@@ -51,10 +51,10 @@ SOFTWARE.
 
 #ifndef OS_H
 #define OS_H
-#include "misc.h"
+#include "Xserver/misc.h"
 #define ALLOCATE_LOCAL_FALLBACK(_size) Xalloc((unsigned long)(_size))
 #define DEALLOCATE_LOCAL_FALLBACK(_ptr) Xfree((pointer)(_ptr))
-#include "Xalloca.h"
+#include "X11/Xalloca.h"
 
 #define NullFID ((FID) 0)
 

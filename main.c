@@ -40,6 +40,7 @@
 #include <time.h>
 
 #include "rfb.h"
+#include "region.h"
 
 #ifdef HAVE_PTHREADS
 pthread_mutex_t logMutex;
@@ -408,6 +409,7 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,
     X11 ScreenPtr, so we do this.  Pretty ugly, but at least it lets us
     avoid hacking up regionstr.h, or changing every call to REGION_*
     (which actually I should probably do eventually). */
+   /*
    rfbScreen->screen.RegionCreate = miRegionCreate;
    rfbScreen->screen.RegionInit = miRegionInit;
    rfbScreen->screen.RegionCopy = miRegionCopy;
@@ -426,6 +428,7 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,
    rfbScreen->screen.RegionExtents = miRegionExtents;
    rfbScreen->screen.RegionAppend = miRegionAppend;
    rfbScreen->screen.RegionValidate = miRegionValidate;
+   */
 
    rfbScreen->kbdAddEvent = defaultKbdAddEvent;
    rfbScreen->kbdReleaseAllKeys = doNothingWithClient;

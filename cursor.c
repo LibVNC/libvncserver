@@ -69,14 +69,6 @@ static unsigned char _reverse_byte[0x100] = {
 };
 
 
-static int EncodeRichCursorData8 (rfbClientPtr cl, char *buf, rfbPixelFormat *fmt,
-				  rfbCursorPtr pCursor);
-static int EncodeRichCursorData16 (rfbClientPtr cl, char *buf, rfbPixelFormat *fmt,
-				   rfbCursorPtr pCursor);
-static int EncodeRichCursorData32 (rfbClientPtr cl, char *buf, rfbPixelFormat *fmt,
-				   rfbCursorPtr pCursor);
-
-
 /*
  * Send cursor shape either in X-style format or in client pixel format.
  */
@@ -209,24 +201,6 @@ rfbSendCursorShape(cl)
                        pCursor->width*bpp1, pCursor->width, pCursor->height);
 
        cl->ublen += pCursor->width*bpp2*pCursor->height;
-       /*
-	switch (cl->format.bitsPerPixel) {
-	case 8:
-	    cl->ublen += EncodeRichCursorData8(cl, &cl->updateBuf[cl->ublen],
-					   &cl->format, pCursor);
-	    break;
-	case 16:
-	    cl->ublen += EncodeRichCursorData16(cl, &cl->updateBuf[cl->ublen],
-					    &cl->format, pCursor);
-	    break;
-	case 32:
-	    cl->ublen += EncodeRichCursorData32(cl, &cl->updateBuf[cl->ublen],
-					    &cl->format, pCursor);
-	    break;
-	default:
-	    return FALSE;
-	}
-	*/
     }
 
     /* Prepare transparency mask. */
@@ -254,123 +228,7 @@ rfbSendCursorShape(cl)
     return TRUE;
 }
 
-
-/*
- * Code to convert cursor source bitmap to the desired pixel format.
- */
-
-#define RGB48_TO_PIXEL(fmt,r,g,b)					\
-    (((CARD32)(r) * ((fmt)->redMax + 1) >> 16) << (fmt)->redShift |	\
-     ((CARD32)(g) * ((fmt)->greenMax + 1) >> 16) << (fmt)->greenShift |	\
-     ((CARD32)(b) * ((fmt)->blueMax + 1) >> 16) << (fmt)->blueShift)
-
-static int
-EncodeRichCursorData8(cl, buf, fmt, pCursor)
-    rfbClientPtr cl;
-    char *buf;
-    rfbPixelFormat *fmt;
-    rfbCursorPtr pCursor;
-{
-    int widthPixels, widthBytes;
-    int x, y, b;
-    CARD8 *src;
-    char pix[2];
-    CARD8 bitmapByte;
-
-    pix[0] = (char)RGB48_TO_PIXEL(fmt, pCursor->backRed, pCursor->backGreen,
-				  pCursor->backBlue);
-    pix[1] = (char)RGB48_TO_PIXEL(fmt, pCursor->foreRed, pCursor->foreGreen,
-				  pCursor->foreBlue);
-
-    src = (CARD8 *)pCursor->richSource;
-    widthPixels = pCursor->width;
-    widthBytes = widthPixels;
-
-    for (y = 0; y < pCursor->height; y++) {
-	for (x = 0; x < widthPixels / 8; x++) {
-	    bitmapByte = src[y * widthBytes + x];
-	    /*if (screenInfo.bitmapBitOrder == LSBFirst) {
-		bitmapByte = _reverse_byte[bitmapByte];
-	    }*/
-	    for (b = 7; b >= 0; b--) {
-		*buf++ = pix[bitmapByte >> b & 1];
-	    }
-	}
-	if (widthPixels % 8) {
-	    bitmapByte = src[y * widthBytes + x];
-	    /*if (screenInfo.bitmapBitOrder == LSBFirst) {
-		bitmapByte = _reverse_byte[bitmapByte];
-	    }*/
-	    for (b = 7; b > 7 - widthPixels % 8; b--) {
-		*buf++ = pix[bitmapByte >> b & 1];
-	    }
-	}
-    }
-
-    return (widthPixels * pCursor->height);
-}
-
-#define DEFINE_RICH_ENCODE(bpp)						 \
-									 \
-static int								 \
-EncodeRichCursorData##bpp(cl, buf, fmt, pCursor)			 \
-    rfbClientPtr cl; \
-    char *buf;								 \
-    rfbPixelFormat *fmt;						 \
-    rfbCursorPtr pCursor;						 \
-{									 \
-    int widthPixels, widthBytes;					 \
-    int x, y, b;							 \
-    CARD8 *src;								 \
-    CARD##bpp pix[2];							 \
-    CARD8 bitmapByte;							 \
-									 \
-    pix[0] = (CARD##bpp)RGB48_TO_PIXEL(fmt, pCursor->backRed,		 \
-				       pCursor->backGreen,		 \
-				       pCursor->backBlue);		 \
-    pix[1] = (CARD##bpp)RGB48_TO_PIXEL(fmt, pCursor->foreRed,		 \
-				       pCursor->foreGreen,		 \
-				       pCursor->foreBlue);		 \
-    if (!cl->screen->rfbServerFormat.bigEndian != !fmt->bigEndian) {		 \
-	pix[0] = Swap##bpp(pix[0]);					 \
-	pix[1] = Swap##bpp(pix[1]);					 \
-    }									 \
-									 \
-    src = (CARD8 *)pCursor->richSource;					 \
-    widthPixels = pCursor->width;					 \
-    widthBytes = (pCursor->width*bpp)/8;				 \
-									 \
-    for (y = 0; y < pCursor->height; y++) {				 \
-	for (x = 0; x < widthPixels / 8; x++) {				 \
-	    bitmapByte = src[y * widthBytes + x];			 \
-	    /*if (screenInfo.bitmapBitOrder == LSBFirst) {		 \
-		bitmapByte = _reverse_byte[bitmapByte];			 \
-	    }*/								 \
-	    for (b = 7; b >= 0; b--) {					 \
-		memcpy (buf, (char *)&pix[bitmapByte >> b & 1],		 \
-			sizeof(CARD##bpp));				 \
-		buf += sizeof(CARD##bpp);				 \
-	    }								 \
-	}								 \
-	if (widthPixels % 8) {						 \
-	    bitmapByte = src[y * widthBytes + x];			 \
-	    /*if (cl->screen.bitmapBitOrder == LSBFirst) {		 \
-		bitmapByte = _reverse_byte[bitmapByte];			 \
-	    }*/								 \
-	    for (b = 7; b > 7 - widthPixels % 8; b--) {			 \
-		memcpy (buf, (char *)&pix[bitmapByte >> b & 1],		 \
-			sizeof(CARD##bpp));				 \
-		buf += sizeof(CARD##bpp);				 \
-	    }								 \
-	}								 \
-    }									 \
-									 \
-    return (widthPixels * pCursor->height * (bpp / 8));			 \
-}
-
-DEFINE_RICH_ENCODE(16)
-DEFINE_RICH_ENCODE(32)
-
+/* if you have a cursor in LSB order you have to convert it */
 void rfbConvertLSBCursorBitmapOrMask(int width,int height,unsigned char* bitmap)
 {
    int i,t=(width+7)/8*height;
@@ -495,7 +353,6 @@ void rfbUndrawCursor(rfbClientPtr cl)
    rfbCursorPtr c=s->cursor;
    int j,x1,x2,y1,y2,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
-   return;
    if(!s->cursorIsDrawn)
      return;
    /* restore what is under the cursor */
@@ -525,7 +382,6 @@ void rfbDrawCursor(rfbClientPtr cl)
    int i,j,x1,x2,y1,y2,i1,j1,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
      bufSize=c->width*c->height*bpp,w=(c->width+7)/8;
-   return;
    if(s->cursorIsDrawn)
      rfbUndrawCursor(cl);
    if(s->underCursorBufferLen<bufSize) {

@@ -1,10 +1,11 @@
-dont draw rich cursors as xcursors
-test drawing of cursors when not using xcursor or rich cursor encoding
+fix bug with odd width
 adapt rdp2vnc (rdesktop)
+dont draw rich cursors as xcursors
 udp
 rfbCloseClient, rfbConnect, ConnectToTcpAddr
 CORBA
 translate.c: warning about non 8-bit colourmaps
+set colourmap
 
 done:
 
@@ -12,4 +13,5 @@ done:
 .cutpaste
 .httpd
 .other encodings
+.test drawing of cursors when not using xcursor or rich cursor encoding
 

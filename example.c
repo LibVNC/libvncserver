@@ -28,9 +28,10 @@
 #endif
 #define XK_MISCELLANY
 #include "rfb.h"
-#include "keysymdef.h"
+#include "keysym.h"
 
 const int maxx=640, maxy=480, bpp=4;
+/* TODO: odd maxx doesn't work */
 
 /* This initializes a nice (?) background */
 
@@ -94,10 +95,10 @@ void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,int x2,i
 void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 {
    ClientData* cd=cl->clientData;
-   //if(cl->screen->cursorIsDrawn)
-     //rfbUndrawCursor(cl);
-   //cl->screen->cursorX=x;
-   //cl->screen->cursorY=y;
+   if(cl->screen->cursorIsDrawn)
+     rfbUndrawCursor(cl);
+   cl->screen->cursorX=x;
+   cl->screen->cursorY=y;
    if(x>=0 && y>=0 && x<maxx && y<maxy) {
       if(buttonMask) {
 	 int i,j,x1,x2,y1,y2;
@@ -252,6 +253,7 @@ int main(int argc,char** argv)
      rfbCursorPtr c = rfbScreen->cursor;
      char x[32*32],mask[32*32/8];
      c=rfbScreen->cursor = rfbMakeXCursor(w,h,x,mask);
+     c->xhot = 2; c->yhot = 10;
      c->mask[0]=0xff; c->mask[1]=0x0;
      memset(c->mask,255,h*w/8);
      c->richSource = malloc(w*h*bpp);

@@ -3,7 +3,8 @@ CFLAGS=-g -Wall
 #CFLAGS=-O2 -Wall
 RANLIB=ranlib
 
-INCLUDES=-I. -Ilibvncauth -Iinclude -Iinclude/X11 -Iinclude/Xserver
+INCLUDES=-I. -Ilibvncauth -Iinclude
+# -Iinclude/X11 -Iinclude/Xserver
 VNCAUTHLIB=-Llibvncauth -lvncauth
 VNCSERVERLIB=-L. -lvncserver -lz -ljpeg
 

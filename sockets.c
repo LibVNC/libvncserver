@@ -61,6 +61,8 @@ struct timeval
 
 #include "rfb.h"
 
+int max(int i,int j) { return(i<j?j:i); }
+
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
 

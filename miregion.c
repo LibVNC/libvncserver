@@ -50,16 +50,23 @@ SOFTWARE.
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "miscstruct.h"
-#include "regionstr.h"
-#include "Xprotostr.h"
-#include "gc.h"
+#include "Xserver/miscstruct.h"
+#include "Xserver/regionstr.h"
+#include "X11/Xprotostr.h"
+#include "Xserver/gc.h"
 
 #if defined (__GNUC__) && !defined (NO_INLINES)
 #define INLINE  __inline
 #else
 #define INLINE
 #endif
+
+#undef xalloc
+#undef xrealloc
+#undef xfree
+#define xalloc malloc
+#define xrealloc realloc
+#define xfree free
 
 /*
  * hack until callers of these functions can deal with out-of-memory

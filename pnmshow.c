@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "rfb.h"
-#define XK_MISCELLANY
-#include "keysymdef.h"
+#include "keysym.h"
 
 void HandleKey(Bool down,KeySym key,rfbClientPtr cl)
 {
@@ -52,12 +51,20 @@ int main(int argc,char** argv)
   /* allocate picture and read it */
   rfbScreen->frameBuffer = (char*)malloc(width*height*4);
   fread(rfbScreen->frameBuffer,width*3,height,in);
+  fclose(in);
 
   /* correct the format to 4 bytes instead of 3 */
   for(i=width*height-1;i>=0;i--) {
-    rfbScreen->frameBuffer[i*4+3]=rfbScreen->frameBuffer[i*3+2];
-    rfbScreen->frameBuffer[i*4+2]=rfbScreen->frameBuffer[i*3+1];
-    rfbScreen->frameBuffer[i*4+1]=rfbScreen->frameBuffer[i*3+0];
+    rfbScreen->frameBuffer[i*4+2]=rfbScreen->frameBuffer[i*3+0];
+    rfbScreen->frameBuffer[i*4+1]=rfbScreen->frameBuffer[i*3+1];
+    rfbScreen->frameBuffer[i*4+0]=rfbScreen->frameBuffer[i*3+2];
+  }
+
+  for(i=0;i<200;i++) {
+    rfbScreen->frameBuffer[i*4+i*width*4]=0;
+    rfbScreen->frameBuffer[i*4+i*width*4+1]=0;
+    rfbScreen->frameBuffer[i*4+i*width*4+2]=0;
+    rfbScreen->frameBuffer[i*4+i*width*4+3]=0;
   }
 
   /* run event loop */

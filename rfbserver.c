@@ -35,6 +35,7 @@
 #include <pthread.h>
 #endif
 #include "rfb.h"
+#include "region.h"
 
 rfbClientPtr pointerClient = NULL;  /* Mutex for pointer events */
 
@@ -845,8 +846,8 @@ rfbSendFramebufferUpdate(cl, updateRegion)
 	sendCursorShape = TRUE;
    } else {
       if (!cl->screen->cursorIsDrawn)
-	//rfbDrawCursor(cl);
-	fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!\n");
+	rfbDrawCursor(cl);
+        //fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!\n");
    }
    
     /*
@@ -865,9 +866,9 @@ rfbSendFramebufferUpdate(cl, updateRegion)
      * no update is needed.
      */
 
-    //REGION_INIT(pScreen,&updateRegion,NullBox,0);
-    //REGION_UNION(pScreen, &updateRegion, &cl->copyRegion,
-	//	 &cl->modifiedRegion);
+    REGION_INIT(pScreen,&updateRegion,NullBox,0);
+    REGION_UNION(pScreen, &updateRegion, &cl->copyRegion,
+		 &cl->modifiedRegion);
     REGION_INTERSECT(pScreen, &updateRegion, &cl->requestedRegion,
 		     &updateRegion);
 

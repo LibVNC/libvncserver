@@ -25,12 +25,69 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "scrnintstr.h"
+//#include "scrnintstr.h"
 
 /* trying to replace the above with some more minimal set of includes */
-#include "misc.h"
-#include "Xmd.h"
-#include "regionstr.h"
+//#include "misc.h"
+//#include "Xmd.h"
+/* TODO: this stuff has to go into autoconf */
+typedef unsigned char CARD8;
+typedef unsigned short CARD16;
+typedef unsigned int CARD32;
+typedef CARD32 Pixel;
+typedef CARD32 KeySym;
+typedef signed char Bool;
+#define FALSE 0
+#define TRUE -1
+#include "keysym.h"
+
+/* region stuff */
+#define NullRegion ((RegionPtr)0)
+#define NullBox ((BoxPtr)0)
+
+typedef struct _Box {
+    short x1, y1, x2, y2;
+} BoxRec, *BoxPtr;
+
+typedef struct _RegData {
+    long	size;
+    long 	numRects;
+/*  BoxRec	rects[size];   in memory but not explicitly declared */
+} RegDataRec, *RegDataPtr;
+
+typedef struct _Region {
+    BoxRec 	extents;
+    RegDataPtr	data;
+} RegionRec, *RegionPtr;
+
+#define REGION_NIL(reg) ((reg)->data && !(reg)->data->numRects)
+#define REGION_NUM_RECTS(reg) ((reg)->data ? (reg)->data->numRects : 1)
+#define REGION_SIZE(reg) ((reg)->data ? (reg)->data->size : 0)
+#define REGION_RECTS(reg) ((reg)->data ? (BoxPtr)((reg)->data + 1) \
+			               : &(reg)->extents)
+#define REGION_BOXPTR(reg) ((BoxPtr)((reg)->data + 1))
+#define REGION_BOX(reg,i) (&REGION_BOXPTR(reg)[i])
+#define REGION_TOP(reg) REGION_BOX(reg, (reg)->data->numRects)
+#define REGION_END(reg) REGION_BOX(reg, (reg)->data->numRects - 1)
+#define REGION_SZOF(n) (sizeof(RegDataRec) + ((n) * sizeof(BoxRec)))
+
+#define REGION_INIT(s,pReg,rect,size) miRegionInit(pReg,rect,size)
+#define REGION_EMPTY(s,pReg) miRegionEmpty(pReg)
+#define REGION_UNINIT(s,pReg) miRegionUninit(pReg)
+#define REGION_NOTEMPTY(s,pReg) miRegionNotEmpty(pReg)
+#define REGION_INTERSECT(s,newReg,reg1,reg2) miIntersect(newReg,reg1,reg2)
+#define REGION_SUBTRACT(s,newReg,reg1,reg2) miSubtract(newReg,reg1,reg2)
+#define REGION_UNION(s,newReg,reg1,reg2) miUnion(newReg,reg1,reg2)
+#define REGION_TRANSLATE(s,pReg,x,y) miTranslateRegion(pReg,x,y)
+
+//#include "regionstr.h"
+
+#define xalloc malloc
+#define xrealloc realloc
+#define xfree free
+
+int max(int,int);
+
 #include <zlib.h>
 
 #include <rfbproto.h>
@@ -60,6 +117,7 @@
 #else
 #define IF_PTHREADS(x)
 #endif
+
 
 struct rfbClientRec;
 struct rfbScreenInfo;
@@ -136,6 +194,7 @@ typedef struct
    
     /* wrapped screen functions */
 
+  /*
     CloseScreenProcPtr			CloseScreen;
     CreateGCProcPtr			CreateGC;
     PaintWindowBackgroundProcPtr	PaintWindowBackground;
@@ -143,10 +202,13 @@ typedef struct
     CopyWindowProcPtr			CopyWindow;
     ClearToBackgroundProcPtr		ClearToBackground;
     RestoreAreasProcPtr			RestoreAreas;
+  */
 
     /* additions by libvncserver */
-   
+
+  /*
     ScreenRec screen;
+  */
     rfbPixelFormat rfbServerFormat;
     char* desktopName;
     char rfbThisHost[255];
@@ -287,8 +349,10 @@ typedef struct rfbClientRec {
        milliseconds so that several changes to the framebuffer can be combined
        into a single update. */
 
-    Bool deferredUpdateScheduled;
-    OsTimerPtr deferredUpdateTimer;
+  /* no deferred timer here; server has to do it alone */
+
+  /* Bool deferredUpdateScheduled;
+     OsTimerPtr deferredUpdateTimer; */
 
     /* translateFn points to the translation function which is used to copy
        and translate a rectangle from the framebuffer to an output buffer. */

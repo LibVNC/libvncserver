@@ -13,12 +13,12 @@
 #ifdef WIN32
 #include <X11/Xwinsock.h>
 #endif
-#include "Xos.h"
+#include "X11/Xos.h"
 #include <stdio.h>
-#include "misc.h"
-#include "X.h"
-#include "input.h"
-#include "opaque.h"
+#include "Xserver/misc.h"
+#include "X11/X.h"
+#include "Xserver/input.h"
+#include "Xserver/opaque.h"
 #ifdef X_POSIX_C_SOURCE
 #define _POSIX_C_SOURCE X_POSIX_C_SOURCE
 #include <signal.h>
