@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.1"
+VERSION="0.6.1"
 
 cd "$(dirname "$0")"
 
@@ -24,8 +24,8 @@ sed -e "s/^SUBDIRS.*$/SUBDIRS=libvncserver x11vnc/" \
 > Makefile.am
 
 cat libvncserver.spec.in | \
-sed -e "s/Johannes.Schindelin/Karl Runge/g" \
-    -e "s/Johannes.Schindelin@gmx.de/karl@runge.com/gi" \
+sed -e "s/Johannes.Schindelin@gmx.de/runge@karlrunge.com/gi" \
+    -e "s/Johannes.Schindelin/Karl Runge/g" \
     -e "s/a library to make writing a vnc server easy/a VNC server for the current X11 session/" \
     -e "/%description/,/%prep/d" \
     -e '/%setup/s/^\(.*\)$/%description\
@@ -37,7 +37,7 @@ Based on the ideas of x0rfbserver and on LibVNCServer, it has evolved\
 into a versatile and performant while still easy to use program.\
 \
 x11vnc was put together and is (actively ;-) maintained by\
-Karl Runge <karl@runge.com>\
+Karl Runge <runge@karlrunge.com>\
 \
 %prep\
 \1/' \
@@ -55,7 +55,7 @@ cat acinclude.m4.LibVNCServer | \
 sed -e "s/^\(_PKG.*\)\$PACKAGE\(.*\)$/\1LibVNCServer\2/" \
 > acinclude.m4
 
-make x11vnc-0.1.tar.gz
+make x11vnc-${VERSION}.tar.gz
 for f in configure.ac Makefile.am libvncserver/Makefile.am acinclude.m4; do
 	mv -f $f.LibVNCServer $f
 done

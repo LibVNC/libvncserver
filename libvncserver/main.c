@@ -473,9 +473,11 @@ rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
   int i=0;
 
   for(passwds=(char**)cl->screen->rfbAuthPasswdData;*passwds;passwds++,i++) {
-    vncEncryptBytes(cl->authChallenge, *passwds);
+    uint8_t auth_tmp[CHALLENGESIZE];
+    memcpy((char *)auth_tmp, (char *)cl->authChallenge, CHALLENGESIZE);
+    vncEncryptBytes(auth_tmp, *passwds);
 
-    if (memcmp(cl->authChallenge, response, len) == 0) {
+    if (memcmp(auth_tmp, response, len) == 0) {
       if(i>=cl->screen->rfbAuthPasswdFirstViewOnly)
 	cl->viewOnly=TRUE;
       return(TRUE);

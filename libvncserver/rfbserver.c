@@ -1017,22 +1017,22 @@ rfbProcessClientNormalMessage(cl)
 	    return;
 	}
 
-	if(!cl->viewOnly) {
-	    msg.cct.length = Swap32IfLE(msg.cct.length);
+	msg.cct.length = Swap32IfLE(msg.cct.length);
 
-	    str = (char *)malloc(msg.cct.length);
+	str = (char *)malloc(msg.cct.length);
 
-	    if ((n = ReadExact(cl, str, msg.cct.length)) <= 0) {
-		if (n != 0)
-		    rfbLogPerror("rfbProcessClientNormalMessage: read");
-		free(str);
-		rfbCloseClient(cl);
-		return;
-	    }
-
-	    cl->screen->setXCutText(str, msg.cct.length, cl);
+	if ((n = ReadExact(cl, str, msg.cct.length)) <= 0) {
+	    if (n != 0)
+	        rfbLogPerror("rfbProcessClientNormalMessage: read");
 	    free(str);
+	    rfbCloseClient(cl);
+	    return;
 	}
+
+	if(!cl->viewOnly) {
+	    cl->screen->setXCutText(str, msg.cct.length, cl);
+	}
+	free(str);
 
         return;
 

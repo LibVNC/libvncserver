@@ -119,10 +119,12 @@
 #endif
 
 /* 
- * Temporary kludge: to run with -xinerama define the following macro
- * and be sure to link with * -lXinerama (e.g. LDFLAGS=-lXinerama before
- * configure).  Support for this is being added to libvncserver 'configure.ac'
- * so it will all be done automatically.
+ * Temporary kludge: to run with -xinerama define the following
+ * macro (uncomment) and be sure to link with -lXinerama
+ * (e.g. LDFLAGS=-lXinerama before configure).  Support for this is
+ * being added to libvncserver 'configure.ac' so it will all be done
+ * automatically, but it won't be in users' build trees for a while,
+ * so one can do it manually here.
 
 #define LIBVNCSERVER_HAVE_LIBXINERAMA
  */
@@ -131,8 +133,14 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-05-21";
+char lastmod[] = "lastmod:    2004-05-27";
 
+
+/*
+ * Well, here starts all our global data, someday we need to split this
+ * file up.  One advantage to this big blob is that it is easy for users
+ * to download and replace a single file to try out the latest version...
+ */
 
 /* X and rfb framebuffer */
 Display *dpy = 0;
@@ -209,6 +217,7 @@ char *allow_list = NULL;	/* for -allow and -localhost */
 char *accept_cmd = NULL;	/* for -accept */
 char *gone_cmd = NULL;		/* for -gone */
 int view_only = 0;		/* clients can only watch. */
+char *viewonly_passwd = NULL;	/* view only passwd. */
 int inetd = 0;			/* spawned from inetd(1) */
 int connect_once = 1;		/* disconnect after first connection session. */
 int flash_cmap = 0;		/* follow installed colormaps */
@@ -462,8 +471,8 @@ void client_gone(rfbClientPtr client) {
 		 * with our RFB_CLIENT_REFUSE behavior in new_client()  (i.e.
 		 * we disconnect after 1 successful connection).
 		 */
-		if (client->state == RFB_PROTOCOL_VERSION ||
-		    client->state == RFB_AUTHENTICATION && accepted_client) {
+		if ((client->state == RFB_PROTOCOL_VERSION ||
+		     client->state == RFB_AUTHENTICATION) && accepted_client) {
 			rfbLog("connect_once: bad password or early "
 			   "disconnect.\n");
 			rfbLog("connect_once: waiting for next connection.\n"); 
@@ -3598,6 +3607,16 @@ if (strcmp(LIBVNCSERVER_VERSION, "0.5") && strcmp(LIBVNCSERVER_VERSION, "0.6")) 
 	bytes_per_line = screen->paddedWidthInBytes;
 	bpp = screen->rfbServerFormat.bitsPerPixel;
 	depth = screen->rfbServerFormat.depth;
+
+	if (viewonly_passwd) {
+		/* append the view only passwd after the normal passwd */
+		char **passwds_new = malloc(3*sizeof(char**));
+		char **passwds_old = (char **) screen->rfbAuthPasswdData;
+		passwds_new[0] = passwds_old[0];
+		passwds_new[1] = viewonly_passwd;
+		passwds_new[2] = NULL;
+		screen->rfbAuthPasswdData = (void*) passwds_new;
+	}
 }
 
 /*
@@ -5795,8 +5814,12 @@ void print_help() {
 "                       simple subnet, for more control build libvncserver with\n"
 "                       libwrap support.\n"
 "-localhost             Same as -allow 127.0.0.1\n"
-"-passwdfile filename   Specify libvncserver -passwd via the first line of file\n"
-"                       \"filename\" instead of via command line.  Note: this\n"
+"-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd\n"
+"                       (non-view-only) password must also be supplied.\n"
+"-passwdfile filename   Specify libvncserver -passwd via the first line of the\n"
+"                       file \"filename\" instead of via command line.  If a\n"
+"                       second non blank line exists in the file it is taken\n"
+"                       as a view-only password (i.e. -viewpasswd) Note: this\n"
 "                       is a simple plaintext passwd, see also -rfbauth below.\n"
 "-accept string         Run a command (possibly to prompt the user at the\n"
 "                       X11 display) to decide whether an incoming client\n"
@@ -6069,6 +6092,7 @@ int main(int argc, char** argv) {
 	char *logfile = NULL;
 	char *passwdfile = NULL;
 	int pw_loc = -1;
+	int vpw_loc = -1;
 	int dt = 0;
 	int bg = 0;
 	int got_rfbwait = 0;
@@ -6104,6 +6128,9 @@ int main(int argc, char** argv) {
 			force_indexed_color = 1;
 		} else if (!strcmp(arg, "-viewonly")) {
 			view_only = 1;
+		} else if (!strcmp(arg, "-viewpasswd")) {
+			vpw_loc = i;
+			viewonly_passwd = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-passwdfile")) {
 			passwdfile = argv[++i];
 		} else if (!strcmp(arg, "-shared")) {
@@ -6305,6 +6332,7 @@ int main(int argc, char** argv) {
 			}
 		}
 	} else if (passwdfile) {
+		/* read passwd from file */
 		char line[512];
 		FILE *in;
 		in = fopen(passwdfile, "r");
@@ -6315,15 +6343,62 @@ int main(int argc, char** argv) {
 			exit(1);
 		}
 		if (fgets(line, 512, in) != NULL) {
-			line[strlen(line)-1] = '\0';
+			int len = strlen(line); 
+			if (len > 0 && line[len-1] == '\n') {
+				line[len-1] = '\0';
+			}
 			argv2[argc2++] = "-passwd";
 			argv2[argc2++] = strdup(line);
+			pw_loc = 100;	/* just for pw_loc check below */
+			if (fgets(line, 512, in) != NULL) {
+				/* try to read viewonly passwd from file */
+				int ok = 0;
+				len = strlen(line); 
+				if (len > 0 && line[len-1] == '\n') {
+					line[len-1] = '\0';
+				}
+				if (strlen(line) > 0) {
+					char *p = line;
+					/* check for non-blank line */
+					while (*p != '\0') {
+						if (! isspace(*p)) {
+							ok = 1;
+						}
+						p++;
+					}
+				}
+				if (ok) {
+					viewonly_passwd = strdup(line);
+				} else {
+					fprintf(stderr, "*** not setting"
+					    " viewonly password to the 2nd"
+					    " line of %s. (blank or other"
+					    " problem)\n", passwdfile);
+				}
+			}
 		} else {
-			fprintf(stderr, "cannot read passwdfile: %s\n",
-			    passwdfile);
-			perror("fgets");
+			fprintf(stderr, "cannot read a line from "
+			    "passwdfile: %s\n", passwdfile);
 			exit(1);
 		}
+		fclose(in);
+	}
+	if (vpw_loc > 0) {
+		char *p = argv[vpw_loc];		
+		while (*p != '\0') {
+			*p++ = '\0';
+		}
+		if (vpw_loc+1 < argc) {
+			p = argv[vpw_loc+1];		
+			while (*p != '\0') {
+				*p++ = '\0';
+			}
+		}
+	} 
+	if (viewonly_passwd && pw_loc < 0) {
+		fprintf(stderr, "-passwd must be supplied when using "
+		    "-viewpasswd\n");
+		exit(1);
 	}
 
 	/* fixup settings that do not make sense */
