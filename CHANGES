@@ -1,3 +1,6 @@
+   fixed long standing cargs bug
+   Even better x11vnc from Karl J. Runge! (supports different kbd layouts of
+	client/server)
    Better x11vnc from Karl J. Runge!
    fixed severe bug (Const Kaplinsky)
    got patch from Const Kaplisnky with CursorPosUpdate encoding and some Docs

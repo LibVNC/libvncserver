@@ -53,7 +53,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 
     if(!argc) return;
     
-    for (i = i1 = 1; i < *argc; i++) {
+    for (i = i1 = 1; i < *argc;) {
         if (strcmp(argv[i], "-help") == 0) {
 	    rfbUsage();
 	    exit(1);
@@ -73,7 +73,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	    passwds[1] = 0;
 	    rfbScreen->rfbAuthPasswdData = (void*)passwds;
 	    rfbScreen->passwordCheck = rfbCheckPasswordByList;
-        } else if (strcmp(argv[i], "-deferupdate") == 0) {  /* -desktop desktop-name */
+        } else if (strcmp(argv[i], "-deferupdate") == 0) {  /* -deferupdate milliseconds */
             if (i + 1 >= *argc) rfbUsage();
             rfbScreen->rfbDeferUpdateTime = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-desktop") == 0) {  /* -desktop desktop-name */
@@ -85,19 +85,14 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
             rfbScreen->rfbNeverShared = TRUE;
         } else if (strcmp(argv[i], "-dontdisconnect") == 0) {
             rfbScreen->rfbDontDisconnect = TRUE;
-        } else if (strcmp(argv[i], "-width") == 0) {
-               rfbScreen->width = atoi(argv[++i]);
-        } else if (strcmp(argv[i], "-height") == 0) {
-               rfbScreen->height = atoi(argv[++i]);
         } else {
 	    /* we just remove the processed arguments from the list */
 	    if(i != i1)
-	        rfbPurgeArguments(argc,&i,i1-i,argv);
-	    i1++;
-	    i++;
+	        rfbPurgeArguments(argc,&i1,i-i1,argv);
         }
+	i1++;
+	i=i1;
     }
-    *argc -= i-i1;
 }
 
 void rfbSizeUsage()
@@ -113,7 +108,7 @@ rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[])
     int i,i1;
 
     if(!argc) return;
-    for (i = i1 = 1; i < *argc-1; i++) {
+    for (i = i1 = 1; i < *argc-1;) {
         if (strcmp(argv[i], "-bpp") == 0) {
                *bpp = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-width") == 0) {
@@ -122,14 +117,12 @@ rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[])
                *height = atoi(argv[++i]);
         } else {
 	    /* we just remove the processed arguments from the list */
-	    if(i != i1) {
-	        memmove(argv+i1,argv+i,sizeof(char*)*(*argc-i));
-		*argc -= i-i1;
-	    }
-	    i1++;
-	    i = i1-1;
+	    if(i != i1)
+	    if(i != i1)
+	        rfbPurgeArguments(argc,&i1,i-i1,argv);
         }
+	i1++;
+	i=i1;
     }
-    *argc -= i-i1;
 }
 
