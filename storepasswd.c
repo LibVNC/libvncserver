@@ -20,7 +20,7 @@
  */
 
 #include <stdio.h>
-#include "vncauth.h"
+#include "rfb.h"
 
 void usage(void)
 {

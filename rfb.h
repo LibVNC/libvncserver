@@ -49,7 +49,6 @@ int max(int,int);
 #include <zlib.h>
 
 #include <rfbproto.h>
-#include <vncauth.h>
 #include <netinet/in.h>
 #ifdef HAVE_PTHREADS
 #include <pthread.h>
@@ -223,6 +222,18 @@ typedef void (*rfbTranslateFnType)(char *table, rfbPixelFormat *in,
                                    int bytesBetweenInputLines,
                                    int width, int height);
 
+
+/* 
+ * vncauth.h - describes the functions provided by the vncauth library.
+ */
+
+#define MAXPWLEN 8
+#define CHALLENGESIZE 16
+
+extern int vncEncryptAndStorePasswd(char *passwd, char *fname);
+extern char *vncDecryptPasswdFromFile(char *fname);
+extern void vncRandomBytes(unsigned char *bytes);
+extern void vncEncryptBytes(unsigned char *bytes, char *passwd);
 
 /* region stuff */
 
