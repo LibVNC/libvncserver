@@ -34,10 +34,7 @@
 #include "avformat.h"
 #include <rfb/rfbclient.h>
 
-/* 5 seconds stream duration */
-//#define STREAM_DURATION   5.0
 #define STREAM_FRAME_RATE 25 /* 25 images/s */
-//#define STREAM_NB_FRAMES  ((int)(STREAM_DURATION * STREAM_FRAME_RATE))
 
 /**************************************************************/
 /* video output */
@@ -81,7 +78,7 @@ AVStream *add_video_stream(AVFormatContext *oc, int codec_id, int w, int h)
            motion of the chroma plane doesnt match the luma plane */
         c->mb_decision=2;
     }
-    // some formats want stream headers to be seperate
+    /* some formats want stream headers to be seperate */
     if(!strcmp(oc->oformat->name, "mp4") || !strcmp(oc->oformat->name, "mov") || !strcmp(oc->oformat->name, "3gp"))
         c->flags |= CODEC_FLAG_GLOBAL_HEADER;
     
@@ -167,15 +164,11 @@ void write_video_frame(AVFormatContext *oc, AVStream *st)
         if (c->pix_fmt != PIX_FMT_RGB565) {
             /* as we only generate a RGB565 picture, we must convert it
                to the codec pixel format if needed */
-		// TODO
-            //fill_yuv_image(tmp_picture, frame_count, c->width, c->height);
             img_convert((AVPicture *)picture, c->pix_fmt, 
                         (AVPicture *)tmp_picture, PIX_FMT_RGB565,
                         c->width, c->height);
-        } else {
-            // TODO: fill_yuv_image(picture, frame_count, c->width, c->height);
         }
-        picture_ptr = picture;
+	picture_ptr = picture;
 
     
     if (oc->oformat->flags & AVFMT_RAWPICTURE) {
@@ -327,7 +320,7 @@ int main(int argc, char **argv)
 {
     time_t stop=0;
     rfbClient* client;
-    int i;
+    int i,j;
 
     /* get a vnc client structure (don't connect yet). */
     client = rfbGetClient(5,3,2);
@@ -343,28 +336,24 @@ int main(int argc, char **argv)
 	!strncmp(argv[argc-1],"localhost",9))
 	    client->appData.encodingsString="raw";
 
-    i=1;
     filename=0;
-    while(i<argc) {
+    for(i=1;i<argc;i++) {
+	    j=i;
 	    if(argc>i+1 && !strcmp("-o",argv[i])) {
 		    filename=argv[2];
-		    i+=2;
+		    j+=2;
 	    } else if(argc>i+1 && !strcmp("-t",argv[i])) {
 		    stop=time(0)+atoi(argv[i+1]);
-		    i+=2;
-	    } else if(argc>i+1 && !strcmp("-encodings",argv[i])) {
-		    client->appData.encodingsString=argv[i+1];
-		    i+=2;
-	    } else
-		    break;
+		    j+=2;
+	    }
+	    if(j>i) {
+		    argc-=j-i;
+		    memmove(argv+i,argv+j,(argc-i)*sizeof(char*));
+		    i--;
+	    }
     }
 
-    if (argc != i+1) {
-        printf("usage: %s [-o output_file] [-t seconds] server:port\n"
-	       "Shoot a movie from a VNC server.\n", argv[0]);
-        exit(1);
-    }
-   
+  
     /* auto detect the output format from the name. default is
        mpeg. */
     fmt = filename?guess_format(NULL, filename, NULL):0;
@@ -390,26 +379,28 @@ int main(int argc, char **argv)
        and initialize the codecs */
     video_st = NULL;
 
-    /* purge the arguments not concerning VNC */
-    argv[1]=argv[i];
-    argc=2;
+    /* open VNC connection */
     client->MallocFrameBuffer=resize;
     client->GotFrameBufferUpdate=update;
     if(!rfbInitClient(client,&argc,argv)) {
-	    fprintf(stderr,"Could not connect to server!\n");
-	    return 1;
+        printf("usage: %s [-o output_file] [-t seconds] server:port\n"
+	       "Shoot a movie from a VNC server.\n", argv[0]);
+        exit(1);
     }
+    if(client->serverPort==-1)
+      client->vncRec->doNotSleep = TRUE; /* vncrec playback */
     
-    /* main loop */
+     /* main loop */
 
     while(!quit) {
-	int i=WaitForMessage(client,2000);
+	int i=WaitForMessage(client,1000000/STREAM_FRAME_RATE);
 	if(i<0) {
 		movie_close();
 		return 0;
 	}
 	if(i)
-		HandleRFBServerMessage(client);
+		if(!HandleRFBServerMessage(client))
+			quit=TRUE;
 	else {
 	        /* compute current audio and video time */
                	video_pts = (double)video_st->pts.val * video_st->time_base.num / video_st->time_base.den;
@@ -418,7 +409,7 @@ int main(int argc, char **argv)
 	        write_video_frame(oc, video_st);
 	}
 	if(stop!=0 && stop<time(0))
-		break;
+		quit=TRUE;
     }
 
     movie_close();
