@@ -464,6 +464,14 @@ WriteExact(cl, buf, len)
     struct timeval tv;
     int totalTimeWaited = 0;
 
+#undef DEBUG_WRITE_EXACT
+#ifdef DEBUG_WRITE_EXACT
+    rfbLog("WriteExact %d bytes\n",len);
+    for(n=0;n<len;n++)
+	    fprintf(stderr,"%02x ",(unsigned char)buf[n]);
+    fprintf(stderr,"\n");
+#endif
+
     LOCK(cl->outputMutex);
     while (len > 0) {
         n = write(sock, buf, len);
