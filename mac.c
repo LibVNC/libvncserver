@@ -281,11 +281,16 @@ Bool viewOnly = FALSE, sharedMode = FALSE;
 void 
 ScreenInit(int argc, char**argv)
 {
+  int bitsPerSample=CGDisplayBitsPerSample(kCGDirectMainDisplay);
   rfbScreen = rfbGetScreen(&argc,argv,
 			   CGDisplayPixelsWide(kCGDirectMainDisplay),
 			   CGDisplayPixelsHigh(kCGDirectMainDisplay),
-			   CGDisplayBitsPerSample(kCGDirectMainDisplay),
+			   bitsPerSample,
 			   CGDisplaySamplesPerPixel(kCGDirectMainDisplay),4);
+  rfbScreen->rfbServerFormat->redShift = bitsPerSample*2;
+  rfbScreen->rfbServerFormat->greenShift = bitsPerSample*1;
+  rfbScreen->rfbServerFormat->blueShift = 0;
+
   gethostname(rfbScreen->rfbThisHost, 255);
   rfbScreen->paddedWidthInBytes = CGDisplayBytesPerRow(kCGDirectMainDisplay);
   rfbScreen->frameBuffer =
