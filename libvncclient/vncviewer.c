@@ -187,10 +187,11 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
     } else {
       char* colon=strchr(argv[i],':');
 
-      client->serverHost=argv[i];
       if(colon) {
-	*colon=0;
+        client->serverHost=strndup(argv[i],colon-argv[i]);
 	client->serverPort=atoi(colon+1);
+      } else {
+	client->serverHost=strdup(argv[i]);
       }
       if(client->serverPort>=0 && client->serverPort<5900)
 	client->serverPort+=5900;
@@ -212,5 +213,6 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 }
 
 void rfbClientCleanup(rfbClient* client) {
+  free(client->serverHost);
   free(client);
 }
