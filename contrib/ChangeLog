@@ -1,3 +1,11 @@
+2004-01-09  Karl Runge <runge@karlrunge.com>
+	* options -allow / -localhost for simple IP based access screening
+	* option -nodragging to skip all screen updates during mouse drags
+	  (thanks to Michal Sabala)
+	* option -input_skip to allow users to tune watch_loop dropthru rate
+	* try to avoid wasting RAM for framebuffer under -nofb
+	* cleanup wrt bpp vs. depth
+
 2003-12-08  Karl Runge <runge@karlrunge.com>
 	* add Xbell support using XKEYBOARD extension (disable: -nobell)
 	* add "-nofb" to disable framebuffer, i.e. mouse + keyboard only (!)

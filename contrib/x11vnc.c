@@ -78,8 +78,8 @@
  * their colors messed up.  When using 8bpp indexed color, the colormap
  * is attempted to be followed, but may become out of date.  Use the
  * -flashcmap option to have colormap flashing as the pointer moves
- * windows with private colormaps (slow).  Displays with mixed 8bpp and
- * 24bpp visuals will incorrect display the non-default one.
+ * windows with private colormaps (slow).  Displays with mixed depth 8 and
+ * 24 visuals will incorrect display the non-default one.
  *
  * Feature -id <windowid> can be picky: it can crash for things like the
  * window not sufficiently mapped into server memory, use of -mouse, etc.
@@ -117,7 +117,7 @@ Display *dpy = 0;
 Visual *visual;
 Window window, rootwin;
 int scr;
-int bpp;
+int bpp, depth;
 int button_mask = 0;
 int dpy_x, dpy_y;
 int off_x, off_y;
@@ -168,6 +168,7 @@ hint_t *hint_list;
 /* various command line options */
 
 int shared = 0;			/* share vnc display. */
+char *allow_list = NULL;	/* for -allow and -localhost */
 int view_only = 0;		/* clients can only watch. */
 int inetd = 0;			/* spawned from inetd(1) */
 int connect_once = 1;		/* disconnect after first connection session. */
@@ -180,7 +181,10 @@ int nofb = 0;			/* do not send any fb updates */
 int local_cursor = 1;		/* whether the viewer draws a local cursor */
 int show_mouse = 0;		/* display a cursor for the real mouse */
 int show_root_cursor = 0;	/* show X when on root background */
-int watch_bell = 1;
+int show_dragging = 1;		/* process mouse movement events */
+int delay_refresh = 0;		/* when buttons are pressed, delay refreshes */
+int ui_dropthru = 10;		/* see watchloop.  negative means ignore input */
+int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
 
 int using_shm = 1;		/* whether mit-shm is used */
 int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
@@ -335,14 +339,51 @@ void client_gone(rfbClientPtr client) {
 	}
 }
 
+int check_access(char *addr) {
+	int allowed = 0;
+	char *p, *list;
+
+	if (allow_list == NULL || *allow_list == '\0') {
+		return 1;
+	}
+	if (addr == NULL || *addr == '\0') {
+		rfbLog("check_access: denying empty host IP address string.\n");
+		return 0;
+	}
+
+	list = strdup(allow_list);
+	p = strtok(list, ",");
+	while (p) {
+		char *q = strstr(addr, p);
+		if (q == addr) {
+			rfbLog("check_access: client %s matches pattern %s\n",
+			    addr, p);
+			allowed = 1;
+
+		} else if(!strcmp(p,"localhost") && !strcmp(addr,"127.0.0.1")) {
+			/* also do host lookup someday... */
+			allowed = 1;
+		}
+		p = strtok(NULL, ",");
+	}
+	free(list);
+	return allowed;
+}
+
 enum rfbNewClientAction new_client(rfbClientPtr client) {
 	static accepted_client = 0;
 	last_event = last_input = time(0);
+
+	if (! check_access(client->host)) {
+		rfbLog("denying client: %s does not match %s\n", client->host,
+		    allow_list ? allow_list : "(null)" );
+		return(RFB_CLIENT_REFUSE);
+	}
 	if (connect_once) {
 		if (screen->rfbDontDisconnect && screen->rfbNeverShared) {
 			if (! shared && accepted_client) {
-				fprintf(stderr, "denying additional client:"
-				     " %s\n", client->host);
+				rfbLog("denying additional client: %s\n",
+				     client->host);
 				return(RFB_CLIENT_REFUSE);
 			}
 		}
@@ -546,6 +587,17 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 		return;
 	}
 
+	got_user_input++;
+
+	/* if any button is pressed, then do not refresh the screen */
+	if (! show_dragging) {
+		if (mask) {
+			delay_refresh = 1;
+		} else {
+			delay_refresh = 0;
+		}
+	}
+
 	X_LOCK;
 
 	XTestFakeMotionEvent(dpy, scr, x + off_x, y + off_y, CurrentTime);
@@ -554,7 +606,6 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 	cursor_y = y;
 
 	last_event = last_input = time(0);
-	got_user_input++;
 
 	for (i=0; i < 5; i++) {
 		if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
@@ -580,7 +631,7 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 
 int xkb_base_event_type;
 
-void initialize_bell_watch() {
+void initialize_watch_bell() {
 	int ir, reason;
 	if (! XkbSelectEvents(dpy, XkbUseCoreKbd, XkbBellNotifyMask,
 	    XkbBellNotifyMask) ) {
@@ -1114,6 +1165,23 @@ void set_colormap(void) {
 }
 
 /*
+ * Presumably under -nofb the clients will never request the framebuffer.
+ * But we have gotten such a request... so let's just give them the current
+ * view on the display.  n.b. x2vnc requests a 1x1 pixel for some workaround. 
+ */
+void nofb_hook(rfbClientPtr cl) {
+	static int loaded_fb = 0;
+	XImage *fb;
+	if (loaded_fb) {
+		return;
+	}
+	rfbLog("framebuffer requested in -nofb mode by client %s\n", cl->host);
+	fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
+	screen->frameBuffer = fb->data;
+	loaded_fb = 1;
+}
+
+/*
  * initialize the rfb framebuffer/screen
  */
 void initialize_screen(int *argc, char **argv, XImage *fb) {
@@ -1174,14 +1242,19 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		    = fb->blue_mask >> screen->rfbServerFormat.blueShift;
 	}
 
-	screen->frameBuffer = fb->data; 
+	if (nofb) {
+		screen->frameBuffer = NULL;
+		screen->displayHook = nofb_hook;
+	} else {
+		screen->frameBuffer = fb->data; 
+	}
 
 	if (inetd) {
 		int fd = dup(0);
 		if (fd < 3) {
 			rfbErr("dup(0) = %d failed.\n", fd);
 			perror("dup");
-			exit(1);
+			clean_up_exit(1);
 		}
 		fclose(stdin);
 		fclose(stdout);
@@ -1222,6 +1295,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	bytes_per_line = screen->paddedWidthInBytes;
 	bpp = screen->rfbServerFormat.bitsPerPixel;
+	depth = screen->rfbServerFormat.depth;
 }
 
 /*
@@ -1275,11 +1349,15 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	XImage *xim;
 
+	if (nofb) {
+		return;
+	}
+
 	X_LOCK;
 
 	if (! using_shm) {
 		/* we only need the XImage created */
-		xim = XCreateImage(dpy, visual, bpp, ZPixmap, 0, NULL, w, h,
+		xim = XCreateImage(dpy, visual, depth, ZPixmap, 0, NULL, w, h,
 		    BitmapPad(dpy), 0);
 
 		X_UNLOCK;
@@ -1316,7 +1394,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 		return;
 	}
 
-	xim = XShmCreateImage(dpy, visual, bpp, ZPixmap, NULL, shm, w, h);
+	xim = XShmCreateImage(dpy, visual, depth, ZPixmap, NULL, shm, w, h);
 
 	if (xim == NULL) {
 		rfbErr("XShmCreateImage(%s) failed.\n", name);
@@ -1362,7 +1440,7 @@ void shm_delete(XShmSegmentInfo *shm) {
 }
 
 void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
-	if (! using_shm) {
+	if (! using_shm || nofb) {
 		return;
 	}
 	X_LOCK;
@@ -1553,6 +1631,7 @@ void tile_updates() {
 		}
 	}
 }
+
 
 /*
  * copy_tile() is called on a tile with a known change (from a scanline
@@ -2295,8 +2374,9 @@ void watch_loop(void) {
 		if (! use_threads) {
 			rfbProcessEvents(screen, -1);
 
-			if (got_user_input && cnt % 10 != 0) {
-				/* every 10-th drops thru to code below... */
+			if ((got_user_input || ui_dropthru < 0) &&
+			    cnt % ui_dropthru != 0) {
+				/* every n-th drops thru to code below... */
 				cnt++;
 				XFlush(dpy);
 				continue;
@@ -2311,20 +2391,42 @@ void watch_loop(void) {
 			usleep(200 * 1000);
 			continue;
 		}
+
 		if (nofb) {
 			continue;
 		}
 
-		rfbUndrawCursor(screen);
-
-		scan_for_updates();
-
 		if (watch_bell) {
+			/* n.b. assumes -nofb folks do not want bell... */
 			watch_bell_event();
 		}
 
-		usleep(waitms * 1000);
+		/*
+		 * delay_refresh amounts to delaying rfb screen refreshes.
+		 * During that time, XQueryPointer needs to be called for
+		 * the events to take place on the x server.
+		 */
+		if (delay_refresh) {
+			Window root_w, child_w;
+			rfbBool ret;
+			int root_x, root_y, win_x, win_y, which = 0;
+			unsigned int mask;
 
+			X_LOCK;
+			if (0) {
+				XFlush(dpy);
+			} else {
+				ret = XQueryPointer(dpy, rootwin, &root_w,
+				    &child_w, &root_x, &root_y, &win_x, &win_y,
+				    &mask);
+			}
+			X_UNLOCK;
+		} else {
+			rfbUndrawCursor(screen);
+			scan_for_updates();
+		}
+
+		usleep(waitms * 1000);
 		cnt++;
 	}
 }
@@ -2367,6 +2469,11 @@ void print_help() {
 "-shared                VNC display is shared (default %s).\n"
 "-forever               Keep listening for more connections rather than exiting\n"
 "                       as soon as the first client(s) disconnect. Same as -many\n"
+"-allow addr1[,addr2..] Only allow client connections from IP addresses matching\n"
+"                       the comma separated list of numerical addresses. Can be\n"
+"                       a prefix, e.g. \"192.168.100.\" to match a simple subnet,\n"
+"                       for more control build libvncserver with libwrap support.\n"
+"-localhost             Same as -allow 127.0.0.1\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
 "                       remote displays can be polled this way: be careful\n"
@@ -2392,6 +2499,15 @@ void print_help() {
 "-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
 "-mouseX                As -mouse, but also draw an X on root background.\n"
 "-X                     Shorthand for -mouseX -nocursor.\n"
+"-nodragging            Do not update the display during mouse dragging events.\n"
+"                       Greatly improves response on slow links, but you lose\n"
+"                       all visual feedback for drags and some menu traversals.\n"
+"-input_skip n          Experimental option difficult to explain! Only active in\n"
+"                       non-threaded mode. See watch_loop() function for info.\n"
+"                       Loop is: rfbProcessEvents, scan display, sleep. If\n"
+"                       there is mouse or keyboard input the scan is skipped\n"
+"                       except every n-th time thru the loop. Default n is 10,\n"
+"                       n<0 means skip even with no user input. Need to improve!\n"
 "\n"
 "-defer time            Time in ms to wait for updates before sending to\n"
 "                       client [rfbDeferUpdateTime]  (default %d).\n"
@@ -2507,6 +2623,10 @@ int main(int argc, char** argv) {
 			view_only = 1;
 		} else if (!strcmp(argv[i], "-shared")) {
 			shared = 1;
+		} else if (!strcmp(argv[i], "-allow")) {
+			allow_list = argv[++i];
+		} else if (!strcmp(argv[i], "-localhost")) {
+			allow_list = "127.0.0.1";
 		} else if (!strcmp(argv[i], "-many")
 		    || !strcmp(argv[i], "-forever")) {
 			connect_once = 0;
@@ -2531,6 +2651,11 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(argv[i], "-mouseX")) {
 			show_mouse = 1;
 			show_root_cursor = 1;
+		} else if (!strcmp(argv[i], "-nodragging")) {
+			show_dragging = 0;
+		} else if (!strcmp(argv[i], "-input_skip")) {
+			ui_dropthru = atoi(argv[++i]);
+			if (! ui_dropthru) ui_dropthru = 1;
 		} else if (!strcmp(argv[i], "-X")) {
 			show_mouse = 1;
 			show_root_cursor = 1;
@@ -2602,6 +2727,8 @@ int main(int argc, char** argv) {
 	if (! quiet) {
 		fprintf(stderr, "viewonly:   %d\n", view_only);
 		fprintf(stderr, "shared:     %d\n", shared);
+		fprintf(stderr, "allow:      %s\n", allow_list ? allow_list
+                    : "null");
 		fprintf(stderr, "inetd:      %d\n", inetd);
 		fprintf(stderr, "conn_once:  %d\n", connect_once);
 		fprintf(stderr, "flashcmap:  %d\n", flash_cmap);
@@ -2613,6 +2740,8 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "mod_tweak:  %d\n", use_modifier_tweak);
 		fprintf(stderr, "loc_curs:   %d\n", local_cursor);
 		fprintf(stderr, "mouse:      %d\n", show_mouse);
+		fprintf(stderr, "dragging:   %d\n", show_dragging);
+		fprintf(stderr, "inputskip:  %d\n", ui_dropthru);
 		fprintf(stderr, "root_curs:  %d\n", show_root_cursor);
 		fprintf(stderr, "defer:      %d\n", defer_update);
 		fprintf(stderr, "waitms:     %d\n", waitms);
@@ -2650,7 +2779,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "Display does not support XTest extension.\n");
 		exit(1);
 	}
-	if (! XShmQueryExtension(dpy)) {
+	if (! nofb && ! XShmQueryExtension(dpy)) {
 		if (! using_shm) {
 			fprintf(stderr, "warning: display does not support "
 			    "XShm.\n");
@@ -2666,7 +2795,7 @@ int main(int argc, char** argv) {
 			fprintf(stderr, "warning: disabling bell.\n");
 			watch_bell = 0;
 		} else {
-			initialize_bell_watch();
+			initialize_watch_bell();
 		}
 	}
 #endif
@@ -2711,11 +2840,26 @@ int main(int argc, char** argv) {
 		set_offset();
 	}
 
-	fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
-	if (! quiet) fprintf(stderr, "Read initial data from display into framebuffer.\n");
 
+	if (nofb) {
+		/* 
+		 * This does not malloc the framebuffer, so can save a few
+		 * MB of memory in nofb mode.
+		 */
+		fb = XCreateImage(dpy, visual, DefaultDepth(dpy, scr), ZPixmap,
+		    0, NULL, dpy_x, dpy_y, BitmapPad(dpy), 0);
+	} else {
+		fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes,
+		    ZPixmap);
+	}
+
+	if (! quiet) {
+		fprintf(stderr, "Read initial data from display into"
+		    " framebuffer.\n");
+	}
 	if (fb->bits_per_pixel == 24 && ! quiet) {
-		fprintf(stderr, "warning: 24 bpp may have poor performance.\n");
+		fprintf(stderr, "warning: 24 bpp may have poor"
+		    " performance.\n");
 	}
 
 	if (! dt) {
