@@ -18,11 +18,17 @@ AC_PROG_RANLIB
 AH_TEMPLATE(BACKCHANNEL, [Enable BackChannel communication])
 AC_ARG_WITH(backchannel,
 	[  --without-backchannel		disable backchannel method],
-	,AC_DEFINE(BACKCHANNEL))
+	, [ with_backchannel=yes ])
+if test "x$with_backchannel" = "xyes"; then
+	AC_DEFINE(BACKCHANNEL)
+fi
 AH_TEMPLATE(ALLOW24BPP, [Enable 24 bit per pixel in native framebuffer])
 AC_ARG_WITH(24bpp,
-	[ --without-24bpp			disable 24 bpp framebuffers],
-	,AC_DEFINE(ALLOW24BPP))
+	[  --without-24bpp			disable 24 bpp framebuffers],
+	, [ with_24bpp=yes ])
+if test "x$with_24bpp" = "xyes"; then
+	AC_DEFINE(ALLOW24BPP)
+fi
 
 # Checks for X libraries
 HAVE_X="false"
@@ -40,11 +46,21 @@ AC_SUBST(X_LIBS)
 AM_CONDITIONAL(HAVE_X, test $HAVE_X != "false")
 
 # Checks for libraries.
-AC_CHECK_HEADER(jpeglib.h, HAVE_JPEGLIB_H="true")
+AC_ARG_WITH(jpeg,
+ 	[  --without-jpeg			disable support for jpeg],
+ 	, [ with_jpeg=yes ])
+if test "x$with_jpeg" = "xyes"; then
+	AC_CHECK_HEADER(jpeglib.h, HAVE_JPEGLIB_H="true")
+fi
 AC_CHECK_HEADER(pthread.h, HAVE_PTHREAD_H="true")
-AC_CHECK_HEADER(zlib.h, HAVE_ZLIB_H="true")
-if test ! -z "$HAVE_JPEGLIB_H"; then
-	AC_CHECK_LIB(jpeg, jpeg_CreateCompress)
+AC_ARG_WITH(zlib,
+ 	[  --without-zlib			disable support for deflate],
+ 	, [ with_zlib=yes ])
+AC_ARG_WITH(libz,
+ 	[  --without-libz			disable support for deflate],
+ 	, [ with_libz=yes ])
+if test "x$with_zlib" = "xyes" -a "x$with_libz" = "xyes"; then
+	AC_CHECK_HEADER(zlib.h, HAVE_ZLIB_H="true")
 fi
 if test ! -z "$HAVE_PTHREAD_H"; then
 	AC_CHECK_LIB(pthread, pthread_mutex_lock)
@@ -55,6 +71,9 @@ AC_CHECK_PROGS(CXX,[g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC],none)
 AC_PROG_CXX
 if test ! -z "$HAVE_ZLIB_H"; then
 	AC_CHECK_LIB(z, deflate, , HAVE_ZLIB_H="")
+	if test ! -z "$HAVE_JPEGLIB_H" -a ! -z "$HAVE_ZLIB_H"; then
+		AC_CHECK_LIB(jpeg, jpeg_CreateCompress)
+	fi
 	if test ! -z "$HAVE_ZLIB_H"; then
 		# check for c++, but don't fail if not found
 		AH_TEMPLATE(HAVE_ZRLE, [Use zrle compression; needs a c++ compiler])
