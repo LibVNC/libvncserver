@@ -169,7 +169,7 @@
 /*
 #define LIBVNCSERVER_HAVE_LIBXINERAMA 1
 #define LIBVNCSERVER_HAVE_XFIXES 1
-#define LIBVNCSERVER_HAVE_XDAMAGE 1
+#define LIBVNCSERVER_HAVE_LIBXDAMAGE 1
  */
 
 #endif	/* OLD_TREE */
@@ -329,13 +329,21 @@ static int xfixes_base_event_type;
 #endif
 
 int xdamage_present = 0;
+int using_xdamage = 0;
+int use_xdamage_hints = 1;	/* just use the xdamage rects. for scanline hints */
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 #include <X11/extensions/Xdamage.h>
 static int xdamage_base_event_type;
+Damage xdamage = 0;
 #endif
+int xdamage_max_area = 20000;	/* pixels */
+double xdamage_memory = 1.0;	/* in units of NSCAN */
+int xdamage_tile_count;
+
+int hack_val = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2pre lastmod: 2005-03-04";
+char lastmod[] = "0.7.2pre lastmod: 2005-03-12";
 
 /* X display info */
 
@@ -347,6 +355,8 @@ int bpp, depth;
 int indexed_color = 0;
 int dpy_x, dpy_y;		/* size of display */
 int off_x, off_y;		/* offsets for -sid */
+int wdpy_x, wdpy_y;		/* for actual sizes in case of -clip */
+int cdpy_x, cdpy_y, coff_x, coff_y;	/* the -clip params */
 int button_mask = 0;		/* button state and info */
 int num_buttons = -1;
 
@@ -395,6 +405,7 @@ unsigned short main_red_shift, main_green_shift, main_blue_shift;
 typedef struct _ClientData {
 	int uid;
 	char *hostname;
+	char *username;
 	int client_port;
 	int server_port;
 	char *server_ip;
@@ -432,6 +443,7 @@ int ntiles, ntiles_x, ntiles_y;
 
 /* arrays that indicate changed or checked tiles. */
 unsigned char *tile_has_diff, *tile_tried, *tile_copied;
+unsigned char *tile_has_xdamage_diff, *tile_row_has_xdamage_diff;
 
 /* times of recent events */
 time_t last_event, last_input, last_client = 0;
@@ -465,6 +477,15 @@ char vnc_connect_str[VNC_CONNECT_MAX+1];
 Atom vnc_connect_prop = None;
 
 struct utsname UT;
+
+/* scan pattern jitter from x0rfbserver */
+#define NSCAN 32
+int scanlines[NSCAN] = {
+	 0, 16,  8, 24,  4, 20, 12, 28,
+	10, 26, 18,  2, 22,  6, 30, 14,
+	 1, 17,  9, 25,  7, 23, 15, 31,
+	19,  3, 27, 11, 29, 13,  5, 21
+};
 
 /* function prototypes (see filename comment above) */
 
@@ -511,6 +532,9 @@ void free_tiles(void);
 void initialize_watch_bell(void);
 void initialize_xinerama(void);
 void initialize_xfixes(void);
+void initialize_xdamage(void);
+void create_xdamage(void);
+void destroy_xdamage(void);
 void initialize_xrandr(void);
 XImage *initialize_xdisplay_fb(void);
 
@@ -596,24 +620,25 @@ void refresh_screen(void);
 /* 
  * variables for the command line options
  */
-char *use_dpy = NULL;
-char *auth_file = NULL;
-char *visual_str = NULL;
-char *logfile = NULL;
+char *use_dpy = NULL;		/* -display */
+char *auth_file = NULL;		/* -auth/-xauth */
+char *visual_str = NULL;	/* -visual */
+char *logfile = NULL;		/* -o, -logfile */
 int logfile_append = 0;
-char *passwdfile = NULL;
-char *blackout_str = NULL;
-int use_solid_bg = 0;
+char *passwdfile = NULL;	/* -passwdfile */
+char *blackout_str = NULL;	/* -blackout */
+char *clip_str = NULL;		/* -clip */
+int use_solid_bg = 0;		/* -solid */
 char *solid_str = NULL;
 char *solid_default = "cyan4";
 
-char *speeds_str = NULL;
+char *speeds_str = NULL;	/* -speeds TBD */
 int measure_speeds = 1;
 int speeds_net_rate = 0;
 int speeds_net_latency = 0;
 int speeds_read_rate = 0;
 
-char *rc_rcfile = NULL;
+char *rc_rcfile = NULL;		/* -rc */
 int rc_norc = 0;
 int opts_bg = 0;
 
@@ -863,6 +888,32 @@ int scan_hexdec(char *str, unsigned long *num) {
 			return 0;
 		}
 	}
+	return 1;
+}
+
+int parse_geom(char *str, int *wp, int *hp, int *xp, int *yp, int W, int H) {
+	int w, h, x, y;
+	/* handle +/-x and +/-y */
+	if (sscanf(str, "%dx%d+%d+%d", &w, &h, &x, &y) == 4) {
+		;
+	} else if (sscanf(str, "%dx%d-%d+%d", &w, &h, &x, &y) == 4) {
+		w = nabs(w);
+		x = W - x - w;
+	} else if (sscanf(str, "%dx%d+%d-%d", &w, &h, &x, &y) == 4) {
+		h = nabs(h);
+		y = H - y - h;
+	} else if (sscanf(str, "%dx%d-%d-%d", &w, &h, &x, &y) == 4) {
+		w = nabs(w);
+		h = nabs(h);
+		x = W - x - w;
+		y = H - y - h;
+	} else {
+		return 0;
+	}
+	*wp = w;
+	*hp = h;
+	*xp = x;
+	*yp = y;
 	return 1;
 }
 
@@ -1704,6 +1755,7 @@ void try_to_switch_users(void) {
 	free(users);
 }
 
+/* -- inet.c -- */
 /*
  * Simple utility to map host name to dotted IP address.  Ignores aliases.
  * Up to caller to free returned string.
@@ -1728,9 +1780,6 @@ char *ip2host(char *ip) {
 	char *str;
 #if LIBVNCSERVER_HAVE_NETDB_H && LIBVNCSERVER_HAVE_NETINET_IN_H
 	struct hostent *hp;
-#ifndef in_addr_t
-typedef unsigned int in_addr_t;
-#endif
 	in_addr_t iaddr;
 
 	iaddr = inet_addr(ip);
@@ -1821,6 +1870,96 @@ char *get_local_host(int sock) {
 	return get_host(sock, 0);
 }
 
+char *ident_username(rfbClientPtr client) {
+	ClientData *cd = (ClientData *) client->clientData;
+	char *str, *newhost, *user = NULL, *newuser = NULL;
+	int len;
+
+	if (cd) {
+		user = cd->username;
+	}
+	if (!user || *user == '\0') {
+		char msg[128];
+		int n, sock, ok = 0;
+
+		if ((sock = rfbConnectToTcpAddr(client->host, 113)) < 0) {
+			rfbLog("could not connect to ident: %s:%d\n",
+			    client->host, 113);
+		} else {
+			int ret;
+			fd_set rfds;
+			struct timeval tv;
+			int rport = get_remote_port(client->sock);
+			int lport = get_local_port(client->sock);
+
+			sprintf(msg, "%d, %d\r\n", rport, lport);
+			n = write(sock, msg, strlen(msg));
+
+			FD_ZERO(&rfds);
+			FD_SET(sock, &rfds);
+			tv.tv_sec  = 4;
+			tv.tv_usec = 0;
+			ret = select(sock+1, &rfds, NULL, NULL, &tv); 
+
+			if (ret > 0) {
+				int i;
+				char *q, *p;
+				for (i=0; i<128; i++) {
+					msg[i] = '\0';
+				}
+				usleep(250*1000);
+				n = read(sock, msg, 127);
+				close(sock);
+				if (n <= 0) goto badreply;
+
+				/* 32782 , 6000 : USERID : UNIX :runge */
+				q = strstr(msg, "USERID");
+				if (!q) goto badreply;
+				q = strstr(q, ":");
+				if (!q) goto badreply;
+				q++;
+				q = strstr(q, ":");
+				if (!q) goto badreply;
+				q++;
+				q = lblanks(q);
+				p = q;
+				while (*p) {
+					if (*p == '\r' || *p == '\n') {
+						*p = '\0';
+					}
+					p++;
+				}
+				ok = 1;
+				if (strlen(q) > 24) {
+					*(q+24) = '\0';
+				}
+				newuser = strdup(q);
+
+				badreply:
+				n = 0;	/* avoid syntax error */
+			} else {
+				close(sock);
+			}
+		}
+		if (! ok || !newuser) {
+			newuser = strdup("unknown-user");
+		}
+		if (cd) {
+			free(cd->username);
+			cd->username = newuser;
+		}
+		user = newuser;
+	}
+	newhost = ip2host(client->host);
+	len = strlen(user) + 1 + strlen(newhost) + 1;
+	str = (char *)malloc(len);
+	sprintf(str, "%s@%s", user, newhost);
+	free(newhost);
+	return str;
+}
+
+/* -- ximage.c -- */
+
 /* 
  * used in rfbGetScreen and rfbNewFramebuffer: and estimate to the number
  * of bits per color, of course for some visuals, e.g. 565, the number
@@ -1846,41 +1985,24 @@ int guess_bits_per_color(int bits_per_pixel) {
 	return bits_per_color;
 }
 
-/* count number of clients supporting NewFBSize */
-int new_fb_size_clients(rfbScreenInfoPtr s) {
-	rfbClientIteratorPtr iter;
-	rfbClientPtr cl;
-	int count = 0;
-
-	if (! s) {
-		return 0;
-	}
-
-	iter = rfbGetClientIterator(s);
-	while( (cl = rfbClientIteratorNext(iter)) ) {
-		if (cl->useNewFBSize) {
-			count++;
-		}
-	}
-	rfbReleaseClientIterator(iter);
-	return count;
-}
-
 /*
  * Kludge to interpose image gets and limit to a subset rectangle of
  * the rootwin.  This is the -sid option trying to work around invisible
- * saveUnders menu, etc, windows.
+ * saveUnders menu, etc, windows.  Also -clip option.
  */
 int rootshift = 0;
+int clipshift = 0;
 
 #define ADJUST_ROOTSHIFT \
 	if (rootshift && subwin) { \
 		d = rootwin; \
 		x += off_x; \
 		y += off_y; \
+	} \
+	if (clipshift) { \
+		x += coff_x; \
+		y += coff_y; \
 	}
-
-/* -- ximage.c -- */
 
 /*
  * Wrappers for Image related X calls
@@ -2025,7 +2147,7 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 
 void copy_image(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 
-	/* default (w=0,h=0) is the fill the entire XImage */
+	/* default (w=0, h=0) is the fill the entire XImage */
 	if (w < 1)  {
 		w = dest->width;
 	}
@@ -2222,6 +2344,11 @@ void clean_up_exit (int ret) {
 	}
 	X_LOCK;
 	XTestDiscard_wr(dpy);
+#if LIBVNCSERVER_HAVE_LIBXDAMAGE
+	if (xdamage) {
+		XDamageDestroy(dpy, xdamage);
+	}
+#endif
 	XCloseDisplay(dpy);
 	X_UNLOCK;
 
@@ -2493,9 +2620,9 @@ char *list_clients(void) {
 
 	/*
 	 * each client:
-         * <id>:<ip>:<port>:<hostname>:<input>:<loginview>,
-	 * 8+1+16+1+5+1+256+1+5+1+1+1
-	 * 123.123.123.123:60000/0x11111111-rw, = 297 bytes 
+         * <id>:<ip>:<port>:<user>:<hostname>:<input>:<loginview>,
+	 * 8+1+16+1+5+1+24+1+256+1+5+1+1+1
+	 * 123.123.123.123:60000/0x11111111-rw,
 	 * so count+1 * 400 must cover it.
 	 */
 	list = (char *) malloc((count+1)*400);
@@ -2514,6 +2641,12 @@ char *list_clients(void) {
 		strcat(list, ":");
 		sprintf(tmp, "%d:", cd->client_port);
 		strcat(list, tmp);
+		if (*(cd->username) == '\0') {
+			char *s = ident_username(cl);
+			if (s) free(s);
+		}
+		strcat(list, cd->username);
+		strcat(list, ":");
 		strcat(list, cd->hostname);
 		strcat(list, ":");
 		strcat(list, cd->input);
@@ -2523,6 +2656,26 @@ char *list_clients(void) {
 	}
 	rfbReleaseClientIterator(iter);
 	return list;
+}
+
+/* count number of clients supporting NewFBSize */
+int new_fb_size_clients(rfbScreenInfoPtr s) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int count = 0;
+
+	if (! s) {
+		return 0;
+	}
+
+	iter = rfbGetClientIterator(s);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		if (cl->useNewFBSize) {
+			count++;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+	return count;
 }
 
 void close_all_clients(void) {
@@ -2779,6 +2932,9 @@ static void client_gone(rfbClientPtr client) {
 			if (cd->hostname) {
 				free(cd->hostname);
 			}
+			if (cd->username) {
+				free(cd->username);
+			}
 		}
 		free(client->clientData);
 	}
@@ -2958,8 +3114,8 @@ static int check_access(char *addr) {
  * x11vnc's first (and only) visible widget: accept/reject dialog window.
  * We go through this pain to avoid dependency on libXt...
  */
-static int ugly_accept_window(char *addr, int X, int Y, int timeout,
-    char *mode) {
+static int ugly_accept_window(char *addr, char *userhost, int X, int Y,
+    int timeout, char *mode) {
 
 #define t2x2_width 16
 #define t2x2_height 16
@@ -2989,6 +3145,7 @@ static char t2x2_bits[] = {
 	/* strings and geometries y/n */
 	KeyCode key_y, key_n, key_v;
 	char strh[100];
+	char stri[100];
 	char str1_b[] = "To accept: press \"y\" or click the \"Yes\" button";
 	char str2_b[] = "To reject: press \"n\" or click the \"No\" button";
 	char str3_b[] = "View only: press \"v\" or click the \"View\" button";
@@ -3002,7 +3159,7 @@ static char t2x2_bits[] = {
 	char str_y[] = "Yes";
 	char str_n[] = "No";
 	char str_v[] = "View";
-	int x, y, w = 345, h = 150, ret = 0;
+	int x, y, w = 345, h = 175, ret = 0;
 	int X_sh = 20, Y_sh = 30, dY = 20;
 	int Ye_x = 20,  Ye_y = 0, Ye_w = 45, Ye_h = 20;
 	int No_x = 75,  No_y = 0, No_w = 45, No_h = 20; 
@@ -3026,6 +3183,7 @@ static char t2x2_bits[] = {
 		h -= dY;
 	}
 
+	/* XXX handle coff_x/coff_y? */
 	if (X < -dpy_x) {
 		x = (dpy_x - w)/2;	/* large negative: center */
 		if (x < 0) x = 0;
@@ -3086,7 +3244,8 @@ static char t2x2_bits[] = {
 	XMapWindow(dpy, awin);
 	XFlush(dpy);
 
-	sprintf(strh, "x11vnc: accept connection from %s?", addr);
+	snprintf(strh, 100, "x11vnc: accept connection from %s?", addr);
+	snprintf(stri, 100, "        (%s)", userhost);
 	key_y = XKeysymToKeycode(dpy, XStringToKeysym("y"));
 	key_n = XKeysymToKeycode(dpy, XStringToKeysym("n"));
 	key_v = XKeysymToKeycode(dpy, XStringToKeysym("v"));
@@ -3122,6 +3281,8 @@ static char t2x2_bits[] = {
 			/* instructions */
 			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
 			    strh, strlen(strh));
+			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
+			    stri, strlen(stri));
 			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
 			    str1, strlen(str1));
 			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
@@ -3336,6 +3497,7 @@ static int accept_client(rfbClientPtr client) {
 		addr = "unknown-host";
 	}
 
+
 	if (strstr(accept_cmd, "popup") == accept_cmd) {
 		/* use our builtin popup button */
 
@@ -3344,6 +3506,7 @@ static int accept_client(rfbClientPtr client) {
 		int ret, timeout = 120;
 		int x = -64000, y = -64000;
 		char *p, *mode;
+		char *userhost = ident_username(client);
 
 		/* extract timeout */
 		if ((p = strchr(accept_cmd, ':')) != NULL) {
@@ -3380,7 +3543,9 @@ static int accept_client(rfbClientPtr client) {
 		}
 
 		rfbLog("accept_client: using builtin popup for: %s\n", addr);
-		if ((ret = ugly_accept_window(addr, x, y, timeout, mode))) {
+		if ((ret = ugly_accept_window(addr, userhost, x, y, timeout,
+		    mode))) {
+			free(userhost);
 			if (ret == 2) {
 				rfbLog("accept_client: viewonly: %s\n", addr);
 				client->viewOnly = TRUE;
@@ -3388,6 +3553,7 @@ static int accept_client(rfbClientPtr client) {
 			rfbLog("accept_client: popup accepted: %s\n", addr);
 			return 1;
 		} else {
+			free(userhost);
 			rfbLog("accept_client: popup rejected: %s\n", addr);
 			return 0;
 		}
@@ -3787,6 +3953,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	cd->server_port = get_local_port(client->sock);
 	cd->server_ip   = get_local_host(client->sock);
 	cd->hostname = ip2host(client->host);
+	cd->username = strdup("");
 
 	cd->input[0] = '-';
 	cd->login_viewonly = -1;
@@ -5755,11 +5922,15 @@ static void update_x11_pointer_position(int x, int y) {
 
 	X_LOCK;
 	if (use_xwarppointer) {
-		/* off_x and off_y not needed with XWarpPointer */
-		XWarpPointer(dpy, None, window, 0, 0, 0, 0, x, y);
+		/*
+		 * off_x and off_y not needed with XWarpPointer since
+		 * window is used:
+		 */
+		XWarpPointer(dpy, None, window, 0, 0, 0, 0, x + coff_x,
+		    y + coff_y);
 	} else {
-		XTestFakeMotionEvent_wr(dpy, scr, x+off_x, y+off_y,
-		    CurrentTime);
+		XTestFakeMotionEvent_wr(dpy, scr, x + off_x + coff_x,
+		    y + off_y + coff_y, CurrentTime);
 	}
 	X_UNLOCK;
 
@@ -5786,7 +5957,7 @@ static void update_x11_pointer_position(int x, int y) {
 }
 
 /*
- * Send a pointer position event to the X server.
+ * Send a pointer button event to the X server.
  */
 static void update_x11_pointer_mask(int mask) {
 	int i, mb;
@@ -6164,8 +6335,8 @@ XErrorHandler old_getimage_handler;
 /* -- xrandr.c -- */
 
 void initialize_xrandr(void) {
-#if LIBVNCSERVER_HAVE_LIBXRANDR
 	if (xrandr_present) {
+#if LIBVNCSERVER_HAVE_LIBXRANDR
 		Rotation rot;
 
 		xrandr_width  = XDisplayWidth(dpy, scr);
@@ -6177,15 +6348,20 @@ void initialize_xrandr(void) {
 		} else {
 			XRRSelectInput(dpy, rootwin, 0);
 		}
-	}
 #endif
+	} else if (xrandr) {
+		rfbLog("-xrandr mode specified, but no RANDR support on\n");
+		rfbLog(" display or in client library. Disabling -xrandr "
+		    "mode.\n");
+		xrandr = 0;
+	}
 }
 
 void handle_xrandr_change(int, int);
 
 int handle_subwin_resize(char *msg) {
 	int new_x, new_y;
-	int i, check = 10, ms = 250;	/* 2.5 secs... */
+	int i, check = 10, ms = 250;	/* 2.5 secs total... */
 
 	if (! subwin) {
 		return 0;	/* hmmm... */
@@ -6200,7 +6376,7 @@ int handle_subwin_resize(char *msg) {
 		X_UNLOCK;
 		clean_up_exit(1);
 	}
-	if (dpy_x == new_x && dpy_y == new_y) {
+	if (wdpy_x == new_x && wdpy_y == new_y) {
 		/* no change */
 		return 0;
 	}
@@ -6225,7 +6401,7 @@ int handle_subwin_resize(char *msg) {
 	}
 
 	rfbLog("subwin 0x%lx new size: x: %d -> %d, y: %d -> %d\n",
-	    subwin, dpy_x, new_x, dpy_y, new_y);
+	    subwin, wdpy_x, new_x, wdpy_y, new_y);
 	rfbLog("calling handle_xrandr_change() for resizing\n");
 
 	X_UNLOCK;
@@ -6268,11 +6444,11 @@ void handle_xrandr_change(int new_x, int new_y) {
 	
 	/* default, resize, and newfbsize create a new fb: */
 	rfbLog("check_xrandr_event: trying to create new framebuffer...\n");
-	if (new_x < dpy_x || new_y < dpy_y) {
+	if (new_x < wdpy_x || new_y < wdpy_y) {
 		check_black_fb();
 	}
 	do_new_fb(1);
-	rfbLog("check_xrandr_event: fb       WxH: %dx%d\n", dpy_x, dpy_y);
+	rfbLog("check_xrandr_event: fb       WxH: %dx%d\n", wdpy_x, wdpy_y);
 }
 
 int check_xrandr_event(char *msg) {
@@ -6304,8 +6480,8 @@ int check_xrandr_event(char *msg) {
 		rfbLog("  mheight:         %d mm\n", (int) rev->mheight);
 		rfbLog("\n");
 		rfbLog("check_xrandr_event: previous WxH: %dx%d\n",
-		    dpy_x, dpy_y);
-		if (dpy_x == rev->width && dpy_y == rev->height &&
+		    wdpy_x, wdpy_y);
+		if (wdpy_x == rev->width && wdpy_y == rev->height &&
 		    xrandr_rotation == (int) rev->rotation) {
 		    rfbLog("check_xrandr_event: no change detected.\n");
 			do_change = 0;
@@ -6624,6 +6800,7 @@ void initialize_xevents(void) {
 	static int did_xcreate_simple_window = 0;
 	static int did_vnc_connect_prop = 0;
 	static int did_xfixes = 0;
+	static int did_xdamage = 0;
 	static int did_xrandr = 0;
 
 	X_LOCK;
@@ -6655,6 +6832,10 @@ void initialize_xevents(void) {
 	if (xfixes_present && use_xfixes && !did_xfixes) {
 		initialize_xfixes();
 		did_xfixes = 1;
+	}
+	if (xdamage_present && !did_xdamage) {
+		initialize_xdamage();
+		did_xdamage = 1;
 	}
 }
 
@@ -7407,7 +7588,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		Window twin;
 		COLON_CHECK("id:")
 		if (query) {
-			snprintf(buf, bufn, "ans=%s%s0x%lx", p, co, subwin);
+			snprintf(buf, bufn, "ans=%s%s0x%lx", p, co,
+			    rootshift ? 0 : subwin);
 			goto qry;
 		}
 		p += strlen("id:");
@@ -7444,7 +7626,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		Window twin;
 		COLON_CHECK("sid:")
 		if (query) {
-			snprintf(buf, bufn, "ans=%s%s0x%lx", p, co, subwin);
+			snprintf(buf, bufn, "ans=%s%s0x%lx", p, co,
+			    !rootshift ? 0 : subwin);
 			goto qry;
 		}
 		p += strlen("sid:");
@@ -7475,6 +7658,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				do_new_fb(1);
 			}
 		}
+	} else if (strstr(p, "clip") == p) {
+		COLON_CHECK("clip:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(clip_str));
+			goto qry;
+		}
+		p += strlen("clip:");
+		if (clip_str) free(clip_str);
+		clip_str = strdup(p);
+
+		/* OK, this requires a new fb... */
+		do_new_fb(1);
+
 	} else if (strstr(p, "waitmapped") == p) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p,
@@ -8676,6 +8873,73 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		initialize_xfixes();
 		first_cursor();
 
+	} else if (!strcmp(p, "xdamage")) {
+		int orig = use_xdamage_hints;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, use_xdamage_hints);
+			goto qry;
+		}
+		if (! xdamage_present) {
+			rfbLog("process_remote_cmd: cannot enable xdamage hints "
+			    "(not supported on X display)\n");
+			goto done;
+		}
+		rfbLog("process_remote_cmd: enabling xdamage hints"
+		    " (if supported).\n");
+		use_xdamage_hints = 1;
+		if (use_xdamage_hints != orig) {
+			initialize_xdamage();
+			create_xdamage();
+		}
+	} else if (!strcmp(p, "noxdamage")) {
+		int orig = use_xdamage_hints;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !use_xdamage_hints);
+			goto qry;
+		}
+		if (! xdamage_present) {
+			rfbLog("process_remote_cmd: disabling xdamage hints "
+			    "(but not supported on X display)\n");
+			goto done;
+		}
+		rfbLog("process_remote_cmd: disabling xdamage hints.\n");
+		use_xdamage_hints = 0;
+		if (use_xdamage_hints != orig) {
+			initialize_xdamage();
+			destroy_xdamage();
+		}
+
+	} else if (strstr(p, "xd_area") == p) {
+		int a;
+		COLON_CHECK("xd_area:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
+			    xdamage_max_area);
+			goto qry;
+		}
+		p += strlen("xd_area:");
+		a = atoi(p);
+		if (a >= 0) {
+			rfbLog("process_remote_cmd: setting xdamage_max_area "
+			    "%d -> %d.\n", xdamage_max_area, a);
+			xdamage_max_area = a;
+		}
+	} else if (strstr(p, "xd_mem") == p) {
+		double a;
+		COLON_CHECK("xd_mem:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%.3f", p, co,
+			    xdamage_memory);
+			goto qry;
+		}
+		p += strlen("xd_mem:");
+		a = atof(p);
+		if (a >= 0.0) {
+			rfbLog("process_remote_cmd: setting xdamage_memory "
+			    "%.3f -> %.3f.\n", xdamage_memory, a);
+			xdamage_memory = a;
+		}
+
 	} else if (strstr(p, "alphacut") == p) {
 		int a;
 		COLON_CHECK("alphacut:")
@@ -9282,6 +9546,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("process_remote_cmd: disabling remote commands.\n");
 		accept_remote_cmds = 0; /* cannot be turned back on. */
 
+	} else if (strstr(p, "hack:") == p) { /* skip-cmd-list */
+		NOTAPP
+		p += strlen("hack:");
+		hack_val = atoi(p);
+		rfbLog("set hack_val to: %d\n", hack_val);
+
 	} else if (query) {
 		/* read-only variables that can only be queried: */
 
@@ -9314,6 +9584,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(users_list));
 		} else if (!strcmp(p, "rootshift")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, rootshift);
+		} else if (!strcmp(p, "clipshift")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, clipshift);
 		} else if (!strcmp(p, "scale_str")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(scale_str));
 		} else if (!strcmp(p, "scaled_x")) {
@@ -9406,6 +9678,22 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, dpy_x);
 		} else if (!strcmp(p, "dpy_y")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, dpy_y);
+		} else if (!strcmp(p, "wdpy_x")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, wdpy_x);
+		} else if (!strcmp(p, "wdpy_y")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, wdpy_y);
+		} else if (!strcmp(p, "off_x")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, off_x);
+		} else if (!strcmp(p, "off_y")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, off_y);
+		} else if (!strcmp(p, "cdpy_x")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, cdpy_x);
+		} else if (!strcmp(p, "cdpy_y")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, cdpy_y);
+		} else if (!strcmp(p, "coff_x")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, coff_x);
+		} else if (!strcmp(p, "coff_y")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, coff_y);
 		} else if (!strcmp(p, "rfbauth")) {
 			NOTAPPRO
 		} else if (!strcmp(p, "passwd")) {
@@ -9445,6 +9733,329 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		XFlush(dpy);
 	}
 	return NULL;
+}
+
+/* -- xdamage.c -- */
+
+sraRegionPtr *xdamage_regions = NULL;
+int xdamage_ticker = 0;
+
+/* for stats */
+int XD_skip = 0, XD_tot = 0, XD_des = 0;
+
+void record_desired_xdamage_rect(int x, int y, int w, int h) {
+	/*
+	 * Unfortunately we currently can't trust an xdamage event
+	 * to correspond to real screen damage.  E.g. focus-in for
+	 * mozilla (depending on wm) will mark the whole toplevel
+	 * area as damaged, when only the border has changed.
+	 * Similar things for terminal windows.
+	 *
+	 * This routine uses some heuristics to detect small enough
+	 * damage regions that we will not have a performance problem
+	 * if we believe them even though they are wrong.  We record
+	 * the corresponding tiles the damage regions touch.
+	 */
+	int dt_x, dt_y, nt_x1, nt_y1, nt_x2, nt_y2, nt;
+	int ix, iy, cnt = 0;
+	int area = w*h, always_accept = 0;
+
+	if (xdamage_max_area <= 0) {
+		always_accept = 1;
+	}
+
+	if (!always_accept && area > xdamage_max_area) {
+		return;
+	}
+
+	dt_x = w / tile_x;
+	dt_y = h / tile_y;
+
+	if (!always_accept && dt_y >= 2 && area > 1000)  {
+		/*
+		 * should be caught by a normal scanline poll, but we might
+		 * as well keep if small.
+		 */
+		return;
+	}
+
+	nt_x1 = nfix(  (x)/tile_x, ntiles_x);
+	nt_x2 = nfix((x+w)/tile_x, ntiles_x);
+	nt_y1 = nfix(  (y)/tile_y, ntiles_y);
+	nt_y2 = nfix((y+h)/tile_y, ntiles_y);
+
+
+	/* loop over the rectangle of tiles (1 tile for a small input rect */
+	for (ix = nt_x1; ix <= nt_x2; ix++) {
+		for (iy = nt_y1; iy <= nt_y2; iy++) {
+			nt = ix + iy * ntiles_x;
+			cnt++;
+			if (! tile_has_xdamage_diff[nt]) {
+				XD_des++;
+			}
+			tile_has_xdamage_diff[nt] = 1;
+			tile_row_has_xdamage_diff[iy] = 1;
+			xdamage_tile_count++;
+		}
+	}
+}
+
+void collect_xdamage(int scancnt) {
+#if LIBVNCSERVER_HAVE_LIBXDAMAGE
+	XDamageNotifyEvent *dev;
+#if 0
+	XserverRegion xregion;
+#endif
+	XEvent ev;
+	sraRegionPtr tmpregion;
+	sraRegionPtr reg;
+	static int rect_count = 0;
+	int nreg, ccount = 0, dcount = 0;
+	static time_t last_rpt = 0;
+	time_t now;
+	int x, y, w, h, x2, y2;
+	int i, dup, next, dup_max = 0;
+#define DUPSZ 16
+	int dup_x[DUPSZ], dup_y[DUPSZ], dup_w[DUPSZ], dup_h[DUPSZ];
+
+	if (! xdamage_present || ! using_xdamage) {
+		return;
+	}
+	if (! xdamage) {
+		return;
+	}
+
+	nreg = (xdamage_memory * NSCAN) + 1;
+	xdamage_ticker = (xdamage_ticker+1) % nreg;
+	reg = xdamage_regions[xdamage_ticker];  
+	sraRgnMakeEmpty(reg);
+
+	X_LOCK;
+	while (XCheckTypedEvent(dpy, xdamage_base_event_type+XDamageNotify, &ev)) {
+		/* TODO max cut off time in this loop? */
+		if (ev.type != xdamage_base_event_type + XDamageNotify) {
+			break;
+		}
+		dev = (XDamageNotifyEvent *) &ev;
+		if (dev->damage != xdamage) {
+			continue;	/* not ours! */
+		}
+
+		x = dev->area.x;
+		y = dev->area.y;
+		w = dev->area.width;
+		h = dev->area.height;
+
+		/*
+		 * we try to manually remove some duplicates because
+		 * certain activities can lead to many 10's of dups
+		 * in a row.  The region work can be costly and reg is
+		 * later used in xdamage_hint_skip loops, so it is good
+		 * to skip them if possible.
+		 */
+		dup = 0;
+		for (i=0; i < dup_max; i++) {
+			if (dup_x[i] == x && dup_y[i] == y && dup_w[i] == w &&
+			    dup_h[i] == h) {
+				dup = 1;
+				break;
+			}
+		}
+		if (dup) {
+			dcount++;
+			continue;
+		}
+		if (dup_max < DUPSZ) {
+			next = dup_max;
+			dup_max++;
+		} else {
+			next = (next+1) % DUPSZ;
+		}
+		dup_x[next] = x;
+		dup_y[next] = y;
+		dup_w[next] = w;
+		dup_h[next] = h;
+
+		/* translate if needed */
+		if (clipshift) {
+			/* set coords relative to fb origin */
+			if (0 && rootshift) {
+				/*
+				 * not needed because damage is relative
+				 * to subwin, not rootwin.
+				 */
+				x = x - off_x;
+				y = y - off_y;
+			}
+			if (clipshift) {
+				x = x - coff_x;
+				y = y - coff_y;
+			}
+
+			x2 = x + w;		/* upper point */
+			x  = nfix(x,  dpy_x);	/* place both in fb area */
+			x2 = nfix(x2, dpy_x);
+			w = x2 - x;		/* recompute w */
+			
+			y2 = y + h;
+			y  = nfix(y,  dpy_y);
+			y2 = nfix(y2, dpy_y);
+			h = y2 - y;
+
+			if (w <= 0 || h <= 0) {
+				continue;
+			}
+		}
+
+
+		record_desired_xdamage_rect(x, y, w, h);
+
+		tmpregion = sraRgnCreateRect(x, y, x + w, y + h); 
+		sraRgnOr(reg, tmpregion);
+		sraRgnDestroy(tmpregion);
+		rect_count++;
+		ccount++;
+	}
+	/* clear the whole damage region for next time. XXX check */
+	XDamageSubtract(dpy, xdamage, None, None);
+	X_UNLOCK;
+
+	now = time(0);
+if (! last_rpt) {
+	last_rpt = now;
+}
+if (now > last_rpt + 15) {
+	double rat = -1.0;
+
+	if (XD_tot) {
+		rat = ((double) XD_skip)/XD_tot;
+	}
+		
+	if (0) fprintf(stderr, "skip/tot: %04d/%04d  rat=%.3f  rect_count: %d  desired_rects: %d\n",
+		XD_skip, XD_tot, rat, rect_count, XD_des);
+	XD_skip = 0;
+	XD_tot  = 0;
+	XD_des  = 0;
+	rect_count = 0;
+	last_rpt = now;
+}
+#endif
+}
+
+int xdamage_hint_skip(int y) {
+	static sraRegionPtr scanline = NULL;
+	sraRegionPtr reg, tmpl;
+	int ret, i, n, nreg;
+
+	if (!xdamage_present || !using_xdamage || !use_xdamage_hints) {
+		return 0;	/* cannot skip */
+	}
+	if (! xdamage_regions) {
+		return 0;	/* cannot skip */
+	}
+
+	if (! scanline) {
+		scanline = sraRgnCreate();
+	}
+
+	tmpl = sraRgnCreateRect(0, y, dpy_x, y+1);
+
+	nreg = (xdamage_memory * NSCAN) + 1;
+	ret = 1;
+	for (i=0; i<nreg; i++) {
+		/* go back thru the history starting at most recent */
+		n = (xdamage_ticker + nreg - i) % nreg;
+		reg = xdamage_regions[n];  
+		if (sraRgnEmpty(reg)) {
+			/* checking for emptiness is very fast */
+			continue;
+		}
+		sraRgnMakeEmpty(scanline);
+		sraRgnOr(scanline, tmpl);
+		if (sraRgnAnd(scanline, reg)) {
+			ret = 0;
+			break;
+		}
+	}
+	sraRgnDestroy(tmpl);
+
+	return ret;
+}
+
+void initialize_xdamage(void) {
+	sraRegionPtr *ptr;
+	int i, nreg;
+
+	using_xdamage = 0;
+	if (xdamage_present) {
+		if (use_xdamage_hints) {
+			using_xdamage = 1;
+		}
+	}
+	if (xdamage_regions)  {
+		ptr = xdamage_regions;
+		while (*ptr != NULL) {
+			sraRgnDestroy(*ptr);
+			ptr++;
+		}
+		free(xdamage_regions);
+		xdamage_regions = NULL;
+	}
+	if (using_xdamage) {
+		nreg = (xdamage_memory * NSCAN) + 2;
+		xdamage_regions = (sraRegionPtr *)
+		    malloc(nreg * sizeof(sraRegionPtr));
+		for (i = 0; i < nreg; i++) {
+			ptr = xdamage_regions+i;
+			if (i == nreg - 1) {
+				*ptr = NULL;
+			} else {
+				*ptr = sraRgnCreate();
+				sraRgnMakeEmpty(*ptr);
+			}
+		}
+		/* set so will be 0 in first collect_xdamage call */
+		xdamage_ticker = -1;
+	}
+}
+
+void create_xdamage(void) {
+#if LIBVNCSERVER_HAVE_LIBXDAMAGE
+	if (! xdamage) {
+		X_LOCK;
+		xdamage = XDamageCreate(dpy, window, XDamageReportRawRectangles); 
+		XDamageSubtract(dpy, xdamage, None, None);
+		X_UNLOCK;
+		rfbLog("created xdamage object: 0x%lx\n", xdamage);
+	}
+#endif
+}
+
+void destroy_xdamage(void) {
+#if LIBVNCSERVER_HAVE_LIBXDAMAGE
+	if (xdamage) {
+		X_LOCK;
+		XDamageDestroy(dpy, xdamage);
+		X_UNLOCK;
+		rfbLog("destroyed xdamage object: 0x%lx\n", xdamage);
+		xdamage = 0;
+	}
+#endif
+}
+
+void check_xdamage_state(void) {
+	if (! using_xdamage || ! xdamage_present) {
+		return;
+	}
+	/*
+	 * Create or destroy the Damage object as needed, we don't want
+	 * one if no clients are connected.
+	 */
+	if (client_count) {
+		create_xdamage();
+	} else {
+		destroy_xdamage();
+	}
 }
 
 /* -- cursor.c -- */
@@ -9525,7 +10136,7 @@ static cursor_info_t cur_arrow = {NULL, NULL, 18, 18, 0, 0, 0, NULL};
 
 /*
  * It turns out we can at least detect mouse is on the root window so 
- * show it (under -cursorX or -X) with this familiar cursor... 
+ * show it (under -cursor X) with this familiar cursor... 
  */
 static char* curs_root_data =
 "                  "
@@ -10868,8 +11479,8 @@ void check_x11_pointer(void) {
 	}
 
 	/* offset subtracted since XQueryPointer relative to rootwin */
-	x = root_x - off_x;
-	y = root_y - off_y;
+	x = root_x - off_x - coff_x;
+	y = root_y - off_y - coff_y;
 
 	/* record the cursor position in the rfb screen */
 	cursor_position(x, y);
@@ -11286,8 +11897,8 @@ XImage *initialize_xdisplay_fb(void) {
 	if (! subwin) {
 		/* full screen */
 		window = rootwin;
-		dpy_x = DisplayWidth(dpy, scr);
-		dpy_y = DisplayHeight(dpy, scr);
+		dpy_x = wdpy_x = DisplayWidth(dpy, scr);
+		dpy_y = wdpy_y = DisplayHeight(dpy, scr);
 		off_x = 0;
 		off_y = 0;
 		/* this may be overridden via visual_id below */
@@ -11302,8 +11913,8 @@ XImage *initialize_xdisplay_fb(void) {
 			X_UNLOCK;
 			clean_up_exit(1);
 		}
-		dpy_x = attr.width;
-		dpy_y = attr.height;
+		dpy_x = wdpy_x = attr.width;
+		dpy_y = wdpy_y = attr.height;
 
 		subwin_bs = attr.backing_store;
 
@@ -11313,6 +11924,46 @@ XImage *initialize_xdisplay_fb(void) {
 		X_UNLOCK;
 		set_offset();
 		X_LOCK;
+	}
+
+	clipshift = 0;
+	cdpy_x = cdpy_y = coff_x = coff_y = 0;
+	if (clip_str) {
+		int w, h, x, y, bad = 0;
+		if (parse_geom(clip_str, &w, &h, &x, &y, wdpy_x, wdpy_y)) {
+			if (x < 0) {
+				x = 0;
+			}
+			if (y < 0) {
+				y = 0;
+			}
+			if (x + w > wdpy_x) {
+				w = wdpy_x - x;
+			}
+			if (y + h > wdpy_y) {
+				h = wdpy_y - y;
+			}
+			if (w <= 0 || h <= 0) {
+				bad = 1;
+			}
+		} else {
+			bad = 1;
+		}
+		if (bad) {
+			rfbLog("skipping invalid -clip WxH+X+Y: %s\n",
+			    clip_str); 
+		} else {
+			/* OK, change geom behind everyone's back... */
+			cdpy_x = w;
+			cdpy_y = h;
+			coff_x = x;
+			coff_y = y;
+
+			clipshift = 1;
+
+			dpy_x = cdpy_x;
+			dpy_y = cdpy_y;
+		}
 	}
 
 	/* initialize depth to reasonable value, visual_id may override */
@@ -11379,13 +12030,13 @@ XImage *initialize_xdisplay_fb(void) {
 		/* subwins can be a dicey if they are changing size... */
 		XTranslateCoordinates(dpy, window, rootwin, 0, 0, &subwin_x,
 		    &subwin_y, &twin);
-		if (subwin_x + dpy_x > disp_x) {
+		if (subwin_x + wdpy_x > disp_x) {
 			shift = 1;
-			subwin_x = disp_x - dpy_x - 3;
+			subwin_x = disp_x - wdpy_x - 3;
 		}
-		if (subwin_y + dpy_y > disp_y) {
+		if (subwin_y + wdpy_y > disp_y) {
 			shift = 1;
-			subwin_y = disp_y - dpy_y - 3;
+			subwin_y = disp_y - wdpy_y - 3;
 		}
 		if (subwin_x < 0) {
 			shift = 1;
@@ -11435,17 +12086,17 @@ XImage *initialize_xdisplay_fb(void) {
 	if (subwin) {
 		XSetErrorHandler(old_handler);
 		if (trapped_xerror) {
-			rfbLog("trapped GetImage at SUBWIN creation.\n");
-			if (try < subwin_tries) {
-				usleep(250 * 1000);
-				if (!get_window_size(window, &dpy_x, &dpy_y)) {
-					rfbLog("could not get size of subwin "
-					    "0x%lx\n", subwin);
-					X_UNLOCK;
-					clean_up_exit(1);
-				}
-				goto again;
+		    rfbLog("trapped GetImage at SUBWIN creation.\n");
+		    if (try < subwin_tries) {
+			usleep(250 * 1000);
+			if (!get_window_size(window, &wdpy_x, &wdpy_y)) {
+				rfbLog("could not get size of subwin "
+				    "0x%lx\n", subwin);
+				X_UNLOCK;
+				clean_up_exit(1);
 			}
+			goto again;
+		    }
 		}
 		trapped_xerror = 0;
 
@@ -11727,7 +12378,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->serverFormat.greenMax   = 0;
 	screen->serverFormat.blueMax    = 0;
 
-	/* these main_* formats are use elsewhere by us. */
+	/* these main_* formats are used generally. */
 	main_red_shift   = 0;
 	main_green_shift = 0;
 	main_blue_shift  = 0;
@@ -12080,12 +12731,12 @@ void solid_root(char *color) {
 	swa.background_pixmap = None;
 	visual.visualid = CopyFromParent;
 	mask = (CWOverrideRedirect|CWBackingStore|CWSaveUnder|CWBackPixmap);
-	expose = XCreateWindow(dpy, window, 0, 0, dpy_x, dpy_y, 0, depth,
+	expose = XCreateWindow(dpy, window, 0, 0, wdpy_x, wdpy_y, 0, depth,
 	    InputOutput, &visual, mask, &swa);
 
 	if (! color) {
 		/* restore the root window from the XImage snapshot */
-		pixmap = XCreatePixmap(dpy, window, dpy_x, dpy_y, depth);
+		pixmap = XCreatePixmap(dpy, window, wdpy_x, wdpy_y, depth);
 
 		if (! image) {
 			/* whoops */
@@ -12100,7 +12751,7 @@ void solid_root(char *color) {
 		gcv.plane_mask = AllPlanes;
 		gc = XCreateGC(dpy, window, GCFunction|GCPlaneMask, &gcv);
 
-		XPutImage(dpy, pixmap, gc, image, 0, 0, 0, 0, dpy_x, dpy_y);
+		XPutImage(dpy, pixmap, gc, image, 0, 0, 0, 0, wdpy_x, wdpy_y);
 
 		gcv.foreground = gcv.background = BlackPixel(dpy, scr);
 		gc = XCreateGC(dpy, window, GCForeground|GCBackground, &gcv);
@@ -12130,14 +12781,14 @@ void solid_root(char *color) {
 		iswa.save_under = False;
 		iswa.background_pixmap = ParentRelative;
 
-		iwin = XCreateWindow(dpy, window, 0, 0, dpy_x, dpy_y, 0, depth,
-		    InputOutput, &visual, mask, &iswa);
+		iwin = XCreateWindow(dpy, window, 0, 0, wdpy_x, wdpy_y, 0,
+		    depth, InputOutput, &visual, mask, &iswa);
 
 		rfbLog("snapshotting background...\n");
 
 		XMapWindow(dpy, iwin);
 		XSync(dpy, False);
-		image = XGetImage(dpy, iwin, 0, 0, dpy_x, dpy_y, AllPlanes,
+		image = XGetImage(dpy, iwin, 0, 0, wdpy_x, wdpy_y, AllPlanes,
 		    ZPixmap);
 		XSync(dpy, False);
 		XDestroyWindow(dpy, iwin);
@@ -12191,7 +12842,7 @@ void solid_cde(char *color) {
 	swa.background_pixmap = None;
 	visual.visualid = CopyFromParent;
 	mask = (CWOverrideRedirect|CWBackingStore|CWSaveUnder|CWBackPixmap);
-	expose = XCreateWindow(dpy, window, 0, 0, dpy_x, dpy_y, 0, depth,
+	expose = XCreateWindow(dpy, window, 0, 0, wdpy_x, wdpy_y, 0, depth,
 	    InputOutput, &visual, mask, &swa);
 
 	if (! color) {
@@ -12212,7 +12863,8 @@ void solid_cde(char *color) {
 				continue;
 			}
 
-			pixmap = XCreatePixmap(dpy, twin, dpy_x, dpy_y, depth);
+			pixmap = XCreatePixmap(dpy, twin, wdpy_x, wdpy_y,
+			    depth);
 			
 			/* draw the image to a pixmap: */
 			gcv.function = GXcopy;
@@ -12220,7 +12872,7 @@ void solid_cde(char *color) {
 			gc = XCreateGC(dpy, twin, GCFunction|GCPlaneMask, &gcv);
 
 			XPutImage(dpy, pixmap, gc, image[n], 0, 0, 0, 0,
-			    dpy_x, dpy_y);
+			    wdpy_x, wdpy_y);
 
 			gcv.foreground = gcv.background = BlackPixel(dpy, scr);
 			gc = XCreateGC(dpy, twin, GCForeground|GCBackground,
@@ -12366,7 +13018,7 @@ void solid_cde(char *color) {
 			iswa.background_pixmap = ParentRelative;
 			visual.visualid = CopyFromParent;
 
-			iwin = XCreateWindow(dpy, twin, 0, 0, dpy_x, dpy_y,
+			iwin = XCreateWindow(dpy, twin, 0, 0, wdpy_x, wdpy_y,
 			    0, depth, InputOutput, &visual, mask, &iswa);
 
 			rfbLog("snapshotting CDE backdrop ws%d 0x%lx -> "
@@ -12374,7 +13026,7 @@ void solid_cde(char *color) {
 			XMapWindow(dpy, iwin);
 			XSync(dpy, False);
 
-			image[n] = XGetImage(dpy, iwin, 0, 0, dpy_x, dpy_y,
+			image[n] = XGetImage(dpy, iwin, 0, 0, wdpy_x, wdpy_y,
 			    AllPlanes, ZPixmap);
 			XSync(dpy, False);
 			XDestroyWindow(dpy, iwin);
@@ -12673,21 +13325,7 @@ void initialize_blackouts(char *list) {
 
 	p = strtok(blist, ", \t");
 	while (p) {
-		/* handle +/-x and +/-y */
-		if (sscanf(p, "%dx%d+%d+%d", &w, &h, &x, &y) == 4) {
-			;
-		} else if (sscanf(p, "%dx%d-%d+%d", &w, &h, &x, &y) == 4) {
-			w = nabs(w);
-			x = dpy_x - x - w;
-		} else if (sscanf(p, "%dx%d+%d-%d", &w, &h, &x, &y) == 4) {
-			h = nabs(h);
-			y = dpy_y - y - h;
-		} else if (sscanf(p, "%dx%d-%d-%d", &w, &h, &x, &y) == 4) {
-			w = nabs(w);
-			h = nabs(h);
-			x = dpy_x - x - w;
-			y = dpy_y - y - h;
-		} else {
+		if (! parse_geom(p, &w, &h, &x, &y, dpy_x, dpy_y)) {
 			if (*p != '\0') {
 				rfbLog("skipping invalid geometry: %s\n", p);
 			}
@@ -13055,15 +13693,6 @@ static int nap_ok = 0, nap_diff_count = 0;
 static int scan_count = 0;	/* indicates which scan pattern we are on  */
 static int scan_in_progress = 0;	
 
-/* scan pattern jitter from x0rfbserver */
-#define NSCAN 32
-static int scanlines[NSCAN] = {
-	 0, 16,  8, 24,  4, 20, 12, 28,
-	10, 26, 18,  2, 22,  6, 30, 14,
-	 1, 17,  9, 25,  7, 23, 15, 31,
-	19,  3, 27, 11, 29, 13,  5, 21
-};
-
 typedef struct tile_change_region {
 	/* start and end lines, along y, of the changed area inside a tile. */
 	unsigned short first_line, last_line;
@@ -13087,6 +13716,10 @@ void initialize_tiles(void) {
 
 	tile_has_diff = (unsigned char *)
 		malloc((size_t) (ntiles * sizeof(unsigned char)));
+	tile_has_xdamage_diff = (unsigned char *)
+		malloc((size_t) (ntiles * sizeof(unsigned char)));
+	tile_row_has_xdamage_diff = (unsigned char *)
+		malloc((size_t) (ntiles_y * sizeof(unsigned char)));
 	tile_tried    = (unsigned char *)
 		malloc((size_t) (ntiles * sizeof(unsigned char)));
 	tile_copied   = (unsigned char *)
@@ -13108,6 +13741,14 @@ void free_tiles(void) {
 	if (tile_has_diff) {
 		free(tile_has_diff);
 		tile_has_diff = NULL;
+	}
+	if (tile_has_xdamage_diff) {
+		free(tile_has_xdamage_diff);
+		tile_has_xdamage_diff = NULL;
+	}
+	if (tile_row_has_xdamage_diff) {
+		free(tile_row_has_xdamage_diff);
+		tile_row_has_xdamage_diff = NULL;
 	}
 	if (tile_tried) {
 		free(tile_tried);
@@ -15032,7 +15673,7 @@ static int scan_display(int ystart, int rescan) {
 	int pixelsize = bpp/8;
 	int x, y, w, n;
 	int tile_count = 0;
-	int whole_line = 1, nodiffs = 0;
+	int nodiffs = 0, diff_hint;
 
 	y = ystart;
 
@@ -15042,6 +15683,15 @@ static int scan_display(int ystart, int rescan) {
 	}
 
 	while (y < dpy_y) {
+
+		if (using_xdamage) {
+			XD_tot++;
+			if (xdamage_hint_skip(y)) {
+				XD_skip++;
+				y += NSCAN;
+				continue;
+			}
+		}
 
 		/* grab the horizontal scanline from the display: */
 		X_LOCK;
@@ -15054,7 +15704,7 @@ static int scan_display(int ystart, int rescan) {
 		src = scanline->data;
 		dst = main_fb + y * main_bytes_per_line;
 
-		if (whole_line && ! memcmp(dst, src, main_bytes_per_line)) {
+		if (! memcmp(dst, src, main_bytes_per_line)) {
 			/* no changes anywhere in scan line */
 			nodiffs = 1;
 			if (! rescan) {
@@ -15066,6 +15716,7 @@ static int scan_display(int ystart, int rescan) {
 		x = 0;
 		while (x < dpy_x) {
 			n = (x/tile_x) + (y/tile_y) * ntiles_x;
+			diff_hint = 0;
 
 			if (blackouts) {
 				if (blackout_line_skip(n, x, y, rescan,
@@ -15081,6 +15732,10 @@ static int scan_display(int ystart, int rescan) {
 					x += NSCAN;
 					continue;
 				}
+			} else if (xdamage_tile_count &&
+			    tile_has_xdamage_diff[n]) {
+				tile_has_xdamage_diff[n] = 2;
+				diff_hint = 1;
 			}
 
 			/* set ptrs to correspond to the x offset: */
@@ -15094,7 +15749,7 @@ static int scan_display(int ystart, int rescan) {
 				w = NSCAN;
 			}
 
-			if (memcmp(dst, src, w * pixelsize)) {
+			if (diff_hint || memcmp(dst, src, w * pixelsize)) {
 				/* found a difference, record it: */
 				if (! blackouts) {
 					tile_has_diff[n] = 1;
@@ -15129,9 +15784,15 @@ int scan_for_updates(int count_only) {
 	double frac3 = 0.02;  /* do scan_display() again after copy_tiles() */
 	for (i=0; i < ntiles; i++) {
 		tile_has_diff[i] = 0;
+		tile_has_xdamage_diff[i] = 0;
 		tile_tried[i] = 0;
 		tile_copied[i] = 0;
 	}
+	for (i=0; i < ntiles_y; i++) {
+		/* could be useful, currently not used */
+		tile_row_has_xdamage_diff[i] = 0;
+	}
+	xdamage_tile_count = 0;
 
 	/*
 	 * n.b. this program has only been tested so far with
@@ -15142,15 +15803,16 @@ int scan_for_updates(int count_only) {
 		scan_count++;
 		scan_count %= NSCAN;
 
-		if (scan_count % (NSCAN/4) == 0)  {
-			/* some periodic maintenance */
-
-			if (subwin) {
-				set_offset();	/* follow the subwindow */
-			}
-			if (indexed_color) {	/* check for changed colormap */
-				set_colormap(0);
-			}
+		/* some periodic maintenance */
+		if (subwin) {
+			set_offset();	/* follow the subwindow */
+		}
+		if (indexed_color && scan_count % 4 == 0) {
+			/* check for changed colormap */
+			set_colormap(0);
+		}
+		if (using_xdamage) {
+			collect_xdamage(scan_count);
 		}
 	}
 
@@ -15170,6 +15832,20 @@ int scan_for_updates(int count_only) {
 		scan_in_progress = 0;
 		fb_copy_in_progress = 0;
 		return tile_count;
+	}
+
+	if (xdamage_tile_count) {
+		/* pick up "known" damaged tiles we missed in scan_display() */
+		for (i=0; i < ntiles; i++) {
+			if (tile_has_diff[i]) {
+				continue;
+			}
+			if (tile_has_xdamage_diff[i] == 1) {
+				tile_has_xdamage_diff[i] = 2;
+				tile_has_diff[i] = 1;
+				tile_count++;
+			}
+		}
 	}
 
 	nap_set(tile_count);
@@ -15349,9 +16025,11 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		exit(0);
 	}
 	if (getenv("DISPLAY") != NULL) {
+		/* worst case */
 		x11vnc_xdisplay = strdup(getenv("DISPLAY"));
 	}
 	if (use_dpy) {
+		/* better */
 		x11vnc_xdisplay = strdup(use_dpy);
 	}
 	if (connect_to_x11vnc) {
@@ -15360,6 +16038,8 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		if (! client_connect_file) {
 			if (getenv("XAUTHORITY") != NULL) {
 				old_xauth = strdup(getenv("XAUTHORITY"));
+			} else {
+				old_xauth = strdup("");
 			}
 			dpy = XOpenDisplay(x11vnc_xdisplay); 
 			if (! dpy && auth_file) {
@@ -15367,11 +16047,12 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 				dpy = XOpenDisplay(x11vnc_xdisplay);
 			}
 			if (! dpy && ! x11vnc_xdisplay) {
+				/* worstest case */
 				x11vnc_xdisplay = strdup(":0");
 				dpy = XOpenDisplay(x11vnc_xdisplay); 
 			}
 			if (! dpy) {
-				fprintf(stderr, "gui: could not open "
+				fprintf(stderr, "gui: could not open x11vnc "
 				    "display: %s\n", NONUL(x11vnc_xdisplay));
 				exit(1);
 			}
@@ -15398,7 +16079,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		}
 		set_env("X11VNC_XDISPLAY", x11vnc_xdisplay);
 		if (getenv("XAUTHORITY") != NULL) {
-			set_env("X11VNC_XAUTHORITY", getenv("XAUTHORITY"));
+			set_env("X11VNC_AUTH_FILE", getenv("XAUTHORITY"));
 		}
 		if (rc == 0) {
 			fprintf(stderr, "gui: ping succeeded.\n");
@@ -15411,7 +16092,15 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 			XCloseDisplay(dpy);
 		}
 		if (old_xauth) {
-			set_env("XAUTHORITY", old_xauth);
+			if (*old_xauth == '\0') {
+				/* wasn't set, hack it out if it is now */
+				char *xauth = getenv("XAUTHORITY");
+				if (xauth) {
+					*(xauth-2) = '_';	/* yow */
+				}
+			} else {
+				set_env("XAUTHORITY", old_xauth);
+			}
 			free(old_xauth);
 		}
 	}
@@ -15458,8 +16147,6 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	set_env("X11VNC_CMDLINE", program_cmdline);
 	if (simple_gui) {
 		set_env("X11VNC_SIMPLE_GUI", "1");
-	}
-	if (auth_file) {
 	}
 
 	sprintf(cmd, "%s -", wish);
@@ -16509,6 +17196,10 @@ static void watch_loop(void) {
 			continue;
 		}
 
+		if (using_xdamage) {
+			check_xdamage_state();
+		}
+
 		if (watch_bell) {
 			/* n.b. assumes -nofb folks do not want bell... */
 			check_bell_event();
@@ -16618,6 +17309,12 @@ static void print_help(int mode) {
 "                       shifts a root view to it: this shows SaveUnders menus,\n"
 "                       etc, although they will be clipped if they extend beyond\n"
 "                       the window.\n"
+"-clip WxH+X+Y          Only show the sub-region of the full display that\n"
+"                       corresponds to the rectangle with size WxH and offset\n"
+"                       +X+Y.  The VNC display has size WxH (i.e. smaller than\n"
+"                       the full display).  This also works for -id/-sid mode\n"
+"                       where the offset is relative to the upper left corner\n"
+"                       of the selected window.\n"
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
 "-notruecolor           For 8bpp displays, force indexed color (i.e. a colormap)\n"
@@ -17292,6 +17989,36 @@ static void print_help(int mode) {
 "                       to really throttle down the screen polls (i.e. sleep\n"
 "                       for about 1.5 secs). Use 0 to disable.  Default: %d\n"
 "\n"
+"-noxdamage             Do not use the X DAMAGE extension to detect framebuffer\n"
+"                       changes even if it is available.\n"
+"\n"
+"                       x11vnc's use of the DAMAGE extension: 1) significantly\n"
+"                       reduces the load when the screen is not changing much,\n"
+"                       and 2) detects changed areas (small ones by default)\n"
+"                       more quickly.\n"
+"\n"
+"                       Currently the DAMAGE extension is overly conservative\n"
+"                       and often reports large areas (e.g. a whole terminal\n"
+"                       or browser window) as damaged even though the actual\n"
+"                       changed region is much smaller (sometimes just a few\n"
+"                       pixels).  So heuristics were introduced to skip large\n"
+"                       areas and use the damage rectangles only as \"hints\"\n"
+"                       for the traditional scanline polling.  The following\n"
+"                       tuning parameters are introduced to adjust this\n"
+"                       behavior:\n"
+"\n"
+"-xd_area A             Set the largest DAMAGE rectangle area \"A\" (in\n"
+"                       pixels: width * height) to trust as truly damaged:\n"
+"                       the rectangle will be copied from the framebuffer\n"
+"                       (slow) no matter what.  Set to zero to trust *all*\n"
+"                       rectangles. Default: %d\n"
+"-xd_mem f              Set how long DAMAGE rectangles should be \"remembered\",\n"
+"                       \"f\" is a floating point number and is in units of the\n"
+"                       scanline repeat cycle time (%d iterations).  The default\n"
+"                       (%.1f) should give no painting problems. Increase it if\n"
+"                       there are problems or decrease it to live on the edge\n"
+"                       (perhaps useful on a slow machine).\n"
+"\n"
 "-sigpipe string        Broken pipe (SIGPIPE) handling.  \"string\" can be\n"
 "                       \"ignore\" or \"exit\".  For \"ignore\" libvncserver\n"
 "                       will handle the abrupt loss of a client and continue,\n"
@@ -17417,6 +18144,7 @@ static void print_help(int mode) {
 "                       id:windowid     set -id window to \"windowid\". empty\n"
 "                                       or \"root\" to go back to root window\n"
 "                       sid:windowid    set -sid window to \"windowid\"\n"
+"                       clip:WxH+X+Y    set -clip mode to \"WxH+X+Y\"\n"
 "                       flashcmap       enable  -flashcmap mode.\n"
 "                       noflashcmap     disable -flashcmap mode.\n"
 "                       notruecolor     enable  -notruecolor mode.\n"
@@ -17559,6 +18287,10 @@ static void print_help(int mode) {
 "                       nap             enable  -nap mode.\n"
 "                       nonap           disable -nap mode.\n"
 "                       sb:n            set -sb to n s, same as screen_blank:n\n"
+"                       xdamage         enable  xdamage polling hints.\n"
+"                       noxdamage       disable xdamage polling hints.\n"
+"                       xd_area:A       set -xd_area max pixel area to \"A\"\n"
+"                       xd_mem:f        set -xd_mem remembrance to \"f\"\n"
 "                       fs:frac         set -fs fraction to \"frac\", e.g. 0.5\n"
 "                       gaps:n          set -gaps to n.\n"
 "                       grow:n          set -grow to n.\n"
@@ -17625,7 +18357,7 @@ static void print_help(int mode) {
 "                       variables correspond to the presence of X extensions):\n"
 "\n"
 "                       ans= stop quit exit shutdown ping blacken zero\n"
-"                       refresh reset close disconnect id sid waitmapped\n"
+"                       refresh reset close disconnect id sid clip waitmapped\n"
 "                       nowaitmapped flashcmap noflashcmap truecolor notruecolor\n"
 "                       overlay nooverlay overlay_cursor overlay_yescursor\n"
 "                       nooverlay_nocursor nooverlay_cursor nooverlay_yescursor\n"
@@ -17641,9 +18373,10 @@ static void print_help(int mode) {
 "                       remap repeat norepeat fb nofb bell nobell sel\n"
 "                       nosel primary noprimary cursorshape nocursorshape\n"
 "                       cursorpos nocursorpos cursor show_cursor noshow_cursor\n"
-"                       nocursor xfixes noxfixes alphacut alphafrac alpharemove\n"
-"                       noalpharemove alphablend noalphablend xwarp xwarppointer\n"
-"                       noxwarp noxwarppointer buttonmap dragging nodragging\n"
+"                       nocursor xfixes noxfixes xdamage noxdamage xd_area\n"
+"                       xd_mem alphacut alphafrac alpharemove noalpharemove\n"
+"                       alphablend noalphablend xwarp xwarppointer noxwarp\n"
+"                       noxwarppointer buttonmap dragging nodragging\n"
 "                       pointer_mode pm input_skip input client_input speeds\n"
 "                       debug_pointer dp nodebug_pointer nodp debug_keyboard dk\n"
 "                       nodebug_keyboard nodk deferupdate defer wait rfbwait\n"
@@ -17654,15 +18387,16 @@ static void print_help(int mode) {
 "                       nodontdisconnect desktop noremote\n"
 "\n"
 "                       aro=  display vncdisplay desktopname http_url auth\n"
-"                       users rootshift scale_str scaled_x scaled_y scale_numer\n"
-"                       scale_denom scale_fac scaling_noblend scaling_nomult4\n"
-"                       scaling_pad scaling_interpolate inetd safer unsafe\n"
-"                       passwdfile using_shm logfile o rc norc h help V version\n"
-"                       lastmod bg sigpipe threads clients client_count pid\n"
-"                       ext_xtest ext_xkb ext_xshm ext_xinerama ext_overlay\n"
-"                       ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons\n"
-"                       button_mask mouse_x mouse_y bpp depth indexed_color\n"
-"                       dpy_x dpy_y rfbauth passwd\n"
+"                       users rootshift clipshift scale_str scaled_x scaled_y\n"
+"                       scale_numer scale_denom scale_fac scaling_noblend\n"
+"                       scaling_nomult4 scaling_pad scaling_interpolate inetd\n"
+"                       safer unsafe passwdfile using_shm logfile o rc norc\n"
+"                       h help V version lastmod bg sigpipe threads clients\n"
+"                       client_count pid ext_xtest ext_xkb ext_xshm ext_xinerama\n"
+"                       ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin\n"
+"                       num_buttons button_mask mouse_x mouse_y bpp depth\n"
+"                       indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y\n"
+"                       cdpy_x cdpy_y coff_x coff_y rfbauth passwd\n"
 "\n"
 "-sync                  By default -remote commands are run asynchronously, that\n"
 "                       is, the request is posted and the program immediately\n"
@@ -17761,6 +18495,7 @@ static void print_help(int mode) {
 		waitms,
 		take_naps ? "take naps":"no naps",
 		screen_blank,
+		xdamage_max_area, NSCAN, xdamage_memory,
 		use_threads ? "-threads":"-nothreads",
 		fs_frac,
 		gaps_fill,
@@ -18126,6 +18861,7 @@ int main(int argc, char* argv[]) {
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0, got_deferupdate = 0, got_defer = 0;
+	int got_noxdamage = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc = 1; char *argv_vnc[128];
@@ -18211,6 +18947,9 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-waitmapped")) {
 			subwin_wait_mapped = 1;
+		} else if (!strcmp(arg, "-clip")) {
+			CHECK_ARGC
+			clip_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-flashcmap")) {
 			flash_cmap = 1;
 		} else if (!strcmp(arg, "-notruecolor")) {
@@ -18468,6 +19207,24 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-sb")) {
 			CHECK_ARGC
 			screen_blank = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-noxdamage")) {
+			using_xdamage = 0;
+			use_xdamage_hints = 0;
+			got_noxdamage = 1;
+		} else if (!strcmp(arg, "-xd_area")) {
+			int tn;
+			CHECK_ARGC
+			tn = atoi(argv[++i]);
+			if (tn >= 0) {
+				xdamage_max_area = tn;
+			}
+		} else if (!strcmp(arg, "-xd_mem")) {
+			double f;
+			CHECK_ARGC
+			f = atof(argv[++i]);
+			if (f >= 0.0) {
+				xdamage_memory = f;
+			}
 		} else if (!strcmp(arg, "-sigpipe")) {
 			CHECK_ARGC
 			if (known_sigpipe_mode(argv[++i])) {
@@ -18820,6 +19577,8 @@ int main(int argc, char* argv[]) {
                     : "null");
 		fprintf(stderr, " subwin:     0x%lx\n", subwin);
 		fprintf(stderr, " -sid mode:  %d\n", rootshift);
+		fprintf(stderr, " clip:       %s\n", clip_str ? clip_str
+                    : "null");
 		fprintf(stderr, " flashcmap:  %d\n", flash_cmap);
 		fprintf(stderr, " force_idx:  %d\n", force_indexed_color);
 		fprintf(stderr, " visual:     %s\n", visual_str ? visual_str
@@ -18909,6 +19668,9 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " waitms:     %d\n", waitms);
 		fprintf(stderr, " take_naps:  %d\n", take_naps);
 		fprintf(stderr, " sb:         %d\n", screen_blank);
+		fprintf(stderr, " xdamage:    %d\n", !got_noxdamage);
+		fprintf(stderr, "  xd_area:   %d\n", xdamage_max_area);
+		fprintf(stderr, "  xd_mem:    %.3f\n", xdamage_memory);
 		fprintf(stderr, " sigpipe:    %s\n", sigpipe
 		    ? sigpipe : "null");
 		fprintf(stderr, " threads:    %d\n", use_threads);
@@ -19050,6 +19812,12 @@ int main(int argc, char* argv[]) {
 		xdamage_present = 1;
 	}
 #endif
+	if (! quiet && xdamage_present && ! got_noxdamage) {
+		rfbLog("X DAMAGE available on display, using it for"
+		    " polling hints\n");
+		rfbLog("  to disable this behavior use: "
+		    "'-noxdamage'\n");
+	}
 
 	overlay_present = 0;
 #ifdef SOLARIS_OVERLAY

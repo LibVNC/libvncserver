@@ -1,3 +1,6 @@
+2005-03-12  Karl Runge <runge@karlrunge.com>
+	* x11vnc: X DAMAGE support, -clip WxH+X+Y, identd.
+
 2005-03-05  Karl Runge <runge@karlrunge.com>
 	* autoconf: rpm -> rpmbuild and echo -n -> printf
 

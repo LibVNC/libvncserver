@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2pre, lastmod: 2005-03-04
+         version: 0.7.2pre, lastmod: 2005-03-12
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -88,6 +88,15 @@ As \fB-id,\fR but instead of using the window directly it
 shifts a root view to it: this shows SaveUnders menus,
 etc, although they will be clipped if they extend beyond
 the window.
+.PP
+\fB-clip\fR \fIWxH+X+Y\fR
+.IP
+Only show the sub-region of the full display that
+corresponds to the rectangle with size WxH and offset
++X+Y.  The VNC display has size WxH (i.e. smaller than
+the full display).  This also works for \fB-id/-sid\fR mode
+where the offset is relative to the upper left corner
+of the selected window.
 .PP
 \fB-flashcmap\fR
 .IP
@@ -994,6 +1003,43 @@ Time in seconds after NO activity (e.g. screen blank)
 to really throttle down the screen polls (i.e. sleep
 for about 1.5 secs). Use 0 to disable.  Default: 60
 .PP
+\fB-noxdamage\fR
+.IP
+Do not use the X DAMAGE extension to detect framebuffer
+changes even if it is available.
+.IP
+x11vnc's use of the DAMAGE extension: 1) significantly
+reduces the load when the screen is not changing much,
+and 2) detects changed areas (small ones by default)
+more quickly.
+.IP
+Currently the DAMAGE extension is overly conservative
+and often reports large areas (e.g. a whole terminal
+or browser window) as damaged even though the actual
+changed region is much smaller (sometimes just a few
+pixels).  So heuristics were introduced to skip large
+areas and use the damage rectangles only as "hints"
+for the traditional scanline polling.  The following
+tuning parameters are introduced to adjust this
+behavior:
+.PP
+\fB-xd_area\fR \fIA\fR
+.IP
+Set the largest DAMAGE rectangle area \fIA\fR (in
+pixels: width * height) to trust as truly damaged:
+the rectangle will be copied from the framebuffer
+(slow) no matter what.  Set to zero to trust *all*
+rectangles. Default: 20000
+.PP
+\fB-xd_mem\fR \fIf\fR
+.IP
+Set how long DAMAGE rectangles should be "remembered",
+\fIf\fR is a floating point number and is in units of the
+scanline repeat cycle time (32 iterations).  The default
+(1.0) should give no painting problems. Increase it if
+there are problems or decrease it to live on the edge
+(perhaps useful on a slow machine).
+.PP
 \fB-sigpipe\fR \fIstring\fR
 .IP
 Broken pipe (SIGPIPE) handling.  \fIstring\fR can be
@@ -1148,6 +1194,8 @@ id:windowid     set \fB-id\fR window to "windowid". empty
                 or "root" to go back to root window
 .IP
 sid:windowid    set \fB-sid\fR window to "windowid"
+.IP
+clip:WxH+X+Y    set \fB-clip\fR mode to "WxH+X+Y"
 .IP
 flashcmap       enable  \fB-flashcmap\fR mode.
 .IP
@@ -1387,6 +1435,14 @@ nonap           disable \fB-nap\fR mode.
 .IP
 sb:n            set \fB-sb\fR to n s, same as screen_blank:n
 .IP
+xdamage         enable  xdamage polling hints.
+.IP
+noxdamage       disable xdamage polling hints.
+.IP
+xd_area:A       set \fB-xd_area\fR max pixel area to "A"
+.IP
+xd_mem:f        set \fB-xd_mem\fR remembrance to "f"
+.IP
 fs:frac         set \fB-fs\fR fraction to "frac", e.g. 0.5
 .IP
 gaps:n          set \fB-gaps\fR to n.
@@ -1491,7 +1547,7 @@ the returned value corresponds to (hint: the ext_*
 variables correspond to the presence of X extensions):
 .IP
 ans= stop quit exit shutdown ping blacken zero
-refresh reset close disconnect id sid waitmapped
+refresh reset close disconnect id sid clip waitmapped
 nowaitmapped flashcmap noflashcmap truecolor notruecolor
 overlay nooverlay overlay_cursor overlay_yescursor
 nooverlay_nocursor nooverlay_cursor nooverlay_yescursor
@@ -1507,9 +1563,10 @@ clear_mods noclear_mods clear_keys noclear_keys
 remap repeat norepeat fb nofb bell nobell sel
 nosel primary noprimary cursorshape nocursorshape
 cursorpos nocursorpos cursor show_cursor noshow_cursor
-nocursor xfixes noxfixes alphacut alphafrac alpharemove
-noalpharemove alphablend noalphablend xwarp xwarppointer
-noxwarp noxwarppointer buttonmap dragging nodragging
+nocursor xfixes noxfixes xdamage noxdamage xd_area
+xd_mem alphacut alphafrac alpharemove noalpharemove
+alphablend noalphablend xwarp xwarppointer noxwarp
+noxwarppointer buttonmap dragging nodragging
 pointer_mode pm input_skip input client_input speeds
 debug_pointer dp nodebug_pointer nodp debug_keyboard dk
 nodebug_keyboard nodk deferupdate defer wait rfbwait
@@ -1520,15 +1577,16 @@ noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop noremote
 .IP
 aro=  display vncdisplay desktopname http_url auth
-users rootshift scale_str scaled_x scaled_y scale_numer
-scale_denom scale_fac scaling_noblend scaling_nomult4
-scaling_pad scaling_interpolate inetd safer unsafe
-passwdfile using_shm logfile o rc norc h help V version
-lastmod bg sigpipe threads clients client_count pid
-ext_xtest ext_xkb ext_xshm ext_xinerama ext_overlay
-ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
-button_mask mouse_x mouse_y bpp depth indexed_color
-dpy_x dpy_y rfbauth passwd
+users rootshift clipshift scale_str scaled_x scaled_y
+scale_numer scale_denom scale_fac scaling_noblend
+scaling_nomult4 scaling_pad scaling_interpolate inetd
+safer unsafe passwdfile using_shm logfile o rc norc
+h help V version lastmod bg sigpipe threads clients
+client_count pid ext_xtest ext_xkb ext_xshm ext_xinerama
+ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin
+num_buttons button_mask mouse_x mouse_y bpp depth
+indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y
+cdpy_x cdpy_y coff_x coff_y rfbauth passwd
 .PP
 \fB-sync\fR
 .IP

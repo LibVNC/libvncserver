@@ -115,6 +115,7 @@ Screen
 	flashcmap
 	notruecolor
 	--
+	clip:
 	=P blackout:
 	xinerama
 	--
@@ -139,11 +140,15 @@ Keyboard
 
 Pointer
 	=D-C:none,arrow,X,some,most cursor:
-	noxfixes
-	noalphablend
 	--
 	cursorpos
 	=D nocursorshape
+	--
+	noxfixes
+	noalphablend
+	alphacut:
+	alphafrac:
+	alpharemove
 	--
 	buttonmap:
 	--
@@ -220,10 +225,6 @@ Tuning
 	noshm
 	flipbyteorder
 	onetile
-	--
-	alphacut:
-	alphafrac:
-	alpharemove
 	-- D
 	speeds:
 	=D wait:
@@ -236,6 +237,11 @@ Tuning
 	grow:
 	fuzz:
 	snapfb
+	--
+	xdamage
+	xd_mem:
+	xd_area:
+	xd_width:
 	--
 	threads
 	--
@@ -2042,17 +2048,18 @@ proc client_dialog {client} {
 	global menu_var text_area cleanup_window item_bool
 
 	append_text "\nClient info string:  $client\n\n"
-	if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*)$} \
-	    $client m0 m1 m2 m3 m4 m5 m6]} {
-		# id:ip:port:hostname:input:loginvo
+	if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
+	    $client m0 m1 m2 m3 m4 m5 m6 m7]} {
+		# id:ip:port:user:hostname:input:loginvo
 		set cid $m1
 		set ip $m2
 		set port $m3
-		set host $m4
+		set user $m4
+		set host $m5
 		regsub {\..*$} $host "" host
-		set input $m5
-		set logvo $m6
-		append_text "Host: $host, Port: $port, IP: $ip, Id: $cid\n"
+		set input $m6
+		set logvo $m7
+		append_text "Host: $host, Port: $port, User: $user, IP: $ip, Id: $cid\n"
 		append_text "    - originally logged in as:  "
 		if {$logvo == "1" } {
 			append_text "View-Only Client\n"
@@ -2184,10 +2191,10 @@ proc update_clients_menu {list} {
 	$subm add separator
 	set count 0
 	foreach client [split $list ","] {
-		if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*)$} \
-		    $client m0 m1 m2 m3 m4 m5 m6]} {
-			# id:ip:port:hostname:input:loginvo
-			set host $m4
+		if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
+		    $client m0 m1 m2 m3 m4 m5 m6 m7]} {
+			# id:ip:port:user:hostname:input:loginvo
+			set host $m5
 			regsub {\..*$} $host "" host
 			set clabel "$host $m1"
 		} else {

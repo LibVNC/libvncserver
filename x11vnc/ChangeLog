@@ -1,3 +1,14 @@
+2005-03-12  Karl Runge <runge@karlrunge.com>
+	* support for the X DAMAGE extension to receive damage
+	  rectangle reports from the X server.  On by default, disable
+	  with -noxdamage.  Currently only trusts small rects
+	  (but see -xd_area n) and uses the rest as "hints" for the
+	  scanline polling.
+	* -clip WxH+X+Y to show a clipped sub-region of the screen.
+	* use RFC 1413 (identd) to attach a name to a client in 
+	  friendly environments.
+	* fix XAUTHORITY wrt '-auth ... -gui other:0'.
+
 2005-03-04  Karl Runge <runge@karlrunge.com>
 	* add changes to couple with -listen option, in particular
 	  the behavior of -localhost and remote control cmds.
