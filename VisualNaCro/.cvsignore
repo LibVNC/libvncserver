@@ -16,4 +16,7 @@ mkinstalldirs
 nacro.pm
 nacro.so
 nacro_wrap.c
-visualnacro-*.tar.gz
+visualnacro-*
+.deps
+.in
+depcomp
