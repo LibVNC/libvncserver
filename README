@@ -1,5 +1,7 @@
 LibVNCServer: a library for easy implementation of a RDP/VNC server.
-Copyright (C) 2001 Johannes E. Schindelin
+Copyright (C) 2001-2003 Johannes E. Schindelin
+
+If you already used LibVNCServer, you probably want to read NEWS.
 
 What is it?
 -----------
@@ -417,3 +419,4 @@ Contact
 -------
 
 To contact me, mail me: Johannes dot Schindelin at gmx dot de
+
