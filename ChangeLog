@@ -1,3 +1,7 @@
+2004-08-03  Karl Runge <runge@karlrunge.com>
+	* x11vnc: manpage and README
+	* fix XKBlib.h detection on *BSD
+
 2004-07-31  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -cursorpos now the default
 

@@ -1,7 +1,8 @@
 DEFINES = -I ..
 LDADD = ../libvncserver/libvncserver.a
 
-EXTRA_DIST=ChangeLog
+man_MANS=x11vnc.1
+EXTRA_DIST=ChangeLog README $(man_MANS)
 
 if CYGIPC
 LD_CYGIPC=-lcygipc

@@ -156,7 +156,7 @@
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.6.2 lastmod: 2004-07-31";
+char lastmod[] = "0.6.3pre lastmod: 2004-08-03";
 
 /* X display info */
 Display *dpy = 0;
@@ -7814,7 +7814,7 @@ static void print_help(void) {
 "                       setting the XAUTHORITY environment varirable to \"file\"\n"
 "                       before startup.  See Xsecurity(7), xauth(1) man pages.\n"
 "\n"
-"-id windowid           Show the window corresponding to <windowid> not the\n"
+"-id windowid           Show the window corresponding to \"windowid\" not the\n"
 "                       entire display. Warning: bugs! new toplevels missed!...\n"
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
@@ -7835,8 +7835,8 @@ static void print_help(void) {
 "                       number, alternatively the notation \"m/n\" may be used\n"
 "                       to denote fractions, e.g. -scale 2/3.\n"
 "\n"
-"                       Scaling Options: can be added after fraction via \":\",\n"
-"                       to supply multiple \":\" options use commas.\n"
+"                       Scaling Options: can be added after \"fraction\" via\n"
+"                       \":\", to supply multiple \":\" options use commas.\n"
 "                       If you just want a quick, rough scaling without\n"
 "                       blending, append \":nb\" to \"fraction\" (e.g. -scale\n"
 "                       1/3:nb).  For compatibility with vncviewers the scaled\n"
@@ -7853,9 +7853,9 @@ static void print_help(void) {
 "-forever               Keep listening for more connections rather than exiting\n"
 "                       as soon as the first client(s) disconnect. Same as -many\n"
 "-connect string        For use with \"vncviewer -listen\" reverse connections.\n"
-"                       If string has the form \"host\" or \"host:port\"\n"
+"                       If \"string\" has the form \"host\" or \"host:port\"\n"
 "                       the connection is made once at startup.  Use commas\n"
-"                       for a list of host's and host:port's.  If string\n"
+"                       for a list of host's and host:port's.  If \"string\"\n"
 "                       contains \"/\" it is instead interpreted as a file to\n"
 "                       periodically check for new hosts.  The first line is\n"
 "                       read and then the file is truncated.\n"
@@ -7941,8 +7941,8 @@ static void print_help(void) {
 "                       responses.  All 3 of the popup keywords can be followed\n"
 "                       by +N+M to supply a position for the popup window.\n"
 "                       The default is to center the popup window.\n"
-"-gone string           As -accept string, except to run a user supplied command\n"
-"                       when a client goes away (disconnects).  Unlike -accept,\n"
+"-gone string           As -accept, except to run a user supplied command when\n"
+"                       a client goes away (disconnects).  Unlike -accept,\n"
 "                       the command return code is not interpreted by x11vnc.\n"
 "\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
@@ -7956,8 +7956,9 @@ static void print_help(void) {
 "                       just use 1 shm tile for polling.  Same as -old_copytile.\n"
 "                       Limits shm segments used to 3.\n"
 "\n"
-"-blackout string       Black out rectangles on the screen. string is a comma\n"
-"                       separated list of WxH+X+Y type geometries for each rect.\n"
+"-blackout string       Black out rectangles on the screen. \"string\" is a\n"
+"                       comma separated list of WxH+X+Y type geometries for\n"
+"                       each rectangle.\n"
 "-xinerama              If your screen is composed of multiple monitors\n"
 "                       glued together via XINERAMA, and that screen is\n"
 "                       non-rectangular this option will try to guess the areas\n"
@@ -9004,6 +9005,8 @@ int main(int argc, char* argv[]) {
 	}
 #else
 	use_xkb = 0;
+	watch_bell = 0;
+	use_xkb_modtweak = 0;
 #endif
 	if (use_dpy) {
 		dpy = XOpenDisplay(use_dpy);

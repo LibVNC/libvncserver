@@ -42,8 +42,11 @@ AC_PATH_XTRA
 AH_TEMPLATE(HAVE_XKEYBOARD, [XKEYBOARD extension build environment present])
 AH_TEMPLATE(HAVE_LIBXINERAMA, [XINERAMA extension build environment present])
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
+	saved_CPPFLAGS="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS $X_CFLAGS"
 	AC_CHECK_HEADER(X11/XKBlib.h, HAVE_XKBLIB_H="true",
 		HAVE_XKBLIB_H="false", [#include <X11/Xlib.h>])
+	CPPFLAGS="$saved_CPPFLAGS"
 	if test $HAVE_XKBLIB_H = "true"; then
 		AC_CHECK_LIB(X11, XkbSelectEvents,
 			[AC_DEFINE(HAVE_XKEYBOARD)], ,
