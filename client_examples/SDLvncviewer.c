@@ -179,14 +179,13 @@ rfbKeySym SDL_keysym2rfbKeySym(int keysym) {
 	}
 }
 
-#define main main1
-#include "ppmtest.c"
-#undef main
-
 void update(rfbClient* cl,int x,int y,int w,int h) {
 	SDL_UpdateRect(cl->clientData, x, y, w, h);
-	SaveFramebufferAsPPM(cl,x,y,w,h);
 }
+
+#ifdef mac
+#define main SDLmain
+#endif
 
 int main(int argc,char** argv) {
 	rfbClient* cl;
