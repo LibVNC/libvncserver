@@ -296,9 +296,11 @@ typedef struct {
 #define rfbEncodingRRE 2
 #define rfbEncodingCoRRE 4
 #define rfbEncodingHextile 5
+#ifdef HAVE_LIBZ
 #define rfbEncodingZlib 6
 #define rfbEncodingTight 7
 #define rfbEncodingZlibHex 8
+#endif
 #ifdef BACKCHANNEL
 #define rfbEncodingBackChannel 15
 #endif
@@ -488,7 +490,7 @@ typedef struct {
 #define rfbHextileExtractW(byte) (((byte) >> 4) + 1)
 #define rfbHextileExtractH(byte) (((byte) & 0xf) + 1)
 
-
+#ifdef HAVE_LIBZ
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * zlib - zlib compressed Encoding.  We have an rfbZlibHeader structure
  * giving the number of bytes following.  Finally the data follows is
@@ -636,6 +638,8 @@ typedef struct {
 #define rfbTightFilterCopy             0x00
 #define rfbTightFilterPalette          0x01
 #define rfbTightFilterGradient         0x02
+
+#endif
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * XCursor encoding. This is a special encoding used to transmit X-style

@@ -309,7 +309,7 @@ rfbCloseClient(cl)
      rfbClientPtr cl;
 {
     LOCK(cl->updateMutex);
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
     if (cl->sock != -1)
 #endif
       {

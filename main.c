@@ -32,7 +32,7 @@
 #include "rfb.h"
 #include "sraRegion.h"
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
 MUTEX(logMutex);
 #endif
 
@@ -130,7 +130,7 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
 #if 0
        /* TODO: is this needed? Or does it mess up deferring? */
        /* while(!sraRgnEmpty(cl->copyRegion)) */ {
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
 	 if(!cl->screen->backgroundLoop)
 #endif
 	   {
@@ -231,7 +231,7 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
    sraRgnDestroy(region);
 }
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
 static void *
 clientOutput(void *data)
 {
@@ -796,7 +796,7 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)
 {
   if(runInBackground) {
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
        pthread_t listener_thread;
 
        rfbScreen->backgroundLoop = TRUE;

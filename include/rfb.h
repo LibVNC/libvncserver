@@ -35,14 +35,14 @@ extern "C"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zlib.h>
+#include "rfbconfig.h"
 #include "keysym.h"
 
+#ifdef HAVE_LIBZ
+#include <zlib.h>
+#endif
+
 /* TODO: this stuff has to go into autoconf */
-#define HAVE_PTHREADS
-#define ALLOW24BPP
-#define HAVE_ZRLE
-#define BACKCHANNEL
 typedef unsigned char CARD8;
 typedef unsigned short CARD16;
 typedef unsigned int CARD32;
@@ -120,7 +120,7 @@ typedef int socklen_t;
 #define                INADDR_NONE     ((in_addr_t) 0xffffffff)
 #endif
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
 #include <pthread.h>
 #if 0 /* debugging */
 #define LOCK(mutex) fprintf(stderr,"%s:%d LOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex))
@@ -163,11 +163,11 @@ typedef int socklen_t;
 
 /* end of stuff for autoconf */
 
-/* if you use pthreads, but don't define HAVE_PTHREADS, the structs
+/* if you use pthreads, but don't define HAVE_LIBPTHREAD, the structs
    get all mixed up. So this gives a linker error reminding you to compile
    the library and your application (at least the parts including rfb.h)
    with the same support for pthreads. */
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
 #ifdef HAVE_ZRLE
 #define rfbInitServer rfbInitServerWithPthreadsAndZRLE
 #else
@@ -345,7 +345,7 @@ typedef struct _rfbScreenInfo
     /* displayHook is called just before a frame buffer update */
     DisplayHookPtr displayHook;
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
     MUTEX(cursorMutex);
     Bool backgroundLoop;
 #endif
@@ -404,7 +404,7 @@ typedef struct _rfbClientRec {
     SOCKET sock;
     char *host;
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
     pthread_t client_thread;
 #endif
                                 /* Possible client states: */
@@ -501,19 +501,23 @@ typedef struct _rfbClientRec {
     int rfbKeyEventsRcvd;
     int rfbPointerEventsRcvd;
 
+#ifdef HAVE_LIBZ
     /* zlib encoding -- necessary compression state info per client */
 
     struct z_stream_s compStream;
     Bool compStreamInited;
     CARD32 zlibCompressLevel;
 
+#ifdef HAVE_LIBJPEG
     /* tight encoding -- preserve zlib streams' state for each client */
-
+  //#ifdef HAVE_LIBJPEG
     z_stream zsStruct[4];
     Bool zsActive[4];
     int zsLevel[4];
     int tightCompressLevel;
     int tightQualityLevel;
+#endif
+#endif
 
     Bool enableLastRectEncoding;   /* client supports LastRect encoding */
     Bool enableCursorShapeUpdates; /* client supports cursor shape updates */
@@ -532,7 +536,7 @@ typedef struct _rfbClientRec {
     struct _rfbClientRec *prev;
     struct _rfbClientRec *next;
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
     /* whenever a client is referenced, the refCount has to be incremented
        and afterwards decremented, so that the client is not cleaned up
        while being referenced.
@@ -683,6 +687,7 @@ extern Bool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
                                        int h);
 
 
+#ifdef HAVE_LIBZ
 /* zlib.c */
 
 /* Minimum zlib rectangle size in bytes.  Anything smaller will
@@ -700,7 +705,7 @@ extern Bool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
 extern Bool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 				    int h);
 
-
+#ifdef HAVE_LIBJPEG
 /* tight.c */
 
 #define TIGHT_DEFAULT_COMPRESSION  6
@@ -709,6 +714,8 @@ extern Bool rfbTightDisableGradient;
 
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
+#endif
+#endif
 
 
 /* cursor.c */

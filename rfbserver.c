@@ -59,7 +59,7 @@ static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
 void rfbIncrClientRef(rfbClientPtr cl)
 {
   LOCK(cl->refCountMutex);
@@ -80,7 +80,7 @@ void rfbIncrClientRef(rfbClientPtr cl) {}
 void rfbDecrClientRef(rfbClientPtr cl) {}
 #endif
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
 MUTEX(rfbClientListMutex);
 #endif
 
@@ -124,7 +124,7 @@ rfbClientIteratorNext(rfbClientIteratorPtr i)
     IF_PTHREADS(rfbDecrClientRef(cl));
   }
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
     while(i->next && i->next->sock<0)
       i->next = i->next->next;
     if(i->next)
@@ -289,10 +289,12 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       rfbScreen->rfbClientHead = cl;
       UNLOCK(rfbClientListMutex);
 
+#ifdef HAVE_LIBJPEG
       cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
       cl->tightQualityLevel = -1;
       for (i = 0; i < 4; i++)
         cl->zsActive[i] = FALSE;
+#endif
 
       cl->enableCursorShapeUpdates = FALSE;
       cl->enableCursorPosUpdates = FALSE;
@@ -300,6 +302,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->enableLastRectEncoding = FALSE;
       cl->useNewFBSize = FALSE;
 
+#ifdef HAVE_LIBZ
       cl->compStreamInited = FALSE;
       cl->compStream.total_in = 0;
       cl->compStream.total_out = 0;
@@ -308,6 +311,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->compStream.opaque = Z_NULL;
 
       cl->zlibCompressLevel = 5;
+#endif
 
       sprintf(pv,rfbProtocolVersionFormat,rfbProtocolMajorVersion,
 	      rfbProtocolMinorVersion);
@@ -381,7 +385,7 @@ rfbClientConnectionGone(cl)
     FreeZrleData(cl);
 #endif
 
-#ifdef HAVE_PTHREADS
+#ifdef HAVE_LIBPTHREAD
     LOCK(cl->refCountMutex);
     if(cl->refCount) {
       UNLOCK(cl->refCountMutex);
@@ -399,15 +403,19 @@ rfbClientConnectionGone(cl)
     rfbLog("Client %s gone\n",cl->host);
     free(cl->host);
 
+#ifdef HAVE_LIBZ
     /* Release the compression state structures if any. */
     if ( cl->compStreamInited ) {
 	deflateEnd( &(cl->compStream) );
     }
 
+#ifdef HAVE_LIBJPEG
     for (i = 0; i < 4; i++) {
 	if (cl->zsActive[i])
 	    deflateEnd(&cl->zsStruct[i]);
     }
+#endif
+#endif
 
     if (pointerClient == cl)
         pointerClient = NULL;
@@ -745,6 +753,7 @@ rfbProcessClientNormalMessage(cl)
                            cl->host);
                 }
                 break;
+#ifdef HAVE_LIBZ
 	    case rfbEncodingZlib:
 		if (cl->preferredEncoding == -1) {
 		    cl->preferredEncoding = enc;
@@ -752,6 +761,7 @@ rfbProcessClientNormalMessage(cl)
 			   cl->host);
 		}
               break;
+#ifdef HAVE_LIBJPEG
 	    case rfbEncodingTight:
 		if (cl->preferredEncoding == -1) {
 		    cl->preferredEncoding = enc;
@@ -759,6 +769,8 @@ rfbProcessClientNormalMessage(cl)
 			   cl->host);
 		}
 		break;
+#endif
+#endif
 	    case rfbEncodingXCursor:
 		if(!cl->screen->dontConvertRichCursorToXCursor) {
 		    rfbLog("Enabling X-style cursor updates for client %s\n",
@@ -815,9 +827,11 @@ rfbProcessClientNormalMessage(cl)
                break;
 #endif
             default:
+#ifdef HAVE_LIBZ
 		if ( enc >= (CARD32)rfbEncodingCompressLevel0 &&
 		     enc <= (CARD32)rfbEncodingCompressLevel9 ) {
 		    cl->zlibCompressLevel = enc & 0x0F;
+#ifdef HAVE_LIBJPEG
 		    cl->tightCompressLevel = enc & 0x0F;
 		    rfbLog("Using compression level %d for client %s\n",
 			   cl->tightCompressLevel, cl->host);
@@ -826,7 +840,9 @@ rfbProcessClientNormalMessage(cl)
 		    cl->tightQualityLevel = enc & 0x0F;
 		    rfbLog("Using image quality level %d for client %s\n",
 			   cl->tightQualityLevel, cl->host);
+#endif
 		} else
+#endif
 		 rfbLog("rfbProcessClientNormalMessage: ignoring unknown "
                        "encoding type %d\n", (int)enc);
             }
@@ -1127,6 +1143,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
             nUpdateRegionRects += (((w-1) / cl->correMaxWidth + 1)
                                      * ((h-1) / cl->correMaxHeight + 1));
         }
+#ifdef HAVE_LIBZ
     } else if (cl->preferredEncoding == rfbEncodingZlib) {
 	nUpdateRegionRects = 0;
 
@@ -1137,6 +1154,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
             int h = rect.y2 - y;
 	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
 	}
+#ifdef HAVE_LIBJPEG
     } else if (cl->preferredEncoding == rfbEncodingTight) {
 	nUpdateRegionRects = 0;
 
@@ -1152,6 +1170,8 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	    }
 	    nUpdateRegionRects += n;
 	}
+#endif
+#endif
     } else {
         nUpdateRegionRects = sraRgnCountRects(updateRegion);
     }
@@ -1226,18 +1246,22 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
                 return FALSE;
             }
             break;
+#ifdef HAVE_LIBZ
 	case rfbEncodingZlib:
 	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
 		return FALSE;
 	    }
 	    break;
+#ifdef HAVE_LIBJPEG
 	case rfbEncodingTight:
 	    if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
 		return FALSE;
 	    }
 	    break;
+#endif
+#endif
 #ifdef HAVE_ZRLE
        case rfbEncodingZRLE:
            if (!rfbSendRectEncodingZRLE(cl, x, y, w, h)) {

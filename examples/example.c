@@ -297,7 +297,7 @@ int main(int argc,char** argv)
   /* initialize the server */
   rfbInitServer(rfbScreen);
 
-#define USE_OWN_LOOP
+#ifndef BACKGROUND_LOOP_TEST
 #ifdef USE_OWN_LOOP
   {
     int i;
@@ -307,12 +307,12 @@ int main(int argc,char** argv)
     }
   }
 #else
-
-#ifndef BACKGROUND_LOOP_TEST
   /* this is the blocking event loop, i.e. it never returns */
   /* 40000 are the microseconds to wait on select(), i.e. 0.04 seconds */
   rfbRunEventLoop(rfbScreen,40000,FALSE);
-#elif !defined(HAVE_PTHREADS)
+#endif /* OWN LOOP */
+#else
+#if !defined(HAVE_LIBPTHREAD)
 #error "I need pthreads for that."
 #endif
 
@@ -320,7 +320,7 @@ int main(int argc,char** argv)
   rfbRunEventLoop(rfbScreen,-1,TRUE);
   /* now we could do some cool things like rendering in idle time */
   while(1) sleep(5); /* render(); */
-#endif
+#endif /* BACKGROUND_LOOP */
 
   rfbFreeCursor(rfbScreen->cursor);
   free(rfbScreen->frameBuffer);

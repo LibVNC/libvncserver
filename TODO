@@ -1,7 +1,7 @@
 immediate:
 ----------
 
-x11vnc: clipboard, cursor, updates interruptible by input (doesn't work yet)
+x11vnc: clipboard, cursor
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
 cursor drawing: set optional grain to mark bigger rectangles as drawn (else
@@ -18,16 +18,15 @@ later:
 authentification schemes (secure vnc)
 	IO function ptr exists; now explain how to tunnel and implement a
 	client address restriction scheme.
-autoconf? at least Sun Solaris and Windows compilation
-	(maybe Michael makes a small autconf)
 using Hermes library for fast colour translations.
 CORBA
-internal HTTP tunnelling feature (needs a special GET target and a few
-	changes to java applet).
 
 done:
 -----
 
+.autoconf
+.internal HTTP tunnelling feature (needs a special GET target and a few
+.	changes to java applet).
 .x11vnc: sometimes XTest fails (but doesn't with x0rfbserver)
 .DeferUpdateTime (timing problems!)
 .empty cursor sending doesn't work.
