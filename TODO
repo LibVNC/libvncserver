@@ -1,7 +1,6 @@
 immediate:
 ----------
 
-CoRRE, Hextile encoding!!! Regression!!!
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
 
@@ -18,6 +17,8 @@ CORBA
 done:
 -----
 
+.somehow IRIX does not send updates (but when explicitely asked to) if not hextile
+.CoRRE, Hextile encoding!!! Regression!!!
 .cursor drawing does not get undone prior to sending
 .following two items overridden by RealVNC's idea: if there are too many
 	rectangles (like >50), just use the bounding box.
