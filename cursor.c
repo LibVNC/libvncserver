@@ -134,9 +134,6 @@ rfbSendCursorShape(cl)
 	for (i = 0; i < pCursor->height; i++) {
 	    for (j = 0; j < bitmapRowBytes; j++) {
 		bitmapByte = bitmapData[i * bitmapRowBytes + j];
-		/*if (screenInfo.bitmapBitOrder == LSBFirst) {
-		    bitmapByte = _reverse_byte[bitmapByte];
-		}*/
 		cl->updateBuf[cl->ublen++] = (char)bitmapByte;
 	    }
 	}
@@ -160,9 +157,6 @@ rfbSendCursorShape(cl)
     for (i = 0; i < pCursor->height; i++) {
 	for (j = 0; j < bitmapRowBytes; j++) {
 	    bitmapByte = bitmapData[i * bitmapRowBytes + j];
-	    /*if (screenInfo.bitmapBitOrder == LSBFirst) {
-		bitmapByte = _reverse_byte[bitmapByte];
-	    }*/
 	    cl->updateBuf[cl->ublen++] = (char)bitmapByte;
 	}
     }
@@ -179,7 +173,7 @@ rfbSendCursorShape(cl)
 }
 
 /* conversion routine for predefined cursors in LSB order */
-static unsigned char _reverse_byte[0x100] = {
+unsigned char rfbReverseByte[0x100] = {
   /* copied from Xvnc/lib/font/util/utilbitmap.c */
 	0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0,
 	0x10, 0x90, 0x50, 0xd0, 0x30, 0xb0, 0x70, 0xf0,
@@ -219,7 +213,7 @@ void rfbConvertLSBCursorBitmapOrMask(int width,int height,unsigned char* bitmap)
 {
    int i,t=(width+7)/8*height;
    for(i=0;i<t;i++)
-     bitmap[i]=_reverse_byte[(int)bitmap[i]];
+     bitmap[i]=rfbReverseByte[(int)bitmap[i]];
 }
 
 /* Cursor creation. You "paint" a cursor and let these routines do the work */
@@ -350,12 +344,12 @@ void rfbUndrawCursor(rfbClientPtr cl)
    x2=x1+c->width;
    if(x1<0) x1=0;
    if(x2>=s->width) x2=s->width-1;
-   x2-=x1;
+   x2-=x1; if(x2<=0) return;
    y1=s->cursorY-c->yhot;
    y2=y1+c->height;
    if(y1<0) y1=0;
    if(y2>=s->height) y2=s->height-1;
-   y2-=y1;
+   y2-=y1; if(y2<=0) return;
    for(j=0;j<y2;j++)
      memcpy(s->frameBuffer+(y1+j)*rowstride+x1*bpp,
 	    s->underCursorBuffer+j*x2*bpp,

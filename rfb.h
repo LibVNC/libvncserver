@@ -605,6 +605,7 @@ typedef struct rfbCursor {
 } rfbCursor, *rfbCursorPtr;
 
 extern Bool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);
+extern unsigned char rfbReverseByte[0x100];
 extern void rfbConvertLSBCursorBitmapOrMask(int width,int height,unsigned char* bitmap);
 extern rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskString);
 extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
@@ -613,6 +614,9 @@ extern void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cu
 extern void rfbFreeCursor(rfbCursorPtr cursor);
 extern void rfbDrawCursor(rfbClientPtr cl);
 extern void rfbUndrawCursor(rfbClientPtr cl);
+
+/* cursor handling for the pointer */
+extern void defaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
 
 /* stats.c */
 
