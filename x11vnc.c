@@ -16,8 +16,10 @@
 Display *dpy = 0;
 int window;
 int c=0,blockLength = 32;
-int tileX=0,tileY=0,tileWidth=32,tileHeight=32*2,dontTile=True;
+int tileX=0,tileY=0,tileWidth=32,tileHeight=32*2,dontTile=TRUE;
 Bool gotInput = FALSE;
+Bool viewOnly = FALSE;
+Bool sharedMode = FALSE;
 
 Bool disconnectAfterFirstClient = TRUE;
 
@@ -129,7 +131,7 @@ int oldButtonMask = 0;
 void mouse(int buttonMask,int x,int y,rfbClientPtr cl)
 {
   int i=0;
-  //fprintf(stderr,"/");
+
   XTestFakeMotionEvent(dpy,0,x,y,CurrentTime );
   while(i<5) {
     if ((oldButtonMask&(1<<i))!=(buttonMask&(1<<i)))
@@ -299,7 +301,11 @@ int main(int argc,char** argv)
     } else if(strcmp(argv[i],"-runforever")==0) {
       disconnectAfterFirstClient = FALSE;
     } else if(strcmp(argv[i],"-tile")==0) {
-      dontTile=False;
+      dontTile=FALSE;
+    } else if(strcmp(argv[i],"-viewonly")==0) {
+      viewOnly=TRUE;
+    } else if(strcmp(argv[i],"-shared")==0) {
+      sharedMode=TRUE;
     }
 
   updateCounter = dontTile?20:1;
@@ -380,8 +386,14 @@ int main(int argc,char** argv)
   screen->frameBuffer = backupImage;
   screen->cursor = 0;
   screen->newClientHook = newClient;
-  screen->kbdAddEvent = keyboard;
-  screen->ptrAddEvent = mouse;
+
+  if(!viewOnly) {
+    screen->kbdAddEvent = keyboard;
+    screen->ptrAddEvent = mouse;
+  }
+  if(sharedMode) {
+    screen->rfbAlwaysShared = TRUE;
+  }
 
   screen->rfbDeferUpdateTime = 1;
   updateCounter /= screen->rfbDeferUpdateTime;

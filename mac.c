@@ -266,6 +266,8 @@ PtrAddEvent(buttonMask, x, y, cl)
                      (buttonMask & (1 << 7)) ? TRUE : FALSE);
 }
 
+Bool viewOnly = FALSE, sharedMode = FALSE;
+
 void 
 ScreenInit(int argc, char**argv)
 {
@@ -278,8 +280,15 @@ ScreenInit(int argc, char**argv)
   rfbScreen->paddedWidthInBytes = CGDisplayBytesPerRow(kCGDirectMainDisplay);
   rfbScreen->frameBuffer =
     (char *)CGDisplayBaseAddress(kCGDirectMainDisplay);
-  rfbScreen->ptrAddEvent = PtrAddEvent;
-  rfbScreen->kbdAddEvent = KbdAddEvent;
+
+  if(!viewOnly) {
+    rfbScreen->ptrAddEvent = PtrAddEvent;
+    rfbScreen->kbdAddEvent = KbdAddEvent;
+  }
+  if(sharedMode) {
+    rfbScreen->rfbAlwaysShared = TRUE;
+  }
+
   rfbInitServer(rfbScreen);
 }
 
@@ -321,6 +330,10 @@ int main(int argc,char *argv[])
       startTime = time(0);
     } else if(strcmp(argv[i],"-runforever")==0) {
       disconnectAfterFirstClient = FALSE;
+    } else if(strcmp(argv[i],"-viewonly")==0) {
+      viewOnly=TRUE;
+    } else if(strcmp(argv[i],"-shared")==0) {
+      sharedMode=TRUE;
     }
 
   ScreenInit(argc,argv);
