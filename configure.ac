@@ -90,6 +90,10 @@ AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove m
 # Check if /dev/vcsa1 exists, if so, define LINUX
 AM_CONDITIONAL(LINUX, test -c /dev/vcsa1)
 
+# Check for OS X specific header
+AC_CHECK_HEADER(ApplicationServices/ApplicationServices.h, HAVE_OSX="true")
+AM_CONDITIONAL(OSX, test "$HAVE_OSX" = "true")
+
 # Check for rpm SOURCES path
 echo -n "checking for rpm sources path... "
 RPMSOURCEDIR="NOT-FOUND"
