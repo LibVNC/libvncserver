@@ -18,11 +18,18 @@ EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 	tableinitcmtemplate.c tabletrans24template.c \
 	zrleencodetemplate.c
 
+if HAVE_LIBZ
+ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c
+if HAVE_LIBJPEG
+JPEGSRCS = tight.c
+endif
+endif
+
 LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
-	zlib.c tight.c httpd.c cursor.c font.c \
+	httpd.c cursor.c font.c \
 	draw.c selbox.c d3des.c vncauth.c cargs.c \
-	zrle.c zrleoutstream.c zrlepalettehelper.c
+	$(ZLIBSRCS) $(JPEGSRCS)
 
 libvncserver_a_SOURCES=$(LIB_SRCS)
 

@@ -27,9 +27,6 @@
 /*#include <stdio.h>*/
 #include <rfb/rfb.h>
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-
 #ifdef WIN32
 #define XMD_H
 #undef FAR
@@ -1821,5 +1818,3 @@ JpegSetDstManager(j_compress_ptr cinfo)
     cinfo->dest = &jpegDstManager;
 }
 
-#endif /* LIBJPEG */
-#endif /* LIBZ */

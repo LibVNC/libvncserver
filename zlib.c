@@ -32,8 +32,6 @@
 
 #include <rfb/rfb.h>
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-
 /*
  * zlibBeforeBuf contains pixel data in the client's format.
  * zlibAfterBuf contains the zlib (deflated) encoding version.
@@ -302,4 +300,3 @@ rfbSendRectEncodingZlib(cl, x, y, w, h)
 
 }
 
-#endif

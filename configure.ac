@@ -69,7 +69,7 @@ fi
 if test ! -z "$HAVE_ZLIB_H"; then
 	AC_CHECK_LIB(z, deflate, , HAVE_ZLIB_H="")
 	if test ! -z "$HAVE_JPEGLIB_H" -a ! -z "$HAVE_ZLIB_H"; then
-		AC_CHECK_LIB(jpeg, jpeg_CreateCompress)
+		AC_CHECK_LIB(jpeg, jpeg_CreateCompress, , HAVE_JPEGLIB_H="")
 	fi
 fi
 if test ! -z "$HAVE_PTHREAD_H"; then
@@ -77,6 +77,8 @@ if test ! -z "$HAVE_PTHREAD_H"; then
 	AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
 fi
 AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
+AM_CONDITIONAL(HAVE_LIBZ, test ! -z "$HAVE_ZLIB_H")
+AM_CONDITIONAL(HAVE_LIBJPEG, test ! -u "$HAVE_JPEGLIB_H")
 
 # Checks for header files.
 AC_HEADER_STDC

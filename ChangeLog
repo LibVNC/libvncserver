@@ -1,3 +1,6 @@
+2004-01-29  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* Honour the check for libz and libjpeg again.
+
 2004-01-21  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* do not send unneccessary updates when drawing a cursor
 	* ignore SIGPIPE; it is handled by EPIPE

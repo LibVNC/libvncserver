@@ -31,8 +31,8 @@
  * algorithm writes to the position one past the end of the pixel data.
  */
 
-#include <zrleoutstream.h>
-#include <zrlepalettehelper.h>
+#include "zrleoutstream.h"
+#include "zrlepalettehelper.h"
 #include <assert.h>
 
 /* __RFB_CONCAT2 concatenates its two arguments.  __RFB_CONCAT2E does the same

@@ -26,7 +26,7 @@
 #ifndef __ZRLE_PALETTE_HELPER_H__
 #define __ZRLE_PALETTE_HELPER_H__
 
-#include <zrletypes.h>
+#include "zrletypes.h"
 
 #define ZRLE_PALETTE_MAX_SIZE 127
 

@@ -18,7 +18,7 @@
  * USA.
  */
 
-#include <zrlepalettehelper.h>
+#include "zrlepalettehelper.h"
 #include <assert.h>
 #include <string.h>
 

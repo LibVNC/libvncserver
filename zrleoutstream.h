@@ -22,8 +22,8 @@
 #define __ZRLE_OUT_STREAM_H__
 
 #include <zlib.h>
-#include <zrletypes.h>
-#include <rfb/rfb.h>
+#include "zrletypes.h"
+#include "rfb/rfb.h"
 
 typedef struct {
   zrle_U8 *start;

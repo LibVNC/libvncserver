@@ -24,8 +24,8 @@
  * Routines to implement Zlib Run-length Encoding (ZRLE).
  */
 
-#include <rfb/rfb.h>
-#include <zrleoutstream.h>
+#include "rfb/rfb.h"
+#include "zrleoutstream.h"
 
 
 #define GET_IMAGE_INTO_BUF(tx,ty,tw,th,buf)                                \
