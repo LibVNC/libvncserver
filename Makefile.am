@@ -4,10 +4,9 @@ DIST_SUBDIRS=examples contrib
 bin_SCRIPTS = libvncserver-config
 
 include_HEADERS=include/rfb.h include/rfbconfig.h include/rfbint.h include/rfbproto.h \
-	include/keysym.h
+	include/keysym.h include/rfbregion.h
 
-noinst_HEADERS=sraRegion.h d3des.h zrleDecode.h zrleEncode.h \
-	include/default8x16.h \
+noinst_HEADERS=d3des.h zrleDecode.h zrleEncode.h include/default8x16.h \
 	rdr/Exception.h rdr/FdInStream.h rdr/FdOutStream.h \
 	rdr/FixedMemOutStream.h rdr/InStream.h rdr/MemInStream.h \
 	rdr/MemOutStream.h rdr/NullOutStream.h rdr/OutStream.h \
@@ -19,7 +18,7 @@ ZRLE_SRCS=zrle.cxx rdr/FdInStream.cxx rdr/FdOutStream.cxx rdr/InStream.cxx \
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 	tableinitcmtemplate.c tabletrans24template.c $(ZRLE_SRCS)
 
-LIB_SRCS = main.c rfbserver.c sraRegion.c auth.c sockets.c \
+LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	zlib.c tight.c httpd.c cursor.c font.c \
 	draw.c selbox.c d3des.c vncauth.c cargs.c

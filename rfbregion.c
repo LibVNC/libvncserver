@@ -6,7 +6,7 @@
  */
 
 #include "rfb.h"
-#include "sraRegion.h"
+#include "rfbregion.h"
 
 /* -=- Internal Span structure */
 

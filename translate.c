@@ -24,7 +24,7 @@
  */
 
 #include "rfb.h"
-#include "sraRegion.h"
+#include "rfbregion.h"
 
 static void PrintPixelFormat(rfbPixelFormat *pf);
 static Bool rfbSetClientColourMapBGR233(rfbClientPtr cl);

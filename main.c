@@ -11,7 +11,7 @@
  */
 
 #include "rfb.h"
-#include "sraRegion.h"
+#include "rfbregion.h"
 
 #include <stdarg.h>
 #include <errno.h>

@@ -26,7 +26,7 @@
 
 #include <string.h>
 #include "rfb.h"
-#include "sraRegion.h"
+#include "rfbregion.h"
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
