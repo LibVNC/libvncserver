@@ -1,5 +1,6 @@
 #!/bin/sh
 
-aclocal && automake && autoconf && ./configure && make
+aclocal && autoheader && \
+	automake --add-missing && autoconf && ./configure && make
 
 
