@@ -171,9 +171,10 @@ void vcScroll(vncConsolePtr c,int lineCount)
 	    c->screenBuffer+(c->height-lineCount)*c->width,
 	    (c->height-lineCount)*c->width);
 #ifdef USE_ATTRIBUTE_BUFFER
-    memmove(c->attributeBuffer,
-	    c->attributeBuffer+(c->height-lineCount)*c->width,
-	    (c->height-lineCount)*c->width);
+    if(c->attributeBuffer)
+	    memmove(c->attributeBuffer,
+		    c->attributeBuffer+(c->height-lineCount)*c->width,
+		    (c->height-lineCount)*c->width);
 #endif
   } else {
     y1=0; y2=-lineCount*c->cHeight;
@@ -182,9 +183,10 @@ void vcScroll(vncConsolePtr c,int lineCount)
 	    c->screenBuffer,
 	    (c->height+lineCount)*c->width);
 #ifdef USE_ATTRIBUTE_BUFFER
-    memmove(c->attributeBuffer-lineCount*c->width,
-	    c->attributeBuffer,
-	    (c->height+lineCount)*c->width);
+    if(c->attributeBuffer)
+	    memmove(c->attributeBuffer-lineCount*c->width,
+		    c->attributeBuffer,
+		    (c->height+lineCount)*c->width);
 #endif
   }
 
@@ -194,8 +196,9 @@ void vcScroll(vncConsolePtr c,int lineCount)
   memset(c->screenBuffer+y1/c->cHeight*c->width,' ',
 	 (y2-y1)/c->cHeight*c->width);
 #ifdef USE_ATTRIBUTE_BUFFER
-  memset(c->attributeBuffer+y1/c->cHeight*c->width,0x07,
-	 (y2-y1)/c->cHeight*c->width);
+  if(c->attributeBuffer)
+	  memset(c->attributeBuffer+y1/c->cHeight*c->width,0x07,
+		 (y2-y1)/c->cHeight*c->width);
 #endif
   /* rfbLog("end scroll\n"); */
 }  
