@@ -193,6 +193,7 @@ int rfb_bytes_per_line;
 
 /* scaling info */
 int scaling = 0;
+int scaling_noblend = 0;
 double scale_fac = 1.0;
 int scaled_x = 0, scaled_y = 0;
 
@@ -3736,11 +3737,14 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	main_blue_mask  = fb->blue_mask;
 
 	if (scaling) {
-		width  = (int) (width  * scale_fac); 
-		height = (int) (height * scale_fac); 
+		double eps = 0.000001;
+		width  = (int) (width  * scale_fac + eps); 
+		height = (int) (height * scale_fac + eps); 
 		scaled_x = width;
 		scaled_y = height;
 		rfb_bytes_per_line = (main_bytes_per_line / fb->width) * width;
+		rfbLog("scaling screen: %dx%d -> %dx%d  scale_fac=%.5f\n",
+		    fb->width, fb->height, scaled_x, scaled_y, scale_fac);
 	} else {
 		rfb_bytes_per_line = main_bytes_per_line;
 	}
@@ -4643,18 +4647,17 @@ static void hint_updates(void) {
 #define FLOOR(x) ( (double) ((int) (x)) )
 
 /*
- * Scaling.
+ * Scaling:
  *
  * For shrinking, a destination (scaled) pixel will correspond to more
- * than one source (i.e. main fb) pixel.  Think of an x-y plane made
- * with graph paper.  Each square in the graph paper (i.e. collection
- * of points (x,y) such that N < x < N+1 and M < y < M+1, N and M
- * integers) corresponds to one pixel in the unscaled fb.  There is a
- * solid color filling the inside such a square.  A scaled pixel has
- * width 1/scale_fac, e.g. for "-scale 3/4" the width of the scaled
- * pixel is 1.333.  The area of this scaled pixel is 1.333 * 1.333
- * (so it obviously overlaps more than one source pixel, each which
- * have area 1).
+ * than one source (i.e. main fb) pixel.  Think of an x-y plane made with
+ * graph paper.  Each unit square in the graph paper (i.e. collection of
+ * points (x,y) such that N < x < N+1 and M < y < M+1, N and M integers)
+ * corresponds to one pixel in the unscaled fb.  There is a solid
+ * color filling the inside of such a square.  A scaled pixel has width
+ * 1/scale_fac, e.g. for "-scale 3/4" the width of the scaled pixel
+ * is 1.333.  The area of this scaled pixel is 1.333 * 1.333 (so it
+ * obviously overlaps more than one source pixel, each which have area 1).
  *
  * We take the weight an unscaled pixel (source) contributes to a
  * scaled pixel (destination) as simply proportional to the overlap area
@@ -4662,65 +4665,103 @@ static void hint_updates(void) {
  * pixel as an integral over the portion of the graph paper it covers.
  * The thing being integrated is the color value of the unscaled source.
  * That color value is constant over a graph paper square (source pixel),
- * and changes discontinuously from one square to the next.
+ * and changes discontinuously from one unit square to the next.
+ *
+
+Here is an example for -scale 3/4, the solid lines are the source pixels
+(graph paper unit squares), while the dotted lines denote the scaled
+pixels (destination pixels):
+
+            0         1 4/3     2     8/3 3         4=12/3
+            |---------|--.------|------.--|---------|.                
+            |         |  .      |      .  |         |.                
+            |    A    |  . B    |      .  |         |.                
+            |         |  .      |      .  |         |.                
+            |         |  .      |      .  |         |.                
+          1 |---------|--.------|------.--|---------|.                
+         4/3|.........|.........|.........|.........|.                
+            |         |  .      |      .  |         |.                
+            |    C    |  . D    |      .  |         |.                
+            |         |  .      |      .  |         |.                
+          2 |---------|--.------|------.--|---------|.                
+            |         |  .      |      .  |         |.                
+            |         |  .      |      .  |         |.                
+         8/3|.........|.........|.........|.........|.                
+            |         |  .      |      .  |         |.                
+          3 |---------|--.------|------.--|---------|.                
+
+So we see the first scaled pixel (0 < x < 4/3 and 0 < y < 4/3) mostly
+overlaps with unscaled source pixel "A".  The integration (averaging)
+weights for this scaled pixel are:
+
+			A	 1
+			B	1/3
+			C	1/3
+			D	1/9
+
  *
  * The Red, Green, and Blue color values must be averaged over separately
- * otherwise you can get a complete mess (except in solid regions).
+ * otherwise you can get a complete mess (except in solid regions),
+ * because high order bits are averaged differently from the low order bits.
  *
  * So the algorithm is roughly:
  *
  *   - Given as input a rectangle in the unscaled source fb with changes,
- *     find the rectangle of pixels this affects in the scaled destination
- *     fb.
+ *     find the rectangle of pixels this affects in the scaled destination fb.
  *
- *   - For each of the affected scaled pixels, determine all of the
- *     unscaled pixels it overlaps with.
+ *   - For each of the affected scaled (dest) pixels, determine all of the
+ *     unscaled (source) pixels it overlaps with.
  *  
- *   - Average those unscaled values together, weighted by the area
+ *   - Average those unscaled source values together, weighted by the area
  *     overlap with the destination pixel.  Average R, G, B separately.
  *
  *   - Take this average value and convert to a valid pixel value if
  *     necessary (e.g. rounding, shifting), and then insert it into the
  *     destination framebuffer as the pixel value.
  *
+ *   - On to the next destination pixel...
+ *
  * ========================================================================
  *
- * For expanding (which we don't think people will do very often... or
- * at least so we hope, the framebuffer can become huge) the situation
- * is reversed and the destination pixel is smaller than a "graph paper"
- * square (source pixel).  Some destination pixels will be completely
- * within a single unscaled source pixel.
+ * For expanding, e.g. -scale 1.1 (which we don't think people will do
+ * very often... or at least so we hope, the framebuffer can become huge)
+ * the situation is reversed and the destination pixel is smaller than a
+ * "graph paper" unit square (source pixel).  Some destination pixels
+ * will be completely within a single unscaled source pixel.
  *
  * What we do here is a simple 4 point interpolation scheme:
  * 
  * Let P00 be the source pixel closest to the destination pixel but with
  * x and y values less than or equal to those of the destination pixel.
- * It is the source pixel immediately to the upper left of the destination
+ * (for simplicity, think of the upper left corner of a pixel defining the
+ * x,y location of the pixel, the center would work just as well).  So it
+ * is the source pixel immediately to the upper left of the destination
  * pixel.  Let P10 be the source pixel one to the right of P00.  Let P01
  * be one down from P00.  And let P11 be one down and one to the right
  * of P00.  They form a 2x2 square we will interpolate inside of.
  * 
  * Let V00, V10, V01, and V11 be the color values of those 4 source
- * pixels.  Let dx be the distance along x the destination pixel is from
- * P00.  Note: 0 <= dx < 1.  Similarly let dy be the distance along y.
- * The weighted average is:
+ * pixels.  Let dx be the displacement along x the destination pixel is
+ * from P00.  Note: 0 <= dx < 1 by definition of P00.  Similarly let
+ * dy be the displacement along y.  The weighted average for the
+ * interpolation is:
  * 
- * 	Vave = V00 * (1 - dx) * (1 - dy)
- * 	     + V10 *      dx  * (1 - dy)
- * 	     + V01 * (1 - dx) *      dy
- * 	     + V11 *      dx  *      dy
+ * 	V_ave = V00 * (1 - dx) * (1 - dy)
+ * 	      + V10 *      dx  * (1 - dy)
+ * 	      + V01 * (1 - dx) *      dy
+ * 	      + V11 *      dx  *      dy
  * 
- * Note that the weights (1-dx)*(1-dy) + dx(1-dy) + (1-dx)*dy + dx*dy
- * automatically add up to 1.  It is also nice that all the weights
- * are positive.  The above formula can be motivated by doing two 1D
- * interpolations along x:
+ * Note that the weights (1-dx)*(1-dy) + dx*(1-dy) + (1-dx)*dy + dx*dy
+ * automatically add up to 1.  It is also nice that all the weights are
+ * positive (unsigned char stays unsigned char).  The above formula can
+ * be motivated by doing two 1D interpolations along x:
  * 
  * 	VA = V00 * (1 - dx) + V10 * dx
  * 	VB = V01 * (1 - dx) + V11 * dx
  * 
  * and then interpolating VA and VB along y:
  * 
- * 	Vave = VA * (1 - dy) + VB * dy
+ * 	V_ave = VA * (1 - dy) + VB * dy
  * 
  *                      VA 
  *           v   |<-dx->|
@@ -4729,14 +4770,19 @@ static void hint_updates(void) {
  *           --  |      o...|...    "o" denotes the position of the desired
  *           ^   |      .   |  .    destination pixel relative to the P00
  *               |      .   |  .    source pixel.
- *              V10 ------ V11 .
+ *              V10 ----.- V11 .
  *                      ........
+ *                      |  
  *                      VB 
  *
  * 
- * Of course R, G, B averages are done separately.  This gives reasonable
- * results.  I believe this is called bilinear scaling.
+ * Of course R, G, B averages are done separately as in the shrinking
+ * case.  This gives reasonable results, and the implementation for
+ * shrinking can simply be used with different choices for weights for
+ * the loop over the 4 pixels.
  */
+
+#define FPTYPE double
 
 static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 /*
@@ -4753,23 +4799,22 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	int i, j, i1, i2, j1, j2;	/* indices for scaled fb (dest) */
 	int I, J, I1, I2, J1, J2;	/* indices for main fb   (source) */
 
-	double w, wx, wy, wtot;	/* pixel weights */
+	FPTYPE w, wx, wy, wtot;	/* pixel weights */
 
-	double x1, y1, x2, y2;	/* x-y coords for destination pixels edges */
-	double dx, dy;		/* size of destination pixel */
+	FPTYPE x1, y1, x2, y2;	/* x-y coords for destination pixels edges */
+	FPTYPE dx, dy;		/* size of destination pixel */
 
-	double ddx, ddy;	/* for interpolation expansion */
+	FPTYPE ddx, ddy;	/* for interpolation expansion */
 
 	char *src, *dest;	/* pointers to the two framebuffers */
 
-	double pixave[4];	/* for averaging pixel values */
+	FPTYPE pixave[4];	/* for averaging pixel values */
 
-	unsigned char uc;	/* tmp pixel data holders */
 	unsigned short us;
 
 	int shrink;		/* whether shrinking or expanding */
+	static int constant_weights = -1;
 
-	int pseudocolor = 0;	/* true if PseudoColor... */
 	if (scale_fac <= 1.0) {
 		shrink = 1;
 	} else {
@@ -4777,7 +4822,10 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	}
 
 	if (! screen->rfbServerFormat.trueColour) {
-		pseudocolor = 1;
+		/*
+		 * PseudoColor colormap... blending leads to random colors.
+		 */
+		scaling_noblend = 1;
 	}
 
 	Bpp = bpp/8;	/* Bytes per pixel */
@@ -4793,8 +4841,8 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	 * both are > 1   (e.g. 1.333 for -scale 3/4)
 	 * they should also be equal but we don't assume it.
 	 */
-	dx = (double) Nx / nx;
-	dy = (double) Ny / ny;
+	dx = (FPTYPE) Nx / nx;
+	dy = (FPTYPE) Ny / ny;
 
 	/*
 	 * find the extent of the change the input rectangle induces in
@@ -4807,11 +4855,11 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	/* Right edges: find smallest i such that (i+1) * dx >= X2+1  */
 	i2 = CEIL( (X2+1)/dx ) - 1;
 
-	/* to be safe, correct any overflows: */
+	/* To be safe, correct any overflows: */
 	i1 = nfix(i1, nx);
 	i2 = nfix(i2, nx) + 1;	/* add 1 to make a rectangle upper boundary */
 
-	/* repeat above for y direction: */
+	/* Repeat above for y direction: */
 	j1 = FLOOR(Y1/dy);
 	j2 = CEIL( (Y2+1)/dy ) - 1;
 
@@ -4819,21 +4867,55 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	j2 = nfix(j2, ny) + 1;
 
 	/*
-	 * loop over destination pixels in scaled fb:
+	 * There is some speedup if the pixel weights are constant, so
+	 * let's special case these.
+	 *
+	 * If scale = 1/n and n divides Nx and Ny, the pixel weights
+	 * are constant.
+	 */
+	if (constant_weights < 0) {
+		int n = 0;
+		constant_weights = 0;
+
+		for (i = 2; i<=128; i++) {
+			double test = ((double) 1)/ i;
+			double diff, eps = 1.0e-9;
+			diff = scale_fac - test;
+			if (-eps < diff && diff < eps) {
+				n = i;
+				break;
+			}
+		}
+		if (n != 0) {
+			if (! scaling_noblend && Nx % n == 0 && Ny % n == 0) {
+				rfbLog("scale_and_mark_rect: using constant "
+				    "pixel weight speedup for 1/%d\n", n);
+				constant_weights = 1;
+			}
+		}
+	}
+	/* set these all to 1.0 to begin with */
+	wx = 1.0;
+	wy = 1.0;
+	w  = 1.0;
+
+	/*
+	 * Loop over destination pixels in scaled fb:
 	 */
 	for (j=j1; j<j2; j++) {
 		y1 =  j * dy;	/* top edge */
 		y2 = y1 + dy;	/* bottom edge */
 
-		/* find main fb indices covered by this dest pixel: */
+		/* Find main fb indices covered by this dest pixel: */
 		J1 = (int) FLOOR(y1);
-		J2 = (int) CEIL(y2) - 1;
-
 		J1 = nfix(J1, Ny);
-		J2 = nfix(J2, Ny);
 
-		if (!shrink) {
+		if (shrink) {
+			J2 = (int) CEIL(y2) - 1;
+			J2 = nfix(J2, Ny);
+		} else {
 			J2 = J1 + 1;	/* simple interpolation */
+			ddy = y1 - J1;
 		}
 
 		/* destination char* pointer: */
@@ -4843,41 +4925,45 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 			x1 =  i * dx;	/* left edge */
 			x2 = x1 + dx;	/* right edge */
 
-			/* find main fb indices covered by this dest pixel: */
+			/* Find main fb indices covered by this dest pixel: */
 			I1 = (int) FLOOR(x1);
-			I2 = (int) CEIL(x2) - 1;
+			if (I1 >= Nx) I1 = Nx - 1;
 
-			I1 = nfix(I1, Nx);
-			I2 = nfix(I2, Nx);
-
-			if (!shrink) {
+			if (shrink) {
+				I2 = (int) CEIL(x2) - 1;
+				if (I2 >= Nx) I2 = Nx - 1;
+			} else {
 				I2 = I1 + 1;	/* simple interpolation */
+				ddx = x1 - I1;
 			}
 			
-			/* zero out accumulators for next pixel average: */
+			/* Zero out accumulators for next pixel average: */
 			for (b=0; b<4; b++) {
 				pixave[b] = 0.0; /* for RGB weighted sums */
 			}
 
 			/*
 			 * wtot is for accumulating the total weight.
-			 * It should always be 1/(scale_fac * scale_fac),
-			 * but we don't assume that.
+			 * It should always sum to 1/(scale_fac * scale_fac).
 			 */
 			wtot = 0.0;
 
-			if (!shrink) {
-				/* interpolation distances, see diagram above */
-				ddx = x1 - I1;
-				ddy = y1 - J1;
-			}
-
 			/*
-			 * loop over source pixels covered by this dest pixel:
+			 * Loop over source pixels covered by this dest pixel.
+			 * 
+			 * These "extra" loops over "J" and "I" make
+			 * the cache/cacheline performance unclear.
+			 * For example, will the data brought in from
+			 * src for j, i, and J=0 still be in the cache
+			 * after the J > 0 data have been accessed and
+			 * we are at j, i+1, J=0?  The stride in J is
+			 * main_bytes_per_line, and so ~4 KB.
 			 */
 			for (J=J1; J<=J2; J++) {
 			    /* see comments for I, x1, x2, etc. below */
-			    if (pseudocolor) {
+			    if (constant_weights) {
+				;
+			    } else if (scaling_noblend) {
 				if (J != J1) {
 					continue;
 				}
@@ -4886,7 +4972,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 				/* interpolation scheme: */
 			    } else if (!shrink) {
 				if (J >= Ny) {
-					continue;	/* off edge */
+					continue;
 				} else if (J == J1) {
 					wy = 1.0 - ddy;
 				} else if (J != J1) {
@@ -4908,11 +4994,15 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 
 				/* Work out the weight: */
 
-				if (pseudocolor) {
+				if (constant_weights) {
+					;
+				} else if (scaling_noblend) {
 					/*
-					 * ugh, colormap is bad news, to 
-					 * avoid random colors just take
-					 * the first pixel.
+					 * Ugh, PseudoColor colormap is
+					 * bad news, to avoid random
+					 * colors just take the first
+					 * pixel.  Or user may have
+					 * specified :nb to fraction.
 					 */
 					if (I != I1) {
 						continue;
@@ -4958,22 +5048,22 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 
 
 				/* 
-				 * we average the unsigned char value
+				 * We average the unsigned char value
 				 * instead of char value: otherwise
 				 * the minimum (char 0) is right next
 				 * to the maximum (char -1)!  This way
 				 * they are spread between 0 and 255.
 				 */
-				if (Bpp == 4 || Bpp == 1) {
-					
+				if (Bpp != 2) {
 					for (b=0; b<Bpp; b++) {
-						uc = (unsigned char) *(src + b);
-						pixave[b] += w * uc;
+						pixave[b] += w *
+						    ((unsigned char) *(src+b));
 					}
-				} else if (Bpp == 2) {
+				} else {
 					/*
-					 * trickier with green split over
-					 * two bytes, so we use the masks:
+					 * 16bpp: trickier with green
+					 * split over two bytes, so we
+					 * use the masks:
 					 */
 					us = *( (unsigned short *) src );
 					pixave[0] += w * (us & main_red_mask);
@@ -4987,12 +5077,12 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 			wtot = 1.0/wtot;	/* normalization factor */
 
 			/* place weighted average pixel in the scaled fb: */
-			if (Bpp == 4 || Bpp == 1) {
+			if (Bpp != 2) {
 				for (b=0; b<Bpp; b++) {
 					*(dest + b) = (char) (wtot * pixave[b]);
 				}
-			} else if (Bpp == 2) {
-				/* 16bpp/565 */
+			} else {
+				/* 16bpp / 565 case: */
 				pixave[0] *= wtot;
 				pixave[1] *= wtot;
 				pixave[2] *= wtot;
@@ -6523,7 +6613,9 @@ static void print_help(void) {
 "                       and response may be slower.  If \"fraction\" contains\n"
 "                       a decimal point \".\" it is taken as a floating point\n"
 "                       number, alternatively the notation \"m/n\" may be used\n"
-"                       to denote fractions, e.g. -scale 2/3\n"
+"                       to denote fractions, e.g. -scale 2/3.   If you just want\n"
+"                       a quick, rough scaling without blending, append \":nb\"\n"
+"                       to \"fraction\" (e.g. -scale 1/3:nb)\n"
 "-visual n              Experimental option: probably does not do what you\n"
 "                       think.  It simply *forces* the visual used for the\n"
 "                       framebuffer; this may be a bad thing... It is useful for\n"
@@ -7010,8 +7102,17 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-scale")) {
 			int m, n;
+			char *p;
 			float f;
-			if (strchr(argv[++i], '.') != NULL) {
+			i++;
+			if ( (p = strchr(argv[i], ':')) != NULL) {
+				/* options */
+				if (strstr(p+1, "nb") != NULL) {
+					scaling_noblend = 1;
+				}
+				*p = '\0';
+			}
+			if (strchr(argv[i], '.') != NULL) {
 				if (sscanf(argv[i], "%f", &f) != 1) {
 					fprintf(stderr, "bad -scale arg: %s\n",
 					    argv[i]);
@@ -7024,7 +7125,7 @@ int main(int argc, char* argv[]) {
 					    argv[i]);
 					exit(1);
 				}
-				scale_fac = (double) m / n;
+				scale_fac = ((double) m)/ n;
 			}
 			if (scale_fac == 1.0) {
 				fprintf(stderr, "scaling disabled for factor "

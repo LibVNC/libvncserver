@@ -1,3 +1,7 @@
+2004-06-27  Karl Runge <runge@karlrunge.com>
+	* speed up scaling a bit for slow machines (still all floating point)
+	* add no blending option (-scale fraction:nb)
+
 2004-06-26  Karl Runge <runge@karlrunge.com>
 	* add -scale fract for global (not per-client) server-side scaling
 	  working more or less OK, needs to be optimized at some point.
