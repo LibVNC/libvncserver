@@ -4,7 +4,7 @@ example
 fontsel
 pnmshow
 pnmshow24
-sratest
+regiontest
 storepasswd
 vncev
 Makefile.in

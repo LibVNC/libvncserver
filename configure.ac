@@ -87,6 +87,9 @@ AC_CHECK_LIB(nsl,gethostbyname)
 AC_CHECK_LIB(socket,socket)
 AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mkfifo select socket strchr strcspn strdup strerror strstr])
 
+# Check if /dev/vcsa1 exists, if so, define LINUX
+AM_CONDITIONAL(LINUX, test -c /dev/vcsa1)
+
 # Check for rpm SOURCES path
 echo -n "checking for rpm sources path... "
 RPMSOURCEDIR="NOT-FOUND"
@@ -104,6 +107,7 @@ LDADD="-L.. -lvncserver"
 AC_CONFIG_FILES([Makefile
                  contrib/Makefile
                  examples/Makefile
+		 vncterm/Makefile
 		 libvncserver.spec
 		 libvncserver-config])
 AC_OUTPUT

@@ -1,0 +1,15 @@
+included in LibVNCServer package, autoconf'ed it
+SetXCutText implemented
+fix for cargs
+attributes work.
+cursor in LinuxVNC is shown.
+paste works
+selection works (no cursor trails)
+LinuxVNC gets it's dimensions via ioctl TIOCGWINSZ
+First working key injection in LinuxVNC!
+Added Mouse marking
+added screenBuffer (so you have ASCII screen also)
+fixed CopyRect for scrolling (need to propagate to libvncserver)
+made VNCommand work (no prompt for bash, but else seems ok)
+added flag for VNCommand to send input only after a newline
+	 (good for interactive bash)

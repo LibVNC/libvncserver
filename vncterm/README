@@ -1,0 +1,25 @@
+
+In this stage (beta), there are two programs functional:
+
+LinuxVNC <tty number>
+	monitor a virtual console (text mode) of Linux. You need
+	root privileges, or at least be in the "tty" group, because
+	it reads /dev/vcsN and writes /dev/ttyN.
+	It follows the same idea as WinVNC, x11vnc or OSXvnc, i.e. it
+	takes an existing desktop and exports it via RFB (VNC), just that
+	LinuxVNC exports text.
+
+VNCommand <command> <args>
+	executes <command> redirecting stdin from a vncviewer and stdout &
+	stderr to the vnc clients. This might be renamed to vncTerm if
+	there are some term capabilities added (up to now, bash doesn't look
+	nice). Colours and other ANSI sequences need to be added.
+
+My original plan was to create a program named vncTerm. It was meant to
+overcome incompatibilities between different TERMs, but I found "screen" to
+be just such a program. Maybe once some time in the future I'll make a
+patch for screen to use VNConsole to export it's contents via RFB...
+
+These two programs are a simple application of LibVNCServer with a small
+console layer in between (VNConsole). You can use them under the terms
+(not vncTerms ;-) of the GPL. They where written by Johannes E. Schindelin.

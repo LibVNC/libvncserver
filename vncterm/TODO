@@ -1,0 +1,21 @@
+VNConsole:
+LinuxVNC:
+VNCommand:
+	make Control or Alt sequences work.
+	Find out how to satisfy isatty(). => /dev/ptyN
+	Fix check if child is alive.
+	Add command line option for real interactive mode.
+
+done:
+
+.treat colours correctly (use /dev/vcsaN's attributes).
+.introduce per cell colours (for attributes)
+.fix cursor fuckup when selecting.
+.default to paste for right mouse button.
+.have an idea how to insert keys
+.convert VNCommand to an interactive shell (vncTerm)
+.bidirectional pipes (spawn a shell ...)
+.mark with mouse (copy text)
+.when scrolling, cursor must be hidden!
+
+	modifiedRegion which are copied with CopyRect have to be modified also.
