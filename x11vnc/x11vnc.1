@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2004" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7pre, lastmod: 2004-12-23
+         version: 0.7.1pre, lastmod: 2004-12-27
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -573,6 +573,13 @@ default (see \fB-noxfixes\fR below).  This can be disabled
 with \fB-nocursor,\fR and also some values of the "mode"
 option below.
 .IP
+Note that under XFIXES cursors with transparency
+(alpha channel) will not be exactly represented and
+so Overlay may be preferred.  See also the \fB-alphacut\fR
+and \fB-alphafrac\fR options below as fudge factors to try
+to improve the situation for cursors with transparency
+for a given theme.
+.IP
 The "mode" string can be used to fine-tune the
 displaying of cursor shapes.  It can be used the
 following ways:
@@ -607,6 +614,37 @@ is not available, \fB-overlay\fR mode will be attempted.
 .IP
 Do not use the XFIXES extension to draw the exact cursor
 shape even if it is available.
+.PP
+\fB-alphacut\fR \fIn\fR
+.IP
+When using the XFIXES extension for the cursor shape,
+cursors with transparency will not be displayed exactly
+(but opaque ones will).  This option sets n as a cutoff
+for cursors that have transparency ("alpha channel"
+with values ranging from 0 to 255) Any cursor pixel with
+alpha value less than n becomes completely transparent.
+Otherwise the pixel is completely opaque.  Default 255
+.IP
+Note: the options \fB-alphacut,\fR \fB-alphafrac,\fR and \fB-alphafrac\fR
+may be removed if a more accurate internal method for
+handling cursor transparency is implemented.
+.PP
+\fB-alphafrac\fR \fIfraction\fR
+.IP
+With the threshold in \fB-alphacut\fR some cursors will become
+almost completely transparent because their alpha values
+are not high enough.  For those cursors adjust the
+alpha threshold until fraction of the non-zero alpha
+channel pixels become opaque.  Default 0.33
+.PP
+\fB-alpharemove\fR
+.IP
+By default, XFIXES cursors pixels with transparency have
+the alpha factor multiplied into the RGB color values
+(i.e. that corresponding to blending the cursor with a
+black background).  Specify this option to remove the
+alpha factor. (useful for light colored semi-transparent
+cursors).
 .PP
 \fB-nocursorshape\fR
 .IP
@@ -998,17 +1036,23 @@ norepeat        enable  \fB-norepeat\fR mode.
 .IP
 repeat          disable \fB-norepeat\fR mode.
 .IP
+nofb            enable  \fB-nofb\fR mode.
+.IP
+fb              disable \fB-nofb\fR mode.
+.IP
 bell            enable  bell (if supported).
 .IP
 nobell          disable bell.
 .IP
-sel             disable \fB-nosel\fR mode.
+bell            enable  bell (if supported).
 .IP
 nosel           enable  \fB-nosel\fR mode.
 .IP
-primary         disable \fB-noprimary\fR mode.
+sel             disable \fB-nosel\fR mode.
 .IP
 noprimary       enable  \fB-noprimary\fR mode.
+.IP
+primary         disable \fB-noprimary\fR mode.
 .IP
 cursor:mode     enable  \fB-cursor\fR "mode".
 .IP
@@ -1020,6 +1064,14 @@ noshow_cursor   disable showing a cursor. (same as
 xfixes          enable  xfixes cursor shape mode.
 .IP
 noxfixes        disable xfixes cursor shape mode.
+.IP
+alphacut:n      set \fB-alphacut\fR to n.
+.IP
+alphafrac:f     set \fB-alphafrac\fR to f.
+.IP
+alpharemove     enable  \fB-alpharemove\fR mode.
+.IP
+noalpharemove   disable \fB-alpharemove\fR mode.
 .IP
 cursorshape     disable \fB-nocursorshape\fR mode.
 .IP
@@ -1055,6 +1107,8 @@ defer:n         set \fB-defer\fR to n ms,same as deferupdate:n
 .IP
 wait:n          set \fB-wait\fR to n ms.
 .IP
+rfbwait:n       set \fB-rfbwait\fR (rfbMaxClientWait) to n ms.
+.IP
 nap             enable  \fB-nap\fR mode.
 .IP
 nonap           disable \fB-nap\fR mode.
@@ -1072,8 +1126,36 @@ fuzz:n          set \fB-fuzz\fR to n.
 progressive:n   set libvncserver \fB-progressive\fR slice
                 height parameter to n.
 .IP
-file:name       run \fB-remote\fR commands from file "name",
-                one command per line,blank and # skipped
+desktop:str     set \fB-desktop\fR name to str for new clients.
+.IP
+rfbport:n       set \fB-rfbport\fR to n.
+.IP
+http            enable  http client connections.
+.IP
+nohttp          disable http client connections.
+.IP
+httpport:n      set \fB-httpport\fR to n.
+.IP
+httpdir:dir     set \fB-httpdir\fR to dir (and enable http).
+.IP
+enablehttpproxy   enable  \fB-enablehttpproxy\fR mode.
+.IP
+noenablehttpproxy disable \fB-enablehttpproxy\fR mode.
+.IP
+alwaysshared     enable  \fB-alwaysshared\fR mode.
+.IP
+noalwaysshared   disable \fB-alwaysshared\fR mode.
+                (may interfere with other options)
+.IP
+nevershared      enable  \fB-nevershared\fR mode.
+.IP
+nonevershared    disable \fB-nevershared\fR mode.
+                (may interfere with other options)
+.IP
+dontdisconnect   enable  \fB-dontdisconnect\fR mode.
+.IP
+nodontdisconnect disable \fB-dontdisconnect\fR mode.
+                (may interfere with other options)
 .IP
 noremote        disable the \fB-remote\fR command processing,
                 it cannot be turned back on.
@@ -1138,33 +1220,37 @@ noflashcmap truecolor notruecolor overlay nooverlay
 overlay_cursor overlay_yescursor nooverlay_nocursor
 nooverlay_cursor nooverlay_yescursor overlay_nocursor
 visual scale viewonly noviewonly shared noshared
-forever noforever once deny lock nodeny unlock connect
-allowonce allow localhost nolocalhost accept gone shm
-noshm flipbyteorder noflipbyteorder onetile noonetile
-blackout xinerama noxinerama xrandr noxrandr xrandr_mode
-padgeom quiet q noquiet modtweak nomodtweak xkb noxkb
-skip_keycodes add_keysyms noadd_keysyms clear_mods
-noclear_mods clear_keys noclear_keys remap repeat
-norepeat bell nobell sel nosel primary noprimary
-cursorshape nocursorshape cursorpos nocursorpos cursor
-show_cursor noshow_cursor nocursor xfixes noxfixes xwarp
-xwarppointer noxwarp noxwarppointer buttonmap dragging
-nodragging pointer_mode input_skip debug_pointer dp
-nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-nodk deferupdate defer wait nap nonap sb screen_blank
-fs gaps grow fuzz progressive noremote
+forever noforever once deny lock nodeny unlock
+connect allowonce allow localhost nolocalhost accept
+gone shm noshm flipbyteorder noflipbyteorder onetile
+noonetile blackout xinerama noxinerama xrandr noxrandr
+xrandr_mode padgeom quiet q noquiet modtweak nomodtweak
+xkb noxkb skip_keycodes add_keysyms noadd_keysyms
+clear_mods noclear_mods clear_keys noclear_keys
+remap repeat norepeat fb nofb bell nobell sel
+nosel primary noprimary cursorshape nocursorshape
+cursorpos nocursorpos cursor show_cursor noshow_cursor
+nocursor xfixes noxfixes alphacut alphafrac alpharemove
+noalpharemove xwarp xwarppointer noxwarp noxwarppointer
+buttonmap dragging nodragging pointer_mode input_skip
+debug_pointer dp nodebug_pointer nodp debug_keyboard
+dk nodebug_keyboard nodk deferupdate defer wait
+rfbwait nap nonap sb screen_blank fs gaps grow fuzz
+progressive rfbport http nohttp httpport httpdir
+enablehttpproxy noenablehttpproxy alwaysshared
+noalwaysshared nevershared noalwaysshared dontdisconnect
+nodontdisconnect desktop noremote
 .IP
-aro=  display vncdisplay desktopname desktop auth
-rootshift scale_str scaled_x scaled_y scale_numer
-scale_denom scale_fac scaling_noblend scaling_nomult4
-scaling_pad scaling_interpolate inetd safer unsafe
-passwdfile using_shm logfile o rc norc h help V version
-lastmod bg nofb sigpipe threads clients client_count
-pid ext_xtest ext_xkb ext_xshm ext_xinerama ext_overlay
-ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
-button_mask mouse_x mouse_y bpp depth indexed_color
-dpy_x dpy_y rfbport rfbwait rfbauth passwd alwaysshared
-dontdisconnect httpdir enablehttpproxy
+aro=  display vncdisplay desktopname auth rootshift
+scale_str scaled_x scaled_y scale_numer scale_denom
+scale_fac scaling_noblend scaling_nomult4 scaling_pad
+scaling_interpolate inetd safer unsafe passwdfile
+using_shm logfile o rc norc h help V version lastmod
+bg sigpipe threads clients client_count pid ext_xtest
+ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes
+ext_xdamage ext_xrandr rootwin num_buttons button_mask
+mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y
+rfbauth passwd
 .PP
 \fB-sync\fR
 .IP

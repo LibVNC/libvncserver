@@ -1,3 +1,11 @@
+2004-12-27  Karl Runge <runge@karlrunge.com>
+	* allow -DLIBVNCSERVER_HAVE_FOO=0 override everything
+	* get_xfixes_cursor() try to more carefully convert alpha channel
+	  to opaque pixel.  Options -alphacut, -alphafrac, -alpharemove
+	* more commands under remote control: rfbwait, rfbport, http,
+	  httpport, httpdir, enablehttpproxy, desktop, alwaysshared,
+	  dontdisconnect.  Add to tkx11vnc.
+
 2004-12-22  Karl Runge <runge@karlrunge.com>
 	* final polishing for 0.7 release, tkx11vnc tweaks
 	* more careful rfbPE in pick_window, start check_user_input4()

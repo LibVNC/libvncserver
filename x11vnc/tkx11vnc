@@ -89,6 +89,7 @@ Clients
 	gone:
 	vncconnect
 	--
+	http
 	=F httpdir:
 	httpport:
 	enablehttpproxy
@@ -167,6 +168,8 @@ Debugging
 	debug_pointer
 	debug_keyboard
 	=F logfile:
+	=GA show-logfile
+	=GA tail-logfile
 	quiet
 	--
 	=GA show-start-cmd
@@ -187,9 +190,9 @@ Permissions
 	--
 	=RA noremote
 	--
-	alwaysshared
-	nevershared
-	dontdisconnect
+	=SA alwaysshared
+	=SA nevershared
+	=SA dontdisconnect
 	--
 	viewpasswd:
 	=F passwdfile:
@@ -204,6 +207,9 @@ Tuning
 	=-C:1,2,3,4 pointer_mode:
 	input_skip:
 	nodragging
+	alphacut:
+	alphafrac:
+	alpharemove
 	--
 	=D noshm
 	flipbyteorder
@@ -289,6 +295,15 @@ a -Q query.  Examples: \"zero:20,20,100,100\", \"Q:ext_xfixes\"
 
 	set helptext(stop+quit) "
 Send the stop command to the x11vnc server, then terminate the tkx11vnc gui.
+"
+
+	set helptext(show-logfile) "
+View the current contents of the logfile (if it exists and is accessible
+by the gui process).
+"
+
+	set helptext(tail-logfile) "
+Run the tail(1) command with -f option on the logfile in an xterm.
 "
 
 	set helptext(Quit) "
@@ -391,6 +406,20 @@ Key Bindings:
 	Anywhere: Control-a invokes \"Actions -> attach\"
 	Anywhere: Control-p invokes \"Actions -> ping\"
 	Anywhere: Control-u and Control-r invoke \"Actions -> update-all\"
+
+Misc:
+
+Since x11vnc has so many settings and to avoid further confusion,
+the libvncserver options:
+
+	-alwaysshared
+	-nevershared
+	-dontdisconnect
+
+are not available for changing in a running x11vnc (even though it
+is feasible).  These options overlap with the x11vnc options -shared
+and -forever which are hopefully enough for most usage.  They may be
+specified for x11vnc startup if desired.
 
 "
 }
@@ -506,8 +535,8 @@ proc active_when_starting {item} {
 }
 
 proc help_win {item} {
-	global helptext helpremote
-	global query_ans query_aro;
+	global helptext helpremote menu_var
+	global query_ans query_aro
 
 	set ok 0
 	set text "Help on $item:\n\n"
@@ -549,6 +578,18 @@ proc help_win {item} {
 		append text "\n"
 		append text $helpremote($item)
 		set ok 1
+	}
+
+	if {![is_action $item] && [info exists menu_var($item)]} {
+		global unset_str
+		append text "\n\n"
+		append text "==== current $item value: ====\n";
+		append text "\n"
+		if {$menu_var($item) == ""} {
+			append text "$unset_str\n"
+		} else {
+			append text "$menu_var($item)\n"
+		}
 	}
 
 	if {$item == "start"} {
@@ -799,15 +840,20 @@ proc menus_disable {} {
 # Entry box utilities:
 proc entry_state {x state} {
 	global entry_box entry_label entry_ok entry_help entry_skip entry_browse
+	global old_labels
 	if {$x == "all"} {
-		$entry_label  configure -state $state
+		if {!$old_labels} {
+			$entry_label configure -state $state
+		}
 		$entry_box    configure -state $state
 		$entry_ok     configure -state $state
 		$entry_skip   configure -state $state
 		$entry_help   configure -state $state
 		$entry_browse configure -state $state
 	} elseif {$x == "label"} {
-		$entry_label  configure -state $state
+		if {!$old_labels} {
+			$entry_label configure -state $state
+		}
 	} elseif {$x == "box"} {
 		$entry_box    configure -state $state
 	} elseif {$x == "ok"} {
@@ -1336,7 +1382,11 @@ proc query_all {{quiet 0}} {
 }
 
 proc set_info {str} {
-	global info_str
+	global info_str info_label
+#set w1 [$info_label cget -width]
+#set w2 [winfo width $info_label]
+#puts "set_info: w=$w1  winfo=$w2"
+#append_text "$str\n"
 	set info_str "$str"
 	update
 }
@@ -1358,6 +1408,55 @@ proc show_all_settings {} {
 		}
 	}
 	textwin "Settings" "All Current Settings" $txt
+}
+
+proc show_logfile {} {
+	global menu_var unset_str
+	set logfile $menu_var(logfile)
+	
+	if {$logfile == "" || $logfile == $unset_str} {
+		set txt "\nNo logfile has been specified.\n\n"	
+	} elseif {![file exists $logfile]} {
+		set txt "\nLogfile \"$logfile\" does not exist.\n\n"
+	} else {
+		set fh "-3"
+		set err ""
+		catch {set fh [open $logfile "r"]} err
+		if {$fh == "-3"} {
+			set txt "\nError opening \"$logfile\" $err.\n\n"
+		} else {
+			set txt "\nLogfile \"$logfile\" current contents:\n"
+			while {[gets $fh line] > -1} {
+				append txt "$line\n"
+			}
+			close $fh
+		}
+	}
+	textwin "Logfile" "Logfile" $txt
+}
+
+proc tail_logfile {} {
+	global menu_var unset_str
+	set logfile $menu_var(logfile)
+	
+	set txt ""
+	if {$logfile == "" || $logfile == $unset_str} {
+		set txt "\nNo logfile has been specified.\n\n"	
+	} elseif {![file exists $logfile]} {
+		set txt "\nLogfile \"$logfile\" does not exist.\n\n"
+	} else {
+		set cmd ""
+		set xterm_cmd "xterm -geometry 80x45 -title x11vnc-logfile -e"
+		set cmd [split $xterm_cmd]
+		lappend cmd "tail"
+		lappend cmd "+1f"
+		lappend cmd $logfile
+		lappend cmd "&"
+		catch {[eval exec $cmd]}
+	}
+	if {$txt != ""} {
+		textwin "Logfile" "Logfile" $txt
+	}
 }
 
 proc set_connected {yesno} {
@@ -1421,6 +1520,12 @@ proc do_action {item} {
 		return
 	} elseif {$item == "all-settings"} {
 		show_all_settings
+		return
+	} elseif {$item == "show-logfile"} {
+		show_logfile
+		return
+	} elseif {$item == "tail-logfile"} {
+		tail_logfile
 		return
 	} elseif {$item == "stop+quit"} {
 		push_new_value "stop" "stop" 1 0
@@ -1666,7 +1771,7 @@ proc disconnect_dialog {client} {
 		append_text "Invalid client info string: $client\n"
 		return
 	}
-	append msg "*** To disconnect this client press \"OK\", otherwise press \"Skip\"\n"
+	append msg "*** To *DISCONNECT* this client press \"OK\", otherwise press \"Skip\"\n"
 	bell
 	if [warning_dialog $msg "current"] {
 		push_new_value "disconnect" "disconnect" $cid 1
@@ -1757,17 +1862,19 @@ proc make_widgets {} {
 	global menu_b menu_m
 	global item_opts item_bool item_case item_entry menu_var unset_str
 	global item_cascade
-	global info_str x11_display vnc_display
+	global info_label info_str x11_display vnc_display
 	global text_area
 	global entry_box entry_str entry_set entry_label entry_ok entry_browse
 	global entry_help entry_skip
 	global bfont
 	global helptext helpremote helplabel
 
-set v 0
-	
-	label .info -textvariable info_str -bd 2 -relief groove -anchor w 
-	pack .info -side top -fill x 
+	set label_width 80
+
+	set info_label .info
+	label $info_label -textvariable info_str -bd 2 -relief groove \
+		-anchor w -width $label_width
+	pack $info_label -side top -fill x -expand 0
 
 	# Extract the Rows:
 	set row 0;
@@ -1869,7 +1976,7 @@ set v 0
 		set item_cascade($item) ""
 		set item_entry($item) $menu_count($case)
 
-if {$v} { puts "ITEM: $item - $opts - $case - $bool - $menu_count($case)" }
+		if {0} { puts "ITEM: $item - $opts - $case - $bool - $menu_count($case)" }
 
 		set mvar 0 
 		set m $menu_m($case)
@@ -1947,8 +2054,6 @@ if {$v} { puts "ITEM: $item - $opts - $case - $bool - $menu_count($case)" }
 		set m $menu_m($case);
 		set n [$m index end]
 
-if {$v} { puts "$case end: $n" }
-
 		for {set i 0} {$i <= $n} {incr i} {
 			set type [$m type $i]
 			if {$type == "separator"} {
@@ -1965,13 +2070,6 @@ if {$v} { puts "$case end: $n" }
 				}
 				$m add command -label $str \
 					-command "menu_help $label";
-
-if {$v} {
-	set ht ""; set hr ""
-	if {[info exists helptext($label)]} { set ht "YES" }
-	if {[info exists helpremote($label)]} { set hr "YES" }
-	puts "'$label'\tht='$ht' hr='$hr'"
-}
 
 				if {$str == ""} {
 					$m entryconfigure end -state disabled
@@ -1994,11 +2092,13 @@ if {$v} {
 
 	set df_x11 "$df.xdisplay"
 	no_x11_display
-	label $df_x11 -textvariable x11_display -width 35 -anchor w
+
+	set lw [expr {$label_width / 2}]
+	label $df_x11 -textvariable x11_display -width $lw -anchor w
 
 	set df_vnc "$df.vdisplay"
 	no_vnc_display
-	label $df_vnc -textvariable vnc_display -width 35 -anchor w
+	label $df_vnc -textvariable vnc_display -width $lw -anchor w
 
 	pack $df_x11 $df_vnc -side left 
 	pack $df -side top -fill x
@@ -2016,7 +2116,7 @@ if {$v} {
 	set ef .entryframe
 	frame $ef -bd 1 -relief groove
 
-	# Label
+	# Entry Label
 	set ef_label "$ef.label"
 	label $ef_label -textvariable entry_str -anchor w -font $bfont
 
@@ -2026,22 +2126,22 @@ if {$v} {
 	bind $ef_entry <KeyPress-Return> {set entry_set 1}
 	bind $ef_entry <KeyPress-Escape> {set entry_set 0}
 
-	# OK button
+	# Entry OK button
 	set ef_ok "$ef.ok"
 	button $ef_ok -text OK -pady 1 -command {set entry_set 1} \
 		-font $bfont
 
-	# Skip button
+	# Entry Skip button
 	set ef_skip "$ef.skip"
 	button $ef_skip -text Skip -pady 0 -command {set entry_set 0} \
 		-font $bfont
 
-	# Help button
+	# Entry Help button
 	set ef_help "$ef.help"
 	button $ef_help -text Help -pady 0 -command \
 		{menu_help $entry_dialog_item} -font $bfont
 
-	# Browse button
+	# Entry Browse button
 	set ef_browse "$ef.browse"
 	button $ef_browse -text "Browse..." -pady 0 -font $bfont \
 		-command {entry_insert [tk_getOpenFile]} 
@@ -2063,6 +2163,11 @@ if {$v} {
 
 	update
 	wm minsize . [winfo width .] [winfo height .]
+
+	#set w [winfo width .info]
+	#puts "w1: $w"
+	#set w [winfo reqwidth .info]
+	#puts "w2: $w"
 }
 
 proc menu_bindings {} {
@@ -2329,13 +2434,13 @@ proc run_remote_cmd {opts} {
 	lappend cmd "2>"
 	lappend cmd "/dev/null"
 
-if {0} {
-	set str [join $cmd]
-	puts "running: $str"
-	foreach word $cmd {
-		puts "   word: $word"
+	if {0} {
+		set str [join $cmd]
+		puts "running: $str"
+		foreach word $cmd {
+			puts "   word: $word"
+		}
 	}
-}
 
 	set output ""
 	menus_disable
@@ -2414,7 +2519,7 @@ global helpall helptext helpremote helplabel hostname;
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
 global menu_var unset_str menus_disabled
-global bfont
+global bfont old_labels
 global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
 global cache_all_query_vars
@@ -2435,6 +2540,12 @@ set cache_all_query_vars ""
 set delay_sleep 350
 set extra_sleep 1000
 set extra_sleep_split 4
+
+if {[regexp {^[34]} $tk_version] || $tk_version == "8.0"} {
+	set old_labels 1
+} else {
+	set old_labels 0
+}
 
 if {"$argv" == "-spit"} {
 	set fh [open $argv0 r]
