@@ -274,7 +274,13 @@ typedef struct _rfbScreenInfo
     rfbBool backgroundLoop;
 #endif
 
+    /* if TRUE, an ignoring signal handler is installed for SIGPIPE */
     rfbBool ignoreSIGPIPE;
+
+    /* if not zero, only a slice of this height is processed every time
+     * an update should be sent. This should make working on a slow
+     * link more interactive. */
+    int progressiveSliceHeight;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -469,6 +475,9 @@ typedef struct _rfbClientRec {
     void* zrleData;
 #endif
 
+    /* if progressive updating is on, this variable holds the current
+     * y coordinate of the progressive slice. */
+    int progressiveSliceY;
 } rfbClientRec, *rfbClientPtr;
 
 /*

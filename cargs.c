@@ -35,6 +35,7 @@ rfbUsage(void)
     fprintf(stderr, "-httpdir dir-path      enable http server using dir-path home\n");
     fprintf(stderr, "-httpport portnum      use portnum for http connection\n");
     fprintf(stderr, "-enablehttpproxy       enable http proxy support\n");
+    fprintf(stderr, "-progressive height    enable progressive updating for slow links\n");
 }
 
 /* purges COUNT arguments from ARGV at POSITION and decrements ARGC.
@@ -119,6 +120,12 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
             rfbScreen->httpPort = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-enablehttpproxy") == 0) {
             rfbScreen->httpEnableProxyConnect = TRUE;
+        } else if (strcmp(argv[i], "-progressive") == 0) {  /* -httpport portnum */
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
+            rfbScreen->progressiveSliceHeight = atoi(argv[++i]);
         } else {
 	    /* we just remove the processed arguments from the list */
 	    if(i != i1)

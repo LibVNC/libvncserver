@@ -340,6 +340,8 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->zlibCompressLevel = 5;
 #endif
 
+      cl->progressiveSliceY = 0;
+
       sprintf(pv,rfbProtocolVersionFormat,rfbProtocolMajorVersion,
 	      rfbProtocolMinorVersion);
 
@@ -1109,6 +1111,26 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
      */
 
     updateRegion = sraRgnCreateRgn(givenUpdateRegion);
+    if(cl->screen->progressiveSliceHeight>0) {
+	    int height=cl->screen->progressiveSliceHeight,
+	    	y=cl->progressiveSliceY;
+	    sraRegionPtr bbox=sraRgnBBox(updateRegion);
+	    sraRect rect;
+	    if(sraRgnPopRect(bbox,&rect,0)) {
+		sraRegionPtr slice;
+		if(y<rect.y1 || y>=rect.y2)
+		    y=rect.y1;
+	    	slice=sraRgnCreateRect(0,y,cl->screen->width,y+height);
+		sraRgnAnd(updateRegion,slice);
+		sraRgnDestroy(slice);
+	    }
+	    sraRgnDestroy(bbox);
+	    y+=height;
+	    if(y>=cl->screen->height)
+		    y=0;
+	    cl->progressiveSliceY=y;
+    }
+
     sraRgnOr(updateRegion,cl->copyRegion);
     if(!sraRgnAnd(updateRegion,cl->requestedRegion) &&
        !sendCursorShape && !sendCursorPos) {

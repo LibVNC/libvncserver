@@ -589,6 +589,11 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    rfbScreen->passwordCheck = defaultPasswordCheck;
 
+   rfbScreen->ignoreSIGPIPE = TRUE;
+
+   /* disable progressive updating per default */
+   rfbScreen->progressiveSliceHeight = 0;
+
    if(!rfbProcessArguments(rfbScreen,argc,argv)) {
      free(rfbScreen);
      return 0;
@@ -637,8 +642,6 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    /* initialize client list and iterator mutex */
    rfbClientListInit(rfbScreen);
-
-   rfbScreen->ignoreSIGPIPE = TRUE;
 
    return(rfbScreen);
 }
@@ -801,7 +804,7 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
   while(cl) {
     if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) &&
         !sraRgnEmpty(cl->requestedRegion)) {
-      if(cl->screen->rfbDeferUpdateTime == 0) {
+      if(rfbScreen->rfbDeferUpdateTime == 0) {
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
       } else if(cl->startDeferring.tv_usec == 0) {
 	gettimeofday(&cl->startDeferring,NULL);
@@ -812,7 +815,7 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 	if(tv.tv_sec < cl->startDeferring.tv_sec /* at midnight */
 	   || ((tv.tv_sec-cl->startDeferring.tv_sec)*1000
 	       +(tv.tv_usec-cl->startDeferring.tv_usec)/1000)
-	     > cl->screen->rfbDeferUpdateTime) {
+	     > rfbScreen->rfbDeferUpdateTime) {
 	  cl->startDeferring.tv_usec = 0;
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
 	}
