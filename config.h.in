@@ -75,6 +75,9 @@
 /* Define if you have the `select' function. */
 #undef HAVE_SELECT
 
+/* Define if you have the `setsid' function. */
+#undef HAVE_SETSID
+
 /* Define if you have the `socket' function. */
 #undef HAVE_SOCKET
 
@@ -160,9 +163,6 @@
 
 /* Name of package */
 #undef PACKAGE
-
-/* Define if the `setpgrp' function takes no argument. */
-#undef SETPGRP_VOID
 
 /* The number of bytes in type char */
 #undef SIZEOF_CHAR
