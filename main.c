@@ -719,7 +719,9 @@ void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
   rfbReleaseClientIterator(iterator);
 }
 
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 extern void TightCleanup();
+#endif
 
 void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
 {
@@ -740,7 +742,9 @@ void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
   if(rfbScreen->cursor)
     rfbFreeCursor(rfbScreen->cursor);
   free(rfbScreen);
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
   TightCleanup();
+#endif
 }
 
 void rfbInitServer(rfbScreenInfoPtr rfbScreen)

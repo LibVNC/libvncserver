@@ -1215,8 +1215,10 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     fu->type = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
 	if(cl->screen->maxRectsPerUpdate>0
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	   /* Tight encoding counts the rectangles differently */
 	   && cl->preferredEncoding != rfbEncodingTight
+#endif
 	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {
 	    sraRegion* newUpdateRegion = sraRgnBBox(updateRegion);
 	    sraRgnDestroy(updateRegion);

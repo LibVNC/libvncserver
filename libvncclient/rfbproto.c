@@ -133,9 +133,11 @@ static rfbBool HandleCoRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile32(rfbClient* client, int rx, int ry, int rw, int rh);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 static rfbBool HandleZlib8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZlib16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZlib32(rfbClient* client, int rx, int ry, int rw, int rh);
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 static rfbBool HandleTight8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleTight16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleTight32(rfbClient* client, int rx, int ry, int rw, int rh);
@@ -148,6 +150,8 @@ static void JpegSkipInputData(j_decompress_ptr cinfo, long num_bytes);
 static void JpegTermSource(j_decompress_ptr cinfo);
 static void JpegSetSrcManager(j_decompress_ptr cinfo, uint8_t *compressedData,
                               int compressedLen);
+#endif
+#endif
 
 /* The zlib encoding requires expansion/decompression/deflation of the
    compressed data in the "buffer" above into another, result buffer.
@@ -155,13 +159,17 @@ static void JpegSetSrcManager(j_decompress_ptr cinfo, uint8_t *compressedData,
    based on the bitsPerPixel, height and width of the rectangle.  We
    allocate this buffer one time to be the full size of the buffer. */
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 static int raw_buffer_size = -1;
 static char *raw_buffer;
 
 static z_stream decompStream;
 static rfbBool decompStreamInited = FALSE;
 
+#endif
 
+
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 /*
  * Variables for the ``tight'' encoding implementation.
  */
@@ -186,7 +194,7 @@ static uint8_t tightPrevRow[2048*3*sizeof(uint16_t)];
 
 /* JPEG decoder state. */
 static rfbBool jpegError;
-
+#endif
 
 /*
  * ConnectToRFBServer.
@@ -408,6 +416,7 @@ SetFormatAndEncodings(rfbClient* client)
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRaw);
       } else if (strncasecmp(encStr,"copyrect",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCopyRect);
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
       } else if (strncasecmp(encStr,"tight",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingTight);
 	requestLastRectEncoding = TRUE;
@@ -415,12 +424,15 @@ SetFormatAndEncodings(rfbClient* client)
 	  requestCompressLevel = TRUE;
 	if (client->appData.enableJPEG)
 	  requestQualityLevel = TRUE;
+#endif
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingHextile);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
       } else if (strncasecmp(encStr,"zlib",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZlib);
 	if (client->appData.compressLevel >= 0 && client->appData.compressLevel <= 9)
 	  requestCompressLevel = TRUE;
+#endif
       } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCoRRE);
       } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
@@ -472,9 +484,13 @@ SetFormatAndEncodings(rfbClient* client)
     }
 
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCopyRect);
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingTight);
+#endif
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingHextile);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZlib);
+#endif
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCoRRE);
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRRE);
 
@@ -813,6 +829,7 @@ HandleRFBServerMessage(rfbClient* client)
 	break;
       }
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
       case rfbEncodingZlib:
       {
 	switch (client->format.bitsPerPixel) {
@@ -832,6 +849,7 @@ HandleRFBServerMessage(rfbClient* client)
 	break;
      }
 
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
       case rfbEncodingTight:
       {
 	switch (client->format.bitsPerPixel) {
@@ -850,6 +868,8 @@ HandleRFBServerMessage(rfbClient* client)
 	}
 	break;
       }
+#endif
+#endif
 
       default:
 	rfbClientLog("Unknown rect encoding %d\n",
@@ -989,6 +1009,8 @@ PrintPixelFormat(format)
   }
 }
 
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+
 static long
 ReadCompactLen (rfbClient* client)
 {
@@ -1071,6 +1093,8 @@ JpegSetSrcManager(j_decompress_ptr cinfo, uint8_t *compressedData,
 
   cinfo->src = &jpegSrcManager;
 }
+
+#endif
 
 /* avoid name clashes with LibVNCServer */
 

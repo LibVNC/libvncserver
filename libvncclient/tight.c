@@ -17,6 +17,8 @@
  *  USA.
  */
 
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+
 /*
  * tight.c - handle ``tight'' encoding.
  *
@@ -601,6 +603,8 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
 
   return !jpegError;
 }
+
+#endif
 
 #endif
 

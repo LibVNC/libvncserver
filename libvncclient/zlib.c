@@ -18,6 +18,8 @@
  *  USA.
  */
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+
 /*
  * zlib.c - handle zlib encoding.
  *
@@ -156,3 +158,5 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 }
 
 #undef CARDBPP
+
+#endif
