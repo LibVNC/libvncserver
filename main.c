@@ -40,7 +40,7 @@ MUTEX(logMutex);
 
 int rfbEnableLogging=1;
 
-#ifdef WORDS_BIGENDIAN
+#ifdef LIBVNCSERVER_WORDS_BIGENDIAN
 char rfbEndianTest = 0;
 #else
 char rfbEndianTest = -1;
