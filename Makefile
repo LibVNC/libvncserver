@@ -20,10 +20,10 @@ OSX_LIBS = -framework ApplicationServices -framework Carbon
 
 SOURCES=main.c rfbserver.c miregion.c auth.c sockets.c xalloc.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
-	zlib.c tight.c
+	zlib.c tight.c httpd.c
 OBJS=main.o rfbserver.o miregion.o auth.o sockets.o xalloc.o \
 	stats.o corre.o hextile.o rre.o translate.o cutpaste.o \
-	zlib.o tight.o
+	zlib.o tight.o httpd.o
 
 all: example pnmshow storepasswd
 

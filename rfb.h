@@ -155,6 +155,11 @@ typedef struct
     Bool inetdInitDone;
     fd_set allFds;
     int rfbMaxClientWait;
+    int httpPort;
+    char* httpDir;
+    int httpListenSock;
+    int httpSock;
+    FILE* httpFP;
     char* rfbAuthPasswdFile;
     int rfbDeferUpdateTime;
     char* rfbScreen;

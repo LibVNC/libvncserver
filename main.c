@@ -310,6 +310,11 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,
    rfbScreen->maxFd=0;
    rfbScreen->rfbListenSock=-1;
    rfbScreen->udpPort=0;
+   rfbScreen->httpPort=0;
+   rfbScreen->httpDir=NULL;
+   rfbScreen->httpListenSock=-1;
+   rfbScreen->httpSock=-1;
+   rfbScreen->httpFP=NULL;
    rfbScreen->inetdInitDone = FALSE;
    rfbScreen->desktopName = "LibVNCServer";
    rfbScreen->rfbAlwaysShared = FALSE;
@@ -388,7 +393,7 @@ void
 processEvents(rfbScreenInfoPtr rfbScreen,long usec)
 {
     rfbCheckFds(rfbScreen,usec);
-    //httpCheckFds(rfbScreen);
+    httpCheckFds(rfbScreen);
 #ifdef CORBA
     corbaCheckFds(rfbScreen);
 #endif
@@ -421,6 +426,7 @@ void runEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)
   }
 
   rfbInitSockets(rfbScreen);
+  httpInitSockets(rfbScreen);
   while(1)
     processEvents(rfbScreen,usec);
 }

@@ -208,6 +208,7 @@ int main(int argc,char** argv)
   rfbScreen->ptrAddEvent = doptr;
   rfbScreen->kbdAddEvent = dokey;
   rfbScreen->newClientHook = newclient;
+  rfbScreen->httpDir = "./classes";
 
   initBuffer(rfbScreen->frameBuffer);
 
