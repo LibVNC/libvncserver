@@ -326,7 +326,7 @@ processArguments(rfbScreenInfoPtr rfbScreen,int argc, char *argv[])
 	   rfbScreen->rfbMaxClientWait = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-rfbauth") == 0) {  /* -rfbauth passwd-file */
             if (i + 1 >= argc) usage();
-            rfbScreen->rfbAuthPasswdFile = argv[++i];
+            rfbScreen->rfbAuthPasswdData = argv[++i];
         } else if (strcmp(argv[i], "-desktop") == 0) {  /* -desktop desktop-name */
             if (i + 1 >= argc) usage();
             rfbScreen->desktopName = argv[++i];
@@ -398,6 +398,15 @@ static rfbCursor myCursor =
 rfbCursorPtr defaultGetCursorPtr(rfbClientPtr cl)
 {
    return(cl->screen->cursor);
+}
+
+Bool defaultGetPassword(rfbClientPtr cl,char* passwd,int len)
+{
+  char *pwd=vncDecryptPasswdFromFile(cl->screen->rfbAuthPasswdData);
+  if(!pwd)
+    return(FALSE);
+  strncpy(passwd,pwd,MAXPWLEN);
+  return(TRUE);
 }
 
 void doNothingWithClient(rfbClientPtr cl)
@@ -511,6 +520,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->setXCutText = defaultSetXCutText;
    rfbScreen->getCursorPtr = defaultGetCursorPtr;
    rfbScreen->setTranslateFunction = rfbSetTranslateFunction;
+   rfbScreen->getPassword = defaultGetPassword;
    rfbScreen->newClientHook = doNothingWithClient;
    rfbScreen->displayHook = 0;
 

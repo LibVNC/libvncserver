@@ -173,108 +173,128 @@ rfbReverseConnection(rfbScreen,host, port)
  */
 
 rfbClientPtr
-rfbNewClient(rfbScreen,sock)
+rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
     rfbScreenInfoPtr rfbScreen;
     int sock;
+    Bool isUDP;
 {
     rfbProtocolVersionMsg pv;
     rfbClientIteratorPtr iterator;
-    rfbClientPtr cl;
+    rfbClientPtr cl,cl_;
     struct sockaddr_in addr;
     int addrlen = sizeof(struct sockaddr_in);
     int i;
 
-    rfbLog("  other clients:\n");
-    iterator = rfbGetClientIterator(rfbScreen);
-    while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
-        rfbLog("     %s\n",cl->host);
-    }
-    rfbReleaseClientIterator(iterator);
+    cl = (rfbClientPtr)malloc(sizeof(rfbClientRec));
 
-    cl = (rfbClientPtr)xalloc(sizeof(rfbClientRec));
-
-    FD_SET(sock,&(rfbScreen->allFds));
     cl->screen = rfbScreen;
     cl->sock = sock;
-    getpeername(sock, (struct sockaddr *)&addr, &addrlen);
-    cl->host = strdup(inet_ntoa(addr.sin_addr));
-
-    INIT_MUTEX(cl->outputMutex);
-    INIT_MUTEX(cl->refCountMutex);
-    INIT_COND(cl->deleteCond);
-
-    cl->state = RFB_PROTOCOL_VERSION;
-
-    cl->reverseConnection = FALSE;
-    cl->readyForSetColourMapEntries = FALSE;
-    cl->useCopyRect = FALSE;
-    cl->preferredEncoding = rfbEncodingRaw;
-    cl->correMaxWidth = 48;
-    cl->correMaxHeight = 48;
-
-    cl->copyRegion = sraRgnCreate();
-    cl->copyDX = 0;
-    cl->copyDY = 0;
-   
-    cl->modifiedRegion =
-      sraRgnCreateRect(0,0,rfbScreen->width,rfbScreen->height);
-
-    INIT_MUTEX(cl->updateMutex);
-    INIT_COND(cl->updateCond);
-
-    cl->requestedRegion = sraRgnCreate();
-
-    cl->format = cl->screen->rfbServerFormat;
-    cl->translateFn = rfbTranslateNone;
-    cl->translateLookupTable = NULL;
-
-    LOCK(rfbClientListMutex);
-
-    IF_PTHREADS(cl->refCount = 0);
-    cl->next = rfbScreen->rfbClientHead;
-    cl->prev = NULL;
-    if (rfbScreen->rfbClientHead)
-        rfbScreen->rfbClientHead->prev = cl;
-
-    rfbScreen->rfbClientHead = cl;
-    UNLOCK(rfbClientListMutex);
-
-    cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
-    cl->tightQualityLevel = -1;
-    for (i = 0; i < 4; i++)
-        cl->zsActive[i] = FALSE;
-
-    cl->enableCursorShapeUpdates = FALSE;
-    cl->useRichCursorEncoding = FALSE;
-    cl->enableLastRectEncoding = FALSE;
-
     rfbResetStats(cl);
 
-    cl->compStreamInited = FALSE;
-    cl->compStream.total_in = 0;
-    cl->compStream.total_out = 0;
-    cl->compStream.zalloc = Z_NULL;
-    cl->compStream.zfree = Z_NULL;
-    cl->compStream.opaque = Z_NULL;
+    if(isUDP) {
+      rfbLog(" accepted UDP client\n");
+    } else {
+      getpeername(sock, (struct sockaddr *)&addr, &addrlen);
+      cl->host = strdup(inet_ntoa(addr.sin_addr));
 
-    cl->zlibCompressLevel = 5;
+      rfbLog("  other clients:\n");
+      iterator = rfbGetClientIterator(rfbScreen);
+      while ((cl_ = rfbClientIteratorNext(iterator)) != NULL) {
+        rfbLog("     %s\n",cl_->host);
+      }
+      rfbReleaseClientIterator(iterator);
 
-    sprintf(pv,rfbProtocolVersionFormat,rfbProtocolMajorVersion,
-            rfbProtocolMinorVersion);
+      FD_SET(sock,&(rfbScreen->allFds));
+      INIT_MUTEX(cl->outputMutex);
+      INIT_MUTEX(cl->refCountMutex);
+      INIT_COND(cl->deleteCond);
+
+      cl->state = RFB_PROTOCOL_VERSION;
+
+      cl->reverseConnection = FALSE;
+      cl->readyForSetColourMapEntries = FALSE;
+      cl->useCopyRect = FALSE;
+      cl->preferredEncoding = rfbEncodingRaw;
+      cl->correMaxWidth = 48;
+      cl->correMaxHeight = 48;
+
+      cl->copyRegion = sraRgnCreate();
+      cl->copyDX = 0;
+      cl->copyDY = 0;
+   
+      cl->modifiedRegion =
+	sraRgnCreateRect(0,0,rfbScreen->width,rfbScreen->height);
+
+      INIT_MUTEX(cl->updateMutex);
+      INIT_COND(cl->updateCond);
+
+      cl->requestedRegion = sraRgnCreate();
+
+      cl->format = cl->screen->rfbServerFormat;
+      cl->translateFn = rfbTranslateNone;
+      cl->translateLookupTable = NULL;
+
+      LOCK(rfbClientListMutex);
+
+      IF_PTHREADS(cl->refCount = 0);
+      cl->next = rfbScreen->rfbClientHead;
+      cl->prev = NULL;
+      if (rfbScreen->rfbClientHead)
+        rfbScreen->rfbClientHead->prev = cl;
+
+      rfbScreen->rfbClientHead = cl;
+      UNLOCK(rfbClientListMutex);
+
+      cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
+      cl->tightQualityLevel = -1;
+      for (i = 0; i < 4; i++)
+        cl->zsActive[i] = FALSE;
+
+      cl->enableCursorShapeUpdates = FALSE;
+      cl->useRichCursorEncoding = FALSE;
+      cl->enableLastRectEncoding = FALSE;
+
+      cl->compStreamInited = FALSE;
+      cl->compStream.total_in = 0;
+      cl->compStream.total_out = 0;
+      cl->compStream.zalloc = Z_NULL;
+      cl->compStream.zfree = Z_NULL;
+      cl->compStream.opaque = Z_NULL;
+
+      cl->zlibCompressLevel = 5;
+
+      sprintf(pv,rfbProtocolVersionFormat,rfbProtocolMajorVersion,
+	      rfbProtocolMinorVersion);
+
+      if (WriteExact(cl, pv, sz_rfbProtocolVersionMsg) < 0) {
+        rfbLogPerror("rfbNewClient: write");
+        rfbCloseClient(cl);
+        return NULL;
+      }
+    }
 
     cl->clientData = NULL;
     cl->clientGoneHook = doNothingWithClient;
     cl->screen->newClientHook(cl);
 
-    if (WriteExact(cl, pv, sz_rfbProtocolVersionMsg) < 0) {
-        rfbLogPerror("rfbNewClient: write");
-        rfbCloseClient(cl);
-        return NULL;
-    }
-
     return cl;
 }
 
+rfbClientPtr
+rfbNewClient(rfbScreen,sock)
+    rfbScreenInfoPtr rfbScreen;
+    int sock;
+{
+  return(rfbNewTCPOrUDPClient(rfbScreen,sock,FALSE));
+}
+
+rfbClientPtr
+rfbNewUDPClient(rfbScreen)
+     rfbScreenInfoPtr rfbScreen;
+{
+  return((rfbScreen->udpClient=
+	  rfbNewTCPOrUDPClient(rfbScreen,rfbScreen->udpSock,TRUE)));
+}
 
 /*
  * rfbClientConnectionGone is called from sockets.c just after a connection
@@ -342,7 +362,7 @@ rfbClientConnectionGone(cl)
 
     rfbPrintStats(cl);
 
-    xfree(cl);
+    free(cl);
 }
 
 
@@ -434,14 +454,14 @@ rfbClientConnFailed(cl, reason)
     char *buf;
     int len = strlen(reason);
 
-    buf = (char *)xalloc(8 + len);
+    buf = (char *)malloc(8 + len);
     ((CARD32 *)buf)[0] = Swap32IfLE(rfbConnFailed);
     ((CARD32 *)buf)[1] = Swap32IfLE(len);
     memcpy(buf + 8, reason, len);
 
     if (WriteExact(cl, buf, 8 + len) < 0)
         rfbLogPerror("rfbClientConnFailed: write");
-    xfree(buf);
+    free(buf);
     rfbCloseClient(cl);
 }
 
@@ -808,19 +828,19 @@ rfbProcessClientNormalMessage(cl)
 
         msg.cct.length = Swap32IfLE(msg.cct.length);
 
-        str = (char *)xalloc(msg.cct.length);
+        str = (char *)malloc(msg.cct.length);
 
         if ((n = ReadExact(cl, str, msg.cct.length)) <= 0) {
             if (n != 0)
                 rfbLogPerror("rfbProcessClientNormalMessage: read");
-            xfree(str);
+            free(str);
             rfbCloseClient(cl);
             return;
         }
 
         cl->screen->setXCutText(str, msg.cct.length, cl);
 
-        xfree(str);
+        free(str);
         return;
 
 
@@ -1388,18 +1408,21 @@ rfbNewUDPConnection(rfbScreen,sock)
  * number of bytes we can possibly get.
  */
 
-#if 0
 void
-rfbProcessUDPInput(rfbClientPtr cl)
+rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
 {
     int n;
+    rfbClientPtr cl=rfbScreen->udpClient;
     rfbClientToServerMsg msg;
 
-    if ((n = read(cl->udpSock, (char *)&msg, sizeof(msg))) <= 0) {
+    if(!cl)
+      return;
+
+    if ((n = read(rfbScreen->udpSock, (char *)&msg, sizeof(msg))) <= 0) {
 	if (n < 0) {
 	    rfbLogPerror("rfbProcessUDPInput: read");
 	}
-	rfbDisconnectUDPSock(cl);
+	rfbDisconnectUDPSock(rfbScreen);
 	return;
     }
 
@@ -1408,7 +1431,7 @@ rfbProcessUDPInput(rfbClientPtr cl)
     case rfbKeyEvent:
 	if (n != sz_rfbKeyEventMsg) {
 	    rfbLog("rfbProcessUDPInput: key event incorrect length\n");
-	    rfbDisconnectUDPSock(cl);
+	    rfbDisconnectUDPSock(rfbScreen);
 	    return;
 	}
 	cl->screen->kbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), cl);
@@ -1417,7 +1440,7 @@ rfbProcessUDPInput(rfbClientPtr cl)
     case rfbPointerEvent:
 	if (n != sz_rfbPointerEventMsg) {
 	    rfbLog("rfbProcessUDPInput: ptr event incorrect length\n");
-	    rfbDisconnectUDPSock(cl);
+	    rfbDisconnectUDPSock(rfbScreen);
 	    return;
 	}
 	cl->screen->ptrAddEvent(msg.pe.buttonMask,
@@ -1427,7 +1450,6 @@ rfbProcessUDPInput(rfbClientPtr cl)
     default:
 	rfbLog("rfbProcessUDPInput: unknown message type %d\n",
 	       msg.type);
-	rfbDisconnectUDPSock(cl);
+	rfbDisconnectUDPSock(rfbScreen);
     }
 }
-#endif

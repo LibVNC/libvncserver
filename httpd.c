@@ -45,7 +45,7 @@
     "<HEAD><TITLE>File Not Found</TITLE></HEAD>\n" \
     "<BODY><H1>File Not Found</H1></BODY>\n"
 
-#define OK_STR "HTTP/1.0 200 OK\n\n"
+#define OK_STR "HTTP/1.0 200 OK\nContent-Type: text/html\n\n"
 
 static void httpProcessInput();
 static Bool compareAndSkip(char **ptr, const char *str);
@@ -273,7 +273,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
     /* Open the file */
 
-    if ((fd = fopen(fullFname, O_RDONLY)) < 0) {
+    if ((fd = fopen(fullFname, "r")) <= 0) {
 	rfbLogPerror("httpProcessInput: open");
 	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
 	httpCloseSock(rfbScreen);
@@ -283,7 +283,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     WriteExact(&cl, OK_STR, strlen(OK_STR));
 
     while (1) {
-	int n = fread(buf, BUF_SIZE-1, 1, fd);
+	int n = fread(buf, 1, BUF_SIZE-1, fd);
 	if (n < 0) {
 	    rfbLogPerror("httpProcessInput: read");
 	    fclose(fd);

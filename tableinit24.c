@@ -82,7 +82,7 @@ rfbInitTrueColourSingleTable24 (char **table, rfbPixelFormat *in,
     int nEntries = 1 << in->bitsPerPixel;
 
     if (*table) free(*table);
-    *table = (char *)xalloc(nEntries * 3 + 1);
+    *table = (char *)malloc(nEntries * 3 + 1);
     t = (CARD8 *)*table;
 
     for (i = 0; i < nEntries; i++) {
@@ -121,7 +121,7 @@ rfbInitTrueColourRGBTables24 (char **table, rfbPixelFormat *in,
     CARD8 *blueTable;
 
     if (*table) free(*table);
-    *table = (char *)xalloc((in->redMax + in->greenMax + in->blueMax + 3)
+    *table = (char *)malloc((in->redMax + in->greenMax + in->blueMax + 3)
                             * 3 + 1);
     redTable = (CARD8 *)*table;
     greenTable = redTable + 3*(in->redMax + 1);

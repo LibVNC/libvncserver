@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zlib.h>
 #include "keysym.h"
 
 /* TODO: this stuff has to go into autoconf */
@@ -35,18 +36,12 @@ typedef unsigned int CARD32;
 typedef CARD32 Pixel;
 typedef CARD32 KeySym;
 /* for some strange reason, "typedef signed char Bool;" yields a four byte
-   signed int on an SGI, but only for rfbserver.o!!! */
+   signed int on IRIX, but only for rfbserver.o!!! */
 #define Bool signed char
 #undef FALSE
 #define FALSE 0
 #undef TRUE
 #define TRUE -1
-
-#define xalloc malloc
-#define xrealloc realloc
-#define xfree free
-
-#include <zlib.h>
 
 #include "rfbproto.h"
 
@@ -84,7 +79,6 @@ typedef CARD32 KeySym;
 
 #ifdef WIN32
 #include <winsock.h>
-//#define sockaddr_in sockaddr*
 #undef SOCKET
 #define SOCKET int
 #else
@@ -134,6 +128,18 @@ int max(int,int);
 #define IF_PTHREADS(x)
 #endif
 
+/* end of stuff for autoconf */
+
+/* if you use pthreads, but don't define HAVE_PTHREADS, the structs
+   get all mixed up. So this gives a linker error reminding you to compile
+   the library and your application (at least the parts including rfb.h)
+   with the same support for pthreads. */
+#ifdef HAVE_PTHREADS
+#define rfbInitServer rfbInitServerWithPthreads
+#else
+#define rfbInitServer rfbInitServerWithoutPthreads
+#endif
+
 #define MAX_ENCODINGS 10
 
 struct rfbClientRec;
@@ -146,6 +152,7 @@ typedef void (*PtrAddEventProcPtr) (int buttonMask, int x, int y, struct rfbClie
 typedef void (*SetXCutTextProcPtr) (char* str,int len, struct rfbClientRec* cl);
 typedef struct rfbCursor* (*GetCursorProcPtr) (struct rfbClientRec* pScreen);
 typedef Bool (*SetTranslateFunctionProcPtr)(struct rfbClientRec* cl);
+typedef Bool (*GetPasswordProcPtr)(struct rfbClientRec* cl,char* passWord,int len);
 typedef void (*NewClientHookPtr)(struct rfbClientRec* cl);
 typedef void (*DisplayHookPtr)(struct rfbClientRec* cl);
 
@@ -158,26 +165,10 @@ typedef struct {
   } data; /* there have to be count*3 entries */
 } rfbColourMap;
 
-/* this is why windows and it's programs are so huge:
-	You can't do something like
-#define MUTEX(m)
-	struct {
-		int i;
-		MUTEX(m);	// this evaluates to ";", and that is not acceptable
-					// to Visual C++
-	}
-*/
-
-#ifdef WIN32
-#undef MUTEX
-#define MUTEX(mutex) char dummy##mutex
-#undef COND
-#define COND(cond) char dummy##cond
-#endif
-
 /*
- * Per-screen (framebuffer) structure.  There is only one of these, since we
- * don't allow the X server to have multiple screens.
+ * Per-screen (framebuffer) structure.  There can be as many as you wish,
+ * each serving different clients. However, you have to call
+ * rfbProcessEvents for each of these.
  */
 
 typedef struct
@@ -245,21 +236,26 @@ typedef struct
     rfbColourMap colourMap; /* set this if rfbServerFormat.trueColour==FALSE */
     char* desktopName;
     char rfbThisHost[255];
+
     int rfbPort;
-    Bool socketInitDone;
-    SOCKET inetdSock;
+    SOCKET rfbListenSock;
     int maxSock;
     int maxFd;
-	SOCKET rfbListenSock;
+    fd_set allFds;
+
+    Bool socketInitDone;
+    SOCKET inetdSock;
+    Bool inetdInitDone;
+
     int udpPort;
     SOCKET udpSock;
     struct rfbClientRec* udpClient;
     Bool udpSockConnected;
     struct sockaddr_in udpRemoteAddr;
-    Bool inetdInitDone;
-    fd_set allFds;
+
     int rfbMaxClientWait;
-  /* http stuff */
+
+    /* http stuff */
     Bool httpInitDone;
     int httpPort;
     char* httpDir;
@@ -267,7 +263,9 @@ typedef struct
     SOCKET httpSock;
     FILE* httpFP;
 
-    char* rfbAuthPasswdFile;
+    GetPasswordProcPtr getPassword;
+    char* rfbAuthPasswdData;
+
     int rfbDeferUpdateTime;
     char* rfbScreen;
     Bool rfbAlwaysShared;
@@ -295,8 +293,8 @@ typedef struct
     /* displayHook is called just before a frame buffer update */
     DisplayHookPtr displayHook;
 
-    MUTEX(cursorMutex);
 #ifdef HAVE_PTHREADS
+    MUTEX(cursorMutex);
     Bool backgroundLoop;
 #endif
 
@@ -345,6 +343,8 @@ typedef struct rfbClientRec {
     /* private data. You should put any application client specific data
      * into a struct and let clientData point to it. Don't forget to
      * free the struct via clientGoneHook!
+     *
+     * This is useful if the IO functions have to behave client specific.
      */
     void* clientData;
     ClientGoneHookPtr clientGoneHook;
@@ -360,15 +360,12 @@ typedef struct rfbClientRec {
     } state;
 
     Bool reverseConnection;
-
     Bool readyForSetColourMapEntries;
-   
     Bool useCopyRect;
     int preferredEncoding;
     int correMaxWidth, correMaxHeight;
 
     /* The following member is only used during VNC authentication */
-
     CARD8 authChallenge[CHALLENGESIZE];
 
     /* The following members represent the update needed to get the client's
@@ -397,7 +394,6 @@ typedef struct rfbClientRec {
     sraRegionPtr copyRegion;	/* the destination region of the copy */
     int copyDX, copyDY;		/* the translation by which the copy happens */
 
-
     sraRegionPtr modifiedRegion;
 
     /* As part of the FramebufferUpdateRequest, a client can express interest
@@ -407,31 +403,25 @@ typedef struct rfbClientRec {
 
     sraRegionPtr requestedRegion;
 
+    /* TODO: */
     /* The following members represent the state of the "deferred update" timer
        - when the framebuffer is modified and the client is ready, in most
        cases it is more efficient to defer sending the update by a few
        milliseconds so that several changes to the framebuffer can be combined
        into a single update. */
 
-  /* no deferred timer here; server has to do it alone */
-
-  /* Bool deferredUpdateScheduled;
-     OsTimerPtr deferredUpdateTimer; */
-
     /* translateFn points to the translation function which is used to copy
        and translate a rectangle from the framebuffer to an output buffer. */
 
     rfbTranslateFnType translateFn;
-
     char *translateLookupTable;
-
     rfbPixelFormat format;
 
-/*
- * UPDATE_BUF_SIZE must be big enough to send at least one whole line of the
- * framebuffer.  So for a max screen width of say 2K with 32-bit pixels this
- * means 8K minimum.
- */
+    /*
+     * UPDATE_BUF_SIZE must be big enough to send at least one whole line of the
+     * framebuffer.  So for a max screen width of say 2K with 32-bit pixels this
+     * means 8K minimum.
+     */
 
 #define UPDATE_BUF_SIZE 30000
 
@@ -455,7 +445,6 @@ typedef struct rfbClientRec {
 
     struct z_stream_s compStream;
     Bool compStreamInited;
-
     CARD32 zlibCompressLevel;
 
     /* tight encoding -- preserve zlib streams' state for each client */
@@ -476,7 +465,8 @@ typedef struct rfbClientRec {
 
 #ifdef HAVE_PTHREADS
     /* whenever a client is referenced, the refCount has to be incremented
-       and afterwards decremented.
+       and afterwards decremented, so that the client is not cleaned up
+       while being referenced.
        Use the functions rfbIncrClientRef(cl) and rfbDecrClientRef(cl);
     */
     int refCount;
@@ -490,7 +480,6 @@ typedef struct rfbClientRec {
 
 } rfbClientRec, *rfbClientPtr;
 
-
 /*
  * This macro is used to test whether there is a framebuffer update needing to
  * be sent to the client.
@@ -500,28 +489,6 @@ typedef struct rfbClientRec {
      ((!(cl)->enableCursorShapeUpdates && !(cl)->screen->cursorIsDrawn) ||   \
      ((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||      \
      !sraRgnEmpty((cl)->copyRegion) || !sraRgnEmpty((cl)->modifiedRegion))
-
-      //REGION_NOTEMPTY(&((cl)->screenInfo->screen),&(cl)->copyRegion) ||  
-      //REGION_NOTEMPTY(&((cl)->screenInfo->screen),&(cl)->modifiedRegion))
-
-/*
- * This macro creates an empty region (ie. a region with no areas) if it is
- * given a rectangle with a width or height of zero. It appears that 
- * REGION_INTERSECT does not quite do the right thing with zero-width
- * rectangles, but it should with completely empty regions.
- */
-
-#define SAFE_REGION_INIT(pscreen, preg, rect, size)          \
-{                                                            \
-      if ( ( (rect) ) &&                                     \
-           ( ( (rect)->x2 == (rect)->x1 ) ||                 \
-             ( (rect)->y2 == (rect)->y1 ) ) ) {              \
-          REGION_INIT( (pscreen), (preg), NullBox, 0 );      \
-      } else {                                               \
-          REGION_INIT( (pscreen), (preg), (rect), (size) );  \
-      }                                                      \
-}
-
 
 /*
  * Macros for endian swapping.
@@ -544,22 +511,12 @@ static const int rfbEndianTest = (_BYTE_ORDER == _LITTLE_ENDIAN);
 #define Swap24IfLE(l) (rfbEndianTest ? Swap24(l) : (l))
 #define Swap32IfLE(l) (rfbEndianTest ? Swap32(l) : (l))
 
-/* main.c */
-
-extern void rfbLog(char *format, ...);
-extern void rfbLogPerror(char *str);
-
-void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
-void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
-
-void rfbDoCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
-void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
-
-
 /* sockets.c */
 
 extern int rfbMaxClientWait;
 
+extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
+extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
 extern void rfbCloseClient(rfbClientPtr cl);
 extern int ReadExact(rfbClientPtr cl, char *buf, int len);
 extern int WriteExact(rfbClientPtr cl, char *buf, int len);
@@ -585,12 +542,13 @@ extern void rfbReleaseClientIterator(rfbClientIteratorPtr iterator);
 
 extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,int sock);
 extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,int sock);
+extern rfbClientPtr rfbNewUDPClient(rfbScreenInfoPtr rfbScreen);
 extern rfbClientPtr rfbReverseConnection(rfbScreenInfoPtr rfbScreen,char *host, int port);
 extern void rfbClientConnectionGone(rfbClientPtr cl);
 extern void rfbProcessClientMessage(rfbClientPtr cl);
 extern void rfbClientConnFailed(rfbClientPtr cl, char *reason);
 extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
-extern void rfbProcessUDPInput(rfbClientPtr cl);
+extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern Bool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
 extern Bool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern Bool rfbSendUpdateBuf(rfbClientPtr cl);
@@ -628,8 +586,6 @@ extern void httpCheckFds();
 /* auth.c */
 
 extern char *rfbAuthPasswdFile;
-extern Bool rfbAuthenticating;
-
 extern void rfbAuthNewClient(rfbClientPtr cl);
 extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
 
@@ -709,11 +665,6 @@ extern void defaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
 extern void rfbResetStats(rfbClientPtr cl);
 extern void rfbPrintStats(rfbClientPtr cl);
 
-/* socket.c */
-
-extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
-extern void rfbDisconnectUDPSock(rfbScreenInfoPtr cl);
-
 /* font.c */
 
 typedef struct rfbFontData {
@@ -734,19 +685,18 @@ void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int
 
 /* main.c */
 
+extern void rfbLog(char *format, ...);
+extern void rfbLogPerror(char *str);
+
+void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
+void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
+
+void rfbDoCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
+void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
+
 void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2);
 void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
 void doNothingWithClient(rfbClientPtr cl);
-
-/* if you use pthreads, but don't define HAVE_PTHREADS, the structs
-   get all mixed up. So this gives a linker error reminding you to compile
-   the library and your application (at least the parts including rfb.h)
-   with the same support for pthreads. */
-#ifdef HAVE_PTHREADS
-#define rfbInitServer rfbInitServerWithPthreads
-#else
-#define rfbInitServer rfbInitServerWithoutPthreads
-#endif
 
 /* functions to make a vnc server */
 extern rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,

@@ -75,9 +75,9 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
     if (zlibBeforeBufSize < maxRawSize) {
 	zlibBeforeBufSize = maxRawSize;
 	if (zlibBeforeBuf == NULL)
-	    zlibBeforeBuf = (char *)xalloc(zlibBeforeBufSize);
+	    zlibBeforeBuf = (char *)malloc(zlibBeforeBufSize);
 	else
-	    zlibBeforeBuf = (char *)xrealloc(zlibBeforeBuf, zlibBeforeBufSize);
+	    zlibBeforeBuf = (char *)realloc(zlibBeforeBuf, zlibBeforeBufSize);
     }
 
     /* zlib compression is not useful for very small data sets.
@@ -115,9 +115,9 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
     if (zlibAfterBufSize < maxCompSize) {
 	zlibAfterBufSize = maxCompSize;
 	if (zlibAfterBuf == NULL)
-	    zlibAfterBuf = (char *)xalloc(zlibAfterBufSize);
+	    zlibAfterBuf = (char *)malloc(zlibAfterBufSize);
 	else
-	    zlibAfterBuf = (char *)xrealloc(zlibAfterBuf, zlibAfterBufSize);
+	    zlibAfterBuf = (char *)realloc(zlibAfterBuf, zlibAfterBufSize);
     }
 
     /* 

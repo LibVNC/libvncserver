@@ -76,7 +76,7 @@ sraSpanRemove(sraSpan *span) {
 void
 sraSpanDestroy(sraSpan *span) {
   if (span->subspan) sraSpanListDestroy(span->subspan);
-  xfree(span);
+  free(span);
 }
 
 void
@@ -153,7 +153,7 @@ sraSpanListDestroy(sraSpanList *list) {
     sraSpanDestroy(curr);
     curr = next;
   }
-  xfree(list);
+  free(list);
 }
 
 void

@@ -214,15 +214,14 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     }
 
     if ((rfbScreen->udpSock != -1) && FD_ISSET(rfbScreen->udpSock, &fds)) {
-
+        if(!rfbScreen->udpClient)
+	    rfbNewUDPClient(rfbScreen);
 	if (recvfrom(rfbScreen->udpSock, buf, 1, MSG_PEEK,
 		     (struct sockaddr *)&addr, &addrlen) < 0) {
-
 	    rfbLogPerror("rfbCheckFds: UDP: recvfrom");
 	    rfbDisconnectUDPSock(rfbScreen);
-
+	    rfbScreen->udpSockConnected = FALSE;
 	} else {
-
 	    if (!rfbScreen->udpSockConnected ||
 		(memcmp(&addr, &rfbScreen->udpRemoteAddr, addrlen) != 0))
 	    {
@@ -242,8 +241,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 		rfbNewUDPConnection(rfbScreen,rfbScreen->udpSock);
 	    }
 
-	    /* TODO: UDP also needs a client
-	       rfbProcessUDPInput(rfbScreen,rfbScreen->udpSock); */
+	    rfbProcessUDPInput(rfbScreen);
 	}
 
 	FD_CLR(rfbScreen->udpSock, &fds);
@@ -263,7 +261,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 void
 rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen)
 {
-    rfbScreen->udpSockConnected = FALSE;
+  rfbScreen->udpSockConnected = FALSE;
 }
 
 

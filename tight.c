@@ -241,9 +241,9 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     if (tightBeforeBufSize < 4) {
         tightBeforeBufSize = 4;
         if (tightBeforeBuf == NULL)
-            tightBeforeBuf = (char *)xalloc(tightBeforeBufSize);
+            tightBeforeBuf = (char *)malloc(tightBeforeBufSize);
         else
-            tightBeforeBuf = (char *)xrealloc(tightBeforeBuf,
+            tightBeforeBuf = (char *)realloc(tightBeforeBuf,
                                               tightBeforeBufSize);
     }
 
@@ -503,18 +503,18 @@ SendRectSimple(cl, x, y, w, h)
     if (tightBeforeBufSize < maxBeforeSize) {
         tightBeforeBufSize = maxBeforeSize;
         if (tightBeforeBuf == NULL)
-            tightBeforeBuf = (char *)xalloc(tightBeforeBufSize);
+            tightBeforeBuf = (char *)malloc(tightBeforeBufSize);
         else
-            tightBeforeBuf = (char *)xrealloc(tightBeforeBuf,
+            tightBeforeBuf = (char *)realloc(tightBeforeBuf,
                                               tightBeforeBufSize);
     }
 
     if (tightAfterBufSize < maxAfterSize) {
         tightAfterBufSize = maxAfterSize;
         if (tightAfterBuf == NULL)
-            tightAfterBuf = (char *)xalloc(tightAfterBufSize);
+            tightAfterBuf = (char *)malloc(tightAfterBufSize);
         else
-            tightAfterBuf = (char *)xrealloc(tightAfterBuf,
+            tightAfterBuf = (char *)realloc(tightAfterBuf,
                                              tightAfterBufSize);
     }
 
@@ -844,7 +844,7 @@ SendGradientRect(cl, w, h)
     }
 
     if (prevRowBuf == NULL)
-        prevRowBuf = (int *)xalloc(2048 * 3 * sizeof(int));
+        prevRowBuf = (int *)malloc(2048 * 3 * sizeof(int));
 
     cl->updateBuf[cl->ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     cl->updateBuf[cl->ublen++] = rfbTightFilterGradient;
@@ -1645,7 +1645,7 @@ SendJpegRect(cl, x, y, w, h, quality)
     if (cl->screen->rfbServerFormat.bitsPerPixel == 8)
         return SendFullColorRect(cl, w, h);
 
-    srcBuf = (CARD8 *)xalloc(w * 3);
+    srcBuf = (CARD8 *)malloc(w * 3);
     if (srcBuf == NULL) {
         return SendFullColorRect(cl, w, h);
     }

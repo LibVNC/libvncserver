@@ -30,10 +30,6 @@
 #include <stdlib.h>
 #include "rfb.h"
 
-
-char *rfbAuthPasswdFile = NULL;
-
-
 /*
  * rfbAuthNewClient is called when we reach the point of authenticating
  * a new client.  If authentication isn't being used then we simply send
@@ -49,15 +45,12 @@ rfbAuthNewClient(cl)
 
     cl->state = RFB_AUTHENTICATION;
 
-    if (rfbAuthPasswdFile && !cl->reverseConnection) {
-
+    if (cl->screen->rfbAuthPasswdData && !cl->reverseConnection) {
         *(CARD32 *)buf = Swap32IfLE(rfbVncAuth);
         vncRandomBytes(cl->authChallenge);
         memcpy(&buf[4], (char *)cl->authChallenge, CHALLENGESIZE);
         len = 4 + CHALLENGESIZE;
-
     } else {
-
         *(CARD32 *)buf = Swap32IfLE(rfbNoAuth);
         len = 4;
         cl->state = RFB_INITIALISATION;
@@ -80,7 +73,7 @@ void
 rfbAuthProcessClientMessage(cl)
     rfbClientPtr cl;
 {
-    char *passwd;
+    char passwd[1024];
     int i, n;
     CARD8 response[CHALLENGESIZE];
     CARD32 authResult;
@@ -92,14 +85,9 @@ rfbAuthProcessClientMessage(cl)
         return;
     }
 
-    passwd = vncDecryptPasswdFromFile(rfbAuthPasswdFile);
-
-    if (passwd == NULL) {
-        rfbLog("rfbAuthProcessClientMessage: could not get password from %s\n",
-               rfbAuthPasswdFile);
-
+    if(!cl->screen->getPassword(cl,passwd,MAXPWLEN)) {
+        rfbLog("rfbAuthProcessClientMessage: could not get password\n");
         authResult = Swap32IfLE(rfbVncAuthFailed);
-
         if (WriteExact(cl, (char *)&authResult, 4) < 0) {
             rfbLogPerror("rfbAuthProcessClientMessage: write");
         }

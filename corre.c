@@ -105,17 +105,17 @@ rfbSendSmallRectEncodingCoRRE(cl, x, y, w, h)
     if (rreBeforeBufSize < maxRawSize) {
         rreBeforeBufSize = maxRawSize;
         if (rreBeforeBuf == NULL)
-            rreBeforeBuf = (char *)xalloc(rreBeforeBufSize);
+            rreBeforeBuf = (char *)malloc(rreBeforeBufSize);
         else
-            rreBeforeBuf = (char *)xrealloc(rreBeforeBuf, rreBeforeBufSize);
+            rreBeforeBuf = (char *)realloc(rreBeforeBuf, rreBeforeBufSize);
     }
 
     if (rreAfterBufSize < maxRawSize) {
         rreAfterBufSize = maxRawSize;
         if (rreAfterBuf == NULL)
-            rreAfterBuf = (char *)xalloc(rreAfterBufSize);
+            rreAfterBuf = (char *)malloc(rreAfterBufSize);
         else
-            rreAfterBuf = (char *)xrealloc(rreAfterBuf, rreAfterBufSize);
+            rreAfterBuf = (char *)realloc(rreAfterBuf, rreAfterBufSize);
     }
 
     (*cl->translateFn)(cl->translateLookupTable,&(cl->screen->rfbServerFormat),
