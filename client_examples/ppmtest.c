@@ -31,7 +31,11 @@ void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) {
 		return;
 	}
 
-	f=fopen("/tmp/framebuffer.ppm","wb");
+	f=fopen("framebuffer.ppm","wb");
+	if(!f) {
+		rfbClientErr("Could not open framebuffer.ppm\n");
+		return;
+	}
 
 	fprintf(f,"P6\n# %s\n%d %d\n255\n",client->desktopName,client->width,client->height);
 	for(j=0;j<client->height*row_stride;j+=row_stride)
