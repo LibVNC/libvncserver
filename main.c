@@ -538,9 +538,15 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
        format->greenShift = bitsPerSample;
        format->blueShift = bitsPerSample * 2;
      } else {
-       format->redShift = bitsPerSample*3;
-       format->greenShift = bitsPerSample*2;
-       format->blueShift = bitsPerSample;
+       if(bytesPerPixel==3) {
+	 format->redShift = bitsPerSample*2;
+	 format->greenShift = bitsPerSample*1;
+	 format->blueShift = 0;
+       } else {
+	 format->redShift = bitsPerSample*3;
+	 format->greenShift = bitsPerSample*2;
+	 format->blueShift = bitsPerSample;
+       }
      }
    }
 
