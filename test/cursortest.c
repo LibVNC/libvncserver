@@ -72,7 +72,7 @@ void SetXCursor(rfbScreenInfoPtr rfbScreen)
 		"xxxx     xxxx";
 	rfbCursorPtr c;
 	
-	c=rfbMakeXCursor(width,height,strdup(cursor),strdup(mask));
+	c=rfbMakeXCursor(width,height,cursor,mask);
 	c->xhot=width/2;c->yhot=height/2;
 
 	rfbSetCursor(rfbScreen, c);
@@ -128,7 +128,7 @@ void SetXCursor2(rfbScreenInfoPtr rfbScreen)
 		"             ";
 	rfbCursorPtr c;
 	
-	c=rfbMakeXCursor(width,height,strdup(cursor),strdup(mask));
+	c=rfbMakeXCursor(width,height,cursor,mask);
 	c->xhot=0;c->yhot=0;
 
 	rfbSetCursor(rfbScreen, c);
@@ -176,7 +176,7 @@ void SetRichCursor(rfbScreenInfoPtr rfbScreen)
 		"      xxxxxxxxxxxxxxxx          "
 		"                                ";
 
-	c=rfbMakeXCursor(w,h,strdup(bitmap),strdup(bitmap));
+	c=rfbMakeXCursor(w,h,bitmap,bitmap);
 	c->xhot = 16; c->yhot = 24;
 
 	c->richSource = (char*)malloc(w*h*bpp);
@@ -215,7 +215,7 @@ void SetRichCursor2(rfbScreenInfoPtr rfbScreen)
 		"xxxxxxxxxxxxx   x"
 		"xxxxxxxxxxxxx   x";
 	/*  c=rfbScreen->cursor = rfbMakeXCursor(w,h,bitmap,bitmap); */
-	c=rfbMakeXCursor(w,h,strdup(bitmap),strdup(bitmap));
+	c=rfbMakeXCursor(w,h,bitmap,bitmap);
 	c->xhot = 5; c->yhot = 7;
 
 	c->richSource = (char*)malloc(w*h*bpp);
@@ -299,6 +299,11 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 			counter=0;
 		}
 	}
+	if(buttonMask&2) {
+		rfbScreenCleanup(cl->screen);
+		exit(0);
+	}
+
 	if(buttonMask&4)
 		rfbCloseClient(cl);
 
@@ -327,7 +332,7 @@ int main(int argc,char** argv)
 	rfbInitServer(rfbScreen);
 
 	rfbLog("Change cursor shape with left mouse button,\n\t"
-			"quit with right one.\n");
+			"quit with right one (middle button quits server).\n");
 
 	/* this is the blocking event loop, i.e. it never returns */
 	/* 40000 are the microseconds to wait on select(), i.e. 0.04 seconds */
