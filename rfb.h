@@ -679,8 +679,29 @@ extern void defaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
 extern void rfbResetStats(rfbClientPtr cl);
 extern void rfbPrintStats(rfbClientPtr cl);
 
+/* socket.c */
+
 extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
 extern void rfbDisconnectUDPSock(rfbScreenInfoPtr cl);
+
+/* font.c */
+
+typedef struct rfbFontData {
+  char* data;
+  /*
+    metaData is a 256*5 array:
+    for each character
+    (offset,width,height,x,y)
+  */
+  int* metaData;
+} rfbFontData,* rfbFontDataPtr;
+
+int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,char c,CARD32 colour);
+void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,char* string,CARD32 colour);
+int rfbWidth(rfbFontDataPtr font,char* string);
+void rfbFontBBox(rfbFontDataPtr font,char c,int* x1,int* y1,int* x2,int* y2);
+
+/* main.c */
 
 void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2);
 void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);

@@ -7,13 +7,16 @@ for($i=0;$i<256*5;$i++) {
 
 $out="";
 $counter=0;
+$fontname="default";
 
 $i=0;
 $searchfor="";
 $nullx="0x";
 
 while(<>) {
-  if(/^ENCODING (.*)$/) {
+  if(/^FONT (.*)$/) {
+    $fontname=$1;
+  } elsif(/^ENCODING (.*)$/) {
     $glyphindex=$1;
     $searchfor="BBX";
   } elsif(/^BBX (.*) (.*) (.*) (.*)$/) {
@@ -36,9 +39,10 @@ while(<>) {
   }
 }
 
-print "unsigned char bdffontdata[$counter]={\n" . $out;
-print "};\nint bdffontmetadata[256*5]={\n";
+print "unsigned char " . $fontname . "FontData[$counter]={\n" . $out;
+print "};\nint " . $fontname . "FontMetaData[256*5]={\n";
 for($i=0;$i<256*5;$i++) {
   print $encodings[$i] . ",";
 }
-print "};\n";
+print "};\nrfbFontData " . $fontname . "Font={" .
+  $fontname . "FontData, " . $fontname . "FontMetaData};\n";
