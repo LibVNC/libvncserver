@@ -1,3 +1,5 @@
+   a HTTP request for tunnelling was added (to fool strict web proxies)
+   sync'ed with TightVNC 1.2.5
 0.4
    support for NewFB from Const Kaplinsky
    memory leaks squashed (localtime pseudo leak is still there :-)
