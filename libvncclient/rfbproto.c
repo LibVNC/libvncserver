@@ -432,6 +432,12 @@ SetFormatAndEncodings(rfbClient* client)
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZlib);
 	if (client->appData.compressLevel >= 0 && client->appData.compressLevel <= 9)
 	  requestCompressLevel = TRUE;
+      } else if (strncasecmp(encStr,"zlibhex",encStrLen) == 0) {
+	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZlibHex);
+	if (client->appData.compressLevel >= 0 && client->appData.compressLevel <= 9)
+	  requestCompressLevel = TRUE;
+      } else if (strncasecmp(encStr,"zrle",encStrLen) == 0) {
+	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZRLE);
 #endif
       } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCoRRE);
