@@ -10,6 +10,6 @@ copyrecttest_LDADD=$(LDADD) -lm
 
 noinst_PROGRAMS=$(ENCODINGS_TEST) cargstest copyrecttest $(BACKGROUND_TEST) 
 
-test: encodingstest cargstest copyrecttest
+test: encodingstest$(EXEEXT) cargstest$(EXEEXT) copyrecttest$(EXEEXT)
 	./encodingstest && ./cargstest
 
