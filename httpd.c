@@ -66,12 +66,10 @@ static char buf[BUF_SIZE];
 void
 httpInitSockets(rfbScreenInfoPtr rfbScreen)
 {
-    static Bool done = FALSE;
-
-    if (done)
+    if (rfbScreen->httpInitDone)
 	return;
 
-    done = TRUE;
+    rfbScreen->httpInitDone = TRUE;
 
     if (!rfbScreen->httpDir)
 	return;

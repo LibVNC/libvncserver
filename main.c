@@ -340,7 +340,9 @@ void doNothingWithClient(rfbClientPtr cl)
 {
 }
 
-rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,int bitsPerSample,int samplesPerPixel,int bytesPerPixel)
+rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
+ int width,int height,int bitsPerSample,int samplesPerPixel,
+ int bytesPerPixel)
 {
    rfbScreenInfoPtr rfbScreen=malloc(sizeof(rfbScreenInfo));
    rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
@@ -350,18 +352,24 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,
 
    rfbScreen->rfbPort=5900;
    rfbScreen->socketInitDone=FALSE;
+
+   rfbScreen->inetdInitDone = FALSE;
    rfbScreen->inetdSock=-1;
+
    rfbScreen->udpSock=-1;
    rfbScreen->udpSockConnected=FALSE;
+   rfbScreen->udpPort=0;
+
    rfbScreen->maxFd=0;
    rfbScreen->rfbListenSock=-1;
-   rfbScreen->udpPort=0;
+
+   rfbScreen->httpInitDone=FALSE;
    rfbScreen->httpPort=0;
    rfbScreen->httpDir=NULL;
    rfbScreen->httpListenSock=-1;
    rfbScreen->httpSock=-1;
    rfbScreen->httpFP=NULL;
-   rfbScreen->inetdInitDone = FALSE;
+
    rfbScreen->desktopName = "LibVNCServer";
    rfbScreen->rfbAlwaysShared = FALSE;
    rfbScreen->rfbNeverShared = FALSE;
@@ -421,11 +429,20 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,
    rfbScreen->cursor = &myCursor;
    rfbScreen->newClientHook = doNothingWithClient;
 
+   /* initialize client list and iterator mutex */
+   rfbClientListInit(rfbScreen);
+
    return(rfbScreen);
 }
 
+void rfbInitServer(rfbScreenInfoPtr rfbScreen)
+{
+  rfbInitSockets(rfbScreen);
+  httpInitSockets(rfbScreen);
+}
+
 void
-processEvents(rfbScreenInfoPtr rfbScreen,long usec)
+rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 {
     rfbCheckFds(rfbScreen,usec);
     httpCheckFds(rfbScreen);
@@ -445,13 +462,14 @@ processEvents(rfbScreenInfoPtr rfbScreen,long usec)
     }
 }
 
-void runEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)
+void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)
 {
+  rfbInitServer(rfbScreen);
+
   if(runInBackground) {
 #ifdef HAVE_PTHREADS
        pthread_t listener_thread;
 
-       rfbClientListInit(rfbScreen);
        //pthread_mutex_init(&logMutex, NULL);
        pthread_create(&listener_thread, NULL, listenerRun, rfbScreen);
     return;
@@ -460,8 +478,6 @@ void runEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)
 #endif
   }
 
-  rfbInitSockets(rfbScreen);
-  httpInitSockets(rfbScreen);
   while(1)
-    processEvents(rfbScreen,usec);
+    rfbProcessEvents(rfbScreen,usec);
 }

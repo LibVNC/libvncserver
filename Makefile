@@ -4,14 +4,13 @@ CFLAGS=-g -Wall
 RANLIB=ranlib
 
 INCLUDES=-I. -Iinclude
-VNCAUTHLIB=
 VNCSERVERLIB=-L. -lvncserver -lz -ljpeg
 
 # These two lines enable useage of PThreads
 #CFLAGS += -DHAVE_PTHREADS
 #VNCSERVERLIB += -lpthread
 
-LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(VNCAUTHLIB)
+LIBS=$(LDFLAGS) $(VNCSERVERLIB)
 
 # for Mac OS X
 OSX_LIBS = -framework ApplicationServices -framework Carbon

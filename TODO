@@ -9,6 +9,7 @@ in the works:
 
 adapt rdp2vnc (rdesktop)
 optionally dont draw rich cursors as xcursors
+use sraRegion from rdp2vnc instead of miregion, because it is much smaller
 
 later:
 ------

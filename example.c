@@ -30,8 +30,8 @@
 #include "rfb.h"
 #include "keysym.h"
 
-const int maxx=641, maxy=480, bpp=4;
-/* TODO: odd maxx doesn't work */
+const int maxx=640, maxy=480, bpp=4;
+/* TODO: odd maxx doesn't work (vncviewer bug) */
 
 /* This initializes a nice (?) background */
 
@@ -288,7 +288,7 @@ void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
 int main(int argc,char** argv)
 {
   rfbScreenInfoPtr rfbScreen =
-    rfbDefaultScreenInit(argc,argv,maxx,maxy,8,3,bpp);
+    rfbGetScreen(argc,argv,maxx,maxy,8,3,bpp);
   rfbScreen->desktopName = "LibVNCServer Example";
   rfbScreen->frameBuffer = (char*)malloc(maxx*maxy*bpp);
   rfbScreen->rfbAlwaysShared = TRUE;
@@ -307,15 +307,17 @@ int main(int argc,char** argv)
 
   MakeRichCursor(rfbScreen);
 
+  /* initialize the server */
+  rfbInitServer(rfbScreen);
+
   /* this is the blocking event loop, i.e. it never returns */
   /* 40000 are the microseconds, i.e. 0.04 seconds */
-  runEventLoop(rfbScreen,40000,FALSE);
+  rfbRunEventLoop(rfbScreen,40000,FALSE);
 
   /* this is the non-blocking event loop; a background thread is started */
-  runEventLoop(rfbScreen,40000,TRUE);
-
+  rfbRunEventLoop(rfbScreen,40000,TRUE);
   /* now we could do some cool things like rendering */
-  while(1);
+  while(1) /* render() */;
    
   return(0);
 }

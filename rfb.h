@@ -182,11 +182,14 @@ typedef struct
     Bool inetdInitDone;
     fd_set allFds;
     int rfbMaxClientWait;
+  /* http stuff */
+    Bool httpInitDone;
     int httpPort;
     char* httpDir;
     int httpListenSock;
     int httpSock;
     FILE* httpFP;
+
     char* rfbAuthPasswdFile;
     int rfbDeferUpdateTime;
     char* rfbScreen;
@@ -601,12 +604,15 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,RegionPtr modRegion);
 void doNothingWithClient(rfbClientPtr cl);
 
 /* functions to make a vnc server */
-extern rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
+extern rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
+ int width,int height,int bitsPerSample,int samplesPerPixel,
+ int bytesPerPixel);
+extern void rfbInitServer(rfbScreenInfoPtr rfbScreen);
 extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
 
 /* call one of these two functions to service the vnc clients.
  usec are the microseconds the select on the fds waits.
  if you are using the event loop, set this to some value > 0. */
 
-extern void runEventLoop(rfbScreenInfoPtr screenInfo, long usec, Bool runInBackground);
-extern void processEvents(rfbScreenInfoPtr screenInfo,long usec);
+extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, Bool runInBackground);
+extern void rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);

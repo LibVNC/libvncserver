@@ -45,7 +45,7 @@ int main(int argc,char** argv)
     paddedWidth+=4-(width&3);
 
   /* initialize data for vnc server */
-  rfbScreen = rfbDefaultScreenInit(argc,argv,width,height,8,3,4);
+  rfbScreen = rfbGetScreen(argc,argv,paddedWidth,height,8,3,4);
   if(argc>1)
     rfbScreen->desktopName = argv[1];
   else
@@ -57,19 +57,25 @@ int main(int argc,char** argv)
   rfbScreen->httpDir = "./classes";
 
   /* allocate picture and read it */
-  rfbScreen->frameBuffer = (char*)calloc(paddedWidth*4,height);
+  rfbScreen->frameBuffer = (char*)malloc(paddedWidth*4*height);
   fread(rfbScreen->frameBuffer,width*3,height,in);
   fclose(in);
 
   /* correct the format to 4 bytes instead of 3 (and pad to paddedWidth) */
-  for(j=height-1;j>=0;j--)
+  for(j=height-1;j>=0;j--) {
     for(i=width-1;i>=0;i--)
       for(k=2;k>=0;k--)
 	rfbScreen->frameBuffer[(j*paddedWidth+i)*4+k]=
 	  rfbScreen->frameBuffer[(j*width+i)*3+k];
+    for(i=width*4;i<paddedWidth*4;i++)
+      rfbScreen->frameBuffer[j*paddedWidth*4+i]=0;
+  }
+
+  /* initialize server */
+  rfbInitServer(rfbScreen);
 
   /* run event loop */
-  runEventLoop(rfbScreen,40000,FALSE);
+  rfbRunEventLoop(rfbScreen,40000,FALSE);
 
   return(0);
 }

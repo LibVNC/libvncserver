@@ -23,37 +23,134 @@ How to use
 To make a server, you just have to initialise a server structure using the
 function rfbDefaultScreenInit, like
   rfbScreenInfoPtr rfbScreen =
-    rfbDefaultScreenInit(argc,argv,maxx,maxy,8,3,bpp);
+    rfbGetScreen(argc,argv,maxx,maxy,8,3,bpp);
 
-You then can set hooks and io functions (see below).
+You then can set hooks and io functions (see below) or other
+options (see below).
+
+After that, you initialize the server, like
+  rfbInitServer(rfbScreen);
 
 You can use a blocking event loop, a background (pthread based) event loop,
-or implement your own using the processEvents function.
+or implement your own using the rfbProcessEvents function.
 
-Also, there is functionality included to draw a cursor (see below).
+Making it interactive
+---------------------
 
-To start also an HTTP server (running on port 5800+display_number), you have
+Input is handled by IO functions (see below).
+
+Whenever you change something in the frame buffer, call rfbMarkRectAsModified.
+You should make sure that the cursor is not drawn before drawing yourself
+by calling rfbUndrawCursor. You can also draw the cursor using rfbDrawCursor,
+but it hardly seems necessary. For cursor details, see below.
+
+Utility functions
+-----------------
+
+Whenever you draw something, you have to call
+ rfbMarkRectAsModified(screen,x1,y1,x2,y2).
+This tells LibVNCServer to send updates to all connected clients.
+
+Before you draw something, be sure to call
+ rfbUndrawCursor(cl).
+This tells LibVNCServer to hide the cursor.
+Remark: There are vncviewers out there, which know a cursor encoding, so
+that network traffic is low, and also the cursor doesn't need to be
+drawn the cursor everytime an update is sent. LibVNCServer handles
+all the details. Just set the cursor and don't bother any more.
+
+What is the difference between rfbScreenInfoPtr and rfbClientPtr?
+-----------------------------------------------------------------
+
+The rfbScreenInfoPtr is a pointer to a rfbScreenInfo structure, which
+holds information about the server, like pixel format, io functions,
+frame buffer etc.
+
+The rfbClientPtr is a pointer to an rfbClientRec structure, which holds
+information about a client, like pixel format, socket of the
+connection, etc.
+
+A server can have several clients, but needn't have any. So, if you
+have a server and three clients are connected, you have one instance
+of a rfbScreenInfo and three instances of rfbClientRec's.
+
+The rfbClientRec structure holds a member
+  rfbScreenInfoPtr screen
+which points to the server and a member
+  rfbClientPtr next
+to the next client.
+
+The rfbScreenInfo structure holds a member
+  rfbClientPtr rfbClientHead
+which points to the first client.
+
+So, to access the server from the client structure, you use client->screen.
+To access all clients from a server, get screen->rfbClientHead and
+iterate using client->next.
+
+If you change client settings, be sure to use the provided iterator
+ rfbGetClientIterator(rfbScreen)
+with
+ rfbClientIteratorNext(iterator)
+and
+ rfbReleaseClientIterator
+to prevent thread clashes.
+
+Other options
+-------------
+
+These options have to be set between rfbGetScreen and rfbInitServer.
+
+If you already have a socket to talk to, just set rfbScreen->inetdSock
+(originally this is for inetd handling, but why not use it for your purpose?).
+
+To also start an HTTP server (running on port 5800+display_number), you have
 to set rfbScreen->httpdDir to a directory containing vncviewer.jar and
 index.vnc (like the included "classes" directory).
 
 Hooks and IO functions
 ----------------------
 
-TODO
+There exist the following IO functions as members of rfbScreen:
+kbdAddEvent, kbdReleaseAllKeys, ptrAddEvent and setXCutText
+
+kbdAddEvent(Bool down,KeySym key,rfbClientPtr cl)
+  is called when a key is pressed.
+kbdReleaseAllKeys(rfbClientPtr cl)
+  is not called at all (maybe in the future).
+ptrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl)
+  is called when the mouse moves or a button is pressed.
+setXCutText(char* str,int len,rfbClientPtr cl)
+  is called when the selection changes.
+
+There is only one hook:
+newClientHook(rfbClientPtr cl)
+  is called when a new client has connected.
+
+You can also override the following method:
+getCursorPtr(rfbClientPtr cl)
+  This could be used to make an animated cursor (if you really want ...)
 
 Cursor handling
 ---------------
+
+The screen holds a pointer
+ rfbCursorPtr cursor
+to the current cursor. Whenever you set it, remember that any dynamically
+created cursor (like return value from rfbMakeXCursor) is not free'd!
 
 The rfbCursor structure consists mainly of a mask and a source. The mask
 describes, which pixels are drawn for the cursor (a cursor needn't be
 rectangular). The source describes, which colour those pixels should have.
 
 The standard is an XCursor: a cursor with a foreground and a background
-colour (stored in backRed and similar with a range from 0-0xffff). The
-arrays "mask" and "source" consist of byte padded rows in MSB order (i.e. a
-10x4 cursor's mask has 2x4 bytes, because 2 bytes are needed to hold 10 bits).
+colour (stored in backRed,backGreen,backBlue and the same for foreground
+in a range from 0-0xffff). Therefore, the arrays "mask" and "source"
+contain pixels as single bits stored in bytes in MSB order. The rows are
+padded, such that each row begins with a new byte (i.e. a 10x4
+cursor's mask has 2x4 bytes, because 2 bytes are needed to hold 10 bits).
 
-It is very easy to make a cursor like this:
+It is however very easy to make a cursor like this:
 
 char* cur="    "
           " xx "
@@ -66,16 +163,19 @@ char* mask="xxxx"
 rfbCursorPtr c=rfbMakeXCursor(4,4,cur,mask);
 
 You can even set "mask" to NULL in this call and LibVNCServer will calculate
-a mask for you.
+a mask for you (dynamically, so you have to free it yourself).
 
 There is also an array named "richSource" for colourful cursors. They have
-the same format as the frameBuffer.
+the same format as the frameBuffer (i.e. if the server is 32 bit,
+a 10x4 cursor has 4x10x4 bytes).
 
 History
 -------
 
 LibVNCServer is based on Tridia VNC and OSXvnc, which in turn are based on
 the original code from ORL/AT&T.
+
+VNC fascinated me from t
 
 License
 -------
