@@ -119,6 +119,21 @@ rfbGetClientIterator(rfbScreenInfoPtr rfbScreen)
 }
 
 rfbClientPtr
+rfbClientIteratorHead(rfbClientIteratorPtr i)
+{
+#ifdef HAVE_LIBPTHREAD
+  if(i->next != 0) {
+    rfbDecrClientRef(i->next);
+    rfbIncrClientRef(i->screen->rfbClientHead);
+  }
+#endif
+  LOCK(rfbClientListMutex);
+  i->next = i->screen->rfbClientHead;
+  UNLOCK(rfbClientListMutex);
+  return i->next;
+}
+
+rfbClientPtr
 rfbClientIteratorNext(rfbClientIteratorPtr i)
 {
   if(i->next == 0) {
@@ -396,7 +411,8 @@ rfbClientConnectionGone(cl)
     LOCK(cl->refCountMutex);
     if(cl->refCount) {
       UNLOCK(cl->refCountMutex);
-      WAIT(cl->deleteCond,cl->refCountMutex);
+      if(cl->screen->backgroundLoop != FALSE)
+        WAIT(cl->deleteCond,cl->refCountMutex);
     } else {
       UNLOCK(cl->refCountMutex);
     }

@@ -750,6 +750,9 @@ void gettimeofday(struct timeval* tv,char* dummy)
 }
 #endif
 
+/* defined in rfbserver.c, but kind of "private" */
+rfbClientPtr rfbClientIteratorHead(rfbClientIteratorPtr i);
+
 void
 rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 {
@@ -767,7 +770,7 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 #endif
 
   i = rfbGetClientIterator(rfbScreen);
-  cl=rfbClientIteratorNext(i);
+  cl=rfbClientIteratorHead(i);
   while(cl) {
     if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) &&
         !sraRgnEmpty(cl->requestedRegion)) {
