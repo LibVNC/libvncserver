@@ -26,7 +26,7 @@ OBJS=main.o rfbserver.o miregion.o auth.o sockets.o xalloc.o \
 	stats.o corre.o hextile.o rre.o translate.o cutpaste.o \
 	zlib.o tight.o
 
-all: example storepasswd
+all: example pnmshow storepasswd
 
 install_OSX: OSXvnc-server
 	cp OSXvnc-server storepasswd ../OSXvnc/build/OSXvnc.app/Contents/MacOS
@@ -40,6 +40,9 @@ libvncserver.a: $(OBJS)
 
 example: example.o libvncauth/libvncauth.a libvncserver.a
 	$(CC) -o example example.o $(LIBS) $(PTHREAD_LIBS)
+
+pnmshow: pnmshow.o libvncauth/libvncauth.a libvncserver.a
+	$(CC) -o pnmshow pnmshow.o $(LIBS) $(PTHREAD_LIBS)
 
 OSXvnc-server: mac.o libvncauth/libvncauth.a libvncserver.a
 	$(CC) -o OSXvnc-server mac.o $(LIBS) $(OSX_LIBS)

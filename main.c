@@ -276,7 +276,7 @@ processArguments(rfbScreenInfoPtr rfbScreen,int argc, char *argv[])
         } else if (strcmp(argv[i], "-dontdisconnect") == 0) {
             rfbScreen->rfbDontDisconnect = TRUE;
         } else {
-            usage();
+	  /* usage(); we no longer exit for unknown arguments */
         }
     }
 }

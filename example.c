@@ -145,6 +145,7 @@ int main(int argc,char** argv)
   initBuffer(rfbScreen->frameBuffer);
 
   /* this is the blocking event loop, i.e. it never returns */
+  /* 40000 are the microseconds, i.e. 0.04 seconds */
   runEventLoop(rfbScreen,40000,FALSE);
 
   /* this is the non-blocking event loop; a background thread is started */
