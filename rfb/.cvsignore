@@ -1,0 +1,5 @@
+rfbconfig.h
+rfbconfig.h.in
+stamp-h*
+rfbint.h
+
