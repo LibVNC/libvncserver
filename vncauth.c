@@ -22,6 +22,8 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <rfb/rfbproto.h>
 #include "d3des.h"
 

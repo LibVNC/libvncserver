@@ -228,7 +228,6 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
     rfbClientPtr cl,cl_;
     struct sockaddr_in addr;
     size_t addrlen = sizeof(struct sockaddr_in);
-    int i;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
 
@@ -317,8 +316,11 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
       cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
       cl->tightQualityLevel = -1;
-      for (i = 0; i < 4; i++)
-        cl->zsActive[i] = FALSE;
+      {
+	int i;
+	for (i = 0; i < 4; i++)
+          cl->zsActive[i] = FALSE;
+      }
 #endif
 
       cl->enableCursorShapeUpdates = FALSE;

@@ -53,7 +53,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 {
     int i,i1;
 
-    if(!argc) return;
+    if(!argc) return TRUE;
     
     for (i = i1 = 1; i < *argc;) {
         if (strcmp(argv[i], "-help") == 0) {

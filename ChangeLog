@@ -1,3 +1,6 @@
+2004-01-16  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* compile fix for cygwin
+
 2004-01-09  Karl Runge <runge@karlrunge.com>
 	* x11vnc options -allow, -localhost, -nodragging, -input_skip
 	* minimize memory usage under -nofb
