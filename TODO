@@ -1,6 +1,7 @@
 immediate:
 ----------
 
+selectbox: scroll bars
 documentation
 	hint that to mark very tiny regions as
 	modified is possibly inefficient for the encodings.
