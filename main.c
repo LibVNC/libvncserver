@@ -106,7 +106,7 @@ clientOutput(void *data)
 {
     rfbClientPtr cl = (rfbClientPtr)data;
     Bool haveUpdate;
-    RegionRec updateRegion;
+    sraRegion* updateRegion;
 
     while (1) {
         haveUpdate = false;

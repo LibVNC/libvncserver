@@ -7,8 +7,8 @@ INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 # These two lines enable useage of PThreads
-#CFLAGS += -DHAVE_PTHREADS
-#VNCSERVERLIB += -lpthread
+CFLAGS += -DHAVE_PTHREADS
+VNCSERVERLIB += -lpthread
 
 LIBS=$(LDFLAGS) $(VNCSERVERLIB)
 

@@ -37,7 +37,9 @@ typedef CARD32 KeySym;
 /* for some strange reason, "typedef signed char Bool;" yields a four byte
    signed int on an SGI, but only for rfbserver.o!!! */
 #define Bool signed char
+#undef FALSE
 #define FALSE 0
+#undef TRUE
 #define TRUE -1
 
 #define xalloc malloc
