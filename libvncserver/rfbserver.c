@@ -1039,6 +1039,9 @@ rfbProcessClientNormalMessage(cl)
 
     default:
 
+	if(cl->screen->processCustomClientMessage(cl,msg.type))
+		return;
+
         rfbLog("rfbProcessClientNormalMessage: unknown message type %d\n",
                 msg.type);
         rfbLog(" ... closing connection\n");

@@ -498,6 +498,11 @@ enum rfbNewClientAction rfbDefaultNewClientHook(rfbClientPtr cl)
 	return RFB_CLIENT_ACCEPT;
 }
 
+rfbBool rfbDefaultProcessCustomClientMessage(rfbClientPtr cl,uint8_t type)
+{
+	return FALSE;
+}
+
 /*
  * Update server's pixel format in screenInfo structure. This
  * function is called from rfbGetScreen() and rfbNewFramebuffer().
@@ -641,6 +646,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->setTranslateFunction = rfbSetTranslateFunction;
    screen->newClientHook = rfbDefaultNewClientHook;
    screen->displayHook = 0;
+   screen->processCustomClientMessage = rfbDefaultProcessCustomClientMessage;
 
    /* initialize client list and iterator mutex */
    rfbClientListInit(screen);
