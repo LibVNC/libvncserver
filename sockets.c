@@ -188,7 +188,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     memcpy((char *)&fds, (char *)&(rfbScreen->allFds), sizeof(fd_set));
     tv.tv_sec = 0;
     tv.tv_usec = usec;
-    nfds = select(rfbScreen->maxFd + 1, &fds, NULL, &fds, &tv);
+    nfds = select(rfbScreen->maxFd + 1, &fds, NULL, NULL /* &fds */, &tv);
     if (nfds == 0) {
 	return;
     }
@@ -451,7 +451,7 @@ WriteExact(cl, buf, len)
             FD_SET(sock, &fds);
             tv.tv_sec = 5;
             tv.tv_usec = 0;
-            n = select(sock+1, NULL, &fds, &fds, &tv);
+            n = select(sock+1, NULL, &fds, NULL /* &fds */, &tv);
             if (n < 0) {
                 rfbLogPerror("WriteExact: select");
                 UNLOCK(cl->outputMutex);

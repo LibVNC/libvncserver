@@ -42,6 +42,13 @@
 #include <vncserverctrl.h>
 #endif
 
+#ifdef DEBUGPROTO
+#undef DEBUGPROTO
+#define DEBUGPROTO(x) x
+#else
+#define DEBUGPROTO(x)
+#endif
+
 rfbClientPtr pointerClient = NULL;  /* Mutex for pointer events */
 
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
