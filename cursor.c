@@ -258,12 +258,14 @@ rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskSt
    char* cp;
    unsigned char bit;
 
+   cursor->cleanup=TRUE;
    cursor->width=width;
    cursor->height=height;
    /*cursor->backRed=cursor->backGreen=cursor->backBlue=0xffff;*/
    cursor->foreRed=cursor->foreGreen=cursor->foreBlue=0xffff;
    
    cursor->source = (unsigned char*)calloc(w,height);
+   cursor->cleanupSource = TRUE;
    for(j=0,cp=cursorString;j<height;j++)
       for(i=0,bit=0x80;i<width;i++,bit=(bit&1)?0x80:bit>>1,cp++)
 	if(*cp!=' ') cursor->source[j*w+i/8]|=bit;
@@ -275,6 +277,7 @@ rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskSt
 	  if(*cp!=' ') cursor->mask[j*w+i/8]|=bit;
    } else
      cursor->mask = (unsigned char*)rfbMakeMaskForXCursor(width,height,(char*)cursor->source);
+   cursor->cleanupMask = TRUE;
 
    return(cursor);
 }
@@ -305,11 +308,19 @@ char* rfbMakeMaskForXCursor(int width,int height,char* source)
 void rfbFreeCursor(rfbCursorPtr cursor)
 {
    if(cursor) {
-      if(cursor->richSource)
-	 free(cursor->richSource);
-      free(cursor->source);
-      free(cursor->mask);
-      free(cursor);
+       if(cursor->cleanupRichSource && cursor->richSource)
+	   free(cursor->richSource);
+       if(cursor->cleanupSource && cursor->source)
+	   free(cursor->source);
+       if(cursor->cleanupMask && cursor->mask)
+	   free(cursor->mask);
+       if(cursor->cleanup)
+	   free(cursor);
+       else {
+	   cursor->cleanup=cursor->cleanupSource=cursor->cleanupMask
+	       =cursor->cleanupRichSource=FALSE;
+	   cursor->source=cursor->mask=cursor->richSource=0;
+       }
    }
    
 }
@@ -323,8 +334,11 @@ void MakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
    uint32_t background;
    char *back=(char*)&background;
    unsigned char bit;
-   
+
+   if(cursor->source && cursor->cleanupSource)
+       free(cursor->source);
    cursor->source=(unsigned char*)calloc(w,cursor->height);
+   cursor->cleanupSource=TRUE;
    
    if(format->bigEndian)
       back+=4-bpp;
@@ -347,7 +361,10 @@ void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
    unsigned char *cp;
    unsigned char bit;
 
+   if(cursor->richSource && cursor->cleanupRichSource)
+       free(cursor->richSource);
    cp=cursor->richSource=(unsigned char*)calloc(cursor->width*bpp,cursor->height);
+   cursor->cleanupRichSource=TRUE;
    
    if(format->bigEndian) {
       back+=4-bpp;
@@ -494,7 +511,7 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
     LOCK(rfbScreen->cursorMutex);
   }
 
-  if(freeOld && rfbScreen->cursor)
+  if(rfbScreen->cursor && (freeOld || rfbScreen->cursor->cleanup))
     rfbFreeCursor(rfbScreen->cursor);
 
   rfbScreen->cursor = c;

@@ -404,6 +404,7 @@ void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
 #if defined(WIN32) || defined(sparc) || !defined(NO_STRICT_ANSI)
 static rfbCursor myCursor = 
 {
+   FALSE, FALSE, FALSE, FALSE,
    (unsigned char*)"\000\102\044\030\044\102\000",
    (unsigned char*)"\347\347\176\074\176\347\347",
    8, 7, 3, 3,
@@ -414,14 +415,13 @@ static rfbCursor myCursor =
 #else
 static rfbCursor myCursor = 
 {
+   cleanup: FALSE,
+   cleanupSource: FALSE,
+   cleanupMask: FALSE,
+   cleanupRichSource: FALSE,
    source: "\000\102\044\030\044\102\000",
    mask:   "\347\347\176\074\176\347\347",
    width: 8, height: 7, xhot: 3, yhot: 3,
-   /*
-     width: 8, height: 7, xhot: 0, yhot: 0,
-     source: "\000\074\176\146\176\074\000",
-     mask:   "\176\377\377\377\377\377\176",
-   */
    foreRed: 0, foreGreen: 0, foreBlue: 0,
    backRed: 0xffff, backGreen: 0xffff, backBlue: 0xffff,
    richSource: 0
@@ -713,6 +713,8 @@ void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
   rfbReleaseClientIterator(iterator);
 }
 
+extern void TightCleanup();
+
 void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
 {
   rfbClientIteratorPtr i=rfbGetClientIterator(rfbScreen);
@@ -729,7 +731,10 @@ void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
   FREE_IF(colourMap.data.bytes);
   FREE_IF(underCursorBuffer);
   TINI_MUTEX(rfbScreen->cursorMutex);
+  if(rfbScreen->cursor)
+    rfbFreeCursor(rfbScreen->cursor);
   free(rfbScreen);
+  TightCleanup();
 }
 
 void rfbInitServer(rfbScreenInfoPtr rfbScreen)

@@ -189,3 +189,4 @@ extern Bool SameMachine(int sock);
 /* vncviewer.c */
 rfbClient* rfbGetClient(int* argc,char** argv,int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
 Bool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerPort);
+void rfbClientCleanup(rfbClient* client);

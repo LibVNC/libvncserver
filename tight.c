@@ -115,6 +115,17 @@ static char *tightAfterBuf = NULL;
 
 static int *prevRowBuf = NULL;
 
+void TightCleanup()
+{
+  if(tightBeforeBufSize) {
+    free(tightBeforeBuf);
+    tightBeforeBufSize=0;
+  }
+  if(tightAfterBufSize) {
+    free(tightAfterBuf);
+    tightAfterBufSize=0;
+  }
+}
 
 /* Prototypes for static functions. */
 

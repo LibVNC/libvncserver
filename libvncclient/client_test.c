@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <errno.h>
 #include <rfb/rfbclient.h>
 
 void PrintRect(rfbClient* client, int x, int y, int w, int h) {
@@ -39,12 +40,31 @@ void SaveFramebufferAsPGM(rfbClient* client, int x, int y, int w, int h) {
 	fputc(client->frameBuffer[j+i+bpp-2],f);
 	fputc(client->frameBuffer[j+i+bpp-3],f);
       } else {
-	fputc(client->frameBuffer[j+i+bpp+0],f);
-	fputc(client->frameBuffer[j+i+bpp+1],f);
-	fputc(client->frameBuffer[j+i+bpp+2],f);
+	fputc(client->frameBuffer[j+i+0],f);
+	fputc(client->frameBuffer[j+i+1],f);
+	fputc(client->frameBuffer[j+i+2],f);
       }
     }
   fclose(f);
+}
+
+int WaitForMessage(rfbClient* client,unsigned int usecs)
+{
+  fd_set fds;
+  struct timeval timeout;
+  int num;
+
+  timeout.tv_sec=(usecs/1000000);
+  timeout.tv_usec=(usecs%1000000);
+
+  FD_ZERO(&fds);
+  FD_SET(client->sock,&fds);
+
+  num=select(client->sock+1, &fds, NULL, NULL, &timeout);
+  if(num<0)
+    rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
+
+  return num;
 }
 
 int
@@ -54,9 +74,10 @@ main(int argc, char **argv)
   rfbClient* client = rfbGetClient(&argc,argv,8,3,4);
   const char* vncServerHost="";
   int vncServerPort=5900;
+  time_t t=time(0);
 
   client->GotFrameBufferUpdate = PrintRect;
-  client->GotFrameBufferUpdate = SaveFramebufferAsPGM;
+  //client->GotFrameBufferUpdate = SaveFramebufferAsPGM;
 
   /* The -listen option is used to make us a daemon process which listens for
      incoming connections from servers, rather than actively connecting to a
@@ -86,12 +107,21 @@ main(int argc, char **argv)
   }
 
   client->appData.encodingsString="tight";
-  rfbInitClient(client,vncServerHost,vncServerPort);
+  if(!rfbInitClient(client,vncServerHost,vncServerPort)) {
+    rfbClientCleanup(client);
+    return 1;
+  }
 
-  while (1) {
-    if (!HandleRFBServerMessage(client))
+  while (time(0)-t<5) {
+    static int i=0;
+    fprintf(stderr,"\r%d",i++);
+    if(WaitForMessage(client,500)<0)
+      break;
+    if(!HandleRFBServerMessage(client))
       break;
   }
+
+  rfbClientCleanup(client);
 
   return 0;
 }

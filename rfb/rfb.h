@@ -635,6 +635,8 @@ extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
 /* cursor.c */
 
 typedef struct rfbCursor {
+    /* set this to true if LibVNCServer has to free this cursor */
+    Bool cleanup, cleanupSource, cleanupMask, cleanupRichSource;
     unsigned char *source;			/* points to bits */
     unsigned char *mask;			/* points to bits */
     unsigned short width, height, xhot, yhot;	/* metrics */

@@ -979,10 +979,10 @@ PrintPixelFormat(format)
 	      (format->bigEndian ? "Most" : "Least"));
     }
     if (format->trueColour) {
-      rfbClientLog("  TRUE colour: max red %d green %d blue %d",
-	      format->redMax, format->greenMax, format->blueMax);
-      rfbClientLog(", shift red %d green %d blue %d\n",
-	      format->redShift, format->greenShift, format->blueShift);
+      rfbClientLog("  TRUE colour: max red %d green %d blue %d"
+		   ", shift red %d green %d blue %d\n",
+		   format->redMax, format->greenMax, format->blueMax,
+		   format->redShift, format->greenShift, format->blueShift);
     } else {
       rfbClientLog("  Colour map (not true colour).\n");
     }

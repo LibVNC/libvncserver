@@ -121,3 +121,7 @@ Bool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerPort
 
   return TRUE;
 }
+
+void rfbClientCleanup(rfbClient* client) {
+  free(client);
+}
