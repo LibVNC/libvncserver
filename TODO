@@ -1,0 +1,17 @@
+.cutpaste
+
+httpd
+
+.other encodings
+
+adapt rdp2vnc (rdesktop)
+
+udp
+
+rfbCloseClient, rfbConnect, ConnectToTcpAddr
+
+CORBA
+
+translate.c: warning about non 8-bit colourmaps
+
+cursors
