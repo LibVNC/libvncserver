@@ -29,7 +29,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
 #include <zlib.h>
 #include "keysym.h"
 
@@ -85,11 +84,13 @@ typedef CARD32 KeySym;
 #endif
 
 #ifdef WIN32
+#include <sys/timeb.h>
 #include <winsock.h>
 #undef SOCKET
 #define SOCKET int
 #else
 int max(int,int);
+#include <sys/time.h>
 #include <netinet/in.h>
 #define SOCKET int
 #endif

@@ -401,7 +401,6 @@ Bool defaultPasswordCheck(rfbClientPtr cl,char* response,int len)
    of char*'s, where the last pointer is 0. */
 Bool checkPasswordByList(rfbClientPtr cl,char* response,int len)
 {
-  int i;
   char **passwds;
 
   for(passwds=(char**)cl->screen->rfbAuthPasswdData;*passwds;passwds++) {
@@ -565,7 +564,7 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
 #include <conio.h>
 #include <sys/timeb.h>
 
-void gettimeofday(struct timeval* tv,char*)
+void gettimeofday(struct timeval* tv,char* dummy)
 {
    SYSTEMTIME t;
    GetSystemTime(&t);

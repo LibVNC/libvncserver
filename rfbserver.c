@@ -205,6 +205,8 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       rfbReleaseClientIterator(iterator);
 
       FD_SET(sock,&(rfbScreen->allFds));
+		rfbScreen->maxFd = max(sock,rfbScreen->maxFd);
+
       INIT_MUTEX(cl->outputMutex);
       INIT_MUTEX(cl->refCountMutex);
       INIT_COND(cl->deleteCond);
@@ -325,6 +327,8 @@ rfbClientConnectionGone(cl)
       UNLOCK(cl->refCountMutex);
     }
 #endif
+
+	 FD_CLR(cl->sock,&(cl->screen->allFds));
 
     cl->clientGoneHook(cl);
 

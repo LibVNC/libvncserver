@@ -69,9 +69,9 @@ struct timeval
 
 #include "rfb.h"
 
-#ifndef WIN32
+//#ifndef WIN32
 int max(int i,int j) { return(i<j?j:i); }
-#endif
+//#endif
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
@@ -202,9 +202,6 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	}
 
 	rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
-
-	FD_SET(sock, &(rfbScreen->allFds));
-	rfbScreen->maxFd = max(sock,rfbScreen->maxFd);
 
 	rfbNewClient(rfbScreen,sock);
 
