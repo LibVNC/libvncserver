@@ -24,7 +24,7 @@ int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 	d=*data;
 	data++;
       }
-      if(d&0x80 && y+j>=0 && x+i>=0 && y+j<rfbScreen->height && x+i<rfbScreen->width)
+      if(d&0x80)
 	memcpy(rfbScreen->frameBuffer+(y+j)*rowstride+(x+i)*bpp,colour,bpp);
       d<<=1;
     }
@@ -43,6 +43,7 @@ void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 }
 
 /* TODO: these two functions need to be more efficient */
+/* if col==bcol, assume transparent background */
 int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 			int x,int y,unsigned char c,
 			int x1,int y1,int x2,int y2,
