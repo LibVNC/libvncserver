@@ -13,7 +13,9 @@
 #include "rfb.h"
 
 Display *dpy = 0;
+int window;
 int c=0,blockLength = 32;
+int tileX=0,tileY=0,tileWidth=32,tileHeight=32,dontTile=True;
 Bool gotInput = FALSE;
 
 Bool disconnectAfterFirstClient = TRUE;
@@ -147,24 +149,25 @@ XShmSegmentInfo shminfo;
 Bool useSHM = FALSE;
 #endif
 
-void getImage(int bpp,Display *dpy,int xscreen,XImage **i)
+void getImage(int bpp,Display *dpy,int xscreen,XImage **i,int x,int y,int width,int height)
 {
+  if(width<=0) width=DisplayWidth(dpy,xscreen);
+  if(height<=0) height=DisplayHeight(dpy,xscreen);
   if(useSHM && bpp>0) {
     static Bool firstTime = TRUE;
     if(firstTime) {
       firstTime = FALSE;
-      *i = XShmCreateImage( dpy,
-			    DefaultVisual( dpy, xscreen ),
-			    bpp,
-			    ZPixmap,
-			    NULL,
-			    &shminfo,
-			    DisplayWidth(dpy,xscreen),
-			    DisplayHeight(dpy,xscreen));
+      *i = XShmCreateImage(dpy,
+			   DefaultVisual( dpy, xscreen ),
+			   bpp,
+			   ZPixmap,
+			   NULL,
+			   &shminfo,
+			   width,height);
 
       if(*i == 0) {
 	useSHM = FALSE;
-	getImage(bpp,dpy,xscreen,i);
+	getImage(bpp,dpy,xscreen,i,x,y,width,height);
 	return;
       }
 
@@ -176,36 +179,39 @@ void getImage(int bpp,Display *dpy,int xscreen,XImage **i)
       XShmAttach( dpy, &shminfo );
     }
 
-    XShmGetImage(dpy,RootWindow(dpy,xscreen),*i,0,0,AllPlanes);
+    if(x==0 && y==0 && width==DisplayWidth(dpy,xscreen) && height==DisplayHeight(dpy,xscreen))
+      XShmGetImage(dpy,window,*i,0,0,AllPlanes);
+    else
+      XGetSubImage(dpy,window,x,y,width,height,AllPlanes,ZPixmap,*i,0,0);
   } else {
-    *i = XGetImage(dpy,RootWindow(dpy,xscreen),0,0,DisplayWidth(dpy,xscreen),DisplayHeight(dpy,xscreen),
-		    AllPlanes,ZPixmap );
+    *i = XGetImage(dpy,window,x,y,width,height,AllPlanes,ZPixmap );
   }
 }
 
-void checkForImageUpdates(rfbScreenInfoPtr s,char *b)
+void checkForImageUpdates(rfbScreenInfoPtr s,char *b,int rowstride,int x,int y,int width,int height)
 {
    Bool changed;
-   int i,j,k,l,x1,y1;
-   for(j=0;j<s->height;j+=blockLength)
-     for(i=0;i<s->width;i+=blockLength) {
-	y1=j+blockLength; if(y1>s->height) y1=s->height;
-	x1=i+blockLength; if(x1>s->width) x1=s->width;
-	y1*=s->paddedWidthInBytes;
+   int i,j,k,l1,l2,x1,y1;
+
+   for(j=0;j<height;j+=blockLength)
+     for(i=0;i<width;i+=blockLength) {
+	y1=j+blockLength; if(y1>height) y1=height;
+	x1=i+blockLength; if(x1>width) x1=width;
+	y1*=rowstride;
 	x1*=s->bitsPerPixel/8;
 	changed=FALSE;
-	for(l=j*s->paddedWidthInBytes;l<y1;l+=s->paddedWidthInBytes)
+	for(l1=j*rowstride,l2=j*s->paddedWidthInBytes;l1<y1;l1+=rowstride,l2+=s->paddedWidthInBytes)
 	  for(k=i*s->bitsPerPixel/8;k<x1;k++)
-	    if(s->frameBuffer[l+k]!=b[l+k]) {
+	    if(s->frameBuffer[l2+k]!=b[l1+k]) {
 	      //	       fprintf(stderr,"changed: %d, %d\n",k,l);
 	       changed=TRUE;
 	       goto changed_p;
 	    }
 	if(changed) {
 	   changed_p:
-	  for(l+=i*s->bitsPerPixel/8;l<y1;l+=s->paddedWidthInBytes)
-	     memcpy(/*b+l,*/s->frameBuffer+l,b+l,x1-i*s->bitsPerPixel/8);
-	   rfbMarkRectAsModified(s,i,j,i+blockLength,j+blockLength);
+	  for(l1+=i*s->bitsPerPixel/8,l2+=i*s->bitsPerPixel/8;l1<y1;l1+=rowstride,l2+=s->paddedWidthInBytes)
+	    memcpy(/*b+l,*/s->frameBuffer+l2,b+l1,x1-i*s->bitsPerPixel/8);
+	  rfbMarkRectAsModified(s,x+i,y+j,x+i+blockLength,y+j+blockLength);
 	}
      }
 }
@@ -248,13 +254,13 @@ int main(int argc,char** argv)
     exit(2);
   }
 
-  XTestGrabControl(dpy,True);
-
   xscreen = DefaultScreen(dpy);
+  window = RootWindow(dpy,xscreen);
+  XTestGrabControl(dpy,True);
 
   init_keycodes();
 
-  getImage(0,dpy,xscreen,&framebufferImage);
+  getImage(0,dpy,xscreen,&framebufferImage,0,0,-1,-1);
 
   screen = rfbGetScreen(&argc,argv,framebufferImage->width,
 			framebufferImage->height,
@@ -346,8 +352,29 @@ int main(int argc,char** argv)
       //fprintf(stderr,"*");
       if(!useSHM)
 	framebufferImage->f.destroy_image(framebufferImage);
-      getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage);
-      checkForImageUpdates(screen,framebufferImage->data);
+      if(dontTile) {
+	getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage,0,0,screen->width,screen->height);
+	checkForImageUpdates(screen,framebufferImage->data,framebufferImage->bytes_per_line,
+			     0,0,screen->width,screen->height);
+      } else {
+	char isRightEdge = tileX+tileWidth>=screen->width;
+	char isLowerEdge = tileY+tileHeight>=screen->height;
+	getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage,tileX,tileY,
+		 isRightEdge?screen->width-tileX:tileWidth,
+		 isLowerEdge?screen->height-tileY:tileHeight);
+	checkForImageUpdates(screen,framebufferImage->data,framebufferImage->bytes_per_line,
+			     tileX,tileY,
+			     isRightEdge?screen->width-tileX:tileWidth,
+			     isLowerEdge?screen->height-tileY:tileHeight);
+	if(isRightEdge) {
+	  tileX=0;
+	  if(isLowerEdge)
+	    tileY=0;
+	  else
+	    tileY+=tileHeight;
+	} else
+	  tileX+=tileWidth;
+      }
       //fprintf(stderr,"+");
     }
 #ifdef WRITE_SNAPS

@@ -1,8 +1,7 @@
 immediate:
 ----------
 
-x11vnc: clipboard, cursor, updates interruptible by input,
-	sometimes XTest fails (but doesn't with x0rfbserver)
+x11vnc: clipboard, cursor, updates interruptible by input (doesn't work yet)
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
 cursor drawing: set optional grain to mark bigger rectangles as drawn (else
@@ -29,6 +28,7 @@ internal HTTP tunnelling feature (needs a special GET target and a few
 done:
 -----
 
+.x11vnc: sometimes XTest fails (but doesn't with x0rfbserver)
 .DeferUpdateTime (timing problems!)
 .empty cursor sending doesn't work.
 .udp (need an rfbClientPtr udpClient in rfbScreen)
