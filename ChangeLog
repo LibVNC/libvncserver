@@ -1,4 +1,6 @@
+   added first alpha version of LibVNCClient
    added simple and simple15 example (really simple examples)
+   finally got around to fix configure in CVS
    long standing http bug (.jar was sent twice) fixed by a friend of Karl named Mike
    http options in cargs
    when closing a client and no longer listening for new ones, don't crash
