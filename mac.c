@@ -9,15 +9,7 @@
  * 
  * This file implements every system specific function for Mac OS X.
  * 
- *  It includes the init function:
- * 
-     void rfbScreenInit(void)
- * 
- * the function to get the address of the framebuffer:
- * 
-     char *rfbGetFramebuffer(void)
- *
- *  keyboard functions:
+ *  It includes the keyboard functions:
  * 
      void KbdAddEvent(down, keySym, cl)
         Bool down;
@@ -33,85 +25,17 @@
         int y;
         rfbClientPtr cl;
  * 
- *  and the EventLoop:
- * 
-     void runEventLoop()
- * 
- * These six functions have to be defined by every VNC server using
- * libvncserver.
- *
- * The main function just calls runVNCServer. This is different
- * for more complex users of libvncserver.
- * 
  */
 
-#include "rfb.h"
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
-#include <X11/keysym.h>
+/* zlib doesn't like Byte already defined */
+#undef Byte
+#undef TRUE
+#include "rfb.h"
+#include "keysym.h"
 
-void 
-rfbScreenInit(void)
-{
-    int bitsPerSample;
-    int samplesPerPixel;
-
-    rfbScreen.width = CGDisplayPixelsWide(kCGDirectMainDisplay);
-    rfbScreen.height = CGDisplayPixelsHigh(kCGDirectMainDisplay);
-    rfbScreen.bitsPerPixel = rfbScreen.depth = 
-        CGDisplayBitsPerPixel(kCGDirectMainDisplay);
-    gethostname(rfbThisHost, 255);
-    rfbScreen.paddedWidthInBytes = CGDisplayBytesPerRow(kCGDirectMainDisplay);
-    rfbServerFormat.bitsPerPixel = rfbScreen.bitsPerPixel;
-    rfbServerFormat.depth = rfbScreen.depth;
-    rfbServerFormat.bigEndian = !(*(char *)&rfbEndianTest);
-    rfbServerFormat.trueColour = TRUE;
-
-    bitsPerSample = CGDisplayBitsPerSample(kCGDirectMainDisplay);
-    samplesPerPixel = CGDisplaySamplesPerPixel(kCGDirectMainDisplay);
-    if (samplesPerPixel != 3) {
-        rfbLog("screen format not supported.  exiting.\n");
-        exit(1);
-    }
-
-    /* This works for 16 and 32-bit, but not for 8-bit.
-       What should it be for 8-bit?  (Shouldn't 8-bit use a colormap?) */
-    rfbServerFormat.redMax = (1 << bitsPerSample) - 1;
-    rfbServerFormat.greenMax = (1 << bitsPerSample) - 1;
-    rfbServerFormat.blueMax = (1 << bitsPerSample) - 1;
-    rfbServerFormat.redShift = bitsPerSample * 2;
-    rfbServerFormat.greenShift = bitsPerSample;
-    rfbServerFormat.blueShift = 0;
-
-    /* We want to use the X11 REGION_* macros without having an actual
-       X11 ScreenPtr, so we do this.  Pretty ugly, but at least it lets us
-       avoid hacking up regionstr.h, or changing every call to REGION_*
-       (which actually I should probably do eventually). */
-    hackScreen.RegionCreate = miRegionCreate;
-    hackScreen.RegionInit = miRegionInit;
-    hackScreen.RegionCopy = miRegionCopy;
-    hackScreen.RegionDestroy = miRegionDestroy;
-    hackScreen.RegionUninit = miRegionUninit;
-    hackScreen.Intersect = miIntersect;
-    hackScreen.Union = miUnion;
-    hackScreen.Subtract = miSubtract;
-    hackScreen.Inverse = miInverse;
-    hackScreen.RegionReset = miRegionReset;
-    hackScreen.TranslateRegion = miTranslateRegion;
-    hackScreen.RectIn = miRectIn;
-    hackScreen.PointInRegion = miPointInRegion;
-    hackScreen.RegionNotEmpty = miRegionNotEmpty;
-    hackScreen.RegionEmpty = miRegionEmpty;
-    hackScreen.RegionExtents = miRegionExtents;
-    hackScreen.RegionAppend = miRegionAppend;
-    hackScreen.RegionValidate = miRegionValidate;
-}
-
-char *
-rfbGetFramebuffer(void)
-{
-    return (char *)CGDisplayBaseAddress(kCGDirectMainDisplay);
-}
+rfbScreenInfoPtr rfbScreen;
 
 /* Where do I get the "official" list of Mac key codes?
    Ripped these out of a Mac II emulator called Basilisk II
@@ -339,50 +263,45 @@ PtrAddEvent(buttonMask, x, y, cl)
                      (buttonMask & (1 << 7)) ? TRUE : FALSE);
 }
 
-void
-KbdReleaseAllKeys()
+void 
+ScreenInit(int argc, char**argv)
 {
-    /* Doesn't seem to be possible. */
+  rfbScreen = rfbGetScreen(argc,argv,
+			   CGDisplayPixelsWide(kCGDirectMainDisplay),
+			   CGDisplayPixelsHigh(kCGDirectMainDisplay),
+			   CGDisplayBitsPerSample(kCGDirectMainDisplay),
+			   CGDisplaySamplesPerPixel(kCGDirectMainDisplay),4);
+  gethostname(rfbScreen->rfbThisHost, 255);
+  rfbScreen->paddedWidthInBytes = CGDisplayBytesPerRow(kCGDirectMainDisplay);
+  rfbScreen->frameBuffer =
+    (char *)CGDisplayBaseAddress(kCGDirectMainDisplay);
+  rfbScreen->ptrAddEvent = PtrAddEvent;
+  rfbScreen->kbdAddEvent = KbdAddEvent;
+  rfbInitServer(rfbScreen);
 }
 
 static void 
 refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 {
-    BoxRec box;
-    RegionRec region;
-    rfbClientIteratorPtr iterator;
-    rfbClientPtr cl;                                                          
     int i;
 
-    for (i = 0; i < count; i++) {
-        box.x1 = rectArray[i].origin.x;
-        box.y1 = rectArray[i].origin.y;
-        box.x2 = box.x1 + rectArray[i].size.width;
-        box.y2 = box.y1 + rectArray[i].size.height;
-
-        SAFE_REGION_INIT(&hackScreen, &region, &box, 0);
-
-        iterator = rfbGetClientIterator();
-        while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
-            pthread_mutex_lock(&cl->updateMutex);
-            REGION_UNION(&hackScreen,&cl->modifiedRegion,&cl->modifiedRegion,&region);
-            pthread_cond_signal(&cl->updateCond);
-            pthread_mutex_unlock(&cl->updateMutex);
-        }
-        rfbReleaseClientIterator(iterator);
-
-        REGION_UNINIT(&hackScreen, &region);
-    }
-}
-
-void runEventLoop()
-{
-    CGRegisterScreenRefreshCallback(refreshCallback, NULL);
-
-    RunApplicationEventLoop();
+    for (i = 0; i < count; i++)
+      rfbMarkRectAsModified(rfbScreen,
+			    rectArray[i].origin.x,rectArray[i].origin.y,
+			    rectArray[i].origin.x + rectArray[i].size.width,
+			    rectArray[i].origin.y + rectArray[i].size.height);
 }
 
 int main(int argc,char *argv[])
 {
-  runVNCServer(argc,argv);
+  ScreenInit(argc,argv);
+  /* enter background event loop */
+  rfbRunEventLoop(rfbScreen,40,TRUE);
+
+  /* enter OS X loop */
+  CGRegisterScreenRefreshCallback(refreshCallback, NULL);
+  RunApplicationEventLoop();
+
+  return(0); /* never ... */
 }
+

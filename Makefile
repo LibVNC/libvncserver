@@ -1,4 +1,4 @@
-CC=gcc
+CC=cc
 CFLAGS=-g -Wall
 #CFLAGS=-O2 -Wall
 RANLIB=ranlib

@@ -56,7 +56,13 @@ int max(int,int);
 #ifdef __linux__
 #include <endian.h>
 #else
+#ifdef __APPLE__
+#include <machine/endian.h>
+#define _BYTE_ORDER BYTE_ORDER
+#define _LITTLE_ENDIAN LITTLE_ENDIAN
+#else
 #include <sys/endian.h>
+#endif
 #endif
 
 #ifndef _BYTE_ORDER
