@@ -1,3 +1,9 @@
+2004-04-28  Karl Runge <runge@karlrunge.com>
+	* -auth cmdline option for xauthority.
+	* decrease default deferupdate under -nofb.
+	* update_client_pointer() from Edoardo Tirtarahardja.
+	* remove some assumptions about libvncserver defaults.
+
 2004-04-19  Karl Runge <runge@karlrunge.com>
 	* support for cursor positions updates -cursorpos
 	* option for SIGPIPE handling -sigpipe

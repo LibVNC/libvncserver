@@ -238,6 +238,7 @@ int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
  */
 int waitms = 30;
 int defer_update = 30;	/* rfbDeferUpdateTime ms to wait before sends. */
+int defer_update_nofb = 6;	/* defer a shorter time under -nofb */
 
 int screen_blank = 60;	/* number of seconds of no activity to throttle */
 			/* down the screen polls.  zero to disable. */
@@ -2055,6 +2056,50 @@ void blackout_nearby_tiles(x, y, dt) {
 	}
 }
 
+/*
+ * This is a special workaround to quickly send rfbCursorPosUpdates
+ * to client(s) when in -nofb mode, e.g. Win2VNC.  It sends the updates
+ * immediately (by-passing libvncserver).  Requires a customized Win2VNC
+ * to interpret the rfbCursorPosUpdates.  Currently no big reason to
+ * do this for non-nofb mode (i.e. normal viewing) and so the normal
+ * libvncserver mechanism is used.  Thanks to Edoardo Tirtarahardja.
+ */
+void update_client_pointer(rfbClientPtr cl, rfbBool send) {
+	rfbFramebufferUpdateMsg *fu;
+
+	if (! nofb) {
+		/* normal libvncserver mechanism: */
+		cl->cursorWasMoved = send;
+		return;
+	}
+	if (! send) {
+		return;
+	}
+	if (cl->state != RFB_NORMAL) {
+		/* bad idea to force this data to initializing clients */
+		return;
+	}
+
+	fu = (rfbFramebufferUpdateMsg*) cl->updateBuf;
+	cl->rfbFramebufferUpdateMessagesSent++;
+	fu->type = rfbFramebufferUpdate;
+	fu->nRects = Swap16IfLE(1);
+	memcpy(&cl->updateBuf[cl->ublen], (char*) fu,
+	    sz_rfbFramebufferUpdateMsg);
+	cl->ublen = sz_rfbFramebufferUpdateMsg;
+
+	rfbSendCursorPos(cl);
+
+	if (debug_pointer) {
+		rfbLog("Sending rfbEncodingPointerPos message to host %s with "
+		    "x=%d,y=%d\n", cl->host, screen->cursorX, screen->cursorY);
+	}
+}
+
+/*
+ * Send rfbCursorPosUpdates back to clients that understand them.  This
+ * seems to be TightVNC specific.
+ */
 void cursor_pos_updates(int x, int y) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
@@ -2063,6 +2108,7 @@ void cursor_pos_updates(int x, int y) {
 	if (! cursor_pos) {
 		return;
 	}
+	/* x and y are current positions of X11 pointer on the X11 display */
 	if (x == screen->cursorX && y == screen->cursorY) {
 		return;
 	}
@@ -2083,25 +2129,24 @@ void cursor_pos_updates(int x, int y) {
 			continue;
 		}
 		if (cl == last_pointer_client) {
+			/*
+			 * special case if this client was the last one to
+			 * send a pointer position.
+			 */
 			if (x == cursor_x && y == cursor_y) {
-				if (cursor_pos > 1) {
-					/* send to all */
-					cl->cursorWasMoved = TRUE;
-					cnt++;
-				} else {
-					cl->cursorWasMoved = FALSE;
-				}
+				update_client_pointer(cl, FALSE);
 			} else {
+				/* an X11 app evidently warped the pointer */
 				if (debug_pointer) {
 					rfbLog("cursor_pos_updates: warp "
 					    "detected dx=%3d dy=%3d\n",
 					    cursor_x - x, cursor_y - y);
 				}
-				cl->cursorWasMoved = TRUE;
+				update_client_pointer(cl, TRUE);
 				cnt++;
 			}
 		} else {
-			cl->cursorWasMoved = TRUE;
+			update_client_pointer(cl, TRUE);
 			cnt++;
 		}
 	}
@@ -2286,11 +2331,6 @@ void update_mouse(void) {
 	int root_x, root_y, win_x, win_y, which = 0;
 	unsigned int mask;
 
-	if (! show_mouse && cursor_pos == 1 && last_pointer_client) {
-		if (client_count == 1) {
-			return;	/* can save some effort for the 1 client case */
-		}
-	}
 	X_LOCK;
 	ret = XQueryPointer(dpy, rootwin, &root_w, &child_w, &root_x, &root_y,
 	    &win_x, &win_y, &mask);
@@ -2498,9 +2538,10 @@ void set_visual(char *vstring) {
 
 /*
  * Presumably under -nofb the clients will never request the framebuffer.
- * But we have gotten such a request... so let's just give them the
- * current view on the display.  n.b. x2vnc and perhaps win2vnc requests
- * a 1x1 pixel for some workaround so sadly this evidently always happens.
+ * But we have gotten such a request... so let's just give them
+ * the current view on the display.  n.b. x2vnc and perhaps win2vnc
+ * requests a 1x1 pixel for some workaround so sadly this evidently
+ * nearly always happens.
  */
 void nofb_hook(rfbClientPtr cl) {
 	static int loaded_fb = 0;
@@ -2515,6 +2556,9 @@ void nofb_hook(rfbClientPtr cl) {
 	screen->displayHook = NULL;
 }
 
+int got_rfbport = 0;
+int got_alwaysshared = 0;
+int got_nevershared = 0;
 /*
  * initialize the rfb framebuffer/screen
  */
@@ -2629,22 +2673,23 @@ if (strcmp(LIBVNCSERVER_VERSION, "0.5") && strcmp(LIBVNCSERVER_VERSION, "0.6")) 
 		/* we keep stderr for logging */
 		screen->inetdSock = fd;
 		screen->rfbPort = 0;
-	}
 
-	/* XXX the following 3 settings are based on libvncserver defaults. */
-	if (screen->rfbPort == 5900) {
+	} else if (! got_rfbport) {
 		screen->autoPort = TRUE;
 	}
-	if (screen->rfbDeferUpdateTime == 5) {
-		screen->rfbDeferUpdateTime = defer_update;
-	}
-	if (! screen->rfbNeverShared && ! screen->rfbAlwaysShared) {
+
+	if (! got_nevershared && ! got_alwaysshared) {
 		if (shared) {
 			screen->rfbAlwaysShared = TRUE;
 		} else {
 			screen->rfbDontDisconnect = TRUE;
 			screen->rfbNeverShared = TRUE;
 		}
+	}
+	/* XXX the following is based on libvncserver defaults. */
+	if (screen->rfbDeferUpdateTime == 5) {
+		/* XXX will be fixed someday */
+		screen->rfbDeferUpdateTime = defer_update;
 	}
 
 	/* event callbacks: */
@@ -3242,8 +3287,15 @@ void initialize_shm() {
 			if (i == 1) {
 				clean_up_exit(1);
 			}
-			rfbLog("error creating tile-row shm for len=%d\n", i);
-			rfbLog("reverting to single_copytile mode\n");
+			rfbLog("shm: Error creating shared memory tile-row for"
+			    " len=%d,\n", i);
+			rfbLog("shm: reverting to -onetile mode. If this"
+			    " problem persists\n");
+			rfbLog("shm: try using the -onetile or -noshm options"
+			    " to limit\n");
+			rfbLog("shm: shared memory usage, or run ipcrm(1)"
+			    " to manually\n");
+			rfbLog("shm: delete unattached shm segments.\n");
 			/* n.b.: "i" not "1", a kludge for cleanup */
 			single_copytile = i;
 		}
@@ -4607,7 +4659,7 @@ void watch_loop(void) {
 
 		if (! use_threads) {
 			rfbProcessEvents(screen, -1);
-			if (check_user_input(dt, &cnt)) {
+			if (! nofb && check_user_input(dt, &cnt)) {
 				/* true means loop back for more input */
 				continue;
 			}
@@ -4857,6 +4909,8 @@ void print_help() {
 "                       contains \"/\" it is a file to periodically check for new\n"
 "                       hosts. The first line is read and then file is truncated.\n"
 "-vncconnect            Monitor the VNC_CONNECT X property set by vncconnect(1).\n"
+"-auth file             Set the X authority file to be \"file\", equivalent to\n"
+"                       setting the XAUTHORITY env. var to \"file\" before startup.\n"
 "-allow addr1[,addr2..] Only allow client connections from IP addresses matching\n"
 "                       the comma separated list of numerical addresses. Can be\n"
 "                       a prefix, e.g. \"192.168.100.\" to match a simple subnet,\n"
@@ -4904,8 +4958,6 @@ void print_help() {
 "                       on touchscreens or other non-standard setups).\n"
 "-cursorpos             Send the X cursor position back to all vnc clients that\n"
 "                       support the TightVNC CursorPosUpdates extension.\n"
-"-cursorposall          As -cursorpos, but send to all clients, even the one\n"
-"                       that is currently moving the cursor around.\n"
 "-buttonmap str         String to remap mouse buttons.  Format: IJK-LMN, this\n"
 "                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31\n"
 "-nodragging            Do not update the display during mouse dragging events\n"
@@ -5021,11 +5073,13 @@ int main(int argc, char** argv) {
 	XImage *fb;
 	int i, op, ev, er, maj, min;
 	char *use_dpy = NULL;
+	char *auth_file = NULL;
 	char *arg, *visual_str = NULL;
 	int pw_loc = -1;
 	int dt = 0;
 	int bg = 0;
 	int got_waitms = 0, got_rfbwait = 0;
+	int got_deferupdate = 0, got_defer = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc2 = 1; char *argv2[100];
@@ -5059,6 +5113,8 @@ int main(int argc, char** argv) {
 			view_only = 1;
 		} else if (!strcmp(arg, "-shared")) {
 			shared = 1;
+		} else if (!strcmp(arg, "-auth")) {
+			auth_file = argv[++i];
 		} else if (!strcmp(arg, "-allow")) {
 			allow_list = argv[++i];
 		} else if (!strcmp(arg, "-localhost")) {
@@ -5114,8 +5170,6 @@ int main(int argc, char** argv) {
 			use_xwarppointer = 1;
 		} else if (!strcmp(arg, "-cursorpos")) {
 			cursor_pos = 1;
-		} else if (!strcmp(arg, "-cursorposall")) {
-			cursor_pos = 2;
 		} else if (!strcmp(arg, "-buttonmap")) {
 			pointer_remap = argv[++i];
 		} else if (!strcmp(arg, "-nodragging")) {
@@ -5134,6 +5188,7 @@ int main(int argc, char** argv) {
 			debug_keyboard++;
 		} else if (!strcmp(arg, "-defer")) {
 			defer_update = atoi(argv[++i]);
+			got_defer = 1;
 		} else if (!strcmp(arg, "-wait")) {
 			waitms = atoi(argv[++i]);
 			got_waitms = 1;
@@ -5188,6 +5243,18 @@ int main(int argc, char** argv) {
 			if (!strcmp(arg, "-rfbwait")) {
 				got_rfbwait = 1;
 			}
+			if (!strcmp(arg, "-deferupdate")) {
+				got_deferupdate = 1;
+			}
+			if (!strcmp(arg, "-rfbport")) {
+				got_rfbport = 1;
+			}
+			if (!strcmp(arg, "-alwaysshared ")) {
+				got_alwaysshared = 1;
+			}
+			if (!strcmp(arg, "-nevershared")) {
+				got_nevershared = 1;
+			}
 			/* otherwise copy it for use below. */
 			if (! quiet && i != pw_loc && i != pw_loc+1) {
 			    fprintf(stderr, "passing arg to libvncserver: %s\n",
@@ -5218,6 +5285,10 @@ int main(int argc, char** argv) {
 
 	/* fixup settings that do not make sense */
 		
+	if (use_threads && nofb && cursor_pos) {
+		fprintf(stderr, "disabling -threads under -nofb -cursorpos\n");
+		use_threads = 0;
+	}
 	if (tile_fuzz < 1) {
 		tile_fuzz = 1;
 	}
@@ -5240,41 +5311,89 @@ int main(int argc, char** argv) {
 		argv2[argc2++] = "604800000"; /* one week... */
 	}
 
+	if (nofb && ! got_deferupdate && ! got_defer) {
+		/* reduce defer time under -nofb */
+		defer_update = defer_update_nofb;
+	}
+	if (! got_deferupdate) {
+		char tmp[40];
+		/* XXX not working yet in libvncserver */
+		sprintf(tmp, "%d", defer_update);
+		argv2[argc2++] = "-deferupdate";
+		argv2[argc2++] = strdup(tmp);
+	}
+
 	if (! quiet) {
 		fprintf(stderr, "\n");
-		fprintf(stderr, "viewonly:   %d\n", view_only);
-		fprintf(stderr, "shared:     %d\n", shared);
-		fprintf(stderr, "allow:      %s\n", allow_list ? allow_list
+		fprintf(stderr, "display:    %s\n", use_dpy ? use_dpy
                     : "null");
-		fprintf(stderr, "inetd:      %d\n", inetd);
-		fprintf(stderr, "conn_once:  %d\n", connect_once);
+		fprintf(stderr, "subwin:     0x%x\n", subwin);
+		fprintf(stderr, "visual:     %s\n", visual_str ? visual_str
+                    : "null");
 		fprintf(stderr, "flashcmap:  %d\n", flash_cmap);
 		fprintf(stderr, "force_idx:  %d\n", force_indexed_color);
+		fprintf(stderr, "viewonly:   %d\n", view_only);
+		fprintf(stderr, "shared:     %d\n", shared);
+		fprintf(stderr, "authfile:   %s\n", auth_file ? auth_file
+                    : "null");
+		fprintf(stderr, "allow:      %s\n", allow_list ? allow_list
+                    : "null");
+		fprintf(stderr, "conn_once:  %d\n", connect_once);
+		fprintf(stderr, "connect:    %s\n", client_connect
+		    ? client_connect : "null");
+		fprintf(stderr, "connectfile %s\n", client_connect_file
+		    ? client_connect_file : "null");
+		fprintf(stderr, "vnc_conn:   %d\n", vnc_connect);
+		fprintf(stderr, "inetd:      %d\n", inetd);
 		fprintf(stderr, "using_shm:  %d\n", using_shm);
 		fprintf(stderr, "flipbytes:  %d\n", flip_byte_order);
-		fprintf(stderr, "nofb:       %d\n", nofb);
-		fprintf(stderr, "watchbell:  %d\n", watch_bell);
 		fprintf(stderr, "mod_tweak:  %d\n", use_modifier_tweak);
+		fprintf(stderr, "remap:      %s\n", remap_file ? remap_file
+                    : "null");
+		fprintf(stderr, "blackout:   %s\n", blackout_string
+		    ? blackout_string : "null");
+		fprintf(stderr, "xinerama:   %d\n", xinerama);
+		fprintf(stderr, "watchbell:  %d\n", watch_bell);
+		fprintf(stderr, "nofb:       %d\n", nofb);
+		fprintf(stderr, "watchsel:   %d\n", watch_selection);
+		fprintf(stderr, "watchprim:  %d\n", watch_primary);
 		fprintf(stderr, "loc_curs:   %d\n", local_cursor);
 		fprintf(stderr, "mouse:      %d\n", show_mouse);
+		fprintf(stderr, "root_curs:  %d\n", show_root_cursor);
+		fprintf(stderr, "xwarpptr:   %d\n", use_xwarppointer);
+		fprintf(stderr, "cursorpos:  %d\n", cursor_pos);
+		fprintf(stderr, "buttonmap:  %s\n", pointer_remap
+		    ? pointer_remap : "null");
 		fprintf(stderr, "dragging:   %d\n", show_dragging);
 		fprintf(stderr, "inputskip:  %d\n", ui_skip);
-		fprintf(stderr, "root_curs:  %d\n", show_root_cursor);
+		fprintf(stderr, "old_ptr:    %d\n", old_pointer);
+		fprintf(stderr, "onetile:    %d\n", single_copytile);
+		fprintf(stderr, "debug_ptr:  %d\n", debug_pointer);
+		fprintf(stderr, "debug_key:  %d\n", debug_keyboard);
 		fprintf(stderr, "defer:      %d\n", defer_update);
 		fprintf(stderr, "waitms:     %d\n", waitms);
 		fprintf(stderr, "take_naps:  %d\n", take_naps);
+		fprintf(stderr, "sigpipe:    %d\n", sigpipe);
 		fprintf(stderr, "threads:    %d\n", use_threads);
 		fprintf(stderr, "fs_frac:    %.2f\n", fs_frac);
 		fprintf(stderr, "gaps_fill:  %d\n", gaps_fill);
 		fprintf(stderr, "grow_fill:  %d\n", grow_fill);
 		fprintf(stderr, "tile_fuzz:  %d\n", tile_fuzz);
 		fprintf(stderr, "use_hints:  %d\n", use_hints);
+		fprintf(stderr, "bg:         %d\n", bg);
 	} else {
 		rfbLogEnable(0);
 	}
 
 	/* open the X display: */
 	X_INIT;
+	if (auth_file) {
+		char *tmp;
+		int len = strlen("XAUTHORITY=") + strlen(auth_file) + 1;
+		tmp = (char *) malloc((size_t) len);
+		sprintf(tmp, "XAUTHORITY=%s", auth_file);
+		putenv(tmp);
+	}
 	if (use_dpy) {
 		dpy = XOpenDisplay(use_dpy);
 	} else if ( (use_dpy = getenv("DISPLAY")) ) {
