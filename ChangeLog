@@ -1,3 +1,9 @@
+2004-03-13  Karl Runge <runge@karlrunge.com>
+	* x11vnc: do not send selection unless all clients
+	  are in RFB_NORMAL state.
+	* increase rfbMaxClientWait when threaded to avoid
+	  ReadExact() timeouts for some viewers.
+
 2004-03-10  Karl Runge <runge@karlrunge.com>
 	* x11vnc options -blackout, -xinerama, -xwarppointer
 	* modify configure.ac to pick up -lXinerama

@@ -1323,7 +1323,7 @@ int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
 int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */
 int own_selection = 0;		/* whether we currently own PRIMARY or not */
 int set_cutbuffer = 0;		/* to avoid bouncing the CutText right back */
-int sel_waittime = 5;		/* some seconds to skip before first send */
+int sel_waittime = 15;		/* some seconds to skip before first send */
 Window selwin;			/* special window for our selection */
 
 /*
@@ -1406,6 +1406,23 @@ void selection_request(XEvent *ev) {
 	XFlush(dpy);
 }
 
+int all_clients_initialized() {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int ok = 1;
+
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		if (cl->state != RFB_NORMAL) {
+			ok = 0;
+			break;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+
+	return ok;
+}
+
 /*
  * CUT_BUFFER0 property on the local display has changed, we read and
  * store it and send it out to any connected VNC clients.
@@ -1444,6 +1461,11 @@ void cutbuffer_send() {
 	} while (bytes_after > 0);
 
 	selection_str[PROP_MAX] = '\0';
+
+	if (! all_clients_initialized()) {
+		rfbLog("cutbuffer_send: no send: uninitialized clients\n");
+		return; /* some clients initializing, cannot send */ 
+	}
 
 	/* now send it to any connected VNC clients (rfbServerCutText) */
 	rfbSendServerCutText(screen, selection_str, strlen(selection_str));
@@ -1529,6 +1551,11 @@ void selection_send(XEvent *ev) {
 	if (newlen == 0) {
 		/* do not bother sending a null string out */
 		return;
+	}
+
+	if (! all_clients_initialized()) {
+		rfbLog("selection_send: no send: uninitialized clients\n");
+		return; /* some clients initializing, cannot send */ 
 	}
 
 	/* now send it to any connected VNC clients (rfbServerCutText) */
@@ -4069,8 +4096,8 @@ void ping_clients(int tile_cnt) {
 	static time_t last_send = 0;
 	time_t now = time(0);
 
-	if (rfbMaxClientWait <= 3000) {
-		rfbMaxClientWait = 3000;
+	if (rfbMaxClientWait < 20000) {
+		rfbMaxClientWait = 20000;
 		rfbLog("reset rfbMaxClientWait to %d ms.\n",
 		    rfbMaxClientWait);
 	}
@@ -4777,9 +4804,11 @@ void print_help() {
 "                       on touchscreens or other non-standard setups).\n"
 "-buttonmap str         String to remap mouse buttons.  Format: IJK-LMN, this\n"
 "                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31\n"
-"-nodragging            Do not update the display during mouse dragging events.\n"
-"                       Greatly improves response on slow setups, but you lose\n"
-"                       all visual feedback for drags and some menu traversals.\n"
+"-nodragging            Do not update the display during mouse dragging events\n"
+"                       (mouse motion with a button held down).  Greatly\n"
+"                       improves response on slow setups, but you lose all\n"
+"                       visual feedback for drags, text selection, and some\n"
+"                       menu traversals.\n"
 "-old_pointer           Do not use the new pointer input handling mechanisms.\n"
 "                       See check_input() and pointer() for details.\n"
 "-input_skip n          For the old pointer handling when non-threaded: try to\n"
@@ -4886,7 +4915,7 @@ int main(int argc, char** argv) {
 	int pw_loc = -1;
 	int dt = 0;
 	int bg = 0;
-	int got_waitms = 0;
+	int got_waitms = 0, got_rfbwait = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc2 = 1; char *argv2[100];
@@ -5030,6 +5059,9 @@ int main(int argc, char** argv) {
 			if (!strcmp(arg, "-passwd")) {
 				pw_loc = i;
 			}
+			if (!strcmp(arg, "-rfbwait")) {
+				got_rfbwait = 1;
+			}
 			/* otherwise copy it for use below. */
 			if (! quiet && i != pw_loc && i != pw_loc+1) {
 			    fprintf(stderr, "passing arg to libvncserver: %s\n",
@@ -5074,6 +5106,12 @@ int main(int argc, char** argv) {
 		shared = 0;
 		connect_once = 1;
 		bg = 0;
+	}
+
+	/* increase rfbwait if threaded */
+	if (use_threads && ! got_rfbwait) {
+		argv2[argc2++] = "-rfbwait";
+		argv2[argc2++] = "604800000"; /* one week... */
 	}
 
 	if (! quiet) {

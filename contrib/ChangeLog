@@ -1,3 +1,9 @@
+2004-04-13  Karl Runge <runge@karlrunge.com>
+	* solve problem with sending selection when client initializing
+	  (not yet in RFB_NORMAL state).  Increase delay to 15s as well. 
+	* when threaded: limit rfbMaxClientWait to >= 20 secs and
+	  increase it to a huge value unless -rfbwait is supplied.
+
 2004-04-08  Karl Runge <runge@karlrunge.com>
 	* added support for blacking out regions of the screen, primarily
 	  for Xinerama usage, options: -blackout -xinerama
