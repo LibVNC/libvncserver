@@ -120,6 +120,9 @@ Screen
 	=DP blackout:
 	=D  xinerama
 	--
+	solid
+	solid_color:
+	--
 	= xrandr
 	=-C:resize,newfbsize,exit xrandr_mode:
 	padgeom:
@@ -127,9 +130,9 @@ Screen
 Keyboard
 	norepeat
 	add_keysyms
+	skip_keycodes:
 	modtweak
 	xkb
-	skip_keycodes:
 	--
 	=FP remap:
 	--
@@ -322,6 +325,10 @@ Allows you to find more information about them or disconnect them.
 You will be prompted to confirm any disconnections.
 "
 
+	set helptext(solid_color) "
+Set the -solid color value.
+"
+
 	set helptext(xrandr_mode) "
 Set the -xrandr mode value.
 "
@@ -390,7 +397,7 @@ will be \"(*none*)\" when there is no connection established.
 
 4) Below the x11 and vnc displays text label is a text area there scrolling
 information about actions being taken and commands being run is displayed.
-To scroll use PageUp/PageDown or the arrow keys.
+To scroll click in the area and use PageUp/PageDown or the arrow keys.
 
 5) At the bottom is an entry area.  When one selects a menu item that
 requires supplying a string value, the label will be set to the
@@ -2319,6 +2326,8 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 						set nitem "sb"
 					} elseif {$nitem == "xrandr_mode"} {
 						set nitem "xrandr"
+					} elseif {$nitem == "solid_color"} {
+						set nitem "solid"
 					}
 					lappend cmd "-$nitem"
 					lappend cmd $menu_var($item)

@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "January 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "February 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.1pre, lastmod: 2005-01-23
+         version: 0.7.1pre, lastmod: 2005-02-05
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -351,6 +351,22 @@ Do not use the new copy_tiles() framebuffer mechanism,
 just use 1 shm tile for polling.  Limits shm segments
 used to 3.
 .PP
+\fB-solid\fR \fI[color]\fR
+.IP
+To improve performance, when VNC clients are connected
+try to change the desktop background to a solid color.
+The [color] is optional: the default color is "cyan4".
+For a different one specify the X color (rgb.txt name,
+e.g. "darkblue" or numerical "#RRGGBB"). Currently
+this option only works on GNOME, KDE, and classic X
+(i.e. with the background image on the root window).
+The "gconftool-2" and "dcop" external commands are
+run for GNOME and KDE respectively.  Other desktops
+won't work, e.g. XFCE (send us the corresponding
+commands if you find them).  If x11vnc guesses your
+desktop incorrectly, you can force it by prefixing
+color with "gnome:", "kde:", or "root:".
+.PP
 \fB-blackout\fR \fIstring\fR
 .IP
 Black out rectangles on the screen. \fIstring\fR is a
@@ -426,6 +442,7 @@ Do not process any .x11vncrc file for options.
 \fB-h,\fR \fB-help\fR
 .IP
 Print this help text.
+-?, \fB-opts\fR              Only list the x11vnc options.
 .PP
 \fB-V,\fR \fB-version\fR
 .IP
@@ -764,11 +781,11 @@ pointer events).  Also note that these modes are not
 available in \fB-threads\fR mode which has its own pointer
 event handling mechanism.
 .IP
-To try out the different pointer modes to see
-which one gives the best response for your usage,
-it is convenient to use the remote control function,
-e.g. "x11vnc \fB-R\fR pointer_mode:4" or the tcl/tk gui
-(Tuning -> pointer_mode -> n).
+To try out the different pointer modes to see which
+one gives the best response for your usage, it is
+convenient to use the remote control function, for
+example "x11vnc \fB-R\fR pm:4" or the tcl/tk gui (Tuning ->
+pointer_mode -> n).
 .PP
 \fB-input_skip\fR \fIn\fR
 .IP
@@ -1065,6 +1082,12 @@ onetile         enable  \fB-onetile\fR mode. (you may need to
 .IP
 noonetile       disable \fB-onetile\fR mode.
 .IP
+solid           enable  \fB-solid\fR mode
+.IP
+nosolid         disable \fB-solid\fR mode.
+.IP
+solid_color:color set \fB-solid\fR color (and apply it).
+.IP
 blackout:str    set \fB-blackout\fR "str" (empty to disable).
                 See \fB-blackout\fR for the form of "str"
                 (basically: WxH+X+Y,...)
@@ -1129,8 +1152,6 @@ fb              disable \fB-nofb\fR mode.
 bell            enable  bell (if supported).
 .IP
 nobell          disable bell.
-.IP
-bell            enable  bell (if supported).
 .IP
 nosel           enable  \fB-nosel\fR mode.
 .IP
@@ -1315,17 +1336,18 @@ refresh reset close disconnect id sid waitmapped
 nowaitmapped flashcmap noflashcmap truecolor notruecolor
 overlay nooverlay overlay_cursor overlay_yescursor
 nooverlay_nocursor nooverlay_cursor nooverlay_yescursor
-overlay_nocursor visual scale viewonly noviewonly shared
-noshared forever noforever once timeout deny lock nodeny
-unlock connect allowonce allow localhost nolocalhost
-accept gone shm noshm flipbyteorder noflipbyteorder
-onetile noonetile blackout xinerama noxinerama xrandr
-noxrandr xrandr_mode padgeom quiet q noquiet modtweak
-nomodtweak xkb noxkb skip_keycodes add_keysyms
-noadd_keysyms clear_mods noclear_mods clear_keys
-noclear_keys remap repeat norepeat fb nofb bell nobell
-sel nosel primary noprimary cursorshape nocursorshape
-cursorpos nocursorpos cursor show_cursor noshow_cursor
+overlay_nocursor visual scale viewonly noviewonly
+shared noshared forever noforever once timeout deny
+lock nodeny unlock connect allowonce allow localhost
+nolocalhost accept gone shm noshm flipbyteorder
+noflipbyteorder onetile noonetile solid_color solid
+nosolid blackout xinerama noxinerama xrandr noxrandr
+xrandr_mode padgeom quiet q noquiet modtweak nomodtweak
+xkb noxkb skip_keycodes add_keysyms noadd_keysyms
+clear_mods noclear_mods clear_keys noclear_keys
+remap repeat norepeat fb nofb bell nobell sel nosel
+primary noprimary cursorshape nocursorshape cursorpos
+nocursorpos cursor show_cursor noshow_cursor
 nocursor xfixes noxfixes alphacut alphafrac
 alpharemove noalpharemove alphablend noalphablend
 xwarp xwarppointer noxwarp noxwarppointer buttonmap

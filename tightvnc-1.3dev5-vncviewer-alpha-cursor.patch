@@ -1,0 +1,143 @@
+--- vnc_unixsrc.orig/vncviewer/cursor.c	2003-01-15 04:46:52.000000000 -0500
++++ vnc_unixsrc/vncviewer/cursor.c	2005-02-05 12:28:10.000000000 -0500
+@@ -472,6 +472,140 @@
+   int offset, bytesPerPixel;
+   char *pos;
+ 
++#define alphahack
++#ifdef alphahack
++  /* hack to have cursor transparency at 32bpp <runge@karlrunge.com> */
++  static int alphablend = -1;
++
++  if (alphablend < 0) {
++	/* you have to set NO_ALPHABLEND=1 in your environment to disable */
++	if (getenv("NO_ALPHABLEND")) {
++		alphablend = 0;
++	} else {
++		alphablend = 1;
++	}
++  }
++
++  bytesPerPixel = myFormat.bitsPerPixel / 8;
++
++  if (alphablend && bytesPerPixel == 4) {
++	unsigned long pixel, put, *upos, *upix;
++	int got_alpha = 0, rsX, rsY, rsW, rsH;
++	static XImage *image = NULL;
++	static int iwidth = 128;
++
++	if (! image) {
++		/* watch out for tiny fb (rare) */
++		if (iwidth > si.framebufferWidth) {
++			iwidth = si.framebufferWidth;
++		}
++		if (iwidth > si.framebufferHeight) {
++			iwidth = si.framebufferHeight;
++		}
++
++		/* initialize an XImage with a chunk of desktopWin */
++		image = XGetImage(dpy, desktopWin, 0, 0, iwidth, iwidth,
++		    AllPlanes, ZPixmap);
++	}
++
++	/* first check if there is any non-zero alpha channel data at all: */
++	for (y = 0; y < rcHeight; y++) {
++		for (x = 0; x < rcWidth; x++) {
++			int alpha;
++
++			offset = y * rcWidth + x;
++			pos = (char *)&rcSource[offset * bytesPerPixel];
++
++			upos = (unsigned long *) pos;
++			alpha = (*upos & 0xff000000) >> 24;
++			if (alpha) {
++				got_alpha = 1;
++				break;
++			}
++		}
++		if (got_alpha) {
++			break;
++		}
++	}
++
++	if (!got_alpha) {
++		/* no alpha channel data, fallback to the old way */
++		goto oldway;
++	}
++
++	/* load the saved fb patch in to image (faster way?) */
++	XGetSubImage(dpy, rcSavedArea, 0, 0, rcWidth, rcHeight,
++	    AllPlanes, ZPixmap, image, 0, 0);
++	upix = (unsigned long *)image->data;
++
++	/* if the richcursor is clipped, the fb patch will be smaller */
++	rsW = rcWidth;
++	rsX = 0;	/* used to denote a shift from the left side */
++	x = rcCursorX - rcHotX;
++	if (x < 0) {
++		rsW += x;
++		rsX = -x;
++	} else if (x + rsW > si.framebufferWidth) {
++		rsW = si.framebufferWidth - x;
++	}
++	rsH = rcHeight;
++	rsY = 0;	/* used to denote a shift from the top side */
++	y = rcCursorY - rcHotY;
++	if (y < 0) {
++		rsH += y;
++		rsY = -y;
++	} else if (y + rsH > si.framebufferHeight) {
++		rsH = si.framebufferHeight - y;
++	}
++
++	/*
++	 * now loop over the cursor data, blend in the fb values,
++	 * and then overwrite the fb (CopyDataToScreen())
++	 */
++	for (y = 0; y < rcHeight; y++) {
++		y0 = rcCursorY - rcHotY + y;
++		if (y0 < 0 || y0 >= si.framebufferHeight) {
++			continue;	/* clipped */
++		}
++		for (x = 0; x < rcWidth; x++) {
++			int alpha, color_curs, color_fb, i;
++
++			x0 = rcCursorX - rcHotX + x;
++			if (x0 < 0 || x0 >= si.framebufferWidth) {
++				continue;	/* clipped */
++			}
++
++			offset = y * rcWidth + x;
++			pos = (char *)&rcSource[offset * bytesPerPixel];
++
++			/* extract secret alpha byte from rich cursor: */
++			upos = (unsigned long *) pos;
++			alpha = (*upos & 0xff000000) >> 24;	/* XXX MSB? */
++
++			/* extract the pixel from the fb: */
++			pixel = *(upix + (y-rsY)*iwidth + (x-rsX));
++
++			put = 0;
++			/* for simplicity, blend all 4 bytes */
++			for (i = 0; i < 4; i++) {
++				int sh = i*8;
++				color_curs = ((0xff << sh) & *upos) >> sh;
++				color_fb   = ((0xff << sh) & pixel) >> sh;
++
++				/* XXX assumes pre-multipled color_curs */
++				color_fb = color_curs
++				    + ((0xff - alpha) * color_fb)/0xff;
++				put |= color_fb << sh;
++			}
++			/* place in the fb: */
++	    		CopyDataToScreen((char *)&put, x0, y0, 1, 1);
++		}
++	}
++	return;
++  }
++oldway:
++#endif
++
+   bytesPerPixel = myFormat.bitsPerPixel / 8;
+ 
+   /* FIXME: Speed optimization is possible. */

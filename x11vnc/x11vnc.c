@@ -273,7 +273,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.1pre lastmod: 2005-01-23";
+char lastmod[] = "0.7.1pre lastmod: 2005-02-05";
 
 /* X display info */
 
@@ -402,6 +402,7 @@ void close_clients(char *);
 void autorepeat(int restore);
 char *bitprint(unsigned int, int);
 void blackout_tiles(void);
+void solid_bg(int);
 void check_connect_inputs(void);
 void check_padded_fb(void);
 void clean_up_exit(int);
@@ -526,6 +527,9 @@ char *logfile = NULL;
 int logfile_append = 0;
 char *passwdfile = NULL;
 char *blackout_str = NULL;
+int use_solid_bg = 0;
+char *solid_str = NULL;
+char *solid_default = "cyan4";
 
 char *speeds_str = NULL;
 int measure_speeds = 1;
@@ -1340,6 +1344,9 @@ void clean_up_exit (int ret) {
 	if (no_autorepeat) {
 		autorepeat(1);
 	}
+	if (use_solid_bg) {
+		solid_bg(1);
+	}
 	X_LOCK;
 	XTestDiscard_wr(dpy);
 	XCloseDisplay(dpy);
@@ -1389,6 +1396,9 @@ static void interrupted (int sig) {
 	}
 	if (no_autorepeat) {
 		autorepeat(1);
+	}
+	if (use_solid_bg) {
+		solid_bg(1);
 	}
 
 	if (sig) {
@@ -1802,6 +1812,9 @@ static void client_gone(rfbClientPtr client) {
 
 	if (no_autorepeat && client_count == 0) {
 		autorepeat(1);
+	}
+	if (use_solid_bg && client_count == 0) {
+		solid_bg(1);
 	}
 	if (gone_cmd && *gone_cmd != '\0') {
 		rfbLog("client_gone: using cmd for: %s\n", client->host);
@@ -2829,6 +2842,9 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	if (no_autorepeat && client_count == 1) {
 		/* first client, turn off X server autorepeat */
 		autorepeat(0);
+	}
+	if (use_solid_bg && client_count == 1) {
+		solid_bg(0);
 	}
 
 	if (pad_geometry) {
@@ -6740,6 +6756,62 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		single_copytile = 0;
 
+	} else if (strstr(p, "solid_color") == p) {
+		char *new;
+		int doit = 1;
+		COLON_CHECK("solid_color:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(solid_str));
+			goto qry;
+		}
+		p += strlen("solid_color:");
+		if (*p != '\0') {
+			new = strdup(p);
+		} else {
+			new = strdup(solid_default);
+		}
+		rfbLog("process_remote_cmd: solid %s -> %s\n",
+		    NONUL(solid_str), new);
+
+		if (solid_str) {
+			if (!strcmp(solid_str, new)) {
+				doit = 0;
+			}
+			free(solid_str);
+		}
+		solid_str = new;
+		use_solid_bg = 1;
+
+		if (doit && client_count) {
+			solid_bg(0);
+		}
+	} else if (!strcmp(p, "solid")) {
+		int orig = use_solid_bg;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, use_solid_bg);
+			goto qry;
+		}
+		rfbLog("process_remote_cmd: enable -solid mode\n");
+		if (! solid_str) {
+			solid_str = strdup(solid_default);
+		}
+		use_solid_bg = 1;
+		if (client_count && !orig) {
+			solid_bg(0);
+		}
+	} else if (!strcmp(p, "nosolid")) {
+		int orig = use_solid_bg;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !use_solid_bg);
+			goto qry;
+		}
+		rfbLog("process_remote_cmd: disable -solid mode\n");
+		use_solid_bg = 0;
+		if (client_count && orig) {
+			solid_bg(1);
+		}
+
 	} else if (strstr(p, "blackout") == p) {
 		char *before, *old;
 		COLON_CHECK("blackout:")
@@ -10579,6 +10651,325 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		passwds_new[2] = NULL;
 		screen->authPasswdData = (void*) passwds_new;
 	}
+}
+
+/* -- solid.c -- */
+
+int do_cmd(char *cmd) {
+	int rc;
+	if (!cmd || *cmd == '\0') {
+		return 0;
+	}
+	rfbLog("running command:\n  %s\n", cmd);
+	rc = system(cmd);
+	if (rc >= 256) {
+		rc = rc/256;
+	}
+	return rc;
+}
+
+char *cmd_output(char *cmd) {
+	FILE *p;
+	static char output[50000];
+	char line[1024];
+	int rc;
+
+	rfbLog("running pipe:\n  %s\n", cmd);
+	p = popen(cmd, "r");
+
+	output[0] = '\0';
+
+	while (fgets(line, 1024, p) != NULL) {
+		if (strlen(output) + strlen(line) + 1 < 50000) {
+			strcat(output, line);
+		}
+	}
+	rc = pclose(p);
+	return(output);
+}
+
+void solid_root(char *color) {
+	Window expose;
+	static XImage *image = NULL;
+	Pixmap pixmap;
+	XGCValues gcv;
+	GC gc;
+	XSetWindowAttributes swa;
+	Visual visual;
+	unsigned long mask, pixel;
+	XColor cdef;
+	Colormap cmap;
+
+	if (subwin || window != rootwin) {
+		rfbLog("cannot set subwin to solid color, must be root\n");
+		return;
+	}
+
+	/* create the "clear" window just for generating exposures */
+	swa.override_redirect = True;
+	swa.backing_store = NotUseful;
+	swa.save_under = False;
+	swa.background_pixmap = None;
+	visual.visualid = CopyFromParent;
+	mask = (CWOverrideRedirect|CWBackingStore|CWSaveUnder|CWBackPixmap);
+	expose = XCreateWindow(dpy, window, 0, 0, dpy_x, dpy_y, 0, depth,
+	    InputOutput, &visual, mask, &swa);
+
+	if (! color) {
+		/* restore the root window from the XImage snapshot */
+		pixmap = XCreatePixmap(dpy, window, dpy_x, dpy_y, depth);
+
+		if (! image) {
+			/* whoops */
+			XDestroyWindow(dpy, expose);
+			rfbLog("no root snapshot available.\n");
+			return;
+		}
+
+		
+		/* draw the image to a pixmap: */
+		gcv.function = GXcopy;
+		gcv.plane_mask = AllPlanes;
+		gc = XCreateGC(dpy, window, GCFunction|GCPlaneMask, &gcv);
+
+		XPutImage(dpy, pixmap, gc, image, 0, 0, 0, 0, dpy_x, dpy_y);
+
+		gcv.foreground = gcv.background = BlackPixel(dpy, scr);
+		gc = XCreateGC(dpy, window, GCForeground|GCBackground, &gcv);
+
+		rfbLog("restoring root snapshot...\n");
+		/* set the pixmap as the bg: */
+		XSetWindowBackgroundPixmap(dpy, window, pixmap);
+		XFreePixmap(dpy, pixmap);
+		XClearWindow(dpy, window);
+		XFlush(dpy);
+		
+		/* generate exposures */
+		XMapWindow(dpy, expose);
+		XSync(dpy, False);
+		XDestroyWindow(dpy, expose);
+		return;
+	}
+
+	if (! image) {
+		/* need to retrieve a snapshot of the root background: */
+		Window iwin;
+		XSetWindowAttributes iswa;
+
+		/* create image window: */
+		iswa.override_redirect = True;
+		iswa.backing_store = NotUseful;
+		iswa.save_under = False;
+		iswa.background_pixmap = None;
+		iswa.background_pixmap = ParentRelative;
+
+		iwin = XCreateWindow(dpy, window, 0, 0, dpy_x, dpy_y, 0, depth,
+		    InputOutput, &visual, mask, &iswa);
+
+		rfbLog("snapshotting background...\n");
+
+		XMapWindow(dpy, iwin);
+		XSync(dpy, False);
+		image = XGetImage(dpy, iwin, 0, 0, dpy_x, dpy_y, AllPlanes,
+		    ZPixmap);
+		XSync(dpy, False);
+		XDestroyWindow(dpy, iwin);
+	}
+
+	/* use black for low colors or failure */
+	pixel = BlackPixel(dpy, scr);
+	if (depth > 8 || strcmp(color, solid_default)) {
+		cmap = DefaultColormap (dpy, scr);
+		if (XParseColor(dpy, cmap, color, &cdef) &&
+		    XAllocColor(dpy, cmap, &cdef)) {
+			pixel = cdef.pixel;
+		} else {
+			rfbLog("error parsing/allocing color: %s\n", color);
+		}
+	}
+
+	rfbLog("setting solid background...\n");
+	XSetWindowBackground(dpy, window, pixel);
+	XMapWindow(dpy, expose);
+	XSync(dpy, False);
+	XDestroyWindow(dpy, expose);
+}
+
+void solid_gnome(char *color) {
+	char get_color[] = "gconftool-2 --get "
+	    "/desktop/gnome/background/primary_color";
+	char set_color[] = "gconftool-2 --set "
+	    "/desktop/gnome/background/primary_color --type string '%s'";
+	char get_option[] = "gconftool-2 --get "
+	    "/desktop/gnome/background/picture_options";
+	char set_option[] = "gconftool-2 --set "
+	    "/desktop/gnome/background/picture_options --type string '%s'";
+	static char *orig_color = NULL;
+	static char *orig_option = NULL;
+	char *cmd;
+	
+	if (! color) {
+		if (! orig_color) {
+			orig_color = strdup("#FFFFFF");
+		}
+		if (! orig_option) {
+			orig_option = strdup("stretched");
+		}
+		if (strstr(orig_color, "'") != NULL)  {
+			rfbLog("bad color: %s\n", orig_color);
+			return;
+		}
+		if (strstr(orig_option, "'") != NULL)  {
+			rfbLog("bad option: %s\n", orig_option);
+			return;
+		}
+		cmd = (char *)malloc(strlen(set_option) - 2 +
+		    strlen(orig_option) + 1);
+		sprintf(cmd, set_option, orig_option);
+		do_cmd(cmd);
+		free(cmd);
+		cmd = (char *)malloc(strlen(set_color) - 2 +
+		    strlen(orig_color) + 1);
+		sprintf(cmd, set_color, orig_color);
+		do_cmd(cmd);
+		free(cmd);
+		return;
+	}
+
+	if (! orig_color) {
+		char *q;
+		orig_color = strdup(cmd_output(get_color));
+		if (*orig_color == '\0') {
+			orig_color = strdup("#FFFFFF");
+		}
+		if ((q = strchr(orig_color, '\n')) != NULL) {
+			*q = '\0';
+		}
+	}
+	if (! orig_option) {
+		char *q;
+		orig_option = strdup(cmd_output(get_option));
+		if (*orig_option == '\0') {
+			orig_option = strdup("stretched");
+		}
+		if ((q = strchr(orig_option, '\n')) != NULL) {
+			*q = '\0';
+		}
+	}
+	if (strstr(color, "'") != NULL)  {
+		rfbLog("bad color: %s\n", color);
+		return;
+	}
+	cmd = (char *)malloc(strlen(set_color) - 2 + strlen(color) + 1);
+	sprintf(cmd, set_color, color);
+	do_cmd(cmd);
+	free(cmd);
+	cmd = (char *)malloc(strlen(set_option) - 2 + strlen("none") + 1);
+	sprintf(cmd, set_option, "none");
+	do_cmd(cmd);
+	free(cmd);
+}
+
+void solid_kde(char *color) {
+	char set_color[] = "dcop kdesktop KBackgroundIface setColor '%s' 1";
+	char bg_off[] = "dcop kdesktop KBackgroundIface setBackgroundEnabled 0";
+	char bg_on[]  = "dcop kdesktop KBackgroundIface setBackgroundEnabled 1";
+	char *cmd;
+
+	if (! color) {
+		do_cmd(bg_on);
+		return;
+	}
+
+	if (strstr(color, "'") != NULL)  {
+		rfbLog("bad color: %s\n", color);
+		return;
+	}
+
+	cmd = (char *)malloc(strlen(set_color) - 2 + strlen(color) + 1);
+	sprintf(cmd, set_color, color);
+	do_cmd(cmd);
+	do_cmd(bg_off);
+	free(cmd);
+}
+
+char *guess_desktop() {
+	Atom prop;
+	prop = XInternAtom(dpy, "_QT_DESKTOP_PROPERTIES", True);
+	if (prop != None) {
+		return "kde";
+	}
+	prop = XInternAtom(dpy, "NAUTILUS_DESKTOP_WINDOW_ID", True);
+	if (prop != None) {
+		return "gnome";
+	}
+	return "root";
+}
+
+void solid_bg(int restore) {
+	static int desktop = -1;
+	static int solid_on = 0;
+	static char *prev_str;
+	char *dtname, *color;
+
+	if (restore) {
+		if (! solid_on) {
+			return;
+		}
+		if (desktop == 0) {
+			solid_root(NULL);
+		} else if (desktop == 1) {
+			solid_gnome(NULL);
+		} else if (desktop == 2) {
+			solid_kde(NULL);
+		}
+		solid_on = 0;
+		return;
+	}
+	if (! solid_str) {
+		return;
+	}
+	if (solid_on && !strcmp(prev_str, solid_str)) {
+		return;
+	}
+	if (strstr(solid_str, "guess:") == solid_str
+	    || !strchr(solid_str, ':')) {
+		dtname = guess_desktop();
+		rfbLog("guessed desktop: %s\n", dtname);
+	} else {
+		if (strstr(solid_str, "gnome:") == solid_str) {
+			dtname = "gnome";
+		} else if (strstr(solid_str, "kde:") == solid_str) {
+			dtname = "kde";
+		} else {
+			dtname = "root";
+		}
+	}
+
+	color = strchr(solid_str, ':');
+	if (! color) {
+		color = solid_str;
+	} else {
+		color++;
+		if (*color == '\0') {
+			color = solid_default;
+		}
+	}
+	if (!strcmp(dtname, "gnome")) {
+		desktop = 1;
+		solid_gnome(color);
+	} else if (!strcmp(dtname, "kde")) {
+		desktop = 2;
+		solid_kde(color);
+	} else {
+		desktop = 0;
+		solid_root(color);
+	}
+	if (prev_str) {
+		free(prev_str);
+	}
+	prev_str = strdup(solid_str);
+	solid_on = 1;
 }
 
 /* -- xinerama.c -- */
@@ -14457,7 +14848,7 @@ static void watch_loop(void) {
 /*
  * text printed out under -help option
  */
-static void print_help(void) {
+static void print_help(int mode) {
 	char help[] = 
 "\n"
 "x11vnc: allow VNC connections to real X11 displays. %s\n"
@@ -14706,6 +15097,19 @@ static void print_help(void) {
 "                       just use 1 shm tile for polling.  Limits shm segments\n"
 "                       used to 3.\n"
 "\n"
+"-solid [color]         To improve performance, when VNC clients are connected\n"
+"                       try to change the desktop background to a solid color.\n"
+"                       The [color] is optional: the default color is \"cyan4\".\n"
+"                       For a different one specify the X color (rgb.txt name,\n"
+"                       e.g. \"darkblue\" or numerical \"#RRGGBB\"). Currently\n"
+"                       this option only works on GNOME, KDE, and classic X\n"
+"                       (i.e. with the background image on the root window).\n"
+"                       The \"gconftool-2\" and \"dcop\" external commands are\n"
+"                       run for GNOME and KDE respectively.  Other desktops\n"
+"                       won't work, e.g. XFCE (send us the corresponding\n"
+"                       commands if you find them).  If x11vnc guesses your\n"
+"                       desktop incorrectly, you can force it by prefixing\n"
+"                       color with \"gnome:\", \"kde:\", or \"root:\".\n"
 "-blackout string       Black out rectangles on the screen. \"string\" is a\n"
 "                       comma separated list of WxH+X+Y type geometries for\n"
 "                       each rectangle.\n"
@@ -14758,6 +15162,7 @@ static void print_help(void) {
 "-rc filename           Use \"filename\" instead of $HOME/.x11vncrc for rc file.\n"
 "-norc                  Do not process any .x11vncrc file for options.\n"
 "-h, -help              Print this help text.\n"
+"-?, -opts              Only list the x11vnc options.\n"
 "-V, -version           Print program version (last modification date).\n"
 "\n"
 "-q                     Be quiet by printing less informational output to\n"
@@ -15024,11 +15429,11 @@ static void print_help(void) {
 "                       available in -threads mode which has its own pointer\n"
 "                       event handling mechanism.\n"
 "\n"
-"                       To try out the different pointer modes to see\n"
-"                       which one gives the best response for your usage,\n"
-"                       it is convenient to use the remote control function,\n"
-"                       e.g. \"x11vnc -R pointer_mode:4\" or the tcl/tk gui\n"
-"                       (Tuning -> pointer_mode -> n).\n"
+"                       To try out the different pointer modes to see which\n"
+"                       one gives the best response for your usage, it is\n"
+"                       convenient to use the remote control function, for\n"
+"                       example \"x11vnc -R pm:4\" or the tcl/tk gui (Tuning ->\n"
+"                       pointer_mode -> n).\n"
 "\n"
 "-input_skip n          For the pointer handling when non-threaded: try to\n"
 "                       read n user input events before scanning display. n < 0\n"
@@ -15239,6 +15644,9 @@ static void print_help(void) {
 "                       onetile         enable  -onetile mode. (you may need to\n"
 "                                       set shm for this to do something)\n"
 "                       noonetile       disable -onetile mode.\n"
+"                       solid           enable  -solid mode\n"
+"                       nosolid         disable -solid mode.\n"
+"                       solid_color:color set -solid color (and apply it).\n"
 "                       blackout:str    set -blackout \"str\" (empty to disable).\n"
 "                                       See -blackout for the form of \"str\"\n"
 "                                       (basically: WxH+X+Y,...)\n"
@@ -15277,7 +15685,6 @@ static void print_help(void) {
 "                       fb              disable -nofb mode.\n"
 "                       bell            enable  bell (if supported).\n"
 "                       nobell          disable bell.\n"
-"                       bell            enable  bell (if supported).\n"
 "                       nosel           enable  -nosel mode.\n"
 "                       sel             disable -nosel mode.\n"
 "                       noprimary       enable  -noprimary mode.\n"
@@ -15385,17 +15792,18 @@ static void print_help(void) {
 "                       nowaitmapped flashcmap noflashcmap truecolor notruecolor\n"
 "                       overlay nooverlay overlay_cursor overlay_yescursor\n"
 "                       nooverlay_nocursor nooverlay_cursor nooverlay_yescursor\n"
-"                       overlay_nocursor visual scale viewonly noviewonly shared\n"
-"                       noshared forever noforever once timeout deny lock nodeny\n"
-"                       unlock connect allowonce allow localhost nolocalhost\n"
-"                       accept gone shm noshm flipbyteorder noflipbyteorder\n"
-"                       onetile noonetile blackout xinerama noxinerama xrandr\n"
-"                       noxrandr xrandr_mode padgeom quiet q noquiet modtweak\n"
-"                       nomodtweak xkb noxkb skip_keycodes add_keysyms\n"
-"                       noadd_keysyms clear_mods noclear_mods clear_keys\n"
-"                       noclear_keys remap repeat norepeat fb nofb bell nobell\n"
-"                       sel nosel primary noprimary cursorshape nocursorshape\n"
-"                       cursorpos nocursorpos cursor show_cursor noshow_cursor\n"
+"                       overlay_nocursor visual scale viewonly noviewonly\n"
+"                       shared noshared forever noforever once timeout deny\n"
+"                       lock nodeny unlock connect allowonce allow localhost\n"
+"                       nolocalhost accept gone shm noshm flipbyteorder\n"
+"                       noflipbyteorder onetile noonetile solid_color solid\n"
+"                       nosolid blackout xinerama noxinerama xrandr noxrandr\n"
+"                       xrandr_mode padgeom quiet q noquiet modtweak nomodtweak\n"
+"                       xkb noxkb skip_keycodes add_keysyms noadd_keysyms\n"
+"                       clear_mods noclear_mods clear_keys noclear_keys\n"
+"                       remap repeat norepeat fb nofb bell nobell sel nosel\n"
+"                       primary noprimary cursorshape nocursorshape cursorpos\n"
+"                       nocursorpos cursor show_cursor noshow_cursor\n"
 "                       nocursor xfixes noxfixes alphacut alphafrac\n"
 "                       alpharemove noalpharemove alphablend noalphablend\n"
 "                       xwarp xwarppointer noxwarp noxwarppointer buttonmap\n"
@@ -15473,6 +15881,31 @@ static void print_help(void) {
 ;
 	/* have both our help and rfbUsage to stdout for more(1), etc. */
 	dup2(1, 2);
+
+	if (mode == 1) {
+		char *p;	
+		int l = 0;
+		fprintf(stderr, "x11vnc: allow VNC connections to real "
+		    "X11 displays. %s\n\nx11vnc options:\n", lastmod);
+		p = strtok(help, "\n");
+		while (p) {
+			int w = 23;
+			char tmp[100];
+			if (p[0] == '-') {
+				strncpy(tmp, p, w);
+				fprintf(stderr, "  %s", tmp);
+				l++;
+				if (l % 2 == 0) {
+					fprintf(stderr, "\n");
+				}
+			}
+			p = strtok(NULL, "\n");
+		}
+		fprintf(stderr, "\n\nlibvncserver options:\n");
+		rfbUsage();
+		fprintf(stderr, "\n");
+		exit(1);
+	}
 	fprintf(stderr, help, lastmod,
 		view_only ? "on":"off",
 		shared ? "on":"off",
@@ -15503,6 +15936,9 @@ static void print_help(void) {
 void set_vnc_desktop_name(void) {
 	int sz = 256;
 	sprintf(vnc_desktop_name, "unknown");
+	if (inetd) {
+		sprintf(vnc_desktop_name, "inetd-no-further-clients");
+	}
 	if (screen->port) {
 		char *host = this_host();
 		int lport = screen->port;
@@ -15827,6 +16263,8 @@ int main(int argc, char* argv[]) {
 	argv_vnc[0] = strdup(argv[0]);
 	program_name = strdup(argv[0]);
 
+	solid_default = strdup(solid_default);	/* for freeing with -R */
+
 	len = 0;
 	for (i=1; i < argc; i++) {
 		len += strlen(argv[i]) + 4 + 1;
@@ -15970,6 +16408,18 @@ int main(int argc, char* argv[]) {
 			flip_byte_order = 1;
 		} else if (!strcmp(arg, "-onetile")) {
 			single_copytile = 1;
+		} else if (!strcmp(arg, "-solid")) {
+			use_solid_bg = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					solid_str = strdup(s);
+					i++;
+				}
+			}
+			if (! solid_str) {
+				solid_str = strdup(solid_default);
+			}
 		} else if (!strcmp(arg, "-blackout")) {
 			CHECK_ARGC
 			blackout_str = strdup(argv[++i]);
@@ -16000,9 +16450,10 @@ int main(int argc, char* argv[]) {
 			i++;	/* done above */
 		} else if (!strcmp(arg, "-norc")) {
 			;	/* done above */
-		} else if (!strcmp(arg, "-h") || !strcmp(arg, "-help")
-			|| !strcmp(arg, "-?")) {
-			print_help();
+		} else if (!strcmp(arg, "-h") || !strcmp(arg, "-help")) {
+			print_help(0);
+		} else if (!strcmp(arg, "-?") || !strcmp(arg, "-opts")) {
+			print_help(1);
 		} else if (!strcmp(arg, "-V") || !strcmp(arg, "-version")) {
 			fprintf(stderr, "x11vnc: %s\n", lastmod);
 			exit(0);
@@ -16270,7 +16721,6 @@ int main(int argc, char* argv[]) {
 	}
 
 
-
 	/*
 	 * If -passwd was used, clear it out of argv.  This does not
 	 * work on all UNIX, have to use execvp() in general...
@@ -16480,6 +16930,8 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " using_shm:  %d\n", using_shm);
 		fprintf(stderr, " flipbytes:  %d\n", flip_byte_order);
 		fprintf(stderr, " onetile:    %d\n", single_copytile);
+		fprintf(stderr, " solid:      %s\n", solid_str
+		    ? solid_str : "null");
 		fprintf(stderr, " blackout:   %s\n", blackout_str
 		    ? blackout_str : "null");
 		fprintf(stderr, " xinerama:   %d\n", xinerama);
@@ -16491,7 +16943,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " logfile:    %s\n", logfile ? logfile
                     : "null");
 		fprintf(stderr, " logappend:  %d\n", logfile_append);
-		fprintf(stderr, " rc_file:    \%s\n", rc_rcfile ? rc_rcfile
+		fprintf(stderr, " rc_file:    %s\n", rc_rcfile ? rc_rcfile
                     : "null");
 		fprintf(stderr, " norc:       %d\n", rc_norc);
 		fprintf(stderr, " bg:         %d\n", bg);

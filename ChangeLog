@@ -1,3 +1,8 @@
+2005-02-05  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -solid color, -opts/-?
+	* tightvnc-1.3dev5-vncviewer-alpha-cursor.patch: create, name
+	  says it all.
+
 2005-01-23  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -timeout, -noalphablend.  make -R norepeat work.
 	* sync with new draw cursor mechanism.

@@ -1,3 +1,7 @@
+2005-02-05  Karl Runge <runge@karlrunge.com>
+	* -solid solid color background when clients are connected. 
+	* -opts/-? to show option names only.
+
 2005-01-23  Karl Runge <runge@karlrunge.com>
 	* sync with new draw cursor mechanism, keep old way in OLD_TREE.
 	* add -timeout option, change -alphablend to be default
