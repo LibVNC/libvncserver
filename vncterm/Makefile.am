@@ -2,7 +2,7 @@ CONSOLE_SRCS=VNConsole.c
 
 noinst_HEADERS=VNConsole.h vga.h
 
-CFLAGS=-I..
+CFLAGS_ADD=-I..
 
 LDADD=../libvncserver.a
 INCLUDES=-I. -I../include
