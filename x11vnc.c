@@ -243,6 +243,11 @@ int main(int argc,char** argv)
 
   if(dpy==0)
     dpy = XOpenDisplay("");
+  if(dpy==0) {
+    fprintf(stderr,"Couldn't open display!\n");
+    exit(2);
+  }
+     
   xscreen = DefaultScreen(dpy);
 
   init_keycodes();

@@ -1,7 +1,8 @@
 immediate:
 ----------
 
-x11vnc: clipboard, cursor, updates interruptible by input
+x11vnc: clipboard, cursor, updates interruptible by input,
+	sometimes XTest fails (but doesn't with x0rfbserver)
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
 cursor drawing: set optional grain to mark bigger rectangles as drawn (else
