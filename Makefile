@@ -1,6 +1,9 @@
 INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
+# for Solaris
+EXTRALIBS=-lsocket -lnsl -L/usr/X/lib
+
 # Uncomment these two lines to enable use of PThreads
 #PTHREADDEF = -DHAVE_PTHREADS
 #PTHREADLIB = -lpthread
@@ -14,7 +17,7 @@ OPTFLAGS=-g -Wall
 CFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES) -DBACKCHANNEL
 RANLIB=ranlib
 
-LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB)
+LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB) $(EXTRALIBS)
 
 # for Mac OS X
 OSX_LIBS = -framework ApplicationServices -framework Carbon
@@ -62,7 +65,7 @@ OSXvnc-server: mac.o libvncserver.a
 x11vnc.o: x11vnc.c 1instance.c
 
 x11vnc: x11vnc.o libvncserver.a
-	$(CC) -o x11vnc x11vnc.o libvncserver.a -lz -ljpeg $(XLIBS)
+	$(CC) -o x11vnc x11vnc.o $(LIBS) $(XLIBS)
 
 x11vnc_static: x11vnc.o libvncserver.a
 	$(CC) -o x11vnc_static x11vnc.o libvncserver.a /usr/lib/libz.a /usr/lib/libjpeg.a $(XLIBS)

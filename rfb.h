@@ -66,15 +66,9 @@ typedef unsigned long KeySym;
 #include <sys/types.h>
 #if defined(__sparc)
   /* SPARC here (big endian) */
-#ifndef _BIG_ENDIAN
-#define _BIG_ENDIAN 4321
-#endif
-#define _BYTE_ORDER _BIG_ENDIAN
+#define _BYTE_ORDER 4321
 #elif defined(__i386)
-#ifndef _LITTLE_ENDIAN
-#define _LITTLE_ENDIAN 1234
-#endif
-#define _BYTE_ORDER _LITTLE_ENDIAN
+#define _BYTE_ORDER 1234
 #else
 #error Solaris 2.5.1 had ppc support did it not? :-)
 #endif
@@ -98,7 +92,7 @@ typedef unsigned long KeySym;
 #define _BYTE_ORDER __BYTE_ORDER
 #endif
 
-#ifndef _LITTLE_ENDIAN
+#if !defined(_LITTLE_ENDIAN) && defined(__LITTLE_ENDIAN)
 #define _LITTLE_ENDIAN __LITTLE_ENDIAN
 #endif
 

@@ -1,8 +1,10 @@
+   solaris compile cleanups
+   many x11vnc improvements
    added backchannel, an encoding which needs special clients to pass
 	arbitrary data to the client
    changes from Tim Jansen regarding multi threading and client blocking
 	as well as C++ compliancy
-   x11vnc can be controlled by restarting with special options if compiling
+   x11vnc can be controlled by starting again with special options if compiling
 	with LOCAL_CONTROL defined
 0.3
    added x11vnc, a x0rfbserver clone
