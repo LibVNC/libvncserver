@@ -35,8 +35,10 @@
 #include <pwd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #endif
+#include <fcntl.h>
 #include <sys/types.h>
 
 #ifdef CORBA
@@ -213,6 +215,8 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
     if(isUDP) {
       rfbLog(" accepted UDP client\n");
     } else {
+      int one=1;
+
       getpeername(sock, (struct sockaddr *)&addr, &addrlen);
       cl->host = strdup(inet_ntoa(addr.sin_addr));
 
@@ -222,6 +226,21 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
         rfbLog("     %s\n",cl_->host);
       }
       rfbReleaseClientIterator(iterator);
+
+#ifndef WIN32
+      if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
+	rfbLogPerror("fcntl failed");
+	close(sock);
+	return NULL;
+      }
+#endif
+
+      if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+		     (char *)&one, sizeof(one)) < 0) {
+	rfbLogPerror("setsockopt failed");
+	close(sock);
+	return NULL;
+      }
 
       FD_SET(sock,&(rfbScreen->allFds));
 		rfbScreen->maxFd = max(sock,rfbScreen->maxFd);

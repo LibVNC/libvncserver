@@ -63,7 +63,7 @@ vncEncryptAndStorePasswd(char *passwd, char *fname)
 
 	/* windows security sux */
 #ifndef WIN32
-    fchmod(fp, S_IRUSR|S_IWUSR);
+    fchmod(fileno(fp), S_IRUSR|S_IWUSR);
 #endif
 
     /* pad password with nulls */

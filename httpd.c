@@ -270,7 +270,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	    // proxy connection
 	    rfbLog("httpd: client asked for CONNECT\n");
 	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
-	    rfbNewClient(rfbScreen,rfbScreen->httpSock);
+	    rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);
 	    // don't fclose(rfbScreen->httpFP), because this would kill the connection
 	    rfbScreen->httpFP = NULL;
 	    rfbScreen->httpSock = -1;
@@ -280,7 +280,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	    // proxy connection
 	    rfbLog("httpd: client asked for /proxied.connection\n");
 	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
-	    rfbNewClient(rfbScreen,rfbScreen->httpSock);
+	    rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);
 	    // don't fclose(rfbScreen->httpFP), because this would kill the connection
 	    rfbScreen->httpFP = NULL;
 	    rfbScreen->httpSock = -1;
