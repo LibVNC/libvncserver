@@ -448,9 +448,14 @@ rfbProcessClientProtocolVersion(cl)
 
     pv[sz_rfbProtocolVersionMsg] = 0;
     if (sscanf(pv,rfbProtocolVersionFormat,&major_,&minor_) != 2) {
-        rfbLog("rfbProcessClientProtocolVersion: not a valid RFB client\n");
-        rfbCloseClient(cl);
-        return;
+        char name[1024]; 
+	if(sscanf(pv,"RFB %03d.%03d %1024s\n",&major_,&minor_,name) != 3) {
+	    rfbLog("rfbProcessClientProtocolVersion: not a valid RFB client\n");
+	    rfbCloseClient(cl);
+	    return;
+	}
+	free(cl->host);
+	cl->host=strdup(name);
     }
     rfbLog("Protocol version %d.%d\n", major_, minor_);
 

@@ -309,12 +309,18 @@ rfbCloseClient(cl)
      rfbClientPtr cl;
 {
     LOCK(cl->updateMutex);
-    if (cl->sock != -1) {
-      FD_CLR(cl->sock,&(cl->screen->allFds));
-      shutdown(cl->sock,SHUT_RDWR);
-      close(cl->sock);
-      cl->sock = -1;
-    }
+#ifdef HAVE_PTHREADS
+    if (cl->sock != -1)
+#endif
+      {
+	FD_CLR(cl->sock,&(cl->screen->allFds));
+	if(cl->sock==cl->screen->maxFd)
+	  while(!FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
+	    cl->screen->maxFd--;
+	shutdown(cl->sock,SHUT_RDWR);
+	close(cl->sock);
+	cl->sock = -1;
+      }
     TSIGNAL(cl->updateCond);
     UNLOCK(cl->updateMutex);
 }

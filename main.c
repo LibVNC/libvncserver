@@ -328,6 +328,7 @@ listenerRun(void *data)
 	if (cl && !cl->onHold )
 		rfbStartOnHoldClient(cl);
     }
+    return(NULL);
 }
 
 void 
