@@ -65,6 +65,17 @@ void do_key(Bool down,KeySym keySym,rfbClientPtr cl)
     isControl--;
 }
 
+/* these colours are from linux kernel drivers/char/console.c */
+unsigned char color_table[] = { 0, 4, 2, 6, 1, 5, 3, 7,
+				       8,12,10,14, 9,13,11,15 };
+/* the default colour table, for VGA+ colour systems */
+int default_red[] = {0x00,0xaa,0x00,0xaa,0x00,0xaa,0x00,0xaa,
+    0x55,0xff,0x55,0xff,0x55,0xff,0x55,0xff};
+int default_grn[] = {0x00,0x00,0xaa,0x55,0x00,0x00,0xaa,0xaa,
+    0x55,0x55,0xff,0xff,0x55,0x55,0xff,0xff};
+int default_blu[] = {0x00,0x00,0x00,0x00,0xaa,0xaa,0xaa,0xaa,
+    0x55,0x55,0x55,0x55,0xff,0xff,0xff,0xff};
+
 int main(int argc,char **argv)
 {
   int width=80,height=25;
@@ -103,6 +114,11 @@ int main(int argc,char **argv)
 
   /* console init */
   console=vcGetConsole(&argc,argv,width,height,&vgaFont,TRUE);
+  for(i=0;i<16;i++) {
+    console->rfbScreen->colourMap.data.bytes[i*3+0]=default_red[color_table[i]];
+    console->rfbScreen->colourMap.data.bytes[i*3+1]=default_grn[color_table[i]];
+    console->rfbScreen->colourMap.data.bytes[i*3+2]=default_blu[color_table[i]];
+  }
   console->rfbScreen->desktopName=title;
   console->rfbScreen->kbdAddEvent=do_key;
   console->selectTimeOut=100000;

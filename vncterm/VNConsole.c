@@ -29,9 +29,7 @@ void MakeColourMap16(vncConsolePtr c)
   if(colourMap->count)
     free(colourMap->data.bytes);
   colourMap->data.bytes=malloc(16*3);
-  for(i=0;i<16;i++)
-    for(j=0;j<3;j++)
-      colourMap->data.bytes[i*3+2-j]=colourMap16[i*3+j];
+  memcpy(colourMap->data.bytes,colourMap16,16*3);
   colourMap->count=16;
   colourMap->is16=FALSE;
   c->rfbScreen->rfbServerFormat.trueColour=FALSE;
