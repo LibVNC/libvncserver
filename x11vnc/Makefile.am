@@ -1,5 +1,5 @@
 DEFINES = -I ..
-LDADD = ../libvncserver/libvncserver.a
+LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
 
 man_MANS=x11vnc.1
 EXTRA_DIST=ChangeLog README $(man_MANS)

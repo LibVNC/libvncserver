@@ -1,14 +1,14 @@
 DEFINES=-I.. -g -Wall
+LDADD = ../libvncserver/libvncserver.a ../libvncclient/libvncclient.a @WSOCKLIB@
 
 if HAVE_LIBPTHREAD
 BACKGROUND_TEST=blooptest
+ENCODINGS_TEST=encodingstest
 endif
 
 copyrecttest_LDADD=$(LDADD) -lm
 
-noinst_PROGRAMS=encodingstest cargstest copyrecttest $(BACKGROUND_TEST) 
-
-LDADD = ../libvncserver/libvncserver.a ../libvncclient/libvncclient.a
+noinst_PROGRAMS=$(ENCODINGS_TEST) cargstest copyrecttest $(BACKGROUND_TEST) 
 
 test: encodingstest cargstest copyrecttest
 	./encodingstest && ./cargstest

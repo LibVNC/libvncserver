@@ -1,6 +1,7 @@
 immediate:
 ----------
 
+MinGW32 doesn't do fcntl on sockets; use setsockopt instead...
 always undraw cursor after sending updates, but do not mark region as modified.
 add automatic tests (plasma?)
 if preferredEncoding is set outside of libvncserver, don't override it.

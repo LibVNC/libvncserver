@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#ifndef __MINGW32__
 #include <sys/socket.h>
+#endif
 #include <rfb/rfb.h>
 #include <rfb/default8x16.h>
 

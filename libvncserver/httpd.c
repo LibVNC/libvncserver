@@ -161,6 +161,9 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
 	    rfbLogPerror("httpCheckFds: accept");
 	    return;
 	}
+#ifdef __MINGW32__
+	rfbErr("O_NONBLOCK on MinGW32 NOT IMPLEMENTED");
+#else
 #ifdef USE_LIBWRAP
 	if(!hosts_ctl("vnc",STRING_UNKNOWN,inet_ntoa(addr.sin_addr),
 		      STRING_UNKNOWN)) {
@@ -176,6 +179,7 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
 	    rfbScreen->httpSock = -1;
 	    return;
 	}
+
 	flags=fcntl(rfbScreen->httpSock,F_GETFL);
 	if(flags==-1 ||
 	   fcntl(rfbScreen->httpSock,F_SETFL,flags|O_NONBLOCK)==-1) {
@@ -184,6 +188,7 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
 	  rfbScreen->httpSock=-1;
 	  return;
 	}
+#endif
 
 	/*AddEnabledDevice(httpSock);*/
     }

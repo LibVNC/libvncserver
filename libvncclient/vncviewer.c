@@ -37,9 +37,18 @@ static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 static char* NoPassword(rfbClient* client) {
   return strdup("");
 }
+
+#ifndef __MINGW32__
 #include <stdio.h>
 #include <termios.h>
+#endif
+
 static char* ReadPassword(rfbClient* client) {
+#ifdef __MINGW32__
+	/* FIXME */
+	rfbClientErr("ReadPassword on MinGW32 NOT IMPLEMENTED\n");
+	return NoPassword(client);
+#else
 	int i;
 	char* p=malloc(9);
 	struct termios save,noecho;
@@ -61,6 +70,7 @@ static char* ReadPassword(rfbClient* client) {
 	}
 	tcsetattr(fileno(stdin),TCSAFLUSH,&save);
 	return p;
+#endif
 }
 static rfbBool MallocFrameBuffer(rfbClient* client) {
   if(client->frameBuffer)
@@ -196,7 +206,8 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       char* colon=strchr(argv[i],':');
 
       if(colon) {
-        client->serverHost=strndup(argv[i],(int)(colon-argv[i]));
+        client->serverHost=strdup(argv[i]);
+	client->serverHost[(int)(colon-argv[i])]='\0';
 	client->serverPort=atoi(colon+1);
       } else {
 	client->serverHost=strdup(argv[i]);

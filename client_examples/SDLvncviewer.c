@@ -1,4 +1,4 @@
-#include <SDL/SDL.h>
+#include <SDL.h>
 #include <rfb/rfbclient.h>
 
 static rfbBool resize(rfbClient* client) {
@@ -186,6 +186,46 @@ void update(rfbClient* cl,int x,int y,int w,int h) {
 	SDL_UpdateRect(cl->clientData, x, y, w, h);
 }
 
+#ifdef __MINGW32__
+#define LOG_TO_FILE
+#endif
+
+#ifdef LOG_TO_FILE
+#include <stdarg.h>
+static void
+log_to_file(const char *format, ...)
+{
+    FILE* logfile;
+    static char* logfile_str=0;
+    va_list args;
+    char buf[256];
+    time_t log_clock;
+
+    if(!rfbEnableClientLogging)
+      return;
+
+    if(logfile_str==0) {
+	logfile_str=getenv("VNCLOG");
+	if(logfile_str==0)
+	    logfile_str="vnc.log";
+    }
+
+    logfile=fopen(logfile_str,"a");
+
+    va_start(args, format);
+
+    time(&log_clock);
+    strftime(buf, 255, "%d/%m/%Y %X ", localtime(&log_clock));
+    fprintf(logfile,buf);
+
+    vfprintf(logfile, format, args);
+    fflush(logfile);
+
+    va_end(args);
+    fclose(logfile);
+}
+#endif
+
 #ifdef mac
 #define main SDLmain
 #endif
@@ -194,6 +234,10 @@ int main(int argc,char** argv) {
 	rfbClient* cl;
 	int i,buttonMask=0;
 	SDL_Event e;
+
+#ifdef LOG_TO_FILE
+	rfbClientLog=rfbClientErr=log_to_file;
+#endif
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
 

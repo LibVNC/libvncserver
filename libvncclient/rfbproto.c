@@ -25,7 +25,9 @@
 
 #include <unistd.h>
 #include <errno.h>
+#ifndef __MINGW32__
 #include <pwd.h>
+#endif
 #include <rfb/rfbclient.h>
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>

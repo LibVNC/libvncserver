@@ -1,5 +1,5 @@
 DEFINES=-I.. -g -Wall
-LDADD = ../libvncclient/libvncclient.a
+LDADD = ../libvncclient/libvncclient.a @WSOCKLIB@
 
 if WITH_FFMPEG
 FFMPEG_HOME=@with_ffmpeg@

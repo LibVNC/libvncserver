@@ -762,8 +762,10 @@ void rfbInitServer(rfbScreenInfoPtr screen)
 #endif
   rfbInitSockets(screen);
   rfbHttpInitSockets(screen);
+#ifndef __MINGW32__
   if(screen->ignoreSIGPIPE)
     signal(SIGPIPE,SIG_IGN);
+#endif
 }
 
 #ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY

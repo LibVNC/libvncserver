@@ -22,15 +22,23 @@
  */
 
 #include <unistd.h>
-#include <sys/socket.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <assert.h>
+#include <rfb/rfbclient.h>
+#ifdef WIN32
+#include <winsock2.h>
+#define EWOULDBLOCK WSAEWOULDBLOCK
+#define close closesocket
+#define read(sock,buf,len) recv(sock,buf,len,0)
+#define write(sock,buf,len) send(sock,buf,len,0)
+#else
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <fcntl.h>
-#include <assert.h>
-#include <rfb/rfbclient.h>
+#endif
 
 void PrintInHex(char *buf, int len);
 
@@ -81,7 +89,12 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  diff.tv_usec+=1000000;
         }
         sleep (diff.tv_sec);
+#ifndef __MINGW32__
+	/* FIXME */
         usleep (diff.tv_usec);
+#else
+	rfbClientErr("usleep on MinGW32 NOT IMPLEMENTED\n");
+#endif
       }
 
       rec->tv=tv;
@@ -114,13 +127,16 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       int i = read(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
       if (i <= 0) {
 	if (i < 0) {
+#ifdef WIN32
+	  errno=WSAGetLastError();
+#endif
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
 	    i = 0;
 	  } else {
-	    rfbClientErr("read");
+	    rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
 	    return FALSE;
 	  }
 	} else {
@@ -143,13 +159,16 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       int i = read(client->sock, out, n);
       if (i <= 0) {
 	if (i < 0) {
+#ifdef WIN32
+	  errno=WSAGetLastError();
+#endif
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
 	    i = 0;
 	  } else {
-	    rfbClientErr("read");
+	    rfbClientErr("read (%s)\n",strerror(errno));
 	    return FALSE;
 	  }
 	} else {
@@ -200,12 +219,12 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
 	  FD_SET(client->sock,&fds);
 
 	  if (select(client->sock+1, NULL, &fds, NULL, NULL) <= 0) {
-	    rfbClientErr("select");
+	    rfbClientErr("select\n");
 	    return FALSE;
 	  }
 	  j = 0;
 	} else {
-	  rfbClientErr("write");
+	  rfbClientErr("write\n");
 	  return FALSE;
 	}
       } else {
@@ -230,25 +249,41 @@ ConnectClientToTcpAddr(unsigned int host, int port)
   struct sockaddr_in addr;
   int one = 1;
 
+#ifdef WIN32
+  WSADATA trash;
+  static rfbBool WSAinitted=FALSE;
+  if(!WSAinitted) {
+    WSAinitted=TRUE;
+    int i=WSAStartup(MAKEWORD(2,0),&trash);
+    if(i!=0) {
+      rfbClientErr("Couldn't init Windows Sockets\n");
+      return -1;
+    }
+  }
+#endif
+
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = host;
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
-    rfbClientErr("ConnectToTcpAddr: socket");
+#ifdef WIN32
+    errno=WSAGetLastError();
+#endif
+    rfbClientErr("ConnectToTcpAddr: socket (%s)\n",strerror(errno));
     return -1;
   }
 
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    rfbClientErr("ConnectToTcpAddr: connect");
+    rfbClientErr("ConnectToTcpAddr: connect\n");
     close(sock);
     return -1;
   }
 
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
-    rfbClientErr("ConnectToTcpAddr: setsockopt");
+    rfbClientErr("ConnectToTcpAddr: setsockopt\n");
     close(sock);
     return -1;
   }
@@ -274,7 +309,7 @@ FindFreeTcpPort(void)
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
-    rfbClientErr(": FindFreeTcpPort: socket");
+    rfbClientErr(": FindFreeTcpPort: socket\n");
     return 0;
   }
 
@@ -308,25 +343,25 @@ ListenAtTcpPort(int port)
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
-    rfbClientErr("ListenAtTcpPort: socket");
+    rfbClientErr("ListenAtTcpPort: socket\n");
     return -1;
   }
 
   if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		 (const char *)&one, sizeof(one)) < 0) {
-    rfbClientErr("ListenAtTcpPort: setsockopt");
+    rfbClientErr("ListenAtTcpPort: setsockopt\n");
     close(sock);
     return -1;
   }
 
   if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    rfbClientErr("ListenAtTcpPort: bind");
+    rfbClientErr("ListenAtTcpPort: bind\n");
     close(sock);
     return -1;
   }
 
   if (listen(sock, 5) < 0) {
-    rfbClientErr("ListenAtTcpPort: listen");
+    rfbClientErr("ListenAtTcpPort: listen\n");
     close(sock);
     return -1;
   }
@@ -349,13 +384,13 @@ AcceptTcpConnection(int listenSock)
 
   sock = accept(listenSock, (struct sockaddr *) &addr, &addrlen);
   if (sock < 0) {
-    rfbClientErr("AcceptTcpConnection: accept");
+    rfbClientErr("AcceptTcpConnection: accept\n");
     return -1;
   }
 
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
-    rfbClientErr("AcceptTcpConnection: setsockopt");
+    rfbClientErr("AcceptTcpConnection: setsockopt\n");
     close(sock);
     return -1;
   }
@@ -371,10 +406,14 @@ AcceptTcpConnection(int listenSock)
 rfbBool
 SetNonBlocking(int sock)
 {
+#ifndef __MINGW32__
   if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
-    rfbClientErr("AcceptTcpConnection: fcntl");
+    rfbClientErr("AcceptTcpConnection: fcntl\n");
     return FALSE;
   }
+#else
+  rfbClientErr("O_NONBLOCK on MinGW32 NOT IMPLEMENTED\n");
+#endif
   return TRUE;
 }
 

@@ -32,7 +32,6 @@ fi
 AH_TEMPLATE(FFMPEG, [Use ffmpeg (for vnc2mpg)])
 AC_ARG_WITH(ffmpeg,
 	[ --with-ffmpeg=dir		set ffmpeg home directory],,)
-#AM_DEFINE(FFMPEG, "$with_ffmpeg")
 AC_SUBST(with_ffmpeg)
 AM_CONDITIONAL(WITH_FFMPEG, test ! -z "$with_ffmpeg")
 
@@ -142,6 +141,13 @@ fi
 AM_CONDITIONAL(HAVE_LIBSDL, test "x$with_sdl" = "xyes")
 AC_SUBST(SDL_CFLAGS)
 AC_SUBST(SDL_LIBS)
+
+MINGW=`uname -s | grep MINGW 2>/dev/null`
+AM_CONDITIONAL(MINGW, test ! -z "$MINGW" )
+if test ! -z "$MINGW"; then
+	WSOCKLIB="-lws2_32"
+fi
+AC_SUBST(WSOCKLIB)
 
 # Checks for header files.
 AC_HEADER_STDC

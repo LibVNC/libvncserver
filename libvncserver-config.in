@@ -60,7 +60,7 @@ while test $# -gt 0; do
       else
         libdirs="-L$libdir"
       fi
-      echo "$libdirs" -lvncserver @LIBS@
+      echo "$libdirs" -lvncserver @LIBS@ @WSOCKLIB@
       ;;
     --link)
       echo @CC@

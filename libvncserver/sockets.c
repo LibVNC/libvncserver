@@ -45,14 +45,6 @@
 #include <sys/types.h>
 #endif
 
-#ifdef WIN32
-#pragma warning (disable: 4018 4761)
-#define close closesocket
-#define read(sock,buf,len) recv(sock,buf,len,0)
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define ETIMEDOUT WSAETIMEDOUT
-#define write(sock,buf,len) send(sock,buf,len,0)
-#else
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
@@ -67,7 +59,6 @@
 #endif
 #ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #endif
 
 #if defined(__linux__) && defined(NEED_TIMEVAL)
@@ -91,10 +82,14 @@ int allow_severity=LOG_INFO;
 int deny_severity=LOG_WARNING;
 #endif
 
-/*#ifndef WIN32
-int max(int i,int j) { return(i<j?j:i); }
+#if defined(WIN32)
+#pragma warning (disable: 4018 4761)
+#define close closesocket
+#define read(sock,buf,len) recv(sock,buf,len,0)
+#define EWOULDBLOCK WSAEWOULDBLOCK
+#define ETIMEDOUT WSAETIMEDOUT
+#define write(sock,buf,len) send(sock,buf,len,0)
 #endif
-*/
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
@@ -334,7 +329,9 @@ rfbCloseClient(cl)
 	  while(cl->screen->maxFd>0
 		&& !FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
 	    cl->screen->maxFd--;
+#ifndef __MINGW32__
 	shutdown(cl->sock,SHUT_RDWR);
+#endif
 	close(cl->sock);
 	cl->sock = -1;
       }
@@ -414,7 +411,7 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 
         } else {
 #ifdef WIN32
-			errno = WSAGetLastError();
+	    errno = WSAGetLastError();
 #endif
 	    if (errno == EINTR)
 		continue;

@@ -41,6 +41,10 @@ extern "C"
 #include <sys/types.h>
 #endif
 
+#ifdef __MINGW32__
+#include <winsock2.h>
+#endif
+
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 #include <pthread.h>
 #if 0 /* debugging */
@@ -208,7 +212,7 @@ typedef struct _rfbScreenInfo
     SOCKET listenSock;
     int maxSock;
     int maxFd;
-    fd_set allFds;
+    struct fd_set allFds;
 
     rfbBool socketInitDone;
     SOCKET inetdSock;

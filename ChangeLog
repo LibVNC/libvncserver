@@ -1,3 +1,6 @@
+2004-12-02  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* make LibVNCServer compile & work on MinGW32
+
 2004-11-30  "Leiradella, Andre V Matos Da Cunha" <ANDRE.LEIRADELLA@bra.xerox.com>
 	* libvncclient/sockets.c: return TRUE in every case of success
 

@@ -1,5 +1,5 @@
 DEFINES = -I ..
-LDADD = ../libvncserver/libvncserver.a
+LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
 
 noinst_PROGRAMS=zippy
 

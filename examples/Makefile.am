@@ -1,5 +1,5 @@
 DEFINES=-I.. -g -Wall
-LDADD = ../libvncserver/libvncserver.a
+LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
 
 if OSX
 MAC=mac

@@ -23,9 +23,13 @@
 
 #include <unistd.h>
 #include <sys/types.h>
+#ifdef __MINGW32__
+#include <winsock2.h>
+#else
 #include <sys/wait.h>
-#include <sys/time.h>
 #include <sys/utsname.h>
+#endif
+#include <sys/time.h>
 #include <rfb/rfbclient.h>
 
 /*
@@ -36,6 +40,11 @@
 void
 listenForIncomingConnections(rfbClient* client)
 {
+#ifdef __MINGW32__
+  /* FIXME */
+  rfbClientErr("listenForIncomingConnections on MinGW32 NOT IMPLEMENTED\n");
+  return;
+#else
   int listenSocket;
   fd_set fds;
 
@@ -77,7 +86,7 @@ listenForIncomingConnections(rfbClient* client)
       switch (fork()) {
 
       case -1: 
-	rfbClientErr("fork"); 
+	rfbClientErr("fork\n"); 
 	return;
 
       case 0:
@@ -92,6 +101,7 @@ listenForIncomingConnections(rfbClient* client)
       }
     }
   }
+#endif
 }
 
 
