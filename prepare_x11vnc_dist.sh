@@ -1,0 +1,62 @@
+#!/bin/bash
+
+VERSION="0.1"
+
+cd "$(dirname "$0")"
+
+mv configure.ac configure.ac.LibVNCServer
+
+cat configure.ac.LibVNCServer | \
+sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
+    -e "s/\(contrib\|examples\|vncterm\|libvncclient\|test\)\/Makefile//g" \
+    -e "s/libvncserver.spec/x11vnc.spec/g" \
+    -e "s/^.*libvncserver-config//g" \
+> configure.ac
+
+mv Makefile.am Makefile.am.LibVNCServer
+
+cat Makefile.am.LibVNCServer | \
+sed -e "s/^SUBDIRS.*$/SUBDIRS=libvncserver x11vnc/" \
+    -e "s/^DIST_SUBDIRS.*$/DIST_SUBDIRS=libvncserver x11vnc classes/" \
+    -e "/all: make_config_executable/,\$d" \
+    -e "/^.*bin_SCRIPTS.*$/d" \
+    -e "s/include_/noinst_/" \
+> Makefile.am
+
+cat libvncserver.spec.in | \
+sed -e "s/Johannes.Schindelin/Karl Runge/g" \
+    -e "s/Johannes.Schindelin@gmx.de/karl@runge.com/gi" \
+    -e "s/a library to make writing a vnc server easy/a VNC server for the current X11 session/" \
+    -e "/%description/,/%prep/d" \
+    -e '/%setup/s/^\(.*\)$/%description\
+x11vnc is to Xwindows what WinVNC is to Windows, i.e. a server\
+which serves the current Xwindows desktop via RFB (VNC) protocol\
+to the user.\
+\
+Based on the ideas of x0rfbserver and on LibVNCServer, it has evolved\
+into a versatile and performant while still easy to use program.\
+\
+x11vnc was put together and is (actively ;-) maintained by\
+Karl Runge <karl@runge.com>\
+\
+%prep\
+\1/' \
+> x11vnc.spec.in
+
+mv libvncserver/Makefile.am libvncserver/Makefile.am.LibVNCServer
+
+cat libvncserver/Makefile.am.LibVNCServer | \
+sed -e "s/\(include\|LIB\|lib\)_/noinst_/g" \
+> libvncserver/Makefile.am
+
+mv acinclude.m4 acinclude.m4.LibVNCServer
+
+cat acinclude.m4.LibVNCServer | \
+sed -e "s/^\(_PKG.*\)\$PACKAGE\(.*\)$/\1LibVNCServer\2/" \
+> acinclude.m4
+
+make x11vnc-0.1.tar.gz
+for f in configure.ac Makefile.am libvncserver/Makefile.am acinclude.m4; do
+	mv -f $f.LibVNCServer $f
+done
+
