@@ -29,10 +29,6 @@ AC_ARG_WITH(24bpp,
 if test "x$with_24bpp" = "xyes"; then
 	AC_DEFINE(ALLOW24BPP)
 fi
-AH_TEMPLATE(SDL_CONFIG, [Use sdl-config (for SDLvncviewer)])
-AC_ARG_WITH(sdl,
-	[  --with-sdl			use sdl-config],
-	, [ with_sdl=yes ])
 AH_TEMPLATE(FFMPEG, [Use ffmpeg (for vnc2mpg)])
 AC_ARG_WITH(ffmpeg,
 	[ --with-ffmpeg=dir		set ffmpeg home directory],,)
@@ -95,7 +91,7 @@ AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
 AM_CONDITIONAL(HAVE_LIBZ, test ! -z "$HAVE_ZLIB_H")
 AM_CONDITIONAL(HAVE_LIBJPEG, test ! -z "$HAVE_JPEGLIB_H")
 if test -z "$with_sdl"; then
-	if sdl-config >/dev/null 2>&1; then
+	if sdl-config --version >/dev/null 2>&1; then
 		with_sdl=yes
 	else
 		with_sdl=no
