@@ -52,15 +52,6 @@ int max(int,int);
 
 #include <rfbproto.h>
 
-#ifdef HAVE_PTHREADS
-#include <pthread.h>
-#define IF_PTHREADS(x) (x)
-#else
-#define IF_PTHREADS(x)
-#endif
-
-
-
 #ifdef __linux__
 #include <endian.h>
 #else
@@ -83,6 +74,47 @@ int max(int,int);
 #endif
 
 #include <netinet/in.h>
+
+#ifdef HAVE_PTHREADS
+#include <pthread.h>
+#if 0
+#define LOCK(mutex) fprintf(stderr,"%s:%d LOCK(%s)\n",__FILE__,__LINE__,#mutex)
+#define UNLOCK(mutex) fprintf(stderr,"%s:%d UNLOCK(%s)\n",__FILE__,__LINE__,#mutex)
+#define MUTEX(mutex)
+#define INIT_MUTEX(mutex) fprintf(stderr,"%s:%d INIT_MUTEX(%s)\n",__FILE__,__LINE__,#mutex)
+#define TINI_MUTEX(mutex) fprintf(stderr,"%s:%d TINI_MUTEX(%s)\n",__FILE__,__LINE__,#mutex)
+#define SIGNAL(cond) fprintf(stderr,"%s:%d SIGNAL(%s)\n",__FILE__,__LINE__,#cond)
+#define WAIT(cond,mutex) fprintf(stderr,"%s:%d WAIT(%s,%s)\n",__FILE__,__LINE__,#cond,#mutex)
+#define COND(cond)
+#define INIT_COND(cond) fprintf(stderr,"%s:%d INIT_COND(%s)\n",__FILE__,__LINE__,#cond)
+#define TINI_COND(cond) fprintf(stderr,"%s:%d TINI_COND(%s)\n",__FILE__,__LINE__,#cond)
+#define IF_PTHREAD(x)
+#else
+#define LOCK(mutex) pthread_mutex_lock(&(mutex))
+#define UNLOCK(mutex) pthread_mutex_unlock(&(mutex))
+#define MUTEX(mutex) pthread_mutex_t (mutex)
+#define INIT_MUTEX(mutex) pthread_mutex_init(&(mutex),NULL)
+#define TINI_MUTEX(mutex) pthread_mutex_destroy(&(mutex))
+#define SIGNAL(cond) pthread_cond_signal(&(cond))
+#define WAIT(cond,mutex) pthread_cond_wait(&(cond),&(mutex))
+#define COND(cond) pthread_cond_t (cond)
+#define INIT_COND(cond) pthread_cond_init(&(cond),NULL)
+#define TINI_COND(cond) pthread_cond_destroy(&(cond))
+#define IF_PTHREADS(x) x
+#endif
+#else
+#define LOCK(mutex)
+#define UNLOCK(mutex)
+#define MUTEX(mutex)
+#define INIT_MUTEX(mutex)
+#define TINI_MUTEX(mutex)
+#define SIGNAL(cond) this_is_unsupported
+#define WAIT(cond,mutex) this_is_unsupported
+#define COND(cond)
+#define INIT_COND(cond)
+#define TINI_COND(cond)
+#define IF_PTHREADS(x)
+#endif
 
 #define MAX_ENCODINGS 10
 
@@ -210,6 +242,7 @@ typedef struct
     Bool rfbDontDisconnect;
     struct rfbClientRec* rfbClientHead;
     struct rfbCursor* cursor;
+    MUTEX(cursorMutex);
    
     /* the following members have to be supplied by the serving process */
     char* frameBuffer;
@@ -273,7 +306,7 @@ typedef struct rfbClientRec {
      */
     void* clientData;
     ClientGoneHookPtr clientGoneHook;
-   
+
     int sock;
     char *host;
                                 /* Possible client states: */
@@ -324,10 +357,17 @@ typedef struct rfbClientRec {
 
 
 #ifdef HAVE_PTHREADS
-    pthread_mutex_t dontKillMutex; /* if you need a reliable clientPtr */
-    pthread_mutex_t outputMutex;
-    pthread_mutex_t updateMutex;
-    pthread_cond_t updateCond;
+    /* whenever a client is referenced, the refCount has to be incremented
+       and afterwards decremented.
+       Use the functions rfbIncrClientRef(cl) and rfbDecrClientRef(cl);
+    */
+    int refCount;
+    MUTEX(refCountMutex);
+    COND(deleteCond);
+
+    MUTEX(outputMutex);
+    MUTEX(updateMutex);
+    COND(updateCond);
 #endif
 
     sraRegionPtr modifiedRegion;
@@ -598,9 +638,6 @@ typedef struct rfbCursor {
     unsigned short foreRed, foreGreen, foreBlue; /* device-independent colour */
     unsigned short backRed, backGreen, backBlue; /* device-independent colour */
     unsigned char *richSource; /* source bytes for a rich cursor */
-#ifdef HAVE_PTHREADS
-    pthread_mutex_t mutex;
-#endif
 } rfbCursor, *rfbCursorPtr;
 
 extern Bool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);

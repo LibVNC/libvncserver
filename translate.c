@@ -449,12 +449,13 @@ rfbSetClientColourMaps(rfbScreen, firstColour, nColours)
     int firstColour;
     int nColours;
 {
-    rfbClientPtr cl, nextCl;
+    rfbClientIteratorPtr i;
+    rfbClientPtr cl;
 
-    for (cl = rfbScreen->rfbClientHead; cl; cl = nextCl) {
-	nextCl = cl->next;
-	rfbSetClientColourMap(cl, firstColour, nColours);
-    }
+    i = rfbGetClientIterator(rfbScreen);
+    while((cl = rfbClientIteratorNext(i)))
+      rfbSetClientColourMap(cl, firstColour, nColours);
+    rfbReleaseClientIterator(i);
 }
 
 static void

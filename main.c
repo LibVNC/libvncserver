@@ -75,14 +75,10 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
 
    iterator=rfbGetClientIterator(rfbScreen);
    while((cl=rfbClientIteratorNext(iterator))) {
-#ifdef HAVE_PTHREADS
-     pthread_mutex_lock(&cl->updateMutex);
-#endif
+     LOCK(cl->updateMutex);
      sraRgnOr(cl->modifiedRegion,modRegion);
-#ifdef HAVE_PTHREADS
-     pthread_cond_signal(&cl->updateCond);
-     pthread_mutex_unlock(&cl->updateMutex);
-#endif
+     SIGNAL(cl->updateCond);
+     UNLOCK(cl->updateMutex);
    }
 
    rfbReleaseClientIterator(iterator);
@@ -120,11 +116,11 @@ clientOutput(void *data)
 
     while (1) {
         haveUpdate = false;
-        pthread_mutex_lock(&cl->updateMutex);
+        LOCK(cl->updateMutex);
         while (!haveUpdate) {
             if (cl->sock == -1) {
                 /* Client has disconnected. */
-	        pthread_mutex_unlock(&cl->updateMutex);
+	        UNLOCK(cl->updateMutex);
                 return NULL;
             }
 	    updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
@@ -132,24 +128,24 @@ clientOutput(void *data)
 	    sraRgnDestroy(updateRegion);
 
             if (!haveUpdate) {
-                pthread_cond_wait(&cl->updateCond, &cl->updateMutex);
+                WAIT(cl->updateCond, cl->updateMutex);
             }
         }
         
         /* OK, now, to save bandwidth, wait a little while for more
            updates to come along. */
-        pthread_mutex_unlock(&cl->updateMutex);
+        UNLOCK(cl->updateMutex);
         usleep(rfbDeferUpdateTime * 1000);
 
         /* Now, get the region we're going to update, and remove
            it from cl->modifiedRegion _before_ we send the update.
            That way, if anything that overlaps the region we're sending
            is updated, we'll be sure to do another update later. */
-        pthread_mutex_lock(&cl->updateMutex);
+        LOCK(cl->updateMutex);
 	updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
 	sraRgnAnd(updateRegion,cl->requestedRegion);
 	sraRgnSubtract(cl->modifiedRegion,updateRegion);
-        pthread_mutex_unlock(&cl->updateMutex);
+        UNLOCK(cl->updateMutex);
 
         /* Now actually send the update. */
         rfbSendFramebufferUpdate(cl, updateRegion);
@@ -176,10 +172,10 @@ clientInput(void *data)
     }
 
     /* Get rid of the output thread. */
-    pthread_mutex_lock(&cl->updateMutex);
-    pthread_cond_signal(&cl->updateCond);
-    pthread_mutex_unlock(&cl->updateMutex);
-    pthread_join(output_thread, NULL);
+    LOCK(cl->updateMutex);
+    SIGNAL(cl->updateCond);
+    UNLOCK(cl->updateMutex);
+    IF_PTHREADS(pthread_join(output_thread, NULL));
 
     rfbClientConnectionGone(cl);
 
@@ -389,6 +385,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->dontSendFramebufferUpdate = FALSE;
    rfbScreen->cursorX=rfbScreen->cursorY=rfbScreen->underCursorBufferLen=0;
    rfbScreen->underCursorBuffer=NULL;
+   //INIT_MUTEX(rfbScreen->cursorMutex);
 
    /* proc's and hook's */
 
@@ -410,6 +407,11 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
 void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
 {
   /* TODO */
+  if(rfbScreen->frameBuffer)
+    free(rfbScreen->frameBuffer);
+  if(rfbScreen->colourMap.data.bytes)
+    free(rfbScreen->colourMap.data.bytes);
+  TINI_MUTEX(rfbScreen->cursorMutex);
   free(rfbScreen);
 }
 
@@ -422,7 +424,8 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
 void
 rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 {
-  rfbClientPtr cl,cl_next;
+  rfbClientIteratorPtr i;
+  rfbClientPtr cl;
 
   rfbCheckFds(rfbScreen,usec);
   httpCheckFds(rfbScreen);
@@ -430,17 +433,14 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
   corbaCheckFds(rfbScreen);
 #endif
 
-  /* this needn't be thread safe:
-     you use rfbRunEventLoop(..,TRUE) for pthreads. */
-  cl=rfbScreen->rfbClientHead;
-  while(cl) {
-    cl_next=cl->next;
+  i = rfbGetClientIterator(rfbScreen);
+  while((cl=rfbClientIteratorNext(i))) {
     if(cl->sock>=0 && FB_UPDATE_PENDING(cl))
       rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
     if(cl->sock==-1)
       rfbClientConnectionGone(cl);
-    cl=cl_next;
   }
+  rfbReleaseClientIterator(i);
 }
 
 void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)

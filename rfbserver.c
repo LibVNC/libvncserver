@@ -33,9 +33,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#ifdef HAVE_PTHREADS
-#include <pthread.h>
-#endif
 
 rfbClientPtr pointerClient = NULL;  /* Mutex for pointer events */
 
@@ -43,52 +40,74 @@ static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 
+#ifdef HAVE_PTHREADS
+void rfbIncrClientRef(rfbClientPtr cl)
+{
+  LOCK(cl->refCountMutex);
+  cl->refCount++;
+  UNLOCK(cl->refCountMutex);
+}
+
+void rfbDecrClientRef(rfbClientPtr cl)
+{
+  LOCK(cl->refCountMutex);
+  cl->refCount--;
+  if(cl->refCount<=0) /* just to be sure also < 0 */
+    SIGNAL(cl->deleteCond);
+  UNLOCK(cl->refCountMutex);
+}
+#endif
+
+MUTEX(rfbClientListMutex);
 
 struct rfbClientIterator {
-    rfbClientPtr next;
+  rfbClientPtr next;
+  rfbScreenInfoPtr screen;
 };
-
-#ifdef HAVE_PTHREADS
-static pthread_mutex_t rfbClientListMutex;
-#endif
-static struct rfbClientIterator rfbClientIteratorInstance;
 
 void
 rfbClientListInit(rfbScreenInfoPtr rfbScreen)
 {
     rfbScreen->rfbClientHead = NULL;
-#ifdef HAVE_PTHREADS
-    pthread_mutex_init(&rfbClientListMutex, NULL);
-#endif
 }
 
 rfbClientIteratorPtr
 rfbGetClientIterator(rfbScreenInfoPtr rfbScreen)
 {
-#ifdef HAVE_PTHREADS
-    pthread_mutex_lock(&rfbClientListMutex);
-#endif
-    rfbClientIteratorInstance.next = rfbScreen->rfbClientHead;
-    
-    return &rfbClientIteratorInstance;
+  rfbClientIteratorPtr i =
+    (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
+  i->next = 0;
+  i->screen = rfbScreen;
+  return i;
 }
 
 rfbClientPtr
-rfbClientIteratorNext(rfbClientIteratorPtr iterator)
+rfbClientIteratorNext(rfbClientIteratorPtr i)
 {
-    rfbClientPtr result;
-    result = iterator->next;
-    if (result)
-        iterator->next = result->next;
-    return result;
+  if(i->next == 0) {
+    LOCK(rfbClientListMutex);
+    i->next = i->screen->rfbClientHead;
+    UNLOCK(rfbClientListMutex);
+  } else {
+    IF_PTHREADS(rfbClientPtr cl = i->next);
+    i->next = i->next->next;
+    IF_PTHREADS(rfbDecrClientRef(cl));
+  }
+
+#ifdef HAVE_PTHREADS
+    while(i->next && i->next->sock<0)
+      i->next = i->next->next;
+    if(i->next)
+      rfbIncrClientRef(i->next);
+#endif
+
+    return i->next;
 }
 
 void
 rfbReleaseClientIterator(rfbClientIteratorPtr iterator)
 {
-#ifdef HAVE_PTHREADS
-    pthread_mutex_unlock(&rfbClientListMutex);
-#endif
+  IF_PTHREADS(if(iterator->next) rfbDecrClientRef(iterator->next));
 }
 
 
@@ -169,9 +188,7 @@ rfbNewClient(rfbScreen,sock)
     getpeername(sock, (struct sockaddr *)&addr, &addrlen);
     cl->host = strdup(inet_ntoa(addr.sin_addr));
 
-#ifdef HAVE_PTHREADS    
-    pthread_mutex_init(&cl->outputMutex, NULL);
-#endif
+    INIT_MUTEX(cl->outputMutex);
 
     cl->state = RFB_PROTOCOL_VERSION;
 
@@ -189,10 +206,8 @@ rfbNewClient(rfbScreen,sock)
     cl->modifiedRegion =
       sraRgnCreateRect(0,0,rfbScreen->width,rfbScreen->height);
 
-#ifdef HAVE_PTHREADS
-    pthread_mutex_init(&cl->updateMutex, NULL);
-    pthread_cond_init(&cl->updateCond, NULL);
-#endif
+    INIT_MUTEX(cl->updateMutex);
+    INIT_COND(cl->updateCond);
 
     cl->requestedRegion = sraRgnCreate();
 
@@ -200,18 +215,16 @@ rfbNewClient(rfbScreen,sock)
     cl->translateFn = rfbTranslateNone;
     cl->translateLookupTable = NULL;
 
-#ifdef HAVE_PTHREADS
-    pthread_mutex_lock(&rfbClientListMutex);
-#endif
+    LOCK(rfbClientListMutex);
+
+    cl->refCount = 0;
     cl->next = rfbScreen->rfbClientHead;
     cl->prev = NULL;
     if (rfbScreen->rfbClientHead)
         rfbScreen->rfbClientHead->prev = cl;
 
     rfbScreen->rfbClientHead = cl;
-#ifdef HAVE_PTHREADS
-    pthread_mutex_unlock(&rfbClientListMutex);
-#endif
+    UNLOCK(rfbClientListMutex);
 
     cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
     cl->tightQualityLevel = -1;
@@ -261,12 +274,23 @@ rfbClientConnectionGone(cl)
 {
     int i;
 
+    LOCK(rfbClientListMutex);
+
+    if (cl->prev)
+        cl->prev->next = cl->next;
+    else
+        cl->screen->rfbClientHead = cl->next;
+    if (cl->next)
+        cl->next->prev = cl->prev;
+
 #ifdef HAVE_PTHREADS
-    /*
-      pthread_mutex_lock(&cl->updateMutex);
-      pthread_mutex_lock(&cl->outputMutex);
-    */
-    pthread_mutex_lock(&rfbClientListMutex);
+    LOCK(cl->refCountMutex);
+    if(cl->refCount) {
+      UNLOCK(cl->refCountMutex);
+      WAIT(cl->deleteCond,cl->refCountMutex);
+    } else {
+      UNLOCK(cl->refCountMutex);
+    }
 #endif
 
     cl->clientGoneHook(cl);
@@ -287,28 +311,19 @@ rfbClientConnectionGone(cl)
     if (pointerClient == cl)
         pointerClient = NULL;
 
-    if (cl->prev)
-        cl->prev->next = cl->next;
-    else
-        cl->screen->rfbClientHead = cl->next;
-    if (cl->next)
-        cl->next->prev = cl->prev;
-
     sraRgnDestroy(cl->modifiedRegion);
 
-    rfbPrintStats(cl);
+    UNLOCK(rfbClientListMutex);
 
     if (cl->translateLookupTable) free(cl->translateLookupTable);
 
-#ifdef HAVE_PTHREADS
-    pthread_mutex_unlock(&rfbClientListMutex);
-#endif
+    TINI_COND(cl->updateCond);
+    TINI_MUTEX(cl->updateMutex);
 
-#ifdef HAVE_PTHREADS
-    pthread_cond_destroy(&cl->updateCond);
-    pthread_mutex_destroy(&cl->updateMutex);
-    pthread_mutex_destroy(&cl->outputMutex);
-#endif
+    LOCK(cl->outputMutex);
+    TINI_MUTEX(cl->outputMutex);
+
+    rfbPrintStats(cl);
 
     xfree(cl);
 }
@@ -694,9 +709,7 @@ rfbProcessClientNormalMessage(cl)
 			   Swap16IfLE(msg.fur.x)+Swap16IfLE(msg.fur.w),
 			   Swap16IfLE(msg.fur.y)+Swap16IfLE(msg.fur.h));
 
-#ifdef HAVE_PTHREADS
-        pthread_mutex_lock(&cl->updateMutex);
-#endif
+        LOCK(cl->updateMutex);
 	sraRgnOr(cl->requestedRegion,tmpRegion);
 
 	if (!cl->readyForSetColourMapEntries) {
@@ -713,19 +726,16 @@ rfbProcessClientNormalMessage(cl)
        if (!msg.fur.incremental) {
 	    sraRgnOr(cl->modifiedRegion,tmpRegion);
 	    sraRgnSubtract(cl->copyRegion,tmpRegion);
-        }
-#ifdef HAVE_PTHREADS
-        pthread_cond_signal(&cl->updateCond);
-        pthread_mutex_unlock(&cl->updateMutex);
-#endif
+       }
+       SIGNAL(cl->updateCond);
+       UNLOCK(cl->updateMutex);
 	
-	if(cl->sock>=0 && FB_UPDATE_PENDING(cl)) {
-	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
-	}
-	
-	sraRgnDestroy(tmpRegion);
+       if(cl->sock>=0 && FB_UPDATE_PENDING(cl)) {
+	 rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
+       }
+       sraRgnDestroy(tmpRegion);
 
-        return;
+       return;
     }
 
     case rfbKeyEvent:
@@ -1209,6 +1219,9 @@ Bool
 rfbSendUpdateBuf(cl)
     rfbClientPtr cl;
 {
+    if(cl->sock<0)
+      return FALSE;
+
     if (WriteExact(cl, cl->updateBuf, cl->ublen) < 0) {
         rfbLogPerror("rfbSendUpdateBuf: write");
         rfbCloseClient(cl);
@@ -1275,17 +1288,19 @@ rfbSendSetColourMapEntries(cl, firstColour, nColours)
 void
 rfbSendBell(rfbScreenInfoPtr rfbScreen)
 {
-    rfbClientPtr cl, nextCl;
+    rfbClientIteratorPtr i;
+    rfbClientPtr cl;
     rfbBellMsg b;
 
-    for (cl = rfbScreen->rfbClientHead; cl; cl = nextCl) {
-	nextCl = cl->next;
+    i = rfbGetClientIterator(rfbScreen);
+    while((cl=rfbClientIteratorNext(i))) {
 	b.type = rfbBell;
 	if (WriteExact(cl, (char *)&b, sz_rfbBellMsg) < 0) {
 	    rfbLogPerror("rfbSendBell: write");
 	    rfbCloseClient(cl);
 	}
     }
+    rfbReleaseClientIterator(i);
 }
 
 

@@ -2,8 +2,8 @@ INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 # Uncomment these two lines to enable use of PThreads
-#PTHREADDEF = -DHAVE_PTHREADS
-#PTHREADLIB = -lpthread
+PTHREADDEF = -DHAVE_PTHREADS
+PTHREADLIB = -lpthread
 
 # Comment the following line to disable the use of 3 Bytes/Pixel.
 # The code for 3 Bytes/Pixel is not very efficient!

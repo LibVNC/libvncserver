@@ -225,9 +225,6 @@ rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskSt
    char* cp;
    unsigned char bit;
 
-#ifdef HAVE_PTHREADS   
-   pthread_mutex_init(&cursor->mutex, NULL);
-#endif
    cursor->width=width;
    cursor->height=height;
    //cursor->backRed=cursor->backGreen=cursor->backBlue=0xffff;
@@ -275,9 +272,6 @@ char* rfbMakeMaskForXCursor(int width,int height,char* source)
 void rfbFreeCursor(rfbCursorPtr cursor)
 {
    if(cursor) {
-#ifdef HAVE_PTHREADS   
-     pthread_mutex_destroy(&cursor->mutex);
-#endif
       free(cursor->source);
       free(cursor->mask);
       free(cursor);
@@ -344,13 +338,9 @@ void rfbUndrawCursor(rfbClientPtr cl)
    int j,x1,x2,y1,y2,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
 
-#ifdef HAVE_PTHREADS
-   pthread_mutex_lock(&c->mutex);
-#endif
+   LOCK(cl->screen->cursorMutex);
    if(!s->cursorIsDrawn) {
-#ifdef HAVE_PTHREADS
-     pthread_mutex_unlock(&c->mutex);
-#endif
+     UNLOCK(cl->screen->cursorMutex);
      return;
    }
    
@@ -360,9 +350,7 @@ void rfbUndrawCursor(rfbClientPtr cl)
    if(x1<0) x1=0;
    if(x2>=s->width) x2=s->width-1;
    x2-=x1; if(x2<=0) {
-#ifdef HAVE_PTHREADS
-     pthread_mutex_unlock(&c->mutex);
-#endif
+     UNLOCK(cl->screen->cursorMutex);
      return;
    }
    y1=s->cursorY-c->yhot;
@@ -370,9 +358,7 @@ void rfbUndrawCursor(rfbClientPtr cl)
    if(y1<0) y1=0;
    if(y2>=s->height) y2=s->height-1;
    y2-=y1; if(y2<=0) {
-#ifdef HAVE_PTHREADS
-     pthread_mutex_unlock(&c->mutex);
-#endif
+     UNLOCK(cl->screen->cursorMutex);
      return;
    }
    for(j=0;j<y2;j++)
@@ -382,9 +368,7 @@ void rfbUndrawCursor(rfbClientPtr cl)
    
    rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
    s->cursorIsDrawn = FALSE;
-#ifdef HAVE_PTHREADS
-   pthread_mutex_unlock(&c->mutex);
-#endif
+   UNLOCK(cl->screen->cursorMutex);
 }
 
 void rfbDrawCursor(rfbClientPtr cl)
@@ -395,14 +379,10 @@ void rfbDrawCursor(rfbClientPtr cl)
      rowstride=s->paddedWidthInBytes,
      bufSize,w;
    if(!c) return;
-#ifdef HAVE_PTHREADS
-   pthread_mutex_lock(&c->mutex);
-#endif
+   LOCK(cl->screen->cursorMutex);
    if(s->cursorIsDrawn) {
      /* is already drawn */
-#ifdef HAVE_PTHREADS
-     pthread_mutex_unlock(&c->mutex);
-#endif
+     UNLOCK(cl->screen->cursorMutex);
      return;
    }
    bufSize=c->width*c->height*bpp;
@@ -420,9 +400,7 @@ void rfbDrawCursor(rfbClientPtr cl)
    if(x1<0) { i1=-x1; x1=0; }
    if(x2>=s->width) x2=s->width-1;
    x2-=x1; if(x2<=0) {
-#ifdef HAVE_PTHREADS
-     pthread_mutex_unlock(&c->mutex);
-#endif
+     UNLOCK(cl->screen->cursorMutex);
      return; /* nothing to do */
    }
    y1=s->cursorY-c->yhot;
@@ -430,9 +408,7 @@ void rfbDrawCursor(rfbClientPtr cl)
    if(y1<0) { j1=-y1; y1=0; }
    if(y2>=s->height) y2=s->height-1;
    y2-=y1; if(y2<=0) {
-#ifdef HAVE_PTHREADS
-     pthread_mutex_unlock(&c->mutex);
-#endif
+     UNLOCK(cl->screen->cursorMutex);
      return; /* nothing to do */
    }
    for(j=0;j<y2;j++)
@@ -452,9 +428,7 @@ void rfbDrawCursor(rfbClientPtr cl)
 
    rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
    s->cursorIsDrawn = TRUE;
-#ifdef HAVE_PTHREADS
-   pthread_mutex_unlock(&c->mutex);
-#endif
+   UNLOCK(cl->screen->cursorMutex);
 }
 
 /* for debugging */
@@ -475,26 +449,21 @@ void rfbPrintXCursor(rfbCursorPtr cursor)
 
 extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
 {
+  rfbClientIteratorPtr i = rfbGetClientIterator(rfbScreen);
   rfbClientPtr cl;
-#ifdef HAVE_PTHREADS
-  pthread_mutex_lock(rfbScreen->cursor->mutex);
-#endif
-  for(cl=rfbScreen->rfbClientHead;cl;cl=cl->next)
-    if(cl->sock>=0) {
-#ifdef HAVE_PTHREADS
-      pthread_mutex_lock(cl->updateMutex);
-#endif
-      rfbUndrawCursor(cl);
-#ifdef HAVE_PTHREADS
-      pthread_mutex_unlock(cl->updateMutex);
-#endif
+
+  LOCK(rfbScreen->cursorMutex);
+
+  while((cl=rfbClientIteratorNext(i))) {
+    LOCK(cl->updateMutex);
+    rfbUndrawCursor(cl);
+    UNLOCK(cl->updateMutex);
     }
-#ifdef HAVE_PTHREADS
-  pthread_mutex_unlock(rfbScreen->cursor->mutex);
-#endif
-  
+
   if(freeOld && rfbScreen->cursor)
     rfbFreeCursor(rfbScreen->cursor);
 
   rfbScreen->cursor = c;
+
+  UNLOCK(rfbScreen->cursorMutex);
 }

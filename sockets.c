@@ -142,7 +142,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     const int one = 1;
     int sock;
     rfbClientIteratorPtr i;
-    rfbClientPtr cl,cl_next;
+    rfbClientPtr cl;
 
     if (!rfbScreen->inetdInitDone && rfbScreen->inetdSock != -1) {
 	rfbNewClientConnection(rfbScreen,rfbScreen->inetdSock); 
@@ -233,34 +233,12 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	    return;
     }
 
-    /* I know that this is horrible. But we have the following problem:
-       inside this loop, the IO functions access the clients via the
-       iterator.
-       So we have to lock rfbClientListMutex to fetch a reliable
-       rfbClientHead. Remember, a client can just go away in a multithreaded
-       environment. So we have to lock the next client before working with
-       the current.
-    */
     i = rfbGetClientIterator(rfbScreen);
-    cl = rfbClientIteratorNext(i);
-    if(cl) {
-#ifdef HAVE_PTHREADS
-      //pthread_mutex_lock(&cl->updateMutex);
-#endif
-    }
-    rfbReleaseClientIterator(i);
-
-    while(cl) {
-      cl_next = cl->next;
-#ifdef HAVE_PTHREADS
-      //pthread_mutex_unlock(&cl->updateMutex);
-      //if(cl_next)
-	//pthread_mutex_lock(&cl_next->updateMutex);
-#endif
+    while((cl = rfbClientIteratorNext(i))) {
       if (FD_ISSET(cl->sock, &fds) && FD_ISSET(cl->sock, &(rfbScreen->allFds)))
 	rfbProcessClientMessage(cl);
-      cl=cl_next;
     }
+    rfbReleaseClientIterator(i);
 }
 
 
@@ -276,17 +254,12 @@ void
 rfbCloseClient(cl)
      rfbClientPtr cl;
 {
-#ifdef HAVE_PTHREADS
-    pthread_mutex_lock(&cl->updateMutex);
-#endif
+    LOCK(cl->updateMutex);
     FD_CLR(cl->sock,&(cl->screen->allFds));
     close(cl->sock);
     cl->sock = -1;
-#ifdef HAVE_PTHREADS
-    pthread_cond_signal(&cl->updateCond);
-    //pthread_mutex_lock(&cl->updateMutex);
-    pthread_mutex_unlock(&cl->updateMutex);
-#endif
+    SIGNAL(cl->updateCond);
+    UNLOCK(cl->updateMutex);
 }
 
 
@@ -362,9 +335,7 @@ WriteExact(cl, buf, len)
     struct timeval tv;
     int totalTimeWaited = 0;
 
-#ifdef HAVE_PTHREADS
-    pthread_mutex_lock(&cl->outputMutex);
-#endif
+    LOCK(cl->outputMutex);
     while (len > 0) {
         n = write(sock, buf, len);
 
@@ -380,9 +351,7 @@ WriteExact(cl, buf, len)
 
         } else {
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
-#ifdef HAVE_PTHREADS
-                pthread_mutex_unlock(&cl->outputMutex);
-#endif
+	        UNLOCK(cl->outputMutex);
                 return n;
             }
 
@@ -397,18 +366,14 @@ WriteExact(cl, buf, len)
             n = select(sock+1, NULL, &fds, NULL, &tv);
             if (n < 0) {
                 rfbLogPerror("WriteExact: select");
-#ifdef HAVE_PTHREADS
-                pthread_mutex_unlock(&cl->outputMutex);
-#endif
+                UNLOCK(cl->outputMutex);
                 return n;
             }
             if (n == 0) {
                 totalTimeWaited += 5000;
                 if (totalTimeWaited >= rfbMaxClientWait) {
                     errno = ETIMEDOUT;
-#ifdef HAVE_PTHREADS
-                    pthread_mutex_unlock(&cl->outputMutex);
-#endif
+                    UNLOCK(cl->outputMutex);
                     return -1;
                 }
             } else {
@@ -416,9 +381,7 @@ WriteExact(cl, buf, len)
             }
         }
     }
-#ifdef HAVE_PTHREADS
-    pthread_mutex_unlock(&cl->outputMutex);
-#endif
+    UNLOCK(cl->outputMutex);
     return 1;
 }
 
