@@ -302,6 +302,7 @@ typedef struct {
 #ifdef BACKCHANNEL
 #define rfbEncodingBackChannel 15
 #endif
+#define rfbEncodingZRLE 16
 
 /*
  * Special encoding numbers:
@@ -557,6 +558,21 @@ typedef struct {
  * in the XCursor encoding). If (w * h == 0), cursor should be hidden (or
  * default local cursor should be set by the client).
  */
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * ZRLE - encoding combining Zlib compression, tiling, palettisation and
+ * run-length encoding.
+ */
+
+typedef struct {
+    CARD32 length;
+} rfbZRLEHeader;
+
+#define sz_rfbZRLEHeader 4
+
+#define rfbZRLETileWidth 64
+#define rfbZRLETileHeight 64
 
 
 /*-----------------------------------------------------------------------------

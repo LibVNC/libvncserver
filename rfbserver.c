@@ -3,6 +3,7 @@
  */
 
 /*
+ *  Copyright (C) 2002 RealVNC Ltd.
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
  *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
  *  All Rights Reserved.
@@ -257,6 +258,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->preferredEncoding = rfbEncodingRaw;
       cl->correMaxWidth = 48;
       cl->correMaxHeight = 48;
+      cl->zrleData = 0;
 
       cl->copyRegion = sraRgnCreate();
       cl->copyDX = 0;
@@ -371,6 +373,10 @@ rfbClientConnectionGone(cl)
         cl->screen->rfbClientHead = cl->next;
     if (cl->next)
         cl->next->prev = cl->prev;
+
+#ifdef HAVE_ZRLE
+    FreeZrleData(cl);
+#endif
 
 #ifdef HAVE_PTHREADS
     LOCK(cl->refCountMutex);
@@ -787,6 +793,15 @@ rfbProcessClientNormalMessage(cl)
 		}
 		break;
 #endif
+#ifdef HAVE_ZRLE
+           case rfbEncodingZRLE:
+               if (cl->preferredEncoding == -1) {
+                   cl->preferredEncoding = enc;
+                   rfbLog("Using ZRLE encoding for client %s\n",
+                          cl->host);
+               }
+               break;
+#endif
             default:
 		if ( enc >= (CARD32)rfbEncodingCompressLevel0 &&
 		     enc <= (CARD32)rfbEncodingCompressLevel9 ) {
@@ -1187,6 +1202,14 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 		return FALSE;
 	    }
 	    break;
+#ifdef HAVE_ZRLE
+       case rfbEncodingZRLE:
+           if (!rfbSendRectEncodingZRLE(cl, x, y, w, h)) {
+	       sraRgnDestroy(updateRegion);
+               return FALSE;
+           }
+           break;
+#endif
         }
     }
     sraRgnReleaseIterator(i);

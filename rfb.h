@@ -6,6 +6,7 @@
  */
 
 /*
+ *  Copyright (C) 2002 RealVNC Ltd.
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
  *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
  *  All Rights Reserved.
@@ -297,7 +298,6 @@ typedef struct _rfbScreenInfo
     char* httpDir;
     SOCKET httpListenSock;
     SOCKET httpSock;
-    FILE* httpFP;
 
     PasswordCheckProcPtr passwordCheck;
     void* rfbAuthPasswdData;
@@ -409,6 +409,9 @@ typedef struct _rfbClientRec {
     Bool useCopyRect;
     int preferredEncoding;
     int correMaxWidth, correMaxHeight;
+#ifdef HAVE_ZRLE
+    void* zrleData;
+#endif
 
     /* The following member is only used during VNC authentication */
     CARD8 authChallenge[CHALLENGESIZE];
@@ -715,6 +718,11 @@ extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
 
 /* cursor handling for the pointer */
 extern void defaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
+
+/* zrle.c */
+
+extern Bool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w,int h);
+extern void FreeZrleData(rfbClientPtr cl);
 
 /* stats.c */
 

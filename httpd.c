@@ -3,6 +3,7 @@
  */
 
 /*
+ *  Copyright (C) 2002 RealVNC Ltd.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -47,29 +48,20 @@
 
 #include "rfb.h"
 
-#define NOT_FOUND_STR "HTTP/1.0 404 Not found\n\n" \
+#define NOT_FOUND_STR "HTTP/1.0 404 Not found\r\n\r\n" \
     "<HEAD><TITLE>File Not Found</TITLE></HEAD>\n" \
     "<BODY><H1>File Not Found</H1></BODY>\n"
 
-#define INVALID_REQUEST_STR "HTTP/1.0 400 Invalid Request\n\n" \
+#define INVALID_REQUEST_STR "HTTP/1.0 400 Invalid Request\r\n\r\n" \
     "<HEAD><TITLE>Invalid Request</TITLE></HEAD>\n" \
     "<BODY><H1>Invalid request</H1></BODY>\n"
 
-#define OK_STR "HTTP/1.0 200 OK\nContent-Type: text/html\n\n"
+#define OK_STR "HTTP/1.0 200 OK\nContent-Type: text/html\r\n\r\n"
 
 static void httpProcessInput();
 static Bool compareAndSkip(char **ptr, const char *str);
 static Bool parseParams(const char *request, char *result, int max_bytes);
 static Bool validateString(char *str);
-
-/*
-int httpPort = 0;
-char *httpDir = NULL;
-
-int httpListenSock = -1;
-int httpSock = -1;
-FILE* httpFP = NULL;
-*/
 
 #define BUF_SIZE 32768
 
@@ -163,8 +155,10 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
 	  rfbLog("Rejected HTTP connection from client %s\n",
 		 inet_ntoa(addr.sin_addr));
 #else
-	if ((rfbScreen->httpFP = fdopen(rfbScreen->httpSock, "r+")) == NULL) {
-	    rfbLogPerror("httpCheckFds: fdopen");
+	flags = fcntl(rfbScreen->httpSock, F_SETFL);
+
+	if (flags < 0 || fcntl(rfbScreen->httpSock, F_SETFL, flags | O_NONBLOCK) == -1) {
+	    rfbLogPerror("httpCheckFds: fcntl");
 #endif
 	    close(rfbScreen->httpSock);
 	    rfbScreen->httpSock = -1;
@@ -187,9 +181,6 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
 static void
 httpCloseSock(rfbScreenInfoPtr rfbScreen)
 {
-    fclose(rfbScreen->httpFP);
-    rfbScreen->httpFP = NULL;
-    /*RemoveEnabledDevice(httpSock);*/
     rfbScreen->httpSock = -1;
 }
 
@@ -231,7 +222,15 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
     /* Read data from the HTTP client until we get a complete request. */
     while (1) {
-	ssize_t got = read (rfbScreen->httpSock, buf + buf_filled,
+	ssize_t got;
+
+        if (buf_filled > sizeof (buf)) {
+	    rfbLog("httpProcessInput: HTTP request is too long\n");
+	    httpCloseSock(rfbScreen);
+	    return;
+	}
+
+	got = read (rfbScreen->httpSock, buf + buf_filled,
 			    sizeof (buf) - buf_filled - 1);
 
 	if (got <= 0) {
@@ -271,8 +270,6 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	    rfbLog("httpd: client asked for CONNECT\n");
 	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
 	    rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);
-	    // don't fclose(rfbScreen->httpFP), because this would kill the connection
-	    rfbScreen->httpFP = NULL;
 	    rfbScreen->httpSock = -1;
 	    return;
 	}
@@ -281,8 +278,6 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	    rfbLog("httpd: client asked for /proxied.connection\n");
 	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
 	    rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);
-	    // don't fclose(rfbScreen->httpFP), because this would kill the connection
-	    rfbScreen->httpFP = NULL;
 	    rfbScreen->httpSock = -1;
 	    return;
 	}	   

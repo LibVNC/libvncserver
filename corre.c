@@ -6,6 +6,7 @@
  */
 
 /*
+ *  Copyright (C) 2002 RealVNC Ltd.
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
  *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
  *  All Rights Reserved.
@@ -63,17 +64,15 @@ rfbSendRectEncodingCoRRE(cl, x, y, w, h)
     int x, y, w, h;
 {
     if (h > cl->correMaxHeight) {
-        rfbSendRectEncodingCoRRE(cl, x, y, w, cl->correMaxHeight  );
-        rfbSendRectEncodingCoRRE(cl, x, y + cl->correMaxHeight, w,
-                                 h - cl->correMaxHeight);
-        return FALSE;
+        return (rfbSendRectEncodingCoRRE(cl, x, y, w, cl->correMaxHeight) &&
+		rfbSendRectEncodingCoRRE(cl, x, y + cl->correMaxHeight, w,
+					 h - cl->correMaxHeight));
     }
 
     if (w > cl->correMaxWidth) {
-        rfbSendRectEncodingCoRRE(cl, x, y, cl->correMaxWidth, h);
-        rfbSendRectEncodingCoRRE(cl, x + cl->correMaxWidth, y,
-                                 w - cl->correMaxWidth, h);
-        return FALSE;
+        return (rfbSendRectEncodingCoRRE(cl, x, y, cl->correMaxWidth, h) &&
+		rfbSendRectEncodingCoRRE(cl, x + cl->correMaxWidth, y,
+					 w - cl->correMaxWidth, h));
     }
 
     rfbSendSmallRectEncodingCoRRE(cl, x, y, w, h);

@@ -1,8 +1,9 @@
 if [ a"$1" = adiff ]; then
   cmd=diff
+  shift
 else
   cmd=update
 fi
 
-cvs -z3 -d :pserver:anonymous@cvs.libvncserver.sf.net:/cvsroot/libvncserver $cmd
+cvs -z3 -d :pserver:anonymous@cvs.libvncserver.sf.net:/cvsroot/libvncserver $cmd "$@"
 

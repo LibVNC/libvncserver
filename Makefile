@@ -1,8 +1,10 @@
 INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
-# for Solaris
+CXX=g++
 CC=gcc
+
+# for Solaris
 #EXTRALIBS=-lsocket -lnsl -L/usr/X/lib
 
 # for FreeBSD
@@ -18,10 +20,7 @@ FLAG24 = -DALLOW24BPP
 
 OPTFLAGS=-g -Wall -pedantic
 #OPTFLAGS=-O2 -Wall
-CFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES) $(EXTRAINCLUDES) -DBACKCHANNEL
 RANLIB=ranlib
-
-LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB) $(EXTRALIBS)
 
 # for Mac OS X
 OSX_LIBS = -framework ApplicationServices -framework Carbon -framework IOKit
@@ -30,14 +29,31 @@ OSX_LIBS = -framework ApplicationServices -framework Carbon -framework IOKit
 #XLIBS =  -L/usr/X11R6/lib -lXtst -lXext -lX11
 XLIBS =  -L/usr/X11R6/lib -L/usr/lib32 -lXtst -lXext -lX11
 
+ifdef CXX
+
+ZRLE_SRCS=zrle.cc rdr/FdInStream.cxx rdr/FdOutStream.cxx rdr/InStream.cxx \
+	rdr/NullOutStream.cxx rdr/ZlibInStream.cxx rdr/ZlibOutStream.cxx
+ZRLE_OBJS=zrle.o rdr/FdInStream.o rdr/FdOutStream.o rdr/InStream.o \
+	rdr/NullOutStream.o rdr/ZlibInStream.o rdr/ZlibOutStream.o
+ZRLE_DEF=-DHAVE_ZRLE
+
+%.o: %.cxx
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+endif
+
+CFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES) $(EXTRAINCLUDES) $(ZRLE_DEF) -DBACKCHANNEL
+CXXFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES) $(EXTRAINCLUDES) $(ZRLE_DEF) -DBACKCHANNEL
+LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB) $(EXTRALIBS)
+
 SOURCES=main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	zlib.c tight.c httpd.c cursor.c font.c \
-	draw.c selbox.c d3des.c vncauth.c cargs.c
+	draw.c selbox.c d3des.c vncauth.c cargs.c $(ZRLE_SRCS)
 OBJS=main.o rfbserver.o sraRegion.o auth.o sockets.o \
 	stats.o corre.o hextile.o rre.o translate.o cutpaste.o \
 	zlib.o tight.o httpd.o cursor.o font.o \
-	draw.o selbox.o d3des.o vncauth.o cargs.o
+	draw.o selbox.o d3des.o vncauth.o cargs.o $(ZRLE_OBJS)
 INSTALLHEADER=rfb.h rfbproto.h sraRegion.h keysym.h
 
 all: example pnmshow storepasswd

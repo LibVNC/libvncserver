@@ -549,7 +549,6 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    rfbScreen->httpDir=NULL;
    rfbScreen->httpListenSock=-1;
    rfbScreen->httpSock=-1;
-   rfbScreen->httpFP=NULL;
 
    rfbScreen->desktopName = "LibVNCServer";
    rfbScreen->rfbAlwaysShared = FALSE;
