@@ -224,7 +224,10 @@ rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskSt
    rfbCursorPtr cursor = (rfbCursorPtr)calloc(1,sizeof(rfbCursor));
    char* cp;
    unsigned char bit;
-   
+
+#ifdef HAVE_PTHREADS   
+   pthread_mutex_init(&cursor->mutex, NULL);
+#endif
    cursor->width=width;
    cursor->height=height;
    //cursor->backRed=cursor->backGreen=cursor->backBlue=0xffff;
@@ -272,6 +275,9 @@ char* rfbMakeMaskForXCursor(int width,int height,char* source)
 void rfbFreeCursor(rfbCursorPtr cursor)
 {
    if(cursor) {
+#ifdef HAVE_PTHREADS   
+     pthread_mutex_destroy(&cursor->mutex);
+#endif
       free(cursor->source);
       free(cursor->mask);
       free(cursor);

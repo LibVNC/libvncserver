@@ -4,6 +4,8 @@ immediate:
 fix bug in http (java) client with big endian server: byte swapping is broken
 cursor "smears" sometimes when not using cursor encoding
 really support pthreads.
+	- cursor seems to be undrawn wildly
+	- connection gone and then reconnect is a problem
 
 in the works:
 -------------
