@@ -499,7 +499,9 @@ WriteExact(cl, buf, len)
             tv.tv_sec = 5;
             tv.tv_usec = 0;
             n = select(sock+1, NULL, &fds, NULL /* &fds */, &tv);
-            if (n < 0) {
+	    if (n < 0) {
+       	        if(errno==EINTR)
+		    continue;
                 rfbLogPerror("WriteExact: select");
                 UNLOCK(cl->outputMutex);
                 return n;

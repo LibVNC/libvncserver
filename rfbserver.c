@@ -655,6 +655,25 @@ rfbProcessClientInitMessage(cl)
     }
 }
 
+static rfbBool rectSwapIfLEAndClip(uint16_t* x,uint16_t* y,uint16_t* w,uint16_t* h,
+		rfbScreenInfoPtr screen)
+{
+	*x=Swap16IfLE(*x);
+	*y=Swap16IfLE(*y);
+	*w=Swap16IfLE(*w);
+	*h=Swap16IfLE(*h);
+	if(*w>screen->width-*x)
+		*w=screen->width-*x;
+	/* possible underflow */
+	if(*w>screen->width-*x)
+		return FALSE;
+	if(*h>screen->height-*y)
+		*h=screen->height-*y;
+	if(*h>screen->height-*y)
+		return FALSE;
+
+	return TRUE;
+}
 
 /*
  * rfbProcessClientNormalMessage is called when the client has sent a normal
@@ -904,11 +923,15 @@ rfbProcessClientNormalMessage(cl)
             return;
         }
 
+	if(!rectSwapIfLEAndClip(&msg.fur.x,&msg.fur.y,&msg.fur.w,&msg.fur.h,
+			cl->screen))
+		return;
+
 	tmpRegion =
-	  sraRgnCreateRect(Swap16IfLE(msg.fur.x),
-			   Swap16IfLE(msg.fur.y),
-			   Swap16IfLE(msg.fur.x)+Swap16IfLE(msg.fur.w),
-			   Swap16IfLE(msg.fur.y)+Swap16IfLE(msg.fur.h));
+	  sraRgnCreateRect(msg.fur.x,
+			   msg.fur.y,
+			   msg.fur.x+msg.fur.w,
+			   msg.fur.y+msg.fur.h);
 
         LOCK(cl->updateMutex);
 	sraRgnOr(cl->requestedRegion,tmpRegion);
