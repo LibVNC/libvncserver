@@ -124,6 +124,7 @@ void
 rfbReleaseClientIterator(rfbClientIteratorPtr iterator)
 {
   IF_PTHREADS(if(iterator->next) rfbDecrClientRef(iterator->next));
+  free(iterator);
 }
 
 
@@ -372,6 +373,8 @@ rfbClientConnectionGone(cl)
         pointerClient = NULL;
 
     sraRgnDestroy(cl->modifiedRegion);
+    sraRgnDestroy(cl->requestedRegion);
+    sraRgnDestroy(cl->copyRegion);
 
     UNLOCK(rfbClientListMutex);
 
@@ -1123,6 +1126,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	    break;
         }
     }
+    sraRgnReleaseIterator(i);
 
     if ( nUpdateRegionRects == 0xFFFF &&
 	 !rfbSendLastRectMarker(cl) ) {

@@ -262,6 +262,17 @@ int main(int argc,char** argv)
   /* initialize the server */
   rfbInitServer(rfbScreen);
 
+#define USE_OWN_LOOP
+#ifdef USE_OWN_LOOP
+  {
+    int i;
+    for(i=0;i<200;i++) {
+      fprintf(stderr,"%d\r",i);
+      rfbProcessEvents(rfbScreen,100000);
+    }
+  }
+#else
+
 #ifndef BACKGROUND_LOOP_TEST
   /* this is the blocking event loop, i.e. it never returns */
   /* 40000 are the microseconds, i.e. 0.04 seconds */
@@ -274,6 +285,11 @@ int main(int argc,char** argv)
   rfbRunEventLoop(rfbScreen,-1,TRUE);
   /* now we could do some cool things like rendering */
   while(1) sleep(5); /* render(); */
-   
+#endif
+
+  rfbFreeCursor(rfbScreen->cursor);
+  free(rfbScreen->frameBuffer);
+  rfbScreenCleanup(rfbScreen);
+
   return(0);
 }

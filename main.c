@@ -55,7 +55,7 @@ rfbLog(const char *format, ...)
 
     time(&log_clock);
     strftime(buf, 255, "%d/%m/%Y %T ", localtime(&log_clock));
-    fprintf(stderr, buf);
+    fprintf(stderr,buf);
 
     vfprintf(stderr, format, args);
     fflush(stderr);
@@ -583,9 +583,19 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
 void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
 {
+  rfbClientIteratorPtr i=rfbGetClientIterator(rfbScreen);
+  rfbClientPtr cl,cl1=rfbClientIteratorNext(i);
+  while(cl1) {
+    cl=rfbClientIteratorNext(i);
+    rfbClientConnectionGone(cl1);
+    cl1=cl;
+  }
+  rfbReleaseClientIterator(i);
+    
   /* TODO: hang up on all clients and free all reserved memory */
-  if(rfbScreen->colourMap.data.bytes)
-    free(rfbScreen->colourMap.data.bytes);
+#define FREE_IF(x) if(rfbScreen->x) free(rfbScreen->x)
+  FREE_IF(colourMap.data.bytes);
+  FREE_IF(underCursorBuffer);
   TINI_MUTEX(rfbScreen->cursorMutex);
   free(rfbScreen);
 }

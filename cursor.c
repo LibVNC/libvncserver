@@ -272,6 +272,8 @@ char* rfbMakeMaskForXCursor(int width,int height,char* source)
 void rfbFreeCursor(rfbCursorPtr cursor)
 {
    if(cursor) {
+      if(cursor->richSource)
+	 free(cursor->richSource);
       free(cursor->source);
       free(cursor->mask);
       free(cursor);
