@@ -329,7 +329,7 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
     }
 #ifdef BACKCHANNEL
       else if(message[0]=='b')
-	rfbSendBackChannel(screen,message+1,strlen(message+1));
+	rfbSendBackChannel(rfbScreen,message+1,strlen(message+1));
 #endif
   }
 #endif
