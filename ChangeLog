@@ -1,3 +1,7 @@
+2005-02-10  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -input option to fine tune allowed client input,
+	  additions to remote control and gui for this.
+
 2005-02-09  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -users, fix -solid on gnome and kde.
 	* configure.ac: add pwd.h, wait.h, and utmpx.h checks.

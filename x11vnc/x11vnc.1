@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.1pre, lastmod: 2005-02-08
+         version: 0.7.1pre, lastmod: 2005-02-10
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -250,6 +250,21 @@ out with the "#" character in the usual way.
 .IP
 Same as \fB-allow\fR 127.0.0.1
 .PP
+\fB-input\fR \fIstring\fR
+.IP
+Fine tuning of allowed user input.  If \fIstring\fR does
+not contain a comma "," the tuning applies only to
+normal clients.  Otherwise the part before "," is
+for normal clients and the part after for view-only
+clients.  "K" is for Keystroke input, "M" for
+Mouse-motion input, and "B" for Button-click input.
+Their presence in the string enables that type of input.
+E.g. "\fB-input\fR \fIM\fR" means normal users can only move
+the mouse and  "\fB-input\fR \fIKMB,M\fR" lets normal users do
+anything and enables view-only users to move the mouse.
+This option is ignored when a global \fB-viewonly\fR is in
+effect (all input is discarded).
+.PP
 \fB-viewpasswd\fR \fIstring\fR
 .IP
 Supply a 2nd password for view-only logins.  The \fB-passwd\fR
@@ -394,7 +409,8 @@ the switch succeeds (i.e. a user logs in).  To make
 it switch immediately regardless if the display can
 be reopened or not prefix the username with the +
 character. E.g. "\fB-users\fR \fI+bob\fR" or "\fB-users\fR \fI+nobody\fR".
-The latter is probably the only use of this option
+The latter (i.e. switching immediately to user
+"nobody") is probably the only use of this option
 that increases security.  To switch to a user *before*
 connections to the display are made or any files opened
 use the "=" character: "\fB-users\fR \fI=username\fR".
@@ -402,7 +418,7 @@ use the "=" character: "\fB-users\fR \fI=username\fR".
 The special user "guess" means to examine the utmpx
 database looking for a user attached to the display
 number and try him/her.  To limit the list of guesses,
-use: "\fB-users\fR \fIguess=bob,fred\fR".  Be especially careful
+use: "\fB-users\fR \fIguess=bob,betty\fR".  Be especially careful
 using this mode.
 .PP
 \fB-noshm\fR
@@ -1143,6 +1159,13 @@ localhost       enable  \fB-localhost\fR mode
 .IP
 nolocalhost     disable \fB-localhost\fR mode
 .IP
+input:str       set \fB-input\fR to "str", empty to disable.
+.IP
+client_input:str set the K, M, B \fB-input\fR on a per-client
+                basis.  select which client as for
+                disconnect, e.g. client_input:host:MB
+                or client_input:0x2:K
+.IP
 accept:cmd      set \fB-accept\fR "cmd" (empty to disable).
 .IP
 gone:cmd        set \fB-gone\fR "cmd" (empty to disable).
@@ -1424,13 +1447,13 @@ nosolid blackout xinerama noxinerama xrandr noxrandr
 xrandr_mode padgeom quiet q noquiet modtweak nomodtweak
 xkb noxkb skip_keycodes add_keysyms noadd_keysyms
 clear_mods noclear_mods clear_keys noclear_keys
-remap repeat norepeat fb nofb bell nobell sel nosel
-primary noprimary cursorshape nocursorshape cursorpos
-nocursorpos cursor show_cursor noshow_cursor
-nocursor xfixes noxfixes alphacut alphafrac
-alpharemove noalpharemove alphablend noalphablend
-xwarp xwarppointer noxwarp noxwarppointer buttonmap
-dragging nodragging pointer_mode pm input_skip speeds
+remap repeat norepeat fb nofb bell nobell sel
+nosel primary noprimary cursorshape nocursorshape
+cursorpos nocursorpos cursor show_cursor noshow_cursor
+nocursor xfixes noxfixes alphacut alphafrac alpharemove
+noalpharemove alphablend noalphablend xwarp xwarppointer
+noxwarp noxwarppointer buttonmap dragging nodragging
+pointer_mode pm input_skip input client_input speeds
 debug_pointer dp nodebug_pointer nodp debug_keyboard dk
 nodebug_keyboard nodk deferupdate defer wait rfbwait
 nap nonap sb screen_blank fs gaps grow fuzz snapfb
@@ -1482,10 +1505,13 @@ x11vnc.  Normally access to the X display is protected.
 Note that if they can modify VNC_CONNECT, they could
 also run their own x11vnc and have complete control
 of the desktop.  If the  "\fB-connect\fR \fI/path/to/file\fR"
-channel is being used, obviously anyone who can write
-to /path/to/file can remotely control x11vnc.  So be
-sure to protect the X display and that file's write
-permissions.
+channel is being used, obviously anyone who can
+write to /path/to/file can remotely control x11vnc.
+So be sure to protect the X display and that file's
+write permissions.
+.IP
+To disable the VNC_CONNECT property channel completely
+use \fB-novncconnect.\fR
 .PP
 \fB-unsafe\fR
 .IP

@@ -196,6 +196,8 @@ Permissions
 	forever
 	timeout:
 	--
+	input:
+	--
 	=SA alwaysshared
 	=SA nevershared
 	=SA dontdisconnect
@@ -279,6 +281,11 @@ Check if x11vnc still responds to \"ping\" remote command.
 	set helptext(update-all) "
 Query the x11vnc server for the current values of all variables.
 Populate the values into the gui's database.
+
+Normally the gui will refresh this info every time it interacts
+with the x11vnc server, so one doesn't need to use this action
+very often (unless something else is changing the state of the
+x11vnc server, or new clients have connected, etc).
 "
 
 	set helptext(clear-all) "
@@ -321,8 +328,27 @@ Terminate the tkx11vnc gui.  Any x11vnc servers will be left running.
 	set helptext(current) "
 Shows a menu of currently connected VNC clients on the x11vnc server.
 
-Allows you to find more information about them or disconnect them.
+Allows you to find more information about them, change their input
+permissions, or disconnect them.
+
 You will be prompted to confirm any disconnections.
+"
+
+	set helptext(client) "
+After selecting a VNC client from the \"Clients -> current\" menu,
+you will be presented with a dialog that shows the information
+about the VNC client.
+
+You can chose to disconnect the client by clicking on the 
+\"Disconnect\" checkbox and pressing \"OK\".  There will be a
+confirmation dialog to doublecheck.
+
+Alternatively, you can fine tune the VNC client's input permissions
+by selecting any of the Keystrokes, Mouse Motion, or Button Clicks
+checkboxes and pressing \"OK\".  This is like the \"-input\" option
+but on a per-client basis.
+
+To not change any aspects of the VNC client press \"Skip\".
 "
 
 	set helptext(solid_color) "
@@ -470,12 +496,18 @@ proc textheight {text} {
 	return $count
 }
 
+proc set_name {name} {
+	wm title    . "$name"
+	wm iconname . "$name"
+}
+
 proc make_toplevel {w {title ""}} {
 	catch {destroy $w}
 	toplevel  $w;
 	bind $w <Escape> "destroy $w"
 	if {$title != ""} {
-		wm title $w $title
+		wm title    $w $title
+		wm iconname $w $title
 	}
 }
 
@@ -1054,6 +1086,195 @@ proc push_new_value {item name new {query 1}} {
 	}
 }
 
+proc set_kmb_str {} {
+	global vl_bk vl_bm vl_bb vr_bk vr_bm vr_bb 
+
+	set str ""
+	if {$vl_bk} {
+		append str "K"
+	}
+	if {$vl_bm} {
+		append str "M"
+	}
+	if {$vl_bb} {
+		append str "B"
+	}
+	if {$vr_bk || $vr_bm || $vr_bb} {
+		append str ","
+	}
+	if {$vr_bk} {
+		append str "K"
+	}
+	if {$vr_bm} {
+		append str "M"
+	}
+	if {$vr_bb} {
+		append str "B"
+	}
+	entry_insert $str
+}
+
+proc insert_input_window {} {
+	global text_area cleanup_window
+	global ffont menu_var
+	global vl_bk vl_bm vl_bb vr_bk vr_bm vr_bb 
+
+	append_text "\nUse these checkboxes to set the input permissions, "
+	append_text "or type in the \"KMB...\"\n-input string manually.  "
+	append_text "Then press \"OK\" or \"Skip\".\n\n"
+	set w "$text_area.wk_f"
+	catch {destroy $w}
+	frame $w -bd 1 -relief ridge -cursor {top_left_arrow}
+	set fl $w.fl
+	frame $fl
+	set fr $w.fr
+	frame $fr
+	label $fl.l -font $ffont -text "Normal clients:   "
+	checkbutton $fl.bk -pady 1 -font $ffont -anchor w -variable vl_bk \
+		-pady 1 -command set_kmb_str -text "Keystrokes" 
+	checkbutton $fl.bm -font $ffont -anchor w -variable vl_bm \
+		-pady 1 -command set_kmb_str -text "Mouse Motion" 
+	checkbutton $fl.bb -font $ffont -anchor w -variable vl_bb \
+		-pady 1 -command set_kmb_str -text "Button Clicks"
+	label $fr.l -pady 1 -font $ffont -text "View-only clients:"
+	checkbutton $fr.bk -font $ffont -anchor w -variable vr_bk \
+		-pady 1 -command set_kmb_str -text "Keystrokes" 
+	checkbutton $fr.bm -font $ffont -anchor w -variable vr_bm \
+		-pady 1 -command set_kmb_str -text "Mouse Motion" 
+	checkbutton $fr.bb -font $ffont -anchor w -variable vr_bb \
+		-pady 1 -command set_kmb_str -text "Button Clicks"
+
+	if {[info exists menu_var(input)]} {
+		set input_str $menu_var(input)
+	} else {
+		set input_str ""
+	}
+
+	if {[regexp {(.*),(.*)} $input_str match normal viewonly]} {
+		;
+	} else {
+		set normal $input_str
+		set viewonly ""
+	}
+	set vl_bk 0
+	set vl_bm 0
+	set vl_bb 0
+	set vr_bk 0
+	set vr_bm 0
+	set vr_bb 0
+
+	if {[regexp -nocase {K} $normal]} {
+		set vl_bk 1
+	}
+	if {[regexp -nocase {M} $normal]} {
+		set vl_bm 1
+	}
+	if {[regexp -nocase {B} $normal]} {
+		set vl_bb 1
+	}
+	if {[regexp -nocase {K} $viewonly]} {
+		set vr_bk 1
+	}
+	if {[regexp -nocase {M} $viewonly]} {
+		set vr_bm 1
+	}
+	if {[regexp -nocase {B} $viewonly]} {
+		set vr_bb 1
+	}
+
+	pack $fl.l $fl.bk $fl.bm $fl.bb -side top -fill x
+	pack $fr.l $fr.bk $fr.bm $fr.bb -side top -fill x
+	pack $fl $fr -side left
+	update
+	update idletasks
+	$text_area window create end -window $w
+	$text_area see end
+	$text_area insert end "\n"
+#	$text_area insert end "\n\n\n\n\n\n\n\n\n"
+
+	set cleanup_window $w
+}
+
+proc set_ca_str {w} {
+	global ca_bk ca_bm ca_bb ca_bk ca_di
+
+	if {$ca_di} {
+		entry_insert "disconnect"
+		$w.bk configure -state disabled
+		$w.bm configure -state disabled
+		$w.bb configure -state disabled
+		return
+	}
+
+	$w.bk configure -state normal
+	$w.bm configure -state normal
+	$w.bb configure -state normal
+
+	set str ""
+	if {$ca_bk} {
+		append str "K"
+	}
+	if {$ca_bm} {
+		append str "M"
+	}
+	if {$ca_bb} {
+		append str "B"
+	}
+	entry_insert $str
+}
+
+proc insert_client_action_window {input} {
+	global text_area cleanup_window
+	global ffont menu_var
+	global ca_bk ca_bm ca_bb ca_bk ca_di
+
+	append_text "\nUse these checkboxes to set the input permissions "
+	append_text "for this client\n-or- whether to disconnect it instead.  "
+	append_text "Then press \"OK\" or \"Skip\".\n\n"
+	set w "$text_area.ca_f"
+	catch {destroy $w}
+	frame $w -bd 1 -relief ridge -cursor {top_left_arrow}
+	checkbutton $w.di -pady 1 -font $ffont -anchor w -variable ca_di \
+		-pady 1 -command "set_ca_str $w" -text "Disconnect    " 
+	checkbutton $w.bk -font $ffont -anchor w -variable ca_bk \
+		-pady 1 -command "set_ca_str $w" -text "Keystrokes" 
+	checkbutton $w.bm -font $ffont -anchor w -variable ca_bm \
+		-pady 1 -command "set_ca_str $w" -text "Mouse Motion" 
+	checkbutton $w.bb -font $ffont -anchor w -variable ca_bb \
+		-pady 1 -command "set_ca_str $w" -text "Button Clicks"
+
+	set ca_di 0
+	set ca_bk 0
+	set ca_bm 0
+	set ca_bb 0
+
+	if {[regexp -nocase {K} $input]} {
+		set ca_bk 1
+	}
+	if {[regexp -nocase {M} $input]} {
+		set ca_bm 1
+	}
+	if {[regexp -nocase {B} $input]} {
+		set ca_bb 1
+	}
+
+	pack $w.di $w.bk $w.bm $w.bb -side left
+	update
+	update idletasks
+	$text_area window create end -window $w
+	$text_area see end
+	$text_area insert end "\n"
+
+	set cleanup_window $w
+}
+
+proc cleanup_text_window {} {
+	global cleanup_window
+	if {[info exists cleanup_window]} {
+		catch {destroy $cleanup_window}
+	}
+}
+
 # For updating a string variable.   Also used for simple OK/Skip dialogs
 # with entry = 0.
 proc entry_dialog {item {entry 1}} {
@@ -1084,6 +1305,13 @@ proc entry_dialog {item {entry 1}} {
 		entry_disable box
 	}
 
+	set clean_text_window 0;
+
+	if {$item == "input"} {
+		insert_input_window
+		set clean_text_window 1
+	}
+
 	update
 
 	# wait for user reply:
@@ -1101,6 +1329,11 @@ proc entry_dialog {item {entry 1}} {
 	entry_delete
 	entry_disable
 	menus_enable
+
+	if {$clean_text_window} {
+		cleanup_text_window;
+	}
+
 	update
 
 	if {! $entry} {
@@ -1205,7 +1438,8 @@ proc see_if_ok {query item expected} {
 	} elseif {[regexp {:[0-9]\.[0-9]} $expected]} {
 		append_text "\t($msg)\n"
 		return 1
-	} elseif {$item == "connect" || $item == "disconnect"} {
+	} elseif {$item == "connect" || $item == "disconnect"
+	    || $item == "client" || $item == "client_input"} {
 		append_text "\t($msg)\n"
 		return 1
 	} else {
@@ -1259,7 +1493,7 @@ proc clear_all {} {
 			continue
 		}
 		if {[info exists menu_var($item)]} {
-			if [is_action $item] {
+			if {[is_action $item]} {
 				set menu_var($item) ""
 			} elseif {[value_is_bool $item]} {
 				set menu_var($item) 0
@@ -1494,7 +1728,7 @@ proc do_action {item} {
 		push_new_value $item $name $new 0
 		set_connected no
 		
-	} elseif [opt_match Q $item] {
+	} elseif {[opt_match Q $item]} {
 		push_new_value $item $name $new 1
 	} else {
 		push_new_value $item $name $new 0
@@ -1660,7 +1894,7 @@ proc split_query {query} {
 proc set_x11_display {name} {
 	global x11_display
 	set x11_display "x11vnc X display: $name"
-	wm title . "tkx11vnc - $name"
+	set_name "tkx11vnc - $name"
 }
 proc set_vnc_display {name} {
 	global vnc_display
@@ -1672,7 +1906,7 @@ proc set_vnc_url {name} {
 }
 proc no_x11_display {} {
 	set_x11_display "(*none*)"
-	wm title . "tkx11vnc"
+	set_name "tkx11vnc"
 }
 proc no_vnc_display {} {
 	set_vnc_display "(*none*)"
@@ -1713,20 +1947,99 @@ proc fetch_displays {} {
 	}
 }
 
+proc client_dialog {client} {
+	set cid ""
+	set host ""
+	set ip ""
+	global menu_var text_area cleanup_window item_bool
+
+	append_text "\nClient info string:  $client\n\n"
+	if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*)$} \
+	    $client m0 m1 m2 m3 m4 m5 m6]} {
+		# id:ip:port:hostname:input:loginvo
+		set cid $m1
+		set ip $m2
+		set port $m3
+		set host $m4
+		regsub {\..*$} $host "" host
+		set input $m5
+		set logvo $m6
+		append_text "Host: $host, Port: $port, IP: $ip, Id: $cid\n"
+		append_text "    - originally logged in as: "
+		if {$logvo == "1" } {
+			append_text "View-Only Client\n"
+		} else {
+			append_text "Normal Client\n"
+		}
+		append_text "    - currently allowed input: "
+		set sk 0
+		set sm 0
+		set sb 0
+		if {[regexp -nocase {K} $input]} {
+			append_text "Keystroke"
+			set sk 1
+		}
+		if {[regexp -nocase {M} $input]} {
+			if {$sk} {
+				append_text ", "
+			}
+			append_text "Mouse-Motion"
+			set sm 1
+		}
+		if {[regexp -nocase {B} $input]} {
+			if {$sk || $sm} {
+				append_text ", "
+			}
+			append_text "Button-Click"
+			set sb 1
+		}
+		if {! $sk && ! $sm && ! $sb} {
+			append_text "None"
+		}
+		append_text "\n"
+	}
+	if {$cid == ""} {
+		append_text "Invalid client info string: $client\n"
+		return
+	}
+
+	regsub -all {_} $input "" input
+	set menu_var(client) "$input"
+	set item_bool(client) 0
+
+	insert_client_action_window $input
+	set rc [entry_dialog client 1]
+
+	cleanup_text_window
+
+	set val $menu_var(client)
+	#puts "rc: $rc  val: $val"
+
+	if {! $rc} {
+		return;
+	} elseif {[regexp -nocase {(disconnect|close)} $val]} {
+		disconnect_dialog $client
+	} else {
+		regsub -all -nocase {[^KMB]} $val "" 
+		set item_bool(client_input) 0
+		push_new_value "client_input" "client_input" "$cid:$val" 0
+	}
+}
+
 proc disconnect_dialog {client} {
 	set cid ""
 	set host ""
 	set msg "\n"
 	append msg "*** Client info string: $client\n"
-	if {[regexp {^(.*):(.*)/(.*)-(.*)$} $client m0 m1 m2 m3 m4]} {
-		if {$m4 == "ro"} {
-			set view "(viewonly)"
-		} else {
-			set view "(interactive)"
-		}
-		set host $m1
-		set cid $m3
-		append msg "*** Host: $m1, Port: $m2 Id: $m3  $view\n"
+	if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*)$} $client m0 m1 m2 m3 m4 m5 m6]} {
+		set cid $m1
+		set ip $m2
+		set port $m3
+		set host $m4
+		regsub {\..*$} $host "" host
+		set input $m5
+		set logvo $m6
+		append_text "Host: $host, Port: $port, IP: $ip, Id: $cid\n"
 	}
 	if {$cid == ""} {
 		append_text "Invalid client info string: $client\n"
@@ -1734,7 +2047,7 @@ proc disconnect_dialog {client} {
 	}
 	append msg "*** To *DISCONNECT* this client press \"OK\", otherwise press \"Skip\"\n"
 	bell
-	if [warning_dialog $msg "current"] {
+	if {[warning_dialog $msg "current"]} {
 		push_new_value "disconnect" "disconnect" $cid 1
 	} else {
 		append_text "disconnect cancelled.\n"
@@ -1756,7 +2069,7 @@ proc update_clients_and_repost {} {
 			continue
 		}
 		set name [$casc entrycget $i -label]
-		if {[regexp {^#} $name]} {
+		if {[regexp {^num-clients} $name]} {
 			continue
 		}
 		if {[regexp {^refresh-list} $name]} {
@@ -1783,12 +2096,20 @@ proc update_clients_menu {list} {
 	$subm add separator
 	set count 0
 	foreach client [split $list ","] {
-		regsub {:[0-9][0-9]*/} $client {/} lab
-		$subm add command -label "$client" \
-			-command "disconnect_dialog $client"
+		if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*)$} \
+		    $client m0 m1 m2 m3 m4 m5 m6]} {
+			# id:ip:port:hostname:input:loginvo
+			set host $m4
+			regsub {\..*$} $host "" host
+			set clabel "$host $m1"
+		} else {
+			regsub {:.*$} $client "" clabel
+		}
+		$subm add command -label "$clabel" \
+			-command "client_dialog $client"
 		incr count
 	}
-	$subm entryconfigure 0 -label "#clients: $count"
+	$subm entryconfigure 0 -label "num-clients: $count"
 }
 
 proc set_widgets {} {
@@ -2076,7 +2397,7 @@ proc make_widgets {} {
 	pack $df -side top -fill x
 
 	# text area
-	text .text -height 11 -relief ridge -font $ffont
+	text .text -height 12 -relief ridge -font $ffont
 	set text_area .text
 	pack .text -side top -fill both -expand 1
 
@@ -2622,7 +2943,7 @@ tweak_both screen_blank sb
 
 set_template
 
-wm title . "tkx11vnc"
+set_name "tkx11vnc"
 make_widgets;
 
 menu_bindings;

@@ -290,7 +290,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.1pre lastmod: 2005-02-08";
+char lastmod[] = "0.7.1pre lastmod: 2005-02-10";
 
 /* X display info */
 
@@ -346,13 +346,19 @@ unsigned short main_red_shift, main_green_shift, main_blue_shift;
 
 /* we now have a struct with client specific data: */
 #define RATE_SAMPLES 5
+#define CILEN 10
 typedef struct _ClientData {
-	int had_cursor_shape_updates;
-	int had_cursor_pos_updates;
 	int uid;
+	char *hostname;
 	int client_port;
 	int server_port;
 	char *server_ip;
+	char input[CILEN];
+	int login_viewonly;
+
+	int had_cursor_shape_updates;
+	int had_cursor_pos_updates;
+
 	double timer;
 	double send_cmp_rate;
 	double send_raw_rate;
@@ -445,6 +451,7 @@ double dtime(double *);
 void initialize_blackouts(char *);
 void initialize_blackouts_and_xinerama(void);
 void initialize_keyboard_and_pointer(void);
+void initialize_allowed_input(void);
 void initialize_modtweak(void);
 void initialize_pointer_map(char *);
 void initialize_cursors_mode(void);
@@ -519,6 +526,8 @@ void check_xevents(void);
 char *this_host(void);
 void set_vnc_desktop_name(void);
 
+char *short_kmb(char *);
+
 int get_cmp_rate(void);
 int get_raw_rate(void);
 int get_read_rate(void);
@@ -574,6 +583,9 @@ char *allow_once = NULL;	/* one time -allow */
 char *accept_cmd = NULL;	/* for -accept */
 char *gone_cmd = NULL;		/* for -gone */
 int view_only = 0;		/* clients can only watch. */
+char *allowed_input_view_only = NULL;
+char *allowed_input_normal = NULL;
+char *allowed_input_str = NULL;
 char *viewonly_passwd = NULL;	/* view only passwd. */
 int inetd = 0;			/* spawned from inetd(1) */
 int connect_once = 1;		/* disconnect after first connection session. */
@@ -772,6 +784,18 @@ void lowercase(char *str) {
 	p = str;
 	while (*p != '\0') {
 		*p = tolower(*p);
+		p++;
+	}
+}
+
+void uppercase(char *str) {
+	char *p;
+	if (str == NULL) {
+		return;
+	}
+	p = str;
+	while (*p != '\0') {
+		*p = toupper(*p);
 		p++;
 	}
 }
@@ -1325,6 +1349,31 @@ char *host2ip(char *host) {
 	return str;
 }
 
+char *ip2host(char *ip) {
+	char *str;
+#if LIBVNCSERVER_HAVE_NETDB_H && LIBVNCSERVER_HAVE_NETINET_IN_H
+	struct hostent *hp;
+#ifndef in_addr_t
+typedef unsigned int in_addr_t;
+#endif
+	in_addr_t iaddr;
+
+	iaddr = inet_addr(ip);
+	if (iaddr == INADDR_NONE) {
+		return strdup("unknown");
+	}
+
+	hp = gethostbyaddr((char *)&iaddr, sizeof(in_addr_t), AF_INET);
+	if (!hp) {
+		return strdup("unknown");
+	}
+	str = strdup(hp->h_name);
+#else
+	str = strdup("unknown");
+#endif
+	return str;
+}
+
 int dotted_ip(char *host) {
 	char *p = host;
 	while (*p != '\0') {
@@ -1337,68 +1386,64 @@ int dotted_ip(char *host) {
 	return 1;
 }
 
-int get_remote_port(int sock) {
+int get_port(int sock, int remote) {
 	struct sockaddr_in saddr;
 	int saddr_len, saddr_port;
 	
 	saddr_len = sizeof(saddr);
 	memset(&saddr, 0, sizeof(saddr));
 	saddr_port = -1;
-	if (!getpeername(sock, (struct sockaddr *)&saddr, &saddr_len)) {
-		saddr_port = ntohs(saddr.sin_port);
+	if (remote) {
+		if (!getpeername(sock, (struct sockaddr *)&saddr, &saddr_len)) {
+			saddr_port = ntohs(saddr.sin_port);
+		}
+	} else {
+		if (!getsockname(sock, (struct sockaddr *)&saddr, &saddr_len)) {
+			saddr_port = ntohs(saddr.sin_port);
+		}
 	}
 	return saddr_port;
 }
 
-char *get_remote_host(int sock) {
-	struct sockaddr_in saddr;
-	int saddr_len, saddr_port;
-	char *saddr_ip_str = NULL;
-	
-	saddr_len = sizeof(saddr);
-	memset(&saddr, 0, sizeof(saddr));
-	saddr_port = -1;
-	if (!getsockname(sock, (struct sockaddr *)&saddr, &saddr_len)) {
-#if LIBVNCSERVER_HAVE_NETINET_IN_H
-		saddr_ip_str = inet_ntoa(saddr.sin_addr);
-#endif
-	}
-	if (! saddr_ip_str) {
-		saddr_ip_str = strdup("unknown");
-	}
-	return saddr_ip_str;
+int get_remote_port(int sock) {
+	return get_port(sock, 1);
 }
 
 int get_local_port(int sock) {
+	return get_port(sock, 0);
+}
+
+char *get_host(int sock, int remote) {
 	struct sockaddr_in saddr;
 	int saddr_len, saddr_port;
+	char *saddr_ip_str = NULL;
 	
 	saddr_len = sizeof(saddr);
 	memset(&saddr, 0, sizeof(saddr));
 	saddr_port = -1;
-	if (!getsockname(sock, (struct sockaddr *)&saddr, &saddr_len)) {
-		saddr_port = ntohs(saddr.sin_port);
+#if LIBVNCSERVER_HAVE_NETINET_IN_H
+	if (remote) {
+		if (!getpeername(sock, (struct sockaddr *)&saddr, &saddr_len)) {
+			saddr_ip_str = inet_ntoa(saddr.sin_addr);
+		}
+	} else {
+		if (!getsockname(sock, (struct sockaddr *)&saddr, &saddr_len)) {
+			saddr_ip_str = inet_ntoa(saddr.sin_addr);
+		}
 	}
-	return saddr_port;
+#endif
+	if (! saddr_ip_str) {
+		saddr_ip_str = "unknown";
+	}
+	return strdup(saddr_ip_str);
+}
+
+char *get_remote_host(int sock) {
+	return get_host(sock, 1);
 }
 
 char *get_local_host(int sock) {
-	struct sockaddr_in saddr;
-	int saddr_len, saddr_port;
-	char *saddr_ip_str = NULL;
-
-	saddr_len = sizeof(saddr);
-	memset(&saddr, 0, sizeof(saddr));
-	saddr_port = -1;
-	if (!getsockname(sock, (struct sockaddr *)&saddr, &saddr_len)) {
-#if LIBVNCSERVER_HAVE_NETINET_IN_H
-		saddr_ip_str = inet_ntoa(saddr.sin_addr);
-#endif
-	}
-	if (! saddr_ip_str) {
-		saddr_ip_str = strdup("unknown");
-	}
-	return saddr_ip_str;
+	return get_host(sock, 0);
 }
 
 /* 
@@ -2072,10 +2117,13 @@ char *list_clients(void) {
 	rfbReleaseClientIterator(iter);
 
 	/*
-	 * each client: 123.123.123.123:60000/0x11111111-rw, = 36 bytes 
-	 * so count+1 * 100 must cover it.
+	 * each client:
+         * <id>:<ip>:<port>:<hostname>:<input>:<loginview>,
+	 * 8+1+16+1+5+1+256+1+5+1+1+1
+	 * 123.123.123.123:60000/0x11111111-rw, = 297 bytes 
+	 * so count+1 * 400 must cover it.
 	 */
-	list = (char *) malloc((count+1)*100);
+	list = (char *) malloc((count+1)*400);
 	
 	list[0] = '\0';
 
@@ -2085,14 +2133,18 @@ char *list_clients(void) {
 		if (*list != '\0') {
 			strcat(list, ",");
 		}
-		strcat(list, cl->host);
-		sprintf(tmp, ":%d/0x%x", get_remote_port(cl->sock), cd->uid);
+		sprintf(tmp, "0x%x:", cd->uid);
 		strcat(list, tmp);
-		if (cl->viewOnly) {
-			strcat(list, "-ro");
-		} else {
-			strcat(list, "-rw");
-		}
+		strcat(list, cl->host);
+		strcat(list, ":");
+		sprintf(tmp, "%d:", cd->client_port);
+		strcat(list, tmp);
+		strcat(list, cd->hostname);
+		strcat(list, ":");
+		strcat(list, cd->input);
+		strcat(list, ":");
+		sprintf(tmp, "%d", cd->login_viewonly);
+		strcat(list, tmp);
 	}
 	rfbReleaseClientIterator(iter);
 	return list;
@@ -2114,23 +2166,18 @@ void close_all_clients(void) {
 	rfbReleaseClientIterator(iter);
 }
 
-void close_clients(char *str) {
+rfbClientPtr *client_match(char *str) {
 	rfbClientIteratorPtr iter;
-	rfbClientPtr cl;
-	int host_warn = 0, hex_warn = 0;
+	rfbClientPtr cl, *cl_list;
+	int i, n, host_warn = 0, hex_warn = 0;
 
-	if (!strcmp(str, "all") || !strcmp(str, "*")) {
-		close_all_clients();
-		return;
-	}
-
-	if (! screen) {
-		return;
-	}
-
+	n = client_count + 10;
+	cl_list = (rfbClientPtr *) malloc(n * sizeof(rfbClientPtr));
+	
+	i = 0;
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
-		if (strstr(str, "0x")) {
+		if (strstr(str, "0x") == str) {
 			int id;
 			ClientData *cd = (ClientData *) cl->clientData;
 			if (sscanf(str, "0x%x", &id) != 1) {
@@ -2141,8 +2188,7 @@ void close_clients(char *str) {
 				continue;
 			}
 			if ( cd->uid == id) {
-				rfbCloseClient(cl);
-				rfbClientConnectionGone(cl);
+				cl_list[i++] = cl;
 			}
 		} else {
 			char *rstr = str;
@@ -2159,15 +2205,77 @@ void close_clients(char *str) {
 				rfbLog("lookup: %s -> %s\n", str, rstr);
 			}
 			if (!strcmp(rstr, cl->host)) {
-				rfbCloseClient(cl);
-				rfbClientConnectionGone(cl);
+				cl_list[i++] = cl;
 			}
 			if (rstr != str) {
 				free(rstr);
 			}
 		}
+		if (i >= n - 1) {
+			break;
+		}
 	}
 	rfbReleaseClientIterator(iter);
+
+	cl_list[i] = NULL;
+
+	return cl_list;
+}
+
+void close_clients(char *str) {
+	rfbClientPtr *cl_list, *cp;
+
+	if (!strcmp(str, "all") || !strcmp(str, "*")) {
+		close_all_clients();
+		return;
+	}
+
+	if (! screen) {
+		return;
+	}
+	
+	cl_list = client_match(str);
+
+	cp = cl_list;
+	while (*cp) {
+		rfbCloseClient(*cp);
+		rfbClientConnectionGone(*cp);
+		cp++;
+	}
+	free(cl_list);
+}
+
+void set_client_input(char *str) {
+	rfbClientPtr *cl_list, *cp;
+	char *p, *val;
+
+	/* str is "match:value" */
+
+	if (! screen) {
+		return;
+	}
+
+	p = strchr(str, ':');
+	if (! p) {
+		return;
+	}
+	*p = '\0';
+	p++;
+	val = short_kmb(p);
+	
+	cl_list = client_match(str);
+
+	cp = cl_list;
+	while (*cp) {
+		ClientData *cd = (ClientData *) (*cp)->clientData;
+		cd->input[0] = '\0';
+		strcat(cd->input, "_");
+		strcat(cd->input, val);
+		cp++;
+	}
+
+	free(val);
+	free(cl_list);
 }
 
 /*
@@ -2221,7 +2329,9 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	if (cd && cd->server_ip) {
 		set_env("RFB_SERVER_IP", cd->server_ip);
 	} else {
-		set_env("RFB_SERVER_IP", get_local_host(client->sock));
+		char *sip = get_local_host(client->sock);
+		set_env("RFB_SERVER_IP", sip);
+		free(sip);
 	}
 
 	if (cd && cd->server_port > 0) {
@@ -2287,8 +2397,13 @@ static void client_gone(rfbClientPtr client) {
 
 	if (client->clientData) {
 		ClientData *cd = (ClientData *) client->clientData;
-		if (cd && cd->server_ip) {
-			free(cd->server_ip);
+		if (cd) {
+			if (cd->server_ip) {
+				free(cd->server_ip);
+			}
+			if (cd->hostname) {
+				free(cd->hostname);
+			}
 		}
 		free(client->clientData);
 	}
@@ -3288,9 +3403,6 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		return(RFB_CLIENT_REFUSE);
 	}
 
-	if (view_only)  {
-		client->viewOnly = TRUE;
-	}
 	client->clientData = (void *) calloc(sizeof(ClientData), 1);
 	cd = (ClientData *) client->clientData;
 
@@ -3298,7 +3410,11 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	cd->client_port = get_remote_port(client->sock);
 	cd->server_port = get_local_port(client->sock);
-	cd->server_ip = strdup(get_remote_host(client->sock));
+	cd->server_ip   = get_local_host(client->sock);
+	cd->hostname = ip2host(client->host);
+
+	cd->input[0] = '-';
+	cd->login_viewonly = -1;
 
 	client->clientGoneHook = client_gone;
 	client_count++;
@@ -3325,6 +3441,54 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	last_client = time(0);
 
 	return(RFB_CLIENT_ACCEPT);
+}
+
+void check_new_clients(void) {
+	static int last_count = 0;
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	
+	if (client_count == last_count) {
+		return;
+	}
+
+	if (! all_clients_initialized()) {
+		return;
+	}
+
+	last_count = client_count;
+	if (! client_count) {
+		return;
+	}
+	if (! screen) {
+		return;
+	}
+
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		ClientData *cd = (ClientData *) cl->clientData;
+
+		if (cd->login_viewonly < 0) {
+			/* this is a general trigger to initialize things */
+			if (cl->viewOnly) {
+				cd->login_viewonly = 1;
+				if (allowed_input_view_only) {
+					cl->viewOnly = FALSE;
+					cd->input[0] = '\0';
+					strncpy(cd->input,
+					    allowed_input_view_only, CILEN);
+				}
+			} else {
+				cd->login_viewonly = 0;
+				if (allowed_input_normal) {
+					cd->input[0] = '\0';
+					strncpy(cd->input,
+					    allowed_input_normal, CILEN);
+				}
+			}
+		}
+	}
+	rfbReleaseClientIterator(iter);
 }
 
 /* -- keyboard.c -- */
@@ -4494,6 +4658,99 @@ if (sym >> 8 == 0) { \
 }
 #endif
 
+char *short_kmb(char *str) {
+	int i, saw_k = 0, saw_m = 0, saw_b = 0, n = 10;
+	char *p, tmp[10];
+	
+	for (i=0; i<n; i++) {
+		tmp[i] = '\0';
+	}
+
+	p = str;
+	i = 0;
+	while (*p) {
+		if ((*p == 'K' || *p == 'k') && !saw_k) {
+			tmp[i++] = 'K';
+			saw_k = 1;
+		} else if ((*p == 'M' || *p == 'm') && !saw_m) {
+			tmp[i++] = 'M';
+			saw_m = 1;
+		} else if ((*p == 'B' || *p == 'b') && !saw_b) {
+			tmp[i++] = 'B';
+			saw_b = 1;
+		}
+		p++;
+	}
+	return(strdup(tmp));
+}
+
+void initialize_allowed_input(void) {
+	char *str;
+
+	if (allowed_input_normal) {
+		free(allowed_input_normal);
+	}
+	if (allowed_input_view_only) {
+		free(allowed_input_view_only);
+	}
+
+	if (! allowed_input_str) {
+		allowed_input_normal = strdup("KMB");
+		allowed_input_view_only = strdup("");
+	} else {
+		char *p, *str = strdup(allowed_input_str);
+		p = strchr(str, ',');
+		if (p) {
+			allowed_input_view_only = strdup(p+1);
+			*p = '\0';
+			allowed_input_normal = strdup(str);
+		} else {
+			allowed_input_normal = strdup(str);
+			allowed_input_view_only = strdup("");
+		}
+		free(str);
+	}
+
+	/* shorten them */
+	str = short_kmb(allowed_input_normal);
+	free(allowed_input_normal);
+	allowed_input_normal = str;
+
+	str = short_kmb(allowed_input_view_only);
+	free(allowed_input_view_only);
+	allowed_input_view_only = str;
+
+	if (screen) {
+		rfbClientIteratorPtr iter;
+		rfbClientPtr cl;
+
+		iter = rfbGetClientIterator(screen);
+		while( (cl = rfbClientIteratorNext(iter)) ) {
+			ClientData *cd = (ClientData *) cl->clientData;
+
+			if (cd->input[0] == '=') {
+				;	/* custom setting */
+			} else if (cd->login_viewonly) {
+				if (*allowed_input_view_only != '\0') {
+					cl->viewOnly = FALSE;
+					cd->input[0] = '\0';
+					strncpy(cd->input,
+					    allowed_input_view_only, CILEN);
+				} else {
+					cl->viewOnly = TRUE;
+				}
+			} else {
+				if (allowed_input_normal) {
+					cd->input[0] = '\0';
+					strncpy(cd->input,
+					    allowed_input_normal, CILEN);
+				}
+			}
+		}
+		rfbReleaseClientIterator(iter);
+	}
+}
+
 void initialize_keyboard_and_pointer(void) {
 	if (use_modifier_tweak) {
 		initialize_modtweak();
@@ -4664,13 +4921,6 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 		    down ? "down" : "up", (int) keysym);
 	}
 
-	if (view_only) {
-		return;
-	}
-	if (client && client->viewOnly) {
-		return;
-	}
-
 #define ADJUSTMOD(sym, state) \
 	if (keysym == sym) { \
 		if (down) { \
@@ -4715,6 +4965,54 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	}
 }
 
+typedef struct allowed_input {
+	int keystroke;
+	int motion;
+	int button;
+} allowed_input_t;
+
+void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
+	ClientData *cd;
+	char *str;
+
+	input->keystroke = 0;
+	input->motion    = 0;
+	input->button    = 0;
+
+	if (! client) {
+		return;
+	}
+
+	cd = (ClientData *) client->clientData;
+	
+	if (cd->input[0] != '-') {
+		str = cd->input;
+	} else if (client->viewOnly) {
+		if (allowed_input_view_only) {
+			str = allowed_input_view_only;
+		} else {
+			str = "";
+		}
+	} else {
+		if (allowed_input_normal) {
+			str = allowed_input_normal;
+		} else {
+			str = "KMB";
+		}
+	}
+
+	while (*str) {
+		if (*str == 'K') {
+			input->keystroke = 1;
+		} else if (*str == 'M') {
+			input->motion = 1;
+		} else if (*str == 'B') {
+			input->button = 1;
+		}
+		str++;
+	}
+}
+
 /*
  * key event handler.  See the above functions for contortions for
  * running under -modtweak.
@@ -4724,6 +5022,7 @@ static rfbClientPtr last_keyboard_client = NULL;
 void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 	int isbutton = 0;
+	allowed_input_t input;
 
 	if (debug_keyboard) {
 		char *str;
@@ -4737,7 +5036,8 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	if (view_only) {
 		return;
 	}
-	if (client && client->viewOnly) {
+	get_allowed_input(client, &input);
+	if (! input.keystroke) {
 		return;
 	}
 
@@ -5074,10 +5374,9 @@ void initialize_pointer_map(char *pointer_remap) {
 }
 
 /*
- * Send a pointer event to the X server.
+ * Send a pointer position event to the X server.
  */
-static void update_x11_pointer(int mask, int x, int y) {
-	int i, mb;
+static void update_x11_pointer_position(int x, int y) {
 
 	X_LOCK;
 	if (use_xwarppointer) {
@@ -5097,6 +5396,25 @@ static void update_x11_pointer(int mask, int x, int y) {
 
 	/* change the cursor shape if necessary */
 	set_cursor(x, y, get_which_cursor());
+
+	last_event = last_input = time(0);
+
+	if (nofb) {
+		/* 
+		 * nofb is for, e.g. Win2VNC, where fastest pointer
+		 * updates are desired.
+		 */
+		X_LOCK;
+		XFlush(dpy);
+		X_UNLOCK;
+	}
+}
+
+/*
+ * Send a pointer position event to the X server.
+ */
+static void update_x11_pointer_mask(int mask) {
+	int i, mb;
 
 	last_event = last_input = time(0);
 
@@ -5165,14 +5483,6 @@ static void update_x11_pointer(int mask, int x, int y) {
 	    }
 	}
 
-	if (nofb) {
-		/* 
-		 * nofb is for, e.g. Win2VNC, where fastest pointer
-		 * updates are desired.
-		 */
-		XFlush(dpy);
-	}
-
 	X_UNLOCK;
 
 	/*
@@ -5185,9 +5495,10 @@ static void update_x11_pointer(int mask, int x, int y) {
 /*
  * Actual callback from libvncserver when it gets a pointer event.
  * This may queue pointer events rather than sending them immediately
- * to the X server. (see update_x11_pointer())
+ * to the X server. (see update_x11_pointer*())
  */
 void pointer(int mask, int x, int y, rfbClientPtr client) {
+	allowed_input_t input;
 
 	if (debug_pointer && mask >= 0) {
 		static int show_motion = -1;
@@ -5207,7 +5518,8 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	if (view_only) {
 		return;
 	}
-	if (client && client->viewOnly) {
+	get_allowed_input(client, &input);
+	if (! input.motion && ! input.button) {
 		return;
 	}
 	if (scaling) {
@@ -5277,6 +5589,13 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				ev[i][0] = mask;
 				ev[i][1] = x;
 				ev[i][2] = y;
+				if (! input.button) {
+					ev[i][0] = -1;
+				}
+				if (! input.motion) {
+					ev[i][1] = -1;
+					ev[i][2] = -1;
+				}
 				UNLOCK(pointerMutex);
 				if (debug_pointer) {
 					rfbLog("pointer(): deferring event "
@@ -5291,7 +5610,12 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			if (debug_pointer) {
 				rfbLog("pointer(): sending event %d\n", i+1);
 			}
-			update_x11_pointer(ev[i][0], ev[i][1], ev[i][2]);
+			if (ev[i][1] >= 0) {
+				update_x11_pointer_position(ev[i][1], ev[i][2]);
+			}
+			if (ev[i][0] >= 0) {
+				update_x11_pointer_mask(ev[i][0]);
+			}
 		}
 		if (nevents && dt > maxwait) {
 			X_LOCK;
@@ -5313,7 +5637,12 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	}
 
 	/* update the X display with the event: */
-	update_x11_pointer(mask, x, y);
+	if (input.motion) {
+		update_x11_pointer_position(x, y);
+	}
+	if (input.button) {
+		update_x11_pointer_mask(mask);
+	}
 }
 
 /* -- xkb_bell.c -- */
@@ -6098,14 +6427,20 @@ void check_xevents(void) {
  * hook called when a VNC client sends us some "XCut" text (rfbClientCutText).
  */
 void xcut_receive(char *text, int len, rfbClientPtr cl) {
+	allowed_input_t input;
 
 	if (!watch_selection) {
 		return;
 	}
-	if (cl && cl->viewOnly) {
+	if (view_only) {
 		return;
 	}
 	if (text == NULL || len == 0) {
+		return;
+	}
+	get_allowed_input(cl, &input);
+	if (!input.keystroke && !input.motion && !input.button) {
+		/* maybe someday KMBC for cut text... */
 		return;
 	}
 
@@ -8012,6 +8347,34 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		is = atoi(p);
 		rfbLog("process_remote_cmd: setting input_skip %d\n", is);
 		ui_skip = is;
+
+	} else if (strstr(p, "input") == p) {
+		int doit = 1;
+		COLON_CHECK("input:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(allowed_input_str));
+			goto qry;
+		}
+		p += strlen("input:");
+		if (allowed_input_str && !strcmp(p, allowed_input_str)) {
+			doit = 0;
+		}
+		rfbLog("process_remote_cmd: setting input %s\n", p);
+		if (allowed_input_str) free(allowed_input_str);
+		if (*p == '\0') {
+			allowed_input_str = NULL;
+		} else {
+			allowed_input_str = strdup(p);
+		}
+		if (doit) {
+			initialize_allowed_input();
+		}
+	} else if (strstr(p, "client_input") == p) {
+		NOTAPP
+		COLON_CHECK("client_input:")
+		p += strlen("client_input:");
+		set_client_input(p);
 
 	} else if (strstr(p, "speeds") == p) {
 		COLON_CHECK("speeds:")
@@ -15328,6 +15691,7 @@ static void watch_loop(void) {
 			copy_screen();
 		}
 
+		check_new_clients();
 		check_xevents();
 		check_connect_inputs();		
 		check_padded_fb();		
@@ -15366,10 +15730,7 @@ static void watch_loop(void) {
 		}
 
 		if (watch_bell) {
-			/*
-			 * check for any bell events.
-			 * n.b. assumes -nofb folks do not want bell...
-			 */
+			/* n.b. assumes -nofb folks do not want bell... */
 			check_bell_event();
 		}
 
@@ -15579,6 +15940,19 @@ static void print_help(int mode) {
 "                       each time a new client connects.  Lines can be commented\n"
 "                       out with the \"#\" character in the usual way.\n"
 "-localhost             Same as -allow 127.0.0.1\n"
+"\n"
+"-input string          Fine tuning of allowed user input.  If \"string\" does\n"
+"                       not contain a comma \",\" the tuning applies only to\n"
+"                       normal clients.  Otherwise the part before \",\" is\n"
+"                       for normal clients and the part after for view-only\n"
+"                       clients.  \"K\" is for Keystroke input, \"M\" for\n"
+"                       Mouse-motion input, and \"B\" for Button-click input.\n"
+"                       Their presence in the string enables that type of input.\n"
+"                       E.g. \"-input M\" means normal users can only move\n"
+"                       the mouse and  \"-input KMB,M\" lets normal users do\n"
+"                       anything and enables view-only users to move the mouse.\n"
+"                       This option is ignored when a global -viewonly is in\n"
+"                       effect (all input is discarded).\n"
 "-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd\n"
 "                       (full-access) password must also be supplied.\n"
 "-passwdfile filename   Specify libvncserver -passwd via the first line of\n"
@@ -15692,7 +16066,8 @@ static void print_help(int mode) {
 "                       it switch immediately regardless if the display can\n"
 "                       be reopened or not prefix the username with the +\n"
 "                       character. E.g. \"-users +bob\" or \"-users +nobody\".\n"
-"                       The latter is probably the only use of this option\n"
+"                       The latter (i.e. switching immediately to user\n"
+"                       \"nobody\") is probably the only use of this option\n"
 "                       that increases security.  To switch to a user *before*\n"
 "                       connections to the display are made or any files opened\n"
 "                       use the \"=\" character: \"-users =username\".\n"
@@ -15700,7 +16075,7 @@ static void print_help(int mode) {
 "                       The special user \"guess\" means to examine the utmpx\n"
 "                       database looking for a user attached to the display\n"
 "                       number and try him/her.  To limit the list of guesses,\n"
-"                       use: \"-users guess=bob,fred\".  Be especially careful\n"
+"                       use: \"-users guess=bob,betty\".  Be especially careful\n"
 "                       using this mode.\n"
 "                       \n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
@@ -16258,6 +16633,11 @@ static void print_help(int mode) {
 "                                       use \"-host\" to delete a single host\n"
 "                       localhost       enable  -localhost mode\n"
 "                       nolocalhost     disable -localhost mode\n"
+"                       input:str       set -input to \"str\", empty to disable.\n"
+"                       client_input:str set the K, M, B -input on a per-client\n"
+"                                       basis.  select which client as for\n"
+"                                       disconnect, e.g. client_input:host:MB\n"
+"                                       or client_input:0x2:K\n"
 /* ext. cmd. */
 "                       accept:cmd      set -accept \"cmd\" (empty to disable).\n"
 "                       gone:cmd        set -gone \"cmd\" (empty to disable).\n"
@@ -16429,13 +16809,13 @@ static void print_help(int mode) {
 "                       xrandr_mode padgeom quiet q noquiet modtweak nomodtweak\n"
 "                       xkb noxkb skip_keycodes add_keysyms noadd_keysyms\n"
 "                       clear_mods noclear_mods clear_keys noclear_keys\n"
-"                       remap repeat norepeat fb nofb bell nobell sel nosel\n"
-"                       primary noprimary cursorshape nocursorshape cursorpos\n"
-"                       nocursorpos cursor show_cursor noshow_cursor\n"
-"                       nocursor xfixes noxfixes alphacut alphafrac\n"
-"                       alpharemove noalpharemove alphablend noalphablend\n"
-"                       xwarp xwarppointer noxwarp noxwarppointer buttonmap\n"
-"                       dragging nodragging pointer_mode pm input_skip speeds\n"
+"                       remap repeat norepeat fb nofb bell nobell sel\n"
+"                       nosel primary noprimary cursorshape nocursorshape\n"
+"                       cursorpos nocursorpos cursor show_cursor noshow_cursor\n"
+"                       nocursor xfixes noxfixes alphacut alphafrac alpharemove\n"
+"                       noalpharemove alphablend noalphablend xwarp xwarppointer\n"
+"                       noxwarp noxwarppointer buttonmap dragging nodragging\n"
+"                       pointer_mode pm input_skip input client_input speeds\n"
 "                       debug_pointer dp nodebug_pointer nodp debug_keyboard dk\n"
 "                       nodebug_keyboard nodk deferupdate defer wait rfbwait\n"
 "                       nap nonap sb screen_blank fs gaps grow fuzz snapfb\n"
@@ -16483,10 +16863,13 @@ static void print_help(int mode) {
 "                       Note that if they can modify VNC_CONNECT, they could\n"
 "                       also run their own x11vnc and have complete control\n"
 "                       of the desktop.  If the  \"-connect /path/to/file\"\n"
-"                       channel is being used, obviously anyone who can write\n"
-"                       to /path/to/file can remotely control x11vnc.  So be\n"
-"                       sure to protect the X display and that file's write\n"
-"                       permissions.\n"
+"                       channel is being used, obviously anyone who can\n"
+"                       write to /path/to/file can remotely control x11vnc.\n"
+"                       So be sure to protect the X display and that file's\n"
+"                       write permissions.\n"
+"\n"
+"                       To disable the VNC_CONNECT property channel completely\n"
+"                       use -novncconnect.\n"
 "\n"
 "-unsafe                If x11vnc is running as root (e.g. inetd or Xsetup for\n"
 "                       a display manager) a few remote commands are disabled\n"
@@ -17044,6 +17427,9 @@ int main(int argc, char* argv[]) {
 			allow_list = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-localhost")) {
 			allow_list = strdup("127.0.0.1");
+		} else if (!strcmp(arg, "-input")) {
+			CHECK_ARGC
+			allowed_input_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-viewpasswd")) {
 			vpw_loc = i;
 			CHECK_ARGC
@@ -17986,6 +18372,8 @@ int main(int argc, char* argv[]) {
 	initialize_speeds();
 
 	initialize_keyboard_and_pointer();
+
+	initialize_allowed_input();
 
 	if (! inetd) {
 		if (! screen->port || screen->listenSock < 0) {

@@ -1,3 +1,8 @@
+2005-02-10  Karl Runge <runge@karlrunge.com>
+	* Add -input to fine tune client input (keystroke, mouse motion,
+	  and button presses).  Allow per-client setting via remote cntl.
+	* fix bug in get_remote_port, add ip2host for client info.
+
 2005-02-09  Karl Runge <runge@karlrunge.com>
 	* Add -users switch user mechanism and related utilities.
 	* fix -solid for gnome and kde.
