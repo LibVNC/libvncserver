@@ -34,7 +34,7 @@
 #include "sraRegion.h"
 
 #ifdef HAVE_PTHREADS
-pthread_mutex_t logMutex;
+MUTEX(logMutex);
 #endif
 
 /*
@@ -48,7 +48,7 @@ rfbLog(char *format, ...)
     char buf[256];
     time_t log_clock;
 
-    IF_PTHREADS(LOCK(logMutex));
+    LOCK(logMutex);
     va_start(args, format);
 
     time(&log_clock);
@@ -59,7 +59,7 @@ rfbLog(char *format, ...)
     fflush(stderr);
 
     va_end(args);
-    IF_PTHREADS(UNLOCK(logMutex));
+    UNLOCK(logMutex);
 }
 
 void rfbLogPerror(char *str)
@@ -116,25 +116,28 @@ clientOutput(void *data)
 
     while (1) {
         haveUpdate = false;
-        LOCK(cl->updateMutex);
         while (!haveUpdate) {
             if (cl->sock == -1) {
                 /* Client has disconnected. */
-	        UNLOCK(cl->updateMutex);
                 return NULL;
             }
-	    updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
-	    haveUpdate = sraRgnAnd(updateRegion,cl->requestedRegion);
-	    sraRgnDestroy(updateRegion);
+	    LOCK(cl->updateMutex);
+	    haveUpdate = FB_UPDATE_PENDING(cl);
+	    if(!haveUpdate) {
+		updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
+		haveUpdate = sraRgnAnd(updateRegion,cl->requestedRegion);
+		sraRgnDestroy(updateRegion);
+	    }
+	    UNLOCK(cl->updateMutex);
 
             if (!haveUpdate) {
                 WAIT(cl->updateCond, cl->updateMutex);
+		UNLOCK(cl->updateMutex); /* we really needn't lock now. */
             }
         }
         
         /* OK, now, to save bandwidth, wait a little while for more
            updates to come along. */
-        UNLOCK(cl->updateMutex);
         usleep(rfbDeferUpdateTime * 1000);
 
         /* Now, get the region we're going to update, and remove
@@ -143,12 +146,10 @@ clientOutput(void *data)
            is updated, we'll be sure to do another update later. */
         LOCK(cl->updateMutex);
 	updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
-	sraRgnAnd(updateRegion,cl->requestedRegion);
-	sraRgnSubtract(cl->modifiedRegion,updateRegion);
+        UNLOCK(cl->updateMutex);
 
         /* Now actually send the update. */
         rfbSendFramebufferUpdate(cl, updateRegion);
-        UNLOCK(cl->updateMutex);
 
 	sraRgnDestroy(updateRegion);
     }
@@ -264,13 +265,14 @@ void
 defaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 {
    if(x!=cl->screen->cursorX || y!=cl->screen->cursorY) {
-      Bool cursorWasDrawn=cl->screen->cursorIsDrawn;
-      if(cursorWasDrawn)
+      if(cl->screen->cursorIsDrawn)
 	rfbUndrawCursor(cl);
-      cl->screen->cursorX = x;
-      cl->screen->cursorY = y;
-      if(cursorWasDrawn)
-	rfbDrawCursor(cl);
+      LOCK(cl->screen->cursorMutex);
+      if(!cl->screen->cursorIsDrawn) {
+	  cl->screen->cursorX = x;
+	  cl->screen->cursorY = y;
+      }
+      UNLOCK(cl->screen->cursorMutex);
    }
 }
 
@@ -310,6 +312,8 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
 {
    rfbScreenInfoPtr rfbScreen=malloc(sizeof(rfbScreenInfo));
    rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
+
+   INIT_MUTEX(logMutex);
 
    if(width&3)
      fprintf(stderr,"WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
@@ -387,7 +391,9 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->dontSendFramebufferUpdate = FALSE;
    rfbScreen->cursorX=rfbScreen->cursorY=rfbScreen->underCursorBufferLen=0;
    rfbScreen->underCursorBuffer=NULL;
-   //INIT_MUTEX(rfbScreen->cursorMutex);
+   rfbScreen->dontConvertRichCursorToXCursor = FALSE;
+   rfbScreen->cursor = &myCursor;
+   INIT_MUTEX(rfbScreen->cursorMutex);
 
    /* proc's and hook's */
 
@@ -396,7 +402,6 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->ptrAddEvent = defaultPtrAddEvent;
    rfbScreen->setXCutText = defaultSetXCutText;
    rfbScreen->getCursorPtr = defaultGetCursorPtr;
-   rfbScreen->cursor = &myCursor;
    rfbScreen->setTranslateFunction = rfbSetTranslateFunction;
    rfbScreen->newClientHook = doNothingWithClient;
 
@@ -421,7 +426,6 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
 {
   rfbInitSockets(rfbScreen);
   httpInitSockets(rfbScreen);
-  INIT_MUTEX(logMutex);
 }
 
 void
@@ -448,8 +452,6 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 
 void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)
 {
-  rfbInitServer(rfbScreen);
-
   if(runInBackground) {
 #ifdef HAVE_PTHREADS
        pthread_t listener_thread;

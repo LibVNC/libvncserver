@@ -73,6 +73,7 @@ void
 rfbClientListInit(rfbScreenInfoPtr rfbScreen)
 {
     rfbScreen->rfbClientHead = NULL;
+    INIT_MUTEX(rfbClientListMutex);
 }
 
 rfbClientIteratorPtr
@@ -657,10 +658,12 @@ rfbProcessClientNormalMessage(cl)
 		}
 		break;
 	    case rfbEncodingXCursor:
-		rfbLog("Enabling X-style cursor updates for client %s\n",
-		       cl->host);
-		cl->enableCursorShapeUpdates = TRUE;
-		cl->cursorWasChanged = TRUE;
+		if(!cl->screen->dontConvertRichCursorToXCursor) {
+		    rfbLog("Enabling X-style cursor updates for client %s\n",
+			   cl->host);
+		    cl->enableCursorShapeUpdates = TRUE;
+		    cl->cursorWasChanged = TRUE;
+		}
 		break;
 	    case rfbEncodingRichCursor:
 	        rfbLog("Enabling full-color cursor updates for client "
@@ -729,6 +732,7 @@ rfbProcessClientNormalMessage(cl)
 	    if (!cl->format.trueColour) {
 		if (!rfbSetClientColourMap(cl, 0, 0)) {
 		    sraRgnDestroy(tmpRegion);
+		    UNLOCK(cl->updateMutex);
 		    return;
 		}
 	    }
@@ -740,10 +744,7 @@ rfbProcessClientNormalMessage(cl)
        }
        SIGNAL(cl->updateCond);
        UNLOCK(cl->updateMutex);
-	
-       if(cl->sock>=0 && FB_UPDATE_PENDING(cl)) {
-	 rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
-       }
+
        sraRgnDestroy(tmpRegion);
 
        return;
@@ -847,15 +848,11 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     sraRegionPtr updateRegion,updateCopyRegion;
     int dx, dy;
     Bool sendCursorShape = FALSE;
-    Bool cursorWasDrawn = FALSE;
-
     
     /*
      * If this client understands cursor shape updates, cursor should be
      * removed from the framebuffer. Otherwise, make sure it's put up.
      */
-
-    cursorWasDrawn = cl->screen->cursorIsDrawn;
 
     if (cl->enableCursorShapeUpdates) {
       if (cl->screen->cursorIsDrawn) {
@@ -869,7 +866,9 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	rfbDrawCursor(cl);
       }
     }
-   
+
+    LOCK(cl->updateMutex);
+
     /*
      * The modifiedRegion may overlap the destination copyRegion.  We remove
      * any overlapping bits from the copyRegion (since they'd only be
@@ -889,6 +888,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     sraRgnOr(updateRegion,cl->copyRegion);
     if(!sraRgnAnd(updateRegion,cl->requestedRegion) && !sendCursorShape) {
       sraRgnDestroy(updateRegion);
+      UNLOCK(cl->updateMutex);
       return TRUE;
     }
 
@@ -927,11 +927,13 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
      sraRgnOr(cl->modifiedRegion,cl->copyRegion);
      sraRgnSubtract(cl->modifiedRegion,updateRegion);
      sraRgnSubtract(cl->modifiedRegion,updateCopyRegion);
-   
+
      sraRgnMakeEmpty(cl->requestedRegion);
      sraRgnMakeEmpty(cl->copyRegion);
      cl->copyDX = 0;
      cl->copyDY = 0;
+   
+     UNLOCK(cl->updateMutex);
    
    /*
      * Now send the update.
@@ -1064,13 +1066,6 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     if (!rfbSendUpdateBuf(cl)) {
         sraRgnDestroy(updateRegion);
         return FALSE;
-    }
-
-    if(cursorWasDrawn != cl->screen->cursorIsDrawn) {
-       if(cursorWasDrawn)
-	  rfbDrawCursor(cl);
-       else
-	  rfbUndrawCursor(cl);
     }
 
     sraRgnDestroy(updateRegion);

@@ -1,6 +1,14 @@
 0.2
+   added flag to optionally not send XCursor updates.
+   fixed java viewer on server side:
+	SendCursorUpdate would send data even before the client pixel format
+	was set.
+   fixed two pthread issues:
+	rfbSendFramebuffer was sent by a ProcessClientMessage function
+	(unprotected by updateMutex).
+	cursor coordinates were set without protection by cursorMutex
    source is now equivalent to TridiaVNC 1.2.1
-   pthreads now work (use the iterators!)
+   pthreads now work (use iterators!)
    cursors are supported (rfbSetCursor automatically undraws cursor)
    support for 3 bytes/pixel (slow!)
    server side colourmap support

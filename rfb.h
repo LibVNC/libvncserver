@@ -78,20 +78,20 @@ int max(int,int);
 #ifdef HAVE_PTHREADS
 #include <pthread.h>
 #if 0
-#define LOCK(mutex) fprintf(stderr,"%s:%d LOCK(%s)\n",__FILE__,__LINE__,#mutex)
-#define UNLOCK(mutex) fprintf(stderr,"%s:%d UNLOCK(%s)\n",__FILE__,__LINE__,#mutex)
-#define MUTEX(mutex)
-#define INIT_MUTEX(mutex) fprintf(stderr,"%s:%d INIT_MUTEX(%s)\n",__FILE__,__LINE__,#mutex)
+#define LOCK(mutex) fprintf(stderr,"%s:%d LOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex))
+#define UNLOCK(mutex) fprintf(stderr,"%s:%d UNLOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex))
+#define MUTEX(mutex) int mutex
+#define INIT_MUTEX(mutex) fprintf(stderr,"%s:%d INIT_MUTEX(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex))
 #define TINI_MUTEX(mutex) fprintf(stderr,"%s:%d TINI_MUTEX(%s)\n",__FILE__,__LINE__,#mutex)
 #define SIGNAL(cond) fprintf(stderr,"%s:%d SIGNAL(%s)\n",__FILE__,__LINE__,#cond)
-#define WAIT(cond,mutex) fprintf(stderr,"%s:%d WAIT(%s,%s)\n",__FILE__,__LINE__,#cond,#mutex)
+#define WAIT(cond,mutex) /* fprintf(stderr,"%s:%d WAIT(%s,%s)\n",__FILE__,__LINE__,#cond,#mutex) */
 #define COND(cond)
 #define INIT_COND(cond) fprintf(stderr,"%s:%d INIT_COND(%s)\n",__FILE__,__LINE__,#cond)
 #define TINI_COND(cond) fprintf(stderr,"%s:%d TINI_COND(%s)\n",__FILE__,__LINE__,#cond)
-#define IF_PTHREAD(x)
+#define IF_PTHREADS(x)
 #else
-#define LOCK(mutex) pthread_mutex_lock(&(mutex))
-#define UNLOCK(mutex) pthread_mutex_unlock(&(mutex))
+#define LOCK(mutex) pthread_mutex_lock(&(mutex));
+#define UNLOCK(mutex) pthread_mutex_unlock(&(mutex));
 #define MUTEX(mutex) pthread_mutex_t (mutex)
 #define INIT_MUTEX(mutex) pthread_mutex_init(&(mutex),NULL)
 #define TINI_MUTEX(mutex) pthread_mutex_destroy(&(mutex))
@@ -203,10 +203,6 @@ typedef struct
     Bool dontSendFramebufferUpdate; /* TRUE while removing or drawing the
 				       cursor */
    
-    /* these variables are needed to save the area under the cursor */
-    int cursorX, cursorY,underCursorBufferLen;
-    char* underCursorBuffer;
-   
     /* additions by libvncserver */
 
     rfbPixelFormat rfbServerFormat;
@@ -242,6 +238,11 @@ typedef struct
     Bool rfbNeverShared;
     Bool rfbDontDisconnect;
     struct rfbClientRec* rfbClientHead;
+
+    /* cursor */
+    int cursorX, cursorY,underCursorBufferLen;
+    char* underCursorBuffer;
+    Bool dontConvertRichCursorToXCursor;
     struct rfbCursor* cursor;
     MUTEX(cursorMutex);
    
@@ -254,8 +255,6 @@ typedef struct
     GetCursorProcPtr getCursorPtr;
     SetTranslateFunctionProcPtr setTranslateFunction;
   
-    /* the following members are hooks, i.e. they are called if set,
-       but not overriding original functionality */
     /* newClientHook is called just after a new client is created */
     NewClientHookPtr newClientHook;
 

@@ -337,10 +337,9 @@ void rfbUndrawCursor(rfbClientPtr cl)
    rfbCursorPtr c=s->cursor;
    int j,x1,x2,y1,y2,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
-
-   LOCK(cl->screen->cursorMutex);
+   LOCK(s->cursorMutex);
    if(!s->cursorIsDrawn) {
-     UNLOCK(cl->screen->cursorMutex);
+     UNLOCK(s->cursorMutex);
      return;
    }
    
@@ -350,7 +349,7 @@ void rfbUndrawCursor(rfbClientPtr cl)
    if(x1<0) x1=0;
    if(x2>=s->width) x2=s->width-1;
    x2-=x1; if(x2<=0) {
-     UNLOCK(cl->screen->cursorMutex);
+     UNLOCK(s->cursorMutex);
      return;
    }
    y1=s->cursorY-c->yhot;
@@ -358,9 +357,11 @@ void rfbUndrawCursor(rfbClientPtr cl)
    if(y1<0) y1=0;
    if(y2>=s->height) y2=s->height-1;
    y2-=y1; if(y2<=0) {
-     UNLOCK(cl->screen->cursorMutex);
+     UNLOCK(s->cursorMutex);
      return;
    }
+
+   /* get saved data */
    for(j=0;j<y2;j++)
      memcpy(s->frameBuffer+(y1+j)*rowstride+x1*bpp,
 	    s->underCursorBuffer+j*x2*bpp,
@@ -368,7 +369,7 @@ void rfbUndrawCursor(rfbClientPtr cl)
    
    rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
    s->cursorIsDrawn = FALSE;
-   UNLOCK(cl->screen->cursorMutex);
+   UNLOCK(s->cursorMutex);
 }
 
 void rfbDrawCursor(rfbClientPtr cl)
@@ -379,10 +380,10 @@ void rfbDrawCursor(rfbClientPtr cl)
      rowstride=s->paddedWidthInBytes,
      bufSize,w;
    if(!c) return;
-   LOCK(cl->screen->cursorMutex);
+   LOCK(s->cursorMutex);
    if(s->cursorIsDrawn) {
      /* is already drawn */
-     UNLOCK(cl->screen->cursorMutex);
+     UNLOCK(s->cursorMutex);
      return;
    }
    bufSize=c->width*c->height*bpp;
@@ -400,7 +401,7 @@ void rfbDrawCursor(rfbClientPtr cl)
    if(x1<0) { i1=-x1; x1=0; }
    if(x2>=s->width) x2=s->width-1;
    x2-=x1; if(x2<=0) {
-     UNLOCK(cl->screen->cursorMutex);
+     UNLOCK(s->cursorMutex);
      return; /* nothing to do */
    }
    y1=s->cursorY-c->yhot;
@@ -408,9 +409,11 @@ void rfbDrawCursor(rfbClientPtr cl)
    if(y1<0) { j1=-y1; y1=0; }
    if(y2>=s->height) y2=s->height-1;
    y2-=y1; if(y2<=0) {
-     UNLOCK(cl->screen->cursorMutex);
+     UNLOCK(s->cursorMutex);
      return; /* nothing to do */
    }
+
+   /* save data */
    for(j=0;j<y2;j++)
      memcpy(s->underCursorBuffer+j*x2*bpp,
 	    s->frameBuffer+(y1+j)*rowstride+x1*bpp,
@@ -426,9 +429,10 @@ void rfbDrawCursor(rfbClientPtr cl)
 	 memcpy(s->frameBuffer+(j+y1)*rowstride+(i+x1)*bpp,
 		c->richSource+(j+j1)*c->width*bpp+(i+i1)*bpp,bpp);
 
+
    rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
    s->cursorIsDrawn = TRUE;
-   UNLOCK(cl->screen->cursorMutex);
+   UNLOCK(s->cursorMutex);
 }
 
 /* for debugging */
