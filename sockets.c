@@ -330,7 +330,8 @@ rfbCloseClient(cl)
       {
 	FD_CLR(cl->sock,&(cl->screen->allFds));
 	if(cl->sock==cl->screen->maxFd)
-	  while(!FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
+	  while(cl->screen->maxFd>0
+		&& !FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
 	    cl->screen->maxFd--;
 	shutdown(cl->sock,SHUT_RDWR);
 	close(cl->sock);
