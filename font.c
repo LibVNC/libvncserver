@@ -68,12 +68,14 @@ int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 
   /* after clipping, x2 will be count of bytes between rows,
    * x1 start of i, y1 start of j, width and height will be adjusted. */
-  if(y1>y) { y1-=y; d+=(width+7)/8; height-=y1; y+=y1; } else y1=0;
-  if(x1>x) { x1-=x; d+=x1; width-=x1; x+=x1; extra_bytes+=x1/8; } else x1=0;
+  if(y1>y) { y1-=y; data+=(width+7)/8; height-=y1; y+=y1; } else y1=0;
+  if(x1>x) { x1-=x; data+=x1; width-=x1; x+=x1; extra_bytes+=x1/8; } else x1=0;
   if(y2<y+height) height-=y+height-y2;
   if(x2<x+width) { extra_bytes+=(x1+width)/8-(x+width-x2+7)/8; width-=x+width-x2; }
 
   for(j=y1;j<height;j++) {
+    if((x1&7)!=0)
+      d=data[-1]; /* TODO: check if in this case extra_bytes is correct! */
     for(i=x1;i<width;i++) {
       if((i&7)==0) {
 	d=*data;
