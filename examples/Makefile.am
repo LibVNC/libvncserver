@@ -12,5 +12,5 @@ noinst_HEADERS=radon.h
 noinst_PROGRAMS=example pnmshow regiontest pnmshow24 fontsel \
 	vncev storepasswd colourmaptest $(BACKGROUND_TEST) $(MAC)
 
-LDADD = -L.. -lvncserver
+LDADD = ../libvncserver.a
 

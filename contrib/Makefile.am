@@ -1,4 +1,4 @@
-LDADD = -L.. -lvncserver
+LDADD = ../libvncserver.a
 
 noinst_PROGRAMS=zippy
 
