@@ -101,7 +101,7 @@ char ModifierState = 0;
 
 /* this function adjusts the modifiers according to mod (as from modifiers) and ModifierState */
 
-void tweakModifiers(char mod,Bool down)
+void tweakModifiers(signed char mod,Bool down)
 {
   Bool isShift=ModifierState&(LEFTSHIFT|RIGHTSHIFT);
 #ifdef KBDDEBUG
