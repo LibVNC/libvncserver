@@ -345,6 +345,9 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,
    rfbScreenInfoPtr rfbScreen=malloc(sizeof(rfbScreenInfo));
    rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
 
+   if(width&3)
+     fprintf(stderr,"WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
+
    rfbScreen->rfbPort=5900;
    rfbScreen->socketInitDone=FALSE;
    rfbScreen->inetdSock=-1;

@@ -11,7 +11,7 @@ void HandleKey(Bool down,KeySym key,rfbClientPtr cl)
 int main(int argc,char** argv)
 {
   FILE* in=stdin;
-  int i,width,height;
+  int i,j,k,width,height,paddedWidth;
   unsigned char buffer[1024];
   rfbScreenInfoPtr rfbScreen;
 
@@ -36,8 +36,13 @@ int main(int argc,char** argv)
 
   /* get width & height */
   sscanf(buffer,"%d %d",&width,&height);
-  fprintf(stderr,"Got width %d and height %d (%s).\n",width,height,buffer);
+  fprintf(stderr,"Got width %d and height %d.\n",width,height);
   fgets(buffer,1024,in);
+
+  /* vncviewers have problems with widths which are no multiple of 4. */
+  paddedWidth = width;
+  if(width&3)
+    paddedWidth+=4-(width&3);
 
   /* initialize data for vnc server */
   rfbScreen = rfbDefaultScreenInit(argc,argv,width,height,8,3,4);
@@ -52,16 +57,16 @@ int main(int argc,char** argv)
   rfbScreen->httpDir = "./classes";
 
   /* allocate picture and read it */
-  rfbScreen->frameBuffer = (char*)malloc(width*height*4);
+  rfbScreen->frameBuffer = (char*)calloc(paddedWidth*4,height);
   fread(rfbScreen->frameBuffer,width*3,height,in);
   fclose(in);
 
-  /* correct the format to 4 bytes instead of 3 */
-  for(i=width*height-1;i>=0;i--) {
-    rfbScreen->frameBuffer[i*4+2]=rfbScreen->frameBuffer[i*3+2];
-    rfbScreen->frameBuffer[i*4+1]=rfbScreen->frameBuffer[i*3+1];
-    rfbScreen->frameBuffer[i*4+0]=rfbScreen->frameBuffer[i*3+0];
-  }
+  /* correct the format to 4 bytes instead of 3 (and pad to paddedWidth) */
+  for(j=height-1;j>=0;j--)
+    for(i=width-1;i>=0;i--)
+      for(k=2;k>=0;k--)
+	rfbScreen->frameBuffer[(j*paddedWidth+i)*4+k]=
+	  rfbScreen->frameBuffer[(j*width+i)*3+k];
 
   /* run event loop */
   runEventLoop(rfbScreen,40000,FALSE);

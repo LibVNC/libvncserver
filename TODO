@@ -1,8 +1,8 @@
 immediate:
 ----------
 
-fix bug with odd width (depends on client depth: width has to be multiple of server.bytesPerPixel/client.bytesPerPixel). only raw!!
 fix bug in http (java) client with big endian server: byte swapping is broken
+cursor "smears" sometimes when not using cursor encoding
 
 in the works:
 -------------
@@ -28,4 +28,5 @@ done:
 .httpd
 .other encodings
 .test drawing of cursors when not using xcursor or rich cursor encoding
+fix bug with odd width (depends on client depth: width has to be multiple of server.bytesPerPixel/client.bytesPerPixel). only raw!! -> bug of vncviewer!
 
