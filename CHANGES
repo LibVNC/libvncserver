@@ -1,4 +1,8 @@
 0.3
+   regard deferUpdateTime in processEvents, if usec<0
+   initialize deferUpdateTime (memory "leak"!)
+   changed command line handling (arguments are parsed and then removed)
+   added very simple example: zippy
    added rfbDrawLine, rfbDrawPixel
 0.2
    inserted a deferUpdate mechanism (X11 independent).
