@@ -6,7 +6,8 @@ documentation
 	perhaps the option (or just hint) not to mark very tiny regions as
 	modified, because that is inefficient for the encodings.
 optionally dont draw rich cursors as xcursors
-cursor smears on IRIX with pthreads, then has bus error.
+cursor smears on IRIX with pthreads, then has bus error. has to be a mutex
+	problem in cursor routines.
 
 later:
 ------

@@ -145,10 +145,10 @@ clientOutput(void *data)
 	updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
 	sraRgnAnd(updateRegion,cl->requestedRegion);
 	sraRgnSubtract(cl->modifiedRegion,updateRegion);
-        UNLOCK(cl->updateMutex);
 
         /* Now actually send the update. */
         rfbSendFramebufferUpdate(cl, updateRegion);
+        UNLOCK(cl->updateMutex);
 
 	sraRgnDestroy(updateRegion);
     }
