@@ -39,6 +39,10 @@ extern "C"
 #include "keysym.h"
 
 /* TODO: this stuff has to go into autoconf */
+#define HAVE_PTHREADS
+#define ALLOW24BPP
+#define HAVE_ZRLE
+#define BACKCHANNEL
 typedef unsigned char CARD8;
 typedef unsigned short CARD16;
 typedef unsigned int CARD32;

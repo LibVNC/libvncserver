@@ -1,10 +1,10 @@
-#ifndef ALLOW24BPP
-#error "I need the ALLOW24BPP flag to work"
-#endif
-
 #include <stdio.h>
 #include "rfb.h"
 #include "keysym.h"
+
+#ifndef ALLOW24BPP
+#error "I need the ALLOW24BPP flag to work"
+#endif
 
 void HandleKey(Bool down,KeySym key,rfbClientPtr cl)
 {

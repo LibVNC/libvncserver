@@ -69,7 +69,7 @@ rfbLog(const char *format, ...)
     va_start(args, format);
 
     time(&log_clock);
-    strftime(buf, 255, "%d/%m/%Y %T ", localtime(&log_clock));
+    strftime(buf, 255, "%d/%m/%Y %X ", localtime(&log_clock));
     fprintf(stderr,buf);
 
     vfprintf(stderr, format, args);

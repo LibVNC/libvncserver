@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <rfb.h>
 #include <keysym.h>
-#include "radon.h"
+#include "default8x16.h"
 
 int maxx=400, maxy=400, bpp=4;
 /* odd maxx doesn't work (vncviewer bug) */
@@ -146,7 +146,7 @@ void on_key_press (Bool down,KeySym key,rfbClientPtr cl)
         case XK_B:
                 rfbUndrawCursor(cl->screen);
                 blank_framebuffer(cl->screen->frameBuffer, 0, 0, maxx, maxy);
-                rfbDrawString(cl->screen,&radonFont,20,maxy-20,"Hello, World!",0xffffff);
+                rfbDrawString(cl->screen,&default8x16Font,20,maxy-20,"Hello, World!",0xffffff);
                 rfbMarkRectAsModified(cl->screen,0, 0,maxx,maxy);
                 fprintf (stderr, "Framebuffer blanked\n");
                 break;
@@ -165,7 +165,7 @@ void on_key_press (Bool down,KeySym key,rfbClientPtr cl)
         case XK_C:
         case XK_c:
                 rfbUndrawCursor(cl->screen);
-		rfbDrawString(cl->screen,&radonFont,20,100,"Hello, World!",0xffffff);
+		rfbDrawString(cl->screen,&default8x16Font,20,100,"Hello, World!",0xffffff);
                 rfbMarkRectAsModified(cl->screen,0, 0,maxx,maxy);
                 break;
         default:

@@ -1,4 +1,4 @@
-INCLUDES=-I.
+INCLUDES=-I. -Iinclude
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 #CXX=
@@ -16,12 +16,10 @@ LINK=gcc
 #EXTRAINCLUDES=-I/usr/X11R6/include
 
 # Uncomment these two lines to enable use of PThreads
-#PTHREADDEF = -DHAVE_PTHREADS
 #PTHREADLIB = -lpthread
 
 # Comment the following line to disable the use of 3 Bytes/Pixel.
 # The code for 3 Bytes/Pixel is not very efficient!
-FLAG24 = -DALLOW24BPP
 
 OPTFLAGS=-g -Wall -pedantic
 #OPTFLAGS=-O2 -Wall
@@ -29,10 +27,6 @@ RANLIB=ranlib
 
 # for Mac OS X
 OSX_LIBS = -framework ApplicationServices -framework Carbon -framework IOKit
-
-# for x11vnc
-#XLIBS =  -L/usr/X11R6/lib -lXtst -lXext -lX11
-XLIBS =  -L/usr/X11R6/lib -L/usr/lib32 -lXtst -lXext -lX11
 
 ifdef CXX
 
@@ -48,8 +42,8 @@ LINK=$(CXX)
 
 endif
 
-CFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES) $(EXTRAINCLUDES) $(ZRLE_DEF) -DBACKCHANNEL
-CXXFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES) $(EXTRAINCLUDES) $(ZRLE_DEF) -DBACKCHANNEL
+CFLAGS=$(OPTFLAGS) $(INCLUDES) $(EXTRAINCLUDES)
+CXXFLAGS=$(OPTFLAGS) $(INCLUDES) $(EXTRAINCLUDES)
 LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB) $(EXTRALIBS)
 
 SOURCES=main.c rfbserver.c sraRegion.c auth.c sockets.c \
@@ -62,9 +56,13 @@ OBJS=main.o rfbserver.o sraRegion.o auth.o sockets.o \
 	draw.o selbox.o d3des.o vncauth.o cargs.o $(ZRLE_OBJS)
 INSTALLHEADER=rfb.h rfbproto.h sraRegion.h keysym.h
 
-all: example pnmshow storepasswd
+all: libvncserver.a all_examples
 
-all_examples: example pnmshow x11vnc x11vnc_static sratest blooptest pnmshow24 fontsel vncev zippy storepasswd
+all_examples:
+	cd examples && make
+
+all_contrib:
+	cd contrib && make
 
 install_OSX: OSXvnc-server
 	cp OSXvnc-server storepasswd ../OSXvnc/build/OSXvnc.app/Contents/MacOS
@@ -72,7 +70,7 @@ install_OSX: OSXvnc-server
 .c.o:
 	$(CC) $(CFLAGS) -c $<
 
-$(OBJS) pnmshow24.o pnmshow.o example.o mac.o blooptest.o: Makefile rfb.h
+$(OBJS): Makefile include/rfb.h
 
 libvncserver.a: $(OBJS)
 	$(AR) cru $@ $(OBJS)
@@ -80,59 +78,10 @@ libvncserver.a: $(OBJS)
 
 translate.o: translate.c tableinit24.c tableinitcmtemplate.c tableinittctemplate.c tabletrans24template.c tabletranstemplate.c
 
-example: example.o libvncserver.a
-	$(LINK) -o example example.o $(LIBS)
-
-pnmshow: pnmshow.o libvncserver.a
-	$(LINK) -o pnmshow pnmshow.o $(LIBS)
-
-mac.o: mac.c 1instance.c
-
-OSXvnc-server: mac.o libvncserver.a
-	$(LINK) -o OSXvnc-server mac.o $(LIBS) $(OSX_LIBS)
-
-x11vnc.o: contrib/x11vnc.c rfb.h 1instance.c Makefile
-	$(CC) $(CFLAGS) -I. -c -o x11vnc.o contrib/x11vnc.c
-
-x11vnc: x11vnc.o libvncserver.a
-	$(LINK) -g -o x11vnc x11vnc.o $(LIBS) $(XLIBS)
-
-x11vnc_static: x11vnc.o libvncserver.a
-	$(LINK) -o x11vnc_static x11vnc.o libvncserver.a /usr/lib/libz.a /usr/lib/libjpeg.a $(XLIBS)
-#$(LIBS) $(XLIBS)
-
-storepasswd: storepasswd.o d3des.o vncauth.o
-	$(LINK) -o storepasswd storepasswd.o d3des.o vncauth.o
-
-sratest: sratest.o
-	$(LINK) -o sratest sratest.o
-
-sratest.o: sraRegion.c
-	$(CC) $(CFLAGS) -DSRA_TEST -c -o sratest.o sraRegion.c
-
-blooptest: blooptest.o libvncserver.a
-	$(LINK) -o blooptest blooptest.o $(LIBS)
-
-blooptest.o: example.c rfb.h
-	$(CC) $(CFLAGS) -DBACKGROUND_LOOP_TEST -c -o blooptest.o example.c
-
-pnmshow24: pnmshow24.o libvncserver.a
-	$(LINK) -o pnmshow24 pnmshow24.o $(LIBS)
-
-fontsel: fontsel.o libvncserver.a
-	$(LINK) -o fontsel fontsel.o -L. -lvncserver -lz -ljpeg
-
-vncev: vncev.o libvncserver.a
-	$(LINK) -o vncev vncev.o -L. -lvncserver -lz -ljpeg
-
-# Example from Justin
-zippy: zippy.o libvncserver.a
-	$(LINK) -o zippy zippy.o -L. -lvncserver -lz -ljpeg
-
 clean:
-	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \
-	     	x11vnc.o mac.o example.o pnmshow.o pnmshow24.o sratest.o \
-		blooptest.o $(OBJS)
+	rm -f $(OBJS) *~ core "#"* *.bak *.orig
+	cd examples && make clean
+	cd contrib && make clean
 
 realclean: clean
 	rm -f OSXvnc-server storepasswd example pnmshow libvncserver.a
