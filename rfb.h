@@ -524,6 +524,7 @@ extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
 extern Bool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
 extern Bool rfbSendLastRectMarker(rfbClientPtr cl);
 extern Bool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
+extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
 
 void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
 
