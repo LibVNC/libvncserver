@@ -1,7 +1,7 @@
 /*
  * x11vnc.c: a VNC server for X displays.
  *
- * Copyright (c) 2002-2003 Karl J. Runge <runge@karlrunge.com>
+ * Copyright (c) 2002-2004 Karl J. Runge <runge@karlrunge.com>
  * All rights reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -93,6 +93,19 @@
  *
  */
 
+/* 
+ * These ' -- filename -- ' comments represent a partial cleanup: they
+ * are an odd way to indicate how this huge file could be split up someday
+ * into multiple files.  Externs and other things would need to be done,
+ * but it indicates the breakup, including static keyword for local items.
+ *
+ * The primary reason we do not break up this file is for user
+ * convenience: those wanting to use the latest version download a single
+ * file, x11vnc.c, and off they go...
+ */
+
+/* -- x11vnc.h -- */
+
 #include <unistd.h>
 #include <signal.h>
 #include <sys/utsname.h>
@@ -133,16 +146,9 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-05-27";
+char lastmod[] = "lastmod:    2004-06-05";
 
-
-/*
- * Well, here starts all our global data, someday we need to split this
- * file up.  One advantage to this big blob is that it is easy for users
- * to download and replace a single file to try out the latest version...
- */
-
-/* X and rfb framebuffer */
+/* X display info */
 Display *dpy = 0;
 Visual *visual;
 Window window, rootwin;
@@ -151,19 +157,20 @@ int bpp, depth;
 int button_mask = 0;
 int dpy_x, dpy_y;
 int off_x, off_y;
-int subwin = 0;
 int indexed_colour = 0;
+int num_buttons = -1;
 
-XImage *tile;
-XImage **tile_row;		/* for all possible row runs */
+/* image structures */
 XImage *scanline;
 XImage *fullscreen;
-int fs_factor = 0;
+XImage **tile_row;		/* for all possible row runs */
 
-XShmSegmentInfo *tile_row_shm;	/* for all possible row runs */
+/* corresponding shm structures */
 XShmSegmentInfo scanline_shm;
 XShmSegmentInfo fullscreen_shm;
+XShmSegmentInfo *tile_row_shm;	/* for all possible row runs */
 
+/* rfb info */
 rfbScreenInfoPtr screen;
 rfbCursorPtr cursor;
 int bytes_per_line;
@@ -185,32 +192,111 @@ typedef struct tbout {
 	int cover;
 	int count;
 } tile_blackout_t;
-blackout_t black[100];		/* hardwired max blackouts */
+
+blackout_t blackr[100];		/* hardwired max blackouts */
 int blackouts = 0;
 tile_blackout_t *tile_blackout;
 
+/* saved cursor */
+int cur_save_x, cur_save_y, cur_save_w, cur_save_h, cur_saved = 0;
 
-typedef struct tile_change_region {
-	/* start and end lines, along y, of the changed area inside a tile. */
-	unsigned short first_line, last_line;
-	/* info about differences along edges. */
-	unsigned short left_diff, right_diff;
-	unsigned short top_diff,  bot_diff;
-} region_t;
+/* times of recent events */
+time_t last_event, last_input, last_client = 0;
 
-/* array to hold the tiles region_t-s. */
-region_t *tile_region;
+/* last client to move pointer */
+rfbClientPtr last_pointer_client = NULL;
+
+int cursor_x, cursor_y;		/* x and y from the viewer(s) */
+int got_user_input = 0;
+int got_pointer_input = 0;
+int got_keyboard_input = 0;
+int fb_copy_in_progress = 0;	
+
+/* string for the VNC_CONNECT property */
+#define VNC_CONNECT_MAX 512
+char vnc_connect_str[VNC_CONNECT_MAX+1];
+Atom vnc_connect_prop = None;
+
+/* XXX usleep(3) is not thread safe on some older systems... */
+struct timeval _mysleep;
+#define usleep2(x) \
+	_mysleep.tv_sec  = (x) / 1000000; \
+	_mysleep.tv_usec = (x) % 1000000; \
+	select(0, NULL, NULL, NULL, &_mysleep); 
+#if !defined(X11VNC_USLEEP)
+#undef usleep
+#define usleep usleep2
+#endif
+
+/*
+ * Not sure why... but when threaded we have to mutex our X11 calls to
+ * avoid XIO crashes.
+ */
+MUTEX(x11Mutex);
+#define X_LOCK       LOCK(x11Mutex)
+#define X_UNLOCK   UNLOCK(x11Mutex)
+#define X_INIT INIT_MUTEX(x11Mutex)
+
+/* function prototypes */
+
+int all_clients_initialized(void);
+void blackout_tiles(void);
+void check_connect_inputs(void);
+void clean_up_exit(int);
+void copy_screen(void);
+
+double dtime(double *);
+
+void initialize_blackout(char *);
+void initialize_modtweak(void);
+void initialize_pointer_map(char *);
+void initialize_remap(char *);
+void initialize_screen(int *argc, char **argv, XImage *fb);
+void initialize_shm(void);
+void initialize_signals(void);
+void initialize_tiles(void);
+void initialize_watch_bell(void);
+void initialize_xinerama(void);
+
+void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client);
+
+void myXTestFakeKeyEvent(Display*, KeyCode, Bool, time_t);
 
 typedef struct hint {
 	/* location x, y, height, and width of a change-rectangle  */
 	/* (grows as adjacent horizontal tiles are glued together) */
 	int x, y, w, h;
 } hint_t;
+void mark_hint(hint_t);
 
-/* array to hold the hints: */
-hint_t *hint_list;
+enum rfbNewClientAction new_client(rfbClientPtr client);
+void nofb_hook(rfbClientPtr client);
+void pointer(int mask, int x, int y, rfbClientPtr client);
 
-/* various command line options */
+void read_vnc_connect_prop(void);
+void redraw_mouse(void);
+void restore_mouse_patch(void);
+void rfbPE(rfbScreenInfoPtr, long);
+void scan_for_updates(void);
+void set_colormap(void);
+void set_offset(void);
+void set_visual(char *vstring);
+
+void shm_clean(XShmSegmentInfo *, XImage *);
+void shm_delete(XShmSegmentInfo *);
+
+void update_mouse(void);
+void watch_bell_event(void);
+void watch_xevents(void);
+
+void xcut_receive(char *text, int len, rfbClientPtr client);
+
+void zero_fb(int, int, int, int);
+
+/* -- options.h -- */
+/* 
+ * variables for the command line options
+ */
 
 int shared = 0;			/* share vnc display. */
 char *allow_list = NULL;	/* for -allow and -localhost */
@@ -224,10 +310,10 @@ int flash_cmap = 0;		/* follow installed colormaps */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 
 int use_modifier_tweak = 0;	/* use the altgr_keyboard modifier tweak */
-char *remap_file = NULL;	/* user supplied remapping file or list */
 int nofb = 0;			/* do not send any fb updates */
 
-char *blackout_string = NULL;	/* -blackout */
+int subwin = 0;			/* -id */
+
 int xinerama = 0;		/* -xinerama */
 
 char *client_connect = NULL;	/* strings for -connect option */
@@ -253,7 +339,6 @@ int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
  */
 int waitms = 30;
 int defer_update = 30;	/* rfbDeferUpdateTime ms to wait before sends. */
-int defer_update_nofb = 6;	/* defer a shorter time under -nofb */
 
 int screen_blank = 60;	/* number of seconds of no activity to throttle */
 			/* down the screen polls.  zero to disable. */
@@ -263,12 +348,14 @@ int napfac = 4;		/* time = napfac*waitms, cut load with extra waits */
 int napmax = 1500;	/* longest nap in ms. */
 int ui_skip = 10;	/* see watchloop.  negative means ignore input */
 
+int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
+int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */
+
+int sigpipe = 1;		/* 0=skip, 1=ignore, 2=exit */
+
 /* for -visual override */
 VisualID visual_id = (VisualID) 0;
 int visual_depth = 0;
-
-int nap_ok = 0, nap_diff_count = 0;
-time_t last_event, last_input, last_client = 0;
 
 /* tile heuristics: */
 double fs_frac = 0.75;	/* threshold tile fraction to do fullscreen updates. */
@@ -278,35 +365,16 @@ int tile_fuzz = 2;	/* tolerance for suspecting changed tiles touching */
 int grow_fill = 3;	/* do the grow islands heuristic with this width. */
 int gaps_fill = 4;	/* do a final pass to try to fill gaps between tiles. */
 
-/* scan pattern jitter from x0rfbserver */
-#define NSCAN 32
-int scanlines[NSCAN] = {
-	 0, 16,  8, 24,  4, 20, 12, 28,
-	10, 26, 18,  2, 22,  6, 30, 14,
-	 1, 17,  9, 25,  7, 23, 15, 31,
-	19,  3, 27, 11, 29, 13,  5, 21
-};
-int count = 0;			/* indicates which scan pattern we are on  */
-
-int cursor_x, cursor_y;		/* x and y from the viewer(s) */
-int got_user_input = 0;
-int got_pointer_input = 0;
-int got_keyboard_input = 0;
-int scan_in_progress = 0;	
-int fb_copy_in_progress = 0;	
-int client_count = 0;
-int shut_down = 0;	
-int sigpipe = 1;		/* 0=skip, 1=ignore, 2=exit */
-
 int debug_pointer = 0;
 int debug_keyboard = 0;
 
 int quiet = 0;
-double dtime(double *);
-int all_clients_initialized(void);
 
-void zero_fb(int, int, int, int);
+int got_rfbport = 0;
+int got_alwaysshared = 0;
+int got_nevershared = 0;
 
+/* threaded vs. non-threaded (default) */
 #if defined(LIBVNCSERVER_X11VNC_THREADED) && ! defined(X11VNC_THREADED)
 #define X11VNC_THREADED
 #endif
@@ -317,33 +385,17 @@ void zero_fb(int, int, int, int);
 	int use_threads = 0;
 #endif
 
-/* XXX usleep(3) is not thread safe on some older systems... */
-struct timeval _mysleep;
-#define usleep2(x) \
-	_mysleep.tv_sec  = (x) / 1000000; \
-	_mysleep.tv_usec = (x) % 1000000; \
-	select(0, NULL, NULL, NULL, &_mysleep); 
-#if !defined(X11VNC_USLEEP)
-#undef usleep
-#define usleep usleep2
-#endif
+
+/* -- cleanup.c -- */
+/*
+ * Exiting and error handling routines
+ */
+
+static int exit_flag = 0;
 
 /*
- * Not sure why... but when threaded we have to mutex our X11 calls to
- * avoid XIO crashes.
+ * Normal exiting
  */
-MUTEX(x11Mutex);
-#define X_LOCK       LOCK(x11Mutex)
-#define X_UNLOCK   UNLOCK(x11Mutex)
-#define X_INIT INIT_MUTEX(x11Mutex)
-
-/*
- * Exiting and error handling:
- */
-void shm_clean(XShmSegmentInfo *, XImage *);
-void shm_delete(XShmSegmentInfo *);
-
-int exit_flag = 0;
 void clean_up_exit (int ret) {
 	int i;
 	exit_flag = 1;
@@ -370,7 +422,7 @@ void clean_up_exit (int ret) {
 /*
  * General problem handler
  */
-void interrupted (int sig) {
+static void interrupted (int sig) {
 	int i;
 	if (exit_flag) {
 		exit_flag++;
@@ -410,20 +462,25 @@ void interrupted (int sig) {
 	}
 }
 
-XErrorHandler   Xerror_def;
-XIOErrorHandler XIOerr_def;
-int Xerror(Display *d, XErrorEvent *error) {
+/* X11 error handlers */
+
+static XErrorHandler   Xerror_def;
+static XIOErrorHandler XIOerr_def;
+
+static int Xerror(Display *d, XErrorEvent *error) {
 	X_UNLOCK;
 	interrupted(0);
 	return (*Xerror_def)(d, error);
 }
-int XIOerr(Display *d) {
+
+static int XIOerr(Display *d) {
 	X_UNLOCK;
 	interrupted(0);
 	return (*XIOerr_def)(d);
 }
 
-void set_signals(void) {
+/* signal handlers */
+void initialize_signals(void) {
 	signal(SIGHUP,  interrupted);
 	signal(SIGINT,  interrupted);
 	signal(SIGQUIT, interrupted);
@@ -438,7 +495,7 @@ void set_signals(void) {
 		signal(SIGPIPE, SIG_IGN);
 #endif
 	} else if (sigpipe == 2) {
-		rfbLog("set_signals: will exit on SIGPIPE\n");
+		rfbLog("initialize_signals: will exit on SIGPIPE\n");
 		signal(SIGPIPE, interrupted);
 	}
 
@@ -448,10 +505,111 @@ void set_signals(void) {
 	X_UNLOCK;
 }
 
-int run_user_command(char *, rfbClientPtr);
+/* -- connections.c -- */
+/*
+ * routines for handling incoming, outgoing, etc connections
+ */
 
-int accepted_client = 0;
-void client_gone(rfbClientPtr client) {
+static int accepted_client = 0;
+static int client_count = 0;
+
+/*
+ * check that all clients are in RFB_NORMAL state
+ */
+int all_clients_initialized(void) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int ok = 1;
+
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		if (cl->state != RFB_NORMAL) {
+			ok = 0;
+			break;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+
+	return ok;
+}
+
+/*
+ * utility to run a user supplied command setting some RFB_ env vars.
+ * used by, e.g., accept_client() and client_gone()
+ */
+static int run_user_command(char *cmd, rfbClientPtr client) {
+	char *dpystr = DisplayString(dpy);
+	static char *display_env = NULL;
+	static char env_rfb_client_id[100];
+	static char env_rfb_client_ip[100];
+	static char env_rfb_client_port[100];
+	static char env_rfb_x11vnc_pid[100];
+	static char env_rfb_client_count[100];
+	char *addr = client->host;
+	int rc, fromlen, fromport;
+	struct sockaddr_in from;
+
+	if (addr == NULL || addr[0] == '\0') {
+		addr = "unknown-host";
+	}
+
+	/* set RFB_CLIENT_ID to semi unique id for command to use */
+	sprintf(env_rfb_client_id, "RFB_CLIENT_ID=%d", (int) client);
+	putenv(env_rfb_client_id);
+
+	/* set RFB_CLIENT_IP to IP addr for command to use */
+	sprintf(env_rfb_client_ip, "RFB_CLIENT_IP=%s", addr);
+	putenv(env_rfb_client_ip);
+
+	/* set RFB_X11VNC_PID to our pid for command to use */
+	sprintf(env_rfb_x11vnc_pid, "RFB_X11VNC_PID=%d", (int) getpid());
+	putenv(env_rfb_x11vnc_pid);
+
+	/* set RFB_CLIENT_PORT to peer port for command to use */
+	fromlen = sizeof(from);
+	memset(&from, 0, sizeof(from));
+	fromport = -1;
+	if (!getpeername(client->sock, (struct sockaddr *)&from, &fromlen)) {
+		fromport = ntohs(from.sin_port);
+	}
+	sprintf(env_rfb_client_port, "RFB_CLIENT_PORT=%d", fromport);
+	putenv(env_rfb_client_port);
+
+	/* 
+	 * Better set DISPLAY to the one we are polling, if they
+	 * want something trickier, they can handle on their own
+	 * via environment, etc.  XXX really should save/restore old.
+	 */
+	if (display_env == NULL) {
+		display_env = (char *) malloc(strlen(dpystr)+10);
+	}
+	sprintf(display_env, "DISPLAY=%s", dpystr);
+	putenv(display_env);
+
+	/*
+	 * work out the number of clients (have to use client_count
+	 * since there is deadlock in rfbGetClientIterator) 
+	 */
+	sprintf(env_rfb_client_count, "RFB_CLIENT_COUNT=%d", client_count);
+	putenv(env_rfb_client_count);
+
+	rfbLog("running command:\n");
+	rfbLog("  %s\n", cmd);
+
+	rc = system(cmd);
+
+	if (rc >= 256) {
+		rc = rc/256;
+	}
+	rfbLog("command returned: %d\n", rc);
+
+	return rc;
+}
+
+/*
+ * callback for when a client disconnects
+ */
+static void client_gone(rfbClientPtr client) {
 
 	client_count--;
 	rfbLog("client_count: %d\n", client_count);
@@ -489,7 +647,7 @@ void client_gone(rfbClientPtr client) {
  * Simple routine to limit access via string compare.  A power user will
  * want to compile libvncserver with libwrap support and use /etc/hosts.allow.
  */
-int check_access(char *addr) {
+static int check_access(char *addr) {
 	int allowed = 0;
 	char *p, *list;
 
@@ -523,8 +681,8 @@ int check_access(char *addr) {
  * x11vnc's first (and only) visible widget: accept/reject dialog window.
  * We go through this pain to avoid dependency on libXt.
  */
-
-int ugly_accept_window(char *addr, int X, int Y, int timeout, char *mode) {
+static int ugly_accept_window(char *addr, int X, int Y, int timeout,
+    char *mode) {
 
 #define t2x2_width 16
 #define t2x2_height 16
@@ -787,87 +945,10 @@ static char t2x2_bits[] = {
 }
 
 /*
- * utility to run a user supplied command setting some RFB_ env vars.
- * used by, e.g., accept_client() and client_gone()
- */
-int run_user_command(char *cmd, rfbClientPtr client) {
-	char *dpystr = DisplayString(dpy);
-	static char *display_env = NULL;
-	static char env_rfb_client_id[100];
-	static char env_rfb_client_ip[100];
-	static char env_rfb_client_port[100];
-	static char env_rfb_x11vnc_pid[100];
-	char *addr = client->host;
-	int rc, fromlen, fromport;
-	struct sockaddr_in from;
-
-	if (addr == NULL || addr[0] == '\0') {
-		addr = "unknown-host";
-	}
-
-	/* set RFB_CLIENT_ID to semi unique id for command to use */
-	sprintf(env_rfb_client_id, "RFB_CLIENT_ID=%d", (int) client);
-	putenv(env_rfb_client_id);
-
-	/* set RFB_CLIENT_IP to IP addr for command to use */
-	sprintf(env_rfb_client_ip, "RFB_CLIENT_IP=%s", addr);
-	putenv(env_rfb_client_ip);
-
-	/* set RFB_X11VNC_PID to our pid for command to use */
-	sprintf(env_rfb_x11vnc_pid, "RFB_X11VNC_PID=%d", (int) getpid());
-	putenv(env_rfb_x11vnc_pid);
-
-	/* set RFB_CLIENT_PORT to peer port for command to use */
-	fromlen = sizeof(from);
-	memset(&from, 0, sizeof(from));
-	fromport = -1;
-	if (!getpeername(client->sock, (struct sockaddr *)&from, &fromlen)) {
-		fromport = ntohs(from.sin_port);
-	}
-	sprintf(env_rfb_client_port, "RFB_CLIENT_PORT=%d", fromport);
-	putenv(env_rfb_client_port);
-
-	/* 
-	 * Better set DISPLAY to the one we are polling, if they
-	 * want something trickier, they can handle on their own
-	 * via environment, etc.  XXX really should save/restore old.
-	 */
-	if (display_env == NULL) {
-		display_env = (char *) malloc(strlen(dpystr)+10);
-	}
-	sprintf(display_env, "DISPLAY=%s", dpystr);
-	putenv(display_env);
-
-	rfbLog("running command:\n");
-	rfbLog("  %s\n", cmd);
-
-	rc = system(cmd);
-
-	if (rc >= 256) {
-		rc = rc/256;
-	}
-	rfbLog("command returned: %d\n", rc);
-
-	sprintf(env_rfb_client_id, "RFB_CLIENT_ID=");
-	putenv(env_rfb_client_id);
-
-	sprintf(env_rfb_client_ip, "RFB_CLIENT_IP=");
-	putenv(env_rfb_client_ip);
-
-	sprintf(env_rfb_client_port, "RFB_CLIENT_PORT=");
-	putenv(env_rfb_client_port);
-
-	sprintf(env_rfb_x11vnc_pid, "RFB_X11VNC_PID=");
-	putenv(env_rfb_x11vnc_pid);
-
-	return rc;
-}
-
-/*
  * process a "yes:0,no:*,view:3" type action list comparing to command
  * return code rc.  * means the default action with no other match.
  */
-int action_match(char *action, int rc) {
+static int action_match(char *action, int rc) {
 	char *p, *q, *s = strdup(action);
 	int cases[4], i, result;
 	char *labels[4];
@@ -964,7 +1045,7 @@ int action_match(char *action, int rc) {
  *	popup:     use internal X widgets for prompting.
  * 
  */
-int accept_client(rfbClientPtr client) {
+static int accept_client(rfbClientPtr client) {
 
 	char xmessage[200], *cmd = NULL;
 	char *addr = client->host;
@@ -1123,7 +1204,7 @@ int accept_client(rfbClientPtr client) {
  * For the -connect <file> option: periodically read the file looking for
  * a connect string.  If one is found set client_connect to it.
  */
-void check_connect_file(char *file) {
+static void check_connect_file(char *file) {
 	FILE *in;
 	char line[512], host[512];
 	static int first_warn = 1, truncate_ok = 1;
@@ -1177,8 +1258,10 @@ void check_connect_file(char *file) {
 	}
 }
 
-/* Do a reverse connect for a single "host" or "host:port" */
-int do_reverse_connect(char *str) {
+/*
+ * Do a reverse connect for a single "host" or "host:port"
+ */
+static int do_reverse_connect(char *str) {
 	rfbClientPtr cl;
 	char *host, *p;
 	int port = 5500, len = strlen(str);
@@ -1218,15 +1301,10 @@ int do_reverse_connect(char *str) {
 	}
 }
 
-void rfbPE(rfbScreenInfoPtr scr, long us) {
-	if (! use_threads) {
-		return rfbProcessEvents(scr, us);
-	}
-}
-
-/* break up comma separated list of hosts and call do_reverse_connect() */
-
-void reverse_connect(char *str) {
+/*
+ * Break up comma separated list of hosts and call do_reverse_connect()
+ */
+static void reverse_connect(char *str) {
 	char *p, *tmp = strdup(str);
 	int sleep_between_host = 300;
 	int sleep_min = 1500, sleep_max = 4500, n_max = 5;
@@ -1276,9 +1354,54 @@ void reverse_connect(char *str) {
 	}
 }
 
-/* check if client_connect has been set, if so make the reverse connections. */
+/*
+ * Routines for monitoring the VNC_CONNECT property for changes.
+ * The vncconnect(1) will set it on our X display.
+ */
+void read_vnc_connect_prop(void) {
+	Atom type;
+	int format, slen, dlen;
+	unsigned long nitems = 0, bytes_after = 0;
+	unsigned char* data = NULL;
 
-void send_client_connect() {
+	vnc_connect_str[0] = '\0';
+	slen = 0;
+
+	if (! vnc_connect || vnc_connect_prop == None) {
+		/* not active or problem with VNC_CONNECT atom */
+		return;
+	}
+
+	/* read the property value into vnc_connect_str: */
+	do {
+		if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
+		    vnc_connect_prop, nitems/4, VNC_CONNECT_MAX/16, False,
+		    AnyPropertyType, &type, &format, &nitems, &bytes_after,
+		    &data) == Success) {
+
+			dlen = nitems * (format/8);
+			if (slen + dlen > VNC_CONNECT_MAX) {
+				/* too big */
+				rfbLog("warning: truncating large VNC_CONNECT"
+				   " string > %d bytes.\n", VNC_CONNECT_MAX);
+				XFree(data);
+				break;
+			}
+			memcpy(vnc_connect_str+slen, data, dlen);
+			slen += dlen;
+			vnc_connect_str[slen] = '\0';
+			XFree(data);
+		}
+	} while (bytes_after > 0);
+
+	vnc_connect_str[VNC_CONNECT_MAX] = '\0';
+	rfbLog("read property VNC_CONNECT: %s\n", vnc_connect_str);
+}
+
+/*
+ * check if client_connect has been set, if so make the reverse connections.
+ */
+static void send_client_connect(void) {
 	if (client_connect != NULL) {
 		reverse_connect(client_connect);
 		free(client_connect);
@@ -1286,12 +1409,10 @@ void send_client_connect() {
 	}
 }
 
-/* string for the VNC_CONNECT property */
-#define VNC_CONNECT_MAX 512
-char vnc_connect_str[VNC_CONNECT_MAX+1];
-
-/* monitor the various input methods */
-void check_connect_inputs() {
+/*
+ * monitor the various input methods
+ */
+void check_connect_inputs(void) {
 
 	/* flush any already set: */
 	send_client_connect();
@@ -1362,18 +1483,20 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	return(RFB_CLIENT_ACCEPT);
 }
 
+/* -- keyboard.c -- */
 /*
  * For tweaking modifiers wrt the Alt-Graph key, etc.
  */
 #define LEFTSHIFT 1
 #define RIGHTSHIFT 2
 #define ALTGR 4
-char mod_state = 0;
+static char mod_state = 0;
 
-char modifiers[0x100];
-KeyCode keycodes[0x100], left_shift_code, right_shift_code, altgr_code;
+static char modifiers[0x100];
+static KeyCode keycodes[0x100];
+static KeyCode left_shift_code, right_shift_code, altgr_code;
 
-void initialize_modtweak() {
+void initialize_modtweak(void) {
 	KeySym key, *keymap;
 	int i, j, minkey, maxkey, syms_per_keycode;
 
@@ -1432,8 +1555,11 @@ typedef struct keyremap {
 	struct keyremap *next;
 } keyremap_t;
 
-keyremap_t *keyremaps = NULL;
+static keyremap_t *keyremaps = NULL;
 
+/*
+ * process the -remap string (file or mapping string)
+ */
 void initialize_remap(char *infile) {
 	FILE *in;
 	char *p, *q, line[256], str1[256], str2[256];
@@ -1529,8 +1655,11 @@ void initialize_remap(char *infile) {
 	fclose(in);
 }
 
-void DebugXTestFakeKeyEvent(Display* dpy, KeyCode key, Bool down, time_t cur_time)
-{
+/*
+ * debugging wrapper for XTestFakeKeyEvent()
+ */
+void myXTestFakeKeyEvent(Display* dpy, KeyCode key, Bool down,
+    time_t cur_time) {
 	if (debug_keyboard) {
 		rfbLog("XTestFakeKeyEvent(dpy, keycode=0x%x \"%s\", %s)\n",
 		    key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
@@ -1540,11 +1669,9 @@ void DebugXTestFakeKeyEvent(Display* dpy, KeyCode key, Bool down, time_t cur_tim
 }
 
 /*
- * This is to allow debug_keyboard option trap everything:
+ * does the actual tweak:
  */
-#define XTestFakeKeyEvent DebugXTestFakeKeyEvent
-
-void tweak_mod(signed char mod, rfbBool down) {
+static void tweak_mod(signed char mod, rfbBool down) {
 	rfbBool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
 	Bool dn = (Bool) down;
 
@@ -1564,20 +1691,20 @@ void tweak_mod(signed char mod, rfbBool down) {
 	X_LOCK;
 	if (is_shift && mod != 1) {
 	    if (mod_state & LEFTSHIFT) {
-		XTestFakeKeyEvent(dpy, left_shift_code, !dn, CurrentTime);
+		myXTestFakeKeyEvent(dpy, left_shift_code, !dn, CurrentTime);
 	    }
 	    if (mod_state & RIGHTSHIFT) {
-		XTestFakeKeyEvent(dpy, right_shift_code, !dn, CurrentTime);
+		myXTestFakeKeyEvent(dpy, right_shift_code, !dn, CurrentTime);
 	    }
 	}
 	if ( ! is_shift && mod == 1 ) {
-	    XTestFakeKeyEvent(dpy, left_shift_code, dn, CurrentTime);
+	    myXTestFakeKeyEvent(dpy, left_shift_code, dn, CurrentTime);
 	}
 	if ( altgr_code && (mod_state & ALTGR) && mod != 2 ) {
-	    XTestFakeKeyEvent(dpy, altgr_code, !dn, CurrentTime);
+	    myXTestFakeKeyEvent(dpy, altgr_code, !dn, CurrentTime);
 	}
 	if ( altgr_code && ! (mod_state & ALTGR) && mod == 2 ) {
-	    XTestFakeKeyEvent(dpy, altgr_code, dn, CurrentTime);
+	    myXTestFakeKeyEvent(dpy, altgr_code, dn, CurrentTime);
 	}
 	X_UNLOCK;
 	if (debug_keyboard) {
@@ -1587,6 +1714,9 @@ void tweak_mod(signed char mod, rfbBool down) {
 	}
 }
 
+/*
+ * tweak the modifier under -modtweak
+ */
 static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
     rfbClientPtr client) {
 	KeyCode k;
@@ -1632,7 +1762,7 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	}
 	if ( k != NoSymbol ) {
 		X_LOCK;
-		XTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
+		myXTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
 		X_UNLOCK;
 	} 
 
@@ -1645,10 +1775,9 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
  * key event handler.  See the above functions for contortions for
  * running under -modtweak.
  */
-rfbClientPtr last_keyboard_client = NULL;
-int num_buttons = -1;
+static rfbClientPtr last_keyboard_client = NULL;
 
-static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
+void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 	int isbutton = 0;
 
@@ -1731,7 +1860,7 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	}
 
 	if ( k != NoSymbol ) {
-		XTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
+		myXTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
 		XFlush(dpy);
 
 		last_event = last_input = time(0);
@@ -1742,6 +1871,7 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	X_UNLOCK;
 }
 
+/* -- pointer.c -- */
 /*
  * pointer event handling routines.
  */
@@ -1757,20 +1887,18 @@ typedef struct ptrremap {
 MUTEX(pointerMutex);
 #define MAX_BUTTONS 5
 #define MAX_BUTTON_EVENTS 50
-prtremap_t pointer_map[MAX_BUTTONS+1][MAX_BUTTON_EVENTS];
-char *pointer_remap = NULL;
-void update_pointer(int, int, int);
+static prtremap_t pointer_map[MAX_BUTTONS+1][MAX_BUTTON_EVENTS];
 
-
-/* based on IsModifierKey in Xutil.h */
+/*
+ * following is based on IsModifierKey in Xutil.h
+*/
 #define ismodkey(keysym) \
   ((((KeySym)(keysym) >= XK_Shift_L) && ((KeySym)(keysym) <= XK_Hyper_R)))
-
 
 /*
  * For parsing the -buttonmap sections, e.g. "4" or ":Up+Up+Up:"
  */
-void buttonparse(int from, char **s) {
+static void buttonparse(int from, char **s) {
 	char *q;
 	int to, i;
 	int modisdown[256];
@@ -1914,7 +2042,10 @@ void buttonparse(int from, char **s) {
 	}
 }
 
-void initialize_pointer_map(void) {
+/*
+ * process the -buttonmap string
+ */
+void initialize_pointer_map(char *pointer_remap) {
 	unsigned char map[MAX_BUTTONS];
 	int i, k;
 	/*
@@ -1988,11 +2119,109 @@ void initialize_pointer_map(void) {
 }
 
 /*
+ * Send a pointer event to the X server.
+ */
+static void update_pointer(int mask, int x, int y) {
+	int i, mb;
+
+	X_LOCK;
+
+	if (! use_xwarppointer) {
+		XTestFakeMotionEvent(dpy, scr, x+off_x, y+off_y, CurrentTime);
+	} else {
+		XWarpPointer(dpy, None, window, 0, 0, 0, 0,  x+off_x, y+off_y);
+	}
+
+	cursor_x = x;
+	cursor_y = y;
+
+	last_event = last_input = time(0);
+
+	for (i=0; i < MAX_BUTTONS; i++) {
+	    /* look for buttons that have be clicked or released: */
+	    if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
+		int k;
+		if (debug_pointer) {
+			rfbLog("pointer(): mask change: mask: 0x%x -> "
+			    "0x%x button: %d\n", button_mask, mask,i+1);
+		}
+		for (k=0; k < MAX_BUTTON_EVENTS; k++) {
+			int bmask = (mask & (1<<i));
+
+			if (pointer_map[i+1][k].end) {
+				break;
+			}
+
+			if (pointer_map[i+1][k].button) {
+				/* sent button up or down */
+				mb = pointer_map[i+1][k].button;
+				if ((num_buttons && mb > num_buttons)
+				    || mb < 1) {
+					rfbLog("ignoring mouse button out of "
+					    "bounds: %d>%d mask: 0x%x -> 0x%x\n",
+					    mb, num_buttons, button_mask, mask);
+					continue;
+				}
+				if (debug_pointer) {
+					rfbLog("pointer(): sending button %d"
+					    " %s (event %d)\n", mb, bmask
+					    ? "down" : "up", k+1);
+				}
+				XTestFakeButtonEvent(dpy, mb, (mask & (1<<i))
+				    ? True : False, CurrentTime);
+			} else {
+				/* sent keysym up or down */
+				KeyCode key = pointer_map[i+1][k].keycode;
+				int up   = pointer_map[i+1][k].up;
+				int down = pointer_map[i+1][k].down;
+
+				if (! bmask) {
+					/* do not send keysym on button up */
+					continue; 
+				}
+				if (debug_pointer) {
+					rfbLog("pointer(): sending button %d "
+					    "down as keycode 0x%x (event %d)\n",
+					    i+1, key, k+1);
+					rfbLog("           down=%d up=%d "
+					    "keysym: %s\n", down, up,
+					    XKeysymToString(XKeycodeToKeysym(
+					    dpy, key, 0)));
+				}
+				if (down) {
+					myXTestFakeKeyEvent(dpy, key, True,
+					    CurrentTime);
+				}
+				if (up) {
+					myXTestFakeKeyEvent(dpy, key, False,
+					    CurrentTime);
+				}
+			}
+		}
+	    }
+	}
+
+	if (nofb) {
+		/* 
+		 * nofb is for, e.g. Win2VNC, where fastest pointer
+		 * updates are desired.
+		 */
+		XFlush(dpy);
+	}
+
+	X_UNLOCK;
+
+	/*
+	 * Remember the button state for next time and also for the
+	 * -nodragging case:
+	 */
+	button_mask = mask;
+}
+
+/*
  * Actual callback from libvncserver when it gets a pointer event.
  */
-rfbClientPtr last_pointer_client = NULL;
-
-static void pointer(int mask, int x, int y, rfbClientPtr client) {
+void pointer(int mask, int x, int y, rfbClientPtr client) {
 
 	if (debug_pointer && mask >= 0) {
 		rfbLog("pointer(mask: 0x%x, x:%4d, y:%4d)\n", mask, x, y);
@@ -2103,115 +2332,18 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 	update_pointer(mask, x, y);
 }
 
-/*
- * Send a pointer event to the X server.
- */
-
-void update_pointer(int mask, int x, int y) {
-	int i, mb;
-
-	X_LOCK;
-
-	if (! use_xwarppointer) {
-		XTestFakeMotionEvent(dpy, scr, x+off_x, y+off_y, CurrentTime);
-	} else {
-		XWarpPointer(dpy, None, window, 0, 0, 0, 0,  x+off_x, y+off_y);
-	}
-
-	cursor_x = x;
-	cursor_y = y;
-
-	last_event = last_input = time(0);
-
-	for (i=0; i < MAX_BUTTONS; i++) {
-	    /* look for buttons that have be clicked or released: */
-	    if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
-		int k;
-		if (debug_pointer) {
-			rfbLog("pointer(): mask change: mask: 0x%x -> "
-			    "0x%x button: %d\n", button_mask, mask,i+1);
-		}
-		for (k=0; k < MAX_BUTTON_EVENTS; k++) {
-			int bmask = (mask & (1<<i));
-
-			if (pointer_map[i+1][k].end) {
-				break;
-			}
-
-			if (pointer_map[i+1][k].button) {
-				/* sent button up or down */
-				mb = pointer_map[i+1][k].button;
-				if ((num_buttons && mb > num_buttons)
-				    || mb < 1) {
-					rfbLog("ignoring mouse button out of "
-					    "bounds: %d>%d mask: 0x%x -> 0x%x\n",
-					    mb, num_buttons, button_mask, mask);
-					continue;
-				}
-				if (debug_pointer) {
-					rfbLog("pointer(): sending button %d"
-					    " %s (event %d)\n", mb, bmask
-					    ? "down" : "up", k+1);
-				}
-				XTestFakeButtonEvent(dpy, mb, (mask & (1<<i))
-				    ? True : False, CurrentTime);
-			} else {
-				/* sent keysym up or down */
-				KeyCode key = pointer_map[i+1][k].keycode;
-				int up   = pointer_map[i+1][k].up;
-				int down = pointer_map[i+1][k].down;
-
-				if (! bmask) {
-					/* do not send keysym on button up */
-					continue; 
-				}
-				if (debug_pointer) {
-					rfbLog("pointer(): sending button %d "
-					    "down as keycode 0x%x (event %d)\n",
-					    i+1, key, k+1);
-					rfbLog("           down=%d up=%d "
-					    "keysym: %s\n", down, up,
-					    XKeysymToString(XKeycodeToKeysym(
-					    dpy, key, 0)));
-				}
-				if (down) {
-					XTestFakeKeyEvent(dpy, key, True,
-					    CurrentTime);
-				}
-				if (up) {
-					XTestFakeKeyEvent(dpy, key, False,
-					    CurrentTime);
-				}
-			}
-		}
-	    }
-	}
-
-	if (nofb) {
-		/* 
-		 * nofb is for, e.g. Win2VNC, where fastest pointer
-		 * updates are desired.
-		 */
-		XFlush(dpy);
-	}
-
-	X_UNLOCK;
-
-	/*
-	 * Remember the button state for next time and also for the
-	 * -nodragging case:
-	 */
-	button_mask = mask;
-}
-
+/* -- bell.c -- */
 /*
  * Bell event handling.  Requires XKEYBOARD extension.
  */
 #ifdef LIBVNCSERVER_HAVE_XKEYBOARD
 
-int xkb_base_event_type;
+static int xkb_base_event_type;
 
-void initialize_watch_bell() {
+/*
+ * check for XKEYBOARD, set up xkb_base_event_type
+ */
+void initialize_watch_bell(void) {
 	int ir, reason;
 	if (! XkbSelectEvents(dpy, XkbUseCoreKbd, XkbBellNotifyMask,
 	    XkbBellNotifyMask) ) {
@@ -2234,7 +2366,7 @@ void initialize_watch_bell() {
  * We call this periodically to process any bell events that have 
  * taken place.
  */
-void watch_bell_event() {
+void watch_bell_event(void) {
 	XEvent xev;
 	XkbAnyEvent *xkb_ev;
 	int got_bell = 0;
@@ -2264,26 +2396,24 @@ void watch_bell_event() {
 	}
 }
 #else
-void watch_bell_event() {}
+void watch_bell_event(void) {}
 #endif
 
-
+/* -- selection.c -- */
 /*
  * Selection/Cutbuffer/Clipboard handlers.
  */
 
-int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
-int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */
-int own_selection = 0;		/* whether we currently own PRIMARY or not */
-int set_cutbuffer = 0;		/* to avoid bouncing the CutText right back */
-int sel_waittime = 15;		/* some seconds to skip before first send */
-Window selwin;			/* special window for our selection */
+static int own_selection = 0;	/* whether we currently own PRIMARY or not */
+static int set_cutbuffer = 0;	/* to avoid bouncing the CutText right back */
+static int sel_waittime = 15;	/* some seconds to skip before first send */
+static Window selwin;		/* special window for our selection */
 
 /*
  * This is where we keep our selection: the string sent TO us from VNC
  * clients, and the string sent BY us to requesting X11 clients.
  */
-char *xcut_string = NULL;
+static char *xcut_string = NULL;
 
 /*
  * Our callbacks instruct us to check for changes in the cutbuffer
@@ -2295,7 +2425,7 @@ char *xcut_string = NULL;
  * SelectionNotify handling).
  */
 #define PROP_MAX (131072L)
-char selection_str[PROP_MAX+1];
+static char selection_str[PROP_MAX+1];
 
 /*
  * An X11 (not VNC) client on the local display has requested the selection
@@ -2303,7 +2433,7 @@ char selection_str[PROP_MAX+1];
  *
  * n.b.: our caller already has the X_LOCK.
  */
-void selection_request(XEvent *ev) {
+static void selection_request(XEvent *ev) {
 	XSelectionEvent notify_event;
 	XSelectionRequestEvent *req_event;
 	unsigned int length;
@@ -2359,30 +2489,13 @@ void selection_request(XEvent *ev) {
 	XFlush(dpy);
 }
 
-int all_clients_initialized() {
-	rfbClientIteratorPtr iter;
-	rfbClientPtr cl;
-	int ok = 1;
-
-	iter = rfbGetClientIterator(screen);
-	while( (cl = rfbClientIteratorNext(iter)) ) {
-		if (cl->state != RFB_NORMAL) {
-			ok = 0;
-			break;
-		}
-	}
-	rfbReleaseClientIterator(iter);
-
-	return ok;
-}
-
 /*
  * CUT_BUFFER0 property on the local display has changed, we read and
  * store it and send it out to any connected VNC clients.
  *
  * n.b.: our caller already has the X_LOCK.
  */
-void cutbuffer_send() {
+static void cutbuffer_send(void) {
 	Atom type;
 	int format, slen, dlen;
 	unsigned long nitems = 0, bytes_after = 0;
@@ -2435,7 +2548,7 @@ void cutbuffer_send() {
  * timestamps to speed up the checking... XtGetSelectionValue().
  */
 #define CHKSZ 32
-void selection_send(XEvent *ev) {
+static void selection_send(XEvent *ev) {
 	Atom type;
 	int format, slen, dlen, oldlen, newlen, toobig = 0;
 	static int err = 0, sent_one = 0;
@@ -2515,59 +2628,11 @@ void selection_send(XEvent *ev) {
 	rfbSendServerCutText(screen, selection_str, newlen);
 }
 
-
-/*
- * Routines for monitoring the VNC_CONNECT property for changes.
- * The vncconnect(1) will set it on our X display.
- */
-
-Atom vnc_connect_prop = None;
-
-void read_vnc_connect_prop() {
-	Atom type;
-	int format, slen, dlen;
-	unsigned long nitems = 0, bytes_after = 0;
-	unsigned char* data = NULL;
-
-	vnc_connect_str[0] = '\0';
-	slen = 0;
-
-	if (! vnc_connect || vnc_connect_prop == None) {
-		/* not active or problem with VNC_CONNECT atom */
-		return;
-	}
-
-	/* read the property value into vnc_connect_str: */
-	do {
-		if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
-		    vnc_connect_prop, nitems/4, VNC_CONNECT_MAX/16, False,
-		    AnyPropertyType, &type, &format, &nitems, &bytes_after,
-		    &data) == Success) {
-
-			dlen = nitems * (format/8);
-			if (slen + dlen > VNC_CONNECT_MAX) {
-				/* too big */
-				rfbLog("warning: truncating large VNC_CONNECT"
-				   " string > %d bytes.\n", VNC_CONNECT_MAX);
-				XFree(data);
-				break;
-			}
-			memcpy(vnc_connect_str+slen, data, dlen);
-			slen += dlen;
-			vnc_connect_str[slen] = '\0';
-			XFree(data);
-		}
-	} while (bytes_after > 0);
-
-	vnc_connect_str[VNC_CONNECT_MAX] = '\0';
-	rfbLog("read property VNC_CONNECT: %s\n", vnc_connect_str);
-}
-
 /*
  * This routine is periodically called to check for selection related
  * and other X11 events and respond to them as needed.
  */
-void watch_xevents() {
+void watch_xevents(void) {
 	XEvent xev;
 	static int first = 1, sent_sel = 0;
 	int have_clients = screen->rfbClientHead ? 1 : 0;
@@ -2746,10 +2811,10 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	set_cutbuffer = 1;
 }
 
-void mark_hint(hint_t);
-
+/* -- cursor.c -- */
 /*
- * Here begins a bit of a mess to experiment with multiple cursors ...
+ * Here begins a bit of a mess to experiment with multiple cursors 
+ * drawn on the remote background ...
  */
 typedef struct cursor_info {
 	char *data;	/* data and mask pointers */
@@ -2802,7 +2867,7 @@ static char* cur_mask =
 #define CUR_SIZE 18
 #define CUR_DATA cur_data
 #define CUR_MASK cur_mask
-cursor_info_t cur0 = {NULL, NULL, CUR_SIZE, CUR_SIZE, 0, 0, 0};
+static cursor_info_t cur0 = {NULL, NULL, CUR_SIZE, CUR_SIZE, 0, 0, 0};
 
 /*
  * It turns out we can at least detect mouse is on the root window so 
@@ -2847,10 +2912,11 @@ static char* root_mask =
 " xxxxx      xxxxx "
 " xxxx        xxxx "
 "                  ";
-cursor_info_t cur1 = {NULL, NULL, 18, 18, 8, 8, 1};
+static cursor_info_t cur1 = {NULL, NULL, 18, 18, 8, 8, 1};
 
-cursor_info_t *cursors[2];
-void setup_cursors(void) {
+static cursor_info_t *cursors[2];
+
+static void setup_cursors(void) {
 	/* TODO clean this up if we ever do more cursors... */
 
 	cur0.data = cur_data;
@@ -2866,14 +2932,14 @@ void setup_cursors(void) {
 /*
  * data and functions for -mouse real pointer position updates
  */
-char cur_save[(4 * CUR_SIZE * CUR_SIZE)];
-int cur_save_x, cur_save_y, cur_save_w, cur_save_h;
-int cur_save_cx, cur_save_cy, cur_save_which, cur_saved = 0;
+static char cur_save[(4 * CUR_SIZE * CUR_SIZE)];
+static int cur_save_cx, cur_save_cy, cur_save_which;
 
 /*
  * save current cursor info and the patch of non-cursor data it covers
  */
-void save_mouse_patch(int x, int y, int w, int h, int cx, int cy, int which) {
+static void save_mouse_patch(int x, int y, int w, int h, int cx, int cy,
+    int which) {
 	int pixelsize = bpp >> 3;
 	char *rfb_fb = screen->frameBuffer;
 	int ly, i = 0;
@@ -2899,7 +2965,7 @@ void save_mouse_patch(int x, int y, int w, int h, int cx, int cy, int which) {
 /*
  * put the non-cursor patch back in the rfb fb
  */
-void restore_mouse_patch() {
+void restore_mouse_patch(void) {
 	int pixelsize = bpp >> 3;
 	char *rfb_fb = screen->frameBuffer;
 	int ly, i = 0;
@@ -2923,7 +2989,7 @@ void restore_mouse_patch() {
  * It seems impossible to do, but if the actual cursor could ever be
  * determined we might want to hash that info on window ID or something...
  */
-int tree_descend_cursor(void) {
+static int tree_descend_cursor(void) {
 	Window r, c;
 	int rx, ry, wx, wy;
 	unsigned int mask;
@@ -2946,7 +3012,10 @@ int tree_descend_cursor(void) {
 	return descend;
 }
 
-void blackout_nearby_tiles(x, y, dt) {
+/*
+ * This is for mouse patch drawing under -xinerama or -blackout
+ */
+static void blackout_nearby_tiles(x, y, dt) {
 	int sx, sy, n, b;
 	int tx = x/tile_x;
 	int ty = y/tile_y;
@@ -2987,7 +3056,7 @@ void blackout_nearby_tiles(x, y, dt) {
  * Send rfbCursorPosUpdates back to clients that understand them.  This
  * seems to be TightVNC specific.
  */
-void cursor_pos_updates(int x, int y) {
+static void cursor_pos_updates(int x, int y) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
 	int cnt = 0;
@@ -3048,7 +3117,7 @@ void cursor_pos_updates(int x, int y) {
 /*
  * draw one of the mouse cursors into the rfb fb
  */
-void draw_mouse(int x, int y, int which, int update) {
+static void draw_mouse(int x, int y, int which, int update) {
 	int px, py, i, offset;
 	int pixelsize = bpp >> 3;
 	char *rfb_fb = screen->frameBuffer;
@@ -3205,6 +3274,9 @@ void draw_mouse(int x, int y, int which, int update) {
 	}
 }
 
+/*
+ * wrapper to redraw the mouse patch
+ */
 void redraw_mouse(void) {
 	if (cur_saved) {
 		/* redraw saved mouse from info (save_mouse_patch) */
@@ -3212,6 +3284,10 @@ void redraw_mouse(void) {
 	}
 }
 
+/*
+ * routine called periodically to update the mouse aspects (drawn & 
+ * cursorpos updates)
+ */
 void update_mouse(void) {
 	Window root_w, child_w;
 	rfbBool ret;
@@ -3240,18 +3316,10 @@ void update_mouse(void) {
 	draw_mouse(root_x - off_x, root_y - off_y, which, 1);
 }
 
+/* -- screen.c -- */
 /*
- * For the subwin case follows the window if it is moved.
+ * X11 and rfb display/screen related routines
  */
-void set_offset(void) {
-	Window w;
-	if (! subwin) {
-		return;
-	}
-	X_LOCK;
-	XTranslateCoordinates(dpy, window, rootwin, 0, 0, &off_x, &off_y, &w);
-	X_UNLOCK;
-}
 
 /*
  * Some handling of 8bpp PseudoColor colormaps.  Called for initializing
@@ -3450,9 +3518,6 @@ void nofb_hook(rfbClientPtr cl) {
 	screen->displayHook = NULL;
 }
 
-int got_rfbport = 0;
-int got_alwaysshared = 0;
-int got_nevershared = 0;
 /*
  * initialize the rfb framebuffer/screen
  */
@@ -3482,17 +3547,18 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
  * Remove at some point.  BTW, this assumes no usage of earlier "0.7pre".
  */
 #ifdef LIBVNCSERVER_VERSION
-if (strcmp(LIBVNCSERVER_VERSION, "0.5") && strcmp(LIBVNCSERVER_VERSION, "0.6")) {
-	if (*argc != 1) {
-		int i;
-		rfbLog("*** unrecognized option(s) ***\n");
-		for (i=1; i< *argc; i++)  {
-			rfbLog("\t[%d]  %s\n", i, argv[i]);
+	if (strcmp(LIBVNCSERVER_VERSION, "0.5") 
+	    && strcmp(LIBVNCSERVER_VERSION, "0.6")) {
+		if (*argc != 1) {
+			int i;
+			rfbLog("*** unrecognized option(s) ***\n");
+			for (i=1; i< *argc; i++)  {
+				rfbLog("\t[%d]  %s\n", i, argv[i]);
+			}
+			rfbLog("for a list of options run: x11vnc -help\n");
+			clean_up_exit(1);
 		}
-		rfbLog("for a list of options run: x11vnc -help\n");
-		clean_up_exit(1);
 	}
-}
 #endif
 
 	screen->paddedWidthInBytes = fb->bytes_per_line;
@@ -3619,6 +3685,11 @@ if (strcmp(LIBVNCSERVER_VERSION, "0.5") && strcmp(LIBVNCSERVER_VERSION, "0.6")) 
 	}
 }
 
+/* -- xinerama.c -- */
+/*
+ * routines related to xinerama and blacking out rectangles
+ */
+
 /*
  * Take a comma separated list of geometries: WxH+X+Y and register them as
  * rectangles to black out from the screen.
@@ -3661,10 +3732,10 @@ void initialize_blackout (char *list) {
 			 * for the region. i.e. the x2, y2 are outside
 			 * by 1 pixel. 
 			 */
-			black[blackouts].x1 = x;
-			black[blackouts].y1 = y;
-			black[blackouts].x2 = X;
-			black[blackouts].y2 = Y;
+			blackr[blackouts].x1 = x;
+			blackr[blackouts].y1 = y;
+			blackr[blackouts].x2 = X;
+			blackr[blackouts].y2 = Y;
 			blackouts++;
 			if (blackouts >= 100) {
 				rfbLog("too many blackouts: %d\n", blackouts);
@@ -3681,7 +3752,7 @@ void initialize_blackout (char *list) {
  * they have with the tiles in the system.  If a tile is touched by a
  * blackout, record information.
  */
-void blackout_tiles() {
+void blackout_tiles(void) {
 	int tx, ty;
 	if (! blackouts) {
 		return;
@@ -3728,8 +3799,8 @@ void blackout_tiles() {
 			/* union of blackouts */
 			for (b=0; b < blackouts; b++) {
 				sraRegionPtr tmp_reg = (sraRegionPtr)
-				    sraRgnCreateRect(black[b].x1, black[b].y1,
-				    black[b].x2, black[b].y2);
+				    sraRgnCreateRect(blackr[b].x1, blackr[b].y1,
+				    blackr[b].x2, blackr[b].y2);
 
 				sraRgnOr(black_reg, tmp_reg);
 				sraRgnDestroy(tmp_reg);
@@ -3795,7 +3866,7 @@ void blackout_tiles() {
 	}
 }
 
-void initialize_xinerama () {
+void initialize_xinerama (void) {
 #ifndef LIBVNCSERVER_HAVE_LIBXINERAMA
 	rfbLog("Xinerama: Library libXinerama is not available to determine\n");
 	rfbLog("Xinerama: the head geometries, consider using -blackout\n");
@@ -3915,20 +3986,46 @@ void zero_fb(x1, y1, x2, y2) {
 	}
 }
 
+/* -- scan.c -- */
 /*
- * Fill the framebuffer with zeros for each blackout region
+ * routines for scanning and reading the X11 display for changes, and
+ * for doing all the tile work (shm, etc).
  */
-void blackout_regions() {
-	int i;
-	for (i=0; i < blackouts; i++) {
-		zero_fb(black[i].x1, black[i].y1, black[i].x2, black[i].y2);
-	}
-}
+
+/* array to hold the hints: */
+static hint_t *hint_list;
+
+/* nap state */
+static int nap_ok = 0, nap_diff_count = 0;
+
+static int scan_count = 0;	/* indicates which scan pattern we are on  */
+static int scan_in_progress = 0;	
+
+/* scan pattern jitter from x0rfbserver */
+#define NSCAN 32
+static int scanlines[NSCAN] = {
+	 0, 16,  8, 24,  4, 20, 12, 28,
+	10, 26, 18,  2, 22,  6, 30, 14,
+	 1, 17,  9, 25,  7, 23, 15, 31,
+	19,  3, 27, 11, 29, 13,  5, 21
+};
+
+typedef struct tile_change_region {
+	/* start and end lines, along y, of the changed area inside a tile. */
+	unsigned short first_line, last_line;
+	/* info about differences along edges. */
+	unsigned short left_diff, right_diff;
+	unsigned short top_diff,  bot_diff;
+} region_t;
+
+/* array to hold the tiles region_t-s. */
+static region_t *tile_region;
+
 
 /*
  * setup tile numbers and allocate the tile and hint arrays:
  */
-void initialize_tiles() {
+void initialize_tiles(void) {
 
 	ntiles_x = (dpy_x - 1)/tile_x + 1;
 	ntiles_y = (dpy_y - 1)/tile_y + 1;
@@ -3956,7 +4053,9 @@ void initialize_tiles() {
  * should always work unless dpy_y is a large prime or something... under
  * failure fs_factor remains 0 and no fullscreen updates will be tried.
  */
-void set_fs_factor(int max) {
+static int fs_factor = 0;
+
+static void set_fs_factor(int max) {
 	int f, fac = 1, n = dpy_y;
 
 	if ( (bpp/8) * dpy_x * dpy_y <= max )  {
@@ -3978,7 +4077,7 @@ void set_fs_factor(int max) {
 /*
  * set up an XShm image
  */
-int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
+static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
     char *name) {
 
 	XImage *xim;
@@ -4121,7 +4220,7 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 	shm_delete(shm);
 }
 
-void initialize_shm() {
+void initialize_shm(void) {
 	int i;
 
 	/* set all shm areas to "none" before trying to create any */
@@ -4193,13 +4292,12 @@ void initialize_shm() {
 	}
 }
 
-
 /*
  * A hint is a rectangular region built from 1 or more adjacent tiles
  * glued together.  Ultimately, this information in a single hint is sent
  * to libvncserver rather than sending each tile separately.
  */
-void create_tile_hint(int x, int y, int th, hint_t *hint) {
+static void create_tile_hint(int x, int y, int th, hint_t *hint) {
 	int w = dpy_x - x;
 	int h = dpy_y - y;
 
@@ -4216,7 +4314,7 @@ void create_tile_hint(int x, int y, int th, hint_t *hint) {
 	hint->h = h;
 }
 
-void extend_tile_hint(int x, int y, int th, hint_t *hint) {
+static void extend_tile_hint(int x, int y, int th, hint_t *hint) {
 	int w = dpy_x - x;
 	int h = dpy_y - y;
 
@@ -4244,7 +4342,7 @@ void extend_tile_hint(int x, int y, int th, hint_t *hint) {
 	}
 }
 
-void save_hint(hint_t hint, int loc) {
+static void save_hint(hint_t hint, int loc) {
 	/* simply copy it to the global array for later use. */
 	hint_list[loc].x = hint.x;
 	hint_list[loc].y = hint.y;
@@ -4256,7 +4354,7 @@ void save_hint(hint_t hint, int loc) {
  * Glue together horizontal "runs" of adjacent changed tiles into one big
  * rectangle change "hint" to be passed to the vnc machinery.
  */
-void hint_updates() {
+static void hint_updates(void) {
 	hint_t hint;
 	int x, y, i, n, ty, th;
 	int hint_count = 0, in_run = 0;
@@ -4312,7 +4410,7 @@ void mark_hint(hint_t hint) {
 /*
  * Notifies libvncserver of a changed tile rectangle.
  */
-void mark_tile(int x, int y, int height) {
+static void mark_tile(int x, int y, int height) {
 	int w = dpy_x - x;
 	int h = dpy_y - y;
 
@@ -4332,7 +4430,7 @@ void mark_tile(int x, int y, int height) {
  * Simply send each modified tile separately to the vnc machinery:
  * (i.e. no hints)
  */
-void tile_updates() {
+static void tile_updates(void) {
 	int x, y, n, ty, th;
 
 	for (y=0; y < ntiles_y; y++) {
@@ -4349,7 +4447,6 @@ void tile_updates() {
 	}
 }
 
-
 /*
  * copy_tiles() gives a slight improvement over copy_tile() since
  * adjacent runs of tiles are done all at once there is some savings
@@ -4360,11 +4457,10 @@ void tile_updates() {
  * the read bandwidth, sometimes only 5 MB/sec on otherwise fast
  * hardware.
  */
+static int *first_line = NULL, *last_line;
+static unsigned short *left_diff, *right_diff;
 
-int *first_line = NULL, *last_line;
-unsigned short *left_diff, *right_diff;
-
-void copy_tiles(int tx, int ty, int nt) {
+static void copy_tiles(int tx, int ty, int nt) {
 	int x, y, line;
 	int size_x, size_y, width1, width2;
 	int off, len, n, dw, dx, t;
@@ -4704,7 +4800,7 @@ void copy_tiles(int tx, int ty, int nt) {
  * See copy_tiles_backward_pass() for analogous checking upward and
  * left tiles.
  */
-int copy_all_tiles() {
+static int copy_all_tiles(void) {
 	int x, y, n, m;
 	int diffs = 0;
 
@@ -4747,7 +4843,7 @@ int copy_all_tiles() {
  * Routine analogous to copy_all_tiles() above, but for horizontal runs
  * of adjacent changed tiles.
  */
-int copy_all_tile_runs() {
+static int copy_all_tile_runs(void) {
 	int x, y, n, m, i;
 	int diffs = 0;
 	int in_run = 0, run = 0;
@@ -4814,7 +4910,7 @@ int copy_all_tile_runs() {
  * Try to predict whether the upward and/or leftward tile has been modified.
  * copy_all_tiles() has already done downward and rightward tiles.
  */
-int copy_tiles_backward_pass() {
+static int copy_tiles_backward_pass(void) {
 	int x, y, n, m;
 	int diffs = 0;
 
@@ -4853,7 +4949,7 @@ int copy_tiles_backward_pass() {
 	return diffs;
 }
 
-void gap_try(int x, int y, int *run, int *saw, int along_x) {
+static void gap_try(int x, int y, int *run, int *saw, int along_x) {
 	int n, m, i, xt, yt;
 
 	n = x + y * ntiles_x;
@@ -4898,7 +4994,7 @@ void gap_try(int x, int y, int *run, int *saw, int along_x) {
  *
  * BTW, grow_islands() is actually pretty successful at doing this too...
  */
-int fill_tile_gaps() {
+static int fill_tile_gaps(void) {
 	int x, y, run, saw;
 	int n, diffs = 0;
 
@@ -4928,7 +5024,7 @@ int fill_tile_gaps() {
 	return diffs;
 }
 
-void island_try(int x, int y, int u, int v, int *run) {
+static void island_try(int x, int y, int u, int v, int *run) {
 	int n, m;
 
 	n = x + y * ntiles_x;
@@ -4958,7 +5054,7 @@ void island_try(int x, int y, int u, int v, int *run) {
  * the boundary of the discontinuity (i.e. make the island larger).
  * Vertical scans are skipped since they do not seem to yield much...
  */
-int grow_islands() {
+static int grow_islands(void) {
 	int x, y, n, run;
 	int diffs = 0;
 
@@ -4990,12 +5086,22 @@ int grow_islands() {
 }
 
 /*
+ * Fill the framebuffer with zeros for each blackout region
+ */
+static void blackout_regions(void) {
+	int i;
+	for (i=0; i < blackouts; i++) {
+		zero_fb(blackr[i].x1, blackr[i].y1, blackr[i].x2, blackr[i].y2);
+	}
+}
+
+/*
  * copy the whole X screen to the rfb framebuffer.  For a large enough
  * number of changed tiles, this is faster than tiles scheme at retrieving
  * the info from the X server.  Bandwidth to client and compression time
  * are other issues...  use -fs 1.0 to disable.
  */
-void copy_screen() {
+void copy_screen(void) {
 	int pixelsize = bpp >> 3;
 	char *rfb_fb;
 	int i, y, block_size;
@@ -5031,34 +5137,13 @@ void copy_screen() {
 	rfbMarkRectAsModified(screen, 0, 0, dpy_x, dpy_y);
 }
 
-/* profiling routines */
-
-double dtime(double *t_old) {
-	/* 
-	 * usage: call with 0.0 to initialize, subsequent calls give
-	 * the time differences.
-	 */
-	double t_now, dt;
-	struct timeval now;
-
-	gettimeofday(&now, NULL);
-	t_now = now.tv_sec + ( (double) now.tv_usec/1000000. );
-	if (*t_old == 0) {
-		*t_old = t_now;
-		return t_now;
-	}
-	dt = t_now - *t_old;
-	*t_old = t_now;
-	return(dt);
-}
-
 
 /*
  * Utilities for managing the "naps" to cut down on amount of polling.
  */
-void nap_set(int tile_cnt) {
+static void nap_set(int tile_cnt) {
 
-	if (count == 0) {
+	if (scan_count == 0) {
 		/* roll up check for all NSCAN scans */
 		nap_ok = 0;
 		if (naptile && nap_diff_count < 2 * NSCAN * naptile) {
@@ -5078,10 +5163,12 @@ void nap_set(int tile_cnt) {
 	}
 }
 
-void nap_sleep(int ms, int split) {
+/*
+ * split up a long nap to improve the wakeup time
+ */
+static void nap_sleep(int ms, int split) {
 	int i, input = got_user_input;
 
-	/* split up a long nap to improve the wakeup time */
 	for (i=0; i<split; i++) {
 		usleep(ms * 1000 / split);
 		if (! use_threads && i != split - 1) {
@@ -5093,7 +5180,10 @@ void nap_sleep(int ms, int split) {
 	}
 }
 
-void nap_check(int tile_cnt) {
+/*
+ * see if we should take a nap of some sort between polls
+ */
+static void nap_check(int tile_cnt) {
 	time_t now;
 
 	nap_diff_count += tile_cnt;
@@ -5129,7 +5219,7 @@ void nap_check(int tile_cnt) {
  * This is called to avoid a ~20 second timeout in libvncserver.
  * May no longer be needed.
  */
-void ping_clients(int tile_cnt) {
+static void ping_clients(int tile_cnt) {
 	static time_t last_send = 0;
 	time_t now = time(0);
 
@@ -5151,7 +5241,8 @@ void ping_clients(int tile_cnt) {
  * scan_display() wants to know if this tile can be skipped due to
  * blackout regions: (no data compare is done, just a quick geometric test)
  */
-int blackout_line_skip(int n, int x, int y, int rescan, int *tile_count) {
+static int blackout_line_skip(int n, int x, int y, int rescan,
+    int *tile_count) {
 	
 	if (tile_blackout[n].cover == 2) {
 		tile_has_diff[n] = 0;
@@ -5198,7 +5289,7 @@ int blackout_line_skip(int n, int x, int y, int rescan, int *tile_count) {
  * scan_display() wants to know if this changed tile can be skipped due
  * to blackout regions (we do an actual compare to find the changed region).
  */
-int blackout_line_cmpskip(int n, int x, int y, char *dst, char *src,
+static int blackout_line_cmpskip(int n, int x, int y, char *dst, char *src,
     int w, int pixelsize) {
 
 	int i, x1, y1, x2, y2, b, hit = 0;
@@ -5256,12 +5347,25 @@ int blackout_line_cmpskip(int n, int x, int y, char *dst, char *src,
 }
 
 /*
+ * For the subwin case follows the window if it is moved.
+ */
+void set_offset(void) {
+	Window w;
+	if (! subwin) {
+		return;
+	}
+	X_LOCK;
+	XTranslateCoordinates(dpy, window, rootwin, 0, 0, &off_x, &off_y, &w);
+	X_UNLOCK;
+}
+
+/*
  * Loop over 1-pixel tall horizontal scanlines looking for changes.  
  * Record the changes in tile_has_diff[].  Scanlines in the loop are
  * equally spaced along y by NSCAN pixels, but have a slightly random
  * starting offset ystart ( < NSCAN ) from scanlines[].
  */
-int scan_display(int ystart, int rescan) {
+static int scan_display(int ystart, int rescan) {
 	char *src, *dst;
 	int pixelsize = bpp >> 3;
 	int x, y, w, n;
@@ -5353,7 +5457,7 @@ int scan_display(int ystart, int rescan) {
 /*
  * toplevel for the scanning, rescanning, and applying the heuristics.
  */
-void scan_for_updates() {
+void scan_for_updates(void) {
 	int i, tile_count, tile_diffs;
 	double frac1 = 0.1;   /* tweak parameter to try a 2nd scan_display() */
 	double frac2 = 0.35;  /* or 3rd */
@@ -5367,10 +5471,10 @@ void scan_for_updates() {
 	 * tile_x = tile_y = NSCAN = 32!
 	 */
 
-	count++;
-	count %= NSCAN;
+	scan_count++;
+	scan_count %= NSCAN;
 
-	if (count % (NSCAN/4) == 0)  {
+	if (scan_count % (NSCAN/4) == 0)  {
 		/* some periodic maintenance */
 
 		if (subwin) {
@@ -5388,7 +5492,7 @@ void scan_for_updates() {
 
 	/* scan with the initial y to the jitter value from scanlines: */
 	scan_in_progress = 1;
-	tile_count = scan_display(scanlines[count], 0);
+	tile_count = scan_display(scanlines[scan_count], 0);
 
 	nap_set(tile_count);
 
@@ -5408,13 +5512,13 @@ void scan_for_updates() {
 			int cp, tile_count_old = tile_count;
 			
 			/* choose a different y shift for the 2nd scan: */
-			cp = (NSCAN - count) % NSCAN;
+			cp = (NSCAN - scan_count) % NSCAN;
 
 			tile_count = scan_display(scanlines[cp], 1);
 
 			if (tile_count >= (1 + frac2) * tile_count_old) {
 				/* on a roll... do a 3rd scan */
-				cp = (NSCAN - count + 7) % NSCAN;
+				cp = (NSCAN - scan_count + 7) % NSCAN;
 				tile_count = scan_display(scanlines[cp], 1);
 			}
 		}
@@ -5530,78 +5634,13 @@ void scan_for_updates() {
 	nap_check(tile_diffs);
 }
 
-int check_user_input(double, int *);
+/* -- x11vnc.c -- */
+/*
+ * main routine for the x11vnc program
+ */
 
-void watch_loop(void) {
-	int cnt = 0;
-	double dt = 0.0;
-
-	if (use_threads) {
-		rfbRunEventLoop(screen, -1, TRUE);
-	}
-
-	while (1) {
-
-		got_user_input = 0;
-		got_pointer_input = 0;
-		got_keyboard_input = 0;
-
-		if (! use_threads) {
-			rfbProcessEvents(screen, -1);
-			if (check_user_input(dt, &cnt)) {
-				/* true means loop back for more input */
-				continue;
-			}
-		}
-
-		if (shut_down) {
-			clean_up_exit(0);
-		}
-
-		watch_xevents();
-		check_connect_inputs();		
-
-		if (! screen->rfbClientHead) {	/* waiting for a client */
-			usleep(200 * 1000);
-			continue;
-		}
-
-		if (nofb) {	/* no framebuffer polling needed */
-			if (cursor_pos) {
-				update_mouse();
-			}
-			continue;
-		}
-
-		if (watch_bell) {
-			/*
-			 * check for any bell events.
-			 * n.b. assumes -nofb folks do not want bell...
-			 */
-			watch_bell_event();
-		}
-		if (! show_dragging && button_mask) {
-			/* if any button is pressed do not update screen */
-			/* XXX consider: use_threads || got_pointer_input */
-			X_LOCK;
-			XFlush(dpy);
-			X_UNLOCK;
-		} else {
-			/* for timing the scan to try to detect thrashing */
-			double tm = 0.0;
-			dtime(&tm);
-
-			rfbUndrawCursor(screen);
-			scan_for_updates();
-
-			dt = dtime(&tm);
-		}
-
-		/* sleep a bit to lessen load */
-		usleep(waitms * 1000);
-		cnt++;
-	}
-}
+static int defer_update_nofb = 6;	/* defer a shorter time under -nofb */
+static int shut_down = 0;	
 
 /*
  * We need to handle user input, particularly pointer input, carefully.
@@ -5620,8 +5659,7 @@ void watch_loop(void) {
  * return of 1 means watch_loop should short-circuit and reloop,
  * return of 0 means watch_loop should proceed to scan_for_updates().
  */
-
-int check_user_input(double dt, int *cnt) {
+static int check_user_input(double dt, int *cnt) {
 
 	if (old_pointer) {
 		/* every n-th drops thru to scan */
@@ -5748,7 +5786,116 @@ int check_user_input(double dt, int *cnt) {
 	return 0;
 }
 
-void print_help() {
+/*
+ * simple function for measuring sub-second time differences, using
+ * a double to hold the value.
+ */
+double dtime(double *t_old) {
+	/* 
+	 * usage: call with 0.0 to initialize, subsequent calls give
+	 * the time differences.
+	 */
+	double t_now, dt;
+	struct timeval now;
+
+	gettimeofday(&now, NULL);
+	t_now = now.tv_sec + ( (double) now.tv_usec/1000000. );
+	if (*t_old == 0) {
+		*t_old = t_now;
+		return t_now;
+	}
+	dt = t_now - *t_old;
+	*t_old = t_now;
+	return(dt);
+}
+
+/*
+ * utility wrapper to call rfbProcessEvents
+ */
+void rfbPE(rfbScreenInfoPtr scr, long us) {
+	if (! use_threads) {
+		return rfbProcessEvents(scr, us);
+	}
+}
+
+/*
+ * main x11vnc loop: polls, checks for events, iterate libvncserver, etc.
+ */
+static void watch_loop(void) {
+	int cnt = 0;
+	double dt = 0.0;
+
+	if (use_threads) {
+		rfbRunEventLoop(screen, -1, TRUE);
+	}
+
+	while (1) {
+
+		got_user_input = 0;
+		got_pointer_input = 0;
+		got_keyboard_input = 0;
+
+		if (! use_threads) {
+			rfbProcessEvents(screen, -1);
+			if (check_user_input(dt, &cnt)) {
+				/* true means loop back for more input */
+				continue;
+			}
+		}
+
+		if (shut_down) {
+			clean_up_exit(0);
+		}
+
+		watch_xevents();
+		check_connect_inputs();		
+
+		if (! screen->rfbClientHead) {	/* waiting for a client */
+			usleep(200 * 1000);
+			continue;
+		}
+
+		if (nofb) {	/* no framebuffer polling needed */
+			if (cursor_pos) {
+				update_mouse();
+			}
+			continue;
+		}
+
+		if (watch_bell) {
+			/*
+			 * check for any bell events.
+			 * n.b. assumes -nofb folks do not want bell...
+			 */
+			watch_bell_event();
+		}
+		if (! show_dragging && button_mask) {
+			/* if any button is pressed do not update screen */
+			/* XXX consider: use_threads || got_pointer_input */
+			X_LOCK;
+			XFlush(dpy);
+			X_UNLOCK;
+		} else {
+			/* for timing the scan to try to detect thrashing */
+			double tm = 0.0;
+			dtime(&tm);
+
+			rfbUndrawCursor(screen);
+			scan_for_updates();
+
+			dt = dtime(&tm);
+		}
+
+		/* sleep a bit to lessen load */
+		usleep(waitms * 1000);
+		cnt++;
+	}
+}
+
+/*
+ * text printed out under -help option
+ */
+static void print_help(void) {
 	char help[] = 
 "\n"
 "x11vnc: allow VNC connections to real X11 displays.\n"
@@ -5829,11 +5976,12 @@ void print_help() {
 "                       contains spaces, etc.  The RFB_CLIENT_IP environment\n"
 "                       variable will be set to the incoming client IP number\n"
 "                       and the port in RFB_CLIENT_PORT (or -1 if unavailable).\n"
-"                       The x11vnc process id will be in RFB_X11VNC_PID and a\n"
-"                       client id number in RFB_CLIENT_ID.  If the external\n"
-"                       command returns 0 the client is accepted, otherwise\n"
-"                       the client is rejected.  See below for an extension to\n"
-"                       accept a client view-only.\n"
+"                       The x11vnc process id will be in RFB_X11VNC_PID, a\n"
+"                       client id number in RFB_CLIENT_ID and the number of\n"
+"                       other connected clients in RFB_CLIENT_COUNT.  If the\n"
+"                       external command returns 0 the client is accepted,\n"
+"                       otherwise the client is rejected.  See below for an\n"
+"                       extension to accept a client view-only.\n"
 "\n"
 "                       If \"string\" is \"popup\" then a builtin popup window\n"
 "                       is used.  The popup will time out after 120 seconds,\n"
@@ -6016,11 +6164,11 @@ void print_help() {
 }
 
 /*
- * choose a desktop name
+ * utility to get the current host name
  */
 #define MAXN 256
 
-char *this_host() {
+static char *this_host(void) {
 	char host[MAXN];
 #ifdef LIBVNCSERVER_HAVE_GETHOSTNAME
 	if (gethostname(host, MAXN) == 0) {
@@ -6030,7 +6178,10 @@ char *this_host() {
 	return NULL;
 }
 
-char *choose_title(char *display) {
+/*
+ * choose a desktop name
+ */
+static char *choose_title(char *display) {
 	static char title[(MAXN+10)];	
 	strcpy(title, "x11vnc");
 
@@ -6060,7 +6211,7 @@ char *choose_title(char *display) {
 /* 
  * check blacklist for OSs with tight shm limits.
  */
-int limit_shm(void) {
+static int limit_shm(void) {
 	struct utsname ut;
 	int limit = 0;
 
@@ -6091,6 +6242,9 @@ int main(int argc, char** argv) {
 	char *arg, *visual_str = NULL;
 	char *logfile = NULL;
 	char *passwdfile = NULL;
+	char *blackout_string = NULL;
+	char *remap_file = NULL;
+	char *pointer_remap = NULL;
 	int pw_loc = -1;
 	int vpw_loc = -1;
 	int dt = 0;
@@ -6657,7 +6811,7 @@ int main(int argc, char** argv) {
 			depth = visual_depth;	/* force it */
 		}
 		if (! quiet) {
-			fprintf(stderr, "vis id:     0x%x\n", 
+			fprintf(stderr, "vis id:     0x%x\n",
 			    (int) vinfo->visualid);
 			fprintf(stderr, "vis scr:      %d\n", vinfo->screen);
 			fprintf(stderr, "vis depth     %d\n", vinfo->depth);
@@ -6725,7 +6879,7 @@ int main(int argc, char** argv) {
 
 	initialize_shm();	/* also creates XImages when using_shm = 0 */
 
-	set_signals();
+	initialize_signals();
 
 	if (blackouts) {	/* blackout fb as needed. */
 		copy_screen();
@@ -6737,7 +6891,7 @@ int main(int argc, char** argv) {
 	if (remap_file != NULL) {
 		initialize_remap(remap_file);
 	}
-	initialize_pointer_map();
+	initialize_pointer_map(pointer_remap);
 
 	if (! inetd) {
 		if (! screen->rfbPort || screen->rfbListenSock < 0) {
@@ -6815,3 +6969,4 @@ int main(int argc, char** argv) {
 
 	return(0);
 }
+

@@ -1,3 +1,7 @@
+2004-06-05  Karl Runge <runge@karlrunge.com>
+	* x11vnc: rearrange file for easier maintenance
+	* add RFB_CLIENT_COUNT to -accept and -gone commands
+
 2004-05-27  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -viewpasswd, viewonly passwds.
 	* some typos in prepare_x11vnc_dist.sh 
@@ -19,7 +23,7 @@
 	* shm OS blacklist revert to -onetile
 
 2004-04-28  Karl Runge <runge@karlrunge.com>
-	* x11vnc: -auth, more -cursopor and -nofb work
+	* x11vnc: -auth, more -cursorpos and -nofb work
 
 2004-04-19  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -cursorpos, -sigpipe

@@ -1,3 +1,8 @@
+2004-06-05  Karl Runge <runge@karlrunge.com>
+	* rearrange file for easier maintenance, indicating file breakup.
+	* add RFB_CLIENT_COUNT, number of other connected clients to
+	  -accept and -gone commands.
+
 2004-05-27  Karl Runge <runge@karlrunge.com>
 	* add view-only passwd via -viewpasswd and 2nd line of -passwdfile
 
