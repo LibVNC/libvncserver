@@ -1,0 +1,14 @@
+0.2
+   cursors are supported
+   support for 3 bytes/pixel (slow!)
+   server side colourmap support
+   fixed rfbCloseClient not to close the connection (pthreads!)
+   pthreads now work
+   cleaned up mac.c (from original OSXvnc); now compiles (untested!)
+   compiles cleanly on Linux, IRIX, BSD, Apple
+0.1
+   rewrote API to use pseudo-methods instead of required functions.
+   lots of clean up.
+   Example can show symbols now.
+   All encodings
+   HTTP
