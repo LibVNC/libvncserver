@@ -274,6 +274,7 @@ typedef struct _rfbScreenInfo
     rfbBool backgroundLoop;
 #endif
 
+    rfbBool ignoreSIGPIPE;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 

@@ -638,6 +638,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    /* initialize client list and iterator mutex */
    rfbClientListInit(rfbScreen);
 
+   rfbScreen->ignoreSIGPIPE = TRUE;
+
    return(rfbScreen);
 }
 
@@ -747,6 +749,8 @@ void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
 #endif
 }
 
+static void ignoreSignal(int dummy) {}
+
 void rfbInitServer(rfbScreenInfoPtr rfbScreen)
 {
 #ifdef WIN32
@@ -755,6 +759,8 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
 #endif
   rfbInitSockets(rfbScreen);
   httpInitSockets(rfbScreen);
+  if(rfbScreen->ignoreSIGPIPE)
+    signal(SIGPIPE,ignoreSignal);
 }
 
 #ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
