@@ -482,8 +482,6 @@ void rfbShowCursor(rfbClientPtr cl)
    if(!c->richSource)
      rfbMakeRichCursorFromXCursor(s,c);
   
-   fprintf(stderr,"show cursor at %d %d\n",x1,y1);
-
    if (c->alphaSource) {
 	int rmax, rshift;
 	int gmax, gshift;
