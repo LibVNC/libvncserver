@@ -89,10 +89,6 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
             rfbScreen->rfbNeverShared = TRUE;
         } else if (strcmp(argv[i], "-dontdisconnect") == 0) {
             rfbScreen->rfbDontDisconnect = TRUE;
-        } else {
-	    /* we just remove the processed arguments from the list */
-	    if(i != i1)
-	        rfbPurgeArguments(argc,&i1,i-i1,argv);
         } else if (strcmp(argv[i], "-httpdir") == 0) {  /* -httpdir directory-path */
             if (i + 1 >= *argc) rfbUsage();
             rfbScreen->httpDir = argv[++i];
@@ -101,6 +97,10 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
             rfbScreen->httpPort = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-enablehttpproxy") == 0) {
             rfbScreen->httpEnableProxyConnect = TRUE;
+        } else {
+	    /* we just remove the processed arguments from the list */
+	    if(i != i1)
+	        rfbPurgeArguments(argc,&i1,i-i1,argv);
         }
 	i1++;
 	i=i1;
