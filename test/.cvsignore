@@ -1,4 +1,5 @@
 .deps
 Makefile
+Makefile.in
 tight-1
 

@@ -1,5 +1,12 @@
 2003-09-11  Mark McLoughlin  <mark@skynet.ie>
 
+	* Makefile.in, */Makefile.in, aclocal.m4,
+	  bootstrap.sh, config.h.in, configure,
+	  depcomp, install-sh, missing, mkinstalldirs,
+	Removed auto-generated files from CVS.
+	
+2003-09-11  Mark McLoughlin  <mark@skynet.ie>
+
 	* rdr/Exception.h, rdr/FdInStream.cxx, rdr/FdInStream.h,
 	  rdr/FdOutStream.cxx, rdr/FdOutStream.h, rdr/FixedMemOutStream.h,
 	  rdr/InStream.cxx, rdr/InStream.h, rdr/MemInStream.h,
