@@ -49,14 +49,21 @@ int max(int,int);
 #include <zlib.h>
 
 #include <rfbproto.h>
-#include <netinet/in.h>
+
 #ifdef HAVE_PTHREADS
 #include <pthread.h>
+#define IF_PTHREADS(x) (x)
+#else
+#define IF_PTHREADS(x)
 #endif
+
+
+
 #ifdef __linux__
 #include <endian.h>
 #else
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include <sys/types.h>
 #include <machine/endian.h>
 #define _BYTE_ORDER BYTE_ORDER
 #define _LITTLE_ENDIAN LITTLE_ENDIAN
@@ -73,14 +80,9 @@ int max(int,int);
 #define _LITTLE_ENDIAN __LITTLE_ENDIAN
 #endif
 
+#include <netinet/in.h>
+
 #define MAX_ENCODINGS 10
-
-#ifdef HAVE_PTHREADS
-#define IF_PTHREADS(x) (x)
-#else
-#define IF_PTHREADS(x)
-#endif
-
 
 struct rfbClientRec;
 struct rfbScreenInfo;

@@ -4,7 +4,7 @@ CFLAGS=-g -Wall
 RANLIB=ranlib
 
 INCLUDES=-I. -Iinclude
-VNCSERVERLIB=-L. -lvncserver -lz -ljpeg
+VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 # These two lines enable useage of PThreads
 #CFLAGS += -DHAVE_PTHREADS
