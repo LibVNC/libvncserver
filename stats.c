@@ -78,7 +78,7 @@ rfbPrintStats(rfbClientPtr cl)
             totalBytesSent);
 
     if (cl->rfbLastRectMarkersSent != 0)
-	rfbLog("    LastRect markers %d, bytes %d\n",
+	rfbLog("    LastRect and NewFBSize markers %d, bytes %d\n",
 		cl->rfbLastRectMarkersSent, cl->rfbLastRectBytesSent);
 
     if (cl->rfbCursorUpdatesSent != 0)

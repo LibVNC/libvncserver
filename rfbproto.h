@@ -328,6 +328,7 @@ typedef struct {
 #define rfbEncodingRichCursor      0xFFFFFF11
 
 #define rfbEncodingLastRect        0xFFFFFF20
+#define rfbEncodingNewFBSize       0xFFFFFF21
 
 #define rfbEncodingQualityLevel0   0xFFFFFFE0
 #define rfbEncodingQualityLevel1   0xFFFFFFE1

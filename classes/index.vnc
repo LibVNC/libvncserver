@@ -8,9 +8,10 @@
 <TITLE>
 $USER's $DESKTOP desktop ($DISPLAY)
 </TITLE>
-<APPLET CODE=vncviewer.class ARCHIVE=VncViewer.jar
+<APPLET CODE=VncViewer.class ARCHIVE=VncViewer.jar
         WIDTH=$APPLETWIDTH HEIGHT=$APPLETHEIGHT>
 <param name=PORT value=$PORT>
+<param name="Open New Window" value=yes>
 </APPLET>
 <BR>
 <A href="http://www.tightvnc.com/">www.TightVNC.com</A>

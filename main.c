@@ -468,12 +468,57 @@ enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl)
 	return RFB_CLIENT_ACCEPT;
 }
 
+/*
+ * Update server's pixel format in rfbScreenInfo structure. This
+ * function is called from rfbGetScreen() and rfbNewFramebuffer().
+ */
+
+static void rfbInitServerFormat(rfbScreenInfoPtr rfbScreen, int bitsPerSample)
+{
+   rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
+
+   format->bitsPerPixel = rfbScreen->bitsPerPixel;
+   format->depth = rfbScreen->depth;
+   format->bigEndian = rfbEndianTest?FALSE:TRUE;
+   format->trueColour = TRUE;
+   rfbScreen->colourMap.count = 0;
+   rfbScreen->colourMap.is16 = 0;
+   rfbScreen->colourMap.data.bytes = NULL;
+
+   if (format->bitsPerPixel == 8) {
+     format->redMax = 7;
+     format->greenMax = 7;
+     format->blueMax = 3;
+     format->redShift = 0;
+     format->greenShift = 3;
+     format->blueShift = 6;
+   } else {
+     format->redMax = (1 << bitsPerSample) - 1;
+     format->greenMax = (1 << bitsPerSample) - 1;
+     format->blueMax = (1 << bitsPerSample) - 1;
+     if(rfbEndianTest) {
+       format->redShift = 0;
+       format->greenShift = bitsPerSample;
+       format->blueShift = bitsPerSample * 2;
+     } else {
+       if(format->bitsPerPixel==8*3) {
+	 format->redShift = bitsPerSample*2;
+	 format->greenShift = bitsPerSample*1;
+	 format->blueShift = 0;
+       } else {
+	 format->redShift = bitsPerSample*3;
+	 format->greenShift = bitsPerSample*2;
+	 format->blueShift = bitsPerSample;
+       }
+     }
+   }
+}
+
 rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel)
 {
    rfbScreenInfoPtr rfbScreen=malloc(sizeof(rfbScreenInfo));
-   rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
 
    INIT_MUTEX(logMutex);
 
@@ -530,41 +575,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    /* format */
 
-   format->bitsPerPixel = rfbScreen->bitsPerPixel;
-   format->depth = rfbScreen->depth;
-   format->bigEndian = rfbEndianTest?FALSE:TRUE;
-   format->trueColour = TRUE;
-   rfbScreen->colourMap.count = 0;
-   rfbScreen->colourMap.is16 = 0;
-   rfbScreen->colourMap.data.bytes = NULL;
-
-   if(bytesPerPixel == 1) {
-     format->redMax = 7;
-     format->greenMax = 7;
-     format->blueMax = 3;
-     format->redShift = 0;
-     format->greenShift = 3;
-     format->blueShift = 6;
-   } else {
-     format->redMax = (1 << bitsPerSample) - 1;
-     format->greenMax = (1 << bitsPerSample) - 1;
-     format->blueMax = (1 << bitsPerSample) - 1;
-     if(rfbEndianTest) {
-       format->redShift = 0;
-       format->greenShift = bitsPerSample;
-       format->blueShift = bitsPerSample * 2;
-     } else {
-       if(bytesPerPixel==3) {
-	 format->redShift = bitsPerSample*2;
-	 format->greenShift = bitsPerSample*1;
-	 format->blueShift = 0;
-       } else {
-	 format->redShift = bitsPerSample*3;
-	 format->greenShift = bitsPerSample*2;
-	 format->blueShift = bitsPerSample;
-       }
-     }
-   }
+   rfbInitServerFormat(rfbScreen, bitsPerSample);
 
    /* cursor */
 
@@ -595,6 +606,84 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    rfbClientListInit(rfbScreen);
 
    return(rfbScreen);
+}
+
+/*
+ * Switch to another framebuffer (maybe of different size and color
+ * format). Clients supporting NewFBSize pseudo-encoding will change
+ * their local framebuffer dimensions if necessary.
+ * NOTE: Rich cursor data should be converted to new pixel format by
+ * the caller.
+ */
+
+void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
+                       int width, int height,
+                       int bitsPerSample, int samplesPerPixel,
+                       int bytesPerPixel)
+{
+  rfbPixelFormat old_format;
+  Bool format_changed = FALSE;
+  rfbClientIteratorPtr iterator;
+  rfbClientPtr cl;
+
+  /* Remove the pointer */
+
+  rfbUndrawCursor(rfbScreen);
+
+  /* Update information in the rfbScreenInfo structure */
+
+  old_format = rfbScreen->rfbServerFormat;
+
+  if (width & 3)
+    rfbLog("WARNING: New width (%d) is not a multiple of 4.\n", width);
+
+  rfbScreen->width = width;
+  rfbScreen->height = height;
+  rfbScreen->bitsPerPixel = rfbScreen->depth = 8*bytesPerPixel;
+  rfbScreen->paddedWidthInBytes = width*bytesPerPixel;
+
+  rfbInitServerFormat(rfbScreen, bitsPerSample);
+
+  if (memcmp(&rfbScreen->rfbServerFormat, &old_format,
+             sizeof(rfbPixelFormat)) != 0) {
+    format_changed = TRUE;
+  }
+
+  rfbScreen->frameBuffer = framebuffer;
+
+  /* Adjust pointer position if necessary */
+
+  if (rfbScreen->cursorX >= width)
+    rfbScreen->cursorX = width - 1;
+  if (rfbScreen->cursorY >= height)
+    rfbScreen->cursorY = height - 1;
+
+  /* For each client: */
+  iterator = rfbGetClientIterator(rfbScreen);
+  while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
+
+    /* Re-install color translation tables if necessary */
+
+    if (format_changed)
+      rfbScreen->setTranslateFunction(cl);
+
+    /* Mark the screen contents as changed, and schedule sending
+       NewFBSize message if supported by this client. */
+
+    LOCK(cl->updateMutex);
+    sraRgnDestroy(cl->modifiedRegion);
+    cl->modifiedRegion = sraRgnCreateRect(0, 0, width, height);
+    sraRgnMakeEmpty(cl->copyRegion);
+    cl->copyDX = 0;
+    cl->copyDY = 0;
+
+    if (cl->useNewFBSize)
+      cl->newFBSizePending = TRUE;
+
+    TSIGNAL(cl->updateCond);
+    UNLOCK(cl->updateMutex);
+  }
+  rfbReleaseClientIterator(iterator);
 }
 
 void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)

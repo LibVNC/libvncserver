@@ -34,7 +34,8 @@
 #include "rfb.h"
 #include "keysym.h"
 
-const int maxx=640, maxy=480, bpp=4;
+const int bpp=4;
+int maxx=800, maxy=600;
 /* TODO: odd maxx doesn't work (vncviewer bug) */
 
 /* This initializes a nice (?) background */
@@ -72,6 +73,23 @@ enum rfbNewClientAction newclient(rfbClientPtr cl)
   cl->clientData = (void*)calloc(sizeof(ClientData),1);
   cl->clientGoneHook = clientgone;
   return RFB_CLIENT_ACCEPT;
+}
+
+/* switch to new framebuffer contents */
+
+void newframebuffer(rfbScreenInfoPtr screen, int width, int height)
+{
+  char *oldfb, *newfb;
+
+  maxx = width;
+  maxy = height;
+  oldfb = screen->frameBuffer;
+  newfb = (char*)malloc(maxx * maxy * bpp);
+  initBuffer(newfb);
+  rfbNewFramebuffer(screen, newfb, maxx, maxy, 8, 3, bpp);
+  free(oldfb);
+
+  /*** FIXME: Re-install cursor. ***/
 }
 
 /* aux function to draw a line */
@@ -158,6 +176,22 @@ void dokey(Bool down,KeySym key,rfbClientPtr cl)
 	rfbUndrawCursor(cl->screen);
       initBuffer(cl->screen->frameBuffer);
       rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
+    } else if (key == XK_Up) {
+      if (maxx < 1024) {
+        if (maxx < 800) {
+          newframebuffer(cl->screen, 800, 600);
+        } else {
+          newframebuffer(cl->screen, 1024, 768);
+        }
+      }
+    } else if(key==XK_Down) {
+      if (maxx > 640) {
+        if (maxx > 800) {
+          newframebuffer(cl->screen, 800, 600);
+        } else {
+          newframebuffer(cl->screen, 640, 480);
+        }
+      }
     } else if(key>=' ' && key<0x100) {
       ClientData* cd=cl->clientData;
       int x1=cd->oldx,y1=cd->oldy,x2,y2;
@@ -266,7 +300,7 @@ int main(int argc,char** argv)
 #ifdef USE_OWN_LOOP
   {
     int i;
-    for(i=0;i<200;i++) {
+    for(i=0;;i++) {
       fprintf(stderr,"%d\r",i);
       rfbProcessEvents(rfbScreen,100000);
     }
@@ -275,7 +309,7 @@ int main(int argc,char** argv)
 
 #ifndef BACKGROUND_LOOP_TEST
   /* this is the blocking event loop, i.e. it never returns */
-  /* 40000 are the microseconds, i.e. 0.04 seconds */
+  /* 40000 are the microseconds to wait on select(), i.e. 0.04 seconds */
   rfbRunEventLoop(rfbScreen,40000,FALSE);
 #elif !defined(HAVE_PTHREADS)
 #error "I need pthreads for that."
@@ -283,7 +317,7 @@ int main(int argc,char** argv)
 
   /* this is the non-blocking event loop; a background thread is started */
   rfbRunEventLoop(rfbScreen,-1,TRUE);
-  /* now we could do some cool things like rendering */
+  /* now we could do some cool things like rendering in idle time */
   while(1) sleep(5); /* render(); */
 #endif
 

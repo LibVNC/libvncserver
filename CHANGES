@@ -1,3 +1,4 @@
+   support for NewFB from Const Kaplinsky
    memory leaks squashed (localtime pseudo leak is still there :-)
    small improvements for OSXvnc (still not working correctly)
    synced with TightVNC 1.2.3

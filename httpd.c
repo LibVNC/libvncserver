@@ -218,6 +218,8 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     fname = &fullFname[strlen(fullFname)];
     maxFnameLen = 255 - strlen(fullFname);
 
+    buf_filled=0;
+
     /* Read data from the HTTP client until we get a complete request. */
     while (1) {
 	ssize_t got = read (rfbScreen->httpSock, buf + buf_filled,

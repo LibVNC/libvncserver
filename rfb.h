@@ -503,8 +503,12 @@ typedef struct _rfbClientRec {
     Bool enableCursorShapeUpdates; /* client supports cursor shape updates */
     Bool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
     Bool cursorWasChanged;         /* cursor shape update should be sent */
+
+    Bool useNewFBSize;             /* client supports NewFBSize encoding */
+    Bool newFBSizePending;         /* framebuffer size was changed */
+
 #ifdef BACKCHANNEL
-    Bool enableBackChannel;
+    Bool enableBackChannel;        /* custom channel for special clients */
 #endif
 
     struct _rfbClientRec *prev;
@@ -532,9 +536,10 @@ typedef struct _rfbClientRec {
  * be sent to the client.
  */
 
-#define FB_UPDATE_PENDING(cl)                           \
-     ((!(cl)->enableCursorShapeUpdates && !(cl)->screen->cursorIsDrawn) ||   \
-     ((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||      \
+#define FB_UPDATE_PENDING(cl)                                              \
+     ((!(cl)->enableCursorShapeUpdates && !(cl)->screen->cursorIsDrawn) || \
+     ((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||         \
+     ((cl)->useNewFBSize && (cl)->newFBSizePending) ||                     \
      !sraRgnEmpty((cl)->copyRegion) || !sraRgnEmpty((cl)->modifiedRegion))
 
 /*
@@ -603,6 +608,7 @@ extern Bool rfbSendUpdateBuf(rfbClientPtr cl);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
 extern Bool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
 extern Bool rfbSendLastRectMarker(rfbClientPtr cl);
+extern Bool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
 extern Bool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
 extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
 
@@ -796,6 +802,10 @@ extern rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel);
 extern void rfbInitServer(rfbScreenInfoPtr rfbScreen);
+extern void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen,char *framebuffer,
+ int width,int height, int bitsPerSample,int samplesPerPixel,
+ int bytesPerPixel);
+
 extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
 
 /* functions to accept/refuse a client that has been put on hold

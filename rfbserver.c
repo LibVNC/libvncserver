@@ -266,6 +266,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->enableCursorShapeUpdates = FALSE;
       cl->useRichCursorEncoding = FALSE;
       cl->enableLastRectEncoding = FALSE;
+      cl->useNewFBSize = FALSE;
 
       cl->compStreamInited = FALSE;
       cl->compStream.total_in = 0;
@@ -663,6 +664,7 @@ rfbProcessClientNormalMessage(cl)
 	cl->useCopyRect = FALSE;
 	cl->enableCursorShapeUpdates = FALSE;
 	cl->enableLastRectEncoding = FALSE;
+        cl->useNewFBSize = FALSE;
 
         for (i = 0; i < msg.se.nEncodings; i++) {
             if ((n = ReadExact(cl, (char *)&enc, 4)) <= 0) {
@@ -740,6 +742,13 @@ rfbProcessClientNormalMessage(cl)
 		    rfbLog("Enabling LastRect protocol extension for client "
 			   "%s\n", cl->host);
 		    cl->enableLastRectEncoding = TRUE;
+		}
+		break;
+	    case rfbEncodingNewFBSize:
+		if (!cl->useNewFBSize) {
+		    rfbLog("Enabling NewFBSize protocol extension for client "
+			   "%s\n", cl->host);
+		    cl->useNewFBSize = TRUE;
 		}
 		break;
 #ifdef BACKCHANNEL
@@ -924,6 +933,25 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
+
+    /*
+     * If framebuffer size was changed and the client supports NewFBSize
+     * encoding, just send NewFBSize marker and return.
+     */
+
+    if (cl->useNewFBSize && cl->newFBSizePending) {
+      LOCK(cl->updateMutex);
+      cl->newFBSizePending = FALSE;
+      UNLOCK(cl->updateMutex);
+      cl->rfbFramebufferUpdateMessagesSent++;
+      fu->type = rfbFramebufferUpdate;
+      fu->nRects = Swap16IfLE(1);
+      cl->ublen = sz_rfbFramebufferUpdateMsg;
+      if (!rfbSendNewFBSize(cl, cl->screen->width, cl->screen->height)) {
+        return FALSE;
+      }
+      return rfbSendUpdateBuf(cl);
+    }
     
     /*
      * If this client understands cursor shape updates, cursor should be
@@ -1300,6 +1328,40 @@ rfbSendLastRectMarker(cl)
     rect.r.h = 0;
 
     memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,sz_rfbFramebufferUpdateRectHeader);
+    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    cl->rfbLastRectMarkersSent++;
+    cl->rfbLastRectBytesSent += sz_rfbFramebufferUpdateRectHeader;
+
+    return TRUE;
+}
+
+
+/*
+ * Send NewFBSize pseudo-rectangle. This tells the client to change
+ * its framebuffer size.
+ */
+
+Bool
+rfbSendNewFBSize(cl, w, h)
+    rfbClientPtr cl;
+    int w, h;
+{
+    rfbFramebufferUpdateRectHeader rect;
+
+    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
+	if (!rfbSendUpdateBuf(cl))
+	    return FALSE;
+    }
+
+    rect.encoding = Swap32IfLE(rfbEncodingNewFBSize);
+    rect.r.x = 0;
+    rect.r.y = 0;
+    rect.r.w = Swap16IfLE(w);
+    rect.r.h = Swap16IfLE(h);
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+           sz_rfbFramebufferUpdateRectHeader);
     cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
     cl->rfbLastRectMarkersSent++;
