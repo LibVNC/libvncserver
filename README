@@ -22,18 +22,20 @@ Try example: it outputs on which port it listens (default: 5900), so it is
 display 0. To view, call
 	vncviewer :0
 You should see a sheet with a gradient and "Hello World!" written on it. Try
-to paint something. Note that everytime you click, there is some bigger blot.
-The size depends on the mouse button you click. Open a second vncviewer with
+to paint something. Note that everytime you click, there is some bigger blot,
+whereas when you drag the mouse while clicked you draw a line. The size of the
+blot depends on the mouse button you click. Open a second vncviewer with
 the same parameters and watch it as you paint in the other window. This also
 works over internet. You just have to know either the name or the IP of your
 machine. Then it is
 	vncviewer machine.where.example.runs.com:0
 or similar for the remote client. Now you are ready to type something. Be sure
 that your mouse sits still, because everytime the mouse moves, the cursor is
-reset! If you are done with that demo, just press Escape in the viewer. Note
-that the server still runs, even if you closed both windows. When you
-reconnect now, everything you painted and wrote is still there. So you press
-"Page Up" for a blank page.
+reset to the position of the pointer! If you are done with that demo, press
+the down or up arrows. If your viewer supports it, then the dimensions of the
+sheet change. Just press Escape in the viewer. Note that the server still
+runs, even if you closed both windows. When you reconnect now, everything you
+painted and wrote is still there. You can press "Page Up" for a blank page.
 
 The demo pnmshow is much simpler: you either provide a filename as argument
 or pipe a file through stdin. Note that the file has to be a raw pnm/ppm file,
@@ -303,7 +305,7 @@ reporters seem to not know dick about what they are reporting about! But
 what is everytime annoying again, is that they don't do it right. Every
 concept has it's new name (remember what enumerators used to be until
 Mickeysoft(tm) claimed that enumerators are what we thought were iterators.
-Yeah right, enumerators are also containers. They are not separate. Muddy.)
+Yeah right, enumerators are also containers. They are not separated. Muddy.)
 
 There are three packages you want to get hold of: zlib, jpeg and pthreads.
 The latter is not strictly necessary, but when you put something like this
@@ -316,6 +318,8 @@ into your source:
 	}
 
 Microsoft's C++ compiler doesn't do it. It complains that this is an error.
+This, however, is how I implemented mutexes in case you don't need pthreads,
+and so don't need the mutex.
 
 You can find the packages at
 http://www.gimp.org/win32/extralibs-dev-20001007.zip
@@ -382,7 +386,7 @@ circumvented the GPL, because you have the benefits of other's work and you
 don't give back anything and you will be in hell for that. In fact, this
 library, as my other projects, is a payback for all the free software I can
 use (and sometimes, make better). For example, just now, I am using XEmacs
-on top X11, all running under Linux.
+on top of XFree86, all running under Linux.
 
 Better: Use a concept like MySQL. This is free software, however, they make
 money with it. If you want something implemented, you have the choice:
