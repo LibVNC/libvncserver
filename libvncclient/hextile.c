@@ -28,7 +28,6 @@
 
 #define HandleHextileBPP CONCAT2E(HandleHextile,BPP)
 #define CARDBPP CONCAT3E(uint,BPP,_t)
-#define GET_PIXEL CONCAT2E(GET_PIXEL,BPP)
 
 static rfbBool
 HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
@@ -85,7 +84,15 @@ HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	  return FALSE;
 
 	for (i = 0; i < nSubrects; i++) {
-	  GET_PIXEL(fg, ptr);
+#if BPP==8
+	  GET_PIXEL8(fg, ptr);
+#elif BPP==16
+	  GET_PIXEL16(fg, ptr);
+#elif BPP==32
+	  GET_PIXEL32(fg, ptr);
+#else
+#error "Invalid BPP"
+#endif
 	  sx = rfbHextileExtractX(*ptr);
 	  sy = rfbHextileExtractY(*ptr);
 	  ptr++;
