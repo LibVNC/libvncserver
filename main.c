@@ -76,21 +76,39 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
      LOCK(cl->updateMutex);
      if(cl->useCopyRect) {
        sraRegionPtr modifiedRegionBackup;
-       if(!sraRgnEmpty(cl->copyRegion) && (cl->copyDX!=dx || cl->copyDY!=dy)) {
-	 sraRgnOr(cl->copyRegion,cl->modifiedRegion);
-	 sraRgnMakeEmpty(cl->copyRegion);
+       if(!sraRgnEmpty(cl->copyRegion)) {
+	  if(cl->copyDX!=dx || cl->copyDY!=dy) {
+	     /* if a copyRegion was not yet executed, treat it as a
+	      * modifiedRegion. The idea: in this case it could be
+	      * source of the new copyRect or modified anyway. */
+	     sraRgnOr(cl->modifiedRegion,cl->copyRegion);
+	     sraRgnMakeEmpty(cl->copyRegion);
+	  } else {
+	     /* we have to set the intersection of the source of the copy
+	      * and the old copy to modified. */
+	     modifiedRegionBackup=sraRgnCreateRgn(copyRegion);
+	     sraRgnOffset(modifiedRegionBackup,-dx,-dy);
+	     sraRgnAnd(modifiedRegionBackup,cl->copyRegion);
+	     sraRgnOr(cl->modifiedRegion,modifiedRegionBackup);
+	     sraRgnDestroy(modifiedRegionBackup);
+	  }
        }
+	  
        sraRgnOr(cl->copyRegion,copyRegion);
        cl->copyDX = dx;
        cl->copyDY = dy;
 
-       /* if there were modified regions, which are now copied: */
+       /* if there were modified regions, which are now copied,
+	* mark them as modified, because the source of these can be overlapped
+	* either by new modified or now copied regions. */
        modifiedRegionBackup=sraRgnCreateRgn(cl->modifiedRegion);
        sraRgnOffset(modifiedRegionBackup,dx,dy);
        sraRgnAnd(modifiedRegionBackup,cl->copyRegion);
        sraRgnOr(cl->modifiedRegion,modifiedRegionBackup);
        sraRgnDestroy(modifiedRegionBackup);
 
+#if 0
+//TODO: is this needed? Or does it mess up deferring?
        /* while(!sraRgnEmpty(cl->copyRegion)) */ {
 #ifdef HAVE_PTHREADS
 	 if(!cl->screen->backgroundLoop)
@@ -104,6 +122,7 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
 	     continue;
 	   }
        }
+#endif
      } else {
        sraRgnOr(cl->modifiedRegion,copyRegion);
      }
