@@ -1,3 +1,8 @@
+2004-06-26  Karl Runge <runge@karlrunge.com>
+	* add -scale fract for global (not per-client) server-side scaling
+	  working more or less OK, needs to be optimized at some point.
+	* remove -hints/-nohints options.
+
 2004-06-17  Karl Runge <runge@karlrunge.com>
 	* simple ~/.x11vncrc config file support, -rc, -norc
 

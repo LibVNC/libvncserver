@@ -1,3 +1,6 @@
+2004-06-26  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add "-scale fraction" for global server-side scaling.
+
 2004-06-17  Karl Runge <runge@karlrunge.com>
 	* x11vnc: simple ~/.x11vncrc config file support, -rc, -norc
 

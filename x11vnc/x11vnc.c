@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-06-17";
+char lastmod[] = "lastmod:    2004-06-26";
 
 /* X display info */
 Display *dpy = 0;
@@ -183,7 +183,18 @@ XShmSegmentInfo *tile_row_shm;	/* for all possible row runs */
 /* rfb info */
 rfbScreenInfoPtr screen;
 rfbCursorPtr cursor;
-int bytes_per_line;
+char *main_fb;			/* our copy of the X11 fb */
+char *rfb_fb;			/* same as main_fb unless transformation */
+int main_bytes_per_line;
+unsigned long  main_red_mask,  main_green_mask,  main_blue_mask;
+unsigned short main_red_max,   main_green_max,   main_blue_max;
+unsigned short main_red_shift, main_green_shift, main_blue_shift;
+int rfb_bytes_per_line;
+
+/* scaling info */
+int scaling = 0;
+double scale_fac = 1.0;
+int scaled_x = 0, scaled_y = 0;
 
 /* size of the basic tile unit that is polled for changes: */
 int tile_x = 32;
@@ -261,6 +272,7 @@ typedef struct hint {
 	int x, y, w, h;
 } hint_t;
 void mark_hint(hint_t);
+void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force);
 
 enum rfbNewClientAction new_client(rfbClientPtr client);
 void nofb_hook(rfbClientPtr client);
@@ -353,7 +365,6 @@ int visual_depth = 0;
 
 /* tile heuristics: */
 double fs_frac = 0.75;	/* threshold tile fraction to do fullscreen updates. */
-int use_hints = 1;	/* use the krfb scheme of gluing tiles together. */
 int tile_fuzz = 2;	/* tolerance for suspecting changed tiles touching */
 			/* a known changed tile. */
 int grow_fill = 3;	/* do the grow islands heuristic with this width. */
@@ -409,6 +420,20 @@ MUTEX(x11Mutex);
 #define X_LOCK       LOCK(x11Mutex)
 #define X_UNLOCK   UNLOCK(x11Mutex)
 #define X_INIT INIT_MUTEX(x11Mutex)
+
+/* -- util.c -- ? */
+
+/*
+ * routine to keep 0 <= i < n, should use in more places...
+ */
+int nfix(int i, int n) {
+	if (i < 0) {
+		i = 0;
+	} else if (i >= n) {
+		i = n - 1;
+	}
+	return i;
+}
 
 
 /* -- cleanup.c -- */
@@ -2403,6 +2428,12 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	if (client->viewOnly) {
 		return;
 	}
+	if (scaling) {
+		x = ((double) x / scaled_x) * dpy_x;
+		if (x >= dpy_x) x = dpy_x - 1;
+		y = ((double) y / scaled_y) * dpy_y;
+		if (y >= dpy_y) y = dpy_y - 1;
+	}
 
 	if (mask >= 0) {
 		/*
@@ -3111,11 +3142,11 @@ static int cur_save_cx, cur_save_cy, cur_save_which;
 static void save_mouse_patch(int x, int y, int w, int h, int cx, int cy,
     int which) {
 	int pixelsize = bpp >> 3;
-	char *rfb_fb = screen->frameBuffer;
+	char *fbp = main_fb;
 	int ly, i = 0;
 
 	for (ly = y; ly < y + h; ly++) {
-		memcpy(cur_save+i, rfb_fb + ly * bytes_per_line
+		memcpy(cur_save+i, fbp + ly * main_bytes_per_line
 		    + x * pixelsize, w * pixelsize);
 
 		i += w * pixelsize;
@@ -3137,7 +3168,7 @@ static void save_mouse_patch(int x, int y, int w, int h, int cx, int cy,
  */
 void restore_mouse_patch(void) {
 	int pixelsize = bpp >> 3;
-	char *rfb_fb = screen->frameBuffer;
+	char *fbp = main_fb;
 	int ly, i = 0;
 
 	if (! cur_saved) {
@@ -3145,7 +3176,7 @@ void restore_mouse_patch(void) {
 	}
 
 	for (ly = cur_save_y; ly < cur_save_y + cur_save_h; ly++) {
-		memcpy(rfb_fb + ly * bytes_per_line + cur_save_x * pixelsize,
+		memcpy(fbp + ly * main_bytes_per_line + cur_save_x * pixelsize,
 		    cur_save+i, cur_save_w * pixelsize);
 		i += cur_save_w * pixelsize;
 	}
@@ -3290,7 +3321,7 @@ static void cursor_pos_updates(int x, int y) {
 static void draw_mouse(int x, int y, int which, int update) {
 	int px, py, i, offset;
 	int pixelsize = bpp >> 3;
-	char *rfb_fb = screen->frameBuffer;
+	char *fbp = main_fb;
 	char cdata, cmask;
 	char *data, *mask;
 	int white = 255, black = 0, shade;
@@ -3366,11 +3397,11 @@ static void draw_mouse(int x, int y, int which, int update) {
 				shade = black;
 			}
 
-			offset = (y0 + py)*bytes_per_line + (x0 + px)*pixelsize;
+			offset = (y0 + py)*main_bytes_per_line + (x0 + px)*pixelsize;
 
 			/* fill in each color byte in the fb */
 			for (i=0; i < pixelsize; i++) {
-				rfb_fb[offset+i] = (char) shade;
+				fbp[offset+i] = (char) shade;
 			}
 		}
 	}
@@ -3683,7 +3714,9 @@ void nofb_hook(rfbClientPtr cl) {
 	}
 	rfbLog("framebuffer requested in -nofb mode by client %s\n", cl->host);
 	fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
-	screen->frameBuffer = fb->data;
+	main_fb = fb->data;
+	rfb_fb = main_fb;
+	screen->frameBuffer = rfb_fb;
 	loaded_fb = 1;
 	screen->displayHook = NULL;
 }
@@ -3693,9 +3726,27 @@ void nofb_hook(rfbClientPtr cl) {
  */
 void initialize_screen(int *argc, char **argv, XImage *fb) {
 	int have_masks = 0;
+	int width  = fb->width;
+	int height = fb->height;
+	
+	main_bytes_per_line = fb->bytes_per_line;
 
-	screen = rfbGetScreen(argc, argv, fb->width, fb->height,
-	    fb->bits_per_pixel, 8, fb->bits_per_pixel/8);
+	main_red_mask   = fb->red_mask;
+	main_green_mask = fb->green_mask;
+	main_blue_mask  = fb->blue_mask;
+
+	if (scaling) {
+		width  = (int) (width  * scale_fac); 
+		height = (int) (height * scale_fac); 
+		scaled_x = width;
+		scaled_y = height;
+		rfb_bytes_per_line = (main_bytes_per_line / fb->width) * width;
+	} else {
+		rfb_bytes_per_line = main_bytes_per_line;
+	}
+
+	screen = rfbGetScreen(argc, argv, width, height, fb->bits_per_pixel,
+	    8, fb->bits_per_pixel/8);
 
 	if (! quiet) {
 		fprintf(stderr, "\n");
@@ -3731,7 +3782,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	}
 #endif
 
-	screen->paddedWidthInBytes = fb->bytes_per_line;
+	screen->paddedWidthInBytes = rfb_bytes_per_line;
 	screen->rfbServerFormat.bitsPerPixel = fb->bits_per_pixel;
 	screen->rfbServerFormat.depth = fb->depth;
 	screen->rfbServerFormat.trueColour = (uint8_t) TRUE;
@@ -3781,15 +3832,30 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		    = fb->green_mask >> screen->rfbServerFormat.greenShift;
 		screen->rfbServerFormat.blueMax
 		    = fb->blue_mask >> screen->rfbServerFormat.blueShift;
+
+		main_red_max   = screen->rfbServerFormat.redMax;
+		main_green_max = screen->rfbServerFormat.greenMax;
+		main_blue_max  = screen->rfbServerFormat.blueMax;
+
+		main_red_shift   = screen->rfbServerFormat.redShift;
+		main_green_shift = screen->rfbServerFormat.greenShift;
+		main_blue_shift  = screen->rfbServerFormat.blueShift;
 	}
 
 	/* nofb is for pointer/keyboard only handling.  */
 	if (nofb) {
-		screen->frameBuffer = NULL;
+		main_fb = NULL;
+		rfb_fb = main_fb;
 		screen->displayHook = nofb_hook;
 	} else {
-		screen->frameBuffer = fb->data; 
+		main_fb = fb->data;
+		if (scaling) {
+			rfb_fb = (char *) malloc(rfb_bytes_per_line * height);
+		} else {
+			rfb_fb = main_fb;
+		}
 	}
+	screen->frameBuffer = rfb_fb;
 
 	/* called from inetd, we need to treat stdio as our socket */
 	if (inetd) {
@@ -3840,9 +3906,13 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	rfbInitServer(screen);
 
-	bytes_per_line = screen->paddedWidthInBytes;
+
 	bpp = screen->rfbServerFormat.bitsPerPixel;
 	depth = screen->rfbServerFormat.depth;
+
+	if (scaling) {
+		mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
+	}
 
 	if (viewonly_passwd) {
 		/* append the view only passwd after the normal passwd */
@@ -4148,11 +4218,11 @@ void zero_fb(x1, y1, x2, y2) {
 		return;
 	}
 
-	dst = screen->frameBuffer + y1 * bytes_per_line + x1 * pixelsize;
+	dst = main_fb + y1 * main_bytes_per_line + x1 * pixelsize;
 	line = y1;
 	while (line++ < y2) {
 		memset(dst, fill, (size_t) (x2 - x1) * pixelsize);
-		dst += bytes_per_line;
+		dst += main_bytes_per_line;
 	}
 }
 
@@ -4566,6 +4636,388 @@ static void hint_updates(void) {
 }
 
 /*
+ * kludge, simple ceil+floor for non-negative doubles:
+ */
+#define CEIL(x)  ( (double) ((int) (x)) == (x) ? \
+	(double) ((int) (x)) : (double) ((int) (x) + 1) )
+#define FLOOR(x) ( (double) ((int) (x)) )
+
+/*
+ * Scaling.
+ *
+ * For shrinking, a destination (scaled) pixel will correspond to more
+ * than one source (i.e. main fb) pixel.  Think of an x-y plane made
+ * with graph paper.  Each square in the graph paper (i.e. collection
+ * of points (x,y) such that N < x < N+1 and M < y < M+1, N and M
+ * integers) corresponds to one pixel in the unscaled fb.  There is a
+ * solid color filling the inside such a square.  A scaled pixel has
+ * width 1/scale_fac, e.g. for "-scale 3/4" the width of the scaled
+ * pixel is 1.333.  The area of this scaled pixel is 1.333 * 1.333
+ * (so it obviously overlaps more than one source pixel, each which
+ * have area 1).
+ *
+ * We take the weight an unscaled pixel (source) contributes to a
+ * scaled pixel (destination) as simply proportional to the overlap area
+ * between the two pixels.  One can then think of the value of the scaled
+ * pixel as an integral over the portion of the graph paper it covers.
+ * The thing being integrated is the color value of the unscaled source.
+ * That color value is constant over a graph paper square (source pixel),
+ * and changes discontinuously from one square to the next.
+ *
+ * The Red, Green, and Blue color values must be averaged over separately
+ * otherwise you can get a complete mess (except in solid regions).
+ *
+ * So the algorithm is roughly:
+ *
+ *   - Given as input a rectangle in the unscaled source fb with changes,
+ *     find the rectangle of pixels this affects in the scaled destination
+ *     fb.
+ *
+ *   - For each of the affected scaled pixels, determine all of the
+ *     unscaled pixels it overlaps with.
+ *  
+ *   - Average those unscaled values together, weighted by the area
+ *     overlap with the destination pixel.  Average R, G, B separately.
+ *
+ *   - Take this average value and convert to a valid pixel value if
+ *     necessary (e.g. rounding, shifting), and then insert it into the
+ *     destination framebuffer as the pixel value.
+ *
+ * ========================================================================
+ *
+ * For expanding (which we don't think people will do very often... or
+ * at least so we hope, the framebuffer can become huge) the situation
+ * is reversed and the destination pixel is smaller than a "graph paper"
+ * square (source pixel).  Some destination pixels will be completely
+ * within a single unscaled source pixel.
+ *
+ * What we do here is a simple 4 point interpolation scheme:
+ * 
+ * Let P00 be the source pixel closest to the destination pixel but with
+ * x and y values less than or equal to those of the destination pixel.
+ * It is the source pixel immediately to the upper left of the destination
+ * pixel.  Let P10 be the source pixel one to the right of P00.  Let P01
+ * be one down from P00.  And let P11 be one down and one to the right
+ * of P00.  They form a 2x2 square we will interpolate inside of.
+ * 
+ * Let V00, V10, V01, and V11 be the color values of those 4 source
+ * pixels.  Let dx be the distance along x the destination pixel is from
+ * P00.  Note: 0 <= dx < 1.  Similarly let dy be the distance along y.
+ * The weighted average is:
+ * 
+ * 	Vave = V00 * (1 - dx) * (1 - dy)
+ * 	     + V10 *      dx  * (1 - dy)
+ * 	     + V01 * (1 - dx) *      dy
+ * 	     + V11 *      dx  *      dy
+ * 
+ * Note that the weights (1-dx)*(1-dy) + dx(1-dy) + (1-dx)*dy + dx*dy
+ * automatically add up to 1.  It is also nice that all the weights
+ * are positive.  The above formula can be motivated by doing two 1D
+ * interpolations along x:
+ * 
+ * 	VA = V00 * (1 - dx) + V10 * dx
+ * 	VB = V01 * (1 - dx) + V11 * dx
+ * 
+ * and then interpolating VA and VB along y:
+ * 
+ * 	Vave = VA * (1 - dy) + VB * dy
+ * 
+ *                      VA 
+ *           v   |<-dx->|
+ *           -- V00 ------ V10
+ *           dy  |          |  
+ *           --  |      o...|...    "o" denotes the position of the desired
+ *           ^   |      .   |  .    destination pixel relative to the P00
+ *               |      .   |  .    source pixel.
+ *              V10 ------ V11 .
+ *                      ........
+ *                      VB 
+ *
+ * 
+ * Of course R, G, B averages are done separately.  This gives reasonable
+ * results.  I believe this is called bilinear scaling.
+ */
+
+static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
+/*
+ * Notation:
+ * "i" an x pixel index in the destination (scaled) framebuffer
+ * "j" a  y pixel index in the destination (scaled) framebuffer
+ * "I" an x pixel index in the source (un-scaled, i.e. main) framebuffer
+ * "J" a  y pixel index in the source (un-scaled, i.e. main) framebuffer
+ *
+ *  Similarly for nx, ny, Nx, Ny, etc.  Lowercase: dest, Uppercase: source.
+ */
+	int Nx, Ny, nx, ny, Bpp, b;
+
+	int i, j, i1, i2, j1, j2;	/* indices for scaled fb (dest) */
+	int I, J, I1, I2, J1, J2;	/* indices for main fb   (source) */
+
+	double w, wx, wy, wtot;	/* pixel weights */
+
+	double x1, y1, x2, y2;	/* x-y coords for destination pixels edges */
+	double dx, dy;		/* size of destination pixel */
+
+	double ddx, ddy;	/* for interpolation expansion */
+
+	char *src, *dest;	/* pointers to the two framebuffers */
+
+	double pixave[4];	/* for averaging pixel values */
+
+	unsigned char uc;	/* tmp pixel data holders */
+	unsigned short us;
+
+	int shrink;		/* whether shrinking or expanding */
+
+	int pseudocolor = 0;	/* true if PseudoColor... */
+	if (scale_fac <= 1.0) {
+		shrink = 1;
+	} else {
+		shrink = 0;
+	}
+
+	if (! screen->rfbServerFormat.trueColour) {
+		pseudocolor = 1;
+	}
+
+	Bpp = bpp/8;	/* Bytes per pixel */
+
+	Nx = dpy_x;	/* extent of source (the whole main fb) */
+	Ny = dpy_y;
+
+	nx = scaled_x;	/* extent of dest (the whole scaled rfb fb) */
+	ny = scaled_y;
+
+	/*
+	 * width and height (real numbers) of a scaled pixel.
+	 * both are > 1   (e.g. 1.333 for -scale 3/4)
+	 * they should also be equal but we don't assume it.
+	 */
+	dx = (double) Nx / nx;
+	dy = (double) Ny / ny;
+
+	/*
+	 * find the extent of the change the input rectangle induces in
+	 * the scaled framebuffer.
+	 */
+
+	/* Left edges: find largest i such that i * dx <= X1  */
+	i1 = FLOOR(X1/dx);
+
+	/* Right edges: find smallest i such that (i+1) * dx >= X2+1  */
+	i2 = CEIL( (X2+1)/dx ) - 1;
+
+	/* to be safe, correct any overflows: */
+	i1 = nfix(i1, nx);
+	i2 = nfix(i2, nx) + 1;	/* add 1 to make a rectangle upper boundary */
+
+	/* repeat above for y direction: */
+	j1 = FLOOR(Y1/dy);
+	j2 = CEIL( (Y2+1)/dy ) - 1;
+
+	j1 = nfix(j1, ny);
+	j2 = nfix(j2, ny) + 1;
+
+	/*
+	 * loop over destination pixels in scaled fb:
+	 */
+	for (j=j1; j<j2; j++) {
+		y1 =  j * dy;	/* top edge */
+		y2 = y1 + dy;	/* bottom edge */
+
+		/* find main fb indices covered by this dest pixel: */
+		J1 = (int) FLOOR(y1);
+		J2 = (int) CEIL(y2) - 1;
+
+		J1 = nfix(J1, Ny);
+		J2 = nfix(J2, Ny);
+
+		if (!shrink) {
+			J2 = J1 + 1;	/* simple interpolation */
+		}
+
+		/* destination char* pointer: */
+		dest = rfb_fb + j*rfb_bytes_per_line + i1*Bpp;
+		
+		for (i=i1; i<i2; i++) {
+			x1 =  i * dx;	/* left edge */
+			x2 = x1 + dx;	/* right edge */
+
+			/* find main fb indices covered by this dest pixel: */
+			I1 = (int) FLOOR(x1);
+			I2 = (int) CEIL(x2) - 1;
+
+			I1 = nfix(I1, Nx);
+			I2 = nfix(I2, Nx);
+
+			if (!shrink) {
+				I2 = I1 + 1;	/* simple interpolation */
+			}
+			
+			/* zero out accumulators for next pixel average: */
+			for (b=0; b<4; b++) {
+				pixave[b] = 0.0; /* for RGB weighted sums */
+			}
+
+			/*
+			 * wtot is for accumulating the total weight.
+			 * It should always be 1/(scale_fac * scale_fac),
+			 * but we don't assume that.
+			 */
+			wtot = 0.0;
+
+			if (!shrink) {
+				/* interpolation distances, see diagram above */
+				ddx = x1 - I1;
+				ddy = y1 - J1;
+			}
+
+			/*
+			 * loop over source pixels covered by this dest pixel:
+			 */
+			for (J=J1; J<=J2; J++) {
+			    /* see comments for I, x1, x2, etc. below */
+			    if (pseudocolor) {
+				if (J != J1) {
+					continue;
+				}
+				wy = 1.0;
+
+				/* interpolation scheme: */
+			    } else if (!shrink) {
+				if (J >= Ny) {
+					continue;	/* off edge */
+				} else if (J == J1) {
+					wy = 1.0 - ddy;
+				} else if (J != J1) {
+					wy = ddy;
+				}
+
+				/* integration scheme: */
+			    } else if (J < y1) {
+				wy = J+1 - y1;
+			    } else if (J+1 > y2) {
+				wy = y2 - J;
+			    } else {
+				wy = 1.0;
+			    }
+
+			    src = main_fb + J*main_bytes_per_line + I1*Bpp;
+
+			    for (I=I1; I<=I2; I++) {
+
+				/* Work out the weight: */
+
+				if (pseudocolor) {
+					/*
+					 * ugh, colormap is bad news, to 
+					 * avoid random colors just take
+					 * the first pixel.
+					 */
+					if (I != I1) {
+						continue;
+					}
+					wx = 1.0;
+
+					/* interpolation scheme: */
+				} else if (!shrink) {
+					if (I >= Nx) {
+						continue;	/* off edge */
+					} else if (I == I1) {
+						wx = 1.0 - ddx;
+					} else if (I != I1) {
+						wx = ddx;
+					}
+
+					/* integration scheme: */
+				} else if (I < x1) {
+					/* 
+					 * source left edge (I) to the
+					 * left of dest left edge (x1):
+					 * fractional weight
+					 */
+					wx = I+1 - x1;
+				} else if (I+1 > x2) {
+					/* 
+					 * source right edge (I+1) to the
+					 * right of dest right edge (x2):
+					 * fractional weight
+					 */
+					wx = x2 - I;
+				} else {
+					/* 
+					 * source edges (I and I+1) completely
+					 * inside dest edges (x1 and x2):
+					 * full weight
+					 */
+					wx = 1.0;
+				}
+
+				w = wx * wy;
+				wtot += w;
+
+
+				/* 
+				 * we average the unsigned char value
+				 * instead of char value: otherwise
+				 * the minimum (char 0) is right next
+				 * to the maximum (char -1)!  This way
+				 * they are spread between 0 and 255.
+				 */
+				if (Bpp == 4 || Bpp == 1) {
+					
+					for (b=0; b<Bpp; b++) {
+						uc = (unsigned char) *(src + b);
+						pixave[b] += w * uc;
+					}
+				} else if (Bpp == 2) {
+					/*
+					 * trickier with green split over
+					 * two bytes, so we use the masks:
+					 */
+					us = *( (unsigned short *) src );
+					pixave[0] += w * (us & main_red_mask);
+					pixave[1] += w * (us & main_green_mask);
+					pixave[2] += w * (us & main_blue_mask);
+				}
+				src += Bpp;
+			    }
+			}
+
+			wtot = 1.0/wtot;	/* normalization factor */
+
+			/* place weighted average pixel in the scaled fb: */
+			if (Bpp == 4 || Bpp == 1) {
+				for (b=0; b<Bpp; b++) {
+					*(dest + b) = (char) (wtot * pixave[b]);
+				}
+			} else if (Bpp == 2) {
+				/* 16bpp/565 */
+				pixave[0] *= wtot;
+				pixave[1] *= wtot;
+				pixave[2] *= wtot;
+				us =  (main_red_mask   & (int) pixave[0])
+				    | (main_green_mask & (int) pixave[1])
+				    | (main_blue_mask  & (int) pixave[2]);
+				*( (unsigned short *) dest ) = us;
+			}
+			dest += Bpp;
+		}
+	}
+
+	mark_rect_as_modified(i1, j1, i2, j2, 1);
+}
+
+void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force) {
+	
+	if (rfb_fb == main_fb || force) {
+		rfbMarkRectAsModified(screen, x1, y1, x2, y2);
+	} else if (scaling) {
+		scale_and_mark_rect(x1, y1, x2, y2);
+	}
+}
+
+/*
  * Notifies libvncserver of a changed hint rectangle.
  */
 void mark_hint(hint_t hint) {
@@ -4574,47 +5026,7 @@ void mark_hint(hint_t hint) {
 	int w = hint.w;	
 	int h = hint.h;	
 
-	rfbMarkRectAsModified(screen, x, y, x + w, y + h);
-}
-
-/*
- * Notifies libvncserver of a changed tile rectangle.
- */
-static void mark_tile(int x, int y, int height) {
-	int w = dpy_x - x;
-	int h = dpy_y - y;
-
-	if (w > tile_x) {
-		w = tile_x;
-	}
-
-	/* height is the height of the changed portion of the tile */
-	if (h > height) {
-		h = height;
-	}
-
-	rfbMarkRectAsModified(screen, x, y, x + w, y + h);
-}
-
-/*
- * Simply send each modified tile separately to the vnc machinery:
- * (i.e. no hints)
- */
-static void tile_updates(void) {
-	int x, y, n, ty, th;
-
-	for (y=0; y < ntiles_y; y++) {
-		for (x=0; x < ntiles_x; x++) {
-			n = x + y * ntiles_x;
-
-			if (tile_has_diff[n]) {
-				ty = tile_region[n].first_line;
-				th = tile_region[n].last_line - ty + 1;
-
-				mark_tile(x * tile_x, y * tile_y + ty, th);
-			}
-		}
-	}
+	mark_rect_as_modified(x, y, x + w, y + h, 0);
 }
 
 /*
@@ -4747,7 +5159,7 @@ static void copy_tiles(int tx, int ty, int nt) {
 	}
 
 	src = tile_row[nt]->data;
-	dst = screen->frameBuffer + y * bytes_per_line + x * pixelsize;
+	dst = main_fb + y * main_bytes_per_line + x * pixelsize;
 
 	s_src = src;
 	s_dst = dst;
@@ -4780,7 +5192,7 @@ static void copy_tiles(int tx, int ty, int nt) {
 			}
 		}
 		s_src += tile_row[nt]->bytes_per_line;
-		s_dst += bytes_per_line;
+		s_dst += main_bytes_per_line;
 	}
 
 	/* see if there were any differences for any tile: */
@@ -4818,7 +5230,7 @@ static void copy_tiles(int tx, int ty, int nt) {
 	}
 
 	m_src = src + (tile_row[nt]->bytes_per_line * size_y);
-	m_dst = dst + (bytes_per_line * size_y);
+	m_dst = dst + (main_bytes_per_line * size_y);
 
 	for (t=1; t <= nt; t++) {
 		last_line[t] = first_line[t];
@@ -4832,7 +5244,7 @@ static void copy_tiles(int tx, int ty, int nt) {
 	for (line = size_y - 1; line > first_min; line--) {
 
 		m_src -= tile_row[nt]->bytes_per_line;
-		m_dst -= bytes_per_line;
+		m_dst -= main_bytes_per_line;
 
 		/* foreach tile: */
 		for (t=1; t <= nt; t++) {
@@ -4913,18 +5325,18 @@ static void copy_tiles(int tx, int ty, int nt) {
 			}
 		}
 		h_src += tile_row[nt]->bytes_per_line;
-		h_dst += bytes_per_line;
+		h_dst += main_bytes_per_line;
 	}
 
 	/* now finally copy the difference to the rfb framebuffer: */
 	s_src = src + tile_row[nt]->bytes_per_line * first_min;
-	s_dst = dst + bytes_per_line * first_min;
+	s_dst = dst + main_bytes_per_line * first_min;
 
 	for (line = first_min; line <= last_max; line++) {
 		/* for I/O speed we do not do this tile by tile */
 		memcpy(s_dst, s_src, size_x * pixelsize);
 		s_src += tile_row[nt]->bytes_per_line;
-		s_dst += bytes_per_line;
+		s_dst += main_bytes_per_line;
 	}
 
 	if (restored_patch) {
@@ -5273,12 +5685,12 @@ static void blackout_regions(void) {
  */
 void copy_screen(void) {
 	int pixelsize = bpp >> 3;
-	char *rfb_fb;
+	char *fbp;
 	int i, y, block_size;
 
 	block_size = (dpy_x * (dpy_y/fs_factor) * pixelsize);
 
-	rfb_fb = screen->frameBuffer;
+	fbp = main_fb;
 	y = 0;
 
 	X_LOCK;
@@ -5292,10 +5704,10 @@ void copy_screen(void) {
 			    fullscreen->height, AllPlanes, ZPixmap, fullscreen,
 			    0, 0);
 		}
-		memcpy(rfb_fb, fullscreen->data, (size_t) block_size);
+		memcpy(fbp, fullscreen->data, (size_t) block_size);
 
 		y += dpy_y / fs_factor;
-		rfb_fb += block_size;
+		fbp += block_size;
 	}
 
 	X_UNLOCK;
@@ -5304,7 +5716,7 @@ void copy_screen(void) {
 		blackout_regions();
 	}
 
-	rfbMarkRectAsModified(screen, 0, 0, dpy_x, dpy_y);
+	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
 }
 
 
@@ -5402,7 +5814,7 @@ static void ping_clients(int tile_cnt) {
 		last_send = now;
 	} else if (now - last_send > 1) {
 		/* Send small heartbeat to client */
-		rfbMarkRectAsModified(screen, 0, 0, 1, 1);
+		mark_rect_as_modified(0, 0, 1, 1, 1);
 		last_send = now;
 	}
 }
@@ -5559,9 +5971,9 @@ static int scan_display(int ystart, int rescan) {
 
 		/* for better memory i/o try the whole line at once */
 		src = scanline->data;
-		dst = screen->frameBuffer + y * bytes_per_line;
+		dst = main_fb + y * main_bytes_per_line;
 
-		if (whole_line && ! memcmp(dst, src, bytes_per_line)) {
+		if (whole_line && ! memcmp(dst, src, main_bytes_per_line)) {
 			/* no changes anywhere in scan line */
 			nodiffs = 1;
 			if (! rescan) {
@@ -5592,8 +6004,7 @@ static int scan_display(int ystart, int rescan) {
 
 			/* set ptrs to correspond to the x offset: */
 			src = scanline->data + x * pixelsize;
-			dst = screen->frameBuffer + y * bytes_per_line
-			    + x * pixelsize;
+			dst = main_fb + y * main_bytes_per_line + x * pixelsize;
 
 			/* compute the width of data to be compared: */
 			if (x + NSCAN > dpy_x) {
@@ -5782,11 +6193,7 @@ void scan_for_updates(void) {
 		}
 	}
 
-	if (use_hints) {
-		hint_updates();	/* use krfb/x0rfbserver hints algorithm */
-	} else {
-		tile_updates();	/* send each tile change individually */
-	}
+	hint_updates();	/* use krfb/x0rfbserver hints algorithm */
 
 	/* Work around threaded rfbProcessClientMessage() calls timeouts */
 	if (use_threads) {
@@ -6111,6 +6518,12 @@ static void print_help(void) {
 "                       as the pointer moves from window to window (slow).\n"
 "-notruecolor           Force 8bpp indexed color even if it looks like TrueColor.\n"
 "\n"
+"-scale fraction        Scale the framebuffer by factor \"fraction\".  Values\n"
+"                       less than 1 shrink the fb.  Note: image may not be sharp\n"
+"                       and response may be slower.  If \"fraction\" contains\n"
+"                       a decimal point \".\" it is taken as a floating point\n"
+"                       number, alternatively the notation \"m/n\" may be used\n"
+"                       to denote fractions, e.g. -scale 2/3\n"
 "-visual n              Experimental option: probably does not do what you\n"
 "                       think.  It simply *forces* the visual used for the\n"
 "                       framebuffer; this may be a bad thing... It is useful for\n"
@@ -6330,9 +6743,6 @@ static void print_help(void) {
 "                       by checking the tile near the boundary (default %d).\n"
 "-fuzz n                Tolerance in pixels to mark a tiles edges as changed\n"
 "                       (default %d).\n"
-"-hints                 Use krfb/x0rfbserver hints (glue changed adjacent\n"
-"                       horizontal tiles into one big rectangle)  (default %s).\n"
-"-nohints               Do not use hints; send each tile separately.\n"
 "%s\n"
 "\n"
 "These options are passed to libvncserver:\n"
@@ -6352,7 +6762,6 @@ static void print_help(void) {
 		gaps_fill,
 		grow_fill,
 		tile_fuzz,
-		use_hints ? "on":"off",
 		""
 	);
 
@@ -6599,6 +7008,30 @@ int main(int argc, char* argv[]) {
 					exit(1);
 				}
 			}
+		} else if (!strcmp(arg, "-scale")) {
+			int m, n;
+			float f;
+			if (strchr(argv[++i], '.') != NULL) {
+				if (sscanf(argv[i], "%f", &f) != 1) {
+					fprintf(stderr, "bad -scale arg: %s\n",
+					    argv[i]);
+					exit(1);
+				}
+				scale_fac = (double) f;
+			} else {
+				if (sscanf(argv[i], "%d/%d", &m, &n) != 2) {
+					fprintf(stderr, "bad -scale arg: %s\n",
+					    argv[i]);
+					exit(1);
+				}
+				scale_fac = (double) m / n;
+			}
+			if (scale_fac == 1.0) {
+				fprintf(stderr, "scaling disabled for factor "
+				    "%f\n", scale_fac);
+			} else {
+				scaling = 1;
+			}
 		} else if (!strcmp(arg, "-visual")) {
 			visual_str = argv[++i];
 		} else if (!strcmp(arg, "-flashcmap")) {
@@ -6742,10 +7175,9 @@ int main(int argc, char* argv[]) {
 			grow_fill = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-fuzz")) {
 			tile_fuzz = atoi(argv[++i]);
-		} else if (!strcmp(arg, "-hints")) {
-			use_hints = 1;
-		} else if (!strcmp(arg, "-nohints")) {
-			use_hints = 0;
+		} else if (!strcmp(arg, "-hints") || !strcmp(arg, "-nohints")) {
+			fprintf(stderr, "warning: -hints/-nohints option "
+			    "has been removed.\n");
 		} else if (!strcmp(arg, "-h") || !strcmp(arg, "-help")
 			|| !strcmp(arg, "-?")) {
 			print_help();
@@ -6961,6 +7393,7 @@ int main(int argc, char* argv[]) {
                     : "null");
 		fprintf(stderr, "flashcmap:  %d\n", flash_cmap);
 		fprintf(stderr, "force_idx:  %d\n", force_indexed_color);
+		fprintf(stderr, "scaling:    %d %.5f\n", scaling, scale_fac);
 		fprintf(stderr, "viewonly:   %d\n", view_only);
 		fprintf(stderr, "shared:     %d\n", shared);
 		fprintf(stderr, "authfile:   %s\n", auth_file ? auth_file
@@ -7017,7 +7450,6 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "gaps_fill:  %d\n", gaps_fill);
 		fprintf(stderr, "grow_fill:  %d\n", grow_fill);
 		fprintf(stderr, "tile_fuzz:  %d\n", tile_fuzz);
-		fprintf(stderr, "use_hints:  %d\n", use_hints);
 		fprintf(stderr, "bg:         %d\n", bg);
 		fprintf(stderr, "%s\n", lastmod);
 	} else {
