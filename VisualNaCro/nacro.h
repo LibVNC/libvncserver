@@ -12,7 +12,7 @@
 typedef int bool_t;
 
 /* a keysym: identical with ASCII for values between 0-127 */
-typedef unsigned char keysym_t;
+typedef int keysym_t;
 
 /* this can be negative, because of a new origin set via visual grep */
 typedef int coordinate_t;
@@ -27,31 +27,31 @@ typedef int resource_t;
 typedef double timeout_t;
 
 /* the return values of process() and friends */
-typedef enum {
-	RESULT_TIMEOUT=1,
-	RESULT_KEY=2,
-	RESULT_MOUSE=4,
-	RESULT_SCREEN=8,
-	RESULT_FOUNDIMAGE=16
-} result_t;
+typedef int result_t;
+/*
+ * %constant int RESULT_TIMEOUT=1;
+%constant int RESULT_KEY=2;
+%constant int RESULT_MOUSE=4;
+%constant int RESULT_SCREEN=8;
+%constant int RESULT_FOUNDIMAGE=16;
+*/
 
 %}
 
 #endif // SWIG
 
 typedef int bool_t;
-typedef unsigned char keysym_t;
+typedef int keysym_t;
 typedef int coordinate_t;
 typedef unsigned char buttons_t;
 typedef int resource_t;
 typedef double timeout_t;
-typedef enum {
-	RESULT_TIMEOUT=1,
-	RESULT_KEY=2,
-	RESULT_MOUSE=4,
-	RESULT_SCREEN=8,
-	RESULT_FOUNDIMAGE=16
-} result_t;
+typedef int result_t;
+#define RESULT_TIMEOUT 1
+#define  RESULT_KEY 2
+#define  RESULT_MOUSE 4
+#define  RESULT_SCREEN 8
+#define  RESULT_FOUNDIMAGE 16
 
 /* init/shutdown */
 
@@ -89,8 +89,8 @@ bool_t sendmouse(resource_t res,coordinate_t x,coordinate_t y,buttons_t buttons)
 
 /* for visual grepping */
 
-coordinate_t getoriginx(resource_t res);
-coordinate_t getoriginy(resource_t res);
+coordinate_t getxorigin(resource_t res);
+coordinate_t getyorigin(resource_t res);
 
 bool_t savepnm(resource_t res,const char* filename,coordinate_t x1, coordinate_t y1, coordinate_t x2, coordinate_t y2);
 

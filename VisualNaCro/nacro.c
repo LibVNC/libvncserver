@@ -110,16 +110,50 @@ rfbBool malloc_frame_buffer(rfbClient* cl)
 	}
 }
 
+bool_t do_visual_grep(private_resource_t* res,int x,int y,int w,int h)
+{
+	rfbClient* cl;
+	image_t* image;
+	int x_start,y_start,x_end=x+w-1,y_end=y+h-1;
+	bool_t found=0;
+
+	if(res==0 || (cl=res->client)==0 || (image=res->grep_image)==0)
+		return 0;
+
+	x_start=x-image->width;
+	y_start=y-image->height;
+	if(x_start<0) x_start=0;
+	if(y_start<0) y_start=0;
+	if(x_end+image->width>cl->width) x_end=cl->width-image->width;
+	if(y_end+image->height>cl->height) y_end=cl->height-image->height;
+	
+	/* find image and set x_origin,y_origin if found */
+	for(y=y_start;y<y_end;y++)
+		for(x=x_start;x<x_end;x++) {
+			bool_t matching=1;
+			int i,j;
+			for(j=0;matching && j<image->height;j++)
+				for(i=0;matching && i<image->width;i++)
+					if(memcmp(cl->frameBuffer+4*(x+i+cl->width*(y+j)),image->buffer+4*(i+image->width*j),3))
+						matching=0;
+			if(matching) {
+				private_resource_t* res=(private_resource_t*)cl->clientData;
+				res->x_origin=x;
+				res->y_origin=y;
+				return -1;
+			}
+		}
+	return 0;
+}
+
 void got_frame_buffer(rfbClient* cl,int x,int y,int w,int h)
 {
 	private_resource_t* res=(private_resource_t*)cl->clientData;
 	
 	assert(res->server);
 	
-	if(res->grep_image) {
-		/* TODO: find image and set x_origin,y_origin if found */
-	} else {
-		res->state=RESULT_SCREEN;
+	if(res->grep_image && do_visual_grep(res,x,y,w,h)) {
+		res->result|=RESULT_FOUNDIMAGE;
 	}
 	if(res->server) {
 		rfbMarkRectAsModified(res->server,x,y,x+w,y+h);
@@ -180,7 +214,8 @@ bool_t savepnm(resource_t resource,const char* filename,int x1,int y1,int x2,int
 	uint32_t* buffer;
 	FILE* f;
 	
-	assert(res->client);
+	if(res==0 || res->client==0)
+		return 0;
 	assert(res->client->format.depth==24);
 
 	w=res->client->width;
@@ -228,7 +263,7 @@ image_t* loadpnm(const char* filename)
 		}
 	} while(buffer[0]=='#');
 
-	if(!fgets(buffer,1024,f) || sscanf(buffer,"%d %d",&w,&h)!=2
+	if( sscanf(buffer,"%d %d",&w,&h)!=2
 			|| !fgets(buffer,1024,f) || strcmp("255\n",buffer)) {
 		fclose(f);
 		return 0;
@@ -246,7 +281,8 @@ image_t* loadpnm(const char* filename)
 	
 	for(j=0;j<h;j++)
 		for(i=0;i<w;i++)
-			if(fread(image->buffer+4*(i+w*j),3,1,f)!=3) {
+			if(fread(image->buffer+4*(i+w*j),3,1,f)!=1) {
+				fprintf(stderr,"Could not read 3 bytes at %d,%d\n",i,j);
 				fclose(f);
 				free(image->buffer);
 				free(image);
@@ -291,9 +327,9 @@ result_t private_process(resource_t resource,timeout_t timeout_in_seconds,result
 			rfbBool loop;
 			do {
 				loop=rfbProcessEvents(res->server,res->server->deferUpdateTime);
-			} while(loop && res->result&return_mask==0);
+			} while(loop && (res->result&return_mask)==0);
 
-			if(res->result&return_mask!=0)
+			if((res->result&return_mask)!=0)
 				return res->result;
 
 			memcpy((char*)&fds,(const char*)&(res->server->allFds),sizeof(fd_set));
@@ -321,14 +357,16 @@ result_t private_process(resource_t resource,timeout_t timeout_in_seconds,result
 
 		if(count>0) {
 			if(FD_ISSET(res->client->sock,&fds)) {
-				if(!HandleRFBServerMessage(res->client))
+				if(!HandleRFBServerMessage(res->client)) {
+					closevnc(resource);
 					return 0;
-				if(res->result&return_mask!=0)
+				}
+				if((res->result&return_mask)!=0)
 					return res->result;
 			}
 		} else {
 			res->result|=RESULT_TIMEOUT;
-			return RESULT_TIMEOUT;
+			return res->result;
 		}
 	} while(1);
 
@@ -355,10 +393,81 @@ result_t waitforupdate(resource_t res,timeout_t timeout)
 	return private_process(res,timeout,RESULT_SCREEN|RESULT_TIMEOUT);
 }
 
-result_t visualgrep(resource_t res,const char* filename,timeout_t timeout)
+result_t visualgrep(resource_t resource,const char* filename,timeout_t timeout)
 {
-	/* TODO: load filename and set res->grep_image to this image */
-	return private_process(res,timeout,RESULT_FOUNDIMAGE|RESULT_TIMEOUT);
+	private_resource_t* res=get_resource(resource);
+	image_t* image;
+	result_t result;
+
+	if(res==0 || res->client==0)
+		return 0;
+
+	/* load filename and set res->grep_image to this image */
+	image=loadpnm(filename);
+	if(image==0)
+		return 0;
+	if(res->grep_image)
+		free_image(res->grep_image);
+	res->grep_image=image;
+
+	if(do_visual_grep(res,0,0,res->client->width,res->client->height))
+		return RESULT_FOUNDIMAGE;
+
+	result=private_process(resource,timeout,RESULT_FOUNDIMAGE|RESULT_TIMEOUT);
+
+	/* free image */
+	if(res->grep_image) {
+		free_image(res->grep_image);
+		res->grep_image=0;
+	}
+
+	return result;
+}
+
+/* auxiliary function for alert */
+
+#include "default8x16.h"
+
+void center_text(rfbScreenInfo* screen,const char* message,int* x,int* y,int* w,int* h)
+{
+	rfbFontData* font=&default8x16Font;
+	const char* pointer;
+	int j,x1,y1,x2,y2,line_count=0;
+	if(message==0 || screen==0)
+		return;
+	rfbWholeFontBBox(font,&x1,&y1,&x2,&y2);
+	for(line_count=1,pointer=message;*pointer;pointer++)
+		if(*pointer=='\n')
+			line_count++;
+	
+	*h=(y2-y1)*line_count;
+	assert(*h>0);
+
+	if(*h>screen->height)
+		*h=screen->height;
+
+	*x=0; *w=screen->width; *y=(screen->height-*h)/2;
+
+	rfbFillRect(screen,*x,*y,*x+*w,*y+*h,0xff0000);
+
+	for(pointer=message,j=0;j<line_count;j++) {
+		const char* eol;
+		int x_cur,y_cur=*y-y1+j*(y2-y1),width;
+		
+		for(width=0,eol=pointer;*eol && *eol!='\n';eol++)
+			width+=rfbWidthOfChar(font,*eol);
+		if(width>screen->width)
+			width=screen->width;
+
+		x_cur=(screen->width-width)/2;
+		for(;pointer!=eol;pointer++)
+			x_cur+=rfbDrawCharWithClip(screen,font,
+					x_cur,y_cur,*pointer,
+					0,0,screen->width,screen->height,
+					0xffffffff,0xffffffff);
+		pointer++;
+	}
+	rfbMarkRectAsModified(screen,*x,*y,*x+*w,*y+*h);
 }
 
 /* this is an overlay which is shown for a certain time */
@@ -368,7 +477,7 @@ result_t alert(resource_t resource,const char* message,timeout_t timeout)
 	private_resource_t* res=get_resource(resource);
 	char* fake_frame_buffer;
 	char* backup;
-	int w,h;
+	int x,y,w,h;
 	result_t result;
 	
 	if(res->server==0)
@@ -381,15 +490,17 @@ result_t alert(resource_t resource,const char* message,timeout_t timeout)
 	if(!fake_frame_buffer)
 		return -1;
 	memcpy(fake_frame_buffer,res->server->frameBuffer,w*4*h);
-	/* TODO: draw message */
 	
 	backup=res->server->frameBuffer;
 	res->server->frameBuffer=fake_frame_buffer;
+	center_text(res->server,message,&x,&y,&w,&h);
+	fprintf(stderr,"%s\n",message);
 
-	result=private_process(resource,timeout,-1);
-	
+	result=waitforinput(resource,timeout);
+
 	res->server->frameBuffer=backup;
-	/* TODO: rfbMarkRectAsModified() */
+	free(fake_frame_buffer);
+	rfbMarkRectAsModified(res->server,x,y,x+w,y+h);
 
 	return result;
 }
@@ -430,24 +541,28 @@ buttons_t getbuttons(resource_t res)
 bool_t sendkey(resource_t res,keysym_t keysym,bool_t keydown)
 {
 	private_resource_t* r=get_resource(res);
+	if(r==0)
+		return 0;
 	return SendKeyEvent(r->client,keysym,keydown);
 }
 
 bool_t sendmouse(resource_t res,coordinate_t x,coordinate_t y,buttons_t buttons)
 {
 	private_resource_t* r=get_resource(res);
+	if(r==0)
+		return 0;
 	return SendPointerEvent(r->client,x,y,buttons);
 }
 
 /* for visual grepping */
 
-coordinate_t getoriginx(resource_t res)
+coordinate_t getxorigin(resource_t res)
 {
 	private_resource_t* r=get_resource(res);
 	return r->x_origin;
 }
 
-coordinate_t getoriginy(resource_t res)
+coordinate_t getyorigin(resource_t res)
 {
 	private_resource_t* r=get_resource(res);
 	return r->y_origin;
