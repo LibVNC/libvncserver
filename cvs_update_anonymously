@@ -1,5 +1,5 @@
-if [ a"$1" = adiff ]; then
-  cmd=diff
+if [ a"$1" = adiff -o a"$1" = aexport ]; then
+  cmd="$1"
   shift
 else
   cmd=update
