@@ -3,10 +3,11 @@ DIST_SUBDIRS=examples contrib vncterm
 
 bin_SCRIPTS = libvncserver-config
 
-include_HEADERS=include/rfb.h include/rfbconfig.h include/rfbint.h include/rfbproto.h \
-	include/keysym.h include/rfbregion.h
+include_HEADERS=
+nobase_include_HEADERS=rfb/rfb.h rfb/rfbconfig.h rfb/rfbint.h rfb/rfbproto.h \
+	rfb/keysym.h rfb/rfbregion.h
 
-noinst_HEADERS=d3des.h zrleDecode.h zrleEncode.h include/default8x16.h \
+noinst_HEADERS=d3des.h zrleDecode.h zrleEncode.h rfb/default8x16.h \
 	rdr/Exception.h rdr/FdInStream.h rdr/FdOutStream.h \
 	rdr/FixedMemOutStream.h rdr/InStream.h rdr/MemInStream.h \
 	rdr/MemOutStream.h rdr/NullOutStream.h rdr/OutStream.h \
