@@ -287,12 +287,13 @@ int main(int argc,char** argv)
 {                                                                
 	int i,j;
 	time_t t;
+	rfbScreenInfoPtr server;
 
 	rfbClientLog=rfbTestLog;
 	rfbClientErr=rfbTestLog;
 
 	/* Initialize server */
-	rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,width,height,8,3,4);
+	server=rfbGetScreen(&argc,argv,width,height,8,3,4);
 
 	server->frameBuffer=malloc(400*300*4);
 	for(j=0;j<400*300*4;j++)

@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "August 2004" "x11vnc " "User Commands"
+.TH X11VNC "1" "December 2004" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.6.3pre, lastmod: 2004-08-31
+         version: 0.6.3pre, lastmod: 2004-12-17
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -19,15 +19,18 @@ Then run this in another window on the machine you are sitting at:
 .IP
 vncviewer far-host:0
 .PP
-Once x11vnc establishes connections with the X11 server and starts
-listening as a VNC server it will print out a string: PORT=XXXX where
-XXXX is typically 5900 (the default VNC port).  One would next run something
-like this on the local machine: "vncviewer host:N" where N is XXXX - 5900,
-i.e. usually "vncviewer host:0"
+Once x11vnc establishes connections with the X11 server and starts listening
+as a VNC server it will print out a string: PORT=XXXX where XXXX is typically
+5900 (the default VNC server port).  One would next run something like
+this on the local machine: "vncviewer hostname:N" where "hostname" is
+the name of the machine running x11vnc and N is XXXX - 5900, i.e. usually
+"vncviewer hostname:0".
 .PP
-By default x11vnc will not allow the screen to be shared and it will
-exit as soon as a client disconnects.  See \fB-shared\fR and \fB-forever\fR below
-to override these protections.
+By default x11vnc will not allow the screen to be shared and it will exit
+as soon as a client disconnects.  See \fB-shared\fR and \fB-forever\fR below to override
+these protections.  See the FAQ on how to tunnel the VNC connection through
+an encrypted channel such as 
+.IR ssh (1).
 .PP
 For additional info see: http://www.karlrunge.com/x11vnc/
 and  http://www.karlrunge.com/x11vnc/#faq
@@ -35,8 +38,8 @@ and  http://www.karlrunge.com/x11vnc/#faq
 Rudimentary config file support: if the file $HOME/.x11vncrc exists then each
 line in it is treated as a single command line option.  Disable with \fB-norc.\fR
 For each option name, the leading character "-" is not required.  E.g. a
-line that is either "nap" or "-nap" may be used and are equivalent.
-Likewise "wait 100" or "-wait 100" are acceptable and equivalent lines.
+line that is either "nap" or "\fB-nap\fR" may be used and are equivalent.
+Likewise "wait 100" or "\fB-wait\fR \fI100\fR" are acceptable and equivalent lines.
 The "#" character comments out to the end of the line in the usual way.
 Leading and trailing whitespace is trimmed off.  Lines may be continued with
 a "\\" as the last character of a line (it becomes a space character).
@@ -65,17 +68,24 @@ man pages.
 .IP
 Show the window corresponding to \fIwindowid\fR not
 the entire display.  New windows like popup menus,
-etc may not be seen, or will be clipped.  x11vnc may
-crash if the window changes size, is iconified, etc.
-Use 
+transient toplevels, etc, may not be seen or may be
+clipped.  Disabling SaveUnders or BackingStore in the
+X server may help show them.  x11vnc may crash if the
+window is initially partially obscured, changes size,
+is iconified, etc.  Some steps are taken to avoid this
+and the \fB-xrandr\fR mechanism is used to track resizes.  Use
 .IR xwininfo (1)
-to get the window id.  Primarily useful
-for exporting very simple applications.
+to get the window id, or use "\fB-id\fR \fIpick\fR"
+to have x11vnc run 
+.IR xwininfo (1)
+for you and extract
+the id.  The \fB-id\fR option is useful for exporting very
+simple applications (e.g. the current view on a webcam).
 .PP
 \fB-sid\fR \fIwindowid\fR
 .IP
 As \fB-id,\fR but instead of using the window directly it
-shifts a root view to it: this shows saveUnders menus,
+shifts a root view to it: this shows SaveUnders menus,
 etc, although they will be clipped if they extend beyond
 the window.
 .PP
@@ -89,26 +99,45 @@ as the pointer moves from window to window (slow).
 For 8bpp displays, force indexed color (i.e. a colormap)
 even if it looks like 8bpp TrueColor. (rare problem)
 .PP
+\fB-visual\fR \fIn\fR
+.IP
+Experimental option: probably does not do what you
+think.  It simply *forces* the visual used for the
+framebuffer; this may be a bad thing... (e.g. messes
+up colors or cause a crash). It is useful for testing
+and for some workarounds.  n may be a decimal number,
+or 0x hex.  Run 
+.IR xdpyinfo (1)
+for the values.  One may
+also use "TrueColor", etc. see <X11/X.h> for a list.
+If the string ends in ":m" for better or for worse
+the visual depth is forced to be m.
+.PP
 \fB-overlay\fR
 .IP
 Handle multiple depth visuals on one screen, e.g. 8+24
 and 24+8 overlay visuals (the 32 bits per pixel are
 packed with 8 for PseudoColor and 24 for TrueColor).
 .IP
-Currently \fB-overlay\fR only works on Solaris (it uses
-XReadScreen(3X11)).  There is a problem with image
-"bleeding" around transient popup menus (but not
-for the menu itself): a workaround is to disable
-SaveUnders by passing the "-su" argument to Xsun
-(in /etc/dt/config/Xservers, say).  Also note that,
-the mouse cursor shape is exactly correct in this mode.
+Currently \fB-overlay\fR only works on Solaris via
+.IR XReadScreen (3X11)
+and IRIX using 
+.IR XReadDisplay (3).
+On Solaris there is a problem with image "bleeding"
+around transient popup menus (but not for the menu
+itself): a workaround is to disable SaveUnders
+by passing the "\fB-su\fR" argument to Xsun (in
+/etc/dt/config/Xservers).  Also note that the mouse
+cursor shape is exactly correct in this mode.
 .IP
 Use \fB-overlay\fR as a workaround for situations like these:
-Some legacy applications require the default visual
+Some legacy applications require the default visual to
 be 8bpp (8+24), or they will use 8bpp PseudoColor even
 when the default visual is depth 24 TrueColor (24+8).
 In these cases colors in some windows will be messed
-up in x11vnc unless \fB-overlay\fR is used.
+up in x11vnc unless \fB-overlay\fR is used.  Another use of
+\fB-overlay\fR is to enable showing the exact mouse cursor
+shape (details below).
 .IP
 Under \fB-overlay,\fR performance will be somewhat degraded
 due to the extra image transformations required.
@@ -122,28 +151,16 @@ visual (some apps have \fB-use24\fR or \fB-visual\fR options).
 Sets \fB-overlay,\fR but does not try to draw the exact mouse
 cursor shape using the overlay mechanism.
 .PP
-\fB-visual\fR \fIn\fR
-.IP
-Experimental option: probably does not do what you
-think.  It simply *forces* the visual used for the
-framebuffer; this may be a bad thing... It is useful for
-testing and for some workarounds.  n may be a decimal
-number, or 0x hex.  Run 
-.IR xdpyinfo (1)
-for the values.
-One may also use "TrueColor", etc. see <X11/X.h>
-for a list.  If the string ends in ":m" for better
-or for worse the visual depth is forced to be m.
-.PP
 \fB-scale\fR \fIfraction\fR
 .IP
-Scale the framebuffer by factor \fIfraction\fR.
-Values less than 1 shrink the fb.  Note: image may not
-be sharp and response may be slower.  Currently the
-cursor shape is not scaled.  If \fIfraction\fR contains
-a decimal point "." it is taken as a floating point
-number, alternatively the notation "m/n" may be used
-to denote fractions exactly, e.g. \fB-scale\fR 2/3.
+Scale the framebuffer by factor \fIfraction\fR.  Values
+less than 1 shrink the fb, larger ones expand it.
+Note: image may not be sharp and response may be
+slower.  Currently the cursor shape is not scaled.
+If \fIfraction\fR contains a decimal point "." it
+is taken as a floating point number, alternatively
+the notation "m/n" may be used to denote fractions
+exactly, e.g. \fB-scale\fR 2/3.
 .IP
 Scaling Options: can be added after \fIfraction\fR via
 ":", to supply multiple ":" options use commas.
@@ -174,6 +191,15 @@ disconnects, opposite of \fB-forever.\fR This is the Default.
 Keep listening for more connections rather than exiting
 as soon as the first client(s) disconnect. Same as \fB-many\fR
 .PP
+\fB-inetd\fR
+.IP
+Launched by 
+.IR inetd (1):
+stdio instead of listening socket.
+Note: if you are not redirecting stderr to a log file
+(via shell 2> or \fB-o\fR option) you must also specify the
+\fB-q\fR option, otherwise the stderr goes to the viewer.
+.PP
 \fB-connect\fR \fIstring\fR
 .IP
 For use with "vncviewer -listen" reverse connections.
@@ -184,41 +210,29 @@ contains "/" it is instead interpreted as a file to
 periodically check for new hosts.  The first line is
 read and then the file is truncated.
 .PP
-\fB-vncconnect\fR
+\fB-vncconnect,\fR \fB-novncconnect\fR
 .IP
 Monitor the VNC_CONNECT X property set by the standard
-.PP
-\fB-novncconnect\fR
-.IP
 VNC program 
-.IR vncconnect (1)
-.  When the property is
+.IR vncconnect (1).
+When the property is
 set to "host" or "host:port" establish a reverse
 connection.  Using 
 .IR xprop (1)
 instead of vncconnect may
-work, see the FAQ.  Default: \fB-vncconnect\fR
+work (see the FAQ).  Default: \fB-vncconnect\fR
 .PP
-\fB-inetd\fR
+\fB-allow\fR \fIhost1[,host2..]\fR
 .IP
-Launched by 
-.IR inetd (1)
-: stdio instead of listening socket.
-Note: if you are not redirecting stderr to a log file
-(via shell 2> or \fB-o\fR option) you must also specify the
-\fB-q\fR option.
-.PP
-\fB-allow\fR \fIaddr1[,addr2..]\fR
-.IP
-Only allow client connections from IP addresses matching
-the comma separated list of numerical addresses.
-Can be a prefix, e.g. "192.168.100." to match a
-simple subnet, for more control build libvncserver
-with libwrap support.  If the list contains a "/"
-it instead is a interpreted as a file containing
-addresses or prefixes that is re-read each time a new
-client connects.  Lines can be commented out with the
-"#" character in the usual way.
+Only allow client connections from hosts matching
+the comma separated list of hostnames or IP addresses.
+Can also be a numerical IP prefix, e.g. "192.168.100."
+to match a simple subnet, for more control build
+libvncserver with libwrap support (See the FAQ).  If the
+list contains a "/" it instead is a interpreted as a
+file containing addresses or prefixes that is re-read
+each time a new client connects.  Lines can be commented
+out with the "#" character in the usual way.
 .PP
 \fB-localhost\fR
 .IP
@@ -236,13 +250,13 @@ the file \fIfilename\fR instead of via command line.
 If a second non blank line exists in the file it is
 taken as a view-only password (i.e. \fB-viewpasswd)\fR Note:
 this is a simple plaintext passwd, see also \fB-rfbauth\fR
-and \fB-storepasswd\fR below.
+and \fB-storepasswd\fR below for obfuscated passwords.
 .PP
 \fB-storepasswd\fR \fIpass\fR \fIfile\fR
 .IP
 Store password \fIpass\fR as the VNC password in the
 file \fIfile\fR.  Once the password is stored the
-program exits.  Use the password via "-rfbauth file"
+program exits.  Use the password via "\fB-rfbauth\fR \fIfile\fR"
 .PP
 \fB-accept\fR \fIstring\fR
 .IP
@@ -253,10 +267,10 @@ an external command run via
 .IR system (3)
 or some special
 cases described below.  Be sure to quote \fIstring\fR
-if it contains spaces, etc.  If the external command
-returns 0 the client is accepted, otherwise the client
-is rejected.  See below for an extension to accept a
-client view-only.
+if it contains spaces, shell characters, etc.  If the
+external command returns 0 the client is accepted,
+otherwise the client is rejected.  See below for an
+extension to accept a client view-only.
 .IP
 Environment: The RFB_CLIENT_IP environment variable will
 be set to the incoming client IP number and the port
@@ -266,7 +280,7 @@ of the connection), are set to allow identification
 of the tcp virtual circuit.  The x11vnc process
 id will be in RFB_X11VNC_PID, a client id number in
 RFB_CLIENT_ID, and the number of other connected clients
-in RFB_CLIENT_COUNT.
+in RFB_CLIENT_COUNT.  RFB_MODE will be "accept"
 .IP
 If \fIstring\fR is "popup" then a builtin popup window
 is used.  The popup will time out after 120 seconds,
@@ -275,7 +289,8 @@ use "popup:N" to modify the timeout to N seconds
 .IP
 If \fIstring\fR is "xmessage" then an 
 .IR xmessage (1)
-invocation is used for the command.
+invocation is used for the command.  xmessage must be
+installed on the machine for this to work.
 .IP
 Both "popup" and "xmessage" will present an option
 for accepting the client "View-Only" (the client
@@ -291,22 +306,26 @@ respectively.  Use "*" instead of a number to indicate
 the default action (in case the command returns an
 unexpected value).  E.g. "no:*" is a good choice.
 .IP
-Note that x11vnc blocks while the external command or
+Note that x11vnc blocks while the external command
 or popup is running (other clients may see no updates
 during this period).
 .IP
 More \fB-accept\fR tricks: use "popupmouse" to only allow
 mouse clicks in the builtin popup to be recognized.
-Similarly use "popupkey" to only recognize keystroke
-responses.  All 3 of the popup keywords can be followed
+Similarly use "popupkey" to only recognize
+keystroke responses.  These are to help avoid the
+user accidentally accepting a client by typing or
+clicking. All 3 of the popup keywords can be followed
 by +N+M to supply a position for the popup window.
 The default is to center the popup window.
 .PP
 \fB-gone\fR \fIstring\fR
 .IP
 As \fB-accept,\fR except to run a user supplied command when
-a client goes away (disconnects).  Unlike \fB-accept,\fR
-the command return code is not interpreted by x11vnc.
+a client goes away (disconnects).  RFB_MODE will be
+set to "gone" and the other RFB_* variables are as
+in \fB-accept.\fR  Unlike \fB-accept,\fR the command return code
+is not interpreted by x11vnc.  Example: \fB-gone\fR 'xlock &'
 .PP
 \fB-noshm\fR
 .IP
@@ -342,10 +361,53 @@ areas to black out (if your system has libXinerama).
 In general on XINERAMA displays you may need to use the
 \fB-xwarppointer\fR option if the mouse pointer misbehaves.
 .PP
+\fB-xrandr\fR \fI[mode]\fR
+.IP
+If the display supports the XRANDR (X Resize, Rotate
+and Reflection) extension, and you expect XRANDR events
+to occur to the display while x11vnc is running, this
+options indicates x11vnc should try to respond to
+them (as opposed to simply crashing by assuming the
+old screen size).  See the 
+.IR xrandr (1)
+manpage and run
+\'xrandr \fB-q'\fR for more info.  [mode] is optional and
+described below.
+.IP
+Since watching for XRANDR events and errors increases
+polling overhead, only use this option if XRANDR changes
+are expected.  For example on a rotatable screen PDA or
+laptop, or using a XRANDR-aware Desktop where you resize
+often.  It is best to be viewing with a vncviewer that
+supports the NewFBSize encoding, since it knows how to
+react to screen size changes.  Otherwise, libvncserver
+tries to do so something reasonable for viewers that
+cannot do this (portions of the screen may be clipped,
+unused, etc).
+.IP
+"mode" defaults to "resize", which means create a
+new, resized, framebuffer and hope all viewers can cope
+with the change.  "newfbsize" means first disconnect
+all viewers that do not support the NewFBSize VNC
+encoding, and then resize the framebuffer.  "exit"
+means disconnect all viewer clients, and then terminate
+x11vnc.
+.PP
+\fB-padgeom\fR \fIWxH\fR
+.IP
+Whenever a new vncviewer connects, the framebuffer is
+replaced with a fake, solid black one of geometry WxH.
+Shortly afterwards the framebuffer is replaced with the
+real one.  This is intended for use with vncviewers
+that do not support NewFBSize and one wants to make
+sure the initial viewer geometry will be big enough
+to handle all subsequent resizes (e.g. under \fB-xrandr,\fR
+\fB-remote\fR id:windowid, rescaling, etc.
+.PP
 \fB-o\fR \fIlogfile\fR
 .IP
 Write stderr messages to file \fIlogfile\fR instead of
-to the terminal.  Same as \fB-logfile\fR "file".
+to the terminal.  Same as "\fB-logfile\fR \fIfile\fR".
 .PP
 \fB-rc\fR \fIfilename\fR
 .IP
@@ -395,19 +457,21 @@ and "," + "<" keys).  Default: \fB-modtweak\fR
 .PP
 \fB-xkb\fR
 .IP
-When in modtweak mode, use the XKEYBOARD extension
-(if it exists) to do the modifier tweaking.  This is
-powerful and should be tried if there are still
-keymapping problems when using the simpler \fB-modtweak.\fR
+When in modtweak mode, use the XKEYBOARD extension (if
+the X display supports it) to do the modifier tweaking.
+This is powerful and should be tried if there are still
+keymapping problems when using \fB-modtweak\fR by itself.
 .PP
 \fB-skip_keycodes\fR \fIstring\fR
 .IP
-Skip keycodes not on your keyboard but your X server
-thinks exist.  Currently only applies to \fB-xkb\fR mode.
-\fIstring\fR is a comma separated list of decimal
-keycodes.  Use this option to help x11vnc in the reverse
-problem it tries to solve: Keysym -> Keycode(s) when
-ambiguities exist.  E.g. \fB-skip_keycodes\fR 94,114
+Ignore the comma separated list of decimal keycodes.
+Perhaps these are keycodes not on your keyboard but
+your X server thinks exist.  Currently only applies
+to \fB-xkb\fR mode.  Use this option to help x11vnc in the
+reverse problem it tries to solve: Keysym -> Keycode(s)
+when ambiguities exist (more than one Keycode per
+Keysym).  Run 'xmodmap \fB-pk'\fR to see your keymapping.
+E.g. "\fB-skip_keycodes\fR \fI94,114\fR"
 .PP
 \fB-add_keysyms\fR
 .IP
@@ -437,10 +501,10 @@ or hex value) separated by a space.  If no file named
 \fIstring\fR exists, it is instead interpreted as this
 form: key1-key2,key3-key4,...  See <X11/keysymdef.h>
 header file for a list of Keysym names, or use
-.IR xev (1)
-. To map a key to a button click, use the
-fake Keysyms "Button1", ..., etc.
-E.g. \fB-remap\fR Super_R-Button2
+.IR xev (1).
+To map a key to a button click, use the
+fake Keysyms "Button1", ..., etc.  E.g. "-remap
+Super_R-Button2" (useful for pasting on a laptop)
 .PP
 \fB-norepeat,\fR \fB-repeat\fR
 .IP
@@ -451,7 +515,7 @@ delays between key down and key up client events:
 either from large screen changes or high latency).
 Note: your VNC viewer side will likely do autorepeating,
 so this is no loss unless someone is simultaneously at
-the real X display.  Default: \fB-repeat\fR
+the real X display.  Default: \fB-norepeat\fR
 .PP
 \fB-nofb\fR
 .IP
@@ -489,27 +553,36 @@ and CursorShapeUpdates extensions (cuts down on
 network traffic by not having to send the cursor image
 every time the pointer is moved), in which case these
 extensions are used (see \fB-nocursorshape\fR and \fB-nocursorpos\fR
-below).  For other viewers the cursor shape is written
-directly to the framebuffer every time the pointer is
-moved or changed and gets sent along with the other
-framebuffer updates.  In this case, there will be
-some lag between the vnc viewer pointer and the remote
-cursor position.
+below to disable).  For other viewers the cursor shape
+is written directly to the framebuffer every time the
+pointer is moved or changed and gets sent along with
+the other framebuffer updates.  In this case, there
+will be some lag between the vnc viewer pointer and
+the remote cursor position.
 .IP
 If the X display supports retrieving the cursor shape
-information from the X server, then the default
-is to use that mode.  On Solaris this requires
-the SUN_OVL extension and the \fB-overlay\fR option to be
-supplied. (see also the \fB-overlay_nomouse\fR option). (Soon)
-on XFree86/Xorg the XFIXES extension is required.
-Either can be disabled with \fB-nocursor,\fR and also some
-values of the "mode" option below.
+information from the X server, then the default is
+to use that mode.  On Solaris this can be done with
+the SUN_OVL extension using \fB-overlay\fR (see also the
+\fB-overlay_nomouse\fR option).  A similar overlay scheme
+is used on IRIX.  Xorg (e.g. Linux) and recent Solaris
+Xsun servers support the XFIXES extension to retrieve
+the exact cursor shape from the X server.  If XFIXES
+is present it is preferred over Overlay and is used by
+default (see \fB-noxfixes\fR below).  This can be disabled
+with \fB-nocursor,\fR and also some values of the "mode"
+option below.
 .IP
 The "mode" string can be used to fine-tune the
 displaying of cursor shapes.  It can be used the
 following ways:
 .IP
-"-cursor X" - when the cursor appears to be on the
+"\fB-cursor\fR \fIarrow\fR" - just show the standard arrow
+nothing more or nothing less.
+.IP
+"\fB-cursor\fR \fInone\fR" - same as "\fB-nocursor\fR"
+.IP
+"\fB-cursor\fR \fIX\fR" - when the cursor appears to be on the
 root window, draw the familiar X shape.  Some desktops
 such as GNOME cover up the root window completely,
 and so this will not work, try "X1", etc, to try to
@@ -517,17 +590,23 @@ shift the tree depth.  On high latency links or slow
 machines there will be a time lag between expected and
 the actual cursor shape.
 .IP
-"-cursor some" - like "X" but use additional
+"\fB-cursor\fR \fIsome\fR" - like "X" but use additional
 heuristics to try to guess if the window should have
 a windowmanager-like resizer cursor or a text input
 I-beam cursor.  This is a complete hack, but may be
 useful in some situations because it provides a little
 more feedback about the cursor shape.
 .IP
-"-cursor most" - try to show as many cursors as
-possible.  Often this will only be the same as "some".
-On Solaris if XFIXES is not available, \fB-overlay\fR mode
-will be used.
+"\fB-cursor\fR \fImost\fR" - try to show as many cursors as
+possible.  Often this will only be the same as "some"
+unless the display has overlay visuals or XFIXES
+extensions available.  On Solaris and IRIX if XFIXES
+is not available, \fB-overlay\fR mode will be attempted.
+.PP
+\fB-noxfixes\fR
+.IP
+Do not use the XFIXES extension to draw the exact cursor
+shape even if it is available.
 .PP
 \fB-nocursorshape\fR
 .IP
@@ -543,11 +622,13 @@ to see the pointer motions. Default: \fB-cursorpos\fR
 .PP
 \fB-xwarppointer\fR
 .IP
-Move the pointer with XWarpPointer(3X) instead of XTEST
-extension.  Use this as a workaround if the pointer
-motion behaves incorrectly, e.g.  on touchscreens or
-other non-standard setups.  Also sometimes needed on
-XINERAMA displays.
+Move the pointer with 
+.IR XWarpPointer (3X)
+instead of
+the XTEST extension.  Use this as a workaround
+if the pointer motion behaves incorrectly, e.g.
+on touchscreens or other non-standard setups.
+Also sometimes needed on XINERAMA displays.
 .PP
 \fB-buttonmap\fR \fIstring\fR
 .IP
@@ -586,22 +667,29 @@ improves response on slow setups, but you lose all
 visual feedback for drags, text selection, and some
 menu traversals.
 .PP
-\fB-old_pointer\fR
+\fB-pointer_mode\fR \fIn\fR
 .IP
-Use the original pointer input handling mechanism.
-See check_input() and pointer() in source file for
-details.
-.PP
-\fB-old_pointer2\fR
-.IP
-The default pointer input handling algorithm was changed
-again, this option indicates to use the second one.
+Various pointer update schemes.  The problem is pointer
+motion can cause rapid changes on the screen, e.g. a
+window drag.  Neither x11vnc nor the bandwidth to the
+vncviewers can keep up these rapid screen changes:
+everything bogs down when dragging or scrolling.
+Note that most video h/w is optimized for writing, not
+reading (a 50X rate difference is possible) and x11vnc
+is reading all the time.  So a scheme has to be used to
+"eat" much of that pointer input before re-polling the
+screen. n can be 1 to 4.  n=1 was the original scheme
+used to about Jan 2004.  n=2 is an improved scheme.
+n=3 is basically a dynamic \fB-nodragging\fR mode: it detects
+if the mouse drag motion has paused and refreshes
+the display.  n=4 is TBD.  The default n is 2.
 .PP
 \fB-input_skip\fR \fIn\fR
 .IP
-For the old pointer handling when non-threaded: try to
+For the pointer handling when non-threaded: try to
 read n user input events before scanning display. n < 0
 means to act as though there is always user input.
+Default: 10
 .PP
 \fB-debug_pointer\fR
 .IP
@@ -628,6 +716,12 @@ down on load.  Default: 30
 .IP
 Monitor activity and if low take longer naps between
 polls to really cut down load when idle.  Default: off
+.PP
+\fB-sb\fR \fItime\fR
+.IP
+Time in seconds after NO activity (e.g. screen blank)
+to really throttle down the screen polls (i.e. sleep
+for about 1.5 secs). Use 0 to disable.  Default: 60
 .PP
 \fB-sigpipe\fR \fIstring\fR
 .IP
@@ -662,6 +756,444 @@ by checking the tile near the boundary.  Default: 3
 .IP
 Tolerance in pixels to mark a tiles edges as changed.
 Default: 2
+.PP
+\fB-gui\fR \fI[gui-opts]\fR
+.IP
+Start up a simple tcl/tk gui based on the the remote
+control options \fB-remote/-query\fR described below.
+Requires the "wish" program to be installed on the
+machine.  "gui-opts" is not required: the default is
+to start up both the gui and x11vnc with the gui showing
+up on the X display in the environment variable DISPLAY.
+.IP
+"gui-opts" can be a comma separated list of items.
+Currently there are only two types of items: 1) a gui
+mode and 2) the X display the gui should display on.
+The gui mode can be "start", "conn", or "wait"
+"start" is the default mode above and is not required.
+"conn" means do not automatically start up x11vnc,
+but instead just try to connect to an existing x11vnc
+process.  "wait" means just start the gui and nothing
+else (you will later instruct the gui to start x11vnc
+or connect to an existing one.)
+.IP
+Note the possible confusion regarding the potentially
+two different X displays: x11vnc polls one, but you
+may want the gui to appear on another.  For example, if
+you ssh in and x11vnc is not running yet you may want
+the gui to come back to you via your ssh redirected X
+display (e.g. localhost:10).
+.IP
+Examples: "x11vnc \fB-gui",\fR "x11vnc \fB-gui\fR localhost:10",
+"x11vnc \fB-gui\fR :10", "x11vnc \fB-gui\fR wait,:10",
+"x11vnc \fB-gui\fR <x11vnc-opts...>"
+.IP
+If you do not specify a gui X display in "gui-opts"
+then the DISPLAY environment variable and \fB-display\fR
+option are tried (in that order).  Regarding the x11vnc
+X display the gui will try to connect to, it first
+tries \fB-display\fR and then DISPLAY.  For example, "x11vnc
+\fB-display\fR :0 \fB-gui\fR otherhost:0", will remote control an
+x11vnc polling :0 and display the gui on otherhost:0
+.IP
+If you do not intend to start x11vnc from the gui
+(i.e. just remote control an existing one), then the
+gui process can run on a different machine from the
+x11vnc server as long as X permissions, etc. permit
+communication between the two.
+.PP
+\fB-remote\fR \fIcommand\fR
+.IP
+Remotely control some aspects of an already running
+x11vnc server.  "\fB-R\fR" and "\fB-r\fR" are aliases for
+"\fB-remote\fR".  After the remote control command is
+sent to the running server the 'x11vnc \fB-remote\fR ...'
+command exits.  You can often use the \fB-query\fR command
+(see below) to see if the x11vnc server processed your
+\fB-remote\fR command.
+.IP
+The default communication channel is that of X
+properties (specifically VNC_CONNECT), and so this
+command must be run with correct settings for DISPLAY
+and possibly XAUTHORITY to connect to the X server
+and set the property.  Alternatively, use the \fB-display\fR
+and \fB-auth\fR options to set them to the correct values.
+The running server cannot use the \fB-novncconnect\fR option
+because that disables the communication channel.
+See below for alternate channels.
+.IP
+For example: 'x11vnc \fB-remote\fR stop' (which is the same as
+\'x11vnc \fB-R\fR stop') will close down the x11vnc server.
+\'x11vnc \fB-R\fR shared' will enable shared connections, and
+\'x11vnc \fB-R\fR scale:3/4' will rescale the desktop.
+.IP
+Note: the more drastic the change induced by the \fB-remote\fR
+command, the bigger the chance for bugs or crashes.
+Please report reproducible bugs.
+.IP
+.IP
+The following \fB-remote/-R\fR commands are supported:
+.IP
+stop            terminate the server, same as "quit"
+                "exit" or "shutdown"
+.IP
+ping            see if the x11vnc server responds.
+                Return is: ans=ping:<xdisplay>
+.IP
+blacken         try to push a black fb update to all
+                clients (due to timings a client
+                could miss it). Same as "zero", also
+                "zero:x1,y1,x2,y2" for a rectangle.
+.IP
+refresh         send the entire fb to all clients.
+.IP
+reset           recreate the fb, polling memory, etc.
+.IP
+id:windowid     set \fB-id\fR window to "windowid". empty
+                or "root" to go back to root window
+.IP
+sid:windowid    set \fB-sid\fR window to "windowid"
+.IP
+flashcmap       enable  \fB-flashcmap\fR mode.
+.IP
+noflashcmap     disable \fB-flashcmap\fR mode.
+.IP
+notruecolor     enable  \fB-notruecolor\fR mode.
+.IP
+truecolor       disable \fB-notruecolor\fR mode.
+.IP
+overlay         enable  \fB-overlay\fR mode (if applicable).
+.IP
+nooverlay       disable \fB-overlay\fR mode.
+.IP
+overlay_cursor  in \fB-overlay\fR mode, enable cursor drawing.
+.IP
+overlay_nocursor disable cursor drawing. same as
+                nooverlay_cursor.
+.IP
+visual:vis      set \fB-visual\fR to "vis"
+.IP
+scale:frac      set \fB-scale\fR to "frac"
+.IP
+viewonly        enable  \fB-viewonly\fR mode.
+.IP
+noviewonly      disable \fB-viewonly\fR mode.
+.IP
+shared          enable  \fB-shared\fR mode.
+.IP
+noshared        disable \fB-shared\fR mode.
+.IP
+forever         enable  \fB-forever\fR mode.
+.IP
+noforever       disable \fB-forever\fR mode.
+.IP
+deny            deny any new connections, same as "lock"
+.IP
+nodeny          allow new connections, same as "unlock"
+.IP
+connect:host    do reverse connection to host, "host"
+                may be a comma separated list of hosts
+                or host:ports.  See \fB-connect.\fR
+.IP
+disconnect:host disconnect any clients from "host"
+                same as "close:host".  Use host
+                "all" to close all current clients.
+                If you know the client internal hex ID,
+                e.g. 0x3 (returned by \fB-query\fR clients and
+                RFB_CLIENT_ID), you can use that too.
+.IP
+allowonce:host  For the next connection only, allow
+                connection from "host".
+.IP
+allow:hostlist  set \fB-allow\fR list to (comma separated)
+                "hostlist". See \fB-allow\fR and \fB-localhost.\fR
+                Do not use with \fB-allow\fR /path/to/file
+                Use "+host" to add a single host, and
+                use "\fB-host\fR" to delete a single host
+.IP
+localhost       enable  \fB-localhost\fR mode
+.IP
+nolocalhost     disable \fB-localhost\fR mode
+.IP
+accept:cmd      set \fB-accept\fR "cmd" (empty to disable).
+.IP
+gone:cmd        set \fB-gone\fR "cmd" (empty to disable).
+.IP
+noshm           enable  \fB-noshm\fR mode.
+.IP
+shm             disable \fB-noshm\fR mode (i.e. use shm).
+.IP
+flipbyteorder   enable \fB-flipbyteorder\fR mode, you may need
+                to set noshm for this to do something.
+.IP
+noflipbyteorder disable \fB-flipbyteorder\fR mode.
+.IP
+onetile         enable  \fB-onetile\fR mode. (you may need to
+                set shm for this to do something)
+.IP
+noonetile       disable \fB-onetile\fR mode.
+.IP
+blackout:str    set \fB-blackout\fR "str" (empty to disable).
+                See \fB-blackout\fR for the form of "str"
+                (basically: WxH+X+Y,...)
+                Use "+WxH+X+Y" to append a single
+                rectangle use "-WxH+X+Y" to delete one
+.IP
+xinerama        enable  \fB-xinerama\fR mode. (if applicable)
+.IP
+noxinerama      disable \fB-xinerama\fR mode.
+.IP
+xrandr          enable  \fB-xrandr\fR mode. (if applicable)
+.IP
+noxrandr        disable \fB-xrandr\fR mode.
+.IP
+xrandr_mode:mode set the \fB-xrandr\fR mode to "mode".
+.IP
+padgeom:WxH     set \fB-padgeom\fR to WxH (empty to disable)
+                If WxH is "force" or "do" the padded
+                geometry fb is immediately applied.
+.IP
+quiet           enable  \fB-quiet\fR mode.
+.IP
+noquiet         disable \fB-quiet\fR mode.
+.IP
+modtweak        enable  \fB-modtweak\fR mode.
+.IP
+nomodtweak      enable  \fB-nomodtweak\fR mode.
+.IP
+xkb             enable  \fB-xkb\fR modtweak mode.
+.IP
+noxkb           disable \fB-xkb\fR modtweak mode.
+.IP
+skip_keycodes:str enable \fB-xkb\fR \fB-skip_keycodes\fR "str".
+.IP
+add_keysyms     enable \fB-add_keysyms\fR mode.
+.IP
+noadd_keysyms   stop adding keysyms. those added will
+                still be removed at exit.
+.IP
+clear_mods      enable  \fB-clear_mods\fR mode and clear them.
+.IP
+noclear_mods    disable \fB-clear_mods\fR mode.
+.IP
+clear_keys      enable  \fB-clear_keys\fR mode and clear them.
+.IP
+noclear_keys    disable \fB-clear_keys\fR mode.
+.IP
+remap:str       set \fB-remap\fR "str" (empty to disable).
+                See \fB-remap\fR for the form of "str"
+                (basically: key1-key2,key3-key4,...)
+                Use "+key1-key2" to append a single
+                keymapping, use "-key1-key2" to delete.
+.IP
+norepeat        enable  \fB-norepeat\fR mode.
+.IP
+repeat          disable \fB-norepeat\fR mode.
+.IP
+bell            enable  bell (if supported).
+.IP
+nobell          disable bell.
+.IP
+sel             disable \fB-nosel\fR mode.
+.IP
+nosel           enable  \fB-nosel\fR mode.
+.IP
+primary         disable \fB-noprimary\fR mode.
+.IP
+noprimary       enable  \fB-noprimary\fR mode.
+.IP
+cursor:mode     enable  \fB-cursor\fR "mode".
+.IP
+show_cursor     enable  showing a cursor.
+.IP
+noshow_cursor   disable showing a cursor. (same as
+                "nocursor")
+.IP
+xfixes          enable  xfixes cursor shape mode.
+.IP
+noxfixes        disable xfixes cursor shape mode.
+.IP
+cursorshape     disable \fB-nocursorshape\fR mode.
+.IP
+nocursorshape   enable  \fB-nocursorshape\fR mode.
+.IP
+cursorpos       disable \fB-nocursorpos\fR mode.
+.IP
+nocursorpos     enable  \fB-nocursorpos\fR mode.
+.IP
+xwarp           enable  \fB-xwarppointer\fR mode.
+.IP
+noxwarp         disable \fB-xwarppointer\fR mode.
+.IP
+buttonmap:str   set \fB-buttonmap\fR "str", empty to disable
+.IP
+dragging        disable \fB-nodragging\fR mode.
+.IP
+nodragging      enable  \fB-nodragging\fR mode.
+.IP
+pointer_mode n  set \fB-pointer_mode\fR to n.
+.IP
+input_skip n    set \fB-input_skip\fR to n.
+.IP
+debug_pointer   enable  \fB-debug_pointer,\fR same as "dp"
+.IP
+nodebug_pointer disable \fB-debug_pointer,\fR same as "nodp"
+.IP
+debug_keyboard   enable  \fB-debug_keyboard,\fR same as "dk"
+.IP
+nodebug_keyboard disable \fB-debug_keyboard,\fR same as "nodk"
+.IP
+defer:n         set \fB-defer\fR to n ms,same as deferupdate:n
+.IP
+wait:n          set \fB-wait\fR to n ms.
+.IP
+nap             enable  \fB-nap\fR mode.
+.IP
+nonap           disable \fB-nap\fR mode.
+.IP
+sb:n            set \fB-sb\fR to n s, same as screen_blank:n
+.IP
+fs:frac         set \fB-fs\fR fraction to "frac", e.g. 0.5
+.IP
+gaps:n          set \fB-gaps\fR to n.
+.IP
+grow:n          set \fB-grow\fR to n.
+.IP
+fuzz:n          set \fB-fuzz\fR to n.
+.IP
+progressive:n   set libvncserver \fB-progressive\fR slice
+                height parameter to n.
+.IP
+file:name       run \fB-remote\fR commands from file "name",
+                one command per line,blank and # skipped
+.IP
+noremote        disable the \fB-remote\fR command processing,
+                it cannot be turned back on.
+.IP
+.IP
+The 
+.IR vncconnect (1)
+command from standard VNC
+.IP
+distributions may also be used if string is prefixed
+.IP
+with "cmd=" E.g. 'vncconnect cmd=stop'.  Under some
+.IP
+circumstances 
+.IR xprop (1)
+can used if it supports \fB-set\fR
+.IP
+(see the FAQ).
+.IP
+.IP
+If "\fB-connect\fR \fI/path/to/file\fR" has been supplied to the
+.IP
+running x11vnc server then that file can be used as a
+.IP
+communication channel (this is the only way to remote
+.IP
+control one of many x11vnc's polling the same X display)
+.IP
+Simply run: 'x11vnc \fB-connect\fR /path/to/file \fB-remote\fR ...'
+.IP
+or you can directly write to the file via something
+.IP
+like: "echo cmd=stop > /path/to/file", etc.
+.PP
+\fB-query\fR \fIvariable\fR
+.IP
+Like \fB-remote,\fR except just query the value of
+\fIvariable\fR.  "\fB-Q\fR" is an alias for "\fB-query\fR".
+Multiple queries can be done by separating variables
+by commas, e.g. \fB-query\fR var1,var2. The results come
+back in the form ans=var1:value1,ans=var2:value2,...
+to the standard output.  If a variable is read-only,
+it comes back with prefix "aro=" instead of "ans=".
+.IP
+Some \fB-remote\fR commands are pure actions that do not make
+sense as variables, e.g. "stop" or "disconnect",
+in these cases the value returned is "N/A".  To direct
+a query straight to the VNC_CONNECT property or connect
+file use "qry=..." instead of "cmd=..."
+.IP
+Here is the current list of "variables" that can
+be supplied to the \fB-query\fR command. This includes the
+"N/A" ones that return no useful info.  For variables
+names that do not correspond to an x11vnc option or
+remote command, we hope the name makes it obvious what
+the returned value corresponds to (hint: the ext_*
+variables correspond to the presence of X extensions):
+.IP
+ans= stop quit exit shutdown ping blacken zero refresh
+reset close disconnect id sid flashcmap noflashcmap
+truecolor notruecolor overlay nooverlay overlay_cursor
+overlay_yescursor nooverlay_cursor overlay_nocursor
+visual scale viewonly noviewonly shared noshared
+forever noforever once deny lock nodeny unlock connect
+allowonce allow localhost nolocalhost accept gone shm
+noshm flipbyteorder noflipbyteorder onetile noonetile
+blackout xinerama noxinerama xrandr noxrandr xrandr_mode
+padgeom quiet q noquiet modtweak nomodtweak xkb noxkb
+skip_keycodes add_keysyms noadd_keysyms clear_mods
+noclear_mods clear_keys noclear_keys remap repeat
+norepeat bell nobell sel nosel primary noprimary
+cursorshape nocursorshape cursorpos nocursorpos cursor
+show_cursor noshow_cursor nocursor xfixes noxfixes xwarp
+xwarppointer noxwarp noxwarppointer buttonmap dragging
+nodragging pointer_mode input_skip debug_pointer dp
+nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+nodk deferupdate defer wait nap nonap sb screen_blank
+fs gaps grow fuzz progressive noremote
+.IP
+aro=  display vncdisplay desktopname desktop auth
+rootshift scale_str scaled_x scaled_y scale_numer
+scale_denom scale_fac scaling_noblend scaling_nomult4
+scaling_pad scaling_interpolate inetd safer unsafe
+passwdfile using_shm logfile o rc norc h help V version
+lastmod bg nofb sigpipe threads clients client_count
+pid ext_xtest ext_xkb ext_xshm ext_xinerama ext_overlay
+ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
+button_mask mouse_x mouse_y bpp depth indexed_color
+dpy_x dpy_y rfbport rfbwait rfbauth passwd alwaysshared
+dontdisconnect httpdir enablehttpproxy
+.PP
+\fB-noremote\fR
+.IP
+Do not process any remote control commands or queries.
+.IP
+A note about security wrt remote control commands.
+If someone can connect to the X display and change the
+property VNC_CONNECT, then they can remotely control
+x11vnc.  Normally access to the X display is protected.
+Note that if they can modify VNC_CONNECT, they could
+also run their own x11vnc and have complete control
+of the desktop.  If the  "\fB-connect\fR \fI/path/to/file\fR"
+channel is being used, obviously anyone who can write
+to /path/to/file can remotely control x11vnc.  So be
+sure to protect the X display and that file's write
+permissions.
+.PP
+\fB-unsafe\fR
+.IP
+If x11vnc is running as root (e.g. inetd or Xsetup for
+a display manager) a few remote commands are disabled
+(currently: id:pick, accept:<cmd>, and gone:<cmd>)
+because they are associated with running external
+programs.  If you specify \fB-unsafe,\fR then these remote
+control commands are allowed when running as root.
+When running as non-root all commands are allowed.
+See \fB-safer\fR below.
+.PP
+\fB-safer\fR
+.IP
+Even if not running as root, disable the above unsafe
+remote control commands.
+.PP
+\fB-deny_all\fR
+.IP
+For use with \fB-remote\fR nodeny: start out denying all
+incoming clients until "\fB-remote\fR \fInodeny\fR" is used to
+let them in.
 .PP
 These options are passed to libvncserver:
 .PP
@@ -736,7 +1268,8 @@ run by \fB-accept\fR and \fB-gone\fR:
 .IR RFB_SERVER_PORT ,
 .IR RFB_X11VNC_PID ,
 .IR RFB_CLIENT_ID ,
-.IR RFB_CLIENT_COUNT
+.IR RFB_CLIENT_COUNT ,
+.IR RFB_MODE
 .SH "SEE ALSO"
 .IR vncviewer (1),
 .IR vncpasswd (1),
@@ -754,7 +1287,8 @@ run by \fB-accept\fR and \fB-gone\fR:
 .IR ipcrm (1),
 .IR http://www.tightvnc.com ,
 .IR http://www.realvnc.com ,
-.IR http://www.karlrunge.com/x11vnc/
+.IR http://www.karlrunge.com/x11vnc/ ,
+.IR http://www.karlrunge.com/x11vnc/#faq
 .SH AUTHORS
 x11vnc was written by Karl J. Runge <runge@karlrunge.com>,
 it is part of the LibVNCServer project <http://sf.net/projects/libvncserver>.

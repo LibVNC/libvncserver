@@ -1,0 +1,2187 @@
+#!/bin/sh
+# the next line restarts using wish. \
+exec wish "$0" "$@"
+catch {rename send {}}
+#
+# Copyright (c) 2004 Karl J. Runge <runge@karlrunge.com>
+# All rights reserved.
+#
+#  This is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  This software is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this software; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
+#  USA.
+
+#
+# tkx11vnc v0.1
+# This is a simple frontend to x11vnc.  It uses the remote control
+# and query features (-remote/-query aka -R/-Q) to interact with it. 
+# It is just a quick-n-dirty hack (it parses -help output, etc), but
+# it could be of use playing with or learning about the (way too) many
+# parameters x11vnc has.
+# 
+# It can be used to interact with a running x11vnc (see the x11vnc
+# -gui option), or to set the parameters and then start up x11vnc.  
+# 
+
+#
+# Below is a simple picture of how the gui should be laid out and how
+# the menus should be organized.  Most menu items correspond to remote
+# control commands. A trailing ":" after the item name means it is a string
+# to be set rather than a boolean that can be toggled (e.g. the entry
+# box must be used).
+#
+# Some tweak options may be set in the prefix "=" string.
+#	A means it is an "Action" (not a true variable)
+#	R means it is an action only valid in remote mode.
+#	S means it is an action only valid in startup mode.
+#	Q means it is an action worth querying after running.
+#	D means it is a good idea to delay a little before querying 
+#	  (i.e. perhaps it causes x11vnc to do a lot of work, new fb)
+#	P means the string can be +/- appended/deleted (string may not
+#         be the same after the remote command)
+#	G means gui internal item
+#	F means can be set via file browse
+#	-C:val1,... means it will be a checkbox (radio button)
+#	   the "-" means no other options follow
+#	0 means to skip the item.
+#	-- means add a separator
+#
+proc set_template {} {
+	global template
+	set template "
+Row: Actions   Clients   Permissions  Keyboard    Pointer  Help
+Row: Displays  Screen    Tuning       Debugging   Misc
+
+Actions
+	=SA start
+	=RA stop
+	=GA attach
+	=RA detach
+	--
+	=RA ping
+	=RA update-all
+	=GA clear-all
+	--
+	=GA Quit 
+
+Help
+	=GA gui
+	=GA all
+
+Clients
+	=RQA current:
+	=F   connect:
+	=RQA disconnect:
+	--
+	accept:
+	gone:
+	vncconnect
+	--
+	=F httpdir:
+	httpport:
+	enablehttpproxy
+
+Displays
+	display:
+	=F auth:
+	desktop:
+	rfbport:
+	=0 gui:
+
+Screen
+	=DRA refresh
+	=DRA reset
+	=DRA blacken
+	--
+	=D id:
+	=D sid:
+	=D scale:
+	--
+	=D overlay
+	overlay_nocursor
+	--
+	=D visual:
+	flashcmap
+	notruecolor
+	--
+	=DP blackout:
+	=D  xinerama
+	--
+	= xrandr
+	=-C:resize,newfbsize,exit xrandr_mode:
+	padgeom:
+
+Keyboard
+	norepeat
+	add_keysyms
+	modtweak
+	xkb
+	skip_keycodes:
+	--
+	=FP remap:
+	--
+	clear_mods
+	clear_keys
+
+Pointer
+	=-C:none,arrow,X,some,most cursor:
+	noxfixes
+	--
+	cursorpos
+	nocursorshape
+	--
+	buttonmap:
+	--
+	xwarppointer
+
+Misc
+	=F rc:
+	norc
+	--
+	nofb
+	--
+	nobell
+	nosel
+	noprimary
+	--
+	bg
+	=-C:ignore,exit sigpipe:
+	=0 inetd
+	--
+	=RA remote-cmd:
+	=GA all-settings
+
+Debugging
+	debug_pointer
+	debug_keyboard
+	=F logfile:
+	quiet
+	--
+	=G debug_gui
+
+Permissions
+	=RQA lock
+	=RQA unlock
+	=SQA deny_all
+	--
+	=FP allow:
+	localhost
+	=RA allowonce:
+	--
+	viewonly
+	shared
+	forever
+	--
+	=RA noremote
+	--
+	alwaysshared
+	nevershared
+	dontdisconnect
+	--
+	viewpasswd:
+	=F passwdfile:
+	=0 storepasswd
+	=F rfbauth:
+	passwd:
+	--
+	safer
+	unsafe
+
+Tuning
+	=-C:1,2,3,4 pointer_mode:
+	input_skip:
+	nodragging
+	--
+	=D noshm
+	flipbyteorder
+	onetile
+	--
+	wait:
+	defer:
+	nap
+	screen_blank:
+	--
+	fs:
+	gaps:
+	grow:
+	fuzz:
+	--
+	threads
+	rfbwait:
+	--
+	progressive:
+"
+}
+
+proc set_internal_help {} {
+	global helptext helpall
+
+	# set some internal item help here:
+	set helptext(start) "
+Launch x11vnc with the settings you have prescribed in the gui.
+The x11vnc process is started in an xterm window so you can see the
+output, kill it, etc.
+"
+
+	set helptext(debug_gui) "
+Set debug_gui to get more output printed in the text area.
+"
+
+	set helptext(detach) "
+No longer be associated with the x11vnc server.  Switch to non-connected
+state.
+"
+
+	set helptext(attach) "
+Attach to the x11vnc server, if possible.  Switches to connected state
+if successful.  To change or set the X display use \"Displays -> display\"
+"
+
+	set helptext(ping) "
+Check if x11vnc still responds to \"ping\" remote command.
+"
+
+	set helptext(update-all) "
+Query the x11vnc server for the current values of all variables.
+Populate the values into the gui's database.
+"
+
+	set helptext(clear-all) "
+Forget any variable settings either entered in by you or retrieved
+from a running x11vnc server.  Basically sets everything to 0 or
+the string (unset).
+"
+
+	set helptext(all-settings) "
+Displays the gui's database of all of the x11vnc server's current
+settings.  Use \"Actions -> update-all\"  or \"Control+R\" to
+refresh this list if it ever gets out of sync.
+"
+
+	set helptext(remote-cmd) "
+Run a remote command (-R) or query (-Q) directly.  Only a few
+remote commands are not on a menu, but for those few you can
+run the command directly this way.  Just enter the command into
+the Entry box when prompted.  Use the prefix \"Q:\" to indicate
+a -Q query.  Examples: \"zero:20,20,100,100\", \"Q:ext_xfixes\"  
+"
+
+	set helptext(Quit) "
+Terminate the tkx11vnc gui.  Any x11vnc servers will be left running.
+"
+
+	set helptext(current) "
+Shows a menu of currently connected VNC clients on the x11vnc server.
+
+Allows you to find more information about them or disconnect them.
+You will be prompted to confirm any disconnections.
+"
+
+	set helptext(xrandr_mode) "
+Set the -xrandr mode value.
+"
+
+	set helptext(all) $helpall
+
+	set helptext(gui) "
+tkx11vnc is a simple frontend to x11vnc.  Nothing fancy, it merely
+provides an interface to each of the many x11vnc command line options and
+remote control commands.  See \"Help -> all\" for much info about x11vnc.
+
+Most menu items have a (?) button one can click on to get more information
+about the option or command.  In most cases it will be text extracted
+from that in \"Help -> all\".
+
+There are two states tkx11vnc can be in:
+
+	1) Available to control a running x11vnc process.
+	2) Getting ready to start a x11vnc process.
+
+In state 1) the Menu items available in the menus are those that
+correspond to the x11vnc \"remote control\" commands.  See the -remote
+entry under \"Help -> all\" for a complete list.  Also available is
+the \"Actions -> stop\" item to shut down the running x11vnc server,
+thereby changing to state 2).  One could also simply \"Actions -> detach\"
+leaving the x11vnc server running.  \"Actions -> attach\" would
+reestablish the connection.
+
+In state 2) the Menu items available in the menus (Actions, Clients,
+etc.) are those that correspond to command line options used in starting
+an x11vnc process, and the \"Actions -> start\" item executes
+x11vnc thereby changing to state 1).  To see what x11vnc startup command
+you have built so far, look at the (?) help for  \"Actions -> start\"
+and it will show you what the command looks like.
+
+There is much overlap between the menu items available in state 1)
+and state 2), but it is worth keeping in mind it is not 100%.
+For example, you cannot set passwords or password files in state 1).
+
+Also note that there may be *two* separate X displays involved, not just
+one:  1) the X display x11vnc will be polling (and making available to
+VNC viewers), and 2) the X display this GUI is intended to display on.
+For example, one might use ssh to access the remote machine where the
+GUI would display on :11 and x11vnc would poll display :0.
+
+
+GUI components: 
+--- ----------
+
+At the top of the gui is a info text label where information will
+be posted, e.g. when traversing menu items text indicating how to get
+help on the item and its current value will be displayed.
+
+Below the info label is the area where the menu buttons, Actions,
+Clients, etc., are presented.  If a menu item has a checkbox,
+it corresponds to a boolean on/off variable.  Otherwise it is
+either a string variable, or an action not associated with a
+variable (for the most part).
+
+Below the menu button area is a text label indicating the current x11vnc
+X display being polled and the corresponding VNC display name.  Both
+will be \"(*none*)\" when there is no connection established.
+
+Below the x11 and vnc displays text label is a text area there scrolling
+information about actions being taken and commands being run is displayed.
+To scroll use PageUp/PageDown or the arrow keys.
+
+At the bottom is an entry area.  When one selects a menu item that
+requires supplying a string value, the label will be set to the
+parameter name and one types in the new value.  Then one presses the
+\"OK\" button or presses \"Enter\" to set the value.  Or you can press
+\"Skip\" or \"Escape\" to avoid changing the variable.  Some variables
+are boolean toggles (for example, \"Permissions -> viewonly\") or Radio
+button selections.  Selecting these menu items will not activate the
+entry area but rather toggle the variable directly.
+
+Cascades: There is a bug not yet worked around for the cascade menus
+where the (?) help button gets in the way.  To get the mouse over to
+the cascade menu click and release mouse to activate the cascade, then
+you can click on its items.  Dragging with a mouse button held down
+will not work (sorry).
+
+Key Bindings:
+
+	In the Text Area: Control-/ selects all of the text.
+	Anywhere: Control-d invokes \"Actions -> detach\"
+	Anywhere: Control-a invokes \"Actions -> attach\"
+	Anywhere: Control-p invokes \"Actions -> ping\"
+	Anywhere: Control-u and Control-r invoke \"Actions -> update-all\"
+
+"
+}
+
+proc center_win {w} {
+	wm withdraw $w
+	set x [expr [winfo screenwidth  $w]/2 - [winfo reqwidth  $w]/2];
+	set y [expr [winfo screenheight $w]/2 - [winfo reqheight $w]/2];
+	wm geom $w +$x+$y
+	wm deiconify $w
+	update
+}
+
+proc textwidth {text} {
+	set min 0;
+	foreach line [split $text "\n"] {
+		set n [string length $line]
+		if {$n > $min} {
+			set min $n
+		}
+	}
+	return $min
+}
+
+proc textheight {text} {
+	set count 0;
+	foreach line [split $text "\n"] {
+		incr count
+	}
+	return $count
+}
+
+proc make_toplevel {w {title ""}} {
+	catch {destroy $w}
+	toplevel  $w;
+	bind $w <Escape> "destroy $w"
+	if {$title != ""} {
+		wm title $w $title
+	}
+}
+
+proc textwin {name title text} {
+	global max_text_height max_text_width
+	global bfont
+
+	set width  [textwidth $text]
+	incr width
+	if {$width > $max_text_width} {
+		set width $max_text_width
+	}
+	set height [textheight $text]
+	if {$height > $max_text_height} {
+		set height $max_text_height
+	}
+
+	set w ".text_$name"
+	make_toplevel $w $title
+
+	frame     $w.f -bd 0;
+	pack      $w.f -fill both -expand 1
+	text      $w.f.t -width $width -height $height -setgrid 1 -bd 2 \
+			-yscrollcommand "$w.f.y set" -relief ridge -font fixed;
+	scrollbar $w.f.y -orient v -relief sunken -command "$w.f.t yview";
+	button    $w.f.b -text "Dismiss" -command "destroy $w" -font $bfont
+
+	$w.f.t insert 1.0 $text;
+
+	bind $w <Enter> "focus $w.f.t"
+
+	wm withdraw $w
+	pack $w.f.b -side bottom -fill x 
+	pack $w.f.y -side right -fill y;
+	pack $w.f.t -side top -fill both -expand 1;
+	update
+
+	center_win $w
+}
+
+proc active_when_connected {item} {
+	global helpremote helptext
+
+	if {[opt_match G $item]} {
+		return 1
+	} elseif {[is_action $item]} {
+		if {[opt_match R $item]} {
+			return 1
+		} else {
+			return 0
+		}
+	} elseif {[info exists helpremote($item)]} {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+proc active_when_starting {item} {
+	global helpremote helptext
+
+	if {[opt_match G $item]} {
+		return 1
+	} elseif {[is_action $item]} {
+		if {[opt_match S $item]} {
+			return 1
+		} else {
+			return 0
+		}
+	} elseif {[info exists helptext($item)]} {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+proc help_win {item} {
+	global helptext helpremote
+	global query_ans query_aro;
+
+	set ok 0
+	set text "Help on $item:\n\n"
+
+	if {[is_gui_internal $item]} {
+		;
+	} elseif {[is_action $item]} {
+		append text "    + Is a remote control Action (cannot be set).\n";
+	} elseif {[active_when_connected $item]} {
+		append text "    + Can be changed in a running x11vnc.\n";
+	} else {
+		append text "    - Cannot be changed in a running x11vnc.\n";
+	}
+	if {[is_gui_internal $item]} {
+		;
+	} elseif {[active_when_starting $item]} {
+		append text "    + Can be set at x11vnc startup.\n";
+	} else {
+		append text "    - Cannot be set at x11vnc startup.\n";
+	}
+	append text "\n"
+
+	if {[info exists helptext($item)]} {
+		append text "\n"
+		if {[is_gui_internal $item]} {
+			append text "==== x11vnc help: ====\n";
+		} else {
+			append text "==== x11vnc startup option help: ====\n";
+		}
+		append text "\n"
+		append text $helptext($item)
+		append text "\n"
+		set ok 1
+	}
+
+	if {[info exists helpremote($item)]} {
+		append text "\n"
+		append text "==== x11vnc remote control help: ====\n";
+		append text "\n"
+		append text $helpremote($item)
+		set ok 1
+	}
+
+	if {$item == "start"} {
+		set str [get_start_x11vnc_txt]
+		append text $str
+		append_text "$str\n"
+	}
+
+	regsub -all { } $item " " name
+
+	if {$ok} {
+		textwin $name "x11vnc help: $item" "$text";
+	}
+	return $ok
+}
+
+proc parse_help {} {
+	global env x11vnc_prog;
+	global helpall helptext;
+
+	set helppipe [open "| $x11vnc_prog -help" "r"];
+	if {$helppipe == ""} {
+		puts stderr "failed to run $x11vnc_prog -help";
+		exit 1;
+	}
+
+	set sawopts 0;
+	set curropt "";
+	while {[gets $helppipe line] > -1} {
+		append helpall "$line\n"	
+
+		# XXX
+		if {[regexp {^Options:} $line]} {
+			set sawopts 1;
+			continue;
+		}
+		# XXX
+		if {[regexp {^These options} $line]} {
+			continue;
+		}
+
+		if {! $sawopts} {
+			continue;
+		}
+		if {[regexp {^-([A-z_][A-z_]*)} $line match name]} {
+			set allnames($name) 1;
+			if {"$curropt" != "no$name" && "no$curropt" != "$name"} {
+				set curropt $name;
+				set helptext($curropt) "$line\n";
+			} else {
+				append helptext($curropt) "$line\n";
+			}
+		} elseif {$curropt != ""} {
+			append helptext($curropt) "$line\n";
+		}
+	}
+	foreach name [array names allnames] {
+		if {[regexp {^no} $name]} {
+			regsub {^no} $name "" pair
+		} else {
+			set pair "no$name"
+		}
+		if {[info exists helptext($name)]} {
+			if ![info exists helptext($pair)] {
+				set helptext($pair) $helptext($name);
+			}
+		} elseif {[info exists helptext($pair)]} {
+			if ![info exists helptext($name)] {
+				set helptext($name) $helptext($pair);
+			}
+		}
+	}
+
+	set_internal_help
+}
+
+proc tweak_both {new old} {
+	tweak_help $new $old
+	tweak_remote_help $new $old
+}
+
+proc tweak_remote_help {new old} {
+	global helpremote
+	if ![info exists helpremote($new)] {
+		if {[info exists helpremote($old)]} {
+			set helpremote($new) $helpremote($old)
+		}
+	}
+}
+
+proc tweak_help {new old} {
+	global helptext
+	if ![info exists helptext($new)] {
+		if {[info exists helptext($old)]} {
+			set helptext($new) $helptext($old)
+		}
+	}
+}
+
+proc parse_remote_help {} {
+	global helpremote helptext help_indent remote_name;
+
+	set sawopts 0;
+	set curropt "";
+	set possopts "";
+	set offset [expr $help_indent - 1];
+	foreach line [split $helptext(remote) "\n"] {
+		
+		set line [string range $line $offset end];
+
+		# XXX
+		if {[regexp {^The following -remote/-R commands} $line]} {
+			set sawopts 1;
+			continue;
+		}
+		# XXX
+		if {[regexp {^The vncconnect.*command} $line]} {
+			set sawopts 0;
+		}
+
+		if {! $sawopts} {
+			continue;
+		}
+		if {[regexp {^([A-z_][A-z_:]*)} $line match name]} {
+			regsub {:.*$} $name "" popt
+			lappend possopts $popt
+			if {"$curropt" != "no$name" && "no$curropt" != "$name"} {
+				set curropt $name;
+				regsub {:.*$} $curropt "" curropt
+				set remote_name($curropt) $name
+				set helpremote($curropt) "$line\n";
+			} else {
+				append helpremote($curropt) "$line\n";
+			}
+		} elseif {$curropt != ""} {
+			append helpremote($curropt) "$line\n";
+		}
+	}
+
+	foreach popt $possopts {
+		if {[info exists helpremote($popt)]} {
+			continue
+		}
+		if {[regexp {^no} $popt]} {
+			regsub {^no} $popt "" try
+		} else {
+			set try "no$popt"
+		}
+		if {[info exists helpremote($try)]} {
+			set helpremote($popt) $helpremote($try)
+		}
+	}
+}
+
+proc parse_query_help {} {
+	global query_ans query_aro query_ans_list query_aro_list helptext;
+
+	set sawans 0;
+	set sawaro 0;
+	set ans_str ""
+	set aro_str ""
+
+	foreach line [split $helptext(query) "\n"] {
+
+		if {! $sawans && [regexp {^ *ans=} $line]} {
+			set sawans 1
+		}
+		if {! $sawans} {
+			continue
+		}
+
+		if {[regexp {^ *aro=} $line]} {
+			set sawaro 1
+		}
+		if {$sawaro && [regexp {^[ 	]*$} $line]} {
+			set sawans 0
+			break
+		}
+
+		regsub {ans=} $line "" line
+		regsub {aro=} $line "" line
+		set line [string trim $line]
+
+		if {$sawaro} {
+			set aro_str "$aro_str $line"
+		} else {
+			set ans_str "$ans_str $line"
+		}
+	}
+
+	regsub -all {  *} $ans_str " " ans_str
+	regsub -all {  *} $aro_str " " aro_str
+
+	set ans_str [string trim $ans_str]
+	set aro_str [string trim $aro_str]
+	set query_ans_list [split $ans_str]
+	set query_aro_list [split $aro_str]
+
+	foreach item $query_ans_list {
+		if {[regexp {^[ 	]*$} $item]} {
+			continue
+		}
+		set query_ans($item) 1
+	}
+	foreach item $query_aro_list {
+		if {[regexp {^[ 	]*$} $item]} {
+			continue
+		}
+		set query_aro($item) 1
+	}
+}
+
+proc in_debug_mode {} {
+	global menu_var
+	if {![info exists menu_var(debug_gui)]} {
+		return 0
+	}
+	return $menu_var(debug_gui)
+}
+
+# Menubar utilities:
+proc menus_state {state} {
+	global menu_b
+
+	foreach case [array names menu_b] {
+		set menu_button $menu_b($case)
+		$menu_button configure -state $state
+	}
+}
+
+proc menus_enable {} {
+	menus_state "normal"
+}
+
+proc menus_disable {} {
+	menus_state "disabled"
+}
+
+# Entry box utilities:
+proc entry_state {x state} {
+	global entry_box entry_label entry_ok entry_help entry_skip entry_browse
+	if {$x == "all"} {
+		$entry_label  configure -state $state
+		$entry_box    configure -state $state
+		$entry_ok     configure -state $state
+		$entry_skip   configure -state $state
+		$entry_help   configure -state $state
+		$entry_browse configure -state $state
+	} elseif {$x == "label"} {
+		$entry_label  configure -state $state
+	} elseif {$x == "box"} {
+		$entry_box    configure -state $state
+	} elseif {$x == "ok"} {
+		$entry_ok     configure -state $state
+	} elseif {$x == "skip"} {
+		$entry_skip   configure -state $state
+	} elseif {$x == "help"} {
+		$entry_help   configure -state $state
+	} elseif {$x == "browse"} {
+		$entry_browse configure -state $state
+	}
+}
+
+proc entry_enable {{x "all"}} {
+	entry_state $x normal
+}
+
+proc entry_disable {{x "all"}} {
+	entry_state $x disabled
+}
+
+proc entry_browse_button {{show 1}} {
+	global entry_browse
+	if {$show} {
+		pack $entry_browse -side left
+	}  else {
+		pack forget $entry_browse
+	}
+}
+proc entry_focus {} {
+	global entry_box
+	focus $entry_box
+}
+proc entry_select {} {
+	global entry_box
+	$entry_box selection range 0 end
+}
+proc entry_get {} {
+	global entry_box
+	return [$entry_box get]
+}
+proc entry_insert {str} {
+	global entry_box
+	entry_delete
+	$entry_box insert end $str
+	$entry_box icursor end
+}
+proc entry_delete {} {
+	global entry_box
+	$entry_box delete 0 end
+}
+
+
+# Utilities for remote control and updating vars.
+
+proc push_new_value {item name new {query 1}} {
+	global menu_var always_update remote_output query_output
+	global delay_sleep extra_sleep extra_sleep_split
+
+	set debug [in_debug_mode]
+	set do_query_all 0
+	set getout 0
+
+	if {$item == "remote-cmd"} {
+		# kludge for arbitrary remote command:
+		if {[regexp {^Q:} $new]} {
+			# extra kludge for Q:var to mean -Q var
+			regsub {^Q:} $new "" new
+			set qonly 1
+		} else {
+			set qonly 0
+		}
+		# need to extract item from new:
+		set qtmp $new
+		regsub {:.*$} $qtmp "" qtmp
+		if {! $qonly} {
+			set rargs [list "-R" "$new"]
+			set qargs [list "-Q" "$qtmp"]
+			set getout 1
+		} else {
+			set rargs [list "-Q" "$qtmp"]
+			set qargs [list "-Q" "$qtmp"]
+		}
+
+	} elseif {[value_is_string $item]} {
+		set rargs [list "-R" "$name:$new"]
+		set qargs [list "-Q" "$name"]
+	} else {
+		set rargs [list "-R" "$name"]
+		set qargs [list "-Q" "$name"]
+	}
+
+	if {!$debug} {
+		append_text "x11vnc $rargs ..."
+	}
+	set remote_output [run_remote_cmd $rargs]
+
+	if {[lindex $rargs 0] == "-Q"} {
+		append_text "\t$remote_output"
+		set getout 1
+	} elseif {! $query && ! $always_update} {
+		set getout 1
+	} elseif {$item == "noremote"} {
+		set getout 1
+	} elseif {[is_action $item] && ![opt_match Q $item] && $rargs != ""} {
+		set getout 1
+	} elseif {[regexp {^(sid|id)$} $item] && ![regexp {^0x} $new]} {
+		set getout 1
+	}
+
+	if {$getout} {
+		append_text "\n"
+		return
+	}
+
+	stop_watch on
+	after $delay_sleep
+	if {[opt_match D $item]} {
+		set s [expr $extra_sleep/$extra_sleep_split] 
+		append_text " "
+		for {set i 0} {$i<$extra_sleep_split} {incr i} {
+			after $s
+			append_text "."
+			update
+		}
+	}
+	stop_watch off
+
+	if {!$debug} {
+		append_text ", -Q ..."
+	}
+
+	if {$item == "disconnect"} {
+		set new "N/A"
+		set do_query_all 1
+	}
+
+	if {$always_update || $do_query_all} {
+		set query [query_all 1]
+	} else {
+		set query [run_remote_cmd $qargs]
+	}
+	set query_output $query
+
+	if {![see_if_ok $query $item "$name:$new"]} {
+		# failed
+		if  {[regexp {^a..=} $query]} {
+			# but some result came back
+			if {! $always_update} {
+				# synchronize everything
+				set query_output [query_all 1]
+			}
+		} else {
+			# server may be dead
+			if {$item != "ping" && $item != "attach"} {
+				try_connect
+			}
+		}
+	} else {
+		# succeeded
+		if {! $always_update} {
+			# synchronize this variable
+			update_menu_vars $query
+		} else {
+			# already done in query_all
+		}
+	}
+}
+
+# For updating a string variable.   Also used for simple OK/Skip dialogs
+# with entry = 0.
+proc entry_dialog {item {entry 1}} {
+	global menu_var entry_str entry_set entry_dialog_item
+	global unset_str connected_to_x11vnc
+
+	set entry_str "Set $item"
+	set entry_set 0
+	set entry_dialog_item $item
+
+	entry_enable
+	menus_disable
+
+	if {$entry} {
+		entry_insert ""
+		if {[info exists menu_var($item)] &&
+		    $menu_var($item) != $unset_str} {
+			entry_insert $menu_var($item)
+			entry_select
+		}
+
+		if {[is_browse $item]} {
+			entry_browse_button
+		}
+		set_info "Set parameter in entry box, "
+		entry_focus
+	} else {
+		entry_disable box
+	}
+
+	update
+
+	# wait for user reply:
+	vwait entry_set
+
+	set rc $entry_set
+	set entry_set 0
+
+	set value [entry_get]
+	update
+
+	entry_browse_button 0
+	set entry_str "Set... :"
+
+	entry_delete
+	entry_disable
+	menus_enable
+	update
+
+	if {! $entry} {
+		;
+	} elseif {$rc} {
+		set menu_var($item) $value
+	} else {
+		if {[in_debug_mode]} {
+			append_text "skipped setting $item\n"
+		}
+	}
+	return $rc
+}
+
+proc warning_dialog {msg {item "gui"} } {
+	append_text $msg
+	# just reuse the entry widgets for a yes/no dialog
+	return [entry_dialog $item 0]
+}
+
+# For updating a boolean toggle:
+proc check_var {item} {
+	global menu_var
+
+	set inval $menu_var($item);
+
+	if {$item == "debug_gui"} {
+		return "";
+	}
+
+	set rname $item
+	if {! $inval} {
+		if {[regexp {^no} $item]} {
+			regsub {^no} $rname "" rname
+		} else {
+			set rname "no$rname"
+		}
+	}
+	return $rname
+}
+
+proc see_if_ok {query item expected} {
+	set ok 0
+	set found ""
+	foreach q [split_query $query] {
+		if {[regexp "^$item:" $q]} {
+			set found $q
+		}
+		if {$q == $expected} {
+			set ok 1
+		}
+	}
+	if {$found == ""} {
+		set msg $query
+		regsub {^a..=} $msg {} msg
+		if {[string length $msg] > 60} {
+			set msg [string range $msg 0 60]
+		}
+	} else {
+		set msg $found
+	}
+	if {$ok} {
+		append_text "\tSet OK  ($msg)\n"
+		return 1
+
+	} elseif {[opt_match P $item] && [regexp {:(-|\+)} $expected]} {
+		# e.g. blackout:+30x30+20+20
+		append_text "\t($msg)\n"
+		return 1
+	} else {
+		append_text "\t*FAILED* $msg\n"
+		return 0
+	}
+}
+
+proc update_menu_vars {{query ""}} {
+	global all_settings menu_var
+
+	set debug [in_debug_mode]
+
+	if {$query == ""} {
+		set qstr $all_settings
+	} else {
+		set qstr $query
+	}
+	foreach piece [split_query $qstr] {
+		if {[regexp {^([^:][^:]*):(.*)$} $piece m0 item val]} {
+			if {[info exists menu_var($item)]} {
+				set old $menu_var($item)
+				if {$val == "N/A"} {
+					continue
+				}
+				if {$debug} {
+					puts "setting menuvar: $item: $old -> $val"
+				}
+				set menu_var($item) $val
+			}
+			if {$item == "clients"} {
+				update_clients_menu $val
+			}
+		}
+	}
+}
+
+proc clear_all {} {
+	global menu_var unset_str
+
+	set debug [in_debug_mode]
+	
+	foreach item [array names menu_var] {
+		if {$item == "debug_gui"} {
+			continue
+		}
+		if {[info exists menu_var($item)]} {
+			if [is_action $item] {
+				set menu_var($item) ""
+			} elseif {[value_is_bool $item]} {
+				set menu_var($item) 0
+			} elseif {[value_is_string $item]} {
+				set menu_var($item) $unset_str
+			}
+		}
+	}
+}
+
+proc all_query_vars {} {
+	global query_ans_list query_aro_list all_settings
+	
+	set qry ""
+	foreach item $query_ans_list {
+		if {$qry == ""} {
+			set qry $item
+		} else {
+			append qry ",$item"
+		}
+	}
+	foreach item $query_aro_list {
+		if {$qry == ""} {
+			set qry $item
+		} else {
+			append qry ",$item"
+		}
+	}
+	return $qry
+}
+
+proc query_all {{quiet 0}} {
+	global query_ans_list query_aro_list all_settings
+
+	set qry [all_query_vars]
+
+	#puts "into query_all $quiet"
+
+	set qargs [list "-Q" $qry]
+	set all [run_remote_cmd $qargs]
+
+	if {[regexp {ans=} $all]} {
+		if {! $quiet} {
+			append_text "Retrieved all settings.\n"
+		}
+		set all_settings $all
+		update_menu_vars $all
+	} else {
+		if {! $quiet} {
+			append_text "Failed to retrieve settings.\n"
+		}
+	}
+	return $all
+}
+
+proc set_info {str} {
+	global info_str
+	set info_str "$str"
+	update
+}
+
+proc append_text {str} {
+	global text_area
+	$text_area insert end $str
+	$text_area see end
+}
+
+proc show_all_settings {} {
+	global all_settings
+	set txt "\nRead-Write setting:\n\n"
+	foreach item [split_query $all_settings]  {
+		regsub {:} $item {: } item
+		append txt "  $item\n"
+		if {[regexp {noremote} $item]} {
+			append txt "\nRead-Only setting:\n\n"
+		}
+	}
+	textwin "Settings" "All Current Settings" $txt
+}
+
+proc set_connected {yesno} {
+	global connected_to_x11vnc
+	set orig $connected_to_x11vnc
+	
+	if {$yesno == "yes"} {
+		set connected_to_x11vnc 1
+	} else {
+		set connected_to_x11vnc 0
+		no_x11_display
+		no_vnc_display
+	}
+	if {$orig != $connected_to_x11vnc} {
+		set_widgets
+	}
+}
+
+proc detach_from_display {} {
+	global connected_to_x11vnc reply_xdisplay x11vnc_xdisplay
+	set str "Detaching from X display."
+	if {$reply_xdisplay != ""} {
+		set str "Detaching from $reply_xdisplay."
+	} elseif {$x11vnc_xdisplay != ""} {
+		set str "Detaching from $x11vnc_xdisplay."
+	}
+	if {$connected_to_x11vnc} {
+		append_text "$str\n"
+	}
+	set_connected no
+}
+
+# Menu item is an action:
+proc do_action {item} {
+	global menu_var connected_to_x11vnc
+
+	if {[in_debug_mode]} {
+		append_text "action: \"$item\"\n"
+	}
+
+	if {$item == "ping"} {
+		try_connect
+		return
+	} elseif {$item == "start"} {
+		start_x11vnc
+		return
+	} elseif {$item == "detach"} {
+		detach_from_display
+		return
+	} elseif {$item == "attach"} {
+		try_connect_and_query_all
+		return
+	} elseif {$item == "update-all"} {
+		query_all
+		return
+	} elseif {$item == "clear-all"} {
+		clear_all
+		return
+	} elseif {$item == "all-settings"} {
+		show_all_settings
+		return
+	}
+
+	if {[value_is_string $item]} {
+		if {! [entry_dialog $item]} {
+			return
+		}
+		set new $menu_var($item)
+		set name $item
+	} else {
+		set new 1
+		set name $item
+	}
+
+	if {! $connected_to_x11vnc} {
+		;
+	} elseif {[regexp {^(stop|quit|exit|shutdown)$} $item]} {
+		# just do -R
+		append_text "stopping remote x11vnc server...\n"
+		push_new_value $item $name $new 0
+		set_connected no
+		
+	} elseif [opt_match Q $item] {
+		push_new_value $item $name $new 1
+	} else {
+		push_new_value $item $name $new 0
+	}
+}
+
+proc do_var {item} {
+	global connected_to_x11vnc item_cascade menu_var
+
+	set string 0
+	if {[is_action $item]} {
+		# Menu item is action:
+		do_action $item
+		return
+	}
+
+	if {[value_is_string $item]} {
+		# Menu item is a string:
+		if {$item_cascade($item) != ""} {
+			# Cascade sets variable automatically
+		} else {
+			# Otherwise Entry box
+			if {![entry_dialog $item]} {
+				return
+			}
+		}
+		set new $menu_var($item)
+		set name $item
+	} else {
+		# Menu item is a boolean:
+		set name [check_var $item]
+		if {$name == ""} {
+			return
+		}
+		set new 1
+	}
+	if {$connected_to_x11vnc} {
+		push_new_value $item $name $new 1
+	}
+}
+
+proc menu_help {item} {
+	if ![help_win $item] {
+		textwin "nohelp" "No help available" \
+			"Sorry, no help avaiable for \"$item\""
+	}
+}
+
+proc opt_match {c item} {
+	global item_opts
+	if {[info exists item_opts($item)]} {
+		if {[regexp "^\[A-z\]*$c" $item_opts($item)]} {
+			return 1
+		}
+	}
+	return 0
+}
+
+proc is_action {item} {
+	return [opt_match A $item]
+}
+
+proc is_gui_internal {item} {
+	return [opt_match G $item]
+}
+
+proc is_browse {item} {
+	return [opt_match F $item]
+}
+
+proc value_is_string {item} {
+	global item_bool
+	if {! $item_bool($item)} {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+proc value_is_bool {item} {
+	global item_bool
+	if {$item_bool($item)} {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+proc split_query {query} {
+	regsub -all {aro=} $query {ans=} query
+	set items {}
+	while {1} {
+		if {! [regexp {^ans=(.*)$} $query m0 m1]} {
+			break
+		}
+		set item $m1
+		set m2 ""
+		regexp {,ans=.*$} $item m2
+		regsub {,ans=.*$} $item "" item
+		if {$item != ""} {
+			lappend items $item
+		}
+		set query $m2
+		regsub {^,} $query "" query
+	}
+	return $items
+}
+
+proc set_x11_display {name} {
+	global x11_display
+	set x11_display "x11vnc X display: $name"
+}
+proc set_vnc_display {name} {
+	global vnc_display
+	set vnc_display "VNC display: $name"
+}
+proc no_x11_display {} {
+	set_x11_display "(*none*)"
+}
+proc no_vnc_display {} {
+	set_vnc_display "(*none*)"
+}
+proc fetch_displays {} {
+
+	set qargs [list "-Q" "display,vncdisplay"]
+	set result [run_remote_cmd $qargs]
+
+	set got_x11 0
+	set got_vnc 0
+
+	foreach item [split_query $result] {
+		if {[regexp {^display:(.*)$} $item m0 m1]} {
+			set_x11_display $m1
+			set got_x11 1
+		} elseif {[regexp {^vncdisplay:(.*)$} $item m0 m1]} {
+			set_vnc_display $m1
+			set got_vnc 1
+		}
+	}
+	if {! $got_x11} {
+		no_x11_display
+	}
+	if {! $got_vnc} {
+		no_vnc_display
+	}
+}
+
+proc disconnect_dialog {client} {
+	set cid ""
+	set host ""
+	set msg "\n"
+	append msg "*** Client info string: $client\n"
+	if {[regexp {^(.*):(.*)/(.*)-(.*)$} $client m0 m1 m2 m3 m4]} {
+		if {$m4 == "ro"} {
+			set view "(viewonly)"
+		} else {
+			set view "(interactive)"
+		}
+		set host $m1
+		set cid $m3
+		append msg "*** Host: $m1, Port: $m2 Id: $m3  $view\n"
+	}
+	if {$cid == ""} {
+		append_text "Invalid client info string: $client\n"
+		return
+	}
+	append msg "*** To disconnect this client press \"OK\", otherwise press \"Skip\"\n"
+	bell
+	if [warning_dialog $msg "current"] {
+		push_new_value "disconnect" "disconnect" $cid 1
+	} else {
+		append_text "disconnect cancelled.\n"
+	}
+}
+
+proc update_clients_menu {list} {
+	global item_cascade
+	set subm $item_cascade(current);
+	catch {destroy $subm}
+	menu $subm -tearoff 0
+	$subm add command
+	$subm add separator
+	set count 0
+	foreach client [split $list ","] {
+		regsub {:[0-9][0-9]*/} $client {/} lab
+		$subm add command -label "$client" \
+			-command "disconnect_dialog $client"
+		incr count
+	}
+	$subm entryconfigure 0 -label "#clients: $count"
+}
+
+proc set_widgets {} {
+	global connected_to_x11vnc item_case item_entry menu_m
+
+	foreach item [array names item_case] {
+		set case $item_case($item)
+		set menu $menu_m($case)
+		set entry $item_entry($item)
+		set type [$menu type $entry]
+		if {$type == "separator" || $type == "tearoff"} {
+			continue
+		}
+		if {$connected_to_x11vnc} {
+			if {[active_when_connected $item]} {
+				$menu entryconfigure $entry -state normal
+			} else {
+				$menu entryconfigure $entry -state disabled
+			}
+		} else {
+			if {[active_when_starting $item]} {
+				$menu entryconfigure $entry -state normal
+			} else {
+				$menu entryconfigure $entry -state disabled
+			}
+		}
+	}
+}
+
+proc make_widgets {} {
+	global template 
+	global menu_b menu_m
+	global item_opts item_bool item_case item_entry menu_var unset_str
+	global item_cascade
+	global info_str x11_display vnc_display
+	global text_area
+	global entry_box entry_str entry_set entry_label entry_ok entry_browse
+	global entry_help entry_skip
+	global bfont
+	global helptext helpremote helplabel
+
+set v 0
+	
+	label .info -textvariable info_str -bd 2 -relief groove -anchor w 
+	pack .info -side top -fill x 
+
+	# Extract the Rows:
+	set row 0;
+	set colmax 0;
+	foreach line [split $template "\n"] {
+		if {[regexp {^Row: (.*)} $line rest]} {
+			set col 0
+			foreach case [split $rest] {
+				if {$case == "" || $case == "Row:"} {
+					continue
+				}
+				set menu_row($case) $row
+				set menu_col($case) $col
+				set menu_count($case) 0
+
+				lappend cases($col) $case;
+				set len [string length $case]
+				if {[info exists max_len($col)]} {
+					if {$len > $max_len($col)} {
+						set max_len($col) $len
+					}
+				} else {
+					set max_len($col) $len
+				}
+				incr col
+				if {$col > $colmax} {
+					set colmax $col
+				}
+			}
+			incr row;
+		}
+	}
+
+	# Make frames for the rows and make the menu buttons.
+	set f ".menuframe"
+	frame $f
+	for {set c 0} {$c < $colmax} {incr c} {
+		set colf "$f.menuframe$c"
+		frame $colf
+		pack $colf -side left -fill y
+		set fbg [$colf cget -background]
+		foreach case $cases($c) {
+			set menub "$colf.menu$case";
+			set menu "$colf.menu$case.menu";
+			set menu_b($case) $menub
+			set menu_m($case) $menu
+			menubutton $menub -text "$case" -underline 0 \
+				-anchor w -menu $menu -background $fbg \
+				-font $bfont
+			pack $menub -side top -fill x
+			menu $menu -tearoff 0
+		}
+	}
+	pack $f -side top -fill x
+
+	# Now extract the menu items:
+	set case "";
+	foreach line [split $template "\n"] {
+		if {[regexp {^Row:} $line]} {
+			continue
+		}
+		if {[regexp {^[A-z]} $line]} {
+			set case [string trim $line]
+			continue;
+		}
+		set item [string trim $line]
+		regsub -all {  *} $item " " item
+		if {$item == ""} {
+			continue;
+		}
+		set opts ""
+		if {[regexp {^=} $item]} {
+			set opts [lindex [split $item] 0]
+			regsub {^=} $opts "" opts
+			set item [lindex [split $item] 1]
+		}
+		if {[regexp {^0} $opts]} {
+			continue;
+		}
+		if {[regexp {:$} $item]} {
+			set bool 0
+		} else {
+			set bool 1
+		}
+		regsub {:$} $item {} item
+
+		set item_opts($item) $opts
+		set item_case($item) $case
+		set item_bool($item) $bool
+		set item_cascade($item) ""
+		set item_entry($item) $menu_count($case)
+
+if {$v} { puts "ITEM: $item - $opts - $case - $bool - $menu_count($case)" }
+
+		set mvar 0 
+		set m $menu_m($case)
+
+		# Create the menu items, its variables, etc., etc.
+
+		if {$item == "--"} {
+			$m add separator
+
+		} elseif {$item == "Quit"} {
+			# Quit item must shut us down:
+			$m add command -label "$item" -underline 0 \
+				-command {destroy .; exit 0}
+
+		} elseif {$case == "Help"} {
+			# Help is simple help:
+			$m add command -label "$item" \
+				-command "menu_help $item"
+
+		} elseif {$item == "current"} {
+			# Current clients cascade
+			set subm $m.cascade$menu_count($case)
+			set item_cascade($item) $subm
+			update_clients_menu ""
+			$m add cascade -label "$item" \
+				-menu $subm
+
+		} elseif {[is_action $item]} {
+			# Action
+			$m add command -label "$item" \
+				-command "do_var $item"
+			set menu_var($item) "";	# for convenience
+
+		} elseif {! $item_bool($item)} {
+			# String
+			if {[regexp -- {-C:(.*)} $item_opts($item) m0 m1]} {
+				# Radiobutton select
+				set subm $m.cascade$menu_count($case)
+				menu $subm -tearoff 0
+				foreach val [split $m1 ","] {
+					$subm add radiobutton -label "$val" \
+						-command "do_var $item" \
+						-value "$val" \
+						-variable menu_var($item)
+				}
+				$m add cascade -label "$item" \
+					-menu $subm
+				set item_cascade($item) $subm
+			} else {
+				# Arbitrary_string
+				$m add command -label "$item" \
+					-command "do_var $item"
+			}
+			set mvar 1
+
+		} else {
+			# Boolean
+			$m add checkbutton -label "$item" \
+				-command "do_var $item" \
+				-variable menu_var($item)
+			set menu_var($item) 0
+		}
+
+		incr menu_count($case)
+		if {$mvar} {
+			set menu_var($item) $unset_str
+		}
+	}
+
+	# Now make the litte "(?)" help buttons
+	foreach case [array names menu_m] {
+		if {$case == "Help"} {
+			continue;
+		}
+		set m $menu_m($case);
+		set n [$m index end]
+
+if {$v} { puts "$case end: $n" }
+
+		for {set i 0} {$i <= $n} {incr i} {
+			set type [$m type $i]
+			if {$type == "separator"} {
+				$m add separator
+			} elseif {$type == "tearoff"} {
+				continue;
+			} else {
+				set label [$m entrycget $i -label]
+				set str ""
+				if {[info exists helpremote($label)]} {
+					set str "(?)"
+				} elseif {[info exists helptext($label)]} {
+					set str "(?)"
+				}
+				$m add command -label $str \
+					-command "menu_help $label";
+
+if {$v} {
+	set ht ""; set hr ""
+	if {[info exists helptext($label)]} { set ht "YES" }
+	if {[info exists helpremote($label)]} { set hr "YES" }
+	puts "'$label'\tht='$ht' hr='$hr'"
+}
+
+				if {$str == ""} {
+					$m entryconfigure end -state disabled
+				}
+				set arg "$m,$i"
+				set helplabel($arg) $label
+				set j [$m index end]
+				set arg "$m,$j"
+				set helplabel($arg) $label
+			}
+			if {$i == 0} {
+				$m entryconfigure end -columnbreak 1
+			}
+		}
+	}
+
+	# Make the x11 and vnc display label bar:
+	set df .displayframe
+	frame $df -bd 1 -relief groove
+
+	set df_x11 "$df.xdisplay"
+	no_x11_display
+	label $df_x11 -textvariable x11_display -width 35 -anchor w
+
+	set df_vnc "$df.vdisplay"
+	no_vnc_display
+	label $df_vnc -textvariable vnc_display -width 35 -anchor w
+
+	pack $df_x11 $df_vnc -side left 
+	pack $df -side top -fill x
+
+	# text area
+	text .text -height 11 -relief ridge
+	set text_area .text
+	pack .text -side top -fill both -expand 1
+
+
+	set str "Click Help -> gui for overview."
+	append_text "\n$str\n\n"
+
+	# Make entry box stuff
+	set ef .entryframe
+	frame $ef -bd 1 -relief groove
+
+	# Label
+	set ef_label "$ef.label"
+	label $ef_label -textvariable entry_str -anchor w -font $bfont
+
+	set entry_str "Set... : "
+	set ef_entry "$ef.entry"
+	entry $ef_entry -relief sunken
+	bind $ef_entry <KeyPress-Return> {set entry_set 1}
+	bind $ef_entry <KeyPress-Escape> {set entry_set 0}
+
+	# OK button
+	set ef_ok "$ef.ok"
+	button $ef_ok -text OK -pady 1 -command {set entry_set 1} \
+		-font $bfont
+
+	# Skip button
+	set ef_skip "$ef.skip"
+	button $ef_skip -text Skip -pady 0 -command {set entry_set 0} \
+		-font $bfont
+
+	# Help button
+	set ef_help "$ef.help"
+	button $ef_help -text Help -pady 0 -command \
+		{menu_help $entry_dialog_item} -font $bfont
+
+	# Browse button
+	set ef_browse "$ef.browse"
+	button $ef_browse -text "Browse..." -pady 0 -font $bfont \
+		-command {entry_insert [tk_getOpenFile]} 
+
+	pack $ef_label -side left
+	pack $ef_entry -side left -fill x -expand 1
+	pack $ef_ok   -side right
+	pack $ef_skip -side right
+	pack $ef_help -side right
+	pack $ef -side bottom -fill x
+
+	set entry_ok $ef_ok
+	set entry_skip $ef_skip
+	set entry_help $ef_help
+	set entry_box $ef_entry
+	set entry_browse $ef_browse
+	set entry_label $ef_label
+	entry_disable
+
+	update
+	wm minsize . [winfo width .] [winfo height .]
+}
+
+proc menu_bindings {} {
+	bind Menu <<MenuSelect>> {
+#syntax hilite bug \
+MenuSelect>>
+		set n [%W index active]
+		set label "    "
+		if {$n != "none"} {
+			set str %W,$n
+			set which ""
+			if {[info exists helplabel($str)]} {
+				set vname [format %%-16s $helplabel($str)]
+				set label "Click (?) for help on: $vname"
+				set which $helplabel($str)
+			}
+			if {$which == ""} {
+				;
+			} elseif {[is_action $which]} {
+				if {[info exists menu_var($which)] 
+				    && $menu_var($which) != ""} {
+					set label "$label value: $menu_var($which)"
+				} else {
+					set label "$label (is action)"
+				}
+			} elseif {[info exists menu_var($which)]} {
+				set label "$label value: $menu_var($which)"
+			}
+		}
+		set_info $label
+	}
+}
+
+proc key_bindings {} {
+	global env
+	if {[info exists env(USER)] && $env(USER) == "runge"} {
+		# quick restart
+		bind . <Control-KeyPress-c> {exec $argv0 $argv &; destroy .}
+	}
+	bind . <Control-KeyPress-p> {try_connect_and_query_all}
+	bind . <Control-KeyPress-u> {query_all 0}
+	bind . <Control-KeyPress-r> {query_all 0}
+	bind . <Control-KeyPress-d> {detach_from_display}
+	bind . <Control-KeyPress-a> {try_connect_and_query_all}
+}
+
+proc stop_watch {onoff} {
+	global orig_cursor text_area entry_box
+
+	set widgets [list . $text_area $entry_box] 
+
+	if {$onoff == "on"} {
+		foreach item $widgets {
+			$item config -cursor {watch}
+		}
+	} else {
+		foreach item $widgets {
+			$item config -cursor {}
+		}
+	}
+	update
+}
+
+proc double_check_noremote {} {
+	set msg "\n\n"
+	append msg "WARNING: setting \"noremote\" will disable ALL remote control commands\n"
+	append msg "WARNING: (i.e. this gui will be locked out)  Do you really want to do this?\n"
+	append msg "WARNING: If so, press \"OK\", otherwise press \"Skip\"\n"
+	append msg "\n"
+	bell
+	return [warning_dialog $msg "noremote"]
+}
+
+proc double_check_start_x11vnc {} {
+	global hostname
+	set msg [get_start_x11vnc_txt]
+	append msg "\n"
+	append msg "*** To run the above command on machine \"$hostname\" to\n"
+	append msg "*** start x11vnc press \"OK\" otherwise press \"Skip\".\n"
+	return [warning_dialog $msg "start"]
+}
+
+proc get_start_x11vnc_txt {} {
+	set cmd [get_start_x11vnc_cmd]
+	set str [join $cmd]
+	set msg ""
+	append msg "\n"
+	append msg "==== The command built so far is: ====\n";
+	append msg "\n"
+	append msg "$str\n"
+	return $msg
+}
+
+proc get_start_x11vnc_cmd {} {
+	global menu_var unset_str x11vnc_prog
+
+	set xterm_cmd "xterm -iconic -geometry 80x35 -title x11vnc-console -e"
+
+	set cmd [split $xterm_cmd]
+
+	lappend cmd $x11vnc_prog
+
+	foreach item [lsort [array names menu_var]] {
+		if {![active_when_starting $item]} {
+			continue
+		}
+		if {[is_action $item]} {
+			continue
+		}
+
+		if {[value_is_bool $item]} {
+			if {[info exists menu_var($item)]} {
+				if {$menu_var($item)} {
+					lappend cmd "-$item"
+				}
+			}
+		} elseif {[value_is_string $item]} {
+			if {[info exists menu_var($item)]} {
+				if {$menu_var($item) != ""
+				    && $menu_var($item) != $unset_str} {
+					lappend cmd "-$item"
+					lappend cmd $menu_var($item)
+				}
+			}
+		}
+	}
+	lappend cmd "2>"
+	lappend cmd "/dev/null"
+	lappend cmd "&"
+	
+	return $cmd
+}
+
+proc start_x11vnc {} {
+	global menu_var unset_str
+	global x11vnc_prog x11vnc_xdisplay
+	global connected_to_x11vnc
+
+	if {$connected_to_x11vnc} {
+		append_text "\n"
+		append_text "WARNING: Still connected to an x11vnc server.\n"
+		append_text "WARNING: Use \"stop\" or \"detach\" first.\n"
+		return 0
+	}
+
+	if {![double_check_start_x11vnc]} {
+		return
+	}
+
+	set x11vnc_xdisplay ""
+	if {[info exists menu_var(display)]} {
+		if {$menu_var(display) != "" && $menu_var(display) != $unset_str} {
+			set x11vnc_xdisplay $menu_var(display)
+		}
+	}
+
+	set cmd [get_start_x11vnc_cmd]
+
+	set str [join $cmd]
+	regsub { -e} $str " -e \\\n   " str
+
+	if {0} {
+		puts "running: $str"
+		foreach word $cmd {
+			puts "   word: $word"
+		}
+	}
+
+	append_text "Starting x11vnc in an iconified xterm with command:\n"
+	append_text "  $str\n\n"
+	catch {[eval exec $cmd]}
+	after 500
+	try_connect_and_query_all 3
+}
+
+proc run_remote_cmd {opts} {
+	global menu_var x11vnc_prog x11vnc_cmdline x11vnc_xdisplay
+
+	set debug [in_debug_mode]
+
+	if {[lindex $opts 0] == "-R" && [lindex $opts 1] == "noremote"} {
+		set str [join $opts]
+		if ![double_check_noremote] {
+			append_text "skipping: x11vnc $str"
+			return ""
+		} else {
+			append_text "running: x11vnc $str (please do \"Actions -> detach\" to clean things up)\n"
+			append_text "subsequent -R/-Q commands should fail..."
+		}
+	}
+
+	set cmd ""
+
+	lappend cmd $x11vnc_prog;
+
+	if {$x11vnc_xdisplay != ""} {
+		lappend cmd "-display"
+		lappend cmd $x11vnc_xdisplay
+	}
+	foreach word $opts {
+		lappend cmd $word
+	}
+	lappend cmd "2>"
+	lappend cmd "/dev/null"
+
+if {0} {
+	set str [join $cmd]
+	puts "running: $str"
+	foreach word $cmd {
+		puts "   word: $word"
+	}
+}
+
+	set output ""
+	stop_watch on
+	catch {set output [eval exec $cmd]}
+	stop_watch off
+	if {$debug} {
+		append_text "output: $output\n"
+	}
+	return $output
+}
+
+proc try_connect_and_query_all {{n 2}} {
+	for {set i 0} {$i < $n} {incr i} {
+		if {$i > 0} {
+			after 500
+			append_text "trying again ...\n"
+		}
+		if {[try_connect]} {
+			query_all
+			break
+		}
+	}
+}
+
+proc try_connect {} {
+	global x11vnc_xdisplay connected_to_x11vnc reply_xdisplay
+	global menu_var unset_str
+
+	if {! $connected_to_x11vnc} {
+		if {[info exists menu_var(display)]} {
+			set d $menu_var(display)
+			if {$d != "" && $d != $unset_str && $d != $x11vnc_xdisplay} {
+				set x11vnc_xdisplay $menu_var(display)
+				append_text "Setting X display to: $x11vnc_xdisplay\n"
+			}
+		}
+	}
+
+	set_info "Pinging $x11vnc_xdisplay ..."
+	set rargs [list "-Q" "ping"]
+	set result [run_remote_cmd $rargs]
+
+	if {[regexp {^ans=ping:} $result]} {
+		regsub {^ans=ping:} $result {} reply_xdisplay
+		set msg "Connected to $reply_xdisplay"
+		set_info $msg
+		append_text "$msg\n"
+		set_connected yes
+		fetch_displays
+		return 1
+	} else {
+		set str "x11vnc server."
+		if {$x11vnc_xdisplay != ""} {
+			set str $x11vnc_xdisplay
+		}
+		set msg "No reply from $str"
+		set_info $msg
+		append_text "$msg\n"
+		set_connected no
+		return 0
+	}
+}
+
+############################################################################
+# main:
+
+global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
+global helpall helptext helpremote helplabel hostname;
+global all_settings reply_xdisplay always_update
+global max_text_height max_text_width
+global menu_var unset_str
+global bfont
+global connected_to_x11vnc
+global delay_sleep extra_sleep extra_sleep_split
+
+set unset_str "(unset)"
+set connected_to_x11vnc 0
+set max_text_height 40
+set max_text_width 90
+set bfont -adobe-helvetica-bold-r-*-*-*-120-*-*-*-*-*-*;
+set help_indent 24;
+set reply_xdisplay ""
+set all_settings "None so far."
+set always_update 1
+
+#set delay_sleep 500
+#set extra_sleep 1500
+set delay_sleep 350
+set extra_sleep 1000
+set extra_sleep_split 4
+
+if {"$argv" == "-spit"} {
+	set fh [open $argv0 r]
+	puts "/*"
+	puts " * tkx11vnc.h: generated by 'tkx11vnc -spit'"
+	puts " * Abandon all hope, ye who enter here..."
+	puts " * ...edit tkx11vnc instead."
+	puts " */"
+	puts "	char gui_code\[\] ="
+	while {[gets $fh line] > -1} {
+		regsub -all {\\} $line {\\\\} line
+		regsub -all {"} $line {\\"} line
+		puts "\"$line\\n\""
+	}
+	close $fh
+	puts ";"
+	exit 0
+}
+
+# Read environment for clues:
+if {[info exists env(X11VNC_PROG)]} {
+	set x11vnc_prog $env(X11VNC_PROG);
+} else {
+	set x11vnc_prog "x11vnc";
+}
+
+if {[info exists env(X11VNC_CMDLINE)]} {
+	set x11vnc_cmdline $env(X11VNC_CMDLINE);
+} else {
+	set x11vnc_cmdline "";
+}
+
+if {[info exists env(X11VNC_CONNECT)]} {
+	set x11vnc_connect 1
+} else {
+	set x11vnc_connect 0;
+}
+
+if {[info exists env(X11VNC_XDISPLAY)]} {
+	set x11vnc_xdisplay $env(X11VNC_XDISPLAY);
+	set x11vnc_connect 1
+
+} elseif {$argv != "" && [regexp {:[0-9]} $argv]} {
+	set x11vnc_xdisplay "$argv"
+	set x11vnc_connect 1
+
+} elseif {[info exists env(DISPLAY)]} {
+	set x11vnc_xdisplay $env(DISPLAY);
+} else {
+	set x11vnc_xdisplay ":0";
+}
+
+set hostname [exec uname -n]
+#puts [exec env]
+#puts "x11vnc_xdisplay: $x11vnc_xdisplay"
+
+set env(X11VNC_STD_HELP) 1
+
+# scrape the help output for the text and remote control vars:
+parse_help;
+parse_remote_help;
+parse_query_help;
+
+# tweaks to duplicate help text:
+tweak_remote_help lock deny
+tweak_remote_help unlock deny
+
+tweak_both quiet q
+tweak_help logfile o
+tweak_both xwarppointer xwarp
+tweak_both screen_blank sb
+
+set_template
+
+wm title . "tkx11vnc"
+make_widgets;
+
+menu_bindings;
+key_bindings;
+
+if {$x11vnc_connect} {
+	try_connect_and_query_all
+}
+set_widgets
+
+# main loop.
