@@ -1,5 +1,5 @@
 CFLAGS=-I.. -g -Wall
-LDADD = ../libvncserver.a
+LDADD = ../libvncserver/libvncserver.a
 
 if HAVE_LIBPTHREAD
 BACKGROUND_TEST=blooptest

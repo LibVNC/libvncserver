@@ -218,7 +218,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     rfbBool performSubstitutions = FALSE;
     char str[256+32];
 #ifndef WIN32
-    struct passwd *user = getpwuid(getuid());
+    char* user=getenv("USER");
 #endif
    
     cl.sock=rfbScreen->httpSock;
@@ -438,8 +438,8 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 		} else if (compareAndSkip(&ptr, "$USER")) {
 #ifndef WIN32
 		    if (user) {
-			WriteExact(&cl, user->pw_name,
-				   strlen(user->pw_name));
+			WriteExact(&cl, user,
+				   strlen(user));
 		    } else
 #endif
 			WriteExact(&cl, "?", 1);

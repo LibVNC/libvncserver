@@ -136,7 +136,9 @@ AC_SUBST(RPMSOURCEDIR)
 LDADD="-L.. -lvncserver"
 
 AC_CONFIG_FILES([Makefile
+                 libvncserver/Makefile
                  contrib/Makefile
+                 x11vnc/Makefile
                  examples/Makefile
 		 vncterm/Makefile
 		 classes/Makefile

@@ -1,3 +1,3 @@
 #define SRA_TEST
-#include "../rfbregion.c"
+#include "../libvncserver/rfbregion.c"
 

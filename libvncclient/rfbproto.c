@@ -1107,5 +1107,5 @@ JpegSetSrcManager(j_decompress_ptr cinfo, uint8_t *compressedData,
 #define usekey rfbUseKey
 #define cpkey rfbCPKey
 
-#include "../vncauth.c"
-#include "../d3des.c"
+#include "../libvncserver/vncauth.c"
+#include "../libvncserver/d3des.c"

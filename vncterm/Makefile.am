@@ -4,8 +4,8 @@ noinst_HEADERS=VNConsole.h vga.h
 
 CFLAGS_ADD=-I..
 
-LDADD=../libvncserver.a
-INCLUDES=-I. -I../include
+LDADD=../libvncserver/libvncserver.a
+INCLUDES=-I.
 
 if LINUX
 bin_PROGRAMS=LinuxVNC
