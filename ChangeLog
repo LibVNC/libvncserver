@@ -1,3 +1,9 @@
+2004-01-19  Karl Runge <runge@karlrunge.com>
+	* handle mouse button number mismatch
+	* improved pointer input handling during drags, etc.
+	* somewhat faster copy_tiles() -> copy_tiles()
+	* x11vnc options -buttonmap -old_pointer -old_copytile
+
 2004-01-16  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* compile fix for cygwin
 

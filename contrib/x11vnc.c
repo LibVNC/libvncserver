@@ -125,11 +125,13 @@ int subwin = 0;
 int indexed_colour = 0;
 
 XImage *tile;
+XImage **tile_row;		/* for all possible row runs */
 XImage *scanline;
 XImage *fullscreen;
 int fs_factor = 0;
 
 XShmSegmentInfo tile_shm;
+XShmSegmentInfo *tile_row_shm;	/* for all possible row runs */
 XShmSegmentInfo scanline_shm;
 XShmSegmentInfo fullscreen_shm;
 
@@ -182,9 +184,10 @@ int local_cursor = 1;		/* whether the viewer draws a local cursor */
 int show_mouse = 0;		/* display a cursor for the real mouse */
 int show_root_cursor = 0;	/* show X when on root background */
 int show_dragging = 1;		/* process mouse movement events */
-int delay_refresh = 0;		/* when buttons are pressed, delay refreshes */
-int ui_dropthru = 10;		/* see watchloop.  negative means ignore input */
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
+
+int old_pointer = 0;		/* use the old way of updating the pointer */
+int old_copytile = 0;		/* use the old way copy_tile() */
 
 int using_shm = 1;		/* whether mit-shm is used */
 int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
@@ -201,12 +204,13 @@ int take_naps = 0;
 int naptile = 3;	/* tile change threshold per poll to take a nap */
 int napfac = 4;		/* time = napfac*waitms, cut load with extra waits */
 int napmax = 1500;	/* longest nap in ms. */
+int ui_skip = 10;	/* see watchloop.  negative means ignore input */
 
 int nap_ok = 0, nap_diff_count = 0;
 time_t last_event, last_input;
 
 /* tile heuristics: */
-double fs_frac = 0.6;	/* threshold tile fraction to do fullscreen updates. */
+double fs_frac = 0.75;	/* threshold tile fraction to do fullscreen updates. */
 int use_hints = 1;	/* use the krfb scheme of gluing tiles together. */
 int tile_fuzz = 2;	/* tolerance for suspecting changed tiles touching */
 			/* a known changed tile. */
@@ -225,9 +229,15 @@ int count = 0;			/* indicates which scan pattern we are on  */
 
 int cursor_x, cursor_y;		/* x and y from the viewer(s) */
 int got_user_input = 0;
+int got_pointer_input = 0;
+int got_keyboard_input = 0;
+int scan_in_progress = 0;	
+int fb_copy_in_progress = 0;	
 int shut_down = 0;	
 
 int quiet = 0;
+double dtime(double *);
+
 #if defined(LIBVNCSERVER_X11VNC_THREADED) && ! defined(X11VNC_THREADED)
 #define X11VNC_THREADED
 #endif
@@ -266,12 +276,20 @@ void shm_delete(XShmSegmentInfo *);
 
 int exit_flag = 0;
 void clean_up_exit (int ret) {
+	int i;
 	exit_flag = 1;
 
 	/* remove the shm areas: */
 	shm_clean(&tile_shm, tile);
 	shm_clean(&scanline_shm, scanline);
 	shm_clean(&fullscreen_shm, fullscreen);
+
+	for(i=1; i<=ntiles_x; i++) {
+		shm_clean(&tile_row_shm[i], tile_row[i]);
+		if (old_copytile && i == 1) {
+			break;
+		}
+	}
 
 	X_LOCK;
 	XTestDiscard(dpy);
@@ -280,10 +298,17 @@ void clean_up_exit (int ret) {
 	exit(ret);
 }
 
+/*
+ * General problem handler
+ */
 void interrupted (int sig) {
+	int i;
 	if (exit_flag) {
+		exit_flag++;
 		if (use_threads) {
 			usleep2(250 * 1000);
+		} else if (exit_flag <= 2) {
+			return;
 		}
 		exit(4);
 	}
@@ -300,6 +325,18 @@ void interrupted (int sig) {
 	shm_delete(&tile_shm);
 	shm_delete(&scanline_shm);
 	shm_delete(&fullscreen_shm);
+
+	/* 
+	 * Here we have to clean up quite a few shm areas for all
+	 * the possible tile row runs (40 for 1280), not as robust
+	 * as one might like... sometimes need to run ipcrm(1). 
+	 */
+	for(i=1; i<=ntiles_x; i++) {
+		shm_clean(&tile_row_shm[i], tile_row[i]);
+		if (old_copytile && i == 1) {
+			break;
+		}
+	}
 	if (sig) {
 		exit(2);
 	}
@@ -308,10 +345,12 @@ void interrupted (int sig) {
 XErrorHandler   Xerror_def;
 XIOErrorHandler XIOerr_def;
 int Xerror(Display *d, XErrorEvent *error) {
+	X_UNLOCK;
 	interrupted(0);
 	return (*Xerror_def)(d, error);
 }
 int XIOerr(Display *d) {
+	X_UNLOCK;
 	interrupted(0);
 	return (*XIOerr_def)(d);
 }
@@ -339,6 +378,10 @@ void client_gone(rfbClientPtr client) {
 	}
 }
 
+/*
+ * Simple routine to limit access via string compare.  A power user will
+ * want to compile libvncserver with libwrap support and use /etc/hosts.allow.
+ */
 int check_access(char *addr) {
 	int allowed = 0;
 	char *p, *list;
@@ -361,7 +404,6 @@ int check_access(char *addr) {
 			allowed = 1;
 
 		} else if(!strcmp(p,"localhost") && !strcmp(addr,"127.0.0.1")) {
-			/* also do host lookup someday... */
 			allowed = 1;
 		}
 		p = strtok(NULL, ",");
@@ -370,6 +412,9 @@ int check_access(char *addr) {
 	return allowed;
 }
 
+/*
+ * libvncserver callback for when a new client connects
+ */
 enum rfbNewClientAction new_client(rfbClientPtr client) {
 	static accepted_client = 0;
 	last_event = last_input = time(0);
@@ -465,6 +510,10 @@ void DebugXTestFakeKeyEvent(Display* dpy, KeyCode keysym, Bool down, time_t cur_
 	XTestFakeKeyEvent(dpy,keysym,down,cur_time);
 }
 
+/*
+ * Uncomment the next line to aid in debugging keymapping problems.
+ */
+
 /* #define XTestFakeKeyEvent DebugXTestFakeKeyEvent */
 
 void tweak_mod(signed char mod, rfbBool down) {
@@ -538,7 +587,8 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr
 }
 
 /*
- * key event handler
+ * key event handler.  See the above functions for contortions for
+ * running under -modtweak.
  */
 static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
@@ -572,31 +622,187 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 		last_event = last_input = time(0);
 		got_user_input++;
+		got_keyboard_input++;
 	}
 
 	X_UNLOCK;
 }
 
 /*
- * pointer event handler
+ * pointer event handling routines.
+ */
+MUTEX(pointerMutex);
+#define MAX_BUTTONS 5
+int pointer_map[MAX_BUTTONS+1];
+int num_buttons = -1;
+char *pointer_remap = NULL;
+void update_pointer(int, int, int);
+
+void init_pointer(void) {
+	unsigned char map[MAX_BUTTONS];
+	int i;
+	/*
+	 * This routine counts the number of pointer buttons on the X
+	 * server (to avoid problems, even crashes, if a client has more
+	 * buttons).  And also initializes any pointer button remapping
+	 * from -buttonmap option.
+	 */
+	
+	X_LOCK;
+	num_buttons = XGetPointerMapping(dpy, map, MAX_BUTTONS);
+	X_UNLOCK;
+	if (num_buttons < 0) {
+		num_buttons = 0;
+	}
+
+	/* FIXME: should use info in map[] */
+	for (i=1; i<= MAX_BUTTONS; i++) {
+		pointer_map[i] = i;
+	}
+
+	if (pointer_remap) {
+		/* -buttonmap, format is like: 12-21:2 */
+		char *p, *q;	
+		int n;
+		if ((p = strchr(pointer_remap, ':')) != NULL) {
+			/* undocumented max button number */
+			n = atoi(p+1);	
+			if (n < num_buttons || num_buttons == 0) {
+				num_buttons = n;
+			}
+		}
+		if ((q = strchr(pointer_remap, '-')) != NULL) {
+			/*
+			 * The '-' separates the 'from' and 'to' lists,
+			 * then it is kind of like tr(1).  
+			 */
+			char str[2];
+			int from, to;
+			p = pointer_remap;
+			q++;
+			i = 0;
+			str[1] = '\0';
+			while (*p != '-') {
+				str[0] = *p;
+				from = atoi(str);
+				str[0] = *(q+i);
+				to   = atoi(str);
+				rfbLog("button remap: %d -> %d using: "
+				    "%s\n", from, to, pointer_remap);
+				pointer_map[from] = to;
+				p++;
+				i++;
+			}
+		}
+	}
+}
+
+/*
+ * Actual callback from libvncserver when it gets a pointer event.
  */
 static void pointer(int mask, int x, int y, rfbClientPtr client) {
-	int i;
 
 	if (view_only) {
 		return;
 	}
 
-	got_user_input++;
-
-	/* if any button is pressed, then do not refresh the screen */
-	if (! show_dragging) {
-		if (mask) {
-			delay_refresh = 1;
-		} else {
-			delay_refresh = 0;
-		}
+	if (num_buttons < 0) {
+		init_pointer();
 	}
+
+	if (mask >= 0) {
+		/*
+		 * mask = -1 is a special case call from scan_for_updates()
+		 * to flush the event queue; there is no real pointer event.
+		 */
+		got_user_input++;
+		got_pointer_input++;
+	}
+
+	/*
+	 * The following is hopefully an improvement wrt response during
+	 * pointer user input (window drags) for the threaded case.
+	 * See check_user_input() for the more complicated things we do
+	 * in the non-threaded case.
+	 */
+	if (use_threads && ! old_pointer) {
+#		define NEV 32
+		/* storage for the event queue */
+		static int mutex_init = 0;
+		static int nevents = 0;
+		static int ev[NEV][3];
+		int i;
+		/* timer things */
+		static double dt = 0.0, tmr = 0.0, maxwait = 0.4;
+
+		if (! mutex_init) {
+			INIT_MUTEX(pointerMutex);
+			mutex_init = 1;
+		}
+
+		LOCK(pointerMutex);
+
+		/* 
+		 * If the framebuffer is being copied in another thread
+		 * (scan_for_updates()), we will queue up to 32 pointer
+		 * events for later.  The idea is by delaying these input
+		 * events, the screen is less likely to change during the
+		 * copying period, and so will give rise to less window
+		 * "tearing".
+		 *
+		 * Tearing is not completely eliminated because we do
+		 * not suspend work in the other libvncserver threads.
+		 * Maybe that is a possibility with a mutex...
+		 */
+		if (fb_copy_in_progress && mask >= 0) {
+			/* 
+			 * mask = -1 is an all-clear signal from
+			 * scan_for_updates().
+			 *
+			 * dt is a timer in seconds; we only queue for so long.
+			 */
+			dt += dtime(&tmr);
+
+			if (nevents < NEV && dt < maxwait) {
+				i = nevents++;
+				ev[i][0] = mask;
+				ev[i][1] = x;
+				ev[i][2] = y;
+				UNLOCK(pointerMutex);
+				return;
+			}
+		}
+
+		/* time to send the queue */
+		for (i=0; i<nevents; i++) {
+			update_pointer(ev[i][0], ev[i][1], ev[i][2]);
+		}
+		if (nevents && dt > maxwait) {
+			X_LOCK;
+			XFlush(dpy);	
+			X_UNLOCK;
+		}
+		nevents = 0;	/* reset everything */
+		tmr = 0.0;
+		dt = 0.0;
+		dtime(&tmr);
+
+		UNLOCK(pointerMutex);
+	}
+	if (mask < 0) {		/* -1 just means flush the event queue */
+		return;
+	}
+
+	/* update the X display with the event: */
+	update_pointer(mask, x, y);
+}
+
+/*
+ * Send a pointer event to the X server.
+ */
+
+void update_pointer(int mask, int x, int y) {
+	int i, mb;
 
 	X_LOCK;
 
@@ -607,25 +813,40 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 
 	last_event = last_input = time(0);
 
-	for (i=0; i < 5; i++) {
+	for (i=0; i < MAX_BUTTONS; i++) {
+		/* look for buttons that have be clicked or released: */
 		if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
-			XTestFakeButtonEvent(dpy, i+1, 
+			mb = pointer_map[i+1];
+			if (num_buttons && mb > num_buttons) {
+				rfbLog("ignoring mouse button out of bounds: %d"
+				    ">%d mask: 0x%x -> 0x%x\n", mb, num_buttons,
+				    button_mask, mask);
+				continue;
+			}
+			XTestFakeButtonEvent(dpy, mb, 
 			    (mask & (1<<i)) ? True : False, CurrentTime);
 		}
 	}
 
 	if (nofb) {
+		/* 
+		 * nofb is for, e.g. Win2VNC, where fastest pointer
+		 * updates are desired.
+		 */
 		XFlush(dpy);
 	}
 
 	X_UNLOCK;
 
-	/* remember the button state for next time: */
+	/*
+	 * Remember the button state for next time and also for the
+	 * -nodragging case:
+	 */
 	button_mask = mask;
 }
 
 /*
- * bell event handling
+ * Bell event handling.  Requires XKEYBOARD extension.
  */
 #ifdef LIBVNCSERVER_HAVE_XKEYBOARD
 
@@ -646,6 +867,10 @@ void initialize_watch_bell() {
 	}
 }
 
+/*
+ * We call this periodically to process any bell events that have 
+ * taken place.
+ */
 void watch_bell_event() {
 	XEvent xev;
 	XkbAnyEvent *xkb_ev;
@@ -677,7 +902,7 @@ void watch_bell_event() {}
 void mark_hint(hint_t);
 
 /*
- * here begins a bit of a mess to experiment with multiple cursors ...
+ * Here begins a bit of a mess to experiment with multiple cursors ...
  */
 typedef struct cursor_info {
 	char *data;	/* data and mask pointers */
@@ -844,7 +1069,7 @@ void restore_mouse_patch() {
 }
 
 /*
- * Descends windows at pointer until the window cursor matches the current 
+ * Descends window tree at pointer until the window cursor matches the current 
  * cursor.  So far only used to detect if mouse is on root background or not.
  * (returns 0 in that case, 1 otherwise).
  *
@@ -1044,6 +1269,9 @@ void update_mouse(void) {
 	draw_mouse(root_x - off_x, root_y - off_y, which, 1);
 }
 
+/*
+ * For the subwin case follows the window if it is moved.
+ */
 void set_offset(void) {
 	Window w;
 	if (! subwin) {
@@ -1054,6 +1282,10 @@ void set_offset(void) {
 	X_UNLOCK;
 }
 
+/*
+ * Some handling of 8bpp PseudoColor colormaps.  Called for initializing
+ * the clients and dynamically if -flashcmap is specified.
+ */
 #define NCOLOR 256
 void set_colormap(void) {
 	static int first = 1;
@@ -1106,7 +1338,7 @@ void set_colormap(void) {
 
 		c = window;
 		while (c && tries++ < 16) {
-			/* XQueryTree somehow? */
+			/* XXX XQueryTree somehow? */
 			XQueryPointer(dpy, c, &r, &c, &rx, &ry, &wx, &wy, &m);
 			if (c && XGetWindowAttributes(dpy, c, &attr)) {
 				if (attr.colormap && attr.map_installed) {
@@ -1166,8 +1398,9 @@ void set_colormap(void) {
 
 /*
  * Presumably under -nofb the clients will never request the framebuffer.
- * But we have gotten such a request... so let's just give them the current
- * view on the display.  n.b. x2vnc requests a 1x1 pixel for some workaround. 
+ * But we have gotten such a request... so let's just give them the
+ * current view on the display.  n.b. x2vnc and perhaps win2vnc requests
+ * a 1x1 pixel for some workaround so sadly this evidently always happens.
  */
 void nofb_hook(rfbClientPtr cl) {
 	static int loaded_fb = 0;
@@ -1179,6 +1412,7 @@ void nofb_hook(rfbClientPtr cl) {
 	fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
 	screen->frameBuffer = fb->data;
 	loaded_fb = 1;
+	screen->displayHook = NULL;
 }
 
 /*
@@ -1242,6 +1476,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		    = fb->blue_mask >> screen->rfbServerFormat.blueShift;
 	}
 
+	/* nofb is for pointer/keyboard only handling.  */
 	if (nofb) {
 		screen->frameBuffer = NULL;
 		screen->displayHook = nofb_hook;
@@ -1249,6 +1484,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		screen->frameBuffer = fb->data; 
 	}
 
+	/* called from inetd, we need to treat stdio as our socket */
 	if (inetd) {
 		int fd = dup(0);
 		if (fd < 3) {
@@ -1312,6 +1548,11 @@ void initialize_tiles() {
 	tile_tried    = (unsigned char *)
 		malloc((size_t) (ntiles * sizeof(unsigned char)));
 	tile_region = (region_t *) malloc((size_t) (ntiles * sizeof(region_t)));
+
+	tile_row = (XImage **)
+		malloc((size_t) ((ntiles_x + 1) * sizeof(XImage *)));
+	tile_row_shm = (XShmSegmentInfo *)
+		malloc((size_t) ((ntiles_x + 1) * sizeof(XShmSegmentInfo)));
 
 	/* there will never be more hints than tiles: */
 	hint_list = (hint_t *) malloc((size_t) (ntiles * sizeof(hint_t)));
@@ -1452,10 +1693,26 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 }
 
 void initialize_shm() {
+	int i;
 
 	/* the tile (e.g. 32x32) shared memory area image: */
 
 	shm_create(&tile_shm, &tile, tile_x, tile_y, "tile"); 
+
+	/*
+	 * for copy_tiles we need a lot of shared memory areas, one for
+	 * each possible run length of changed tiles.  32 for 1024x768
+	 * and 40 for 1280x1024, etc. 
+	 */
+
+	for (i=1; i<=ntiles_x; i++) {
+		shm_create(&tile_row_shm[i], &tile_row[i], tile_x * i, tile_y,
+		    "tile_row"); 
+		if (old_copytile && i == 1) {
+			/* only need 1x1 tiles */
+			break;
+		}
+	}
 
 	/* the scanline (e.g. 1280x1) shared memory area image: */
 
@@ -1474,7 +1731,6 @@ void initialize_shm() {
 
 	shm_create(&fullscreen_shm, &fullscreen, dpy_x, dpy_y/fs_factor,
 	    "fullscreen"); 
-
 }
 
 
@@ -1529,12 +1785,12 @@ void extend_tile_hint(int x, int y, int th, hint_t *hint) {
 }
 
 void save_hint(hint_t hint, int loc) {
-	hint_list[loc].x = hint.x;		/* copy to the global array */
+	/* simply copy it to the global array for later use. */
+	hint_list[loc].x = hint.x;
 	hint_list[loc].y = hint.y;
 	hint_list[loc].w = hint.w;
 	hint_list[loc].h = hint.h;
 }
-
 
 /*
  * Glue together horizontal "runs" of adjacent changed tiles into one big
@@ -1794,6 +2050,308 @@ void copy_tile(int tx, int ty) {
 	}
 }
 
+
+/*
+ * copy_tiles() gives a slight improvement over copy_tile() since
+ * adjacent runs of tiles are done all at once there is some savings
+ * due to contiguous memory access.  Not a great speedup, but in
+ * some cases it can be up to 2X.  Even more on a SunRay where no
+ * graphics hardware is involved in the read.  Generally, graphics
+ * devices are optimized for write, not read, so we are limited by
+ * the read bandwidth, sometimes only 5 MB/sec on otherwise fast
+ * hardware.
+ */
+
+int *first_line = NULL, *last_line;
+unsigned short *left_diff, *right_diff;
+
+void copy_tiles(int tx, int ty, int nt) {
+	int x, y, line;
+	int size_x, size_y, width, width1, width2;
+	int off, len, n, dw, dx, i, t;
+	int w1, w2, dx1, dx2;	/* tmps for normal and short tiles */
+	int pixelsize = bpp >> 3;
+	int first_min, last_max;
+
+	int restored_patch = 0; /* for show_mouse */
+
+	char *src, *dst, *s_src, *s_dst, *m_src, *m_dst;
+	char *h_src, *h_dst;
+	if (! first_line) {
+		/* allocate arrays first time in. */
+		int n = ntiles_x + 1;
+		first_line = (int *) malloc((size_t) (n * sizeof(int)));
+		last_line  = (int *) malloc((size_t) (n * sizeof(int)));
+		left_diff  = (unsigned short *)
+			malloc((size_t) (n * sizeof(unsigned short)));
+		right_diff = (unsigned short *)
+			malloc((size_t) (n * sizeof(unsigned short)));
+	}
+
+	x = tx * tile_x;
+	y = ty * tile_y;
+
+	size_x = dpy_x - x;
+	if ( size_x > tile_x * nt ) {
+		size_x = tile_x * nt;
+		width1 = tile_x;
+		width2 = tile_x;
+	} else {
+		/* short tile */
+		width1 = tile_x;	/* internal tile */
+		width2 = size_x - (nt - 1) * tile_x;	/* right hand tile */
+	}
+
+	size_y = dpy_y - y;
+	if ( size_y > tile_y ) {
+		size_y = tile_y;
+	}
+
+	n = tx + ty * ntiles_x;		/* number of the first tile */
+
+	X_LOCK;
+	/* read in the whole tile run at once: */
+	if ( using_shm && size_x == tile_x * nt && size_y == tile_y ) {
+		/* general case: */
+		XShmGetImage(dpy, window, tile_row[nt], x, y, AllPlanes);
+	} else {
+		/*
+		 * No shm or near bottom/rhs edge case:
+		 * (but only if tile size does not divide screen size)
+		 */
+		XGetSubImage(dpy, window, x, y, size_x, size_y, AllPlanes,
+		    ZPixmap, tile_row[nt], 0, 0);
+	}
+	X_UNLOCK;
+
+	/*
+	 * Some awkwardness wrt the little remote mouse patch we display.
+	 * When threaded we want to have as small a window of time
+	 * as possible when the mouse image is not in the fb, otherwise
+	 * a libvncserver thread may send the uncorrected patch to the
+	 * clients.
+	 */
+	if (show_mouse && use_threads && cur_saved) {
+		/* check for overlap */
+		if (cur_save_x + cur_save_w > x && x + size_x > cur_save_x &&
+		    cur_save_y + cur_save_h > y && y + size_y > cur_save_y) {
+
+			/* restore the real data to the rfb fb */
+			restore_mouse_patch();
+			restored_patch = 1;
+		}
+	}
+
+	src = tile_row[nt]->data;
+	dst = screen->frameBuffer + y * bytes_per_line + x * pixelsize;
+
+	s_src = src;
+	s_dst = dst;
+
+	for (t=1; t <= nt; t++) {
+		first_line[t] = -1;
+	}
+	/* find the first line with difference: */
+	w1 = width1 * pixelsize;
+	w2 = width2 * pixelsize;
+
+	/* foreach line: */
+	for (line = 0; line < size_y; line++) {
+		/* foreach horizontal tile: */
+		for (t=1; t <= nt; t++) {
+			if (first_line[t] != -1) {
+				continue;
+			}
+
+			off = (t-1) * w1;
+			if (t == nt) {
+				len = w2;	/* possible short tile */
+			} else {
+				len = w1;
+			}
+			
+			if (memcmp(s_dst + off, s_src + off, len)) {
+				first_line[t] = line;
+			}
+		}
+		s_src += tile_row[nt]->bytes_per_line;
+		s_dst += bytes_per_line;
+	}
+
+	/* see if there were any differences for any tile: */
+	first_min = -1;
+	for (t=1; t <= nt; t++) {
+		tile_tried[n+(t-1)] = 1;
+		if (first_line[t] != -1) {
+			if (first_min == -1 || first_line[t] < first_min) {
+				first_min = first_line[t];
+			}
+		}
+	}
+	if (first_min == -1) {
+		/* no tile has a difference, note this and get out: */
+		for (t=1; t <= nt; t++) {
+			tile_has_diff[n+(t-1)] = 0;
+		}
+		if (restored_patch) {
+			redraw_mouse(); 
+		}
+		return;
+	} else {
+		/*
+		 * at least one tile has a difference.  make sure info
+		 * is recorded (e.g. sometimes we guess tiles and they
+		 * came in with tile_has_diff 0)
+		 */
+		for (t=1; t <= nt; t++) {
+			if (first_line[t] == -1) {
+				tile_has_diff[n+(t-1)] = 0;
+			} else {
+				tile_has_diff[n+(t-1)] = 1;
+			}
+		}
+	}
+
+	m_src = src + (tile_row[nt]->bytes_per_line * size_y);
+	m_dst = dst + (bytes_per_line * size_y);
+
+	for (t=1; t <= nt; t++) {
+		last_line[t] = first_line[t];
+	}
+
+	/* find the last line with difference: */
+	w1 = width1 * pixelsize;
+	w2 = width2 * pixelsize;
+
+	/* foreach line: */
+	for (line = size_y - 1; line > first_min; line--) {
+
+		m_src -= tile_row[nt]->bytes_per_line;
+		m_dst -= bytes_per_line;
+
+		/* foreach tile: */
+		for (t=1; t <= nt; t++) {
+			if (first_line[t] == -1
+			    || last_line[t] != first_line[t]) {
+				/* tile has no changes or already done */
+				continue;
+			}
+
+			off = (t-1) * w1;
+			if (t == nt) {
+				len = w2;	/* possible short tile */
+			} else {
+				len = w1;
+			}
+			if (memcmp(m_dst + off, m_src + off, len)) {
+				last_line[t] = line;
+			}
+		}
+	}
+	
+	/*
+	 * determine the farthest down last changed line
+	 * will be used below to limit our memcpy() to the framebuffer.
+	 */
+	last_max = -1;
+	for (t=1; t <= nt; t++) {
+		if (first_line[t] == -1) {
+			continue;
+		}
+		if (last_max == -1 || last_line[t] > last_max) {
+			last_max = last_line[t];
+		}
+	}
+
+	/* look for differences on left and right hand edges: */
+	for (t=1; t <= nt; t++) {
+		left_diff[t] = 0;
+		right_diff[t] = 0;
+	}
+
+	h_src = src;
+	h_dst = dst;
+
+	w1 = width1 * pixelsize;
+	w2 = width2 * pixelsize;
+
+	dx1 = (width1 - tile_fuzz) * pixelsize;
+	dx2 = (width2 - tile_fuzz) * pixelsize;
+	dw = tile_fuzz * pixelsize; 
+
+	/* foreach line: */
+	for (line = 0; line < size_y; line++) {
+		/* foreach tile: */
+		for (t=1; t <= nt; t++) {
+			if (first_line[t] == -1) {
+				/* tile has no changes at all */
+				continue;
+			}
+
+			off = (t-1) * w1;
+			if (t == nt) {
+				dx = dx2;	/* possible short tile */
+				if (dx <= 0) {
+					break;
+				}
+			} else {
+				dx = dx1;
+			}
+
+			if (! left_diff[t] && memcmp(h_dst + off,
+			    h_src + off, dw)) {
+				left_diff[t] = 1;
+			}
+			if (! right_diff[t] && memcmp(h_dst + off + dx,
+			    h_src + off + dx, dw) ) {
+				right_diff[t] = 1;
+			}
+		}
+		h_src += tile_row[nt]->bytes_per_line;
+		h_dst += bytes_per_line;
+	}
+
+	/* now finally copy the difference to the rfb framebuffer: */
+	s_src = src + tile_row[nt]->bytes_per_line * first_min;
+	s_dst = dst + bytes_per_line * first_min;
+
+	for (line = first_min; line <= last_max; line++) {
+		/* for I/O speed we do not do this tile by tile */
+		memcpy(s_dst, s_src, size_x * pixelsize);
+		s_src += tile_row[nt]->bytes_per_line;
+		s_dst += bytes_per_line;
+	}
+
+	if (restored_patch) {
+		redraw_mouse(); 
+	}
+
+	/* record all the info in the region array for this tile: */
+	for (t=1; t <= nt; t++) {
+		int s = t - 1;
+
+		if (first_line[t] == -1) {
+			/* tile unchanged */
+			continue;
+		}
+		tile_region[n+s].first_line = first_line[t];
+		tile_region[n+s].last_line  = last_line[t];
+
+		tile_region[n+s].top_diff = 0;
+		tile_region[n+s].bot_diff = 0;
+		if ( first_line[t] < tile_fuzz ) {
+			tile_region[n+s].top_diff = 1;
+		}
+		if ( last_line[t] > (size_y - 1) - tile_fuzz ) {
+			tile_region[n+s].bot_diff = 1;
+		}
+
+		tile_region[n+s].left_diff  = left_diff[t];
+		tile_region[n+s].right_diff = right_diff[t];
+	}
+
+}
+
 /*
  * The copy_tile() call in the loop below copies the changed tile into
  * the rfb framebuffer.  Note that copy_tile() sets the tile_region
@@ -1817,6 +2375,7 @@ int copy_all_tiles() {
 
 			if (tile_has_diff[n]) {
 				copy_tile(x, y);
+				/* later: copy_tiles(x, y, 1); */
 			}
 			if (! tile_has_diff[n]) {
 				/*
@@ -1839,6 +2398,67 @@ int copy_all_tiles() {
 				m = (x+1) + y * ntiles_x;
 				if (! tile_has_diff[m]) {
 					tile_has_diff[m] = 2;
+				}
+			}
+		}
+	}
+	return diffs;
+}
+
+/*
+ * Routine analogous to copy_all_tiles() above, but for horizontal runs
+ * of adjacent changed tiles.
+ */
+int copy_all_tile_runs() {
+	int x, y, n, m, i;
+	int diffs = 0;
+	int in_run = 0, run = 0;
+	int ntave = 0, ntcnt = 0;
+
+	for (y=0; y < ntiles_y; y++) {
+		for (x=0; x < ntiles_x + 1; x++) {
+			n = x + y * ntiles_x;
+
+			if (x != ntiles_x && tile_has_diff[n]) {
+				in_run = 1;
+				run++;
+			} else {
+				if (! in_run) {
+					in_run = 0;
+					run = 0;
+					continue;
+				}
+				copy_tiles(x - run, y, run);
+
+				ntcnt++;
+				ntave += run;
+				diffs += run;
+
+				/* neighboring tile downward: */
+				for (i=1; i <= run; i++) {
+					if ((y+1) < ntiles_y
+					    && tile_region[n-i].bot_diff) {
+						m = (x-i) + (y+1) * ntiles_x;
+						if (! tile_has_diff[m]) {
+							tile_has_diff[m] = 2;
+						}
+					}
+				}
+
+				/* neighboring tile to right: */
+				if (((x-1)+1) < ntiles_x
+				    && tile_region[n-1].right_diff) {
+					m = ((x-1)+1) + y * ntiles_x;
+					if (! tile_has_diff[m]) {
+						tile_has_diff[m] = 2;
+					}
+					
+					/* note that this starts a new run */
+					in_run = 1;
+					run = 1;
+				} else {
+					in_run = 0;
+					run = 0;
 				}
 			}
 		}
@@ -1938,7 +2558,7 @@ void gap_try(int x, int y, int *run, int *saw, int along_x) {
  * be a distracting delayed filling in of such gaps.  gaps_fill is the
  * tweak parameter that sets the width of the gaps that are checked.
  *
- * BTW, grow_islands() is actually pretty successful at doing this too.
+ * BTW, grow_islands() is actually pretty successful at doing this too...
  */
 int fill_tile_gaps() {
 	int x, y, run, saw;
@@ -2049,6 +2669,7 @@ void copy_screen() {
 
 	X_LOCK;
 
+	/* screen may be too big for 1 shm area, so broken into fs_factor */
 	for (i=0; i < fs_factor; i++) {
 		if (using_shm) {
 			XShmGetImage(dpy, window, fullscreen, 0, y, AllPlanes);
@@ -2068,8 +2689,30 @@ void copy_screen() {
 	rfbMarkRectAsModified(screen, 0, 0, dpy_x, dpy_y);
 }
 
+/* profiling routines */
+
+double dtime(double *t_old) {
+	/* 
+	 * usage: call with 0.0 to initialize, subsequent calls give
+	 * the time differences.
+	 */
+	double t_now, dt;
+	struct timeval now;
+
+	gettimeofday(&now, NULL);
+	t_now = now.tv_sec + ( (double) now.tv_usec/1000000. );
+	if (*t_old == 0) {
+		*t_old = t_now;
+		return t_now;
+	}
+	dt = t_now - *t_old;
+	*t_old = t_now;
+	return(dt);
+}
+
+
 /*
- * Utilities for managing the "naps" to cut down on amount of polling
+ * Utilities for managing the "naps" to cut down on amount of polling.
  */
 void nap_set(int tile_cnt) {
 
@@ -2096,7 +2739,7 @@ void nap_set(int tile_cnt) {
 void nap_sleep(int ms, int split) {
 	int i, input = got_user_input;
 
-	/* split it up to improve the wakeup time */
+	/* split up a long nap to improve the wakeup time */
 	for (i=0; i<split; i++) {
 		usleep(ms * 1000 / split);
 		if (! use_threads && i != split - 1) {
@@ -2140,6 +2783,10 @@ void nap_check(int tile_cnt) {
 	}
 }
 
+/*
+ * This is called to avoid a ~20 second timeout in libvncserver.
+ * May no longer be needed.
+ */
 void ping_clients(int tile_cnt) {
 	static time_t last_send = 0;
 	time_t now = time(0);
@@ -2242,6 +2889,7 @@ int scan_display(int ystart, int rescan) {
 void scan_for_updates() {
 	int i, tile_count, tile_diffs;
 	double frac1 = 0.1;   /* tweak parameter to try a 2nd scan_display() */
+	double frac2 = 0.35;  /* or 3rd */
 	for (i=0; i < ntiles; i++) {
 		tile_has_diff[i] = 0;
 		tile_tried[i] = 0;
@@ -2256,6 +2904,8 @@ void scan_for_updates() {
 	count %= NSCAN;
 
 	if (count % (NSCAN/4) == 0)  {
+		/* some periodic maintenance */
+
 		if (subwin) {
 			set_offset();	/* follow the subwindow */
 		}
@@ -2270,7 +2920,8 @@ void scan_for_updates() {
 	}
 
 	/* scan with the initial y to the jitter value from scanlines: */
-	tile_count = scan_display( scanlines[count], 0 );
+	scan_in_progress = 1;
+	tile_count = scan_display(scanlines[count], 0);
 
 	nap_set(tile_count);
 
@@ -2279,7 +2930,7 @@ void scan_for_updates() {
 		frac1 = fs_frac/2.0;
 	}
 
-	if ( tile_count > frac1 * ntiles) {
+	if (tile_count > frac1 * ntiles) {
 		/*
 		 * many tiles have changed, so try a rescan (since it should
 		 * be short compared to the many upcoming copy_tile() calls)
@@ -2287,13 +2938,20 @@ void scan_for_updates() {
 
 		/* this check is done to skip the extra scan_display() call */
 		if (! fs_factor || tile_count <= fs_frac * ntiles) {
-			int cp;
+			int cp, tile_count_old = tile_count;
 			
 			/* choose a different y shift for the 2nd scan: */
 			cp = (NSCAN - count) % NSCAN;
 
-			tile_count = scan_display( scanlines[cp], 1 );
+			tile_count = scan_display(scanlines[cp], 1);
+
+			if (tile_count >= (1 + frac2) * tile_count_old) {
+				/* on a roll... do a 3rd scan */
+				cp = (NSCAN - count + 7) % NSCAN;
+				tile_count = scan_display(scanlines[cp], 1);
+			}
 		}
+		scan_in_progress = 0;
 
 		/*
 		 * At some number of changed tiles it is better to just
@@ -2310,6 +2968,7 @@ void scan_for_updates() {
 		 * Use -fs 1.0 to disable on slow links.
 		 */
 		if (fs_factor && tile_count > fs_frac * ntiles) {
+			fb_copy_in_progress = 1;
 			copy_screen();
 			if (show_mouse) {
 				if (! use_threads) {
@@ -2317,13 +2976,32 @@ void scan_for_updates() {
 				}
 				update_mouse();
 			}
+			fb_copy_in_progress = 0;
+			if (use_threads && ! old_pointer) {
+				pointer(-1, 0, 0, NULL);
+			}
 			nap_check(tile_count);
 			return;
 		}
 	}
+	scan_in_progress = 0;
 
 	/* copy all tiles with differences from display to rfb framebuffer: */
-	tile_diffs = copy_all_tiles();
+	fb_copy_in_progress = 1;
+
+	if (old_copytile) {
+		/*
+		 * Old way, copy I/O one tile at a time.
+		 */
+		tile_diffs = copy_all_tiles();
+	} else {
+		/* 
+		 * New way, does runs of horizontal tiles at once.
+		 * Note that below, for simplicity, the extra tile finding
+		 * (e.g. copy_tiles_backward_pass) is done the old way.
+		 */
+		tile_diffs = copy_all_tile_runs();
+	}
 
 	/*
 	 * This backward pass for upward and left tiles complements what
@@ -2331,12 +3009,23 @@ void scan_for_updates() {
 	 */
 	tile_diffs = copy_tiles_backward_pass();
 
+	/* Given enough tile diffs, try the islands: */
 	if (grow_fill && tile_diffs > 4) {
 		tile_diffs = grow_islands();
 	}
 
+	/* Given enough tile diffs, try the gaps: */
 	if (gaps_fill && tile_diffs > 4) {
 		tile_diffs = fill_tile_gaps();
+	}
+
+	fb_copy_in_progress = 0;
+	if (use_threads && ! old_pointer) {
+		/*
+		 * tell the pointer handler it can process any queued
+		 * pointer events:
+		 */
+		pointer(-1, 0, 0, NULL);
 	}
 
 	if (use_hints) {
@@ -2363,22 +3052,22 @@ void scan_for_updates() {
 
 void watch_loop(void) {
 	int cnt = 0;
+	double dt = 0.0;
 
 	if (use_threads) {
 		rfbRunEventLoop(screen, -1, TRUE);
 	}
 
 	while (1) {
+
 		got_user_input = 0;
+		got_pointer_input = 0;
+		got_keyboard_input = 0;
 
 		if (! use_threads) {
 			rfbProcessEvents(screen, -1);
-
-			if ((got_user_input || ui_dropthru < 0) &&
-			    cnt % ui_dropthru != 0) {
-				/* every n-th drops thru to code below... */
-				cnt++;
-				XFlush(dpy);
+			if (check_user_input(dt, &cnt)) {
+				/* true means loop back for more input */
 				continue;
 			}
 		}
@@ -2392,43 +3081,184 @@ void watch_loop(void) {
 			continue;
 		}
 
-		if (nofb) {
+		if (nofb) {	/* no framebuffer polling needed */
 			continue;
 		}
 
 		if (watch_bell) {
-			/* n.b. assumes -nofb folks do not want bell... */
+			/*
+			 * check for any bell events.
+			 * n.b. assumes -nofb folks do not want bell...
+			 */
 			watch_bell_event();
 		}
 
-		/*
-		 * delay_refresh amounts to delaying rfb screen refreshes.
-		 * During that time, XQueryPointer needs to be called for
-		 * the events to take place on the x server.
-		 */
-		if (delay_refresh) {
-			Window root_w, child_w;
-			rfbBool ret;
-			int root_x, root_y, win_x, win_y, which = 0;
-			unsigned int mask;
-
+		if (! show_dragging && button_mask) {
+			/* if any button is pressed do not update screen */
+			/* XXX consider: use_threads || got_pointer_input */
 			X_LOCK;
-			if (0) {
-				XFlush(dpy);
-			} else {
-				ret = XQueryPointer(dpy, rootwin, &root_w,
-				    &child_w, &root_x, &root_y, &win_x, &win_y,
-				    &mask);
-			}
+			XFlush(dpy);
 			X_UNLOCK;
 		} else {
+			/* for timing the scan to try to detect thrashing */
+			double tm = 0.0;
+			dtime(&tm);
+
 			rfbUndrawCursor(screen);
 			scan_for_updates();
+
+			dt = dtime(&tm);
 		}
 
+		/* sleep a bit to lessen load */
 		usleep(waitms * 1000);
 		cnt++;
 	}
+}
+
+/*
+ * We need to handle user input, particularly pointer input, carefully.
+ * This function is only called when non-threaded.  Note that
+ * rfbProcessEvents() only processes *one* pointer event per call,
+ * so if we interlace it with scan_for_updates(), we can get swamped
+ * with queued up pointer inputs.  And if the pointer inputs are inducing
+ * large changes on the screen (e.g. window drags), the whole thing
+ * bogs down miserably and only comes back to life at some time after
+ * one stops moving the mouse.  So, to first approximation, we are trying
+ * to eat as much user input here as we can using some hints from the
+ * duration of the previous scan_for_updates() call (in dt).
+ *
+ * return of 1 means watch_loop should short-circuit and reloop,
+ * return of 0 means watch_loop should proceed to scan_for_updates().
+ */
+
+int check_user_input(double dt, int *cnt) {
+	
+	if (old_pointer) {
+		/* every n-th drops thru to scan */
+		if ((got_user_input || ui_skip < 0) && *cnt % ui_skip != 0) {
+			*cnt++;
+			XFlush(dpy);
+			return 1;	/* short circuit watch_loop */
+		} else {
+			return 0;
+		}
+	}
+
+	if (got_keyboard_input) {
+		if (*cnt % ui_skip != 0) {
+			*cnt++;
+			return 1;	/* short circuit watch_loop */
+		}
+		/* otherwise continue with pointer input */
+	}
+
+	if (got_pointer_input) {
+		int eaten = 0, miss = 0, max_eat = 50;
+		int g, g_in;
+		double spin = 0.0, tm = 0.0;
+		double quick_spin_fac  = 0.40;
+		double grind_spin_time = 0.175;
+
+
+		dtime(&tm);
+		g = g_in = got_pointer_input;
+
+		/*
+		 * Try for some "quick" pointer input processing.
+		 *
+		 * About as fast as we can, we try to process user input
+		 * calling rfbProcessEvents or rfbCheckFds.  We do this
+		 * for a time on order of the last scan_for_updates() time,
+		 * dt, but if we stop getting user input we break out.
+		 * We will also break out if we have processed max_eat
+		 * inputs.
+		 *
+		 * Note that rfbCheckFds() does not send any framebuffer
+		 * updates, so is more what we want here, although it is
+		 * likely they have all be sent already.
+		 */
+		while (1) {
+			//rfbProcessEvents(screen, 1000);
+			rfbCheckFds(screen, 1000);
+			XFlush(dpy);
+
+			spin += dtime(&tm);
+
+			if (spin > quick_spin_fac * dt) {
+				/* get out if spin time comparable to last scan time */
+				break;
+			}
+			if (got_pointer_input > g) {
+				g = got_pointer_input;
+				if (eaten++ < max_eat) {
+					continue;
+				}
+			} else {
+				miss++;
+			}
+			if (miss > 1) {	/* 1 means out on 2nd miss */
+				break;
+			}
+		}
+
+
+		/*
+		 * Probably grinding with a lot of fb I/O if dt is
+		 * this large.  (need to do this more elegantly) 
+		 *
+		 * Current idea is to spin our wheels here *not* processing
+		 * any fb I/O, but still processing the user input.
+		 * This user input goes to the X display and changes it,
+		 * but we don't poll it while we "rest" here for a time
+		 * on order of dt, the previous scan_for_updates() time.
+		 * We also break out if we miss enough user input.
+		 */
+		if (dt > grind_spin_time) {
+			int i, ms, split = 30;
+			double shim;
+
+			/*
+			 * Break up our pause into 'split' steps.
+			 * We get at most one input per step.
+			 */
+			shim = 0.75 * dt / split;
+
+			ms = (int) (1000 * shim);
+
+			/* cutoff how long the pause can be */
+			if (split * ms > 300) {
+				ms = 300 / split;
+			}
+
+			spin = 0.0;
+			tm = 0.0;
+			dtime(&tm);
+
+			g = got_pointer_input;
+			miss = 0;
+			for (i=0; i<split; i++) {
+				usleep(ms * 1000);
+				//rfbProcessEvents(screen, 1000);
+				rfbCheckFds(screen, 1000);
+				spin += dtime(&tm);
+				if (got_pointer_input > g) {
+					XFlush(dpy);
+					miss = 0;
+				} else {
+					miss++;
+				}
+				g = got_pointer_input;
+				if (miss > 2) {
+					break;
+				}
+				if (1000 * spin > ms * split)  {
+					break;
+				}
+			}
+		}
+	}
+	return 0;
 }
 
 void print_help() {
@@ -2499,15 +3329,17 @@ void print_help() {
 "-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
 "-mouseX                As -mouse, but also draw an X on root background.\n"
 "-X                     Shorthand for -mouseX -nocursor.\n"
+"-buttonmap str         String to remap mouse buttons.  Format: IJK-LMN, this\n"
+"                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31\n"
 "-nodragging            Do not update the display during mouse dragging events.\n"
-"                       Greatly improves response on slow links, but you lose\n"
+"                       Greatly improves response on slow setups, but you lose\n"
 "                       all visual feedback for drags and some menu traversals.\n"
-"-input_skip n          Experimental option difficult to explain! Only active in\n"
-"                       non-threaded mode. See watch_loop() function for info.\n"
-"                       Loop is: rfbProcessEvents, scan display, sleep. If\n"
-"                       there is mouse or keyboard input the scan is skipped\n"
-"                       except every n-th time thru the loop. Default n is 10,\n"
-"                       n<0 means skip even with no user input. Need to improve!\n"
+"-old_pointer           Do not use the new pointer input handling mechanisms.\n"
+"                       See check_input() and pointer() for details.\n"
+"-input_skip n          For the old pointer handling when non-threaded: try to\n"
+"                       read n user input events before scanning display. n < 0\n"
+"                       means to act as though there is always user input.\n"
+"-old_copytile          Do not use the new copy_tiles() framebuffer mechanism.\n"
 "\n"
 "-defer time            Time in ms to wait for updates before sending to\n"
 "                       client [rfbDeferUpdateTime]  (default %d).\n"
@@ -2651,15 +3483,21 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(argv[i], "-mouseX")) {
 			show_mouse = 1;
 			show_root_cursor = 1;
-		} else if (!strcmp(argv[i], "-nodragging")) {
-			show_dragging = 0;
-		} else if (!strcmp(argv[i], "-input_skip")) {
-			ui_dropthru = atoi(argv[++i]);
-			if (! ui_dropthru) ui_dropthru = 1;
 		} else if (!strcmp(argv[i], "-X")) {
 			show_mouse = 1;
 			show_root_cursor = 1;
 			local_cursor = 0;
+		} else if (!strcmp(argv[i], "-buttonmap")) {
+			pointer_remap = argv[++i];
+		} else if (!strcmp(argv[i], "-nodragging")) {
+			show_dragging = 0;
+		} else if (!strcmp(argv[i], "-input_skip")) {
+			ui_skip = atoi(argv[++i]);
+			if (! ui_skip) ui_skip = 1;
+		} else if (!strcmp(argv[i], "-old_pointer")) {
+			old_pointer = 1;
+		} else if (!strcmp(argv[i], "-old_copytile")) {
+			old_copytile = 1;
 		} else if (!strcmp(argv[i], "-defer")) {
 			defer_update = atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "-wait")) {
@@ -2708,6 +3546,8 @@ int main(int argc, char** argv) {
 			}
 		}
 	}
+
+	/* fixup settings that do not make sense */
 		
 	if (tile_fuzz < 1) {
 		tile_fuzz = 1;
@@ -2724,6 +3564,7 @@ int main(int argc, char** argv) {
 		connect_once = 1;
 		bg = 0;
 	}
+
 	if (! quiet) {
 		fprintf(stderr, "viewonly:   %d\n", view_only);
 		fprintf(stderr, "shared:     %d\n", shared);
@@ -2741,7 +3582,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "loc_curs:   %d\n", local_cursor);
 		fprintf(stderr, "mouse:      %d\n", show_mouse);
 		fprintf(stderr, "dragging:   %d\n", show_dragging);
-		fprintf(stderr, "inputskip:  %d\n", ui_dropthru);
+		fprintf(stderr, "inputskip:  %d\n", ui_skip);
 		fprintf(stderr, "root_curs:  %d\n", show_root_cursor);
 		fprintf(stderr, "defer:      %d\n", defer_update);
 		fprintf(stderr, "waitms:     %d\n", waitms);
@@ -2756,6 +3597,7 @@ int main(int argc, char** argv) {
 		rfbLogEnable(0);
 	}
 
+	/* open the X display: */
 	X_INIT;
 	if (use_dpy) {
 		dpy = XOpenDisplay(use_dpy);
@@ -2775,10 +3617,13 @@ int main(int argc, char** argv) {
 		if (! quiet) fprintf(stderr, "Using default display.\n");
 	}
 
+	/* check for XTEST */
 	if (! XTestQueryExtension(dpy, &ev, &er, &maj, &min)) {
 		fprintf(stderr, "Display does not support XTest extension.\n");
 		exit(1);
 	}
+
+	/* check for MIT-SHM */
 	if (! nofb && ! XShmQueryExtension(dpy)) {
 		if (! using_shm) {
 			fprintf(stderr, "warning: display does not support "
@@ -2790,6 +3635,7 @@ int main(int argc, char** argv) {
 		}
 	}
 #ifdef LIBVNCSERVER_HAVE_XKEYBOARD
+	/* check for XKEYBOARD */
 	if (watch_bell) {
 		if (! XkbQueryExtension(dpy, &op, &ev, &er, &maj, &min)) {
 			fprintf(stderr, "warning: disabling bell.\n");
@@ -2810,6 +3656,7 @@ int main(int argc, char** argv) {
 	scr = DefaultScreen(dpy);
 	rootwin = RootWindow(dpy, scr);
 
+	/* set up parameters for subwin or non-subwin cases: */
 	if (! subwin) {
 		window = rootwin;
 		dpy_x = DisplayWidth(dpy, scr);
@@ -2895,6 +3742,7 @@ int main(int argc, char** argv) {
 
 #if defined(LIBVNCSERVER_HAVE_FORK) && defined(LIBVNCSERVER_HAVE_SETSID)
 	if (bg) {
+		/* fork into the background now */
 		int p, n;
 		if ((p = fork()) > 0)  {
 			exit(0);
@@ -2908,6 +3756,7 @@ int main(int argc, char** argv) {
 			perror("setsid");
 			exit(1);
 		}
+		/* adjust our stdio */
 		n = open("/dev/null", O_RDONLY);
 		dup2(n, 0);
 		dup2(n, 1);
