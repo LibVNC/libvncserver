@@ -20,7 +20,7 @@ LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB)
 OSX_LIBS = -framework ApplicationServices -framework Carbon
 
 # for x11vnc
-XLIBS =  -L/usr/X11R6/lib -lX11
+XLIBS =  -L/usr/X11R6/lib -lX11 -lXext
 
 SOURCES=main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \

@@ -1,19 +1,48 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
+#ifndef NO_SHM
+#include <X11/extensions/XShm.h>
+#include <sys/shm.h>
+#endif
 #define KEYSYM_H
 #include "rfb.h"
 
 int c=0,blockLength = 32;
 
-void getImage(Display *dpy,int xscreen,XImage **i)
+Bool useSHM =
+#ifndef NO_SHM
+ TRUE;
+XShmSegmentInfo shminfo;
+#else
+ FALSE;
+#endif
+
+void getImage(int bpp,Display *dpy,int xscreen,XImage **i)
 {
-  *i = XGetImage( dpy,
-		  RootWindow(dpy,xscreen),
-		  0,0,
-		  DisplayWidth(dpy,xscreen),
-		  DisplayHeight(dpy,xscreen),
-		  AllPlanes,
-		  ZPixmap );
+  if(useSHM && bpp>0) {
+
+    *i = XShmCreateImage( dpy,
+			  DefaultVisual( dpy, xscreen ),
+			  bpp,
+			  ZPixmap,
+			  NULL,
+			  &shminfo,
+			  DisplayWidth(dpy,xscreen),
+			  DisplayHeight(dpy,xscreen));
+                                  
+    shminfo.shmid = shmget( IPC_PRIVATE,
+                                 (*i)->bytes_per_line * (*i)->height,
+                                 IPC_CREAT | 0777 );
+    shminfo.shmaddr = (*i)->data = (char *) shmat( shminfo.shmid, 0, 0 );
+    shminfo.readOnly = False;
+  
+    XShmAttach( dpy, &shminfo );
+
+    XShmGetImage(dpy,RootWindow(dpy,xscreen),*i,0,0,AllPlanes);
+  } else {
+    *i = XGetImage(dpy,RootWindow(dpy,xscreen),0,0,DisplayWidth(dpy,xscreen),DisplayHeight(dpy,xscreen),
+		    AllPlanes,ZPixmap );
+  }
 }
 
 void checkForImageUpdates(rfbScreenInfoPtr s,char *b)
@@ -30,14 +59,14 @@ void checkForImageUpdates(rfbScreenInfoPtr s,char *b)
 	for(l=j*s->paddedWidthInBytes;!changed&&l<y1;l+=s->paddedWidthInBytes)
 	  for(k=i*s->bitsPerPixel/8;k<x1;k++)
 	    if(s->frameBuffer[l+k]!=b[l+k]) {
-//	       fprintf(stderr,"changed: %d, %d\n",k,l);
+	      //	       fprintf(stderr,"changed: %d, %d\n",k,l);
 	       changed=TRUE;
 	       goto changed_p;
 	    }
 	if(changed) {
 	   changed_p:
-	  for(;l<0*y1;l++)
-	     memcpy(/*b+l,*/s->frameBuffer+l,b+l,x1-l);
+	  for(l+=i*s->bitsPerPixel/8;l<y1;l+=s->paddedWidthInBytes)
+	     memcpy(/*b+l,*/s->frameBuffer+l,b+l,x1-i*s->bitsPerPixel/8);
 	   rfbMarkRectAsModified(s,i,j,i+blockLength,j+blockLength);
 	}
      }
@@ -54,7 +83,7 @@ int main(int argc,char** argv)
   dpy = XOpenDisplay("");
   xscreen = DefaultScreen(dpy);
 
-  getImage(dpy,xscreen,&framebufferImage);
+  getImage(0,dpy,xscreen,&framebufferImage);
 
   screen = rfbGetScreen(&argc,argv,framebufferImage->width,
 			framebufferImage->height,
@@ -95,23 +124,24 @@ int main(int argc,char** argv)
   }
 
   backupImage = malloc(screen->height*screen->paddedWidthInBytes);
-  //memcpy(backupImage,framebufferImage->data,screen->height*screen->paddedWidthInBytes);
+  memcpy(backupImage,framebufferImage->data,screen->height*screen->paddedWidthInBytes);
   screen->frameBuffer = backupImage;
-  screen->rfbDeferUpdateTime = 500;
+  screen->rfbDeferUpdateTime = 50;
   screen->cursor = 0;
 
   rfbInitServer(screen);
    
   while(1) {
+    //fprintf(stderr,"%d\r",c++);
     rfbProcessEvents(screen,-1);
-    if(1 || /*c++>7 &&*/ (!screen->rfbClientHead || !FB_UPDATE_PENDING(screen->rfbClientHead))) {
-       c=0;
+    //if(1 || /*c++>7 &&*/ (!screen->rfbClientHead || !FB_UPDATE_PENDING(screen->rfbClientHead))) {
+    //c=0;
     framebufferImage->f.destroy_image(framebufferImage);
-    getImage(dpy,xscreen,&framebufferImage);
-    //checkForImageUpdates(screen,framebufferImage->data);
-    }
-     fprintf(stderr,"%x\n%x\n---\n",screen->frameBuffer,framebufferImage->data);
-   memcpy(screen->frameBuffer,framebufferImage->data,screen->height/10*screen->paddedWidthInBytes);
+    getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage);
+    checkForImageUpdates(screen,framebufferImage->data);
+    //}
+    //fprintf(stderr,"%x\n%x\n---\n",screen->frameBuffer,framebufferImage->data);
+     //memcpy(screen->frameBuffer,framebufferImage->data,screen->height*screen->paddedWidthInBytes);
    rfbMarkRectAsModified(screen,0,0,screen->width,screen->height);
 #if 0
        {
@@ -120,8 +150,8 @@ int main(int argc,char** argv)
 	  fprintf(f,"P6\n%d %d\n255\n",screen->width,screen->height);
 	  for(j=0;j<screen->height;j++)
 	    for(i=0;i<screen->width;i++) {
-	       //r=screen->frameBuffer[j*screen->paddedWidthInBytes+i*2];
-	       r=framebufferImage->data[j*screen->paddedWidthInBytes+i*2];
+	      //r=screen->frameBuffer[j*screen->paddedWidthInBytes+i*2];
+	      r=framebufferImage->data[j*screen->paddedWidthInBytes+i*2];
 	       fputc(((r>>screen->rfbServerFormat.redShift)&screen->rfbServerFormat.redMax)*255/screen->rfbServerFormat.redMax,f);
 	       fputc(((r>>screen->rfbServerFormat.greenShift)&screen->rfbServerFormat.greenMax)*255/screen->rfbServerFormat.greenMax,f);
 	       fputc(((r>>screen->rfbServerFormat.blueShift)&screen->rfbServerFormat.blueMax)*255/screen->rfbServerFormat.blueMax,f);
@@ -130,6 +160,9 @@ int main(int argc,char** argv)
        }
 #endif
   }
+#ifndef NO_SHM
+  XShmDetach(dpy,framebufferImage);
+#endif
 
   return(0);
 }
