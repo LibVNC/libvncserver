@@ -176,7 +176,7 @@ sraSpanListEqual(const sraSpanList *s1, const sraSpanList *s2) {
     if (!s2) {
       return 1;
     } else {
-      printf("sraSpanListEqual:incompatible spans (only one NULL!)\n");
+      rfbErr("sraSpanListEqual:incompatible spans (only one NULL!)\n");
       return FALSE;
     }
   }
@@ -271,7 +271,7 @@ sraSpanListOr(sraSpanList *dest, const sraSpanList *src) {
     if (!src) {
       return;
     } else {
-      printf("sraSpanListOr:incompatible spans (only one NULL!)\n");
+      rfbErr("sraSpanListOr:incompatible spans (only one NULL!)\n");
       return;
     }
   }
@@ -360,7 +360,7 @@ sraSpanListAnd(sraSpanList *dest, const sraSpanList *src) {
     if (!src) {
       return 1;
     } else {
-      printf("sraSpanListAnd:incompatible spans (only one NULL!)\n");
+      rfbErr("sraSpanListAnd:incompatible spans (only one NULL!)\n");
       return FALSE;
     }
   }
@@ -440,7 +440,7 @@ sraSpanListSubtract(sraSpanList *dest, const sraSpanList *src) {
     if (!src) {
       return 1;
     } else {
-      printf("sraSpanListSubtract:incompatible spans (only one NULL!)\n");
+      rfbErr("sraSpanListSubtract:incompatible spans (only one NULL!)\n");
       return FALSE;
     }
   }
