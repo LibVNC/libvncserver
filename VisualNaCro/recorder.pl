@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+use Getopt::Long;
 use nacro;
 
 # TODO: take options
@@ -8,6 +9,37 @@ $output="my_script";
 $server="localhost";
 $port=5900;
 $listen_port=5923;
+
+if(!GetOptions(
+	"script:s" => \$output,
+	"listen:i" => \$listen_port
+) || $#ARGV!=0) {
+	print STDERR "Usage: $ARGV0 [--script output_name] [--listen listen_port] server[:port]\n";
+	exit 2;
+}
+
+$output=~s/\.pl$//;
+
+$server=$ARGV[0];
+
+if($server=~/^(.*):(\d+)$/) {
+	$server=$1;
+	$port=$2;
+	if($2<100) {
+		$port+=5900;
+	}
+}
+
+if($listen_port<100) {
+	$listen_port+=5900;
+}
+
+# do not overwrite script
+
+if(stat("$output.pl")) {
+	print STDERR "Will not overwrite $output.pl\n";
+	exit 2;
+}
 
 # start connection
 $vnc=nacro::initvnc($server,$port,$listen_port);
