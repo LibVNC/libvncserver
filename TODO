@@ -1,23 +1,25 @@
 immediate:
 ----------
 
-test copyRect and pthreads.
 authentification schemes (secure vnc)
-udp
+udp (need an rfbClientPtr udpClient in rfbScreen)
 documentation
 	hint that to mark very tiny regions as
 	modified is possibly inefficient for the encodings.
-	(a trail of points could be better a small rectangle).
+	(a trail of points could better be a small rectangle).
 
 later:
 ------
 
 autoconf? at least Sun Solaris and Windows compilation
+	(maybe Michael makes that)
+using Hermes library for fast colour translations.
 CORBA
 
 done:
 -----
 
+.test copyRect and pthreads.
 .optionally dont draw rich cursors as xcursors
 .cursor smears on IRIX with pthreads, then has bus error. has to be a mutex
 	problem in cursor routines.
@@ -56,3 +58,8 @@ fix bug with odd width (depends on client depth: width has to be multiple of ser
 	  three have to be warned that this is happening.
 	-> rfbClientConnectionGone can only be called by the outer loop
 	(with background loop, it is input, else it is processEvents).
+. fixed pthreads issues:
+	cursor deadlock,
+	CopyRect deadlock.
+. when copying a region with modified parts, they were not marked
+	as modified

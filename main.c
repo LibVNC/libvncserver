@@ -75,6 +75,7 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
    while((cl=rfbClientIteratorNext(iterator))) {
      LOCK(cl->updateMutex);
      if(cl->useCopyRect) {
+       sraRegionPtr modifiedRegionBackup;
        if(!sraRgnEmpty(cl->copyRegion) && (cl->copyDX!=dx || cl->copyDY!=dy)) {
 	 sraRgnOr(cl->copyRegion,cl->modifiedRegion);
 	 sraRgnMakeEmpty(cl->copyRegion);
@@ -82,6 +83,13 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
        sraRgnOr(cl->copyRegion,copyRegion);
        cl->copyDX = dx;
        cl->copyDY = dy;
+
+       /* if there were modified regions, which are now copied: */
+       modifiedRegionBackup=sraRgnCreateRgn(cl->modifiedRegion);
+       sraRgnOffset(modifiedRegionBackup,dx,dy);
+       sraRgnAnd(modifiedRegionBackup,cl->copyRegion);
+       sraRgnOr(cl->modifiedRegion,modifiedRegionBackup);
+       sraRgnDestroy(modifiedRegionBackup);
 
        /* while(!sraRgnEmpty(cl->copyRegion)) */ {
 #ifdef HAVE_PTHREADS

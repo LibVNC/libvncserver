@@ -1,4 +1,14 @@
 0.2
+   rfbNewClient now sets the socket in the fd_set (for the select() call)
+   when compiling the library with HAVE_PTHREADS and an application
+	which includes "rfb.h" without, the structures got mixed up.
+	So, the pthreads section is now always at the end, and also
+	you get a linker error for rfbInitServer when using two different
+	pthread setups.
+   fixed two deadlocks: when setting a cursor and when using CopyRect
+   fixed CopyRect when copying modified regions (they lost the modified
+	 property)
+   WIN32 target compiles and works for example :-)
    fixed CopyRect (was using the wrong order of rectangles...)
    	 should also work with pthreads, because copyrects are
 	 always sent immediately (so that two consecutive copy rects
@@ -6,11 +16,16 @@
    changed rfbUndrawCursor(rfbClientPtr) to (rfbScreenInfoPtr), because
    	   this makes more sense!
    flag backgroundLoop in rfbScreenInfo (if having pthreads)
-   rfbCopyRect & rfbCopyRegion (really copies rectangle in frameBuffer)
-   added flag to optionally not send XCursor updates.
+   CopyRect & CopyRegion were implemented.
+	if you use a rfbDoCopyR* function, it copies the data in the
+	framebuffer. If you prefer to do that yourself, use rfbScheduleCopyR*
+	instead; this doesn't modify the frameBuffer.
+   added flag to optionally not send XCursor updates, but only RichCursor,
+	or if that is not possible, fall back to server side cursor.
+	This is useful if your cursor has many nice colours.
    fixed java viewer on server side:
 	SendCursorUpdate would send data even before the client pixel format
-	was set.
+	was set, but the java applet doesn't like the server's format.
    fixed two pthread issues:
 	rfbSendFramebuffer was sent by a ProcessClientMessage function
 	(unprotected by updateMutex).

@@ -738,15 +738,20 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
 void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
 void doNothingWithClient(rfbClientPtr cl);
 
-/* functions to make a vnc server */
-extern rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
- int width,int height,int bitsPerSample,int samplesPerPixel,
- int bytesPerPixel);
+/* if you use pthreads, but don't define HAVE_PTHREADS, the structs
+   get all mixed up. So this gives a linker error reminding you to compile
+   the library and your application (at least the parts including rfb.h)
+   with the same support for pthreads. */
 #ifdef HAVE_PTHREADS
 #define rfbInitServer rfbInitServerWithPthreads
 #else
 #define rfbInitServer rfbInitServerWithoutPthreads
 #endif
+
+/* functions to make a vnc server */
+extern rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
+ int width,int height,int bitsPerSample,int samplesPerPixel,
+ int bytesPerPixel);
 extern void rfbInitServer(rfbScreenInfoPtr rfbScreen);
 extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
 
