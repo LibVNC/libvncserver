@@ -6,6 +6,7 @@
    pthreads now work
    cleaned up mac.c (from original OSXvnc); now compiles (untested!)
    compiles cleanly on Linux, IRIX, BSD, Apple
+   fixed prototypes
 0.1
    rewrote API to use pseudo-methods instead of required functions.
    lots of clean up.

@@ -143,14 +143,14 @@ typedef struct
        routines can invoke the cursor routines, but also the cursor routines
        themselves end up invoking drawing routines.
 
-       Removing the cursor (rfbSpriteRemoveCursor) is eventually achieved by
+       Removing the cursor (rfbUndrawCursor) is eventually achieved by
        doing a CopyArea from a pixmap to the screen, where the pixmap contains
        the saved contents of the screen under the cursor.  Before doing this,
        however, we set cursorIsDrawn to FALSE.  Then, when CopyArea is called,
        it sees that cursorIsDrawn is FALSE and so doesn't feel the need to
        (recursively!) remove the cursor before doing it.
 
-       Putting up the cursor (rfbSpriteRestoreCursor) involves a call to
+       Putting up the cursor (rfbDrawCursor) involves a call to
        PushPixels.  While this is happening, cursorIsDrawn must be FALSE so
        that PushPixels doesn't think it has to remove the cursor first.
        Obviously cursorIsDrawn is set to TRUE afterwards.
@@ -175,23 +175,8 @@ typedef struct
     int cursorX, cursorY,underCursorBufferLen;
     char* underCursorBuffer;
    
-    /* wrapped screen functions */
-
-  /*
-    CloseScreenProcPtr			CloseScreen;
-    CreateGCProcPtr			CreateGC;
-    PaintWindowBackgroundProcPtr	PaintWindowBackground;
-    PaintWindowBorderProcPtr		PaintWindowBorder;
-    CopyWindowProcPtr			CopyWindow;
-    ClearToBackgroundProcPtr		ClearToBackground;
-    RestoreAreasProcPtr			RestoreAreas;
-  */
-
     /* additions by libvncserver */
 
-  /*
-    ScreenRec screen;
-  */
     rfbPixelFormat rfbServerFormat;
     rfbColourMap colourMap; /* set this if rfbServerFormat.trueColour==FALSE */
     char* desktopName;
@@ -628,6 +613,7 @@ extern void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cu
 extern void rfbFreeCursor(rfbCursorPtr cursor);
 extern void rfbDrawCursor(rfbClientPtr cl);
 extern void rfbUndrawCursor(rfbClientPtr cl);
+extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld);
 
 /* cursor handling for the pointer */
 extern void defaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);

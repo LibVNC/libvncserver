@@ -472,3 +472,29 @@ void rfbPrintXCursor(rfbCursorPtr cursor)
       putchar('\n');
    }
 }
+
+extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
+{
+  rfbClientPtr cl;
+#ifdef HAVE_PTHREADS
+  pthread_mutex_lock(rfbScreen->cursor->mutex);
+#endif
+  for(cl=rfbScreen->rfbClientHead;cl;cl=cl->next)
+    if(cl->sock>=0) {
+#ifdef HAVE_PTHREADS
+      pthread_mutex_lock(cl->updateMutex);
+#endif
+      rfbUndrawCursor(cl);
+#ifdef HAVE_PTHREADS
+      pthread_mutex_unlock(cl->updateMutex);
+#endif
+    }
+#ifdef HAVE_PTHREADS
+  pthread_mutex_unlock(rfbScreen->cursor->mutex);
+#endif
+  
+  if(freeOld && rfbScreen->cursor)
+    rfbFreeCursor(rfbScreen->cursor);
+
+  rfbScreen->cursor = c;
+}
