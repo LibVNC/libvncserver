@@ -457,11 +457,11 @@ ScreenInit(int argc, char**argv)
 			   CGDisplayPixelsHigh(kCGDirectMainDisplay),
 			   bitsPerSample,
 			   CGDisplaySamplesPerPixel(kCGDirectMainDisplay),4);
-  rfbScreen->rfbServerFormat.redShift = bitsPerSample*2;
-  rfbScreen->rfbServerFormat.greenShift = bitsPerSample*1;
-  rfbScreen->rfbServerFormat.blueShift = 0;
+  rfbScreen->serverFormat.redShift = bitsPerSample*2;
+  rfbScreen->serverFormat.greenShift = bitsPerSample*1;
+  rfbScreen->serverFormat.blueShift = 0;
 
-  gethostname(rfbScreen->rfbThisHost, 255);
+  gethostname(rfbScreen->thisHost, 255);
   rfbScreen->paddedWidthInBytes = CGDisplayBytesPerRow(kCGDirectMainDisplay);
   rfbScreen->frameBuffer =
     (char *)CGDisplayBaseAddress(kCGDirectMainDisplay);
@@ -470,7 +470,7 @@ ScreenInit(int argc, char**argv)
   rfbScreen->kbdAddEvent = KbdAddEvent;
 
   if(sharedMode) {
-    rfbScreen->rfbAlwaysShared = TRUE;
+    rfbScreen->alwaysShared = TRUE;
   }
 
   rfbInitServer(rfbScreen);
