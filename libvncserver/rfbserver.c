@@ -410,6 +410,9 @@ rfbClientConnectionGone(cl)
     if (cl->next)
         cl->next->prev = cl->prev;
 
+    if(cl->sock)
+	close(cl->sock);
+
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     FreeZrleData(cl);
 #endif
