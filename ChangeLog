@@ -1,3 +1,7 @@
+2004-03-22  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* fix cargs.c (hopefully for the last time):
+	  arguments were not correctly purged
+
 2004-03-15  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* fix libvncserver-config to again return a linker when
 	  called with --link

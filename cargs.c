@@ -46,7 +46,6 @@ void rfbPurgeArguments(int* argc,int* position,int count,char *argv[])
   if(amount)
     memmove(argv+(*position),argv+(*position)+count,sizeof(char*)*amount);
   (*argc)-=count;
-  (*position)--;
 }
 
 rfbBool 
@@ -127,11 +126,12 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	    }
             rfbScreen->progressiveSliceHeight = atoi(argv[++i]);
         } else {
-	    /* we just remove the processed arguments from the list */
-	    if(i != i1)
-	        rfbPurgeArguments(argc,&i1,i-i1,argv);
-        }
-	i1++;
+	    i++;
+	    i1=i;
+	    continue;
+	}
+	/* we just remove the processed arguments from the list */
+	rfbPurgeArguments(argc,&i1,i-i1+1,argv);
 	i=i1;
     }
     return TRUE;
@@ -157,12 +157,11 @@ rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[])
         } else if (strcmp(argv[i], "-height") == 0) {
                *height = atoi(argv[++i]);
         } else {
-	    /* we just remove the processed arguments from the list */
-	    if(i != i1)
-	    if(i != i1)
-	        rfbPurgeArguments(argc,&i1,i-i1,argv);
-        }
-	i1++;
+	    i++;
+	    i1=i;
+	    continue;
+	}
+	rfbPurgeArguments(argc,&i1,i-i1,argv);
 	i=i1;
     }
     return TRUE;
