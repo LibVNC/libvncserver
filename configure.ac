@@ -5,7 +5,11 @@ AM_CONFIG_HEADER([include/rfbconfig.h])
 
 # Checks for programs.
 AC_PROG_CC
-CCLD="\$(CC)"
+if test -z "$CC"; then
+	CCLD="\$(CC)"
+else
+	CCLD="$CC"
+fi
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 
@@ -55,7 +59,11 @@ if test ! -z "$HAVE_ZLIB_H"; then
 		if test x$CXX != xnone; then
 			AC_DEFINE(HAVE_ZRLE)
 			AC_PROG_CXX
-			CCLD="\$(CXX)"
+			if test -z "$CXX"; then
+				CCLD="\$(CXX)"
+			else
+				CCLD="$CXX"
+			fi
 		fi
 	fi
 else
