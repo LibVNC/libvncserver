@@ -1,3 +1,7 @@
+2004-03-15  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* fix libvncserver-config to again return a linker when
+	  called with --link
+
 2004-03-10  Karl Runge <runge@karlrunge.com>
 	* x11vnc options -vncconnect, -connect, -remap,
 	  -debug_pointer, and -debug_keyboard

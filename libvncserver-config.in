@@ -63,7 +63,7 @@ while test $# -gt 0; do
       echo "$libdirs" -lvncserver @LIBS@
       ;;
     --link)
-      echo @CCLD@
+      echo @CC@
       ;;
     *)
       echo "${usage}" 1>&2
