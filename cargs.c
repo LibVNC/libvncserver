@@ -35,6 +35,17 @@ rfbUsage(void)
     exit(1);
 }
 
+/* purges COUNT arguments from ARGV at POSITION and decrements ARGC.
+   POSITION points to the first non purged argument afterwards. */
+void rfbPurgeArguments(int* argc,int* position,int count,char *argv[])
+{
+  int amount=(*argc)-(*position)-count;
+  if(amount)
+    memmove(argv+(*position),argv+(*position)+count,sizeof(char*)*amount);
+  (*argc)-=count;
+  (*position)--;
+}
+
 void 
 rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 {
@@ -80,12 +91,10 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
                rfbScreen->height = atoi(argv[++i]);
         } else {
 	    /* we just remove the processed arguments from the list */
-	    if(i != i1) {
-	        memmove(argv+i1,argv+i,sizeof(char*)*(*argc-i));
-		*argc -= i-i1;
-	    }
+	    if(i != i1)
+	        rfbPurgeArguments(argc,&i,i1-i,argv);
 	    i1++;
-	    i = i1-1;
+	    i++;
         }
     }
     *argc -= i-i1;

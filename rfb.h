@@ -760,6 +760,7 @@ extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,
 /* cargs.c */
 
 extern void rfbUsage();
+extern void rfbPurgeArguments(int* argc,int* position,int count,char *argv[]);
 extern void rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[]);
 extern void rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[]);
 
