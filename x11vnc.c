@@ -11,6 +11,8 @@
 #include <sys/shm.h>
 #endif
 #define KEYSYM_H
+#undef Bool
+#define KeySym RFBKeySym
 #include "rfb.h"
 
 Display *dpy = 0;
@@ -24,6 +26,7 @@ Bool sharedMode = FALSE;
 Bool disconnectAfterFirstClient = TRUE;
 
 /* keyboard handling */
+#define KBDDEBUG
 
 char modifiers[0x100];
 KeyCode keycodes[0x100],leftShiftCode,rightShiftCode,altGrCode;
@@ -38,18 +41,34 @@ void init_keycodes()
   XDisplayKeycodes(dpy,&minkey,&maxkey);
   keymap=XGetKeyboardMapping(dpy,minkey,(maxkey - minkey + 1),&syms_per_keycode);
 
+#ifdef KBDDEBUG
+  fprintf(stderr,"minkey=%d, maxkey=%d, syms_per_keycode=%d\n",
+	  minkey,maxkey,syms_per_keycode);
+#endif
   for (i = minkey; i <= maxkey; i++)
     for(j=0;j<syms_per_keycode;j++) {
       key=keymap[(i-minkey)*syms_per_keycode+j];
+#ifdef KBDDEBUG
+      fprintf(stderr,"keymap(i=0x%x,j=%d)==0x%lx\n",i,j,key);
+#endif
       if(key>=' ' && key<0x100 && i==XKeysymToKeycode(dpy,key)) {
 	keycodes[key]=i;
 	modifiers[key]=j;
+#ifdef KBDDEBUG
+	fprintf(stderr,"key 0x%lx (%c): keycode=0x%x, modifier=%d\n",
+		key,(char)key,i,j);
+#endif
       }
     }
 
   leftShiftCode=XKeysymToKeycode(dpy,XK_Shift_L);
   rightShiftCode=XKeysymToKeycode(dpy,XK_Shift_R);
   altGrCode=XKeysymToKeycode(dpy,XK_Mode_switch);
+
+#ifdef KBDDEBUG
+  fprintf(stderr,"leftShift=0x%x, rightShift=0x%x, altGr=0x%x\n",
+	  leftShiftCode,rightShiftCode,altGrCode);
+#endif
 
   XFree ((char *) keymap);
 }
@@ -61,7 +80,7 @@ void clientGone(rfbClientPtr cl)
   exit(0);
 }
 
-void newClient(rfbClientPtr cl)
+enum rfbNewClientAction newClient(rfbClientPtr cl)
 {
   if(disconnectAfterFirstClient)
     cl->clientGoneHook = clientGone;
@@ -69,6 +88,7 @@ void newClient(rfbClientPtr cl)
     cl->clientData = (void*)-1;
   else
     cl->clientData = (void*)0;
+  return(RFB_CLIENT_ACCEPT);
 }
 
 #define LEFTSHIFT 1
@@ -81,6 +101,10 @@ char ModifierState = 0;
 void tweakModifiers(char mod,Bool down)
 {
   Bool isShift=ModifierState&(LEFTSHIFT|RIGHTSHIFT);
+#ifdef KBDDEBUG
+  fprintf(stderr,"tweakModifiers: 0x%x %s\n",
+	  mod,down?"down":"up");
+#endif
   if(mod<0) return;
   if(isShift && mod!=1) {
     if(ModifierState&LEFTSHIFT)
@@ -108,6 +132,11 @@ void keyboard(Bool down,KeySym keySym,rfbClientPtr cl)
   ADJUSTMOD(XK_Shift_R,RIGHTSHIFT)
   ADJUSTMOD(XK_Mode_switch,ALTGR)
 
+#ifdef KBDDEBUG
+    fprintf(stderr,"keyboard: down=%s, keySym=0x%lx (%s), ModState=0x%x\n",
+	    down?"down":"up",keySym,XKeysymToString(keySym),ModifierState);
+#endif
+
   if(keySym>=' ' && keySym<0x100) {
     KeyCode k;
     if(down)
@@ -119,7 +148,6 @@ void keyboard(Bool down,KeySym keySym,rfbClientPtr cl)
       XTestFakeKeyEvent(dpy,k,down,CurrentTime);
       gotInput = TRUE;
     }
-    /*XTestFakeKeyEvent(dpy,keycodes[keySym],down,CurrentTime);*/
     if(down)
       tweakModifiers(modifiers[keySym],False);
     gotInput = TRUE;
@@ -462,7 +490,7 @@ int main(int argc,char** argv)
 	rfbClientPtr cl;
 	for(cl=screen->rfbClientHead;cl;cl=cl->next)
 	  if(!strcmp(message+1,cl->host)) {
-	    cl->clientData=(cl->clientData==0)?-1:0;
+	    cl->clientData=(void*)((cl->clientData==0)?-1:0);
 	    break;
 	  }
       }
