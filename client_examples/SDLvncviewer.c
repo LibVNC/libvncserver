@@ -27,7 +27,7 @@ static rfbBool resize(rfbClient* client) {
 		}
 	} else {
 		SDL_Surface* sdl=client->clientData;
-		fprintf(stderr,"Could not set resolution %dx%d!\n",
+		rfbClientLog("Could not set resolution %dx%d!\n",
 				client->width,client->height);
 		if(sdl) {
 			client->width=sdl->w;
@@ -167,15 +167,18 @@ rfbKeySym SDL_keysym2rfbKeySym(int keysym) {
 	case SDLK_LALT: return XK_Alt_L;
 	case SDLK_RMETA: return XK_Meta_R;
 	case SDLK_LMETA: return XK_Meta_L;
-	//case SDLK_LSUPER: return XK_LSuper;		/* left "windows" key */
-	//case SDLK_RSUPER: return XK_RSuper;		/* right "windows" key */
+#if 0
+	/* TODO: find out keysyms */
+	case SDLK_LSUPER: return XK_LSuper;		/* left "windows" key */
+	case SDLK_RSUPER: return XK_RSuper;		/* right "windows" key */
+	case SDLK_COMPOSE: return XK_Compose;
+#endif
 	case SDLK_MODE: return XK_Mode_switch;
-	//case SDLK_COMPOSE: return XK_Compose;
 	case SDLK_HELP: return XK_Help;
 	case SDLK_PRINT: return XK_Print;
 	case SDLK_SYSREQ: return XK_Sys_Req;
 	case SDLK_BREAK: return XK_Break;
-	default: fprintf(stderr,"Unknown keysym: %d\n",keysym);
+	default: rfbClientLog("Unknown keysym: %d\n",keysym);
 	}
 }
 
@@ -195,15 +198,6 @@ int main(int argc,char** argv) {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
 
 	cl=rfbGetClient(5,3,2);
-	i=1;
-	while(i<argc-1) {
-		if(i+1<argc-1 && !strcmp(argv[i],"-encodings")) {
-			cl->appData.encodingsString=argv[i+1];
-			i+=2;
-		}
-	}
-	argc-=i-1;
-	memmove(argv+1,argv+i,(argc-1)*sizeof(char*));
 	cl->MallocFrameBuffer=resize;
 	cl->GotFrameBufferUpdate=update;
 	if(!rfbInitClient(cl,&argc,argv))
@@ -238,6 +232,10 @@ int main(int argc,char** argv) {
 				case SDL_QUIT:
 					rfbClientCleanup(cl);
 					return 0;
+				case SDL_ACTIVEEVENT:
+					break;
+				default:
+					rfbClientLog("ignore SDL event: 0x%x\n",e.type);
 			}
 		else {
 			i=WaitForMessage(cl,500);
