@@ -1,8 +1,9 @@
 immediate:
 ----------
 
+x11vnc: clipboard, cursor, updates interruptible by input
 extra_bytes in rfbDrawCharWithClip.
-in keysym tested mouse buttons make copy rect, but text is not marked as mod.
+tested mouse buttons make copy rect, but text is not marked as mod.
 cursor drawing: set optional grain to mark bigger rectangles as drawn (else
 	you end up with thousands of one-pixel-rectangles to encode).
 selectbox: scroll bars
