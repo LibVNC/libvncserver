@@ -35,30 +35,33 @@ AC_SUBST(X_LIBS)
 AM_CONDITIONAL(HAVE_X, test $HAVE_X != "false")
 
 # Checks for libraries.
-AC_CHECK_HEADERS(jpeglib.h pthread.h zlib.h)
-if test ! -z "$HAVE_JPEGLIB.H"; then
+AC_CHECK_HEADER(jpeglib.h, HAVE_JPEGLIB_H="true")
+AC_CHECK_HEADER(pthread.h, HAVE_PTHREAD_H="true")
+AC_CHECK_HEADER(zlib.h, HAVE_ZLIB_H="true")
+if test ! -z "$HAVE_JPEGLIB_H"; then
 	AC_CHECK_LIB(jpeg, jpeg_CreateCompress)
 fi
-if test ! -z "$HAVE_PTHREAD.H"; then
+if test ! -z "$HAVE_PTHREAD_H"; then
 	AC_CHECK_LIB(pthread, pthread_mutex_lock)
 	AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
 fi
-#AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_PTHREAD.H")
 AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
-if test ! -z "$HAVE_ZLIB.H"; then
-	AC_CHECK_LIB(z, deflate)
-	# check for c++, but don't fail if not found
-	AC_CHECK_PROGS(CXX,[g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC],none)
-	AH_TEMPLATE(HAVE_ZRLE, [Use zrle compression; needs a c++ compiler])
-	if test x$CXX != xnone; then
-		AC_DEFINE(HAVE_ZRLE)
-		AC_PROG_CXX
-		CCLD="\$(CXX)"
+if test ! -z "$HAVE_ZLIB_H"; then
+	AC_CHECK_LIB(z, deflate, , HAVE_ZLIB_H="")
+	if test ! -z "$HAVE_ZLIB_H"; then
+		# check for c++, but don't fail if not found
+		AC_CHECK_PROGS(CXX,[g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC],none)
+		AH_TEMPLATE(HAVE_ZRLE, [Use zrle compression; needs a c++ compiler])
+		if test x$CXX != xnone; then
+			AC_DEFINE(HAVE_ZRLE)
+			AC_PROG_CXX
+			CCLD="\$(CXX)"
+		fi
 	fi
 else
 	CXX=none
 fi
-AM_CONDITIONAL(HAVE_CXX, test x$CXX != xnone)
+AM_CONDITIONAL(HAVE_CXX, test x$CXX != xnone -a ! -z "$HAVE_ZLIB_H")
 AC_SUBST(CCLD)
 
 # Checks for header files.
