@@ -54,6 +54,15 @@
 #define DEFAULT_VIA_CMD     \
   (DEFAULT_SSH_CMD " -f -L %L:%H:%R %G sleep 20")
 
+/* vncrec */
+
+typedef struct {
+  FILE* file;
+  struct timeval tv;
+  rfbBool readTimestamp;
+  rfbBool doNotSleep;
+} rfbVNCRec;
+
 
 typedef struct {
   rfbBool shareDesktop;
@@ -94,7 +103,7 @@ typedef struct _rfbClient {
 
 	const char* programName;
 	const char* serverHost;
-	int serverPort;
+	int serverPort; /* if -1, then use file recorded by vncrec */
 	rfbBool listenSpecified;
 	int listenPort, flashPort;
 
@@ -123,11 +132,14 @@ typedef struct _rfbClient {
 	/* private data pointer */
 	void* clientData;
 
+	rfbVNCRec* vncRec;
+
 	/* hooks */
 	HandleCursorPosProc HandleCursorPos;
 	SoftCursorLockAreaProc SoftCursorLockArea;
 	SoftCursorUnlockScreenProc SoftCursorUnlockScreen;
 	GotFrameBufferUpdateProc GotFrameBufferUpdate;
+	/* the pointer returned by GetPassword will be freed after use! */
 	GetPasswordProc GetPassword;
 	MallocFrameBufferProc MallocFrameBuffer;
 	BellProc Bell;
