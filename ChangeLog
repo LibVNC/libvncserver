@@ -1,3 +1,9 @@
+2004-02-19  Karl Runge <runge@karlrunge.com>
+	* x11vnc options -nosel -noprimary -visual.
+	* add clipboard/selection handling.
+	* add visual option (mostly for testing and workarounds).
+	* improve shm cleanup on failures.
+
 2004-02-04  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* Make examples (at least a few) compileable with g++,
 	  as pointed out by Juan Jose Costello
@@ -14,7 +20,7 @@
 	* ignore SIGPIPE; it is handled by EPIPE
 	* add an example how to use rfbDoCopyRect
 	* add experimental progressive updating (off by default)
-	
+
 2004-01-19  Karl Runge <runge@karlrunge.com>
 	* handle mouse button number mismatch
 	* improved pointer input handling during drags, etc.
@@ -44,7 +50,7 @@
 	  bootstrap.sh, config.h.in, configure,
 	  depcomp, install-sh, missing, mkinstalldirs,
 	Removed auto-generated files from CVS.
-	
+
 2003-09-11  Mark McLoughlin  <mark@skynet.ie>
 
 	* rdr/Exception.h, rdr/FdInStream.cxx, rdr/FdInStream.h,

@@ -102,6 +102,7 @@
 #include <X11/extensions/XShm.h>
 #include <X11/extensions/XTest.h>
 #include <X11/keysym.h>
+#include <X11/Xatom.h>
 
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -111,6 +112,7 @@
 #ifdef LIBVNCSERVER_HAVE_XKEYBOARD
 #include <X11/XKBlib.h>
 #endif
+
 
 /* X and rfb framebuffer */
 Display *dpy = 0;
@@ -187,7 +189,7 @@ int show_dragging = 1;		/* process mouse movement events */
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
 
 int old_pointer = 0;		/* use the old way of updating the pointer */
-int old_copytile = 0;		/* use the old way copy_tile() */
+int single_copytile = 0;	/* use the old way copy_tile() */
 
 int using_shm = 1;		/* whether mit-shm is used */
 int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
@@ -205,6 +207,10 @@ int naptile = 3;	/* tile change threshold per poll to take a nap */
 int napfac = 4;		/* time = napfac*waitms, cut load with extra waits */
 int napmax = 1500;	/* longest nap in ms. */
 int ui_skip = 10;	/* see watchloop.  negative means ignore input */
+
+/* for -visual override */
+VisualID visual_id = (VisualID) 0;
+int visual_depth = 0;
 
 int nap_ok = 0, nap_diff_count = 0;
 time_t last_event, last_input;
@@ -286,7 +292,7 @@ void clean_up_exit (int ret) {
 
 	for(i=1; i<=ntiles_x; i++) {
 		shm_clean(&tile_row_shm[i], tile_row[i]);
-		if (old_copytile && i == 1) {
+		if (single_copytile && i >= single_copytile) {
 			break;
 		}
 	}
@@ -332,8 +338,8 @@ void interrupted (int sig) {
 	 * as one might like... sometimes need to run ipcrm(1). 
 	 */
 	for(i=1; i<=ntiles_x; i++) {
-		shm_clean(&tile_row_shm[i], tile_row[i]);
-		if (old_copytile && i == 1) {
+		shm_delete(&tile_row_shm[i]);
+		if (single_copytile && i >= single_copytile) {
 			break;
 		}
 	}
@@ -511,10 +517,12 @@ void DebugXTestFakeKeyEvent(Display* dpy, KeyCode keysym, Bool down, time_t cur_
 }
 
 /*
- * Uncomment the next line to aid in debugging keymapping problems.
+ * Uncomment the two lines to aid in debugging keymapping problems.
  */
-
-/* #define XTestFakeKeyEvent DebugXTestFakeKeyEvent */
+/*
+#define XTestFakeKeyEvent DebugXTestFakeKeyEvent
+#define DebugKeyEvent
+*/
 
 void tweak_mod(signed char mod, rfbBool down) {
 	rfbBool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
@@ -593,7 +601,7 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr
 static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 
-#ifdef DebugXTestFakeKeyEvent
+#ifdef DebugKeyEvent
 	X_LOCK;
 	rfbLog("keyboard(%s,%s(0x%x),client)\n",
 	    down?"down":"up",XKeysymToString(keysym),(int)keysym);
@@ -899,6 +907,386 @@ void watch_bell_event() {
 void watch_bell_event() {}
 #endif
 
+
+/*
+ * Selection/Cutbuffer/Clipboard handlers.
+ */
+
+int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
+int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */
+int own_selection = 0;		/* whether we currently own PRIMARY or not */
+int set_cutbuffer = 0;		/* to avoid bouncing the CutText right back */
+int sel_waittime = 5;		/* some seconds to skip before first send */
+Window selwin;			/* special window for our selection */
+
+/*
+ * This is where we keep our selection: the string sent TO us from VNC
+ * clients, and the string sent BY us to requesting X11 clients.
+ */
+char *xcut_string = NULL;
+
+/*
+ * Our callbacks instruct us to check for changes in the cutbuffer
+ * and PRIMARY selection on the local X11 display.
+ *
+ * We store the new cutbuffer and/or PRIMARY selection data in this
+ * constant sized array selection_str[].
+ * TODO: check if malloc does not cause performance issues (esp. WRT
+ * SelectionNotify handling).
+ */
+#define PROP_MAX (131072L)
+char selection_str[PROP_MAX+1];
+
+/*
+ * An X11 (not VNC) client on the local display has requested the selection
+ * from us (because we are the current owner).
+ *
+ * n.b.: our caller already has the X_LOCK.
+ */
+void selection_request(XEvent *ev) {
+	XSelectionEvent notify_event;
+	XSelectionRequestEvent *req_event;
+	unsigned int length;
+	unsigned char *data;
+#ifndef XA_LENGTH
+	unsigned long XA_LENGTH = XInternAtom(dpy, "LENGTH", True);
+#endif
+
+	req_event = &(ev->xselectionrequest);
+	notify_event.type 	= SelectionNotify;
+	notify_event.display	= req_event->display;
+	notify_event.requestor	= req_event->requestor;
+	notify_event.selection	= req_event->selection;
+	notify_event.target	= req_event->target;
+	notify_event.time	= req_event->time;
+
+	if (req_event->property == None) {
+		notify_event.property = req_event->target;
+	} else {
+		notify_event.property = req_event->property;
+	}
+	if (xcut_string) {
+		length = strlen(xcut_string);
+	} else {
+		length = 0;
+	}
+
+
+	if (ev->xselectionrequest.target == XA_LENGTH) {
+		/* length request */
+
+		XChangeProperty(ev->xselectionrequest.display,
+		    ev->xselectionrequest.requestor,
+		    ev->xselectionrequest.property,
+		    ev->xselectionrequest.target, 32, PropModeReplace,
+		    (unsigned char *) &length, sizeof(unsigned int));
+
+	} else {
+		/* data request */
+
+		data = (unsigned char *)xcut_string;
+
+		XChangeProperty(ev->xselectionrequest.display,
+		    ev->xselectionrequest.requestor,
+		    ev->xselectionrequest.property,
+		    ev->xselectionrequest.target, 8, PropModeReplace,
+		    data, length);
+	}
+
+	XSendEvent(req_event->display, req_event->requestor, False, 0,
+	    (XEvent *)&notify_event);
+
+	XFlush(dpy);
+}
+
+/*
+ * CUT_BUFFER0 property on the local display has changed, we read and
+ * store it and send it out to any connected VNC clients.
+ *
+ * n.b.: our caller already has the X_LOCK.
+ */
+void cutbuffer_send() {
+	Atom type;
+	int format, slen, dlen;
+	unsigned long nitems = 0, bytes_after = 0;
+	unsigned char* data = NULL;
+
+	selection_str[0] = '\0';
+	slen = 0;
+
+	/* read the property value into selection_str: */
+	do {
+		if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
+		    XA_CUT_BUFFER0, nitems/4, PROP_MAX/16, False,
+		    AnyPropertyType, &type, &format, &nitems, &bytes_after,
+		    &data) == Success) {
+
+			dlen = nitems * (format/8);
+			if (slen + dlen > PROP_MAX) {
+				/* too big */
+				rfbLog("warning: truncating large CUT_BUFFER0"
+				   " selection > %d bytes.\n", PROP_MAX);
+				XFree(data);
+				break;
+			}
+			memcpy(selection_str+slen, data, dlen);
+			slen += dlen;
+			selection_str[slen] = '\0';
+			XFree(data);
+		}
+	} while (bytes_after > 0);
+
+	selection_str[PROP_MAX] = '\0';
+
+	/* now send it to any connected VNC clients (rfbServerCutText) */
+	rfbSendServerCutText(screen, selection_str, strlen(selection_str));
+}
+
+/* 
+ * "callback" for our SelectionNotify polling.  We try to determine if
+ * the PRIMARY selection has changed (checking length and first CHKSZ bytes)
+ * and if it has we store it and send it off to any connected VNC clients.
+ *
+ * n.b.: our caller already has the X_LOCK.
+ *
+ * TODO: if we were willing to use libXt, we could perhaps get selection
+ * timestamps to speed up the checking... XtGetSelectionValue().
+ */
+#define CHKSZ 32
+void selection_send(XEvent *ev) {
+	Atom type;
+	int format, slen, dlen, oldlen, newlen, toobig = 0;
+	static int skip_count = 2, err = 0, sent_one = 0;
+	char before[CHKSZ], after[CHKSZ];
+	unsigned long nitems = 0, bytes_after = 0;
+	unsigned char* data = NULL;
+
+	/*
+	 * remember info about our last value of PRIMARY (or CUT_BUFFER0)
+	 * so we can check for any changes below.
+	 */
+	oldlen = strlen(selection_str);
+	strncpy(before, selection_str, CHKSZ);
+
+	selection_str[0] = '\0';
+	slen = 0;
+
+	/* read in the current value of PRIMARY: */
+	do {
+		if (XGetWindowProperty(dpy, ev->xselection.requestor,
+		    ev->xselection.property, nitems/4, PROP_MAX/16, True,
+		    AnyPropertyType, &type, &format, &nitems, &bytes_after,
+		    &data) == Success) {
+
+			dlen = nitems * (format/8);
+			if (slen + dlen > PROP_MAX) {
+				/* too big */
+				toobig = 1;
+				XFree(data);
+				if (err) {	/* cut down on messages */
+					break;
+				} else {
+					err = 5;
+				}
+				rfbLog("warning: truncating large PRIMARY"
+				   " selection > %d bytes.\n", PROP_MAX);
+				break;
+			}
+			memcpy(selection_str+slen, data, dlen);
+			slen += dlen;
+			selection_str[slen] = '\0';
+			XFree(data);
+		}
+	} while (bytes_after > 0);
+
+	if (! toobig) {
+		err = 0;
+	} else if (err) {
+		err--;
+	}
+
+	if (! sent_one) {
+		/* try to force a send first time in */
+		oldlen = -1;
+		sent_one = 1;
+	}
+
+	/* look for changes in the new value */
+	newlen = strlen(selection_str);
+	strncpy(after, selection_str, CHKSZ);
+
+	if (oldlen == newlen && strncmp(before, after, CHKSZ) == 0) {
+		/* evidently no change */
+		return;
+	}
+	if (newlen == 0) {
+		/* do not bother sending a null string out */
+		return;
+	}
+
+	/* now send it to any connected VNC clients (rfbServerCutText) */
+	rfbSendServerCutText(screen, selection_str, newlen);
+}
+
+/*
+ * This routine is periodically called to check for selection related
+ * X11 events and respond to them as needed.
+ */
+void watch_selection_event() {
+	XEvent xev;
+	static int last_request = 0, first = 1, sent_sel = 0, starttime;
+
+	X_LOCK;
+	if (first) {
+		/* create fake window for our selection ownership, etc */
+		selwin = XCreateSimpleWindow(dpy, rootwin, 0, 0, 1, 1, 0, 0, 0);
+
+		/*
+		 * register desired event(s) for notification.
+		 * PropertyChangeMask is for CUT_BUFFER0 changes.
+		 * TODO: does this cause a flood of other stuff?
+		 */
+		XSelectInput(dpy, rootwin, PropertyChangeMask);
+
+		starttime = time(0);
+
+		first = 0;
+	}
+
+	/*
+	 * There is a bug where we have to wait before sending text to
+	 * the client... so instead of sending right away we wait a
+	 * the few seconds.
+	 */
+	if (! sent_sel && time(0) > starttime + sel_waittime) {
+		if (XGetSelectionOwner(dpy, XA_PRIMARY) == None) {
+			cutbuffer_send();
+		}
+		sent_sel = 1;
+	}
+
+	/* check for CUT_BUFFER0 change: */
+	if (XCheckTypedEvent(dpy, PropertyNotify, &xev)) {
+		if (xev.type == PropertyNotify &&
+		    xev.xproperty.atom == XA_CUT_BUFFER0) {
+	
+			/*
+			 * Go retrieve CUT_BUFFER0 and send it.
+			 *
+			 * set_cutbuffer is a flag to try to avoid processing
+			 * our own cutbuffer changes.
+			 */
+			if (! set_cutbuffer) {
+				cutbuffer_send();
+				sent_sel = 1;
+			}
+			set_cutbuffer = 0;
+		}
+	}
+
+	/* check for our PRIMARY request notification: */
+	if (watch_primary) {
+		if (XCheckTypedEvent(dpy, SelectionNotify, &xev)) {
+			if (xev.type == SelectionNotify &&
+			    xev.xselection.requestor == selwin &&
+			    xev.xselection.selection == XA_PRIMARY &&
+			    xev.xselection.property != None &&
+			    xev.xselection.target == XA_STRING) {
+
+				/* go retrieve PRIMARY and check it */
+				if (sent_sel ||
+				    time(0) > starttime + sel_waittime) {
+					selection_send(&xev);
+				}
+			}
+		}
+		if (time(0) > last_request + 1) {
+			/*
+			 * Every second or two, request PRIMARY, unless we
+			 * already own it or there is no owner.
+			 * TODO: even at this low rate we should look into
+			 * and performance problems in odds cases, etc.
+			 */
+			last_request = time(0);
+			if (! own_selection &&
+			    XGetSelectionOwner(dpy, XA_PRIMARY) != None) {
+				XConvertSelection(dpy, XA_PRIMARY, XA_STRING,
+				    XA_STRING, selwin, CurrentTime);
+			}
+		}
+	}
+
+	if (! own_selection) {
+		/*
+		 * no need to do the PRIMARY maintenance tasks below if
+		 * no we do not own it (right?).
+		 */
+		X_UNLOCK;
+		return;
+	}
+
+	/* we own PRIMARY, see if someone requested it: */
+	if (XCheckTypedEvent(dpy, SelectionRequest, &xev)) {
+		if (xev.type == SelectionRequest &&
+		    xev.xselectionrequest.selection == XA_PRIMARY) {
+			selection_request(&xev);
+		}
+	}
+
+	/* we own PRIMARY, see if we no longer own it: */
+	if (XCheckTypedEvent(dpy, SelectionClear, &xev)) {
+		if (xev.type == SelectionClear &&
+		    xev.xselectionclear.selection == XA_PRIMARY) {
+
+			own_selection = 0;
+			if (xcut_string) {
+				free(xcut_string);
+				xcut_string = NULL;
+			}
+		}
+	}
+	X_UNLOCK;
+}
+
+/*
+ * hook called when a VNC client sends us some "XCut" text (rfbClientCutText).
+ */
+void xcut_receive(char *text, int len, rfbClientPtr cl) {
+	static int first = 1;
+
+	if (text == NULL || len == 0) {
+		return;
+	}
+
+	X_LOCK;
+
+	/* associate this text with PRIMARY (and SECONDARY...) */
+	if (! own_selection) {
+		own_selection = 1;
+		/* we need to grab the PRIMARY selection */
+		XSetSelectionOwner(dpy, XA_PRIMARY, selwin, CurrentTime);
+		XFlush(dpy);
+	}
+
+	/* duplicate the text string for our own use. */
+	if (xcut_string != NULL) {
+		free(xcut_string);
+	}
+	xcut_string = (unsigned char *)
+	    malloc((size_t) (len+1) * sizeof(unsigned char));
+	strncpy(xcut_string, text, len);
+	xcut_string[len] = '\0';	/* make sure null terminated */
+
+	/* copy this text to CUT_BUFFER0 as well: */
+	XChangeProperty(dpy, rootwin, XA_CUT_BUFFER0, XA_STRING, 8,
+	    PropModeReplace, text, len);
+	XFlush(dpy);
+
+	X_UNLOCK;
+
+	set_cutbuffer = 1;
+}
+
 void mark_hint(hint_t);
 
 /*
@@ -1076,27 +1464,27 @@ void restore_mouse_patch() {
  * It seems impossible to do, but if the actual cursor could ever be
  * determined we might want to hash that info on window ID or something...
  */
-int tree_depth_cursor(void) {
+int tree_descend_cursor(void) {
 	Window r, c;
 	int rx, ry, wx, wy;
 	unsigned int mask;
-	int depth = 0, tries = 0, maxtries = 1;
+	int descend = 0, tries = 0, maxtries = 1;
 
 	X_LOCK;
 	c = window;
 	while (c) {
 		if (++tries > maxtries) {
-			depth = maxtries;
+			descend = maxtries;
 			break;
 		}
 		if ( XTestCompareCurrentCursorWithWindow(dpy, c) ) {
 			break;
 		}
 		XQueryPointer(dpy, c, &r, &c, &rx, &ry, &wx, &wy, &mask);
-		depth++;
+		descend++;
 	}
 	X_UNLOCK;
-	return depth;
+	return descend;
 }
 
 /*
@@ -1258,8 +1646,8 @@ void update_mouse(void) {
 	}
 
 	if (show_root_cursor) {
-		int depth;
-		if ( (depth = tree_depth_cursor()) ) {
+		int descend;
+		if ( (descend = tree_descend_cursor()) ) {
 			which = 0;
 		} else {
 			which = 1;
@@ -1397,6 +1785,58 @@ void set_colormap(void) {
 }
 
 /*
+ * Experimental mode to force the visual of the window instead of querying
+ * it.  Currently just used for testing or overriding some rare cases.
+ * Input string can be a decimal or 0x hex or something like TrueColor
+ * or TrueColor:24 to force a depth as well.
+ */
+void set_visual(char *vstring) {
+	int vis, defdepth = DefaultDepth(dpy, scr);
+	XVisualInfo vinfo;
+	char *p;
+
+	fprintf(stderr, "set_visual: %s\n", vstring);
+
+	if ((p = strchr(vstring, ':')) != NULL) {
+		visual_depth = atoi(p+1);
+		*p = '\0';
+	} else {
+		visual_depth = defdepth;
+	}
+	if (strcmp(vstring, "StaticGray") == 0) {
+		vis = StaticGray;
+	} else if (strcmp(vstring, "GrayScale") == 0) {
+		vis = GrayScale;
+	} else if (strcmp(vstring, "StaticColor") == 0) {
+		vis = StaticColor;
+	} else if (strcmp(vstring, "PseudoColor") == 0) {
+		vis = PseudoColor;
+	} else if (strcmp(vstring, "TrueColor") == 0) {
+		vis = TrueColor;
+	} else if (strcmp(vstring, "DirectColor") == 0) {
+		vis = DirectColor;
+	} else {
+		if (sscanf(vstring, "0x%x", &visual_id) != 1) {
+			if (sscanf(vstring, "%d", &visual_id) == 1) {
+				return;
+			}
+			fprintf(stderr, "bad -visual arg: %s\n", vstring);
+			exit(1);
+		}
+		return;
+	}
+	if (XMatchVisualInfo(dpy, scr, visual_depth, vis, &vinfo)) {
+		;
+	} else if (XMatchVisualInfo(dpy, scr, defdepth, vis, &vinfo)) {
+		;
+	} else {
+		fprintf(stderr, "could not find visual: %s\n", vstring);
+		exit(1);
+	}
+	visual_id = vinfo.visualid;
+}
+
+/*
  * Presumably under -nofb the clients will never request the framebuffer.
  * But we have gotten such a request... so let's just give them the
  * current view on the display.  n.b. x2vnc and perhaps win2vnc requests
@@ -1519,6 +1959,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->newClientHook = new_client;
 	screen->kbdAddEvent = keyboard;
 	screen->ptrAddEvent = pointer;
+	if (watch_selection) {
+		screen->setXCutText = xcut_receive;
+	}
 
 	if (local_cursor) {
 		cursor = rfbMakeXCursor(CUR_SIZE, CUR_SIZE, CUR_DATA, CUR_MASK);
@@ -1585,13 +2028,17 @@ void set_fs_factor(int max) {
 /*
  * set up an XShm image
  */
-void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
+int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
     char *name) {
 
 	XImage *xim;
 
+	shm->shmid = -1;
+	shm->shmaddr = (char *) -1;
+	*ximg_ptr = NULL;
+
 	if (nofb) {
-		return;
+		return 1;
 	}
 
 	X_LOCK;
@@ -1605,12 +2052,12 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 		if (xim == NULL) {
 			rfbErr("XCreateImage(%s) failed.\n", name);
-			exit(1);
+			return 0;
 		}
 		xim->data = (char *) malloc(xim->bytes_per_line * xim->height);
 		if (xim->data == NULL) {
 			rfbErr("XCreateImage(%s) data malloc failed.\n", name);
-			exit(1);
+			return 0;
 		}
 		if (flip_byte_order) {
 			static int reported = 0;
@@ -1632,18 +2079,18 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 		}
 
 		*ximg_ptr = xim;
-		return;
+		return 1;
 	}
 
 	xim = XShmCreateImage(dpy, visual, depth, ZPixmap, NULL, shm, w, h);
 
 	if (xim == NULL) {
 		rfbErr("XShmCreateImage(%s) failed.\n", name);
-		exit(1);
+		X_UNLOCK;
+		return 0;
 	}
 
 	*ximg_ptr = xim;
-
 
 	shm->shmid = shmget(IPC_PRIVATE,
 	    xim->bytes_per_line * xim->height, IPC_CREAT | 0777);
@@ -1651,7 +2098,12 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	if (shm->shmid == -1) {
 		rfbErr("shmget(%s) failed.\n", name);
 		perror("shmget");
-		exit(1);
+
+		XDestroyImage(xim);
+		*ximg_ptr = NULL;
+
+		X_UNLOCK;
+		return 0;
 	}
 
 	shm->shmaddr = xim->data = (char *) shmat(shm->shmid, 0, 0);
@@ -1659,25 +2111,48 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	if (shm->shmaddr == (char *)-1) {
 		rfbErr("shmat(%s) failed.\n", name);
 		perror("shmat");
-		exit(1);
+
+		XDestroyImage(xim);
+		*ximg_ptr = NULL;
+
+		shmctl(shm->shmid, IPC_RMID, 0);
+		shm->shmid = -1;
+
+		X_UNLOCK;
+		return 0;
 	}
 
 	shm->readOnly = False;
 
 	if (! XShmAttach(dpy, shm)) {
 		rfbErr("XShmAttach(%s) failed.\n", name);
-		exit(1);
+		XDestroyImage(xim);
+		*ximg_ptr = NULL;
+
+		shmdt(shm->shmaddr);
+		shm->shmaddr = (char *) -1;
+
+		shmctl(shm->shmid, IPC_RMID, 0);
+		shm->shmid = -1;
+
+		X_UNLOCK;
+		return 0;
 	}
 
 	X_UNLOCK;
+	return 1;
 }
 
 void shm_delete(XShmSegmentInfo *shm) {
 	if (! using_shm) {
 		return;
 	}
-	shmdt(shm->shmaddr);
-	shmctl(shm->shmid, IPC_RMID, 0);
+	if (shm->shmaddr != (char *) -1) {
+		shmdt(shm->shmaddr);
+	}
+	if (shm->shmid != -1) {
+		shmctl(shm->shmid, IPC_RMID, 0);
+	}
 }
 
 void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
@@ -1685,8 +2160,12 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 		return;
 	}
 	X_LOCK;
-	XShmDetach(dpy, shm);
-	XDestroyImage(xim);
+	if (shm->shmid != -1) {
+		XShmDetach(dpy, shm);
+	}
+	if (xim != NULL) {
+		XDestroyImage(xim);
+	}
 	X_UNLOCK;
 
 	shm_delete(shm);
@@ -1695,28 +2174,33 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 void initialize_shm() {
 	int i;
 
+	/* set all shm areas to "none" before trying to create any */
+	tile_shm.shmid		= -1;
+	tile_shm.shmaddr	= (char *) -1;
+	tile			= NULL;
+	scanline_shm.shmid	= -1;
+	scanline_shm.shmaddr	= (char *) -1;
+	scanline		= NULL;
+	fullscreen_shm.shmid	= -1;
+	fullscreen_shm.shmaddr	= (char *) -1;
+	fullscreen		= NULL;
+	for (i=1; i<=ntiles_x; i++) {
+		tile_row_shm[i].shmid	= -1;
+		tile_row_shm[i].shmaddr	= (char *) -1;
+		tile_row[i]		= NULL;
+	}
+
 	/* the tile (e.g. 32x32) shared memory area image: */
 
-	shm_create(&tile_shm, &tile, tile_x, tile_y, "tile"); 
-
-	/*
-	 * for copy_tiles we need a lot of shared memory areas, one for
-	 * each possible run length of changed tiles.  32 for 1024x768
-	 * and 40 for 1280x1024, etc. 
-	 */
-
-	for (i=1; i<=ntiles_x; i++) {
-		shm_create(&tile_row_shm[i], &tile_row[i], tile_x * i, tile_y,
-		    "tile_row"); 
-		if (old_copytile && i == 1) {
-			/* only need 1x1 tiles */
-			break;
-		}
+	if (! shm_create(&tile_shm, &tile, tile_x, tile_y, "tile")) {
+		clean_up_exit(1);
 	}
 
 	/* the scanline (e.g. 1280x1) shared memory area image: */
 
-	shm_create(&scanline_shm, &scanline, dpy_x, 1, "scanline"); 
+	if (! shm_create(&scanline_shm, &scanline, dpy_x, 1, "scanline")) {
+		clean_up_exit(1);
+	}
 
 	/*
 	 * the fullscreen (e.g. 1280x1024/fs_factor) shared memory area image:
@@ -1726,11 +2210,36 @@ void initialize_shm() {
 	set_fs_factor(1024 * 1024);
 	if (! fs_factor) {
 		fprintf(stderr, "warning: fullscreen updates are disabled.\n");
-		return;
+	} else {
+		if (! shm_create(&fullscreen_shm, &fullscreen, dpy_x,
+		    dpy_y/fs_factor, "fullscreen")) {
+			clean_up_exit(1);
+		} 
 	}
 
-	shm_create(&fullscreen_shm, &fullscreen, dpy_x, dpy_y/fs_factor,
-	    "fullscreen"); 
+	/*
+	 * for copy_tiles we need a lot of shared memory areas, one for
+	 * each possible run length of changed tiles.  32 for 1024x768
+	 * and 40 for 1280x1024, etc. 
+	 */
+
+	for (i=1; i<=ntiles_x; i++) {
+		if (! shm_create(&tile_row_shm[i], &tile_row[i], tile_x * i,
+		    tile_y, "tile_row")) {
+			int j;
+			if (i == 1) {
+				clean_up_exit(1);
+			}
+			rfbLog("error creating tile-row shm for len=%d\n", i);
+			rfbLog("reverting to single_copytile mode\n");
+			/* n.b.: "i" not "1", a kludge for cleanup */
+			single_copytile = i;
+		}
+		if (single_copytile && i >= 1) {
+			/* only need 1x1 tiles */
+			break;
+		}
+	}
 }
 
 
@@ -1829,6 +2338,7 @@ void hint_updates() {
 			in_run = 0;
 		}
 	}
+
 
 	for (i=0; i < hint_count; i++) {
 		/* pass update info to vnc: */
@@ -2154,6 +2664,7 @@ void copy_tiles(int tx, int ty, int nt) {
 	/* find the first line with difference: */
 	w1 = width1 * pixelsize;
 	w2 = width2 * pixelsize;
+
 
 	/* foreach line: */
 	for (line = 0; line < size_y; line++) {
@@ -2989,7 +3500,7 @@ void scan_for_updates() {
 	/* copy all tiles with differences from display to rfb framebuffer: */
 	fb_copy_in_progress = 1;
 
-	if (old_copytile) {
+	if (single_copytile) {
 		/*
 		 * Old way, copy I/O one tile at a time.
 		 */
@@ -3066,6 +3577,7 @@ void watch_loop(void) {
 
 		if (! use_threads) {
 			rfbProcessEvents(screen, -1);
+//fprintf(stderr, "watch_loop rfbProcessEvents done.\n");
 			if (check_user_input(dt, &cnt)) {
 				/* true means loop back for more input */
 				continue;
@@ -3081,6 +3593,10 @@ void watch_loop(void) {
 			continue;
 		}
 
+		if (watch_selection) {
+			watch_selection_event();
+		}
+
 		if (nofb) {	/* no framebuffer polling needed */
 			continue;
 		}
@@ -3092,7 +3608,6 @@ void watch_loop(void) {
 			 */
 			watch_bell_event();
 		}
-
 		if (! show_dragging && button_mask) {
 			/* if any button is pressed do not update screen */
 			/* XXX consider: use_threads || got_pointer_input */
@@ -3295,6 +3810,14 @@ void print_help() {
 "                       as the pointer moves from window to window (slow).\n"
 "-notruecolor           Force 8bpp indexed color even if it looks like TrueColor.\n"
 "\n"
+"-visual n              Experimental option: probably does not do what you think.\n"
+"                       It simply *forces* the visual used for the framebuffer;\n"
+"                       this may be a bad thing... It is useful for testing and\n"
+"                       for some workarounds.  n may be a decimal number, or 0x\n"
+"                       hex.  Run xdpyinfo(1) for the values. One may also use\n"
+"                       \"TrueColor\", etc. see <X11/X.h> for a list.  If the\n"
+"                       string ends in \":m\" the visual depth is forced to be m.\n"
+"\n"
 "-viewonly              Clients can only watch (default %s).\n"
 "-shared                VNC display is shared (default %s).\n"
 "-forever               Keep listening for more connections rather than exiting\n"
@@ -3324,6 +3847,8 @@ void print_help() {
 "-nomodtweak            Send the keysym directly to the X server.\n"
 "-nobell                Do not watch for XBell events.\n"
 "-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
+"-nosel                 Do not manage exchange of X selection/cutbuffer.\n"
+"-noprimary             Exchange X cutbuffer changes but not PRIMARY selection.\n"
 "\n"
 "-nocursor              Do not have the viewer show a local cursor.\n"
 "-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
@@ -3347,8 +3872,10 @@ void print_help() {
 "                       to cut down on load (default %d).\n"
 "-nap                   Monitor activity and if low take longer naps between\n" 
 "                       polls to really cut down load when idle (default %s).\n"
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 "-threads               Whether or not to use the threaded libvncserver\n"
 "-nothreads             algorithm [rfbRunEventLoop] (default %s).\n"
+#endif
 "\n"
 "-fs f                  If the fraction of changed tiles in a poll is greater\n"
 "                       than f, the whole screen is updated (default %.2f).\n"
@@ -3362,6 +3889,10 @@ void print_help() {
 "                       horizontal tiles into one big rectangle)  (default %s).\n"
 "-nohints               Do not use hints; send each tile separately.\n"
 "%s\n"
+"\n"
+"These options are passed to libvncserver:\n"
+"\n"
+;
 "\n"
 "These options are passed to libvncserver:\n"
 "\n"
@@ -3427,6 +3958,7 @@ int main(int argc, char** argv) {
 	XImage *fb;
 	int i, op, ev, er, maj, min;
 	char *use_dpy = NULL;
+	char *visual_str = NULL;
 	int dt = 0;
 	int bg = 0;
 	int got_waitms = 0;
@@ -3447,6 +3979,8 @@ int main(int argc, char** argv) {
 					exit(1);
 				}
 			}
+		} else if (!strcmp(argv[i], "-visual")) {
+			visual_str = argv[++i];
 		} else if (!strcmp(argv[i], "-flashcmap")) {
 			flash_cmap = 1;
 		} else if (!strcmp(argv[i], "-notruecolor")) {
@@ -3476,6 +4010,10 @@ int main(int argc, char** argv) {
 			watch_bell = 0;
 		} else if (!strcmp(argv[i], "-nofb")) {
 			nofb = 1;
+		} else if (!strcmp(argv[i], "-nosel")) {
+			watch_selection = 0;
+		} else if (!strcmp(argv[i], "-noprimary")) {
+			watch_primary = 0;
 		} else if (!strcmp(argv[i], "-nocursor")) {
 			local_cursor = 0;
 		} else if (!strcmp(argv[i], "-mouse")) {
@@ -3497,7 +4035,7 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(argv[i], "-old_pointer")) {
 			old_pointer = 1;
 		} else if (!strcmp(argv[i], "-old_copytile")) {
-			old_copytile = 1;
+			single_copytile = 1;
 		} else if (!strcmp(argv[i], "-defer")) {
 			defer_update = atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "-wait")) {
@@ -3634,6 +4172,10 @@ int main(int argc, char** argv) {
 			exit(1);
 		}
 	}
+
+	if (visual_str != NULL) {
+		set_visual(visual_str);
+	}
 #ifdef LIBVNCSERVER_HAVE_XKEYBOARD
 	/* check for XKEYBOARD */
 	if (watch_bell) {
@@ -3687,22 +4229,63 @@ int main(int argc, char** argv) {
 		set_offset();
 	}
 
+	/* initialize depth to reasonable value */
+	depth = DefaultDepth(dpy, scr);
 
-	if (nofb) {
+	/*
+	 * User asked for non-default visual, this is not working well but it
+	 * does some useful things...  What should it do in general?
+	 */
+	if (visual_id) {
+		XVisualInfo vinfo_tmpl, *vinfo;
+		int n;
+		
+		vinfo_tmpl.visualid = visual_id; 
+		vinfo = XGetVisualInfo(dpy, VisualIDMask, &vinfo_tmpl, &n);
+		if (vinfo == NULL || n == 0) {
+			fprintf(stderr, "could not match visual_id: 0x%x\n",
+			    visual_id);
+			exit(1);
+		}
+		visual = vinfo->visual;
+		depth = vinfo->depth;
+		if (visual_depth) {
+			depth = visual_depth;	/* force it */
+		}
+		if (! quiet) {
+			fprintf(stderr, "vis id:     0x%x\n", vinfo->visualid);
+			fprintf(stderr, "vis scr:      %d\n", vinfo->screen);
+			fprintf(stderr, "vis depth     %d\n", vinfo->depth);
+			fprintf(stderr, "vis class     %d\n", vinfo->class);
+			fprintf(stderr, "vis rmask   0x%x\n", vinfo->red_mask);
+			fprintf(stderr, "vis gmask   0x%x\n", vinfo->green_mask);
+			fprintf(stderr, "vis bmask   0x%x\n", vinfo->blue_mask);
+			fprintf(stderr, "vis cmap_sz   %d\n", vinfo->colormap_size);
+			fprintf(stderr, "vis b/rgb     %d\n", vinfo->bits_per_rgb);
+		}
+
+		XFree(vinfo);
+	}
+
+
+	if (nofb || visual_id) {
+		fb = XCreateImage(dpy, visual, depth, ZPixmap, 0, NULL,
+		    dpy_x, dpy_y, BitmapPad(dpy), 0);
 		/* 
-		 * This does not malloc the framebuffer, so can save a few
-		 * MB of memory in nofb mode.
+		 * For -nofb we do not allocate the framebuffer, so we
+		 * can save a few MB of memory. 
 		 */
-		fb = XCreateImage(dpy, visual, DefaultDepth(dpy, scr), ZPixmap,
-		    0, NULL, dpy_x, dpy_y, BitmapPad(dpy), 0);
+		if (! nofb) {
+			fb->data = (char *) malloc(fb->bytes_per_line *
+			    fb->height);
+		}
 	} else {
 		fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes,
 		    ZPixmap);
-	}
-
-	if (! quiet) {
-		fprintf(stderr, "Read initial data from display into"
-		    " framebuffer.\n");
+		if (! quiet) {
+			fprintf(stderr, "Read initial data from display into"
+			    " framebuffer.\n");
+		}
 	}
 	if (fb->bits_per_pixel == 24 && ! quiet) {
 		fprintf(stderr, "warning: 24 bpp may have poor"
@@ -3749,12 +4332,12 @@ int main(int argc, char** argv) {
 		} else if (p == -1) {
 			fprintf(stderr, "could not fork\n");
 			perror("fork");
-			exit(1);
+			clean_up_exit(1);
 		}
 		if (setsid() == -1) {
 			fprintf(stderr, "setsid failed\n");
 			perror("setsid");
-			exit(1);
+			clean_up_exit(1);
 		}
 		/* adjust our stdio */
 		n = open("/dev/null", O_RDONLY);

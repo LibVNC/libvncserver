@@ -1,3 +1,12 @@
+2004-02-19  Karl Runge <runge@karlrunge.com>
+	* added handling of clipboard/selection exchange to/from clients,
+	  even holds PRIMARY which Xvnc does not do.  disable with -nosel.
+	  use -noprimary to disable polling of PRIMARY selection.
+	* added -visual option to force framebuffer visual.  not really
+	  of general use, more for testing and workarounds (e.g. win2vnc
+	  fails under 8bpp index color)
+	* improve cleanup and error handling WRT shm and other failures.
+
 2004-01-19  Karl Runge <runge@karlrunge.com>
 	* improvements to pointer event handling primarily during window
 	  dragging.  check_user_input() for non-threaded and pointer()
