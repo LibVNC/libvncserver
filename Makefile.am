@@ -3,8 +3,10 @@ DIST_SUBDIRS=examples contrib vncterm
 
 bin_SCRIPTS = libvncserver-config
 
-include_HEADERS=
-nobase_include_HEADERS=rfb/rfb.h rfb/rfbconfig.h rfb/rfbint.h rfb/rfbproto.h \
+includedir=$(prefix)/include/rfb
+#include_HEADERS=rfb.h rfbconfig.h rfbint.h rfbproto.h keysym.h rfbregion.h
+
+include_HEADERS=rfb/rfb.h rfb/rfbconfig.h rfb/rfbint.h rfb/rfbproto.h \
 	rfb/keysym.h rfb/rfbregion.h
 
 noinst_HEADERS=d3des.h zrleDecode.h zrleEncode.h rfb/default8x16.h \
