@@ -101,18 +101,18 @@ void keyboard(Bool down,KeySym keySym,rfbClientPtr cl)
 
   if(keySym>=' ' && keySym<0x100) {
     KeyCode k;
-    /* if(down)
-       tweakModifiers(modifiers[keySym],True); */
-    tweakModifiers(modifiers[keySym],down);
-    XTestFakeKeyEvent(dpy,XK_Shift_R,True,CurrentTime);
-    k = XKeysymToKeycode( dpy,keySym );
+    if(down)
+       tweakModifiers(modifiers[keySym],True);
+    //tweakModifiers(modifiers[keySym],down);
+    //k = XKeysymToKeycode( dpy,keySym );
+    k = keycodes[keySym];
     if(k!=NoSymbol) {
       XTestFakeKeyEvent(dpy,k,down,CurrentTime);
       gotInput = TRUE;
     }
     /*XTestFakeKeyEvent(dpy,keycodes[keySym],down,CurrentTime);*/
-    /*if(down)
-      tweakModifiers(modifiers[keySym],False);*/
+    if(down)
+      tweakModifiers(modifiers[keySym],False);
     gotInput = TRUE;
   } else {
     KeyCode k = XKeysymToKeycode( dpy,keySym );
