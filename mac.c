@@ -311,6 +311,8 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
   int i;
 
 #ifdef LOCAL_CONTROL
+  char message[1024];
+
   if(get_next_message(message,1024,&single_instance,50)) {
     if(message[0]=='l' && message[1]==0) {
       rfbClientPtr cl;
