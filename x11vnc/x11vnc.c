@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-07-15";
+char lastmod[] = "lastmod:    2004-07-19";
 
 /* X display info */
 Display *dpy = 0;
@@ -1970,6 +1970,14 @@ void initialize_modtweak(void) {
 	}
 	for (i = minkey; i <= maxkey; i++) {
 		for (j = 0; j < syms_per_keycode; j++) {
+			if (j >= 4) {
+				/*
+				 * Something wacky in the keymapping.
+				 * Ignore these non Shift/AltGr chords
+				 * for now...
+				 */
+				continue;
+			}
 			keysym = keymap[ (i - minkey) * syms_per_keycode + j ];
 			if ( keysym >= ' ' && keysym < 0x100
 			    && i == XKeysymToKeycode(dpy, keysym) ) {
@@ -1995,13 +2003,13 @@ static void tweak_mod(signed char mod, rfbBool down) {
 
 	if (mod < 0) {
 		if (debug_keyboard) {
-			rfbLog("tweak_mod: Skip:  down=%d mod=0x%x\n", down,
+			rfbLog("tweak_mod: Skip:  down=%d j-mod=0x%x\n", down,
 			    (int) mod);
 		}
 		return;
 	}
 	if (debug_keyboard) {
-		rfbLog("tweak_mod: Start:  down=%d mod=0x%x mod_state=0x%x"
+		rfbLog("tweak_mod: Start:  down=%d j-mod=0x%x mod_state=0x%x"
 		    " is_shift=%d\n", down, (int) mod, (int) mod_state,
 		    is_shift);
 	}
@@ -2026,7 +2034,7 @@ static void tweak_mod(signed char mod, rfbBool down) {
 	}
 	X_UNLOCK;
 	if (debug_keyboard) {
-		rfbLog("tweak_mod: Finish: down=%d mod=0x%x mod_state=0x%x"
+		rfbLog("tweak_mod: Finish: down=%d j-mod=0x%x mod_state=0x%x"
 		    " is_shift=%d\n", down, (int) mod, (int) mod_state,
 		    is_shift);
 	}
@@ -6761,7 +6769,7 @@ static void watch_loop(void) {
 static void print_help(void) {
 	char help[] = 
 "\n"
-"x11vnc: allow VNC connections to real X11 displays.\n"
+"x11vnc: allow VNC connections to real X11 displays.  %s\n"
 "\n"
 "Typical usage is:\n"
 "\n"
@@ -6952,6 +6960,8 @@ static void print_help(void) {
 "                       to the terminal.  Same as -logfile.\n"
 "-rc filename           Use \"filename\" instead of $HOME/.x11vncrc for rc file.\n"
 "-norc                  Do not process any .x11vncrc file for options.\n"
+"-h, -help              Print this help text.\n"
+"-V, -version           Print program version (last modification date).\n"
 "\n"
 "-q                     Be quiet by printing less informational output to\n"
 "                       stderr.  Same as -quiet.\n"
@@ -7073,7 +7083,9 @@ static void print_help(void) {
 "These options are passed to libvncserver:\n"
 "\n"
 ;
-	fprintf(stderr, help,
+	/* have both our help and rfbUsage to stdout for more(1), etc. */
+	dup2(1, 2);
+	fprintf(stderr, help, lastmod,
 		view_only ? "on":"off",
 		shared ? "on":"off",
 		use_modifier_tweak ? "on":"off",
@@ -7572,6 +7584,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-h") || !strcmp(arg, "-help")
 			|| !strcmp(arg, "-?")) {
 			print_help();
+		} else if (!strcmp(arg, "-V") || !strcmp(arg, "-version")) {
+			fprintf(stderr, "x11vnc: %s\n", lastmod);
+			exit(0);
 		} else if (!strcmp(arg, "-o") || !strcmp(arg, "-logfile")) {
 			CHECK_ARGC
 			logfile = argv[++i];

@@ -1,3 +1,7 @@
+2004-07-19  Karl Runge <runge@karlrunge.com>
+	* ignore keysyms 5-8 for keycode keymapping.
+	* help to stdout for easy paging, add lastmod to help and -version.
+
 2004-07-15  Karl Runge <runge@karlrunge.com>
 	* make "modtweak" the default, disable with -nomodtweak.  this
 	  corrects ghost "< >" key on pc104 us in XFree86.
