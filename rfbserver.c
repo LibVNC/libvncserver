@@ -25,6 +25,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "rfb.h"
+#include "region.h"
 #include <unistd.h>
 #include <pwd.h>
 #include <sys/types.h>
@@ -34,8 +36,6 @@
 #ifdef HAVE_PTHREADS
 #include <pthread.h>
 #endif
-#include "rfb.h"
-#include "region.h"
 
 rfbClientPtr pointerClient = NULL;  /* Mutex for pointer events */
 
@@ -273,7 +273,7 @@ rfbClientConnectionGone(cl)
     free(cl->host);
 
     /* Release the compression state structures if any. */
-    if ( cl->compStreamInited == TRUE ) {
+    if ( cl->compStreamInited ) {
 	deflateEnd( &(cl->compStream) );
     }
 
@@ -523,8 +523,8 @@ rfbProcessClientNormalMessage(cl)
 
         cl->format.bitsPerPixel = msg.spf.format.bitsPerPixel;
         cl->format.depth = msg.spf.format.depth;
-        cl->format.bigEndian = (msg.spf.format.bigEndian ? 1 : 0);
-        cl->format.trueColour = (msg.spf.format.trueColour ? 1 : 0);
+        cl->format.bigEndian = (msg.spf.format.bigEndian ? TRUE : FALSE);
+        cl->format.trueColour = (msg.spf.format.trueColour ? TRUE : FALSE);
         cl->format.redMax = Swap16IfLE(msg.spf.format.redMax);
         cl->format.greenMax = Swap16IfLE(msg.spf.format.greenMax);
         cl->format.blueMax = Swap16IfLE(msg.spf.format.blueMax);

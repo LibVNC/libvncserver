@@ -28,6 +28,8 @@ OBJS=main.o rfbserver.o miregion.o auth.o sockets.o xalloc.o \
 
 all: example pnmshow storepasswd
 
+$(OBJS): rfb.h
+
 install_OSX: OSXvnc-server
 	cp OSXvnc-server storepasswd ../OSXvnc/build/OSXvnc.app/Contents/MacOS
 

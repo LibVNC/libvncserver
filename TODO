@@ -1,13 +1,27 @@
-fix bug with odd width
+immediate:
+----------
+
+fix bug with odd width (depends on client depth: width has to be multiple of server.bytesPerPixel/client.bytesPerPixel). only raw!!
+fix bug in http (java) client with big endian server: byte swapping is broken
+
+in the works:
+-------------
+
 adapt rdp2vnc (rdesktop)
-dont draw rich cursors as xcursors
+optionally dont draw rich cursors as xcursors
+
+later:
+------
+
 udp
 rfbCloseClient, rfbConnect, ConnectToTcpAddr
 CORBA
 translate.c: warning about non 8-bit colourmaps
 set colourmap
+documentation
 
 done:
+-----
 
 .cursors
 .cutpaste

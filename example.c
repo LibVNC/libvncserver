@@ -30,7 +30,7 @@
 #include "rfb.h"
 #include "keysym.h"
 
-const int maxx=640, maxy=480, bpp=4;
+const int maxx=641, maxy=480, bpp=4;
 /* TODO: odd maxx doesn't work */
 
 /* This initializes a nice (?) background */
@@ -40,9 +40,9 @@ void initBuffer(unsigned char* buffer)
   int i,j;
   for(i=0;i<maxx;++i)
     for(j=0;j<maxy;++j) {
-      buffer[(j*maxx+i)*bpp+1]=(i+j)*128/(maxx+maxy); /* red */
-      buffer[(j*maxx+i)*bpp+2]=i*128/maxx; /* green */
-      buffer[(j*maxx+i)*bpp+3]=j*256/maxy; /* blue */
+      buffer[(j*maxx+i)*bpp+0]=(i+j)*128/(maxx+maxy); /* red */
+      buffer[(j*maxx+i)*bpp+1]=i*128/maxx; /* green */
+      buffer[(j*maxx+i)*bpp+2]=j*256/maxy; /* blue */
     }
 }
 
@@ -65,6 +65,7 @@ void newclient(rfbClientPtr cl)
 }
 
 /* aux function to draw a line */
+
 void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,int x2,int y2)
 {
   int i,j;
@@ -194,15 +195,15 @@ void dokey(Bool down,KeySym key,rfbClientPtr cl)
     if(key==XK_Escape)
       rfbCloseClient(cl);
     else if(key==XK_Page_Up) {
-       //if(cl->screen->cursorIsDrawn)
-	 //rfbUndrawCursor(cl);
+      if(cl->screen->cursorIsDrawn)
+	rfbUndrawCursor(cl);
       initBuffer(cl->screen->frameBuffer);
       rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
     } else if(key>=' ' && key<0x100) {
       ClientData* cd=cl->clientData;
       int x1=cd->oldx,y1=cd->oldy,x2,y2;
-      //if(cl->screen->cursorIsDrawn)
-	 //rfbUndrawCursor(cl);
+      if(cl->screen->cursorIsDrawn)
+	rfbUndrawCursor(cl);
       cd->oldx+=drawchar(cl->screen->frameBuffer,
 			 cl->screen->paddedWidthInBytes,bpp,cd->oldx,cd->oldy,
 			 key);
@@ -212,10 +213,10 @@ void dokey(Bool down,KeySym key,rfbClientPtr cl)
   }
 }
 
-/*
-extern void rfbPrintXCursor(rfbCursorPtr cursor);
-int exampleCursorWidth=9,exampleCursorHeight=7;
-char exampleCursor[]=
+/* Example for an XCursor (foreground/background only) */
+
+int exampleXCursorWidth=9,exampleXCursorHeight=7;
+char exampleXCursor[]=
   "         "
   " xx   xx "
   "  xx xx  "
@@ -223,12 +224,59 @@ char exampleCursor[]=
   "  xx xx  "
   " xx   xx "
   "         ";
-rfbCursorPtr exampleCurse;
-rfbCursorPtr exampleGetCursor(rfbClientPtr cl)
+
+/* Example for a rich cursor (full-colour) */
+
+void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
 {
-   return(exampleCurse);
+  int i,j,w=32,h=32;
+  rfbCursorPtr c = rfbScreen->cursor;
+  char bitmap[]=
+    "                                "
+    "              xxxxxx            "
+    "       xxxxxxxxxxxxxxxxx        "
+    "      xxxxxxxxxxxxxxxxxxxxxx    "
+    "    xxxxxxxxxxxxxxxxxxxxxxxxx   "
+    "   xxxxxxxxxxxxxxxxxxxxxxxxxxx  "
+    "  xxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+    "  xxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxxxx   "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxxx    "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxx     "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxx     "
+    "  xxxxxxxxxxxxxxxxxxxxxxxx      "
+    "   xxxxxxxxxxxxxxxxxxxxxx       "
+    "      xxxxxxxxxxxxxxxxxxx       "
+    "        xxxxxxxxxxxxxxxxx       "
+    "           xxxxxxxxxxxxxxx      "
+    "             xxxxxxxxxxxxxx     "
+    "               xxxxxxxxxxxx     "
+    "                xxxxxxxxxxxx    "
+    "  xx             xxxxxxxxxxx    "
+    "  xxx             xxxxxxxxxxx   "
+    "  xxxx            xxxxxxxxxxx   "
+    "   xxxxxx      xxxxxxxxxxxxx    "
+    "    xxxxxxxxxxxxxxxxxxxxxx      "
+    "      xxxxxxxxxxxxxxxx          "
+    "                                ";
+  c=rfbScreen->cursor = rfbMakeXCursor(w,h,bitmap,0);
+  c->xhot = 2; c->yhot = 10;
+
+  c->richSource = malloc(w*h*bpp);
+  for(j=0;j<h;j++) {
+    for(i=0;i<w;i++) {
+      c->richSource[j*w*bpp+i*bpp+0]=0; //i*0xff/w;
+      c->richSource[j*w*bpp+i*bpp+1]=0;
+      c->richSource[j*w*bpp+i*bpp+2]=j*0xff/h;
+      c->richSource[j*w*bpp+i*bpp+3]=0;
+    }
+  }
 }
-*/
 
 /* Initialization */
 
@@ -247,30 +295,12 @@ int main(int argc,char** argv)
   initBuffer(rfbScreen->frameBuffer);
   drawstring(rfbScreen->frameBuffer,maxx*bpp,bpp,20,100,"Hello, World!");
 
-  //exampleCurse = rfbMakeXCursor(exampleCursorWidth,exampleCursorHeight,exampleCursor,0);
-  {
-     int i,j,w=32,h=32;
-     rfbCursorPtr c = rfbScreen->cursor;
-     char x[32*32],mask[32*32/8];
-     c=rfbScreen->cursor = rfbMakeXCursor(w,h,x,mask);
-     c->xhot = 2; c->yhot = 10;
-     c->mask[0]=0xff; c->mask[1]=0x0;
-     memset(c->mask,255,h*w/8);
-     c->richSource = malloc(w*h*bpp);
-     for(j=0;j<h;j++) {
-       for(i=0;i<w;i++) {
-	  c->richSource[j*w*bpp+i*bpp+0]=0;
-	  c->richSource[j*w*bpp+i*bpp+1]=0;
-	  c->richSource[j*w*bpp+i*bpp+2]=j*0xff/h;
-	  c->richSource[j*w*bpp+i*bpp+3]=0;
-       }
-       c->richSource[j*w*bpp+(w-1)*bpp+0]=0xff;
-       c->richSource[j*w*bpp+(w-1)*bpp+1]=0xff;
-       c->richSource[j*w*bpp+(w-1)*bpp+2]=0xff;
-       c->richSource[j*w*bpp+(w-1)*bpp+3]=0xff;
-     }
-     //memset(c->richSource,0xff,w*h*bpp);
-  }
+  /* This call creates a mask and then a cursor: */
+  /* rfbScreen->defaultCursor =
+       rfbMakeXCursor(exampleCursorWidth,exampleCursorHeight,exampleCursor,0);
+  */
+
+  MakeRichCursor(rfbScreen);
 
   /* this is the blocking event loop, i.e. it never returns */
   /* 40000 are the microseconds, i.e. 0.04 seconds */

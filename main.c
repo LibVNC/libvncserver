@@ -1,22 +1,13 @@
 /*
- *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
- *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
+ *  This file is called main.c, because it contains most of the new functions
+ *  for use with LibVNCServer.
+ *
+ *  LibVNCServer (C) 2001 Johannes E. Schindelin <Johannes.Schindelin@gmx.de>
+ *  Original OSXvnc (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
+ *  Original Xvnc (C) 1999 AT&T Laboratories Cambridge.  
  *  All Rights Reserved.
  *
- *  This is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This software is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this software; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
- *  USA.
+ *  see GPL (latest version) for full details
  */
 
 #include <stdio.h>
@@ -273,9 +264,6 @@ processArguments(rfbScreenInfoPtr rfbScreen,int argc, char *argv[])
         } else if (strcmp(argv[i], "-rfbauth") == 0) {  /* -rfbauth passwd-file */
             if (i + 1 >= argc) usage();
             rfbScreen->rfbAuthPasswdFile = argv[++i];
-        } else if (strcmp(argv[i], "-deferupdate") == 0) {      /* -deferupdate ms */
-            if (i + 1 >= argc) usage();
-            rfbScreen->rfbDeferUpdateTime = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-desktop") == 0) {  /* -desktop desktop-name */
             if (i + 1 >= argc) usage();
             rfbScreen->desktopName = argv[++i];
@@ -313,6 +301,8 @@ defaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
 {
 }
+
+/* TODO: add a nice VNC or RFB cursor */
 
 static rfbCursor myCursor = 
 {
@@ -353,6 +343,8 @@ void doNothingWithClient(rfbClientPtr cl)
 rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,int bitsPerSample,int samplesPerPixel,int bytesPerPixel)
 {
    rfbScreenInfoPtr rfbScreen=malloc(sizeof(rfbScreenInfo));
+   rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
+
    rfbScreen->rfbPort=5900;
    rfbScreen->socketInitDone=FALSE;
    rfbScreen->inetdSock=-1;
@@ -379,56 +371,44 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,
    rfbScreen->bitsPerPixel = rfbScreen->depth = 8*bytesPerPixel;
    gethostname(rfbScreen->rfbThisHost, 255);
    rfbScreen->paddedWidthInBytes = width*bytesPerPixel;
-   rfbScreen->rfbServerFormat.bitsPerPixel = rfbScreen->bitsPerPixel;
-   rfbScreen->rfbServerFormat.depth = rfbScreen->depth;
-   rfbScreen->rfbServerFormat.bigEndian = !(*(char *)&rfbEndianTest);
-   rfbScreen->rfbServerFormat.trueColour = TRUE;
 
-   /* Why? (TODO)
-   if (samplesPerPixel != 3) {
-      rfbLog("screen format not supported.  exiting.\n");
-      exit(1);
+   /* format */
+
+   format->bitsPerPixel = rfbScreen->bitsPerPixel;
+   format->depth = rfbScreen->depth;
+   format->bigEndian = rfbEndianTest?FALSE:TRUE;
+   format->trueColour = TRUE;
+
+   if(bytesPerPixel == 8) {
+     format->redMax = 7;
+     format->greenMax = 7;
+     format->blueMax = 3;
+     format->redShift = 0;
+     format->greenShift = 3;
+     format->blueShift = 6;
+   } else {
+     format->redMax = (1 << bitsPerSample) - 1;
+     format->greenMax = (1 << bitsPerSample) - 1;
+     format->blueMax = (1 << bitsPerSample) - 1;
+     if(rfbEndianTest) {
+       format->redShift = 0;
+       format->greenShift = bitsPerSample;
+       format->blueShift = bitsPerSample * 2;
+     } else {
+       format->redShift = bitsPerSample*3;
+       format->greenShift = bitsPerSample*2;
+       format->blueShift = bitsPerSample;
+     }
    }
-   */
 
-   /* This works for 16 and 32-bit, but not for 8-bit.
-    What should it be for 8-bit?  (Shouldn't 8-bit use a colormap?) */
-   rfbScreen->rfbServerFormat.redMax = (1 << bitsPerSample) - 1;
-   rfbScreen->rfbServerFormat.greenMax = (1 << bitsPerSample) - 1;
-   rfbScreen->rfbServerFormat.blueMax = (1 << bitsPerSample) - 1;
-   rfbScreen->rfbServerFormat.redShift = bitsPerSample * 2;
-   rfbScreen->rfbServerFormat.greenShift = bitsPerSample;
-   rfbScreen->rfbServerFormat.blueShift = 0;
+   /* cursor */
 
    rfbScreen->cursorIsDrawn = FALSE;
    rfbScreen->dontSendFramebufferUpdate = FALSE;
    rfbScreen->cursorX=rfbScreen->cursorY=rfbScreen->underCursorBufferLen=0;
    rfbScreen->underCursorBuffer=NULL;
-   
-   /* We want to use the X11 REGION_* macros without having an actual
-    X11 ScreenPtr, so we do this.  Pretty ugly, but at least it lets us
-    avoid hacking up regionstr.h, or changing every call to REGION_*
-    (which actually I should probably do eventually). */
-   /*
-   rfbScreen->screen.RegionCreate = miRegionCreate;
-   rfbScreen->screen.RegionInit = miRegionInit;
-   rfbScreen->screen.RegionCopy = miRegionCopy;
-   rfbScreen->screen.RegionDestroy = miRegionDestroy;
-   rfbScreen->screen.RegionUninit = miRegionUninit;
-   rfbScreen->screen.Intersect = miIntersect;
-   rfbScreen->screen.Union = miUnion;
-   rfbScreen->screen.Subtract = miSubtract;
-   rfbScreen->screen.Inverse = miInverse;
-   rfbScreen->screen.RegionReset = miRegionReset;
-   rfbScreen->screen.TranslateRegion = miTranslateRegion;
-   rfbScreen->screen.RectIn = miRectIn;
-   rfbScreen->screen.PointInRegion = miPointInRegion;
-   rfbScreen->screen.RegionNotEmpty = miRegionNotEmpty;
-   rfbScreen->screen.RegionEmpty = miRegionEmpty;
-   rfbScreen->screen.RegionExtents = miRegionExtents;
-   rfbScreen->screen.RegionAppend = miRegionAppend;
-   rfbScreen->screen.RegionValidate = miRegionValidate;
-   */
+
+   /* proc's and hook's */
 
    rfbScreen->kbdAddEvent = defaultKbdAddEvent;
    rfbScreen->kbdReleaseAllKeys = doNothingWithClient;

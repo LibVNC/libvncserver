@@ -23,64 +23,22 @@
  *  USA.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include "scrnintstr.h"
+#include "keysym.h"
 
-/* trying to replace the above with some more minimal set of includes */
-//#include "misc.h"
-//#include "Xmd.h"
 /* TODO: this stuff has to go into autoconf */
 typedef unsigned char CARD8;
 typedef unsigned short CARD16;
 typedef unsigned int CARD32;
 typedef CARD32 Pixel;
 typedef CARD32 KeySym;
-typedef signed char Bool;
+/* for some strange reason, "typedef signed char Bool;" yields a four byte
+   signed int on an SGI, but only for rfbserver.o!!! */
+#define Bool signed char
 #define FALSE 0
 #define TRUE -1
-#include "keysym.h"
-
-/* region stuff */
-#define NullRegion ((RegionPtr)0)
-#define NullBox ((BoxPtr)0)
-
-typedef struct _Box {
-    short x1, y1, x2, y2;
-} BoxRec, *BoxPtr;
-
-typedef struct _RegData {
-    long	size;
-    long 	numRects;
-/*  BoxRec	rects[size];   in memory but not explicitly declared */
-} RegDataRec, *RegDataPtr;
-
-typedef struct _Region {
-    BoxRec 	extents;
-    RegDataPtr	data;
-} RegionRec, *RegionPtr;
-
-#define REGION_NIL(reg) ((reg)->data && !(reg)->data->numRects)
-#define REGION_NUM_RECTS(reg) ((reg)->data ? (reg)->data->numRects : 1)
-#define REGION_SIZE(reg) ((reg)->data ? (reg)->data->size : 0)
-#define REGION_RECTS(reg) ((reg)->data ? (BoxPtr)((reg)->data + 1) \
-			               : &(reg)->extents)
-#define REGION_BOXPTR(reg) ((BoxPtr)((reg)->data + 1))
-#define REGION_BOX(reg,i) (&REGION_BOXPTR(reg)[i])
-#define REGION_TOP(reg) REGION_BOX(reg, (reg)->data->numRects)
-#define REGION_END(reg) REGION_BOX(reg, (reg)->data->numRects - 1)
-#define REGION_SZOF(n) (sizeof(RegDataRec) + ((n) * sizeof(BoxRec)))
-
-#define REGION_INIT(s,pReg,rect,size) miRegionInit(pReg,rect,size)
-#define REGION_EMPTY(s,pReg) miRegionEmpty(pReg)
-#define REGION_UNINIT(s,pReg) miRegionUninit(pReg)
-#define REGION_NOTEMPTY(s,pReg) miRegionNotEmpty(pReg)
-#define REGION_INTERSECT(s,newReg,reg1,reg2) miIntersect(newReg,reg1,reg2)
-#define REGION_SUBTRACT(s,newReg,reg1,reg2) miSubtract(newReg,reg1,reg2)
-#define REGION_UNION(s,newReg,reg1,reg2) miUnion(newReg,reg1,reg2)
-#define REGION_TRANSLATE(s,pReg,x,y) miTranslateRegion(pReg,x,y)
-
-//#include "regionstr.h"
 
 #define xalloc malloc
 #define xrealloc realloc
@@ -265,6 +223,19 @@ typedef void (*rfbTranslateFnType)(char *table, rfbPixelFormat *in,
                                    int bytesBetweenInputLines,
                                    int width, int height);
 
+
+/* region stuff */
+
+typedef struct BoxRec {
+    short x1, y1, x2, y2;
+} BoxRec, *BoxPtr;
+
+typedef struct RegDataRec* RegDataPtr;
+
+typedef struct RegionRec {
+    BoxRec 	extents;
+    RegDataPtr	data;
+} RegionRec, *RegionPtr;
 
 /*
  * Per-client structure.
@@ -457,9 +428,9 @@ typedef struct rfbClientRec {
 
 static const int rfbEndianTest = (_BYTE_ORDER == _LITTLE_ENDIAN);
 
-#define Swap16IfLE(s) (*(const char *)&rfbEndianTest ? Swap16(s) : (s))
+#define Swap16IfLE(s) (rfbEndianTest ? Swap16(s) : (s))
 
-#define Swap32IfLE(l) (*(const char *)&rfbEndianTest ? Swap32(l) : (l))
+#define Swap32IfLE(l) (rfbEndianTest ? Swap32(l) : (l))
 
 /* main.c */
 
