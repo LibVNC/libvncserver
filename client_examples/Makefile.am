@@ -5,7 +5,7 @@ if WITH_FFMPEG
 FFMPEG_HOME=@with_ffmpeg@
 
 vnc2mpg_CFLAGS=-I$(FFMPEG_HOME)/libavformat -I$(FFMPEG_HOME)/libavcodec
-vnc2mpg_LDADD=$(LDADD) $(FFMPEG_HOME)/libavformat/libavformat.a $(FFMPEG_HOME)/libavcodec/libavcodec.a -lm
+vnc2mpg_LDADD=$(LDADD) $(FFMPEG_HOME)/libavformat/libavformat.a $(FFMPEG_HOME)/libavcodec/libavcodec.a -lmp3lame -lm
 
 FFMPEG_CLIENT=vnc2mpg
 endif
