@@ -766,7 +766,8 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
   i = rfbGetClientIterator(rfbScreen);
   cl=rfbClientIteratorNext(i);
   while(cl) {
-    if(cl->sock>=0 && (!cl->onHold) && FB_UPDATE_PENDING(cl)) {
+    if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) &&
+        !sraRgnEmpty(cl->requestedRegion)) {
       if(cl->screen->rfbDeferUpdateTime == 0) {
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
       } else if(cl->startDeferring.tv_usec == 0) {

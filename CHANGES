@@ -1,3 +1,4 @@
+   fixed severe bug (Const Kaplinsky)
    got patch from Const Kaplisnky with CursorPosUpdate encoding and some Docs
    sync'ed with newest RealVNC (ZRLE encoding)
    a HTTP request for tunnelling was added (to fool strict web proxies)

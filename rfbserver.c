@@ -1101,7 +1101,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
      sraRgnSubtract(cl->modifiedRegion,updateRegion);
      sraRgnSubtract(cl->modifiedRegion,updateCopyRegion);
 
-     /* sraRgnMakeEmpty(cl->requestedRegion); */
+     sraRgnMakeEmpty(cl->requestedRegion);
      sraRgnMakeEmpty(cl->copyRegion);
      cl->copyDX = 0;
      cl->copyDY = 0;
