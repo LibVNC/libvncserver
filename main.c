@@ -401,7 +401,7 @@ Bool defaultPasswordCheck(rfbClientPtr cl,char* response,int len)
 
 /* for this method, rfbAuthPasswdData is really a pointer to an array
    of char*'s, where the last pointer is 0. */
-Bool checkPasswordByList(rfbClientPtr cl,char* response,int len)
+Bool rfbCheckPasswordByList(rfbClientPtr cl,char* response,int len)
 {
   char **passwds;
 
@@ -464,6 +464,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    rfbScreen->width = width;
    rfbScreen->height = height;
    rfbScreen->bitsPerPixel = rfbScreen->depth = 8*bytesPerPixel;
+
+   rfbScreen->passwordCheck = defaultPasswordCheck;
 
    rfbProcessArguments(rfbScreen,argc,argv);
 
@@ -532,7 +534,6 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    rfbScreen->setXCutText = defaultSetXCutText;
    rfbScreen->getCursorPtr = defaultGetCursorPtr;
    rfbScreen->setTranslateFunction = rfbSetTranslateFunction;
-   rfbScreen->passwordCheck = defaultPasswordCheck;
    rfbScreen->newClientHook = doNothingWithClient;
    rfbScreen->displayHook = 0;
 

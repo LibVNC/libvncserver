@@ -748,6 +748,9 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
 void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
 void doNothingWithClient(rfbClientPtr cl);
 
+/* to check against plain passwords */
+Bool rfbCheckPasswordByList(rfbClientPtr cl,char* response,int len);
+
 /* functions to make a vnc server */
 extern rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,

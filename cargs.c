@@ -21,6 +21,8 @@ rfbUsage(void)
     fprintf(stderr, "-rfbwait time          max time in ms to wait for RFB client\n");
     fprintf(stderr, "-rfbauth passwd-file   use authentication on RFB protocol\n"
                     "                       (use 'storepasswd' to create a password file)\n");
+    fprintf(stderr, "-passwd plain-password use authentication \n"
+                    "                       (use plain-password as password, USE AT YOUR RISK)\n");
     fprintf(stderr, "-deferupdate time      time in ms to defer updates "
                                                              "(default 40)\n");
     fprintf(stderr, "-desktop name          VNC desktop name (default \"LibVNCServer\")\n");
@@ -51,6 +53,13 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
         } else if (strcmp(argv[i], "-rfbauth") == 0) {  /* -rfbauth passwd-file */
             if (i + 1 >= *argc) rfbUsage();
             rfbScreen->rfbAuthPasswdData = argv[++i];
+	} else if (strcmp(argv[i], "-passwd") == 0) {  /* -passwd password */
+	    char **passwds = malloc(sizeof(char**)*2);
+	    if (i + 1 >= *argc) rfbUsage();
+	    passwds[0] = argv[++i];
+	    passwds[1] = 0;
+	    rfbScreen->rfbAuthPasswdData = passwds;
+	    rfbScreen->passwordCheck = rfbCheckPasswordByList;
         } else if (strcmp(argv[i], "-deferupdate") == 0) {  /* -desktop desktop-name */
             if (i + 1 >= *argc) rfbUsage();
             rfbScreen->rfbDeferUpdateTime = atoi(argv[++i]);
