@@ -2,7 +2,7 @@ DEFINES = -I ..
 LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
 
 man_MANS=x11vnc.1
-EXTRA_DIST=ChangeLog README $(man_MANS)
+EXTRA_DIST=ChangeLog README tkx11vnc tkx11vnc.h $(man_MANS)
 
 if CYGIPC
 LD_CYGIPC=-lcygipc
