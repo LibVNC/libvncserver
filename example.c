@@ -21,9 +21,6 @@
  *  USA.
  */
 
-#include <stdio.h>
-#include <sys/types.h>
-#include <netinet/in.h>
 #ifdef __IRIX__
 #include <netdb.h>
 #endif
