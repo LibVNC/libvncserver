@@ -1,3 +1,8 @@
+2005-03-04  Karl Runge <runge@karlrunge.com>
+	* add changes to couple with -listen option, in particular
+	  the behavior of -localhost and remote control cmds.
+	* workarounds for old trees.
+
 2005-02-23  Karl Runge <runge@karlrunge.com>
 	* final changes for 0.7.1 release.
 

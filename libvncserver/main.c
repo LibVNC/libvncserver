@@ -579,6 +579,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    /* disable progressive updating per default */
    screen->progressiveSliceHeight = 0;
 
+   screen->listenInterface = htonl(INADDR_ANY);
+
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);
      return 0;

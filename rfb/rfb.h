@@ -257,6 +257,8 @@ typedef struct _rfbScreenInfo
     /* if LibVNCServer doesn't know the normal message, it calls this
      * hook. If the hook handles the message, it returns TRUE. */
     rfbProcessCustomClientMessageProcPtr processCustomClientMessage;
+
+    in_addr_t listenInterface;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -506,8 +508,8 @@ extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
 extern void rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern int rfbConnectToTcpAddr(char* host, int port);
-extern int rfbListenOnTCPPort(int port);
-extern int rfbListenOnUDPPort(int port);
+extern int rfbListenOnTCPPort(int port, in_addr_t iface);
+extern int rfbListenOnUDPPort(int port, in_addr_t iface);
 
 /* rfbserver.c */
 

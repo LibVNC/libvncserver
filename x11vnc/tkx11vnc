@@ -49,6 +49,7 @@ catch {rename send {}}
 #         be the same after the remote command)
 #	G means gui internal item
 #	F means can be set via file browse
+#	D means for simple gui
 #	-C:val1,... means it will be a checkbox (radio button)
 #	   the "-" means no other options follow
 #	0 means to skip the item.
@@ -87,7 +88,7 @@ Clients
 	vncconnect
 	-- D
 	=D http
-	=F httpdir:
+	httpdir:
 	httpport:
 	enablehttpproxy
 
@@ -185,8 +186,9 @@ Permissions
 	=SQA deny_all
 	--
 	=DFP allow:
-	localhost
+	=D localhost
 	=RA allowonce:
+	listen:
 	-- D
 	=RA noremote
 	--

@@ -102,7 +102,8 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
 
     rfbLog("  URL http://%s:%d\n",rfbScreen->thisHost,rfbScreen->httpPort);
 
-    if ((rfbScreen->httpListenSock = rfbListenOnTCPPort(rfbScreen->httpPort)) < 0) {
+    if ((rfbScreen->httpListenSock =
+      rfbListenOnTCPPort(rfbScreen->httpPort, rfbScreen->listenInterface)) < 0) {
 	rfbLogPerror("ListenOnTCPPort");
 	return;
     }

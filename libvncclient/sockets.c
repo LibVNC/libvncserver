@@ -305,7 +305,7 @@ FindFreeTcpPort(void)
   struct sockaddr_in addr;
 
   addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = INADDR_ANY;
+  addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
@@ -339,7 +339,7 @@ ListenAtTcpPort(int port)
 
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
-  addr.sin_addr.s_addr = INADDR_ANY;
+  addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {

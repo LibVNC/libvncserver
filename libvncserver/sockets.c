@@ -102,6 +102,8 @@ int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
 void
 rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 {
+    in_addr_t iface = rfbScreen->listenInterface;
+
     if (rfbScreen->socketInitDone)
 	return;
 
@@ -132,9 +134,8 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     if(rfbScreen->autoPort) {
         int i;
         rfbLog("Autoprobing TCP port \n");
-
         for (i = 5900; i < 6000; i++) {
-            if ((rfbScreen->listenSock = rfbListenOnTCPPort(i)) >= 0) {
+            if ((rfbScreen->listenSock = rfbListenOnTCPPort(i, iface)) >= 0) {
 		rfbScreen->port = i;
 		break;
 	    }
@@ -153,7 +154,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     else if(rfbScreen->port>0) {
       rfbLog("Listening for VNC connections on TCP port %d\n", rfbScreen->port);
 
-      if ((rfbScreen->listenSock = rfbListenOnTCPPort(rfbScreen->port)) < 0) {
+      if ((rfbScreen->listenSock = rfbListenOnTCPPort(rfbScreen->port, iface)) < 0) {
 	rfbLogPerror("ListenOnTCPPort");
 	return;
       }
@@ -166,7 +167,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     if (rfbScreen->udpPort != 0) {
 	rfbLog("rfbInitSockets: listening for input on UDP port %d\n",rfbScreen->udpPort);
 
-	if ((rfbScreen->udpSock = rfbListenOnUDPPort(rfbScreen->udpPort)) < 0) {
+	if ((rfbScreen->udpSock = rfbListenOnUDPPort(rfbScreen->udpPort, iface)) < 0) {
 	    rfbLogPerror("ListenOnUDPPort");
 	    return;
 	}
@@ -527,9 +528,29 @@ rfbWriteExact(cl, buf, len)
     return 1;
 }
 
+/* currently private, called by rfbProcessArguments() */
 int
-rfbListenOnTCPPort(port)
+rfbStringToAddr(char *str, in_addr_t *addr)  {
+    if (str == NULL || *str == '\0' || strcmp(str, "any") == 0) {
+        *addr = htonl(INADDR_ANY);
+    } else if (strcmp(str, "localhost") == 0) {
+        *addr = htonl(INADDR_LOOPBACK);
+    } else {
+        struct hostent *hp;
+        if ((*addr = inet_addr(str)) == htonl(INADDR_NONE)) {
+            if (!(hp = gethostbyname(str))) {
+                return 0;
+            }
+            *addr = *(unsigned long *)hp->h_addr;
+        }
+    }
+    return 1;
+}
+
+int
+rfbListenOnTCPPort(port, iface)
     int port;
+    in_addr_t iface;
 {
     struct sockaddr_in addr;
     int sock;
@@ -538,8 +559,7 @@ rfbListenOnTCPPort(port)
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    /* addr.sin_addr.s_addr = interface.s_addr; */
-    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_addr.s_addr = iface;
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 	return -1;
@@ -574,7 +594,7 @@ rfbConnectToTcpAddr(host, port)
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
 
-    if ((addr.sin_addr.s_addr = inet_addr(host)) == INADDR_NONE)
+    if ((addr.sin_addr.s_addr = inet_addr(host)) == htonl(INADDR_NONE))
     {
 	if (!(hp = gethostbyname(host))) {
 	    errno = EINVAL;
@@ -596,8 +616,9 @@ rfbConnectToTcpAddr(host, port)
 }
 
 int
-rfbListenOnUDPPort(port)
+rfbListenOnUDPPort(port, iface)
     int port;
+    in_addr_t iface;
 {
     struct sockaddr_in addr;
     int sock;
@@ -606,8 +627,7 @@ rfbListenOnUDPPort(port)
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    /* addr.sin_addr.s_addr = interface.s_addr; */
-    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_addr.s_addr = iface;
 
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 	return -1;

@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "February 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "March 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.1, lastmod: 2005-02-23
+         version: 0.7.2pre, lastmod: 2005-03-04
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -248,7 +248,19 @@ out with the "#" character in the usual way.
 .PP
 \fB-localhost\fR
 .IP
-Same as \fB-allow\fR 127.0.0.1
+Same as "\fB-allow\fR \fI127.0.0.1\fR".
+.IP
+Note: if you want to restrict which network interface
+x11vnc listens on, see the \fB-listen\fR option below.
+E.g. "\fB-listen\fR \fIlocalhost\fR" or "\fB-listen\fR \fI192.168.3.21\fR".
+As a special case, the option "\fB-localhost\fR" implies
+"\fB-listen\fR \fIlocalhost\fR".
+.IP
+For non-localhost \fB-listen\fR usage, if you use the remote
+control mechanism (-R) to change the \fB-listen\fR interface
+you may need to manually adjust the \fB-allow\fR list (and
+vice versa) to avoid situations where no connections
+(or too many) are allowed.
 .PP
 \fB-input\fR \fIstring\fR
 .IP
@@ -438,7 +450,7 @@ means to try to guess the DISPLAY from the utmpx login
 database as well.  So it "lurks" waiting for anyone
 to log into an X session and then connects to it.
 Specify a list of users after the = to limit which
-users will be tried.  To enable a difference searching
+users will be tried.  To enable a different searching
 mode, if the first user in the list is something like
 ":0" or ":0-2" that indicates a range of DISPLAY
 numbers that will be tried (regardless of whether
@@ -1202,6 +1214,8 @@ localhost       enable  \fB-localhost\fR mode
 .IP
 nolocalhost     disable \fB-localhost\fR mode
 .IP
+listen:str      set \fB-listen\fR to str, empty to disable.
+.IP
 input:str       set \fB-input\fR to "str", empty to disable.
 .IP
 client_input:str set the K, M, B \fB-input\fR on a per-client
@@ -1484,7 +1498,7 @@ nooverlay_nocursor nooverlay_cursor nooverlay_yescursor
 overlay_nocursor visual scale viewonly noviewonly
 shared noshared forever noforever once timeout deny
 lock nodeny unlock connect allowonce allow localhost
-nolocalhost accept gone shm noshm flipbyteorder
+nolocalhost listen accept gone shm noshm flipbyteorder
 noflipbyteorder onetile noonetile solid_color solid
 nosolid blackout xinerama noxinerama xrandr noxrandr
 xrandr_mode padgeom quiet q noquiet modtweak nomodtweak
@@ -1634,6 +1648,11 @@ enable http proxy support
 \fB-progressive\fR \fIheight\fR
 .IP
 enable progressive updating for slow links
+.PP
+\fB-listen\fR \fIipaddr\fR
+.IP
+listen for connections only on network interface with
+addr ipaddr. '-listen localhost' and hostname work too.
 .SH "FILES"
 .IR $HOME/.x11vncrc ,
 .IR $HOME/.Xauthority

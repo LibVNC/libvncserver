@@ -1,7 +1,7 @@
 /*
  * x11vnc.c: a VNC server for X displays.
  *
- * Copyright (c) 2002-2004 Karl J. Runge <runge@karlrunge.com>
+ * Copyright (c) 2002-2005 Karl J. Runge <runge@karlrunge.com>
  * All rights reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -27,16 +27,21 @@
  *       krfb, the KDE desktopsharing project (Tim Jansen)
  *
  * The primary goal of this program is to create a portable and simple
- * command-line server utility that allows a VNC viewer to connect to an
- * actual X display (as the above do).  The only non-standard dependency
- * of this program is the static library libvncserver.a (although in
- * some environments libjpeg.so may not be readily available and needs
- * to be installed, it may be found at ftp://ftp.uu.net/graphics/jpeg/).
- * To increase portability it is written in plain C.
+ * command-line server utility that allows a VNC viewer to connect
+ * to an actual X display (as the above do).  The only non-standard
+ * dependency of this program is the static library libvncserver.a.
+ * Although in some environments libjpeg.so or libz.so may not be
+ * readily available and needs to be installed, they may be found
+ * at ftp://ftp.uu.net/graphics/jpeg/ and http://www.gzip.org/zlib/,
+ * respectively.  To increase portability it is written in plain C.
  *
- * The next goal is to improve performance and interactive response.
+ * Another goal is to improve performance and interactive response.
  * The algorithm of x0rfbserver was used as a base.  Additional heuristics
  * are also applied (currently there are a bit too many of these...)
+ *
+ * Another goal is to add many features that enable and incourage creative
+ * Ausage and application of the tool.  pologies for the large number
+ * Aof options!
  *
  * To build:
  *
@@ -53,12 +58,13 @@
  * Known shortcomings:
  *
  * The screen updates are good, but of course not perfect since the X
- * display must be continuously polled and read for changes (as opposed to
- * receiving a change callback from the X server, if that were generally
- * possible... (Update: this seems to be handled now with the X DAMAGE
- * extension, but unfortunately that doesn't seem to address the slow
- * read from the video h/w).  So, e.g., opaque moves and similar window
- * activity can be very painful; one has to modify one's behavior a bit.
+ * display must be continuously polled and read for changes and this is
+ * slow for most hardware. This can be contrasted with receiving a change
+ * callback from the X server, if that were generally possible... (Update:
+ * this seems to be handled now with the X DAMAGE extension, but
+ * unfortunately that doesn't seem to address the slow read from the
+ * video h/w.  So, e.g., opaque moves and similar window activity can
+ * be very painful; one has to modify one's behavior a bit.
  *
  * General audio at the remote display is lost unless one separately
  * sets up some audio side-channel such as esd.
@@ -73,7 +79,10 @@
  * the -cursor option.  Further, if -cursorX or -X is used, a trick
  * is done to at least show the root window cursor vs non-root cursor.
  * (perhaps some heuristic can be done to further distinguish cases...,
- * currently -cursor some is a first hack at this)
+ * currently "-cursor some" is a first hack at this)
+ *
+ * Under XFIXES mode for showing the cursor shape, the cursor may be
+ * poorly approximated if it has transparency.
  *
  * Windows using visuals other than the default X visual may have
  * their colors messed up.  When using 8bpp indexed color, the colormap
@@ -83,9 +92,16 @@
  * 24 visuals will incorrectly display windows using the non-default one.
  * On Sun and Sgi hardware we can to work around this with -overlay.
  *
- * Feature -id <windowid> can be picky: it can crash for things like the
- * window not sufficiently mapped into server memory, etc.  SaveUnders
- * menus, popups, etc will not be seen.
+ * Feature -id <windowid> can be picky: it can crash for things like
+ * the window not sufficiently mapped into server memory, etc (Update:
+ * we now use the -xrandr mechanisms to trap errors for this mode).
+ * SaveUnders menus, popups, etc will not be seen.
+ *
+ * Under some situations the keysym unmapping is not correct, especially
+ * if the two keyboards correspond to different languages.  The -modtweak
+ * option is the default and corrects most problems. One can use the
+ * -xkb option to try to use the XKEYBOARD extension to clear up any
+ * remaining problems.
  *
  * Occasionally, a few tile updates can be missed leaving a patch of
  * color that needs to be refreshed.  This may only be when threaded,
@@ -113,15 +129,23 @@
 
 /*
  * if you are inserting this file, x11vnc.c into an old CVS tree you
- * may need to set OLD_TREE to 1.
+ * may need to set OLD_TREE to 1.  See below for LibVNCServer 0.7 tips.
  */
+
 #define OLD_TREE 0
 #if OLD_TREE
 
 /*
- * if have a very old tree and get errors these may be needed as well:
+ * if you have a very old tree (LibVNCServer 0.6) and get errors these may
+ * be need to be uncommented.  LibVNCServer <= 0.5 is no longer supported.
+ * note the maxRectsPerUpdate below is a hack that may break some usage.
 #define oldCursorX cursorX
 #define oldCursorY cursorY
+#define thisHost rfbThisHost
+#define framebufferUpdateMessagesSent rfbFramebufferUpdateMessagesSent
+#define bytesSent rfbBytesSent
+#define rawBytesEquivalent rfbRawBytesEquivalent
+#define progressiveSliceHeight maxRectsPerUpdate
  */
 
 /* 
@@ -189,8 +213,29 @@
 #else
 #define RFBUNDRAWCURSOR(s)
 #endif
+/*
+ * To get a clean build in a LibVNCServer 0.7 source tree no need for
+ * OLD_TREE, you just need to either download the forgotten tkx11vnc.h
+ * file or run:
+ *
+ *	echo 'char gui_code[] = "";' > tkx11vnc.h
+ *
+ * (this disables the gui) and uncomment this line:
+#define rfbSetCursor(a, b) rfbSetCursor((a), (b), FALSE)
+ */
+
+/*
+ * To get a clean build on LibVNCServer 0.7.1 no need for OLD_TREE,
+ * just uncomment this line (note the maxRectsPerUpdate below is a hack
+ * that may break some usage):
+ *
+#define listenInterface maxRectsPerUpdate
+ */
 
 #if LIBVNCSERVER_HAVE_XSHM
+#  if defined(__hpux) && defined(__ia64)  /* something weird on hp/itanic */
+#    undef _INCLUDE_HPUX_SOURCE
+#  endif
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <X11/extensions/XShm.h>
@@ -290,7 +335,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.1 lastmod: 2005-02-23";
+char lastmod[] = "0.7.2pre lastmod: 2005-03-04";
 
 /* X display info */
 
@@ -579,6 +624,7 @@ int safe_remote_only = 0;	/* -safer, -unsafe */
 int started_as_root = 0;
 char *users_list = NULL;	/* -users */
 char *allow_list = NULL;	/* for -allow and -localhost */
+char *listen_str = NULL;
 char *allow_once = NULL;	/* one time -allow */
 char *accept_cmd = NULL;	/* for -accept */
 char *gone_cmd = NULL;		/* for -gone */
@@ -1688,7 +1734,7 @@ typedef unsigned int in_addr_t;
 	in_addr_t iaddr;
 
 	iaddr = inet_addr(ip);
-	if (iaddr == INADDR_NONE) {
+	if (iaddr == htonl(INADDR_NONE)) {
 		return strdup("unknown");
 	}
 
@@ -7140,7 +7186,7 @@ void reset_httpport(int old, int new) {
 			close(screen->httpListenSock);
 		}
 		rfbLog("reset_httpport: setting httpport %d -> %d.\n",
-		    old, hp);
+		    old == -1 ? hp : old, hp);
 		rfbHttpInitSockets(screen);
 	}
 }
@@ -7171,7 +7217,7 @@ void reset_rfbport(int old, int new)  {
 		}
 
 		rfbLog("reset_rfbport: setting rfbport %d -> %d.\n",
-		    old, rp);
+		    old == -1 ? rp : old, rp);
 		rfbInitSockets(screen);
 
 		maxfd = screen->maxFd;
@@ -7731,7 +7777,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		char *before, *old;
 		if (query) {
 			int state = 0;
-			if (allow_list && !strcmp(allow_list, "127.0.0.1")) {
+			char *s = allow_list;
+			if (s && (!strcmp(s, "127.0.0.1") ||
+			    !strcmp(s, "localhost"))) {
 				state = 1;
 			}
 			snprintf(buf, bufn, "ans=%s:%d", p, state);
@@ -7753,11 +7801,26 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		if (old) free(old);
 		free(before);
+
+		if (listen_str) {
+			free(listen_str);
+		}
+		listen_str = strdup("localhost");
+
+		screen->listenInterface = htonl(INADDR_LOOPBACK);
+		rfbLog("listening on loopback network only.\n");
+		rfbLog("allow list is: '%s'\n", NONUL(allow_list));
+		reset_rfbport(-1, screen->port);
+		if (screen->httpListenSock > -1) {
+			reset_httpport(-1, screen->httpPort);
+		}
 	} else if (!strcmp(p, "nolocalhost")) {
 		char *before, *old;
 		if (query) {
 			int state = 0;
-			if (allow_list && !strcmp(allow_list, "127.0.0.1")) {
+			char *s = allow_list;
+			if (s && (!strcmp(s, "127.0.0.1") ||
+			    !strcmp(s, "localhost"))) {
 				state = 1;
 			}
 			snprintf(buf, bufn, "ans=%s:%d", p, !state);
@@ -7779,6 +7842,106 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		if (old) free(old);
 		free(before);
+
+		if (listen_str) {
+			free(listen_str);
+		}
+		listen_str = NULL;
+
+		screen->listenInterface = htonl(INADDR_ANY);
+		rfbLog("listening on ALL network interfaces.\n");
+		rfbLog("allow list is: '%s'\n", NONUL(allow_list));
+		reset_rfbport(-1, screen->port);
+		if (screen->httpListenSock > -1) {
+			reset_httpport(-1, screen->httpPort);
+		}
+
+	} else if (strstr(p, "listen") == p) {
+		char *before;
+		int ok, mod = 0;
+
+		COLON_CHECK("listen:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(listen_str));
+			goto qry;
+		}
+		if (listen_str) {
+			before = strdup(listen_str);
+		} else {
+			before = strdup("");
+		}
+		p += strlen("listen:");
+
+		listen_str = strdup(p);
+
+		if (strcmp(before, listen_str)) {
+			rfbLog("process_remote_cmd: modified listen_str:\n");
+			rfbLog(" from: \"%s\"\n", before);
+			rfbLog(" to:   \"%s\"\n", listen_str);
+			mod = 1;
+		}
+
+		ok = 1;
+		if (listen_str == NULL || *listen_str == '\0' ||
+		    !strcmp(listen_str, "any")) {
+			screen->listenInterface = htonl(INADDR_ANY);
+		} else if (!strcmp(listen_str, "localhost")) {
+			screen->listenInterface = htonl(INADDR_LOOPBACK);
+		} else {
+			struct hostent *hp;
+			in_addr_t iface = inet_addr(listen_str);
+			if (iface == htonl(INADDR_NONE)) {
+				if (!(hp = gethostbyname(listen_str))) {
+					ok = 0;
+				} else {
+					iface = *(unsigned long *)hp->h_addr;
+				}
+			}
+			if (ok) {
+				screen->listenInterface = iface;
+			}
+		}
+
+		if (ok && mod) {
+			int is_loopback = 0;
+			in_addr_t iface = screen->listenInterface;
+
+			if (allow_list) {
+				if (!strcmp(allow_list, "127.0.0.1") ||
+				    !strcmp(allow_list, "localhost")) {
+					is_loopback = 1;
+				}
+			}
+			if (iface != htonl(INADDR_LOOPBACK)) {
+			    if (is_loopback) {
+				rfbLog("re-setting -allow list to all "
+				   "hosts for non-loopback listening.\n");
+				free(allow_list);
+				allow_list = NULL;
+			    }
+			} else {
+			    if (!is_loopback) {
+				if (allow_list) {
+					free(allow_list);
+				}
+				rfbLog("setting -allow list to 127.0.0.1\n");
+				allow_list = strdup("127.0.0.1");
+			    }
+			}
+		}
+		if (ok) {
+			rfbLog("allow list is: '%s'\n", NONUL(allow_list));
+			reset_rfbport(-1, screen->port);
+			if (screen->httpListenSock > -1) {
+				reset_httpport(-1, screen->httpPort);
+			}
+			free(before);
+		} else {
+			rfbLog("bad listen string: %s\n", listen_str);
+			free(listen_str);
+			listen_str = before;
+		}
 
 	} else if (strstr(p, "accept") == p) {
 		COLON_CHECK("accept:")
@@ -16079,7 +16242,7 @@ void initialize_speeds(void) {
 		s = strdup("6,4,200");
 	} else if (!strcmp(speeds_str, "dsl")) {
 		s = strdup("6,100,50");
-	} else if (!strcmp(speeds_str, "modem")) {
+	} else if (!strcmp(speeds_str, "lan")) {
 		s = strdup("6,5000,1");
 	} else {
 		s = strdup(speeds_str);
@@ -16556,7 +16719,19 @@ static void print_help(int mode) {
 "                       file containing addresses or prefixes that is re-read\n"
 "                       each time a new client connects.  Lines can be commented\n"
 "                       out with the \"#\" character in the usual way.\n"
-"-localhost             Same as -allow 127.0.0.1\n"
+"-localhost             Same as \"-allow 127.0.0.1\".\n"
+"\n"
+"                       Note: if you want to restrict which network interface\n"
+"                       x11vnc listens on, see the -listen option below.\n"
+"                       E.g. \"-listen localhost\" or \"-listen 192.168.3.21\".\n"
+"                       As a special case, the option \"-localhost\" implies\n"
+"                       \"-listen localhost\".\n"
+"\n"
+"                       For non-localhost -listen usage, if you use the remote\n"
+"                       control mechanism (-R) to change the -listen interface\n"
+"                       you may need to manually adjust the -allow list (and\n"
+"                       vice versa) to avoid situations where no connections\n"
+"                       (or too many) are allowed.\n"
 "\n"
 "-input string          Fine tuning of allowed user input.  If \"string\" does\n"
 "                       not contain a comma \",\" the tuning applies only to\n"
@@ -16708,7 +16883,7 @@ static void print_help(int mode) {
 "                       database as well.  So it \"lurks\" waiting for anyone\n"
 "                       to log into an X session and then connects to it.\n"
 "                       Specify a list of users after the = to limit which\n"
-"                       users will be tried.  To enable a difference searching\n"
+"                       users will be tried.  To enable a different searching\n"
 "                       mode, if the first user in the list is something like\n"
 "                       \":0\" or \":0-2\" that indicates a range of DISPLAY\n"
 "                       numbers that will be tried (regardless of whether\n"
@@ -17286,6 +17461,7 @@ static void print_help(int mode) {
 "                                       use \"-host\" to delete a single host\n"
 "                       localhost       enable  -localhost mode\n"
 "                       nolocalhost     disable -localhost mode\n"
+"                       listen:str      set -listen to str, empty to disable.\n"
 "                       input:str       set -input to \"str\", empty to disable.\n"
 "                       client_input:str set the K, M, B -input on a per-client\n"
 "                                       basis.  select which client as for\n"
@@ -17456,7 +17632,7 @@ static void print_help(int mode) {
 "                       overlay_nocursor visual scale viewonly noviewonly\n"
 "                       shared noshared forever noforever once timeout deny\n"
 "                       lock nodeny unlock connect allowonce allow localhost\n"
-"                       nolocalhost accept gone shm noshm flipbyteorder\n"
+"                       nolocalhost listen accept gone shm noshm flipbyteorder\n"
 "                       noflipbyteorder onetile noonetile solid_color solid\n"
 "                       nosolid blackout xinerama noxinerama xrandr noxrandr\n"
 "                       xrandr_mode padgeom quiet q noquiet modtweak nomodtweak\n"
@@ -17606,6 +17782,11 @@ void set_vnc_desktop_name(void) {
 	if (screen->port) {
 		char *host = this_host();
 		int lport = screen->port;
+		char *iface = listen_str;
+
+		if (iface != NULL && *iface != '\0' && strcmp(iface, "any")) {
+			host = iface;
+		}
 		if (host != NULL) {
 			/* note that vncviewer special cases 5900-5999 */
 			if (inetd) {
@@ -18159,7 +18340,7 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-?") || !strcmp(arg, "-opts")) {
 			print_help(1);
 		} else if (!strcmp(arg, "-V") || !strcmp(arg, "-version")) {
-			fprintf(stderr, "x11vnc: %s\n", lastmod);
+			fprintf(stdout, "x11vnc: %s\n", lastmod);
 			exit(0);
 		} else if (!strcmp(arg, "-q") || !strcmp(arg, "-quiet")) {
 			quiet = 1;
@@ -18376,6 +18557,9 @@ int main(int argc, char* argv[]) {
 			}
 			if (!strcmp(arg, "-nevershared")) {
 				got_nevershared = 1;
+			}
+			if (!strcmp(arg, "-listen") && i < argc-1) {
+				listen_str = strdup(argv[i+1]);
 			}
 			/* otherwise copy it for libvncserver use below. */
 			if (argc_vnc < 100) {
@@ -18613,6 +18797,18 @@ int main(int argc, char* argv[]) {
 			bg = 0;
 			quiet = 0;
 		}
+	}
+
+	/* tie together cases of -localhost vs. -listen localhost */
+	if (! listen_str) {
+		if (allow_list && !strcmp(allow_list, "127.0.0.1")) {
+			listen_str = strdup("localhost");
+			argv_vnc[argc_vnc++] = strdup("-listen");
+			argv_vnc[argc_vnc++] = strdup(listen_str);
+		}
+	} else if (!strcmp(listen_str, "localhost") ||
+	    !strcmp(listen_str, "127.0.0.1")) {
+		allow_list = strdup("127.0.0.1");
 	}
 
 	if (! quiet) {

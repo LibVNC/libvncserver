@@ -14,6 +14,8 @@
 
 #include <rfb/rfb.h>
 
+extern rfbStringToAddr(char *str, in_addr_t *iface);
+
 void
 rfbUsage(void)
 {
@@ -36,6 +38,8 @@ rfbUsage(void)
     fprintf(stderr, "-httpport portnum      use portnum for http connection\n");
     fprintf(stderr, "-enablehttpproxy       enable http proxy support\n");
     fprintf(stderr, "-progressive height    enable progressive updating for slow links\n");
+    fprintf(stderr, "-listen ipaddr         listen for connections only on network interface with\n");
+    fprintf(stderr, "                       addr ipaddr. '-listen localhost' and hostname work too.\n");
 }
 
 /* purges COUNT arguments from ARGV at POSITION and decrements ARGC.
@@ -125,6 +129,14 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		return FALSE;
 	    }
             rfbScreen->progressiveSliceHeight = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-listen") == 0) {  /* -listen ipaddr */
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
+            if (! rfbStringToAddr(argv[++i], &(rfbScreen->listenInterface))) {
+                return FALSE;
+            }
         } else {
 	    i++;
 	    i1=i;

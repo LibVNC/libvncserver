@@ -1,3 +1,9 @@
+2005-03-04  Karl Runge <runge@karlrunge.com>
+	* libvncserver/{cargs.c,sockets.c}: add -listen option and
+	  rfbScreen member listenInterface.
+	* rfb/rfb.h: rfbListenOnTCPPort() and rfbListenOnUDPPort()
+	  function prototypes changed to include network interface.
+
 2005-02-14  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -users lurk=, -solid for cde, -gui ez,.. beginner mode.
 
