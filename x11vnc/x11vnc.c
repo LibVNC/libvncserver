@@ -6006,7 +6006,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		
 	} else if (!strcmp(p, "overlay_cursor") ||
-	    !strcmp(p, "overlay_yescursor")) {
+	    !strcmp(p, "overlay_yescursor") || !strcmp(p, "nooverlay_nocursor")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, overlay_cursor);
 			goto qry;
@@ -6023,7 +6023,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    "cursors.\n");
 		}
 	} else if (!strcmp(p, "nooverlay_cursor") ||
-	    !strcmp(p, "overlay_nocursor")) {
+	    !strcmp(p, "nooverlay_yescursor") || !strcmp(p, "overlay_nocursor")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !overlay_cursor);
 			goto qry;
@@ -13845,10 +13845,11 @@ static void print_help(void) {
 "                       the returned value corresponds to (hint: the ext_*\n"
 "                       variables correspond to the presence of X extensions):\n"
 "\n"
-"                       ans= stop quit exit shutdown ping blacken zero refresh\n"
-"                       reset close disconnect id sid flashcmap noflashcmap\n"
-"                       truecolor notruecolor overlay nooverlay overlay_cursor\n"
-"                       overlay_yescursor nooverlay_cursor overlay_nocursor\n"
+"                       ans= stop quit exit shutdown ping blacken zero\n"
+"                       refresh reset close disconnect id sid flashcmap\n"
+"                       noflashcmap truecolor notruecolor overlay nooverlay\n"
+"                       overlay_cursor overlay_yescursor nooverlay_nocursor\n"
+"                       nooverlay_cursor nooverlay_yescursor overlay_nocursor\n"
 "                       visual scale viewonly noviewonly shared noshared\n"
 "                       forever noforever once deny lock nodeny unlock connect\n"
 "                       allowonce allow localhost nolocalhost accept gone shm\n"
