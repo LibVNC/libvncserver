@@ -98,7 +98,9 @@ int loop_if_server(single_instance_struct* str,event_dispatcher dispatcher)
 
 void send_message(single_instance_struct* str,char* message)
 {
+#ifdef DEBUG_1INSTANCE
   int i=
+#endif
   write(str->fd,message,strlen(message));
 #ifdef DEBUG_1INSTANCE
   fprintf(stderr,"send: %s => %d(%d)\n",message,i,strlen(message));

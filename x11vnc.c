@@ -232,8 +232,8 @@ int probeX=0,probeY=0;
 
 void probeScreen(rfbScreenInfoPtr s,int xscreen)
 {
-  int i,j,pixel,i1,j1,
-    bpp=s->rfbServerFormat.bitsPerPixel/8,mask=(1<<bpp)-1,
+  int i,j,/*pixel,i1,*/j1,
+    bpp=s->rfbServerFormat.bitsPerPixel/8,/*mask=(1<<bpp)-1,*/
     rstride=s->paddedWidthInBytes;
   XImage* im;
   //fprintf(stderr,"/%d,%d",probeX,probeY);
@@ -316,6 +316,13 @@ int main(int argc,char** argv)
       send_message(&single_instance,"l");
       exit(0);
     } else
+#ifdef BACKCHANNEL
+    if(i<argc-1 && !strcmp(argv[i],"-backchannel")) {
+      sprintf(message,"b%s",argv[i+1]);
+      send_message(&single_instance,message);
+      exit(0);
+    } else
+#endif
 #endif
     if(i<argc-1 && strcmp(argv[i],"-display")==0) {
       fprintf(stderr,"Using display %s\n",argv[i+1]);
@@ -459,6 +466,10 @@ int main(int argc,char** argv)
 	    break;
 	  }
       }
+#ifdef BACKCHANNEL
+      else if(message[0]=='b')
+	rfbSendBackChannel(screen,message+1,strlen(message+1));
+#endif
     }
 #endif
 

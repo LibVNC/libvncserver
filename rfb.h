@@ -273,7 +273,7 @@ typedef struct
     FILE* httpFP;
 
     PasswordCheckProcPtr passwordCheck;
-    char* rfbAuthPasswdData;
+    void* rfbAuthPasswdData;
 
     /* this is the amount of milliseconds to wait at least before sending
      * an update. */
@@ -574,6 +574,10 @@ extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
 
 void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
 
+#ifdef BACKCHANNEL
+extern void rfbSendBackChannel(rfbScreenInfoPtr s,char* message,int len);
+#endif
+
 /* translate.c */
 
 extern Bool rfbEconomicTranslate;
@@ -599,7 +603,6 @@ extern void httpCheckFds();
 
 /* auth.c */
 
-extern char *rfbAuthPasswdFile;
 extern void rfbAuthNewClient(rfbClientPtr cl);
 extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
 

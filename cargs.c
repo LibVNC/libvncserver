@@ -60,7 +60,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	    if (i + 1 >= *argc) rfbUsage();
 	    passwds[0] = argv[++i];
 	    passwds[1] = 0;
-	    rfbScreen->rfbAuthPasswdData = passwds;
+	    rfbScreen->rfbAuthPasswdData = (void*)passwds;
 	    rfbScreen->passwordCheck = rfbCheckPasswordByList;
         } else if (strcmp(argv[i], "-deferupdate") == 0) {  /* -desktop desktop-name */
             if (i + 1 >= *argc) rfbUsage();

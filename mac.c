@@ -327,6 +327,10 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 	  break;
 	}
     }
+#ifdef BACKCHANNEL
+      else if(message[0]=='b')
+	rfbSendBackChannel(screen,message+1,strlen(message+1));
+#endif
   }
 #endif
 
@@ -377,6 +381,13 @@ int main(int argc,char *argv[])
       send_message(&single_instance,"l");
       exit(0);
     } else
+#ifdef BACKCHANNEL
+    if(i<argc-1 && !strcmp(argv[i],"-backchannel")) {
+      sprintf(message,"b%s",argv[i+1]);
+      send_message(&single_instance,message);
+      exit(0);
+    } else
+#endif
 #endif
     if(i<argc-1 && strcmp(argv[i],"-wait4client")==0) {
       maxSecsToConnect = atoi(argv[i+1])/1000;

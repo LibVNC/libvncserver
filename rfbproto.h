@@ -268,7 +268,9 @@ typedef struct {
 #define rfbSetColourMapEntries 1
 #define rfbBell 2
 #define rfbServerCutText 3
-
+#ifdef BACKCHANNEL
+#define rfbBackChannel 15
+#endif
 
 /* client -> server */
 
@@ -297,6 +299,9 @@ typedef struct {
 #define rfbEncodingZlib 6
 #define rfbEncodingTight 7
 #define rfbEncodingZlibHex 8
+#ifdef BACKCHANNEL
+#define rfbEncodingBackChannel 15
+#endif
 
 /*
  * Special encoding numbers:
@@ -508,7 +513,6 @@ typedef struct {
 #define rfbTightFilterPalette          0x01
 #define rfbTightFilterGradient         0x02
 
-
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * XCursor encoding. This is a special encoding used to transmit X-style
  * cursor shapes from server to clients. Note that for this encoding,
@@ -603,6 +607,10 @@ typedef struct {
 } rfbServerCutTextMsg;
 
 #define sz_rfbServerCutTextMsg 8
+
+#ifdef BACKCHANNEL
+typedef rfbServerCutTextMsg rfbBackChannelMsg;
+#endif
 
 
 /*-----------------------------------------------------------------------------
