@@ -18,6 +18,39 @@ Bool gotInput = FALSE;
 
 Bool disconnectAfterFirstClient = TRUE;
 
+/* keyboard handling */
+
+char modifiers[0x100];
+KeyCode keycodes[0x100],leftShiftCode,rightShiftCode,altGrCode;
+
+void init_keycodes()
+{
+  Display *dpy;
+  KeySym key,*keymap;
+  int i,j,minkey,maxkey,syms_per_keycode;
+
+  memset(modifiers,-1,sizeof(modifiers));
+
+  dpy=XOpenDisplay("");
+  XDisplayKeycodes(dpy,&minkey,&maxkey);
+  keymap=XGetKeyboardMapping(dpy,minkey,(maxkey - minkey + 1),&syms_per_keycode);
+
+  for (i = minkey; i <= maxkey; i++)
+    for(j=0;j<syms_per_keycode;j++) {
+      key=keymap[(i-minkey)*syms_per_keycode+j];
+      if(key>=' ' && key<0x100 && i==XKeysymToKeycode(dpy,key)) {
+	keycodes[key]=i;
+	modifiers[key]=j;
+      }
+    }
+
+  leftShiftCode=XKeysymToKeycode(dpy,XK_Shift_L);
+  rightShiftCode=XKeysymToKeycode(dpy,XK_Shift_R);
+  altGrCode=XKeysymToKeycode(dpy,XK_Mode_switch);
+
+  XFree ((char *) keymap);
+}
+
 /* the hooks */
 
 void clientGone(rfbClientPtr cl)
@@ -31,12 +64,63 @@ void newClient(rfbClientPtr cl)
     cl->clientGoneHook = clientGone;
 }
 
+#define LEFTSHIFT 1
+#define RIGHTSHIFT 2
+#define ALTGR 4
+char ModifierState = 0;
+
+/* this function adjusts the modifiers according to mod (as from modifiers) and ModifierState */
+
+void tweakModifiers(char mod,Bool down)
+{
+  Bool isShift=ModifierState&(LEFTSHIFT|RIGHTSHIFT);
+  if(mod<0) return;
+  if(isShift && mod!=1) {
+    if(ModifierState&LEFTSHIFT)
+      XTestFakeKeyEvent(dpy,leftShiftCode,!down,CurrentTime);
+    if(ModifierState&RIGHTSHIFT)
+      XTestFakeKeyEvent(dpy,rightShiftCode,!down,CurrentTime);
+  }
+  if(!isShift && mod==1)
+    XTestFakeKeyEvent(dpy,leftShiftCode,down,CurrentTime);
+
+  if(ModifierState&ALTGR && mod!=2)
+    XTestFakeKeyEvent(dpy,altGrCode,!down,CurrentTime);
+  if(!(ModifierState&ALTGR) && mod==2)
+    XTestFakeKeyEvent(dpy,altGrCode,down,CurrentTime);
+}
+
 void keyboard(Bool down,KeySym keySym,rfbClientPtr cl)
 {
-  KeyCode k = XKeysymToKeycode( dpy,keySym );
-  if(k!=NoSymbol)
-    XTestFakeKeyEvent(dpy,k,down,CurrentTime);
-  gotInput = TRUE;
+#define ADJUSTMOD(sym,state) \
+  if(keySym==sym) { if(down) ModifierState|=state; else ModifierState&=~state; }
+
+  ADJUSTMOD(XK_Shift_L,LEFTSHIFT)
+  ADJUSTMOD(XK_Shift_R,RIGHTSHIFT)
+  ADJUSTMOD(XK_Mode_switch,ALTGR)
+
+  if(keySym>=' ' && keySym<0x100) {
+    KeyCode k;
+    /* if(down)
+       tweakModifiers(modifiers[keySym],True); */
+    tweakModifiers(modifiers[keySym],down);
+    XTestFakeKeyEvent(dpy,XK_Shift_R,True,CurrentTime);
+    k = XKeysymToKeycode( dpy,keySym );
+    if(k!=NoSymbol) {
+      XTestFakeKeyEvent(dpy,k,down,CurrentTime);
+      gotInput = TRUE;
+    }
+    /*XTestFakeKeyEvent(dpy,keycodes[keySym],down,CurrentTime);*/
+    /*if(down)
+      tweakModifiers(modifiers[keySym],False);*/
+    gotInput = TRUE;
+  } else {
+    KeyCode k = XKeysymToKeycode( dpy,keySym );
+    if(k!=NoSymbol) {
+      XTestFakeKeyEvent(dpy,k,down,CurrentTime);
+      gotInput = TRUE;
+    }
+  }
 }
 
 int oldButtonMask = 0;
@@ -132,8 +216,8 @@ void checkForImageUpdates(rfbScreenInfoPtr s,char *b)
 
 int main(int argc,char** argv)
 {
-  Screen *sc;
-  Colormap cm;
+  //Screen *sc;
+  //Colormap cm;
   XImage *framebufferImage;
   char *backupImage;
   int xscreen,i;
@@ -161,6 +245,8 @@ int main(int argc,char** argv)
   if(dpy==0)
     dpy = XOpenDisplay("");
   xscreen = DefaultScreen(dpy);
+
+  init_keycodes();
 
   getImage(0,dpy,xscreen,&framebufferImage);
 
