@@ -16,7 +16,7 @@ later:
 ------
 
 udp
-autoconf
+autoconf? at least Sun Solaris compilation
 rfbCloseClient, rfbConnect, ConnectToTcpAddr
 CORBA
 translate.c: warning about non 8-bit colourmaps
