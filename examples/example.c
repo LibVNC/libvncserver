@@ -197,7 +197,7 @@ void dokey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
       int x1=cd->oldx,y1=cd->oldy,x2,y2;
       if(cl->screen->cursorIsDrawn)
 	rfbUndrawCursor(cl->screen);
-      cd->oldx+=rfbDrawChar(cl->screen,&radonFont,cd->oldx,cd->oldy,(char)key,0x00ffffff);
+      cd->oldx+=rfbDrawCharWithClip(cl->screen,&radonFont,cd->oldx,cd->oldy,(char)key,0,0,cl->screen->width,cl->screen->height,0x00ffffff,0x00ffffff);
       rfbFontBBox(&radonFont,(char)key,&x1,&y1,&x2,&y2);
       rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);
     }
