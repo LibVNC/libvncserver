@@ -9,7 +9,7 @@ includedir=$(prefix)/include/rfb
 #include_HEADERS=rfb.h rfbconfig.h rfbint.h rfbproto.h keysym.h rfbregion.h
 
 include_HEADERS=rfb/rfb.h rfb/rfbconfig.h rfb/rfbint.h rfb/rfbproto.h \
-	rfb/keysym.h rfb/rfbregion.h
+	rfb/keysym.h rfb/rfbregion.h rfb/rfbclient.h
 
 noinst_HEADERS=d3des.h zrleDecode.h zrleEncode.h rfb/default8x16.h \
 	rdr/Exception.h rdr/FdInStream.h rdr/FdOutStream.h \

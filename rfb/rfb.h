@@ -424,7 +424,6 @@ typedef struct _rfbClientRec {
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     /* tight encoding -- preserve zlib streams' state for each client */
-  //#ifdef LIBVNCSERVER_HAVE_LIBJPEG
     z_stream zsStruct[4];
     rfbBool zsActive[4];
     int zsLevel[4];
@@ -713,7 +712,7 @@ void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);
    with a NULL.
    It returns the index in the list or -1 if cancelled or something else
    wasn't kosher. */
-typedef void (*SelectionChangedHookPtr)(int index);
+typedef void (*SelectionChangedHookPtr)(int _index);
 extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,
 			rfbFontDataPtr font, char** list,
 			int x1, int y1, int x2, int y2,

@@ -145,8 +145,6 @@ typedef struct _rfbClient {
 
 /* cursor.c */
 
-// TODO: make callback
-
 extern rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int height, uint32_t enc);
 
 /* listen.c */
