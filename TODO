@@ -4,6 +4,10 @@ immediate:
 always undraw cursor after sending updates, but do not mark region as modified.
 add automatic tests (plasma?)
 if preferredEncoding is set outside of libvncserver, don't override it.
+make libvncclient threadsafe (static zlib buffer -> rfbClient*)
+make corre work again (libvncclient or libvncserver?)
+implement zrle in libvncclient
+implement "-record" in libvncclient
 
 later:
 ------
