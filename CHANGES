@@ -1,11 +1,13 @@
 0.2
-   cursors are supported
+   source is now equivalent to TridiaVNC 1.2.1
+   pthreads now work (use the iterators!)
+   cursors are supported (rfbSetCursor automatically undraws cursor)
    support for 3 bytes/pixel (slow!)
    server side colourmap support
    fixed rfbCloseClient not to close the connection (pthreads!)
-   pthreads now work
+	this is done lazily (and with proper signalling).
    cleaned up mac.c (from original OSXvnc); now compiles (untested!)
-   compiles cleanly on Linux, IRIX, BSD, Apple
+   compiles cleanly on Linux, IRIX, BSD, Apple (Darwin)
    fixed prototypes
 0.1
    rewrote API to use pseudo-methods instead of required functions.

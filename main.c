@@ -48,7 +48,7 @@ rfbLog(char *format, ...)
     char buf[256];
     time_t log_clock;
 
-    IF_PTHREADS(pthread_mutex_lock(&logMutex));
+    IF_PTHREADS(LOCK(logMutex));
     va_start(args, format);
 
     time(&log_clock);
@@ -59,7 +59,7 @@ rfbLog(char *format, ...)
     fflush(stderr);
 
     va_end(args);
-    IF_PTHREADS(pthread_mutex_unlock(&logMutex));
+    IF_PTHREADS(UNLOCK(logMutex));
 }
 
 void rfbLogPerror(char *str)
@@ -314,6 +314,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    if(width&3)
      fprintf(stderr,"WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
 
+   rfbScreen->rfbClientHead=0;
    rfbScreen->rfbPort=5900;
    rfbScreen->socketInitDone=FALSE;
 
@@ -323,6 +324,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->udpSock=-1;
    rfbScreen->udpSockConnected=FALSE;
    rfbScreen->udpPort=0;
+   rfbScreen->udpClient=0;
 
    rfbScreen->maxFd=0;
    rfbScreen->rfbListenSock=-1;
@@ -419,6 +421,7 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
 {
   rfbInitSockets(rfbScreen);
   httpInitSockets(rfbScreen);
+  INIT_MUTEX(logMutex);
 }
 
 void
@@ -451,7 +454,6 @@ void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground
 #ifdef HAVE_PTHREADS
        pthread_t listener_thread;
 
-       pthread_mutex_init(&logMutex, NULL);
        pthread_create(&listener_thread, NULL, listenerRun, rfbScreen);
     return;
 #else

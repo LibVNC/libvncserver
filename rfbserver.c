@@ -34,6 +34,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#ifdef CORBA
+#include <vncserverctrl.h>
+#endif
+
 rfbClientPtr pointerClient = NULL;  /* Mutex for pointer events */
 
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
@@ -124,6 +128,10 @@ rfbNewClientConnection(rfbScreen,sock)
     rfbClientPtr cl;
 
     cl = rfbNewClient(rfbScreen,sock);
+#ifdef CORBA
+    if(cl!=NULL)
+      newConnection(cl, (KEYBOARD_DEVICE|POINTER_DEVICE),1,1,1);
+#endif
 }
 
 
@@ -133,27 +141,24 @@ rfbNewClientConnection(rfbScreen,sock)
  */
 
 rfbClientPtr
-rfbReverseConnection(host, port)
+rfbReverseConnection(rfbScreen,host, port)
+    rfbScreenInfoPtr rfbScreen;
     char *host;
     int port;
 {
-    return NULL;
-
-#ifdef NOT_YET
     int sock;
     rfbClientPtr cl;
 
-    if ((sock = rfbConnect(host, port)) < 0)
+    if ((sock = rfbConnect(rfbScreen, host, port)) < 0)
         return (rfbClientPtr)NULL;
 
-    cl = rfbNewClient(sock);
+    cl = rfbNewClient(rfbScreen, sock);
 
     if (cl) {
         cl->reverseConnection = TRUE;
     }
 
     return cl;
-#endif
 }
 
 
@@ -189,6 +194,8 @@ rfbNewClient(rfbScreen,sock)
     cl->host = strdup(inet_ntoa(addr.sin_addr));
 
     INIT_MUTEX(cl->outputMutex);
+    INIT_MUTEX(cl->refCountMutex);
+    INIT_COND(cl->deleteCond);
 
     cl->state = RFB_PROTOCOL_VERSION;
 
@@ -322,6 +329,10 @@ rfbClientConnectionGone(cl)
 
     LOCK(cl->outputMutex);
     TINI_MUTEX(cl->outputMutex);
+
+#ifdef CORBA
+    destroyConnection(cl);
+#endif
 
     rfbPrintStats(cl);
 
@@ -977,8 +988,10 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
    if (sendCursorShape) {
 	cl->cursorWasChanged = FALSE;
-	if (!rfbSendCursorShape(cl))
+	if (!rfbSendCursorShape(cl)) {
+	    sraRgnDestroy(updateRegion);
 	    return FALSE;
+	}
     }
    
     if (!sraRgnEmpty(updateCopyRegion)) {
@@ -1003,21 +1016,25 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
         switch (cl->preferredEncoding) {
         case rfbEncodingRaw:
             if (!rfbSendRectEncodingRaw(cl, x, y, w, h)) {
+	        sraRgnDestroy(updateRegion);
                 return FALSE;
             }
             break;
         case rfbEncodingRRE:
             if (!rfbSendRectEncodingRRE(cl, x, y, w, h)) {
+	        sraRgnDestroy(updateRegion);
                 return FALSE;
             }
             break;
         case rfbEncodingCoRRE:
             if (!rfbSendRectEncodingCoRRE(cl, x, y, w, h)) {
+	        sraRgnDestroy(updateRegion);
                 return FALSE;
             }
             break;
         case rfbEncodingHextile:
             if (!rfbSendRectEncodingHextile(cl, x, y, w, h)) {
+	        sraRgnDestroy(updateRegion);
                 return FALSE;
             }
             break;
@@ -1038,11 +1055,14 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
     if ( nUpdateRegionRects == 0xFFFF &&
 	 !rfbSendLastRectMarker(cl) ) {
+        sraRgnDestroy(updateRegion);
 	return FALSE;
     }
 
-    if (!rfbSendUpdateBuf(cl))
+    if (!rfbSendUpdateBuf(cl)) {
+        sraRgnDestroy(updateRegion);
         return FALSE;
+    }
 
     if(cursorWasDrawn != cl->screen->cursorIsDrawn) {
        if(cursorWasDrawn)
@@ -1051,6 +1071,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	  rfbUndrawCursor(cl);
     }
 
+    sraRgnDestroy(updateRegion);
     return TRUE;
 }
 
@@ -1315,7 +1336,6 @@ rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len)
     rfbServerCutTextMsg sct;
     rfbClientIteratorPtr iterator;
 
-    /* XXX bad-- writing with client list lock held */
     iterator = rfbGetClientIterator(rfbScreen);
     while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
         sct.type = rfbServerCutText;
@@ -1334,8 +1354,6 @@ rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len)
     rfbReleaseClientIterator(iterator);
 }
 
-unsigned char ptrAcceleration = 50;
-
 /*****************************************************************************
  *
  * UDP can be used for keyboard and pointer events when the underlying
@@ -1343,6 +1361,8 @@ unsigned char ptrAcceleration = 50;
  * videotile, whose TCP implementation doesn't like sending lots of small
  * packets (such as 100s of pen readings per second!).
  */
+
+unsigned char ptrAcceleration = 50;
 
 void
 rfbNewUDPConnection(rfbScreen,sock)

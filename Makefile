@@ -65,7 +65,7 @@ sratest.o: sraRegion.c
 blooptest: blooptest.o libvncserver.a
 	$(CC) -o blooptest blooptest.o $(LIBS)
 
-blooptest.o: example.c
+blooptest.o: example.c rfb.h
 	$(CC) $(CFLAGS) -DBACKGROUND_LOOP_TEST -c -o blooptest.o example.c
 
 pnmshow24: pnmshow24.o libvncserver.a

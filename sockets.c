@@ -56,7 +56,6 @@ struct timeval
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <arpa/inet.h>
 
 #include "rfb.h"
@@ -182,7 +181,6 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	    return;
 	}
 
-	fprintf(stderr,"\n");
 	rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
 
 	FD_SET(sock, &(rfbScreen->allFds));
@@ -224,8 +222,8 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 		rfbNewUDPConnection(rfbScreen,rfbScreen->udpSock);
 	    }
 
-	    //TODO: UDP also needs a client
-	    //rfbProcessUDPInput(rfbScreen,rfbScreen->udpSock);
+	    /* TODO: UDP also needs a client
+	       rfbProcessUDPInput(rfbScreen,rfbScreen->udpSock); */
 	}
 
 	FD_CLR(rfbScreen->udpSock, &fds);
@@ -262,6 +260,47 @@ rfbCloseClient(cl)
     UNLOCK(cl->updateMutex);
 }
 
+
+/*
+ * rfbConnect is called to make a connection out to a given TCP address.
+ */
+
+int
+rfbConnect(rfbScreen, host, port)
+    rfbScreenInfoPtr rfbScreen;
+    char *host;
+    int port;
+{
+    int sock;
+    int one = 1;
+
+    rfbLog("Making connection to client on host %s port %d\n",
+	   host,port);
+
+    if ((sock = ConnectToTcpAddr(host, port)) < 0) {
+	rfbLogPerror("connection failed");
+	return -1;
+    }
+
+    if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
+	rfbLogPerror("fcntl failed");
+	close(sock);
+	return -1;
+    }
+
+    if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+		   (char *)&one, sizeof(one)) < 0) {
+	rfbLogPerror("setsockopt failed");
+	close(sock);
+	return -1;
+    }
+
+    /* AddEnabledDevice(sock); */
+    FD_SET(sock, &rfbScreen->allFds);
+    rfbScreen->maxFd = max(sock,rfbScreen->maxFd);
+
+    return sock;
+}
 
 /*
  * ReadExact reads an exact number of bytes from a client.  Returns 1 if
@@ -385,7 +424,6 @@ WriteExact(cl, buf, len)
     return 1;
 }
 
-
 int
 ListenOnTCPPort(port)
     int port;
@@ -396,7 +434,7 @@ ListenOnTCPPort(port)
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    //addr.sin_addr.s_addr = interface.s_addr;
+    /* addr.sin_addr.s_addr = interface.s_addr; */
     addr.sin_addr.s_addr = INADDR_ANY;
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -420,6 +458,39 @@ ListenOnTCPPort(port)
 }
 
 int
+ConnectToTcpAddr(host, port)
+    char *host;
+    int port;
+{
+    struct hostent *hp;
+    int sock;
+    struct sockaddr_in addr;
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    if ((addr.sin_addr.s_addr = inet_addr(host)) == -1)
+    {
+	if (!(hp = gethostbyname(host))) {
+	    errno = EINVAL;
+	    return -1;
+	}
+	addr.sin_addr.s_addr = *(unsigned long *)hp->h_addr;
+    }
+
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+	return -1;
+    }
+
+    if (connect(sock, (struct sockaddr *)&addr, (sizeof(addr))) < 0) {
+	close(sock);
+	return -1;
+    }
+
+    return sock;
+}
+
+int
 ListenOnUDPPort(port)
     int port;
 {
@@ -429,7 +500,7 @@ ListenOnUDPPort(port)
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    //addr.sin_addr.s_addr = interface.s_addr;
+    /* addr.sin_addr.s_addr = interface.s_addr; */
     addr.sin_addr.s_addr = INADDR_ANY;
 
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {

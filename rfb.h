@@ -221,6 +221,7 @@ typedef struct
     int rfbListenSock;
     int udpPort;
     int udpSock;
+    struct rfbClientRec* udpClient;
     Bool udpSockConnected;
     struct sockaddr_in udpRemoteAddr;
     Bool inetdInitDone;
@@ -517,6 +518,8 @@ extern void rfbCloseClient(rfbClientPtr cl);
 extern int ReadExact(rfbClientPtr cl, char *buf, int len);
 extern int WriteExact(rfbClientPtr cl, char *buf, int len);
 extern void rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
+extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
+extern int ConnectToTcpAddr(char* host, int port);
 extern int ListenOnTCPPort(int port);
 extern int ListenOnUDPPort(int port);
 
@@ -536,7 +539,7 @@ extern void rfbReleaseClientIterator(rfbClientIteratorPtr iterator);
 
 extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,int sock);
 extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,int sock);
-extern rfbClientPtr rfbReverseConnection(char *host, int port);
+extern rfbClientPtr rfbReverseConnection(rfbScreenInfoPtr rfbScreen,char *host, int port);
 extern void rfbClientConnectionGone(rfbClientPtr cl);
 extern void rfbProcessClientMessage(rfbClientPtr cl);
 extern void rfbClientConnFailed(rfbClientPtr cl, char *reason);

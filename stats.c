@@ -69,6 +69,10 @@ rfbPrintStats(rfbClientPtr cl)
         totalBytesSent += cl->rfbBytesSent[i];
     }
 
+    totalRectanglesSent += (cl->rfbCursorUpdatesSent +
+			    cl->rfbLastRectMarkersSent);
+    totalBytesSent += (cl->rfbCursorBytesSent + cl->rfbLastRectBytesSent);
+
     rfbLog("  framebuffer updates %d, rectangles %d, bytes %d\n",
             cl->rfbFramebufferUpdateMessagesSent, totalRectanglesSent,
             totalBytesSent);
