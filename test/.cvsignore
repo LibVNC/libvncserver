@@ -2,4 +2,6 @@
 Makefile
 Makefile.in
 tight-1
-
+blooptest
+cargstest
+copyrecttest

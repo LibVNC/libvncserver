@@ -4,7 +4,8 @@ configure
 configure.lineno
 config.status
 config.log
-libvncserver.spec
+LibVNCServer.spec.in
+LibVNCServer.spec
 .deps
 aclocal.m4
 autom4te.cache
@@ -12,6 +13,16 @@ libvncserver-config
 _configs.sed
 config.h
 LibVNCServer*.tar.gz
-upload_lib.sh
+upload_beta.sh
 stamp-*
+x11vnc*.tar.gz
+config.h.in
+rfbconfig.h
+rfbconfig.h.in
+install-sh
+missing
+mkinstalldirs
+depcomp
+description-pak
+libvncserver*.deb
 
