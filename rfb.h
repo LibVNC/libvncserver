@@ -524,7 +524,7 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,RegionPtr modRegion);
 void doNothingWithClient(rfbClientPtr cl);
 
 /* functions to make a vnc server */
-extern rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv);
+extern rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
 extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
 
 /* call one of these two functions to service the vnc clients.

@@ -91,7 +91,10 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
 {
    BoxRec box;
    RegionRec region;
-   box.x1=x1; box.y1=y1; box.x2=x2; box.y2=y2;
+   int i;
+   if(x1>x2) { i=x1; x1=x2; x2=i; }
+   if(y1>y2) { i=y1; y1=y2; y2=i; }
+   box.x1=x1; box.y1=y1; box.x2=x2+1; box.y2=y2+1;
    REGION_INIT(cl->screen,&region,&box,0);
    rfbMarkRegionAsModified(rfbScreen,&region);
 }
@@ -296,10 +299,8 @@ void doNothingWithClient(rfbClientPtr cl)
 {
 }
 
-rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv)
+rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,int bitsPerSample,int samplesPerPixel,int bytesPerPixel)
 {
-   int bitsPerSample,samplesPerPixel;
-   
    rfbScreenInfoPtr rfbScreen=malloc(sizeof(rfbScreenInfo));
    rfbScreen->rfbPort=5900;
    rfbScreen->socketInitDone=FALSE;
@@ -317,22 +318,22 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv)
    
    processArguments(rfbScreen,argc,argv);
 
-   rfbScreen->width = 640;
-   rfbScreen->height = 480;
-   rfbScreen->bitsPerPixel = rfbScreen->depth = 32;
+   rfbScreen->width = width;
+   rfbScreen->height = height;
+   rfbScreen->bitsPerPixel = rfbScreen->depth = 8*bytesPerPixel;
    gethostname(rfbScreen->rfbThisHost, 255);
-   rfbScreen->paddedWidthInBytes = 640*4;
+   rfbScreen->paddedWidthInBytes = width*bytesPerPixel;
    rfbScreen->rfbServerFormat.bitsPerPixel = rfbScreen->bitsPerPixel;
    rfbScreen->rfbServerFormat.depth = rfbScreen->depth;
    rfbScreen->rfbServerFormat.bigEndian = !(*(char *)&rfbEndianTest);
    rfbScreen->rfbServerFormat.trueColour = TRUE;
 
-   bitsPerSample = 8;
-   samplesPerPixel = 3;
+   /* Why? (TODO)
    if (samplesPerPixel != 3) {
       rfbLog("screen format not supported.  exiting.\n");
       exit(1);
    }
+   */
 
    /* This works for 16 and 32-bit, but not for 8-bit.
     What should it be for 8-bit?  (Shouldn't 8-bit use a colormap?) */
@@ -342,6 +343,14 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv)
    rfbScreen->rfbServerFormat.redShift = bitsPerSample * 2;
    rfbScreen->rfbServerFormat.greenShift = bitsPerSample;
    rfbScreen->rfbServerFormat.blueShift = 0;
+fprintf(stderr,"format: %d %d %d %d %d %d\n",
+	rfbScreen->rfbServerFormat.redMax,
+	rfbScreen->rfbServerFormat.greenMax,
+	rfbScreen->rfbServerFormat.blueMax,
+	rfbScreen->rfbServerFormat.redShift,
+	rfbScreen->rfbServerFormat.greenShift,
+	rfbScreen->rfbServerFormat.blueShift);
+
 
    /* We want to use the X11 REGION_* macros without having an actual
     X11 ScreenPtr, so we do this.  Pretty ugly, but at least it lets us
