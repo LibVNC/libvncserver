@@ -168,6 +168,7 @@ Debugging
 	=F logfile:
 	quiet
 	--
+	=GA show-start-cmd
 	=G debug_gui
 
 Permissions
@@ -232,6 +233,14 @@ proc set_internal_help {} {
 Launch x11vnc with the settings you have prescribed in the gui.
 The x11vnc process is started in an xterm window so you can see the
 output, kill it, etc.
+"
+
+	set helptext(show-start-cmd) "
+Displays in the text area what the x11vnc start command (i.e. the command
+run by \"Actions -> start\") looks like for the current values of the
+settings.  This can be done even in the attached state.  Intended for
+debugging the gui.  The help item for \"Actions -> start\" gives the
+same info.
 "
 
 	set helptext(debug_gui) "
@@ -541,6 +550,9 @@ proc help_win {item} {
 		set str [get_start_x11vnc_txt]
 		append text $str
 		append_text "$str\n"
+		append text "\nPossible \$HOME/.x11vncrc settings for this command:\n\n"
+		set rctxt [get_start_x11vnc_cmd 1]
+		append text "$rctxt\n"
 	}
 
 	regsub -all { } $item " " name
@@ -1391,6 +1403,9 @@ proc do_action {item} {
 	} elseif {$item == "clear-all"} {
 		clear_all
 		return
+	} elseif {$item == "show-start-cmd"} {
+		show_start_cmd
+		return
 	} elseif {$item == "all-settings"} {
 		show_all_settings
 		return
@@ -2080,7 +2095,12 @@ proc get_start_x11vnc_txt {} {
 	return $msg
 }
 
-proc get_start_x11vnc_cmd {} {
+proc show_start_cmd {} {
+	set msg [get_start_x11vnc_txt]
+	append_text "$msg\n"
+}
+
+proc get_start_x11vnc_cmd {{show_rc 0}} {
 	global menu_var unset_str x11vnc_prog
 
 	set xterm_cmd "xterm -iconic -geometry 80x35 -title x11vnc-console -e"
@@ -2088,6 +2108,8 @@ proc get_start_x11vnc_cmd {} {
 	set cmd [split $xterm_cmd]
 
 	lappend cmd $x11vnc_prog
+
+	set rc_txt ""
 
 	set saw_id 0
 
@@ -2119,11 +2141,15 @@ proc get_start_x11vnc_cmd {} {
 		if {$item == "dontdisconnect" && $menu_var($item) == "-1"} {
 			continue
 		}
+		if {$item == "alwaysshared" && $menu_var($item) == "-1"} {
+			continue
+		}
 
 		if {[value_is_bool $item]} {
 			if {[info exists menu_var($item)]} {
 				if {$menu_var($item)} {
 					lappend cmd "-$item"
+					append rc_txt "-$item\n"
 				}
 			}
 		} elseif {[value_is_string $item]} {
@@ -2133,9 +2159,12 @@ proc get_start_x11vnc_cmd {} {
 					set nitem $item
 					if {$nitem == "screen_blank"} {
 						set nitem "sb"
+					} elseif {$nitem == "xrandr_mode"} {
+						set nitem "xrandr"
 					}
 					lappend cmd "-$nitem"
 					lappend cmd $menu_var($item)
+					append rc_txt "-$nitem $menu_var($item)\n"
 				}
 			}
 		}
@@ -2144,7 +2173,11 @@ proc get_start_x11vnc_cmd {} {
 	lappend cmd "/dev/null"
 	lappend cmd "&"
 	
-	return $cmd
+	if {$show_rc} {
+		return $rc_txt
+	} else {
+		return $cmd
+	}
 }
 
 proc start_x11vnc {} {

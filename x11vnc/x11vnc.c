@@ -256,7 +256,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.6.3pre lastmod: 2004-12-19";
+char lastmod[] = "0.7pre lastmod: 2004-12-20";
 
 /* X display info */
 
@@ -11879,10 +11879,6 @@ static int blackout_line_skip(int n, int x, int y, int rescan,
 	return 0;	/* do not skip */
 }
 
-/*
- * scan_display() wants to know if this changed tile can be skipped due
- * to blackout regions (we do an actual compare to find the changed region).
- */
 static int blackout_line_cmpskip(int n, int x, int y, char *dst, char *src,
     int w, int pixelsize) {
 
