@@ -2,7 +2,6 @@ immediate:
 ----------
 
 VisualNaCro testing
-rfbMakeMaskFromAlphaSource
 test IRIX -overlay (x11vnc)
 java vncviewer doesn't do colour cursors?
 MinGW32 doesn't do fcntl on sockets; use setsockopt instead...

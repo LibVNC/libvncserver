@@ -639,6 +639,7 @@ extern rfbBool rfbSendCursorPos(rfbClientPtr cl);
 extern void rfbConvertLSBCursorBitmapOrMask(int width,int height,unsigned char* bitmap);
 extern rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskString);
 extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
+extern char* rfbMakeMaskFromAlphaSource(int width,int height,unsigned char* alphaSource);
 extern void rfbMakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
 extern void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
 extern void rfbFreeCursor(rfbCursorPtr cursor);

@@ -306,6 +306,44 @@ char* rfbMakeMaskForXCursor(int width,int height,char* source)
    return(mask);
 }
 
+/* this function dithers the alpha using Floyd-Steinberg */
+
+char* rfbMakeMaskFromAlphaSource(int width,int height,unsigned char* alphaSource)
+{
+	int* error=(int*)calloc(sizeof(int),width);
+	int i,j,currentError=0,maskStride=(width+7)/8;
+	unsigned char* result=(unsigned char*)calloc(maskStride,height);
+	
+	for(j=0;j<height;j++)
+		for(i=0;i<width;i++) {
+			int right,middle,left;
+			currentError+=alphaSource[i+width*j]+error[i];
+		
+			if(currentError<0x80) {
+				/* set to transparent */
+				/* alpha was treated as 0 */
+			} else {
+				/* set to solid */
+				result[i/8+j*maskStride]|=(0x100>>(i&7));
+				/* alpha was treated as 0xff */
+				currentError-=0xff;
+			}
+			/* propagate to next row */
+			right=currentError/16;
+			middle=currentError*5/16;
+			left=currentError*3/16;
+			currentError-=right+middle+left;
+			error[i]=right;
+			if(i>0) {
+				error[i-1]=middle;
+				if(i>1)
+					error[i-2]=left;
+			}
+		}
+	free(error);
+	return result;
+}
+
 void rfbFreeCursor(rfbCursorPtr cursor)
 {
    if(cursor) {
