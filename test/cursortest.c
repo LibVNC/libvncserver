@@ -236,6 +236,7 @@ void SetAlphaCursor(rfbScreenInfoPtr screen,int mode)
 {
 	int i,j;
 	rfbCursorPtr c = screen->cursor;
+	int maskStride=(c->width+7)/8;
 
 	if(!c)
 		return;
@@ -252,10 +253,14 @@ void SetAlphaCursor(rfbScreenInfoPtr screen,int mode)
 
 	for(j=0;j<c->height;j++)
 		for(i=0;i<c->width;i++) {
-			unsigned char value=0x100*j/c->height;
-			rfbBool masked=(c->mask[(i/8)+(c->width+7)/8*j]<<(i&7))&0x80;
+			unsigned char value=0x100*i/c->width;
+			rfbBool masked=(c->mask[(i/8)+maskStride*j]<<(i&7))&0x80;
 			c->alphaSource[i+c->width*j]=(masked?(mode==1?value:0xff-value):0);
 		}
+	if(c->cleanupMask)
+		free(c->mask);
+	c->mask=rfbMakeMaskFromAlphaSource(c->width,c->height,c->alphaSource);
+	c->cleanupMask=TRUE;
 }
 
 /* Here the pointer events are handled */
