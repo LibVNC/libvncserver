@@ -262,8 +262,10 @@ rfbClientConnectionGone(cl)
     int i;
 
 #ifdef HAVE_PTHREADS
-    pthread_mutex_lock(&cl->updateMutex);
-    pthread_mutex_lock(&cl->outputMutex);
+    /*
+      pthread_mutex_lock(&cl->updateMutex);
+      pthread_mutex_lock(&cl->outputMutex);
+    */
     pthread_mutex_lock(&rfbClientListMutex);
 #endif
 
@@ -815,15 +817,15 @@ rfbProcessClientNormalMessage(cl)
  */
 
 Bool
-rfbSendFramebufferUpdate(cl, updateRegion)
+rfbSendFramebufferUpdate(cl, givenUpdateRegion)
      rfbClientPtr cl;
-     sraRegionPtr updateRegion;
+     sraRegionPtr givenUpdateRegion;
 {
     sraRectangleIterator* i;
     sraRect rect;
     int nUpdateRegionRects;
     rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
-    sraRegionPtr updateCopyRegion;
+    sraRegionPtr updateRegion,updateCopyRegion;
     int dx, dy;
     Bool sendCursorShape = FALSE;
     Bool cursorWasDrawn = FALSE;
@@ -862,8 +864,8 @@ rfbSendFramebufferUpdate(cl, updateRegion)
      * no update is needed.
      */
 
-    updateRegion = sraRgnCreateRgn(cl->copyRegion);
-    sraRgnOr(updateRegion,cl->modifiedRegion);
+    updateRegion = sraRgnCreateRgn(givenUpdateRegion);
+    sraRgnOr(updateRegion,cl->copyRegion);
     if(!sraRgnAnd(updateRegion,cl->requestedRegion) && !sendCursorShape) {
       sraRgnDestroy(updateRegion);
       return TRUE;
@@ -1209,14 +1211,6 @@ Bool
 rfbSendUpdateBuf(cl)
     rfbClientPtr cl;
 {
-    /*
-    int i;
-    for (i = 0; i < cl->ublen; i++) {
-        fprintf(stderr,"%02x ",((unsigned char *)cl->updateBuf)[i]);
-    }
-    fprintf(stderr,"\n");
-    */
-
     if (WriteExact(cl, cl->updateBuf, cl->ublen) < 0) {
         rfbLogPerror("rfbSendUpdateBuf: write");
         rfbCloseClient(cl);

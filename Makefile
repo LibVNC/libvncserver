@@ -6,7 +6,7 @@ PTHREADDEF = -DHAVE_PTHREADS
 PTHREADLIB = -lpthread
 
 #CC=cc
-CFLAGS=-g -Wall $(PTHREADDEF)
+CFLAGS=-g -Wall $(PTHREADDEF) $(INCLUDES)
 #CFLAGS=-O2 -Wall
 RANLIB=ranlib
 
@@ -32,7 +32,7 @@ install_OSX: OSXvnc-server
 	cp OSXvnc-server storepasswd ../OSXvnc/build/OSXvnc.app/Contents/MacOS
 
 .c.o:
-	$(CC) $(CFLAGS) $(INCLUDES) -c $<
+	$(CC) $(CFLAGS) -c $<
 
 libvncserver.a: $(OBJS)
 	$(AR) cru $@ $(OBJS)
@@ -54,7 +54,13 @@ sratest: sratest.o
 	$(CC) -o sratest sratest.o
 
 sratest.o: sraRegion.c
-	$(CC) $(CFLAGS) $(INCLUDES) -DSRA_TEST -c -o sratest.o sraRegion.c
+	$(CC) $(CFLAGS) -DSRA_TEST -c -o sratest.o sraRegion.c
+
+blooptest: blooptest.o libvncserver.a
+	$(CC) -o blooptest blooptest.o $(LIBS)
+
+blooptest.o: example.c
+	$(CC) $(CFLAGS) -DBACKGROUND_LOOP_TEST -c -o blooptest.o example.c
 
 clean:
 	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \

@@ -141,7 +141,8 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     char buf[6];
     const int one = 1;
     int sock;
-    rfbClientPtr cl;
+    rfbClientIteratorPtr i;
+    rfbClientPtr cl,cl_next;
 
     if (!rfbScreen->inetdInitDone && rfbScreen->inetdSock != -1) {
 	rfbNewClientConnection(rfbScreen,rfbScreen->inetdSock); 
@@ -232,10 +233,33 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	    return;
     }
 
-    for (cl = rfbScreen->rfbClientHead; cl; cl=cl->next) {
-	if (FD_ISSET(cl->sock, &fds) && FD_ISSET(cl->sock, &(rfbScreen->allFds))) {
-	    rfbProcessClientMessage(cl);
-	}
+    /* I know that this is horrible. But we have the following problem:
+       inside this loop, the IO functions access the clients via the
+       iterator.
+       So we have to lock rfbClientListMutex to fetch a reliable
+       rfbClientHead. Remember, a client can just go away in a multithreaded
+       environment. So we have to lock the next client before working with
+       the current.
+    */
+    i = rfbGetClientIterator(rfbScreen);
+    cl = rfbClientIteratorNext(i);
+    if(cl) {
+#ifdef HAVE_PTHREADS
+      //pthread_mutex_lock(&cl->updateMutex);
+#endif
+    }
+    rfbReleaseClientIterator(i);
+
+    while(cl) {
+      cl_next = cl->next;
+#ifdef HAVE_PTHREADS
+      //pthread_mutex_unlock(&cl->updateMutex);
+      //if(cl_next)
+	//pthread_mutex_lock(&cl_next->updateMutex);
+#endif
+      if (FD_ISSET(cl->sock, &fds) && FD_ISSET(cl->sock, &(rfbScreen->allFds)))
+	rfbProcessClientMessage(cl);
+      cl=cl_next;
     }
 }
 
@@ -257,8 +281,8 @@ rfbCloseClient(cl)
     close(cl->sock);
     cl->sock = -1;
     pthread_cond_signal(&cl->updateCond);
-    pthread_mutex_lock(&cl->updateMutex);
-    rfbClientConnectionGone(cl);
+    //pthread_mutex_lock(&cl->updateMutex);
+    //rfbClientConnectionGone(cl);
     pthread_mutex_unlock(&cl->updateMutex);
 }
 

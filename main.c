@@ -72,7 +72,7 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
 {
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
-   
+
    iterator=rfbGetClientIterator(rfbScreen);
    while((cl=rfbClientIteratorNext(iterator))) {
      pthread_mutex_lock(&cl->updateMutex);
@@ -88,6 +88,7 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
 {
    sraRegionPtr region;
    int i;
+
    if(x1>x2) { i=x1; x1=x2; x2=i; }
    x2++;
    if(x1<0) { x1=0; if(x2==x1) x2++; }
@@ -103,7 +104,7 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
    sraRgnDestroy(region);
 }
 
-int rfbDeferUpdateTime = 400; /* ms */
+int rfbDeferUpdateTime = 40; /* ms */
 
 #ifdef HAVE_PTHREADS
 static void *
@@ -415,22 +416,25 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
 void
 rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 {
-    rfbCheckFds(rfbScreen,usec);
-    httpCheckFds(rfbScreen);
+  rfbClientPtr cl,cl_next;
+
+  rfbCheckFds(rfbScreen,usec);
+  httpCheckFds(rfbScreen);
 #ifdef CORBA
-    corbaCheckFds(rfbScreen);
+  corbaCheckFds(rfbScreen);
 #endif
-    {
-       rfbClientPtr cl,cl_next;
-       cl=rfbScreen->rfbClientHead;
-       while(cl) {
-	 cl_next=cl->next;
-	 if(cl->sock>=0 && FB_UPDATE_PENDING(cl)) {
-	    rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
-	 }
-	 cl=cl_next;
-       }
-    }
+
+  /* this needn't be thread safe:
+     you use rfbRunEventLoop(..,TRUE) for pthreads. */
+  cl=rfbScreen->rfbClientHead;
+  while(cl) {
+    cl_next=cl->next;
+    if(cl->sock>=0 && FB_UPDATE_PENDING(cl))
+      rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
+    if(cl->sock==-1)
+      rfbClientConnectionGone(cl);
+    cl=cl_next;
+  }
 }
 
 void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)
@@ -441,11 +445,12 @@ void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground
 #ifdef HAVE_PTHREADS
        pthread_t listener_thread;
 
-       //pthread_mutex_init(&logMutex, NULL);
+       pthread_mutex_init(&logMutex, NULL);
        pthread_create(&listener_thread, NULL, listenerRun, rfbScreen);
     return;
 #else
     fprintf(stderr,"Can't run in background, because I don't have PThreads!\n");
+    exit(-1);
 #endif
   }
 

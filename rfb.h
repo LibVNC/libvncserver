@@ -282,9 +282,6 @@ typedef struct rfbClientRec {
    
     int sock;
     char *host;
-#ifdef HAVE_PTHREADS
-    pthread_mutex_t outputMutex;
-#endif
                                 /* Possible client states: */
     enum {
         RFB_PROTOCOL_VERSION,   /* establishing protocol version */
@@ -333,6 +330,8 @@ typedef struct rfbClientRec {
 
 
 #ifdef HAVE_PTHREADS
+    pthread_mutex_t dontKillMutex; /* if you need a reliable clientPtr */
+    pthread_mutex_t outputMutex;
     pthread_mutex_t updateMutex;
     pthread_cond_t updateCond;
 #endif

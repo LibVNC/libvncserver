@@ -2,10 +2,8 @@ immediate:
 ----------
 
 fix bug in http (java) client with big endian server: byte swapping is broken
-cursor "smears" sometimes when not using cursor encoding
 really support pthreads.
-	- cursor seems to be undrawn wildly
-	- connection gone and then reconnect is a problem
+	- cursor drawing!
 
 in the works:
 -------------
@@ -16,6 +14,8 @@ optionally dont draw rich cursors as xcursors
 later:
 ------
 
+cursor "smears" sometimes when not using cursor encoding
+	(seems to be gone now; haven't debugged properly, though)
 udp
 autoconf? at least Sun Solaris compilation
 rfbCloseClient, rfbConnect, ConnectToTcpAddr
@@ -34,4 +34,10 @@ done:
 .test drawing of cursors when not using xcursor or rich cursor encoding
 fix bug with odd width (depends on client depth: width has to be multiple of server.bytesPerPixel/client.bytesPerPixel). only raw!! -> bug of vncviewer!
 .use sraRegion from Wez instead of miregion, because it is much smaller
-
+.	- connection gone and then reconnect is a problem
+	  the reason: there are in fact three threads accessing
+	  the clientPtr: input, output and the application thread.
+	  if you kill the viewer or do rfbCloseClient, all of those
+	  three have to be warned that this is happening.
+	-> rfbClientConnectionGone can only be called by the outer loop
+	(with background loop, it is input, else it is processEvents).

@@ -21,6 +21,7 @@
  *  USA.
  */
 
+#include <unistd.h>
 #ifdef __IRIX__
 #include <netdb.h>
 #endif
@@ -99,10 +100,10 @@ void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,int x2,i
 void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 {
    ClientData* cd=cl->clientData;
+
    if(cl->screen->cursorIsDrawn)
      rfbUndrawCursor(cl);
-   cl->screen->cursorX=x;
-   cl->screen->cursorY=y;
+
    if(x>=0 && y>=0 && x<maxx && y<maxy) {
       if(buttonMask) {
 	 int i,j,x1,x2,y1,y2;
@@ -112,6 +113,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 		     x,y,cd->oldx,cd->oldy);
 	    rfbMarkRectAsModified(cl->screen,x,y,cd->oldx,cd->oldy);
 	 } else { /* draw a point (diameter depends on button) */
+	    int w=cl->screen->paddedWidthInBytes;
 	    x1=x-buttonMask; if(x1<0) x1=0;
 	    x2=x+buttonMask; if(x2>maxx) x2=maxx;
 	    y1=y-buttonMask; if(y1<0) y1=0;
@@ -119,7 +121,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 
 	    for(i=x1*bpp;i<x2*bpp;i++)
 	      for(j=y1;j<y2;j++)
-		cl->screen->frameBuffer[j*cl->screen->paddedWidthInBytes+i]=0xff;
+		cl->screen->frameBuffer[j*w+i]=0xff;
 	    rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);
 	 }
 
@@ -131,6 +133,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 
       cd->oldx=x; cd->oldy=y; cd->oldButton=buttonMask;
    }
+   defaultPtrAddEvent(buttonMask,x,y,cl);
 }
 
 /* aux function to draw a character to x, y */
@@ -308,14 +311,16 @@ int main(int argc,char** argv)
   /* initialize the server */
   rfbInitServer(rfbScreen);
 
+#ifndef BACKGROUND_LOOP_TEST
   /* this is the blocking event loop, i.e. it never returns */
   /* 40000 are the microseconds, i.e. 0.04 seconds */
   rfbRunEventLoop(rfbScreen,40000,FALSE);
+#endif
 
   /* this is the non-blocking event loop; a background thread is started */
   rfbRunEventLoop(rfbScreen,40000,TRUE);
   /* now we could do some cool things like rendering */
-  while(1) /* render() */;
+  while(1) sleep(5); /* render(); */
    
   return(0);
 }
