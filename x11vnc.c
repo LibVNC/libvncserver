@@ -150,7 +150,14 @@ int main(int argc,char** argv)
       }
     } else if(strcmp(argv[i],"-noshm")==0) {
       useSHM = FALSE;
+    } else if(strcmp(argv[i],"-runforever")==0) {
+      disconnectAfterFirstClient = FALSE;
+    } else if(i<argc-1 && strcmp(argv[i],"-wait4client")==0) {
+      maxMsecsToConnect = atoi(argv[i+1]);
+    } else if(i<argc-1 && strcmp(argv[i],"-update")==0) {
+      updateCounter = atoi(argv[i+1]);
     }
+
   if(dpy==0)
     dpy = XOpenDisplay("");
   xscreen = DefaultScreen(dpy);
