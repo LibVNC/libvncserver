@@ -224,6 +224,17 @@ AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_TYPE_SOCKLEN_T
 AC_CREATE_STDINT_H(rfb/rfbint.h)
+AC_CACHE_CHECK([for in_addr_t],
+        inaddrt, [
+                AC_TRY_COMPILE([#include <sys/types.h>
+#include <netinet/in.h>],
+                        [in_addr_t foo; return 0;],
+                                        [inaddrt=yes],
+                                        [inaddrt=no]),
+        ])
+if test $inaddrt = no ; then
+  AC_CHECK_TYPE(in_addr_t, uint32_t)
+fi
 
 # Checks for library functions.
 AC_FUNC_MALLOC
