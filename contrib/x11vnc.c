@@ -43,14 +43,12 @@
  *
  * Obtain the libvncserver package (http://libvncserver.sourceforge.net).
  * As of 12/2002 this version of x11vnc.c is contained in the libvncserver
- * CVS tree and released in version 0.5.  For earlier releases (say
- * libvncserver-0.4) this file may be inserted in place of the original
- * x11vnc.c file.
+ * CVS tree and released in version 0.5.
  *
  * gcc should be used on all platforms.  To build a threaded version put
  * "-D_REENTRANT -DX11VNC_THREADED" in the environment variable CFLAGS
- * or CPPFLAGS (e.g. before running configure).  The threaded mode is a 
- * bit more responsive, but can be unstable.
+ * or CPPFLAGS (e.g. before running the libvncserver configure).  The
+ * threaded mode is a bit more responsive, but can be unstable.
  *
  * Known shortcomings:
  *
@@ -64,10 +62,6 @@
  * general audio at the remote display is lost as well unless one separately
  * sets up some audio side-channel.
  *
- * Windows using visuals other than the default X visual may have their
- * colors messed up.  When using 8bpp indexed color, the colormap may
- * become out of date (as the colormap is added to) or incorrect.
- *
  * It does not appear possible to query the X server for the current
  * cursor shape.  We can use XTest to compare cursor to current window's
  * cursor, but we cannot extract what the cursor is...  
@@ -80,6 +74,17 @@
  * With -mouse there are occasionally some repainting errors involving
  * big areas near the cursor.  The mouse painting is in general a bit
  * ragged and not very pleasant.
+ *
+ * Windows using visuals other than the default X visual may have
+ * their colors messed up.  When using 8bpp indexed color, the colormap
+ * is attempted to be followed, but may become out of date.  Use the
+ * -flashcmap option to have colormap flashing as the pointer moves
+ * windows with private colormaps (slow).  Displays with mixed 8bpp and
+ * 24bpp visuals will incorrect display the non-default one.
+ *
+ * Feature -id <windowid> can be picky: it can crash for things like the
+ * window not sufficiently mapped into server memory, use of -mouse, etc.
+ * SaveUnders menus, popups, etc will not be seen.
  *
  * Occasionally, a few tile updates can be missed leaving a patch of
  * color that needs to be refreshed.
@@ -99,18 +104,21 @@
 #include <X11/extensions/XTest.h>
 #include <X11/keysym.h>
 
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include <rfb/rfb.h>
 
 /* X and rfb framebuffer */
 Display *dpy = 0;
 Visual *visual;
 Window window, rootwin;
-int subwin = 0;
 int scr;
 int bpp;
 int button_mask = 0;
 int dpy_x, dpy_y;
 int off_x, off_y;
+int subwin = 0;
 int indexed_colour = 0;
 
 XImage *tile;
@@ -206,7 +214,12 @@ int cursor_x, cursor_y;		/* x and y from the viewer(s) */
 int got_user_input = 0;
 int shut_down = 0;	
 
-#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) && defined(LIBVNCSERVER_X11VNC_THREADED)
+int quiet = 0;
+#if defined(LIBVNCSERVER_X11VNC_THREADED) && ! defined(X11VNC_THREADED)
+#define X11VNC_THREADED
+#endif
+
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) && defined(X11VNC_THREADED)
 	int use_threads = 1;
 #else
 	int use_threads = 0;
@@ -263,9 +276,9 @@ void interrupted (int sig) {
 	}
 	exit_flag++;
 	if (sig == 0) {
-		printf("caught X11 error:\n");
+		fprintf(stderr, "caught X11 error:\n");
 	} else {
-		printf("caught signal: %d\n", sig);
+		fprintf(stderr, "caught signal: %d\n", sig);
 	}
 	/*
 	 * to avoid deadlock, etc, just delete the shm areas and
@@ -308,7 +321,7 @@ void set_signals(void) {
 
 void client_gone(rfbClientPtr client) {
 	if (connect_once) {
-		printf("viewer exited.\n");
+		fprintf(stderr, "viewer exited.\n");
 		clean_up_exit(0);
 	}
 }
@@ -319,8 +332,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	if (connect_once) {
 		if (screen->rfbDontDisconnect && screen->rfbNeverShared) {
 			if (! shared && client_count) {
-				printf("denying additional client: %s\n",
-				    client->host);
+				fprintf(stderr, "denying additional client:"
+				     " %s\n", client->host);
 				return(RFB_CLIENT_REFUSE);
 			}
 		}
@@ -771,9 +784,14 @@ void draw_mouse(int x, int y, int which, int update) {
 	cur_sy	= cursors[which]->sy;
 	reverse	= cursors[which]->reverse;	/* reverse video */
 
+	if (indexed_colour) {
+		black = BlackPixel(dpy, scr) % 256;
+		white = WhitePixel(dpy, scr) % 256;
+	}
 	if (reverse) {
+		int tmp = black;
 		black = white;
-		white = 0;
+		white = tmp;
 	}
 
 	/*
@@ -924,7 +942,8 @@ void set_colormap(void) {
 	static int first = 1;
 	static XColor color[NCOLOR], prev[NCOLOR];
 	Colormap cmap;
-	int i, diffs = 0;
+	Visual *vis;
+	int i, ncells, diffs = 0;
 
 	if (first) {
 		screen->colourMap.count = NCOLOR;
@@ -935,7 +954,6 @@ void set_colormap(void) {
 	}
 
 	for (i=0; i < NCOLOR; i++) {
-		color[i].pixel = i;
 		prev[i].red   = color[i].red;
 		prev[i].green = color[i].green;
 		prev[i].blue  = color[i].blue;
@@ -944,6 +962,24 @@ void set_colormap(void) {
 	X_LOCK;
 
 	cmap = DefaultColormap(dpy, scr);
+	ncells = CellsOfScreen(ScreenOfDisplay(dpy, scr));
+	vis = visual;
+
+	if (subwin) {
+		XWindowAttributes attr;
+
+		if (XGetWindowAttributes(dpy, window, &attr)) {
+			cmap = attr.colormap;
+			vis = attr.visual;
+			ncells = vis->map_entries;
+		}
+	}
+
+	if (first && ncells != NCOLOR) {
+		fprintf(stderr, "set_colormap: number of cells is %d"
+		    " instead of %d.\n", ncells, NCOLOR);
+		screen->colourMap.count = ncells;
+	}
 
 	if (flash_cmap && ! first) {
 		XWindowAttributes attr;
@@ -953,11 +989,13 @@ void set_colormap(void) {
 
 		c = window;
 		while (c && tries++ < 16) {
-			/* XXX this is a hack, XQueryTree probably better. */
+			/* XQueryTree somehow? */
 			XQueryPointer(dpy, c, &r, &c, &rx, &ry, &wx, &wy, &m);
 			if (c && XGetWindowAttributes(dpy, c, &attr)) {
 				if (attr.colormap && attr.map_installed) {
 					cmap = attr.colormap;
+					vis = attr.visual;
+					ncells = vis->map_entries;
 					break;
 				}
 			} else {
@@ -965,12 +1003,32 @@ void set_colormap(void) {
 			}
 		}
 	}
+	if (ncells > NCOLOR) {
+		fprintf(stderr, "set_colormap: big problem: ncells=%d > %d\n",
+		    ncells, NCOLOR);
+	}
 
-	XQueryColors(dpy, cmap, color, NCOLOR);
+	if (vis->class == TrueColor || vis->class == DirectColor) {
+		/*
+		 * Kludge to make 8bpp TrueColor & DirectColor be like
+		 * the StaticColor map.  The ncells = 8 is "8 per subfield"
+		 * mentioned in xdpyinfo.  Looks OK... likely fortuitously.
+		 */
+		if (ncells == 8) {
+			ncells = NCOLOR;
+		}
+	}
+
+	for (i=0; i < ncells; i++) {
+		color[i].pixel = i;
+		color[i].pad = 0;
+	}
+
+	XQueryColors(dpy, cmap, color, ncells);
 
 	X_UNLOCK;
 
-	for(i=0; i < NCOLOR; i++) {
+	for(i=0; i < ncells; i++) {
 		screen->colourMap.data.shorts[i*3+0] = color[i].red;
 		screen->colourMap.data.shorts[i*3+1] = color[i].green;
 		screen->colourMap.data.shorts[i*3+2] = color[i].blue;
@@ -983,7 +1041,7 @@ void set_colormap(void) {
 	}
 
 	if (diffs && ! first) {
-		rfbSetClientColourMaps(screen, 0, NCOLOR);
+		rfbSetClientColourMaps(screen, 0, ncells);
 	}
 
 	first = 0;
@@ -993,6 +1051,7 @@ void set_colormap(void) {
  * initialize the rfb framebuffer/screen
  */
 void initialize_screen(int *argc, char **argv, XImage *fb) {
+	int have_masks = 0;
 
 	screen = rfbGetScreen(argc, argv, fb->width, fb->height,
 	    fb->bits_per_pixel, 8, fb->bits_per_pixel/8);
@@ -1001,17 +1060,20 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->rfbServerFormat.bitsPerPixel = fb->bits_per_pixel;
 	screen->rfbServerFormat.depth = fb->depth;
 	screen->rfbServerFormat.trueColour = (uint8_t) TRUE;
+	have_masks = (fb->red_mask|fb->green_mask|fb->blue_mask != 0);
 
-	if ( screen->rfbServerFormat.bitsPerPixel == 8
+	if ( ! have_masks && screen->rfbServerFormat.bitsPerPixel == 8
 	    && CellsOfScreen(ScreenOfDisplay(dpy,scr)) ) {
 		/* indexed colour */
-		printf("using 8bpp indexed colour\n");
+		if (! quiet) fprintf(stderr, "using 8bpp indexed colour\n");
 		indexed_colour = 1;
 		set_colormap();
 	} else {
 		/* general case ... */
-		printf("using %dbpp depth=%d true colour\n", fb->bits_per_pixel,
-		    fb->depth);
+		if (! quiet) {
+			fprintf(stderr, "using %dbpp depth=%d true colour\n",
+			    fb->bits_per_pixel, fb->depth);
+		}
 
 		/* convert masks to bit shifts and max # colors */
 		screen->rfbServerFormat.redShift = 0;
@@ -1135,7 +1197,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	xim = XShmCreateImage(dpy, visual, bpp, ZPixmap, NULL, shm, w, h);
 
 	if (xim == NULL) {
-		rfbErr( "XShmCreateImage(%s) failed.\n", name);
+		rfbErr("XShmCreateImage(%s) failed.\n", name);
 		exit(1);
 	}
 
@@ -1199,7 +1261,7 @@ void initialize_shm() {
 	 */
 	set_fs_factor(1024 * 1024);
 	if (! fs_factor) {
-		printf("warning: fullscreen updates are disabled.\n");
+		fprintf(stderr, "warning: fullscreen updates are disabled.\n");
 		return;
 	}
 
@@ -1870,7 +1932,8 @@ void ping_clients(int tile_cnt) {
 
 	if (rfbMaxClientWait <= 3000) {
 		rfbMaxClientWait = 3000;
-		printf("reset rfbMaxClientWait to %d ms.\n", rfbMaxClientWait);
+		fprintf(stderr, "reset rfbMaxClientWait to %d ms.\n",
+		    rfbMaxClientWait);
 	}
 	if (tile_cnt) {
 		last_send = now;
@@ -2094,6 +2157,7 @@ void watch_loop(void) {
 
 			if (got_user_input && cnt % 10 != 0) {
 				/* every 10-th drops thru to code below... */
+				cnt++;
 				XFlush(dpy);
 				continue;
 			}
@@ -2121,7 +2185,24 @@ void watch_loop(void) {
 void print_help() {
 	char help[] = 
 "\n"
-"x11vnc options:\n"
+"x11vnc: allow VNC connections to real X11 displays.\n"
+"\n"
+"Typical usage is:\n"
+"\n"
+"   Run this command in a shell on the remote machine \"far-host\":\n"
+"\n"
+"       x11vnc -display :0\n"
+"\n"
+"   Then run this in another window on the machine you are sitting at:\n"
+"\n"
+"       vncviewer far-host:0\n"
+"\n"
+"Once x11vnc establishes connections with the X11 server and starts\n"
+"listening as a VNC server it will print out a string: PORT=XXXX where\n"
+"XXXX is typically 5900 (the default VNC port).  One would next run something\n"
+"like this on the local machine: \"vncviewer host:N\" where N is XXXX - 5900.\n" 
+"\n"
+"Options:\n"
 "\n"
 "-display disp          X11 server display to connect to, the X server process\n"
 "                       must be running on same machine and support MIT-SHM.\n"
@@ -2134,6 +2215,14 @@ void print_help() {
 "-shared                VNC display is shared (default %s).\n"
 "-many                  keep listening for more connections rather than exiting\n"
 "                       as soon as the first clients disconnect.\n"
+"\n"
+"-q                     be quiet by printing less informational output.\n" 
+"-bg                    go into the background after screen setup.\n" 
+"                       something like this could be useful in a script:\n"
+"                         port=`ssh $host \"x11vnc -display :0 -bg\" | grep PORT`\n"
+"                         port=`echo \"$port\" | sed -e 's/PORT=//'`\n"
+"                         port=`expr $port - 5900`\n"
+"                         vncviewer $host:$port\n"
 "\n"
 "-modtweak              handle AltGr/Shift modifiers for differing languages\n"
 "                       between client and host (default %s).\n"
@@ -2150,10 +2239,8 @@ void print_help() {
 "                       to cut down on load (default %d).\n"
 "-nap                   monitor activity and if low take longer naps between\n" 
 "                       polls to really cut down load when idle (default %s).\n"
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 "-threads               whether or not to use the threaded libvncserver\n"
 "-nothreads             algorithm [rfbRunEventLoop] (default %s).\n"
-#endif
 "\n"
 "-fs f                  if the fraction of changed tiles in a poll is greater\n"
 "                       than f, the whole screen is updated (default %.2f).\n"
@@ -2210,9 +2297,11 @@ char *choose_title(char *display) {
 	title[0] = '\0';
 	if (display[0] == ':') {
 		char host[MAXN];
+#ifdef LIBVNCSERVER_HAVE_GETHOSTNAME
 		if (gethostname(host, MAXN) == 0) {
 			strncpy(title, host, MAXN - strlen(title));
 		}
+#endif
 	}
 	strncat(title, display, MAXN - strlen(title));
 	if (subwin) {
@@ -2231,6 +2320,7 @@ int main(int argc, char** argv) {
 	int i, ev, er, maj, min;
 	char *use_dpy = NULL;
 	int dt = 0;
+	int bg = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc2 = 1; char *argv2[100];
@@ -2241,10 +2331,10 @@ int main(int argc, char** argv) {
 		if (!strcmp(argv[i], "-display")) {
 			use_dpy = argv[++i];
 		} else if (!strcmp(argv[i], "-id")) {
-			/* expt to just show one window. XXX not finished. */
 			if (sscanf(argv[++i], "0x%x", &subwin) != 1) {
 				if (sscanf(argv[i], "%d", &subwin) != 1) {
-					printf("bad -id arg: %s\n", argv[i]);
+					fprintf(stderr, "bad -id arg: %s\n",
+					    argv[i]);
 					exit(1);
 				}
 			}
@@ -2298,12 +2388,21 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(argv[i], "-h")
 		    || !strcmp(argv[i], "-help")) {
 			print_help();
+		} else if (!strcmp(argv[i], "-q")) {
+			quiet = 1;
+#ifdef LIBVNCSERVER_HAVE_SETSID
+		} else if (!strcmp(argv[i], "-bg")) {
+			bg = 1;
+#endif
 		} else {
 			if (!strcmp(argv[i], "-desktop")) {
 				dt = 1;
 			}
 			/* otherwise copy it for use below. */
-			printf("passing arg to libvncserver: %s\n", argv[i]);
+			if (! quiet) {
+			    fprintf(stderr, "passing arg to libvncserver: %s\n",
+				argv[i]);
+			}
 			if (argc2 < 100) {
 				argv2[argc2++] = argv[i];
 			}
@@ -2316,22 +2415,26 @@ int main(int argc, char** argv) {
 	if (waitms < 0) {
 		waitms = 0;
 	}
-	printf("viewonly:   %d\n", view_only);
-	printf("shared:     %d\n", shared);
-	printf("conn_once:  %d\n", connect_once);
-	printf("mod_tweak:  %d\n", use_modifier_tweak);
-	printf("loc_curs:   %d\n", local_cursor);
-	printf("mouse:      %d\n", show_mouse);
-	printf("root_curs:  %d\n", show_root_cursor);
-	printf("defer:      %d\n", defer_update);
-	printf("waitms:     %d\n", waitms);
-	printf("take_naps:  %d\n", take_naps);
-	printf("threads:    %d\n", use_threads);
-	printf("fs_frac:    %.2f\n", fs_frac);
-	printf("gaps_fill:  %d\n", gaps_fill);
-	printf("grow_fill:  %d\n", grow_fill);
-	printf("tile_fuzz:  %d\n", tile_fuzz);
-	printf("use_hints:  %d\n", use_hints);
+	if (! quiet) {
+		fprintf(stderr, "viewonly:   %d\n", view_only);
+		fprintf(stderr, "shared:     %d\n", shared);
+		fprintf(stderr, "conn_once:  %d\n", connect_once);
+		fprintf(stderr, "mod_tweak:  %d\n", use_modifier_tweak);
+		fprintf(stderr, "loc_curs:   %d\n", local_cursor);
+		fprintf(stderr, "mouse:      %d\n", show_mouse);
+		fprintf(stderr, "root_curs:  %d\n", show_root_cursor);
+		fprintf(stderr, "defer:      %d\n", defer_update);
+		fprintf(stderr, "waitms:     %d\n", waitms);
+		fprintf(stderr, "take_naps:  %d\n", take_naps);
+		fprintf(stderr, "threads:    %d\n", use_threads);
+		fprintf(stderr, "fs_frac:    %.2f\n", fs_frac);
+		fprintf(stderr, "gaps_fill:  %d\n", gaps_fill);
+		fprintf(stderr, "grow_fill:  %d\n", grow_fill);
+		fprintf(stderr, "tile_fuzz:  %d\n", tile_fuzz);
+		fprintf(stderr, "use_hints:  %d\n", use_hints);
+	} else {
+		rfbLogEnable(0);
+	}
 
 	X_INIT;
 	if (use_dpy) {
@@ -2343,20 +2446,21 @@ int main(int argc, char** argv) {
 	}
 
 	if (! dpy) {
-		printf("XOpenDisplay failed (%s)\n", use_dpy);
+		fprintf(stderr, "XOpenDisplay failed (%s)\n",
+		    use_dpy ? use_dpy:"null");
 		exit(1);
 	} else if (use_dpy) {
-		printf("Using display %s\n", use_dpy);
+		if (! quiet) fprintf(stderr, "Using display %s\n", use_dpy);
 	} else {
-		printf("Using default display.\n");
+		if (! quiet) fprintf(stderr, "Using default display.\n");
 	}
 
 	if (! XTestQueryExtension(dpy, &ev, &er, &maj, &min)) {
-		printf("Display does not support the XTest extension.\n");
+		fprintf(stderr, "Display does not support XTest extension.\n");
 		exit(1);
 	}
 	if (! XShmQueryExtension(dpy)) {
-		printf("Display does not support XShm extension"
+		fprintf(stderr, "Display does not support XShm extension"
 		    " (must be local).\n");
 		exit(1);
 	}
@@ -2384,7 +2488,7 @@ int main(int argc, char** argv) {
 
 		window = (Window) subwin;
 		if ( ! XGetWindowAttributes(dpy, window, &attr) ) {
-			printf("bad window: 0x%x\n", window);
+			fprintf(stderr, "bad window: 0x%x\n", window);
 			exit(1);
 		}
 		dpy_x = attr.width;
@@ -2394,17 +2498,18 @@ int main(int argc, char** argv) {
 		/* show_mouse has some segv crashes as well */
 		if (show_root_cursor) {
 			show_root_cursor = 0;
-			printf("disabling root cursor drawing for subwindow\n");
+			fprintf(stderr, "disabling root cursor drawing for "
+			    "subwindow\n");
 		}
 
 		set_offset();
 	}
 
 	fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
-	printf("Read initial data from display into framebuffer.\n");
+	if (! quiet) fprintf(stderr, "Read initial data from display into framebuffer.\n");
 
-	if (fb->bits_per_pixel == 24) {
-		printf("warning: 24 bpp may have poor performance.\n");
+	if (fb->bits_per_pixel == 24 && ! quiet) {
+		fprintf(stderr, "warning: 24 bpp may have poor performance.\n");
 	}
 
 	if (! dt) {
@@ -2430,7 +2535,38 @@ int main(int argc, char** argv) {
 		initialize_keycodes();
 	}
 
-	printf("screen setup finished.\n");
+	if (screen->rfbPort) {
+		fprintf(stdout, "PORT=%d\n", screen->rfbPort);
+		fflush(stdout);	
+	}
+	if (! quiet) {
+		fprintf(stderr, "screen setup finished.\n");
+	}
+
+#if defined(LIBVNCSERVER_HAVE_FORK) && defined(LIBVNCSERVER_HAVE_SETSID)
+	if (bg) {
+		int p, n;
+		if ((p = fork()) > 0)  {
+			exit(0);
+		} else if (p == -1) {
+			fprintf(stderr, "could not fork\n");
+			perror("fork");
+			exit(1);
+		}
+		if (setsid() == -1) {
+			fprintf(stderr, "setsid failed\n");
+			perror("setsid");
+			exit(1);
+		}
+		n = open("/dev/null", O_RDONLY);
+		dup2(n, 0);
+		dup2(n, 1);
+		dup2(n, 2);
+		if (n > 2) {
+			close(n);
+		}
+	}
+#endif
 
 	watch_loop();
 
