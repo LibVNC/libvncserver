@@ -180,7 +180,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     fd_set fds;
     struct timeval tv;
     struct sockaddr_in addr;
-    int addrlen = sizeof(addr);
+    socklen_t addrlen = sizeof(addr);
     char buf[6];
     const int one = 1;
     int sock;
@@ -311,6 +311,7 @@ rfbCloseClient(cl)
     LOCK(cl->updateMutex);
     if (cl->sock != -1) {
       FD_CLR(cl->sock,&(cl->screen->allFds));
+      shutdown(cl->sock,SHUT_RDWR);
       close(cl->sock);
       cl->sock = -1;
     }
@@ -369,10 +370,7 @@ rfbConnect(rfbScreen, host, port)
  */
 
 int
-ReadExact(cl, buf, len)
-     rfbClientPtr cl;
-     char *buf;
-     int len;
+ReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 {
     int sock = cl->sock;
     int n;
@@ -401,8 +399,8 @@ ReadExact(cl, buf, len)
 
             FD_ZERO(&fds);
             FD_SET(sock, &fds);
-            tv.tv_sec = rfbMaxClientWait / 1000;
-            tv.tv_usec = (rfbMaxClientWait % 1000) * 1000;
+            tv.tv_sec = timeout / 1000;
+            tv.tv_usec = (timeout % 1000) * 1000;
             n = select(sock+1, &fds, NULL, &fds, &tv);
             if (n < 0) {
                 rfbLogPerror("ReadExact: select");
@@ -417,7 +415,10 @@ ReadExact(cl, buf, len)
     return 1;
 }
 
-
+int ReadExact(rfbClientPtr cl,char* buf,int len)
+{
+  return(ReadExactTimeout(cl,buf,len,rfbMaxClientWait));
+}
 
 /*
  * WriteExact writes an exact number of bytes to a client.  Returns 1 if
@@ -428,7 +429,7 @@ ReadExact(cl, buf, len)
 int
 WriteExact(cl, buf, len)
      rfbClientPtr cl;
-     char *buf;
+     const char *buf;
      int len;
 {
     int sock = cl->sock;
@@ -535,7 +536,7 @@ ConnectToTcpAddr(host, port)
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
 
-    if ((addr.sin_addr.s_addr = inet_addr(host)) == -1)
+    if ((addr.sin_addr.s_addr = inet_addr(host)) == INADDR_NONE)
     {
 	if (!(hp = gethostbyname(host))) {
 	    errno = EINVAL;

@@ -113,7 +113,7 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
     fd_set fds;
     struct timeval tv;
     struct sockaddr_in addr;
-    int addrlen = sizeof(addr);
+    socklen_t addrlen = sizeof(addr);
 
     if (!rfbScreen->httpDir)
 	return;
@@ -196,7 +196,7 @@ static void
 httpProcessInput(rfbScreenInfoPtr rfbScreen)
 {
     struct sockaddr_in addr;
-    int addrlen = sizeof(addr);
+    socklen_t addrlen = sizeof(addr);
     char fullFname[256];
     char *fname;
     unsigned int maxFnameLen;

@@ -172,9 +172,6 @@ sraSpanListMakeEmpty(sraSpanList *list) {
   list->back._next = NULL;
 }
 
-int sraMax(int a, int b) {return (a>b)?a:b;}
-int sraMin(int a, int b) {return (a<b)?a:b;}
-
 Bool
 sraSpanListEqual(const sraSpanList *s1, const sraSpanList *s2) {
   sraSpan *sp1, *sp2;

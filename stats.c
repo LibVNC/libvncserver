@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include "rfb.h"
 
-static char* encNames[] = {
+static const char* encNames[] = {
     "raw", "copyRect", "RRE", "[encoding 3]", "CoRRE", "hextile",
     "zlib", "tight", "[encoding 8]", "[encoding 9]"
 };

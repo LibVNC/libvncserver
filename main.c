@@ -34,10 +34,20 @@
 
 MUTEX(logMutex);
 
+int rfbEnableLogging=1;
+
 /* we cannot compare to _LITTLE_ENDIAN, because some systems
    (as Solaris) assume little endian if _LITTLE_ENDIAN is
    defined, even if _BYTE_ORDER is not _LITTLE_ENDIAN */
 char rfbEndianTest = (_BYTE_ORDER == 1234);
+
+/* from rfbserver.c */
+void rfbIncrClientRef(rfbClientPtr cl);
+void rfbDecrClientRef(rfbClientPtr cl);
+
+void rfbLogEnable(int enabled) {
+  rfbEnableLogging=enabled;
+}
 
 /*
  * rfbLog prints a time-stamped message to the log file (stderr).
@@ -49,6 +59,9 @@ rfbLog(const char *format, ...)
     va_list args;
     char buf[256];
     time_t log_clock;
+
+    if(!rfbEnableLogging)
+      return;
 
     LOCK(logMutex);
     va_start(args, format);
@@ -259,7 +272,9 @@ clientOutput(void *data)
         UNLOCK(cl->updateMutex);
 
         /* Now actually send the update. */
+	rfbIncrClientRef(cl);
         rfbSendFramebufferUpdate(cl, updateRegion);
+	rfbDecrClientRef(cl);
 
 	sraRgnDestroy(updateRegion);
     }
@@ -300,7 +315,7 @@ listenerRun(void *data)
     int client_fd;
     struct sockaddr_in peer;
     rfbClientPtr cl;
-    int len;
+    socklen_t len;
 
     len = sizeof(peer);
 
@@ -397,7 +412,7 @@ rfbCursorPtr defaultGetCursorPtr(rfbClientPtr cl)
 }
 
 /* response is cl->authChallenge vncEncrypted with passwd */
-Bool defaultPasswordCheck(rfbClientPtr cl,char* response,int len)
+Bool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
 {
   int i;
   char *passwd=vncDecryptPasswdFromFile(cl->screen->rfbAuthPasswdData);
@@ -427,7 +442,7 @@ Bool defaultPasswordCheck(rfbClientPtr cl,char* response,int len)
 
 /* for this method, rfbAuthPasswdData is really a pointer to an array
    of char*'s, where the last pointer is 0. */
-Bool rfbCheckPasswordByList(rfbClientPtr cl,char* response,int len)
+Bool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
 {
   char **passwds;
 

@@ -34,7 +34,7 @@ int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 }
 
 void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
-		   int x,int y,const unsigned char* string,Pixel colour)
+		   int x,int y,const char* string,Pixel colour)
 {
   while(*string) {
     x+=rfbDrawChar(rfbScreen,font,x,y,*string,colour);
@@ -100,7 +100,7 @@ int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 }
 
 void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
-			   int x,int y,const unsigned char* string,
+			   int x,int y,const char* string,
 			   int x1,int y1,int x2,int y2,
 			   Pixel colour,Pixel backColour)
 {
@@ -111,7 +111,7 @@ void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
   }
 }
 
-int rfbWidthOfString(rfbFontDataPtr font,const unsigned char* string)
+int rfbWidthOfString(rfbFontDataPtr font,const char* string)
 {
   int i=0;
   while(*string) {
@@ -166,7 +166,7 @@ rfbFontDataPtr rfbLoadConsoleFont(char *filename)
   if(!f) return(0);
 
   p=(rfbFontDataPtr)malloc(sizeof(rfbFontData));
-  p->data=(char*)malloc(4096);
+  p->data=(unsigned char*)malloc(4096);
   if(1!=fread(p->data,4096,1,f)) {
     free(p->data);
     free(p);

@@ -230,18 +230,18 @@ rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskSt
    /*cursor->backRed=cursor->backGreen=cursor->backBlue=0xffff;*/
    cursor->foreRed=cursor->foreGreen=cursor->foreBlue=0xffff;
    
-   cursor->source = (char*)calloc(w,height);
+   cursor->source = (unsigned char*)calloc(w,height);
    for(j=0,cp=cursorString;j<height;j++)
       for(i=0,bit=0x80;i<width;i++,bit=(bit&1)?0x80:bit>>1,cp++)
 	if(*cp!=' ') cursor->source[j*w+i/8]|=bit;
 
    if(maskString) {
-      cursor->mask = (char*)calloc(w,height);
+      cursor->mask = (unsigned char*)calloc(w,height);
       for(j=0,cp=maskString;j<height;j++)
 	for(i=0,bit=0x80;i<width;i++,bit=(bit&1)?0x80:bit>>1,cp++)
 	  if(*cp!=' ') cursor->mask[j*w+i/8]|=bit;
    } else
-     cursor->mask = rfbMakeMaskForXCursor(width,height,cursor->source);
+     cursor->mask = (unsigned char*)rfbMakeMaskForXCursor(width,height,cursor->source);
 
    return(cursor);
 }
@@ -291,7 +291,7 @@ void MakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
    char *back=(char*)&background;
    unsigned char bit;
    
-   cursor->source=(char*)calloc(w,cursor->height);
+   cursor->source=(unsigned char*)calloc(w,cursor->height);
    
    if(format->bigEndian)
       back+=4-bpp;
@@ -310,10 +310,11 @@ void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
    rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
    int i,j,w=(cursor->width+7)/8,bpp=format->bitsPerPixel/8;
    CARD32 background,foreground;
-   char *cp,*back=(char*)&background,*fore=(char*)&foreground;
+   char *back=(char*)&background,*fore=(char*)&foreground;
+   unsigned char *cp;
    unsigned char bit;
 
-   cp=cursor->richSource=(char*)calloc(cursor->width*bpp,cursor->height);
+   cp=cursor->richSource=(unsigned char*)calloc(cursor->width*bpp,cursor->height);
    
    if(format->bigEndian) {
       back+=4-bpp;

@@ -47,6 +47,9 @@ typedef unsigned long KeySym;
 #define SIGNED signed
 /* for some strange reason, "typedef signed char Bool;" yields a four byte
    signed int on IRIX, but only for rfbserver.o!!! */
+#ifdef Bool
+#undef Bool
+#endif
 #define Bool signed char
 #undef FALSE
 #define FALSE 0
@@ -179,7 +182,7 @@ typedef void (*PtrAddEventProcPtr) (int buttonMask, int x, int y, struct _rfbCli
 typedef void (*SetXCutTextProcPtr) (char* str,int len, struct _rfbClientRec* cl);
 typedef struct rfbCursor* (*GetCursorProcPtr) (struct _rfbClientRec* pScreen);
 typedef Bool (*SetTranslateFunctionProcPtr)(struct _rfbClientRec* cl);
-typedef Bool (*PasswordCheckProcPtr)(struct _rfbClientRec* cl,char* encryptedPassWord,int len);
+typedef Bool (*PasswordCheckProcPtr)(struct _rfbClientRec* cl,const char* encryptedPassWord,int len);
 typedef enum rfbNewClientAction (*NewClientHookPtr)(struct _rfbClientRec* cl);
 typedef void (*DisplayHookPtr)(struct _rfbClientRec* cl);
 
@@ -261,7 +264,7 @@ typedef struct _rfbScreenInfo
 
     rfbPixelFormat rfbServerFormat;
     rfbColourMap colourMap; /* set this if rfbServerFormat.trueColour==FALSE */
-    char* desktopName;
+    const char* desktopName;
     char rfbThisHost[255];
 
     Bool autoPort;
@@ -560,7 +563,8 @@ extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
 extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
 extern void rfbCloseClient(rfbClientPtr cl);
 extern int ReadExact(rfbClientPtr cl, char *buf, int len);
-extern int WriteExact(rfbClientPtr cl, char *buf, int len);
+extern int ReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
+extern int WriteExact(rfbClientPtr cl, const char *buf, int len);
 extern void rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern int ConnectToTcpAddr(char* host, int port);
@@ -623,8 +627,8 @@ extern void rfbSetClientColourMaps(rfbScreenInfoPtr rfbScreen, int firstColour, 
 extern int httpPort;
 extern char *httpDir;
 
-extern void httpInitSockets();
-extern void httpCheckFds();
+extern void httpInitSockets(rfbScreenInfoPtr rfbScreen);
+extern void httpCheckFds(rfbScreenInfoPtr rfbScreen);
 
 
 
@@ -722,11 +726,11 @@ typedef struct rfbFontData {
 } rfbFontData,* rfbFontDataPtr;
 
 int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,Pixel colour);
-void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const unsigned char* string,Pixel colour);
+void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,Pixel colour);
 /* if colour==backColour, background is transparent */
 int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,int x1,int y1,int x2,int y2,Pixel colour,Pixel backColour);
-void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const unsigned char* string,int x1,int y1,int x2,int y2,Pixel colour,Pixel backColour);
-int rfbWidthOfString(rfbFontDataPtr font,const unsigned char* string);
+void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,int x1,int y1,int x2,int y2,Pixel colour,Pixel backColour);
+int rfbWidthOfString(rfbFontDataPtr font,const char* string);
 int rfbWidthOfChar(rfbFontDataPtr font,unsigned char c);
 void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int* y2);
 /* this returns the smallest box enclosing any character of font. */
@@ -759,13 +763,14 @@ extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,
 
 /* cargs.c */
 
-extern void rfbUsage();
+extern void rfbUsage(void);
 extern void rfbPurgeArguments(int* argc,int* position,int count,char *argv[]);
 extern void rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[]);
 extern void rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[]);
 
 /* main.c */
 
+extern void rfbLogEnable(int enabled);
 extern void rfbLog(const char *format, ...);
 extern void rfbLogPerror(const char *str);
 
@@ -781,7 +786,7 @@ void doNothingWithClient(rfbClientPtr cl);
 enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
 
 /* to check against plain passwords */
-Bool rfbCheckPasswordByList(rfbClientPtr cl,char* response,int len);
+Bool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len);
 
 /* functions to make a vnc server */
 extern rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
