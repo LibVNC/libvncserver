@@ -166,6 +166,7 @@ hint_t *hint_list;
 
 int shared = 0;			/* share vnc display. */
 int view_only = 0;		/* clients can only watch. */
+int inetd = 0;			/* spawned from inetd(1) */
 int connect_once = 1;		/* disconnect after first connection session. */
 int flash_cmap = 0;		/* follow installed colormaps */
 
@@ -175,6 +176,8 @@ int local_cursor = 1;		/* whether the viewer draws a local cursor */
 int show_mouse = 0;		/* display a cursor for the real mouse */
 int show_root_cursor = 0;	/* show X when on root background */
 
+int using_shm = 1;		/* whether mit-shm is used */
+int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
 /*
  * waitms is the msec to wait between screen polls.  Not too old h/w shows
  * poll times of 10-35ms, so maybe this value cuts the idle load by 2 or so.
@@ -337,8 +340,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 				return(RFB_CLIENT_REFUSE);
 			}
 		}
-		client->clientGoneHook = client_gone;
 	}
+	client->clientGoneHook = client_gone;
 	if (view_only)  {
 		client->clientData = (void *) -1;
 	} else {
@@ -1107,6 +1110,20 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	screen->frameBuffer = fb->data; 
 
+	if (inetd) {
+		int fd = dup(0);
+		if (fd < 3) {
+			rfbErr("dup(0) = %d failed.\n", fd);
+			perror("dup");
+			exit(1);
+		}
+		fclose(stdin);
+		fclose(stdout);
+		/* we keep stderr for logging */
+		screen->inetdSock = fd;
+		screen->rfbPort = 0;
+	}
+
 	/* XXX the following 3 settings are based on libvncserver defaults. */
 	if (screen->rfbPort == 5900) {
 		screen->autoPort = TRUE;
@@ -1194,6 +1211,45 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	X_LOCK;
 
+	if (! using_shm) {
+		/* we only need the XImage created */
+		xim = XCreateImage(dpy, visual, bpp, ZPixmap, 0, NULL, w, h,
+		    BitmapPad(dpy), 0);
+
+		X_UNLOCK;
+
+		if (xim == NULL) {
+			rfbErr("XCreateImage(%s) failed.\n", name);
+			exit(1);
+		}
+		xim->data = (char *) malloc(xim->bytes_per_line * xim->height);
+		if (xim->data == NULL) {
+			rfbErr("XCreateImage(%s) data malloc failed.\n", name);
+			exit(1);
+		}
+		if (flip_byte_order) {
+			static int reported = 0;
+			char *bo;
+			if (xim->byte_order == LSBFirst) {
+				bo = "MSBFirst";
+				xim->byte_order = MSBFirst;
+				xim->bitmap_bit_order = MSBFirst;
+			} else {
+				bo = "LSBFirst";
+				xim->byte_order = LSBFirst;
+				xim->bitmap_bit_order = LSBFirst;
+			}
+			if (! reported && ! quiet) {
+				fprintf(stderr, "changing XImage byte order"
+				    " to %s\n", bo);
+				reported = 1;
+			}
+		}
+
+		*ximg_ptr = xim;
+		return;
+	}
+
 	xim = XShmCreateImage(dpy, visual, bpp, ZPixmap, NULL, shm, w, h);
 
 	if (xim == NULL) {
@@ -1202,6 +1258,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	}
 
 	*ximg_ptr = xim;
+
 
 	shm->shmid = shmget(IPC_PRIVATE,
 	    xim->bytes_per_line * xim->height, IPC_CREAT | 0777);
@@ -1231,11 +1288,17 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 }
 
 void shm_delete(XShmSegmentInfo *shm) {
+	if (! using_shm) {
+		return;
+	}
 	shmdt(shm->shmaddr);
 	shmctl(shm->shmid, IPC_RMID, 0);
 }
 
 void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
+	if (! using_shm) {
+		return;
+	}
 	X_LOCK;
 	XShmDetach(dpy, shm);
 	XDestroyImage(xim);
@@ -1460,12 +1523,12 @@ void copy_tile(int tx, int ty) {
 	n = tx + ty * ntiles_x;		/* number of the tile */
 
 	X_LOCK;
-	if ( size_x == tile_x && size_y == tile_y ) {
+	if ( using_shm && size_x == tile_x && size_y == tile_y ) {
 		/* general case: */
 		XShmGetImage(dpy, window, tile, x, y, AllPlanes);
 	} else {
 		/*
-		 * near bottom or rhs edge case:
+		 * No shm or near bottom/rhs edge case:
 		 * (but only if tile size does not divide screen size)
 		 */
 		XGetSubImage(dpy, window, x, y, size_x, size_y, AllPlanes,
@@ -1832,7 +1895,7 @@ int grow_islands() {
 void copy_screen() {
 	int pixelsize = bpp >> 3;
 	char *rfb_fb;
-	int i, y, block_size, xi;
+	int i, y, block_size;
 
 	block_size = (dpy_x * (dpy_y/fs_factor) * pixelsize);
 
@@ -1842,7 +1905,13 @@ void copy_screen() {
 	X_LOCK;
 
 	for (i=0; i < fs_factor; i++) {
-		xi = XShmGetImage(dpy, window, fullscreen, 0, y, AllPlanes);
+		if (using_shm) {
+			XShmGetImage(dpy, window, fullscreen, 0, y, AllPlanes);
+		} else {
+			XGetSubImage(dpy, window, 0, y, fullscreen->width,
+			    fullscreen->height, AllPlanes, ZPixmap, fullscreen,
+			    0, 0);
+		}
 		memcpy(rfb_fb, fullscreen->data, (size_t) block_size);
 
 		y += dpy_y / fs_factor;
@@ -1963,7 +2032,13 @@ int scan_display(int ystart, int rescan) {
 
 		/* grab the horizontal scanline from the display: */
 		X_LOCK;
-		XShmGetImage(dpy, window, scanline, 0, y, AllPlanes);
+		if (using_shm) {
+			XShmGetImage(dpy, window, scanline, 0, y, AllPlanes);
+		} else {
+			XGetSubImage(dpy, window, 0, y, scanline->width,
+			    scanline->height, AllPlanes, ZPixmap, scanline,
+			    0, 0);
+		}
 		X_UNLOCK;
 
 		/* for better memory i/o try the whole line at once */
@@ -2215,6 +2290,12 @@ void print_help() {
 "-shared                VNC display is shared (default %s).\n"
 "-many                  keep listening for more connections rather than exiting\n"
 "                       as soon as the first clients disconnect.\n"
+"-inetd                 launched by inetd(1): stdio instead of listening socket.\n"
+"-noshm                 do not use the MIT-SHM extension for the polling.\n"
+"                       remote displays can be polled this way: be careful\n"
+"                       this can use large amounts of network bandwidth.\n"
+"-flipbyteorder         sometimes needed if remotely polled host has different\n"
+"                       endianness.  ignored unless -noshm is set.\n"
 "\n"
 "-q                     be quiet by printing less informational output.\n" 
 "-bg                    go into the background after screen setup.\n" 
@@ -2321,6 +2402,7 @@ int main(int argc, char** argv) {
 	char *use_dpy = NULL;
 	int dt = 0;
 	int bg = 0;
+	int got_waitms = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc2 = 1; char *argv2[100];
@@ -2346,6 +2428,12 @@ int main(int argc, char** argv) {
 			shared = 1;
 		} else if (!strcmp(argv[i], "-many")) {
 			connect_once = 0;
+		} else if (!strcmp(argv[i], "-inetd")) {
+			inetd = 1;
+		} else if (!strcmp(argv[i], "-noshm")) {
+			using_shm = 0;
+		} else if (!strcmp(argv[i], "-flipbyteorder")) {
+			flip_byte_order = 1;
 		} else if (!strcmp(argv[i], "-modtweak")) {
 			use_modifier_tweak = 1;
 		} else if (!strcmp(argv[i], "-nomodtweak")) {
@@ -2365,6 +2453,7 @@ int main(int argc, char** argv) {
 			defer_update = atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "-wait")) {
 			waitms = atoi(argv[++i]);
+			got_waitms = 1;
 		} else if (!strcmp(argv[i], "-nap")) {
 			take_naps = 1;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
@@ -2415,10 +2504,22 @@ int main(int argc, char** argv) {
 	if (waitms < 0) {
 		waitms = 0;
 	}
+	if (! using_shm && ! got_waitms) {
+		/* try to cut down on polling over network... */
+		waitms *= 2;
+	}
+	if (inetd) {
+		shared = 0;
+		connect_once = 1;
+		bg = 0;
+	}
 	if (! quiet) {
 		fprintf(stderr, "viewonly:   %d\n", view_only);
 		fprintf(stderr, "shared:     %d\n", shared);
+		fprintf(stderr, "inetd:      %d\n", inetd);
 		fprintf(stderr, "conn_once:  %d\n", connect_once);
+		fprintf(stderr, "using_shm:  %d\n", using_shm);
+		fprintf(stderr, "flipbyteo:  %d\n", flip_byte_order);
 		fprintf(stderr, "mod_tweak:  %d\n", use_modifier_tweak);
 		fprintf(stderr, "loc_curs:   %d\n", local_cursor);
 		fprintf(stderr, "mouse:      %d\n", show_mouse);
@@ -2460,9 +2561,14 @@ int main(int argc, char** argv) {
 		exit(1);
 	}
 	if (! XShmQueryExtension(dpy)) {
-		fprintf(stderr, "Display does not support XShm extension"
-		    " (must be local).\n");
-		exit(1);
+		if (! using_shm) {
+			fprintf(stderr, "warning: display does not support "
+			    "XShm.\n");
+		} else {
+			fprintf(stderr, "Display does not support XShm "
+			    "extension (must be local).\n");
+			exit(1);
+		}
 	}
 
 	/*
@@ -2527,7 +2633,7 @@ int main(int argc, char** argv) {
 
 	initialize_tiles();
 
-	initialize_shm();
+	initialize_shm();	/* also creates XImages when using_shm = 0 */
 
 	set_signals();
 

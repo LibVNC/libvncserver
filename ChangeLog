@@ -1,3 +1,6 @@
+2003-11-07  Karl Runge
+	* support "-inetd", "-noshm", "-flipbyteorder" in x11vnc
+
 2003-10-26  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* released Version 0.6
 
