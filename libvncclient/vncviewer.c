@@ -108,6 +108,9 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   initAppData(&client->appData);
   client->programName = 0;
   client->endianTest = 1;
+  client->programName="";
+  client->serverHost="";
+  client->serverPort=5900;
 
   client->format.bitsPerPixel = bytesPerPixel*8;
   client->format.depth = bitsPerSample*samplesPerPixel;
@@ -188,11 +191,7 @@ static rfbBool rfbInitConnection(rfbClient* client)
 rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
   int i,j;
 
-  if(argv==0 || argc==0 || *argc==0) {
-    client->programName="";
-    client->serverHost="";
-    client->serverPort=5900;
-  } else {
+  if(argv>0 && argc && *argc) {
     if(client->programName==0)
       client->programName=argv[0];
 
