@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Mon Feb 14 14:23:56 EST 2005
+x11vnc README file                         Date: Mon Feb 21 22:41:53 EST 2005
 
 The following information is taken from these URLs:
 
@@ -594,8 +594,6 @@ ls -l ./x11vnc/x11vnc
 
    Please feel free to [45]contact me if you have any questions,
    problems, or comments about x11vnc, etc.
-
-   [PayPal]
      _________________________________________________________________
 
     x11vnc FAQ:
@@ -1927,9 +1925,34 @@ x11vnc -logfile $HOME/.x11vnc.log -rfbauth $HOME/.vnc/passwd -forever -bg
    killed immediately after the user logs in. Here are [154]full details
    on how to configure gdm
 
-   If you do not want to deal with the display manager startup scripts,
+   Here is an example what we did on a vanilla install of Solaris:
+   Make the directory /etc/dt/config:
+  mkdir -p /etc/dt/config
+
+   Copy over the Xconfig file for customization:
+  cp /usr/dt/config/Xconfig /etc/dt/config/Xconfig
+
+   Edit /etc/dt/config/Xconfig and uncomment the line:
+  Dtlogin*grabServer:        False
+
+   Next, copy over Xsetup for customization:
+  cp /usr/dt/config/Xsetup /etc/dt/config/Xsetup
+
+   Edit /etc/dt/config/Xsetup and at the bottom put a line like:
+  /usr/local/bin/x11vnc -forever -o /var/tmp/x11vnc.log -bg
+
+   (tweaked to your local setup and preferences, a password via -rfbauth,
+   etc. would be a very good idea).
+
+   Restart the X server and dtlogin:
+  /etc/init.d/dtlogin stop
+  /etc/init.d/dtlogin start
+
+   (or reboot or maybe just restart the X session).
+
+   If you do not want to deal with any display manager startup scripts,
    here is a kludgey script that can be run manually or out of a boot
-   file like rc.local. [155]x11vnc_loop It will need some local
+   file like rc.local: [155]x11vnc_loop It will need some local
    customization before running. Because the XAUTHORITY auth file must be
    guessed by this script, use of the display manager script above is
    preferred.
@@ -2908,6 +2931,9 @@ ied)
    If you don't want to hear the beeps use the -nobell option. If you
    want to hear the audio from the remote applications, consider trying a
    redirector such as esd.
+     _________________________________________________________________
+
+   [PayPal]
 
 References
 
@@ -3090,8 +3116,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.1pre lastmod: 2005-02-1
-4
+x11vnc: allow VNC connections to real X11 displays. 0.7.1 lastmod: 2005-02-22
 
 x11vnc options:
   -display disp            -auth file             
@@ -3133,16 +3158,16 @@ x11vnc options:
   -input_skip n            -speeds rd,bw,lat      
   -debug_pointer           -debug_keyboard        
   -defer time              -wait time             
-  -nap                     -sb time               
-  -sigpipe string          -threads               
-  -nothreads               -fs f                  
-  -gaps n                  -grow n                
-  -fuzz n                  -snapfb                
-  -gui [gui-opts]          -remote command        
-  -query variable          -sync                  
-  -noremote                -unsafe                
-  -safer                   -deny_all              
-
+  -nap                     -nonap                 
+  -sb time                 -sigpipe string        
+  -threads                 -nothreads             
+  -fs f                    -gaps n                
+  -grow n                  -fuzz n                
+  -snapfb                  -gui [gui-opts]        
+  -remote command          -query variable        
+  -sync                    -noremote              
+  -unsafe                  -safer                 
+  -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -3166,8 +3191,7 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.1pre lastmod: 2005-02-1
-4
+x11vnc: allow VNC connections to real X11 displays. 0.7.1 lastmod: 2005-02-22
 
 Typical usage is:
 
@@ -3188,7 +3212,7 @@ the name of the machine running x11vnc and N is XXXX - 5900, i.e. usually
 "vncviewer hostname:0".
 
 By default x11vnc will not allow the screen to be shared and it will exit
-as soon as a client disconnects.  See -shared and -forever below to override
+as soon as the client disconnects.  See -shared and -forever below to override
 these protections.  See the FAQ on how to tunnel the VNC connection through
 an encrypted channel such as ssh(1).
 
@@ -3199,7 +3223,7 @@ For additional info see: http://www.karlrunge.com/x11vnc/
 Rudimentary config file support: if the file $HOME/.x11vncrc exists then each
 line in it is treated as a single command line option.  Disable with -norc.
 For each option name, the leading character "-" is not required.  E.g. a
-line that is either "nap" or "-nap" may be used and are equivalent.
+line that is either "forever" or "-forever" may be used and are equivalent.
 Likewise "wait 100" or "-wait 100" are acceptable and equivalent lines.
 The "#" character comments out to the end of the line in the usual way.
 Leading and trailing whitespace is trimmed off.  Lines may be continued with
@@ -3235,7 +3259,7 @@ Options:
 -flashcmap             In 8bpp indexed color, let the installed colormap flash
                        as the pointer moves from window to window (slow).
 -notruecolor           For 8bpp displays, force indexed color (i.e. a colormap)
-                       even if it looks like 8bpp TrueColor. (rare problem)
+                       even if it looks like 8bpp TrueColor (rare problem).
 -visual n              Experimental option: probably does not do what you
                        think.  It simply *forces* the visual used for the
                        framebuffer; this may be a bad thing... (e.g. messes
@@ -3243,8 +3267,8 @@ Options:
                        and for some workarounds.  n may be a decimal number,
                        or 0x hex.  Run xdpyinfo(1) for the values.  One may
                        also use "TrueColor", etc. see <X11/X.h> for a list.
-                       If the string ends in ":m" for better or for worse
-                       the visual depth is forced to be m.
+                       If the string ends in ":m" the for better or for
+                       worse the visual depth is forced to be m.
 -overlay               Handle multiple depth visuals on one screen, e.g. 8+24
                        and 24+8 overlay visuals (the 32 bits per pixel are
                        packed with 8 for PseudoColor and 24 for TrueColor).
@@ -3272,7 +3296,7 @@ Options:
                        For optimal performance do not use -overlay, but rather
                        configure the X server so that the default visual is
                        depth 24 TrueColor and try to have all apps use that
-                       visual (some apps have -use24 or -visual options).
+                       visual (e.g. some apps have -use24 or -visual options).
 -overlay_nocursor      Sets -overlay, but does not try to draw the exact mouse
                        cursor shape using the overlay mechanism.
 
@@ -3349,15 +3373,16 @@ Options:
                        effect (all input is discarded).
 -viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd
                        (full-access) password must also be supplied.
--passwdfile filename   Specify libvncserver -passwd via the first line of
-                       the file "filename" instead of via command line.
-                       If a second non blank line exists in the file it
-                       is taken as a view-only password (i.e. -viewpasswd)
-                       To supply an empty password for either field use the
-                       string "__EMPTY__".  Note: -passwdfile is a simple
-                       plaintext passwd, see also -rfbauth and -storepasswd
-                       below for obfuscated passwords.  Neither should be
-                       readable by others.
+-passwdfile filename   Specify libvncserver -passwd via the first line of the
+                       file "filename" instead of via command line (where
+                       others might see it via ps(1)).  If a second non blank
+                       line exists in the file it is taken as a view-only
+                       password (i.e. -viewpasswd) To supply an empty password
+                       for either field the string "__EMPTY__" may be used.
+                       Note: -passwdfile is a simple plaintext passwd, see
+                       also -rfbauth and -storepasswd below for obfuscated
+                       VNC password files.  Neither file should be readable
+                       by others.
 -storepasswd pass file Store password "pass" as the VNC password in the
                        file "file".  Once the password is stored the
                        program exits.  Use the password via "-rfbauth file"
@@ -3427,21 +3452,21 @@ Options:
                        in -accept.  Unlike -accept, the command return code
                        is not interpreted by x11vnc.  Example: -gone 'xlock &'
 
--users list            If x11vnc is started as root (say from inetd(1) or
-                       from display managers xdm(1), gdm(1), etc), then as
-                       soon as possible after connections to the display are
+-users list            If x11vnc is started as root (say from inetd(1) or from
+                       display managers xdm(1), gdm(1), etc), then as soon
+                       as possible after connections to the X display are
                        established try to switch to one of the users in the
                        comma separated "list".  If x11vnc is not running as
                        root this option is ignored.
                        
-                       Why use this option?  In general it is not needed
-                       since x11vnc is already connected to the display and
-                       can perform its primary functions.  The option was
-                       added to make some of the *external* utility commands
-                       x11vnc occasionally runs work properly.  In particular
-                       under GNOME and KDE to implement the "-solid color"
-                       feature external commands (gconftool-2 and dcop) must be
-                       run as the user owning the desktop session.  Since this
+                       Why use this option?  In general it is not needed since
+                       x11vnc is already connected to the X display and can
+                       perform its primary functions.  The option was added
+                       to make some of the *external* utility commands x11vnc
+                       occasionally runs work properly.  In particular under
+                       GNOME and KDE to implement the "-solid color" feature
+                       external commands (gconftool-2 and dcop) must be run
+                       as the user owning the desktop session.  Since this
                        option switches userid it also affects the userid used
                        to run the processes for the -accept and -gone options.
                        It also affects the ability to read files for options
@@ -3462,16 +3487,16 @@ Options:
                        Under display managers it may be a long time before
                        the switch succeeds (i.e. a user logs in).  To make
                        it switch immediately regardless if the display
-                       can be reopened prefix the username with the +
+                       can be reopened prefix the username with the "+"
                        character. E.g. "-users +bob" or "-users +nobody".
                        The latter (i.e. switching immediately to user
                        "nobody") is probably the only use of this option
                        that increases security.
                        
-                       To immediately switch to a user *before* connections to
-                       the display are made or any files opened use the "="
-                       character: "-users =bob".  That user needs to be able
-                       to open the display of course.
+                       To immediately switch to a user *before* connections
+                       to the X display are made or any files opened use the
+                       "=" character: "-users =bob".  That user needs to
+                       be able to open the X display of course.
                        
                        The special user "guess=" means to examine the utmpx
                        database (see who(1)) looking for a user attached to
@@ -3484,12 +3509,13 @@ Options:
                        database as well.  So it "lurks" waiting for anyone
                        to log into an X session and then connects to it.
                        Specify a list of users after the = to limit which
-                       users will be tried.  If the first user in the list
-                       is something like ":0" or ":0-2" that indicates a
-                       range of DISPLAY numbers that will be tried (regardless
-                       of whether they are in the utmpx database) for all
-                       users that are logged in.  Examples: "-users lurk="
-                       and "-users lurk=:0-1,bob,mary"
+                       users will be tried.  To enable a difference searching
+                       mode, if the first user in the list is something like
+                       ":0" or ":0-2" that indicates a range of DISPLAY
+                       numbers that will be tried (regardless of whether
+                       they are in the utmpx database) for all users that
+                       are logged in.  Examples: "-users lurk=" and also
+                       "-users lurk=:0-1,bob,mary"
                        
                        Be especially careful using the "guess=" and "lurk="
                        modes.  They are not recommended for use on machines
@@ -3516,7 +3542,7 @@ Options:
                        and classic X (i.e. with the background image on the
                        root window).  The "gconftool-2" and "dcop" external
                        commands are run for GNOME and KDE respectively.
-                       Other desktops won't work, e.g. XFCE (send us the
+                       Other desktops won't work, e.g. Xfce (send us the
                        corresponding commands if you find them).  If x11vnc is
                        running as root (inetd(1) or gdm(1)), the -users option
                        may be needed for GNOME and KDE.  If x11vnc guesses
@@ -3529,6 +3555,7 @@ Options:
                        glued together via XINERAMA, and that screen is
                        non-rectangular this option will try to guess the
                        areas to black out (if your system has libXinerama).
+
                        In general on XINERAMA displays you may need to use the
                        -xwarppointer option if the mouse pointer misbehaves.
 
@@ -3541,16 +3568,16 @@ Options:
                        'xrandr -q' for more info.  [mode] is optional and
                        described below.
 
-                       Since watching for XRANDR events and errors increases
-                       polling overhead, only use this option if XRANDR changes
-                       are expected.  For example on a rotatable screen PDA or
-                       laptop, or using a XRANDR-aware Desktop where you resize
-                       often.  It is best to be viewing with a vncviewer that
-                       supports the NewFBSize encoding, since it knows how to
-                       react to screen size changes.  Otherwise, libvncserver
-                       tries to do so something reasonable for viewers that
-                       cannot do this (portions of the screen may be clipped,
-                       unused, etc).
+                       Since watching for XRANDR events and trapping errors
+                       increases polling overhead, only use this option if
+                       XRANDR changes are expected.  For example on a rotatable
+                       screen PDA or laptop, or using a XRANDR-aware Desktop
+                       where you resize often.  It is best to be viewing with a
+                       vncviewer that supports the NewFBSize encoding, since it
+                       knows how to react to screen size changes.  Otherwise,
+                       libvncserver tries to do so something reasonable for
+                       viewers that cannot do this (portions of the screen
+                       may be clipped, unused, etc).
 
                        "mode" defaults to "resize", which means create a
                        new, resized, framebuffer and hope all viewers can cope
@@ -3566,7 +3593,7 @@ Options:
                        that do not support NewFBSize and one wants to make
                        sure the initial viewer geometry will be big enough
                        to handle all subsequent resizes (e.g. under -xrandr,
-                       -remote id:windowid, rescaling, etc.
+                       -remote id:windowid, rescaling, etc.)
 
 -o logfile             Write stderr messages to file "logfile" instead of
                        to the terminal.  Same as "-logfile file".  To append
@@ -3575,7 +3602,7 @@ Options:
 -norc                  Do not process any .x11vncrc file for options.
 -h, -help              Print this help text.
 -?, -opts              Only list the x11vnc options.
--V, -version           Print program version (last modification date).
+-V, -version           Print program version and last modification date.
 
 -q                     Be quiet by printing less informational output to
                        stderr.  Same as -quiet.
@@ -3606,11 +3633,11 @@ Options:
                        reverse problem it tries to solve: Keysym -> Keycode(s)
                        when ambiguities exist (more than one Keycode per
                        Keysym).  Run 'xmodmap -pk' to see your keymapping.
-                       E.g. "-skip_keycodes 94,114"
+                       Example: "-skip_keycodes 94,114"
 -add_keysyms           If a Keysym is received from a VNC viewer and
                        that Keysym does not exist in the X server, then
                        add the Keysym to the X server's keyboard mapping.
-                       Added Keysyms will be removed when exiting.
+                       Added Keysyms will be removed when x11vnc exits.
 -clear_mods            At startup and exit clear the modifier keys by sending
                        KeyRelease for each one. The Lock modifiers are skipped.
                        Used to clear the state if the display was accidentally
@@ -3623,10 +3650,10 @@ Options:
                        or hex value) separated by a space.  If no file named
                        "string" exists, it is instead interpreted as this
                        form: key1-key2,key3-key4,...  See <X11/keysymdef.h>
-                       header file for a list of Keysym names, or use
-                       xev(1). To map a key to a button click, use the
-                       fake Keysyms "Button1", ..., etc.  E.g. "-remap
-                       Super_R-Button2" (useful for pasting on a laptop)
+                       header file for a list of Keysym names, or use xev(1).
+                       To map a key to a button click, use the fake Keysyms
+                       "Button1", ..., etc. E.g: "-remap Super_R-Button2"
+                       (useful for pasting on a laptop)
 -norepeat              Option -norepeat disables X server key auto repeat
 -repeat                when VNC clients are connected.  This works around a
                        repeating keystrokes bug (triggered by long processing
@@ -3681,9 +3708,9 @@ Options:
                        
                        Note that under XFIXES cursors with transparency (alpha
                        channel) will not be exactly represented and one may
-                       find Overlay may be preferable.  See also the -alphacut
-                       and -alphafrac options below as fudge factors to try
-                       to improve the situation for cursors with transparency
+                       find Overlay preferable.  See also the -alphacut and
+                       -alphafrac options below as fudge factors to try to
+                       improve the situation for cursors with transparency
                        for a given theme.
 
                        The "mode" string can be used to fine-tune the
@@ -3872,8 +3899,9 @@ Options:
                        (deferUpdateTime)  Default: 30
 -wait time             Time in ms to pause between screen polls.  Used to cut
                        down on load.  Default: 30
--nap                   Monitor activity and if low take longer naps between
-                       polls to really cut down load when idle.  Default: off
+-nap                   Monitor activity and if it is low take longer naps
+-nonap                 between screen polls to really cut down load when idle.
+                       Default: take naps
 -sb time               Time in seconds after NO activity (e.g. screen blank)
                        to really throttle down the screen polls (i.e. sleep
                        for about 1.5 secs). Use 0 to disable.  Default: 60
@@ -3990,7 +4018,7 @@ Options:
                        The following -remote/-R commands are supported:
 
                        stop            terminate the server, same as "quit"
-                                       "exit" or "shutdown"
+                                       "exit" or "shutdown".
                        ping            see if the x11vnc server responds.
                                        Return is: ans=ping:<xdisplay>
                        blacken         try to push a black fb update to all

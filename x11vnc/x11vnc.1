@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.1pre, lastmod: 2005-02-14
+         version: 0.7.1, lastmod: 2005-02-22
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -27,7 +27,7 @@ the name of the machine running x11vnc and N is XXXX - 5900, i.e. usually
 "vncviewer hostname:0".
 .PP
 By default x11vnc will not allow the screen to be shared and it will exit
-as soon as a client disconnects.  See \fB-shared\fR and \fB-forever\fR below to override
+as soon as the client disconnects.  See \fB-shared\fR and \fB-forever\fR below to override
 these protections.  See the FAQ on how to tunnel the VNC connection through
 an encrypted channel such as 
 .IR ssh (1).
@@ -38,7 +38,7 @@ and  http://www.karlrunge.com/x11vnc/#faq
 Rudimentary config file support: if the file $HOME/.x11vncrc exists then each
 line in it is treated as a single command line option.  Disable with \fB-norc.\fR
 For each option name, the leading character "-" is not required.  E.g. a
-line that is either "nap" or "\fB-nap\fR" may be used and are equivalent.
+line that is either "forever" or "\fB-forever\fR" may be used and are equivalent.
 Likewise "wait 100" or "\fB-wait\fR \fI100\fR" are acceptable and equivalent lines.
 The "#" character comments out to the end of the line in the usual way.
 Leading and trailing whitespace is trimmed off.  Lines may be continued with
@@ -97,7 +97,7 @@ as the pointer moves from window to window (slow).
 \fB-notruecolor\fR
 .IP
 For 8bpp displays, force indexed color (i.e. a colormap)
-even if it looks like 8bpp TrueColor. (rare problem)
+even if it looks like 8bpp TrueColor (rare problem).
 .PP
 \fB-visual\fR \fIn\fR
 .IP
@@ -110,8 +110,8 @@ or 0x hex.  Run
 .IR xdpyinfo (1)
 for the values.  One may
 also use "TrueColor", etc. see <X11/X.h> for a list.
-If the string ends in ":m" for better or for worse
-the visual depth is forced to be m.
+If the string ends in ":m" the for better or for
+worse the visual depth is forced to be m.
 .PP
 \fB-overlay\fR
 .IP
@@ -144,7 +144,7 @@ due to the extra image transformations required.
 For optimal performance do not use \fB-overlay,\fR but rather
 configure the X server so that the default visual is
 depth 24 TrueColor and try to have all apps use that
-visual (some apps have \fB-use24\fR or \fB-visual\fR options).
+visual (e.g. some apps have \fB-use24\fR or \fB-visual\fR options).
 .PP
 \fB-overlay_nocursor\fR
 .IP
@@ -272,15 +272,18 @@ Supply a 2nd password for view-only logins.  The \fB-passwd\fR
 .PP
 \fB-passwdfile\fR \fIfilename\fR
 .IP
-Specify libvncserver \fB-passwd\fR via the first line of
-the file \fIfilename\fR instead of via command line.
-If a second non blank line exists in the file it
-is taken as a view-only password (i.e. \fB-viewpasswd)\fR
-To supply an empty password for either field use the
-string "__EMPTY__".  Note: \fB-passwdfile\fR is a simple
-plaintext passwd, see also \fB-rfbauth\fR and \fB-storepasswd\fR
-below for obfuscated passwords.  Neither should be
-readable by others.
+Specify libvncserver \fB-passwd\fR via the first line of the
+file \fIfilename\fR instead of via command line (where
+others might see it via 
+.IR ps (1)
+).  If a second non blank
+line exists in the file it is taken as a view-only
+password (i.e. \fB-viewpasswd)\fR To supply an empty password
+for either field the string "__EMPTY__" may be used.
+Note: \fB-passwdfile\fR is a simple plaintext passwd, see
+also \fB-rfbauth\fR and \fB-storepasswd\fR below for obfuscated
+VNC password files.  Neither file should be readable
+by others.
 .PP
 \fB-storepasswd\fR \fIpass\fR \fIfile\fR
 .IP
@@ -372,25 +375,25 @@ is not interpreted by x11vnc.  Example: \fB-gone\fR 'xlock &'
 .IP
 If x11vnc is started as root (say from 
 .IR inetd (1)
-or
-from display managers 
+or from
+display managers 
 .IR xdm (1)
 , 
 .IR gdm (1)
-, etc), then as
-soon as possible after connections to the display are
+, etc), then as soon
+as possible after connections to the X display are
 established try to switch to one of the users in the
 comma separated \fIlist\fR.  If x11vnc is not running as
 root this option is ignored.
 .IP
-Why use this option?  In general it is not needed
-since x11vnc is already connected to the display and
-can perform its primary functions.  The option was
-added to make some of the *external* utility commands
-x11vnc occasionally runs work properly.  In particular
-under GNOME and KDE to implement the "\fB-solid\fR \fIcolor\fR"
-feature external commands (gconftool-2 and dcop) must be
-run as the user owning the desktop session.  Since this
+Why use this option?  In general it is not needed since
+x11vnc is already connected to the X display and can
+perform its primary functions.  The option was added
+to make some of the *external* utility commands x11vnc
+occasionally runs work properly.  In particular under
+GNOME and KDE to implement the "\fB-solid\fR \fIcolor\fR" feature
+external commands (gconftool-2 and dcop) must be run
+as the user owning the desktop session.  Since this
 option switches userid it also affects the userid used
 to run the processes for the \fB-accept\fR and \fB-gone\fR options.
 It also affects the ability to read files for options
@@ -411,16 +414,16 @@ to user "fred".  What happens next?
 Under display managers it may be a long time before
 the switch succeeds (i.e. a user logs in).  To make
 it switch immediately regardless if the display
-can be reopened prefix the username with the +
+can be reopened prefix the username with the "+"
 character. E.g. "\fB-users\fR \fI+bob\fR" or "\fB-users\fR \fI+nobody\fR".
 The latter (i.e. switching immediately to user
 "nobody") is probably the only use of this option
 that increases security.
 .IP
-To immediately switch to a user *before* connections to
-the display are made or any files opened use the "="
-character: "\fB-users\fR \fI=bob\fR".  That user needs to be able
-to open the display of course.
+To immediately switch to a user *before* connections
+to the X display are made or any files opened use the
+"=" character: "\fB-users\fR \fI=bob\fR".  That user needs to
+be able to open the X display of course.
 .IP
 The special user "guess=" means to examine the utmpx
 database (see 
@@ -435,12 +438,13 @@ means to try to guess the DISPLAY from the utmpx login
 database as well.  So it "lurks" waiting for anyone
 to log into an X session and then connects to it.
 Specify a list of users after the = to limit which
-users will be tried.  If the first user in the list
-is something like ":0" or ":0-2" that indicates a
-range of DISPLAY numbers that will be tried (regardless
-of whether they are in the utmpx database) for all
-users that are logged in.  Examples: "\fB-users\fR \fIlurk=\fR"
-and "\fB-users\fR \fIlurk=:0-1,bob,mary\fR"
+users will be tried.  To enable a difference searching
+mode, if the first user in the list is something like
+":0" or ":0-2" that indicates a range of DISPLAY
+numbers that will be tried (regardless of whether
+they are in the utmpx database) for all users that
+are logged in.  Examples: "\fB-users\fR \fIlurk=\fR" and also
+"\fB-users\fR \fIlurk=:0-1,bob,mary\fR"
 .IP
 Be especially careful using the "guess=" and "lurk="
 modes.  They are not recommended for use on machines
@@ -477,7 +481,7 @@ Currently this option only works on GNOME, KDE, CDE,
 and classic X (i.e. with the background image on the
 root window).  The "gconftool-2" and "dcop" external
 commands are run for GNOME and KDE respectively.
-Other desktops won't work, e.g. XFCE (send us the
+Other desktops won't work, e.g. Xfce (send us the
 corresponding commands if you find them).  If x11vnc is
 running as root (
 .IR inetd (1)
@@ -500,6 +504,7 @@ If your screen is composed of multiple monitors
 glued together via XINERAMA, and that screen is
 non-rectangular this option will try to guess the
 areas to black out (if your system has libXinerama).
+.IP
 In general on XINERAMA displays you may need to use the
 \fB-xwarppointer\fR option if the mouse pointer misbehaves.
 .PP
@@ -516,16 +521,16 @@ manpage and run
 \'xrandr \fB-q'\fR for more info.  [mode] is optional and
 described below.
 .IP
-Since watching for XRANDR events and errors increases
-polling overhead, only use this option if XRANDR changes
-are expected.  For example on a rotatable screen PDA or
-laptop, or using a XRANDR-aware Desktop where you resize
-often.  It is best to be viewing with a vncviewer that
-supports the NewFBSize encoding, since it knows how to
-react to screen size changes.  Otherwise, libvncserver
-tries to do so something reasonable for viewers that
-cannot do this (portions of the screen may be clipped,
-unused, etc).
+Since watching for XRANDR events and trapping errors
+increases polling overhead, only use this option if
+XRANDR changes are expected.  For example on a rotatable
+screen PDA or laptop, or using a XRANDR-aware Desktop
+where you resize often.  It is best to be viewing with a
+vncviewer that supports the NewFBSize encoding, since it
+knows how to react to screen size changes.  Otherwise,
+libvncserver tries to do so something reasonable for
+viewers that cannot do this (portions of the screen
+may be clipped, unused, etc).
 .IP
 "mode" defaults to "resize", which means create a
 new, resized, framebuffer and hope all viewers can cope
@@ -544,7 +549,7 @@ real one.  This is intended for use with vncviewers
 that do not support NewFBSize and one wants to make
 sure the initial viewer geometry will be big enough
 to handle all subsequent resizes (e.g. under \fB-xrandr,\fR
-\fB-remote\fR id:windowid, rescaling, etc.
+\fB-remote\fR id:windowid, rescaling, etc.)
 .PP
 \fB-o\fR \fIlogfile\fR
 .IP
@@ -567,7 +572,7 @@ Print this help text.
 .PP
 \fB-V,\fR \fB-version\fR
 .IP
-Print program version (last modification date).
+Print program version and last modification date.
 .PP
 \fB-q\fR
 .IP
@@ -615,14 +620,14 @@ to \fB-xkb\fR mode.  Use this option to help x11vnc in the
 reverse problem it tries to solve: Keysym -> Keycode(s)
 when ambiguities exist (more than one Keycode per
 Keysym).  Run 'xmodmap \fB-pk'\fR to see your keymapping.
-E.g. "\fB-skip_keycodes\fR \fI94,114\fR"
+Example: "\fB-skip_keycodes\fR \fI94,114\fR"
 .PP
 \fB-add_keysyms\fR
 .IP
 If a Keysym is received from a VNC viewer and
 that Keysym does not exist in the X server, then
 add the Keysym to the X server's keyboard mapping.
-Added Keysyms will be removed when exiting.
+Added Keysyms will be removed when x11vnc exits.
 .PP
 \fB-clear_mods\fR
 .IP
@@ -644,11 +649,11 @@ Format is one pair of Keysyms per line (can be name
 or hex value) separated by a space.  If no file named
 \fIstring\fR exists, it is instead interpreted as this
 form: key1-key2,key3-key4,...  See <X11/keysymdef.h>
-header file for a list of Keysym names, or use
+header file for a list of Keysym names, or use 
 .IR xev (1).
-To map a key to a button click, use the
-fake Keysyms "Button1", ..., etc.  E.g. "-remap
-Super_R-Button2" (useful for pasting on a laptop)
+To map a key to a button click, use the fake Keysyms
+"Button1", ..., etc. E.g: "\fB-remap\fR \fISuper_R-Button2\fR"
+(useful for pasting on a laptop)
 .PP
 \fB-norepeat,\fR \fB-repeat\fR
 .IP
@@ -719,9 +724,9 @@ option below.
 .IP
 Note that under XFIXES cursors with transparency (alpha
 channel) will not be exactly represented and one may
-find Overlay may be preferable.  See also the \fB-alphacut\fR
-and \fB-alphafrac\fR options below as fudge factors to try
-to improve the situation for cursors with transparency
+find Overlay preferable.  See also the \fB-alphacut\fR and
+\fB-alphafrac\fR options below as fudge factors to try to
+improve the situation for cursors with transparency
 for a given theme.
 .IP
 The "mode" string can be used to fine-tune the
@@ -964,8 +969,12 @@ down on load.  Default: 30
 .PP
 \fB-nap\fR
 .IP
-Monitor activity and if low take longer naps between
-polls to really cut down load when idle.  Default: off
+Monitor activity and if it is low take longer naps
+.PP
+\fB-nonap\fR
+.IP
+between screen polls to really cut down load when idle.
+Default: take naps
 .PP
 \fB-sb\fR \fItime\fR
 .IP
@@ -1109,7 +1118,7 @@ Please report reproducible bugs.
 The following \fB-remote/-R\fR commands are supported:
 .IP
 stop            terminate the server, same as "quit"
-                "exit" or "shutdown"
+                "exit" or "shutdown".
 .IP
 ping            see if the x11vnc server responds.
                 Return is: ans=ping:<xdisplay>

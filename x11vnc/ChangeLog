@@ -1,3 +1,7 @@
+2005-02-21  Karl Runge <runge@karlrunge.com>
+	* -nap is now the default, disable with -nonap
+	* set version to 0.7.1, word tune -help, etc.
+
 2005-02-14  Karl Runge <runge@karlrunge.com>
 	* cleanup -users stuff, add "lurk=" mode
 	* support cde in -solid

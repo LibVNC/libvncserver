@@ -477,7 +477,7 @@ if {$beginner_mode} {
 	set helptext(gui) "
 tkx11vnc is a simple frontend to x11vnc.  It is currently running in
 \"ez\" or \"simple\" mode.  For many more options run it in normal
-mode buy toggling \"Misc -> simple_gui\".
+mode by toggling \"Misc -> simple_gui\".
 
 All menu items have a (?) button one can click on to get more information
 about the option or command.
@@ -666,6 +666,7 @@ proc active_when_starting {item} {
 proc help_win {item} {
 	global helptext helpremote menu_var
 	global query_ans query_aro
+	global beginner_mode
 
 	set ok 0
 	set text "Help on $item:\n\n"
@@ -686,7 +687,9 @@ proc help_win {item} {
 	} elseif {[active_when_starting $item]} {
 		append text "    + Can be set at x11vnc startup.\n";
 	} else {
-		append text "    - Cannot be set at x11vnc startup.\n";
+		if {! $beginner_mode} {
+			append text "    - Cannot be set at x11vnc startup.\n";
+		}
 	}
 	append text "\n"
 

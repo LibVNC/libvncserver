@@ -290,7 +290,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.1pre lastmod: 2005-02-14";
+char lastmod[] = "0.7.1 lastmod: 2005-02-22";
 
 /* X display info */
 
@@ -657,8 +657,8 @@ int defer_update = 30;	/* deferUpdateTime ms to wait before sends. */
 
 int screen_blank = 60;	/* number of seconds of no activity to throttle */
 			/* down the screen polls.  zero to disable. */
-int take_naps = 0;
-int naptile = 3;	/* tile change threshold per poll to take a nap */
+int take_naps = 1;	/* -nap/-nonap */
+int naptile = 4;	/* tile change threshold per poll to take a nap */
 int napfac = 4;		/* time = napfac*waitms, cut load with extra waits */
 int napmax = 1500;	/* longest nap in ms. */
 int ui_skip = 10;	/* see watchloop.  negative means ignore input */
@@ -16411,7 +16411,7 @@ static void print_help(int mode) {
 "\"vncviewer hostname:0\".\n"
 "\n"
 "By default x11vnc will not allow the screen to be shared and it will exit\n"
-"as soon as a client disconnects.  See -shared and -forever below to override\n"
+"as soon as the client disconnects.  See -shared and -forever below to override\n"
 "these protections.  See the FAQ on how to tunnel the VNC connection through\n"
 "an encrypted channel such as ssh(1).\n"
 "\n"
@@ -16422,7 +16422,7 @@ static void print_help(int mode) {
 "Rudimentary config file support: if the file $HOME/.x11vncrc exists then each\n"
 "line in it is treated as a single command line option.  Disable with -norc.\n"
 "For each option name, the leading character \"-\" is not required.  E.g. a\n"
-"line that is either \"nap\" or \"-nap\" may be used and are equivalent.\n"
+"line that is either \"forever\" or \"-forever\" may be used and are equivalent.\n"
 "Likewise \"wait 100\" or \"-wait 100\" are acceptable and equivalent lines.\n"
 "The \"#\" character comments out to the end of the line in the usual way.\n"
 "Leading and trailing whitespace is trimmed off.  Lines may be continued with\n"
@@ -16458,7 +16458,7 @@ static void print_help(int mode) {
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
 "-notruecolor           For 8bpp displays, force indexed color (i.e. a colormap)\n"
-"                       even if it looks like 8bpp TrueColor. (rare problem)\n"
+"                       even if it looks like 8bpp TrueColor (rare problem).\n"
 "-visual n              Experimental option: probably does not do what you\n"
 "                       think.  It simply *forces* the visual used for the\n"
 "                       framebuffer; this may be a bad thing... (e.g. messes\n"
@@ -16466,8 +16466,8 @@ static void print_help(int mode) {
 "                       and for some workarounds.  n may be a decimal number,\n"
 "                       or 0x hex.  Run xdpyinfo(1) for the values.  One may\n"
 "                       also use \"TrueColor\", etc. see <X11/X.h> for a list.\n"
-"                       If the string ends in \":m\" for better or for worse\n"
-"                       the visual depth is forced to be m.\n"
+"                       If the string ends in \":m\" the for better or for\n"
+"                       worse the visual depth is forced to be m.\n"
 "-overlay               Handle multiple depth visuals on one screen, e.g. 8+24\n"
 "                       and 24+8 overlay visuals (the 32 bits per pixel are\n"
 "                       packed with 8 for PseudoColor and 24 for TrueColor).\n"
@@ -16495,7 +16495,7 @@ static void print_help(int mode) {
 "                       For optimal performance do not use -overlay, but rather\n"
 "                       configure the X server so that the default visual is\n"
 "                       depth 24 TrueColor and try to have all apps use that\n"
-"                       visual (some apps have -use24 or -visual options).\n"
+"                       visual (e.g. some apps have -use24 or -visual options).\n"
 "-overlay_nocursor      Sets -overlay, but does not try to draw the exact mouse\n"
 "                       cursor shape using the overlay mechanism.\n"
 "\n"
@@ -16572,15 +16572,16 @@ static void print_help(int mode) {
 "                       effect (all input is discarded).\n"
 "-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd\n"
 "                       (full-access) password must also be supplied.\n"
-"-passwdfile filename   Specify libvncserver -passwd via the first line of\n"
-"                       the file \"filename\" instead of via command line.\n"
-"                       If a second non blank line exists in the file it\n"
-"                       is taken as a view-only password (i.e. -viewpasswd)\n"
-"                       To supply an empty password for either field use the\n"
-"                       string \"__EMPTY__\".  Note: -passwdfile is a simple\n"
-"                       plaintext passwd, see also -rfbauth and -storepasswd\n"
-"                       below for obfuscated passwords.  Neither should be\n"
-"                       readable by others.\n"
+"-passwdfile filename   Specify libvncserver -passwd via the first line of the\n"
+"                       file \"filename\" instead of via command line (where\n"
+"                       others might see it via ps(1)).  If a second non blank\n"
+"                       line exists in the file it is taken as a view-only\n"
+"                       password (i.e. -viewpasswd) To supply an empty password\n"
+"                       for either field the string \"__EMPTY__\" may be used.\n"
+"                       Note: -passwdfile is a simple plaintext passwd, see\n"
+"                       also -rfbauth and -storepasswd below for obfuscated\n"
+"                       VNC password files.  Neither file should be readable\n"
+"                       by others.\n"
 "-storepasswd pass file Store password \"pass\" as the VNC password in the\n"
 "                       file \"file\".  Once the password is stored the\n"
 "                       program exits.  Use the password via \"-rfbauth file\"\n"
@@ -16650,21 +16651,21 @@ static void print_help(int mode) {
 "                       in -accept.  Unlike -accept, the command return code\n"
 "                       is not interpreted by x11vnc.  Example: -gone 'xlock &'\n"
 "\n"
-"-users list            If x11vnc is started as root (say from inetd(1) or\n"
-"                       from display managers xdm(1), gdm(1), etc), then as\n"
-"                       soon as possible after connections to the display are\n"
+"-users list            If x11vnc is started as root (say from inetd(1) or from\n"
+"                       display managers xdm(1), gdm(1), etc), then as soon\n"
+"                       as possible after connections to the X display are\n"
 "                       established try to switch to one of the users in the\n"
 "                       comma separated \"list\".  If x11vnc is not running as\n"
 "                       root this option is ignored.\n"
 "                       \n"
-"                       Why use this option?  In general it is not needed\n"
-"                       since x11vnc is already connected to the display and\n"
-"                       can perform its primary functions.  The option was\n"
-"                       added to make some of the *external* utility commands\n"
-"                       x11vnc occasionally runs work properly.  In particular\n"
-"                       under GNOME and KDE to implement the \"-solid color\"\n"
-"                       feature external commands (gconftool-2 and dcop) must be\n"
-"                       run as the user owning the desktop session.  Since this\n"
+"                       Why use this option?  In general it is not needed since\n"
+"                       x11vnc is already connected to the X display and can\n"
+"                       perform its primary functions.  The option was added\n"
+"                       to make some of the *external* utility commands x11vnc\n"
+"                       occasionally runs work properly.  In particular under\n"
+"                       GNOME and KDE to implement the \"-solid color\" feature\n"
+"                       external commands (gconftool-2 and dcop) must be run\n"
+"                       as the user owning the desktop session.  Since this\n"
 "                       option switches userid it also affects the userid used\n"
 "                       to run the processes for the -accept and -gone options.\n"
 "                       It also affects the ability to read files for options\n"
@@ -16685,16 +16686,16 @@ static void print_help(int mode) {
 "                       Under display managers it may be a long time before\n"
 "                       the switch succeeds (i.e. a user logs in).  To make\n"
 "                       it switch immediately regardless if the display\n"
-"                       can be reopened prefix the username with the +\n"
+"                       can be reopened prefix the username with the \"+\"\n"
 "                       character. E.g. \"-users +bob\" or \"-users +nobody\".\n"
 "                       The latter (i.e. switching immediately to user\n"
 "                       \"nobody\") is probably the only use of this option\n"
 "                       that increases security.\n"
 "                       \n"
-"                       To immediately switch to a user *before* connections to\n"
-"                       the display are made or any files opened use the \"=\"\n"
-"                       character: \"-users =bob\".  That user needs to be able\n"
-"                       to open the display of course.\n"
+"                       To immediately switch to a user *before* connections\n"
+"                       to the X display are made or any files opened use the\n"
+"                       \"=\" character: \"-users =bob\".  That user needs to\n"
+"                       be able to open the X display of course.\n"
 "                       \n"
 "                       The special user \"guess=\" means to examine the utmpx\n"
 "                       database (see who(1)) looking for a user attached to\n"
@@ -16707,12 +16708,13 @@ static void print_help(int mode) {
 "                       database as well.  So it \"lurks\" waiting for anyone\n"
 "                       to log into an X session and then connects to it.\n"
 "                       Specify a list of users after the = to limit which\n"
-"                       users will be tried.  If the first user in the list\n"
-"                       is something like \":0\" or \":0-2\" that indicates a\n"
-"                       range of DISPLAY numbers that will be tried (regardless\n"
-"                       of whether they are in the utmpx database) for all\n"
-"                       users that are logged in.  Examples: \"-users lurk=\"\n"
-"                       and \"-users lurk=:0-1,bob,mary\"\n"
+"                       users will be tried.  To enable a difference searching\n"
+"                       mode, if the first user in the list is something like\n"
+"                       \":0\" or \":0-2\" that indicates a range of DISPLAY\n"
+"                       numbers that will be tried (regardless of whether\n"
+"                       they are in the utmpx database) for all users that\n"
+"                       are logged in.  Examples: \"-users lurk=\" and also\n"
+"                       \"-users lurk=:0-1,bob,mary\"\n"
 "                       \n"
 "                       Be especially careful using the \"guess=\" and \"lurk=\"\n"
 "                       modes.  They are not recommended for use on machines\n"
@@ -16739,7 +16741,7 @@ static void print_help(int mode) {
 "                       and classic X (i.e. with the background image on the\n"
 "                       root window).  The \"gconftool-2\" and \"dcop\" external\n"
 "                       commands are run for GNOME and KDE respectively.\n"
-"                       Other desktops won't work, e.g. XFCE (send us the\n"
+"                       Other desktops won't work, e.g. Xfce (send us the\n"
 "                       corresponding commands if you find them).  If x11vnc is\n"
 "                       running as root (inetd(1) or gdm(1)), the -users option\n"
 "                       may be needed for GNOME and KDE.  If x11vnc guesses\n"
@@ -16752,6 +16754,7 @@ static void print_help(int mode) {
 "                       glued together via XINERAMA, and that screen is\n"
 "                       non-rectangular this option will try to guess the\n"
 "                       areas to black out (if your system has libXinerama).\n"
+"\n"
 "                       In general on XINERAMA displays you may need to use the\n"
 "                       -xwarppointer option if the mouse pointer misbehaves.\n"
 "\n"
@@ -16764,16 +16767,16 @@ static void print_help(int mode) {
 "                       'xrandr -q' for more info.  [mode] is optional and\n"
 "                       described below.\n"
 "\n"
-"                       Since watching for XRANDR events and errors increases\n"
-"                       polling overhead, only use this option if XRANDR changes\n"
-"                       are expected.  For example on a rotatable screen PDA or\n"
-"                       laptop, or using a XRANDR-aware Desktop where you resize\n"
-"                       often.  It is best to be viewing with a vncviewer that\n"
-"                       supports the NewFBSize encoding, since it knows how to\n"
-"                       react to screen size changes.  Otherwise, libvncserver\n"
-"                       tries to do so something reasonable for viewers that\n"
-"                       cannot do this (portions of the screen may be clipped,\n"
-"                       unused, etc).\n"
+"                       Since watching for XRANDR events and trapping errors\n"
+"                       increases polling overhead, only use this option if\n"
+"                       XRANDR changes are expected.  For example on a rotatable\n"
+"                       screen PDA or laptop, or using a XRANDR-aware Desktop\n"
+"                       where you resize often.  It is best to be viewing with a\n"
+"                       vncviewer that supports the NewFBSize encoding, since it\n"
+"                       knows how to react to screen size changes.  Otherwise,\n"
+"                       libvncserver tries to do so something reasonable for\n"
+"                       viewers that cannot do this (portions of the screen\n"
+"                       may be clipped, unused, etc).\n"
 "\n"
 "                       \"mode\" defaults to \"resize\", which means create a\n"
 "                       new, resized, framebuffer and hope all viewers can cope\n"
@@ -16789,7 +16792,7 @@ static void print_help(int mode) {
 "                       that do not support NewFBSize and one wants to make\n"
 "                       sure the initial viewer geometry will be big enough\n"
 "                       to handle all subsequent resizes (e.g. under -xrandr,\n"
-"                       -remote id:windowid, rescaling, etc.\n"
+"                       -remote id:windowid, rescaling, etc.)\n"
 "\n"
 "-o logfile             Write stderr messages to file \"logfile\" instead of\n"
 "                       to the terminal.  Same as \"-logfile file\".  To append\n"
@@ -16798,7 +16801,7 @@ static void print_help(int mode) {
 "-norc                  Do not process any .x11vncrc file for options.\n"
 "-h, -help              Print this help text.\n"
 "-?, -opts              Only list the x11vnc options.\n"
-"-V, -version           Print program version (last modification date).\n"
+"-V, -version           Print program version and last modification date.\n"
 "\n"
 "-q                     Be quiet by printing less informational output to\n"
 "                       stderr.  Same as -quiet.\n"
@@ -16833,11 +16836,11 @@ static void print_help(int mode) {
 "                       reverse problem it tries to solve: Keysym -> Keycode(s)\n"
 "                       when ambiguities exist (more than one Keycode per\n"
 "                       Keysym).  Run 'xmodmap -pk' to see your keymapping.\n"
-"                       E.g. \"-skip_keycodes 94,114\"\n"
+"                       Example: \"-skip_keycodes 94,114\"\n"
 "-add_keysyms           If a Keysym is received from a VNC viewer and\n"
 "                       that Keysym does not exist in the X server, then\n"
 "                       add the Keysym to the X server's keyboard mapping.\n"
-"                       Added Keysyms will be removed when exiting.\n"
+"                       Added Keysyms will be removed when x11vnc exits.\n"
 #if 0
 "-xkbcompat             Ignore the XKEYBOARD extension.  Use as a workaround for\n"
 "                       some keyboard mapping problems.  E.g. if you are using\n"
@@ -16858,10 +16861,10 @@ static void print_help(int mode) {
 "                       or hex value) separated by a space.  If no file named\n"
 "                       \"string\" exists, it is instead interpreted as this\n"
 "                       form: key1-key2,key3-key4,...  See <X11/keysymdef.h>\n"
-"                       header file for a list of Keysym names, or use\n"
-"                       xev(1). To map a key to a button click, use the\n"
-"                       fake Keysyms \"Button1\", ..., etc.  E.g. \"-remap\n"
-"                       Super_R-Button2\" (useful for pasting on a laptop)\n"
+"                       header file for a list of Keysym names, or use xev(1).\n"
+"                       To map a key to a button click, use the fake Keysyms\n"
+"                       \"Button1\", ..., etc. E.g: \"-remap Super_R-Button2\"\n"
+"                       (useful for pasting on a laptop)\n"
 "-norepeat              Option -norepeat disables X server key auto repeat\n"
 "-repeat                when VNC clients are connected.  This works around a\n"
 "                       repeating keystrokes bug (triggered by long processing\n"
@@ -16916,9 +16919,9 @@ static void print_help(int mode) {
 "                       \n"
 "                       Note that under XFIXES cursors with transparency (alpha\n"
 "                       channel) will not be exactly represented and one may\n"
-"                       find Overlay may be preferable.  See also the -alphacut\n"
-"                       and -alphafrac options below as fudge factors to try\n"
-"                       to improve the situation for cursors with transparency\n"
+"                       find Overlay preferable.  See also the -alphacut and\n"
+"                       -alphafrac options below as fudge factors to try to\n"
+"                       improve the situation for cursors with transparency\n"
 "                       for a given theme.\n"
 "\n"
 "                       The \"mode\" string can be used to fine-tune the\n"
@@ -17107,8 +17110,9 @@ static void print_help(int mode) {
 "                       (deferUpdateTime)  Default: %d\n"
 "-wait time             Time in ms to pause between screen polls.  Used to cut\n"
 "                       down on load.  Default: %d\n"
-"-nap                   Monitor activity and if low take longer naps between\n"
-"                       polls to really cut down load when idle.  Default: %s\n"
+"-nap                   Monitor activity and if it is low take longer naps\n"
+"-nonap                 between screen polls to really cut down load when idle.\n"
+"                       Default: %s\n"
 "-sb time               Time in seconds after NO activity (e.g. screen blank)\n"
 "                       to really throttle down the screen polls (i.e. sleep\n"
 "                       for about 1.5 secs). Use 0 to disable.  Default: %d\n"
@@ -17225,7 +17229,7 @@ static void print_help(int mode) {
 "                       The following -remote/-R commands are supported:\n"
 "\n"
 "                       stop            terminate the server, same as \"quit\"\n"
-"                                       \"exit\" or \"shutdown\"\n"
+"                                       \"exit\" or \"shutdown\".\n"
 "                       ping            see if the x11vnc server responds.\n"
 "                                       Return is: ans=ping:<xdisplay>\n"
 "                       blacken         try to push a black fb update to all\n"
@@ -17579,7 +17583,7 @@ static void print_help(int mode) {
 		ui_skip,
 		defer_update,
 		waitms,
-		take_naps ? "on":"off",
+		take_naps ? "take naps":"no naps",
 		screen_blank,
 		use_threads ? "-threads":"-nothreads",
 		fs_frac,
@@ -18278,6 +18282,8 @@ int main(int argc, char* argv[]) {
 			waitms = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-nap")) {
 			take_naps = 1;
+		} else if (!strcmp(arg, "-nonap")) {
+			take_naps = 0;
 		} else if (!strcmp(arg, "-sb")) {
 			CHECK_ARGC
 			screen_blank = atoi(argv[++i]);
@@ -18663,7 +18669,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " logfile:    %s\n", logfile ? logfile
                     : "null");
 		fprintf(stderr, " logappend:  %d\n", logfile_append);
-		fprintf(stderr, " rc_file:    %s\n", rc_rcfile ? rc_rcfile
+		fprintf(stderr, " rc_file:    \"%s\"\n", rc_rcfile ? rc_rcfile
                     : "null");
 		fprintf(stderr, " norc:       %d\n", rc_norc);
 		fprintf(stderr, " bg:         %d\n", bg);
