@@ -21,7 +21,7 @@
  *
  * This program is based heavily on the following programs:
  *
- *       x11vnc.c of the libvncserver project (Johannes E. Schindelin)
+ *       original x11vnc.c of the libvncserver project (Johannes E. Schindelin)
  *       krfb, the KDE desktopsharing project (Tim Jansen)
  *	 x0rfbserver, the original native X vnc server (Jens Wagner)
  *
@@ -62,9 +62,6 @@
  *     -lsocket -lnsl -L/usr/X/lib -R/usr/X/lib -lX11 -lXext -lXtst 
  */
 
-#define KeySym RFBKeySym
-#include "rfb.h"
-
 #include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -74,7 +71,15 @@
 #include <X11/extensions/XTest.h>
 #include <X11/keysym.h>
 
+#ifdef Bool
+#undef Bool
+#endif
+#define Bool RFBBool
+#define KeySym RFBKeySym
+#include "rfb.h"
+
 Display *dpy = 0;
+int scr;
 int dpy_x, dpy_y;
 int bpp;
 int window;
@@ -222,10 +227,12 @@ static void keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
 
 	X_LOCK
 
-	k = XKeysymToKeycode(dpy, keysym);
+	/* KeySym is XID in <X11/X.h> */
+	k = XKeysymToKeycode(dpy, (XID) keysym);
 
 	if ( k != NoSymbol ) {
-		XTestFakeKeyEvent(dpy, k, down, CurrentTime);
+		/* Bool is int in <X11/Xlib.h> */
+		XTestFakeKeyEvent(dpy, k, (int) down, CurrentTime);
 		XFlush(dpy);
 
 		got_user_input++;
@@ -314,12 +321,31 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	if ( screen->rfbServerFormat.bitsPerPixel == 8 ) {
 		/* 8 bpp */
-		screen->rfbServerFormat.redShift   = 0;
-		screen->rfbServerFormat.greenShift = 2;
-		screen->rfbServerFormat.blueShift  = 5;
-		screen->rfbServerFormat.redMax     = 3;
-		screen->rfbServerFormat.greenMax   = 7;
-		screen->rfbServerFormat.blueMax    = 3;
+		if(CellsOfScreen(ScreenOfDisplay(dpy,scr))) {
+			/* indexed colour */
+			XColor color[256];
+			int i;
+			screen->colourMap.count = 256;
+			screen->rfbServerFormat.trueColour = FALSE;
+			screen->colourMap.is16 = TRUE;
+			for(i=0;i<256;i++)
+				color[i].pixel=i;
+			XQueryColors(dpy,DefaultColormap(dpy,scr),color,256);
+			screen->colourMap.data.shorts = (unsigned short*)malloc(3*sizeof(short)*screen->colourMap.count);
+			for(i=0;i<screen->colourMap.count;i++) {
+				screen->colourMap.data.shorts[i*3+0] = color[i].red;
+				screen->colourMap.data.shorts[i*3+1] = color[i].green;
+				screen->colourMap.data.shorts[i*3+2] = color[i].blue;
+			}
+		} else {
+			/* true colour */
+			screen->rfbServerFormat.redShift   = 0;
+			screen->rfbServerFormat.greenShift = 2;
+			screen->rfbServerFormat.blueShift  = 5;
+			screen->rfbServerFormat.redMax     = 3;
+			screen->rfbServerFormat.greenMax   = 7;
+			screen->rfbServerFormat.blueMax    = 3;
+		}	
 	} else {
 		/* general case ... */
 		screen->rfbServerFormat.redShift = 0;
@@ -676,7 +702,7 @@ void copy_tile(int tx, int ty) {
 	}
 	X_UNLOCK
 
-	src = (unsigned char*) tile->data;
+	src = tile->data;
 	dst = screen->frameBuffer + y * bytes_per_line + x * pixelsize;
 
 	s_src = src;
@@ -1034,7 +1060,7 @@ int scan_display(int ystart, int rescan) {
 			}
 
 			/* set ptrs to correspond to the x offset: */
-			src = (unsigned char*) scanline->data + x * pixelsize;
+			src = scanline->data + x * pixelsize;
 			dst = screen->frameBuffer + y * bytes_per_line
 			    + x * pixelsize;
 
@@ -1185,35 +1211,35 @@ void watch_loop(void) {
 }
 
 void print_help() {
-	char help[] = "
-x0vnc options:
-
--defer time            time in ms to wait for updates before sending to
-                       client [rfbDeferUpdateTime]  (default %d)
--wait time             time in ms to pause between screen polls.  used
-                       to cut down on load (default %d)
-
--gaps n                heuristic to fill in gaps in rows or cols of n or less
-                       tiles.  used to improve text paging (default %d).
--grow n                heuristic to grow islands of changed tiles n or wider
-                       by checking the tile near the boundary (default %d).
--fs f                  if the fraction of changed tiles in a poll is greater
-                       than f, the whole screen is updated (default %.2f)
--fuzz n                tolerance in pixels to mark a tiles edges as changed.
-                       (default %d).
--hints                 use krfb/x0rfbserver hints (glue changed adjacent
-                       horizontal tiles into one big rectangle)  (default %s).
--nohints               do not use hints; send each tile separately.
-
--threads               use threaded algorithm [rfbRunEventLoop] if compiled
-                       with threads (default %s).
--nothreads             do not use [rfbRunEventLoop].
--viewonly              clients can only watch (default %s).
--shared                VNC display is shared (default %s)
-
-These options are passed to libvncserver:
-
-";
+	char help[] = 
+"x0vnc options:\n"
+"\n"
+"-defer time            time in ms to wait for updates before sending to\n"
+"                       client [rfbDeferUpdateTime]  (default %d)\n"
+"-wait time             time in ms to pause between screen polls.  used\n"
+"                       to cut down on load (default %d)\n"
+"\n"
+"-gaps n                heuristic to fill in gaps in rows or cols of n or less\n"
+"                       tiles.  used to improve text paging (default %d).\n"
+"-grow n                heuristic to grow islands of changed tiles n or wider\n"
+"                       by checking the tile near the boundary (default %d).\n"
+"-fs f                  if the fraction of changed tiles in a poll is greater\n"
+"                       than f, the whole screen is updated (default %.2f)\n"
+"-fuzz n                tolerance in pixels to mark a tiles edges as changed.\n"
+"                       (default %d).\n"
+"-hints                 use krfb/x0rfbserver hints (glue changed adjacent\n"
+"                       horizontal tiles into one big rectangle)  (default %s).\n"
+"-nohints               do not use hints; send each tile separately.\n"
+"\n"
+"-threads               use threaded algorithm [rfbRunEventLoop] if compiled\n"
+"                       with threads (default %s).\n"
+"-nothreads             do not use [rfbRunEventLoop].\n"
+"-viewonly              clients can only watch (default %s).\n"
+"-shared                VNC display is shared (default %s)\n"
+"\n"
+"These options are passed to libvncserver:\n"
+"\n"
+;
 	fprintf(stderr, help, defer_update, waitms, gaps_fill, grow_fill,
 	    fs_frac, tile_fuzz,
 	    use_hints ? "on":"off", use_threads ? "on":"off",
@@ -1225,7 +1251,7 @@ These options are passed to libvncserver:
 int main(int argc, char** argv) {
 
 	XImage *fb;
-	int i, scr, ev, er, maj, min;
+	int i, ev, er, maj, min;
 	char *use_dpy = NULL;
 
 
