@@ -76,7 +76,7 @@ am__include = @am__include@
 am__quote = @am__quote@
 install_sh = @install_sh@
 
-CFLAGS = -I..
+CFLAGS = -I.. -g -Wall
 
 @HAVE_LIBPTHREAD_TRUE@BACKGROUND_TEST = blooptest
 

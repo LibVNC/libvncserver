@@ -1,4 +1,4 @@
-CFLAGS=-I..
+CFLAGS=-I.. -g -Wall
 
 if HAVE_LIBPTHREAD
 BACKGROUND_TEST=blooptest

@@ -77,6 +77,8 @@ install_sh = @install_sh@
 
 includedir = $(prefix)/include/rfb
 
+CFLAGS = -g
+
 SUBDIRS = . examples contrib vncterm classes
 DIST_SUBDIRS = examples contrib vncterm classes
 
@@ -171,7 +173,6 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-CFLAGS = @CFLAGS@
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
 CXXLD = $(CXX)

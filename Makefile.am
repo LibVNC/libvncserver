@@ -1,3 +1,5 @@
+CFLAGS=-g
+
 SUBDIRS=. examples contrib vncterm classes
 DIST_SUBDIRS=examples contrib vncterm classes
 
