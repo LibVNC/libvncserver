@@ -4,6 +4,7 @@
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
+#include <X11/extensions/XTest.h>
 #ifndef NO_SHM
 #include <X11/extensions/XShm.h>
 #include <sys/shm.h>
