@@ -27,8 +27,6 @@
  * 
  */
 
-#define LOCAL_CONTROL
-
 #ifdef LOCAL_CONTROL
 #include "1instance.c"
 #endif

@@ -4,6 +4,7 @@ endif
 
 if OSX
 MAC=mac
+mac_LDFLAGS=-framework ApplicationServices -framework Carbon -framework IOKit
 endif
 
 noinst_HEADERS=radon.h

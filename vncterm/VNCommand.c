@@ -1,11 +1,18 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <sys/time.h>
-#include <unistd.h>
-#include <errno.h>
 #include "VNConsole.h"
 #include "vga.h"
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_SYS_WAIT_H
+#include <sys/wait.h>
+#endif
+#include <errno.h>
 
 
 int main(int argc, char **argv)
@@ -45,7 +52,7 @@ int main(int argc, char **argv)
       char buffer[1024];
       fd_set fs,fs1/*,ifs,ifs1*/;
       struct timeval tv,tv1;
-      int i,c=1,num_fds,max_fd=out[0];
+      int i,c=1,num_fds,max_fd=out[0],status;
       FILE *input_pipe;
       vncConsolePtr console=vcGetConsole(&serverArgc,argv,80,25,&vgaFont,FALSE);
       if(interactive)
@@ -61,7 +68,7 @@ int main(int argc, char **argv)
 
       input_pipe=fdopen(in[1],"w");
       setbuf(input_pipe,NULL);
-      while(c || getpgid(pid)>=0) {
+      while(c || waitpid(pid,&status,WNOHANG)==0) {
 	/* event loop */
 	vcProcessEvents(console);
 

@@ -1,6 +1,6 @@
 CONSOLE_SRCS=VNConsole.c
 
-noinst_HEADERS=VNConsole.h
+noinst_HEADERS=VNConsole.h vga.h
 
 LDADD=-L.. -lvncserver
 INCLUDES=-I. -I../include
