@@ -126,8 +126,8 @@ vncev: vncev.o libvncserver.a
 	$(LINK) -o vncev vncev.o -L. -lvncserver -lz -ljpeg
 
 # Example from Justin
-zippy: contrib/zippy.o libvncserver.a
-	$(LINK) -o zippy contrib/zippy.o -L. -lvncserver -lz -ljpeg
+zippy: zippy.o libvncserver.a
+	$(LINK) -o zippy zippy.o -L. -lvncserver -lz -ljpeg
 
 clean:
 	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \
