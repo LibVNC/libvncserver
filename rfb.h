@@ -26,6 +26,11 @@
  *  USA.
  */
 
+#if(defined __cplusplus)
+extern "C"
+{
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -90,7 +95,7 @@ typedef unsigned long KeySym;
 #undef SOCKET
 #define SOCKET int
 #else
-int max(int,int);
+#define max(a,b) (((a)>(b))?(a):(b))
 #include <sys/time.h>
 #include <netinet/in.h>
 #define SOCKET int
@@ -116,7 +121,7 @@ int max(int,int);
 #define MUTEX(mutex) pthread_mutex_t (mutex)
 #define INIT_MUTEX(mutex) pthread_mutex_init(&(mutex),NULL)
 #define TINI_MUTEX(mutex) pthread_mutex_destroy(&(mutex))
-#define SIGNAL(cond) pthread_cond_signal(&(cond))
+#define TSIGNAL(cond) pthread_cond_signal(&(cond))
 #define WAIT(cond,mutex) pthread_cond_wait(&(cond),&(mutex))
 #define COND(cond) pthread_cond_t (cond)
 #define INIT_COND(cond) pthread_cond_init(&(cond),NULL)
@@ -129,7 +134,7 @@ int max(int,int);
 #define MUTEX(mutex)
 #define INIT_MUTEX(mutex)
 #define TINI_MUTEX(mutex)
-#define SIGNAL(cond)
+#define TSIGNAL(cond)
 #define WAIT(cond,mutex) this_is_unsupported
 #define COND(cond)
 #define INIT_COND(cond)
@@ -151,19 +156,25 @@ int max(int,int);
 
 #define MAX_ENCODINGS 10
 
-struct rfbClientRec;
-struct rfbScreenInfo;
+struct _rfbClientRec;
+struct _rfbScreenInfo;
 struct rfbCursor;
 
-typedef void (*KbdAddEventProcPtr) (Bool down, KeySym keySym, struct rfbClientRec* cl);
-typedef void (*KbdReleaseAllKeysProcPtr) (struct rfbClientRec* cl);
-typedef void (*PtrAddEventProcPtr) (int buttonMask, int x, int y, struct rfbClientRec* cl);
-typedef void (*SetXCutTextProcPtr) (char* str,int len, struct rfbClientRec* cl);
-typedef struct rfbCursor* (*GetCursorProcPtr) (struct rfbClientRec* pScreen);
-typedef Bool (*SetTranslateFunctionProcPtr)(struct rfbClientRec* cl);
-typedef Bool (*PasswordCheckProcPtr)(struct rfbClientRec* cl,char* encryptedPassWord,int len);
-typedef void (*NewClientHookPtr)(struct rfbClientRec* cl);
-typedef void (*DisplayHookPtr)(struct rfbClientRec* cl);
+enum rfbNewClientAction {
+	RFB_CLIENT_ACCEPT,
+	RFB_CLIENT_ON_HOLD,
+	RFB_CLIENT_REFUSE
+};
+
+typedef void (*KbdAddEventProcPtr) (Bool down, KeySym keySym, struct _rfbClientRec* cl);
+typedef void (*KbdReleaseAllKeysProcPtr) (struct _rfbClientRec* cl);
+typedef void (*PtrAddEventProcPtr) (int buttonMask, int x, int y, struct _rfbClientRec* cl);
+typedef void (*SetXCutTextProcPtr) (char* str,int len, struct _rfbClientRec* cl);
+typedef struct rfbCursor* (*GetCursorProcPtr) (struct _rfbClientRec* pScreen);
+typedef Bool (*SetTranslateFunctionProcPtr)(struct _rfbClientRec* cl);
+typedef Bool (*PasswordCheckProcPtr)(struct _rfbClientRec* cl,char* encryptedPassWord,int len);
+typedef enum rfbNewClientAction (*NewClientHookPtr)(struct _rfbClientRec* cl);
+typedef void (*DisplayHookPtr)(struct _rfbClientRec* cl);
 
 typedef struct {
   CARD32 count;
@@ -180,7 +191,7 @@ typedef struct {
  * rfbProcessEvents for each of these.
  */
 
-typedef struct
+typedef struct _rfbScreenInfo
 {
     int width;
     int paddedWidthInBytes;
@@ -246,6 +257,7 @@ typedef struct
     char* desktopName;
     char rfbThisHost[255];
 
+    Bool autoPort;
     int rfbPort;
     SOCKET rfbListenSock;
     int maxSock;
@@ -258,7 +270,7 @@ typedef struct
 
     int udpPort;
     SOCKET udpSock;
-    struct rfbClientRec* udpClient;
+    struct _rfbClientRec* udpClient;
     Bool udpSockConnected;
     struct sockaddr_in udpRemoteAddr;
 
@@ -282,7 +294,7 @@ typedef struct
     Bool rfbAlwaysShared;
     Bool rfbNeverShared;
     Bool rfbDontDisconnect;
-    struct rfbClientRec* rfbClientHead;
+    struct _rfbClientRec* rfbClientHead;
 
     /* cursor */
     int cursorX, cursorY,underCursorBufferLen;
@@ -346,9 +358,9 @@ typedef struct sraRegion* sraRegionPtr;
  * Per-client structure.
  */
 
-typedef void (*ClientGoneHookPtr)(struct rfbClientRec* cl);
+typedef void (*ClientGoneHookPtr)(struct _rfbClientRec* cl);
 
-typedef struct rfbClientRec {
+typedef struct _rfbClientRec {
   
     /* back pointer to the screen */
     rfbScreenInfoPtr screen;
@@ -364,6 +376,10 @@ typedef struct rfbClientRec {
 
     SOCKET sock;
     char *host;
+
+#ifdef HAVE_PTHREADS
+    pthread_t client_thread;
+#endif
                                 /* Possible client states: */
     enum {
         RFB_PROTOCOL_VERSION,   /* establishing protocol version */
@@ -373,6 +389,7 @@ typedef struct rfbClientRec {
     } state;
 
     Bool reverseConnection;
+    Bool onHold;
     Bool readyForSetColourMapEntries;
     Bool useCopyRect;
     int preferredEncoding;
@@ -477,8 +494,8 @@ typedef struct rfbClientRec {
     Bool enableBackChannel;
 #endif
 
-    struct rfbClientRec *prev;
-    struct rfbClientRec *next;
+    struct _rfbClientRec *prev;
+    struct _rfbClientRec *next;
 
 #ifdef HAVE_PTHREADS
     /* whenever a client is referenced, the refCount has to be incremented
@@ -741,8 +758,8 @@ extern void rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, c
 
 /* main.c */
 
-extern void rfbLog(char *format, ...);
-extern void rfbLogPerror(char *str);
+extern void rfbLog(const char *format, ...);
+extern void rfbLogPerror(const char *str);
 
 void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
 void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
@@ -753,6 +770,7 @@ void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,i
 void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2);
 void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
 void doNothingWithClient(rfbClientPtr cl);
+enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
 
 /* to check against plain passwords */
 Bool rfbCheckPasswordByList(rfbClientPtr cl,char* response,int len);
@@ -764,6 +782,12 @@ extern rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 extern void rfbInitServer(rfbScreenInfoPtr rfbScreen);
 extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
 
+/* functions to accept/refuse a client that has been put on hold
+   by a NewClientHookPtr function. Must not be called in other
+   situations. */
+extern void rfbStartOnHoldClient(rfbClientPtr cl);
+extern void rfbRefuseOnHoldClient(rfbClientPtr cl);
+
 /* call one of these two functions to service the vnc clients.
  usec are the microseconds the select on the fds waits.
  if you are using the event loop, set this to some value > 0, so the
@@ -772,4 +796,8 @@ extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
 extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, Bool runInBackground);
 extern void rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
 
+#endif
+
+#if(defined __cplusplus)
+}
 #endif

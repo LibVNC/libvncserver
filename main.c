@@ -41,7 +41,7 @@ char rfbEndianTest = (_BYTE_ORDER == _LITTLE_ENDIAN);
  */
 
 void
-rfbLog(char *format, ...)
+rfbLog(const char *format, ...)
 {
     va_list args;
     char buf[256];
@@ -61,7 +61,7 @@ rfbLog(char *format, ...)
     UNLOCK(logMutex);
 }
 
-void rfbLogPerror(char *str)
+void rfbLogPerror(const char *str)
 {
     rfbLog("%s: %s\n", str, strerror(errno));
 }
@@ -128,7 +128,7 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
      } else {
        sraRgnOr(cl->modifiedRegion,copyRegion);
      }
-     SIGNAL(cl->updateCond);
+     TSIGNAL(cl->updateCond);
      UNLOCK(cl->updateMutex);
    }
 
@@ -186,7 +186,7 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
    while((cl=rfbClientIteratorNext(iterator))) {
      LOCK(cl->updateMutex);
      sraRgnOr(cl->modifiedRegion,modRegion);
-     SIGNAL(cl->updateCond);
+     TSIGNAL(cl->updateCond);
      UNLOCK(cl->updateMutex);
    }
 
@@ -281,7 +281,7 @@ clientInput(void *data)
 
     /* Get rid of the output thread. */
     LOCK(cl->updateMutex);
-    SIGNAL(cl->updateCond);
+    TSIGNAL(cl->updateCond);
     UNLOCK(cl->updateMutex);
     IF_PTHREADS(pthread_join(output_thread, NULL));
 
@@ -290,31 +290,52 @@ clientInput(void *data)
     return NULL;
 }
 
-void*
+static void*
 listenerRun(void *data)
 {
     rfbScreenInfoPtr rfbScreen=(rfbScreenInfoPtr)data;
     int client_fd;
     struct sockaddr_in peer;
-    pthread_t client_thread;
     rfbClientPtr cl;
     int len;
 
     len = sizeof(peer);
+
+    /* TODO: this thread wont die by restarting the server */
     while ((client_fd = accept(rfbScreen->rfbListenSock, 
-                               (struct sockaddr *)&peer, &len)) >= 0) {
+                               (struct sockaddr*)&peer, &len)) >= 0) {
         cl = rfbNewClient(rfbScreen,client_fd);
-
-        pthread_create(&client_thread, NULL, clientInput, (void *)cl);
         len = sizeof(peer);
-    }
 
-    rfbLog("accept failed\n");
-    exit(1);
+	if (cl && !cl->onHold )
+		rfbStartOnHoldClient(cl);
+    }
 }
+
+void 
+rfbStartOnHoldClient(rfbClientPtr cl)
+{
+    pthread_create(&cl->client_thread, NULL, clientInput, (void *)cl);
+}
+
+#else
+
+void 
+rfbStartOnHoldClient(rfbClientPtr cl)
+{
+	cl->onHold = FALSE;
+}
+
 #endif
 
-void
+void 
+rfbRefuseOnHoldClient(rfbClientPtr cl)
+{
+    rfbCloseClient(cl);
+    rfbClientConnectionGone(cl);
+}
+
+static void
 defaultKbdAddEvent(Bool down, KeySym keySym, rfbClientPtr cl)
 {
 }
@@ -423,6 +444,11 @@ void doNothingWithClient(rfbClientPtr cl)
 {
 }
 
+enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl)
+{
+	return RFB_CLIENT_ACCEPT;
+}
+
 rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel)
@@ -435,6 +461,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    if(width&3)
      fprintf(stderr,"WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
 
+   rfbScreen->autoPort=FALSE;
    rfbScreen->rfbClientHead=0;
    rfbScreen->rfbPort=5900;
    rfbScreen->socketInitDone=FALSE;
@@ -536,7 +563,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    rfbScreen->setXCutText = defaultSetXCutText;
    rfbScreen->getCursorPtr = defaultGetCursorPtr;
    rfbScreen->setTranslateFunction = rfbSetTranslateFunction;
-   rfbScreen->newClientHook = doNothingWithClient;
+   rfbScreen->newClientHook = defaultNewClientHook;
    rfbScreen->displayHook = 0;
 
    /* initialize client list and iterator mutex */
@@ -597,7 +624,7 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
   i = rfbGetClientIterator(rfbScreen);
   cl=rfbClientIteratorNext(i);
   while(cl) {
-    if(cl->sock>=0 && FB_UPDATE_PENDING(cl)) {
+    if(cl->sock>=0 && (!cl->onHold) && FB_UPDATE_PENDING(cl)) {
       if(cl->screen->rfbDeferUpdateTime == 0) {
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
       } else if(cl->startDeferring.tv_usec == 0) {

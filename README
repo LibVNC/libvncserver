@@ -83,7 +83,7 @@ Whenever you draw something, you have to call
 This tells LibVNCServer to send updates to all connected clients.
 
 Before you draw something, be sure to call
- rfbUndrawCursor(cl).
+ rfbUndrawCursor(screen).
 This tells LibVNCServer to hide the cursor.
 Remark: There are vncviewers out there, which know a cursor encoding, so
 that network traffic is low, and also the cursor doesn't need to be

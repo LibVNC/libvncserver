@@ -42,7 +42,7 @@ rfbSendCursorShape(cl)
     CARD8 bitmapByte;
 
     pCursor = cl->screen->getCursorPtr(cl);
-    //if(!pCursor) return TRUE;
+    /*if(!pCursor) return TRUE;*/
 
     if (cl->useRichCursorEncoding) {
       if(pCursor && !pCursor->richSource)
@@ -227,7 +227,7 @@ rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskSt
 
    cursor->width=width;
    cursor->height=height;
-   //cursor->backRed=cursor->backGreen=cursor->backBlue=0xffff;
+   /*cursor->backRed=cursor->backGreen=cursor->backBlue=0xffff;*/
    cursor->foreRed=cursor->foreGreen=cursor->foreBlue=0xffff;
    
    cursor->source = (char*)calloc(w,height);

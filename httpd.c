@@ -92,7 +92,7 @@ httpInitSockets(rfbScreenInfoPtr rfbScreen)
 	exit(1);
     }
 
-   //AddEnabledDevice(httpListenSock);
+   /*AddEnabledDevice(httpListenSock);*/
 }
 
 
@@ -151,7 +151,7 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
 	    return;
 	}
 
-	//AddEnabledDevice(httpSock);
+	/*AddEnabledDevice(httpSock);*/
     }
 }
 
@@ -161,7 +161,7 @@ httpCloseSock(rfbScreenInfoPtr rfbScreen)
 {
     fclose(rfbScreen->httpFP);
     rfbScreen->httpFP = NULL;
-    //RemoveEnabledDevice(httpSock);
+    /*RemoveEnabledDevice(httpSock);*/
     rfbScreen->httpSock = -1;
 }
 

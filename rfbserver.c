@@ -61,7 +61,7 @@ void rfbDecrClientRef(rfbClientPtr cl)
   LOCK(cl->refCountMutex);
   cl->refCount--;
   if(cl->refCount<=0) /* just to be sure also < 0 */
-    SIGNAL(cl->deleteCond);
+    TSIGNAL(cl->deleteCond);
   UNLOCK(cl->refCountMutex);
 }
 #endif
@@ -271,14 +271,29 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       if (WriteExact(cl, pv, sz_rfbProtocolVersionMsg) < 0) {
         rfbLogPerror("rfbNewClient: write");
         rfbCloseClient(cl);
+	/* TODO: memory leak here (cl is never freed)
+	 * can rfbClientConnectionGone called at this time?
+	 * tim@tjansen.de
+	 */
         return NULL;
       }
     }
 
     cl->clientData = NULL;
     cl->clientGoneHook = doNothingWithClient;
-    cl->screen->newClientHook(cl);
-
+    switch (cl->screen->newClientHook(cl)) {
+    case RFB_CLIENT_ON_HOLD:
+	    cl->onHold = TRUE;
+	    break;
+    case RFB_CLIENT_ACCEPT:
+	    cl->onHold = FALSE;
+	    break;
+    case RFB_CLIENT_REFUSE:
+	    rfbCloseClient(cl);
+	    rfbClientConnectionGone(cl);
+	    cl = NULL;
+	    break;
+    }
     return cl;
 }
 
@@ -781,7 +796,7 @@ rfbProcessClientNormalMessage(cl)
 	    sraRgnOr(cl->modifiedRegion,tmpRegion);
 	    sraRgnSubtract(cl->copyRegion,tmpRegion);
        }
-       SIGNAL(cl->updateCond);
+       TSIGNAL(cl->updateCond);
        UNLOCK(cl->updateMutex);
 
        sraRgnDestroy(tmpRegion);
@@ -1431,7 +1446,7 @@ rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
     rfbClientPtr cl=rfbScreen->udpClient;
     rfbClientToServerMsg msg;
 
-    if(!cl)
+    if((!cl) || cl->onHold)
       return;
 
     if ((n = read(rfbScreen->udpSock, (char *)&msg, sizeof(msg))) <= 0) {

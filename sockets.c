@@ -69,9 +69,10 @@ struct timeval
 
 #include "rfb.h"
 
-//#ifndef WIN32
+/*#ifndef WIN32
 int max(int i,int j) { return(i<j?j:i); }
-//#endif
+#endif
+*/
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
@@ -111,7 +112,28 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	return;
     }
 
-    if(rfbScreen->rfbPort>0) {
+    if(rfbScreen->autoPort) {
+        int i;
+        rfbLog("Autoprobing TCP port \n");
+
+        for (i = 5900; i < 6000; i++) {
+            if ((rfbScreen->rfbListenSock = ListenOnTCPPort(i)) >= 0) {
+		rfbScreen->rfbPort = i;
+		break;
+	    }
+        }
+
+        if (i >= 6000) {
+	    rfbLogPerror("Failure autoprobing");
+	    exit(1);
+        }
+
+        rfbLog("Autoprobing selected port %d\n", rfbScreen->rfbPort);
+        FD_ZERO(&(rfbScreen->allFds));
+        FD_SET(rfbScreen->rfbListenSock, &(rfbScreen->allFds));
+        rfbScreen->maxFd = rfbScreen->rfbListenSock;
+    }
+    else if(rfbScreen->rfbPort>0) {
       rfbLog("Listening for VNC connections on TCP port %d\n", rfbScreen->rfbPort);
 
       if ((rfbScreen->rfbListenSock = ListenOnTCPPort(rfbScreen->rfbPort)) < 0) {
@@ -204,7 +226,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
 
 	rfbNewClient(rfbScreen,sock);
-
+	
 	FD_CLR(rfbScreen->rfbListenSock, &fds);
 	if (--nfds == 0)
 	    return;
@@ -248,6 +270,8 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 
     i = rfbGetClientIterator(rfbScreen);
     while((cl = rfbClientIteratorNext(i))) {
+      if (cl->onHold)
+	continue;
       if (FD_ISSET(cl->sock, &fds) && FD_ISSET(cl->sock, &(rfbScreen->allFds)))
 	rfbProcessClientMessage(cl);
     }
@@ -268,10 +292,12 @@ rfbCloseClient(cl)
      rfbClientPtr cl;
 {
     LOCK(cl->updateMutex);
-    FD_CLR(cl->sock,&(cl->screen->allFds));
-    close(cl->sock);
-    cl->sock = -1;
-    SIGNAL(cl->updateCond);
+    if (cl->sock != -1) {
+      FD_CLR(cl->sock,&(cl->screen->allFds));
+      close(cl->sock);
+      cl->sock = -1;
+    }
+    TSIGNAL(cl->updateCond);
     UNLOCK(cl->updateMutex);
 }
 
@@ -360,7 +386,7 @@ ReadExact(cl, buf, len)
             FD_SET(sock, &fds);
             tv.tv_sec = rfbMaxClientWait / 1000;
             tv.tv_usec = (rfbMaxClientWait % 1000) * 1000;
-            n = select(sock+1, &fds, NULL, NULL, &tv);
+            n = select(sock+1, &fds, NULL, &fds, &tv);
             if (n < 0) {
                 rfbLogPerror("ReadExact: select");
                 return n;

@@ -259,8 +259,9 @@ rfbSetTranslateFunction(cl)
 #endif
         (cl->screen->rfbServerFormat.bitsPerPixel != 32))
     {
-        rfbLog("%s: server bits per pixel not 8, 16 or 32\n",
-                "rfbSetTranslateFunction");
+        rfbLog("%s: server bits per pixel not 8, 16 or 32 (is %d)\n",
+	       "rfbSetTranslateFunction", 
+	       cl->screen->rfbServerFormat.bitsPerPixel);
         rfbCloseClient(cl);
         return FALSE;
     }

@@ -67,10 +67,11 @@ void clientgone(rfbClientPtr cl)
   free(cl->clientData);
 }
 
-void newclient(rfbClientPtr cl)
+enum rfbNewClientAction newclient(rfbClientPtr cl)
 {
   cl->clientData = (void*)calloc(sizeof(ClientData),1);
   cl->clientGoneHook = clientgone;
+  return RFB_CLIENT_ACCEPT;
 }
 
 /* aux function to draw a line */

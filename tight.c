@@ -24,7 +24,7 @@
  *  USA.
  */
 
-//#include <stdio.h>
+/*#include <stdio.h>*/
 #include "rfb.h"
 
 #ifdef WIN32
@@ -34,7 +34,6 @@
 #endif
 
 #include <jpeglib.h>
-
 
 /* Note: The following constant should not be changed. */
 #define TIGHT_MIN_TO_COMPRESS 12
