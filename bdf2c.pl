@@ -16,6 +16,7 @@ $nullx="0x";
 while(<>) {
   if(/^FONT (.*)$/) {
     $fontname=$1;
+    $fontname=~y/\"//d;
   } elsif(/^ENCODING (.*)$/) {
     $glyphindex=$1;
     $searchfor="BBX";

@@ -853,6 +853,9 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     sraRegionPtr updateRegion,updateCopyRegion;
     int dx, dy;
     Bool sendCursorShape = FALSE;
+
+    if(cl->screen->displayHook)
+      cl->screen->displayHook(cl);
     
     /*
      * If this client understands cursor shape updates, cursor should be
@@ -1097,6 +1100,7 @@ rfbSendCopyRegion(cl, reg, dx, dy)
     sraRectangleIterator* i;
     sraRect rect1;
 
+    /* printf("copyrect: "); sraRgnPrint(reg); putchar('\n'); fflush(stdout); */
     i = sraRgnGetReverseIterator(reg,dx>0,dy>0);
 
     while(sraRgnIteratorNext(i,&rect1)) {

@@ -75,22 +75,28 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
    while((cl=rfbClientIteratorNext(iterator))) {
      LOCK(cl->updateMutex);
      if(cl->useCopyRect) {
+       if(!sraRgnEmpty(cl->copyRegion) && (cl->copyDX!=dx || cl->copyDY!=dy)) {
+	 sraRgnOr(cl->copyRegion,cl->modifiedRegion);
+	 sraRgnMakeEmpty(cl->copyRegion);
+       }
        sraRgnOr(cl->copyRegion,copyRegion);
        cl->copyDX = dx;
        cl->copyDY = dy;
-       
+
+       /* while(!sraRgnEmpty(cl->copyRegion)) */ {
 #ifdef HAVE_PTHREADS
-       if(cl->screen->backgroundLoop) {
-	 SIGNAL(cl->updateCond);
-	 UNLOCK(cl->updateMutex);
-	 LOCK(cl->updateMutex);
-       } else
+	 if(cl->screen->backgroundLoop) {
+	   SIGNAL(cl->updateCond);
+	   UNLOCK(cl->updateMutex);
+	   LOCK(cl->updateMutex);
+	 } else
 #endif
-       {
-	 sraRegionPtr updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
-	 sraRgnOr(updateRegion,cl->copyRegion);
-	 rfbSendFramebufferUpdate(cl,updateRegion);
-	 sraRgnDestroy(updateRegion);
+	   {
+	     sraRegionPtr updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
+	     sraRgnOr(updateRegion,cl->copyRegion);
+	     rfbSendFramebufferUpdate(cl,updateRegion);
+	     sraRgnDestroy(updateRegion);
+	   }
        }
      } else {
        sraRgnOr(cl->modifiedRegion,copyRegion);
@@ -457,7 +463,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->colourMap.is16 = 0;
    rfbScreen->colourMap.data.bytes = NULL;
 
-   if(bytesPerPixel == 8) {
+   if(bytesPerPixel == 1) {
      format->redMax = 7;
      format->greenMax = 7;
      format->blueMax = 3;
@@ -500,6 +506,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->getCursorPtr = defaultGetCursorPtr;
    rfbScreen->setTranslateFunction = rfbSetTranslateFunction;
    rfbScreen->newClientHook = doNothingWithClient;
+   rfbScreen->displayHook = 0;
 
    /* initialize client list and iterator mutex */
    rfbClientListInit(rfbScreen);

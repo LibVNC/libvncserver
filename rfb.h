@@ -147,6 +147,7 @@ typedef void (*SetXCutTextProcPtr) (char* str,int len, struct rfbClientRec* cl);
 typedef struct rfbCursor* (*GetCursorProcPtr) (struct rfbClientRec* pScreen);
 typedef Bool (*SetTranslateFunctionProcPtr)(struct rfbClientRec* cl);
 typedef void (*NewClientHookPtr)(struct rfbClientRec* cl);
+typedef void (*DisplayHookPtr)(struct rfbClientRec* cl);
 
 typedef struct {
   CARD32 count;
@@ -296,6 +297,8 @@ typedef struct
   
     /* newClientHook is called just after a new client is created */
     NewClientHookPtr newClientHook;
+    /* displayHook is called just before a frame buffer update */
+    DisplayHookPtr displayHook;
 
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
@@ -714,7 +717,7 @@ extern void rfbDisconnectUDPSock(rfbScreenInfoPtr cl);
 /* font.c */
 
 typedef struct rfbFontData {
-  char* data;
+  unsigned char* data;
   /*
     metaData is a 256*5 array:
     for each character
@@ -723,10 +726,11 @@ typedef struct rfbFontData {
   int* metaData;
 } rfbFontData,* rfbFontDataPtr;
 
-int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,char c,CARD32 colour);
-void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,char* string,CARD32 colour);
-int rfbWidth(rfbFontDataPtr font,char* string);
-void rfbFontBBox(rfbFontDataPtr font,char c,int* x1,int* y1,int* x2,int* y2);
+int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,CARD32 colour);
+void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char* string,CARD32 colour);
+int rfbWidth(rfbFontDataPtr font,unsigned char* string);
+int rfbWidthOfChar(rfbFontDataPtr font,unsigned char c);
+void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int* y2);
 
 /* main.c */
 
