@@ -3,7 +3,11 @@
 
 static rfbBool resize(rfbClient* client) {
 	static char first=TRUE;
+#ifdef SDL_ASYNCBLIT
 	int flags=SDL_HWSURFACE|SDL_ASYNCBLIT|SDL_HWACCEL;
+#else
+	int flags=SDL_HWSURFACE|SDL_HWACCEL;
+#endif
 	int width=client->width,height=client->height,
 		depth=client->format.bitsPerPixel;
 	rfbBool okay=SDL_VideoModeOK(width,height,depth,flags);
@@ -250,17 +254,19 @@ int main(int argc,char** argv) {
 	while(1) {
 		if(SDL_PollEvent(&e))
 			switch(e.type) {
+#if SDL_MAJOR_VERSION>1 || SDL_MINOR_VERSION>=2
 				case SDL_VIDEOEXPOSE:
 					SendFramebufferUpdateRequest(cl,0,0,cl->width,cl->height,FALSE);
 					break;
+#endif
 				case SDL_MOUSEBUTTONUP: case SDL_MOUSEBUTTONDOWN:
 				case SDL_MOUSEMOTION: {
 						int x,y;
 						int state=SDL_GetMouseState(&x,&y);
 						struct { int sdl; int rfb; } buttonMapping[]={
-							{SDL_BUTTON_LEFT, rfbButton1Mask},
-							{SDL_BUTTON_RIGHT, rfbButton2Mask},
-							{SDL_BUTTON_MIDDLE, rfbButton3Mask},
+							{1, rfbButton1Mask},
+							{3, rfbButton2Mask},
+							{2, rfbButton3Mask},
 							{0,0}
 						};
 						int i;
