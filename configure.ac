@@ -50,15 +50,15 @@ if test ! -z "$HAVE_PTHREAD_H"; then
 	AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
 fi
 AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
+AC_CHECK_PROGS(CXX,[g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC],none)
+AC_PROG_CXX
 if test ! -z "$HAVE_ZLIB_H"; then
 	AC_CHECK_LIB(z, deflate, , HAVE_ZLIB_H="")
 	if test ! -z "$HAVE_ZLIB_H"; then
 		# check for c++, but don't fail if not found
-		AC_CHECK_PROGS(CXX,[g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC],none)
 		AH_TEMPLATE(HAVE_ZRLE, [Use zrle compression; needs a c++ compiler])
 		if test x$CXX != xnone; then
 			AC_DEFINE(HAVE_ZRLE)
-			AC_PROG_CXX
 			if test -z "$CXX"; then
 				CCLD="\$(CXX)"
 			else
