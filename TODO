@@ -5,7 +5,6 @@ VisualNaCro testing
 test IRIX -overlay (x11vnc)
 java vncviewer doesn't do colour cursors?
 MinGW32 doesn't do fcntl on sockets; use setsockopt instead...
-if preferredEncoding is set outside of libvncserver, don't override it.
 make libvncclient threadsafe (static zlib buffer -> rfbClient*)
 make corre work again (libvncclient or libvncserver?)
 implement zrle in libvncclient

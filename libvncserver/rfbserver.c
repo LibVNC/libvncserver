@@ -283,7 +283,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->reverseConnection = FALSE;
       cl->readyForSetColourMapEntries = FALSE;
       cl->useCopyRect = FALSE;
-      cl->preferredEncoding = rfbEncodingRaw;
+      cl->preferredEncoding = -1;
       cl->correMaxWidth = 48;
       cl->correMaxHeight = 48;
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -1331,6 +1331,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
                                       + w * (cl->format.bitsPerPixel / 8) * h);
 
         switch (cl->preferredEncoding) {
+	case -1:
         case rfbEncodingRaw:
             if (!rfbSendRectEncodingRaw(cl, x, y, w, h))
 	        goto updateFailed;
