@@ -27,6 +27,12 @@
  * 
  */
 
+#define LOCAL_CONTROL
+
+#ifdef LOCAL_CONTROL
+#include "1instance.c"
+#endif
+
 #include <unistd.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
@@ -225,6 +231,8 @@ KbdAddEvent(Bool down, KeySym keySym, struct rfbClientRec* cl)
     CGKeyCode keyCode = -1;
     int found = 0;
 
+    if(((int)cl->clientData)==-1) return; /* viewOnly */
+
     for (i = 0; i < (sizeof(keyTable) / sizeof(int)); i += 2) {
         if (keyTable[i] == keySym) {
             keyCode = keyTable[i+1];
@@ -251,6 +259,8 @@ PtrAddEvent(buttonMask, x, y, cl)
     rfbClientPtr cl;
 {
     CGPoint position;
+
+    if(((int)cl->clientData)==-1) return; /* viewOnly */
 
     position.x = x;
     position.y = y;
@@ -281,10 +291,9 @@ ScreenInit(int argc, char**argv)
   rfbScreen->frameBuffer =
     (char *)CGDisplayBaseAddress(kCGDirectMainDisplay);
 
-  if(!viewOnly) {
-    rfbScreen->ptrAddEvent = PtrAddEvent;
-    rfbScreen->kbdAddEvent = KbdAddEvent;
-  }
+  rfbScreen->ptrAddEvent = PtrAddEvent;
+  rfbScreen->kbdAddEvent = KbdAddEvent;
+
   if(sharedMode) {
     rfbScreen->rfbAlwaysShared = TRUE;
   }
@@ -292,10 +301,32 @@ ScreenInit(int argc, char**argv)
   rfbInitServer(rfbScreen);
 }
 
+#ifdef LOCAL_CONTROL
+single_instance_struct single_instance = { "/tmp/OSXvnc_control" };
+#endif
+
 static void 
 refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 {
   int i;
+
+#ifdef LOCAL_CONTROL
+  if(get_next_message(message,1024,&single_instance,50)) {
+    if(message[0]=='l' && message[1]==0) {
+      rfbClientPtr cl;
+      int i;
+      for(i=0,cl=rfbScreen->rfbClientHead;cl;cl=cl->next,i++)
+	fprintf(stderr,"%02d: %s\n",i,cl->host);
+    } else if(message[0]=='t') {
+      rfbClientPtr cl;
+      for(cl=rfbScreen->rfbClientHead;cl;cl=cl->next)
+	if(!strcmp(message+1,cl->host)) {
+	  cl->clientData=(cl->clientData==0)?-1:0;
+	  break;
+	}
+    }
+  }
+#endif
 
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
     exit(0);
@@ -319,12 +350,32 @@ void newClient(rfbClientPtr cl)
 
   if(disconnectAfterFirstClient)
     cl->clientGoneHook = clientGone;
+
+  cl->clientData=(void*)((viewOnly)?-1:0);
 }
 
 int main(int argc,char *argv[])
 {
   int i;
+
+#ifdef LOCAL_CONTROL
+  char message[1024];
+
+  open_control_file(&single_instance);
+#endif
+
   for(i=argc-1;i>0;i--)
+#ifdef LOCAL_CONTROL
+    if(i<argc-1 && !strcmp(argv[i],"-toggleviewonly")) {
+      sprintf(message,"t%s",argv[i+1]);
+      send_message(&single_instance,message);
+      exit(0);
+    } else if(!strcmp(argv[i],"-listclients")) {
+      fprintf(stderr,"list clients\n");
+      send_message(&single_instance,"l");
+      exit(0);
+    } else
+#endif
     if(i<argc-1 && strcmp(argv[i],"-wait4client")==0) {
       maxSecsToConnect = atoi(argv[i+1])/1000;
       startTime = time(0);
