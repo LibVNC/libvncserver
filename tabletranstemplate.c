@@ -98,7 +98,7 @@ rfbTranslateWithRGBTablesINtoOUT (char *table, rfbPixelFormat *in,
     OUT_T *blueTable = greenTable + in->greenMax + 1;
 
     while (height > 0) {
-        opLineEnd = op + width;
+        opLineEnd = &op[width];
 
         while (op < opLineEnd) {
             *(op++) = (redTable[(*ip >> in->redShift) & in->redMax] |
