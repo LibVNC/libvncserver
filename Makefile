@@ -9,7 +9,6 @@ PTHREADLIB = -lpthread
 # The code for 3 Bytes/Pixel is not very efficient!
 FLAG24 = -DALLOW24BPP
 
-#CC=cc
 CFLAGS=-g -Wall $(PTHREADDEF) $(FLAG24) $(INCLUDES)
 #CFLAGS=-O2 -Wall
 RANLIB=ranlib
@@ -29,6 +28,7 @@ OBJS=main.o rfbserver.o sraRegion.o auth.o sockets.o \
 	stats.o corre.o hextile.o rre.o translate.o cutpaste.o \
 	zlib.o tight.o httpd.o cursor.o font.o \
 	d3des.o vncauth.o
+INSTALLHEADER=rfb.h rfbproto.h sraRegion.h keysym.h
 
 all: example pnmshow storepasswd
 
