@@ -337,19 +337,38 @@ void rfbUndrawCursor(rfbClientPtr cl)
    rfbCursorPtr c=s->cursor;
    int j,x1,x2,y1,y2,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
-   if(!s->cursorIsDrawn)
+
+#ifdef HAVE_PTHREADS
+   pthread_mutex_lock(&c->mutex);
+#endif
+   if(!s->cursorIsDrawn) {
+#ifdef HAVE_PTHREADS
+     pthread_mutex_unlock(&c->mutex);
+#endif
      return;
+   }
+   
    /* restore what is under the cursor */
    x1=s->cursorX-c->xhot;
    x2=x1+c->width;
    if(x1<0) x1=0;
    if(x2>=s->width) x2=s->width-1;
-   x2-=x1; if(x2<=0) return;
+   x2-=x1; if(x2<=0) {
+#ifdef HAVE_PTHREADS
+     pthread_mutex_unlock(&c->mutex);
+#endif
+     return;
+   }
    y1=s->cursorY-c->yhot;
    y2=y1+c->height;
    if(y1<0) y1=0;
    if(y2>=s->height) y2=s->height-1;
-   y2-=y1; if(y2<=0) return;
+   y2-=y1; if(y2<=0) {
+#ifdef HAVE_PTHREADS
+     pthread_mutex_unlock(&c->mutex);
+#endif
+     return;
+   }
    for(j=0;j<y2;j++)
      memcpy(s->frameBuffer+(y1+j)*rowstride+x1*bpp,
 	    s->underCursorBuffer+j*x2*bpp,
@@ -357,6 +376,9 @@ void rfbUndrawCursor(rfbClientPtr cl)
    
    rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
    s->cursorIsDrawn = FALSE;
+#ifdef HAVE_PTHREADS
+   pthread_mutex_unlock(&c->mutex);
+#endif
 }
 
 void rfbDrawCursor(rfbClientPtr cl)
@@ -367,10 +389,18 @@ void rfbDrawCursor(rfbClientPtr cl)
      rowstride=s->paddedWidthInBytes,
      bufSize,w;
    if(!c) return;
+#ifdef HAVE_PTHREADS
+   pthread_mutex_lock(&c->mutex);
+#endif
+   if(s->cursorIsDrawn) {
+     /* is already drawn */
+#ifdef HAVE_PTHREADS
+     pthread_mutex_unlock(&c->mutex);
+#endif
+     return;
+   }
    bufSize=c->width*c->height*bpp;
    w=(c->width+7)/8;
-   if(s->cursorIsDrawn)
-     rfbUndrawCursor(cl);
    if(s->underCursorBufferLen<bufSize) {
       if(s->underCursorBuffer!=NULL)
 	free(s->underCursorBuffer);
@@ -383,12 +413,22 @@ void rfbDrawCursor(rfbClientPtr cl)
    x2=x1+c->width;
    if(x1<0) { i1=-x1; x1=0; }
    if(x2>=s->width) x2=s->width-1;
-   x2-=x1; if(x2<=0) return; /* nothing to do */
+   x2-=x1; if(x2<=0) {
+#ifdef HAVE_PTHREADS
+     pthread_mutex_unlock(&c->mutex);
+#endif
+     return; /* nothing to do */
+   }
    y1=s->cursorY-c->yhot;
    y2=y1+c->height;
    if(y1<0) { j1=-y1; y1=0; }
    if(y2>=s->height) y2=s->height-1;
-   y2-=y1; if(y2<=0) return; /* nothing to do */
+   y2-=y1; if(y2<=0) {
+#ifdef HAVE_PTHREADS
+     pthread_mutex_unlock(&c->mutex);
+#endif
+     return; /* nothing to do */
+   }
    for(j=0;j<y2;j++)
      memcpy(s->underCursorBuffer+j*x2*bpp,
 	    s->frameBuffer+(y1+j)*rowstride+x1*bpp,
@@ -406,6 +446,9 @@ void rfbDrawCursor(rfbClientPtr cl)
 
    rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
    s->cursorIsDrawn = TRUE;
+#ifdef HAVE_PTHREADS
+   pthread_mutex_unlock(&c->mutex);
+#endif
 }
 
 /* for debugging */

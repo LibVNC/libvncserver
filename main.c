@@ -72,10 +72,15 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
 {
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
+   
    iterator=rfbGetClientIterator(rfbScreen);
-   while((cl=rfbClientIteratorNext(iterator)))
+   while((cl=rfbClientIteratorNext(iterator))) {
+     pthread_mutex_lock(&cl->updateMutex);
      sraRgnOr(cl->modifiedRegion,modRegion);
-  
+     pthread_cond_signal(&cl->updateCond);
+     pthread_mutex_unlock(&cl->updateMutex);
+   }
+
    rfbReleaseClientIterator(iterator);
 }
 
@@ -98,7 +103,7 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
    sraRgnDestroy(region);
 }
 
-int rfbDeferUpdateTime = 40; /* ms */
+int rfbDeferUpdateTime = 400; /* ms */
 
 #ifdef HAVE_PTHREADS
 static void *
@@ -180,37 +185,14 @@ void*
 listenerRun(void *data)
 {
     rfbScreenInfoPtr rfbScreen=(rfbScreenInfoPtr)data;
-    int listen_fd, client_fd;
-    struct sockaddr_in sin, peer;
+    int client_fd;
+    struct sockaddr_in peer;
     pthread_t client_thread;
     rfbClientPtr cl;
-    int len, value;
-
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_port = htons(rfbScreen->rfbPort ? rfbScreen->rfbPort : 5901);
-
-    if ((listen_fd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-        return NULL;
-    }
-    value = 1;
-    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, 
-                   &value, sizeof(value)) < 0) {
-        rfbLog("setsockopt SO_REUSEADDR failed\n");
-    }
-                                                                   
-    if (bind(listen_fd, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-        rfbLog("failed to bind socket\n");
-        exit(1);
-    }
-
-    if (listen(listen_fd, 5) < 0) {
-        rfbLog("listen failed\n");
-        exit(1);
-    }
+    int len;
 
     len = sizeof(peer);
-    while ((client_fd = accept(listen_fd, 
+    while ((client_fd = accept(rfbScreen->rfbListenSock, 
                                (struct sockaddr *)&peer, &len)) >= 0) {
         cl = rfbNewClient(rfbScreen,client_fd);
 

@@ -1,16 +1,16 @@
-#CC=cc
-CFLAGS=-g -Wall
-#CFLAGS=-O2 -Wall
-RANLIB=ranlib
-
 INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
-# These two lines enable useage of PThreads
-CFLAGS += -DHAVE_PTHREADS
-VNCSERVERLIB += -lpthread
+# Uncomment these two lines to enable use of PThreads
+PTHREADDEF = -DHAVE_PTHREADS
+PTHREADLIB = -lpthread
 
-LIBS=$(LDFLAGS) $(VNCSERVERLIB)
+#CC=cc
+CFLAGS=-g -Wall $(PTHREADDEF)
+#CFLAGS=-O2 -Wall
+RANLIB=ranlib
+
+LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB)
 
 # for Mac OS X
 OSX_LIBS = -framework ApplicationServices -framework Carbon

@@ -599,6 +599,9 @@ typedef struct rfbCursor {
     unsigned short foreRed, foreGreen, foreBlue; /* device-independent color */
     unsigned short backRed, backGreen, backBlue; /* device-independent color */
     unsigned char *richSource; /* source bytes for a rich cursor */
+#ifdef HAVE_PTHREADS
+    pthread_mutex_t mutex;
+#endif
 } rfbCursor, *rfbCursorPtr;
 
 extern Bool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);

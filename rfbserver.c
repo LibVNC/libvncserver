@@ -260,7 +260,10 @@ rfbClientConnectionGone(cl)
      rfbClientPtr cl;
 {
     int i;
+
 #ifdef HAVE_PTHREADS
+    pthread_mutex_lock(&cl->updateMutex);
+    pthread_mutex_lock(&cl->outputMutex);
     pthread_mutex_lock(&rfbClientListMutex);
 #endif
 
@@ -289,15 +292,15 @@ rfbClientConnectionGone(cl)
     if (cl->next)
         cl->next->prev = cl->prev;
 
-#ifdef HAVE_PTHREADS
-    pthread_mutex_unlock(&rfbClientListMutex);
-#endif
-
     sraRgnDestroy(cl->modifiedRegion);
 
     rfbPrintStats(cl);
 
     if (cl->translateLookupTable) free(cl->translateLookupTable);
+
+#ifdef HAVE_PTHREADS
+    pthread_mutex_unlock(&rfbClientListMutex);
+#endif
 
 #ifdef HAVE_PTHREADS
     pthread_cond_destroy(&cl->updateCond);
@@ -839,8 +842,9 @@ rfbSendFramebufferUpdate(cl, updateRegion)
       if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged)
 	sendCursorShape = TRUE;
     } else {
-      if (!cl->screen->cursorIsDrawn)
+      if (!cl->screen->cursorIsDrawn) {
 	rfbDrawCursor(cl);
+      }
     }
    
     /*
