@@ -1,4 +1,4 @@
-/* This file is part of LibVNCServer.
+/* This file (x11vnc.c) is part of LibVNCServer.
    It is a small clone of x0rfbserver by HexoNet, demonstrating the
    capabilities of LibVNCServer.
 */
@@ -65,6 +65,10 @@ void newClient(rfbClientPtr cl)
 {
   if(disconnectAfterFirstClient)
     cl->clientGoneHook = clientGone;
+  if(viewOnly)
+    cl->clientData = (void*)-1;
+  else
+    cl->clientData = (void*)0;
 }
 
 #define LEFTSHIFT 1
@@ -95,6 +99,8 @@ void tweakModifiers(char mod,Bool down)
 
 void keyboard(Bool down,KeySym keySym,rfbClientPtr cl)
 {
+  if(((int)cl->clientData)==-1) return; /* viewOnly */
+
 #define ADJUSTMOD(sym,state) \
   if(keySym==sym) { if(down) ModifierState|=state; else ModifierState&=~state; }
 
@@ -131,6 +137,8 @@ int oldButtonMask = 0;
 void mouse(int buttonMask,int x,int y,rfbClientPtr cl)
 {
   int i=0;
+
+  if(((int)cl->clientData)==-1) return; /* viewOnly */
 
   XTestFakeMotionEvent(dpy,0,x,y,CurrentTime );
   while(i<5) {
@@ -271,6 +279,12 @@ void probeScreen(rfbScreenInfoPtr s,int xscreen)
     }
 }
 
+#define LOCAL_CONTROL
+
+#ifdef LOCAL_CONTROL
+#include "1instance.c"
+#endif
+
 /* the main program */
 
 int main(int argc,char** argv)
@@ -284,7 +298,25 @@ int main(int argc,char** argv)
   int maxMsecsToConnect = 5000; /* a maximum of 5 seconds to connect */
   int updateCounter; /* about every 50 ms a screen update should be made. */
 
+#ifdef LOCAL_CONTROL
+  char message[1024];
+  single_instance_struct single_instance = { "/tmp/x11vnc_control" };
+
+  open_control_file(&single_instance);
+#endif
+
   for(i=argc-1;i>0;i--)
+#ifdef LOCAL_CONTROL
+    if(i<argc-1 && !strcmp(argv[i],"-toggleviewonly")) {
+      sprintf(message,"t%s",argv[i+1]);
+      send_message(&single_instance,message);
+      exit(0);
+    } else if(!strcmp(argv[i],"-listclients")) {
+      fprintf(stderr,"list clients\n");
+      send_message(&single_instance,"l");
+      exit(0);
+    } else
+#endif
     if(i<argc-1 && strcmp(argv[i],"-display")==0) {
       fprintf(stderr,"Using display %s\n",argv[i+1]);
       dpy = XOpenDisplay(argv[i+1]);
@@ -387,10 +419,9 @@ int main(int argc,char** argv)
   screen->cursor = 0;
   screen->newClientHook = newClient;
 
-  if(!viewOnly) {
-    screen->kbdAddEvent = keyboard;
-    screen->ptrAddEvent = mouse;
-  }
+  screen->kbdAddEvent = keyboard;
+  screen->ptrAddEvent = mouse;
+
   if(sharedMode) {
     screen->rfbAlwaysShared = TRUE;
   }
@@ -412,6 +443,24 @@ int main(int argc,char** argv)
 	exit(2);
       }
     }
+
+#ifdef LOCAL_CONTROL
+    if(get_next_message(message,1024,&single_instance,50)) {
+      if(message[0]=='l' && message[1]==0) {
+	rfbClientPtr cl;
+	int i;
+	for(i=0,cl=screen->rfbClientHead;cl;cl=cl->next,i++)
+	  fprintf(stderr,"%02d: %s\n",i,cl->host);
+      } else if(message[0]=='t') {
+	rfbClientPtr cl;
+	for(cl=screen->rfbClientHead;cl;cl=cl->next)
+	  if(!strcmp(message+1,cl->host)) {
+	    cl->clientData=(cl->clientData==0)?-1:0;
+	    break;
+	  }
+      }
+    }
+#endif
 
     rfbProcessEvents(screen,-1);
 
