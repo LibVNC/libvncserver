@@ -1,3 +1,6 @@
+2004-12-20  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* released version 0.7
+
 2004-12-19  Karl Runge <runge@karlrunge.com>
 	* x11vnc: string cleanup, synchronous remote-control option -sync
 	* libvncserver/cursor.c: zero underCursorBufferLen when cursor freed.
