@@ -10,6 +10,9 @@
  *  see GPL (latest version) for full details
  */
 
+#include "rfb.h"
+#include "sraRegion.h"
+
 #include <stdarg.h>
 #include <errno.h>
 
@@ -30,9 +33,6 @@
 
 #include <signal.h>
 #include <time.h>
-
-#include "rfb.h"
-#include "sraRegion.h"
 
 #ifdef HAVE_LIBPTHREAD
 MUTEX(logMutex);
