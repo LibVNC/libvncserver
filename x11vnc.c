@@ -247,7 +247,9 @@ int main(int argc,char** argv)
     fprintf(stderr,"Couldn't open display!\n");
     exit(2);
   }
-     
+
+  XTestGrabControl(dpy,True);
+
   xscreen = DefaultScreen(dpy);
 
   init_keycodes();
@@ -330,6 +332,7 @@ int main(int argc,char** argv)
     maxMsecsToConnect -= screen->rfbDeferUpdateTime;
     if(maxMsecsToConnect<0) {
       fprintf(stderr,"Maximum time to connect reached. Exiting.\n");
+      XTestDiscard(dpy);
       exit(2);
     }
 

@@ -9,8 +9,8 @@ VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 # The code for 3 Bytes/Pixel is not very efficient!
 FLAG24 = -DALLOW24BPP
 
-#OPTFLAGS=-g # -Wall
-OPTFLAGS=-O2 -Wall
+OPTFLAGS=-g # -Wall
+#OPTFLAGS=-O2 -Wall
 CFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES)
 RANLIB=ranlib
 
@@ -58,7 +58,8 @@ OSXvnc-server: mac.o libvncserver.a
 	$(CC) -o OSXvnc-server mac.o $(LIBS) $(OSX_LIBS)
 
 x11vnc: x11vnc.o libvncserver.a
-	$(CC) -o x11vnc x11vnc.o libvncserver.a /usr/lib/libz.a /usr/lib/libjpeg.a $(XLIBS)
+	$(CC) -o x11vnc x11vnc.o libvncserver.a -lz -ljpeg $(XLIBS)
+#	$(CC) -o x11vnc x11vnc.o libvncserver.a /usr/lib/libz.a /usr/lib/libjpeg.a $(XLIBS)
 #$(LIBS) $(XLIBS)
 
 storepasswd: storepasswd.o d3des.o vncauth.o
