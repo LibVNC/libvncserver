@@ -266,7 +266,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 		httpCloseSock(rfbScreen);
 		return;
 	    }
-	    // proxy connection
+	    /* proxy connection */
 	    rfbLog("httpd: client asked for CONNECT\n");
 	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
 	    rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);
@@ -274,7 +274,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	    return;
 	}
 	if (!strncmp(buf, "GET ",4) && !strncmp(strchr(buf,'/'),"/proxied.connection HTTP/1.", 27)) {
-	    // proxy connection
+	    /* proxy connection */
 	    rfbLog("httpd: client asked for /proxied.connection\n");
 	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
 	    rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);

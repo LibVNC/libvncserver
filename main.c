@@ -128,7 +128,7 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
        sraRgnDestroy(modifiedRegionBackup);
 
 #if 0
-//TODO: is this needed? Or does it mess up deferring?
+       /* TODO: is this needed? Or does it mess up deferring? */
        /* while(!sraRgnEmpty(cl->copyRegion)) */ {
 #ifdef HAVE_PTHREADS
 	 if(!cl->screen->backgroundLoop)

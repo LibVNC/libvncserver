@@ -1,3 +1,4 @@
+   Better x11vnc from Karl J. Runge!
    fixed severe bug (Const Kaplinsky)
    got patch from Const Kaplisnky with CursorPosUpdate encoding and some Docs
    sync'ed with newest RealVNC (ZRLE encoding)

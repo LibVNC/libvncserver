@@ -164,9 +164,17 @@ typedef int socklen_t;
    the library and your application (at least the parts including rfb.h)
    with the same support for pthreads. */
 #ifdef HAVE_PTHREADS
-#define rfbInitServer rfbInitServerWithPthreads
+#ifdef HAVE_ZRLE
+#define rfbInitServer rfbInitServerWithPthreadsAndZRLE
 #else
-#define rfbInitServer rfbInitServerWithoutPthreads
+#define rfbInitServer rfbInitServerWithPthreadsButWithoutZRLE
+#endif
+#else
+#ifdef HAVE_ZRLE
+#define rfbInitServer rfbInitServerWithoutPthreadsButWithZRLE
+#else
+#define rfbInitServer rfbInitServerWithoutPthreadsAndZRLE
+#endif
 #endif
 
 #define MAX_ENCODINGS 10
@@ -409,9 +417,6 @@ typedef struct _rfbClientRec {
     Bool useCopyRect;
     int preferredEncoding;
     int correMaxWidth, correMaxHeight;
-#ifdef HAVE_ZRLE
-    void* zrleData;
-#endif
 
     /* The following member is only used during VNC authentication */
     CARD8 authChallenge[CHALLENGESIZE];
@@ -536,6 +541,10 @@ typedef struct _rfbClientRec {
     MUTEX(outputMutex);
     MUTEX(updateMutex);
     COND(updateCond);
+#endif
+
+#ifdef HAVE_ZRLE
+    void* zrleData;
 #endif
 
 } rfbClientRec, *rfbClientPtr;
@@ -725,9 +734,10 @@ extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
 extern void defaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
 
 /* zrle.c */
-
+#ifdef HAVE_ZRLE
 extern Bool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w,int h);
 extern void FreeZrleData(rfbClientPtr cl);
+#endif
 
 /* stats.c */
 
