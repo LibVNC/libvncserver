@@ -377,7 +377,7 @@ void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
      cursor->foreGreen<<format->greenShift|cursor->foreBlue<<format->blueShift;
    
    for(j=0;j<cursor->height;j++)
-     for(i=0,bit=0x80;i<cursor->height;i++,bit=(bit&1)?0x80:bit>>1,cp+=bpp)
+     for(i=0,bit=0x80;i<cursor->width;i++,bit=(bit&1)?0x80:bit>>1,cp+=bpp)
        if(cursor->source[j*w+i/8]&bit) memcpy(cp,fore,bpp);
        else memcpy(cp,back,bpp);
 }
