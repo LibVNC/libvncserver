@@ -834,17 +834,20 @@ rfbSendFramebufferUpdate(cl, updateRegion)
      * removed from the framebuffer. Otherwise, make sure it's put up.
      */
 
-    if (cl->enableCursorShapeUpdates) {
-       cursorWasDrawn = cl->screen->cursorIsDrawn;
-       if (cl->screen->cursorIsDrawn) {
-	  fprintf(stderr,"rfbSpriteRemoveCursor(pScreen); not yet!\n");
-       }
-       if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged)
-	 sendCursorShape = TRUE;
-    } else {
-       if (!cl->screen->cursorIsDrawn)
-	 fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!\n");
-    }
+   cursorWasDrawn = cl->screen->cursorIsDrawn;
+
+   if (cl->enableCursorShapeUpdates) {
+      if (cl->screen->cursorIsDrawn) {
+	 rfbUndrawCursor(cl);
+	 //fprintf(stderr,"rfbSpriteRemoveCursor(pScreen); not yet!\n");
+      }
+      if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged)
+	sendCursorShape = TRUE;
+   } else {
+      if (!cl->screen->cursorIsDrawn)
+	//rfbDrawCursor(cl);
+	fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!\n");
+   }
    
     /*
      * The modifiedRegion may overlap the destination copyRegion.  We remove
@@ -1046,9 +1049,11 @@ rfbSendFramebufferUpdate(cl, updateRegion)
 
     if(cursorWasDrawn != cl->screen->cursorIsDrawn) {
        if(cursorWasDrawn)
-	  fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!!\n");
+	  rfbDrawCursor(cl);
+	  //fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!!\n");
        else
-	  fprintf(stderr,"rfbSpriteRemoveCursor(pScreen); not yet!!\n");
+	  rfbUndrawCursor(cl);
+	  //fprintf(stderr,"rfbSpriteRemoveCursor(pScreen); not yet!!\n");
     }
 
     return TRUE;

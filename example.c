@@ -94,6 +94,10 @@ void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,int x2,i
 void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 {
    ClientData* cd=cl->clientData;
+   //if(cl->screen->cursorIsDrawn)
+     //rfbUndrawCursor(cl);
+   //cl->screen->cursorX=x;
+   //cl->screen->cursorY=y;
    if(x>=0 && y>=0 && x<maxx && y<maxy) {
       if(buttonMask) {
 	 int i,j,x1,x2,y1,y2;
@@ -189,11 +193,15 @@ void dokey(Bool down,KeySym key,rfbClientPtr cl)
     if(key==XK_Escape)
       rfbCloseClient(cl);
     else if(key==XK_Page_Up) {
+       //if(cl->screen->cursorIsDrawn)
+	 //rfbUndrawCursor(cl);
       initBuffer(cl->screen->frameBuffer);
       rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
     } else if(key>=' ' && key<0x100) {
       ClientData* cd=cl->clientData;
       int x1=cd->oldx,y1=cd->oldy,x2,y2;
+      //if(cl->screen->cursorIsDrawn)
+	 //rfbUndrawCursor(cl);
       cd->oldx+=drawchar(cl->screen->frameBuffer,
 			 cl->screen->paddedWidthInBytes,bpp,cd->oldx,cd->oldy,
 			 key);

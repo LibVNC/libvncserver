@@ -539,6 +539,8 @@ extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
 extern void MakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
 extern void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
 extern void rfbFreeCursor(rfbCursorPtr cursor);
+extern void rfbDrawCursor(rfbClientPtr cl);
+extern void rfbUndrawCursor(rfbClientPtr cl);
 
 /* stats.c */
 

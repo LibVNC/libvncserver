@@ -495,6 +495,7 @@ void rfbUndrawCursor(rfbClientPtr cl)
    rfbCursorPtr c=s->cursor;
    int j,x1,x2,y1,y2,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
+   return;
    if(!s->cursorIsDrawn)
      return;
    /* restore what is under the cursor */
@@ -512,6 +513,9 @@ void rfbUndrawCursor(rfbClientPtr cl)
      memcpy(s->frameBuffer+(y1+j)*rowstride+x1*bpp,
 	    s->underCursorBuffer+j*x2*bpp,
 	    x2*bpp);
+   
+   rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
+   s->cursorIsDrawn = FALSE;
 }
 
 void rfbDrawCursor(rfbClientPtr cl)
@@ -521,6 +525,7 @@ void rfbDrawCursor(rfbClientPtr cl)
    int i,j,x1,x2,y1,y2,i1,j1,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
      bufSize=c->width*c->height*bpp,w=(c->width+7)/8;
+   return;
    if(s->cursorIsDrawn)
      rfbUndrawCursor(cl);
    if(s->underCursorBufferLen<bufSize) {
@@ -555,6 +560,9 @@ void rfbDrawCursor(rfbClientPtr cl)
        if((c->mask[(j+j1)*w+(i+i1)/8]<<((i+i1)&7))&0x80)
 	 memcpy(s->frameBuffer+(j+y1)*rowstride+(i+x1)*bpp,
 		c->richSource+(j+j1)*c->width*bpp+(i+i1)*bpp,bpp);
+
+   rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
+   s->cursorIsDrawn = TRUE;
 }
 
 void rfbPrintXCursor(rfbCursorPtr cursor)

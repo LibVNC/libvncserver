@@ -90,8 +90,8 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,RegionPtr modRegion)
 
 void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2)
 {
-   BoxRec box;
-   RegionRec region;
+   BoxRec box; //=(BoxRec*)malloc(sizeof(BoxRec));
+   RegionRec* region=(RegionRec*)malloc(sizeof(RegionRec));
    int i;
    if(x1>x2) { i=x1; x1=x2; x2=i; }
    x2++;
@@ -104,8 +104,8 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
    if(y2>=rfbScreen->height) { y2=rfbScreen->height-1; if(y1==y2) y1--; }
    
    box.x1=x1; box.y1=y1; box.x2=x2; box.y2=y2;
-   REGION_INIT(cl->screen,&region,&box,0);
-   rfbMarkRegionAsModified(rfbScreen,&region);
+   REGION_INIT(cl->screen,region,&box,0);
+   rfbMarkRegionAsModified(rfbScreen,region);
 }
 
 int rfbDeferUpdateTime = 40; /* ms */
@@ -298,6 +298,15 @@ defaultKbdAddEvent(Bool down, KeySym keySym, rfbClientPtr cl)
 void
 defaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 {
+   if(x!=cl->screen->cursorX || y!=cl->screen->cursorY) {
+      Bool cursorWasDrawn=cl->screen->cursorIsDrawn;
+      if(cursorWasDrawn)
+	rfbUndrawCursor(cl);
+      cl->screen->cursorX = x;
+      cl->screen->cursorY = y;
+      if(cursorWasDrawn)
+	rfbDrawCursor(cl);
+   }
 }
 
 void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
