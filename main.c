@@ -34,7 +34,10 @@
 
 MUTEX(logMutex);
 
-char rfbEndianTest = (_BYTE_ORDER == _LITTLE_ENDIAN);
+/* we cannot compare to _LITTLE_ENDIAN, because some systems
+   (as Solaris) assume little endian if _LITTLE_ENDIAN is
+   defined, even if _BYTE_ORDER is not _LITTLE_ENDIAN */
+char rfbEndianTest = (_BYTE_ORDER == 1234);
 
 /*
  * rfbLog prints a time-stamped message to the log file (stderr).
