@@ -598,6 +598,20 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
   httpInitSockets(rfbScreen);
 }
 
+#ifdef WIN32
+#include <fcntl.h>
+#include <conio.h>
+#include <sys/timeb.h>
+
+void gettimeofday(struct timeval* tv,char*)
+{
+   SYSTEMTIME t;
+   GetSystemTime(&t);
+   tv->tv_sec=t.wHour*3600+t.wMinute*60+t.wSecond;
+   tv->tv_usec=t.wMilliseconds*1000;
+}
+#endif
+
 void
 rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 {
