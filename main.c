@@ -752,8 +752,6 @@ void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
 #endif
 }
 
-static void ignoreSignal(int dummy) {}
-
 void rfbInitServer(rfbScreenInfoPtr rfbScreen)
 {
 #ifdef WIN32
@@ -763,7 +761,7 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
   rfbInitSockets(rfbScreen);
   httpInitSockets(rfbScreen);
   if(rfbScreen->ignoreSIGPIPE)
-    signal(SIGPIPE,ignoreSignal);
+    signal(SIGPIPE,SIG_IGN);
 }
 
 #ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
