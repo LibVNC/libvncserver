@@ -1,4 +1,5 @@
 2004-06-07  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* libvncserver/cursor.c, rfb/rfb.h: fix cursor trails
 	* */Makefile.am: stop automake nagging
 	* libvncclient/*, client_examples/*: streamline API, SDLvncviewer added
 	* examples/, libvncclient/, test/: moved tests to test/

@@ -248,7 +248,7 @@ typedef struct _rfbScreenInfo
     struct _rfbClientRec* rfbClientHead;
 
     /* cursor */
-    int cursorX, cursorY,underCursorBufferLen;
+    int cursorX, cursorY,oldCursorX,oldCursorY,underCursorBufferLen;
     char* underCursorBuffer;
     rfbBool dontConvertRichCursorToXCursor;
     struct rfbCursor* cursor;

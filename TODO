@@ -1,7 +1,6 @@
 immediate:
 ----------
 
-cursor drawing does not get undone prior to sending
 TightVNC encoding!!! Regression!!!
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
@@ -19,6 +18,7 @@ CORBA
 done:
 -----
 
+.cursor drawing does not get undone prior to sending
 .following two items overridden by RealVNC's idea: if there are too many
 	rectangles (like >50), just use the bounding box.
   cursor drawing: set optional grain to mark bigger rectangles as drawn (else

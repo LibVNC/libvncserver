@@ -390,7 +390,7 @@ void rfbUndrawCursor(rfbScreenInfoPtr s)
    int j,x1,x2,y1,y2,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
    LOCK(s->cursorMutex);
-   if(!s->cursorIsDrawn) {
+   if(!s->cursorIsDrawn || !c) {
      UNLOCK(s->cursorMutex);
      return;
    }
@@ -421,6 +421,8 @@ void rfbUndrawCursor(rfbScreenInfoPtr s)
    
    /* rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2); */
    s->cursorIsDrawn = FALSE;
+   s->oldCursorX=s->cursorX;
+   s->oldCursorY=s->cursorY;
    UNLOCK(s->cursorMutex);
 }
 
@@ -431,13 +433,20 @@ void rfbDrawCursor(rfbScreenInfoPtr s)
      rowstride=s->paddedWidthInBytes,
      bufSize,w;
    rfbBool wasChanged=FALSE;
-   
+
    if(!c) return;
    LOCK(s->cursorMutex);
    if(s->cursorIsDrawn) {
      /* is already drawn */
      UNLOCK(s->cursorMutex);
      return;
+   }
+
+   if(s->cursor && s->underCursorBuffer &&
+		   (s->cursorX!=s->oldCursorX || s->cursorY!=s->oldCursorY)) {
+	   int x1=s->oldCursorX-s->cursor->xhot,x2=x1+s->cursor->width;
+	   int y1=s->oldCursorY-s->cursor->yhot,y2=y1+s->cursor->height;
+	   rfbMarkRectAsModified(s,x1,y1,x2,y2);
    }
    bufSize=c->width*c->height*bpp;
    w=(c->width+7)/8;
@@ -517,6 +526,9 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,rfbBool freeOld)
     rfbUndrawCursor(rfbScreen);
     LOCK(rfbScreen->cursorMutex);
   }
+
+  free(rfbScreen->underCursorBuffer);
+  rfbScreen->underCursorBuffer=0;
 
   if(rfbScreen->cursor && (freeOld || rfbScreen->cursor->cleanup))
     rfbFreeCursor(rfbScreen->cursor);
