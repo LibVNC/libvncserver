@@ -64,7 +64,7 @@ HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	if (!ReadFromRFBServer(client, (char *)&bg, sizeof(bg)))
 	  return FALSE;
 
-      FillRectangle(client, x, y, w, h, fg);
+      FillRectangle(client, x, y, w, h, bg);
 
       if (subencoding & rfbHextileForegroundSpecified)
 	if (!ReadFromRFBServer(client, (char *)&fg, sizeof(fg)))
