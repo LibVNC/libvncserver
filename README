@@ -48,8 +48,10 @@ To make a server, you just have to initialise a server structure using the
 function rfbDefaultScreenInit, like
   rfbScreenInfoPtr rfbScreen =
     rfbGetScreen(argc,argv,width,height,8,3,bpp);
-where byte per pixel is 1, 2 or 4. This is so because of speed considerations
-(you can use native data types of that width).
+where byte per pixel should be 1, 2 or 4. If performance doesn't matter,
+you may try bpp=3 (internally one cannot use native data types in this
+case; if you want to use this, look at pnmshow24).
+
 
 You then can set hooks and io functions (see below) or other
 options (see below).

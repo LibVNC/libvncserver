@@ -19,15 +19,18 @@ cursor "smears" sometimes when not using cursor encoding
 	(seems to be gone now; haven't debugged properly, though)
 udp
 autoconf? at least Sun Solaris compilation
-rfbCloseClient, rfbConnect, ConnectToTcpAddr
+rfbConnect, ConnectToTcpAddr
 CORBA
-translate.c: warning about non 8-bit colourmaps
-set colourmap
 documentation
 
 done:
 -----
 
+.translate.c: warning about non 8-bit colourmaps
+	16-bit colourmaps are 192k -> no use without fast net.
+.rfbCloseClient
+.set colourmap
+.support 3 bytes per pixel
 .cursors
 .cutpaste
 .httpd

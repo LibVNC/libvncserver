@@ -26,7 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "rfb.h"
-#include "region.h"
+#include "sraRegion.h"
 #include <unistd.h>
 #include <pwd.h>
 #include <sys/types.h>
@@ -699,7 +699,6 @@ rfbProcessClientNormalMessage(cl)
 #endif
 	sraRgnOr(cl->requestedRegion,tmpRegion);
 
-#ifdef NOT_YET
 	if (!cl->readyForSetColourMapEntries) {
 	    /* client hasn't sent a SetPixelFormat so is using server's */
 	    cl->readyForSetColourMapEntries = TRUE;
@@ -710,7 +709,6 @@ rfbProcessClientNormalMessage(cl)
 		}
 	    }
 	}
-#endif
 
        if (!msg.fur.incremental) {
 	    sraRgnOr(cl->modifiedRegion,tmpRegion);
@@ -1221,7 +1219,6 @@ rfbSendUpdateBuf(cl)
     return TRUE;
 }
 
-#ifdef NOT_YET
 /*
  * rfbSendSetColourMapEntries sends a SetColourMapEntries message to the
  * client, using values from the currently installed colormap.
@@ -1236,7 +1233,8 @@ rfbSendSetColourMapEntries(cl, firstColour, nColours)
     char buf[sz_rfbSetColourMapEntriesMsg + 256 * 3 * 2];
     rfbSetColourMapEntriesMsg *scme = (rfbSetColourMapEntriesMsg *)buf;
     CARD16 *rgb = (CARD16 *)(&buf[sz_rfbSetColourMapEntriesMsg]);
-    EntryPtr pent;
+    rfbColourMap* cm = &cl->screen->colourMap;
+    
     int i, len;
 
     scme->type = rfbSetColourMapEntries;
@@ -1246,30 +1244,29 @@ rfbSendSetColourMapEntries(cl, firstColour, nColours)
 
     len = sz_rfbSetColourMapEntriesMsg;
 
-    pent = (EntryPtr)&rfbInstalledColormap->red[firstColour];
     for (i = 0; i < nColours; i++) {
-	if (pent->fShared) {
-	    rgb[i*3] = Swap16IfLE(pent->co.shco.red->color);
-	    rgb[i*3+1] = Swap16IfLE(pent->co.shco.green->color);
-	    rgb[i*3+2] = Swap16IfLE(pent->co.shco.blue->color);
+      if(i<cm->count) {
+	if(cm->is16) {
+	  rgb[i*3] = Swap16IfLE(cm->data.shorts[i*3]);
+	  rgb[i*3+1] = Swap16IfLE(cm->data.shorts[i*3+1]);
+	  rgb[i*3+2] = Swap16IfLE(cm->data.shorts[i*3+2]);
 	} else {
-	    rgb[i*3] = Swap16IfLE(pent->co.local.red);
-	    rgb[i*3+1] = Swap16IfLE(pent->co.local.green);
-	    rgb[i*3+2] = Swap16IfLE(pent->co.local.blue);
+	  rgb[i*3] = Swap16IfLE(cm->data.bytes[i*3]);
+	  rgb[i*3+1] = Swap16IfLE(cm->data.bytes[i*3+1]);
+	  rgb[i*3+2] = Swap16IfLE(cm->data.bytes[i*3+2]);
 	}
-	pent++;
+      }
     }
 
     len += nColours * 3 * 2;
 
-    if (WriteExact(cl->sock, buf, len) < 0) {
+    if (WriteExact(cl, buf, len) < 0) {
 	rfbLogPerror("rfbSendSetColourMapEntries: write");
 	rfbCloseClient(cl);
 	return FALSE;
     }
     return TRUE;
 }
-#endif
 
 /*
  * rfbSendBell sends a Bell message to all the clients.

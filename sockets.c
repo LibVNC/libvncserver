@@ -276,14 +276,17 @@ void
 rfbCloseClient(cl)
      rfbClientPtr cl;
 {
+#ifdef HAVE_PTHREADS
     pthread_mutex_lock(&cl->updateMutex);
+#endif
     FD_CLR(cl->sock,&(cl->screen->allFds));
     close(cl->sock);
     cl->sock = -1;
+#ifdef HAVE_PTHREADS
     pthread_cond_signal(&cl->updateCond);
     //pthread_mutex_lock(&cl->updateMutex);
-    //rfbClientConnectionGone(cl);
     pthread_mutex_unlock(&cl->updateMutex);
+#endif
 }
 
 

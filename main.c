@@ -31,7 +31,7 @@
 #include <time.h>
 
 #include "rfb.h"
-#include "region.h"
+#include "sraRegion.h"
 
 #ifdef HAVE_PTHREADS
 pthread_mutex_t logMutex;
@@ -75,10 +75,14 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
 
    iterator=rfbGetClientIterator(rfbScreen);
    while((cl=rfbClientIteratorNext(iterator))) {
+#ifdef HAVE_PTHREADS
      pthread_mutex_lock(&cl->updateMutex);
+#endif
      sraRgnOr(cl->modifiedRegion,modRegion);
+#ifdef HAVE_PTHREADS
      pthread_cond_signal(&cl->updateCond);
      pthread_mutex_unlock(&cl->updateMutex);
+#endif
    }
 
    rfbReleaseClientIterator(iterator);
@@ -353,7 +357,9 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    format->depth = rfbScreen->depth;
    format->bigEndian = rfbEndianTest?FALSE:TRUE;
    format->trueColour = TRUE;
-   rfbScreen->colourMap = NULL;
+   rfbScreen->colourMap.count = 0;
+   rfbScreen->colourMap.is16 = 0;
+   rfbScreen->colourMap.data.bytes = NULL;
 
    if(bytesPerPixel == 8) {
      format->redMax = 7;

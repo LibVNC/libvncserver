@@ -43,39 +43,39 @@
                                 CONCAT2E(rfbInitColourMapSingleTable,OUT)
 
 static void
-rfbInitColourMapSingleTableOUT (char **table, rfbPixelFormat *in,
-                                rfbPixelFormat *out)
+rfbInitColourMapSingleTableOUT(char **table, rfbPixelFormat *in,
+                            rfbPixelFormat *out,rfbColourMap* colourMap)
 {
-    int i, r, g, b;
+    CARD32 i, r, g, b;
     OUT_T *t;
-    EntryPtr pent;
     int nEntries = 1 << in->bitsPerPixel;
+    int shift = colourMap->is16?16:8;
 
     if (*table) free(*table);
     *table = (char *)malloc(nEntries * sizeof(OUT_T));
     t = (OUT_T *)*table;
 
-    pent = (EntryPtr)&rfbInstalledColormap->red[0];
-
     for (i = 0; i < nEntries; i++) {
-        if (pent->fShared) {
-            r = pent->co.shco.red->color;
-            g = pent->co.shco.green->color;
-            b = pent->co.shco.blue->color;
-        } else {
-            r = pent->co.local.red;
-            g = pent->co.local.green;
-            b = pent->co.local.blue;
-        }
-        t[i] = ((((r * out->redMax + 32767) / 65535) << out->redShift) |
-                (((g * out->greenMax + 32767) / 65535) << out->greenShift) |
-                (((b * out->blueMax + 32767) / 65535) << out->blueShift));
+        r = g = b = 0;
+	if(i < colourMap->count) {
+	  if(colourMap->is16) {
+	    r = colourMap->data.shorts[3*i+0];
+	    g = colourMap->data.shorts[3*i+1];
+	    b = colourMap->data.shorts[3*i+2];
+	  } else {
+	    r = colourMap->data.bytes[3*i+0];
+	    g = colourMap->data.bytes[3*i+1];
+	    b = colourMap->data.bytes[3*i+2];
+	  }
+	}
+        t[i] = ((((r * (1 + out->redMax)) >> shift) << out->redShift) |
+                (((g * (1 + out->greenMax)) >> shift) << out->greenShift) |
+                (((b * (1 + out->blueMax)) >> shift) << out->blueShift));
 #if (OUT != 8)
         if (out->bigEndian != in->bigEndian) {
             t[i] = SwapOUT(t[i]);
         }
 #endif
-        pent++;
     }
 }
 

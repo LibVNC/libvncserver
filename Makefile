@@ -2,11 +2,15 @@ INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 # Uncomment these two lines to enable use of PThreads
-PTHREADDEF = -DHAVE_PTHREADS
-PTHREADLIB = -lpthread
+#PTHREADDEF = -DHAVE_PTHREADS
+#PTHREADLIB = -lpthread
+
+# Comment the following line to disable the use of 3 Bytes/Pixel.
+# The code for 3 Bytes/Pixel is not very efficient!
+FLAG24 = -DALLOW24BPP
 
 #CC=cc
-CFLAGS=-g -Wall $(PTHREADDEF) $(INCLUDES)
+CFLAGS=-g -Wall $(PTHREADDEF) $(FLAG24) $(INCLUDES)
 #CFLAGS=-O2 -Wall
 RANLIB=ranlib
 
@@ -33,6 +37,8 @@ install_OSX: OSXvnc-server
 
 .c.o:
 	$(CC) $(CFLAGS) -c $<
+
+$(OBJS): Makefile rfb.h
 
 libvncserver.a: $(OBJS)
 	$(AR) cru $@ $(OBJS)
@@ -61,6 +67,11 @@ blooptest: blooptest.o libvncserver.a
 
 blooptest.o: example.c
 	$(CC) $(CFLAGS) -DBACKGROUND_LOOP_TEST -c -o blooptest.o example.c
+
+pnmshow24: pnmshow24.o libvncserver.a
+	$(CC) -o pnmshow24 pnmshow24.o $(LIBS)
+
+pnmshow24.o: Makefile
 
 clean:
 	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \

@@ -98,6 +98,15 @@ typedef struct rfbCursor* (*GetCursorProcPtr) (struct rfbClientRec* pScreen);
 typedef Bool (*SetTranslateFunctionProcPtr)(struct rfbClientRec* cl);
 typedef void (*NewClientHookPtr)(struct rfbClientRec* cl);
 
+typedef struct {
+  int count;
+  Bool is16; /* is the data format short? */
+  union {
+    CARD8* bytes;
+    CARD16* shorts;
+  } data; /* there have to be count*3 entries */
+} rfbColourMap;
+
 /*
  * Per-screen (framebuffer) structure.  There is only one of these, since we
  * don't allow the X server to have multiple screens.
@@ -184,7 +193,7 @@ typedef struct
     ScreenRec screen;
   */
     rfbPixelFormat rfbServerFormat;
-    CARD16* colourMap; /* set this if rfbServerFormat.trueColour==FALSE */
+    rfbColourMap colourMap; /* set this if rfbServerFormat.trueColour==FALSE */
     char* desktopName;
     char rfbThisHost[255];
     int rfbPort;
@@ -453,6 +462,9 @@ typedef struct rfbClientRec {
 
 #define Swap16(s) ((((s) & 0xff) << 8) | (((s) >> 8) & 0xff))
 
+#define Swap24(l) ((((l) & 0xff) << 16) | (((l) >> 16) & 0xff) | \
+                   (((l) & 0x00ff00)))
+
 #define Swap32(l) (((l) >> 24) | \
                    (((l) & 0x00ff0000) >> 8)  | \
                    (((l) & 0x0000ff00) << 8)  | \
@@ -462,7 +474,7 @@ typedef struct rfbClientRec {
 static const int rfbEndianTest = (_BYTE_ORDER == _LITTLE_ENDIAN);
 
 #define Swap16IfLE(s) (rfbEndianTest ? Swap16(s) : (s))
-
+#define Swap24IfLE(l) (rfbEndianTest ? Swap24(l) : (l))
 #define Swap32IfLE(l) (rfbEndianTest ? Swap32(l) : (l))
 
 /* main.c */
@@ -511,6 +523,7 @@ extern Bool rfbSendUpdateBuf(rfbClientPtr cl);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
 extern Bool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
 extern Bool rfbSendLastRectMarker(rfbClientPtr cl);
+extern Bool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
 
 void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
 
@@ -524,7 +537,8 @@ extern void rfbTranslateNone(char *table, rfbPixelFormat *in,
                              int bytesBetweenInputLines,
                              int width, int height);
 extern Bool rfbSetTranslateFunction(rfbClientPtr cl);
-
+extern Bool rfbSetClientColourMap(rfbClientPtr cl, int firstColour, int nColours);
+extern void rfbSetClientColourMaps(rfbScreenInfoPtr rfbScreen, int firstColour, int nColours);
 
 /* httpd.c */
 
@@ -595,8 +609,8 @@ typedef struct rfbCursor {
     unsigned char *source;			/* points to bits */
     unsigned char *mask;			/* points to bits */
     unsigned short width, height, xhot, yhot;	/* metrics */
-    unsigned short foreRed, foreGreen, foreBlue; /* device-independent color */
-    unsigned short backRed, backGreen, backBlue; /* device-independent color */
+    unsigned short foreRed, foreGreen, foreBlue; /* device-independent colour */
+    unsigned short backRed, backGreen, backBlue; /* device-independent colour */
     unsigned char *richSource; /* source bytes for a rich cursor */
 #ifdef HAVE_PTHREADS
     pthread_mutex_t mutex;
