@@ -452,7 +452,11 @@ void rfbPrintXCursor(rfbCursorPtr cursor)
 extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
 {
   LOCK(rfbScreen->cursorMutex);
-  rfbUndrawCursor(rfbScreen);
+  while(rfbScreen->cursorIsDrawn) {
+    UNLOCK(rfbScreen->cursorMutex);
+    rfbUndrawCursor(rfbScreen);
+    LOCK(rfbScreen->cursorMutex);
+  }
 
   if(freeOld && rfbScreen->cursor)
     rfbFreeCursor(rfbScreen->cursor);

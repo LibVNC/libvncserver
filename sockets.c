@@ -111,16 +111,18 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	return;
     }
 
-    rfbLog("Listening for VNC connections on TCP port %d\n", rfbScreen->rfbPort);
+    if(rfbScreen->rfbPort>0) {
+      rfbLog("Listening for VNC connections on TCP port %d\n", rfbScreen->rfbPort);
 
-    if ((rfbScreen->rfbListenSock = ListenOnTCPPort(rfbScreen->rfbPort)) < 0) {
+      if ((rfbScreen->rfbListenSock = ListenOnTCPPort(rfbScreen->rfbPort)) < 0) {
 	rfbLogPerror("ListenOnTCPPort");
 	exit(1);
-    }
+      }
 
-    FD_ZERO(&(rfbScreen->allFds));
-    FD_SET(rfbScreen->rfbListenSock, &(rfbScreen->allFds));
-    rfbScreen->maxFd = rfbScreen->rfbListenSock;
+      FD_ZERO(&(rfbScreen->allFds));
+      FD_SET(rfbScreen->rfbListenSock, &(rfbScreen->allFds));
+      rfbScreen->maxFd = rfbScreen->rfbListenSock;
+    }
 
     if (rfbScreen->udpPort != 0) {
 	rfbLog("rfbInitSockets: listening for input on UDP port %d\n",rfbScreen->udpPort);
@@ -159,7 +161,6 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     if (!rfbScreen->inetdInitDone && rfbScreen->inetdSock != -1) {
 	rfbNewClientConnection(rfbScreen,rfbScreen->inetdSock); 
 	rfbScreen->inetdInitDone = TRUE;
-        FD_SET(rfbScreen->inetdSock,&(rfbScreen->allFds));
     }
 
     memcpy((char *)&fds, (char *)&(rfbScreen->allFds), sizeof(fd_set));

@@ -172,7 +172,7 @@ typedef struct {
 #undef MUTEX
 #define MUTEX(mutex) char dummy##mutex
 #undef COND
-#define COND(cont) char dummy##cond
+#define COND(cond) char dummy##cond
 #endif
 
 /*
@@ -280,11 +280,6 @@ typedef struct
     char* underCursorBuffer;
     Bool dontConvertRichCursorToXCursor;
     struct rfbCursor* cursor;
-    MUTEX(cursorMutex);
-
-#ifdef HAVE_PTHREADS
-    Bool backgroundLoop;
-#endif
 
     /* the following members have to be supplied by the serving process */
     char* frameBuffer;
@@ -299,6 +294,11 @@ typedef struct
     NewClientHookPtr newClientHook;
     /* displayHook is called just before a frame buffer update */
     DisplayHookPtr displayHook;
+
+    MUTEX(cursorMutex);
+#ifdef HAVE_PTHREADS
+    Bool backgroundLoop;
+#endif
 
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
@@ -398,20 +398,6 @@ typedef struct rfbClientRec {
     int copyDX, copyDY;		/* the translation by which the copy happens */
 
 
-#ifdef HAVE_PTHREADS
-    /* whenever a client is referenced, the refCount has to be incremented
-       and afterwards decremented.
-       Use the functions rfbIncrClientRef(cl) and rfbDecrClientRef(cl);
-    */
-    int refCount;
-    MUTEX(refCountMutex);
-    COND(deleteCond);
-
-    MUTEX(outputMutex);
-    MUTEX(updateMutex);
-    COND(updateCond);
-#endif
-
     sraRegionPtr modifiedRegion;
 
     /* As part of the FramebufferUpdateRequest, a client can express interest
@@ -487,6 +473,20 @@ typedef struct rfbClientRec {
 
     struct rfbClientRec *prev;
     struct rfbClientRec *next;
+
+#ifdef HAVE_PTHREADS
+    /* whenever a client is referenced, the refCount has to be incremented
+       and afterwards decremented.
+       Use the functions rfbIncrClientRef(cl) and rfbDecrClientRef(cl);
+    */
+    int refCount;
+    MUTEX(refCountMutex);
+    COND(deleteCond);
+
+    MUTEX(outputMutex);
+    MUTEX(updateMutex);
+    COND(updateCond);
+#endif
 
 } rfbClientRec, *rfbClientPtr;
 
@@ -742,6 +742,11 @@ void doNothingWithClient(rfbClientPtr cl);
 extern rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel);
+#ifdef HAVE_PTHREADS
+#define rfbInitServer rfbInitServerWithPthreads
+#else
+#define rfbInitServer rfbInitServerWithoutPthreads
+#endif
 extern void rfbInitServer(rfbScreenInfoPtr rfbScreen);
 extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
 

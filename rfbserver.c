@@ -137,6 +137,7 @@ rfbNewClientConnection(rfbScreen,sock)
     if(cl!=NULL)
       newConnection(cl, (KEYBOARD_DEVICE|POINTER_DEVICE),1,1,1);
 #endif
+    FD_SET(sock,&(rfbScreen->allFds));
 }
 
 

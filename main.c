@@ -85,17 +85,15 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
 
        /* while(!sraRgnEmpty(cl->copyRegion)) */ {
 #ifdef HAVE_PTHREADS
-	 if(cl->screen->backgroundLoop) {
-	   SIGNAL(cl->updateCond);
-	   UNLOCK(cl->updateMutex);
-	   LOCK(cl->updateMutex);
-	 } else
+	 if(!cl->screen->backgroundLoop)
 #endif
 	   {
 	     sraRegionPtr updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
 	     sraRgnOr(updateRegion,cl->copyRegion);
+	     UNLOCK(cl->updateMutex);
 	     rfbSendFramebufferUpdate(cl,updateRegion);
 	     sraRgnDestroy(updateRegion);
+	     continue;
 	   }
        }
      } else {
@@ -525,7 +523,11 @@ void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
   free(rfbScreen);
 }
 
+#ifdef HAVE_PTHREADS
+void rfbInitServerWithPthreads(rfbScreenInfoPtr rfbScreen)
+#else
 void rfbInitServer(rfbScreenInfoPtr rfbScreen)
+#endif
 {
 #ifdef WIN32
   WSADATA trash;
