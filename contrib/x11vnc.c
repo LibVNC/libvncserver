@@ -263,6 +263,8 @@ void DebugXTestFakeKeyEvent(Display* dpy, KeyCode keysym, Bool down, time_t cur_
     XTestFakeKeyEvent(dpy,keysym,down,cur_time);
 }
 
+/* #define XTestFakeKeyEvent DebugXTestFakeKeyEvent */
+
 void tweak_mod(signed char mod, Bool down) {
 	Bool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
 	X_Bool dn = (X_Bool) down;
@@ -336,6 +338,9 @@ static void modifier_tweak_keyboard(Bool down, KeySym keysym, rfbClientPtr clien
 /* key event handler */
 static void keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
 	KeyCode k;
+
+	/* fprintf(stderr,"keyboard(%s,%s(0x%x),client)\n",
+	   down?"down":"up",XKeysymToString(keysym),(int)keysym); */
 
 	if (view_only) {
 		return;
