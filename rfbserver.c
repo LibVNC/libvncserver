@@ -258,7 +258,9 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->preferredEncoding = rfbEncodingRaw;
       cl->correMaxWidth = 48;
       cl->correMaxHeight = 48;
+#ifdef HAVE_ZRLE
       cl->zrleData = 0;
+#endif
 
       cl->copyRegion = sraRgnCreate();
       cl->copyDX = 0;

@@ -1,9 +1,13 @@
 INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
+#CXX=
 CXX=g++
 CC=gcc
 LINK=gcc
+
+# for IRIX
+#EXTRALIBS=-L/usr/lib32
 
 # for Solaris
 #EXTRALIBS=-lsocket -lnsl -L/usr/X/lib
