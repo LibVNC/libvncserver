@@ -131,7 +131,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-05-13";
+char lastmod[] = "lastmod:    2004-05-14";
 
 
 /* X and rfb framebuffer */
@@ -2928,8 +2928,10 @@ void set_colormap(void) {
 	}
 
 	if (first && ncells != NCOLOR) {
-		fprintf(stderr, "set_colormap: number of cells is %d"
-		    " instead of %d.\n", ncells, NCOLOR);
+		if (! quiet) {
+			fprintf(stderr, "set_colormap: number of cells is %d "
+			    "instead of %d.\n", ncells, NCOLOR);
+		}
 		screen->colourMap.count = ncells;
 	}
 
@@ -2955,7 +2957,7 @@ void set_colormap(void) {
 			}
 		}
 	}
-	if (ncells > NCOLOR) {
+	if (ncells > NCOLOR && ! quiet) {
 		fprintf(stderr, "set_colormap: big problem: ncells=%d > %d\n",
 		    ncells, NCOLOR);
 	}
@@ -3014,7 +3016,9 @@ void set_visual(char *vstring) {
 	XVisualInfo vinfo;
 	char *p;
 
-	fprintf(stderr, "set_visual: %s\n", vstring);
+	if (! quiet) {
+		fprintf(stderr, "set_visual: %s\n", vstring);
+	}
 
 	if ((p = strchr(vstring, ':')) != NULL) {
 		visual_depth = atoi(p+1);
@@ -3090,7 +3094,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen = rfbGetScreen(argc, argv, fb->width, fb->height,
 	    fb->bits_per_pixel, 8, fb->bits_per_pixel/8);
 
-	fprintf(stderr, "\n");
+	if (! quiet) {
+		fprintf(stderr, "\n");
+	}
 
 	if (! screen) {
 		int i;
@@ -3412,20 +3418,18 @@ void blackout_tiles() {
 }
 
 void initialize_xinerama () {
-#ifdef LIBVNCSERVER_HAVE_LIBXINERAMA
+#ifndef LIBVNCSERVER_HAVE_LIBXINERAMA
+	rfbLog("Xinerama: Library libXinerama is not available to determine\n");
+	rfbLog("Xinerama: the head geometries, consider using -blackout\n");
+	rfbLog("Xinerama: if the screen is non-rectangular.\n");
+#else
 	XineramaScreenInfo *sc, *xineramas;
-#endif
 	sraRegionPtr black_region, tmp_region;
 	sraRectangleIterator *iter;
 	sraRect rect;
 	char *bstr, *tstr;
 	int ev, er, i, n, rcnt;
 
-#ifndef LIBVNCSERVER_HAVE_LIBXINERAMA
-	rfbLog("Xinerama: Library libXinerama is not available to determine\n");
-	rfbLog("Xinerama: the head geometries, consider using -blackout\n");
-	rfbLog("Xinerama: if the screen is non-rectangular.\n");
-#else
 	if (! XineramaQueryExtension(dpy, &ev, &er)) {
 		rfbLog("Xinerama: disabling: display does not support it.\n");
 		xinerama = 0;
@@ -3508,7 +3512,6 @@ void initialize_xinerama () {
 	free(bstr);
 	free(tstr);
 #endif
-
 }
 
 /*
@@ -5448,6 +5451,8 @@ void print_help() {
 "                       or popup is running (other clients may see no updates\n"
 "                       during this period).\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
+"                       Note: if you are not redirecting stderr to a log file\n"
+"                       you must also specify -q as the first argument.\n"
 "\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
 "                       remote displays can be polled this way: be careful\n"
@@ -5461,7 +5466,8 @@ void print_help() {
 "                       together via XINERAMA, and that screen is non-rectangular\n"
 "                       this option will try to guess the areas to black out.\n"
 "\n"
-"-q                     Be quiet by printing less informational output.\n" 
+"-q                     Be quiet by printing less informational output to stderr.\n" 
+"                       Same as -quiet\n" 
 "-bg                    Go into the background after screen setup.\n" 
 "                       Something like this could be useful in a script:\n"
 "                         port=`ssh $host \"x11vnc -display :0 -bg\" | grep PORT`\n"
@@ -5641,7 +5647,7 @@ int limit_shm(void) {
 			}
 		}
 	}
-	if (limit) {
+	if (limit && ! quiet) {
 		fprintf(stderr, "reducing shm usage on %s %s (adding "
 		    "-onetile)\n", ut.sysname, ut.release);
 	}
@@ -5837,7 +5843,7 @@ int main(int argc, char** argv) {
 				got_nevershared = 1;
 			}
 			/* otherwise copy it for use below. */
-			if (! quiet && i != pw_loc && i != pw_loc+1) {
+			if (!quiet && !inetd && i != pw_loc && i != pw_loc+1) {
 			    fprintf(stderr, "passing arg to libvncserver: %s\n",
 				arg);
 			}
@@ -5867,7 +5873,10 @@ int main(int argc, char** argv) {
 	/* fixup settings that do not make sense */
 		
 	if (use_threads && nofb && cursor_pos) {
-		fprintf(stderr, "disabling -threads under -nofb -cursorpos\n");
+		if (! quiet) {
+			fprintf(stderr, "disabling -threads under -nofb "
+			    "-cursorpos\n");
+		}
 		use_threads = 0;
 	}
 	if (tile_fuzz < 1) {
@@ -6016,8 +6025,10 @@ int main(int argc, char** argv) {
 	/* check for MIT-SHM */
 	if (! nofb && ! XShmQueryExtension(dpy)) {
 		if (! using_shm) {
-			fprintf(stderr, "warning: display does not support "
-			    "XShm.\n");
+			if (! quiet) {
+				fprintf(stderr, "warning: display does not "
+				    "support XShm.\n");
+			}
 		} else {
 			fprintf(stderr, "Display does not support XShm "
 			    "extension (must be local).\n");
@@ -6032,7 +6043,9 @@ int main(int argc, char** argv) {
 	/* check for XKEYBOARD */
 	if (watch_bell) {
 		if (! XkbQueryExtension(dpy, &op, &ev, &er, &maj, &min)) {
-			fprintf(stderr, "warning: disabling bell.\n");
+			if (! quiet) {
+				fprintf(stderr, "warning: disabling bell.\n");
+			}
 			watch_bell = 0;
 		} else {
 			initialize_watch_bell();
@@ -6074,8 +6087,10 @@ int main(int argc, char** argv) {
 		/* show_mouse has some segv crashes as well */
 		if (show_root_cursor) {
 			show_root_cursor = 0;
-			fprintf(stderr, "disabling root cursor drawing for "
-			    "subwindow\n");
+			if (! quiet) {
+				fprintf(stderr, "disabling root cursor drawing"
+				    " for subwindow\n");
+			}
 		}
 
 		set_offset();
@@ -6201,7 +6216,9 @@ int main(int argc, char** argv) {
 		int port = screen->rfbPort;
 		if (host != NULL) {
 			/* note that vncviewer special cases 5900-5999 */
-			if (quiet) {
+			if (inetd) {
+				;	/* should not occur */
+			} else if (quiet) {
 				if (port >= 5900) {
 					fprintf(stderr, "The VNC desktop is "
 					    "%s:%d\n", host, port - 5900);
