@@ -256,7 +256,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7pre lastmod: 2004-12-20";
+char lastmod[] = "0.7pre lastmod: 2004-12-23";
 
 /* X display info */
 
@@ -732,13 +732,21 @@ int pick_windowid(unsigned long *num) {
 
 		if (screen && screen->clientHead) {
 			/* they may be doing the pointer-pick thru vnc: */
+			int nfds;
 			tv.tv_sec = 0;
 			tv.tv_usec = msec * 1000;
 			FD_ZERO(&set);
 			FD_SET(fileno(p), &set);
-			if (select(fileno(p)+1, &set, NULL, NULL, &tv) == 0) {
-				/* note that rfbPE takes about 30ms too */
+
+			nfds = select(fileno(p)+1, &set, NULL, NULL, &tv);
+			
+			if (nfds == 0 || nfds < 0) {
+				/* 
+				 * select timedout or error.
+				 * note this rfbPE takes about 30ms too:
+				 */
 				rfbPE(screen, -1);
+				XFlush(dpy);
 				continue;
 			}
 		}
@@ -12585,7 +12593,7 @@ static void check_user_input3(double dt, int tile_diffs) {
 		int spun_out, missed_out, allowed_misses, g, g_in;
 		double spin, spin_max, tm, to, dtm, rpe_last;
 		static int rfb_wait_ms = 2;
-		static double grind_spin_time = 0.30, dt_min = 0.075;
+		static double grind_spin_time = 0.30, dt_cut = 0.075;
 		static double quick_spin_fac = 0.65, spin_max_fac = 2.0;
 		static double rpe_wait = 0.15;
 		int grinding, gcnt, ms, split = 200;
@@ -12593,10 +12601,11 @@ static void check_user_input3(double dt, int tile_diffs) {
 		if (first) {
 			char *p = getenv("SPIN");
 			if (p) {
-				sscanf(p, "%lf,%lf,%lf", &grind_spin_time, &dt_min, &quick_spin_fac);
+				sscanf(p, "%lf,%lf,%lf", &grind_spin_time, &dt_cut, &quick_spin_fac);
 			}
 			first = 0;
 		}
+
 
 
 		/*
@@ -12615,8 +12624,8 @@ static void check_user_input3(double dt, int tile_diffs) {
 		 * should continue, if we do so we say we are "grinding"
 		 */
 
-		if (dt < dt_min) {
-			dt = dt_min;	/* this is to try to avoid early exit */
+		if (dt < dt_cut) {
+			dt = dt_cut;	/* this is to try to avoid early exit */
 		}
 		/* max spin time in 1st pass, comparable to last dt */
 		spin_max = quick_spin_fac * dt;
@@ -12723,8 +12732,167 @@ static void check_user_input3(double dt, int tile_diffs) {
 	drag_in_progress = 0;
 }
 
+/* quick-n-dirty copy of check_user_input3, merge later... */
+
 static void check_user_input4(double dt, int tile_diffs) {
-	return;
+
+	int spun_out, missed_out, allowed_misses, g, g_in;
+	double spin, spin_max, tm, to, dtm, rpe_last;
+	static int rfb_wait_ms = 2;
+	static double grind_spin_time = 0.30, dt_cut = 0.075;
+	static double quick_spin_fac = 0.65, spin_max_fac = 2.0;
+	static double rpe_wait = 0.15;
+	int grinding, gcnt, ms, split = 200;
+	static int first = 1;
+
+	int Btile = tile_x * tile_y * bpp/8; 
+	double Ttile;
+	double screen_rate = 5000000.;    /* 5 MB/sec */
+	double client_rate = 80 * 100000.; /* 20 KB/sec @ 80X compression */
+	static double Tfac = 1.0;
+	static double dt_min = -1.0, dt_max = -1.0;
+
+	if (first) {
+		char *p = getenv("SPIN");
+		if (p) {
+			sscanf(p, "%lf,%lf,%lf,%lf", &grind_spin_time,
+			    &dt_cut, &quick_spin_fac, &Tfac);
+		}
+		first = 0;
+	}
+
+	if (dt_min < 0 || dt < dt_min) {
+		dt_min = dt;
+	}
+	if (dt_max < 0 || dt > dt_max) {
+		dt_max = dt;
+	}
+
+	/*
+	 * when we first enter we require some pointer input
+	 */
+	if (!got_pointer_input) {
+		drag_in_progress = 0;
+		return;
+	}
+
+	Ttile = Btile * (1.0/screen_rate + 1.0/client_rate);
+	Ttile = Tfac * Ttile;
+
+	if (dt < dt_cut) {
+		dt = dt_cut;	/* this is to try to avoid early exit */
+	}
+
+	/* max spin time in 1st pass, comparable to last dt */
+	spin_max = quick_spin_fac * dt;
+
+	grinding = 0;		/* 1st pass is "not grinding" */
+	spin = 0.0;		/* amount of time spinning */
+	spun_out = 0;		/* whether we spun out of time */
+	missed_out = 0;		/* whether we received no ptr input */
+	allowed_misses = 3;	/* number of ptr inputs we can miss */
+	gcnt = 0;
+
+	tm = 0.0;		/* timer variable */
+	dtime(&tm);
+	rpe_last = to = tm;	/* last time we did rfbPE() */
+	g = g_in = got_pointer_input;
+
+
+	while (1) {
+		int got_input = 0;
+
+		gcnt++;
+		if (grinding) {
+			if (gcnt >= split) {
+				break;
+			}
+			usleep(ms * 1000);
+		}
+
+		if (button_mask) {
+			drag_in_progress = 1;
+		}
+
+		if (show_multiple_cursors && tm > rpe_last + rpe_wait) {
+			rfbPE(screen, rfb_wait_ms * 1000);
+			rpe_last = tm;
+		} else {
+			rfbCFD(screen, rfb_wait_ms * 1000);
+		}
+
+		dtm = dtime(&tm);
+		spin += dtm;
+
+		if (spin > spin_max) {
+			/* get out if spin time over limit */
+			spun_out = 1;
+
+		} else if (tile_diffs > 200 && spin > Ttile * tile_diffs) {
+			/* XXX not finished. */
+			/* we think we can push the frame */
+			break;
+
+		} else if (got_pointer_input > g) {
+			/* received some input, flush to display. */
+			got_input = 1;
+			g = got_pointer_input;
+			XFlush(dpy);
+
+		} else if (--allowed_misses <= 0) {
+			/* too many misses */
+			missed_out = 1;
+
+		} else {
+			/* these are misses */
+			int wms = 0;
+			if (! grinding && gcnt == 1 && button_mask) {
+				/*
+				 * missed our first input, wait for
+				 * a defer time. (e.g. on slow link)
+				 * hopefully client will batch them.
+				 */
+				wms = 1000 * (0.5 * (spin_max - spin));
+
+			} else if (button_mask) {
+				wms = 10;
+			}
+			if (wms) {
+				usleep(wms * 1000);
+			}
+		}
+		if (spun_out && ! grinding) {
+			/* set parameters for grinding mode. */
+
+			grinding = 1;
+
+			if (spin > grind_spin_time || button_mask) {
+				spin_max = spin +
+				    grind_spin_time * spin_max_fac;
+			} else {
+				spin_max = spin + dt * spin_max_fac;
+			}
+			ms = (int) (1000 * ((spin_max - spin)/split));
+			if (ms < 1) {
+				ms = 1;
+			}
+
+			/* reset for second pass */
+			spun_out = 0;
+			missed_out = 0;
+			allowed_misses = 3;
+			g = got_pointer_input;
+			gcnt = 0;
+
+		} else if (spun_out && grinding) {
+			/* done in 2nd pass */
+			break;
+		} else if (missed_out) {
+			/* done in either pass */
+			break;
+		}
+	}
+	drag_in_progress = 0;
 }
 
 static int check_user_input(double dt, int tile_diffs, int *cnt) {

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.6.3pre"
+VERSION="0.7pre"
 
 cd "$(dirname "$0")"
 

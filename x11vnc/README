@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Mon Dec 20 11:34:56 EST 2004
+x11vnc README file                         Date: Wed Dec 22 23:18:56 EST 2004
 
 The following information is taken from these URLs:
 
@@ -895,31 +895,15 @@ int srandom(unsigned int seed);
 #undef LIBVNCSERVER_HAVE_LIBPTHREAD
 #define SHUT_RDWR 2
 typedef unsigned int in_addr_t;
-#define XConvertCase(sym, lower, upper) \
-*(lower) = sym; \
-*(upper) = sym; \
-if (sym >> 8 == 0) { \
-    if ((sym >= XK_A) && (sym <= XK_Z)) \
-        *(lower) += (XK_a - XK_A); \
-    else if ((sym >= XK_a) && (sym <= XK_z)) \
-        *(upper) -= (XK_a - XK_A); \
-    else if ((sym >= XK_Agrave) && (sym <= XK_Odiaeresis)) \
-        *(lower) += (XK_agrave - XK_Agrave); \
-    else if ((sym >= XK_agrave) && (sym <= XK_odiaeresis)) \
-        *(upper) -= (XK_agrave - XK_Agrave); \
-    else if ((sym >= XK_Ooblique) && (sym <= XK_Thorn)) \
-        *(lower) += (XK_oslash - XK_Ooblique); \
-    else if ((sym >= XK_oslash) && (sym <= XK_thorn)) \
-        *(upper) -= (XK_oslash - XK_Ooblique); \
-}
-
-   You will also have to change all the snprint() references to sprintf()
-   calls x11vnc.c (sorry I don't know how to do this in a macro since
-   snprint() is varargs).
+#ifndef snprintf
+#define snprintf(a, n, args...) sprintf((a), ## args)
+#endif
 
    Then run make with the Solaris build script environment, everything
    should compile without problems, and the resulting x11vnc binary
-   should work OK (but note the above XConvertCase only covers Latin 1).
+   should work OK (but note the workaround for XConvertCase in x11vnc.c
+   only covers Latin 1). If some non-x11vnc related programs fail (e.g.
+   test programs) and the x11vnc binary is not created try "make -k".
    Similar sorts of kludges can be done on other older OS (Solaris,
    Linux, ...) releases.
 

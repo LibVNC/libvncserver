@@ -73,6 +73,7 @@ Actions
 	=RA update-all
 	=GA clear-all
 	--
+	=RA stop+quit 
 	=GA Quit 
 
 Help
@@ -284,6 +285,10 @@ remote commands are not on a menu, but for those few you can
 run the command directly this way.  Just enter the command into
 the Entry box when prompted.  Use the prefix \"Q:\" to indicate
 a -Q query.  Examples: \"zero:20,20,100,100\", \"Q:ext_xfixes\"  
+"
+
+	set helptext(stop+quit) "
+Send the stop command to the x11vnc server, then terminate the tkx11vnc gui.
 "
 
 	set helptext(Quit) "
@@ -778,10 +783,16 @@ proc menus_state {state} {
 }
 
 proc menus_enable {} {
+	global menus_disabled
+
 	menus_state "normal"
+	set menus_disabled 0
 }
 
 proc menus_disable {} {
+	global menus_disabled
+
+	set menus_disabled 1
 	menus_state "disabled"
 }
 
@@ -1183,6 +1194,8 @@ proc see_if_ok {query item expected} {
 	set query_result_list [split_query $query]
 
 	foreach q $query_result_list {
+		# XXX following will crash if $item is not a good regexp
+		# need to protect it \Q$item\E style...
 #		if {[regexp "^$item:" $q]} {
 #			set found $q
 #		}
@@ -1409,6 +1422,12 @@ proc do_action {item} {
 	} elseif {$item == "all-settings"} {
 		show_all_settings
 		return
+	} elseif {$item == "stop+quit"} {
+		push_new_value "stop" "stop" 1 0
+		set_connected no
+		update
+		after 500
+		destroy .
 	}
 
 	if {[value_is_string $item]} {
@@ -1656,12 +1675,45 @@ proc disconnect_dialog {client} {
 	}
 }
 
+proc update_clients_and_repost {} {
+	global item_cascade menu_m menu_b
+
+	append_text "Refreshing connected clients list... "
+	query_all 1
+	update
+
+	set saw 0
+	set casc $item_cascade(current)
+	set last [$casc index end]
+	for {set i 0} {$i <= $last} {incr i} {
+		if {[$casc type $i] == "separator"} {
+			continue
+		}
+		set name [$casc entrycget $i -label]
+		if {[regexp {^#} $name]} {
+			continue
+		}
+		if {[regexp {^refresh-list} $name]} {
+			continue
+		}
+		if {! $saw} {
+			append_text "\n"
+		}
+		set saw 1
+		append_text "client: $name\n"
+	}
+	if {! $saw} {
+		append_text "done.\n"
+	}
+}
+
 proc update_clients_menu {list} {
 	global item_cascade
 	set subm $item_cascade(current);
 	catch {destroy $subm}
 	menu $subm -tearoff 0
 	$subm add command
+	$subm add command -label "refresh-list" -command "update_clients_and_repost"
 	$subm add separator
 	set count 0
 	foreach client [split $list ","] {
@@ -1762,7 +1814,16 @@ set v 0
 			set menu "$colf.menu$case.menu";
 			set menu_b($case) $menub
 			set menu_m($case) $menu
-			menubutton $menub -text "$case" -underline 0 \
+			set ul 0
+			foreach char [split $case ""] {
+				set char [string tolower $char]
+				if {![info exists underlined($char)]} {
+					set underlined($char) 1
+					break
+				}
+				incr ul
+			}
+			menubutton $menub -text "$case" -underline $ul \
 				-anchor w -menu $menu -background $fbg \
 				-font $bfont
 			pack $menub -side top -fill x
@@ -2036,16 +2097,31 @@ MenuSelect>>
 }
 
 proc key_bindings {} {
-	global env
+	global env menus_disabled
 	if {[info exists env(USER)] && $env(USER) == "runge"} {
 		# quick restart
 		bind . <Control-KeyPress-c> {exec $argv0 $argv &; destroy .}
 	}
-	bind . <Control-KeyPress-p> {try_connect_and_query_all}
-	bind . <Control-KeyPress-u> {query_all 0}
-	bind . <Control-KeyPress-r> {query_all 0}
-	bind . <Control-KeyPress-d> {detach_from_display}
-	bind . <Control-KeyPress-a> {try_connect_and_query_all}
+	bind . <Control-KeyPress-p> { \
+		global menus_disabled; \
+		if {!$menus_disabled} {try_connect_and_query_all} \
+	}
+	bind . <Control-KeyPress-u> { \
+		global menus_disabled; \
+		if {!$menus_disabled} {query_all 0} \
+	}
+	bind . <Control-KeyPress-r> { \
+		global menus_disabled; \
+		if {!$menus_disabled} {query_all 0} \
+	}
+	bind . <Control-KeyPress-d> { \
+		global menus_disabled; \
+		if {!$menus_disabled} {detach_from_display} \
+	}
+	bind . <Control-KeyPress-a> { \
+		global menus_disabled; \
+		if {!$menus_disabled} {try_connect_and_query_all} \
+	}
 }
 
 proc stop_watch {onoff} {
@@ -2337,7 +2413,7 @@ global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
 global helpall helptext helpremote helplabel hostname;
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
-global menu_var unset_str
+global menu_var unset_str menus_disabled
 global bfont
 global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
@@ -2345,6 +2421,7 @@ global cache_all_query_vars
 
 set unset_str "(unset)"
 set connected_to_x11vnc 0
+set menus_disabled 0
 set max_text_height 40
 set max_text_width 90
 set bfont -adobe-helvetica-bold-r-*-*-*-120-*-*-*-*-*-*;
