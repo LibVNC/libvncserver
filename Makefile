@@ -9,8 +9,9 @@ VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 # The code for 3 Bytes/Pixel is not very efficient!
 FLAG24 = -DALLOW24BPP
 
-CFLAGS=-g -Wall $(PTHREADDEF) $(FLAG24) $(INCLUDES)
-#CFLAGS=-O2 -Wall
+OPTFLAGS=-g # -Wall
+#OPTFLAGS=-O2 -Wall
+CFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES)
 RANLIB=ranlib
 
 LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB)

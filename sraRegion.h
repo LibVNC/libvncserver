@@ -12,7 +12,6 @@ typedef struct _rect {
 	int y2;
 } sraRect;
 
-//struct sraRegion;
 typedef struct sraRegion sraRegion;
 
 /* -=- Region manipulation functions */

@@ -401,7 +401,7 @@ rfbProcessClientProtocolVersion(cl)
     rfbClientPtr cl;
 {
     rfbProtocolVersionMsg pv;
-    int n, major, minor;
+    int n, major_, minor_;
     char failureReason[256];
 
     if ((n = ReadExact(cl, pv, sz_rfbProtocolVersionMsg)) <= 0) {
@@ -414,25 +414,25 @@ rfbProcessClientProtocolVersion(cl)
     }
 
     pv[sz_rfbProtocolVersionMsg] = 0;
-    if (sscanf(pv,rfbProtocolVersionFormat,&major,&minor) != 2) {
+    if (sscanf(pv,rfbProtocolVersionFormat,&major_,&minor_) != 2) {
         rfbLog("rfbProcessClientProtocolVersion: not a valid RFB client\n");
         rfbCloseClient(cl);
         return;
     }
-    rfbLog("Protocol version %d.%d\n", major, minor);
+    rfbLog("Protocol version %d.%d\n", major_, minor_);
 
-    if (major != rfbProtocolMajorVersion) {
+    if (major_ != rfbProtocolMajorVersion) {
         /* Major version mismatch - send a ConnFailed message */
 
         rfbLog("Major version mismatch\n");
         sprintf(failureReason,
                 "RFB protocol version mismatch - server %d.%d, client %d.%d",
-                rfbProtocolMajorVersion,rfbProtocolMinorVersion,major,minor);
+                rfbProtocolMajorVersion,rfbProtocolMinorVersion,major_,minor_);
         rfbClientConnFailed(cl, failureReason);
         return;
     }
 
-    if (minor != rfbProtocolMinorVersion) {
+    if (minor_ != rfbProtocolMinorVersion) {
         /* Minor version mismatch - warn but try to continue */
         rfbLog("Ignoring minor version mismatch\n");
     }

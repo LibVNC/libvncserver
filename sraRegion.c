@@ -81,7 +81,7 @@ sraSpanDestroy(sraSpan *span) {
 
 void
 sraSpanCheck(const sraSpan *span, const char *text) {
-  // Check the span is valid!
+  /* Check the span is valid! */
   if (span->start == span->end) {
     printf(text); 
     printf(":%d-%d\n", span->start, span->end);
@@ -172,8 +172,8 @@ sraSpanListMakeEmpty(sraSpanList *list) {
   list->back._next = NULL;
 }
 
-int sraMax(int a, int b) {return (a>b)?a:b;};
-int sraMin(int a, int b) {return (a<b)?a:b;};
+int sraMax(int a, int b) {return (a>b)?a:b;}
+int sraMin(int a, int b) {return (a<b)?a:b;}
 
 Bool
 sraSpanListEqual(const sraSpanList *s1, const sraSpanList *s2) {
@@ -288,11 +288,11 @@ sraSpanListOr(sraSpanList *dest, const sraSpanList *src) {
   s_end = s_curr->end;
   while (s_curr != &(src->back)) {
 
-    // - If we are at end of destination list OR
-    //   If the new span comes before the next destination one
+    /* - If we are at end of destination list OR
+       If the new span comes before the next destination one */
     if ((d_curr == &(dest->back)) ||
 		(d_curr->start >= s_end)) {
-      // - Add the span
+      /* - Add the span */
       sraSpanInsertBefore(sraSpanCreate(s_start, s_end,
 					s_curr->subspan),
 			  d_curr);
@@ -303,11 +303,11 @@ sraSpanListOr(sraSpanList *dest, const sraSpanList *src) {
       s_end = s_curr->end;
     } else {
 
-      // - If the new span overlaps the existing one
+      /* - If the new span overlaps the existing one */
       if ((s_start < d_curr->end) &&
 	  (s_end > d_curr->start)) {
 
-	// - Insert new span before the existing destination one?
+	/* - Insert new span before the existing destination one? */
 	if (s_start < d_curr->start) {
 	  sraSpanInsertBefore(sraSpanCreate(s_start,
 					    d_curr->start,
@@ -316,7 +316,7 @@ sraSpanListOr(sraSpanList *dest, const sraSpanList *src) {
 	  sraSpanMergePrevious(d_curr);
 	}
 
-	// Split the existing span if necessary
+	/* Split the existing span if necessary */
 	if (s_end < d_curr->end) {
 	  sraSpanInsertAfter(sraSpanCreate(s_end,
 					   d_curr->end,
@@ -332,16 +332,16 @@ sraSpanListOr(sraSpanList *dest, const sraSpanList *src) {
 	  d_curr->start = s_start;
 	}
 
-	// Recursively OR subspans
+	/* Recursively OR subspans */
 	sraSpanListOr(d_curr->subspan, s_curr->subspan);
 
-	// Merge this span with previous or next?
+	/* Merge this span with previous or next? */
 	if (d_curr->_prev != &(dest->front))
 	  sraSpanMergePrevious(d_curr);
 	if (d_curr->_next != &(dest->back))
 	  sraSpanMergeNext(d_curr);
 
-	// Move onto the next pair to compare
+	/* Move onto the next pair to compare */
 	if (s_end > d_curr->end) {
 	  s_start = d_curr->end;
 	  d_curr = d_curr->_next;
@@ -351,7 +351,7 @@ sraSpanListOr(sraSpanList *dest, const sraSpanList *src) {
 	  s_end = s_curr->end;
 	}
       } else {
-	// - No overlap.  Move to the next destination span
+	/* - No overlap.  Move to the next destination span */
 	d_curr = d_curr->_next;
       }
     }
@@ -375,13 +375,13 @@ sraSpanListAnd(sraSpanList *dest, const sraSpanList *src) {
   s_curr = src->front._next;
   while ((s_curr != &(src->back)) && (d_curr != &(dest->back))) {
 
-    // - If we haven't reached a destination span yet then move on
+    /* - If we haven't reached a destination span yet then move on */
     if (d_curr->start >= s_curr->end) {
       s_curr = s_curr->_next;
       continue;
     }
 
-    // - If we are beyond the current destination span then remove it
+    /* - If we are beyond the current destination span then remove it */
     if (d_curr->end <= s_curr->start) {
       sraSpan *next = d_curr->_next;
       sraSpanRemove(d_curr);
@@ -390,13 +390,13 @@ sraSpanListAnd(sraSpanList *dest, const sraSpanList *src) {
       continue;
     }
 
-    // - If we partially overlap a span then split it up or remove bits
+    /* - If we partially overlap a span then split it up or remove bits */
     if (s_curr->start > d_curr->start) {
-      // - The top bit of the span does not match
+      /* - The top bit of the span does not match */
       d_curr->start = s_curr->start;
     }
     if (s_curr->end < d_curr->end) {
-      // - The end of the span does not match
+      /* - The end of the span does not match */
       sraSpanInsertAfter(sraSpanCreate(s_curr->end,
 				       d_curr->end,
 				       d_curr->subspan),
@@ -404,19 +404,19 @@ sraSpanListAnd(sraSpanList *dest, const sraSpanList *src) {
       d_curr->end = s_curr->end;
     }
 
-    // - Now recursively process the affected span
+    /* - Now recursively process the affected span */
     if (!sraSpanListAnd(d_curr->subspan, s_curr->subspan)) {
-      // - The destination subspan is now empty, so we should remove it
+      /* - The destination subspan is now empty, so we should remove it */
 		sraSpan *next = d_curr->_next;
       sraSpanRemove(d_curr);
       sraSpanDestroy(d_curr);
       d_curr = next;
     } else {
-      // Merge this span with previous or next?
+      /* Merge this span with previous or next? */
       if (d_curr->_prev != &(dest->front))
 	sraSpanMergePrevious(d_curr);
 
-      // - Move on to the next span
+      /* - Move on to the next span */
       d_next = d_curr;
       if (s_curr->end >= d_curr->end) {
 	d_next = d_curr->_next;
@@ -455,19 +455,19 @@ sraSpanListSubtract(sraSpanList *dest, const sraSpanList *src) {
   s_curr = src->front._next;
   while ((s_curr != &(src->back)) && (d_curr != &(dest->back))) {
 
-    // - If we haven't reached a destination span yet then move on
+    /* - If we haven't reached a destination span yet then move on */
     if (d_curr->start >= s_curr->end) {
       s_curr = s_curr->_next;
       continue;
     }
 
-    // - If we are beyond the current destination span then skip it
+    /* - If we are beyond the current destination span then skip it */
     if (d_curr->end <= s_curr->start) {
       d_curr = d_curr->_next;
       continue;
     }
 
-    // - If we partially overlap the current span then split it up
+    /* - If we partially overlap the current span then split it up */
     if (s_curr->start > d_curr->start) {
       sraSpanInsertBefore(sraSpanCreate(d_curr->start,
 					s_curr->start,
@@ -483,21 +483,21 @@ sraSpanListSubtract(sraSpanList *dest, const sraSpanList *src) {
       d_curr->end = s_curr->end;
     }
 
-    // - Now recursively process the affected span
+    /* - Now recursively process the affected span */
     if ((!d_curr->subspan) || !sraSpanListSubtract(d_curr->subspan, s_curr->subspan)) {
-      // - The destination subspan is now empty, so we should remove it
+      /* - The destination subspan is now empty, so we should remove it */
       sraSpan *next = d_curr->_next;
       sraSpanRemove(d_curr);
       sraSpanDestroy(d_curr);
       d_curr = next;
     } else {
-      // Merge this span with previous or next?
+      /* Merge this span with previous or next? */
       if (d_curr->_prev != &(dest->front))
 	sraSpanMergePrevious(d_curr);
       if (d_curr->_next != &(dest->back))
 	sraSpanMergeNext(d_curr);
 
-      // - Move on to the next span
+      /* - Move on to the next span */
       if (s_curr->end > d_curr->end) {
 	d_curr = d_curr->_next;
       } else {
@@ -595,7 +595,7 @@ sraRgnPopRect(sraRegion *rgn, sraRect *rect, unsigned long flags) {
   Bool right2left = flags & 2;
   Bool bottom2top = flags & 1;
 
-  // - Pick correct order
+  /* - Pick correct order */
   if (bottom2top) {
     vcurr = ((sraSpanList*)rgn)->back._prev;
     vend = &(((sraSpanList*)rgn)->front);
@@ -608,7 +608,7 @@ sraRgnPopRect(sraRegion *rgn, sraRect *rect, unsigned long flags) {
     rect->y1 = vcurr->start;
     rect->y2 = vcurr->end;
 
-    // - Pick correct order
+    /* - Pick correct order */
     if (right2left) {
       hcurr = vcurr->subspan->back._prev;
       hend = &(vcurr->subspan->front);
