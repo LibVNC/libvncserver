@@ -123,8 +123,7 @@ subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES = libvncclient/Makefile test/Makefile \
-	libvncserver.spec libvncserver-config
+CONFIG_CLEAN_FILES = libvncserver.spec libvncserver-config
 LIBRARIES = $(lib_LIBRARIES)
 
 libvncserver_a_AR = $(AR) cru
@@ -229,10 +228,6 @@ $(srcdir)/config.h.in:  $(top_srcdir)/configure.ac $(ACLOCAL_M4)
 
 distclean-hdr:
 	-rm -f config.h
-libvncclient/Makefile: $(top_builddir)/config.status $(top_srcdir)/libvncclient/Makefile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
-test/Makefile: $(top_builddir)/config.status $(top_srcdir)/test/Makefile.in
-	cd $(top_builddir) && $(SHELL) ./config.status $@
 libvncserver.spec: $(top_builddir)/config.status libvncserver.spec.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 libvncserver-config: $(top_builddir)/config.status libvncserver-config.in
@@ -567,7 +562,7 @@ distcleancheck_listfiles = find . -type f -print
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkinstalldirs) $(distdir)/. $(distdir)/libvncclient $(distdir)/rdr $(distdir)/rfb $(distdir)/test
+	$(mkinstalldirs) $(distdir)/. $(distdir)/rdr $(distdir)/rfb
 	@for file in $(DISTFILES); do \
 	  if test -f $$file || test -d $$file; then d=.; else d=$(srcdir); fi; \
 	  dir=`echo "$$file" | sed -e 's,/[^/]*$$,,'`; \

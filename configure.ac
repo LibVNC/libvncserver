@@ -67,8 +67,15 @@ if test ! -z "$HAVE_PTHREAD_H"; then
 	AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
 fi
 AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
-AC_CHECK_PROGS(CXX,[g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC],none)
-AC_PROG_CXX
+AC_ARG_ENABLE(cxx,
+	[  --disable-cxx			disable use of c++],
+	[ disable_cxx=yes],)
+if test -z "$disable_cxx"; then
+	AC_CHECK_PROGS(CXX,[g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC],none)
+	AC_PROG_CXX
+else
+	CXX=none
+fi
 if test ! -z "$HAVE_ZLIB_H"; then
 	AC_CHECK_LIB(z, deflate, , HAVE_ZLIB_H="")
 	if test ! -z "$HAVE_JPEGLIB_H" -a ! -z "$HAVE_ZLIB_H"; then

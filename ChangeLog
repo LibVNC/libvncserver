@@ -1,3 +1,22 @@
+   added --disable-cxx Option for configure
+   x11vnc changes from Karl Runge:
+      - Changed all those whimpy printf(...)'s into manly fprintf(stdxxx,...)'s.
+
+      - Added -q switch (quiet) to suppress printing all the debug-looking output.
+
+      - Added -bg switch to fork into background after everything is set up.
+        (checks for LIBVNCSERVER_HAVE_FORK and LIBVNCSERVER_HAVE_SETSID)
+
+      - Print this string out to stdout:  'PORT=XXXX' (usually XXXX = 5900).
+        Combining with -bg, easy to write a ssh/rsh wrapper with something like:
+        port=`ssh $host "x11vnc -bg .."` then run vncviewer based on $port output.
+        (tunneling the vnc traffic thru ssh a bit more messy, but doable)
+
+      - Quite a bit of code to be more careful when doing 8bpp indexed color, e.g.
+        not assuming NCOLORS is 256, handling 8bit TrueColor and Direct Color, etc
+        (I did all this probably in April, not quite clear in my mind now, but
+        I did test it out a fair amount on my old Sparcstation 20 wrt a user's
+        questions).
    introduce rfbErr for Errors (Erik)
    make rfbLog overridable (suggested by Erik)
    don't reutrn on EINTR in WriteExact()/ReadExact() (suggested by Erik)
