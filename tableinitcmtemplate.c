@@ -48,7 +48,7 @@ rfbInitColourMapSingleTableOUT(char **table, rfbPixelFormat *in,
 {
     CARD32 i, r, g, b;
     OUT_T *t;
-    int nEntries = 1 << in->bitsPerPixel;
+    CARD32 nEntries = 1 << in->bitsPerPixel;
     int shift = colourMap->is16?16:8;
 
     if (*table) free(*table);

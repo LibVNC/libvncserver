@@ -27,12 +27,16 @@
 #include <stdlib.h>
 #include "rfb.h"
 #include "sraRegion.h"
+#ifdef WIN32
+#define write(sock,buf,len) send(sock,buf,len,0)
+#else
 #include <unistd.h>
 #include <pwd.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#endif
+#include <sys/types.h>
 
 #ifdef CORBA
 #include <vncserverctrl.h>
@@ -984,8 +988,8 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
     fu->type = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
-	fu->nRects = Swap16IfLE(sraRgnCountRects(updateCopyRegion)
-				+ nUpdateRegionRects + !!sendCursorShape);
+	fu->nRects = Swap16IfLE((CARD16)(sraRgnCountRects(updateCopyRegion)
+				+ nUpdateRegionRects + !!sendCursorShape));
     } else {
 	fu->nRects = 0xFFFF;
     }
@@ -1277,7 +1281,7 @@ rfbSendSetColourMapEntries(cl, firstColour, nColours)
     len = sz_rfbSetColourMapEntriesMsg;
 
     for (i = 0; i < nColours; i++) {
-      if(i<cm->count) {
+      if(i<(int)cm->count) {
 	if(cm->is16) {
 	  rgb[i*3] = Swap16IfLE(cm->data.shorts[i*3]);
 	  rgb[i*3+1] = Swap16IfLE(cm->data.shorts[i*3+1]);

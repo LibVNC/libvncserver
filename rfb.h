@@ -46,22 +46,18 @@ typedef CARD32 KeySym;
 #define xrealloc realloc
 #define xfree free
 
-int max(int,int);
-
 #include <zlib.h>
 
-#include <rfbproto.h>
+#include "rfbproto.h"
 
 #ifdef __linux__
 #include <endian.h>
-#else
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#elif defined(__APPLE__) || defined(__FreeBSD__)
 #include <sys/types.h>
 #include <machine/endian.h>
 #define _BYTE_ORDER BYTE_ORDER
 #define _LITTLE_ENDIAN LITTLE_ENDIAN
-#else
-#ifdef sparc
+#elif sparc
 #define _LITTLE_ENDIAN 1234
 #define _BYTE_ORDER _LITTLE_ENDIAN
 #undef Bool
@@ -69,10 +65,13 @@ int max(int,int);
 #include <sys/types.h>
 /* typedef unsigned int pthread_t; */
 /* SUN cc seems to have problems with inclusion of sys/types! */
+#elif defined(WIN32)
+#define _LITTLE_ENDIAN 1234
+#define _BYTE_ORDER _LITTLE_ENDIAN
+#undef Bool
+#define Bool int
 #else
 #include <sys/endian.h>
-#endif
-#endif
 #endif
 
 #ifndef _BYTE_ORDER
@@ -83,11 +82,20 @@ int max(int,int);
 #define _LITTLE_ENDIAN __LITTLE_ENDIAN
 #endif
 
+#ifdef WIN32
+#include <winsock.h>
+//#define sockaddr_in sockaddr*
+#undef SOCKET
+#define SOCKET int
+#else
+int max(int,int);
 #include <netinet/in.h>
+#define SOCKET int
+#endif
 
 #ifdef HAVE_PTHREADS
 #include <pthread.h>
-#if 0
+#if 0 /* debugging */
 #define LOCK(mutex) fprintf(stderr,"%s:%d LOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex))
 #define UNLOCK(mutex) fprintf(stderr,"%s:%d UNLOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex))
 #define MUTEX(mutex) int mutex
@@ -141,13 +149,30 @@ typedef Bool (*SetTranslateFunctionProcPtr)(struct rfbClientRec* cl);
 typedef void (*NewClientHookPtr)(struct rfbClientRec* cl);
 
 typedef struct {
-  int count;
+  CARD32 count;
   Bool is16; /* is the data format short? */
   union {
     CARD8* bytes;
     CARD16* shorts;
   } data; /* there have to be count*3 entries */
 } rfbColourMap;
+
+/* this is why windows and it's programs are so huge:
+	You can't do something like
+#define MUTEX(m)
+	struct {
+		int i;
+		MUTEX(m);	// this evaluates to ";", and that is not acceptable
+					// to Visual C++
+	}
+*/
+
+#ifdef WIN32
+#undef MUTEX
+#define MUTEX(mutex) char dummy##mutex
+#undef COND
+#define COND(cont) char dummy##cond
+#endif
 
 /*
  * Per-screen (framebuffer) structure.  There is only one of these, since we
@@ -221,12 +246,12 @@ typedef struct
     char rfbThisHost[255];
     int rfbPort;
     Bool socketInitDone;
-    int inetdSock;
+    SOCKET inetdSock;
     int maxSock;
     int maxFd;
-    int rfbListenSock;
+	SOCKET rfbListenSock;
     int udpPort;
-    int udpSock;
+    SOCKET udpSock;
     struct rfbClientRec* udpClient;
     Bool udpSockConnected;
     struct sockaddr_in udpRemoteAddr;
@@ -237,8 +262,8 @@ typedef struct
     Bool httpInitDone;
     int httpPort;
     char* httpDir;
-    int httpListenSock;
-    int httpSock;
+    SOCKET httpListenSock;
+    SOCKET httpSock;
     FILE* httpFP;
 
     char* rfbAuthPasswdFile;
@@ -255,8 +280,10 @@ typedef struct
     Bool dontConvertRichCursorToXCursor;
     struct rfbCursor* cursor;
     MUTEX(cursorMutex);
-   
-    IF_PTHREADS(Bool backgroundLoop);
+
+#ifdef HAVE_PTHREADS
+    Bool backgroundLoop;
+#endif
 
     /* the following members have to be supplied by the serving process */
     char* frameBuffer;
@@ -319,7 +346,7 @@ typedef struct rfbClientRec {
     void* clientData;
     ClientGoneHookPtr clientGoneHook;
 
-    int sock;
+    SOCKET sock;
     char *host;
                                 /* Possible client states: */
     enum {

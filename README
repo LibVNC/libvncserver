@@ -291,6 +291,80 @@ There is the possibility to set a password, which is also negotiated by the
 RFB protocol, but IT IS NOT SECURE. Anybody sniffing your net can get the
 password. You really should tunnel through SSH.
 
+Windows or: why do you do that to me?
+--------------------------------------------
+
+If you love products from Redmod, you better skip this paragraph.
+I am always amazed how people react whenever Microsoft(tm) puts in some
+features into their products which were around for a long time. Especially
+reporters seem to not know dick about what they are reporting about! But
+what is everytime annoying again, is that they don't do it right. Every
+concept has it's new name (remember what enumerators used to be until
+Mickeysoft(tm) claimed that enumerators are what we thought were iterators.
+Yeah right, enumerators are also containers. They are not separate. Muddy.)
+
+There are three packages you want to get hold of: zlib, jpeg and pthreads.
+The latter is not strictly necessary, but when you put something like this
+into your source:
+
+#define MUTEX(s)
+	struct {
+		int something;
+		MUTEX(latex);
+	}
+
+Microsoft's C++ compiler doesn't do it. It complains that this is an error.
+
+You can find the packages at
+http://www.gimp.org/win32/extralibs-dev-20001007.zip
+
+Thanks go to all the GIMP team!
+
+Why I don't feel bad about GPL
+------------------------------
+
+At the beginning of this projects I would have liked to make it a BSD
+license. However, it is based on plenty of GPL'ed code, so it has to be
+a GPL. I hear BeeGee complaining: "but that's invasive, every derivative
+work, even just linking, makes my software GPL!"
+
+Yeah. That's right. It is because there are nasty jarheads out there who
+would take anybody's work and claim it their own, selling it for much too
+much money, stealing freedom and innovation from others, saying they were
+the maintainers of innovation, lying, making money with that.
+
+The people at AT&T worked really well to produce something as clean and lean
+as VNC. The managers decided that for their fame, they would release the
+program for free. But not only that! They realized that by releasing also
+the code for free, VNC would become an evolving little child, conquering
+new worlds, making it's parents very proud. As well they can be! To protect
+this innovation, they decided to make it GPL, not BSD. The principal
+difference is: You can make closed source programs deriving from BSD, not
+from GPL. You have to give proper credit with both.
+
+Now, why not BSD? Well, imagine your child being some famous actor. Along
+comes a manager who exploits your child exclusively, that is: nobody else
+can profit from the child, it itself included. Got it?
+
+What reason do you have now to use this library commercially?
+
+Several: You don't have to give away your product. Then you have effectively
+circumvented the GPL, because you have the benefits of other's work and you
+don't give back anything and you will be in hell for that. In fact, this
+library, as my other projects, is a payback for all the free software I can
+use (and sometimes, make better). For example, just now, I am using XEmacs
+on top X11, all running under Linux.
+
+Better: Use a concept like MySQL. This is free software, however, they make
+money with it. If you want something implemented, you have the choice:
+Ask them to do it (and pay a fair price), or do it yourself, normally giving
+back your enhancements to the free world of computing.
+
+Learn from it: If you like the style this is written, learn how to imitate
+it. If you don't like the style, learn how to avoid those things you don't
+like. I learnt so much, just from looking at code like Linux, XEmacs,
+LilyPond, STL, etc.
+
 License
 -------
 

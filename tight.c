@@ -24,8 +24,15 @@
  *  USA.
  */
 
-#include <stdio.h>
+//#include <stdio.h>
 #include "rfb.h"
+
+#ifdef WIN32
+#define XMD_H
+#undef FAR
+#define NEEDFAR_POINTERS
+#endif
+
 #include <jpeglib.h>
 
 
@@ -1433,7 +1440,7 @@ DetectSmoothImage (cl, fmt, w, h)
     rfbPixelFormat *fmt;
     int w, h;
 {
-    unsigned long avgError;
+    long avgError;
 
     if ( cl->screen->rfbServerFormat.bitsPerPixel == 8 || fmt->bitsPerPixel == 8 ||
          w < DETECT_MIN_WIDTH || h < DETECT_MIN_HEIGHT ) {

@@ -26,7 +26,13 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef WIN32
+#include <time.h>
+#define srandom srand
+#define random rand
+#else
 #include <sys/time.h>
+#endif
 #include "rfb.h"
 #include "d3des.h"
 
@@ -49,12 +55,15 @@ int
 vncEncryptAndStorePasswd(char *passwd, char *fname)
 {
     FILE *fp;
-    int i;
+    unsigned int i;
     unsigned char encryptedPasswd[8];
 
     if ((fp = fopen(fname,"w")) == NULL) return 1;
 
+	/* windows security sux */
+#ifndef WIN32
     chmod(fname, S_IRUSR|S_IWUSR);
+#endif
 
     /* pad password with nulls */
 
@@ -142,7 +151,7 @@ void
 vncEncryptBytes(unsigned char *bytes, char *passwd)
 {
     unsigned char key[8];
-    int i;
+    unsigned int i;
 
     /* key is simply password padded with nulls */
 

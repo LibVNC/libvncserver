@@ -21,9 +21,11 @@
 #endif
 
 #include <sys/types.h>
+#ifndef WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#endif
 #include <signal.h>
 #include <time.h>
 
@@ -354,11 +356,22 @@ void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
 
 /* TODO: add a nice VNC or RFB cursor */
 
+#ifdef WIN32
 static rfbCursor myCursor = 
 {
-   width: 8, height: 7, xhot: 3, yhot: 3,
+   "\000\102\044\030\044\102\000",
+   "\347\347\176\074\176\347\347",
+   8, 7, 3, 3,
+   0, 0, 0,
+   0xffff, 0xffff, 0xffff,
+   0
+};
+#else
+static rfbCursor myCursor = 
+{
    source: "\000\102\044\030\044\102\000",
    mask:   "\347\347\176\074\176\347\347",
+   width: 8, height: 7, xhot: 3, yhot: 3,
    /*
      width: 8, height: 7, xhot: 0, yhot: 0,
      source: "\000\074\176\146\176\074\000",
@@ -368,6 +381,7 @@ static rfbCursor myCursor =
    backRed: 0xffff, backGreen: 0xffff, backBlue: 0xffff,
    richSource: 0
 };
+#endif
 
 rfbCursorPtr defaultGetCursorPtr(rfbClientPtr cl)
 {
@@ -422,7 +436,15 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->width = width;
    rfbScreen->height = height;
    rfbScreen->bitsPerPixel = rfbScreen->depth = 8*bytesPerPixel;
+#ifdef WIN32
+   {
+	   DWORD dummy=255;
+	   GetComputerName(rfbScreen->rfbThisHost,&dummy);
+   }
+#else
    gethostname(rfbScreen->rfbThisHost, 255);
+#endif
+
    rfbScreen->paddedWidthInBytes = width*bytesPerPixel;
 
    /* format */
@@ -498,6 +520,10 @@ void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
 
 void rfbInitServer(rfbScreenInfoPtr rfbScreen)
 {
+#ifdef WIN32
+  WSADATA trash;
+  int i=WSAStartup(MAKEWORD(2,2),&trash);
+#endif
   rfbInitSockets(rfbScreen);
   httpInitSockets(rfbScreen);
 }
@@ -506,7 +532,7 @@ void
 rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 {
   rfbClientIteratorPtr i;
-  rfbClientPtr cl;
+  rfbClientPtr cl,clPrev;
 
   rfbCheckFds(rfbScreen,usec);
   httpCheckFds(rfbScreen);
@@ -515,11 +541,14 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 #endif
 
   i = rfbGetClientIterator(rfbScreen);
-  while((cl=rfbClientIteratorNext(i))) {
+  cl=rfbClientIteratorNext(i);
+  while(cl) {
     if(cl->sock>=0 && FB_UPDATE_PENDING(cl))
       rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
-    if(cl->sock==-1)
-      rfbClientConnectionGone(cl);
+	clPrev=cl;
+	cl=rfbClientIteratorNext(i);
+    if(clPrev->sock==-1)
+      rfbClientConnectionGone(clPrev);
   }
   rfbReleaseClientIterator(i);
 }

@@ -23,16 +23,21 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#ifdef WIN32
+#include <winsock.h>
+#define close closesocket
+#else
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <pwd.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#endif
+#include <fcntl.h>
+#include <errno.h>
 
 #include "rfb.h"
 
@@ -120,6 +125,9 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
 	return;
     }
     if (nfds < 0) {
+#ifdef WIN32
+		errno = WSAGetLastError();
+#endif
 	rfbLogPerror("httpCheckFds: select");
 	return;
     }
@@ -170,12 +178,14 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     int addrlen = sizeof(addr);
     char fullFname[256];
     char *fname;
-    int maxFnameLen;
-    int fd;
+    unsigned int maxFnameLen;
+    FILE* fd;
     Bool gotGet = FALSE;
     Bool performSubstitutions = FALSE;
     char str[256];
+#ifndef WIN32
     struct passwd *user = getpwuid(getuid());;
+#endif
    
     cl.sock=rfbScreen->httpSock;
 
@@ -263,7 +273,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
     /* Open the file */
 
-    if ((fd = open(fullFname, O_RDONLY)) < 0) {
+    if ((fd = fopen(fullFname, O_RDONLY)) < 0) {
 	rfbLogPerror("httpProcessInput: open");
 	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
 	httpCloseSock(rfbScreen);
@@ -273,10 +283,10 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     WriteExact(&cl, OK_STR, strlen(OK_STR));
 
     while (1) {
-	int n = read(fd, buf, BUF_SIZE-1);
+	int n = fread(buf, BUF_SIZE-1, 1, fd);
 	if (n < 0) {
 	    rfbLogPerror("httpProcessInput: read");
-	    close(fd);
+	    fclose(fd);
 	    httpCloseSock(rfbScreen);
 	    return;
 	}
@@ -335,20 +345,19 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 		    WriteExact(&cl, str, strlen(str));
 
 		} else if (compareAndSkip(&ptr, "$USER")) {
-
+#ifndef WIN32
 		    if (user) {
 			WriteExact(&cl, user->pw_name,
 				   strlen(user->pw_name));
-		    } else {
+		    } else
+#endif
 			WriteExact(&cl, "?", 1);
-		    }
-
 		} else {
 		    if (!compareAndSkip(&ptr, "$$"))
 			ptr++;
 
 		    if (WriteExact(&cl, "$", 1) < 0) {
-			close(fd);
+			fclose(fd);
 			httpCloseSock(rfbScreen);
 			return;
 		    }
@@ -366,7 +375,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	}
     }
 
-    close(fd);
+    fclose(fd);
     httpCloseSock(rfbScreen);
 }
 

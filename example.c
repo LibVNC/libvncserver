@@ -21,11 +21,16 @@
  *  USA.
  */
 
+#ifdef WIN32
+#define sleep Sleep
+#else
 #include <unistd.h>
+#endif
+
 #ifdef __IRIX__
 #include <netdb.h>
 #endif
-#define XK_MISCELLANY
+
 #include "rfb.h"
 #include "keysym.h"
 
@@ -121,7 +126,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 
 	    for(i=x1*bpp;i<x2*bpp;i++)
 	      for(j=y1;j<y2;j++)
-		cl->screen->frameBuffer[j*w+i]=0xff;
+		cl->screen->frameBuffer[j*w+i]=(char)0xff;
 	    rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);
 	 }
 
@@ -157,8 +162,8 @@ void dokey(Bool down,KeySym key,rfbClientPtr cl)
       int x1=cd->oldx,y1=cd->oldy,x2,y2;
       if(cl->screen->cursorIsDrawn)
 	rfbUndrawCursor(cl->screen);
-      cd->oldx+=rfbDrawChar(cl->screen,&radonFont,cd->oldx,cd->oldy,key,0xffffff);
-      rfbFontBBox(&radonFont,key,&x1,&y1,&x2,&y2);
+      cd->oldx+=rfbDrawChar(cl->screen,&radonFont,cd->oldx,cd->oldy,(char)key,0x00ffffff);
+      rfbFontBBox(&radonFont,(char)key,&x1,&y1,&x2,&y2);
       rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);
     }
   }

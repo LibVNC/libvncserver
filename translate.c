@@ -63,6 +63,9 @@ static const rfbPixelFormat BGR233Format = {
 #define CONCAT4(a,b,c,d) a##b##c##d
 #define CONCAT4E(a,b,c,d) CONCAT4(a,b,c,d)
 
+#undef OUT
+#undef IN
+
 #define OUT 8
 #include "tableinitcmtemplate.c"
 #include "tableinittctemplate.c"

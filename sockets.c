@@ -41,7 +41,22 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#ifdef WIN32
+#pragma warning (disable: 4018 4761)
+#define close closesocket
+#define read(sock,buf,len) recv(sock,buf,len,0)
+#define EWOULDBLOCK WSAEWOULDBLOCK
+#define ETIMEDOUT WSAETIMEDOUT
+#define write(sock,buf,len) send(sock,buf,len,0)
+#else
 #include <sys/time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#endif
 #if defined(__linux__) && defined(NEED_TIMEVAL)
 struct timeval 
 {
@@ -49,18 +64,14 @@ struct timeval
 }
 ;
 #endif
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <netdb.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <unistd.h>
-#include <arpa/inet.h>
 
 #include "rfb.h"
 
+#ifndef WIN32
 int max(int i,int j) { return(i<j?j:i); }
+#endif
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
@@ -81,10 +92,12 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     if (rfbScreen->inetdSock != -1) {
 	const int one = 1;
 
+#ifndef WIN32
 	if (fcntl(rfbScreen->inetdSock, F_SETFL, O_NONBLOCK) < 0) {
 	    rfbLogPerror("fcntl");
 	    exit(1);
 	}
+#endif
 
 	if (setsockopt(rfbScreen->inetdSock, IPPROTO_TCP, TCP_NODELAY,
 		       (char *)&one, sizeof(one)) < 0) {
@@ -117,7 +130,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	    exit(1);
 	}
 	FD_SET(rfbScreen->udpSock, &(rfbScreen->allFds));
-	rfbScreen->maxFd = max(rfbScreen->udpSock,rfbScreen->maxFd);
+	rfbScreen->maxFd = max((int)rfbScreen->udpSock,rfbScreen->maxFd);
     }
 }
 
@@ -156,6 +169,9 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	return;
     }
     if (nfds < 0) {
+#ifdef WIN32
+		errno = WSAGetLastError();
+#endif
 	rfbLogPerror("rfbCheckFds: select");
 	return;
     }
@@ -168,11 +184,13 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	    return;
 	}
 
+#ifndef WIN32
 	if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
 	    rfbLogPerror("rfbCheckFds: fcntl");
 	    close(sock);
 	    return;
 	}
+#endif
 
 	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		       (char *)&one, sizeof(one)) < 0) {
@@ -282,11 +300,13 @@ rfbConnect(rfbScreen, host, port)
 	return -1;
     }
 
+#ifndef WIN32
     if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
 	rfbLogPerror("fcntl failed");
 	close(sock);
 	return -1;
     }
+#endif
 
     if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		   (char *)&one, sizeof(one)) < 0) {
@@ -332,6 +352,9 @@ ReadExact(cl, buf, len)
             return 0;
 
         } else {
+#ifdef WIN32
+			errno = WSAGetLastError();
+#endif
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
                 return n;
             }
@@ -389,6 +412,9 @@ WriteExact(cl, buf, len)
             exit(1);
 
         } else {
+#ifdef WIN32
+			errno = WSAGetLastError();
+#endif
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
 	        UNLOCK(cl->outputMutex);
                 return n;
