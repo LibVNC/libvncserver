@@ -51,8 +51,8 @@ storepasswd: storepasswd.o d3des.o vncauth.o
 	$(CC) -o storepasswd storepasswd.o d3des.o vncauth.o
 
 clean:
-	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o *.a $(OBJS)
-
+	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o *.a \
+	     	mac.o example.o pnmshow.o $(OBJS) 
 
 realclean: clean
 	rm -f OSXvnc-server storepasswd example pnmshow
