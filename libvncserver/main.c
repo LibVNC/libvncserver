@@ -736,6 +736,8 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
 extern void TightCleanup();
 #endif
 
+/* hang up on all clients and free all reserved memory */
+
 void rfbScreenCleanup(rfbScreenInfoPtr screen)
 {
   rfbClientIteratorPtr i=rfbGetClientIterator(screen);
@@ -747,7 +749,6 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   }
   rfbReleaseClientIterator(i);
     
-  /* TODO: hang up on all clients and free all reserved memory */
 #define FREE_IF(x) if(screen->x) free(screen->x)
   FREE_IF(colourMap.data.bytes);
   FREE_IF(underCursorBuffer);
