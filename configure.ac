@@ -27,7 +27,7 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 		HAVE_XTEST="false",
 		$X_LIBS $X_PRELIBS -lX11 -lXext $X_EXTRA_LIBS)
 	if test $HAVE_XTEST = "true"; then
-		X_LIBS="$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS -lXext -lXtst"
+		X_LIBS="$X_LIBS $X_PRELIBS -lXtst -lXext -lX11 $X_EXTRA_LIBS"
 		HAVE_X="true"
 	fi
 fi
