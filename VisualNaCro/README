@@ -1,0 +1,86 @@
+This is VisualNaCro.
+
+DISCLAIMER: recorder.pl is not yet functional.
+
+What does it?
+
+	It is a Perl module meant to remote control a VNC server.
+	
+	It includes a recorder (written in Perl) to make it easy to
+	record a macro, which is just a Perl script, and which you can
+	modify to your heart's content.
+	
+	The most important feature, however, is that you can mark a
+	rectangle which the Perl script will try to find again when you
+	run it. Thus when you play a game and want to hit a certain button,
+	you just hit the Ctrl key twice, mark the button, and from then on,
+	all mouse movements will be repeated relative to that button, even
+	if the button is somewhere else when you run the script the next
+	time.
+
+	If you know Tcl Expect, you will recognize this approach. Only this
+	time, it is not text, but an image which is expected.
+	
+How does it work?
+
+	It acts as a VNC proxy: your Perl script starts its own VNC server.
+	The script now can intercept inputs and outputs, and act upon them.
+	In order to write a macro, start
+	
+		recorder.pl host:port my_macro.pl
+	
+	connect with a vncviewer of your choice to <host2>:23, where <host2>
+	is the computer	on which recorder.pl was started (not necessarily the
+	same as the VNC server!). Now your actions are recorded into
+	my_macro.pl, and the images you want to grep for will be saved as
+	my_macro-1.pnm,	my_macro-2.pnm, ...
+
+Why did I do it?
+
+	Because I could ;-)
+
+	No really, I needed a way to write automated tests. While there
+	exist a lot of OpenSource programs for web testing, I found none
+	of them easy to use, and for GUI testing I found xautomation.
+
+	Xautomation has this "visual grep" (or "graphical expect") feature:
+	given an image it tries to find it on the desktop and returns the
+	coordinates. Unfortunately, there is no easy way to record macros
+	with it, and it only works on X11.
+
+	As I know VNC pretty well, and there are VNC servers for every OS
+	and gadget, I thought it might be cool to have this feature to
+	control a VNC server.
+
+	Actually, it makes it even easier: with plain X11, for example, you
+	can not know where on the screen the action is if you don't check
+	the whole screen. This complex problem is beautifully addressed
+	in Karl Runge's x11vnc.
+
+	My main purpose is to run regression tests on different browsers,
+	which I can easily do by starting Xvnc and using VisualNaCro.
+
+How did I do it?
+
+	I wondered long about how to do it. I couldn't take the same approach
+	as xautomation: I cannot connect to the VNC server thousand times
+	per second. So I decided to create an interface of LibVNCServer/
+	LibVNCClient for use in a script language.
+
+	Fortunately, this task is made very, very easy by SWIG. As Perl
+	is one of my favorite script languages, I decided to use this.
+	But SWIG makes it easy to use the very same interface for other
+	popular languages, so you are welcome to port VisualNaCro to
+	the language of your choice!
+	
+Isn't it pronounced "Visual Macro"?
+
+	Yes. But I liked the Visual Na Cro play of acronyms. I'm sorry if
+	you don't find it funny.
+
+What's the license?
+
+	GPL. It is based on LibVNCServer/LibVNCClient, so it has to be.
+	If you want to port this package to use vncreflector, which has a
+	BSD license, go ahead.
+
