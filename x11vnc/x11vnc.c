@@ -290,7 +290,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.1 lastmod: 2005-02-22";
+char lastmod[] = "0.7.1 lastmod: 2005-02-23";
 
 /* X display info */
 
