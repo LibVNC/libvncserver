@@ -188,38 +188,44 @@ static rfbBool rfbInitConnection(rfbClient* client)
 rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
   int i,j;
 
-  if(client->programName==0)
-    client->programName=argv[0];
+  if(argv==0 || argc==0 || *argc==0) {
+    client->programName="";
+    client->serverHost="";
+    client->serverPort=5900;
+  } else {
+    if(client->programName==0)
+      client->programName=argv[0];
 
-  for (i = 1; i < *argc; i++) {
-    j = i;
-    if (strcmp(argv[i], "-listen") == 0) {
-      listenForIncomingConnections(client);
-      break;
-    } else if (strcmp(argv[i], "-play") == 0) {
-      client->serverPort = -1;
-      j++;
-    } else if (i+1<*argc && strcmp(argv[i], "-encodings") == 0) {
-      client->appData.encodingsString = argv[i+1];
-      j+=2;
-    } else {
-      char* colon=strchr(argv[i],':');
-
-      if(colon) {
-        client->serverHost=strdup(argv[i]);
-	client->serverHost[(int)(colon-argv[i])]='\0';
-	client->serverPort=atoi(colon+1);
+    for (i = 1; i < *argc; i++) {
+      j = i;
+      if (strcmp(argv[i], "-listen") == 0) {
+	listenForIncomingConnections(client);
+	break;
+      } else if (strcmp(argv[i], "-play") == 0) {
+	client->serverPort = -1;
+	j++;
+      } else if (i+1<*argc && strcmp(argv[i], "-encodings") == 0) {
+	client->appData.encodingsString = argv[i+1];
+	j+=2;
       } else {
-	client->serverHost=strdup(argv[i]);
+	char* colon=strchr(argv[i],':');
+
+	if(colon) {
+	  client->serverHost=strdup(argv[i]);
+	  client->serverHost[(int)(colon-argv[i])]='\0';
+	  client->serverPort=atoi(colon+1);
+	} else {
+	  client->serverHost=strdup(argv[i]);
+	}
+	if(client->serverPort>=0 && client->serverPort<5900)
+	  client->serverPort+=5900;
       }
-      if(client->serverPort>=0 && client->serverPort<5900)
-	client->serverPort+=5900;
-    }
-    /* purge arguments */
-    if (j>i) {
-      *argc-=j-i;
-      memmove(argv+i,argv+j,(*argc-i)*sizeof(char*));
-      i--;
+      /* purge arguments */
+      if (j>i) {
+	*argc-=j-i;
+	memmove(argv+i,argv+j,(*argc-i)*sizeof(char*));
+	i--;
+      }
     }
   }
 
