@@ -211,7 +211,7 @@ rfbDimmingShutdown(void)
 
 rfbScreenInfoPtr rfbScreen;
 
-void shutdown(rfbClientPtr cl);
+void rfbShutdown(rfbClientPtr cl);
 
 /* some variables to enable special behaviour */
 int startTime = -1, maxSecsToConnect = 0;
@@ -512,7 +512,7 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 #endif
 
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
-    shutdown(0);
+    rfbShutdown(0);
 
   for (i = 0; i < count; i++)
     rfbMarkRectAsModified(rfbScreen,
@@ -523,13 +523,13 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 
 void clientGone(rfbClientPtr cl)
 {
-  shutdown(cl);
+  rfbShutdown(cl);
 }
 
 enum rfbNewClientAction newClient(rfbClientPtr cl)
 {
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
-    shutdown(cl);
+    rfbShutdown(cl);
 
   if(disconnectAfterFirstClient)
     cl->clientGoneHook = clientGone;
@@ -596,7 +596,7 @@ int main(int argc,char *argv[])
   return(0); /* never ... */
 }
 
-void shutdown(rfbClientPtr cl)
+void rfbShutdown(rfbClientPtr cl)
 {
   rfbScreenCleanup(rfbScreen);
   rfbDimmingShutdown();

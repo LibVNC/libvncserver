@@ -23,7 +23,7 @@ RANLIB=ranlib
 LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB) $(EXTRALIBS)
 
 # for Mac OS X
-OSX_LIBS = -framework ApplicationServices -framework Carbon
+OSX_LIBS = -framework ApplicationServices -framework Carbon -framework IOKit
 
 # for x11vnc
 XLIBS =  -L/usr/X11R6/lib -lX11 -lXext -lXtst
