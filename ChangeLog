@@ -1,3 +1,7 @@
+2004-12-19  Karl Runge <runge@karlrunge.com>
+	* x11vnc: string cleanup, synchronous remote-control option -sync
+	* libvncserver/cursor.c: zero underCursorBufferLen when cursor freed.
+
 2004-12-16  Karl Runge <runge@karlrunge.com>
 	* test/encodingstest.c: fix decl bug in main()
 	* x11vnc: use XFIXES extension to show the exact cursor shape.

@@ -529,6 +529,7 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,rfbBool freeOld)
 
   free(rfbScreen->underCursorBuffer);
   rfbScreen->underCursorBuffer=0;
+  rfbScreen->underCursorBufferLen=0;
 
   if(rfbScreen->cursor && (freeOld || rfbScreen->cursor->cleanup))
     rfbFreeCursor(rfbScreen->cursor);

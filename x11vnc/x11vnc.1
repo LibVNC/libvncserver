@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2004" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.6.3pre, lastmod: 2004-12-17
+         version: 0.6.3pre, lastmod: 2004-12-19
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -661,28 +661,36 @@ To include button events use "Button1", ... etc.
 .PP
 \fB-nodragging\fR
 .IP
-Do not update the display during mouse dragging events
-(mouse motion with a button held down).  Greatly
-improves response on slow setups, but you lose all
-visual feedback for drags, text selection, and some
-menu traversals.
+Do not update the display during mouse dragging
+events (mouse motion with a button held down).
+Greatly improves response on slow setups, but you lose
+all visual feedback for drags, text selection, and some
+menu traversals.  It overrides any \fB-pointer_mode\fR setting
+(think of it as pointer_mode 0)
 .PP
 \fB-pointer_mode\fR \fIn\fR
 .IP
 Various pointer update schemes.  The problem is pointer
 motion can cause rapid changes on the screen, e.g. a
-window drag.  Neither x11vnc nor the bandwidth to the
-vncviewers can keep up these rapid screen changes:
-everything bogs down when dragging or scrolling.
-Note that most video h/w is optimized for writing, not
-reading (a 50X rate difference is possible) and x11vnc
-is reading all the time.  So a scheme has to be used to
-"eat" much of that pointer input before re-polling the
-screen. n can be 1 to 4.  n=1 was the original scheme
-used to about Jan 2004.  n=2 is an improved scheme.
-n=3 is basically a dynamic \fB-nodragging\fR mode: it detects
-if the mouse drag motion has paused and refreshes
-the display.  n=4 is TBD.  The default n is 2.
+window drag.  Neither x11vnc's screen polling nor the
+bandwidth to the vncviewers can keep up these rapid
+screen changes: everything bogs down when dragging
+or scrolling.  Note that most video h/w is optimized
+for writing, not reading (a 50X rate difference is
+possible) and x11vnc is reading all the time.  So a
+scheme has to be used to "eat" much of that pointer
+input before re-polling the screen. n can be 1 to 4.
+.IP
+n=1 was the original scheme used to about Jan 2004: it
+basically just skips \fB-input_skip\fR pointer events before
+repolling the screen.  n=2 is an improved scheme:
+by watching the current rate it tries to detect if
+it should try to "eat" more pointer events.  n=3 is
+basically a dynamic \fB-nodragging\fR mode: it detects if the
+mouse drag motion has paused and refreshes the display.
+n=4 is TBD, it will try measure screen read and client
+write rates and try to insert "frames" between the
+on/off states of mode 3.  The default n is 2.
 .PP
 \fB-input_skip\fR \fIn\fR
 .IP
@@ -1156,6 +1164,27 @@ ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
 button_mask mouse_x mouse_y bpp depth indexed_color
 dpy_x dpy_y rfbport rfbwait rfbauth passwd alwaysshared
 dontdisconnect httpdir enablehttpproxy
+.PP
+\fB-sync\fR
+.IP
+By default \fB-remote\fR commands are run asynchronously, that
+is, the request is posted and the program immediately
+exits.  Use \fB-sync\fR to have the program wait for an
+acknowledgement from the x11vnc server that command
+was processed.  On the other hand \fB-query\fR requests are
+always processed synchronously because they have wait
+for the result.
+.IP
+Also note that if both \fB-remote\fR and \fB-query\fR requests are
+supplied on the command line, the \fB-remote\fR is processed
+first (synchronously: no need for \fB-sync),\fR and then
+the \fB-query\fR request is processed in the normal way.
+This allows for a reliable way to see if the \fB-remote\fR
+command was processed by querying for any new settings.
+Note however that there is timeout of a few seconds so
+if the x11vnc takes longer than that to process the
+requests the requestor will think that a failure has
+taken place.
 .PP
 \fB-noremote\fR
 .IP

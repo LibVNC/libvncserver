@@ -1,3 +1,8 @@
+2004-12-19  Karl Runge <runge@karlrunge.com>
+	* cleanup putenv, snprint, other string manip.
+	* add -sync mode to remote control for better control
+	* allow -remote and -query at same time.
+
 2004-12-16  Karl Runge <runge@karlrunge.com>
 	* support for XFIXES extension to show the exact cursor shape,
 	  working on Linux/Xorg and Solaris 10.  disable with -noxfixes

@@ -256,7 +256,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.6.3pre lastmod: 2004-12-17";
+char lastmod[] = "0.6.3pre lastmod: 2004-12-19";
 
 /* X display info */
 
@@ -310,6 +310,9 @@ typedef struct _ClientData {
 	int had_cursor_shape_updates;
 	int had_cursor_pos_updates;
 	int uid;
+	int client_port;
+	int server_port;
+	char *server_ip;
 } ClientData;
 
 /* scaling parameters */
@@ -697,7 +700,7 @@ int scan_hexdec(char *str, unsigned long *num) {
 
 void set_env(char *name, char *value) {
 	char *str;
-	str = malloc(strlen(name)+strlen(value)+2);
+	str = (char *)malloc(strlen(name)+strlen(value)+2);
 	sprintf(str, "%s=%s", name, value);
 	putenv(str);
 }
@@ -1460,6 +1463,10 @@ char *list_clients(void) {
 	}
 	rfbReleaseClientIterator(iter);
 
+	/*
+	 * each client: 123.123.123.123:60000/0x11111111-rw, = 36 bytes 
+	 * so count+1 * 100 should cover it.
+	 */
 	list = (char *) malloc((count+1)*100);
 	
 	list[0] = '\0';
@@ -1553,18 +1560,10 @@ void close_clients(char *str) {
  */
 static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	char *dpystr = DisplayString(dpy);
-	static char *display_env = NULL;
-	static char env_rfb_client_id[100];
-	static char env_rfb_client_ip[100];
-	static char env_rfb_client_port[100];
-	static char env_rfb_server_ip[100];
-	static char env_rfb_server_port[100];
-	static char env_rfb_x11vnc_pid[100];
-	static char env_rfb_client_count[100];
-	static char env_rfb_mode[100];
+	char *old_display = NULL;
 	char *addr = client->host;
-	int rc, hport;
-	char *ip_str = NULL;
+	char str[100];
+	int rc;
 	ClientData *cd = (ClientData *) client->clientData;
 
 	if (addr == NULL || addr[0] == '\0') {
@@ -1573,29 +1572,29 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 
 	/* set RFB_CLIENT_ID to semi unique id for command to use */
 	if (cd && cd->uid) {
-		sprintf(env_rfb_client_id, "RFB_CLIENT_ID=0x%x", cd->uid);
+		sprintf(str, "0x%x", cd->uid);
 	} else {
 		/* not accepted yet: */
-		sprintf(env_rfb_client_id, "RFB_CLIENT_ID=0x%x",
-		    clients_served);
+		sprintf(str, "0x%x", clients_served);
 	}
-	putenv(env_rfb_client_id);
+	set_env("RFB_CLIENT_ID", str);
 
 	/* set RFB_CLIENT_IP to IP addr for command to use */
-	sprintf(env_rfb_client_ip, "RFB_CLIENT_IP=%s", addr);
-	putenv(env_rfb_client_ip);
+	set_env("RFB_CLIENT_IP", addr);
 
 	/* set RFB_X11VNC_PID to our pid for command to use */
-	sprintf(env_rfb_x11vnc_pid, "RFB_X11VNC_PID=%d", (int) getpid());
-	putenv(env_rfb_x11vnc_pid);
+	sprintf(str, "%d", (int) getpid());
+	set_env("RFB_X11VNC_PID", str);
 
 	/* set RFB_CLIENT_PORT to peer port for command to use */
-	hport = get_remote_port(client->sock);
-	sprintf(env_rfb_client_port, "RFB_CLIENT_PORT=%d", hport);
-	putenv(env_rfb_client_port);
+	if (cd && cd->client_port > 0) {
+		sprintf(str, "%d", cd->client_port);
+	} else {
+		sprintf(str, "%d", get_remote_port(client->sock));
+	}
+	set_env("RFB_CLIENT_PORT", str);
 
-	sprintf(env_rfb_mode, "RFB_MODE=%s", mode);
-	putenv(env_rfb_mode);
+	set_env("RFB_MODE", mode);
 
 	/* 
 	 * now do RFB_SERVER_IP and RFB_SERVER_PORT (i.e. us!)
@@ -1603,32 +1602,35 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	 * program can potentially use to work out the virtual circuit
 	 * for this connection.
 	 */
-	ip_str = get_local_host(client->sock);
-	hport = get_local_port(client->sock);
-	
-	sprintf(env_rfb_server_ip, "RFB_SERVER_IP=%s", ip_str);
-	putenv(env_rfb_server_ip);
-	sprintf(env_rfb_server_port, "RFB_SERVER_PORT=%d", hport);
-	putenv(env_rfb_server_port);
+	if (cd && cd->server_ip) {
+		set_env("RFB_SERVER_IP", cd->server_ip);
+	} else {
+		set_env("RFB_SERVER_IP", get_local_host(client->sock));
+	}
 
+	if (cd && cd->server_port > 0) {
+		sprintf(str, "%d", cd->server_port);
+	} else {
+		sprintf(str, "%d", get_local_port(client->sock));
+	}
+	set_env("RFB_SERVER_PORT", str);
 
 	/* 
 	 * Better set DISPLAY to the one we are polling, if they
 	 * want something trickier, they can handle on their own
-	 * via environment, etc.  XXX really should save/restore old.
+	 * via environment, etc. 
 	 */
-	if (display_env == NULL) {
-		display_env = (char *) malloc(strlen(dpystr)+10);
+	if (getenv("DISPLAY")) {
+		old_display = strdup(getenv("DISPLAY"));
 	}
-	sprintf(display_env, "DISPLAY=%s", dpystr);
-	putenv(display_env);
+	set_env("DISPLAY", dpystr);
 
 	/*
 	 * work out the number of clients (have to use client_count
 	 * since there is deadlock in rfbGetClientIterator) 
 	 */
-	sprintf(env_rfb_client_count, "RFB_CLIENT_COUNT=%d", client_count);
-	putenv(env_rfb_client_count);
+	sprintf(str, "%d", client_count);
+	set_env("RFB_CLIENT_COUNT", str);
 
 	rfbLog("running command:\n");
 	rfbLog("  %s\n", cmd);
@@ -1639,6 +1641,11 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 		rc = rc/256;
 	}
 	rfbLog("command returned: %d\n", rc);
+
+	if (old_display) {
+		set_env("DISPLAY", old_display);
+		free(old_display);
+	}
 
 	return rc;
 }
@@ -1651,16 +1658,20 @@ static void client_gone(rfbClientPtr client) {
 	client_count--;
 	rfbLog("client_count: %d\n", client_count);
 
-	if (client->clientData) {
-		free(client->clientData);
-	}
-
 	if (no_autorepeat && client_count == 0) {
 		autorepeat(1);
 	}
 	if (gone_cmd && *gone_cmd != '\0') {
 		rfbLog("client_gone: using cmd for: %s\n", client->host);
 		run_user_command(gone_cmd, client, "gone");
+	}
+
+	if (client->clientData) {
+		ClientData *cd = (ClientData *) client->clientData;
+		if (cd && cd->server_ip) {
+			free(cd->server_ip);
+		}
+		free(client->clientData);
 	}
 
 	if (inetd) {
@@ -2543,14 +2554,14 @@ void read_vnc_connect_prop(void) {
 	} while (bytes_after > 0);
 
 	vnc_connect_str[VNC_CONNECT_MAX] = '\0';
-	if (strlen(vnc_connect_str) > 100) {
-		char trim[101]; 
+	if (strlen(vnc_connect_str) > 38) {
+		char trim[100]; 
 		trim[0] = '\0';
-		strncat(trim, vnc_connect_str, 100);
-		rfbLog("read X property VNC_CONNECT: %s ...\n", trim);
+		strncat(trim, vnc_connect_str, 38);
+		rfbLog("read VNC_CONNECT: %s ...\n", trim);
 		
 	} else {
-		rfbLog("read X property VNC_CONNECT: %s\n", vnc_connect_str);
+		rfbLog("read VNC_CONNECT: %s\n", vnc_connect_str);
 	}
 }
 
@@ -2563,6 +2574,8 @@ static void send_client_connect(void) {
 		if (strstr(str, "cmd=") == str || strstr(str, "qry=") == str) {
 			process_remote_cmd(client_connect, 0);
 		} else if (strstr(str, "ans=") || strstr(str, "aro=") == str) {
+			;
+		} else if (strstr(str, "ack=") == str) {
 			;
 		} else {
 			reverse_connect(client_connect);
@@ -2640,6 +2653,10 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	cd = (ClientData *) client->clientData;
 
 	cd->uid = clients_served;
+
+	cd->client_port = get_remote_port(client->sock);
+	cd->server_port = get_local_port(client->sock);
+	cd->server_ip = strdup(get_remote_host(client->sock));
 
 	client->clientGoneHook = client_gone;
 	client_count++;
@@ -4419,7 +4436,8 @@ static void update_x11_pointer(int mask, int x, int y) {
 
 	X_LOCK;
 	if (use_xwarppointer) {
-		XWarpPointer(dpy, None, window, 0, 0, 0, 0, x+off_x, y+off_y);
+		/* off_x and off_y not needed with XWarpPointer */
+		XWarpPointer(dpy, None, window, 0, 0, 0, 0, x, y);
 	} else {
 		XTestFakeMotionEvent_wr(dpy, scr, x+off_x, y+off_y,
 		    CurrentTime);
@@ -4820,7 +4838,6 @@ int handle_subwin_resize(char *msg) {
 	int new_x, new_y;
 	int i, check = 10, ms = 250;	/* 2.5 secs... */
 
-	if (0) fprintf(stderr, "IN    handle_subwin_resize('%s')\n", msg);
 	if (! subwin) {
 		return 0;	/* hmmm... */
 	}
@@ -5473,8 +5490,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 /*
  * for the wild-n-crazy -remote/-R interface.
  */
-int send_remote_cmd(char *cmd, int query) {
-	char *str;
+int send_remote_cmd(char *cmd, int query, int wait) {
 	FILE *in = NULL;
 
 	if (client_connect_file) {
@@ -5494,29 +5510,22 @@ int send_remote_cmd(char *cmd, int query) {
 			return 1;
 		}
 	}
-	str = (char *) malloc((strlen(cmd)+5));
-	if (query) {
-		strcpy(str, "qry=");
-	} else {
-		strcpy(str, "cmd=");
-	}
-	strcat(str, cmd);
 
 	if (in != NULL) {
 		fprintf(stderr, "sending remote command: \"%s\"\nvia connect"
 		    " file: %s\n", cmd, client_connect_file);
-		fprintf(in, "%s\n", str);
+		fprintf(in, "%s\n", cmd);
 		fclose(in);
 	} else {
 		fprintf(stderr, "sending remote command: \"%s\" via VNC_CONNECT"
 		    " X property.\n", cmd);
-		set_vnc_connect_prop(str);
+		set_vnc_connect_prop(cmd);
 		XFlush(dpy);
 	}
 
-	if (strstr(str, "qry=") == str) {
+	if (query || wait) {
 		char line[VNC_CONNECT_MAX];	
-		int rc=1, i=0, max=20, ms_sl=100;
+		int rc=1, i=0, max=70, ms_sl=50;
 		for (i=0; i<max; i++) {
 			usleep(ms_sl * 1000);
 			if (client_connect_file) {
@@ -5540,14 +5549,15 @@ int send_remote_cmd(char *cmd, int query) {
 				read_vnc_connect_prop();
 				strncpy(line, vnc_connect_str, VNC_CONNECT_MAX);
 			}
-			if (strcmp(str, line)){
-				fprintf(stdout, "%s\n", line);
-				fflush(stdout);
+			if (strcmp(cmd, line)){
+				if (query) {
+					fprintf(stdout, "%s\n", line);
+					fflush(stdout);
+				}
 				rc = 0;
 				break;
 			}
 		}
-		free(str);
 		if (rc) {
 			fprintf(stderr, "error: could not connect to "
 			    "an x11vnc server at %s  (rc=%d)\n",
@@ -5556,8 +5566,40 @@ int send_remote_cmd(char *cmd, int query) {
 		}
 		return rc;
 	}
-	free(str);
 	return 0;
+}
+
+int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync) {
+	char *rcmd = NULL, *qcmd = NULL;
+	int rc = 1;
+
+	if (remote_cmd) {
+		rcmd = (char *)malloc(strlen(remote_cmd) + 5);
+		strcpy(rcmd, "cmd=");
+		strcat(rcmd, remote_cmd);
+	}
+	if (query_cmd) {
+		qcmd = (char *)malloc(strlen(query_cmd) + 5);
+		strcpy(qcmd, "qry=");
+		strcat(qcmd, query_cmd);
+	}
+	
+	if (rcmd && qcmd) {
+		rc = send_remote_cmd(rcmd, 0, 1);
+		if (rc) {
+			free(rcmd);
+			free(qcmd);
+			return(rc);
+		}
+		rc = send_remote_cmd(qcmd, 1, 1);
+	} else if (rcmd) {
+		rc = send_remote_cmd(rcmd, 0, remote_sync);
+		free(rcmd);
+	} else if (qcmd) {
+		rc = send_remote_cmd(qcmd, 1, 1);
+		free(qcmd);
+	}
+	return rc;
 }
 
 char *add_item(char *instr, char *item) {
@@ -5652,7 +5694,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	char *p = cmd;
 	char *co = "";
 	char buf[VNC_CONNECT_MAX]; 
-	int do_vnc_connect = 0;
+	int bufn = VNC_CONNECT_MAX;
 	int query = 0;
 	static char *prev_cursors_mode = NULL;
 
@@ -5661,6 +5703,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		return NULL;
 	}
 
+	strcpy(buf, "");
 	if (strstr(cmd, "cmd=") == cmd) {
 		p += strlen("cmd=");
 	} else if (strstr(cmd, "qry=") == cmd) {
@@ -5673,8 +5716,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			s = strdup(cmd + strlen("qry="));
 			q = strtok(s, ","); 
 			while (q) {
-				sprintf(tmp, "qry=%s", q);
+				strcpy(tmp, "qry=");
+				strncat(tmp, q, 500);
 				res = process_remote_cmd(tmp, 1);
+				if (res && strlen(buf)+strlen(res)
+				    >= VNC_CONNECT_MAX - 1) {
+					rfbLog("overflow in process_remote_cmd:"
+					    " %s -- %s\n", buf, res);
+					free(res);
+					break;
+				}
 				if (res) {
 					strcat(buf, res);
 					free(res);
@@ -5690,48 +5741,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("qry=");
 	} else {
 		rfbLog("ignoring malformed command: %s\n", cmd);
-		return NULL;
+		goto done;
 	}
 
-	if (!query && strstr(p, "file:") == p) {
-		/* process command from a script file */
-		FILE *in;
-		char line[VNC_CONNECT_MAX], cmd[VNC_CONNECT_MAX];
-		int sz = VNC_CONNECT_MAX - 6;
-		p += strlen("file:");
-		in = fopen(p, "r");
-		if (in == NULL) {
-			rfbLog("process_remote_cmd: could not open cmd file"
-			    " '%s'\n", p);
-			return NULL;
-		}
-		rfbLog("process_remote_cmd: running command from '%s'\n", p);
-		while (fgets(line, sz, in) != NULL) {
-			char *q;
-			if (strlen(line)) {
-				q = line + strlen(line) - 1;
-				if (*q == '\n') {
-					*q = '\0';
-				}
-				while (q > line && isspace(*q)) {
-					*q = '\0';
-					q--;
-				}
-			}
-			q = line;
-			while (isspace(*q)) {
-				q++;
-			}
-			if ( *q == '#' || *q == '\0') {
-				continue;
-			}
-			strcpy(cmd, "cmd=");
-			strcat(cmd, q);
-			process_remote_cmd(cmd, 0);
-		}
-		fclose(in);
-		return NULL;
-	}
 
 	/* always call like: COLON_CHECK("foobar:") */
 #define COLON_CHECK(str) \
@@ -5750,9 +5762,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 #define NOTAPP \
 	if (query) { \
 		if (strchr(p, ':')) { \
-			sprintf(buf, "ans=%sN/A", p); \
+			snprintf(buf, bufn, "ans=%sN/A", p); \
 		} else { \
-			sprintf(buf, "ans=%s:N/A", p); \
+			snprintf(buf, bufn, "ans=%s:N/A", p); \
 		} \
 		goto qry; \
 	}
@@ -5760,9 +5772,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 #define NOTAPPRO \
 	if (query) { \
 		if (strchr(p, ':')) { \
-			sprintf(buf, "aro=%sN/A", p); \
+			snprintf(buf, bufn, "aro=%sN/A", p); \
 		} else { \
-			sprintf(buf, "aro=%s:N/A", p); \
+			snprintf(buf, bufn, "aro=%s:N/A", p); \
 		} \
 		goto qry; \
 	}
@@ -5780,9 +5792,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "ping")) {
 		query = 1;
 		if (rfb_desktop_name) {
-			sprintf(buf, "ans=%s:%s", p, rfb_desktop_name);
+			snprintf(buf, bufn, "ans=%s:%s", p, rfb_desktop_name);
 		} else {
-			sprintf(buf, "ans=%s:%s", p, "unknown");
+			snprintf(buf, bufn, "ans=%s:%s", p, "unknown");
 		}
 		goto qry;
 
@@ -5841,7 +5853,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		Window twin;
 		COLON_CHECK("id:")
 		if (query) {
-			sprintf(buf, "ans=%s%s0x%lx", p, co, subwin);
+			snprintf(buf, bufn, "ans=%s%s0x%lx", p, co, subwin);
 			goto qry;
 		}
 		p += strlen("id:");
@@ -5857,7 +5869,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				ok = 1;
 			}
 		} else if (! scan_hexdec(p, &twin)) {
-			rfbLog("-id: incorrect hex/dec number: %s\n", p);
+			rfbLog("-id: skipping incorrect hex/dec number: %s\n", p);
 		} else {
 			ok = 1;
 		}
@@ -5877,7 +5889,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		Window twin;
 		COLON_CHECK("sid:")
 		if (query) {
-			sprintf(buf, "ans=%s%s0x%lx", p, co, subwin);
+			snprintf(buf, bufn, "ans=%s%s0x%lx", p, co, subwin);
 			goto qry;
 		}
 		p += strlen("sid:");
@@ -5893,7 +5905,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				ok = 1;
 			}
 		} else if (! scan_hexdec(p, &twin)) {
-			rfbLog("-sid: incorrect hex/dec number: %s\n", p);
+			rfbLog("-sid: skipping incorrect hex/dec number: %s\n", p);
 		} else {
 			ok = 1;
 		}
@@ -5911,14 +5923,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "flashcmap")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, flash_cmap);
+			snprintf(buf, bufn, "ans=%s:%d", p, flash_cmap);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on flashcmap mode.\n");
 		flash_cmap = 1;
 	} else if (!strcmp(p, "noflashcmap")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !flash_cmap);
+			snprintf(buf, bufn, "ans=%s:%d", p, !flash_cmap);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off flashcmap mode.\n");
@@ -5927,7 +5939,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "truecolor")) {
 		int orig = force_indexed_color;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !force_indexed_color);
+			snprintf(buf, bufn, "ans=%s:%d", p, !force_indexed_color);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off notruecolor mode.\n");
@@ -5938,7 +5950,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "notruecolor")) {
 		int orig = force_indexed_color;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, force_indexed_color);
+			snprintf(buf, bufn, "ans=%s:%d", p, force_indexed_color);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on notruecolor mode.\n");
@@ -5949,7 +5961,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		
 	} else if (!strcmp(p, "overlay")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, overlay);
+			snprintf(buf, bufn, "ans=%s:%d", p, overlay);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on -overlay mode.\n");
@@ -5971,7 +5983,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "nooverlay")) {
 		int orig = overlay;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !overlay);
+			snprintf(buf, bufn, "ans=%s:%d", p, !overlay);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off overlay mode\n");
@@ -5988,7 +6000,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "overlay_cursor") ||
 	    !strcmp(p, "overlay_yescursor")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, overlay_cursor);
+			snprintf(buf, bufn, "ans=%s:%d", p, overlay_cursor);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on overlay_cursor mode.\n");
@@ -6005,7 +6017,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "nooverlay_cursor") ||
 	    !strcmp(p, "overlay_nocursor")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !overlay_cursor);
+			snprintf(buf, bufn, "ans=%s:%d", p, !overlay_cursor);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off overlay_cursor mode\n");
@@ -6022,7 +6034,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (strstr(p, "visual") == p) {
 		COLON_CHECK("visual:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(visual_str));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(visual_str));
 			goto qry;
 		}
 		p += strlen("visual:");
@@ -6032,10 +6045,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		/* OK, this requires a new fb... */
 		do_new_fb(0);
 
-	} else if (strstr(p, "scale") == p) {
+	} else if (!strcmp(p, "scale") ||
+		    strstr(p, "scale:") == p) {	/* skip-cmd-list */
 		COLON_CHECK("scale:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(scale_str));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co, NONUL(scale_str));
 			goto qry;
 		}
 		p += strlen("scale:");
@@ -6048,20 +6062,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "viewonly")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, view_only); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, view_only); goto qry;
 		}
 		rfbLog("process_remote_cmd: enable viewonly mode.\n");
 		view_only = 1;
 	} else if (!strcmp(p, "noviewonly")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !view_only); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, !view_only); goto qry;
 		}
 		rfbLog("process_remote_cmd: disable viewonly mode.\n");
 		view_only = 0;
 
 	} else if (!strcmp(p, "shared")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, shared); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, shared); goto qry;
 		}
 		rfbLog("process_remote_cmd: enable sharing.\n");
 		shared = 1;
@@ -6069,7 +6083,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		screen->neverShared = FALSE;
 	} else if (!strcmp(p, "noshared")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !shared); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, !shared); goto qry;
 		}
 		rfbLog("process_remote_cmd: disable sharing.\n");
 		shared = 0;
@@ -6078,26 +6092,28 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "forever")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, 1-connect_once); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, 1-connect_once);
+			goto qry;
 		}
 		rfbLog("process_remote_cmd: enable -forever mode.\n");
 		connect_once = 0;
 	} else if (!strcmp(p, "noforever") || !strcmp(p, "once")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, connect_once); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, connect_once);
+			goto qry;
 		}
 		rfbLog("process_remote_cmd: disable -forever mode.\n");
 		connect_once = 1;
 
 	} else if (!strcmp(p, "deny") || !strcmp(p, "lock")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, deny_all); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, deny_all); goto qry;
 		}
 		rfbLog("process_remote_cmd: denying new connections.\n");
 		deny_all = 1;
 	} else if (!strcmp(p, "nodeny") || !strcmp(p, "unlock")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !deny_all); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, !deny_all); goto qry;
 		}
 		rfbLog("process_remote_cmd: allowing new connections.\n");
 		deny_all = 0;
@@ -6105,8 +6121,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (strstr(p, "connect") == p) {
 		NOTAPP
 		COLON_CHECK("connect:")
-		p += strlen("connect:");	/* handled at end */
-		do_vnc_connect = 1;
+		p += strlen("connect:");
+		/* this is a reverse connection */
+		strncpy(vnc_connect_str, p, VNC_CONNECT_MAX);
+		vnc_connect_str[VNC_CONNECT_MAX] = '\0';
 
 	} else if (strstr(p, "allowonce") == p) {
 		NOTAPP
@@ -6119,14 +6137,15 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		char *before, *old;
 		COLON_CHECK("allow:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(allow_list));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(allow_list));
 			goto qry;
 		}
 		p += strlen("allow:");
 		if (allow_list && strchr(allow_list, '/')) {
 			rfbLog("process_remote_cmd: cannot use allow:host\n");
 			rfbLog("in '-allow %s' mode.\n", allow_list);
-			return NULL;
+			goto done;
 		}
 		if (allow_list) {
 			before = strdup(allow_list);
@@ -6160,7 +6179,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			if (allow_list && !strcmp(allow_list, "127.0.0.1")) {
 				state = 1;
 			}
-			sprintf(buf, "ans=%s:%d", p, state);
+			snprintf(buf, bufn, "ans=%s:%d", p, state);
 			goto qry;
 		}
 		if (allow_list) {
@@ -6186,7 +6205,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			if (allow_list && !strcmp(allow_list, "127.0.0.1")) {
 				state = 1;
 			}
-			sprintf(buf, "ans=%s:%d", p, !state);
+			snprintf(buf, bufn, "ans=%s:%d", p, !state);
 			goto qry;
 		}
 		if (allow_list) {
@@ -6209,7 +6228,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (strstr(p, "accept") == p) {
 		COLON_CHECK("accept:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(accept_cmd));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(accept_cmd));
 			goto qry;
 		}
 		if (safe_remote_only) {
@@ -6223,7 +6243,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (strstr(p, "gone") == p) {
 		COLON_CHECK("gone:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(gone_cmd));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co, NONUL(gone_cmd));
 			goto qry;
 		}
 		if (safe_remote_only) {
@@ -6237,7 +6257,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "shm")) {
 		int orig = using_shm;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, using_shm);
+			snprintf(buf, bufn, "ans=%s:%d", p, using_shm);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off noshm mode.\n");
@@ -6250,7 +6270,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "noshm")) {
 		int orig = using_shm;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !using_shm);
+			snprintf(buf, bufn, "ans=%s:%d", p, !using_shm);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on noshm mode.\n");
@@ -6264,7 +6284,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "flipbyteorder")) {
 		int orig = flip_byte_order;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, flip_byte_order);
+			snprintf(buf, bufn, "ans=%s:%d", p, flip_byte_order);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on flipbyteorder mode.\n");
@@ -6279,7 +6299,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "noflipbyteorder")) {
 		int orig = flip_byte_order;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !flip_byte_order);
+			snprintf(buf, bufn, "ans=%s:%d", p, !flip_byte_order);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off flipbyteorder mode.\n");
@@ -6294,13 +6314,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		
 	} else if (!strcmp(p, "onetile")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, single_copytile); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, single_copytile);
+			goto qry;
 		}
 		rfbLog("process_remote_cmd: enable -onetile mode.\n");
 		single_copytile = 1;
 	} else if (!strcmp(p, "noonetile")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !single_copytile);
+			snprintf(buf, bufn, "ans=%s:%d", p, !single_copytile);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: disable -onetile mode.\n");
@@ -6315,7 +6336,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		char *before, *old;
 		COLON_CHECK("blackout:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co,
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
 			    NONUL(blackout_string));
 			goto qry;
 		}
@@ -6352,7 +6373,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "xinerama")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, xinerama); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, xinerama); goto qry;
 		}
 		rfbLog("process_remote_cmd: enable xinerama mode."
 		    "(if applicable).\n");
@@ -6360,7 +6381,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		initialize_blackouts_and_xinerama();
 	} else if (!strcmp(p, "noxinerama")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !xinerama); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, !xinerama); goto qry;
 		}
 		rfbLog("process_remote_cmd: disable xinerama mode."
 		    "(if applicable).\n");
@@ -6370,7 +6391,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "xrandr")) {
 		int orig = xrandr;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, xrandr); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, xrandr); goto qry;
 		}
 		if (xrandr_present) {
 			rfbLog("process_remote_cmd: enable xrandr mode.\n");
@@ -6388,7 +6409,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "noxrandr")) {
 		int orig = xrandr;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !xrandr); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, !xrandr); goto qry;
 		}
 		xrandr = 0;
 		if (xrandr_present) {
@@ -6404,7 +6425,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int orig = xrandr;
 		COLON_CHECK("xrandr_mode:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(xrandr_mode));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(xrandr_mode));
 			goto qry;
 		}
 		p += strlen("xrandr_mode:");
@@ -6416,7 +6438,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				xrandr_mode = strdup(p);
 			} else {
 				rfbLog("skipping unknown xrandr mode: %s\n", p);
-				return NULL;
+				goto done;
 			}
 			xrandr = 1;
 		}
@@ -6442,7 +6464,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (strstr(p, "padgeom") == p) {
 		COLON_CHECK("padgeom:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(pad_geometry));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(pad_geometry));
 			goto qry;
 		}
 		p += strlen("padgeom:");
@@ -6459,20 +6482,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "quiet") || !strcmp(p, "q")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, quiet); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, quiet); goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on quiet mode.\n");
 		quiet = 1;
 	} else if (!strcmp(p, "noquiet")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !quiet); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, !quiet); goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off quiet mode.\n");
 		quiet = 0;
 		
 	} else if (!strcmp(p, "modtweak")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, use_modifier_tweak);
+			snprintf(buf, bufn, "ans=%s:%d", p, use_modifier_tweak);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling -modtweak mode.\n");
@@ -6484,7 +6507,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "nomodtweak")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !use_modifier_tweak);
+			snprintf(buf, bufn, "ans=%s:%d", p, !use_modifier_tweak);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling -nomodtweak mode.\n");
@@ -6492,13 +6515,13 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "xkb")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, use_xkb_modtweak);
+			snprintf(buf, bufn, "ans=%s:%d", p, use_xkb_modtweak);
 			goto qry;
 		}
 		if (! xkb_present) {
 			rfbLog("process_remote_cmd: cannot enable -xkb "
 			    "modtweak mode (not supported on X display)\n");
-			return NULL;
+			goto done;
 		}
 		rfbLog("process_remote_cmd: enabling -xkb modtweak mode"
 		    " (if supported).\n");
@@ -6512,13 +6535,13 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "noxkb")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !use_xkb_modtweak);
+			snprintf(buf, bufn, "ans=%s:%d", p, !use_xkb_modtweak);
 			goto qry;
 		}
 		if (! xkb_present) {
 			rfbLog("process_remote_cmd: cannot disable -xkb "
 			    "modtweak mode (not supported on X display)\n");
-			return NULL;
+			goto done;
 		}
 		rfbLog("process_remote_cmd: disabling -xkb modtweak mode.\n");
 		use_xkb_modtweak = 0;
@@ -6526,7 +6549,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (strstr(p, "skip_keycodes") == p) {
 		COLON_CHECK("skip_keycodes:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(skip_keycodes));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(skip_keycodes));
 			goto qry;
 		}
 		p += strlen("skip_keycodes:");
@@ -6549,7 +6573,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "add_keysyms")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, add_keysyms);
+			snprintf(buf, bufn, "ans=%s:%d", p, add_keysyms);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling -add_keysyms mode.\n");
@@ -6557,7 +6581,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "noadd_keysyms")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !add_keysyms);
+			snprintf(buf, bufn, "ans=%s:%d", p, !add_keysyms);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: disabling -add_keysyms mode.\n");
@@ -6565,7 +6589,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "clear_mods")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, clear_mods == 1);
+			snprintf(buf, bufn, "ans=%s:%d", p, clear_mods == 1);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling -clear_mods mode.\n");
@@ -6574,7 +6598,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "noclear_mods")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !(clear_mods == 1));
+			snprintf(buf, bufn, "ans=%s:%d", p, !(clear_mods == 1));
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: disabling -clear_mods mode.\n");
@@ -6582,7 +6606,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "clear_keys")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, clear_mods == 2);
+			snprintf(buf, bufn, "ans=%s:%d", p, clear_mods == 2);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling -clear_keys mode.\n");
@@ -6591,7 +6615,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "noclear_keys")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !(clear_mods == 2));
+			snprintf(buf, bufn, "ans=%s:%d", p, !(clear_mods == 2));
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: disabling -clear_keys mode.\n");
@@ -6601,7 +6625,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		char *before, *old;
 		COLON_CHECK("remap:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(remap_file));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(remap_file));
 			goto qry;
 		}
 		p += strlen("remap:");
@@ -6609,7 +6634,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    strchr(remap_file, '/')) {
 			rfbLog("process_remote_cmd: cannot use remap:+/-\n");
 			rfbLog("in '-remap %s' mode.\n", remap_file);
-			return NULL;
+			goto done;
 		}
 		if (remap_file) {
 			before = strdup(remap_file);
@@ -6640,7 +6665,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "repeat")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !no_autorepeat);
+			snprintf(buf, bufn, "ans=%s:%d", p, !no_autorepeat);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling -repeat mode.\n");
@@ -6651,7 +6676,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "norepeat")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, no_autorepeat);
+			snprintf(buf, bufn, "ans=%s:%d", p, no_autorepeat);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling -norepeat mode.\n");
@@ -6663,7 +6688,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "bell")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, sound_bell);
+			snprintf(buf, bufn, "ans=%s:%d", p, sound_bell);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling bell (if supported).\n");
@@ -6671,7 +6696,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "nobell")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !sound_bell);
+			snprintf(buf, bufn, "ans=%s:%d", p, !sound_bell);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: disabling bell.\n");
@@ -6679,7 +6704,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "sel")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, watch_selection);
+			snprintf(buf, bufn, "ans=%s:%d", p, watch_selection);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling watch_selection.\n");
@@ -6687,7 +6712,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "nosel")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !watch_selection);
+			snprintf(buf, bufn, "ans=%s:%d", p, !watch_selection);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: disabling watch_selection.\n");
@@ -6695,7 +6720,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "primary")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, watch_primary);
+			snprintf(buf, bufn, "ans=%s:%d", p, watch_primary);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling watch_primary.\n");
@@ -6703,7 +6728,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "noprimary")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !watch_primary);
+			snprintf(buf, bufn, "ans=%s:%d", p, !watch_primary);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: disabling watch_primary.\n");
@@ -6715,7 +6740,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "cursorshape")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, cursor_shape_updates);
+			snprintf(buf, bufn, "ans=%s:%d", p, cursor_shape_updates);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on cursorshape mode.\n");
@@ -6727,7 +6752,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (!strcmp(p, "nocursorshape")) {
 		int i, max = 5;
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !cursor_shape_updates);
+			snprintf(buf, bufn, "ans=%s:%d", p, !cursor_shape_updates);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off cursorshape mode.\n");
@@ -6743,14 +6768,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "cursorpos")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, cursor_pos_updates);
+			snprintf(buf, bufn, "ans=%s:%d", p, cursor_pos_updates);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on cursorpos mode.\n");
 		cursor_pos_updates = 1;
 	} else if (!strcmp(p, "nocursorpos")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !cursor_pos_updates);
+			snprintf(buf, bufn, "ans=%s:%d", p, !cursor_pos_updates);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off cursorpos mode.\n");
@@ -6759,7 +6784,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (strstr(p, "cursor") == p) {
 		COLON_CHECK("cursor:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co,
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
 			    NONUL(multiple_cursors_mode));
 			goto qry;
 		}
@@ -6783,7 +6808,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "show_cursor")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, show_cursor);
+			snprintf(buf, bufn, "ans=%s:%d", p, show_cursor);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling show_cursor.\n");
@@ -6803,7 +6828,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		initialize_cursors_mode();
 	} else if (!strcmp(p, "noshow_cursor") || !strcmp(p, "nocursor")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !show_cursor);
+			snprintf(buf, bufn, "ans=%s:%d", p, !show_cursor);
 			goto qry;
 		}
 		if (prev_cursors_mode) free(prev_cursors_mode);
@@ -6815,13 +6840,13 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "xfixes")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, use_xfixes);
+			snprintf(buf, bufn, "ans=%s:%d", p, use_xfixes);
 			goto qry;
 		}
 		if (! xfixes_present) {
 			rfbLog("process_remote_cmd: cannot enable xfixes "
 			    "(not supported on X display)\n");
-			return NULL;
+			goto done;
 		}
 		rfbLog("process_remote_cmd: enabling -xfixes"
 		    " (if supported).\n");
@@ -6829,28 +6854,28 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		initialize_xfixes();
 	} else if (!strcmp(p, "noxfixes")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !use_xfixes);
+			snprintf(buf, bufn, "ans=%s:%d", p, !use_xfixes);
 			goto qry;
 		}
 		if (! xfixes_present) {
 			rfbLog("process_remote_cmd: disabling xfixes  "
 			    "(but not supported on X display)\n");
-			return NULL;
+			goto done;
 		}
 		rfbLog("process_remote_cmd: disabling -xfixes.\n");
 		use_xfixes = 0;
 		initialize_xfixes();
 
-	} else if (strstr(p, "xwarp") == p || strstr(p, "xwarppointer")) {
+	} else if (strstr(p, "xwarp") == p || strstr(p, "xwarppointer") == p) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, use_xwarppointer);
+			snprintf(buf, bufn, "ans=%s:%d", p, use_xwarppointer);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on xwarppointer mode.\n");
 		use_xwarppointer = 1;
-	} else if (strstr(p, "noxwarp") == p || strstr(p, "noxwarppointer")) {
+	} else if (strstr(p, "noxwarp") == p || strstr(p, "noxwarppointer") == p) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !use_xwarppointer);
+			snprintf(buf, bufn, "ans=%s:%d", p, !use_xwarppointer);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off xwarppointer mode.\n");
@@ -6859,7 +6884,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (strstr(p, "buttonmap") == p) {
 		COLON_CHECK("buttonmap:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%s", p, co, NONUL(pointer_remap));
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(pointer_remap));
 			goto qry;
 		}
 		p += strlen("buttonmap:");
@@ -6872,14 +6898,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "dragging")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, show_dragging);
+			snprintf(buf, bufn, "ans=%s:%d", p, show_dragging);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling mouse dragging mode.\n");
 		show_dragging = 1;
 	} else if (!strcmp(p, "nodragging")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !show_dragging);
+			snprintf(buf, bufn, "ans=%s:%d", p, !show_dragging);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling mouse nodragging mode.\n");
@@ -6889,7 +6915,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int pm;
 		COLON_CHECK("pointer_mode:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co, pointer_mode);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, pointer_mode);
 			goto qry;
 		}
 		p += strlen("pointer_mode:");
@@ -6906,7 +6932,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int is;
 		COLON_CHECK("input_skip:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co, ui_skip);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, ui_skip);
 			goto qry;
 		}
 		p += strlen("input_skip:");
@@ -6916,14 +6942,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "debug_pointer") || !strcmp(p, "dp")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, debug_pointer);
+			snprintf(buf, bufn, "ans=%s:%d", p, debug_pointer);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on debug_pointer.\n");
 		debug_pointer = 1;
 	} else if (!strcmp(p, "nodebug_pointer") || !strcmp(p, "nodp")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !debug_pointer);
+			snprintf(buf, bufn, "ans=%s:%d", p, !debug_pointer);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off debug_pointer.\n");
@@ -6931,14 +6957,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "debug_keyboard") || !strcmp(p, "dk")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, debug_keyboard);
+			snprintf(buf, bufn, "ans=%s:%d", p, debug_keyboard);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on debug_keyboard.\n");
 		debug_keyboard = 1;
 	} else if (!strcmp(p, "nodebug_keyboard") || !strcmp(p, "nodk")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !debug_keyboard);
+			snprintf(buf, bufn, "ans=%s:%d", p, !debug_keyboard);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off debug_keyboard.\n");
@@ -6948,7 +6974,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int d;
 		COLON_CHECK("deferupdate:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co,
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
 			    screen->deferUpdateTime);
 			goto qry;
 		}
@@ -6962,7 +6988,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int d;
 		COLON_CHECK("defer:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co,
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
 			    screen->deferUpdateTime);
 			goto qry;
 		}
@@ -6977,7 +7003,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int w;
 		COLON_CHECK("wait:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co, waitms);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, waitms);
 			goto qry;
 		}
 		p += strlen("wait:");
@@ -6989,13 +7015,13 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "nap")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, take_naps); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, take_naps); goto qry;
 		}
 		rfbLog("process_remote_cmd: turning on nap mode.\n");
 		take_naps = 1;
 	} else if (!strcmp(p, "nonap")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !take_naps); goto qry;
+			snprintf(buf, bufn, "ans=%s:%d", p, !take_naps); goto qry;
 		}
 		rfbLog("process_remote_cmd: turning off nap mode.\n");
 		take_naps = 0;
@@ -7004,7 +7030,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int w;
 		COLON_CHECK("sb:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co, screen_blank);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, screen_blank);
 			goto qry;
 		}
 		p += strlen("sb:");
@@ -7017,7 +7043,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int w;
 		COLON_CHECK("screen_blank:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co, screen_blank);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, screen_blank);
 			goto qry;
 		}
 		p += strlen("screen_blank:");
@@ -7030,7 +7056,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else if (strstr(p, "fs") == p) {
 		COLON_CHECK("fs:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%f", p, co, fs_frac);
+			snprintf(buf, bufn, "ans=%s%s%f", p, co, fs_frac);
 			goto qry;
 		}
 		p += strlen("fs:");
@@ -7041,7 +7067,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int g;
 		COLON_CHECK("gaps:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co, gaps_fill);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, gaps_fill);
 			goto qry;
 		}
 		p += strlen("gaps:");
@@ -7054,7 +7080,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int g;
 		COLON_CHECK("grow:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co, grow_fill);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, grow_fill);
 			goto qry;
 		}
 		p += strlen("grow:");
@@ -7067,7 +7093,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int f;
 		COLON_CHECK("fuzz:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co, tile_fuzz);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, tile_fuzz);
 			goto qry;
 		}
 		p += strlen("fuzz:");
@@ -7081,7 +7107,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int f;
 		COLON_CHECK("progressive:")
 		if (query) {
-			sprintf(buf, "ans=%s%s%d", p, co,
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
 			    screen->progressiveSliceHeight);
 			goto qry;
 		}
@@ -7094,7 +7120,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "noremote")) {
 		if (query) {
-			sprintf(buf, "ans=%s:%d", p, !accept_remote_cmds);
+			snprintf(buf, bufn, "ans=%s:%d", p, !accept_remote_cmds);
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: disabling remote commands.\n");
@@ -7107,114 +7133,119 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			char *d = DisplayString(dpy);
 			if (! d) d = "unknown";
 			if (*d == ':') {
-				sprintf(buf, "aro=%s:%s%s", p, this_host(), d);
+				snprintf(buf, bufn, "aro=%s:%s%s", p,
+				    this_host(), d);
 			} else {
-				sprintf(buf, "aro=%s:%s", p, d);
+				snprintf(buf, bufn, "aro=%s:%s", p, d);
 			}
 		} else if (!strcmp(p, "vncdisplay")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(vnc_desktop_name));
+			snprintf(buf, bufn, "aro=%s:%s", p,
+			    NONUL(vnc_desktop_name));
 		} else if (!strcmp(p, "desktopname")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(rfb_desktop_name));
+			snprintf(buf, bufn, "aro=%s:%s", p,
+			    NONUL(rfb_desktop_name));
 		} else if (!strcmp(p, "desktop")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(rfb_desktop_name));
+			snprintf(buf, bufn, "aro=%s:%s", p,
+			    NONUL(rfb_desktop_name));
 		} else if (!strcmp(p, "auth")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(auth_file));
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(auth_file));
 		} else if (!strcmp(p, "rootshift")) {
-			sprintf(buf, "aro=%s:%d", p, rootshift);
+			snprintf(buf, bufn, "aro=%s:%d", p, rootshift);
 		} else if (!strcmp(p, "scale_str")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(scale_str));
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(scale_str));
 		} else if (!strcmp(p, "scaled_x")) {
-			sprintf(buf, "aro=%s:%d", p, scaled_x);
+			snprintf(buf, bufn, "aro=%s:%d", p, scaled_x);
 		} else if (!strcmp(p, "scaled_y")) {
-			sprintf(buf, "aro=%s:%d", p, scaled_y);
+			snprintf(buf, bufn, "aro=%s:%d", p, scaled_y);
 		} else if (!strcmp(p, "scale_numer")) {
-			sprintf(buf, "aro=%s:%d", p, scale_numer);
+			snprintf(buf, bufn, "aro=%s:%d", p, scale_numer);
 		} else if (!strcmp(p, "scale_denom")) {
-			sprintf(buf, "aro=%s:%d", p, scale_denom);
+			snprintf(buf, bufn, "aro=%s:%d", p, scale_denom);
 		} else if (!strcmp(p, "scale_fac")) {
-			sprintf(buf, "aro=%s:%f", p, scale_fac);
+			snprintf(buf, bufn, "aro=%s:%f", p, scale_fac);
 		} else if (!strcmp(p, "scaling_noblend")) {
-			sprintf(buf, "aro=%s:%d", p, scaling_noblend);
+			snprintf(buf, bufn, "aro=%s:%d", p, scaling_noblend);
 		} else if (!strcmp(p, "scaling_nomult4")) {
-			sprintf(buf, "aro=%s:%d", p, scaling_nomult4);
+			snprintf(buf, bufn, "aro=%s:%d", p, scaling_nomult4);
 		} else if (!strcmp(p, "scaling_pad")) {
-			sprintf(buf, "aro=%s:%d", p, scaling_pad);
+			snprintf(buf, bufn, "aro=%s:%d", p, scaling_pad);
 		} else if (!strcmp(p, "scaling_interpolate")) {
-			sprintf(buf, "aro=%s:%d", p, scaling_interpolate);
+			snprintf(buf, bufn, "aro=%s:%d", p, scaling_interpolate);
 		} else if (!strcmp(p, "inetd")) {
-			sprintf(buf, "aro=%s:%d", p, inetd);
+			snprintf(buf, bufn, "aro=%s:%d", p, inetd);
 		} else if (!strcmp(p, "safer")) {
-			sprintf(buf, "aro=%s:%d", p, safe_remote_only);
+			snprintf(buf, bufn, "aro=%s:%d", p, safe_remote_only);
 		} else if (!strcmp(p, "unsafe")) {
-			sprintf(buf, "aro=%s:%d", p, !safe_remote_only);
+			snprintf(buf, bufn, "aro=%s:%d", p, !safe_remote_only);
 		} else if (!strcmp(p, "passwdfile")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(passwdfile));
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(passwdfile));
 		} else if (!strcmp(p, "using_shm")) {
-			sprintf(buf, "aro=%s:%d", p, !using_shm);
+			snprintf(buf, bufn, "aro=%s:%d", p, !using_shm);
 		} else if (!strcmp(p, "logfile") || !strcmp(p, "o")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(logfile));
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(logfile));
 		} else if (!strcmp(p, "rc")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(rc_rcfile));
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(rc_rcfile));
 		} else if (!strcmp(p, "norc")) {
-			sprintf(buf, "aro=%s:%d", p, rc_norc);
+			snprintf(buf, bufn, "aro=%s:%d", p, rc_norc);
 		} else if (!strcmp(p, "h") || !strcmp(p, "help") ||
 		    !strcmp(p, "V") || !strcmp(p, "version") ||
 		    !strcmp(p, "lastmod")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(lastmod));
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(lastmod));
 		} else if (!strcmp(p, "bg")) {
-			sprintf(buf, "aro=%s:%d", p, opts_bg);
+			snprintf(buf, bufn, "aro=%s:%d", p, opts_bg);
 		} else if (!strcmp(p, "nofb")) {
-			sprintf(buf, "aro=%s:%d", p, nofb);
+			snprintf(buf, bufn, "aro=%s:%d", p, nofb);
 		} else if (!strcmp(p, "sigpipe")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(sigpipe));
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(sigpipe));
 		} else if (!strcmp(p, "threads")) {
-			sprintf(buf, "aro=%s:%d", p, use_threads);
+			snprintf(buf, bufn, "aro=%s:%d", p, use_threads);
 		} else if (!strcmp(p, "clients")) {
 			char *str = list_clients();
-			sprintf(buf, "aro=%s:%s", p, str);
+			snprintf(buf, bufn, "aro=%s:%s", p, str);
 			free(str);
 		} else if (!strcmp(p, "client_count")) {
-			sprintf(buf, "aro=%s:%d", p, client_count);
+			snprintf(buf, bufn, "aro=%s:%d", p, client_count);
 		} else if (!strcmp(p, "pid")) {
-			sprintf(buf, "aro=%s:%d", p, (int) getpid());
+			snprintf(buf, bufn, "aro=%s:%d", p, (int) getpid());
 		} else if (!strcmp(p, "ext_xtest")) {
-			sprintf(buf, "aro=%s:%d", p, xtest_present);
+			snprintf(buf, bufn, "aro=%s:%d", p, xtest_present);
 		} else if (!strcmp(p, "ext_xkb")) {
-			sprintf(buf, "aro=%s:%d", p, xkb_present);
+			snprintf(buf, bufn, "aro=%s:%d", p, xkb_present);
 		} else if (!strcmp(p, "ext_xshm")) {
-			sprintf(buf, "aro=%s:%d", p, xshm_present);
+			snprintf(buf, bufn, "aro=%s:%d", p, xshm_present);
 		} else if (!strcmp(p, "ext_xinerama")) {
-			sprintf(buf, "aro=%s:%d", p, xinerama_present);
+			snprintf(buf, bufn, "aro=%s:%d", p, xinerama_present);
 		} else if (!strcmp(p, "ext_overlay")) {
-			sprintf(buf, "aro=%s:%d", p, overlay_present);
+			snprintf(buf, bufn, "aro=%s:%d", p, overlay_present);
 		} else if (!strcmp(p, "ext_xfixes")) {
-			sprintf(buf, "aro=%s:%d", p, xfixes_present);
+			snprintf(buf, bufn, "aro=%s:%d", p, xfixes_present);
 		} else if (!strcmp(p, "ext_xdamage")) {
-			sprintf(buf, "aro=%s:%d", p, xdamage_present);
+			snprintf(buf, bufn, "aro=%s:%d", p, xdamage_present);
 		} else if (!strcmp(p, "ext_xrandr")) {
-			sprintf(buf, "aro=%s:%d", p, xrandr_present);
+			snprintf(buf, bufn, "aro=%s:%d", p, xrandr_present);
 		} else if (!strcmp(p, "rootwin")) {
-			sprintf(buf, "aro=%s:0x%x", p, (unsigned int) rootwin);
+			snprintf(buf, bufn, "aro=%s:0x%x", p,
+			    (unsigned int) rootwin);
 		} else if (!strcmp(p, "num_buttons")) {
-			sprintf(buf, "aro=%s:%d", p, num_buttons);
+			snprintf(buf, bufn, "aro=%s:%d", p, num_buttons);
 		} else if (!strcmp(p, "button_mask")) {
-			sprintf(buf, "aro=%s:%d", p, button_mask);
+			snprintf(buf, bufn, "aro=%s:%d", p, button_mask);
 		} else if (!strcmp(p, "mouse_x")) {
-			sprintf(buf, "aro=%s:%d", p, cursor_x);
+			snprintf(buf, bufn, "aro=%s:%d", p, cursor_x);
 		} else if (!strcmp(p, "mouse_y")) {
-			sprintf(buf, "aro=%s:%d", p, cursor_y);
+			snprintf(buf, bufn, "aro=%s:%d", p, cursor_y);
 		} else if (!strcmp(p, "bpp")) {
-			sprintf(buf, "aro=%s:%d", p, bpp);
+			snprintf(buf, bufn, "aro=%s:%d", p, bpp);
 		} else if (!strcmp(p, "depth")) {
-			sprintf(buf, "aro=%s:%d", p, depth);
+			snprintf(buf, bufn, "aro=%s:%d", p, depth);
 		} else if (!strcmp(p, "indexed_color")) {
-			sprintf(buf, "aro=%s:%d", p, indexed_color);
+			snprintf(buf, bufn, "aro=%s:%d", p, indexed_color);
 		} else if (!strcmp(p, "dpy_x")) {
-			sprintf(buf, "aro=%s:%d", p, dpy_x);
+			snprintf(buf, bufn, "aro=%s:%d", p, dpy_x);
 		} else if (!strcmp(p, "dpy_y")) {
-			sprintf(buf, "aro=%s:%d", p, dpy_y);
+			snprintf(buf, bufn, "aro=%s:%d", p, dpy_y);
 		} else if (!strcmp(p, "rfbport")) {
-			sprintf(buf, "aro=%s:%d", p, screen->port);
+			snprintf(buf, bufn, "aro=%s:%d", p, screen->port);
 		} else if (!strcmp(p, "rfbwait")) {
 			NOTAPPRO
 		} else if (!strcmp(p, "rfbauth")) {
@@ -7222,33 +7253,34 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		} else if (!strcmp(p, "passwd")) {
 			NOTAPPRO
 		} else if (!strcmp(p, "alwaysshared")) {
-			sprintf(buf, "aro=%s:%d", p, screen->alwaysShared);
+			snprintf(buf, bufn, "aro=%s:%d", p, screen->alwaysShared);
 		} else if (!strcmp(p, "dontdisconnect")) {
-			sprintf(buf, "aro=%s:%d", p, screen->dontDisconnect);
+			snprintf(buf, bufn, "aro=%s:%d", p,
+			    screen->dontDisconnect);
 		} else if (!strcmp(p, "httpdir")) {
-			sprintf(buf, "aro=%s:%s", p, NONUL(screen->httpDir));
+			snprintf(buf, bufn, "aro=%s:%s", p,
+			    NONUL(screen->httpDir));
 		} else if (!strcmp(p, "enablehttpproxy")) {
-			sprintf(buf, "aro=%s:%d", p,
+			snprintf(buf, bufn, "aro=%s:%d", p,
 			    screen->httpEnableProxyConnect);
 		} else {
 			NOTAPP
 		}
 		goto qry;
 	} else {
+		char tmp[100];
 		NOTAPP
 		rfbLog("process_remote_cmd: warning unknown\n");
-		rfbLog("command \"%s\"\n", p);
-		return NULL;
-	}
-
-	if (*p != '\0' && do_vnc_connect) {
-		/* this is a reverse connection */
-		strncpy(vnc_connect_str, p, VNC_CONNECT_MAX);
-		vnc_connect_str[VNC_CONNECT_MAX] = '\0';
+		strncpy(tmp, p, 90);
+		rfbLog("command \"%s\"\n", tmp);
+		goto done;
 	}
 
 	done:
-	return NULL;
+
+	if (*buf == '\0') {
+		sprintf(buf, "ack=1");
+	}
 
 	qry:
 
@@ -7259,7 +7291,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (out != NULL) {
 			fprintf(out, "%s\n", buf);
 			fclose(out);
-			usleep(200*1000);
+			usleep(20*1000);
 		}
 	} else {
 		set_vnc_connect_prop(buf);
@@ -8418,7 +8450,11 @@ void cursor_position(int x, int y) {
 }
 
 void set_rfb_cursor(int which) {
-	int workaround = 2; /* if rfbSetCursor does not mark modified  */
+	int workaround = 1; /* if rfbSetCursor does not mark modified  */
+
+#if OLD_TREE
+	workaround = 2;
+#endif
 
 	if (! show_cursor) {
 		return;
@@ -8711,6 +8747,7 @@ void set_visual(char *str) {
 				return;
 			}
 			rfbLog("bad -visual arg: %s\n", vstring);
+			X_UNLOCK;
 			clean_up_exit(1);
 		}
 		visual_id = (VisualID) v_in;
@@ -8725,6 +8762,7 @@ void set_visual(char *str) {
 		;
 	} else {
 		rfbLog("could not find visual: %s\n", vstring);
+		X_UNLOCK;
 		clean_up_exit(1);
 	}
 	free(vstring);
@@ -12197,12 +12235,12 @@ char gui_code[] = "";
 
 void run_gui(char *gui_xdisplay, int connect_to_x11vnc) {
 	char *x11vnc_xdisplay = NULL;
-	char extra_path[] = ":/usr/local/bin:/usr/sfw/bin:/usr/X11R6/bin";
+	char extra_path[] = ":/usr/local/bin:/usr/bin/X11:/usr/sfw/bin"
+	    ":/usr/X11R6/bin:/usr/openwin/bin:/usr/dt/bin";
 	char cmd[100];
-	char *wish, *orig_path, *full_path, *tpath, *p;
+	char *wish = NULL, *orig_path, *full_path, *tpath, *p;
 	int try_max = 9, sleep = 300;
 	FILE *pipe;
-
 
 	if (getenv("DISPLAY") != NULL) {
 		x11vnc_xdisplay = strdup(getenv("DISPLAY"));
@@ -12212,10 +12250,11 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc) {
 	}
 	if (connect_to_x11vnc) {
 		int rc, i;
+		rfbLogEnable(0);
 		if (! client_connect_file) {
 			dpy = XOpenDisplay(x11vnc_xdisplay); 
 			if (! dpy) {
-				fprintf(stderr, "could not open display: %s\n",
+				fprintf(stderr, "gui: could not open display: %s\n",
 				    x11vnc_xdisplay);
 				exit(1);
 			}
@@ -12223,22 +12262,23 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc) {
 			rootwin = RootWindow(dpy, scr);
 			initialize_vnc_connect_prop();
 		}
+		usleep(1000*1000);
 		for (i=0; i<try_max; i++) {
 			usleep(sleep*1000);
-			fprintf(stderr, "pinging %s ...\n",
-			    NONUL(x11vnc_xdisplay));
-			rc = send_remote_cmd("ping", 1);
+			fprintf(stderr, "gui: pinging %s try=%d ...\n",
+			    NONUL(x11vnc_xdisplay), i+1);
+			rc = send_remote_cmd("qry=ping", 1, 1);
 			if (rc == 0) {
 				break;
 			}
 		}
 		if (rc == 0) {
-			fprintf(stderr, "success.\n");
+			fprintf(stderr, "gui: ping succeeded.\n");
 			set_env("X11VNC_XDISPLAY", x11vnc_xdisplay);
 			set_env("X11VNC_CONNECT", "1");
 		} else {
-			fprintf(stderr, "could not connect to: '%s', try again"
-			    " in the gui.\n", x11vnc_xdisplay);
+			fprintf(stderr, "gui: could not connect to: '%s', try"
+			    " again manually.\n", x11vnc_xdisplay);
 		}
 	}
 
@@ -12262,9 +12302,9 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc) {
 		try = (char *)malloc(strlen(p) + 10);
 		for (i=0; i<nwishes; i++) {
 			sprintf(try, "%s/%s", p, wishes[i]);
-			if (stat(try, &sbuf)) {
+			if (stat(try, &sbuf) == 0) {
+				/* assume executable, should check mode */
 				wish = wishes[i];
-				break;
 			}
 		}
 		free(try);
@@ -12282,7 +12322,6 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc) {
 	set_env("X11VNC_PROG", program_name);
 	set_env("X11VNC_CMDLINE", program_cmdline);
 
-if (0) system("env");
 	sprintf(cmd, "%s -", wish);
 	pipe = popen(cmd, "w");
 	if (! pipe) {
@@ -13332,25 +13371,33 @@ static void print_help(void) {
 "                       initial state of the modifier is ignored and not reset)\n"
 "                       To include button events use \"Button1\", ... etc.\n"
 "\n"
-"-nodragging            Do not update the display during mouse dragging events\n"
-"                       (mouse motion with a button held down).  Greatly\n"
-"                       improves response on slow setups, but you lose all\n"
-"                       visual feedback for drags, text selection, and some\n"
-"                       menu traversals.\n"
+"-nodragging            Do not update the display during mouse dragging\n"
+"                       events (mouse motion with a button held down).\n"
+"                       Greatly improves response on slow setups, but you lose\n"
+"                       all visual feedback for drags, text selection, and some\n"
+"                       menu traversals.  It overrides any -pointer_mode setting\n"
+"                       (think of it as pointer_mode 0)\n"
 "-pointer_mode n        Various pointer update schemes.  The problem is pointer\n"
 "                       motion can cause rapid changes on the screen, e.g. a\n"
-"                       window drag.  Neither x11vnc nor the bandwidth to the\n"
-"                       vncviewers can keep up these rapid screen changes:\n"
-"                       everything bogs down when dragging or scrolling.\n"
-"                       Note that most video h/w is optimized for writing, not\n"
-"                       reading (a 50X rate difference is possible) and x11vnc\n"
-"                       is reading all the time.  So a scheme has to be used to\n"
-"                       \"eat\" much of that pointer input before re-polling the\n"
-"                       screen. n can be 1 to %d.  n=1 was the original scheme\n"
-"                       used to about Jan 2004.  n=2 is an improved scheme.\n"
-"                       n=3 is basically a dynamic -nodragging mode: it detects\n"
-"                       if the mouse drag motion has paused and refreshes\n"
-"                       the display.  n=4 is TBD.  The default n is %d.\n"
+"                       window drag.  Neither x11vnc's screen polling nor the\n"
+"                       bandwidth to the vncviewers can keep up these rapid\n"
+"                       screen changes: everything bogs down when dragging\n"
+"                       or scrolling.  Note that most video h/w is optimized\n"
+"                       for writing, not reading (a 50X rate difference is\n"
+"                       possible) and x11vnc is reading all the time.  So a\n"
+"                       scheme has to be used to \"eat\" much of that pointer\n"
+"                       input before re-polling the screen. n can be 1 to %d.\n"
+"\n"
+"                       n=1 was the original scheme used to about Jan 2004: it\n"
+"                       basically just skips -input_skip pointer events before\n"
+"                       repolling the screen.  n=2 is an improved scheme:\n"
+"                       by watching the current rate it tries to detect if\n"
+"                       it should try to \"eat\" more pointer events.  n=3 is\n"
+"                       basically a dynamic -nodragging mode: it detects if the\n"
+"                       mouse drag motion has paused and refreshes the display.\n"
+"                       n=4 is TBD, it will try measure screen read and client\n"
+"                       write rates and try to insert \"frames\" between the\n"
+"                       on/off states of mode 3.  The default n is %d.\n"
 "-input_skip n          For the pointer handling when non-threaded: try to\n"
 "                       read n user input events before scanning display. n < 0\n"
 "                       means to act as though there is always user input.\n"
@@ -13667,6 +13714,25 @@ static void print_help(void) {
 "                       dpy_x dpy_y rfbport rfbwait rfbauth passwd alwaysshared\n"
 "                       dontdisconnect httpdir enablehttpproxy\n"
 "\n"
+"-sync                  By default -remote commands are run asynchronously, that\n"
+"                       is, the request is posted and the program immediately\n"
+"                       exits.  Use -sync to have the program wait for an\n"
+"                       acknowledgement from the x11vnc server that command\n"
+"                       was processed.  On the other hand -query requests are\n"
+"                       always processed synchronously because they have wait\n"
+"                       for the result.\n"
+"\n"
+"                       Also note that if both -remote and -query requests are\n"
+"                       supplied on the command line, the -remote is processed\n"
+"                       first (synchronously: no need for -sync), and then\n"
+"                       the -query request is processed in the normal way.\n"
+"                       This allows for a reliable way to see if the -remote\n"
+"                       command was processed by querying for any new settings.\n"
+"                       Note however that there is timeout of a few seconds so\n"
+"                       if the x11vnc takes longer than that to process the\n"
+"                       requests the requestor will think that a failure has\n"
+"                       taken place.\n"
+"\n"
 "-noremote              Do not process any remote control commands or queries.\n"
 "\n"
 "                       A note about security wrt remote control commands.\n"
@@ -13825,6 +13891,7 @@ static void check_rcfile(int argc, char **argv) {
 		}
 	}
 	rc_norc = norc;
+	rc_rcfile = strdup("");
 	if (norc) {
 		;
 	} else if (infile != NULL) {
@@ -13842,9 +13909,10 @@ static void check_rcfile(int argc, char **argv) {
 		strcat(rcfile, "/.x11vncrc");
 		infile = rcfile;
 		rc = fopen(rcfile, "r");
-		rc_rcfile = strdup(rcfile);
 		if (rc == NULL) {
 			norc = 1;
+		} else {
+			rc_rcfile = strdup(rcfile);
 		}
 	}
 
@@ -13980,9 +14048,10 @@ int main(int argc, char* argv[]) {
 	int i, len;
 	int ev, er, maj, min;
 	char *arg;
+	int remote_sync = 0;
 	char *remote_cmd = NULL;
+	char *query_cmd  = NULL;
 	char *gui_string = NULL;
-	int remote_query = 0;
 	int pw_loc = -1;
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
@@ -14317,18 +14386,21 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-remote") || !strcmp(arg, "-R")
 		    || !strcmp(arg, "-r")) {
 			CHECK_ARGC
-			remote_cmd = strdup(argv[++i]);
-			if (!strcmp(remote_cmd, "ping")) {
-				remote_query = 1;
+			i++;
+			if (!strcmp(argv[i], "ping")) {
+				query_cmd = strdup(argv[i]);
+			} else {
+				remote_cmd = strdup(argv[i]);
 			}
 			quiet = 1;
 			xkbcompat = 0;
 		} else if (!strcmp(arg, "-query") || !strcmp(arg, "-Q")) {
 			CHECK_ARGC
-			remote_cmd = strdup(argv[++i]);
-			remote_query = 1;
+			query_cmd = strdup(argv[++i]);
 			quiet = 1;
 			xkbcompat = 0;
+		} else if (!strcmp(arg, "-sync")) {
+			remote_sync = 1;
 		} else if (!strcmp(arg, "-noremote")) {
 			accept_remote_cmds = 0;
 		} else if (!strcmp(arg, "-unsafe")) {
@@ -14396,13 +14468,14 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	if (client_connect_file && remote_cmd) {
+	if (client_connect_file && (remote_cmd || query_cmd)) {
 		/* no need to open DISPLAY, just write it to the file now */
-		int rc = send_remote_cmd(remote_cmd, remote_query);
+		int rc = do_remote_query(remote_cmd, query_cmd, remote_sync);
 		fflush(stderr);
 		fflush(stdout);
 		exit(rc);
 	}
+
 
 
 	/*
@@ -14654,11 +14727,7 @@ int main(int argc, char* argv[]) {
 	/* open the X display: */
 	X_INIT;
 	if (auth_file) {
-		char *tmp;
-		int len = strlen("XAUTHORITY=") + strlen(auth_file) + 1;
-		tmp = (char *) malloc((size_t) len);
-		sprintf(tmp, "XAUTHORITY=%s", auth_file);
-		putenv(tmp);
+		set_env("XAUTHORITY", auth_file);
 	}
 	if (watch_bell || use_xkb_modtweak) {
 		/* we need XKEYBOARD for these: */
@@ -14708,10 +14777,11 @@ int main(int argc, char* argv[]) {
 	scr = DefaultScreen(dpy);
 	rootwin = RootWindow(dpy, scr);
 
-	if (remote_cmd) {
-		int rc = send_remote_cmd(remote_cmd, remote_query);
+	if (remote_cmd || query_cmd) {
+		int rc = do_remote_query(remote_cmd, query_cmd, remote_sync);
 		XFlush(dpy);
 		fflush(stderr);
+		fflush(stdout);
 		usleep(30 * 1000);	/* still needed? */
 		XCloseDisplay(dpy);
 		exit(rc);

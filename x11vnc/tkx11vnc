@@ -47,6 +47,7 @@ catch {rename send {}}
 #	Q means it is an action worth querying after running.
 #	D means it is a good idea to delay a little before querying 
 #	  (i.e. perhaps it causes x11vnc to do a lot of work, new fb)
+#	  No longer used, -sync is used instead.
 #	P means the string can be +/- appended/deleted (string may not
 #         be the same after the remote command)
 #	G means gui internal item
@@ -839,7 +840,8 @@ proc entry_delete {} {
 
 # Utilities for remote control and updating vars.
 
-proc push_new_value {item name new {query 1}} {
+proc push_new_value0 {item name new {query 1}} {
+	# old way w/o -sync
 	global menu_var always_update remote_output query_output
 	global delay_sleep extra_sleep extra_sleep_split
 
@@ -953,6 +955,125 @@ proc push_new_value {item name new {query 1}} {
 	}
 }
 
+proc push_new_value {item name new {query 1}} {
+	global menu_var always_update remote_output query_output
+	global delay_sleep extra_sleep extra_sleep_split
+	global query_result_list
+
+	set debug [in_debug_mode]
+
+	set getout 0
+	set print_getout 0;
+
+	set do_query_all 0
+
+	set newnew ""
+	if {$item == "disconnect"} {
+		set newnew "N/A"
+		set do_query_all 1
+	} elseif {$always_update} {
+		set do_query_all 1
+	}
+
+	if {$item == "remote-cmd"} {
+		# kludge for arbitrary remote command:
+		if {[regexp {^Q:} $new]} {
+			# extra kludge for Q:var to mean -Q var
+			regsub {^Q:} $new "" new
+			set qonly 1
+		} else {
+			set qonly 0
+		}
+		# need to extract item from new:
+		set qtmp $new
+		regsub {:.*$} $qtmp "" qtmp
+		if {$qonly} {
+			set rargs [list "-Q" "$qtmp"]
+			set print_getout 1
+			set qargs ""
+		} else {
+			set rargs [list "-R" "$new"]
+			set qargs ""
+		}
+		set getout 1
+
+	} elseif {[value_is_string $item]} {
+		# string var:
+		set rargs [list "-R" "$name:$new"]
+		set qargs [list "-Q" "$name"]
+	} else {
+		# boolean var:
+		set rargs [list "-R" "$name"]
+		set qargs [list "-Q" "$name"]
+	}
+
+	if {! $query && ! $always_update} {
+		set getout 1
+	} elseif {$item == "noremote"} {
+		set getout 1
+	} elseif {[is_action $item] && ![opt_match Q $item] && $rargs != ""} {
+		set getout 1
+	} elseif {[regexp {^(sid|id)$} $item] && ![regexp {^0x} $new]} {
+		set getout 1
+	}
+
+	set remote_output ""
+	set query_output ""
+
+	if {!$debug} {
+		append_text "x11vnc $rargs ..."
+	}
+
+	if {$getout} {
+		set remote_output [run_remote_cmd $rargs]
+		if {$print_getout} {
+			append_text "\t$remote_output"
+		}
+		append_text "\n"
+		return
+	}
+
+	if {$do_query_all} {
+		set all [all_query_vars]
+		set qargs [list "-Q" $all]
+	}
+
+	set rqargs [concat $rargs $qargs]
+
+	set query [run_remote_cmd $rqargs]
+	set query_output $query
+
+	set query_result_list ""
+
+	if {$newnew != ""} {
+		set new $newnew
+	}
+
+	if {![see_if_ok $query $item "$name:$new"]} {
+		# failed
+		if  {[regexp {^a..=} $query]} {
+			# but some result came back
+			# synchronize everything with a 2nd call.
+			set query_output [query_all 1]
+		} else {
+			# server may be dead
+			if {$item != "ping" && $item != "attach"} {
+				try_connect
+			}
+		}
+	} else {
+		# succeeded
+		# synchronize this variable (or variables)
+		# for a speedup used the list parsed by see_if_ok.
+		update_menu_vars "USE_LIST"
+
+		if {$do_query_all} {
+			global all_settings
+			set all_settings $query
+		}
+	}
+}
+
 # For updating a string variable.   Also used for simple OK/Skip dialogs
 # with entry = 0.
 proc entry_dialog {item {entry 1}} {
@@ -1042,14 +1163,25 @@ proc check_var {item} {
 }
 
 proc see_if_ok {query item expected} {
+	global query_result_list
+
 	set ok 0
 	set found ""
-	foreach q [split_query $query] {
-		if {[regexp "^$item:" $q]} {
+
+	set query_result_list [split_query $query]
+
+	foreach q $query_result_list {
+#		if {[regexp "^$item:" $q]} {
+#			set found $q
+#		}
+		if {[string first "$item:" $q] == 0} {
 			set found $q
 		}
 		if {$q == $expected} {
 			set ok 1
+			if {$found != ""} {
+				break;
+			}
 		}
 	}
 	if {$found == ""} {
@@ -1076,23 +1208,26 @@ proc see_if_ok {query item expected} {
 }
 
 proc update_menu_vars {{query ""}} {
-	global all_settings menu_var
+	global all_settings menu_var query_result_list
 
 	set debug [in_debug_mode]
 
-	if {$query == ""} {
-		set qstr $all_settings
+	if {$query == "USE_LIST"} {
+		;
+	} elseif {$query == ""} {
+		set query_result_list [split_query $all_settings]
 	} else {
-		set qstr $query
+		set query_result_list [split_query $query]
 	}
-	foreach piece [split_query $qstr] {
+
+	foreach piece $query_result_list {
 		if {[regexp {^([^:][^:]*):(.*)$} $piece m0 item val]} {
 			if {[info exists menu_var($item)]} {
 				set old $menu_var($item)
 				if {$val == "N/A"} {
 					continue
 				}
-				if {$debug} {
+				if {0 && $debug} {
 					puts "setting menuvar: $item: $old -> $val"
 				}
 				set menu_var($item) $val
@@ -1127,7 +1262,12 @@ proc clear_all {} {
 
 proc all_query_vars {} {
 	global query_ans_list query_aro_list all_settings
+	global cache_all_query_vars
 	
+	if {$cache_all_query_vars != ""} {
+		return $cache_all_query_vars
+	}
+
 	set qry ""
 	foreach item $query_ans_list {
 		if {$qry == ""} {
@@ -1143,6 +1283,8 @@ proc all_query_vars {} {
 			append qry ",$item"
 		}
 	}
+	set cache_all_query_vars $qry
+
 	return $qry
 }
 
@@ -1150,8 +1292,6 @@ proc query_all {{quiet 0}} {
 	global query_ans_list query_aro_list all_settings
 
 	set qry [all_query_vars]
-
-	#puts "into query_all $quiet"
 
 	set qargs [list "-Q" $qry]
 	set all [run_remote_cmd $qargs]
@@ -1282,13 +1422,25 @@ proc do_action {item} {
 	}
 }
 
+proc ptime {time} {
+	set usec [lindex [split $time] 0]
+	set sec [format "%.3f" [expr "$usec / 1000000.0"]]
+	puts "time: $sec secs."
+}
+
 proc do_var {item} {
 	global connected_to_x11vnc item_cascade menu_var
+
+	set debug [in_debug_mode]
 
 	set string 0
 	if {[is_action $item]} {
 		# Menu item is action:
-		do_action $item
+		if {$debug} {
+			ptime [time {do_action $item}]
+		} else {
+			do_action $item
+		}
 		return
 	}
 
@@ -1313,7 +1465,11 @@ proc do_var {item} {
 		set new 1
 	}
 	if {$connected_to_x11vnc} {
-		push_new_value $item $name $new 1
+		if {$debug} {
+			ptime [time {push_new_value $item $name $new 1}]
+		} else {
+			push_new_value $item $name $new 1
+		}
 	}
 }
 
@@ -1364,7 +1520,8 @@ proc value_is_bool {item} {
 	}
 }
 
-proc split_query {query} {
+proc split_query0 {query} {
+	# original slower way with regexp/regsub
 	regsub -all {aro=} $query {ans=} query
 	set items {}
 	while {1} {
@@ -1384,6 +1541,38 @@ proc split_query {query} {
 	return $items
 }
 
+proc split_query {query} {
+	regsub -all {aro=} $query {ans=} query
+	set items {}
+	while {1} {
+		set n [string first "ans=" $query]
+		if {$n < 0} {
+			break
+		}
+		set from [expr $n+4]
+
+		set m [string first ",ans=" $query]
+		if {$m < 0} {
+			set more 0
+			set item [string range $query $from end]
+		} else {
+			set more 1
+			set to   [expr $m-1]
+			set item [string range $query $from $to]
+		}
+		if {$item != ""} {
+			lappend items $item
+		}
+		if {$more} {
+			incr m
+			set query [string range $query $m end]
+		} else {
+			set query ""
+		}
+	}
+	return $items
+}
+
 proc set_x11_display {name} {
 	global x11_display
 	set x11_display "x11vnc X display: $name"
@@ -1398,6 +1587,7 @@ proc no_x11_display {} {
 proc no_vnc_display {} {
 	set_vnc_display "(*none*)"
 }
+
 proc fetch_displays {} {
 
 	set qargs [list "-Q" "display,vncdisplay"]
@@ -1899,11 +2089,34 @@ proc get_start_x11vnc_cmd {} {
 
 	lappend cmd $x11vnc_prog
 
+	set saw_id 0
+
 	foreach item [lsort [array names menu_var]] {
 		if {![active_when_starting $item]} {
 			continue
 		}
 		if {[is_action $item]} {
+			continue
+		}
+		if {$item == "debug_gui"} {
+			continue
+		}
+		if {$item == "id" || $item == "sid"} {
+			set val $menu_var($item);
+			if {$val == "0x0" || $val == "root"} {
+				continue
+			}
+		}
+		if {$item == "sid" && $saw_id} {
+			continue
+		}
+		if {$item == "id"} {
+			set saw_id 1
+		}
+		if {$item == "progressive" && $menu_var($item) == "0"} {
+			continue
+		}
+		if {$item == "dontdisconnect" && $menu_var($item) == "-1"} {
 			continue
 		}
 
@@ -1917,7 +2130,11 @@ proc get_start_x11vnc_cmd {} {
 			if {[info exists menu_var($item)]} {
 				if {$menu_var($item) != ""
 				    && $menu_var($item) != $unset_str} {
-					lappend cmd "-$item"
+					set nitem $item
+					if {$nitem == "screen_blank"} {
+						set nitem "sb"
+					}
+					lappend cmd "-$nitem"
 					lappend cmd $menu_var($item)
 				}
 			}
@@ -1996,6 +2213,7 @@ proc run_remote_cmd {opts} {
 		lappend cmd "-display"
 		lappend cmd $x11vnc_xdisplay
 	}
+	lappend cmd "-sync"
 	foreach word $opts {
 		lappend cmd $word
 	}
@@ -2011,11 +2229,18 @@ if {0} {
 }
 
 	set output ""
+	menus_disable
 	stop_watch on
 	catch {set output [eval exec $cmd]}
 	stop_watch off
+	menus_enable
 	if {$debug} {
-		append_text "output: $output\n"
+		if {[string length $output] > 100} {
+			set str [string range $output 0 100]
+			append_text "output: $str ...\n"
+		} else {
+			append_text "output: $output\n"
+		}
 	}
 	return $output
 }
@@ -2083,6 +2308,7 @@ global menu_var unset_str
 global bfont
 global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
+global cache_all_query_vars
 
 set unset_str "(unset)"
 set connected_to_x11vnc 0
@@ -2093,9 +2319,9 @@ set help_indent 24;
 set reply_xdisplay ""
 set all_settings "None so far."
 set always_update 1
+set cache_all_query_vars ""
 
-#set delay_sleep 500
-#set extra_sleep 1500
+# these are no longer used under x11vnc -sync:
 set delay_sleep 350
 set extra_sleep 1000
 set extra_sleep_split 4
