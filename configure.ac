@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 AC_INIT(LibVNCServer, 0.7pre, http://sourceforge.net/projects/libvncserver)
 AM_INIT_AUTOMAKE(LibVNCServer, 0.7pre)
-AM_CONFIG_HEADER(config.h)
+AM_CONFIG_HEADER(rfbconfig.h)
 AX_PREFIX_CONFIG_H([rfb/rfbconfig.h])
 
 # Checks for programs.
@@ -83,7 +83,7 @@ if test ! -z "$HAVE_PTHREAD_H"; then
 fi
 AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
 AM_CONDITIONAL(HAVE_LIBZ, test ! -z "$HAVE_ZLIB_H")
-AM_CONDITIONAL(HAVE_LIBJPEG, test ! -u "$HAVE_JPEGLIB_H")
+AM_CONDITIONAL(HAVE_LIBJPEG, test ! -z "$HAVE_JPEGLIB_H")
 
 # Checks for header files.
 AC_HEADER_STDC
