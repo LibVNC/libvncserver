@@ -1,3 +1,7 @@
+2005-03-19  Karl Runge <runge@karlrunge.com>
+	* x11vnc: scale cursors by default, -scale_cursor to tune,
+	  -arrow n, -norepeat n, speed up integer magnification. 
+
 2005-03-12  Karl Runge <runge@karlrunge.com>
 	* x11vnc: X DAMAGE support, -clip WxH+X+Y, identd.
 

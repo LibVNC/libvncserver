@@ -1,3 +1,12 @@
+2005-03-19  Karl Runge <runge@karlrunge.com>
+	* scale cursors along with display. Use -scale_cursor to change
+	  or disable cursor scaling.
+	* speed up scaling in some cases, :nb and integer magnification.
+	* provide alternative arrow cursors (1-6) via -arrow n.
+	* reset no autorepeat a couple times if something turns it off,
+	  set with -norepeat N.
+	* do not take a nap if DAMAGE seems to be doing its job.
+
 2005-03-12  Karl Runge <runge@karlrunge.com>
 	* support for the X DAMAGE extension to receive damage
 	  rectangle reports from the X server.  On by default, disable

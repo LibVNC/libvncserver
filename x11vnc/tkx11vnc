@@ -107,6 +107,7 @@ Screen
 	id:
 	sid:
 	=D scale:
+	scale_cursor:
 	--
 	overlay
 	overlay_nocursor
@@ -140,6 +141,7 @@ Keyboard
 
 Pointer
 	=D-C:none,arrow,X,some,most cursor:
+	=-C:1,2,3,4,5,6 arrow:
 	--
 	cursorpos
 	=D nocursorshape
@@ -239,9 +241,8 @@ Tuning
 	snapfb
 	--
 	xdamage
-	xd_mem:
 	xd_area:
-	xd_width:
+	xd_mem:
 	--
 	threads
 	--

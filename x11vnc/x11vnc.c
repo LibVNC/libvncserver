@@ -314,7 +314,6 @@ int overlay_present = 0;
 static int xrandr_base_event_type;
 #endif
 
-#define CURSOR_TRANSPARENCY 1 
 int xfixes_present = 0;
 int use_xfixes = 1;
 int got_xfixes_cursor_notify = 0;
@@ -322,6 +321,8 @@ int alpha_threshold = 240;
 double alpha_frac = 0.33;
 int alpha_remove = 0;
 int alpha_blend = 1;
+
+int alt_arrow = 1;
 
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 #include <X11/extensions/Xfixes.h>
@@ -343,7 +344,7 @@ int xdamage_tile_count;
 int hack_val = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2pre lastmod: 2005-03-12";
+char lastmod[] = "0.7.2pre lastmod: 2005-03-19";
 
 /* X display info */
 
@@ -436,6 +437,15 @@ int scaling_interpolate = 0;	/* use interpolation scheme when shrinking */
 int scaled_x = 0, scaled_y = 0;	/* dimensions of scaled display */
 int scale_numer = 0, scale_denom = 0;	/* n/m */
 
+/* scale cursor */
+char *scale_cursor_str = NULL;
+double scale_cursor_fac = 1.0;
+int scaling_cursor = 0;
+int scaling_cursor_noblend = 0;
+int scaling_cursor_interpolate = 0;
+int scale_cursor_numer = 0, scale_cursor_denom = 0;
+
+
 /* size of the basic tile unit that is polled for changes: */
 int tile_x = 32;
 int tile_y = 32;
@@ -492,6 +502,7 @@ int scanlines[NSCAN] = {
 int all_clients_initialized(void);
 void close_all_clients(void);
 void close_clients(char *);
+int get_autorepeat_state(void);
 void autorepeat(int restore);
 char *bitprint(unsigned int, int);
 void blackout_tiles(void);
@@ -576,6 +587,7 @@ void set_cursor(int, int, int);
 void setup_cursors(void);
 void setup_cursors_and_push(void);
 void first_cursor(void);
+rfbCursorPtr pixels2curs(unsigned long *, int, int, int, int, int);
 void set_no_cursor(void);
 void set_cursor_was_changed(rfbScreenInfoPtr);
 void set_cursor_was_moved(rfbScreenInfoPtr);
@@ -610,6 +622,13 @@ char *get_remote_host(int sock);
 char *get_local_host(int sock);
 
 void xcut_receive(char *text, int len, rfbClientPtr client);
+
+void parse_scale_string(char *, double *, int *, int *,
+    int *, int *, int *, int *, int *);
+void scale_rect(double, int, int, int,
+    char *, int, char *, int,
+    int, int, int, int, int, int, int, int, int);
+int scale_round(int, double);
 
 void zero_fb(int, int, int, int);
 void push_black_screen(int);
@@ -698,6 +717,7 @@ int cursor_shape_updates = 1;	/* cursor shape updates -nocursorshape */
 int use_xwarppointer = 0;	/* use XWarpPointer instead of XTestFake... */
 int show_dragging = 1;		/* process mouse movement events */
 int no_autorepeat = 1;		/* turn off autorepeat with clients */
+int no_repeat_countdown = 2;
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
 int sound_bell = 1;		/* actually send it */
 int xkbcompat = 0;		/* ignore XKEYBOARD extension */
@@ -2889,6 +2909,7 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	rfbLog("running command:\n");
 	rfbLog("  %s\n", cmd);
 
+	/* XXX need to close port 5900, etc.. */
 	rc = system(cmd);
 
 	if (rc >= 256) {
@@ -4152,8 +4173,16 @@ void clear_keys(void) {
  * keystroke autorepeating as well, it kind of makes sense to shut it
  * off if no one is at the physical display...
  */
-void autorepeat(int restore) {
+int get_autorepeat_state(void) {
 	XKeyboardState kstate;
+	X_LOCK;
+	XGetKeyboardControl(dpy, &kstate);
+	X_UNLOCK;
+	return kstate.global_auto_repeat;
+}
+
+void autorepeat(int restore) {
+	int global_auto_repeat;
 	XKeyboardControl kctrl;
 	static int save_auto_repeat = -1;
 
@@ -4161,10 +4190,10 @@ void autorepeat(int restore) {
 		if (save_auto_repeat < 0) {
 			return;		/* nothing to restore */
 		}
+		global_auto_repeat = get_autorepeat_state();
 		X_LOCK;
 		/* read state and skip restore if equal (e.g. no clients) */
-		XGetKeyboardControl(dpy, &kstate);
-		if (kstate.global_auto_repeat == save_auto_repeat) {
+		if (global_auto_repeat == save_auto_repeat) {
 			X_UNLOCK;
 			return;
 		}
@@ -4177,17 +4206,21 @@ void autorepeat(int restore) {
 		rfbLog("Restored X server key autorepeat to: %d\n",
 		    save_auto_repeat);
 	} else {
-		X_LOCK;
-		XGetKeyboardControl(dpy, &kstate);
-		save_auto_repeat = kstate.global_auto_repeat;
+		global_auto_repeat = get_autorepeat_state();
+		save_auto_repeat = global_auto_repeat;
 
+		X_LOCK;
 		kctrl.auto_repeat_mode = AutoRepeatModeOff;
 		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
 		XFlush(dpy);
 		X_UNLOCK;
 
-		rfbLog("Disabled X server key autorepeat. (you can run the\n");
-		rfbLog("command: 'xset r on' to force it back on)\n");
+		rfbLog("Disabled X server key autorepeat.\n");
+		if (no_repeat_countdown >= 0) {
+			rfbLog("  you can run the command: 'xset r on' (%d "
+			    "times)\n", no_repeat_countdown+1);
+			rfbLog("  to force it back on.\n");
+		}
 	}
 }
 
@@ -6884,6 +6917,30 @@ void check_xevents(void) {
 		}
 	}
 
+	if (no_autorepeat && client_count && no_repeat_countdown) {
+		static time_t last_check = 0;
+		if (now > last_check + 1) {
+			last_check = now;
+			X_UNLOCK;
+			if (get_autorepeat_state() != 0) {
+				int n = no_repeat_countdown - 1;
+				if (n >= 0) {
+					rfbLog("Battling with something for "
+					    "-norepeat!! (%d resets left)\n",n);
+				} else {
+					rfbLog("Battling with something for "
+					    "-norepeat!!\n");
+				}
+				if (no_repeat_countdown > 0) {
+					no_repeat_countdown--;
+				}
+				autorepeat(1);
+				autorepeat(0);
+			}
+			X_LOCK;
+		}
+	}
+
 	if (XCheckTypedEvent(dpy, MappingNotify, &xev)) {
 		XRefreshKeyboardMapping((XMappingEvent *) &xev);
 		if (use_modifier_tweak) {
@@ -7658,20 +7715,6 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				do_new_fb(1);
 			}
 		}
-	} else if (strstr(p, "clip") == p) {
-		COLON_CHECK("clip:")
-		if (query) {
-			snprintf(buf, bufn, "ans=%s%s%s", p, co,
-			    NONUL(clip_str));
-			goto qry;
-		}
-		p += strlen("clip:");
-		if (clip_str) free(clip_str);
-		clip_str = strdup(p);
-
-		/* OK, this requires a new fb... */
-		do_new_fb(1);
-
 	} else if (strstr(p, "waitmapped") == p) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p,
@@ -7686,6 +7729,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		subwin_wait_mapped = 0;
+
+	} else if (strstr(p, "clip") == p) {
+		COLON_CHECK("clip:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(clip_str));
+			goto qry;
+		}
+		p += strlen("clip:");
+		if (clip_str) free(clip_str);
+		clip_str = strdup(p);
+
+		/* OK, this requires a new fb... */
+		do_new_fb(1);
 
 	} else if (!strcmp(p, "flashcmap")) {
 		if (query) {
@@ -7830,6 +7887,23 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		/* OK, this requires a new fb... */
 		check_black_fb();
 		do_new_fb(0);
+
+	} else if (!strcmp(p, "scale_cursor") ||
+		    strstr(p, "scale_cursor:") == p) {	/* skip-cmd-list */
+		COLON_CHECK("scale_cursor:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(scale_cursor_str));
+			goto qry;
+		}
+		p += strlen("scale_cursor:");
+		if (scale_cursor_str) free(scale_cursor_str);
+		if (*p == '\0') {
+			scale_cursor_str = NULL;
+		} else {
+			scale_cursor_str = strdup(p);
+		}
+		setup_cursors_and_push();
 
 	} else if (!strcmp(p, "viewonly")) {
 		if (query) {
@@ -8657,6 +8731,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("process_remote_cmd: enabling -norepeat mode.\n");
 		no_autorepeat = 1;
+		if (no_repeat_countdown >= 0) {
+			no_repeat_countdown = 2;
+		}
 		if (client_count) {
 			autorepeat(0);	/* disable if any clients */
 		}
@@ -8842,6 +8919,18 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		show_cursor = 0;
 		initialize_cursors_mode();
 		first_cursor();
+
+	} else if (strstr(p, "arrow") == p) {
+		COLON_CHECK("arrow:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, alt_arrow);
+			goto qry;
+		}
+		p += strlen("arrow:");
+		alt_arrow = atoi(p);
+		rfbLog("process_remote_cmd: setting alt_arrow: %d.\n",
+		    alt_arrow);
+		setup_cursors_and_push();
 
 	} else if (!strcmp(p, "xfixes")) {
 		if (query) {
@@ -9547,7 +9636,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		accept_remote_cmds = 0; /* cannot be turned back on. */
 
 	} else if (strstr(p, "hack:") == p) { /* skip-cmd-list */
-		NOTAPP
+		COLON_CHECK("hack:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, hack_val);
+			goto qry;
+		}
 		p += strlen("hack:");
 		hack_val = atoi(p);
 		rfbLog("set hack_val to: %d\n", hack_val);
@@ -9921,24 +10014,23 @@ void collect_xdamage(int scancnt) {
 	X_UNLOCK;
 
 	now = time(0);
-if (! last_rpt) {
-	last_rpt = now;
-}
-if (now > last_rpt + 15) {
-	double rat = -1.0;
-
-	if (XD_tot) {
-		rat = ((double) XD_skip)/XD_tot;
+	if (! last_rpt) {
+		last_rpt = now;
 	}
-		
-	if (0) fprintf(stderr, "skip/tot: %04d/%04d  rat=%.3f  rect_count: %d  desired_rects: %d\n",
-		XD_skip, XD_tot, rat, rect_count, XD_des);
-	XD_skip = 0;
-	XD_tot  = 0;
-	XD_des  = 0;
-	rect_count = 0;
-	last_rpt = now;
-}
+	if (now > last_rpt + 15) {
+		double rat = -1.0;
+
+		if (XD_tot) {
+			rat = ((double) XD_skip)/XD_tot;
+		}
+			
+if (0) fprintf(stderr, "skip/tot: %04d/%04d  rat=%.3f  rect_count: %d  desired_rects: %d\n", XD_skip, XD_tot, rat, rect_count, XD_des);
+		XD_skip = 0;
+		XD_tot  = 0;
+		XD_des  = 0;
+		rect_count = 0;
+		last_rpt = now;
+	}
 #endif
 }
 
@@ -10072,6 +10164,25 @@ typedef struct cursor_info {
 	rfbCursorPtr rfb;
 } cursor_info_t;
 
+void curs_copy(cursor_info_t *dest, cursor_info_t *src) {
+	if (src->data != NULL) {
+		dest->data = strdup(src->data);
+	} else {
+		dest->data = NULL;
+	}
+	if (src->mask != NULL) {
+		dest->mask = strdup(src->mask);
+	} else {
+		dest->mask = NULL;
+	}
+	dest->wx = src->wx;
+	dest->wy = src->wy;
+	dest->sx = src->sx;
+	dest->sy = src->sy;
+	dest->reverse = src->reverse;
+	dest->rfb = src->rfb;
+}
+
 /* empty cursor */
 static char* curs_empty_data =
 "  "
@@ -10091,6 +10202,7 @@ static char* curs_dot_mask =
 "  "
 " x";
 static cursor_info_t cur_dot = {NULL, NULL, 2, 2, 0, 0, 0, NULL};
+
 
 /* main cursor */
 static char* curs_arrow_data =
@@ -10132,8 +10244,198 @@ static char* curs_arrow_mask =
 "      xx          "
 "                  "
 "                  ";
-static cursor_info_t cur_arrow = {NULL, NULL, 18, 18, 0, 0, 0, NULL};
+static cursor_info_t cur_arrow = {NULL, NULL, 18, 18, 0, 0, 1, NULL};
 
+static char* curs_arrow2_data =
+"                  "
+" x                "
+" xx               "
+" xxx              "
+" xxxx             "
+" xxxxx            "
+" xxxxxx           "
+" xxxxxxx          "
+" xxxxxxxx         "
+" xxxxx            "
+" xx xx            "
+" x   xx           "
+"     xx           "
+"      xx          "
+"      xx          "
+"                  "
+"                  "
+"                  ";
+
+static char* curs_arrow2_mask =
+"xx                "
+"xxx               "
+"xxxx              "
+"xxxxx             "
+"xxxxxx            "
+"xxxxxxx           "
+"xxxxxxxx          "
+"xxxxxxxxx         "
+"xxxxxxxxxx        "
+"xxxxxxxxxx        "
+"xxxxxxx           "
+"xxx xxxx          "
+"xx  xxxx          "
+"     xxxx         "
+"     xxxx         "
+"      xx          "
+"                  "
+"                  ";
+static cursor_info_t cur_arrow2 = {NULL, NULL, 18, 18, 0, 0, 0, NULL};
+
+static char* curs_arrow3_data = 
+"                "
+" xx             "
+" xxxx           "
+"  xxxxx         "
+"  xxxxxxx       "
+"   xxxxxxxx     "
+"   xxxxxxxxxx   "
+"    xxxxx       "
+"    xxxxx       "
+"     xx  x      "
+"     xx   x     "
+"      x    x    "
+"      x     x   "
+"             x  "
+"              x "
+"                ";
+
+static char* curs_arrow3_mask = 
+"xxx             "
+"xxxxx           "
+"xxxxxxx         "
+" xxxxxxxx       "
+" xxxxxxxxxx     "
+"  xxxxxxxxxxxx  "
+"  xxxxxxxxxxxx  "
+"   xxxxxxxxxxx  "
+"   xxxxxxx      "
+"    xxxxxxx     "
+"    xxxx xxx    "
+"     xxx  xxx   "
+"     xxx   xxx  "
+"     xxx    xxx "
+"             xxx"
+"              xx";
+
+static cursor_info_t cur_arrow3 = {NULL, NULL, 16, 16, 0, 0, 1, NULL};
+
+static char* curs_arrow4_data = 
+"                "
+" xx             "
+" xxxx           "
+"  xxxxx         "
+"  xxxxxxx       "
+"   xxxxxxxx     "
+"   xxxxxxxxxx   "
+"    xxxxx       "
+"    xxxxx       "
+"     xx  x      "
+"     xx   x     "
+"      x    x    "
+"      x     x   "
+"             x  "
+"              x "
+"                ";
+
+static char* curs_arrow4_mask = 
+"xxx             "
+"xxxxx           "
+"xxxxxxx         "
+" xxxxxxxx       "
+" xxxxxxxxxx     "
+"  xxxxxxxxxxxx  "
+"  xxxxxxxxxxxx  "
+"   xxxxxxxxxxx  "
+"   xxxxxxx      "
+"    xxxxxxx     "
+"    xxxx xxx    "
+"     xxx  xxx   "
+"     xxx   xxx  "
+"     xxx    xxx "
+"             xxx"
+"              xx";
+
+static cursor_info_t cur_arrow4 = {NULL, NULL, 16, 16, 0, 0, 0, NULL};
+
+static char* curs_arrow5_data = 
+"x              "
+" xx            "
+" xxxx          "
+"  xxxxx        "
+"  xxxxxxx      "
+"   xxx         "
+"   xx x        "
+"    x  x       "
+"    x   x      "
+"         x     "
+"          x    "
+"           x   "
+"            x  "
+"             x "
+"              x";
+
+static char* curs_arrow5_mask = 
+"xx             "
+"xxxx           "
+" xxxxx         "
+" xxxxxxx       "
+"  xxxxxxxx     "
+"  xxxxxxxx     "
+"   xxxxx       "
+"   xxxxxx      "
+"    xx xxx     "
+"     x  xxx    "
+"         xxx   "
+"          xxx  "
+"           xxx "
+"            xxx"
+"             xx";
+
+static cursor_info_t cur_arrow5 = {NULL, NULL, 15, 15, 0, 0, 1, NULL};
+
+static char* curs_arrow6_data = 
+"x              "
+" xx            "
+" xxxx          "
+"  xxxxx        "
+"  xxxxxxx      "
+"   xxx         "
+"   xx x        "
+"    x  x       "
+"    x   x      "
+"         x     "
+"          x    "
+"           x   "
+"            x  "
+"             x "
+"              x";
+
+static char* curs_arrow6_mask = 
+"xx             "
+"xxxx           "
+" xxxxx         "
+" xxxxxxx       "
+"  xxxxxxxx     "
+"  xxxxxxxx     "
+"   xxxxx       "
+"   xxxxxx      "
+"    xx xxx     "
+"     x  xxx    "
+"         xxx   "
+"          xxx  "
+"           xxx "
+"            xxx"
+"             xx";
+
+static cursor_info_t cur_arrow6 = {NULL, NULL, 15, 15, 0, 0, 0, NULL};
+
+int alt_arrow_max = 6;
 /*
  * It turns out we can at least detect mouse is on the root window so 
  * show it (under -cursor X) with this familiar cursor... 
@@ -10338,7 +10640,8 @@ void first_cursor(void) {
 
 void setup_cursors(void) {
 	rfbCursorPtr rfb_curs;
-	int i, n = 0;
+	char *scale = NULL;
+	int i, j, n = 0;
 	static int first = 1;
 
 	rfbLog("setting up %d cursors...\n", CURS_MAX);
@@ -10380,6 +10683,7 @@ void setup_cursors(void) {
 			if (ci->mask) {
 				free(ci->mask);
 			}
+			free(ci);
 		}
 
 		/* create new struct: */
@@ -10407,6 +10711,16 @@ void setup_cursors(void) {
 
 	cur_arrow.data	= curs_arrow_data;
 	cur_arrow.mask	= curs_arrow_mask;
+	cur_arrow2.data	= curs_arrow2_data;
+	cur_arrow2.mask	= curs_arrow2_mask;
+	cur_arrow3.data	= curs_arrow3_data;
+	cur_arrow3.mask	= curs_arrow3_mask;
+	cur_arrow4.data	= curs_arrow4_data;
+	cur_arrow4.mask	= curs_arrow4_mask;
+	cur_arrow5.data	= curs_arrow5_data;
+	cur_arrow5.mask	= curs_arrow5_mask;
+	cur_arrow6.data	= curs_arrow6_data;
+	cur_arrow6.mask	= curs_arrow6_mask;
 
 	cur_root.data	= curs_root_data;
 	cur_root.mask	= curs_root_mask;
@@ -10420,74 +10734,155 @@ void setup_cursors(void) {
 	cur_xterm.data	= curs_xterm_data;
 	cur_xterm.mask	= curs_xterm_mask;
 
-	cursors[CURS_EMPTY] = &cur_empty;	n++;
-	cursors[CURS_DOT]   = &cur_dot;		n++;
-	cursors[CURS_ARROW] = &cur_arrow;	n++;
-	cursors[CURS_ROOT]  = &cur_root;	n++;
-	cursors[CURS_WM]    = &cur_fleur;	n++;
-	cursors[CURS_TERM]  = &cur_xterm;	n++;
-	cursors[CURS_PLUS]  = &cur_plus;	n++;
+	curs_copy(cursors[CURS_EMPTY], &cur_empty);	n++;
+	curs_copy(cursors[CURS_DOT],   &cur_dot);	n++;
+
+	if (alt_arrow < 1 || alt_arrow > alt_arrow_max) {
+		alt_arrow = 1;
+	}
+	if (alt_arrow == 1) {
+		curs_copy(cursors[CURS_ARROW], &cur_arrow);	n++;
+	} else if (alt_arrow == 2) {
+		curs_copy(cursors[CURS_ARROW], &cur_arrow2);	n++;
+	} else if (alt_arrow == 3) {
+		curs_copy(cursors[CURS_ARROW], &cur_arrow3);	n++;
+	} else if (alt_arrow == 4) {
+		curs_copy(cursors[CURS_ARROW], &cur_arrow4);	n++;
+	} else if (alt_arrow == 5) {
+		curs_copy(cursors[CURS_ARROW], &cur_arrow5);	n++;
+	} else if (alt_arrow == 6) {
+		curs_copy(cursors[CURS_ARROW], &cur_arrow6);	n++;
+	} else {
+		alt_arrow = 1;
+		curs_copy(cursors[CURS_ARROW], &cur_arrow);	n++;
+	}
+
+	curs_copy(cursors[CURS_ROOT], &cur_root);	n++;
+	curs_copy(cursors[CURS_WM],   &cur_fleur);	n++;
+	curs_copy(cursors[CURS_TERM], &cur_xterm);	n++;
+	curs_copy(cursors[CURS_PLUS], &cur_plus);	n++;
+
+	if (scale_cursor_str) {
+		scale = scale_cursor_str;
+	} else if (scaling && scale_str) {
+		scale = scale_str;
+	}
+	/* scale = NULL zeroes everything */
+	parse_scale_string(scale, &scale_cursor_fac, &scaling_cursor,
+	    &scaling_cursor_noblend, &j, &j, &scaling_cursor_interpolate,
+	    &scale_cursor_numer, &scale_cursor_denom);
 
 	for (i=0; i<n; i++) {
 		/* create rfbCursors for the special cursors: */
 
 		cursor_info_t *ci = cursors[i];
 
-		ci->data = strdup(ci->data);
-		ci->mask = strdup(ci->mask);
+		if (scaling_cursor && scale_cursor_fac != 1.0) {
+			int w, h, x, y, i;
+			unsigned long *pixels;
 
-		rfb_curs = rfbMakeXCursor(ci->wx, ci->wy, ci->data, ci->mask);
+			w = ci->wx;
+			h = ci->wy;
 
-		if (ci->reverse) {
-			rfb_curs->foreRed   = 0x0000;
-			rfb_curs->foreGreen = 0x0000;
-			rfb_curs->foreBlue  = 0x0000;
-			rfb_curs->backRed   = 0xffff;
-			rfb_curs->backGreen = 0xffff;
-			rfb_curs->backBlue  = 0xffff;
-		}
-		rfb_curs->xhot = ci->sx;
-		rfb_curs->yhot = ci->sy;
-		rfb_curs->cleanup = FALSE;
-		rfb_curs->cleanupSource = FALSE;
-		rfb_curs->cleanupMask = FALSE;
-		rfb_curs->cleanupRichSource = FALSE;
+			pixels = (unsigned long *) malloc(4*w*h);
 
-		if (bpp == 8 && indexed_color) {
-			/*
-			 * use richsource in PseudoColor for better
-			 * looking cursors (i.e. two-color).
-			 */
-			int x, y, k = 0, bw;
-			char d, m;
-			int black = BlackPixel(dpy, scr);
-			int white = WhitePixel(dpy, scr);
+			i = 0;
+			for (y=0; y<h; y++) {
+				for (x=0; x<w; x++) {
+					char d = ci->data[i];
+					char m = ci->mask[i];
+					unsigned long *p;
 
-			rfb_curs->richSource
-			    = (char *)calloc(ci->wx * ci->wy, 1);
+					p = pixels + i;
 
-			for (y = 0; y < ci->wy; y++) {
-			    for (x = 0; x < ci->wx; x++) {
-				d = *(ci->data + k);
-				m = *(ci->mask + k);
-				if (d == ' ' && m == ' ') {
-					k++;
-					continue;
-				} else if (m != ' ' && d == ' ') {
-					bw = black;
-				} else {
-					bw = white;
-				}
-				if (ci->reverse) {
-					if (bw == black) {
-						bw = white;
-					} else {
-						bw = black;
+					/* set alpha on */
+					*p = 0xff000000;
+
+					if (d == ' ' && m == ' ') {
+						/* alpha off */
+						*p = 0x00000000;
+					} else if (d != ' ') {
+						/* body */
+						if (ci->reverse) {
+							*p |= 0x00000000;
+						} else {
+							*p |= 0x00ffffff;
+						}
+					} else if (m != ' ') {
+						/* edge */
+						if (ci->reverse) {
+							*p |= 0x00ffffff;
+						} else {
+							*p |= 0x00000000;
+						}
 					}
+					i++;
 				}
-				*(rfb_curs->richSource+k) = (unsigned char) bw;
-				k++;
-			    }
+			}
+
+			rfb_curs = pixels2curs(pixels, w, h, ci->sx, ci->sy,
+			    bpp/8);
+
+			free(pixels);
+
+		} else {
+
+			/* standard X cursor */
+			rfb_curs = rfbMakeXCursor(ci->wx, ci->wy,
+			    ci->data, ci->mask);
+
+			if (ci->reverse) {
+				rfb_curs->foreRed   = 0x0000;
+				rfb_curs->foreGreen = 0x0000;
+				rfb_curs->foreBlue  = 0x0000;
+				rfb_curs->backRed   = 0xffff;
+				rfb_curs->backGreen = 0xffff;
+				rfb_curs->backBlue  = 0xffff;
+			}
+			rfb_curs->xhot = ci->sx;
+			rfb_curs->yhot = ci->sy;
+			rfb_curs->cleanup = FALSE;
+			rfb_curs->cleanupSource = FALSE;
+			rfb_curs->cleanupMask = FALSE;
+			rfb_curs->cleanupRichSource = FALSE;
+
+			if (bpp == 8 && indexed_color) {
+				/*
+				 * use richsource in PseudoColor for better
+				 * looking cursors (i.e. two-color).
+				 */
+				int x, y, k = 0, bw;
+				char d, m;
+				int black = BlackPixel(dpy, scr);
+				int white = WhitePixel(dpy, scr);
+
+				rfb_curs->richSource
+				    = (char *)calloc(ci->wx * ci->wy, 1);
+
+				for (y = 0; y < ci->wy; y++) {
+				    for (x = 0; x < ci->wx; x++) {
+					d = *(ci->data + k);
+					m = *(ci->mask + k);
+					if (d == ' ' && m == ' ') {
+						k++;
+						continue;
+					} else if (m != ' ' && d == ' ') {
+						bw = black;
+					} else {
+						bw = white;
+					}
+					if (ci->reverse) {
+						if (bw == black) {
+							bw = white;
+						} else {
+							bw = black;
+						}
+					}
+					*(rfb_curs->richSource+k) =
+					    (unsigned char) bw;
+					k++;
+				    }
+				}
 			}
 		}
 		ci->rfb = rfb_curs;
@@ -10622,6 +11017,227 @@ void initialize_xfixes(void) {
 #endif
 }
 
+rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
+    int xhot, int yhot, int Bpp) {
+	rfbCursorPtr c;
+	static unsigned long black, white;
+	static int first = 1;
+	char *bitmap, *rich, *alpha;
+	char *new_pixels = NULL;
+	int n_opaque, n_trans, n_alpha, len, histo[256];
+	int send_alpha = 0, alpha_shift, thresh;
+	int i, x, y;
+
+	if (first) {
+		X_LOCK;
+		black = BlackPixel(dpy, scr);
+		white = WhitePixel(dpy, scr);
+		X_UNLOCK;
+		first = 0;
+	}
+
+	if (scaling_cursor && scale_cursor_fac != 1.0) {
+		int W, H;
+
+		W = w;
+		H = h;
+
+		w = scale_round(W, scale_cursor_fac);
+		h = scale_round(H, scale_cursor_fac);
+
+		new_pixels = (char *) malloc(4 * w * h);
+
+		scale_rect(scale_cursor_fac, scaling_cursor_noblend,
+		    scaling_cursor_interpolate, 4,
+		    (char *) pixels, 4*W, new_pixels, 4*w,
+		    W, H, w, h,
+		    0, 0, W, H, 0);
+
+		pixels = (unsigned long *) new_pixels;
+
+		xhot = scale_round(xhot, scale_cursor_fac);
+		yhot = scale_round(yhot, scale_cursor_fac);
+	}
+
+	len = w * h;
+	/* for bitmap data */
+	bitmap = (char *)malloc(len+1);
+	bitmap[len] = '\0';
+
+	/* for rich cursor pixel data */
+	rich  = (char *)calloc(Bpp*len, 1);
+	alpha = (char *)calloc(1*len, 1);
+
+	n_opaque = 0;
+	n_trans = 0;
+	n_alpha = 0;
+	for (i=0; i<256; i++) {
+		histo[i] = 0;
+	}
+
+	i = 0;
+	for (y = 0; y < h; y++) {
+		for (x = 0; x < w; x++) {
+			unsigned long a;
+
+			a = 0xff000000 & (*(pixels+i));
+			a = a >> 24;	/* alpha channel */
+			if (a > 0) {
+				n_alpha++;
+			}
+			histo[a]++;
+			if (a < alpha_threshold) {
+				n_trans++;
+			} else {
+				n_opaque++;
+			}
+			i++;
+		}
+	}
+	if (alpha_blend) {
+		send_alpha = 0;
+		if (Bpp == 4) {
+			send_alpha = 1;
+		}
+		alpha_shift = 24;
+		if (main_red_shift == 24 || main_green_shift == 24 ||
+		    main_blue_shift == 24)  {
+			alpha_shift = 0;	/* XXX correct? */
+		}
+	}
+	if (n_opaque >= alpha_frac * n_alpha) {
+		thresh = alpha_threshold;
+	} else {
+		n_opaque = 0;
+		for (i=255; i>=0; i--) {
+			n_opaque += histo[i];
+			thresh = i;
+			if (n_opaque >= alpha_frac * n_alpha) {
+				break;
+			}
+		}
+	}
+
+	i = 0;
+	for (y = 0; y < h; y++) {
+		for (x = 0; x < w; x++) {
+			unsigned long r, g, b, a;
+			unsigned int ui;
+			char *p;
+
+			a = 0xff000000 & (*(pixels+i));
+			a = a >> 24;	/* alpha channel */
+
+
+			if (a < thresh) {
+				bitmap[i] = ' ';
+			} else {
+				bitmap[i] = 'x';
+			}
+
+			r = 0x00ff0000 & (*(pixels+i));
+			g = 0x0000ff00 & (*(pixels+i));
+			b = 0x000000ff & (*(pixels+i));
+			r = r >> 16;	/* red */
+			g = g >> 8;	/* green */
+			b = b >> 0;	/* blue */
+
+			if (alpha_remove && a != 0) {
+				r = (255 * r) / a;
+				g = (255 * g) / a;
+				b = (255 * b) / a;
+				if (r > 255) r = 255;
+				if (g > 255) g = 255;
+				if (b > 255) b = 255;
+			}
+
+			if (indexed_color) {
+				/*
+				 * Choose black or white for
+				 * PseudoColor case.
+				 */
+				int value = (r+g+b)/3;
+				if (value > 127) {
+					ui = white;
+				} else {
+					ui = black;
+				}
+			} else {
+				/*
+				 * Otherwise map the RGB data onto
+				 * the framebuffer format:
+				 */
+				r = (main_red_max   * r)/255;
+				g = (main_green_max * g)/255;
+				b = (main_blue_max  * b)/255;
+				ui = 0;
+				ui |= (r << main_red_shift);
+				ui |= (g << main_green_shift);
+				ui |= (b << main_blue_shift);
+				if (send_alpha) {
+					ui |= (a << alpha_shift);
+				}
+			}
+
+			/* insert value into rich source: */
+			p = rich + Bpp*i;
+
+			if (Bpp == 1) {
+				*((unsigned char *)p)
+				= (unsigned char) ui;
+			} else if (Bpp == 2) {
+				*((unsigned short *)p)
+				= (unsigned short) ui;
+			} else if (Bpp == 3) {
+				*((unsigned char *)p)
+				= (unsigned char) ((ui & 0x0000ff) >> 0);
+				*((unsigned char *)(p+1))
+				= (unsigned char) ((ui & 0x00ff00) >> 8);
+				*((unsigned char *)(p+2))
+				= (unsigned char) ((ui & 0xff0000) >> 16);
+			} else if (Bpp == 4) {
+				*((unsigned int *)p)
+				= (unsigned int) ui;
+			}
+
+			/* insert alpha value into alpha source: */
+			p = alpha + i;
+			*((unsigned char *)p) = (unsigned char) a;
+
+			i++;
+		}
+	}
+
+	/* create the cursor with the bitmap: */
+	c = rfbMakeXCursor(w, h, bitmap, bitmap);
+	free(bitmap);
+
+	if (new_pixels) {
+		free(new_pixels);
+	}
+
+	/* set up the cursor parameters: */
+	c->xhot = xhot;
+	c->yhot = yhot;
+	c->cleanup = FALSE;
+	c->cleanupSource = FALSE;
+	c->cleanupMask = FALSE;
+	c->cleanupRichSource = FALSE;
+	c->richSource = rich;
+
+#if !OLD_TREE
+	if (alpha_blend && !indexed_color) {
+		c->alphaSource = alpha;
+		c->alphaPreMultiplied = TRUE;
+	} else {
+		free(alpha);
+		c->alphaSource = NULL;
+	}
+#endif
+
+	return c;
+}
+
 int get_xfixes_cursor(int init) {
 	static unsigned long last_cursor = 0;
 	static int last_index = 0;
@@ -10643,14 +11259,8 @@ int get_xfixes_cursor(int init) {
 
 	if (xfixes_present) {
 #if LIBVNCSERVER_HAVE_LIBXFIXES
-		int use, oldest, i, x, y, w, h, len;
-		int Bpp = bpp/8;
+		int use, oldest, i;
 		time_t oldtime, now;
-		char *bitmap, *rich, *alpha;
-		unsigned long black, white;
-		rfbCursorPtr c;
-		int thresh,  n_opaque, n_trans, n_alpha, histo[256];
-		int send_alpha = 0, alpha_shift;
 		XFixesCursorImage *xfc;
 
 		if (! got_xfixes_cursor_notify) {
@@ -10727,7 +11337,7 @@ int get_xfixes_cursor(int init) {
 			if (cursors[use]->rfb->richSource) {
 				free(cursors[use]->rfb->richSource);
 			}
-#if !OLD_TREE && CURSOR_TRANSPARENCY
+#if !OLD_TREE
 			if (cursors[use]->rfb->alphaSource) {
 				free(cursors[use]->rfb->alphaSource);
 			}
@@ -10741,193 +11351,9 @@ int get_xfixes_cursor(int init) {
 			free(cursors[use]->rfb);
 		}
 
-		X_LOCK;
-		black = BlackPixel(dpy, scr);
-		white = WhitePixel(dpy, scr);
-		X_UNLOCK;
-
-		w = xfc->width;
-		h = xfc->height;
-		len = w * h;
-
-		/* for bitmap data */
-		bitmap = (char *)malloc(len+1);
-		bitmap[len] = '\0';
-
-		/* for rich cursor pixel data */
-		rich = (char *)calloc(Bpp*len, 1);
-		alpha = (char *)calloc(1*len, 1);
-
-		n_opaque = 0;
-		n_trans = 0;
-		n_alpha = 0;
-		for (i=0; i<256; i++) {
-			histo[i] = 0;
-		}
-
-		i = 0;
-		for (y = 0; y < h; y++) {
-			for (x = 0; x < w; x++) {
-				unsigned long a;
-
-				a = 0xff000000 & (*(xfc->pixels+i));
-				a = a >> 24;	/* alpha channel */
-				if (a > 0) {
-					n_alpha++;
-				}
-				histo[a]++;
-				if (a < alpha_threshold) {
-					n_trans++;
-				} else {
-					n_opaque++;
-				}
-				i++;
-			}
-		}
-		if (alpha_blend) {
-			send_alpha = 0;
-#if CURSOR_TRANSPARENCY
-			if (Bpp == 4) {
-				send_alpha = 1;
-			}
-#endif
-			alpha_shift = 24;
-			if (main_red_shift == 24 || main_green_shift == 24 ||
-			    main_blue_shift == 24)  {
-				alpha_shift = 0;	/* XXX correct? */
-			}
-		}
-		if (n_opaque >= alpha_frac * n_alpha) {
-			thresh = alpha_threshold;
-		} else {
-			n_opaque = 0;
-			for (i=255; i>=0; i--) {
-				n_opaque += histo[i];
-				thresh = i;
-				if (n_opaque >= alpha_frac * n_alpha) {
-					break;
-				}
-			}
-		}
-
-		i = 0;
-		for (y = 0; y < h; y++) {
-			for (x = 0; x < w; x++) {
-				unsigned long r, g, b, a;
-				unsigned int ui;
-				char *p;
-
-				a = 0xff000000 & (*(xfc->pixels+i));
-				a = a >> 24;	/* alpha channel */
-
-
-				if (a < thresh) {
-					bitmap[i] = ' ';
-				} else {
-					bitmap[i] = 'x';
-				}
-
-				r = 0x00ff0000 & (*(xfc->pixels+i));
-				g = 0x0000ff00 & (*(xfc->pixels+i));
-				b = 0x000000ff & (*(xfc->pixels+i));
-				r = r >> 16;	/* red */
-				g = g >> 8;	/* green */
-				b = b >> 0;	/* blue */
-
-				if (alpha_remove && a != 0) {
-					r = (255 * r) / a;
-					g = (255 * g) / a;
-					b = (255 * b) / a;
-					if (r > 255) r = 255;
-					if (g > 255) g = 255;
-					if (b > 255) b = 255;
-				}
-
-				if (indexed_color) {
-					/*
-					 * Choose black or white for
-					 * PseudoColor case.
-					 */
-					int value = (r+g+b)/3;
-					if (value > 127) {
-						ui = white;
-					} else {
-						ui = black;
-					}
-				} else {
-					/*
-					 * Otherwise map the RGB data onto
-					 * the framebuffer format:
-					 */
-					r = (main_red_max   * r)/255;
-					g = (main_green_max * g)/255;
-					b = (main_blue_max  * b)/255;
-					ui = 0;
-					ui |= (r << main_red_shift);
-					ui |= (g << main_green_shift);
-					ui |= (b << main_blue_shift);
-					if (send_alpha) {
-						ui |= (a << alpha_shift);
-					}
-				}
-
-				/* insert value into rich source: */
-				p = rich + Bpp*i;
-
-#if 0
-				memcpy(p, (char *)&ui, Bpp);
-#else
-				if (Bpp == 1) {
-					*((unsigned char *)p)
-					= (unsigned char) ui;
-				} else if (Bpp == 2) {
-					*((unsigned short *)p)
-					= (unsigned short) ui;
-				} else if (Bpp == 3) {
-					*((unsigned char *)p)
-					= (unsigned char) ((ui & 0x0000ff) >> 0);
-					*((unsigned char *)(p+1))
-					= (unsigned char) ((ui & 0x00ff00) >> 8);
-					*((unsigned char *)(p+2))
-					= (unsigned char) ((ui & 0xff0000) >> 16);
-				} else if (Bpp == 4) {
-					*((unsigned int *)p)
-					= (unsigned int) ui;
-				}
-#endif
-
-				/* insert alpha value into alpha source: */
-				p = alpha + i;
-				*((unsigned char *)p) = (unsigned char) a;
-
-				i++;
-			}
-		}
-
-		/* create the cursor with the bitmap: */
-		c = rfbMakeXCursor(w, h, bitmap, bitmap);
-		free(bitmap);
-
-		/* set up the cursor parameters: */
-		c->xhot = xfc->xhot;
-		c->yhot = xfc->yhot;
-		c->cleanup = FALSE;
-		c->cleanupSource = FALSE;
-		c->cleanupMask = FALSE;
-		c->cleanupRichSource = FALSE;
-		c->richSource = rich;
-
-#if !OLD_TREE && CURSOR_TRANSPARENCY
-		if (alpha_blend && !indexed_color) {
-			c->alphaSource = alpha;
-			c->alphaPreMultiplied = TRUE;
-		} else {
-			c->alphaSource = NULL;
-		}
-#endif
-
 		/* place cursor into our collection */
-		cursors[use]->rfb = c;
+		cursors[use]->rfb = pixels2curs(xfc->pixels, xfc->width,
+		    xfc->height, xfc->xhot, xfc->yhot, bpp/8);
 
 		/* update time and serial index: */
 		curs_times[use] = now;
@@ -12116,19 +12542,20 @@ XImage *initialize_xdisplay_fb(void) {
 	return fb;
 }
 
-void parse_scale_string(char *str) {
+void parse_scale_string(char *str, double *factor, int *scaling, int *noblend,
+    int *nomult4, int *pad, int *interpolate, int *numer, int *denom) {
+
 	int m, n;
 	char *p, *tstr;
 	double f;
 
-	scale_fac = 1.0;
-	scaling = 0;
-	scaling_noblend = 0;
-	scaling_nomult4 = 0;
-	scaling_pad = 0;
-	scaling_interpolate = 0;
-	scaled_x = 0, scaled_y = 0;
-	scale_numer = 0, scale_denom = 0;
+	*factor = 1.0;
+	*scaling = 0;
+	*noblend = 0;
+	*nomult4 = 0;
+	*pad = 0;
+	*interpolate = 0;
+	*numer = 0, *denom = 0;
 
 	if (str == NULL || str[0] == '\0') {
 		return;
@@ -12138,16 +12565,16 @@ void parse_scale_string(char *str) {
 	if ( (p = strchr(tstr, ':')) != NULL) {
 		/* options */
 		if (strstr(p+1, "nb") != NULL) {
-			scaling_noblend = 1;
+			*noblend = 1;
 		}
 		if (strstr(p+1, "n4") != NULL) {
-			scaling_nomult4 = 1;
+			*nomult4 = 1;
 		}
 		if (strstr(p+1, "in") != NULL) {
-			scaling_interpolate = 1;
+			*interpolate = 1;
 		}
 		if (strstr(p+1, "pad") != NULL) {
-			scaling_pad = 1;
+			*pad = 1;
 		}
 		*p = '\0';
 	}
@@ -12157,24 +12584,24 @@ void parse_scale_string(char *str) {
 			rfbLog("bad -scale arg: %s\n", tstr);
 			clean_up_exit(1);
 		}
-		scale_fac = (double) f;
+		*factor = (double) f;
 		/* look for common fractions from small ints: */
 		for (n=2; n<=10; n++) {
 			for (m=1; m<n; m++) {
 				test = ((double) m)/ n;
-				diff = scale_fac - test;
+				diff = *factor - test;
 				if (-eps < diff && diff < eps) {
-					scale_numer = m;
-					scale_denom = n;
+					*numer = m;
+					*denom = n;
 					break;
 				
 				}
 			}
-			if (scale_denom) {
+			if (*denom) {
 				break;
 			}
 		}
-		if (scale_fac < 0.01) {
+		if (*factor < 0.01) {
 			rfbLog("-scale factor too small: %f\n", scale_fac);
 			clean_up_exit(1);
 		}
@@ -12192,34 +12619,42 @@ void parse_scale_string(char *str) {
 			rfbLog("bad -scale arg: %s\n", tstr);
 			clean_up_exit(1);
 		}
-		scale_fac = ((double) m)/ n;
-		if (scale_fac < 0.01) {
-			rfbLog("-scale factor too small: %f\n", scale_fac);
+		*factor = ((double) m)/ n;
+		if (*factor < 0.01) {
+			rfbLog("-scale factor too small: %f\n", *factor);
 			clean_up_exit(1);
 		}
-		scale_numer = m;
-		scale_denom = n;
+		*numer = m;
+		*denom = n;
 	}
-	if (scale_fac == 1.0) {
+	if (*factor == 1.0) {
 		if (! quiet) {
-			rfbLog("scaling disabled for factor %f\n", scale_fac);
+			rfbLog("scaling disabled for factor %f\n", *factor);
 		}
 	} else {
-		scaling = 1;
+		*scaling = 1;
 	}
 	free(tstr);
+}
+
+int scale_round(int len, double fac) {
+	double eps = 0.000001;
+	
+	len = (int) (len * fac + eps);
+	return len;
 }
 
 void setup_scaling(int *width_in, int *height_in) {
 	int width  = *width_in;
 	int height = *height_in;
 
-	parse_scale_string(scale_str);
+	parse_scale_string(scale_str, &scale_fac, &scaling, &scaling_noblend,
+	    &scaling_nomult4, &scaling_pad, &scaling_interpolate,
+	    &scale_numer, &scale_denom);
 
 	if (scaling) {
-		double eps = 0.000001;
-		width  = (int) (width  * scale_fac + eps); 
-		height = (int) (height * scale_fac + eps); 
+		width  = scale_round(width,  scale_fac);
+		height = scale_round(height, scale_fac);
 		if (scale_denom && scaling_pad) {
 			/* it is not clear this padding is useful anymore */
 			rfbLog("width  %% denom: %d %% %d = %d\n", width,
@@ -14304,7 +14739,9 @@ weights for this scaled pixel are:
  * the loop over the 4 pixels.
  */
 
-static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
+void scale_rect(double factor, int noblend, int interpolate, int Bpp,
+    char *src_fb, int src_bytes_per_line, char *dst_fb, int dst_bytes_per_line,
+    int Nx, int Ny, int nx, int ny, int X1, int Y1, int X2, int Y2, int mark) {
 /*
  * Notation:
  * "i" an x pixel index in the destination (scaled) framebuffer
@@ -14314,8 +14751,6 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
  *
  *  Similarly for nx, ny, Nx, Ny, etc.  Lowercase: dest, Uppercase: source.
  */
-	int Nx, Ny, nx, ny, Bpp, b;
-
 	int i, j, i1, i2, j1, j2;	/* indices for scaled fb (dest) */
 	int I, J, I1, I2, J1, J2;	/* indices for main fb   (source) */
 
@@ -14323,73 +14758,108 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 
 	double x1, y1, x2, y2;	/* x-y coords for destination pixels edges */
 	double dx, dy;		/* size of destination pixel */
-
 	double ddx, ddy;	/* for interpolation expansion */
 
 	char *src, *dest;	/* pointers to the two framebuffers */
 
-	double pixave[4];	/* for averaging pixel values */
 
 	unsigned short us;
+	unsigned char  uc;
+	unsigned int   ui;
 
+	int use_noblend_shortcut = 1;
 	int shrink;		/* whether shrinking or expanding */
-	static int constant_weights = -1, cnt = 0;
+	static int constant_weights = -1, mag_int = -1;
+	static int last_Nx = -1, last_Ny = -1, cnt = 0;
+	static double last_factor = -1.0;
+	int b, k;
+	double pixave[4];	/* for averaging pixel values */
 
-	if (scale_fac <= 1.0) {
+	if (factor <= 1.0) {
 		shrink = 1;
 	} else {
 		shrink = 0;
 	}
-	if (shrink && scaling_interpolate) {
-		/*
-		 * User asked for interpolation scheme, presumably for
-		 * small shrink. 
-		 */
-		shrink = 0;
-	}
-	if (!screen || !rfb_fb || !main_fb) {
-		return;
-	}
-
-	if (! screen->serverFormat.trueColour) {
-		/*
-		 * PseudoColor colormap... blending leads to random colors.
-		 */
-		scaling_noblend = 1;
-	}
-
-	Bpp = bpp/8;	/* Bytes per pixel */
-
-	Nx = dpy_x;	/* extent of source (the whole main fb) */
-	Ny = dpy_y;
-
-	nx = scaled_x;	/* extent of dest (the whole scaled rfb fb) */
-	ny = scaled_y;
 
 	/*
-	 * width and height (real numbers) of a scaled pixel.
+	 * N.B. width and height (real numbers) of a scaled pixel.
 	 * both are > 1   (e.g. 1.333 for -scale 3/4)
 	 * they should also be equal but we don't assume it.
-	 */
-
-	/*
-	 * This original way is probably incorrect, giving rise to dx and
-	 * dy that will not exactly line up with the grid for 2/3, etc.
-	 * This gives rise to a whole spectrum of weights, leading to poor
-	 * tightvnc (and other encoding) compression. 
-	 */
-#if 0
-	dx = (double) Nx / nx;
-	dy = (double) Ny / ny;
-#else
-	
-	/*
+	 *
 	 * This new way is probably the best we can do, take the inverse
 	 * of the scaling factor to double precision.
 	 */
-	dx = 1.0/scale_fac;
-	dy = 1.0/scale_fac;
-#endif
+	dx = 1.0/factor;
+	dy = 1.0/factor;
+
+	/*
+	 * There is some speedup if the pixel weights are constant, so
+	 * let's special case these.
+	 *
+	 * If scale = 1/n and n divides Nx and Ny, the pixel weights
+	 * are constant (e.g. 1/2 => equal on 2x2 square).
+	 */
+	if (factor != last_factor || Nx != last_Nx || Ny != last_Ny) {
+		constant_weights = -1;
+		mag_int = -1;
+		last_Nx = Nx;
+		last_Ny = Ny;
+		last_factor = factor;
+	}
+
+	if (constant_weights < 0) {
+		int n = 0;
+
+		constant_weights = 0;
+		mag_int = 0;
+
+		for (i = 2; i<=128; i++) {
+			double test = ((double) 1)/ i;
+			double diff, eps = 1.0e-7;
+			diff = factor - test;
+			if (-eps < diff && diff < eps) {
+				n = i;
+				break;
+			}
+		}
+		if (noblend || ! shrink || interpolate) {
+			;
+		} else if (n != 0) {
+			if (Nx % n == 0 && Ny % n == 0) {
+				static int didmsg = 0;
+				if (mark && ! didmsg) {
+					didmsg = 1;
+					rfbLog("scale_and_mark_rect: using "
+					    "constant pixel weight speedup "
+					    "for 1/%d\n", n);
+				}
+				constant_weights = 1;
+			}
+		}
+
+		n = 0;
+		for (i = 2; i<=32; i++) {
+			double test = (double) i;
+			double diff, eps = 1.0e-7;
+			diff = factor - test;
+			if (-eps < diff && diff < eps) {
+				n = i;
+				break;
+			}
+		}
+		if (noblend && factor > 1.0 && n) {
+			mag_int = n;
+		}
+	}
+
+	if (mark && factor > 1.0 && ! noblend) {
+		/*
+		 * kludge: correct for interpolating blurring leaking
+		 * up or left 1 destination pixel.
+		 */
+		if (X1 > 0) X1--;
+		if (Y1 > 0) Y1--;
+	}
 
 	/*
 	 * find the extent of the change the input rectangle induces in
@@ -14413,36 +14883,45 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	j1 = nfix(j1, ny);
 	j2 = nfix(j2, ny) + 1;
 
-	/*
-	 * There is some speedup if the pixel weights are constant, so
-	 * let's special case these.
-	 *
-	 * If scale = 1/n and n divides Nx and Ny, the pixel weights
-	 * are constant (e.g. 1/2 => equal on 2x2 square).
-	 */
-	if (constant_weights < 0) {
-		int n = 0;
-		constant_weights = 0;
+	/* special case integer magnification with no blending */
+	if (mark && noblend && mag_int && Bpp != 3) {
+		int jmin, jmax, imin, imax;
 
-		for (i = 2; i<=128; i++) {
-			double test = ((double) 1)/ i;
-			double diff, eps = 1.0e-7;
-			diff = scale_fac - test;
-			if (-eps < diff && diff < eps) {
-				n = i;
-				break;
+		/* outer loop over *source* pixels */
+		for (J=Y1; J < Y2; J++) {
+		    jmin = J * mag_int;
+		    jmax = jmin + mag_int;
+		    for (I=X1; I < X2; I++) {
+			/* extract value */
+			src = src_fb + J*src_bytes_per_line + I*Bpp;
+			if (Bpp == 4) {
+				ui = *((unsigned int *)src);
+			} else if (Bpp == 2) {
+				us = *((unsigned short *)src);
+			} else if (Bpp == 1) {
+				uc = *((unsigned char *)src);
 			}
-		}
-		if (scaling_noblend || ! shrink) {
-			;
-		} else if (n != 0) {
-			if (Nx % n == 0 && Ny % n == 0) {
-				rfbLog("scale_and_mark_rect: using constant "
-				    "pixel weight speedup for 1/%d\n", n);
-				constant_weights = 1;
+			imin = I * mag_int;
+			imax = imin + mag_int;
+			/* inner loop over *dest* pixels */
+			for (j=jmin; j<jmax; j++) {
+			    dest = dst_fb + j*dst_bytes_per_line + imin*Bpp;
+			    for (i=imin; i<imax; i++) {
+				if (Bpp == 4) {
+					*((unsigned int *)dest) = ui;
+				} else if (Bpp == 2) {
+					*((unsigned short *)dest) = us;
+				} else if (Bpp == 1) {
+					*((unsigned char *)dest) = uc;
+				}
+				dest += Bpp;
+			    }
 			}
+		    }
 		}
+		goto markit;
 	}
+
 	/* set these all to 1.0 to begin with */
 	wx = 1.0;
 	wy = 1.0;
@@ -14463,7 +14942,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 		J1 = (int) FLOOR(y1);
 		J1 = nfix(J1, Ny);
 
-		if (shrink) {
+		if (shrink && ! interpolate) {
 			J2 = (int) CEIL(y2) - 1;
 			J2 = nfix(J2, Ny);
 		} else {
@@ -14472,9 +14951,10 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 		}
 
 		/* destination char* pointer: */
-		dest = rfb_fb + j*rfb_bytes_per_line + i1*Bpp;
+		dest = dst_fb + j*dst_bytes_per_line + i1*Bpp;
 		
 		for (i=i1; i<i2; i++) {
+
 			x1 =  i * dx;	/* left edge */
 			if (x1 > Nx - 1) {
 				/* can go over with dx = 1/scale_fac */
@@ -14488,14 +14968,39 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 			I1 = (int) FLOOR(x1);
 			if (I1 >= Nx) I1 = Nx - 1;
 
-			if (shrink) {
+			if (noblend && use_noblend_shortcut) {
+				/*
+				 * The noblend case involves no weights,
+				 * and 1 pixel, so just copy the value
+				 * directly.
+				 */
+				src = src_fb + J1*src_bytes_per_line + I1*Bpp;
+				if (Bpp == 4) {
+					*((unsigned int *)dest)
+					    = *((unsigned int *)src);
+				} else if (Bpp == 2) {
+					*((unsigned short *)dest)
+					    = *((unsigned short *)src);
+				} else if (Bpp == 1) {
+					*(dest) = *(src);
+				} else if (Bpp == 3) {
+					/* rare case */
+					for (k=0; k<=2; k++) {
+						*(dest+k) = *(src+k);
+					}
+				}
+				dest += Bpp;
+				continue;
+			}
+			
+			if (shrink && ! interpolate) {
 				I2 = (int) CEIL(x2) - 1;
 				if (I2 >= Nx) I2 = Nx - 1;
 			} else {
 				I2 = I1 + 1;	/* simple interpolation */
 				ddx = x1 - I1;
 			}
-			
+
 			/* Zero out accumulators for next pixel average: */
 			for (b=0; b<4; b++) {
 				pixave[b] = 0.0; /* for RGB weighted sums */
@@ -14517,19 +15022,22 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 			 * after the J > 0 data have been accessed and
 			 * we are at j, i+1, J=0?  The stride in J is
 			 * main_bytes_per_line, and so ~4 KB.
+			 *
+			 * Typical case when shrinking are 2x2 loop, so
+			 * just two lines to worry about.
 			 */
 			for (J=J1; J<=J2; J++) {
 			    /* see comments for I, x1, x2, etc. below */
 			    if (constant_weights) {
 				;
-			    } else if (scaling_noblend) {
+			    } else if (noblend) {
 				if (J != J1) {
 					continue;
 				}
 				wy = 1.0;
 
 				/* interpolation scheme: */
-			    } else if (!shrink) {
+			    } else if (!shrink || interpolate) {
 				if (J >= Ny) {
 					continue;
 				} else if (J == J1) {
@@ -14547,7 +15055,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 				wy = 1.0;
 			    }
 
-			    src = main_fb + J*main_bytes_per_line + I1*Bpp;
+			    src = src_fb + J*src_bytes_per_line + I1*Bpp;
 
 			    for (I=I1; I<=I2; I++) {
 
@@ -14555,7 +15063,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 
 				if (constant_weights) {
 					;
-				} else if (scaling_noblend) {
+				} else if (noblend) {
 					/*
 					 * Ugh, PseudoColor colormap is
 					 * bad news, to avoid random
@@ -14569,7 +15077,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 					wx = 1.0;
 
 					/* interpolation scheme: */
-				} else if (!shrink) {
+				} else if (!shrink || interpolate) {
 					if (I >= Nx) {
 						continue;	/* off edge */
 					} else if (I == I1) {
@@ -14605,7 +15113,6 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 				w = wx * wy;
 				wtot += w;
 
-
 				/* 
 				 * We average the unsigned char value
 				 * instead of char value: otherwise
@@ -14613,21 +15120,34 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 				 * to the maximum (char -1)!  This way
 				 * they are spread between 0 and 255.
 				 */
-				if (Bpp != 2) {
-					for (b=0; b<Bpp; b++) {
-						pixave[b] += w *
-						    ((unsigned char) *(src+b));
-					}
-				} else {
+				if (Bpp == 4) {
+					/* unroll the loops, can give 20% */
+					pixave[0] += w *
+					    ((unsigned char) *(src  ));
+					pixave[1] += w *
+					    ((unsigned char) *(src+1));
+					pixave[2] += w *
+					    ((unsigned char) *(src+2));
+					pixave[3] += w *
+					    ((unsigned char) *(src+3));
+				} else if (Bpp == 2) {
 					/*
 					 * 16bpp: trickier with green
 					 * split over two bytes, so we
 					 * use the masks:
 					 */
-					us = *( (unsigned short *) src );
+					us = *((unsigned short *) src);
 					pixave[0] += w*(us & main_red_mask);
 					pixave[1] += w*(us & main_green_mask);
 					pixave[2] += w*(us & main_blue_mask);
+				} else if (Bpp == 1) {
+					pixave[0] += w *
+					    ((unsigned char) *(src));
+				} else {
+					for (b=0; b<Bpp; b++) {
+						pixave[b] += w *
+						    ((unsigned char) *(src+b));
+					}
 				}
 				src += Bpp;
 			    }
@@ -14639,11 +15159,12 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 			wtot = 1.0/wtot;	/* normalization factor */
 
 			/* place weighted average pixel in the scaled fb: */
-			if (Bpp != 2) {
-				for (b=0; b<Bpp; b++) {
-					*(dest + b) = (char) (wtot * pixave[b]);
-				}
-			} else {
+			if (Bpp == 4) {
+				*(dest  ) = (char) (wtot * pixave[0]);
+				*(dest+1) = (char) (wtot * pixave[1]);
+				*(dest+2) = (char) (wtot * pixave[2]);
+				*(dest+3) = (char) (wtot * pixave[3]);
+			} else if (Bpp == 2) {
 				/* 16bpp / 565 case: */
 				pixave[0] *= wtot;
 				pixave[1] *= wtot;
@@ -14652,12 +15173,37 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 				    | (main_green_mask & (int) pixave[1])
 				    | (main_blue_mask  & (int) pixave[2]);
 				*( (unsigned short *) dest ) = us;
+			} else if (Bpp == 1) {
+				*(dest) = (char) (wtot * pixave[0]);
+			} else {
+				for (b=0; b<Bpp; b++) {
+					*(dest+b) = (char) (wtot * pixave[b]);
+				}
 			}
 			dest += Bpp;
 		}
 	}
+	markit:
+	if (mark) {
+		mark_rect_as_modified(i1, j1, i2, j2, 1);
+	}
+}
 
-	mark_rect_as_modified(i1, j1, i2, j2, 1);
+static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
+
+	if (!screen || !rfb_fb || !main_fb) {
+		return;
+	}
+	if (! screen->serverFormat.trueColour) {
+		/*
+		 * PseudoColor colormap... blending leads to random colors.
+		 */
+		scaling_noblend = 1;
+	}
+
+	scale_rect(scale_fac, scaling_noblend, scaling_interpolate, bpp/8,
+	    main_fb, main_bytes_per_line, rfb_fb, rfb_bytes_per_line,
+	    dpy_x, dpy_y, scaled_x, scaled_y, X1, Y1, X2, Y2, 1);
 }
 
 void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force) {
@@ -15449,6 +15995,7 @@ int copy_snap(void) {
  * Utilities for managing the "naps" to cut down on amount of polling.
  */
 static void nap_set(int tile_cnt) {
+	int nap_in = nap_ok;
 
 	if (scan_count == 0) {
 		/* roll up check for all NSCAN scans */
@@ -15458,6 +16005,12 @@ static void nap_set(int tile_cnt) {
 			nap_ok = 1;
 		}
 		nap_diff_count = 0;
+	}
+	if (nap_ok && ! nap_in && using_xdamage) {
+		if (XD_skip > 0.8 * XD_tot) 	{
+			/* X DAMAGE is keeping load low, so skip nap */
+			nap_ok = 0;
+		}
 	}
 
 	if (show_cursor) {
@@ -17315,6 +17868,7 @@ static void print_help(int mode) {
 "                       the full display).  This also works for -id/-sid mode\n"
 "                       where the offset is relative to the upper left corner\n"
 "                       of the selected window.\n"
+"\n"
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
 "-notruecolor           For 8bpp displays, force indexed color (i.e. a colormap)\n"
@@ -17326,7 +17880,7 @@ static void print_help(int mode) {
 "                       and for some workarounds.  n may be a decimal number,\n"
 "                       or 0x hex.  Run xdpyinfo(1) for the values.  One may\n"
 "                       also use \"TrueColor\", etc. see <X11/X.h> for a list.\n"
-"                       If the string ends in \":m\" the for better or for\n"
+"                       If the string ends in \":m\" then for better or for\n"
 "                       worse the visual depth is forced to be m.\n"
 "-overlay               Handle multiple depth visuals on one screen, e.g. 8+24\n"
 "                       and 24+8 overlay visuals (the 32 bits per pixel are\n"
@@ -17360,9 +17914,8 @@ static void print_help(int mode) {
 "                       cursor shape using the overlay mechanism.\n"
 "\n"
 "-scale fraction        Scale the framebuffer by factor \"fraction\".  Values\n"
-"                       less than 1 shrink the fb, larger ones expand it.\n"
-"                       Note: image may not be sharp and response may be\n"
-"                       slower.  Currently the cursor shape is not scaled.\n"
+"                       less than 1 shrink the fb, larger ones expand it.  Note:\n"
+"                       image may not be sharp and response may be slower.\n"
 "                       If \"fraction\" contains a decimal point \".\" it\n"
 "                       is taken as a floating point number, alternatively\n"
 "                       the notation \"m/n\" may be used to denote fractions\n"
@@ -17378,6 +17931,15 @@ static void print_help(int mode) {
 "                       interpolation scheme even when shrinking, \":pad\",\n"
 "                       pad scaled width and height to be multiples of scaling\n"
 "                       denominator (e.g. 3 for 2/3).\n"
+"\n"
+"-scale_cursor frac     By default if -scale is supplied the cursor shape is\n"
+"                       scaled by the same factor.  Depending on your usage,\n"
+"                       you may want to scale the cursor independently of the\n"
+"                       screen or not at all.  If you specify -scale_cursor\n"
+"                       the cursor will be scaled by that factor.  When using\n"
+"                       -scale mode to keep the cursor at its \"natural\" size\n"
+"                       use \"-scale_cursor 1\".  Most of the \":\" scaling\n"
+"                       options apply here as well.\n"
 "\n"
 "-viewonly              All VNC clients can only watch (default %s).\n"
 "-shared                VNC display is shared (default %s).\n"
@@ -17746,6 +18308,11 @@ static void print_help(int mode) {
 "                       so this is no loss unless someone is simultaneously at\n"
 "                       the real X display.  Default: %s\n"
 "\n"
+"                       Use \"-norepeat N\" to set how many times norepeat will\n"
+"                       be reset if something else (e.g. X session manager)\n"
+"                       disables it.  The default is 2.  Use a negative value\n"
+"                       for unlimited resets.\n"
+"\n"
 "-nofb                  Ignore video framebuffer: only process keyboard and\n"
 "                       pointer.  Intended for use with Win2VNC and x2vnc\n"
 "                       dual-monitor setups.\n"
@@ -17825,6 +18392,9 @@ static void print_help(int mode) {
 "                       unless the display has overlay visuals or XFIXES\n"
 "                       extensions available.  On Solaris and IRIX if XFIXES\n"
 "                       is not available, -overlay mode will be attempted.\n"
+"\n"
+"-arrow n               Choose an alternate \"arrow\" cursor from a set of\n"
+"                       some common ones.  n can be 1 to %d.  Default is: %d\n"
 "\n"
 "-noxfixes              Do not use the XFIXES extension to draw the exact cursor\n"
 "                       shape even if it is available.\n"
@@ -18144,6 +18714,8 @@ static void print_help(int mode) {
 "                       id:windowid     set -id window to \"windowid\". empty\n"
 "                                       or \"root\" to go back to root window\n"
 "                       sid:windowid    set -sid window to \"windowid\"\n"
+"                       waitmapped      wait until subwin is mapped.\n"
+"                       nowaitmapped    do not wait until subwin is mapped.\n"
 "                       clip:WxH+X+Y    set -clip mode to \"WxH+X+Y\"\n"
 "                       flashcmap       enable  -flashcmap mode.\n"
 "                       noflashcmap     disable -flashcmap mode.\n"
@@ -18156,6 +18728,7 @@ static void print_help(int mode) {
 "                                        nooverlay_cursor.\n"
 "                       visual:vis      set -visual to \"vis\"\n"
 "                       scale:frac      set -scale to \"frac\"\n"
+"                       scale_cursor:f  set -scale_cursor to \"f\"\n"
 "                       viewonly        enable  -viewonly mode.\n"
 /* access view,share,forever */
 "                       noviewonly      disable -viewonly mode.\n"
@@ -18257,6 +18830,7 @@ static void print_help(int mode) {
 "                       show_cursor     enable  showing a cursor.\n"
 "                       noshow_cursor   disable showing a cursor. (same as\n"
 "                                       \"nocursor\")\n"
+"                       arrow:n         set -arrow to alternate n.\n"
 "                       xfixes          enable  xfixes cursor shape mode.\n"
 "                       noxfixes        disable xfixes cursor shape mode.\n"
 "                       alphacut:n      set -alphacut to n.\n"
@@ -18356,27 +18930,27 @@ static void print_help(int mode) {
 "                       the returned value corresponds to (hint: the ext_*\n"
 "                       variables correspond to the presence of X extensions):\n"
 "\n"
-"                       ans= stop quit exit shutdown ping blacken zero\n"
-"                       refresh reset close disconnect id sid clip waitmapped\n"
-"                       nowaitmapped flashcmap noflashcmap truecolor notruecolor\n"
+"                       ans= stop quit exit shutdown ping blacken zero refresh\n"
+"                       reset close disconnect id sid waitmapped nowaitmapped\n"
+"                       clip flashcmap noflashcmap truecolor notruecolor\n"
 "                       overlay nooverlay overlay_cursor overlay_yescursor\n"
 "                       nooverlay_nocursor nooverlay_cursor nooverlay_yescursor\n"
-"                       overlay_nocursor visual scale viewonly noviewonly\n"
-"                       shared noshared forever noforever once timeout deny\n"
-"                       lock nodeny unlock connect allowonce allow localhost\n"
-"                       nolocalhost listen accept gone shm noshm flipbyteorder\n"
-"                       noflipbyteorder onetile noonetile solid_color solid\n"
-"                       nosolid blackout xinerama noxinerama xrandr noxrandr\n"
-"                       xrandr_mode padgeom quiet q noquiet modtweak nomodtweak\n"
-"                       xkb noxkb skip_keycodes add_keysyms noadd_keysyms\n"
-"                       clear_mods noclear_mods clear_keys noclear_keys\n"
-"                       remap repeat norepeat fb nofb bell nobell sel\n"
-"                       nosel primary noprimary cursorshape nocursorshape\n"
-"                       cursorpos nocursorpos cursor show_cursor noshow_cursor\n"
-"                       nocursor xfixes noxfixes xdamage noxdamage xd_area\n"
-"                       xd_mem alphacut alphafrac alpharemove noalpharemove\n"
-"                       alphablend noalphablend xwarp xwarppointer noxwarp\n"
-"                       noxwarppointer buttonmap dragging nodragging\n"
+"                       overlay_nocursor visual scale scale_cursor viewonly\n"
+"                       noviewonly shared noshared forever noforever once\n"
+"                       timeout deny lock nodeny unlock connect allowonce\n"
+"                       allow localhost nolocalhost listen accept gone\n"
+"                       shm noshm flipbyteorder noflipbyteorder onetile\n"
+"                       noonetile solid_color solid nosolid blackout xinerama\n"
+"                       noxinerama xrandr noxrandr xrandr_mode padgeom quiet\n"
+"                       q noquiet modtweak nomodtweak xkb noxkb skip_keycodes\n"
+"                       add_keysyms noadd_keysyms clear_mods noclear_mods\n"
+"                       clear_keys noclear_keys remap repeat norepeat fb nofb\n"
+"                       bell nobell sel nosel primary noprimary cursorshape\n"
+"                       nocursorshape cursorpos nocursorpos cursor show_cursor\n"
+"                       noshow_cursor nocursor arrow xfixes noxfixes xdamage\n"
+"                       noxdamage xd_area xd_mem alphacut alphafrac alpharemove\n"
+"                       noalpharemove alphablend noalphablend xwarp xwarppointer\n"
+"                       noxwarp noxwarppointer buttonmap dragging nodragging\n"
 "                       pointer_mode pm input_skip input client_input speeds\n"
 "                       debug_pointer dp nodebug_pointer nodp debug_keyboard dk\n"
 "                       nodebug_keyboard nodk deferupdate defer wait rfbwait\n"
@@ -18486,6 +19060,7 @@ static void print_help(int mode) {
 		vnc_connect ? "-vncconnect":"-novncconnect",
 		use_modifier_tweak ? "-modtweak":"-nomodtweak",
 		no_autorepeat ? "-norepeat":"-repeat",
+		alt_arrow_max, alt_arrow,
 		alpha_threshold,
 		alpha_frac,
 		cursor_pos_updates ? "-cursorpos":"-nocursorpos",
@@ -18968,6 +19543,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-scale")) {
 			CHECK_ARGC
 			scale_str = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-scale_cursor")) {
+			CHECK_ARGC
+			scale_cursor_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-viewonly")) {
 			view_only = 1;
 		} else if (!strcmp(arg, "-shared")) {
@@ -19114,6 +19692,15 @@ int main(int argc, char* argv[]) {
 			remap_file = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-norepeat")) {
 			no_autorepeat = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (*s == '-') {
+					s++;
+				}
+				if (isdigit(*s)) {
+					no_repeat_countdown = atoi(argv[++i]);
+				}
+			}
 		} else if (!strcmp(arg, "-repeat")) {
 			no_autorepeat = 0;
 		} else if (!strcmp(arg, "-nofb")) {
@@ -19139,6 +19726,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-nocursor")) { 
 			multiple_cursors_mode = strdup("none");
 			show_cursor = 0;
+		} else if (!strcmp(arg, "-arrow")) {
+			CHECK_ARGC
+			alt_arrow = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-noxfixes")) { 
 			use_xfixes = 0;
 		} else if (!strcmp(arg, "-alphacut")) {
@@ -19639,6 +20229,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " remap:      %s\n", remap_file ? remap_file
                     : "null");
 		fprintf(stderr, " norepeat:   %d\n", no_autorepeat);
+		fprintf(stderr, " norepeatcnt:%d\n", no_repeat_countdown);
 		fprintf(stderr, " nofb:       %d\n", nofb);
 		fprintf(stderr, " watchbell:  %d\n", watch_bell);
 		fprintf(stderr, " watchsel:   %d\n", watch_selection);
@@ -19711,11 +20302,12 @@ int main(int argc, char* argv[]) {
 	if (xkbcompat) {
 		Bool rc = XkbIgnoreExtension(True);
 		if (! quiet) {
-			rfbLog("disabling xkb extension. rc=%d\n", rc);
+			rfbLog("Disabling xkb XKEYBOARD extension. rc=%d\n",
+			    rc);
 		}
 		if (watch_bell) {
 			watch_bell = 0;
-			if (! quiet) rfbLog("disabling bell.\n");
+			if (! quiet) rfbLog("Disabling bell.\n");
 		}
 	}
 #else
@@ -19792,7 +20384,7 @@ int main(int argc, char* argv[]) {
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 	if (! XFixesQueryExtension(dpy, &xfixes_base_event_type, &er)) {
 		if (! quiet) {
-			rfbLog("disabling xfixes mode: display does not "
+			rfbLog("Disabling XFIXES mode: display does not "
 			    "support it.\n");
 		}
 		xfixes_present = 0;
@@ -19803,8 +20395,8 @@ int main(int argc, char* argv[]) {
 
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (! XDamageQueryExtension(dpy, &xdamage_base_event_type, &er)) {
-		if (0 && ! quiet) {
-			rfbLog("disabling xdamage mode: display does not "
+		if (! quiet) {
+			rfbLog("Disabling X DAMAGE mode: display does not "
 			    "support it.\n");
 		}
 		xdamage_present = 0;
@@ -19823,7 +20415,7 @@ int main(int argc, char* argv[]) {
 #ifdef SOLARIS_OVERLAY
 	if (! XQueryExtension(dpy, "SUN_OVL", &maj, &ev, &er)) {
 		if (! quiet && overlay) {
-			rfbLog("disabling -overlay: SUN_OVL "
+			rfbLog("Disabling -overlay: SUN_OVL "
 			    "extension not available.\n");
 		}
 	} else {
@@ -19833,7 +20425,7 @@ int main(int argc, char* argv[]) {
 #ifdef IRIX_OVERLAY
 	if (! XReadDisplayQueryExtension(dpy, &ev, &er)) {
 		if (! quiet && overlay) {
-			rfbLog("disabling -overlay: IRIX ReadDisplay "
+			rfbLog("Disabling -overlay: IRIX ReadDisplay "
 			    "extension not available.\n");
 		}
 	} else {
@@ -19905,15 +20497,24 @@ int main(int argc, char* argv[]) {
 
 	/* check for XTEST */
 	if (! XTestQueryExtension_wr(dpy, &ev, &er, &maj, &min)) {
-	    if (! quiet) {
-		rfbLog("warning: XTest extension not available, most user"
-		    " input\n");
-		rfbLog("(pointer and keyboard) will be discarded.\n");
-		rfbLog("no XTest extension, switching to -xwarppointer mode\n");
-		rfbLog("for pointer motion input.\n");
-	    }
-	    xtest_present = 0;
-	    use_xwarppointer = 1;
+		if (! quiet) {
+			rfbLog("WARNING: XTEST extension not available "
+			    "(either missing from\n");
+			rfbLog("  display or client library libXtst "
+			    "missing at build time).\n");
+			rfbLog("  MOST user input (pointer and keyboard) "
+			    "will be DISCARDED.\n");
+			rfbLog("  If display does have XTEST, be sure to "
+			    "build x11vnc with\n");
+			rfbLog("  a working libXtst build environment "
+			    "(e.g. libxtst-dev,\n");
+			rfbLog("  or other packages).\n");
+			rfbLog("No XTEST extension, switching to "
+			    "-xwarppointer mode for\n");
+			rfbLog("  pointer motion input.\n");
+		}
+		xtest_present = 0;
+		use_xwarppointer = 1;
 	}
 	/*
 	 * Window managers will often grab the display during resize, etc.
@@ -19980,8 +20581,8 @@ int main(int argc, char* argv[]) {
 #if LIBVNCSERVER_HAVE_LIBXRANDR
 	if (! XRRQueryExtension(dpy, &xrandr_base_event_type, &er)) {
 		if (xrandr && ! quiet) {
-			rfbLog("disabling -xrandr mode: display does not"
-			    " support it.\n");
+			rfbLog("Disabling -xrandr mode: display does not"
+			    " support X RANDR.\n");
 		}
 		xrandr = 0;
 		xrandr_present = 0;

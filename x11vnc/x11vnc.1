@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2pre, lastmod: 2005-03-12
+         version: 0.7.2pre, lastmod: 2005-03-19
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -119,7 +119,7 @@ or 0x hex.  Run
 .IR xdpyinfo (1)
 for the values.  One may
 also use "TrueColor", etc. see <X11/X.h> for a list.
-If the string ends in ":m" the for better or for
+If the string ends in ":m" then for better or for
 worse the visual depth is forced to be m.
 .PP
 \fB-overlay\fR
@@ -163,9 +163,8 @@ cursor shape using the overlay mechanism.
 \fB-scale\fR \fIfraction\fR
 .IP
 Scale the framebuffer by factor \fIfraction\fR.  Values
-less than 1 shrink the fb, larger ones expand it.
-Note: image may not be sharp and response may be
-slower.  Currently the cursor shape is not scaled.
+less than 1 shrink the fb, larger ones expand it.  Note:
+image may not be sharp and response may be slower.
 If \fIfraction\fR contains a decimal point "." it
 is taken as a floating point number, alternatively
 the notation "m/n" may be used to denote fractions
@@ -181,6 +180,17 @@ this use ":n4".  More esoteric options: ":in" use
 interpolation scheme even when shrinking, ":pad",
 pad scaled width and height to be multiples of scaling
 denominator (e.g. 3 for 2/3).
+.PP
+\fB-scale_cursor\fR \fIfrac\fR
+.IP
+By default if \fB-scale\fR is supplied the cursor shape is
+scaled by the same factor.  Depending on your usage,
+you may want to scale the cursor independently of the
+screen or not at all.  If you specify \fB-scale_cursor\fR
+the cursor will be scaled by that factor.  When using
+\fB-scale\fR mode to keep the cursor at its "natural" size
+use "\fB-scale_cursor\fR \fI1\fR".  Most of the ":" scaling
+options apply here as well.
 .PP
 \fB-viewonly\fR
 .IP
@@ -686,6 +696,11 @@ either from large screen changes or high latency).
 Note: your VNC viewer side will likely do autorepeating,
 so this is no loss unless someone is simultaneously at
 the real X display.  Default: \fB-norepeat\fR
+.IP
+Use "\fB-norepeat\fR \fIN\fR" to set how many times norepeat will
+be reset if something else (e.g. X session manager)
+disables it.  The default is 2.  Use a negative value
+for unlimited resets.
 .PP
 \fB-nofb\fR
 .IP
@@ -779,6 +794,11 @@ possible.  Often this will only be the same as "some"
 unless the display has overlay visuals or XFIXES
 extensions available.  On Solaris and IRIX if XFIXES
 is not available, \fB-overlay\fR mode will be attempted.
+.PP
+\fB-arrow\fR \fIn\fR
+.IP
+Choose an alternate "arrow" cursor from a set of
+some common ones.  n can be 1 to 6.  Default is: 1
 .PP
 \fB-noxfixes\fR
 .IP
@@ -1195,6 +1215,10 @@ id:windowid     set \fB-id\fR window to "windowid". empty
 .IP
 sid:windowid    set \fB-sid\fR window to "windowid"
 .IP
+waitmapped      wait until subwin is mapped.
+.IP
+nowaitmapped    do not wait until subwin is mapped.
+.IP
 clip:WxH+X+Y    set \fB-clip\fR mode to "WxH+X+Y"
 .IP
 flashcmap       enable  \fB-flashcmap\fR mode.
@@ -1217,6 +1241,8 @@ overlay_nocursor disable cursor drawing. same as
 visual:vis      set \fB-visual\fR to "vis"
 .IP
 scale:frac      set \fB-scale\fR to "frac"
+.IP
+scale_cursor:f  set \fB-scale_cursor\fR to "f"
 .IP
 viewonly        enable  \fB-viewonly\fR mode.
 .IP
@@ -1374,6 +1400,8 @@ show_cursor     enable  showing a cursor.
 .IP
 noshow_cursor   disable showing a cursor. (same as
                 "nocursor")
+.IP
+arrow:n         set \fB-arrow\fR to alternate n.
 .IP
 xfixes          enable  xfixes cursor shape mode.
 .IP
@@ -1546,27 +1574,27 @@ remote command, we hope the name makes it obvious what
 the returned value corresponds to (hint: the ext_*
 variables correspond to the presence of X extensions):
 .IP
-ans= stop quit exit shutdown ping blacken zero
-refresh reset close disconnect id sid clip waitmapped
-nowaitmapped flashcmap noflashcmap truecolor notruecolor
+ans= stop quit exit shutdown ping blacken zero refresh
+reset close disconnect id sid waitmapped nowaitmapped
+clip flashcmap noflashcmap truecolor notruecolor
 overlay nooverlay overlay_cursor overlay_yescursor
 nooverlay_nocursor nooverlay_cursor nooverlay_yescursor
-overlay_nocursor visual scale viewonly noviewonly
-shared noshared forever noforever once timeout deny
-lock nodeny unlock connect allowonce allow localhost
-nolocalhost listen accept gone shm noshm flipbyteorder
-noflipbyteorder onetile noonetile solid_color solid
-nosolid blackout xinerama noxinerama xrandr noxrandr
-xrandr_mode padgeom quiet q noquiet modtweak nomodtweak
-xkb noxkb skip_keycodes add_keysyms noadd_keysyms
-clear_mods noclear_mods clear_keys noclear_keys
-remap repeat norepeat fb nofb bell nobell sel
-nosel primary noprimary cursorshape nocursorshape
-cursorpos nocursorpos cursor show_cursor noshow_cursor
-nocursor xfixes noxfixes xdamage noxdamage xd_area
-xd_mem alphacut alphafrac alpharemove noalpharemove
-alphablend noalphablend xwarp xwarppointer noxwarp
-noxwarppointer buttonmap dragging nodragging
+overlay_nocursor visual scale scale_cursor viewonly
+noviewonly shared noshared forever noforever once
+timeout deny lock nodeny unlock connect allowonce
+allow localhost nolocalhost listen accept gone
+shm noshm flipbyteorder noflipbyteorder onetile
+noonetile solid_color solid nosolid blackout xinerama
+noxinerama xrandr noxrandr xrandr_mode padgeom quiet
+q noquiet modtweak nomodtweak xkb noxkb skip_keycodes
+add_keysyms noadd_keysyms clear_mods noclear_mods
+clear_keys noclear_keys remap repeat norepeat fb nofb
+bell nobell sel nosel primary noprimary cursorshape
+nocursorshape cursorpos nocursorpos cursor show_cursor
+noshow_cursor nocursor arrow xfixes noxfixes xdamage
+noxdamage xd_area xd_mem alphacut alphafrac alpharemove
+noalpharemove alphablend noalphablend xwarp xwarppointer
+noxwarp noxwarppointer buttonmap dragging nodragging
 pointer_mode pm input_skip input client_input speeds
 debug_pointer dp nodebug_pointer nodp debug_keyboard dk
 nodebug_keyboard nodk deferupdate defer wait rfbwait
