@@ -45,6 +45,23 @@ i.e. a truecolour graphics. Only the Escape key is implemented. This may be
 the best starting point if you want to learn how to use LibVNCServer. You
 are confronted with the fact that the bytes per pixel can only be 8, 16 or 32.
 
+Projects using it
+----------------------------------------
+
+VNC for KDE
+http://www.tjansen.de/krfb
+
+GemsVNC
+http://www.elilabs.com/~rj/gemsvnc/
+
+VNC for Netware
+http://forge.novell.com/modules/xfmod/project/?vncnw
+
+RDesktop
+http://rdesktop.sourceforge.net
+
+Mail me, if your application is missing!
+
 How to use
 ----------
 
