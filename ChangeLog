@@ -1,3 +1,8 @@
+2004-06-07  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* */Makefile.am: stop automake nagging
+	* libvncclient/*, client_examples/*: streamline API, SDLvncviewer added
+	* examples/, libvncclient/, test/: moved tests to test/
+
 2004-06-05  Karl Runge <runge@karlrunge.com>
 	* x11vnc: rearrange file for easier maintenance
 	* add RFB_CLIENT_COUNT to -accept and -gone commands

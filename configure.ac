@@ -29,6 +29,10 @@ AC_ARG_WITH(24bpp,
 if test "x$with_24bpp" = "xyes"; then
 	AC_DEFINE(ALLOW24BPP)
 fi
+AH_TEMPLATE(SDL_CONFIG, [Use sdl-config (for SDLvncviewer)])
+AC_ARG_WITH(sdl,
+	[  --with-sdl			use sdl-config],
+	, [ with_sdl=yes ])
 
 # Checks for X libraries
 HAVE_X="false"
@@ -84,6 +88,14 @@ fi
 AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
 AM_CONDITIONAL(HAVE_LIBZ, test ! -z "$HAVE_ZLIB_H")
 AM_CONDITIONAL(HAVE_LIBJPEG, test ! -z "$HAVE_JPEGLIB_H")
+if test -z "$with_sdl"; then
+	if sdl-config >/dev/null 2>&1; then
+		with_sdl=yes
+	else
+		with_sdl=no
+	fi
+fi
+AM_CONDITIONAL(HAVE_LIBSDL, test "x$with_sdl" = "xyes")
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -141,6 +153,7 @@ AC_CONFIG_FILES([Makefile
 		 vncterm/Makefile
 		 classes/Makefile
 		 libvncclient/Makefile
+		 client_examples/Makefile
 		 test/Makefile
 		 libvncserver.spec
 		 libvncserver-config])

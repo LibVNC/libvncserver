@@ -1,4 +1,4 @@
-CFLAGS = -I ..
+DEFINES = -I ..
 LDADD = ../libvncserver/libvncserver.a
 
 EXTRA_DIST=ChangeLog

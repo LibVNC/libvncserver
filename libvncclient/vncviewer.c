@@ -43,15 +43,35 @@ static rfbBool MallocFrameBuffer(rfbClient* client) {
   return client->frameBuffer?TRUE:FALSE;
 }
 
-rfbClient* rfbGetClient(int* argc,char** argv,
-			int bitsPerSample,int samplesPerPixel,
+static void initAppData(AppData* data) {
+	data->shareDesktop=TRUE;
+	data->viewOnly=FALSE;
+	data->encodingsString="tight hextile zlib corre rre raw";
+	data->useBGR233=FALSE;
+	data->nColours=0;
+	data->forceOwnCmap=FALSE;
+	data->forceTrueColour=FALSE;
+	data->requestedDepth=0;
+	data->compressLevel=3;
+	data->qualityLevel=5;
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+	data->enableJPEG=TRUE;
+#else
+	data->enableJPEG=FALSE;
+#endif
+	data->useRemoteCursor=FALSE;
+}
+
+rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 			int bytesPerPixel) {
   rfbClient* client=(rfbClient*)calloc(sizeof(rfbClient),1);
-  client->programName = argv[0];
+  initAppData(&client->appData);
+  client->programName = 0;
   client->endianTest = 1;
 
   client->format.bitsPerPixel = bytesPerPixel*8;
   client->format.depth = bitsPerSample*samplesPerPixel;
+  client->appData.requestedDepth=client->format.depth;
   client->format.bigEndian = *(char *)&client->endianTest?FALSE:TRUE;
   client->format.trueColour = TRUE;
 
@@ -94,13 +114,13 @@ rfbClient* rfbGetClient(int* argc,char** argv,
   return client;
 }
 
-rfbBool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerPort)
+static rfbBool rfbInitConnection(rfbClient* client)
 {
   /* Unless we accepted an incoming connection, make a TCP connection to the
      given VNC server */
 
   if (!client->listenSpecified) {
-    if (!ConnectToRFBServer(client,vncServerHost, vncServerPort))
+    if (!client->serverHost || !ConnectToRFBServer(client,client->serverHost,client->serverPort))
       return FALSE;
   }
 
@@ -118,6 +138,37 @@ rfbBool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerP
   if (!SendFramebufferUpdateRequest(client,
 				    0,0,client->width,client->height,FALSE))
     return FALSE;
+
+  return TRUE;
+}
+
+rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
+  int i;
+
+  if(client->programName==0)
+    client->programName=argv[0];
+
+  for (i = 1; i < *argc; i++) {
+    if (strcmp(argv[i], "-listen") == 0) {
+      listenForIncomingConnections(client);
+      break;
+    } else {
+      char* colon=strchr(argv[i],':');
+
+      client->serverHost=argv[i];
+      if(colon) {
+	*colon=0;
+	client->serverPort=atoi(colon+1);
+      } else
+	client->serverPort=0;
+      client->serverPort+=5900;
+    }
+  }
+
+  if(!rfbInitConnection(client)) {
+    rfbClientCleanup(client);
+    return FALSE;
+  }
 
   return TRUE;
 }

@@ -422,3 +422,24 @@ PrintInHex(char *buf, int len)
 
   fflush(stderr);
 }
+
+int WaitForMessage(rfbClient* client,unsigned int usecs)
+{
+  fd_set fds;
+  struct timeval timeout;
+  int num;
+
+  timeout.tv_sec=(usecs/1000000);
+  timeout.tv_usec=(usecs%1000000);
+
+  FD_ZERO(&fds);
+  FD_SET(client->sock,&fds);
+
+  num=select(client->sock+1, &fds, NULL, NULL, &timeout);
+  if(num<0)
+    rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
+
+  return num;
+}
+
+

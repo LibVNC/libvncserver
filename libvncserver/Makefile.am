@@ -1,4 +1,4 @@
-CFLAGS=-g -Wall
+DEFINES=-g -Wall
 
 includedir=$(prefix)/include/rfb
 #include_HEADERS=rfb.h rfbconfig.h rfbint.h rfbproto.h keysym.h rfbregion.h

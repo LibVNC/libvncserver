@@ -1,3 +1,6 @@
+#ifndef RFBCLIENT_H
+#define RFBCLIENT_H
+
 /*
  *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
@@ -55,30 +58,14 @@
 typedef struct {
   rfbBool shareDesktop;
   rfbBool viewOnly;
-  rfbBool fullScreen;
-  rfbBool grabKeyboard;
-  rfbBool raiseOnBeep;
 
   const char* encodingsString;
 
   rfbBool useBGR233;
   int nColours;
-  rfbBool useSharedColours;
   rfbBool forceOwnCmap;
   rfbBool forceTrueColour;
   int requestedDepth;
-
-  rfbBool useShm;
-
-  int wmDecorationWidth;
-  int wmDecorationHeight;
-
-  rfbBool debug;
-
-  int popupButtonCount;
-
-  int bumpScrollTime;
-  int bumpScrollPixels;
 
   int compressLevel;
   int qualityLevel;
@@ -133,6 +120,9 @@ typedef struct _rfbClient {
 	/* cursor.c */
 	uint8_t *rcSource, *rcMask;
 
+	/* private data pointer */
+	void* clientData;
+
 	/* hooks */
 	HandleCursorPosProc HandleCursorPos;
 	SoftCursorLockAreaProc SoftCursorLockArea;
@@ -183,8 +173,12 @@ extern rfbBool SetNonBlocking(int sock);
 
 extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
 extern rfbBool SameMachine(int sock);
+extern int WaitForMessage(rfbClient* client,unsigned int usecs);
 
 /* vncviewer.c */
-rfbClient* rfbGetClient(int* argc,char** argv,int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
-rfbBool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerPort);
+rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
+rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv);
 void rfbClientCleanup(rfbClient* client);
+
+#endif
+

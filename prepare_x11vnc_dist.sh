@@ -8,7 +8,7 @@ mv configure.ac configure.ac.LibVNCServer
 
 cat configure.ac.LibVNCServer | \
 sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
-    -e "s/\(contrib\|examples\|vncterm\|libvncclient\|test\)\/Makefile//g" \
+    -e "s/\(contrib\|examples\|vncterm\|libvncclient\|test\|client_examples\)\/Makefile//g" \
     -e "s/libvncserver.spec/x11vnc.spec/g" \
     -e "s/^.*libvncserver-config//g" \
 > configure.ac

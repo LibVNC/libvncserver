@@ -8,7 +8,7 @@ int main(int argc,char** argv)
   time_t t=time(0);
 
   rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,400,300,8,3,4);
-  rfbClient* client=rfbGetClient(&argc,argv,8,3,4);
+  rfbClient* client=rfbGetClient(8,3,4);
 
   server->frameBuffer=malloc(400*300*4);
   for(j=0;j<400*300*4;j++)

@@ -1,6 +1,7 @@
 immediate:
 ----------
 
+cursor drawing does not get undone prior to sending
 TightVNC encoding!!! Regression!!!
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
