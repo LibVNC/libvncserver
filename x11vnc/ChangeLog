@@ -1,3 +1,8 @@
+2005-02-09  Karl Runge <runge@karlrunge.com>
+	* Add -users switch user mechanism and related utilities.
+	* fix -solid for gnome and kde.
+	* exit earlier on trapped XIO errors.
+
 2005-02-05  Karl Runge <runge@karlrunge.com>
 	* -solid solid color background when clients are connected. 
 	* -opts/-? to show option names only.

@@ -1660,6 +1660,7 @@ proc split_query {query} {
 proc set_x11_display {name} {
 	global x11_display
 	set x11_display "x11vnc X display: $name"
+	wm title . "tkx11vnc - $name"
 }
 proc set_vnc_display {name} {
 	global vnc_display
@@ -1671,6 +1672,7 @@ proc set_vnc_url {name} {
 }
 proc no_x11_display {} {
 	set_x11_display "(*none*)"
+	wm title . "tkx11vnc"
 }
 proc no_vnc_display {} {
 	set_vnc_display "(*none*)"
@@ -2391,6 +2393,7 @@ proc start_x11vnc {} {
 
 proc run_remote_cmd {opts} {
 	global menu_var x11vnc_prog x11vnc_cmdline x11vnc_xdisplay
+	global x11vnc_auth_file
 
 	set debug [in_debug_mode]
 
@@ -2412,6 +2415,10 @@ proc run_remote_cmd {opts} {
 	if {$x11vnc_xdisplay != ""} {
 		lappend cmd "-display"
 		lappend cmd $x11vnc_xdisplay
+	}
+	if {$x11vnc_auth_file != ""} {
+		lappend cmd "-auth"
+		lappend cmd $x11vnc_auth_file
 	}
 	lappend cmd "-sync"
 	foreach word $opts {
@@ -2501,6 +2508,7 @@ proc try_connect {} {
 # main:
 
 global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
+global x11vnc_auth_file
 global helpall helptext helpremote helplabel hostname;
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
@@ -2584,6 +2592,13 @@ if {[info exists env(X11VNC_XDISPLAY)]} {
 } else {
 	set x11vnc_xdisplay ":0";
 }
+
+if {[info exists env(X11VNC_AUTH_FILE)]} {
+	set x11vnc_auth_file $env(X11VNC_AUTH_FILE)
+} else {
+	set x11vnc_auth_file ""
+}
+
 
 set hostname [exec uname -n]
 #puts [exec env]

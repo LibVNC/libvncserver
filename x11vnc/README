@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat Feb  5 12:56:36 EST 2005
+x11vnc README file                         Date: Wed Feb  9 00:21:28 EST 2005
 
 The following information is taken from these URLs:
 
@@ -354,16 +354,34 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
    TightVNC encoding gives very good compression and performance, it even
    makes a noticeable difference over a fast LAN)
 
+   Shortcut: On Solaris 10 you can pick up everything just by insuring
+   that your PATH has /usr/sfw/bin (for gcc) and /usr/ccs/bin (for other
+   build tools), e.g.:
+
+  env PATH=/usr/sfw/bin:/usr/ccs/bin:$PATH sh -c './configure; make'
+
    libjpeg is included in Solaris 9 and later (/usr/sfw/include and
    /usr/sfw/lib), and zlib in Solaris 8 and later (/usr/include and
-   /usr/lib). To get the source for these libraries: libjpeg is available
-   at [36]ftp://ftp.uu.net/graphics/jpeg/ and zlib at
+   /usr/lib).
+
+   So on Solaris 9 you can pick up everything with something like this:
+  env PATH=/usr/local/bin:/usr/ccs/bin:$PATH CPPFLAGS='-I /usr/sfw/include' LDF
+LAGS='-L/usr/sfw/lib -R/usr/sfw/lib' sh -c './configure; make'
+
+   assuming your gcc is in /usr/local/bin. That is getting pretty long,
+   see those assignments split up in the build script below.
+
+   If your system does not have these libraries you can get the source
+   for these libraries to build them: libjpeg is available at
+   [36]ftp://ftp.uu.net/graphics/jpeg/ and zlib at
    [37]http://www.gzip.org/zlib/. See also
    [38]http://www.sunfreeware.com/ for Solaris binary packages of these
-   libraries.
+   libraries as well as for gcc. Normally they will install into
+   /usr/local.
 
    Here is a build script that indicates one way to pass the library
-   locations information to the libvncserver configuration:
+   locations information to the libvncserver configuration via the
+   CPPFLAGS and LDFLAGS environmental variables:
 #!/bin/sh
 
 # Build script for Solaris, etc, with gcc, libjpeg and libz in
@@ -511,11 +529,12 @@ ls -l ./x11vnc/x11vnc
 
    SunRay Gotcha #1:   Note that even though your SunRay X11 DISPLAY is
    something like :137, x11vnc still tries for port 5900 as its listening
-   if it can get it, in which case the VNC display (i.e. the information
-   you supply to the VNC viewer) is something like sunray-server:0
-   (note the :0 corresponding to port 5900, it is not :137). If it cannot
-   get 5900, it tries for 5901, and so on. You can also try to force the
-   port (and thereby the VNC display) using the -rfbport NNNN option.
+   port if it can get it, in which case the VNC display (i.e. the
+   information you supply to the VNC viewer) is something like
+   sunray-server:0   (note the :0 corresponding to port 5900, it is not
+   :137). If it cannot get 5900, it tries for 5901, and so on. You can
+   also try to force the port (and thereby the VNC display) using the
+   -rfbport NNNN option.
 
     Limitations:
 
@@ -530,8 +549,8 @@ ls -l ./x11vnc/x11vnc
      * A rate limiting factor for x11vnc performance is that video
        hardware is optimized for writing, not reading (x11vnc reads the
        video framebuffer for the screen image data). The difference can
-       be a factor of 10-50, and it usually takes about 0.5-1 sec to read
-       in the whole video hardware framebuffer (5MB for 1280x1024 at
+       be a factor of 10-200, and it usually takes about 0.5-1 sec to
+       read in the whole video hardware framebuffer (5MB for 1280x1024 at
        depth 24). So whenever activity changes most of the screen there
        is a delay of 0.5-1 sec while x11vnc reads the changed regions in.
        To get a sense of the read and write speeds of your video card,
@@ -540,7 +559,7 @@ ls -l ./x11vnc/x11vnc
        direct graphics access the dga command (press "b" to run the
        benchmark and then after a few seconds press "q" to quit).
        On XFree86 it is actually possible to increase the framebuffer
-       read speed considerably (5-50 times) by using the Shadow
+       read speed considerably (5-100 times) by using the Shadow
        Framebuffer (a copy of the framebuffer is kept in main memory and
        this can be read much more quickly). To do this one puts the line
        Option "ShadowFB" "true" (and depending on video card driver,

@@ -137,11 +137,17 @@
 
 #define LIBVNCSERVER_HAVE_XSHM 1
 #define LIBVNCSERVER_HAVE_XTEST 1
+
+#define LIBVNCSERVER_HAVE_PWD_H 1
+#define LIBVNCSERVER_HAVE_SYS_WAIT_H 1
+#define LIBVNCSERVER_HAVE_UTMPX_H 1
+
 /*
 #define LIBVNCSERVER_HAVE_LIBXINERAMA 1
 #define LIBVNCSERVER_HAVE_XFIXES 1
 #define LIBVNCSERVER_HAVE_XDAMAGE 1
  */
+
 #endif	/* OLD_TREE */
 
 #include <unistd.h>
@@ -215,6 +221,17 @@ extern int h_errno;
 #include <arpa/inet.h>
 #endif
 
+/* XXX autoconf */
+#if LIBVNCSERVER_HAVE_PWD_H
+#include <pwd.h>
+#endif
+#if LIBVNCSERVER_HAVE_SYS_WAIT_H
+#include <sys/wait.h>
+#endif
+#if LIBVNCSERVER_HAVE_UTMPX_H
+#include <utmpx.h>
+#endif
+
 /*
  * overlay/multi-depth screen reading support
  * undef SOLARIS_OVERLAY or IRIX_OVERLAY if there are problems building.
@@ -273,7 +290,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.1pre lastmod: 2005-02-05";
+char lastmod[] = "0.7.1pre lastmod: 2005-02-08";
 
 /* X display info */
 
@@ -371,6 +388,10 @@ time_t last_event, last_input, last_client = 0;
 /* last client to move pointer */
 rfbClientPtr last_pointer_client = NULL;
 
+int accepted_client = 0;
+int client_count = 0;
+int clients_served = 0;
+
 /* more transient kludge variables: */
 int cursor_x, cursor_y;		/* x and y from the viewer(s) */
 int got_user_input = 0;
@@ -433,6 +454,7 @@ void initialize_polling_images(void);
 void initialize_signals(void);
 void initialize_tiles(void);
 void initialize_speeds(void);
+void clean_shm(int);
 void free_tiles(void);
 void initialize_watch_bell(void);
 void initialize_xinerama(void);
@@ -545,6 +567,8 @@ int shared = 0;			/* share vnc display. */
 int deny_all = 0;		/* global locking of new clients */
 int accept_remote_cmds = 1;	/* -noremote */
 int safe_remote_only = 0;	/* -safer, -unsafe */
+int started_as_root = 0;
+char *users_list = NULL;	/* -users */
 char *allow_list = NULL;	/* for -allow and -localhost */
 char *allow_once = NULL;	/* one time -allow */
 char *accept_cmd = NULL;	/* for -accept */
@@ -752,6 +776,17 @@ void lowercase(char *str) {
 	}
 }
 
+char *lblanks(char *str) {
+	char *p = str;
+	while (*p) {
+		if (! isspace(*p)) {
+			break;
+		}
+		p++;
+	}
+	return p;
+}
+
 int scan_hexdec(char *str, unsigned long *num) {
 	if (sscanf(str, "0x%lx", num) != 1) {
 		if (sscanf(str, "%ld", num) != 1) {
@@ -850,6 +885,424 @@ char *bitprint(unsigned int st, int nbits) {
 		mask = mask << 1;
 	}
 	return str;	/* take care to use or copy immediately */
+}
+
+char *get_user_name(void) {
+	char *user = NULL;
+
+	user = getenv("USER");
+	if (user == NULL) {
+		user = getenv("LOGNAME");
+	}
+
+#if LIBVNCSERVER_HAVE_PWD_H
+	if (user == NULL) {
+		struct passwd *pw = getpwuid(getuid());
+		if (pw) {
+			user = pw->pw_name;
+		}
+	}
+#endif
+
+	if (user) {
+		return(strdup(user));
+	} else {
+		return(strdup("unknown-user"));
+	}
+}
+
+char *get_home_dir(void) {
+	char *home = NULL;
+
+	home = getenv("HOME");
+
+#if LIBVNCSERVER_HAVE_PWD_H
+	if (home == NULL) {
+		struct passwd *pw = getpwuid(getuid());
+		if (pw) {
+			home = pw->pw_dir;
+		}
+	}
+#endif
+
+	if (home) {
+		return(strdup(home));
+	} else {
+		return(strdup("/"));
+	}
+}
+
+char *get_shell(void) {
+	char *shell = NULL;
+
+	shell = getenv("SHELL");
+
+#if LIBVNCSERVER_HAVE_PWD_H
+	if (shell == NULL) {
+		struct passwd *pw = getpwuid(getuid());
+		if (pw) {
+			shell = pw->pw_shell;
+		}
+	}
+#endif
+
+	if (shell) {
+		return(strdup(shell));
+	} else {
+		return(strdup("/bin/sh"));
+	}
+}
+
+int switch_user(char *);
+void try_to_switch_users(void);
+char *guess_desktop(void);
+
+void switch_user_dummy(void) {
+	;	/* dummy does nothing */
+}
+void switch_user_solid_bg(void) {
+	/* we have switched users, some things to do. */
+	if (use_solid_bg && client_count) {
+		solid_bg(0);
+	}
+}
+
+void check_switched_user (void) {
+	static time_t sched_switched_user = 0;
+	static int did_solid = 0;
+	static int did_dummy = 0;
+	int delay = 15;
+	time_t now = time(0);
+
+	if (started_as_root == 1 && users_list) {
+		try_to_switch_users();
+		if (started_as_root == 2) {
+			/*
+			 * schedule the switch_user_tasks() call
+			 * 15 secs is for piggy desktops to start up.
+			 * might not be enough for slow machines...
+			 */
+			sched_switched_user = now;
+			did_dummy = 0;
+			did_solid = 0;
+			/* add other activities */
+		}
+	}
+	if (! sched_switched_user) {
+		return;
+	}
+
+	if (! did_dummy) {
+		switch_user_dummy();
+		did_dummy = 1;
+	}
+	if (! did_solid) {
+		int doit = 0;
+		char *ss = solid_str;
+		if (now >= sched_switched_user + delay) {
+			doit = 1;
+		} else if (ss && strstr(ss, "root:") == ss) {
+		    	if (now >= sched_switched_user + 3) {
+				doit = 1;
+			}
+		} else if (strcmp("root", guess_desktop())) {
+			usleep(1000 * 1000);
+			doit = 1;
+		}
+		if (doit) {
+			switch_user_solid_bg();
+			did_solid = 1;
+		}
+	}
+
+	if (did_dummy && did_solid) {
+		sched_switched_user = 0;
+	}
+}
+
+int guess_user_and_switch(char *str) {
+#if LIBVNCSERVER_HAVE_UTMPX_H
+	char *q, *dstr, *d = DisplayString(dpy);
+	char *allowed = NULL;
+	int i, ret = 0, max = 300;
+
+	if (strstr(str, "guess=") == str) {
+		char *allowed = strchr(str, '=');
+		allowed++;
+	}
+
+	/* pick out ":N" */
+	dstr = strchr(d, ':');
+	if (! dstr) {
+		return 0;
+	}
+	q = strchr(dstr, '.');
+	if (q) {
+		*q = '\0';
+	}
+
+	/* look over the utmpx entries looking for this display */
+	setutxent();
+	for (i=0; i<max; i++) {
+		char *str;
+		struct utmpx *utx = getutxent();
+
+		if (! utx) {
+			break;
+		}
+
+		str = lblanks(utx->ut_user);
+		if (*str == '\0') {
+			continue;	/* blank user */
+		}
+		if (allowed) {
+			char *p, *t = strdup(allowed);	
+			int ok = 0;
+			p = strtok(t, ",");
+			while (p) {
+				if (!strcmp(p, utx->ut_user)) {
+					ok = 1;
+				}
+				p = strtok(NULL, ",");
+			}
+			free(t);
+			if (! ok) {
+				continue;
+			}
+		}
+		if (!strcmp(utx->ut_user, "guess")) {
+			continue;	/* never... */
+		}
+
+		/* try the line for leading :N */
+		str = lblanks(utx->ut_line);
+		if (strstr(str, dstr) == str) {
+			int n = strlen(dstr);
+			if (isdigit(*(str+n))) {
+				continue;	/* :1 vs. :10 */
+			} else if (switch_user(utx->ut_user)) {
+				rfbLog("switched to guessed user: %s\n",
+				    utx->ut_user);
+				ret = 1;
+				break;
+			} else {
+				continue;
+			}
+		}
+
+		/* try the host for leading :N */
+		str = lblanks(utx->ut_host);
+		if (strstr(str, dstr) == str) {
+			int n = strlen(dstr);
+			if (isdigit(*(str+n))) {
+				continue;	/* :1 vs. :10 */
+			} else if (switch_user(utx->ut_user)) {
+				rfbLog("switched to guessed user: %s\n",
+				    utx->ut_user);
+				ret = 1;
+				break;
+			} else {
+				continue;
+			}
+		}
+	}
+	endutxent();
+
+	return ret;
+#else
+	return 0;
+#endif
+}
+
+int switch_user(char *user) {
+	int force = 0, numerical = 1;
+	uid_t uid = 0;
+	char *q, *name, *home;
+
+	if (*user == '+') {
+		force = 1;
+		user++;
+	}
+
+	if (!strcmp(user, "guess") || strstr(user, "guess=") == user) {
+		return guess_user_and_switch(user);
+	}
+
+	q = user;
+	while (*q) {
+		if (! isdigit(*q)) {
+			numerical = 0;
+			break;
+		}
+		q++;
+	}
+
+#if LIBVNCSERVER_HAVE_PWD_H
+	if (numerical) {
+		int u = atoi(user);
+		struct passwd *pw;
+
+		if (u > 0) {
+			uid = (uid_t) u;
+		} else {
+			return 0;
+		}
+		pw = getpwuid(uid);
+		if (pw) {
+			name = pw->pw_name;
+			home = pw->pw_dir;
+		} else {
+			return 0;
+		}
+	} else {
+		struct passwd *pw = getpwnam(user);
+		if (pw) {
+			uid = pw->pw_uid;
+			name = pw->pw_name;
+			home = pw->pw_dir;
+		} else {
+			return 0;
+		}
+	}
+#else
+	return 0;
+#endif
+	if (! uid) {
+		return 0;
+	}
+
+	if (! force) {
+#if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SYS_WAIT_H
+		pid_t pid, pidw;
+		int st;
+		
+		/* 
+		 * We fork here and try to open the display again as the
+		 * new user.  Unreadable XAUTHORITY could be a problem...
+		 * This is not really needed since we have DISPLAY open
+		 * but: 1) is a good indicator this user owns the session
+		 * and  2) some activities do spawn new X apps, e.g.
+		 * xmessage(1), etc.
+		 */
+		if ((pid = fork()) > 0) {
+			;
+		} else if (pid == -1) {
+			fprintf(stderr, "could not fork\n");
+			rfbLogPerror("fork");
+			return 0;
+		} else {
+			Display *dpy2 = 0;
+			char *xauth = getenv("XAUTHORITY");
+#if LIBVNCSERVER_HAVE_SETUID
+			if (setuid(uid) != 0) {
+				exit(1);	/* fail */
+			}
+#else
+			exit(1);
+#endif
+			if (xauth && access(xauth, R_OK) != 0) {
+				*(xauth-2) = '_';	/* yow */
+			}
+			set_env("USER", name);
+			set_env("LOGNAME", name);
+			set_env("HOME", home);
+			fclose(stderr);
+			dpy2 = XOpenDisplay(DisplayString(dpy));
+			if (dpy2) {
+				XCloseDisplay(dpy2);
+				exit(0);	/* success */
+			} else {
+				exit(2);	/* fail */
+			}
+		}
+
+		/* see what the child says: */
+		pidw = waitpid(pid, &st, 0);
+		if (pidw == pid && WIFEXITED(st) && WEXITSTATUS(st) == 0) {
+			force = 1;
+		}
+#else
+		force = 1;
+#endif
+	}
+
+	if (force) {
+		char *xauth = getenv("XAUTHORITY");
+
+		/*
+		 * OK tricky here, we need to free the shm... otherwise
+		 * we won't be able to delete it as the other user...
+		 */
+#if !LIBVNCSERVER_HAVE_SETUID
+		return 0;
+#else
+		if (using_shm) {
+			clean_shm(0);
+			free_tiles();
+		}
+		if (setuid(uid) != 0) {
+			if (using_shm) {
+				/* 2 means we did clean_shm and free_tiles */
+				do_new_fb(2);
+			}
+			return 0;
+		}
+#endif
+		if (using_shm) {
+			do_new_fb(2);
+		}
+
+		if (xauth && access(xauth, R_OK) != 0) {
+			*(xauth-2) = '_';	/* yow */
+		}
+		set_env("USER", name);
+		set_env("LOGNAME", name);
+		set_env("HOME", home);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+void try_to_switch_users(void) {
+	static time_t last_try = 0;
+	time_t now = time(0);
+	char *users, *p;
+
+	if (getuid() && geteuid()) {
+		rfbLog("try_to_switch_users: not root\n");
+		started_as_root = 2;
+		return;
+	}
+	if (!last_try) {
+		last_try = now;
+	} else if (now <= last_try + 2) {
+		/* try every 3 secs or so */
+		return;
+	}
+	last_try = now;
+
+	users = strdup(users_list);
+
+	if (strstr(users, "guess=") == users) {
+		if (switch_user(users)) {
+			started_as_root = 2;
+			rfbLog("try_to_switch_users: now %s\n", p);
+		}
+		free(users);
+		return;
+	}
+
+	p = strtok(users, ",");
+	while (p) {
+		if (switch_user(p)) {
+			started_as_root = 2;
+			rfbLog("try_to_switch_users: now %s\n", p);
+			break;
+		}
+		p = strtok(NULL, ",");
+	}
+	free(users);
 }
 
 /*
@@ -1318,7 +1771,7 @@ void clean_shm(int quick) {
 			break;
 		}
 	}
-	if (!quiet && !quick) {
+	if (!quiet) {
 		rfbLog("deleted %d tile_row polling images.\n", cnt);
 	}
 }
@@ -1356,67 +1809,23 @@ void clean_up_exit (int ret) {
 	exit(ret);
 }
 
-/*
- * General problem handler
- */
-static void interrupted (int sig) {
-	exit_sig = sig;
-	if (exit_flag) {
-		exit_flag++;
-		if (use_threads) {
-			usleep2(250 * 1000);
-		} else if (exit_flag <= 2) {
-			return;
-		}
-		exit(4);
-	}
-	exit_flag++;
-	if (sig == 0) {
-		fprintf(stderr, "caught X11 error:\n");
-	} else {
-		fprintf(stderr, "caught signal: %d\n", sig);
-	}
-	if (sig == SIGINT) {
-		shut_down = 1;
-		return;
-	}
-
-	X_UNLOCK;
-
-	/* remove the shm areas with quick=1: */
-	clean_shm(1);
-
-	/* X keyboard cleanups */
-	delete_added_keycodes();
-
-	if (clear_mods == 1) {
-		clear_modifiers(0);
-	} else if (clear_mods == 2) {
-		clear_keys();
-	}
-	if (no_autorepeat) {
-		autorepeat(1);
-	}
-	if (use_solid_bg) {
-		solid_bg(1);
-	}
-
-	if (sig) {
-		exit(2);
-	}
-}
-
 /* X11 error handlers */
 
 static XErrorHandler   Xerror_def;
 static XIOErrorHandler XIOerr_def;
 XErrorEvent *trapped_xerror_event;
 int trapped_xerror = 0;
+int trapped_xioerror = 0;
 int trapped_getimage_xerror = 0;
 
 int trap_xerror(Display *d, XErrorEvent *error) {
 	trapped_xerror = 1;
 	trapped_xerror_event = error;
+	return 0;
+}
+
+int trap_xioerror(Display *d) {
+	trapped_xioerror = 1;
 	return 0;
 }
 
@@ -1426,6 +1835,8 @@ int trap_getimage_xerror(Display *d, XErrorEvent *error) {
 	return 0;
 }
 
+void interrupted(int);
+
 static int Xerror(Display *d, XErrorEvent *error) {
 	X_UNLOCK;
 	interrupted(0);
@@ -1434,7 +1845,7 @@ static int Xerror(Display *d, XErrorEvent *error) {
 
 static int XIOerr(Display *d) {
 	X_UNLOCK;
-	interrupted(0);
+	interrupted(-1);
 	return (*XIOerr_def)(d);
 }
 
@@ -1470,6 +1881,63 @@ char *xerror_string(XErrorEvent *error) {
 		return xerrors[index];
 	} else {
 		return xerrors[xerrors_max+1];
+	}
+}
+
+/*
+ * General problem handler
+ */
+void interrupted (int sig) {
+	exit_sig = sig;
+	if (exit_flag) {
+		exit_flag++;
+		if (use_threads) {
+			usleep2(250 * 1000);
+		} else if (exit_flag <= 2) {
+			return;
+		}
+		exit(4);
+	}
+	exit_flag++;
+	if (sig == 0) {
+		fprintf(stderr, "caught X11 error:\n");
+	} else if (sig == -1) {
+		fprintf(stderr, "caught XIO error:\n");
+	} else {
+		fprintf(stderr, "caught signal: %d\n", sig);
+	}
+	if (sig == SIGINT) {
+		shut_down = 1;
+		return;
+	}
+
+	X_UNLOCK;
+
+	/* remove the shm areas with quick=1: */
+	clean_shm(1);
+
+	if (sig == -1) {
+		/* not worth trying any more cleanup, X server probably gone */
+		exit(3);
+	}
+
+	/* X keyboard cleanups */
+	delete_added_keycodes();
+
+	if (clear_mods == 1) {
+		clear_modifiers(0);
+	} else if (clear_mods == 2) {
+		clear_keys();
+	}
+	if (no_autorepeat) {
+		autorepeat(1);
+	}
+	if (use_solid_bg) {
+		solid_bg(1);
+	}
+
+	if (sig) {
+		exit(2);
 	}
 }
 
@@ -1562,10 +2030,6 @@ void initialize_signals(void) {
 /*
  * routines for handling incoming, outgoing, etc connections
  */
-
-static int accepted_client = 0;
-static int client_count = 0;
-static int clients_served = 0;
 
 /*
  * check that all clients are in RFB_NORMAL state
@@ -3189,16 +3653,9 @@ void initialize_remap(char *infile) {
 		rewind(in);
 	}
 	while (fgets(line, 256, in) != NULL) {
-		int blank = 1, isbtn = 0;
-		p = line;
-		while (*p) {
-			if (! isspace(*p)) {
-				blank = 0;
-				break;
-			}
-			p++;
-		}
-		if (blank) {
+		int isbtn = 0;
+		p = lblanks(line);
+		if (*p == '\0') {
 			continue;
 		}
 		if (strchr(line, '#')) {
@@ -7987,6 +8444,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			}
 		} else if (!strcmp(p, "auth")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(auth_file));
+		} else if (!strcmp(p, "users")) {
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(users_list));
 		} else if (!strcmp(p, "rootshift")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, rootshift);
 		} else if (!strcmp(p, "scale_str")) {
@@ -9156,6 +9615,10 @@ int get_which_cursor(void) {
 					which = CURS_TERM;
 				} else if (strstr(winfo.res_class, "text")) {
 					which = CURS_TERM;
+				} else if (strstr(winfo.res_name, "onsole")) {
+					which = CURS_TERM;
+				} else if (strstr(winfo.res_class, "onsole")) {
+					which = CURS_TERM;
 				}
 			}
 		}
@@ -9796,7 +10259,8 @@ void do_new_fb(int reset_mem) {
 		rfbLog(" not work, do not use -threads if problems arise.\n");
 	}
 
-	if (reset_mem) {
+	if (reset_mem == 1) {
+		/* reset_mem == 2 is a hack for changing users... */
 		clean_shm(0);
 		free_tiles();
 	}
@@ -10655,13 +11119,45 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 /* -- solid.c -- */
 
-int do_cmd(char *cmd) {
+void usr_bin_path(int restore) {
+	static char *oldpath = NULL;
+	char *newpath;
+	char addpath[] = "/usr/bin:/bin:";
+
+	if (restore) {
+		if (oldpath) {
+			set_env("PATH", oldpath);
+			free(oldpath);
+			oldpath = NULL;
+		}
+		return;
+	}
+
+	if (getenv("PATH")) {
+		oldpath = strdup(getenv("PATH"));
+	} else {
+		oldpath = strdup("/usr/bin");
+	}
+	newpath = (char *) malloc(strlen(oldpath) + strlen(addpath) + 1);
+	newpath[0] = '\0';
+	strcat(newpath, addpath);
+	strcat(newpath, oldpath);
+	set_env("PATH", newpath);
+	free(newpath);
+}
+
+int dt_cmd(char *cmd) {
 	int rc;
+
 	if (!cmd || *cmd == '\0') {
 		return 0;
 	}
+
 	rfbLog("running command:\n  %s\n", cmd);
+	usr_bin_path(0);
 	rc = system(cmd);
+	usr_bin_path(1);
+
 	if (rc >= 256) {
 		rc = rc/256;
 	}
@@ -10674,8 +11170,14 @@ char *cmd_output(char *cmd) {
 	char line[1024];
 	int rc;
 
+	if (!cmd || *cmd == '\0') {
+		return "";
+	}
+
 	rfbLog("running pipe:\n  %s\n", cmd);
+	usr_bin_path(0);
 	p = popen(cmd, "r");
+	usr_bin_path(1);
 
 	output[0] = '\0';
 
@@ -10826,12 +11328,12 @@ void solid_gnome(char *color) {
 		cmd = (char *)malloc(strlen(set_option) - 2 +
 		    strlen(orig_option) + 1);
 		sprintf(cmd, set_option, orig_option);
-		do_cmd(cmd);
+		dt_cmd(cmd);
 		free(cmd);
 		cmd = (char *)malloc(strlen(set_color) - 2 +
 		    strlen(orig_color) + 1);
 		sprintf(cmd, set_color, orig_color);
-		do_cmd(cmd);
+		dt_cmd(cmd);
 		free(cmd);
 		return;
 	}
@@ -10860,24 +11362,42 @@ void solid_gnome(char *color) {
 		rfbLog("bad color: %s\n", color);
 		return;
 	}
-	cmd = (char *)malloc(strlen(set_color) - 2 + strlen(color) + 1);
+	cmd = (char *)malloc(strlen(set_color) + strlen(color) + 1);
 	sprintf(cmd, set_color, color);
-	do_cmd(cmd);
+	dt_cmd(cmd);
 	free(cmd);
-	cmd = (char *)malloc(strlen(set_option) - 2 + strlen("none") + 1);
+
+	cmd = (char *)malloc(strlen(set_option) + strlen("none") + 1);
 	sprintf(cmd, set_option, "none");
-	do_cmd(cmd);
+	dt_cmd(cmd);
 	free(cmd);
 }
 
 void solid_kde(char *color) {
-	char set_color[] = "dcop kdesktop KBackgroundIface setColor '%s' 1";
-	char bg_off[] = "dcop kdesktop KBackgroundIface setBackgroundEnabled 0";
-	char bg_on[]  = "dcop kdesktop KBackgroundIface setBackgroundEnabled 1";
-	char *cmd;
+	char set_color[] =
+	    "dcop --user '%s' kdesktop KBackgroundIface setColor '%s' 1";
+	char bg_off[] =
+	    "dcop --user '%s' kdesktop KBackgroundIface setBackgroundEnabled 0";
+	char bg_on[] =
+	    "dcop --user '%s' kdesktop KBackgroundIface setBackgroundEnabled 1";
+	char *cmd, *user = NULL;
+	int len;
+
+	user = get_user_name();
+	if (strstr(user, "'") != NULL)  {
+		rfbLog("bad user: %s\n", user);
+		free(user);
+		return;
+	}
 
 	if (! color) {
-		do_cmd(bg_on);
+		len = strlen(bg_on) + strlen(user) + 1;
+		cmd = (char *)malloc(len);
+		sprintf(cmd, bg_on, user);
+		dt_cmd(cmd);
+		free(cmd);
+		free(user);
+
 		return;
 	}
 
@@ -10886,11 +11406,18 @@ void solid_kde(char *color) {
 		return;
 	}
 
-	cmd = (char *)malloc(strlen(set_color) - 2 + strlen(color) + 1);
-	sprintf(cmd, set_color, color);
-	do_cmd(cmd);
-	do_cmd(bg_off);
+	len = strlen(set_color) + strlen(user) + strlen(color) + 1;
+	cmd = (char *)malloc(len);
+	sprintf(cmd, set_color, user, color);
+	dt_cmd(cmd);
 	free(cmd);
+
+	len = strlen(bg_off) + strlen(user) + 1;
+	cmd = (char *)malloc(len);
+	sprintf(cmd, bg_off, user);
+	dt_cmd(cmd);
+	free(cmd);
+	free(user);
 }
 
 char *guess_desktop() {
@@ -10911,6 +11438,11 @@ void solid_bg(int restore) {
 	static int solid_on = 0;
 	static char *prev_str;
 	char *dtname, *color;
+
+	if (started_as_root == 1 && users_list) {
+		/* we are still root, don't try. */
+		return;
+	}
 
 	if (restore) {
 		if (! solid_on) {
@@ -11644,6 +12176,7 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 #endif
 	if (xim != NULL) {
 		XDestroyImage(xim);
+		xim = NULL;
 	}
 	X_UNLOCK;
 
@@ -13669,6 +14202,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, pid_t parent) {
 	    ":/usr/X11R6/bin:/usr/openwin/bin:/usr/dt/bin";
 	char cmd[100];
 	char *wish = NULL, *orig_path, *full_path, *tpath, *p;
+	char *old_xauth = NULL;
 	int try_max = 4, sleep = 300;
 	pid_t mypid = getpid();
 	FILE *pipe, *tmpf;
@@ -13687,7 +14221,14 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, pid_t parent) {
 		int rc, i;
 		rfbLogEnable(0);
 		if (! client_connect_file) {
+			if (getenv("XAUTHORITY") != NULL) {
+				old_xauth = strdup(getenv("XAUTHORITY"));
+			}
 			dpy = XOpenDisplay(x11vnc_xdisplay); 
+			if (! dpy && auth_file) {
+				set_env("XAUTHORITY", auth_file);
+				dpy = XOpenDisplay(x11vnc_xdisplay);
+			}
 			if (! dpy && ! x11vnc_xdisplay) {
 				x11vnc_xdisplay = strdup(":0");
 				dpy = XOpenDisplay(x11vnc_xdisplay); 
@@ -13719,12 +14260,22 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, pid_t parent) {
 			}
 		}
 		set_env("X11VNC_XDISPLAY", x11vnc_xdisplay);
+		if (getenv("XAUTHORITY") != NULL) {
+			set_env("X11VNC_XAUTHORITY", getenv("XAUTHORITY"));
+		}
 		if (rc == 0) {
 			fprintf(stderr, "gui: ping succeeded.\n");
 			set_env("X11VNC_CONNECT", "1");
 		} else {
 			fprintf(stderr, "gui: could not connect to: '%s', try"
 			    " again manually.\n", x11vnc_xdisplay);
+		}
+		if (dpy)  {
+			XCloseDisplay(dpy);
+		}
+		if (old_xauth) {
+			set_env("XAUTHORITY", old_xauth);
+			free(old_xauth);
 		}
 	}
 
@@ -13768,6 +14319,9 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, pid_t parent) {
 	set_env("DISPLAY", gui_xdisplay);
 	set_env("X11VNC_PROG", program_name);
 	set_env("X11VNC_CMDLINE", program_cmdline);
+	if (auth_file) {
+		set_env("X11VNC_AUTH_FILE", auth_file);
+	}
 
 	sprintf(cmd, "%s -", wish);
 	tmpf = tmpfile();
@@ -13871,6 +14425,7 @@ void do_gui(char *opts) {
 	if (! test_dpy) {
 		fprintf(stderr, "error: cannot connect to gui X DISPLAY: %s\n",
 		    gui_xdisplay);
+		exit(1);
 	}
 	XCloseDisplay(test_dpy);
 
@@ -14776,11 +15331,15 @@ static void watch_loop(void) {
 		check_xevents();
 		check_connect_inputs();		
 		check_padded_fb();		
+		if (started_as_root) {
+			check_switched_user();
+		}
 
 		if (first_conn_timeout < 0) {
 			start = time(0);
 			first_conn_timeout = -first_conn_timeout;
 		}
+
 		if (! screen || ! screen->clientHead) {
 			/* waiting for a client */
 			if (first_conn_timeout) {
@@ -14788,13 +15347,15 @@ static void watch_loop(void) {
 					rfbLog("No client after %d secs.\n",
 					    first_conn_timeout);
 					shut_down = 1;
-					continue;
 				}
 			}
 			usleep(200 * 1000);
 			continue;
 		}
-		first_conn_timeout = 0;
+
+		if (first_conn_timeout && all_clients_initialized()) {
+			first_conn_timeout = 0;
+		}
 
 		if (nofb) {
 			/* no framebuffer polling needed */
@@ -14897,7 +15458,8 @@ static void print_help(int mode) {
 "                       environment variable to \"disp\".\n"
 "-auth file             Set the X authority file to be \"file\", equivalent to\n"
 "                       setting the XAUTHORITY environment variable to \"file\"\n"
-"                       before startup.  See Xsecurity(7), xauth(1) man pages.\n"
+"                       before startup.  Same as -xauth file.  See Xsecurity(7),\n"
+"                       xauth(1) man pages for more info.\n"
 "\n"
 "-id windowid           Show the window corresponding to \"windowid\" not\n"
 "                       the entire display.  New windows like popup menus,\n"
@@ -14994,10 +15556,13 @@ static void print_help(int mode) {
 "-connect string        For use with \"vncviewer -listen\" reverse connections.\n"
 "                       If \"string\" has the form \"host\" or \"host:port\"\n"
 "                       the connection is made once at startup.  Use commas\n"
-"                       for a list of host's and host:port's.  If \"string\"\n"
-"                       contains \"/\" it is instead interpreted as a file to\n"
-"                       periodically check for new hosts.  The first line is\n"
-"                       read and then the file is truncated.\n"
+"                       for a list of host's and host:port's.\n"
+"\n"
+"                       If \"string\" contains \"/\" it is instead interpreted\n"
+"                       as a file to periodically check for new hosts.\n"
+"                       The first line is read and then the file is truncated.\n"
+"                       Be careful for this usage mode if x11vnc is running as\n"
+"                       root (e.g. via inetd(1) or gdm(1)).\n"
 "-vncconnect            Monitor the VNC_CONNECT X property set by the standard\n"
 "-novncconnect          VNC program vncconnect(1).  When the property is\n"
 "                       set to \"host\" or \"host:port\" establish a reverse\n"
@@ -15034,6 +15599,11 @@ static void print_help(int mode) {
 "                       external command returns 0 the client is accepted,\n"
 "                       otherwise the client is rejected.  See below for an\n"
 "                       extension to accept a client view-only.\n"
+"\n"
+"                       If x11vnc is running as root (say from inetd(1) or from\n"
+"                       display managers xdm(1), gdm(1), etc), think about the\n"
+"                       security implications carefully before supplying this\n"
+"                       option (likewise for the -gone option).\n"
 "\n"
 "                       Environment: The RFB_CLIENT_IP environment variable will\n"
 "                       be set to the incoming client IP number and the port\n"
@@ -15086,6 +15656,53 @@ static void print_help(int mode) {
 "                       in -accept.  Unlike -accept, the command return code\n"
 "                       is not interpreted by x11vnc.  Example: -gone 'xlock &'\n"
 "\n"
+"-users list            If x11vnc is started as root (say from inetd(1) or\n"
+"                       from display managers xdm(1), gdm(1), etc), then as\n"
+"                       soon as possible after connections to the display are\n"
+"                       established try to switch to one of the users in the\n"
+"                       comma separated \"list\".  If x11vnc is not running as\n"
+"                       root this option is ignored.\n"
+"                       \n"
+"                       Why use this option?  In general it is not needed\n"
+"                       since x11vnc is already connected to the display and\n"
+"                       can perform its primary functions.  It was added to\n"
+"                       make some of the *external* utility commands x11vnc\n"
+"                       occasionally runs work properly.  In particular under\n"
+"                       GNOME and KDE to implement the \"-solid color\" feature\n"
+"                       external commands (gconftool-2 and dcop) must be run as\n"
+"                       the user owning the desktop session.  This option also\n"
+"                       affects the userid used to run the processes for the\n"
+"                       -accept and -gone options.  It also affects the ability\n"
+"                       to read files for options such as -connect, -allow, and\n"
+"                       -remap. Note that the -connect file is also written to.\n"
+"                       \n"
+"                       So be careful with this option since in many situations\n"
+"                       its use can decrease security.\n"
+"                       \n"
+"                       The switch to a user will only take place if the display\n"
+"                       can still be opened as that user (this is primarily to\n"
+"                       try to guess the actual owner of the session). Example:\n"
+"                       \"-users fred,wilma,betty\".  Note that a malicious\n"
+"                       user \"barney\" by quickly using \"xhost +\" when\n"
+"                       logging in can get x11vnc to switch to user \"fred\".\n"
+"                       What happens next?\n"
+"                       \n"
+"                       Under display managers it may be a long time before\n"
+"                       the switch succeeds (i.e. a user logs in).  To make\n"
+"                       it switch immediately regardless if the display can\n"
+"                       be reopened or not prefix the username with the +\n"
+"                       character. E.g. \"-users +bob\" or \"-users +nobody\".\n"
+"                       The latter is probably the only use of this option\n"
+"                       that increases security.  To switch to a user *before*\n"
+"                       connections to the display are made or any files opened\n"
+"                       use the \"=\" character: \"-users =username\".\n"
+"                       \n"
+"                       The special user \"guess\" means to examine the utmpx\n"
+"                       database looking for a user attached to the display\n"
+"                       number and try him/her.  To limit the list of guesses,\n"
+"                       use: \"-users guess=bob,fred\".  Be especially careful\n"
+"                       using this mode.\n"
+"                       \n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
 "                       Remote displays can be polled this way: be careful this\n"
 "                       can use large amounts of network bandwidth.  This is\n"
@@ -15101,15 +15718,18 @@ static void print_help(int mode) {
 "                       try to change the desktop background to a solid color.\n"
 "                       The [color] is optional: the default color is \"cyan4\".\n"
 "                       For a different one specify the X color (rgb.txt name,\n"
-"                       e.g. \"darkblue\" or numerical \"#RRGGBB\"). Currently\n"
-"                       this option only works on GNOME, KDE, and classic X\n"
-"                       (i.e. with the background image on the root window).\n"
-"                       The \"gconftool-2\" and \"dcop\" external commands are\n"
-"                       run for GNOME and KDE respectively.  Other desktops\n"
-"                       won't work, e.g. XFCE (send us the corresponding\n"
-"                       commands if you find them).  If x11vnc guesses your\n"
-"                       desktop incorrectly, you can force it by prefixing\n"
-"                       color with \"gnome:\", \"kde:\", or \"root:\".\n"
+"                       e.g. \"darkblue\" or numerical \"#RRGGBB\").\n"
+"\n"
+"                       Currently this option only works on GNOME, KDE, and\n"
+"                       classic X (i.e. with the background image on the root\n"
+"                       window).  The \"gconftool-2\" and \"dcop\" external\n"
+"                       commands are run for GNOME and KDE respectively.\n"
+"                       Other desktops won't work, e.g. XFCE (send us the\n"
+"                       corresponding commands if you find them).  If x11vnc\n"
+"                       is running as root (inetd(1) or gdm(1)), the -users\n"
+"                       option may be needed for GNOME and KDE.  If x11vnc\n"
+"                       guesses your desktop incorrectly, you can force it by\n"
+"                       prefixing color with \"gnome:\", \"kde:\", or \"root:\".\n"
 "-blackout string       Black out rectangles on the screen. \"string\" is a\n"
 "                       comma separated list of WxH+X+Y type geometries for\n"
 "                       each rectangle.\n"
@@ -15535,8 +16155,7 @@ static void print_help(int mode) {
 "                       display (e.g. localhost:10).\n"
 "\n"
 "                       Examples: \"x11vnc -gui\", \"x11vnc -gui localhost:10\",\n"
-"                       \"x11vnc -gui :10\", \"x11vnc -gui wait,:10\",\n"
-"                       \"x11vnc -gui <x11vnc-opts...>\"\n"
+"                       \"x11vnc -gui :10\", \"x11vnc -gui conn,host:10\",\n"
 "\n"
 "                       If you do not specify a gui X display in \"gui-opts\"\n"
 "                       then the DISPLAY environment variable and -display\n"
@@ -15591,6 +16210,7 @@ static void print_help(int mode) {
 "                                       \"zero:x1,y1,x2,y2\" for a rectangle.\n"
 "                       refresh         send the entire fb to all clients.\n"
 "                       reset           recreate the fb, polling memory, etc.\n"
+/* ext. cmd. */
 "                       id:windowid     set -id window to \"windowid\". empty\n"
 "                                       or \"root\" to go back to root window\n"
 "                       sid:windowid    set -sid window to \"windowid\"\n"
@@ -15606,6 +16226,7 @@ static void print_help(int mode) {
 "                       visual:vis      set -visual to \"vis\"\n"
 "                       scale:frac      set -scale to \"frac\"\n"
 "                       viewonly        enable  -viewonly mode.\n"
+/* access view,share,forever */
 "                       noviewonly      disable -viewonly mode.\n"
 "                       shared          enable  -shared mode.\n"
 "                       noshared        disable -shared mode.\n"
@@ -15616,6 +16237,7 @@ static void print_help(int mode) {
 "                                       connects in the next n secs.\n"
 "                       deny            deny any new connections, same as \"lock\"\n"
 "                       nodeny          allow new connections, same as \"unlock\"\n"
+/* access, filename */
 "                       connect:host    do reverse connection to host, \"host\"\n"
 "                                       may be a comma separated list of hosts\n"
 "                                       or host:ports.  See -connect.\n"
@@ -15625,8 +16247,10 @@ static void print_help(int mode) {
 "                                       If you know the client internal hex ID,\n"
 "                                       e.g. 0x3 (returned by -query clients and\n"
 "                                       RFB_CLIENT_ID), you can use that too.\n"
+/* access */
 "                       allowonce:host  For the next connection only, allow\n"
 "                                       connection from \"host\".\n"
+/* access */
 "                       allow:hostlist  set -allow list to (comma separated)\n"
 "                                       \"hostlist\". See -allow and -localhost.\n"
 "                                       Do not use with -allow /path/to/file\n"
@@ -15634,6 +16258,7 @@ static void print_help(int mode) {
 "                                       use \"-host\" to delete a single host\n"
 "                       localhost       enable  -localhost mode\n"
 "                       nolocalhost     disable -localhost mode\n"
+/* ext. cmd. */
 "                       accept:cmd      set -accept \"cmd\" (empty to disable).\n"
 "                       gone:cmd        set -gone \"cmd\" (empty to disable).\n"
 "                       noshm           enable  -noshm mode.\n"
@@ -15644,6 +16269,7 @@ static void print_help(int mode) {
 "                       onetile         enable  -onetile mode. (you may need to\n"
 "                                       set shm for this to do something)\n"
 "                       noonetile       disable -onetile mode.\n"
+/* ext. cmd. */
 "                       solid           enable  -solid mode\n"
 "                       nosolid         disable -solid mode.\n"
 "                       solid_color:color set -solid color (and apply it).\n"
@@ -15674,6 +16300,7 @@ static void print_help(int mode) {
 "                       noclear_mods    disable -clear_mods mode.\n"
 "                       clear_keys      enable  -clear_keys mode and clear them.\n"
 "                       noclear_keys    disable -clear_keys mode.\n"
+/* filename */
 "                       remap:str       set -remap \"str\" (empty to disable).\n"
 "                                       See -remap for the form of \"str\"\n"
 "                                       (basically: key1-key2,key3-key4,...)\n"
@@ -15733,6 +16360,7 @@ static void print_help(int mode) {
 "                                       height parameter to n.\n"
 "                       desktop:str     set -desktop name to str for new clients.\n"
 "                       rfbport:n       set -rfbport to n.\n"
+/* access */
 "                       http            enable  http client connections.\n"
 "                       nohttp          disable http client connections.\n"
 "                       httpport:n      set -httpport to n.\n"
@@ -15817,7 +16445,7 @@ static void print_help(int mode) {
 "                       nodontdisconnect desktop noremote\n"
 "\n"
 "                       aro=  display vncdisplay desktopname http_url auth\n"
-"                       rootshift scale_str scaled_x scaled_y scale_numer\n"
+"                       users rootshift scale_str scaled_x scaled_y scale_numer\n"
 "                       scale_denom scale_fac scaling_noblend scaling_nomult4\n"
 "                       scaling_pad scaling_interpolate inetd safer unsafe\n"
 "                       passwdfile using_shm logfile o rc norc h help V version\n"
@@ -16097,17 +16725,22 @@ static void check_rcfile(int argc, char **argv) {
 			perror("fopen");
 			exit(1);
 		}
-	} else if (getenv("HOME") == NULL) {
-		norc = 1;
 	} else {
-		strncpy(rcfile, getenv("HOME"), 500);
-		strcat(rcfile, "/.x11vncrc");
-		infile = rcfile;
-		rc = fopen(rcfile, "r");
-		if (rc == NULL) {
+		char *home = get_home_dir();
+		if (! home) {
 			norc = 1;
 		} else {
-			rc_rcfile = strdup(rcfile);
+			strncpy(rcfile, home, 500);
+			free(home);
+
+			strcat(rcfile, "/.x11vncrc");
+			infile = rcfile;
+			rc = fopen(rcfile, "r");
+			if (rc == NULL) {
+				norc = 1;
+			} else {
+				rc_rcfile = strdup(rcfile);
+			}
 		}
 	}
 
@@ -16161,12 +16794,7 @@ static void check_rcfile(int argc, char **argv) {
 			if ( (q = strchr(p, '#')) != NULL) {
 				*q = '\0';
 			}
-			while (*p) {
-				if (! isspace(*p)) {
-					break;
-				}
-				p++;
-			}
+			p = lblanks(p);
 
 			strncat(buf, p, sz - strlen(buf) - 1);
 			if (cont) {
@@ -16195,12 +16823,7 @@ static void check_rcfile(int argc, char **argv) {
 			
 			p = buf;
 			p += strlen(parm);
-			while (*p) {
-				if (! isspace(*p)) {
-					break;
-				}
-				p++;
-			}
+			p = lblanks(p);
 			if (*p == '\0') {
 				buf[0] = '\0';
 				continue;
@@ -16258,6 +16881,45 @@ int main(int argc, char* argv[]) {
 	/* if we are root limit some remote commands: */
 	if (!getuid() || !geteuid()) {
 		safe_remote_only = 1;
+		started_as_root = 1;
+
+		/* check for '-users =fred' */
+		for (i=1; i < argc; i++) {
+			char *u;
+			int saved;
+
+			if (strcmp(argv[i], "-users")) {
+				continue;
+			}
+			if (i == argc - 1) {
+				fprintf(stderr, "not enough arguments for: "
+				    "-users\n");
+				exit(1);
+			}
+			if (*(argv[i+1]) != '=') {
+				break;
+			}
+			u = strdup(argv[i+1]);
+			*u = '+';
+			if (strstr(u, "+guess") == u) {
+				fprintf(stderr, "invalid user: %s\n", u);
+				exit(1);
+			}
+			/* kludge... */
+			saved = using_shm;
+			using_shm = 0;
+			if (!switch_user(u)) {
+				fprintf(stderr, "Could not switch to user: "
+				    "%s\n", u+1);
+				exit(1);
+			} else {
+				fprintf(stderr, "Switched to user: %s\n", u+1);
+				started_as_root = 2;
+			}
+			using_shm = saved;
+			free(u);
+			break;
+		}
 	}
 
 	argv_vnc[0] = strdup(argv[0]);
@@ -16305,7 +16967,7 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-display")) {
 			CHECK_ARGC
 			use_dpy = strdup(argv[++i]);
-		} else if (!strcmp(arg, "-auth")) {
+		} else if (!strcmp(arg, "-auth") || !strcmp(arg, "-xauth")) {
 			CHECK_ARGC
 			auth_file = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-id") || !strcmp(arg, "-sid")) {
@@ -16361,6 +17023,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-timeout")) {
 			CHECK_ARGC
 			first_conn_timeout = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-users")) {
+			CHECK_ARGC
+			users_list = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-inetd")) {
 			inetd = 1;
 		} else if (!strcmp(arg, "-connect")) {
@@ -16927,6 +17592,8 @@ int main(int argc, char* argv[]) {
                     : "null");
 		fprintf(stderr, " gone:       %s\n", gone_cmd ? gone_cmd
                     : "null");
+		fprintf(stderr, " users:      %s\n", users_list ? users_list
+                    : "null");
 		fprintf(stderr, " using_shm:  %d\n", using_shm);
 		fprintf(stderr, " flipbytes:  %d\n", flip_byte_order);
 		fprintf(stderr, " onetile:    %d\n", single_copytile);
@@ -17162,7 +17829,8 @@ int main(int argc, char* argv[]) {
 				    " cursor mode\n");
 				rfbLog("  to: '-cursor most'.\n");
 				rfbLog("  to disable this behavior use: "
-				    "'-cursor arrow'.\n");
+				    "'-cursor arrow'\n");
+				rfbLog("  or '-noxfixes'.\n");
 			}
 		}
 		if(!strcmp(multiple_cursors_mode, "most")) {
