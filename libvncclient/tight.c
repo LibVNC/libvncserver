@@ -227,10 +227,10 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
   /* Read, decode and draw actual pixel data in a loop. */
 
-  bufferSize = BUFFER_SIZE * bitsPixel / (bitsPixel + BPP) & 0xFFFFFFFC;
+  bufferSize = RFB_BUFFER_SIZE * bitsPixel / (bitsPixel + BPP) & 0xFFFFFFFC;
   buffer2 = &client->buffer[bufferSize];
   if (rowSize > bufferSize) {
-    /* Should be impossible when BUFFER_SIZE >= 16384 */
+    /* Should be impossible when RFB_BUFFER_SIZE >= 16384 */
     rfbClientLog("Internal error: incorrect buffer size.\n");
     return FALSE;
   }
@@ -586,12 +586,12 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
     if (jpegError) {
       break;
     }
-    pixelPtr = (CARDBPP *)&client->buffer[BUFFER_SIZE / 2];
+    pixelPtr = (CARDBPP *)&client->buffer[RFB_BUFFER_SIZE / 2];
     for (dx = 0; dx < w; dx++) {
       *pixelPtr++ =
 	RGB24_TO_PIXEL(BPP, client->buffer[dx*3], client->buffer[dx*3+1], client->buffer[dx*3+2]);
     }
-    CopyRectangle(client, &client->buffer[BUFFER_SIZE / 2], x, y + dy, w, 1);
+    CopyRectangle(client, &client->buffer[RFB_BUFFER_SIZE / 2], x, y + dy, w, 1);
     dy++;
   }
 

@@ -43,7 +43,7 @@
 rfbBool rfbEnableClientLogging=TRUE;
 
 void
-rfbClientLog(const char *format, ...)
+rfbDefaultClientLog(const char *format, ...)
 {
     va_list args;
     char buf[256];
@@ -63,6 +63,9 @@ rfbClientLog(const char *format, ...)
 
     va_end(args);
 }
+
+rfbClientLogProc rfbClientLog=rfbDefaultClientLog;
+rfbClientLogProc rfbClientErr=rfbDefaultClientLog;
 
 void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_t colour) {
   int i,j;
@@ -271,13 +274,14 @@ InitialiseRFBConnection(rfbClient* client)
     errorMessageOnReadFailure = FALSE;
 
   if (!ReadFromRFBServer(client, pv, sz_rfbProtocolVersionMsg)) return FALSE;
+  pv[sz_rfbProtocolVersionMsg]=0;
 
   errorMessageOnReadFailure = TRUE;
 
   pv[sz_rfbProtocolVersionMsg] = 0;
 
   if (sscanf(pv,rfbProtocolVersionFormat,&major,&minor) != 2) {
-    rfbClientLog("Not a valid VNC server\n");
+    rfbClientLog("Not a valid VNC server (%s)\n",pv);
     return FALSE;
   }
 
@@ -769,7 +773,7 @@ HandleRFBServerMessage(rfbClient* client)
 	int y=rect.r.y, h=rect.r.h;
 
 	bytesPerLine = rect.r.w * client->format.bitsPerPixel / 8;
-	linesToRead = BUFFER_SIZE / bytesPerLine;
+	linesToRead = RFB_BUFFER_SIZE / bytesPerLine;
 
 	while (h > 0) {
 	  if (linesToRead > h)

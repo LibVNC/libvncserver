@@ -96,8 +96,8 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   while (( remaining > 0 ) &&
          ( inflateResult == Z_OK )) {
   
-    if ( remaining > BUFFER_SIZE ) {
-      toRead = BUFFER_SIZE;
+    if ( remaining > RFB_BUFFER_SIZE ) {
+      toRead = RFB_BUFFER_SIZE;
     }
     else {
       toRead = remaining;

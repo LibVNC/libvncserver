@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <rfb/rfbclient.h>
 
@@ -128,6 +129,9 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
     }
   }
 
+  client->bufoutptr=client->buf;
+  client->buffered=0;
+
   client->HandleCursorPos = DummyPoint;
   client->SoftCursorLockArea = DummyRect;
   client->SoftCursorUnlockScreen = Dummy;
@@ -188,7 +192,7 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       char* colon=strchr(argv[i],':');
 
       if(colon) {
-        client->serverHost=strndup(argv[i],colon-argv[i]);
+        client->serverHost=strndup(argv[i],(int)(colon-argv[i]));
 	client->serverPort=atoi(colon+1);
       } else {
 	client->serverHost=strdup(argv[i]);

@@ -36,11 +36,6 @@ void PrintInHex(char *buf, int len);
 
 rfbBool errorMessageOnReadFailure = TRUE;
 
-#define BUF_SIZE 8192
-static char buf[BUF_SIZE];
-static char *bufoutptr = buf;
-static int buffered = 0;
-
 /*
  * ReadFromRFBServer is called whenever we want to read some data from the RFB
  * server.  It is non-trivial for two reasons:
@@ -95,28 +90,28 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
     return (fread(out,1,n,rec->file)<0?FALSE:TRUE);
   }
   
-  if (n <= buffered) {
-    memcpy(out, bufoutptr, n);
-    bufoutptr += n;
-    buffered -= n;
+  if (n <= client->buffered) {
+    memcpy(out, client->bufoutptr, n);
+    client->bufoutptr += n;
+    client->buffered -= n;
 #ifdef DEBUG_READ_EXACT
     goto hexdump;
 #endif
     return TRUE;
   }
 
-  memcpy(out, bufoutptr, buffered);
+  memcpy(out, client->bufoutptr, client->buffered);
 
-  out += buffered;
-  n -= buffered;
+  out += client->buffered;
+  n -= client->buffered;
 
-  bufoutptr = buf;
-  buffered = 0;
+  client->bufoutptr = client->buf;
+  client->buffered = 0;
 
-  if (n <= BUF_SIZE) {
+  if (n <= RFB_BUF_SIZE) {
 
-    while (buffered < n) {
-      int i = read(client->sock, buf + buffered, BUF_SIZE - buffered);
+    while (client->buffered < n) {
+      int i = read(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
       if (i <= 0) {
 	if (i < 0) {
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
@@ -135,12 +130,12 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  return FALSE;
 	}
       }
-      buffered += i;
+      client->buffered += i;
     }
 
-    memcpy(out, bufoutptr, n);
-    bufoutptr += n;
-    buffered -= n;
+    memcpy(out, client->bufoutptr, n);
+    client->bufoutptr += n;
+    client->buffered -= n;
 
   } else {
 

@@ -102,7 +102,7 @@ typedef struct _rfbClient {
 	AppData appData;
 
 	const char* programName;
-	const char* serverHost;
+	char* serverHost;
 	int serverPort; /* if -1, then use file recorded by vncrec */
 	rfbBool listenSpecified;
 	int listenPort, flashPort;
@@ -112,8 +112,8 @@ typedef struct _rfbClient {
 	   Hextile also assumes it is big enough to hold 16 * 16 * 32 bits.
 	   Tight encoding assumes BUFFER_SIZE is at least 16384 bytes. */
 
-#define BUFFER_SIZE (640*480)
-	char buffer[BUFFER_SIZE];
+#define RFB_BUFFER_SIZE (640*480)
+	char buffer[RFB_BUFFER_SIZE];
 
 	/* rfbproto.c */
 
@@ -125,6 +125,13 @@ typedef struct _rfbClient {
 	rfbServerInitMsg si;
 	char *serverCutText;
 	rfbBool newServerCutText;
+
+	/* sockets.c */
+#define RFB_BUF_SIZE 8192
+	char buf[RFB_BUF_SIZE];
+	char *bufoutptr;
+	int buffered;
+
 
 	/* cursor.c */
 	uint8_t *rcSource, *rcMask;
@@ -156,7 +163,8 @@ extern void listenForIncomingConnections(rfbClient* viewer);
 /* rfbproto.c */
 
 extern rfbBool rfbEnableClientLogging;
-extern void rfbClientLog(const char *format, ...);
+typedef void (*rfbClientLogProc)(const char *format, ...);
+extern rfbClientLogProc rfbClientLog,rfbClientErr;
 extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
 extern rfbBool InitialiseRFBConnection(rfbClient* client);
 extern rfbBool SetFormatAndEncodings(rfbClient* client);
