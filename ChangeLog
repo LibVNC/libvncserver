@@ -1,3 +1,8 @@
+2004-01-21  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* do not send unneccessary updates when drawing a cursor
+	* ignore SIGPIPE; it is handled by EPIPE
+	* add an example how to use rfbDoCopyRect
+	
 2004-01-19  Karl Runge <runge@karlrunge.com>
 	* handle mouse button number mismatch
 	* improved pointer input handling during drags, etc.
