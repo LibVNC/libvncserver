@@ -43,7 +43,175 @@
 #include "rfb.h"
 #include "keysym.h"
 
+#include <IOKit/pwr_mgt/IOPMLib.h>
+#include <IOKit/pwr_mgt/IOPM.h>
+#include <stdio.h>
+#include <signal.h>
+#include <pthread.h>
+
+Bool rfbNoDimming = FALSE;
+Bool rfbNoSleep   = TRUE;
+
+static pthread_mutex_t  dimming_mutex;
+static unsigned long    dim_time;
+static unsigned long    sleep_time;
+static mach_port_t      master_dev_port;
+static io_connect_t     power_mgt;
+static Bool initialized            = FALSE;
+static Bool dim_time_saved         = FALSE;
+static Bool sleep_time_saved       = FALSE;
+
+static int
+saveDimSettings(void)
+{
+    if (IOPMGetAggressiveness(power_mgt, 
+                              kPMMinutesToDim, 
+                              &dim_time) != kIOReturnSuccess)
+        return -1;
+
+    dim_time_saved = TRUE;
+    return 0;
+}
+
+static int
+restoreDimSettings(void)
+{
+    if (!dim_time_saved)
+        return -1;
+
+    if (IOPMSetAggressiveness(power_mgt, 
+                              kPMMinutesToDim, 
+                              dim_time) != kIOReturnSuccess)
+        return -1;
+
+    dim_time_saved = FALSE;
+    dim_time = 0;
+    return 0;
+}
+
+static int
+saveSleepSettings(void)
+{
+    if (IOPMGetAggressiveness(power_mgt, 
+                              kPMMinutesToSleep, 
+                              &sleep_time) != kIOReturnSuccess)
+        return -1;
+
+    sleep_time_saved = TRUE;
+    return 0;
+}
+
+static int
+restoreSleepSettings(void)
+{
+    if (!sleep_time_saved)
+        return -1;
+
+    if (IOPMSetAggressiveness(power_mgt, 
+                              kPMMinutesToSleep, 
+                              sleep_time) != kIOReturnSuccess)
+        return -1;
+
+    sleep_time_saved = FALSE;
+    sleep_time = 0;
+    return 0;
+}
+
+
+int
+rfbDimmingInit(void)
+{
+    pthread_mutex_init(&dimming_mutex, NULL);
+
+    if (IOMasterPort(bootstrap_port, &master_dev_port) != kIOReturnSuccess)
+        return -1;
+
+    if (!(power_mgt = IOPMFindPowerManagement(master_dev_port)))
+        return -1;
+
+    if (rfbNoDimming) {
+        if (saveDimSettings() < 0)
+            return -1;
+        if (IOPMSetAggressiveness(power_mgt, 
+                                  kPMMinutesToDim, 0) != kIOReturnSuccess)
+            return -1;
+    }
+
+    if (rfbNoSleep) {
+        if (saveSleepSettings() < 0)
+            return -1;
+        if (IOPMSetAggressiveness(power_mgt, 
+                                  kPMMinutesToSleep, 0) != kIOReturnSuccess)
+            return -1;
+    }
+
+    initialized = TRUE;
+    return 0;
+}
+
+
+int
+rfbUndim(void)
+{
+    int result = -1;
+
+    pthread_mutex_lock(&dimming_mutex);
+    
+    if (!initialized)
+        goto DONE;
+
+    if (!rfbNoDimming) {
+        if (saveDimSettings() < 0)
+            goto DONE;
+        if (IOPMSetAggressiveness(power_mgt, kPMMinutesToDim, 0) != kIOReturnSuccess)
+            goto DONE;
+        if (restoreDimSettings() < 0)
+            goto DONE;
+    }
+    
+    if (!rfbNoSleep) {
+        if (saveSleepSettings() < 0)
+            goto DONE;
+        if (IOPMSetAggressiveness(power_mgt, kPMMinutesToSleep, 0) != kIOReturnSuccess)
+            goto DONE;
+        if (restoreSleepSettings() < 0)
+            goto DONE;
+    }
+
+    result = 0;
+
+ DONE:
+    pthread_mutex_unlock(&dimming_mutex);
+    return result;
+}
+
+
+int
+rfbDimmingShutdown(void)
+{
+    int result = -1;
+
+    if (!initialized)
+        goto DONE;
+
+    pthread_mutex_lock(&dimming_mutex);
+    if (dim_time_saved)
+        if (restoreDimSettings() < 0)
+            goto DONE;
+    if (sleep_time_saved)
+        if (restoreSleepSettings() < 0)
+            goto DONE;
+
+    result = 0;
+
+ DONE:
+    pthread_mutex_unlock(&dimming_mutex);
+    return result;
+}
+
 rfbScreenInfoPtr rfbScreen;
+
+void shutdown(rfbClientPtr cl);
 
 /* some variables to enable special behaviour */
 int startTime = -1, maxSecsToConnect = 0;
@@ -233,6 +401,8 @@ KbdAddEvent(Bool down, KeySym keySym, struct _rfbClientRec* cl)
 
     if(((int)cl->clientData)==-1) return; /* viewOnly */
 
+    rfbUndim();
+
     for (i = 0; i < (sizeof(keyTable) / sizeof(int)); i += 2) {
         if (keyTable[i] == keySym) {
             keyCode = keyTable[i+1];
@@ -261,6 +431,8 @@ PtrAddEvent(buttonMask, x, y, cl)
     CGPoint position;
 
     if(((int)cl->clientData)==-1) return; /* viewOnly */
+
+    rfbUndim();
 
     position.x = x;
     position.y = y;
@@ -340,7 +512,7 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 #endif
 
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
-    exit(0);
+    shutdown(0);
 
   for (i = 0; i < count; i++)
     rfbMarkRectAsModified(rfbScreen,
@@ -351,13 +523,13 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 
 void clientGone(rfbClientPtr cl)
 {
-  exit(0);
+  shutdown(cl);
 }
 
 enum rfbNewClientAction newClient(rfbClientPtr cl)
 {
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
-    exit(0);
+    shutdown(cl);
 
   if(disconnectAfterFirstClient)
     cl->clientGoneHook = clientGone;
@@ -407,6 +579,8 @@ int main(int argc,char *argv[])
       sharedMode=TRUE;
     }
 
+  rfbDimmingInit();
+
   ScreenInit(argc,argv);
   rfbScreen->newClientHook = newClient;
 
@@ -417,6 +591,14 @@ int main(int argc,char *argv[])
   CGRegisterScreenRefreshCallback(refreshCallback, NULL);
   RunApplicationEventLoop();
 
+  rfbDimmingShutdown();
+
   return(0); /* never ... */
 }
 
+void shutdown(rfbClientPtr cl)
+{
+  rfbScreenCleanup(rfbScreen);
+  rfbDimmingShutdown();
+  exit(0);
+}
