@@ -37,6 +37,10 @@
 
 rfbScreenInfoPtr rfbScreen;
 
+/* some variables to enable special behaviour */
+int startTime = -1, maxSecsToConnect = 0;
+Bool disconnectAfterFirstClient = True;
+
 /* Where do I get the "official" list of Mac key codes?
    Ripped these out of a Mac II emulator called Basilisk II
    that I found on the net. */
@@ -283,18 +287,45 @@ ScreenInit(int argc, char**argv)
 static void 
 refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 {
-    int i;
+  int i;
 
-    for (i = 0; i < count; i++)
-      rfbMarkRectAsModified(rfbScreen,
-			    rectArray[i].origin.x,rectArray[i].origin.y,
-			    rectArray[i].origin.x + rectArray[i].size.width,
-			    rectArray[i].origin.y + rectArray[i].size.height);
+  if(startTime>0 && time()>startTime+maxSecsToConnect)
+    exit(0);
+
+  for (i = 0; i < count; i++)
+    rfbMarkRectAsModified(rfbScreen,
+			  rectArray[i].origin.x,rectArray[i].origin.y,
+			  rectArray[i].origin.x + rectArray[i].size.width,
+			  rectArray[i].origin.y + rectArray[i].size.height);
+}
+
+void clientGone(rfbClientPtr cl)
+{
+  exit(0);
+}
+
+void newClient(rfbClientPtr cl)
+{
+  if(startTime>0 && time()>startTime+maxSecsToConnect)
+    exit(0);
+
+  if(disconnectAfterFirstClient)
+    cl->clientGoneHook = clientGone;
 }
 
 int main(int argc,char *argv[])
 {
+  for(i=argc-1;i>0;i--)
+    if(i<argc-1 && strcmp(argv[i],"-wait4client")==0) {
+      maxSecsToConnect = atoi(argv[i+1])/1000;
+      startTime = time();
+    } else if(strcmp(argv[i],"-runforever")==0) {
+      disconnectAfterFirstClient = FALSE;
+    }
+
   ScreenInit(argc,argv);
+  rfbScreen->newClientHook = newClient;
+
   /* enter background event loop */
   rfbRunEventLoop(rfbScreen,40,TRUE);
 
