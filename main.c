@@ -38,10 +38,11 @@ MUTEX(logMutex);
 
 int rfbEnableLogging=1;
 
-/* we cannot compare to _LITTLE_ENDIAN, because some systems
-   (as Solaris) assume little endian if _LITTLE_ENDIAN is
-   defined, even if _BYTE_ORDER is not _LITTLE_ENDIAN */
-char rfbEndianTest = (_BYTE_ORDER == 1234);
+#ifdef WORDS_BIGENDIAN
+char rfbEndianTest = 0;
+#else
+char rfbEndianTest = -1;
+#endif
 
 /* from rfbserver.c */
 void rfbIncrClientRef(rfbClientPtr cl);

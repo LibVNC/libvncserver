@@ -60,48 +60,15 @@ typedef signed char Bool;
 
 #include "rfbproto.h"
 
-#ifdef __linux__
-#include <endian.h>
-#elif defined(__APPLE__) || defined(__FreeBSD__)
 #include <sys/types.h>
-#include <machine/endian.h>
-#define _BYTE_ORDER BYTE_ORDER
-#define _LITTLE_ENDIAN LITTLE_ENDIAN
-#elif defined (__SVR4) && defined (__sun) /* Solaris */
-#include <sys/types.h>
-#if defined(__sparc)
-  /* SPARC here (big endian) */
-#define _BYTE_ORDER 4321
-#elif defined(__i386)
-#define _BYTE_ORDER 1234
-#else
-#error Solaris 2.5.1 had ppc support did it not? :-)
-#endif
-#undef Bool
-#define Bool char
-#undef SIGNED
-#define SIGNED
-#include <sys/types.h>
-/* typedef unsigned int pthread_t; */
-#elif defined(WIN32)
-#define _LITTLE_ENDIAN 1234
-#define _BYTE_ORDER _LITTLE_ENDIAN
+#if defined(WIN32)
+#define WORDS_BIGENDIAN
 #undef Bool
 #define Bool int
-#else
-#include <sys/endian.h>
 #endif
 
 #ifdef __sgi__
 typedef int socklen_t;
-#endif
-
-#ifndef _BYTE_ORDER
-#define _BYTE_ORDER __BYTE_ORDER
-#endif
-
-#if !defined(_LITTLE_ENDIAN) && defined(__LITTLE_ENDIAN)
-#define _LITTLE_ENDIAN __LITTLE_ENDIAN
 #endif
 
 #ifdef WIN32
