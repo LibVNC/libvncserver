@@ -9,10 +9,17 @@
 
 <br>
 
-    If you have problems updating with CVS, here is a <a href=LibVNCServer-0.7pre.tar.gz>preliminary version</a>.
+    If you have problems updating with CVS, here is a <a href=LibVNCServer-0.7pre.tar.gz>preliminary version</a>. If you are looking for more information
+    on Karl's wonderful x11vnc, either download it
+    <a href=http://sourceforge.net/project/showfiles.php?group_id=32584>here</a>, or
+    look at <a href=http://www.karlrunge.com/x11vnc/>x11vnc's homepage</a>.
 <p>
 
     <h2> News </h2>
+    <strong>2004/09/14</strong> Added
+    <a href=http://libvncserver.sourceforge.net/success.html>
+    Success stories</a>.
+<p>
     <strong>2004/09/07</strong> The API was cleaned up. The structures and functions now have a prefix (mostly "rfb", sometimes "zrle" or "sra") in order not to clutter the namespace, while the structure's members don't need such a prefix.
 <p>
     <strong>2004/08/17</strong> I finally came around to fix mouse behaviour in QEMU's VNC frontend for Windows 98. Please find the patch <a href=qemu/>here</a>. If mouse behaves strangely, try to wiggle the pointer to a free spot on the desktop, hit Ctrl+Shift and release them. After that, the mouse should behave nicely.
@@ -142,6 +149,9 @@ int main(int argc,char** argv)
  Unfortunately he used the example code from rfbcounter, which can encode only
  RRE, which is not a good compression.
 <p>
+ <a href=http://libvncserver.sourceforge.net/success.html>Other people</a>
+ have used this library as well.
+<p>
  If you want to know about other of my projects, look at
  <a href=http://wrzx69.rz.uni-wuerzburg.de/~gene099/index.html>my homepage</a>.
     <hr>
@@ -151,7 +161,7 @@ int main(int argc,char** argv)
 	width="88" height="31" border="0" alt="SourceForge Logo"></A><br>
 <!-- Created: Thu Sep 27 12:27:41 MESZ 2001 -->
 <!-- hhmts start -->
-Last modified: Sun Feb 09 06:27:38 MESZ 2003
+Last modified: Tue Sep 14 10:52:00 MESZ 2004
 <!-- hhmts end -->
   </body>
 </html>
