@@ -1,15 +1,13 @@
 Makefile
-blooptest
+*test
 example
 fontsel
 pnmshow
 pnmshow24
-regiontest
 storepasswd
 vncev
 Makefile.in
 .deps
-colourmaptest
 simple
 simple15
 
