@@ -1,6 +1,9 @@
 immediate:
 ----------
 
+DeferUpdateTime (timing problems!)
+cursor drawing: set optional grain to mark bigger rectangles as drawn (else
+	you end up with thousands of one-pixel-rectangles to encode).
 selectbox: scroll bars
 documentation
 	hint that to mark very tiny regions as

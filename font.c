@@ -28,7 +28,7 @@ int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 	memcpy(rfbScreen->frameBuffer+(y+j)*rowstride+(x+i)*bpp,colour,bpp);
       d<<=1;
     }
-    if((i&7)!=0) data++;
+    /* if((i&7)!=0) data++; */
   }
   return(width);
 }
@@ -90,7 +90,7 @@ int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
       }
       d<<=1;
     }
-    //if((i&7)==0) data++;
+    /* if((i&7)==0) data++; */
     data += extra_bytes;
   }
   return(width);

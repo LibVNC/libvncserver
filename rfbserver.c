@@ -871,7 +871,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     sraRect rect;
     int nUpdateRegionRects;
     rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
-    sraRegionPtr updateRegion,updateCopyRegion;
+    sraRegionPtr updateRegion,updateCopyRegion,tmpRegion;
     int dx, dy;
     Bool sendCursorShape = FALSE;
 
@@ -932,8 +932,10 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
     updateCopyRegion = sraRgnCreateRgn(cl->copyRegion);
     sraRgnAnd(updateCopyRegion,cl->requestedRegion);
-    sraRgnOffset(cl->requestedRegion,cl->copyDX,cl->copyDY);
-    sraRgnAnd(updateCopyRegion,cl->requestedRegion);
+    tmpRegion = sraRgnCreateRgn(cl->requestedRegion);
+    sraRgnOffset(tmpRegion,cl->copyDX,cl->copyDY);
+    sraRgnAnd(updateCopyRegion,tmpRegion);
+    sraRgnDestroy(tmpRegion);
     dx = cl->copyDX;
     dy = cl->copyDY;
 
@@ -957,7 +959,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
      sraRgnSubtract(cl->modifiedRegion,updateRegion);
      sraRgnSubtract(cl->modifiedRegion,updateCopyRegion);
 
-     sraRgnMakeEmpty(cl->requestedRegion);
+     /* sraRgnMakeEmpty(cl->requestedRegion); */
      sraRgnMakeEmpty(cl->copyRegion);
      cl->copyDX = 0;
      cl->copyDY = 0;
