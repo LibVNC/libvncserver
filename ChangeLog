@@ -1,3 +1,8 @@
+2004-08-29  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* */*.[ch]: API changes: global functions/structures should have
+	*   either "rfb", "sra" or "zrle" as prefix, while structure members
+	*   should not...
+
 2004-08-29  Karl Runge <runge@karlrunge.com>
 	* x11vnc: changes in cursor shape handling: use rfbSetCursor()
 	* cursor shape options: -cursor, -cursor (X|some|most)
