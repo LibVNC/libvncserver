@@ -1,6 +1,7 @@
 immediate:
 ----------
 
+always undraw cursor after sending updates, but do not mark region as modified.
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
 
