@@ -212,7 +212,11 @@ typedef struct _rfbScreenInfo
     SOCKET listenSock;
     int maxSock;
     int maxFd;
+#ifdef __MINGW32__
     struct fd_set allFds;
+#else
+    fd_set allFds;
+#endif
 
     rfbBool socketInitDone;
     SOCKET inetdSock;
