@@ -1,5 +1,5 @@
-SUBDIRS=. examples contrib vncterm
-DIST_SUBDIRS=examples contrib vncterm
+SUBDIRS=. examples contrib vncterm classes
+DIST_SUBDIRS=examples contrib vncterm classes
 
 bin_SCRIPTS = libvncserver-config
 
