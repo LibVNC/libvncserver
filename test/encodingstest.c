@@ -160,17 +160,14 @@ static void update(rfbClient* client,int x,int y,int w,int h) {
 static void* clientLoop(void* data) {
 	rfbClient* client=(rfbClient*)data;
 	clientData* cd=(clientData*)client->clientData;
-	int argc=4;
-	char* argv[4]={"client",
-		"-encodings", testEncodings[cd->encodingIndex].str,
-		cd->display};
-	
+
+	client->appData.encodingsString=strdup(testEncodings[cd->encodingIndex].str);
 	
 	sleep(1);
 	rfbClientLog("Starting client (encoding %s, display %s)\n",
 			testEncodings[cd->encodingIndex].str,
 			cd->display);
-	if(!rfbInitClient(client,&argc,argv)) {
+	if(!rfbInitClient(client,0,0)) {
 		rfbClientErr("Had problems starting client (encoding %s)\n",
 				testEncodings[cd->encodingIndex].str);
 		updateStatistics(cd->encodingIndex,TRUE);
@@ -296,6 +293,7 @@ int main(int argc,char** argv)
 	server=rfbGetScreen(&argc,argv,width,height,8,3,4);
 
 	server->frameBuffer=malloc(400*300*4);
+	server->cursor=0;
 	for(j=0;j<400*300*4;j++)
 		server->frameBuffer[j]=j;
 	rfbInitServer(server);
@@ -313,7 +311,7 @@ int main(int argc,char** argv)
 
 	t=time(0);
 	/* test 20 seconds */
-	while(time(0)-t<5) {
+	while(time(0)-t<20) {
 
 		idle(server);
 
