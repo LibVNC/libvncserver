@@ -120,7 +120,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    */
 	    i = 0;
 	  } else {
-	    perror("read");
+	    rfbClientErr("read");
 	    return FALSE;
 	  }
 	} else {
@@ -149,7 +149,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    */
 	    i = 0;
 	  } else {
-	    perror("read");
+	    rfbClientErr("read");
 	    return FALSE;
 	  }
 	} else {
@@ -200,12 +200,12 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
 	  FD_SET(client->sock,&fds);
 
 	  if (select(client->sock+1, NULL, &fds, NULL, NULL) <= 0) {
-	    perror("select");
+	    rfbClientErr("select");
 	    return FALSE;
 	  }
 	  j = 0;
 	} else {
-	  perror("write");
+	  rfbClientErr("write");
 	  return FALSE;
 	}
       } else {
@@ -236,19 +236,19 @@ ConnectClientToTcpAddr(unsigned int host, int port)
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
-    perror("ConnectToTcpAddr: socket");
+    rfbClientErr("ConnectToTcpAddr: socket");
     return -1;
   }
 
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    perror("ConnectToTcpAddr: connect");
+    rfbClientErr("ConnectToTcpAddr: connect");
     close(sock);
     return -1;
   }
 
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
-    perror("ConnectToTcpAddr: setsockopt");
+    rfbClientErr("ConnectToTcpAddr: setsockopt");
     close(sock);
     return -1;
   }
@@ -274,7 +274,7 @@ FindFreeTcpPort(void)
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
-    perror(": FindFreeTcpPort: socket");
+    rfbClientErr(": FindFreeTcpPort: socket");
     return 0;
   }
 
@@ -308,25 +308,25 @@ ListenAtTcpPort(int port)
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
-    perror("ListenAtTcpPort: socket");
+    rfbClientErr("ListenAtTcpPort: socket");
     return -1;
   }
 
   if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		 (const char *)&one, sizeof(one)) < 0) {
-    perror("ListenAtTcpPort: setsockopt");
+    rfbClientErr("ListenAtTcpPort: setsockopt");
     close(sock);
     return -1;
   }
 
   if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    perror("ListenAtTcpPort: bind");
+    rfbClientErr("ListenAtTcpPort: bind");
     close(sock);
     return -1;
   }
 
   if (listen(sock, 5) < 0) {
-    perror("ListenAtTcpPort: listen");
+    rfbClientErr("ListenAtTcpPort: listen");
     close(sock);
     return -1;
   }
@@ -349,13 +349,13 @@ AcceptTcpConnection(int listenSock)
 
   sock = accept(listenSock, (struct sockaddr *) &addr, &addrlen);
   if (sock < 0) {
-    perror("AcceptTcpConnection: accept");
+    rfbClientErr("AcceptTcpConnection: accept");
     return -1;
   }
 
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
-    perror("AcceptTcpConnection: setsockopt");
+    rfbClientErr("AcceptTcpConnection: setsockopt");
     close(sock);
     return -1;
   }
@@ -372,7 +372,7 @@ rfbBool
 SetNonBlocking(int sock)
 {
   if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
-    perror("AcceptTcpConnection: fcntl");
+    rfbClientErr("AcceptTcpConnection: fcntl");
     return FALSE;
   }
   return TRUE;

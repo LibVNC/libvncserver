@@ -77,7 +77,7 @@ listenForIncomingConnections(rfbClient* client)
       switch (fork()) {
 
       case -1: 
-	perror("fork"); 
+	rfbClientErr("fork"); 
 	return;
 
       case 0:

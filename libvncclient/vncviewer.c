@@ -91,6 +91,10 @@ static void initAppData(AppData* data) {
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 			int bytesPerPixel) {
   rfbClient* client=(rfbClient*)calloc(sizeof(rfbClient),1);
+  if(!client) {
+    rfbClientErr("Couldn't allocate client structure!\n");
+    return 0;
+  }
   initAppData(&client->appData);
   client->programName = 0;
   client->endianTest = 1;
