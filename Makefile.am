@@ -1,4 +1,4 @@
-CFLAGS=-g
+CFLAGS=-g -Wall
 
 SUBDIRS=. examples contrib vncterm classes libvncclient test
 DIST_SUBDIRS=examples contrib vncterm classes libvncclient test
@@ -11,28 +11,20 @@ includedir=$(prefix)/include/rfb
 include_HEADERS=rfb/rfb.h rfb/rfbconfig.h rfb/rfbint.h rfb/rfbproto.h \
 	rfb/keysym.h rfb/rfbregion.h rfb/rfbclient.h
 
-noinst_HEADERS=d3des.h zrleDecode.h zrleEncode.h rfb/default8x16.h \
-	rdr/Exception.h rdr/FdInStream.h rdr/FdOutStream.h \
-	rdr/FixedMemOutStream.h rdr/InStream.h rdr/MemInStream.h \
-	rdr/MemOutStream.h rdr/NullOutStream.h rdr/OutStream.h \
-	rdr/ZlibInStream.h rdr/ZlibOutStream.h rdr/types.h
-
-ZRLE_SRCS=zrle.cxx rdr/FdInStream.cxx rdr/FdOutStream.cxx rdr/InStream.cxx \
-	rdr/NullOutStream.cxx rdr/ZlibInStream.cxx rdr/ZlibOutStream.cxx
+noinst_HEADERS=d3des.h rfb/default8x16.h zrleoutstream.h \
+	zrlepalettehelper.h zrletypes.h
 
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
-	tableinitcmtemplate.c tabletrans24template.c $(ZRLE_SRCS)
+	tableinitcmtemplate.c tabletrans24template.c \
+	zrleencodetemplate.c
 
 LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	zlib.c tight.c httpd.c cursor.c font.c \
-	draw.c selbox.c d3des.c vncauth.c cargs.c
+	draw.c selbox.c d3des.c vncauth.c cargs.c \
+	zrle.c zrleoutstream.c zrlepalettehelper.c
 
-if HAVE_CXX
-libvncserver_a_SOURCES=$(LIB_SRCS) $(ZRLE_SRCS)
-else
 libvncserver_a_SOURCES=$(LIB_SRCS)
-endif
 
 lib_LIBRARIES=libvncserver.a
 

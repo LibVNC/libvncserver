@@ -89,13 +89,13 @@ extern "C"
    the library and your application (at least the parts including rfb.h)
    with the same support for pthreads. */
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-#ifdef LIBVNCSERVER_HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbInitServer rfbInitServerWithPthreadsAndZRLE
 #else
 #define rfbInitServer rfbInitServerWithPthreadsButWithoutZRLE
 #endif
 #else
-#ifdef LIBVNCSERVER_HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbInitServer rfbInitServerWithoutPthreadsButWithZRLE
 #else
 #define rfbInitServer rfbInitServerWithoutPthreadsAndZRLE
@@ -464,7 +464,7 @@ typedef struct _rfbClientRec {
     COND(updateCond);
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBZ
     void* zrleData;
 #endif
 
@@ -661,7 +661,7 @@ extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,rfbBool freeO
 extern void defaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
 
 /* zrle.c */
-#ifdef LIBVNCSERVER_HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 extern rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w,int h);
 extern void FreeZrleData(rfbClientPtr cl);
 #endif

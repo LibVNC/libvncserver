@@ -65,8 +65,6 @@ PATH_SEPARATOR = @PATH_SEPARATOR@
 AMTAR = @AMTAR@
 AWK = @AWK@
 CC = @CC@
-CCLD = @CCLD@
-CXX = @CXX@
 DEPDIR = @DEPDIR@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 PACKAGE = @PACKAGE@
@@ -105,18 +103,18 @@ CONFIG_CLEAN_FILES =
 noinst_PROGRAMS = VNCommand$(EXEEXT) example$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
 
-am__objects_1 = VNConsole.$(OBJEXT)
-@LINUX_TRUE@am_LinuxVNC_OBJECTS = LinuxVNC.$(OBJEXT) $(am__objects_1)
+am__objects_2 = VNConsole.$(OBJEXT)
+@LINUX_TRUE@am_LinuxVNC_OBJECTS = LinuxVNC.$(OBJEXT) $(am__objects_2)
 LinuxVNC_OBJECTS = $(am_LinuxVNC_OBJECTS)
 LinuxVNC_LDADD = $(LDADD)
 LinuxVNC_DEPENDENCIES = ../libvncserver.a
 LinuxVNC_LDFLAGS =
-am_VNCommand_OBJECTS = VNCommand.$(OBJEXT) $(am__objects_1)
+am_VNCommand_OBJECTS = VNCommand.$(OBJEXT) $(am__objects_2)
 VNCommand_OBJECTS = $(am_VNCommand_OBJECTS)
 VNCommand_LDADD = $(LDADD)
 VNCommand_DEPENDENCIES = ../libvncserver.a
 VNCommand_LDFLAGS =
-am_example_OBJECTS = example.$(OBJEXT) $(am__objects_1)
+am_example_OBJECTS = example.$(OBJEXT) $(am__objects_2)
 example_OBJECTS = $(am_example_OBJECTS)
 example_LDADD = $(LDADD)
 example_DEPENDENCIES = ../libvncserver.a
@@ -133,6 +131,7 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/VNConsole.Po ./$(DEPDIR)/example.Po
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 DIST_SOURCES = $(LinuxVNC_SOURCES) $(VNCommand_SOURCES) \
 	$(example_SOURCES)

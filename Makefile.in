@@ -66,8 +66,6 @@ includedir = $(prefix)/include/rfb
 AMTAR = @AMTAR@
 AWK = @AWK@
 CC = @CC@
-CCLD = @CCLD@
-CXX = @CXX@
 DEPDIR = @DEPDIR@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 PACKAGE = @PACKAGE@
@@ -82,7 +80,7 @@ X_PRE_LIBS = @X_PRE_LIBS@
 am__include = @am__include@
 am__quote = @am__quote@
 install_sh = @install_sh@
-CFLAGS = -g
+CFLAGS = -g -Wall
 
 SUBDIRS = . examples contrib vncterm classes libvncclient test
 DIST_SUBDIRS = examples contrib vncterm classes libvncclient test
@@ -94,29 +92,23 @@ include_HEADERS = rfb/rfb.h rfb/rfbconfig.h rfb/rfbint.h rfb/rfbproto.h \
 	rfb/keysym.h rfb/rfbregion.h rfb/rfbclient.h
 
 
-noinst_HEADERS = d3des.h zrleDecode.h zrleEncode.h rfb/default8x16.h \
-	rdr/Exception.h rdr/FdInStream.h rdr/FdOutStream.h \
-	rdr/FixedMemOutStream.h rdr/InStream.h rdr/MemInStream.h \
-	rdr/MemOutStream.h rdr/NullOutStream.h rdr/OutStream.h \
-	rdr/ZlibInStream.h rdr/ZlibOutStream.h rdr/types.h
-
-
-ZRLE_SRCS = zrle.cxx rdr/FdInStream.cxx rdr/FdOutStream.cxx rdr/InStream.cxx \
-	rdr/NullOutStream.cxx rdr/ZlibInStream.cxx rdr/ZlibOutStream.cxx
+noinst_HEADERS = d3des.h rfb/default8x16.h zrleoutstream.h \
+	zrlepalettehelper.h zrletypes.h
 
 
 EXTRA_DIST = tableinit24.c tableinittctemplate.c tabletranstemplate.c \
-	tableinitcmtemplate.c tabletrans24template.c $(ZRLE_SRCS)
+	tableinitcmtemplate.c tabletrans24template.c \
+	zrleencodetemplate.c
 
 
 LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	zlib.c tight.c httpd.c cursor.c font.c \
-	draw.c selbox.c d3des.c vncauth.c cargs.c
+	draw.c selbox.c d3des.c vncauth.c cargs.c \
+	zrle.c zrleoutstream.c zrlepalettehelper.c
 
 
-@HAVE_CXX_TRUE@libvncserver_a_SOURCES = $(LIB_SRCS) $(ZRLE_SRCS)
-@HAVE_CXX_FALSE@libvncserver_a_SOURCES = $(LIB_SRCS)
+libvncserver_a_SOURCES = $(LIB_SRCS)
 
 lib_LIBRARIES = libvncserver.a
 subdir = .
@@ -134,14 +126,9 @@ am__objects_1 = main.$(OBJEXT) rfbserver.$(OBJEXT) rfbregion.$(OBJEXT) \
 	translate.$(OBJEXT) cutpaste.$(OBJEXT) zlib.$(OBJEXT) \
 	tight.$(OBJEXT) httpd.$(OBJEXT) cursor.$(OBJEXT) font.$(OBJEXT) \
 	draw.$(OBJEXT) selbox.$(OBJEXT) d3des.$(OBJEXT) \
-	vncauth.$(OBJEXT) cargs.$(OBJEXT)
-am__objects_2 = zrle.$(OBJEXT) FdInStream.$(OBJEXT) \
-	FdOutStream.$(OBJEXT) InStream.$(OBJEXT) \
-	NullOutStream.$(OBJEXT) ZlibInStream.$(OBJEXT) \
-	ZlibOutStream.$(OBJEXT)
-@HAVE_CXX_TRUE@am_libvncserver_a_OBJECTS = $(am__objects_1) \
-@HAVE_CXX_TRUE@	$(am__objects_2)
-@HAVE_CXX_FALSE@am_libvncserver_a_OBJECTS = $(am__objects_1)
+	vncauth.$(OBJEXT) cargs.$(OBJEXT) zrle.$(OBJEXT) \
+	zrleoutstream.$(OBJEXT) zrlepalettehelper.$(OBJEXT)
+am_libvncserver_a_OBJECTS = $(am__objects_1)
 libvncserver_a_OBJECTS = $(am_libvncserver_a_OBJECTS)
 SCRIPTS = $(bin_SCRIPTS)
 
@@ -153,31 +140,23 @@ LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/FdInStream.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/FdOutStream.Po ./$(DEPDIR)/InStream.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/NullOutStream.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/ZlibInStream.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/ZlibOutStream.Po ./$(DEPDIR)/auth.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/cargs.Po ./$(DEPDIR)/corre.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/cursor.Po ./$(DEPDIR)/cutpaste.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/d3des.Po ./$(DEPDIR)/draw.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/font.Po ./$(DEPDIR)/hextile.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/httpd.Po ./$(DEPDIR)/main.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/rfbregion.Po ./$(DEPDIR)/rfbserver.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/rre.Po ./$(DEPDIR)/selbox.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/sockets.Po ./$(DEPDIR)/stats.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/tight.Po ./$(DEPDIR)/translate.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/vncauth.Po ./$(DEPDIR)/zlib.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/zrle.Po
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/auth.Po ./$(DEPDIR)/cargs.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/corre.Po ./$(DEPDIR)/cursor.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/cutpaste.Po ./$(DEPDIR)/d3des.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/draw.Po ./$(DEPDIR)/font.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/hextile.Po ./$(DEPDIR)/httpd.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/main.Po ./$(DEPDIR)/rfbregion.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/rfbserver.Po ./$(DEPDIR)/rre.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/selbox.Po ./$(DEPDIR)/sockets.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/stats.Po ./$(DEPDIR)/tight.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/translate.Po ./$(DEPDIR)/vncauth.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/zlib.Po ./$(DEPDIR)/zrle.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/zrleoutstream.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/zrlepalettehelper.Po
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
-	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
-CXXLD = $(CXX)
-CXXLINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
-	-o $@
-CXXFLAGS = @CXXFLAGS@
 DIST_SOURCES = $(libvncserver_a_SOURCES)
 HEADERS = $(include_HEADERS) $(noinst_HEADERS)
 
@@ -197,7 +176,7 @@ all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
-.SUFFIXES: .c .cxx .o .obj
+.SUFFIXES: .c .o .obj
 $(srcdir)/Makefile.in:  Makefile.am  $(top_srcdir)/configure.ac $(ACLOCAL_M4)
 	cd $(top_srcdir) && \
 	  $(AUTOMAKE) --gnu  Makefile
@@ -264,12 +243,6 @@ uninstall-libLIBRARIES:
 
 clean-libLIBRARIES:
 	-test -z "$(lib_LIBRARIES)" || rm -f $(lib_LIBRARIES)
-FdInStream.$(OBJEXT): rdr/FdInStream.cxx
-FdOutStream.$(OBJEXT): rdr/FdOutStream.cxx
-InStream.$(OBJEXT): rdr/InStream.cxx
-NullOutStream.$(OBJEXT): rdr/NullOutStream.cxx
-ZlibInStream.$(OBJEXT): rdr/ZlibInStream.cxx
-ZlibOutStream.$(OBJEXT): rdr/ZlibOutStream.cxx
 libvncserver.a: $(libvncserver_a_OBJECTS) $(libvncserver_a_DEPENDENCIES) 
 	-rm -f libvncserver.a
 	$(libvncserver_a_AR) libvncserver.a $(libvncserver_a_OBJECTS) $(libvncserver_a_LIBADD)
@@ -302,12 +275,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/FdInStream.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/FdOutStream.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/InStream.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/NullOutStream.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ZlibInStream.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ZlibOutStream.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/auth.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cargs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/corre.Po@am__quote@
@@ -330,6 +297,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vncauth.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zlib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zrle.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zrleoutstream.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zrlepalettehelper.Po@am__quote@
 
 distclean-depend:
 	-rm -rf ./$(DEPDIR)
@@ -346,91 +315,6 @@ distclean-depend:
 @AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 	$(COMPILE) -c `cygpath -w $<`
 CCDEPMODE = @CCDEPMODE@
-
-.cxx.o:
-@AMDEP_TRUE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/$*.Po' tmpdepfile='$(DEPDIR)/$*.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXXCOMPILE) -c -o $@ `test -f $< || echo '$(srcdir)/'`$<
-
-.cxx.obj:
-@AMDEP_TRUE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/$*.Po' tmpdepfile='$(DEPDIR)/$*.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXXCOMPILE) -c -o $@ `cygpath -w $<`
-
-FdInStream.o: rdr/FdInStream.cxx
-@AMDEP_TRUE@	source='rdr/FdInStream.cxx' object='FdInStream.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/FdInStream.Po' tmpdepfile='$(DEPDIR)/FdInStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o FdInStream.o `test -f rdr/FdInStream.cxx || echo '$(srcdir)/'`rdr/FdInStream.cxx
-
-FdInStream.obj: rdr/FdInStream.cxx
-@AMDEP_TRUE@	source='rdr/FdInStream.cxx' object='FdInStream.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/FdInStream.Po' tmpdepfile='$(DEPDIR)/FdInStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o FdInStream.obj `cygpath -w rdr/FdInStream.cxx`
-
-FdOutStream.o: rdr/FdOutStream.cxx
-@AMDEP_TRUE@	source='rdr/FdOutStream.cxx' object='FdOutStream.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/FdOutStream.Po' tmpdepfile='$(DEPDIR)/FdOutStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o FdOutStream.o `test -f rdr/FdOutStream.cxx || echo '$(srcdir)/'`rdr/FdOutStream.cxx
-
-FdOutStream.obj: rdr/FdOutStream.cxx
-@AMDEP_TRUE@	source='rdr/FdOutStream.cxx' object='FdOutStream.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/FdOutStream.Po' tmpdepfile='$(DEPDIR)/FdOutStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o FdOutStream.obj `cygpath -w rdr/FdOutStream.cxx`
-
-InStream.o: rdr/InStream.cxx
-@AMDEP_TRUE@	source='rdr/InStream.cxx' object='InStream.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/InStream.Po' tmpdepfile='$(DEPDIR)/InStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o InStream.o `test -f rdr/InStream.cxx || echo '$(srcdir)/'`rdr/InStream.cxx
-
-InStream.obj: rdr/InStream.cxx
-@AMDEP_TRUE@	source='rdr/InStream.cxx' object='InStream.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/InStream.Po' tmpdepfile='$(DEPDIR)/InStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o InStream.obj `cygpath -w rdr/InStream.cxx`
-
-NullOutStream.o: rdr/NullOutStream.cxx
-@AMDEP_TRUE@	source='rdr/NullOutStream.cxx' object='NullOutStream.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/NullOutStream.Po' tmpdepfile='$(DEPDIR)/NullOutStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o NullOutStream.o `test -f rdr/NullOutStream.cxx || echo '$(srcdir)/'`rdr/NullOutStream.cxx
-
-NullOutStream.obj: rdr/NullOutStream.cxx
-@AMDEP_TRUE@	source='rdr/NullOutStream.cxx' object='NullOutStream.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/NullOutStream.Po' tmpdepfile='$(DEPDIR)/NullOutStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o NullOutStream.obj `cygpath -w rdr/NullOutStream.cxx`
-
-ZlibInStream.o: rdr/ZlibInStream.cxx
-@AMDEP_TRUE@	source='rdr/ZlibInStream.cxx' object='ZlibInStream.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/ZlibInStream.Po' tmpdepfile='$(DEPDIR)/ZlibInStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o ZlibInStream.o `test -f rdr/ZlibInStream.cxx || echo '$(srcdir)/'`rdr/ZlibInStream.cxx
-
-ZlibInStream.obj: rdr/ZlibInStream.cxx
-@AMDEP_TRUE@	source='rdr/ZlibInStream.cxx' object='ZlibInStream.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/ZlibInStream.Po' tmpdepfile='$(DEPDIR)/ZlibInStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o ZlibInStream.obj `cygpath -w rdr/ZlibInStream.cxx`
-
-ZlibOutStream.o: rdr/ZlibOutStream.cxx
-@AMDEP_TRUE@	source='rdr/ZlibOutStream.cxx' object='ZlibOutStream.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/ZlibOutStream.Po' tmpdepfile='$(DEPDIR)/ZlibOutStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o ZlibOutStream.o `test -f rdr/ZlibOutStream.cxx || echo '$(srcdir)/'`rdr/ZlibOutStream.cxx
-
-ZlibOutStream.obj: rdr/ZlibOutStream.cxx
-@AMDEP_TRUE@	source='rdr/ZlibOutStream.cxx' object='ZlibOutStream.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/ZlibOutStream.Po' tmpdepfile='$(DEPDIR)/ZlibOutStream.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o ZlibOutStream.obj `cygpath -w rdr/ZlibOutStream.cxx`
-CXXDEPMODE = @CXXDEPMODE@
 uninstall-info-am:
 includeHEADERS_INSTALL = $(INSTALL_HEADER)
 install-includeHEADERS: $(include_HEADERS)
@@ -562,7 +446,7 @@ distcleancheck_listfiles = find . -type f -print
 distdir: $(DISTFILES)
 	$(am__remove_distdir)
 	mkdir $(distdir)
-	$(mkinstalldirs) $(distdir)/. $(distdir)/rdr $(distdir)/rfb
+	$(mkinstalldirs) $(distdir)/. $(distdir)/rfb
 	@for file in $(DISTFILES); do \
 	  if test -f $$file || test -d $$file; then d=.; else d=$(srcdir); fi; \
 	  dir=`echo "$$file" | sed -e 's,/[^/]*$$,,'`; \

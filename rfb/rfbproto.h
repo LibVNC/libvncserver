@@ -347,7 +347,7 @@ typedef struct {
 #ifdef LIBVNCSERVER_BACKCHANNEL
 #define rfbEncodingBackChannel 15
 #endif
-#ifdef LIBVNCSERVER_HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbEncodingZRLE 16
 #endif
 

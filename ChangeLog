@@ -1,3 +1,4 @@
+   Mark sent me patches to no longer need C++ for ZRLE encoding!
    added --disable-cxx Option for configure
    x11vnc changes from Karl Runge:
       - Changed all those whimpy printf(...)'s into manly fprintf(stdxxx,...)'s.

@@ -283,7 +283,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->preferredEncoding = rfbEncodingRaw;
       cl->correMaxWidth = 48;
       cl->correMaxHeight = 48;
-#ifdef LIBVNCSERVER_HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBZ
       cl->zrleData = 0;
 #endif
 
@@ -406,7 +406,7 @@ rfbClientConnectionGone(cl)
     if (cl->next)
         cl->next->prev = cl->prev;
 
-#ifdef LIBVNCSERVER_HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBZ
     FreeZrleData(cl);
 #endif
 
@@ -843,7 +843,7 @@ rfbProcessClientNormalMessage(cl)
 		}
 		break;
 #endif
-#ifdef LIBVNCSERVER_HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBZ
            case rfbEncodingZRLE:
                if (cl->preferredEncoding == -1) {
                    cl->preferredEncoding = enc;
@@ -1309,7 +1309,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	    break;
 #endif
 #endif
-#ifdef LIBVNCSERVER_HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBZ
        case rfbEncodingZRLE:
            if (!rfbSendRectEncodingZRLE(cl, x, y, w, h)) {
 	       sraRgnDestroy(updateRegion);

@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 AC_INIT(LibVNCServer, 0.6pre, http://sourceforge.net/projects/libvncserver)
 AM_INIT_AUTOMAKE(LibVNCServer, 0.6pre)
-AM_CONFIG_HEADER([config.h])
+AM_CONFIG_HEADER(config.h)
 AX_PREFIX_CONFIG_H([rfb/rfbconfig.h])
 
 # Checks for programs.
@@ -62,42 +62,17 @@ AC_ARG_WITH(libz,
 if test "x$with_zlib" = "xyes" -a "x$with_libz" = "xyes"; then
 	AC_CHECK_HEADER(zlib.h, HAVE_ZLIB_H="true")
 fi
-if test ! -z "$HAVE_PTHREAD_H"; then
-	AC_CHECK_LIB(pthread, pthread_mutex_lock)
-	AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
-fi
-AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
-AC_ARG_ENABLE(cxx,
-	[  --disable-cxx			disable use of c++],
-	[ disable_cxx=yes],)
-if test -z "$disable_cxx"; then
-	AC_CHECK_PROGS(CXX,[g++ c++ gpp aCC CC cxx cc++ cl FCC KCC RCC xlC_r xlC],none)
-	AC_PROG_CXX
-else
-	CXX=none
-fi
 if test ! -z "$HAVE_ZLIB_H"; then
 	AC_CHECK_LIB(z, deflate, , HAVE_ZLIB_H="")
 	if test ! -z "$HAVE_JPEGLIB_H" -a ! -z "$HAVE_ZLIB_H"; then
 		AC_CHECK_LIB(jpeg, jpeg_CreateCompress)
 	fi
-	if test ! -z "$HAVE_ZLIB_H"; then
-		# check for c++, but don't fail if not found
-		AH_TEMPLATE(HAVE_ZRLE, [Use zrle compression; needs a c++ compiler])
-		if test x$CXX != xnone; then
-			AC_DEFINE(HAVE_ZRLE)
-			if test -z "$CXX"; then
-				CCLD="\$(CXX)"
-			else
-				CCLD="$CXX"
-			fi
-		fi
-	fi
-else
-	CXX=none
 fi
-AM_CONDITIONAL(HAVE_CXX, test x$CXX != xnone -a ! -z "$HAVE_ZLIB_H")
-AC_SUBST(CCLD)
+if test ! -z "$HAVE_PTHREAD_H"; then
+	AC_CHECK_LIB(pthread, pthread_mutex_lock)
+	AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
+fi
+AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
 
 # Checks for header files.
 AC_HEADER_STDC
