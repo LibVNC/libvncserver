@@ -85,17 +85,17 @@ typedef uint32_t Pixel;
 #ifdef HAVE_LIBPTHREAD
 #include <pthread.h>
 #if 0 /* debugging */
-#define LOCK(mutex) fprintf(stderr,"%s:%d LOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex))
-#define UNLOCK(mutex) fprintf(stderr,"%s:%d UNLOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex))
-#define MUTEX(mutex) int mutex
-#define INIT_MUTEX(mutex) fprintf(stderr,"%s:%d INIT_MUTEX(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex))
-#define TINI_MUTEX(mutex) fprintf(stderr,"%s:%d TINI_MUTEX(%s)\n",__FILE__,__LINE__,#mutex)
-#define SIGNAL(cond) fprintf(stderr,"%s:%d SIGNAL(%s)\n",__FILE__,__LINE__,#cond)
-#define WAIT(cond,mutex) /* fprintf(stderr,"%s:%d WAIT(%s,%s)\n",__FILE__,__LINE__,#cond,#mutex) */
-#define COND(cond)
-#define INIT_COND(cond) fprintf(stderr,"%s:%d INIT_COND(%s)\n",__FILE__,__LINE__,#cond)
-#define TINI_COND(cond) fprintf(stderr,"%s:%d TINI_COND(%s)\n",__FILE__,__LINE__,#cond)
-#define IF_PTHREADS(x)
+#define LOCK(mutex) (fprintf(stderr,"%s:%d LOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_lock(&(mutex)))
+#define UNLOCK(mutex) (fprintf(stderr,"%s:%d UNLOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_unlock(&(mutex)))
+#define MUTEX(mutex) pthread_mutex_t (mutex)
+#define INIT_MUTEX(mutex) (fprintf(stderr,"%s:%d INIT_MUTEX(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_init(&(mutex),NULL))
+#define TINI_MUTEX(mutex) (fprintf(stderr,"%s:%d TINI_MUTEX(%s)\n",__FILE__,__LINE__,#mutex), pthread_mutex_destroy(&(mutex)))
+#define TSIGNAL(cond) (fprintf(stderr,"%s:%d TSIGNAL(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_signal(&(cond)))
+#define WAIT(cond,mutex) (fprintf(stderr,"%s:%d WAIT(%s,%s)\n",__FILE__,__LINE__,#cond,#mutex), pthread_cond_wait(&(cond),&(mutex)))
+#define COND(cond) pthread_cond_t (cond)
+#define INIT_COND(cond) (fprintf(stderr,"%s:%d INIT_COND(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_init(&(cond),NULL))
+#define TINI_COND(cond) (fprintf(stderr,"%s:%d TINI_COND(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_destroy(&(cond)))
+#define IF_PTHREADS(x) x
 #else
 #define LOCK(mutex) pthread_mutex_lock(&(mutex));
 #define UNLOCK(mutex) pthread_mutex_unlock(&(mutex));
