@@ -1,3 +1,14 @@
+
+   when closing a client and no longer listening for new ones, don't crash
+   fixed a bug with ClientConnectionGone
+   endianness is checked at configure time
+   fixed a bug that prevented the first client from being closed
+   fixed that annoying "libvncserver-config --link" bug
+   make rfbReverseByte public (for rdp2vnc)
+   fixed compilation on OS X, IRIX, Solaris
+   install target for headers is now ${prefix}/include/rfb ("#include <rfb/rfb.h>")
+   renamed "sraRegion.h" to "rfbregion.h"
+   CARD{8,16,32} are more standard uint{8,16,32}_t now
    fixed LinuxVNC colour handling
    fixed a bug with pthreads where the connection was not closed
    moved vncterm to main package (LinuxVNC included)
