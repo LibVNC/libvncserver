@@ -1,5 +1,5 @@
 /*
- * x0vnc.c: a VNC server for X displays.
+ * x11vnc.c: a VNC server for X displays.
  *
  * Copyright (c) 2002 Karl J. Runge <runge@karlrunge.com>  All rights reserved.
  *
@@ -21,45 +21,30 @@
  *
  * This program is based heavily on the following programs:
  *
- *       original x11vnc.c of the libvncserver project (Johannes E. Schindelin)
+ *       the originial x11vnc.c in libvncserver (Johannes E. Schindelin)
  *       krfb, the KDE desktopsharing project (Tim Jansen)
  *	 x0rfbserver, the original native X vnc server (Jens Wagner)
  *
  * The primary goal of this program is to create a portable and simple
  * command-line server utility that allows a VNC viewer to connect to an
- * actual X display (as x11vnc, krfb, and x0rfbserver do).  The only
- * non-standard dependency of this program is the static library
- * libvncserver.a (although in some environments libjpeg.so may not be
- * readily available).  To increase portability it is written in plain C.
+ * actual X display (as the above do).  The only non-standard dependency
+ * of this program is the static library libvncserver.a (although in
+ * some environments libjpeg.so may not be readily available and needs
+ * to be installed, it may be found at ftp://ftp.uu.net/graphics/jpeg/).
+ * To increase portability it is written in plain C.
  *
  * The next goal is to improve performance and interactive response.
  * The algorithm currently used here to achieve this is that of krfb
  * (based on x0rfbserver algorithm).  Additional heuristics are also
- * applied.  Currently there are a bit too many of these...
+ * applied (currently there are a bit too many of these...)
  *
  * To build:
- * Obtain the libvncserver package (http://libvncserver.sourceforge.net)
- * and ensure that "make" and "make x11vnc" work correctly.  Defining
- * HAVE_PTHREADS in the Makefile is recommended.  One then could move the
- * x11vnc.c file aside, copy this file in its place into the source tree,
- * and issue:
- *
- *	make x11vnc
- *	mv x11vnc x0vnc
- *
- * to create the x0vnc binary.  Otherwise, with x0vnc.c copied to
- * libvncserver source directory, something like this should work:
- *
- * gcc -Wall  -DALLOW24BPP -I.  -DBACKCHANNEL -c x0vnc.c
- * gcc -o x0vnc x0vnc.o  -L. -lvncserver -L/usr/local/lib -lz -ljpeg \
- *     -L/usr/X11R6/lib -lX11 -lXext -lXtst
- *
- * include -DHAVE_PTHREADS ... -lpthread to use threads.
- *
- * On Solaris the 2nd command might look something like:
- *
- * gcc -o x0vnc x0vnc.o -L. -lvncserver -L/usr/local/lib -lz -ljpeg \
- *     -lsocket -lnsl -L/usr/X/lib -R/usr/X/lib -lX11 -lXext -lXtst 
+ * Obtain the libvncserver package (http://libvncserver.sourceforge.net).
+ * As of 12/2002 this version of x11vnc.c is contained in the libvncserver
+ * CVS tree.  Parameters in the Makefile should be adjusted to the build
+ * system and then "make x11vnc" should create it.  For earlier releases
+ * (say libvncserver-0.4) this file may be inserted in place of the
+ * original x11vnc.c file.
  */
 
 #include <unistd.h>
@@ -71,11 +56,24 @@
 #include <X11/extensions/XTest.h>
 #include <X11/keysym.h>
 
+/*
+ * Work around Bool and KeySym same names in X and rfb.
+ * Bool is #define int in <X11/Xlib.h>
+ * KeySym is typedef XID in <X11/X.h>
+ * (note that X and rfb KeySym types are the same so a bit silly to worry...
+ * the Bool types are different though)
+ */
+typedef Bool X_Bool;
+typedef KeySym X_KeySym;
+
+/* the #define Bool can be removed: */
 #ifdef Bool
 #undef Bool
 #endif
-#define Bool RFBBool
+
+/* the KeySym typedef cannot be removed, so use an alias for rest of file: */
 #define KeySym RFBKeySym
+
 #include "rfb.h"
 
 Display *dpy = 0;
@@ -129,6 +127,8 @@ int shared = 0;		/* share vnc display. */
 int view_only = 0;	/* client can only watch. */
 int connect_once = 1;	/* allow only one client connection. */
 
+int use_altgr = 0;	/* use the altgr_keyboard modifier tweak */
+
 /*
  * waitms is the msec to wait between screen polls.  Not too old h/w shows
  * poll times of 15-35ms, so maybe this value cuts the rest load by 2 or so.
@@ -143,7 +143,7 @@ int tile_fuzz = 2;	/* tolerance for suspecting changed tiles touching */
 			/* a known changed tile. */
 int grow_fill = 3;	/* do the grow islands heuristic with this width. */
 int gaps_fill = 4;	/* do a final pass to try to fill gaps between tiles. */
-double fs_frac = 0.5;	/* threshold tile fraction to do fullscreen updates. */
+double fs_frac = 0.6;	/* threshold tile fraction to do fullscreen updates. */
 
 #define NSCAN 32
 int scanlines[NSCAN] = {	 /* scan pattern jitter from x0rfbserver */
@@ -217,6 +217,115 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	return(RFB_CLIENT_ACCEPT);
 }
 
+/* For tweaking modifiers wrt the Alt-Graph key */
+
+#define LEFTSHIFT 1
+#define RIGHTSHIFT 2
+#define ALTGR 4
+char mod_state = 0;
+
+char modifiers[0x100];
+KeyCode keycodes[0x100], left_shift_code, right_shift_code, altgr_code;
+
+void initialize_keycodes() {
+	X_KeySym key, *keymap;
+	int i, j, minkey, maxkey, syms_per_keycode;
+
+	memset(modifiers, -1, sizeof(modifiers));
+
+	XDisplayKeycodes(dpy, &minkey, &maxkey);
+
+	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
+	    &syms_per_keycode);
+
+	for (i = minkey; i <= maxkey; i++) {
+		for (j = 0; j < syms_per_keycode; j++) {
+			key = keymap[ (i - minkey) * syms_per_keycode + j ];
+			if ( key >= ' ' && key < 0x100
+			    && i == XKeysymToKeycode(dpy, key) ) {
+				keycodes[key] = i;
+				modifiers[key] = j;
+			}
+		}
+	}
+
+	left_shift_code = XKeysymToKeycode(dpy, XK_Shift_L);
+	right_shift_code = XKeysymToKeycode(dpy, XK_Shift_R);
+	altgr_code = XKeysymToKeycode(dpy, XK_Mode_switch);
+
+	XFree ((void *) keymap);
+}
+
+void tweak_mod(char mod, Bool down) {
+	Bool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
+	X_Bool dn = (X_Bool) down;
+
+	if (mod < 0) {
+		return;
+	}
+
+	X_LOCK
+	if (is_shift && mod != 1) {
+	    if (mod_state & LEFTSHIFT) {
+		XTestFakeKeyEvent(dpy, left_shift_code, !dn, CurrentTime);
+	    }
+	    if (mod_state & RIGHTSHIFT) {
+		XTestFakeKeyEvent(dpy, right_shift_code, !dn, CurrentTime);
+	    }
+	}
+	if ( ! is_shift && mod == 1 ) {
+		XTestFakeKeyEvent(dpy, left_shift_code, dn, CurrentTime);
+	}
+	if ( (mod_state & ALTGR) && mod != 2 ) {
+		XTestFakeKeyEvent(dpy, altgr_code, !dn, CurrentTime);
+	}
+	if ( ! (mod_state & ALTGR) && mod == 2 ) {
+		XTestFakeKeyEvent(dpy, altgr_code, dn, CurrentTime);
+	}
+	X_UNLOCK
+}
+
+static void altgr_keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
+	KeyCode k;
+	int tweak = 0;
+
+	if (view_only) {
+		return;
+	}
+
+#define ADJUSTMOD(sym, state) \
+	if (keysym == sym) { \
+		if (down) { \
+			mod_state |= state; \
+		} else { \
+			mod_state &= ~state; \
+		} \
+	}
+
+	ADJUSTMOD(XK_Shift_L, LEFTSHIFT)
+	ADJUSTMOD(XK_Shift_R, RIGHTSHIFT)
+	ADJUSTMOD(XK_Mode_switch, ALTGR)
+
+	if ( down && keysym >= ' ' && keysym < 0x100 ) {
+		tweak = 1;
+		tweak_mod(modifiers[keysym], True);
+		k = keycodes[keysym];
+	} else {
+		X_LOCK
+		k = XKeysymToKeycode(dpy, (X_KeySym) keysym);
+		X_UNLOCK
+	}
+	if ( k != NoSymbol ) {
+		X_LOCK
+		XTestFakeKeyEvent(dpy, k, (X_Bool) down, CurrentTime);
+		X_UNLOCK
+	}
+
+	if ( tweak ) {
+		tweak_mod(modifiers[keysym], False);
+	}
+}
+
 /* key event handler */
 static void keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
 	KeyCode k;
@@ -224,19 +333,23 @@ static void keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
 	if (view_only) {
 		return;
 	}
+	
+	if (use_altgr) {
+		altgr_keyboard(down, keysym, client);
+		return;
+	}
 
 	X_LOCK
 
-	/* KeySym is XID in <X11/X.h> */
-	k = XKeysymToKeycode(dpy, (XID) keysym);
+	k = XKeysymToKeycode(dpy, (X_KeySym) keysym);
 
 	if ( k != NoSymbol ) {
-		/* Bool is int in <X11/Xlib.h> */
-		XTestFakeKeyEvent(dpy, k, (int) down, CurrentTime);
+		XTestFakeKeyEvent(dpy, k, (X_Bool) down, CurrentTime);
 		XFlush(dpy);
 
 		got_user_input++;
 	}
+
 	X_UNLOCK
 }
 
@@ -1212,7 +1325,7 @@ void watch_loop(void) {
 
 void print_help() {
 	char help[] = 
-"x0vnc options:\n"
+"x11vnc options:\n"
 "\n"
 "-defer time            time in ms to wait for updates before sending to\n"
 "                       client [rfbDeferUpdateTime]  (default %d)\n"
@@ -1231,6 +1344,9 @@ void print_help() {
 "                       horizontal tiles into one big rectangle)  (default %s).\n"
 "-nohints               do not use hints; send each tile separately.\n"
 "\n"
+"-altgr                 use a mechanism to properly handle the AltGr modifier\n"
+"                       on certain keyboards (default %d).\n"
+"-noaltgr               send the keysym directly to the X server.\n"
 "-threads               use threaded algorithm [rfbRunEventLoop] if compiled\n"
 "                       with threads (default %s).\n"
 "-nothreads             do not use [rfbRunEventLoop].\n"
@@ -1242,8 +1358,9 @@ void print_help() {
 ;
 	fprintf(stderr, help, defer_update, waitms, gaps_fill, grow_fill,
 	    fs_frac, tile_fuzz,
-	    use_hints ? "on":"off", use_threads ? "on":"off",
-	    view_only ? "on":"off", shared ? "on":"off");
+	    use_hints ? "on":"off", use_altgr ? "on":"off",
+	    use_threads ? "on":"off", view_only ? "on":"off",
+	    shared ? "on":"off");
 	rfbUsage();
 	exit(1);
 }
@@ -1282,6 +1399,10 @@ int main(int argc, char** argv) {
 			use_threads = 1;
 		} else if (!strcmp(argv[i], "-nothreads")) {
 			use_threads = 0;
+		} else if (!strcmp(argv[i], "-altgr")) {
+			use_altgr = 1;
+		} else if (!strcmp(argv[i], "-noaltgr")) {
+			use_altgr = 0;
 		} else if (!strcmp(argv[i], "-viewonly")) {
 			view_only = 1;
 		} else if (!strcmp(argv[i], "-shared")) {
@@ -1369,6 +1490,10 @@ int main(int argc, char** argv) {
 	initialize_tiles();
 
 	initialize_shm();
+
+	if (use_altgr) {
+		initialize_keycodes();
+	}
 
 	printf("screen setup finished.\n");
 

@@ -139,7 +139,7 @@ void linecount (char* frame_buffer)
 
 void on_key_press (Bool down,KeySym key,rfbClientPtr cl)
 {
-        if (down)		//or else the action occurs on both the press and depress
+        if (down)		/* or else the action occurs on both the press and depress */
 	switch (key) {
 
         case XK_b:
