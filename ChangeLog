@@ -1,3 +1,6 @@
+2004-06-17  Karl Runge <runge@karlrunge.com>
+	* x11vnc: simple ~/.x11vncrc config file support, -rc, -norc
+
 2004-06-12  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -clear_mods, -clear_keys, and -storepasswd,
 	* add RFB_SERVER_IP RFB_SERVER_PORT to -accept env.

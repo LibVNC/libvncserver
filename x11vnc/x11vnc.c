@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-06-11";
+char lastmod[] = "lastmod:    2004-06-17";
 
 /* X display info */
 Display *dpy = 0;
@@ -600,7 +600,7 @@ static int run_user_command(char *cmd, rfbClientPtr client) {
 	}
 
 	/* set RFB_CLIENT_ID to semi unique id for command to use */
-	sprintf(env_rfb_client_id, "RFB_CLIENT_ID=%d", (int) client);
+	sprintf(env_rfb_client_id, "RFB_CLIENT_ID=%p", (void *) client);
 	putenv(env_rfb_client_id);
 
 	/* set RFB_CLIENT_IP to IP addr for command to use */
@@ -2973,7 +2973,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 
 	/* copy this text to CUT_BUFFER0 as well: */
 	XChangeProperty(dpy, rootwin, XA_CUT_BUFFER0, XA_STRING, 8,
-	    PropModeReplace, text, len);
+	    PropModeReplace, (unsigned char *) text, len);
 	XFlush(dpy);
 
 	X_UNLOCK;
@@ -5983,7 +5983,7 @@ double dtime(double *t_old) {
  */
 void rfbPE(rfbScreenInfoPtr scr, long us) {
 	if (! use_threads) {
-		return rfbProcessEvents(scr, us);
+		rfbProcessEvents(scr, us);
 	}
 }
 
@@ -6090,6 +6090,15 @@ static void print_help(void) {
 "\n"
 "For additional info see: http://www.karlrunge.com/x11vnc/\n"
 "                    and  http://www.karlrunge.com/x11vnc/#faq\n"
+"\n"
+"\n"
+"Rudimentary config file support: if the file $HOME/.x11vncrc exists then each\n"
+"line in it is treated as a single command line option.  Disable with -norc.\n"
+"For each option name, the leading character \"-\" is not required.  E.g. a\n"
+"line that is either \"nap\" or \"-nap\" may be used.  Likewise \"wait 100\"\n"
+"or \"-wait 100\" are acceptable lines.  The \"#\" character comments out to\n"
+"the end of the line in the usual way.  Leading and trailing whitespace is\n"
+"trimmed off.\n"
 "\n"
 "Options:\n"
 "\n"
@@ -6217,6 +6226,9 @@ static void print_help(void) {
 "\n"
 "-o logfile             Write stderr messages to file \"logfile\" instead of\n"
 "                       to the terminal.  Same as -logfile.\n"
+"-rc filename           Use \"filename\" instead of $HOME/.x11vncrc for rc file.\n"
+"-norc                  Do not process the $HOME/.x11vncrc file for options.\n"
+"\n"
 "-q                     Be quiet by printing less informational output to\n"
 "                       stderr.  Same as -quiet.\n"
 "-bg                    Go into the background after screen setup.  Messages to\n"
@@ -6242,8 +6254,9 @@ static void print_help(void) {
 "                       \"string\" can also be of form: key1-key2,key3-key4...\n"
 "                       To map a key to a button click, use the fake keysyms\n"
 "                       \"Button1\", ..., etc. E.g. -remap Super_R-Button2\n"
-"-nobell                Do not watch for XBell events.\n"
+"\n"
 "-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
+"-nobell                Do not watch for XBell events.\n"
 "-nosel                 Do not manage exchange of X selection/cutbuffer.\n"
 "-noprimary             Do not poll the PRIMARY selection for changes and send\n"
 "                       back to clients.  PRIMARY is still set on received\n"
@@ -6417,7 +6430,130 @@ static int limit_shm(void) {
 	return limit;
 }
 
-int main(int argc, char** argv) {
+/*
+ * quick-n-dirty ~/.x11vncrc: each line (except # comments) is a cmdline option.
+ */
+static int argc2 = 0;
+static char **argv2;
+
+static void check_rcfile(int argc, char **argv) {
+	int i, norc = 0, argmax = 512;
+	char *infile = NULL;
+	char rcfile[512];
+	FILE *rc; 
+
+	for (i=1; i < argc; i++) {
+		if (!strcmp(argv[i], "-norc")) {
+			norc = 1;
+		}
+		if (!strcmp(argv[i], "-rc")) {
+			if (i+1 >= argc) {
+				fprintf(stderr, "-rc option requires a "
+				    "filename\n");
+				exit(1);
+			} else {
+				infile = argv[i+1];
+			}
+		}
+	}
+	if (norc) {
+		;
+	} else if (infile != NULL) {
+		rc = fopen(infile, "r");
+		if (rc == NULL) {
+			fprintf(stderr, "could not open rcfile: %s\n", infile);
+			perror("fopen");
+			exit(1);
+		}
+	} else if (getenv("HOME") == NULL) {
+		norc = 1;
+	} else {
+		strncpy(rcfile, getenv("HOME"), 500);
+		strcat(rcfile, "/.x11vncrc");
+		rc = fopen(rcfile, "r");
+		if (rc == NULL) {
+			norc = 1;
+		}
+	}
+
+	argv2 = (char **) malloc(argmax * sizeof(char *));
+	argv2[argc2++] = strdup(argv[0]);
+
+	if (! norc) {
+		char line[1024], parm[1024], tmp[1025];
+		while (fgets(line, 1024, rc) != NULL) {
+			char *q, *p = line;
+			q = p;
+			while (*q) {
+				if (*q == '\n') {
+					while (isspace(*q)) {
+						*q = '\0';
+						if (q == p) {
+							break;
+						}
+						q--;
+					}
+					break;
+				}
+				q++;
+			}
+			if ( (q = strchr(p, '#')) != NULL) {
+				*q = '\0';
+			}
+			while (*p) {
+				if (! isspace(*p)) {
+					break;
+				}
+				p++;
+			}
+			if (*p == '\0') {
+				continue;
+			}
+			if ( sscanf(p, "%s", parm) != 1) {
+				fprintf(stderr, "invalid rcfile line: %s\n", p);
+				exit(1);
+			}
+			if (parm[0] == '-') {
+				strncpy(tmp, parm, 1024); 
+			} else {
+				tmp[0] = '-';
+				strncpy(tmp+1, parm, 1024); 
+			}
+
+			argv2[argc2++] = strdup(tmp);
+			if (argc2 >= argmax) {
+				fprintf(stderr, "too many rcfile options\n");
+				exit(1);
+			}
+			
+			p += strlen(parm);
+			while (*p) {
+				if (! isspace(*p)) {
+					break;
+				}
+				p++;
+			}
+			if (*p == '\0') {
+				continue;
+			}
+			argv2[argc2++] = strdup(p);
+			if (argc2 >= argmax) {
+				fprintf(stderr, "too many rcfile options\n");
+				exit(1);
+			}
+		}
+		fclose(rc);
+	}
+	for (i=1; i < argc; i++) {
+		argv2[argc2++] = strdup(argv[i]);
+		if (argc2 >= argmax) {
+			fprintf(stderr, "too many rcfile options\n");
+			exit(1);
+		}
+	}
+}
+
+int main(int argc, char* argv[]) {
 
 	XImage *fb;
 	int i, op, ev, er, maj, min;
@@ -6437,10 +6573,15 @@ int main(int argc, char** argv) {
 	int got_deferupdate = 0, got_defer = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
-	int argc2 = 1; char *argv2[128];
+	int argc_vnc = 1; char *argv_vnc[128];
 
-	argv2[0] = strdup(argv[0]);
-	
+	argv_vnc[0] = strdup(argv[0]);
+
+	check_rcfile(argc, argv);
+	/* kludge for the new array argv2 set in check_rcfile() */
+#	define argc argc2
+#	define argv argv2
+
 	for (i=1; i < argc; i++) {
 		/* quick-n-dirty --option handling. */
 		arg = argv[i];
@@ -6525,6 +6666,10 @@ int main(int argc, char** argv) {
 			blackout_string = argv[++i];
 		} else if (!strcmp(arg, "-xinerama")) {
 			xinerama = 1;
+		} else if (!strcmp(arg, "-norc")) {
+			;
+		} else if (!strcmp(arg, "-rc")) {
+			i++;
 		} else if (!strcmp(arg, "-nobell")) {
 			watch_bell = 0;
 		} else if (!strcmp(arg, "-nofb")) {
@@ -6635,8 +6780,8 @@ int main(int argc, char** argv) {
 				got_nevershared = 1;
 			}
 			/* otherwise copy it for libvncserver use below. */
-			if (argc2 < 100) {
-				argv2[argc2++] = strdup(arg);
+			if (argc_vnc < 100) {
+				argv_vnc[argc_vnc++] = strdup(arg);
 			}
 		}
 	}
@@ -6658,10 +6803,10 @@ int main(int argc, char** argv) {
 	}
 	if (! quiet && ! inetd) {
 		int i;
-		for (i=1; i < argc2; i++) {
+		for (i=1; i < argc_vnc; i++) {
 			fprintf(stderr, "passing arg to libvncserver: %s\n",
-			    argv2[i]);
-			if (!strcmp(argv2[i], "-passwd")) {
+			    argv_vnc[i]);
+			if (!strcmp(argv_vnc[i], "-passwd")) {
 				i++;
 			}
 		}
@@ -6699,8 +6844,8 @@ int main(int argc, char** argv) {
 			if (len > 0 && line[len-1] == '\n') {
 				line[len-1] = '\0';
 			}
-			argv2[argc2++] = "-passwd";
-			argv2[argc2++] = strdup(line);
+			argv_vnc[argc_vnc++] = "-passwd";
+			argv_vnc[argc_vnc++] = strdup(line);
 			pw_loc = 100;	/* just for pw_loc check below */
 			if (fgets(line, 512, in) != NULL) {
 				/* try to read viewonly passwd from file */
@@ -6776,8 +6921,8 @@ int main(int argc, char** argv) {
 
 	/* increase rfbwait if threaded */
 	if (use_threads && ! got_rfbwait) {
-		argv2[argc2++] = "-rfbwait";
-		argv2[argc2++] = "604800000"; /* one week... */
+		argv_vnc[argc_vnc++] = "-rfbwait";
+		argv_vnc[argc_vnc++] = "604800000"; /* one week... */
 	}
 
 	/* check for OS with small shm limits */
@@ -6795,8 +6940,8 @@ int main(int argc, char** argv) {
 		char tmp[40];
 		/* XXX not working yet in libvncserver */
 		sprintf(tmp, "%d", defer_update);
-		argv2[argc2++] = "-deferupdate";
-		argv2[argc2++] = strdup(tmp);
+		argv_vnc[argc_vnc++] = "-deferupdate";
+		argv_vnc[argc_vnc++] = strdup(tmp);
 	}
 	if (debug_pointer || debug_keyboard) {
 		if (bg || quiet) {
@@ -7051,8 +7196,8 @@ int main(int argc, char** argv) {
 	}
 	if (! dt) {
 		static char str[] = "-desktop";
-		argv2[argc2++] = str;
-		argv2[argc2++] = choose_title(use_dpy);
+		argv_vnc[argc_vnc++] = str;
+		argv_vnc[argc_vnc++] = choose_title(use_dpy);
 	}
 
 	/*
@@ -7060,7 +7205,7 @@ int main(int argc, char** argv) {
 	 * is called since we are single-threaded until then.
 	 */
 
-	initialize_screen(&argc2, argv2, fb);
+	initialize_screen(&argc_vnc, argv_vnc, fb);
 
 	initialize_tiles();
 
@@ -7172,5 +7317,8 @@ int main(int argc, char** argv) {
 	watch_loop();
 
 	return(0);
+
+#undef argc
+#undef argv
 }
 
