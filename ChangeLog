@@ -1,3 +1,6 @@
+2004-02-29  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* fixed warning of valgrind for regiontest
+
 2004-02-19  Karl Runge <runge@karlrunge.com>
 	* x11vnc options -nosel -noprimary -visual.
 	* add clipboard/selection handling.

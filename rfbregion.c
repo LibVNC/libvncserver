@@ -224,8 +224,9 @@ sraSpanListCount(const sraSpanList *list) {
 void
 sraSpanMergePrevious(sraSpan *dest) {
   sraSpan *prev = dest->_prev;
-  while ((prev->end == dest->start) &&
-	 (prev->_prev) &&
+ 
+  while ((prev->_prev) &&
+	 (prev->end == dest->start) &&
 	 (sraSpanListEqual(prev->subspan, dest->subspan))) {
     /*
     printf("merge_prev:");
@@ -244,8 +245,8 @@ sraSpanMergePrevious(sraSpan *dest) {
 void
 sraSpanMergeNext(sraSpan *dest) {
   sraSpan *next = dest->_next;
-  while ((next->start == dest->end) &&
-	 (next->_next) &&
+  while ((next->_next) &&
+	 (next->start == dest->end) &&
 	 (sraSpanListEqual(next->subspan, dest->subspan))) {
 /*
 	  printf("merge_next:");
@@ -834,7 +835,7 @@ int main(int argc, char** argv)
 	   rect.x2-rect.x1,rect.y2-rect.y1,
 	   rect.x1,rect.y1);
   sraRgnReleaseIterator(i);
-  printf("\n20x10+0+0 600x30+0+10 590x10+10+40 30x150+10+50 250x150+350+50 590x100+10+200\n\n");
+  printf("\n20x10+0+0 600x30+0+10 590x10+10+40 30x150+10+50 250x150+350+50 590x100+10+200 \n\n");
 
   i = sraRgnGetReverseIterator(region,1,0);
   while(sraRgnIteratorNext(i, &rect))
@@ -842,7 +843,7 @@ int main(int argc, char** argv)
 	   rect.x2-rect.x1,rect.y2-rect.y1,
 	   rect.x1,rect.y1);
   sraRgnReleaseIterator(i);
-  printf("\n20x10+0+0 600x30+0+10 590x10+10+40 250x150+350+50 30x150+10+50 590x100+10+200\n\n");
+  printf("\n20x10+0+0 600x30+0+10 590x10+10+40 250x150+350+50 30x150+10+50 590x100+10+200 \n\n");
 
   i = sraRgnGetReverseIterator(region,1,1);
   while(sraRgnIteratorNext(i, &rect))
@@ -850,7 +851,11 @@ int main(int argc, char** argv)
 	   rect.x2-rect.x1,rect.y2-rect.y1,
 	   rect.x1,rect.y1);
   sraRgnReleaseIterator(i);
-  printf("\n590x100+10+200 250x150+350+50 30x150+10+50 590x10+10+40 600x30+0+10 20x10+0+0\n\n");
+  printf("\n590x100+10+200 250x150+350+50 30x150+10+50 590x10+10+40 600x30+0+10 20x10+0+0 \n\n");
+
+  sraRgnDestroy(region);
+  sraRgnDestroy(region1);
+  sraRgnDestroy(region2);
 
   return(0);
 }
