@@ -1,3 +1,8 @@
+2005-02-14  Karl Runge <runge@karlrunge.com>
+	* cleanup -users stuff, add "lurk=" mode
+	* support cde in -solid
+	* simple gui mode for beginners, -gui ez,...
+
 2005-02-10  Karl Runge <runge@karlrunge.com>
 	* Add -input to fine tune client input (keystroke, mouse motion,
 	  and button presses).  Allow per-client setting via remote cntl.

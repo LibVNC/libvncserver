@@ -3,7 +3,7 @@
 exec wish "$0" "$@"
 catch {rename send {}}
 #
-# Copyright (c) 2004 Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2004-2005 Karl J. Runge <runge@karlrunge.com>
 # All rights reserved.
 #
 #  This is free software; you can redistribute it and/or modify
@@ -45,9 +45,6 @@ catch {rename send {}}
 #	R means it is an action only valid in remote mode.
 #	S means it is an action only valid in startup mode.
 #	Q means it is an action worth querying after running.
-#	D means it is a good idea to delay a little before querying 
-#	  (i.e. perhaps it causes x11vnc to do a lot of work, new fb)
-#	  No longer used, -sync is used instead.
 #	P means the string can be +/- appended/deleted (string may not
 #         be the same after the remote command)
 #	G means gui internal item
@@ -66,61 +63,61 @@ Row: Displays  Screen    Tuning       Debugging   Misc
 Actions
 	=SA start
 	=RA stop
-	=GA attach
-	=RA detach
+	=DGA attach
+	=DRA detach
 	--
 	=RA ping
 	=RA update-all
 	=GA clear-all
-	--
-	=RA stop+quit 
-	=GA Quit 
+	-- D
+	=DRA stop+quit 
+	=DGA Quit 
 
 Help
-	=GA gui
+	=DGA gui
 	=GA all
 
 Clients
-	=RQA current:
-	=F   connect:
-	=RQA disconnect:
+	=DRQA current:
+	=DF   connect:
+	=DRQA disconnect:
 	--
 	accept:
 	gone:
 	vncconnect
-	--
-	http
+	-- D
+	=D http
 	=F httpdir:
 	httpport:
 	enablehttpproxy
 
 Displays
-	display:
+	=D display:
 	=F auth:
-	desktop:
-	rfbport:
+	=D desktop:
+	=D rfbport:
 	=0 gui:
 
 Screen
 	=DRA refresh
-	=DRA reset
+	=RA reset
 	=DRA blacken
-	--
-	=D id:
-	=D sid:
+	-- D
+	id:
+	sid:
 	=D scale:
 	--
-	=D overlay
+	overlay
 	overlay_nocursor
 	--
-	=D visual:
+	visual:
 	flashcmap
 	notruecolor
 	--
-	=DP blackout:
-	=D  xinerama
+	=P blackout:
+	xinerama
 	--
-	solid
+	=D solid
 	solid_color:
 	--
 	= xrandr
@@ -128,8 +125,8 @@ Screen
 	padgeom:
 
 Keyboard
-	norepeat
-	add_keysyms
+	=D norepeat
+	=D add_keysyms
 	skip_keycodes:
 	modtweak
 	xkb
@@ -140,25 +137,27 @@ Keyboard
 	clear_keys
 
 Pointer
-	=-C:none,arrow,X,some,most cursor:
+	=D-C:none,arrow,X,some,most cursor:
 	noxfixes
 	noalphablend
 	--
 	cursorpos
-	nocursorshape
+	=D nocursorshape
 	--
 	buttonmap:
 	--
 	xwarppointer
 
 Misc
+	=GD simple-gui
+	-- D
 	=F rc:
 	norc
 	--
 	nofb
 	--
-	nobell
-	nosel
+	=D nobell
+	=D nosel
 	noprimary
 	--
 	bg
@@ -178,29 +177,29 @@ Debugging
 	quiet
 	--
 	=GA show-start-cmd
-	=G debug_gui
+	=DG debug_gui
 
 Permissions
-	=RQA lock
-	=RQA unlock
+	=DRQA lock
+	=DRQA unlock
 	=SQA deny_all
 	--
-	=FP allow:
+	=DFP allow:
 	localhost
 	=RA allowonce:
-	--
+	-- D
 	=RA noremote
 	--
-	viewonly
-	shared
-	forever
+	=D viewonly
+	=D shared
+	=D forever
 	timeout:
 	--
 	input:
 	--
-	=SA alwaysshared
-	=SA nevershared
-	=SA dontdisconnect
+	=S alwaysshared
+	=S nevershared
+	=S dontdisconnect
 	--
 	viewpasswd:
 	=F passwdfile:
@@ -212,22 +211,22 @@ Permissions
 	unsafe
 
 Tuning
-	=-C:0,1,2,3,4 pointer_mode:
+	=D-C:0,1,2,3,4 pointer_mode:
 	input_skip:
-	nodragging
+	=D nodragging
 	--
-	=D noshm
+	noshm
 	flipbyteorder
 	onetile
 	--
 	alphacut:
 	alphafrac:
 	alpharemove
-	--
+	-- D
 	speeds:
-	wait:
+	=D wait:
 	defer:
-	nap
+	=D nap
 	screen_blank:
 	--
 	fs:
@@ -359,6 +358,12 @@ Set the -solid color value.
 Set the -xrandr mode value.
 "
 
+	set helptext(simple-gui) "
+Toggle between menu items corresponding the most basic ones
+and all possible settings.  I.e. toggle between a simple gui
+and one for power users.
+"
+
 	set helptext(all) $helpall
 
 	set helptext(gui) "
@@ -366,7 +371,7 @@ tkx11vnc is a simple frontend to x11vnc.  Nothing fancy, it merely
 provides an interface to each of the many x11vnc command line options and
 remote control commands.  See \"Help -> all\" for much info about x11vnc.
 
-Most menu items have a (?) button one can click on to get more information
+All menu items have a (?) button one can click on to get more information
 about the option or command.
 
 There are two states tkx11vnc can be in:
@@ -466,6 +471,57 @@ and -forever which are hopefully enough for most usage.  They may be
 specified for x11vnc startup if desired.
 
 "
+
+global beginner_mode
+if {$beginner_mode} {
+	set helptext(gui) "
+tkx11vnc is a simple frontend to x11vnc.  It is currently running in
+\"ez\" or \"simple\" mode.  For many more options run it in normal
+mode buy toggling \"Misc -> simple_gui\".
+
+All menu items have a (?) button one can click on to get more information
+about the option or command.
+
+GUI components: 
+--- ----------
+
+1) At the top of the gui is a info text label where information will
+be posted, e.g. when traversing menu items text indicating how to get
+help on the item and its current value will be displayed.
+
+2) Below the info label is the area where the menu buttons, Actions,
+Clients, etc., are presented.  If a menu item has a checkbox,
+it corresponds to a boolean on/off variable.  Otherwise it is
+either a string variable, or an action not associated with a
+variable (for the most part).
+
+3) Below the menu button area is a text label indicating the current x11vnc
+X display being polled and the corresponding VNC display name.  Both
+will be \"(*none*)\" when there is no connection established.
+
+4) Below the x11 and vnc displays text label is a text area there scrolling
+information about actions being taken and commands being run is displayed.
+To scroll click in the area and use PageUp/PageDown or the arrow keys.
+
+5) At the bottom is an entry area.  When one selects a menu item that
+requires supplying a string value, the label will be set to the
+parameter name and one types in the new value.  Then one presses the
+\"OK\" button or presses \"Enter\" to set the value.  Or you can press
+\"Skip\" or \"Escape\" to avoid changing the variable.  Some variables
+are boolean toggles (for example, \"Permissions -> viewonly\") or Radio
+button selections.  Selecting these menu items will not activate the
+entry area but rather toggle the variable directly.
+
+
+Cascades Bug: There is a bug not yet worked around for the cascade menus
+where the (?) help button gets in the way.  To get the mouse over to
+the cascade menu click and release mouse to activate the cascade, then
+you can click on its items.  Dragging with a mouse button held down will
+not work (sorry!).
+
+"
+}
+
 }
 
 proc center_win {w} {
@@ -555,6 +611,10 @@ proc active_when_connected {item} {
 
 	if {[opt_match G $item]} {
 		return 1
+	} elseif {[opt_match R $item]} {
+		return 1
+	} elseif {[opt_match S $item]} {
+		return 0
 	} elseif {[is_action $item]} {
 		if {[opt_match R $item]} {
 			return 1
@@ -569,10 +629,27 @@ proc active_when_connected {item} {
 }
 
 proc active_when_starting {item} {
-	global helpremote helptext
+	global helpremote helptext beginner_mode
+
+	if {$beginner_mode} {
+		if {[opt_match G $item]} {
+			return 1
+		}
+		if {$item == "display"} {
+			return 1
+		}
+		if {$item == "debug_gui"} {
+			return 1
+		}
+		return 0
+	}
 
 	if {[opt_match G $item]} {
 		return 1
+	} elseif {[opt_match S $item]} {
+		return 1
+	} elseif {[opt_match R $item]} {
+		return 0
 	} elseif {[is_action $item]} {
 		if {[opt_match S $item]} {
 			return 1
@@ -1120,8 +1197,10 @@ proc insert_input_window {} {
 	global vl_bk vl_bm vl_bb vr_bk vr_bm vr_bb 
 
 	append_text "\nUse these checkboxes to set the input permissions, "
-	append_text "or type in the \"KMB...\"\n-input string manually.  "
-	append_text "Then press \"OK\" or \"Skip\".\n\n"
+	append_text "or type in the \"KMB...\"\n"
+	append_text "-input string manually.  Then press \"OK\" or \"Skip\".\n"
+	append_text "(note: an empty setting means use the default behavior, "
+	append_text "see viewonly)\n\n"
 	set w "$text_area.wk_f"
 	catch {destroy $w}
 	frame $w -bd 1 -relief ridge -cursor {top_left_arrow}
@@ -1136,7 +1215,7 @@ proc insert_input_window {} {
 		-pady 1 -command set_kmb_str -text "Mouse Motion" 
 	checkbutton $fl.bb -font $ffont -anchor w -variable vl_bb \
 		-pady 1 -command set_kmb_str -text "Button Clicks"
-	label $fr.l -pady 1 -font $ffont -text "View-only clients:"
+	label $fr.l -pady 1 -font $ffont -text "View-Only clients:"
 	checkbutton $fr.bk -font $ffont -anchor w -variable vr_bk \
 		-pady 1 -command set_kmb_str -text "Keystrokes" 
 	checkbutton $fr.bm -font $ffont -anchor w -variable vr_bm \
@@ -1623,7 +1702,7 @@ proc tail_logfile {} {
 		set xterm_cmd "xterm -sb -fn $ffont -geometry 80x45 -title x11vnc-logfile -e"
 		set cmd [split $xterm_cmd]
 		lappend cmd "tail"
-		lappend cmd "+1f"
+		lappend cmd "-3000f"
 		lappend cmd $logfile
 		lappend cmd "&"
 		catch {[eval exec $cmd]}
@@ -1665,14 +1744,18 @@ proc detach_from_display {} {
 
 # Menu item is an action:
 proc do_action {item} {
-	global menu_var connected_to_x11vnc
+	global menu_var connected_to_x11vnc beginner_mode
 
 	if {[in_debug_mode]} {
 		append_text "action: \"$item\"\n"
 	}
 
 	if {$item == "ping"} {
-		try_connect
+		if {$beginner_mode} {
+			try_connect_and_query_all
+		} else {
+			try_connect
+		}
 		return
 	} elseif {$item == "start"} {
 		start_x11vnc
@@ -1965,18 +2048,18 @@ proc client_dialog {client} {
 		set input $m5
 		set logvo $m6
 		append_text "Host: $host, Port: $port, IP: $ip, Id: $cid\n"
-		append_text "    - originally logged in as: "
+		append_text "    - originally logged in as:  "
 		if {$logvo == "1" } {
 			append_text "View-Only Client\n"
 		} else {
 			append_text "Normal Client\n"
 		}
-		append_text "    - currently allowed input: "
+		append_text "    - currently allowed input:  "
 		set sk 0
 		set sm 0
 		set sb 0
 		if {[regexp -nocase {K} $input]} {
-			append_text "Keystroke"
+			append_text "Keystrokes"
 			set sk 1
 		}
 		if {[regexp -nocase {M} $input]} {
@@ -1990,7 +2073,7 @@ proc client_dialog {client} {
 			if {$sk || $sm} {
 				append_text ", "
 			}
-			append_text "Button-Click"
+			append_text "Button-Clicks"
 			set sb 1
 		}
 		if {! $sk && ! $sm && ! $sb} {
@@ -2020,7 +2103,7 @@ proc client_dialog {client} {
 	} elseif {[regexp -nocase {(disconnect|close)} $val]} {
 		disconnect_dialog $client
 	} else {
-		regsub -all -nocase {[^KMB]} $val "" 
+		regsub -all -nocase {[^KMB]} $val "" val
 		set item_bool(client_input) 0
 		push_new_value "client_input" "client_input" "$cid:$val" 0
 	}
@@ -2119,6 +2202,10 @@ proc set_widgets {} {
 		set case $item_case($item)
 		set menu $menu_m($case)
 		set entry $item_entry($item)
+		if {$entry < 0} {
+			# skip case under beginner_mode 
+			continue
+		}
 		set type [$menu type $entry]
 		if {$type == "separator" || $type == "tearoff"} {
 			continue
@@ -2126,14 +2213,236 @@ proc set_widgets {} {
 		if {$connected_to_x11vnc} {
 			if {[active_when_connected $item]} {
 				$menu entryconfigure $entry -state normal
+#puts "n-1 $case / $item / $entry"
 			} else {
 				$menu entryconfigure $entry -state disabled
+#puts "I-1 $case / $item / $entry"
 			}
 		} else {
 			if {[active_when_starting $item]} {
 				$menu entryconfigure $entry -state normal
+#puts "n-2 $case / $item / $entry"
 			} else {
 				$menu entryconfigure $entry -state disabled
+#puts "I-2 $case / $item / $entry"
+			}
+		}
+	}
+}
+
+proc toggle_simple_gui {} {
+	global beginner_mode simple_gui_created
+	global connected_to_x11vnc
+
+	if {$beginner_mode} {
+		append_text "\nSwitching to simple-gui mode.\n"
+	} else {
+		append_text "\nSwitching to power-user gui mode.\n"
+	}
+
+	set simple_gui_created 1
+	make_menu_items
+	set_widgets
+	set_internal_help
+	if {$connected_to_x11vnc} {
+		query_all
+	}
+	append_text "\n"
+}
+
+proc make_menu_items {} {
+	global template 
+	global menu_b menu_m menu_count
+	global item_opts item_bool item_case item_entry menu_var unset_str
+	global item_cascade
+	global bfont ffont beginner_mode simple_gui_created
+	global helptext helpremote helplabel
+
+	# Extract the menu items:
+	set case "";
+	foreach line [split $template "\n"] {
+		if {[regexp {^Row:} $line]} {
+			continue
+		}
+		if {[regexp {^[A-z]} $line]} {
+			set case [string trim $line]
+
+			if {$simple_gui_created} {
+				set i0 0
+				if {$case == "Misc"} {
+					# kludge for simple_gui
+					set i0 1
+				}
+				catch {$menu_m($case) delete $i0 end}
+			}
+			set menu_count($case) 0
+			continue;
+		}
+
+		set item [string trim $line]
+		regsub -all {  *} $item " " item
+		if {$item == ""} {
+			continue;
+		}
+		set opts ""
+		if {[regexp {^=} $item]} {
+			set opts [lindex [split $item] 0]
+			regsub {^=} $opts "" opts
+			set item [lindex [split $item] 1]
+		}
+		if {[regexp {^0} $opts]} {
+			continue;
+		}
+		if {[regexp {:$} $item]} {
+			set bool 0
+		} else {
+			set bool 1
+		}
+		regsub {:$} $item {} item
+
+		if {$item == "-- D"} {
+			set beginner_sep 1
+			set item "--"
+		} else {
+			set beginner_sep 0
+		}
+
+		set item_opts($item) $opts
+		set item_case($item) $case
+		set item_bool($item) $bool
+		set item_cascade($item) ""
+		set item_entry($item) $menu_count($case)
+
+		set mvar 0 
+		set m $menu_m($case)
+
+		if {$beginner_mode && ! $beginner_sep && ![opt_match D $item]} {
+			set item_entry($item) "-1"
+			continue;
+		}
+
+		if {0} { puts "ITEM: $item\t- $opts\t- $case\t- $bool\t- $menu_count($case)" }
+
+		# Create the menu items, its variables, etc., etc.
+
+		if {$item == "--"} {
+			$m add separator
+
+		} elseif {$item == "Quit"} {
+			# Quit item must shut us down:
+			$m add command -label "$item" -underline 0 \
+				-font $ffont \
+				-command {destroy .; exit 0}
+
+		} elseif {$case == "Help"} {
+			# Help is simple help:
+			$m add command -label "$item" \
+				-font $ffont \
+				-command "menu_help $item"
+
+		} elseif {$item == "current"} {
+			# Current clients cascade
+			set subm $m.current_cascade
+			catch {destroy $subm}
+			set item_cascade($item) $subm
+			update_clients_menu ""
+			$m add cascade -label "$item" \
+				-font $ffont \
+				-menu $subm
+
+		} elseif {[is_action $item]} {
+			# Action
+			$m add command -label "$item" \
+				-font $ffont \
+				-command "do_var $item"
+			set menu_var($item) "";	# for convenience
+
+		} elseif {! $item_bool($item)} {
+			# String
+			if {[regexp -- {-C:(.*)} $item_opts($item) m0 m1]} {
+				# Radiobutton select
+				set subm $m.radio_cascade$menu_count($case)
+				catch {destroy $subm}
+				menu $subm -tearoff 0 -font $ffont
+				foreach val [split $m1 ","] {
+					$subm add radiobutton -label "$val" \
+						-command "do_var $item" \
+						-value "$val" \
+						-font $ffont \
+						-variable menu_var($item)
+				}
+				$m add cascade -label "$item" \
+					-font $ffont \
+					-menu $subm
+				set item_cascade($item) $subm
+			} else {
+				# Arbitrary_string
+				$m add command -label "$item" \
+					-font $ffont \
+					-command "do_var $item"
+			}
+			set mvar 1
+
+		} elseif {$item == "simple-gui"} {
+			if {! $simple_gui_created} {
+				$m add checkbutton -label "$item" \
+					-command "toggle_simple_gui" \
+					-font $ffont \
+					-variable beginner_mode
+			}
+		} else {
+			# Boolean
+			$m add checkbutton -label "$item" \
+				-command "do_var $item" \
+				-font $ffont \
+				-variable menu_var($item)
+			set menu_var($item) 0
+		}
+
+		incr menu_count($case)
+
+		if {$mvar} {
+			set menu_var($item) $unset_str
+		}
+	}
+
+	# Now make the little "(?)" help buttons
+	foreach case [array names menu_m] {
+		if {$case == "Help"} {
+			continue;
+		}
+		set m $menu_m($case);
+		set n [$m index end]
+
+		for {set i 0} {$i <= $n} {incr i} {
+			set type [$m type $i]
+			if {$type == "separator"} {
+				$m add separator
+			} elseif {$type == "tearoff"} {
+				continue;
+			} else {
+				set label [$m entrycget $i -label]
+				set str ""
+				if {[info exists helpremote($label)]} {
+					set str "(?)"
+				} elseif {[info exists helptext($label)]} {
+					set str "(?)"
+				}
+				$m add command -label $str \
+					-font $ffont \
+					-command "menu_help $label";
+
+				if {$str == ""} {
+					$m entryconfigure end -state disabled
+				}
+				set arg "$m,$i"
+				set helplabel($arg) $label
+				set j [$m index end]
+				set arg "$m,$j"
+				set helplabel($arg) $label
+			}
+			if {$i == 0} {
+				$m entryconfigure end -columnbreak 1
 			}
 		}
 	}
@@ -2141,18 +2450,18 @@ proc set_widgets {} {
 
 proc make_widgets {} {
 	global template 
-	global menu_b menu_m
+	global menu_b menu_m menu_count
 	global item_opts item_bool item_case item_entry menu_var unset_str
 	global item_cascade
 	global info_label info_str x11_display vnc_display
 	global text_area
 	global entry_box entry_str entry_set entry_label entry_ok entry_browse
 	global entry_help entry_skip
-	global bfont ffont
+	global bfont ffont beginner_mode
 	global helptext helpremote helplabel
 
+	# Make the top label
 	set label_width 80
-
 	set info_label .info
 	label $info_label -textvariable info_str -bd 2 -relief groove \
 		-anchor w -width $label_width -font $ffont
@@ -2170,7 +2479,6 @@ proc make_widgets {} {
 				}
 				set menu_row($case) $row
 				set menu_col($case) $col
-				set menu_count($case) 0
 
 				lappend cases($col) $case;
 				set len [string length $case]
@@ -2221,161 +2529,7 @@ proc make_widgets {} {
 	}
 	pack $f -side top -fill x
 
-	# Now extract the menu items:
-	set case "";
-	foreach line [split $template "\n"] {
-		if {[regexp {^Row:} $line]} {
-			continue
-		}
-		if {[regexp {^[A-z]} $line]} {
-			set case [string trim $line]
-			continue;
-		}
-		set item [string trim $line]
-		regsub -all {  *} $item " " item
-		if {$item == ""} {
-			continue;
-		}
-		set opts ""
-		if {[regexp {^=} $item]} {
-			set opts [lindex [split $item] 0]
-			regsub {^=} $opts "" opts
-			set item [lindex [split $item] 1]
-		}
-		if {[regexp {^0} $opts]} {
-			continue;
-		}
-		if {[regexp {:$} $item]} {
-			set bool 0
-		} else {
-			set bool 1
-		}
-		regsub {:$} $item {} item
-
-		set item_opts($item) $opts
-		set item_case($item) $case
-		set item_bool($item) $bool
-		set item_cascade($item) ""
-		set item_entry($item) $menu_count($case)
-
-		if {0} { puts "ITEM: $item - $opts - $case - $bool - $menu_count($case)" }
-
-		set mvar 0 
-		set m $menu_m($case)
-
-		# Create the menu items, its variables, etc., etc.
-
-		if {$item == "--"} {
-			$m add separator
-
-		} elseif {$item == "Quit"} {
-			# Quit item must shut us down:
-			$m add command -label "$item" -underline 0 \
-				-font $ffont \
-				-command {destroy .; exit 0}
-
-		} elseif {$case == "Help"} {
-			# Help is simple help:
-			$m add command -label "$item" \
-				-font $ffont \
-				-command "menu_help $item"
-
-		} elseif {$item == "current"} {
-			# Current clients cascade
-			set subm $m.cascade$menu_count($case)
-			set item_cascade($item) $subm
-			update_clients_menu ""
-			$m add cascade -label "$item" \
-				-font $ffont \
-				-menu $subm
-
-		} elseif {[is_action $item]} {
-			# Action
-			$m add command -label "$item" \
-				-font $ffont \
-				-command "do_var $item"
-			set menu_var($item) "";	# for convenience
-
-		} elseif {! $item_bool($item)} {
-			# String
-			if {[regexp -- {-C:(.*)} $item_opts($item) m0 m1]} {
-				# Radiobutton select
-				set subm $m.cascade$menu_count($case)
-				menu $subm -tearoff 0 -font $ffont
-				foreach val [split $m1 ","] {
-					$subm add radiobutton -label "$val" \
-						-command "do_var $item" \
-						-value "$val" \
-						-font $ffont \
-						-variable menu_var($item)
-				}
-				$m add cascade -label "$item" \
-					-font $ffont \
-					-menu $subm
-				set item_cascade($item) $subm
-			} else {
-				# Arbitrary_string
-				$m add command -label "$item" \
-					-font $ffont \
-					-command "do_var $item"
-			}
-			set mvar 1
-
-		} else {
-			# Boolean
-			$m add checkbutton -label "$item" \
-				-command "do_var $item" \
-				-font $ffont \
-				-variable menu_var($item)
-			set menu_var($item) 0
-		}
-
-		incr menu_count($case)
-		if {$mvar} {
-			set menu_var($item) $unset_str
-		}
-	}
-
-	# Now make the litte "(?)" help buttons
-	foreach case [array names menu_m] {
-		if {$case == "Help"} {
-			continue;
-		}
-		set m $menu_m($case);
-		set n [$m index end]
-
-		for {set i 0} {$i <= $n} {incr i} {
-			set type [$m type $i]
-			if {$type == "separator"} {
-				$m add separator
-			} elseif {$type == "tearoff"} {
-				continue;
-			} else {
-				set label [$m entrycget $i -label]
-				set str ""
-				if {[info exists helpremote($label)]} {
-					set str "(?)"
-				} elseif {[info exists helptext($label)]} {
-					set str "(?)"
-				}
-				$m add command -label $str \
-					-font $ffont \
-					-command "menu_help $label";
-
-				if {$str == ""} {
-					$m entryconfigure end -state disabled
-				}
-				set arg "$m,$i"
-				set helplabel($arg) $label
-				set j [$m index end]
-				set arg "$m,$j"
-				set helplabel($arg) $label
-			}
-			if {$i == 0} {
-				$m entryconfigure end -columnbreak 1
-			}
-		}
-	}
+	make_menu_items
 
 	# Make the x11 and vnc display label bar:
 	set df .displayframe
@@ -2552,9 +2706,9 @@ proc stop_watch {onoff} {
 
 proc double_check_noremote {} {
 	set msg "\n\n"
-	append msg "WARNING: setting \"noremote\" will disable ALL remote control commands\n"
-	append msg "WARNING: (i.e. this gui will be locked out)  Do you really want to do this?\n"
-	append msg "WARNING: If so, press \"OK\", otherwise press \"Skip\"\n"
+	append msg "*** WARNING: setting \"noremote\" will disable ALL remote control commands (i.e.\n"
+	append msg "*** WARNING: *this* gui will be locked out). Do you really want to do this?\n"
+	append msg "*** WARNING: If so, press \"OK\", otherwise press \"Skip\"\n"
 	append msg "\n"
 	bell
 	return [warning_dialog $msg "noremote"]
@@ -2829,7 +2983,7 @@ proc try_connect {} {
 # main:
 
 global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
-global x11vnc_auth_file
+global x11vnc_auth_file beginner_mode simple_gui_created
 global helpall helptext helpremote helplabel hostname;
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
@@ -2918,6 +3072,13 @@ if {[info exists env(X11VNC_AUTH_FILE)]} {
 	set x11vnc_auth_file $env(X11VNC_AUTH_FILE)
 } else {
 	set x11vnc_auth_file ""
+}
+
+set simple_gui_created 0
+if {[info exists env(X11VNC_SIMPLE_GUI)]} {
+	set beginner_mode 1
+} else {
+	set beginner_mode 0
 }
 
 

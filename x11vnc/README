@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Thu Feb 10 23:33:03 EST 2005
+x11vnc README file                         Date: Mon Feb 14 14:23:56 EST 2005
 
 The following information is taken from these URLs:
 
@@ -889,7 +889,9 @@ ls -l ./x11vnc/x11vnc
    the person sitting at the X session types "xhost +localhost" then one
    should be able to attach x11vnc to the session (from the same
    machine). The person could then type "xhost -localhost" after x11vnc
-   has connected to go back to the default permissions.
+   has connected to go back to the default permissions. Also, for some
+   situations the -users lurk= option may be of use (please read the
+   documentation on the -users option).
 
    Some Linux distributions or display managers may set XAUTHORITY to a
    random local filename. You need to dig out where they have hidden the
@@ -2246,9 +2248,9 @@ ied)
    has been added to allow exact extraction of the mouse cursor shape.
    The only issue is the handling of alpha channel transparency in
    cursors (they must be approximated). XFIXES is available on recent
-   Linux Xorg based distros and Solaris 10 express (on Solaris you will
-   need to add "-L /usr/openwin/sfw/lib -R /usr/openwin/sfw/lib" to
-   LDFLAGS for configure to enable it).
+   Linux Xorg based distros and Solaris 10 (on Solaris you will need to
+   add "-L /usr/openwin/sfw/lib -R /usr/openwin/sfw/lib" to LDFLAGS for
+   configure to enable it).
 
    Q-43: When using XFIXES cursorshape mode, some of the cursors look
    really bad with extra black borders around the cursor and other cruft.
@@ -3088,8 +3090,8 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.1pre lastmod: 2005-02-0
-5
+x11vnc: allow VNC connections to real X11 displays. 0.7.1pre lastmod: 2005-02-1
+4
 
 x11vnc options:
   -display disp            -auth file             
@@ -3102,9 +3104,10 @@ x11vnc options:
   -timeout n               -inetd                 
   -connect string          -vncconnect            
   -novncconnect            -allow host1[,host2..] 
-  -localhost               -viewpasswd string     
-  -passwdfile filename     -storepasswd pass file 
-  -accept string           -gone string           
+  -localhost               -input string          
+  -viewpasswd string       -passwdfile filename   
+  -storepasswd pass file   -accept string         
+  -gone string             -users list            
   -noshm                   -flipbyteorder         
   -onetile                 -solid [color]         
   -blackout string         -xinerama              
@@ -3163,8 +3166,8 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.1pre lastmod: 2005-02-0
-5
+x11vnc: allow VNC connections to real X11 displays. 0.7.1pre lastmod: 2005-02-1
+4
 
 Typical usage is:
 
@@ -3210,7 +3213,8 @@ Options:
                        environment variable to "disp".
 -auth file             Set the X authority file to be "file", equivalent to
                        setting the XAUTHORITY environment variable to "file"
-                       before startup.  See Xsecurity(7), xauth(1) man pages.
+                       before startup.  Same as -xauth file.  See Xsecurity(7),
+                       xauth(1) man pages for more info.
 
 -id windowid           Show the window corresponding to "windowid" not
                        the entire display.  New windows like popup menus,
@@ -3307,10 +3311,13 @@ Options:
 -connect string        For use with "vncviewer -listen" reverse connections.
                        If "string" has the form "host" or "host:port"
                        the connection is made once at startup.  Use commas
-                       for a list of host's and host:port's.  If "string"
-                       contains "/" it is instead interpreted as a file to
-                       periodically check for new hosts.  The first line is
-                       read and then the file is truncated.
+                       for a list of host's and host:port's.
+
+                       If "string" contains "/" it is instead interpreted
+                       as a file to periodically check for new hosts.
+                       The first line is read and then the file is truncated.
+                       Be careful for this usage mode if x11vnc is running as
+                       root (e.g. via inetd(1) or gdm(1)).
 -vncconnect            Monitor the VNC_CONNECT X property set by the standard
 -novncconnect          VNC program vncconnect(1).  When the property is
                        set to "host" or "host:port" establish a reverse
@@ -3327,14 +3334,30 @@ Options:
                        each time a new client connects.  Lines can be commented
                        out with the "#" character in the usual way.
 -localhost             Same as -allow 127.0.0.1
+
+-input string          Fine tuning of allowed user input.  If "string" does
+                       not contain a comma "," the tuning applies only to
+                       normal clients.  Otherwise the part before "," is
+                       for normal clients and the part after for view-only
+                       clients.  "K" is for Keystroke input, "M" for
+                       Mouse-motion input, and "B" for Button-click input.
+                       Their presence in the string enables that type of input.
+                       E.g. "-input M" means normal users can only move
+                       the mouse and  "-input KMB,M" lets normal users do
+                       anything and enables view-only users to move the mouse.
+                       This option is ignored when a global -viewonly is in
+                       effect (all input is discarded).
 -viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd
                        (full-access) password must also be supplied.
 -passwdfile filename   Specify libvncserver -passwd via the first line of
                        the file "filename" instead of via command line.
-                       If a second non blank line exists in the file it is
-                       taken as a view-only password (i.e. -viewpasswd) Note:
-                       this is a simple plaintext passwd, see also -rfbauth
-                       and -storepasswd below for obfuscated passwords.
+                       If a second non blank line exists in the file it
+                       is taken as a view-only password (i.e. -viewpasswd)
+                       To supply an empty password for either field use the
+                       string "__EMPTY__".  Note: -passwdfile is a simple
+                       plaintext passwd, see also -rfbauth and -storepasswd
+                       below for obfuscated passwords.  Neither should be
+                       readable by others.
 -storepasswd pass file Store password "pass" as the VNC password in the
                        file "file".  Once the password is stored the
                        program exits.  Use the password via "-rfbauth file"
@@ -3347,6 +3370,11 @@ Options:
                        external command returns 0 the client is accepted,
                        otherwise the client is rejected.  See below for an
                        extension to accept a client view-only.
+
+                       If x11vnc is running as root (say from inetd(1) or from
+                       display managers xdm(1), gdm(1), etc), think about the
+                       security implications carefully before supplying this
+                       option (likewise for the -gone option).
 
                        Environment: The RFB_CLIENT_IP environment variable will
                        be set to the incoming client IP number and the port
@@ -3399,6 +3427,74 @@ Options:
                        in -accept.  Unlike -accept, the command return code
                        is not interpreted by x11vnc.  Example: -gone 'xlock &'
 
+-users list            If x11vnc is started as root (say from inetd(1) or
+                       from display managers xdm(1), gdm(1), etc), then as
+                       soon as possible after connections to the display are
+                       established try to switch to one of the users in the
+                       comma separated "list".  If x11vnc is not running as
+                       root this option is ignored.
+                       
+                       Why use this option?  In general it is not needed
+                       since x11vnc is already connected to the display and
+                       can perform its primary functions.  The option was
+                       added to make some of the *external* utility commands
+                       x11vnc occasionally runs work properly.  In particular
+                       under GNOME and KDE to implement the "-solid color"
+                       feature external commands (gconftool-2 and dcop) must be
+                       run as the user owning the desktop session.  Since this
+                       option switches userid it also affects the userid used
+                       to run the processes for the -accept and -gone options.
+                       It also affects the ability to read files for options
+                       such as -connect, -allow, and -remap.  Note that the
+                       -connect file is also sometimes written to.
+                       
+                       So be careful with this option since in many situations
+                       its use can decrease security.
+                       
+                       The switch to a user will only take place if the
+                       display can still be successfully opened as that user
+                       (this is primarily to try to guess the actual owner
+                       of the session). Example: "-users fred,wilma,betty".
+                       Note that a malicious user "barney" by quickly using
+                       "xhost +" when logging in may get x11vnc to switch
+                       to user "fred".  What happens next?
+                       
+                       Under display managers it may be a long time before
+                       the switch succeeds (i.e. a user logs in).  To make
+                       it switch immediately regardless if the display
+                       can be reopened prefix the username with the +
+                       character. E.g. "-users +bob" or "-users +nobody".
+                       The latter (i.e. switching immediately to user
+                       "nobody") is probably the only use of this option
+                       that increases security.
+                       
+                       To immediately switch to a user *before* connections to
+                       the display are made or any files opened use the "="
+                       character: "-users =bob".  That user needs to be able
+                       to open the display of course.
+                       
+                       The special user "guess=" means to examine the utmpx
+                       database (see who(1)) looking for a user attached to
+                       the display number (from DISPLAY or -display option)
+                       and try him/her.  To limit the list of guesses, use:
+                       "-users guess=bob,betty".
+                       
+                       Even more sinister is the special user "lurk=" that
+                       means to try to guess the DISPLAY from the utmpx login
+                       database as well.  So it "lurks" waiting for anyone
+                       to log into an X session and then connects to it.
+                       Specify a list of users after the = to limit which
+                       users will be tried.  If the first user in the list
+                       is something like ":0" or ":0-2" that indicates a
+                       range of DISPLAY numbers that will be tried (regardless
+                       of whether they are in the utmpx database) for all
+                       users that are logged in.  Examples: "-users lurk="
+                       and "-users lurk=:0-1,bob,mary"
+                       
+                       Be especially careful using the "guess=" and "lurk="
+                       modes.  They are not recommended for use on machines
+                       with untrustworthy local users.
+                       
 -noshm                 Do not use the MIT-SHM extension for the polling.
                        Remote displays can be polled this way: be careful this
                        can use large amounts of network bandwidth.  This is
@@ -3414,15 +3510,18 @@ Options:
                        try to change the desktop background to a solid color.
                        The [color] is optional: the default color is "cyan4".
                        For a different one specify the X color (rgb.txt name,
-                       e.g. "darkblue" or numerical "#RRGGBB"). Currently
-                       this option only works on GNOME, KDE, and classic X
-                       (i.e. with the background image on the root window).
-                       The "gconftool-2" and "dcop" external commands are
-                       run for GNOME and KDE respectively.  Other desktops
-                       won't work, e.g. XFCE (send us the corresponding
-                       commands if you find them).  If x11vnc guesses your
-                       desktop incorrectly, you can force it by prefixing
-                       color with "gnome:", "kde:", or "root:".
+                       e.g. "darkblue" or numerical "#RRGGBB").
+
+                       Currently this option only works on GNOME, KDE, CDE,
+                       and classic X (i.e. with the background image on the
+                       root window).  The "gconftool-2" and "dcop" external
+                       commands are run for GNOME and KDE respectively.
+                       Other desktops won't work, e.g. XFCE (send us the
+                       corresponding commands if you find them).  If x11vnc is
+                       running as root (inetd(1) or gdm(1)), the -users option
+                       may be needed for GNOME and KDE.  If x11vnc guesses
+                       your desktop incorrectly, you can force it by prefixing
+                       color with "gnome:", "kde:", "cde:" or "root:".
 -blackout string       Black out rectangles on the screen. "string" is a
                        comma separated list of WxH+X+Y type geometries for
                        each rectangle.
@@ -3818,9 +3917,11 @@ Options:
                        up on the X display in the environment variable DISPLAY.
 
                        "gui-opts" can be a comma separated list of items.
-                       Currently there are only two types of items: 1) a gui
-                       mode and 2) the X display the gui should display on.
-                       The gui mode can be "start", "conn", or "wait"
+                       Currently there are these types of items: 1) a gui mode,
+                       a 2) gui "simplicity", and 3) the X display the gui
+                       should display on.
+
+                       1) The gui mode can be "start", "conn", or "wait"
                        "start" is the default mode above and is not required.
                        "conn" means do not automatically start up x11vnc,
                        but instead just try to connect to an existing x11vnc
@@ -3828,16 +3929,22 @@ Options:
                        else (you will later instruct the gui to start x11vnc
                        or connect to an existing one.)
 
-                       Note the possible confusion regarding the potentially
+                       2) The gui simplicity is off by default (a power-user
+                       gui with all options is presented) To start with
+                       something less daunting supply the string "simple"
+                       ("ez" is an alias for this).  Once the gui is
+                       started you can toggle between the two with "Misc ->
+                       simple_gui".
+
+                       3) Note the possible confusion regarding the potentially
                        two different X displays: x11vnc polls one, but you
                        may want the gui to appear on another.  For example, if
                        you ssh in and x11vnc is not running yet you may want
                        the gui to come back to you via your ssh redirected X
                        display (e.g. localhost:10).
 
-                       Examples: "x11vnc -gui", "x11vnc -gui localhost:10",
-                       "x11vnc -gui :10", "x11vnc -gui wait,:10",
-                       "x11vnc -gui <x11vnc-opts...>"
+                       Examples: "x11vnc -gui", "x11vnc -gui ez"
+                       "x11vnc -gui localhost:10", "x11vnc -gui conn,host:0"
 
                        If you do not specify a gui X display in "gui-opts"
                        then the DISPLAY environment variable and -display
@@ -3935,6 +4042,11 @@ Options:
                                        use "-host" to delete a single host
                        localhost       enable  -localhost mode
                        nolocalhost     disable -localhost mode
+                       input:str       set -input to "str", empty to disable.
+                       client_input:str set the K, M, B -input on a per-client
+                                       basis.  select which client as for
+                                       disconnect, e.g. client_input:host:MB
+                                       or client_input:0x2:K
                        accept:cmd      set -accept "cmd" (empty to disable).
                        gone:cmd        set -gone "cmd" (empty to disable).
                        noshm           enable  -noshm mode.
@@ -4103,13 +4215,13 @@ Options:
                        xrandr_mode padgeom quiet q noquiet modtweak nomodtweak
                        xkb noxkb skip_keycodes add_keysyms noadd_keysyms
                        clear_mods noclear_mods clear_keys noclear_keys
-                       remap repeat norepeat fb nofb bell nobell sel nosel
-                       primary noprimary cursorshape nocursorshape cursorpos
-                       nocursorpos cursor show_cursor noshow_cursor
-                       nocursor xfixes noxfixes alphacut alphafrac
-                       alpharemove noalpharemove alphablend noalphablend
-                       xwarp xwarppointer noxwarp noxwarppointer buttonmap
-                       dragging nodragging pointer_mode pm input_skip speeds
+                       remap repeat norepeat fb nofb bell nobell sel
+                       nosel primary noprimary cursorshape nocursorshape
+                       cursorpos nocursorpos cursor show_cursor noshow_cursor
+                       nocursor xfixes noxfixes alphacut alphafrac alpharemove
+                       noalpharemove alphablend noalphablend xwarp xwarppointer
+                       noxwarp noxwarppointer buttonmap dragging nodragging
+                       pointer_mode pm input_skip input client_input speeds
                        debug_pointer dp nodebug_pointer nodp debug_keyboard dk
                        nodebug_keyboard nodk deferupdate defer wait rfbwait
                        nap nonap sb screen_blank fs gaps grow fuzz snapfb
@@ -4119,7 +4231,7 @@ Options:
                        nodontdisconnect desktop noremote
 
                        aro=  display vncdisplay desktopname http_url auth
-                       rootshift scale_str scaled_x scaled_y scale_numer
+                       users rootshift scale_str scaled_x scaled_y scale_numer
                        scale_denom scale_fac scaling_noblend scaling_nomult4
                        scaling_pad scaling_interpolate inetd safer unsafe
                        passwdfile using_shm logfile o rc norc h help V version
@@ -4157,10 +4269,13 @@ Options:
                        Note that if they can modify VNC_CONNECT, they could
                        also run their own x11vnc and have complete control
                        of the desktop.  If the  "-connect /path/to/file"
-                       channel is being used, obviously anyone who can write
-                       to /path/to/file can remotely control x11vnc.  So be
-                       sure to protect the X display and that file's write
-                       permissions.
+                       channel is being used, obviously anyone who can
+                       write to /path/to/file can remotely control x11vnc.
+                       So be sure to protect the X display and that file's
+                       write permissions.
+
+                       To disable the VNC_CONNECT property channel completely
+                       use -novncconnect.
 
 -unsafe                If x11vnc is running as root (e.g. inetd or Xsetup for
                        a display manager) a few remote commands are disabled

@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.1pre, lastmod: 2005-02-10
+         version: 0.7.1pre, lastmod: 2005-02-14
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -274,10 +274,13 @@ Supply a 2nd password for view-only logins.  The \fB-passwd\fR
 .IP
 Specify libvncserver \fB-passwd\fR via the first line of
 the file \fIfilename\fR instead of via command line.
-If a second non blank line exists in the file it is
-taken as a view-only password (i.e. \fB-viewpasswd)\fR Note:
-this is a simple plaintext passwd, see also \fB-rfbauth\fR
-and \fB-storepasswd\fR below for obfuscated passwords.
+If a second non blank line exists in the file it
+is taken as a view-only password (i.e. \fB-viewpasswd)\fR
+To supply an empty password for either field use the
+string "__EMPTY__".  Note: \fB-passwdfile\fR is a simple
+plaintext passwd, see also \fB-rfbauth\fR and \fB-storepasswd\fR
+below for obfuscated passwords.  Neither should be
+readable by others.
 .PP
 \fB-storepasswd\fR \fIpass\fR \fIfile\fR
 .IP
@@ -382,44 +385,66 @@ root this option is ignored.
 .IP
 Why use this option?  In general it is not needed
 since x11vnc is already connected to the display and
-can perform its primary functions.  It was added to
-make some of the *external* utility commands x11vnc
-occasionally runs work properly.  In particular under
-GNOME and KDE to implement the "\fB-solid\fR \fIcolor\fR" feature
-external commands (gconftool-2 and dcop) must be run as
-the user owning the desktop session.  This option also
-affects the userid used to run the processes for the
-\fB-accept\fR and \fB-gone\fR options.  It also affects the ability
-to read files for options such as \fB-connect,\fR \fB-allow,\fR and
-\fB-remap.\fR Note that the \fB-connect\fR file is also written to.
+can perform its primary functions.  The option was
+added to make some of the *external* utility commands
+x11vnc occasionally runs work properly.  In particular
+under GNOME and KDE to implement the "\fB-solid\fR \fIcolor\fR"
+feature external commands (gconftool-2 and dcop) must be
+run as the user owning the desktop session.  Since this
+option switches userid it also affects the userid used
+to run the processes for the \fB-accept\fR and \fB-gone\fR options.
+It also affects the ability to read files for options
+such as \fB-connect,\fR \fB-allow,\fR and \fB-remap.\fR  Note that the
+\fB-connect\fR file is also sometimes written to.
 .IP
 So be careful with this option since in many situations
 its use can decrease security.
 .IP
-The switch to a user will only take place if the display
-can still be opened as that user (this is primarily to
-try to guess the actual owner of the session). Example:
-"\fB-users\fR \fIfred,wilma,betty\fR".  Note that a malicious
-user "barney" by quickly using "xhost +" when
-logging in can get x11vnc to switch to user "fred".
-What happens next?
+The switch to a user will only take place if the
+display can still be successfully opened as that user
+(this is primarily to try to guess the actual owner
+of the session). Example: "\fB-users\fR \fIfred,wilma,betty\fR".
+Note that a malicious user "barney" by quickly using
+"xhost +" when logging in may get x11vnc to switch
+to user "fred".  What happens next?
 .IP
 Under display managers it may be a long time before
 the switch succeeds (i.e. a user logs in).  To make
-it switch immediately regardless if the display can
-be reopened or not prefix the username with the +
+it switch immediately regardless if the display
+can be reopened prefix the username with the +
 character. E.g. "\fB-users\fR \fI+bob\fR" or "\fB-users\fR \fI+nobody\fR".
 The latter (i.e. switching immediately to user
 "nobody") is probably the only use of this option
-that increases security.  To switch to a user *before*
-connections to the display are made or any files opened
-use the "=" character: "\fB-users\fR \fI=username\fR".
+that increases security.
 .IP
-The special user "guess" means to examine the utmpx
-database looking for a user attached to the display
-number and try him/her.  To limit the list of guesses,
-use: "\fB-users\fR \fIguess=bob,betty\fR".  Be especially careful
-using this mode.
+To immediately switch to a user *before* connections to
+the display are made or any files opened use the "="
+character: "\fB-users\fR \fI=bob\fR".  That user needs to be able
+to open the display of course.
+.IP
+The special user "guess=" means to examine the utmpx
+database (see 
+.IR who (1)
+) looking for a user attached to
+the display number (from DISPLAY or \fB-display\fR option)
+and try him/her.  To limit the list of guesses, use:
+"\fB-users\fR \fIguess=bob,betty\fR".
+.IP
+Even more sinister is the special user "lurk=" that
+means to try to guess the DISPLAY from the utmpx login
+database as well.  So it "lurks" waiting for anyone
+to log into an X session and then connects to it.
+Specify a list of users after the = to limit which
+users will be tried.  If the first user in the list
+is something like ":0" or ":0-2" that indicates a
+range of DISPLAY numbers that will be tried (regardless
+of whether they are in the utmpx database) for all
+users that are logged in.  Examples: "\fB-users\fR \fIlurk=\fR"
+and "\fB-users\fR \fIlurk=:0-1,bob,mary\fR"
+.IP
+Be especially careful using the "guess=" and "lurk="
+modes.  They are not recommended for use on machines
+with untrustworthy local users.
 .PP
 \fB-noshm\fR
 .IP
@@ -448,20 +473,20 @@ The [color] is optional: the default color is "cyan4".
 For a different one specify the X color (rgb.txt name,
 e.g. "darkblue" or numerical "#RRGGBB").
 .IP
-Currently this option only works on GNOME, KDE, and
-classic X (i.e. with the background image on the root
-window).  The "gconftool-2" and "dcop" external
+Currently this option only works on GNOME, KDE, CDE,
+and classic X (i.e. with the background image on the
+root window).  The "gconftool-2" and "dcop" external
 commands are run for GNOME and KDE respectively.
 Other desktops won't work, e.g. XFCE (send us the
-corresponding commands if you find them).  If x11vnc
-is running as root (
+corresponding commands if you find them).  If x11vnc is
+running as root (
 .IR inetd (1)
 or 
 .IR gdm (1)
-), the \fB-users\fR
-option may be needed for GNOME and KDE.  If x11vnc
-guesses your desktop incorrectly, you can force it by
-prefixing color with "gnome:", "kde:", or "root:".
+), the \fB-users\fR option
+may be needed for GNOME and KDE.  If x11vnc guesses
+your desktop incorrectly, you can force it by prefixing
+color with "gnome:", "kde:", "cde:" or "root:".
 .PP
 \fB-blackout\fR \fIstring\fR
 .IP
@@ -1008,9 +1033,11 @@ to start up both the gui and x11vnc with the gui showing
 up on the X display in the environment variable DISPLAY.
 .IP
 "gui-opts" can be a comma separated list of items.
-Currently there are only two types of items: 1) a gui
-mode and 2) the X display the gui should display on.
-The gui mode can be "start", "conn", or "wait"
+Currently there are these types of items: 1) a gui mode,
+a 2) gui "simplicity", and 3) the X display the gui
+should display on.
+.IP
+1) The gui mode can be "start", "conn", or "wait"
 "start" is the default mode above and is not required.
 "conn" means do not automatically start up x11vnc,
 but instead just try to connect to an existing x11vnc
@@ -1018,15 +1045,22 @@ process.  "wait" means just start the gui and nothing
 else (you will later instruct the gui to start x11vnc
 or connect to an existing one.)
 .IP
-Note the possible confusion regarding the potentially
+2) The gui simplicity is off by default (a power-user
+gui with all options is presented) To start with
+something less daunting supply the string "simple"
+("ez" is an alias for this).  Once the gui is
+started you can toggle between the two with "Misc ->
+simple_gui".
+.IP
+3) Note the possible confusion regarding the potentially
 two different X displays: x11vnc polls one, but you
 may want the gui to appear on another.  For example, if
 you ssh in and x11vnc is not running yet you may want
 the gui to come back to you via your ssh redirected X
 display (e.g. localhost:10).
 .IP
-Examples: "x11vnc \fB-gui",\fR "x11vnc \fB-gui\fR localhost:10",
-"x11vnc \fB-gui\fR :10", "x11vnc \fB-gui\fR conn,host:10",
+Examples: "x11vnc \fB-gui",\fR "x11vnc \fB-gui\fR ez"
+"x11vnc \fB-gui\fR localhost:10", "x11vnc \fB-gui\fR conn,host:0"
 .IP
 If you do not specify a gui X display in "gui-opts"
 then the DISPLAY environment variable and \fB-display\fR
