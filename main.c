@@ -143,6 +143,8 @@ void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,i
     rowstride=rfbScreen->paddedWidthInBytes;
    char *in,*out;
 
+   rfbUndrawCursor(rfbScreen);
+  
    /* copy it, really */
    i = sraRgnGetReverseIterator(copyRegion,dx<0,dy<0);
    while(sraRgnIteratorNext(i,&rect)) {

@@ -40,6 +40,8 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 {
     int i,i1;
 
+    if(!argc) return;
+    
     for (i = i1 = 1; i < *argc; i++) {
         if (strcmp(argv[i], "-help") == 0) {
 	    rfbUsage();
@@ -101,6 +103,7 @@ rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[])
 {
     int i,i1;
 
+    if(!argc) return;
     for (i = i1 = 1; i < *argc-1; i++) {
         if (strcmp(argv[i], "-bpp") == 0) {
                *bpp = atoi(argv[++i]);
