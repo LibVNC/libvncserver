@@ -1,3 +1,7 @@
+2005-01-23  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -timeout, -noalphablend.  make -R norepeat work.
+	* sync with new draw cursor mechanism.
+
 2005-01-20  Karl Runge <runge@karlrunge.com>
 	* libvncserver/{cursor.c,rfbserver.c}: fixed the "disappearing cursor"
 	  problem

@@ -2,7 +2,7 @@
 .TH X11VNC "1" "January 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.1pre, lastmod: 2005-01-16
+         version: 0.7.1pre, lastmod: 2005-01-23
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -190,6 +190,11 @@ disconnects, opposite of \fB-forever.\fR This is the Default.
 .IP
 Keep listening for more connections rather than exiting
 as soon as the first client(s) disconnect. Same as \fB-many\fR
+.PP
+\fB-timeout\fR \fIn\fR
+.IP
+Exit unless a client connects within the first n seconds
+of startup.
 .PP
 \fB-inetd\fR
 .IP
@@ -574,9 +579,9 @@ default (see \fB-noxfixes\fR below).  This can be disabled
 with \fB-nocursor,\fR and also some values of the "mode"
 option below.
 .IP
-Note that under XFIXES cursors with transparency
-(alpha channel) will not be exactly represented and
-so Overlay may be preferred.  See also the \fB-alphacut\fR
+Note that under XFIXES cursors with transparency (alpha
+channel) will not be exactly represented and one may
+find Overlay may be preferable.  See also the \fB-alphacut\fR
 and \fB-alphafrac\fR options below as fudge factors to try
 to improve the situation for cursors with transparency
 for a given theme.
@@ -647,16 +652,16 @@ black background).  Specify this option to remove the
 alpha factor. (useful for light colored semi-transparent
 cursors).
 .PP
-\fB-alphablend\fR
+\fB-noalphablend\fR
 .IP
-In XFIXES mode send cursor alpha channel data to
-libvncserver.  The blending effect will only be
-visible in \fB-nocursorshape\fR mode or for clients with
-cursorshapeupdates turned off. (However there is a
-hack for 32bpp with depth 24, it uses the extra 8 bits
-to store cursor transparency for use with a hacked
-vncviewer that applies the transparency locally.
-See the FAQ for more info).
+In XFIXES mode do not send cursor alpha channel data
+to libvncserver.  The default is to send it.  The
+alphablend effect will only be visible in \fB-nocursorshape\fR
+mode or for clients with cursorshapeupdates turned
+off. (However there is a hack for 32bpp with depth 24,
+it uses the extra 8 bits to store cursor transparency
+for use with a hacked vncviewer that applies the
+transparency locally.  See the FAQ for more info).
 .PP
 \fB-nocursorshape\fR
 .IP
@@ -1010,6 +1015,10 @@ forever         enable  \fB-forever\fR mode.
 .IP
 noforever       disable \fB-forever\fR mode.
 .IP
+timeout:n       reset \fB-timeout\fR to n, if there are
+                currently no clients, exit unless one
+                connects in the next n secs.
+.IP
 deny            deny any new connections, same as "lock"
 .IP
 nodeny          allow new connections, same as "unlock"
@@ -1150,9 +1159,9 @@ alpharemove     enable  \fB-alpharemove\fR mode.
 .IP
 noalpharemove   disable \fB-alpharemove\fR mode.
 .IP
-alphablend      enable  \fB-alphablend\fR mode.
+alphablend      disable \fB-noalphablend\fR mode.
 .IP
-noalphablend    disable \fB-alphablend\fR mode.
+noalphablend    enable  \fB-noalphablend\fR mode.
 .IP
 cursorshape     disable \fB-nocursorshape\fR mode.
 .IP
@@ -1306,8 +1315,8 @@ refresh reset close disconnect id sid waitmapped
 nowaitmapped flashcmap noflashcmap truecolor notruecolor
 overlay nooverlay overlay_cursor overlay_yescursor
 nooverlay_nocursor nooverlay_cursor nooverlay_yescursor
-overlay_nocursor visual scale viewonly noviewonly
-shared noshared forever noforever once deny lock nodeny
+overlay_nocursor visual scale viewonly noviewonly shared
+noshared forever noforever once timeout deny lock nodeny
 unlock connect allowonce allow localhost nolocalhost
 accept gone shm noshm flipbyteorder noflipbyteorder
 onetile noonetile blackout xinerama noxinerama xrandr
@@ -1329,16 +1338,16 @@ httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop noremote
 .IP
-aro=  display vncdisplay desktopname auth rootshift
-scale_str scaled_x scaled_y scale_numer scale_denom
-scale_fac scaling_noblend scaling_nomult4 scaling_pad
-scaling_interpolate inetd safer unsafe passwdfile
-using_shm logfile o rc norc h help V version lastmod
-bg sigpipe threads clients client_count pid ext_xtest
-ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes
-ext_xdamage ext_xrandr rootwin num_buttons button_mask
-mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y
-rfbauth passwd
+aro=  display vncdisplay desktopname http_url auth
+rootshift scale_str scaled_x scaled_y scale_numer
+scale_denom scale_fac scaling_noblend scaling_nomult4
+scaling_pad scaling_interpolate inetd safer unsafe
+passwdfile using_shm logfile o rc norc h help V version
+lastmod bg sigpipe threads clients client_count pid
+ext_xtest ext_xkb ext_xshm ext_xinerama ext_overlay
+ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
+button_mask mouse_x mouse_y bpp depth indexed_color
+dpy_x dpy_y rfbauth passwd
 .PP
 \fB-sync\fR
 .IP

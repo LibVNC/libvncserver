@@ -139,7 +139,7 @@ Keyboard
 Pointer
 	=-C:none,arrow,X,some,most cursor:
 	noxfixes
-	alphablend
+	noalphablend
 	--
 	cursorpos
 	nocursorshape
@@ -186,11 +186,12 @@ Permissions
 	localhost
 	=RA allowonce:
 	--
+	=RA noremote
+	--
 	viewonly
 	shared
 	forever
-	--
-	=RA noremote
+	timeout:
 	--
 	=SA alwaysshared
 	=SA nevershared
@@ -359,35 +360,39 @@ There is much overlap between the menu items available in state 1)
 and state 2), but it is worth keeping in mind it is not 100%.
 For example, you cannot set passwords or password files in state 1).
 
+
 Also note that there may be *two* separate X displays involved, not just
 one:  1) the X display x11vnc will be polling (and making available to
 VNC viewers), and 2) the X display this GUI is intended to display on.
 For example, one might use ssh to access the remote machine where the
-GUI would display on :11 and x11vnc would poll display :0.
+GUI would display on :11 and x11vnc would poll display :0.  By default
+the gui will display on the value in the DISPLAY env. variable followed
+by the value from the -display option.  To override this, use something
+like: \"-gui otherhost:0\", etc.
 
 
 GUI components: 
 --- ----------
 
-At the top of the gui is a info text label where information will
+1) At the top of the gui is a info text label where information will
 be posted, e.g. when traversing menu items text indicating how to get
 help on the item and its current value will be displayed.
 
-Below the info label is the area where the menu buttons, Actions,
+2) Below the info label is the area where the menu buttons, Actions,
 Clients, etc., are presented.  If a menu item has a checkbox,
 it corresponds to a boolean on/off variable.  Otherwise it is
 either a string variable, or an action not associated with a
 variable (for the most part).
 
-Below the menu button area is a text label indicating the current x11vnc
+3) Below the menu button area is a text label indicating the current x11vnc
 X display being polled and the corresponding VNC display name.  Both
 will be \"(*none*)\" when there is no connection established.
 
-Below the x11 and vnc displays text label is a text area there scrolling
+4) Below the x11 and vnc displays text label is a text area there scrolling
 information about actions being taken and commands being run is displayed.
 To scroll use PageUp/PageDown or the arrow keys.
 
-At the bottom is an entry area.  When one selects a menu item that
+5) At the bottom is an entry area.  When one selects a menu item that
 requires supplying a string value, the label will be set to the
 parameter name and one types in the new value.  Then one presses the
 \"OK\" button or presses \"Enter\" to set the value.  Or you can press
@@ -396,11 +401,13 @@ are boolean toggles (for example, \"Permissions -> viewonly\") or Radio
 button selections.  Selecting these menu items will not activate the
 entry area but rather toggle the variable directly.
 
-Cascades: There is a bug not yet worked around for the cascade menus
+
+Cascades Bug: There is a bug not yet worked around for the cascade menus
 where the (?) help button gets in the way.  To get the mouse over to
 the cascade menu click and release mouse to activate the cascade, then
-you can click on its items.  Dragging with a mouse button held down
-will not work (sorry).
+you can click on its items.  Dragging with a mouse button held down will
+not work (sorry!).
+
 
 Key Bindings:
 
@@ -409,6 +416,7 @@ Key Bindings:
 	Anywhere: Control-a invokes \"Actions -> attach\"
 	Anywhere: Control-p invokes \"Actions -> ping\"
 	Anywhere: Control-u and Control-r invoke \"Actions -> update-all\"
+
 
 Misc:
 
@@ -547,7 +555,9 @@ proc help_win {item} {
 	set text "Help on $item:\n\n"
 
 	if {[is_gui_internal $item]} {
-		;
+		if {$item != "gui" && $item != "all"} {
+			append text "    + Is a gui internal Action (cannot be set).\n";
+		}
 	} elseif {[is_action $item]} {
 		append text "    + Is a remote control Action (cannot be set).\n";
 	} elseif {[active_when_connected $item]} {
@@ -594,6 +604,10 @@ proc help_win {item} {
 			append text "$unset_str\n"
 		} else {
 			append text "$menu_var($item)\n"
+		}
+		if {$item == "http" || $item == "httpdir" || $item == "httpport"} {
+			global vnc_url;
+			append text "\nURL: $vnc_url\n"
 		}
 	}
 
@@ -1221,6 +1235,8 @@ proc update_menu_vars {{query ""}} {
 				set_x11_display $val
 			} elseif {$item == "vncdisplay"} {
 				set_vnc_display $val
+			} elseif {$item == "http_url"} {
+				set_vnc_url $val
 			}
 		}
 	}
@@ -1353,7 +1369,7 @@ proc show_logfile {} {
 }
 
 proc tail_logfile {} {
-	global menu_var unset_str
+	global menu_var unset_str ffont
 	set logfile $menu_var(logfile)
 	
 	set txt ""
@@ -1363,7 +1379,7 @@ proc tail_logfile {} {
 		set txt "\nLogfile \"$logfile\" does not exist.\n\n"
 	} else {
 		set cmd ""
-		set xterm_cmd "xterm -geometry 80x45 -title x11vnc-logfile -e"
+		set xterm_cmd "xterm -sb -fn $ffont -geometry 80x45 -title x11vnc-logfile -e"
 		set cmd [split $xterm_cmd]
 		lappend cmd "tail"
 		lappend cmd "+1f"
@@ -1526,6 +1542,11 @@ proc do_var {item} {
 		} else {
 			push_new_value $item $name $new 1
 		}
+
+		if {$item == "http"} {
+			global vnc_url
+			append_text "  URL: $vnc_url\n"
+		}
 	}
 }
 
@@ -1637,11 +1658,18 @@ proc set_vnc_display {name} {
 	global vnc_display
 	set vnc_display "VNC display: $name"
 }
+proc set_vnc_url {name} {
+	global vnc_url
+	set vnc_url $name
+}
 proc no_x11_display {} {
 	set_x11_display "(*none*)"
 }
 proc no_vnc_display {} {
 	set_vnc_display "(*none*)"
+}
+proc no_vnc_url {} {
+	set_vnc_url "(*none*)"
 }
 
 proc fetch_displays {} {
@@ -1651,6 +1679,7 @@ proc fetch_displays {} {
 
 	set got_x11 0
 	set got_vnc 0
+	set got_url 0
 
 	foreach item [split_query $result] {
 		if {[regexp {^display:(.*)$} $item m0 m1]} {
@@ -1659,6 +1688,9 @@ proc fetch_displays {} {
 		} elseif {[regexp {^vncdisplay:(.*)$} $item m0 m1]} {
 			set_vnc_display $m1
 			set got_vnc 1
+		} elseif {[regexp {^http_url:(.*)$} $item m0 m1]} {
+			set_vnc_url $m1
+			set got_url 1
 		}
 	}
 	if {! $got_x11} {
@@ -1666,6 +1698,9 @@ proc fetch_displays {} {
 	}
 	if {! $got_vnc} {
 		no_vnc_display
+	}
+	if {! $got_url} {
+		no_vnc_url
 	}
 }
 
@@ -2130,6 +2165,10 @@ MenuSelect>>
 				}
 			} elseif {[info exists menu_var($which)]} {
 				set label "$label value: $menu_var($which)"
+				if {$which == "http"} {
+					global vnc_url
+					set label "$label  URL: $vnc_url"
+				}
 			}
 		}
 		set_info $label

@@ -1,3 +1,9 @@
+2005-01-23  Karl Runge <runge@karlrunge.com>
+	* sync with new draw cursor mechanism, keep old way in OLD_TREE.
+	* add -timeout option, change -alphablend to be default
+	* -R norepeat now forces the issue (Xsession may turn it back on).
+	* try :0 if no other info.
+
 2005-01-15  Karl Runge <runge@karlrunge.com>
 	* adjust alpha blending parameters, -alphablend, handle 24bpp.
 	* add -snapfb snapshot fb, not clear how useful it is..
