@@ -2,7 +2,10 @@ INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 # for Solaris
-EXTRALIBS=-lsocket -lnsl -L/usr/X/lib
+#EXTRALIBS=-lsocket -lnsl -L/usr/X/lib
+
+# for FreeBSD
+#EXTRAINCLUDES=-I/usr/X11R6/include
 
 # Uncomment these two lines to enable use of PThreads
 #PTHREADDEF = -DHAVE_PTHREADS
@@ -14,7 +17,7 @@ FLAG24 = -DALLOW24BPP
 
 OPTFLAGS=-g -Wall
 #OPTFLAGS=-O2 -Wall
-CFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES) -DBACKCHANNEL
+CFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES) $(EXTRAINCLUDES) -DBACKCHANNEL
 RANLIB=ranlib
 
 LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB) $(EXTRALIBS)
@@ -101,7 +104,7 @@ zippy: zippy.o libvncserver.a
 
 clean:
 	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \
-	     	mac.o example.o pnmshow.o pnmshow24.o sratest.o \
+	     	x11vnc.o mac.o example.o pnmshow.o pnmshow24.o sratest.o \
 		blooptest.o $(OBJS)
 
 realclean: clean

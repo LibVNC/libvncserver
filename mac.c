@@ -225,7 +225,7 @@ static int keyTable[] = {
 };
 
 void
-KbdAddEvent(Bool down, KeySym keySym, struct rfbClientRec* cl)
+KbdAddEvent(Bool down, KeySym keySym, struct _rfbClientRec* cl)
 {
     int i;
     CGKeyCode keyCode = -1;
@@ -349,7 +349,7 @@ void clientGone(rfbClientPtr cl)
   exit(0);
 }
 
-void newClient(rfbClientPtr cl)
+enum rfbNewClientAction newClient(rfbClientPtr cl)
 {
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
     exit(0);
@@ -358,6 +358,8 @@ void newClient(rfbClientPtr cl)
     cl->clientGoneHook = clientGone;
 
   cl->clientData=(void*)((viewOnly)?-1:0);
+
+  return(RFB_CLIENT_ACCEPT);
 }
 
 int main(int argc,char *argv[])
