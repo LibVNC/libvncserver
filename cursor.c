@@ -40,8 +40,8 @@ rfbSendCursorShape(cl)
     int saved_ublen;
     int bitmapRowBytes, maskBytes, dataBytes;
     int i, j;
-    CARD8 *bitmapData;
-    CARD8 bitmapByte;
+    uint8_t *bitmapData;
+    uint8_t bitmapByte;
 
     pCursor = cl->screen->getCursorPtr(cl);
     /*if(!pCursor) return TRUE;*/
@@ -131,7 +131,7 @@ rfbSendCursorShape(cl)
 	memcpy(&cl->updateBuf[cl->ublen], (char *)&colors, sz_rfbXCursorColors);
 	cl->ublen += sz_rfbXCursorColors;
 
-	bitmapData = (CARD8 *)pCursor->source;
+	bitmapData = (uint8_t *)pCursor->source;
 
 	for (i = 0; i < pCursor->height; i++) {
 	    for (j = 0; j < bitmapRowBytes; j++) {
@@ -154,7 +154,7 @@ rfbSendCursorShape(cl)
 
     /* Prepare transparency mask. */
 
-    bitmapData = (CARD8 *)pCursor->mask;
+    bitmapData = (uint8_t *)pCursor->mask;
 
     for (i = 0; i < pCursor->height; i++) {
 	for (j = 0; j < bitmapRowBytes; j++) {
@@ -322,7 +322,7 @@ void MakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
    rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
    int i,j,w=(cursor->width+7)/8,bpp=format->bitsPerPixel/8,
      width=cursor->width*bpp;
-   CARD32 background;
+   uint32_t background;
    char *back=(char*)&background;
    unsigned char bit;
    
@@ -344,7 +344,7 @@ void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
 {
    rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
    int i,j,w=(cursor->width+7)/8,bpp=format->bitsPerPixel/8;
-   CARD32 background,foreground;
+   uint32_t background,foreground;
    char *back=(char*)&background,*fore=(char*)&foreground;
    unsigned char *cp;
    unsigned char bit;

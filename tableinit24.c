@@ -24,22 +24,22 @@
  */
 
 static void
-rfbInitOneRGBTable24 (CARD8 *table, int inMax, int outMax, int outShift,int swap);
+rfbInitOneRGBTable24 (uint8_t *table, int inMax, int outMax, int outShift,int swap);
 
 
 static void
 rfbInitColourMapSingleTable24(char **table, rfbPixelFormat *in,
                             rfbPixelFormat *out,rfbColourMap* colourMap)
 {
-    CARD32 i, r, g, b, outValue;
-    CARD8 *t;
-    CARD8 c;
+    uint32_t i, r, g, b, outValue;
+    uint8_t *t;
+    uint8_t c;
     unsigned int nEntries = 1 << in->bitsPerPixel;
     int shift = colourMap->is16?16:8;
 
     if (*table) free(*table);
     *table = (char *)malloc(nEntries * 3 + 1);
-    t = (CARD8 *)*table;
+    t = (uint8_t *)*table;
 
     for (i = 0; i < nEntries; i++) {
         r = g = b = 0;
@@ -57,7 +57,7 @@ rfbInitColourMapSingleTable24(char **table, rfbPixelFormat *in,
         outValue = ((((r * (1 + out->redMax)) >> shift) << out->redShift) |
                 (((g * (1 + out->greenMax)) >> shift) << out->greenShift) |
                 (((b * (1 + out->blueMax)) >> shift) << out->blueShift));
-	*(CARD32*)&t[3*i] = outValue;
+	*(uint32_t*)&t[3*i] = outValue;
 	if(!rfbEndianTest)
 	  memmove(t+3*i,t+3*i+1,3);
         if (out->bigEndian != in->bigEndian) {
@@ -77,13 +77,13 @@ rfbInitTrueColourSingleTable24 (char **table, rfbPixelFormat *in,
 {
     int i,outValue;
     int inRed, inGreen, inBlue, outRed, outGreen, outBlue;
-    CARD8 *t;
-    CARD8 c;
+    uint8_t *t;
+    uint8_t c;
     int nEntries = 1 << in->bitsPerPixel;
 
     if (*table) free(*table);
     *table = (char *)malloc(nEntries * 3 + 1);
-    t = (CARD8 *)*table;
+    t = (uint8_t *)*table;
 
     for (i = 0; i < nEntries; i++) {
         inRed   = (i >> in->redShift)   & in->redMax;
@@ -97,7 +97,7 @@ rfbInitTrueColourSingleTable24 (char **table, rfbPixelFormat *in,
 	outValue = ((outRed   << out->redShift)   |
                 (outGreen << out->greenShift) |
                 (outBlue  << out->blueShift));
-	*(CARD32*)&t[3*i] = outValue;
+	*(uint32_t*)&t[3*i] = outValue;
 	if(!rfbEndianTest)
 	  memmove(t+3*i,t+3*i+1,3);
         if (out->bigEndian != in->bigEndian) {
@@ -116,14 +116,14 @@ static void
 rfbInitTrueColourRGBTables24 (char **table, rfbPixelFormat *in,
                                rfbPixelFormat *out)
 {
-    CARD8 *redTable;
-    CARD8 *greenTable;
-    CARD8 *blueTable;
+    uint8_t *redTable;
+    uint8_t *greenTable;
+    uint8_t *blueTable;
 
     if (*table) free(*table);
     *table = (char *)malloc((in->redMax + in->greenMax + in->blueMax + 3)
                             * 3 + 1);
-    redTable = (CARD8 *)*table;
+    redTable = (uint8_t *)*table;
     greenTable = redTable + 3*(in->redMax + 1);
     blueTable = greenTable + 3*(in->greenMax + 1);
 
@@ -136,17 +136,17 @@ rfbInitTrueColourRGBTables24 (char **table, rfbPixelFormat *in,
 }
 
 static void
-rfbInitOneRGBTable24 (CARD8 *table, int inMax, int outMax, int outShift,
+rfbInitOneRGBTable24 (uint8_t *table, int inMax, int outMax, int outShift,
                        int swap)
 {
     int i;
     int nEntries = inMax + 1;
-    CARD32 outValue;
-    CARD8 c;
+    uint32_t outValue;
+    uint8_t c;
 
     for (i = 0; i < nEntries; i++) {
       outValue = ((i * outMax + inMax / 2) / inMax) << outShift;
-      *(CARD32 *)&table[3*i] = outValue;
+      *(uint32_t *)&table[3*i] = outValue;
       if(!rfbEndianTest)
 	memmove(table+3*i,table+3*i+1,3);
         if (swap) {

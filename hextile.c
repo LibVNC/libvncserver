@@ -25,7 +25,6 @@
  *  USA.
  */
 
-#include <stdio.h>
 #include "rfb.h"
 
 static Bool sendHextiles8(rfbClientPtr cl, int x, int y, int w, int h);
@@ -90,10 +89,10 @@ rfbSendRectEncodingHextile(cl, x, y, w, h)
 #define DEFINE_SEND_HEXTILES(bpp)                                               \
                                                                                 \
                                                                                 \
-static Bool subrectEncode##bpp(rfbClientPtr cli, CARD##bpp *data, int w, int h, \
-                               CARD##bpp bg, CARD##bpp fg, Bool mono);          \
-static void testColours##bpp(CARD##bpp *data, int size, Bool *mono,             \
-                             Bool *solid, CARD##bpp *bg, CARD##bpp *fg);        \
+static Bool subrectEncode##bpp(rfbClientPtr cli, uint##bpp##_t *data, int w, int h, \
+                               uint##bpp##_t bg, uint##bpp##_t fg, Bool mono);          \
+static void testColours##bpp(uint##bpp##_t *data, int size, Bool *mono,             \
+                             Bool *solid, uint##bpp##_t *bg, uint##bpp##_t *fg);        \
                                                                                 \
                                                                                 \
 /*                                                                              \
@@ -108,11 +107,11 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
     int x, y, w, h;                                                             \
     int startUblen;                                                             \
     char *fbptr;                                                                \
-    CARD##bpp bg = 0, fg = 0, newBg, newFg;                                     \
+    uint##bpp##_t bg = 0, fg = 0, newBg, newFg;                                     \
     Bool mono, solid;                                                           \
     Bool validBg = FALSE;                                                       \
     Bool validFg = FALSE;                                                       \
-    CARD##bpp clientPixelData[16*16*(bpp/8)];                                   \
+    uint##bpp##_t clientPixelData[16*16*(bpp/8)];                                   \
                                                                                 \
     for (y = ry; y < ry+rh; y += 16) {                                          \
         for (x = rx; x < rx+rw; x += 16) {                                      \
@@ -194,16 +193,16 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
                                                                                 \
                                                                                 \
 static Bool                                                                     \
-subrectEncode##bpp(rfbClientPtr cl, CARD##bpp *data, int w, int h,              \
-                   CARD##bpp bg, CARD##bpp fg, Bool mono)                       \
+subrectEncode##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w, int h,              \
+                   uint##bpp##_t bg, uint##bpp##_t fg, Bool mono)                       \
 {                                                                               \
-    CARD##bpp cl2;                                                              \
+    uint##bpp##_t cl2;                                                              \
     int x,y;                                                                    \
     int i,j;                                                                    \
     int hx=0,hy,vx=0,vy;                                                        \
     int hyflag;                                                                 \
-    CARD##bpp *seg;                                                             \
-    CARD##bpp *line;                                                            \
+    uint##bpp##_t *seg;                                                             \
+    uint##bpp##_t *line;                                                            \
     int hw,hh,vw,vh;                                                            \
     int thex,they,thew,theh;                                                    \
     int numsubs = 0;                                                            \
@@ -297,14 +296,14 @@ subrectEncode##bpp(rfbClientPtr cl, CARD##bpp *data, int w, int h,              
                                                                                 \
 static void                                                                     \
 testColours##bpp(data,size,mono,solid,bg,fg)                                    \
-    CARD##bpp *data;                                                            \
+    uint##bpp##_t *data;                                                            \
     int size;                                                                   \
     Bool *mono;                                                                 \
     Bool *solid;                                                                \
-    CARD##bpp *bg;                                                              \
-    CARD##bpp *fg;                                                              \
+    uint##bpp##_t *bg;                                                              \
+    uint##bpp##_t *fg;                                                              \
 {                                                                               \
-    CARD##bpp colour1 = 0, colour2 = 0;                                         \
+    uint##bpp##_t colour1 = 0, colour2 = 0;                                         \
     int n1 = 0, n2 = 0;                                                         \
     *mono = TRUE;                                                               \
     *solid = TRUE;                                                              \

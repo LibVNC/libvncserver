@@ -461,7 +461,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->paddedWidthInBytes = fb->bytes_per_line;
 	screen->rfbServerFormat.bitsPerPixel = fb->bits_per_pixel;
 	screen->rfbServerFormat.depth = fb->depth;
-	screen->rfbServerFormat.trueColour = (CARD8) TRUE;
+	screen->rfbServerFormat.trueColour = (uint8_t) TRUE;
 
 	if ( screen->rfbServerFormat.bitsPerPixel == 8 ) {
 		/* 8 bpp */

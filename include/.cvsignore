@@ -1,4 +1,5 @@
 rfbconfig.h
 rfbconfig.h.in
-stamp-h1
+stamp-h*
+rfbint.h
 

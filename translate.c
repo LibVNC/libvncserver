@@ -23,8 +23,6 @@
  *  USA.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include "rfb.h"
 #include "sraRegion.h"
 
@@ -60,6 +58,8 @@ static const rfbPixelFormat BGR233Format = {
 
 #define CONCAT2(a,b) a##b
 #define CONCAT2E(a,b) CONCAT2(a,b)
+#define CONCAT3(a,b,c) a##b##c
+#define CONCAT3E(a,b,c) CONCAT3(a,b,c)
 #define CONCAT4(a,b,c,d) a##b##c##d
 #define CONCAT4E(a,b,c,d) CONCAT4(a,b,c,d)
 
@@ -364,7 +364,7 @@ rfbSetClientColourMapBGR233(cl)
 {
     char buf[sz_rfbSetColourMapEntriesMsg + 256 * 3 * 2];
     rfbSetColourMapEntriesMsg *scme = (rfbSetColourMapEntriesMsg *)buf;
-    CARD16 *rgb = (CARD16 *)(&buf[sz_rfbSetColourMapEntriesMsg]);
+    uint16_t *rgb = (uint16_t *)(&buf[sz_rfbSetColourMapEntriesMsg]);
     int i, len;
     int r, g, b;
 

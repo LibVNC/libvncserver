@@ -23,7 +23,6 @@
 // Routines to implement Zlib Run-length Encoding (ZRLE).
 //
 
-#include <stdio.h>
 extern "C" {
 #include "rfb.h"
 }
@@ -158,7 +157,7 @@ Bool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
       bytesToCopy = mos.length() - i;
     }
 
-    memcpy(cl->updateBuf+cl->ublen, (CARD8*)mos.data() + i, bytesToCopy);
+    memcpy(cl->updateBuf+cl->ublen, (uint8_t*)mos.data() + i, bytesToCopy);
 
     cl->ublen += bytesToCopy;
     i += bytesToCopy;

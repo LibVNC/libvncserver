@@ -37,7 +37,7 @@
 #error "It is included as part of translate.c"
 #endif
 
-#define OUT_T CONCAT2E(CARD,OUT)
+#define OUT_T CONCAT3E(uint,OUT,_t)
 #define SwapOUT(x) CONCAT2E(Swap,OUT(x))
 #define rfbInitColourMapSingleTableOUT \
                                 CONCAT2E(rfbInitColourMapSingleTable,OUT)
@@ -46,9 +46,9 @@ static void
 rfbInitColourMapSingleTableOUT(char **table, rfbPixelFormat *in,
                             rfbPixelFormat *out,rfbColourMap* colourMap)
 {
-    CARD32 i, r, g, b;
+    uint32_t i, r, g, b;
     OUT_T *t;
-    CARD32 nEntries = 1 << in->bitsPerPixel;
+    uint32_t nEntries = 1 << in->bitsPerPixel;
     int shift = colourMap->is16?16:8;
 
     if (*table) free(*table);

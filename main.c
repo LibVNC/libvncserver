@@ -10,8 +10,6 @@
  *  see GPL (latest version) for full details
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdarg.h>
 #include <errno.h>
 
@@ -20,12 +18,16 @@
 #define true -1
 #endif
 
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+
 #ifndef WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #endif
+
 #include <signal.h>
 #include <time.h>
 
@@ -734,7 +736,7 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
   httpInitSockets(rfbScreen);
 }
 
-#ifdef WIN32
+#ifndef HAVE_GETTIMEOFDAY
 #include <fcntl.h>
 #include <conio.h>
 #include <sys/timeb.h>

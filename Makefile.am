@@ -3,7 +3,7 @@ DIST_SUBDIRS=examples contrib
 
 bin_SCRIPTS = libvncserver-config
 
-include_HEADERS=include/rfb.h include/rfbconfig.h include/rfbproto.h \
+include_HEADERS=include/rfb.h include/rfbconfig.h include/rfbint.h include/rfbproto.h \
 	include/keysym.h
 
 noinst_HEADERS=sraRegion.h d3des.h zrleDecode.h zrleEncode.h \

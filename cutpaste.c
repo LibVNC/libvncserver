@@ -23,7 +23,6 @@
  *  USA.
  */
 
-#include <stdio.h>
 #include "rfb.h"
 
 

@@ -39,8 +39,8 @@
 #error "It is included as part of translate.c"
 #endif
 
-#define IN_T CONCAT2E(CARD,IN)
-#define OUT_T CONCAT2E(CARD,OUT)
+#define IN_T CONCAT3E(uint,IN,_t)
+#define OUT_T CONCAT3E(uint,OUT,_t)
 #define rfbTranslateWithSingleTableINtoOUT \
                                 CONCAT4E(rfbTranslateWithSingleTable,IN,to,OUT)
 #define rfbTranslateWithRGBTablesINtoOUT \

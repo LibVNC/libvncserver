@@ -30,7 +30,6 @@
  * or send email to feedback@developvnc.org.
  */
 
-#include <stdio.h>
 #include "rfb.h"
 
 #ifdef HAVE_LIBZ

@@ -39,8 +39,12 @@
  *  USA.
  */
 
-#include <stdio.h>
+#include "rfb.h"
+
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+
 #ifdef WIN32
 #pragma warning (disable: 4018 4761)
 #define close closesocket
@@ -49,14 +53,23 @@
 #define ETIMEDOUT WSAETIMEDOUT
 #define write(sock,buf,len) send(sock,buf,len,0)
 #else
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
-#include <unistd.h>
 #include <arpa/inet.h>
 #endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#endif
+
 #if defined(__linux__) && defined(NEED_TIMEVAL)
 struct timeval 
 {
@@ -64,7 +77,11 @@ struct timeval
 }
 ;
 #endif
+
+#ifdef HAVE_FCNTL_H
 #include <fcntl.h>
+#endif
+
 #include <errno.h>
 
 #ifdef USE_LIBWRAP
@@ -73,8 +90,6 @@ struct timeval
 int allow_severity=LOG_INFO;
 int deny_severity=LOG_WARNING;
 #endif
-
-#include "rfb.h"
 
 /*#ifndef WIN32
 int max(int i,int j) { return(i<j?j:i); }

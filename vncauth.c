@@ -21,21 +21,27 @@
  * vncauth.c - Functions for VNC password management and authentication.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+#include "rfb.h"
+#include "d3des.h"
+
 #include <string.h>
 #include <math.h>
+
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#endif
+
 #include <time.h>
+
 #ifdef WIN32
 #define srandom srand
 #define random rand
 #else
 #include <sys/time.h>
 #endif
-#include "rfb.h"
-#include "d3des.h"
 
 
 /*

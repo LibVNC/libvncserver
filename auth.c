@@ -26,8 +26,6 @@
  *  USA.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include "rfb.h"
 
 /*
@@ -46,12 +44,12 @@ rfbAuthNewClient(cl)
     cl->state = RFB_AUTHENTICATION;
 
     if (cl->screen->rfbAuthPasswdData && !cl->reverseConnection) {
-        *(CARD32 *)buf = Swap32IfLE(rfbVncAuth);
+        *(uint32_t *)buf = Swap32IfLE(rfbVncAuth);
         vncRandomBytes(cl->authChallenge);
         memcpy(&buf[4], (char *)cl->authChallenge, CHALLENGESIZE);
         len = 4 + CHALLENGESIZE;
     } else {
-        *(CARD32 *)buf = Swap32IfLE(rfbNoAuth);
+        *(uint32_t *)buf = Swap32IfLE(rfbNoAuth);
         len = 4;
         cl->state = RFB_INITIALISATION;
     }
@@ -74,8 +72,8 @@ rfbAuthProcessClientMessage(cl)
     rfbClientPtr cl;
 {
     int n;
-    CARD8 response[CHALLENGESIZE];
-    CARD32 authResult;
+    uint8_t response[CHALLENGESIZE];
+    uint32_t authResult;
 
     if ((n = ReadExact(cl, (char *)response, CHALLENGESIZE)) <= 0) {
         if (n != 0)

@@ -36,52 +36,47 @@ extern "C"
 #include <stdlib.h>
 #include <string.h>
 #include "rfbconfig.h"
+#include "rfbint.h"
 #include "keysym.h"
 
 #ifdef HAVE_LIBZ
 #include <zlib.h>
 #endif
 
-/* TODO: this stuff has to go into autoconf */
-typedef unsigned char CARD8;
-typedef unsigned short CARD16;
-typedef unsigned int CARD32;
-typedef CARD32 Pixel;
-/* typedef CARD32 KeySym; */
-typedef unsigned long KeySym;
-#define SIGNED signed
-
-typedef signed char Bool;
-
-#undef FALSE
-#define FALSE 0
-#undef TRUE
-#define TRUE -1
-
 #include "rfbproto.h"
 
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+
 #if defined(WIN32)
 #define WORDS_BIGENDIAN
 #undef Bool
 #define Bool int
-#endif
-
-#ifdef __sgi__
-typedef int socklen_t;
-#endif
-
-#ifdef WIN32
 #include <sys/timeb.h>
 #include <winsock.h>
 #undef SOCKET
 #define SOCKET int
 #else
 #define max(a,b) (((a)>(b))?(a):(b))
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
-#include <netinet/in.h>
-#define SOCKET int
 #endif
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#define SOCKET int
+#ifndef Bool
+typedef int8_t Bool;
+#undef FALSE
+#define FALSE 0
+#undef TRUE
+#define TRUE -1
+#endif
+#endif
+
+typedef uint32_t KeySym;
+typedef uint32_t Pixel;
 
 #ifndef INADDR_NONE
 #define                INADDR_NONE     ((in_addr_t) 0xffffffff)
@@ -171,11 +166,11 @@ typedef enum rfbNewClientAction (*NewClientHookPtr)(struct _rfbClientRec* cl);
 typedef void (*DisplayHookPtr)(struct _rfbClientRec* cl);
 
 typedef struct {
-  CARD32 count;
+  uint32_t count;
   Bool is16; /* is the data format short? */
   union {
-    CARD8* bytes;
-    CARD16* shorts;
+    uint8_t* bytes;
+    uint16_t* shorts;
   } data; /* there have to be count*3 entries */
 } rfbColourMap;
 
@@ -390,7 +385,7 @@ typedef struct _rfbClientRec {
     int correMaxWidth, correMaxHeight;
 
     /* The following member is only used during VNC authentication */
-    CARD8 authChallenge[CHALLENGESIZE];
+    uint8_t authChallenge[CHALLENGESIZE];
 
     /* The following members represent the update needed to get the client's
        framebuffer from its present state to the current state of our
@@ -473,7 +468,7 @@ typedef struct _rfbClientRec {
 
     struct z_stream_s compStream;
     Bool compStreamInited;
-    CARD32 zlibCompressLevel;
+    uint32_t zlibCompressLevel;
 
 #ifdef HAVE_LIBJPEG
     /* tight encoding -- preserve zlib streams' state for each client */

@@ -53,19 +53,19 @@ rfbTranslateWithSingleTable24to24 (char *table, rfbPixelFormat *in,
                                     int bytesBetweenInputLines,
                                     int width, int height)
 {
-    CARD8 *ip = (CARD8 *)iptr;
-    CARD8 *op = (CARD8 *)optr;
+    uint8_t *ip = (uint8_t *)iptr;
+    uint8_t *op = (uint8_t *)optr;
     int ipextra = bytesBetweenInputLines - width * 3;
-    CARD8 *opLineEnd;
-    CARD8 *t = (CARD8 *)table;
+    uint8_t *opLineEnd;
+    uint8_t *t = (uint8_t *)table;
     int shift = rfbEndianTest?0:8;
-    CARD8 c;
+    uint8_t c;
 
     while (height > 0) {
         opLineEnd = op + width*3;
 
         while (op < opLineEnd) {
-	    *(CARD32*)op = t[((*(CARD32 *)ip)>>shift)&0x00ffffff];
+	    *(uint32_t*)op = t[((*(uint32_t *)ip)>>shift)&0x00ffffff];
 	    if(!rfbEndianTest)
 	      memmove(op,op+1,3);
 	    if (out->bigEndian != in->bigEndian) {
@@ -92,21 +92,21 @@ rfbTranslateWithRGBTables24to24 (char *table, rfbPixelFormat *in,
                                   int bytesBetweenInputLines,
                                   int width, int height)
 {
-    CARD8 *ip = (CARD8 *)iptr;
-    CARD8 *op = (CARD8 *)optr;
+    uint8_t *ip = (uint8_t *)iptr;
+    uint8_t *op = (uint8_t *)optr;
     int ipextra = bytesBetweenInputLines - width*3;
-    CARD8 *opLineEnd;
-    CARD8 *redTable = (CARD8 *)table;
-    CARD8 *greenTable = redTable + 3*(in->redMax + 1);
-    CARD8 *blueTable = greenTable + 3*(in->greenMax + 1);
-    CARD32 outValue,inValue;
+    uint8_t *opLineEnd;
+    uint8_t *redTable = (uint8_t *)table;
+    uint8_t *greenTable = redTable + 3*(in->redMax + 1);
+    uint8_t *blueTable = greenTable + 3*(in->greenMax + 1);
+    uint32_t outValue,inValue;
     int shift = rfbEndianTest?0:8;
 
     while (height > 0) {
         opLineEnd = op+3*width;
 
         while (op < opLineEnd) {
-	    inValue = ((*(CARD32 *)ip)>>shift)&0x00ffffff;
+	    inValue = ((*(uint32_t *)ip)>>shift)&0x00ffffff;
             outValue = (redTable[(inValue >> in->redShift) & in->redMax] |
                        greenTable[(inValue >> in->greenShift) & in->greenMax] |
                        blueTable[(inValue >> in->blueShift) & in->blueMax]);
@@ -121,8 +121,8 @@ rfbTranslateWithRGBTables24to24 (char *table, rfbPixelFormat *in,
 
 #else
 
-#define IN_T CONCAT2E(CARD,BPP)
-#define OUT_T CONCAT2E(CARD,BPP)
+#define IN_T CONCAT3E(uint,BPP,_t)
+#define OUT_T CONCAT3E(uint,BPP,_t)
 #define rfbTranslateWithSingleTable24toOUT \
                                 CONCAT4E(rfbTranslateWithSingleTable,24,to,BPP)
 #define rfbTranslateWithSingleTableINto24 \
@@ -144,7 +144,7 @@ rfbTranslateWithSingleTable24toOUT (char *table, rfbPixelFormat *in,
                                     int bytesBetweenInputLines,
                                     int width, int height)
 {
-    CARD8 *ip = (CARD8 *)iptr;
+    uint8_t *ip = (uint8_t *)iptr;
     OUT_T *op = (OUT_T *)optr;
     int ipextra = bytesBetweenInputLines - width*3;
     OUT_T *opLineEnd;
@@ -155,7 +155,7 @@ rfbTranslateWithSingleTable24toOUT (char *table, rfbPixelFormat *in,
         opLineEnd = op + width;
 
         while (op < opLineEnd) {
-            *(op++) = t[((*(CARD32 *)ip)>>shift)&0x00ffffff];
+            *(op++) = t[((*(uint32_t *)ip)>>shift)&0x00ffffff];
 	    ip+=3;
         }
 
@@ -177,21 +177,21 @@ rfbTranslateWithRGBTables24toOUT (char *table, rfbPixelFormat *in,
                                   int bytesBetweenInputLines,
                                   int width, int height)
 {
-    CARD8 *ip = (CARD8 *)iptr;
+    uint8_t *ip = (uint8_t *)iptr;
     OUT_T *op = (OUT_T *)optr;
     int ipextra = bytesBetweenInputLines - width*3;
     OUT_T *opLineEnd;
     OUT_T *redTable = (OUT_T *)table;
     OUT_T *greenTable = redTable + in->redMax + 1;
     OUT_T *blueTable = greenTable + in->greenMax + 1;
-    CARD32 inValue;
+    uint32_t inValue;
     int shift = rfbEndianTest?0:8;
 
     while (height > 0) {
         opLineEnd = &op[width];
 
         while (op < opLineEnd) {
-	    inValue = ((*(CARD32 *)ip)>>shift)&0x00ffffff;
+	    inValue = ((*(uint32_t *)ip)>>shift)&0x00ffffff;
             *(op++) = (redTable[(inValue >> in->redShift) & in->redMax] |
                        greenTable[(inValue >> in->greenShift) & in->greenMax] |
                        blueTable[(inValue >> in->blueShift) & in->blueMax]);
@@ -215,10 +215,10 @@ rfbTranslateWithSingleTableINto24 (char *table, rfbPixelFormat *in,
                                     int width, int height)
 {
     IN_T *ip = (IN_T *)iptr;
-    CARD8 *op = (CARD8 *)optr;
+    uint8_t *op = (uint8_t *)optr;
     int ipextra = bytesBetweenInputLines / sizeof(IN_T) - width;
-    CARD8 *opLineEnd;
-    CARD8 *t = (CARD8 *)table;
+    uint8_t *opLineEnd;
+    uint8_t *t = (uint8_t *)table;
 
     while (height > 0) {
         opLineEnd = op + width * 3;
@@ -247,13 +247,13 @@ rfbTranslateWithRGBTablesINto24 (char *table, rfbPixelFormat *in,
                                   int width, int height)
 {
     IN_T *ip = (IN_T *)iptr;
-    CARD8 *op = (CARD8 *)optr;
+    uint8_t *op = (uint8_t *)optr;
     int ipextra = bytesBetweenInputLines / sizeof(IN_T) - width;
-    CARD8 *opLineEnd;
-    CARD8 *redTable = (CARD8 *)table;
-    CARD8 *greenTable = redTable + 3*(in->redMax + 1);
-    CARD8 *blueTable = greenTable + 3*(in->greenMax + 1);
-    CARD32 outValue;
+    uint8_t *opLineEnd;
+    uint8_t *redTable = (uint8_t *)table;
+    uint8_t *greenTable = redTable + 3*(in->redMax + 1);
+    uint8_t *blueTable = greenTable + 3*(in->greenMax + 1);
+    uint32_t outValue;
 
     while (height > 0) {
         opLineEnd = op+3*width;

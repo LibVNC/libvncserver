@@ -39,7 +39,7 @@
 #error "It is included as part of translate.c"
 #endif
 
-#define OUT_T CONCAT2E(CARD,OUT)
+#define OUT_T CONCAT3E(uint,OUT,_t)
 #define SwapOUT(x) CONCAT2E(Swap,OUT(x))
 #define rfbInitTrueColourSingleTableOUT \
                                 CONCAT2E(rfbInitTrueColourSingleTable,OUT)

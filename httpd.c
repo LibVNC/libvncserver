@@ -22,31 +22,42 @@
  *  USA.
  */
 
-#include <stdio.h>
+#include "rfb.h"
+
 #include <ctype.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif
+#include <errno.h>
+
 #ifdef WIN32
 #include <winsock.h>
 #define close closesocket
 #else
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
-#include <pwd.h>
 #include <arpa/inet.h>
-#include <unistd.h>
 #endif
-#include <fcntl.h>
-#include <errno.h>
+#include <pwd.h>
+#endif
 
 #ifdef USE_LIBWRAP
 #include <tcpd.h>
 #endif
-
-#include "rfb.h"
 
 #define NOT_FOUND_STR "HTTP/1.0 404 Not found\r\n\r\n" \
     "<HEAD><TITLE>File Not Found</TITLE></HEAD>\n" \

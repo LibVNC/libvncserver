@@ -1,7 +1,6 @@
 immediate:
 ----------
 
-autoconf also CARD8,CARD16,...
 x11vnc: clipboard, cursor
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
@@ -25,6 +24,7 @@ CORBA
 done:
 -----
 
+.autoconf also CARD8,CARD16,...
 .autoconf
 .internal HTTP tunnelling feature (needs a special GET target and a few
 .	changes to java applet).

@@ -8,9 +8,6 @@
 #include "rfb.h"
 #include "sraRegion.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-
 /* -=- Internal Span structure */
 
 struct sraRegion;

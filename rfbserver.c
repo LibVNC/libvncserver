@@ -24,23 +24,30 @@
  *  USA.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "rfb.h"
 #include "sraRegion.h"
+
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif
+
 #ifdef WIN32
 #define write(sock,buf,len) send(sock,buf,len,0)
 #else
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <pwd.h>
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #endif
-#include <fcntl.h>
-#include <sys/types.h>
+#endif
 
 #ifdef CORBA
 #include <vncserverctrl.h>
@@ -538,8 +545,8 @@ rfbClientConnFailed(cl, reason)
     int len = strlen(reason);
 
     buf = (char *)malloc(8 + len);
-    ((CARD32 *)buf)[0] = Swap32IfLE(rfbConnFailed);
-    ((CARD32 *)buf)[1] = Swap32IfLE(len);
+    ((uint32_t *)buf)[0] = Swap32IfLE(rfbConnFailed);
+    ((uint32_t *)buf)[1] = Swap32IfLE(len);
     memcpy(buf + 8, reason, len);
 
     if (WriteExact(cl, buf, 8 + len) < 0)
@@ -692,7 +699,7 @@ rfbProcessClientNormalMessage(cl)
     case rfbSetEncodings:
     {
         int i;
-        CARD32 enc;
+        uint32_t enc;
 
         if ((n = ReadExact(cl, ((char *)&msg) + 1,
                            sz_rfbSetEncodingsMsg - 1)) <= 0) {
@@ -828,15 +835,15 @@ rfbProcessClientNormalMessage(cl)
 #endif
             default:
 #ifdef HAVE_LIBZ
-		if ( enc >= (CARD32)rfbEncodingCompressLevel0 &&
-		     enc <= (CARD32)rfbEncodingCompressLevel9 ) {
+		if ( enc >= (uint32_t)rfbEncodingCompressLevel0 &&
+		     enc <= (uint32_t)rfbEncodingCompressLevel9 ) {
 		    cl->zlibCompressLevel = enc & 0x0F;
 #ifdef HAVE_LIBJPEG
 		    cl->tightCompressLevel = enc & 0x0F;
 		    rfbLog("Using compression level %d for client %s\n",
 			   cl->tightCompressLevel, cl->host);
-		} else if ( enc >= (CARD32)rfbEncodingQualityLevel0 &&
-			    enc <= (CARD32)rfbEncodingQualityLevel9 ) {
+		} else if ( enc >= (uint32_t)rfbEncodingQualityLevel0 &&
+			    enc <= (uint32_t)rfbEncodingQualityLevel9 ) {
 		    cl->tightQualityLevel = enc & 0x0F;
 		    rfbLog("Using image quality level %d for client %s\n",
 			   cl->tightQualityLevel, cl->host);
@@ -1178,7 +1185,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
     fu->type = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
-	fu->nRects = Swap16IfLE((CARD16)(sraRgnCountRects(updateCopyRegion) +
+	fu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
 					 nUpdateRegionRects +
 					 !!sendCursorShape + !!sendCursorPos));
     } else {
@@ -1516,7 +1523,7 @@ rfbSendSetColourMapEntries(cl, firstColour, nColours)
 {
     char buf[sz_rfbSetColourMapEntriesMsg + 256 * 3 * 2];
     rfbSetColourMapEntriesMsg *scme = (rfbSetColourMapEntriesMsg *)buf;
-    CARD16 *rgb = (CARD16 *)(&buf[sz_rfbSetColourMapEntriesMsg]);
+    uint16_t *rgb = (uint16_t *)(&buf[sz_rfbSetColourMapEntriesMsg]);
     rfbColourMap* cm = &cl->screen->colourMap;
     
     int i, len;

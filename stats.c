@@ -24,8 +24,6 @@
  *  USA.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include "rfb.h"
 
 static const char* encNames[] = {

@@ -71,6 +71,8 @@ AC_C_INLINE
 AC_C_BIGENDIAN
 AC_TYPE_SIZE_T
 AC_HEADER_TIME
+AC_TYPE_SOCKLEN_T
+AC_CREATE_STDINT_H(include/rfbint.h)
 
 # Checks for library functions.
 AC_FUNC_MALLOC
