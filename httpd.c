@@ -192,7 +192,9 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
 static void
 httpCloseSock(rfbScreenInfoPtr rfbScreen)
 {
+    close(rfbScreen->httpSock);
     rfbScreen->httpSock = -1;
+    buf_filled = 0;
 }
 
 static rfbClientRec cl;
