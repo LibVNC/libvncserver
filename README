@@ -128,9 +128,12 @@ There is only one hook:
 newClientHook(rfbClientPtr cl)
   is called when a new client has connected.
 
-You can also override the following method:
+You can also override the following methods:
 getCursorPtr(rfbClientPtr cl)
   This could be used to make an animated cursor (if you really want ...)
+setTranslateFunction(rfbClientPtr cl)
+  If you insist on colour maps or something more obscure, you have to
+  implement this. Default is a trueColour mapping.
 
 Cursor handling
 ---------------

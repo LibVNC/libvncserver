@@ -533,8 +533,8 @@ rfbProcessClientNormalMessage(cl)
         cl->format.blueShift = msg.spf.format.blueShift;
 
 	cl->readyForSetColourMapEntries = TRUE;
+        cl->screen->setTranslateFunction(cl);
 
-        rfbSetTranslateFunction(cl);
         return;
 
 

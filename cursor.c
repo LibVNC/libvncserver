@@ -370,7 +370,10 @@ void rfbDrawCursor(rfbClientPtr cl)
    rfbCursorPtr c=s->cursor;
    int i,j,x1,x2,y1,y2,i1,j1,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
-     bufSize=c->width*c->height*bpp,w=(c->width+7)/8;
+     bufSize,w;
+   if(!c) return;
+   bufSize=c->width*c->height*bpp;
+   w=(c->width+7)/8;
    if(s->cursorIsDrawn)
      rfbUndrawCursor(cl);
    if(s->underCursorBufferLen<bufSize) {

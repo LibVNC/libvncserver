@@ -91,6 +91,7 @@ typedef void (*KbdReleaseAllKeysProcPtr) (struct rfbClientRec* cl);
 typedef void (*PtrAddEventProcPtr) (int buttonMask, int x, int y, struct rfbClientRec* cl);
 typedef void (*SetXCutTextProcPtr) (char* str,int len, struct rfbClientRec* cl);
 typedef struct rfbCursor* (*GetCursorProcPtr) (struct rfbClientRec* pScreen);
+typedef Bool (*SetTranslateFunctionProcPtr)(struct rfbClientRec* cl);
 typedef void (*NewClientHookPtr)(struct rfbClientRec* cl);
 
 /*
@@ -110,6 +111,12 @@ typedef struct
     Pixel blackPixel;
     Pixel whitePixel;
 
+    /* some screen specific data can be put into a struct where screenData
+     * points to. You need this if you have more than one screen at the
+     * same time while using the same functions.
+     */
+    void* screenData;
+  
     /* The following two members are used to minimise the amount of unnecessary
        drawing caused by cursor movement.  Whenever any drawing affects the
        part of the screen where the cursor is, the cursor is removed first and
@@ -212,7 +219,8 @@ typedef struct
     PtrAddEventProcPtr ptrAddEvent;
     SetXCutTextProcPtr setXCutText;
     GetCursorProcPtr getCursorPtr;
-   
+    SetTranslateFunctionProcPtr setTranslateFunction;
+  
     /* the following members are hooks, i.e. they are called if set,
        but not overriding original functionality */
     /* newClientHook is called just after a new client is created */
@@ -264,7 +272,14 @@ typedef struct RegionRec {
 typedef void (*ClientGoneHookPtr)(struct rfbClientRec* cl);
 
 typedef struct rfbClientRec {
+  
+    /* back pointer to the screen */
     rfbScreenInfoPtr screen;
+  
+    /* private data. You should put any application client specific data
+     * into a struct and let clientData point to it. Don't forget to
+     * free the struct via clientGoneHook!
+     */
     void* clientData;
     ClientGoneHookPtr clientGoneHook;
    

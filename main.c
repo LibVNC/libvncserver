@@ -415,6 +415,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->setXCutText = defaultSetXCutText;
    rfbScreen->getCursorPtr = defaultGetCursorPtr;
    rfbScreen->cursor = &myCursor;
+   rfbScreen->setTranslateFunction = rfbSetTranslateFunction;
    rfbScreen->newClientHook = doNothingWithClient;
 
    /* initialize client list and iterator mutex */
