@@ -304,7 +304,9 @@ typedef struct {
 #ifdef BACKCHANNEL
 #define rfbEncodingBackChannel 15
 #endif
+#ifdef HAVE_ZRLE
 #define rfbEncodingZRLE 16
+#endif
 
 /*
  * Special encoding numbers:

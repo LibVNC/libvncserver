@@ -1,9 +1,13 @@
-if [ a"$1" = adiff -o a"$1" = aexport ]; then
-  cmd="$1"
-  shift
-else
-  cmd=update
-fi
+#!/bin/bash
+
+case "$1" in
+#cvs --help-commands 2>&1 | sed "s/[ 	][ 	]*/ /g" | cut -d " " -f 2
+add|admin|annotate|checkout|commit|diff|edit|editors|export|history|import|\
+init|log|login|logout|pserver|rdiff|release|remove|rtag|server|status|\
+tag|unedit|update|watch|watchers)
+  cmd="$1"; shift;;
+*) cmd=update;;
+esac
 
 cvs -z3 -d :pserver:anonymous@cvs.libvncserver.sf.net:/cvsroot/libvncserver $cmd "$@"
 
