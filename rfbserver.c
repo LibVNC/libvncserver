@@ -408,14 +408,14 @@ rfbClientConnectionGone(cl)
 #endif
 
 #ifdef HAVE_LIBPTHREAD
-    LOCK(cl->refCountMutex);
-    if(cl->refCount) {
-      UNLOCK(cl->refCountMutex);
-      if(cl->screen->backgroundLoop != FALSE)
-        WAIT(cl->deleteCond,cl->refCountMutex);
-    } else {
-      UNLOCK(cl->refCountMutex);
-    }
+    if(cl->screen->backgroundLoop != FALSE)
+      do {
+	LOCK(cl->refCountMutex);
+	i=cl->refCount;
+	UNLOCK(cl->refCountMutex);
+	if(i>0)
+	  WAIT(cl->deleteCond,cl->refCountMutex);
+      } while(i>0);
 #endif
 
     if(cl->sock>=0)

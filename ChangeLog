@@ -1,3 +1,5 @@
+   fixed LinuxVNC colour handling
+   fixed a bug with pthreads where the connection was not closed
    moved vncterm to main package (LinuxVNC included)
    portability fixes (IRIX, OSX, Solaris)
    more portable way to determine endianness and types of a given size
