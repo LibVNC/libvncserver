@@ -150,8 +150,10 @@ static void update(rfbClient* client,int x,int y,int w,int h) {
 		return;
 	}
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 	if(testEncodings[cd->encodingIndex].id==rfbEncodingTight)
 		maxDelta=5;
+#endif
 	
 	updateStatistics(cd->encodingIndex,
 			!doFramebuffersMatch(cd->server,client,maxDelta));
