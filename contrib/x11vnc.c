@@ -59,7 +59,7 @@
  * can be very painful; one has to modify one's behavior a bit.
  *
  * General audio at the remote display is lost unless one separately
- * sets up some audio side-channel.
+ * sets up some audio side-channel such as esd.
  *
  * It does not appear possible to query the X server for the current
  * cursor shape.  We can use XTest to compare cursor to current window's
@@ -95,8 +95,11 @@
 
 #include <unistd.h>
 #include <signal.h>
+#include <sys/utsname.h>
+
 #include <sys/ipc.h>
 #include <sys/shm.h>
+
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/XShm.h>
@@ -126,6 +129,9 @@
 #include <X11/extensions/Xinerama.h>
 #endif
 
+/*        date +'"lastmod:    %Y-%m-%d";' */
+char lastmod[] = "lastmod:    2004-05-05";
+
 
 /* X and rfb framebuffer */
 Display *dpy = 0;
@@ -145,9 +151,6 @@ XImage *scanline;
 XImage *fullscreen;
 int fs_factor = 0;
 
-#ifdef SINGLE_TILE_SHM
-XShmSegmentInfo tile_shm;
-#endif
 XShmSegmentInfo *tile_row_shm;	/* for all possible row runs */
 XShmSegmentInfo scanline_shm;
 XShmSegmentInfo fullscreen_shm;
@@ -333,9 +336,6 @@ void clean_up_exit (int ret) {
 	exit_flag = 1;
 
 	/* remove the shm areas: */
-#ifdef SINGLE_TILE_SHM
-	shm_clean(&tile_shm, tile);
-#endif
 	shm_clean(&scanline_shm, scanline);
 	shm_clean(&fullscreen_shm, fullscreen);
 
@@ -377,9 +377,6 @@ void interrupted (int sig) {
 	 * to avoid deadlock, etc, just delete the shm areas and
 	 * leave the X stuff hanging.
 	 */
-#ifdef SINGLE_TILE_SHM
-	shm_delete(&tile_shm);
-#endif
 	shm_delete(&scanline_shm);
 	shm_delete(&fullscreen_shm);
 
@@ -424,7 +421,6 @@ void set_signals(void) {
 
 	if (sigpipe == 1) {
 #ifdef SIG_IGN
-		rfbLog("set_signals: ignoring SIGPIPE\n");
 		signal(SIGPIPE, SIG_IGN);
 #endif
 	} else if (sigpipe == 2) {
@@ -771,6 +767,7 @@ void initialize_modtweak() {
 typedef struct keyremap {
 	KeySym before;
 	KeySym after;
+	int isbutton;
 	struct keyremap *next;
 } keyremap_t;
 
@@ -778,22 +775,22 @@ keyremap_t *keyremaps = NULL;
 
 void initialize_remap(char *infile) {
 	FILE *in;
-	char *p, line[256], str1[256], str2[256];
+	char *p, *q, line[256], str1[256], str2[256];
 	int i;
 	KeySym ksym1, ksym2;
 	keyremap_t *remap, *current;
 
 	in = fopen(infile, "r"); 
 	if (in == NULL) {
-		/* assume cmd line key1:key2,key3:key4 */
-		if (! strchr(infile, ':') || (in = tmpfile()) == NULL) {
+		/* assume cmd line key1-key2,key3-key4 */
+		if (! strchr(infile, '-') || (in = tmpfile()) == NULL) {
 			rfbLog("remap: cannot open: %s\n", infile);
 			perror("fopen");
 			clean_up_exit(1);
 		}
 		p = infile;
 		while (*p) {
-			if (*p == ':') {
+			if (*p == '-') {
 				fprintf(in, " ");
 			} else if (*p == ',') {
 				fprintf(in, "\n");
@@ -807,7 +804,7 @@ void initialize_remap(char *infile) {
 		rewind(in);
 	}
 	while (fgets(line, 256, in) != NULL) {
-		int blank = 1;
+		int blank = 1, isbtn = 0;
 		p = line;
 		while (*p) {
 			if (! isspace(*p)) {
@@ -821,6 +818,10 @@ void initialize_remap(char *infile) {
 		}
 		if (strchr(line, '#')) {
 			continue;
+		}
+		if ( (q = strchr(line, '-')) != NULL)   {
+			/* allow Keysym1-Keysym2 notation */
+			*q = ' ';	
 		}
 		
 		if (sscanf(line, "%s %s", str1, str2) != 2) {
@@ -838,6 +839,13 @@ void initialize_remap(char *infile) {
 		} else {
 			ksym2 = XStringToKeysym(str2);
 		}
+		if (ksym2 == NoSymbol) {
+			int i;
+			if (sscanf(str2, "Button%d", &i) == 1) {
+				ksym2 = (KeySym) i;
+				isbtn = 1; 
+			}
+		}
 		if (ksym1 == NoSymbol || ksym2 == NoSymbol) {
 			rfbLog("warning: skipping bad remap line: %s", line);
 			continue;
@@ -845,9 +853,10 @@ void initialize_remap(char *infile) {
 		remap = (keyremap_t *) malloc((size_t) sizeof(keyremap_t));
 		remap->before = ksym1;
 		remap->after  = ksym2;
+		remap->isbutton = isbtn;
 		remap->next   = NULL;
-		rfbLog("remapping: (%s, 0x%x) -> (%s, 0x%x)\n", str1, ksym1,
-		    str2, ksym2);
+		rfbLog("remapping: (%s, 0x%x) -> (%s, 0x%x) isbtn=%d\n", str1,
+		    ksym1, str2, ksym2, isbtn);
 		if (keyremaps == NULL) {
 			keyremaps = remap;
 		} else {
@@ -972,9 +981,11 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr
  * running under -modtweak.
  */
 rfbClientPtr last_keyboard_client = NULL;
+int num_buttons = -1;
 
 static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
+	int isbutton = 0;
 
 	if (debug_keyboard) {
 		X_LOCK;
@@ -993,18 +1004,44 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		while (remap != NULL) {
 			if (remap->before == keysym) {
 				keysym = remap->after;
+				isbutton = remap->isbutton;
 				if (debug_keyboard) {
+					X_LOCK;
 					rfbLog("keyboard(): remapping keysym: "
 					    "0x%x \"%s\" -> 0x%x \"%s\"\n",
 					    (int) remap->before,
 					    XKeysymToString(remap->before),
 					    (int) remap->after,
+					    remap->isbutton ? "button" :
 					    XKeysymToString(remap->after));
+					X_UNLOCK;
 				}
 				break;
 			}
 			remap = remap->next;
 		}
+	}
+
+	if (isbutton) {
+		int button = (int) keysym;
+		if (! down) {
+			return;	/* nothing to send */
+		}
+		if (debug_keyboard) {
+			rfbLog("keyboard(): remapping keystroke to button %d"
+			    " click\n", button);
+		}
+		if (button < 1 || button > num_buttons) {
+			rfbLog("keyboard(): ignoring mouse button out of "
+			    "bounds: %d\n", button);
+			return;
+		}
+		X_LOCK;
+		XTestFakeButtonEvent(dpy, button, True, CurrentTime);
+		XTestFakeButtonEvent(dpy, button, False, CurrentTime);
+		XFlush(dpy);
+		X_UNLOCK;
+		return;
 	}
 
 	if (use_modifier_tweak) {
@@ -1040,16 +1077,178 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 /*
  * pointer event handling routines.
  */
+typedef struct ptrremap {
+	KeySym keysym;
+	KeyCode keycode;
+	int end;
+	int button;
+	int down;
+	int up;
+} prtremap_t;
+
 MUTEX(pointerMutex);
 #define MAX_BUTTONS 5
-int pointer_map[MAX_BUTTONS+1];
-int num_buttons = -1;
+#define MAX_BUTTON_EVENTS 50
+prtremap_t pointer_map[MAX_BUTTONS+1][MAX_BUTTON_EVENTS];
 char *pointer_remap = NULL;
 void update_pointer(int, int, int);
 
-void init_pointer(void) {
+
+/* based on IsModifierKey in Xutil.h */
+#define ismodkey(keysym) \
+  ((((KeySym)(keysym) >= XK_Shift_L) && ((KeySym)(keysym) <= XK_Hyper_R)))
+
+
+/*
+ * For parsing the -buttonmap sections, e.g. "4" or ":Up+Up+Up:"
+ */
+void buttonparse(int from, char **s) {
+	char *q;
+	int to, i;
+	int modisdown[256];
+
+	q = *s;
+
+	for (i=0; i<256; i++) {
+		modisdown[i] = 0;
+	}
+
+	if (*q == ':') {
+		/* :sym1+sym2+...+symN: format */
+		int l = 0, n = 0;
+		char list[1000];
+		char *t, *kp = q + 1;
+		KeyCode kcode;
+
+		while (*(kp+l) != ':' && *(kp+l) != '\0') {
+			/* loop to the matching ':' */
+			l++;
+			if (l >= 1000) {
+				rfbLog("buttonparse: keysym list too long: "
+				    "%s\n", q);
+				break;
+			}
+		}
+		*(kp+l) = '\0';
+		strncpy(list, kp, l);
+		list[l] = '\0';
+		rfbLog("remap button %d using \"%s\"\n", from, list);
+
+		/* loop over tokens separated by '+' */
+		t = strtok(list, "+");
+		while (t) {
+			KeySym ksym;
+			int i;
+			if (n >= MAX_BUTTON_EVENTS - 20) {
+				rfbLog("buttonparse: too many button map "
+					"events: %s\n", list);
+				break;
+			}
+			if (sscanf(t, "0x%x", &i) == 1) {
+				ksym = (KeySym) i;	/* hex value */
+			} else {
+				ksym = XStringToKeysym(t); /* string value */
+			}
+			if (ksym == NoSymbol) {
+				/* see if Button<N> "keysym" was used: */
+				if (sscanf(t, "Button%d", &i) == 1) {
+					rfbLog("   event %d: button %d\n",
+					    from, n+1, i);
+					if (i == 0) i = -1; /* bah */
+					pointer_map[from][n].keysym  = NoSymbol;
+					pointer_map[from][n].keycode = NoSymbol;
+					pointer_map[from][n].button = i;
+					pointer_map[from][n].end    = 0;
+					pointer_map[from][n].down   = 0;
+					pointer_map[from][n].up     = 0;
+				} else {
+					rfbLog("buttonparse: ignoring unknown "
+					    "keysym: %s\n", t);
+					n--;
+				}
+			} else {
+				kcode = XKeysymToKeycode(dpy, ksym);
+
+				pointer_map[from][n].keysym  = ksym;
+				pointer_map[from][n].keycode = kcode;
+				pointer_map[from][n].button = 0;
+				pointer_map[from][n].end    = 0;
+				if (! ismodkey(ksym) ) {
+					/* do both down then up */
+					pointer_map[from][n].down = 1;
+					pointer_map[from][n].up   = 1;
+				} else {
+					if (modisdown[kcode]) {
+						pointer_map[from][n].down = 0;
+						pointer_map[from][n].up   = 1;
+						modisdown[kcode] = 0;
+					} else {
+						pointer_map[from][n].down = 1;
+						pointer_map[from][n].up   = 0;
+						modisdown[kcode] = 1;
+					}
+				}
+				rfbLog("   event %d: keysym %s (0x%x) -> "
+				    "keycode 0x%x down=%d up=%d\n", n+1,
+				    XKeysymToString(ksym), ksym, kcode,
+				    pointer_map[from][n].down,
+				    pointer_map[from][n].up);
+			}
+			t = strtok(NULL, "+");
+			n++;
+		}
+
+		/* we must release any modifiers that are still down: */
+		for (i=0; i<256; i++) {
+			kcode = (KeyCode) i;
+			if (n >= MAX_BUTTON_EVENTS) {
+				rfbLog("buttonparse: too many button map "
+					"events: %s\n", list);
+				break;
+			}
+			if (modisdown[kcode]) {
+				pointer_map[from][n].keysym  = NoSymbol;
+				pointer_map[from][n].keycode = kcode;
+				pointer_map[from][n].button = 0;
+				pointer_map[from][n].end    = 0;
+				pointer_map[from][n].down = 0;
+				pointer_map[from][n].up   = 1;
+				modisdown[kcode] = 0;
+				n++;
+			}
+		}
+
+		/* advance the source pointer position */
+		(*s) += l+2;
+	} else {
+		/* single digit format */
+		char str[2];
+		str[0] = *q;
+		str[1] = '\0';
+
+		to = atoi(str);
+		if (to < 1) {
+			rfbLog("skipping invalid remap button \"%d\" for button"
+			    " %d from string \"%s\"\n",
+			    to, from, str);
+		} else {
+			rfbLog("remap button %d using \"%s\"\n", from, str);
+			rfbLog("   button: %d -> %d\n", from, to);
+			pointer_map[from][0].keysym  = NoSymbol;
+			pointer_map[from][0].keycode = NoSymbol;
+			pointer_map[from][0].button = to;
+			pointer_map[from][0].end    = 0;
+			pointer_map[from][0].down   = 0;
+			pointer_map[from][0].up     = 0;
+		}
+		/* advance the source pointer position */
+		(*s)++;
+	}
+}
+
+void initialize_pointer_map(void) {
 	unsigned char map[MAX_BUTTONS];
-	int i;
+	int i, k;
 	/*
 	 * This routine counts the number of pointer buttons on the X
 	 * server (to avoid problems, even crashes, if a client has more
@@ -1059,23 +1258,33 @@ void init_pointer(void) {
 	
 	X_LOCK;
 	num_buttons = XGetPointerMapping(dpy, map, MAX_BUTTONS);
-	X_UNLOCK;
+
 	if (num_buttons < 0) {
 		num_buttons = 0;
 	}
 
 	/* FIXME: should use info in map[] */
 	for (i=1; i<= MAX_BUTTONS; i++) {
-		pointer_map[i] = i;
+		for (k=0; k < MAX_BUTTON_EVENTS; k++) {
+			pointer_map[i][k].end = 1;
+		}
+		pointer_map[i][0].keysym  = NoSymbol;
+		pointer_map[i][0].keycode = NoSymbol;
+		pointer_map[i][0].button = i;
+		pointer_map[i][0].end    = 0;
+		pointer_map[i][0].down   = 0;
+		pointer_map[i][0].up     = 0;
 	}
 
 	if (pointer_remap) {
-		/* -buttonmap, format is like: 12-21:2 */
-		char *p, *q;	
+		/* -buttonmap, format is like: 12-21=2 */
+		char *p, *q, *remap = pointer_remap;	
 		int n;
-		if ((p = strchr(pointer_remap, ':')) != NULL) {
+
+		if ((p = strchr(remap, '=')) != NULL) {
 			/* undocumented max button number */
 			n = atoi(p+1);	
+			*p = '\0';
 			if (n < num_buttons || num_buttons == 0) {
 				num_buttons = n;
 			} else {
@@ -1084,30 +1293,31 @@ void init_pointer(void) {
 				num_buttons = n;
 			}
 		}
-		if ((q = strchr(pointer_remap, '-')) != NULL) {
+		if ((q = strchr(remap, '-')) != NULL) {
 			/*
 			 * The '-' separates the 'from' and 'to' lists,
 			 * then it is kind of like tr(1).  
 			 */
 			char str[2];
 			int from, to;
-			p = pointer_remap;
+
+			rfbLog("remapping pointer buttons using string:\n");
+			rfbLog("   \"%s\"\n", remap);
+
+			p = remap;
 			q++;
 			i = 0;
 			str[1] = '\0';
 			while (*p != '-') {
+				int n;
 				str[0] = *p;
 				from = atoi(str);
-				str[0] = *(q+i);
-				to   = atoi(str);
-				rfbLog("button remap: %d -> %d using: "
-				    "%s\n", from, to, pointer_remap);
-				pointer_map[from] = to;
+				buttonparse(from, &q);
 				p++;
-				i++;
 			}
 		}
 	}
+	X_UNLOCK;
 }
 
 /*
@@ -1125,9 +1335,6 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 		return;
 	}
 
-	if (num_buttons < 0) {
-		init_pointer();
-	}
 
 	if (mask >= 0) {
 		/*
@@ -1248,22 +1455,67 @@ void update_pointer(int mask, int x, int y) {
 	last_event = last_input = time(0);
 
 	for (i=0; i < MAX_BUTTONS; i++) {
-		/* look for buttons that have be clicked or released: */
-		if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
-			if (debug_pointer) {
-				rfbLog("pointer(): mask change: mask: 0x%x -> "
-				    "0x%x button: %d\n", button_mask, mask,i+1);
-			}
-			mb = pointer_map[i+1];
-			if (num_buttons && mb > num_buttons) {
-				rfbLog("ignoring mouse button out of bounds: %d"
-				    ">%d mask: 0x%x -> 0x%x\n", mb, num_buttons,
-				    button_mask, mask);
-				continue;
-			}
-			XTestFakeButtonEvent(dpy, mb, 
-			    (mask & (1<<i)) ? True : False, CurrentTime);
+	    /* look for buttons that have be clicked or released: */
+	    if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
+		int k;
+		if (debug_pointer) {
+			rfbLog("pointer(): mask change: mask: 0x%x -> "
+			    "0x%x button: %d\n", button_mask, mask,i+1);
 		}
+		for (k=0; k < MAX_BUTTON_EVENTS; k++) {
+			int bmask = (mask & (1<<i));
+
+			if (pointer_map[i+1][k].end) {
+				break;
+			}
+
+			if (pointer_map[i+1][k].button) {
+				/* sent button up or down */
+				mb = pointer_map[i+1][k].button;
+				if ((num_buttons && mb > num_buttons)
+				    || mb < 1) {
+					rfbLog("ignoring mouse button out of "
+					    "bounds: %d>%d mask: 0x%x -> 0x%x\n",
+					    mb, num_buttons, button_mask, mask);
+					continue;
+				}
+				if (debug_pointer) {
+					rfbLog("pointer(): sending button %d"
+					    " %s (event %d)\n", mb, bmask
+					    ? "down" : "up", k+1);
+				}
+				XTestFakeButtonEvent(dpy, mb, (mask & (1<<i))
+				    ? True : False, CurrentTime);
+			} else {
+				/* sent keysym up or down */
+				KeyCode key = pointer_map[i+1][k].keycode;
+				int up   = pointer_map[i+1][k].up;
+				int down = pointer_map[i+1][k].down;
+
+				if (! bmask) {
+					/* do not send keysym on button up */
+					continue; 
+				}
+				if (debug_pointer) {
+					rfbLog("pointer(): sending button %d "
+					    "down as keycode 0x%x (event %d)\n",
+					    i+1, key, k+1);
+					rfbLog("           down=%d up=%d "
+					    "keysym: %s\n", down, up,
+					    XKeysymToString(XKeycodeToKeysym(
+					    dpy, key, 0)));
+				}
+				if (down) {
+					XTestFakeKeyEvent(dpy, key, True,
+					    CurrentTime);
+				}
+				if (up) {
+					XTestFakeKeyEvent(dpy, key, False,
+					    CurrentTime);
+				}
+			}
+		}
+	    }
 	}
 
 	if (nofb) {
@@ -1294,13 +1546,17 @@ void initialize_watch_bell() {
 	int ir, reason;
 	if (! XkbSelectEvents(dpy, XkbUseCoreKbd, XkbBellNotifyMask,
 	    XkbBellNotifyMask) ) {
-		fprintf(stderr, "warning: disabling bell.\n");
+		if (! quiet) {
+			fprintf(stderr, "warning: disabling bell.\n");
+		}
 		watch_bell = 0;
 		return;
 	}
 	if (! XkbOpenDisplay(DisplayString(dpy), &xkb_base_event_type, &ir,
 	    NULL, NULL, &reason) ) {
-		fprintf(stderr, "warning: disabling bell.\n");
+		if (! quiet) {
+			fprintf(stderr, "warning: disabling bell.\n");
+		}
 		watch_bell = 0;
 	}
 }
@@ -2057,46 +2313,6 @@ void blackout_nearby_tiles(x, y, dt) {
 }
 
 /*
- * This is a special workaround to quickly send rfbCursorPosUpdates
- * to client(s) when in -nofb mode, e.g. Win2VNC.  It sends the updates
- * immediately (by-passing libvncserver).  Requires a customized Win2VNC
- * to interpret the rfbCursorPosUpdates.  Currently no big reason to
- * do this for non-nofb mode (i.e. normal viewing) and so the normal
- * libvncserver mechanism is used.  Thanks to Edoardo Tirtarahardja.
- */
-void update_client_pointer(rfbClientPtr cl, rfbBool send) {
-	rfbFramebufferUpdateMsg *fu;
-
-	if (! nofb) {
-		/* normal libvncserver mechanism: */
-		cl->cursorWasMoved = send;
-		return;
-	}
-	if (! send) {
-		return;
-	}
-	if (cl->state != RFB_NORMAL) {
-		/* bad idea to force this data to initializing clients */
-		return;
-	}
-
-	fu = (rfbFramebufferUpdateMsg*) cl->updateBuf;
-	cl->rfbFramebufferUpdateMessagesSent++;
-	fu->type = rfbFramebufferUpdate;
-	fu->nRects = Swap16IfLE(1);
-	memcpy(&cl->updateBuf[cl->ublen], (char*) fu,
-	    sz_rfbFramebufferUpdateMsg);
-	cl->ublen = sz_rfbFramebufferUpdateMsg;
-
-	rfbSendCursorPos(cl);
-
-	if (debug_pointer) {
-		rfbLog("Sending rfbEncodingPointerPos message to host %s with "
-		    "x=%d,y=%d\n", cl->host, screen->cursorX, screen->cursorY);
-	}
-}
-
-/*
  * Send rfbCursorPosUpdates back to clients that understand them.  This
  * seems to be TightVNC specific.
  */
@@ -2134,7 +2350,7 @@ void cursor_pos_updates(int x, int y) {
 			 * send a pointer position.
 			 */
 			if (x == cursor_x && y == cursor_y) {
-				update_client_pointer(cl, FALSE);
+				cl->cursorWasMoved = FALSE;
 			} else {
 				/* an X11 app evidently warped the pointer */
 				if (debug_pointer) {
@@ -2142,11 +2358,11 @@ void cursor_pos_updates(int x, int y) {
 					    "detected dx=%3d dy=%3d\n",
 					    cursor_x - x, cursor_y - y);
 				}
-				update_client_pointer(cl, TRUE);
+				cl->cursorWasMoved = TRUE;
 				cnt++;
 			}
 		} else {
-			update_client_pointer(cl, TRUE);
+			cl->cursorWasMoved = TRUE;
 			cnt++;
 		}
 	}
@@ -3224,11 +3440,6 @@ void initialize_shm() {
 	int i;
 
 	/* set all shm areas to "none" before trying to create any */
-#ifdef SINGLE_TILE_SHM
-	tile_shm.shmid		= -1;
-	tile_shm.shmaddr	= (char *) -1;
-	tile			= NULL;
-#endif
 	scanline_shm.shmid	= -1;
 	scanline_shm.shmaddr	= (char *) -1;
 	scanline		= NULL;
@@ -3240,14 +3451,6 @@ void initialize_shm() {
 		tile_row_shm[i].shmaddr	= (char *) -1;
 		tile_row[i]		= NULL;
 	}
-
-#ifdef SINGLE_TILE_SHM
-	/* the tile (e.g. 32x32) shared memory area image: */
-
-	if (! shm_create(&tile_shm, &tile, tile_x, tile_y, "tile")) {
-		clean_up_exit(1);
-	}
-#endif
 
 	/* the scanline (e.g. 1280x1) shared memory area image: */
 
@@ -4659,7 +4862,7 @@ void watch_loop(void) {
 
 		if (! use_threads) {
 			rfbProcessEvents(screen, -1);
-			if (! nofb && check_user_input(dt, &cnt)) {
+			if (check_user_input(dt, &cnt)) {
 				/* true means loop back for more input */
 				continue;
 			}
@@ -4726,12 +4929,14 @@ void watch_loop(void) {
  * to eat as much user input here as we can using some hints from the
  * duration of the previous scan_for_updates() call (in dt).
  *
+ * note: we do this even under -nofb
+ *
  * return of 1 means watch_loop should short-circuit and reloop,
  * return of 0 means watch_loop should proceed to scan_for_updates().
  */
 
 int check_user_input(double dt, int *cnt) {
-	
+
 	if (old_pointer) {
 		/* every n-th drops thru to scan */
 		if ((got_user_input || ui_skip < 0) && *cnt % ui_skip != 0) {
@@ -4881,10 +5086,14 @@ void print_help() {
 "exit as soon as a client disconnects.  See -shared and -forever below\n"
 "to override these protections.\n"
 "\n"
+"For additional info see: http://www.karlrunge.com/x11vnc/\n"
+"                    and  http://www.karlrunge.com/x11vnc/#faq\n"
+"\n"
 "Options:\n"
 "\n"
 "-display disp          X11 server display to connect to, the X server process\n"
 "                       must be running on same machine and support MIT-SHM.\n"
+"                       Equivalent to setting the DISPLAY env. variable.\n"
 "-id windowid           Show the window corresponding to <windowid> not the\n"
 "                       entire display. Warning: bugs! new toplevels missed!...\n"
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
@@ -4920,7 +5129,8 @@ void print_help() {
 "\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
 "                       remote displays can be polled this way: be careful\n"
-"                       this can use large amounts of network bandwidth.\n"
+"                       this can use large amounts of network bandwidth. Also\n"
+"                       of use if machine has a limited number of shm segments.\n"
 "-flipbyteorder         Sometimes needed if remotely polled host has different\n"
 "                       endianness.  Ignored unless -noshm is set.\n"
 "-blackout string       Black out rectangles on the screen. string is a comma\n"
@@ -4942,7 +5152,9 @@ void print_help() {
 "-nomodtweak            Send the keysym directly to the X server.\n"
 "-remap string          Read keysym remappings from file \"string\".  Format is\n"
 "                       one pair of keysyms per line (can be name or hex value).\n"
-"                       \"string\" can also be of form: key1:key2,key3:key4...\n"
+"                       \"string\" can also be of form: key1-key2,key3-key4...\n"
+"                       To map a key to a button click, use the fake keysyms\n"
+"                       \"Button1\", ..., etc. E.g. -remap Super_R-Button2\n"
 "-nobell                Do not watch for XBell events.\n"
 "-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
 "-nosel                 Do not manage exchange of X selection/cutbuffer.\n"
@@ -4958,8 +5170,24 @@ void print_help() {
 "                       on touchscreens or other non-standard setups).\n"
 "-cursorpos             Send the X cursor position back to all vnc clients that\n"
 "                       support the TightVNC CursorPosUpdates extension.\n"
-"-buttonmap str         String to remap mouse buttons.  Format: IJK-LMN, this\n"
+"-buttonmap string      String to remap mouse buttons.  Format: IJK-LMN, this\n"
 "                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31\n"
+"\n"
+"                       Button presses can also be mapped to keysyms: replace\n"
+"                       a button digit on the right of the dash with :<sym>:\n"
+"                       or :<sym1>+<sym2>: etc. for multiple keys. For example,\n"
+"                       if the viewing machine has a mouse-wheel (buttons 4 5)\n"
+"                       but the x11vnc side does not, these will do scrolls:\n"
+"                              -buttonmap 12345-123:Prior::Next:\n"
+"                              -buttonmap 12345-123:Up+Up+Up::Down+Down+Down:\n"
+"\n"
+"                       If you include a modifier like \"Shift_L\" the modifier's\n"
+"                       up/down state is toggled, e.g. to send \"The\" use\n"
+"                       :Shift_L+t+Shift_L+h+e: (the 1st one is shift down and\n"
+"                       the 2nd one is shift up. (note: the initial state of\n"
+"                       the modifier is ignored and not reset)\n"
+"                       To include button events use \"Button1\", ... etc.\n"
+"\n"
 "-nodragging            Do not update the display during mouse dragging events\n"
 "                       (mouse motion with a button held down).  Greatly\n"
 "                       improves response on slow setups, but you lose all\n"
@@ -4994,6 +5222,7 @@ void print_help() {
 "                       than f, the whole screen is updated (default %.2f).\n"
 "-onetile               Do not use the new copy_tiles() framebuffer mechanism,\n"
 "                       just use 1 shm tile for polling.  Same as -old_copytile.\n"
+"                       Limits shm segments used to 3.\n"
 "-gaps n                Heuristic to fill in gaps in rows or cols of n or less\n"
 "                       tiles.  Used to improve text paging (default %d).\n"
 "-grow n                Heuristic to grow islands of changed tiles n or wider\n"
@@ -5038,6 +5267,17 @@ void print_help() {
  * choose a desktop name
  */
 #define MAXN 256
+
+char *this_host() {
+	char host[MAXN];
+#ifdef LIBVNCSERVER_HAVE_GETHOSTNAME
+	if (gethostname(host, MAXN) == 0) {
+		return strdup(host);
+	}
+#endif
+	return NULL;
+}
+
 char *choose_title(char *display) {
 	static char title[(MAXN+10)];	
 	strcpy(title, "x11vnc");
@@ -5051,11 +5291,9 @@ char *choose_title(char *display) {
 	title[0] = '\0';
 	if (display[0] == ':') {
 		char host[MAXN];
-#ifdef LIBVNCSERVER_HAVE_GETHOSTNAME
-		if (gethostname(host, MAXN) == 0) {
-			strncpy(title, host, MAXN - strlen(title));
+		if (this_host() != NULL) {
+			strncpy(title, this_host(), MAXN - strlen(title));
 		}
-#endif
 	}
 	strncat(title, display, MAXN - strlen(title));
 	if (subwin) {
@@ -5068,6 +5306,31 @@ char *choose_title(char *display) {
 	return title;
 }
 
+/* 
+ * check blacklist for OSs with tight shm limits.
+ */
+int limit_shm(void) {
+	struct utsname ut;
+	int limit = 0;
+
+	if (uname(&ut) == -1) {
+		return 0;
+	}
+	if (!strcmp(ut.sysname, "SunOS")) {
+		char *r = ut.release;
+		if (*r == '5' && *(r+1) == '.') {
+			if (strchr("2345678", *(r+2)) != NULL) {
+				limit = 1;
+			}
+		}
+	}
+	if (limit) {
+		fprintf(stderr, "reducing shm usage on %s %s (adding "
+		    "-onetile)\n", ut.sysname, ut.release);
+	}
+	return limit;
+}
+
 int main(int argc, char** argv) {
 
 	XImage *fb;
@@ -5078,7 +5341,7 @@ int main(int argc, char** argv) {
 	int pw_loc = -1;
 	int dt = 0;
 	int bg = 0;
-	int got_waitms = 0, got_rfbwait = 0;
+	int got_rfbwait = 0;
 	int got_deferupdate = 0, got_defer = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
@@ -5191,7 +5454,6 @@ int main(int argc, char** argv) {
 			got_defer = 1;
 		} else if (!strcmp(arg, "-wait")) {
 			waitms = atoi(argv[++i]);
-			got_waitms = 1;
 		} else if (!strcmp(arg, "-nap")) {
 			take_naps = 1;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
@@ -5295,10 +5557,6 @@ int main(int argc, char** argv) {
 	if (waitms < 0) {
 		waitms = 0;
 	}
-	if (! using_shm && ! got_waitms) {
-		/* try to cut down on polling over network... */
-		waitms *= 2;
-	}
 	if (inetd) {
 		shared = 0;
 		connect_once = 1;
@@ -5311,6 +5569,13 @@ int main(int argc, char** argv) {
 		argv2[argc2++] = "604800000"; /* one week... */
 	}
 
+	/* check for OS with small shm limits */
+	if (using_shm && ! single_copytile) {
+		if (limit_shm()) {
+			single_copytile = 1;
+		}
+	}
+
 	if (nofb && ! got_deferupdate && ! got_defer) {
 		/* reduce defer time under -nofb */
 		defer_update = defer_update_nofb;
@@ -5321,6 +5586,14 @@ int main(int argc, char** argv) {
 		sprintf(tmp, "%d", defer_update);
 		argv2[argc2++] = "-deferupdate";
 		argv2[argc2++] = strdup(tmp);
+	}
+	if (debug_pointer || debug_keyboard) {
+		if (bg || quiet) {
+			fprintf(stderr, "disabling -bg/-q under -debug_pointer"
+			    "/-debug_keyboard\n");
+			bg = 0;
+			quiet = 0;
+		}
 	}
 
 	if (! quiet) {
@@ -5381,6 +5654,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "tile_fuzz:  %d\n", tile_fuzz);
 		fprintf(stderr, "use_hints:  %d\n", use_hints);
 		fprintf(stderr, "bg:         %d\n", bg);
+		fprintf(stderr, "%s\n", lastmod);
 	} else {
 		rfbLogEnable(0);
 	}
@@ -5589,13 +5863,47 @@ int main(int argc, char** argv) {
 	if (remap_file != NULL) {
 		initialize_remap(remap_file);
 	}
+	initialize_pointer_map();
 
-	if (screen->rfbPort) {
-		fprintf(stdout, "PORT=%d\n", screen->rfbPort);
-		fflush(stdout);	
+	if (! inetd) {
+		if (! screen->rfbPort || screen->rfbListenSock < 0) {
+			rfbLog("Error: could not obtain listening port.\n");
+			clean_up_exit(1);
+		}
 	}
 	if (! quiet) {
 		rfbLog("screen setup finished.\n");
+	}
+	if (screen->rfbPort) {
+		char *host = this_host();
+		int port = screen->rfbPort;
+		if (host != NULL) {
+			/* note that vncviewer special cases 5900-5999 */
+			if (quiet) {
+				if (port >= 5900) {
+					fprintf(stderr, "The VNC desktop is "
+					    "%s:%d\n", host, port - 5900);
+				} else {
+					fprintf(stderr, "The VNC desktop is "
+					    "%s:%d\n", host, port);
+				}
+			} else if (port >= 5900) {
+				rfbLog("The VNC desktop is %s:%d\n", host,
+				    port - 5900);
+				if (port >= 6000) {
+					rfbLog("possible aliases:  %s:%d, "
+					    "%s::%d\n", host, port, host, port);
+				}
+			} else {
+				rfbLog("The VNC desktop is %s:%d\n", host,
+				    port);
+				rfbLog("possible alias:    %s::%d\n",
+				    host, port);
+			}
+		}
+		fflush(stderr);	
+		fprintf(stdout, "PORT=%d\n", screen->rfbPort);
+		fflush(stdout);	
 	}
 
 #if defined(LIBVNCSERVER_HAVE_FORK) && defined(LIBVNCSERVER_HAVE_SETSID)
