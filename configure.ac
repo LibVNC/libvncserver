@@ -124,3 +124,5 @@ AC_CONFIG_FILES([Makefile
 		 libvncserver.spec
 		 libvncserver-config])
 AC_OUTPUT
+chmod a+x ./libvncserver-config
+

@@ -3,6 +3,16 @@
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 exec_prefix_set=no
+includedir=@includedir@
+libdir=@libdir@
+
+# if this script is in the same directory as libvncserver-config.in, assume not installed
+if [ -f "`dirname "$0"`/libvncserver-config.in" ]; then
+  dir="`dirname "$0"`"
+  prefix="`cd "$dir"; pwd`"
+  includedir="$prefix"
+  libdir="$prefix"
+fi
 
 usage="\
 Usage: @PACKAGE@-config [--prefix[=DIR]] [--exec-prefix[=DIR]] [--version] [--link] [--libs] [--cflags]"
@@ -39,18 +49,18 @@ while test $# -gt 0; do
       echo @VERSION@
       ;;
     --cflags)
-      if [ "@includedir@" != /usr/include ]; then
-	  includes=-I@includedir@
+      if [ "$includedir" != /usr/include ]; then
+	  includes=-I"$includedir"
       fi
-      echo $includes
+      echo "$includes"
       ;;
     --libs)
       if [ "`uname`" = "SunOS" ]; then
-        libdirs="-L@libdir@ -R@libdir@"
+        libdirs="-L$libdir -R$libdir"
       else
-        libdirs="-L@libdir@"
+        libdirs="-L$libdir"
       fi
-      echo $libdirs -lvncserver @LIBS@
+      echo "$libdirs" -lvncserver @LIBS@
       ;;
     --link)
       echo @CCLD@
@@ -62,3 +72,4 @@ while test $# -gt 0; do
   esac
   shift
 done
+

@@ -42,3 +42,10 @@ rpm: $(PACKAGE)-$(VERSION).tar.gz libvncserver.spec
 	cp $(PACKAGE)-$(VERSION).tar.gz @RPMSOURCEDIR@
 	rpm -ba libvncserver.spec
 endif
+
+all: make_config_executable
+
+make_config_executable:
+	chmod a+x libvncserver-config
+
+
