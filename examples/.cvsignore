@@ -7,4 +7,5 @@ sratest
 storepasswd
 vncev
 Makefile.in
+.deps
 

@@ -1,0 +1,9 @@
+Makefile.in
+configure
+config.status
+config.log
+libvncserver.spec
+.deps
+aclocal.m4
+autom4te.cache
+

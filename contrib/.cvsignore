@@ -1,4 +1,5 @@
 Makefile.in
 x11vnc
 zippy
+.deps
 

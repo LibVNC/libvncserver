@@ -1,0 +1,58 @@
+# Note that this is NOT a relocatable package
+Name: @PACKAGE@
+Version: @VERSION@
+Release: 1
+Summary: a library to make writing a vnc server easy
+Copyright: GPL
+Group: Libraries/Network
+Packager: Johannes.Schindelin <Johannes.Schindelin@gmx.de>
+
+Source: %{name}-%{version}.tar.gz
+
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+Prefix: %{_prefix}
+
+%description
+LibVNCServer makes writing a VNC server (or more correctly, a program
+exporting a framebuffer via the Remote Frame Buffer protocol) easy.
+
+It is based on OSXvnc, which in turn is based on the original Xvnc by
+ORL, later AT&T research labs in UK.
+
+It hides the programmer from the tedious task of managing clients and
+compression schemata.
+
+LibVNCServer was put together and is (actively ;-) maintained by
+Johannes Schindelin <Johannes.Schindelin@gmx.de>
+
+%prep
+%setup -n %{name}-%{version}
+
+
+%build
+CFLAGS="$RPM_OPT_FLAGS" ./configure --prefix=%{prefix}
+
+make
+
+
+%install
+make install prefix=$RPM_BUILD_ROOT%{prefix}
+
+%clean
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
+
+
+%pre
+%post
+%preun
+%postun
+
+
+%files
+%defattr(-,root,root)
+%{prefix}
+%{_mandir}/man1/*
+%doc AUTHORS COPYING ChangeLog README TODO
+
+%changelog
+see ChangeLog
