@@ -109,6 +109,7 @@
 
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
@@ -292,6 +293,7 @@ int debug_keyboard = 0;
 
 int quiet = 0;
 double dtime(double *);
+int all_clients_initialized(void);
 
 void zero_fb(int, int, int, int);
 
@@ -777,18 +779,18 @@ int do_reverse_connect(char *str) {
 	int port = 5500, len = strlen(str);
 
 	if (len < 1) {
-		return;
+		return 0;
 	}
 	if (len > 512) {
 		rfbLog("reverse_connect: string too long: %d bytes\n", len);
-		return;
+		return 0;
 	}
 
 	/* copy in to host */
 	host = (char *) malloc((size_t) len+1);
 	if (! host) {
 		rfbLog("reverse_connect: could not malloc string %d\n", len);
-		return;
+		return 0;
 	}
 	strncpy(host, str, len);
 	host[len] = '\0';
@@ -907,7 +909,7 @@ void check_connect_inputs() {
  * libvncserver callback for when a new client connects
  */
 enum rfbNewClientAction new_client(rfbClientPtr client) {
-	static accepted_client = 0;
+	static int accepted_client = 0;
 	last_event = last_input = time(0);
 
 	if (connect_once) {
@@ -1542,7 +1544,7 @@ void initialize_pointer_map(void) {
 			 * then it is kind of like tr(1).  
 			 */
 			char str[2];
-			int from, to;
+			int from;
 
 			rfbLog("remapping pointer buttons using string:\n");
 			rfbLog("   \"%s\"\n", remap);
@@ -1552,7 +1554,6 @@ void initialize_pointer_map(void) {
 			i = 0;
 			str[1] = '\0';
 			while (*p != '-') {
-				int n;
 				str[0] = *p;
 				from = atoi(str);
 				buttonparse(from, &q);
@@ -2012,7 +2013,7 @@ void cutbuffer_send() {
 void selection_send(XEvent *ev) {
 	Atom type;
 	int format, slen, dlen, oldlen, newlen, toobig = 0;
-	static int skip_count = 2, err = 0, sent_one = 0;
+	static int err = 0, sent_one = 0;
 	char before[CHKSZ], after[CHKSZ];
 	unsigned long nitems = 0, bytes_after = 0;
 	unsigned char* data = NULL;
@@ -2283,7 +2284,6 @@ void watch_xevents() {
  * hook called when a VNC client sends us some "XCut" text (rfbClientCutText).
  */
 void xcut_receive(char *text, int len, rfbClientPtr cl) {
-	static int first = 1;
 
 	if (text == NULL || len == 0) {
 		return;
@@ -2975,13 +2975,16 @@ void set_visual(char *vstring) {
 	} else if (strcmp(vstring, "DirectColor") == 0) {
 		vis = DirectColor;
 	} else {
-		if (sscanf(vstring, "0x%x", &visual_id) != 1) {
-			if (sscanf(vstring, "%d", &visual_id) == 1) {
+		int v_in;
+		if (sscanf(vstring, "0x%x", &v_in) != 1) {
+			if (sscanf(vstring, "%d", &v_in) == 1) {
+				visual_id = (VisualID) v_in;
 				return;
 			}
 			fprintf(stderr, "bad -visual arg: %s\n", vstring);
 			exit(1);
 		}
+		visual_id = (VisualID) v_in;
 		return;
 	}
 	if (XMatchVisualInfo(dpy, scr, visual_depth, vis, &vinfo)) {
@@ -3023,7 +3026,6 @@ int got_nevershared = 0;
  */
 void initialize_screen(int *argc, char **argv, XImage *fb) {
 	int have_masks = 0;
-	int argc_orig = *argc;
 
 	screen = rfbGetScreen(argc, argv, fb->width, fb->height,
 	    fb->bits_per_pixel, 8, fb->bits_per_pixel/8);
@@ -3063,7 +3065,7 @@ if (strcmp(LIBVNCSERVER_VERSION, "0.5") && strcmp(LIBVNCSERVER_VERSION, "0.6")) 
 	screen->rfbServerFormat.bitsPerPixel = fb->bits_per_pixel;
 	screen->rfbServerFormat.depth = fb->depth;
 	screen->rfbServerFormat.trueColour = (uint8_t) TRUE;
-	have_masks = (fb->red_mask|fb->green_mask|fb->blue_mask != 0);
+	have_masks = ((fb->red_mask|fb->green_mask|fb->blue_mask) != 0);
 	if (force_indexed_color) {
 		have_masks = 0;
 	}
@@ -3180,7 +3182,6 @@ if (strcmp(LIBVNCSERVER_VERSION, "0.5") && strcmp(LIBVNCSERVER_VERSION, "0.6")) 
 void initialize_blackout (char *list) {
 	char *p, *blist = strdup(list);
 	int x, y, X, Y, h, w;
-	int tx, ty;
 
 	p = strtok(blist, ",");
 	while (p) {
@@ -3729,7 +3730,6 @@ void initialize_shm() {
 	for (i=1; i<=ntiles_x; i++) {
 		if (! shm_create(&tile_row_shm[i], &tile_row[i], tile_x * i,
 		    tile_y, "tile_row")) {
-			int j;
 			if (i == 1) {
 				clean_up_exit(1);
 			}
@@ -3925,8 +3925,8 @@ unsigned short *left_diff, *right_diff;
 
 void copy_tiles(int tx, int ty, int nt) {
 	int x, y, line;
-	int size_x, size_y, width, width1, width2;
-	int off, len, n, dw, dx, i, t;
+	int size_x, size_y, width1, width2;
+	int off, len, n, dw, dx, t;
 	int w1, w2, dx1, dx2;	/* tmps for normal and short tiles */
 	int pixelsize = bpp >> 3;
 	int first_min, last_max;
@@ -5089,6 +5089,8 @@ void scan_for_updates() {
 	nap_check(tile_diffs);
 }
 
+int check_user_input(double, int *);
+
 void watch_loop(void) {
 	int cnt = 0;
 	double dt = 0.0;
@@ -5490,10 +5492,6 @@ void print_help() {
 "These options are passed to libvncserver:\n"
 "\n"
 ;
-"\n"
-"These options are passed to libvncserver:\n"
-"\n"
-;
 	fprintf(stderr, help,
 		view_only ? "on":"off",
 		shared ? "on":"off",
@@ -5543,7 +5541,6 @@ char *choose_title(char *display) {
 	}
 	title[0] = '\0';
 	if (display[0] == ':') {
-		char host[MAXN];
 		if (this_host() != NULL) {
 			strncpy(title, this_host(), MAXN - strlen(title));
 		}
@@ -6000,7 +5997,7 @@ int main(int argc, char** argv) {
 
 		window = (Window) subwin;
 		if ( ! XGetWindowAttributes(dpy, window, &attr) ) {
-			fprintf(stderr, "bad window: 0x%x\n", window);
+			fprintf(stderr, "bad window: 0x%lx\n", window);
 			exit(1);
 		}
 		dpy_x = attr.width;
@@ -6032,7 +6029,7 @@ int main(int argc, char** argv) {
 		vinfo = XGetVisualInfo(dpy, VisualIDMask, &vinfo_tmpl, &n);
 		if (vinfo == NULL || n == 0) {
 			fprintf(stderr, "could not match visual_id: 0x%x\n",
-			    visual_id);
+			    (int) visual_id);
 			exit(1);
 		}
 		visual = vinfo->visual;
@@ -6041,13 +6038,14 @@ int main(int argc, char** argv) {
 			depth = visual_depth;	/* force it */
 		}
 		if (! quiet) {
-			fprintf(stderr, "vis id:     0x%x\n", vinfo->visualid);
+			fprintf(stderr, "vis id:     0x%x\n", 
+			    (int) vinfo->visualid);
 			fprintf(stderr, "vis scr:      %d\n", vinfo->screen);
 			fprintf(stderr, "vis depth     %d\n", vinfo->depth);
 			fprintf(stderr, "vis class     %d\n", vinfo->class);
-			fprintf(stderr, "vis rmask   0x%x\n", vinfo->red_mask);
-			fprintf(stderr, "vis gmask   0x%x\n", vinfo->green_mask);
-			fprintf(stderr, "vis bmask   0x%x\n", vinfo->blue_mask);
+			fprintf(stderr, "vis rmask   0x%lx\n", vinfo->red_mask);
+			fprintf(stderr, "vis gmask   0x%lx\n", vinfo->green_mask);
+			fprintf(stderr, "vis bmask   0x%lx\n", vinfo->blue_mask);
 			fprintf(stderr, "vis cmap_sz   %d\n", vinfo->colormap_size);
 			fprintf(stderr, "vis b/rgb     %d\n", vinfo->bits_per_rgb);
 		}
