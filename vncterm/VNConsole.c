@@ -24,11 +24,14 @@ unsigned char colourMap16[16*3]={
 
 void MakeColourMap16(vncConsolePtr c)
 {
+  int i,j;
   rfbColourMap* colourMap=&(c->rfbScreen->colourMap);
   if(colourMap->count)
     free(colourMap->data.bytes);
   colourMap->data.bytes=malloc(16*3);
-  memcpy(colourMap->data.bytes,colourMap16,16*3);
+  for(i=0;i<16;i++)
+    for(j=0;j<3;j++)
+      colourMap->data.bytes[i*3+2-j]=colourMap16[i*3+j];
   colourMap->count=16;
   colourMap->is16=FALSE;
   c->rfbScreen->rfbServerFormat.trueColour=FALSE;
