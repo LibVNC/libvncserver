@@ -44,6 +44,8 @@ libvncserver.a: $(OBJS)
 	$(AR) cru $@ $(OBJS)
 	$(RANLIB) $@
 
+translate.o: translate.c tableinit24.c tableinitcmtemplate.c tableinittctemplate.c tabletrans24template.c tabletranstemplate.c
+
 example: example.o libvncserver.a
 	$(CC) -o example example.o $(LIBS)
 

@@ -164,9 +164,11 @@ ptrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl)
 setXCutText(char* str,int len,rfbClientPtr cl)
   is called when the selection changes.
 
-There is only one hook:
+There are only two hooks:
 newClientHook(rfbClientPtr cl)
   is called when a new client has connected.
+displayHook
+  is called just before a frame buffer update is sent.
 
 You can also override the following methods:
 getCursorPtr(rfbClientPtr cl)

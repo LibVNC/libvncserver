@@ -55,7 +55,7 @@ rfbTranslateWithSingleTable24to24 (char *table, rfbPixelFormat *in,
 {
     CARD8 *ip = (CARD8 *)iptr;
     CARD8 *op = (CARD8 *)optr;
-    int ipextra = bytesBetweenInputLines / 3 - width;
+    int ipextra = bytesBetweenInputLines - width * 3;
     CARD8 *opLineEnd;
     CARD8 *t = (CARD8 *)table;
     int shift = rfbEndianTest?0:8;
@@ -94,7 +94,7 @@ rfbTranslateWithRGBTables24to24 (char *table, rfbPixelFormat *in,
 {
     CARD8 *ip = (CARD8 *)iptr;
     CARD8 *op = (CARD8 *)optr;
-    int ipextra = bytesBetweenInputLines / 3 - width;
+    int ipextra = bytesBetweenInputLines - width*3;
     CARD8 *opLineEnd;
     CARD8 *redTable = (CARD8 *)table;
     CARD8 *greenTable = redTable + 3*(in->redMax + 1);
@@ -146,7 +146,7 @@ rfbTranslateWithSingleTable24toOUT (char *table, rfbPixelFormat *in,
 {
     CARD8 *ip = (CARD8 *)iptr;
     OUT_T *op = (OUT_T *)optr;
-    int ipextra = bytesBetweenInputLines / 3 - width;
+    int ipextra = bytesBetweenInputLines - width*3;
     OUT_T *opLineEnd;
     OUT_T *t = (OUT_T *)table;
     int shift = rfbEndianTest?0:8;
@@ -179,7 +179,7 @@ rfbTranslateWithRGBTables24toOUT (char *table, rfbPixelFormat *in,
 {
     CARD8 *ip = (CARD8 *)iptr;
     OUT_T *op = (OUT_T *)optr;
-    int ipextra = bytesBetweenInputLines / 3 - width;
+    int ipextra = bytesBetweenInputLines - width*3;
     OUT_T *opLineEnd;
     OUT_T *redTable = (OUT_T *)table;
     OUT_T *greenTable = redTable + in->redMax + 1;
