@@ -1,4 +1,5 @@
-/* This file is part of LibVNCServer. It is a small clone of x0rfbserver by HexoNet, demonstrating the
+/* This file is part of LibVNCServer.
+   It is a small clone of x0rfbserver by HexoNet, demonstrating the
    capabilities of LibVNCServer.
 */
 
@@ -216,6 +217,47 @@ void checkForImageUpdates(rfbScreenInfoPtr s,char *b,int rowstride,int x,int y,i
      }
 }
 
+int probeX=0,probeY=0;
+
+void probeScreen(rfbScreenInfoPtr s,int xscreen)
+{
+  int i,j,pixel,
+    bpp=s->rfbServerFormat.bitsPerPixel/8,mask=(1<<bpp)-1,
+    rstride=s->paddedWidthInBytes;
+  XImage* im;
+
+  probeX++;
+  if(probeX>=tileWidth) {
+    probeX=0;
+    probeY++;
+    if(probeY>=tileHeight)
+      probeY=0;
+  }
+
+  for(j=probeY;j<s->height;j+=tileHeight)
+    for(i=probeX;i<s->width;i+=tileWidth) {
+      im=XGetImage(dpy,window,i,j,1,1,AllPlanes,ZPixmap);
+      pixel=XGetPixel(im,0,0);
+      XDestroyImage(im);
+      if(!memcmp(&pixel,s->frameBuffer+i*bpp+j*rstride,bpp)) {
+	/* do update */
+	int i1,j1,x=i-probeX,w=(x+tileWidth>s->width)?s->width-x:tileWidth,
+	  y=j-probeY,h=(y+tileHeight>s->height)?s->height-y:tileHeight;
+	//getImage(bpp,dpy,xscreen,&im,x,y,w,h);
+	im = XGetImage(dpy,window,x,y,w,h,AllPlanes,ZPixmap );
+	for(j1=0;j1<h;j1++)
+	  memcpy(s->frameBuffer+x*bpp+(y+j1)*rstride,
+		 im->data+j1*im->bytes_per_line,bpp*w);
+	//checkForImageUpdates(s,im->data,rstride,x,y,w,h);
+	//if(0 && !useSHM)
+	  XDestroyImage(im);
+	//memcpy(s->frameBuffer+i*bpp+j*rstride,&pixel,bpp);
+	rfbMarkRectAsModified(s,x,y,x+w,y+h);
+	//fprintf(stderr,"%d:%d:%x\n",i,j,pixel);
+      }
+    }
+}
+
 /* the main program */
 
 int main(int argc,char** argv)
@@ -334,16 +376,21 @@ int main(int argc,char** argv)
   c=0;
   while(1) {
     if(screen->rfbClientHead)
-      maxMsecsToConnect = 5000;
-    maxMsecsToConnect -= screen->rfbDeferUpdateTime;
-    if(maxMsecsToConnect<0) {
-      fprintf(stderr,"Maximum time to connect reached. Exiting.\n");
-      XTestDiscard(dpy);
-      exit(2);
+      maxMsecsToConnect = 1<<16;
+    else {
+      maxMsecsToConnect -= screen->rfbDeferUpdateTime;
+      if(maxMsecsToConnect<0) {
+	fprintf(stderr,"Maximum time to connect reached. Exiting.\n");
+	XTestDiscard(dpy);
+	exit(2);
+      }
     }
 
     rfbProcessEvents(screen,-1);
 
+#if 1
+    probeScreen(screen,xscreen);
+#else
     if(gotInput) {
       gotInput = FALSE;
       c=updateCounter;
@@ -375,8 +422,8 @@ int main(int argc,char** argv)
 	} else
 	  tileX+=tileWidth;
       }
-      //fprintf(stderr,"+");
     }
+#endif
 #ifdef WRITE_SNAPS
        {
 	  int i,j,r,g,b;
