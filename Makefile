@@ -2,6 +2,7 @@ INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 # for Solaris
+#CC=gcc
 #EXTRALIBS=-lsocket -lnsl -L/usr/X/lib
 
 # for FreeBSD

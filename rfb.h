@@ -81,7 +81,6 @@ typedef unsigned long KeySym;
 #define SIGNED
 #include <sys/types.h>
 /* typedef unsigned int pthread_t; */
-/* SUN cc seems to have problems with inclusion of sys/types! */
 #elif defined(WIN32)
 #define _LITTLE_ENDIAN 1234
 #define _BYTE_ORDER _LITTLE_ENDIAN
@@ -109,6 +108,10 @@ typedef unsigned long KeySym;
 #include <sys/time.h>
 #include <netinet/in.h>
 #define SOCKET int
+#endif
+
+#ifndef INADDR_NONE
+#define                INADDR_NONE     ((in_addr_t) 0xffffffff)
 #endif
 
 #ifdef HAVE_PTHREADS
