@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-07-19";
+char lastmod[] = "lastmod:    2004-07-26";
 
 /* X display info */
 Display *dpy = 0;
@@ -249,6 +249,7 @@ Atom vnc_connect_prop = None;
 
 int all_clients_initialized(void);
 void autorepeat(int restore);
+char *bitprint(unsigned int);
 void blackout_tiles(void);
 void check_connect_inputs(void);
 void clean_up_exit(int);
@@ -322,6 +323,7 @@ int flash_cmap = 0;		/* follow installed colormaps */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 
 int use_modifier_tweak = 1;	/* use the shift/altgr modifier tweak */
+int use_iso_level3 = 0;		/* ISO_Level3_Shift instead of Mode_switch */
 int clear_mods = 0;		/* -clear_mods (1) and -clear_keys (2) */
 int nofb = 0;			/* do not send any fb updates */
 
@@ -341,6 +343,10 @@ int show_root_cursor = 0;	/* show X when on root background */
 int show_dragging = 1;		/* process mouse movement events */
 int no_autorepeat = 0;		/* turn off autorepeat with clients */
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
+int xkbcompat = 0;		/* ignore XKEYBOARD extension */
+int use_xkb = 0;		/* try to open Xkb connection (for bell or other) */
+int use_xkb_modtweak = 0;	/* -xkb */
+char *skip_keycodes = NULL;
 
 int old_pointer = 0;		/* use the old way of updating the pointer */
 int single_copytile = 0;	/* use the old way copy_tiles() */
@@ -548,6 +554,12 @@ static void interrupted (int sig) {
 
 static XErrorHandler   Xerror_def;
 static XIOErrorHandler XIOerr_def;
+int trapped_xerror = 0;
+
+int trap_xerror(Display *d, XErrorEvent *error) {
+	trapped_xerror = 1;
+	return 0;
+}
 
 static int Xerror(Display *d, XErrorEvent *error) {
 	X_UNLOCK;
@@ -1511,14 +1523,14 @@ static void reverse_connect(char *str) {
 	int sleep_min = 1500, sleep_max = 4500, n_max = 5;
 	int n, tot, t, dt = 100, cnt = 0;
 
-	p = strtok(tmp, ",");
+	p = strtok(tmp, ", \t\r\n");
 	while (p) {
 		if ((n = do_reverse_connect(p)) != 0) {
 			rfbPE(screen, -1);
 		}
 		cnt += n;
 
-		p = strtok(NULL, ",");
+		p = strtok(NULL, ", \t\r\n");
 		if (p) {
 			t = 0;
 			while (t < sleep_between_host) {
@@ -1833,7 +1845,7 @@ void initialize_remap(char *infile) {
 		while (*p) {
 			if (*p == '-') {
 				fprintf(in, " ");
-			} else if (*p == ',') {
+			} else if (*p == ',' || *p == ' ' ||  *p == '\t') {
 				fprintf(in, "\n");
 			} else {
 				fprintf(in, "%c", *p);
@@ -1926,6 +1938,745 @@ void myXTestFakeKeyEvent(Display* dpy, KeyCode key, Bool down,
 	XTestFakeKeyEvent(dpy, key, down, cur_time);
 }
 
+
+/*
+ * preliminary support for using the Xkb (XKEYBOARD) extension for handling
+ * user input.  inelegant, slow, and incomplete currently... but initial
+ * tests show it is useful for some setups.
+ */
+typedef struct keychar {
+	KeyCode code;
+	int group;
+	int level;
+} keychar_t;
+
+/* max number of key groups and shift levels we consider */
+#define GRP 4
+#define LVL 8
+static int lvl_max, grp_max, kc_min, kc_max;
+static KeySym xkbkeysyms[0x100][GRP][LVL];
+static unsigned int xkbstate[0x100][GRP][LVL];
+static unsigned int xkbignore[0x100][GRP][LVL];
+static unsigned int xkbmodifiers[0x100][GRP][LVL];
+static int multi_key[0x100], mode_switch[0x100], skipkeycode[0x100];
+static int shift_keys[0x100];
+
+#ifndef LIBVNCSERVER_HAVE_XKEYBOARD
+
+/* empty functions for no xkb */
+static void initialize_xkb_modtweak(void) {}
+static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
+    rfbClientPtr client) {
+}
+
+#else
+
+/* sets up all the keymapping info via Xkb API */
+
+static void initialize_xkb_modtweak(void) {
+	KeySym ks;
+	int kc, grp, lvl, k;
+	unsigned int state;
+
+/*
+ * Here is a guide:
+
+Workarounds arrays:
+
+multi_key[]     indicates which keycodes have Multi_key (Compose)
+                bound to them.
+mode_switch[]   indicates which keycodes have Mode_switch (AltGr)
+                bound to them.
+shift_keys[]    indicates which keycodes have Shift bound to them.
+skipkeycode[]   indicates which keycodes are to be skipped
+                for any lookups from -skip_keycodes option. 
+
+Groups and Levels, here is an example:
+                                                                  
+      ^          --------                                      
+      |      L2 | A   AE |                                      
+    shift       |        |                                      
+    level    L1 | a   ae |                                      
+                 --------                                      
+                  G1  G2                                        
+                                                                
+                  group ->                                      
+
+Traditionally this it all a key could do.  L1 vs. L2 selected via Shift
+and G1 vs. G2 selected via Mode_switch.  Up to 4 Keysyms could be bound
+to a key.  See initialize_modtweak() for an example of using that type
+of keymap from XGetKeyboardMapping().
+
+Xkb gives us up to 4 groups and 63 shift levels per key, with the
+situation being potentially different for each key.  This is complicated,
+and I don't claim to understand it all, but in the following we just think
+of ranging over the group and level indices as covering all of the cases.
+This gives us an accurate view of the keymap.  The main tricky part
+is mapping between group+level and modifier state.
+
+On current linux/XFree86 setups (Xkb is enabled by default) the
+information from XGetKeyboardMapping() (evidently the compat map)
+is incomplete and inaccurate, so we are really forced to use the
+Xkb API.
+
+xkbkeysyms[]      For a (keycode,group,level) holds the KeySym (0 for none)
+xkbstate[]        For a (keycode,group,level) holds the corresponding
+                  modifier state needed to get that KeySym
+xkbignore[]       For a (keycode,group,level) which modifiers can be
+                  ignored (the 0 bits can be ignored).
+xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
+                  the modifier mask.   
+ *
+ */
+
+	/* initialize all the arrays: */
+	for (kc = 0; kc < 0x100; kc++) {
+		multi_key[kc] = 0;
+		mode_switch[kc] = 0;
+		skipkeycode[kc] = 0;
+		shift_keys[kc] = 0;
+
+		for (grp = 0; grp < GRP; grp++) {
+			for (lvl = 0; lvl < LVL; lvl++) {
+				xkbkeysyms[kc][grp][lvl] = NoSymbol;
+				xkbmodifiers[kc][grp][lvl] = -1;
+				xkbstate[kc][grp][lvl] = -1;
+			}
+		}
+	}
+
+	/*
+	 * the array is 256*LVL*GRP, but we can make the searched region
+	 * smaller by computing the actual ranges.
+	 */
+	lvl_max = 0;
+	grp_max = 0;
+	kc_max = 0;
+	kc_min = 0x100;
+
+	/*
+	 * loop over all possible (keycode, group, level) triples
+	 * and record what we find for it:
+	 */
+	if (debug_keyboard > 1) {
+		rfbLog("initialize_xkb_modtweak: XKB keycode -> keysyms "
+		    "mapping info:\n");
+	}
+	for (kc = 0; kc < 0x100; kc++) {
+	    for (grp = 0; grp < GRP; grp++) {
+		for (lvl = 0; lvl < LVL; lvl++) {
+			unsigned int ms, mods;
+			int state_save = -1, mods_save;
+			KeySym ks2;
+
+			/* look up the Keysym, if any */
+			ks = XkbKeycodeToKeysym(dpy, kc, grp, lvl);
+			xkbkeysyms[kc][grp][lvl] = ks;
+
+			/* if no Keysym, on to next */
+			if (ks == NoSymbol) {
+				continue;
+			}
+			/*
+			 * for various workarounds, note where these special
+			 * keys are bound to.
+			 */
+			if (ks == XK_Multi_key) {
+				multi_key[kc] = lvl+1;
+			}
+			if (ks == XK_Mode_switch) {
+				mode_switch[kc] = lvl+1;
+			}
+			if (ks == XK_Shift_L || ks == XK_Shift_R) {
+				shift_keys[kc] = lvl+1;
+			}
+
+			/*
+			 * record maximum extent for group/level indices
+			 * and keycode range:
+			 */
+			if (grp > grp_max) {
+				grp_max = grp;
+			}
+			if (lvl > lvl_max) {
+				lvl_max = lvl;
+			}
+			if (kc > kc_max) {
+				kc_max = kc;
+			}
+			if (kc < kc_min) {
+				kc_min = kc;
+			}
+
+			/*
+			 * lookup on *keysym* (i.e. not kc, grp, lvl)
+			 * and get the modifier mask.  this is 0 for
+			 * most keysyms, only non zero for modifiers.
+			 */
+			ms = XkbKeysymToModifiers(dpy, ks);
+			xkbmodifiers[kc][grp][lvl] = ms;
+
+			/*
+			 * Amusing heuristic (may have bugs).  There are
+			 * 8 modifier bits, so 256 possible modifier
+			 * states.  We loop over all of them for this
+			 * keycode (simulating Key "events") and ask
+			 * XkbLookupKeySym to tell us the Keysym.  Once it
+			 * matches the Keysym we have for this (keycode,
+			 * group, level), gotten via XkbKeycodeToKeysym()
+			 * above, we then (hopefully...) know that state
+			 * of modifiers needed to generate this keysym.
+			 *
+			 * Yes... keep your fingers crossed.
+			 *
+			 * Note that many of the 256 states give the
+			 * Keysym, we just need one, and we take the
+			 * first one found.
+			 */
+			state = 0;
+			while(state < 256) {
+				if (XkbLookupKeySym(dpy, kc, state, &mods,
+				    &ks2)) {
+
+					/* save these for workaround below */
+					if (state_save == -1) {
+						state_save = state;
+						mods_save = mods;
+					}
+					if (ks2 == ks) {
+						/*
+						 * zero the irrelevant bits
+						 * by anding with mods.
+						 */
+						xkbstate[kc][grp][lvl]
+						    = state & mods;
+						/*
+						 * also remember the irrelevant
+						 * bits since it is handy.
+						 */
+						xkbignore[kc][grp][lvl] = mods;
+
+						break;
+					}
+				}
+				state++;
+			}
+			if (xkbstate[kc][grp][lvl] == -1 && grp == 1) {
+				/*
+				 * Hack on Solaris 9 for Mode_switch
+				 * for Group2 characters.  We force the 
+				 * Mode_switch modifier bit on.
+				 * XXX Need to figure out better what is
+				 * happening here.  Is compat on somehow??
+				 */
+				unsigned int ms2;
+				ms2 = XkbKeysymToModifiers(dpy, XK_Mode_switch);
+
+				xkbstate[kc][grp][lvl]
+				    = (state_save & mods_save) | ms2;
+
+				xkbignore[kc][grp][lvl] = mods_save | ms2;
+			}
+
+			if (debug_keyboard > 1) {
+				fprintf(stderr, "  %03d  G%d L%d  mod=%s ",
+				    kc, grp+1, lvl+1, bitprint(ms));
+				fprintf(stderr, "state=%s ",
+				    bitprint(xkbstate[kc][grp][lvl]));
+				fprintf(stderr, "ignore=%s ",
+				    bitprint(xkbignore[kc][grp][lvl]));
+				fprintf(stderr, " ks=0x%08lx \"%s\"\n",
+				    ks, XKeysymToString(ks));
+			}
+		}
+	    }
+	}
+
+	/*
+	 * process the user supplied -skip_keycodes string.
+	 * This is presumably a list if "ghost" keycodes, the X server
+	 * thinks they exist, but they do not.  ghosts can lead to
+	 * ambiguities in the reverse map: Keysym -> KeyCode + Modstate,
+	 * so if we can ignore them so much the better.  Presumably the
+	 * user can never generate them from the physical keyboard.
+	 * There may be other reasons to deaden some keys.
+	 */
+	if (skip_keycodes != NULL) {
+		char *p, *str = strdup(skip_keycodes);
+		p = strtok(str, ", \t\n\r");
+		while (p) {
+			k = 1;
+			if (sscanf(p, "%d", &k) != 1 || k < 0 || k >= 0x100) {
+				rfbLog("bad skip_keycodes: %s %s\n",
+				    skip_keycodes, p);
+				clean_up_exit(1);
+			}
+			skipkeycode[k] = 1;
+			p = strtok(NULL, ", \t\n\r");
+		}
+		free(str);
+	}
+	if (debug_keyboard > 1) {
+		fprintf(stderr, "grp_max=%d lvl_max=%d\n", grp_max, lvl_max);
+	}
+}
+
+/*
+ * Called on user keyboard input.  Try to solve the reverse mapping
+ * problem: KeySym (from VNC client) => KeyCode(s) to press to generate
+ * it.  The one-to-many KeySym => KeyCode mapping makes it difficult, as
+ * does working out what changes to the modifier keypresses are needed.
+ */
+static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
+    rfbClientPtr client) {
+
+	int kc, grp, lvl, i;
+	int kc_f[0x100], grp_f[0x100], lvl_f[0x100], state_f[0x100], found;
+	unsigned int state;
+
+	/* these are used for finding modifiers, etc */
+	XkbStateRec kbstate;
+	int got_kbstate = 0;
+	int Kc_f, Grp_f, Lvl_f;
+
+	X_LOCK;
+
+	if (debug_keyboard) {
+		char *str = XKeysymToString(keysym);
+
+		if (debug_keyboard > 1) fprintf(stderr, "\n");
+
+		rfbLog("xkb_tweak_keyboard: %s keysym=0x%x \"%s\"\n",
+		    down ? "down" : "up", (int) keysym, str ? str : "null");
+	}
+
+	/*
+	 * set everything to not-yet-found.
+	 * these "found" arrays (*_f) let us dyanamically consider the
+	 * one-to-many Keysym -> Keycode issue.  we set the size at 256,
+	 * but of course only very few will be found.
+	 */
+	for (i = 0; i < 0x100; i++) {
+		kc_f[i]    = -1;
+		grp_f[i]   = -1;
+		lvl_f[i]   = -1;
+		state_f[i] = -1;
+	}
+	found = 0;
+
+	/*
+	 * loop over all (keycode, group, level) triples looking for
+	 * matching keysyms.  Amazingly this isn't slow (but maybe if
+	 * you type really fast...).  Hash lookup into a linked list of
+	 * (keycode,grp,lvl) triples would be the way to improve this
+	 * in the future if needed.
+	 */
+	for (kc = kc_min; kc <= kc_max; kc++) {
+	    for (grp = 0; grp < grp_max+1; grp++) {
+		for (lvl = 0; lvl < lvl_max+1; lvl++) {
+			if (keysym != xkbkeysyms[kc][grp][lvl]) {
+				continue;
+			}
+			/* got a keysym match */
+			state = xkbstate[kc][grp][lvl];
+
+			if (debug_keyboard > 1) {
+				fprintf(stderr, "  got match kc=%03d=0x%02x G%d"
+				    " L%d  ks=0x%x \"%s\"  (basesym: \"%s\")\n",
+				    kc, kc, grp+1, lvl+1, keysym,
+				    XKeysymToString(keysym), XKeysymToString(
+				    XKeycodeToKeysym(dpy, kc, 0)));
+				fprintf(stderr, "    need state: %s\n",
+				    bitprint(state));
+				fprintf(stderr, "    ignorable : %s\n",
+				    bitprint(xkbignore[kc][grp][lvl]));
+			}
+
+			/* save it if state is OK and not told to skip */
+			if (state == -1) {
+				continue;
+			}
+			if (skipkeycode[kc] && debug_keyboard) {
+				fprintf(stderr, "    xxx skipping keycode: %d "
+				   "G%d/L%d\n", kc, grp+1, lvl+1);
+			}
+			if (skipkeycode[kc]) {
+				continue;
+			}
+			if (found > 0 && kc == kc_f[found-1]) {
+				/* ignore repeats for same keycode */
+				continue;
+			}
+			kc_f[found] = kc;
+			grp_f[found] = grp;
+			lvl_f[found] = lvl;
+			state_f[found] = state;
+			found++;
+		}
+	    }
+	}
+
+#define PKBSTATE  \
+	fprintf(stderr, "    --- current mod state:\n"); \
+	fprintf(stderr, "    mods      : %s\n", bitprint(kbstate.mods)); \
+	fprintf(stderr, "    base_mods : %s\n", bitprint(kbstate.base_mods)); \
+	fprintf(stderr, "    latch_mods: %s\n", bitprint(kbstate.latched_mods)); \
+	fprintf(stderr, "    lock_mods : %s\n", bitprint(kbstate.locked_mods)); \
+	fprintf(stderr, "    compat    : %s\n", bitprint(kbstate.compat_state));
+
+	/*
+	 * Now get the current state of the keyboard from the X server.
+	 * This seems to be the safest way to go as opposed to our
+	 * keeping track of the modifier state on our own.  Again,
+	 * this is fortunately not too slow.
+	 */
+
+	if (debug_keyboard > 1) {
+		/* get state early for debug output */
+		XkbGetState(dpy, XkbUseCoreKbd, &kbstate);
+		got_kbstate = 1;
+		PKBSTATE
+	}
+	if (!found && debug_keyboard) {
+		char *str = XKeysymToString(keysym);
+		fprintf(stderr, "    *** NO key found for: 0x%x %s  "
+		    "*keystroke ignored*\n", keysym, str ? str : "null");
+	}
+	if (!found) {
+		X_UNLOCK;
+		return;
+	}
+
+	/* 
+	 * we could optimize here if found > 1
+	 * e.g. minimize lvl or grp, or other things to give
+	 * "safest" scenario to simulate the keystrokes.
+	 * but for now we just take the first one we found.
+	 */
+	Kc_f = kc_f[0];
+	Grp_f = grp_f[0];
+	Lvl_f = lvl_f[0];
+	state = state_f[0];
+
+	if (debug_keyboard && found > 1) {
+		int l;
+		char *str;
+		fprintf(stderr, "    *** found more than one keycode: ");
+		for (l = 0; l < found; l++) {
+			fprintf(stderr, "%03d ", kc_f[l]);
+		}
+		for (l = 0; l < found; l++) {
+			str = XKeysymToString(XKeycodeToKeysym(dpy,kc_f[l],0));
+			fprintf(stderr, " \"%s\"", str ? str : "null");
+		}
+		fprintf(stderr, ", using first one: %03d\n", Kc_f);
+	}
+
+	if (down) {
+		/*
+		 * need to set up the mods for tweaking and other workarounds
+		 */
+		int needmods[8], sentmods[8], Ilist[8], keystate[256];
+		int involves_multi_key, shift_is_down;
+		int i, j, b, curr, need;
+		unsigned int ms;
+		KeySym ks;
+		Bool dn;
+
+		if (! got_kbstate) {
+			/* get the current modifier state if we haven't yet */
+			XkbGetState(dpy, XkbUseCoreKbd, &kbstate);
+		}
+
+		/*
+		 * needmods[] whether or not that modifier bit needs
+		 *            something done to it. 
+		 *            < 0 means no,
+		 *            0   means needs to go up.
+		 *            1   means needs to go down.
+		 *
+		 * -1, -2, -3 are used for debugging info to indicate
+		 * why nothing needs to be done with the modifier, see below.
+		 *
+		 * sentmods[] is the corresponding keycode to use
+		 * to acheive the needmods[] requirement for the bit.
+		 */
+
+		for (i=0; i<8; i++) {
+			needmods[i] = -1;
+			sentmods[i] = 0;
+		}
+
+		/*
+		 * Loop over the 8 modifier bits and check if the current
+		 * setting is what we need it to be or whether it should
+		 * be changed (by us sending some keycode event)
+		 *
+		 * If nothing needs to be done to it record why:
+		 *   -1  the modifier bit is ignored.
+		 *   -2  the modifier bit is ignored, but is correct anyway.
+		 *   -3  the modifier bit is correct.
+		 */
+
+		b = 0x1;
+		for (i=0; i<8; i++) {
+			curr = b & kbstate.mods;
+			need = b & state;
+
+			if (! (b & xkbignore[Kc_f][Grp_f][Lvl_f])) {
+				/* irrelevant modifier bit */
+				needmods[i] = -1;
+				if (curr == need) needmods[i] = -2;
+			} else if (curr == need) {
+				/* already correct */
+				needmods[i] = -3;
+			} else if (! curr && need) {
+				/* need it down */
+				needmods[i] = 1;
+			} else if (curr && ! need) {
+				/* need it up */
+				needmods[i] = 0;
+			}
+
+			b = b << 1;
+		}
+
+		/*
+		 * Again we dynamically probe the X server for information,
+		 * this time for the state of all the keycodes.  Useful
+		 * info, and evidently is not too slow...
+		 */
+		get_keystate(keystate);
+
+		/*
+		 * We try to determine if Shift is down (since that can
+		 * screw up ISO_Level3_Shift manipulations).
+		 */
+		shift_is_down = 0;
+
+		for (kc = kc_min; kc <= kc_max; kc++) {
+			if (skipkeycode[kc] && debug_keyboard) {
+				fprintf(stderr, "    xxx skipping keycode: "
+				    "%d\n", kc);
+			}
+			if (skipkeycode[kc]) {
+				continue;
+			}
+			if (shift_keys[kc] && keystate[kc]) {
+				shift_is_down = kc;
+				break;
+			}
+		}
+
+		/*
+		 * Now loop over the modifier bits and try to deduce the
+		 * keycode presses/release require to match the desired
+		 * state.
+		 */
+		for (i=0; i<8; i++) {
+			if (needmods[i] < 0 && debug_keyboard > 1) {
+				int k = -needmods[i] - 1;
+				char *words[] = {"ignorable",
+				    "bitset+ignorable", "bitset"};
+				fprintf(stderr, "    +++ needmods: mod=%d is "
+				    "OK  (%s)\n", i, words[k]);
+			}
+			if (needmods[i] < 0) {
+				continue;
+			}
+
+			b = 1 << i;
+
+			if (debug_keyboard > 1) {
+				fprintf(stderr, "    +++ needmods: mod=%d %s "
+				    "need it to be: %d %s\n", i, bitprint(b),
+				    needmods[i], needmods[i] ? "down" : "up");
+			}
+
+			/*
+			 * Again, an inefficient loop, this time just
+			 * looking for modifiers...
+			 */
+			for (kc = kc_min; kc <= kc_max; kc++) {
+			    for (grp = 0; grp < grp_max+1; grp++) {
+				for (lvl = 0; lvl < lvl_max+1; lvl++) {
+					int skip = 1, dbmsg = 0;
+
+					ms = xkbmodifiers[kc][grp][lvl];
+					if (! ms || ms != b) {
+						continue;
+					}
+
+					if (skipkeycode[kc] && debug_keyboard) {
+					    fprintf(stderr, "    xxx skipping "
+						"keycode: %d G%d/L%d\n",
+						kc, grp+1, lvl+1);
+					}
+					if (skipkeycode[kc]) {
+						continue;
+					}
+
+					ks = xkbkeysyms[kc][grp][lvl];
+					if (! ks) {
+						continue;
+					}
+
+					if (ks == XK_Shift_L) {
+						skip = 0;
+					} else if (ks == XK_Shift_R) {
+						skip = 0;
+					} else if (ks == XK_Mode_switch) {
+						skip = 0;
+					} else if (ks == XK_ISO_Level3_Shift) {
+						skip = 0;
+					}
+					/*
+					 * Alt, Meta, Control, Super,
+					 * Hyper, Num, Caps are skipped.
+					 *
+					 * XXX need more work on Locks,
+					 * and non-standard modifiers.
+					 * (e.g. XF86_Next_VMode using
+					 * Ctrl+Alt)
+					 */
+					if (debug_keyboard > 1) {
+						char *str = XKeysymToString(ks);
+						int kt = keystate[kc];
+						fprintf(stderr, "    === for "
+						    "mod=%s found kc=%03d/G%d"
+						    "/L%d it is %d %s skip=%d "
+						    "(%s)\n", bitprint(b), kc,
+						    grp+1, lvl+1, kt, kt ?
+						    "down" : "up  ", skip,
+						    str ? str : "null");
+					}
+
+					if (! skip && needmods[i] !=
+					    keystate[kc] && sentmods[i] == 0) {
+						sentmods[i] = kc;
+						dbmsg = 1;
+					}
+
+					if (debug_keyboard > 1 && dbmsg) {
+						int nm = needmods[i];
+						fprintf(stderr, "    >>> we "
+						    "choose kc=%03d=0x%02x to "
+						    "change it to: %d %s\n", kc,
+						    kc, nm, nm ? "down" : "up");
+					}
+						
+				}
+			    }
+			}
+		}
+		for (i=0; i<8; i++) {
+			/*
+			 * reverse order is useful for tweaking
+			 * ISO_Level3_Shift before Shift, but assumes they
+			 * are in that order (i.e. Shift is first bit).
+			 */
+			int reverse = 1;
+			if (reverse) {
+				Ilist[i] = 7 - i;
+			} else {
+				Ilist[i] = i;
+			}
+		}
+
+		/*
+		 * check to see if Multi_key is bound to one of the Mods
+		 * we have to tweak
+		 */
+		involves_multi_key = 0;
+		for (j=0; j<8; j++) {
+			i = Ilist[j];
+			if (sentmods[i] == 0) continue;
+			dn = (Bool) needmods[i];
+			if (!dn) continue;
+			if (multi_key[sentmods[i]]) {
+				involves_multi_key = i+1;
+			}
+		}
+
+		if (involves_multi_key && shift_is_down && needmods[0] < 0) {
+			/*
+			 * Workaround for Multi_key and shift.
+			 * Assumes Shift is bit 1 (needmods[0])
+			 */
+			if (debug_keyboard) {
+				fprintf(stderr, "    ^^^ trying to avoid "
+				    "inadvertent Multi_key from Shift "
+				    "(doing %03d up now)\n", shift_is_down);
+			}
+			myXTestFakeKeyEvent(dpy, shift_is_down, False,
+			    CurrentTime);
+		} else {
+			involves_multi_key = 0;
+		}
+
+		for (j=0; j<8; j++) {
+			/* do the Mod ups */
+			i = Ilist[j];
+			if (sentmods[i] == 0) continue;
+			dn = (Bool) needmods[i];
+			if (dn) continue;
+			myXTestFakeKeyEvent(dpy, sentmods[i], dn, CurrentTime);
+		}
+		for (j=0; j<8; j++) {
+			/* next, do the Mod downs */
+			i = Ilist[j];
+			if (sentmods[i] == 0) continue;
+			dn = (Bool) needmods[i];
+			if (!dn) continue;
+			myXTestFakeKeyEvent(dpy, sentmods[i], dn, CurrentTime);
+		}
+
+		if (involves_multi_key) {
+			/*
+			 * Reverse workaround for Multi_key and shift.
+			 */
+			if (debug_keyboard) {
+				fprintf(stderr, "    vvv trying to avoid "
+				    "inadvertent Multi_key from Shift "
+				    "(doing %03d down now)\n", shift_is_down);
+			}
+			myXTestFakeKeyEvent(dpy, shift_is_down, True,
+			    CurrentTime);
+		}
+
+		/*
+		 * With the above modifier work done, send the actual keycode:
+		 */
+		myXTestFakeKeyEvent(dpy, Kc_f, (Bool) down, CurrentTime);
+
+		/*
+		 * Now undo the modifier work:
+		 */
+		for (j=7; j>=0; j--) {
+			/* reverse Mod downs we did */
+			i = Ilist[j];
+			if (sentmods[i] == 0) continue;
+			dn = (Bool) needmods[i];
+			if (!dn) continue;
+			myXTestFakeKeyEvent(dpy, sentmods[i], !dn, CurrentTime);
+		}
+		for (j=7; j>=0; j--) {
+			/* finally reverse the Mod ups we did */
+			i = Ilist[j];
+			if (sentmods[i] == 0) continue;
+			dn = (Bool) needmods[i];
+			if (dn) continue;
+			myXTestFakeKeyEvent(dpy, sentmods[i], !dn, CurrentTime);
+		}
+
+	} else { /* for up case, hopefully just need to pop it up: */
+
+		myXTestFakeKeyEvent(dpy, Kc_f, (Bool) down, CurrentTime);
+	}
+	X_UNLOCK;
+}
+#endif
+
 /*
  * For tweaking modifiers wrt the Alt-Graph key, etc.
  */
@@ -1936,14 +2687,39 @@ static char mod_state = 0;
 
 static char modifiers[0x100];
 static KeyCode keycodes[0x100];
-static KeyCode left_shift_code, right_shift_code, altgr_code;
+static KeyCode left_shift_code, right_shift_code, altgr_code, iso_level3_code;
+
+char *bitprint(unsigned int st) {
+	static char str[9];
+	int i, mask;
+	for (i=0; i<8; i++) {
+		str[i] = '0';
+	}
+	str[8] = '\0';
+	mask = 1;
+	for (i=7; i>=0; i--) {
+		if (st & mask) {
+			str[i] = '1';
+		}
+		mask = mask << 1;
+	}
+	return str;
+}
 
 void initialize_modtweak(void) {
 	KeySym keysym, *keymap;
 	int i, j, minkey, maxkey, syms_per_keycode;
 
+	if (use_xkb_modtweak) {
+		initialize_xkb_modtweak();
+		return;
+	}
 	memset(modifiers, -1, sizeof(modifiers));
+	for (i=0; i<0x100; i++) {
+		keycodes[i] = NoSymbol;
+	}
 
+	X_LOCK;
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
 
 	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
@@ -1969,7 +2745,23 @@ void initialize_modtweak(void) {
 		}
 	}
 	for (i = minkey; i <= maxkey; i++) {
+		if (debug_keyboard) {
+			if (i == minkey) {
+				rfbLog("initialize_modtweak: keycode -> "
+				    "keysyms mapping info:\n");
+			}
+			fprintf(stderr, "  %03d  ", i);
+		}
 		for (j = 0; j < syms_per_keycode; j++) {
+			if (debug_keyboard) {
+				char *sym;
+				sym = XKeysymToString(XKeycodeToKeysym(dpy,
+				    i, j));
+				fprintf(stderr, "%-18s ", sym ? sym : "null");
+				if (j == syms_per_keycode - 1) {
+					fprintf(stderr, "\n");
+				}
+			}
 			if (j >= 4) {
 				/*
 				 * Something wacky in the keymapping.
@@ -1990,8 +2782,14 @@ void initialize_modtweak(void) {
 	left_shift_code = XKeysymToKeycode(dpy, XK_Shift_L);
 	right_shift_code = XKeysymToKeycode(dpy, XK_Shift_R);
 	altgr_code = XKeysymToKeycode(dpy, XK_Mode_switch);
+	iso_level3_code = NoSymbol;
+#ifdef XK_ISO_Level3_Shift
+	iso_level3_code = XKeysymToKeycode(dpy, XK_ISO_Level3_Shift);
+#endif
 
 	XFree ((void *) keymap);
+
+	X_UNLOCK;
 }
 
 /*
@@ -2000,18 +2798,23 @@ void initialize_modtweak(void) {
 static void tweak_mod(signed char mod, rfbBool down) {
 	rfbBool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
 	Bool dn = (Bool) down;
+	KeyCode altgr = altgr_code;
 
 	if (mod < 0) {
 		if (debug_keyboard) {
-			rfbLog("tweak_mod: Skip:  down=%d j-mod=0x%x\n", down,
+			rfbLog("tweak_mod: Skip:  down=%d index=%d\n", down,
 			    (int) mod);
 		}
 		return;
 	}
 	if (debug_keyboard) {
-		rfbLog("tweak_mod: Start:  down=%d j-mod=0x%x mod_state=0x%x"
+		rfbLog("tweak_mod: Start:  down=%d index=%d mod_state=0x%x"
 		    " is_shift=%d\n", down, (int) mod, (int) mod_state,
 		    is_shift);
+	}
+
+	if (use_iso_level3 && iso_level3_code) {
+		altgr = iso_level3_code;
 	}
 
 	X_LOCK;
@@ -2026,15 +2829,15 @@ static void tweak_mod(signed char mod, rfbBool down) {
 	if ( ! is_shift && mod == 1 ) {
 	    myXTestFakeKeyEvent(dpy, left_shift_code, dn, CurrentTime);
 	}
-	if ( altgr_code && (mod_state & ALTGR) && mod != 2 ) {
-	    myXTestFakeKeyEvent(dpy, altgr_code, !dn, CurrentTime);
+	if ( altgr && (mod_state & ALTGR) && mod != 2 ) {
+	    myXTestFakeKeyEvent(dpy, altgr, !dn, CurrentTime);
 	}
-	if ( altgr_code && ! (mod_state & ALTGR) && mod == 2 ) {
-	    myXTestFakeKeyEvent(dpy, altgr_code, dn, CurrentTime);
+	if ( altgr && ! (mod_state & ALTGR) && mod == 2 ) {
+	    myXTestFakeKeyEvent(dpy, altgr, dn, CurrentTime);
 	}
 	X_UNLOCK;
 	if (debug_keyboard) {
-		rfbLog("tweak_mod: Finish: down=%d j-mod=0x%x mod_state=0x%x"
+		rfbLog("tweak_mod: Finish: down=%d index=%d mod_state=0x%x"
 		    " is_shift=%d\n", down, (int) mod, (int) mod_state,
 		    is_shift);
 	}
@@ -2047,6 +2850,11 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
     rfbClientPtr client) {
 	KeyCode k;
 	int tweak = 0;
+
+	if (use_xkb_modtweak) {
+		xkb_tweak_keyboard(down, keysym, client);
+		return;
+	}
 	if (debug_keyboard) {
 		rfbLog("modifier_tweak_keyboard: %s keysym=0x%x\n",
 		    down ? "down" : "up", (int) keysym);
@@ -2108,9 +2916,11 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	int isbutton = 0;
 
 	if (debug_keyboard) {
+		char *str;
 		X_LOCK;
+		str = XKeysymToString(keysym);
 		rfbLog("keyboard(%s, 0x%x \"%s\")\n", down ? "down":"up",
-		    (int) keysym, XKeysymToString(keysym));
+		    (int) keysym, str ? str : "null");
 		X_UNLOCK;
 	}
 
@@ -2184,8 +2994,9 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	k = XKeysymToKeycode(dpy, (KeySym) keysym);
 
 	if (debug_keyboard) {
+		char *str = XKeysymToString(keysym);
 		rfbLog("keyboard(): KeySym 0x%x \"%s\" -> KeyCode 0x%x%s\n",
-		    (int) keysym, XKeysymToString(keysym), (int) k,
+		    (int) keysym, str ? str : "null", (int) k,
 		    k ? "" : " *ignored*");
 	}
 
@@ -2669,20 +3480,45 @@ static int xkb_base_event_type;
 /*
  * check for XKEYBOARD, set up xkb_base_event_type
  */
-void initialize_watch_bell(void) {
+void initialize_xkb(void) {
 	int ir, reason;
-	if (! XkbSelectEvents(dpy, XkbUseCoreKbd, XkbBellNotifyMask,
-	    XkbBellNotifyMask) ) {
+	int op, ev, er, maj, min;
+	
+	if (! use_xkb) {
+		return;
+	}
+	if (! XkbQueryExtension(dpy, &op, &ev, &er, &maj, &min)) {
 		if (! quiet) {
-			fprintf(stderr, "warning: disabling bell.\n");
+			fprintf(stderr, "warning: XKEYBOARD"
+			    " extension not present.\n");
 		}
-		watch_bell = 0;
+		use_xkb = 0;
 		return;
 	}
 	if (! XkbOpenDisplay(DisplayString(dpy), &xkb_base_event_type, &ir,
 	    NULL, NULL, &reason) ) {
 		if (! quiet) {
-			fprintf(stderr, "warning: disabling bell.\n");
+			fprintf(stderr, "warning: disabling XKEYBOARD."
+			    " XkbOpenDisplay failed.\n");
+		}
+		use_xkb = 0;
+	}
+}
+
+void initialize_watch_bell(void) {
+	if (! use_xkb) {
+		if (! quiet) {
+			fprintf(stderr, "warning: disabling bell."
+			    " XKEYBOARD ext. not present.\n");
+		}
+		watch_bell = 0;
+		return;
+	}
+	if (! XkbSelectEvents(dpy, XkbUseCoreKbd, XkbBellNotifyMask,
+	    XkbBellNotifyMask) ) {
+		if (! quiet) {
+			fprintf(stderr, "warning: disabling bell."
+			    " XkbSelectEvents failed.\n");
 		}
 		watch_bell = 0;
 	}
@@ -2762,6 +3598,7 @@ static char selection_str[PROP_MAX+1];
 static void selection_request(XEvent *ev) {
 	XSelectionEvent notify_event;
 	XSelectionRequestEvent *req_event;
+	XErrorHandler old_handler;
 	unsigned int length;
 	unsigned char *data;
 #ifndef XA_LENGTH
@@ -2787,6 +3624,9 @@ static void selection_request(XEvent *ev) {
 		length = 0;
 	}
 
+	/* the window may have gone away, so trap errors */
+	trapped_xerror = 0;
+	old_handler = XSetErrorHandler(trap_xerror);
 
 	if (ev->xselectionrequest.target == XA_LENGTH) {
 		/* length request */
@@ -2809,8 +3649,16 @@ static void selection_request(XEvent *ev) {
 		    data, length);
 	}
 
-	XSendEvent(req_event->display, req_event->requestor, False, 0,
-	    (XEvent *)&notify_event);
+	if (! trapped_xerror) {
+		XSendEvent(req_event->display, req_event->requestor, False, 0,
+		    (XEvent *)&notify_event);
+	} 
+	if (trapped_xerror) {
+		rfbLog("selection_request: ignored XError while sending "
+		    "PRIMARY selection to 0x%x.\n", req_event->requestor);
+	}
+	XSetErrorHandler(old_handler);
+	trapped_xerror = 0;
 
 	XFlush(dpy);
 }
@@ -2960,9 +3808,10 @@ static void selection_send(XEvent *ev) {
  */
 void watch_xevents(void) {
 	XEvent xev;
-	static int first = 1, sent_sel = 0;
+	static int first = 1, sent_some_sel = 0;
+	static time_t last_request = 0;
+	time_t now = time(0);
 	int have_clients = screen->rfbClientHead ? 1 : 0;
-	time_t last_request = 0, now = time(0);
 
 	X_LOCK;
 	if (first && (watch_selection || vnc_connect)) {
@@ -2988,12 +3837,20 @@ void watch_xevents(void) {
 	 * the client... so instead of sending right away we wait a
 	 * the few seconds.
 	 */
-	if (have_clients && watch_selection && ! sent_sel
+	if (have_clients && watch_selection && ! sent_some_sel
 	    && now > last_client + sel_waittime) {
 		if (XGetSelectionOwner(dpy, XA_PRIMARY) == None) {
 			cutbuffer_send();
 		}
-		sent_sel = 1;
+		sent_some_sel = 1;
+	}
+
+	if (XCheckTypedEvent(dpy, MappingNotify, &xev)) {
+		if (use_modifier_tweak) {
+			X_UNLOCK;
+			initialize_modtweak();
+			X_LOCK;
+		}
 	}
 
 	/* check for CUT_BUFFER0 and VNC_CONNECT changes: */
@@ -3009,7 +3866,7 @@ void watch_xevents(void) {
 				if (have_clients && watch_selection
 				    && ! set_cutbuffer) {
 					cutbuffer_send();
-					sent_sel = 1;
+					sent_some_sel = 1;
 				}
 				set_cutbuffer = 0;
 			} else if (vnc_connect && vnc_connect_prop != None
@@ -3023,15 +3880,6 @@ void watch_xevents(void) {
 		}
 	}
 
-	if (! have_clients || ! watch_selection) {
-		/*
-		 * no need to monitor selections if no current clients
-		 * or -nosel.
-		 */
-		X_UNLOCK;
-		return;
-	}
-
 	/* check for our PRIMARY request notification: */
 	if (watch_primary) {
 		if (XCheckTypedEvent(dpy, SelectionNotify, &xev)) {
@@ -3043,20 +3891,21 @@ void watch_xevents(void) {
 
 				/* go retrieve PRIMARY and check it */
 				if (now > last_client + sel_waittime
-				    || sent_sel) {
+				    || sent_some_sel) {
 					selection_send(&xev);
 				}
 			}
 		}
-		if (now > last_request + 1) {
+		if (now > last_request) {
 			/*
 			 * Every second or two, request PRIMARY, unless we
-			 * already own it or there is no owner.
+			 * already own it or there is no owner or we have
+			 * no clients.
 			 * TODO: even at this low rate we should look into
 			 * and performance problems in odds cases, etc.
 			 */
 			last_request = now;
-			if (! own_selection &&
+			if (! own_selection && have_clients &&
 			    XGetSelectionOwner(dpy, XA_PRIMARY) != None) {
 				XConvertSelection(dpy, XA_PRIMARY, XA_STRING,
 				    XA_STRING, selwin, CurrentTime);
@@ -3064,32 +3913,25 @@ void watch_xevents(void) {
 		}
 	}
 
-	if (! own_selection) {
-		/*
-		 * no need to do the PRIMARY maintenance tasks below if
-		 * no we do not own it (right?).
-		 */
-		X_UNLOCK;
-		return;
-	}
-
-	/* we own PRIMARY, see if someone requested it: */
-	if (XCheckTypedEvent(dpy, SelectionRequest, &xev)) {
-		if (xev.type == SelectionRequest &&
-		    xev.xselectionrequest.selection == XA_PRIMARY) {
-			selection_request(&xev);
+	if (own_selection) {
+		/* we own PRIMARY, see if someone requested it: */
+		if (XCheckTypedEvent(dpy, SelectionRequest, &xev)) {
+			if (xev.type == SelectionRequest &&
+			    xev.xselectionrequest.selection == XA_PRIMARY) {
+				selection_request(&xev);
+			}
 		}
-	}
 
-	/* we own PRIMARY, see if we no longer own it: */
-	if (XCheckTypedEvent(dpy, SelectionClear, &xev)) {
-		if (xev.type == SelectionClear &&
-		    xev.xselectionclear.selection == XA_PRIMARY) {
+		/* we own PRIMARY, see if we no longer own it: */
+		if (XCheckTypedEvent(dpy, SelectionClear, &xev)) {
+			if (xev.type == SelectionClear &&
+			    xev.xselectionclear.selection == XA_PRIMARY) {
 
-			own_selection = 0;
-			if (xcut_string) {
-				free(xcut_string);
-				xcut_string = NULL;
+				own_selection = 0;
+				if (xcut_string) {
+					free(xcut_string);
+					xcut_string = NULL;
+				}
 			}
 		}
 	}
@@ -3385,6 +4227,7 @@ static void blackout_nearby_tiles(x, y, dt) {
 static void cursor_pos_updates(int x, int y) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
+	static time_t last_warp = 0;
 	int cnt = 0;
 
 	if (! cursor_pos) {
@@ -3411,11 +4254,12 @@ static void cursor_pos_updates(int x, int y) {
 			continue;
 		}
 		if (cl == last_pointer_client) {
+			time_t now = time(0);
 			/*
 			 * special case if this client was the last one to
 			 * send a pointer position.
 			 */
-			if (x == cursor_x && y == cursor_y) {
+			if (x == cursor_x && y == cursor_y && now>last_warp+5) {
 				cl->cursorWasMoved = FALSE;
 			} else {
 				/* an X11 app evidently warped the pointer */
@@ -3425,6 +4269,7 @@ static void cursor_pos_updates(int x, int y) {
 					    cursor_x - x, cursor_y - y);
 				}
 				cl->cursorWasMoved = TRUE;
+				last_warp = now;
 				cnt++;
 			}
 		} else {
@@ -4109,7 +4954,7 @@ void initialize_blackout (char *list) {
 	char *p, *blist = strdup(list);
 	int x, y, X, Y, h, w;
 
-	p = strtok(blist, ",");
+	p = strtok(blist, ", \t");
 	while (p) {
 		/* handle +/-x and +/-y */
 		if (sscanf(p, "%dx%d+%d+%d", &w, &h, &x, &y) == 4) {
@@ -4125,7 +4970,7 @@ void initialize_blackout (char *list) {
 			if (*p != '\0') {
 				rfbLog("skipping invalid geometry: %s\n", p);
 			}
-			p = strtok(NULL, ",");
+			p = strtok(NULL, ", \t");
 			continue;
 		}
 		X = x + w;
@@ -4153,7 +4998,7 @@ void initialize_blackout (char *list) {
 				break;
 			}
 		}
-		p = strtok(NULL, ",");
+		p = strtok(NULL, ", \t");
 	}
 	free(blist);
 }
@@ -6800,7 +7645,8 @@ static void print_help(void) {
 "line that is either \"nap\" or \"-nap\" may be used and are equivalent.\n"
 "Likewise \"wait 100\" or \"-wait 100\" are acceptable lines.  The \"#\"\n"
 "character comments out to the end of the line in the usual way.  Leading and\n"
-"trailing whitespace is trimmed off.\n"
+"trailing whitespace is trimmed off.  Lines may be continued with a \"\\\"\n"
+"as the last character of a line (it becomes a space character).\n"
 "\n"
 "Options:\n"
 "\n"
@@ -6980,6 +7826,26 @@ static void print_help(void) {
 "                       This may cause problems if a keysym is bound to multiple\n"
 "                       keys, e.g. when typing \"<\" if the Xserver defines a\n"
 "                       \"< and >\" key in addition to a \"< and comma\" key.\n"
+#if 0
+"-isolevel3             When in modtweak mode, send ISO_Level3_Shift to the X\n"
+"                       server instead of Mode_switch (AltGr).\n"
+#endif
+"-xkb                   Use XKEYBOARD extension (if it exists) to do the modifier\n"
+"                       tweaking.\n"
+"-skip_keycodes string  Skip keycodes not on your keyboard but your X server\n"
+"                       thinks exist.  Currently only applies to -xkb mode.\n"
+"                       \"string\" is a comma separated list of decimal\n"
+"                       keycodes.  Use this option to help x11vnc in the reverse\n"
+"                       problem it tries to solve: Keysym -> Keycode(s) when\n"
+"                       ambiguities exist.  E.g. -skip_keycodes 94,114\n"
+#if 0
+"-xkbcompat             Ignore the XKEYBOARD extension.  Use as a workaround for\n"
+"                       some keyboard mapping problems.  E.g. if you are using\n"
+"                       an international keyboard (AltGr or ISO_Level3_Shift),\n"
+"                       and the OS or keyboard where the VNC viewer is run\n"
+"                       is not identical to that of the X server, and you are\n"
+"                       having problems typing some keys.  Implies -nobell.\n"
+#endif
 "-clear_mods            At startup and exit clear the modifier keys by sending\n"
 "                       KeyRelease for each one. The Lock modifiers are skipped.\n"
 "                       Used to clear the state if the display was accidentally\n"
@@ -7050,6 +7916,8 @@ static void print_help(void) {
 "\n"
 "-debug_pointer         Print debugging output for every pointer event.\n"
 "-debug_keyboard        Print debugging output for every keyboard event.\n"
+"                       Same as -dp and -dk, respectively.  Use multiple\n"
+"                       times for more output.\n"
 "\n"
 "-defer time            Time in ms to wait for updates before sending to client\n"
 "                       [rfbDeferUpdateTime]  (default %d).\n"
@@ -7216,6 +8084,7 @@ static void check_rcfile(int argc, char **argv) {
 	} else {
 		strncpy(rcfile, getenv("HOME"), 500);
 		strcat(rcfile, "/.x11vncrc");
+		infile = rcfile;
 		rc = fopen(rcfile, "r");
 		if (rc == NULL) {
 			norc = 1;
@@ -7226,12 +8095,37 @@ static void check_rcfile(int argc, char **argv) {
 	argv2[argc2++] = strdup(argv[0]);
 
 	if (! norc) {
-		char line[1024], parm[1024], tmp[1025];
-		while (fgets(line, 1024, rc) != NULL) {
+		char line[4096], parm[100], tmp[101];
+		char *buf;
+		struct stat sbuf;
+		int sz;
+
+		if (fstat(fileno(rc), &sbuf) != 0) {
+			fprintf(stderr, "problem with %s\n", infile);
+			perror("fstat");
+			exit(1);
+		}
+		sz = sbuf.st_size+1;
+		if (sz < 1024) {
+			sz = 1024;
+		}
+
+		buf  = (char *) malloc(sz);
+
+		while (fgets(line, 4096, rc) != NULL) {
 			char *q, *p = line;
+			char c = '\0';
+			int cont = 0;
+
 			q = p;
 			while (*q) {
 				if (*q == '\n') {
+					if (c == '\\') {
+						cont = 1;
+						*q = '\0';
+						*(q-1) = ' ';
+						break;
+					}
 					while (isspace(*q)) {
 						*q = '\0';
 						if (q == p) {
@@ -7241,6 +8135,7 @@ static void check_rcfile(int argc, char **argv) {
 					}
 					break;
 				}
+				c = *q;
 				q++;
 			}
 			if ( (q = strchr(p, '#')) != NULL) {
@@ -7252,18 +8147,24 @@ static void check_rcfile(int argc, char **argv) {
 				}
 				p++;
 			}
-			if (*p == '\0') {
+
+			strncat(buf, p, sz - strlen(buf) - 1);
+			if (cont) {
 				continue;
 			}
-			if ( sscanf(p, "%s", parm) != 1) {
+			if (buf[0] == '\0') {
+				continue;
+			}
+
+			if (sscanf(buf, "%s", parm) != 1) {
 				fprintf(stderr, "invalid rcfile line: %s\n", p);
 				exit(1);
 			}
 			if (parm[0] == '-') {
-				strncpy(tmp, parm, 1024); 
+				strncpy(tmp, parm, 100); 
 			} else {
 				tmp[0] = '-';
-				strncpy(tmp+1, parm, 1024); 
+				strncpy(tmp+1, parm, 100); 
 			}
 
 			argv2[argc2++] = strdup(tmp);
@@ -7272,6 +8173,7 @@ static void check_rcfile(int argc, char **argv) {
 				exit(1);
 			}
 			
+			p = buf;
 			p += strlen(parm);
 			while (*p) {
 				if (! isspace(*p)) {
@@ -7280,15 +8182,19 @@ static void check_rcfile(int argc, char **argv) {
 				p++;
 			}
 			if (*p == '\0') {
+				buf[0] = '\0';
 				continue;
 			}
+
 			argv2[argc2++] = strdup(p);
 			if (argc2 >= argmax) {
 				fprintf(stderr, "too many rcfile options\n");
 				exit(1);
 			}
+			buf[0] = '\0';
 		}
 		fclose(rc);
+		free(buf);
 	}
 	for (i=1; i < argc; i++) {
 		argv2[argc2++] = strdup(argv[i]);
@@ -7302,7 +8208,7 @@ static void check_rcfile(int argc, char **argv) {
 int main(int argc, char* argv[]) {
 
 	XImage *fb;
-	int i, op, ev, er, maj, min;
+	int i, ev, er, maj, min;
 	char *use_dpy = NULL;
 	char *auth_file = NULL;
 	char *arg, *visual_str = NULL;
@@ -7479,6 +8385,15 @@ int main(int argc, char* argv[]) {
 			use_modifier_tweak = 1;
 		} else if (!strcmp(arg, "-nomodtweak")) {
 			use_modifier_tweak = 0;
+		} else if (!strcmp(arg, "-isolevel3")) {
+			use_iso_level3 = 1;
+		} else if (!strcmp(arg, "-xkb")) {
+			use_xkb_modtweak = 1;
+		} else if (!strcmp(arg, "-skip_keycodes")) {
+			CHECK_ARGC
+			skip_keycodes = argv[++i];
+		} else if (!strcmp(arg, "-xkbcompat")) {
+			xkbcompat = 1;
 		} else if (!strcmp(arg, "-clear_mods")) {
 			clear_mods = 1;
 		} else if (!strcmp(arg, "-clear_keys")) {
@@ -7535,8 +8450,11 @@ int main(int argc, char* argv[]) {
 			|| !strcmp(arg, "-old_copytile")) {
 			single_copytile = 1;
 		} else if (!strcmp(arg, "-debug_pointer")) {
+		} else if (!strcmp(arg, "-debug_pointer")
+		    || !strcmp(arg, "-dp")) {
 			debug_pointer++;
-		} else if (!strcmp(arg, "-debug_keyboard")) {
+		} else if (!strcmp(arg, "-debug_keyboard")
+		    || !strcmp(arg, "-dk")) {
 			debug_keyboard++;
 		} else if (!strcmp(arg, "-defer")) {
 			CHECK_ARGC
@@ -7796,43 +8714,49 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "display:    %s\n", use_dpy ? use_dpy
                     : "null");
 		fprintf(stderr, "subwin:     0x%x\n", subwin);
-		fprintf(stderr, "visual:     %s\n", visual_str ? visual_str
-                    : "null");
 		fprintf(stderr, "flashcmap:  %d\n", flash_cmap);
 		fprintf(stderr, "force_idx:  %d\n", force_indexed_color);
 		fprintf(stderr, "scaling:    %d %.5f\n", scaling, scale_fac);
+		fprintf(stderr, "visual:     %s\n", visual_str ? visual_str
+                    : "null");
 		fprintf(stderr, "viewonly:   %d\n", view_only);
 		fprintf(stderr, "shared:     %d\n", shared);
-		fprintf(stderr, "authfile:   %s\n", auth_file ? auth_file
-                    : "null");
-		fprintf(stderr, "passfile:   %s\n", passwdfile ? passwdfile
-                    : "null");
-		fprintf(stderr, "logfile:    %s\n", logfile ? logfile
-                    : "null");
-		fprintf(stderr, "allow:      %s\n", allow_list ? allow_list
-                    : "null");
-		fprintf(stderr, "accept:     %s\n", accept_cmd ? accept_cmd
-                    : "null");
-		fprintf(stderr, "gone:       %s\n", gone_cmd ? gone_cmd
-                    : "null");
 		fprintf(stderr, "conn_once:  %d\n", connect_once);
 		fprintf(stderr, "connect:    %s\n", client_connect
 		    ? client_connect : "null");
 		fprintf(stderr, "connectfile %s\n", client_connect_file
 		    ? client_connect_file : "null");
 		fprintf(stderr, "vnc_conn:   %d\n", vnc_connect);
+		fprintf(stderr, "authfile:   %s\n", auth_file ? auth_file
+                    : "null");
+		fprintf(stderr, "allow:      %s\n", allow_list ? allow_list
+                    : "null");
+		fprintf(stderr, "passfile:   %s\n", passwdfile ? passwdfile
+                    : "null");
+		fprintf(stderr, "accept:     %s\n", accept_cmd ? accept_cmd
+                    : "null");
+		fprintf(stderr, "gone:       %s\n", gone_cmd ? gone_cmd
+                    : "null");
 		fprintf(stderr, "inetd:      %d\n", inetd);
 		fprintf(stderr, "using_shm:  %d\n", using_shm);
 		fprintf(stderr, "flipbytes:  %d\n", flip_byte_order);
-		fprintf(stderr, "mod_tweak:  %d\n", use_modifier_tweak);
-		fprintf(stderr, "clearmods:  %d\n", clear_mods);
-		fprintf(stderr, "remap:      %s\n", remap_file ? remap_file
-                    : "null");
 		fprintf(stderr, "blackout:   %s\n", blackout_string
 		    ? blackout_string : "null");
 		fprintf(stderr, "xinerama:   %d\n", xinerama);
-		fprintf(stderr, "watchbell:  %d\n", watch_bell);
+		fprintf(stderr, "logfile:    %s\n", logfile ? logfile
+                    : "null");
+		fprintf(stderr, "bg:         %d\n", bg);
+		fprintf(stderr, "mod_tweak:  %d\n", use_modifier_tweak);
+		fprintf(stderr, "isolevel3:  %d\n", use_iso_level3);
+		fprintf(stderr, "xkb:        %d\n", use_xkb_modtweak);
+		fprintf(stderr, "skipkeys:   %s\n", skip_keycodes ? skip_keycodes
+                    : "null");
+		fprintf(stderr, "xkbcompat:  %d\n", xkbcompat);
+		fprintf(stderr, "clearmods:  %d\n", clear_mods);
+		fprintf(stderr, "remap:      %s\n", remap_file ? remap_file
+                    : "null");
 		fprintf(stderr, "nofb:       %d\n", nofb);
+		fprintf(stderr, "watchbell:  %d\n", watch_bell);
 		fprintf(stderr, "watchsel:   %d\n", watch_selection);
 		fprintf(stderr, "watchprim:  %d\n", watch_primary);
 		fprintf(stderr, "loc_curs:   %d\n", local_cursor);
@@ -7843,9 +8767,9 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "buttonmap:  %s\n", pointer_remap
 		    ? pointer_remap : "null");
 		fprintf(stderr, "dragging:   %d\n", show_dragging);
-		fprintf(stderr, "inputskip:  %d\n", ui_skip);
 		fprintf(stderr, "old_ptr:    %d\n", old_pointer);
-		fprintf(stderr, "onetile:    %d\n", single_copytile);
+		fprintf(stderr, "inputskip:  %d\n", ui_skip);
+		fprintf(stderr, "norepeat:   %d\n", no_autorepeat);
 		fprintf(stderr, "debug_ptr:  %d\n", debug_pointer);
 		fprintf(stderr, "debug_key:  %d\n", debug_keyboard);
 		fprintf(stderr, "defer:      %d\n", defer_update);
@@ -7854,10 +8778,10 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "sigpipe:    %d\n", sigpipe);
 		fprintf(stderr, "threads:    %d\n", use_threads);
 		fprintf(stderr, "fs_frac:    %.2f\n", fs_frac);
+		fprintf(stderr, "onetile:    %d\n", single_copytile);
 		fprintf(stderr, "gaps_fill:  %d\n", gaps_fill);
 		fprintf(stderr, "grow_fill:  %d\n", grow_fill);
 		fprintf(stderr, "tile_fuzz:  %d\n", tile_fuzz);
-		fprintf(stderr, "bg:         %d\n", bg);
 		fprintf(stderr, "%s\n", lastmod);
 	} else {
 		rfbLogEnable(0);
@@ -7872,6 +8796,31 @@ int main(int argc, char* argv[]) {
 		sprintf(tmp, "XAUTHORITY=%s", auth_file);
 		putenv(tmp);
 	}
+	if (watch_bell || use_xkb_modtweak) {
+		/* we need XKEYBOARD for these: */
+		use_xkb = 1;
+	}
+	if (xkbcompat) {
+		use_xkb = 0;
+	}
+#ifdef LIBVNCSERVER_HAVE_XKEYBOARD
+	/*
+	 * Disable XKEYBOARD before calling XOpenDisplay()
+	 * this should be used if there is ambiguity in the keymapping. 
+	 */
+	if (xkbcompat) {
+		Bool rc = XkbIgnoreExtension(True);
+		if (! quiet) {
+			fprintf(stderr, "disabling xkb extension. rc=%d\n", rc);
+			if (watch_bell) {
+				watch_bell = 0;
+				fprintf(stderr, "disabling bell.\n");
+			}
+		}
+	}
+#else
+	use_xkb = 0;
+#endif
 	if (use_dpy) {
 		dpy = XOpenDisplay(use_dpy);
 	} else if ( (use_dpy = getenv("DISPLAY")) ) {
@@ -7896,6 +8845,7 @@ int main(int argc, char* argv[]) {
 	}
 	scr = DefaultScreen(dpy);
 	rootwin = RootWindow(dpy, scr);
+
 
 	/* check for XTEST */
 	if (! XTestQueryExtension(dpy, &ev, &er, &maj, &min)) {
@@ -7928,15 +8878,14 @@ int main(int argc, char* argv[]) {
 	}
 #ifdef LIBVNCSERVER_HAVE_XKEYBOARD
 	/* check for XKEYBOARD */
-	if (watch_bell) {
-		if (! XkbQueryExtension(dpy, &op, &ev, &er, &maj, &min)) {
-			if (! quiet) {
-				fprintf(stderr, "warning: disabling bell.\n");
-			}
-			watch_bell = 0;
-		} else {
-			initialize_watch_bell();
-		}
+	if (use_xkb) {
+		initialize_xkb();
+	}
+	initialize_watch_bell();
+	if (!use_xkb && use_xkb_modtweak) {
+		fprintf(stderr, "warning: disabling xkb modtweak."
+		    " XKEYBOARD ext. not present.\n");
+		use_xkb_modtweak = 0;
 	}
 #endif
 

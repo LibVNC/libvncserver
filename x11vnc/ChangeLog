@@ -1,3 +1,13 @@
+2004-07-26  Karl Runge <runge@karlrunge.com>
+	* first pass at doing modtweak via XKEYBOARD extension (-xkb)
+	* -skip_keycodes option for use with -xkb
+	* reset modtweak and xkb_modtweak on event MappingNotify.
+	* trap Xerror during XSendEvent/XChangeProperty.
+	* fix bug requesting PRIMARY way too often.
+	* more careful to check if XKeysymToString returns NULL.
+	* continuation lines "\" in x11vncrc.
+	* undoc'd expts: -isolevel3, -xkbcompat
+
 2004-07-19  Karl Runge <runge@karlrunge.com>
 	* ignore keysyms 5-8 for keycode keymapping.
 	* help to stdout for easy paging, add lastmod to help and -version.

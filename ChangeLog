@@ -1,3 +1,9 @@
+2004-07-26  Karl Runge <runge@karlrunge.com>
+	* x11vnc: first pass at doing modtweak via XKEYBOARD extension (-xkb)
+	* -skip_keycodes; reset modtweaks on event MappingNotify.
+	* fix bugs wrt PRIMARY handling.
+	* continuation lines "\" in x11vncrc.  
+
 2004-07-15  Karl Runge <runge@karlrunge.com>
 	* x11vnc: modtweak is now the default
 	* check X11/XKBlib.h in configure.ac to work around Solaris 7 bug.
