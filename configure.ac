@@ -33,6 +33,12 @@ AH_TEMPLATE(SDL_CONFIG, [Use sdl-config (for SDLvncviewer)])
 AC_ARG_WITH(sdl,
 	[  --with-sdl			use sdl-config],
 	, [ with_sdl=yes ])
+AH_TEMPLATE(FFMPEG, [Use ffmpeg (for vnc2mpg)])
+AC_ARG_WITH(ffmpeg,
+	[ --with-ffmpeg=dir		set ffmpeg home directory],,)
+#AM_DEFINE(FFMPEG, "$with_ffmpeg")
+AC_SUBST(with_ffmpeg)
+AM_CONDITIONAL(WITH_FFMPEG, test ! -z "$with_ffmpeg")
 
 # Checks for X libraries
 HAVE_X="false"
@@ -155,7 +161,7 @@ AC_CONFIG_FILES([Makefile
 		 libvncclient/Makefile
 		 client_examples/Makefile
 		 test/Makefile
-		 libvncserver.spec
+		 LibVNCServer.spec
 		 libvncserver-config])
 AC_OUTPUT
 chmod a+x ./libvncserver-config
