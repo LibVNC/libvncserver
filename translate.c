@@ -259,7 +259,7 @@ rfbSetTranslateFunction(cl)
 #endif
         (cl->screen->rfbServerFormat.bitsPerPixel != 32))
     {
-        rfbLog("%s: server bits per pixel not 8, 16 or 32 (is %d)\n",
+        rfbErr("%s: server bits per pixel not 8, 16 or 32 (is %d)\n",
 	       "rfbSetTranslateFunction", 
 	       cl->screen->rfbServerFormat.bitsPerPixel);
         rfbCloseClient(cl);
@@ -273,14 +273,14 @@ rfbSetTranslateFunction(cl)
 #endif
         (cl->format.bitsPerPixel != 32))
     {
-        rfbLog("%s: client bits per pixel not 8, 16 or 32\n",
+        rfbErr("%s: client bits per pixel not 8, 16 or 32\n",
                 "rfbSetTranslateFunction");
         rfbCloseClient(cl);
         return FALSE;
     }
 
     if (!cl->format.trueColour && (cl->format.bitsPerPixel != 8)) {
-        rfbLog("rfbSetTranslateFunction: client has colour map "
+        rfbErr("rfbSetTranslateFunction: client has colour map "
                 "but %d-bit - can only cope with 8-bit colour maps\n",
                 cl->format.bitsPerPixel);
         rfbCloseClient(cl);
@@ -369,7 +369,7 @@ rfbSetClientColourMapBGR233(cl)
     int r, g, b;
 
     if (cl->format.bitsPerPixel != 8 ) {
-        rfbLog("%s: client not 8 bits per pixel\n",
+        rfbErr("%s: client not 8 bits per pixel\n",
                 "rfbSetClientColourMapBGR233");
         rfbCloseClient(cl);
         return FALSE;

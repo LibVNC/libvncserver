@@ -521,7 +521,7 @@ rfbProcessClientProtocolVersion(cl)
     if (sscanf(pv,rfbProtocolVersionFormat,&major_,&minor_) != 2) {
         char name[1024]; 
 	if(sscanf(pv,"RFB %03d.%03d %1024s\n",&major_,&minor_,name) != 3) {
-	    rfbLog("rfbProcessClientProtocolVersion: not a valid RFB client\n");
+	    rfbErr("rfbProcessClientProtocolVersion: not a valid RFB client\n");
 	    rfbCloseClient(cl);
 	    return;
 	}
@@ -533,7 +533,7 @@ rfbProcessClientProtocolVersion(cl)
     if (major_ != rfbProtocolMajorVersion) {
         /* Major version mismatch - send a ConnFailed message */
 
-        rfbLog("Major version mismatch\n");
+        rfbErr("Major version mismatch\n");
         sprintf(failureReason,
                 "RFB protocol version mismatch - server %d.%d, client %d.%d",
                 rfbProtocolMajorVersion,rfbProtocolMinorVersion,major_,minor_);
@@ -1448,7 +1448,7 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
 
         nlines = (UPDATE_BUF_SIZE - cl->ublen) / bytesPerLine;
         if (nlines == 0) {
-            rfbLog("rfbSendRectEncodingRaw: send buffer too small for %d "
+            rfbErr("rfbSendRectEncodingRaw: send buffer too small for %d "
                    "bytes per line\n", bytesPerLine);
             rfbCloseClient(cl);
             return FALSE;
@@ -1698,7 +1698,7 @@ rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
 
     case rfbKeyEvent:
 	if (n != sz_rfbKeyEventMsg) {
-	    rfbLog("rfbProcessUDPInput: key event incorrect length\n");
+	    rfbErr("rfbProcessUDPInput: key event incorrect length\n");
 	    rfbDisconnectUDPSock(rfbScreen);
 	    return;
 	}
@@ -1707,7 +1707,7 @@ rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
 
     case rfbPointerEvent:
 	if (n != sz_rfbPointerEventMsg) {
-	    rfbLog("rfbProcessUDPInput: ptr event incorrect length\n");
+	    rfbErr("rfbProcessUDPInput: ptr event incorrect length\n");
 	    rfbDisconnectUDPSock(rfbScreen);
 	    return;
 	}
@@ -1716,7 +1716,7 @@ rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
 	break;
 
     default:
-	rfbLog("rfbProcessUDPInput: unknown message type %d\n",
+	rfbErr("rfbProcessUDPInput: unknown message type %d\n",
 	       msg.type);
 	rfbDisconnectUDPSock(rfbScreen);
     }

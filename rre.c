@@ -307,7 +307,7 @@ getBgColour(data,size,bpp)
   for (j=0; j<size; j++) {
     k = (int)(((uint8_t *)data)[j]);
     if (k >= NUMCLRS) {
-      rfbLog("getBgColour: unusual colour = %d\n", k);
+      rfbErr("getBgColour: unusual colour = %d\n", k);
       return 0;
     }
     counts[k] += 1;

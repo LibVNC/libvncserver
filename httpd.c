@@ -223,7 +223,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     cl.sock=rfbScreen->httpSock;
 
     if (strlen(rfbScreen->httpDir) > 255) {
-	rfbLog("-httpd directory too long\n");
+	rfbErr("-httpd directory too long\n");
 	httpCloseSock(rfbScreen);
 	return;
     }
@@ -238,7 +238,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	ssize_t got;
 
         if (buf_filled > sizeof (buf)) {
-	    rfbLog("httpProcessInput: HTTP request is too long\n");
+	    rfbErr("httpProcessInput: HTTP request is too long\n");
 	    httpCloseSock(rfbScreen);
 	    return;
 	}
@@ -248,7 +248,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
 	if (got <= 0) {
 	    if (got == 0) {
-		rfbLog("httpd: premature connection close\n");
+		rfbErr("httpd: premature connection close\n");
 	    } else {
 		if (errno == EAGAIN) {
 		    return;
@@ -274,7 +274,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	const static char* PROXY_OK_STR = "HTTP/1.0 200 OK\r\nContent-Type: octet-stream\r\nPragma: no-cache\r\n\r\n";
 	if(!strncmp(buf, "CONNECT ", 8)) {
 	    if(atoi(strchr(buf, ':')+1)!=rfbScreen->rfbPort) {
-		rfbLog("httpd: CONNECT format invalid.\n");
+		rfbErr("httpd: CONNECT format invalid.\n");
 		WriteExact(&cl,INVALID_REQUEST_STR, strlen(INVALID_REQUEST_STR));
 		httpCloseSock(rfbScreen);
 		return;
@@ -297,7 +297,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     }
 
     if (strncmp(buf, "GET ", 4)) {
-	rfbLog("httpd: no GET line\n");
+	rfbErr("httpd: no GET line\n");
 	httpCloseSock(rfbScreen);
 	return;
     } else {
@@ -306,26 +306,26 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     }
 
     if (strlen(buf) > maxFnameLen) {
-	rfbLog("httpd: GET line too long\n");
+	rfbErr("httpd: GET line too long\n");
 	httpCloseSock(rfbScreen);
 	return;
     }
 
     if (sscanf(buf, "GET %s HTTP/1.0", fname) != 1) {
-	rfbLog("httpd: couldn't parse GET line\n");
+	rfbErr("httpd: couldn't parse GET line\n");
 	httpCloseSock(rfbScreen);
 	return;
     }
 
     if (fname[0] != '/') {
-	rfbLog("httpd: filename didn't begin with '/'\n");
+	rfbErr("httpd: filename didn't begin with '/'\n");
 	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
 	httpCloseSock(rfbScreen);
 	return;
     }
 
     if (strchr(fname+1, '/') != NULL) {
-	rfbLog("httpd: asking for file in other directory\n");
+	rfbErr("httpd: asking for file in other directory\n");
 	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
 	httpCloseSock(rfbScreen);
 	return;
@@ -343,7 +343,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
        *ptr = '\0';
        if (!parseParams(&ptr[1], params, 1024)) {
            params[0] = '\0';
-           rfbLog("httpd: bad parameters in the URL\n");
+           rfbErr("httpd: bad parameters in the URL\n");
        }
     }
 

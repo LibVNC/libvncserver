@@ -1135,7 +1135,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	xim = XShmCreateImage(dpy, visual, bpp, ZPixmap, NULL, shm, w, h);
 
 	if (xim == NULL) {
-		rfbLog( "XShmCreateImage(%s) failed.\n", name);
+		rfbErr( "XShmCreateImage(%s) failed.\n", name);
 		exit(1);
 	}
 
@@ -1145,7 +1145,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	    xim->bytes_per_line * xim->height, IPC_CREAT | 0777);
 
 	if (shm->shmid == -1) {
-		rfbLog("shmget(%s) failed.\n", name);
+		rfbErr("shmget(%s) failed.\n", name);
 		perror("shmget");
 		exit(1);
 	}
@@ -1153,7 +1153,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	shm->shmaddr = xim->data = (char *) shmat(shm->shmid, 0, 0);
 
 	if (shm->shmaddr == (char *)-1) {
-		rfbLog("shmat(%s) failed.\n", name);
+		rfbErr("shmat(%s) failed.\n", name);
 		perror("shmat");
 		exit(1);
 	}
@@ -1161,7 +1161,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	shm->readOnly = False;
 
 	if (! XShmAttach(dpy, shm)) {
-		rfbLog("XShmAttach(%s) failed.\n", name);
+		rfbErr("XShmAttach(%s) failed.\n", name);
 		exit(1);
 	}
 

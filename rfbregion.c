@@ -759,7 +759,7 @@ rfbBool sraRgnIteratorNext(sraRectangleIterator* i,sraRect* r)
   }
 
   if((i->ptrPos%4)!=2) {
-    rfbLog("sraRgnIteratorNext: offset is wrong (%d%%4!=2)\n",i->ptrPos);
+    rfbErr("sraRgnIteratorNext: offset is wrong (%d%%4!=2)\n",i->ptrPos);
     return FALSE;
   }
 

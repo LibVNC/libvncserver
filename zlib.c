@@ -164,7 +164,7 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
     zlibAfterBufLen = cl->compStream.total_out - previousOut;
 
     if ( deflateResult != Z_OK ) {
-        rfbLog("zlib deflation error: %s\n", cl->compStream.msg);
+        rfbErr("zlib deflation error: %s\n", cl->compStream.msg);
         return FALSE;
     }
 

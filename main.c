@@ -83,10 +83,11 @@ rfbDefaultLog(const char *format, ...)
 }
 
 rfbLogProc rfbLog=rfbDefaultLog;
+rfbLogProc rfbErr=rfbDefaultLog;
 
 void rfbLogPerror(const char *str)
 {
-    rfbLog("%s: %s\n", str, strerror(errno));
+    rfbErr("%s: %s\n", str, strerror(errno));
 }
 
 void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy)
@@ -442,7 +443,7 @@ rfbBool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
   char *passwd=vncDecryptPasswdFromFile(cl->screen->rfbAuthPasswdData);
 
   if(!passwd) {
-    rfbLog("Couldn't read password file: %s\n",cl->screen->rfbAuthPasswdData);
+    rfbErr("Couldn't read password file: %s\n",cl->screen->rfbAuthPasswdData);
     return(FALSE);
   }
 
@@ -456,7 +457,7 @@ rfbBool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
   free(passwd);
 
   if (memcmp(cl->authChallenge, response, len) != 0) {
-    rfbLog("rfbAuthProcessClientMessage: authentication failed from %s\n",
+    rfbErr("rfbAuthProcessClientMessage: authentication failed from %s\n",
 	   cl->host);
     return(FALSE);
   }
@@ -481,7 +482,7 @@ rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
     }
   }
 
-  rfbLog("rfbAuthProcessClientMessage: authentication failed from %s\n",
+  rfbErr("rfbAuthProcessClientMessage: authentication failed from %s\n",
 	 cl->host);
   return(FALSE);
 }
@@ -550,7 +551,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    INIT_MUTEX(logMutex);
 
    if(width&3)
-     rfbLog("WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
+     rfbErr("WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
 
    rfbScreen->autoPort=FALSE;
    rfbScreen->rfbClientHead=0;
@@ -667,7 +668,7 @@ void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
   old_format = rfbScreen->rfbServerFormat;
 
   if (width & 3)
-    rfbLog("WARNING: New width (%d) is not a multiple of 4.\n", width);
+    rfbErr("WARNING: New width (%d) is not a multiple of 4.\n", width);
 
   rfbScreen->width = width;
   rfbScreen->height = height;
@@ -826,7 +827,7 @@ void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, rfbBool runInBackgro
        pthread_create(&listener_thread, NULL, listenerRun, rfbScreen);
     return;
 #else
-    rfbLog("Can't run in background, because I don't have PThreads!\n");
+    rfbErr("Can't run in background, because I don't have PThreads!\n");
     return;
 #endif
   }

@@ -54,7 +54,7 @@ int main(int argc,char** argv)
   rfbScreen = s;
   font=rfbLoadConsoleFont(DEFAULTFONT);
   if(!font) {
-    rfbLog("Couldn't find %s\n",DEFAULTFONT);
+    rfbErr("Couldn't find %s\n",DEFAULTFONT);
     exit(1);
   }
   

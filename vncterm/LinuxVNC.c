@@ -57,7 +57,7 @@ void do_key(rfbBool down,rfbKeySym keySym,rfbClientPtr cl)
 	  tty_inject_device=open(device,O_WRONLY);
 	  ret=ioctl(tty_inject_device,TIOCSTI,&keySym);
 	  if(ret<0)
-	    rfbLog("Couldn't reopen device %s!\n",device);
+	    rfbErr("Couldn't reopen device %s!\n",device);
 	}
       }
     }
@@ -88,7 +88,7 @@ int main(int argc,char **argv)
 
   if(argc>1) {
     if((tty=atoi(argv[1]))<1) {
-      rfbLog("Usage: %s [tty_number [vnc args]]\n",argv[0]);
+      rfbErr("Usage: %s [tty_number [vnc args]]\n",argv[0]);
       exit(1);
     } else {
       argv++;
@@ -100,7 +100,7 @@ int main(int argc,char **argv)
 
   sprintf(tty_device,"/dev/tty%d",tty);
   if((tty_inject_device=open(tty_device,O_WRONLY))<0) {
-    rfbLog("Couldn't open tty device %s!\n",tty_device);
+    rfbErr("Couldn't open tty device %s!\n",tty_device);
     exit(1);
   }
   rfbLog("Using device %s.\n",tty_device);
@@ -142,7 +142,7 @@ int main(int argc,char **argv)
     if(!console->currentlyMarking) {
       tty_file=fopen(tty_device,"rb");
       if(!tty_file) {
-	rfbLog("cannot open device \"%s\"\n",
+	rfbErr("cannot open device \"%s\"\n",
 		tty_device);
 	exit(1);
       }

@@ -410,7 +410,7 @@ KbdAddEvent(rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl)
     }
 
     if (!found) {
-        rfbLog("warning: couldn't figure out keycode for X keysym %d (0x%x)\n", 
+        rfbErr("warning: couldn't figure out keycode for X keysym %d (0x%x)\n", 
                (int)keySym, (int)keySym);
     } else {
         /* Hopefully I can get away with not specifying a CGCharCode.

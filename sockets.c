@@ -474,7 +474,7 @@ WriteExact(cl, buf, len)
 
         } else if (n == 0) {
 
-            rfbLog("WriteExact: write returned 0?\n");
+            rfbErr("WriteExact: write returned 0?\n");
             return 0;
 
         } else {
