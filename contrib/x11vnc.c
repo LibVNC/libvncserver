@@ -220,6 +220,7 @@ char *client_connect_file = NULL;
 int vnc_connect = 0;		/* -vncconnect option */
 
 int local_cursor = 1;		/* whether the viewer draws a local cursor */
+int cursor_pos = 0;		/* cursor position updates -cursorpos */
 int show_mouse = 0;		/* display a cursor for the real mouse */
 int use_xwarppointer = 0;	/* use XWarpPointer instead of XTestFake... */
 int show_root_cursor = 0;	/* show X when on root background */
@@ -277,7 +278,9 @@ int got_pointer_input = 0;
 int got_keyboard_input = 0;
 int scan_in_progress = 0;	
 int fb_copy_in_progress = 0;	
+int client_count = 0;
 int shut_down = 0;	
+int sigpipe = 1;		/* 0=skip, 1=ignore, 2=exit */
 
 int debug_pointer = 0;
 int debug_keyboard = 0;
@@ -418,6 +421,16 @@ void set_signals(void) {
 	signal(SIGSEGV, interrupted);
 	signal(SIGFPE,  interrupted);
 
+	if (sigpipe == 1) {
+#ifdef SIG_IGN
+		rfbLog("set_signals: ignoring SIGPIPE\n");
+		signal(SIGPIPE, SIG_IGN);
+#endif
+	} else if (sigpipe == 2) {
+		rfbLog("set_signals: will exit on SIGPIPE\n");
+		signal(SIGPIPE, interrupted);
+	}
+
 	X_LOCK;
 	Xerror_def = XSetErrorHandler(Xerror);
 	XIOerr_def = XSetIOErrorHandler(XIOerr);
@@ -425,6 +438,8 @@ void set_signals(void) {
 }
 
 void client_gone(rfbClientPtr client) {
+	client_count--;
+	rfbLog("client_count: %d\n", client_count);
 	if (connect_once) {
 		rfbLog("viewer exited.\n");
 		clean_up_exit(0);
@@ -685,6 +700,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	}
 	accepted_client = 1;
 	last_client = time(0);
+	client_count++;
 	return(RFB_CLIENT_ACCEPT);
 }
 
@@ -954,6 +970,8 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr
  * key event handler.  See the above functions for contortions for
  * running under -modtweak.
  */
+rfbClientPtr last_keyboard_client = NULL;
+
 static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 
@@ -967,6 +985,7 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	if (view_only) {
 		return;
 	}
+	last_keyboard_client = client;
 	
 	if (keyremaps) {
 		keyremap_t *remap = keyremaps;
@@ -1093,6 +1112,8 @@ void init_pointer(void) {
 /*
  * Actual callback from libvncserver when it gets a pointer event.
  */
+rfbClientPtr last_pointer_client = NULL;
+
 static void pointer(int mask, int x, int y, rfbClientPtr client) {
 
 	if (debug_pointer && mask >= 0) {
@@ -1114,6 +1135,7 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 		 */
 		got_user_input++;
 		got_pointer_input++;
+		last_pointer_client = client;
 	}
 
 	/*
@@ -1307,7 +1329,12 @@ void watch_bell_event() {
 	X_UNLOCK;
 
 	if (got_bell) {
-		rfbSendBell(screen);
+		if (! all_clients_initialized()) {
+			rfbLog("watch_bell_event: not sending bell: "
+			    "uninitialized clients\n");
+		} else {
+			rfbSendBell(screen);
+		}
 	}
 }
 #else
@@ -2028,6 +2055,64 @@ void blackout_nearby_tiles(x, y, dt) {
 	}
 }
 
+void cursor_pos_updates(int x, int y) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int cnt = 0;
+
+	if (! cursor_pos) {
+		return;
+	}
+	if (x == screen->cursorX && y == screen->cursorY) {
+		return;
+	}
+
+	if (screen->cursorIsDrawn) {
+		rfbUndrawCursor(screen);
+	}
+	LOCK(screen->cursorMutex);
+	if (! screen->cursorIsDrawn) {
+		screen->cursorX = x;
+		screen->cursorY = y;
+	}
+	UNLOCK(screen->cursorMutex);
+
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		if (! cl->enableCursorPosUpdates) {
+			continue;
+		}
+		if (cl == last_pointer_client) {
+			if (x == cursor_x && y == cursor_y) {
+				if (cursor_pos > 1) {
+					/* send to all */
+					cl->cursorWasMoved = TRUE;
+					cnt++;
+				} else {
+					cl->cursorWasMoved = FALSE;
+				}
+			} else {
+				if (debug_pointer) {
+					rfbLog("cursor_pos_updates: warp "
+					    "detected dx=%3d dy=%3d\n",
+					    cursor_x - x, cursor_y - y);
+				}
+				cl->cursorWasMoved = TRUE;
+				cnt++;
+			}
+		} else {
+			cl->cursorWasMoved = TRUE;
+			cnt++;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+
+	if (debug_pointer && cnt) {
+		rfbLog("cursor_pos_updates: sent position x=%3d y=%3d to %d"
+		    " clients\n", x, y, cnt);
+	}
+}
+
 /*
  * draw one of the mouse cursors into the rfb fb
  */
@@ -2042,6 +2127,9 @@ void draw_mouse(int x, int y, int which, int update) {
 	int cur_x, cur_y, cur_sx, cur_sy, reverse;
 	static int first = 1;
 
+	if (! show_mouse) {
+		return;
+	}
 	if (first) {
 		first = 0;
 		setup_cursors();
@@ -2198,6 +2286,11 @@ void update_mouse(void) {
 	int root_x, root_y, win_x, win_y, which = 0;
 	unsigned int mask;
 
+	if (! show_mouse && cursor_pos == 1 && last_pointer_client) {
+		if (client_count == 1) {
+			return;	/* can save some effort for the 1 client case */
+		}
+	}
 	X_LOCK;
 	ret = XQueryPointer(dpy, rootwin, &root_w, &child_w, &root_x, &root_y,
 	    &win_x, &win_y, &mask);
@@ -2216,6 +2309,7 @@ void update_mouse(void) {
 		}
 	}
 
+	cursor_pos_updates(root_x - off_x, root_y - off_y);
 	draw_mouse(root_x - off_x, root_y - off_y, which, 1);
 }
 
@@ -2340,6 +2434,10 @@ void set_colormap(void) {
 	}
 
 	if (diffs && ! first) {
+		if (! all_clients_initialized()) {
+			rfbLog("set_colormap: warning: sending cmap "
+			    "with uninitialized clients.\n");
+		}
 		rfbSetClientColourMaps(screen, 0, ncells);
 	}
 
@@ -4400,8 +4498,8 @@ void scan_for_updates() {
 		if (fs_factor && tile_count > fs_frac * ntiles) {
 			fb_copy_in_progress = 1;
 			copy_screen();
-			if (show_mouse) {
-				if (! use_threads) {
+			if (show_mouse || cursor_pos) {
+				if (show_mouse && ! use_threads) {
 					redraw_mouse();
 				}
 				update_mouse();
@@ -4483,8 +4581,8 @@ void scan_for_updates() {
 	}
 
 	/* Handle the remote mouse pointer */
-	if (show_mouse) {
-		if (! use_threads) {
+	if (show_mouse || cursor_pos) {
+		if (show_mouse && ! use_threads) {
 			redraw_mouse();
 		}
 		update_mouse();
@@ -4509,7 +4607,6 @@ void watch_loop(void) {
 
 		if (! use_threads) {
 			rfbProcessEvents(screen, -1);
-//fprintf(stderr, "watch_loop rfbProcessEvents done.\n");
 			if (check_user_input(dt, &cnt)) {
 				/* true means loop back for more input */
 				continue;
@@ -4529,6 +4626,9 @@ void watch_loop(void) {
 		}
 
 		if (nofb) {	/* no framebuffer polling needed */
+			if (cursor_pos) {
+				update_mouse();
+			}
 			continue;
 		}
 
@@ -4802,6 +4902,10 @@ void print_help() {
 "-xwarppointer          Move the pointer with XWarpPointer instead of XTEST\n"
 "                       (try as a workaround if pointer behaves poorly, e.g.\n"
 "                       on touchscreens or other non-standard setups).\n"
+"-cursorpos             Send the X cursor position back to all vnc clients that\n"
+"                       support the TightVNC CursorPosUpdates extension.\n"
+"-cursorposall          As -cursorpos, but send to all clients, even the one\n"
+"                       that is currently moving the cursor around.\n"
 "-buttonmap str         String to remap mouse buttons.  Format: IJK-LMN, this\n"
 "                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31\n"
 "-nodragging            Do not update the display during mouse dragging events\n"
@@ -4814,6 +4918,7 @@ void print_help() {
 "-input_skip n          For the old pointer handling when non-threaded: try to\n"
 "                       read n user input events before scanning display. n < 0\n"
 "                       means to act as though there is always user input.\n"
+"\n"
 "-debug_pointer         Print debugging output for every pointer event.\n"
 "-debug_keyboard        Print debugging output for every keyboard event.\n"
 "\n"
@@ -4823,6 +4928,11 @@ void print_help() {
 "                       to cut down on load (default %d).\n"
 "-nap                   Monitor activity and if low take longer naps between\n" 
 "                       polls to really cut down load when idle (default %s).\n"
+"-sigpipe string        Broken pipe (SIGPIPE) handling. string can be \"ignore\"\n"
+"                       or \"exit\", for the 1st libvncserver will handle the\n"
+"                       abrupt loss of a client and continue, for the 2nd x11vnc\n"
+"                       will cleanup and exit at the 1st broken connection.\n"
+"                       Default is \"ignore\".\n"
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 "-threads               Whether or not to use the threaded libvncserver\n"
 "-nothreads             algorithm [rfbRunEventLoop] (default %s).\n"
@@ -4959,9 +5069,9 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(arg, "-connect")) {
 			i++;
 			if (strchr(arg, '/')) {
-				client_connect_file = arg;
+				client_connect_file = argv[i];
 			} else {
-				client_connect = strdup(arg);
+				client_connect = strdup(argv[i]);
 			}
 		} else if (!strcmp(arg, "-vncconnect")) {
 			vnc_connect = 1;
@@ -5002,6 +5112,10 @@ int main(int argc, char** argv) {
 			local_cursor = 0;
 		} else if (!strcmp(arg, "-xwarppointer")) {
 			use_xwarppointer = 1;
+		} else if (!strcmp(arg, "-cursorpos")) {
+			cursor_pos = 1;
+		} else if (!strcmp(arg, "-cursorposall")) {
+			cursor_pos = 2;
 		} else if (!strcmp(arg, "-buttonmap")) {
 			pointer_remap = argv[++i];
 		} else if (!strcmp(arg, "-nodragging")) {
@@ -5031,6 +5145,18 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(arg, "-nothreads")) {
 			use_threads = 0;
 #endif
+		} else if (!strcmp(arg, "-sigpipe")) {
+			if (!strcmp(argv[++i], "ignore"))  {
+				sigpipe = 1;
+			} else if (!strcmp(argv[i], "exit")) {
+				sigpipe = 2;
+			} else if (!strcmp(argv[i], "skip")) {
+				sigpipe = 0;
+			} else {
+				fprintf(stderr, "bad -sigpipe arg: %s, must "
+				    "be \"ignore\" or \"exit\"\n", argv[i]);
+				exit(1);
+			}
 		} else if (!strcmp(arg, "-fs")) {
 			fs_frac = atof(argv[++i]);
 		} else if (!strcmp(arg, "-gaps")) {
