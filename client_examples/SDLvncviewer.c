@@ -196,7 +196,15 @@ int main(int argc,char** argv) {
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
 
 	cl=rfbGetClient(5,3,2);
-	//cl=rfbGetClient(8,3,4);
+	i=1;
+	while(i<argc-1) {
+		if(i+1<argc-1 && !strcmp(argv[i],"-encodings")) {
+			cl->appData.encodingsString=argv[i+1];
+			i+=2;
+		}
+	}
+	argc-=i-1;
+	memmove(argv+1,argv+i,(argc-1)*sizeof(char*));
 	cl->MallocFrameBuffer=resize;
 	cl->GotFrameBufferUpdate=update;
 	if(!rfbInitClient(cl,&argc,argv))

@@ -1,7 +1,7 @@
 immediate:
 ----------
 
-TightVNC encoding!!! Regression!!!
+CoRRE, Hextile encoding!!! Regression!!!
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
 
