@@ -227,7 +227,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
     rfbClientIteratorPtr iterator;
     rfbClientPtr cl,cl_;
     struct sockaddr_in addr;
-    socklen_t addrlen = sizeof(struct sockaddr_in);
+    size_t addrlen = sizeof(struct sockaddr_in);
     int i;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);

@@ -195,7 +195,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     fd_set fds;
     struct timeval tv;
     struct sockaddr_in addr;
-    socklen_t addrlen = sizeof(addr);
+    size_t addrlen = sizeof(addr);
     char buf[6];
     const int one = 1;
     int sock;
