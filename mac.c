@@ -27,11 +27,13 @@
  * 
  */
 
+#include <unistd.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
 /* zlib doesn't like Byte already defined */
 #undef Byte
 #undef TRUE
+#undef Bool
 #include "rfb.h"
 #include "keysym.h"
 
@@ -39,7 +41,7 @@ rfbScreenInfoPtr rfbScreen;
 
 /* some variables to enable special behaviour */
 int startTime = -1, maxSecsToConnect = 0;
-Bool disconnectAfterFirstClient = True;
+Bool disconnectAfterFirstClient = TRUE;
 
 /* Where do I get the "official" list of Mac key codes?
    Ripped these out of a Mac II emulator called Basilisk II
@@ -217,10 +219,7 @@ static int keyTable[] = {
 };
 
 void
-KbdAddEvent(down, keySym, cl)
-    Bool down;
-    KeySym keySym;
-    rfbClientPtr cl;
+KbdAddEvent(Bool down, KeySym keySym, struct rfbClientRec* cl)
 {
     int i;
     CGKeyCode keyCode = -1;
@@ -289,7 +288,7 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 {
   int i;
 
-  if(startTime>0 && time()>startTime+maxSecsToConnect)
+  if(startTime>0 && time(0)>startTime+maxSecsToConnect)
     exit(0);
 
   for (i = 0; i < count; i++)
@@ -306,7 +305,7 @@ void clientGone(rfbClientPtr cl)
 
 void newClient(rfbClientPtr cl)
 {
-  if(startTime>0 && time()>startTime+maxSecsToConnect)
+  if(startTime>0 && time(0)>startTime+maxSecsToConnect)
     exit(0);
 
   if(disconnectAfterFirstClient)
@@ -315,10 +314,11 @@ void newClient(rfbClientPtr cl)
 
 int main(int argc,char *argv[])
 {
+  int i;
   for(i=argc-1;i>0;i--)
     if(i<argc-1 && strcmp(argv[i],"-wait4client")==0) {
       maxSecsToConnect = atoi(argv[i+1])/1000;
-      startTime = time();
+      startTime = time(0);
     } else if(strcmp(argv[i],"-runforever")==0) {
       disconnectAfterFirstClient = FALSE;
     }
