@@ -20,7 +20,7 @@ LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB)
 OSX_LIBS = -framework ApplicationServices -framework Carbon
 
 # for x11vnc
-XLIBS =  -L/usr/X11R6/lib -lX11 -lXext
+XLIBS =  -L/usr/X11R6/lib -lX11 -lXext -lXtst
 
 SOURCES=main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
@@ -58,7 +58,8 @@ OSXvnc-server: mac.o libvncserver.a
 	$(CC) -o OSXvnc-server mac.o $(LIBS) $(OSX_LIBS)
 
 x11vnc: x11vnc.o libvncserver.a
-	$(CC) -o x11vnc x11vnc.o $(LIBS) $(XLIBS)
+	$(CC) -o x11vnc x11vnc.o libvncserver.a /usr/lib/libz.a /usr/lib/libjpeg.a $(XLIBS)
+#$(LIBS) $(XLIBS)
 
 storepasswd: storepasswd.o d3des.o vncauth.o
 	$(CC) -o storepasswd storepasswd.o d3des.o vncauth.o

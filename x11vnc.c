@@ -1,3 +1,7 @@
+/* This file is part of LibVNCServer. It is a small clone of x0rfbserver by HexoNet, demonstrating the
+   capabilities of LibVNCServer.
+*/
+
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #ifndef NO_SHM
@@ -7,36 +11,87 @@
 #define KEYSYM_H
 #include "rfb.h"
 
+Display *dpy = 0;
 int c=0,blockLength = 32;
+Bool gotInput = FALSE;
 
-Bool useSHM =
+Bool disconnectAfterFirstClient = TRUE;
+
+/* the hooks */
+
+void clientGone(rfbClientPtr cl)
+{
+  exit(0);
+}
+
+void newClient(rfbClientPtr cl)
+{
+  if(disconnectAfterFirstClient)
+    cl->clientGoneHook = clientGone;
+}
+
+void keyboard(Bool down,KeySym keySym,rfbClientPtr cl)
+{
+  KeyCode k = XKeysymToKeycode( dpy,keySym );
+  if(k!=NoSymbol)
+    XTestFakeKeyEvent(dpy,k,down,CurrentTime);
+  gotInput = TRUE;
+}
+
+int oldButtonMask = 0;
+
+void mouse(int buttonMask,int x,int y,rfbClientPtr cl)
+{
+  int i=0;
+  //fprintf(stderr,"/");
+  XTestFakeMotionEvent(dpy,0,x,y,CurrentTime );
+  while(i<5) {
+    if ((oldButtonMask&(1<<i))!=(buttonMask&(1<<i)))
+      XTestFakeButtonEvent(dpy,i+1,(buttonMask&(1<<i))?True:False,CurrentTime);
+    i++;
+  }
+  oldButtonMask = buttonMask;
+  //fprintf(stderr,"-");
+  gotInput = TRUE;
+}
+
+/* the X11 interaction */
+
 #ifndef NO_SHM
- TRUE;
+Bool useSHM = TRUE;
 XShmSegmentInfo shminfo;
 #else
- FALSE;
+Bool useSHM = FALSE;
 #endif
 
 void getImage(int bpp,Display *dpy,int xscreen,XImage **i)
 {
   if(useSHM && bpp>0) {
+    static Bool firstTime = TRUE;
+    if(firstTime) {
+      firstTime = FALSE;
+      *i = XShmCreateImage( dpy,
+			    DefaultVisual( dpy, xscreen ),
+			    bpp,
+			    ZPixmap,
+			    NULL,
+			    &shminfo,
+			    DisplayWidth(dpy,xscreen),
+			    DisplayHeight(dpy,xscreen));
 
-    *i = XShmCreateImage( dpy,
-			  DefaultVisual( dpy, xscreen ),
-			  bpp,
-			  ZPixmap,
-			  NULL,
-			  &shminfo,
-			  DisplayWidth(dpy,xscreen),
-			  DisplayHeight(dpy,xscreen));
-                                  
-    shminfo.shmid = shmget( IPC_PRIVATE,
-                                 (*i)->bytes_per_line * (*i)->height,
-                                 IPC_CREAT | 0777 );
-    shminfo.shmaddr = (*i)->data = (char *) shmat( shminfo.shmid, 0, 0 );
-    shminfo.readOnly = False;
-  
-    XShmAttach( dpy, &shminfo );
+      if(*i == 0) {
+	useSHM = FALSE;
+	getImage(bpp,dpy,xscreen,i);
+	return;
+      }
+
+      shminfo.shmid = shmget( IPC_PRIVATE,
+			      (*i)->bytes_per_line * (*i)->height,
+			      IPC_CREAT | 0777 );
+      shminfo.shmaddr = (*i)->data = (char *) shmat( shminfo.shmid, 0, 0 );
+      shminfo.readOnly = False;
+      XShmAttach( dpy, &shminfo );
+    }
 
     XShmGetImage(dpy,RootWindow(dpy,xscreen),*i,0,0,AllPlanes);
   } else {
@@ -56,7 +111,7 @@ void checkForImageUpdates(rfbScreenInfoPtr s,char *b)
 	y1*=s->paddedWidthInBytes;
 	x1*=s->bitsPerPixel/8;
 	changed=FALSE;
-	for(l=j*s->paddedWidthInBytes;!changed&&l<y1;l+=s->paddedWidthInBytes)
+	for(l=j*s->paddedWidthInBytes;l<y1;l+=s->paddedWidthInBytes)
 	  for(k=i*s->bitsPerPixel/8;k<x1;k++)
 	    if(s->frameBuffer[l+k]!=b[l+k]) {
 	      //	       fprintf(stderr,"changed: %d, %d\n",k,l);
@@ -72,15 +127,29 @@ void checkForImageUpdates(rfbScreenInfoPtr s,char *b)
      }
 }
 
+/* the main program */
+
 int main(int argc,char** argv)
 {
   XImage *framebufferImage;
   char *backupImage;
-  Display *dpy;
-  int xscreen;
+  int xscreen,i;
   rfbScreenInfoPtr screen;
+  int maxMsecsToConnect = 5000; /* a maximum of 5 seconds to connect */
+  int updateCounter = 20; /* about every 50 ms a screen update should be made. */
 
-  dpy = XOpenDisplay("");
+  for(i=argc-1;i>0;i--)
+    if(i<argc-1 && strcmp(argv[i],"-display")==0) {
+      dpy = XOpenDisplay(argv[i+1]);
+      if(dpy==0) {
+	fprintf(stderr,"Couldn't connect to display \"%s\".\n",argv[i+1]);
+	exit(1);
+      }
+    } else if(strcmp(argv[i],"-noshm")==0) {
+      useSHM = FALSE;
+    }
+  if(dpy==0)
+    dpy = XOpenDisplay("");
   xscreen = DefaultScreen(dpy);
 
   getImage(0,dpy,xscreen,&framebufferImage);
@@ -95,7 +164,7 @@ int main(int argc,char** argv)
 
   screen->rfbServerFormat.bitsPerPixel = framebufferImage->bits_per_pixel;
   screen->rfbServerFormat.depth = framebufferImage->depth;
-  rfbEndianTest = framebufferImage->bitmap_bit_order != MSBFirst;
+  //rfbEndianTest = framebufferImage->bitmap_bit_order != MSBFirst;
   screen->rfbServerFormat.trueColour = TRUE;
 
   if ( screen->rfbServerFormat.bitsPerPixel == 8 ) {
@@ -125,25 +194,43 @@ int main(int argc,char** argv)
 
   backupImage = malloc(screen->height*screen->paddedWidthInBytes);
   memcpy(backupImage,framebufferImage->data,screen->height*screen->paddedWidthInBytes);
+
   screen->frameBuffer = backupImage;
-  screen->rfbDeferUpdateTime = 50;
   screen->cursor = 0;
+  screen->newClientHook = newClient;
+  screen->kbdAddEvent = keyboard;
+  screen->ptrAddEvent = mouse;
+
+  screen->rfbDeferUpdateTime = 1;
+  updateCounter /= screen->rfbDeferUpdateTime;
 
   rfbInitServer(screen);
-   
+
+  c=0;
   while(1) {
-    //fprintf(stderr,"%d\r",c++);
+    if(screen->rfbClientHead)
+      maxMsecsToConnect = 5000;
+    maxMsecsToConnect -= screen->rfbDeferUpdateTime;
+    if(maxMsecsToConnect<0) {
+      fprintf(stderr,"Maximum time to connect reached. Exiting.\n");
+      exit(2);
+    }
+
     rfbProcessEvents(screen,-1);
-    //if(1 || /*c++>7 &&*/ (!screen->rfbClientHead || !FB_UPDATE_PENDING(screen->rfbClientHead))) {
-    //c=0;
-    framebufferImage->f.destroy_image(framebufferImage);
-    getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage);
-    checkForImageUpdates(screen,framebufferImage->data);
-    //}
-    //fprintf(stderr,"%x\n%x\n---\n",screen->frameBuffer,framebufferImage->data);
-     //memcpy(screen->frameBuffer,framebufferImage->data,screen->height*screen->paddedWidthInBytes);
-   rfbMarkRectAsModified(screen,0,0,screen->width,screen->height);
-#if 0
+
+    if(gotInput) {
+      gotInput = FALSE;
+      c=updateCounter;
+    } else if(screen->rfbClientHead && c++>updateCounter) {
+      c=0;
+      //fprintf(stderr,"*");
+      if(!useSHM)
+	framebufferImage->f.destroy_image(framebufferImage);
+      getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage);
+      checkForImageUpdates(screen,framebufferImage->data);
+      //fprintf(stderr,"+");
+    }
+#ifdef WRITE_SNAPS
        {
 	  int i,j,r,g,b;
 	  FILE* f=fopen("test.pnm","wb");
@@ -161,7 +248,7 @@ int main(int argc,char** argv)
 #endif
   }
 #ifndef NO_SHM
-  XShmDetach(dpy,framebufferImage);
+  //XShmDetach(dpy,framebufferImage);
 #endif
 
   return(0);
