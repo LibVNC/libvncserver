@@ -28,7 +28,7 @@ OSX_LIBS = -framework ApplicationServices -framework Carbon -framework IOKit
 
 # for x11vnc
 #XLIBS =  -L/usr/X11R6/lib -lXtst -lXext -lX11
-XLIBS =  -L/usr/lib32 -lXtst -lXext -lX11
+XLIBS =  -L/usr/X11R6/lib -L/usr/lib32 -lXtst -lXext -lX11
 
 SOURCES=main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
@@ -41,6 +41,8 @@ OBJS=main.o rfbserver.o sraRegion.o auth.o sockets.o \
 INSTALLHEADER=rfb.h rfbproto.h sraRegion.h keysym.h
 
 all: example pnmshow storepasswd
+
+all_examples: example pnmshow x11vnc x11vnc_static sratest blooptest pnmshow24 fontsel vncev zippy storepasswd
 
 install_OSX: OSXvnc-server
 	cp OSXvnc-server storepasswd ../OSXvnc/build/OSXvnc.app/Contents/MacOS

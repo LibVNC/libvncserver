@@ -16,7 +16,7 @@ int main(int argc,char** argv)
 {
   FILE* in=stdin;
   int j,width,height,paddedWidth;
-  unsigned char buffer[1024];
+  char buffer[1024];
   rfbScreenInfoPtr rfbScreen;
 
   if(argc>1) {

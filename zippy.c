@@ -21,7 +21,6 @@ void on_key_press (Bool down,KeySym key,rfbClientPtr cl);
 
 int main (int argc, char **argv)
 {
-        int i;
 	rfbScreenInfoPtr server;
 
 	rfbProcessSizeArguments(&maxx,&maxy,&bpp,&argc,argv);
@@ -109,7 +108,7 @@ void draw_primary_colours_generic_fast(rfbScreenInfoPtr s,int x1,int y1,int x2,i
 void draw_primary_colours_generic_ultrafast(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
 {
   rfbPixelFormat f=s->rfbServerFormat;
-  int i,j,y3=(y1*2+y2)/3,y4=(y1+y2*2)/3;
+  int y3=(y1*2+y2)/3,y4=(y1+y2*2)/3;
   /* fill rectangles */
   rfbFillRect(s,x1,y1,x2,y3,f.redMax<<f.redShift);
   rfbFillRect(s,x1,y3,x2,y4,f.greenMax<<f.greenShift);

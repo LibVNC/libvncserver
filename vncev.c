@@ -67,10 +67,10 @@ void output(rfbScreenInfoPtr s,char* line)
 
 void dokey(Bool down,KeySym k,rfbClientPtr cl)
 {
-   char buffer[1024];
+   char buffer[1024+32];
    
    sprintf(buffer,"%s: %s (0x%x)",
-	   down?"down":"up",keys[k&0x3ff]?keys[k&0x3ff]:"",k);
+	   down?"down":"up",keys[k&0x3ff]?keys[k&0x3ff]:"",(unsigned int)k);
    output(cl->screen,buffer);
 }
 
@@ -84,17 +84,18 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
    
 }
 
-void newclient(rfbClientPtr cl)
+enum rfbNewClientAction newclient(rfbClientPtr cl)
 {
    char buffer[1024];
    struct sockaddr_in addr;
-   int len=sizeof(addr),ip;
+   unsigned int len=sizeof(addr),ip;
    
-   getpeername(cl->sock,&addr,&len);
+   getpeername(cl->sock,(struct sockaddr*)&addr,&len);
    ip=ntohl(addr.sin_addr.s_addr);
    sprintf(buffer,"Client connected from ip %d.%d.%d.%d",
 	   (ip>>24)&0xff,(ip>>16)&0xff,(ip>>8)&0xff,ip&0xff);
    output(cl->screen,buffer);
+   return RFB_CLIENT_ACCEPT;
 }
 
 int main(int argc,char** argv)
@@ -102,7 +103,7 @@ int main(int argc,char** argv)
    rfbScreenInfoPtr s=rfbGetScreen(&argc,argv,640,480,8,1,1);
    s->colourMap.is16=FALSE;
    s->colourMap.count=2;
-   s->colourMap.data.bytes="\xd0\xd0\xd0\x30\x01\xe0";
+   s->colourMap.data.bytes=(unsigned char*)"\xd0\xd0\xd0\x30\x01\xe0";
    s->rfbServerFormat.trueColour=FALSE;
    s->frameBuffer=f;
    s->kbdAddEvent=dokey;

@@ -211,7 +211,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     unsigned int maxFnameLen;
     FILE* fd;
     Bool performSubstitutions = FALSE;
-    char str[256];
+    char str[256+32];
 #ifndef WIN32
     struct passwd *user = getpwuid(getuid());
 #endif

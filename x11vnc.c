@@ -4,6 +4,7 @@
 */
 
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
 #ifndef NO_SHM
@@ -338,6 +339,8 @@ int main(int argc,char** argv)
   for(i=argc-1;i>0;i--)
 #ifdef LOCAL_CONTROL
     if(i<argc-1 && !strcmp(argv[i],"-toggleviewonly")) {
+      if(strlen(argv[i+1])>1022)
+	argv[i+1][1022]=0;
       sprintf(message,"t%s",argv[i+1]);
       send_message(&single_instance,message);
       exit(0);
@@ -348,6 +351,8 @@ int main(int argc,char** argv)
     } else
 #ifdef BACKCHANNEL
     if(i<argc-1 && !strcmp(argv[i],"-backchannel")) {
+      if(strlen(argv[i+1])>1022)
+	argv[i+1][1022]=0;
       sprintf(message,"b%s",argv[i+1]);
       send_message(&single_instance,message);
       exit(0);
@@ -417,7 +422,7 @@ int main(int argc,char** argv)
         for(i=0;i<256;i++)
 	  color[i].pixel=i;
 	XQueryColors(dpy,DefaultColormap(dpy,xscreen),color,256);
-	screen->colourMap.data.shorts = (short*)malloc(3*sizeof(short)*screen->colourMap.count);
+	screen->colourMap.data.shorts = (unsigned short*)malloc(3*sizeof(short)*screen->colourMap.count);
 	for(i=0;i<screen->colourMap.count;i++) {
 	   screen->colourMap.data.shorts[i*3+0] = color[i].red;
 	   screen->colourMap.data.shorts[i*3+1] = color[i].green;
@@ -509,7 +514,7 @@ int main(int argc,char** argv)
       rfbScreenCleanup(screen);
       XFree(dpy);
 #ifndef NO_SHM
-      XShmDetach(dpy,framebufferImage);
+      XShmDetach(dpy,&shminfo);
 #endif
       exit(0);
     }
