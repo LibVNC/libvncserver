@@ -244,7 +244,7 @@ int main(int argc,char** argv)
     } else if(screen->rfbClientHead && c++>updateCounter) {
       c=0;
       //fprintf(stderr,"*");
-      //if(!useSHM)
+      if(!useSHM)
 	framebufferImage->f.destroy_image(framebufferImage);
       getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage);
       checkForImageUpdates(screen,framebufferImage->data);
