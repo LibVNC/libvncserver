@@ -131,6 +131,10 @@ void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int
   *y2=*y1+font->metaData[c*5+2];
 }
 
+#ifndef INT_MAX
+#define INT_MAX 0x7fffffff
+#endif
+
 void rfbWholeFontBBox(rfbFontDataPtr font,
 		      int *x1, int *y1, int *x2, int *y2)
 {
