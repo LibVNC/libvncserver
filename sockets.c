@@ -159,6 +159,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     if (!rfbScreen->inetdInitDone && rfbScreen->inetdSock != -1) {
 	rfbNewClientConnection(rfbScreen,rfbScreen->inetdSock); 
 	rfbScreen->inetdInitDone = TRUE;
+        FD_SET(rfbScreen->inetdSock,&(rfbScreen->allFds));
     }
 
     memcpy((char *)&fds, (char *)&(rfbScreen->allFds), sizeof(fd_set));
