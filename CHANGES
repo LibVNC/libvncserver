@@ -1,3 +1,5 @@
+0.3
+   added rfbDrawLine, rfbDrawPixel
 0.2
    inserted a deferUpdate mechanism (X11 independent).
    removed deletion of requestedRegion
