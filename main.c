@@ -46,13 +46,13 @@ rfbLog(char *format, ...)
 {
     va_list args;
     char buf[256];
-    time_t clock;
+    time_t log_clock;
 
     IF_PTHREADS(pthread_mutex_lock(&logMutex));
     va_start(args, format);
 
-    time(&clock);
-    strftime(buf, 255, "%d/%m/%Y %T ", localtime(&clock));
+    time(&log_clock);
+    strftime(buf, 255, "%d/%m/%Y %T ", localtime(&log_clock));
     fprintf(stderr, buf);
 
     vfprintf(stderr, format, args);
@@ -68,22 +68,20 @@ void rfbLogPerror(char *str)
 }
 
 
-void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,RegionPtr modRegion)
+void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
 {
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
    iterator=rfbGetClientIterator(rfbScreen);
-   while((cl=rfbClientIteratorNext(iterator))) {
-     REGION_UNION(cl->screen,&cl->modifiedRegion,&cl->modifiedRegion,modRegion);
-   }
+   while((cl=rfbClientIteratorNext(iterator)))
+     sraRgnOr(cl->modifiedRegion,modRegion);
   
    rfbReleaseClientIterator(iterator);
 }
 
 void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2)
 {
-   BoxRec box; //=(BoxRec*)malloc(sizeof(BoxRec));
-   RegionRec* region=(RegionRec*)malloc(sizeof(RegionRec));
+   sraRegionPtr region;
    int i;
    if(x1>x2) { i=x1; x1=x2; x2=i; }
    x2++;
@@ -95,9 +93,9 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
    if(y1<0) { y1=0; if(y2==y1) y2++; }
    if(y2>=rfbScreen->height) { y2=rfbScreen->height-1; if(y1==y2) y1--; }
    
-   box.x1=x1; box.y1=y1; box.x2=x2; box.y2=y2;
-   REGION_INIT(cl->screen,region,&box,0);
+   region = sraRgnCreateRect(x1,y1,x2,y2);
    rfbMarkRegionAsModified(rfbScreen,region);
+   sraRgnDestroy(region);
 }
 
 int rfbDeferUpdateTime = 40; /* ms */
@@ -119,12 +117,9 @@ clientOutput(void *data)
 	        pthread_mutex_unlock(&cl->updateMutex);
                 return NULL;
             }
-
-            REGION_INIT(&hackScreen, &updateRegion, NullBox, 0);
-            REGION_INTERSECT(&hackScreen, &updateRegion, 
-                             &cl->modifiedRegion, &cl->requestedRegion);
-            haveUpdate = REGION_NOTEMPTY(&hackScreen, &updateRegion);
-            REGION_UNINIT(&hackScreen, &updateRegion);
+	    updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
+	    haveUpdate = sraRgnAnd(updateRegion,cl->requestedRegion);
+	    sraRgnDestroy(updateRegion);
 
             if (!haveUpdate) {
                 pthread_cond_wait(&cl->updateCond, &cl->updateMutex);
@@ -141,17 +136,15 @@ clientOutput(void *data)
            That way, if anything that overlaps the region we're sending
            is updated, we'll be sure to do another update later. */
         pthread_mutex_lock(&cl->updateMutex);
-        REGION_INIT(&hackScreen, &updateRegion, NullBox, 0);
-        REGION_INTERSECT(&hackScreen, &updateRegion, 
-                         &cl->modifiedRegion, &cl->requestedRegion);
-        REGION_SUBTRACT(&hackScreen, &cl->modifiedRegion,
-                        &cl->modifiedRegion, &updateRegion);
+	updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
+	sraRgnAnd(updateRegion,cl->requestedRegion);
+	sraRgnSubtract(cl->modifiedRegion,updateRegion);
         pthread_mutex_unlock(&cl->updateMutex);
 
         /* Now actually send the update. */
         rfbSendFramebufferUpdate(cl, updateRegion);
 
-        REGION_UNINIT(&hackScreen, &updateRegion);
+	sraRgnDestroy(updateRegion);
     }
 
     return NULL;
@@ -377,6 +370,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    format->depth = rfbScreen->depth;
    format->bigEndian = rfbEndianTest?FALSE:TRUE;
    format->trueColour = TRUE;
+   rfbScreen->colourMap = NULL;
 
    if(bytesPerPixel == 8) {
      format->redMax = 7;

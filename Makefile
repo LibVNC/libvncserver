@@ -1,9 +1,9 @@
-CC=cc
+#CC=cc
 CFLAGS=-g -Wall
 #CFLAGS=-O2 -Wall
 RANLIB=ranlib
 
-INCLUDES=-I. -Iinclude
+INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 # These two lines enable useage of PThreads
@@ -17,11 +17,11 @@ OSX_LIBS = -framework ApplicationServices -framework Carbon
 
 # for Example
 
-SOURCES=main.c rfbserver.c miregion.c auth.c sockets.c xalloc.c \
+SOURCES=main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	zlib.c tight.c httpd.c cursor.o \
 	d3des.c vncauth.c
-OBJS=main.o rfbserver.o miregion.o auth.o sockets.o xalloc.o \
+OBJS=main.o rfbserver.o sraRegion.o auth.o sockets.o \
 	stats.o corre.o hextile.o rre.o translate.o cutpaste.o \
 	zlib.o tight.o httpd.o cursor.o \
 	d3des.o vncauth.o
@@ -50,9 +50,15 @@ OSXvnc-server: mac.o libvncserver.a
 storepasswd: storepasswd.o d3des.o vncauth.o
 	$(CC) -o storepasswd storepasswd.o d3des.o vncauth.o
 
+sratest: sratest.o
+	$(CC) -o sratest sratest.o
+
+sratest.o: sraRegion.c
+	$(CC) $(CFLAGS) $(INCLUDES) -DSRA_TEST -c -o sratest.o sraRegion.c
+
 clean:
 	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \
-	     	mac.o example.o pnmshow.o $(OBJS) 
+	     	mac.o example.o pnmshow.o sratest.o $(OBJS)
 
 realclean: clean
 	rm -f OSXvnc-server storepasswd example pnmshow libvncserver.a

@@ -346,11 +346,9 @@ rfbSetClientColourMap(cl, firstColour, nColours)
 	    [cl->format.bitsPerPixel / 16]) (&cl->translateLookupTable,
 					     &rfbServerFormat, &cl->format);
 
-	REGION_UNINIT(pScreen,&cl->modifiedRegion);
-	box.x1 = box.y1 = 0;
-	box.x2 = rfbScreen.width;
-	box.y2 = rfbScreen.height;
-	REGION_INIT(pScreen,&cl->modifiedRegion,&box,0);
+	sraRgnDestroy(cl->modifiedRegion);
+	cl->modifiedRegion =
+	  sraRgnCreateRect(0,0,rfbScreen.width,rfbScreen.height);
 
 	return TRUE;
     }

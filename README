@@ -18,16 +18,44 @@ There are two examples included:
 The examples are not too well documented, but easy straight forward and a
 good starting point.
 
+Try example: it outputs on which port it listens (default: 5900), so it is
+display 0. To view, call
+	vncviewer :0
+You should see a sheet with a gradient and "Hello World!" written on it. Try
+to paint something. Note that everytime you click, there is some bigger blot.
+The size depends on the mouse button you click. Open a second vncviewer with
+the same parameters and watch it as you paint in the other window. This also
+works over internet. You just have to know either the name or the IP of your
+machine. Then it is
+	vncviewer machine.where.example.runs.com:0
+or similar for the remote client. Now you are ready to type something. Be sure
+that your mouse sits still, because everytime the mouse moves, the cursor is
+reset! If you are done with that demo, just press Escape in the viewer. Note
+that the server still runs, even if you closed both windows. When you
+reconnect now, everything you painted and wrote is still there. So you press
+"Page Up" for a blank page.
+
+The demo pnmshow is much simpler: you either provide a filename as argument
+or pipe a file through stdin. Note that the file has to be a raw pnm/ppm file,
+i.e. a truecolour graphics. Only the Escape key is implemented. This may be
+the best starting point if you want to learn how to use LibVNCServer. You
+are confronted with the fact that the bytes per pixel can only be 8, 16 or 32.
+
 How to use
 ----------
 
 To make a server, you just have to initialise a server structure using the
 function rfbDefaultScreenInit, like
   rfbScreenInfoPtr rfbScreen =
-    rfbGetScreen(argc,argv,maxx,maxy,8,3,bpp);
+    rfbGetScreen(argc,argv,width,height,8,3,bpp);
+where byte per pixel is 1, 2 or 4. This is so because of speed considerations
+(you can use native data types of that width).
 
 You then can set hooks and io functions (see below) or other
 options (see below).
+
+And you allocate the frame buffer like this:
+    rfbScreen->frameBuffer = (char*)malloc(width*height*bpp);
 
 After that, you initialize the server, like
   rfbInitServer(rfbScreen);
@@ -59,6 +87,11 @@ Remark: There are vncviewers out there, which know a cursor encoding, so
 that network traffic is low, and also the cursor doesn't need to be
 drawn the cursor everytime an update is sent. LibVNCServer handles
 all the details. Just set the cursor and don't bother any more.
+
+To set the mouse coordinates (or emulate mouse clicks), call
+  defaultPtrAddEvent(buttonMask,x,y,cl);
+However, this works only if your client doesn't do local cursor drawing. There
+is no way (to my knowledge) to set the pointer of a client via RFB protocol.
 
 What is the difference between rfbScreenInfoPtr and rfbClientPtr?
 -----------------------------------------------------------------
@@ -121,6 +154,9 @@ kbdReleaseAllKeys(rfbClientPtr cl)
   is not called at all (maybe in the future).
 ptrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl)
   is called when the mouse moves or a button is pressed.
+  WARNING: if you want to have proper cursor handling, call
+	defaultPtrAddEvent(buttonMask,x,y,cl)
+  in your own function. This sets the coordinates of the cursor.
 setXCutText(char* str,int len,rfbClientPtr cl)
   is called when the selection changes.
 

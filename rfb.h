@@ -182,6 +182,7 @@ typedef struct
     ScreenRec screen;
   */
     rfbPixelFormat rfbServerFormat;
+    CARD16* colourMap; /* set this if rfbServerFormat.trueColour==FALSE */
     char* desktopName;
     char rfbThisHost[255];
     int rfbPort;
@@ -256,16 +257,8 @@ extern void vncEncryptBytes(unsigned char *bytes, char *passwd);
 
 /* region stuff */
 
-typedef struct BoxRec {
-    short x1, y1, x2, y2;
-} BoxRec, *BoxPtr;
-
-typedef struct RegDataRec* RegDataPtr;
-
-typedef struct RegionRec {
-    BoxRec 	extents;
-    RegDataPtr	data;
-} RegionRec, *RegionPtr;
+struct sraRegion;
+typedef struct sraRegion* sraRegionPtr;
 
 /*
  * Per-client structure.
@@ -333,7 +326,7 @@ typedef struct rfbClientRec {
        the destination copyRegion.  Just before an update is sent we remove
        from the copyRegion anything in the modifiedRegion. */
 
-    RegionRec copyRegion;	/* the destination region of the copy */
+    sraRegionPtr copyRegion;	/* the destination region of the copy */
     int copyDX, copyDY;		/* the translation by which the copy happens */
 
 
@@ -342,14 +335,14 @@ typedef struct rfbClientRec {
     pthread_cond_t updateCond;
 #endif
 
-    RegionRec modifiedRegion;
+    sraRegionPtr modifiedRegion;
 
     /* As part of the FramebufferUpdateRequest, a client can express interest
        in a subrectangle of the whole framebuffer.  This is stored in the
        requestedRegion member.  In the normal case this is the whole
        framebuffer if the client is ready, empty if it's not. */
 
-    RegionRec requestedRegion;
+    sraRegionPtr requestedRegion;
 
     /* The following members represent the state of the "deferred update" timer
        - when the framebuffer is modified and the client is ready, in most
@@ -429,8 +422,10 @@ typedef struct rfbClientRec {
 #define FB_UPDATE_PENDING(cl)                           \
      ((!(cl)->enableCursorShapeUpdates && !(cl)->screen->cursorIsDrawn) ||   \
      ((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||      \
-     REGION_NOTEMPTY(&((cl)->screenInfo->screen),&(cl)->copyRegion) ||  \
-     REGION_NOTEMPTY(&((cl)->screenInfo->screen),&(cl)->modifiedRegion))
+     !sraRgnEmpty((cl)->copyRegion) || !sraRgnEmpty((cl)->modifiedRegion))
+
+      //REGION_NOTEMPTY(&((cl)->screenInfo->screen),&(cl)->copyRegion) ||  
+      //REGION_NOTEMPTY(&((cl)->screenInfo->screen),&(cl)->modifiedRegion))
 
 /*
  * This macro creates an empty region (ie. a region with no areas) if it is
@@ -509,11 +504,11 @@ extern void rfbProcessClientMessage(rfbClientPtr cl);
 extern void rfbClientConnFailed(rfbClientPtr cl, char *reason);
 extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
 extern void rfbProcessUDPInput(rfbClientPtr cl);
-extern Bool rfbSendFramebufferUpdate(rfbClientPtr cl, RegionRec updateRegion);
+extern Bool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
 extern Bool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern Bool rfbSendUpdateBuf(rfbClientPtr cl);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
-extern Bool rfbSendCopyRegion(rfbClientPtr cl,RegionPtr reg,int dx,int dy);
+extern Bool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
 extern Bool rfbSendLastRectMarker(rfbClientPtr cl);
 
 void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
@@ -627,7 +622,7 @@ extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
 extern void rfbDisconnectUDPSock(rfbScreenInfoPtr cl);
 
 void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2);
-void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,RegionPtr modRegion);
+void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
 void doNothingWithClient(rfbClientPtr cl);
 
 /* functions to make a vnc server */

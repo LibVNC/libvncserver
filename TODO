@@ -10,7 +10,6 @@ in the works:
 
 adapt rdp2vnc (rdesktop)
 optionally dont draw rich cursors as xcursors
-use sraRegion from Wez instead of miregion, because it is much smaller
 
 later:
 ------
@@ -32,4 +31,5 @@ done:
 .other encodings
 .test drawing of cursors when not using xcursor or rich cursor encoding
 fix bug with odd width (depends on client depth: width has to be multiple of server.bytesPerPixel/client.bytesPerPixel). only raw!! -> bug of vncviewer!
+.use sraRegion from Wez instead of miregion, because it is much smaller
 

@@ -1,6 +1,9 @@
 #ifndef REGION_H
 #define REGION_H
 
+#include "sraRegion.h"
+
+#if 0
 #define NullRegion ((RegionPtr)0)
 #define NullBox ((BoxPtr)0)
 
@@ -38,5 +41,6 @@ extern void miTranslateRegion(RegionPtr,int,int);
 #define REGION_SUBTRACT(s,newReg,reg1,reg2) miSubtract(newReg,reg1,reg2)
 #define REGION_UNION(s,newReg,reg1,reg2) miUnion(newReg,reg1,reg2)
 #define REGION_TRANSLATE(s,pReg,x,y) miTranslateRegion(pReg,x,y)
+#endif
 
 #endif

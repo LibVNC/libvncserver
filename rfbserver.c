@@ -151,7 +151,6 @@ rfbNewClient(rfbScreen,sock)
     rfbProtocolVersionMsg pv;
     rfbClientIteratorPtr iterator;
     rfbClientPtr cl;
-    BoxRec box;
     struct sockaddr_in addr;
     int addrlen = sizeof(struct sockaddr_in);
     int i;
@@ -183,21 +182,19 @@ rfbNewClient(rfbScreen,sock)
     cl->correMaxWidth = 48;
     cl->correMaxHeight = 48;
 
-    REGION_INIT(rfbScreen,&cl->copyRegion,NullBox,0);
+    cl->copyRegion = sraRgnCreate();
     cl->copyDX = 0;
     cl->copyDY = 0;
    
-    box.x1 = box.y1 = 0;
-    box.x2 = rfbScreen->width;
-    box.y2 = rfbScreen->height;
-    REGION_INIT(pScreen,&cl->modifiedRegion,&box,0);
+    cl->modifiedRegion =
+      sraRgnCreateRect(0,0,rfbScreen->width,rfbScreen->height);
 
 #ifdef HAVE_PTHREADS
     pthread_mutex_init(&cl->updateMutex, NULL);
     pthread_cond_init(&cl->updateCond, NULL);
 #endif
 
-    REGION_INIT(pScreen,&cl->requestedRegion,NullBox,0);
+    cl->requestedRegion = sraRgnCreate();
 
     cl->format = cl->screen->rfbServerFormat;
     cl->translateFn = rfbTranslateNone;
@@ -296,7 +293,7 @@ rfbClientConnectionGone(cl)
     pthread_mutex_unlock(&rfbClientListMutex);
 #endif
 
-    REGION_UNINIT(pScreen,&cl->modifiedRegion);
+    sraRgnDestroy(cl->modifiedRegion);
 
     rfbPrintStats(cl);
 
@@ -676,8 +673,7 @@ rfbProcessClientNormalMessage(cl)
 
     case rfbFramebufferUpdateRequest:
     {
-        RegionRec tmpRegion;
-        BoxRec box;
+        sraRegionPtr tmpRegion;
 
         if ((n = ReadExact(cl, ((char *)&msg) + 1,
                            sz_rfbFramebufferUpdateRequestMsg-1)) <= 0) {
@@ -687,17 +683,16 @@ rfbProcessClientNormalMessage(cl)
             return;
         }
 
-        box.x1 = Swap16IfLE(msg.fur.x);
-        box.y1 = Swap16IfLE(msg.fur.y);
-        box.x2 = box.x1 + Swap16IfLE(msg.fur.w);
-        box.y2 = box.y1 + Swap16IfLE(msg.fur.h);
-        SAFE_REGION_INIT(pScreen,&tmpRegion,&box,0);
+	tmpRegion =
+	  sraRgnCreateRect(Swap16IfLE(msg.fur.x),
+			   Swap16IfLE(msg.fur.y),
+			   Swap16IfLE(msg.fur.x)+Swap16IfLE(msg.fur.w),
+			   Swap16IfLE(msg.fur.y)+Swap16IfLE(msg.fur.h));
 
 #ifdef HAVE_PTHREADS
         pthread_mutex_lock(&cl->updateMutex);
 #endif
-        REGION_UNION(pScreen, &cl->requestedRegion, &cl->requestedRegion,
-                     &tmpRegion);
+	sraRgnOr(cl->requestedRegion,tmpRegion);
 
 #ifdef NOT_YET
 	if (!cl->readyForSetColourMapEntries) {
@@ -705,7 +700,7 @@ rfbProcessClientNormalMessage(cl)
 	    cl->readyForSetColourMapEntries = TRUE;
 	    if (!cl->format.trueColour) {
 		if (!rfbSetClientColourMap(cl, 0, 0)) {
-		    REGION_UNINIT(pScreen,&tmpRegion);
+		    sraRgnDestroy(tmpRegion);
 		    return;
 		}
 	    }
@@ -713,9 +708,8 @@ rfbProcessClientNormalMessage(cl)
 #endif
 
        if (!msg.fur.incremental) {
-            REGION_UNION(pScreen,&cl->modifiedRegion,&cl->modifiedRegion,
-                         &tmpRegion);
-	    REGION_SUBTRACT(pScreen,&cl->copyRegion,&cl->copyRegion,&tmpRegion);
+	    sraRgnOr(cl->modifiedRegion,tmpRegion);
+	    sraRgnSubtract(cl->copyRegion,tmpRegion);
         }
 #ifdef HAVE_PTHREADS
         pthread_cond_signal(&cl->updateCond);
@@ -726,7 +720,7 @@ rfbProcessClientNormalMessage(cl)
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
 	}
 	
-        REGION_UNINIT(pScreen,&tmpRegion);
+	sraRgnDestroy(tmpRegion);
 
         return;
     }
@@ -820,12 +814,13 @@ rfbProcessClientNormalMessage(cl)
 Bool
 rfbSendFramebufferUpdate(cl, updateRegion)
      rfbClientPtr cl;
-     RegionRec updateRegion;
+     sraRegionPtr updateRegion;
 {
-    int i;
+    sraRectangleIterator* i;
+    sraRect rect;
     int nUpdateRegionRects;
     rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
-    RegionRec updateCopyRegion;
+    sraRegionPtr updateCopyRegion;
     int dx, dy;
     Bool sendCursorShape = FALSE;
     Bool cursorWasDrawn = FALSE;
@@ -835,29 +830,26 @@ rfbSendFramebufferUpdate(cl, updateRegion)
      * removed from the framebuffer. Otherwise, make sure it's put up.
      */
 
-   cursorWasDrawn = cl->screen->cursorIsDrawn;
+    cursorWasDrawn = cl->screen->cursorIsDrawn;
 
-   if (cl->enableCursorShapeUpdates) {
+    if (cl->enableCursorShapeUpdates) {
       if (cl->screen->cursorIsDrawn) {
-	 rfbUndrawCursor(cl);
-	 //fprintf(stderr,"rfbSpriteRemoveCursor(pScreen); not yet!\n");
+	rfbUndrawCursor(cl);
       }
       if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged)
 	sendCursorShape = TRUE;
-   } else {
+    } else {
       if (!cl->screen->cursorIsDrawn)
 	rfbDrawCursor(cl);
-        //fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!\n");
-   }
+    }
    
     /*
      * The modifiedRegion may overlap the destination copyRegion.  We remove
      * any overlapping bits from the copyRegion (since they'd only be
      * overwritten anyway).
      */
-
-    REGION_SUBTRACT(pScreen, &cl->copyRegion, &cl->copyRegion,
-		    &cl->modifiedRegion);
+    
+    sraRgnSubtract(cl->copyRegion,cl->modifiedRegion);
 
     /*
      * The client is interested in the region requestedRegion.  The region
@@ -866,15 +858,11 @@ rfbSendFramebufferUpdate(cl, updateRegion)
      * no update is needed.
      */
 
-    REGION_INIT(pScreen,&updateRegion,NullBox,0);
-    REGION_UNION(pScreen, &updateRegion, &cl->copyRegion,
-		 &cl->modifiedRegion);
-    REGION_INTERSECT(pScreen, &updateRegion, &cl->requestedRegion,
-		     &updateRegion);
-
-    if (!REGION_NOTEMPTY(pScreen,&updateRegion) && !sendCursorShape) {
-	REGION_UNINIT(pScreen,&updateRegion);
-	return TRUE;
+    updateRegion = sraRgnCreateRgn(cl->copyRegion);
+    sraRgnOr(updateRegion,cl->modifiedRegion);
+    if(!sraRgnAnd(updateRegion,cl->requestedRegion) && !sendCursorShape) {
+      sraRgnDestroy(updateRegion);
+      return TRUE;
     }
 
     /*
@@ -886,12 +874,10 @@ rfbSendFramebufferUpdate(cl, updateRegion)
      * updateCopyRegion to this.
      */
 
-    REGION_INIT(pScreen,&updateCopyRegion,NullBox,0);
-    REGION_INTERSECT(pScreen, &updateCopyRegion, &cl->copyRegion,
-		     &cl->requestedRegion);
-    REGION_TRANSLATE(pScreen, &cl->requestedRegion, cl->copyDX, cl->copyDY);
-    REGION_INTERSECT(pScreen, &updateCopyRegion, &updateCopyRegion,
-		     &cl->requestedRegion);
+    updateCopyRegion = sraRgnCreateRgn(cl->copyRegion);
+    sraRgnAnd(updateCopyRegion,cl->requestedRegion);
+    sraRgnOffset(cl->requestedRegion,cl->copyDX,cl->copyDY);
+    sraRgnAnd(updateCopyRegion,cl->requestedRegion);
     dx = cl->copyDX;
     dy = cl->copyDY;
 
@@ -901,7 +887,7 @@ rfbSendFramebufferUpdate(cl, updateRegion)
      * a copy).
      */
 
-    REGION_SUBTRACT(pScreen, &updateRegion, &updateRegion, &updateCopyRegion);
+    sraRgnSubtract(updateRegion,updateCopyRegion);
 
     /*
      * Finally we leave modifiedRegion to be the remainder (if any) of parts of
@@ -911,19 +897,15 @@ rfbSendFramebufferUpdate(cl, updateRegion)
      */
 
 
-    REGION_UNION(pScreen, &cl->modifiedRegion, &cl->modifiedRegion,
-		                  &cl->copyRegion);
-       REGION_SUBTRACT(pScreen, &cl->modifiedRegion, &cl->modifiedRegion,
-		                           &updateRegion);
-       REGION_SUBTRACT(pScreen, &cl->modifiedRegion, &cl->modifiedRegion,
-		                           &updateCopyRegion);
+     sraRgnOr(cl->modifiedRegion,cl->copyRegion);
+     sraRgnSubtract(cl->modifiedRegion,updateRegion);
+     sraRgnSubtract(cl->modifiedRegion,updateCopyRegion);
    
-       REGION_EMPTY(pScreen, &cl->requestedRegion);
-       REGION_EMPTY(pScreen, &cl->copyRegion);
-       cl->copyDX = 0;
-       cl->copyDY = 0;
+     sraRgnMakeEmpty(cl->requestedRegion);
+     sraRgnMakeEmpty(cl->copyRegion);
+     cl->copyDX = 0;
+     cl->copyDY = 0;
    
-
    /*
      * Now send the update.
      */
@@ -933,32 +915,32 @@ rfbSendFramebufferUpdate(cl, updateRegion)
     if (cl->preferredEncoding == rfbEncodingCoRRE) {
         nUpdateRegionRects = 0;
 
-        for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
-            int x = REGION_RECTS(&updateRegion)[i].x1;
-            int y = REGION_RECTS(&updateRegion)[i].y1;
-            int w = REGION_RECTS(&updateRegion)[i].x2 - x;
-            int h = REGION_RECTS(&updateRegion)[i].y2 - y;
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
             nUpdateRegionRects += (((w-1) / cl->correMaxWidth + 1)
                                      * ((h-1) / cl->correMaxHeight + 1));
         }
     } else if (cl->preferredEncoding == rfbEncodingZlib) {
 	nUpdateRegionRects = 0;
 
-	for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
-	    int x = REGION_RECTS(&updateRegion)[i].x1;
-	    int y = REGION_RECTS(&updateRegion)[i].y1;
-	    int w = REGION_RECTS(&updateRegion)[i].x2 - x;
-	    int h = REGION_RECTS(&updateRegion)[i].y2 - y;
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
 	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
 	}
     } else if (cl->preferredEncoding == rfbEncodingTight) {
 	nUpdateRegionRects = 0;
 
-	for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
-	    int x = REGION_RECTS(&updateRegion)[i].x1;
-	    int y = REGION_RECTS(&updateRegion)[i].y1;
-	    int w = REGION_RECTS(&updateRegion)[i].x2 - x;
-	    int h = REGION_RECTS(&updateRegion)[i].y2 - y;
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
 	    int n = rfbNumCodedRectsTight(cl, x, y, w, h);
 	    if (n == 0) {
 		nUpdateRegionRects = 0xFFFF;
@@ -967,12 +949,12 @@ rfbSendFramebufferUpdate(cl, updateRegion)
 	    nUpdateRegionRects += n;
 	}
     } else {
-        nUpdateRegionRects = REGION_NUM_RECTS(&updateRegion);
+        nUpdateRegionRects = sraRgnCountRects(updateRegion);
     }
 
     fu->type = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
-	fu->nRects = Swap16IfLE(REGION_NUM_RECTS(&updateCopyRegion)
+	fu->nRects = Swap16IfLE(sraRgnCountRects(updateCopyRegion)
 				+ nUpdateRegionRects + !!sendCursorShape);
     } else {
 	fu->nRects = 0xFFFF;
@@ -985,21 +967,21 @@ rfbSendFramebufferUpdate(cl, updateRegion)
 	    return FALSE;
     }
    
-    if (REGION_NOTEMPTY(pScreen,&updateCopyRegion)) {
-	if (!rfbSendCopyRegion(cl,&updateCopyRegion,dx,dy)) {
-	    REGION_UNINIT(pScreen,&updateRegion);
-	    REGION_UNINIT(pScreen,&updateCopyRegion);
+    if (!sraRgnEmpty(updateCopyRegion)) {
+	if (!rfbSendCopyRegion(cl,updateCopyRegion,dx,dy)) {
+	    sraRgnDestroy(updateRegion);
+	    sraRgnDestroy(updateCopyRegion);
 	    return FALSE;
 	}
     }
 
-    REGION_UNINIT(pScreen,&updateCopyRegion);
+    sraRgnDestroy(updateCopyRegion);
 
-    for (i = 0; i < REGION_NUM_RECTS(&updateRegion); i++) {
-        int x = REGION_RECTS(&updateRegion)[i].x1;
-        int y = REGION_RECTS(&updateRegion)[i].y1;
-        int w = REGION_RECTS(&updateRegion)[i].x2 - x;
-        int h = REGION_RECTS(&updateRegion)[i].y2 - y;
+    for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+        int x = rect.x1;
+        int y = rect.y1;
+        int w = rect.x2 - x;
+        int h = rect.y2 - y;
 
         cl->rfbRawBytesEquivalent += (sz_rfbFramebufferUpdateRectHeader
                                       + w * (cl->format.bitsPerPixel / 8) * h);
@@ -1027,13 +1009,13 @@ rfbSendFramebufferUpdate(cl, updateRegion)
             break;
 	case rfbEncodingZlib:
 	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h)) {
-		REGION_UNINIT(pScreen,&updateRegion);
+	        sraRgnDestroy(updateRegion);
 		return FALSE;
 	    }
 	    break;
 	case rfbEncodingTight:
 	    if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
-		REGION_UNINIT(pScreen,&updateRegion);
+	        sraRgnDestroy(updateRegion);
 		return FALSE;
 	    }
 	    break;
@@ -1051,10 +1033,8 @@ rfbSendFramebufferUpdate(cl, updateRegion)
     if(cursorWasDrawn != cl->screen->cursorIsDrawn) {
        if(cursorWasDrawn)
 	  rfbDrawCursor(cl);
-	  //fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!!\n");
        else
 	  rfbUndrawCursor(cl);
-	  //fprintf(stderr,"rfbSpriteRemoveCursor(pScreen); not yet!!\n");
     }
 
     return TRUE;
@@ -1071,86 +1051,43 @@ rfbSendFramebufferUpdate(cl, updateRegion)
 Bool
 rfbSendCopyRegion(cl, reg, dx, dy)
     rfbClientPtr cl;
-    RegionPtr reg;
+    sraRegionPtr reg;
     int dx, dy;
 {
-    int nrects, nrectsInBand, x_inc, y_inc, thisRect, firstInNextBand;
     int x, y, w, h;
     rfbFramebufferUpdateRectHeader rect;
     rfbCopyRect cr;
+    sraRectangleIterator* i;
+    sraRect rect1;
 
-    nrects = REGION_NUM_RECTS(reg);
+    i = sraRgnGetReverseIterator(reg,dx<0,dy<0);
 
-    if (dx <= 0) {
-	x_inc = 1;
-    } else {
-	x_inc = -1;
-    }
+    while(sraRgnIteratorNext(i,&rect1)) {
+      x = rect1.x1;
+      y = rect1.y1;
+      w = rect1.x2 - x;
+      h = rect1.y2 - y;
 
-    if (dy <= 0) {
-	thisRect = 0;
-	y_inc = 1;
-    } else {
-	thisRect = nrects - 1;
-	y_inc = -1;
-    }
+      rect.r.x = Swap16IfLE(x);
+      rect.r.y = Swap16IfLE(y);
+      rect.r.w = Swap16IfLE(w);
+      rect.r.h = Swap16IfLE(h);
+      rect.encoding = Swap32IfLE(rfbEncodingCopyRect);
 
-    while (nrects > 0) {
+      memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+	     sz_rfbFramebufferUpdateRectHeader);
+      cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-	firstInNextBand = thisRect;
-	nrectsInBand = 0;
+      cr.srcX = Swap16IfLE(x - dx);
+      cr.srcY = Swap16IfLE(y - dy);
 
-	while ((nrects > 0) &&
-	       (REGION_RECTS(reg)[firstInNextBand].y1
-		== REGION_RECTS(reg)[thisRect].y1))
-	{
-	    firstInNextBand += y_inc;
-	    nrects--;
-	    nrectsInBand++;
-	}
+      memcpy(&cl->updateBuf[cl->ublen], (char *)&cr, sz_rfbCopyRect);
+      cl->ublen += sz_rfbCopyRect;
 
-	if (x_inc != y_inc) {
-	    thisRect = firstInNextBand - y_inc;
-	}
+      cl->rfbRectanglesSent[rfbEncodingCopyRect]++;
+      cl->rfbBytesSent[rfbEncodingCopyRect]
+	+= sz_rfbFramebufferUpdateRectHeader + sz_rfbCopyRect;
 
-	while (nrectsInBand > 0) {
-	    if ((cl->ublen + sz_rfbFramebufferUpdateRectHeader
-		 + sz_rfbCopyRect) > UPDATE_BUF_SIZE)
-	    {
-		if (!rfbSendUpdateBuf(cl))
-		    return FALSE;
-	    }
-
-	    x = REGION_RECTS(reg)[thisRect].x1;
-	    y = REGION_RECTS(reg)[thisRect].y1;
-	    w = REGION_RECTS(reg)[thisRect].x2 - x;
-	    h = REGION_RECTS(reg)[thisRect].y2 - y;
-
-	    rect.r.x = Swap16IfLE(x);
-	    rect.r.y = Swap16IfLE(y);
-	    rect.r.w = Swap16IfLE(w);
-	    rect.r.h = Swap16IfLE(h);
-	    rect.encoding = Swap32IfLE(rfbEncodingCopyRect);
-
-	    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
-		   sz_rfbFramebufferUpdateRectHeader);
-	    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
-
-	    cr.srcX = Swap16IfLE(x - dx);
-	    cr.srcY = Swap16IfLE(y - dy);
-
-	    memcpy(&cl->updateBuf[cl->ublen], (char *)&cr, sz_rfbCopyRect);
-	    cl->ublen += sz_rfbCopyRect;
-
-	    cl->rfbRectanglesSent[rfbEncodingCopyRect]++;
-	    cl->rfbBytesSent[rfbEncodingCopyRect]
-		+= sz_rfbFramebufferUpdateRectHeader + sz_rfbCopyRect;
-
-	    thisRect += x_inc;
-	    nrectsInBand--;
-	}
-
-	thisRect = firstInNextBand;
     }
 
     return TRUE;
