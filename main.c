@@ -176,14 +176,14 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
    int i;
 
    if(x1>x2) { i=x1; x1=x2; x2=i; }
-   x2++;
-   if(x1<0) { x1=0; if(x2==x1) x2++; }
-   if(x2>=rfbScreen->width) { x2=rfbScreen->width-1; if(x1==x2) x1--; }
+   if(x1<0) x1=0;
+   if(x2>=rfbScreen->width) x2=rfbScreen->width-1;
+   if(x1==x2) return;
    
    if(y1>y2) { i=y1; y1=y2; y2=i; }
-   y2++;
-   if(y1<0) { y1=0; if(y2==y1) y2++; }
-   if(y2>=rfbScreen->height) { y2=rfbScreen->height-1; if(y1==y2) y1--; }
+   if(y1<0) y1=0;
+   if(y2>=rfbScreen->height) y2=rfbScreen->height-1;
+   if(y1==y2) return;
    
    region = sraRgnCreateRect(x1,y1,x2,y2);
    rfbMarkRegionAsModified(rfbScreen,region);
@@ -400,12 +400,32 @@ rfbCursorPtr defaultGetCursorPtr(rfbClientPtr cl)
    return(cl->screen->cursor);
 }
 
-Bool defaultGetPassword(rfbClientPtr cl,char* passwd,int len)
+/* response is cl->authChallenge vncEncrypted with passwd */
+Bool defaultPasswordCheck(rfbClientPtr cl,char* response,int len)
 {
-  char *pwd=vncDecryptPasswdFromFile(cl->screen->rfbAuthPasswdData);
-  if(!pwd)
+  int i;
+  char *passwd=vncDecryptPasswdFromFile(cl->screen->rfbAuthPasswdData);
+
+  if(!passwd) {
+    rfbLog("Couldn't read password file: %s\n",cl->screen->rfbAuthPasswdData);
     return(FALSE);
-  strncpy(passwd,pwd,MAXPWLEN);
+  }
+
+  vncEncryptBytes(cl->authChallenge, passwd);
+
+  /* Lose the password from memory */
+  for (i = strlen(passwd); i >= 0; i--) {
+    passwd[i] = '\0';
+  }
+
+  free(passwd);
+
+  if (memcmp(cl->authChallenge, response, len) != 0) {
+    rfbLog("rfbAuthProcessClientMessage: authentication failed from %s\n",
+	   cl->host);
+    return(FALSE);
+  }
+
   return(TRUE);
 }
 
@@ -520,7 +540,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->setXCutText = defaultSetXCutText;
    rfbScreen->getCursorPtr = defaultGetCursorPtr;
    rfbScreen->setTranslateFunction = rfbSetTranslateFunction;
-   rfbScreen->getPassword = defaultGetPassword;
+   rfbScreen->passwordCheck = defaultPasswordCheck;
    rfbScreen->newClientHook = doNothingWithClient;
    rfbScreen->displayHook = 0;
 

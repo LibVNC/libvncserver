@@ -73,8 +73,7 @@ void
 rfbAuthProcessClientMessage(cl)
     rfbClientPtr cl;
 {
-    char passwd[1024];
-    int i, n;
+    int n;
     CARD8 response[CHALLENGESIZE];
     CARD32 authResult;
 
@@ -85,31 +84,9 @@ rfbAuthProcessClientMessage(cl)
         return;
     }
 
-    if(!cl->screen->getPassword(cl,passwd,MAXPWLEN)) {
-        rfbLog("rfbAuthProcessClientMessage: could not get password\n");
+    if(!cl->screen->passwordCheck(cl,response,CHALLENGESIZE)) {
+        rfbLog("rfbAuthProcessClientMessage: password check failed\n");
         authResult = Swap32IfLE(rfbVncAuthFailed);
-        if (WriteExact(cl, (char *)&authResult, 4) < 0) {
-            rfbLogPerror("rfbAuthProcessClientMessage: write");
-        }
-        rfbCloseClient(cl);
-        return;
-    }
-
-    vncEncryptBytes(cl->authChallenge, passwd);
-
-    /* Lose the password from memory */
-    for (i = strlen(passwd); i >= 0; i--) {
-        passwd[i] = '\0';
-    }
-
-    free((char *)passwd);
-
-    if (memcmp(cl->authChallenge, response, CHALLENGESIZE) != 0) {
-        rfbLog("rfbAuthProcessClientMessage: authentication failed from %s\n",
-               cl->host);
-
-        authResult = Swap32IfLE(rfbVncAuthFailed);
-
         if (WriteExact(cl, (char *)&authResult, 4) < 0) {
             rfbLogPerror("rfbAuthProcessClientMessage: write");
         }

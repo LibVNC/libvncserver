@@ -42,21 +42,21 @@ rfbSendCursorShape(cl)
     CARD8 bitmapByte;
 
     pCursor = cl->screen->getCursorPtr(cl);
-    if(!pCursor) return TRUE;
+    //if(!pCursor) return TRUE;
 
     if (cl->useRichCursorEncoding) {
-       if(!pCursor->richSource)
-	 MakeRichCursorFromXCursor(cl->screen,pCursor);
-       rect.encoding = Swap32IfLE(rfbEncodingRichCursor);
+      if(pCursor && !pCursor->richSource)
+	MakeRichCursorFromXCursor(cl->screen,pCursor);
+      rect.encoding = Swap32IfLE(rfbEncodingRichCursor);
     } else {
-       if(!pCursor->source)
+       if(pCursor && !pCursor->source)
 	 MakeXCursorFromRichCursor(cl->screen,pCursor);
        rect.encoding = Swap32IfLE(rfbEncodingXCursor);
     }
 
     /* If there is no cursor, send update with empty cursor data. */
 
-    if ( pCursor->width == 1 &&
+    if ( pCursor && pCursor->width == 1 &&
 	 pCursor->height == 1 &&
 	 pCursor->mask[0] == 0 ) {
 	pCursor = NULL;

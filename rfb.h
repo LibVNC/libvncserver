@@ -155,7 +155,7 @@ typedef void (*PtrAddEventProcPtr) (int buttonMask, int x, int y, struct rfbClie
 typedef void (*SetXCutTextProcPtr) (char* str,int len, struct rfbClientRec* cl);
 typedef struct rfbCursor* (*GetCursorProcPtr) (struct rfbClientRec* pScreen);
 typedef Bool (*SetTranslateFunctionProcPtr)(struct rfbClientRec* cl);
-typedef Bool (*GetPasswordProcPtr)(struct rfbClientRec* cl,char* passWord,int len);
+typedef Bool (*PasswordCheckProcPtr)(struct rfbClientRec* cl,char* encryptedPassWord,int len);
 typedef void (*NewClientHookPtr)(struct rfbClientRec* cl);
 typedef void (*DisplayHookPtr)(struct rfbClientRec* cl);
 
@@ -266,7 +266,7 @@ typedef struct
     SOCKET httpSock;
     FILE* httpFP;
 
-    GetPasswordProcPtr getPassword;
+    PasswordCheckProcPtr passwordCheck;
     char* rfbAuthPasswdData;
 
     int rfbDeferUpdateTime;
@@ -680,11 +680,38 @@ typedef struct rfbFontData {
   int* metaData;
 } rfbFontData,* rfbFontDataPtr;
 
-int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,CARD32 colour);
-void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char* string,CARD32 colour);
-int rfbWidth(rfbFontDataPtr font,unsigned char* string);
+int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,Pixel colour);
+void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const unsigned char* string,Pixel colour);
+/* if colour==backColour, background is transparent */
+int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,int x1,int y1,int x2,int y2,Pixel colour,Pixel backColour);
+void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const unsigned char* string,int x1,int y1,int x2,int y2,Pixel colour,Pixel backColour);
+int rfbWidthOfString(rfbFontDataPtr font,const unsigned char* string);
 int rfbWidthOfChar(rfbFontDataPtr font,unsigned char c);
 void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int* y2);
+/* this returns the smallest box enclosing any character of font. */
+void rfbWholeFontBBox(rfbFontDataPtr font,int *x1, int *y1, int *x2, int *y2);
+
+/* dynamically load a linux console font (4096 bytes, 256 glyphs a 8x16 */
+rfbFontDataPtr rfbLoadConsoleFont(char *filename);
+/* free a dynamically loaded font */
+void rfbFreeFont(rfbFontDataPtr font);
+
+/* draw.c */
+
+void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,Pixel col);
+
+/* selbox.c */
+
+/* this opens a modal select box. list is an array of strings, the end marked
+   with a NULL.
+   It returns the index in the list or -1 if cancelled or something else
+   wasn't kosher. */
+typedef void (*SelectionChangedHookPtr)(int index);
+extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,
+			rfbFontDataPtr font, char** list,
+			int x1, int y1, int x2, int y2,
+			Pixel foreColour, Pixel backColour,
+			int border,SelectionChangedHookPtr selChangedHook);
 
 /* main.c */
 

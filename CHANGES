@@ -1,4 +1,11 @@
 0.2
+   added rfbLoadConsoleFont
+   fixed font colour handling.
+   added rfbSelectBox
+   added rfbDrawCharWithClip to allow for clipping and a background colour.
+   fixed font colours
+   added rfbFillRect
+   added IO function to check password.
    rfbNewClient now sets the socket in the fd_set (for the select() call)
    when compiling the library with HAVE_PTHREADS and an application
 	which includes "rfb.h" without, the structures got mixed up.

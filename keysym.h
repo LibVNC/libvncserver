@@ -1629,3 +1629,6 @@ SOFTWARE.
 #define XK_Korean_Won					0xeff
 
 #endif /* XK_KOREAN */
+
+/* Euro currency symbol */
+#define XK_EuroSign 0x20ac

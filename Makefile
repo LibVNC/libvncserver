@@ -2,8 +2,8 @@ INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 # Uncomment these two lines to enable use of PThreads
-PTHREADDEF = -DHAVE_PTHREADS
-PTHREADLIB = -lpthread
+#PTHREADDEF = -DHAVE_PTHREADS
+#PTHREADLIB = -lpthread
 
 # Comment the following line to disable the use of 3 Bytes/Pixel.
 # The code for 3 Bytes/Pixel is not very efficient!
@@ -23,11 +23,11 @@ OSX_LIBS = -framework ApplicationServices -framework Carbon
 SOURCES=main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	zlib.c tight.c httpd.c cursor.c font.c \
-	d3des.c vncauth.c
+	draw.c selbox.c d3des.c vncauth.c
 OBJS=main.o rfbserver.o sraRegion.o auth.o sockets.o \
 	stats.o corre.o hextile.o rre.o translate.o cutpaste.o \
 	zlib.o tight.o httpd.o cursor.o font.o \
-	d3des.o vncauth.o
+	draw.o selbox.o d3des.o vncauth.o
 INSTALLHEADER=rfb.h rfbproto.h sraRegion.h keysym.h
 
 all: example pnmshow storepasswd
@@ -72,6 +72,9 @@ blooptest.o: example.c rfb.h
 
 pnmshow24: pnmshow24.o libvncserver.a
 	$(CC) -o pnmshow24 pnmshow24.o $(LIBS)
+
+fontsel: fontsel.o libvncserver.a
+	$(CC) -o fontsel fontsel.o -L. -lvncserver -lz -ljpeg
 
 clean:
 	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \

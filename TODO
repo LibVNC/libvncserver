@@ -1,8 +1,6 @@
 immediate:
 ----------
 
-authentification schemes (secure vnc)
-udp (need an rfbClientPtr udpClient in rfbScreen)
 documentation
 	hint that to mark very tiny regions as
 	modified is possibly inefficient for the encodings.
@@ -11,14 +9,23 @@ documentation
 later:
 ------
 
+authentification schemes (secure vnc)
+	IO function ptr exists; now explain how to tunnel and implement a
+	client address restriction scheme.
 autoconf? at least Sun Solaris and Windows compilation
-	(maybe Michael makes that)
+	(maybe Michael makes a small autconf)
 using Hermes library for fast colour translations.
 CORBA
+internal HTTP tunnelling feature (needs a special GET target and a few
+	changes to java applet).
 
 done:
 -----
 
+.empty cursor sending doesn't work.
+.udp (need an rfbClientPtr udpClient in rfbScreen)
+	input only; nearly untested (don't have the clients).
+.font handling: bpp>1
 .test copyRect and pthreads.
 .optionally dont draw rich cursors as xcursors
 .cursor smears on IRIX with pthreads, then has bus error. has to be a mutex
