@@ -616,14 +616,15 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
 
   LOCK(rfbScreen->cursorMutex);
 
-  if(rfbScreen->cursor && rfbScreen->cursor->cleanup) {
+  if(rfbScreen->cursor) {
     iterator=rfbGetClientIterator(rfbScreen);
     while((cl=rfbClientIteratorNext(iterator)))
 	if(!cl->enableCursorShapeUpdates)
 	  rfbRedrawAfterHideCursor(cl);
     rfbReleaseClientIterator(iterator);
 
-    rfbFreeCursor(rfbScreen->cursor);
+    if(rfbScreen->cursor->cleanup)
+	 rfbFreeCursor(rfbScreen->cursor);
   }
 
   rfbScreen->cursor = c;
