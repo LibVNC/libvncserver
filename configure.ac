@@ -133,8 +133,6 @@ echo "$RPMSOURCEDIR"
 AM_CONDITIONAL(HAVE_RPM, test "$RPMSOURCEDIR" != "NOT-FOUND")
 AC_SUBST(RPMSOURCEDIR)
 
-LDADD="-L.. -lvncserver"
-
 AC_CONFIG_FILES([Makefile
                  libvncserver/Makefile
                  contrib/Makefile
