@@ -9,7 +9,7 @@ mv configure.ac configure.ac.LibVNCServer
 cat configure.ac.LibVNCServer | \
 sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
     -e "s/\(contrib\|examples\|vncterm\|libvncclient\|test\|client_examples\)\/Makefile//g" \
-    -e "s/libvncserver.spec/x11vnc.spec/g" \
+    -e "s/LibVNCServer.spec/x11vnc.spec/g" \
     -e "s/^.*libvncserver-config//g" \
 > configure.ac
 
@@ -23,7 +23,7 @@ sed -e "s/^SUBDIRS.*$/SUBDIRS=libvncserver x11vnc/" \
     -e "s/include_/noinst_/" \
 > Makefile.am
 
-cat libvncserver.spec.in | \
+cat LibVNCServer.spec.in | \
 sed -e "s/Johannes.Schindelin@gmx.de/runge@karlrunge.com/gi" \
     -e "s/Johannes.Schindelin/Karl Runge/g" \
     -e "s/a library to make writing a vnc server easy/a VNC server for the current X11 session/" \
