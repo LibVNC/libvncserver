@@ -1,5 +1,7 @@
+   autoconf'ed the whole package (including optional support for zlib,
+	pthreads and libjpeg as well as zrle/c++)
    moved appropriate files to contrib/ and examples/ respectively
-   fixed long standing cargs bug
+   fixed long standing cargs bug (Justin "Zippy" Dearing)
    Even better x11vnc from Karl J. Runge! (supports different kbd layouts of
 	client/server)
    Better x11vnc from Karl J. Runge!

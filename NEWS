@@ -1,0 +1,15 @@
+Upcoming 0.5 release!
+
+The library just got autoconf && automake support as well as a real install
+target!
+
+x11vnc was much improved thanks to Karl Runge!
+
+CursorPosUpdate encoding supported thanks to Const Kaplinsky!
+
+ZRLE encoding, if you have a c++ compiler!
+
+HTTP now optionally handles HTTP proxy functions to connect to the same
+server only.
+
+Of course, a lot of bugs fixed since last release...
