@@ -1208,7 +1208,8 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
     char *fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)
                    + (x * (cl->screen->bitsPerPixel / 8)));
 
-    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
+    /* Flush the buffer to guarantee correct alignment for translateFn(). */
+    if (cl->ublen > 0) {
         if (!rfbSendUpdateBuf(cl))
             return FALSE;
     }

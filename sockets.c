@@ -67,6 +67,13 @@ struct timeval
 #include <fcntl.h>
 #include <errno.h>
 
+#ifdef USE_LIBWRAP
+#include <syslog.h>
+#include <tcpd.h>
+int allow_severity=LOG_INFO;
+int deny_severity=LOG_WARNING;
+#endif
+
 #include "rfb.h"
 
 /*#ifndef WIN32
@@ -222,6 +229,16 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	    close(sock);
 	    return;
 	}
+
+#ifdef USE_LIBWRAP
+	if(!hosts_ctl("vnc",STRING_UNKNOWN,inet_ntoa(addr.sin_addr),
+		      STRING_UNKNOWN)) {
+	  rfbLog("Rejected connection from client %s\n",
+		 inet_ntoa(addr.sin_addr));
+	  close(sock);
+	  return;
+	}
+#endif
 
 	rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
 

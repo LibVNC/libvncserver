@@ -39,6 +39,10 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#ifdef USE_LIBWRAP
+#include <tcpd.h>
+#endif
+
 #include "rfb.h"
 
 #define NOT_FOUND_STR "HTTP/1.0 404 Not found\n\n" \
@@ -62,6 +66,7 @@ FILE* httpFP = NULL;
 #define BUF_SIZE 32768
 
 static char buf[BUF_SIZE];
+static size_t buf_filled=0;
 
 
 /*
@@ -137,6 +142,7 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
     }
 
     if (FD_ISSET(rfbScreen->httpListenSock, &fds)) {
+        int flags;
 	if (rfbScreen->httpSock >= 0) close(rfbScreen->httpSock);
 
 	if ((rfbScreen->httpSock = accept(rfbScreen->httpListenSock,
@@ -144,11 +150,26 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
 	    rfbLogPerror("httpCheckFds: accept");
 	    return;
 	}
+#ifdef USE_LIBWRAP
+	if(!hosts_ctl("vnc",STRING_UNKNOWN,inet_ntoa(addr.sin_addr),
+		      STRING_UNKNOWN)) {
+	  rfbLog("Rejected connection from client %s\n",
+		 inet_ntoa(addr.sin_addr));
+#else
 	if ((rfbScreen->httpFP = fdopen(rfbScreen->httpSock, "r+")) == NULL) {
 	    rfbLogPerror("httpCheckFds: fdopen");
+#endif
 	    close(rfbScreen->httpSock);
 	    rfbScreen->httpSock = -1;
 	    return;
+	}
+	flags=fcntl(rfbScreen->httpSock,F_GETFL);
+	if(flags==-1 ||
+	   fcntl(rfbScreen->httpSock,F_SETFL,flags|O_NONBLOCK)==-1) {
+	  rfbLogPerror("httpCheckFds: fcntl");
+	  close(rfbScreen->httpSock);
+	  rfbScreen->httpSock=-1;
+	  return;
 	}
 
 	/*AddEnabledDevice(httpSock);*/
@@ -180,11 +201,10 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     char *fname;
     unsigned int maxFnameLen;
     FILE* fd;
-    Bool gotGet = FALSE;
     Bool performSubstitutions = FALSE;
     char str[256];
 #ifndef WIN32
-    struct passwd *user = getpwuid(getuid());;
+    struct passwd *user = getpwuid(getuid());
 #endif
    
     cl.sock=rfbScreen->httpSock;
@@ -198,65 +218,73 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     fname = &fullFname[strlen(fullFname)];
     maxFnameLen = 255 - strlen(fullFname);
 
-    buf[0] = '\0';
-
+    /* Read data from the HTTP client until we get a complete request. */
     while (1) {
+	ssize_t got = read (rfbScreen->httpSock, buf + buf_filled,
+			    sizeof (buf) - buf_filled - 1);
 
-	/* Read lines from the HTTP client until a blank line.  The only
-	   line we need to parse is the line "GET <filename> ..." */
-
-	if (!fgets(buf, BUF_SIZE, rfbScreen->httpFP)) {
-	    rfbLogPerror("httpProcessInput: fgets");
+	if (got <= 0) {
+	    if (got == 0) {
+		rfbLog("httpd: premature connection close\n");
+	    } else {
+		if (errno == EAGAIN) {
+		    return;
+		}
+		rfbLogPerror("httpProcessInput: read");
+	    }
 	    httpCloseSock(rfbScreen);
 	    return;
 	}
 
-	if ((strcmp(buf,"\n") == 0) || (strcmp(buf,"\r\n") == 0)
-	    || (strcmp(buf,"\r") == 0) || (strcmp(buf,"\n\r") == 0))
-	    /* end of client request */
+	buf_filled += got;
+	buf[buf_filled] = '\0';
+
+	/* Is it complete yet (is there a blank line)? */
+	if (strstr (buf, "\r\r") || strstr (buf, "\n\n") ||
+	    strstr (buf, "\r\n\r\n") || strstr (buf, "\n\r\n\r"))
 	    break;
-
-	if (strncmp(buf, "GET ", 4) == 0) {
-	    gotGet = TRUE;
-
-	    if (strlen(buf) > maxFnameLen) {
-		rfbLog("GET line too long\n");
-		httpCloseSock(rfbScreen);
-		return;
-	    }
-
-	    if (sscanf(buf, "GET %s HTTP/1.0", fname) != 1) {
-		rfbLog("couldn't parse GET line\n");
-		httpCloseSock(rfbScreen);
-		return;
-	    }
-
-	    if (fname[0] != '/') {
-		rfbLog("filename didn't begin with '/'\n");
-		WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
-		httpCloseSock(rfbScreen);
-		return;
-	    }
-
-	    if (strchr(fname+1, '/') != NULL) {
-		rfbLog("asking for file in other directory\n");
-		WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
-		httpCloseSock(rfbScreen);
-		return;
-	    }
-
-	    getpeername(rfbScreen->httpSock, (struct sockaddr *)&addr, &addrlen);
-	    rfbLog("httpd: get '%s' for %s\n", fname+1,
-		   inet_ntoa(addr.sin_addr));
-	    continue;
-	}
     }
 
-    if (!gotGet) {
+
+    /* Process the request. */
+    if (strncmp(buf, "GET ", 4)) {
 	rfbLog("no GET line\n");
 	httpCloseSock(rfbScreen);
 	return;
+    } else {
+	/* Only use the first line. */
+	buf[strcspn(buf, "\n\r")] = '\0';
     }
+
+    if (strlen(buf) > maxFnameLen) {
+	rfbLog("GET line too long\n");
+	httpCloseSock(rfbScreen);
+	return;
+    }
+
+    if (sscanf(buf, "GET %s HTTP/1.0", fname) != 1) {
+	rfbLog("couldn't parse GET line\n");
+	httpCloseSock(rfbScreen);
+	return;
+    }
+
+    if (fname[0] != '/') {
+	rfbLog("filename didn't begin with '/'\n");
+	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
+	httpCloseSock(rfbScreen);
+	return;
+    }
+
+    if (strchr(fname+1, '/') != NULL) {
+	rfbLog("asking for file in other directory\n");
+	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
+	httpCloseSock(rfbScreen);
+	return;
+    }
+
+    getpeername(rfbScreen->httpSock, (struct sockaddr *)&addr, &addrlen);
+    rfbLog("httpd: get '%s' for %s\n", fname+1,
+	   inet_ntoa(addr.sin_addr));
 
     /* If we were asked for '/', actually read the file index.vnc */
 
@@ -274,10 +302,10 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     /* Open the file */
 
     if ((fd = fopen(fullFname, "r")) <= 0) {
-	rfbLogPerror("httpProcessInput: open");
-	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
-	httpCloseSock(rfbScreen);
-	return;
+        rfbLogPerror("httpProcessInput: open");
+        WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
+        httpCloseSock(rfbScreen);
+        return;
     }
 
     WriteExact(&cl, OK_STR, strlen(OK_STR));
