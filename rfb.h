@@ -292,6 +292,7 @@ typedef struct _rfbScreenInfo
 
     /* http stuff */
     Bool httpInitDone;
+    Bool httpEnableProxyConnect;
     int httpPort;
     char* httpDir;
     SOCKET httpListenSock;
@@ -633,9 +634,6 @@ extern Bool rfbSetClientColourMap(rfbClientPtr cl, int firstColour, int nColours
 extern void rfbSetClientColourMaps(rfbScreenInfoPtr rfbScreen, int firstColour, int nColours);
 
 /* httpd.c */
-
-extern int httpPort;
-extern char *httpDir;
 
 extern void httpInitSockets(rfbScreenInfoPtr rfbScreen);
 extern void httpCheckFds(rfbScreenInfoPtr rfbScreen);

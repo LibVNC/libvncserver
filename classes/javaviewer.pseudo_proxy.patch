@@ -1,0 +1,141 @@
+diff -ru vnc_javasrc/OptionsFrame.java proxy_vnc_javasrc/OptionsFrame.java
+--- vnc_javasrc/OptionsFrame.java	Fri Jul  5 08:17:23 2002
++++ proxy_vnc_javasrc/OptionsFrame.java	Thu Aug 22 23:24:44 2002
+@@ -70,6 +70,12 @@
+ 
+   Label[] labels = new Label[names.length];
+   Choice[] choices = new Choice[names.length];
++
++  Label proxyHostLabel;
++  TextField proxyHostEdit;
++  Label proxyPortLabel;
++  TextField proxyPortEdit;
++  
+   Button closeButton;
+   VncViewer viewer;
+ 
+@@ -93,6 +99,9 @@
+   boolean shareDesktop;
+   boolean viewOnly;
+ 
++  String proxyHost;
++  int proxyPort;
++
+   //
+   // Constructor.  Set up the labels and choices from the names and values
+   // arrays.
+@@ -126,6 +135,32 @@
+       }
+     }
+ 
++    // TODO: find a way to set these to defaults from browser
++    proxyPort = viewer.readIntParameter("Use Proxy Port", -1);
++    if(proxyPort>-1) {
++      proxyHost = viewer.readParameter("Use Proxy Host", false);
++      if(proxyHost == null)
++	proxyHost = viewer.host;
++
++      proxyHostLabel = new Label("Proxy Host");
++      gbc.gridwidth = 1;
++      gridbag.setConstraints(proxyHostLabel,gbc);
++      add(proxyHostLabel);
++      proxyHostEdit = new TextField();
++      gbc.gridwidth = GridBagConstraints.REMAINDER;
++      gridbag.setConstraints(proxyHostEdit,gbc);
++      add(proxyHostEdit);
++    
++      proxyPortLabel = new Label("Proxy Port");
++      gbc.gridwidth = 1;
++      gridbag.setConstraints(proxyPortLabel,gbc);
++      add(proxyPortLabel);
++      proxyPortEdit = new TextField();
++      gbc.gridwidth = GridBagConstraints.REMAINDER;
++      gridbag.setConstraints(proxyPortEdit,gbc);
++      add(proxyPortEdit);
++    }
++    
+     closeButton = new Button("Close");
+     gbc.gridwidth = GridBagConstraints.REMAINDER;
+     gridbag.setConstraints(closeButton, gbc);
+@@ -161,6 +196,11 @@
+       }
+     }
+ 
++    if(proxyPort>-1) {
++      proxyPortEdit.setText(Integer.toString(proxyPort));
++      proxyHostEdit.setText(proxyHost);
++    }
++
+     // Make the booleans and encodings array correspond to the state of the GUI
+ 
+     setEncodings();
+@@ -361,8 +401,12 @@
+   //
+ 
+   public void actionPerformed(ActionEvent evt) {
+-    if (evt.getSource() == closeButton)
++    if (evt.getSource() == closeButton) {
+       setVisible(false);
++      proxyHost = proxyHostEdit.getText();
++      proxyPort = Integer.parseInt(proxyPortEdit.getText());
++      System.err.println("proxy is " + proxyHost + ":" + proxyPort);
++    }
+   }
+ 
+   //
+diff -ru vnc_javasrc/RfbProto.java proxy_vnc_javasrc/RfbProto.java
+--- vnc_javasrc/RfbProto.java	Sun Aug  4 18:39:35 2002
++++ proxy_vnc_javasrc/RfbProto.java	Thu Aug 22 22:53:53 2002
+@@ -119,12 +119,51 @@
+     viewer = v;
+     host = h;
+     port = p;
+-    sock = new Socket(host, port);
++    if(viewer.options.proxyPort>-1)
++      sock = new Socket(viewer.options.proxyHost, viewer.options.proxyPort);
++    else
++      sock = new Socket(host, port);
+     is = new DataInputStream(new BufferedInputStream(sock.getInputStream(),
+ 						     16384));
+     os = sock.getOutputStream();
++    if(viewer.options.proxyPort>-1)
++      negotiateProxy(host,port);
+   }
+ 
++  // this is inefficient as hell, but only used once per connection
++  String readLine() {
++    byte[] ba = new byte[1];
++    String s = new String("");
++
++    ba[0]=0;
++    try {
++      while(ba[0] != 0xa) {
++	ba[0] = (byte)is.readUnsignedByte();
++	s += new String(ba);
++      }
++    } catch(Exception e) {
++      e.printStackTrace();
++    }
++    return s;
++  }
++
++  void negotiateProxy(String realHost,int realPort) throws IOException {
++    String line;
++
++    // this would be the correct way, but we want to trick strict proxies.
++    // line = "CONNECT " + realHost + ":" + realPort + " HTTP/1.1\r\nHost: " + realHost + ":" + realPort + "\r\n\r\n";
++    line = "GET " + realHost + ":" + realPort + "/proxied.connection HTTP/1.0\r\nPragma: No-Cache\r\nProxy-Connection: Keep-Alive\r\n\r\n";
++    os.write(line.getBytes());
++
++    line = readLine();
++    System.err.println("Proxy said: " + line);
++    if(!(line.substring(0,7)+line.substring(8,12)).equalsIgnoreCase("HTTP/1. 200")) {
++      IOException e = new IOException(line);
++      throw e;
++    }
++    while(!line.equals("\r\n") && !line.equals("\n"))
++      line = readLine();
++  }    
+ 
+   void close() {
+     try {

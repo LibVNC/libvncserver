@@ -544,6 +544,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    rfbScreen->rfbListenSock=-1;
 
    rfbScreen->httpInitDone=FALSE;
+   rfbScreen->httpEnableProxyConnect=FALSE;
    rfbScreen->httpPort=0;
    rfbScreen->httpDir=NULL;
    rfbScreen->httpListenSock=-1;

@@ -282,6 +282,7 @@ int main(int argc,char** argv)
   rfbScreen->kbdAddEvent = dokey;
   rfbScreen->newClientHook = newclient;
   rfbScreen->httpDir = "./classes";
+  rfbScreen->httpEnableProxyConnect = TRUE;
 
   initBuffer((unsigned char*)rfbScreen->frameBuffer);
   rfbDrawString(rfbScreen,&radonFont,20,100,"Hello, World!",0xffffff);

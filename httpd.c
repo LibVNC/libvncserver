@@ -22,6 +22,7 @@
  */
 
 #include <stdio.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <sys/types.h>
 #ifdef WIN32
@@ -49,6 +50,10 @@
 #define NOT_FOUND_STR "HTTP/1.0 404 Not found\n\n" \
     "<HEAD><TITLE>File Not Found</TITLE></HEAD>\n" \
     "<BODY><H1>File Not Found</H1></BODY>\n"
+
+#define INVALID_REQUEST_STR "HTTP/1.0 400 Invalid Request\n\n" \
+    "<HEAD><TITLE>Invalid Request</TITLE></HEAD>\n" \
+    "<BODY><H1>Invalid request</H1></BODY>\n"
 
 #define OK_STR "HTTP/1.0 200 OK\nContent-Type: text/html\n\n"
 
@@ -253,6 +258,36 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
 
     /* Process the request. */
+    if(rfbScreen->httpEnableProxyConnect) {
+	const static char* PROXY_OK_STR = "HTTP/1.0 200 OK\r\nContent-Type: octet-stream\r\nPragma: no-cache\r\n\r\n";
+	if(!strncmp(buf, "CONNECT ", 8)) {
+	    if(atoi(strchr(buf, ':')+1)!=rfbScreen->rfbPort) {
+		rfbLog("httpd: CONNECT format invalid.\n");
+		WriteExact(&cl,INVALID_REQUEST_STR, strlen(INVALID_REQUEST_STR));
+		httpCloseSock(rfbScreen);
+		return;
+	    }
+	    // proxy connection
+	    rfbLog("httpd: client asked for CONNECT\n");
+	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
+	    rfbNewClient(rfbScreen,rfbScreen->httpSock);
+	    // don't fclose(rfbScreen->httpFP), because this would kill the connection
+	    rfbScreen->httpFP = NULL;
+	    rfbScreen->httpSock = -1;
+	    return;
+	}
+	if (!strncmp(buf, "GET ",4) && !strncmp(strchr(buf,'/'),"/proxied.connection HTTP/1.", 27)) {
+	    // proxy connection
+	    rfbLog("httpd: client asked for /proxied.connection\n");
+	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
+	    rfbNewClient(rfbScreen,rfbScreen->httpSock);
+	    // don't fclose(rfbScreen->httpFP), because this would kill the connection
+	    rfbScreen->httpFP = NULL;
+	    rfbScreen->httpSock = -1;
+	    return;
+	}	   
+    }
+
     if (strncmp(buf, "GET ", 4)) {
 	rfbLog("httpd: no GET line\n");
 	httpCloseSock(rfbScreen);
@@ -400,10 +435,8 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 #endif
 			WriteExact(&cl, "?", 1);
                } else if (compareAndSkip(&ptr, "$PARAMS")) {
-
                    if (params[0] != '\0')
-                       WriteExact(httpSock, params, strlen(params));
-
+                       WriteExact(&cl, params, strlen(params));
 		} else {
 		    if (!compareAndSkip(&ptr, "$$"))
 			ptr++;
