@@ -34,7 +34,23 @@ static rfbBool DummyPoint(rfbClient* client, int x, int y) {
 static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 }
 static char* NoPassword(rfbClient* client) {
-  return "";
+  return strdup("");
+}
+#include <stdio.h>
+#include <termios.h>
+static char* ReadPassword(rfbClient* client) {
+	int i=8;
+	char* p=malloc(9);
+	struct termios save,noecho;
+	p[0]=0;
+	if(tcgetattr(fileno(stdin),&save)!=0) return p;
+	noecho=save; noecho.c_lflag &= ~ECHO;
+	if(tcsetattr(fileno(stdin),TCSAFLUSH,&noecho)!=0) return p;
+	fprintf(stderr,"Password: ");
+	getline(&p,&i,stdin);
+	if(i>0 && p[i-2]=='\n') p[i-2]=0;
+	tcsetattr(fileno(stdin),TCSAFLUSH,&save);
+	return p;
 }
 static rfbBool MallocFrameBuffer(rfbClient* client) {
   if(client->frameBuffer)
@@ -107,7 +123,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->SoftCursorLockArea = DummyRect;
   client->SoftCursorUnlockScreen = Dummy;
   client->GotFrameBufferUpdate = DummyRect;
-  client->GetPassword = NoPassword;
+  client->GetPassword = ReadPassword;
   client->MallocFrameBuffer = MallocFrameBuffer;
   client->Bell = Dummy;
 
@@ -143,15 +159,22 @@ static rfbBool rfbInitConnection(rfbClient* client)
 }
 
 rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
-  int i;
+  int i,j;
 
   if(client->programName==0)
     client->programName=argv[0];
 
   for (i = 1; i < *argc; i++) {
+    j = i;
     if (strcmp(argv[i], "-listen") == 0) {
       listenForIncomingConnections(client);
       break;
+    } else if (strcmp(argv[i], "-play") == 0) {
+      client->serverPort = -1;
+      j++;
+    } else if (i+1<*argc && strcmp(argv[i], "-encodings") == 0) {
+      client->appData.encodingsString = argv[i+1];
+      j+=2;
     } else {
       char* colon=strchr(argv[i],':');
 
@@ -159,9 +182,15 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       if(colon) {
 	*colon=0;
 	client->serverPort=atoi(colon+1);
-      } else
-	client->serverPort=0;
-      client->serverPort+=5900;
+      }
+      if(client->serverPort>=0 && client->serverPort<5900)
+	client->serverPort+=5900;
+    }
+    /* purge arguments */
+    if (j>i) {
+      *argc-=j-i;
+      memmove(argv+i,argv+j,(*argc-i)*sizeof(char*));
+      i--;
     }
   }
 

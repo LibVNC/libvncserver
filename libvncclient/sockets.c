@@ -58,12 +58,43 @@ static int buffered = 0;
 rfbBool
 ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 {
-//#define DEBUG_READ_EXACT
+#undef DEBUG_READ_EXACT
 #ifdef DEBUG_READ_EXACT
 	char* oout=out;
 	int nn=n;
 	rfbClientLog("ReadFromRFBServer %d bytes\n",n);
 #endif
+  if (client->serverPort==-1) {
+    /* vncrec playing */
+    rfbVNCRec* rec = client->vncRec;
+    struct timeval tv;
+
+    if (rec->readTimestamp) {
+      rec->readTimestamp = FALSE;
+      if (!fread(&tv,sizeof(struct timeval),1,rec->file))
+        return FALSE;
+
+      tv.tv_sec = rfbClientSwap32IfLE (tv.tv_sec);
+      tv.tv_usec = rfbClientSwap32IfLE (tv.tv_usec);
+
+      if (rec->tv.tv_sec!=0 && !rec->doNotSleep) {
+        struct timeval diff;
+        diff.tv_sec = tv.tv_sec - rec->tv.tv_sec;
+        diff.tv_usec = tv.tv_usec - rec->tv.tv_usec;
+        if(diff.tv_usec<0) {
+	  diff.tv_sec--;
+	  diff.tv_usec+=1000000;
+        }
+        sleep (diff.tv_sec);
+        usleep (diff.tv_usec);
+      }
+
+      rec->tv=tv;
+    }
+    
+    return (fread(out,1,n,rec->file)<0?FALSE:TRUE);
+  }
+  
   if (n <= buffered) {
     memcpy(out, bufoutptr, n);
     bufoutptr += n;
@@ -160,6 +191,9 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
   fd_set fds;
   int i = 0;
   int j;
+
+  if (client->serverPort==-1)
+    return TRUE; /* vncrec playing */
 
   while (i < n) {
     j = write(client->sock, buf + i, (n - i));
@@ -445,6 +479,10 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
   struct timeval timeout;
   int num;
 
+  if (client->serverPort==-1)
+    /* playing back vncrec file */
+    return 1;
+  
   timeout.tv_sec=(usecs/1000000);
   timeout.tv_usec=(usecs%1000000);
 
