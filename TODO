@@ -2,26 +2,30 @@ immediate:
 ----------
 
 fix bug in http (java) client with big endian server: byte swapping is broken
-really support pthreads.
+pthreads concept: How to iterate over rfbClientPtr's? So that it can be
+	 either called from rfbProcessEvents (which locks the list mutex)
+	 or from the main thread (where the background loop sometimes
+	 locks the list mutex).
 	- cursor drawing!
+	- cursor setting!
+	- rfbMarkRectAsModified
 update to newest TridiaVNC version.
-
-in the works:
--------------
-
 adapt rdp2vnc (rdesktop)
-optionally dont draw rich cursors as xcursors
 
 later:
 ------
 
-cursor "smears" sometimes when not using cursor encoding
-	(seems to be gone now; haven't debugged properly, though)
-udp
+optionally dont draw rich cursors as xcursors
+
 autoconf? at least Sun Solaris compilation
+perhaps the option (or just hint) not to mark very tiny regions as modified,
+	because that is inefficient for the encodings.
+udp
 rfbConnect, ConnectToTcpAddr
 CORBA
 documentation
+cursor "smears" sometimes when not using cursor encoding
+	(seems to be gone now; haven't debugged properly, though)
 
 done:
 -----
