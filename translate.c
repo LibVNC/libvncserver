@@ -23,13 +23,13 @@
  *  USA.
  */
 
-#include "rfb.h"
-#include "rfbregion.h"
+#include <rfb/rfb.h>
+#include <rfb/rfbregion.h>
 
 static void PrintPixelFormat(rfbPixelFormat *pf);
-static Bool rfbSetClientColourMapBGR233(rfbClientPtr cl);
+static rfbBool rfbSetClientColourMapBGR233(rfbClientPtr cl);
 
-Bool rfbEconomicTranslate = FALSE;
+rfbBool rfbEconomicTranslate = FALSE;
 
 /*
  * Some standard pixel formats.
@@ -108,7 +108,7 @@ static const rfbPixelFormat BGR233Format = {
 #undef IN
 #undef OUT
 
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
 #define COUNT_OFFSETS 4
 #define BPP2OFFSET(bpp) ((bpp)/8-1)
 #include "tableinit24.c"
@@ -137,7 +137,7 @@ typedef void (*rfbInitTableFnType)(char **table, rfbPixelFormat *in,
 rfbInitCMTableFnType rfbInitColourMapSingleTableFns[COUNT_OFFSETS] = {
     rfbInitColourMapSingleTable8,
     rfbInitColourMapSingleTable16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     rfbInitColourMapSingleTable24,
 #endif
     rfbInitColourMapSingleTable32
@@ -146,7 +146,7 @@ rfbInitCMTableFnType rfbInitColourMapSingleTableFns[COUNT_OFFSETS] = {
 rfbInitTableFnType rfbInitTrueColourSingleTableFns[COUNT_OFFSETS] = {
     rfbInitTrueColourSingleTable8,
     rfbInitTrueColourSingleTable16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     rfbInitTrueColourSingleTable24,
 #endif
     rfbInitTrueColourSingleTable32
@@ -155,7 +155,7 @@ rfbInitTableFnType rfbInitTrueColourSingleTableFns[COUNT_OFFSETS] = {
 rfbInitTableFnType rfbInitTrueColourRGBTablesFns[COUNT_OFFSETS] = {
     rfbInitTrueColourRGBTables8,
     rfbInitTrueColourRGBTables16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     rfbInitTrueColourRGBTables24,
 #endif
     rfbInitTrueColourRGBTables32
@@ -164,17 +164,17 @@ rfbInitTableFnType rfbInitTrueColourRGBTablesFns[COUNT_OFFSETS] = {
 rfbTranslateFnType rfbTranslateWithSingleTableFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
     { rfbTranslateWithSingleTable8to8,
       rfbTranslateWithSingleTable8to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithSingleTable8to24,
 #endif
       rfbTranslateWithSingleTable8to32 },
     { rfbTranslateWithSingleTable16to8,
       rfbTranslateWithSingleTable16to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithSingleTable16to24,
 #endif
       rfbTranslateWithSingleTable16to32 },
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     { rfbTranslateWithSingleTable24to8,
       rfbTranslateWithSingleTable24to16,
       rfbTranslateWithSingleTable24to24,
@@ -182,7 +182,7 @@ rfbTranslateFnType rfbTranslateWithSingleTableFns[COUNT_OFFSETS][COUNT_OFFSETS] 
 #endif
     { rfbTranslateWithSingleTable32to8,
       rfbTranslateWithSingleTable32to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithSingleTable32to24,
 #endif
       rfbTranslateWithSingleTable32to32 }
@@ -191,17 +191,17 @@ rfbTranslateFnType rfbTranslateWithSingleTableFns[COUNT_OFFSETS][COUNT_OFFSETS] 
 rfbTranslateFnType rfbTranslateWithRGBTablesFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
     { rfbTranslateWithRGBTables8to8,
       rfbTranslateWithRGBTables8to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithRGBTables8to24,
 #endif
       rfbTranslateWithRGBTables8to32 },
     { rfbTranslateWithRGBTables16to8,
       rfbTranslateWithRGBTables16to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithRGBTables16to24,
 #endif
       rfbTranslateWithRGBTables16to32 },
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     { rfbTranslateWithRGBTables24to8,
       rfbTranslateWithRGBTables24to16,
       rfbTranslateWithRGBTables24to24,
@@ -209,7 +209,7 @@ rfbTranslateFnType rfbTranslateWithRGBTablesFns[COUNT_OFFSETS][COUNT_OFFSETS] = 
 #endif
     { rfbTranslateWithRGBTables32to8,
       rfbTranslateWithRGBTables32to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithRGBTables32to24,
 #endif
       rfbTranslateWithRGBTables32to32 }
@@ -241,7 +241,7 @@ rfbTranslateNone(char *table, rfbPixelFormat *in, rfbPixelFormat *out,
  * rfbSetTranslateFunction sets the translation function.
  */
 
-Bool
+rfbBool
 rfbSetTranslateFunction(cl)
     rfbClientPtr cl;
 {
@@ -254,7 +254,7 @@ rfbSetTranslateFunction(cl)
 
     if ((cl->screen->rfbServerFormat.bitsPerPixel != 8) &&
         (cl->screen->rfbServerFormat.bitsPerPixel != 16) &&
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
 	(cl->screen->rfbServerFormat.bitsPerPixel != 24) &&
 #endif
         (cl->screen->rfbServerFormat.bitsPerPixel != 32))
@@ -268,7 +268,7 @@ rfbSetTranslateFunction(cl)
 
     if ((cl->format.bitsPerPixel != 8) &&
         (cl->format.bitsPerPixel != 16) &&
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
 	(cl->format.bitsPerPixel != 24) &&
 #endif
         (cl->format.bitsPerPixel != 32))
@@ -358,7 +358,7 @@ rfbSetTranslateFunction(cl)
  * just like an 8-bit BGR233 true colour client.
  */
 
-static Bool
+static rfbBool
 rfbSetClientColourMapBGR233(cl)
     rfbClientPtr cl;
 {
@@ -413,7 +413,7 @@ rfbSetClientColourMapBGR233(cl)
  * and mark the whole screen as having been modified.
  */
 
-Bool
+rfbBool
 rfbSetClientColourMap(cl, firstColour, nColours)
     rfbClientPtr cl;
     int firstColour;

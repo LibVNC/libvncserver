@@ -2,11 +2,11 @@
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
 
-#ifndef ALLOW24BPP
+#ifndef LIBVNCSERVER_ALLOW24BPP
 #error "I need the ALLOW24BPP flag to work"
 #endif
 
-void HandleKey(Bool down,KeySym key,rfbClientPtr cl)
+void HandleKey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
 {
   if(down && (key==XK_Escape || key=='q' || key=='Q'))
     rfbCloseClient(cl);

@@ -22,16 +22,16 @@
  *  USA.
  */
 
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 #include <ctype.h>
-#ifdef HAVE_UNISTD_H
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#ifdef HAVE_SYS_TYPES_H
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-#ifdef HAVE_FCNTL_H
+#ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
 #include <errno.h>
@@ -40,13 +40,13 @@
 #include <winsock.h>
 #define close closesocket
 #else
-#ifdef HAVE_SYS_TIME_H
+#ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-#ifdef HAVE_SYS_SOCKET_H
+#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
-#ifdef HAVE_NETINET_IN_H
+#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
@@ -70,9 +70,9 @@
 #define OK_STR "HTTP/1.0 200 OK\nContent-Type: text/html\r\n\r\n"
 
 static void httpProcessInput();
-static Bool compareAndSkip(char **ptr, const char *str);
-static Bool parseParams(const char *request, char *result, int max_bytes);
-static Bool validateString(char *str);
+static rfbBool compareAndSkip(char **ptr, const char *str);
+static rfbBool parseParams(const char *request, char *result, int max_bytes);
+static rfbBool validateString(char *str);
 
 #define BUF_SIZE 32768
 
@@ -104,7 +104,7 @@ httpInitSockets(rfbScreenInfoPtr rfbScreen)
 
     if ((rfbScreen->httpListenSock = ListenOnTCPPort(rfbScreen->httpPort)) < 0) {
 	rfbLogPerror("ListenOnTCPPort");
-	exit(1);
+	return;
     }
 
    /*AddEnabledDevice(httpListenSock);*/
@@ -214,7 +214,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     char *fname;
     unsigned int maxFnameLen;
     FILE* fd;
-    Bool performSubstitutions = FALSE;
+    rfbBool performSubstitutions = FALSE;
     char str[256+32];
 #ifndef WIN32
     struct passwd *user = getpwuid(getuid());
@@ -473,7 +473,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 }
 
 
-static Bool
+static rfbBool
 compareAndSkip(char **ptr, const char *str)
 {
     if (strncmp(*ptr, str, strlen(str)) == 0) {
@@ -489,7 +489,7 @@ compareAndSkip(char **ptr, const char *str)
  * of <param> tags for inclusion into an HTML page with embedded applet.
  */
 
-static Bool
+static rfbBool
 parseParams(const char *request, char *result, int max_bytes)
 {
     char param_request[128];
@@ -559,7 +559,7 @@ parseParams(const char *request, char *result, int max_bytes)
  * signs, underscores, and dots. Replace all '+' signs with spaces.
  */
 
-static Bool
+static rfbBool
 validateString(char *str)
 {
     char *ptr;

@@ -78,7 +78,7 @@ void vcMakeSureCursorIsDrawn(rfbClientPtr cl)
 vncConsolePtr vcGetConsole(int *argc,char **argv,
 			   int width,int height,rfbFontDataPtr font
 #ifdef USE_ATTRIBUTE_BUFFER
-			   ,Bool withAttributes
+			   ,rfbBool withAttributes
 #endif
 			   )
 {
@@ -147,7 +147,7 @@ vncConsolePtr vcGetConsole(int *argc,char **argv,
   return(c);
 }
 
-#include "rfbregion.h"
+#include <rfb/rfbregion.h>
 
 /* before using this function, hide the cursor */
 void vcScroll(vncConsolePtr c,int lineCount)
@@ -363,7 +363,7 @@ char *vcGetString(vncConsolePtr c,char *buffer,int bufferSize)
   return(buffer);
 }
 
-void vcKbdAddEventProc(Bool down,KeySym keySym,rfbClientPtr cl)
+void vcKbdAddEventProc(rfbBool down,rfbKeySym keySym,rfbClientPtr cl)
 {
   vncConsolePtr c=(vncConsolePtr)cl->screen->screenData;
   if(down) {

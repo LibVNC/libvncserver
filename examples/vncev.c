@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <rfb/rfb.h>
-#include "default8x16.h"
+#include <rfb/default8x16.h>
 
 char f[640*480];
 char* keys[0x400];
@@ -66,7 +66,7 @@ void output(rfbScreenInfoPtr s,char* line)
    rfbLog("%s\n",line);
 }
 
-void dokey(Bool down,KeySym k,rfbClientPtr cl)
+void dokey(rfbBool down,rfbKeySym k,rfbClientPtr cl)
 {
    char buffer[1024+32];
    

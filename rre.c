@@ -26,7 +26,7 @@
  *  USA.
  */
 
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 /*
  * rreBeforeBuf contains pixel data in the client's format.
@@ -52,7 +52,7 @@ static uint32_t getBgColour(char *data, int size, int bpp);
  * rfbSendRectEncodingRRE - send a given rectangle using RRE encoding.
  */
 
-Bool
+rfbBool
 rfbSendRectEncodingRRE(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
@@ -100,7 +100,7 @@ rfbSendRectEncodingRRE(cl, x, y, w, h)
         break;
     default:
         rfbLog("getBgColour: bpp %d?\n",cl->format.bitsPerPixel);
-        exit(1);
+        return FALSE;
     }
         
     if (nSubrects < 0) {
@@ -296,7 +296,7 @@ getBgColour(data,size,bpp)
       return ((uint32_t *)data)[0];
     } else {
       rfbLog("getBgColour: bpp %d?\n",bpp);
-      exit(1);
+      return 0;
     }
   }
 
@@ -308,7 +308,7 @@ getBgColour(data,size,bpp)
     k = (int)(((uint8_t *)data)[j]);
     if (k >= NUMCLRS) {
       rfbLog("getBgColour: unusual colour = %d\n", k);
-      exit(1);
+      return 0;
     }
     counts[k] += 1;
     if (counts[k] > maxcount) {

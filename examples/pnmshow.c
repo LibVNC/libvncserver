@@ -2,7 +2,7 @@
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
 
-void HandleKey(Bool down,KeySym key,rfbClientPtr cl)
+void HandleKey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
 {
   if(down && (key==XK_Escape || key=='q' || key=='Q'))
     rfbCloseClient(cl);

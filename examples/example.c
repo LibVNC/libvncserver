@@ -59,7 +59,7 @@ void initBuffer(unsigned char* buffer)
 /* Here we create a structure so that every client has it's own pointer */
 
 typedef struct ClientData {
-  Bool oldButton;
+  rfbBool oldButton;
   int oldx,oldy;
 } ClientData;
 
@@ -166,7 +166,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 
 /* Here the key events are handled */
 
-void dokey(Bool down,KeySym key,rfbClientPtr cl)
+void dokey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
 {
   if(down) {
     if(key==XK_Escape)
@@ -312,7 +312,7 @@ int main(int argc,char** argv)
   rfbRunEventLoop(rfbScreen,40000,FALSE);
 #endif /* OWN LOOP */
 #else
-#if !defined(HAVE_LIBPTHREAD)
+#if !defined(LIBVNCSERVER_HAVE_LIBPTHREAD)
 #error "I need pthreads for that."
 #endif
 

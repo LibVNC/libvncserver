@@ -39,9 +39,9 @@
  *  USA.
  */
 
-#include "rfb.h"
+#include <rfb/rfb.h>
 
-#ifdef HAVE_SYS_TYPES_H
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
 
@@ -53,19 +53,19 @@
 #define ETIMEDOUT WSAETIMEDOUT
 #define write(sock,buf,len) send(sock,buf,len,0)
 #else
-#ifdef HAVE_SYS_TIME_H
+#ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-#ifdef HAVE_SYS_SOCKET_H
+#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
-#ifdef HAVE_NETINET_IN_H
+#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #endif
-#ifdef HAVE_UNISTD_H
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 #endif
@@ -78,7 +78,7 @@ struct timeval
 ;
 #endif
 
-#ifdef HAVE_FCNTL_H
+#ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
 
@@ -118,14 +118,14 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 #ifndef WIN32
 	if (fcntl(rfbScreen->inetdSock, F_SETFL, O_NONBLOCK) < 0) {
 	    rfbLogPerror("fcntl");
-	    exit(1);
+	    return;
 	}
 #endif
 
 	if (setsockopt(rfbScreen->inetdSock, IPPROTO_TCP, TCP_NODELAY,
 		       (char *)&one, sizeof(one)) < 0) {
 	    rfbLogPerror("setsockopt");
-	    exit(1);
+	    return;
 	}
 
     	FD_ZERO(&(rfbScreen->allFds));
@@ -147,7 +147,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 
         if (i >= 6000) {
 	    rfbLogPerror("Failure autoprobing");
-	    exit(1);
+	    return;
         }
 
         rfbLog("Autoprobing selected port %d\n", rfbScreen->rfbPort);
@@ -160,7 +160,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 
       if ((rfbScreen->rfbListenSock = ListenOnTCPPort(rfbScreen->rfbPort)) < 0) {
 	rfbLogPerror("ListenOnTCPPort");
-	exit(1);
+	return;
       }
 
       FD_ZERO(&(rfbScreen->allFds));
@@ -173,7 +173,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 
 	if ((rfbScreen->udpSock = ListenOnUDPPort(rfbScreen->udpPort)) < 0) {
 	    rfbLogPerror("ListenOnUDPPort");
-	    exit(1);
+	    return;
 	}
 	FD_SET(rfbScreen->udpSock, &(rfbScreen->allFds));
 	rfbScreen->maxFd = max((int)rfbScreen->udpSock,rfbScreen->maxFd);
@@ -324,7 +324,7 @@ rfbCloseClient(cl)
      rfbClientPtr cl;
 {
     LOCK(cl->updateMutex);
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     if (cl->sock != -1)
 #endif
       {
@@ -472,7 +472,7 @@ WriteExact(cl, buf, len)
         } else if (n == 0) {
 
             rfbLog("WriteExact: write returned 0?\n");
-            exit(1);
+            return 0;
 
         } else {
 #ifdef WIN32

@@ -1,4 +1,28 @@
-Upcoming 0.5 release!
+Question: Why the *&!"/(§ did you change so many things in the API?
+Answer: It was necessary to make this library slightly less
+	painful to use with other libraries.
+
+	Anyway, most changes are just search-and-replace:
+
+	#include "rfb.h"  ->  #include <rfb/rfb.h>
+	CARD8   ->  uint8_t
+	CARD16  ->  uint16_t
+	CARD32  ->  uint32_t
+	Pixel  -> rfbPixel
+	KeySym  -> rfbKeySym
+	Bool  ->  rfbBool
+
+	also, rfbUsage doesn't exit any longer, but returns FALSE
+
+	If you used some constants defined in rfbconfig.h, you now
+	have to prefix LIBVNCSERVER_ to the constants.
+	
+Upcoming 0.6 release!
+
+lots of bugs fixed.
+
+
+Version 5.0:
 
 The library just got autoconf && automake support as well as a real install
 target!

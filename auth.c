@@ -26,7 +26,7 @@
  *  USA.
  */
 
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 /*
  * rfbAuthNewClient is called when we reach the point of authenticating

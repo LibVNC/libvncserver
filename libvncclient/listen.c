@@ -43,7 +43,8 @@ listenForIncomingConnections(rfbClient* client)
 
   listenSocket = ListenAtTcpPort(client->listenPort);
 
-  if ((listenSocket < 0)) exit(1);
+  if ((listenSocket < 0))
+    return;
 
   rfbClientLog("%s -listen: Listening on port %d\n",
 	  client->programName,client->listenPort);
@@ -66,8 +67,10 @@ listenForIncomingConnections(rfbClient* client)
 
     if (FD_ISSET(listenSocket, &fds)) {
       client->sock = AcceptTcpConnection(listenSocket);
-      if (client->sock < 0) exit(1);
-      if (!SetNonBlocking(client->sock)) exit(1);
+      if (client->sock < 0)
+	return;
+      if (!SetNonBlocking(client->sock))
+	return;
 
       /* Now fork off a new process to deal with it... */
 
@@ -75,7 +78,7 @@ listenForIncomingConnections(rfbClient* client)
 
       case -1: 
 	perror("fork"); 
-	exit(1);
+	return;
 
       case 0:
 	/* child - return to caller */

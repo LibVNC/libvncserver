@@ -25,24 +25,24 @@
  */
 
 #include <string.h>
-#include "rfb.h"
-#include "rfbregion.h"
+#include <rfb/rfb.h>
+#include <rfb/rfbregion.h>
 
-#ifdef HAVE_FCNTL_H
+#ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
 
 #ifdef WIN32
 #define write(sock,buf,len) send(sock,buf,len,0)
 #else
-#ifdef HAVE_UNISTD_H
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 #include <pwd.h>
-#ifdef HAVE_SYS_SOCKET_H
+#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
-#ifdef HAVE_NETINET_IN_H
+#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
@@ -66,7 +66,7 @@ static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 void rfbIncrClientRef(rfbClientPtr cl)
 {
   LOCK(cl->refCountMutex);
@@ -87,7 +87,7 @@ void rfbIncrClientRef(rfbClientPtr cl) {}
 void rfbDecrClientRef(rfbClientPtr cl) {}
 #endif
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 MUTEX(rfbClientListMutex);
 #endif
 
@@ -99,9 +99,10 @@ struct rfbClientIterator {
 void
 rfbClientListInit(rfbScreenInfoPtr rfbScreen)
 {
-    if(sizeof(Bool)!=1) {
+    if(sizeof(rfbBool)!=1) {
         /* a sanity check */
-        fprintf(stderr,"Bool's size is not 1 (%d)!\n",sizeof(Bool));
+        fprintf(stderr,"rfbBool's size is not 1 (%d)!\n",sizeof(rfbBool));
+	/* we cannot continue, because rfbBool is supposed to be char everywhere */
 	exit(1);
     }
     rfbScreen->rfbClientHead = NULL;
@@ -121,7 +122,7 @@ rfbGetClientIterator(rfbScreenInfoPtr rfbScreen)
 rfbClientPtr
 rfbClientIteratorHead(rfbClientIteratorPtr i)
 {
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
   if(i->next != 0) {
     rfbDecrClientRef(i->next);
     rfbIncrClientRef(i->screen->rfbClientHead);
@@ -146,7 +147,7 @@ rfbClientIteratorNext(rfbClientIteratorPtr i)
     IF_PTHREADS(rfbDecrClientRef(cl));
   }
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     while(i->next && i->next->sock<0)
       i->next = i->next->next;
     if(i->next)
@@ -220,7 +221,7 @@ rfbClientPtr
 rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
     rfbScreenInfoPtr rfbScreen;
     int sock;
-    Bool isUDP;
+    rfbBool isUDP;
 {
     rfbProtocolVersionMsg pv;
     rfbClientIteratorPtr iterator;
@@ -282,7 +283,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->preferredEncoding = rfbEncodingRaw;
       cl->correMaxWidth = 48;
       cl->correMaxHeight = 48;
-#ifdef HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_ZRLE
       cl->zrleData = 0;
 #endif
 
@@ -313,7 +314,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       rfbScreen->rfbClientHead = cl;
       UNLOCK(rfbClientListMutex);
 
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
       cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
       cl->tightQualityLevel = -1;
       for (i = 0; i < 4; i++)
@@ -326,7 +327,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->enableLastRectEncoding = FALSE;
       cl->useNewFBSize = FALSE;
 
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
       cl->compStreamInited = FALSE;
       cl->compStream.total_in = 0;
       cl->compStream.total_out = 0;
@@ -405,11 +406,11 @@ rfbClientConnectionGone(cl)
     if (cl->next)
         cl->next->prev = cl->prev;
 
-#ifdef HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_ZRLE
     FreeZrleData(cl);
 #endif
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     if(cl->screen->backgroundLoop != FALSE)
       do {
 	LOCK(cl->refCountMutex);
@@ -428,13 +429,13 @@ rfbClientConnectionGone(cl)
     rfbLog("Client %s gone\n",cl->host);
     free(cl->host);
 
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
     /* Release the compression state structures if any. */
     if ( cl->compStreamInited ) {
 	deflateEnd( &(cl->compStream) );
     }
 
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
     for (i = 0; i < 4; i++) {
 	if (cl->zsActive[i])
 	    deflateEnd(&cl->zsStruct[i]);
@@ -778,7 +779,7 @@ rfbProcessClientNormalMessage(cl)
                            cl->host);
                 }
                 break;
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 	    case rfbEncodingZlib:
 		if (cl->preferredEncoding == -1) {
 		    cl->preferredEncoding = enc;
@@ -786,7 +787,7 @@ rfbProcessClientNormalMessage(cl)
 			   cl->host);
 		}
               break;
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	    case rfbEncodingTight:
 		if (cl->preferredEncoding == -1) {
 		    cl->preferredEncoding = enc;
@@ -833,7 +834,7 @@ rfbProcessClientNormalMessage(cl)
 		    cl->useNewFBSize = TRUE;
 		}
 		break;
-#ifdef BACKCHANNEL
+#ifdef LIBVNCSERVER_BACKCHANNEL
 	    case rfbEncodingBackChannel:
 	        if (!cl->enableBackChannel) {
 		    rfbLog("Enabling BackChannel protocol extension for "
@@ -842,7 +843,7 @@ rfbProcessClientNormalMessage(cl)
 		}
 		break;
 #endif
-#ifdef HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_ZRLE
            case rfbEncodingZRLE:
                if (cl->preferredEncoding == -1) {
                    cl->preferredEncoding = enc;
@@ -852,11 +853,11 @@ rfbProcessClientNormalMessage(cl)
                break;
 #endif
             default:
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 		if ( enc >= (uint32_t)rfbEncodingCompressLevel0 &&
 		     enc <= (uint32_t)rfbEncodingCompressLevel9 ) {
 		    cl->zlibCompressLevel = enc & 0x0F;
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 		    cl->tightCompressLevel = enc & 0x0F;
 		    rfbLog("Using compression level %d for client %s\n",
 			   cl->tightCompressLevel, cl->host);
@@ -945,7 +946,7 @@ rfbProcessClientNormalMessage(cl)
 	}
 
 	if(!cl->viewOnly) {
-	    cl->screen->kbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), cl);
+	    cl->screen->kbdAddEvent(msg.ke.down, (rfbKeySym)Swap32IfLE(msg.ke.key), cl);
 	}
 
         return;
@@ -1027,7 +1028,7 @@ rfbProcessClientNormalMessage(cl)
  * givenUpdateRegion is not changed.
  */
 
-Bool
+rfbBool
 rfbSendFramebufferUpdate(cl, givenUpdateRegion)
      rfbClientPtr cl;
      sraRegionPtr givenUpdateRegion;
@@ -1038,8 +1039,8 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
     sraRegionPtr updateRegion,updateCopyRegion,tmpRegion;
     int dx, dy;
-    Bool sendCursorShape = FALSE;
-    Bool sendCursorPos = FALSE;
+    rfbBool sendCursorShape = FALSE;
+    rfbBool sendCursorPos = FALSE;
 
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
@@ -1177,7 +1178,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
                                      * ((h-1) / cl->correMaxHeight + 1));
         }
 	sraRgnReleaseIterator(i);
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
     } else if (cl->preferredEncoding == rfbEncodingZlib) {
 	nUpdateRegionRects = 0;
 
@@ -1188,7 +1189,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
             int h = rect.y2 - y;
 	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
 	}
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
     } else if (cl->preferredEncoding == rfbEncodingTight) {
 	nUpdateRegionRects = 0;
 
@@ -1290,14 +1291,14 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
                 return FALSE;
             }
             break;
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 	case rfbEncodingZlib:
 	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
 		return FALSE;
 	    }
 	    break;
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	case rfbEncodingTight:
 	    if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
@@ -1306,7 +1307,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	    break;
 #endif
 #endif
-#ifdef HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_ZRLE
        case rfbEncodingZRLE:
            if (!rfbSendRectEncodingZRLE(cl, x, y, w, h)) {
 	       sraRgnDestroy(updateRegion);
@@ -1341,7 +1342,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
  * of a later one.
  */
 
-Bool
+rfbBool
 rfbSendCopyRegion(cl, reg, dx, dy)
     rfbClientPtr cl;
     sraRegionPtr reg;
@@ -1391,7 +1392,7 @@ rfbSendCopyRegion(cl, reg, dx, dy)
  * Send a given rectangle in raw encoding (rfbEncodingRaw).
  */
 
-Bool
+rfbBool
 rfbSendRectEncodingRaw(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
@@ -1464,7 +1465,7 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
  * protocol).
  */
 
-Bool
+rfbBool
 rfbSendLastRectMarker(cl)
     rfbClientPtr cl;
 {
@@ -1496,7 +1497,7 @@ rfbSendLastRectMarker(cl)
  * its framebuffer size.
  */
 
-Bool
+rfbBool
 rfbSendNewFBSize(cl, w, h)
     rfbClientPtr cl;
     int w, h;
@@ -1530,7 +1531,7 @@ rfbSendNewFBSize(cl, w, h)
  * not (errno should be set).
  */
 
-Bool
+rfbBool
 rfbSendUpdateBuf(cl)
     rfbClientPtr cl;
 {
@@ -1552,7 +1553,7 @@ rfbSendUpdateBuf(cl)
  * client, using values from the currently installed colormap.
  */
 
-Bool
+rfbBool
 rfbSendSetColourMapEntries(cl, firstColour, nColours)
     rfbClientPtr cl;
     int firstColour;
@@ -1701,7 +1702,7 @@ rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
 	    rfbDisconnectUDPSock(rfbScreen);
 	    return;
 	}
-	cl->screen->kbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), cl);
+	cl->screen->kbdAddEvent(msg.ke.down, (rfbKeySym)Swap32IfLE(msg.ke.key), cl);
 	break;
 
     case rfbPointerEvent:
@@ -1721,7 +1722,7 @@ rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
     }
 }
 
-#ifdef BACKCHANNEL
+#ifdef LIBVNCSERVER_BACKCHANNEL
 void rfbSendBackChannel(rfbScreenInfoPtr rfbScreen,char* str,int len)
 {
     rfbClientPtr cl;

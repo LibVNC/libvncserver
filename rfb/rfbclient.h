@@ -53,27 +53,27 @@
 
 
 typedef struct {
-  Bool shareDesktop;
-  Bool viewOnly;
-  Bool fullScreen;
-  Bool grabKeyboard;
-  Bool raiseOnBeep;
+  rfbBool shareDesktop;
+  rfbBool viewOnly;
+  rfbBool fullScreen;
+  rfbBool grabKeyboard;
+  rfbBool raiseOnBeep;
 
   const char* encodingsString;
 
-  Bool useBGR233;
+  rfbBool useBGR233;
   int nColours;
-  Bool useSharedColours;
-  Bool forceOwnCmap;
-  Bool forceTrueColour;
+  rfbBool useSharedColours;
+  rfbBool forceOwnCmap;
+  rfbBool forceTrueColour;
   int requestedDepth;
 
-  Bool useShm;
+  rfbBool useShm;
 
   int wmDecorationWidth;
   int wmDecorationHeight;
 
-  Bool debug;
+  rfbBool debug;
 
   int popupButtonCount;
 
@@ -82,19 +82,19 @@ typedef struct {
 
   int compressLevel;
   int qualityLevel;
-  Bool enableJPEG;
-  Bool useRemoteCursor;
+  rfbBool enableJPEG;
+  rfbBool useRemoteCursor;
 } AppData;
 
 
 struct _rfbClient;
 
-typedef Bool (*HandleCursorPosProc)(struct _rfbClient* client, int x, int y);
+typedef rfbBool (*HandleCursorPosProc)(struct _rfbClient* client, int x, int y);
 typedef void (*SoftCursorLockAreaProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef void (*SoftCursorUnlockScreenProc)(struct _rfbClient* client);
 typedef void (*GotFrameBufferUpdateProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef char* (*GetPasswordProc)(struct _rfbClient* client);
-typedef Bool (*MallocFrameBufferProc)(struct _rfbClient* client);
+typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*BellProc)(struct _rfbClient* client);
 
 typedef struct _rfbClient {
@@ -108,7 +108,7 @@ typedef struct _rfbClient {
 	const char* programName;
 	const char* serverHost;
 	int serverPort;
-	Bool listenSpecified;
+	rfbBool listenSpecified;
 	int listenPort, flashPort;
 
 	/* Note that the CoRRE encoding uses this buffer and assumes it is big enough
@@ -122,13 +122,13 @@ typedef struct _rfbClient {
 	/* rfbproto.c */
 
 	int sock;
-	Bool canUseCoRRE;
-	Bool canUseHextile;
+	rfbBool canUseCoRRE;
+	rfbBool canUseHextile;
 	char *desktopName;
 	rfbPixelFormat format;
 	rfbServerInitMsg si;
 	char *serverCutText;
-	Bool newServerCutText;
+	rfbBool newServerCutText;
 
 	/* cursor.c */
 	uint8_t *rcSource, *rcMask;
@@ -147,7 +147,7 @@ typedef struct _rfbClient {
 
 // TODO: make callback
 
-extern Bool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int height, uint32_t enc);
+extern rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int height, uint32_t enc);
 
 /* listen.c */
 
@@ -155,38 +155,38 @@ extern void listenForIncomingConnections(rfbClient* viewer);
 
 /* rfbproto.c */
 
-extern Bool rfbEnableClientLogging;
+extern rfbBool rfbEnableClientLogging;
 extern void rfbClientLog(const char *format, ...);
-extern Bool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
-extern Bool InitialiseRFBConnection(rfbClient* client);
-extern Bool SetFormatAndEncodings(rfbClient* client);
-extern Bool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
-extern Bool SendFramebufferUpdateRequest(rfbClient* client,
+extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
+extern rfbBool InitialiseRFBConnection(rfbClient* client);
+extern rfbBool SetFormatAndEncodings(rfbClient* client);
+extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
+extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
 					 int x, int y, int w, int h,
-					 Bool incremental);
-extern Bool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
-extern Bool SendKeyEvent(rfbClient* client,uint32_t key, Bool down);
-extern Bool SendClientCutText(rfbClient* client,char *str, int len);
-extern Bool HandleRFBServerMessage(rfbClient* client);
+					 rfbBool incremental);
+extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
+extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
+extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);
+extern rfbBool HandleRFBServerMessage(rfbClient* client);
 
 extern void PrintPixelFormat(rfbPixelFormat *format);
 
 /* sockets.c */
 
-extern Bool errorMessageOnReadFailure;
+extern rfbBool errorMessageOnReadFailure;
 
-extern Bool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
-extern Bool WriteToRFBServer(rfbClient* client, char *buf, int n);
+extern rfbBool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
+extern rfbBool WriteToRFBServer(rfbClient* client, char *buf, int n);
 extern int FindFreeTcpPort(void);
 extern int ListenAtTcpPort(int port);
 extern int ConnectClientToTcpAddr(unsigned int host, int port);
 extern int AcceptTcpConnection(int listenSock);
-extern Bool SetNonBlocking(int sock);
+extern rfbBool SetNonBlocking(int sock);
 
-extern Bool StringToIPAddr(const char *str, unsigned int *addr);
-extern Bool SameMachine(int sock);
+extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
+extern rfbBool SameMachine(int sock);
 
 /* vncviewer.c */
 rfbClient* rfbGetClient(int* argc,char** argv,int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
-Bool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerPort);
+rfbBool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerPort);
 void rfbClientCleanup(rfbClient* client);

@@ -43,7 +43,7 @@
  * why we call it "software cursor").
  ********************************************************************/
 
-Bool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int height, uint32_t enc)
+rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int height, uint32_t enc)
 {
   int bytesPerPixel;
   size_t bytesPerRow, bytesMaskData;

@@ -30,7 +30,7 @@
 #define CARDBPP CONCAT3E(uint,BPP,_t)
 #define GET_PIXEL CONCAT2E(GET_PIXEL,BPP)
 
-static Bool
+static rfbBool
 HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 {
   CARDBPP bg, fg;

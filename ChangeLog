@@ -1,3 +1,8 @@
+   use AX_PREFIX_CONFIG_H to prefix constants in config.h to avoid
+	name clashes (also suggested by Erik)
+   transformed Bool, KeySym, Pixel to rfbBool, rfbKeySym, rfbPixel
+	(as suggested by Erik)
+   purged exit() calls (suggested by Erik)
    fixed bug with maxRectsPerUpdate and Tight Encoding (these are incompatible)
    checked sync with TightVNC 1.2.8:
 	viewonly/full passwords; if given a list, only the first is a full one

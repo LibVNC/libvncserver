@@ -52,39 +52,36 @@
 #include <rfb/rfbint.h>
 #include <rfb/keysym.h>
 
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
 #endif
 
 
 #if defined(WIN32)
 #define WORDS_BIGENDIAN
-#undef Bool
-#define Bool int
+#define rfbBool int
 #include <sys/timeb.h>
 #include <winsock.h>
 #undef SOCKET
 #define SOCKET int
 #else
 #define max(a,b) (((a)>(b))?(a):(b))
-#ifdef HAVE_SYS_TIME_H
+#ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-#ifdef HAVE_NETINET_IN_H
+#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #endif
 #define SOCKET int
-#ifndef Bool
-typedef int8_t Bool;
+typedef int8_t rfbBool;
 #undef FALSE
 #define FALSE 0
 #undef TRUE
 #define TRUE -1
 #endif
-#endif
 
-typedef uint32_t KeySym;
-typedef uint32_t Pixel;
+typedef uint32_t rfbKeySym;
+typedef uint32_t rfbPixel;
 
 #ifndef INADDR_NONE
 #define                INADDR_NONE     ((in_addr_t) 0xffffffff)
@@ -313,7 +310,7 @@ typedef struct {
 #define rfbSetColourMapEntries 1
 #define rfbBell 2
 #define rfbServerCutText 3
-#ifdef BACKCHANNEL
+#ifdef LIBVNCSERVER_BACKCHANNEL
 #define rfbBackChannel 15
 #endif
 
@@ -341,15 +338,15 @@ typedef struct {
 #define rfbEncodingRRE 2
 #define rfbEncodingCoRRE 4
 #define rfbEncodingHextile 5
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbEncodingZlib 6
 #define rfbEncodingTight 7
 #define rfbEncodingZlibHex 8
 #endif
-#ifdef BACKCHANNEL
+#ifdef LIBVNCSERVER_BACKCHANNEL
 #define rfbEncodingBackChannel 15
 #endif
-#ifdef HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_ZRLE
 #define rfbEncodingZRLE 16
 #endif
 
@@ -537,7 +534,7 @@ typedef struct {
 #define rfbHextileExtractW(byte) (((byte) >> 4) + 1)
 #define rfbHextileExtractH(byte) (((byte) & 0xf) + 1)
 
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * zlib - zlib compressed Encoding.  We have an rfbZlibHeader structure
  * giving the number of bytes following.  Finally the data follows is
@@ -798,7 +795,7 @@ typedef struct {
 
 #define sz_rfbServerCutTextMsg 8
 
-#ifdef BACKCHANNEL
+#ifdef LIBVNCSERVER_BACKCHANNEL
 typedef rfbServerCutTextMsg rfbBackChannelMsg;
 #define sz_rfbBackChannelMsg 8
 #endif

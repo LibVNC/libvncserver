@@ -152,7 +152,7 @@ Hooks and IO functions
 There exist the following IO functions as members of rfbScreen:
 kbdAddEvent, kbdReleaseAllKeys, ptrAddEvent and setXCutText
 
-kbdAddEvent(Bool down,KeySym key,rfbClientPtr cl)
+kbdAddEvent(rfbBool down,rfbKeySym key,rfbClientPtr cl)
   is called when a key is pressed.
 kbdReleaseAllKeys(rfbClientPtr cl)
   is not called at all (maybe in the future).

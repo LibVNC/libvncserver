@@ -27,7 +27,7 @@
  *  USA.
  */
 
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 /*
  * rreBeforeBuf contains pixel data in the client's format.
@@ -47,7 +47,7 @@ static int subrectEncode8(uint8_t *data, int w, int h);
 static int subrectEncode16(uint16_t *data, int w, int h);
 static int subrectEncode32(uint32_t *data, int w, int h);
 static uint32_t getBgColour(char *data, int size, int bpp);
-static Bool rfbSendSmallRectEncodingCoRRE(rfbClientPtr cl, int x, int y,
+static rfbBool rfbSendSmallRectEncodingCoRRE(rfbClientPtr cl, int x, int y,
                                           int w, int h);
 
 
@@ -56,7 +56,7 @@ static Bool rfbSendSmallRectEncodingCoRRE(rfbClientPtr cl, int x, int y,
  * encoding.
  */
 
-Bool
+rfbBool
 rfbSendRectEncodingCoRRE(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
@@ -84,7 +84,7 @@ rfbSendRectEncodingCoRRE(cl, x, y, w, h)
  * rectangle using CoRRE encoding.
  */
 
-static Bool
+static rfbBool
 rfbSendSmallRectEncodingCoRRE(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
@@ -131,7 +131,7 @@ rfbSendSmallRectEncodingCoRRE(cl, x, y, w, h)
         break;
     default:
         rfbLog("getBgColour: bpp %d?\n",cl->format.bitsPerPixel);
-        exit(1);
+        return FALSE;
     }
         
     if (nSubrects < 0) {
@@ -327,7 +327,7 @@ getBgColour(data,size,bpp)
       return ((uint32_t *)data)[0];
     } else {
       rfbLog("getBgColour: bpp %d?\n",bpp);
-      exit(1);
+      return 0;
     }
   }
 
@@ -339,7 +339,7 @@ getBgColour(data,size,bpp)
     k = (int)(((uint8_t *)data)[j]);
     if (k >= NUMCLRS) {
       rfbLog("getBgColour: unusual colour = %d\n", k);
-      exit(1);
+      return 0;
     }
     counts[k] += 1;
     if (counts[k] > maxcount) {

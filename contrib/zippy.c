@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
-#include "default8x16.h"
+#include <rfb/default8x16.h>
 
 int maxx=400, maxy=400, bpp=4;
 /* odd maxx doesn't work (vncviewer bug) */
@@ -17,13 +17,14 @@ void linecount (char* frame_buffer);
 /* handles mouse events */
 void on_mouse_event (int buttonMask,int x,int y,rfbClientPtr cl);
 /* handles keyboard events */
-void on_key_press (Bool down,KeySym key,rfbClientPtr cl);
+void on_key_press (rfbBool down,rfbKeySym key,rfbClientPtr cl);
 
 int main (int argc, char **argv)
 {
 	rfbScreenInfoPtr server;
 
-	rfbProcessSizeArguments(&maxx,&maxy,&bpp,&argc,argv);
+	if(!rfbProcessSizeArguments(&maxx,&maxy,&bpp,&argc,argv))
+	  return 1;
 	  
         server = rfbGetScreen (&argc, argv, maxx, maxy, 8, 3, bpp);
 	server->desktopName = "Zippy das wundersquirrel\'s VNC server";
@@ -137,7 +138,7 @@ void linecount (char* frame_buffer)
 }
 
 
-void on_key_press (Bool down,KeySym key,rfbClientPtr cl)
+void on_key_press (rfbBool down,rfbKeySym key,rfbClientPtr cl)
 {
         if (down)		/* or else the action occurs on both the press and depress */
 	switch (key) {

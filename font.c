@@ -1,7 +1,7 @@
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
-		 int x,int y,unsigned char c,Pixel col)
+		 int x,int y,unsigned char c,rfbPixel col)
 {
   int i,j,width,height;
   unsigned char* data=font->data+font->metaData[c*5];
@@ -34,7 +34,7 @@ int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 }
 
 void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
-		   int x,int y,const char* string,Pixel colour)
+		   int x,int y,const char* string,rfbPixel colour)
 {
   while(*string) {
     x+=rfbDrawChar(rfbScreen,font,x,y,*string,colour);
@@ -46,7 +46,7 @@ void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 			int x,int y,unsigned char c,
 			int x1,int y1,int x2,int y2,
-			Pixel col,Pixel bcol)
+			rfbPixel col,rfbPixel bcol)
 {
   int i,j,width,height;
   unsigned char* data=font->data+font->metaData[c*5];
@@ -102,7 +102,7 @@ int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 			   int x,int y,const char* string,
 			   int x1,int y1,int x2,int y2,
-			   Pixel colour,Pixel backColour)
+			   rfbPixel colour,rfbPixel backColour)
 {
   while(*string) {
     x+=rfbDrawCharWithClip(rfbScreen,font,x,y,*string,x1,y1,x2,y2,

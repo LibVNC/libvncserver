@@ -28,10 +28,10 @@
 #include <string.h>
 #include <math.h>
 
-#ifdef HAVE_SYS_TYPES_H
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-#ifdef HAVE_SYS_STAT_H
+#ifdef LIBVNCSERVER_HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
 
@@ -142,7 +142,7 @@ void
 vncRandomBytes(unsigned char *bytes)
 {
     int i;
-    static Bool s_srandom_called = FALSE;
+    static rfbBool s_srandom_called = FALSE;
 
     if (!s_srandom_called) {
 	srandom((unsigned int)time(0) ^ (unsigned int)getpid());

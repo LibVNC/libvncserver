@@ -12,8 +12,8 @@
  *  It includes the keyboard functions:
  * 
      void KbdAddEvent(down, keySym, cl)
-        Bool down;
-        KeySym keySym;
+        rfbBool down;
+        rfbKeySym keySym;
         rfbClientPtr cl;
      void KbdReleaseAllKeys()
  * 
@@ -37,7 +37,7 @@
 /* zlib doesn't like Byte already defined */
 #undef Byte
 #undef TRUE
-#undef Bool
+#undef rfbBool
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
 
@@ -47,17 +47,17 @@
 #include <signal.h>
 #include <pthread.h>
 
-Bool rfbNoDimming = FALSE;
-Bool rfbNoSleep   = TRUE;
+rfbBool rfbNoDimming = FALSE;
+rfbBool rfbNoSleep   = TRUE;
 
 static pthread_mutex_t  dimming_mutex;
 static unsigned long    dim_time;
 static unsigned long    sleep_time;
 static mach_port_t      master_dev_port;
 static io_connect_t     power_mgt;
-static Bool initialized            = FALSE;
-static Bool dim_time_saved         = FALSE;
-static Bool sleep_time_saved       = FALSE;
+static rfbBool initialized            = FALSE;
+static rfbBool dim_time_saved         = FALSE;
+static rfbBool sleep_time_saved       = FALSE;
 
 static int
 saveDimSettings(void)
@@ -213,7 +213,7 @@ void rfbShutdown(rfbClientPtr cl);
 
 /* some variables to enable special behaviour */
 int startTime = -1, maxSecsToConnect = 0;
-Bool disconnectAfterFirstClient = TRUE;
+rfbBool disconnectAfterFirstClient = TRUE;
 
 /* Where do I get the "official" list of Mac key codes?
    Ripped these out of a Mac II emulator called Basilisk II
@@ -391,7 +391,7 @@ static int keyTable[] = {
 };
 
 void
-KbdAddEvent(Bool down, KeySym keySym, struct _rfbClientRec* cl)
+KbdAddEvent(rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl)
 {
     int i;
     CGKeyCode keyCode = -1;
@@ -446,7 +446,7 @@ PtrAddEvent(buttonMask, x, y, cl)
                      (buttonMask & (1 << 7)) ? TRUE : FALSE);
 }
 
-Bool viewOnly = FALSE, sharedMode = FALSE;
+rfbBool viewOnly = FALSE, sharedMode = FALSE;
 
 void 
 ScreenInit(int argc, char**argv)
@@ -502,7 +502,7 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 	  break;
 	}
     }
-#ifdef BACKCHANNEL
+#ifdef LIBVNCSERVER_BACKCHANNEL
       else if(message[0]=='b')
 	rfbSendBackChannel(rfbScreen,message+1,strlen(message+1));
 #endif
@@ -560,7 +560,7 @@ int main(int argc,char *argv[])
       send_message(&single_instance,"l");
       exit(0);
     } else
-#ifdef BACKCHANNEL
+#ifdef LIBVNCSERVER_BACKCHANNEL
     if(i<argc-1 && !strcmp(argv[i],"-backchannel")) {
       if(strlen(argv[i+1])>1022)
 	argv[i+1][1022]=0;

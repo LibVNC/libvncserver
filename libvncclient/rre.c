@@ -29,7 +29,7 @@
 #define HandleRREBPP CONCAT2E(HandleRRE,BPP)
 #define CARDBPP CONCAT3E(uint,BPP,_t)
 
-static Bool
+static rfbBool
 HandleRREBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 {
   rfbRREHeader hdr;

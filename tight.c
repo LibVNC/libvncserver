@@ -25,10 +25,10 @@
  */
 
 /*#include <stdio.h>*/
-#include "rfb.h"
+#include <rfb/rfb.h>
 
-#ifdef HAVE_LIBZ
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 
 #ifdef WIN32
 #define XMD_H
@@ -47,10 +47,10 @@
 #define MAX_SPLIT_TILE_SIZE       16
 
 /* May be set to TRUE with "-lazytight" Xvnc option. */
-Bool rfbTightDisableGradient = FALSE;
+rfbBool rfbTightDisableGradient = FALSE;
 
 /* This variable is set on every rfbSendRectEncodingTight() call. */
-static Bool usePixelFormat24;
+static rfbBool usePixelFormat24;
 
 
 /* Compression level stuff. The following array contains various
@@ -134,28 +134,28 @@ static void FindBestSolidArea (rfbClientPtr cl, int x, int y, int w, int h,
 static void ExtendSolidArea   (rfbClientPtr cl, int x, int y, int w, int h,
                                uint32_t colorValue,
                                int *x_ptr, int *y_ptr, int *w_ptr, int *h_ptr);
-static Bool CheckSolidTile    (rfbClientPtr cl, int x, int y, int w, int h,
-                               uint32_t *colorPtr, Bool needSameColor);
-static Bool CheckSolidTile8   (rfbClientPtr cl, int x, int y, int w, int h,
-                               uint32_t *colorPtr, Bool needSameColor);
-static Bool CheckSolidTile16  (rfbClientPtr cl, int x, int y, int w, int h,
-                               uint32_t *colorPtr, Bool needSameColor);
-static Bool CheckSolidTile32  (rfbClientPtr cl, int x, int y, int w, int h,
-                               uint32_t *colorPtr, Bool needSameColor);
+static rfbBool CheckSolidTile    (rfbClientPtr cl, int x, int y, int w, int h,
+                               uint32_t *colorPtr, rfbBool needSameColor);
+static rfbBool CheckSolidTile8   (rfbClientPtr cl, int x, int y, int w, int h,
+                               uint32_t *colorPtr, rfbBool needSameColor);
+static rfbBool CheckSolidTile16  (rfbClientPtr cl, int x, int y, int w, int h,
+                               uint32_t *colorPtr, rfbBool needSameColor);
+static rfbBool CheckSolidTile32  (rfbClientPtr cl, int x, int y, int w, int h,
+                               uint32_t *colorPtr, rfbBool needSameColor);
 
-static Bool SendRectSimple    (rfbClientPtr cl, int x, int y, int w, int h);
-static Bool SendSubrect       (rfbClientPtr cl, int x, int y, int w, int h);
-static Bool SendTightHeader   (rfbClientPtr cl, int x, int y, int w, int h);
+static rfbBool SendRectSimple    (rfbClientPtr cl, int x, int y, int w, int h);
+static rfbBool SendSubrect       (rfbClientPtr cl, int x, int y, int w, int h);
+static rfbBool SendTightHeader   (rfbClientPtr cl, int x, int y, int w, int h);
 
-static Bool SendSolidRect     (rfbClientPtr cl);
-static Bool SendMonoRect      (rfbClientPtr cl, int w, int h);
-static Bool SendIndexedRect   (rfbClientPtr cl, int w, int h);
-static Bool SendFullColorRect (rfbClientPtr cl, int w, int h);
-static Bool SendGradientRect  (rfbClientPtr cl, int w, int h);
+static rfbBool SendSolidRect     (rfbClientPtr cl);
+static rfbBool SendMonoRect      (rfbClientPtr cl, int w, int h);
+static rfbBool SendIndexedRect   (rfbClientPtr cl, int w, int h);
+static rfbBool SendFullColorRect (rfbClientPtr cl, int w, int h);
+static rfbBool SendGradientRect  (rfbClientPtr cl, int w, int h);
 
-static Bool CompressData(rfbClientPtr cl, int streamId, int dataLen,
+static rfbBool CompressData(rfbClientPtr cl, int streamId, int dataLen,
                          int zlibLevel, int zlibStrategy);
-static Bool SendCompressedData(rfbClientPtr cl, int compressedLen);
+static rfbBool SendCompressedData(rfbClientPtr cl, int compressedLen);
 
 static void FillPalette8(int count);
 static void FillPalette16(int count);
@@ -182,7 +182,7 @@ static unsigned long DetectSmoothImage24(rfbClientPtr cl, rfbPixelFormat *fmt, i
 static unsigned long DetectSmoothImage16(rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h);
 static unsigned long DetectSmoothImage32(rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h);
 
-static Bool SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h,
+static rfbBool SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h,
                          int quality);
 static void PrepareRowForJpeg(rfbClientPtr cl, uint8_t *dst, int x, int y, int count);
 static void PrepareRowForJpeg24(rfbClientPtr cl, uint8_t *dst, int x, int y, int count);
@@ -225,7 +225,7 @@ rfbNumCodedRectsTight(cl, x, y, w, h)
     }
 }
 
-Bool
+rfbBool
 rfbSendRectEncodingTight(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
@@ -452,7 +452,7 @@ ExtendSolidArea(cl, x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
  * that case new color will be stored in *colorPtr.
  */
 
-static Bool CheckSolidTile(rfbClientPtr cl, int x, int y, int w, int h, uint32_t* colorPtr, Bool needSameColor)
+static rfbBool CheckSolidTile(rfbClientPtr cl, int x, int y, int w, int h, uint32_t* colorPtr, rfbBool needSameColor)
 {
     switch(cl->screen->rfbServerFormat.bitsPerPixel) {
     case 32:
@@ -466,8 +466,8 @@ static Bool CheckSolidTile(rfbClientPtr cl, int x, int y, int w, int h, uint32_t
 
 #define DEFINE_CHECK_SOLID_FUNCTION(bpp)                                      \
                                                                               \
-static Bool                                                                   \
-CheckSolidTile##bpp(rfbClientPtr cl, int x, int y, int w, int h, uint32_t* colorPtr, Bool needSameColor) \
+static rfbBool                                                                   \
+CheckSolidTile##bpp(rfbClientPtr cl, int x, int y, int w, int h, uint32_t* colorPtr, rfbBool needSameColor) \
 {                                                                             \
     uint##bpp##_t *fbptr;                                                         \
     uint##bpp##_t colorValue;                                                     \
@@ -496,7 +496,7 @@ DEFINE_CHECK_SOLID_FUNCTION(8)
 DEFINE_CHECK_SOLID_FUNCTION(16)
 DEFINE_CHECK_SOLID_FUNCTION(32)
 
-static Bool
+static rfbBool
 SendRectSimple(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
@@ -551,13 +551,13 @@ SendRectSimple(cl, x, y, w, h)
     return TRUE;
 }
 
-static Bool
+static rfbBool
 SendSubrect(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
 {
     char *fbptr;
-    Bool success = FALSE;
+    rfbBool success = FALSE;
 
     /* Send pending data if there is more than 128 bytes. */
     if (cl->ublen > 128) {
@@ -627,7 +627,7 @@ SendSubrect(cl, x, y, w, h)
     return success;
 }
 
-static Bool
+static rfbBool
 SendTightHeader(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
@@ -659,7 +659,7 @@ SendTightHeader(cl, x, y, w, h)
  * Subencoding implementations.
  */
 
-static Bool
+static rfbBool
 SendSolidRect(cl)
     rfbClientPtr cl;
 {
@@ -685,7 +685,7 @@ SendSolidRect(cl)
     return TRUE;
 }
 
-static Bool
+static rfbBool
 SendMonoRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
@@ -750,7 +750,7 @@ SendMonoRect(cl, w, h)
                         Z_DEFAULT_STRATEGY);
 }
 
-static Bool
+static rfbBool
 SendIndexedRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
@@ -813,7 +813,7 @@ SendIndexedRect(cl, w, h)
                         Z_DEFAULT_STRATEGY);
 }
 
-static Bool
+static rfbBool
 SendFullColorRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
@@ -840,7 +840,7 @@ SendFullColorRect(cl, w, h)
                         Z_DEFAULT_STRATEGY);
 }
 
-static Bool
+static rfbBool
 SendGradientRect(cl, w, h)
     rfbClientPtr cl;
     int w, h;
@@ -879,7 +879,7 @@ SendGradientRect(cl, w, h)
                         Z_FILTERED);
 }
 
-static Bool
+static rfbBool
 CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
     rfbClientPtr cl;
     int streamId, dataLen, zlibLevel, zlibStrategy;
@@ -934,7 +934,7 @@ CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
     return SendCompressedData(cl, tightAfterBufSize - pz->avail_out);
 }
 
-static Bool SendCompressedData(cl, compressedLen)
+static rfbBool SendCompressedData(cl, compressedLen)
     rfbClientPtr cl;
     int compressedLen;
 {
@@ -1378,7 +1378,7 @@ FilterGradient##bpp(cl, buf, fmt, w, h)                                      \
     int w, h;                                                            \
 {                                                                        \
     uint##bpp##_t pix, diff;                                                 \
-    Bool endianMismatch;                                                 \
+    rfbBool endianMismatch;                                                 \
     int *prevRowPtr;                                                     \
     int maxColor[3], shiftBits[3];                                       \
     int pixHere[3], pixUpper[3], pixLeft[3], pixUpperLeft[3];            \
@@ -1558,7 +1558,7 @@ DetectSmoothImage##bpp (cl, fmt, w, h)                                          
     rfbPixelFormat *fmt;                                                     \
     int w, h;                                                                \
 {                                                                            \
-    Bool endianMismatch;                                                     \
+    rfbBool endianMismatch;                                                     \
     uint##bpp##_t pix;                                                           \
     int maxColor[3], shiftBits[3];                                           \
     int x, y, d, dx, c;                                                      \
@@ -1640,10 +1640,10 @@ DEFINE_DETECT_FUNCTION(32)
  */
 
 static struct jpeg_destination_mgr jpegDstManager;
-static Bool jpegError;
+static rfbBool jpegError;
 static int jpegDstDataLen;
 
-static Bool
+static rfbBool
 SendJpegRect(cl, x, y, w, h, quality)
     rfbClientPtr cl;
     int x, y, w, h;

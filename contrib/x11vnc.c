@@ -99,24 +99,6 @@
 #include <X11/extensions/XTest.h>
 #include <X11/keysym.h>
 
-/*
- * Work around Bool and KeySym same names in X and rfb.
- * Bool is #define int in <X11/Xlib.h>
- * KeySym is typedef XID in <X11/X.h>
- * (note that X and rfb KeySym types are the same so a bit silly to worry...
- * the Bool types are different though)
- */
-typedef Bool X_Bool;
-typedef KeySym X_KeySym;
-
-/* the #define Bool can be removed: */
-#ifdef Bool
-#undef Bool
-#endif
-
-/* the KeySym typedef cannot be removed, so use an alias for rest of file: */
-#define KeySym RFBKeySym
-
 #include <rfb/rfb.h>
 
 /* X and rfb framebuffer */
@@ -224,7 +206,7 @@ int cursor_x, cursor_y;		/* x and y from the viewer(s) */
 int got_user_input = 0;
 int shut_down = 0;	
 
-#if defined(HAVE_LIBPTHREAD) && defined(X11VNC_THREADED)
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) && defined(LIBVNCSERVER_X11VNC_THREADED)
 	int use_threads = 1;
 #else
 	int use_threads = 0;
@@ -365,7 +347,7 @@ char modifiers[0x100];
 KeyCode keycodes[0x100], left_shift_code, right_shift_code, altgr_code;
 
 void initialize_keycodes() {
-	X_KeySym key, *keymap;
+	KeySym key, *keymap;
 	int i, j, minkey, maxkey, syms_per_keycode;
 
 	memset(modifiers, -1, sizeof(modifiers));
@@ -377,7 +359,7 @@ void initialize_keycodes() {
 
 	/* handle alphabetic char with only one keysym (no upper + lower) */
 	for (i = minkey; i <= maxkey; i++) {
-		X_KeySym lower, upper;
+		KeySym lower, upper;
 		/* 2nd one */
 		key = keymap[(i - minkey) * syms_per_keycode + 1];
 		if (key != NoSymbol) {
@@ -422,9 +404,9 @@ void DebugXTestFakeKeyEvent(Display* dpy, KeyCode keysym, Bool down, time_t cur_
 
 /* #define XTestFakeKeyEvent DebugXTestFakeKeyEvent */
 
-void tweak_mod(signed char mod, Bool down) {
-	Bool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
-	X_Bool dn = (X_Bool) down;
+void tweak_mod(signed char mod, rfbBool down) {
+	rfbBool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
+	Bool dn = (Bool) down;
 
 	if (mod < 0) {
 		return;
@@ -451,7 +433,7 @@ void tweak_mod(signed char mod, Bool down) {
 	X_UNLOCK;
 }
 
-static void modifier_tweak_keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
+static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 	int tweak = 0;
 
@@ -478,12 +460,12 @@ static void modifier_tweak_keyboard(Bool down, KeySym keysym, rfbClientPtr clien
 		k = keycodes[keysym];
 	} else {
 		X_LOCK;
-		k = XKeysymToKeycode(dpy, (X_KeySym) keysym);
+		k = XKeysymToKeycode(dpy, (KeySym) keysym);
 		X_UNLOCK;
 	}
 	if ( k != NoSymbol ) {
 		X_LOCK;
-		XTestFakeKeyEvent(dpy, k, (X_Bool) down, CurrentTime);
+		XTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
 		X_UNLOCK;
 	}
 
@@ -495,7 +477,7 @@ static void modifier_tweak_keyboard(Bool down, KeySym keysym, rfbClientPtr clien
 /*
  * key event handler
  */
-static void keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
+static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 
 	if (0) {
@@ -516,10 +498,10 @@ static void keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
 
 	X_LOCK;
 
-	k = XKeysymToKeycode(dpy, (X_KeySym) keysym);
+	k = XKeysymToKeycode(dpy, (KeySym) keysym);
 
 	if ( k != NoSymbol ) {
-		XTestFakeKeyEvent(dpy, k, (X_Bool) down, CurrentTime);
+		XTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
 		XFlush(dpy);
 
 		last_event = last_input = time(0);
@@ -902,7 +884,7 @@ void redraw_mouse(void) {
 
 void update_mouse(void) {
 	Window root_w, child_w;
-	Bool ret;
+	rfbBool ret;
 	int root_x, root_y, win_x, win_y, which = 0;
 	unsigned int mask;
 
@@ -2168,7 +2150,7 @@ void print_help() {
 "                       to cut down on load (default %d).\n"
 "-nap                   monitor activity and if low take longer naps between\n" 
 "                       polls to really cut down load when idle (default %s).\n"
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 "-threads               whether or not to use the threaded libvncserver\n"
 "-nothreads             algorithm [rfbRunEventLoop] (default %s).\n"
 #endif
@@ -2196,7 +2178,7 @@ void print_help() {
 		defer_update,
 		waitms,
 		take_naps ? "on":"off",
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 		use_threads ? "on":"off",
 #endif
 		fs_frac,
@@ -2295,7 +2277,7 @@ int main(int argc, char** argv) {
 			waitms = atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "-nap")) {
 			take_naps = 1;
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 		} else if (!strcmp(argv[i], "-threads")) {
 			use_threads = 1;
 		} else if (!strcmp(argv[i], "-nothreads")) {

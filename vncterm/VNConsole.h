@@ -20,7 +20,7 @@ typedef struct vncConsole {
 #endif
 
   /* if this is set, the screen doesn't scroll. */
-  Bool wrapBottomToTop;
+  rfbBool wrapBottomToTop;
 
   /* height and width of one character */
   int cWidth, cHeight;
@@ -36,20 +36,20 @@ typedef struct vncConsole {
   int inputCount;
   int inputSize;
   long selectTimeOut;
-  Bool doEcho; /* if reading input, do output directly? */
+  rfbBool doEcho; /* if reading input, do output directly? */
 
   /* selection */
   char *selection;
 
   /* mouse */
-  Bool wasRightButtonDown;
-  Bool currentlyMarking;
+  rfbBool wasRightButtonDown;
+  rfbBool currentlyMarking;
   int markStart,markEnd;
 
   /* should text cursor be drawn? (an underscore at current position) */
-  Bool cursorActive;
-  Bool cursorIsDrawn;
-  Bool dontDrawCursor; /* for example, while scrolling */
+  rfbBool cursorActive;
+  rfbBool cursorIsDrawn;
+  rfbBool dontDrawCursor; /* for example, while scrolling */
 
   rfbFontDataPtr font;
   rfbScreenInfoPtr rfbScreen;
@@ -58,7 +58,7 @@ typedef struct vncConsole {
 #ifdef USE_ATTRIBUTE_BUFFER
 vncConsolePtr vcGetConsole(int *argc,char **argv,
 			   int width,int height,rfbFontDataPtr font,
-			   Bool withAttributes);
+			   rfbBool withAttributes);
 #else
 vncConsolePtr vcGetConsole(int argc,char **argv,
 			   int width,int height,rfbFontDataPtr font);
@@ -82,7 +82,7 @@ char vcGetCh(vncConsolePtr c);
 char vcGetChar(vncConsolePtr c); /* blocking */
 char *vcGetString(vncConsolePtr c,char *buffer,int maxLen);
 
-void vcKbdAddEventProc(Bool down,KeySym keySym,rfbClientPtr cl);
+void vcKbdAddEventProc(rfbBool down,rfbKeySym keySym,rfbClientPtr cl);
 void vcPtrAddEventProc(int buttonMask,int x,int y,rfbClientPtr cl);
 void vcSetXCutTextProc(char* str,int len, struct _rfbClientRec* cl);
 

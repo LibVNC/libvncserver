@@ -28,7 +28,7 @@
 
 static void Dummy(rfbClient* client) {
 }
-static Bool DummyPoint(rfbClient* client, int x, int y) {
+static rfbBool DummyPoint(rfbClient* client, int x, int y) {
   return TRUE;
 }
 static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
@@ -36,7 +36,7 @@ static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 static char* NoPassword(rfbClient* client) {
   return "";
 }
-static Bool MallocFrameBuffer(rfbClient* client) {
+static rfbBool MallocFrameBuffer(rfbClient* client) {
   if(client->frameBuffer)
     free(client->frameBuffer);
   client->frameBuffer=malloc(client->width*client->height*client->format.bitsPerPixel/8);
@@ -94,7 +94,7 @@ rfbClient* rfbGetClient(int* argc,char** argv,
   return client;
 }
 
-Bool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerPort)
+rfbBool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerPort)
 {
   /* Unless we accepted an incoming connection, make a TCP connection to the
      given VNC server */

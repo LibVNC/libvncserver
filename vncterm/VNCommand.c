@@ -1,15 +1,15 @@
 #include "VNConsole.h"
 #include "vga.h"
-#ifdef HAVE_FCNTL_H
+#ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
-#ifdef HAVE_SYS_TIME_H
+#ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-#ifdef HAVE_UNISTD_H
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#ifdef HAVE_SYS_WAIT_H
+#ifdef LIBVNCSERVER_HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
 #include <errno.h>
@@ -17,7 +17,7 @@
 
 int main(int argc, char **argv)
 {
-  Bool interactive=FALSE,sendOnlyWholeLines=TRUE;
+  rfbBool interactive=FALSE,sendOnlyWholeLines=TRUE;
   int serverArgc,programArg0;
   for(serverArgc=1;serverArgc<argc
 	&& argv[serverArgc][0]=='-' && argv[serverArgc][1]!='-';serverArgc++)

@@ -30,9 +30,9 @@
  * or send email to feedback@developvnc.org.
  */
 
-#include "rfb.h"
+#include <rfb/rfb.h>
 
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 
 /*
  * zlibBeforeBuf contains pixel data in the client's format.
@@ -54,7 +54,7 @@ static int zlibAfterBufLen;
  *                              rectangle encoding.
  */
 
-Bool
+rfbBool
 rfbSendOneRectEncodingZlib(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
@@ -231,7 +231,7 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
  *                           Zlib encoding rectangles.
  */
 
-Bool
+rfbBool
 rfbSendRectEncodingZlib(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;

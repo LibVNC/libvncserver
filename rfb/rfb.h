@@ -37,11 +37,11 @@ extern "C"
 #include <string.h>
 #include <rfb/rfbproto.h>
 
-#ifdef HAVE_SYS_TYPES_H
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 #include <pthread.h>
 #if 0 /* debugging */
 #define LOCK(mutex) (rfbLog("%s:%d LOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_lock(&(mutex)))
@@ -84,18 +84,18 @@ extern "C"
 
 /* end of stuff for autoconf */
 
-/* if you use pthreads, but don't define HAVE_LIBPTHREAD, the structs
+/* if you use pthreads, but don't define LIBVNCSERVER_HAVE_LIBPTHREAD, the structs
    get all mixed up. So this gives a linker error reminding you to compile
    the library and your application (at least the parts including rfb.h)
    with the same support for pthreads. */
-#ifdef HAVE_LIBPTHREAD
-#ifdef HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_ZRLE
 #define rfbInitServer rfbInitServerWithPthreadsAndZRLE
 #else
 #define rfbInitServer rfbInitServerWithPthreadsButWithoutZRLE
 #endif
 #else
-#ifdef HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_ZRLE
 #define rfbInitServer rfbInitServerWithoutPthreadsButWithZRLE
 #else
 #define rfbInitServer rfbInitServerWithoutPthreadsAndZRLE
@@ -112,19 +112,19 @@ enum rfbNewClientAction {
 	RFB_CLIENT_REFUSE
 };
 
-typedef void (*KbdAddEventProcPtr) (Bool down, KeySym keySym, struct _rfbClientRec* cl);
+typedef void (*KbdAddEventProcPtr) (rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl);
 typedef void (*KbdReleaseAllKeysProcPtr) (struct _rfbClientRec* cl);
 typedef void (*PtrAddEventProcPtr) (int buttonMask, int x, int y, struct _rfbClientRec* cl);
 typedef void (*SetXCutTextProcPtr) (char* str,int len, struct _rfbClientRec* cl);
 typedef struct rfbCursor* (*GetCursorProcPtr) (struct _rfbClientRec* pScreen);
-typedef Bool (*SetTranslateFunctionProcPtr)(struct _rfbClientRec* cl);
-typedef Bool (*PasswordCheckProcPtr)(struct _rfbClientRec* cl,const char* encryptedPassWord,int len);
+typedef rfbBool (*SetTranslateFunctionProcPtr)(struct _rfbClientRec* cl);
+typedef rfbBool (*PasswordCheckProcPtr)(struct _rfbClientRec* cl,const char* encryptedPassWord,int len);
 typedef enum rfbNewClientAction (*NewClientHookPtr)(struct _rfbClientRec* cl);
 typedef void (*DisplayHookPtr)(struct _rfbClientRec* cl);
 
 typedef struct {
   uint32_t count;
-  Bool is16; /* is the data format short? */
+  rfbBool is16; /* is the data format short? */
   union {
     uint8_t* bytes;
     uint16_t* shorts;
@@ -146,8 +146,8 @@ typedef struct _rfbScreenInfo
     int bitsPerPixel;
     int sizeInBytes;
 
-    Pixel blackPixel;
-    Pixel whitePixel;
+    rfbPixel blackPixel;
+    rfbPixel whitePixel;
 
     /* some screen specific data can be put into a struct where screenData
      * points to. You need this if you have more than one screen at the
@@ -192,8 +192,8 @@ typedef struct _rfbScreenInfo
        dontSendFramebufferUpdate to TRUE, and all the drawing routines check
        this before calling rfbSendFramebufferUpdate. */
 
-    Bool cursorIsDrawn;		    /* TRUE if the cursor is currently drawn */
-    Bool dontSendFramebufferUpdate; /* TRUE while removing or drawing the
+    rfbBool cursorIsDrawn;		    /* TRUE if the cursor is currently drawn */
+    rfbBool dontSendFramebufferUpdate; /* TRUE while removing or drawing the
 				       cursor */
    
     /* additions by libvncserver */
@@ -203,28 +203,28 @@ typedef struct _rfbScreenInfo
     const char* desktopName;
     char rfbThisHost[255];
 
-    Bool autoPort;
+    rfbBool autoPort;
     int rfbPort;
     SOCKET rfbListenSock;
     int maxSock;
     int maxFd;
     fd_set allFds;
 
-    Bool socketInitDone;
+    rfbBool socketInitDone;
     SOCKET inetdSock;
-    Bool inetdInitDone;
+    rfbBool inetdInitDone;
 
     int udpPort;
     SOCKET udpSock;
     struct _rfbClientRec* udpClient;
-    Bool udpSockConnected;
+    rfbBool udpSockConnected;
     struct sockaddr_in udpRemoteAddr;
 
     int rfbMaxClientWait;
 
     /* http stuff */
-    Bool httpInitDone;
-    Bool httpEnableProxyConnect;
+    rfbBool httpInitDone;
+    rfbBool httpEnableProxyConnect;
     int httpPort;
     char* httpDir;
     SOCKET httpListenSock;
@@ -242,15 +242,15 @@ typedef struct _rfbScreenInfo
      * an update. */
     int rfbDeferUpdateTime;
     char* rfbScreen;
-    Bool rfbAlwaysShared;
-    Bool rfbNeverShared;
-    Bool rfbDontDisconnect;
+    rfbBool rfbAlwaysShared;
+    rfbBool rfbNeverShared;
+    rfbBool rfbDontDisconnect;
     struct _rfbClientRec* rfbClientHead;
 
     /* cursor */
     int cursorX, cursorY,underCursorBufferLen;
     char* underCursorBuffer;
-    Bool dontConvertRichCursorToXCursor;
+    rfbBool dontConvertRichCursorToXCursor;
     struct rfbCursor* cursor;
 
     /* the frameBufferhas to be supplied by the serving process.
@@ -269,9 +269,9 @@ typedef struct _rfbScreenInfo
     /* displayHook is called just before a frame buffer update */
     DisplayHookPtr displayHook;
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     MUTEX(cursorMutex);
-    Bool backgroundLoop;
+    rfbBool backgroundLoop;
 #endif
 
 } rfbScreenInfo, *rfbScreenInfoPtr;
@@ -316,7 +316,7 @@ typedef struct _rfbClientRec {
     SOCKET sock;
     char *host;
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t client_thread;
 #endif
                                 /* Possible client states: */
@@ -327,14 +327,14 @@ typedef struct _rfbClientRec {
         RFB_NORMAL              /* normal protocol messages */
     } state;
 
-    Bool reverseConnection;
-    Bool onHold;
-    Bool readyForSetColourMapEntries;
-    Bool useCopyRect;
+    rfbBool reverseConnection;
+    rfbBool onHold;
+    rfbBool readyForSetColourMapEntries;
+    rfbBool useCopyRect;
     int preferredEncoding;
     int correMaxWidth, correMaxHeight;
 
-    Bool viewOnly;
+    rfbBool viewOnly;
 
     /* The following member is only used during VNC authentication */
     uint8_t authChallenge[CHALLENGESIZE];
@@ -415,42 +415,42 @@ typedef struct _rfbClientRec {
     int rfbKeyEventsRcvd;
     int rfbPointerEventsRcvd;
 
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
     /* zlib encoding -- necessary compression state info per client */
 
     struct z_stream_s compStream;
-    Bool compStreamInited;
+    rfbBool compStreamInited;
     uint32_t zlibCompressLevel;
 
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
     /* tight encoding -- preserve zlib streams' state for each client */
-  //#ifdef HAVE_LIBJPEG
+  //#ifdef LIBVNCSERVER_HAVE_LIBJPEG
     z_stream zsStruct[4];
-    Bool zsActive[4];
+    rfbBool zsActive[4];
     int zsLevel[4];
     int tightCompressLevel;
     int tightQualityLevel;
 #endif
 #endif
 
-    Bool enableLastRectEncoding;   /* client supports LastRect encoding */
-    Bool enableCursorShapeUpdates; /* client supports cursor shape updates */
-    Bool enableCursorPosUpdates;   /* client supports cursor position updates */
-    Bool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
-    Bool cursorWasChanged;         /* cursor shape update should be sent */
-    Bool cursorWasMoved;           /* cursor position update should be sent */
+    rfbBool enableLastRectEncoding;   /* client supports LastRect encoding */
+    rfbBool enableCursorShapeUpdates; /* client supports cursor shape updates */
+    rfbBool enableCursorPosUpdates;   /* client supports cursor position updates */
+    rfbBool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
+    rfbBool cursorWasChanged;         /* cursor shape update should be sent */
+    rfbBool cursorWasMoved;           /* cursor position update should be sent */
 
-    Bool useNewFBSize;             /* client supports NewFBSize encoding */
-    Bool newFBSizePending;         /* framebuffer size was changed */
+    rfbBool useNewFBSize;             /* client supports NewFBSize encoding */
+    rfbBool newFBSizePending;         /* framebuffer size was changed */
 
-#ifdef BACKCHANNEL
-    Bool enableBackChannel;        /* custom channel for special clients */
+#ifdef LIBVNCSERVER_BACKCHANNEL
+    rfbBool enableBackChannel;        /* custom channel for special clients */
 #endif
 
     struct _rfbClientRec *prev;
     struct _rfbClientRec *next;
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     /* whenever a client is referenced, the refCount has to be incremented
        and afterwards decremented, so that the client is not cleaned up
        while being referenced.
@@ -465,7 +465,7 @@ typedef struct _rfbClientRec {
     COND(updateCond);
 #endif
 
-#ifdef HAVE_ZRLE
+#ifdef LIBVNCSERVER_HAVE_ZRLE
     void* zrleData;
 #endif
 
@@ -543,33 +543,33 @@ extern void rfbProcessClientMessage(rfbClientPtr cl);
 extern void rfbClientConnFailed(rfbClientPtr cl, char *reason);
 extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
 extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
-extern Bool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
-extern Bool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
-extern Bool rfbSendUpdateBuf(rfbClientPtr cl);
+extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
+extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
+extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
-extern Bool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
-extern Bool rfbSendLastRectMarker(rfbClientPtr cl);
-extern Bool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
-extern Bool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
+extern rfbBool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
+extern rfbBool rfbSendLastRectMarker(rfbClientPtr cl);
+extern rfbBool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
+extern rfbBool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
 extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
 
 void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
 
-#ifdef BACKCHANNEL
+#ifdef LIBVNCSERVER_BACKCHANNEL
 extern void rfbSendBackChannel(rfbScreenInfoPtr s,char* message,int len);
 #endif
 
 /* translate.c */
 
-extern Bool rfbEconomicTranslate;
+extern rfbBool rfbEconomicTranslate;
 
 extern void rfbTranslateNone(char *table, rfbPixelFormat *in,
                              rfbPixelFormat *out,
                              char *iptr, char *optr,
                              int bytesBetweenInputLines,
                              int width, int height);
-extern Bool rfbSetTranslateFunction(rfbClientPtr cl);
-extern Bool rfbSetClientColourMap(rfbClientPtr cl, int firstColour, int nColours);
+extern rfbBool rfbSetTranslateFunction(rfbClientPtr cl);
+extern rfbBool rfbSetClientColourMap(rfbClientPtr cl, int firstColour, int nColours);
 extern void rfbSetClientColourMaps(rfbScreenInfoPtr rfbScreen, int firstColour, int nColours);
 
 /* httpd.c */
@@ -587,21 +587,21 @@ extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
 
 /* rre.c */
 
-extern Bool rfbSendRectEncodingRRE(rfbClientPtr cl, int x,int y,int w,int h);
+extern rfbBool rfbSendRectEncodingRRE(rfbClientPtr cl, int x,int y,int w,int h);
 
 
 /* corre.c */
 
-extern Bool rfbSendRectEncodingCoRRE(rfbClientPtr cl, int x,int y,int w,int h);
+extern rfbBool rfbSendRectEncodingCoRRE(rfbClientPtr cl, int x,int y,int w,int h);
 
 
 /* hextile.c */
 
-extern Bool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
+extern rfbBool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
                                        int h);
 
 
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 /* zlib.c */
 
 /* Minimum zlib rectangle size in bytes.  Anything smaller will
@@ -616,18 +616,18 @@ extern Bool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
 #define ZLIB_MAX_SIZE(min) ((( min * 2 ) > ZLIB_MAX_RECT_SIZE ) ? \
 			    ( min * 2 ) : ZLIB_MAX_RECT_SIZE )
 
-extern Bool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
+extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 				    int h);
 
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 /* tight.c */
 
 #define TIGHT_DEFAULT_COMPRESSION  6
 
-extern Bool rfbTightDisableGradient;
+extern rfbBool rfbTightDisableGradient;
 
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
-extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
+extern rfbBool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
 #endif
 #endif
 
@@ -636,7 +636,7 @@ extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
 
 typedef struct rfbCursor {
     /* set this to true if LibVNCServer has to free this cursor */
-    Bool cleanup, cleanupSource, cleanupMask, cleanupRichSource;
+    rfbBool cleanup, cleanupSource, cleanupMask, cleanupRichSource;
     unsigned char *source;			/* points to bits */
     unsigned char *mask;			/* points to bits */
     unsigned short width, height, xhot, yhot;	/* metrics */
@@ -646,8 +646,8 @@ typedef struct rfbCursor {
 } rfbCursor, *rfbCursorPtr;
 extern unsigned char rfbReverseByte[0x100];
 
-extern Bool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);
-extern Bool rfbSendCursorPos(rfbClientPtr cl);
+extern rfbBool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);
+extern rfbBool rfbSendCursorPos(rfbClientPtr cl);
 extern void rfbConvertLSBCursorBitmapOrMask(int width,int height,unsigned char* bitmap);
 extern rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskString);
 extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
@@ -656,14 +656,14 @@ extern void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cu
 extern void rfbFreeCursor(rfbCursorPtr cursor);
 extern void rfbDrawCursor(rfbScreenInfoPtr rfbScreen);
 extern void rfbUndrawCursor(rfbScreenInfoPtr rfbScreen);
-extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld);
+extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,rfbBool freeOld);
 
 /* cursor handling for the pointer */
 extern void defaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
 
 /* zrle.c */
-#ifdef HAVE_ZRLE
-extern Bool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w,int h);
+#ifdef LIBVNCSERVER_HAVE_ZRLE
+extern rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w,int h);
 extern void FreeZrleData(rfbClientPtr cl);
 #endif
 
@@ -684,11 +684,11 @@ typedef struct rfbFontData {
   int* metaData;
 } rfbFontData,* rfbFontDataPtr;
 
-int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,Pixel colour);
-void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,Pixel colour);
+int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,rfbPixel colour);
+void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,rfbPixel colour);
 /* if colour==backColour, background is transparent */
-int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,int x1,int y1,int x2,int y2,Pixel colour,Pixel backColour);
-void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,int x1,int y1,int x2,int y2,Pixel colour,Pixel backColour);
+int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,unsigned char c,int x1,int y1,int x2,int y2,rfbPixel colour,rfbPixel backColour);
+void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,int x,int y,const char* string,int x1,int y1,int x2,int y2,rfbPixel colour,rfbPixel backColour);
 int rfbWidthOfString(rfbFontDataPtr font,const char* string);
 int rfbWidthOfChar(rfbFontDataPtr font,unsigned char c);
 void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int* y2);
@@ -703,9 +703,9 @@ void rfbFreeFont(rfbFontDataPtr font);
 /* draw.c */
 
 /* You have to call rfbUndrawCursor before using these functions */
-void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,Pixel col);
-void rfbDrawPixel(rfbScreenInfoPtr s,int x,int y,Pixel col);
-void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,Pixel col);
+void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);
+void rfbDrawPixel(rfbScreenInfoPtr s,int x,int y,rfbPixel col);
+void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);
 
 /* selbox.c */
 
@@ -717,15 +717,15 @@ typedef void (*SelectionChangedHookPtr)(int index);
 extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,
 			rfbFontDataPtr font, char** list,
 			int x1, int y1, int x2, int y2,
-			Pixel foreColour, Pixel backColour,
+			rfbPixel foreColour, rfbPixel backColour,
 			int border,SelectionChangedHookPtr selChangedHook);
 
 /* cargs.c */
 
 extern void rfbUsage(void);
 extern void rfbPurgeArguments(int* argc,int* position,int count,char *argv[]);
-extern void rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[]);
-extern void rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[]);
+extern rfbBool rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[]);
+extern rfbBool rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[]);
 
 /* main.c */
 
@@ -745,7 +745,7 @@ void doNothingWithClient(rfbClientPtr cl);
 enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
 
 /* to check against plain passwords */
-Bool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len);
+rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len);
 
 /* functions to make a vnc server */
 extern rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
@@ -769,7 +769,7 @@ extern void rfbRefuseOnHoldClient(rfbClientPtr cl);
  if you are using the event loop, set this to some value > 0, so the
  server doesn't get a high load just by listening. */
 
-extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, Bool runInBackground);
+extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, rfbBool runInBackground);
 extern void rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
 
 #endif

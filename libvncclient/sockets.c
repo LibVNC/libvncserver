@@ -34,7 +34,7 @@
 
 void PrintInHex(char *buf, int len);
 
-Bool errorMessageOnReadFailure = TRUE;
+rfbBool errorMessageOnReadFailure = TRUE;
 
 #define BUF_SIZE 8192
 static char buf[BUF_SIZE];
@@ -55,7 +55,7 @@ static int buffered = 0;
  *    events are processed, as there is no XtAppMainLoop in the program.
  */
 
-Bool
+rfbBool
 ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 {
   if (n <= buffered) {
@@ -138,7 +138,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
  * Write an exact number of bytes, and don't return until you've sent them.
  */
 
-Bool
+rfbBool
 WriteToRFBServer(rfbClient* client, char *buf, int n)
 {
   fd_set fds;
@@ -322,7 +322,7 @@ AcceptTcpConnection(int listenSock)
  * SetNonBlocking sets a socket into non-blocking mode.
  */
 
-Bool
+rfbBool
 SetNonBlocking(int sock)
 {
   if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
@@ -337,7 +337,7 @@ SetNonBlocking(int sock)
  * StringToIPAddr - convert a host string to an IP address.
  */
 
-Bool
+rfbBool
 StringToIPAddr(const char *str, unsigned int *addr)
 {
   struct hostent *hp;
@@ -367,7 +367,7 @@ StringToIPAddr(const char *str, unsigned int *addr)
  * Test if the other end of a socket is on the same machine.
  */
 
-Bool
+rfbBool
 SameMachine(int sock)
 {
   struct sockaddr_in peeraddr, myaddr;

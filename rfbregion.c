@@ -5,8 +5,8 @@
  * Only deals with rectangular regions, though.
  */
 
-#include "rfb.h"
-#include "rfbregion.h"
+#include <rfb/rfb.h>
+#include <rfb/rfbregion.h>
 
 /* -=- Internal Span structure */
 
@@ -82,7 +82,6 @@ sraSpanCheck(const sraSpan *span, const char *text) {
   if (span->start == span->end) {
     printf(text); 
     printf(":%d-%d\n", span->start, span->end);
-    exit(0);
   }
 }
 
@@ -169,7 +168,7 @@ sraSpanListMakeEmpty(sraSpanList *list) {
   list->back._next = NULL;
 }
 
-Bool
+rfbBool
 sraSpanListEqual(const sraSpanList *s1, const sraSpanList *s2) {
   sraSpan *sp1, *sp2;
 
@@ -178,7 +177,7 @@ sraSpanListEqual(const sraSpanList *s1, const sraSpanList *s2) {
       return 1;
     } else {
       printf("sraSpanListEqual:incompatible spans (only one NULL!)\n");
-      exit(1);
+      return FALSE;
     }
   }
 
@@ -202,7 +201,7 @@ sraSpanListEqual(const sraSpanList *s1, const sraSpanList *s2) {
   }    
 }
 
-Bool
+rfbBool
 sraSpanListEmpty(const sraSpanList *list) {
   return (list->front._next == &(list->back));
 }
@@ -272,7 +271,7 @@ sraSpanListOr(sraSpanList *dest, const sraSpanList *src) {
       return;
     } else {
       printf("sraSpanListOr:incompatible spans (only one NULL!)\n");
-      exit(1);
+      return;
     }
   }
 
@@ -352,7 +351,7 @@ sraSpanListOr(sraSpanList *dest, const sraSpanList *src) {
   }
 }
 
-Bool
+rfbBool
 sraSpanListAnd(sraSpanList *dest, const sraSpanList *src) {
   sraSpan *d_curr, *s_curr, *d_next;
 
@@ -361,7 +360,7 @@ sraSpanListAnd(sraSpanList *dest, const sraSpanList *src) {
       return 1;
     } else {
       printf("sraSpanListAnd:incompatible spans (only one NULL!)\n");
-      exit(1);
+      return FALSE;
     }
   }
 
@@ -432,7 +431,7 @@ sraSpanListAnd(sraSpanList *dest, const sraSpanList *src) {
   return !sraSpanListEmpty(dest);
 }
 
-Bool
+rfbBool
 sraSpanListSubtract(sraSpanList *dest, const sraSpanList *src) {
   sraSpan *d_curr, *s_curr;
 
@@ -441,7 +440,7 @@ sraSpanListSubtract(sraSpanList *dest, const sraSpanList *src) {
       return 1;
     } else {
       printf("sraSpanListSubtract:incompatible spans (only one NULL!)\n");
-      exit(1);
+      return FALSE;
     }
   }
 
@@ -547,7 +546,7 @@ sraRgnMakeEmpty(sraRegion *rgn) {
 
 /* -=- Boolean Region ops */
 
-Bool
+rfbBool
 sraRgnAnd(sraRegion *dst, const sraRegion *src) {
   return sraSpanListAnd((sraSpanList*)dst, (sraSpanList*)src);
 }
@@ -557,7 +556,7 @@ sraRgnOr(sraRegion *dst, const sraRegion *src) {
   sraSpanListOr((sraSpanList*)dst, (sraSpanList*)src);
 }
 
-Bool
+rfbBool
 sraRgnSubtract(sraRegion *dst, const sraRegion *src) {
   return sraSpanListSubtract((sraSpanList*)dst, (sraSpanList*)src);
 }
@@ -614,12 +613,12 @@ sraRegion *sraRgnBBox(const sraRegion *src) {
   return sraRgnCreateRect(xmin,ymin,xmax,ymax);
 }
 
-Bool
+rfbBool
 sraRgnPopRect(sraRegion *rgn, sraRect *rect, unsigned long flags) {
   sraSpan *vcurr, *hcurr;
   sraSpan *vend, *hend;
-  Bool right2left = flags & 2;
-  Bool bottom2top = flags & 1;
+  rfbBool right2left = flags & 2;
+  rfbBool bottom2top = flags & 1;
 
   /* - Pick correct order */
   if (bottom2top) {
@@ -672,7 +671,7 @@ sraRgnCountRects(const sraRegion *rgn) {
   return count;
 }
 
-Bool
+rfbBool
 sraRgnEmpty(const sraRegion *rgn) {
   return sraSpanListEmpty((sraSpanList*)rgn);
 }
@@ -706,7 +705,7 @@ sraRectangleIterator *sraRgnGetIterator(sraRegion *s)
   return(i);
 }
 
-sraRectangleIterator *sraRgnGetReverseIterator(sraRegion *s,Bool reverseX,Bool reverseY)
+sraRectangleIterator *sraRgnGetReverseIterator(sraRegion *s,rfbBool reverseX,rfbBool reverseY)
 {
   sraRectangleIterator *i = sraRgnGetIterator(s);
   if(reverseY) {
@@ -718,7 +717,7 @@ sraRectangleIterator *sraRgnGetReverseIterator(sraRegion *s,Bool reverseX,Bool r
   return(i);
 }
 
-Bool sraReverse(sraRectangleIterator *i)
+rfbBool sraReverse(sraRectangleIterator *i)
 {
   return( ((i->ptrPos&2) && i->reverseX) ||
      (!(i->ptrPos&2) && i->reverseY));
@@ -732,7 +731,7 @@ sraSpan* sraNextSpan(sraRectangleIterator *i)
     return(i->sPtrs[i->ptrPos]->_next);
 }
 
-Bool sraRgnIteratorNext(sraRectangleIterator* i,sraRect* r)
+rfbBool sraRgnIteratorNext(sraRectangleIterator* i,sraRect* r)
 {
   /* is the subspan finished? */
   while(sraNextSpan(i) == i->sPtrs[i->ptrPos+1]) {
@@ -761,7 +760,7 @@ Bool sraRgnIteratorNext(sraRectangleIterator* i,sraRect* r)
 
   if((i->ptrPos%4)!=2) {
     rfbLog("sraRgnIteratorNext: offset is wrong (%d%%4!=2)\n",i->ptrPos);
-    exit(-1);
+    return FALSE;
   }
 
   r->y1 = i->sPtrs[i->ptrPos-2]->start;
@@ -783,7 +782,7 @@ sraRgnPrint(const sraRegion *rgn) {
 	sraSpanListPrint((sraSpanList*)rgn);
 }
 
-Bool
+rfbBool
 sraClipRect(int *x, int *y, int *w, int *h,
 	    int cx, int cy, int cw, int ch) {
   if (*x < cx) {
@@ -812,7 +811,7 @@ int main(int argc, char** argv)
   sraRegionPtr region, region1, region2;
   sraRectangleIterator* i;
   sraRect rect;
-  Bool b;
+  rfbBool b;
 
   region = sraRgnCreateRect(10, 10, 600, 300);
   region1 = sraRgnCreateRect(40, 50, 350, 200);

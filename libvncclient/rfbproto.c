@@ -27,10 +27,10 @@
 #include <errno.h>
 #include <pwd.h>
 #include <rfb/rfbclient.h>
-#ifdef HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
 #endif
-#ifdef HAVE_LIBJPEG
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 #include <jpeglib.h>
 #endif
 #include <stdarg.h>
@@ -40,7 +40,7 @@
  * rfbClientLog prints a time-stamped message to the log file (stderr).
  */
 
-Bool rfbEnableClientLogging=TRUE;
+rfbBool rfbEnableClientLogging=TRUE;
 
 void
 rfbClientLog(const char *format, ...)
@@ -124,21 +124,21 @@ void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, int w, 
   }
 }
 
-static Bool HandleRRE8(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleRRE16(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleCoRRE8(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleCoRRE16(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleCoRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleHextile8(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleHextile16(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleHextile32(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleZlib8(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleZlib16(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleZlib32(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleTight8(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleTight16(rfbClient* client, int rx, int ry, int rw, int rh);
-static Bool HandleTight32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleRRE8(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleRRE16(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleCoRRE8(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleCoRRE16(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleCoRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleHextile8(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleHextile16(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleHextile32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleZlib8(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleZlib16(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleZlib32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTight8(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTight16(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTight32(rfbClient* client, int rx, int ry, int rw, int rh);
 
 static long ReadCompactLen (rfbClient* client);
 
@@ -159,7 +159,7 @@ static int raw_buffer_size = -1;
 static char *raw_buffer;
 
 static z_stream decompStream;
-static Bool decompStreamInited = FALSE;
+static rfbBool decompStreamInited = FALSE;
 
 
 /*
@@ -174,25 +174,25 @@ static char zlib_buffer[ZLIB_BUFFER_SIZE];
 
 /* Four independent compression streams for zlib library. */
 static z_stream zlibStream[4];
-static Bool zlibStreamActive[4] = {
+static rfbBool zlibStreamActive[4] = {
   FALSE, FALSE, FALSE, FALSE
 };
 
 /* Filter stuff. Should be initialized by filter initialization code. */
-static Bool cutZeros;
+static rfbBool cutZeros;
 static int rectWidth, rectColors;
 static char tightPalette[256*4];
 static uint8_t tightPrevRow[2048*3*sizeof(uint16_t)];
 
 /* JPEG decoder state. */
-static Bool jpegError;
+static rfbBool jpegError;
 
 
 /*
  * ConnectToRFBServer.
  */
 
-Bool
+rfbBool
 ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
 {
   unsigned int host;
@@ -218,7 +218,7 @@ static void rfbEncryptBytes(unsigned char *bytes, char *passwd);
  * InitialiseRFBConnection.
  */
 
-Bool
+rfbBool
 InitialiseRFBConnection(rfbClient* client)
 {
   rfbProtocolVersionMsg pv;
@@ -368,7 +368,7 @@ InitialiseRFBConnection(rfbClient* client)
  * SetFormatAndEncodings.
  */
 
-Bool
+rfbBool
 SetFormatAndEncodings(rfbClient* client)
 {
   rfbSetPixelFormatMsg spf;
@@ -376,9 +376,9 @@ SetFormatAndEncodings(rfbClient* client)
   rfbSetEncodingsMsg *se = (rfbSetEncodingsMsg *)buf;
   uint32_t *encs = (uint32_t *)(&buf[sz_rfbSetEncodingsMsg]);
   int len = 0;
-  Bool requestCompressLevel = FALSE;
-  Bool requestQualityLevel = FALSE;
-  Bool requestLastRectEncoding = FALSE;
+  rfbBool requestCompressLevel = FALSE;
+  rfbBool requestQualityLevel = FALSE;
+  rfbBool requestLastRectEncoding = FALSE;
 
   spf.type = rfbSetPixelFormat;
   spf.format = client->format;
@@ -519,7 +519,7 @@ SetFormatAndEncodings(rfbClient* client)
  * SendIncrementalFramebufferUpdateRequest.
  */
 
-Bool
+rfbBool
 SendIncrementalFramebufferUpdateRequest(rfbClient* client)
 {
   return SendFramebufferUpdateRequest(client, 0, 0, client->si.framebufferWidth,
@@ -531,8 +531,8 @@ SendIncrementalFramebufferUpdateRequest(rfbClient* client)
  * SendFramebufferUpdateRequest.
  */
 
-Bool
-SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, Bool incremental)
+rfbBool
+SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, rfbBool incremental)
 {
   rfbFramebufferUpdateRequestMsg fur;
 
@@ -554,7 +554,7 @@ SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, Bool
  * SendPointerEvent.
  */
 
-Bool
+rfbBool
 SendPointerEvent(rfbClient* client,int x, int y, int buttonMask)
 {
   rfbPointerEventMsg pe;
@@ -574,8 +574,8 @@ SendPointerEvent(rfbClient* client,int x, int y, int buttonMask)
  * SendKeyEvent.
  */
 
-Bool
-SendKeyEvent(rfbClient* client, uint32_t key, Bool down)
+rfbBool
+SendKeyEvent(rfbClient* client, uint32_t key, rfbBool down)
 {
   rfbKeyEventMsg ke;
 
@@ -590,7 +590,7 @@ SendKeyEvent(rfbClient* client, uint32_t key, Bool down)
  * SendClientCutText.
  */
 
-Bool
+rfbBool
 SendClientCutText(rfbClient* client, char *str, int len)
 {
   rfbClientCutTextMsg cct;
@@ -611,7 +611,7 @@ SendClientCutText(rfbClient* client, char *str, int len)
  * HandleRFBServerMessage.
  */
 
-Bool
+rfbBool
 HandleRFBServerMessage(rfbClient* client)
 {
   rfbServerToClientMsg msg;

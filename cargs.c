@@ -12,7 +12,7 @@
  *  see GPL (latest version) for full details
  */
 
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 void
 rfbUsage(void)
@@ -35,8 +35,6 @@ rfbUsage(void)
     fprintf(stderr, "-httpdir dir-path      enable http server using dir-path home\n");
     fprintf(stderr, "-httpport portnum      use portnum for http connection\n");
     fprintf(stderr, "-enablehttpproxy       enable http proxy support\n");
-
-    exit(1);
 }
 
 /* purges COUNT arguments from ARGV at POSITION and decrements ARGC.
@@ -50,7 +48,7 @@ void rfbPurgeArguments(int* argc,int* position,int count,char *argv[])
   (*position)--;
 }
 
-void 
+rfbBool 
 rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 {
     int i,i1;
@@ -60,28 +58,46 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
     for (i = i1 = 1; i < *argc;) {
         if (strcmp(argv[i], "-help") == 0) {
 	    rfbUsage();
-	    exit(1);
+	    return FALSE;
 	} else if (strcmp(argv[i], "-rfbport") == 0) { /* -rfbport port */
-            if (i + 1 >= *argc) rfbUsage();
-	   rfbScreen->rfbPort = atoi(argv[++i]);
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
+	    rfbScreen->rfbPort = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-rfbwait") == 0) {  /* -rfbwait ms */
-            if (i + 1 >= *argc) rfbUsage();
-	   rfbScreen->rfbMaxClientWait = atoi(argv[++i]);
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
+	    rfbScreen->rfbMaxClientWait = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-rfbauth") == 0) {  /* -rfbauth passwd-file */
-            if (i + 1 >= *argc) rfbUsage();
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
             rfbScreen->rfbAuthPasswdData = argv[++i];
 	} else if (strcmp(argv[i], "-passwd") == 0) {  /* -passwd password */
 	    char **passwds = malloc(sizeof(char**)*2);
-	    if (i + 1 >= *argc) rfbUsage();
+	    if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
 	    passwds[0] = argv[++i];
 	    passwds[1] = 0;
 	    rfbScreen->rfbAuthPasswdData = (void*)passwds;
 	    rfbScreen->passwordCheck = rfbCheckPasswordByList;
         } else if (strcmp(argv[i], "-deferupdate") == 0) {  /* -deferupdate milliseconds */
-            if (i + 1 >= *argc) rfbUsage();
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
             rfbScreen->rfbDeferUpdateTime = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-desktop") == 0) {  /* -desktop desktop-name */
-            if (i + 1 >= *argc) rfbUsage();
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
             rfbScreen->desktopName = argv[++i];
         } else if (strcmp(argv[i], "-alwaysshared") == 0) {
 	    rfbScreen->rfbAlwaysShared = TRUE;
@@ -90,10 +106,16 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
         } else if (strcmp(argv[i], "-dontdisconnect") == 0) {
             rfbScreen->rfbDontDisconnect = TRUE;
         } else if (strcmp(argv[i], "-httpdir") == 0) {  /* -httpdir directory-path */
-            if (i + 1 >= *argc) rfbUsage();
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
             rfbScreen->httpDir = argv[++i];
         } else if (strcmp(argv[i], "-httpport") == 0) {  /* -httpport portnum */
-            if (i + 1 >= *argc) rfbUsage();
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
             rfbScreen->httpPort = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-enablehttpproxy") == 0) {
             rfbScreen->httpEnableProxyConnect = TRUE;
@@ -105,21 +127,21 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	i1++;
 	i=i1;
     }
+    return TRUE;
 }
 
 void rfbSizeUsage()
 {
     fprintf(stderr, "-width                 sets the width of the framebuffer\n");
     fprintf(stderr, "-height                sets the height of the framebuffer\n");
-    exit(1);
 }
 
-void 
+rfbBool 
 rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[])
 {
     int i,i1;
 
-    if(!argc) return;
+    if(!argc) return TRUE;
     for (i = i1 = 1; i < *argc-1;) {
         if (strcmp(argv[i], "-bpp") == 0) {
                *bpp = atoi(argv[++i]);
@@ -136,5 +158,6 @@ rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[])
 	i1++;
 	i=i1;
     }
+    return TRUE;
 }
 

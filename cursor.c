@@ -22,13 +22,13 @@
  *  USA.
  */
 
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 /*
  * Send cursor shape either in X-style format or in client pixel format.
  */
 
-Bool
+rfbBool
 rfbSendCursorShape(cl)
     rfbClientPtr cl;
 {
@@ -176,7 +176,7 @@ rfbSendCursorShape(cl)
  * Send cursor position (PointerPos pseudo-encoding).
  */
 
-Bool
+rfbBool
 rfbSendCursorPos(rfbClientPtr cl)
 {
   rfbFramebufferUpdateRectHeader rect;
@@ -502,7 +502,7 @@ void rfbPrintXCursor(rfbCursorPtr cursor)
    }
 }
 
-void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
+void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,rfbBool freeOld)
 {
   LOCK(rfbScreen->cursorMutex);
   while(rfbScreen->cursorIsDrawn) {

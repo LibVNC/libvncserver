@@ -24,7 +24,7 @@
 //
 
 extern "C" {
-#include "rfb.h"
+#include <rfb/rfb.h>
 }
 #include <rdr/MemOutStream.h>
 #include <rdr/ZlibOutStream.h>
@@ -75,7 +75,7 @@ static rdr::MemOutStream mos;
  */
 
 
-Bool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
+rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
 {
   if (!cl->zrleData) cl->zrleData = new rdr::ZlibOutStream;
   rdr::ZlibOutStream* zos = (rdr::ZlibOutStream*)cl->zrleData;

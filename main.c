@@ -10,8 +10,8 @@
  *  see GPL (latest version) for full details
  */
 
-#include "rfb.h"
-#include "rfbregion.h"
+#include <rfb/rfb.h>
+#include <rfb/rfbregion.h>
 
 #include <stdarg.h>
 #include <errno.h>
@@ -21,7 +21,7 @@
 #define true -1
 #endif
 
-#ifdef HAVE_SYS_TYPES_H
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
 
@@ -34,7 +34,7 @@
 #include <signal.h>
 #include <time.h>
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 MUTEX(logMutex);
 #endif
 
@@ -133,7 +133,7 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
 #if 0
        /* TODO: is this needed? Or does it mess up deferring? */
        /* while(!sraRgnEmpty(cl->copyRegion)) */ {
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 	 if(!cl->screen->backgroundLoop)
 #endif
 	   {
@@ -234,12 +234,12 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
    sraRgnDestroy(region);
 }
 
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 static void *
 clientOutput(void *data)
 {
     rfbClientPtr cl = (rfbClientPtr)data;
-    Bool haveUpdate;
+    rfbBool haveUpdate;
     sraRegion* updateRegion;
 
     while (1) {
@@ -360,7 +360,7 @@ rfbRefuseOnHoldClient(rfbClientPtr cl)
 }
 
 static void
-defaultKbdAddEvent(Bool down, KeySym keySym, rfbClientPtr cl)
+defaultKbdAddEvent(rfbBool down, rfbKeySym keySym, rfbClientPtr cl)
 {
 }
 
@@ -434,7 +434,7 @@ rfbCursorPtr defaultGetCursorPtr(rfbClientPtr cl)
 }
 
 /* response is cl->authChallenge vncEncrypted with passwd */
-Bool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
+rfbBool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
 {
   int i;
   char *passwd=vncDecryptPasswdFromFile(cl->screen->rfbAuthPasswdData);
@@ -464,7 +464,7 @@ Bool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
 
 /* for this method, rfbAuthPasswdData is really a pointer to an array
    of char*'s, where the last pointer is 0. */
-Bool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
+rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
 {
   char **passwds;
   int i=0;
@@ -586,7 +586,10 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    rfbScreen->passwordCheck = defaultPasswordCheck;
 
-   rfbProcessArguments(rfbScreen,argc,argv);
+   if(!rfbProcessArguments(rfbScreen,argc,argv)) {
+     free(rfbScreen);
+     return 0;
+   }
 
 #ifdef WIN32
    {
@@ -649,7 +652,7 @@ void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
                        int bytesPerPixel)
 {
   rfbPixelFormat old_format;
-  Bool format_changed = FALSE;
+  rfbBool format_changed = FALSE;
   rfbClientIteratorPtr iterator;
   rfbClientPtr cl;
 
@@ -747,7 +750,7 @@ void rfbInitServer(rfbScreenInfoPtr rfbScreen)
   httpInitSockets(rfbScreen);
 }
 
-#ifndef HAVE_GETTIMEOFDAY
+#ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
 #include <fcntl.h>
 #include <conio.h>
 #include <sys/timeb.h>
@@ -810,10 +813,10 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
   rfbReleaseClientIterator(i);
 }
 
-void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)
+void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, rfbBool runInBackground)
 {
   if(runInBackground) {
-#ifdef HAVE_LIBPTHREAD
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
        pthread_t listener_thread;
 
        rfbScreen->backgroundLoop = TRUE;
@@ -822,7 +825,7 @@ void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground
     return;
 #else
     rfbLog("Can't run in background, because I don't have PThreads!\n");
-    exit(-1);
+    return;
 #endif
   }
 

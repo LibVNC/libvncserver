@@ -6,7 +6,7 @@
 static int tty=2;
 static int tty_inject_device;
 
-void do_key(Bool down,KeySym keySym,rfbClientPtr cl)
+void do_key(rfbBool down,rfbKeySym keySym,rfbClientPtr cl)
 {
   static char isControl=0;
 
