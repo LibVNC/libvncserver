@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <title>LibVNCServer</title>
+  </head>
+
+  <body>
+    <h1>LibVNCServer</h1>
+
+<br>
+    <h2> News </h2>
+    <strong>2003/02/09</strong> Version 0.5 is out! Features include autoconf based configure, rpm package (YMMV), cleanup of directory structure, NEW x11vnc! ZRLE encoding! HTTP tunnelling through LibVNCServer's HTTP support! Many bug fixes!
+<p>
+    <strong>2002/07/28</strong> Version 0.4 is out! Biggest feature: NewFB encoding. Quite a few bugfixes also (Thanks to all!).
+<p>
+    <strong>2001/12/14</strong> A new version of
+      <a href=http://prdownloads.sourceforge.net/libvncserver/rdesktop-1.1.0+vnc-0.2.tar.gz>rdesktop+vnc</a> is available!
+      (Includes support for other platforms keyboard mapping with plain rdesktop!)
+<p>
+    <strong>2001/10/23</strong> Added a link to my homepage at the end.
+<p>
+    <strong>2001/10/18</strong> I released the rdp2vnc extensions as well as
+    patches for general keyboard handling, working inside Xvnc and
+    process_text2 (the famous "font:" error) to rdesktop. Please find it on
+    the <a href=http://sourceforge.net/project/showfiles.php?group_id=32584>
+      download page</a>.
+<p>
+    <strong>2001/10/13</strong> A snapshot of 
+    <a href=http://sourceforge.net/project/showfiles.php?group_id=32584>
+	LibVNCServer</a> and 
+    <a href=http://sourceforge.net/project/showfiles.php?group_id=32584>
+	RDP2VNC</a>
+    is now available. You can also download the
+    <a href=http://sourceforge.net/project/showfiles.php?group_id=32584>
+	diff</a> against rdesktop-1.1.0.
+    rdp2vnc also contains the patches for keyboards other than PC keyboards,
+    and you can specify "-k fr" again.
+
+<p><br>
+
+    <h2> Introduction </h2>
+    If you don't know VNC, have a look at
+ <a href=http://www.uk.research.att.com/vnc/>the original VNC</a> or at
+ <a href=http://www.tridiavnc.com/>Tridia VNC</a>, who also have commercial
+ support for it.
+
+<p>
+
+    Now that you know what it is, maybe you want to make your own server.
+    If this is not the case, you can ignore the rest of this page an go on
+    surfing the internet.
+
+<p>
+
+    Now that you want to make a VNC server, that is, a server which speaks
+    the RFB protocol, you can download this library from
+    <a href=http://sf.net/projects/libvncserver/>sourceforge</a>.
+
+<p>
+
+    The simplest server looks like this:<br><br>
+
+<pre>
+#include "rfb.h"
+
+int main(int argc,char** argv)
+{
+  rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,400,300,8,3,4);
+  server->frameBuffer=malloc(400*300*4);
+  rfbInitServer(server);
+  rfbRunEventLoop(server,-1,FALSE);
+  return(0);
+}
+
+</pre>
+
+    This sample creates a 400x300 frame buffer in true colour. There are
+    4 bytes per pixel, because 3 (which are only used instead of all 4) is
+    such an odd number. Then the server is initialized and a blocking event
+    loop is started.
+
+<p>
+    Of course, this program only shows rubbish (whatever is in the frame
+    buffer you malloc'd), but it proves that writing a server can be
+    very easy.
+
+<p>
+    For details (especially if you want to write a real server) look into the
+    provided examples, pnmshow.c and example.c, and into the README. You find
+    there documentation for much more complicated servers.
+
+<p>
+    Serious comments, suggestions, pizzas, etc. go to
+    <a href=mailto:Johannes.Schindelin@RuBBISHgmx.de>me</a>
+    (delete the RuBBISH).
+
+<p>
+    Here are some links:
+
+<p>
+    LibVNCServer  is an adapted
+ <a href=http://www.osxvnc.com/>OSXvnc-server</a> by
+ <a href=mailto:mcguirk@incompleteness.net>Dan McGuirk</a>,
+ which is in turn an adapted original
+ <a href=http://www.uk.research.att.com/vnc/>Xvnc</a>.
+<p>
+ I use it to to drive a
+<strong>Windows Terminal Server (RDP) to RFB converter</strong> with it.
+ Much work has been done to make
+ <a href=http://www.rdesktop.org/>rdesktop</a>
+ a good X client to Windows Terminal Services (both NT and 2000, see
+ <a href=http://bibl4.oru.se/projects/rdesktop/>rdesktop patches</a>).
+ Previous work was done by <a href=mailto:tme23@cam.ac.uk>Tim Edmonds</a>
+ who has set up such a converter named
+ <a href=http://www-lce.eng.cam.ac.uk/~tme23/vdesktop/>vdesktop</a>
+ including a single client server and a multi client server, rdp2vnc.
+ Unfortunately he used the example code from rfbcounter, which can encode only
+ RRE, which is not a good compression.
+<p>
+ If you want to know about other of my projects, look at
+ <a href=http://wrzx69.rz.uni-wuerzburg.de/~gene099/index.html>my homepage</a>.
+    <hr>
+    Project hosted on the fantastic
+ <A href="http://sourceforge.net">
+ <IMG src="http://sourceforge.net/sflogo.php?group_id=32584"
+	width="88" height="31" border="0" alt="SourceForge Logo"></A><br>
+<!-- Created: Thu Sep 27 12:27:41 MESZ 2001 -->
+<!-- hhmts start -->
+Last modified: Sun Feb 09 06:27:38 MESZ 2003
+<!-- hhmts end -->
+  </body>
+</html>
