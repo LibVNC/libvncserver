@@ -16,7 +16,7 @@
 Display *dpy = 0;
 int window;
 int c=0,blockLength = 32;
-int tileX=0,tileY=0,tileWidth=32,tileHeight=32,dontTile=True;
+int tileX=0,tileY=0,tileWidth=32,tileHeight=32*2,dontTile=True;
 Bool gotInput = FALSE;
 
 Bool disconnectAfterFirstClient = TRUE;
@@ -193,16 +193,17 @@ void checkForImageUpdates(rfbScreenInfoPtr s,char *b,int rowstride,int x,int y,i
 {
    Bool changed;
    int i,j,k,l1,l2,x1,y1;
+   int bpp=s->bitsPerPixel/8;
 
    for(j=0;j<height;j+=blockLength)
      for(i=0;i<width;i+=blockLength) {
 	y1=j+blockLength; if(y1>height) y1=height;
 	x1=i+blockLength; if(x1>width) x1=width;
 	y1*=rowstride;
-	x1*=s->bitsPerPixel/8;
+	x1*=bpp;
 	changed=FALSE;
-	for(l1=j*rowstride,l2=j*s->paddedWidthInBytes;l1<y1;l1+=rowstride,l2+=s->paddedWidthInBytes)
-	  for(k=i*s->bitsPerPixel/8;k<x1;k++)
+	for(l1=j*rowstride,l2=(j+y)*s->paddedWidthInBytes+x*bpp;l1<y1;l1+=rowstride,l2+=s->paddedWidthInBytes)
+	  for(k=i*bpp;k<x1;k++)
 	    if(s->frameBuffer[l2+k]!=b[l1+k]) {
 	      //	       fprintf(stderr,"changed: %d, %d\n",k,l);
 	       changed=TRUE;
@@ -210,8 +211,8 @@ void checkForImageUpdates(rfbScreenInfoPtr s,char *b,int rowstride,int x,int y,i
 	    }
 	if(changed) {
 	   changed_p:
-	  for(l1+=i*s->bitsPerPixel/8,l2+=i*s->bitsPerPixel/8;l1<y1;l1+=rowstride,l2+=s->paddedWidthInBytes)
-	    memcpy(/*b+l,*/s->frameBuffer+l2,b+l1,x1-i*s->bitsPerPixel/8);
+	  for(l1+=i*bpp,l2+=i*bpp;l1<y1;l1+=rowstride,l2+=s->paddedWidthInBytes)
+	    memcpy(/*b+l,*/s->frameBuffer+l2,b+l1,x1-i*bpp);
 	  rfbMarkRectAsModified(s,x+i,y+j,x+i+blockLength,y+j+blockLength);
 	}
      }
@@ -221,11 +222,12 @@ int probeX=0,probeY=0;
 
 void probeScreen(rfbScreenInfoPtr s,int xscreen)
 {
-  int i,j,pixel,
+  int i,j,pixel,i1,j1,
     bpp=s->rfbServerFormat.bitsPerPixel/8,mask=(1<<bpp)-1,
     rstride=s->paddedWidthInBytes;
   XImage* im;
-
+  //fprintf(stderr,"/%d,%d",probeX,probeY);
+#if 0
   probeX++;
   if(probeX>=tileWidth) {
     probeX=0;
@@ -233,17 +235,24 @@ void probeScreen(rfbScreenInfoPtr s,int xscreen)
     if(probeY>=tileHeight)
       probeY=0;
   }
+#else
+  probeX=(rand()%tileWidth);
+  probeY=(rand()%tileHeight);
+#endif
 
   for(j=probeY;j<s->height;j+=tileHeight)
-    for(i=probeX;i<s->width;i+=tileWidth) {
-      im=XGetImage(dpy,window,i,j,1,1,AllPlanes,ZPixmap);
-      pixel=XGetPixel(im,0,0);
-      XDestroyImage(im);
-      if(!memcmp(&pixel,s->frameBuffer+i*bpp+j*rstride,bpp)) {
+    for(i=0/*probeX*/;i<s->width;i+=tileWidth) {
+      im=XGetImage(dpy,window,i,j,tileWidth/*1*/,1,AllPlanes,ZPixmap);
+      /*      for(i1=0;i1<bpp && im->data[i1]==(s->frameBuffer+i*bpp+j*rstride)[i1];i1++);
+	      if(i1<bpp) { */
+      if(memcmp(im->data,s->frameBuffer+i*bpp+j*rstride,tileWidth*bpp)) {
 	/* do update */
-	int i1,j1,x=i-probeX,w=(x+tileWidth>s->width)?s->width-x:tileWidth,
+	int x=i/*-probeX*/,w=(x+tileWidth>s->width)?s->width-x:tileWidth,
 	  y=j-probeY,h=(y+tileHeight>s->height)?s->height-y:tileHeight;
+
+	XDestroyImage(im);
 	//getImage(bpp,dpy,xscreen,&im,x,y,w,h);
+	//fprintf(stderr,"GetImage(%d,%d,%d,%d)",x,y,w,h);
 	im = XGetImage(dpy,window,x,y,w,h,AllPlanes,ZPixmap );
 	for(j1=0;j1<h;j1++)
 	  memcpy(s->frameBuffer+x*bpp+(y+j1)*rstride,
@@ -254,7 +263,9 @@ void probeScreen(rfbScreenInfoPtr s,int xscreen)
 	//memcpy(s->frameBuffer+i*bpp+j*rstride,&pixel,bpp);
 	rfbMarkRectAsModified(s,x,y,x+w,y+h);
 	//fprintf(stderr,"%d:%d:%x\n",i,j,pixel);
-      }
+	//fprintf(stderr,"*");
+      } else
+	XDestroyImage(im);
     }
 }
 
@@ -269,7 +280,7 @@ int main(int argc,char** argv)
   int xscreen,i;
   rfbScreenInfoPtr screen;
   int maxMsecsToConnect = 5000; /* a maximum of 5 seconds to connect */
-  int updateCounter = 20; /* about every 50 ms a screen update should be made. */
+  int updateCounter; /* about every 50 ms a screen update should be made. */
 
   for(i=argc-1;i>0;i--)
     if(i<argc-1 && strcmp(argv[i],"-display")==0) {
@@ -279,15 +290,19 @@ int main(int argc,char** argv)
 	fprintf(stderr,"Couldn't connect to display \"%s\".\n",argv[i+1]);
 	exit(1);
       }
-    } else if(strcmp(argv[i],"-noshm")==0) {
-      useSHM = FALSE;
-    } else if(strcmp(argv[i],"-runforever")==0) {
-      disconnectAfterFirstClient = FALSE;
     } else if(i<argc-1 && strcmp(argv[i],"-wait4client")==0) {
       maxMsecsToConnect = atoi(argv[i+1]);
     } else if(i<argc-1 && strcmp(argv[i],"-update")==0) {
       updateCounter = atoi(argv[i+1]);
+    } else if(strcmp(argv[i],"-noshm")==0) {
+      useSHM = FALSE;
+    } else if(strcmp(argv[i],"-runforever")==0) {
+      disconnectAfterFirstClient = FALSE;
+    } else if(strcmp(argv[i],"-tile")==0) {
+      dontTile=False;
     }
+
+  updateCounter = dontTile?20:1;
 
   if(dpy==0)
     dpy = XOpenDisplay("");
@@ -388,42 +403,45 @@ int main(int argc,char** argv)
 
     rfbProcessEvents(screen,-1);
 
-#if 1
-    probeScreen(screen,xscreen);
-#else
-    if(gotInput) {
-      gotInput = FALSE;
-      c=updateCounter;
-    } else if(screen->rfbClientHead && c++>updateCounter) {
-      c=0;
-      //fprintf(stderr,"*");
-      if(!useSHM)
-	framebufferImage->f.destroy_image(framebufferImage);
-      if(dontTile) {
-	getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage,0,0,screen->width,screen->height);
-	checkForImageUpdates(screen,framebufferImage->data,framebufferImage->bytes_per_line,
-			     0,0,screen->width,screen->height);
-      } else {
-	char isRightEdge = tileX+tileWidth>=screen->width;
-	char isLowerEdge = tileY+tileHeight>=screen->height;
-	getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage,tileX,tileY,
-		 isRightEdge?screen->width-tileX:tileWidth,
-		 isLowerEdge?screen->height-tileY:tileHeight);
-	checkForImageUpdates(screen,framebufferImage->data,framebufferImage->bytes_per_line,
-			     tileX,tileY,
-			     isRightEdge?screen->width-tileX:tileWidth,
-			     isLowerEdge?screen->height-tileY:tileHeight);
-	if(isRightEdge) {
-	  tileX=0;
-	  if(isLowerEdge)
-	    tileY=0;
-	  else
-	    tileY+=tileHeight;
-	} else
-	  tileX+=tileWidth;
+    if(dontTile) {
+      if(gotInput) {
+	gotInput = FALSE;
+	c=updateCounter;
+      } else if(screen->rfbClientHead && c++>updateCounter) {
+	c=0;
+	//fprintf(stderr,"*");
+	if(!useSHM)
+	  framebufferImage->f.destroy_image(framebufferImage);
+	if(dontTile) {
+	  getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage,0,0,screen->width,screen->height);
+	  checkForImageUpdates(screen,framebufferImage->data,framebufferImage->bytes_per_line,
+			       0,0,screen->width,screen->height);
+	} else {
+	  /* old tile code. Eventually to be removed (TODO) */
+	  char isRightEdge = tileX+tileWidth>=screen->width;
+	  char isLowerEdge = tileY+tileHeight>=screen->height;
+	  getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage,tileX,tileY,
+		   isRightEdge?screen->width-tileX:tileWidth,
+		   isLowerEdge?screen->height-tileY:tileHeight);
+	  checkForImageUpdates(screen,framebufferImage->data,framebufferImage->bytes_per_line,
+			       tileX,tileY,
+			       isRightEdge?screen->width-tileX:tileWidth,
+			       isLowerEdge?screen->height-tileY:tileHeight);
+	  if(isRightEdge) {
+	    tileX=0;
+	    if(isLowerEdge)
+	      tileY=0;
+	    else
+	      tileY+=tileHeight;
+	  } else
+	    tileX+=tileWidth;
+	}
       }
+    } else if(c++>updateCounter) {
+      c=0;
+      probeScreen(screen,xscreen);
     }
-#endif
+
 #ifdef WRITE_SNAPS
        {
 	  int i,j,r,g,b;
