@@ -35,6 +35,7 @@ typedef unsigned short CARD16;
 typedef unsigned int CARD32;
 typedef CARD32 Pixel;
 typedef CARD32 KeySym;
+#define SIGNED signed
 /* for some strange reason, "typedef signed char Bool;" yields a four byte
    signed int on IRIX, but only for rfbserver.o!!! */
 #define Bool signed char
@@ -57,6 +58,8 @@ typedef CARD32 KeySym;
 #define _BYTE_ORDER _LITTLE_ENDIAN
 #undef Bool
 #define Bool char
+#undef SIGNED
+#define SIGNED
 #include <sys/types.h>
 /* typedef unsigned int pthread_t; */
 /* SUN cc seems to have problems with inclusion of sys/types! */

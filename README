@@ -4,7 +4,7 @@ Copyright (C) 2001 Johannes E. Schindelin
 What is it?
 -----------
 
-VNC is set of programs using the RFB (Remote Frame Buffer) protocol. They
+VNC is a set of programs using the RFB (Remote Frame Buffer) protocol. They
 are designed to "export" a frame buffer via net (if you don't know VNC, I
 suggest you read "Basics" below). It is already in wide use for
 administration, but it is not that easy to program a server yourself.
