@@ -1,3 +1,7 @@
+2004-08-15  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -overlay to fix colors with Sun 8+24 overlay visuals.
+	* -sid option.
+
 2004-08-03  Karl Runge <runge@karlrunge.com>
 	* x11vnc: manpage and README
 	* fix XKBlib.h detection on *BSD

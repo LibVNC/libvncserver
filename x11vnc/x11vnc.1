@@ -2,7 +2,7 @@
 .TH X11VNC "1" "August 2004" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.6.2, lastmod: 2004-07-31
+         version: 0.6.3pre, lastmod: 2004-08-15
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -69,7 +69,9 @@ entire display. Warning: bugs! new toplevels missed!...
 \fB-sid\fR \fIwindowid\fR
 .IP
 As \fB-id,\fR but instead of using the window directly it
-shifts a root view to it: shows saveUnders menus, etc.
+shifts a root view to it: shows saveUnders menus, etc,
+although they will be clipped if they extend beyond
+the window.
 .PP
 \fB-flashcmap\fR
 .IP
@@ -78,7 +80,34 @@ as the pointer moves from window to window (slow).
 .PP
 \fB-notruecolor\fR
 .IP
-Force 8bpp indexed color even if it looks like TrueColor.
+For 8bpp displays, force indexed color (i.e. a colormap)
+even if it looks like 8bpp TrueColor. (rare problem)
+.PP
+\fB-overlay\fR
+.IP
+Handle multiple depth visuals on one screen, e.g. 8+24
+and 24+8 overlay visuals (the 32 bits per pixel are
+packed with 8 for PseudoColor and 24 for TrueColor).
+.IP
+Currently \fB-overlay\fR only works on Solaris (it uses
+XReadScreen(3X11)).  There are still some problems with
+surrounding-region painting for popup menus (but not
+for the popup menu itself); a workaround is to disable
+SaveUnders (pass \fB-su\fR to Xsun).  Amusingly, if \fB-overlay\fR
+is used with \fB-mouse,\fR the mouse cursor shape is correct.
+.IP
+Use \fB-overlay\fR as a workaround for situations like these:
+Some legacy applications require the default visual
+be 8bpp (8+24), or they will use 8bpp PseudoColor even
+when the default visual is depth 24 TrueColor (24+8).
+In these cases colors in some windows will be messed
+up in x11vnc unless \fB-overlay\fR is used.
+.IP
+Under \fB-overlay,\fR performance will be somewhat degraded
+due to the extra image transformations required.
+For optimal performance do not use \fB-overlay,\fR but rather
+configure the X server so that the default visual is
+depth 24 TrueColor and have all apps use that visual.
 .PP
 \fB-visual\fR \fIn\fR
 .IP
@@ -100,7 +129,7 @@ less than 1 shrink the fb.  Note: image may not be sharp
 and response may be slower.  If \fIfraction\fR contains
 a decimal point "." it is taken as a floating point
 number, alternatively the notation "m/n" may be used
-to denote fractions, e.g. \fB-scale\fR 2/3.
+to denote fractions exactly, e.g. \fB-scale\fR 2/3.
 .IP
 Scaling Options: can be added after \fIfraction\fR via
 ":", to supply multiple ":" options use commas.

@@ -79,6 +79,7 @@
  * -flashcmap option to have colormap flashing as the pointer moves
  * windows with private colormaps (slow).  Displays with mixed depth 8 and
  * 24 visuals will incorrectly display windows using the non-default one.
+ * On Sun hardware we try to work around this with -overlay.
  *
  * Feature -id <windowid> can be picky: it can crash for things like the
  * window not sufficiently mapped into server memory, use of -mouse, etc.
@@ -141,6 +142,11 @@
 #include <arpa/inet.h>
 #endif
 
+#if defined (__SVR4) && defined (__sun)
+#define SOLARIS
+#include <X11/extensions/transovl.h>
+#endif
+
 /* 
  * Temporary kludge: to run with -xinerama define the following
  * macro (uncomment) and be sure to link with -lXinerama
@@ -156,18 +162,19 @@
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.6.3pre lastmod: 2004-08-03";
+char lastmod[] = "0.6.3pre lastmod: 2004-08-15";
 
 /* X display info */
-Display *dpy = 0;
-Visual *visual;
-Window window, rootwin;
+
+Display *dpy = 0;		/* the single display screen we connect to */
 int scr;
+Window window, rootwin;		/* polled window, root window (usu. same) */
+Visual *default_visual;		/* the default visual (unless -visual) */
 int bpp, depth;
-int button_mask = 0;
-int dpy_x, dpy_y;
-int off_x, off_y;
 int indexed_colour = 0;
+int dpy_x, dpy_y;		/* size of display */
+int off_x, off_y;		/* offsets for -sid */
+int button_mask = 0;		/* button state and info */
 int num_buttons = -1;
 
 /* image structures */
@@ -209,17 +216,19 @@ int ntiles, ntiles_x, ntiles_y;
 /* arrays that indicate changed or checked tiles. */
 unsigned char *tile_has_diff, *tile_tried;
 
-/* blacked-out region things */
+/* blacked-out region (-blackout, -xinerama) */
 typedef struct bout {
 	int x1, y1, x2, y2;
 } blackout_t;
+#define BO_MAX 16
 typedef struct tbout {
-	blackout_t bo[16];	/* hardwired max rectangles. */
+	blackout_t bo[BO_MAX];	/* hardwired max rectangles. */
 	int cover;
 	int count;
 } tile_blackout_t;
 
-blackout_t blackr[100];		/* hardwired max blackouts */
+#define BLACKR_MAX 100
+blackout_t blackr[BLACKR_MAX];	/* hardwired max blackouts */
 int blackouts = 0;
 tile_blackout_t *tile_blackout;
 
@@ -244,6 +253,7 @@ int shut_down = 0;
 #define VNC_CONNECT_MAX 512
 char vnc_connect_str[VNC_CONNECT_MAX+1];
 Atom vnc_connect_prop = None;
+
 
 /* function prototypes (see filename comment above) */
 
@@ -378,9 +388,11 @@ int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */
 
 int sigpipe = 1;		/* 0=skip, 1=ignore, 2=exit */
 
-/* for -visual override */
+/* visual stuff for -visual override or -overlay */
 VisualID visual_id = (VisualID) 0;
 int visual_depth = 0;
+int overlay = 0;
+int overlay_mouse = 0;
 
 /* tile heuristics: */
 double fs_frac = 0.75;	/* threshold tile fraction to do fullscreen updates. */
@@ -394,6 +406,7 @@ int debug_keyboard = 0;
 
 int quiet = 0;
 
+/* info about command line opts */
 int got_rfbport = 0;
 int got_alwaysshared = 0;
 int got_nevershared = 0;
@@ -452,6 +465,102 @@ int nfix(int i, int n) {
 		i = n - 1;
 	}
 	return i;
+}
+
+/*
+ * Kludge to interpose image gets and limit to a subset rectangle of
+ * the rootwin.  This is the -sid option trying to work around invisible
+ * saveUnders menu, etc, windows.
+ */
+int rootshift = 0;
+
+#define ADJUST_ROOTSHIFT \
+	if (rootshift && subwin) { \
+		d = rootwin; \
+		x += off_x; \
+		y += off_y; \
+	}
+
+/* Wrappers for Image related X calls */
+Status XShmGetImage_wr(Display *disp, Drawable d, XImage *image, int x, int y,
+    unsigned long mask) {
+
+	ADJUST_ROOTSHIFT
+
+	/* The Solaris overlay stuff is all non-shm (using_shm = 0) */
+
+	return XShmGetImage(disp, d, image, x, y, mask); 
+}
+
+XImage *XGetSubImage_wr(Display *disp, Drawable d, int x, int y,
+    unsigned int width, unsigned int height, unsigned long plane_mask,
+    int format, XImage *dest_image, int dest_x, int dest_y) {
+
+	ADJUST_ROOTSHIFT
+
+#ifdef SOLARIS
+	if (overlay && dest_x == 0 && dest_y == 0) {
+		size_t size = dest_image->height * dest_image->bytes_per_line;
+		XImage *xi = XReadScreen(disp, d, x, y, width, height,
+		    (Bool) overlay_mouse);
+
+		/*
+		 * There is extra overhead from memcpy and free...
+		 * this is not like the real XGetSubImage().  We hope
+		 * this significant overhead is still small compared to
+		 * the time to retrieve the fb data.
+		 */
+		memcpy(dest_image->data, xi->data, size);
+
+		XDestroyImage(xi);
+		return (dest_image);
+	}
+#endif
+	return XGetSubImage(disp, d, x, y, width, height, plane_mask,
+	    format, dest_image, dest_x, dest_y);
+}
+
+XImage *XGetImage_wr(Display *disp, Drawable d, int x, int y,
+    unsigned int width, unsigned int height, unsigned long plane_mask,
+    int format) {
+
+	ADJUST_ROOTSHIFT
+
+#ifdef SOLARIS
+	if (overlay) {
+		return XReadScreen(disp, d, x, y, width, height,
+		    (Bool) overlay_mouse);
+	}
+#endif
+	return XGetImage(disp, d, x, y, width, height, plane_mask, format);
+}
+
+XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
+    int format, int offset, char *data, unsigned int width,
+    unsigned int height, int bitmap_pad, int bytes_per_line) {
+/*
+ * This is a kludge to get a created XImage to exactly match what
+ * XReadScreen returns: we noticed the rgb masks are different from
+ * XCreateImage with the high color visual (red mask <-> blue mask).
+ * Note we read from the root window(!) then free the data.
+ */
+#ifdef SOLARIS
+	if (overlay) {
+		XImage *xi;
+		xi = XReadScreen(disp, window, 0, 0, width, height, False);
+		if (xi == NULL) {
+			return xi;
+		}
+		if (xi->data != NULL) {
+			free(xi->data);
+		}
+		xi->data = data;
+		return xi;
+	}
+#endif
+
+	return XCreateImage(disp, visual, depth, format, offset, data,
+	    width, height, bitmap_pad, bytes_per_line);
 }
 
 
@@ -4329,7 +4438,7 @@ static int tree_descend_cursor(void) {
 /*
  * This is for mouse patch drawing under -xinerama or -blackout
  */
-static void blackout_nearby_tiles(x, y, dt) {
+static void blackout_nearby_tiles(int x, int y, int dt) {
 	int sx, sy, n, b;
 	int tx = x/tile_x;
 	int ty = y/tile_y;
@@ -4676,7 +4785,7 @@ void set_colormap(void) {
 
 	cmap = DefaultColormap(dpy, scr);
 	ncells = CellsOfScreen(ScreenOfDisplay(dpy, scr));
-	vis = visual;
+	vis = default_visual;
 
 	if (subwin) {
 		XWindowAttributes attr;
@@ -4727,7 +4836,7 @@ void set_colormap(void) {
 		/*
 		 * Kludge to make 8bpp TrueColor & DirectColor be like
 		 * the StaticColor map.  The ncells = 8 is "8 per subfield"
-		 * mentioned in xdpyinfo.  Looks OK... likely fortuitously.
+		 * mentioned in xdpyinfo.  Looks OK... perhaps fortuitously.
 		 */
 		if (ncells == 8) {
 			ncells = NCOLOR;
@@ -4768,25 +4877,31 @@ void set_colormap(void) {
 
 /*
  * Experimental mode to force the visual of the window instead of querying
- * it.  Currently just used for testing or overriding some rare cases.
- * Input string can be a decimal or 0x hex or something like TrueColor
- * or TrueColor:24 to force a depth as well.
+ * it.  Used for testing, overriding some rare cases (win2vnc), and for
+ * -overlay .  Input string can be a decimal or 0x hex or something like
+ * TrueColor or TrueColor:24 to force a depth as well.
+ *
+ * visual_id and possibly visual_depth are set.
  */
-void set_visual(char *vstring) {
-	int vis, defdepth = DefaultDepth(dpy, scr);
+void set_visual(char *str) {
+	int vis, vdepth, defdepth = DefaultDepth(dpy, scr);
 	XVisualInfo vinfo;
-	char *p;
+	char *p, *vstring = strdup(str);
 
 	if (! quiet) {
 		fprintf(stderr, "set_visual: %s\n", vstring);
 	}
 
+	/* set visual depth */
 	if ((p = strchr(vstring, ':')) != NULL) {
 		visual_depth = atoi(p+1);
 		*p = '\0';
+		vdepth = visual_depth;
 	} else {
-		visual_depth = defdepth;
+		vdepth = defdepth; 
 	}
+
+	/* set visual id number */
 	if (strcmp(vstring, "StaticGray") == 0) {
 		vis = StaticGray;
 	} else if (strcmp(vstring, "GrayScale") == 0) {
@@ -4810,8 +4925,10 @@ void set_visual(char *vstring) {
 			exit(1);
 		}
 		visual_id = (VisualID) v_in;
+		free(vstring);
 		return;
 	}
+
 	if (XMatchVisualInfo(dpy, scr, visual_depth, vis, &vinfo)) {
 		;
 	} else if (XMatchVisualInfo(dpy, scr, defdepth, vis, &vinfo)) {
@@ -4820,6 +4937,9 @@ void set_visual(char *vstring) {
 		fprintf(stderr, "could not find visual: %s\n", vstring);
 		exit(1);
 	}
+	free(vstring);
+
+	/* set numerical visual id. */
 	visual_id = vinfo.visualid;
 }
 
@@ -4837,7 +4957,7 @@ void nofb_hook(rfbClientPtr cl) {
 		return;
 	}
 	rfbLog("framebuffer requested in -nofb mode by client %s\n", cl->host);
-	fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
+	fb = XGetImage_wr(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
 	main_fb = fb->data;
 	rfb_fb = main_fb;
 	screen->frameBuffer = rfb_fb;
@@ -5147,7 +5267,7 @@ void initialize_blackout (char *list) {
 			blackr[blackouts].x2 = X;
 			blackr[blackouts].y2 = Y;
 			blackouts++;
-			if (blackouts >= 100) {
+			if (blackouts >= BLACKR_MAX) {
 				rfbLog("too many blackouts: %d\n", blackouts);
 				break;
 			}
@@ -5209,8 +5329,8 @@ void blackout_tiles(void) {
 			/* union of blackouts */
 			for (b=0; b < blackouts; b++) {
 				sraRegionPtr tmp_reg = (sraRegionPtr)
-				    sraRgnCreateRect(blackr[b].x1, blackr[b].y1,
-				    blackr[b].x2, blackr[b].y2);
+				    sraRgnCreateRect(blackr[b].x1,
+				    blackr[b].y1, blackr[b].x2, blackr[b].y2);
 
 				sraRgnOr(black_reg, tmp_reg);
 				sraRgnDestroy(tmp_reg);
@@ -5260,7 +5380,7 @@ void blackout_tiles(void) {
 					tile_blackout[n].cover = 1;
 				}
 
-				if (++cnt >= 10) {
+				if (++cnt >= BO_MAX) {
 					rfbLog("too many blackout rectangles "
 					    "for tile %d=%d,%d.\n", n, tx, ty);
 					break;
@@ -5376,7 +5496,7 @@ void initialize_xinerama (void) {
 /*
  * Fill the framebuffer with zero for the prescribed rectangle
  */
-void zero_fb(x1, y1, x2, y2) {
+void zero_fb(int x1, int y1, int x2, int y2) {
 	int pixelsize = bpp >> 3;
 	int line, fill = 0;
 	char *dst;
@@ -5485,7 +5605,7 @@ static void set_fs_factor(int max) {
 }
 
 /*
- * set up an XShm image
+ * set up an XShm image, or if not using shm just create the XImage.
  */
 static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
     char *name) {
@@ -5504,8 +5624,8 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	if (! using_shm) {
 		/* we only need the XImage created */
-		xim = XCreateImage(dpy, visual, depth, ZPixmap, 0, NULL, w, h,
-		    BitmapPad(dpy), 0);
+		xim = XCreateImage_wr(dpy, default_visual, depth, ZPixmap,
+		    0, NULL, w, h, BitmapPad(dpy), 0);
 
 		X_UNLOCK;
 
@@ -5541,7 +5661,8 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 		return 1;
 	}
 
-	xim = XShmCreateImage(dpy, visual, depth, ZPixmap, NULL, shm, w, h);
+	xim = XShmCreateImage(dpy, default_visual, depth, ZPixmap, NULL,
+	    shm, w, h);
 
 	if (xim == NULL) {
 		rfbErr("XShmCreateImage(%s) failed.\n", name);
@@ -6393,13 +6514,13 @@ static void copy_tiles(int tx, int ty, int nt) {
 	/* read in the whole tile run at once: */
 	if ( using_shm && size_x == tile_x * nt && size_y == tile_y ) {
 		/* general case: */
-		XShmGetImage(dpy, window, tile_row[nt], x, y, AllPlanes);
+		XShmGetImage_wr(dpy, window, tile_row[nt], x, y, AllPlanes);
 	} else {
 		/*
 		 * No shm or near bottom/rhs edge case:
 		 * (but only if tile size does not divide screen size)
 		 */
-		XGetSubImage(dpy, window, x, y, size_x, size_y, AllPlanes,
+		XGetSubImage_wr(dpy, window, x, y, size_x, size_y, AllPlanes,
 		    ZPixmap, tile_row[nt], 0, 0);
 	}
 	X_UNLOCK;
@@ -6991,9 +7112,10 @@ void copy_screen(void) {
 	/* screen may be too big for 1 shm area, so broken into fs_factor */
 	for (i=0; i < fs_factor; i++) {
 		if (using_shm) {
-			XShmGetImage(dpy, window, fullscreen, 0, y, AllPlanes);
+			XShmGetImage_wr(dpy, window, fullscreen, 0, y,
+			    AllPlanes);
 		} else {
-			XGetSubImage(dpy, window, 0, y, fullscreen->width,
+			XGetSubImage_wr(dpy, window, 0, y, fullscreen->width,
 			    fullscreen->height, AllPlanes, ZPixmap, fullscreen,
 			    0, 0);
 		}
@@ -7254,9 +7376,9 @@ static int scan_display(int ystart, int rescan) {
 		/* grab the horizontal scanline from the display: */
 		X_LOCK;
 		if (using_shm) {
-			XShmGetImage(dpy, window, scanline, 0, y, AllPlanes);
+			XShmGetImage_wr(dpy, window, scanline, 0, y, AllPlanes);
 		} else {
-			XGetSubImage(dpy, window, 0, y, scanline->width,
+			XGetSubImage_wr(dpy, window, 0, y, scanline->width,
 			    scanline->height, AllPlanes, ZPixmap, scanline,
 			    0, 0);
 		}
@@ -7816,9 +7938,37 @@ static void print_help(void) {
 "\n"
 "-id windowid           Show the window corresponding to \"windowid\" not the\n"
 "                       entire display. Warning: bugs! new toplevels missed!...\n"
+"-sid windowid          As -id, but instead of using the window directly it\n"
+"                       shifts a root view to it: shows saveUnders menus, etc,\n"
+"                       although they will be clipped if they extend beyond\n"
+"                       the window.\n"
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
-"-notruecolor           Force 8bpp indexed color even if it looks like TrueColor.\n"
+"-notruecolor           For 8bpp displays, force indexed color (i.e. a colormap)\n"
+"                       even if it looks like 8bpp TrueColor. (rare problem)\n"
+"-overlay               Handle multiple depth visuals on one screen, e.g. 8+24\n"
+"                       and 24+8 overlay visuals (the 32 bits per pixel are\n"
+"                       packed with 8 for PseudoColor and 24 for TrueColor).\n"
+"\n"
+"                       Currently -overlay only works on Solaris (it uses\n"
+"                       XReadScreen(3X11)).  There are still some problems with\n"
+"                       surrounding-region painting for popup menus (but not\n"
+"                       for the popup menu itself); a workaround is to disable\n"
+"                       SaveUnders (pass -su to Xsun).  Amusingly, if -overlay\n"
+"                       is used with -mouse, the mouse cursor shape is correct.\n"
+"\n"
+"                       Use -overlay as a workaround for situations like these:\n"
+"                       Some legacy applications require the default visual\n"
+"                       be 8bpp (8+24), or they will use 8bpp PseudoColor even\n"
+"                       when the default visual is depth 24 TrueColor (24+8).\n"
+"                       In these cases colors in some windows will be messed\n"
+"                       up in x11vnc unless -overlay is used.\n"
+"\n"
+"                       Under -overlay, performance will be somewhat degraded\n"
+"                       due to the extra image transformations required.\n"
+"                       For optimal performance do not use -overlay, but rather\n"
+"                       configure the X server so that the default visual is\n"
+"                       depth 24 TrueColor and have all apps use that visual.\n"
 "-visual n              Experimental option: probably does not do what you\n"
 "                       think.  It simply *forces* the visual used for the\n"
 "                       framebuffer; this may be a bad thing... It is useful for\n"
@@ -7833,7 +7983,7 @@ static void print_help(void) {
 "                       and response may be slower.  If \"fraction\" contains\n"
 "                       a decimal point \".\" it is taken as a floating point\n"
 "                       number, alternatively the notation \"m/n\" may be used\n"
-"                       to denote fractions, e.g. -scale 2/3.\n"
+"                       to denote fractions exactly, e.g. -scale 2/3.\n"
 "\n"
 "                       Scaling Options: can be added after \"fraction\" via\n"
 "                       \":\", to supply multiple \":\" options use commas.\n"
@@ -8189,7 +8339,7 @@ static char *choose_title(char *display) {
 	strncat(title, display, MAXN - strlen(title));
 	if (subwin) {
 		char *name;
-		if (XFetchName(dpy, window, &name)) {
+		if (XFetchName(dpy, subwin, &name)) {
 			strncat(title, " ",  MAXN - strlen(title));
 			strncat(title, name, MAXN - strlen(title));
 		}
@@ -8436,6 +8586,16 @@ int main(int argc, char* argv[]) {
 					exit(1);
 				}
 			}
+		} else if (!strcmp(arg, "-sid")) {
+			rootshift = 1;
+			CHECK_ARGC
+			if (sscanf(argv[++i], "0x%x", &subwin) != 1) {
+				if (sscanf(argv[i], "%d", &subwin) != 1) {
+					fprintf(stderr, "bad -id arg: %s\n",
+					    argv[i]);
+					exit(1);
+				}
+			}
 		} else if (!strcmp(arg, "-scale")) {
 			int m, n;
 			char *p;
@@ -8500,6 +8660,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-visual")) {
 			CHECK_ARGC
 			visual_str = argv[++i];
+		} else if (!strcmp(arg, "-overlay")) {
+			overlay = 1;
 		} else if (!strcmp(arg, "-flashcmap")) {
 			flash_cmap = 1;
 		} else if (!strcmp(arg, "-notruecolor")) {
@@ -8866,6 +9028,28 @@ int main(int argc, char* argv[]) {
 		argv_vnc[argc_vnc++] = "604800000"; /* one week... */
 	}
 
+	if (overlay) {
+#ifdef SOLARIS
+		using_shm = 0;
+
+		if (flash_cmap && ! quiet) {
+			fprintf(stderr, "warning: -flashcmap may be "
+			    "incompatible with -overlay\n");
+		}
+		
+		if (show_mouse) {
+			show_mouse = 0;
+			overlay_mouse = 1;
+		}
+#else
+		if (! quiet) {
+			fprintf(stderr, "disabling -overlay: currently only "
+			    "available on Solaris Xsun.\n");
+		}
+		overlay = 0; 
+#endif
+	}
+
 	/* check for OS with small shm limits */
 	if (using_shm && ! single_copytile) {
 		if (limit_shm()) {
@@ -8903,6 +9087,8 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "scaling:    %d %.5f\n", scaling, scale_fac);
 		fprintf(stderr, "visual:     %s\n", visual_str ? visual_str
                     : "null");
+		fprintf(stderr, "overlay:    %d\n", overlay);
+		fprintf(stderr, "ovl_mouse:  %d\n", overlay_mouse);
 		fprintf(stderr, "viewonly:   %d\n", view_only);
 		fprintf(stderr, "shared:     %d\n", shared);
 		fprintf(stderr, "conn_once:  %d\n", connect_once);
@@ -9025,14 +9211,15 @@ int main(int argc, char* argv[]) {
 	} else {
 		if (! quiet) fprintf(stderr, "Using default X display.\n");
 	}
+
+	scr = DefaultScreen(dpy);
+	rootwin = RootWindow(dpy, scr);
+
 	if (! dt) {
 		static char str[] = "-desktop";
 		argv_vnc[argc_vnc++] = str;
 		argv_vnc[argc_vnc++] = choose_title(use_dpy);
 	}
-	scr = DefaultScreen(dpy);
-	rootwin = RootWindow(dpy, scr);
-
 
 	/* check for XTEST */
 	if (! XTestQueryExtension(dpy, &ev, &er, &maj, &min)) {
@@ -9060,9 +9247,38 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	if (overlay) {
+	/* 
+	 * ideally we'd like to not have to cook up the visual variables
+	 * but rather let it all come out of XReadScreen(), however
+	 * there is no way to get a default visual out of it, so we
+	 * pretend -visual TrueColor:NN was supplied with NN usually 24.
+	 */
+#ifdef SOLARIS
+		char str[16];
+		XImage *xi;
+		Window twin = subwin ? subwin : rootwin;
+
+		xi = XReadScreen(dpy, twin, 0, 0, 8, 8, False);
+
+		sprintf(str, "TrueColor:%d", xi->depth);
+		if (xi->depth != 24 && ! quiet) {
+			fprintf(stderr, "warning XReadScreen() image has "
+			    "depth %d instead of 24.\n", xi->depth);
+		}
+		XDestroyImage(xi);
+		if (visual_str != NULL && ! quiet) {
+			fprintf(stderr, "warning: replacing '-visual %s' by "
+			    "'%s' for use with -overlay\n", visual_str, str);
+		}
+		visual_str = strdup(str);
+#endif
+	}
+
 	if (visual_str != NULL) {
 		set_visual(visual_str);
 	}
+
 #ifdef LIBVNCSERVER_HAVE_XKEYBOARD
 	/* check for XKEYBOARD */
 	if (use_xkb) {
@@ -9083,7 +9299,8 @@ int main(int argc, char* argv[]) {
 		dpy_y = DisplayHeight(dpy, scr);
 		off_x = 0;
 		off_y = 0;
-		visual = DefaultVisual(dpy, scr);
+		/* this may be overridden via visual_id below */
+		default_visual = DefaultVisual(dpy, scr);
 	} else {
 		/* experiment to share just one window */
 		XWindowAttributes attr;
@@ -9095,7 +9312,9 @@ int main(int argc, char* argv[]) {
 		}
 		dpy_x = attr.width;
 		dpy_y = attr.height;
-		visual = attr.visual;
+
+		/* this may be overridden via visual_id below */
+		default_visual = attr.visual;
 
 		/* show_mouse has some segv crashes as well */
 		if (show_root_cursor) {
@@ -9108,17 +9327,18 @@ int main(int argc, char* argv[]) {
 		set_offset();
 	}
 
-	/* initialize depth to reasonable value */
+	/* initialize depth to reasonable value, visual_id may override */
 	depth = DefaultDepth(dpy, scr);
 
-	/*
-	 * User asked for non-default visual, this is not working well but it
-	 * does some useful things...  What should it do in general?
-	 */
 	if (visual_id) {
-		XVisualInfo vinfo_tmpl, *vinfo;
 		int n;
-		
+		XVisualInfo vinfo_tmpl, *vinfo;
+
+		/*
+		 * we are in here from -visual or -overlay options
+		 * visual_id and visual_depth were set in set_visual().
+		 */
+
 		vinfo_tmpl.visualid = visual_id; 
 		vinfo = XGetVisualInfo(dpy, VisualIDMask, &vinfo_tmpl, &n);
 		if (vinfo == NULL || n == 0) {
@@ -9126,10 +9346,11 @@ int main(int argc, char* argv[]) {
 			    (int) visual_id);
 			exit(1);
 		}
-		visual = vinfo->visual;
+		default_visual = vinfo->visual;
 		depth = vinfo->depth;
 		if (visual_depth) {
-			depth = visual_depth;	/* force it */
+			/* force it from -visual FooColor:NN */
+			depth = visual_depth;
 		}
 		if (! quiet) {
 			fprintf(stderr, "vis id:     0x%x\n",
@@ -9148,19 +9369,23 @@ int main(int argc, char* argv[]) {
 	}
 
 
-	if (nofb || visual_id) {
-		fb = XCreateImage(dpy, visual, depth, ZPixmap, 0, NULL,
-		    dpy_x, dpy_y, BitmapPad(dpy), 0);
+	if (nofb) {
 		/* 
 		 * For -nofb we do not allocate the framebuffer, so we
 		 * can save a few MB of memory. 
 		 */
-		if (! nofb) {
-			fb->data = (char *) malloc(fb->bytes_per_line *
-			    fb->height);
-		}
+		fb = XCreateImage_wr(dpy, default_visual, depth, ZPixmap,
+		    0, NULL, dpy_x, dpy_y, BitmapPad(dpy), 0);
+
+	} else if (visual_id) {
+		/*
+		 * we need to call XCreateImage to supply the visual
+		 */
+		fb = XCreateImage_wr(dpy, default_visual, depth, ZPixmap,
+		    0, NULL, dpy_x, dpy_y, BitmapPad(dpy), 0);
+		fb->data = (char *) malloc(fb->bytes_per_line * fb->height);
 	} else {
-		fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes,
+		fb = XGetImage_wr(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes,
 		    ZPixmap);
 		if (! quiet) {
 			fprintf(stderr, "Read initial data from X display into"
