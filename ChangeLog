@@ -1,4 +1,5 @@
-   portability fixes
+   moved vncterm to main package (LinuxVNC included)
+   portability fixes (IRIX, OSX, Solaris)
    more portable way to determine endianness and types of a given size
 	through autoconf based methods
 0.5
