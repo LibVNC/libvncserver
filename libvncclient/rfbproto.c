@@ -728,26 +728,27 @@ HandleRFBServerMessage(rfbClient* client)
 
       switch (rect.encoding) {
 
-      case rfbEncodingRaw:
+      case rfbEncodingRaw: {
+	int y=rect.r.y, h=rect.r.h;
 
 	bytesPerLine = rect.r.w * client->format.bitsPerPixel / 8;
 	linesToRead = BUFFER_SIZE / bytesPerLine;
 
-	while (rect.r.h > 0) {
-	  if (linesToRead > rect.r.h)
-	    linesToRead = rect.r.h;
+	while (h > 0) {
+	  if (linesToRead > h)
+	    linesToRead = h;
 
 	  if (!ReadFromRFBServer(client, client->buffer,bytesPerLine * linesToRead))
 	    return FALSE;
 
 	  CopyRectangle(client, client->buffer,
-			   rect.r.x, rect.r.y, rect.r.w,linesToRead);
+			   rect.r.x, y, rect.r.w,linesToRead);
 
-	  rect.r.h -= linesToRead;
-	  rect.r.y += linesToRead;
+	  h -= linesToRead;
+	  y += linesToRead;
 
 	}
-	break;
+      } break;
 
       case rfbEncodingCopyRect:
       {
