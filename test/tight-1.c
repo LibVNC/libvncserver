@@ -13,7 +13,6 @@ int main(int argc,char** argv)
   server->frameBuffer=malloc(400*300*4);
   for(j=0;j<400*300*4;j++)
     server->frameBuffer[j]=j;
-  //server->maxRectsPerUpdate=-1;
   rfbInitServer(server);           
   while(time(0)-t<20) {
 

@@ -48,7 +48,6 @@ void do_key(rfbBool down,rfbKeySym keySym,rfbClientPtr cl)
 
       if(keySym<0x100) {
 	int ret;
-	//rfbLog("do_key: %c (0x%lx)\n",(char)keySym,keySym);
 	ret=ioctl(tty_inject_device,TIOCSTI,&keySym);
 	if(ret<0) {
 	  static char device[64];

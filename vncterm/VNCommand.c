@@ -44,7 +44,7 @@ int main(int argc, char **argv)
       dup2(in[0],0);
       dup2(out[1],1);
       dup2(err[1],2);
-      //setbuf(stdin,NULL);
+      /*setbuf(stdin,NULL);*/
       execvp(argv[programArg0],argv+programArg0);
     }
 
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
       FD_ZERO(&fs);
       FD_SET(out[0],&fs);
       FD_SET(err[0],&fs);
-      //FD_SET(0,&fs);
+      /*FD_SET(0,&fs);*/
       tv.tv_sec=0; tv.tv_usec=5000;
 
       input_pipe=fdopen(in[1],"w");

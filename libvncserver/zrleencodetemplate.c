@@ -134,15 +134,15 @@ void ZRLE_ENCODE_TILE (PIXEL_T* data, int w, int h, zrleOutStream* os)
     return;
   }
 
-  // Try to work out whether to use RLE and/or a palette.  We do this by
-  // estimating the number of bytes which will be generated and picking the
-  // method which results in the fewest bytes.  Of course this may not result
-  // in the fewest bytes after compression...
+  /* Try to work out whether to use RLE and/or a palette.  We do this by
+     estimating the number of bytes which will be generated and picking the
+     method which results in the fewest bytes.  Of course this may not result
+     in the fewest bytes after compression... */
 
   useRle = FALSE;
   usePalette = FALSE;
 
-  estimatedBytes = w * h * (BPPOUT/8); // start assuming raw
+  estimatedBytes = w * h * (BPPOUT/8); /* start assuming raw */
 
   plainRleBytes = ((BPPOUT/8)+1) * (runs + singlePixels);
 
@@ -216,13 +216,13 @@ void ZRLE_ENCODE_TILE (PIXEL_T* data, int w, int h, zrleOutStream* os)
 
   } else {
 
-    // no RLE
+    /* no RLE */
 
     if (usePalette) {
       int bppp;
       PIXEL_T* ptr = data;
 
-      // packed pixels
+      /* packed pixels */
 
       assert (ph->size < 17);
 
@@ -251,7 +251,7 @@ void ZRLE_ENCODE_TILE (PIXEL_T* data, int w, int h, zrleOutStream* os)
       }
     } else {
 
-      // raw
+      /* raw */
 
 #ifdef CPIXEL
       PIXEL_T *ptr;

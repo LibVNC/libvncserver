@@ -416,7 +416,7 @@ void vcPtrAddEventProc(int buttonMask,int x,int y,rfbClientPtr cl)
     if(cy<0) cy=0; else if(cy>=c->height) cy=c->height-1;
     pos=cy*c->width+cx;
 
-    // mark
+    /* mark */
     if(!c->currentlyMarking) {
       c->currentlyMarking=TRUE;
       c->markStart=pos;
