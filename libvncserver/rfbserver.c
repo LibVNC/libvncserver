@@ -425,6 +425,8 @@ rfbClientConnectionGone(cl)
       } while(i>0);
 #endif
 
+    UNLOCK(rfbClientListMutex);
+
     if(cl->sock>=0)
        FD_CLR(cl->sock,&(cl->screen->allFds));
 
@@ -453,8 +455,6 @@ rfbClientConnectionGone(cl)
     sraRgnDestroy(cl->modifiedRegion);
     sraRgnDestroy(cl->requestedRegion);
     sraRgnDestroy(cl->copyRegion);
-
-    UNLOCK(rfbClientListMutex);
 
     if (cl->translateLookupTable) free(cl->translateLookupTable);
 
