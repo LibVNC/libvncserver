@@ -218,7 +218,8 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 #ifdef WIN32
 		errno = WSAGetLastError();
 #endif
-	rfbLogPerror("rfbCheckFds: select");
+	if (errno != EINTR)
+		rfbLogPerror("rfbCheckFds: select");
 	return;
     }
 

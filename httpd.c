@@ -143,7 +143,8 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
 #ifdef WIN32
 		errno = WSAGetLastError();
 #endif
-	rfbLogPerror("httpCheckFds: select");
+	if (errno != EINTR)
+		rfbLogPerror("httpCheckFds: select");
 	return;
     }
 
