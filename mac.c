@@ -323,7 +323,7 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
       rfbClientPtr cl;
       for(cl=rfbScreen->rfbClientHead;cl;cl=cl->next)
 	if(!strcmp(message+1,cl->host)) {
-	  cl->clientData=(cl->clientData==0)?-1:0;
+	  cl->clientData=(void*)((cl->clientData==0)?-1:0);
 	  break;
 	}
     }
