@@ -1,3 +1,10 @@
+2004-06-12  Karl Runge <runge@karlrunge.com>
+	* add -clear_mods -clear_keys for (rare) case where keys are
+	  not being released (e.g. Ctrl-C x11vnc thru x11vnc).
+	* export RFB_SERVER_IP and RFB_SERVER_PORT to -accept program
+	  so that the tcp 4-tuple is completely specified.  
+	* add -storepasswd <pass> <file> so storepasswd program not needed
+
 2004-06-05  Karl Runge <runge@karlrunge.com>
 	* rearrange file for easier maintenance, indicating file breakup.
 	* add RFB_CLIENT_COUNT, number of other connected clients to

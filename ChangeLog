@@ -1,3 +1,7 @@
+2004-06-12  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -clear_mods, -clear_keys, and -storepasswd,
+	* add RFB_SERVER_IP RFB_SERVER_PORT to -accept env.
+
 2004-06-07  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* libvncserver/cursor.c, rfb/rfb.h: fix cursor trails
 	* */Makefile.am: stop automake nagging

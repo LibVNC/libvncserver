@@ -35,9 +35,8 @@
  * To increase portability it is written in plain C.
  *
  * The next goal is to improve performance and interactive response.
- * The algorithm currently used here to achieve this is that of krfb
- * (based on x0rfbserver algorithm).  Additional heuristics are also
- * applied (currently there are a bit too many of these...)
+ * The algorithm of x0rfbserver was used as a base.  Additional heuristics
+ * are also applied (currently there are a bit too many of these...)
  *
  * To build:
  *
@@ -79,14 +78,15 @@
  * is attempted to be followed, but may become out of date.  Use the
  * -flashcmap option to have colormap flashing as the pointer moves
  * windows with private colormaps (slow).  Displays with mixed depth 8 and
- * 24 visuals will incorrect display the non-default one.
+ * 24 visuals will incorrectly display windows using the non-default one.
  *
  * Feature -id <windowid> can be picky: it can crash for things like the
  * window not sufficiently mapped into server memory, use of -mouse, etc.
  * SaveUnders menus, popups, etc will not be seen.
  *
  * Occasionally, a few tile updates can be missed leaving a patch of
- * color that needs to be refreshed.
+ * color that needs to be refreshed.  This may only be when threaded,
+ * which is no longer the default.
  *
  * There seems to be a serious bug with simultaneous clients when
  * threaded, currently the only workaround in this case is -nothreads.
@@ -94,10 +94,11 @@
  */
 
 /* 
- * These ' -- filename -- ' comments represent a partial cleanup: they
- * are an odd way to indicate how this huge file could be split up someday
- * into multiple files.  Externs and other things would need to be done,
- * but it indicates the breakup, including static keyword for local items.
+ * These ' -- filename -- ' comments represent a partial cleanup:
+ * they are an odd way to indicate how this huge file would be split up
+ * someday into multiple files.  Not finished, externs and other things
+ * would need to be done, but it indicates the breakup, including static
+ * keyword for local items.
  *
  * The primary reason we do not break up this file is for user
  * convenience: those wanting to use the latest version download a single
@@ -131,6 +132,15 @@
 #include <X11/XKBlib.h>
 #endif
 
+#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#endif
+
 /* 
  * Temporary kludge: to run with -xinerama define the following
  * macro (uncomment) and be sure to link with -lXinerama
@@ -146,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-06-05";
+char lastmod[] = "lastmod:    2004-06-11";
 
 /* X display info */
 Display *dpy = 0;
@@ -188,7 +198,7 @@ typedef struct bout {
 	int x1, y1, x2, y2;
 } blackout_t;
 typedef struct tbout {
-	blackout_t bo[10];	/* hardwired max rectangles. */
+	blackout_t bo[16];	/* hardwired max rectangles. */
 	int cover;
 	int count;
 } tile_blackout_t;
@@ -211,38 +221,21 @@ int got_user_input = 0;
 int got_pointer_input = 0;
 int got_keyboard_input = 0;
 int fb_copy_in_progress = 0;	
+int shut_down = 0;	
 
 /* string for the VNC_CONNECT property */
 #define VNC_CONNECT_MAX 512
 char vnc_connect_str[VNC_CONNECT_MAX+1];
 Atom vnc_connect_prop = None;
 
-/* XXX usleep(3) is not thread safe on some older systems... */
-struct timeval _mysleep;
-#define usleep2(x) \
-	_mysleep.tv_sec  = (x) / 1000000; \
-	_mysleep.tv_usec = (x) % 1000000; \
-	select(0, NULL, NULL, NULL, &_mysleep); 
-#if !defined(X11VNC_USLEEP)
-#undef usleep
-#define usleep usleep2
-#endif
-
-/*
- * Not sure why... but when threaded we have to mutex our X11 calls to
- * avoid XIO crashes.
- */
-MUTEX(x11Mutex);
-#define X_LOCK       LOCK(x11Mutex)
-#define X_UNLOCK   UNLOCK(x11Mutex)
-#define X_INIT INIT_MUTEX(x11Mutex)
-
-/* function prototypes */
+/* function prototypes (see filename comment above) */
 
 int all_clients_initialized(void);
 void blackout_tiles(void);
 void check_connect_inputs(void);
 void clean_up_exit(int);
+void clear_modifiers(int init);
+void clear_keys(void);
 void copy_screen(void);
 
 double dtime(double *);
@@ -310,6 +303,7 @@ int flash_cmap = 0;		/* follow installed colormaps */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 
 int use_modifier_tweak = 0;	/* use the altgr_keyboard modifier tweak */
+int clear_mods = 0;		/* -clear_mods (1) and -clear_keys (2) */
 int nofb = 0;			/* do not send any fb updates */
 
 int subwin = 0;			/* -id */
@@ -386,12 +380,44 @@ int got_nevershared = 0;
 #endif
 
 
+/* -- util.h -- */
+
+
+/* XXX usleep(3) is not thread safe on some older systems... */
+struct timeval _mysleep;
+#define usleep2(x) \
+	_mysleep.tv_sec  = (x) / 1000000; \
+	_mysleep.tv_usec = (x) % 1000000; \
+	select(0, NULL, NULL, NULL, &_mysleep); 
+#if !defined(X11VNC_USLEEP)
+#undef usleep
+#define usleep usleep2
+#endif
+
+/*
+ * following is based on IsModifierKey in Xutil.h
+*/
+#define ismodkey(keysym) \
+  ((((KeySym)(keysym) >= XK_Shift_L) && ((KeySym)(keysym) <= XK_Hyper_R) && \
+  ((KeySym)(keysym) != XK_Caps_Lock) && ((KeySym)(keysym) != XK_Shift_Lock)))
+
+/*
+ * Not sure why... but when threaded we have to mutex our X11 calls to
+ * avoid XIO crashes.
+ */
+MUTEX(x11Mutex);
+#define X_LOCK       LOCK(x11Mutex)
+#define X_UNLOCK   UNLOCK(x11Mutex)
+#define X_INIT INIT_MUTEX(x11Mutex)
+
+
 /* -- cleanup.c -- */
 /*
  * Exiting and error handling routines
  */
 
 static int exit_flag = 0;
+int exit_sig = 0;
 
 /*
  * Normal exiting
@@ -411,8 +437,14 @@ void clean_up_exit (int ret) {
 		}
 	}
 
+	if (clear_mods == 1) {
+		clear_modifiers(0);
+	} else if (clear_mods == 2) {
+		clear_keys();
+	}
 	X_LOCK;
 	XTestDiscard(dpy);
+	XCloseDisplay(dpy);
 	X_UNLOCK;
 
 	fflush(stderr);
@@ -424,6 +456,7 @@ void clean_up_exit (int ret) {
  */
 static void interrupted (int sig) {
 	int i;
+	exit_sig = sig;
 	if (exit_flag) {
 		exit_flag++;
 		if (use_threads) {
@@ -438,6 +471,10 @@ static void interrupted (int sig) {
 		fprintf(stderr, "caught X11 error:\n");
 	} else {
 		fprintf(stderr, "caught signal: %d\n", sig);
+	}
+	if (sig == SIGINT) {
+		shut_down = 1;
+		return;
 	}
 	/*
 	 * to avoid deadlock, etc, just delete the shm areas and
@@ -456,6 +493,11 @@ static void interrupted (int sig) {
 		if (single_copytile && i >= single_copytile) {
 			break;
 		}
+	}
+	if (clear_mods == 1) {
+		clear_modifiers(0);
+	} else if (clear_mods == 2) {
+		clear_keys();
 	}
 	if (sig) {
 		exit(2);
@@ -543,11 +585,15 @@ static int run_user_command(char *cmd, rfbClientPtr client) {
 	static char env_rfb_client_id[100];
 	static char env_rfb_client_ip[100];
 	static char env_rfb_client_port[100];
+	static char env_rfb_server_ip[100];
+	static char env_rfb_server_port[100];
 	static char env_rfb_x11vnc_pid[100];
 	static char env_rfb_client_count[100];
 	char *addr = client->host;
-	int rc, fromlen, fromport;
-	struct sockaddr_in from;
+	int rc;
+	char *saddr_ip_str = NULL;
+	int saddr_len, saddr_port;
+	struct sockaddr_in saddr;
 
 	if (addr == NULL || addr[0] == '\0') {
 		addr = "unknown-host";
@@ -566,14 +612,36 @@ static int run_user_command(char *cmd, rfbClientPtr client) {
 	putenv(env_rfb_x11vnc_pid);
 
 	/* set RFB_CLIENT_PORT to peer port for command to use */
-	fromlen = sizeof(from);
-	memset(&from, 0, sizeof(from));
-	fromport = -1;
-	if (!getpeername(client->sock, (struct sockaddr *)&from, &fromlen)) {
-		fromport = ntohs(from.sin_port);
+	saddr_len = sizeof(saddr);
+	memset(&saddr, 0, sizeof(saddr));
+	saddr_port = -1;
+	if (!getpeername(client->sock, (struct sockaddr *)&saddr, &saddr_len)) {
+		saddr_port = ntohs(saddr.sin_port);
 	}
-	sprintf(env_rfb_client_port, "RFB_CLIENT_PORT=%d", fromport);
+	sprintf(env_rfb_client_port, "RFB_CLIENT_PORT=%d", saddr_port);
 	putenv(env_rfb_client_port);
+
+	/* 
+	 * now do RFB_SERVER_IP and RFB_SERVER_PORT (i.e. us!)
+	 * This will establish a 5-tuple (including tcp) the external
+	 * program can potentially use to work out the virtual circuit
+	 * for this connection.
+	 */
+	saddr_len = sizeof(saddr);
+	memset(&saddr, 0, sizeof(saddr));
+	saddr_port = -1;
+	saddr_ip_str = "unknown";
+	if (!getsockname(client->sock, (struct sockaddr *)&saddr, &saddr_len)) {
+		saddr_port = ntohs(saddr.sin_port);
+#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
+		saddr_ip_str = inet_ntoa(saddr.sin_addr);
+#endif
+	}
+	sprintf(env_rfb_server_ip, "RFB_SERVER_IP=%s", saddr_ip_str);
+	putenv(env_rfb_server_ip);
+	sprintf(env_rfb_server_port, "RFB_SERVER_PORT=%d", saddr_port);
+	putenv(env_rfb_server_port);
+
 
 	/* 
 	 * Better set DISPLAY to the one we are polling, if they
@@ -1497,7 +1565,7 @@ static KeyCode keycodes[0x100];
 static KeyCode left_shift_code, right_shift_code, altgr_code;
 
 void initialize_modtweak(void) {
-	KeySym key, *keymap;
+	KeySym keysym, *keymap;
 	int i, j, minkey, maxkey, syms_per_keycode;
 
 	memset(modifiers, -1, sizeof(modifiers));
@@ -1511,16 +1579,16 @@ void initialize_modtweak(void) {
 	for (i = minkey; i <= maxkey; i++) {
 		KeySym lower, upper;
 		/* 2nd one */
-		key = keymap[(i - minkey) * syms_per_keycode + 1];
-		if (key != NoSymbol) {
+		keysym = keymap[(i - minkey) * syms_per_keycode + 1];
+		if (keysym != NoSymbol) {
 			continue;
 		}
 		/* 1st one */
-		key = keymap[(i - minkey) * syms_per_keycode + 0];
-		if (key == NoSymbol) {
+		keysym = keymap[(i - minkey) * syms_per_keycode + 0];
+		if (keysym == NoSymbol) {
 			continue;
 		}
-		XConvertCase(key, &lower, &upper);
+		XConvertCase(keysym, &lower, &upper);
 		if (lower != upper) {
 			keymap[(i - minkey) * syms_per_keycode + 0] = lower;
 			keymap[(i - minkey) * syms_per_keycode + 1] = upper;
@@ -1528,11 +1596,11 @@ void initialize_modtweak(void) {
 	}
 	for (i = minkey; i <= maxkey; i++) {
 		for (j = 0; j < syms_per_keycode; j++) {
-			key = keymap[ (i - minkey) * syms_per_keycode + j ];
-			if ( key >= ' ' && key < 0x100
-			    && i == XKeysymToKeycode(dpy, key) ) {
-				keycodes[key] = i;
-				modifiers[key] = j;
+			keysym = keymap[ (i - minkey) * syms_per_keycode + j ];
+			if ( keysym >= ' ' && keysym < 0x100
+			    && i == XKeysymToKeycode(dpy, keysym) ) {
+				keycodes[keysym] = i;
+				modifiers[keysym] = j;
 			}
 		}
 	}
@@ -1544,6 +1612,114 @@ void initialize_modtweak(void) {
 	XFree ((void *) keymap);
 }
 
+/*
+ * Routine to retreive current state keyboard.  1 means down, 0 up.
+ */
+static void get_keystate(int *keystate) {
+	int i, k;
+	char keys[32];
+	
+	/* n.b. caller decides to X_LOCK or not. */
+	XQueryKeymap(dpy, keys);
+	for (i=0; i<32; i++) {
+		char c = keys[i];
+
+		for (k=0; k < 8; k++) {
+			if (c & 0x1) {
+				keystate[8*i + k] = 1;
+			} else {
+				keystate[8*i + k] = 0;
+			}
+			c = c >> 1;
+		}
+	}
+}
+
+/*
+ * Try to KeyRelease any non-Lock modifiers that are down.
+ */
+void clear_modifiers(int init) {
+	static KeyCode keycodes[256];
+	static KeySym  keysyms[256];
+	static char *keystrs[256];
+	static int kcount = 0, first = 1;
+	int keystate[256];
+	int i, j, minkey, maxkey, syms_per_keycode;
+	KeySym *keymap;
+	KeySym keysym;
+	KeyCode keycode;
+
+	/* n.b. caller decides to X_LOCK or not. */
+	if (first) {
+		/*
+		 * we store results in static arrays, to aid interrupted
+		 * case, but modifiers could have changed during session...
+		 */
+		XDisplayKeycodes(dpy, &minkey, &maxkey);
+
+		keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
+		    &syms_per_keycode);
+
+		for (i = minkey; i <= maxkey; i++) {
+		    for (j = 0; j < syms_per_keycode; j++) {
+			keysym = keymap[ (i - minkey) * syms_per_keycode + j ];
+			if (keysym == NoSymbol || ! ismodkey(keysym)) {
+				continue;
+			}
+			keycode = XKeysymToKeycode(dpy, keysym);
+			if (keycode == NoSymbol) {
+				continue;
+			}
+			keycodes[kcount] = keycode;
+			keysyms[kcount]  = keysym;
+			keystrs[kcount]  = strdup(XKeysymToString(keysym));
+			kcount++;
+		    }
+		}
+		XFree((void *) keymap);
+		first = 0;
+	}
+	if (init) {
+		return;
+	}
+	
+	get_keystate(keystate);
+	for (i=0; i < kcount; i++) {
+		keysym  = keysyms[i];
+		keycode = keycodes[i];
+
+		if (! keystate[(int) keycode]) {
+			continue;
+		}
+
+		if (clear_mods) {
+			rfbLog("clear_modifiers: up: %-10s (0x%x) "
+			    "keycode=0x%x\n", keystrs[i], keysym, keycode);
+		}
+		myXTestFakeKeyEvent(dpy, keycode, False, CurrentTime);
+	}
+	XFlush(dpy);
+}
+
+/*
+ * Attempt to set all keys to Up position.  Can mess up typing at the
+ * physical keyboard so use with caution.
+ */
+void clear_keys(void) {
+	int k, keystate[256];
+	
+	/* n.b. caller decides to X_LOCK or not. */
+	get_keystate(keystate);
+	for (k=0; k<256; k++) {
+		if (keystate[k]) {
+			KeyCode keycode = (KeyCode) k;
+			rfbLog("clear_keys: keycode=%d\n", keycode);
+			myXTestFakeKeyEvent(dpy, keycode, False, CurrentTime);
+		}
+	}
+	XFlush(dpy);
+}
+		
 /*
  * The following is for an experimental -remap option to allow the user
  * to remap keystrokes.  It is currently confusing wrt modifiers...
@@ -1888,12 +2064,6 @@ MUTEX(pointerMutex);
 #define MAX_BUTTONS 5
 #define MAX_BUTTON_EVENTS 50
 static prtremap_t pointer_map[MAX_BUTTONS+1][MAX_BUTTON_EVENTS];
-
-/*
- * following is based on IsModifierKey in Xutil.h
-*/
-#define ismodkey(keysym) \
-  ((((KeySym)(keysym) >= XK_Shift_L) && ((KeySym)(keysym) <= XK_Hyper_R)))
 
 /*
  * For parsing the -buttonmap sections, e.g. "4" or ":Up+Up+Up:"
@@ -4585,10 +4755,10 @@ static void copy_tiles(int tx, int ty, int nt) {
 	for (t=1; t <= nt; t++) {
 		first_line[t] = -1;
 	}
+
 	/* find the first line with difference: */
 	w1 = width1 * pixelsize;
 	w2 = width2 * pixelsize;
-
 
 	/* foreach line: */
 	for (line = 0; line < size_y; line++) {
@@ -5640,7 +5810,6 @@ void scan_for_updates(void) {
  */
 
 static int defer_update_nofb = 6;	/* defer a shorter time under -nofb */
-static int shut_down = 0;	
 
 /*
  * We need to handle user input, particularly pointer input, carefully.
@@ -5963,25 +6132,33 @@ static void print_help(void) {
 "-localhost             Same as -allow 127.0.0.1\n"
 "-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd\n"
 "                       (full-access) password must also be supplied.\n"
-"-passwdfile filename   Specify libvncserver -passwd via the first line of the\n"
-"                       file \"filename\" instead of via command line.  If a\n"
-"                       second non blank line exists in the file it is taken\n"
-"                       as a view-only password (i.e. -viewpasswd) Note: this\n"
-"                       is a simple plaintext passwd, see also -rfbauth below.\n"
-"-accept string         Run a command (possibly to prompt the user at the\n"
-"                       X11 display) to decide whether an incoming client\n"
-"                       should be allowed to connect or not.  \"string\" is\n"
-"                       an external command run via system(3) (see below for\n"
-"                       special cases).  Be sure to quote \"string\" if it\n"
-"                       contains spaces, etc.  The RFB_CLIENT_IP environment\n"
-"                       variable will be set to the incoming client IP number\n"
-"                       and the port in RFB_CLIENT_PORT (or -1 if unavailable).\n"
-"                       The x11vnc process id will be in RFB_X11VNC_PID, a\n"
-"                       client id number in RFB_CLIENT_ID and the number of\n"
-"                       other connected clients in RFB_CLIENT_COUNT.  If the\n"
-"                       external command returns 0 the client is accepted,\n"
-"                       otherwise the client is rejected.  See below for an\n"
-"                       extension to accept a client view-only.\n"
+"-passwdfile filename   Specify libvncserver -passwd via the first line of\n"
+"                       the file \"filename\" instead of via command line.\n"
+"                       If a second non blank line exists in the file it is\n"
+"                       taken as a view-only password (i.e. -viewpasswd) Note:\n"
+"                       this is a simple plaintext passwd, see also -rfbauth\n"
+"                       and -storepasswd below.\n"
+"-storepasswd pass file Store password \"pass\" as the VNC password in the\n"
+"                       file \"file\".  Once the password is stored the\n"
+"                       program exits.  Use the password via \"-rfbauth file\"\n"
+"-accept string         Run a command (possibly to prompt the user at the X11\n"
+"                       display) to decide whether an incoming client should be\n"
+"                       allowed to connect or not.  \"string\" is an external\n"
+"                       command run via system(3) (see below for special cases).\n"
+"                       Be sure to quote \"string\" if it contains spaces,\n"
+"                       etc.  If the external command returns 0 the client is\n"
+"                       accepted, otherwise the client is rejected.  See below\n"
+"                       for an extension to accept a client view-only.\n"
+"\n"
+"                       Environment: The RFB_CLIENT_IP environment variable will\n"
+"                       be set to the incoming client IP number and the port\n"
+"                       in RFB_CLIENT_PORT (or -1 if unavailable).  Similarly,\n"
+"                       RFB_SERVER_IP and RFB_SERVER_PORT (the x11vnc side\n"
+"                       of the connection), are set to allow identification\n"
+"                       of the tcp virtual circuit.  The x11vnc process\n"
+"                       id will be in RFB_X11VNC_PID, a client id number in\n"
+"                       RFB_CLIENT_ID, and the number of other connected clients\n"
+"                       in RFB_CLIENT_COUNT.\n"
 "\n"
 "                       If \"string\" is \"popup\" then a builtin popup window\n"
 "                       is used.  The popup will time out after 120 seconds,\n"
@@ -6053,6 +6230,13 @@ static void print_help(void) {
 "-modtweak              Handle AltGr/Shift modifiers for differing languages\n"
 "                       between client and host (default %s).\n"
 "-nomodtweak            Send the keysym directly to the X server.\n"
+"-clear_mods            At startup and exit clear the modifier keys by sending\n"
+"                       KeyRelease for each one. The Lock modifiers are skipped.\n"
+"                       Used to clear the state if the display was accidentally\n"
+"                       left with any pressed down.  That should be rare.\n"
+"-clear_keys            As -clear_mods, except try to release any pressed key.\n"
+"                       Intended for debugging.  This option and -clear_mods\n"
+"                       can interfere with typing at the physical keyboard.\n"
 "-remap string          Read keysym remappings from file \"string\".  Format is\n"
 "                       one pair of keysyms per line (can be name or hex value).\n"
 "                       \"string\" can also be of form: key1-key2,key3-key4...\n"
@@ -6287,6 +6471,16 @@ int main(int argc, char** argv) {
 			viewonly_passwd = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-passwdfile")) {
 			passwdfile = argv[++i];
+		} else if (!strcmp(arg, "-storepasswd")) {
+			if (i+2 >= argc || vncEncryptAndStorePasswd(argv[i+1],
+			    argv[i+2]) != 0) {
+				fprintf(stderr, "-storepasswd failed\n");
+				exit(1);
+			} else {
+				fprintf(stderr, "stored passwd in file %s\n",
+				    argv[i+2]);
+				exit(0);
+			}
 		} else if (!strcmp(arg, "-shared")) {
 			shared = 1;
 		} else if (!strcmp(arg, "-auth")) {
@@ -6321,6 +6515,10 @@ int main(int argc, char** argv) {
 			use_modifier_tweak = 1;
 		} else if (!strcmp(arg, "-nomodtweak")) {
 			use_modifier_tweak = 0;
+		} else if (!strcmp(arg, "-clear_mods")) {
+			clear_mods = 1;
+		} else if (!strcmp(arg, "-clear_keys")) {
+			clear_mods = 2;
 		} else if (!strcmp(arg, "-remap")) {
 			remap_file = argv[++i];
 		} else if (!strcmp(arg, "-blackout")) {
@@ -6642,6 +6840,7 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "using_shm:  %d\n", using_shm);
 		fprintf(stderr, "flipbytes:  %d\n", flip_byte_order);
 		fprintf(stderr, "mod_tweak:  %d\n", use_modifier_tweak);
+		fprintf(stderr, "clearmods:  %d\n", clear_mods);
 		fprintf(stderr, "remap:      %s\n", remap_file ? remap_file
                     : "null");
 		fprintf(stderr, "blackout:   %s\n", blackout_string
@@ -6850,7 +7049,6 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "warning: 24 bpp may have poor"
 		    " performance.\n");
 	}
-
 	if (! dt) {
 		static char str[] = "-desktop";
 		argv2[argc2++] = str;
@@ -6881,6 +7079,7 @@ int main(int argc, char** argv) {
 
 	initialize_signals();
 
+
 	if (blackouts) {	/* blackout fb as needed. */
 		copy_screen();
 	}
@@ -6892,6 +7091,11 @@ int main(int argc, char** argv) {
 		initialize_remap(remap_file);
 	}
 	initialize_pointer_map(pointer_remap);
+
+	clear_modifiers(1);
+	if (clear_mods == 1) {
+		clear_modifiers(0);
+	}
 
 	if (! inetd) {
 		if (! screen->rfbPort || screen->rfbListenSock < 0) {
