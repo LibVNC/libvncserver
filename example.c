@@ -270,7 +270,7 @@ int main(int argc,char** argv)
 #endif
 
   /* this is the non-blocking event loop; a background thread is started */
-  rfbRunEventLoop(rfbScreen,40000,TRUE);
+  rfbRunEventLoop(rfbScreen,-1,TRUE);
   /* now we could do some cool things like rendering */
   while(1) sleep(5); /* render(); */
    

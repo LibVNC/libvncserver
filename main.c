@@ -34,6 +34,8 @@
 
 MUTEX(logMutex);
 
+char rfbEndianTest = (_BYTE_ORDER == _LITTLE_ENDIAN);
+
 /*
  * rfbLog prints a time-stamped message to the log file (stderr).
  */
@@ -579,6 +581,9 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
   rfbClientIteratorPtr i;
   rfbClientPtr cl,clPrev;
   struct timeval tv;
+
+  if(usec<0)
+    usec=rfbScreen->rfbDeferUpdateTime*1000;
 
   rfbCheckFds(rfbScreen,usec);
   httpCheckFds(rfbScreen);

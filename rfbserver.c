@@ -328,7 +328,8 @@ rfbClientConnectionGone(cl)
     }
 #endif
 
-	 FD_CLR(cl->sock,&(cl->screen->allFds));
+    if(cl->sock>=0)
+       FD_CLR(cl->sock,&(cl->screen->allFds));
 
     cl->clientGoneHook(cl);
 

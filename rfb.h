@@ -37,7 +37,8 @@ typedef unsigned char CARD8;
 typedef unsigned short CARD16;
 typedef unsigned int CARD32;
 typedef CARD32 Pixel;
-typedef CARD32 KeySym;
+/* typedef CARD32 KeySym; */
+typedef unsigned long KeySym;
 #define SIGNED signed
 /* for some strange reason, "typedef signed char Bool;" yields a four byte
    signed int on IRIX, but only for rfbserver.o!!! */
@@ -518,7 +519,7 @@ typedef struct rfbClientRec {
                    ((l) << 24))
 
 
-static const int rfbEndianTest = (_BYTE_ORDER == _LITTLE_ENDIAN);
+extern char rfbEndianTest;
 
 #define Swap16IfLE(s) (rfbEndianTest ? Swap16(s) : (s))
 #define Swap24IfLE(l) (rfbEndianTest ? Swap24(l) : (l))
