@@ -434,9 +434,9 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 		    } else
 #endif
 			WriteExact(&cl, "?", 1);
-               } else if (compareAndSkip(&ptr, "$PARAMS")) {
-                   if (params[0] != '\0')
-                       WriteExact(&cl, params, strlen(params));
+		} else if (compareAndSkip(&ptr, "$PARAMS")) {
+		    if (params[0] != '\0')
+			WriteExact(&cl, params, strlen(params));
 		} else {
 		    if (!compareAndSkip(&ptr, "$$"))
 			ptr++;

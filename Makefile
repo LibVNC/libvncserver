@@ -27,7 +27,8 @@ LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(PTHREADLIB) $(EXTRALIBS)
 OSX_LIBS = -framework ApplicationServices -framework Carbon -framework IOKit
 
 # for x11vnc
-XLIBS =  -L/usr/X11R6/lib -lX11 -lXext -lXtst
+#XLIBS =  -L/usr/X11R6/lib -lXtst -lXext -lX11
+XLIBS =  -L/usr/lib32 -lXtst -lXext -lX11
 
 SOURCES=main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
