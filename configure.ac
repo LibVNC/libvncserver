@@ -17,23 +17,28 @@ AC_PROG_RANLIB
 # Options
 AH_TEMPLATE(BACKCHANNEL, [Enable BackChannel communication])
 AC_ARG_WITH(backchannel,
-	[  --without-backchannel		disable backchannel method],
+	[  --without-backchannel   disable backchannel method],
 	, [ with_backchannel=yes ])
 if test "x$with_backchannel" = "xyes"; then
 	AC_DEFINE(BACKCHANNEL)
 fi
 AH_TEMPLATE(ALLOW24BPP, [Enable 24 bit per pixel in native framebuffer])
 AC_ARG_WITH(24bpp,
-	[  --without-24bpp			disable 24 bpp framebuffers],
+	[  --without-24bpp         disable 24 bpp framebuffers],
 	, [ with_24bpp=yes ])
 if test "x$with_24bpp" = "xyes"; then
 	AC_DEFINE(ALLOW24BPP)
 fi
 AH_TEMPLATE(FFMPEG, [Use ffmpeg (for vnc2mpg)])
 AC_ARG_WITH(ffmpeg,
-	[ --with-ffmpeg=dir		set ffmpeg home directory],,)
+	[  --with-ffmpeg=dir       set ffmpeg home directory],,)
 AC_SUBST(with_ffmpeg)
 AM_CONDITIONAL(WITH_FFMPEG, test ! -z "$with_ffmpeg")
+
+
+# Seem to need this dummy here to induce the 'checking for egrep... grep -E', etc.
+# before it seemed to be inside the with_jpeg conditional. 
+AC_CHECK_HEADER(thenonexistentheader.h, HAVE_THENONEXISTENTHEADER_H="true")
 
 # Checks for X libraries
 HAVE_X="false"
@@ -85,13 +90,20 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 
 		AC_CHECK_LIB(Xfixes, XFixesGetCursorImage,
 			X_PRELIBS="$X_PRELIBS -lXfixes"
-			[AC_DEFINE(HAVE_LIBXFIXES)], ,
+			[AC_DEFINE(HAVE_LIBXFIXES) HAVE_LIBXFIXES="true"], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
 		AC_CHECK_LIB(Xdamage, XDamageQueryExtension,
 			X_PRELIBS="$X_PRELIBS -lXdamage"
-			[AC_DEFINE(HAVE_LIBXDAMAGE)], ,
+			[AC_DEFINE(HAVE_LIBXDAMAGE) HAVE_LIBXDAMAGE="true"], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		if test ! -z "$HAVE_LIBXFIXES" -o ! -z "$HAVE_LIBXDAMAGE"; then
+			# need /usr/sfw/lib in RPATH for Solaris 10 and later
+			case `(uname -sr) 2>/dev/null` in
+			"SunOS 5"*) X_EXTRA_LIBS="$X_EXTRA_LIBS -R/usr/sfw/lib" ;;
+			esac
+		fi
 
 		X_LIBS="$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS"
 	fi
@@ -100,35 +112,85 @@ AC_SUBST(X_LIBS)
 AM_CONDITIONAL(HAVE_X, test $HAVE_X != "false")
 
 # Checks for libraries.
+
 AC_ARG_WITH(jpeg,
- 	[  --without-jpeg			disable support for jpeg],
- 	, [ with_jpeg=yes ])
-if test "x$with_jpeg" = "xyes"; then
+[  --without-jpeg          disable support for jpeg]
+[  --with-jpeg=DIR         use jpeg include/library files in DIR],,)
+
+# At this point:
+#	no jpeg on command line   with_jpeg=""
+#	-with-jpeg                with_jpeg="yes"
+#	-without-jpeg             with_jpeg="no"
+#	-with-jpeg=/foo/dir       with_jpeg="/foo/dir"
+
+if test "x$with_jpeg" != "xno"; then
+	if test ! -z "$with_jpeg" -a "x$with_jpeg" != "xyes"; then
+		# add user supplied directory to flags:
+		saved_CPPFLAGS="$CPPFLAGS"
+		saved_LDFLAGS="$LDFLAGS"
+		CPPFLAGS="$CPPFLAGS -I$with_jpeg/include"
+		LDFLAGS="$LDFLAGS -L$with_jpeg/lib"
+		if test "x$GCC" = "xyes"; then
+			# this is not complete... in general a rat's nest.
+			LDFLAGS="$LDFLAGS -Xlinker -R$with_jpeg/lib"
+		else
+			LDFLAGS="$LDFLAGS -R$with_jpeg/lib"
+		fi
+	fi
 	AC_CHECK_HEADER(jpeglib.h, HAVE_JPEGLIB_H="true")
-fi
-AC_CHECK_HEADER(pthread.h, HAVE_PTHREAD_H="true")
-AC_ARG_WITH(zlib,
- 	[  --without-zlib			disable support for deflate],
- 	, [ with_zlib=yes ])
-AC_ARG_WITH(libz,
- 	[  --without-libz			disable support for deflate],
- 	, [ with_libz=yes ])
-if test "x$with_zlib" = "xyes" -a "x$with_libz" = "xyes"; then
-	AC_CHECK_HEADER(zlib.h, HAVE_ZLIB_H="true")
-fi
-if test ! -z "$HAVE_ZLIB_H"; then
-	AC_CHECK_LIB(z, deflate, , HAVE_ZLIB_H="")
-	if test ! -z "$HAVE_JPEGLIB_H" -a ! -z "$HAVE_ZLIB_H"; then
+	if test "x$HAVE_JPEGLIB_H" = "xtrue"; then
 		AC_CHECK_LIB(jpeg, jpeg_CreateCompress, , HAVE_JPEGLIB_H="")
 	fi
+	if test ! -z "$with_jpeg" -a "x$with_jpeg" != "xyes"; then
+		if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
+			# restore old flags on failure:
+			CPPFLAGS="$saved_CPPFLAGS"
+			LDFLAGS="$saved_LDFLAGS"
+		fi
+	fi
 fi
+
+AC_ARG_WITH(libz,
+[  --without-libz          disable support for deflate],,)
+AC_ARG_WITH(zlib,
+[  --without-zlib          disable support for deflate]
+[  --with-zlib=DIR         use zlib include/library files in DIR],,)
+
+if test "x$with_zlib" != "xno" -a "x$with_libz" != "xno"; then
+	if test ! -z "$with_zlib" -a "x$with_zlib" != "xyes"; then
+		saved_CPPFLAGS="$CPPFLAGS"
+		saved_LDFLAGS="$LDFLAGS"
+		CPPFLAGS="$CPPFLAGS -I$with_zlib/include"
+		LDFLAGS="$LDFLAGS -L$with_zlib/lib"
+		if test "x$GCC" = "xyes"; then
+			LDFLAGS="$LDFLAGS -Xlinker -R$with_zlib/lib"
+		else
+			LDFLAGS="$LDFLAGS -R$with_zlib/lib"
+		fi
+	fi
+	AC_CHECK_HEADER(zlib.h, HAVE_ZLIB_H="true")
+	if test "x$HAVE_ZLIB_H" = "xtrue"; then
+		AC_CHECK_LIB(z, deflate, , HAVE_ZLIB_H="")
+	fi
+	if test ! -z "$with_zlib" -a "x$with_zlib" != "xyes"; then
+		if test "x$HAVE_ZLIB_H" != "xtrue"; then
+			CPPFLAGS="$saved_CPPFLAGS"
+			LDFLAGS="$saved_LDFLAGS"
+		fi
+	fi
+fi
+
+AC_CHECK_HEADER(pthread.h, HAVE_PTHREAD_H="true")
 if test ! -z "$HAVE_PTHREAD_H"; then
+	# why twice?
 	AC_CHECK_LIB(pthread, pthread_mutex_lock)
 	AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
 fi
+
 AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
 AM_CONDITIONAL(HAVE_LIBZ, test ! -z "$HAVE_ZLIB_H")
 AM_CONDITIONAL(HAVE_LIBJPEG, test ! -z "$HAVE_JPEGLIB_H")
+
 if test -z "$with_sdl"; then
 	if sdl-config --version >/dev/null 2>&1; then
 		with_sdl=yes
