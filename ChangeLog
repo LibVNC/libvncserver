@@ -1,3 +1,10 @@
+2004-03-10  Karl Runge <runge@karlrunge.com>
+	* x11vnc options -vncconnect, -connect, -remap,
+	  -debug_pointer, and -debug_keyboard
+	* support reverse connections, vncconnect(1), etc.
+	* expt. with user supplied keysym remapping.
+	* debug output option for pointer and keyboard.
+
 2004-02-29  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* fixed warning of valgrind for regiontest
 

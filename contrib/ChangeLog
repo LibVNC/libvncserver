@@ -1,3 +1,11 @@
+2004-03-10  Karl Runge <runge@karlrunge.com>
+	* added reverse connection for vncconnect(1) and other means
+	  -vncconnect, -connect host:port, and -connect watchfile 
+	* added first pass at user keysym remapping feature via
+	  -remap file.  Ignores modifier state, need to generalize.
+	* debugging options for users -debug_pointer and -debug_keyboard
+	* clear -passwd from argv for privacy (if OS allows).
+
 2004-02-19  Karl Runge <runge@karlrunge.com>
 	* added handling of clipboard/selection exchange to/from clients,
 	  even holds PRIMARY which Xvnc does not do.  disable with -nosel.

@@ -180,7 +180,12 @@ int flash_cmap = 0;		/* follow installed colormaps */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 
 int use_modifier_tweak = 0;	/* use the altgr_keyboard modifier tweak */
+char *remap_file = NULL;	/* user supplied remapping file */
 int nofb = 0;			/* do not send any fb updates */
+
+char *client_connect = NULL;	/* strings for -connect option */
+char *client_connect_file = NULL;
+int vnc_connect = 0;		/* -vncconnect option */
 
 int local_cursor = 1;		/* whether the viewer draws a local cursor */
 int show_mouse = 0;		/* display a cursor for the real mouse */
@@ -213,7 +218,7 @@ VisualID visual_id = (VisualID) 0;
 int visual_depth = 0;
 
 int nap_ok = 0, nap_diff_count = 0;
-time_t last_event, last_input;
+time_t last_event, last_input, last_client = 0;
 
 /* tile heuristics: */
 double fs_frac = 0.75;	/* threshold tile fraction to do fullscreen updates. */
@@ -240,6 +245,9 @@ int got_keyboard_input = 0;
 int scan_in_progress = 0;	
 int fb_copy_in_progress = 0;	
 int shut_down = 0;	
+
+int debug_pointer = 0;
+int debug_keyboard = 0;
 
 int quiet = 0;
 double dtime(double *);
@@ -419,6 +427,197 @@ int check_access(char *addr) {
 }
 
 /*
+ * For the -connect <file> option: periodically read the file looking for
+ * a connect string.  If one is found set client_connect to it.
+ */
+void check_connect_file(char *file) {
+	FILE *in;
+	char line[512], host[512];
+	static int first_warn = 1, truncate_ok = 1;
+	static time_t last_time = 0; 
+	time_t now = time(0);
+
+	if (now - last_time < 1) {
+		/* check only once a second */
+		return;
+	}
+	last_time = now;
+
+	if (! truncate_ok) {
+		/* check if permissions changed */
+		if (access(file, W_OK) == 0) {
+			truncate_ok = 1;
+		} else {
+			return;
+		}
+	}
+
+	in = fopen(file, "r");
+	if (in == NULL) {
+		if (first_warn) {
+			rfbLog("check_connect_file: fopen failure: %s\n", file);
+			perror("fopen");
+			first_warn = 0;
+		}
+		return;
+	}
+
+	if (fgets(line, 512, in) != NULL) {
+		if (sscanf(line, "%s", host) == 1) {
+			if (strlen(host) > 0) {
+				client_connect = strdup(host);
+				rfbLog("read connect file: %s\n", host);
+			}
+		}
+	}
+	fclose(in);
+
+	/* truncate file */
+	in = fopen(file, "w");
+	if (in != NULL) {
+		fclose(in);
+	} else {
+		/* disable if we cannot truncate */
+		rfbLog("check_connect_file: could not truncate %s, "
+		   "disabling checking.\n", file);
+		truncate_ok = 0;
+	}
+}
+
+/* Do a reverse connect for a single "host" or "host:port" */
+int do_reverse_connect(char *str) {
+	rfbClientPtr cl;
+	char *host, *p;
+	int port = 5500, len = strlen(str);
+
+	if (len < 1) {
+		return;
+	}
+	if (len > 512) {
+		rfbLog("reverse_connect: string too long: %d bytes\n", len);
+		return;
+	}
+
+	/* copy in to host */
+	host = (char *) malloc((size_t) len+1);
+	if (! host) {
+		rfbLog("reverse_connect: could not malloc string %d\n", len);
+		return;
+	}
+	strncpy(host, str, len);
+	host[len] = '\0';
+
+	/* extract port, if any */
+	if ((p = strchr(host, ':')) != NULL) {
+		port = atoi(p+1);
+		*p = '\0';
+	}
+
+	cl = rfbReverseConnection(screen, host, port);
+	free(host);
+
+	if (cl == NULL) {
+		rfbLog("reverse_connect: %s failed\n", str);
+		return 0;
+	} else {
+		rfbLog("reverse_connect: %s/%s OK\n", str, cl->host);
+		return 1;
+	}
+}
+
+void rfbPE(rfbScreenInfoPtr scr, long us) {
+	if (! use_threads) {
+		return rfbProcessEvents(scr, us);
+	}
+}
+
+/* break up comma separated list of hosts and call do_reverse_connect() */
+
+void reverse_connect(char *str) {
+	char *p, *tmp = strdup(str);
+	int sleep_between_host = 300;
+	int sleep_min = 1500, sleep_max = 4500, n_max = 5;
+	int n, tot, t, dt = 100, cnt = 0;
+
+	p = strtok(tmp, ",");
+	while (p) {
+		if ((n = do_reverse_connect(p)) != 0) {
+			rfbPE(screen, -1);
+		}
+		cnt += n;
+
+		p = strtok(NULL, ",");
+		if (p) {
+			t = 0;
+			while (t < sleep_between_host) {
+				usleep(dt * 1000);
+				rfbPE(screen, -1);
+				t += dt;
+			}
+		}
+	}
+	free(tmp);
+
+	if (cnt == 0) {
+		return;
+	}
+
+	/*
+	 * XXX: we need to process some of the initial handshaking
+	 * events, otherwise the client can get messed up (why??) 
+	 * so we send rfbProcessEvents() all over the place.
+	 */
+
+	n = cnt;
+	if (n >= n_max) {
+		n = n_max; 
+	} 
+	t = sleep_max - sleep_min;
+	tot = sleep_min + ((n-1) * t) / (n_max-1);
+
+	t = 0;
+	while (t < tot) {
+		rfbPE(screen, -1);
+		usleep(dt * 1000);
+		t += dt;
+	}
+}
+
+/* check if client_connect has been set, if so make the reverse connections. */
+
+void send_client_connect() {
+	if (client_connect != NULL) {
+		reverse_connect(client_connect);
+		free(client_connect);
+		client_connect = NULL;
+	}
+}
+
+/* string for the VNC_CONNECT property */
+#define VNC_CONNECT_MAX 512
+char vnc_connect_str[VNC_CONNECT_MAX+1];
+
+/* monitor the various input methods */
+void check_connect_inputs() {
+
+	/* flush any already set: */
+	send_client_connect();
+
+	/* connect file: */
+	if (client_connect_file != NULL) {
+		check_connect_file(client_connect_file);		
+	}
+	send_client_connect();
+
+	/* VNC_CONNECT property (vncconnect program) */
+	if (vnc_connect && *vnc_connect_str != '\0') {
+		client_connect = strdup(vnc_connect_str);
+		vnc_connect_str[0] = '\0';
+	}
+	send_client_connect();
+}
+
+/*
  * libvncserver callback for when a new client connects
  */
 enum rfbNewClientAction new_client(rfbClientPtr client) {
@@ -446,6 +645,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		client->clientData = (void *) 0;
 	}
 	accepted_client = 1;
+	last_client = time(0);
 	return(RFB_CLIENT_ACCEPT);
 }
 
@@ -460,7 +660,7 @@ char mod_state = 0;
 char modifiers[0x100];
 KeyCode keycodes[0x100], left_shift_code, right_shift_code, altgr_code;
 
-void initialize_keycodes() {
+void initialize_modtweak() {
 	KeySym key, *keymap;
 	int i, j, minkey, maxkey, syms_per_keycode;
 
@@ -508,25 +708,105 @@ void initialize_keycodes() {
 	XFree ((void *) keymap);
 }
 
-void DebugXTestFakeKeyEvent(Display* dpy, KeyCode keysym, Bool down, time_t cur_time)
+/*
+ * The following is for an experimental -remap option to allow the user
+ * to remap keystrokes.  It is currently confusing wrt modifiers...
+ */
+typedef struct keyremap {
+	KeySym before;
+	KeySym after;
+	struct keyremap *next;
+} keyremap_t;
+
+keyremap_t *keyremaps = NULL;
+
+void initialize_remap(char *infile) {
+	FILE *in;
+	char *p, line[256], str1[256], str2[256];
+	int i;
+	KeySym ksym1, ksym2;
+	keyremap_t *remap, *current;
+
+	in = fopen(infile, "r"); 
+	if (in == NULL) {
+		rfbLog("remap: cannot open: %s\n", infile);
+		perror("fopen");
+		clean_up_exit(1);
+	}
+	while (fgets(line, 256, in) != NULL) {
+		int blank = 1;
+		p = line;
+		while (*p) {
+			if (! isspace(*p)) {
+				blank = 0;
+				break;
+			}
+			p++;
+		}
+		if (blank) {
+			continue;
+		}
+		if (strchr(line, '#')) {
+			continue;
+		}
+		
+		if (sscanf(line, "%s %s", str1, str2) != 2) {
+			rfbLog("remap: bad line: %s\n", line);
+			fclose(in);
+			clean_up_exit(1);
+		}
+		if (sscanf(str1, "0x%x", &i) == 1) {
+			ksym1 = (KeySym) i;
+		} else {
+			ksym1 = XStringToKeysym(str1);
+		}
+		if (sscanf(str2, "0x%x", &i) == 1) {
+			ksym2 = (KeySym) i;
+		} else {
+			ksym2 = XStringToKeysym(str2);
+		}
+		if (ksym1 == NoSymbol || ksym2 == NoSymbol) {
+			rfbLog("warning: skipping bad remap line: %s", line);
+			continue;
+		}
+		remap = (keyremap_t *) malloc((size_t) sizeof(keyremap_t));
+		remap->before = ksym1;
+		remap->after  = ksym2;
+		remap->next   = NULL;
+		rfbLog("remapping: (%s, 0x%x) -> (%s, 0x%x)\n", str1, ksym1,
+		    str2, ksym2);
+		if (keyremaps == NULL) {
+			keyremaps = remap;
+		} else {
+			current->next = remap;
+			
+		}
+		current = remap;
+	}
+	fclose(in);
+}
+
+void DebugXTestFakeKeyEvent(Display* dpy, KeyCode key, Bool down, time_t cur_time)
 {
-	rfbLog("XTestFakeKeyEvent(dpy,%s(0x%x),%s,CurrentTime)\n",
-	    XKeysymToString(XKeycodeToKeysym(dpy,keysym,0)),keysym,
-	    down?"down":"up");
-	XTestFakeKeyEvent(dpy,keysym,down,cur_time);
+	if (debug_keyboard) {
+		rfbLog("XTestFakeKeyEvent(dpy, keycode=0x%x \"%s\", %s)\n",
+		    key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
+		    down ? "down":"up");
+	}
+	XTestFakeKeyEvent(dpy, key, down, cur_time);
 }
 
 /*
- * Uncomment the two lines to aid in debugging keymapping problems.
+ * This is to allow debug_keyboard option trap everything:
  */
-/*
 #define XTestFakeKeyEvent DebugXTestFakeKeyEvent
-#define DebugKeyEvent
-*/
 
 void tweak_mod(signed char mod, rfbBool down) {
 	rfbBool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
 	Bool dn = (Bool) down;
+	if (debug_keyboard) {
+		rfbLog("tweak_mod: down=%d mod=0x%x\n", down, mod);
+	}
 
 	if (mod < 0) {
 		return;
@@ -556,6 +836,10 @@ void tweak_mod(signed char mod, rfbBool down) {
 static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 	int tweak = 0;
+	if (debug_keyboard) {
+		rfbLog("modifier_tweak_keyboard: %s keysym=0x%x\n",
+		    down ? "down" : "up", (int) keysym);
+	}
 
 	if (view_only) {
 		return;
@@ -601,17 +885,36 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr
 static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 
-#ifdef DebugKeyEvent
-	X_LOCK;
-	rfbLog("keyboard(%s,%s(0x%x),client)\n",
-	    down?"down":"up",XKeysymToString(keysym),(int)keysym);
-	X_UNLOCK;
-#endif
+	if (debug_keyboard) {
+		X_LOCK;
+		rfbLog("keyboard(%s, 0x%x \"%s\")\n", down ? "down":"up",
+		    (int) keysym, XKeysymToString(keysym));
+		X_UNLOCK;
+	}
 
 	if (view_only) {
 		return;
 	}
 	
+	if (keyremaps) {
+		keyremap_t *remap = keyremaps;
+		while (remap != NULL) {
+			if (remap->before == keysym) {
+				keysym = remap->after;
+				if (debug_keyboard) {
+					rfbLog("keyboard(): remapping keysym: "
+					    "0x%x \"%s\" -> 0x%x \"%s\"\n",
+					    (int) remap->before,
+					    XKeysymToString(remap->before),
+					    (int) remap->after,
+					    XKeysymToString(remap->after));
+				}
+				break;
+			}
+			remap = remap->next;
+		}
+	}
+
 	if (use_modifier_tweak) {
 		modifier_tweak_keyboard(down, keysym, client);
 		X_LOCK;
@@ -623,6 +926,11 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	X_LOCK;
 
 	k = XKeysymToKeycode(dpy, (KeySym) keysym);
+
+	if (debug_keyboard) {
+		rfbLog("keyboard(): KeySym 0x%x \"%s\" -> KeyCode 0x%x\n",
+		    (int) keysym, XKeysymToString(keysym), (int) k);
+	}
 
 	if ( k != NoSymbol ) {
 		XTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
@@ -677,6 +985,10 @@ void init_pointer(void) {
 			n = atoi(p+1);	
 			if (n < num_buttons || num_buttons == 0) {
 				num_buttons = n;
+			} else {
+				rfbLog("warning: increasing number of mouse "
+				    "buttons from %d to %d\n", num_buttons, n);
+				num_buttons = n;
 			}
 		}
 		if ((q = strchr(pointer_remap, '-')) != NULL) {
@@ -709,6 +1021,10 @@ void init_pointer(void) {
  * Actual callback from libvncserver when it gets a pointer event.
  */
 static void pointer(int mask, int x, int y, rfbClientPtr client) {
+
+	if (debug_pointer && mask >= 0) {
+		rfbLog("pointer(mask: 0x%x, x:%4d, y:%4d)\n", mask, x, y);
+	}
 
 	if (view_only) {
 		return;
@@ -777,12 +1093,19 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 				ev[i][1] = x;
 				ev[i][2] = y;
 				UNLOCK(pointerMutex);
+				if (debug_pointer) {
+					rfbLog("pointer(): deferring event "
+					    "%d\n", i);
+				}
 				return;
 			}
 		}
 
 		/* time to send the queue */
 		for (i=0; i<nevents; i++) {
+			if (debug_pointer) {
+				rfbLog("pointer(): sending event %d\n", i+1);
+			}
 			update_pointer(ev[i][0], ev[i][1], ev[i][2]);
 		}
 		if (nevents && dt > maxwait) {
@@ -798,6 +1121,9 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 		UNLOCK(pointerMutex);
 	}
 	if (mask < 0) {		/* -1 just means flush the event queue */
+		if (debug_pointer > 1) {
+			rfbLog("pointer(): flush only.\n");
+		}
 		return;
 	}
 
@@ -824,6 +1150,10 @@ void update_pointer(int mask, int x, int y) {
 	for (i=0; i < MAX_BUTTONS; i++) {
 		/* look for buttons that have be clicked or released: */
 		if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
+			if (debug_pointer) {
+				rfbLog("pointer(): mask change: mask: 0x%x -> "
+				    "0x%x button: %d\n", button_mask, mask,i+1);
+			}
 			mb = pointer_map[i+1];
 			if (num_buttons && mb > num_buttons) {
 				rfbLog("ignoring mouse button out of bounds: %d"
@@ -1128,60 +1458,130 @@ void selection_send(XEvent *ev) {
 	rfbSendServerCutText(screen, selection_str, newlen);
 }
 
+
+/*
+ * Routines for monitoring the VNC_CONNECT property for changes.
+ * The vncconnect(1) will set it on our X display.
+ */
+
+Atom vnc_connect_prop = None;
+
+void read_vnc_connect_prop() {
+	Atom type;
+	int format, slen, dlen;
+	unsigned long nitems = 0, bytes_after = 0;
+	unsigned char* data = NULL;
+
+	vnc_connect_str[0] = '\0';
+	slen = 0;
+
+	if (! vnc_connect || vnc_connect_prop == None) {
+		/* not active or problem with VNC_CONNECT atom */
+		return;
+	}
+
+	/* read the property value into vnc_connect_str: */
+	do {
+		if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
+		    vnc_connect_prop, nitems/4, VNC_CONNECT_MAX/16, False,
+		    AnyPropertyType, &type, &format, &nitems, &bytes_after,
+		    &data) == Success) {
+
+			dlen = nitems * (format/8);
+			if (slen + dlen > VNC_CONNECT_MAX) {
+				/* too big */
+				rfbLog("warning: truncating large VNC_CONNECT"
+				   " string > %d bytes.\n", VNC_CONNECT_MAX);
+				XFree(data);
+				break;
+			}
+			memcpy(vnc_connect_str+slen, data, dlen);
+			slen += dlen;
+			vnc_connect_str[slen] = '\0';
+			XFree(data);
+		}
+	} while (bytes_after > 0);
+
+	vnc_connect_str[VNC_CONNECT_MAX] = '\0';
+	rfbLog("read property VNC_CONNECT: %s\n", vnc_connect_str);
+}
+
 /*
  * This routine is periodically called to check for selection related
- * X11 events and respond to them as needed.
+ * and other X11 events and respond to them as needed.
  */
-void watch_selection_event() {
+void watch_xevents() {
 	XEvent xev;
-	static int last_request = 0, first = 1, sent_sel = 0, starttime;
+	static int first = 1, sent_sel = 0;
+	int have_clients = screen->rfbClientHead ? 1 : 0;
+	time_t last_request = 0, now = time(0);
 
 	X_LOCK;
-	if (first) {
-		/* create fake window for our selection ownership, etc */
-		selwin = XCreateSimpleWindow(dpy, rootwin, 0, 0, 1, 1, 0, 0, 0);
-
+	if (first && (watch_selection || vnc_connect)) {
 		/*
 		 * register desired event(s) for notification.
 		 * PropertyChangeMask is for CUT_BUFFER0 changes.
 		 * TODO: does this cause a flood of other stuff?
 		 */
 		XSelectInput(dpy, rootwin, PropertyChangeMask);
-
-		starttime = time(0);
-
-		first = 0;
 	}
+	if (first && watch_selection) {
+		/* create fake window for our selection ownership, etc */
+		selwin = XCreateSimpleWindow(dpy, rootwin, 0, 0, 1, 1, 0, 0, 0);
+	}
+	if (first && vnc_connect) {
+		vnc_connect_str[0] = '\0';
+		vnc_connect_prop = XInternAtom(dpy, "VNC_CONNECT", False);
+	}
+	first = 0;
 
 	/*
 	 * There is a bug where we have to wait before sending text to
 	 * the client... so instead of sending right away we wait a
 	 * the few seconds.
 	 */
-	if (! sent_sel && time(0) > starttime + sel_waittime) {
+	if (have_clients && watch_selection && ! sent_sel
+	    && now > last_client + sel_waittime) {
 		if (XGetSelectionOwner(dpy, XA_PRIMARY) == None) {
 			cutbuffer_send();
 		}
 		sent_sel = 1;
 	}
 
-	/* check for CUT_BUFFER0 change: */
+	/* check for CUT_BUFFER0 and VNC_CONNECT changes: */
 	if (XCheckTypedEvent(dpy, PropertyNotify, &xev)) {
-		if (xev.type == PropertyNotify &&
-		    xev.xproperty.atom == XA_CUT_BUFFER0) {
+		if (xev.type == PropertyNotify) {
+			if (xev.xproperty.atom == XA_CUT_BUFFER0) {
+				/*
+				 * Go retrieve CUT_BUFFER0 and send it.
+				 *
+				 * set_cutbuffer is a flag to try to avoid
+				 * processing our own cutbuffer changes.
+				 */
+				if (have_clients && watch_selection
+				    && ! set_cutbuffer) {
+					cutbuffer_send();
+					sent_sel = 1;
+				}
+				set_cutbuffer = 0;
+			} else if (vnc_connect && vnc_connect_prop != None
+		    	    && xev.xproperty.atom == vnc_connect_prop) {
 	
-			/*
-			 * Go retrieve CUT_BUFFER0 and send it.
-			 *
-			 * set_cutbuffer is a flag to try to avoid processing
-			 * our own cutbuffer changes.
-			 */
-			if (! set_cutbuffer) {
-				cutbuffer_send();
-				sent_sel = 1;
+				/*
+				 * Go retrieve VNC_CONNECT string.
+				 */
+				read_vnc_connect_prop();
 			}
-			set_cutbuffer = 0;
 		}
+	}
+
+	if (! have_clients || ! watch_selection) {
+		/*
+		 * no need to monitor selections if no current clients
+		 * or -nosel.
+		 */
+		X_UNLOCK;
+		return;
 	}
 
 	/* check for our PRIMARY request notification: */
@@ -1194,20 +1594,20 @@ void watch_selection_event() {
 			    xev.xselection.target == XA_STRING) {
 
 				/* go retrieve PRIMARY and check it */
-				if (sent_sel ||
-				    time(0) > starttime + sel_waittime) {
+				if (now > last_client + sel_waittime
+				    || sent_sel) {
 					selection_send(&xev);
 				}
 			}
 		}
-		if (time(0) > last_request + 1) {
+		if (now > last_request + 1) {
 			/*
 			 * Every second or two, request PRIMARY, unless we
 			 * already own it or there is no owner.
 			 * TODO: even at this low rate we should look into
 			 * and performance problems in odds cases, etc.
 			 */
-			last_request = time(0);
+			last_request = now;
 			if (! own_selection &&
 			    XGetSelectionOwner(dpy, XA_PRIMARY) != None) {
 				XConvertSelection(dpy, XA_PRIMARY, XA_STRING,
@@ -3588,13 +3988,12 @@ void watch_loop(void) {
 			clean_up_exit(0);
 		}
 
+		watch_xevents();
+		check_connect_inputs();		
+
 		if (! screen->rfbClientHead) {	/* waiting for a client */
 			usleep(200 * 1000);
 			continue;
-		}
-
-		if (watch_selection) {
-			watch_selection_event();
 		}
 
 		if (nofb) {	/* no framebuffer polling needed */
@@ -3694,7 +4093,6 @@ int check_user_input(double dt, int *cnt) {
 		 * likely they have all be sent already.
 		 */
 		while (1) {
-			//rfbProcessEvents(screen, 1000);
 			rfbCheckFds(screen, 1000);
 			XFlush(dpy);
 
@@ -3754,7 +4152,6 @@ int check_user_input(double dt, int *cnt) {
 			miss = 0;
 			for (i=0; i<split; i++) {
 				usleep(ms * 1000);
-				//rfbProcessEvents(screen, 1000);
 				rfbCheckFds(screen, 1000);
 				spin += dtime(&tm);
 				if (got_pointer_input > g) {
@@ -3822,6 +4219,12 @@ void print_help() {
 "-shared                VNC display is shared (default %s).\n"
 "-forever               Keep listening for more connections rather than exiting\n"
 "                       as soon as the first client(s) disconnect. Same as -many\n"
+"-connect string        For use with \"vncviewer -listen\" reverse connections. If\n"
+"                       string has the form \"host\" or \"host:port\" the connection\n"
+"                       is made once at startup. Use commas for a list. If string\n"
+"                       contains \"/\" it is a file to periodically check for new\n"
+"                       hosts. The first line is read and then file is truncated.\n"
+"-vncconnect            Monitor the VNC_CONNECT X property set by vncconnect(1).\n"
 "-allow addr1[,addr2..] Only allow client connections from IP addresses matching\n"
 "                       the comma separated list of numerical addresses. Can be\n"
 "                       a prefix, e.g. \"192.168.100.\" to match a simple subnet,\n"
@@ -3845,10 +4248,13 @@ void print_help() {
 "-modtweak              Handle AltGr/Shift modifiers for differing languages\n"
 "                       between client and host (default %s).\n"
 "-nomodtweak            Send the keysym directly to the X server.\n"
+"-remap file            Read keysym remappings from file.  Format is one pair\n"
+"                       of keysyms per line (can be string or the hex value).\n"
 "-nobell                Do not watch for XBell events.\n"
 "-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
 "-nosel                 Do not manage exchange of X selection/cutbuffer.\n"
-"-noprimary             Exchange X cutbuffer changes but not PRIMARY selection.\n"
+"-noprimary             Do not poll the PRIMARY selection for changes and send\n"
+"                       back to clients.  PRIMARY is set for received changes.\n"
 "\n"
 "-nocursor              Do not have the viewer show a local cursor.\n"
 "-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
@@ -3865,6 +4271,8 @@ void print_help() {
 "                       read n user input events before scanning display. n < 0\n"
 "                       means to act as though there is always user input.\n"
 "-old_copytile          Do not use the new copy_tiles() framebuffer mechanism.\n"
+"-debug_pointer         Print debugging output for every pointer event.\n"
+"-debug_keyboard        Print debugging output for every keyboard event.\n"
 "\n"
 "-defer time            Time in ms to wait for updates before sending to\n"
 "                       client [rfbDeferUpdateTime]  (default %d).\n"
@@ -3959,6 +4367,7 @@ int main(int argc, char** argv) {
 	int i, op, ev, er, maj, min;
 	char *use_dpy = NULL;
 	char *visual_str = NULL;
+	int pw_loc = -1;
 	int dt = 0;
 	int bg = 0;
 	int got_waitms = 0;
@@ -3996,6 +4405,15 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(argv[i], "-many")
 		    || !strcmp(argv[i], "-forever")) {
 			connect_once = 0;
+		} else if (!strcmp(argv[i], "-connect")) {
+			i++;
+			if (strchr(argv[i], '/')) {
+				client_connect_file = argv[i];
+			} else {
+				client_connect = strdup(argv[i]);
+			}
+		} else if (!strcmp(argv[i], "-vncconnect")) {
+			vnc_connect = 1;
 		} else if (!strcmp(argv[i], "-inetd")) {
 			inetd = 1;
 		} else if (!strcmp(argv[i], "-noshm")) {
@@ -4006,6 +4424,8 @@ int main(int argc, char** argv) {
 			use_modifier_tweak = 1;
 		} else if (!strcmp(argv[i], "-nomodtweak")) {
 			use_modifier_tweak = 0;
+		} else if (!strcmp(argv[i], "-remap")) {
+			remap_file = argv[++i];
 		} else if (!strcmp(argv[i], "-nobell")) {
 			watch_bell = 0;
 		} else if (!strcmp(argv[i], "-nofb")) {
@@ -4036,6 +4456,10 @@ int main(int argc, char** argv) {
 			old_pointer = 1;
 		} else if (!strcmp(argv[i], "-old_copytile")) {
 			single_copytile = 1;
+		} else if (!strcmp(argv[i], "-debug_pointer")) {
+			debug_pointer++;
+		} else if (!strcmp(argv[i], "-debug_keyboard")) {
+			debug_keyboard++;
 		} else if (!strcmp(argv[i], "-defer")) {
 			defer_update = atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "-wait")) {
@@ -4074,13 +4498,33 @@ int main(int argc, char** argv) {
 			if (!strcmp(argv[i], "-desktop")) {
 				dt = 1;
 			}
+			if (!strcmp(argv[i], "-passwd")) {
+				pw_loc = i;
+			}
 			/* otherwise copy it for use below. */
-			if (! quiet) {
+			if (! quiet && i != pw_loc && i != pw_loc+1) {
 			    fprintf(stderr, "passing arg to libvncserver: %s\n",
 				argv[i]);
 			}
 			if (argc2 < 100) {
-				argv2[argc2++] = argv[i];
+				argv2[argc2++] = strdup(argv[i]);
+			}
+		}
+	}
+
+	/*
+	 * If -passwd was used, clear it out of argv.  This does not
+	 * work on all UNIX, have to use execvp() in general...
+	 */
+	if (pw_loc > 0) {
+		char *p = argv[pw_loc];		
+		while (*p != '\0') {
+			*p++ = '\0';
+		}
+		if (pw_loc+1 < argc) {
+			p = argv[pw_loc+1];		
+			while (*p != '\0') {
+				*p++ = '\0';
 			}
 		}
 	}
@@ -4312,7 +4756,10 @@ int main(int argc, char** argv) {
 	set_signals();
 
 	if (use_modifier_tweak) {
-		initialize_keycodes();
+		initialize_modtweak();
+	}
+	if (remap_file != NULL) {
+		initialize_remap(remap_file);
 	}
 
 	if (screen->rfbPort) {
