@@ -2,6 +2,7 @@
 	* -cursorpos now the default; make cursorpos work when scaling
 	* fix bug with multiple adds of the same keysym for -add_keysyms
 	* rewhack -help output again
+	* adjust version number and output.
 
 2004-07-28  Karl Runge <runge@karlrunge.com>
 	* -add_keysyms dynamically add missing keysyms to X server

@@ -155,8 +155,8 @@
 #include <X11/extensions/Xinerama.h>
 #endif
 
-/*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-07-31";
+/*               date +'lastmod: %Y-%m-%d' */
+char lastmod[] = "0.6.2 lastmod: 2004-07-31";
 
 /* X display info */
 Display *dpy = 0;
@@ -7768,7 +7768,7 @@ static void watch_loop(void) {
 static void print_help(void) {
 	char help[] = 
 "\n"
-"x11vnc: allow VNC connections to real X11 displays.  %s\n"
+"x11vnc: allow VNC connections to real X11 displays. %s\n"
 "\n"
 "Typical usage is:\n"
 "\n"
@@ -8966,7 +8966,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "gaps_fill:  %d\n", gaps_fill);
 		fprintf(stderr, "grow_fill:  %d\n", grow_fill);
 		fprintf(stderr, "tile_fuzz:  %d\n", tile_fuzz);
-		fprintf(stderr, "%s\n", lastmod);
+		fprintf(stderr, "version: %s\n", lastmod);
 	} else {
 		rfbLogEnable(0);
 	}
