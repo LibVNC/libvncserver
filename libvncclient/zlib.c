@@ -60,7 +60,7 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   if (!ReadFromRFBServer(client, (char *)&hdr, sz_rfbZlibHeader))
     return FALSE;
 
-  remaining = Swap32IfLE(hdr.nBytes);
+  remaining = rfbClientSwap32IfLE(hdr.nBytes);
 
   /* Need to initialize the decompressor state. */
   decompStream.next_in   = ( Bytef * )client->buffer;
@@ -75,7 +75,7 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     inflateResult = inflateInit( &decompStream );
 
     if ( inflateResult != Z_OK ) {
-      fprintf(stderr,
+      rfbClientLog(
               "inflateInit returned error: %d, msg: %s\n",
               inflateResult,
               decompStream.msg);
@@ -113,11 +113,11 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
     /* We never supply a dictionary for compression. */
     if ( inflateResult == Z_NEED_DICT ) {
-      fprintf(stderr,"zlib inflate needs a dictionary!\n");
+      rfbClientLog("zlib inflate needs a dictionary!\n");
       return FALSE;
     }
     if ( inflateResult < 0 ) {
-      fprintf(stderr,
+      rfbClientLog(
               "zlib inflate returned error: %d, msg: %s\n",
               inflateResult,
               decompStream.msg);
@@ -129,7 +129,7 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
      */
     if (( decompStream.avail_in > 0 ) &&
         ( decompStream.avail_out <= 0 )) {
-      fprintf(stderr,"zlib inflate ran out of space!\n");
+      rfbClientLog("zlib inflate ran out of space!\n");
       return FALSE;
     }
 
@@ -144,7 +144,7 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   }
   else {
 
-    fprintf(stderr,
+    rfbClientLog(
             "zlib inflate returned error: %d, msg: %s\n",
             inflateResult,
             decompStream.msg);

@@ -63,7 +63,7 @@ void output(rfbScreenInfoPtr s,char* line)
 {
    rfbDoCopyRect(s,0,0,640,480-lineHeight,0,-lineHeight);
    rfbDrawString(s,&default8x16Font,10,lineY,line,0x01);
-   fprintf(stderr,"%s\n",line);
+   rfbLog("%s\n",line);
 }
 
 void dokey(Bool down,KeySym k,rfbClientPtr cl)

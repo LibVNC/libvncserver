@@ -39,6 +39,10 @@
 #include <rdr/FdInStream.h>
 #include <rdr/Exception.h>
 
+extern "C" {
+  extern void rfbLog(const char *format, ...);
+}
+
 using namespace rdr;
 
 enum { DEFAULT_BUF_SIZE = 8192,
@@ -136,7 +140,7 @@ int FdInStream::checkReadable(int fd, int timeout)
     int n = select(fd+1, &rfds, 0, 0, &tv);
     if (n != -1 || errno != EINTR)
       return n;
-    fprintf(stderr,"select returned EINTR\n");
+    rfbLog("select returned EINTR\n");
   }
 }
 
@@ -184,7 +188,7 @@ int FdInStream::readWithTimeoutOrCallback(void* buf, int len)
     n = ::read(fd, buf, len);
     if (n != -1 || errno != EINTR)
       break;
-    fprintf(stderr,"read returned EINTR\n");
+    rfbLog("read returned EINTR\n");
   }
 
   if (n < 0) throw SystemException("read",errno);
@@ -192,17 +196,17 @@ int FdInStream::readWithTimeoutOrCallback(void* buf, int len)
 
   if (timing) {
     gettimeofday(&after, 0);
-//      fprintf(stderr,"%d.%06d\n",(after.tv_sec - before.tv_sec),
+//      rfbLog("%d.%06d\n",(after.tv_sec - before.tv_sec),
 //              (after.tv_usec - before.tv_usec));
     int newTimeWaited = ((after.tv_sec - before.tv_sec) * 10000 +
                          (after.tv_usec - before.tv_usec) / 100);
     int newKbits = n * 8 / 1000;
 
 //      if (newTimeWaited == 0) {
-//        fprintf(stderr,"new kbps infinite t %d k %d\n",
+//        rfbLog("new kbps infinite t %d k %d\n",
 //                newTimeWaited, newKbits);
 //      } else {
-//        fprintf(stderr,"new kbps %d t %d k %d\n",
+//        rfbLog("new kbps %d t %d k %d\n",
 //                newKbits * 10000 / newTimeWaited, newTimeWaited, newKbits);
 //      }
 

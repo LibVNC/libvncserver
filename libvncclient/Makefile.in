@@ -82,36 +82,38 @@ X_PRE_LIBS = @X_PRE_LIBS@
 am__include = @am__include@
 am__quote = @am__quote@
 install_sh = @install_sh@
-CFLAGS = -I ..
-LDADD = ../libvncserver.a
+CFLAGS = -g -I.. -I. -Wall
 
-noinst_PROGRAMS = zippy
+libvncclient_a_SOURCES = cursor.c listen.c rfbproto.c sockets.c vncviewer.c
 
-@HAVE_X_TRUE@bin_PROGRAMS = x11vnc
-@HAVE_X_TRUE@x11vnc_SOURCES = x11vnc.c
-@HAVE_X_TRUE@INCLUDES = @X_CFLAGS@
-@HAVE_X_TRUE@x11vnc_LDADD = @X_LIBS@ $(LDADD)
+EXTRA_DIST = corre.c hextile.c rre.c tight.c zlib.c
 
-zippy_SOURCES = zippy.c
-subdir = contrib
+lib_LIBRARIES = libvncclient.a
+
+client_test_SOURCES = client_test.c
+
+noinst_PROGRAMS = client_test
+
+#client_test_LDADD=libvncclient.a ../libvncserver.a
+client_test_LDADD = libvncclient.a
+subdir = libvncclient
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/rfb/rfbconfig.h
 CONFIG_CLEAN_FILES =
-@HAVE_X_TRUE@bin_PROGRAMS = x11vnc$(EXEEXT)
-@HAVE_X_FALSE@bin_PROGRAMS =
-noinst_PROGRAMS = zippy$(EXEEXT)
-PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
+LIBRARIES = $(lib_LIBRARIES)
 
-@HAVE_X_TRUE@am_x11vnc_OBJECTS = x11vnc.$(OBJEXT)
-x11vnc_OBJECTS = $(am_x11vnc_OBJECTS)
-@HAVE_X_TRUE@x11vnc_DEPENDENCIES = ../libvncserver.a
-@HAVE_X_FALSE@x11vnc_DEPENDENCIES =
-x11vnc_LDFLAGS =
-am_zippy_OBJECTS = zippy.$(OBJEXT)
-zippy_OBJECTS = $(am_zippy_OBJECTS)
-zippy_LDADD = $(LDADD)
-zippy_DEPENDENCIES = ../libvncserver.a
-zippy_LDFLAGS =
+libvncclient_a_AR = $(AR) cru
+libvncclient_a_LIBADD =
+am_libvncclient_a_OBJECTS = cursor.$(OBJEXT) listen.$(OBJEXT) \
+	rfbproto.$(OBJEXT) sockets.$(OBJEXT) vncviewer.$(OBJEXT)
+libvncclient_a_OBJECTS = $(am_libvncclient_a_OBJECTS)
+noinst_PROGRAMS = client_test$(EXEEXT)
+PROGRAMS = $(noinst_PROGRAMS)
+
+am_client_test_OBJECTS = client_test.$(OBJEXT)
+client_test_OBJECTS = $(am_client_test_OBJECTS)
+client_test_DEPENDENCIES = libvncclient.a
+client_test_LDFLAGS =
 
 DEFS = @DEFS@
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)/rfb
@@ -120,13 +122,15 @@ LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/x11vnc.Po ./$(DEPDIR)/zippy.Po
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/client_test.Po ./$(DEPDIR)/cursor.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/listen.Po ./$(DEPDIR)/rfbproto.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/sockets.Po ./$(DEPDIR)/vncviewer.Po
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-DIST_SOURCES = $(x11vnc_SOURCES) $(zippy_SOURCES)
-DIST_COMMON = ChangeLog Makefile.am Makefile.in
-SOURCES = $(x11vnc_SOURCES) $(zippy_SOURCES)
+DIST_SOURCES = $(libvncclient_a_SOURCES) $(client_test_SOURCES)
+DIST_COMMON = Makefile.am Makefile.in
+SOURCES = $(libvncclient_a_SOURCES) $(client_test_SOURCES)
 
 all: all-am
 
@@ -134,42 +138,51 @@ all: all-am
 .SUFFIXES: .c .o .obj
 $(srcdir)/Makefile.in:  Makefile.am  $(top_srcdir)/configure.ac $(ACLOCAL_M4)
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  contrib/Makefile
+	  $(AUTOMAKE) --gnu  libvncclient/Makefile
 Makefile:  $(srcdir)/Makefile.in  $(top_builddir)/config.status
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)
-binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
-install-binPROGRAMS: $(bin_PROGRAMS)
+
+AR = ar
+libLIBRARIES_INSTALL = $(INSTALL_DATA)
+install-libLIBRARIES: $(lib_LIBRARIES)
 	@$(NORMAL_INSTALL)
-	$(mkinstalldirs) $(DESTDIR)$(bindir)
-	@list='$(bin_PROGRAMS)'; for p in $$list; do \
-	  p1=`echo $$p|sed 's/$(EXEEXT)$$//'`; \
-	  if test -f $$p \
-	  ; then \
-	    f=`echo "$$p1" | sed 's,^.*/,,;$(transform);s/$$/$(EXEEXT)/'`; \
-	   echo " $(INSTALL_PROGRAM_ENV) $(binPROGRAMS_INSTALL) $$p $(DESTDIR)$(bindir)/$$f"; \
-	   $(INSTALL_PROGRAM_ENV) $(binPROGRAMS_INSTALL) $$p $(DESTDIR)$(bindir)/$$f; \
+	$(mkinstalldirs) $(DESTDIR)$(libdir)
+	@list='$(lib_LIBRARIES)'; for p in $$list; do \
+	  if test -f $$p; then \
+	    f="`echo $$p | sed -e 's|^.*/||'`"; \
+	    echo " $(libLIBRARIES_INSTALL) $$p $(DESTDIR)$(libdir)/$$f"; \
+	    $(libLIBRARIES_INSTALL) $$p $(DESTDIR)$(libdir)/$$f; \
+	  else :; fi; \
+	done
+	@$(POST_INSTALL)
+	@list='$(lib_LIBRARIES)'; for p in $$list; do \
+	  if test -f $$p; then \
+	    p="`echo $$p | sed -e 's|^.*/||'`"; \
+	    echo " $(RANLIB) $(DESTDIR)$(libdir)/$$p"; \
+	    $(RANLIB) $(DESTDIR)$(libdir)/$$p; \
 	  else :; fi; \
 	done
 
-uninstall-binPROGRAMS:
+uninstall-libLIBRARIES:
 	@$(NORMAL_UNINSTALL)
-	@list='$(bin_PROGRAMS)'; for p in $$list; do \
-	  f=`echo "$$p" | sed 's,^.*/,,;s/$(EXEEXT)$$//;$(transform);s/$$/$(EXEEXT)/'`; \
-	  echo " rm -f $(DESTDIR)$(bindir)/$$f"; \
-	  rm -f $(DESTDIR)$(bindir)/$$f; \
+	@list='$(lib_LIBRARIES)'; for p in $$list; do \
+	  p="`echo $$p | sed -e 's|^.*/||'`"; \
+	  echo " rm -f $(DESTDIR)$(libdir)/$$p"; \
+	  rm -f $(DESTDIR)$(libdir)/$$p; \
 	done
 
-clean-binPROGRAMS:
-	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+clean-libLIBRARIES:
+	-test -z "$(lib_LIBRARIES)" || rm -f $(lib_LIBRARIES)
+libvncclient.a: $(libvncclient_a_OBJECTS) $(libvncclient_a_DEPENDENCIES) 
+	-rm -f libvncclient.a
+	$(libvncclient_a_AR) libvncclient.a $(libvncclient_a_OBJECTS) $(libvncclient_a_LIBADD)
+	$(RANLIB) libvncclient.a
 
 clean-noinstPROGRAMS:
 	-test -z "$(noinst_PROGRAMS)" || rm -f $(noinst_PROGRAMS)
-x11vnc$(EXEEXT): $(x11vnc_OBJECTS) $(x11vnc_DEPENDENCIES) 
-	@rm -f x11vnc$(EXEEXT)
-	$(LINK) $(x11vnc_LDFLAGS) $(x11vnc_OBJECTS) $(x11vnc_LDADD) $(LIBS)
-zippy$(EXEEXT): $(zippy_OBJECTS) $(zippy_DEPENDENCIES) 
-	@rm -f zippy$(EXEEXT)
-	$(LINK) $(zippy_LDFLAGS) $(zippy_OBJECTS) $(zippy_LDADD) $(LIBS)
+client_test$(EXEEXT): $(client_test_OBJECTS) $(client_test_DEPENDENCIES) 
+	@rm -f client_test$(EXEEXT)
+	$(LINK) $(client_test_LDFLAGS) $(client_test_OBJECTS) $(client_test_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT) core *.core
@@ -177,8 +190,12 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/x11vnc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zippy.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/client_test.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cursor.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/listen.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rfbproto.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sockets.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vncviewer.Po@am__quote@
 
 distclean-depend:
 	-rm -rf ./$(DEPDIR)
@@ -260,10 +277,10 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS)
+all-am: Makefile $(LIBRARIES) $(PROGRAMS)
 
 installdirs:
-	$(mkinstalldirs) $(DESTDIR)$(bindir)
+	$(mkinstalldirs) $(DESTDIR)$(libdir)
 
 install: install-am
 install-exec: install-exec-am
@@ -291,7 +308,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-binPROGRAMS clean-generic clean-noinstPROGRAMS \
+clean-am: clean-generic clean-libLIBRARIES clean-noinstPROGRAMS \
 	mostlyclean-am
 
 distclean: distclean-am
@@ -309,7 +326,7 @@ info-am:
 
 install-data-am:
 
-install-exec-am: install-binPROGRAMS
+install-exec-am: install-libLIBRARIES
 
 install-info: install-info-am
 
@@ -325,19 +342,24 @@ mostlyclean: mostlyclean-am
 
 mostlyclean-am: mostlyclean-compile mostlyclean-generic
 
-uninstall-am: uninstall-binPROGRAMS uninstall-info-am
+uninstall-am: uninstall-info-am uninstall-libLIBRARIES
 
-.PHONY: GTAGS all all-am check check-am clean clean-binPROGRAMS \
-	clean-generic clean-noinstPROGRAMS distclean distclean-compile \
-	distclean-depend distclean-generic distclean-tags distdir dvi \
-	dvi-am info info-am install install-am install-binPROGRAMS \
-	install-data install-data-am install-exec install-exec-am \
-	install-info install-info-am install-man install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
+.PHONY: GTAGS all all-am check check-am clean clean-generic \
+	clean-libLIBRARIES clean-noinstPROGRAMS distclean \
+	distclean-compile distclean-depend distclean-generic \
+	distclean-tags distdir dvi dvi-am info info-am install \
+	install-am install-data install-data-am install-exec \
+	install-exec-am install-info install-info-am \
+	install-libLIBRARIES install-man install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic tags uninstall uninstall-am \
-	uninstall-binPROGRAMS uninstall-info-am
+	uninstall-info-am uninstall-libLIBRARIES
 
+
+rfbproto.o: rfbproto.c corre.c hextile.c rre.c tight.c zlib.c
+
+$(libvncclient_a_OBJECTS): ../rfb/rfbclient.h
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

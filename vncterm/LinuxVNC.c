@@ -48,7 +48,7 @@ void do_key(Bool down,KeySym keySym,rfbClientPtr cl)
 
       if(keySym<0x100) {
 	int ret;
-	//fprintf(stderr,"do_key: %c (0x%lx)\n",(char)keySym,keySym);
+	//rfbLog("do_key: %c (0x%lx)\n",(char)keySym,keySym);
 	ret=ioctl(tty_inject_device,TIOCSTI,&keySym);
 	if(ret<0) {
 	  static char device[64];
@@ -57,7 +57,7 @@ void do_key(Bool down,KeySym keySym,rfbClientPtr cl)
 	  tty_inject_device=open(device,O_WRONLY);
 	  ret=ioctl(tty_inject_device,TIOCSTI,&keySym);
 	  if(ret<0)
-	    fprintf(stderr,"Couldn't reopen device %s!\n",device);
+	    rfbLog("Couldn't reopen device %s!\n",device);
 	}
       }
     }
@@ -88,7 +88,7 @@ int main(int argc,char **argv)
 
   if(argc>1) {
     if((tty=atoi(argv[1]))<1) {
-      fprintf(stderr,"Usage: %s [tty_number [vnc args]]\n",argv[0]);
+      rfbLog("Usage: %s [tty_number [vnc args]]\n",argv[0]);
       exit(1);
     } else {
       argv++;
@@ -100,10 +100,10 @@ int main(int argc,char **argv)
 
   sprintf(tty_device,"/dev/tty%d",tty);
   if((tty_inject_device=open(tty_device,O_WRONLY))<0) {
-    fprintf(stderr,"Couldn't open tty device %s!\n",tty_device);
+    rfbLog("Couldn't open tty device %s!\n",tty_device);
     exit(1);
   }
-  fprintf(stderr,"Using device %s.\n",tty_device);
+  rfbLog("Using device %s.\n",tty_device);
 
   if(ioctl(tty_inject_device,TIOCGWINSZ,&dimensions)>=0) {
     width=dimensions.ws_col;
@@ -142,7 +142,7 @@ int main(int argc,char **argv)
     if(!console->currentlyMarking) {
       tty_file=fopen(tty_device,"rb");
       if(!tty_file) {
-	fprintf(stderr,"cannot open device \"%s\"\n",
+	rfbLog("cannot open device \"%s\"\n",
 		tty_device);
 	exit(1);
       }
@@ -166,7 +166,7 @@ int main(int argc,char **argv)
 	    console->x=(i%console->width);
 	    console->y=(i/console->width);
 	    /*
-	      fprintf(stderr,"changes: %d,%d (%d!=%d || %d!=%d)\n",
+	      rfbLog("changes: %d,%d (%d!=%d || %d!=%d)\n",
 	      console->x,console->y,
 	      buffer[4+2*i],console->screenBuffer[i],
 	      buffer[5+2*i],console->attributeBuffer[i]);

@@ -68,7 +68,7 @@ int get_next_message(char* buffer,int len,single_instance_struct* str,int usecs)
     }
     buffer[reallen]=0;
 #ifdef DEBUG_1INSTANCE
-    if(reallen!=0) fprintf(stderr,"message received: %s.\n",buffer);
+    if(reallen!=0) rfbLog("message received: %s.\n",buffer);
 #endif
   }
 
@@ -104,7 +104,7 @@ void send_message(single_instance_struct* str,char* message)
 #endif
   write(str->fd,message,strlen(message));
 #ifdef DEBUG_1INSTANCE
-  fprintf(stderr,"send: %s => %d(%d)\n",message,i,strlen(message));
+  rfbLog("send: %s => %d(%d)\n",message,i,strlen(message));
 #endif
 }
 
@@ -118,7 +118,7 @@ single_instance_struct str1 = { "/tmp/1instance" };
 void my_dispatcher(char* message)
 {
 #ifdef DEBUG_1INSTANCE
-  fprintf(stderr,"Message arrived: %s.\n",message);
+  rfbLog("Message arrived: %s.\n",message);
 #endif
   if(!strcmp(message,"quit")) {
     delete_control_file(str1);

@@ -45,9 +45,9 @@ listenForIncomingConnections(rfbClient* client)
 
   if ((listenSocket < 0)) exit(1);
 
-  fprintf(stderr,"%s -listen: Listening on port %d\n",
+  rfbClientLog("%s -listen: Listening on port %d\n",
 	  client->programName,client->listenPort);
-  fprintf(stderr,"%s -listen: Command line errors are not reported until "
+  rfbClientLog("%s -listen: Command line errors are not reported until "
 	  "a connection comes in.\n", client->programName);
 
   while (TRUE) {

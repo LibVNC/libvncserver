@@ -1,7 +1,7 @@
 CFLAGS=-g
 
-SUBDIRS=. examples contrib vncterm classes
-DIST_SUBDIRS=examples contrib vncterm classes
+SUBDIRS=. examples contrib vncterm classes libvncclient test
+DIST_SUBDIRS=examples contrib vncterm classes libvncclient test
 
 bin_SCRIPTS = libvncserver-config
 

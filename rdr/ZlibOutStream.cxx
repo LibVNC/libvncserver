@@ -20,6 +20,10 @@
 #include <rdr/Exception.h>
 #include <zlib.h>
 
+extern "C" {
+  extern void rfbLog(const char *format, ...);
+}
+
 using namespace rdr;
 
 enum { DEFAULT_BUF_SIZE = 16384 };
@@ -65,7 +69,7 @@ void ZlibOutStream::flush()
   zs->next_in = start;
   zs->avail_in = ptr - start;
 
-//    fprintf(stderr,"zos flush: avail_in %d\n",zs->avail_in);
+//    rfbLog("zos flush: avail_in %d\n",zs->avail_in);
 
   while (zs->avail_in != 0) {
 
@@ -74,12 +78,12 @@ void ZlibOutStream::flush()
       zs->next_out = underlying->getptr();
       zs->avail_out = underlying->getend() - underlying->getptr();
 
-//        fprintf(stderr,"zos flush: calling deflate, avail_in %d, avail_out %d\n",
+//        rfbLog("zos flush: calling deflate, avail_in %d, avail_out %d\n",
 //                zs->avail_in,zs->avail_out);
       int rc = deflate(zs, Z_SYNC_FLUSH);
       if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
 
-//        fprintf(stderr,"zos flush: after deflate: %d bytes\n",
+//        rfbLog("zos flush: after deflate: %d bytes\n",
 //                zs->next_out-underlying->getptr());
 
       underlying->setptr(zs->next_out);
@@ -92,7 +96,7 @@ void ZlibOutStream::flush()
 
 int ZlibOutStream::overrun(int itemSize, int nItems)
 {
-//    fprintf(stderr,"ZlibOutStream overrun\n");
+//    rfbLog("ZlibOutStream overrun\n");
 
   if (itemSize > bufSize)
     throw Exception("ZlibOutStream overrun: max itemSize exceeded");
@@ -106,13 +110,13 @@ int ZlibOutStream::overrun(int itemSize, int nItems)
       zs->next_out = underlying->getptr();
       zs->avail_out = underlying->getend() - underlying->getptr();
 
-//        fprintf(stderr,"zos overrun: calling deflate, avail_in %d, avail_out %d\n",
+//        rfbLog("zos overrun: calling deflate, avail_in %d, avail_out %d\n",
 //                zs->avail_in,zs->avail_out);
 
       int rc = deflate(zs, 0);
       if (rc != Z_OK) throw Exception("ZlibOutStream: deflate failed");
 
-//        fprintf(stderr,"zos overrun: after deflate: %d bytes\n",
+//        rfbLog("zos overrun: after deflate: %d bytes\n",
 //                zs->next_out-underlying->getptr());
 
       underlying->setptr(zs->next_out);
@@ -126,7 +130,7 @@ int ZlibOutStream::overrun(int itemSize, int nItems)
     } else {
       // but didn't consume all the data?  try shifting what's left to the
       // start of the buffer.
-      fprintf(stderr,"z out buf not full, but in data not consumed\n");
+      rfbLog("z out buf not full, but in data not consumed\n");
       memmove(start, zs->next_in, ptr - zs->next_in);
       offset += zs->next_in - start;
       ptr -= zs->next_in - start;

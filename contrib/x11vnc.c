@@ -414,7 +414,7 @@ void initialize_keycodes() {
 
 void DebugXTestFakeKeyEvent(Display* dpy, KeyCode keysym, Bool down, time_t cur_time)
 {
-	fprintf(stderr,"XTestFakeKeyEvent(dpy,%s(0x%x),%s,CurrentTime)\n",
+	rfbLog("XTestFakeKeyEvent(dpy,%s(0x%x),%s,CurrentTime)\n",
 	    XKeysymToString(XKeycodeToKeysym(dpy,keysym,0)),keysym,
 	    down?"down":"up");
 	XTestFakeKeyEvent(dpy,keysym,down,cur_time);
@@ -500,7 +500,7 @@ static void keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
 
 	if (0) {
 		X_LOCK;
-		fprintf(stderr,"keyboard(%s,%s(0x%x),client)\n",
+		rfbLog("keyboard(%s,%s(0x%x),client)\n",
 		    down?"down":"up",XKeysymToString(keysym),(int)keysym);
 		X_UNLOCK;
 	}
@@ -1153,7 +1153,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	xim = XShmCreateImage(dpy, visual, bpp, ZPixmap, NULL, shm, w, h);
 
 	if (xim == NULL) {
-		fprintf(stderr, "XShmCreateImage(%s) failed.\n", name);
+		rfbLog( "XShmCreateImage(%s) failed.\n", name);
 		exit(1);
 	}
 
@@ -1163,7 +1163,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	    xim->bytes_per_line * xim->height, IPC_CREAT | 0777);
 
 	if (shm->shmid == -1) {
-		fprintf(stderr, "shmget(%s) failed.\n", name);
+		rfbLog("shmget(%s) failed.\n", name);
 		perror("shmget");
 		exit(1);
 	}
@@ -1171,7 +1171,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	shm->shmaddr = xim->data = (char *) shmat(shm->shmid, 0, 0);
 
 	if (shm->shmaddr == (char *)-1) {
-		fprintf(stderr, "shmat(%s) failed.\n", name);
+		rfbLog("shmat(%s) failed.\n", name);
 		perror("shmat");
 		exit(1);
 	}
@@ -1179,7 +1179,7 @@ void shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 	shm->readOnly = False;
 
 	if (! XShmAttach(dpy, shm)) {
-		fprintf(stderr, "XShmAttach(%s) failed.\n", name);
+		rfbLog("XShmAttach(%s) failed.\n", name);
 		exit(1);
 	}
 

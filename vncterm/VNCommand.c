@@ -35,7 +35,7 @@ int main(int argc, char **argv)
   if(programArg0<argc) {
     int in[2],out[2],err[2],pid;
     if(pipe(in)<0 || pipe(out)<0 || pipe(err)<0) {
-      fprintf(stderr,"Couldn't make pipes!");
+      rfbLog("Couldn't make pipes!");
       return(1);
     }
 
@@ -118,6 +118,6 @@ int main(int argc, char **argv)
       }
     }
   }
-  fprintf(stderr,"exit\n");
+  rfbLog("exit\n");
   return(0);
 }

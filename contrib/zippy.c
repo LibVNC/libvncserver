@@ -148,7 +148,7 @@ void on_key_press (Bool down,KeySym key,rfbClientPtr cl)
                 blank_framebuffer(cl->screen->frameBuffer, 0, 0, maxx, maxy);
                 rfbDrawString(cl->screen,&default8x16Font,20,maxy-20,"Hello, World!",0xffffff);
                 rfbMarkRectAsModified(cl->screen,0, 0,maxx,maxy);
-                fprintf (stderr, "Framebuffer blanked\n");
+                rfbLog("Framebuffer blanked\n");
                 break;
         case XK_p:
         case XK_P:
@@ -156,11 +156,11 @@ void on_key_press (Bool down,KeySym key,rfbClientPtr cl)
                 /* draw_primary_colors (cl->screen->frameBuffer, 0, 0, maxx, maxy); */
 		draw_primary_colours_generic_ultrafast (cl->screen, 0, 0, maxx, maxy);
                 rfbMarkRectAsModified(cl->screen,0, 0,maxx,maxy);
-                fprintf (stderr, "Primary colors displayed\n");
+                rfbLog("Primary colors displayed\n");
                 break;
         case XK_Q:
         case XK_q:
-                fprintf (stderr, "Exiting now\n");
+                rfbLog("Exiting now\n");
                 exit(0);
         case XK_C:
         case XK_c:
@@ -169,7 +169,7 @@ void on_key_press (Bool down,KeySym key,rfbClientPtr cl)
                 rfbMarkRectAsModified(cl->screen,0, 0,maxx,maxy);
                 break;
         default:
-                fprintf (stderr, "The %c key was pressed\n", (char) key);
+                rfbLog("The %c key was pressed\n", (char) key);
         }
 }
 

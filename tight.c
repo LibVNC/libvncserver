@@ -225,6 +225,8 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
     int x_best, y_best, w_best, h_best;
     char *fbptr;
 
+    rfbSendUpdateBuf(cl);
+
     compressLevel = cl->tightCompressLevel;
     qualityLevel = cl->tightQualityLevel;
 
@@ -952,8 +954,8 @@ static Bool SendCompressedData(cl, compressedLen)
         memcpy(&cl->updateBuf[cl->ublen], &tightAfterBuf[i], portionLen);
         cl->ublen += portionLen;
     }
-    portionLen = UPDATE_BUF_SIZE;
     cl->rfbBytesSent[rfbEncodingTight] += compressedLen;
+
     return TRUE;
 }
 

@@ -90,7 +90,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
-	    fprintf(stderr,"VNC server closed connection\n");
+	    rfbClientLog("VNC server closed connection\n");
 	  }
 	  return FALSE;
 	}
@@ -120,7 +120,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
-	    fprintf(stderr,"VNC server closed connection\n");
+	    rfbClientLog("VNC server closed connection\n");
 	  }
 	  return FALSE;
 	}
@@ -139,7 +139,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
  */
 
 Bool
-WriteExact(rfbClient* client, char *buf, int n)
+WriteToRFBServer(rfbClient* client, char *buf, int n)
 {
   fd_set fds;
   int i = 0;
@@ -163,7 +163,7 @@ WriteExact(rfbClient* client, char *buf, int n)
 	  return FALSE;
 	}
       } else {
-	fprintf(stderr,"write failed\n");
+	rfbClientLog("write failed\n");
 	return FALSE;
       }
     }
@@ -178,7 +178,7 @@ WriteExact(rfbClient* client, char *buf, int n)
  */
 
 int
-ConnectToTcpAddr(unsigned int host, int port)
+ConnectClientToTcpAddr(unsigned int host, int port)
 {
   int sock;
   struct sockaddr_in addr;
@@ -392,32 +392,32 @@ PrintInHex(char *buf, int len)
 
   str[16] = 0;
 
-  fprintf(stderr,"ReadExact: ");
+  rfbClientLog("ReadExact: ");
 
   for (i = 0; i < len; i++)
     {
       if ((i % 16 == 0) && (i != 0)) {
-	fprintf(stderr,"           ");
+	rfbClientLog("           ");
       }
       c = buf[i];
       str[i % 16] = (((c > 31) && (c < 127)) ? c : '.');
-      fprintf(stderr,"%02x ",(unsigned char)c);
+      rfbClientLog("%02x ",(unsigned char)c);
       if ((i % 4) == 3)
-	fprintf(stderr," ");
+	rfbClientLog(" ");
       if ((i % 16) == 15)
 	{
-	  fprintf(stderr,"%s\n",str);
+	  rfbClientLog("%s\n",str);
 	}
     }
   if ((i % 16) != 0)
     {
       for (j = i % 16; j < 16; j++)
 	{
-	  fprintf(stderr,"   ");
-	  if ((j % 4) == 3) fprintf(stderr," ");
+	  rfbClientLog("   ");
+	  if ((j % 4) == 3) rfbClientLog(" ");
 	}
       str[i % 16] = 0;
-      fprintf(stderr,"%s\n",str);
+      rfbClientLog("%s\n",str);
     }
 
   fflush(stderr);

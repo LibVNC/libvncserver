@@ -1214,16 +1214,17 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     fu->type = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
 	if(cl->screen->maxRectsPerUpdate>0
+	   /* Tight encoding counts the rectangles differently */
+	   && cl->preferredEncoding != rfbEncodingTight
 	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {
 	    sraRegion* newUpdateRegion = sraRgnBBox(updateRegion);
 	    sraRgnDestroy(updateRegion);
 	    updateRegion = newUpdateRegion;
 	    nUpdateRegionRects = sraRgnCountRects(updateRegion);
 	}
-
 	fu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
-					 nUpdateRegionRects +
-					 !!sendCursorShape + !!sendCursorPos));
+					   nUpdateRegionRects +
+					   !!sendCursorShape + !!sendCursorPos));
     } else {
 	fu->nRects = 0xFFFF;
     }

@@ -36,7 +36,7 @@ int main(int argc,char** argv)
 
   /* get width & height */
   sscanf(buffer,"%d %d",&width,&height);
-  fprintf(stderr,"Got width %d and height %d.\n",width,height);
+  rfbLog("Got width %d and height %d.\n",width,height);
   fgets(buffer,1024,in);
 
   /* vncviewers have problems with widths which are no multiple of 4. */

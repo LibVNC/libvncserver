@@ -19,7 +19,7 @@ int main(int argc,char** argv)
       for(i=0;i<300;i+=10)
 	rfbMarkRectAsModified(server,i,j,i+5,j+5);
 
-    rfbProcessEvents(server,50);
+    rfbProcessEvents(server,5000);
   }
   return(0);
 }

@@ -493,7 +493,7 @@ refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
       rfbClientPtr cl;
       int i;
       for(i=0,cl=rfbScreen->rfbClientHead;cl;cl=cl->next,i++)
-	fprintf(stderr,"%02d: %s\n",i,cl->host);
+	rfbLog("%02d: %s\n",i,cl->host);
     } else if(message[0]=='t') {
       rfbClientPtr cl;
       for(cl=rfbScreen->rfbClientHead;cl;cl=cl->next)
@@ -556,7 +556,7 @@ int main(int argc,char *argv[])
       send_message(&single_instance,message);
       exit(0);
     } else if(!strcmp(argv[i],"-listclients")) {
-      fprintf(stderr,"list clients\n");
+      rfbLog("list clients\n");
       send_message(&single_instance,"l");
       exit(0);
     } else

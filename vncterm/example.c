@@ -19,7 +19,7 @@ int main(int argc,char **argv)
     l=strlen(buffer)-1;
     while(l>=0 && buffer[l]=='\n')
       buffer[l]=0;
-    //fprintf(stderr,"%s (%d)",buffer,strlen(buffer));
+    //rfbLog("%s (%d)",buffer,strlen(buffer));
     if(!strcmp(buffer,"quit"))
       return(0);
     if(!strcmp(buffer,"s"))

@@ -52,7 +52,7 @@ void vcDrawCursor(vncConsolePtr c)
 {
   rfbDrawCursor(c->rfbScreen);
   if(c->cursorActive && !c->cursorIsDrawn && c->y<c->height && c->x<c->width) {
-    /* fprintf(stderr,"DrawCursor: %d,%d\n",c->x,c->y); */
+    /* rfbLog("DrawCursor: %d,%d\n",c->x,c->y); */
     vcDrawOrHideCursor(c);
   }
 }
@@ -63,7 +63,7 @@ void vcHideCursor(vncConsolePtr c)
   if(c->currentlyMarking)
     vcUnmark(c);
   if(c->cursorIsDrawn) {
-    /* fprintf(stderr,"HideCursor: %d,%d\n",c->x,c->y); */
+    /* rfbLog("HideCursor: %d,%d\n",c->x,c->y); */
     vcDrawOrHideCursor(c);
   }
 }
@@ -158,7 +158,7 @@ void vcScroll(vncConsolePtr c,int lineCount)
   if(lineCount==0)
     return;
 
-  /* fprintf(stderr,"begin scroll\n"); */
+  /* rfbLog("begin scroll\n"); */
   vcHideCursor(c);
   c->dontDrawCursor=TRUE;
 
@@ -197,7 +197,7 @@ void vcScroll(vncConsolePtr c,int lineCount)
   memset(c->attributeBuffer+y1/c->cHeight*c->width,0x07,
 	 (y2-y1)/c->cHeight*c->width);
 #endif
-  /* fprintf(stderr,"end scroll\n"); */
+  /* rfbLog("end scroll\n"); */
 }  
 
 void vcCheckCoordinates(vncConsolePtr c)
@@ -256,7 +256,7 @@ void vcPutCharColour(vncConsolePtr c,unsigned char ch,unsigned char foreColour,u
       } while(c->x%8);
       break;
     default:
-       fprintf(stderr,"putchar of unknown character: %c(%d).\n",ch,ch);
+       rfbLog("putchar of unknown character: %c(%d).\n",ch,ch);
       vcPutChar(c,' ');
     }
   } else {
@@ -420,7 +420,7 @@ void vcPtrAddEventProc(int buttonMask,int x,int y,rfbClientPtr cl)
       c->markEnd=pos;
       vcToggleMarkCell(c,pos);
     } else {
-      DEBUG(fprintf(stderr,"markStart: %d, markEnd: %d, pos: %d\n",
+      DEBUG(rfbLog("markStart: %d, markEnd: %d, pos: %d\n",
 	      c->markStart,c->markEnd,pos));
       if(c->markEnd!=pos) {
 	if(c->markEnd<pos) {

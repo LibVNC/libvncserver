@@ -122,6 +122,8 @@ AC_CONFIG_FILES([Makefile
                  examples/Makefile
 		 vncterm/Makefile
 		 classes/Makefile
+		 libvncclient/Makefile
+		 test/Makefile
 		 libvncserver.spec
 		 libvncserver-config])
 AC_OUTPUT

@@ -31,10 +31,10 @@
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
 
-#define Swap16IfLE(s) \
+#define rfbClientSwap16IfLE(s) \
     (*(char *)&client->endianTest ? ((((s) & 0xff) << 8) | (((s) >> 8) & 0xff)) : (s))
 
-#define Swap32IfLE(l) \
+#define rfbClientSwap32IfLE(l) \
     (*(char *)&client->endianTest ? ((((l) & 0xff000000) >> 24) | \
 			     (((l) & 0x00ff0000) >> 8)  | \
 			     (((l) & 0x0000ff00) << 8)  | \
@@ -92,7 +92,7 @@ struct _rfbClient;
 typedef Bool (*HandleCursorPosProc)(struct _rfbClient* client, int x, int y);
 typedef void (*SoftCursorLockAreaProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef void (*SoftCursorUnlockScreenProc)(struct _rfbClient* client);
-typedef void (*FramebufferUpdateReceivedProc)(struct _rfbClient* client, int x, int y, int w, int h);
+typedef void (*GotFrameBufferUpdateProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef char* (*GetPasswordProc)(struct _rfbClient* client);
 typedef Bool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*BellProc)(struct _rfbClient* client);
@@ -137,7 +137,7 @@ typedef struct _rfbClient {
 	HandleCursorPosProc HandleCursorPos;
 	SoftCursorLockAreaProc SoftCursorLockArea;
 	SoftCursorUnlockScreenProc SoftCursorUnlockScreen;
-	FramebufferUpdateReceivedProc FramebufferUpdateReceived;
+	GotFrameBufferUpdateProc GotFrameBufferUpdate;
 	GetPasswordProc GetPassword;
 	MallocFrameBufferProc MallocFrameBuffer;
 	BellProc Bell;
@@ -155,6 +155,8 @@ extern void listenForIncomingConnections(rfbClient* viewer);
 
 /* rfbproto.c */
 
+extern Bool rfbEnableClientLogging;
+extern void rfbClientLog(const char *format, ...);
 extern Bool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
 extern Bool InitialiseRFBConnection(rfbClient* client);
 extern Bool SetFormatAndEncodings(rfbClient* client);
@@ -174,13 +176,16 @@ extern void PrintPixelFormat(rfbPixelFormat *format);
 extern Bool errorMessageOnReadFailure;
 
 extern Bool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
-extern Bool WriteExact(rfbClient* client, char *buf, int n);
+extern Bool WriteToRFBServer(rfbClient* client, char *buf, int n);
 extern int FindFreeTcpPort(void);
 extern int ListenAtTcpPort(int port);
-extern int ConnectToTcpAddr(unsigned int host, int port);
+extern int ConnectClientToTcpAddr(unsigned int host, int port);
 extern int AcceptTcpConnection(int listenSock);
 extern Bool SetNonBlocking(int sock);
 
 extern Bool StringToIPAddr(const char *str, unsigned int *addr);
 extern Bool SameMachine(int sock);
 
+/* vncviewer.c */
+rfbClient* rfbGetClient(int* argc,char** argv,int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
+Bool rfbInitClient(rfbClient* client,const char* vncServerHost,int vncServerPort);

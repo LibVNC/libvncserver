@@ -105,7 +105,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     if ((comp_ctl & 1) && zlibStreamActive[stream_id]) {
       if (inflateEnd (&zlibStream[stream_id]) != Z_OK &&
 	  zlibStream[stream_id].msg != NULL)
-	fprintf(stderr, "inflateEnd: %s\n", zlibStream[stream_id].msg);
+	rfbClientLog("inflateEnd: %s\n", zlibStream[stream_id].msg);
       zlibStreamActive[stream_id] = FALSE;
     }
     comp_ctl >>= 1;
@@ -135,7 +135,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
 #if BPP == 8
   if (comp_ctl == rfbTightJpeg) {
-    fprintf(stderr, "Tight encoding: JPEG is not supported in 8 bpp mode.\n");
+    rfbClientLog("Tight encoding: JPEG is not supported in 8 bpp mode.\n");
     return FALSE;
   }
 #else
@@ -146,7 +146,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
   /* Quit on unsupported subencoding value. */
   if (comp_ctl > rfbTightMaxSubencoding) {
-    fprintf(stderr, "Tight encoding: bad subencoding value received.\n");
+    rfbClientLog("Tight encoding: bad subencoding value received.\n");
     return FALSE;
   }
 
@@ -174,7 +174,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
       bitsPixel = InitFilterGradientBPP(client, rw, rh);
       break;
     default:
-      fprintf(stderr, "Tight encoding: unknown filter code received.\n");
+      rfbClientLog("Tight encoding: unknown filter code received.\n");
       return FALSE;
     }
   } else {
@@ -182,7 +182,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     bitsPixel = InitFilterCopyBPP(client, rw, rh);
   }
   if (bitsPixel == 0) {
-    fprintf(stderr, "Tight encoding: error receiving palette.\n");
+    rfbClientLog("Tight encoding: error receiving palette.\n");
     return FALSE;
   }
 
@@ -203,7 +203,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   /* Read the length (1..3 bytes) of compressed data following. */
   compressedLen = (int)ReadCompactLen(client);
   if (compressedLen <= 0) {
-    fprintf(stderr, "Incorrect data received from the server.\n");
+    rfbClientLog("Incorrect data received from the server.\n");
     return FALSE;
   }
 
@@ -217,7 +217,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     err = inflateInit(zs);
     if (err != Z_OK) {
       if (zs->msg != NULL)
-	fprintf(stderr, "InflateInit error: %s.\n", zs->msg);
+	rfbClientLog("InflateInit error: %s.\n", zs->msg);
       return FALSE;
     }
     zlibStreamActive[stream_id] = TRUE;
@@ -229,7 +229,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   buffer2 = &client->buffer[bufferSize];
   if (rowSize > bufferSize) {
     /* Should be impossible when BUFFER_SIZE >= 16384 */
-    fprintf(stderr, "Internal error: incorrect buffer size.\n");
+    rfbClientLog("Internal error: incorrect buffer size.\n");
     return FALSE;
   }
 
@@ -259,9 +259,9 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	break;
       if (err != Z_OK && err != Z_STREAM_END) {
 	if (zs->msg != NULL) {
-	  fprintf(stderr, "Inflate error: %s.\n", zs->msg);
+	  rfbClientLog("Inflate error: %s.\n", zs->msg);
 	} else {
-	  fprintf(stderr, "Inflate error: %d.\n", err);
+	  rfbClientLog("Inflate error: %d.\n", err);
 	}
 	return FALSE;
       }
@@ -282,7 +282,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   }
 
   if (rowsProcessed != rh) {
-    fprintf(stderr, "Incorrect number of scan lines after decompression.\n");
+    rfbClientLog("Incorrect number of scan lines after decompression.\n");
     return FALSE;
   }
 
@@ -545,13 +545,13 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
 
   compressedLen = (int)ReadCompactLen(client);
   if (compressedLen <= 0) {
-    fprintf(stderr, "Incorrect data received from the server.\n");
+    rfbClientLog("Incorrect data received from the server.\n");
     return FALSE;
   }
 
   compressedData = malloc(compressedLen);
   if (compressedData == NULL) {
-    fprintf(stderr, "Memory allocation error.\n");
+    rfbClientLog("Memory allocation error.\n");
     return FALSE;
   }
 
@@ -571,7 +571,7 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
   jpeg_start_decompress(&cinfo);
   if (cinfo.output_width != w || cinfo.output_height != h ||
       cinfo.output_components != 3) {
-    fprintf(stderr, "Tight Encoding: Wrong JPEG data received.\n");
+    rfbClientLog("Tight Encoding: Wrong JPEG data received.\n");
     jpeg_destroy_decompress(&cinfo);
     free(compressedData);
     return FALSE;

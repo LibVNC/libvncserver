@@ -548,7 +548,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    INIT_MUTEX(logMutex);
 
    if(width&3)
-     fprintf(stderr,"WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
+     rfbLog("WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
 
    rfbScreen->autoPort=FALSE;
    rfbScreen->rfbClientHead=0;
@@ -816,7 +816,7 @@ void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground
        pthread_create(&listener_thread, NULL, listenerRun, rfbScreen);
     return;
 #else
-    fprintf(stderr,"Can't run in background, because I don't have PThreads!\n");
+    rfbLog("Can't run in background, because I don't have PThreads!\n");
     exit(-1);
 #endif
   }

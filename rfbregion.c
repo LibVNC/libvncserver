@@ -602,7 +602,6 @@ sraRegion *sraRgnBBox(const sraRegion *src) {
 	xmin=hcurr->start;
       if(hcurr->end>xmax)
 	xmax=hcurr->end;
-      fprintf(stderr,"%d,%d,%d,%d\n",hcurr->start,vcurr->start,hcurr->end,vcurr->end);
       hcurr = hcurr->_next;
     }
 
@@ -761,7 +760,7 @@ Bool sraRgnIteratorNext(sraRectangleIterator* i,sraRect* r)
   }
 
   if((i->ptrPos%4)!=2) {
-    fprintf(stderr,"sraRgnIteratorNext: offset is wrong (%d%%4!=2)\n",i->ptrPos);
+    rfbLog("sraRgnIteratorNext: offset is wrong (%d%%4!=2)\n",i->ptrPos);
     exit(-1);
   }
 

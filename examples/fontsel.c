@@ -54,7 +54,7 @@ int main(int argc,char** argv)
   rfbScreen = s;
   font=rfbLoadConsoleFont(DEFAULTFONT);
   if(!font) {
-    fprintf(stderr,"Couldn't find %s\n",DEFAULTFONT);
+    rfbLog("Couldn't find %s\n",DEFAULTFONT);
     exit(1);
   }
   
@@ -62,7 +62,7 @@ int main(int argc,char** argv)
     rfbProcessEvents(s,900000);
 
   i = rfbSelectBox(s,font,fontlist,10,20,200,300,0xffdfdf,0x602040,2,showFont);
-  fprintf(stderr,"Selection: %d: %s\n",i,(i>=0)?fontlist[i]:"cancelled");
+  rfbLog("Selection: %d: %s\n",i,(i>=0)?fontlist[i]:"cancelled");
 
   rfbFreeFont(font);
 
