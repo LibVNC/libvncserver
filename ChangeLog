@@ -1,3 +1,6 @@
+2003-10-26  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* released Version 0.6
+
 2003-09-11  Mark McLoughlin  <mark@skynet.ie>
 
 	* Makefile.in, */Makefile.in, aclocal.m4,

@@ -14,7 +14,7 @@ check for other headers or add files), you have to have a current
 (>2.50) version of autoconf. Also, you need automake.
 
 Then, just do
-	sh bootstrap.sh
+	sh autogen.sh && make
 in LibVNCServer's directory, and you should see plenty of output and
 finally have a complete build of LibVNCServer.
 
