@@ -1,0 +1,51 @@
+From Karl (x11vnc's father) on Apr 2, 2003:
+	
+New option -nocursor to not display the vncviewer local cursor if user
+does not want it (also caused some problems with older vncviewers)
+
+New option -mouse to show the position of the X server mouse (i.e. lagged
+from the user's vnc cursor position).  Also: -mouseX will try to show
+the a different cursor (X) when on the root background.
+
+New option -many to wait for more connections rather than exiting when
+the first client(s) disconnect.
+
+New option -flashcmap to try to follow installed colormaps under 8bpp
+indexed color as pointer is moved.
+
+New option -nap to watch for low activity and throttle down the polling
+rate.  Useful on shared machines to keep the load down.
+
+Experimental option -id <windowid> to show just that window and not
+the whole display.  Some remaining bugs and inconvenient behavior...
+(e.g. new toplevels can be unseen)
+
+Fixed bug on multi-headed machines where the screen number was being
+ignored in a number of places.
+
+Fixed bug wrt connect_once mode.  Now just refuses new clients unless
+shared rather than terminating all clients.
+
+Try to follow changing default colormap under 8bpp indexed color
+as color cells are added.
+
+Needed to pick up HAVE_LIBPTHREAD from autoconf.
+
+defined a select() macro for usleep() since usleep is not always thread
+safe.
+
+Catch and exit on errors in the shm setup work (XShmCreateImage, shmget,...)
+and moved the creation and removal work to separate utility functions.
+
+Added signal and X error handlers to try to clean out the shm objects
+before exiting on interrupt, etc.
+
+Improved performance a bit on the memcmp() in scan_display() by checking
+the whole line first.
+
+Added a workaround when threaded where libvncserver may disconnect too
+early if it does not hear from a client (a small heartbeat is sent).
+This may not be needed any longer.
+
+If -desktop has not been prescribed, try to choose a title based on DISPLAY
+and the hostname (and window name under -id).
