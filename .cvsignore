@@ -6,6 +6,7 @@ config.status
 config.log
 LibVNCServer.spec.in
 LibVNCServer.spec
+x11vnc.spec.in
 .deps
 aclocal.m4
 autom4te.cache
