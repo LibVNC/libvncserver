@@ -25,13 +25,11 @@ KeyCode keycodes[0x100],leftShiftCode,rightShiftCode,altGrCode;
 
 void init_keycodes()
 {
-  Display *dpy;
   KeySym key,*keymap;
   int i,j,minkey,maxkey,syms_per_keycode;
 
   memset(modifiers,-1,sizeof(modifiers));
 
-  dpy=XOpenDisplay("");
   XDisplayKeycodes(dpy,&minkey,&maxkey);
   keymap=XGetKeyboardMapping(dpy,minkey,(maxkey - minkey + 1),&syms_per_keycode);
 
@@ -227,6 +225,7 @@ int main(int argc,char** argv)
 
   for(i=argc-1;i>0;i--)
     if(i<argc-1 && strcmp(argv[i],"-display")==0) {
+      fprintf(stderr,"Using display %s\n",argv[i+1]);
       dpy = XOpenDisplay(argv[i+1]);
       if(dpy==0) {
 	fprintf(stderr,"Couldn't connect to display \"%s\".\n",argv[i+1]);
