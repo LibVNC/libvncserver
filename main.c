@@ -364,16 +364,32 @@ defaultKbdAddEvent(Bool down, KeySym keySym, rfbClientPtr cl)
 void
 defaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 {
-   if(x!=cl->screen->cursorX || y!=cl->screen->cursorY) {
-      if(cl->screen->cursorIsDrawn)
-	rfbUndrawCursor(cl->screen);
-      LOCK(cl->screen->cursorMutex);
-      if(!cl->screen->cursorIsDrawn) {
-	  cl->screen->cursorX = x;
-	  cl->screen->cursorY = y;
+  rfbClientIteratorPtr iterator;
+  rfbClientPtr other_client;
+
+  if (x != cl->screen->cursorX || y != cl->screen->cursorY) {
+    if (cl->screen->cursorIsDrawn)
+      rfbUndrawCursor(cl->screen);
+    LOCK(cl->screen->cursorMutex);
+    if (!cl->screen->cursorIsDrawn) {
+      cl->screen->cursorX = x;
+      cl->screen->cursorY = y;
+    }
+    UNLOCK(cl->screen->cursorMutex);
+
+    /* The cursor was moved by this client, so don't send CursorPos. */
+    if (cl->enableCursorPosUpdates)
+      cl->cursorWasMoved = FALSE;
+
+    /* But inform all remaining clients about this cursor movement. */
+    iterator = rfbGetClientIterator(cl->screen);
+    while ((other_client = rfbClientIteratorNext(iterator)) != NULL) {
+      if (other_client != cl && other_client->enableCursorPosUpdates) {
+	other_client->cursorWasMoved = TRUE;
       }
-      UNLOCK(cl->screen->cursorMutex);
-   }
+    }
+    rfbReleaseClientIterator(iterator);
+  }
 }
 
 void defaultSetXCutText(char* text, int len, rfbClientPtr cl)

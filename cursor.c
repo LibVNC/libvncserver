@@ -24,6 +24,8 @@
 
 #include "rfb.h"
 
+static unsigned char rfbReverseByte[0x100];
+
 /*
  * Send cursor shape either in X-style format or in client pixel format.
  */
@@ -73,8 +75,8 @@ rfbSendCursorShape(cl)
 	       sz_rfbFramebufferUpdateRectHeader);
 	cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-	cl->rfbCursorBytesSent += sz_rfbFramebufferUpdateRectHeader;
-	cl->rfbCursorUpdatesSent++;
+	cl->rfbCursorShapeBytesSent += sz_rfbFramebufferUpdateRectHeader;
+	cl->rfbCursorShapeUpdatesSent++;
 
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
@@ -163,8 +165,8 @@ rfbSendCursorShape(cl)
 
     /* Send everything we have prepared in the cl->updateBuf[]. */
 
-    cl->rfbCursorBytesSent += (cl->ublen - saved_ublen);
-    cl->rfbCursorUpdatesSent++;
+    cl->rfbCursorShapeBytesSent += (cl->ublen - saved_ublen);
+    cl->rfbCursorShapeUpdatesSent++;
 
     if (!rfbSendUpdateBuf(cl))
 	return FALSE;
@@ -172,8 +174,41 @@ rfbSendCursorShape(cl)
     return TRUE;
 }
 
+/*
+ * Send cursor position (PointerPos pseudo-encoding).
+ */
+
+Bool
+rfbSendCursorPos(rfbClientPtr cl)
+{
+  rfbFramebufferUpdateRectHeader rect;
+
+  if (cl->ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
+    if (!rfbSendUpdateBuf(cl))
+      return FALSE;
+  }
+
+  rect.encoding = Swap32IfLE(rfbEncodingPointerPos);
+  rect.r.x = Swap16IfLE(cl->screen->cursorX);
+  rect.r.y = Swap16IfLE(cl->screen->cursorY);
+  rect.r.w = 0;
+  rect.r.h = 0;
+
+  memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+	 sz_rfbFramebufferUpdateRectHeader);
+  cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+  cl->rfbCursorPosBytesSent += sz_rfbFramebufferUpdateRectHeader;
+  cl->rfbCursorPosUpdatesSent++;
+
+  if (!rfbSendUpdateBuf(cl))
+    return FALSE;
+
+  return TRUE;
+}
+
 /* conversion routine for predefined cursors in LSB order */
-unsigned char rfbReverseByte[0x100] = {
+static unsigned char rfbReverseByte[0x100] = {
   /* copied from Xvnc/lib/font/util/utilbitmap.c */
 	0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0,
 	0x10, 0x90, 0x50, 0xd0, 0x30, 0xb0, 0x70, 0xf0,
@@ -452,7 +487,7 @@ void rfbPrintXCursor(rfbCursorPtr cursor)
    }
 }
 
-extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
+void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
 {
   LOCK(rfbScreen->cursorMutex);
   while(rfbScreen->cursorIsDrawn) {

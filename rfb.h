@@ -483,8 +483,10 @@ typedef struct _rfbClientRec {
     int rfbRectanglesSent[MAX_ENCODINGS];
     int rfbLastRectMarkersSent;
     int rfbLastRectBytesSent;
-    int rfbCursorBytesSent;
-    int rfbCursorUpdatesSent;
+    int rfbCursorShapeBytesSent;
+    int rfbCursorShapeUpdatesSent;
+    int rfbCursorPosBytesSent;
+    int rfbCursorPosUpdatesSent;
     int rfbFramebufferUpdateMessagesSent;
     int rfbRawBytesEquivalent;
     int rfbKeyEventsRcvd;
@@ -506,8 +508,10 @@ typedef struct _rfbClientRec {
 
     Bool enableLastRectEncoding;   /* client supports LastRect encoding */
     Bool enableCursorShapeUpdates; /* client supports cursor shape updates */
+    Bool enableCursorPosUpdates;   /* client supports cursor position updates */
     Bool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
     Bool cursorWasChanged;         /* cursor shape update should be sent */
+    Bool cursorWasMoved;           /* cursor position update should be sent */
 
     Bool useNewFBSize;             /* client supports NewFBSize encoding */
     Bool newFBSizePending;         /* framebuffer size was changed */
@@ -545,6 +549,7 @@ typedef struct _rfbClientRec {
      ((!(cl)->enableCursorShapeUpdates && !(cl)->screen->cursorIsDrawn) || \
      ((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||         \
      ((cl)->useNewFBSize && (cl)->newFBSizePending) ||                     \
+     ((cl)->enableCursorPosUpdates && (cl)->cursorWasMoved) ||             \
      !sraRgnEmpty((cl)->copyRegion) || !sraRgnEmpty((cl)->modifiedRegion))
 
 /*
@@ -705,7 +710,7 @@ typedef struct rfbCursor {
 } rfbCursor, *rfbCursorPtr;
 
 extern Bool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);
-extern unsigned char rfbReverseByte[0x100];
+extern Bool rfbSendCursorPos(rfbClientPtr cl);
 extern void rfbConvertLSBCursorBitmapOrMask(int width,int height,unsigned char* bitmap);
 extern rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskString);
 extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
