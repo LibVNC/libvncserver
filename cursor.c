@@ -42,6 +42,7 @@ rfbSendCursorShape(cl)
     CARD8 bitmapByte;
 
     pCursor = cl->screen->getCursorPtr(cl);
+    if(!pCursor) return TRUE;
 
     if (cl->useRichCursorEncoding) {
        if(!pCursor->richSource)
