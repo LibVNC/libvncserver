@@ -114,6 +114,7 @@ Screen
 	--
 	visual:
 	flashcmap
+	shiftcmap:
 	notruecolor
 	--
 	clip:

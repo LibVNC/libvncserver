@@ -45,11 +45,13 @@ HAVE_X="false"
 AC_PATH_XTRA
 AH_TEMPLATE(HAVE_XSHM, [MIT-SHM extension build environment present])
 AH_TEMPLATE(HAVE_XTEST, [XTEST extension build environment present])
+AH_TEMPLATE(HAVE_XTESTGRABCONTROL, [XTEST extension has XTestGrabControl])
 AH_TEMPLATE(HAVE_XKEYBOARD, [XKEYBOARD extension build environment present])
 AH_TEMPLATE(HAVE_LIBXINERAMA, [XINERAMA extension build environment present])
 AH_TEMPLATE(HAVE_LIBXRANDR, [XRANDR extension build environment present])
 AH_TEMPLATE(HAVE_LIBXFIXES, [XFIXES extension build environment present])
 AH_TEMPLATE(HAVE_LIBXDAMAGE, [XDAMAGE extension build environment present])
+AH_TEMPLATE(HAVE_LIBXTRAP, [DEC-XTRAP extension build environment present])
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 	AC_CHECK_LIB(X11, XGetImage, HAVE_X="true",
 		HAVE_X="false",
@@ -62,10 +64,28 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			[AC_DEFINE(HAVE_XSHM)], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
+		AC_CHECK_LIB(Xtst, XTestGrabControl, 
+			X_PRELIBS="$X_PRELIBS -lXtst"
+			[AC_DEFINE(HAVE_XTESTGRABCONTROL) HAVE_XTESTGRABCONTROL="true"], ,
+			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
 		AC_CHECK_LIB(Xtst, XTestFakeKeyEvent, 
 			X_PRELIBS="$X_PRELIBS -lXtst"
 			[AC_DEFINE(HAVE_XTEST)], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		# we use XTRAP on X11R5, or user can set X11VNC_USE_XTRAP
+		if test ! -z "$X11VNC_USE_XTRAP" -o -z "$HAVE_XTESTGRABCONTROL"; then
+			AC_CHECK_LIB(XTrap, XETrapSetGrabServer, 
+				X_PRELIBS="$X_PRELIBS -lXTrap"
+				[AC_DEFINE(HAVE_LIBXTRAP)], ,
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+			# tru64 uses libXETrap.so
+			AC_CHECK_LIB(XETrap, XETrapSetGrabServer, 
+				X_PRELIBS="$X_PRELIBS -lXETrap"
+				[AC_DEFINE(HAVE_LIBXTRAP)], ,
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		fi
 
 		saved_CPPFLAGS="$CPPFLAGS"
 		CPPFLAGS="$CPPFLAGS $X_CFLAGS"

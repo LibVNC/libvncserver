@@ -1,3 +1,10 @@
+2005-04-03  Karl Runge <runge@karlrunge.com>
+	* try DEC-XTRAP on X11R5 if XTestGrabControl is missing.
+	* -shiftcmap n, for 8bpp displays using < 256 color cells
+	  and with pixel values shifted from zero.
+	* fix DAMAGE event leak after viewers disconnect.
+	* -http option to try to guess where the java viewer is.
+
 2005-03-29  Karl Runge <runge@karlrunge.com>
 	* build-time customizations X11VNC_SHARED, X11VNC_FOREVER,
 	  REMOTE_CONTROL, SMALL_FOOTPRINT for CPPFLAGS

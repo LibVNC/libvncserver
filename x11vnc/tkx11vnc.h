@@ -120,6 +120,7 @@
 "	--\n"
 "	visual:\n"
 "	flashcmap\n"
+"	shiftcmap:\n"
 "	notruecolor\n"
 "	--\n"
 "	clip:\n"

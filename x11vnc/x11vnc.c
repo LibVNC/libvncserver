@@ -165,6 +165,7 @@
 
 #define LIBVNCSERVER_HAVE_XSHM 1
 #define LIBVNCSERVER_HAVE_XTEST 1
+#define LIBVNCSERVER_HAVE_XTESTGRABCONTROL 1
 
 #define LIBVNCSERVER_HAVE_PWD_H 1
 #define LIBVNCSERVER_HAVE_SYS_WAIT_H 1
@@ -290,6 +291,7 @@
 #define LIBVNCSERVER_HAVE_PWD_H 0
 #define REMOTE_CONTROL 0
 #endif
+/****************************************************************************/
 
 
 /* Extensions and related includes: */
@@ -306,6 +308,16 @@
 #if LIBVNCSERVER_HAVE_XTEST
 #include <X11/extensions/XTest.h>
 #endif
+static int xtest_base_event_type = 0;
+
+#if LIBVNCSERVER_HAVE_LIBXTRAP
+#define NEED_EVENTS
+#define NEED_REPLIES
+#include <X11/extensions/xtraplib.h>
+#include <X11/extensions/xtraplibp.h>
+XETC *trap_ctx = NULL;
+#endif
+static int xtrap_base_event_type = 0;
 
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 #include <X11/XKBlib.h>
@@ -373,8 +385,9 @@ int overlay_present = 0;
  */
 #if LIBVNCSERVER_HAVE_LIBXRANDR
 #include <X11/extensions/Xrandr.h>
-static int xrandr_base_event_type = 0;
 #endif
+static int xrandr_base_event_type = 0;
+
 
 int xfixes_present = 0;
 int use_xfixes = 1;
@@ -383,29 +396,29 @@ int alpha_threshold = 240;
 double alpha_frac = 0.33;
 int alpha_remove = 0;
 int alpha_blend = 1;
-
 int alt_arrow = 1;
 
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 #include <X11/extensions/Xfixes.h>
-static int xfixes_base_event_type = 0;
 #endif
+static int xfixes_base_event_type = 0;
+
 
 int xdamage_present = 0;
 int use_xdamage = 1;	/* just use the xdamage rects. for scanline hints */
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 #include <X11/extensions/Xdamage.h>
-static int xdamage_base_event_type = 0;
 Damage xdamage = 0;
 #endif
+static int xdamage_base_event_type = 0;
 int xdamage_max_area = 20000;	/* pixels */
 double xdamage_memory = 1.0;	/* in units of NSCAN */
 int xdamage_tile_count;
 
-int hack_val = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2pre lastmod: 2005-03-29";
+char lastmod[] = "0.7.2pre lastmod: 2005-04-03";
+int hack_val = 0;
 
 /* X display info */
 
@@ -461,7 +474,7 @@ unsigned long  main_red_mask,  main_green_mask,  main_blue_mask;
 unsigned short main_red_max,   main_green_max,   main_blue_max;
 unsigned short main_red_shift, main_green_shift, main_blue_shift;
 
-/* we now have a struct with client specific data: */
+/* struct with client specific data: */
 #define RATE_SAMPLES 5
 #define CILEN 10
 typedef struct _ClientData {
@@ -559,8 +572,8 @@ int scanlines[NSCAN] = {
 	19,  3, 27, 11, 29, 13,  5, 21
 };
 
-/* function prototypes (see filename comment above) */
 
+/* function prototypes (see filename comment above) */
 int all_clients_initialized(void);
 void close_all_clients(void);
 void close_clients(char *);
@@ -606,8 +619,8 @@ void initialize_watch_bell(void);
 void initialize_xinerama(void);
 void initialize_xfixes(void);
 void initialize_xdamage(void);
-void create_xdamage(void);
-void destroy_xdamage(void);
+void create_xdamage_if_needed(void);
+void destroy_xdamage_if_needed(void);
 void initialize_xrandr(void);
 XImage *initialize_xdisplay_fb(void);
 
@@ -620,6 +633,7 @@ int XTestGrabControl_wr(Display*, Bool);
 Bool XTestCompareCurrentCursorWithWindow_wr(Display*, Window);
 Bool XTestCompareCursorWithWindow_wr(Display*, Window, Cursor);
 Bool XTestQueryExtension_wr(Display*, int*, int*, int*, int*);
+Bool XETrapQueryExtension_wr(Display*, int*, int*, int*);
 void XTestDiscard_wr(Display*);
 
 typedef struct hint {
@@ -698,6 +712,7 @@ void push_black_screen(int);
 void push_sleep(int);
 void refresh_screen(void);
 
+
 /* -- options.h -- */
 /* 
  * variables for the command line options
@@ -753,6 +768,7 @@ char *viewonly_passwd = NULL;	/* view only passwd. */
 int inetd = 0;			/* spawned from inetd(1) */
 int first_conn_timeout = 0;	/* -timeout */
 int flash_cmap = 0;		/* follow installed colormaps */
+int shift_cmap = 0;		/* ncells < 256 and needs shift of pixel values */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 int launch_gui = 0;		/* -gui */
 
@@ -801,7 +817,7 @@ char *remap_file = NULL;	/* -remap */
 char *pointer_remap = NULL;
 /* use the various ways of updating pointer */
 #ifndef POINTER_MODE_DEFAULT
-#define POINTER_MODE_DEFAULT 3
+#define POINTER_MODE_DEFAULT 2
 #endif
 #define POINTER_MODE_NOFB 2
 int pointer_mode = POINTER_MODE_DEFAULT;
@@ -850,6 +866,11 @@ int xshm_present = 0;
 int xtest_present = 1;
 #else
 int xtest_present = 0;
+#endif
+#if LIBVNCSERVER_HAVE_LIBXTRAP
+int xtrap_present = 1;
+#else
+int xtrap_present = 0;
 #endif
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 int xkb_present = 1;
@@ -2300,6 +2321,7 @@ void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 	XTestFakeKeyEvent(dpy, key, down, delay);
 #endif
 }
+/* XTRAP: XESimulateXEventRequest(tc, KeyPress, key, 0, 0, 0); */
 
 void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
     unsigned long delay) {
@@ -2310,6 +2332,7 @@ void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
     	XTestFakeButtonEvent(dpy, button, is_press, delay);
 #endif
 }
+/* XTRAP: XESimulateXEventRequest(tc, ButtonPress, button, 0, 0, 0); */
 
 void XTestFakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
     unsigned long delay) {
@@ -2320,6 +2343,7 @@ void XTestFakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
 	XTestFakeMotionEvent(dpy, screen, x, y, delay);
 #endif
 }
+/* XTRAP: XESimulateXEventRequest(tc, MotionNotify, 0, x, y, 0); */
 
 Bool XTestCompareCurrentCursorWithWindow_wr(Display* dpy, Window w) {
 	if (! xtest_present) {
@@ -2343,11 +2367,20 @@ Bool XTestCompareCursorWithWindow_wr(Display* dpy, Window w, Cursor cursor) {
 #endif
 }
 
+/* how to handle old tree for this w/o OLD_TREE? */
+#if 0
+#if LIBVNCSERVER_HAVE_XTEST
+#ifndef LIBVNCSERVER_HAVE_XTESTGRABCONTROL
+#define LIBVNCSERVER_HAVE_XTESTGRABCONTROL 1
+#endif
+#endif
+#endif
+
 int XTestGrabControl_wr(Display* dpy, Bool impervious) {
 	if (! xtest_present) {
 		return 0;
 	}
-#if LIBVNCSERVER_HAVE_XTEST
+#if LIBVNCSERVER_HAVE_XTEST && LIBVNCSERVER_HAVE_XTESTGRABCONTROL
 	return XTestGrabControl(dpy, impervious);
 #else
 	return 0;
@@ -2370,6 +2403,43 @@ void XTestDiscard_wr(Display *dpy) {
 #if LIBVNCSERVER_HAVE_XTEST
 	XTestDiscard(dpy);
 #endif
+}
+
+Bool XETrapQueryExtension_wr(Display *dpy, int *ev, int *er, int *op) {
+#if LIBVNCSERVER_HAVE_LIBXTRAP
+	return XETrapQueryExtension(dpy, (INT32 *)ev, (INT32 *)er,
+	    (INT32 *)op);
+#else
+	return False;
+#endif
+}
+
+void disable_grabserver(void) {
+#if LIBVNCSERVER_HAVE_XTEST && LIBVNCSERVER_HAVE_XTESTGRABCONTROL
+	if (XTestGrabControl_wr(dpy, True)) {
+		return;
+	}
+#endif
+#if LIBVNCSERVER_HAVE_LIBXTRAP
+	if (xtrap_present) {
+		ReqFlags requests;
+
+		trap_ctx = XECreateTC(dpy, 0, NULL);
+		if (! trap_ctx) {
+			rfbLog("DEC-XTRAP XECreateTC failed.  Watch out for"
+			    "XGrabServer from wm's\n");
+			return;
+		}
+		XEStartTrapRequest(trap_ctx);
+		memset(requests, 0, sizeof(requests));
+		BitTrue(requests, X_GrabServer);
+		BitTrue(requests, X_UngrabServer);
+		XETrapSetRequests(trap_ctx, True, requests);
+		XETrapSetGrabServer(trap_ctx, True);
+		return;
+	}
+#endif
+	rfbLog("No XTEST or DEC-XTRAP protection from XGrabServer.\n");
 }
 
 
@@ -2451,6 +2521,11 @@ void clean_up_exit (int ret) {
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (xdamage) {
 		XDamageDestroy(dpy, xdamage);
+	}
+#endif
+#if LIBVNCSERVER_HAVE_LIBXTRAP
+	if (trap_ctx) {
+		XEFreeTC(trap_ctx);
 	}
 #endif
 	XCloseDisplay(dpy);
@@ -7049,16 +7124,29 @@ void check_xevents(void) {
 		}
 	}
 
-	if (now > last_call && XCheckTypedEvent(dpy, MappingNotify, &xev)) {
-		/* we only check this once a second or so. */
-		XRefreshKeyboardMapping((XMappingEvent *) &xev);
+	if (now > last_call+1) {
+		/* we only check these once a second or so. */
+		int n = 0;
 		while (XCheckTypedEvent(dpy, MappingNotify, &xev)) {
 			XRefreshKeyboardMapping((XMappingEvent *) &xev);
+			n++;
 		}
-		if (use_modifier_tweak) {
+		if (n && use_modifier_tweak) {
 			X_UNLOCK;
 			initialize_modtweak();
 			X_LOCK;
+		}
+		if (xtrap_base_event_type) {
+			int base = xtrap_base_event_type;
+			while (XCheckTypedEvent(dpy, base, &xev)) {
+				;
+			}
+		}
+		if (xtest_base_event_type) {
+			int base = xtest_base_event_type;
+			while (XCheckTypedEvent(dpy, base, &xev)) {
+				;
+			}
 		}
 	}
 
@@ -7176,7 +7264,7 @@ void check_xevents(void) {
 	}
 
 #ifndef DEBUG_XEVENTS
-#define DEBUG_XEVENTS 0
+#define DEBUG_XEVENTS 1
 #endif
 #if DEBUG_XEVENTS
 	if (hack_val) {
@@ -7210,7 +7298,7 @@ void check_xevents(void) {
 	}
 #endif
 
-	if (now > last_sync + 3600) {
+	if (now > last_sync + 1200) {
 		/* kludge for any remaining event leaks */
 		int bugout = use_xdamage ? 500 : 50;
 		if (last_sync != 0) {
@@ -7547,7 +7635,8 @@ int check_httpdir(void) {
 
 		if (stat(httpdir, &sbuf) == 0) {
 			/* good enough for me */
-			rfbLog("check_httpdir: guessed: %s\n", httpdir);
+			rfbLog("check_httpdir: guessed directory:\n");
+			rfbLog("   %s\n", httpdir);
 			http_dir = httpdir;
 			return 1;
 		} else {
@@ -7562,7 +7651,8 @@ int check_httpdir(void) {
 				http_dir = strdup("/usr/share/x11vnc/classes");	
 				return 1;
 			}
-			rfbLog("check_httpdir: bad guess: %s\n", httpdir);
+			rfbLog("check_httpdir: bad guess:\n");
+			rfbLog("   %s\n", httpdir);
 			return 0;
 		}
 	}
@@ -7941,6 +8031,17 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("process_remote_cmd: turning off flashcmap mode.\n");
 		flash_cmap = 0;
 		
+	} else if (strstr(p, "shiftcmap") == p) {
+		COLON_CHECK("shiftcmap:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, shift_cmap);
+			goto qry;
+		}
+		p += strlen("shiftcmap:");
+		shift_cmap = atoi(p);
+		rfbLog("process_remote_cmd: set -shiftcmap %d\n", shift_cmap);
+		do_new_fb(1);
+
 	} else if (!strcmp(p, "truecolor")) {
 		int orig = force_indexed_color;
 		if (query) {
@@ -9190,7 +9291,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		use_xdamage = 1;
 		if (use_xdamage != orig) {
 			initialize_xdamage();
-			create_xdamage();
+			create_xdamage_if_needed();
 		}
 	} else if (!strcmp(p, "noxdamage")) {
 		int orig = use_xdamage;
@@ -9207,7 +9308,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		use_xdamage = 0;
 		if (use_xdamage != orig) {
 			initialize_xdamage();
-			destroy_xdamage();
+			destroy_xdamage_if_needed();
 		}
 
 	} else if (strstr(p, "xd_area") == p) {
@@ -9948,6 +10049,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, (int) getpid());
 		} else if (!strcmp(p, "ext_xtest")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, xtest_present);
+		} else if (!strcmp(p, "ext_xtrap")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, xtrap_present);
 		} else if (!strcmp(p, "ext_xkb")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, xkb_present);
 		} else if (!strcmp(p, "ext_xshm")) {
@@ -10318,7 +10421,7 @@ void initialize_xdamage(void) {
 	}
 }
 
-void create_xdamage(void) {
+void create_xdamage_if_needed(void) {
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (! xdamage) {
 		X_LOCK;
@@ -10330,7 +10433,7 @@ void create_xdamage(void) {
 #endif
 }
 
-void destroy_xdamage(void) {
+void destroy_xdamage_if_needed(void) {
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (xdamage) {
 		XEvent ev;
@@ -10351,7 +10454,7 @@ void destroy_xdamage(void) {
 }
 
 void check_xdamage_state(void) {
-	if (! use_xdamage || ! xdamage_present) {
+	if (! xdamage_present) {
 		return;
 	}
 	/*
@@ -10359,9 +10462,9 @@ void check_xdamage_state(void) {
 	 * one if no clients are connected.
 	 */
 	if (client_count) {
-		create_xdamage();
+		create_xdamage_if_needed();
 	} else {
-		destroy_xdamage();
+		destroy_xdamage_if_needed();
 	}
 }
 
@@ -11723,19 +11826,30 @@ int get_which_cursor(void) {
 			}
 			if (which == which0) {
 				/* the string "term" mean I-beam. */
+				char *name, *class;
 				lowercase(winfo.res_name);
 				lowercase(winfo.res_class);
-				if (strstr(winfo.res_name, "term")) {
+				name  = winfo.res_name;
+				class = winfo.res_class;
+				if (strstr(name, "term")) {
 					which = CURS_TERM;
-				} else if (strstr(winfo.res_class, "term")) {
+				} else if (strstr(class, "term")) {
 					which = CURS_TERM;
-				} else if (strstr(winfo.res_name, "text")) {
+				} else if (strstr(name,  "text")) {
 					which = CURS_TERM;
-				} else if (strstr(winfo.res_class, "text")) {
+				} else if (strstr(class, "text")) {
 					which = CURS_TERM;
-				} else if (strstr(winfo.res_name, "onsole")) {
+				} else if (strstr(name,  "onsole")) {
 					which = CURS_TERM;
-				} else if (strstr(winfo.res_class, "onsole")) {
+				} else if (strstr(class, "onsole")) {
+					which = CURS_TERM;
+				} else if (strstr(name,  "cmdtool")) {
+					which = CURS_TERM;
+				} else if (strstr(class, "cmdtool")) {
+					which = CURS_TERM;
+				} else if (strstr(name,  "shelltool")) {
+					which = CURS_TERM;
+				} else if (strstr(class, "shelltool")) {
 					which = CURS_TERM;
 				}
 			}
@@ -12184,12 +12298,14 @@ void set_colormap(int reset) {
 		}
 	}
 
-	if (first && ncells != NCOLOR) {
-		if (! quiet) {
-			fprintf(stderr, "set_colormap: number of cells is %d "
+	if (ncells != NCOLOR) {
+		if (first && ! quiet) {
+			rfbLog("set_colormap: number of cells is %d "
 			    "instead of %d.\n", ncells, NCOLOR);
 		}
-		screen->colourMap.count = ncells;
+		if (! shift_cmap) {
+			screen->colourMap.count = ncells;
+		}
 	}
 
 	if (flash_cmap && ! first) {
@@ -12215,7 +12331,7 @@ void set_colormap(int reset) {
 		}
 	}
 	if (ncells > NCOLOR && ! quiet) {
-		fprintf(stderr, "set_colormap: big problem: ncells=%d > %d\n",
+		rfbLog("set_colormap: big problem: ncells=%d > %d\n",
 		    ncells, NCOLOR);
 	}
 
@@ -12225,7 +12341,7 @@ void set_colormap(int reset) {
 		 * the StaticColor map.  The ncells = 8 is "8 per subfield"
 		 * mentioned in xdpyinfo.  Looks OK... perhaps fortuitously.
 		 */
-		if (ncells == 8) {
+		if (ncells == 8 && ! shift_cmap) {
 			ncells = NCOLOR;
 		}
 	}
@@ -12239,7 +12355,9 @@ void set_colormap(int reset) {
 
 	X_UNLOCK;
 
-	for(i=0; i < ncells; i++) {
+	for(i = ncells - 1; i >= 0; i--) {
+		int k = i + shift_cmap;
+
 		screen->colourMap.data.shorts[i*3+0] = color[i].red;
 		screen->colourMap.data.shorts[i*3+1] = color[i].green;
 		screen->colourMap.data.shorts[i*3+2] = color[i].blue;
@@ -12249,6 +12367,13 @@ void set_colormap(int reset) {
 		    prev[i].blue  != color[i].blue ) {
 			diffs++;
 		}
+
+		if (shift_cmap && k >= 0 && k < NCOLOR) {
+			/* kludge to copy the colors to higher pixel values */
+			screen->colourMap.data.shorts[k*3+0] = color[i].red;
+			screen->colourMap.data.shorts[k*3+1] = color[i].green;
+			screen->colourMap.data.shorts[k*3+2] = color[i].blue;
+		}
 	}
 
 	if (diffs && ! first) {
@@ -12256,10 +12381,55 @@ void set_colormap(int reset) {
 			rfbLog("set_colormap: warning: sending cmap "
 			    "with uninitialized clients.\n");
 		}
-		rfbSetClientColourMaps(screen, 0, ncells);
+		if (shift_cmap) {
+			rfbSetClientColourMaps(screen, 0, NCOLOR);
+		} else {
+			rfbSetClientColourMaps(screen, 0, ncells);
+		}
 	}
 
 	first = 0;
+}
+
+void debug_colormap(XImage *fb) {
+	static int debug_cmap = -1;
+	int i, k, histo[NCOLOR];
+
+	if (debug_cmap < 0) {
+		if (getenv("DEBUG_CMAP") != NULL) {
+			debug_cmap = 1;
+		} else {
+			debug_cmap = 0;
+		}
+	}
+	if (! debug_cmap) {
+		return;
+	}
+	if (! fb) {
+		return;
+	}
+	if (fb->bits_per_pixel != 8) {
+		return;
+	}
+
+	for (i=0; i < NCOLOR; i++) {
+		histo[i] = 0;
+	}
+	for (k = 0; k < fb->width * fb->height; k++) {
+		unsigned char n;
+		char c = *(fb->data + k);
+
+		n = (unsigned char) c;
+		histo[n]++;
+	}
+	fprintf(stderr, "\nColormap histogram for current screen contents:\n");
+	for (i=0; i < NCOLOR; i++) {
+		fprintf(stderr, "   %03d: %7d", i, histo[i]);
+		if ((i+1) % 4 == 0)  {
+			fprintf(stderr, "\n");
+		}
+	}
+	fprintf(stderr, "\n");
 }
 
 /*
@@ -13088,6 +13258,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		screen->serverFormat.trueColour = FALSE;
 		indexed_color = 1;
 		set_colormap(1);
+		debug_colormap(fb);
 	} else {
 		/* 
 		 * general case, we call it truecolor, but could be direct
@@ -18095,6 +18266,7 @@ static void watch_loop(void) {
 		check_xevents();
 		check_connect_inputs();		
 		check_padded_fb();		
+		check_xdamage_state();
 		if (started_as_root) {
 			check_switched_user();
 		}
@@ -18127,10 +18299,6 @@ static void watch_loop(void) {
 				check_x11_pointer();
 			}
 			continue;
-		}
-
-		if (use_xdamage) {
-			check_xdamage_state();
 		}
 
 		if (button_mask && (!show_dragging || pointer_mode == 0)) {
@@ -18247,6 +18415,13 @@ static void print_help(int mode) {
 "\n"
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
+"-shiftcmap n           Rare problem, but some 8bpp displays use less than 256\n"
+"                       colorcells (e.g. 16-color grayscale, perhaps the other\n"
+"                       bits are used for double buffering) *and* also need to\n"
+"                       shift the pixels values away from 0, .., ncells.  \"n\"\n"
+"                       indicates the shift to be applied to the pixel values.\n"
+"                       To see the pixel values set DEBUG_CMAP=1 to print out\n"
+"                       a colormap histogram.  Example: -shiftcmap 240\n"
 "-notruecolor           For 8bpp displays, force indexed color (i.e. a colormap)\n"
 "                       even if it looks like 8bpp TrueColor (rare problem).\n"
 "-visual n              Experimental option: probably does not do what you\n"
@@ -18330,6 +18505,11 @@ static void print_help(int mode) {
 "                       Note: if you are not redirecting stderr to a log file\n"
 "                       (via shell 2> or -o option) you must also specify the\n"
 "                       -q option, otherwise the stderr goes to the viewer.\n"
+"-http                  Instead of using -httpdir (see below) to specify\n"
+"                       where the Java vncviewer applet is, have x11vnc try\n"
+"                       to *guess* where the directory is by looking relative\n"
+"                       to the program location and in standard locations\n"
+"                       (/usr/local/share/x11vnc/classes, etc).\n"
 "-connect string        For use with \"vncviewer -listen\" reverse connections.\n"
 "                       If \"string\" has the form \"host\" or \"host:port\"\n"
 "                       the connection is made once at startup.  Use commas\n"
@@ -18880,7 +19060,7 @@ static void print_help(int mode) {
 "\n"
 "                       n=3 is basically the same as n=2 except with slightly\n"
 "                       tweaked parameters.  We made this a new one so one\n"
-"                       could use -pm 2 for the old behavior.\n"
+"                       could use -pm 2 for the old behavior.  NOT FINISHED.\n"
 "\n"
 "                       n=4 is basically a dynamic -nodragging mode: it detects\n"
 "                       when the mouse motion has paused and then refreshes\n"
@@ -18911,7 +19091,7 @@ static void print_help(int mode) {
 "\n"
 "-speeds rd,bw,lat      x11vnc tries to estimate some speed parameters that\n"
 "                       are used to optimize scheduling (e.g. -pointer_mode\n"
-"                       4) and other things.  Use the -speeds option to set\n"
+"                       5) and other things.  Use the -speeds option to set\n"
 "                       these manually.  The triple \"rd,bw,lat\" corresponds\n"
 "                       to video h/w read rate in MB/sec, network bandwidth to\n"
 "                       clients in KB/sec, and network latency to clients in\n"
@@ -19110,6 +19290,7 @@ static void print_help(int mode) {
 "                       clip:WxH+X+Y    set -clip mode to \"WxH+X+Y\"\n"
 "                       flashcmap       enable  -flashcmap mode.\n"
 "                       noflashcmap     disable -flashcmap mode.\n"
+"                       shiftcmap:n     set -shiftcmap to n.\n"
 "                       notruecolor     enable  -notruecolor mode.\n"
 "                       truecolor       disable -notruecolor mode.\n"
 "                       overlay         enable  -overlay mode (if applicable).\n"
@@ -19130,6 +19311,9 @@ static void print_help(int mode) {
 "                       timeout:n       reset -timeout to n, if there are\n"
 "                                       currently no clients, exit unless one\n"
 "                                       connects in the next n secs.\n"
+/* access */
+"                       http            enable  http client connections.\n"
+"                       nohttp          disable http client connections.\n"
 "                       deny            deny any new connections, same as \"lock\"\n"
 "                       nodeny          allow new connections, same as \"unlock\"\n"
 /* access, filename */
@@ -19269,8 +19453,6 @@ static void print_help(int mode) {
 "                       desktop:str     set -desktop name to str for new clients.\n"
 "                       rfbport:n       set -rfbport to n.\n"
 /* access */
-"                       http            enable  http client connections.\n"
-"                       nohttp          disable http client connections.\n"
 "                       httpport:n      set -httpport to n.\n"
 "                       httpdir:dir     set -httpdir to dir (and enable http).\n"
 "                       enablehttpproxy   enable  -enablehttpproxy mode.\n"
@@ -19323,27 +19505,28 @@ static void print_help(int mode) {
 "                       the returned value corresponds to (hint: the ext_*\n"
 "                       variables correspond to the presence of X extensions):\n"
 "\n"
-"                       ans= stop quit exit shutdown ping blacken zero refresh\n"
-"                       reset close disconnect id sid waitmapped nowaitmapped\n"
-"                       clip flashcmap noflashcmap truecolor notruecolor\n"
-"                       overlay nooverlay overlay_cursor overlay_yescursor\n"
-"                       nooverlay_nocursor nooverlay_cursor nooverlay_yescursor\n"
-"                       overlay_nocursor visual scale scale_cursor viewonly\n"
-"                       noviewonly shared noshared forever noforever once\n"
-"                       timeout deny lock nodeny unlock connect allowonce allow\n"
-"                       localhost nolocalhost listen lookup nolookup accept\n"
-"                       gone shm noshm flipbyteorder noflipbyteorder onetile\n"
-"                       noonetile solid_color solid nosolid blackout xinerama\n"
-"                       noxinerama xrandr noxrandr xrandr_mode padgeom quiet\n"
-"                       q noquiet modtweak nomodtweak xkb noxkb skip_keycodes\n"
-"                       add_keysyms noadd_keysyms clear_mods noclear_mods\n"
-"                       clear_keys noclear_keys remap repeat norepeat fb nofb\n"
-"                       bell nobell sel nosel primary noprimary cursorshape\n"
-"                       nocursorshape cursorpos nocursorpos cursor show_cursor\n"
-"                       noshow_cursor nocursor arrow xfixes noxfixes xdamage\n"
-"                       noxdamage xd_area xd_mem alphacut alphafrac alpharemove\n"
-"                       noalpharemove alphablend noalphablend xwarp xwarppointer\n"
-"                       noxwarp noxwarppointer buttonmap dragging nodragging\n"
+"                       ans= stop quit exit shutdown ping blacken zero\n"
+"                       refresh reset close disconnect id sid waitmapped\n"
+"                       nowaitmapped clip flashcmap noflashcmap shiftcmap\n"
+"                       truecolor notruecolor overlay nooverlay overlay_cursor\n"
+"                       overlay_yescursor nooverlay_nocursor nooverlay_cursor\n"
+"                       nooverlay_yescursor overlay_nocursor visual scale\n"
+"                       scale_cursor viewonly noviewonly shared noshared\n"
+"                       forever noforever once timeout deny lock nodeny unlock\n"
+"                       connect allowonce allow localhost nolocalhost listen\n"
+"                       lookup nolookup accept gone shm noshm flipbyteorder\n"
+"                       noflipbyteorder onetile noonetile solid_color solid\n"
+"                       nosolid blackout xinerama noxinerama xrandr noxrandr\n"
+"                       xrandr_mode padgeom quiet q noquiet modtweak nomodtweak\n"
+"                       xkb noxkb skip_keycodes add_keysyms noadd_keysyms\n"
+"                       clear_mods noclear_mods clear_keys noclear_keys\n"
+"                       remap repeat norepeat fb nofb bell nobell sel nosel\n"
+"                       primary noprimary cursorshape nocursorshape cursorpos\n"
+"                       nocursorpos cursor show_cursor noshow_cursor nocursor\n"
+"                       arrow xfixes noxfixes xdamage noxdamage xd_area\n"
+"                       xd_mem alphacut alphafrac alpharemove noalpharemove\n"
+"                       alphablend noalphablend xwarp xwarppointer noxwarp\n"
+"                       noxwarppointer buttonmap dragging nodragging\n"
 "                       pointer_mode pm input_skip input client_input speeds\n"
 "                       debug_pointer dp nodebug_pointer nodp debug_keyboard dk\n"
 "                       nodebug_keyboard nodk deferupdate defer wait rfbwait\n"
@@ -19359,11 +19542,12 @@ static void print_help(int mode) {
 "                       scaling_nomult4 scaling_pad scaling_interpolate inetd\n"
 "                       safer unsafe passwdfile using_shm logfile o rc norc\n"
 "                       h help V version lastmod bg sigpipe threads clients\n"
-"                       client_count pid ext_xtest ext_xkb ext_xshm ext_xinerama\n"
-"                       ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin\n"
-"                       num_buttons button_mask mouse_x mouse_y bpp depth\n"
-"                       indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y\n"
-"                       cdpy_x cdpy_y coff_x coff_y rfbauth passwd\n"
+"                       client_count pid ext_xtest ext_xtrap ext_xkb ext_xshm\n"
+"                       ext_xinerama ext_overlay ext_xfixes ext_xdamage\n"
+"                       ext_xrandr rootwin num_buttons button_mask mouse_x\n"
+"                       mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x\n"
+"                       wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth\n"
+"                       passwd\n"
 "\n"
 "-sync                  By default -remote commands are run asynchronously, that\n"
 "                       is, the request is posted and the program immediately\n"
@@ -19832,6 +20016,7 @@ int main(int argc, char* argv[]) {
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0, got_deferupdate = 0, got_defer = 0;
+	int got_httpdir = 0, try_http = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc = 1; char *argv_vnc[128];
@@ -19922,6 +20107,9 @@ int main(int argc, char* argv[]) {
 			clip_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-flashcmap")) {
 			flash_cmap = 1;
+		} else if (!strcmp(arg, "-shiftcmap")) {
+			CHECK_ARGC
+			shift_cmap = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-notruecolor")) {
 			force_indexed_color = 1;
 		} else if (!strcmp(arg, "-overlay")) {
@@ -19957,6 +20145,8 @@ int main(int argc, char* argv[]) {
 			users_list = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-inetd")) {
 			inetd = 1;
+		} else if (!strcmp(arg, "-http")) {
+			try_http = 1;
 		} else if (!strcmp(arg, "-connect")) {
 			CHECK_ARGC
 			if (strchr(argv[++i], '/')) {
@@ -20281,6 +20471,7 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-httpdir")) {
 			CHECK_ARGC
 			http_dir = strdup(argv[++i]);
+			got_httpdir = 1;
 		} else {
 			if (!strcmp(arg, "-desktop") && i < argc-1) {
 				dt = 1;
@@ -20563,6 +20754,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " clip:       %s\n", clip_str ? clip_str
                     : "null");
 		fprintf(stderr, " flashcmap:  %d\n", flash_cmap);
+		fprintf(stderr, " shiftcmap:  %d\n", shift_cmap);
 		fprintf(stderr, " force_idx:  %d\n", force_indexed_color);
 		fprintf(stderr, " visual:     %s\n", visual_str ? visual_str
                     : "null");
@@ -20908,13 +21100,23 @@ int main(int argc, char* argv[]) {
 		}
 		xtest_present = 0;
 		use_xwarppointer = 1;
+	} else {
+		xtest_base_event_type = ev;
 	}
+
+	if (! XETrapQueryExtension_wr(dpy, &ev, &er, &maj)) {
+		xtrap_present = 0;
+	} else {
+		xtrap_base_event_type = ev;
+	}
+
 	/*
-	 * Window managers will often grab the display during resize, etc.
-	 * To avoid deadlock (our user resize input is not processed)
-	 * we tell the server to process our requests during all grabs:
+	 * Window managers will often grab the display during resize,
+	 * etc, using XGrabServer().  To avoid deadlock (our user resize
+	 * input is not processed) we tell the server to process our
+	 * requests during all grabs:
 	 */
-	XTestGrabControl_wr(dpy, True);
+	disable_grabserver();
 
 	/* set OS struct UT */
 	uname(&UT);
@@ -20995,6 +21197,10 @@ int main(int argc, char* argv[]) {
 	 */
 
 	initialize_screen(&argc_vnc, argv_vnc, fb0);
+
+	if (try_http && ! got_httpdir && check_httpdir()) {
+		http_connections(1);
+	}
 
 	initialize_tiles();
 

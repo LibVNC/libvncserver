@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Tue Mar 29 09:30:54 EST 2005
+x11vnc README file                         Date: Sun Apr  3 16:28:59 EDT 2005
 
 The following information is taken from these URLs:
 
@@ -515,9 +515,14 @@ make
    x11vnc is both a client and a server at the same time. It is an X
    client because it connects to the running X server to do the screen
    polls. Think of it as a rather efficient "screenshot" program running
-   continuously. It is a server in the sense that it is a VNC server that
-   VNC viewers on the network can connect to and view the screen
-   framebuffer it manages.
+   continuously. It is a server in the sense that it is a VNC server VNC
+   viewers on the network can connect to and view the screen framebuffer
+   it manages.
+
+   When trying debug problems, remember to think of both roles. E.g. "how
+   is x11vnc connecting to the X server?", "how is the vncviewer
+   connecting to x11vnc?", "what permits/restricts the connection?". Both
+   links may have reachability, permission, and other issues.
 
    Network performance:   Whether you are using Xvnc or x11vnc it is
    always a good idea to have a solid background color instead of a
@@ -1311,7 +1316,22 @@ display :0
   env CPPFLAGS="-DX11VNC_FOREVER=1" ./configure; make
 
    If other things (e.g. "-I ...") are needed in CPPFLAGS add them as
-   well. Let us know if more customizations would be useful.
+   well.
+
+   Let us know if more build-time customizations would be useful.
+
+   If the system does not have the XTEST XTestGrabControl interface (some
+   early X11R5 systems have XTEST but not this interface), then configure
+   will automatically try to see if the DEC-XTRAP extension build
+   environment is available and use that for avoiding GrabServer
+   deadlock. If you want DEC-XTRAP compiled in no matter what, set
+   X11VNC_USE_XTRAP=1 in your environment. Note that DEC-XTRAP should
+   only be used as a last resort on legacy machines since the standard
+   XTEST works well. If there is interest for legacy machines to use
+   DEC-XTRAP for all of the user input injection (not just grab control)
+   let us know and we will put it in for you to try. (Note: DEC-XTRAP
+   grab control seems to be broken on Linux/XFree86)
+
    [Win2VNC Related]
 
    Q-12: I have two separate machine displays in front of me, one Windows
@@ -1559,8 +1579,8 @@ TrueColor defdepth 24
    If the X display machine is a traditional Xterminal (where the X
    server process runs on the Xterminal box, but all of the X client
    applications (mozilla, etc) run on a central server (aka "terminal
-   server")), you will need somehow to be able to log into the Xterminal
-   machine (i.e. get a shell there) and start the x11vnc program. If the
+   server")), you will need to log into the Xterminal machine (i.e. get a
+   shell running there) and then start the x11vnc program. If the
    Xterminal Linux/Unix machine is stripped down (e.g. no users besides
    root) that may be difficult.
 
@@ -1568,13 +1588,14 @@ TrueColor defdepth 24
    hence the MIT-MAGIC-COOKIE auth files, are on the central server and
    not on the Xterminal box where the X server and x11vnc processes are.
 
-   To run the x11vnc process on the Xterminal box, somehow the
-   MIT-MAGIC-COOKIE auth file data (XAUTHORITY or $HOME/.Xauthority) must
-   be accessible by or copied to the Xterminal. If $HOME/.Xauthority is
-   exported via NFS (this is insecure of course, but has been going on
-   for decades), then x11vnc can simply pick it up via NFS (you may need
-   to use the [189]-auth option to point to the correct file). Other
-   options include copying the auth file using scp, or something like:
+   So unless X permissions are completely turned off (e.g. "xhost +"), to
+   run the x11vnc process on the Xterminal box the MIT-MAGIC-COOKIE auth
+   file data (XAUTHORITY or $HOME/.Xauthority) must be accessible by or
+   copied to the Xterminal. If $HOME/.Xauthority is exported via NFS
+   (this is insecure of course, but has been going on for decades), then
+   x11vnc can simply pick it up via NFS (you may need to use the
+   [189]-auth option to point to the correct file). Other options include
+   copying the auth file using scp, or something like:
   central-server>  xauth nextract - xterm123:0 | ssh xterm123 xauth nmerge -
 
    and then, say, ssh from central-server to xterm123 to start x11vnc.
@@ -3822,62 +3843,64 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2pre lastmod: 2005-03-1
-9
+x11vnc: allow VNC connections to real X11 displays. 0.7.2pre lastmod: 2005-04-0
+3
 
 x11vnc options:
   -display disp            -auth file             
   -id windowid             -sid windowid          
   -clip WxH+X+Y            -flashcmap             
-  -notruecolor             -visual n              
-  -overlay                 -overlay_nocursor      
-  -scale fraction          -scale_cursor frac     
-  -viewonly                -shared                
-  -once                    -forever               
-  -timeout n               -inetd                 
+  -shiftcmap n             -notruecolor           
+  -visual n                -overlay               
+  -overlay_nocursor        -scale fraction        
+  -scale_cursor frac       -viewonly              
+  -shared                  -once                  
+  -forever                 -timeout n             
+  -inetd                   -http                  
   -connect string          -vncconnect            
   -novncconnect            -allow host1[,host2..] 
-  -localhost               -input string          
-  -viewpasswd string       -passwdfile filename   
-  -storepasswd pass file   -accept string         
-  -gone string             -users list            
-  -noshm                   -flipbyteorder         
-  -onetile                 -solid [color]         
-  -blackout string         -xinerama              
-  -xrandr [mode]           -padgeom WxH           
-  -o logfile               -rc filename           
-  -norc                    -h, -help              
-  -?, -opts                -V, -version           
-  -q                       -bg                    
-  -modtweak                -nomodtweak            
-  -xkb                     -skip_keycodes string  
-  -add_keysyms             -clear_mods            
-  -clear_keys              -remap string          
-  -norepeat                -repeat                
-  -nofb                    -nobell                
-  -nosel                   -noprimary             
-  -cursor [mode]           -nocursor              
-  -arrow n                 -noxfixes              
-  -alphacut n              -alphafrac fraction    
-  -alpharemove             -noalphablend          
-  -nocursorshape           -cursorpos             
-  -nocursorpos             -xwarppointer          
-  -buttonmap string        -nodragging            
-  -pointer_mode n          -input_skip n          
-  -speeds rd,bw,lat        -debug_pointer         
-  -debug_keyboard          -defer time            
-  -wait time               -nap                   
-  -nonap                   -sb time               
-  -noxdamage               -xd_area A             
-  -xd_mem f                -sigpipe string        
-  -threads                 -nothreads             
-  -fs f                    -gaps n                
-  -grow n                  -fuzz n                
-  -snapfb                  -gui [gui-opts]        
-  -remote command          -query variable        
-  -sync                    -noremote              
-  -unsafe                  -safer                 
-  -deny_all              
+  -localhost               -nolookup              
+  -input string            -viewpasswd string     
+  -passwdfile filename     -storepasswd pass file 
+  -accept string           -gone string           
+  -users list              -noshm                 
+  -flipbyteorder           -onetile               
+  -solid [color]           -blackout string       
+  -xinerama                -xrandr [mode]         
+  -padgeom WxH             -o logfile             
+  -rc filename             -norc                  
+  -h, -help                -?, -opts              
+  -V, -version             -q                     
+  -bg                      -modtweak              
+  -nomodtweak              -xkb                   
+  -skip_keycodes string    -add_keysyms           
+  -clear_mods              -clear_keys            
+  -remap string            -norepeat              
+  -repeat                  -nofb                  
+  -nobell                  -nosel                 
+  -noprimary               -cursor [mode]         
+  -nocursor                -arrow n               
+  -noxfixes                -alphacut n            
+  -alphafrac fraction      -alpharemove           
+  -noalphablend            -nocursorshape         
+  -cursorpos               -nocursorpos           
+  -xwarppointer            -buttonmap string      
+  -nodragging              -pointer_mode n        
+  -input_skip n            -speeds rd,bw,lat      
+  -debug_pointer           -debug_keyboard        
+  -defer time              -wait time             
+  -nap                     -nonap                 
+  -sb time                 -noxdamage             
+  -xd_area A               -xd_mem f              
+  -sigpipe string          -threads               
+  -nothreads               -fs f                  
+  -gaps n                  -grow n                
+  -fuzz n                  -snapfb                
+  -gui [gui-opts]          -remote command        
+  -query variable          -sync                  
+  -noremote                -unsafe                
+  -safer                   -deny_all              
+
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -3903,8 +3926,8 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2pre lastmod: 2005-03-1
-9
+x11vnc: allow VNC connections to real X11 displays. 0.7.2pre lastmod: 2005-04-0
+3
 
 Typical usage is:
 
@@ -3978,6 +4001,13 @@ Options:
 
 -flashcmap             In 8bpp indexed color, let the installed colormap flash
                        as the pointer moves from window to window (slow).
+-shiftcmap n           Rare problem, but some 8bpp displays use less than 256
+                       colorcells (e.g. 16-color grayscale, perhaps the other
+                       bits are used for double buffering) *and* also need to
+                       shift the pixels values away from 0, .., ncells.  "n"
+                       indicates the shift to be applied to the pixel values.
+                       To see the pixel values set DEBUG_CMAP=1 to print out
+                       a colormap histogram.  Example: -shiftcmap 240
 -notruecolor           For 8bpp displays, force indexed color (i.e. a colormap)
                        even if it looks like 8bpp TrueColor (rare problem).
 -visual n              Experimental option: probably does not do what you
@@ -4027,7 +4057,7 @@ Options:
                        If "fraction" contains a decimal point "." it
                        is taken as a floating point number, alternatively
                        the notation "m/n" may be used to denote fractions
-                       exactly, e.g. -scale 2/3.
+                       exactly, e.g. -scale 2/3
 
                        Scaling Options: can be added after "fraction" via
                        ":", to supply multiple ":" options use commas.
@@ -4061,6 +4091,11 @@ Options:
                        Note: if you are not redirecting stderr to a log file
                        (via shell 2> or -o option) you must also specify the
                        -q option, otherwise the stderr goes to the viewer.
+-http                  Instead of using -httpdir (see below) to specify
+                       where the Java vncviewer applet is, have x11vnc try
+                       to *guess* where the directory is by looking relative
+                       to the program location and in standard locations
+                       (/usr/local/share/x11vnc/classes, etc).
 -connect string        For use with "vncviewer -listen" reverse connections.
                        If "string" has the form "host" or "host:port"
                        the connection is made once at startup.  Use commas
@@ -4099,6 +4134,11 @@ Options:
                        you may need to manually adjust the -allow list (and
                        vice versa) to avoid situations where no connections
                        (or too many) are allowed.
+
+-nolookup              Do not use gethostbyname() or gethostbyaddr() to look up
+                       host names or IP numbers.  Use this if name resolution
+                       is incorrectly set up and leads to long pauses as name
+                       lookup times out, etc.
 
 -input string          Fine tuning of allowed user input.  If "string" does
                        not contain a comma "," the tuning applies only to
@@ -4341,6 +4381,7 @@ Options:
                        to the terminal.  Same as "-logfile file".  To append
                        to the file use "-oa file" or "-logappend file".
 -rc filename           Use "filename" instead of $HOME/.x11vncrc for rc file.
+
 -norc                  Do not process any .x11vncrc file for options.
 -h, -help              Print this help text.
 -?, -opts              Only list the x11vnc options.
@@ -4576,7 +4617,7 @@ Options:
                        or scrolling.  So a scheme has to be used to "eat"
                        much of that pointer input before re-polling the screen
                        and sending out framebuffer updates. The mode number
-                       "n" can be 0 to 4 and selects one of the schemes
+                       "n" can be 0 to 5 and selects one of the schemes
                        desribed below.
 
                        n=0: does the same as -nodragging. (all screen polling
@@ -4589,19 +4630,24 @@ Options:
                        n=2 is an improved scheme: by watching the current rate
                        of input events it tries to detect if it should try to
                        "eat" additional pointer events before continuing.
+                       This mode was the default until Apr 2005.
 
-                       n=3 is basically a dynamic -nodragging mode: it detects
+                       n=3 is basically the same as n=2 except with slightly
+                       tweaked parameters.  We made this a new one so one
+                       could use -pm 2 for the old behavior.  NOT FINISHED.
+
+                       n=4 is basically a dynamic -nodragging mode: it detects
                        when the mouse motion has paused and then refreshes
                        the display.
 
-                       n=4: attempts to measures network rates and latency,
+                       n=5 attempts to measures network rates and latency,
                        the video card read rate, and how many tiles have been
                        changed on the screen.  From this, it aggressively tries
                        to push screen "frames" when it decides it has enough
                        resources to do so.  NOT FINISHED.
 
-                       The default n is 2. Note that modes 2, 3, 4 will skip
-                       -input_skip keyboard events (but it will not count
+                       The default n is 2. Note that modes 2, 3, 4, 5 will
+                       skip -input_skip keyboard events (but it will not count
                        pointer events).  Also note that these modes are not
                        available in -threads mode which has its own pointer
                        event handling mechanism.
@@ -4619,7 +4665,7 @@ Options:
 
 -speeds rd,bw,lat      x11vnc tries to estimate some speed parameters that
                        are used to optimize scheduling (e.g. -pointer_mode
-                       4) and other things.  Use the -speeds option to set
+                       5) and other things.  Use the -speeds option to set
                        these manually.  The triple "rd,bw,lat" corresponds
                        to video h/w read rate in MB/sec, network bandwidth to
                        clients in KB/sec, and network latency to clients in
@@ -4627,14 +4673,16 @@ Options:
                        e.g. "-speeds ,100,15", then the internal scheme is
                        used to estimate the empty value(s).
 
+                       Note: use this option is currently NOT FINISHED.
+
                        Typical PC video cards have read rates of 5-10 MB/sec.
                        If the framebuffer is in main memory instead of video
                        h/w (e.g. SunRay, shadowfb, Xvfb), the read rate may
                        be much faster.  "x11perf -getimage500" can be used
                        to get a lower bound (remember to factor in the bytes
                        per pixel).  It is up to you to estimate the network
-                       bandwith to clients.  For the latency the ping(1)
-                       command can be used.
+                       bandwith and latency to clients.  For the latency the
+                       ping(1) command can be used.
 
                        For convenience there are some aliases provided,
                        e.g. "-speeds modem".  The aliases are: "modem" for
@@ -4815,6 +4863,7 @@ Options:
                        clip:WxH+X+Y    set -clip mode to "WxH+X+Y"
                        flashcmap       enable  -flashcmap mode.
                        noflashcmap     disable -flashcmap mode.
+                       shiftcmap:n     set -shiftcmap to n.
                        notruecolor     enable  -notruecolor mode.
                        truecolor       disable -notruecolor mode.
                        overlay         enable  -overlay mode (if applicable).
@@ -4834,6 +4883,8 @@ Options:
                        timeout:n       reset -timeout to n, if there are
                                        currently no clients, exit unless one
                                        connects in the next n secs.
+                       http            enable  http client connections.
+                       nohttp          disable http client connections.
                        deny            deny any new connections, same as "lock"
                        nodeny          allow new connections, same as "unlock"
                        connect:host    do reverse connection to host, "host"
@@ -4843,8 +4894,8 @@ Options:
                                        same as "close:host".  Use host
                                        "all" to close all current clients.
                                        If you know the client internal hex ID,
-                                       e.g. 0x3 (returned by -query clients and
-                                       RFB_CLIENT_ID), you can use that too.
+                                       e.g. 0x3 (returned by "-query clients"
+                                       and RFB_CLIENT_ID) you can use that too.
                        allowonce:host  For the next connection only, allow
                                        connection from "host".
                        allow:hostlist  set -allow list to (comma separated)
@@ -4855,6 +4906,8 @@ Options:
                        localhost       enable  -localhost mode
                        nolocalhost     disable -localhost mode
                        listen:str      set -listen to str, empty to disable.
+                       nolookup        enable  -nolookup mode.
+                       lookup          disable -nolookup mode.
                        input:str       set -input to "str", empty to disable.
                        client_input:str set the K, M, B -input on a per-client
                                        basis.  select which client as for
@@ -4965,8 +5018,6 @@ Options:
                        desktop:str     set -desktop name to str for new clients
 .
                        rfbport:n       set -rfbport to n.
-                       http            enable  http client connections.
-                       nohttp          disable http client connections.
                        httpport:n      set -httpport to n.
                        httpdir:dir     set -httpdir to dir (and enable http).
                        enablehttpproxy   enable  -enablehttpproxy mode.
@@ -5019,27 +5070,28 @@ Options:
                        the returned value corresponds to (hint: the ext_*
                        variables correspond to the presence of X extensions):
 
-                       ans= stop quit exit shutdown ping blacken zero refresh
-                       reset close disconnect id sid waitmapped nowaitmapped
-                       clip flashcmap noflashcmap truecolor notruecolor
-                       overlay nooverlay overlay_cursor overlay_yescursor
-                       nooverlay_nocursor nooverlay_cursor nooverlay_yescursor
-                       overlay_nocursor visual scale scale_cursor viewonly
-                       noviewonly shared noshared forever noforever once
-                       timeout deny lock nodeny unlock connect allowonce
-                       allow localhost nolocalhost listen accept gone
-                       shm noshm flipbyteorder noflipbyteorder onetile
-                       noonetile solid_color solid nosolid blackout xinerama
-                       noxinerama xrandr noxrandr xrandr_mode padgeom quiet
-                       q noquiet modtweak nomodtweak xkb noxkb skip_keycodes
-                       add_keysyms noadd_keysyms clear_mods noclear_mods
-                       clear_keys noclear_keys remap repeat norepeat fb nofb
-                       bell nobell sel nosel primary noprimary cursorshape
-                       nocursorshape cursorpos nocursorpos cursor show_cursor
-                       noshow_cursor nocursor arrow xfixes noxfixes xdamage
-                       noxdamage xd_area xd_mem alphacut alphafrac alpharemove
-                       noalpharemove alphablend noalphablend xwarp xwarppointer
-                       noxwarp noxwarppointer buttonmap dragging nodragging
+                       ans= stop quit exit shutdown ping blacken zero
+                       refresh reset close disconnect id sid waitmapped
+                       nowaitmapped clip flashcmap noflashcmap shiftcmap
+                       truecolor notruecolor overlay nooverlay overlay_cursor
+                       overlay_yescursor nooverlay_nocursor nooverlay_cursor
+                       nooverlay_yescursor overlay_nocursor visual scale
+                       scale_cursor viewonly noviewonly shared noshared
+                       forever noforever once timeout deny lock nodeny unlock
+                       connect allowonce allow localhost nolocalhost listen
+                       lookup nolookup accept gone shm noshm flipbyteorder
+                       noflipbyteorder onetile noonetile solid_color solid
+                       nosolid blackout xinerama noxinerama xrandr noxrandr
+                       xrandr_mode padgeom quiet q noquiet modtweak nomodtweak
+                       xkb noxkb skip_keycodes add_keysyms noadd_keysyms
+                       clear_mods noclear_mods clear_keys noclear_keys
+                       remap repeat norepeat fb nofb bell nobell sel nosel
+                       primary noprimary cursorshape nocursorshape cursorpos
+                       nocursorpos cursor show_cursor noshow_cursor nocursor
+                       arrow xfixes noxfixes xdamage noxdamage xd_area
+                       xd_mem alphacut alphafrac alpharemove noalpharemove
+                       alphablend noalphablend xwarp xwarppointer noxwarp
+                       noxwarppointer buttonmap dragging nodragging
                        pointer_mode pm input_skip input client_input speeds
                        debug_pointer dp nodebug_pointer nodp debug_keyboard dk
                        nodebug_keyboard nodk deferupdate defer wait rfbwait
@@ -5055,19 +5107,20 @@ Options:
                        scaling_nomult4 scaling_pad scaling_interpolate inetd
                        safer unsafe passwdfile using_shm logfile o rc norc
                        h help V version lastmod bg sigpipe threads clients
-                       client_count pid ext_xtest ext_xkb ext_xshm ext_xinerama
-                       ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin
-                       num_buttons button_mask mouse_x mouse_y bpp depth
-                       indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y
-                       cdpy_x cdpy_y coff_x coff_y rfbauth passwd
+                       client_count pid ext_xtest ext_xtrap ext_xkb ext_xshm
+                       ext_xinerama ext_overlay ext_xfixes ext_xdamage
+                       ext_xrandr rootwin num_buttons button_mask mouse_x
+                       mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x
+                       wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth
+                       passwd
 
 -sync                  By default -remote commands are run asynchronously, that
                        is, the request is posted and the program immediately
                        exits.  Use -sync to have the program wait for an
-                       acknowledgement from the x11vnc server that command
-                       was processed.  On the other hand -query requests are
-                       always processed synchronously because they have wait
-                       for the result.
+                       acknowledgement from the x11vnc server that command was
+                       processed (somehow).  On the other hand -query requests
+                       are always processed synchronously because they have
+                       to wait for the result.
 
                        Also note that if both -remote and -query requests are
                        supplied on the command line, the -remote is processed
@@ -5083,19 +5136,21 @@ Options:
 -noremote              Do not process any remote control commands or queries.
 
                        A note about security wrt remote control commands.
-                       If someone can connect to the X display and change the
-                       property VNC_CONNECT, then they can remotely control
-                       x11vnc.  Normally access to the X display is protected.
-                       Note that if they can modify VNC_CONNECT, they could
-                       also run their own x11vnc and have complete control
+                       If someone can connect to the X display and change
+                       the property VNC_CONNECT, then they can remotely
+                       control x11vnc.  Normally access to the X display is
+                       protected.  Note that if they can modify VNC_CONNECT
+                       on the X server, they have enough permissions to also
+                       run their own x11vnc and thus have complete control
                        of the desktop.  If the  "-connect /path/to/file"
-                       channel is being used, obviously anyone who can
-                       write to /path/to/file can remotely control x11vnc.
-                       So be sure to protect the X display and that file's
-                       write permissions.
+                       channel is being used, obviously anyone who can write
+                       to /path/to/file can remotely control x11vnc.  So be
+                       sure to protect the X display and that file's write
+                       permissions.
 
-                       To disable the VNC_CONNECT property channel completely
-                       use -novncconnect.
+                       If you are paranoid and do not think -noremote is
+                       enough, to disable the VNC_CONNECT property channel
+                       completely use -novncconnect.
 
 -unsafe                If x11vnc is running as root (e.g. inetd or Xsetup for
                        a display manager) a few remote commands are disabled

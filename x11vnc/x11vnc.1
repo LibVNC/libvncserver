@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "March 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "April 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2pre, lastmod: 2005-03-29
+         version: 0.7.2pre, lastmod: 2005-04-03
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -102,6 +102,16 @@ of the selected window.
 .IP
 In 8bpp indexed color, let the installed colormap flash
 as the pointer moves from window to window (slow).
+.PP
+\fB-shiftcmap\fR \fIn\fR
+.IP
+Rare problem, but some 8bpp displays use less than 256
+colorcells (e.g. 16-color grayscale, perhaps the other
+bits are used for double buffering) *and* also need to
+shift the pixels values away from 0, .., ncells.  \fIn\fR
+indicates the shift to be applied to the pixel values.
+To see the pixel values set DEBUG_CMAP=1 to print out
+a colormap histogram.  Example: \fB-shiftcmap\fR 240
 .PP
 \fB-notruecolor\fR
 .IP
@@ -223,6 +233,14 @@ stdio instead of listening socket.
 Note: if you are not redirecting stderr to a log file
 (via shell 2> or \fB-o\fR option) you must also specify the
 \fB-q\fR option, otherwise the stderr goes to the viewer.
+.PP
+\fB-http\fR
+.IP
+Instead of using \fB-httpdir\fR (see below) to specify
+where the Java vncviewer applet is, have x11vnc try
+to *guess* where the directory is by looking relative
+to the program location and in standard locations
+(/usr/local/share/x11vnc/classes, etc).
 .PP
 \fB-connect\fR \fIstring\fR
 .IP
@@ -942,7 +960,7 @@ This mode was the default until Apr 2005.
 .IP
 n=3 is basically the same as n=2 except with slightly
 tweaked parameters.  We made this a new one so one
-could use \fB-pm\fR 2 for the old behavior.
+could use \fB-pm\fR 2 for the old behavior.  NOT FINISHED.
 .IP
 n=4 is basically a dynamic \fB-nodragging\fR mode: it detects
 when the mouse motion has paused and then refreshes
@@ -954,7 +972,7 @@ changed on the screen.  From this, it aggressively tries
 to push screen "frames" when it decides it has enough
 resources to do so.  NOT FINISHED.
 .IP
-The default n is 3. Note that modes 2, 3, 4, 5 will
+The default n is 2. Note that modes 2, 3, 4, 5 will
 skip \fB-input_skip\fR keyboard events (but it will not count
 pointer events).  Also note that these modes are not
 available in \fB-threads\fR mode which has its own pointer
@@ -977,7 +995,7 @@ Default: 10
 .IP
 x11vnc tries to estimate some speed parameters that
 are used to optimize scheduling (e.g. \fB-pointer_mode\fR
-4) and other things.  Use the \fB-speeds\fR option to set
+5) and other things.  Use the \fB-speeds\fR option to set
 these manually.  The triple \fIrd,bw,lat\fR corresponds
 to video h/w read rate in MB/sec, network bandwidth to
 clients in KB/sec, and network latency to clients in
@@ -1239,6 +1257,8 @@ flashcmap       enable  \fB-flashcmap\fR mode.
 .IP
 noflashcmap     disable \fB-flashcmap\fR mode.
 .IP
+shiftcmap:n     set \fB-shiftcmap\fR to n.
+.IP
 notruecolor     enable  \fB-notruecolor\fR mode.
 .IP
 truecolor       disable \fB-notruecolor\fR mode.
@@ -1273,6 +1293,10 @@ noforever       disable \fB-forever\fR mode.
 timeout:n       reset \fB-timeout\fR to n, if there are
                 currently no clients, exit unless one
                 connects in the next n secs.
+.IP
+http            enable  http client connections.
+.IP
+nohttp          disable http client connections.
 .IP
 deny            deny any new connections, same as "lock"
 .IP
@@ -1508,10 +1532,6 @@ desktop:str     set \fB-desktop\fR name to str for new clients.
 .IP
 rfbport:n       set \fB-rfbport\fR to n.
 .IP
-http            enable  http client connections.
-.IP
-nohttp          disable http client connections.
-.IP
 httpport:n      set \fB-httpport\fR to n.
 .IP
 httpdir:dir     set \fB-httpdir\fR to dir (and enable http).
@@ -1592,27 +1612,28 @@ remote command, we hope the name makes it obvious what
 the returned value corresponds to (hint: the ext_*
 variables correspond to the presence of X extensions):
 .IP
-ans= stop quit exit shutdown ping blacken zero refresh
-reset close disconnect id sid waitmapped nowaitmapped
-clip flashcmap noflashcmap truecolor notruecolor
-overlay nooverlay overlay_cursor overlay_yescursor
-nooverlay_nocursor nooverlay_cursor nooverlay_yescursor
-overlay_nocursor visual scale scale_cursor viewonly
-noviewonly shared noshared forever noforever once
-timeout deny lock nodeny unlock connect allowonce allow
-localhost nolocalhost listen lookup nolookup accept
-gone shm noshm flipbyteorder noflipbyteorder onetile
-noonetile solid_color solid nosolid blackout xinerama
-noxinerama xrandr noxrandr xrandr_mode padgeom quiet
-q noquiet modtweak nomodtweak xkb noxkb skip_keycodes
-add_keysyms noadd_keysyms clear_mods noclear_mods
-clear_keys noclear_keys remap repeat norepeat fb nofb
-bell nobell sel nosel primary noprimary cursorshape
-nocursorshape cursorpos nocursorpos cursor show_cursor
-noshow_cursor nocursor arrow xfixes noxfixes xdamage
-noxdamage xd_area xd_mem alphacut alphafrac alpharemove
-noalpharemove alphablend noalphablend xwarp xwarppointer
-noxwarp noxwarppointer buttonmap dragging nodragging
+ans= stop quit exit shutdown ping blacken zero
+refresh reset close disconnect id sid waitmapped
+nowaitmapped clip flashcmap noflashcmap shiftcmap
+truecolor notruecolor overlay nooverlay overlay_cursor
+overlay_yescursor nooverlay_nocursor nooverlay_cursor
+nooverlay_yescursor overlay_nocursor visual scale
+scale_cursor viewonly noviewonly shared noshared
+forever noforever once timeout deny lock nodeny unlock
+connect allowonce allow localhost nolocalhost listen
+lookup nolookup accept gone shm noshm flipbyteorder
+noflipbyteorder onetile noonetile solid_color solid
+nosolid blackout xinerama noxinerama xrandr noxrandr
+xrandr_mode padgeom quiet q noquiet modtweak nomodtweak
+xkb noxkb skip_keycodes add_keysyms noadd_keysyms
+clear_mods noclear_mods clear_keys noclear_keys
+remap repeat norepeat fb nofb bell nobell sel nosel
+primary noprimary cursorshape nocursorshape cursorpos
+nocursorpos cursor show_cursor noshow_cursor nocursor
+arrow xfixes noxfixes xdamage noxdamage xd_area
+xd_mem alphacut alphafrac alpharemove noalpharemove
+alphablend noalphablend xwarp xwarppointer noxwarp
+noxwarppointer buttonmap dragging nodragging
 pointer_mode pm input_skip input client_input speeds
 debug_pointer dp nodebug_pointer nodp debug_keyboard dk
 nodebug_keyboard nodk deferupdate defer wait rfbwait
@@ -1628,11 +1649,12 @@ scale_numer scale_denom scale_fac scaling_noblend
 scaling_nomult4 scaling_pad scaling_interpolate inetd
 safer unsafe passwdfile using_shm logfile o rc norc
 h help V version lastmod bg sigpipe threads clients
-client_count pid ext_xtest ext_xkb ext_xshm ext_xinerama
-ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin
-num_buttons button_mask mouse_x mouse_y bpp depth
-indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y
-cdpy_x cdpy_y coff_x coff_y rfbauth passwd
+client_count pid ext_xtest ext_xtrap ext_xkb ext_xshm
+ext_xinerama ext_overlay ext_xfixes ext_xdamage
+ext_xrandr rootwin num_buttons button_mask mouse_x
+mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x
+wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth
+passwd
 .PP
 \fB-sync\fR
 .IP

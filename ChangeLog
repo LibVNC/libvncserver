@@ -1,3 +1,8 @@
+2005-04-03  Karl Runge <runge@karlrunge.com>
+	* configure.ac: add conditional libXTrap checking
+	* x11vnc: use DEC-XTRAP on old X11R5 for grab control.
+	  -shiftcmap n, -http, fix DAMAGE event leak.
+
 2005-03-29  Karl Runge <runge@karlrunge.com>
 	* x11vnc: fix event leaks, build-time customizations, -nolookup
 
