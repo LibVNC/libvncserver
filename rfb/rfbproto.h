@@ -343,6 +343,7 @@ typedef struct {
 #define rfbEncodingZlib 6
 #define rfbEncodingTight 7
 #define rfbEncodingZlibHex 8
+#define rfbEncodingUltra 9
 #endif
 #ifdef LIBVNCSERVER_BACKCHANNEL
 #define rfbEncodingBackChannel 15
