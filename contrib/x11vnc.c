@@ -127,7 +127,7 @@ int shared = 0;		/* share vnc display. */
 int view_only = 0;	/* client can only watch. */
 int connect_once = 1;	/* allow only one client connection. */
 
-int use_altgr = 0;	/* use the altgr_keyboard modifier tweak */
+int use_modifier_tweak = 0;	/* use the altgr_keyboard modifier tweak */
 
 /*
  * waitms is the msec to wait between screen polls.  Not too old h/w shows
@@ -256,7 +256,14 @@ void initialize_keycodes() {
 	XFree ((void *) keymap);
 }
 
-void tweak_mod(char mod, Bool down) {
+void DebugXTestFakeKeyEvent(Display* dpy, KeyCode keysym, Bool down, time_t cur_time)
+{
+    fprintf(stderr,"XTestFakeKeyEvent(dpy,%s(0x%x),%s,CurrentTime)\n",
+	    XKeysymToString(XKeycodeToKeysym(dpy,keysym,0)),keysym,down?"down":"up");
+    XTestFakeKeyEvent(dpy,keysym,down,cur_time);
+}
+
+void tweak_mod(signed char mod, Bool down) {
 	Bool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
 	X_Bool dn = (X_Bool) down;
 
@@ -274,18 +281,18 @@ void tweak_mod(char mod, Bool down) {
 	    }
 	}
 	if ( ! is_shift && mod == 1 ) {
-		XTestFakeKeyEvent(dpy, left_shift_code, dn, CurrentTime);
+	    XTestFakeKeyEvent(dpy, left_shift_code, dn, CurrentTime);
 	}
-	if ( (mod_state & ALTGR) && mod != 2 ) {
-		XTestFakeKeyEvent(dpy, altgr_code, !dn, CurrentTime);
+	if ( altgr_code && (mod_state & ALTGR) && mod != 2 ) {
+	    XTestFakeKeyEvent(dpy, altgr_code, !dn, CurrentTime);
 	}
-	if ( ! (mod_state & ALTGR) && mod == 2 ) {
-		XTestFakeKeyEvent(dpy, altgr_code, dn, CurrentTime);
+	if ( altgr_code && ! (mod_state & ALTGR) && mod == 2 ) {
+	    XTestFakeKeyEvent(dpy, altgr_code, dn, CurrentTime);
 	}
 	X_UNLOCK
 }
 
-static void altgr_keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
+static void modifier_tweak_keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 	int tweak = 0;
 
@@ -334,8 +341,8 @@ static void keyboard(Bool down, KeySym keysym, rfbClientPtr client) {
 		return;
 	}
 	
-	if (use_altgr) {
-		altgr_keyboard(down, keysym, client);
+	if (use_modifier_tweak) {
+		modifier_tweak_keyboard(down, keysym, client);
 		return;
 	}
 
@@ -1344,9 +1351,9 @@ void print_help() {
 "                       horizontal tiles into one big rectangle)  (default %s).\n"
 "-nohints               do not use hints; send each tile separately.\n"
 "\n"
-"-altgr                 use a mechanism to properly handle the AltGr modifier\n"
-"                       on certain keyboards (default %d).\n"
-"-noaltgr               send the keysym directly to the X server.\n"
+"-modtweak              handle AltGr/Shift modifiers for differing languages\n"
+"                       between client and host (default %d).\n"
+"-nomodtweak            send the keysym directly to the X server.\n"
 "-threads               use threaded algorithm [rfbRunEventLoop] if compiled\n"
 "                       with threads (default %s).\n"
 "-nothreads             do not use [rfbRunEventLoop].\n"
@@ -1358,7 +1365,7 @@ void print_help() {
 ;
 	fprintf(stderr, help, defer_update, waitms, gaps_fill, grow_fill,
 	    fs_frac, tile_fuzz,
-	    use_hints ? "on":"off", use_altgr ? "on":"off",
+	    use_hints ? "on":"off", use_modifier_tweak ? "on":"off",
 	    use_threads ? "on":"off", view_only ? "on":"off",
 	    shared ? "on":"off");
 	rfbUsage();
@@ -1399,10 +1406,10 @@ int main(int argc, char** argv) {
 			use_threads = 1;
 		} else if (!strcmp(argv[i], "-nothreads")) {
 			use_threads = 0;
-		} else if (!strcmp(argv[i], "-altgr")) {
-			use_altgr = 1;
-		} else if (!strcmp(argv[i], "-noaltgr")) {
-			use_altgr = 0;
+		} else if (!strcmp(argv[i], "-modtweak")) {
+			use_modifier_tweak = 1;
+		} else if (!strcmp(argv[i], "-nomodtweak")) {
+			use_modifier_tweak = 0;
 		} else if (!strcmp(argv[i], "-viewonly")) {
 			view_only = 1;
 		} else if (!strcmp(argv[i], "-shared")) {
@@ -1491,7 +1498,7 @@ int main(int argc, char** argv) {
 
 	initialize_shm();
 
-	if (use_altgr) {
+	if (use_modifier_tweak) {
 		initialize_keycodes();
 	}
 
