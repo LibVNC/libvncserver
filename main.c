@@ -471,6 +471,7 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->rfbAlwaysShared = FALSE;
    rfbScreen->rfbNeverShared = FALSE;
    rfbScreen->rfbDontDisconnect = FALSE;
+   rfbScreen->rfbAuthPasswdData = 0;
    
    processArguments(rfbScreen,argc,argv);
 
@@ -580,6 +581,7 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 {
   rfbClientIteratorPtr i;
   rfbClientPtr cl,clPrev;
+  struct timeval tv;
 
   rfbCheckFds(rfbScreen,usec);
   httpCheckFds(rfbScreen);
@@ -590,10 +592,24 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
   i = rfbGetClientIterator(rfbScreen);
   cl=rfbClientIteratorNext(i);
   while(cl) {
-    if(cl->sock>=0 && FB_UPDATE_PENDING(cl))
-      rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
-	clPrev=cl;
-	cl=rfbClientIteratorNext(i);
+    if(cl->sock>=0 && FB_UPDATE_PENDING(cl)) {
+      if(cl->startDeferring.tv_usec == 0) {
+	gettimeofday(&cl->startDeferring,NULL);
+	if(cl->startDeferring.tv_usec == 0)
+	  cl->startDeferring.tv_usec++;
+      } else {
+	gettimeofday(&tv,NULL);
+	if(tv.tv_sec < cl->startDeferring.tv_sec /* at midnight */
+	   || ((tv.tv_sec-cl->startDeferring.tv_sec)*1000
+	       +(tv.tv_usec-cl->startDeferring.tv_usec)/1000)
+	     > cl->screen->rfbDeferUpdateTime) {
+	  cl->startDeferring.tv_usec = 0;
+	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
+	}
+      }
+    }
+    clPrev=cl;
+    cl=rfbClientIteratorNext(i);
     if(clPrev->sock==-1)
       rfbClientConnectionGone(clPrev);
   }

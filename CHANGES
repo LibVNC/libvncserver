@@ -1,4 +1,6 @@
 0.2
+   inserted a deferUpdate mechanism (X11 independent).
+   removed deletion of requestedRegion
    added rfbLoadConsoleFont
    fixed font colour handling.
    added rfbSelectBox

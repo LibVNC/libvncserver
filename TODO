@@ -1,7 +1,6 @@
 immediate:
 ----------
 
-DeferUpdateTime (timing problems!)
 cursor drawing: set optional grain to mark bigger rectangles as drawn (else
 	you end up with thousands of one-pixel-rectangles to encode).
 selectbox: scroll bars
@@ -26,6 +25,7 @@ internal HTTP tunnelling feature (needs a special GET target and a few
 done:
 -----
 
+.DeferUpdateTime (timing problems!)
 .empty cursor sending doesn't work.
 .udp (need an rfbClientPtr udpClient in rfbScreen)
 	input only; nearly untested (don't have the clients).

@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <zlib.h>
 #include "keysym.h"
 
@@ -269,6 +270,8 @@ typedef struct
     PasswordCheckProcPtr passwordCheck;
     char* rfbAuthPasswdData;
 
+    /* this is the amount of milliseconds to wait at least before sending
+     * an update. */
     int rfbDeferUpdateTime;
     char* rfbScreen;
     Bool rfbAlwaysShared;
@@ -406,12 +409,13 @@ typedef struct rfbClientRec {
 
     sraRegionPtr requestedRegion;
 
-    /* TODO: */
-    /* The following members represent the state of the "deferred update" timer
+    /* The following member represents the state of the "deferred update" timer
        - when the framebuffer is modified and the client is ready, in most
        cases it is more efficient to defer sending the update by a few
        milliseconds so that several changes to the framebuffer can be combined
        into a single update. */
+
+      struct timeval startDeferring;
 
     /* translateFn points to the translation function which is used to copy
        and translate a rectangle from the framebuffer to an output buffer. */

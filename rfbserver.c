@@ -185,7 +185,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
     int addrlen = sizeof(struct sockaddr_in);
     int i;
 
-    cl = (rfbClientPtr)malloc(sizeof(rfbClientRec));
+    cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
 
     cl->screen = rfbScreen;
     cl->sock = sock;
