@@ -238,6 +238,25 @@ void initialize_keycodes() {
 	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
 	    &syms_per_keycode);
 
+	/* handle alphabetic char with only one keysym (no upper + lower) */
+	for (i = minkey; i <= maxkey; i++) {
+		X_KeySym lower, upper;
+		/* 2nd one */
+		key = keymap[(i - minkey) * syms_per_keycode + 1];
+		if (key != NoSymbol) {
+			continue;
+		}
+		/* 1st one */
+		key = keymap[(i - minkey) * syms_per_keycode + 0];
+		if (key == NoSymbol) {
+			continue;
+		}
+		XConvertCase(key, &lower, &upper);
+		if (lower != upper) {
+			keymap[(i - minkey) * syms_per_keycode + 0] = lower;
+			keymap[(i - minkey) * syms_per_keycode + 1] = upper;
+		}
+	}
 	for (i = minkey; i <= maxkey; i++) {
 		for (j = 0; j < syms_per_keycode; j++) {
 			key = keymap[ (i - minkey) * syms_per_keycode + j ];
