@@ -5815,7 +5815,7 @@ void print_help() {
 "                       libwrap support.\n"
 "-localhost             Same as -allow 127.0.0.1\n"
 "-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd\n"
-"                       (non-view-only) password must also be supplied.\n"
+"                       (full-access) password must also be supplied.\n"
 "-passwdfile filename   Specify libvncserver -passwd via the first line of the\n"
 "                       file \"filename\" instead of via command line.  If a\n"
 "                       second non blank line exists in the file it is taken\n"
