@@ -86,7 +86,7 @@ CFLAGS = -I..
 noinst_HEADERS = radon.h
 
 noinst_PROGRAMS = example pnmshow regiontest pnmshow24 fontsel \
-	vncev storepasswd colourmaptest $(BACKGROUND_TEST) $(MAC)
+	vncev storepasswd colourmaptest simple simple15 $(BACKGROUND_TEST) $(MAC)
 
 
 LDADD = ../libvncserver.a
@@ -102,7 +102,8 @@ CONFIG_CLEAN_FILES =
 @HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	vncev$(EXEEXT) \
 @HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	storepasswd$(EXEEXT) \
 @HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	colourmaptest$(EXEEXT) \
-@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	mac$(EXEEXT)
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	simple$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	simple15$(EXEEXT) mac$(EXEEXT)
 @HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@noinst_PROGRAMS = example$(EXEEXT) \
 @HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	pnmshow$(EXEEXT) \
 @HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	regiontest$(EXEEXT) \
@@ -110,7 +111,9 @@ CONFIG_CLEAN_FILES =
 @HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	fontsel$(EXEEXT) \
 @HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	vncev$(EXEEXT) \
 @HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	storepasswd$(EXEEXT) \
-@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	colourmaptest$(EXEEXT)
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	colourmaptest$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	simple$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	simple15$(EXEEXT)
 @HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@noinst_PROGRAMS = example$(EXEEXT) \
 @HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	pnmshow$(EXEEXT) \
 @HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	regiontest$(EXEEXT) \
@@ -118,6 +121,8 @@ CONFIG_CLEAN_FILES =
 @HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	fontsel$(EXEEXT) vncev$(EXEEXT) \
 @HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	storepasswd$(EXEEXT) \
 @HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	colourmaptest$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	simple$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	simple15$(EXEEXT) \
 @HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	blooptest$(EXEEXT) mac$(EXEEXT)
 @HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@noinst_PROGRAMS = example$(EXEEXT) \
 @HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	pnmshow$(EXEEXT) \
@@ -127,6 +132,8 @@ CONFIG_CLEAN_FILES =
 @HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	vncev$(EXEEXT) \
 @HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	storepasswd$(EXEEXT) \
 @HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	colourmaptest$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	simple$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	simple15$(EXEEXT) \
 @HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	blooptest$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 
@@ -169,6 +176,16 @@ regiontest_OBJECTS = regiontest.$(OBJEXT)
 regiontest_LDADD = $(LDADD)
 regiontest_DEPENDENCIES = ../libvncserver.a
 regiontest_LDFLAGS =
+simple_SOURCES = simple.c
+simple_OBJECTS = simple.$(OBJEXT)
+simple_LDADD = $(LDADD)
+simple_DEPENDENCIES = ../libvncserver.a
+simple_LDFLAGS =
+simple15_SOURCES = simple15.c
+simple15_OBJECTS = simple15.$(OBJEXT)
+simple15_LDADD = $(LDADD)
+simple15_DEPENDENCIES = ../libvncserver.a
+simple15_LDFLAGS =
 storepasswd_SOURCES = storepasswd.c
 storepasswd_OBJECTS = storepasswd.$(OBJEXT)
 storepasswd_LDADD = $(LDADD)
@@ -190,17 +207,19 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 @AMDEP_TRUE@	$(DEPDIR)/colourmaptest.Po $(DEPDIR)/example.Po \
 @AMDEP_TRUE@	$(DEPDIR)/fontsel.Po $(DEPDIR)/mac.Po \
 @AMDEP_TRUE@	$(DEPDIR)/pnmshow.Po $(DEPDIR)/pnmshow24.Po \
-@AMDEP_TRUE@	$(DEPDIR)/regiontest.Po $(DEPDIR)/storepasswd.Po \
+@AMDEP_TRUE@	$(DEPDIR)/regiontest.Po $(DEPDIR)/simple.Po \
+@AMDEP_TRUE@	$(DEPDIR)/simple15.Po $(DEPDIR)/storepasswd.Po \
 @AMDEP_TRUE@	$(DEPDIR)/vncev.Po
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 DIST_SOURCES = blooptest.c colourmaptest.c example.c fontsel.c mac.c \
-	pnmshow.c pnmshow24.c regiontest.c storepasswd.c vncev.c
+	pnmshow.c pnmshow24.c regiontest.c simple.c simple15.c \
+	storepasswd.c vncev.c
 HEADERS = $(noinst_HEADERS)
 
 DIST_COMMON = $(noinst_HEADERS) Makefile.am Makefile.in
-SOURCES = blooptest.c colourmaptest.c example.c fontsel.c mac.c pnmshow.c pnmshow24.c regiontest.c storepasswd.c vncev.c
+SOURCES = blooptest.c colourmaptest.c example.c fontsel.c mac.c pnmshow.c pnmshow24.c regiontest.c simple.c simple15.c storepasswd.c vncev.c
 
 all: all-am
 
@@ -240,6 +259,12 @@ pnmshow24$(EXEEXT): $(pnmshow24_OBJECTS) $(pnmshow24_DEPENDENCIES)
 regiontest$(EXEEXT): $(regiontest_OBJECTS) $(regiontest_DEPENDENCIES) 
 	@rm -f regiontest$(EXEEXT)
 	$(LINK) $(regiontest_LDFLAGS) $(regiontest_OBJECTS) $(regiontest_LDADD) $(LIBS)
+simple$(EXEEXT): $(simple_OBJECTS) $(simple_DEPENDENCIES) 
+	@rm -f simple$(EXEEXT)
+	$(LINK) $(simple_LDFLAGS) $(simple_OBJECTS) $(simple_LDADD) $(LIBS)
+simple15$(EXEEXT): $(simple15_OBJECTS) $(simple15_DEPENDENCIES) 
+	@rm -f simple15$(EXEEXT)
+	$(LINK) $(simple15_LDFLAGS) $(simple15_OBJECTS) $(simple15_LDADD) $(LIBS)
 storepasswd$(EXEEXT): $(storepasswd_OBJECTS) $(storepasswd_DEPENDENCIES) 
 	@rm -f storepasswd$(EXEEXT)
 	$(LINK) $(storepasswd_LDFLAGS) $(storepasswd_OBJECTS) $(storepasswd_LDADD) $(LIBS)
@@ -261,6 +286,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/pnmshow.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/pnmshow24.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/regiontest.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/simple.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/simple15.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/storepasswd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/vncev.Po@am__quote@
 

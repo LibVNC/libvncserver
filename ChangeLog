@@ -1,3 +1,4 @@
+   added simple and simple15 example (really simple examples)
    long standing http bug (.jar was sent twice) fixed by a friend of Karl named Mike
    http options in cargs
    when closing a client and no longer listening for new ones, don't crash

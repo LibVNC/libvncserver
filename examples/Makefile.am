@@ -12,7 +12,7 @@ endif
 noinst_HEADERS=radon.h
 
 noinst_PROGRAMS=example pnmshow regiontest pnmshow24 fontsel \
-	vncev storepasswd colourmaptest $(BACKGROUND_TEST) $(MAC)
+	vncev storepasswd colourmaptest simple simple15 $(BACKGROUND_TEST) $(MAC)
 
 LDADD = ../libvncserver.a
 
