@@ -256,7 +256,7 @@ int main(int argc,char** argv)
 
   xscreen = DefaultScreen(dpy);
   window = RootWindow(dpy,xscreen);
-  XTestGrabControl(dpy,True);
+  //XTestGrabControl(dpy,True);
 
   init_keycodes();
 
