@@ -561,7 +561,6 @@ int nofb = 0;			/* do not send any fb updates */
 
 unsigned long subwin = 0x0;	/* -id, -sid */
 int subwin_wait_mapped = 0;
-int no_su = 0;			/* -nosu */
 
 int xinerama = 0;		/* -xinerama */
 int xrandr = 0;			/* -xrandr */
@@ -686,15 +685,6 @@ int got_nevershared = 0;
 
 /* -- util.h -- */
 
-// FYI: GB='garbage begin' GE='garbage end'.  Lines ending in //G trimmed too.
-int debug = 0;
-int libvnc_count = 0;
-
-#if defined(__sun)
-long long libvnc_time;
-#else
-double libvnc_time;
-#endif
 #define NONUL(x) ((x) ? (x) : "")
 
 /* XXX usleep(3) is not thread safe on some older systems... */
@@ -823,7 +813,6 @@ int pick_windowid(unsigned long *num) {
 		if (fgets(line, 512, p) == NULL) {
 			break;
 		}
-if (0) fprintf(stderr, "line: %s\n", line);
 		q = strstr(line, " id: 0x"); 
 		if (q) {
 			q += 5;
@@ -1195,7 +1184,6 @@ void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 		rfbLog("XTestFakeKeyEvent(dpy, keycode=0x%x \"%s\", %s)\n",
 		    key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
 		    down ? "down":"up");
-		fflush(stderr);
 	}
 	if (! xtest_present) {
 		return;
@@ -1282,82 +1270,6 @@ void XTestDiscard_wr(Display *dpy) {
 }
 
 
-/* -- vcr.h -- */
-/*
- * experiment to look for vertical copy rect changes
- */
-
-void do_vcr(void);
-void initialize_vcr(void);
-
-#define VCR_HACK
-#ifdef VCR_HACK
-int vcopyrect = 0;
-
-/*
- * vcr_map is a pattern of horizontal offsets for vertical scanlines
- * within a column of changed tiles.  15 is in the middle of the tile,
- * 0 the left edge, 31 the right edge, etc.  It is kind of a recursive
- * bisection of the tile.
- */
-int vcr_map[] = {
-	15,  0, 31,  7, 23,  3, 27, 11, 19,
-	 1,  5,  9, 13, 17, 21, 25, 29,
-	 2,  4,  6,  8, 10, 12, 14, 16,
-	18, 20, 22, 24, 26, 28, 30
-};
-
-/*
- * VCR_DEPTH says how far into the vcr_map[] pattern we consider 
- * e.g. 5 means we consider offsets: 15, 0, 31, 7, 23.
- */
-#define VCR_DEPTH 32
-//int vcr_depth = VCR_DEPTH;
-int vcr_depth = 9;
-
-/*
- * fbd_old and fbd_new are the vertical "scan lines" of fb data.
- * The "40" is just an index into which column (x value) of tiles it
- * corresponds to.
- * The VCR_DEPTH is an index for which of the above vcr_map[] offsets.
- * The 1024 is how tall the display can possibly be (i.e. 1280x1024)
- *
- * fdb_old contains framebuffer pixel data before the copy_tiles() update. 
- * fdb_new contains framebuffer pixel data after  the copy_tiles() update. 
- *
- * By comparing these vectors with one shifted by a vertical offset,
- * we can look for the offset that gives a long run of perfect coincidence
- * of the fb pixel data.  If a coincidence found, then we have a verticle
- * offset for a potential copyRegion transfer (if we find a number >
- * 1 of adjacent scanlines with the same offset to form a rectangle).
- * 
- */
-void	***fbd_old;
-void	***fbd_new;
-char	***fbd_old8;
-char	***fbd_new8;
-short	***fbd_old16;
-short	***fbd_new16;
-int	***fbd_old32;
-int	***fbd_new32;
-
-/* smaller temporary ones to improve horrendous I/O (i.e. fewer pages)  */
-void	**fbt_old;
-void	**fbt_new;
-char	**fbt_old8;
-char	**fbt_new8;
-short	**fbt_old16;
-short	**fbt_new16;
-int	**fbt_old32;
-int	**fbt_new32;
-//int fbd_old[40][VCR_DEPTH][1024];
-//int fbd_new[40][VCR_DEPTH][1024];
-
-sraRegionPtr vcr_change_region = NULL;
-sraRegionPtr vcr_mod_region = NULL;
-
-#endif
-
 /* -- cleanup.c -- */
 /*
  * Exiting and error handling routines
@@ -1443,7 +1355,6 @@ void clean_up_exit (int ret) {
 static void interrupted (int sig) {
 	exit_sig = sig;
 	if (exit_flag) {
-		fprintf(stderr, "extra[%d] signal: %d\n", exit_flag, sig);
 		exit_flag++;
 		if (use_threads) {
 			usleep2(250 * 1000);
@@ -1460,7 +1371,6 @@ static void interrupted (int sig) {
 	}
 	if (sig == SIGINT) {
 		shut_down = 1;
-		fprintf(stderr, "interrupted: set shut_down flag for SIGINT\n");
 		return;
 	}
 
@@ -1481,10 +1391,6 @@ static void interrupted (int sig) {
 		autorepeat(1);
 	}
 
-if (getenv("GDB")) {
-	fprintf(stderr, "getc> ");
-	getc(stdin);
-}
 	if (sig) {
 		exit(2);
 	}
@@ -1614,31 +1520,6 @@ int get_window_size(Window win, int *x, int *y) {
 	}
 }
 
-int bs_w = 0;
-void remove_backingstore_and_saveunders(Window win) {
-	int i, nchild;
-	Window root, parent;
-	Window *child_list;
-	XSetWindowAttributes sattr;
-	for (i=0; i< bs_w; i++) {
-		fprintf(stderr, " ");
-	}
-	bs_w += 2;
-	fprintf(stderr, "0x%lx\n", win);
-	sattr.save_under = False;
-	XChangeWindowAttributes(dpy, win, CWSaveUnder, &sattr);
-
-	if (XQueryTree(dpy, win, &root, &parent, &child_list, &nchild)) {
-		if (child_list && nchild) {
-			for (i=0; i<nchild; i++) {
-				Window twin = child_list[i];
-				remove_backingstore_and_saveunders(twin);
-			}
-		}
-		XFree(child_list);
-	}
-	bs_w -= 2;
-}
 /* signal handlers */
 void initialize_signals(void) {
 	signal(SIGHUP,  interrupted);
@@ -2072,7 +1953,6 @@ static int check_access(char *addr) {
 		} else {
 			chk = p;
 		}
-if (0) fprintf(stderr, "chk: %s\n", chk);
 
 		q = strstr(addr, chk);
 		if (chk[strlen(chk)-1] != '.') {
@@ -2758,13 +2638,11 @@ static void reverse_connect(char *str) {
 		p = strtok(NULL, ", \t\r\n");
 		if (p) {
 			t = 0;
-			rfbLog("reverse_connect: start btw.\n");
 			while (t < sleep_between_host) {
 				usleep(dt * 1000);
 				rfbPE(screen, -1);
 				t += dt;
 			}
-			rfbLog("reverse_connect: end   btw.\n");
 		}
 	}
 	free(tmp);
@@ -2786,14 +2664,12 @@ static void reverse_connect(char *str) {
 	t = sleep_max - sleep_min;
 	tot = sleep_min + ((n-1) * t) / (n_max-1);
 
-	rfbLog("reverse_connect: start sleeping.\n");
 	t = 0;
 	while (t < tot) {
 		rfbPE(screen, -1);
 		usleep(dt * 1000);
 		t += dt;
 	}
-	rfbLog("reverse_connect:   end sleeping.\n");
 }
 
 /*
@@ -4233,50 +4109,6 @@ void initialize_modtweak(void) {
 			}
 		}
 	}
-if (0) {
-	if (debug_keyboard) {
-		int kc, g, l;
-		KeySym ks;
-		fprintf(stderr, "keycodes[] and modifiers[]:\n");
-		for (keysym = 0; keysym < 0x100; keysym++) {
-			char *str = XKeysymToString(keysym);
-			fprintf(stderr, "keysym 0x%02lx code=%03d/%03d index=%3d %s\n",
-			    keysym, keycodes[keysym], XKeysymToKeycode(dpy, keysym),
-			    (int) modifiers[keysym], str ? str : "null");
-		}
-		for (kc = 0; kc < 0x100; kc++)  {
-			unsigned int state = 0;
-			int put = 0;
-			for (g = 1; g <= 4; g++) {
-				for (l = 1; l <= 4; l++) {
-					unsigned int ms;
-					ks = XkbKeycodeToKeysym(dpy, kc, g - 1, l - 1);
-					ms = XkbKeysymToModifiers(dpy, ks);
-					if (ks != NoSymbol) {
-						char *str = XKeysymToString(ks);
-						fprintf(stderr, "%03d G%d L%d mods=%3d 0x%04lx %s\n",
-						    kc, g, l, (int) ms, ks, str ? str : "null");
-						put = 1;
-					}
-				}
-			}
-			fprintf(stderr, "   %03d --\n", kc);
-			while (state < 256) {
-				unsigned int mods;
-				if (XkbLookupKeySym(dpy, kc, state, &mods, &ks)) {
-					char *str = XKeysymToString(ks);
-					fprintf(stderr, "   %03d 0x%lx/%s", state,
-						ks, bitprint(state, 8));
-					fprintf(stderr, "/%s", bitprint(mods, 8));
-					fprintf(stderr, "/%s %s\n", bitprint(state & mods, 8),
-						str ? str : "null");
-				}
-				state++;
-			}
-			if (put) fprintf(stderr, "\n");
-		}
-	}
-}
 
 	left_shift_code = XKeysymToKeycode(dpy, XK_Shift_L);
 	right_shift_code = XKeysymToKeycode(dpy, XK_Shift_R);
@@ -5178,7 +5010,6 @@ int handle_subwin_resize(char *msg) {
 	int new_x, new_y;
 	int i, check = 10, ms = 250;	/* 2.5 secs... */
 
-if (0) fprintf(stderr, "IN    handle_subwin_resize('%s')\n", msg);
 	if (! subwin) {
 		return 0;	/* hmmm... */
 	}
@@ -5216,7 +5047,6 @@ if (0) fprintf(stderr, "IN    handle_subwin_resize('%s')\n", msg);
 		}
 	}
 
-if (0) fprintf(stderr, "IN    handle_subwin_resize('%s')\n", msg);
 	rfbLog("subwin 0x%lx new size: x: %d -> %d, y: %d -> %d\n",
 	    subwin, dpy_x, new_x, dpy_y, new_y);
 	rfbLog("calling handle_xrandr_change() for resizing\n");
@@ -5277,7 +5107,6 @@ int check_xrandr_event(char *msg) {
 	if (! xrandr || ! xrandr_present) {
 		return 0;
 	}
-if (0) fprintf(stderr, "IN    check_xrandr_event('%s')\n", msg);
 	if (XCheckTypedEvent(dpy, xrandr_base_event_type +
 	    RRScreenChangeNotify, &xev)) {
 		int do_change;
@@ -5324,11 +5153,9 @@ if (0) fprintf(stderr, "IN    check_xrandr_event('%s')\n", msg);
 		    XDisplayWidth(dpy, scr), XDisplayHeight(dpy, scr));
 		rfbLog("check_xrandr_event(): returning control to"
 		    " caller...\n");
-if (0) fprintf(stderr, "OUT-%d check_xrandr_event('%s')\n", do_change, msg);
 		return do_change;
 	}
 #endif
-if (0) fprintf(stderr, "OUT-0 check_xrandr_event('%s')\n", msg);
 	return 0;
 }
 
@@ -5421,9 +5248,6 @@ static void selection_request(XEvent *ev) {
 	} else {
 		length = 0;
 	}
-rfbLog("selection_request: owner=0x%x requestor=0x%x sel=%d targ=%d prop=%d\n",
-	req_event->owner, req_event->requestor, req_event->selection,
-	req_event->target, req_event->property);
 
 	/* the window may have gone away, so trap errors */
 	trapped_xerror = 0;
@@ -8967,9 +8791,7 @@ int get_xfixes_cursor(int init) {
 		}
 		if (n_opaque >= alpha_frac * n_alpha) {
 			thresh = alpha_threshold;
-fprintf(stderr, "OK      thresh:  %d/%d\n", n_opaque, n_alpha);
 		} else {
-			int o_opaque = n_opaque;
 			n_opaque = 0;
 			for (i=255; i>=0; i--) {
 				n_opaque += histo[i];
@@ -8978,8 +8800,6 @@ fprintf(stderr, "OK      thresh:  %d/%d\n", n_opaque, n_alpha);
 					break;
 				}
 			}
-fprintf(stderr, "changed thresh: %d -> %d  [%d->%d]/%d\n",
-	alpha_threshold, thresh, o_opaque, n_opaque, n_alpha); 
 		}
 
 		i = 0;
@@ -9730,8 +9550,6 @@ void set_colormap(int reset) {
 			/* XXX XQueryTree somehow? */
 			XQueryPointer(dpy, c, &r, &c, &rx, &ry, &wx, &wy, &m);
 			if (c && XGetWindowAttributes(dpy, c, &attr)) {
-				if (debug) fprintf(stderr, "child: %d  0x%x   cmap: 0x%x  map_installed: %d\n",
-				    tries, (int) c, (int) attr.colormap, attr.map_installed);
 				if (attr.colormap && attr.map_installed) {
 					cmap = attr.colormap;
 					vis = attr.visual;
@@ -9781,7 +9599,6 @@ void set_colormap(int reset) {
 	}
 
 	if (diffs && ! first) {
-		if (debug) fprintf(stderr, "set_colormap: %d changed colormap entries.\n", diffs);
 		if (! all_clients_initialized()) {
 			rfbLog("set_colormap: warning: sending cmap "
 			    "with uninitialized clients.\n");
@@ -10234,9 +10051,6 @@ XImage *initialize_xdisplay_fb(void) {
 		/* try once more */
 		usleep(250 * 1000);
 		goto again;
-	}
-	if (no_su) {
-		remove_backingstore_and_saveunders(window);
 	}
 	if (use_snapfb) {
 		initialize_snap_fb();
@@ -10883,14 +10697,6 @@ void blackout_tiles(void) {
 	 * to simplify things drop down to single copy mode, no vcr, etc...
 	 */
 	single_copytile = 1;
-#ifdef VCR_HACK
-#if 0
-	if (vcopyrect) {
-		rfbLog("disabling vertical copyrect due to blackouts\n");
-		vcopyrect = 0;
-	}
-#endif
-#endif
 
 	/* loop over all tiles. */
 	for (ty=0; ty < ntiles_y; ty++) {
@@ -11072,7 +10878,6 @@ void initialize_xinerama (void) {
 
 	/* max len is 10000x10000+10000+10000 (23 chars) per geometry */
 	rcnt = (int) sraRgnCountRects(black_region);
- fprintf(stderr, "xinerama: rcnt=%d\n", rcnt);
 	bstr = (char *) malloc(30 * (rcnt+1) * sizeof(char));
 	tstr = (char *) malloc(30 * sizeof(char));
 	bstr[0] = '\0';
@@ -11099,7 +10904,6 @@ void initialize_xinerama (void) {
 		sprintf(tstr, "%dx%d+%d+%d,", w, h, x, y);
 		strcat(bstr, tstr);
 	}
- fprintf(stderr, "xinerama: bstr: %s\n", bstr);
 	initialize_blackouts(bstr);
 
 	free(bstr);
@@ -11212,47 +11016,6 @@ typedef struct tile_change_region {
 /* array to hold the tiles region_t-s. */
 static region_t *tile_region;
 
-/* for measurements: */
-static int gap_got, gap_tot, isl_got, isl_tot, noretry;
-static int hints_used, hint_cnt;
-static int wrote_copy_tile_header = 0;
-static int scan_cnt = 0, scan_cnt2 = 0;
-static double scan_ave = 0, scan_ave2 = 0;
-static int memcmp_scan = 0, memcmp_copy = 0, memcpy_copy = 0;
-static int xget_scan = 0, xget_copy = 0;
-static int scale_data = 0;
-
-#if defined(__sun)
-static long long memcpy_copy_time, memcmp_copy_time, memcmp_scan_time;
-static long long copy_tile_time, xshmget_scan_time, xshmget_copy_time;
-static long long scale_time;
-static hrtime_t beg, end;
-static hrtime_t beg2, end2;
-#define BEG_FAC 1000000000
-#define BEG  if(debug) {beg  = gethrtime();}
-#define BEG2 if(debug) {beg2 = gethrtime();}
-#define END(x)  if(debug) {end  = gethrtime(); x += (long long) (end  - beg);} 
-#define END2(x) if(debug) {end2 = gethrtime(); x += (long long) (end2 - beg2);} 
-
-#else
-/* not very fast or accurate */
-static double memcpy_copy_time, memcmp_copy_time, memcmp_scan_time;
-static double copy_tile_time, xshmget_scan_time, xshmget_copy_time;
-static double scale_time;
-static double doub1 = 0.0, doub2 = 0.0;
-static double beg, end;
-static double beg2, end2;
-#define BEG_FAC 1
-#define BEG  if(debug) {beg  = dtime(&doub1);}
-#define BEG2 if(debug) {beg2 = dtime(&doub2);}
-#define END(x)  if(debug) {end  = dtime(&doub1); x +=  (end);} 
-#define END2(x) if(debug) {end2 = dtime(&doub2); x +=  (end2);} 
-#endif
-
-#ifdef VCR_HACK
-static int vcr_shift[VCR_DEPTH];/* vcr_map[]*pixelsize, use in copytile */
-static int vcr_cnt = 0;		/* for statistics. */
-#endif
 
 /*
  * setup tile numbers and allocate the tile and hint arrays:
@@ -11535,11 +11298,6 @@ void initialize_polling_images(void) {
 		fs_frac = 1.1;
 		fs_factor = 0;
 	}
-	if (debug) {
-		int fs_tmp = fs_factor ? fs_factor : 1;
-		rfbLog("fs_factor: %d shm: %d\n", fs_factor,
-		    (bpp/8) * dpy_x * (dpy_y/fs_tmp) );
-	}
 	if (! fs_factor) {
 		rfbLog("warning: fullscreen updates are disabled.\n");
 	} else {
@@ -11694,82 +11452,7 @@ static void hint_updates(void) {
 			in_run = 0;
 		}
 	}
-	hint_cnt = hint_count;	
 
-#ifdef VCR_HACK
- if (vcopyrect && vcr_change_region != NULL) {
-	static char **pic = NULL;
-	int tx2, ty2, x2, y2;
-	sraRegionPtr tmp_region;
-
-	if (pic == NULL) {
-		int n;
-		pic = (char **) malloc(ntiles_x * sizeof(char *));
-		for (n=0; n < ntiles_x; n++) {
-			pic[n] = (char *) malloc(ntiles_y * sizeof(char));
-		}
-	}
-	for (ty2=0; ty2 < ntiles_y; ty2++) {
-		for (tx2=0; tx2 < ntiles_x; tx2++) {
-			char c = ' ';
-			n = tx2 + ty2 * ntiles_x;
-
-			if (tile_has_diff[n]) {
-				c = 'X';
-			} else if (tile_tried[n]) {
-				c = 't';
-			}
-			x2 = tx2 * tile_x;
-			y2 = ty2 * tile_y;
-
-			tmp_region = (sraRegionPtr)
-			    sraRgnCreateRect(x2, y2, x2 + tile_x, y2 + tile_y);
-			if (sraRgnAnd(tmp_region, vcr_change_region)) {
-				if (c == 'X')  {
-					c = '-';	
-				} else if (c == 't')  {
-					c = '_';	
-				} else {
-					c = '.';	
-				}
-			}
-			pic[tx2][ty2] = c;
-			sraRgnDestroy(tmp_region);
-		}
-	}
-	fprintf(stderr, "\n");
-	for (ty2=0; ty2 < ntiles_y; ty2++) {
-		for (tx2=0; tx2 < ntiles_x; tx2++) {
-			fprintf(stderr, "%c", pic[tx2][ty2]);
-		}
-		fprintf(stderr, "\n");
-	}
-	fprintf(stderr, "\n");
-
- fprintf(stderr, "vcr_change_region: 0x%x Rects: %d ", (int) vcr_change_region, (int) sraRgnCountRects(vcr_change_region));
- fprintf(stderr, "vcr_mod_region: 0x%x Rects: %d ", (int) vcr_mod_region, (int) sraRgnCountRects(vcr_mod_region));
-	for (i=0; i < hint_count; i++) {
-		int x = hint_list[i].x;	
-		int y = hint_list[i].y;	
-		int w = hint_list[i].w;	
-		int h = hint_list[i].h;	
-		tmp_region = (sraRegionPtr)
-		    sraRgnCreateRect(x, y, x + w, y + h);
-		sraRgnSubtract(tmp_region, vcr_change_region);
-		if (!sraRgnEmpty(tmp_region)) {
- fprintf(stderr, "M");
-			rfbMarkRegionAsModified(screen, tmp_region);
-		} else {
- fprintf(stderr, "_");
-		}
-		sraRgnDestroy(tmp_region);
-	}
- fprintf(stderr, "\n");
-	sraRgnDestroy(vcr_change_region);
-	vcr_change_region = NULL;
-	return;
- }
-#endif /* VCR_HACK */
 
 	for (i=0; i < hint_count; i++) {
 		/* pass update info to vnc: */
@@ -11951,7 +11634,6 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	int shrink;		/* whether shrinking or expanding */
 	static int constant_weights = -1, cnt = 0;
 
-BEG
 	if (scale_fac <= 1.0) {
 		shrink = 1;
 	} else {
@@ -12059,8 +11741,6 @@ BEG
 				constant_weights = 1;
 			}
 		}
-fprintf(stderr, " scale dx: %.15f\n", dx);
-fprintf(stderr, " scale dy: %.15f\n", dy);
 	}
 	/* set these all to 1.0 to begin with */
 	wx = 1.0;
@@ -12114,7 +11794,6 @@ fprintf(stderr, " scale dy: %.15f\n", dy);
 				I2 = I1 + 1;	/* simple interpolation */
 				ddx = x1 - I1;
 			}
-//if (first) fprintf(stderr, "  I1=%d I2=%d J1=%d J2=%d\n", I1, I2, J1, J2);
 			
 			/* Zero out accumulators for next pixel average: */
 			for (b=0; b<4; b++) {
@@ -12225,12 +11904,6 @@ fprintf(stderr, " scale dy: %.15f\n", dy);
 				w = wx * wy;
 				wtot += w;
 
-#if 0
-if (cnt % 37 == 0)
-	fprintf(stderr, " w=%15.12f  wx=%15.12f  wy=%15.12f wtot=%8.3f "
-	"i=%3d j=%3d idx=%8.3f jdy=%8.3f I=%3d J=%3d\n",
-	w, wx, wy, wtot, i, j, i * dx, j * dy, I, J);
-#endif
 
 				/* 
 				 * We average the unsigned char value
@@ -12256,7 +11929,6 @@ if (cnt % 37 == 0)
 					pixave[2] += w*(us & main_blue_mask);
 				}
 				src += Bpp;
-scale_data += Bpp;
 			    }
 			}
 
@@ -12283,7 +11955,6 @@ scale_data += Bpp;
 			dest += Bpp;
 		}
 	}
-END(scale_time)
 
 	mark_rect_as_modified(i1, j1, i2, j2, 1);
 }
@@ -12348,7 +12019,6 @@ static int copy_tiles(int tx, int ty, int nt) {
 
 	char *src, *dst, *s_src, *s_dst, *m_src, *m_dst;
 	char *h_src, *h_dst;
-BEG2
 	if (! first_line) {
 		/* allocate arrays first time in. */
 		int n = ntiles_x + 1;
@@ -12392,14 +12062,11 @@ BEG2
 	}
 
 	X_LOCK;
-BEG
 	XRANDR_SET_TRAP_RET(-1, "copy_tile-set");
 	/* read in the whole tile run at once: */
 	copy_image(tile_row[nt], x, y, size_x, size_y);
 	XRANDR_CHK_TRAP_RET(-1, "copy_tile-chk");
 
-xget_copy += size_x * size_y * pixelsize;
-END(xshmget_copy_time)
 	X_UNLOCK;
 
 	if (blackouts && tile_blackout[n].cover == 1) {
@@ -12422,7 +12089,6 @@ END(xshmget_copy_time)
 			w = (x2 - x1) * pixelsize;
 			s = x1 * pixelsize;
 
-//fprintf(stderr, "rbo: %d w=%d s=%d x=%d-%d y=%d-%d b=%d\n", n, w, s, x1, x2, y1, y2, b);
 			for (line = 0; line < size_y; line++) {
 				if (y1 <= line && line < y2) {
 					memset(b_dst + s, fill, (size_t) w);
@@ -12441,63 +12107,6 @@ END(xshmget_copy_time)
 	for (t=1; t <= nt; t++) {
 		first_line[t] = -1;
 	}
-BEG
-#ifdef VCR_HACK
-/*
- * This is the great copyrect hunt macro.  See the comments in copytile()
- * for the general description.  The only difference here in copy_tiles()
- * is we have more than one horizontal tile index, tx+(t-1), to deal
- * with.
- */
- {int k;
-	for (k=0; k < vcr_depth; k++) {
-		vcr_shift[k] = vcr_map[k]*pixelsize;
-	}
- }
-#define VCR_FB0(DST,SRC) 	\
- if (vcopyrect) {	\
-	int k, yl = y + line;	\
-	if (bpp == 32) { \
-		for (k=0; k < vcr_depth; k++) {	\
-			memcpy(fbd_old32[tx+(t-1)][k]+yl, \
-			    ((DST)+vcr_shift[k]), 4);	\
-			memcpy(fbd_new32[tx+(t-1)][k]+yl, \
-			    ((SRC)+vcr_shift[k]), 4);	\
-		} \
-	} else if (bpp == 16) { /* XXX */ \
-		for (k=0; k < vcr_depth; k++) {	\
-			memcpy(fbd_old16[tx+(t-1)][k]+yl, \
-			    ((DST)+vcr_shift[k]), 2);	\
-			memcpy(fbd_new16[tx+(t-1)][k]+yl, \
-			    ((SRC)+vcr_shift[k]), 2);	\
-		} \
-	} else if (bpp == 8) { /* XXX */ \
-		for (k=0; k < vcr_depth; k++) {	\
-			memcpy(fbd_old8[tx+(t-1)][k]+yl, \
-			    ((DST)+vcr_shift[k]), 1);	\
-			memcpy(fbd_new8[tx+(t-1)][k]+yl, \
-			    ((SRC)+vcr_shift[k]), 1);	\
-		} \
-	} \
-	vcr_cnt++; \
- }
-
-#define VCR_FB(DST,SRC) 	\
- if (vcopyrect) {	\
-	int k, yl = y + line;	\
-	if (bpp == 32) { \
-		for (k=0; k < vcr_depth; k++) {	\
-			memcpy(fbt_old32[(t-1)*tile_x + k]+(yl % tile_y), \
-			    ((DST)+vcr_shift[k]), 4);	\
-			memcpy(fbt_new32[(t-1)*tile_x + k]+(yl % tile_y), \
-			    ((SRC)+vcr_shift[k]), 4);	\
-		} \
-	} \
-	vcr_cnt++; \
- }
-#else
-#define VCR_FB(DST,SRC)
-#endif /* VCR_HACK */
 
 	/* find the first line with difference: */
 	w1 = width1 * pixelsize;
@@ -12521,13 +12130,10 @@ BEG
 			if (memcmp(s_dst + off, s_src + off, len)) {
 				first_line[t] = line;
 			}
- else { VCR_FB(s_dst + off, s_src + off); }
-			memcmp_copy += len;
 		}
 		s_src += tile_row[nt]->bytes_per_line;
 		s_dst += main_bytes_per_line;
 	}
-END(memcmp_copy_time)
 
 	/* see if there were any differences for any tile: */
 	first_min = -1;
@@ -12544,7 +12150,6 @@ END(memcmp_copy_time)
 		for (t=1; t <= nt; t++) {
 			tile_has_diff[n+(t-1)] = 0;
 		}
-END2(copy_tile_time)
 		return(0);
 	} else {
 		/*
@@ -12561,7 +12166,6 @@ END2(copy_tile_time)
 		}
 	}
 
-BEG
 	m_src = src + (tile_row[nt]->bytes_per_line * size_y);
 	m_dst = dst + (main_bytes_per_line * size_y);
 
@@ -12593,11 +12197,9 @@ BEG
 			} else {
 				len = w1;
 			}
-			memcmp_copy += len;
 			if (memcmp(m_dst + off, m_src + off, len)) {
 				last_line[t] = line;
 			}
- else {VCR_FB(m_dst + off, m_src + off); }
 		}
 	}
 	
@@ -12650,7 +12252,6 @@ BEG
 				dx = dx1;
 			}
 
-			memcmp_copy += (2 - left_diff[t] - right_diff[t]) * dw;
 			if (! left_diff[t] && memcmp(h_dst + off,
 			    h_src + off, dw)) {
 				left_diff[t] = 1;
@@ -12663,50 +12264,17 @@ BEG
 		h_src += tile_row[nt]->bytes_per_line;
 		h_dst += main_bytes_per_line;
 	}
-END(memcmp_copy_time)
 
 	/* now finally copy the difference to the rfb framebuffer: */
-BEG
 	s_src = src + tile_row[nt]->bytes_per_line * first_min;
 	s_dst = dst + main_bytes_per_line * first_min;
 
-#ifdef VCR_HACK
-    if (! vcopyrect) {
-#endif
 	for (line = first_min; line <= last_max; line++) {
 		/* for I/O speed we do not do this tile by tile */
 		memcpy(s_dst, s_src, size_x * pixelsize);
-		memcpy_copy += size_x * pixelsize;
 		s_src += tile_row[nt]->bytes_per_line;
 		s_dst += main_bytes_per_line;
 	}
-#ifdef VCR_HACK
-    } else {
-	w1 = width1 * pixelsize;
-	w2 = width2 * pixelsize;
-
-	for (line = first_min; line <= last_max; line++) {
-		for (t=1; t <= nt; t++) {
-			if (first_line[t] == -1) {
-				continue;
-			}
-			off = (t-1) * w1;
-			if (t == nt) {
-				len = w2;	/* possible short tile */
-			} else {
-				len = w1;
-			}
-/* here VCR_FB must be done before the memcpy otherwise there'd be no diffs */
-VCR_FB(s_dst + off, s_src + off);
-			memcpy(s_dst + off, s_src + off, len);
-			memcpy_copy += len;
-		}
-		s_src += tile_row[nt]->bytes_per_line;
-		s_dst += main_bytes_per_line;
-	}
-    }
-#endif /* VCR_HACK */ 
-END(memcpy_copy_time)
 
 	/* record all the info in the region array for this tile: */
 	for (t=1; t <= nt; t++) {
@@ -12733,23 +12301,7 @@ END(memcpy_copy_time)
 
 		tile_copied[n+s] = 1;
 	}
-#ifdef VCR_HACK
-    if (vcopyrect) {
-	int k, ps = pixelsize;
-	if (bpp == 32) {
-		for (t=1; t <= nt; t++) {
-			for (k=0; k < vcr_depth; k++) {
-				memcpy(fbd_old32[tx+(t-1)][k] + y,
-				    fbt_old32[(t-1)*tile_x + k], tile_y * ps);  
-				memcpy(fbd_new32[tx+(t-1)][k] + y,
-				    fbt_new32[(t-1)*tile_x + k], tile_y * ps);  
-			}
-		}
-	} /* XXX */
-    }
-#endif
 
-END2(copy_tile_time)
 	return(1);
 }
 
@@ -12865,9 +12417,6 @@ static int copy_all_tile_runs(void) {
 			}
 		}
 	}
- if (ntcnt) {
-//	fprintf(stderr, "  ntave: %.1f\n", ((double) ntave)/ntcnt);
- }
 	return diffs;
 }
 
@@ -12900,8 +12449,6 @@ static int copy_tiles_backward_pass(void) {
 				tile_has_diff[m] = 2;
 				ct = copy_tiles(x, y-1, 1);
 				if (ct < 0) return ct;	/* fatal */
-			} else {
-				noretry++;	/* only for statistics */
 			}
 		}
 
@@ -12912,8 +12459,6 @@ static int copy_tiles_backward_pass(void) {
 				tile_has_diff[m] = 2;
 				ct = copy_tiles(x-1, y, 1);
 				if (ct < 0) return ct;	/* fatal */
-			} else {
-				noretry++;
 			}
 		}
 	    }
@@ -12969,7 +12514,6 @@ static int gap_try(int x, int y, int *run, int *saw, int along_x) {
 		*saw = 1;
 		return 0;
 	}
-	gap_tot += *run;
 
 	for (i=1; i <= *run; i++) {	/* iterate thru the run. */
 		if (along_x) {
@@ -12982,16 +12526,11 @@ static int gap_try(int x, int y, int *run, int *saw, int along_x) {
 
 		m = xt + yt * ntiles_x;
 		if (tile_tried[m]) {	/* do not repeat tiles */
-			gap_tot--;
-			noretry++;
 			continue;
 		}
 
 		ct = copy_tiles(xt, yt, 1);
 		if (ct < 0) return ct;	/* fatal */
-		if (tile_has_diff[m]) {
-			gap_got++;
-		}
 	}
 	*run = 0;
 	*saw = 1;
@@ -13054,7 +12593,6 @@ static int island_try(int x, int y, int u, int v, int *run) {
 		/* found a discontinuity */
 
 		if (tile_tried[m]) {
-			noretry++;
 			return 0;
 		} else if (*run < grow_fill) {
 			return 0;
@@ -13062,10 +12600,6 @@ static int island_try(int x, int y, int u, int v, int *run) {
 
 		ct = copy_tiles(u, v, 1);
 		if (ct < 0) return ct;	/* fatal */
-		isl_tot++;
-		if (tile_has_diff[m]) {
-			isl_got++;
-		}
 	}
 	return 1;
 }
@@ -13205,84 +12739,10 @@ int copy_snap(void) {
 		rfbLog("copy_snap: time for -snapfb snapshot: %.3f sec\n", dt);
 		first = 0;
 	}
-	fprintf(stderr, "copy_snap: %.3f sec\n", dt);
 
 	return 0;
 }
 
-/* profiling routines */
-static void do_stats(void) {
-	static double t = 0;
-	if (t == 0) {
-		dtime(&t);
-	}
-#ifdef VCR_HACK
-	if (vcr_cnt && scan_count == NSCAN - 1) {
-		// fprintf(stderr, "vcr_cnt: %d\n", vcr_cnt);
-		vcr_cnt = 0;
-	}
-#endif
-	if ( scan_count == 0 ) {
-		hints_used = 0;
-		gap_got = 0; gap_tot = 0;
-		isl_got = 0; isl_tot = 0;
-		noretry = 0;
-	} else if ( debug && scan_count == NSCAN - 1 ) {
-		int ave = (int) (1000 * (scan_ave/scan_cnt));
-		int ave2 = (int) (1000 * (scan_ave2/scan_cnt2));
-		scan_ave = 0; scan_cnt = 0;
-		scan_ave2 = 0; scan_cnt2 = 0;
-		fprintf(stderr, "All pix %.2fs (s4u aves: all: %dms scan: "
-		    "%dms). tiles: %4d  hints:%3d  retry:%3d  gaps:%3d/%-3d  "
-		    "isl:%3d/%-3d  nap_ok=%d\n",
-		    dtime(&t), ave, ave2, nap_diff_count, hints_used, noretry,
-		    gap_got, gap_tot - gap_got, isl_got, isl_tot - isl_got,
-		    nap_ok);
-		wrote_copy_tile_header = 0;
-	}
-}
-
-/* 
- * debugging: print out a picture of the tiles.
- */
-static void print_tiles(void) {
-	/* hack for viewing tile diffs on the screen. */
-	static char *prev = NULL;
-	int n, x, y, ms = 1500;
-
-	ms = 1;
-
-	if (! prev) {
-		prev = (char *) malloc((size_t) (ntiles * sizeof(char)));
-		for (n=0; n < ntiles; n++) {
-			prev[n] = 0;
-		}
-	}
-	fprintf(stderr, "   ");
-	for (x=0; x < ntiles_x; x++) {
-		fprintf(stderr, "%1d", x % 10);
-	}
-	fprintf(stderr, "\n");
-	n = 0;
-	for (y=0; y < ntiles_y; y++) {
-		fprintf(stderr, "%2d ", y);
-		for (x=0; x < ntiles_x; x++) {
-			if (tile_has_diff[n]) {
-				fprintf(stderr, "X");
-			} else if (prev[n]) {
-				fprintf(stderr, "o");
-			} else {
-				fprintf(stderr, ".");
-			}
-			n++;
-		}
-		fprintf(stderr, "\n");
-	}
-	for (n=0; n < ntiles; n++) {
-		prev[n] = tile_has_diff[n];
-	}
-	usleep(ms * 1000);
-}
 
 /*
  * Utilities for managing the "naps" to cut down on amount of polling.
@@ -13473,9 +12933,6 @@ static int blackout_line_cmpskip(int n, int x, int y, char *dst, char *src,
 		x1 = tile_blackout[n].bo[b].x1 - x;
 		x2 = tile_blackout[n].bo[b].x2 - x;
 
-//fprintf(stderr, "cmpskip[%d]: n=%3d X=%3d Y=%3d y=%d-%d w=%2d ps=%2d "
-//    "beg=%2d end=%2d x=%d-%d\n", b, n, x, y, y1, y2, w, pixelsize,
-//    beg, end, x1, x2);
 		if (y1 > y || y >= y2) {
 			continue;
 		}
@@ -13528,33 +12985,25 @@ static int scan_display(int ystart, int rescan) {
 
 		/* grab the horizontal scanline from the display: */
 		X_LOCK;
-BEG
 		XRANDR_SET_TRAP_RET(-1, "scan_display-set");
 		copy_image(scanline, 0, y, 0, 0);
 		XRANDR_CHK_TRAP_RET(-1, "scan_display-chk");
-xget_scan += main_bytes_per_line;
-END(xshmget_scan_time)
 		X_UNLOCK;
 
 		/* for better memory i/o try the whole line at once */
 		src = scanline->data;
 		dst = main_fb + y * main_bytes_per_line;
 
-BEG
 		if (whole_line && ! memcmp(dst, src, main_bytes_per_line)) {
 			/* no changes anywhere in scan line */
-			memcmp_scan += main_bytes_per_line;
 			nodiffs = 1;
 			if (! rescan) {
-END(memcmp_scan_time)
 				y += NSCAN;
 				continue;
 			}
 		}
-END(memcmp_scan_time)
 
 		x = 0;
-BEG
 		while (x < dpy_x) {
 			n = (x/tile_x) + (y/tile_y) * ntiles_x;
 
@@ -13599,34 +13048,14 @@ BEG
 						tile_count++;		
 					}
 				}
-			} else {	
-				memcmp_scan += w * pixelsize;
 			}
 			x += NSCAN;
 		}
 		y += NSCAN;
-END(memcmp_scan_time)
 	}
 	return tile_count;
 }
 
-#if 0
-void check_key_down(void) {
-	double t = 0.0;
-	if (last_keyboard_input < 0) {
-		rfbCFD(screen, 1000);
-		if (last_keyboard_input) {
-			fprintf(stderr, "key *SWITCH*\n");
-		}
-	}
-	dtime(&t);
-	if (last_keyboard_input < 0) {
-		fprintf(stderr, "key DOWN: %3d  %12.6f\n", -last_keyboard_input, t - 1089481179.0);
-	} else {
-		fprintf(stderr, "key up:   %3d  %12.6f\n", +last_keyboard_input, t - 1089481179.0);
-	}
-}
-#endif
 
 /*
  * toplevel for the scanning, rescanning, and applying the heuristics.
@@ -13638,32 +13067,6 @@ int scan_for_updates(int count_only) {
 	double frac1 = 0.1;   /* tweak parameter to try a 2nd scan_display() */
 	double frac2 = 0.35;  /* or 3rd */
 	double frac3 = 0.02;  /* do scan_display() again after copy_tiles() */
-	double t = 0, t2 = 0, dt2;
-	double d1, d2, d3, d4, d = 0;
-	int full = 0;
-	int gap_g, gap_t, isl_g, isl_t, gap_n, isl_n, tdiff;
-
-	memcmp_scan = 0; memcmp_copy = 0; memcpy_copy = 0;
-	xget_scan = 0; xget_copy = 0;
-	memcpy_copy_time = 0;
-	memcmp_copy_time = 0;
-	memcmp_scan_time = 0;
-	xshmget_copy_time = 0;
-	xshmget_scan_time = 0;
-	copy_tile_time = 0;
-	scale_time = 0;
-	scale_data = 0;
-	dtime(&t2);
-	dtime(&d);
-
-	do_stats();
-	if (debug) {
-		dtime(&t);
-	}
-	if (debug && scan_count == 0) {
-		fflush(stderr);
-		fflush(stdout);
-	}
 	for (i=0; i < ntiles; i++) {
 		tile_has_diff[i] = 0;
 		tile_tried[i] = 0;
@@ -13711,7 +13114,6 @@ int scan_for_updates(int count_only) {
 
 	nap_set(tile_count);
 
-	dt2 = dtime(&t2);
 	if (fs_factor && frac1 >= fs_frac) {
 		/* make frac1 < fs_frac if fullscreen updates are enabled */
 		frac1 = fs_frac/2.0;
@@ -13733,13 +13135,11 @@ int scan_for_updates(int count_only) {
 			tile_count = scan_display(scanlines[cp], 1);
 			SCAN_FATAL(tile_count);
 
-			dt2 += dtime(&t2);
 			if (tile_count >= (1 + frac2) * tile_count_old) {
 				/* on a roll... do a 3rd scan */
 				cp = (NSCAN - scan_count + 7) % NSCAN;
 				tile_count = scan_display(scanlines[cp], 1);
 				SCAN_FATAL(tile_count);
-				dt2 += dtime(&t2);
 			}
 		}
 		scan_in_progress = 0;
@@ -13767,16 +13167,11 @@ int scan_for_updates(int count_only) {
 			if (use_threads && pointer_mode != 1) {
 				pointer(-1, 0, 0, NULL);
 			}
-			/* go finish the stats collecting, etc */
-			full = 1;
-			tile_diffs = tile_count;
-			goto finish;
 			nap_check(tile_count);
 			return tile_count;
 		}
 	}
 	scan_in_progress = 0;
-	dtime(&d);
 
 	/* copy all tiles with differences from display to rfb framebuffer: */
 	fb_copy_in_progress = 1;
@@ -13799,7 +13194,6 @@ int scan_for_updates(int count_only) {
 	} else {
 		tile_diffs = copy_all_tile_runs();
 	}
-	d1 = dtime(&d);
 	SCAN_FATAL(tile_diffs);
 
 	/*
@@ -13824,43 +13218,18 @@ int scan_for_updates(int count_only) {
 		tile_diffs = copy_tiles_additional_pass();
 		SCAN_FATAL(tile_diffs);
 	}
-	d2 = dtime(&d);
-	isl_n = noretry;
-	isl_g = isl_got;
-	isl_t = isl_tot;
 
 	/* Given enough tile diffs, try the islands: */
 	if (grow_fill && tile_diffs > 4) {
 		tile_diffs = grow_islands();
 	}
 	SCAN_FATAL(tile_diffs);
-	d3 = dtime(&d);
-
-	isl_n = noretry - isl_n;
-	isl_g = isl_got - isl_g;
-	isl_t = isl_tot - isl_t;
-
-	gap_n = noretry;
-	gap_g = gap_got;
-	gap_t = gap_tot;
 
 	/* Given enough tile diffs, try the gaps: */
 	if (gaps_fill && tile_diffs > 4) {
 		tile_diffs = fill_tile_gaps();
 	}
 	SCAN_FATAL(tile_diffs);
-	d4 = dtime(&d);
-
-	gap_n = noretry - gap_n;
-	gap_g = gap_got - gap_g;
-	gap_t = gap_tot - gap_t;
-
-	if (0) print_tiles();
-#ifdef VCR_HACK
-	if (vcopyrect) {
-		do_vcr();
-	}
-#endif
 
 	fb_copy_in_progress = 0;
 	if (use_threads && pointer_mode != 1) {
@@ -13891,138 +13260,6 @@ int scan_for_updates(int count_only) {
 		ping_clients(tile_diffs);
 	}
 
-finish:
-
-	tdiff = 0;
-	for (i=0; i < ntiles; i++) {
-		if (tile_has_diff[i]) {
-			tdiff++;
-		}
-	}
-	if (debug) {
-		double dt = dtime(&t);
-
-		hints_used += hint_cnt;
-		scan_ave += dt;
-		scan_cnt++;
-		scan_ave2 += dt2;
-		scan_cnt2++;
-
-	    if (tdiff >= 4) {
-		double rat = dt / (tdiff ? tdiff : 1);
-		double libvnc = (double) libvnc_time / BEG_FAC;
-
-		if (full) {
-			double rat2 = dt / ntiles;
-			double rat3 = dpy_x * dpy_y * (bpp/8) / (dt - dt2);
-
-
-			rat3 /= 1000000;
-			rat3 *= 2;	/* both XShmGetImage and memcpy to fb */
-			fprintf(stderr, "fullscreen: %6.3f %4d %4d  %4.1f ms "
-			    "-- (%.3f)  T/ntiles %.2f ms  rate: %5.1f MB/s "
-			    "vnc: %.3f/%d\n",
-			    dt, tile_count, tdiff, 1000*rat, dt2, 1000*rat2,
-			    rat3, libvnc, libvnc_count);
-		} else {
-			/*
-			 * dt = full time
-			 * dt2 = scan_display (sum for both if applicable)
-			 * d1 = copy_all_tiles
-			 * d2 = copy_tiles_backward_pass
-			 * d3 = grow_islands
-			 * d4 = fill_tile_gaps
-			 * memcmp_scan number of bytes; memcmp_scan_time ns
-			 * memcpy_copy number of bytes; memcpy_copy_time ns
-			 * memcmp_copy number of bytes;	memcmp_copy_time ns
-			 */
-			double mrat1 = (memcmp_scan) / (dt2);
-			double mrat2 = (memcpy_copy) / (d1 + d2 + d3 + d4);
-			double mrat3 = (memcmp_copy) / (d1 + d2 + d3 + d4);
-			double mrat4, mrat5, mrat6, mrat7;
-			double time4, time5, time6, time7;
-			double xrat1, xrat2;
-			double xshm_scan, xshm_copy;
-			double scale_tm, scale_amt;
-			double ct_time;
-
-			/* convert to (overall func. call) MB/sec */
-			mrat1 = mrat1 / 1000000;	/* scanline memcmp */
-			mrat2 = mrat2 / 1000000;	/* copytile memcpy */
-			mrat3 = mrat3 / 1000000;	/* copytile memcmp */
-
-			/* now work out more accurate rates MB/sec */
-			time4 = (double) memcpy_copy_time / BEG_FAC;
-			mrat4 = memcpy_copy / time4;
-			mrat4 = mrat4 / 1000000;	/* copytile memcpy */
-
-			time5 = (double) memcmp_copy_time / BEG_FAC;
-			mrat5 = memcmp_copy / time5;
-			mrat5 = mrat5 / 1000000;	/* copytile memcmp */
-
-			time6 = (double) memcmp_scan_time / BEG_FAC;
-			mrat6 = memcmp_scan / time6;
-			mrat6 = mrat6 / 1000000;	/* scanline memcmp */
-
-			/* total time in copytile() */
-			ct_time = (double) copy_tile_time / BEG_FAC;
-			/* total xshmgetimage copytile */
-			xshm_copy = (double) xshmget_copy_time / BEG_FAC;
-			/* total xshmgetimage scanline */
-			xshm_scan = (double) xshmget_scan_time / BEG_FAC;
-
-			/* total scale_and_mark time */
-			scale_tm = (double) scale_time / BEG_FAC;
-			scale_amt = (double) scale_data / 1000000;
-			time7 = (double) scale_time / BEG_FAC;
-			if (time7 == 0.0) time7 = 1.0;
-			mrat7 = scale_data / time7;
-			mrat7 = mrat7 / 1000000;	/* scale_and_mark rate */
-
-
-			xrat1 = xget_scan / (1000000 * xshm_scan);
-			xrat2 = xget_copy / (1000000 * xshm_copy);
-
-			if (! wrote_copy_tile_header) {
-				fprintf(stderr, "----------   Time tlcnt tldif "
-				" T/tld  -- (Tscan)  - Tcopy  Tisl   Tgap   R "
-				"Tcp2/cp1 Tisl/cp Tgap/cp    Y/N-retry  "
-				"Y/N-retry\n");
-				wrote_copy_tile_header = 1;
-			}
-			fprintf(stderr, "copy_tile:  %6.3f %4d %4d  %4.1f ms --"
-			    " (%.3f)  - %.3f  %.3f  %.3f  R (%.3f)   %.3f  %.3f"
-			    "  isl=%d/%d-%d\tgap=%d/%d-%d\n    "
-			    "# scanline: cmp=%7d rate=%5.1f MB/s mcmp=%.4f"
-				" | xshm=%.4f st=%.4f xt/st=%.2f xrate_s=%5.1f "
-				"MB/s\n    "
-			    "# copytile: cmp=%7d rate=%5.1f MB/s mcmp=%.4f"
-				" | vnc: %.4f/%03d  scale: %.4f %5.2f MB  %5.1f MB/s\n    "
-			    "            cpy=%7d rate=%5.1f MB/s mcpy=%.4f"
-				" | xshm=%.4f ct=%.4f xt/ct=%.2f xrate_c=%5.1f "
-				"MB/s\n",
-			    dt, tile_count, tdiff, 1000*rat, dt2,
-			    d1 + d2, d3, d4,
-			    d2/d1, d3/(d1+d2), d4/(d1+d2),
-			    isl_g, isl_t - isl_g, isl_n,
-			    gap_g, gap_t - gap_g, gap_n,
-			    memcmp_scan, mrat6, time6,
-			    xshm_scan, dt2, xshm_scan/dt2, xrat1,
-			    memcmp_copy, mrat5, time5,
-			    libvnc, libvnc_count,
-			    scale_tm, scale_amt, mrat7,
-			    memcpy_copy, mrat4, time4,
-			    xshm_copy, ct_time, xshm_copy/ct_time, xrat2
-			);
-			if (0 && isl_g < 5 && isl_t - isl_g > 30 ) {
-				print_tiles();
-			}
-		}
-    		libvnc_time = 0;
-    		libvnc_count = 0;
-	    }
-	}
-	/* end of profile timing junk */
 
 	nap_check(tile_diffs);
 	return tile_diffs;
@@ -14311,9 +13548,7 @@ static void check_user_input2(double dt) {
 	double quick_spin_fac  = 0.40;
 	double grind_spin_time = 0.175;
 
-	int gb = 1;
 
-	if (gb) fprintf(stderr, "\n GOT dt: %.3f  gpi: %d\n", dt, got_pointer_input);
 
 	dtime(&tm);
 	g = g_in = got_pointer_input;
@@ -14342,15 +13577,12 @@ static void check_user_input2(double dt) {
 		XFlush(dpy);
 
 		spin += dtime(&tm);
-		if (gb) fprintf(stderr, "  sp=%.3f ", spin);
 
 		if (spin > quick_spin_fac * dt) {
 			/* get out if spin time comparable to last scan time */
-			if (gb) fprintf(stderr, " SPIN-OUT: %.3f qsf * dt: %.3f", spin, quick_spin_fac * dt);
 			break;
 		}
 		if (got_pointer_input > g) {
-			if (gb) fprintf(stderr, "-%d", got_pointer_input - g_in);
 			g = got_pointer_input;
 			if (eaten++ < max_eat) {
 				continue;
@@ -14359,13 +13591,10 @@ static void check_user_input2(double dt) {
 			miss++;
 		}
 		if (miss > 1) {	/* 1 means out on 2nd miss */
-			if (gb) fprintf(stderr, " MISS-BRK: %.3f", spin);
 			break;
 		}
 	}
 
-	if (gb && eaten >= max_eat) fprintf(stderr, " +MAX_EAT");
-	if (gb) fprintf(stderr, "\n");
 
 	/*
 	 * Probably grinding with a lot of fb I/O if dt is this large.
@@ -14401,17 +13630,14 @@ static void check_user_input2(double dt) {
 
 		g = got_pointer_input;
 		miss = 0;
-		if (gb) fprintf(stderr, " GRIND ms: %d ", ms);
 		for (i=0; i<split; i++) {
 			usleep(ms * 1000);
-			if (gb) fprintf(stderr, "*");
 			if (show_multiple_cursors) {
 				rfbPE(screen, 1000);
 			} else {
 				rfbCFD(screen, 1000);
 			}
 			spin += dtime(&tm);
-			if (gb) fprintf(stderr, "%d", got_pointer_input - g_in);
 			if (got_pointer_input > g) {
 				XFlush(dpy);
 				miss = 0;
@@ -14426,8 +13652,6 @@ static void check_user_input2(double dt) {
 				break;
 			}
 		}
-		if (gb && i == split) fprintf(stderr, " +MAX_GR");
-		if (gb) fprintf(stderr, " spin: %.3f\n", spin);
 	}
 }
 
@@ -14441,16 +13665,13 @@ static void check_user_input3(double dt, double dtr, int tile_diffs) {
 	int gcnt, ginput;
 	static int first = 1;
 
-	static int gb = 1;
 
 	if (first) {
 		char *p = getenv("SPIN");
 		if (p) {
 			double junk;
 			sscanf(p, "%lf,%lf", &dt_cut, &junk);
-			gb = 1;
 		}
-fprintf(stderr, " dt_cut: %f \n", dt_cut);
 		first = 0;
 	}
 
@@ -14458,7 +13679,6 @@ fprintf(stderr, " dt_cut: %f \n", dt_cut);
 		return;
 	}
 
-if (gb) fprintf(stderr, "\n GOT dt: %.3f  gpi: %d\n", dt, got_pointer_input);
 
 	if (dt < dt_cut) {
 		dt = dt_cut;	/* this is to try to avoid early exit */
@@ -14492,7 +13712,6 @@ if (gb) fprintf(stderr, "\n GOT dt: %.3f  gpi: %d\n", dt, got_pointer_input);
 
 		dtm = dtime(&tm);
 		spin += dtm;
-if (gb) fprintf(stderr, " dtm=%.4f", dtm);
 
 		if (got_pointer_input == g) {
 			if (last_was_miss) {
@@ -14510,11 +13729,9 @@ if (gb) fprintf(stderr, " dtm=%.4f", dtm);
 
 		if (spin > spin_max) {
 			/* get out if spin time over limit */
-if (gb) fprintf(stderr, " SPIN-OUT: %.4f", spin);
 			break;
 
 		} else if (got_pointer_input > g) {
-if (gb) fprintf(stderr, ">>%d/dtp=%.4f, ", got_pointer_input - g_in, tm - to); to = tm;
 			/* received some input, flush to display. */
 			got_input = 1;
 			g = got_pointer_input;
@@ -14523,11 +13740,9 @@ if (gb) fprintf(stderr, ">>%d/dtp=%.4f, ", got_pointer_input - g_in, tm - to); t
 			X_UNLOCK;
 		} else if (--allowed_misses <= 0) {
 			/* too many misses */
-if (gb) fprintf(stderr, ">>*M\nMISS-BRK: %.4f", spin);
 			break;
 		} else if (consecutive_misses >=3) {
 			/* too many misses */
-if (gb) fprintf(stderr, ">>*M\nMISS-CONS: %.4f", spin);
 			break;
 		} else {
 			/* these are misses */
@@ -14540,12 +13755,9 @@ if (gb) fprintf(stderr, ">>*M\nMISS-CONS: %.4f", spin);
 				 * will batch them.
 				 */
 				wms = 50;
-if (gb) fprintf(stderr, ">>*M-FST, ");
 			} else if (button_mask) {
 				wms = 10;
-if (gb) fprintf(stderr, ">>*M, ");
 			} else {
-if (gb) fprintf(stderr, ">>*M, ");
 			}
 			if (wms) {
 				usleep(wms * 1000);
@@ -14560,7 +13772,6 @@ if (gb) fprintf(stderr, ">>*M, ");
 		}
 	}
 
-if (gb) fprintf(stderr, "\n");
 	drag_in_progress = 0;
 }
 
@@ -14576,7 +13787,6 @@ int fb_update_sent(int *count) {
 	}
 	rfbReleaseClientIterator(i);
 	if (sent != last_count) {
-		if (0) fprintf(stderr, "\n***FB_UPDATE_SENT***\n");
 		rc = 1;
 	}
 	if (count != NULL) {
@@ -14588,7 +13798,6 @@ int fb_update_sent(int *count) {
 
 static void check_user_input4(double dt, double dtr, int tile_diffs) {
 
-static int gb = 1;
 	int g, g_in, i, ginput, gcnt, tmp;
 	int last_was_miss, consecutive_misses;
 	int min_frame_size = 10;	/* 10 tiles */
@@ -14612,9 +13821,7 @@ static int gb = 1;
 		char *p = getenv("SPIN");
 		if (p) {
 			sscanf(p, "%lf,%lf,%lf,%lf", &dt_cut, &Tfac_r, &Tfac_v, &Tfac_n);
-			gb = 1;
 		}
-		fprintf(stderr, "dt_cut: %f Tfac_r/r: %f/%f Tdelay: %f\n", dt_cut, Tfac_r, Tfac_v, Tdelay);
 		first = 0;
 		ssec = time(0);
 	}
@@ -14670,16 +13877,11 @@ static int gb = 1;
 			}
 			/* damn, they didn't push our frame! */
 			iter++;
-			if (gb && iter == 1) fprintf(stderr, "PUSH_FRAME:");
-			if (gb) fprintf(stderr, " %d", iter);
-//			measure_send_rates(1);
 			rfbPE(screen, rfb_wait_ms * 1000);
-//			measure_send_rates(0);
 			
 			push_spin += dtime(&tp);
 		}
 		if (iter) {
-			if (gb) fprintf(stderr, "\n");
 			X_LOCK;
 			XFlush(dpy);
 			X_UNLOCK;
@@ -14692,7 +13894,6 @@ static int gb = 1;
 	 * when we first enter we require some pointer input
 	 */
 	if (!got_pointer_input) {
-		if (gb && dtr > 0.05) fprintf(stderr, "-- dt: %.3f  dtr: %.3f\n", dt, dtr);
 		return;
 	}
 
@@ -14721,13 +13922,6 @@ static int gb = 1;
 	rpe_last = to = tc = tm;	/* last time we did rfbPE() */
 	g = g_in = got_pointer_input;
 
-	if (gb) {
-		fprintf(stderr, "\n GOT dt: %.3f  dtr: %.3f  gpi: %d   dt_min: %.3f"
-		    " dt_max: %.3f  TD= %d  Ttiletm: %.3f"
-		    " now: %.3f  vnccpu_rate: %.2f KB/sec  screen_rate: %.2f MB/sec net_rate: %.2f KB/sec Delay: %.4f sec \n",
-		    dt, dtr, got_pointer_input, dt_min, dt_max,
-		    tile_diffs, Ttile * tile_diffs, tm - ssec, vnccpu_rate / 1000, screen_rate / 1000000, net_rate/1000, Tdelay);
-	}
 	tile_diffs = 0;	/* reset our knowlegde of tile_diffs to zero */
 
 	while (1) {
@@ -14749,9 +13943,7 @@ static int gb = 1;
 		if ( (gcnt == 1 && got_pointer_input > g) || tm-tc > 2*dt_min) {
 			tile_diffs = scan_for_updates(1);
 			tc = tm;
-			if (gb) fprintf(stderr, " NewTD%s=%d/%.3f", tile_diffs > 10 ? "*" : "", tile_diffs, spin);
 		}
-		if (gb) fprintf(stderr, " dtm%s=%.4f", dtm >= 0.05 ? "*" : "", dtm);
 
 		if (got_pointer_input == g) {
 			if (last_was_miss) {
@@ -14766,7 +13958,6 @@ static int gb = 1;
 
 		if (tile_diffs > min_frame_size && spin > Ttile * tile_diffs + Tdelay) {
 			/* we think we can push the frame */
-			if (gb) fprintf(stderr, "\n ##FRAME-OUT: %.4f Btile: %d del: %.3f", spin, Btile * tile_diffs, tm - ssec);
 			push_frame = 1;
 			fb_update_sent(&update_count);
 			break;
@@ -14778,11 +13969,9 @@ static int gb = 1;
 			X_LOCK;
 			XFlush(dpy);
 			X_UNLOCK;
-			if (gb) fprintf(stderr, "++%d/dtp=%.4f, ", got_pointer_input - g_in, tm - to); to = tm;
 
 		} else if (consecutive_misses >= 2) {
 			/* too many misses in a row */
-			if (gb) fprintf(stderr, ">>*M\nMISS-CONS: %.4f del: %.3f", spin, tm - ssec);
 			break;
 
 		} else {
@@ -14796,17 +13985,13 @@ static int gb = 1;
 				 * of them for the next read.
 				 */
 				wms = 50;
-				if (gb) fprintf(stderr, ">>*M-FST, ");
 
 			} else if (button_mask) {
 				wms = 10;
-				if (gb) fprintf(stderr, ">>*M-DRG, ");
 			} else {
 				wms = 0;
-				if (gb) fprintf(stderr, ">>*M, ");
 			}
 			if (wms) {
-				if (gb) fprintf(stderr, "wms=%d, ", wms);
 				usleep(wms * 1000);
 			}
 		}
@@ -14817,7 +14002,6 @@ static int gb = 1;
 			rfbCFD(screen, rfb_wait_ms * 1000);
 		}
 	}
-	if (gb) fprintf(stderr, "\n");
 	drag_in_progress = 0;
 }
 
@@ -15040,8 +14224,6 @@ void measure_send_rates(int init) {
 		ClientData *cd = (ClientData *) cl->clientData;
 		tmp2 = 0.0;
 		dtime(&tmp2);
-fprintf(stderr, "client num rects init=%d: req: %d  mod: %d  time: %.3f\n", init,
-	(int) sraRgnCountRects(cl->requestedRegion), (int) sraRgnCountRects(cl->modifiedRegion), tmp2);
 if (init) {
 	continue;
 }
@@ -15120,7 +14302,6 @@ if (init) {
 		dbr = rbs - cd->set_raw_bytes;
 		cmp_rate = db/dt;
 		raw_rate = dbr/dt;
-fprintf(stderr, "RATE: %11.2f  RAW: %11.2f  dt: %.3f  B: %7d R: %7d\n", cmp_rate, raw_rate, dt, db, dbr);
 		if (dbr > min_width * min_width * bpp/8) {
 			cd->sample++;
 			if (cd->sample >= RATE_SAMPLES) {
@@ -15143,11 +14324,7 @@ void rfbPE(rfbScreenInfoPtr scr, long usec) {
 		return;
 	}
 	if (! use_threads) {
-BEG
-measure_send_rates(1);
 		rfbProcessEvents(scr, usec);
-measure_send_rates(0);
-END(libvnc_time); libvnc_count++;
 	}
 }
 
@@ -15156,9 +14333,7 @@ void rfbCFD(rfbScreenInfoPtr scr, long usec) {
 		return;
 	}
 	if (! use_threads) {
-BEG
 		rfbCheckFds(scr, usec);
-END(libvnc_time); libvnc_count++;
 	}
 }
 
@@ -15183,9 +14358,7 @@ static void watch_loop(void) {
 		if (! use_threads) {
 			double tm = 0.0;
 			dtime(&tm);
-//			measure_send_rates(1);
 			rfbPE(screen, -1);
-//			measure_send_rates(0);
 			dtr = dtime(&tm);
 			fb_update_sent(NULL);
 
@@ -15351,12 +14524,6 @@ static void print_help(void) {
 "                       shifts a root view to it: this shows SaveUnders menus,\n"
 "                       etc, although they will be clipped if they extend beyond\n"
 "                       the window.\n"
-#if 0
-"-nosu                  Intended for use with -id windowid.  Follow the window\n"
-"                       tree down and *irreversibly* disable BackingStore and\n"
-"                       SaveUnders for all windows.  The hope is this will show\n"
-"                       the popups and menus in -id mode.  Use with caution.\n"
-#endif
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
 "-notruecolor           For 8bpp displays, force indexed color (i.e. a colormap)\n"
@@ -16304,25 +15471,6 @@ static void print_help(void) {
 "These options are passed to libvncserver:\n"
 "\n"
 ;
-//"                       It also sets -xwarppointer, use -noxwarppointer to undo.\n"
-	char help2[] =
-"but first, here are some experimental ones (your version may not have them):\n"
-"\n"
-"-d                     Turn on debugging and stats output.\n"
-"-naptile n             Cutoff/max number of tile changes per poll to permit\n"
-"                       a nap between polls.  Use 0 to disable.  Default %d\n"
-"-napfac n              Factor by which to multiply the wait ms (see -wait)\n"
-"                       to get the nap time.  Default: %d times waitms\n"
-"-napmax time           Maximum time in ms for a nap.  Default: %d\n"
-#ifdef VCR_HACK
-"-vcr                   Vertical CopyRect. Enable an experimental hack to detect\n"
-"                       vertical displacements (i.e. scrolls) and send them\n"
-"                       using the very efficient CopyRect encoding. UNSTABLE!\n"
-#endif
-"\n"
-"These options are passed to libvncserver:\n"
-"\n"
-;
 	/* have both our help and rfbUsage to stdout for more(1), etc. */
 	dup2(1, 2);
 	fprintf(stderr, help, lastmod,
@@ -16347,9 +15495,6 @@ static void print_help(void) {
 		tile_fuzz,
 		""
 	);
-	if (getenv("X11VNC_STD_HELP") == NULL) {
-		fprintf(stderr, help2, naptile, napfac, napmax);
-	}
 
 	rfbUsage();
 	exit(1);
@@ -16655,9 +15800,6 @@ static void check_rcfile(int argc, char **argv) {
 			exit(1);
 		}
 	}
-	for (i=0; i < argc2; i++) {
-//		fprintf(stderr, "argv2[%d] \"%s\"\n", i, argv2[i]);
-	}
 }
 
 int main(int argc, char* argv[]) {
@@ -16752,8 +15894,6 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-waitmapped")) {
 			subwin_wait_mapped = 1;
-		} else if (!strcmp(arg, "-nosu")) {
-			no_su = 1;
 		} else if (!strcmp(arg, "-flashcmap")) {
 			flash_cmap = 1;
 		} else if (!strcmp(arg, "-notruecolor")) {
@@ -17054,21 +16194,6 @@ int main(int argc, char* argv[]) {
 			safe_remote_only = 1;
 		} else if (!strcmp(arg, "-deny_all")) {
 			deny_all = 1;
-		} else if (!strcmp(arg, "-d") || !strcmp(arg, "-debug")) {
-			debug = 1;
-		} else if (!strcmp(arg, "-naptile")) {
-			CHECK_ARGC
-			naptile = atoi(argv[++i]);
-		} else if (!strcmp(arg, "-napfac")) {
-			CHECK_ARGC
-			napfac = atoi(argv[++i]);
-		} else if (!strcmp(arg, "-napmax")) {
-			CHECK_ARGC
-			napmax = atoi(argv[++i]);
-#ifdef VCR_HACK
-		} else if (!strcmp(arg, "-vcr")) {
-			vcopyrect = 1;
-#endif
 		} else if (!strcmp(arg, "-httpdir")) {
 			CHECK_ARGC
 			http_dir = strdup(argv[++i]);
@@ -17412,8 +16537,6 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " sb:         %d\n", screen_blank);
 		fprintf(stderr, " sigpipe:    %s\n", sigpipe
 		    ? sigpipe : "null");
-		fprintf(stderr, " nap t-f-m:  %d/%d/%d\n", naptile, napfac,
-		    napmax);
 		fprintf(stderr, " threads:    %d\n", use_threads);
 		fprintf(stderr, " fs_frac:    %.2f\n", fs_frac);
 		fprintf(stderr, " gaps_fill:  %d\n", gaps_fill);
@@ -17426,7 +16549,6 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " noremote:   %d\n", !accept_remote_cmds);
 		fprintf(stderr, " safemode:   %d\n", safe_remote_only);
 		fprintf(stderr, " deny_all:   %d\n", deny_all);
-		fprintf(stderr, " debug:      %d\n", debug);
 		fprintf(stderr, "\n");
 		rfbLog("x11vnc version: %s\n", lastmod);
 	} else {
@@ -17740,11 +16862,6 @@ int main(int argc, char* argv[]) {
 
 	initialize_signals();
 
-#ifdef VCR_HACK
-	if (vcopyrect) {
-		initialize_vcr();
-	}
-#endif
 
 	initialize_speeds();
 
@@ -17797,1010 +16914,4 @@ int main(int argc, char* argv[]) {
 #undef argc
 #undef argv
 }
-
-/* -- vcr.c -- */
-
-/* ######################################################################## */
-/* experiment to look for vertical copy rect changes */
-#ifdef VCR_HACK
-
-/*
- * vcr_send()
- * Takes the copyrect info (currently limited to a single column of
- * changed tiles) and schedules the CopyRegion with libvncserver.
- */
-static void vcr_send(int x0, int y0, int x1, int y1, int del) {
-	sraRegionPtr copy_region;
-
-	copy_region = (sraRegionPtr) sraRgnCreateRect(x0, y0, x1, y1);
-	rfbScheduleCopyRegion(screen, copy_region, 0, del);
-	sraRgnDestroy(copy_region);
-}
-
-/*
- * vcr_flush2()
- * Current hack to try to force libvncserver to flush the copyRegion
- * changes.  It splits up the deferUpdateTime into time slices and
- * tries to force the rfbSendUpdateBuf for each connected client.
- *
- * mode = 0 means just try to flush all the copyRegion changes.
- * mode = 1 means try to flush both the copyRegion and modifiedRegion changes.
- */
-static void vcr_flush2(int mode) {
-	int k1, k2, j, n, nfac = 10;
-	rfbClientIteratorPtr i;
-	rfbClientPtr cl;
-	
-	fprintf(stderr, "vcr_flush2 ");
-
-	/* break up the time into ~nfac slices. */
-	n = screen->deferUpdateTime / nfac;
-
-	for (j=0; j < nfac + 3; j++) {
-		/* loop over each time slice */
-
-		fprintf(stderr, ".");
-		usleep(n * 1000);
-
-		/* give rfbProcessEvents a shot. */
-		rfbPE(screen, 0);
-
-		/*
-		 * loop over connected clients and examine
-		 * their copyRegion/modifiedRegion regions
-		 * if they exist, try to flush them.
-		 */
-		i = rfbGetClientIterator(screen);
-		k1 = 0;
-		k2 = 0;
-		while( (cl = rfbClientIteratorNext(i)) ) {
-			/* check modifiedRegion */
-			if (sraRgnEmpty(cl->modifiedRegion)) {
-				fprintf(stderr, " MOD=empty ");
-			} else {
-				fprintf(stderr, " MOD=NOT ");
-				if (mode == 1) {
-					rfbSendUpdateBuf(cl);
-				}
-				k2++;
-			}
-
-			/* check copyRegion */
-			if (sraRgnEmpty(cl->copyRegion)) {
-				fprintf(stderr, " CR=empty ");
-			} else {
-				fprintf(stderr, " CR=NOT ");
-				rfbSendUpdateBuf(cl);
-				k1++;
-			}
-		}
-		rfbReleaseClientIterator(i);
-
-		if (mode == 0) {
-			if (k1 == 0) {
-				break;
-			}
-		} else if (mode == 1) {
-			if (k1 == 0 && k2 == 0) {
-				break;
-			}
-		}
-	}
-	fprintf(stderr, " k1=%d/k2=%d\n", k1, k2);
-}
-
-/*
- * vcr_flush1()
- * simple try; didn't work.
-static void vcr_flush1(int mode) {
-	rfbPE(screen, 0);
-}
- */
-
-/* flush wrapper */
-static void vcr_flush(int mode) {
-	vcr_flush2(mode);
-}
-
-/*
- * A structure to describe a discovered vertical translation within
- * a pair of old/new vertical scanlines.
- */
-typedef struct displacement {
-	int runlen;	/* how long the "best" concidence run was  */
-	int longruns;	/* how many "long" runs we found altogether */
-	int disp;	/* the verticle displacement of the best run */
-	int top;	/* the top (smallest y-pixel position) */
-	int mid;	/* the middle y-pixel position */
-	int bot;	/* the bottom (highest y-pixel position) */
-} disp_t;
-
-/*
- * A structure for the actual copyrect we find for a bunch of adjacent
- * vertical scanlines with the same offest del.
- *
- * Currently used for a copyrect only within one column of changed 
- * tiles.  libvncserver seems to be pretty good at gluing them
- * together horizontally, so we don't bother, but we could use
- * this for that too, x1 - x0 would just be bigger.
- */
-typedef struct copyrect {
-	int x0;
-	int y0;
-	int x1;
-	int y1;
-	int del;
-} copyrect_t;
-
-/*
- * vcr_run()
- * Given a column (at tile column x) of n_run changed tiles with tile
- * column y-values y_run[n_run], try to find the offset with optimal
- * pixel coincidence/overlap.
- *
- * Optimal usually means the set of scanlines with same offset giving
- * the longest run of coincidence.  But see suggested_disp below...
- * 
- * If suggested_disp != 0, that means that vertical displacement is
- * highly preferred, presumably being the results found from vcr_run
- * for neighboring columns of changed tiles.  suggested_disp is a hint
- * from do_vcr().
- * 
- * The optimal displacement copyrect is for the tile column is returned 
- * in the copyrect_t cr.
- */
-static int vcr_run(int *y_run, int x, int n_run, copyrect_t *cr,
-    int suggested_disp) {
-	/* parameter to skip short columns of changed tiles */
-	int tile_run_min = 4;
-
-	/* minimum number of coincident y-pixels to be accepted */
-	int match_run_min = 3 * tile_y;
-
-	/* variables for the search */
-	int x0, y0, yd, del, prev_del;
-	int run_up, run_dn, run;
-	int col, n0;
-	int x_left, x_right;
-	int y_top, y_bot;
-	int i, best;
-	int y_min, y_max, y_mid;
-
-	/* tmp pointers to the old and new vertical scanline fb data */
-//	int *fb_old;
-//	int *fb_new;
-	char *fb_old8;
-	char *fb_new8;
-	short *fb_old16;
-	short *fb_new16;
-	int *fb_old32;
-	int *fb_new32;
-
-	/* we need a disp_t for each vertical scanline in the tile column */
-	disp_t verts[VCR_DEPTH];
-
- if (suggested_disp) {
-	fprintf(stderr, "IN vcr_run col=%2d/%3d row=%2d/%3d  tn=%2d nr=%2d pref=%3d\n",
-	    x, x * tile_x, y_run[0], y_run[0] * tile_y, y_run[n_run-1], n_run, suggested_disp); 
- }
-
-	if (! suggested_disp) {
-		/* get out if the run is too short */
-		if (n_run < tile_run_min) {
- if (suggested_disp) fprintf(stderr, "OUT vcr_run A\n");
-			return 0;
-		}
-	} else {
-		/* be more tolerant of short columns if suggested_disp given */
-		if (n_run < tile_run_min/2) {
- if (suggested_disp) fprintf(stderr, "OUT vcr_run B\n");
-			return 0;
-		}
-		match_run_min /= 2;
-	}
-
-	/* initialize each vert scanline to "nothing found" */
-	for (col=0; col < vcr_depth; col++) {
-		verts[col].runlen = 0;
-		verts[col].disp   = 0;
-		verts[col].top    = -1;
-		verts[col].mid    = -1;
-		verts[col].bot    = -1;
-
-		verts[col].longruns = 0;
-	}
-	/*
-	 * best will be the run length (number of coincident pixels) for
-	 * for out "best find" so far.
-	 */
-	best = -1;
-
-	/* we start out in the middle of the tile column and work outwards */
-	n0 = n_run/2;			/* y-tile # in run */
-	y0 = y_run[n0] * tile_y;	/* pixel position on screen */
-
-	/* little shift to y-middle of a tile if n_run is not even */
-	if (n_run % 2 != 0) {
-		y0 += tile_y/2;
-	}
-
-	/* horizontal pixel position of left edge of tile column */
-	x0 = x * tile_x;
-
-	/* lowest possible y of the tile column */
-	y_min = y_run[0] * tile_y;
-	/* highest possible y of the tile column */
-	y_max = (y_run[n_run-1] + 1) * tile_y;
-
- fprintf(stderr, "  vcr_run: x== %d\n", x);
-
-	/*
-	 * Loop over each vertical scanline, using the vcr_map pattern
-	 * for the order.
-	 */
-	for (col=0; col < vcr_depth; col++) {
-		/*
-		 * Make pointers to offsets in the before/after vertical
-		 * scanline fb data for the desired scanline.
-		 * (Note: the whole scanline need not be up to date,
-		 * but it is up to date for the changed tile column
-		 * considered here)
-		 */
-		if (bpp == 32) {
-			fb_old32 = fbd_old32[x][col];
-			fb_new32 = fbd_new32[x][col];
-		} else if (bpp == 16) {
-			fb_old16 = fbd_old16[x][col];
-			fb_new16 = fbd_new16[x][col];
-		} else if (bpp == 8) {
-			fb_old8 = fbd_old8[x][col];
-			fb_new8 = fbd_new8[x][col];
-		}
-
-		/* start at the middle y-value */
-		y_mid = y0;
-
-		/*
-		 * check if a previous scanline found a displacment
-		 * with high coincidence.  store it in prev_del.
-		 * also use its y_mid value.
-		 */
-		prev_del = 0;
-		for (i = col - 1; i >= 0; i--)  {
-			if (verts[i].runlen > 0) {
-				y_mid = verts[i].mid;
-				prev_del = verts[i].disp;
-				break;
-			}
-		}
-
-		/*
-		 * Now loop over all possible displacements between
-		 * the old and new vertical scanlines.
-		 * That is,  y_mid + del < y_max and y_mid - del >
-		 * y_min for relative displacement del.
-		 *
-		 * We work out way out +/- from y_mid (trying to avoid
-		 * ambiguities at the top or bottom of the tile column).
-		 */
-
-		for (del = 1; y_mid+del < y_max || y_mid-del > y_min; del++) {
-		    int i;
-		    for (i=0; i <= 1; i++) {
-			/* this is just the +/- plus/minux del aspect */
-			int d = (1 - 2*i) * del;
-
-			if (prev_del != 0 && d != prev_del) {
-				/*
-				 * If we have a previous del, we want
-				 * to stick to it to greatly shorten
-				 * the time spent in this loop.
-				 *
-				 * But if we have a suggested_disp we
-				 * let that drop through.
-				 */
-				if (d != suggested_disp) {
-					continue;
-				}
-			}
-
-			/*
-			 * Possible speedup: use longruns as a big
-			 * clue the scanlines are basically constant
-			 * (e.g. lies on a solid root background).
-			 */
-			if (suggested_disp && d != suggested_disp
-			    && verts[col].longruns > 4) {
-				continue;
-			}
-
-			/*
-			 * yd will be the displaced midpoint for the
-			 * new fb fb_new.
-			 *
-			 * y_mid will be the midpoint of the old fb
-			 * fb_old.
-			 */
-			yd = y_mid + d;
-
-			if (yd <= y_min || yd >= y_max) {
-				/* out of range for fb_new */
-				continue;
-			}
-
-			/*
-			 * Loop upwards from these midpoints, but break
-			 * out as soon as there is a pixel difference.
-			 * (i.e. break out at the high-end of the
-			 * coincidence)
-			 */
-			if (bpp == 32) {
-				for (run_up = 0; yd+run_up < y_max
-				    && y_mid+run_up < y_max; run_up++) {
-					if (   *(fb_old32 + (y_mid+run_up))
-					    != *(fb_new32 + (yd+run_up))) {
-						break;
-					}
-				}
-			}
-			/*
-			 * Loop downwards from these midpoints, but break
-			 * out as soon as there is a pixel difference.
-			 * (i.e. break out at the low-end of the
-			 * coincidence)
-			 *
-			 * Note: for 16bpp we really check two pixels
-			 * at a time, for 8bpp we check 4 at a time.
-			 */
-			if (bpp == 32) {
-				for (run_dn =-1; yd+run_dn > y_min
-				    && y_mid+run_dn > y_min; run_dn--) {
-					if (   *(fb_old32 + (y_mid+run_dn))
-					    != *(fb_new32 + (yd+run_dn))) {
-						break;
-					}
-				}
-			}
-
-			/* compute the total number of coincident pixels */
-			run = run_up - run_dn - 1;
-
-			if (run > match_run_min) {
-				/*
-				 * It is long enough, add to the tally
-				 * of long runs.
-				 */
-				verts[col].longruns++;
-
-				/* 
-				 * Now check if it is the longest one
-				 * so far or matches the suggested_disp.
-				 *
-				 * TODO: what if d == suggested_disp is
-				 * overridden later?
-				 */
-				if (run > verts[col].runlen 
-				    || d == suggested_disp) {
-					if (run > best) {
-						/* best for any scanline */
-						best = run;
-					}
-
-					/* record the best for this scanline */
-					verts[col].runlen = run;
-					verts[col].disp   = d;
-					verts[col].top    = y_mid + run_dn;
-					verts[col].mid    = y_mid;
-					verts[col].bot    = y_mid + run_up;
-				}
-			}
-		    }
-		}
-	}
-
-	if (best < 0) {
-		/* did not find anything. */
- fprintf(stderr, "vcr_run return 0, no best\n");
-		return 0;
-	}
-
-	/*
-	 * Now, not all of the coincidences in the vertical scanlines
-	 * may be the same.  The may start and stop at different y-values.
-	 *
-	 * And (we hope not, but) a single displacement may not apply
-	 * to all of the vertical scanlines.
-	 *
-	 * So we loop over the scanlines and try to find
-	 * the minimal/optimal set that applies to most of them.
-	 *
-	 * The result will be the basis of the copyrect rectangle  
-	 * we send to libvncserver.
-	 */
-
-	x_left  = -1;	/* furthest left scanline x position */
-	x_right = -1;	/* furthest right scanline x position  */
-	y_top   = -1;	/* y-bound from the top (small y) */
-	y_bot   = -1;	/* y-bound from the bottom (large y) */
-	del = 0;	/* the vertical displacement found */
-
-	for (col=0; col < vcr_depth; col++) {
-		if (verts[col].runlen < 1) {
-			/* no concidence found for this scan line */
-			continue;
-		}
-		if (del == 0) {
-			/* use the first one... */
-			del = verts[col].disp;
-		} else if (del != verts[col].disp) {
-			/*
-			 * skip if not equal to first one
-			 * XXX improve
-			 */
-			continue;
-		}
-		if (y_top < 0 || verts[col].top > y_top) {
-			/* trim y_top to include this scanline */
-			y_top = verts[col].top;
-		}
-		if (y_bot < 0 || verts[col].bot < y_bot) {
-			/* trim y_bot to include this scanline */
-			y_bot = verts[col].bot;
-		}
-		if (x_left < 0 || vcr_map[col] < x_left ) {
-			/* hmm, correct?... */
-			x_left = vcr_map[col];
-		}
-		if (x_right < 0 || vcr_map[col] > x_right ) {
-			/* hmm, correct?... */
-			x_right = vcr_map[col];
-		}
-
-		fprintf(stderr, "   vcr_run: m_match: del=%4d run=%3d  ymin=%3d ymid=%3d ymax=%3d lruns=%3d col=%d\n",
-		    verts[col].disp, verts[col].runlen, verts[col].top, verts[col].mid, verts[col].bot, verts[col].longruns, vcr_map[col]);
-	}
-
-	if (del == 0 || x_left == -1 || x_right == -1 || y_top == -1 || y_bot == -1) {
-		/* not everything agreed/made sense */
-		return 0;
-	}
-
-	if (x_left == x_right || y_top == y_bot) {
-		/* only one scanline or no y span (line/point not a rectangle) */
-		return 0;
-	}
-	fprintf(stderr, "      vcr_run: x_left=%2d  x_right=%2d  y_top=%3d  y_bot=%3d\n", x_left, x_right, y_top, y_bot);
-
-	/*
-	 * Finally, create the copyrect_t.
-	 * XXX these may still have off by 1 pixel errors...
-	 */
-	if (del > 0) {
-		/* new fb is displaced downward from old fb */
-		cr->x0 = x0 + x_left;
-		cr->y0 = y_top + del + 1;
-		cr->x1 = x0 + x_right + 1;
-		cr->y1 = y_bot + del;
-		cr->del = del;
-	} else {
-		/* new fb is displaced upward from old fb */
-		cr->x0 = x0 + x_left;
-		cr->y0 = y_top + del + 1;
-		cr->x1 = x0 + x_right + 1;
-		cr->y1 = y_bot + del;
-		cr->del = del;
-	}
-	return 1;
-}
-
-#define WMAX 40		/* max number of horizontal tiles */
-#define YMAX 40		/* max number of vertical tiles */
-
-/*
- * char fbd_old[ntile_x][tile_x * (bpp/8)][dpy_y];
- */
-void initialize_vcr(void) {
-	int i, j;
-
-	if (bpp == 24) {
-		rfbLog("initialize_vcr: disabling -vcr in 24bpp mode\n");
-		vcopyrect = 0;
-		return;
-	}
-	if (dpy_x % tile_x != 0) {
-		rfbLog("initialize_vcr: disabling -vcr: display width is not "
-		    "a multiple of %d\n", tile_x);
-		vcopyrect = 0;
-		return;
-	}
-	if (dpy_y % tile_y != 0) {
-		rfbLog("initialize_vcr: disabling -vcr: display height is not "
-		    "a multiple of %d\n", tile_y);
-		vcopyrect = 0;
-		return;
-	}
-
-	if (bpp == 8) {
-		fbd_old8 = (char ***) malloc(ntiles_x * sizeof(char **));
-		fbd_new8 = (char ***) malloc(ntiles_x * sizeof(char **));
-
-		for (i=0; i < ntiles_x; i++) {
-			fbd_old8[i] = (char **) malloc(tile_x*sizeof(char *));
-			fbd_new8[i] = (char **) malloc(tile_x*sizeof(char *));
-			
-			for (j=0; j < tile_x; j++) {
-				size_t n = (size_t) dpy_y * sizeof(char *);
-				fbd_old8[i][j] = (char *) malloc(n);
-				fbd_new8[i][j] = (char *) malloc(n);
-			}
-		}
-
-		/* temp array for one tile row */
-		fbt_old8 = (char **) malloc(dpy_x * sizeof(char *));
-		fbt_new8 = (char **) malloc(dpy_x * sizeof(char *));
-		for (i=0; i < dpy_x; i++) {
-			size_t n = (size_t) tile_y * sizeof(char *);
-			fbt_old8[i] = (char *) malloc(n);
-			fbt_new8[i] = (char *) malloc(n);
-		}
-
-	} else if (bpp == 16) {
-		fbd_old16 = (short ***) malloc(ntiles_x * sizeof(short **));
-		fbd_new16 = (short ***) malloc(ntiles_x * sizeof(short **));
-
-		for (i=0; i < ntiles_x; i++) {
-			fbd_old16[i] = (short **)malloc(tile_x*sizeof(short *));
-			fbd_new16[i] = (short **)malloc(tile_x*sizeof(short *));
-			
-			for (j=0; j < tile_x; j++) {
-				size_t n = (size_t) dpy_y * sizeof(short *);
-				fbd_old16[i][j] = (short *) malloc(n);
-				fbd_new16[i][j] = (short *) malloc(n);
-			}
-		}
-
-		/* temp array for one tile row */
-		fbt_old16 = (short **) malloc(dpy_x * sizeof(short *));
-		fbt_new16 = (short **) malloc(dpy_x * sizeof(short *));
-		for (i=0; i < dpy_x; i++) {
-			size_t n = (size_t) tile_y * sizeof(short *);
-			fbt_old16[i] = (short *) malloc(n);
-			fbt_new16[i] = (short *) malloc(n);
-		}
-
-	} else if (bpp == 32) {
-		fbd_old32 = (int ***) malloc(ntiles_x * sizeof(int **));
-		fbd_new32 = (int ***) malloc(ntiles_x * sizeof(int **));
-
-		for (i=0; i < ntiles_x; i++) {
-			fbd_old32[i] = (int **) malloc(tile_x*sizeof(int *));
-			fbd_new32[i] = (int **) malloc(tile_x*sizeof(int *));
-			
-			for (j=0; j < tile_x; j++) {
-				size_t n = (size_t) dpy_y * sizeof(int *);
-				fbd_old32[i][j] = (int *) malloc(n);
-				fbd_new32[i][j] = (int *) malloc(n);
-			}
-		}
-
-		/* temp array for one tile row */
-		fbt_old32 = (int **) malloc(dpy_x * sizeof(int *));
-		fbt_new32 = (int **) malloc(dpy_x * sizeof(int *));
-		for (i=0; i < dpy_x; i++) {
-			size_t n = (size_t) tile_y * sizeof(int *);
-			fbt_old32[i] = (int *) malloc(n);
-			fbt_new32[i] = (int *) malloc(n);
-		}
-
-	} else {
-		vcopyrect = 0;
-	}
-	if (getenv("VCR_DEPTH")) {
-		vcr_depth = atoi(getenv("VCR_DEPTH"));
-		fprintf(stderr, "reset vcr_depth to: %d\n", vcr_depth);
-	} else {
-		fprintf(stderr, "vcr_depth is: %d\n", vcr_depth);
-	}
-}
-
-/*
- * do_vcr()
- * Top level routine for the great vertical copyrect hunt.
- *
- * It is called shortly after the copy_tiles
- * calls finish, so the vertical scan line framebuffer pixel
- * data (old and new) is up to date.
- *
- * It only deals with tiles, looking for vertical runs of
- * changed (or tried) ones.  It passes off the actual 
- * fb pixel coincidence checking to vcr_run() and records
- * wnat vcr_run finds.
- * 
- * Finally, it determines the copyrects that need to be
- * sent to libvncserver, sends them, tries to flush, etc. 
- */
-void do_vcr(void) {
-	int x, y, n;
-	int dx, pm, x_cm = 0, y_cm = 0, n_cm = 0;
-	int got, in_run = 0, thd = 0, tt = 0;
-	int cpr_cnt = 0, suggested_disp;
-	int tile_tot = 0, tile_vcr = 0;
-	static int vcr_sleep = -1;
-
-	/*
-	 * y_run is an array that holds the tile y indexes
-	 * for a vertical run of adjacent changed tiles. 
-	 */
-	int y_run[YMAX];
-
-	/*
-	 * some info for each column, x_has_diff[] says the
-	 * column has a tile diff or tried tile somewhere
-	 *
-	 * disps[] records the displacement found by
-	 * vcr_run for this column (XXX: more than one?)
-	 * 
-	 */
-	int x_has_diff[WMAX], disps[WMAX];
-
-	/* we store the found copyrects here: */
-	copyrect_t cpr[4*WMAX], cr;
-
-
-	/* zero our arrays. */
-	for (x=0; x < ntiles_x; x++) {
-		x_has_diff[x] = 0;
-		disps[x] = 0;
-	}
-
-	/*
-	 * Try to find the "center of mass" of the region of changed
-	 * tiles.  Makes the most sense if the changed tiles are
-	 * limited to one window (or subregion of a window).  Think
-	 * of a scroll.  We are trying to find the middle of the
-	 * changed region and then work our way out from there.
-	 *
-	 * The thought is we have a better chance of discovering
-	 * the "true" vertical displacement if we start in the middle
-	 * rather than at the edges.  Even if there is clutter
-	 * around the scrolled region, this could still get us into
-	 * the interior of it. 
-	 */
-	for (x=0; x < ntiles_x; x++) {
-		for (y=0; y < ntiles_y; y++) {
-			n = x + y * ntiles_x;
-			if (tile_has_diff[n] || tile_tried[n]) {
-				/*
-				 * note that this column has a diff,
-				 * and accumulate the cm stuff.
-				 */
-				x_has_diff[x]++;
-				x_cm += x;
-				y_cm += y;
-				n_cm++;
-			}
-		}
-	}
-
-	if (! n_cm) {
-		/* no changed or tried tiles. */
-		return;
-	}
-
-	/*
-	 * Compute center of mass.  These are tile indexes, not
-	 * pixel indexes, btw.
-	 *
-	 * We currently only use x_cm the "center of mass" in the
-	 * horizontal direction.  We compute y_cm but don't use it yet
-	 */
-	x_cm = x_cm / n_cm;
-	y_cm = y_cm / n_cm;
-
- fprintf(stderr, "\ndo_vcr() x_cm: %d  y_cm: %d\n", x_cm, y_cm);
-
-	/* work our way outward from x_cm, dx is the displacement */
-	for (dx=0; dx <= ntiles_x; dx++) {
-
-	    /* we go +/- (plus or minus) dx */
-	    for (pm=0; pm <= 1; pm++) {
-		int x2, dx2, dx2_best;
-
-		if (dx == 0 && pm == 1) {
-			/* just do dx = 0 once. */
-			continue;
-		}
-
-		/* tile x index: */
-		x = x_cm + (1 - 2*pm) * dx;
-
-		if (x < 0 || x >= ntiles_x) {
-			/* out of range... */
-			continue;
-		}
-
-		/*
-		 * Loop over previously tried columns of tiles looking for
-		 * a preferred y-displacement.  This will be used to speed
-		 * up the search (later columns will aim for the same
-		 * vertical translation...  keep thinking of a scroll.)
-		 */
-		suggested_disp = 0;
-		dx2_best = -1;
-		for (x2=0; x2 < ntiles_x; x2++) {
-			if (! disps[x2]) {
-				/*
-				 * column with nothing found or
-				 * not yet examined.
-				 */
-				continue;
-			}
-
-			dx2 = x - x2;
-			if (dx2 < 0) {
-				dx2 = -dx2;
-			}
-			
-			if (dx2_best == -1 || dx2 < dx2_best) {
-				suggested_disp = disps[x2];
-				dx2_best = dx2;
-			}
-		}
-		
-		/*
-		 * Now loop down thru the column looking for
-		 * changed/tried tiles that are adjacent (along y).
-		 * A set of these will be called a "run".
-		 */
-		got = 0;
-		in_run = 0;
-		thd = 0;
-		tt = 0;
-		for (y=0; y <= ntiles_y; y++) {
-			int changed = 0, end = 0;
-			n = x + y * ntiles_x;
-
-			if (y == ntiles_y) {
-				end = 1;
-			} else if (tile_has_diff[n] || tile_tried[n]) {
-				changed = 1;
-				tile_tot++;
-			}
-
-			if (changed) {
-				got++;
-				if (tile_has_diff[n]) {
-					thd++;
-				}
-				if (tile_tried[n]) {
-					tt++;
-				}
-				if (! in_run) {
-					/* start of a run */
-					in_run = 1;
-				} else {
-					/* continuation of a run */
-					in_run++;
-				}
-				/* store the y tile number */
-				y_run[in_run - 1] = y;
-			} else {
-				/* either tile w/o diff or special end case */
-				if (! in_run) {
-					continue;
-				}
-				/* this could be the end of a run */
-				if (thd <= tt/10) {
-					/* not enough have real differences */
-					;
-				} else if (vcr_run(y_run, x, in_run, &cr,
-				    suggested_disp)) {
-					/*
-					 * otherwise we called vcr_run
-					 * to analyse the run.  And it
-					 * found one. Record it.
-					 */
-					cpr[cpr_cnt].x0 = cr.x0;
-					cpr[cpr_cnt].y0 = cr.y0;
-					cpr[cpr_cnt].x1 = cr.x1;
-					cpr[cpr_cnt].y1 = cr.y1;
-					cpr[cpr_cnt].del = cr.del;
-					cpr_cnt++;
-					disps[x] = cr.del;
-
-					tile_vcr += (cr.y1 - cr.y0)/tile_y;
-				}
-
- if(got > 3) fprintf(stderr,
- "  do_vcr: run: x: %d pm=%d dx=%d got=%d thd=%d tt=%d in_run=%d\n",
- x, pm, dx, got, thd, tt, in_run);
-
-				/* get ready for a new run */
-				got = 0;
-				in_run = 0;
-				thd = 0;
-				tt = 0;
-			}
-		}
-	    }
-	}
-
- if (tile_vcr) fprintf(stderr, "  do_vcr: tile_vcr/tile_tot: %d/%d\n", tile_vcr, tile_tot);
-
-	if (cpr_cnt) {
-		/* we got some copyrects! */
-
-		int i, j, ndel, del_shift[100], del_cnt[100];
-		int willdo = 0, min_cnt = 4;
-		int x, y, n;
-		sraRegionPtr tmp_region, mod_region;
-
-		/*
-		 * There there is too much clutter from other tiles w/o
-		 * a vcr, bail out to try to avoid painting errors.
-		 */
-		if (tile_vcr < 0.5 * tile_tot) {
- fprintf(stderr, "bad tile_vcr SNR.\n");
-			return;
-		}
-
-		/*
-		 * First tally and do some bookkeepping regarding the
-		 * different y-displacements.  Hopefully most of the
-		 * time there will be just one displacement.
-		 *
-		 * One has to take some care... if we send libvncserver
-		 * different displacements, it may treat some of them
-		 * as modifiedRegions instead of copyRegions.
-		 */
-		ndel = 0;
-		for (i=0; i<cpr_cnt; i++) {
-			int got = 0;	
-			int d = cpr[i].del;
-			for (j=0; j < ndel; j++) {
-				if (del_shift[j] == d) {
-					/*
-					 * a duplicate with the same del
-					 * record it.
-					 */
-					del_cnt[j]++;
-
-					if (del_cnt[j] >= min_cnt) {
-						/* we know we have least one */
-						willdo = 1;
-					}
-					got = 1;
-				}
-			}
-			if (! got) {
-				/* no dup, so set it */
-				del_cnt[ndel] = 1;
-				del_shift[ndel++] = d;
-			}
-		}
-		fprintf(stderr, "\n");
-		if (! willdo) {
-			fprintf(stderr, "no willdo, return\n");
-			return;
-		}
-
-		/* now use willdo to count number of different dels */
-		willdo = 0;
-		for (j=0; j < ndel; j++) {
-			int d = del_shift[j];
-			fprintf(stderr, "del: %d/%d  del_cnt: %d\n",
-			    d, ndel, del_cnt[j]);
-			if (del_cnt[j] >= min_cnt) {
-				willdo++;
-			}
-		}
-		fprintf(stderr, "willdo number of dels: %d\n", willdo);
-
-		/*
-		 * We noted above that we will do at least one copyrect.
-		 * So we prepare a region of all of the changed/tried
-		 * tiles that we can subtract the copyRegion from, etc.
-		 */
-		mod_region = (sraRegionPtr) sraRgnCreate();
-		for (x=0; x < ntiles_x; x++) {
-		    for (y=0; y < ntiles_y; y++) {
-			n = x + y * ntiles_x;
-			if (! tile_has_diff[n] && ! tile_tried[n]) {
-				continue;
-			}
-			/* XXX optimize this somehow? */
-			tmp_region = (sraRegionPtr)
-			    sraRgnCreateRect(x * tile_x, y * tile_x,
-			    (x+1) * tile_x, (y+1) * tile_y);
-
-			sraRgnOr(mod_region, tmp_region);
-			sraRgnDestroy(tmp_region);
-		    }
-		}
-		fprintf(stderr, "\n");
-
-		/*
-		 * vcr_change_region will be the region corresponding to
-		 * all of our discovered copyrects.
-		 */
-		if (vcr_change_region) {
-			sraRgnDestroy(vcr_change_region);
-		}
-		vcr_change_region = (sraRegionPtr) sraRgnCreate();
-
-		if (vcr_mod_region) {
-			sraRgnDestroy(vcr_mod_region);
-		}
-		vcr_mod_region = NULL;
-
-		/*
-		 * Now we go over the different del's (hopefully just
-		 * one) and send the copyrects with the same del out to
-		 * libvncserver and try to XXX
-		 */
-
-		for (j=0; j < ndel; j++) {
-			int d = del_shift[j];
-			if (del_cnt[j] < min_cnt) {
-				/* too short */
-				continue;
-			}
-			for (i=0; i<cpr_cnt; i++) {
-				if (cpr[i].del != d) {
-					continue;
-				}
-				tmp_region = (sraRegionPtr)
-				    sraRgnCreateRect(cpr[i].x0,
-				    cpr[i].y0 + cpr[i].del, cpr[i].x1,
-				    cpr[i].y1 + cpr[i].del);
-				/*
-				 * subtract this from our modifiedRegion
-				 * (see below).
-				 */
-				sraRgnSubtract(mod_region, tmp_region);
-				sraRgnOr(vcr_change_region, tmp_region);
-				sraRgnDestroy(tmp_region);
-
-				/* tell libvncserver about the copyrect. */
-				vcr_send(cpr[i].x0, cpr[i].y0, cpr[i].x1,
-				    cpr[i].y1, cpr[i].del);
-
- fprintf(stderr, "del: %d  x0=%3d  y0=%3d  x1=%3d  y1=%3d\n",
-    cpr[i].del, cpr[i].x0, cpr[i].y0, cpr[i].x1, cpr[i].y1);
-
-			}
-			if (willdo > 1) {
-				/* if more than 1 delta, must flush each one */
-				vcr_flush(0);
-			}
-		}
-
-		/*
-		 * tell libvncserver to now flush the modified region
-		 * outside of the copyrect region.
-		 */
-		fprintf(stderr, "rfbMarkRegionAsModified\n");
-		rfbMarkRegionAsModified(screen, mod_region);
-		fprintf(stderr, "vcr_flush for mod_region\n");
-
-		vcr_flush(1);
-		vcr_mod_region = (sraRegionPtr) sraRgnCreateRgn(mod_region);
-		
-		sraRgnDestroy(mod_region);
-		rfbPE(screen, 0);
-
-		/* hack to sleep */
-		if (vcr_sleep < 0 || vcr_sleep == 1) {
-			if (getenv("VCR_SLEEP") != NULL) {
-				vcr_sleep = 1;
-				fprintf(stderr, "sleep...\n"); sleep(atoi(getenv("VCR_SLEEP")));
-			} else {
-				vcr_sleep = 0;
-			}
-		}
-		fprintf(stderr, "done...\n");
-	}
-}
-#endif /* VCR_HACK */
-/* ######################################################################## */
 
