@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-07-01";
+char lastmod[] = "lastmod:    2004-07-04";
 
 /* X display info */
 Display *dpy = 0;
@@ -757,10 +757,51 @@ static int check_access(char *addr) {
 		return 0;
 	}
 
-	list = strdup(allow_list);
-	p = strtok(list, ",");
+	if (strchr(allow_list, '/')) {
+		/* a file of IP addresess or prefixes */
+		int len;
+		struct stat sbuf;
+		FILE *in;
+		char line[1024], *q;
+
+		if (stat(allow_list, &sbuf) != 0) {
+			rfbLog("check_access: failure stating file: %s\n",
+			    allow_list);
+			rfbLogPerror("stat");
+			clean_up_exit(1);
+		}
+		len = sbuf.st_size + 1;	/* 1 more for '\0' at end */
+		list = malloc(len);
+		list[0] = '\0';
+		
+		in = fopen(allow_list, "r");
+		if (in == NULL) {
+			rfbLog("check_access: cannot open: %s\n", allow_list);
+			rfbLogPerror("fopen");
+			clean_up_exit(1);
+		}
+		while (fgets(line, 1024, in) != NULL) {
+			if ( (q = strchr(line, '#')) != NULL) {
+				*q = '\0';
+			}
+			if (strlen(list) + strlen(line) >= len) {
+				break;
+			}
+			strcat(list, line);
+		}
+		fclose(in);
+	} else {
+		list = strdup(allow_list);
+	}
+
+	
+	p = strtok(list, ", \t\n\r");
 	while (p) {
-		char *q = strstr(addr, p);
+		char *q;
+		if (*p == '\0') {
+			continue;	
+		}
+		q = strstr(addr, p);
 		if (q == addr) {
 			rfbLog("check_access: client %s matches pattern %s\n",
 			    addr, p);
@@ -769,7 +810,7 @@ static int check_access(char *addr) {
 		} else if(!strcmp(p,"localhost") && !strcmp(addr,"127.0.0.1")) {
 			allowed = 1;
 		}
-		p = strtok(NULL, ",");
+		p = strtok(NULL, ", \t\n\r");
 	}
 	free(list);
 	return allowed;
@@ -1304,7 +1345,7 @@ static int accept_client(rfbClientPtr client) {
  */
 static void check_connect_file(char *file) {
 	FILE *in;
-	char line[512], host[512];
+	char line[1024], host[1024];
 	static int first_warn = 1, truncate_ok = 1;
 	static time_t last_time = 0; 
 	time_t now = time(0);
@@ -1328,13 +1369,13 @@ static void check_connect_file(char *file) {
 	if (in == NULL) {
 		if (first_warn) {
 			rfbLog("check_connect_file: fopen failure: %s\n", file);
-			perror("fopen");
+			rfbLogPerror("fopen");
 			first_warn = 0;
 		}
 		return;
 	}
 
-	if (fgets(line, 512, in) != NULL) {
+	if (fgets(line, 1024, in) != NULL) {
 		if (sscanf(line, "%s", host) == 1) {
 			if (strlen(host) > 0) {
 				client_connect = strdup(host);
@@ -1367,7 +1408,7 @@ static int do_reverse_connect(char *str) {
 	if (len < 1) {
 		return 0;
 	}
-	if (len > 512) {
+	if (len > 1024) {
 		rfbLog("reverse_connect: string too long: %d bytes\n", len);
 		return 0;
 	}
@@ -1778,7 +1819,7 @@ void initialize_remap(char *infile) {
 		/* assume cmd line key1-key2,key3-key4 */
 		if (! strchr(infile, '-') || (in = tmpfile()) == NULL) {
 			rfbLog("remap: cannot open: %s\n", infile);
-			perror("fopen");
+			rfbLogPerror("fopen");
 			clean_up_exit(1);
 		}
 		p = infile;
@@ -3913,7 +3954,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		int fd = dup(0);
 		if (fd < 3) {
 			rfbErr("dup(0) = %d failed.\n", fd);
-			perror("dup");
+			rfbLogPerror("dup");
 			clean_up_exit(1);
 		}
 		fclose(stdin);
@@ -4437,7 +4478,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	if (shm->shmid == -1) {
 		rfbErr("shmget(%s) failed.\n", name);
-		perror("shmget");
+		rfbLogPerror("shmget");
 
 		XDestroyImage(xim);
 		*ximg_ptr = NULL;
@@ -4450,7 +4491,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	if (shm->shmaddr == (char *)-1) {
 		rfbErr("shmat(%s) failed.\n", name);
-		perror("shmat");
+		rfbLogPerror("shmat");
 
 		XDestroyImage(xim);
 		*ximg_ptr = NULL;
@@ -4903,7 +4944,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 #if 0
 	dx = (double) Nx / nx;
 	dy = (double) Ny / ny;
-#endif
+#else
 	
 	/*
 	 * This new way is probably the best we can do, take the inverse
@@ -4911,6 +4952,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	 */
 	dx = 1.0/scale_fac;
 	dy = 1.0/scale_fac;
+#endif
 
 	/*
 	 * find the extent of the change the input rectangle induces in
@@ -6696,14 +6738,18 @@ static void print_help(void) {
 "                       and response may be slower.  If \"fraction\" contains\n"
 "                       a decimal point \".\" it is taken as a floating point\n"
 "                       number, alternatively the notation \"m/n\" may be used\n"
-"                       to denote fractions, e.g. -scale 2/3.   If you just want\n"
-"                       a quick, rough scaling without blending, append \":nb\"\n"
-"                       to \"fraction\" (e.g. -scale 1/3:nb).\n"
+"                       to denote fractions, e.g. -scale 2/3.\n"
 "\n"
-"                       For compatibility with vncviewers, the scaled width\n"
-"                       is adjusted to be a multiple of 4.  To disable this\n"
-"                       use \":n4\".  Separate multiple -scale \":\" options\n"
-"                       via commas.\n"
+"                       Scaling Options: can be added after fraction via \":\",\n"
+"                       to supply multiple \":\" options use commas.\n"
+"                       If you just want a quick, rough scaling without\n"
+"                       blending, append \":nb\" to \"fraction\" (e.g. -scale\n"
+"                       1/3:nb).  For compatibility with vncviewers the scaled\n"
+"                       width is adjusted to be a multiple of 4, to disable\n"
+"                       this use \":n4\".  More esoteric options: \":in\" use\n"
+"                       interpolation scheme even when shrinking, \":pad\",\n"
+"                       pad scaled width and height to be multiples of scaling\n"
+"                       denominator (e.g. 3 for 2/3).\n"
 "-visual n              Experimental option: probably does not do what you\n"
 "                       think.  It simply *forces* the visual used for the\n"
 "                       framebuffer; this may be a bad thing... It is useful for\n"
@@ -6715,22 +6761,33 @@ static void print_help(void) {
 "\n"
 "-viewonly              All clients can only watch (default %s).\n"
 "-shared                VNC display is shared (default %s).\n"
+"-once                  Exit after the first successfully connected viewer\n"
+"                       disconnects.  This is the Default behavior.\n"
 "-forever               Keep listening for more connections rather than exiting\n"
 "                       as soon as the first client(s) disconnect. Same as -many\n"
 "-connect string        For use with \"vncviewer -listen\" reverse connections.\n"
 "                       If string has the form \"host\" or \"host:port\"\n"
 "                       the connection is made once at startup.  Use commas\n"
-"                       for a list.  If string contains \"/\" it is a file to\n"
+"                       for a list of host's and host:port's.  If string\n"
+"                       contains \"/\" it is instead interpreted as a file to\n"
 "                       periodically check for new hosts.  The first line is\n"
-"                       read and then file is truncated.\n"
-"-vncconnect            Monitor the VNC_CONNECT X property set by vncconnect(1).\n"
-"-auth file             Set the X authority file to be \"file\", equivalent to\n"
-"                       setting the XAUTHORITY env. var to \"file\" before startup.\n"
+"                       read and then the file is truncated.\n"
+"-vncconnect            Monitor the VNC_CONNECT X property set by the standard\n"
+"                       VNC program vncconnect(1).  When the property is set\n"
+"                       to host or host:port establish a reverse connection.\n"
+"                       Using xprop(1) instead of vncconnect may work, see FAQ.\n"
+"-auth file             Set the X authority file to be \"file\", equivalent\n"
+"                       to setting the XAUTHORITY env. var to \"file\" before\n"
+"                       startup.\n"
 "-allow addr1[,addr2..] Only allow client connections from IP addresses matching\n"
 "                       the comma separated list of numerical addresses.\n"
 "                       Can be a prefix, e.g. \"192.168.100.\" to match a\n"
-"                       simple subnet, for more control build libvncserver with\n"
-"                       libwrap support.\n"
+"                       simple subnet, for more control build libvncserver\n"
+"                       with libwrap support.  If the list contains a \"/\"\n"
+"                       it instead is a interpreted as a file containing\n"
+"                       addresses or prefixes that is re-read each time a new\n"
+"                       client connects.  Lines can be commented out with the\n"
+"                       \"#\" character in the usual way.\n"
 "-localhost             Same as -allow 127.0.0.1\n"
 "-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd\n"
 "                       (full-access) password must also be supplied.\n"
@@ -6842,11 +6899,13 @@ static void print_help(void) {
 "-clear_keys            As -clear_mods, except try to release any pressed key.\n"
 "                       Intended for debugging.  This option and -clear_mods\n"
 "                       can interfere with typing at the physical keyboard.\n"
-"-remap string          Read keysym remappings from file \"string\".  Format is\n"
-"                       one pair of keysyms per line (can be name or hex value).\n"
-"                       \"string\" can also be of form: key1-key2,key3-key4...\n"
-"                       To map a key to a button click, use the fake keysyms\n"
-"                       \"Button1\", ..., etc. E.g. -remap Super_R-Button2\n"
+"-remap string          Read keysym remappings from file named \"string\".\n"
+"                       Format is one pair of keysyms per line (can be name\n"
+"                       or hex value) separated by a space.  If no file named\n"
+"                       \"string\" exists, it is instead interpreted as this\n"
+"                       form: key1-key2,key3-key4,...  To map a key to a\n"
+"                       button click, use the fake keysyms \"Button1\", ...,\n"
+"                       etc. E.g. -remap Super_R-Button2\n"
 "\n"
 "-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
 "-nobell                Do not watch for XBell events.\n"
@@ -7026,9 +7085,9 @@ static int argc2 = 0;
 static char **argv2;
 
 static void check_rcfile(int argc, char **argv) {
-	int i, norc = 0, argmax = 512;
+	int i, norc = 0, argmax = 1024;
 	char *infile = NULL;
-	char rcfile[512];
+	char rcfile[1024];
 	FILE *rc; 
 
 	for (i=1; i < argc; i++) {
@@ -7284,6 +7343,8 @@ int main(int argc, char* argv[]) {
 			accept_cmd = argv[++i];
 		} else if (!strcmp(arg, "-gone")) {
 			gone_cmd = argv[++i];
+		} else if (!strcmp(arg, "-once")) {
+			connect_once = 1;
 		} else if (!strcmp(arg, "-many")
 			|| !strcmp(arg, "-forever")) {
 			connect_once = 0;
@@ -7479,7 +7540,7 @@ int main(int argc, char* argv[]) {
 		}
 	} else if (passwdfile) {
 		/* read passwd from file */
-		char line[512];
+		char line[1024];
 		FILE *in;
 		in = fopen(passwdfile, "r");
 		if (in == NULL) {
@@ -7488,7 +7549,7 @@ int main(int argc, char* argv[]) {
 			perror("fopen");
 			exit(1);
 		}
-		if (fgets(line, 512, in) != NULL) {
+		if (fgets(line, 1024, in) != NULL) {
 			int len = strlen(line); 
 			if (len > 0 && line[len-1] == '\n') {
 				line[len-1] = '\0';
@@ -7496,7 +7557,7 @@ int main(int argc, char* argv[]) {
 			argv_vnc[argc_vnc++] = "-passwd";
 			argv_vnc[argc_vnc++] = strdup(line);
 			pw_loc = 100;	/* just for pw_loc check below */
-			if (fgets(line, 512, in) != NULL) {
+			if (fgets(line, 1024, in) != NULL) {
 				/* try to read viewonly passwd from file */
 				int ok = 0;
 				len = strlen(line); 
