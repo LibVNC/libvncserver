@@ -6,8 +6,10 @@ endif
 
 copyrecttest_LDADD=$(LDADD) -lm
 
-noinst_PROGRAMS=tight-1 cargstest copyrecttest $(BACKGROUND_TEST) 
-
+noinst_PROGRAMS=encodingstest cargstest copyrecttest $(BACKGROUND_TEST) 
 
 LDADD = ../libvncserver/libvncserver.a ../libvncclient/libvncclient.a
+
+test: encodingstest cargstest copyrecttest
+	./encodingstest && ./cargstest
 

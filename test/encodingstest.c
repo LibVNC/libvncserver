@@ -1,12 +1,13 @@
 #include <time.h>
+#include <stdarg.h>
 #include <rfb/rfb.h>
 #include <rfb/rfbclient.h>
 
-#ifndef LIBVNCSERVER_HAVE_LIBTHREAD
-//#error This test need pthread support (otherwise the client blocks the client)
+#ifndef LIBVNCSERVER_HAVE_LIBPTHREAD
+#error This test need pthread support (otherwise the client blocks the client)
 #endif
 
-//#define ALL_AT_ONCE
+#define ALL_AT_ONCE
 //#define VERY_VERBOSE
 
 MUTEX(frameBufferMutex);
@@ -15,12 +16,14 @@ typedef struct { int id; char* str; } encoding_t;
 encoding_t testEncodings[]={
 	{ rfbEncodingRaw, "raw" },
 	{ rfbEncodingRRE, "rre" },
-	{ rfbEncodingCoRRE, "corre" },
+	/* TODO: fix corre */
+	/* { rfbEncodingCoRRE, "corre" }, */
 	{ rfbEncodingHextile, "hextile" },
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	{ rfbEncodingZlib, "zlib" },
 	{ rfbEncodingZlibHex, "zlibhex" },
-	{ rfbEncodingZRLE, "zrle" },
+	/* TODO: implement ZRLE decoding */
+	/* { rfbEncodingZRLE, "zrle" }, */
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	{ rfbEncodingTight, "tight" },
 #endif
@@ -125,11 +128,15 @@ typedef struct clientData {
 static void update(rfbClient* client,int x,int y,int w,int h) {
 	clientData* cd=(clientData*)client->clientData;
 	int maxDelta=0;
+	
+#ifndef VERY_VERBOSE
+	static const char* progress="|/-\\";
+	static int counter=0;
 
-	/* TODO: check if dimensions match with marked rectangle */
-
-#ifdef VERY_VERBOSE
-	rfbLog("Got update (encoding=%s): (%d,%d)-(%d,%d)\n",
+	if(++counter>sizeof(progress)) counter=0;
+	fprintf(stderr,"%c\r",progress[counter]);
+#else
+	rfbClientLog("Got update (encoding=%s): (%d,%d)-(%d,%d)\n",
 			testEncodings[cd->encodingIndex].str,
 			x,y,x+w,y+h);
 #endif
@@ -137,7 +144,7 @@ static void update(rfbClient* client,int x,int y,int w,int h) {
 	/* only check if this was the last update */
 	if(x+w!=lastUpdateRect.x2 || y+h!=lastUpdateRect.y2) {
 #ifdef VERY_VERBOSE
-		rfbLog("Waiting (%d!=%d or %d!=%d)\n",
+		rfbClientLog("Waiting (%d!=%d or %d!=%d)\n",
 				x+w,lastUpdateRect.x2,y+h,lastUpdateRect.y2);
 #endif
 		return;
@@ -160,11 +167,11 @@ static void* clientLoop(void* data) {
 	
 	
 	sleep(1);
-	rfbLog("Starting client (encoding %s, display %s)\n",
+	rfbClientLog("Starting client (encoding %s, display %s)\n",
 			testEncodings[cd->encodingIndex].str,
 			cd->display);
 	if(!rfbInitClient(client,&argc,argv)) {
-		rfbLog("Had problems starting client (encoding %s)\n",
+		rfbClientErr("Had problems starting client (encoding %s)\n",
 				testEncodings[cd->encodingIndex].str);
 		updateStatistics(cd->encodingIndex,TRUE);
 		return 0;
@@ -196,7 +203,11 @@ static void startClient(int encodingIndex,rfbScreenInfo* server) {
 	cd->server=server;
 	cd->display=(char*)malloc(6);
 	sprintf(cd->display,":%d",server->port-5900);
-	
+
+	lastUpdateRect.x1=lastUpdateRect.y1=0;
+	lastUpdateRect.x2=server->width;
+	lastUpdateRect.y2=server->height;
+
 	pthread_create(&clientThread,NULL,clientLoop,(void*)client);
 }
 
@@ -246,12 +257,39 @@ static void idle(rfbScreenInfo* server)
 	UNLOCK(frameBufferMutex);
 }
 
-//TODO: pthread'ize the client. otherwise server and client block each
-//other
+/* log function (to show what messages are from the client) */
+
+void
+rfbTestLog(const char *format, ...)
+{
+	va_list args;
+	char buf[256];
+	time_t log_clock;
+
+	if(!rfbEnableClientLogging)
+		return;
+
+	va_start(args, format);
+
+	time(&log_clock);
+	strftime(buf, 255, "%d/%m/%Y %X (client) ", localtime(&log_clock));
+	fprintf(stderr,buf);
+
+	vfprintf(stderr, format, args);
+	fflush(stderr);
+
+	va_end(args);
+}
+
+/* the main function */
+
 int main(int argc,char** argv)
 {                                                                
 	int i,j;
 	time_t t;
+
+	rfbClientLog=rfbTestLog;
+	rfbClientErr=rfbTestLog;
 
 	/* Initialize server */
 	rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,width,height,8,3,4);
@@ -303,4 +341,5 @@ int main(int argc,char** argv)
 		return 1;
 	return(0);
 }
+
 
