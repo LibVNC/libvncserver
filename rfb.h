@@ -66,6 +66,8 @@ typedef void (*KbdReleaseAllKeysProcPtr) (struct rfbClientRec* cl);
 typedef void (*PtrAddEventProcPtr) (int buttonMask, int x, int y, struct rfbClientRec* cl);
 typedef void (*SetXCutTextProcPtr) (char* str,int len, struct rfbClientRec* cl);
 
+typedef void (*NewClientHookPtr)(struct rfbClientRec* cl);
+
 /*
  * Per-screen (framebuffer) structure.  There is only one of these, since we
  * don't allow the X server to have multiple screens.
@@ -167,6 +169,12 @@ typedef struct
     KbdReleaseAllKeysProcPtr kbdReleaseAllKeys;
     PtrAddEventProcPtr ptrAddEvent;
     SetXCutTextProcPtr setXCutText;
+
+    /* the following members are hooks, i.e. they are called if set,
+       but not overriding original functionality */
+    /* newClientHook is called just after a new client is created */
+    NewClientHookPtr newClientHook;
+
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -174,7 +182,6 @@ typedef struct
  * rfbTranslateFnType is the type of translation functions.
  */
 
-struct rfbClientRec;
 typedef void (*rfbTranslateFnType)(char *table, rfbPixelFormat *in,
                                    rfbPixelFormat *out,
                                    char *iptr, char *optr,
@@ -186,8 +193,12 @@ typedef void (*rfbTranslateFnType)(char *table, rfbPixelFormat *in,
  * Per-client structure.
  */
 
+typedef void (*ClientGoneHookPtr)(struct rfbClientRec* cl);
+
 typedef struct rfbClientRec {
     rfbScreenInfoPtr screen;
+    void* clientData;
+    ClientGoneHookPtr clientGoneHook;
    
     int sock;
     char *host;
@@ -415,6 +426,8 @@ extern Bool rfbSendFramebufferUpdate(rfbClientPtr cl, RegionRec updateRegion);
 extern Bool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern Bool rfbSendUpdateBuf(rfbClientPtr cl);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
+extern Bool rfbSendCopyRegion(rfbClientPtr cl,RegionPtr reg,int dx,int dy);
+extern Bool rfbSendLastRectMarker(rfbClientPtr cl);
 
 void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
 
@@ -508,7 +521,7 @@ extern void rfbDisconnectUDPSock(rfbScreenInfoPtr cl);
 
 void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2);
 void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,RegionPtr modRegion);
-
+void doNothingWithClient(rfbClientPtr cl);
 
 /* functions to make a vnc server */
 extern rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv);

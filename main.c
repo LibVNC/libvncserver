@@ -279,32 +279,20 @@ processArguments(rfbScreenInfoPtr rfbScreen,int argc, char *argv[])
 }
 
 void
-DefaultKbdAddEvent(down, keySym, cl)
-    Bool down;
-    KeySym keySym;
-    rfbClientPtr cl;
+defaultKbdAddEvent(Bool down, KeySym keySym, rfbClientPtr cl)
 {
 }
 
 void
-DefaultPtrAddEvent(buttonMask, x, y, cl)
-    int buttonMask;
-    int x;
-    int y;
-    rfbClientPtr cl;
+defaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 {
 }
 
-void
-DefaultKbdReleaseAllKeys(cl)
-     rfbClientPtr cl;
+void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
 {
 }
 
-void DefaultSetXCutText(text,len,cl)
-  char* text;
-  int len;
-  rfbClientPtr cl;
+void doNothingWithClient(rfbClientPtr cl)
 {
 }
 
@@ -378,10 +366,12 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv)
    rfbScreen->screen.RegionAppend = miRegionAppend;
    rfbScreen->screen.RegionValidate = miRegionValidate;
 
-   rfbScreen->kbdAddEvent = DefaultKbdAddEvent;
-   rfbScreen->kbdReleaseAllKeys = DefaultKbdReleaseAllKeys;
-   rfbScreen->ptrAddEvent = DefaultPtrAddEvent;
-   rfbScreen->setXCutText = DefaultSetXCutText;
+   rfbScreen->kbdAddEvent = defaultKbdAddEvent;
+   rfbScreen->kbdReleaseAllKeys = doNothingWithClient;
+   rfbScreen->ptrAddEvent = defaultPtrAddEvent;
+   rfbScreen->setXCutText = defaultSetXCutText;
+   rfbScreen->newClientHook = doNothingWithClient;
+
    return(rfbScreen);
 }
 
@@ -394,14 +384,15 @@ processEvents(rfbScreenInfoPtr rfbScreen,long usec)
     corbaCheckFds(rfbScreen);
 #endif
     {
-       rfbClientIteratorPtr iterator;
-       rfbClientPtr cl;
-       iterator=rfbGetClientIterator(rfbScreen);
-       while((cl=rfbClientIteratorNext(iterator)))
+       rfbClientPtr cl,cl_next;
+       cl=rfbScreen->rfbClientHead;
+       while(cl) {
+	 cl_next=cl->next;
 	 if(cl->sock>=0 && FB_UPDATE_PENDING(cl)) {
 	    rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
 	 }
-       rfbReleaseClientIterator(iterator);
+	 cl=cl_next;
+       }
     }
 }
 

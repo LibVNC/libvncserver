@@ -32,26 +32,49 @@
 
 const int maxx=640, maxy=480, bpp=4;
 
+void initBuffer(char* buffer)
+{
+  int i,j;
+  for(i=0;i<maxx;++i)
+    for(j=0;j<maxy;++j) {
+      buffer[(j*maxx+i)*bpp]=i*256/maxx;
+      buffer[(j*maxx+i)*bpp+1]=j*256/maxy;
+      buffer[(j*maxx+i)*bpp+2]=(i+j)*256/(maxx*maxy);
+      buffer[(j*maxx+i)*bpp+3]=(i-j)*256/(maxx*maxy);
+    }
+}
+
 void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 {
    if(buttonMask && x>=0 && y>=0 && x<maxx && y<maxy) {
-      int i;
-      for(i=0;i<bpp;i++)
-	cl->screen->frameBuffer[y*cl->screen->paddedWidthInBytes+x*bpp+i]^=0xff;
-      rfbMarkRectAsModified(cl->screen,x,y,x+1,y+1);
+      int i,j,x1,x2,y1,y2;
+      x1=x-buttonMask; if(x1<0) x1=0;
+      x2=x+buttonMask; if(x2>maxx) x2=maxx;
+      y1=y-buttonMask; if(y1<0) y1=0;
+      y2=y+buttonMask; if(y2>maxy) y2=maxy;
+
+      for(i=x1*bpp;i<x2*bpp;i++)
+	for(j=y1;j<y2;j++)
+	  cl->screen->frameBuffer[j*cl->screen->paddedWidthInBytes+i]=0xff;
+      rfbMarkRectAsModified(cl->screen,x1,y1,x2,y2);
       rfbGotXCutText(cl->screen,"Hallo",5);
    }
 }
+
+
 
 void dokey(Bool down,KeySym key,rfbClientPtr cl)
 {
   if(down && key==XK_Escape)
     rfbCloseClient(cl);
+  else if(down && key=='c') {
+    initBuffer(cl->screen->frameBuffer);
+    rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
+  }
 }
 
 int main(int argc,char** argv)
 {
-  int i,j;
   rfbScreenInfoPtr rfbScreen = rfbDefaultScreenInit(argc,argv);
   rfbScreen->desktopName="LibVNCServer Example";
   rfbScreen->frameBuffer = (char*)malloc(maxx*maxy*bpp);
@@ -61,12 +84,7 @@ int main(int argc,char** argv)
   rfbScreen->ptrAddEvent=doptr;
   rfbScreen->kbdAddEvent=dokey;
 
-  for(i=0;i<maxx;++i)
-    for(j=0;j<maxy;++j) {
-      rfbScreen->frameBuffer[(j*maxx+i)*bpp]=i*256/maxx;
-      rfbScreen->frameBuffer[(j*maxx+i)*bpp+1]=j*256/maxy;
-      rfbScreen->frameBuffer[(j*maxx+i)*bpp+2]=(i+j)*256/(maxx*maxy);
-    }
+  initBuffer(rfbScreen->frameBuffer);
 
   runEventLoop(rfbScreen,40000,FALSE);
   runEventLoop(rfbScreen,40000,TRUE);

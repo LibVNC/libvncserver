@@ -237,6 +237,10 @@ rfbNewClient(rfbScreen,sock)
     sprintf(pv,rfbProtocolVersionFormat,rfbProtocolMajorVersion,
             rfbProtocolMinorVersion);
 
+    cl->clientData = NULL;
+    cl->clientGoneHook = doNothingWithClient;
+    cl->screen->newClientHook(cl);
+
     if (WriteExact(cl, pv, sz_rfbProtocolVersionMsg) < 0) {
         rfbLogPerror("rfbNewClient: write");
         rfbCloseClient(cl);
@@ -260,6 +264,8 @@ rfbClientConnectionGone(cl)
 #ifdef HAVE_PTHREADS
     pthread_mutex_lock(&rfbClientListMutex);
 #endif
+
+    cl->clientGoneHook(cl);
 
     rfbLog("Client %s gone\n",cl->host);
     free(cl->host);
@@ -1052,7 +1058,7 @@ rfbSendFramebufferUpdate(cl, updateRegion)
  * of a later one.
  */
 
-static Bool
+Bool
 rfbSendCopyRegion(cl, reg, dx, dy)
     rfbClientPtr cl;
     RegionPtr reg;
@@ -1216,7 +1222,7 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
  * protocol).
  */
 
-static Bool
+Bool
 rfbSendLastRectMarker(cl)
     rfbClientPtr cl;
 {

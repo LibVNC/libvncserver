@@ -8,10 +8,10 @@ VNCAUTHLIB=-Llibvncauth -lvncauth
 VNCSERVERLIB=-L. -lvncserver -lz -ljpeg
 
 # These two lines enable useage of PThreads
-CFLAGS += -DHAVE_PTHREADS
+#CFLAGS += -DHAVE_PTHREADS
 VNCSERVERLIB += -lpthread
 
-LIBS=$(VNCSERVERLIB) $(VNCAUTHLIB)
+LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(VNCAUTHLIB)
 
 # for Mac OS X
 OSX_LIBS = -framework ApplicationServices -framework Carbon
