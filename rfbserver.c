@@ -857,14 +857,14 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
     if (cl->enableCursorShapeUpdates) {
       if (cl->screen->cursorIsDrawn) {
-	rfbUndrawCursor(cl);
+	rfbUndrawCursor(cl->screen);
       }
       if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged &&
 	  cl->readyForSetColourMapEntries)
 	  sendCursorShape = TRUE;
     } else {
       if (!cl->screen->cursorIsDrawn) {
-	rfbDrawCursor(cl);
+	rfbDrawCursor(cl->screen);
       }
     }
 
@@ -1093,7 +1093,7 @@ rfbSendCopyRegion(cl, reg, dx, dy)
     sraRectangleIterator* i;
     sraRect rect1;
 
-    i = sraRgnGetReverseIterator(reg,dx<0,dy<0);
+    i = sraRgnGetReverseIterator(reg,dx>0,dy>0);
 
     while(sraRgnIteratorNext(i,&rect1)) {
       x = rect1.x1;
@@ -1113,7 +1113,7 @@ rfbSendCopyRegion(cl, reg, dx, dy)
 
       cr.srcX = Swap16IfLE(x - dx);
       cr.srcY = Swap16IfLE(y - dy);
-fprintf(stderr,"sent copyrect (%d,%d) (%d,%d) (%d,%d)\n",x,y,w,h,x-dx,y-dy);
+
       memcpy(&cl->updateBuf[cl->ublen], (char *)&cr, sz_rfbCopyRect);
       cl->ublen += sz_rfbCopyRect;
 

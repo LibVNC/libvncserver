@@ -1,5 +1,11 @@
 0.2
-   flag backgroundLoop in rfbScreenInfo
+   fixed CopyRect (was using the wrong order of rectangles...)
+   	 should also work with pthreads, because copyrects are
+	 always sent immediately (so that two consecutive copy rects
+	 cannot conflict).
+   changed rfbUndrawCursor(rfbClientPtr) to (rfbScreenInfoPtr), because
+   	   this makes more sense!
+   flag backgroundLoop in rfbScreenInfo (if having pthreads)
    rfbCopyRect & rfbCopyRegion (really copies rectangle in frameBuffer)
    added flag to optionally not send XCursor updates.
    fixed java viewer on server side:

@@ -102,7 +102,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
    ClientData* cd=cl->clientData;
 
    if(cl->screen->cursorIsDrawn)
-     rfbUndrawCursor(cl);
+     rfbUndrawCursor(cl->screen);
 
    if(x>=0 && y>=0 && x<maxx && y<maxy) {
       if(buttonMask) {
@@ -149,14 +149,14 @@ void dokey(Bool down,KeySym key,rfbClientPtr cl)
       rfbCloseClient(cl);
     else if(key==XK_Page_Up) {
       if(cl->screen->cursorIsDrawn)
-	rfbUndrawCursor(cl);
+	rfbUndrawCursor(cl->screen);
       initBuffer(cl->screen->frameBuffer);
       rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
     } else if(key>=' ' && key<0x100) {
       ClientData* cd=cl->clientData;
       int x1=cd->oldx,y1=cd->oldy,x2,y2;
       if(cl->screen->cursorIsDrawn)
-	rfbUndrawCursor(cl);
+	rfbUndrawCursor(cl->screen);
       cd->oldx+=rfbDrawChar(cl->screen,&radonFont,cd->oldx,cd->oldy,key,0xffffff);
       rfbFontBBox(&radonFont,key,&x1,&y1,&x2,&y2);
       rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);

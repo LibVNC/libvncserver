@@ -667,8 +667,8 @@ extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
 extern void MakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
 extern void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
 extern void rfbFreeCursor(rfbCursorPtr cursor);
-extern void rfbDrawCursor(rfbClientPtr cl);
-extern void rfbUndrawCursor(rfbClientPtr cl);
+extern void rfbDrawCursor(rfbScreenInfoPtr rfbScreen);
+extern void rfbUndrawCursor(rfbScreenInfoPtr rfbScreen);
 extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld);
 
 /* cursor handling for the pointer */

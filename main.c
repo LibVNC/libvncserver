@@ -67,23 +67,29 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
 
-  iterator=rfbGetClientIterator(rfbScreen);
+   rfbUndrawCursor(rfbScreen);
+  
+   iterator=rfbGetClientIterator(rfbScreen);
    while((cl=rfbClientIteratorNext(iterator))) {
      LOCK(cl->updateMutex);
      if(cl->useCopyRect) {
-       while(!sraRgnEmpty(cl->copyRegion) && (cl->copyDX!=dx || cl->copyDY!=dy)) {
-#ifdef HAVE_PTHREADS
-	 if(cl->screen->backgroundLoop) {
-	   SIGNAL(cl->updateCond);
-	   UNLOCK(cl->updateMutex);
-	   LOCK(cl->updateMutex);
-	 } else
-#endif
-	   rfbSendFramebufferUpdate(cl,cl->copyRegion);
-       }
        sraRgnOr(cl->copyRegion,copyRegion);
        cl->copyDX = dx;
        cl->copyDY = dy;
+       
+#ifdef HAVE_PTHREADS
+       if(cl->screen->backgroundLoop) {
+	 SIGNAL(cl->updateCond);
+	 UNLOCK(cl->updateMutex);
+	 LOCK(cl->updateMutex);
+       } else
+#endif
+       {
+	 sraRegionPtr updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
+	 sraRgnOr(updateRegion,cl->copyRegion);
+	 rfbSendFramebufferUpdate(cl,updateRegion);
+	 sraRgnDestroy(updateRegion);
+       }
      } else {
        sraRgnOr(cl->modifiedRegion,copyRegion);
      }
@@ -332,7 +338,7 @@ defaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 {
    if(x!=cl->screen->cursorX || y!=cl->screen->cursorY) {
       if(cl->screen->cursorIsDrawn)
-	rfbUndrawCursor(cl);
+	rfbUndrawCursor(cl->screen);
       LOCK(cl->screen->cursorMutex);
       if(!cl->screen->cursorIsDrawn) {
 	  cl->screen->cursorX = x;

@@ -1,7 +1,7 @@
 immediate:
 ----------
 
-copyRect and pthreads possible problem.
+test copyRect and pthreads.
 authentification schemes (secure vnc)
 udp
 documentation

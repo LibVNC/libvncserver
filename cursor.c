@@ -331,9 +331,8 @@ void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
 
 /* functions to draw/hide cursor directly in the frame buffer */
 
-void rfbUndrawCursor(rfbClientPtr cl)
+void rfbUndrawCursor(rfbScreenInfoPtr s)
 {
-   rfbScreenInfoPtr s=cl->screen;
    rfbCursorPtr c=s->cursor;
    int j,x1,x2,y1,y2,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
@@ -372,9 +371,8 @@ void rfbUndrawCursor(rfbClientPtr cl)
    UNLOCK(s->cursorMutex);
 }
 
-void rfbDrawCursor(rfbClientPtr cl)
+void rfbDrawCursor(rfbScreenInfoPtr s)
 {
-   rfbScreenInfoPtr s=cl->screen;
    rfbCursorPtr c=s->cursor;
    int i,j,x1,x2,y1,y2,i1,j1,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
@@ -453,16 +451,8 @@ void rfbPrintXCursor(rfbCursorPtr cursor)
 
 extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
 {
-  rfbClientIteratorPtr i = rfbGetClientIterator(rfbScreen);
-  rfbClientPtr cl;
-
   LOCK(rfbScreen->cursorMutex);
-
-  while((cl=rfbClientIteratorNext(i))) {
-    LOCK(cl->updateMutex);
-    rfbUndrawCursor(cl);
-    UNLOCK(cl->updateMutex);
-    }
+  rfbUndrawCursor(rfbScreen);
 
   if(freeOld && rfbScreen->cursor)
     rfbFreeCursor(rfbScreen->cursor);
