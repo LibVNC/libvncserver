@@ -1,6 +1,6 @@
 # Process this file with autoconf to produce a configure script.
 AC_INIT(LibVNCServer, 0.5, http://sourceforge.net/projects/libvncserver)
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE(LibVNCServer, 0.5)
 AM_CONFIG_HEADER([include/rfbconfig.h])
 
 # Checks for programs.

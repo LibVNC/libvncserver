@@ -19,15 +19,15 @@ ZRLE_SRCS=zrle.cxx rdr/FdInStream.cxx rdr/FdOutStream.cxx rdr/InStream.cxx \
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 	tableinitcmtemplate.c tabletrans24template.c $(ZRLE_SRCS)
 
-LIB_SOURCES = main.c rfbserver.c sraRegion.c auth.c sockets.c \
+LIB_SRCS = main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	zlib.c tight.c httpd.c cursor.c font.c \
 	draw.c selbox.c d3des.c vncauth.c cargs.c
 
 if HAVE_CXX
-libvncserver_a_SOURCES=$(LIB_SOURCES) $(ZRLE_SRCS)
+libvncserver_a_SOURCES=$(LIB_SRCS) $(ZRLE_SRCS)
 else
-libvncserver_a_SOURCES=$(LIB_SOURCES)
+libvncserver_a_SOURCES=$(LIB_SRCS)
 endif
 
 lib_LIBRARIES=libvncserver.a
@@ -36,7 +36,7 @@ if HAVE_RPM
 $(PACKAGE)-$(VERSION).tar.gz: dist
 
 # Rule to build RPM distribution package
-rpm: $(PACKAGE)-$(VERSION).tar.gz
+rpm: $(PACKAGE)-$(VERSION).tar.gz libvncserver.spec
 	cp $(PACKAGE)-$(VERSION).tar.gz @RPMSOURCEDIR@
 	rpm -ba libvncserver.spec
 endif
