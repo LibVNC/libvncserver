@@ -68,6 +68,11 @@ void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,int x2,i
 {
   int i,j;
   i=x1-x2; j=y1-y2;
+  if(i==0 && j==0) {
+     for(i=0;i<bpp;i++)
+       buffer[y1*rowstride+x1*bpp+i]=0xff;
+     return;
+  }
   if(i<0) i=-i;
   if(j<0) j=-j;
   if(i<j) {
@@ -89,32 +94,34 @@ void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,int x2,i
 void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 {
    ClientData* cd=cl->clientData;
-   if(buttonMask && x>=0 && y>=0 && x<maxx && y<maxy) {
-      int i,j,x1,x2,y1,y2;
+   if(x>=0 && y>=0 && x<maxx && y<maxy) {
+      if(buttonMask) {
+	 int i,j,x1,x2,y1,y2;
 
-      if(cd->oldButton==buttonMask) { /* draw a line */
-	drawline(cl->screen->frameBuffer,cl->screen->paddedWidthInBytes,bpp,
-		 x,y,cd->oldx,cd->oldy);
-	rfbMarkRectAsModified(cl->screen,x,y,cd->oldx,cd->oldy);
-      } else { /* draw a point (diameter depends on button) */
-	x1=x-buttonMask; if(x1<0) x1=0;
-	x2=x+buttonMask; if(x2>maxx) x2=maxx;
-	y1=y-buttonMask; if(y1<0) y1=0;
-	y2=y+buttonMask; if(y2>maxy) y2=maxy;
+	 if(cd->oldButton==buttonMask) { /* draw a line */
+	    drawline(cl->screen->frameBuffer,cl->screen->paddedWidthInBytes,bpp,
+		     x,y,cd->oldx,cd->oldy);
+	    rfbMarkRectAsModified(cl->screen,x,y,cd->oldx,cd->oldy);
+	 } else { /* draw a point (diameter depends on button) */
+	    x1=x-buttonMask; if(x1<0) x1=0;
+	    x2=x+buttonMask; if(x2>maxx) x2=maxx;
+	    y1=y-buttonMask; if(y1<0) y1=0;
+	    y2=y+buttonMask; if(y2>maxy) y2=maxy;
 
-	for(i=x1*bpp;i<x2*bpp;i++)
-	  for(j=y1;j<y2;j++)
-	    cl->screen->frameBuffer[j*cl->screen->paddedWidthInBytes+i]=0xff;
-	rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);
-      }
+	    for(i=x1*bpp;i<x2*bpp;i++)
+	      for(j=y1;j<y2;j++)
+		cl->screen->frameBuffer[j*cl->screen->paddedWidthInBytes+i]=0xff;
+	    rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);
+	 }
 
-      /* we could get a selection like that:
-	 rfbGotXCutText(cl->screen,"Hallo",5);
-      */
-   } else
-     cd->oldButton=0;
+	 /* we could get a selection like that:
+	  rfbGotXCutText(cl->screen,"Hallo",5);
+	  */
+      } else
+	cd->oldButton=0;
 
-   cd->oldx=x; cd->oldy=y; cd->oldButton=buttonMask;
+      cd->oldx=x; cd->oldy=y; cd->oldButton=buttonMask;
+   }
 }
 
 /* aux function to draw a character to x, y */
@@ -196,6 +203,24 @@ void dokey(Bool down,KeySym key,rfbClientPtr cl)
   }
 }
 
+/*
+extern void rfbPrintXCursor(rfbCursorPtr cursor);
+int exampleCursorWidth=9,exampleCursorHeight=7;
+char exampleCursor[]=
+  "         "
+  " xx   xx "
+  "  xx xx  "
+  "   xxx   "
+  "  xx xx  "
+  " xx   xx "
+  "         ";
+rfbCursorPtr exampleCurse;
+rfbCursorPtr exampleGetCursor(rfbClientPtr cl)
+{
+   return(exampleCurse);
+}
+*/
+
 /* Initialization */
 
 int main(int argc,char** argv)
@@ -211,8 +236,31 @@ int main(int argc,char** argv)
   rfbScreen->httpDir = "./classes";
 
   initBuffer(rfbScreen->frameBuffer);
+  drawstring(rfbScreen->frameBuffer,maxx*bpp,bpp,20,100,"Hello, World!");
 
-  drawstring(rfbScreen->frameBuffer,maxx*bpp,bpp,20,100,"Hallo, Welt!");
+  //exampleCurse = rfbMakeXCursor(exampleCursorWidth,exampleCursorHeight,exampleCursor,0);
+  {
+     int i,j,w=32,h=32;
+     rfbCursorPtr c = rfbScreen->cursor;
+     char x[32*32],mask[32*32/8];
+     c=rfbScreen->cursor = rfbMakeXCursor(w,h,x,mask);
+     c->mask[0]=0xff; c->mask[1]=0x0;
+     memset(c->mask,255,h*w/8);
+     c->richSource = malloc(w*h*bpp);
+     for(j=0;j<h;j++) {
+       for(i=0;i<w;i++) {
+	  c->richSource[j*w*bpp+i*bpp+0]=0;
+	  c->richSource[j*w*bpp+i*bpp+1]=0;
+	  c->richSource[j*w*bpp+i*bpp+2]=j*0xff/h;
+	  c->richSource[j*w*bpp+i*bpp+3]=0;
+       }
+       c->richSource[j*w*bpp+(w-1)*bpp+0]=0xff;
+       c->richSource[j*w*bpp+(w-1)*bpp+1]=0xff;
+       c->richSource[j*w*bpp+(w-1)*bpp+2]=0xff;
+       c->richSource[j*w*bpp+(w-1)*bpp+3]=0xff;
+     }
+     //memset(c->richSource,0xff,w*h*bpp);
+  }
 
   /* this is the blocking event loop, i.e. it never returns */
   /* 40000 are the microseconds, i.e. 0.04 seconds */

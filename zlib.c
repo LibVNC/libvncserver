@@ -235,8 +235,6 @@ rfbSendRectEncodingZlib(cl, x, y, w, h)
     rfbClientPtr cl;
     int x, y, w, h;
 {
-    int  totalSize = 0;
-    int  partialSize = 0;
     int  maxLines;
     int  linesRemaining;
     rfbRectangle partialRect;

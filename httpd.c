@@ -31,6 +31,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <pwd.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 
 #include "rfb.h"
 
@@ -99,7 +101,7 @@ httpInitSockets(rfbScreenInfoPtr rfbScreen)
 void
 httpCheckFds(rfbScreenInfoPtr rfbScreen)
 {
-    int nfds, n;
+    int nfds;
     fd_set fds;
     struct timeval tv;
     struct sockaddr_in addr;

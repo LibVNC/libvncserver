@@ -221,6 +221,7 @@ rfbNewClient(rfbScreen,sock)
         cl->zsActive[i] = FALSE;
 
     cl->enableCursorShapeUpdates = FALSE;
+    cl->useRichCursorEncoding = FALSE;
     cl->enableLastRectEncoding = FALSE;
 
     rfbResetStats(cl);
@@ -630,18 +631,15 @@ rfbProcessClientNormalMessage(cl)
 		rfbLog("Enabling X-style cursor updates for client %s\n",
 		       cl->host);
 		cl->enableCursorShapeUpdates = TRUE;
-		cl->useRichCursorEncoding = FALSE;
 		cl->cursorWasChanged = TRUE;
 		break;
 	    case rfbEncodingRichCursor:
-		if (!cl->enableCursorShapeUpdates) {
-		    rfbLog("Enabling full-color cursor updates for client "
-			   "%s\n", cl->host);
-		    cl->enableCursorShapeUpdates = TRUE;
-		    cl->useRichCursorEncoding = TRUE;
-		    cl->cursorWasChanged = TRUE;
-		}
-		break;
+	        rfbLog("Enabling full-color cursor updates for client "
+		      "%s\n", cl->host);
+	        cl->enableCursorShapeUpdates = TRUE;
+	        cl->useRichCursorEncoding = TRUE;
+	        cl->cursorWasChanged = TRUE;
+	        break;
 	    case rfbEncodingLastRect:
 		if (!cl->enableLastRectEncoding) {
 		    rfbLog("Enabling LastRect protocol extension for client "
@@ -829,23 +827,24 @@ rfbSendFramebufferUpdate(cl, updateRegion)
     RegionRec updateCopyRegion;
     int dx, dy;
     Bool sendCursorShape = FALSE;
+    Bool cursorWasDrawn = FALSE;
 
     /*
      * If this client understands cursor shape updates, cursor should be
      * removed from the framebuffer. Otherwise, make sure it's put up.
      */
 
-#ifdef NOT_YET
     if (cl->enableCursorShapeUpdates) {
-	if (cl->screen->cursorIsDrawn)
-	    rfbSpriteRemoveCursor(pScreen);
-	if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged)
-	    sendCursorShape = TRUE;
+       cursorWasDrawn = cl->screen->cursorIsDrawn;
+       if (cl->screen->cursorIsDrawn) {
+	  fprintf(stderr,"rfbSpriteRemoveCursor(pScreen); not yet!\n");
+       }
+       if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged)
+	 sendCursorShape = TRUE;
     } else {
-	if (!cl->screen->cursorIsDrawn)
-	    rfbSpriteRestoreCursor(pScreen);
+       if (!cl->screen->cursorIsDrawn)
+	 fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!\n");
     }
-#endif
    
     /*
      * The modifiedRegion may overlap the destination copyRegion.  We remove
@@ -976,13 +975,11 @@ rfbSendFramebufferUpdate(cl, updateRegion)
     }
     cl->ublen = sz_rfbFramebufferUpdateMsg;
 
-#ifdef NOT_YET
    if (sendCursorShape) {
 	cl->cursorWasChanged = FALSE;
-	if (!rfbSendCursorShape(cl, pScreen))
+	if (!rfbSendCursorShape(cl))
 	    return FALSE;
     }
-#endif
    
     if (REGION_NOTEMPTY(pScreen,&updateCopyRegion)) {
 	if (!rfbSendCopyRegion(cl,&updateCopyRegion,dx,dy)) {
@@ -1046,6 +1043,13 @@ rfbSendFramebufferUpdate(cl, updateRegion)
 
     if (!rfbSendUpdateBuf(cl))
         return FALSE;
+
+    if(cursorWasDrawn != cl->screen->cursorIsDrawn) {
+       if(cursorWasDrawn)
+	  fprintf(stderr,"rfbSpriteRestoreCursor(pScreen); not yet!!\n");
+       else
+	  fprintf(stderr,"rfbSpriteRemoveCursor(pScreen); not yet!!\n");
+    }
 
     return TRUE;
 }

@@ -57,6 +57,7 @@ struct timeval
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <arpa/inet.h>
 
 #include "rfb.h"
 

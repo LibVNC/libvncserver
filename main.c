@@ -37,6 +37,7 @@
 #endif
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
 
 #include "rfb.h"
 
@@ -93,8 +94,16 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
    RegionRec region;
    int i;
    if(x1>x2) { i=x1; x1=x2; x2=i; }
+   x2++;
+   if(x1<0) { x1=0; if(x2==x1) x2++; }
+   if(x2>=rfbScreen->width) { x2=rfbScreen->width-1; if(x1==x2) x1--; }
+   
    if(y1>y2) { i=y1; y1=y2; y2=i; }
-   box.x1=x1; box.y1=y1; box.x2=x2+1; box.y2=y2+1;
+   y2++;
+   if(y1<0) { y1=0; if(y2==y1) y2++; }
+   if(y2>=rfbScreen->height) { y2=rfbScreen->height-1; if(y1==y2) y1--; }
+   
+   box.x1=x1; box.y1=y1; box.x2=x2; box.y2=y2;
    REGION_INIT(cl->screen,&region,&box,0);
    rfbMarkRegionAsModified(rfbScreen,&region);
 }
@@ -295,6 +304,38 @@ void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
 {
 }
 
+static rfbCursor myCursor = 
+{
+   //width: 8, height: 7, xhot: 3, yhot: 3,
+   width: 8, height: 7, xhot: 0, yhot: 0,
+   //source: "\000\102\044\030\044\102\000",
+   //mask:   "\347\347\176\074\176\347\347",
+   source: "\000\074\176\146\176\074\000",
+   mask:   "\176\377\377\377\377\377\176",
+   foreRed: 0, foreGreen: 0, foreBlue: 0,
+   backRed: 0xffff, backGreen: 0xffff, backBlue: 0xffff,
+ #define D "\000\000\000\000"
+ #define R "\377\000\000\000"
+ #define G "\000\377\000\000"
+ #define B "\000\000\377\000"
+ #define S "\377\377\000\000"
+ #define H "\000\377\377\000"
+ #define C "\377\000\377\000"
+   richSource: 0
+   /*D D D D D D D D
+     D D R R R R D D
+     D S S S S S S D
+     D G G D D G G D
+     D H H H H H H D
+     D D B B B B D D
+     D D D D D D D D*/
+};
+
+rfbCursorPtr defaultGetCursorPtr(rfbClientPtr cl)
+{
+   return(cl->screen->cursor);
+}
+
 void doNothingWithClient(rfbClientPtr cl)
 {
 }
@@ -348,15 +389,12 @@ rfbScreenInfoPtr rfbDefaultScreenInit(int argc,char** argv,int width,int height,
    rfbScreen->rfbServerFormat.redShift = bitsPerSample * 2;
    rfbScreen->rfbServerFormat.greenShift = bitsPerSample;
    rfbScreen->rfbServerFormat.blueShift = 0;
-fprintf(stderr,"format: %d %d %d %d %d %d\n",
-	rfbScreen->rfbServerFormat.redMax,
-	rfbScreen->rfbServerFormat.greenMax,
-	rfbScreen->rfbServerFormat.blueMax,
-	rfbScreen->rfbServerFormat.redShift,
-	rfbScreen->rfbServerFormat.greenShift,
-	rfbScreen->rfbServerFormat.blueShift);
 
-
+   rfbScreen->cursorIsDrawn = FALSE;
+   rfbScreen->dontSendFramebufferUpdate = FALSE;
+   rfbScreen->cursorX=rfbScreen->cursorY=rfbScreen->underCursorBufferLen=0;
+   rfbScreen->underCursorBuffer=NULL;
+   
    /* We want to use the X11 REGION_* macros without having an actual
     X11 ScreenPtr, so we do this.  Pretty ugly, but at least it lets us
     avoid hacking up regionstr.h, or changing every call to REGION_*
@@ -384,6 +422,8 @@ fprintf(stderr,"format: %d %d %d %d %d %d\n",
    rfbScreen->kbdReleaseAllKeys = doNothingWithClient;
    rfbScreen->ptrAddEvent = defaultPtrAddEvent;
    rfbScreen->setXCutText = defaultSetXCutText;
+   rfbScreen->getCursorPtr = defaultGetCursorPtr;
+   rfbScreen->cursor = &myCursor;
    rfbScreen->newClientHook = doNothingWithClient;
 
    return(rfbScreen);

@@ -23,6 +23,8 @@
  *  USA.
  */
 
+#include <stdlib.h>
+#include <string.h>
 #include "scrnintstr.h"
 
 /* trying to replace the above with some more minimal set of includes */
@@ -60,12 +62,14 @@
 #endif
 
 struct rfbClientRec;
-//typedef struct rfbClientInfo* rfbClientPtr;
+struct rfbScreenInfo;
+struct rfbCursor;
+
 typedef void (*KbdAddEventProcPtr) (Bool down, KeySym keySym, struct rfbClientRec* cl);
 typedef void (*KbdReleaseAllKeysProcPtr) (struct rfbClientRec* cl);
 typedef void (*PtrAddEventProcPtr) (int buttonMask, int x, int y, struct rfbClientRec* cl);
 typedef void (*SetXCutTextProcPtr) (char* str,int len, struct rfbClientRec* cl);
-
+typedef struct rfbCursor* (*GetCursorProcPtr) (struct rfbClientRec* pScreen);
 typedef void (*NewClientHookPtr)(struct rfbClientRec* cl);
 
 /*
@@ -125,7 +129,11 @@ typedef struct
     Bool cursorIsDrawn;		    /* TRUE if the cursor is currently drawn */
     Bool dontSendFramebufferUpdate; /* TRUE while removing or drawing the
 				       cursor */
-
+   
+    /* these variables are needed to save the area under the cursor */
+    int cursorX, cursorY,underCursorBufferLen;
+    char* underCursorBuffer;
+   
     /* wrapped screen functions */
 
     CloseScreenProcPtr			CloseScreen;
@@ -167,14 +175,16 @@ typedef struct
     Bool rfbNeverShared;
     Bool rfbDontDisconnect;
     struct rfbClientRec* rfbClientHead;
-
+    struct rfbCursor* cursor;
+   
     /* the following members have to be supplied by the serving process */
     char* frameBuffer;
     KbdAddEventProcPtr kbdAddEvent;
     KbdReleaseAllKeysProcPtr kbdReleaseAllKeys;
     PtrAddEventProcPtr ptrAddEvent;
     SetXCutTextProcPtr setXCutText;
-
+    GetCursorProcPtr getCursorPtr;
+   
     /* the following members are hooks, i.e. they are called if set,
        but not overriding original functionality */
     /* newClientHook is called just after a new client is created */
@@ -513,8 +523,22 @@ extern Bool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
 
 /* cursor.c */
 
-extern Bool rfbSendCursorShape(rfbClientPtr cl, ScreenPtr pScreen);
+typedef struct rfbCursor {
+    unsigned char *source;			/* points to bits */
+    unsigned char *mask;			/* points to bits */
+    unsigned short width, height, xhot, yhot;	/* metrics */
+    unsigned short foreRed, foreGreen, foreBlue; /* device-independent color */
+    unsigned short backRed, backGreen, backBlue; /* device-independent color */
+    unsigned char *richSource; /* source bytes for a rich cursor */
+} rfbCursor, *rfbCursorPtr;
 
+extern Bool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);
+extern void rfbConvertLSBCursorBitmapOrMask(int width,int height,unsigned char* bitmap);
+extern rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskString);
+extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
+extern void MakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
+extern void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
+extern void rfbFreeCursor(rfbCursorPtr cursor);
 
 /* stats.c */
 

@@ -1,6 +1,15 @@
 LibVNCServer: a library for easy implementation of a RDP/VNC server.
 Copyright (C) 2001 Johannes E. Schindelin
 
+What is it?
+-----------
+
+VNC is set of programs using the RFB (Remote Frame Buffer) protocol. They
+are designed to "export" a frame buffer via net. It is already in wide use
+for administration, but it is not that easy to make a server yourself.
+
+This has been changed by LibVNCServer.
+
 There are two examples included:
  - example, a shared scribble sheet
  - pnmshow, a program to show PNMs (pictures) over the net.
@@ -12,12 +21,55 @@ How to use
 ----------
 
 To make a server, you just have to initialise a server structure using the
-function rfbDefaultScreenInit.
+function rfbDefaultScreenInit, like
+  rfbScreenInfoPtr rfbScreen =
+    rfbDefaultScreenInit(argc,argv,maxx,maxy,8,3,bpp);
 
-You then can set hooks and io functions.
+You then can set hooks and io functions (see below).
 
 You can use a blocking event loop, a background (pthread based) event loop,
 or implement your own using the processEvents function.
+
+Also, there is functionality included to draw a cursor (see below).
+
+To start also an HTTP server (running on port 5800+display_number), you have
+to set rfbScreen->httpdDir to a directory containing vncviewer.jar and
+index.vnc (like the included "classes" directory).
+
+Hooks and IO functions
+----------------------
+
+TODO
+
+Cursor handling
+---------------
+
+The rfbCursor structure consists mainly of a mask and a source. The mask
+describes, which pixels are drawn for the cursor (a cursor needn't be
+rectangular). The source describes, which colour those pixels should have.
+
+The standard is an XCursor: a cursor with a foreground and a background
+colour (stored in backRed and similar with a range from 0-0xffff). The
+arrays "mask" and "source" consist of byte padded rows in MSB order (i.e. a
+10x4 cursor's mask has 2x4 bytes, because 2 bytes are needed to hold 10 bits).
+
+It is very easy to make a cursor like this:
+
+char* cur="    "
+          " xx "
+	  " x  "
+	  "    ";
+char* mask="xxxx"
+           "xxxx"
+	   "xxxx"
+	   "xxx ";
+rfbCursorPtr c=rfbMakeXCursor(4,4,cur,mask);
+
+You can even set "mask" to NULL in this call and LibVNCServer will calculate
+a mask for you.
+
+There is also an array named "richSource" for colourful cursors. They have
+the same format as the frameBuffer.
 
 History
 -------
