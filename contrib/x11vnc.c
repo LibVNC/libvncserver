@@ -131,7 +131,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-05-08";
+char lastmod[] = "lastmod:    2004-05-13";
 
 
 /* X and rfb framebuffer */
@@ -485,7 +485,7 @@ int check_access(char *addr) {
  * We go through this pain to avoid dependency on libXt.
  */
 
-int ugly_accept_window(char *addr) {
+int ugly_accept_window(char *addr, int timeout) {
 
 #define t2x2_width 16
 #define t2x2_height 16
@@ -496,10 +496,10 @@ static char t2x2_bits[] = {
 
 	Window awin;
 	GC gc;
-	XFontStruct *font_info;
 	XSizeHints hints;
-	Pixmap ico;
 	XGCValues values;
+	static XFontStruct *font_info = NULL;
+	static Pixmap ico = 0;
 	unsigned long valuemask = 0;
 	static char dash_list[] = {20, 40};
 	int list_length = sizeof(dash_list);
@@ -508,12 +508,22 @@ static char t2x2_bits[] = {
 	Atom wm_delete_window;
 
 	XEvent ev;
+	long evmask = ExposureMask | KeyPressMask | ButtonPressMask
+	    | StructureNotifyMask;
+	double waited = 0.0;
+
+	/* strings and geometries y/n */
 	KeyCode key_y, key_n;
 	char str1[100];
-	char str2[] = "To accept: press \"y\" or click Mouse Button1";
-	char str3[] = "To reject: press \"n\" or click Mouse Button3";
+	char str2[] = "To accept: press \"y\" or click the \"Yes\" button";
+	char str3[] = "To reject: press \"n\" or click the \"No\" button";
+	char str4[] = "Yes";
+	char str5[] = "No";
+	int x, y, w = 345, h = 125, ret = 0;
+	int X_sh = 20, Y_sh = 30, dY = 20;
+	int Ye_x = 20, Ye_y = 0, Ye_w = 40, Ye_h = 20;
+	int No_x = 70, No_y = 0, No_w = 40, No_h = 20; 
 
-	int x, y, w = 345, h = 120, ret = 0;
 
 	x = (dpy_x - w)/2;
 	y = (dpy_y - h)/2;
@@ -529,8 +539,10 @@ static char t2x2_bits[] = {
 	wm_delete_window = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(dpy, awin, &wm_delete_window, 1);
 
-	ico = XCreateBitmapFromData(dpy, awin, t2x2_bits, t2x2_width,
-	    t2x2_height);
+	if (! ico) {
+		ico = XCreateBitmapFromData(dpy, awin, t2x2_bits, t2x2_width,
+		    t2x2_height);
+	}
 
 	hints.flags = PPosition | PSize | PMinSize;
 	hints.x = x;
@@ -543,10 +555,9 @@ static char t2x2_bits[] = {
 	XSetStandardProperties(dpy, awin, "new x11vnc client", "x11vnc query",
 	    ico, NULL, 0, &hints);
 
-	XSelectInput(dpy, awin, ExposureMask | KeyPressMask | ButtonPressMask
-	    | StructureNotifyMask);
+	XSelectInput(dpy, awin, evmask);
 
-	if ((font_info =  XLoadQueryFont(dpy, "fixed")) == NULL) {
+	if (! font_info && (font_info = XLoadQueryFont(dpy, "fixed")) == NULL) {
 		rfbLog("ugly_accept_window: cannot locate font fixed.\n");
 		X_UNLOCK;
 		clean_up_exit(1);
@@ -566,18 +577,55 @@ static char t2x2_bits[] = {
 	key_n = XKeysymToKeycode(dpy, XStringToKeysym("n"));
 
 	while (1) {
-		int out = -1;
+		int out = -1, l1, l2, l3, l4, l5, x, y, tw;
 
-		XNextEvent(dpy, &ev);
+		if (XCheckWindowEvent(dpy, awin, evmask, &ev)) {
+			;	/* proceed to handling */
+		} else if (XCheckTypedEvent(dpy, ClientMessage, &ev)) {
+			;	/* proceed to handling */
+		} else {
+			int ms = 100;	/* sleep a bit */
+			usleep(ms * 1000);
+			waited += ((double) ms)/1000.;
+			if (timeout && (int) waited >= timeout) {
+				rfbLog("accept_client: popup timed out after "
+				    "%d seconds.\n", timeout);
+				out = 0;
+				ev.type = 0;
+			} else {
+				continue;
+			}
+		}
 
 		switch(ev.type) {
 		case Expose:
 			while (XCheckTypedEvent(dpy, Expose, &ev)) {
 				;
 			}
-			XDrawString(dpy, awin, gc, 20, 30, str1, strlen(str1));
-			XDrawString(dpy, awin, gc, 20, 50, str2, strlen(str2));
-			XDrawString(dpy, awin, gc, 20, 70, str3, strlen(str3));
+			l1 = strlen(str1); l2 = strlen(str2);
+			l3 = strlen(str3); l4 = strlen(str4); l5 = strlen(str5);
+
+			XDrawString(dpy, awin, gc, X_sh, Y_sh+0*dY, str1, l1);
+			XDrawString(dpy, awin, gc, X_sh, Y_sh+1*dY, str2, l2);
+			XDrawString(dpy, awin, gc, X_sh, Y_sh+2*dY, str3, l3);
+
+			Ye_y = Y_sh+3*dY;
+			No_y = Y_sh+3*dY;
+			XDrawRectangle(dpy, awin, gc, Ye_x, Ye_y, Ye_w, Ye_h);
+			XDrawRectangle(dpy, awin, gc, No_x, No_y, No_w, No_h);
+
+			tw = XTextWidth(font_info, str4, l4);
+			tw = (Ye_w - tw)/2;
+			if (tw < 0) tw = 1;
+			XDrawString(dpy, awin, gc, Ye_x+tw, Ye_y+Ye_h-5,
+			    str4, l4);
+
+			tw = XTextWidth(font_info, str5, l5);
+			tw = (No_w - tw)/2;
+			if (tw < 0) tw = 1;
+			XDrawString(dpy, awin, gc, No_x+tw, No_y+No_h-5,
+			    str5, l5);
+
 			break;
 
 		case ClientMessage:
@@ -588,10 +636,14 @@ static char t2x2_bits[] = {
 			break;
 
 		case ButtonPress:
-			if (ev.xbutton.button == 1) {
-				out = 1;
-			} else if (ev.xbutton.button == 3) {
+			x = ev.xbutton.x;
+			y = ev.xbutton.y;
+			if (x > No_x && x < No_x+No_w && y > No_y
+			    && y < No_y+No_h) {
 				out = 0;
+			} else if (x > Ye_x && x < Ye_x+Ye_w && y > Ye_y
+			    && y < Ye_y+Ye_h) {
+				out = 1;
 			}
 			break;
 
@@ -655,10 +707,18 @@ int accept_client(char *addr) {
 		    "'x11vnc: accept connection from %s?'", addr);
 		cmd = xmessage;
 		
-	} else if (!strcmp(accept_cmd, "popup") || !strcmp(accept_cmd,
-	    "builtin")) {
+	} else if (strstr(accept_cmd, "popup:") == accept_cmd ||
+	    !strcmp(accept_cmd, "popup")) {
+		int timeout = 120;
+		char *p;
+		if ((p = strchr(accept_cmd, ':')) != NULL) {
+			int in;
+			if (sscanf(p+1, "%d", &in) == 1) {
+				timeout = in;
+			}
+		}
 		rfbLog("accept_client: using builtin popup for: %s\n", addr);
-		if (ugly_accept_window(addr)) {
+		if (ugly_accept_window(addr, timeout)) {
 			rfbLog("accept_client: popup accepted: %s\n", addr);
 			return 1;
 		} else {
@@ -5372,14 +5432,21 @@ void print_help() {
 "-localhost             Same as -allow 127.0.0.1\n"
 "-accept string         Prompt user at the X11 display whether an incoming\n"
 "                       client should be allowed to connect.  \"string\" is an\n"
-"                       external command run via system(3).  The RFB_CLIENT env.\n"
+"                       external command run via system(3).  Be sure to quote\n"
+"                       \"string\" if it contains spaces, etc. The RFB_CLIENT env.\n"
 "                       variable will be set to the client's IP number.  If the\n"
-"                       command returns 0 the client is accepted, otherwise it\n"
-"                       is rejected.  If string is \"xmessage\" then an xmessage(1)\n"
-"                       invocation is used for the command. If string is \"popup\"\n"
-"                       then a builtin popup window is used.  Note that x11vnc\n"
-"                       blocks while the external command is running (other\n"
-"                       clients may see no updates during this period).\n"
+"                       external command returns 0 the client is accepted,\n"
+"                       otherwise the client is rejected.\n"
+"\n"
+"                       If string is \"xmessage\" then an xmessage(1) invocation\n"
+"                       is used for the command. If string is \"popup\" then a\n"
+"                       builtin popup window is used.  The popup will time out\n"
+"                       after 120 seconds, use \"popup:N\" to modify the timeout\n"
+"                       to N seconds (use 0 for no timeout)\n"
+"\n"
+"                       Note that x11vnc blocks while the external command or\n"
+"                       or popup is running (other clients may see no updates\n"
+"                       during this period).\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
 "\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
