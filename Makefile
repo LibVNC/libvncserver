@@ -54,8 +54,12 @@ example: example.o libvncserver.a
 pnmshow: pnmshow.o libvncserver.a
 	$(CC) -o pnmshow pnmshow.o $(LIBS)
 
+mac.o: mac.c 1instance.c
+
 OSXvnc-server: mac.o libvncserver.a
 	$(CC) -o OSXvnc-server mac.o $(LIBS) $(OSX_LIBS)
+
+x11vnc.o: x11vnc.c 1instance.c
 
 x11vnc: x11vnc.o libvncserver.a
 	$(CC) -o x11vnc x11vnc.o libvncserver.a -lz -ljpeg $(XLIBS)

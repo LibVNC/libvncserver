@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
 
 typedef struct {
   char* filename; /* this file is the pipe (set by user) */
