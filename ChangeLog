@@ -1,3 +1,4 @@
+   fixed bug with maxRectsPerUpdate and Tight Encoding (these are incompatible)
    checked sync with TightVNC 1.2.8:
 	viewonly/full passwords; if given a list, only the first is a full one
 	vncRandomBytes is a little more secure now

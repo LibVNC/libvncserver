@@ -1,4 +1,16 @@
-To compile LibVNCServer with sources from CVS, you have to have a current
+If you check out CVS of LibVNCServer, everything should build as usual:
+
+./configure && make
+
+If your machine complains not having the right version of automake (which should
+not be necessary, because every needed file is checked in), try
+
+find -name Makefile.in -exec touch {} \;
+
+and rerun ./configure && make
+
+If you want to make changes which require automake or autoconf (i.e. you
+check for other headers or add files), you have to have a current
 (>2.50) version of autoconf. Also, you need automake.
 
 Then, just do
