@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-06-28";
+char lastmod[] = "lastmod:    2004-07-01";
 
 /* X display info */
 Display *dpy = 0;
@@ -195,9 +195,11 @@ int rfb_bytes_per_line;
 int scaling = 0;
 int scaling_noblend = 0;
 int scaling_nomult4 = 0;
+int scaling_pad = 0;
 int scaling_interpolate = 0;
 double scale_fac = 1.0;
 int scaled_x = 0, scaled_y = 0;
+int scale_numer = 0, scale_denom = 0;
 
 /* size of the basic tile unit that is polled for changes: */
 int tile_x = 32;
@@ -3742,6 +3744,33 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		double eps = 0.000001;
 		width  = (int) (width  * scale_fac + eps); 
 		height = (int) (height * scale_fac + eps); 
+		if (scale_denom && scaling_pad) {
+			/* it is not clear this padding is useful anymore */
+			rfbLog("width  %% denom: %d %% %d = %d\n", width,
+			    scale_denom, width  % scale_denom);
+			rfbLog("height %% denom: %d %% %d = %d\n", height,
+			    scale_denom, height % scale_denom);
+			if (width % scale_denom != 0) {
+				int w = width;
+				w += scale_denom - (w % scale_denom);
+				if (!scaling_nomult4 && w % 4 != 0) {
+					/* need to make mult of 4 as well */
+					int c = 0;	
+					while (w % 4 != 0 && c++ <= 5) {
+						w += scale_denom;
+					}
+				}
+				width = w;
+				rfbLog("padded width  to: %d (mult of %d%s\n",
+				    width, scale_denom, !scaling_nomult4 ?
+				    " and 4)" : ")");
+			}
+			if (height % scale_denom != 0) {
+				height += scale_denom - (height % scale_denom);
+				rfbLog("padded height to: %d (mult of %d)\n",
+				    height, scale_denom);
+			}
+		}
 		if (!scaling_nomult4 && width % 4 != 0 && width > 2) {
 			/* reset width to be multiple of 4 */
 			int width0 = width;
@@ -3872,6 +3901,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		main_fb = fb->data;
 		if (scaling) {
 			rfb_fb = (char *) malloc(rfb_bytes_per_line * height);
+			memset(rfb_fb, 0, rfb_bytes_per_line * height);
 		} else {
 			rfb_fb = main_fb;
 		}
@@ -4799,8 +4829,6 @@ weights for this scaled pixel are:
  * the loop over the 4 pixels.
  */
 
-#define FPTYPE double
-
 static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 /*
  * Notation:
@@ -4816,21 +4844,21 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	int i, j, i1, i2, j1, j2;	/* indices for scaled fb (dest) */
 	int I, J, I1, I2, J1, J2;	/* indices for main fb   (source) */
 
-	FPTYPE w, wx, wy, wtot;	/* pixel weights */
+	double w, wx, wy, wtot;	/* pixel weights */
 
-	FPTYPE x1, y1, x2, y2;	/* x-y coords for destination pixels edges */
-	FPTYPE dx, dy;		/* size of destination pixel */
+	double x1, y1, x2, y2;	/* x-y coords for destination pixels edges */
+	double dx, dy;		/* size of destination pixel */
 
-	FPTYPE ddx, ddy;	/* for interpolation expansion */
+	double ddx, ddy;	/* for interpolation expansion */
 
 	char *src, *dest;	/* pointers to the two framebuffers */
 
-	FPTYPE pixave[4];	/* for averaging pixel values */
+	double pixave[4];	/* for averaging pixel values */
 
 	unsigned short us;
 
 	int shrink;		/* whether shrinking or expanding */
-	static int constant_weights = -1;
+	static int constant_weights = -1, cnt = 0;
 
 	if (scale_fac <= 1.0) {
 		shrink = 1;
@@ -4865,8 +4893,24 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	 * both are > 1   (e.g. 1.333 for -scale 3/4)
 	 * they should also be equal but we don't assume it.
 	 */
-	dx = (FPTYPE) Nx / nx;
-	dy = (FPTYPE) Ny / ny;
+
+	/*
+	 * This original way is probably incorrect, giving rise to dx and
+	 * dy that will not exactly line up with the grid for 2/3, etc.
+	 * This gives rise to a whole spectrum of weights, leading to poor
+	 * tightvnc (and other encoding) compression. 
+	 */
+#if 0
+	dx = (double) Nx / nx;
+	dy = (double) Ny / ny;
+#endif
+	
+	/*
+	 * This new way is probably the best we can do, take the inverse
+	 * of the scaling factor to double precision.
+	 */
+	dx = 1.0/scale_fac;
+	dy = 1.0/scale_fac;
 
 	/*
 	 * find the extent of the change the input rectangle induces in
@@ -4895,7 +4939,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	 * let's special case these.
 	 *
 	 * If scale = 1/n and n divides Nx and Ny, the pixel weights
-	 * are constant.
+	 * are constant (e.g. 1/2 => equal on 2x2 square).
 	 */
 	if (constant_weights < 0) {
 		int n = 0;
@@ -4903,7 +4947,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 
 		for (i = 2; i<=128; i++) {
 			double test = ((double) 1)/ i;
-			double diff, eps = 1.0e-9;
+			double diff, eps = 1.0e-7;
 			diff = scale_fac - test;
 			if (-eps < diff && diff < eps) {
 				n = i;
@@ -4930,6 +4974,10 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	 */
 	for (j=j1; j<j2; j++) {
 		y1 =  j * dy;	/* top edge */
+		if (y1 > Ny - 1) {
+			/* can go over with dy = 1/scale_fac */
+			y1 = Ny - 1;
+		}
 		y2 = y1 + dy;	/* bottom edge */
 
 		/* Find main fb indices covered by this dest pixel: */
@@ -4949,7 +4997,13 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 		
 		for (i=i1; i<i2; i++) {
 			x1 =  i * dx;	/* left edge */
+			if (x1 > Nx - 1) {
+				/* can go over with dx = 1/scale_fac */
+				x1 = Nx - 1;
+			}
 			x2 = x1 + dx;	/* right edge */
+
+			cnt++;
 
 			/* Find main fb indices covered by this dest pixel: */
 			I1 = (int) FLOOR(x1);
@@ -5100,6 +5154,9 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 			    }
 			}
 
+			if (wtot <= 0.0) {
+				wtot = 1.0;
+			}
 			wtot = 1.0/wtot;	/* normalization factor */
 
 			/* place weighted average pixel in the scaled fb: */
@@ -7134,7 +7191,7 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-scale")) {
 			int m, n;
 			char *p;
-			float f;
+			double f;
 			i++;
 			if ( (p = strchr(argv[i], ':')) != NULL) {
 				/* options */
@@ -7147,15 +7204,35 @@ int main(int argc, char* argv[]) {
 				if (strstr(p+1, "in") != NULL) {
 					scaling_interpolate = 1;
 				}
+				if (strstr(p+1, "pad") != NULL) {
+					scaling_pad = 1;
+				}
 				*p = '\0';
 			}
 			if (strchr(argv[i], '.') != NULL) {
-				if (sscanf(argv[i], "%f", &f) != 1) {
+				double test, diff, eps = 1.0e-7;
+				if (sscanf(argv[i], "%lf", &f) != 1) {
 					fprintf(stderr, "bad -scale arg: %s\n",
 					    argv[i]);
 					exit(1);
 				}
 				scale_fac = (double) f;
+				/* look for common fractions from small ints: */
+				for (n=2; n<=10; n++) {
+					for (m=1; m<n; m++) {
+						test = ((double) m)/ n;
+						diff = scale_fac - test;
+						if (-eps < diff && diff < eps) {
+							scale_numer = m;
+							scale_denom = n;
+							break;
+						
+						}
+					}
+					if (scale_denom) {
+						break;
+					}
+				}
 			} else {
 				if (sscanf(argv[i], "%d/%d", &m, &n) != 2) {
 					fprintf(stderr, "bad -scale arg: %s\n",
@@ -7163,6 +7240,8 @@ int main(int argc, char* argv[]) {
 					exit(1);
 				}
 				scale_fac = ((double) m)/ n;
+				scale_numer = m;
+				scale_denom = n;
 			}
 			if (scale_fac == 1.0) {
 				fprintf(stderr, "scaling disabled for factor "

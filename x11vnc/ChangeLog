@@ -1,3 +1,8 @@
+2004-07-01  Karl Runge <runge@karlrunge.com>
+	* improve scaled grid calculation to prevent drift (which causes
+	  drift in pixel weights and poorer tightvnc compression)
+	* add ":pad" scale option, detect small fraction scale = m/n.
+
 2004-06-28  Karl Runge <runge@karlrunge.com>
 	* round scaled width to multiple of 4 to make vncviewer happy.
 	* allow override of above ":n4" and allow 4 point interpolation
