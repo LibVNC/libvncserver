@@ -664,6 +664,8 @@ typedef struct rfbCursor {
     unsigned short foreRed, foreGreen, foreBlue; /* device-independent colour */
     unsigned short backRed, backGreen, backBlue; /* device-independent colour */
     unsigned char *richSource; /* source bytes for a rich cursor */
+    unsigned char *alphaSource; /* source for alpha blending info */
+    rfbBool alphaPreMultiplied; /* if richSource already has alpha applied */
 } rfbCursor, *rfbCursorPtr;
 extern unsigned char rfbReverseByte[0x100];
 

@@ -1,3 +1,10 @@
+2005-01-15  Karl Runge <runge@karlrunge.com>
+	* rfb/rfb.h: add alphaSource and alphaPreMultiplied to rfbCursor. 
+	* libvncserver/cursor.c: do cursor alpha blending in rfbDrawCursor()
+	  for non-cursorshapeupdates clients.
+	* x11vnc: -alphablend, cursors fixes, -snapfb, more tweaks and bug
+	  fixes.
+
 2004-12-27  Karl Runge <runge@karlrunge.com>
 	* x11vnc: improve alpha channel handling for XFIXES cursors. 
 	* add more parameters to remote control.

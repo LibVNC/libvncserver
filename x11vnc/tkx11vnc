@@ -139,6 +139,7 @@ Keyboard
 Pointer
 	=-C:none,arrow,X,some,most cursor:
 	noxfixes
+	alphablend
 	--
 	cursorpos
 	nocursorshape
@@ -160,6 +161,7 @@ Misc
 	bg
 	=-C:ignore,exit sigpipe:
 	=0 inetd
+	rfbwait:
 	--
 	=RA remote-cmd:
 	=GA all-settings
@@ -204,17 +206,19 @@ Permissions
 	unsafe
 
 Tuning
-	=-C:1,2,3,4 pointer_mode:
+	=-C:0,1,2,3,4 pointer_mode:
 	input_skip:
 	nodragging
-	alphacut:
-	alphafrac:
-	alpharemove
 	--
 	=D noshm
 	flipbyteorder
 	onetile
 	--
+	alphacut:
+	alphafrac:
+	alpharemove
+	--
+	speeds:
 	wait:
 	defer:
 	nap
@@ -224,9 +228,9 @@ Tuning
 	gaps:
 	grow:
 	fuzz:
+	snapfb
 	--
 	threads
-	rfbwait:
 	--
 	progressive:
 "
@@ -329,8 +333,7 @@ provides an interface to each of the many x11vnc command line options and
 remote control commands.  See \"Help -> all\" for much info about x11vnc.
 
 Most menu items have a (?) button one can click on to get more information
-about the option or command.  In most cases it will be text extracted
-from that in \"Help -> all\".
+about the option or command.
 
 There are two states tkx11vnc can be in:
 
@@ -463,7 +466,7 @@ proc make_toplevel {w {title ""}} {
 
 proc textwin {name title text} {
 	global max_text_height max_text_width
-	global bfont
+	global bfont ffont
 
 	set width  [textwidth $text]
 	incr width
@@ -481,9 +484,11 @@ proc textwin {name title text} {
 	frame     $w.f -bd 0;
 	pack      $w.f -fill both -expand 1
 	text      $w.f.t -width $width -height $height -setgrid 1 -bd 2 \
-			-yscrollcommand "$w.f.y set" -relief ridge -font fixed;
+			-yscrollcommand "$w.f.y set" -relief ridge \
+			-font $ffont;
 	scrollbar $w.f.y -orient v -relief sunken -command "$w.f.t yview";
-	button    $w.f.b -text "Dismiss" -command "destroy $w" -font $bfont
+	button    $w.f.b -text "Dismiss" -command "destroy $w" -font $bfont \
+			-pady 2
 
 	$w.f.t insert 1.0 $text;
 
@@ -909,121 +914,6 @@ proc entry_delete {} {
 
 # Utilities for remote control and updating vars.
 
-proc push_new_value0 {item name new {query 1}} {
-	# old way w/o -sync
-	global menu_var always_update remote_output query_output
-	global delay_sleep extra_sleep extra_sleep_split
-
-	set debug [in_debug_mode]
-	set do_query_all 0
-	set getout 0
-
-	if {$item == "remote-cmd"} {
-		# kludge for arbitrary remote command:
-		if {[regexp {^Q:} $new]} {
-			# extra kludge for Q:var to mean -Q var
-			regsub {^Q:} $new "" new
-			set qonly 1
-		} else {
-			set qonly 0
-		}
-		# need to extract item from new:
-		set qtmp $new
-		regsub {:.*$} $qtmp "" qtmp
-		if {! $qonly} {
-			set rargs [list "-R" "$new"]
-			set qargs [list "-Q" "$qtmp"]
-			set getout 1
-		} else {
-			set rargs [list "-Q" "$qtmp"]
-			set qargs [list "-Q" "$qtmp"]
-		}
-
-	} elseif {[value_is_string $item]} {
-		set rargs [list "-R" "$name:$new"]
-		set qargs [list "-Q" "$name"]
-	} else {
-		set rargs [list "-R" "$name"]
-		set qargs [list "-Q" "$name"]
-	}
-
-	if {!$debug} {
-		append_text "x11vnc $rargs ..."
-	}
-	set remote_output [run_remote_cmd $rargs]
-
-	if {[lindex $rargs 0] == "-Q"} {
-		append_text "\t$remote_output"
-		set getout 1
-	} elseif {! $query && ! $always_update} {
-		set getout 1
-	} elseif {$item == "noremote"} {
-		set getout 1
-	} elseif {[is_action $item] && ![opt_match Q $item] && $rargs != ""} {
-		set getout 1
-	} elseif {[regexp {^(sid|id)$} $item] && ![regexp {^0x} $new]} {
-		set getout 1
-	}
-
-	if {$getout} {
-		append_text "\n"
-		return
-	}
-
-	stop_watch on
-	after $delay_sleep
-	if {[opt_match D $item]} {
-		set s [expr $extra_sleep/$extra_sleep_split] 
-		append_text " "
-		for {set i 0} {$i<$extra_sleep_split} {incr i} {
-			after $s
-			append_text "."
-			update
-		}
-	}
-	stop_watch off
-
-	if {!$debug} {
-		append_text ", -Q ..."
-	}
-
-	if {$item == "disconnect"} {
-		set new "N/A"
-		set do_query_all 1
-	}
-
-	if {$always_update || $do_query_all} {
-		set query [query_all 1]
-	} else {
-		set query [run_remote_cmd $qargs]
-	}
-	set query_output $query
-
-	if {![see_if_ok $query $item "$name:$new"]} {
-		# failed
-		if  {[regexp {^a..=} $query]} {
-			# but some result came back
-			if {! $always_update} {
-				# synchronize everything
-				set query_output [query_all 1]
-			}
-		} else {
-			# server may be dead
-			if {$item != "ping" && $item != "attach"} {
-				try_connect
-			}
-		}
-	} else {
-		# succeeded
-		if {! $always_update} {
-			# synchronize this variable
-			update_menu_vars $query
-		} else {
-			# already done in query_all
-		}
-	}
-}
-
 proc push_new_value {item name new {query 1}} {
 	global menu_var always_update remote_output query_output
 	global delay_sleep extra_sleep extra_sleep_split
@@ -1264,12 +1154,37 @@ proc see_if_ok {query item expected} {
 	} else {
 		set msg $found
 	}
+	if {!$ok && $found != ""} {
+		# check for floating point match:
+		set v1 ""
+		set v2 ""
+		regexp {:([0-9.][0-9.]*)$} $found m0 v1
+		regexp {:([0-9.][0-9.]*)$} $expected m0 v2
+		if {$v1 != "" && $v2 != ""} {
+			set diff ""
+			catch {set diff [expr "$v1 - $v2"]}
+			if {$diff != ""} {
+				if {$diff < 0} {
+					set diff [expr "0.0 - $diff"]
+				}
+				if {$diff < 0.00001} {
+					set ok 1
+				}
+			}
+		}
+	}
 	if {$ok} {
 		append_text "\tSet OK  ($msg)\n"
 		return 1
 
 	} elseif {[opt_match P $item] && [regexp {:(-|\+)} $expected]} {
 		# e.g. blackout:+30x30+20+20
+		append_text "\t($msg)\n"
+		return 1
+	} elseif {[regexp {:[0-9]\.[0-9]} $expected]} {
+		append_text "\t($msg)\n"
+		return 1
+	} elseif {$item == "connect" || $item == "disconnect"} {
 		append_text "\t($msg)\n"
 		return 1
 	} else {
@@ -1298,13 +1213,14 @@ proc update_menu_vars {{query ""}} {
 				if {$val == "N/A"} {
 					continue
 				}
-				if {0 && $debug} {
-					puts "setting menuvar: $item: $old -> $val"
-				}
 				set menu_var($item) $val
 			}
 			if {$item == "clients"} {
 				update_clients_menu $val
+			} elseif {$item == "display"} {
+				set_x11_display $val
+			} elseif {$item == "vncdisplay"} {
+				set_vnc_display $val
 			}
 		}
 	}
@@ -1329,6 +1245,7 @@ proc clear_all {} {
 			}
 		}
 	}
+	append_text "Cleared all settings.\n"
 }
 
 proc all_query_vars {} {
@@ -1813,10 +1730,10 @@ proc update_clients_and_repost {} {
 }
 
 proc update_clients_menu {list} {
-	global item_cascade
+	global item_cascade ffont
 	set subm $item_cascade(current);
 	catch {destroy $subm}
-	menu $subm -tearoff 0
+	menu $subm -tearoff 0 -font $ffont
 	$subm add command
 	$subm add command -label "refresh-list" -command "update_clients_and_repost"
 	$subm add separator
@@ -1866,14 +1783,14 @@ proc make_widgets {} {
 	global text_area
 	global entry_box entry_str entry_set entry_label entry_ok entry_browse
 	global entry_help entry_skip
-	global bfont
+	global bfont ffont
 	global helptext helpremote helplabel
 
 	set label_width 80
 
 	set info_label .info
 	label $info_label -textvariable info_str -bd 2 -relief groove \
-		-anchor w -width $label_width
+		-anchor w -width $label_width -font $ffont
 	pack $info_label -side top -fill x -expand 0
 
 	# Extract the Rows:
@@ -1989,11 +1906,13 @@ proc make_widgets {} {
 		} elseif {$item == "Quit"} {
 			# Quit item must shut us down:
 			$m add command -label "$item" -underline 0 \
+				-font $ffont \
 				-command {destroy .; exit 0}
 
 		} elseif {$case == "Help"} {
 			# Help is simple help:
 			$m add command -label "$item" \
+				-font $ffont \
 				-command "menu_help $item"
 
 		} elseif {$item == "current"} {
@@ -2002,11 +1921,13 @@ proc make_widgets {} {
 			set item_cascade($item) $subm
 			update_clients_menu ""
 			$m add cascade -label "$item" \
+				-font $ffont \
 				-menu $subm
 
 		} elseif {[is_action $item]} {
 			# Action
 			$m add command -label "$item" \
+				-font $ffont \
 				-command "do_var $item"
 			set menu_var($item) "";	# for convenience
 
@@ -2015,19 +1936,22 @@ proc make_widgets {} {
 			if {[regexp -- {-C:(.*)} $item_opts($item) m0 m1]} {
 				# Radiobutton select
 				set subm $m.cascade$menu_count($case)
-				menu $subm -tearoff 0
+				menu $subm -tearoff 0 -font $ffont
 				foreach val [split $m1 ","] {
 					$subm add radiobutton -label "$val" \
 						-command "do_var $item" \
 						-value "$val" \
+						-font $ffont \
 						-variable menu_var($item)
 				}
 				$m add cascade -label "$item" \
+					-font $ffont \
 					-menu $subm
 				set item_cascade($item) $subm
 			} else {
 				# Arbitrary_string
 				$m add command -label "$item" \
+					-font $ffont \
 					-command "do_var $item"
 			}
 			set mvar 1
@@ -2036,6 +1960,7 @@ proc make_widgets {} {
 			# Boolean
 			$m add checkbutton -label "$item" \
 				-command "do_var $item" \
+				-font $ffont \
 				-variable menu_var($item)
 			set menu_var($item) 0
 		}
@@ -2069,6 +1994,7 @@ proc make_widgets {} {
 					set str "(?)"
 				}
 				$m add command -label $str \
+					-font $ffont \
 					-command "menu_help $label";
 
 				if {$str == ""} {
@@ -2094,17 +2020,19 @@ proc make_widgets {} {
 	no_x11_display
 
 	set lw [expr {$label_width / 2}]
-	label $df_x11 -textvariable x11_display -width $lw -anchor w
+	label $df_x11 -textvariable x11_display -width $lw -anchor w \
+		-font $ffont
 
 	set df_vnc "$df.vdisplay"
 	no_vnc_display
-	label $df_vnc -textvariable vnc_display -width $lw -anchor w
+	label $df_vnc -textvariable vnc_display -width $lw -anchor w \
+		-font $ffont
 
 	pack $df_x11 $df_vnc -side left 
 	pack $df -side top -fill x
 
 	# text area
-	text .text -height 11 -relief ridge
+	text .text -height 11 -relief ridge -font $ffont
 	set text_area .text
 	pack .text -side top -fill both -expand 1
 
@@ -2122,28 +2050,35 @@ proc make_widgets {} {
 
 	set entry_str "Set... : "
 	set ef_entry "$ef.entry"
-	entry $ef_entry -relief sunken
+	entry $ef_entry -relief sunken -font $ffont
 	bind $ef_entry <KeyPress-Return> {set entry_set 1}
 	bind $ef_entry <KeyPress-Escape> {set entry_set 0}
 
 	# Entry OK button
+	set bpx "1m"
+	set bpy "1"
+	set hlt "0"
 	set ef_ok "$ef.ok"
-	button $ef_ok -text OK -pady 1 -command {set entry_set 1} \
+	button $ef_ok -text OK -pady $bpy -padx $bpx -command {set entry_set 1} \
+		-highlightthickness $hlt \
 		-font $bfont
 
 	# Entry Skip button
 	set ef_skip "$ef.skip"
-	button $ef_skip -text Skip -pady 0 -command {set entry_set 0} \
+	button $ef_skip -text Skip -pady $bpy -padx $bpx -command {set entry_set 0} \
+		-highlightthickness $hlt \
 		-font $bfont
 
 	# Entry Help button
 	set ef_help "$ef.help"
-	button $ef_help -text Help -pady 0 -command \
-		{menu_help $entry_dialog_item} -font $bfont
+	button $ef_help -text Help -pady $bpy -padx $bpx -command \
+		{menu_help $entry_dialog_item} -font $bfont \
+		-highlightthickness $hlt
 
 	# Entry Browse button
 	set ef_browse "$ef.browse"
-	button $ef_browse -text "Browse..." -pady 0 -font $bfont \
+	button $ef_browse -text "Browse..." -pady $bpy -padx $bpx -font $bfont \
+		-highlightthickness $hlt \
 		-command {entry_insert [tk_getOpenFile]} 
 
 	pack $ef_label -side left
@@ -2315,6 +2250,9 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 		}
 		if {$item == "id"} {
 			set saw_id 1
+		}
+		if {$item == "httpport" && $menu_var($item) == "0"} {
+			continue
 		}
 		if {$item == "progressive" && $menu_var($item) == "0"} {
 			continue
@@ -2519,7 +2457,7 @@ global helpall helptext helpremote helplabel hostname;
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
 global menu_var unset_str menus_disabled
-global bfont old_labels
+global bfont ffont old_labels
 global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
 global cache_all_query_vars
@@ -2529,7 +2467,8 @@ set connected_to_x11vnc 0
 set menus_disabled 0
 set max_text_height 40
 set max_text_width 90
-set bfont -adobe-helvetica-bold-r-*-*-*-120-*-*-*-*-*-*;
+set bfont "-adobe-helvetica-bold-r-*-*-*-120-*-*-*-*-*-*"
+set ffont "fixed"
 set help_indent 24;
 set reply_xdisplay ""
 set all_settings "None so far."

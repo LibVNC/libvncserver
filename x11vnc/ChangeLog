@@ -1,3 +1,12 @@
+2005-01-15  Karl Runge <runge@karlrunge.com>
+	* adjust alpha blending parameters, -alphablend, handle 24bpp.
+	* add -snapfb snapshot fb, not clear how useful it is..
+	* more functions etc for -pointer_mode 4, still not finished.
+	* scan_for_updates() "count only" mode.
+	* increase max shm size on Linux.
+	* -oa -logappend, -pm, -speeds 
+	* fix bugs in -allow, -R connect, screen == NULL
+
 2004-12-27  Karl Runge <runge@karlrunge.com>
 	* allow -DLIBVNCSERVER_HAVE_FOO=0 override everything
 	* get_xfixes_cursor() try to more carefully convert alpha channel

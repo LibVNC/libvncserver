@@ -310,6 +310,8 @@ void rfbFreeCursor(rfbCursorPtr cursor)
    if(cursor) {
        if(cursor->cleanupRichSource && cursor->richSource)
 	   free(cursor->richSource);
+       if(cursor->cleanupRichSource && cursor->alphaSource)
+	   free(cursor->alphaSource);
        if(cursor->cleanupSource && cursor->source)
 	   free(cursor->source);
        if(cursor->cleanupMask && cursor->mask)
@@ -320,6 +322,7 @@ void rfbFreeCursor(rfbCursorPtr cursor)
 	   cursor->cleanup=cursor->cleanupSource=cursor->cleanupMask
 	       =cursor->cleanupRichSource=FALSE;
 	   cursor->source=cursor->mask=cursor->richSource=0;
+	   cursor->alphaSource=0;
        }
    }
    
@@ -489,12 +492,84 @@ void rfbDrawCursor(rfbScreenInfoPtr s)
    if(!c->richSource)
      rfbMakeRichCursorFromXCursor(s,c);
    
-   /* now the cursor has to be drawn */
-   for(j=0;j<y2;j++)
-     for(i=0;i<x2;i++)
-       if((c->mask[(j+j1)*w+(i+i1)/8]<<((i+i1)&7))&0x80)
-	 memcpy(s->frameBuffer+(j+y1)*rowstride+(i+x1)*bpp,
-		c->richSource+(j+j1)*c->width*bpp+(i+i1)*bpp,bpp);
+   if (c->alphaSource) {
+	int rmax, rshift;
+	int gmax, gshift;
+	int bmax, bshift;
+	int amax = 255;	/* alphaSource is always 8bits of info per pixel */
+	unsigned long rmask, gmask, bmask;
+
+	rmax   = s->serverFormat.redMax;
+	gmax   = s->serverFormat.greenMax;
+	bmax   = s->serverFormat.blueMax;
+	rshift = s->serverFormat.redShift;
+	gshift = s->serverFormat.greenShift;
+	bshift = s->serverFormat.blueShift;
+
+	rmask = (rmax << rshift);
+	gmask = (gmax << gshift);
+	bmask = (bmax << bshift);
+
+	for(j=0;j<y2;j++) {
+		for(i=0;i<x2;i++) {
+			/*
+			 * we loop over the whole cursor ignoring c->mask[],
+			 * using the extracted alpha value instead.
+			 */
+			char *dest, *src, *aptr;
+			unsigned long val, *dv, *sv;
+			int rdst, gdst, bdst;		/* fb RGB */
+			int asrc, rsrc, gsrc, bsrc;	/* rich source ARGB */
+
+			dest = s->frameBuffer + (j+y1)*rowstride + (i+x1)*bpp;
+			src  = c->richSource  + (j+j1)*c->width*bpp + (i+i1)*bpp;
+			aptr = c->alphaSource + (j+j1)*c->width + (i+i1);
+
+			dv = (unsigned long *)dest;
+			sv = (unsigned long *)src;
+
+			asrc = *((unsigned char *)aptr);
+
+			if (!asrc) {
+				continue;
+			}
+
+			/* extract dest and src RGB */
+			rdst = (*dv & rmask) >> rshift;	/* fb */
+			gdst = (*dv & gmask) >> gshift;
+			bdst = (*dv & bmask) >> bshift;
+
+			rsrc = (*sv & rmask) >> rshift;	/* richcursor */
+			gsrc = (*sv & gmask) >> gshift;
+			bsrc = (*sv & bmask) >> bshift;
+
+			/* blend in fb data. */
+			if (! c->alphaPreMultiplied) {
+				rsrc = (asrc * rsrc)/amax;
+				gsrc = (asrc * gsrc)/amax;
+				bsrc = (asrc * bsrc)/amax;
+			}
+			rdst = rsrc + ((amax - asrc) * rdst)/amax;
+			gdst = gsrc + ((amax - asrc) * gdst)/amax;
+			bdst = bsrc + ((amax - asrc) * bdst)/amax;
+
+			val = 0;
+			val |= (rdst << rshift);
+			val |= (gdst << gshift);
+			val |= (bdst << bshift);
+
+			/* insert the cooked pixel into the fb */
+			memcpy(dest, &val, bpp);
+		}
+	}
+   } else {
+      /* now the cursor has to be drawn */
+      for(j=0;j<y2;j++)
+        for(i=0;i<x2;i++)
+          if((c->mask[(j+j1)*w+(i+i1)/8]<<((i+i1)&7))&0x80)
+   	 memcpy(s->frameBuffer+(j+y1)*rowstride+(i+x1)*bpp,
+   		c->richSource+(j+j1)*c->width*bpp+(i+i1)*bpp,bpp);
+   }
 
    if(wasChanged)
      rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);

@@ -248,12 +248,14 @@ int overlay_present = 0;
 static int xrandr_base_event_type;
 #endif
 
+#define CURSOR_TRANSPARENCY 1 
 int xfixes_present = 0;
 int use_xfixes = 1;
 int got_xfixes_cursor_notify = 0;
-int alpha_threshold = 255;
+int alpha_threshold = 240;
 double alpha_frac = 0.33;
 int alpha_remove = 0;
+int alpha_blend = 0;
 
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 #include <X11/extensions/Xfixes.h>
@@ -267,7 +269,7 @@ static int xdamage_base_event_type;
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.1pre lastmod: 2004-12-27";
+char lastmod[] = "0.7.1pre lastmod: 2005-01-16";
 
 /* X display info */
 
@@ -287,6 +289,8 @@ XImage *scanline;
 XImage *fullscreen;
 XImage **tile_row;		/* for all possible row runs */
 XImage *fb0;
+XImage *snaprect = NULL;	/* for XShmGetImage (fs_factor) */
+XImage *snap = NULL;		/* the full snap fb */
 
 #if !LIBVNCSERVER_HAVE_XSHM
 /*
@@ -302,6 +306,7 @@ typedef struct {
 XShmSegmentInfo scanline_shm;
 XShmSegmentInfo fullscreen_shm;
 XShmSegmentInfo *tile_row_shm;	/* for all possible row runs */
+XShmSegmentInfo snaprect_shm;
 
 /* rfb screen info */
 rfbScreenInfoPtr screen = NULL;
@@ -310,6 +315,7 @@ char *http_dir = NULL;
 char vnc_desktop_name[256];
 char *main_fb;			/* our copy of the X11 fb */
 char *rfb_fb;			/* same as main_fb unless transformation */
+char *snap_fb = NULL;		/* used under -snapfb */
 char *fake_fb = NULL;		/* used under -padgeom */
 int rfb_bytes_per_line;
 int main_bytes_per_line;
@@ -318,6 +324,7 @@ unsigned short main_red_max,   main_green_max,   main_blue_max;
 unsigned short main_red_shift, main_green_shift, main_blue_shift;
 
 /* we now have a struct with client specific data: */
+#define RATE_SAMPLES 5
 typedef struct _ClientData {
 	int had_cursor_shape_updates;
 	int had_cursor_pos_updates;
@@ -325,6 +332,14 @@ typedef struct _ClientData {
 	int client_port;
 	int server_port;
 	char *server_ip;
+	double timer;
+	double send_cmp_rate;
+	double send_raw_rate;
+	int set_cmp_bytes;
+	int set_raw_bytes;
+	double cmp_samp[RATE_SAMPLES];
+	double raw_samp[RATE_SAMPLES];
+	int sample;
 } ClientData;
 
 /* scaling parameters */
@@ -344,7 +359,7 @@ int tile_y = 32;
 int ntiles, ntiles_x, ntiles_y;
 
 /* arrays that indicate changed or checked tiles. */
-unsigned char *tile_has_diff, *tile_tried;
+unsigned char *tile_has_diff, *tile_tried, *tile_copied;
 
 /* times of recent events */
 time_t last_event, last_input, last_client = 0;
@@ -372,6 +387,8 @@ char *program_cmdline = NULL;
 #define VNC_CONNECT_MAX 16384
 char vnc_connect_str[VNC_CONNECT_MAX+1];
 Atom vnc_connect_prop = None;
+
+struct utsname UT;
 
 /* function prototypes (see filename comment above) */
 
@@ -410,6 +427,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb);
 void initialize_polling_images(void);
 void initialize_signals(void);
 void initialize_tiles(void);
+void initialize_speeds(void);
 void free_tiles(void);
 void initialize_watch_bell(void);
 void initialize_xinerama(void);
@@ -446,16 +464,18 @@ void set_vnc_connect_prop(char *);
 char *process_remote_cmd(char *, int);
 void rfbPE(rfbScreenInfoPtr, long);
 void rfbCFD(rfbScreenInfoPtr, long);
-int scan_for_updates(void);
+int scan_for_updates(int);
 void set_colormap(int);
 void set_offset(void);
 void set_rfb_cursor(int);
 void set_visual(char *vstring);
 void set_cursor(int, int, int);
 void setup_cursors(void);
+void setup_cursors_and_push(void);
 void first_cursor(void);
 void set_no_cursor(void);
 void set_cursor_was_changed(rfbScreenInfoPtr);
+void set_cursor_was_moved(rfbScreenInfoPtr);
 int get_which_cursor(void);
 int get_xfixes_cursor(int);
 
@@ -470,6 +490,14 @@ void check_x11_pointer(void);
 void check_bell_event(void);
 void check_xevents(void);
 char *this_host(void);
+void set_vnc_desktop_name(void);
+
+int get_cmp_rate(void);
+int get_raw_rate(void);
+int get_read_rate(void);
+int get_net_rate(void);
+int get_net_latency(void);
+void measure_send_rates(int);
 
 int get_remote_port(int sock);
 int get_local_port(int sock);
@@ -491,8 +519,16 @@ char *use_dpy = NULL;
 char *auth_file = NULL;
 char *visual_str = NULL;
 char *logfile = NULL;
+int logfile_append = 0;
 char *passwdfile = NULL;
-char *blackout_string = NULL;
+char *blackout_str = NULL;
+
+char *speeds_str = NULL;
+int measure_speeds = 1;
+int speeds_net_rate = 0;
+int speeds_net_latency = 0;
+int speeds_read_rate = 0;
+
 char *rc_rcfile = NULL;
 int rc_norc = 0;
 int opts_bg = 0;
@@ -519,6 +555,7 @@ int clear_mods = 0;		/* -clear_mods (1) and -clear_keys (2) */
 int nofb = 0;			/* do not send any fb updates */
 
 unsigned long subwin = 0x0;	/* -id, -sid */
+int subwin_wait_mapped = 0;
 
 int xinerama = 0;		/* -xinerama */
 int xrandr = 0;			/* -xrandr */
@@ -531,6 +568,7 @@ Time xrandr_cfg_time = 0;
 char *xrandr_mode = NULL;
 char *pad_geometry = NULL;
 time_t pad_geometry_time;
+int use_snapfb = 0;
 
 char *client_connect = NULL;	/* strings for -connect option */
 char *client_connect_file = NULL;
@@ -554,7 +592,9 @@ int add_keysyms = 0;		/* automatically add keysyms to X server */
 
 char *remap_file = NULL;	/* -remap */
 char *pointer_remap = NULL;
-int pointer_mode = 2;		/* use the various ways of updating pointer */
+/* use the various ways of updating pointer */
+#define POINTER_MODE_DEFAULT 2
+int pointer_mode = POINTER_MODE_DEFAULT;
 int pointer_mode_max = 4;	
 int single_copytile = 0;	/* use the old way copy_tiles() */
 int single_copytile_orig = 0;
@@ -930,6 +970,10 @@ int new_fb_size_clients(rfbScreenInfoPtr s) {
 	rfbClientPtr cl;
 	int count = 0;
 
+	if (! s) {
+		return 0;
+	}
+
 	iter = rfbGetClientIterator(s);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		if (cl->useNewFBSize) {
@@ -1097,6 +1141,35 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 	    width, height, bitmap_pad, bytes_per_line);
 }
 
+void copy_image(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
+
+	/* default (w=0,h=0) is the fill the entire XImage */
+	if (w < 1)  {
+		w = dest->width;
+	}
+	if (h < 1)  {
+		h = dest->height;
+	}
+
+	if (use_snapfb && snap_fb && dest != snaprect) {
+		char *src, *dst;
+		int line, pixelsize = bpp/8;
+
+		src = snap->data + snap->bytes_per_line*y + pixelsize*x;
+		dst = dest->data;
+		for (line = 0; line < h; line++) {
+			memcpy(dst, src, w * pixelsize);
+			src += snap->bytes_per_line;
+			dst += dest->bytes_per_line;
+		}
+	} else if (using_shm && w == dest->width && h == dest->height) {
+		XShmGetImage_wr(dpy, window, dest, x, y, AllPlanes);
+	} else {
+		XGetSubImage_wr(dpy, window, x, y, w, h, AllPlanes,
+		    ZPixmap, dest, 0, 0);
+	}
+}
+
 /*
  * wrappers for XTestFakeKeyEvent, etc..
  */
@@ -1210,9 +1283,11 @@ void clean_shm(int quick) {
 	if (quick) {
 		shm_delete(&scanline_shm);
 		shm_delete(&fullscreen_shm);
+		shm_delete(&snaprect_shm);
 	} else {
 		shm_clean(&scanline_shm, scanline);
 		shm_clean(&fullscreen_shm, fullscreen);
+		shm_clean(&snaprect_shm, snaprect);
 	}
 
 	/* 
@@ -1404,6 +1479,30 @@ int valid_window(Window win) {
 	return ok;
 }
 
+int wait_until_mapped(Window win) {
+	int ms = 50, waittime = 30;
+	time_t start = time(0);
+	XWindowAttributes attr;
+
+	while (1) {
+		if (! valid_window(win)) {
+			if (time(0) > start + waittime) {
+				return 0;
+			}
+			usleep(ms * 1000);
+			continue;
+		}
+		if (! XGetWindowAttributes(dpy, win, &attr)) {
+			return 0;
+		}
+		if (attr.map_state == IsViewable) {
+			return 1;
+		}
+		usleep(ms * 1000);
+	}
+	return 0;
+}
+
 int get_window_size(Window win, int *x, int *y) {
 	XWindowAttributes attr;
 	/* valid_window? */
@@ -1461,6 +1560,10 @@ int all_clients_initialized(void) {
 	rfbClientPtr cl;
 	int ok = 1;
 
+	if (! screen) {
+		return ok;
+	}
+
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		if (cl->state != RFB_NORMAL) {
@@ -1479,6 +1582,10 @@ char *list_clients(void) {
 	char *list, tmp[32];
 	int count = 0;
 
+	if (!screen) {
+		return strdup("");
+	}
+
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		count++;
@@ -1487,7 +1594,7 @@ char *list_clients(void) {
 
 	/*
 	 * each client: 123.123.123.123:60000/0x11111111-rw, = 36 bytes 
-	 * so count+1 * 100 should cover it.
+	 * so count+1 * 100 must cover it.
 	 */
 	list = (char *) malloc((count+1)*100);
 	
@@ -1516,6 +1623,10 @@ void close_all_clients(void) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
 
+	if (! screen) {
+		return;
+	}
+
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		rfbCloseClient(cl);
@@ -1531,6 +1642,10 @@ void close_clients(char *str) {
 
 	if (!strcmp(str, "all") || !strcmp(str, "*")) {
 		close_all_clients();
+		return;
+	}
+
+	if (! screen) {
 		return;
 	}
 
@@ -1554,7 +1669,7 @@ void close_clients(char *str) {
 			char *rstr = str;
 			if (! dotted_ip(str))  {
 				rstr = host2ip(str);
-				if (rstr == NULL) {
+				if (rstr == NULL || *rstr == '\0') {
 					if (host_warn++) {
 						continue;
 					}
@@ -1738,23 +1853,23 @@ static int check_access(char *addr) {
 		    "blocked.\n");
 		return 0;
 	}
-
-	if (allow_list == NULL || *allow_list == '\0') {
-		if (allow_once == NULL) {
-			return 1;
-		}
-	}
-	if (allow_list == NULL) {
-		allow_list = strdup("");
-	}
 	if (addr == NULL || *addr == '\0') {
 		rfbLog("check_access: denying empty host IP address string.\n");
 		return 0;
 	}
 
+	if (allow_list == NULL) {
+		/* set to "" to possibly append allow_once */
+		allow_list = strdup("");
+	}
+	if (*allow_list == '\0' && allow_once == NULL) {
+		/* no constraints, accept it */
+		return 1;
+	}
+
 	if (strchr(allow_list, '/')) {
 		/* a file of IP addresess or prefixes */
-		int len;
+		int len, len2 = 0;
 		struct stat sbuf;
 		FILE *in;
 		char line[1024], *q;
@@ -1767,7 +1882,8 @@ static int check_access(char *addr) {
 		}
 		len = sbuf.st_size + 1;	/* 1 more for '\0' at end */
 		if (allow_once) {
-			len += strlen(allow_once) + 2;
+			len2 = strlen(allow_once) + 2;
+			len += len2;
 		}
 		list = malloc(len);
 		list[0] = '\0';
@@ -1782,20 +1898,22 @@ static int check_access(char *addr) {
 			if ( (q = strchr(line, '#')) != NULL) {
 				*q = '\0';
 			}
-			if (strlen(list) + strlen(line) >= len) {
+			if (strlen(list) + strlen(line) >= len - len2) {
+				/* file grew since our stat() */
 				break;
 			}
 			strcat(list, line);
 		}
 		fclose(in);
 		if (allow_once) {
+			strcat(list, "\n");
 			strcat(list, allow_once);
 			strcat(list, "\n");
 		}
 	} else {
-		int len = strlen(allow_list);
+		int len = strlen(allow_list) + 1;
 		if (allow_once) {
-			len += strlen(allow_once) + 2;
+			len += strlen(allow_once) + 1;
 		}
 		list = malloc(len);
 		list[0] = '\0';
@@ -1813,28 +1931,43 @@ static int check_access(char *addr) {
 	
 	p = strtok(list, ", \t\n\r");
 	while (p) {
-		char *q, *r = NULL;
+		char *chk, *q, *r = NULL;
 		if (*p == '\0') {
 			p = strtok(NULL, ", \t\n\r");
 			continue;	
 		}
 		if (! dotted_ip(p)) {
 			r = host2ip(p);
-			if (r == NULL) {
+			if (r == NULL || *r == '\0') {
 				rfbLog("check_access: bad lookup \"%s\"\n", p);
 				p = strtok(NULL, ", \t\n\r");
 				continue;
 			}
 			rfbLog("check_access: lookup %s -> %s\n", p, r);
-			p = r;
+			chk = r;
+		} else {
+			chk = p;
 		}
-		q = strstr(addr, p);
-		if (q == addr) {
-			rfbLog("check_access: client %s matches pattern %s\n",
-			    addr, p);
-			allowed = 1;
 
-		} else if(!strcmp(p,"localhost") && !strcmp(addr,"127.0.0.1")) {
+		q = strstr(addr, chk);
+		if (chk[strlen(chk)-1] != '.') {
+			if (!strcmp(addr, chk)) {
+				if (chk != p) {
+					rfbLog("check_access: client %s "
+					    "matches host %s=%s\n", addr,
+					    chk, p);
+				} else {
+					rfbLog("check_access: client %s "
+					    "matches host %s\n", addr, chk);
+				}
+				allowed = 1;
+			} else if(!strcmp(chk, "localhost") &&
+			    !strcmp(addr, "127.0.0.1")) {
+				allowed = 1;
+			}
+		} else if (q == addr) {
+			rfbLog("check_access: client %s matches pattern %s\n",
+			    addr, chk);
 			allowed = 1;
 		}
 		p = strtok(NULL, ", \t\n\r");
@@ -2449,6 +2582,10 @@ static int do_reverse_connect(char *str) {
 		rfbLog("reverse_connect: string too long: %d bytes\n", len);
 		return 0;
 	}
+	if (!screen) {
+		rfbLog("reverse_connect: screen not setup yet.\n");
+		return 0;
+	}
 
 	/* copy in to host */
 	host = (char *) malloc((size_t) len+1);
@@ -2634,6 +2771,7 @@ void check_connect_inputs(void) {
  */
 enum rfbNewClientAction new_client(rfbClientPtr client) {
 	ClientData *cd; 
+	int i;
 	last_event = last_input = time(0);
 
 	if (inetd) {
@@ -2691,6 +2829,12 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	if (pad_geometry) {
 		install_padded_fb(pad_geometry);
 	}
+
+	for (i=0; i<RATE_SAMPLES; i++) {
+		cd->cmp_samp[i] = 5000;	/* 56k modem */
+		cd->raw_samp[i] = 50000;
+	}
+	cd->sample = 0;
 
 	accepted_client = 1;
 	last_client = time(0);
@@ -4780,7 +4924,9 @@ void check_bell_event(void) {
 			rfbLog("check_bell_event: not sending bell: "
 			    "uninitialized clients\n");
 		} else {
-			rfbSendBell(screen);
+			if (screen) {
+				rfbSendBell(screen);
+			}
 		}
 	}
 }
@@ -4796,7 +4942,6 @@ int subwin_trap_count = 0;
 XErrorHandler old_getimage_handler;
 #define XRANDR_SET_TRAP_RET(x,y)  \
 	if (subwin || xrandr) { \
-	    if (0) fprintf(stderr, "          SET_TRAP: '%d' '%s'\n", x, y); \
 		trapped_getimage_xerror = 0; \
 		old_getimage_handler = XSetErrorHandler(trap_getimage_xerror); \
 		if (check_xrandr_event(y)) { \
@@ -4807,7 +4952,6 @@ XErrorHandler old_getimage_handler;
 	}
 #define XRANDR_CHK_TRAP_RET(x,y)  \
 	if (subwin || xrandr) { \
-	    if (0) fprintf(stderr, "          CHK_TRAP: '%d' '%s'\n", x, y); \
 		if (trapped_getimage_xerror) { \
 			if (subwin) { \
 				static int last = 0; \
@@ -4926,7 +5070,7 @@ void handle_xrandr_change(int new_x, int new_y) {
 		rfbLog("  shutting down due to XRANDR event.\n");
 		clean_up_exit(0);
 	}
-	if (!strcmp(xrandr_mode, "newfbsize")) {
+	if (!strcmp(xrandr_mode, "newfbsize") && screen) {
 		iter = rfbGetClientIterator(screen);
 		while( (cl = rfbClientIteratorNext(iter)) ) {
 			if (cl->useNewFBSize) {
@@ -4958,7 +5102,6 @@ int check_xrandr_event(char *msg) {
 	if (! xrandr || ! xrandr_present) {
 		return 0;
 	}
-	if (0) fprintf(stderr, "IN    check_xrandr_event('%s')\n", msg);
 	if (XCheckTypedEvent(dpy, xrandr_base_event_type +
 	    RRScreenChangeNotify, &xev)) {
 		int do_change;
@@ -5005,12 +5148,9 @@ int check_xrandr_event(char *msg) {
 		    XDisplayWidth(dpy, scr), XDisplayHeight(dpy, scr));
 		rfbLog("check_xrandr_event(): returning control to"
 		    " caller...\n");
-		if (0) fprintf(stderr, "OUT-%d check_xrandr_event('%s')\n",
-		    do_change, msg);
 		return do_change;
 	}
 #endif
-	if (0) fprintf(stderr, "OUT-0 check_xrandr_event('%s')\n", msg);
 	return 0;
 }
 
@@ -5055,7 +5195,7 @@ static Window selwin;		/* special window for our selection */
  * This is where we keep our selection: the string sent TO us from VNC
  * clients, and the string sent BY us to requesting X11 clients.
  */
-static char *xcut_string = NULL;
+static char *xcut_str = NULL;
 
 /*
  * Our callbacks instruct us to check for changes in the cutbuffer
@@ -5098,8 +5238,8 @@ static void selection_request(XEvent *ev) {
 	} else {
 		notify_event.property = req_event->property;
 	}
-	if (xcut_string) {
-		length = strlen(xcut_string);
+	if (xcut_str) {
+		length = strlen(xcut_str);
 	} else {
 		length = 0;
 	}
@@ -5120,7 +5260,7 @@ static void selection_request(XEvent *ev) {
 	} else {
 		/* data request */
 
-		data = (unsigned char *)xcut_string;
+		data = (unsigned char *)xcut_str;
 
 		XChangeProperty(ev->xselectionrequest.display,
 		    ev->xselectionrequest.requestor,
@@ -5188,6 +5328,9 @@ static void cutbuffer_send(void) {
 	}
 
 	/* now send it to any connected VNC clients (rfbServerCutText) */
+	if (!screen) {
+		return;
+	}
 	rfbSendServerCutText(screen, selection_str, strlen(selection_str));
 }
 
@@ -5281,6 +5424,9 @@ static void selection_send(XEvent *ev) {
 	}
 
 	/* now send it to any connected VNC clients (rfbServerCutText) */
+	if (!screen) {
+		return;
+	}
 	rfbSendServerCutText(screen, selection_str, newlen);
 }
 
@@ -5339,7 +5485,7 @@ void check_xevents(void) {
 	static int first = 1, sent_some_sel = 0;
 	static time_t last_request = 0;
 	time_t now = time(0);
-	int have_clients = screen->clientHead ? 1 : 0;
+	int have_clients = 0;
 
 
 	if (first) {
@@ -5347,6 +5493,9 @@ void check_xevents(void) {
 	}
 	first = 0;
 
+	if (screen && screen->clientHead) {
+		have_clients = 1;
+	}
 	X_LOCK;
 	/*
 	 * There is a bug where we have to wait before sending text to
@@ -5457,9 +5606,9 @@ void check_xevents(void) {
 			    xev.xselectionclear.selection == XA_PRIMARY) {
 
 				own_selection = 0;
-				if (xcut_string) {
-					free(xcut_string);
-					xcut_string = NULL;
+				if (xcut_str) {
+					free(xcut_str);
+					xcut_str = NULL;
 				}
 			}
 		}
@@ -5472,6 +5621,9 @@ void check_xevents(void) {
  */
 void xcut_receive(char *text, int len, rfbClientPtr cl) {
 
+	if (!watch_selection) {
+		return;
+	}
 	if (cl && cl->viewOnly) {
 		return;
 	}
@@ -5490,13 +5642,13 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	}
 
 	/* duplicate the text string for our own use. */
-	if (xcut_string != NULL) {
-		free(xcut_string);
+	if (xcut_str != NULL) {
+		free(xcut_str);
 	}
-	xcut_string = (unsigned char *)
+	xcut_str = (unsigned char *)
 	    malloc((size_t) (len+1) * sizeof(unsigned char));
-	strncpy(xcut_string, text, len);
-	xcut_string[len] = '\0';	/* make sure null terminated */
+	strncpy(xcut_str, text, len);
+	xcut_str[len] = '\0';	/* make sure null terminated */
 
 	/* copy this text to CUT_BUFFER0 as well: */
 	XChangeProperty(dpy, rootwin, XA_CUT_BUFFER0, XA_STRING, 8,
@@ -5549,6 +5701,10 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 	if (query || wait) {
 		char line[VNC_CONNECT_MAX];	
 		int rc=1, i=0, max=70, ms_sl=50;
+
+		if (!strcmp(cmd, "cmd=stop")) {
+			max = 20;
+		}
 		for (i=0; i<max; i++) {
 			usleep(ms_sl * 1000);
 			if (client_connect_file) {
@@ -5629,14 +5785,15 @@ char *add_item(char *instr, char *item) {
 	char *p, *str;
 	int len, saw_item = 0;
 
-	if (! instr) {
+	if (! instr || *instr == '\0') {
 		str = strdup(item);
 		return str;
 	}
-	len = strlen(instr) + strlen(item) + 2;
+	len = strlen(instr) + 1 + strlen(item) + 1;
 	str = (char *)malloc(len);
 	str[0] = '\0';
 
+	/* n.b. instr will be modified; caller replaces with returned string */
 	p = strtok(instr, ",");
 	while (p) {
 		if (!strcmp(p, item)) {
@@ -5660,7 +5817,6 @@ char *add_item(char *instr, char *item) {
 			strcat(str, ",");
 		}
 		strcat(str, item);
-		
 	}
 	return str;
 }
@@ -5669,7 +5825,7 @@ char *delete_item(char *instr, char *item) {
 	char *p, *str;
 	int len;
 
-	if (! instr) {
+	if (! instr || *instr == '\0') {
 		str = strdup("");
 		return str;
 	}
@@ -5677,6 +5833,7 @@ char *delete_item(char *instr, char *item) {
 	str = (char *)malloc(len);
 	str[0] = '\0';
 
+	/* n.b. instr will be modified; caller replaces with returned string */
 	p = strtok(instr, ",");
 	while (p) {
 		if (!strcmp(p, item) || *p == '\0') {
@@ -5701,6 +5858,9 @@ void if_8bpp_do_new_fb(void) {
 }
 
 void check_black_fb(void) {
+	if (!screen) {
+		return;
+	}
 	if (new_fb_size_clients(screen) != client_count) {
 		rfbLog("trying to send a black fb for non-newfbsize"
 		    " clients %d != %d\n", client_count,
@@ -5713,7 +5873,7 @@ int check_httpdir(void) {
 	if (http_dir) {
 		return 1;
 	} else {
-		char *prog, *httpdir, *q;
+		char *prog = NULL, *httpdir, *q;
 		struct stat sbuf;
 		int len;
 
@@ -5760,6 +5920,7 @@ int check_httpdir(void) {
 			free(prog);
 			return 0;
 		}
+
 		len = strlen(prog) + 17 + 1;
 		*q = '\0';
 		httpdir = (char *) malloc(len);
@@ -5773,7 +5934,8 @@ int check_httpdir(void) {
 			return 1;
 		} else {
 			/* try some hardwires: */
-			if (stat("/usr/local/share/x11vnc/classes", &sbuf) == 0) {
+			if (stat("/usr/local/share/x11vnc/classes",
+			    &sbuf) == 0) {
 				http_dir =
 				    strdup("/usr/local/share/x11vnc/classes");	
 				return 1;
@@ -5789,6 +5951,9 @@ int check_httpdir(void) {
 }
 
 void http_connections(int on) {
+	if (!screen) {
+		return;
+	}
 	if (on) {
 		rfbLog("http_connections: turning on http service.\n");
 		screen->httpInitDone = FALSE;
@@ -5815,7 +5980,7 @@ void reset_httpport(int old, int new) {
 	} else if (inetd) {
 		rfbLog("reset_httpport: cannot set httpport: %d"
 		    " in inetd.\n", hp);
-	} else {
+	} else if (screen) {
 		screen->httpPort = hp;
 		screen->httpInitDone = FALSE;
 		if (screen->httpListenSock > -1) {
@@ -5836,7 +6001,7 @@ void reset_rfbport(int old, int new)  {
 	} else if (inetd) {
 		rfbLog("reset_rfbport: cannot set rfbport: %d"
 		    " in inetd.\n", rp);
-	} else {
+	} else if (screen) {
 		rfbClientIteratorPtr iter;
 		rfbClientPtr cl;
 		int maxfd;
@@ -5872,6 +6037,8 @@ void reset_rfbport(int old, int new)  {
 		rfbReleaseClientIterator(iter);
 
 		screen->maxFd = maxfd;
+
+		set_vnc_desktop_name();
 	}
 }
 
@@ -6109,6 +6276,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				do_new_fb(1);
 			}
 		}
+	} else if (strstr(p, "waitmapped") == p) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p,
+			    subwin_wait_mapped);
+			goto qry;
+		}
+		subwin_wait_mapped = 1;
+	} else if (strstr(p, "nowaitmapped") == p) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p,
+			    !subwin_wait_mapped);
+			goto qry;
+		}
+		subwin_wait_mapped = 0;
 
 	} else if (!strcmp(p, "flashcmap")) {
 		if (query) {
@@ -6275,16 +6456,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("process_remote_cmd: enable sharing.\n");
 		shared = 1;
-		screen->alwaysShared = TRUE;
-		screen->neverShared = FALSE;
+		if (screen) {
+			screen->alwaysShared = TRUE;
+			screen->neverShared = FALSE;
+		}
 	} else if (!strcmp(p, "noshared")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !shared); goto qry;
 		}
 		rfbLog("process_remote_cmd: disable sharing.\n");
 		shared = 0;
-		screen->alwaysShared = FALSE;
-		screen->neverShared = TRUE;
+		if (screen) {
+			screen->alwaysShared = FALSE;
+			screen->neverShared = TRUE;
+		}
 
 	} else if (!strcmp(p, "forever")) {
 		if (query) {
@@ -6321,12 +6506,15 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		COLON_CHECK("connect:")
 		p += strlen("connect:");
 		/* this is a reverse connection */
-		strncpy(vnc_connect_str, p, VNC_CONNECT_MAX);
-		vnc_connect_str[VNC_CONNECT_MAX] = '\0';
+		reverse_connect(p);
 
 	} else if (strstr(p, "allowonce") == p) {
-		NOTAPP
 		COLON_CHECK("allowonce:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(allow_once));
+			goto qry;
+		}
 		p += strlen("allowonce:");
 		allow_once = strdup(p);
 		rfbLog("process_remote_cmd: set allow_once %s\n", allow_once);
@@ -6536,30 +6724,30 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		COLON_CHECK("blackout:")
 		if (query) {
 			snprintf(buf, bufn, "ans=%s%s%s", p, co,
-			    NONUL(blackout_string));
+			    NONUL(blackout_str));
 			goto qry;
 		}
 		p += strlen("blackout:");
-		if (blackout_string) {
-			before = strdup(blackout_string);
+		if (blackout_str) {
+			before = strdup(blackout_str);
 		} else {
 			before = strdup("");
 		}
-		old = blackout_string;
+		old = blackout_str;
 		if (*p == '+') {
 			p++;
-			blackout_string = add_item(blackout_string, p);
+			blackout_str = add_item(blackout_str, p);
 		} else if (*p == '-') {
 			p++;
-			blackout_string = delete_item(blackout_string, p);
+			blackout_str = delete_item(blackout_str, p);
 		} else {
-			blackout_string = strdup(p);
+			blackout_str = strdup(p);
 		}
-		if (strcmp(before, blackout_string)) {
+		if (strcmp(before, blackout_str)) {
 			rfbLog("process_remote_cmd: changing -blackout\n");
 			rfbLog(" from: %s\n", before);
-			rfbLog(" to:   %s\n", blackout_string);
-			if (0 && !strcmp(blackout_string, "") &&
+			rfbLog(" to:   %s\n", blackout_str);
+			if (0 && !strcmp(blackout_str, "") &&
 			    single_copytile_orig != single_copytile) {
 				rfbLog("resetting single_copytile to: %d\n",
 				    single_copytile_orig);
@@ -6978,6 +7166,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		set_no_cursor();
 		cursor_shape_updates = 1;
 		restore_cursor_shape_updates(screen);
+		first_cursor();
 	} else if (!strcmp(p, "nocursorshape")) {
 		int i, max = 5;
 		if (query) {
@@ -6995,6 +7184,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		cursor_shape_updates = 0;
 		disable_cursor_shape_updates(screen);
+		first_cursor();
 
 	} else if (!strcmp(p, "cursorpos")) {
 		if (query) {
@@ -7037,6 +7227,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    "to: %d\n", show_cursor);
 		}
 		initialize_cursors_mode();
+		first_cursor();
 
 	} else if (!strcmp(p, "show_cursor")) {
 		if (query) {
@@ -7058,6 +7249,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    "to: %s\n", multiple_cursors_mode);
 		}
 		initialize_cursors_mode();
+		first_cursor();
 	} else if (!strcmp(p, "noshow_cursor") || !strcmp(p, "nocursor")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !show_cursor);
@@ -7069,6 +7261,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("process_remote_cmd: disabling show_cursor.\n");
 		show_cursor = 0;
 		initialize_cursors_mode();
+		first_cursor();
 
 	} else if (!strcmp(p, "xfixes")) {
 		if (query) {
@@ -7084,6 +7277,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    " (if supported).\n");
 		use_xfixes = 1;
 		initialize_xfixes();
+		first_cursor();
 	} else if (!strcmp(p, "noxfixes")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !use_xfixes);
@@ -7097,6 +7291,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("process_remote_cmd: disabling -xfixes.\n");
 		use_xfixes = 0;
 		initialize_xfixes();
+		first_cursor();
 
 	} else if (strstr(p, "alphacut") == p) {
 		int a;
@@ -7118,8 +7313,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				    " transparent cursors.\n");
 			}
 			alpha_threshold = a;
-			setup_cursors();
-			first_cursor();
+			setup_cursors_and_push();
 		}
 	} else if (strstr(p, "alphafrac") == p) {
 		double a;
@@ -7137,8 +7331,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			rfbLog("process_remote_cmd: setting alphafrac "
 			    "%f -> %f.\n", alpha_frac, a);
 			alpha_frac = a;
-			setup_cursors();
-			first_cursor();
+			setup_cursors_and_push();
 		}
 	} else if (strstr(p, "alpharemove") == p) {
 		if (query) {
@@ -7148,8 +7341,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (!alpha_remove) {
 			rfbLog("process_remote_cmd: enable alpharemove\n");
 			alpha_remove = 1;
-			setup_cursors();
-			first_cursor();
+			setup_cursors_and_push();
 		}
 	} else if (strstr(p, "noalpharemove") == p) {
 		if (query) {
@@ -7159,8 +7351,28 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (alpha_remove) {
 			rfbLog("process_remote_cmd: disable alpharemove\n");
 			alpha_remove = 0;
-			setup_cursors();
-			first_cursor();
+			setup_cursors_and_push();
+		}
+	} else if (strstr(p, "alphablend") == p) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, alpha_blend);
+			goto qry;
+		}
+		if (!alpha_blend) {
+			rfbLog("process_remote_cmd: enable alphablend\n");
+			alpha_remove = 0;
+			alpha_blend = 1;
+			setup_cursors_and_push();
+		}
+	} else if (strstr(p, "noalphablend") == p) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !alpha_blend);
+			goto qry;
+		}
+		if (alpha_blend) {
+			rfbLog("process_remote_cmd: disable alphablend\n");
+			alpha_blend = 0;
+			setup_cursors_and_push();
 		}
 
 	} else if (strstr(p, "xwarp") == p || strstr(p, "xwarppointer") == p) {
@@ -7218,7 +7430,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("pointer_mode:");
 		pm = atoi(p);
-		if (pm < 1 || pm > pointer_mode_max) {
+		if (pm < 0 || pm > pointer_mode_max) {
 			rfbLog("process_remote_cmd: pointer_mode out of range:"
 			   " 1-%d: %d\n", pointer_mode_max, pm);
 		} else {
@@ -7226,6 +7438,24 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    pm);
 			pointer_mode = pm;
 		}
+	} else if (strstr(p, "pm") == p) {
+		int pm;
+		COLON_CHECK("pm:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, pointer_mode);
+			goto qry;
+		}
+		p += strlen("pm:");
+		pm = atoi(p);
+		if (pm < 0 || pm > pointer_mode_max) {
+			rfbLog("process_remote_cmd: pointer_mode out of range:"
+			   " 1-%d: %d\n", pointer_mode_max, pm);
+		} else {
+			rfbLog("process_remote_cmd: setting pointer_mode %d\n",
+			    pm);
+			pointer_mode = pm;
+		}
+
 	} else if (strstr(p, "input_skip") == p) {
 		int is;
 		COLON_CHECK("input_skip:")
@@ -7237,6 +7467,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		is = atoi(p);
 		rfbLog("process_remote_cmd: setting input_skip %d\n", is);
 		ui_skip = is;
+
+	} else if (strstr(p, "speeds") == p) {
+		COLON_CHECK("speeds:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(speeds_str));
+			goto qry;
+		}
+		p += strlen("speeds:");
+		if (speeds_str) free(speeds_str);
+		speeds_str = strdup(p);
+
+		rfbLog("process_remote_cmd: setting -speeds to:\n"
+		    "\t'%s'\n", p);
+		initialize_speeds();
 
 	} else if (!strcmp(p, "debug_pointer") || !strcmp(p, "dp")) {
 		if (query) {
@@ -7422,6 +7667,29 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    tile_fuzz, f);
 		grow_fill = f;
 
+	} else if (!strcmp(p, "snapfb")) {
+		int orig = use_snapfb;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, use_snapfb);
+			    goto qry;
+		}
+		rfbLog("process_remote_cmd: turning on snapfb mode.\n");
+		use_snapfb = 1;
+		if (orig != use_snapfb) {
+			do_new_fb(1);
+		}
+	} else if (!strcmp(p, "nosnapfb")) {
+		int orig = use_snapfb;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !use_snapfb);
+			    goto qry;
+		}
+		rfbLog("process_remote_cmd: turning off snapfb mode.\n");
+		use_snapfb = 0;
+		if (orig != use_snapfb) {
+			do_new_fb(1);
+		}
+
 	} else if (strstr(p, "progressive") == p) {
 		int f;
 		COLON_CHECK("progressive:")
@@ -7504,9 +7772,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				free(http_dir);
 			}
 			http_dir = strdup(p);
-			if (*p == '\0') {
-				http_connections(0);
-			} else {
+			http_connections(0);
+			if (*p != '\0') {
 				http_connections(1);
 			}
 		}
@@ -8019,12 +8286,21 @@ enum cursor_names {
 #define CURS_MAX 32
 static cursor_info_t *cursors[CURS_MAX];
 
+void setup_cursors_and_push(void) {
+	setup_cursors();
+	first_cursor();
+}
+
 void first_cursor(void) {
+	if (! screen) {
+		return;
+	}
 	if (! show_cursor) {
 		screen->cursor = NULL;
 	} else {
-		/* just set it to the arrow for now. */
-		set_rfb_cursor(CURS_ARROW);
+		got_xfixes_cursor_notify++;
+		set_rfb_cursor(get_which_cursor());
+		set_cursor_was_changed(screen);
 	}
 }
 
@@ -8338,10 +8614,11 @@ int get_xfixes_cursor(int init) {
 		int use, oldest, i, x, y, w, h, len;
 		int Bpp = bpp/8;
 		time_t oldtime, now;
-		char *bitmap, *rich;
+		char *bitmap, *rich, *alpha;
 		unsigned long black, white;
 		rfbCursorPtr c;
 		int thresh,  n_opaque, n_trans, n_alpha, histo[256];
+		int send_alpha = 0, alpha_shift;
 		XFixesCursorImage *xfc;
 
 		if (! got_xfixes_cursor_notify) {
@@ -8419,6 +8696,11 @@ int get_xfixes_cursor(int init) {
 			if (cursors[use]->rfb->richSource) {
 				free(cursors[use]->rfb->richSource);
 			}
+#if !OLD_TREE && CURSOR_TRANSPARENCY
+			if (cursors[use]->rfb->alphaSource) {
+				free(cursors[use]->rfb->alphaSource);
+			}
+#endif
 			if (cursors[use]->rfb->source) {
 				free(cursors[use]->rfb->source);
 			}
@@ -8443,6 +8725,7 @@ int get_xfixes_cursor(int init) {
 
 		/* for rich cursor pixel data */
 		rich = (char *)calloc(Bpp*len, 1);
+		alpha = (char *)calloc(1*len, 1);
 
 		n_opaque = 0;
 		n_trans = 0;
@@ -8470,6 +8753,19 @@ int get_xfixes_cursor(int init) {
 				i++;
 			}
 		}
+		if (alpha_blend) {
+			send_alpha = 0;
+#if CURSOR_TRANSPARENCY
+			if (Bpp == 4) {
+				send_alpha = 1;
+			}
+#endif
+			alpha_shift = 24;
+			if (main_red_shift == 24 || main_green_shift == 24 ||
+			    main_blue_shift == 24)  {
+				alpha_shift = 0;	/* XXX correct? */
+			}
+		}
 		if (n_opaque >= alpha_frac * n_alpha) {
 			thresh = alpha_threshold;
 		} else {
@@ -8493,10 +8789,9 @@ int get_xfixes_cursor(int init) {
 				a = 0xff000000 & (*(xfc->pixels+i));
 				a = a >> 24;	/* alpha channel */
 
+
 				if (a < thresh) {
 					bitmap[i] = ' ';
-					i++;
-					continue;
 				} else {
 					bitmap[i] = 'x';
 				}
@@ -8540,20 +8835,40 @@ int get_xfixes_cursor(int init) {
 					ui |= (r << main_red_shift);
 					ui |= (g << main_green_shift);
 					ui |= (b << main_blue_shift);
+					if (send_alpha) {
+						ui |= (a << alpha_shift);
+					}
 				}
 
 				/* insert value into rich source: */
 				p = rich + Bpp*i;
+
+#if 0
+				memcpy(p, (char *)&ui, Bpp);
+#else
 				if (Bpp == 1) {
 					*((unsigned char *)p)
 					= (unsigned char) ui;
 				} else if (Bpp == 2) {
 					*((unsigned short *)p)
 					= (unsigned short) ui;
+				} else if (Bpp == 3) {
+					*((unsigned char *)p)
+					= (unsigned char) ((ui & 0x0000ff) >> 0);
+					*((unsigned char *)(p+1))
+					= (unsigned char) ((ui & 0x00ff00) >> 8);
+					*((unsigned char *)(p+2))
+					= (unsigned char) ((ui & 0xff0000) >> 16);
 				} else if (Bpp == 4) {
 					*((unsigned int *)p)
 					= (unsigned int) ui;
 				}
+#endif
+
+				/* insert alpha value into alpha source: */
+				p = alpha + i;
+				*((unsigned char *)p) = (unsigned char) a;
+
 				i++;
 			}
 		}
@@ -8570,6 +8885,15 @@ int get_xfixes_cursor(int init) {
 		c->cleanupMask = FALSE;
 		c->cleanupRichSource = FALSE;
 		c->richSource = rich;
+
+#if !OLD_TREE && CURSOR_TRANSPARENCY
+		if (alpha_blend && !indexed_color) {
+			c->alphaSource = alpha;
+			c->alphaPreMultiplied = TRUE;
+		} else {
+			c->alphaSource = NULL;
+		}
+#endif
 
 		/* place cursor into our collection */
 		cursors[use]->rfb = c;
@@ -8711,6 +9035,7 @@ int get_which_cursor(void) {
 				Window r;
 
 				trapped_xerror = 0;
+				X_LOCK;
 				old_handler = XSetErrorHandler(trap_xerror);
 
 				/* "narrow" windows are WM */
@@ -8721,6 +9046,7 @@ int get_which_cursor(void) {
 					}
 				}
 				XSetErrorHandler(old_handler);
+				X_UNLOCK;
 				trapped_xerror = 0;
 			}
 			if (which == which0) {
@@ -8750,7 +9076,7 @@ void mark_cursor_patch_modified(rfbScreenInfoPtr s, int old) {
 	int curx, cury, xhot, yhot, w, h;
 	int x1, x2, y1, y2;
 
-	if (! s->cursor) {
+	if (! s || ! s->cursor) {
 		return;
 	}
 
@@ -8785,6 +9111,9 @@ void set_cursor_was_changed(rfbScreenInfoPtr s) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
 
+	if (! s) {
+		return;
+	}
 	iter = rfbGetClientIterator(s);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		cl->cursorWasChanged = TRUE;
@@ -8796,6 +9125,9 @@ void set_cursor_was_moved(rfbScreenInfoPtr s) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
 
+	if (! s) {
+		return;
+	}
 	iter = rfbGetClientIterator(s);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		cl->cursorWasMoved = TRUE;
@@ -8808,6 +9140,9 @@ void restore_cursor_shape_updates(rfbScreenInfoPtr s) {
 	rfbClientPtr cl;
 	int count = 0;
 
+	if (! s || ! s->clientHead) {
+		return;
+	}
 	iter = rfbGetClientIterator(s);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		int changed = 0;
@@ -8837,6 +9172,10 @@ void disable_cursor_shape_updates(rfbScreenInfoPtr s) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
 
+	if (! s || ! s->clientHead) {
+		return;
+	}
+
 	iter = rfbGetClientIterator(s);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd;
@@ -8861,6 +9200,9 @@ int cursor_shape_updates_clients(rfbScreenInfoPtr s) {
 	rfbClientPtr cl;
 	int count = 0;
 
+	if (! s) {
+		return 0;
+	}
 	iter = rfbGetClientIterator(s);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		if (cl->enableCursorShapeUpdates) {
@@ -8876,6 +9218,9 @@ int cursor_pos_updates_clients(rfbScreenInfoPtr s) {
 	rfbClientPtr cl;
 	int count = 0;
 
+	if (! s) {
+		return 0;
+	}
 	iter = rfbGetClientIterator(s);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		if (cl->enableCursorPosUpdates) {
@@ -8898,6 +9243,9 @@ void cursor_position(int x, int y) {
 	int x_old, y_old, x_in = x, y_in = y;
 
 	/* x and y are current positions of X11 pointer on the X11 display */
+	if (!screen) {
+		return;
+	}
 
 	if (scaling) {
 		x = ((double) x / dpy_x) * scaled_x;
@@ -8976,6 +9324,9 @@ void set_rfb_cursor(int which) {
 #endif
 
 	if (! show_cursor) {
+		return;
+	}
+	if (! screen) {
 		return;
 	}
 	
@@ -9415,6 +9766,15 @@ void install_padded_fb(char *geom) {
 	pad_geometry_time = time(0);
 }
 
+void initialize_snap_fb(void) {
+	if (snap_fb) {
+		free(snap_fb);
+	}
+	snap = XGetImage_wr(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes,
+	    ZPixmap);
+	snap_fb = snap->data;
+}
+
 /*
  * initialize a fb for the X display
  */
@@ -9426,10 +9786,15 @@ XImage *initialize_xdisplay_fb(void) {
 	int subwin_bs;
 
 	X_LOCK;
-	if (subwin && !valid_window((Window) subwin)) {
-		rfbLog("invalid sub-window: 0x%lx\n", subwin);
-		X_UNLOCK;
-		clean_up_exit(1);
+	if (subwin) {
+		if (subwin_wait_mapped) {
+			wait_until_mapped(subwin);
+		}
+		if (!valid_window((Window) subwin)) {
+			rfbLog("invalid sub-window: 0x%lx\n", subwin);
+			X_UNLOCK;
+			clean_up_exit(1);
+		}
 	}
 	
 	if (overlay) {
@@ -9637,6 +10002,9 @@ XImage *initialize_xdisplay_fb(void) {
 		/* try once more */
 		usleep(250 * 1000);
 		goto again;
+	}
+	if (use_snapfb) {
+		initialize_snap_fb();
 	}
 	X_UNLOCK;
 
@@ -10080,8 +10448,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	bpp   = screen->serverFormat.bitsPerPixel;
 	depth = screen->serverFormat.depth;
 
-	setup_cursors();
-	first_cursor();
+	setup_cursors_and_push();
 
 	if (scaling) {
 		mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
@@ -10150,9 +10517,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->newClientHook = new_client;
 	screen->kbdAddEvent = keyboard;
 	screen->ptrAddEvent = pointer;
-	if (watch_selection) {
-		screen->setXCutText = xcut_receive;
-	}
+	screen->setXCutText = xcut_receive;
 
 	rfbInitServer(screen);
 
@@ -10464,7 +10829,7 @@ void initialize_xinerama (void) {
 
 	/* max len is 10000x10000+10000+10000 (23 chars) per geometry */
 	rcnt = (int) sraRgnCountRects(black_region);
-	bstr = (char *) malloc(30 * rcnt * sizeof(char));
+	bstr = (char *) malloc(30 * (rcnt+1) * sizeof(char));
 	tstr = (char *) malloc(30 * sizeof(char));
 	bstr[0] = '\0';
 
@@ -10498,8 +10863,8 @@ void initialize_xinerama (void) {
 }
 
 void initialize_blackouts_and_xinerama(void) {
-	if (blackout_string != NULL) {
-		initialize_blackouts(blackout_string);
+	if (blackout_str != NULL) {
+		initialize_blackouts(blackout_str);
 	}
 	if (xinerama) {
 		initialize_xinerama();
@@ -10525,12 +10890,18 @@ void push_sleep(n) {
  * try to forcefully push a black screen to all connected clients
  */
 void push_black_screen(int n) {
+	if (!screen) {
+		return;
+	}
 	zero_fb(0, 0, dpy_x, dpy_y);
 	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 1);
 	push_sleep(n);
 }
 
 void refresh_screen(void) {
+	if (!screen) {
+		return;
+	}
 	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 1);
 	rfbPE(screen, -1);
 }
@@ -10539,7 +10910,7 @@ void refresh_screen(void) {
  * Fill the framebuffer with zero for the prescribed rectangle
  */
 void zero_fb(int x1, int y1, int x2, int y2) {
-	int pixelsize = bpp >> 3;
+	int pixelsize = bpp/8;
 	int line, fill = 0;
 	char *dst;
 	
@@ -10547,6 +10918,9 @@ void zero_fb(int x1, int y1, int x2, int y2) {
 		return;
 	}
 	if (y1 < 0 || y2 <= y1 || y2 > dpy_y) {
+		return;
+	}
+	if (! main_fb) {
 		return;
 	}
 
@@ -10607,6 +10981,8 @@ void initialize_tiles(void) {
 		malloc((size_t) (ntiles * sizeof(unsigned char)));
 	tile_tried    = (unsigned char *)
 		malloc((size_t) (ntiles * sizeof(unsigned char)));
+	tile_copied   = (unsigned char *)
+		malloc((size_t) (ntiles * sizeof(unsigned char)));
 	tile_blackout    = (tile_blackout_t *)
 		malloc((size_t) (ntiles * sizeof(tile_blackout_t)));
 	tile_region = (region_t *) malloc((size_t) (ntiles * sizeof(region_t)));
@@ -10628,6 +11004,10 @@ void free_tiles(void) {
 	if (tile_tried) {
 		free(tile_tried);
 		tile_tried = NULL;
+	}
+	if (tile_copied) {
+		free(tile_copied);
+		tile_copied = NULL;
 	}
 	if (tile_blackout) {
 		free(tile_blackout);
@@ -10661,7 +11041,8 @@ static int fs_factor = 0;
 static void set_fs_factor(int max) {
 	int f, fac = 1, n = dpy_y;
 
-	if ( (bpp/8) * dpy_x * dpy_y <= max )  {
+	fs_factor = 0;
+	if ((bpp/8) * dpy_x * dpy_y <= max)  {
 		fs_factor = 1;
 		return;
 	}
@@ -10830,7 +11211,7 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 }
 
 void initialize_polling_images(void) {
-	int i;
+	int i, MB = 1024 * 1024;
 
 	/* set all shm areas to "none" before trying to create any */
 	scanline_shm.shmid	= -1;
@@ -10839,6 +11220,9 @@ void initialize_polling_images(void) {
 	fullscreen_shm.shmid	= -1;
 	fullscreen_shm.shmaddr	= (char *) -1;
 	fullscreen		= NULL;
+	snaprect_shm.shmid	= -1;
+	snaprect_shm.shmaddr	= (char *) -1;
+	snaprect		= NULL;
 	for (i=1; i<=ntiles_x; i++) {
 		tile_row_shm[i].shmid	= -1;
 		tile_row_shm[i].shmaddr	= (char *) -1;
@@ -10850,20 +11234,17 @@ void initialize_polling_images(void) {
 	if (! shm_create(&scanline_shm, &scanline, dpy_x, 1, "scanline")) {
 		clean_up_exit(1);
 	}
-	if (0 && !quiet) {
-		if (using_shm) {
-			rfbLog("created \"scanline\" shm polling image.\n");
-		} else {
-			rfbLog("created \"scanline\" polling image.\n");
-		}
-	}
 
 	/*
 	 * the fullscreen (e.g. 1280x1024/fs_factor) shared memory area image:
 	 * (we cut down the size of the shm area to try avoid and shm segment
 	 * limits, e.g. the default 1MB on Solaris)
 	 */
-	set_fs_factor(1024 * 1024);
+	if (UT.sysname && strstr(UT.sysname, "Linux")) {
+		set_fs_factor(10 * MB);
+	} else {
+		set_fs_factor(1 * MB);
+	}
 	if (fs_frac >= 1.0) {
 		fs_frac = 1.1;
 		fs_factor = 0;
@@ -10875,13 +11256,15 @@ void initialize_polling_images(void) {
 		    dpy_y/fs_factor, "fullscreen")) {
 			clean_up_exit(1);
 		} 
-		if (0 && !quiet) {
-		    if (using_shm) {
-			rfbLog("created \"scanline\" shm polling image.\n");
-		    } else {
-			rfbLog("created \"scanline\" polling image.\n");
-		    }
-		}
+	}
+	if (use_snapfb) {
+		if (! fs_factor) {
+			rfbLog("warning: disabling -snapfb mode.\n");
+			use_snapfb = 0;
+		} else if (! shm_create(&snaprect_shm, &snaprect, dpy_x,
+		    dpy_y/fs_factor, "snaprect")) {
+			clean_up_exit(1);
+		} 
 	}
 
 	/*
@@ -11213,6 +11596,9 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 		 * small shrink. 
 		 */
 		shrink = 0;
+	}
+	if (!screen || !rfb_fb || !main_fb) {
+		return;
 	}
 
 	if (! screen->serverFormat.trueColour) {
@@ -11579,7 +11965,7 @@ static int copy_tiles(int tx, int ty, int nt) {
 	int size_x, size_y, width1, width2;
 	int off, len, n, dw, dx, t;
 	int w1, w2, dx1, dx2;	/* tmps for normal and short tiles */
-	int pixelsize = bpp >> 3;
+	int pixelsize = bpp/8;
 	int first_min, last_max;
 
 	char *src, *dst, *s_src, *s_dst, *m_src, *m_dst;
@@ -11629,18 +12015,9 @@ static int copy_tiles(int tx, int ty, int nt) {
 	X_LOCK;
 	XRANDR_SET_TRAP_RET(-1, "copy_tile-set");
 	/* read in the whole tile run at once: */
-	if (using_shm && size_x == tile_x * nt && size_y == tile_y) {
-		/* general case: */
-		XShmGetImage_wr(dpy, window, tile_row[nt], x, y, AllPlanes);
-	} else {
-		/*
-		 * No shm or near bottom/rhs edge case:
-		 * (but only if tile size does not divide screen size)
-		 */
-		XGetSubImage_wr(dpy, window, x, y, size_x, size_y, AllPlanes,
-		    ZPixmap, tile_row[nt], 0, 0);
-	}
+	copy_image(tile_row[nt], x, y, size_x, size_y);
 	XRANDR_CHK_TRAP_RET(-1, "copy_tile-chk");
+
 	X_UNLOCK;
 
 	if (blackouts && tile_blackout[n].cover == 1) {
@@ -11872,6 +12249,8 @@ static int copy_tiles(int tx, int ty, int nt) {
 
 		tile_region[n+s].left_diff  = left_diff[t];
 		tile_region[n+s].right_diff = right_diff[t];
+
+		tile_copied[n+s] = 1;
 	}
 
 	return(1);
@@ -12043,6 +12422,33 @@ static int copy_tiles_backward_pass(void) {
 	return diffs;
 }
 
+static int copy_tiles_additional_pass(void) {
+	int x, y, n;
+	int diffs = 0, ct;
+
+	for (y=0; y < ntiles_y; y++) {
+		for (x=0; x < ntiles_x; x++) {
+			n = x + y * ntiles_x;		/* number of this tile */
+
+			if (! tile_has_diff[n]) {
+				continue;
+			}
+			if (tile_copied[n]) {
+				continue;
+			}
+
+			ct = copy_tiles(x, y, 1);
+			if (ct < 0) return ct;	/* fatal */
+		}
+	}
+	for (n=0; n < ntiles; n++) {
+		if (tile_has_diff[n]) {
+			diffs++;
+		}
+	}
+	return diffs;
+}
+
 static int gap_try(int x, int y, int *run, int *saw, int along_x) {
 	int n, m, i, xt, yt, ct;
 
@@ -12204,7 +12610,7 @@ static void blackout_regions(void) {
  * are other issues...  use -fs 1.0 to disable.
  */
 int copy_screen(void) {
-	int pixelsize = bpp >> 3;
+	int pixelsize = bpp/8;
 	char *fbp;
 	int i, y, block_size;
 
@@ -12214,6 +12620,9 @@ int copy_screen(void) {
 
 	block_size = (dpy_x * (dpy_y/fs_factor) * pixelsize);
 
+	if (! main_fb) {
+		return 0;
+	}
 	fbp = main_fb;
 	y = 0;
 
@@ -12222,15 +12631,9 @@ int copy_screen(void) {
 	/* screen may be too big for 1 shm area, so broken into fs_factor */
 	for (i=0; i < fs_factor; i++) {
 		XRANDR_SET_TRAP_RET(-1, "copy_screen-set");
-		if (using_shm) {
-			XShmGetImage_wr(dpy, window, fullscreen, 0, y,
-			    AllPlanes);
-		} else {
-			XGetSubImage_wr(dpy, window, 0, y, fullscreen->width,
-			    fullscreen->height, AllPlanes, ZPixmap, fullscreen,
-			    0, 0);
-		}
+		copy_image(fullscreen, 0, y, 0, 0);
 		XRANDR_CHK_TRAP_RET(-1, "copy_screen-chk");
+
 		memcpy(fbp, fullscreen->data, (size_t) block_size);
 
 		y += dpy_y / fs_factor;
@@ -12244,6 +12647,50 @@ int copy_screen(void) {
 	}
 
 	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
+	return 0;
+}
+
+int copy_snap(void) {
+	int pixelsize = bpp/8;
+	char *fbp;
+	int i, y, block_size;
+	double dt = 0.0;
+	static int first = 1;
+
+	if (! fs_factor) {
+		return 0;
+	}
+
+	block_size = (dpy_x * (dpy_y/fs_factor) * pixelsize);
+
+	if (! snap_fb || ! snap || ! snaprect) {
+		return 0;
+	}
+	fbp = snap_fb;
+	y = 0;
+
+	dtime(&dt);
+	X_LOCK;
+
+	/* screen may be too big for 1 shm area, so broken into fs_factor */
+	for (i=0; i < fs_factor; i++) {
+		XRANDR_SET_TRAP_RET(-1, "copy_snap-set");
+		copy_image(snaprect, 0, y, 0, 0);
+		XRANDR_CHK_TRAP_RET(-1, "copy_snap-chk");
+
+		memcpy(fbp, snaprect->data, (size_t) block_size);
+
+		y += dpy_y / fs_factor;
+		fbp += block_size;
+	}
+
+	X_UNLOCK;
+	dt = dtime(&dt);
+	if (first) {
+		rfbLog("copy_snap: time for -snapfb snapshot: %.3f sec\n", dt);
+		first = 0;
+	}
+
 	return 0;
 }
 
@@ -12473,25 +12920,24 @@ void set_offset(void) {
  */
 static int scan_display(int ystart, int rescan) {
 	char *src, *dst;
-	int pixelsize = bpp >> 3;
+	int pixelsize = bpp/8;
 	int x, y, w, n;
 	int tile_count = 0;
 	int whole_line = 1, nodiffs = 0;
 
 	y = ystart;
 
+	if (! main_fb) {
+		rfbLog("scan_display: no main_fb!\n");
+		return 0;
+	}
+
 	while (y < dpy_y) {
 
 		/* grab the horizontal scanline from the display: */
 		X_LOCK;
 		XRANDR_SET_TRAP_RET(-1, "scan_display-set");
-		if (using_shm) {
-			XShmGetImage_wr(dpy, window, scanline, 0, y, AllPlanes);
-		} else {
-			XGetSubImage_wr(dpy, window, 0, y, scanline->width,
-			    scanline->height, AllPlanes, ZPixmap, scanline,
-			    0, 0);
-		}
+		copy_image(scanline, 0, y, 0, 0);
 		XRANDR_CHK_TRAP_RET(-1, "scan_display-chk");
 		X_UNLOCK;
 
@@ -12566,13 +13012,16 @@ static int scan_display(int ystart, int rescan) {
  * toplevel for the scanning, rescanning, and applying the heuristics.
  * returns number of changed tiles.
  */
-int scan_for_updates(void) {
+int scan_for_updates(int count_only) {
 	int i, tile_count, tile_diffs;
+	int old_copy_tile;
 	double frac1 = 0.1;   /* tweak parameter to try a 2nd scan_display() */
 	double frac2 = 0.35;  /* or 3rd */
+	double frac3 = 0.02;  /* do scan_display() again after copy_tiles() */
 	for (i=0; i < ntiles; i++) {
 		tile_has_diff[i] = 0;
 		tile_tried[i] = 0;
+		tile_copied[i] = 0;
 	}
 
 	/*
@@ -12580,17 +13029,19 @@ int scan_for_updates(void) {
 	 * tile_x = tile_y = NSCAN = 32!
 	 */
 
-	scan_count++;
-	scan_count %= NSCAN;
+	if (!count_only) {
+		scan_count++;
+		scan_count %= NSCAN;
 
-	if (scan_count % (NSCAN/4) == 0)  {
-		/* some periodic maintenance */
+		if (scan_count % (NSCAN/4) == 0)  {
+			/* some periodic maintenance */
 
-		if (subwin) {
-			set_offset();	/* follow the subwindow */
-		}
-		if (indexed_color) {	/* check for changed colormap */
-			set_colormap(0);
+			if (subwin) {
+				set_offset();	/* follow the subwindow */
+			}
+			if (indexed_color) {	/* check for changed colormap */
+				set_colormap(0);
+			}
 		}
 	}
 
@@ -12605,6 +13056,12 @@ int scan_for_updates(void) {
 	scan_in_progress = 1;
 	tile_count = scan_display(scanlines[scan_count], 0);
 	SCAN_FATAL(tile_count);
+
+	if (count_only) {
+		scan_in_progress = 0;
+		fb_copy_in_progress = 0;
+		return tile_count;
+	}
 
 	nap_set(tile_count);
 
@@ -12674,13 +13131,18 @@ int scan_for_updates(void) {
 		/*
 		 * Old way, copy I/O one tile at a time.
 		 */
-		tile_diffs = copy_all_tiles();
+		old_copy_tile = 1;
 	} else {
 		/* 
 		 * New way, does runs of horizontal tiles at once.
 		 * Note that below, for simplicity, the extra tile finding
 		 * (e.g. copy_tiles_backward_pass) is done the old way.
 		 */
+		old_copy_tile = 0;
+	}
+	if (old_copy_tile) {
+		tile_diffs = copy_all_tiles();
+	} else {
 		tile_diffs = copy_all_tile_runs();
 	}
 	SCAN_FATAL(tile_diffs);
@@ -12691,6 +13153,22 @@ int scan_for_updates(void) {
 	 */
 	tile_diffs = copy_tiles_backward_pass();
 	SCAN_FATAL(tile_diffs);
+
+	if (tile_diffs > frac3 * ntiles) {
+		/*
+		 * we spent a lot of time in those copy_tiles, run
+		 * another scan, maybe more of the screen changed.
+		 */
+		int cp = (NSCAN - scan_count + 13) % NSCAN;
+
+		scan_in_progress = 1;
+		tile_count = scan_display(scanlines[cp], 1);
+		SCAN_FATAL(tile_count);
+		scan_in_progress = 0;
+
+		tile_diffs = copy_tiles_additional_pass();
+		SCAN_FATAL(tile_diffs);
+	}
 
 	/* Given enough tile diffs, try the islands: */
 	if (grow_fill && tile_diffs > 4) {
@@ -12753,7 +13231,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, pid_t parent) {
 	char *wish = NULL, *orig_path, *full_path, *tpath, *p;
 	int try_max = 4, sleep = 300;
 	pid_t mypid = getpid();
-	FILE *pipe;
+	FILE *pipe, *tmpf;
 
 	if (*gui_code == '\0') {
 		rfbLog("gui not available in this program.\n");
@@ -12822,7 +13300,8 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, pid_t parent) {
 		char *wishes[] = {"wish", "wish8.3", "wish8.4"};
 		int nwishes = 3, i;
 
-		try = (char *)malloc(strlen(p) + 10);
+		/* strlen("wish8.4") is 7 */
+		try = (char *)malloc(strlen(p) + 1 + 7 + 1);
 		for (i=0; i<nwishes; i++) {
 			sprintf(try, "%s/%s", p, wishes[i]);
 			if (stat(try, &sbuf) == 0) {
@@ -12846,13 +13325,32 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, pid_t parent) {
 	set_env("X11VNC_CMDLINE", program_cmdline);
 
 	sprintf(cmd, "%s -", wish);
-	pipe = popen(cmd, "w");
-	if (! pipe) {
-		fprintf(stderr, "could not run: %s\n", cmd);
-		perror("popen");
+	tmpf = tmpfile();
+	if (tmpf == NULL) {
+		/* if no tmpfile, use a pipe */
+		pipe = popen(cmd, "w");
+		if (! pipe) {
+			fprintf(stderr, "could not run: %s\n", cmd);
+			perror("popen");
+		}
+		fprintf(pipe, "%s", gui_code);
+		pclose(pipe);
+	} else {
+		/*
+		 * we prefer a tmpfile since then this x11vnc process
+		 * will then be gone, otherwise the x11vnc program text
+		 * will still be in use.
+		 */
+		int n = fileno(tmpf);
+		fprintf(tmpf, "%s", gui_code);
+		fflush(tmpf);
+		rewind(tmpf);
+		dup2(n, 0);
+		close(n);
+		execlp(wish, wish, "-", (char *) NULL); 
+		fprintf(stderr, "could not exec wish: %s -\n", wish);
+		perror("execlp");
 	}
-	fprintf(pipe, "%s", gui_code);
-	pclose(pipe);
 	exit(0);
 }
 
@@ -12990,433 +13488,477 @@ static int defer_update_nofb = 6;	/* defer a shorter time under -nofb */
 
 static void check_user_input2(double dt) {
 
+	int eaten = 0, miss = 0, max_eat = 50;
+	int g, g_in;
+	double spin = 0.0, tm = 0.0;
+	double quick_spin_fac  = 0.40;
+	double grind_spin_time = 0.175;
 
-	if (got_pointer_input) {
-		int eaten = 0, miss = 0, max_eat = 50;
-		int g, g_in;
-		double spin = 0.0, tm = 0.0;
-		double quick_spin_fac  = 0.40;
-		double grind_spin_time = 0.175;
 
-		dtime(&tm);
-		g = g_in = got_pointer_input;
+
+	dtime(&tm);
+	g = g_in = got_pointer_input;
+	if (!got_pointer_input) {
+		return;
+	}
+	/*
+	 * Try for some "quick" pointer input processing.
+	 *
+	 * About as fast as we can, we try to process user input calling
+	 * rfbProcessEvents or rfbCheckFds.  We do this for a time on
+	 * order of the last scan_for_updates() time, dt, but if we stop
+	 * getting user input we break out.  We will also break out if
+	 * we have processed max_eat inputs.
+	 *
+	 * Note that rfbCheckFds() does not send any framebuffer updates,
+	 * so is more what we want here, although it is likely they have
+	 * all be sent already.
+	 */
+	while (1) {
+		if (show_multiple_cursors) {
+			rfbPE(screen, 1000);
+		} else {
+			rfbCFD(screen, 1000);
+		}
+		XFlush(dpy);
+
+		spin += dtime(&tm);
+
+		if (spin > quick_spin_fac * dt) {
+			/* get out if spin time comparable to last scan time */
+			break;
+		}
+		if (got_pointer_input > g) {
+			g = got_pointer_input;
+			if (eaten++ < max_eat) {
+				continue;
+			}
+		} else {
+			miss++;
+		}
+		if (miss > 1) {	/* 1 means out on 2nd miss */
+			break;
+		}
+	}
+
+
+	/*
+	 * Probably grinding with a lot of fb I/O if dt is this large.
+	 * (need to do this more elegantly)
+	 *
+	 * Current idea is to spin our wheels here *not* processing any
+	 * fb I/O, but still processing the user input.  This user input
+	 * goes to the X display and changes it, but we don't poll it
+	 * while we "rest" here for a time on order of dt, the previous
+	 * scan_for_updates() time.  We also break out if we miss enough
+	 * user input.
+	 */
+	if (dt > grind_spin_time) {
+		int i, ms, split = 30;
+		double shim;
 
 		/*
-		 * Try for some "quick" pointer input processing.
-		 *
-		 * About as fast as we can, we try to process user input
-		 * calling rfbProcessEvents or rfbCheckFds.  We do this
-		 * for a time on order of the last scan_for_updates() time,
-		 * dt, but if we stop getting user input we break out.
-		 * We will also break out if we have processed max_eat
-		 * inputs.
-		 *
-		 * Note that rfbCheckFds() does not send any framebuffer
-		 * updates, so is more what we want here, although it is
-		 * likely they have all be sent already.
+		 * Break up our pause into 'split' steps.  We get at
+		 * most one input per step.
 		 */
-		while (1) {
+		shim = 0.75 * dt / split;
+
+		ms = (int) (1000 * shim);
+
+		/* cutoff how long the pause can be */
+		if (split * ms > 300) {
+			ms = 300 / split;
+		}
+
+		spin = 0.0;
+		tm = 0.0;
+		dtime(&tm);
+
+		g = got_pointer_input;
+		miss = 0;
+		for (i=0; i<split; i++) {
+			usleep(ms * 1000);
 			if (show_multiple_cursors) {
 				rfbPE(screen, 1000);
 			} else {
 				rfbCFD(screen, 1000);
 			}
-			XFlush(dpy);
-
 			spin += dtime(&tm);
-
-			if (spin > quick_spin_fac * dt) {
-				/* get out if spin time comparable to last scan time */
-				break;
-			}
 			if (got_pointer_input > g) {
-				g = got_pointer_input;
-				if (eaten++ < max_eat) {
-					continue;
-				}
+				XFlush(dpy);
+				miss = 0;
 			} else {
 				miss++;
 			}
-			if (miss > 1) {	/* 1 means out on 2nd miss */
-				break;
-			}
-		}
-
-
-		/*
-		 * Probably grinding with a lot of fb I/O if dt is
-		 * this large.  (need to do this more elegantly) 
-		 *
-		 * Current idea is to spin our wheels here *not* processing
-		 * any fb I/O, but still processing the user input.
-		 * This user input goes to the X display and changes it,
-		 * but we don't poll it while we "rest" here for a time
-		 * on order of dt, the previous scan_for_updates() time.
-		 * We also break out if we miss enough user input.
-		 */
-		if (dt > grind_spin_time) {
-			int i, ms, split = 30;
-			double shim;
-
-			/*
-			 * Break up our pause into 'split' steps.
-			 * We get at most one input per step.
-			 */
-			shim = 0.75 * dt / split;
-
-			ms = (int) (1000 * shim);
-
-			/* cutoff how long the pause can be */
-			if (split * ms > 300) {
-				ms = 300 / split;
-			}
-
-			spin = 0.0;
-			tm = 0.0;
-			dtime(&tm);
-
 			g = got_pointer_input;
-			miss = 0;
-			for (i=0; i<split; i++) {
-				usleep(ms * 1000);
-				if (show_multiple_cursors) {
-					rfbPE(screen, 1000);
-				} else {
-					rfbCFD(screen, 1000);
-				}
-				spin += dtime(&tm);
-				if (got_pointer_input > g) {
-					XFlush(dpy);
-					miss = 0;
-				} else {
-					miss++;
-				}
-				g = got_pointer_input;
-				if (miss > 2) {
-					break;
-				}
-				if (1000 * spin > ms * split)  {
-					break;
-				}
+			if (miss > 2) {
+				break;
+			}
+			if (1000 * spin > ms * split)  {
+				break;
 			}
 		}
 	}
 }
 
-static void check_user_input3(double dt, int tile_diffs) {
+static void check_user_input3(double dt, double dtr, int tile_diffs) {
 
-	if (got_pointer_input) {
-		int spun_out, missed_out, allowed_misses, g, g_in;
-		double spin, spin_max, tm, to, dtm, rpe_last;
-		static int rfb_wait_ms = 2;
-		static double grind_spin_time = 0.30, dt_cut = 0.075;
-		static double quick_spin_fac = 0.65, spin_max_fac = 2.0;
-		static double rpe_wait = 0.15;
-		int grinding, gcnt, ms, split = 200;
-		static int first = 1;
-		if (first) {
-			char *p = getenv("SPIN");
-			if (p) {
-				sscanf(p, "%lf,%lf,%lf", &grind_spin_time, &dt_cut, &quick_spin_fac);
-			}
-			first = 0;
-		}
-
-
-
-		/*
-		 * Try for some "quick" pointer input processing.
-		 *
-		 * About as fast as we can, we try to process user input
-		 * calling rfbProcessEvents or rfbCheckFds.  We do this
-		 * for a time on order of the last scan_for_updates() time,
-		 * dt, but if we stop getting user input we break out.
-		 *
-		 * Note that rfbCheckFds() does not send any framebuffer
-		 * updates, so is more what we want here, although it is
-		 * likely they have all be sent already.
-		 *
-		 * After our first spin_out or missed_out, we decide if we
-		 * should continue, if we do so we say we are "grinding"
-		 */
-
-		if (dt < dt_cut) {
-			dt = dt_cut;	/* this is to try to avoid early exit */
-		}
-		/* max spin time in 1st pass, comparable to last dt */
-		spin_max = quick_spin_fac * dt;
-
-		grinding = 0;		/* 1st pass is "not grinding" */
-		spin = 0.0;		/* amount of time spinning */
-		spun_out = 0;		/* whether we spun out of time */
-		missed_out = 0;		/* whether we received no ptr input */
-		allowed_misses = 3;	/* number of ptr inputs we can miss */
-		gcnt = 0;
-
-		tm = 0.0;		/* timer variable */
-		dtime(&tm);
-		rpe_last = to = tm;	/* last time we did rfbPE() */
-		g = g_in = got_pointer_input;
-
-
-		while (1) {
-			int got_input = 0;
-
-			gcnt++;
-			if (grinding) {
-				if (gcnt >= split) {
-					break;
-				}
-				usleep(ms * 1000);
-			}
-
-			if (button_mask) {
-				drag_in_progress = 1;
-			}
-
-			if (show_multiple_cursors && tm > rpe_last + rpe_wait) {
-				rfbPE(screen, rfb_wait_ms * 1000);
-				rpe_last = tm;
-			} else {
-				rfbCFD(screen, rfb_wait_ms * 1000);
-			}
-
-			dtm = dtime(&tm);
-			spin += dtm;
-
-			if (spin > spin_max) {
-				/* get out if spin time over limit */
-				spun_out = 1;
-			} else if (got_pointer_input > g) {
-				/* received some input, flush to display. */
-				got_input = 1;
-				g = got_pointer_input;
-				XFlush(dpy);
-			} else if (--allowed_misses <= 0) {
-				/* too many misses */
-				missed_out = 1;
-			} else {
-				/* these are misses */
-				int wms = 0;
-				if (! grinding && gcnt == 1 && button_mask) {
-					/*
-					 * missed our first input, wait
-					 * for a defer time. (e.g. on
-					 * slow link) hopefully client
-					 * will batch them.
-					 */
-					wms = 1000 * (0.5 * (spin_max - spin));
-				} else if (button_mask) {
-					wms = 10;
-				} else {
-				}
-				if (wms) {
-					usleep(wms * 1000);
-				}
-			}
-			if (spun_out && ! grinding) {
-				/* set parameters for grinding mode. */
-
-				grinding = 1;
-
-				if (spin > grind_spin_time || button_mask) {
-					spin_max = spin +
-					    grind_spin_time * spin_max_fac;
-				} else {
-					spin_max = spin + dt * spin_max_fac;
-				}
-				ms = (int) (1000 * ((spin_max - spin)/split));
-				if (ms < 1) {
-					ms = 1;
-				}
-
-				/* reset for second pass */
-				spun_out = 0;
-				missed_out = 0;
-				allowed_misses = 3;
-				g = got_pointer_input;
-				gcnt = 0;
-			} else if (spun_out && grinding) {
-				/* done in 2nd pass */
-				break;
-			} else if (missed_out) {
-				/* done in either pass */
-				break;
-			}
-		}
-	}
-	drag_in_progress = 0;
-}
-
-/* quick-n-dirty copy of check_user_input3, merge later... */
-
-static void check_user_input4(double dt, int tile_diffs) {
-
-	int spun_out, missed_out, allowed_misses, g, g_in;
-	double spin, spin_max, tm, to, dtm, rpe_last;
-	static int rfb_wait_ms = 2;
-	static double grind_spin_time = 0.30, dt_cut = 0.075;
-	static double quick_spin_fac = 0.65, spin_max_fac = 2.0;
-	static double rpe_wait = 0.15;
-	int grinding, gcnt, ms, split = 200;
+	int allowed_misses, miss_tweak, i, g, g_in;
+	int last_was_miss, consecutive_misses;
+	double spin, spin_max, tm, to, dtm;
+	int rfb_wait_ms = 2;
+	static double dt_cut = 0.075;
+	int gcnt, ginput;
 	static int first = 1;
 
-	int Btile = tile_x * tile_y * bpp/8; 
-	double Ttile;
-	double screen_rate = 5000000.;    /* 5 MB/sec */
-	double client_rate = 80 * 100000.; /* 20 KB/sec @ 80X compression */
-	static double Tfac = 1.0;
-	static double dt_min = -1.0, dt_max = -1.0;
 
 	if (first) {
 		char *p = getenv("SPIN");
 		if (p) {
-			sscanf(p, "%lf,%lf,%lf,%lf", &grind_spin_time,
-			    &dt_cut, &quick_spin_fac, &Tfac);
+			double junk;
+			sscanf(p, "%lf,%lf", &dt_cut, &junk);
 		}
 		first = 0;
 	}
 
-	if (dt_min < 0 || dt < dt_min) {
-		dt_min = dt;
-	}
-	if (dt_max < 0 || dt > dt_max) {
-		dt_max = dt;
-	}
-
-	/*
-	 * when we first enter we require some pointer input
-	 */
 	if (!got_pointer_input) {
-		drag_in_progress = 0;
 		return;
 	}
 
-	Ttile = Btile * (1.0/screen_rate + 1.0/client_rate);
-	Ttile = Tfac * Ttile;
 
 	if (dt < dt_cut) {
 		dt = dt_cut;	/* this is to try to avoid early exit */
 	}
+	spin_max = 0.5;
 
-	/* max spin time in 1st pass, comparable to last dt */
-	spin_max = quick_spin_fac * dt;
-
-	grinding = 0;		/* 1st pass is "not grinding" */
 	spin = 0.0;		/* amount of time spinning */
-	spun_out = 0;		/* whether we spun out of time */
-	missed_out = 0;		/* whether we received no ptr input */
-	allowed_misses = 3;	/* number of ptr inputs we can miss */
+	allowed_misses = 10;	/* number of ptr inputs we can miss */
+	miss_tweak = 8;
+	last_was_miss = 0;
+	consecutive_misses = 1;
 	gcnt = 0;
+	ginput = 0;
 
 	tm = 0.0;		/* timer variable */
 	dtime(&tm);
-	rpe_last = to = tm;	/* last time we did rfbPE() */
-	g = g_in = got_pointer_input;
+	to = tm;	/* last time we did rfbPE() */
 
+	g = g_in = got_pointer_input;
 
 	while (1) {
 		int got_input = 0;
 
 		gcnt++;
-		if (grinding) {
-			if (gcnt >= split) {
-				break;
-			}
-			usleep(ms * 1000);
-		}
 
 		if (button_mask) {
 			drag_in_progress = 1;
 		}
 
-		if (show_multiple_cursors && tm > rpe_last + rpe_wait) {
-			rfbPE(screen, rfb_wait_ms * 1000);
-			rpe_last = tm;
-		} else {
-			rfbCFD(screen, rfb_wait_ms * 1000);
-		}
+		rfbCFD(screen, rfb_wait_ms * 1000);
 
 		dtm = dtime(&tm);
 		spin += dtm;
 
+		if (got_pointer_input == g) {
+			if (last_was_miss) {
+				consecutive_misses++;
+			}
+			last_was_miss = 1;
+		} else {
+			ginput++;
+			if (ginput % miss_tweak == 0) {
+				allowed_misses++;
+			}
+			consecutive_misses = 1;
+			last_was_miss = 0;
+		}
+
 		if (spin > spin_max) {
 			/* get out if spin time over limit */
-			spun_out = 1;
-
-		} else if (tile_diffs > 200 && spin > Ttile * tile_diffs) {
-			/* XXX not finished. */
-			/* we think we can push the frame */
 			break;
 
 		} else if (got_pointer_input > g) {
 			/* received some input, flush to display. */
 			got_input = 1;
 			g = got_pointer_input;
+			X_LOCK;
 			XFlush(dpy);
-
+			X_UNLOCK;
 		} else if (--allowed_misses <= 0) {
 			/* too many misses */
-			missed_out = 1;
-
+			break;
+		} else if (consecutive_misses >=3) {
+			/* too many misses */
+			break;
 		} else {
 			/* these are misses */
 			int wms = 0;
-			if (! grinding && gcnt == 1 && button_mask) {
+			if (gcnt == 1 && button_mask) {
 				/*
-				 * missed our first input, wait for
-				 * a defer time. (e.g. on slow link)
-				 * hopefully client will batch them.
+				 * missed our first input, wait
+				 * for a defer time. (e.g. on
+				 * slow link) hopefully client
+				 * will batch them.
 				 */
-				wms = 1000 * (0.5 * (spin_max - spin));
-
+				wms = 50;
 			} else if (button_mask) {
 				wms = 10;
+			} else {
 			}
 			if (wms) {
 				usleep(wms * 1000);
 			}
 		}
-		if (spun_out && ! grinding) {
-			/* set parameters for grinding mode. */
+	}
 
-			grinding = 1;
+	if (ginput >= 2) {
+		/* try for a couple more quick ones */
+		for (i=0; i<2; i++) {
+			rfbCFD(screen, rfb_wait_ms * 1000);
+		}
+	}
 
-			if (spin > grind_spin_time || button_mask) {
-				spin_max = spin +
-				    grind_spin_time * spin_max_fac;
-			} else {
-				spin_max = spin + dt * spin_max_fac;
+	drag_in_progress = 0;
+}
+
+int fb_update_sent(int *count) {
+	static int last_count = 0;
+	int sent = 0, rc = 0;
+	rfbClientIteratorPtr i;
+	rfbClientPtr cl;
+
+	i = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(i)) ) {
+		sent += cl->framebufferUpdateMessagesSent;
+	}
+	rfbReleaseClientIterator(i);
+	if (sent != last_count) {
+		rc = 1;
+	}
+	if (count != NULL) {
+		*count = sent;
+	}
+	last_count = sent;
+	return rc; 
+}
+
+static void check_user_input4(double dt, double dtr, int tile_diffs) {
+
+	int g, g_in, i, ginput, gcnt, tmp;
+	int last_was_miss, consecutive_misses;
+	int min_frame_size = 10;	/* 10 tiles */
+	double spin, tm, to, tc, dtm, rpe_last;
+	int rfb_wait_ms = 2;
+	static double dt_cut = 0.050;
+	static int first = 1;
+
+	int Btile = tile_x * tile_y * bpp/8; 	/* Bytes per tile */
+	double Ttile, dt_use;
+	double screen_rate = 6000000.;    /* 5 MB/sec */
+	double vnccpu_rate = 80 * 100000.; /* 20 KB/sec @ 80X compression */
+	double net_rate = 50000.;
+	static double Tfac_r = 1.0, Tfac_v = 1.0, Tfac_n = 1.0, Tdelay = 0.001;
+	static double dt_min = -1.0, dt_max = -1.0;
+	double dt_min_fallback = 0.050;
+	static int ssec = 0, total_calls = 0;
+	static int push_frame = 0, update_count = 0;
+
+	if (first) {
+		char *p = getenv("SPIN");
+		if (p) {
+			sscanf(p, "%lf,%lf,%lf,%lf", &dt_cut, &Tfac_r, &Tfac_v, &Tfac_n);
+		}
+		first = 0;
+		ssec = time(0);
+	}
+
+	total_calls++;
+
+	if (dt_min < 0.0 || dt < dt_min) {
+		if (dt > 0.0) {
+			dt_min = dt;
+		}
+	}
+	if (dt_min < 0.0) {
+		/* sensible value for the very 1st call if dt = 0.0 */
+		dt_min = dt_min_fallback;
+	}
+	if (dt_max < 0.0 || dt > dt_max) {
+		dt_max = dt;
+	}
+
+	if (total_calls > 30 && dt_min > 0.0) {
+		static int first = 1;
+		/*
+		 * dt_min will soon be the quickest time to do
+		 * one scan_for_updates with no tiles copied.
+		 * use this (instead of copy_tiles) to estimate
+		 * screen read rate.
+		 */
+		screen_rate = (main_bytes_per_line * ntiles_y) / dt_min;
+		if (first) {
+			rfbLog("measured screen read rate: %.2f Bytes/sec\n",
+			    screen_rate);
+		}
+		first = 0;
+	}
+
+	tm = 0.0;		/* timer variable */
+	dtime(&tm);
+
+	if (dt < dt_cut) {
+		dt_use = dt_cut;
+	} else {
+		dt_use = dt;
+	}
+
+	if (push_frame) {
+		int cnt, iter = 0;
+		double tp = 0.0, push_spin = 0.0;
+		dtime(&tp);
+		while (push_spin < dt_use * 0.5) {
+			fb_update_sent(&cnt);
+			if (cnt != update_count) {
+				break;
 			}
-			ms = (int) (1000 * ((spin_max - spin)/split));
-			if (ms < 1) {
-				ms = 1;
-			}
+			/* damn, they didn't push our frame! */
+			iter++;
+			rfbPE(screen, rfb_wait_ms * 1000);
+			
+			push_spin += dtime(&tp);
+		}
+		if (iter) {
+			X_LOCK;
+			XFlush(dpy);
+			X_UNLOCK;
+		}
+		push_frame = 0;
+		update_count = 0;
+	}
 
-			/* reset for second pass */
-			spun_out = 0;
-			missed_out = 0;
-			allowed_misses = 3;
+	/*
+	 * when we first enter we require some pointer input
+	 */
+	if (!got_pointer_input) {
+		return;
+	}
+
+	vnccpu_rate = get_raw_rate();
+
+	if ((tmp = get_read_rate()) != 0) {
+		screen_rate = (double) tmp;
+	}
+	if ((tmp = get_net_rate()) != 0) {
+		net_rate = (double) tmp;
+	}
+	net_rate = (vnccpu_rate/get_cmp_rate()) * net_rate;
+
+	if ((tmp = get_net_latency()) != 0) {
+		Tdelay = 0.5 * ((double) tmp)/1000.;
+	}
+
+	Ttile = Btile * (Tfac_r/screen_rate + Tfac_v/vnccpu_rate + Tfac_n/net_rate);
+
+	spin = 0.0;		/* amount of time spinning */
+	last_was_miss = 0;
+	consecutive_misses = 1;
+	gcnt = 0;
+	ginput = 0;
+
+	rpe_last = to = tc = tm;	/* last time we did rfbPE() */
+	g = g_in = got_pointer_input;
+
+	tile_diffs = 0;	/* reset our knowlegde of tile_diffs to zero */
+
+	while (1) {
+		int got_input = 0;
+
+		gcnt++;
+
+		if (button_mask) {
+			/* this varible is used by our pointer handler */
+			drag_in_progress = 1;
+		}
+
+		/* turn libvncserver crank to process events: */
+		rfbCFD(screen, rfb_wait_ms * 1000);
+
+		dtm = dtime(&tm);
+		spin += dtm;
+
+		if ( (gcnt == 1 && got_pointer_input > g) || tm-tc > 2*dt_min) {
+			tile_diffs = scan_for_updates(1);
+			tc = tm;
+		}
+
+		if (got_pointer_input == g) {
+			if (last_was_miss) {
+				consecutive_misses++;
+			}
+			last_was_miss = 1;
+		} else {
+			ginput++;
+			consecutive_misses = 1;
+			last_was_miss = 0;
+		}
+
+		if (tile_diffs > min_frame_size && spin > Ttile * tile_diffs + Tdelay) {
+			/* we think we can push the frame */
+			push_frame = 1;
+			fb_update_sent(&update_count);
+			break;
+
+		} else if (got_pointer_input > g) {
+			/* received some input, flush it to display. */
+			got_input = 1;
 			g = got_pointer_input;
-			gcnt = 0;
+			X_LOCK;
+			XFlush(dpy);
+			X_UNLOCK;
 
-		} else if (spun_out && grinding) {
-			/* done in 2nd pass */
+		} else if (consecutive_misses >= 2) {
+			/* too many misses in a row */
 			break;
-		} else if (missed_out) {
-			/* done in either pass */
-			break;
+
+		} else {
+			/* these are pointer input misses */
+			int wms;
+			if (gcnt == 1 && button_mask) {
+				/*
+				 * missed our first input, wait for
+				 * a defer time. (e.g. on slow link)
+				 * hopefully client will batch many
+				 * of them for the next read.
+				 */
+				wms = 50;
+
+			} else if (button_mask) {
+				wms = 10;
+			} else {
+				wms = 0;
+			}
+			if (wms) {
+				usleep(wms * 1000);
+			}
+		}
+	}
+	if (ginput >= 2) {
+		/* try for a couple more quick ones */
+		for (i=0; i<2; i++) {
+			rfbCFD(screen, rfb_wait_ms * 1000);
 		}
 	}
 	drag_in_progress = 0;
 }
 
-static int check_user_input(double dt, int tile_diffs, int *cnt) {
+static int check_user_input(double dt, double dtr, int tile_diffs, int *cnt) {
 	if (pointer_mode == 1) {
 		if ((got_user_input || ui_skip < 0) && *cnt % ui_skip != 0) {
 			/* every ui_skip-th drops thru to scan */
 			*cnt++;
+			X_LOCK;
 			XFlush(dpy);
+			X_UNLOCK;
 			return 1;	/* short circuit watch_loop */
 		} else {
 			return 0;
@@ -13424,19 +13966,24 @@ static int check_user_input(double dt, int tile_diffs, int *cnt) {
 	}
 	if (pointer_mode >= 2 && pointer_mode <= 4) {
 		if (got_keyboard_input) {
+			/*
+			 * for these modes, short circuit watch_loop on
+			 * *keyboard* input.
+			 */
 			if (*cnt % ui_skip != 0) {
 				*cnt++;
-				return 1;	/* short circuit watch_loop */
+				return 1;
 			}
 		}
-		/* otherwise continue with pointer input */
+		/* otherwise continue below with pointer input method */
 	}
+
 	if (pointer_mode == 2) {
 		check_user_input2(dt);
 	} else if (pointer_mode == 3) {
-		check_user_input3(dt, tile_diffs);
+		check_user_input3(dt, dtr, tile_diffs);
 	} else if (pointer_mode == 4) {
-		check_user_input4(dt, tile_diffs);
+		check_user_input4(dt, dtr, tile_diffs);
 	}
 	return 0;
 }
@@ -13448,7 +13995,7 @@ static int check_user_input(double dt, int tile_diffs, int *cnt) {
 double dtime(double *t_old) {
 	/* 
 	 * usage: call with 0.0 to initialize, subsequent calls give
-	 * the time differences.
+	 * the time difference since last call.
 	 */
 	double t_now, dt;
 	struct timeval now;
@@ -13464,17 +14011,273 @@ double dtime(double *t_old) {
 	return(dt);
 }
 
+void measure_display_hook(rfbClientPtr cl) {
+	ClientData *cd = (ClientData *) cl->clientData;
+	cd->timer = 0.0;
+	dtime(&cd->timer);
+}
+
+void measure_send_rates_init(void) {
+	int i, bs, rbs;
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+
+	screen->displayHook = measure_display_hook;
+
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		ClientData *cd = (ClientData *) cl->clientData;
+		bs = 0;
+		for (i=0; i<MAX_ENCODINGS; i++) {
+			bs += cl->bytesSent[i];
+		}
+		rbs = cl->rawBytesEquivalent;
+		
+		cd->set_cmp_bytes = bs;
+		cd->set_raw_bytes = rbs;
+		cd->timer = -1.0;
+	}
+	rfbReleaseClientIterator(iter);
+}
+
+int get_rate(int which) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int i, samples = RATE_SAMPLES;
+	double dslowest = -1.0, dsum;
+	
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		ClientData *cd = (ClientData *) cl->clientData;
+
+		dsum = 0.0;
+		for (i=0; i<samples; i++) {
+			if (which == 0) {
+				dsum += cd->cmp_samp[i];
+			} else {
+				dsum += cd->raw_samp[i];
+			}
+		}
+		dsum = dsum / samples;
+		if (dsum > dslowest) {
+			dslowest = dsum;
+		}
+		
+	}
+	rfbReleaseClientIterator(iter);
+
+	if (dslowest < 0.0) {
+		if (which == 0) {
+			dslowest = 5000.0;
+		} else {
+			dslowest = 50000.0;
+		}
+	}
+	return (int) dslowest;
+}
+
+int get_cmp_rate(void) {
+	return get_rate(0);
+}
+
+int get_raw_rate(void) {
+	return get_rate(1);
+}
+
+void initialize_speeds(void) {
+	char *s, *p;
+	int i;
+
+	speeds_read_rate = 0;
+	speeds_net_rate = 0;
+	speeds_net_latency = 0;
+	if (! speeds_str || *speeds_str == '\0') {
+		return;
+	}
+
+	if (!strcmp(speeds_str, "modem")) {
+		s = strdup("6,4,200");
+	} else if (!strcmp(speeds_str, "dsl")) {
+		s = strdup("6,100,50");
+	} else if (!strcmp(speeds_str, "modem")) {
+		s = strdup("6,5000,1");
+	} else {
+		s = strdup(speeds_str);
+	}
+
+	p = strtok(s, ",");
+	i = 0;
+	while (p) {
+		double val;
+		if (*p != '\0') {
+			val = atof(p);
+			if (i==0) {
+				speeds_read_rate = (int) 1000000 * val;
+			} else if (i==1) {
+				speeds_net_rate = (int) 1000 * val;
+			} else if (i==2) {
+				speeds_net_latency = (int) val;
+			}
+		}
+		i++;
+		p = strtok(NULL, ",");
+	}
+	free(s);
+}
+
+int get_read_rate(void) {
+	if (speeds_read_rate) {
+		return speeds_read_rate;
+	}
+	return 0;
+}
+
+int get_net_rate(void) {
+	if (speeds_net_rate) {
+		return speeds_net_rate;
+	}
+	return 0;
+}
+
+int get_net_latency(void) {
+	if (speeds_net_latency) {
+		return speeds_net_latency;
+	}
+	return 0;
+}
+
+void measure_send_rates(int init) {
+	int i, j, nclient = 0;
+	int min_width = 200;
+	double dt, cmp_rate, raw_rate;
+	rfbClientPtr id[100]; 
+	double dts[100], dts_sorted[100], dtmp;
+	int sorted[100], did[100], best;
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+
+	if (! measure_speeds) {
+		return;
+	}
+	if (init) {
+		measure_send_rates_init();
+		return;
+	}
+
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		double tmp2;
+		ClientData *cd = (ClientData *) cl->clientData;
+		tmp2 = 0.0;
+		dtime(&tmp2);
+if (init) {
+	continue;
+}
+		if (cd->timer <= 0.0) {
+			continue;
+		}
+		dt = dtime(&cd->timer);
+		cd->timer = dt;
+		if (nclient < 100) {
+			id[nclient] = cl;
+			dts[nclient] = dt;
+			nclient++;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+if (init) {
+	return;
+}
+
+	for (i=0; i<nclient; i++) {
+		did[i] = 0;
+	}
+	for (i=0; i<nclient; i++) {
+		dtmp = -1.0;
+		best = -1;
+		for (j=0; j<nclient; j++) {
+			if (did[j]) {
+				continue;
+			}
+			if (dts[j] > dtmp) {
+				best = j;
+				dtmp = dts[j];
+			}
+		} 
+		did[best] = 1;
+		sorted[i] = best;
+		dts_sorted[i] = dts[best];
+	}
+	
+
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		int db, dbr, cbs, rbs;
+		ClientData *cd = (ClientData *) cl->clientData;
+
+		dt = cd->timer;
+		if (dt <= 0.0) {
+			continue;
+		}
+		if (nclient > 1) {
+			for (i=0; i<nclient; i++) {
+				if (cl != id[i]) {
+					continue;
+				}
+				for (j=0; j<nclient; j++) {
+					if (sorted[j] == i) {
+						if (j < nclient - 1) {
+							dt -= dts_sorted[j+1];
+						}
+					}
+				}
+				break;
+			}
+		}
+		if (dt <= 0.0) {
+			continue;
+		}
+
+		cbs = 0;
+		for (i=0; i<MAX_ENCODINGS; i++) {
+			cbs += cl->bytesSent[i];
+		}
+		rbs = cl->rawBytesEquivalent;
+
+		db  = cbs - cd->set_cmp_bytes;
+		dbr = rbs - cd->set_raw_bytes;
+		cmp_rate = db/dt;
+		raw_rate = dbr/dt;
+		if (dbr > min_width * min_width * bpp/8) {
+			cd->sample++;
+			if (cd->sample >= RATE_SAMPLES) {
+				cd->sample = 0;
+			}
+			i = cd->sample;
+			cd->cmp_samp[i] = cmp_rate;
+			cd->raw_samp[i] = raw_rate;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+}
+
 /*
  * utility wrapper to call rfbProcessEvents
  * checks that we are not in threaded mode.
  */
 void rfbPE(rfbScreenInfoPtr scr, long usec) {
+	if (! scr) {
+		return;
+	}
 	if (! use_threads) {
 		rfbProcessEvents(scr, usec);
 	}
 }
 
 void rfbCFD(rfbScreenInfoPtr scr, long usec) {
+	if (! scr) {
+		return;
+	}
 	if (! use_threads) {
 		rfbCheckFds(scr, usec);
 	}
@@ -13485,7 +14288,7 @@ void rfbCFD(rfbScreenInfoPtr scr, long usec) {
  */
 static void watch_loop(void) {
 	int cnt = 0, tile_diffs = 0;
-	double dt = 0.0;
+	double dt = 0.0, dtr = 0.0;
 
 	if (use_threads) {
 		rfbRunEventLoop(screen, -1, TRUE);
@@ -13498,12 +14301,18 @@ static void watch_loop(void) {
 		got_keyboard_input = 0;
 
 		if (! use_threads) {
+			double tm = 0.0;
+			dtime(&tm);
 			rfbPE(screen, -1);
+			dtr = dtime(&tm);
+			fb_update_sent(NULL);
+
 			if (! cursor_shape_updates) {
 				/* undo any cursor shape requests */
 				disable_cursor_shape_updates(screen);
 			}
-			if (check_user_input(dt, tile_diffs, &cnt)) {
+			if (screen && screen->clientHead && 
+			    check_user_input(dt, dtr, tile_diffs, &cnt)) {
 				/* true means loop back for more input */
 				continue;
 			}
@@ -13522,7 +14331,8 @@ static void watch_loop(void) {
 		check_connect_inputs();		
 		check_padded_fb();		
 
-		if (! screen->clientHead) {	/* waiting for a client */
+		if (! screen || ! screen->clientHead) {
+			/* waiting for a client */
 			usleep(200 * 1000);
 			continue;
 		}
@@ -13542,7 +14352,8 @@ static void watch_loop(void) {
 			 */
 			check_bell_event();
 		}
-		if (! show_dragging && button_mask) {
+
+		if (button_mask && (!show_dragging || pointer_mode == 0)) {
 			/*
 			 * if any button is pressed do not update rfb
 			 * screen, but do flush the X11 display.
@@ -13556,7 +14367,15 @@ static void watch_loop(void) {
 			dtime(&tm);
 
 			rfbUndrawCursor(screen);
-			tile_diffs = scan_for_updates();
+			if (use_snapfb) {
+				int t, tries = 5;
+				copy_snap();
+				for (t =0; t < tries; t++) {
+					tile_diffs = scan_for_updates(0);
+				}
+			} else {
+				tile_diffs = scan_for_updates(0);
+			}
 			dt = dtime(&tm);
 			check_x11_pointer();
 		}
@@ -13618,7 +14437,7 @@ static void print_help(void) {
 "                       support MIT-SHM.  Equivalent to setting the DISPLAY\n"
 "                       environment variable to \"disp\".\n"
 "-auth file             Set the X authority file to be \"file\", equivalent to\n"
-"                       setting the XAUTHORITY environment varirable to \"file\"\n"
+"                       setting the XAUTHORITY environment variable to \"file\"\n"
 "                       before startup.  See Xsecurity(7), xauth(1) man pages.\n"
 "\n"
 "-id windowid           Show the window corresponding to \"windowid\" not\n"
@@ -13864,7 +14683,8 @@ static void print_help(void) {
 "                       -remote id:windowid, rescaling, etc.\n"
 "\n"
 "-o logfile             Write stderr messages to file \"logfile\" instead of\n"
-"                       to the terminal.  Same as \"-logfile file\".\n"
+"                       to the terminal.  Same as \"-logfile file\".  To append\n"
+"                       to the file use \"-oa file\" or \"-logappend file\".\n"
 "-rc filename           Use \"filename\" instead of $HOME/.x11vncrc for rc file.\n"
 "-norc                  Do not process any .x11vncrc file for options.\n"
 "-h, -help              Print this help text.\n"
@@ -14045,6 +14865,14 @@ static void print_help(void) {
 "                       black background).  Specify this option to remove the\n"
 "                       alpha factor. (useful for light colored semi-transparent\n"
 "                       cursors).\n"
+"-alphablend            In XFIXES mode send cursor alpha channel data to\n"
+"                       libvncserver.  The blending effect will only be\n"
+"                       visible in -nocursorshape mode or for clients with\n"
+"                       cursorshapeupdates turned off. (However there is a\n"
+"                       hack for 32bpp with depth 24, it uses the extra 8 bits\n"
+"                       to store cursor transparency for use with a hacked\n"
+"                       vncviewer that applies the transparency locally.\n"
+"                       See the FAQ for more info).\n"
 "\n"
 "-nocursorshape         Do not use the TightVNC CursorShapeUpdates extension\n"
 "                       even if clients support it.  See -cursor above.\n"
@@ -14081,37 +14909,84 @@ static void print_help(void) {
 "                       initial state of the modifier is ignored and not reset)\n"
 "                       To include button events use \"Button1\", ... etc.\n"
 "\n"
-"-nodragging            Do not update the display during mouse dragging\n"
-"                       events (mouse motion with a button held down).\n"
-"                       Greatly improves response on slow setups, but you lose\n"
-"                       all visual feedback for drags, text selection, and some\n"
-"                       menu traversals.  It overrides any -pointer_mode setting\n"
-"                       (think of it as pointer_mode 0)\n"
-"-pointer_mode n        Various pointer update schemes.  The problem is pointer\n"
-"                       motion can cause rapid changes on the screen, e.g. a\n"
-"                       window drag.  Neither x11vnc's screen polling nor the\n"
+"-nodragging            Do not update the display during mouse dragging events\n"
+"                       (mouse button held down).  Greatly improves response on\n"
+"                       slow setups, but you lose all visual feedback for drags,\n"
+"                       text selection, and some menu traversals.  It overrides\n"
+"                       any -pointer_mode setting\n"
+"-pointer_mode n        Various pointer motion update schemes. \"-pm\" is\n"
+"                       an alias.  The problem is pointer motion can cause\n"
+"                       rapid changes on the screen: consider the rapid changes\n"
+"                       when you drag a large window around.  Neither x11vnc's\n"
+"                       screen polling and vnc compression routines nor the\n"
 "                       bandwidth to the vncviewers can keep up these rapid\n"
-"                       screen changes: everything bogs down when dragging\n"
-"                       or scrolling.  Note that most video h/w is optimized\n"
-"                       for writing, not reading (a 50X rate difference is\n"
-"                       possible) and x11vnc is reading all the time.  So a\n"
-"                       scheme has to be used to \"eat\" much of that pointer\n"
-"                       input before re-polling the screen. n can be 1 to %d.\n"
+"                       screen changes: everything will bog down when dragging\n"
+"                       or scrolling.  So a scheme has to be used to \"eat\"\n"
+"                       much of that pointer input before re-polling the screen\n"
+"                       and sending out framebuffer updates. The mode number\n"
+"                       \"n\" can be 0 to %d and selects one of the schemes\n"
+"                       desribed below.\n"
 "\n"
-"                       n=1 was the original scheme used to about Jan 2004: it\n"
-"                       basically just skips -input_skip pointer events before\n"
-"                       repolling the screen.  n=2 is an improved scheme:\n"
-"                       by watching the current rate it tries to detect if\n"
-"                       it should try to \"eat\" more pointer events.  n=3 is\n"
-"                       basically a dynamic -nodragging mode: it detects if the\n"
-"                       mouse drag motion has paused and refreshes the display.\n"
-"                       n=4 is TBD, it will try measure screen read and client\n"
-"                       write rates and try to insert \"frames\" between the\n"
-"                       on/off states of mode 3.  The default n is %d.\n"
+"                       n=0: does the same as -nodragging. (all screen polling\n"
+"                       is suspended if a mouse button is pressed.)\n"
+"\n"
+"                       n=1: was the original scheme used to about Jan 2004:\n"
+"                       it basically just skips -input_skip keyboard or pointer\n"
+"                       events before repolling the screen.\n"
+"\n"
+"                       n=2 is an improved scheme: by watching the current rate\n"
+"                       of input events it tries to detect if it should try to\n"
+"                       \"eat\" additional pointer events before continuing.\n"
+"\n"
+"                       n=3 is basically a dynamic -nodragging mode: it detects\n"
+"                       when the mouse motion has paused and then refreshes\n"
+"                       the display.\n"
+"\n"
+"                       n=4: attempts to measures network rates and latency,\n"
+"                       the video card read rate, and how many tiles have been\n"
+"                       changed on the screen.  From this, it aggressively tries\n"
+"                       to push screen \"frames\" when it decides it has enough\n"
+"                       resources to do so.  NOT FINISHED.\n"
+"\n"
+"                       The default n is %d. Note that modes 2, 3, 4 will skip\n"
+"                       -input_skip keyboard events (but it will not count\n"
+"                       pointer events).  Also note that these modes are not\n"
+"                       available in -threads mode which has its own pointer\n"
+"                       event handling mechanism.\n"
+"\n"
+"                       To try out the different pointer modes to see\n"
+"                       which one gives the best response for your usage,\n"
+"                       it is convenient to use the remote control function,\n"
+"                       e.g. \"x11vnc -R pointer_mode:4\" or the tcl/tk gui\n"
+"                       (Tuning -> pointer_mode -> n).\n"
+"\n"
 "-input_skip n          For the pointer handling when non-threaded: try to\n"
 "                       read n user input events before scanning display. n < 0\n"
 "                       means to act as though there is always user input.\n"
 "                       Default: %d\n"
+"\n"
+"-speeds rd,bw,lat      x11vnc tries to estimate some speed parameters that\n"
+"                       are used to optimize scheduling (e.g. -pointer_mode\n"
+"                       4) and other things.  Use the -speeds option to set\n"
+"                       these manually.  The triple \"rd,bw,lat\" corresponds\n"
+"                       to video h/w read rate in MB/sec, network bandwidth to\n"
+"                       clients in KB/sec, and network latency to clients in\n"
+"                       milliseconds, respectively.  If a value is left blank,\n"
+"                       e.g. \"-speeds ,100,15\", then the internal scheme is\n"
+"                       used to estimate the empty value(s).\n"
+"\n"
+"                       Typical PC video cards have read rates of 5-10 MB/sec.\n"
+"                       If the framebuffer is in main memory instead of video\n"
+"                       h/w (e.g. SunRay, shadowfb, Xvfb), the read rate may\n"
+"                       be much faster.  \"x11perf -getimage500\" can be used\n"
+"                       to get a lower bound (remember to factor in the bytes\n"
+"                       per pixel).  It is up to you to estimate the network\n"
+"                       bandwith to clients.  For the latency the ping(1)\n"
+"                       command can be used.\n"
+"\n"
+"                       For convenience there are some aliases provided,\n"
+"                       e.g. \"-speeds modem\".  The aliases are: \"modem\" for\n"
+"                       6,4,200; \"dsl\" for 6,100,50; and \"lan\" for 6,5000,1\n"
 "\n"
 "-debug_pointer         Print debugging output for every pointer event.\n"
 "-debug_keyboard        Print debugging output for every keyboard event.\n"
@@ -14145,6 +15020,19 @@ static void print_help(void) {
 "                       by checking the tile near the boundary.  Default: %d\n"
 "-fuzz n                Tolerance in pixels to mark a tiles edges as changed.\n"
 "                       Default: %d\n"
+"-snapfb                Instead of polling the X display framebuffer (fb) for\n"
+"                       changes, periodically copy all of X display fb into main\n"
+"                       memory and examine that copy for changes.  Under some\n"
+"                       circumstances this will improve interactive response,\n"
+"                       or at least make things look smoother, but in others\n"
+"                       (many) it will make the response worse.  If the video\n"
+"                       h/w fb is such that reading small tiles is very slow\n"
+"                       this mode could help.  To keep the \"framerate\" up\n"
+"                       the screen size x bpp cannot be too large.  Note that\n"
+"                       this mode is very wasteful of memory I/O resources\n"
+"                       (it makes full screen copies even if nothing changes).\n"
+"                       It may be of use in video capture-like applications,\n"
+"                       or where window tearing is a problem.\n"
 "\n"
 "-gui [gui-opts]        Start up a simple tcl/tk gui based on the the remote\n"
 "                       control options -remote/-query described below.\n"
@@ -14331,6 +15219,8 @@ static void print_help(void) {
 "                       alphafrac:f     set -alphafrac to f.\n"
 "                       alpharemove     enable  -alpharemove mode.\n"
 "                       noalpharemove   disable -alpharemove mode.\n"
+"                       alphablend      enable  -alphablend mode.\n"
+"                       noalphablend    disable -alphablend mode.\n"
 "                       cursorshape     disable -nocursorshape mode.\n"
 "                       nocursorshape   enable  -nocursorshape mode.\n"
 "                       cursorpos       disable -nocursorpos mode.\n"
@@ -14340,8 +15230,9 @@ static void print_help(void) {
 "                       buttonmap:str   set -buttonmap \"str\", empty to disable\n"
 "                       dragging        disable -nodragging mode.\n"
 "                       nodragging      enable  -nodragging mode.\n"
-"                       pointer_mode n  set -pointer_mode to n.\n"
-"                       input_skip n    set -input_skip to n.\n"
+"                       pointer_mode:n  set -pointer_mode to n. same as \"pm\"\n"
+"                       input_skip:n    set -input_skip to n.\n"
+"                       speeds:str      set -speeds to str.\n"
 "                       debug_pointer   enable  -debug_pointer, same as \"dp\"\n"
 "                       nodebug_pointer disable -debug_pointer, same as \"nodp\"\n"
 "                       debug_keyboard   enable  -debug_keyboard, same as \"dk\"\n"
@@ -14356,6 +15247,8 @@ static void print_help(void) {
 "                       gaps:n          set -gaps to n.\n"
 "                       grow:n          set -grow to n.\n"
 "                       fuzz:n          set -fuzz to n.\n"
+"                       snapfb          enable  -snapfb mode.\n"
+"                       nosnapfb        disable -snapfb mode.\n"
 "                       progressive:n   set libvncserver -progressive slice\n"
 "                                       height parameter to n.\n"
 "                       desktop:str     set -desktop name to str for new clients.\n"
@@ -14415,29 +15308,30 @@ static void print_help(void) {
 "                       variables correspond to the presence of X extensions):\n"
 "\n"
 "                       ans= stop quit exit shutdown ping blacken zero\n"
-"                       refresh reset close disconnect id sid flashcmap\n"
-"                       noflashcmap truecolor notruecolor overlay nooverlay\n"
-"                       overlay_cursor overlay_yescursor nooverlay_nocursor\n"
-"                       nooverlay_cursor nooverlay_yescursor overlay_nocursor\n"
-"                       visual scale viewonly noviewonly shared noshared\n"
-"                       forever noforever once deny lock nodeny unlock\n"
-"                       connect allowonce allow localhost nolocalhost accept\n"
-"                       gone shm noshm flipbyteorder noflipbyteorder onetile\n"
-"                       noonetile blackout xinerama noxinerama xrandr noxrandr\n"
-"                       xrandr_mode padgeom quiet q noquiet modtweak nomodtweak\n"
-"                       xkb noxkb skip_keycodes add_keysyms noadd_keysyms\n"
-"                       clear_mods noclear_mods clear_keys noclear_keys\n"
-"                       remap repeat norepeat fb nofb bell nobell sel\n"
-"                       nosel primary noprimary cursorshape nocursorshape\n"
+"                       refresh reset close disconnect id sid waitmapped\n"
+"                       nowaitmapped flashcmap noflashcmap truecolor notruecolor\n"
+"                       overlay nooverlay overlay_cursor overlay_yescursor\n"
+"                       nooverlay_nocursor nooverlay_cursor nooverlay_yescursor\n"
+"                       overlay_nocursor visual scale viewonly noviewonly\n"
+"                       shared noshared forever noforever once deny lock nodeny\n"
+"                       unlock connect allowonce allow localhost nolocalhost\n"
+"                       accept gone shm noshm flipbyteorder noflipbyteorder\n"
+"                       onetile noonetile blackout xinerama noxinerama xrandr\n"
+"                       noxrandr xrandr_mode padgeom quiet q noquiet modtweak\n"
+"                       nomodtweak xkb noxkb skip_keycodes add_keysyms\n"
+"                       noadd_keysyms clear_mods noclear_mods clear_keys\n"
+"                       noclear_keys remap repeat norepeat fb nofb bell nobell\n"
+"                       sel nosel primary noprimary cursorshape nocursorshape\n"
 "                       cursorpos nocursorpos cursor show_cursor noshow_cursor\n"
-"                       nocursor xfixes noxfixes alphacut alphafrac alpharemove\n"
-"                       noalpharemove xwarp xwarppointer noxwarp noxwarppointer\n"
-"                       buttonmap dragging nodragging pointer_mode input_skip\n"
-"                       debug_pointer dp nodebug_pointer nodp debug_keyboard\n"
-"                       dk nodebug_keyboard nodk deferupdate defer wait\n"
-"                       rfbwait nap nonap sb screen_blank fs gaps grow fuzz\n"
-"                       progressive rfbport http nohttp httpport httpdir\n"
-"                       enablehttpproxy noenablehttpproxy alwaysshared\n"
+"                       nocursor xfixes noxfixes alphacut alphafrac\n"
+"                       alpharemove noalpharemove alphablend noalphablend\n"
+"                       xwarp xwarppointer noxwarp noxwarppointer buttonmap\n"
+"                       dragging nodragging pointer_mode pm input_skip speeds\n"
+"                       debug_pointer dp nodebug_pointer nodp debug_keyboard dk\n"
+"                       nodebug_keyboard nodk deferupdate defer wait rfbwait\n"
+"                       nap nonap sb screen_blank fs gaps grow fuzz snapfb\n"
+"                       nosnapfb progressive rfbport http nohttp httpport\n"
+"                       httpdir enablehttpproxy noenablehttpproxy alwaysshared\n"
 "                       noalwaysshared nevershared noalwaysshared dontdisconnect\n"
 "                       nodontdisconnect desktop noremote\n"
 "\n"
@@ -14533,6 +15427,59 @@ static void print_help(void) {
 	exit(1);
 }
 
+void set_vnc_desktop_name(void) {
+	int sz = 256;
+	sprintf(vnc_desktop_name, "unknown");
+	if (screen->port) {
+		char *host = this_host();
+		int lport = screen->port;
+		if (host != NULL) {
+			/* note that vncviewer special cases 5900-5999 */
+			if (inetd) {
+				;	/* should not occur (port) */
+			} else if (quiet) {
+				if (lport >= 5900) {
+					snprintf(vnc_desktop_name, sz, "%s:%d",
+					    host, lport - 5900);
+					fprintf(stderr, "The VNC desktop is "
+					    "%s\n", vnc_desktop_name);
+				} else {
+					snprintf(vnc_desktop_name, sz, "%s:%d",
+					    host, lport);
+					fprintf(stderr, "The VNC desktop is "
+					    "%s\n", vnc_desktop_name);
+				}
+			} else if (lport >= 5900) {
+				snprintf(vnc_desktop_name, sz, "%s:%d",
+				    host, lport - 5900);
+				rfbLog("\n");
+				rfbLog("The VNC desktop is %s\n",
+				    vnc_desktop_name);
+				if (lport >= 6000) {
+					rfbLog("possible aliases:  %s:%d, "
+					    "%s::%d\n", host, lport,
+					    host, lport);
+				}
+			} else {
+				snprintf(vnc_desktop_name, sz, "%s:%d",
+				    host, lport);
+				rfbLog("\n");
+				rfbLog("The VNC desktop is %s\n",
+				    vnc_desktop_name);
+				rfbLog("possible alias:    %s::%d\n",
+				    host, lport);
+			}
+		}
+		fflush(stderr);	
+		if (inetd) {
+			;	/* should not occur (port) */
+		} else {
+			fprintf(stdout, "PORT=%d\n", screen->port);
+		}
+		fflush(stdout);	
+	}
+}
+
 /*
  * utility to get the current host name
  */
@@ -14582,14 +15529,13 @@ static char *choose_title(char *display) {
  * check blacklist for OSs with tight shm limits.
  */
 static int limit_shm(void) {
-	struct utsname ut;
 	int limit = 0;
 
-	if (uname(&ut) == -1) {
+	if (UT.sysname == NULL) {
 		return 0;
 	}
-	if (!strcmp(ut.sysname, "SunOS")) {
-		char *r = ut.release;
+	if (!strcmp(UT.sysname, "SunOS")) {
+		char *r = UT.release;
 		if (*r == '5' && *(r+1) == '.') {
 			if (strchr("2345678", *(r+2)) != NULL) {
 				limit = 1;
@@ -14598,7 +15544,7 @@ static int limit_shm(void) {
 	}
 	if (limit && ! quiet) {
 		fprintf(stderr, "reducing shm usage on %s %s (adding "
-		    "-onetile)\n", ut.sysname, ut.release);
+		    "-onetile)\n", UT.sysname, UT.release);
 	}
 	return limit;
 }
@@ -14670,12 +15616,12 @@ static void check_rcfile(int argc, char **argv) {
 			perror("fstat");
 			exit(1);
 		}
-		sz = sbuf.st_size+1;
+		sz = sbuf.st_size+1;	/* allocate whole file size */
 		if (sz < 1024) {
 			sz = 1024;
 		}
 
-		buf  = (char *) malloc(sz);
+		buf = (char *) malloc(sz);
 
 		while (fgets(line, 4096, rc) != NULL) {
 			char *q, *p = line;
@@ -14791,7 +15737,7 @@ int main(int argc, char* argv[]) {
 	int remote_sync = 0;
 	char *remote_cmd = NULL;
 	char *query_cmd  = NULL;
-	char *gui_string = NULL;
+	char *gui_str = NULL;
 	int pw_loc = -1;
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
@@ -14873,6 +15819,8 @@ int main(int argc, char* argv[]) {
 				    argv[i]);
 				exit(1);
 			}
+		} else if (!strcmp(arg, "-waitmapped")) {
+			subwin_wait_mapped = 1;
 		} else if (!strcmp(arg, "-flashcmap")) {
 			flash_cmap = 1;
 		} else if (!strcmp(arg, "-notruecolor")) {
@@ -14948,7 +15896,7 @@ int main(int argc, char* argv[]) {
 			single_copytile = 1;
 		} else if (!strcmp(arg, "-blackout")) {
 			CHECK_ARGC
-			blackout_string = strdup(argv[++i]);
+			blackout_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-xinerama")) {
 			xinerama = 1;
 		} else if (!strcmp(arg, "-xrandr")) {
@@ -14966,6 +15914,11 @@ int main(int argc, char* argv[]) {
 			pad_geometry = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-o") || !strcmp(arg, "-logfile")) {
 			CHECK_ARGC
+			logfile_append = 0;
+			logfile = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-oa") || !strcmp(arg, "-logappend")) {
+			CHECK_ARGC
+			logfile_append = 1;
 			logfile = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-rc")) {
 			i++;	/* done above */
@@ -15045,6 +15998,8 @@ int main(int argc, char* argv[]) {
 			alpha_frac = atof(argv[++i]);
 		} else if (!strcmp(arg, "-alpharemove")) {
 			alpha_remove = 1;
+		} else if (!strcmp(arg, "-alphablend")) {
+			alpha_blend = 1;
 		} else if (!strcmp(arg, "-nocursorshape")) {
 			cursor_shape_updates = 0;
 		} else if (!strcmp(arg, "-cursorpos")) {
@@ -15058,7 +16013,8 @@ int main(int argc, char* argv[]) {
 			pointer_remap = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-nodragging")) {
 			show_dragging = 0;
-		} else if (!strcmp(arg, "-pointer_mode")) {
+		} else if (!strcmp(arg, "-pointer_mode")
+		    || !strcmp(arg, "-pm")) {
 			char *p, *s;
 			CHECK_ARGC
 			s = argv[++i];
@@ -15077,6 +16033,9 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			ui_skip = atoi(argv[++i]);
 			if (! ui_skip) ui_skip = 1;
+		} else if (!strcmp(arg, "-speeds")) {
+			CHECK_ARGC
+			speeds_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-debug_pointer")
 		    || !strcmp(arg, "-dp")) {
 			debug_pointer++;
@@ -15122,12 +16081,14 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-fuzz")) {
 			CHECK_ARGC
 			tile_fuzz = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-snapfb")) {
+			use_snapfb = 1;
 		} else if (!strcmp(arg, "-gui")) {
 			launch_gui = 1;
 			if (i < argc-1) {
 				char *s = argv[i+1];
 				if (*s != '-') {
-					gui_string = strdup(s);
+					gui_str = strdup(s);
 					i++;
 				} 
 			}
@@ -15191,11 +16152,16 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (launch_gui) {
-		do_gui(gui_string);
+		do_gui(gui_str);
 	}
 	if (logfile) {
 		int n;
-		if ((n = open(logfile, O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0) {
+		if (logfile_append) {
+			n = open(logfile, O_WRONLY|O_CREAT|O_APPEND, 0666);
+		} else {
+			n = open(logfile, O_WRONLY|O_CREAT|O_TRUNC, 0666);
+		}
+		if (n < 0) {
 			fprintf(stderr, "error opening logfile: %s\n", logfile);
 			perror("open");
 			exit(1);
@@ -15324,6 +16290,7 @@ int main(int argc, char* argv[]) {
 	if (waitms < 0) {
 		waitms = 0;
 	}
+
 	if (alpha_threshold < 0) {
 		alpha_threshold = 0;
 	}
@@ -15336,6 +16303,10 @@ int main(int argc, char* argv[]) {
 	if (alpha_frac > 1.0) {
 		alpha_frac = 1.0;
 	}
+	if (alpha_blend) {
+		alpha_remove = 0;
+	}
+
 	if (inetd) {
 		shared = 0;
 		connect_once = 1;
@@ -15404,13 +16375,13 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " authfile:   %s\n", auth_file ? auth_file
                     : "null");
 		fprintf(stderr, " subwin:     0x%lx\n", subwin);
-		fprintf(stderr, " rootshift:  %d\n", rootshift);
+		fprintf(stderr, " -sid mode:  %d\n", rootshift);
 		fprintf(stderr, " flashcmap:  %d\n", flash_cmap);
 		fprintf(stderr, " force_idx:  %d\n", force_indexed_color);
-		fprintf(stderr, " overlay:    %d\n", overlay);
-		fprintf(stderr, " ovl_cursor: %d\n", overlay_cursor);
 		fprintf(stderr, " visual:     %s\n", visual_str ? visual_str
                     : "null");
+		fprintf(stderr, " overlay:    %d\n", overlay);
+		fprintf(stderr, " ovl_cursor: %d\n", overlay_cursor);
 		fprintf(stderr, " scaling:    %d %.5f\n", scaling, scale_fac);
 		fprintf(stderr, " viewonly:   %d\n", view_only);
 		fprintf(stderr, " shared:     %d\n", shared);
@@ -15432,14 +16403,17 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " using_shm:  %d\n", using_shm);
 		fprintf(stderr, " flipbytes:  %d\n", flip_byte_order);
 		fprintf(stderr, " onetile:    %d\n", single_copytile);
-		fprintf(stderr, " blackout:   %s\n", blackout_string
-		    ? blackout_string : "null");
+		fprintf(stderr, " blackout:   %s\n", blackout_str
+		    ? blackout_str : "null");
 		fprintf(stderr, " xinerama:   %d\n", xinerama);
 		fprintf(stderr, " xrandr:     %d\n", xrandr);
 		fprintf(stderr, " xrandrmode: %s\n", xrandr_mode ? xrandr_mode
 		    : "null");
+		fprintf(stderr, " padgeom:    %s\n", pad_geometry
+		    ? pad_geometry : "null");
 		fprintf(stderr, " logfile:    %s\n", logfile ? logfile
                     : "null");
+		fprintf(stderr, " logappend:  %d\n", logfile_append);
 		fprintf(stderr, " rc_file:    %s\n", rc_rcfile ? rc_rcfile
                     : "null");
 		fprintf(stderr, " norc:       %d\n", rc_norc);
@@ -15460,11 +16434,15 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " watchsel:   %d\n", watch_selection);
 		fprintf(stderr, " watchprim:  %d\n", watch_primary);
 		fprintf(stderr, " cursor:     %d\n", show_cursor);
-		fprintf(stderr, " root_curs:  %d\n", show_multiple_cursors);
+		fprintf(stderr, " multicurs:  %d\n", show_multiple_cursors);
 		fprintf(stderr, " curs_mode:  %s\n", multiple_cursors_mode
 		    ? multiple_cursors_mode : "null");
 		fprintf(stderr, " xfixes:     %d\n", use_xfixes);
-		fprintf(stderr, " cursorshp:  %d\n", cursor_shape_updates);
+		fprintf(stderr, " alphacut:   %d\n", alpha_threshold);
+		fprintf(stderr, " alphafrac:  %.2f\n", alpha_frac);
+		fprintf(stderr, " alpharemove:%d\n", alpha_remove);
+		fprintf(stderr, " alphablend: %d\n", alpha_blend);
+		fprintf(stderr, " cursorshape:%d\n", cursor_shape_updates);
 		fprintf(stderr, " cursorpos:  %d\n", cursor_pos_updates);
 		fprintf(stderr, " xwarpptr:   %d\n", use_xwarppointer);
 		fprintf(stderr, " buttonmap:  %s\n", pointer_remap
@@ -15472,6 +16450,8 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " dragging:   %d\n", show_dragging);
 		fprintf(stderr, " ptr_mode:   %d\n", pointer_mode);
 		fprintf(stderr, " inputskip:  %d\n", ui_skip);
+		fprintf(stderr, " speeds:     %s\n", speeds_str
+		    ? speeds_str : "null");
 		fprintf(stderr, " debug_ptr:  %d\n", debug_pointer);
 		fprintf(stderr, " debug_key:  %d\n", debug_keyboard);
 		fprintf(stderr, " defer:      %d\n", defer_update);
@@ -15485,8 +16465,13 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " gaps_fill:  %d\n", gaps_fill);
 		fprintf(stderr, " grow_fill:  %d\n", grow_fill);
 		fprintf(stderr, " tile_fuzz:  %d\n", tile_fuzz);
-		fprintf(stderr, " deny_all:   %d\n", deny_all);
+		fprintf(stderr, " snapfb:     %d\n", use_snapfb);
+		fprintf(stderr, " gui:        %d\n", launch_gui);
+		fprintf(stderr, " gui_mode:   %s\n", gui_str
+		    ? gui_str : "null");
 		fprintf(stderr, " noremote:   %d\n", !accept_remote_cmds);
+		fprintf(stderr, " safemode:   %d\n", safe_remote_only);
+		fprintf(stderr, " deny_all:   %d\n", deny_all);
 		fprintf(stderr, "\n");
 		rfbLog("x11vnc version: %s\n", lastmod);
 	} else {
@@ -15689,6 +16674,9 @@ int main(int argc, char* argv[]) {
 	 */
 	XTestGrabControl_wr(dpy, True);
 
+	/* set OS struct UT */
+	uname(&UT);
+
 	/* check for OS with small shm limits */
 	if (using_shm && ! single_copytile) {
 		if (limit_shm()) {
@@ -15778,6 +16766,8 @@ int main(int argc, char* argv[]) {
 	initialize_signals();
 
 
+	initialize_speeds();
+
 	initialize_keyboard_and_pointer();
 
 	if (! inetd) {
@@ -15789,53 +16779,7 @@ int main(int argc, char* argv[]) {
 	if (! quiet) {
 		rfbLog("screen setup finished.\n");
 	}
-	sprintf(vnc_desktop_name, "unknown");
-	if (screen->port) {
-		char *host = this_host();
-		int lport = screen->port;
-		if (host != NULL) {
-			/* note that vncviewer special cases 5900-5999 */
-			if (inetd) {
-				;	/* should not occur (port) */
-			} else if (quiet) {
-				if (lport >= 5900) {
-					sprintf(vnc_desktop_name, "%s:%d",
-					    host, lport - 5900);
-					fprintf(stderr, "The VNC desktop is "
-					    "%s\n", vnc_desktop_name);
-				} else {
-					sprintf(vnc_desktop_name, "%s:%d",
-					    host, lport);
-					fprintf(stderr, "The VNC desktop is "
-					    "%s\n", vnc_desktop_name);
-				}
-			} else if (lport >= 5900) {
-				sprintf(vnc_desktop_name, "%s:%d",
-				    host, lport - 5900);
-				rfbLog("\n");
-				rfbLog("The VNC desktop is %s\n",
-				    vnc_desktop_name);
-				if (lport >= 6000) {
-					rfbLog("possible aliases:  %s:%d, "
-					    "%s::%d\n", host, lport, host, lport);
-				}
-			} else {
-				sprintf(vnc_desktop_name, "%s:%d", host, lport);
-				rfbLog("\n");
-				rfbLog("The VNC desktop is %s\n",
-				    vnc_desktop_name);
-				rfbLog("possible alias:    %s::%d\n",
-				    host, lport);
-			}
-		}
-		fflush(stderr);	
-		if (inetd) {
-			;	/* should not occur (port) */
-		} else {
-			fprintf(stdout, "PORT=%d\n", screen->port);
-		}
-		fflush(stdout);	
-	}
+	set_vnc_desktop_name();
 
 #if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SETSID
 	if (bg) {

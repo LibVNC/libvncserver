@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "December 2004" "x11vnc " "User Commands"
+.TH X11VNC "1" "January 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.1pre, lastmod: 2004-12-27
+         version: 0.7.1pre, lastmod: 2005-01-16
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -57,7 +57,7 @@ environment variable to \fIdisp\fR.
 \fB-auth\fR \fIfile\fR
 .IP
 Set the X authority file to be \fIfile\fR, equivalent to
-setting the XAUTHORITY environment varirable to \fIfile\fR
+setting the XAUTHORITY environment variable to \fIfile\fR
 before startup.  See 
 .IR Xsecurity (7)
 , 
@@ -407,7 +407,8 @@ to handle all subsequent resizes (e.g. under \fB-xrandr,\fR
 \fB-o\fR \fIlogfile\fR
 .IP
 Write stderr messages to file \fIlogfile\fR instead of
-to the terminal.  Same as "\fB-logfile\fR \fIfile\fR".
+to the terminal.  Same as "\fB-logfile\fR \fIfile\fR".  To append
+to the file use "\fB-oa\fR \fIfile\fR" or "\fB-logappend\fR \fIfile\fR".
 .PP
 \fB-rc\fR \fIfilename\fR
 .IP
@@ -623,7 +624,7 @@ cursors with transparency will not be displayed exactly
 for cursors that have transparency ("alpha channel"
 with values ranging from 0 to 255) Any cursor pixel with
 alpha value less than n becomes completely transparent.
-Otherwise the pixel is completely opaque.  Default 255
+Otherwise the pixel is completely opaque.  Default 240
 .IP
 Note: the options \fB-alphacut,\fR \fB-alphafrac,\fR and \fB-alphafrac\fR
 may be removed if a more accurate internal method for
@@ -645,6 +646,17 @@ the alpha factor multiplied into the RGB color values
 black background).  Specify this option to remove the
 alpha factor. (useful for light colored semi-transparent
 cursors).
+.PP
+\fB-alphablend\fR
+.IP
+In XFIXES mode send cursor alpha channel data to
+libvncserver.  The blending effect will only be
+visible in \fB-nocursorshape\fR mode or for clients with
+cursorshapeupdates turned off. (However there is a
+hack for 32bpp with depth 24, it uses the extra 8 bits
+to store cursor transparency for use with a hacked
+vncviewer that applies the transparency locally.
+See the FAQ for more info).
 .PP
 \fB-nocursorshape\fR
 .IP
@@ -699,36 +711,59 @@ To include button events use "Button1", ... etc.
 .PP
 \fB-nodragging\fR
 .IP
-Do not update the display during mouse dragging
-events (mouse motion with a button held down).
-Greatly improves response on slow setups, but you lose
-all visual feedback for drags, text selection, and some
-menu traversals.  It overrides any \fB-pointer_mode\fR setting
-(think of it as pointer_mode 0)
+Do not update the display during mouse dragging events
+(mouse button held down).  Greatly improves response on
+slow setups, but you lose all visual feedback for drags,
+text selection, and some menu traversals.  It overrides
+any \fB-pointer_mode\fR setting
 .PP
 \fB-pointer_mode\fR \fIn\fR
 .IP
-Various pointer update schemes.  The problem is pointer
-motion can cause rapid changes on the screen, e.g. a
-window drag.  Neither x11vnc's screen polling nor the
+Various pointer motion update schemes. "\fB-pm\fR" is
+an alias.  The problem is pointer motion can cause
+rapid changes on the screen: consider the rapid changes
+when you drag a large window around.  Neither x11vnc's
+screen polling and vnc compression routines nor the
 bandwidth to the vncviewers can keep up these rapid
-screen changes: everything bogs down when dragging
-or scrolling.  Note that most video h/w is optimized
-for writing, not reading (a 50X rate difference is
-possible) and x11vnc is reading all the time.  So a
-scheme has to be used to "eat" much of that pointer
-input before re-polling the screen. n can be 1 to 4.
+screen changes: everything will bog down when dragging
+or scrolling.  So a scheme has to be used to "eat"
+much of that pointer input before re-polling the screen
+and sending out framebuffer updates. The mode number
+\fIn\fR can be 0 to 4 and selects one of the schemes
+desribed below.
 .IP
-n=1 was the original scheme used to about Jan 2004: it
-basically just skips \fB-input_skip\fR pointer events before
-repolling the screen.  n=2 is an improved scheme:
-by watching the current rate it tries to detect if
-it should try to "eat" more pointer events.  n=3 is
-basically a dynamic \fB-nodragging\fR mode: it detects if the
-mouse drag motion has paused and refreshes the display.
-n=4 is TBD, it will try measure screen read and client
-write rates and try to insert "frames" between the
-on/off states of mode 3.  The default n is 2.
+n=0: does the same as \fB-nodragging.\fR (all screen polling
+is suspended if a mouse button is pressed.)
+.IP
+n=1: was the original scheme used to about Jan 2004:
+it basically just skips \fB-input_skip\fR keyboard or pointer
+events before repolling the screen.
+.IP
+n=2 is an improved scheme: by watching the current rate
+of input events it tries to detect if it should try to
+"eat" additional pointer events before continuing.
+.IP
+n=3 is basically a dynamic \fB-nodragging\fR mode: it detects
+when the mouse motion has paused and then refreshes
+the display.
+.IP
+n=4: attempts to measures network rates and latency,
+the video card read rate, and how many tiles have been
+changed on the screen.  From this, it aggressively tries
+to push screen "frames" when it decides it has enough
+resources to do so.  NOT FINISHED.
+.IP
+The default n is 2. Note that modes 2, 3, 4 will skip
+\fB-input_skip\fR keyboard events (but it will not count
+pointer events).  Also note that these modes are not
+available in \fB-threads\fR mode which has its own pointer
+event handling mechanism.
+.IP
+To try out the different pointer modes to see
+which one gives the best response for your usage,
+it is convenient to use the remote control function,
+e.g. "x11vnc \fB-R\fR pointer_mode:4" or the tcl/tk gui
+(Tuning -> pointer_mode -> n).
 .PP
 \fB-input_skip\fR \fIn\fR
 .IP
@@ -736,6 +771,32 @@ For the pointer handling when non-threaded: try to
 read n user input events before scanning display. n < 0
 means to act as though there is always user input.
 Default: 10
+.PP
+\fB-speeds\fR \fIrd,bw,lat\fR
+.IP
+x11vnc tries to estimate some speed parameters that
+are used to optimize scheduling (e.g. \fB-pointer_mode\fR
+4) and other things.  Use the \fB-speeds\fR option to set
+these manually.  The triple \fIrd,bw,lat\fR corresponds
+to video h/w read rate in MB/sec, network bandwidth to
+clients in KB/sec, and network latency to clients in
+milliseconds, respectively.  If a value is left blank,
+e.g. "\fB-speeds\fR \fI,100,15\fR", then the internal scheme is
+used to estimate the empty value(s).
+.IP
+Typical PC video cards have read rates of 5-10 MB/sec.
+If the framebuffer is in main memory instead of video
+h/w (e.g. SunRay, shadowfb, Xvfb), the read rate may
+be much faster.  "x11perf \fB-getimage500"\fR can be used
+to get a lower bound (remember to factor in the bytes
+per pixel).  It is up to you to estimate the network
+bandwith to clients.  For the latency the 
+.IR ping (1)
+command can be used.
+.IP
+For convenience there are some aliases provided,
+e.g. "\fB-speeds\fR \fImodem\fR".  The aliases are: "modem" for
+6,4,200; "dsl" for 6,100,50; and "lan" for 6,5000,1
 .PP
 \fB-debug_pointer\fR
 .IP
@@ -802,6 +863,22 @@ by checking the tile near the boundary.  Default: 3
 .IP
 Tolerance in pixels to mark a tiles edges as changed.
 Default: 2
+.PP
+\fB-snapfb\fR
+.IP
+Instead of polling the X display framebuffer (fb) for
+changes, periodically copy all of X display fb into main
+memory and examine that copy for changes.  Under some
+circumstances this will improve interactive response,
+or at least make things look smoother, but in others
+(many) it will make the response worse.  If the video
+h/w fb is such that reading small tiles is very slow
+this mode could help.  To keep the "framerate" up
+the screen size x bpp cannot be too large.  Note that
+this mode is very wasteful of memory I/O resources
+(it makes full screen copies even if nothing changes).
+It may be of use in video capture-like applications,
+or where window tearing is a problem.
 .PP
 \fB-gui\fR \fI[gui-opts]\fR
 .IP
@@ -1073,6 +1150,10 @@ alpharemove     enable  \fB-alpharemove\fR mode.
 .IP
 noalpharemove   disable \fB-alpharemove\fR mode.
 .IP
+alphablend      enable  \fB-alphablend\fR mode.
+.IP
+noalphablend    disable \fB-alphablend\fR mode.
+.IP
 cursorshape     disable \fB-nocursorshape\fR mode.
 .IP
 nocursorshape   enable  \fB-nocursorshape\fR mode.
@@ -1091,9 +1172,11 @@ dragging        disable \fB-nodragging\fR mode.
 .IP
 nodragging      enable  \fB-nodragging\fR mode.
 .IP
-pointer_mode n  set \fB-pointer_mode\fR to n.
+pointer_mode:n  set \fB-pointer_mode\fR to n. same as "pm"
 .IP
-input_skip n    set \fB-input_skip\fR to n.
+input_skip:n    set \fB-input_skip\fR to n.
+.IP
+speeds:str      set \fB-speeds\fR to str.
 .IP
 debug_pointer   enable  \fB-debug_pointer,\fR same as "dp"
 .IP
@@ -1122,6 +1205,10 @@ gaps:n          set \fB-gaps\fR to n.
 grow:n          set \fB-grow\fR to n.
 .IP
 fuzz:n          set \fB-fuzz\fR to n.
+.IP
+snapfb          enable  \fB-snapfb\fR mode.
+.IP
+nosnapfb        disable \fB-snapfb\fR mode.
 .IP
 progressive:n   set libvncserver \fB-progressive\fR slice
                 height parameter to n.
@@ -1215,29 +1302,30 @@ the returned value corresponds to (hint: the ext_*
 variables correspond to the presence of X extensions):
 .IP
 ans= stop quit exit shutdown ping blacken zero
-refresh reset close disconnect id sid flashcmap
-noflashcmap truecolor notruecolor overlay nooverlay
-overlay_cursor overlay_yescursor nooverlay_nocursor
-nooverlay_cursor nooverlay_yescursor overlay_nocursor
-visual scale viewonly noviewonly shared noshared
-forever noforever once deny lock nodeny unlock
-connect allowonce allow localhost nolocalhost accept
-gone shm noshm flipbyteorder noflipbyteorder onetile
-noonetile blackout xinerama noxinerama xrandr noxrandr
-xrandr_mode padgeom quiet q noquiet modtweak nomodtweak
-xkb noxkb skip_keycodes add_keysyms noadd_keysyms
-clear_mods noclear_mods clear_keys noclear_keys
-remap repeat norepeat fb nofb bell nobell sel
-nosel primary noprimary cursorshape nocursorshape
+refresh reset close disconnect id sid waitmapped
+nowaitmapped flashcmap noflashcmap truecolor notruecolor
+overlay nooverlay overlay_cursor overlay_yescursor
+nooverlay_nocursor nooverlay_cursor nooverlay_yescursor
+overlay_nocursor visual scale viewonly noviewonly
+shared noshared forever noforever once deny lock nodeny
+unlock connect allowonce allow localhost nolocalhost
+accept gone shm noshm flipbyteorder noflipbyteorder
+onetile noonetile blackout xinerama noxinerama xrandr
+noxrandr xrandr_mode padgeom quiet q noquiet modtweak
+nomodtweak xkb noxkb skip_keycodes add_keysyms
+noadd_keysyms clear_mods noclear_mods clear_keys
+noclear_keys remap repeat norepeat fb nofb bell nobell
+sel nosel primary noprimary cursorshape nocursorshape
 cursorpos nocursorpos cursor show_cursor noshow_cursor
-nocursor xfixes noxfixes alphacut alphafrac alpharemove
-noalpharemove xwarp xwarppointer noxwarp noxwarppointer
-buttonmap dragging nodragging pointer_mode input_skip
-debug_pointer dp nodebug_pointer nodp debug_keyboard
-dk nodebug_keyboard nodk deferupdate defer wait
-rfbwait nap nonap sb screen_blank fs gaps grow fuzz
-progressive rfbport http nohttp httpport httpdir
-enablehttpproxy noenablehttpproxy alwaysshared
+nocursor xfixes noxfixes alphacut alphafrac
+alpharemove noalpharemove alphablend noalphablend
+xwarp xwarppointer noxwarp noxwarppointer buttonmap
+dragging nodragging pointer_mode pm input_skip speeds
+debug_pointer dp nodebug_pointer nodp debug_keyboard dk
+nodebug_keyboard nodk deferupdate defer wait rfbwait
+nap nonap sb screen_blank fs gaps grow fuzz snapfb
+nosnapfb progressive rfbport http nohttp httpport
+httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop noremote
 .IP
