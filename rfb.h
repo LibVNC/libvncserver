@@ -61,7 +61,17 @@ int max(int,int);
 #define _BYTE_ORDER BYTE_ORDER
 #define _LITTLE_ENDIAN LITTLE_ENDIAN
 #else
+#ifdef sparc
+#define _LITTLE_ENDIAN 1234
+#define _BYTE_ORDER _LITTLE_ENDIAN
+#undef Bool
+#define Bool char
+#include <sys/types.h>
+/* typedef unsigned int pthread_t; */
+/* SUN cc seems to have problems with inclusion of sys/types! */
+#else
 #include <sys/endian.h>
+#endif
 #endif
 #endif
 
