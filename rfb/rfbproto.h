@@ -84,6 +84,10 @@ typedef int8_t rfbBool;
 typedef uint32_t rfbKeySym;
 typedef uint32_t rfbPixel;
 
+#ifdef LIBVNCSERVER_NEED_INADDR_T
+typedef uint32_t in_addr_t;
+#endif
+
 #ifndef INADDR_NONE
 #define                INADDR_NONE     ((in_addr_t) 0xffffffff)
 #endif

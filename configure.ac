@@ -232,8 +232,9 @@ AC_CACHE_CHECK([for in_addr_t],
                                         [inaddrt=yes],
                                         [inaddrt=no]),
         ])
+AH_TEMPLATE(NEED_INADDR_T, [Need a typedef for in_addr_t])
 if test $inaddrt = no ; then
-  AC_CHECK_TYPE(in_addr_t, uint32_t)
+  AC_DEFINE(NEED_INADDR_T)
 fi
 
 # Checks for library functions.
