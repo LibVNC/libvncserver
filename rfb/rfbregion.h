@@ -37,6 +37,8 @@ extern Bool sraRgnPopRect(sraRegion *region, sraRect *rect,
 extern unsigned long sraRgnCountRects(const sraRegion *rgn);
 extern Bool sraRgnEmpty(const sraRegion *rgn);
 
+extern sraRegion *sraRgnBBox(const sraRegion *src);
+
 /* -=- rectangle iterator */
 
 typedef struct sraRectangleIterator {

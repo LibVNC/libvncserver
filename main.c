@@ -467,12 +467,16 @@ Bool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
 Bool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
 {
   char **passwds;
+  int i=0;
 
-  for(passwds=(char**)cl->screen->rfbAuthPasswdData;*passwds;passwds++) {
+  for(passwds=(char**)cl->screen->rfbAuthPasswdData;*passwds;passwds++,i++) {
     vncEncryptBytes(cl->authChallenge, *passwds);
 
-    if (memcmp(cl->authChallenge, response, len) == 0)
+    if (memcmp(cl->authChallenge, response, len) == 0) {
+      if(i>=cl->screen->rfbAuthPasswdFirstViewOnly)
+	cl->viewOnly=TRUE;
       return(TRUE);
+    }
   }
 
   rfbLog("rfbAuthProcessClientMessage: authentication failed from %s\n",
@@ -574,6 +578,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    rfbScreen->rfbNeverShared = FALSE;
    rfbScreen->rfbDontDisconnect = FALSE;
    rfbScreen->rfbAuthPasswdData = 0;
+   rfbScreen->rfbAuthPasswdFirstViewOnly = 1;
    
    rfbScreen->width = width;
    rfbScreen->height = height;
@@ -611,6 +616,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    IF_PTHREADS(rfbScreen->backgroundLoop = FALSE);
 
    rfbScreen->rfbDeferUpdateTime=5;
+   rfbScreen->maxRectsPerUpdate=50;
 
    /* proc's and hook's */
 

@@ -233,6 +233,8 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
 
     cl->screen = rfbScreen;
     cl->sock = sock;
+    cl->viewOnly = FALSE;
+
     rfbResetStats(cl);
 
     if(isUDP) {
@@ -932,70 +934,78 @@ rfbProcessClientNormalMessage(cl)
 
     case rfbKeyEvent:
 
-        cl->rfbKeyEventsRcvd++;
+	cl->rfbKeyEventsRcvd++;
 
-        if ((n = ReadExact(cl, ((char *)&msg) + 1,
-                           sz_rfbKeyEventMsg - 1)) <= 0) {
-            if (n != 0)
-                rfbLogPerror("rfbProcessClientNormalMessage: read");
-            rfbCloseClient(cl);
-            return;
-        }
+	if ((n = ReadExact(cl, ((char *)&msg) + 1,
+			   sz_rfbKeyEventMsg - 1)) <= 0) {
+	    if (n != 0)
+		rfbLogPerror("rfbProcessClientNormalMessage: read");
+	    rfbCloseClient(cl);
+	    return;
+	}
 
-        cl->screen->kbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), cl);
+	if(!cl->viewOnly) {
+	    cl->screen->kbdAddEvent(msg.ke.down, (KeySym)Swap32IfLE(msg.ke.key), cl);
+	}
+
         return;
 
 
     case rfbPointerEvent:
 
-        cl->rfbPointerEventsRcvd++;
+	cl->rfbPointerEventsRcvd++;
 
-        if ((n = ReadExact(cl, ((char *)&msg) + 1,
-                           sz_rfbPointerEventMsg - 1)) <= 0) {
-            if (n != 0)
-                rfbLogPerror("rfbProcessClientNormalMessage: read");
-            rfbCloseClient(cl);
-            return;
-        }
+	if ((n = ReadExact(cl, ((char *)&msg) + 1,
+			   sz_rfbPointerEventMsg - 1)) <= 0) {
+	    if (n != 0)
+		rfbLogPerror("rfbProcessClientNormalMessage: read");
+	    rfbCloseClient(cl);
+	    return;
+	}
 
-        if (pointerClient && (pointerClient != cl))
-            return;
+	if (pointerClient && (pointerClient != cl))
+	    return;
 
-        if (msg.pe.buttonMask == 0)
-            pointerClient = NULL;
-        else
-            pointerClient = cl;
+	if (msg.pe.buttonMask == 0)
+	    pointerClient = NULL;
+	else
+	    pointerClient = cl;
 
-        cl->screen->ptrAddEvent(msg.pe.buttonMask,
-                    Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), cl);
+	if(!cl->viewOnly) {
+	    cl->screen->ptrAddEvent(msg.pe.buttonMask,
+				    Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), cl);
+	}
+
         return;
 
 
     case rfbClientCutText:
 
-        if ((n = ReadExact(cl, ((char *)&msg) + 1,
-                           sz_rfbClientCutTextMsg - 1)) <= 0) {
-            if (n != 0)
-                rfbLogPerror("rfbProcessClientNormalMessage: read");
-            rfbCloseClient(cl);
-            return;
-        }
+	if ((n = ReadExact(cl, ((char *)&msg) + 1,
+			   sz_rfbClientCutTextMsg - 1)) <= 0) {
+	    if (n != 0)
+		rfbLogPerror("rfbProcessClientNormalMessage: read");
+	    rfbCloseClient(cl);
+	    return;
+	}
 
-        msg.cct.length = Swap32IfLE(msg.cct.length);
+	if(!cl->viewOnly) {
+	    msg.cct.length = Swap32IfLE(msg.cct.length);
 
-        str = (char *)malloc(msg.cct.length);
+	    str = (char *)malloc(msg.cct.length);
 
-        if ((n = ReadExact(cl, str, msg.cct.length)) <= 0) {
-            if (n != 0)
-                rfbLogPerror("rfbProcessClientNormalMessage: read");
-            free(str);
-            rfbCloseClient(cl);
-            return;
-        }
+	    if ((n = ReadExact(cl, str, msg.cct.length)) <= 0) {
+		if (n != 0)
+		    rfbLogPerror("rfbProcessClientNormalMessage: read");
+		free(str);
+		rfbCloseClient(cl);
+		return;
+	    }
 
-        cl->screen->setXCutText(str, msg.cct.length, cl);
+	    cl->screen->setXCutText(str, msg.cct.length, cl);
+	    free(str);
+	}
 
-        free(str);
         return;
 
 
@@ -1166,6 +1176,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
             nUpdateRegionRects += (((w-1) / cl->correMaxWidth + 1)
                                      * ((h-1) / cl->correMaxHeight + 1));
         }
+	sraRgnReleaseIterator(i);
 #ifdef HAVE_LIBZ
     } else if (cl->preferredEncoding == rfbEncodingZlib) {
 	nUpdateRegionRects = 0;
@@ -1193,6 +1204,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	    }
 	    nUpdateRegionRects += n;
 	}
+	sraRgnReleaseIterator(i);
 #endif
 #endif
     } else {
@@ -1201,6 +1213,14 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
     fu->type = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
+	if(cl->screen->maxRectsPerUpdate>0
+	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {
+	    sraRegion* newUpdateRegion = sraRgnBBox(updateRegion);
+	    sraRgnDestroy(updateRegion);
+	    updateRegion = newUpdateRegion;
+	    nUpdateRegionRects = sraRgnCountRects(updateRegion);
+	}
+
 	fu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
 					 nUpdateRegionRects +
 					 !!sendCursorShape + !!sendCursorPos));

@@ -1,20 +1,14 @@
 immediate:
 ----------
 
-x11vnc: clipboard, cursor
+TightVNC encoding!!! Regression!!!
 extra_bytes in rfbDrawCharWithClip.
 tested mouse buttons make copy rect, but text is not marked as mod.
-cursor drawing: set optional grain to mark bigger rectangles as drawn (else
-	you end up with thousands of one-pixel-rectangles to encode).
-selectbox: scroll bars
-documentation
-	hint that to mark very tiny regions as
-	modified is possibly inefficient for the encodings.
-	(a trail of points could better be a small rectangle).
 
 later:
 ------
 
+selectbox: scroll bars
 authentification schemes (secure vnc)
 	IO function ptr exists; now explain how to tunnel and implement a
 	client address restriction scheme.
@@ -24,6 +18,17 @@ CORBA
 done:
 -----
 
+.following two items overridden by RealVNC's idea: if there are too many
+	rectangles (like >50), just use the bounding box.
+  cursor drawing: set optional grain to mark bigger rectangles as drawn (else
+	you end up with thousands of one-pixel-rectangles to encode).
+  documentation
+	hint that to mark very tiny regions as
+	modified is possibly inefficient for the encodings.
+	(a trail of points could better be a small rectangle).
+
+.viewonly/full password method
+.x11vnc: clipboard, cursor (Karl's work)
 .autoconf also CARD8,CARD16,...
 .autoconf
 .internal HTTP tunnelling feature (needs a special GET target and a few

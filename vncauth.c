@@ -142,9 +142,13 @@ void
 vncRandomBytes(unsigned char *bytes)
 {
     int i;
-    unsigned int seed = (unsigned int) time(0);
+    static Bool s_srandom_called = FALSE;
 
-    srandom(seed);
+    if (!s_srandom_called) {
+	srandom((unsigned int)time(0) ^ (unsigned int)getpid());
+	s_srandom_called = TRUE;
+    }
+
     for (i = 0; i < CHALLENGESIZE; i++) {
 	bytes[i] = (unsigned char)(random() & 255);    
     }

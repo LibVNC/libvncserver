@@ -232,7 +232,12 @@ typedef struct _rfbScreenInfo
 
     PasswordCheckProcPtr passwordCheck;
     void* rfbAuthPasswdData;
+    /* If rfbAuthPasswdData is given a list, this is the first
+       view only password. */
+    int rfbAuthPasswdFirstViewOnly;
 
+    /* send only this many rectangles in one update */
+    int maxRectsPerUpdate;
     /* this is the amount of milliseconds to wait at least before sending
      * an update. */
     int rfbDeferUpdateTime;
@@ -328,6 +333,8 @@ typedef struct _rfbClientRec {
     Bool useCopyRect;
     int preferredEncoding;
     int correMaxWidth, correMaxHeight;
+
+    Bool viewOnly;
 
     /* The following member is only used during VNC authentication */
     uint8_t authChallenge[CHALLENGESIZE];

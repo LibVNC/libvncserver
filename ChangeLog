@@ -1,3 +1,9 @@
+   checked sync with TightVNC 1.2.8:
+	viewonly/full passwords; if given a list, only the first is a full one
+	vncRandomBytes is a little more secure now
+	new weights for tight encoding
+   checked sync with RealVNC 3.3.7
+	introduced maxRectsPerUpdate
    added first alpha version of LibVNCClient
    added simple and simple15 example (really simple examples)
    finally got around to fix configure in CVS
@@ -20,6 +26,7 @@
    more portable way to determine endianness and types of a given size
 	through autoconf based methods
 0.5
+   rpm packaging through autoconf
    autoconf'ed the whole package (including optional support for zlib,
 	pthreads and libjpeg as well as zrle/c++)
    moved appropriate files to contrib/ and examples/ respectively

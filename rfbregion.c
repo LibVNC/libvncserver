@@ -582,6 +582,39 @@ sraRgnOffset(sraRegion *dst, int dx, int dy) {
   }
 }
 
+sraRegion *sraRgnBBox(const sraRegion *src) {
+  int xmin=((unsigned int)(int)-1)>>1,ymin=xmin,xmax=1-xmin,ymax=xmax;
+  sraSpan *vcurr, *hcurr;
+
+  if(!src)
+    return sraRgnCreate();
+
+  vcurr = ((sraSpanList*)src)->front._next;
+  while (vcurr != &(((sraSpanList*)src)->back)) {
+    if(vcurr->start<ymin)
+      ymin=vcurr->start;
+    if(vcurr->end>ymax)
+      ymax=vcurr->end;
+    
+    hcurr = vcurr->subspan->front._next;
+    while (hcurr != &(vcurr->subspan->back)) {
+      if(hcurr->start<xmin)
+	xmin=hcurr->start;
+      if(hcurr->end>xmax)
+	xmax=hcurr->end;
+      fprintf(stderr,"%d,%d,%d,%d\n",hcurr->start,vcurr->start,hcurr->end,vcurr->end);
+      hcurr = hcurr->_next;
+    }
+
+    vcurr = vcurr->_next;
+  }
+
+  if(xmax<xmin || ymax<ymin)
+    return sraRgnCreate();
+
+  return sraRgnCreateRect(xmin,ymin,xmax,ymax);
+}
+
 Bool
 sraRgnPopRect(sraRegion *rgn, sraRect *rect, unsigned long flags) {
   sraSpan *vcurr, *hcurr;

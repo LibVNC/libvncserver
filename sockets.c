@@ -521,6 +521,7 @@ ListenOnTCPPort(port)
     int sock;
     int one = 1;
 
+    memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     /* addr.sin_addr.s_addr = interface.s_addr; */
@@ -555,6 +556,7 @@ ConnectToTcpAddr(host, port)
     int sock;
     struct sockaddr_in addr;
 
+    memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
 
@@ -587,6 +589,7 @@ ListenOnUDPPort(port)
     int sock;
     int one = 1;
 
+    memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     /* addr.sin_addr.s_addr = interface.s_addr; */
