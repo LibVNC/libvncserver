@@ -39,7 +39,7 @@ static char* NoPassword(rfbClient* client) {
 #include <stdio.h>
 #include <termios.h>
 static char* ReadPassword(rfbClient* client) {
-	int i=8;
+	int i;
 	char* p=malloc(9);
 	struct termios save,noecho;
 	p[0]=0;
@@ -47,8 +47,17 @@ static char* ReadPassword(rfbClient* client) {
 	noecho=save; noecho.c_lflag &= ~ECHO;
 	if(tcsetattr(fileno(stdin),TCSAFLUSH,&noecho)!=0) return p;
 	fprintf(stderr,"Password: ");
-	getline(&p,&i,stdin);
-	if(i>0 && p[i-2]=='\n') p[i-2]=0;
+	i=0;
+	while(1) {
+		int c=fgetc(stdin);
+		if(c=='\n')
+			break;
+		if(i<8) {
+			p[i]=c;
+			i++;
+			p[i]=0;
+		}
+	}
 	tcsetattr(fileno(stdin),TCSAFLUSH,&save);
 	return p;
 }
