@@ -125,9 +125,6 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 {
    ClientData* cd=cl->clientData;
 
-   if(cl->screen->cursorIsDrawn)
-     rfbUndrawCursor(cl->screen);
-
    if(x>=0 && y>=0 && x<maxx && y<maxy) {
       if(buttonMask) {
 	 int i,j,x1,x2,y1,y2;
@@ -172,8 +169,6 @@ void dokey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
     if(key==XK_Escape)
       rfbCloseClient(cl);
     else if(key==XK_Page_Up) {
-      if(cl->screen->cursorIsDrawn)
-	rfbUndrawCursor(cl->screen);
       initBuffer((unsigned char*)cl->screen->frameBuffer);
       rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
     } else if (key == XK_Up) {
@@ -195,8 +190,6 @@ void dokey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
     } else if(key>=' ' && key<0x100) {
       ClientData* cd=cl->clientData;
       int x1=cd->oldx,y1=cd->oldy,x2,y2;
-      if(cl->screen->cursorIsDrawn)
-	rfbUndrawCursor(cl->screen);
       cd->oldx+=rfbDrawCharWithClip(cl->screen,&radonFont,cd->oldx,cd->oldy,(char)key,0,0,cl->screen->width,cl->screen->height,0x00ffffff,0x00ffffff);
       rfbFontBBox(&radonFont,(char)key,&x1,&y1,&x2,&y2);
       rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);

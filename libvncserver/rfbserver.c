@@ -60,7 +60,11 @@
 #define DEBUGPROTO(x)
 #endif
 
-static rfbClientPtr pointerClient = NULL;  /* "Mutex" for pointer events */
+/* from cursor.c */
+
+void rfbShowCursor(rfbClientPtr cl);
+void rfbHideCursor(rfbClientPtr cl);
+void rfbRedrawAfterHideCursor(rfbClientPtr cl);
 
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
@@ -327,6 +331,8 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->enableCursorPosUpdates = FALSE;
       cl->useRichCursorEncoding = FALSE;
       cl->enableLastRectEncoding = FALSE;
+      cl->cursorX = rfbScreen->cursorX;
+      cl->cursorY = rfbScreen->cursorY;
       cl->useNewFBSize = FALSE;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -452,8 +458,8 @@ rfbClientConnectionGone(cl)
 #endif
 #endif
 
-    if (pointerClient == cl)
-        pointerClient = NULL;
+    if (cl->screen->pointerClient == cl)
+        cl->screen->pointerClient = 0;
 
     sraRgnDestroy(cl->modifiedRegion);
     sraRgnDestroy(cl->requestedRegion);
@@ -756,13 +762,6 @@ rfbProcessClientNormalMessage(cl)
 
         msg.se.nEncodings = Swap16IfLE(msg.se.nEncodings);
 
-        cl->preferredEncoding = -1;
-	cl->useCopyRect = FALSE;
-	cl->enableCursorShapeUpdates = FALSE;
-	cl->enableCursorPosUpdates = FALSE;
-	cl->enableLastRectEncoding = FALSE;
-        cl->useNewFBSize = FALSE;
-
         for (i = 0; i < msg.se.nEncodings; i++) {
             if ((n = rfbReadExact(cl, (char *)&enc, 4)) <= 0) {
                 if (n != 0)
@@ -827,6 +826,10 @@ rfbProcessClientNormalMessage(cl)
 		if(!cl->screen->dontConvertRichCursorToXCursor) {
 		    rfbLog("Enabling X-style cursor updates for client %s\n",
 			   cl->host);
+		    /* if cursor was drawn, hide the cursor */
+		    if(!cl->enableCursorShapeUpdates)
+		        rfbRedrawAfterHideCursor(cl);
+
 		    cl->enableCursorShapeUpdates = TRUE;
 		    cl->cursorWasChanged = TRUE;
 		}
@@ -834,6 +837,10 @@ rfbProcessClientNormalMessage(cl)
 	    case rfbEncodingRichCursor:
 	        rfbLog("Enabling full-color cursor updates for client %s\n",
 		       cl->host);
+		/* if cursor was drawn, hide the cursor */
+		if(!cl->enableCursorShapeUpdates)
+		    rfbRedrawAfterHideCursor(cl);
+
 	        cl->enableCursorShapeUpdates = TRUE;
 	        cl->useRichCursorEncoding = TRUE;
 	        cl->cursorWasChanged = TRUE;
@@ -994,13 +1001,13 @@ rfbProcessClientNormalMessage(cl)
 	    return;
 	}
 
-	if (pointerClient && (pointerClient != cl))
+	if (cl->screen->pointerClient && cl->screen->pointerClient != cl)
 	    return;
 
 	if (msg.pe.buttonMask == 0)
-	    pointerClient = NULL;
+	    cl->screen->pointerClient = 0;
 	else
-	    pointerClient = cl;
+	    cl->screen->pointerClient = cl;
 
 	if(!cl->viewOnly) {
 	    cl->screen->ptrAddEvent(msg.pe.buttonMask,
@@ -1066,7 +1073,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
      rfbClientPtr cl;
      sraRegionPtr givenUpdateRegion;
 {
-    sraRectangleIterator* i;
+    sraRectangleIterator* i=0;
     sraRect rect;
     int nUpdateRegionRects;
     rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
@@ -1074,6 +1081,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     int dx, dy;
     rfbBool sendCursorShape = FALSE;
     rfbBool sendCursorPos = FALSE;
+    rfbBool result = TRUE;
 
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
@@ -1103,16 +1111,8 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
      */
 
     if (cl->enableCursorShapeUpdates) {
-      if (cl->screen->cursorIsDrawn) {
-	rfbUndrawCursor(cl->screen);
-      }
-      if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged &&
-	  cl->readyForSetColourMapEntries)
+      if (cl->cursorWasChanged && cl->readyForSetColourMapEntries)
 	  sendCursorShape = TRUE;
-    } else {
-      if (!cl->screen->cursorIsDrawn) {
-	rfbDrawCursor(cl->screen);
-      }
     }
 
     /*
@@ -1162,6 +1162,9 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
     sraRgnOr(updateRegion,cl->copyRegion);
     if(!sraRgnAnd(updateRegion,cl->requestedRegion) &&
+       sraRgnEmpty(updateRegion) &&
+       (cl->enableCursorShapeUpdates ||
+	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY)) &&
        !sendCursorShape && !sendCursorPos) {
       sraRgnDestroy(updateRegion);
       UNLOCK(cl->updateMutex);
@@ -1201,22 +1204,32 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
      * carry over a copyRegion for a future update.
      */
 
-
      sraRgnOr(cl->modifiedRegion,cl->copyRegion);
      sraRgnSubtract(cl->modifiedRegion,updateRegion);
      sraRgnSubtract(cl->modifiedRegion,updateCopyRegion);
 
-     sraRgnMakeEmpty(cl->requestedRegion);
+     /* TODO: is this sensible? sraRgnMakeEmpty(cl->requestedRegion); */
      sraRgnMakeEmpty(cl->copyRegion);
      cl->copyDX = 0;
      cl->copyDY = 0;
    
      UNLOCK(cl->updateMutex);
    
+    if (!cl->enableCursorShapeUpdates) {
+      if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
+	rfbRedrawAfterHideCursor(cl);
+	LOCK(cl->screen->cursorMutex);
+	cl->cursorX = cl->screen->cursorX;
+	cl->cursorY = cl->screen->cursorY;
+	UNLOCK(cl->screen->cursorMutex);
+	rfbRedrawAfterHideCursor(cl);
+      }
+      rfbShowCursor(cl);
+    }
+
    /*
      * Now send the update.
      */
-
     cl->framebufferUpdateMessagesSent++;
 
     if (cl->preferredEncoding == rfbEncodingCoRRE) {
@@ -1291,26 +1304,19 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
    if (sendCursorShape) {
 	cl->cursorWasChanged = FALSE;
-	if (!rfbSendCursorShape(cl)) {
-	    sraRgnDestroy(updateRegion);
-	    return FALSE;
-	}
+	if (!rfbSendCursorShape(cl))
+	    goto updateFailed;
     }
    
    if (sendCursorPos) {
 	cl->cursorWasMoved = FALSE;
-	if (!rfbSendCursorPos(cl)) {
-	    sraRgnDestroy(updateRegion);
-	    return FALSE;
-	}
-    }
+	if (!rfbSendCursorPos(cl))
+	        goto updateFailed;
+   }
    
     if (!sraRgnEmpty(updateCopyRegion)) {
-	if (!rfbSendCopyRegion(cl,updateCopyRegion,dx,dy)) {
-	    sraRgnDestroy(updateRegion);
-	    sraRgnDestroy(updateCopyRegion);
-	    return FALSE;
-	}
+	if (!rfbSendCopyRegion(cl,updateCopyRegion,dx,dy))
+	        goto updateFailed;
     }
 
     sraRgnDestroy(updateCopyRegion);
@@ -1326,77 +1332,59 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 
         switch (cl->preferredEncoding) {
         case rfbEncodingRaw:
-            if (!rfbSendRectEncodingRaw(cl, x, y, w, h)) {
-	        sraRgnDestroy(updateRegion);
-		sraRgnReleaseIterator(i);
-                return FALSE;
-            }
+            if (!rfbSendRectEncodingRaw(cl, x, y, w, h))
+	        goto updateFailed;
             break;
         case rfbEncodingRRE:
-            if (!rfbSendRectEncodingRRE(cl, x, y, w, h)) {
-	        sraRgnDestroy(updateRegion);
-		sraRgnReleaseIterator(i);
-                return FALSE;
-            }
+            if (!rfbSendRectEncodingRRE(cl, x, y, w, h))
+	        goto updateFailed;
             break;
         case rfbEncodingCoRRE:
-            if (!rfbSendRectEncodingCoRRE(cl, x, y, w, h)) {
-	        sraRgnDestroy(updateRegion);
-		sraRgnReleaseIterator(i);
-                return FALSE;
-            }
-            break;
+            if (!rfbSendRectEncodingCoRRE(cl, x, y, w, h))
+	        goto updateFailed;
+	    break;
         case rfbEncodingHextile:
-            if (!rfbSendRectEncodingHextile(cl, x, y, w, h)) {
-	        sraRgnDestroy(updateRegion);
-		sraRgnReleaseIterator(i);
-                return FALSE;
-            }
+            if (!rfbSendRectEncodingHextile(cl, x, y, w, h))
+	        goto updateFailed;
             break;
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	case rfbEncodingZlib:
-	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h)) {
-	        sraRgnDestroy(updateRegion);
-		sraRgnReleaseIterator(i);
-		return FALSE;
-	    }
+	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h))
+	        goto updateFailed;
 	    break;
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	case rfbEncodingTight:
-	    if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
-	        sraRgnDestroy(updateRegion);
-		sraRgnReleaseIterator(i);
-		return FALSE;
-	    }
+	    if (!rfbSendRectEncodingTight(cl, x, y, w, h))
+	        goto updateFailed;
 	    break;
 #endif
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
        case rfbEncodingZRLE:
-           if (!rfbSendRectEncodingZRLE(cl, x, y, w, h)) {
-	       sraRgnDestroy(updateRegion);
-		sraRgnReleaseIterator(i);
-               return FALSE;
-           }
+           if (!rfbSendRectEncodingZRLE(cl, x, y, w, h))
+	       goto updateFailed;
            break;
 #endif
         }
     }
-    sraRgnReleaseIterator(i);
 
     if ( nUpdateRegionRects == 0xFFFF &&
-	 !rfbSendLastRectMarker(cl) ) {
-        sraRgnDestroy(updateRegion);
-	return FALSE;
-    }
+	 !rfbSendLastRectMarker(cl) )
+	    goto updateFailed;
 
     if (!rfbSendUpdateBuf(cl)) {
-        sraRgnDestroy(updateRegion);
-        return FALSE;
+updateFailed:
+	result = FALSE;
     }
 
+    if (!cl->enableCursorShapeUpdates) {
+      rfbHideCursor(cl);
+    }
+
+    if(i)
+        sraRgnReleaseIterator(i);
     sraRgnDestroy(updateRegion);
-    return TRUE;
+    return result;
 }
 
 

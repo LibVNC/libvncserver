@@ -50,6 +50,9 @@ char rfbEndianTest = -1;
 void rfbIncrClientRef(rfbClientPtr cl);
 void rfbDecrClientRef(rfbClientPtr cl);
 
+/* cursor.c */
+void rfbRedrawAfterHideCursor(rfbClientPtr cl);
+
 void rfbLogEnable(int enabled) {
   rfbEnableLogging=enabled;
 }
@@ -95,8 +98,6 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
 
-   rfbUndrawCursor(rfbScreen);
-  
    iterator=rfbGetClientIterator(rfbScreen);
    while((cl=rfbClientIteratorNext(iterator))) {
      LOCK(cl->updateMutex);
@@ -132,23 +133,6 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
        sraRgnAnd(modifiedRegionBackup,cl->copyRegion);
        sraRgnOr(cl->modifiedRegion,modifiedRegionBackup);
        sraRgnDestroy(modifiedRegionBackup);
-
-#if 0
-       /* TODO: is this needed? Or does it mess up deferring? */
-       /* while(!sraRgnEmpty(cl->copyRegion)) */ {
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-	 if(!cl->screen->backgroundLoop)
-#endif
-	   {
-	     sraRegionPtr updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
-	     sraRgnOr(updateRegion,cl->copyRegion);
-	     UNLOCK(cl->updateMutex);
-	     rfbSendFramebufferUpdate(cl,updateRegion);
-	     sraRgnDestroy(updateRegion);
-	     continue;
-	   }
-       }
-#endif
      } else {
        sraRgnOr(cl->modifiedRegion,copyRegion);
      }
@@ -167,8 +151,6 @@ void rfbDoCopyRegion(rfbScreenInfoPtr screen,sraRegionPtr copyRegion,int dx,int 
     rowstride=screen->paddedWidthInBytes;
    char *in,*out;
 
-   rfbUndrawCursor(screen);
-  
    /* copy it, really */
    i = sraRgnGetReverseIterator(copyRegion,dx<0,dy<0);
    while(sraRgnIteratorNext(i,&rect)) {
@@ -372,23 +354,21 @@ rfbDefaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 {
   rfbClientIteratorPtr iterator;
   rfbClientPtr other_client;
+  rfbScreenInfoPtr s = cl->screen;
+  rfbCursorPtr c = s->cursor;
 
-  if (x != cl->screen->cursorX || y != cl->screen->cursorY) {
-    if (cl->screen->cursorIsDrawn)
-      rfbUndrawCursor(cl->screen);
-    LOCK(cl->screen->cursorMutex);
-    if (!cl->screen->cursorIsDrawn) {
-      cl->screen->cursorX = x;
-      cl->screen->cursorY = y;
-    }
-    UNLOCK(cl->screen->cursorMutex);
+  if (x != s->cursorX || y != s->cursorY) {
+    LOCK(s->cursorMutex);
+    s->cursorX = x;
+    s->cursorY = y;
+    UNLOCK(s->cursorMutex);
 
     /* The cursor was moved by this client, so don't send CursorPos. */
     if (cl->enableCursorPosUpdates)
       cl->cursorWasMoved = FALSE;
 
     /* But inform all remaining clients about this cursor movement. */
-    iterator = rfbGetClientIterator(cl->screen);
+    iterator = rfbGetClientIterator(s);
     while ((other_client = rfbClientIteratorNext(iterator)) != NULL) {
       if (other_client != cl && other_client->enableCursorPosUpdates) {
 	other_client->cursorWasMoved = TRUE;
@@ -562,6 +542,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    screen->autoPort=FALSE;
    screen->clientHead=0;
+   screen->pointerClient=0;
    screen->port=5900;
    screen->socketInitDone=FALSE;
 
@@ -623,8 +604,6 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    /* cursor */
 
-   screen->cursorIsDrawn = FALSE;
-   screen->dontSendFramebufferUpdate = FALSE;
    screen->cursorX=screen->cursorY=screen->underCursorBufferLen=0;
    screen->underCursorBuffer=NULL;
    screen->dontConvertRichCursorToXCursor = FALSE;
@@ -671,10 +650,6 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
   rfbBool format_changed = FALSE;
   rfbClientIteratorPtr iterator;
   rfbClientPtr cl;
-
-  /* Remove the pointer */
-
-  rfbUndrawCursor(screen);
 
   /* Update information in the screenInfo structure */
 

@@ -50,8 +50,7 @@ void vcDrawOrHideCursor(vncConsolePtr c)
 
 void vcDrawCursor(vncConsolePtr c)
 {
-  rfbDrawCursor(c->screen);
-  if(c->cursorActive && !c->cursorIsDrawn && c->y<c->height && c->x<c->width) {
+  if(c->cursorActive && c->y<c->height && c->x<c->width) {
     /* rfbLog("DrawCursor: %d,%d\n",c->x,c->y); */
     vcDrawOrHideCursor(c);
   }
@@ -59,13 +58,9 @@ void vcDrawCursor(vncConsolePtr c)
 
 void vcHideCursor(vncConsolePtr c)
 {
-  rfbUndrawCursor(c->screen);
   if(c->currentlyMarking)
     vcUnmark(c);
-  if(c->cursorIsDrawn) {
-    /* rfbLog("HideCursor: %d,%d\n",c->x,c->y); */
-    vcDrawOrHideCursor(c);
-  }
+  vcDrawOrHideCursor(c);
 }
 
 void vcMakeSureCursorIsDrawn(rfbClientPtr cl)
@@ -393,8 +388,6 @@ void vcKbdAddEventProc(rfbBool down,rfbKeySym keySym,rfbClientPtr cl)
 void vcPtrAddEventProc(int buttonMask,int x,int y,rfbClientPtr cl)
 {
   vncConsolePtr c=(vncConsolePtr)cl->screen->screenData;
-
-  rfbUndrawCursor(c->screen);
 
   if(c->wasRightButtonDown) {
     if((buttonMask&4)==0) {

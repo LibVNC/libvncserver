@@ -1,3 +1,24 @@
+2005-01-18  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* rfb/rfb.h libvncserver/rfbserver.c: pointerClient was still static
+	* libvncserver/rfbserver.c: do not make requestedRegion empty without
+	  reason.
+	* almost everything: the cursor handling for clients which don't handle
+	  CursorShape updates was completely broken. It originally was very
+	  complicated for performance reasons, however, in most cases it made
+	  performance even worse, because at idle times there was way too much
+	  checking going on, and furthermore, sometimes unnecessary updates
+	  were inevitable.
+	  The code now is much more elegant: the ClientRec structure knows
+	  exactly where it last painted the cursor, and the ScreenInfo
+	  structure knows where the cursor shall be.
+	  As a consequence there is no more rfbDrawCursor()/rfbUndrawCursor(),
+	  no more dontSendFramebufferUpdate, and no more isCursorDrawn.
+	  It is now possible to have clients which understand CursorShape
+	  updates and clients which don't at the same time.
+	* libvncserver/cursor.c: rfbSetCursor no longer has the option
+	  freeOld; this is obsolete, as the cursor structure knows what
+	  to free and what not.
+
 2005-01-15  Karl Runge <runge@karlrunge.com>
 	* rfb/rfb.h: add alphaSource and alphaPreMultiplied to rfbCursor. 
 	* libvncserver/cursor.c: do cursor alpha blending in rfbDrawCursor()

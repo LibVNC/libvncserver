@@ -145,7 +145,6 @@ void on_key_press (rfbBool down,rfbKeySym key,rfbClientPtr cl)
 
         case XK_b:
         case XK_B:
-                rfbUndrawCursor(cl->screen);
                 blank_framebuffer(cl->screen->frameBuffer, 0, 0, maxx, maxy);
                 rfbDrawString(cl->screen,&default8x16Font,20,maxy-20,"Hello, World!",0xffffff);
                 rfbMarkRectAsModified(cl->screen,0, 0,maxx,maxy);
@@ -153,7 +152,6 @@ void on_key_press (rfbBool down,rfbKeySym key,rfbClientPtr cl)
                 break;
         case XK_p:
         case XK_P:
-                rfbUndrawCursor(cl->screen);
                 /* draw_primary_colors (cl->screen->frameBuffer, 0, 0, maxx, maxy); */
 		draw_primary_colours_generic_ultrafast (cl->screen, 0, 0, maxx, maxy);
                 rfbMarkRectAsModified(cl->screen,0, 0,maxx,maxy);
@@ -165,7 +163,6 @@ void on_key_press (rfbBool down,rfbKeySym key,rfbClientPtr cl)
                 exit(0);
         case XK_C:
         case XK_c:
-                rfbUndrawCursor(cl->screen);
 		rfbDrawString(cl->screen,&default8x16Font,20,100,"Hello, World!",0xffffff);
                 rfbMarkRectAsModified(cl->screen,0, 0,maxx,maxy);
                 break;

@@ -160,47 +160,6 @@ typedef struct _rfbScreenInfo
      */
     void* screenData;
   
-    /* The following two members are used to minimise the amount of unnecessary
-       drawing caused by cursor movement.  Whenever any drawing affects the
-       part of the screen where the cursor is, the cursor is removed first and
-       then the drawing is done (this is what the sprite routines test for).
-       Afterwards, however, we do not replace the cursor, even when the cursor
-       is logically being moved across the screen.  We only draw the cursor
-       again just as we are about to send the client a framebuffer update.
-
-       We need to be careful when removing and drawing the cursor because of
-       their relationship with the normal drawing routines.  The drawing
-       routines can invoke the cursor routines, but also the cursor routines
-       themselves end up invoking drawing routines.
-
-       Removing the cursor (rfbUndrawCursor) is eventually achieved by
-       doing a CopyArea from a pixmap to the screen, where the pixmap contains
-       the saved contents of the screen under the cursor.  Before doing this,
-       however, we set cursorIsDrawn to FALSE.  Then, when CopyArea is called,
-       it sees that cursorIsDrawn is FALSE and so doesn't feel the need to
-       (recursively!) remove the cursor before doing it.
-
-       Putting up the cursor (rfbDrawCursor) involves a call to
-       PushPixels.  While this is happening, cursorIsDrawn must be FALSE so
-       that PushPixels doesn't think it has to remove the cursor first.
-       Obviously cursorIsDrawn is set to TRUE afterwards.
-
-       Another problem we face is that drawing routines sometimes cause a
-       framebuffer update to be sent to the RFB client.  When the RFB client is
-       already waiting for a framebuffer update and some drawing to the
-       framebuffer then happens, the drawing routine sees that the client is
-       ready, so it calls rfbSendFramebufferUpdate.  If the cursor is not drawn
-       at this stage, it must be put up, and so rfbSpriteRestoreCursor is
-       called.  However, if the original drawing routine was actually called
-       from within rfbSpriteRestoreCursor or rfbSpriteRemoveCursor we don't
-       want this to happen.  So both the cursor routines set
-       dontSendFramebufferUpdate to TRUE, and all the drawing routines check
-       this before calling rfbSendFramebufferUpdate. */
-
-    rfbBool cursorIsDrawn;		    /* TRUE if the cursor is currently drawn */
-    rfbBool dontSendFramebufferUpdate; /* TRUE while removing or drawing the
-				       cursor */
-   
     /* additions by libvncserver */
 
     rfbPixelFormat serverFormat;
@@ -257,9 +216,11 @@ typedef struct _rfbScreenInfo
     rfbBool neverShared;
     rfbBool dontDisconnect;
     struct _rfbClientRec* clientHead;
+    struct _rfbClientRec* pointerClient;  /* "Mutex" for pointer events */
+
 
     /* cursor */
-    int cursorX, cursorY,oldCursorX,oldCursorY,underCursorBufferLen;
+    int cursorX, cursorY,underCursorBufferLen;
     char* underCursorBuffer;
     rfbBool dontConvertRichCursorToXCursor;
     struct rfbCursor* cursor;
@@ -460,6 +421,8 @@ typedef struct _rfbClientRec {
     rfbBool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
     rfbBool cursorWasChanged;         /* cursor shape update should be sent */
     rfbBool cursorWasMoved;           /* cursor position update should be sent */
+    int cursorX,cursorY;	      /* the coordinates of the cursor,
+					 if enableCursorShapeUpdates = FALSE */
 
     rfbBool useNewFBSize;             /* client supports NewFBSize encoding */
     rfbBool newFBSizePending;         /* framebuffer size was changed */
@@ -501,8 +464,10 @@ typedef struct _rfbClientRec {
  */
 
 #define FB_UPDATE_PENDING(cl)                                              \
-     ((!(cl)->enableCursorShapeUpdates && !(cl)->screen->cursorIsDrawn) || \
-     ((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||         \
+     (((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||        \
+     (((cl)->enableCursorShapeUpdates == FALSE &&                          \
+       ((cl)->cursorX != (cl)->screen->cursorX ||                          \
+	(cl)->cursorY != (cl)->screen->cursorY))) ||                       \
      ((cl)->useNewFBSize && (cl)->newFBSizePending) ||                     \
      ((cl)->enableCursorPosUpdates && (cl)->cursorWasMoved) ||             \
      !sraRgnEmpty((cl)->copyRegion) || !sraRgnEmpty((cl)->modifiedRegion))
@@ -677,9 +642,7 @@ extern char* rfbMakeMaskForXCursor(int width,int height,char* cursorString);
 extern void rfbMakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
 extern void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor);
 extern void rfbFreeCursor(rfbCursorPtr cursor);
-extern void rfbDrawCursor(rfbScreenInfoPtr rfbScreen);
-extern void rfbUndrawCursor(rfbScreenInfoPtr rfbScreen);
-extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,rfbBool freeOld);
+extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c);
 
 /* cursor handling for the pointer */
 extern void rfbDefaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
@@ -725,7 +688,6 @@ void rfbFreeFont(rfbFontDataPtr font);
 
 /* draw.c */
 
-/* You have to call rfbUndrawCursor before using these functions */
 void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);
 void rfbDrawPixel(rfbScreenInfoPtr s,int x,int y,rfbPixel col);
 void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col);

@@ -7162,7 +7162,6 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("process_remote_cmd: turning on cursorshape mode.\n");
 
-		rfbUndrawCursor(screen);
 		set_no_cursor();
 		cursor_shape_updates = 1;
 		restore_cursor_shape_updates(screen);
@@ -7176,7 +7175,6 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("process_remote_cmd: turning off cursorshape mode.\n");
 		
-		rfbUndrawCursor(screen);
 		set_no_cursor();
 		for (i=0; i<max; i++) {
 			/* XXX: try to force empty cursor back to client */
@@ -8319,7 +8317,6 @@ void setup_cursors(void) {
 	first = 0;
 
 	if (screen) {
-		rfbUndrawCursor(screen);
 		screen->cursor = NULL;
 		LOCK(screen->cursorMutex);
 	}
@@ -8686,9 +8683,6 @@ int get_xfixes_cursor(int init) {
 			}
 		}
 
-		if (screen) {
-			rfbUndrawCursor(screen);
-		}
 		/* we need to create the cursor and overwrite oldest */
 		use = oldest;
 		if (cursors[use]->rfb) {
@@ -9080,11 +9074,12 @@ void mark_cursor_patch_modified(rfbScreenInfoPtr s, int old) {
 		return;
 	}
 
-	if (old) {
-		/* use oldCursor pos */
+	/* TODO Karl: is this needed any longer? */
+	/* if (old) {
+		/* use oldCursor pos *//*
 		curx = s->oldCursorX;
 		cury = s->oldCursorY;
-	} else {
+	} else */ {
 		curx = s->cursorX;
 		cury = s->cursorY;
 	}
@@ -9257,18 +9252,15 @@ void cursor_position(int x, int y) {
 	if (x == screen->cursorX && y == screen->cursorY) {
 		return;
 	}
+	/* TODO Karl: do we really need x_old,y_old? */
+	/*
 	x_old = screen->oldCursorX;
 	y_old = screen->oldCursorY;
-
-	if (screen->cursorIsDrawn) {
-		rfbUndrawCursor(screen);
-	}
+	*/
 
 	LOCK(screen->cursorMutex);
-	if (! screen->cursorIsDrawn) {
-		screen->cursorX = x;
-		screen->cursorY = y;
-	}
+	screen->cursorX = x;
+	screen->cursorY = y;
 	UNLOCK(screen->cursorMutex);
 
 	iter = rfbGetClientIterator(screen);
@@ -9304,11 +9296,13 @@ void cursor_position(int x, int y) {
 	}
 	rfbReleaseClientIterator(iter);
 
+	/* TODO Karl: do we need x_old, y_old? */
+	/*
 	if (nonCursorPosUpdates_clients && show_cursor) {
 		if (x_old != x || y_old != y) {
 			mark_cursor_patch_modified(screen, 0);
 		}
-	}
+	}*/
 
 	if (debug_pointer && cnt) {
 		rfbLog("cursor_position: sent position x=%3d y=%3d to %d"
@@ -9355,9 +9349,10 @@ void set_rfb_cursor(int which) {
 		rfbLog("non-existent cursor: which=%d\n", which);
 		return;
 	} else {
-		rfbSetCursor(screen, cursors[which]->rfb, FALSE);
+		rfbSetCursor(screen, cursors[which]->rfb);
 	}
 
+	/* TODO Karl: is this still necessary? */
 	/* this is a 2nd workaround for rfbSetCursor() */
 	if (workaround > 1) {
 		if (screen->underCursorBuffer == NULL &&
@@ -9368,6 +9363,7 @@ void set_rfb_cursor(int which) {
 		}
 	}
 
+	/* TODO Karl: is this still necessary? */
 	if (workaround) {
 		set_cursor_was_changed(screen);
 	}
@@ -14366,7 +14362,6 @@ static void watch_loop(void) {
 			double tm = 0.0;
 			dtime(&tm);
 
-			rfbUndrawCursor(screen);
 			if (use_snapfb) {
 				int t, tries = 5;
 				copy_snap();
