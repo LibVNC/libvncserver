@@ -1,3 +1,5 @@
+   make rfbLog overridable (suggested by Erik)
+   don't reutrn on EINTR in WriteExact()/ReadExact() (suggested by Erik)
    use AX_PREFIX_CONFIG_H to prefix constants in config.h to avoid
 	name clashes (also suggested by Erik)
    transformed Bool, KeySym, Pixel to rfbBool, rfbKeySym, rfbPixel
