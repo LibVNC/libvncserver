@@ -709,6 +709,15 @@ rfbProcessClientNormalMessage(cl)
 		    cl->enableLastRectEncoding = TRUE;
 		}
 		break;
+#ifdef BACKCHANNEL
+	    case rfbEncodingBackChannel:
+	        if (!cl->enableBackChannel) {
+		    rfbLog("Enabling BackChannel protocol extension for "
+			   "client %s\n", cl->host);
+		    cl->enableBackChannel = TRUE;
+		}
+		break;
+#endif
             default:
 		if ( enc >= (CARD32)rfbEncodingCompressLevel0 &&
 		     enc <= (CARD32)rfbEncodingCompressLevel9 ) {
@@ -1470,18 +1479,20 @@ void rfbSendBackChannel(rfbScreenInfoPtr rfbScreen,char* str,int len)
 
     iterator = rfbGetClientIterator(rfbScreen);
     while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
-        sct.type = rfbBackChannel;
-        sct.length = Swap32IfLE(len);
-        if (WriteExact(cl, (char *)&sct,
-                       sz_rfbServerCutTextMsg) < 0) {
-            rfbLogPerror("rfbSendServerCutText: write");
-            rfbCloseClient(cl);
-            continue;
-        }
-        if (WriteExact(cl, str, len) < 0) {
-            rfbLogPerror("rfbSendServerCutText: write");
-            rfbCloseClient(cl);
-        }
+        if (cl->enableBackChannel) {
+	    sct.type = rfbBackChannel;
+	    sct.length = Swap32IfLE(len);
+	    if (WriteExact(cl, (char *)&sct,
+			   sz_rfbBackChannelMsg) < 0) {
+	        rfbLogPerror("rfbSendBackChannel: write");
+		rfbCloseClient(cl);
+		continue;
+	    }
+	    if (WriteExact(cl, str, len) < 0) {
+	        rfbLogPerror("rfbSendBackChannel: write");
+		rfbCloseClient(cl);
+	    }
+	}
     }
     rfbReleaseClientIterator(iterator);
 }

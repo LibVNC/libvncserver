@@ -4,8 +4,8 @@ int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 		 int x,int y,unsigned char c,Pixel col)
 {
   int i,j,width,height;
-  unsigned char d;
   unsigned char* data=font->data+font->metaData[c*5];
+  unsigned char d=*data;
   int rowstride=rfbScreen->paddedWidthInBytes;
   int bpp=rfbScreen->rfbServerFormat.bitsPerPixel/8;
   char *colour=(char*)&col;
@@ -49,8 +49,8 @@ int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 			Pixel col,Pixel bcol)
 {
   int i,j,width,height;
-  unsigned char d;
   unsigned char* data=font->data+font->metaData[c*5];
+  unsigned char d;
   int rowstride=rfbScreen->paddedWidthInBytes;
   int bpp=rfbScreen->rfbServerFormat.bitsPerPixel/8,extra_bytes=0;
   char* colour=(char*)&col;
@@ -73,6 +73,7 @@ int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
   if(y2<y+height) height-=y+height-y2;
   if(x2<x+width) { extra_bytes+=(x1+width)/8-(x+width-x2+7)/8; width-=x+width-x2; }
 
+  d=*data;
   for(j=y1;j<height;j++) {
     if((x1&7)!=0)
       d=data[-1]; /* TODO: check if in this case extra_bytes is correct! */

@@ -610,6 +610,7 @@ typedef struct {
 
 #ifdef BACKCHANNEL
 typedef rfbServerCutTextMsg rfbBackChannelMsg;
+#define sz_rfbBackChannelMsg 8
 #endif
 
 

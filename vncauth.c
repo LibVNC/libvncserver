@@ -26,8 +26,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef WIN32
 #include <time.h>
+#ifdef WIN32
 #define srandom srand
 #define random rand
 #else

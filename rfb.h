@@ -473,6 +473,9 @@ typedef struct rfbClientRec {
     Bool enableCursorShapeUpdates; /* client supports cursor shape updates */
     Bool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
     Bool cursorWasChanged;         /* cursor shape update should be sent */
+#ifdef BACKCHANNEL
+    Bool enableBackChannel;
+#endif
 
     struct rfbClientRec *prev;
     struct rfbClientRec *next;
