@@ -1221,8 +1221,9 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
             int y = rect.y1;
             int w = rect.x2 - x;
             int h = rect.y2 - y;
-            nUpdateRegionRects += (((w-1) / cl->correMaxWidth + 1)
-                                     * ((h-1) / cl->correMaxHeight + 1));
+	    int rectsPerRow = (w-1)/cl->correMaxWidth+1;
+	    int rows = (h-1)/cl->correMaxHeight+1;
+	    nUpdateRegionRects += rectsPerRow*rows;
         }
 	sraRgnReleaseIterator(i);
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -1266,6 +1267,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	   /* Tight encoding counts the rectangles differently */
 	   && cl->preferredEncoding != rfbEncodingTight
+	   && cl->preferredEncoding != rfbEncodingCoRRE
 #endif
 	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {
 	    sraRegion* newUpdateRegion = sraRgnBBox(updateRegion);
