@@ -122,7 +122,7 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
     /* 
      * Convert pixel data to client format.
      */
-    (*cl->translateFn)(cl->translateLookupTable, &cl->screen->rfbServerFormat,
+    (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
 		       &cl->format, fbptr, zlibBeforeBuf,
 		       cl->screen->paddedWidthInBytes, w, h);
 
@@ -174,8 +174,8 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
      */
 
     /* Update statics */
-    cl->rfbRectanglesSent[rfbEncodingZlib]++;
-    cl->rfbBytesSent[rfbEncodingZlib] += (sz_rfbFramebufferUpdateRectHeader
+    cl->rectanglesSent[rfbEncodingZlib]++;
+    cl->bytesSent[rfbEncodingZlib] += (sz_rfbFramebufferUpdateRectHeader
 					 + sz_rfbZlibHeader + zlibAfterBufLen);
 
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader

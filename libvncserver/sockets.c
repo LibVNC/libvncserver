@@ -139,8 +139,8 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
         rfbLog("Autoprobing TCP port \n");
 
         for (i = 5900; i < 6000; i++) {
-            if ((rfbScreen->rfbListenSock = ListenOnTCPPort(i)) >= 0) {
-		rfbScreen->rfbPort = i;
+            if ((rfbScreen->listenSock = rfbListenOnTCPPort(i)) >= 0) {
+		rfbScreen->port = i;
 		break;
 	    }
         }
@@ -150,28 +150,28 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	    return;
         }
 
-        rfbLog("Autoprobing selected port %d\n", rfbScreen->rfbPort);
+        rfbLog("Autoprobing selected port %d\n", rfbScreen->port);
         FD_ZERO(&(rfbScreen->allFds));
-        FD_SET(rfbScreen->rfbListenSock, &(rfbScreen->allFds));
-        rfbScreen->maxFd = rfbScreen->rfbListenSock;
+        FD_SET(rfbScreen->listenSock, &(rfbScreen->allFds));
+        rfbScreen->maxFd = rfbScreen->listenSock;
     }
-    else if(rfbScreen->rfbPort>0) {
-      rfbLog("Listening for VNC connections on TCP port %d\n", rfbScreen->rfbPort);
+    else if(rfbScreen->port>0) {
+      rfbLog("Listening for VNC connections on TCP port %d\n", rfbScreen->port);
 
-      if ((rfbScreen->rfbListenSock = ListenOnTCPPort(rfbScreen->rfbPort)) < 0) {
+      if ((rfbScreen->listenSock = rfbListenOnTCPPort(rfbScreen->port)) < 0) {
 	rfbLogPerror("ListenOnTCPPort");
 	return;
       }
 
       FD_ZERO(&(rfbScreen->allFds));
-      FD_SET(rfbScreen->rfbListenSock, &(rfbScreen->allFds));
-      rfbScreen->maxFd = rfbScreen->rfbListenSock;
+      FD_SET(rfbScreen->listenSock, &(rfbScreen->allFds));
+      rfbScreen->maxFd = rfbScreen->listenSock;
     }
 
     if (rfbScreen->udpPort != 0) {
 	rfbLog("rfbInitSockets: listening for input on UDP port %d\n",rfbScreen->udpPort);
 
-	if ((rfbScreen->udpSock = ListenOnUDPPort(rfbScreen->udpPort)) < 0) {
+	if ((rfbScreen->udpSock = rfbListenOnUDPPort(rfbScreen->udpPort)) < 0) {
 	    rfbLogPerror("ListenOnUDPPort");
 	    return;
 	}
@@ -223,9 +223,9 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	return;
     }
 
-    if (rfbScreen->rfbListenSock != -1 && FD_ISSET(rfbScreen->rfbListenSock, &fds)) {
+    if (rfbScreen->listenSock != -1 && FD_ISSET(rfbScreen->listenSock, &fds)) {
 
-	if ((sock = accept(rfbScreen->rfbListenSock,
+	if ((sock = accept(rfbScreen->listenSock,
 			   (struct sockaddr *)&addr, &addrlen)) < 0) {
 	    rfbLogPerror("rfbCheckFds: accept");
 	    return;
@@ -260,7 +260,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 
 	rfbNewClient(rfbScreen,sock);
 	
-	FD_CLR(rfbScreen->rfbListenSock, &fds);
+	FD_CLR(rfbScreen->listenSock, &fds);
 	if (--nfds == 0)
 	    return;
     }
@@ -359,7 +359,7 @@ rfbConnect(rfbScreen, host, port)
     rfbLog("Making connection to client on host %s port %d\n",
 	   host,port);
 
-    if ((sock = ConnectToTcpAddr(host, port)) < 0) {
+    if ((sock = rfbConnectToTcpAddr(host, port)) < 0) {
 	rfbLogPerror("connection failed");
 	return -1;
     }
@@ -393,7 +393,7 @@ rfbConnect(rfbScreen, host, port)
  */
 
 int
-ReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
+rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 {
     int sock = cl->sock;
     int n;
@@ -441,9 +441,9 @@ ReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
     return 1;
 }
 
-int ReadExact(rfbClientPtr cl,char* buf,int len)
+int rfbReadExact(rfbClientPtr cl,char* buf,int len)
 {
-  return(ReadExactTimeout(cl,buf,len,rfbMaxClientWait));
+  return(rfbReadExactTimeout(cl,buf,len,rfbMaxClientWait));
 }
 
 /*
@@ -453,7 +453,7 @@ int ReadExact(rfbClientPtr cl,char* buf,int len)
  */
 
 int
-WriteExact(cl, buf, len)
+rfbWriteExact(cl, buf, len)
      rfbClientPtr cl;
      const char *buf;
      int len;
@@ -531,7 +531,7 @@ WriteExact(cl, buf, len)
 }
 
 int
-ListenOnTCPPort(port)
+rfbListenOnTCPPort(port)
     int port;
 {
     struct sockaddr_in addr;
@@ -565,7 +565,7 @@ ListenOnTCPPort(port)
 }
 
 int
-ConnectToTcpAddr(host, port)
+rfbConnectToTcpAddr(host, port)
     char *host;
     int port;
 {
@@ -599,7 +599,7 @@ ConnectToTcpAddr(host, port)
 }
 
 int
-ListenOnUDPPort(port)
+rfbListenOnUDPPort(port)
     int port;
 {
     struct sockaddr_in addr;

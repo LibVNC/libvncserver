@@ -62,7 +62,7 @@ static unsigned char fixedkey[8] = {23,82,107,6,35,78,88,7};
  */
 
 int
-vncEncryptAndStorePasswd(char *passwd, char *fname)
+rfbEncryptAndStorePasswd(char *passwd, char *fname)
 {
     FILE *fp;
     unsigned int i;
@@ -88,8 +88,8 @@ vncEncryptAndStorePasswd(char *passwd, char *fname)
     /* Do encryption in-place - this way we overwrite our copy of the plaintext
        password */
 
-    deskey(fixedkey, EN0);
-    des(encryptedPasswd, encryptedPasswd);
+    rfbDesKey(fixedkey, EN0);
+    rfbDes(encryptedPasswd, encryptedPasswd);
 
     for (i = 0; i < 8; i++) {
 	putc(encryptedPasswd[i], fp);
@@ -107,7 +107,7 @@ vncEncryptAndStorePasswd(char *passwd, char *fname)
  */
 
 char *
-vncDecryptPasswdFromFile(char *fname)
+rfbDecryptPasswdFromFile(char *fname)
 {
     FILE *fp;
     int i, ch;
@@ -126,8 +126,8 @@ vncDecryptPasswdFromFile(char *fname)
 
     fclose(fp);
 
-    deskey(fixedkey, DE1);
-    des(passwd, passwd);
+    rfbDesKey(fixedkey, DE1);
+    rfbDes(passwd, passwd);
 
     passwd[8] = 0;
 
@@ -141,7 +141,7 @@ vncDecryptPasswdFromFile(char *fname)
  */
 
 void
-vncRandomBytes(unsigned char *bytes)
+rfbRandomBytes(unsigned char *bytes)
 {
     int i;
     static rfbBool s_srandom_called = FALSE;
@@ -162,7 +162,7 @@ vncRandomBytes(unsigned char *bytes)
  */
 
 void
-vncEncryptBytes(unsigned char *bytes, char *passwd)
+rfbEncryptBytes(unsigned char *bytes, char *passwd)
 {
     unsigned char key[8];
     unsigned int i;
@@ -177,9 +177,9 @@ vncEncryptBytes(unsigned char *bytes, char *passwd)
 	}
     }
 
-    deskey(key, EN0);
+    rfbDesKey(key, EN0);
 
     for (i = 0; i < CHALLENGESIZE; i += 8) {
-	des(bytes+i, bytes+i);
+	rfbDes(bytes+i, bytes+i);
     }
 }

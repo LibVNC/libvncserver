@@ -157,7 +157,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 
       cd->oldx=x; cd->oldy=y; cd->oldButton=buttonMask;
    }
-   defaultPtrAddEvent(buttonMask,x,y,cl);
+   rfbDefaultPtrAddEvent(buttonMask,x,y,cl);
 }
 
 /* aux function to draw a character to x, y */
@@ -277,7 +277,7 @@ int main(int argc,char** argv)
     rfbGetScreen(&argc,argv,maxx,maxy,8,3,bpp);
   rfbScreen->desktopName = "LibVNCServer Example";
   rfbScreen->frameBuffer = (char*)malloc(maxx*maxy*bpp);
-  rfbScreen->rfbAlwaysShared = TRUE;
+  rfbScreen->alwaysShared = TRUE;
   rfbScreen->ptrAddEvent = doptr;
   rfbScreen->kbdAddEvent = dokey;
   rfbScreen->newClientHook = newclient;

@@ -52,7 +52,7 @@ typedef struct vncConsole {
   rfbBool dontDrawCursor; /* for example, while scrolling */
 
   rfbFontDataPtr font;
-  rfbScreenInfoPtr rfbScreen;
+  rfbScreenInfoPtr screen;
 } vncConsole, *vncConsolePtr;
 
 #ifdef USE_ATTRIBUTE_BUFFER

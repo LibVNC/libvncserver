@@ -46,11 +46,11 @@ rfbSendCursorShape(cl)
 
     if (cl->useRichCursorEncoding) {
       if(pCursor && !pCursor->richSource)
-	MakeRichCursorFromXCursor(cl->screen,pCursor);
+	rfbMakeRichCursorFromXCursor(cl->screen,pCursor);
       rect.encoding = Swap32IfLE(rfbEncodingRichCursor);
     } else {
        if(pCursor && !pCursor->source)
-	 MakeXCursorFromRichCursor(cl->screen,pCursor);
+	 rfbMakeXCursorFromRichCursor(cl->screen,pCursor);
        rect.encoding = Swap32IfLE(rfbEncodingXCursor);
     }
 
@@ -73,8 +73,8 @@ rfbSendCursorShape(cl)
 	       sz_rfbFramebufferUpdateRectHeader);
 	cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-	cl->rfbCursorShapeBytesSent += sz_rfbFramebufferUpdateRectHeader;
-	cl->rfbCursorShapeUpdatesSent++;
+	cl->cursorShapeBytesSent += sz_rfbFramebufferUpdateRectHeader;
+	cl->cursorShapeUpdatesSent++;
 
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
@@ -139,10 +139,10 @@ rfbSendCursorShape(cl)
 	}
     } else {
 	/* RichCursor encoding. */
-       int bpp1=cl->screen->rfbServerFormat.bitsPerPixel/8,
+       int bpp1=cl->screen->serverFormat.bitsPerPixel/8,
 	 bpp2=cl->format.bitsPerPixel/8;
        (*cl->translateFn)(cl->translateLookupTable,
-		       &(cl->screen->rfbServerFormat),
+		       &(cl->screen->serverFormat),
                        &cl->format, (char*)pCursor->richSource,
 		       &cl->updateBuf[cl->ublen],
                        pCursor->width*bpp1, pCursor->width, pCursor->height);
@@ -163,8 +163,8 @@ rfbSendCursorShape(cl)
 
     /* Send everything we have prepared in the cl->updateBuf[]. */
 
-    cl->rfbCursorShapeBytesSent += (cl->ublen - saved_ublen);
-    cl->rfbCursorShapeUpdatesSent++;
+    cl->cursorShapeBytesSent += (cl->ublen - saved_ublen);
+    cl->cursorShapeUpdatesSent++;
 
     if (!rfbSendUpdateBuf(cl))
 	return FALSE;
@@ -196,8 +196,8 @@ rfbSendCursorPos(rfbClientPtr cl)
 	 sz_rfbFramebufferUpdateRectHeader);
   cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-  cl->rfbCursorPosBytesSent += sz_rfbFramebufferUpdateRectHeader;
-  cl->rfbCursorPosUpdatesSent++;
+  cl->cursorPosBytesSent += sz_rfbFramebufferUpdateRectHeader;
+  cl->cursorPosUpdatesSent++;
 
   if (!rfbSendUpdateBuf(cl))
     return FALSE;
@@ -326,9 +326,9 @@ void rfbFreeCursor(rfbCursorPtr cursor)
 }
 
 /* background and foregroud colour have to be set beforehand */
-void MakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
+void rfbMakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
 {
-   rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
+   rfbPixelFormat* format=&rfbScreen->serverFormat;
    int i,j,w=(cursor->width+7)/8,bpp=format->bitsPerPixel/8,
      width=cursor->width*bpp;
    uint32_t background;
@@ -352,9 +352,9 @@ void MakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
 	 cursor->source[j*w+i/8]|=bit;
 }
 
-void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
+void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
 {
-   rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
+   rfbPixelFormat* format=&rfbScreen->serverFormat;
    int i,j,w=(cursor->width+7)/8,bpp=format->bitsPerPixel/8;
    uint32_t background,foreground;
    char *back=(char*)&background,*fore=(char*)&foreground;
@@ -387,7 +387,7 @@ void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
 void rfbUndrawCursor(rfbScreenInfoPtr s)
 {
    rfbCursorPtr c=s->cursor;
-   int j,x1,x2,y1,y2,bpp=s->rfbServerFormat.bitsPerPixel/8,
+   int j,x1,x2,y1,y2,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
    LOCK(s->cursorMutex);
    if(!s->cursorIsDrawn || !c) {
@@ -429,7 +429,7 @@ void rfbUndrawCursor(rfbScreenInfoPtr s)
 void rfbDrawCursor(rfbScreenInfoPtr s)
 {
    rfbCursorPtr c=s->cursor;
-   int i,j,x1,x2,y1,y2,i1,j1,bpp=s->rfbServerFormat.bitsPerPixel/8,
+   int i,j,x1,x2,y1,y2,i1,j1,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
      bufSize,w;
    rfbBool wasChanged=FALSE;
@@ -487,7 +487,7 @@ void rfbDrawCursor(rfbScreenInfoPtr s)
    }
    
    if(!c->richSource)
-     MakeRichCursorFromXCursor(s,c);
+     rfbMakeRichCursorFromXCursor(s,c);
    
    /* now the cursor has to be drawn */
    for(j=0;j<y2;j++)

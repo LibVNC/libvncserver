@@ -25,24 +25,24 @@ unsigned char colourMap16[16*3]={
 void MakeColourMap16(vncConsolePtr c)
 {
   int i,j;
-  rfbColourMap* colourMap=&(c->rfbScreen->colourMap);
+  rfbColourMap* colourMap=&(c->screen->colourMap);
   if(colourMap->count)
     free(colourMap->data.bytes);
   colourMap->data.bytes=malloc(16*3);
   memcpy(colourMap->data.bytes,colourMap16,16*3);
   colourMap->count=16;
   colourMap->is16=FALSE;
-  c->rfbScreen->rfbServerFormat.trueColour=FALSE;
+  c->screen->serverFormat.trueColour=FALSE;
 }
 
 void vcDrawOrHideCursor(vncConsolePtr c)
 {
-  int i,j,w=c->rfbScreen->paddedWidthInBytes;
-  char *b=c->rfbScreen->frameBuffer+c->y*c->cHeight*w+c->x*c->cWidth;
+  int i,j,w=c->screen->paddedWidthInBytes;
+  char *b=c->screen->frameBuffer+c->y*c->cHeight*w+c->x*c->cWidth;
   for(j=c->cy1;j<c->cy2;j++)
     for(i=c->cx1;i<c->cx2;i++)
       b[j*w+i]^=0x0f;
-  rfbMarkRectAsModified(c->rfbScreen,
+  rfbMarkRectAsModified(c->screen,
 			c->x*c->cWidth+c->cx1,c->y*c->cHeight+c->cy1,
 			c->x*c->cWidth+c->cx2,c->y*c->cHeight+c->cy2);
   c->cursorIsDrawn=c->cursorIsDrawn?FALSE:TRUE;
@@ -50,7 +50,7 @@ void vcDrawOrHideCursor(vncConsolePtr c)
 
 void vcDrawCursor(vncConsolePtr c)
 {
-  rfbDrawCursor(c->rfbScreen);
+  rfbDrawCursor(c->screen);
   if(c->cursorActive && !c->cursorIsDrawn && c->y<c->height && c->x<c->width) {
     /* rfbLog("DrawCursor: %d,%d\n",c->x,c->y); */
     vcDrawOrHideCursor(c);
@@ -59,7 +59,7 @@ void vcDrawCursor(vncConsolePtr c)
 
 void vcHideCursor(vncConsolePtr c)
 {
-  rfbUndrawCursor(c->rfbScreen);
+  rfbUndrawCursor(c->screen);
   if(c->currentlyMarking)
     vcUnmark(c);
   if(c->cursorIsDrawn) {
@@ -126,23 +126,23 @@ vncConsolePtr vcGetConsole(int *argc,char **argv,
   if(c->cy1<0)
     c->cy2=0;
 
-  c->rfbScreen=
+  c->screen=
     rfbGetScreen(argc,argv,c->cWidth*c->width,c->cHeight*c->height,8,1,1);
-  c->rfbScreen->screenData=(void*)c;
-  c->rfbScreen->displayHook=vcMakeSureCursorIsDrawn;
-  c->rfbScreen->frameBuffer=
-    (char*)malloc(c->rfbScreen->width*c->rfbScreen->height);
-  memset(c->rfbScreen->frameBuffer,c->backColour,
-	 c->rfbScreen->width*c->rfbScreen->height);
-  c->rfbScreen->kbdAddEvent=vcKbdAddEventProc;
-  c->rfbScreen->ptrAddEvent=vcPtrAddEventProc;
-  c->rfbScreen->setXCutText=vcSetXCutTextProc;
+  c->screen->screenData=(void*)c;
+  c->screen->displayHook=vcMakeSureCursorIsDrawn;
+  c->screen->frameBuffer=
+    (char*)malloc(c->screen->width*c->screen->height);
+  memset(c->screen->frameBuffer,c->backColour,
+	 c->screen->width*c->screen->height);
+  c->screen->kbdAddEvent=vcKbdAddEventProc;
+  c->screen->ptrAddEvent=vcPtrAddEventProc;
+  c->screen->setXCutText=vcSetXCutTextProc;
 
   MakeColourMap16(c);
   c->foreColour=0x7;
   c->backColour=0;
 
-  rfbInitServer(c->rfbScreen);
+  rfbInitServer(c->screen);
 
   return(c);
 }
@@ -153,7 +153,7 @@ vncConsolePtr vcGetConsole(int *argc,char **argv,
 void vcScroll(vncConsolePtr c,int lineCount)
 {
   int y1,y2;
-  rfbScreenInfoPtr s=c->rfbScreen;
+  rfbScreenInfoPtr s=c->screen;
 
   if(lineCount==0)
     return;
@@ -232,7 +232,7 @@ void vcPutChar(vncConsolePtr c,unsigned char ch)
 
 void vcPutCharColour(vncConsolePtr c,unsigned char ch,unsigned char foreColour,unsigned char backColour)
 {
-  rfbScreenInfoPtr s=c->rfbScreen;
+  rfbScreenInfoPtr s=c->screen;
   int j,x,y;
 
   vcHideCursor(c);
@@ -394,15 +394,15 @@ void vcPtrAddEventProc(int buttonMask,int x,int y,rfbClientPtr cl)
 {
   vncConsolePtr c=(vncConsolePtr)cl->screen->screenData;
 
-  rfbUndrawCursor(c->rfbScreen);
+  rfbUndrawCursor(c->screen);
 
   if(c->wasRightButtonDown) {
     if((buttonMask&4)==0) {
       if(c->selection) {
 	char* s;
 	for(s=c->selection;*s;s++) {
-	  c->rfbScreen->kbdAddEvent(1,*s,cl);
-	  c->rfbScreen->kbdAddEvent(0,*s,cl);
+	  c->screen->kbdAddEvent(1,*s,cl);
+	  c->screen->kbdAddEvent(0,*s,cl);
 	}
       }
       c->wasRightButtonDown=0;
@@ -455,9 +455,9 @@ void vcPtrAddEventProc(int buttonMask,int x,int y,rfbClientPtr cl)
     memcpy(c->selection,c->screenBuffer+i,j-i);
     c->selection[j-i]=0;
     vcUnmark(c);
-    rfbGotXCutText(c->rfbScreen,c->selection,j-i);
+    rfbGotXCutText(c->screen,c->selection,j-i);
   }
-  defaultPtrAddEvent(buttonMask,x,y,cl);
+  rfbDefaultPtrAddEvent(buttonMask,x,y,cl);
 }
 
 void vcSetXCutTextProc(char* str,int len, struct _rfbClientRec* cl)
@@ -475,12 +475,12 @@ void vcToggleMarkCell(vncConsolePtr c,int pos)
   int x=(pos%c->width)*c->cWidth,
     y=(pos/c->width)*c->cHeight;
   int i,j;
-  rfbScreenInfoPtr s=c->rfbScreen;
+  rfbScreenInfoPtr s=c->screen;
   char *b=s->frameBuffer+y*s->width+x;
   for(j=0;j<c->cHeight;j++)
     for(i=0;i<c->cWidth;i++)
       b[j*s->width+i]^=0x0f;
-  rfbMarkRectAsModified(c->rfbScreen,x,y,x+c->cWidth,y+c->cHeight);
+  rfbMarkRectAsModified(c->screen,x,y,x+c->cWidth,y+c->cHeight);
 }
 
 void vcUnmark(vncConsolePtr c)
@@ -498,6 +498,6 @@ void vcUnmark(vncConsolePtr c)
 
 void vcProcessEvents(vncConsolePtr c)
 {
-  rfbProcessEvents(c->rfbScreen,c->selectTimeOut);
+  rfbProcessEvents(c->screen,c->selectTimeOut);
 }
 

@@ -33,7 +33,7 @@
 		 + (cl->screen->paddedWidthInBytes * ty)                   \
                  + (tx * (cl->screen->bitsPerPixel / 8)));                 \
                                                                            \
-  (*cl->translateFn)(cl->translateLookupTable, &cl->screen->rfbServerFormat,\
+  (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,\
                      &cl->format, fbptr, (char*)buf,                       \
                      cl->screen->paddedWidthInBytes, tw, th); }
 
@@ -123,8 +123,8 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
     break;
   }
 
-  cl->rfbRectanglesSent[rfbEncodingZRLE]++;
-  cl->rfbBytesSent[rfbEncodingZRLE] += (sz_rfbFramebufferUpdateRectHeader
+  cl->rectanglesSent[rfbEncodingZRLE]++;
+  cl->bytesSent[rfbEncodingZRLE] += (sz_rfbFramebufferUpdateRectHeader
                                         + sz_rfbZRLEHeader + ZRLE_BUFFER_LENGTH(&zos->out));
 
   if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbZRLEHeader

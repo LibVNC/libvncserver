@@ -84,7 +84,7 @@ static size_t buf_filled=0;
  */
 
 void
-httpInitSockets(rfbScreenInfoPtr rfbScreen)
+rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
 {
     if (rfbScreen->httpInitDone)
 	return;
@@ -95,14 +95,14 @@ httpInitSockets(rfbScreenInfoPtr rfbScreen)
 	return;
 
     if (rfbScreen->httpPort == 0) {
-	rfbScreen->httpPort = rfbScreen->rfbPort-100;
+	rfbScreen->httpPort = rfbScreen->port-100;
     }
 
     rfbLog("Listening for HTTP connections on TCP port %d\n", rfbScreen->httpPort);
 
-    rfbLog("  URL http://%s:%d\n",rfbScreen->rfbThisHost,rfbScreen->httpPort);
+    rfbLog("  URL http://%s:%d\n",rfbScreen->thisHost,rfbScreen->httpPort);
 
-    if ((rfbScreen->httpListenSock = ListenOnTCPPort(rfbScreen->httpPort)) < 0) {
+    if ((rfbScreen->httpListenSock = rfbListenOnTCPPort(rfbScreen->httpPort)) < 0) {
 	rfbLogPerror("ListenOnTCPPort");
 	return;
     }
@@ -117,7 +117,7 @@ httpInitSockets(rfbScreenInfoPtr rfbScreen)
  */
 
 void
-httpCheckFds(rfbScreenInfoPtr rfbScreen)
+rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
 {
     int nfds;
     fd_set fds;
@@ -274,15 +274,15 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     if(rfbScreen->httpEnableProxyConnect) {
 	const static char* PROXY_OK_STR = "HTTP/1.0 200 OK\r\nContent-Type: octet-stream\r\nPragma: no-cache\r\n\r\n";
 	if(!strncmp(buf, "CONNECT ", 8)) {
-	    if(atoi(strchr(buf, ':')+1)!=rfbScreen->rfbPort) {
+	    if(atoi(strchr(buf, ':')+1)!=rfbScreen->port) {
 		rfbErr("httpd: CONNECT format invalid.\n");
-		WriteExact(&cl,INVALID_REQUEST_STR, strlen(INVALID_REQUEST_STR));
+		rfbWriteExact(&cl,INVALID_REQUEST_STR, strlen(INVALID_REQUEST_STR));
 		httpCloseSock(rfbScreen);
 		return;
 	    }
 	    /* proxy connection */
 	    rfbLog("httpd: client asked for CONNECT\n");
-	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
+	    rfbWriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
 	    rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);
 	    rfbScreen->httpSock = -1;
 	    return;
@@ -290,7 +290,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	if (!strncmp(buf, "GET ",4) && !strncmp(strchr(buf,'/'),"/proxied.connection HTTP/1.", 27)) {
 	    /* proxy connection */
 	    rfbLog("httpd: client asked for /proxied.connection\n");
-	    WriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
+	    rfbWriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
 	    rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);
 	    rfbScreen->httpSock = -1;
 	    return;
@@ -320,14 +320,14 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
     if (fname[0] != '/') {
 	rfbErr("httpd: filename didn't begin with '/'\n");
-	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
+	rfbWriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
 	httpCloseSock(rfbScreen);
 	return;
     }
 
     if (strchr(fname+1, '/') != NULL) {
 	rfbErr("httpd: asking for file in other directory\n");
-	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
+	rfbWriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
 	httpCloseSock(rfbScreen);
 	return;
     }
@@ -366,12 +366,12 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
     if ((fd = fopen(fullFname, "r")) == 0) {
         rfbLogPerror("httpProcessInput: open");
-        WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
+        rfbWriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
         httpCloseSock(rfbScreen);
         return;
     }
 
-    WriteExact(&cl, OK_STR, strlen(OK_STR));
+    rfbWriteExact(&cl, OK_STR, strlen(OK_STR));
 
     while (1) {
 	int n = fread(buf, 1, BUF_SIZE-1, fd);
@@ -397,74 +397,74 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	    buf[n] = 0; /* make sure it's null-terminated */
 
 	    while ((dollar = strchr(ptr, '$'))!=NULL) {
-		WriteExact(&cl, ptr, (dollar - ptr));
+		rfbWriteExact(&cl, ptr, (dollar - ptr));
 
 		ptr = dollar;
 
 		if (compareAndSkip(&ptr, "$WIDTH")) {
 
 		    sprintf(str, "%d", rfbScreen->width);
-		    WriteExact(&cl, str, strlen(str));
+		    rfbWriteExact(&cl, str, strlen(str));
 
 		} else if (compareAndSkip(&ptr, "$HEIGHT")) {
 
 		    sprintf(str, "%d", rfbScreen->height);
-		    WriteExact(&cl, str, strlen(str));
+		    rfbWriteExact(&cl, str, strlen(str));
 
 		} else if (compareAndSkip(&ptr, "$APPLETWIDTH")) {
 
 		    sprintf(str, "%d", rfbScreen->width);
-		    WriteExact(&cl, str, strlen(str));
+		    rfbWriteExact(&cl, str, strlen(str));
 
 		} else if (compareAndSkip(&ptr, "$APPLETHEIGHT")) {
 
 		    sprintf(str, "%d", rfbScreen->height + 32);
-		    WriteExact(&cl, str, strlen(str));
+		    rfbWriteExact(&cl, str, strlen(str));
 
 		} else if (compareAndSkip(&ptr, "$PORT")) {
 
-		    sprintf(str, "%d", rfbScreen->rfbPort);
-		    WriteExact(&cl, str, strlen(str));
+		    sprintf(str, "%d", rfbScreen->port);
+		    rfbWriteExact(&cl, str, strlen(str));
 
 		} else if (compareAndSkip(&ptr, "$DESKTOP")) {
 
-		    WriteExact(&cl, rfbScreen->desktopName, strlen(rfbScreen->desktopName));
+		    rfbWriteExact(&cl, rfbScreen->desktopName, strlen(rfbScreen->desktopName));
 
 		} else if (compareAndSkip(&ptr, "$DISPLAY")) {
 
-		    sprintf(str, "%s:%d", rfbScreen->rfbThisHost, rfbScreen->rfbPort-5900);
-		    WriteExact(&cl, str, strlen(str));
+		    sprintf(str, "%s:%d", rfbScreen->thisHost, rfbScreen->port-5900);
+		    rfbWriteExact(&cl, str, strlen(str));
 
 		} else if (compareAndSkip(&ptr, "$USER")) {
 #ifndef WIN32
 		    if (user) {
-			WriteExact(&cl, user,
+			rfbWriteExact(&cl, user,
 				   strlen(user));
 		    } else
 #endif
-			WriteExact(&cl, "?", 1);
+			rfbWriteExact(&cl, "?", 1);
 		} else if (compareAndSkip(&ptr, "$PARAMS")) {
 		    if (params[0] != '\0')
-			WriteExact(&cl, params, strlen(params));
+			rfbWriteExact(&cl, params, strlen(params));
 		} else {
 		    if (!compareAndSkip(&ptr, "$$"))
 			ptr++;
 
-		    if (WriteExact(&cl, "$", 1) < 0) {
+		    if (rfbWriteExact(&cl, "$", 1) < 0) {
 			fclose(fd);
 			httpCloseSock(rfbScreen);
 			return;
 		    }
 		}
 	    }
-	    if (WriteExact(&cl, ptr, (&buf[n] - ptr)) < 0)
+	    if (rfbWriteExact(&cl, ptr, (&buf[n] - ptr)) < 0)
 		break;
 
 	} else {
 
 	    /* For files not ending .vnc, just write out the buffer */
 
-	    if (WriteExact(&cl, buf, n) < 0)
+	    if (rfbWriteExact(&cl, buf, n) < 0)
 		break;
 	}
     }

@@ -58,8 +58,8 @@ rfbSendRectEncodingHextile(cl, x, y, w, h)
            sz_rfbFramebufferUpdateRectHeader);
     cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-    cl->rfbRectanglesSent[rfbEncodingHextile]++;
-    cl->rfbBytesSent[rfbEncodingHextile] += sz_rfbFramebufferUpdateRectHeader;
+    cl->rectanglesSent[rfbEncodingHextile]++;
+    cl->bytesSent[rfbEncodingHextile] += sz_rfbFramebufferUpdateRectHeader;
 
     switch (cl->format.bitsPerPixel) {
     case 8:
@@ -130,7 +130,7 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
             fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)   \
                      + (x * (cl->screen->bitsPerPixel / 8)));                     \
                                                                                 \
-            (*cl->translateFn)(cl->translateLookupTable, &(cl->screen->rfbServerFormat),      \
+            (*cl->translateFn)(cl->translateLookupTable, &(cl->screen->serverFormat),      \
                                &cl->format, fbptr, (char *)clientPixelData,     \
                                cl->screen->paddedWidthInBytes, w, h);             \
                                                                                 \
@@ -149,7 +149,7 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
             }                                                                   \
                                                                                 \
             if (solid) {                                                        \
-                cl->rfbBytesSent[rfbEncodingHextile] += cl->ublen - startUblen; \
+                cl->bytesSent[rfbEncodingHextile] += cl->ublen - startUblen; \
                 continue;                                                       \
             }                                                                   \
                                                                                 \
@@ -174,7 +174,7 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
                 cl->ublen = startUblen;                                         \
                 cl->updateBuf[cl->ublen++] = rfbHextileRaw;                     \
                 (*cl->translateFn)(cl->translateLookupTable,                    \
-                                   &(cl->screen->rfbServerFormat), &cl->format, fbptr,        \
+                                   &(cl->screen->serverFormat), &cl->format, fbptr,        \
                                    (char *)clientPixelData,                     \
                                    cl->screen->paddedWidthInBytes, w, h);         \
                                                                                 \
@@ -184,7 +184,7 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
                 cl->ublen += w * h * (bpp/8);                                   \
             }                                                                   \
                                                                                 \
-            cl->rfbBytesSent[rfbEncodingHextile] += cl->ublen - startUblen;     \
+            cl->bytesSent[rfbEncodingHextile] += cl->ublen - startUblen;     \
         }                                                                       \
     }                                                                           \
                                                                                 \

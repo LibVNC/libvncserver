@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     if (argc != 3) 
         usage();
 
-    if (vncEncryptAndStorePasswd(argv[1], argv[2]) != 0) {
+    if (rfbEncryptAndStorePasswd(argv[1], argv[2]) != 0) {
         printf("storing password failed.\n");
         return 1;
     } else {

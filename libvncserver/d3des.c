@@ -71,7 +71,7 @@ static unsigned char pc2[48] = {
 	40, 51, 30, 36, 46, 54, 29, 39, 50, 44, 32, 47,
 	43, 48, 38, 55, 33, 52, 45, 41, 49, 35, 28, 31 };
 
-void deskey(key, edf)	/* Thanks to James Gillogly & Phil Karn! */
+void rfbDesKey(key, edf)	/* Thanks to James Gillogly & Phil Karn! */
 unsigned char *key;
 int edf;
 {
@@ -127,11 +127,11 @@ register unsigned long *raw1;
 		*cook	|= (*raw1 & 0x0003f000L) >> 4;
 		*cook++ |= (*raw1 & 0x0000003fL);
 		}
-	usekey(dough);
+	rfbUseKey(dough);
 	return;
 	}
 
-void cpkey(into)
+void rfbCPKey(into)
 register unsigned long *into;
 {
 	register unsigned long *from, *endp;
@@ -141,7 +141,7 @@ register unsigned long *into;
 	return;
 	}
 
-void usekey(from)
+void rfbUseKey(from)
 register unsigned long *from;
 {
 	register unsigned long *to, *endp;
@@ -151,7 +151,7 @@ register unsigned long *from;
 	return;
 	}
 
-void des(inblock, outblock)
+void rfbDes(inblock, outblock)
 unsigned char *inblock, *outblock;
 {
 	unsigned long work[2];

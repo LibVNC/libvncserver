@@ -105,7 +105,7 @@ int main(int argc,char** argv)
    s->colourMap.is16=FALSE;
    s->colourMap.count=2;
    s->colourMap.data.bytes=(unsigned char*)"\xd0\xd0\xd0\x30\x01\xe0";
-   s->rfbServerFormat.trueColour=FALSE;
+   s->serverFormat.trueColour=FALSE;
    s->frameBuffer=f;
    s->kbdAddEvent=dokey;
    s->ptrAddEvent=doptr;

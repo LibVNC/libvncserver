@@ -114,12 +114,12 @@ int main(int argc,char **argv)
   /* console init */
   console=vcGetConsole(&argc,argv,width,height,&vgaFont,TRUE);
   for(i=0;i<16;i++) {
-    console->rfbScreen->colourMap.data.bytes[i*3+0]=default_red[color_table[i]];
-    console->rfbScreen->colourMap.data.bytes[i*3+1]=default_grn[color_table[i]];
-    console->rfbScreen->colourMap.data.bytes[i*3+2]=default_blu[color_table[i]];
+    console->screen->colourMap.data.bytes[i*3+0]=default_red[color_table[i]];
+    console->screen->colourMap.data.bytes[i*3+1]=default_grn[color_table[i]];
+    console->screen->colourMap.data.bytes[i*3+2]=default_blu[color_table[i]];
   }
-  console->rfbScreen->desktopName=title;
-  console->rfbScreen->kbdAddEvent=do_key;
+  console->screen->desktopName=title;
+  console->screen->kbdAddEvent=do_key;
   console->selectTimeOut=100000;
   console->wrapBottomToTop=TRUE;
 #ifdef USE_OLD_VCS

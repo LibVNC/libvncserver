@@ -13,9 +13,9 @@ int main(int argc,char** argv)
 #define CHECK(a,b) if(screen->a!=b) { fprintf(stderr,#a " is %d (should be " #b ")\n",screen->a); ret=1; }
 	CHECK(width,1024);
 	CHECK(height,768);
-	CHECK(rfbAlwaysShared,TRUE);
+	CHECK(alwaysShared,TRUE);
 	CHECK(httpPort,3002);
-	CHECK(rfbDontDisconnect,TRUE);
+	CHECK(dontDisconnect,TRUE);
 	if(fake_argc!=2) {
 		fprintf(stderr,"fake_argc is %d (should be 2)\n",fake_argc);
 		ret=1;

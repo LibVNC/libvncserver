@@ -57,7 +57,7 @@ int main(int argc,char** argv)
     rfbScreen->desktopName = argv[1];
   else
     rfbScreen->desktopName = "Picture";
-  rfbScreen->rfbAlwaysShared = TRUE;
+  rfbScreen->alwaysShared = TRUE;
   rfbScreen->kbdAddEvent = HandleKey;
 
   /* enable http */

@@ -115,7 +115,7 @@ rfbSendSmallRectEncodingCoRRE(cl, x, y, w, h)
             rreAfterBuf = (char *)realloc(rreAfterBuf, rreAfterBufSize);
     }
 
-    (*cl->translateFn)(cl->translateLookupTable,&(cl->screen->rfbServerFormat),
+    (*cl->translateFn)(cl->translateLookupTable,&(cl->screen->serverFormat),
                        &cl->format, fbptr, rreBeforeBuf,
                        cl->screen->paddedWidthInBytes, w, h);
 
@@ -141,8 +141,8 @@ rfbSendSmallRectEncodingCoRRE(cl, x, y, w, h)
         return rfbSendRectEncodingRaw(cl, x, y, w, h);
     }
 
-    cl->rfbRectanglesSent[rfbEncodingCoRRE]++;
-    cl->rfbBytesSent[rfbEncodingCoRRE] += (sz_rfbFramebufferUpdateRectHeader
+    cl->rectanglesSent[rfbEncodingCoRRE]++;
+    cl->bytesSent[rfbEncodingCoRRE] += (sz_rfbFramebufferUpdateRectHeader
                                            + sz_rfbRREHeader + rreAfterBufLen);
 
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbRREHeader

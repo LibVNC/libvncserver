@@ -1904,7 +1904,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	}
 
 	if (connect_once) {
-		if (screen->rfbDontDisconnect && screen->rfbNeverShared) {
+		if (screen->dontDisconnect && screen->neverShared) {
 			if (! shared && accepted_client) {
 				rfbLog("denying additional client: %s\n",
 				     client->host);
@@ -4247,7 +4247,7 @@ void check_xevents(void) {
 	static int first = 1, sent_some_sel = 0;
 	static time_t last_request = 0;
 	time_t now = time(0);
-	int have_clients = screen->rfbClientHead ? 1 : 0;
+	int have_clients = screen->clientHead ? 1 : 0;
 
 	X_LOCK;
 	if (first && (watch_selection || vnc_connect)) {
@@ -5161,7 +5161,7 @@ void set_colormap(void) {
 
 	if (first) {
 		screen->colourMap.count = NCOLOR;
-		screen->rfbServerFormat.trueColour = FALSE;
+		screen->serverFormat.trueColour = FALSE;
 		screen->colourMap.is16 = TRUE;
 		screen->colourMap.data.shorts = (unsigned short*)
 			malloc(3*sizeof(short) * NCOLOR);
@@ -5477,15 +5477,15 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 #endif
 
 	screen->paddedWidthInBytes = rfb_bytes_per_line;
-	screen->rfbServerFormat.bitsPerPixel = fb->bits_per_pixel;
-	screen->rfbServerFormat.depth = fb->depth;
-	screen->rfbServerFormat.trueColour = (uint8_t) TRUE;
+	screen->serverFormat.bitsPerPixel = fb->bits_per_pixel;
+	screen->serverFormat.depth = fb->depth;
+	screen->serverFormat.trueColour = (uint8_t) TRUE;
 	have_masks = ((fb->red_mask|fb->green_mask|fb->blue_mask) != 0);
 	if (force_indexed_color) {
 		have_masks = 0;
 	}
 
-	if ( ! have_masks && screen->rfbServerFormat.bitsPerPixel == 8
+	if ( ! have_masks && screen->serverFormat.bitsPerPixel == 8
 	    && CellsOfScreen(ScreenOfDisplay(dpy,scr)) ) {
 		/* indexed colour */
 		if (!quiet) {
@@ -5513,41 +5513,41 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		}
 
 		/* convert masks to bit shifts and max # colors */
-		screen->rfbServerFormat.redShift = 0;
+		screen->serverFormat.redShift = 0;
 		if ( fb->red_mask ) {
 			while ( ! (fb->red_mask
-			    & (1 << screen->rfbServerFormat.redShift) ) ) {
-				    screen->rfbServerFormat.redShift++;
+			    & (1 << screen->serverFormat.redShift) ) ) {
+				    screen->serverFormat.redShift++;
 			}
 		}
-		screen->rfbServerFormat.greenShift = 0;
+		screen->serverFormat.greenShift = 0;
 		if ( fb->green_mask ) {
 			while ( ! (fb->green_mask
-			    & (1 << screen->rfbServerFormat.greenShift) ) ) {
-				    screen->rfbServerFormat.greenShift++;
+			    & (1 << screen->serverFormat.greenShift) ) ) {
+				    screen->serverFormat.greenShift++;
 			}
 		}
-		screen->rfbServerFormat.blueShift = 0;
+		screen->serverFormat.blueShift = 0;
 		if ( fb->blue_mask ) {
 			while ( ! (fb->blue_mask
-			    & (1 << screen->rfbServerFormat.blueShift) ) ) {
-				    screen->rfbServerFormat.blueShift++;
+			    & (1 << screen->serverFormat.blueShift) ) ) {
+				    screen->serverFormat.blueShift++;
 			}
 		}
-		screen->rfbServerFormat.redMax
-		    = fb->red_mask >> screen->rfbServerFormat.redShift;
-		screen->rfbServerFormat.greenMax
-		    = fb->green_mask >> screen->rfbServerFormat.greenShift;
-		screen->rfbServerFormat.blueMax
-		    = fb->blue_mask >> screen->rfbServerFormat.blueShift;
+		screen->serverFormat.redMax
+		    = fb->red_mask >> screen->serverFormat.redShift;
+		screen->serverFormat.greenMax
+		    = fb->green_mask >> screen->serverFormat.greenShift;
+		screen->serverFormat.blueMax
+		    = fb->blue_mask >> screen->serverFormat.blueShift;
 
-		main_red_max   = screen->rfbServerFormat.redMax;
-		main_green_max = screen->rfbServerFormat.greenMax;
-		main_blue_max  = screen->rfbServerFormat.blueMax;
+		main_red_max   = screen->serverFormat.redMax;
+		main_green_max = screen->serverFormat.greenMax;
+		main_blue_max  = screen->serverFormat.blueMax;
 
-		main_red_shift   = screen->rfbServerFormat.redShift;
-		main_green_shift = screen->rfbServerFormat.greenShift;
-		main_blue_shift  = screen->rfbServerFormat.blueShift;
+		main_red_shift   = screen->serverFormat.redShift;
+		main_green_shift = screen->serverFormat.greenShift;
+		main_blue_shift  = screen->serverFormat.blueShift;
 	}
 	if (overlay && ! quiet) {
 		rfbLog("\n");
@@ -5587,7 +5587,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		fclose(stdout);
 		/* we keep stderr for logging */
 		screen->inetdSock = fd;
-		screen->rfbPort = 0;
+		screen->port = 0;
 
 	} else if (! got_rfbport) {
 		screen->autoPort = TRUE;
@@ -5595,16 +5595,16 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	if (! got_nevershared && ! got_alwaysshared) {
 		if (shared) {
-			screen->rfbAlwaysShared = TRUE;
+			screen->alwaysShared = TRUE;
 		} else {
-			screen->rfbDontDisconnect = TRUE;
-			screen->rfbNeverShared = TRUE;
+			screen->dontDisconnect = TRUE;
+			screen->neverShared = TRUE;
 		}
 	}
 	/* XXX the following is based on libvncserver defaults. */
-	if (screen->rfbDeferUpdateTime == 5) {
+	if (screen->deferUpdateTime == 5) {
 		/* XXX will be fixed someday */
-		screen->rfbDeferUpdateTime = defer_update;
+		screen->deferUpdateTime = defer_update;
 	}
 
 	/* event callbacks: */
@@ -5625,8 +5625,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	rfbInitServer(screen);
 
 
-	bpp = screen->rfbServerFormat.bitsPerPixel;
-	depth = screen->rfbServerFormat.depth;
+	bpp = screen->serverFormat.bitsPerPixel;
+	depth = screen->serverFormat.depth;
 
 	if (scaling) {
 		mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
@@ -5635,11 +5635,11 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	if (viewonly_passwd) {
 		/* append the view only passwd after the normal passwd */
 		char **passwds_new = malloc(3*sizeof(char**));
-		char **passwds_old = (char **) screen->rfbAuthPasswdData;
+		char **passwds_old = (char **) screen->authPasswdData;
 		passwds_new[0] = passwds_old[0];
 		passwds_new[1] = viewonly_passwd;
 		passwds_new[2] = NULL;
-		screen->rfbAuthPasswdData = (void*) passwds_new;
+		screen->authPasswdData = (void*) passwds_new;
 	}
 }
 
@@ -6564,7 +6564,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 		shrink = 0;
 	}
 
-	if (! screen->rfbServerFormat.trueColour) {
+	if (! screen->serverFormat.trueColour) {
 		/*
 		 * PseudoColor colormap... blending leads to random colors.
 		 */
@@ -8265,7 +8265,7 @@ static void watch_loop(void) {
 		check_xevents();
 		check_connect_inputs();		
 
-		if (! screen->rfbClientHead) {	/* waiting for a client */
+		if (! screen->clientHead) {	/* waiting for a client */
 			usleep(200 * 1000);
 			continue;
 		}
@@ -9176,7 +9176,7 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			passwdfile = argv[++i];
 		} else if (!strcmp(arg, "-storepasswd")) {
-			if (i+2 >= argc || vncEncryptAndStorePasswd(argv[i+1],
+			if (i+2 >= argc || rfbEncryptAndStorePasswd(argv[i+1],
 			    argv[i+2]) != 0) {
 				fprintf(stderr, "-storepasswd failed\n");
 				exit(1);
@@ -10020,7 +10020,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (! inetd) {
-		if (! screen->rfbPort || screen->rfbListenSock < 0) {
+		if (! screen->port || screen->listenSock < 0) {
 			rfbLog("Error: could not obtain listening port.\n");
 			clean_up_exit(1);
 		}
@@ -10028,9 +10028,9 @@ int main(int argc, char* argv[]) {
 	if (! quiet) {
 		rfbLog("screen setup finished.\n");
 	}
-	if (screen->rfbPort) {
+	if (screen->port) {
 		char *host = this_host();
-		int port = screen->rfbPort;
+		int port = screen->port;
 		if (host != NULL) {
 			/* note that vncviewer special cases 5900-5999 */
 			if (inetd) {
@@ -10061,7 +10061,7 @@ int main(int argc, char* argv[]) {
 		if (inetd) {
 			;	/* should not occur (rfbPort) */
 		} else {
-			fprintf(stdout, "PORT=%d\n", screen->rfbPort);
+			fprintf(stdout, "PORT=%d\n", screen->port);
 		}
 		fflush(stdout);	
 	}

@@ -8,7 +8,7 @@ int main(int argc,char** argv)
 
   rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,256,256,8,1,1);
 
-  server->rfbServerFormat.trueColour=FALSE;
+  server->serverFormat.trueColour=FALSE;
   server->colourMap.count=256;
   server->colourMap.is16=FALSE;
   for(i=0;i<256;i++) {

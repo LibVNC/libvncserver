@@ -7,7 +7,7 @@ int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
   unsigned char* data=font->data+font->metaData[c*5];
   unsigned char d=*data;
   int rowstride=rfbScreen->paddedWidthInBytes;
-  int bpp=rfbScreen->rfbServerFormat.bitsPerPixel/8;
+  int bpp=rfbScreen->serverFormat.bitsPerPixel/8;
   char *colour=(char*)&col;
 
   if(!rfbEndianTest)
@@ -52,7 +52,7 @@ int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
   unsigned char* data=font->data+font->metaData[c*5];
   unsigned char d;
   int rowstride=rfbScreen->paddedWidthInBytes;
-  int bpp=rfbScreen->rfbServerFormat.bitsPerPixel/8,extra_bytes=0;
+  int bpp=rfbScreen->serverFormat.bitsPerPixel/8,extra_bytes=0;
   char* colour=(char*)&col;
   char* bcolour=(char*)&bcol;
 

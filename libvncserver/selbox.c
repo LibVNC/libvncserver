@@ -209,10 +209,10 @@ int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
    int bpp = rfbScreen->bitsPerPixel/8;
    char* frameBufferBackup;
    void* screenDataBackup = rfbScreen->screenData;
-   KbdAddEventProcPtr kbdAddEventBackup = rfbScreen->kbdAddEvent;
-   PtrAddEventProcPtr ptrAddEventBackup = rfbScreen->ptrAddEvent;
-   GetCursorProcPtr getCursorPtrBackup = rfbScreen->getCursorPtr;
-   DisplayHookPtr displayHookBackup = rfbScreen->displayHook;
+   rfbKbdAddEventProcPtr kbdAddEventBackup = rfbScreen->kbdAddEvent;
+   rfbPtrAddEventProcPtr ptrAddEventBackup = rfbScreen->ptrAddEvent;
+   rfbGetCursorProcPtr getCursorPtrBackup = rfbScreen->getCursorPtr;
+   rfbDisplayHookPtr displayHookBackup = rfbScreen->displayHook;
    rfbSelectData selData;
    int i,j,k;
    int fx1,fy1,fx2,fy2; /* for font bbox */

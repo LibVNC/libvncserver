@@ -252,16 +252,16 @@ rfbSetTranslateFunction(cl)
      * Check that bits per pixel values are valid
      */
 
-    if ((cl->screen->rfbServerFormat.bitsPerPixel != 8) &&
-        (cl->screen->rfbServerFormat.bitsPerPixel != 16) &&
+    if ((cl->screen->serverFormat.bitsPerPixel != 8) &&
+        (cl->screen->serverFormat.bitsPerPixel != 16) &&
 #ifdef LIBVNCSERVER_ALLOW24BPP
-	(cl->screen->rfbServerFormat.bitsPerPixel != 24) &&
+	(cl->screen->serverFormat.bitsPerPixel != 24) &&
 #endif
-        (cl->screen->rfbServerFormat.bitsPerPixel != 32))
+        (cl->screen->serverFormat.bitsPerPixel != 32))
     {
         rfbErr("%s: server bits per pixel not 8, 16 or 32 (is %d)\n",
 	       "rfbSetTranslateFunction", 
-	       cl->screen->rfbServerFormat.bitsPerPixel);
+	       cl->screen->serverFormat.bitsPerPixel);
         rfbCloseClient(cl);
         return FALSE;
     }
@@ -307,7 +307,7 @@ rfbSetTranslateFunction(cl)
 
     /* truecolour -> truecolour */
 
-    if (PF_EQ(cl->format,cl->screen->rfbServerFormat)) {
+    if (PF_EQ(cl->format,cl->screen->serverFormat)) {
 
         /* client & server the same */
 
@@ -316,36 +316,36 @@ rfbSetTranslateFunction(cl)
         return TRUE;
     }
 
-    if ((cl->screen->rfbServerFormat.bitsPerPixel < 16) ||
-        ((!cl->screen->rfbServerFormat.trueColour || !rfbEconomicTranslate) &&
-	   (cl->screen->rfbServerFormat.bitsPerPixel == 16))) {
+    if ((cl->screen->serverFormat.bitsPerPixel < 16) ||
+        ((!cl->screen->serverFormat.trueColour || !rfbEconomicTranslate) &&
+	   (cl->screen->serverFormat.bitsPerPixel == 16))) {
 
         /* we can use a single lookup table for <= 16 bpp */
 
         cl->translateFn = rfbTranslateWithSingleTableFns
-                              [BPP2OFFSET(cl->screen->rfbServerFormat.bitsPerPixel)]
+                              [BPP2OFFSET(cl->screen->serverFormat.bitsPerPixel)]
                                   [BPP2OFFSET(cl->format.bitsPerPixel)];
 
-	if(cl->screen->rfbServerFormat.trueColour)
+	if(cl->screen->serverFormat.trueColour)
 	  (*rfbInitTrueColourSingleTableFns
 	   [BPP2OFFSET(cl->format.bitsPerPixel)]) (&cl->translateLookupTable,
-						   &(cl->screen->rfbServerFormat), &cl->format);
+						   &(cl->screen->serverFormat), &cl->format);
 	else
 	  (*rfbInitColourMapSingleTableFns
 	   [BPP2OFFSET(cl->format.bitsPerPixel)]) (&cl->translateLookupTable,
-						   &(cl->screen->rfbServerFormat), &cl->format,&cl->screen->colourMap);
+						   &(cl->screen->serverFormat), &cl->format,&cl->screen->colourMap);
 
     } else {
 
         /* otherwise we use three separate tables for red, green and blue */
 
         cl->translateFn = rfbTranslateWithRGBTablesFns
-                              [BPP2OFFSET(cl->screen->rfbServerFormat.bitsPerPixel)]
+                              [BPP2OFFSET(cl->screen->serverFormat.bitsPerPixel)]
                                   [BPP2OFFSET(cl->format.bitsPerPixel)];
 
         (*rfbInitTrueColourRGBTablesFns
             [BPP2OFFSET(cl->format.bitsPerPixel)]) (&cl->translateLookupTable,
-                                             &(cl->screen->rfbServerFormat), &cl->format);
+                                             &(cl->screen->serverFormat), &cl->format);
     }
 
     return TRUE;
@@ -396,7 +396,7 @@ rfbSetClientColourMapBGR233(cl)
 
     len += 256 * 3 * 2;
 
-    if (WriteExact(cl, buf, len) < 0) {
+    if (rfbWriteExact(cl, buf, len) < 0) {
         rfbLogPerror("rfbSetClientColourMapBGR233: write");
         rfbCloseClient(cl);
         return FALSE;
@@ -419,7 +419,7 @@ rfbSetClientColourMap(cl, firstColour, nColours)
     int firstColour;
     int nColours;
 {
-    if (cl->screen->rfbServerFormat.trueColour || !cl->readyForSetColourMapEntries) {
+    if (cl->screen->serverFormat.trueColour || !cl->readyForSetColourMapEntries) {
 	return TRUE;
     }
 
@@ -430,7 +430,7 @@ rfbSetClientColourMap(cl, firstColour, nColours)
     if (cl->format.trueColour) {
 	(*rfbInitColourMapSingleTableFns
 	    [BPP2OFFSET(cl->format.bitsPerPixel)]) (&cl->translateLookupTable,
-					     &cl->screen->rfbServerFormat, &cl->format,&cl->screen->colourMap);
+					     &cl->screen->serverFormat, &cl->format,&cl->screen->colourMap);
 
 	sraRgnDestroy(cl->modifiedRegion);
 	cl->modifiedRegion =

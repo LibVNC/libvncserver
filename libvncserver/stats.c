@@ -44,19 +44,19 @@ rfbResetStats(rfbClientPtr cl)
 {
     int i;
     for (i = 0; i < MAX_ENCODINGS; i++) {
-        cl->rfbBytesSent[i] = 0;
-        cl->rfbRectanglesSent[i] = 0;
+        cl->bytesSent[i] = 0;
+        cl->rectanglesSent[i] = 0;
     }
-    cl->rfbLastRectMarkersSent = 0;
-    cl->rfbLastRectBytesSent = 0;
-    cl->rfbCursorShapeBytesSent = 0;
-    cl->rfbCursorShapeUpdatesSent = 0;
-    cl->rfbCursorPosBytesSent = 0;
-    cl->rfbCursorPosUpdatesSent = 0;
-    cl->rfbFramebufferUpdateMessagesSent = 0;
-    cl->rfbRawBytesEquivalent = 0;
-    cl->rfbKeyEventsRcvd = 0;
-    cl->rfbPointerEventsRcvd = 0;
+    cl->lastRectMarkersSent = 0;
+    cl->lastRectBytesSent = 0;
+    cl->cursorShapeBytesSent = 0;
+    cl->cursorShapeUpdatesSent = 0;
+    cl->cursorPosBytesSent = 0;
+    cl->cursorPosUpdatesSent = 0;
+    cl->framebufferUpdateMessagesSent = 0;
+    cl->rawBytesEquivalent = 0;
+    cl->keyEventsRcvd = 0;
+    cl->pointerEventsRcvd = 0;
 }
 
 void
@@ -68,52 +68,52 @@ rfbPrintStats(rfbClientPtr cl)
 
     rfbLog("Statistics:\n");
 
-    if ((cl->rfbKeyEventsRcvd != 0) || (cl->rfbPointerEventsRcvd != 0))
+    if ((cl->keyEventsRcvd != 0) || (cl->pointerEventsRcvd != 0))
         rfbLog("  key events received %d, pointer events %d\n",
-                cl->rfbKeyEventsRcvd, cl->rfbPointerEventsRcvd);
+                cl->keyEventsRcvd, cl->pointerEventsRcvd);
 
     for (i = 0; i < MAX_ENCODINGS; i++) {
-        totalRectanglesSent += cl->rfbRectanglesSent[i];
-        totalBytesSent += cl->rfbBytesSent[i];
+        totalRectanglesSent += cl->rectanglesSent[i];
+        totalBytesSent += cl->bytesSent[i];
     }
 
-    totalRectanglesSent += (cl->rfbCursorShapeUpdatesSent +
-                            cl->rfbCursorPosUpdatesSent +
-			    cl->rfbLastRectMarkersSent);
-    totalBytesSent += (cl->rfbCursorShapeBytesSent +
-                       cl->rfbCursorPosBytesSent +
-                       cl->rfbLastRectBytesSent);
+    totalRectanglesSent += (cl->cursorShapeUpdatesSent +
+                            cl->cursorPosUpdatesSent +
+			    cl->lastRectMarkersSent);
+    totalBytesSent += (cl->cursorShapeBytesSent +
+                       cl->cursorPosBytesSent +
+                       cl->lastRectBytesSent);
 
     rfbLog("  framebuffer updates %d, rectangles %d, bytes %d\n",
-            cl->rfbFramebufferUpdateMessagesSent, totalRectanglesSent,
+            cl->framebufferUpdateMessagesSent, totalRectanglesSent,
             totalBytesSent);
 
-    if (cl->rfbLastRectMarkersSent != 0)
+    if (cl->lastRectMarkersSent != 0)
 	rfbLog("    LastRect and NewFBSize markers %d, bytes %d\n",
-		cl->rfbLastRectMarkersSent, cl->rfbLastRectBytesSent);
+		cl->lastRectMarkersSent, cl->lastRectBytesSent);
 
-    if (cl->rfbCursorShapeUpdatesSent != 0)
+    if (cl->cursorShapeUpdatesSent != 0)
 	rfbLog("    cursor shape updates %d, bytes %d\n",
-		cl->rfbCursorShapeUpdatesSent, cl->rfbCursorShapeBytesSent);
+		cl->cursorShapeUpdatesSent, cl->cursorShapeBytesSent);
 
-    if (cl->rfbCursorPosUpdatesSent != 0)
+    if (cl->cursorPosUpdatesSent != 0)
 	rfbLog("    cursor position updates %d, bytes %d\n",
-		cl->rfbCursorPosUpdatesSent, cl->rfbCursorPosBytesSent);
+		cl->cursorPosUpdatesSent, cl->cursorPosBytesSent);
 
     for (i = 0; i < MAX_ENCODINGS; i++) {
-        if (cl->rfbRectanglesSent[i] != 0)
+        if (cl->rectanglesSent[i] != 0)
             rfbLog("    %s rectangles %d, bytes %d\n",
-                   encNames[i], cl->rfbRectanglesSent[i], cl->rfbBytesSent[i]);
+                   encNames[i], cl->rectanglesSent[i], cl->bytesSent[i]);
     }
 
-    if ((totalBytesSent - cl->rfbBytesSent[rfbEncodingCopyRect]) != 0) {
+    if ((totalBytesSent - cl->bytesSent[rfbEncodingCopyRect]) != 0) {
         rfbLog("  raw bytes equivalent %d, compression ratio %f\n",
-                cl->rfbRawBytesEquivalent,
-                (double)cl->rfbRawBytesEquivalent
+                cl->rawBytesEquivalent,
+                (double)cl->rawBytesEquivalent
                 / (double)(totalBytesSent
-                           - cl->rfbBytesSent[rfbEncodingCopyRect]-
-			   cl->rfbCursorShapeBytesSent -
-                           cl->rfbCursorPosBytesSent -
-			   cl->rfbLastRectBytesSent));
+                           - cl->bytesSent[rfbEncodingCopyRect]-
+			   cl->cursorShapeBytesSent -
+                           cl->cursorPosBytesSent -
+			   cl->lastRectBytesSent));
     }
 }

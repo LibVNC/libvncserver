@@ -246,7 +246,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
   return SetNonBlocking(client->sock);
 }
 
-static void rfbEncryptBytes(unsigned char *bytes, char *passwd);
+extern void rfbClientEncryptBytes(unsigned char* bytes, char* passwd);
 
 /*
  * InitialiseRFBConnection.
@@ -327,7 +327,7 @@ InitialiseRFBConnection(rfbClient* client)
         passwd[8] = '\0';
       }
 
-      rfbEncryptBytes(challenge, passwd);
+      rfbClientEncryptBytes(challenge, passwd);
 
       /* Lose the password from memory */
       for (i = strlen(passwd); i >= 0; i--) {
@@ -1136,14 +1136,14 @@ JpegSetSrcManager(j_decompress_ptr cinfo, uint8_t *compressedData,
 
 /* avoid name clashes with LibVNCServer */
 
-#define vncEncryptBytes rfbEncryptBytes
-#define vncEncryptAndStorePasswd rfbEncryptAndStorePasswdUnused
-#define vncDecryptPasswdFromFile rfbDecryptPasswdFromFileUnused
-#define vncRandomBytes rfbRandomBytesUnused
-#define des rfbDES
-#define deskey rfbDESKey
-#define usekey rfbUseKey
-#define cpkey rfbCPKey
+#define rfbEncryptBytes rfbClientEncryptBytes
+#define rfbEncryptAndStorePasswd rfbClientEncryptAndStorePasswdUnused
+#define rfbDecryptPasswdFromFile rfbClientDecryptPasswdFromFileUnused
+#define rfbRandomBytes rfbClientRandomBytesUnused
+#define rfbDes rfbClientDes
+#define rfbDesKey rfbClientDesKey
+#define rfbUseKey rfbClientUseKey
+#define rfbCPKey rfbClientCPKey
 
 #include "../libvncserver/vncauth.c"
 #include "../libvncserver/d3des.c"

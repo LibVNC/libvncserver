@@ -21,7 +21,7 @@ int main(int argc,char** argv)
   rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,width,height,8,3,4);
   server->frameBuffer=(char*)malloc(width*height*4);
   initBackground(server);
-  server->rfbDeferUpdateTime=0;
+  server->deferUpdateTime=0;
   rfbInitServer(server);
 
   r=0;

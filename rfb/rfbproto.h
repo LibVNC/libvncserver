@@ -991,10 +991,10 @@ typedef union {
 #define MAXPWLEN 8
 #define CHALLENGESIZE 16
 
-extern int vncEncryptAndStorePasswd(char *passwd, char *fname);
-extern char *vncDecryptPasswdFromFile(char *fname);
-extern void vncRandomBytes(unsigned char *bytes);
-extern void vncEncryptBytes(unsigned char *bytes, char *passwd);
+extern int rfbEncryptAndStorePasswd(char *passwd, char *fname);
+extern char *rfbDecryptPasswdFromFile(char *fname);
+extern void rfbRandomBytes(unsigned char *bytes);
+extern void rfbEncryptBytes(unsigned char *bytes, char *passwd);
 
 
 #endif

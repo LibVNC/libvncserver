@@ -64,19 +64,19 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		rfbUsage();
 		return FALSE;
 	    }
-	    rfbScreen->rfbPort = atoi(argv[++i]);
+	    rfbScreen->port = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-rfbwait") == 0) {  /* -rfbwait ms */
             if (i + 1 >= *argc) {
 		rfbUsage();
 		return FALSE;
 	    }
-	    rfbScreen->rfbMaxClientWait = atoi(argv[++i]);
+	    rfbScreen->maxClientWait = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-rfbauth") == 0) {  /* -rfbauth passwd-file */
             if (i + 1 >= *argc) {
 		rfbUsage();
 		return FALSE;
 	    }
-            rfbScreen->rfbAuthPasswdData = argv[++i];
+            rfbScreen->authPasswdData = argv[++i];
 	} else if (strcmp(argv[i], "-passwd") == 0) {  /* -passwd password */
 	    char **passwds = malloc(sizeof(char**)*2);
 	    if (i + 1 >= *argc) {
@@ -85,14 +85,14 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	    }
 	    passwds[0] = argv[++i];
 	    passwds[1] = 0;
-	    rfbScreen->rfbAuthPasswdData = (void*)passwds;
+	    rfbScreen->authPasswdData = (void*)passwds;
 	    rfbScreen->passwordCheck = rfbCheckPasswordByList;
         } else if (strcmp(argv[i], "-deferupdate") == 0) {  /* -deferupdate milliseconds */
             if (i + 1 >= *argc) {
 		rfbUsage();
 		return FALSE;
 	    }
-            rfbScreen->rfbDeferUpdateTime = atoi(argv[++i]);
+            rfbScreen->deferUpdateTime = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-desktop") == 0) {  /* -desktop desktop-name */
             if (i + 1 >= *argc) {
 		rfbUsage();
@@ -100,11 +100,11 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	    }
             rfbScreen->desktopName = argv[++i];
         } else if (strcmp(argv[i], "-alwaysshared") == 0) {
-	    rfbScreen->rfbAlwaysShared = TRUE;
+	    rfbScreen->alwaysShared = TRUE;
         } else if (strcmp(argv[i], "-nevershared") == 0) {
-            rfbScreen->rfbNeverShared = TRUE;
+            rfbScreen->neverShared = TRUE;
         } else if (strcmp(argv[i], "-dontdisconnect") == 0) {
-            rfbScreen->rfbDontDisconnect = TRUE;
+            rfbScreen->dontDisconnect = TRUE;
         } else if (strcmp(argv[i], "-httpdir") == 0) {  /* -httpdir directory-path */
             if (i + 1 >= *argc) {
 		rfbUsage();

@@ -159,22 +159,22 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
    rfbReleaseClientIterator(iterator);
 }
 
-void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy)
+void rfbDoCopyRegion(rfbScreenInfoPtr screen,sraRegionPtr copyRegion,int dx,int dy)
 {
    sraRectangleIterator* i;
    sraRect rect;
-   int j,widthInBytes,bpp=rfbScreen->rfbServerFormat.bitsPerPixel/8,
-    rowstride=rfbScreen->paddedWidthInBytes;
+   int j,widthInBytes,bpp=screen->serverFormat.bitsPerPixel/8,
+    rowstride=screen->paddedWidthInBytes;
    char *in,*out;
 
-   rfbUndrawCursor(rfbScreen);
+   rfbUndrawCursor(screen);
   
    /* copy it, really */
    i = sraRgnGetReverseIterator(copyRegion,dx<0,dy<0);
    while(sraRgnIteratorNext(i,&rect)) {
      widthInBytes = (rect.x2-rect.x1)*bpp;
-     out = rfbScreen->frameBuffer+rect.x1*bpp+rect.y1*rowstride;
-     in = rfbScreen->frameBuffer+(rect.x1-dx)*bpp+(rect.y1-dy)*rowstride;
+     out = screen->frameBuffer+rect.x1*bpp+rect.y1*rowstride;
+     in = screen->frameBuffer+(rect.x1-dx)*bpp+(rect.y1-dy)*rowstride;
      if(dy<0)
        for(j=rect.y1;j<rect.y2;j++,out+=rowstride,in+=rowstride)
 	 memmove(out,in,widthInBytes);
@@ -186,27 +186,27 @@ void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,i
      }
    }
   
-   rfbScheduleCopyRegion(rfbScreen,copyRegion,dx,dy);
+   rfbScheduleCopyRegion(screen,copyRegion,dx,dy);
 }
 
-void rfbDoCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy)
+void rfbDoCopyRect(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2,int dx,int dy)
 {
   sraRegionPtr region = sraRgnCreateRect(x1,y1,x2,y2);
-  rfbDoCopyRegion(rfbScreen,region,dx,dy);
+  rfbDoCopyRegion(screen,region,dx,dy);
 }
 
-void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy)
+void rfbScheduleCopyRect(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2,int dx,int dy)
 {
   sraRegionPtr region = sraRgnCreateRect(x1,y1,x2,y2);
-  rfbScheduleCopyRegion(rfbScreen,region,dx,dy);
+  rfbScheduleCopyRegion(screen,region,dx,dy);
 }
 
-void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
+void rfbMarkRegionAsModified(rfbScreenInfoPtr screen,sraRegionPtr modRegion)
 {
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
 
-   iterator=rfbGetClientIterator(rfbScreen);
+   iterator=rfbGetClientIterator(screen);
    while((cl=rfbClientIteratorNext(iterator))) {
      LOCK(cl->updateMutex);
      sraRgnOr(cl->modifiedRegion,modRegion);
@@ -217,23 +217,23 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
    rfbReleaseClientIterator(iterator);
 }
 
-void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2)
+void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
 {
    sraRegionPtr region;
    int i;
 
    if(x1>x2) { i=x1; x1=x2; x2=i; }
    if(x1<0) x1=0;
-   if(x2>=rfbScreen->width) x2=rfbScreen->width-1;
+   if(x2>=screen->width) x2=screen->width-1;
    if(x1==x2) return;
    
    if(y1>y2) { i=y1; y1=y2; y2=i; }
    if(y1<0) y1=0;
-   if(y2>=rfbScreen->height) y2=rfbScreen->height-1;
+   if(y2>=screen->height) y2=screen->height-1;
    if(y1==y2) return;
    
    region = sraRgnCreateRect(x1,y1,x2,y2);
-   rfbMarkRegionAsModified(rfbScreen,region);
+   rfbMarkRegionAsModified(screen,region);
    sraRgnDestroy(region);
 }
 
@@ -269,7 +269,7 @@ clientOutput(void *data)
         
         /* OK, now, to save bandwidth, wait a little while for more
            updates to come along. */
-        usleep(cl->screen->rfbDeferUpdateTime * 1000);
+        usleep(cl->screen->deferUpdateTime * 1000);
 
         /* Now, get the region we're going to update, and remove
            it from cl->modifiedRegion _before_ we send the update.
@@ -319,7 +319,7 @@ clientInput(void *data)
 static void*
 listenerRun(void *data)
 {
-    rfbScreenInfoPtr rfbScreen=(rfbScreenInfoPtr)data;
+    rfbScreenInfoPtr screen=(rfbScreenInfoPtr)data;
     int client_fd;
     struct sockaddr_in peer;
     rfbClientPtr cl;
@@ -328,9 +328,9 @@ listenerRun(void *data)
     len = sizeof(peer);
 
     /* TODO: this thread wont die by restarting the server */
-    while ((client_fd = accept(rfbScreen->rfbListenSock, 
+    while ((client_fd = accept(screen->listenSock, 
                                (struct sockaddr*)&peer, &len)) >= 0) {
-        cl = rfbNewClient(rfbScreen,client_fd);
+        cl = rfbNewClient(screen,client_fd);
         len = sizeof(peer);
 
 	if (cl && !cl->onHold )
@@ -363,12 +363,12 @@ rfbRefuseOnHoldClient(rfbClientPtr cl)
 }
 
 static void
-defaultKbdAddEvent(rfbBool down, rfbKeySym keySym, rfbClientPtr cl)
+rfbDefaultKbdAddEvent(rfbBool down, rfbKeySym keySym, rfbClientPtr cl)
 {
 }
 
 void
-defaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
+rfbDefaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 {
   rfbClientIteratorPtr iterator;
   rfbClientPtr other_client;
@@ -398,7 +398,7 @@ defaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
   }
 }
 
-void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
+void rfbDefaultSetXCutText(char* text, int len, rfbClientPtr cl)
 {
 }
 
@@ -431,23 +431,23 @@ static rfbCursor myCursor =
 };
 #endif
 
-rfbCursorPtr defaultGetCursorPtr(rfbClientPtr cl)
+rfbCursorPtr rfbDefaultGetCursorPtr(rfbClientPtr cl)
 {
    return(cl->screen->cursor);
 }
 
 /* response is cl->authChallenge vncEncrypted with passwd */
-rfbBool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
+rfbBool rfbDefaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
 {
   int i;
-  char *passwd=vncDecryptPasswdFromFile(cl->screen->rfbAuthPasswdData);
+  char *passwd=rfbDecryptPasswdFromFile(cl->screen->authPasswdData);
 
   if(!passwd) {
-    rfbErr("Couldn't read password file: %s\n",cl->screen->rfbAuthPasswdData);
+    rfbErr("Couldn't read password file: %s\n",cl->screen->authPasswdData);
     return(FALSE);
   }
 
-  vncEncryptBytes(cl->authChallenge, passwd);
+  rfbEncryptBytes(cl->authChallenge, passwd);
 
   /* Lose the password from memory */
   for (i = strlen(passwd); i >= 0; i--) {
@@ -457,7 +457,7 @@ rfbBool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
   free(passwd);
 
   if (memcmp(cl->authChallenge, response, len) != 0) {
-    rfbErr("rfbAuthProcessClientMessage: authentication failed from %s\n",
+    rfbErr("authProcessClientMessage: authentication failed from %s\n",
 	   cl->host);
     return(FALSE);
   }
@@ -465,55 +465,55 @@ rfbBool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
   return(TRUE);
 }
 
-/* for this method, rfbAuthPasswdData is really a pointer to an array
+/* for this method, authPasswdData is really a pointer to an array
    of char*'s, where the last pointer is 0. */
 rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
 {
   char **passwds;
   int i=0;
 
-  for(passwds=(char**)cl->screen->rfbAuthPasswdData;*passwds;passwds++,i++) {
+  for(passwds=(char**)cl->screen->authPasswdData;*passwds;passwds++,i++) {
     uint8_t auth_tmp[CHALLENGESIZE];
     memcpy((char *)auth_tmp, (char *)cl->authChallenge, CHALLENGESIZE);
-    vncEncryptBytes(auth_tmp, *passwds);
+    rfbEncryptBytes(auth_tmp, *passwds);
 
     if (memcmp(auth_tmp, response, len) == 0) {
-      if(i>=cl->screen->rfbAuthPasswdFirstViewOnly)
+      if(i>=cl->screen->authPasswdFirstViewOnly)
 	cl->viewOnly=TRUE;
       return(TRUE);
     }
   }
 
-  rfbErr("rfbAuthProcessClientMessage: authentication failed from %s\n",
+  rfbErr("authProcessClientMessage: authentication failed from %s\n",
 	 cl->host);
   return(FALSE);
 }
 
-void doNothingWithClient(rfbClientPtr cl)
+void rfbDoNothingWithClient(rfbClientPtr cl)
 {
 }
 
-enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl)
+enum rfbNewClientAction rfbDefaultNewClientHook(rfbClientPtr cl)
 {
 	return RFB_CLIENT_ACCEPT;
 }
 
 /*
- * Update server's pixel format in rfbScreenInfo structure. This
+ * Update server's pixel format in screenInfo structure. This
  * function is called from rfbGetScreen() and rfbNewFramebuffer().
  */
 
-static void rfbInitServerFormat(rfbScreenInfoPtr rfbScreen, int bitsPerSample)
+static void rfbInitServerFormat(rfbScreenInfoPtr screen, int bitsPerSample)
 {
-   rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
+   rfbPixelFormat* format=&screen->serverFormat;
 
-   format->bitsPerPixel = rfbScreen->bitsPerPixel;
-   format->depth = rfbScreen->depth;
+   format->bitsPerPixel = screen->bitsPerPixel;
+   format->depth = screen->depth;
    format->bigEndian = rfbEndianTest?FALSE:TRUE;
    format->trueColour = TRUE;
-   rfbScreen->colourMap.count = 0;
-   rfbScreen->colourMap.is16 = 0;
-   rfbScreen->colourMap.data.bytes = NULL;
+   screen->colourMap.count = 0;
+   screen->colourMap.is16 = 0;
+   screen->colourMap.data.bytes = NULL;
 
    if (format->bitsPerPixel == 8) {
      format->redMax = 7;
@@ -548,104 +548,104 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel)
 {
-   rfbScreenInfoPtr rfbScreen=malloc(sizeof(rfbScreenInfo));
+   rfbScreenInfoPtr screen=malloc(sizeof(rfbScreenInfo));
 
    INIT_MUTEX(logMutex);
 
    if(width&3)
      rfbErr("WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
 
-   rfbScreen->autoPort=FALSE;
-   rfbScreen->rfbClientHead=0;
-   rfbScreen->rfbPort=5900;
-   rfbScreen->socketInitDone=FALSE;
+   screen->autoPort=FALSE;
+   screen->clientHead=0;
+   screen->port=5900;
+   screen->socketInitDone=FALSE;
 
-   rfbScreen->inetdInitDone = FALSE;
-   rfbScreen->inetdSock=-1;
+   screen->inetdInitDone = FALSE;
+   screen->inetdSock=-1;
 
-   rfbScreen->udpSock=-1;
-   rfbScreen->udpSockConnected=FALSE;
-   rfbScreen->udpPort=0;
-   rfbScreen->udpClient=0;
+   screen->udpSock=-1;
+   screen->udpSockConnected=FALSE;
+   screen->udpPort=0;
+   screen->udpClient=0;
 
-   rfbScreen->maxFd=0;
-   rfbScreen->rfbListenSock=-1;
+   screen->maxFd=0;
+   screen->listenSock=-1;
 
-   rfbScreen->httpInitDone=FALSE;
-   rfbScreen->httpEnableProxyConnect=FALSE;
-   rfbScreen->httpPort=0;
-   rfbScreen->httpDir=NULL;
-   rfbScreen->httpListenSock=-1;
-   rfbScreen->httpSock=-1;
+   screen->httpInitDone=FALSE;
+   screen->httpEnableProxyConnect=FALSE;
+   screen->httpPort=0;
+   screen->httpDir=NULL;
+   screen->httpListenSock=-1;
+   screen->httpSock=-1;
 
-   rfbScreen->desktopName = "LibVNCServer";
-   rfbScreen->rfbAlwaysShared = FALSE;
-   rfbScreen->rfbNeverShared = FALSE;
-   rfbScreen->rfbDontDisconnect = FALSE;
-   rfbScreen->rfbAuthPasswdData = 0;
-   rfbScreen->rfbAuthPasswdFirstViewOnly = 1;
+   screen->desktopName = "LibVNCServer";
+   screen->alwaysShared = FALSE;
+   screen->neverShared = FALSE;
+   screen->dontDisconnect = FALSE;
+   screen->authPasswdData = 0;
+   screen->authPasswdFirstViewOnly = 1;
    
-   rfbScreen->width = width;
-   rfbScreen->height = height;
-   rfbScreen->bitsPerPixel = rfbScreen->depth = 8*bytesPerPixel;
+   screen->width = width;
+   screen->height = height;
+   screen->bitsPerPixel = screen->depth = 8*bytesPerPixel;
 
-   rfbScreen->passwordCheck = defaultPasswordCheck;
+   screen->passwordCheck = rfbDefaultPasswordCheck;
 
-   rfbScreen->ignoreSIGPIPE = TRUE;
+   screen->ignoreSIGPIPE = TRUE;
 
    /* disable progressive updating per default */
-   rfbScreen->progressiveSliceHeight = 0;
+   screen->progressiveSliceHeight = 0;
 
-   if(!rfbProcessArguments(rfbScreen,argc,argv)) {
-     free(rfbScreen);
+   if(!rfbProcessArguments(screen,argc,argv)) {
+     free(screen);
      return 0;
    }
 
 #ifdef WIN32
    {
 	   DWORD dummy=255;
-	   GetComputerName(rfbScreen->rfbThisHost,&dummy);
+	   GetComputerName(screen->thisHost,&dummy);
    }
 #else
-   gethostname(rfbScreen->rfbThisHost, 255);
+   gethostname(screen->thisHost, 255);
 #endif
 
-   rfbScreen->paddedWidthInBytes = width*bytesPerPixel;
+   screen->paddedWidthInBytes = width*bytesPerPixel;
 
    /* format */
 
-   rfbInitServerFormat(rfbScreen, bitsPerSample);
+   rfbInitServerFormat(screen, bitsPerSample);
 
    /* cursor */
 
-   rfbScreen->cursorIsDrawn = FALSE;
-   rfbScreen->dontSendFramebufferUpdate = FALSE;
-   rfbScreen->cursorX=rfbScreen->cursorY=rfbScreen->underCursorBufferLen=0;
-   rfbScreen->underCursorBuffer=NULL;
-   rfbScreen->dontConvertRichCursorToXCursor = FALSE;
-   rfbScreen->cursor = &myCursor;
-   INIT_MUTEX(rfbScreen->cursorMutex);
+   screen->cursorIsDrawn = FALSE;
+   screen->dontSendFramebufferUpdate = FALSE;
+   screen->cursorX=screen->cursorY=screen->underCursorBufferLen=0;
+   screen->underCursorBuffer=NULL;
+   screen->dontConvertRichCursorToXCursor = FALSE;
+   screen->cursor = &myCursor;
+   INIT_MUTEX(screen->cursorMutex);
 
-   IF_PTHREADS(rfbScreen->backgroundLoop = FALSE);
+   IF_PTHREADS(screen->backgroundLoop = FALSE);
 
-   rfbScreen->rfbDeferUpdateTime=5;
-   rfbScreen->maxRectsPerUpdate=50;
+   screen->deferUpdateTime=5;
+   screen->maxRectsPerUpdate=50;
 
    /* proc's and hook's */
 
-   rfbScreen->kbdAddEvent = defaultKbdAddEvent;
-   rfbScreen->kbdReleaseAllKeys = doNothingWithClient;
-   rfbScreen->ptrAddEvent = defaultPtrAddEvent;
-   rfbScreen->setXCutText = defaultSetXCutText;
-   rfbScreen->getCursorPtr = defaultGetCursorPtr;
-   rfbScreen->setTranslateFunction = rfbSetTranslateFunction;
-   rfbScreen->newClientHook = defaultNewClientHook;
-   rfbScreen->displayHook = 0;
+   screen->kbdAddEvent = rfbDefaultKbdAddEvent;
+   screen->kbdReleaseAllKeys = rfbDoNothingWithClient;
+   screen->ptrAddEvent = rfbDefaultPtrAddEvent;
+   screen->setXCutText = rfbDefaultSetXCutText;
+   screen->getCursorPtr = rfbDefaultGetCursorPtr;
+   screen->setTranslateFunction = rfbSetTranslateFunction;
+   screen->newClientHook = rfbDefaultNewClientHook;
+   screen->displayHook = 0;
 
    /* initialize client list and iterator mutex */
-   rfbClientListInit(rfbScreen);
+   rfbClientListInit(screen);
 
-   return(rfbScreen);
+   return(screen);
 }
 
 /*
@@ -656,7 +656,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  * the caller.
  */
 
-void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
+void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
                        int width, int height,
                        int bitsPerSample, int samplesPerPixel,
                        int bytesPerPixel)
@@ -668,44 +668,44 @@ void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
 
   /* Remove the pointer */
 
-  rfbUndrawCursor(rfbScreen);
+  rfbUndrawCursor(screen);
 
-  /* Update information in the rfbScreenInfo structure */
+  /* Update information in the screenInfo structure */
 
-  old_format = rfbScreen->rfbServerFormat;
+  old_format = screen->serverFormat;
 
   if (width & 3)
     rfbErr("WARNING: New width (%d) is not a multiple of 4.\n", width);
 
-  rfbScreen->width = width;
-  rfbScreen->height = height;
-  rfbScreen->bitsPerPixel = rfbScreen->depth = 8*bytesPerPixel;
-  rfbScreen->paddedWidthInBytes = width*bytesPerPixel;
+  screen->width = width;
+  screen->height = height;
+  screen->bitsPerPixel = screen->depth = 8*bytesPerPixel;
+  screen->paddedWidthInBytes = width*bytesPerPixel;
 
-  rfbInitServerFormat(rfbScreen, bitsPerSample);
+  rfbInitServerFormat(screen, bitsPerSample);
 
-  if (memcmp(&rfbScreen->rfbServerFormat, &old_format,
+  if (memcmp(&screen->serverFormat, &old_format,
              sizeof(rfbPixelFormat)) != 0) {
     format_changed = TRUE;
   }
 
-  rfbScreen->frameBuffer = framebuffer;
+  screen->frameBuffer = framebuffer;
 
   /* Adjust pointer position if necessary */
 
-  if (rfbScreen->cursorX >= width)
-    rfbScreen->cursorX = width - 1;
-  if (rfbScreen->cursorY >= height)
-    rfbScreen->cursorY = height - 1;
+  if (screen->cursorX >= width)
+    screen->cursorX = width - 1;
+  if (screen->cursorY >= height)
+    screen->cursorY = height - 1;
 
   /* For each client: */
-  iterator = rfbGetClientIterator(rfbScreen);
+  iterator = rfbGetClientIterator(screen);
   while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
 
     /* Re-install color translation tables if necessary */
 
     if (format_changed)
-      rfbScreen->setTranslateFunction(cl);
+      screen->setTranslateFunction(cl);
 
     /* Mark the screen contents as changed, and schedule sending
        NewFBSize message if supported by this client. */
@@ -730,9 +730,9 @@ void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
 extern void TightCleanup();
 #endif
 
-void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
+void rfbScreenCleanup(rfbScreenInfoPtr screen)
 {
-  rfbClientIteratorPtr i=rfbGetClientIterator(rfbScreen);
+  rfbClientIteratorPtr i=rfbGetClientIterator(screen);
   rfbClientPtr cl,cl1=rfbClientIteratorNext(i);
   while(cl1) {
     cl=rfbClientIteratorNext(i);
@@ -742,27 +742,27 @@ void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
   rfbReleaseClientIterator(i);
     
   /* TODO: hang up on all clients and free all reserved memory */
-#define FREE_IF(x) if(rfbScreen->x) free(rfbScreen->x)
+#define FREE_IF(x) if(screen->x) free(screen->x)
   FREE_IF(colourMap.data.bytes);
   FREE_IF(underCursorBuffer);
-  TINI_MUTEX(rfbScreen->cursorMutex);
-  if(rfbScreen->cursor)
-    rfbFreeCursor(rfbScreen->cursor);
-  free(rfbScreen);
+  TINI_MUTEX(screen->cursorMutex);
+  if(screen->cursor)
+    rfbFreeCursor(screen->cursor);
+  free(screen);
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
-  TightCleanup();
+  rfbTightCleanup();
 #endif
 }
 
-void rfbInitServer(rfbScreenInfoPtr rfbScreen)
+void rfbInitServer(rfbScreenInfoPtr screen)
 {
 #ifdef WIN32
   WSADATA trash;
   int i=WSAStartup(MAKEWORD(2,2),&trash);
 #endif
-  rfbInitSockets(rfbScreen);
-  httpInitSockets(rfbScreen);
-  if(rfbScreen->ignoreSIGPIPE)
+  rfbInitSockets(screen);
+  rfbHttpInitSockets(screen);
+  if(screen->ignoreSIGPIPE)
     signal(SIGPIPE,SIG_IGN);
 }
 
@@ -784,27 +784,27 @@ void gettimeofday(struct timeval* tv,char* dummy)
 rfbClientPtr rfbClientIteratorHead(rfbClientIteratorPtr i);
 
 void
-rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
+rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 {
   rfbClientIteratorPtr i;
   rfbClientPtr cl,clPrev;
   struct timeval tv;
 
   if(usec<0)
-    usec=rfbScreen->rfbDeferUpdateTime*1000;
+    usec=screen->deferUpdateTime*1000;
 
-  rfbCheckFds(rfbScreen,usec);
-  httpCheckFds(rfbScreen);
+  rfbCheckFds(screen,usec);
+  rfbHttpCheckFds(screen);
 #ifdef CORBA
-  corbaCheckFds(rfbScreen);
+  corbaCheckFds(screen);
 #endif
 
-  i = rfbGetClientIterator(rfbScreen);
+  i = rfbGetClientIterator(screen);
   cl=rfbClientIteratorHead(i);
   while(cl) {
     if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) &&
         !sraRgnEmpty(cl->requestedRegion)) {
-      if(rfbScreen->rfbDeferUpdateTime == 0) {
+      if(screen->deferUpdateTime == 0) {
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
       } else if(cl->startDeferring.tv_usec == 0) {
 	gettimeofday(&cl->startDeferring,NULL);
@@ -815,7 +815,7 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 	if(tv.tv_sec < cl->startDeferring.tv_sec /* at midnight */
 	   || ((tv.tv_sec-cl->startDeferring.tv_sec)*1000
 	       +(tv.tv_usec-cl->startDeferring.tv_usec)/1000)
-	     > rfbScreen->rfbDeferUpdateTime) {
+	     > screen->deferUpdateTime) {
 	  cl->startDeferring.tv_usec = 0;
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
 	}
@@ -829,15 +829,15 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
   rfbReleaseClientIterator(i);
 }
 
-void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, rfbBool runInBackground)
+void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground)
 {
   if(runInBackground) {
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
        pthread_t listener_thread;
 
-       rfbScreen->backgroundLoop = TRUE;
+       screen->backgroundLoop = TRUE;
 
-       pthread_create(&listener_thread, NULL, listenerRun, rfbScreen);
+       pthread_create(&listener_thread, NULL, listenerRun, screen);
     return;
 #else
     rfbErr("Can't run in background, because I don't have PThreads!\n");
@@ -846,8 +846,8 @@ void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, rfbBool runInBackgro
   }
 
   if(usec<0)
-    usec=rfbScreen->rfbDeferUpdateTime*1000;
+    usec=screen->deferUpdateTime*1000;
 
   while(1)
-    rfbProcessEvents(rfbScreen,usec);
+    rfbProcessEvents(screen,usec);
 }

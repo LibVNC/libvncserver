@@ -84,7 +84,7 @@ rfbSendRectEncodingRRE(cl, x, y, w, h)
     }
 
     (*cl->translateFn)(cl->translateLookupTable,
-		       &(cl->screen->rfbServerFormat),
+		       &(cl->screen->serverFormat),
                        &cl->format, fbptr, rreBeforeBuf,
                        cl->screen->paddedWidthInBytes, w, h);
 
@@ -110,8 +110,8 @@ rfbSendRectEncodingRRE(cl, x, y, w, h)
         return rfbSendRectEncodingRaw(cl, x, y, w, h);
     }
 
-    cl->rfbRectanglesSent[rfbEncodingRRE]++;
-    cl->rfbBytesSent[rfbEncodingRRE] += (sz_rfbFramebufferUpdateRectHeader
+    cl->rectanglesSent[rfbEncodingRRE]++;
+    cl->bytesSent[rfbEncodingRRE] += (sz_rfbFramebufferUpdateRectHeader
                                          + sz_rfbRREHeader + rreAfterBufLen);
 
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbRREHeader

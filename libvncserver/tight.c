@@ -112,7 +112,7 @@ static char *tightAfterBuf = NULL;
 
 static int *prevRowBuf = NULL;
 
-void TightCleanup()
+void rfbTightCleanup()
 {
   if(tightBeforeBufSize) {
     free(tightBeforeBuf);
@@ -330,7 +330,7 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                          (cl->screen->paddedWidthInBytes * y_best) +
                          (x_best * (cl->screen->bitsPerPixel / 8)));
 
-                (*cl->translateFn)(cl->translateLookupTable, &cl->screen->rfbServerFormat,
+                (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
                                    &cl->format, fbptr, tightBeforeBuf,
                                    cl->screen->paddedWidthInBytes, 1, 1);
 
@@ -451,7 +451,7 @@ ExtendSolidArea(cl, x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
 
 static rfbBool CheckSolidTile(rfbClientPtr cl, int x, int y, int w, int h, uint32_t* colorPtr, rfbBool needSameColor)
 {
-    switch(cl->screen->rfbServerFormat.bitsPerPixel) {
+    switch(cl->screen->serverFormat.bitsPerPixel) {
     case 32:
         return CheckSolidTile32(cl, x, y, w, h, colorPtr, needSameColor);
     case 16:
@@ -568,7 +568,7 @@ SendSubrect(cl, x, y, w, h)
     fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)
              + (x * (cl->screen->bitsPerPixel / 8)));
 
-    (*cl->translateFn)(cl->translateLookupTable, &cl->screen->rfbServerFormat,
+    (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
                        &cl->format, fbptr, tightBeforeBuf,
                        cl->screen->paddedWidthInBytes, w, h);
 
@@ -646,8 +646,8 @@ SendTightHeader(cl, x, y, w, h)
            sz_rfbFramebufferUpdateRectHeader);
     cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-    cl->rfbRectanglesSent[rfbEncodingTight]++;
-    cl->rfbBytesSent[rfbEncodingTight] += sz_rfbFramebufferUpdateRectHeader;
+    cl->rectanglesSent[rfbEncodingTight]++;
+    cl->bytesSent[rfbEncodingTight] += sz_rfbFramebufferUpdateRectHeader;
 
     return TRUE;
 }
@@ -677,7 +677,7 @@ SendSolidRect(cl)
     memcpy (&cl->updateBuf[cl->ublen], tightBeforeBuf, len);
     cl->ublen += len;
 
-    cl->rfbBytesSent[rfbEncodingTight] += len + 1;
+    cl->bytesSent[rfbEncodingTight] += len + 1;
 
     return TRUE;
 }
@@ -720,7 +720,7 @@ SendMonoRect(cl, w, h)
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteLen);
         cl->ublen += paletteLen;
-        cl->rfbBytesSent[rfbEncodingTight] += 3 + paletteLen;
+        cl->bytesSent[rfbEncodingTight] += 3 + paletteLen;
         break;
 
     case 16:
@@ -731,7 +731,7 @@ SendMonoRect(cl, w, h)
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, 4);
         cl->ublen += 4;
-        cl->rfbBytesSent[rfbEncodingTight] += 7;
+        cl->bytesSent[rfbEncodingTight] += 7;
         break;
 
     default:
@@ -739,7 +739,7 @@ SendMonoRect(cl, w, h)
 
         cl->updateBuf[cl->ublen++] = (char)monoBackground;
         cl->updateBuf[cl->ublen++] = (char)monoForeground;
-        cl->rfbBytesSent[rfbEncodingTight] += 5;
+        cl->bytesSent[rfbEncodingTight] += 5;
     }
 
     return CompressData(cl, streamId, dataLen,
@@ -785,7 +785,7 @@ SendIndexedRect(cl, w, h)
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteNumColors * entryLen);
         cl->ublen += paletteNumColors * entryLen;
-        cl->rfbBytesSent[rfbEncodingTight] += 3 + paletteNumColors * entryLen;
+        cl->bytesSent[rfbEncodingTight] += 3 + paletteNumColors * entryLen;
         break;
 
     case 16:
@@ -798,7 +798,7 @@ SendIndexedRect(cl, w, h)
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteNumColors * 2);
         cl->ublen += paletteNumColors * 2;
-        cl->rfbBytesSent[rfbEncodingTight] += 3 + paletteNumColors * 2;
+        cl->bytesSent[rfbEncodingTight] += 3 + paletteNumColors * 2;
         break;
 
     default:
@@ -824,7 +824,7 @@ SendFullColorRect(cl, w, h)
     }
 
     cl->updateBuf[cl->ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
-    cl->rfbBytesSent[rfbEncodingTight]++;
+    cl->bytesSent[rfbEncodingTight]++;
 
     if (usePixelFormat24) {
         Pack24(cl, tightBeforeBuf, &cl->format, w * h);
@@ -858,7 +858,7 @@ SendGradientRect(cl, w, h)
 
     cl->updateBuf[cl->ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     cl->updateBuf[cl->ublen++] = rfbTightFilterGradient;
-    cl->rfbBytesSent[rfbEncodingTight] += 2;
+    cl->bytesSent[rfbEncodingTight] += 2;
 
     if (usePixelFormat24) {
         FilterGradient24(cl, tightBeforeBuf, &cl->format, w, h);
@@ -887,7 +887,7 @@ CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
     if (dataLen < TIGHT_MIN_TO_COMPRESS) {
         memcpy(&cl->updateBuf[cl->ublen], tightBeforeBuf, dataLen);
         cl->ublen += dataLen;
-        cl->rfbBytesSent[rfbEncodingTight] += dataLen;
+        cl->bytesSent[rfbEncodingTight] += dataLen;
         return TRUE;
     }
 
@@ -938,15 +938,15 @@ static rfbBool SendCompressedData(cl, compressedLen)
     int i, portionLen;
 
     cl->updateBuf[cl->ublen++] = compressedLen & 0x7F;
-    cl->rfbBytesSent[rfbEncodingTight]++;
+    cl->bytesSent[rfbEncodingTight]++;
     if (compressedLen > 0x7F) {
         cl->updateBuf[cl->ublen-1] |= 0x80;
         cl->updateBuf[cl->ublen++] = compressedLen >> 7 & 0x7F;
-        cl->rfbBytesSent[rfbEncodingTight]++;
+        cl->bytesSent[rfbEncodingTight]++;
         if (compressedLen > 0x3FFF) {
             cl->updateBuf[cl->ublen-1] |= 0x80;
             cl->updateBuf[cl->ublen++] = compressedLen >> 14 & 0xFF;
-            cl->rfbBytesSent[rfbEncodingTight]++;
+            cl->bytesSent[rfbEncodingTight]++;
         }
     }
 
@@ -962,7 +962,7 @@ static rfbBool SendCompressedData(cl, compressedLen)
         memcpy(&cl->updateBuf[cl->ublen], &tightAfterBuf[i], portionLen);
         cl->ublen += portionLen;
     }
-    cl->rfbBytesSent[rfbEncodingTight] += compressedLen;
+    cl->bytesSent[rfbEncodingTight] += compressedLen;
 
     return TRUE;
 }
@@ -1181,7 +1181,7 @@ static void Pack24(cl, buf, fmt, count)
 
     buf32 = (uint32_t *)buf;
 
-    if (!cl->screen->rfbServerFormat.bigEndian == !fmt->bigEndian) {
+    if (!cl->screen->serverFormat.bigEndian == !fmt->bigEndian) {
         r_shift = fmt->redShift;
         g_shift = fmt->greenShift;
         b_shift = fmt->blueShift;
@@ -1323,7 +1323,7 @@ FilterGradient24(cl, buf, fmt, w, h)
     buf32 = (uint32_t *)buf;
     memset (prevRowBuf, 0, w * 3 * sizeof(int));
 
-    if (!cl->screen->rfbServerFormat.bigEndian == !fmt->bigEndian) {
+    if (!cl->screen->serverFormat.bigEndian == !fmt->bigEndian) {
         shiftBits[0] = fmt->redShift;
         shiftBits[1] = fmt->greenShift;
         shiftBits[2] = fmt->blueShift;
@@ -1384,7 +1384,7 @@ FilterGradient##bpp(cl, buf, fmt, w, h)                                      \
                                                                          \
     memset (prevRowBuf, 0, w * 3 * sizeof(int));                         \
                                                                          \
-    endianMismatch = (!cl->screen->rfbServerFormat.bigEndian != !fmt->bigEndian);    \
+    endianMismatch = (!cl->screen->serverFormat.bigEndian != !fmt->bigEndian);    \
                                                                          \
     maxColor[0] = fmt->redMax;                                           \
     maxColor[1] = fmt->greenMax;                                         \
@@ -1452,7 +1452,7 @@ DetectSmoothImage (cl, fmt, w, h)
 {
     long avgError;
 
-    if ( cl->screen->rfbServerFormat.bitsPerPixel == 8 || fmt->bitsPerPixel == 8 ||
+    if ( cl->screen->serverFormat.bitsPerPixel == 8 || fmt->bitsPerPixel == 8 ||
          w < DETECT_MIN_WIDTH || h < DETECT_MIN_HEIGHT ) {
         return 0;
     }
@@ -1564,7 +1564,7 @@ DetectSmoothImage##bpp (cl, fmt, w, h)                                          
     int sample, sum, left[3];                                                \
     unsigned long avgError;                                                  \
                                                                              \
-    endianMismatch = (!cl->screen->rfbServerFormat.bigEndian != !fmt->bigEndian);        \
+    endianMismatch = (!cl->screen->serverFormat.bigEndian != !fmt->bigEndian);        \
                                                                              \
     maxColor[0] = fmt->redMax;                                               \
     maxColor[1] = fmt->greenMax;                                             \
@@ -1652,7 +1652,7 @@ SendJpegRect(cl, x, y, w, h, quality)
     JSAMPROW rowPointer[1];
     int dy;
 
-    if (cl->screen->rfbServerFormat.bitsPerPixel == 8)
+    if (cl->screen->serverFormat.bitsPerPixel == 8)
         return SendFullColorRect(cl, w, h);
 
     srcBuf = (uint8_t *)malloc(w * 3);
@@ -1698,7 +1698,7 @@ SendJpegRect(cl, x, y, w, h, quality)
     }
 
     cl->updateBuf[cl->ublen++] = (char)(rfbTightJpeg << 4);
-    cl->rfbBytesSent[rfbEncodingTight]++;
+    cl->bytesSent[rfbEncodingTight]++;
 
     return SendCompressedData(cl, jpegDstDataLen);
 }
@@ -1709,10 +1709,10 @@ PrepareRowForJpeg(cl, dst, x, y, count)
     uint8_t *dst;
     int x, y, count;
 {
-    if (cl->screen->rfbServerFormat.bitsPerPixel == 32) {
-        if ( cl->screen->rfbServerFormat.redMax == 0xFF &&
-             cl->screen->rfbServerFormat.greenMax == 0xFF &&
-             cl->screen->rfbServerFormat.blueMax == 0xFF ) {
+    if (cl->screen->serverFormat.bitsPerPixel == 32) {
+        if ( cl->screen->serverFormat.redMax == 0xFF &&
+             cl->screen->serverFormat.greenMax == 0xFF &&
+             cl->screen->serverFormat.blueMax == 0xFF ) {
             PrepareRowForJpeg24(cl, dst, x, y, count);
         } else {
             PrepareRowForJpeg32(cl, dst, x, y, count);
@@ -1737,9 +1737,9 @@ PrepareRowForJpeg24(cl, dst, x, y, count)
 
     while (count--) {
         pix = *fbptr++;
-        *dst++ = (uint8_t)(pix >> cl->screen->rfbServerFormat.redShift);
-        *dst++ = (uint8_t)(pix >> cl->screen->rfbServerFormat.greenShift);
-        *dst++ = (uint8_t)(pix >> cl->screen->rfbServerFormat.blueShift);
+        *dst++ = (uint8_t)(pix >> cl->screen->serverFormat.redShift);
+        *dst++ = (uint8_t)(pix >> cl->screen->serverFormat.greenShift);
+        *dst++ = (uint8_t)(pix >> cl->screen->serverFormat.blueShift);
     }
 }
 
@@ -1763,18 +1763,18 @@ PrepareRowForJpeg##bpp(cl, dst, x, y, count)                                    
         pix = *fbptr++;                                                     \
                                                                             \
         inRed = (int)                                                       \
-            (pix >> cl->screen->rfbServerFormat.redShift   & cl->screen->rfbServerFormat.redMax);   \
+            (pix >> cl->screen->serverFormat.redShift   & cl->screen->serverFormat.redMax);   \
         inGreen = (int)                                                     \
-            (pix >> cl->screen->rfbServerFormat.greenShift & cl->screen->rfbServerFormat.greenMax); \
+            (pix >> cl->screen->serverFormat.greenShift & cl->screen->serverFormat.greenMax); \
         inBlue  = (int)                                                     \
-            (pix >> cl->screen->rfbServerFormat.blueShift  & cl->screen->rfbServerFormat.blueMax);  \
+            (pix >> cl->screen->serverFormat.blueShift  & cl->screen->serverFormat.blueMax);  \
                                                                             \
-	*dst++ = (uint8_t)((inRed   * 255 + cl->screen->rfbServerFormat.redMax / 2) /     \
-                         cl->screen->rfbServerFormat.redMax);                           \
-	*dst++ = (uint8_t)((inGreen * 255 + cl->screen->rfbServerFormat.greenMax / 2) /   \
-                         cl->screen->rfbServerFormat.greenMax);                         \
-	*dst++ = (uint8_t)((inBlue  * 255 + cl->screen->rfbServerFormat.blueMax / 2) /    \
-                         cl->screen->rfbServerFormat.blueMax);                          \
+	*dst++ = (uint8_t)((inRed   * 255 + cl->screen->serverFormat.redMax / 2) /     \
+                         cl->screen->serverFormat.redMax);                           \
+	*dst++ = (uint8_t)((inGreen * 255 + cl->screen->serverFormat.greenMax / 2) /   \
+                         cl->screen->serverFormat.greenMax);                         \
+	*dst++ = (uint8_t)((inBlue  * 255 + cl->screen->serverFormat.blueMax / 2) /    \
+                         cl->screen->serverFormat.blueMax);                          \
     }                                                                       \
 }
 

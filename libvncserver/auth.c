@@ -43,9 +43,9 @@ rfbAuthNewClient(cl)
 
     cl->state = RFB_AUTHENTICATION;
 
-    if (cl->screen->rfbAuthPasswdData && !cl->reverseConnection) {
+    if (cl->screen->authPasswdData && !cl->reverseConnection) {
         *(uint32_t *)buf = Swap32IfLE(rfbVncAuth);
-        vncRandomBytes(cl->authChallenge);
+        rfbRandomBytes(cl->authChallenge);
         memcpy(&buf[4], (char *)cl->authChallenge, CHALLENGESIZE);
         len = 4 + CHALLENGESIZE;
     } else {
@@ -54,7 +54,7 @@ rfbAuthNewClient(cl)
         cl->state = RFB_INITIALISATION;
     }
 
-    if (WriteExact(cl, buf, len) < 0) {
+    if (rfbWriteExact(cl, buf, len) < 0) {
         rfbLogPerror("rfbAuthNewClient: write");
         rfbCloseClient(cl);
         return;
@@ -75,7 +75,7 @@ rfbAuthProcessClientMessage(cl)
     uint8_t response[CHALLENGESIZE];
     uint32_t authResult;
 
-    if ((n = ReadExact(cl, (char *)response, CHALLENGESIZE)) <= 0) {
+    if ((n = rfbReadExact(cl, (char *)response, CHALLENGESIZE)) <= 0) {
         if (n != 0)
             rfbLogPerror("rfbAuthProcessClientMessage: read");
         rfbCloseClient(cl);
@@ -85,7 +85,7 @@ rfbAuthProcessClientMessage(cl)
     if(!cl->screen->passwordCheck(cl,(const char*)response,CHALLENGESIZE)) {
         rfbErr("rfbAuthProcessClientMessage: password check failed\n");
         authResult = Swap32IfLE(rfbVncAuthFailed);
-        if (WriteExact(cl, (char *)&authResult, 4) < 0) {
+        if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
             rfbLogPerror("rfbAuthProcessClientMessage: write");
         }
         rfbCloseClient(cl);
@@ -94,7 +94,7 @@ rfbAuthProcessClientMessage(cl)
 
     authResult = Swap32IfLE(rfbVncAuthOK);
 
-    if (WriteExact(cl, (char *)&authResult, 4) < 0) {
+    if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
         rfbLogPerror("rfbAuthProcessClientMessage: write");
         rfbCloseClient(cl);
         return;

@@ -64,7 +64,7 @@ int main(int argc,char** argv)
     rfbScreen->desktopName = argv[1];
   else
     rfbScreen->desktopName = "Picture";
-  rfbScreen->rfbAlwaysShared = TRUE;
+  rfbScreen->alwaysShared = TRUE;
   rfbScreen->kbdAddEvent = HandleKey;
 
   /* enable http */
@@ -76,7 +76,7 @@ int main(int argc,char** argv)
   fclose(in);
 
   if(picType!=TRUECOLOUR) {
-	  rfbScreen->rfbServerFormat.trueColour=FALSE;
+	  rfbScreen->serverFormat.trueColour=FALSE;
 	  rfbScreen->colourMap.count=256;
 	  rfbScreen->colourMap.is16=FALSE;
 	  rfbScreen->colourMap.data.bytes=malloc(256*3);
