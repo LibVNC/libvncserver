@@ -2,6 +2,7 @@
 	* configure.ac: add /usr/sfw on Solaris when XFIXES, add
 	  --with-jpeg=DIR --with-zlib=DIR, workaround bug when
 	  --without-jpeg was supplied.
+	* prepare_x11vnc_dist.sh: few tweaks for next release
 
 2005-02-05  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -solid color, -opts/-?
