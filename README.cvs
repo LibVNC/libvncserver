@@ -1,0 +1,10 @@
+To compile LibVNCServer with sources from CVS, you have to have a current
+(>2.50) version of autoconf. Also, you need automake.
+
+Then, just do
+	sh bootstrap.sh
+in LibVNCServer's directory, and you should see plenty of output and
+finally have a complete build of LibVNCServer.
+
+Happy VNC'ing!
+
