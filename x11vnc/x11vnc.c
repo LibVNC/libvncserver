@@ -37,11 +37,11 @@
  *
  * Another goal is to improve performance and interactive response.
  * The algorithm of x0rfbserver was used as a base.  Additional heuristics
- * are also applied (currently there are a bit too many of these...)
+ * are also applied.
  *
  * Another goal is to add many features that enable and incourage creative
- * Ausage and application of the tool.  pologies for the large number
- * Aof options!
+ * usage and application of the tool.  Apologies for the large number
+ * of options!
  *
  * To build:
  *
@@ -60,18 +60,18 @@
  * The screen updates are good, but of course not perfect since the X
  * display must be continuously polled and read for changes and this is
  * slow for most hardware. This can be contrasted with receiving a change
- * callback from the X server, if that were generally possible... (Update:
- * this seems to be handled now with the X DAMAGE extension, but
- * unfortunately that doesn't seem to address the slow read from the
- * video h/w.  So, e.g., opaque moves and similar window activity can
- * be very painful; one has to modify one's behavior a bit.
+ * callback from the X server, if that were generally possible... (UPDATE:
+ * this is handled now with the X DAMAGE extension, but unfortunately
+ * that doesn't seem to address the slow read from the video h/w).  So,
+ * e.g., opaque moves and similar window activity can be very painful;
+ * one has to modify one's behavior a bit.
  *
  * General audio at the remote display is lost unless one separately
  * sets up some audio side-channel such as esd.
  *
  * It does not appear possible to query the X server for the current
  * cursor shape.  We can use XTest to compare cursor to current window's
- * cursor, but we cannot extract what the cursor is... (Update: we now
+ * cursor, but we cannot extract what the cursor is... (UPDATE: we now
  * use XFIXES extension for this.  Also on Solaris and IRIX Overlay
  * extensions exists that allow drawing the mouse into the framebuffer)
  * 
@@ -82,7 +82,7 @@
  * currently "-cursor some" is a first hack at this)
  *
  * Under XFIXES mode for showing the cursor shape, the cursor may be
- * poorly approximated if it has transparency.
+ * poorly approximated if it has transparency (alpha channel).
  *
  * Windows using visuals other than the default X visual may have
  * their colors messed up.  When using 8bpp indexed color, the colormap
@@ -93,9 +93,9 @@
  * On Sun and Sgi hardware we can to work around this with -overlay.
  *
  * Feature -id <windowid> can be picky: it can crash for things like
- * the window not sufficiently mapped into server memory, etc (Update:
- * we now use the -xrandr mechanisms to trap errors for this mode).
- * SaveUnders menus, popups, etc will not be seen.
+ * the window not sufficiently mapped into server memory, etc (UPDATE:
+ * we now use the -xrandr mechanisms to trap errors more robustly for
+ * this mode).  SaveUnders menus, popups, etc will not be seen.
  *
  * Under some situations the keysym unmapping is not correct, especially
  * if the two keyboards correspond to different languages.  The -modtweak
@@ -128,11 +128,15 @@
 /* -- x11vnc.h -- */
 
 /*
+ ***************************************************************************
  * if you are inserting this file, x11vnc.c into an old CVS tree you
- * may need to set OLD_TREE to 1.  See below for LibVNCServer 0.7 tips.
+ * may need to set OLD_TREE to 1.  Or use -DOLD_TREE=1 in CPPFLAGS.
+ * See below for LibVNCServer 0.7 tips.
  */
 
+#ifndef OLD_TREE
 #define OLD_TREE 0
+#endif
 #if OLD_TREE
 
 /*
@@ -173,6 +177,10 @@
  */
 
 #endif	/* OLD_TREE */
+/****************************************************************************/
+
+
+/* Standard includes and libvncserver */
 
 #include <unistd.h>
 #include <signal.h>
@@ -191,6 +199,7 @@
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
 
+/****************************************************************************/
 #if OLD_TREE
 /*
  * This is another transient for building in older libvncserver trees,
@@ -210,9 +219,9 @@
 #define rfbHttpInitSockets	httpInitSockets
 
 #define RFBUNDRAWCURSOR(s) if (s) {rfbUndrawCursor(s);}
-#else
+#else	/* OLD_TREE */
 #define RFBUNDRAWCURSOR(s)
-#endif
+#endif	/* !OLD_TREE */
 /*
  * To get a clean build in a LibVNCServer 0.7 source tree no need for
  * OLD_TREE, you just need to either download the forgotten tkx11vnc.h
@@ -230,7 +239,60 @@
  * that may break some usage):
  *
 #define listenInterface maxRectsPerUpdate
+ *
  */
+/****************************************************************************/
+
+
+/* Build-time customization via CPPFLAGS. */
+
+/*
+ * -DX11VNC_SHARED to have the vnc display shared by default.
+ */
+
+/*
+ * -DX11VNC_FOREVER to have -forever on by default.
+ */
+
+/*
+ * This can be used to disable the remote control mechanism.
+ * E.g. -DREMOTE_CONTROL=0 in CPPFLAGS.
+ */
+#ifndef REMOTE_CONTROL
+#define REMOTE_CONTROL 1
+#endif
+
+/*
+ * Beginning of support for small binary footprint build for embedded
+ * systems, PDA's etc.  It currently just cuts out the low-hanging
+ * fruit (large text passages).  Set to 2, 3 to cut out some of the
+ * more esoteric extensions.  More tedious is to modify LDFLAGS in the
+ * Makefile to not link against the extension libraries... but that
+ * should be done too (manually for now).
+ *
+ * If there is interest more of the bloat can be removed...  Currently
+ * these shrink the binary from 500K to about 270K.
+ */
+#ifndef SMALL_FOOTPRINT
+#define SMALL_FOOTPRINT 0
+#endif
+
+#if (SMALL_FOOTPRINT > 1)
+#define LIBVNCSERVER_HAVE_XKEYBOARD 0
+#define LIBVNCSERVER_HAVE_LIBXINERAMA 0
+#define LIBVNCSERVER_HAVE_LIBXRANDR 0
+#define LIBVNCSERVER_HAVE_LIBXFIXES 0
+#define LIBVNCSERVER_HAVE_LIBXDAMAGE 0
+#endif
+
+#if (SMALL_FOOTPRINT > 2)
+#define LIBVNCSERVER_HAVE_UTMPX_H 0
+#define LIBVNCSERVER_HAVE_PWD_H 0
+#define REMOTE_CONTROL 0
+#endif
+
+
+/* Extensions and related includes: */
 
 #if LIBVNCSERVER_HAVE_XSHM
 #  if defined(__hpux) && defined(__ia64)  /* something weird on hp/itanic */
@@ -311,7 +373,7 @@ int overlay_present = 0;
  */
 #if LIBVNCSERVER_HAVE_LIBXRANDR
 #include <X11/extensions/Xrandr.h>
-static int xrandr_base_event_type;
+static int xrandr_base_event_type = 0;
 #endif
 
 int xfixes_present = 0;
@@ -326,15 +388,14 @@ int alt_arrow = 1;
 
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 #include <X11/extensions/Xfixes.h>
-static int xfixes_base_event_type;
+static int xfixes_base_event_type = 0;
 #endif
 
 int xdamage_present = 0;
-int using_xdamage = 0;
-int use_xdamage_hints = 1;	/* just use the xdamage rects. for scanline hints */
+int use_xdamage = 1;	/* just use the xdamage rects. for scanline hints */
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 #include <X11/extensions/Xdamage.h>
-static int xdamage_base_event_type;
+static int xdamage_base_event_type = 0;
 Damage xdamage = 0;
 #endif
 int xdamage_max_area = 20000;	/* pixels */
@@ -344,7 +405,7 @@ int xdamage_tile_count;
 int hack_val = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2pre lastmod: 2005-03-19";
+char lastmod[] = "0.7.2pre lastmod: 2005-03-29";
 
 /* X display info */
 
@@ -457,6 +518,7 @@ unsigned char *tile_has_xdamage_diff, *tile_row_has_xdamage_diff;
 
 /* times of recent events */
 time_t last_event, last_input, last_client = 0;
+time_t last_sendevent = 0;
 
 /* last client to move pointer */
 rfbClientPtr last_pointer_client = NULL;
@@ -569,6 +631,7 @@ void mark_hint(hint_t);
 void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force);
 
 enum rfbNewClientAction new_client(rfbClientPtr client);
+void set_nofb_params(void);
 void nofb_hook(rfbClientPtr client);
 void pointer(int mask, int x, int y, rfbClientPtr client);
 void cursor_position(int, int);
@@ -661,11 +724,21 @@ char *rc_rcfile = NULL;		/* -rc */
 int rc_norc = 0;
 int opts_bg = 0;
 
+#ifndef X11VNC_SHARED
 int shared = 0;			/* share vnc display. */
+#else
+int shared = 1;
+#endif
+#ifndef X11VNC_FOREVER
+int connect_once = 1;		/* disconnect after first connection session. */
+#else
+int connect_once = 0;
+#endif
 int deny_all = 0;		/* global locking of new clients */
 int accept_remote_cmds = 1;	/* -noremote */
 int safe_remote_only = 0;	/* -safer, -unsafe */
 int started_as_root = 0;
+int host_lookup = 1;
 char *users_list = NULL;	/* -users */
 char *allow_list = NULL;	/* for -allow and -localhost */
 char *listen_str = NULL;
@@ -678,7 +751,6 @@ char *allowed_input_normal = NULL;
 char *allowed_input_str = NULL;
 char *viewonly_passwd = NULL;	/* view only passwd. */
 int inetd = 0;			/* spawned from inetd(1) */
-int connect_once = 1;		/* disconnect after first connection session. */
 int first_conn_timeout = 0;	/* -timeout */
 int flash_cmap = 0;		/* follow installed colormaps */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
@@ -721,7 +793,6 @@ int no_repeat_countdown = 2;
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
 int sound_bell = 1;		/* actually send it */
 int xkbcompat = 0;		/* ignore XKEYBOARD extension */
-int use_xkb = 0;		/* try to open Xkb connection (for bell or other) */
 int use_xkb_modtweak = 0;	/* -xkb */
 char *skip_keycodes = NULL;
 int add_keysyms = 0;		/* automatically add keysyms to X server */
@@ -729,9 +800,12 @@ int add_keysyms = 0;		/* automatically add keysyms to X server */
 char *remap_file = NULL;	/* -remap */
 char *pointer_remap = NULL;
 /* use the various ways of updating pointer */
-#define POINTER_MODE_DEFAULT 2
+#ifndef POINTER_MODE_DEFAULT
+#define POINTER_MODE_DEFAULT 3
+#endif
+#define POINTER_MODE_NOFB 2
 int pointer_mode = POINTER_MODE_DEFAULT;
-int pointer_mode_max = 4;	
+int pointer_mode_max = 5;	
 int single_copytile = 0;	/* use the old way copy_tiles() */
 int single_copytile_orig = 0;
 int single_copytile_count = 0;
@@ -801,6 +875,8 @@ int quiet = 0;
 int got_rfbport = 0;
 int got_alwaysshared = 0;
 int got_nevershared = 0;
+int got_cursorpos = 0;
+int got_pointer_mode = -1;
 
 /* threaded vs. non-threaded (default) */
 #if LIBVNCSERVER_X11VNC_THREADED && ! defined(X11VNC_THREADED)
@@ -1112,7 +1188,7 @@ void switch_user_task_solid_bg(void) {
 	}
 }
 
-void check_switched_user (void) {
+void check_switched_user(void) {
 	static time_t sched_switched_user = 0;
 	static int did_solid = 0;
 	static int did_dummy = 0;
@@ -1785,6 +1861,10 @@ char *host2ip(char *host) {
 	struct sockaddr_in addr;
 	char *str;
 
+	if (! host_lookup) {
+		return NULL;
+	}
+
 	hp = gethostbyname(host);
 	if (!hp) {
 		return NULL;
@@ -1801,6 +1881,10 @@ char *ip2host(char *ip) {
 #if LIBVNCSERVER_HAVE_NETDB_H && LIBVNCSERVER_HAVE_NETINET_IN_H
 	struct hostent *hp;
 	in_addr_t iaddr;
+
+	if (! host_lookup) {
+		return strdup("unknown");
+	}
 
 	iaddr = inet_addr(ip);
 	if (iaddr == htonl(INADDR_NONE)) {
@@ -3391,6 +3475,7 @@ static char t2x2_bits[] = {
 		}
 		if (out != -1) {
 			ret = out;
+			XSelectInput(dpy, awin, 0);
 			XUnmapWindow(dpy, awin);
 			XFreeGC(dpy, gc);
 			XDestroyWindow(dpy, awin);
@@ -3517,7 +3602,6 @@ static int accept_client(rfbClientPtr client) {
 	if (addr == NULL || addr[0] == '\0') {
 		addr = "unknown-host";
 	}
-
 
 	if (strstr(accept_cmd, "popup") == accept_cmd) {
 		/* use our builtin popup button */
@@ -6230,7 +6314,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
  */
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 
-static int xkb_base_event_type;
+static int xkb_base_event_type = 0;
 
 /*
  * check for XKEYBOARD, set up xkb_base_event_type
@@ -6239,36 +6323,46 @@ void initialize_xkb(void) {
 	int ir, reason;
 	int op, ev, er, maj, min;
 	
-	if (! XkbQueryExtension(dpy, &op, &ev, &er, &maj, &min)) {
-		if (! quiet && use_xkb) {
+	if (xkbcompat) {
+		xkb_present = 0;
+	} else if (! XkbQueryExtension(dpy, &op, &ev, &er, &maj, &min)) {
+		if (! quiet) {
 			rfbLog("warning: XKEYBOARD extension not present.\n");
 		}
 		xkb_present = 0;
-		use_xkb = 0;
-		return;
 	} else {
 		xkb_present = 1;
 	}
-	if (! use_xkb) {
+
+	if (! xkb_present) {
 		return;
 	}
+
 	if (! XkbOpenDisplay(DisplayString(dpy), &xkb_base_event_type, &ir,
 	    NULL, NULL, &reason) ) {
 		if (! quiet) {
 			rfbLog("warning: disabling XKEYBOARD. XkbOpenDisplay"
 			    " failed.\n");
 		}
-		use_xkb = 0;
+		xkb_base_event_type = 0;
+		xkb_present = 0;
 	}
 }
 
 void initialize_watch_bell(void) {
-	if (! use_xkb) {
+	if (! xkb_present) {
 		if (! quiet) {
 			rfbLog("warning: disabling bell. XKEYBOARD ext. "
 			    "not present.\n");
 		}
 		watch_bell = 0;
+		sound_bell = 0;
+		return;
+	}
+
+	XkbSelectEvents(dpy, XkbUseCoreKbd, XkbBellNotifyMask, 0);
+
+	if (! watch_bell) {
 		return;
 	}
 	if (! XkbSelectEvents(dpy, XkbUseCoreKbd, XkbBellNotifyMask,
@@ -6278,6 +6372,7 @@ void initialize_watch_bell(void) {
 			    " failed.\n");
 		}
 		watch_bell = 0;
+		sound_bell = 0;
 	}
 }
 
@@ -6290,33 +6385,40 @@ void check_bell_event(void) {
 	XkbAnyEvent *xkb_ev;
 	int got_bell = 0;
 
-	if (! watch_bell) {
+	if (! xkb_base_event_type) {
 		return;
 	}
 
-	X_LOCK;
+	/* caller does X_LOCK */
 	if (! XCheckTypedEvent(dpy, xkb_base_event_type, &xev)) {
-		X_UNLOCK;
 		return;
 	}
+	if (! watch_bell) {
+		/* we return here to avoid xkb events piling up */
+		return;
+	}
+
 	xkb_ev = (XkbAnyEvent *) &xev;
 	if (xkb_ev->xkb_type == XkbBellNotify) {
 		got_bell = 1;
 	}
-	X_UNLOCK;
 
 	if (got_bell && sound_bell) {
 		if (! all_clients_initialized()) {
 			rfbLog("check_bell_event: not sending bell: "
 			    "uninitialized clients\n");
 		} else {
-			if (screen) {
+			if (screen && client_count) {
 				rfbSendBell(screen);
 			}
 		}
 	}
 }
 #else
+void initialize_watch_bell(void) {
+	watch_bell = 0;
+	sound_bell = 0;
+}
 void check_bell_event(void) {}
 #endif
 
@@ -6493,8 +6595,8 @@ int check_xrandr_event(char *msg) {
 	if (! xrandr || ! xrandr_present) {
 		return 0;
 	}
-	if (XCheckTypedEvent(dpy, xrandr_base_event_type +
-	    RRScreenChangeNotify, &xev)) {
+	if (xrandr_base_event_type && XCheckTypedEvent(dpy,
+	    xrandr_base_event_type + RRScreenChangeNotify, &xev)) {
 		int do_change;
 		XRRScreenChangeNotifyEvent *rev;
 
@@ -6663,6 +6765,7 @@ static void selection_request(XEvent *ev) {
 	if (! trapped_xerror) {
 		XSendEvent(req_event->display, req_event->requestor, False, 0,
 		    (XEvent *)&notify_event);
+		last_sendevent = time(0);
 	} 
 	if (trapped_xerror) {
 		rfbLog("selection_request: ignored XError while sending "
@@ -6836,23 +6939,25 @@ void initialize_xevents(void) {
 	static int did_xdamage = 0;
 	static int did_xrandr = 0;
 
-	X_LOCK;
 	if ((watch_selection || vnc_connect) && !did_xselect_input) {
 		/*
 		 * register desired event(s) for notification.
 		 * PropertyChangeMask is for CUT_BUFFER0 changes.
 		 * XXX: does this cause a flood of other stuff?
 		 */
+		X_LOCK;
 		XSelectInput(dpy, rootwin, PropertyChangeMask);
+		X_UNLOCK;
 		did_xselect_input = 1;
 	}
 	if (watch_selection && !did_xcreate_simple_window) {
 		/* create fake window for our selection ownership, etc */
 
+		X_LOCK;
 		selwin = XCreateSimpleWindow(dpy, rootwin, 0, 0, 1, 1, 0, 0, 0);
+		X_UNLOCK;
 		did_xcreate_simple_window = 1;
 	}
-	X_UNLOCK;
 
 	if (xrandr && !did_xrandr) {
 		initialize_xrandr();
@@ -6878,16 +6983,19 @@ void initialize_xevents(void) {
  */
 void check_xevents(void) {
 	XEvent xev;
-	static int first = 1, sent_some_sel = 0;
-	static time_t last_request = 0;
-	time_t now = time(0);
 	int have_clients = 0;
+	static int sent_some_sel = 0;
+	static time_t last_request = 0;
+	static time_t last_call = 0;
+	static time_t last_bell = 0;
+	static time_t last_init_check = 0;
+	static time_t last_sync = 0;
+	time_t now = time(0);
 
-
-	if (first) {
+	if (now > last_init_check+1) {
+		last_init_check = now;
 		initialize_xevents();
 	}
-	first = 0;
 
 	if (screen && screen->clientHead) {
 		have_clients = 1;
@@ -6898,7 +7006,7 @@ void check_xevents(void) {
 	 * the client... so instead of sending right away we wait a
 	 * the few seconds.
 	 */
-	if (have_clients && watch_selection && ! sent_some_sel
+	if (have_clients && watch_selection && !sent_some_sel
 	    && now > last_client + sel_waittime) {
 		if (XGetSelectionOwner(dpy, XA_PRIMARY) == None) {
 			cutbuffer_send();
@@ -6917,7 +7025,7 @@ void check_xevents(void) {
 		}
 	}
 
-	if (no_autorepeat && client_count && no_repeat_countdown) {
+	if (no_autorepeat && have_clients && no_repeat_countdown) {
 		static time_t last_check = 0;
 		if (now > last_check + 1) {
 			last_check = now;
@@ -6941,13 +7049,28 @@ void check_xevents(void) {
 		}
 	}
 
-	if (XCheckTypedEvent(dpy, MappingNotify, &xev)) {
+	if (now > last_call && XCheckTypedEvent(dpy, MappingNotify, &xev)) {
+		/* we only check this once a second or so. */
 		XRefreshKeyboardMapping((XMappingEvent *) &xev);
+		while (XCheckTypedEvent(dpy, MappingNotify, &xev)) {
+			XRefreshKeyboardMapping((XMappingEvent *) &xev);
+		}
 		if (use_modifier_tweak) {
 			X_UNLOCK;
 			initialize_modtweak();
 			X_LOCK;
 		}
+	}
+
+	if (last_sendevent && (now > last_sendevent+1 || now % 10 == 0)) {
+		/*
+		 * we can get ClientMessage from our XSendEvent() call in 
+		 * selection_request().
+		 */
+		while (XCheckTypedEvent(dpy, ClientMessage, &xev)) {
+			;
+		}
+		last_sendevent = 0;
 	}
 
 	/* check for CUT_BUFFER0 and VNC_CONNECT changes: */
@@ -6983,9 +7106,11 @@ void check_xevents(void) {
 	}
 #endif
 #if LIBVNCSERVER_HAVE_LIBXFIXES
-	if (XCheckTypedEvent(dpy, xfixes_base_event_type +
-	    XFixesCursorNotify, &xev)) {
-		got_xfixes_cursor_notify++;
+	if (xfixes_present && use_xfixes && xfixes_base_event_type) {
+		if (XCheckTypedEvent(dpy, xfixes_base_event_type +
+		    XFixesCursorNotify, &xev)) {
+			got_xfixes_cursor_notify++;
+		}
 	}
 #endif
 
@@ -7044,7 +7169,63 @@ void check_xevents(void) {
 			}
 		}
 	}
+
+	if (watch_bell || now > last_bell+1) {
+		last_bell = now;
+		check_bell_event();
+	}
+
+#ifndef DEBUG_XEVENTS
+#define DEBUG_XEVENTS 0
+#endif
+#if DEBUG_XEVENTS
+	if (hack_val) {
+		static time_t last_check = 0;
+
+		if (now > last_check + 1) {
+			XEvent xevs[400];
+			int i, tot = XEventsQueued(dpy, QueuedAlready);
+
+			last_check = now;
+			if (tot) {
+		    		fprintf(stderr, "Total events queued: %d\n",
+				    tot);
+			}
+			for (i=1; i<300; i++) {
+				int k, n = 0;
+				while (XCheckTypedEvent(dpy, i, xevs+n)) {
+					if (++n >= 400) {
+						break;
+					}
+				}
+				if (n) {
+					fprintf(stderr, "%d events of type %d "
+					    "queued\n", n, i);
+				}
+				for (k=n-1; k >= 0; k--) {
+					XPutBackEvent(dpy, xevs+k);
+				}
+			}
+		}
+	}
+#endif
+
+	if (now > last_sync + 3600) {
+		/* kludge for any remaining event leaks */
+		int bugout = use_xdamage ? 500 : 50;
+		if (last_sync != 0) {
+			int qlen = XEventsQueued(dpy, QueuedAlready);
+			if (qlen >= bugout) {
+				rfbLog("event leak: %d queued, "
+				    " calling XSync(dpy, True)\n", qlen);  
+				XSync(dpy, True);
+			}
+		}
+		last_sync = now;
+	}
 	X_UNLOCK;
+
+	last_call = now;
 }
 
 /*
@@ -7484,6 +7665,7 @@ void reset_rfbport(int old, int new)  {
  * -remote/-R and -query/-Q.
  */
 char *process_remote_cmd(char *cmd, int stringonly) {
+#if REMOTE_CONTROL
 	char *p = cmd;
 	char *co = "";
 	char buf[VNC_CONNECT_MAX]; 
@@ -7572,7 +7754,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	}
 
 /*
- * Add: passwdfile logfile bg nofb rfbauth passwd noshm...
+ * Maybe add: passwdfile logfile bg rfbauth passwd...
  */
 	if (!strcmp(p, "stop") || !strcmp(p, "quit") ||
 	    !strcmp(p, "exit") || !strcmp(p, "shutdown")) {
@@ -8163,7 +8345,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			struct hostent *hp;
 			in_addr_t iface = inet_addr(listen_str);
 			if (iface == htonl(INADDR_NONE)) {
-				if (!(hp = gethostbyname(listen_str))) {
+				if (!host_lookup) {
+					ok = 0;
+				} else if (!(hp = gethostbyname(listen_str))) {
 					ok = 0;
 				} else {
 					iface = *(unsigned long *)hp->h_addr;
@@ -8213,6 +8397,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			free(listen_str);
 			listen_str = before;
 		}
+	} else if (!strcmp(p, "lookup")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, host_lookup);
+			goto qry;
+		}
+		rfbLog("process_remote_cmd: enabling hostname lookup.\n");
+		host_lookup = 1;
+	} else if (!strcmp(p, "nolookup")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !host_lookup);
+			goto qry;
+		}
+		rfbLog("process_remote_cmd: disabling hostname lookup.\n");
+		host_lookup = 0;
 
 	} else if (strstr(p, "accept") == p) {
 		COLON_CHECK("accept:")
@@ -8745,6 +8943,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		if (nofb) {
 			rfbLog("process_remote_cmd: disabling nofb mode.\n");
+			rfbLog("  you may need to these turn back on:\n");
+			rfbLog("     xfixes, xdamage, solid, flashcmap\n");
+			rfbLog("     overlay, shm, noonetile, nap, cursor\n");
+			rfbLog("     cursorpos, cursorshape, bell.\n");
 			nofb = 0;
 			do_new_fb(1);
 		}
@@ -8759,6 +8961,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				push_black_screen(4);
 			}
 			nofb = 1;
+			sound_bell = 0;
+			initialize_watch_bell();
+			set_nofb_params();
+			do_new_fb(1);
 		}
 
 	} else if (!strcmp(p, "bell")) {
@@ -8767,6 +8973,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: enabling bell (if supported).\n");
+		initialize_watch_bell();
 		sound_bell = 1;
 
 	} else if (!strcmp(p, "nobell")) {
@@ -8775,6 +8982,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		rfbLog("process_remote_cmd: disabling bell.\n");
+		initialize_watch_bell();
 		sound_bell = 0;
 
 	} else if (!strcmp(p, "sel")) {
@@ -8782,16 +8990,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, watch_selection);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling watch_selection.\n");
+		rfbLog("process_remote_cmd: enabling watch "
+		    "selection+primary.\n");
 		watch_selection = 1;
+		watch_primary = 1;
 
 	} else if (!strcmp(p, "nosel")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !watch_selection);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disabling watch_selection.\n");
+		rfbLog("process_remote_cmd: disabling watch "
+		    "selection+primary.\n");
 		watch_selection = 0;
+		watch_primary = 0;
 
 	} else if (!strcmp(p, "primary")) {
 		if (query) {
@@ -8963,9 +9175,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		first_cursor();
 
 	} else if (!strcmp(p, "xdamage")) {
-		int orig = use_xdamage_hints;
+		int orig = use_xdamage;
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p, use_xdamage_hints);
+			snprintf(buf, bufn, "ans=%s:%d", p, use_xdamage);
 			goto qry;
 		}
 		if (! xdamage_present) {
@@ -8975,15 +9187,15 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("process_remote_cmd: enabling xdamage hints"
 		    " (if supported).\n");
-		use_xdamage_hints = 1;
-		if (use_xdamage_hints != orig) {
+		use_xdamage = 1;
+		if (use_xdamage != orig) {
 			initialize_xdamage();
 			create_xdamage();
 		}
 	} else if (!strcmp(p, "noxdamage")) {
-		int orig = use_xdamage_hints;
+		int orig = use_xdamage;
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p, !use_xdamage_hints);
+			snprintf(buf, bufn, "ans=%s:%d", p, !use_xdamage);
 			goto qry;
 		}
 		if (! xdamage_present) {
@@ -8992,8 +9204,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto done;
 		}
 		rfbLog("process_remote_cmd: disabling xdamage hints.\n");
-		use_xdamage_hints = 0;
-		if (use_xdamage_hints != orig) {
+		use_xdamage = 0;
+		if (use_xdamage != orig) {
 			initialize_xdamage();
 			destroy_xdamage();
 		}
@@ -9825,6 +10037,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		set_vnc_connect_prop(buf);
 		XFlush(dpy);
 	}
+#endif
 	return NULL;
 }
 
@@ -9877,7 +10090,6 @@ void record_desired_xdamage_rect(int x, int y, int w, int h) {
 	nt_y1 = nfix(  (y)/tile_y, ntiles_y);
 	nt_y2 = nfix((y+h)/tile_y, ntiles_y);
 
-
 	/* loop over the rectangle of tiles (1 tile for a small input rect */
 	for (ix = nt_x1; ix <= nt_x2; ix++) {
 		for (iy = nt_y1; iy <= nt_y2; iy++) {
@@ -9896,9 +10108,6 @@ void record_desired_xdamage_rect(int x, int y, int w, int h) {
 void collect_xdamage(int scancnt) {
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	XDamageNotifyEvent *dev;
-#if 0
-	XserverRegion xregion;
-#endif
 	XEvent ev;
 	sraRegionPtr tmpregion;
 	sraRegionPtr reg;
@@ -9911,10 +10120,13 @@ void collect_xdamage(int scancnt) {
 #define DUPSZ 16
 	int dup_x[DUPSZ], dup_y[DUPSZ], dup_w[DUPSZ], dup_h[DUPSZ];
 
-	if (! xdamage_present || ! using_xdamage) {
+	if (! xdamage_present || ! use_xdamage) {
 		return;
 	}
 	if (! xdamage) {
+		return;
+	}
+	if (! xdamage_base_event_type) {
 		return;
 	}
 
@@ -9974,8 +10186,8 @@ void collect_xdamage(int scancnt) {
 			/* set coords relative to fb origin */
 			if (0 && rootshift) {
 				/*
-				 * not needed because damage is relative
-				 * to subwin, not rootwin.
+				 * Note: not needed because damage is
+				 * relative to subwin, not rootwin.
 				 */
 				x = x - off_x;
 				y = y - off_y;
@@ -10000,7 +10212,6 @@ void collect_xdamage(int scancnt) {
 			}
 		}
 
-
 		record_desired_xdamage_rect(x, y, w, h);
 
 		tmpregion = sraRgnCreateRect(x, y, x + w, y + h); 
@@ -10024,7 +10235,6 @@ void collect_xdamage(int scancnt) {
 			rat = ((double) XD_skip)/XD_tot;
 		}
 			
-if (0) fprintf(stderr, "skip/tot: %04d/%04d  rat=%.3f  rect_count: %d  desired_rects: %d\n", XD_skip, XD_tot, rat, rect_count, XD_des);
 		XD_skip = 0;
 		XD_tot  = 0;
 		XD_des  = 0;
@@ -10039,7 +10249,7 @@ int xdamage_hint_skip(int y) {
 	sraRegionPtr reg, tmpl;
 	int ret, i, n, nreg;
 
-	if (!xdamage_present || !using_xdamage || !use_xdamage_hints) {
+	if (! xdamage_present || ! use_xdamage) {
 		return 0;	/* cannot skip */
 	}
 	if (! xdamage_regions) {
@@ -10078,11 +10288,8 @@ void initialize_xdamage(void) {
 	sraRegionPtr *ptr;
 	int i, nreg;
 
-	using_xdamage = 0;
-	if (xdamage_present) {
-		if (use_xdamage_hints) {
-			using_xdamage = 1;
-		}
+	if (! xdamage_present) {
+		use_xdamage = 0;
 	}
 	if (xdamage_regions)  {
 		ptr = xdamage_regions;
@@ -10093,7 +10300,7 @@ void initialize_xdamage(void) {
 		free(xdamage_regions);
 		xdamage_regions = NULL;
 	}
-	if (using_xdamage) {
+	if (use_xdamage) {
 		nreg = (xdamage_memory * NSCAN) + 2;
 		xdamage_regions = (sraRegionPtr *)
 		    malloc(nreg * sizeof(sraRegionPtr));
@@ -10126,8 +10333,16 @@ void create_xdamage(void) {
 void destroy_xdamage(void) {
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (xdamage) {
+		XEvent ev;
 		X_LOCK;
 		XDamageDestroy(dpy, xdamage);
+		XFlush(dpy);
+		if (xdamage_base_event_type) {
+			while (XCheckTypedEvent(dpy,
+			    xdamage_base_event_type+XDamageNotify, &ev)) {
+				;
+			}
+		}
 		X_UNLOCK;
 		rfbLog("destroyed xdamage object: 0x%lx\n", xdamage);
 		xdamage = 0;
@@ -10136,7 +10351,7 @@ void destroy_xdamage(void) {
 }
 
 void check_xdamage_state(void) {
-	if (! using_xdamage || ! xdamage_present) {
+	if (! use_xdamage || ! xdamage_present) {
 		return;
 	}
 	/*
@@ -11263,7 +11478,7 @@ int get_xfixes_cursor(int init) {
 		time_t oldtime, now;
 		XFixesCursorImage *xfc;
 
-		if (! got_xfixes_cursor_notify) {
+		if (! got_xfixes_cursor_notify && xfixes_base_event_type) {
 			/* try again for XFixesCursorNotify event */
 			XEvent xev;
 			X_LOCK;
@@ -12128,6 +12343,35 @@ void set_visual(char *str) {
 	visual_id = vinfo.visualid;
 }
 
+void set_nofb_params(void) {
+	use_xfixes = 0;
+	use_xdamage = 0;
+
+	use_solid_bg = 0;
+	overlay = 0;
+	overlay_cursor = 0;
+
+	using_shm = 0;
+	single_copytile = 1;
+
+	take_naps = 0;
+	measure_speeds = 0;
+
+	show_cursor = 0;
+	show_multiple_cursors = 0;
+	cursor_shape_updates = 0;
+	if (! got_cursorpos) {
+		cursor_pos_updates = 0;
+	}
+
+	if (! quiet) {
+		rfbLog("disabling: xfixes, xdamage, solid, overlay, shm,\n");
+		rfbLog("  noonetile, nap, cursor, %scursorshape\n",
+		    got_cursorpos ? "" : "cursorpos, " );
+		rfbLog("  in -nofb mode.\n");
+	}
+}
+
 /*
  * Presumably under -nofb the clients will never request the framebuffer.
  * However, we have gotten such a request... so let's just give them
@@ -12136,18 +12380,13 @@ void set_visual(char *str) {
  * nearly always happens.
  */
 void nofb_hook(rfbClientPtr cl) {
-	static int loaded_fb = 0;
 	XImage *fb;
-	if (loaded_fb) {
-		return;
-	}
 	rfbLog("framebuffer requested in -nofb mode by client %s\n", cl->host);
 	/* ignore xrandr */
 	fb = XGetImage_wr(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
 	main_fb = fb->data;
 	rfb_fb = main_fb;
 	screen->frameBuffer = rfb_fb;
-	loaded_fb = 1;
 	screen->displayHook = NULL;
 }
 
@@ -12420,7 +12659,7 @@ XImage *initialize_xdisplay_fb(void) {
 		}
 		if (! quiet) {
 			fprintf(stderr, " initialize_xdisplay_fb()\n");
-			fprintf(stderr, " Visual*:    0x%p\n", vinfo->visual);
+			fprintf(stderr, " Visual*:    %p\n", vinfo->visual);
 			fprintf(stderr, " visualid:   0x%x\n",
 			    (int) vinfo->visualid);
 			fprintf(stderr, " screen:     %d\n", vinfo->screen);
@@ -12731,8 +12970,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	/*
 	 * These are just hints wrt pixel format just to let
 	 * rfbGetScreen/rfbNewFramebuffer proceed with reasonable
-	 * defaults.  We manually set them in painful detail
-	 * below.
+	 * defaults.  We manually set them in painful detail below.
 	 */
 	bits_per_color = guess_bits_per_color(fb->bits_per_pixel);
 
@@ -12898,6 +13136,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		main_blue_shift  = screen->serverFormat.blueShift;
 	}
 
+#if !SMALL_FOOTPRINT
 	if (!quiet) {
 		fprintf(stderr, "\n");
 		fprintf(stderr, "FrameBuffer Info:\n");
@@ -12954,7 +13193,6 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 			fprintf(stderr, " bitmap_bit_order: %d\n",
 			fb->bitmap_bit_order); break;
 		}
-		fprintf(stderr, "\n");
 	}
 	if (overlay && ! quiet) {
 		rfbLog("\n");
@@ -12965,6 +13203,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		rfbLog("Xsun -su ... see Xserver(1), xinit(1) for more info.\n");
 		rfbLog("\n");
 	}
+#endif
 
 	/* nofb is for pointer/keyboard only handling.  */
 	if (nofb) {
@@ -12981,6 +13220,11 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		}
 	}
 	screen->frameBuffer = rfb_fb;
+	if (!quiet) {
+		fprintf(stderr, " main_fb:     %p\n", main_fb);
+		fprintf(stderr, " rfb_fb:      %p\n", rfb_fb);
+		fprintf(stderr, "\n");
+	}
 
 	bpp   = screen->serverFormat.bitsPerPixel;
 	depth = screen->serverFormat.depth;
@@ -16006,7 +16250,7 @@ static void nap_set(int tile_cnt) {
 		}
 		nap_diff_count = 0;
 	}
-	if (nap_ok && ! nap_in && using_xdamage) {
+	if (nap_ok && ! nap_in && use_xdamage) {
 		if (XD_skip > 0.8 * XD_tot) 	{
 			/* X DAMAGE is keeping load low, so skip nap */
 			nap_ok = 0;
@@ -16237,7 +16481,7 @@ static int scan_display(int ystart, int rescan) {
 
 	while (y < dpy_y) {
 
-		if (using_xdamage) {
+		if (use_xdamage) {
 			XD_tot++;
 			if (xdamage_hint_skip(y)) {
 				XD_skip++;
@@ -16364,7 +16608,7 @@ int scan_for_updates(int count_only) {
 			/* check for changed colormap */
 			set_colormap(0);
 		}
-		if (using_xdamage) {
+		if (use_xdamage) {
 			collect_xdamage(scan_count);
 		}
 	}
@@ -16555,7 +16799,7 @@ int scan_for_updates(int count_only) {
 }
 
 /* -- gui.c -- */
-#if OLD_TREE
+#if OLD_TREE || SMALL_FOOTPRINT
 char gui_code[] = "";
 #else
 #include "tkx11vnc.h"
@@ -16877,8 +17121,6 @@ static void check_user_input2(double dt) {
 	double quick_spin_fac  = 0.40;
 	double grind_spin_time = 0.175;
 
-
-
 	dtime(&tm);
 	g = g_in = got_pointer_input;
 	if (!got_pointer_input) {
@@ -16984,7 +17226,140 @@ static void check_user_input2(double dt) {
 	}
 }
 
-static void check_user_input3(double dt, double dtr, int tile_diffs) {
+static void check_user_input3(double dt) {
+
+	int eaten = 0, miss = 0, max_eat = 50;
+	int miss_max = 2;
+	int g, g_in;
+	double spin = 0.0, tm = 0.0;
+	double quick_spin_fac  = 0.40, button_down_time = 0.050;
+	double grind_spin_time = 0.125;
+
+	dtime(&tm);
+	g = g_in = got_pointer_input;
+	if (!got_pointer_input) {
+		return;
+	}
+	/*
+	 * Try for some "quick" pointer input processing.
+	 *
+	 * About as fast as we can, we try to process user input calling
+	 * rfbProcessEvents or rfbCheckFds.  We do this for a time on
+	 * order of the last scan_for_updates() time, dt, but if we stop
+	 * getting user input we break out.  We will also break out if
+	 * we have processed max_eat inputs.
+	 *
+	 * Note that rfbCheckFds() does not send any framebuffer updates,
+	 * so is more what we want here, although it is likely they have
+	 * all be sent already.
+	 */
+	while (1) {
+		double spin_out;
+		int mcut = miss_max;
+
+		if (show_multiple_cursors) {
+			rfbPE(screen, 1000);
+		} else {
+			rfbCFD(screen, 1000);
+		}
+		XFlush(dpy);
+
+
+		spin += dtime(&tm);
+
+		spin_out = quick_spin_fac * dt;
+		if (button_mask && button_down_time > spin_out) {
+			spin_out = button_down_time;
+		}
+
+		if (spin > spin_out) {
+			/* get out if spin time comparable to last scan time */
+			break;
+		}
+
+		if (got_pointer_input > g) {
+			g = got_pointer_input;
+			if (button_mask) {
+				miss = 0;
+			}
+			if (eaten++ < max_eat) {
+				continue;
+			}
+		} else {
+			miss++;
+		}
+
+		if (button_mask) {
+			mcut = 4;
+		}
+		if (miss >= mcut) {
+			if (! button_mask || spin > button_down_time) {
+				break;
+			}
+		}
+	}
+
+
+	/*
+	 * Probably grinding with a lot of fb I/O if dt is this large.
+	 * (need to do this more elegantly)
+	 *
+	 * Current idea is to spin our wheels here *not* processing any
+	 * fb I/O, but still processing the user input.  This user input
+	 * goes to the X display and changes it, but we don't poll it
+	 * while we "rest" here for a time on order of dt, the previous
+	 * scan_for_updates() time.  We also break out if we miss enough
+	 * user input.
+	 */
+	if (dt > grind_spin_time) {
+		int i, ms, split = 30;
+		double shim;
+
+		/*
+		 * Break up our pause into 'split' steps.  We get at
+		 * most one input per step.
+		 */
+		shim = 0.75 * dt / split;
+
+		ms = (int) (1000 * shim);
+
+		/* cutoff how long the pause can be */
+		if (split * ms > 300) {
+			ms = 300 / split;
+		}
+
+		spin = 0.0;
+		tm = 0.0;
+		dtime(&tm);
+
+		g = got_pointer_input;
+		miss = 0;
+		for (i=0; i<split; i++) {
+			usleep(ms * 1000);
+			if (show_multiple_cursors) {
+				rfbPE(screen, 1000);
+			} else {
+				rfbCFD(screen, 1000);
+			}
+			spin += dtime(&tm);
+			if (got_pointer_input > g) {
+				XFlush(dpy);
+				miss = 0;
+			} else {
+				miss++;
+			}
+			g = got_pointer_input;
+			if (miss > 2) {
+				break;
+			}
+			if (1000 * spin > ms * split)  {
+				break;
+			}
+		}
+	}
+}
+
+static void check_user_input4(double dt, double dtr, int tile_diffs) {
 
 	int allowed_misses, miss_tweak, i, g, g_in;
 	int last_was_miss, consecutive_misses;
@@ -16993,7 +17368,6 @@ static void check_user_input3(double dt, double dtr, int tile_diffs) {
 	static double dt_cut = 0.075;
 	int gcnt, ginput;
 	static int first = 1;
-
 
 	if (first) {
 		char *p = getenv("SPIN");
@@ -17110,6 +17484,10 @@ int fb_update_sent(int *count) {
 	rfbClientIteratorPtr i;
 	rfbClientPtr cl;
 
+	if (nofb) {
+		return 0;
+	}
+
 	i = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(i)) ) {
 		sent += cl->framebufferUpdateMessagesSent;
@@ -17125,7 +17503,7 @@ int fb_update_sent(int *count) {
 	return rc; 
 }
 
-static void check_user_input4(double dt, double dtr, int tile_diffs) {
+static void check_user_input5(double dt, double dtr, int tile_diffs) {
 
 	int g, g_in, i, ginput, gcnt, tmp;
 	int last_was_miss, consecutive_misses;
@@ -17364,9 +17742,11 @@ static int check_user_input(double dt, double dtr, int tile_diffs, int *cnt) {
 	if (pointer_mode == 2) {
 		check_user_input2(dt);
 	} else if (pointer_mode == 3) {
-		check_user_input3(dt, dtr, tile_diffs);
+		check_user_input3(dt);
 	} else if (pointer_mode == 4) {
 		check_user_input4(dt, dtr, tile_diffs);
+	} else if (pointer_mode == 5) {
+		check_user_input5(dt, dtr, tile_diffs);
 	}
 	return 0;
 }
@@ -17749,13 +18129,8 @@ static void watch_loop(void) {
 			continue;
 		}
 
-		if (using_xdamage) {
+		if (use_xdamage) {
 			check_xdamage_state();
-		}
-
-		if (watch_bell) {
-			/* n.b. assumes -nofb folks do not want bell... */
-			check_bell_event();
 		}
 
 		if (button_mask && (!show_dragging || pointer_mode == 0)) {
@@ -17795,6 +18170,7 @@ static void watch_loop(void) {
  * text printed out under -help option
  */
 static void print_help(int mode) {
+#if !SMALL_FOOTPRINT
 	char help[] = 
 "\n"
 "x11vnc: allow VNC connections to real X11 displays. %s\n"
@@ -17882,6 +18258,7 @@ static void print_help(int mode) {
 "                       also use \"TrueColor\", etc. see <X11/X.h> for a list.\n"
 "                       If the string ends in \":m\" then for better or for\n"
 "                       worse the visual depth is forced to be m.\n"
+"\n"
 "-overlay               Handle multiple depth visuals on one screen, e.g. 8+24\n"
 "                       and 24+8 overlay visuals (the 32 bits per pixel are\n"
 "                       packed with 8 for PseudoColor and 24 for TrueColor).\n"
@@ -17919,7 +18296,7 @@ static void print_help(int mode) {
 "                       If \"fraction\" contains a decimal point \".\" it\n"
 "                       is taken as a floating point number, alternatively\n"
 "                       the notation \"m/n\" may be used to denote fractions\n"
-"                       exactly, e.g. -scale 2/3.\n"
+"                       exactly, e.g. -scale 2/3\n"
 "\n"
 "                       Scaling Options: can be added after \"fraction\" via\n"
 "                       \":\", to supply multiple \":\" options use commas.\n"
@@ -17992,6 +18369,11 @@ static void print_help(int mode) {
 "                       vice versa) to avoid situations where no connections\n"
 "                       (or too many) are allowed.\n"
 "\n"
+"-nolookup              Do not use gethostbyname() or gethostbyaddr() to look up\n"
+"                       host names or IP numbers.  Use this if name resolution\n"
+"                       is incorrectly set up and leads to long pauses as name\n"
+"                       lookup times out, etc.\n"
+"\n"
 "-input string          Fine tuning of allowed user input.  If \"string\" does\n"
 "                       not contain a comma \",\" the tuning applies only to\n"
 "                       normal clients.  Otherwise the part before \",\" is\n"
@@ -18019,6 +18401,7 @@ static void print_help(int mode) {
 "-storepasswd pass file Store password \"pass\" as the VNC password in the\n"
 "                       file \"file\".  Once the password is stored the\n"
 "                       program exits.  Use the password via \"-rfbauth file\"\n"
+"\n"
 "-accept string         Run a command (possibly to prompt the user at the\n"
 "                       X11 display) to decide whether an incoming client\n"
 "                       should be allowed to connect or not.  \"string\" is\n"
@@ -18232,6 +18615,7 @@ static void print_help(int mode) {
 "                       to the terminal.  Same as \"-logfile file\".  To append\n"
 "                       to the file use \"-oa file\" or \"-logappend file\".\n"
 "-rc filename           Use \"filename\" instead of $HOME/.x11vncrc for rc file.\n"
+"\n"
 "-norc                  Do not process any .x11vncrc file for options.\n"
 "-h, -help              Print this help text.\n"
 "-?, -opts              Only list the x11vnc options.\n"
@@ -18492,19 +18876,24 @@ static void print_help(int mode) {
 "                       n=2 is an improved scheme: by watching the current rate\n"
 "                       of input events it tries to detect if it should try to\n"
 "                       \"eat\" additional pointer events before continuing.\n"
+"                       This mode was the default until Apr 2005.\n"
 "\n"
-"                       n=3 is basically a dynamic -nodragging mode: it detects\n"
+"                       n=3 is basically the same as n=2 except with slightly\n"
+"                       tweaked parameters.  We made this a new one so one\n"
+"                       could use -pm 2 for the old behavior.\n"
+"\n"
+"                       n=4 is basically a dynamic -nodragging mode: it detects\n"
 "                       when the mouse motion has paused and then refreshes\n"
 "                       the display.\n"
 "\n"
-"                       n=4: attempts to measures network rates and latency,\n"
+"                       n=5 attempts to measures network rates and latency,\n"
 "                       the video card read rate, and how many tiles have been\n"
 "                       changed on the screen.  From this, it aggressively tries\n"
 "                       to push screen \"frames\" when it decides it has enough\n"
 "                       resources to do so.  NOT FINISHED.\n"
 "\n"
-"                       The default n is %d. Note that modes 2, 3, 4 will skip\n"
-"                       -input_skip keyboard events (but it will not count\n"
+"                       The default n is %d. Note that modes 2, 3, 4, 5 will\n"
+"                       skip -input_skip keyboard events (but it will not count\n"
 "                       pointer events).  Also note that these modes are not\n"
 "                       available in -threads mode which has its own pointer\n"
 "                       event handling mechanism.\n"
@@ -18530,14 +18919,16 @@ static void print_help(int mode) {
 "                       e.g. \"-speeds ,100,15\", then the internal scheme is\n"
 "                       used to estimate the empty value(s).\n"
 "\n"
+"                       Note: use this option is currently NOT FINISHED.\n"
+"\n"
 "                       Typical PC video cards have read rates of 5-10 MB/sec.\n"
 "                       If the framebuffer is in main memory instead of video\n"
 "                       h/w (e.g. SunRay, shadowfb, Xvfb), the read rate may\n"
 "                       be much faster.  \"x11perf -getimage500\" can be used\n"
 "                       to get a lower bound (remember to factor in the bytes\n"
 "                       per pixel).  It is up to you to estimate the network\n"
-"                       bandwith to clients.  For the latency the ping(1)\n"
-"                       command can be used.\n"
+"                       bandwith and latency to clients.  For the latency the\n"
+"                       ping(1) command can be used.\n"
 "\n"
 "                       For convenience there are some aliases provided,\n"
 "                       e.g. \"-speeds modem\".  The aliases are: \"modem\" for\n"
@@ -18749,8 +19140,8 @@ static void print_help(int mode) {
 "                                       same as \"close:host\".  Use host\n"
 "                                       \"all\" to close all current clients.\n"
 "                                       If you know the client internal hex ID,\n"
-"                                       e.g. 0x3 (returned by -query clients and\n"
-"                                       RFB_CLIENT_ID), you can use that too.\n"
+"                                       e.g. 0x3 (returned by \"-query clients\"\n"
+"                                       and RFB_CLIENT_ID) you can use that too.\n"
 /* access */
 "                       allowonce:host  For the next connection only, allow\n"
 "                                       connection from \"host\".\n"
@@ -18763,6 +19154,8 @@ static void print_help(int mode) {
 "                       localhost       enable  -localhost mode\n"
 "                       nolocalhost     disable -localhost mode\n"
 "                       listen:str      set -listen to str, empty to disable.\n"
+"                       nolookup        enable  -nolookup mode.\n"
+"                       lookup          disable -nolookup mode.\n"
 "                       input:str       set -input to \"str\", empty to disable.\n"
 "                       client_input:str set the K, M, B -input on a per-client\n"
 "                                       basis.  select which client as for\n"
@@ -18937,9 +19330,9 @@ static void print_help(int mode) {
 "                       nooverlay_nocursor nooverlay_cursor nooverlay_yescursor\n"
 "                       overlay_nocursor visual scale scale_cursor viewonly\n"
 "                       noviewonly shared noshared forever noforever once\n"
-"                       timeout deny lock nodeny unlock connect allowonce\n"
-"                       allow localhost nolocalhost listen accept gone\n"
-"                       shm noshm flipbyteorder noflipbyteorder onetile\n"
+"                       timeout deny lock nodeny unlock connect allowonce allow\n"
+"                       localhost nolocalhost listen lookup nolookup accept\n"
+"                       gone shm noshm flipbyteorder noflipbyteorder onetile\n"
 "                       noonetile solid_color solid nosolid blackout xinerama\n"
 "                       noxinerama xrandr noxrandr xrandr_mode padgeom quiet\n"
 "                       q noquiet modtweak nomodtweak xkb noxkb skip_keycodes\n"
@@ -18975,10 +19368,10 @@ static void print_help(int mode) {
 "-sync                  By default -remote commands are run asynchronously, that\n"
 "                       is, the request is posted and the program immediately\n"
 "                       exits.  Use -sync to have the program wait for an\n"
-"                       acknowledgement from the x11vnc server that command\n"
-"                       was processed.  On the other hand -query requests are\n"
-"                       always processed synchronously because they have wait\n"
-"                       for the result.\n"
+"                       acknowledgement from the x11vnc server that command was\n"
+"                       processed (somehow).  On the other hand -query requests\n"
+"                       are always processed synchronously because they have\n"
+"                       to wait for the result.\n"
 "\n"
 "                       Also note that if both -remote and -query requests are\n"
 "                       supplied on the command line, the -remote is processed\n"
@@ -18994,19 +19387,21 @@ static void print_help(int mode) {
 "-noremote              Do not process any remote control commands or queries.\n"
 "\n"
 "                       A note about security wrt remote control commands.\n"
-"                       If someone can connect to the X display and change the\n"
-"                       property VNC_CONNECT, then they can remotely control\n"
-"                       x11vnc.  Normally access to the X display is protected.\n"
-"                       Note that if they can modify VNC_CONNECT, they could\n"
-"                       also run their own x11vnc and have complete control\n"
+"                       If someone can connect to the X display and change\n"
+"                       the property VNC_CONNECT, then they can remotely\n"
+"                       control x11vnc.  Normally access to the X display is\n"
+"                       protected.  Note that if they can modify VNC_CONNECT\n"
+"                       on the X server, they have enough permissions to also\n"
+"                       run their own x11vnc and thus have complete control\n"
 "                       of the desktop.  If the  \"-connect /path/to/file\"\n"
-"                       channel is being used, obviously anyone who can\n"
-"                       write to /path/to/file can remotely control x11vnc.\n"
-"                       So be sure to protect the X display and that file's\n"
-"                       write permissions.\n"
+"                       channel is being used, obviously anyone who can write\n"
+"                       to /path/to/file can remotely control x11vnc.  So be\n"
+"                       sure to protect the X display and that file's write\n"
+"                       permissions.\n"
 "\n"
-"                       To disable the VNC_CONNECT property channel completely\n"
-"                       use -novncconnect.\n"
+"                       If you are paranoid and do not think -noremote is\n"
+"                       enough, to disable the VNC_CONNECT property channel\n"
+"                       completely use -novncconnect.\n"
 "\n"
 "-unsafe                If x11vnc is running as root (e.g. inetd or Xsetup for\n"
 "                       a display manager) a few remote commands are disabled\n"
@@ -19080,6 +19475,7 @@ static void print_help(int mode) {
 	);
 
 	rfbUsage();
+#endif
 	exit(1);
 }
 
@@ -19436,7 +19832,6 @@ int main(int argc, char* argv[]) {
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0, got_deferupdate = 0, got_defer = 0;
-	int got_noxdamage = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc = 1; char *argv_vnc[128];
@@ -19578,6 +19973,8 @@ int main(int argc, char* argv[]) {
 			allow_list = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-localhost")) {
 			allow_list = strdup("127.0.0.1");
+		} else if (!strcmp(arg, "-nolookup")) {
+			host_lookup = 0;
 		} else if (!strcmp(arg, "-input")) {
 			CHECK_ARGC
 			allowed_input_str = strdup(argv[++i]);
@@ -19707,8 +20104,10 @@ int main(int argc, char* argv[]) {
 			nofb = 1;
 		} else if (!strcmp(arg, "-nobell")) {
 			watch_bell = 0;
+			sound_bell = 0;
 		} else if (!strcmp(arg, "-nosel")) {
 			watch_selection = 0;
+			watch_primary = 0;
 		} else if (!strcmp(arg, "-noprimary")) {
 			watch_primary = 0;
 		} else if (!strcmp(arg, "-cursor")) {
@@ -19745,6 +20144,7 @@ int main(int argc, char* argv[]) {
 			cursor_shape_updates = 0;
 		} else if (!strcmp(arg, "-cursorpos")) {
 			cursor_pos_updates = 1;
+			got_cursorpos = 1;
 		} else if (!strcmp(arg, "-nocursorpos")) {
 			cursor_pos_updates = 0;
 		} else if (!strcmp(arg, "-xwarppointer")) {
@@ -19769,6 +20169,7 @@ int main(int argc, char* argv[]) {
 				    pointer_mode_max, atoi(s));
 			} else {
 				pointer_mode = atoi(s);
+				got_pointer_mode = pointer_mode;
 			}
 		} else if (!strcmp(arg, "-input_skip")) {
 			CHECK_ARGC
@@ -19798,9 +20199,7 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			screen_blank = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-noxdamage")) {
-			using_xdamage = 0;
-			use_xdamage_hints = 0;
-			got_noxdamage = 1;
+			use_xdamage = 0;
 		} else if (!strcmp(arg, "-xd_area")) {
 			int tn;
 			CHECK_ARGC
@@ -20112,20 +20511,14 @@ int main(int argc, char* argv[]) {
 
 	if (nofb) {
 		/* disable things that do not make sense with no fb */
-		using_shm = 0;
-		flash_cmap = 0;
-		show_cursor = 0;
-		show_multiple_cursors = 0;
-		overlay = 0;
-		overlay_cursor = 0;
-		if (! quiet) {
-			rfbLog("disabling -cursor, fb, shm, etc. in "
-			   "-nofb mode.\n");
-		}
+		set_nofb_params();
 
 		if (! got_deferupdate && ! got_defer) {
 			/* reduce defer time under -nofb */
 			defer_update = defer_update_nofb;
+		}
+		if (got_pointer_mode < 0) {
+			pointer_mode = POINTER_MODE_NOFB;
 		}
 	}
 
@@ -20259,7 +20652,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " waitms:     %d\n", waitms);
 		fprintf(stderr, " take_naps:  %d\n", take_naps);
 		fprintf(stderr, " sb:         %d\n", screen_blank);
-		fprintf(stderr, " xdamage:    %d\n", !got_noxdamage);
+		fprintf(stderr, " xdamage:    %d\n", use_xdamage);
 		fprintf(stderr, "  xd_area:   %d\n", xdamage_max_area);
 		fprintf(stderr, "  xd_mem:    %.3f\n", xdamage_memory);
 		fprintf(stderr, " sigpipe:    %s\n", sigpipe
@@ -20287,13 +20680,6 @@ int main(int argc, char* argv[]) {
 	if (auth_file) {
 		set_env("XAUTHORITY", auth_file);
 	}
-	if (watch_bell || use_xkb_modtweak) {
-		/* we need XKEYBOARD for these: */
-		use_xkb = 1;
-	}
-	if (xkbcompat) {
-		use_xkb = 0;
-	}
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 	/*
 	 * Disable XKEYBOARD before calling XOpenDisplay()
@@ -20311,7 +20697,6 @@ int main(int argc, char* argv[]) {
 		}
 	}
 #else
-	use_xkb = 0;
 	watch_bell = 0;
 	use_xkb_modtweak = 0;
 #endif
@@ -20387,11 +20772,15 @@ int main(int argc, char* argv[]) {
 			rfbLog("Disabling XFIXES mode: display does not "
 			    "support it.\n");
 		}
+		xfixes_base_event_type = 0;
 		xfixes_present = 0;
 	} else {
 		xfixes_present = 1;
 	}
 #endif
+	if (! xfixes_present) {
+		use_xfixes = 0;
+	}
 
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (! XDamageQueryExtension(dpy, &xdamage_base_event_type, &er)) {
@@ -20399,12 +20788,16 @@ int main(int argc, char* argv[]) {
 			rfbLog("Disabling X DAMAGE mode: display does not "
 			    "support it.\n");
 		}
+		xdamage_base_event_type = 0;
 		xdamage_present = 0;
 	} else {
 		xdamage_present = 1;
 	}
 #endif
-	if (! quiet && xdamage_present && ! got_noxdamage) {
+	if (! xdamage_present) {
+		use_xdamage = 0;
+	}
+	if (! quiet && xdamage_present && use_xdamage) {
 		rfbLog("X DAMAGE available on display, using it for"
 		    " polling hints\n");
 		rfbLog("  to disable this behavior use: "
@@ -20536,7 +20929,7 @@ int main(int argc, char* argv[]) {
 	single_copytile_orig = single_copytile;
 
 	/* check for MIT-SHM */
-	if (! nofb && ! XShmQueryExtension_wr(dpy)) {
+	if (! XShmQueryExtension_wr(dpy)) {
 		xshm_present = 0;
 		if (! using_shm) {
 			if (! quiet) {
@@ -20565,11 +20958,9 @@ int main(int argc, char* argv[]) {
 
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 	/* check for XKEYBOARD */
-	if (use_xkb) {
-		initialize_xkb();
-	}
+	initialize_xkb();
 	initialize_watch_bell();
-	if (!use_xkb && use_xkb_modtweak) {
+	if (!xkb_present && use_xkb_modtweak) {
 		if (! quiet) {
 			rfbLog("warning: disabling xkb modtweak."
 			    " XKEYBOARD ext. not present.\n");
@@ -20584,6 +20975,7 @@ int main(int argc, char* argv[]) {
 			rfbLog("Disabling -xrandr mode: display does not"
 			    " support X RANDR.\n");
 		}
+		xrandr_base_event_type = 0;
 		xrandr = 0;
 		xrandr_present = 0;
 	} else {

@@ -173,6 +173,7 @@
 "	=D nobell\n"
 "	=D nosel\n"
 "	noprimary\n"
+"	nolookup\n"
 "	--\n"
 "	bg\n"
 "	=-C:ignore,exit sigpipe:\n"

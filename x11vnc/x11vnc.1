@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2pre, lastmod: 2005-03-19
+         version: 0.7.2pre, lastmod: 2005-03-29
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -168,7 +168,7 @@ image may not be sharp and response may be slower.
 If \fIfraction\fR contains a decimal point "." it
 is taken as a floating point number, alternatively
 the notation "m/n" may be used to denote fractions
-exactly, e.g. \fB-scale\fR 2/3.
+exactly, e.g. \fB-scale\fR 2/3
 .IP
 Scaling Options: can be added after \fIfraction\fR via
 ":", to supply multiple ":" options use commas.
@@ -280,6 +280,13 @@ control mechanism (-R) to change the \fB-listen\fR interface
 you may need to manually adjust the \fB-allow\fR list (and
 vice versa) to avoid situations where no connections
 (or too many) are allowed.
+.PP
+\fB-nolookup\fR
+.IP
+Do not use gethostbyname() or gethostbyaddr() to look up
+host names or IP numbers.  Use this if name resolution
+is incorrectly set up and leads to long pauses as name
+lookup times out, etc.
 .PP
 \fB-input\fR \fIstring\fR
 .IP
@@ -918,7 +925,7 @@ screen changes: everything will bog down when dragging
 or scrolling.  So a scheme has to be used to "eat"
 much of that pointer input before re-polling the screen
 and sending out framebuffer updates. The mode number
-\fIn\fR can be 0 to 4 and selects one of the schemes
+\fIn\fR can be 0 to 5 and selects one of the schemes
 desribed below.
 .IP
 n=0: does the same as \fB-nodragging.\fR (all screen polling
@@ -931,19 +938,24 @@ events before repolling the screen.
 n=2 is an improved scheme: by watching the current rate
 of input events it tries to detect if it should try to
 "eat" additional pointer events before continuing.
+This mode was the default until Apr 2005.
 .IP
-n=3 is basically a dynamic \fB-nodragging\fR mode: it detects
+n=3 is basically the same as n=2 except with slightly
+tweaked parameters.  We made this a new one so one
+could use \fB-pm\fR 2 for the old behavior.
+.IP
+n=4 is basically a dynamic \fB-nodragging\fR mode: it detects
 when the mouse motion has paused and then refreshes
 the display.
 .IP
-n=4: attempts to measures network rates and latency,
+n=5 attempts to measures network rates and latency,
 the video card read rate, and how many tiles have been
 changed on the screen.  From this, it aggressively tries
 to push screen "frames" when it decides it has enough
 resources to do so.  NOT FINISHED.
 .IP
-The default n is 2. Note that modes 2, 3, 4 will skip
-\fB-input_skip\fR keyboard events (but it will not count
+The default n is 3. Note that modes 2, 3, 4, 5 will
+skip \fB-input_skip\fR keyboard events (but it will not count
 pointer events).  Also note that these modes are not
 available in \fB-threads\fR mode which has its own pointer
 event handling mechanism.
@@ -973,13 +985,15 @@ milliseconds, respectively.  If a value is left blank,
 e.g. "\fB-speeds\fR \fI,100,15\fR", then the internal scheme is
 used to estimate the empty value(s).
 .IP
+Note: use this option is currently NOT FINISHED.
+.IP
 Typical PC video cards have read rates of 5-10 MB/sec.
 If the framebuffer is in main memory instead of video
 h/w (e.g. SunRay, shadowfb, Xvfb), the read rate may
 be much faster.  "x11perf \fB-getimage500"\fR can be used
 to get a lower bound (remember to factor in the bytes
 per pixel).  It is up to you to estimate the network
-bandwith to clients.  For the latency the 
+bandwith and latency to clients.  For the latency the
 .IR ping (1)
 command can be used.
 .IP
@@ -1272,8 +1286,8 @@ disconnect:host disconnect any clients from "host"
                 same as "close:host".  Use host
                 "all" to close all current clients.
                 If you know the client internal hex ID,
-                e.g. 0x3 (returned by \fB-query\fR clients and
-                RFB_CLIENT_ID), you can use that too.
+                e.g. 0x3 (returned by "\fB-query\fR \fIclients\fR"
+                and RFB_CLIENT_ID) you can use that too.
 .IP
 allowonce:host  For the next connection only, allow
                 connection from "host".
@@ -1289,6 +1303,10 @@ localhost       enable  \fB-localhost\fR mode
 nolocalhost     disable \fB-localhost\fR mode
 .IP
 listen:str      set \fB-listen\fR to str, empty to disable.
+.IP
+nolookup        enable  \fB-nolookup\fR mode.
+.IP
+lookup          disable \fB-nolookup\fR mode.
 .IP
 input:str       set \fB-input\fR to "str", empty to disable.
 .IP
@@ -1581,9 +1599,9 @@ overlay nooverlay overlay_cursor overlay_yescursor
 nooverlay_nocursor nooverlay_cursor nooverlay_yescursor
 overlay_nocursor visual scale scale_cursor viewonly
 noviewonly shared noshared forever noforever once
-timeout deny lock nodeny unlock connect allowonce
-allow localhost nolocalhost listen accept gone
-shm noshm flipbyteorder noflipbyteorder onetile
+timeout deny lock nodeny unlock connect allowonce allow
+localhost nolocalhost listen lookup nolookup accept
+gone shm noshm flipbyteorder noflipbyteorder onetile
 noonetile solid_color solid nosolid blackout xinerama
 noxinerama xrandr noxrandr xrandr_mode padgeom quiet
 q noquiet modtweak nomodtweak xkb noxkb skip_keycodes
@@ -1621,10 +1639,10 @@ cdpy_x cdpy_y coff_x coff_y rfbauth passwd
 By default \fB-remote\fR commands are run asynchronously, that
 is, the request is posted and the program immediately
 exits.  Use \fB-sync\fR to have the program wait for an
-acknowledgement from the x11vnc server that command
-was processed.  On the other hand \fB-query\fR requests are
-always processed synchronously because they have wait
-for the result.
+acknowledgement from the x11vnc server that command was
+processed (somehow).  On the other hand \fB-query\fR requests
+are always processed synchronously because they have
+to wait for the result.
 .IP
 Also note that if both \fB-remote\fR and \fB-query\fR requests are
 supplied on the command line, the \fB-remote\fR is processed
@@ -1642,19 +1660,21 @@ taken place.
 Do not process any remote control commands or queries.
 .IP
 A note about security wrt remote control commands.
-If someone can connect to the X display and change the
-property VNC_CONNECT, then they can remotely control
-x11vnc.  Normally access to the X display is protected.
-Note that if they can modify VNC_CONNECT, they could
-also run their own x11vnc and have complete control
+If someone can connect to the X display and change
+the property VNC_CONNECT, then they can remotely
+control x11vnc.  Normally access to the X display is
+protected.  Note that if they can modify VNC_CONNECT
+on the X server, they have enough permissions to also
+run their own x11vnc and thus have complete control
 of the desktop.  If the  "\fB-connect\fR \fI/path/to/file\fR"
-channel is being used, obviously anyone who can
-write to /path/to/file can remotely control x11vnc.
-So be sure to protect the X display and that file's
-write permissions.
+channel is being used, obviously anyone who can write
+to /path/to/file can remotely control x11vnc.  So be
+sure to protect the X display and that file's write
+permissions.
 .IP
-To disable the VNC_CONNECT property channel completely
-use \fB-novncconnect.\fR
+If you are paranoid and do not think \fB-noremote\fR is
+enough, to disable the VNC_CONNECT property channel
+completely use \fB-novncconnect.\fR
 .PP
 \fB-unsafe\fR
 .IP

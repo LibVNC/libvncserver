@@ -1,3 +1,11 @@
+2005-03-29  Karl Runge <runge@karlrunge.com>
+	* build-time customizations X11VNC_SHARED, X11VNC_FOREVER,
+	  REMOTE_CONTROL, SMALL_FOOTPRINT for CPPFLAGS
+	* fix event leaks for xkb BellNotify and ClientMessage and others,
+	  esp. under -nofb.  make nofb work with remote control.
+	* -nolookup for bad DNS setups.
+	* more playing with pointer_mode: check_user_input3()
+
 2005-03-19  Karl Runge <runge@karlrunge.com>
 	* scale cursors along with display. Use -scale_cursor to change
 	  or disable cursor scaling.

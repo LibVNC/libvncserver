@@ -167,6 +167,7 @@ Misc
 	=D nobell
 	=D nosel
 	noprimary
+	nolookup
 	--
 	bg
 	=-C:ignore,exit sigpipe:
