@@ -51,8 +51,8 @@ make install prefix=$RPM_BUILD_ROOT%{prefix}
 %files
 %defattr(-,root,root)
 %{prefix}
-%{_mandir}/man1/*
-%doc AUTHORS COPYING ChangeLog README TODO
 
 %changelog
-see ChangeLog
+* Sun Feb 9 2003 Johannes Schindelin
+- created libvncserver.spec.in
+

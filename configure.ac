@@ -5,7 +5,7 @@ AM_CONFIG_HEADER([include/rfbconfig.h])
 
 # Checks for programs.
 AC_PROG_CC
-CCLD=$CC
+CCLD="\$(CC)"
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 
@@ -39,10 +39,12 @@ AC_CHECK_HEADERS(jpeglib.h pthread.h zlib.h)
 if test ! -z "$HAVE_JPEGLIB.H"; then
 	AC_CHECK_LIB(jpeg, jpeg_CreateCompress)
 fi
-AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_PTHREAD.H")
 if test ! -z "$HAVE_PTHREAD.H"; then
 	AC_CHECK_LIB(pthread, pthread_mutex_lock)
+	AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
 fi
+#AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_PTHREAD.H")
+AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
 if test ! -z "$HAVE_ZLIB.H"; then
 	AC_CHECK_LIB(z, deflate)
 	# check for c++, but don't fail if not found
@@ -51,17 +53,13 @@ if test ! -z "$HAVE_ZLIB.H"; then
 	if test x$CXX != xnone; then
 		AC_DEFINE(HAVE_ZRLE)
 		AC_PROG_CXX
-		CCLD=$CXX
+		CCLD="\$(CXX)"
 	fi
 else
 	CXX=none
 fi
 AM_CONDITIONAL(HAVE_CXX, test x$CXX != xnone)
 AC_SUBST(CCLD)
-
-VNCLIBS="-L.. -lvncserver"
-
-LIBS="$VNCLIBS $LIBS"
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -79,10 +77,27 @@ AC_FUNC_MEMCMP
 AC_FUNC_STAT
 AC_FUNC_STRFTIME
 AC_FUNC_VPRINTF
+AC_CHECK_LIB(nsl,gethostbyname)
+AC_CHECK_LIB(socket,socket)
 AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mkfifo select socket strchr strcspn strdup strerror strstr])
+
+# Check for rpm SOURCES path
+echo -n "checking for rpm sources path... "
+RPMSOURCEDIR="NOT-FOUND"
+for directory in packages OpenLinux redhat RedHat rpm RPM "" ; do
+	if test -d /usr/src/${directory}/SOURCES; then
+		RPMSOURCEDIR="/usr/src/${directory}/SOURCES/"
+	fi
+done
+echo "$RPMSOURCEDIR"
+AM_CONDITIONAL(HAVE_RPM, test "$RPMSOURCEDIR" != "NOT-FOUND")
+AC_SUBST(RPMSOURCEDIR)
+
+LDADD="-L.. -lvncserver"
 
 AC_CONFIG_FILES([Makefile
                  contrib/Makefile
                  examples/Makefile
-		 libvncserver.spec])
+		 libvncserver.spec
+		 libvncserver-config])
 AC_OUTPUT

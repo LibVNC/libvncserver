@@ -1,11 +1,23 @@
 SUBDIRS=. examples contrib
 DIST_SUBDIRS=examples contrib
 
+bin_SCRIPTS = libvncserver-config
+
 include_HEADERS=include/rfb.h include/rfbconfig.h include/rfbproto.h \
 	include/keysym.h
 
+noinst_HEADERS=sraRegion.h d3des.h zrleDecode.h zrleEncode.h \
+	include/default8x16.h \
+	rdr/Exception.h rdr/FdInStream.h rdr/FdOutStream.h \
+	rdr/FixedMemOutStream.h rdr/InStream.h rdr/MemInStream.h \
+	rdr/MemOutStream.h rdr/NullOutStream.h rdr/OutStream.h \
+	rdr/ZlibInStream.h rdr/ZlibOutStream.h rdr/types.h
+
 ZRLE_SRCS=zrle.cxx rdr/FdInStream.cxx rdr/FdOutStream.cxx rdr/InStream.cxx \
 	rdr/NullOutStream.cxx rdr/ZlibInStream.cxx rdr/ZlibOutStream.cxx
+
+EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
+	tableinitcmtemplate.c tabletrans24template.c $(ZRLE_SRCS)
 
 LIB_SOURCES = main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
@@ -19,3 +31,12 @@ libvncserver_a_SOURCES=$(LIB_SOURCES)
 endif
 
 lib_LIBRARIES=libvncserver.a
+
+if HAVE_RPM
+$(PACKAGE)-$(VERSION).tar.gz: dist
+
+# Rule to build RPM distribution package
+rpm: $(PACKAGE)-$(VERSION).tar.gz
+	cp $(PACKAGE)-$(VERSION).tar.gz @RPMSOURCEDIR@
+	rpm -ba libvncserver.spec
+endif
