@@ -1,5 +1,32 @@
-OSXvnc: a VNC server for Mac OS X
-Copyright (C) 2001 Dan McGuirk
+LibVNCServer: a library for easy implementation of a RDP/VNC server.
+Copyright (C) 2001 Johannes E. Schindelin
+
+There are two examples included:
+ - example, a shared scribble sheet
+ - pnmshow, a program to show PNMs (pictures) over the net.
+
+The examples are not too well documented, but easy straight forward and a
+good starting point.
+
+How to use
+----------
+
+To make a server, you just have to initialise a server structure using the
+function rfbDefaultScreenInit.
+
+You then can set hooks and io functions.
+
+You can use a blocking event loop, a background (pthread based) event loop,
+or implement your own using the processEvents function.
+
+History
+-------
+
+LibVNCServer is based on Tridia VNC and OSXvnc, which in turn are based on
+the original code from ORL/AT&T.
+
+License
+-------
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
