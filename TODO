@@ -4,6 +4,7 @@ immediate:
 fix bug in http (java) client with big endian server: byte swapping is broken
 really support pthreads.
 	- cursor drawing!
+update to newest TridiaVNC version.
 
 in the works:
 -------------
