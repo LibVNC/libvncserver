@@ -437,10 +437,31 @@ void set_signals(void) {
 	X_UNLOCK;
 }
 
+int accepted_client = 0;
 void client_gone(rfbClientPtr client) {
+
 	client_count--;
 	rfbLog("client_count: %d\n", client_count);
+
+	if (inetd) {
+		rfbLog("viewer exited.\n");
+		clean_up_exit(0);
+	}
 	if (connect_once) {
+		/*
+		 * This non-exit is done for a bad passwd to be consistent
+		 * with our RFB_CLIENT_REFUSE behavior in new_client()  (i.e.
+		 * we disconnect after 1 successful connection).
+		 */
+		if (client->state == RFB_PROTOCOL_VERSION ||
+		    client->state == RFB_AUTHENTICATION && accepted_client) {
+			rfbLog("connect_once: bad password or early "
+			   "disconnect.\n");
+			rfbLog("connect_once: waiting for next connection.\n"); 
+			accepted_client = 0;
+			return;
+		}
+
 		rfbLog("viewer exited.\n");
 		clean_up_exit(0);
 	}
@@ -969,8 +990,15 @@ void check_connect_inputs() {
  * libvncserver callback for when a new client connects
  */
 enum rfbNewClientAction new_client(rfbClientPtr client) {
-	static int accepted_client = 0;
 	last_event = last_input = time(0);
+
+	if (inetd) {
+		/* 
+		 * Set this so we exit as soon as connection closes,
+		 * otherwise client_gone is only called after RFB_CLIENT_ACCEPT
+		 */
+		client->clientGoneHook = client_gone;
+	}
 
 	if (connect_once) {
 		if (screen->rfbDontDisconnect && screen->rfbNeverShared) {
@@ -994,15 +1022,18 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		return(RFB_CLIENT_REFUSE);
 	}
 
-	client->clientGoneHook = client_gone;
 	if (view_only)  {
 		client->clientData = (void *) -1;
 	} else {
 		client->clientData = (void *) 0;
 	}
+
+	client->clientGoneHook = client_gone;
+	client_count++;
+
 	accepted_client = 1;
 	last_client = time(0);
-	client_count++;
+
 	return(RFB_CLIENT_ACCEPT);
 }
 
