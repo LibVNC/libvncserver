@@ -1,3 +1,9 @@
+2004-03-10  Karl Runge <runge@karlrunge.com>
+	* x11vnc options -blackout, -xinerama, -xwarppointer
+	* modify configure.ac to pick up -lXinerama
+	* extend -remap to take mapping list.
+	* check cargs result for unused args.
+
 2004-03-22  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* fix cargs.c (hopefully for the last time):
 	  arguments were not correctly purged

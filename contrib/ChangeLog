@@ -1,3 +1,12 @@
+2004-04-08  Karl Runge <runge@karlrunge.com>
+	* added support for blacking out regions of the screen, primarily
+	  for Xinerama usage, options: -blackout -xinerama
+	* Xinerama workaround mouse problem on 'embedded' system, 
+	  option -xwarppointer (XWarpPointer instead of XTEST)
+	* let -remap option take key remappings on cmdline as well as file.
+	* use cargs fix to test for invalid cmdline options. Add --option.
+	* remove copy_tile, use copy_tiles(..., 1) instead.
+
 2004-03-10  Karl Runge <runge@karlrunge.com>
 	* added reverse connection for vncconnect(1) and other means
 	  -vncconnect, -connect host:port, and -connect watchfile 

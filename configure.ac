@@ -34,10 +34,15 @@ fi
 HAVE_X="false"
 AC_PATH_XTRA
 AH_TEMPLATE(HAVE_XKEYBOARD, [XKEYBOARD extension build environment present])
+AH_TEMPLATE(HAVE_LIBXINERAMA, [XINERAMA extension build environment present])
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 	AC_CHECK_LIB(X11, XkbSelectEvents,
 		[AC_DEFINE(HAVE_XKEYBOARD)], ,
 		$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+	AC_CHECK_LIB(Xinerama, XineramaQueryScreens,
+		X_PRELIBS="$X_PRELIBS -lXinerama"
+		[AC_DEFINE(HAVE_LIBXINERAMA)], ,
+		$X_LIBS $X_PRELIBS -lX11 -lXext $X_EXTRA_LIBS)
 	AC_CHECK_LIB(Xtst, XTestFakeKeyEvent, HAVE_XTEST="true",
 		HAVE_XTEST="false",
 		$X_LIBS $X_PRELIBS -lX11 -lXext $X_EXTRA_LIBS)

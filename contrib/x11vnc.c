@@ -108,9 +108,22 @@
 #include <fcntl.h>
 
 #include <rfb/rfb.h>
+#include <rfb/rfbregion.h>
 
 #ifdef LIBVNCSERVER_HAVE_XKEYBOARD
 #include <X11/XKBlib.h>
+#endif
+
+/* 
+ * Temporary kludge: to run with -xinerama define the following macro
+ * and be sure to link with * -lXinerama (e.g. LDFLAGS=-lXinerama before
+ * configure).  Support for this is being added to libvncserver 'configure.ac'
+ * so it will all be done automatically.
+
+#define LIBVNCSERVER_HAVE_LIBXINERAMA
+ */
+#ifdef LIBVNCSERVER_HAVE_LIBXINERAMA
+#include <X11/extensions/Xinerama.h>
 #endif
 
 
@@ -132,7 +145,9 @@ XImage *scanline;
 XImage *fullscreen;
 int fs_factor = 0;
 
+#ifdef SINGLE_TILE_SHM
 XShmSegmentInfo tile_shm;
+#endif
 XShmSegmentInfo *tile_row_shm;	/* for all possible row runs */
 XShmSegmentInfo scanline_shm;
 XShmSegmentInfo fullscreen_shm;
@@ -148,6 +163,20 @@ int ntiles, ntiles_x, ntiles_y;
 
 /* arrays that indicate changed or checked tiles. */
 unsigned char *tile_has_diff, *tile_tried;
+
+/* blacked-out region things */
+typedef struct bout {
+	int x1, y1, x2, y2;
+} blackout_t;
+typedef struct tbout {
+	blackout_t bo[10];	/* hardwired max rectangles. */
+	int cover;
+	int count;
+} tile_blackout_t;
+blackout_t black[100];		/* hardwired max blackouts */
+int blackouts = 0;
+tile_blackout_t *tile_blackout;
+
 
 typedef struct tile_change_region {
 	/* start and end lines, along y, of the changed area inside a tile. */
@@ -180,8 +209,11 @@ int flash_cmap = 0;		/* follow installed colormaps */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 
 int use_modifier_tweak = 0;	/* use the altgr_keyboard modifier tweak */
-char *remap_file = NULL;	/* user supplied remapping file */
+char *remap_file = NULL;	/* user supplied remapping file or list */
 int nofb = 0;			/* do not send any fb updates */
+
+char *blackout_string = NULL;	/* -blackout */
+int xinerama = 0;		/* -xinerama */
 
 char *client_connect = NULL;	/* strings for -connect option */
 char *client_connect_file = NULL;
@@ -189,12 +221,13 @@ int vnc_connect = 0;		/* -vncconnect option */
 
 int local_cursor = 1;		/* whether the viewer draws a local cursor */
 int show_mouse = 0;		/* display a cursor for the real mouse */
+int use_xwarppointer = 0;	/* use XWarpPointer instead of XTestFake... */
 int show_root_cursor = 0;	/* show X when on root background */
 int show_dragging = 1;		/* process mouse movement events */
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
 
 int old_pointer = 0;		/* use the old way of updating the pointer */
-int single_copytile = 0;	/* use the old way copy_tile() */
+int single_copytile = 0;	/* use the old way copy_tiles() */
 
 int using_shm = 1;		/* whether mit-shm is used */
 int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
@@ -252,6 +285,8 @@ int debug_keyboard = 0;
 int quiet = 0;
 double dtime(double *);
 
+void zero_fb(int, int, int, int);
+
 #if defined(LIBVNCSERVER_X11VNC_THREADED) && ! defined(X11VNC_THREADED)
 #define X11VNC_THREADED
 #endif
@@ -294,7 +329,9 @@ void clean_up_exit (int ret) {
 	exit_flag = 1;
 
 	/* remove the shm areas: */
+#ifdef SINGLE_TILE_SHM
 	shm_clean(&tile_shm, tile);
+#endif
 	shm_clean(&scanline_shm, scanline);
 	shm_clean(&fullscreen_shm, fullscreen);
 
@@ -336,7 +373,9 @@ void interrupted (int sig) {
 	 * to avoid deadlock, etc, just delete the shm areas and
 	 * leave the X stuff hanging.
 	 */
+#ifdef SINGLE_TILE_SHM
 	shm_delete(&tile_shm);
+#endif
 	shm_delete(&scanline_shm);
 	shm_delete(&fullscreen_shm);
 
@@ -387,7 +426,7 @@ void set_signals(void) {
 
 void client_gone(rfbClientPtr client) {
 	if (connect_once) {
-		fprintf(stderr, "viewer exited.\n");
+		rfbLog("viewer exited.\n");
 		clean_up_exit(0);
 	}
 }
@@ -729,9 +768,26 @@ void initialize_remap(char *infile) {
 
 	in = fopen(infile, "r"); 
 	if (in == NULL) {
-		rfbLog("remap: cannot open: %s\n", infile);
-		perror("fopen");
-		clean_up_exit(1);
+		/* assume cmd line key1:key2,key3:key4 */
+		if (! strchr(infile, ':') || (in = tmpfile()) == NULL) {
+			rfbLog("remap: cannot open: %s\n", infile);
+			perror("fopen");
+			clean_up_exit(1);
+		}
+		p = infile;
+		while (*p) {
+			if (*p == ':') {
+				fprintf(in, " ");
+			} else if (*p == ',') {
+				fprintf(in, "\n");
+			} else {
+				fprintf(in, "%c", *p);
+			}
+			p++;
+		}
+		fprintf(in, "\n");
+		fflush(in);	
+		rewind(in);
 	}
 	while (fgets(line, 256, in) != NULL) {
 		int blank = 1;
@@ -804,12 +860,18 @@ void DebugXTestFakeKeyEvent(Display* dpy, KeyCode key, Bool down, time_t cur_tim
 void tweak_mod(signed char mod, rfbBool down) {
 	rfbBool is_shift = mod_state & (LEFTSHIFT|RIGHTSHIFT);
 	Bool dn = (Bool) down;
-	if (debug_keyboard) {
-		rfbLog("tweak_mod: down=%d mod=0x%x\n", down, mod);
-	}
 
 	if (mod < 0) {
+		if (debug_keyboard) {
+			rfbLog("tweak_mod: Skip:  down=%d mod=0x%x\n", down,
+			    (int) mod);
+		}
 		return;
+	}
+	if (debug_keyboard) {
+		rfbLog("tweak_mod: Start:  down=%d mod=0x%x mod_state=0x%x"
+		    " is_shift=%d\n", down, (int) mod, (int) mod_state,
+		    is_shift);
 	}
 
 	X_LOCK;
@@ -831,6 +893,11 @@ void tweak_mod(signed char mod, rfbBool down) {
 	    XTestFakeKeyEvent(dpy, altgr_code, dn, CurrentTime);
 	}
 	X_UNLOCK;
+	if (debug_keyboard) {
+		rfbLog("tweak_mod: Finish: down=%d mod=0x%x mod_state=0x%x"
+		    " is_shift=%d\n", down, (int) mod, (int) mod_state,
+		    is_shift);
+	}
 }
 
 static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
@@ -867,11 +934,16 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr
 		k = XKeysymToKeycode(dpy, (KeySym) keysym);
 		X_UNLOCK;
 	}
+	if (debug_keyboard) {
+		rfbLog("modifier_tweak_keyboard: KeySym 0x%x \"%s\" -> "
+		    "KeyCode 0x%x%s\n", (int) keysym, XKeysymToString(keysym),
+		    (int) k, k ? "" : " *ignored*");
+	}
 	if ( k != NoSymbol ) {
 		X_LOCK;
 		XTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
 		X_UNLOCK;
-	}
+	} 
 
 	if ( tweak ) {
 		tweak_mod(modifiers[keysym], False);
@@ -928,8 +1000,9 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	k = XKeysymToKeycode(dpy, (KeySym) keysym);
 
 	if (debug_keyboard) {
-		rfbLog("keyboard(): KeySym 0x%x \"%s\" -> KeyCode 0x%x\n",
-		    (int) keysym, XKeysymToString(keysym), (int) k);
+		rfbLog("keyboard(): KeySym 0x%x \"%s\" -> KeyCode 0x%x%s\n",
+		    (int) keysym, XKeysymToString(keysym), (int) k,
+		    k ? "" : " *ignored*");
 	}
 
 	if ( k != NoSymbol ) {
@@ -1140,7 +1213,11 @@ void update_pointer(int mask, int x, int y) {
 
 	X_LOCK;
 
-	XTestFakeMotionEvent(dpy, scr, x + off_x, y + off_y, CurrentTime);
+	if (! use_xwarppointer) {
+		XTestFakeMotionEvent(dpy, scr, x+off_x, y+off_y, CurrentTime);
+	} else {
+		XWarpPointer(dpy, None, window, 0, 0, 0, 0,  x+off_x, y+off_y);
+	}
 
 	cursor_x = x;
 	cursor_y = y;
@@ -1812,7 +1889,7 @@ int cur_save_x, cur_save_y, cur_save_w, cur_save_h;
 int cur_save_cx, cur_save_cy, cur_save_which, cur_saved = 0;
 
 /*
- * save current cursor info and the patch of data it covers
+ * save current cursor info and the patch of non-cursor data it covers
  */
 void save_mouse_patch(int x, int y, int w, int h, int cx, int cy, int which) {
 	int pixelsize = bpp >> 3;
@@ -1885,6 +1962,43 @@ int tree_descend_cursor(void) {
 	}
 	X_UNLOCK;
 	return descend;
+}
+
+void blackout_nearby_tiles(x, y, dt) {
+	int sx, sy, n, b;
+	int tx = x/tile_x;
+	int ty = y/tile_y;
+	
+	if (! blackouts) {
+		return;
+	}
+	if (dt < 1) {
+		dt = 1;
+	}
+	/* loop over a range of tiles, blacking out as needed */
+
+	for (sx = tx - dt; sx <= tx + dt; sx++) {
+		if (sx < 0 || sx >= tile_x) {
+			continue;
+		}
+		for (sy = ty - dt; sy <= ty + dt; sy++) {
+			if (sy < 0 || sy >= tile_y) {
+				continue;
+			}
+			n = sx + sy * ntiles_x;
+			if (tile_blackout[n].cover == 0) {
+				continue;
+			}
+			for (b=0; b <= tile_blackout[n].count; b++) {
+				int x1, y1, x2, y2;
+				x1 = tile_blackout[n].bo[b].x1;
+				y1 = tile_blackout[n].bo[b].y1;
+				x2 = tile_blackout[n].bo[b].x2;
+				y2 = tile_blackout[n].bo[b].y2;
+				zero_fb(x1, y1, x2, y2);
+			}
+		}
+	}
 }
 
 /*
@@ -1972,6 +2086,27 @@ void draw_mouse(int x, int y, int which, int update) {
 			for (i=0; i < pixelsize; i++) {
 				rfb_fb[offset+i] = (char) shade;
 			}
+		}
+	}
+
+	if (blackouts) {
+		/*
+		 * loop over a range of tiles, blacking out as needed
+		 * note we currently disable mouse drawing under blackouts.
+		 */
+		static int mx = -1, my = -1;
+		int skip = 0;
+		if (mx < 0) {
+			mx = x;
+			my = y;
+		} else if (mx == x && my == y) {
+			skip = 1;
+		}
+		mx = x;
+		my = y;
+
+		if (! skip) {
+			blackout_nearby_tiles(x, y, 2);
 		}
 	}
 
@@ -2260,9 +2395,41 @@ void nofb_hook(rfbClientPtr cl) {
  */
 void initialize_screen(int *argc, char **argv, XImage *fb) {
 	int have_masks = 0;
+	int argc_orig = *argc;
 
 	screen = rfbGetScreen(argc, argv, fb->width, fb->height,
 	    fb->bits_per_pixel, 8, fb->bits_per_pixel/8);
+
+	fprintf(stderr, "\n");
+
+	if (! screen) {
+		int i;
+		rfbLog("\n");
+		rfbLog("failed to create rfb screen.\n");
+		for (i=0; i< *argc; i++)  {
+			rfbLog("\t[%d]  %s\n", i, argv[i]);
+		}
+		clean_up_exit(1);
+	}
+
+/*
+ * This ifdef is a transient for source compatibility for people who download
+ * the x11vnc.c file by itself and plop it down into their libvncserver tree.
+ * Remove at some point.  BTW, this assumes no usage of earlier "0.7pre".
+ */
+#ifdef LIBVNCSERVER_VERSION
+if (strcmp(LIBVNCSERVER_VERSION, "0.5") && strcmp(LIBVNCSERVER_VERSION, "0.6")) {
+	if (*argc != 1) {
+		int i;
+		rfbLog("*** unrecognized option(s) ***\n");
+		for (i=1; i< *argc; i++)  {
+			rfbLog("\t[%d]  %s\n", i, argv[i]);
+		}
+		rfbLog("for a list of options run: x11vnc -help\n");
+		clean_up_exit(1);
+	}
+}
+#endif
 
 	screen->paddedWidthInBytes = fb->bytes_per_line;
 	screen->rfbServerFormat.bitsPerPixel = fb->bits_per_pixel;
@@ -2276,14 +2443,14 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	if ( ! have_masks && screen->rfbServerFormat.bitsPerPixel == 8
 	    && CellsOfScreen(ScreenOfDisplay(dpy,scr)) ) {
 		/* indexed colour */
-		if (! quiet) fprintf(stderr, "using 8bpp indexed colour\n");
+		if (!quiet) rfbLog("Using X display with 8bpp indexed color\n");
 		indexed_colour = 1;
 		set_colormap();
 	} else {
 		/* general case ... */
 		if (! quiet) {
-			fprintf(stderr, "using %dbpp depth=%d true colour\n",
-			    fb->bits_per_pixel, fb->depth);
+			rfbLog("Using X display with %dbpp depth=%d true "
+			    "color\n", fb->bits_per_pixel, fb->depth);
 		}
 
 		/* convert masks to bit shifts and max # colors */
@@ -2378,6 +2545,316 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 }
 
 /*
+ * Take a comma separated list of geometries: WxH+X+Y and register them as
+ * rectangles to black out from the screen.
+ */
+void initialize_blackout (char *list) {
+	char *p, *blist = strdup(list);
+	int x, y, X, Y, h, w;
+	int tx, ty;
+
+	p = strtok(blist, ",");
+	while (p) {
+		/* handle +/-x and +/-y */
+		if (sscanf(p, "%dx%d+%d+%d", &w, &h, &x, &y) == 4) {
+			;
+		} else if (sscanf(p, "%dx%d-%d+%d", &w, &h, &x, &y) == 4) {
+			x = dpy_x - x - w;
+		} else if (sscanf(p, "%dx%d+%d-%d", &w, &h, &x, &y) == 4) {
+			y = dpy_y - y - h;
+		} else if (sscanf(p, "%dx%d-%d-%d", &w, &h, &x, &y) == 4) {
+			x = dpy_x - x - w;
+			y = dpy_y - y - h;
+		} else {
+			if (*p != '\0') {
+				rfbLog("skipping invalid geometry: %s\n", p);
+			}
+			p = strtok(NULL, ",");
+			continue;
+		}
+		X = x + w;
+		Y = y + h;
+		if (x < 0 || x > dpy_x || y < 0 || y > dpy_y ||
+		    X < 0 || X > dpy_x || Y < 0 || Y > dpy_y) {
+			rfbLog("skipping invalid blackout geometry: %s x="
+			    "%d-%d,y=%d-%d,w=%d,h=%d\n", p, x, X, y, Y, w, h);
+		} else {
+			rfbLog("blackout rect: %s: x=%d-%d y=%d-%d\n", p,
+			    x, X, y, Y);
+
+			/*
+			 * note that the black out is x1 <= x but x < x2
+			 * for the region. i.e. the x2, y2 are outside
+			 * by 1 pixel. 
+			 */
+			black[blackouts].x1 = x;
+			black[blackouts].y1 = y;
+			black[blackouts].x2 = X;
+			black[blackouts].y2 = Y;
+			blackouts++;
+			if (blackouts >= 100) {
+				rfbLog("too many blackouts: %d\n", blackouts);
+				break;
+			}
+		}
+		p = strtok(NULL, ",");
+	}
+	free(blist);
+}
+
+/*
+ * Now that all blackout rectangles have been constructed, see what overlap
+ * they have with the tiles in the system.  If a tile is touched by a
+ * blackout, record information.
+ */
+void blackout_tiles() {
+	int tx, ty;
+	if (! blackouts) {
+		return;
+	}
+
+	/* 
+	 * to simplify things drop down to single copy mode, no vcr, etc...
+	 */
+	single_copytile = 1;
+	if (show_mouse) {
+		rfbLog("disabling remote mouse drawing due to blackouts\n");
+		show_mouse = 0;
+	}
+
+	/* loop over all tiles. */
+	for (ty=0; ty < ntiles_y; ty++) {
+		for (tx=0; tx < ntiles_x; tx++) {
+			sraRegionPtr tile_reg, black_reg;
+			sraRect rect;
+			sraRectangleIterator *iter;
+			int n, b, x1, y1, x2, y2, cnt;
+
+			/* tile number and coordinates: */
+			n = tx + ty * ntiles_x;
+			x1 = tx * tile_x;
+			y1 = ty * tile_y;
+			x2 = x1 + tile_x;
+			y2 = y1 + tile_y;
+			if (x2 > dpy_x) {
+				x2 = dpy_x;
+			}
+			if (y2 > dpy_y) {
+				y2 = dpy_y;
+			}
+
+			/* make regions for the tile and the blackouts: */
+			black_reg = (sraRegionPtr) sraRgnCreate();
+			tile_reg  = (sraRegionPtr) sraRgnCreateRect(x1, y1,
+			    x2, y2);
+
+			tile_blackout[n].cover = 0;
+			tile_blackout[n].count = 0;
+
+			/* union of blackouts */
+			for (b=0; b < blackouts; b++) {
+				sraRegionPtr tmp_reg = (sraRegionPtr)
+				    sraRgnCreateRect(black[b].x1, black[b].y1,
+				    black[b].x2, black[b].y2);
+
+				sraRgnOr(black_reg, tmp_reg);
+				sraRgnDestroy(tmp_reg);
+			}
+
+			if (! sraRgnAnd(black_reg, tile_reg)) {
+				/*
+				 * no intersection for this tile, so we
+				 * are done.
+				 */
+				sraRgnDestroy(black_reg);
+				sraRgnDestroy(tile_reg);
+				continue;
+			}
+
+			/*
+			 * loop over rectangles that make up the blackout
+			 * region:
+			 */
+			cnt = 0;
+			iter = sraRgnGetIterator(black_reg);
+			while (sraRgnIteratorNext(iter, &rect)) {
+
+				/* make sure x1 < x2 and y1 < y2 */
+				if (rect.x1 > rect.x2) {
+					int tmp = rect.x2;
+					rect.x2 = rect.x1;
+					rect.x1 = tmp;
+				}
+				if (rect.y1 > rect.y2) {
+					int tmp = rect.y2;
+					rect.y2 = rect.y1;
+					rect.y1 = tmp;
+				}
+
+				/* store coordinates */
+				tile_blackout[n].bo[cnt].x1 = rect.x1;
+				tile_blackout[n].bo[cnt].y1 = rect.y1;
+				tile_blackout[n].bo[cnt].x2 = rect.x2;
+				tile_blackout[n].bo[cnt].y2 = rect.y2;
+
+				/* note if the tile is completely obscured */
+				if (rect.x1 == x1 && rect.y1 == y1 &&
+				    rect.x2 == x2 && rect.y2 == y2) {
+					tile_blackout[n].cover = 2;
+				} else {
+					tile_blackout[n].cover = 1;
+				}
+
+				if (++cnt >= 10) {
+					rfbLog("too many blackout rectangles "
+					    "for tile %d=%d,%d.\n", n, tx, ty);
+					break;
+				}
+			}
+
+			sraRgnReleaseIterator(iter);
+			sraRgnDestroy(black_reg);
+			sraRgnDestroy(tile_reg);
+
+			tile_blackout[n].count = cnt;
+		}
+	}
+}
+
+void initialize_xinerama () {
+#ifdef LIBVNCSERVER_HAVE_LIBXINERAMA
+	XineramaScreenInfo *sc, *xineramas;
+#endif
+	sraRegionPtr black_region, tmp_region;
+	sraRectangleIterator *iter;
+	sraRect rect;
+	char *bstr, *tstr;
+	int ev, er, i, n, rcnt;
+
+#ifndef LIBVNCSERVER_HAVE_LIBXINERAMA
+	rfbLog("Xinerama: Library libXinerama is not available to determine\n");
+	rfbLog("Xinerama: the head geometries, consider using -blackout\n");
+	rfbLog("Xinerama: if the screen is non-rectangular.\n");
+#else
+	if (! XineramaQueryExtension(dpy, &ev, &er)) {
+		rfbLog("Xinerama: disabling: display does not support it.\n");
+		xinerama = 0;
+		return;
+	}
+	if (! XineramaIsActive(dpy)) {
+		/* n.b. change to XineramaActive(dpy, window) someday */
+		rfbLog("Xinerama: disabling: not active on display.\n");
+		xinerama = 0;
+		return;
+	}
+
+	/* n.b. change to XineramaGetData() someday */
+	xineramas = XineramaQueryScreens(dpy, &n);
+	rfbLog("Xinerama: number of sub-screens: %d\n", n);
+
+	if (n == 1) {
+		rfbLog("Xinerama: no blackouts needed (only one"
+		    " sub-screen)\n");
+		XFree(xineramas);
+		return;		/* must be OK w/o change */
+	}
+
+	black_region = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
+
+	sc = xineramas;
+	for (i=0; i<n; i++) {
+		int x, y, w, h;
+		
+		x = sc->x_org;
+		y = sc->y_org;
+		w = sc->width;
+		h = sc->height;
+
+		tmp_region = sraRgnCreateRect(x, y, x + w, y + h);
+
+		sraRgnSubtract(black_region, tmp_region);
+		sraRgnDestroy(tmp_region);
+		sc++;
+	}
+	XFree(xineramas);
+
+	if (sraRgnEmpty(black_region)) {
+		rfbLog("Xinerama: no blackouts needed (screen fills"
+		    " rectangle)\n");
+		sraRgnDestroy(black_region);
+		return;
+	}
+
+	/* max len is 10000x10000+10000+10000 (23 chars) per geometry */
+	rcnt = (int) sraRgnCountRects(black_region);
+	bstr = (char *) malloc(30 * rcnt * sizeof(char));
+	tstr = (char *) malloc(30 * sizeof(char));
+	bstr[0] = '\0';
+
+	iter = sraRgnGetIterator(black_region);
+	while (sraRgnIteratorNext(iter, &rect)) {
+		int x, y, w, h;
+
+		/* make sure x1 < x2 and y1 < y2 */
+		if (rect.x1 > rect.x2) {
+			int tmp = rect.x2;
+			rect.x2 = rect.x1;
+			rect.x1 = tmp;
+		}
+		if (rect.y1 > rect.y2) {
+			int tmp = rect.y2;
+			rect.y2 = rect.y1;
+			rect.y1 = tmp;
+		}
+		x = rect.x1;
+		y = rect.y1;
+		w = rect.x2 - x;
+		h = rect.y2 - y;
+		sprintf(tstr, "%dx%d+%d+%d,", w, h, x, y);
+		strcat(bstr, tstr);
+	}
+	initialize_blackout(bstr);
+
+	free(bstr);
+	free(tstr);
+#endif
+
+}
+
+/*
+ * Fill the framebuffer with zero for the prescribed rectangle
+ */
+void zero_fb(x1, y1, x2, y2) {
+	int pixelsize = bpp >> 3;
+	int line, fill = 0;
+	char *dst;
+	
+	if (x1 < 0 || x2 <= x1 || x2 > dpy_x) {
+		return;
+	}
+	if (y1 < 0 || y2 <= y1 || y2 > dpy_y) {
+		return;
+	}
+
+	dst = screen->frameBuffer + y1 * bytes_per_line + x1 * pixelsize;
+	line = y1;
+	while (line++ < y2) {
+		memset(dst, fill, (size_t) (x2 - x1) * pixelsize);
+		dst += bytes_per_line;
+	}
+}
+
+/*
+ * Fill the framebuffer with zeros for each blackout region
+ */
+void blackout_regions() {
+	int i;
+	for (i=0; i < blackouts; i++) {
+		zero_fb(black[i].x1, black[i].y1, black[i].x2, black[i].y2);
+	}
+}
+
+/*
  * setup tile numbers and allocate the tile and hint arrays:
  */
 void initialize_tiles() {
@@ -2390,6 +2867,8 @@ void initialize_tiles() {
 		malloc((size_t) (ntiles * sizeof(unsigned char)));
 	tile_tried    = (unsigned char *)
 		malloc((size_t) (ntiles * sizeof(unsigned char)));
+	tile_blackout    = (tile_blackout_t *)
+		malloc((size_t) (ntiles * sizeof(tile_blackout_t)));
 	tile_region = (region_t *) malloc((size_t) (ntiles * sizeof(region_t)));
 
 	tile_row = (XImage **)
@@ -2472,7 +2951,7 @@ int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 				xim->bitmap_bit_order = LSBFirst;
 			}
 			if (! reported && ! quiet) {
-				fprintf(stderr, "changing XImage byte order"
+				rfbLog("changing XImage byte order"
 				    " to %s\n", bo);
 				reported = 1;
 			}
@@ -2575,9 +3054,11 @@ void initialize_shm() {
 	int i;
 
 	/* set all shm areas to "none" before trying to create any */
+#ifdef SINGLE_TILE_SHM
 	tile_shm.shmid		= -1;
 	tile_shm.shmaddr	= (char *) -1;
 	tile			= NULL;
+#endif
 	scanline_shm.shmid	= -1;
 	scanline_shm.shmaddr	= (char *) -1;
 	scanline		= NULL;
@@ -2590,11 +3071,13 @@ void initialize_shm() {
 		tile_row[i]		= NULL;
 	}
 
+#ifdef SINGLE_TILE_SHM
 	/* the tile (e.g. 32x32) shared memory area image: */
 
 	if (! shm_create(&tile_shm, &tile, tile_x, tile_y, "tile")) {
 		clean_up_exit(1);
 	}
+#endif
 
 	/* the scanline (e.g. 1280x1) shared memory area image: */
 
@@ -2608,8 +3091,12 @@ void initialize_shm() {
 	 * limits, e.g. the default 1MB on Solaris)
 	 */
 	set_fs_factor(1024 * 1024);
+	if (fs_frac >= 1.0) {
+		fs_frac = 1.1;
+		fs_factor = 0;
+	}
 	if (! fs_factor) {
-		fprintf(stderr, "warning: fullscreen updates are disabled.\n");
+		rfbLog("warning: fullscreen updates are disabled.\n");
 	} else {
 		if (! shm_create(&fullscreen_shm, &fullscreen, dpy_x,
 		    dpy_y/fs_factor, "fullscreen")) {
@@ -2800,168 +3287,6 @@ void tile_updates() {
 
 
 /*
- * copy_tile() is called on a tile with a known change (from a scanline
- * diff) or a suspected change (from our various heuristics).
- *
- * Examine the whole tile for the y-range of difference, copy that
- * image difference to the rfb framebuffer, and do bookkeepping wrt
- * the y-range and edge differences.
- *
- * This call is somewhat costly, maybe 1-2 ms.  Primarily the XShmGetImage
- * and then the memcpy/memcmp.
- */
-
-void copy_tile(int tx, int ty) {
-	int x, y, line, first_line, last_line;
-	int size_x, size_y, n, dw, dx;
-	int pixelsize = bpp >> 3;
-	unsigned short l_diff = 0, r_diff = 0;
-
-	int restored_patch = 0; /* for show_mouse */
-
-	char *src, *dst, *s_src, *s_dst, *m_src, *m_dst;
-	char *h_src, *h_dst;
-
-	x = tx * tile_x;
-	y = ty * tile_y;
-
-	size_x = dpy_x - x;
-	if ( size_x > tile_x ) size_x = tile_x;
-
-	size_y = dpy_y - y;
-	if ( size_y > tile_y ) size_y = tile_y;
-
-	n = tx + ty * ntiles_x;		/* number of the tile */
-
-	X_LOCK;
-	if ( using_shm && size_x == tile_x && size_y == tile_y ) {
-		/* general case: */
-		XShmGetImage(dpy, window, tile, x, y, AllPlanes);
-	} else {
-		/*
-		 * No shm or near bottom/rhs edge case:
-		 * (but only if tile size does not divide screen size)
-		 */
-		XGetSubImage(dpy, window, x, y, size_x, size_y, AllPlanes,
-		    ZPixmap, tile, 0, 0);
-	}
-	X_UNLOCK;
-
-	/*
-	 * Some awkwardness wrt the little remote mouse patch we display.
-	 * When threaded we want to have as small a window of time
-	 * as possible when the mouse image is not in the fb, otherwise
-	 * a libvncserver thread may send the uncorrected patch to the
-	 * clients.
-	 */
-	if (show_mouse && use_threads && cur_saved) {
-		/* check for overlap */
-		if (cur_save_x + cur_save_w > x && x + size_x > cur_save_x &&
-		    cur_save_y + cur_save_h > y && y + size_y > cur_save_y) {
-
-			/* restore the real data to the rfb fb */
-			restore_mouse_patch();
-			restored_patch = 1;
-		}
-	}
-
-	src = tile->data;
-	dst = screen->frameBuffer + y * bytes_per_line + x * pixelsize;
-
-	s_src = src;
-	s_dst = dst;
-
-	first_line = -1;
-
-	/* find the first line with difference: */
-	for (line = 0; line < size_y; line++) {
-		if ( memcmp(s_dst, s_src, size_x * pixelsize) ) {
-			first_line = line;
-			break;
-		}
-		s_src += tile->bytes_per_line;
-		s_dst += bytes_per_line;
-	}
-
-	tile_tried[n] = 1;
-	if (first_line == -1) {
-		/* tile has no difference, note it and get out: */
-		tile_has_diff[n] = 0;
-		if (restored_patch) {
-			redraw_mouse(); 
-		}
-		return;
-	} else {
-		/*
-		 * make sure it is recorded (e.g. sometimes we guess tiles
-		 * and they came in with tile_has_diff 0)
-		 */
-		tile_has_diff[n] = 1;
-	}
-
-	m_src = src + (tile->bytes_per_line * size_y);
-	m_dst = dst + (bytes_per_line * size_y);
-	last_line = first_line;
-
-	/* find the last line with difference: */
-	for (line = size_y - 1; line > first_line; line--) {
-		m_src -= tile->bytes_per_line;
-		m_dst -= bytes_per_line;
-		if ( memcmp(m_dst, m_src, size_x * pixelsize) ) {
-			last_line = line;
-			break;
-		}
-	}
-
-	/* look for differences on left and right hand edges: */
-	dx = (size_x - tile_fuzz) * pixelsize;
-	dw = tile_fuzz * pixelsize; 
-
-	h_src = src;
-	h_dst = dst;
-	for (line = 0; line < size_y; line++) {
-		if (! l_diff && memcmp(h_dst, h_src, dw) ) {
-			l_diff = 1;
-		}
-		if (! r_diff && memcmp(h_dst + dx, h_src + dx, dw) ) {
-			r_diff = 1;
-		}
-		if (l_diff && r_diff) {
-			break;
-		}
-		h_src += tile->bytes_per_line;
-		h_dst += bytes_per_line;
-	}
-
-	/* now copy the difference to the rfb framebuffer: */
-	for (line = first_line; line <= last_line; line++) {
-		memcpy(s_dst, s_src, size_x * pixelsize);
-		s_src += tile->bytes_per_line;
-		s_dst += bytes_per_line;
-	}
-
-	if (restored_patch) {
-		redraw_mouse(); 
-	}
-
-	/* record all the info in the region array for this tile: */
-	tile_region[n].first_line = first_line;
-	tile_region[n].last_line  = last_line;
-	tile_region[n].left_diff  = l_diff;
-	tile_region[n].right_diff = r_diff;
-
-	tile_region[n].top_diff = 0;
-	tile_region[n].bot_diff = 0;
-	if ( first_line < tile_fuzz ) {
-		tile_region[n].top_diff = 1;
-	}
-	if ( last_line > (size_y - 1) - tile_fuzz ) {
-		tile_region[n].bot_diff = 1;
-	}
-}
-
-
-/*
  * copy_tiles() gives a slight improvement over copy_tile() since
  * adjacent runs of tiles are done all at once there is some savings
  * due to contiguous memory access.  Not a great speedup, but in
@@ -3019,6 +3344,16 @@ void copy_tiles(int tx, int ty, int nt) {
 
 	n = tx + ty * ntiles_x;		/* number of the first tile */
 
+	if (blackouts && tile_blackout[n].cover == 2) {
+		/*
+		 * If there are blackouts and this tile is completely covered
+		 * no need to poll screen or do anything else..
+		 * n.b. we are int single copy_tile mode: nt=1
+		 */
+		tile_has_diff[n] = 0;
+		return;
+	}
+
 	X_LOCK;
 	/* read in the whole tile run at once: */
 	if ( using_shm && size_x == tile_x * nt && size_y == tile_y ) {
@@ -3033,6 +3368,35 @@ void copy_tiles(int tx, int ty, int nt) {
 		    ZPixmap, tile_row[nt], 0, 0);
 	}
 	X_UNLOCK;
+
+	if (blackouts && tile_blackout[n].cover == 1) {
+		/*
+		 * If there are blackouts and this tile is partially covered
+		 * we should re-black-out the portion.
+		 * n.b. we are int single copy_tile mode: nt=1
+		 */
+		int x1, x2, y1, y2, b;
+		int w, s, fill = 0;
+
+		for (b=0; b < tile_blackout[n].count; b++) {
+			char *b_dst = tile_row[nt]->data;
+			
+			x1 = tile_blackout[n].bo[b].x1 - x;
+			y1 = tile_blackout[n].bo[b].y1 - y;
+			x2 = tile_blackout[n].bo[b].x2 - x;
+			y2 = tile_blackout[n].bo[b].y2 - y;
+
+			w = (x2 - x1) * pixelsize;
+			s = x1 * pixelsize;
+
+			for (line = 0; line < size_y; line++) {
+				if (y1 <= line && line < y2) {
+					memset(b_dst + s, fill, (size_t) w);
+				}
+				b_dst += tile_row[nt]->bytes_per_line;
+			}
+		}
+	}
 
 	/*
 	 * Some awkwardness wrt the little remote mouse patch we display.
@@ -3285,12 +3649,11 @@ int copy_all_tiles() {
 			n = x + y * ntiles_x;
 
 			if (tile_has_diff[n]) {
-				copy_tile(x, y);
-				/* later: copy_tiles(x, y, 1); */
+				copy_tiles(x, y, 1);
 			}
 			if (! tile_has_diff[n]) {
 				/*
-				 * n.b. copy_tile() may have detected
+				 * n.b. copy_tiles() may have detected
 				 * no change and reset tile_has_diff to 0.
 				 */
 				continue;
@@ -3404,7 +3767,7 @@ int copy_tiles_backward_pass() {
 		if (y >= 1 && ! tile_has_diff[m] && tile_region[n].top_diff) {
 			if (! tile_tried[m]) {
 				tile_has_diff[m] = 2;
-				copy_tile(x, y-1);
+				copy_tiles(x, y-1, 1);
 			}
 		}
 
@@ -3413,7 +3776,7 @@ int copy_tiles_backward_pass() {
 		if (x >= 1 && ! tile_has_diff[m] && tile_region[n].left_diff) {
 			if (! tile_tried[m]) {
 				tile_has_diff[m] = 2;
-				copy_tile(x-1, y);
+				copy_tiles(x-1, y, 1);
 			}
 		}
 	    }
@@ -3457,7 +3820,7 @@ void gap_try(int x, int y, int *run, int *saw, int along_x) {
 			continue;
 		}
 
-		copy_tile(xt, yt);
+		copy_tiles(xt, yt, 1);
 	}
 	*run = 0;
 	*saw = 1;
@@ -3522,7 +3885,7 @@ void island_try(int x, int y, int u, int v, int *run) {
 			return;
 		}
 
-		copy_tile(u, v);
+		copy_tiles(u, v, 1);
 	}
 }
 
@@ -3596,6 +3959,10 @@ void copy_screen() {
 	}
 
 	X_UNLOCK;
+
+	if (blackouts) {
+		blackout_regions();
+	}
 
 	rfbMarkRectAsModified(screen, 0, 0, dpy_x, dpy_y);
 }
@@ -3704,7 +4071,7 @@ void ping_clients(int tile_cnt) {
 
 	if (rfbMaxClientWait <= 3000) {
 		rfbMaxClientWait = 3000;
-		fprintf(stderr, "reset rfbMaxClientWait to %d ms.\n",
+		rfbLog("reset rfbMaxClientWait to %d ms.\n",
 		    rfbMaxClientWait);
 	}
 	if (tile_cnt) {
@@ -3713,6 +4080,114 @@ void ping_clients(int tile_cnt) {
 		/* Send small heartbeat to client */
 		rfbMarkRectAsModified(screen, 0, 0, 1, 1);
 		last_send = now;
+	}
+}
+
+/*
+ * scan_display() wants to know if this tile can be skipped due to
+ * blackout regions: (no data compare is done, just a quick geometric test)
+ */
+int blackout_line_skip(int n, int x, int y, int rescan, int *tile_count) {
+	
+	if (tile_blackout[n].cover == 2) {
+		tile_has_diff[n] = 0;
+		return 1;	/* skip it */
+
+	} else if (tile_blackout[n].cover == 1) {
+		int w, x1, y1, x2, y2, b, hit = 0;
+		if (x + NSCAN > dpy_x) {
+			w = dpy_x - x;
+		} else {
+			w = NSCAN;
+		}
+
+		for (b=0; b < tile_blackout[n].count; b++) {
+			
+			/* n.b. these coords are in full display space: */
+			x1 = tile_blackout[n].bo[b].x1;
+			x2 = tile_blackout[n].bo[b].x2;
+			y1 = tile_blackout[n].bo[b].y1;
+			y2 = tile_blackout[n].bo[b].y2;
+
+			if (x2 - x1 < w) {
+				/* need to cover full width */
+				continue;
+			}
+			if (y1 <= y && y < y2) {
+				hit = 1;
+				break;
+			}
+		}
+		if (hit) {
+			if (! rescan) {
+				tile_has_diff[n] = 0;
+			} else {
+				*tile_count += tile_has_diff[n];
+			}
+			return 1;	/* skip */
+		}
+	}
+	return 0;	/* do not skip */
+}
+
+/*
+ * scan_display() wants to know if this changed tile can be skipped due
+ * to blackout regions (we do an actual compare to find the changed region).
+ */
+int blackout_line_cmpskip(int n, int x, int y, char *dst, char *src,
+    int w, int pixelsize) {
+
+	int i, x1, y1, x2, y2, b, hit = 0;
+	int beg = -1, end = -1; 
+
+	if (tile_blackout[n].cover == 0) {
+		return 0;	/* 0 means do not skip it. */
+	} else if (tile_blackout[n].cover == 2) {
+		return 1;	/* 1 means skip it. */
+	}
+
+	/* tile has partial coverage: */
+
+	for (i=0; i < w * pixelsize; i++)  {
+		if (*(dst+i) != *(src+i)) {
+			beg = i/pixelsize;	/* beginning difference */
+			break;
+		}
+	}
+	for (i = w * pixelsize - 1; i >= 0; i--)  {
+		if (*(dst+i) != *(src+i)) {
+			end = i/pixelsize;	/* ending difference */
+			break;
+		}
+	}
+	if (beg < 0 || end < 0) {
+		/* problem finding range... */
+		return 0;
+	}
+
+	/* loop over blackout rectangles: */
+	for (b=0; b < tile_blackout[n].count; b++) {
+		
+		/* y in full display space: */
+		y1 = tile_blackout[n].bo[b].y1;
+		y2 = tile_blackout[n].bo[b].y2;
+
+		/* x relative to tile origin: */
+		x1 = tile_blackout[n].bo[b].x1 - x;
+		x2 = tile_blackout[n].bo[b].x2 - x;
+
+		if (y1 > y || y >= y2) {
+			continue;
+		}
+		if (x1 <= beg && end <= x2) {
+			hit = 1;
+			break;
+		}
+	}
+	if (hit) {
+		return 1;
+	} else {
+		return 0;
 	}
 }
 
@@ -3727,7 +4202,7 @@ int scan_display(int ystart, int rescan) {
 	int pixelsize = bpp >> 3;
 	int x, y, w, n;
 	int tile_count = 0;
-	int whole_line = 1, nodiffs;
+	int whole_line = 1, nodiffs = 0;
 
 	y = ystart;
 
@@ -3748,7 +4223,6 @@ int scan_display(int ystart, int rescan) {
 		src = scanline->data;
 		dst = screen->frameBuffer + y * bytes_per_line;
 
-		nodiffs = 0;
 		if (whole_line && ! memcmp(dst, src, bytes_per_line)) {
 			/* no changes anywhere in scan line */
 			nodiffs = 1;
@@ -3761,6 +4235,14 @@ int scan_display(int ystart, int rescan) {
 		x = 0;
 		while (x < dpy_x) {
 			n = (x/tile_x) + (y/tile_y) * ntiles_x;
+
+			if (blackouts) {
+				if (blackout_line_skip(n, x, y, rescan,
+				    &tile_count)) {
+					x += NSCAN;
+					continue;
+				}
+			}
 
 			if (rescan) {
 				if (nodiffs || tile_has_diff[n]) {
@@ -3784,8 +4266,18 @@ int scan_display(int ystart, int rescan) {
 
 			if (memcmp(dst, src, w * pixelsize)) {
 				/* found a difference, record it: */
-				tile_has_diff[n] = 1;
-				tile_count++;		
+				if (! blackouts) {
+					tile_has_diff[n] = 1;
+					tile_count++;		
+				} else {
+					if (blackout_line_cmpskip(n, x, y,
+					    dst, src, w, pixelsize)) {
+						tile_has_diff[n] = 0;
+					} else {
+						tile_has_diff[n] = 1;
+						tile_count++;		
+					}
+				}
 			}
 			x += NSCAN;
 		}
@@ -3844,7 +4336,7 @@ void scan_for_updates() {
 	if (tile_count > frac1 * ntiles) {
 		/*
 		 * many tiles have changed, so try a rescan (since it should
-		 * be short compared to the many upcoming copy_tile() calls)
+		 * be short compared to the many upcoming copy_tiles() calls)
 		 */
 
 		/* this check is done to skip the extra scan_display() call */
@@ -3867,7 +4359,7 @@ void scan_for_updates() {
 		/*
 		 * At some number of changed tiles it is better to just
 		 * copy the full screen at once.  I.e. time = c1 + m * r1
-		 * where m is number of tiles, r1 is the copy_tile()
+		 * where m is number of tiles, r1 is the copy_tiles()
 		 * time, and c1 is the scan_display() time: for some m
 		 * it crosses the full screen update time.
 		 *
@@ -3937,6 +4429,19 @@ void scan_for_updates() {
 		 * pointer events:
 		 */
 		pointer(-1, 0, 0, NULL);
+	}
+
+	if (blackouts) {
+		/* ignore any diffs in completely covered tiles */
+		int x, y, n;
+		for (y=0; y < ntiles_y; y++) {
+			for (x=0; x < ntiles_x; x++) {
+				n = x + y * ntiles_x;
+				if (tile_blackout[n].cover == 2) {
+					tile_has_diff[n] = 0;
+				}
+			}
+		}
 	}
 
 	if (use_hints) {
@@ -4231,11 +4736,17 @@ void print_help() {
 "                       for more control build libvncserver with libwrap support.\n"
 "-localhost             Same as -allow 127.0.0.1\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
+"\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
 "                       remote displays can be polled this way: be careful\n"
 "                       this can use large amounts of network bandwidth.\n"
 "-flipbyteorder         Sometimes needed if remotely polled host has different\n"
 "                       endianness.  Ignored unless -noshm is set.\n"
+"-blackout string       Black out rectangles on the screen. string is a comma\n"
+"                       separated list of WxH+X+Y type geometries for each rect.\n"
+"-xinerama              If your screen is composed of multiple monitors glued\n"
+"                       together via XINERAMA, and that screen is non-rectangular\n"
+"                       this option will try to guess the areas to black out.\n"
 "\n"
 "-q                     Be quiet by printing less informational output.\n" 
 "-bg                    Go into the background after screen setup.\n" 
@@ -4248,8 +4759,9 @@ void print_help() {
 "-modtweak              Handle AltGr/Shift modifiers for differing languages\n"
 "                       between client and host (default %s).\n"
 "-nomodtweak            Send the keysym directly to the X server.\n"
-"-remap file            Read keysym remappings from file.  Format is one pair\n"
-"                       of keysyms per line (can be string or the hex value).\n"
+"-remap string          Read keysym remappings from file \"string\".  Format is\n"
+"                       one pair of keysyms per line (can be name or hex value).\n"
+"                       \"string\" can also be of form: key1:key2,key3:key4...\n"
 "-nobell                Do not watch for XBell events.\n"
 "-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
 "-nosel                 Do not manage exchange of X selection/cutbuffer.\n"
@@ -4260,6 +4772,9 @@ void print_help() {
 "-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
 "-mouseX                As -mouse, but also draw an X on root background.\n"
 "-X                     Shorthand for -mouseX -nocursor.\n"
+"-xwarppointer          Move the pointer with XWarpPointer instead of XTEST\n"
+"                       (try as a workaround if pointer behaves poorly, e.g.\n"
+"                       on touchscreens or other non-standard setups).\n"
 "-buttonmap str         String to remap mouse buttons.  Format: IJK-LMN, this\n"
 "                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31\n"
 "-nodragging            Do not update the display during mouse dragging events.\n"
@@ -4270,7 +4785,6 @@ void print_help() {
 "-input_skip n          For the old pointer handling when non-threaded: try to\n"
 "                       read n user input events before scanning display. n < 0\n"
 "                       means to act as though there is always user input.\n"
-"-old_copytile          Do not use the new copy_tiles() framebuffer mechanism.\n"
 "-debug_pointer         Print debugging output for every pointer event.\n"
 "-debug_keyboard        Print debugging output for every keyboard event.\n"
 "\n"
@@ -4287,6 +4801,8 @@ void print_help() {
 "\n"
 "-fs f                  If the fraction of changed tiles in a poll is greater\n"
 "                       than f, the whole screen is updated (default %.2f).\n"
+"-onetile               Do not use the new copy_tiles() framebuffer mechanism,\n"
+"                       just use 1 shm tile for polling.  Same as -old_copytile.\n"
 "-gaps n                Heuristic to fill in gaps in rows or cols of n or less\n"
 "                       tiles.  Used to improve text paging (default %d).\n"
 "-grow n                Heuristic to grow islands of changed tiles n or wider\n"
@@ -4366,7 +4882,7 @@ int main(int argc, char** argv) {
 	XImage *fb;
 	int i, op, ev, er, maj, min;
 	char *use_dpy = NULL;
-	char *visual_str = NULL;
+	char *arg, *visual_str = NULL;
 	int pw_loc = -1;
 	int dt = 0;
 	int bg = 0;
@@ -4375,12 +4891,18 @@ int main(int argc, char** argv) {
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc2 = 1; char *argv2[100];
 
-	argv2[0] = argv[0];
+	argv2[0] = strdup(argv[0]);
 	
 	for (i=1; i < argc; i++) {
-		if (!strcmp(argv[i], "-display")) {
+		/* quick-n-dirty --option handling. */
+		arg = argv[i];
+		if (strstr(arg, "--") == arg) {
+			arg++;
+		}
+
+		if (!strcmp(arg, "-display")) {
 			use_dpy = argv[++i];
-		} else if (!strcmp(argv[i], "-id")) {
+		} else if (!strcmp(arg, "-id")) {
 			if (sscanf(argv[++i], "0x%x", &subwin) != 1) {
 				if (sscanf(argv[i], "%d", &subwin) != 1) {
 					fprintf(stderr, "bad -id arg: %s\n",
@@ -4388,126 +4910,133 @@ int main(int argc, char** argv) {
 					exit(1);
 				}
 			}
-		} else if (!strcmp(argv[i], "-visual")) {
+		} else if (!strcmp(arg, "-visual")) {
 			visual_str = argv[++i];
-		} else if (!strcmp(argv[i], "-flashcmap")) {
+		} else if (!strcmp(arg, "-flashcmap")) {
 			flash_cmap = 1;
-		} else if (!strcmp(argv[i], "-notruecolor")) {
+		} else if (!strcmp(arg, "-notruecolor")) {
 			force_indexed_color = 1;
-		} else if (!strcmp(argv[i], "-viewonly")) {
+		} else if (!strcmp(arg, "-viewonly")) {
 			view_only = 1;
-		} else if (!strcmp(argv[i], "-shared")) {
+		} else if (!strcmp(arg, "-shared")) {
 			shared = 1;
-		} else if (!strcmp(argv[i], "-allow")) {
+		} else if (!strcmp(arg, "-allow")) {
 			allow_list = argv[++i];
-		} else if (!strcmp(argv[i], "-localhost")) {
+		} else if (!strcmp(arg, "-localhost")) {
 			allow_list = "127.0.0.1";
-		} else if (!strcmp(argv[i], "-many")
-		    || !strcmp(argv[i], "-forever")) {
+		} else if (!strcmp(arg, "-many")
+			|| !strcmp(arg, "-forever")) {
 			connect_once = 0;
-		} else if (!strcmp(argv[i], "-connect")) {
+		} else if (!strcmp(arg, "-connect")) {
 			i++;
-			if (strchr(argv[i], '/')) {
-				client_connect_file = argv[i];
+			if (strchr(arg, '/')) {
+				client_connect_file = arg;
 			} else {
-				client_connect = strdup(argv[i]);
+				client_connect = strdup(arg);
 			}
-		} else if (!strcmp(argv[i], "-vncconnect")) {
+		} else if (!strcmp(arg, "-vncconnect")) {
 			vnc_connect = 1;
-		} else if (!strcmp(argv[i], "-inetd")) {
+		} else if (!strcmp(arg, "-inetd")) {
 			inetd = 1;
-		} else if (!strcmp(argv[i], "-noshm")) {
+		} else if (!strcmp(arg, "-noshm")) {
 			using_shm = 0;
-		} else if (!strcmp(argv[i], "-flipbyteorder")) {
+		} else if (!strcmp(arg, "-flipbyteorder")) {
 			flip_byte_order = 1;
-		} else if (!strcmp(argv[i], "-modtweak")) {
+		} else if (!strcmp(arg, "-modtweak")) {
 			use_modifier_tweak = 1;
-		} else if (!strcmp(argv[i], "-nomodtweak")) {
+		} else if (!strcmp(arg, "-nomodtweak")) {
 			use_modifier_tweak = 0;
-		} else if (!strcmp(argv[i], "-remap")) {
+		} else if (!strcmp(arg, "-remap")) {
 			remap_file = argv[++i];
-		} else if (!strcmp(argv[i], "-nobell")) {
+		} else if (!strcmp(arg, "-blackout")) {
+			blackout_string = argv[++i];
+		} else if (!strcmp(arg, "-xinerama")) {
+			xinerama = 1;
+		} else if (!strcmp(arg, "-nobell")) {
 			watch_bell = 0;
-		} else if (!strcmp(argv[i], "-nofb")) {
+		} else if (!strcmp(arg, "-nofb")) {
 			nofb = 1;
-		} else if (!strcmp(argv[i], "-nosel")) {
+		} else if (!strcmp(arg, "-nosel")) {
 			watch_selection = 0;
-		} else if (!strcmp(argv[i], "-noprimary")) {
+		} else if (!strcmp(arg, "-noprimary")) {
 			watch_primary = 0;
-		} else if (!strcmp(argv[i], "-nocursor")) {
+		} else if (!strcmp(arg, "-nocursor")) {
 			local_cursor = 0;
-		} else if (!strcmp(argv[i], "-mouse")) {
+		} else if (!strcmp(arg, "-mouse")) {
 			show_mouse = 1;
-		} else if (!strcmp(argv[i], "-mouseX")) {
+		} else if (!strcmp(arg, "-mouseX")) {
 			show_mouse = 1;
 			show_root_cursor = 1;
-		} else if (!strcmp(argv[i], "-X")) {
+		} else if (!strcmp(arg, "-X")) {
 			show_mouse = 1;
 			show_root_cursor = 1;
 			local_cursor = 0;
-		} else if (!strcmp(argv[i], "-buttonmap")) {
+		} else if (!strcmp(arg, "-xwarppointer")) {
+			use_xwarppointer = 1;
+		} else if (!strcmp(arg, "-buttonmap")) {
 			pointer_remap = argv[++i];
-		} else if (!strcmp(argv[i], "-nodragging")) {
+		} else if (!strcmp(arg, "-nodragging")) {
 			show_dragging = 0;
-		} else if (!strcmp(argv[i], "-input_skip")) {
+		} else if (!strcmp(arg, "-input_skip")) {
 			ui_skip = atoi(argv[++i]);
 			if (! ui_skip) ui_skip = 1;
-		} else if (!strcmp(argv[i], "-old_pointer")) {
+		} else if (!strcmp(arg, "-old_pointer")) {
 			old_pointer = 1;
-		} else if (!strcmp(argv[i], "-old_copytile")) {
+		} else if (!strcmp(arg, "-onetile")
+			|| !strcmp(arg, "-old_copytile")) {
 			single_copytile = 1;
-		} else if (!strcmp(argv[i], "-debug_pointer")) {
+		} else if (!strcmp(arg, "-debug_pointer")) {
 			debug_pointer++;
-		} else if (!strcmp(argv[i], "-debug_keyboard")) {
+		} else if (!strcmp(arg, "-debug_keyboard")) {
 			debug_keyboard++;
-		} else if (!strcmp(argv[i], "-defer")) {
+		} else if (!strcmp(arg, "-defer")) {
 			defer_update = atoi(argv[++i]);
-		} else if (!strcmp(argv[i], "-wait")) {
+		} else if (!strcmp(arg, "-wait")) {
 			waitms = atoi(argv[++i]);
 			got_waitms = 1;
-		} else if (!strcmp(argv[i], "-nap")) {
+		} else if (!strcmp(arg, "-nap")) {
 			take_naps = 1;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-		} else if (!strcmp(argv[i], "-threads")) {
+		} else if (!strcmp(arg, "-threads")) {
 			use_threads = 1;
-		} else if (!strcmp(argv[i], "-nothreads")) {
+		} else if (!strcmp(arg, "-nothreads")) {
 			use_threads = 0;
 #endif
-		} else if (!strcmp(argv[i], "-fs")) {
+		} else if (!strcmp(arg, "-fs")) {
 			fs_frac = atof(argv[++i]);
-		} else if (!strcmp(argv[i], "-gaps")) {
+		} else if (!strcmp(arg, "-gaps")) {
 			gaps_fill = atoi(argv[++i]);
-		} else if (!strcmp(argv[i], "-grow")) {
+		} else if (!strcmp(arg, "-grow")) {
 			grow_fill = atoi(argv[++i]);
-		} else if (!strcmp(argv[i], "-fuzz")) {
+		} else if (!strcmp(arg, "-fuzz")) {
 			tile_fuzz = atoi(argv[++i]);
-		} else if (!strcmp(argv[i], "-hints")) {
+		} else if (!strcmp(arg, "-hints")) {
 			use_hints = 1;
-		} else if (!strcmp(argv[i], "-nohints")) {
+		} else if (!strcmp(arg, "-nohints")) {
 			use_hints = 0;
-		} else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "-help")
-		    || !strcmp(argv[i], "-?")) {
+		} else if (!strcmp(arg, "-h") || !strcmp(arg, "-help")
+			|| !strcmp(arg, "-?")) {
 			print_help();
-		} else if (!strcmp(argv[i], "-q")) {
+		} else if (!strcmp(arg, "-q") || !strcmp(arg, "-quiet")) {
 			quiet = 1;
 #ifdef LIBVNCSERVER_HAVE_SETSID
-		} else if (!strcmp(argv[i], "-bg")) {
+		} else if (!strcmp(arg, "-bg") || !strcmp(arg, "-background")) {
 			bg = 1;
 #endif
 		} else {
-			if (!strcmp(argv[i], "-desktop")) {
+			if (!strcmp(arg, "-desktop")) {
 				dt = 1;
 			}
-			if (!strcmp(argv[i], "-passwd")) {
+			if (!strcmp(arg, "-passwd")) {
 				pw_loc = i;
 			}
 			/* otherwise copy it for use below. */
 			if (! quiet && i != pw_loc && i != pw_loc+1) {
 			    fprintf(stderr, "passing arg to libvncserver: %s\n",
-				argv[i]);
+				arg);
 			}
 			if (argc2 < 100) {
-				argv2[argc2++] = strdup(argv[i]);
+				argv2[argc2++] = strdup(arg);
 			}
 		}
 	}
@@ -4548,6 +5077,7 @@ int main(int argc, char** argv) {
 	}
 
 	if (! quiet) {
+		fprintf(stderr, "\n");
 		fprintf(stderr, "viewonly:   %d\n", view_only);
 		fprintf(stderr, "shared:     %d\n", shared);
 		fprintf(stderr, "allow:      %s\n", allow_list ? allow_list
@@ -4594,9 +5124,9 @@ int main(int argc, char** argv) {
 		    use_dpy ? use_dpy:"null");
 		exit(1);
 	} else if (use_dpy) {
-		if (! quiet) fprintf(stderr, "Using display %s\n", use_dpy);
+		if (! quiet) fprintf(stderr, "Using X display %s\n", use_dpy);
 	} else {
-		if (! quiet) fprintf(stderr, "Using default display.\n");
+		if (! quiet) fprintf(stderr, "Using default X display.\n");
 	}
 
 	/* check for XTEST */
@@ -4727,7 +5257,7 @@ int main(int argc, char** argv) {
 		fb = XGetImage(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes,
 		    ZPixmap);
 		if (! quiet) {
-			fprintf(stderr, "Read initial data from display into"
+			fprintf(stderr, "Read initial data from X display into"
 			    " framebuffer.\n");
 		}
 	}
@@ -4751,9 +5281,24 @@ int main(int argc, char** argv) {
 
 	initialize_tiles();
 
+	/* rectangular blackout regions */
+	if (blackout_string != NULL) {
+		initialize_blackout(blackout_string);
+	}
+	if (xinerama) {
+		initialize_xinerama();
+	}
+	if (blackouts) {
+		blackout_tiles();
+	}
+
 	initialize_shm();	/* also creates XImages when using_shm = 0 */
 
 	set_signals();
+
+	if (blackouts) {	/* blackout fb as needed. */
+		copy_screen();
+	}
 
 	if (use_modifier_tweak) {
 		initialize_modtweak();
@@ -4767,7 +5312,7 @@ int main(int argc, char** argv) {
 		fflush(stdout);	
 	}
 	if (! quiet) {
-		fprintf(stderr, "screen setup finished.\n");
+		rfbLog("screen setup finished.\n");
 	}
 
 #if defined(LIBVNCSERVER_HAVE_FORK) && defined(LIBVNCSERVER_HAVE_SETSID)
