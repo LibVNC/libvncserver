@@ -74,7 +74,7 @@ typedef KeySym X_KeySym;
 /* the KeySym typedef cannot be removed, so use an alias for rest of file: */
 #define KeySym RFBKeySym
 
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 Display *dpy = 0;
 int scr;

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <rfb.h>
-#include <keysym.h>
+#include <rfb/rfb.h>
+#include <rfb/keysym.h>
 #include "default8x16.h"
 
 int maxx=400, maxy=400, bpp=4;

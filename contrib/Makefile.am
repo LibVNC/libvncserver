@@ -1,3 +1,4 @@
+CFLAGS = -I ..
 LDADD = ../libvncserver.a
 
 noinst_PROGRAMS=zippy

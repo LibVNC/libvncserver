@@ -1,4 +1,4 @@
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 /* this is now the default */
 #define USE_ATTRIBUTE_BUFFER

@@ -38,8 +38,8 @@
 #undef Byte
 #undef TRUE
 #undef Bool
-#include "rfb.h"
-#include "keysym.h"
+#include <rfb/rfb.h>
+#include <rfb/keysym.h>
 
 #include <IOKit/pwr_mgt/IOPMLib.h>
 #include <IOKit/pwr_mgt/IOPM.h>

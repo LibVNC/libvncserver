@@ -39,8 +39,8 @@ while test $# -gt 0; do
       echo @VERSION@
       ;;
     --cflags)
-      if test @includedir@ != /usr/include ; then
-        includes=-I@includedir@
+      if [ "@includedir@" != /usr/include ]; then
+	  includes=-I@includedir@
       fi
       echo $includes
       ;;

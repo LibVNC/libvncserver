@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include "rfb.h"
+#include <rfb/rfb.h>
 #include "default8x16.h"
 
 char f[640*480];

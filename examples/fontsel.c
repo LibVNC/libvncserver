@@ -1,4 +1,4 @@
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 #define FONTDIR "/usr/lib/kbd/consolefonts/"
 #define DEFAULTFONT FONTDIR "default8x16"

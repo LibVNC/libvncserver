@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include "rfb.h"
-#include "keysym.h"
+#include <rfb/rfb.h>
+#include <rfb/keysym.h>
 
 void HandleKey(Bool down,KeySym key,rfbClientPtr cl)
 {

@@ -20,7 +20,7 @@
  */
 
 #include <stdio.h>
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 void usage(void)
 {

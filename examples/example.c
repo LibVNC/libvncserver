@@ -31,8 +31,8 @@
 #include <netdb.h>
 #endif
 
-#include "rfb.h"
-#include "keysym.h"
+#include <rfb/rfb.h>
+#include <rfb/keysym.h>
 
 const int bpp=4;
 int maxx=800, maxy=600;

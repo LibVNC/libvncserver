@@ -1,3 +1,5 @@
+CFLAGS=-I..
+
 if HAVE_LIBPTHREAD
 BACKGROUND_TEST=blooptest
 endif
