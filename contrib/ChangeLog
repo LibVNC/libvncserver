@@ -1,3 +1,9 @@
+2003-12-08  Karl Runge <runge@karlrunge.com>
+	* add Xbell support using XKEYBOARD extension (disable: -nobell)
+	* add "-nofb" to disable framebuffer, i.e. mouse + keyboard only (!)
+	* add "-notruecolor" to force indexed 8bpp color (when 8bpp) 
+	* make alias "-forever" for "-many"
+
 From Karl (x11vnc's father) on Apr 2, 2003:
 	
 New option -nocursor to not display the vncviewer local cursor if user

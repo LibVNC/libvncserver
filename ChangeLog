@@ -1,4 +1,8 @@
-2003-11-07  Karl Runge
+2003-12-08  Karl Runge <runge@karlrunge.com>
+	* add check for XKEYBOARD extension in configure.ac
+	* support XBell events (disable: "-nobell"), "-nofb" in x11vnc
+
+2003-11-07  Karl Runge <runge@karlrunge.com>
 	* support "-inetd", "-noshm", "-flipbyteorder" in x11vnc
 
 2003-10-26  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>

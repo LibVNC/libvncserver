@@ -58,8 +58,7 @@
  * possible...).  So, e.g., opaque moves and similar window activity
  * can be very painful; one has to modify one's behavior a bit.
  *
- * It currently cannot capture XBell beeps (impossible?)  And, of course,
- * general audio at the remote display is lost as well unless one separately
+ * General audio at the remote display is lost unless one separately
  * sets up some audio side-channel.
  *
  * It does not appear possible to query the X server for the current
@@ -108,6 +107,10 @@
 #include <fcntl.h>
 
 #include <rfb/rfb.h>
+
+#ifdef LIBVNCSERVER_HAVE_XKEYBOARD
+#include <X11/XKBlib.h>
+#endif
 
 /* X and rfb framebuffer */
 Display *dpy = 0;
@@ -169,12 +172,15 @@ int view_only = 0;		/* clients can only watch. */
 int inetd = 0;			/* spawned from inetd(1) */
 int connect_once = 1;		/* disconnect after first connection session. */
 int flash_cmap = 0;		/* follow installed colormaps */
+int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 
 int use_modifier_tweak = 0;	/* use the altgr_keyboard modifier tweak */
+int nofb = 0;			/* do not send any fb updates */
 
 int local_cursor = 1;		/* whether the viewer draws a local cursor */
 int show_mouse = 0;		/* display a cursor for the real mouse */
 int show_root_cursor = 0;	/* show X when on root background */
+int watch_bell = 1;
 
 int using_shm = 1;		/* whether mit-shm is used */
 int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
@@ -330,11 +336,11 @@ void client_gone(rfbClientPtr client) {
 }
 
 enum rfbNewClientAction new_client(rfbClientPtr client) {
-	static client_count = 0;
+	static accepted_client = 0;
 	last_event = last_input = time(0);
 	if (connect_once) {
 		if (screen->rfbDontDisconnect && screen->rfbNeverShared) {
-			if (! shared && client_count) {
+			if (! shared && accepted_client) {
 				fprintf(stderr, "denying additional client:"
 				     " %s\n", client->host);
 				return(RFB_CLIENT_REFUSE);
@@ -347,7 +353,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	} else {
 		client->clientData = (void *) 0;
 	}
-	client_count++;
+	accepted_client = 1;
 	return(RFB_CLIENT_ACCEPT);
 }
 
@@ -496,12 +502,12 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr
 static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 
-	if (0) {
-		X_LOCK;
-		rfbLog("keyboard(%s,%s(0x%x),client)\n",
-		    down?"down":"up",XKeysymToString(keysym),(int)keysym);
-		X_UNLOCK;
-	}
+#ifdef DebugXTestFakeKeyEvent
+	X_LOCK;
+	rfbLog("keyboard(%s,%s(0x%x),client)\n",
+	    down?"down":"up",XKeysymToString(keysym),(int)keysym);
+	X_UNLOCK;
+#endif
 
 	if (view_only) {
 		return;
@@ -509,6 +515,9 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	
 	if (use_modifier_tweak) {
 		modifier_tweak_keyboard(down, keysym, client);
+		X_LOCK;
+		XFlush(dpy);
+		X_UNLOCK;
 		return;
 	}
 
@@ -554,11 +563,65 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 		}
 	}
 
+	if (nofb) {
+		XFlush(dpy);
+	}
+
 	X_UNLOCK;
 
 	/* remember the button state for next time: */
 	button_mask = mask;
 }
+
+/*
+ * bell event handling
+ */
+#ifdef LIBVNCSERVER_HAVE_XKEYBOARD
+
+int xkb_base_event_type;
+
+void initialize_bell_watch() {
+	int ir, reason;
+	if (! XkbSelectEvents(dpy, XkbUseCoreKbd, XkbBellNotifyMask,
+	    XkbBellNotifyMask) ) {
+		fprintf(stderr, "warning: disabling bell.\n");
+		watch_bell = 0;
+		return;
+	}
+	if (! XkbOpenDisplay(DisplayString(dpy), &xkb_base_event_type, &ir,
+	    NULL, NULL, &reason) ) {
+		fprintf(stderr, "warning: disabling bell.\n");
+		watch_bell = 0;
+	}
+}
+
+void watch_bell_event() {
+	XEvent xev;
+	XkbAnyEvent *xkb_ev;
+	int got_bell = 0;
+
+	if (! watch_bell) {
+		return;
+	}
+
+	X_LOCK;
+	if (! XCheckTypedEvent(dpy, xkb_base_event_type , &xev)) {
+		X_UNLOCK;
+		return;
+	}
+	xkb_ev = (XkbAnyEvent *) &xev;
+	if (xkb_ev->xkb_type == XkbBellNotify) {
+		got_bell = 1;
+	}
+	X_UNLOCK;
+
+	if (got_bell) {
+		rfbSendBell(screen);
+	}
+}
+#else
+void watch_bell_event() {}
+#endif
 
 void mark_hint(hint_t);
 
@@ -1064,6 +1127,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->rfbServerFormat.depth = fb->depth;
 	screen->rfbServerFormat.trueColour = (uint8_t) TRUE;
 	have_masks = (fb->red_mask|fb->green_mask|fb->blue_mask != 0);
+	if (force_indexed_color) {
+		have_masks = 0;
+	}
 
 	if ( ! have_masks && screen->rfbServerFormat.bitsPerPixel == 8
 	    && CellsOfScreen(ScreenOfDisplay(dpy,scr)) ) {
@@ -2097,7 +2163,6 @@ int scan_display(int ystart, int rescan) {
 void scan_for_updates() {
 	int i, tile_count, tile_diffs;
 	double frac1 = 0.1;   /* tweak parameter to try a 2nd scan_display() */
-
 	for (i=0; i < ntiles; i++) {
 		tile_has_diff[i] = 0;
 		tile_tried[i] = 0;
@@ -2246,10 +2311,17 @@ void watch_loop(void) {
 			usleep(200 * 1000);
 			continue;
 		}
+		if (nofb) {
+			continue;
+		}
 
 		rfbUndrawCursor(screen);
 
 		scan_for_updates();
+
+		if (watch_bell) {
+			watch_bell_event();
+		}
 
 		usleep(waitms * 1000);
 
@@ -2277,63 +2349,70 @@ void print_help() {
 "XXXX is typically 5900 (the default VNC port).  One would next run something\n"
 "like this on the local machine: \"vncviewer host:N\" where N is XXXX - 5900.\n" 
 "\n"
+"By default x11vnc will not allow the screen to be shared and it will\n"
+"exit as soon as a client disconnects.  See -shared and -forever below\n"
+"to override these protections.\n"
+"\n"
 "Options:\n"
 "\n"
 "-display disp          X11 server display to connect to, the X server process\n"
 "                       must be running on same machine and support MIT-SHM.\n"
-"-id windowid           show the window corresponding to <windowid> not the\n"
+"-id windowid           Show the window corresponding to <windowid> not the\n"
 "                       entire display. Warning: bugs! new toplevels missed!...\n"
-"-flashcmap             in 8bpp indexed color, let the installed colormap flash\n"
+"-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
+"-notruecolor           Force 8bpp indexed color even if it looks like TrueColor.\n"
 "\n"
-"-viewonly              clients can only watch (default %s).\n"
+"-viewonly              Clients can only watch (default %s).\n"
 "-shared                VNC display is shared (default %s).\n"
-"-many                  keep listening for more connections rather than exiting\n"
-"                       as soon as the first clients disconnect.\n"
-"-inetd                 launched by inetd(1): stdio instead of listening socket.\n"
-"-noshm                 do not use the MIT-SHM extension for the polling.\n"
+"-forever               Keep listening for more connections rather than exiting\n"
+"                       as soon as the first client(s) disconnect. Same as -many\n"
+"-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
+"-noshm                 Do not use the MIT-SHM extension for the polling.\n"
 "                       remote displays can be polled this way: be careful\n"
 "                       this can use large amounts of network bandwidth.\n"
-"-flipbyteorder         sometimes needed if remotely polled host has different\n"
-"                       endianness.  ignored unless -noshm is set.\n"
+"-flipbyteorder         Sometimes needed if remotely polled host has different\n"
+"                       endianness.  Ignored unless -noshm is set.\n"
 "\n"
-"-q                     be quiet by printing less informational output.\n" 
-"-bg                    go into the background after screen setup.\n" 
-"                       something like this could be useful in a script:\n"
+"-q                     Be quiet by printing less informational output.\n" 
+"-bg                    Go into the background after screen setup.\n" 
+"                       Something like this could be useful in a script:\n"
 "                         port=`ssh $host \"x11vnc -display :0 -bg\" | grep PORT`\n"
 "                         port=`echo \"$port\" | sed -e 's/PORT=//'`\n"
 "                         port=`expr $port - 5900`\n"
 "                         vncviewer $host:$port\n"
 "\n"
-"-modtweak              handle AltGr/Shift modifiers for differing languages\n"
+"-modtweak              Handle AltGr/Shift modifiers for differing languages\n"
 "                       between client and host (default %s).\n"
-"-nomodtweak            send the keysym directly to the X server.\n"
+"-nomodtweak            Send the keysym directly to the X server.\n"
+"-nobell                Do not watch for XBell events.\n"
+"-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
 "\n"
-"-nocursor              do not have the viewer show a local cursor.\n"
-"-mouse                 draw a 2nd cursor at the current X pointer position.\n"
-"-mouseX                as -mouse, but also draw an X on root background.\n"
-"-X                     shorthand for -mouseX -nocursor.\n"
+"-nocursor              Do not have the viewer show a local cursor.\n"
+"-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
+"-mouseX                As -mouse, but also draw an X on root background.\n"
+"-X                     Shorthand for -mouseX -nocursor.\n"
 "\n"
-"-defer time            time in ms to wait for updates before sending to\n"
+"-defer time            Time in ms to wait for updates before sending to\n"
 "                       client [rfbDeferUpdateTime]  (default %d).\n"
-"-wait time             time in ms to pause between screen polls.  used\n"
+"-wait time             Time in ms to pause between screen polls.  Used\n"
 "                       to cut down on load (default %d).\n"
-"-nap                   monitor activity and if low take longer naps between\n" 
+"-nap                   Monitor activity and if low take longer naps between\n" 
 "                       polls to really cut down load when idle (default %s).\n"
-"-threads               whether or not to use the threaded libvncserver\n"
+"-threads               Whether or not to use the threaded libvncserver\n"
 "-nothreads             algorithm [rfbRunEventLoop] (default %s).\n"
 "\n"
-"-fs f                  if the fraction of changed tiles in a poll is greater\n"
+"-fs f                  If the fraction of changed tiles in a poll is greater\n"
 "                       than f, the whole screen is updated (default %.2f).\n"
-"-gaps n                heuristic to fill in gaps in rows or cols of n or less\n"
-"                       tiles.  used to improve text paging (default %d).\n"
-"-grow n                heuristic to grow islands of changed tiles n or wider\n"
+"-gaps n                Heuristic to fill in gaps in rows or cols of n or less\n"
+"                       tiles.  Used to improve text paging (default %d).\n"
+"-grow n                Heuristic to grow islands of changed tiles n or wider\n"
 "                       by checking the tile near the boundary (default %d).\n"
-"-fuzz n                tolerance in pixels to mark a tiles edges as changed\n"
+"-fuzz n                Tolerance in pixels to mark a tiles edges as changed\n"
 "                       (default %d).\n"
-"-hints                 use krfb/x0rfbserver hints (glue changed adjacent\n"
+"-hints                 Use krfb/x0rfbserver hints (glue changed adjacent\n"
 "                       horizontal tiles into one big rectangle)  (default %s).\n"
-"-nohints               do not use hints; send each tile separately.\n"
+"-nohints               Do not use hints; send each tile separately.\n"
 "%s\n"
 "\n"
 "These options are passed to libvncserver:\n"
@@ -2398,7 +2477,7 @@ char *choose_title(char *display) {
 int main(int argc, char** argv) {
 
 	XImage *fb;
-	int i, ev, er, maj, min;
+	int i, op, ev, er, maj, min;
 	char *use_dpy = NULL;
 	int dt = 0;
 	int bg = 0;
@@ -2422,11 +2501,14 @@ int main(int argc, char** argv) {
 			}
 		} else if (!strcmp(argv[i], "-flashcmap")) {
 			flash_cmap = 1;
+		} else if (!strcmp(argv[i], "-notruecolor")) {
+			force_indexed_color = 1;
 		} else if (!strcmp(argv[i], "-viewonly")) {
 			view_only = 1;
 		} else if (!strcmp(argv[i], "-shared")) {
 			shared = 1;
-		} else if (!strcmp(argv[i], "-many")) {
+		} else if (!strcmp(argv[i], "-many")
+		    || !strcmp(argv[i], "-forever")) {
 			connect_once = 0;
 		} else if (!strcmp(argv[i], "-inetd")) {
 			inetd = 1;
@@ -2438,6 +2520,10 @@ int main(int argc, char** argv) {
 			use_modifier_tweak = 1;
 		} else if (!strcmp(argv[i], "-nomodtweak")) {
 			use_modifier_tweak = 0;
+		} else if (!strcmp(argv[i], "-nobell")) {
+			watch_bell = 0;
+		} else if (!strcmp(argv[i], "-nofb")) {
+			nofb = 1;
 		} else if (!strcmp(argv[i], "-nocursor")) {
 			local_cursor = 0;
 		} else if (!strcmp(argv[i], "-mouse")) {
@@ -2474,8 +2560,8 @@ int main(int argc, char** argv) {
 			use_hints = 1;
 		} else if (!strcmp(argv[i], "-nohints")) {
 			use_hints = 0;
-		} else if (!strcmp(argv[i], "-h")
-		    || !strcmp(argv[i], "-help")) {
+		} else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "-help")
+		    || !strcmp(argv[i], "-?")) {
 			print_help();
 		} else if (!strcmp(argv[i], "-q")) {
 			quiet = 1;
@@ -2518,8 +2604,12 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "shared:     %d\n", shared);
 		fprintf(stderr, "inetd:      %d\n", inetd);
 		fprintf(stderr, "conn_once:  %d\n", connect_once);
+		fprintf(stderr, "flashcmap:  %d\n", flash_cmap);
+		fprintf(stderr, "force_idx:  %d\n", force_indexed_color);
 		fprintf(stderr, "using_shm:  %d\n", using_shm);
-		fprintf(stderr, "flipbyteo:  %d\n", flip_byte_order);
+		fprintf(stderr, "flipbytes:  %d\n", flip_byte_order);
+		fprintf(stderr, "nofb:       %d\n", nofb);
+		fprintf(stderr, "watchbell:  %d\n", watch_bell);
 		fprintf(stderr, "mod_tweak:  %d\n", use_modifier_tweak);
 		fprintf(stderr, "loc_curs:   %d\n", local_cursor);
 		fprintf(stderr, "mouse:      %d\n", show_mouse);
@@ -2570,6 +2660,16 @@ int main(int argc, char** argv) {
 			exit(1);
 		}
 	}
+#ifdef LIBVNCSERVER_HAVE_XKEYBOARD
+	if (watch_bell) {
+		if (! XkbQueryExtension(dpy, &op, &ev, &er, &maj, &min)) {
+			fprintf(stderr, "warning: disabling bell.\n");
+			watch_bell = 0;
+		} else {
+			initialize_bell_watch();
+		}
+	}
+#endif
 
 	/*
 	 * Window managers will often grab the display during resize, etc.
