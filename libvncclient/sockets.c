@@ -58,10 +58,19 @@ static int buffered = 0;
 rfbBool
 ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 {
+//#define DEBUG_READ_EXACT
+#ifdef DEBUG_READ_EXACT
+	char* oout=out;
+	int nn=n;
+	rfbClientLog("ReadFromRFBServer %d bytes\n",n);
+#endif
   if (n <= buffered) {
     memcpy(out, bufoutptr, n);
     bufoutptr += n;
     buffered -= n;
+#ifdef DEBUG_READ_EXACT
+    goto hexdump;
+#endif
     return TRUE;
   }
 
@@ -101,7 +110,6 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
     memcpy(out, bufoutptr, n);
     bufoutptr += n;
     buffered -= n;
-    return TRUE;
 
   } else {
 
@@ -129,6 +137,14 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       n -= i;
     }
 
+#ifdef DEBUG_READ_EXACT
+hexdump:
+    { int ii;
+      for(ii=0;ii<nn;ii++)
+	      fprintf(stderr,"%02x ",(unsigned char)oout[ii]);
+      fprintf(stderr,"\n");
+    }
+#endif
     return TRUE;
   }
 }
