@@ -54,6 +54,8 @@
 
 static void httpProcessInput();
 static Bool compareAndSkip(char **ptr, const char *str);
+static Bool parseParams(const char *request, char *result, int max_bytes);
+static Bool validateString(char *str);
 
 /*
 int httpPort = 0;
@@ -153,7 +155,7 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
 #ifdef USE_LIBWRAP
 	if(!hosts_ctl("vnc",STRING_UNKNOWN,inet_ntoa(addr.sin_addr),
 		      STRING_UNKNOWN)) {
-	  rfbLog("Rejected connection from client %s\n",
+	  rfbLog("Rejected HTTP connection from client %s\n",
 		 inet_ntoa(addr.sin_addr));
 #else
 	if ((rfbScreen->httpFP = fdopen(rfbScreen->httpSock, "r+")) == NULL) {
@@ -197,7 +199,9 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 {
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
-    char fullFname[256];
+    char fullFname[512];
+    char params[1024];
+    char *ptr;
     char *fname;
     unsigned int maxFnameLen;
     FILE* fd;
@@ -209,14 +213,14 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
    
     cl.sock=rfbScreen->httpSock;
 
-    if (strlen(rfbScreen->httpDir) > 200) {
+    if (strlen(rfbScreen->httpDir) > 255) {
 	rfbLog("-httpd directory too long\n");
 	httpCloseSock(rfbScreen);
 	return;
     }
     strcpy(fullFname, rfbScreen->httpDir);
     fname = &fullFname[strlen(fullFname)];
-    maxFnameLen = 255 - strlen(fullFname);
+    maxFnameLen = 511 - strlen(fullFname);
 
     buf_filled=0;
 
@@ -250,7 +254,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
     /* Process the request. */
     if (strncmp(buf, "GET ", 4)) {
-	rfbLog("no GET line\n");
+	rfbLog("httpd: no GET line\n");
 	httpCloseSock(rfbScreen);
 	return;
     } else {
@@ -259,26 +263,26 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     }
 
     if (strlen(buf) > maxFnameLen) {
-	rfbLog("GET line too long\n");
+	rfbLog("httpd: GET line too long\n");
 	httpCloseSock(rfbScreen);
 	return;
     }
 
     if (sscanf(buf, "GET %s HTTP/1.0", fname) != 1) {
-	rfbLog("couldn't parse GET line\n");
+	rfbLog("httpd: couldn't parse GET line\n");
 	httpCloseSock(rfbScreen);
 	return;
     }
 
     if (fname[0] != '/') {
-	rfbLog("filename didn't begin with '/'\n");
+	rfbLog("httpd: filename didn't begin with '/'\n");
 	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
 	httpCloseSock(rfbScreen);
 	return;
     }
 
     if (strchr(fname+1, '/') != NULL) {
-	rfbLog("asking for file in other directory\n");
+	rfbLog("httpd: asking for file in other directory\n");
 	WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
 	httpCloseSock(rfbScreen);
 	return;
@@ -287,6 +291,19 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     getpeername(rfbScreen->httpSock, (struct sockaddr *)&addr, &addrlen);
     rfbLog("httpd: get '%s' for %s\n", fname+1,
 	   inet_ntoa(addr.sin_addr));
+
+    /* Extract parameters from the URL string if necessary */
+
+    params[0] = '\0';
+    ptr = strchr(fname, '?');
+    if (ptr != NULL) {
+       *ptr = '\0';
+       if (!parseParams(&ptr[1], params, 1024)) {
+           params[0] = '\0';
+           rfbLog("httpd: bad parameters in the URL\n");
+       }
+    }
+
 
     /* If we were asked for '/', actually read the file index.vnc */
 
@@ -382,6 +399,11 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 		    } else
 #endif
 			WriteExact(&cl, "?", 1);
+               } else if (compareAndSkip(&ptr, "$PARAMS")) {
+
+                   if (params[0] != '\0')
+                       WriteExact(httpSock, params, strlen(params));
+
 		} else {
 		    if (!compareAndSkip(&ptr, "$$"))
 			ptr++;
@@ -420,3 +442,96 @@ compareAndSkip(char **ptr, const char *str)
 
     return FALSE;
 }
+
+/*
+ * Parse the request tail after the '?' character, and format a sequence
+ * of <param> tags for inclusion into an HTML page with embedded applet.
+ */
+
+static Bool
+parseParams(const char *request, char *result, int max_bytes)
+{
+    char param_request[128];
+    char param_formatted[196];
+    const char *tail;
+    char *delim_ptr;
+    char *value_str;
+    int cur_bytes, len;
+
+    result[0] = '\0';
+    cur_bytes = 0;
+
+    tail = request;
+    for (;;) {
+	/* Copy individual "name=value" string into a buffer */
+	delim_ptr = strchr((char *)tail, '&');
+	if (delim_ptr == NULL) {
+	    if (strlen(tail) >= sizeof(param_request)) {
+		return FALSE;
+	    }
+	    strcpy(param_request, tail);
+	} else {
+	    len = delim_ptr - tail;
+	    if (len >= sizeof(param_request)) {
+		return FALSE;
+	    }
+	    memcpy(param_request, tail, len);
+	    param_request[len] = '\0';
+	}
+
+	/* Split the request into parameter name and value */
+	value_str = strchr(&param_request[1], '=');
+	if (value_str == NULL) {
+	    return FALSE;
+	}
+	*value_str++ = '\0';
+	if (strlen(value_str) == 0) {
+	    return FALSE;
+	}
+
+	/* Validate both parameter name and value */
+	if (!validateString(param_request) || !validateString(value_str)) {
+	    return FALSE;
+	}
+
+	/* Prepare HTML-formatted representation of the name=value pair */
+	len = sprintf(param_formatted,
+		      "<PARAM NAME=\"%s\" VALUE=\"%s\">\n",
+		      param_request, value_str);
+	if (cur_bytes + len + 1 > max_bytes) {
+	    return FALSE;
+	}
+	strcat(result, param_formatted);
+	cur_bytes += len;
+
+	/* Go to the next parameter */
+	if (delim_ptr == NULL) {
+	    break;
+	}
+	tail = delim_ptr + 1;
+    }
+    return TRUE;
+}
+
+/*
+ * Check if the string consists only of alphanumeric characters, '+'
+ * signs, underscores, and dots. Replace all '+' signs with spaces.
+ */
+
+static Bool
+validateString(char *str)
+{
+    char *ptr;
+
+    for (ptr = str; *ptr != '\0'; ptr++) {
+	if (!isalnum(*ptr) && *ptr != '_' && *ptr != '.') {
+	    if (*ptr == '+') {
+		*ptr = ' ';
+	    } else {
+		return FALSE;
+	    }
+	}
+    }
+    return TRUE;
+}
+
