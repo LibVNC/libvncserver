@@ -24,8 +24,6 @@
 
 #include "rfb.h"
 
-static unsigned char rfbReverseByte[0x100];
-
 /*
  * Send cursor shape either in X-style format or in client pixel format.
  */
@@ -208,7 +206,7 @@ rfbSendCursorPos(rfbClientPtr cl)
 }
 
 /* conversion routine for predefined cursors in LSB order */
-static unsigned char rfbReverseByte[0x100] = {
+unsigned char rfbReverseByte[0x100] = {
   /* copied from Xvnc/lib/font/util/utilbitmap.c */
 	0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0,
 	0x10, 0x90, 0x50, 0xd0, 0x30, 0xb0, 0x70, 0xf0,

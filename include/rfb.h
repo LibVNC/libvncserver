@@ -36,6 +36,7 @@ extern "C"
 #include <stdlib.h>
 #include <string.h>
 #include "rfbconfig.h"
+#undef VERSION
 #include "rfbint.h"
 #include "keysym.h"
 
@@ -690,6 +691,7 @@ typedef struct rfbCursor {
     unsigned short backRed, backGreen, backBlue; /* device-independent colour */
     unsigned char *richSource; /* source bytes for a rich cursor */
 } rfbCursor, *rfbCursorPtr;
+extern unsigned char rfbReverseByte[0x100];
 
 extern Bool rfbSendCursorShape(rfbClientPtr cl/*, rfbScreenInfoPtr pScreen*/);
 extern Bool rfbSendCursorPos(rfbClientPtr cl);
