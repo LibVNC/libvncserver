@@ -118,7 +118,7 @@ int max(int,int);
 #define MUTEX(mutex)
 #define INIT_MUTEX(mutex)
 #define TINI_MUTEX(mutex)
-#define SIGNAL(cond) this_is_unsupported
+#define SIGNAL(cond)
 #define WAIT(cond,mutex) this_is_unsupported
 #define COND(cond)
 #define INIT_COND(cond)
@@ -256,6 +256,8 @@ typedef struct
     struct rfbCursor* cursor;
     MUTEX(cursorMutex);
    
+    IF_PTHREADS(Bool backgroundLoop);
+
     /* the following members have to be supplied by the serving process */
     char* frameBuffer;
     KbdAddEventProcPtr kbdAddEvent;
@@ -516,7 +518,12 @@ static const int rfbEndianTest = (_BYTE_ORDER == _LITTLE_ENDIAN);
 
 extern void rfbLog(char *format, ...);
 extern void rfbLogPerror(char *str);
-extern int runVNCServer(int argc, char *argv[]);
+
+void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
+void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
+
+void rfbDoCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);
+void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy);
 
 
 /* sockets.c */

@@ -225,7 +225,7 @@ rfbNewClient(rfbScreen,sock)
 
     LOCK(rfbClientListMutex);
 
-    cl->refCount = 0;
+    IF_PTHREADS(cl->refCount = 0);
     cl->next = rfbScreen->rfbClientHead;
     cl->prev = NULL;
     if (rfbScreen->rfbClientHead)
@@ -834,6 +834,7 @@ rfbProcessClientNormalMessage(cl)
 /*
  * rfbSendFramebufferUpdate - send the currently pending framebuffer update to
  * the RFB client.
+ * givenUpdateRegion is not changed.
  */
 
 Bool
@@ -1112,7 +1113,7 @@ rfbSendCopyRegion(cl, reg, dx, dy)
 
       cr.srcX = Swap16IfLE(x - dx);
       cr.srcY = Swap16IfLE(y - dy);
-
+fprintf(stderr,"sent copyrect (%d,%d) (%d,%d) (%d,%d)\n",x,y,w,h,x-dx,y-dy);
       memcpy(&cl->updateBuf[cl->ublen], (char *)&cr, sz_rfbCopyRect);
       cl->ublen += sz_rfbCopyRect;
 

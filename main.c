@@ -23,9 +23,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#ifdef HAVE_PTHREADS
-#include <pthread.h>
-#endif
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
@@ -33,9 +30,7 @@
 #include "rfb.h"
 #include "sraRegion.h"
 
-#ifdef HAVE_PTHREADS
 MUTEX(logMutex);
-#endif
 
 /*
  * rfbLog prints a time-stamped message to the log file (stderr).
@@ -67,6 +62,77 @@ void rfbLogPerror(char *str)
     rfbLog("%s: %s\n", str, strerror(errno));
 }
 
+void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy)
+{  
+   rfbClientIteratorPtr iterator;
+   rfbClientPtr cl;
+
+  iterator=rfbGetClientIterator(rfbScreen);
+   while((cl=rfbClientIteratorNext(iterator))) {
+     LOCK(cl->updateMutex);
+     if(cl->useCopyRect) {
+       while(!sraRgnEmpty(cl->copyRegion) && (cl->copyDX!=dx || cl->copyDY!=dy)) {
+#ifdef HAVE_PTHREADS
+	 if(cl->screen->backgroundLoop) {
+	   SIGNAL(cl->updateCond);
+	   UNLOCK(cl->updateMutex);
+	   LOCK(cl->updateMutex);
+	 } else
+#endif
+	   rfbSendFramebufferUpdate(cl,cl->copyRegion);
+       }
+       sraRgnOr(cl->copyRegion,copyRegion);
+       cl->copyDX = dx;
+       cl->copyDY = dy;
+     } else {
+       sraRgnOr(cl->modifiedRegion,copyRegion);
+     }
+     SIGNAL(cl->updateCond);
+     UNLOCK(cl->updateMutex);
+   }
+
+   rfbReleaseClientIterator(iterator);
+}
+
+void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy)
+{
+   sraRectangleIterator* i;
+   sraRect rect;
+   int j,widthInBytes,bpp=rfbScreen->rfbServerFormat.bitsPerPixel/8,
+    rowstride=rfbScreen->paddedWidthInBytes;
+   char *in,*out;
+
+   /* copy it, really */
+   i = sraRgnGetReverseIterator(copyRegion,dx<0,dy<0);
+   while(sraRgnIteratorNext(i,&rect)) {
+     widthInBytes = (rect.x2-rect.x1)*bpp;
+     out = rfbScreen->frameBuffer+rect.x1*bpp+rect.y1*rowstride;
+     in = rfbScreen->frameBuffer+(rect.x1-dx)*bpp+(rect.y1-dy)*rowstride;
+     if(dy<0)
+       for(j=rect.y1;j<rect.y2;j++,out+=rowstride,in+=rowstride)
+	 memmove(out,in,widthInBytes);
+     else {
+       out += rowstride*(rect.y2-rect.y1-1);
+       in += rowstride*(rect.y2-rect.y1-1);
+       for(j=rect.y2-1;j>=rect.y1;j--,out-=rowstride,in-=rowstride)
+	 memmove(out,in,widthInBytes);
+     }
+   }
+  
+   rfbScheduleCopyRegion(rfbScreen,copyRegion,dx,dy);
+}
+
+void rfbDoCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy)
+{
+  sraRegionPtr region = sraRgnCreateRect(x1,y1,x2,y2);
+  rfbDoCopyRegion(rfbScreen,region,dx,dy);
+}
+
+void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy)
+{
+  sraRegionPtr region = sraRgnCreateRect(x1,y1,x2,y2);
+  rfbScheduleCopyRegion(rfbScreen,region,dx,dy);
+}
 
 void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
 {
@@ -395,6 +461,8 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->cursor = &myCursor;
    INIT_MUTEX(rfbScreen->cursorMutex);
 
+   IF_PTHREADS(rfbScreen->backgroundLoop = FALSE);
+
    /* proc's and hook's */
 
    rfbScreen->kbdAddEvent = defaultKbdAddEvent;
@@ -455,6 +523,8 @@ void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground
   if(runInBackground) {
 #ifdef HAVE_PTHREADS
        pthread_t listener_thread;
+
+       rfbScreen->backgroundLoop = TRUE;
 
        pthread_create(&listener_thread, NULL, listenerRun, rfbScreen);
     return;

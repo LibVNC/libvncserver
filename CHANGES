@@ -1,4 +1,6 @@
 0.2
+   flag backgroundLoop in rfbScreenInfo
+   rfbCopyRect & rfbCopyRegion (really copies rectangle in frameBuffer)
    added flag to optionally not send XCursor updates.
    fixed java viewer on server side:
 	SendCursorUpdate would send data even before the client pixel format

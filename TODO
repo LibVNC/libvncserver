@@ -1,10 +1,13 @@
 immediate:
 ----------
 
+copyRect and pthreads possible problem.
+authentification schemes (secure vnc)
 udp
 documentation
-	perhaps the option (or just hint) not to mark very tiny regions as
-	modified, because that is inefficient for the encodings.
+	hint that to mark very tiny regions as
+	modified is possibly inefficient for the encodings.
+	(a trail of points could be better a small rectangle).
 
 later:
 ------
