@@ -208,9 +208,20 @@ int main(int argc,char** argv) {
 				case SDL_VIDEOEXPOSE:
 					SendFramebufferUpdateRequest(cl,0,0,cl->width,cl->height,FALSE);
 					break;
+				case SDL_MOUSEBUTTONUP: case SDL_MOUSEBUTTONDOWN:
 				case SDL_MOUSEMOTION: {
 						int x,y;
-						SDL_GetMouseState(&x,&y);
+						int state=SDL_GetMouseState(&x,&y);
+						struct { int sdl; int rfb; } buttonMapping[]={
+							{SDL_BUTTON_LEFT, rfbButton1Mask},
+							{SDL_BUTTON_RIGHT, rfbButton2Mask},
+							{SDL_BUTTON_MIDDLE, rfbButton3Mask},
+							{0,0}
+						};
+						int i;
+						for(buttonMask=0,i=0;buttonMapping[i].sdl;i++)
+							if(state&SDL_BUTTON(buttonMapping[i].sdl))
+								buttonMask|=buttonMapping[i].rfb;
 						SendPointerEvent(cl,x,y,buttonMask);
 					}
 					break;
