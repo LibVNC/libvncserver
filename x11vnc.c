@@ -131,6 +131,8 @@ void checkForImageUpdates(rfbScreenInfoPtr s,char *b)
 
 int main(int argc,char** argv)
 {
+  Screen *sc;
+  Colormap cm;
   XImage *framebufferImage;
   char *backupImage;
   int xscreen,i;
@@ -168,12 +170,27 @@ int main(int argc,char** argv)
   screen->rfbServerFormat.trueColour = TRUE;
 
   if ( screen->rfbServerFormat.bitsPerPixel == 8 ) {
-    screen->rfbServerFormat.redShift = 0;
-    screen->rfbServerFormat.greenShift = 2;
-    screen->rfbServerFormat.blueShift = 5;
-    screen->rfbServerFormat.redMax   = 3;
-    screen->rfbServerFormat.greenMax = 7;
-    screen->rfbServerFormat.blueMax  = 3;
+     if(CellsOfScreen(ScreenOfDisplay(dpy,xscreen))!=0) {
+	XColor color[256];
+	int i;
+	screen->rfbServerFormat.trueColour = FALSE;
+	screen->colourMap = malloc(sizeof(rfbColourMap));
+	screen->colourMap.is16 = TRUE;
+	screen->colourMap.count = XQueryColors(dpy,DefaultColormap(dpy,xscreen),color,256);
+	screen->colourMap.data.shorts = malloc(6*screen->colourMap.count);
+	for(i=0;i<screen->colourMap.count;i++) {
+	   screen->colourMap.data.shorts[i*6+0] = color[i].red;
+	   screen->colourMap.data.shorts[i*6+2] = color[i].green;
+	   screen->colourMap.data.shorts[i*6+4] = color[i].blue;
+	}
+     } else {
+	screen->rfbServerFormat.redShift = 0;
+	screen->rfbServerFormat.greenShift = 2;
+	screen->rfbServerFormat.blueShift = 5;
+	screen->rfbServerFormat.redMax   = 3;
+	screen->rfbServerFormat.greenMax = 7;
+	screen->rfbServerFormat.blueMax  = 3;
+     }
   } else {
     screen->rfbServerFormat.redShift = 0;
     if ( framebufferImage->red_mask )
