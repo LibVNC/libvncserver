@@ -93,11 +93,15 @@ AM_CONDITIONAL(HAVE_LIBJPEG, test ! -z "$HAVE_JPEGLIB_H")
 if test -z "$with_sdl"; then
 	if sdl-config --version >/dev/null 2>&1; then
 		with_sdl=yes
+		SDL_CFLAGS=`sdl-config --cflags`
+		SDL_LIBS=`sdl-config --libs`
 	else
 		with_sdl=no
 	fi
 fi
 AM_CONDITIONAL(HAVE_LIBSDL, test "x$with_sdl" = "xyes")
+AC_SUBST(SDL_CFLAGS)
+AC_SUBST(SDL_LIBS)
 
 # Checks for header files.
 AC_HEADER_STDC

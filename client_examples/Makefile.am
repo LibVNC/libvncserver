@@ -13,9 +13,10 @@ endif
 if HAVE_LIBSDL
 SDLVIEWER=SDLvncviewer
 
-SDLvncviewer_CFLAGS=`sdl-config --cflags`
+SDLvncviewer_CFLAGS=$(SDL_CFLAGS)
 
-SDLvncviewer_LDFLAGS=`sdl-config --libs`
+# thanks to autoconf, this looks ugly
+SDLvncviewer_LDADD=$(LDADD) $(SDL_LIBS)
 endif
 
 noinst_PROGRAMS=ppmtest $(SDLVIEWER) $(FFMPEG_CLIENT)
