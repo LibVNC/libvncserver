@@ -1,3 +1,7 @@
+2004-01-30  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* Thanks to Paul Fox from Bright Star Engineering,
+	  a few more memory leaks were fixed.
+
 2004-01-29  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* Honour the check for libz and libjpeg again.
 

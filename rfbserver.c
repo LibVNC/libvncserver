@@ -1213,6 +1213,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
             int h = rect.y2 - y;
 	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
 	}
+	sraRgnReleaseIterator(i);
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     } else if (cl->preferredEncoding == rfbEncodingTight) {
 	nUpdateRegionRects = 0;
@@ -1296,24 +1297,28 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
         case rfbEncodingRaw:
             if (!rfbSendRectEncodingRaw(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
+		sraRgnReleaseIterator(i);
                 return FALSE;
             }
             break;
         case rfbEncodingRRE:
             if (!rfbSendRectEncodingRRE(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
+		sraRgnReleaseIterator(i);
                 return FALSE;
             }
             break;
         case rfbEncodingCoRRE:
             if (!rfbSendRectEncodingCoRRE(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
+		sraRgnReleaseIterator(i);
                 return FALSE;
             }
             break;
         case rfbEncodingHextile:
             if (!rfbSendRectEncodingHextile(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
+		sraRgnReleaseIterator(i);
                 return FALSE;
             }
             break;
@@ -1321,6 +1326,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	case rfbEncodingZlib:
 	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
+		sraRgnReleaseIterator(i);
 		return FALSE;
 	    }
 	    break;
@@ -1328,6 +1334,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	case rfbEncodingTight:
 	    if (!rfbSendRectEncodingTight(cl, x, y, w, h)) {
 	        sraRgnDestroy(updateRegion);
+		sraRgnReleaseIterator(i);
 		return FALSE;
 	    }
 	    break;
@@ -1337,6 +1344,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
        case rfbEncodingZRLE:
            if (!rfbSendRectEncodingZRLE(cl, x, y, w, h)) {
 	       sraRgnDestroy(updateRegion);
+		sraRgnReleaseIterator(i);
                return FALSE;
            }
            break;
