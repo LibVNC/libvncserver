@@ -47,9 +47,17 @@
  */
 
 
+#if defined(WIN32)
+#define LIBVNCSERVER_WORDS_BIGENDIAN
+#define rfbBool int
+#include <sys/timeb.h>
+#include <winsock.h>
+#undef SOCKET
+#define SOCKET int
+#else
 #include <rfb/rfbconfig.h>
-#undef VERSION
 #include <rfb/rfbint.h>
+#endif
 #include <rfb/keysym.h>
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -57,14 +65,7 @@
 #endif
 
 
-#if defined(WIN32)
-#define WORDS_BIGENDIAN
-#define rfbBool int
-#include <sys/timeb.h>
-#include <winsock.h>
-#undef SOCKET
-#define SOCKET int
-#else
+#if !defined(WIN32)
 #define max(a,b) (((a)>(b))?(a):(b))
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
