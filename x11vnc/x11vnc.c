@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-06-26";
+char lastmod[] = "lastmod:    2004-06-28";
 
 /* X display info */
 Display *dpy = 0;
@@ -194,6 +194,8 @@ int rfb_bytes_per_line;
 /* scaling info */
 int scaling = 0;
 int scaling_noblend = 0;
+int scaling_nomult4 = 0;
+int scaling_interpolate = 0;
 double scale_fac = 1.0;
 int scaled_x = 0, scaled_y = 0;
 
@@ -3740,6 +3742,21 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		double eps = 0.000001;
 		width  = (int) (width  * scale_fac + eps); 
 		height = (int) (height * scale_fac + eps); 
+		if (!scaling_nomult4 && width % 4 != 0 && width > 2) {
+			/* reset width to be multiple of 4 */
+			int width0 = width;
+			if ((width+1) % 4 == 0) {
+				width = width+1;
+			} else if ((width-1) % 4 == 0) {
+				width = width-1;
+			} else if ((width+2) % 4 == 0) {
+				width = width+2;
+			}
+			rfbLog("reset scaled width %d -> %d to be a multiple of"
+			    " 4 (to\n", width0, width);
+			rfbLog("make vncviewers happy). use -scale m/n:n4 to "
+			    "disable.\n");
+		}
 		scaled_x = width;
 		scaled_y = height;
 		rfb_bytes_per_line = (main_bytes_per_line / fb->width) * width;
@@ -4820,6 +4837,13 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	} else {
 		shrink = 0;
 	}
+	if (shrink && scaling_interpolate) {
+		/*
+		 * User asked for interpolation scheme, presumably for
+		 * small shrink. 
+		 */
+		shrink = 0;
+	}
 
 	if (! screen->rfbServerFormat.trueColour) {
 		/*
@@ -4886,8 +4910,10 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 				break;
 			}
 		}
-		if (n != 0) {
-			if (! scaling_noblend && Nx % n == 0 && Ny % n == 0) {
+		if (scaling_noblend || ! shrink) {
+			;
+		} else if (n != 0) {
+			if (Nx % n == 0 && Ny % n == 0) {
 				rfbLog("scale_and_mark_rect: using constant "
 				    "pixel weight speedup for 1/%d\n", n);
 				constant_weights = 1;
@@ -5066,9 +5092,9 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 					 * use the masks:
 					 */
 					us = *( (unsigned short *) src );
-					pixave[0] += w * (us & main_red_mask);
-					pixave[1] += w * (us & main_green_mask);
-					pixave[2] += w * (us & main_blue_mask);
+					pixave[0] += w*(us & main_red_mask);
+					pixave[1] += w*(us & main_green_mask);
+					pixave[2] += w*(us & main_blue_mask);
 				}
 				src += Bpp;
 			    }
@@ -6615,7 +6641,12 @@ static void print_help(void) {
 "                       number, alternatively the notation \"m/n\" may be used\n"
 "                       to denote fractions, e.g. -scale 2/3.   If you just want\n"
 "                       a quick, rough scaling without blending, append \":nb\"\n"
-"                       to \"fraction\" (e.g. -scale 1/3:nb)\n"
+"                       to \"fraction\" (e.g. -scale 1/3:nb).\n"
+"\n"
+"                       For compatibility with vncviewers, the scaled width\n"
+"                       is adjusted to be a multiple of 4.  To disable this\n"
+"                       use \":n4\".  Separate multiple -scale \":\" options\n"
+"                       via commas.\n"
 "-visual n              Experimental option: probably does not do what you\n"
 "                       think.  It simply *forces* the visual used for the\n"
 "                       framebuffer; this may be a bad thing... It is useful for\n"
@@ -7109,6 +7140,12 @@ int main(int argc, char* argv[]) {
 				/* options */
 				if (strstr(p+1, "nb") != NULL) {
 					scaling_noblend = 1;
+				}
+				if (strstr(p+1, "n4") != NULL) {
+					scaling_nomult4 = 1;
+				}
+				if (strstr(p+1, "in") != NULL) {
+					scaling_interpolate = 1;
 				}
 				*p = '\0';
 			}

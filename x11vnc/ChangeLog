@@ -1,3 +1,8 @@
+2004-06-28  Karl Runge <runge@karlrunge.com>
+	* round scaled width to multiple of 4 to make vncviewer happy.
+	* allow override of above ":n4" and allow 4 point interpolation
+	  to be used even with shrinking ":in". 
+
 2004-06-27  Karl Runge <runge@karlrunge.com>
 	* speed up scaling a bit for slow machines (still all floating point)
 	* add no blending option (-scale fraction:nb)
