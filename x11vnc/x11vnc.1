@@ -1,0 +1,661 @@
+.\" This file was automatically generated from x11vnc -help output.
+.TH X11VNC "1" "August 2004" "x11vnc " "User Commands"
+.SH NAME
+x11vnc - allow VNC connections to real X11 displays
+         version: 0.6.2, lastmod: 2004-07-31
+.SH SYNOPSIS
+.B x11vnc
+[OPTION]...
+.SH DESCRIPTION
+.PP
+Typical usage is:
+.IP
+Run this command in a shell on the remote machine "far-host"
+with X session you wish to view:
+.IP
+x11vnc -display :0
+.IP
+Then run this in another window on the machine you are sitting at:
+.IP
+vncviewer far-host:0
+.PP
+Once x11vnc establishes connections with the X11 server and starts
+listening as a VNC server it will print out a string: PORT=XXXX where
+XXXX is typically 5900 (the default VNC port).  One would next run something
+like this on the local machine: "vncviewer host:N" where N is XXXX - 5900,
+i.e. usually "vncviewer host:0"
+.PP
+By default x11vnc will not allow the screen to be shared and it will
+exit as soon as a client disconnects.  See \fB-shared\fR and \fB-forever\fR below
+to override these protections.
+.PP
+For additional info see: http://www.karlrunge.com/x11vnc/
+and  http://www.karlrunge.com/x11vnc/#faq
+.PP
+Rudimentary config file support: if the file $HOME/.x11vncrc exists then each
+line in it is treated as a single command line option.  Disable with \fB-norc.\fR
+For each option name, the leading character "-" is not required.  E.g. a
+line that is either "nap" or "-nap" may be used and are equivalent.
+Likewise "wait 100" or "-wait 100" are acceptable and equivalent lines.
+The "#" character comments out to the end of the line in the usual way.
+Leading and trailing whitespace is trimmed off.  Lines may be continued with
+a "\\" as the last character of a line (it becomes a space character).
+.PP
+.SH OPTIONS
+
+.PP
+\fB-display\fR \fIdisp\fR
+.IP
+X11 server display to connect to, usually :0.  The X
+server process must be running on same machine and
+support MIT-SHM.  Equivalent to setting the DISPLAY
+environment variable to \fIdisp\fR.
+.PP
+\fB-auth\fR \fIfile\fR
+.IP
+Set the X authority file to be \fIfile\fR, equivalent to
+setting the XAUTHORITY environment varirable to \fIfile\fR
+before startup.  See 
+.IR Xsecurity (7)
+, 
+.IR xauth (1)
+man pages.
+.PP
+\fB-id\fR \fIwindowid\fR
+.IP
+Show the window corresponding to \fIwindowid\fR not the
+entire display. Warning: bugs! new toplevels missed!...
+.PP
+\fB-sid\fR \fIwindowid\fR
+.IP
+As \fB-id,\fR but instead of using the window directly it
+shifts a root view to it: shows saveUnders menus, etc.
+.PP
+\fB-flashcmap\fR
+.IP
+In 8bpp indexed color, let the installed colormap flash
+as the pointer moves from window to window (slow).
+.PP
+\fB-notruecolor\fR
+.IP
+Force 8bpp indexed color even if it looks like TrueColor.
+.PP
+\fB-visual\fR \fIn\fR
+.IP
+Experimental option: probably does not do what you
+think.  It simply *forces* the visual used for the
+framebuffer; this may be a bad thing... It is useful for
+testing and for some workarounds.  n may be a decimal
+number, or 0x hex.  Run 
+.IR xdpyinfo (1)
+for the values.
+One may also use "TrueColor", etc. see <X11/X.h>
+for a list.  If the string ends in ":m" for better
+or for worse the visual depth is forced to be m.
+.PP
+\fB-scale\fR \fIfraction\fR
+.IP
+Scale the framebuffer by factor \fIfraction\fR.  Values
+less than 1 shrink the fb.  Note: image may not be sharp
+and response may be slower.  If \fIfraction\fR contains
+a decimal point "." it is taken as a floating point
+number, alternatively the notation "m/n" may be used
+to denote fractions, e.g. \fB-scale\fR 2/3.
+.IP
+Scaling Options: can be added after \fIfraction\fR via
+":", to supply multiple ":" options use commas.
+If you just want a quick, rough scaling without
+blending, append ":nb" to \fIfraction\fR (e.g. \fB-scale\fR
+1/3:nb).  For compatibility with vncviewers the scaled
+width is adjusted to be a multiple of 4, to disable
+this use ":n4".  More esoteric options: ":in" use
+interpolation scheme even when shrinking, ":pad",
+pad scaled width and height to be multiples of scaling
+denominator (e.g. 3 for 2/3).
+.PP
+\fB-viewonly\fR
+.IP
+All VNC clients can only watch (default off).
+.PP
+\fB-shared\fR
+.IP
+VNC display is shared (default off).
+.PP
+\fB-once\fR
+.IP
+Exit after the first successfully connected viewer
+disconnects, opposite of \fB-forever.\fR This is the Default.
+.PP
+\fB-forever\fR
+.IP
+Keep listening for more connections rather than exiting
+as soon as the first client(s) disconnect. Same as \fB-many\fR
+.PP
+\fB-connect\fR \fIstring\fR
+.IP
+For use with "vncviewer -listen" reverse connections.
+If \fIstring\fR has the form "host" or "host:port"
+the connection is made once at startup.  Use commas
+for a list of host's and host:port's.  If \fIstring\fR
+contains "/" it is instead interpreted as a file to
+periodically check for new hosts.  The first line is
+read and then the file is truncated.
+.PP
+\fB-vncconnect\fR
+.IP
+Monitor the VNC_CONNECT X property set by the standard
+VNC program 
+.IR vncconnect (1)
+.  When the property is set
+to host or host:port establish a reverse connection.
+Using 
+.IR xprop (1)
+instead of vncconnect may work, see FAQ.
+.PP
+\fB-inetd\fR
+.IP
+Launched by 
+.IR inetd (1)
+: stdio instead of listening socket.
+Note: if you are not redirecting stderr to a log file
+(via shell 2> or \fB-o\fR option) you must also specify the
+\fB-q\fR option.
+.PP
+\fB-allow\fR \fIaddr1[,addr2..]\fR
+.IP
+Only allow client connections from IP addresses matching
+the comma separated list of numerical addresses.
+Can be a prefix, e.g. "192.168.100." to match a
+simple subnet, for more control build libvncserver
+with libwrap support.  If the list contains a "/"
+it instead is a interpreted as a file containing
+addresses or prefixes that is re-read each time a new
+client connects.  Lines can be commented out with the
+"#" character in the usual way.
+.PP
+\fB-localhost\fR
+.IP
+Same as \fB-allow\fR 127.0.0.1
+.PP
+\fB-viewpasswd\fR \fIstring\fR
+.IP
+Supply a 2nd password for view-only logins.  The \fB-passwd\fR
+(full-access) password must also be supplied.
+.PP
+\fB-passwdfile\fR \fIfilename\fR
+.IP
+Specify libvncserver \fB-passwd\fR via the first line of
+the file \fIfilename\fR instead of via command line.
+If a second non blank line exists in the file it is
+taken as a view-only password (i.e. \fB-viewpasswd)\fR Note:
+this is a simple plaintext passwd, see also \fB-rfbauth\fR
+and \fB-storepasswd\fR below.
+.PP
+\fB-storepasswd\fR \fIpass\fR \fIfile\fR
+.IP
+Store password \fIpass\fR as the VNC password in the
+file \fIfile\fR.  Once the password is stored the
+program exits.  Use the password via "-rfbauth file"
+.PP
+\fB-accept\fR \fIstring\fR
+.IP
+Run a command (possibly to prompt the user at the
+X11 display) to decide whether an incoming client
+should be allowed to connect or not.  \fIstring\fR is
+an external command run via 
+.IR system (3)
+or some special
+cases described below.  Be sure to quote \fIstring\fR
+if it contains spaces, etc.  If the external command
+returns 0 the client is accepted, otherwise the client
+is rejected.  See below for an extension to accept a
+client view-only.
+.IP
+Environment: The RFB_CLIENT_IP environment variable will
+be set to the incoming client IP number and the port
+in RFB_CLIENT_PORT (or -1 if unavailable).  Similarly,
+RFB_SERVER_IP and RFB_SERVER_PORT (the x11vnc side
+of the connection), are set to allow identification
+of the tcp virtual circuit.  The x11vnc process
+id will be in RFB_X11VNC_PID, a client id number in
+RFB_CLIENT_ID, and the number of other connected clients
+in RFB_CLIENT_COUNT.
+.IP
+If \fIstring\fR is "popup" then a builtin popup window
+is used.  The popup will time out after 120 seconds,
+use "popup:N" to modify the timeout to N seconds
+(use 0 for no timeout)
+.IP
+If \fIstring\fR is "xmessage" then an 
+.IR xmessage (1)
+invocation is used for the command.
+.IP
+Both "popup" and "xmessage" will present an option
+for accepting the client "View-Only" (the client
+can only watch).  This option will not be presented if
+\fB-viewonly\fR has been specified, in which case the entire
+display is view only.
+.IP
+If the user supplied command is prefixed with something
+like "yes:0,no:*,view:3 mycommand ..." then this
+associates the numerical command return code with
+the actions: accept, reject, and accept-view-only,
+respectively.  Use "*" instead of a number to indicate
+the default action (in case the command returns an
+unexpected value).  E.g. "no:*" is a good choice.
+.IP
+Note that x11vnc blocks while the external command or
+or popup is running (other clients may see no updates
+during this period).
+.IP
+More \fB-accept\fR tricks: use "popupmouse" to only allow
+mouse clicks in the builtin popup to be recognized.
+Similarly use "popupkey" to only recognize keystroke
+responses.  All 3 of the popup keywords can be followed
+by +N+M to supply a position for the popup window.
+The default is to center the popup window.
+.PP
+\fB-gone\fR \fIstring\fR
+.IP
+As \fB-accept,\fR except to run a user supplied command when
+a client goes away (disconnects).  Unlike \fB-accept,\fR
+the command return code is not interpreted by x11vnc.
+.PP
+\fB-noshm\fR
+.IP
+Do not use the MIT-SHM extension for the polling.
+Remote displays can be polled this way: be careful this
+can use large amounts of network bandwidth.  This is
+also of use if the local machine has a limited number
+of shm segments and \fB-onetile\fR is not sufficient.
+.PP
+\fB-flipbyteorder\fR
+.IP
+Sometimes needed if remotely polled host has different
+endianness.  Ignored unless \fB-noshm\fR is set.
+.PP
+\fB-onetile\fR
+.IP
+Do not use the new copy_tiles() framebuffer mechanism,
+just use 1 shm tile for polling.  Same as \fB-old_copytile.\fR
+Limits shm segments used to 3.
+.PP
+\fB-blackout\fR \fIstring\fR
+.IP
+Black out rectangles on the screen. \fIstring\fR is a
+comma separated list of WxH+X+Y type geometries for
+each rectangle.
+.PP
+\fB-xinerama\fR
+.IP
+If your screen is composed of multiple monitors
+glued together via XINERAMA, and that screen is
+non-rectangular this option will try to guess the areas
+to black out (if your system has libXinerama).
+.PP
+\fB-o\fR \fIlogfile\fR
+.IP
+Write stderr messages to file \fIlogfile\fR instead of
+to the terminal.  Same as \fB-logfile\fR "file".
+.PP
+\fB-rc\fR \fIfilename\fR
+.IP
+Use \fIfilename\fR instead of $HOME/.x11vncrc for rc file.
+.PP
+\fB-norc\fR
+.IP
+Do not process any .x11vncrc file for options.
+.PP
+\fB-h,\fR \fB-help\fR
+.IP
+Print this help text.
+.PP
+\fB-V,\fR \fB-version\fR
+.IP
+Print program version (last modification date).
+.PP
+\fB-q\fR
+.IP
+Be quiet by printing less informational output to
+stderr.  Same as \fB-quiet.\fR
+.PP
+\fB-bg\fR
+.IP
+Go into the background after screen setup.  Messages to
+stderr are lost unless \fB-o\fR logfile is used.  Something
+like this could be useful in a script:
+.IP
+port=`ssh $host "x11vnc -display :0 -bg" | grep PORT`
+.IP
+port=`echo "$port" | sed -e 's/PORT=//'`
+.IP
+port=`expr $port - 5900`
+.IP
+vncviewer $host:$port
+.PP
+\fB-modtweak,\fR \fB-nomodtweak\fR
+.IP
+Option \fB-modtweak\fR automatically tries to adjust the AltGr
+and Shift modifiers for differing language keyboards
+between client and host.  Otherwise, only a single key
+press/release of a Keycode is simulated (i.e. ignoring
+the state of the modifiers: this usually works for
+identical keyboards).  Also useful in resolving cases
+where a Keysym is bound to multiple keys (e.g. "<" + ">"
+and "," + "<" keys).  Default: \fB-modtweak\fR
+.PP
+\fB-xkb\fR
+.IP
+When in modtweak mode, use the XKEYBOARD extension
+(if it exists) to do the modifier tweaking.
+.PP
+\fB-skip_keycodes\fR \fIstring\fR
+.IP
+Skip keycodes not on your keyboard but your X server
+thinks exist.  Currently only applies to \fB-xkb\fR mode.
+\fIstring\fR is a comma separated list of decimal
+keycodes.  Use this option to help x11vnc in the reverse
+problem it tries to solve: Keysym -> Keycode(s) when
+ambiguities exist.  E.g. \fB-skip_keycodes\fR 94,114
+.PP
+\fB-add_keysyms\fR
+.IP
+If a Keysym is received from a VNC viewer and
+that Keysym does not exist in the X server, then
+add the Keysym to the X server's keyboard mapping.
+Added Keysyms will be removed when exiting.
+.PP
+\fB-clear_mods\fR
+.IP
+At startup and exit clear the modifier keys by sending
+KeyRelease for each one. The Lock modifiers are skipped.
+Used to clear the state if the display was accidentally
+left with any pressed down.
+.PP
+\fB-clear_keys\fR
+.IP
+As \fB-clear_mods,\fR except try to release any pressed key.
+Note that this option and \fB-clear_mods\fR can interfere
+with a person typing at the physical keyboard.
+.PP
+\fB-remap\fR \fIstring\fR
+.IP
+Read Keysym remappings from file named \fIstring\fR.
+Format is one pair of Keysyms per line (can be name
+or hex value) separated by a space.  If no file named
+\fIstring\fR exists, it is instead interpreted as this
+form: key1-key2,key3-key4,...  See <X11/keysymdef.h>
+header file for a list of Keysym names, or use
+.IR xev (1)
+. To map a key to a button click, use the
+fake Keysyms "Button1", ..., etc.
+E.g. \fB-remap\fR Super_R-Button2
+.PP
+\fB-norepeat,\fR \fB-repeat\fR
+.IP
+Option \fB-norepeat\fR disables X server key auto repeat
+when VNC clients are connected.  This works around a
+repeating keystrokes bug (triggered by long processing
+delays between key down and key up client events:
+either from large screen changes or high latency).
+Note: your VNC viewer side will likely do autorepeating,
+so this is no loss unless someone is simultaneously at
+the real X display.  Default: \fB-repeat\fR
+.PP
+\fB-nofb\fR
+.IP
+Ignore video framebuffer: only process keyboard and
+pointer.  Intended for use with Win2VNC and x2vnc
+dual-monitor setups.
+.PP
+\fB-nobell\fR
+.IP
+Do not watch for XBell events. (no beeps will be heard)
+Note: XBell monitoring requires the XKEYBOARD extension.
+.PP
+\fB-nosel\fR
+.IP
+Do not manage exchange of X selection/cutbuffer between
+VNC viewers and the X server.
+.PP
+\fB-noprimary\fR
+.IP
+Do not poll the PRIMARY selection for changes to send
+back to clients.  (PRIMARY is still set on received
+changes, however).
+.PP
+\fB-nocursor\fR
+.IP
+Do not have the VNC viewer show a local cursor.
+.PP
+\fB-mouse\fR
+.IP
+Draw a 2nd cursor at the current X pointer position.
+.PP
+\fB-mouseX\fR
+.IP
+As \fB-mouse,\fR but also draw an "X" when pointer is on
+root background.
+.PP
+\fB-X\fR
+.IP
+Shorthand for \fB-mouseX\fR \fB-nocursor.\fR
+.PP
+\fB-xwarppointer\fR
+.IP
+Move the pointer with XWarpPointer() instead of XTEST
+(try as a workaround if pointer behaves poorly, e.g.
+on touchscreens or other non-standard setups).
+.PP
+\fB-cursorpos,\fR \fB-nocursorpos\fR
+.IP
+Option \fB-cursorpos\fR enables sending the X cursor position
+back to all vnc clients that support the TightVNC
+CursorPosUpdates extension.  Default: \fB-cursorpos\fR
+.PP
+\fB-buttonmap\fR \fIstring\fR
+.IP
+String to remap mouse buttons.  Format: IJK-LMN, this
+maps buttons I -> L, etc., e.g.  \fB-buttonmap\fR 13-31
+.IP
+Button presses can also be mapped to keystrokes: replace
+a button digit on the right of the dash with :<sym>:
+or :<sym1>+<sym2>: etc. for multiple keys. For example,
+if the viewing machine has a mouse-wheel (buttons 4 5)
+but the x11vnc side does not, these will do scrolls:
+.IP
+\fB-buttonmap\fR 12345-123:Prior::Next:
+.IP
+\fB-buttonmap\fR 12345-123:Up+Up+Up::Down+Down+Down:
+.IP
+See <X11/keysymdef.h> header file for a list of Keysyms,
+or use the 
+.IR xev (1)
+program.  Note: mapping of button
+clicks to Keysyms may not work if \fB-modtweak\fR or \fB-xkb\fR is
+needed for the Keysym.
+.IP
+If you include a modifier like "Shift_L" the
+modifier's up/down state is toggled, e.g. to send
+"The" use :Shift_L+t+Shift_L+h+e: (the 1st one is
+shift down and the 2nd one is shift up). (note: the
+initial state of the modifier is ignored and not reset)
+To include button events use "Button1", ... etc.
+.PP
+\fB-nodragging\fR
+.IP
+Do not update the display during mouse dragging events
+(mouse motion with a button held down).  Greatly
+improves response on slow setups, but you lose all
+visual feedback for drags, text selection, and some
+menu traversals.
+.PP
+\fB-old_pointer\fR
+.IP
+Do not use the new pointer input handling mechanisms.
+See check_input() and pointer() in source file for
+details.
+.PP
+\fB-input_skip\fR \fIn\fR
+.IP
+For the old pointer handling when non-threaded: try to
+read n user input events before scanning display. n < 0
+means to act as though there is always user input.
+.PP
+\fB-debug_pointer\fR
+.IP
+Print debugging output for every pointer event.
+.PP
+\fB-debug_keyboard\fR
+.IP
+Print debugging output for every keyboard event.
+.PP
+Same as \fB-dp\fR and \fB-dk,\fR respectively.  Use multiple
+times for more output.
+.PP
+\fB-defer\fR \fItime\fR
+.IP
+Time in ms to wait for updates before sending to client
+[rfbDeferUpdateTime]  Default: 30
+.PP
+\fB-wait\fR \fItime\fR
+.IP
+Time in ms to pause between screen polls.  Used to cut
+down on load.  Default: 30
+.PP
+\fB-nap\fR
+.IP
+Monitor activity and if low take longer naps between
+polls to really cut down load when idle.  Default: off
+.PP
+\fB-sigpipe\fR \fIstring\fR
+.IP
+Broken pipe (SIGPIPE) handling.  \fIstring\fR can be
+"ignore" or "exit".  For "ignore" libvncserver
+will handle the abrupt loss of a client and continue,
+for "exit" x11vnc will cleanup and exit at the 1st
+broken connection.  Default: "ignore".
+.PP
+\fB-threads,\fR \fB-nothreads\fR
+.IP
+Whether or not to use the threaded libvncserver
+algorithm [rfbRunEventLoop] if libpthread is available
+Default: \fB-nothreads\fR
+.PP
+\fB-fs\fR \fIf\fR
+.IP
+If the fraction of changed tiles in a poll is greater
+than f, the whole screen is updated.  Default: 0.75
+.PP
+\fB-gaps\fR \fIn\fR
+.IP
+Heuristic to fill in gaps in rows or cols of n or
+less tiles.  Used to improve text paging.  Default: 4
+.PP
+\fB-grow\fR \fIn\fR
+.IP
+Heuristic to grow islands of changed tiles n or wider
+by checking the tile near the boundary.  Default: 3
+.PP
+\fB-fuzz\fR \fIn\fR
+.IP
+Tolerance in pixels to mark a tiles edges as changed.
+Default: 2
+.PP
+These options are passed to libvncserver:
+.PP
+\fB-rfbport\fR \fIport\fR
+.IP
+TCP port for RFB protocol
+.PP
+\fB-rfbwait\fR \fItime\fR
+.IP
+max time in ms to wait for RFB client
+.PP
+\fB-rfbauth\fR \fIpasswd-file\fR
+.IP
+use authentication on RFB protocol
+(use 'storepasswd' to create a password file)
+.PP
+\fB-passwd\fR \fIplain-password\fR
+.IP
+use authentication
+(use plain-password as password, USE AT YOUR RISK)
+.PP
+\fB-deferupdate\fR \fItime\fR
+.IP
+time in ms to defer updates (default 40)
+.PP
+\fB-desktop\fR \fIname\fR
+.IP
+VNC desktop name (default "LibVNCServer")
+.PP
+\fB-alwaysshared\fR
+.IP
+always treat new clients as shared
+.PP
+\fB-nevershared\fR
+.IP
+never treat new clients as shared
+.PP
+\fB-dontdisconnect\fR
+.IP
+don't disconnect existing clients when a new non-shared
+connection comes in (refuse new connection instead)
+.PP
+\fB-httpdir\fR \fIdir-path\fR
+.IP
+enable http server using dir-path home
+.PP
+\fB-httpport\fR \fIportnum\fR
+.IP
+use portnum for http connection
+.PP
+\fB-enablehttpproxy\fR
+.IP
+enable http proxy support
+.PP
+\fB-progressive\fR \fIheight\fR
+.IP
+enable progressive updating for slow links
+.SH "FILES"
+.IR $HOME/.x11vncrc ,
+.IR $HOME/.Xauthority
+.SH "ENVIRONMENT"
+.IR DISPLAY ,
+.IR XAUTHORITY ,
+.IR HOME
+.PP
+The following are set for the auxiliary commands
+run by \fB-accept\fR and \fB-gone\fR:
+.PP
+.IR RFB_CLIENT_IP ,
+.IR RFB_CLIENT_PORT ,
+.IR RFB_SERVER_IP ,
+.IR RFB_SERVER_PORT ,
+.IR RFB_X11VNC_PID ,
+.IR RFB_CLIENT_ID ,
+.IR RFB_CLIENT_COUNT
+.SH "SEE ALSO"
+.IR vncviewer (1),
+.IR vncpasswd (1),
+.IR vncconnect (1),
+.IR vncserver (1),
+.IR Xvnc (1),
+.IR inetd (1),
+.IR xev (1),
+.IR xmodmap (1),
+.IR Xserver (1),
+.IR xauth (1),
+.IR xhost (1),
+.IR Xsecurity (7),
+.IR xmessage (1),
+.IR ipcrm (1),
+.IR http://www.tightvnc.com ,
+.IR http://www.realvnc.com ,
+.IR http://www.karlrunge.com/x11vnc/
+.SH AUTHORS
+x11vnc was written by Karl J. Runge <runge@karlrunge.com>,
+it is part of the LibVNCServer project <http://sf.net/projects/libvncserver>.
+This manual page is based one the one written by Ludovic Drolez
+<ldrolez@debian.org>, for the Debian project (both may be used by others).

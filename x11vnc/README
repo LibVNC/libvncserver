@@ -1,0 +1,2720 @@
+
+x11vnc README file                         Date: Tue Aug  3 21:54:01 EDT 2004
+
+The following information is taken from these URLs:
+
+	http://www.karlrunge.com/x11vnc/index.html
+	http://www.karlrunge.com/x11vnc/x11vnc_opts.html
+
+they contain the most up to date info.
+
+=======================================================================
+http://www.karlrunge.com/x11vnc/index.html:
+
+     _________________________________________________________________
+
+x11vnc: a VNC server for real X displays    (to [1]FAQ)    (to [2]downloads)
+(to [3]building)
+
+   x11vnc allows one to remotely view and interact with real X displays
+   (i.e. a display corresponding to a physical monitor, keyboard, and
+   mouse) with any VNC viewer. In this way it plays the role for Unix/X11
+   that WinVNC plays for Windows.
+
+   I wrote x11vnc because x0rfbserver was basically impossible to build
+   on Solaris and had poor performance. The primary x0rfbserver build
+   problems centered around esoteric C++ toolkits. x11vnc is written in
+   plain C and uses only standard libraries. I also added a few
+   enhancements to improve the interactive response, add esoteric
+   features, etc.
+
+    Background:
+
+   VNC is a very useful network graphics protocol in the spirit of X,
+   however, unlike X, the viewing-end is very simple and maintains no
+   state. It is a remote framebuffer (RFB) protocol .
+
+   Some VNC links:
+     * [4]http://www.uk.research.att.com/vnc/
+     * [5]http://www.realvnc.com
+     * [6]http://www.tightvnc.com
+
+   For Unix, the VNC implementation includes a virtual X11 server Xvnc
+   (usually launched via the vncserver command) that is not associated
+   with a real display, but provides a "fake" one X11 clients (xterm,
+   mozilla, etc.) can attach to. A remote user then connects to Xvnc via
+   the VNC client vncviewer from anywhere on the network to view and
+   interact with the whole virtual X11 desktop.
+
+   The VNC protocol is in most cases better suited for remote connections
+   with low bandwidth and high latency than is the X11 protocol. Also,
+   with no state maintained the viewing-end can crash, be rebooted, or
+   relocated and the applications and desktop continue running. Not so
+   with X11.
+
+   So the standard Xvnc program is very useful, I use it for things like:
+     * desktop conferencing with other users (e.g. codereviews).
+     * long running apps/tasks I want to be able to view from many
+       places.
+     * Motif, GNOME, and similar applications that would yield very poor
+       performance over a high latency link.
+
+   However, sometimes one wants to connect to a real X11 display (i.e.
+   one attached to a physical monitor, keyboard, and mouse: a Workstation
+   or a SunRay session) from far away. Maybe you want to close down an
+   application cleanly rather than using kill, or want to work a bit in
+   an already running application, or would like to help a distant
+   colleague solve a problem with their desktop. This is where x11vnc is
+   useful.
+     _________________________________________________________________
+
+    How to use x11vnc:
+
+   In this example let's assume the remote machine with the X display you
+   wish to view is far-away.east:0 and the workstation you are presently
+   working at is sitting-here.west.
+
+   Step 0. Download x11vnc ([7]see below) and have it available to run
+   (e.g. via PATH) on far-away.east. Similarly, have a VNC viewer (e.g.
+   vncviewer) ready to run on sitting-here.west.
+
+   Step 1. By some means log in to far-away.east and get a command shell
+   running there. You can use ssh, rlogin, telnet, or any other method to
+   do this. x11vnc needs to be run on the same machine the X server
+   process is running on (because MIT-SHM shared memory is used to poll
+   the X11 framebuffer).
+
+   Step 2. In that far-away.east shell (with command prompt "far-away>"
+   in this example) run x11vnc directed at the far-away.east X session:
+
+  far-away> x11vnc -display :0
+
+   You could have also set the environment variable DISPLAY=:0 to achieve
+   the same thing. This step attaches x11vnc to the far-away.east:0 X
+   display (no viewer clients yet).
+
+   There will then be much chatter printed out from x11vnc, until it
+   finally says something like:
+  .
+  .
+  13/05/2004 14:59:54 Autoprobing selected port 5900
+  13/05/2004 14:59:54 screen setup finished.
+  13/05/2004 14:59:54 The VNC desktop is far-away:0
+  PORT=5900
+
+   which means all is OK, and we are ready for the final step.
+
+   Step 3. At the place where you are sitting (sitting-here.west in this
+   example) you now want to run a VNC viewer program. There are VNC
+   viewers for Unix, Windows, MacOS, Java-enabled web browsers, and even
+   for PDA's like the Palm Pilot! You can use any of them to connect to
+   x11vnc (see the above VNC links on how to obtain a viewer for your
+   platform. For Solaris, vncviewer is available in the [8]Companion CD
+   package SFWvnc ).
+
+   In this example we'll use the Unix vncviewer program on sitting-here
+   by typing the following command in a second terminal window:
+
+  sitting-here> vncviewer far-away.east:0
+
+   That should pop up a viewer window on sitting-here.west showing and
+   allowing interaction with the far-away.east:0  X11 desktop. Pretty
+   nifty! When finished, exit the viewer: the remote x11vnc process will
+   shutdown automatically (or you can use the -forever [9]option to have
+   it wait for additional viewer connections).
+
+   Desktop Sharing: The above more or less assumed nobody was sitting at
+   the workstation display far-away.east:0. This is often the case: a
+   user wants to access her workstation remotely. Another usage pattern
+   has the user sitting at far-away.east:0 and invites one or more other
+   people to view and interact with his desktop. Perhaps the user gives a
+   demo or presentation this way (using the telephone for vocal
+   communication). A "Remote Help Desk" mode would be similar: a
+   technician remotely connects to the user's desktop to interactively
+   solve a problem the user is having.
+
+   For these cases it should be obvious how it is done. The above steps
+   will work, but more easily the user sitting at far-away.east:0 simply
+   starts up x11vnc from a terminal window, after which the guests would
+   start their VNC viewers. For this usage mode the -accept popup option
+   discussed in the [10]FAQ below may be of use to allow the user at
+   far-away.east:0 to accept or reject incoming connections.
+     _________________________________________________________________
+
+    Tunnelling x11vnc via ssh:
+
+   The above example had no security or privacy at all. When logging into
+   remote machines (certainly when going over the internet) it is best to
+   use ssh, or use a VPN. For x11vnc one can tunnel the VNC protocol
+   through the encrypted ssh channel. It would look something like this:
+  sitting-here> ssh -L 5900:localhost:5900 far-away.east 'x11vnc -display :0'
+
+   (you will likely have to provide passwords/passphrases for the ssh
+   login) and then in another terminal window on sitting-here run the
+   command:
+  sitting-here> vncviewer -encodings "copyrect tight hextile" localhost:0
+
+   The -encodings option is very important: vncviewer will default to
+   "raw" encoding if it thinks the connection is to the local machine,
+   and so vncviewer gets tricked this way by the ssh redirection. "raw"
+   encoding will be extremely slow over a networked link, so you need to
+   force the issue with -encodings "copyrect tight ...".
+
+   If the machine you SSH into is not the same machine with the X display
+   you wish to view (e.g. your company provides incoming SSH access to a
+   gateway machine), then you need to change the above to, e.g.: -L
+   5900:otherhost:5900. Once logged in, you'll need to do a second login
+   (ssh or rsh) to the workstation machine 'otherhost' and then start up
+   x11vnc on it.
+
+   As discussed below, there may be some problems with port 5900 being
+   available. If that happens, the above port and display numbers may
+   change a bit. However, if you "know" port 5900 will be free on the
+   local and remote machines, you can automate the above two steps by
+   using the x11vnc option -bg (forks into background after connection to
+   the display is set up) or using the -f option of ssh. A simple example
+   script, assuming no problems with port 5900 being taken on the local
+   or remote sides, looks like:
+#!/bin/sh
+# usage: x11vnc_ssh <host>:<xdisplay>
+#  e.g.: x11vnc_ssh snoopy.peanuts.com:0
+
+host=`echo $1 | awk -F: '{print $1}'`
+disp=`echo $1 | awk -F: '{print $2}'`
+if [ "x$disp" = "x" ]; then disp=0; fi
+
+cmd="x11vnc -display :$disp -rfbauth .vnc/passwd"
+enc="copyrect tight hextile zlib corre rre raw"
+
+ssh -f -L 5900:localhost:5900 $host "$cmd"
+
+for i in 1 2 3
+do
+        sleep 2
+        if vncviewer -encodings "$enc" :0; then break; fi
+done
+
+   See also rx11vnc.pl below.
+
+   Another method is to start the VNC viewer in listen mode "vncviewer
+   -listen" and have x11vnc initiate the reverse connection using the
+   -connect option:
+#!/bin/sh
+# usage: x11vnc_ssh <host>:<xdisplay>
+#  e.g.: x11vnc_ssh snoopy.peanuts.com:0
+
+host=`echo $1 | awk -F: '{print $1}'`
+disp=`echo $1 | awk -F: '{print $2}'`
+if [ "x$disp" = "x" ]; then disp=0; fi
+
+cmd="x11vnc -display :$disp -connect localhost"   # <-- new option
+enc="copyrect tight hextile zlib corre rre raw"
+
+vncviewer -encodings "$enc" -listen &
+pid=$!
+ssh -R 5500:localhost:5500 $host "$cmd"
+kill $pid
+
+   A third way is specific to the TightVNC vncviewer special option -via
+   for gateways. The only tricky part is we need to start up x11vnc and
+   give it some time to start listening for connections (so we cannot use
+   the TightVNC default setting for VNC_VIA_CMD):
+#!/bin/sh
+# usage: x11vnc_ssh <host>:<xdisplay>
+#  e.g.: x11vnc_ssh snoopy.peanuts.com:0
+
+host=`echo $1 | awk -F: '{print $1}'`
+disp=`echo $1 | awk -F: '{print $2}'`
+if [ "x$disp" = "x" ]; then disp=0; fi
+
+VNC_VIA_CMD="ssh -f -L %L:%H:%R %G x11vnc -rfbport 5900 -display :$disp; sleep
+5"
+export VNC_VIA_CMD
+
+vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
+
+   Of course if you already have the x11vnc running waiting for
+   connections (or have it started out of inetd(1)), you can simply use
+   the TightVNC vncviewer -via gateway host:port in its default mode to
+   provide secure ssh tunneling.
+
+   VNC password file: Also note in the first example script that the
+   option "-rfbauth .vnc/passwd" provides additional protection by
+   requiring a VNC password for every VNC viewer that connects. The
+   vncpasswd or storepasswd programs, or the x11vnc [11]-storepasswd
+   option can be used to create the password file. x11vnc also has the
+   slightly less secure [12]-passwdfile and -passwd XXXXX options.
+
+   It is up to you to tell x11vnc to use password protection, it will not
+   do it for you automatically. The same goes for encrypting the channel
+   between the viewer and x11vnc: it is up to you to use ssh, etc.
+     _________________________________________________________________
+
+    Downloading x11vnc:
+
+   x11vnc is a contributed program to the [13]libvncserver project at
+   SourceForge.net. I use libvncserver for all of the VNC aspects; I
+   couldn't have done without it. The full source code may be found and
+   downloaded (either file-release tarball or CVS tree) from the above
+   link. As of Aug 2004, the [14]x11vnc 0.6.2 source package is released
+   (recommended download) . The x11vnc package is the subset of the
+   libvncserver package needed to build the x11vnc program. Also, you can
+   get a copy of my latest, bleeding edge [15]x11vnc.c file to replace
+   the one in the above packages or the one in the CVS tree and then
+   rebuild.
+
+   See the [16]FAQ below for information about where you might obtain a
+   precompiled x11vnc binary from 3rd parties.
+
+   More tools: Here is a rsh/ssh wrapper script rx11vnc that attempts to
+   automatically do the above Steps 1-3 for you (provided you have
+   rsh/ssh login permission on the machine x11vnc is to be run on). The
+   above example would be: rx11vnc far-away.east:0 typed into a shell on
+   sitting-here.west. Also included is an experimental script rx11vnc.pl
+   that attempts to tunnel the vnc traffic through an ssh port
+   redirection (and does not assume port 5900 is free). Have a look at
+   them to see what they do and customize as needed:
+     * [17]rx11vnc wrapper script
+     * [18]rx11vnc.pl wrapper script to tunnel traffic thru ssh
+     _________________________________________________________________
+
+    Building x11vnc:
+
+   If your OS has libjpeg.so and libz.so in standard locations you can
+   build as follows (example given for the 0.6.2 release of x11vnc:
+   replace with the version you downloaded):
+(un-tar the x11vnc+libvncserver tarball)
+# gzip -dc x11vnc-0.6.2.tar.gz | tar -xvf -
+
+(cd to the source directory)
+# cd x11vnc-0.6.2
+
+(run configure and then run make)
+# ./configure
+# make
+
+(if all went OK, copy x11vnc to the desired destination, e.g. $HOME/bin)
+# cp ./x11vnc/x11vnc $HOME/bin
+
+   Or do make install, it will probably install to /usr/local/bin (run
+   ./configure --help for information on customizing your configuration).
+   You can now run it via typing "x11vnc", "x11vnc -help", "x11vnc -nap
+   -display :0", etc.
+
+   Building on Solaris:   Depending on your version of Solaris (or other
+   Unix OS), the jpeg and/or zlib libraries may be in non-standard places
+   (e.g. /usr/local). Note: if configure cannot find these two libraries
+   then TightVNC support will be disabled, and you don't want that! Here
+   is a build script that indicates one way to pass this information to
+   the libvncserver configuration:
+#!/bin/sh
+
+# Build script for Solaris, etc, with, gcc, libjpeg and libz in
+# non-standard locations.
+
+PATH=/path/to/gcc/bin:/usr/ccs/bin:$PATH        # set to get gcc
+
+JPEG=/path/to/jpeg                      # maybe "/usr/local" or "/opt/sfw"
+ZLIB=/path/to/zlib                      # maybe "/usr/local" or "/opt/sfw"
+
+# Below we assume headers in $JPEG/include and $ZLIB/include and the
+# shared libraries are in $JPEG/lib and $ZLIB/lib.  If your situation
+# is different change the locations in the two lines below.
+
+CPPFLAGS="-I $JPEG/include -I $ZLIB/include"
+LDFLAGS="-L $JPEG/lib -R $JPEG/lib -L $ZLIB/lib -R $ZLIB/lib"
+
+# These two lines may not be needed on more recent Solaris releases:
+CPPFLAGS="$CPPFLAGS -I /usr/openwin/include"
+LDFLAGS="$LDFLAGS -L /usr/openwin/lib -R /usr/openwin/lib"
+
+export PATH CPPFLAGS LDFLAGS
+
+./configure
+make
+
+ls -l ./x11vnc/x11vnc
+
+   Then do make install or copy the binary to your desired destination.
+
+   Note that on Solaris make is /usr/ccs/bin/make, so that is why the
+   above puts /usr/ccs/bin in PATH. Other important build utililties are
+   there too: ld, ar, etc. Also, it is probably a bad idea to have
+   /usr/ucb in your PATH while building.
+
+   One user had a problem where the above build script was failing
+   because his work environment had the ENV variable set to a script that
+   was resetting his PATH so that gcc could no longer be found. Make sure
+   you do not have any ENV or BASH_ENV in your environment doing things
+   like that.
+
+   There is a build problem on Solaris 7 11/99 (update 4) where the
+   header file X11/extensions/XKBstr.h that X11/XKBlib.h uses was not
+   shipped. The x11vnc configure succeeds and sets
+   LIBVNCSERVER_HAVE_XKEYBOARD in rfb/rfbconfig.h but then the build of
+   x11vnc fails in the make. A workaround is to remove all lines
+   referring to LIBVNCSERVER_HAVE_XKEYBOARD in rfb/rfbconfig.h after
+   configure has been run. Alternatively, one could put #undef
+   LIBVNCSERVER_HAVE_XKEYBOARD after the rfb/rfb.h include in the
+   x11vnc/x11vnc.c file. We are working to fix this in the configure
+   script.
+     _________________________________________________________________
+
+    Some Notes:
+
+   Network performance:   Whether you are using Xvnc or x11vnc it is
+   always a good idea to have a solid background color instead of a
+   pretty background image. Each and every re-exposure of the background
+   must be resent over the network: better to have that background be a
+   solid color that compresses very well compared to a photo image. I
+   suggest using xsetroot, dtstyle or similar utility to set a solid
+   background while using x11vnc.
+
+   I also find the [19]tightvnc encoding gives the best response for my
+   usage (Unix <-> Unix over cable modem). One needs a tightvnc-aware
+   vncviewer to take advantage of this encoding.
+
+   TCP port issues:   Notice the lines
+  18/07/2003 14:36:31 Autoprobing selected port 5900
+  PORT=5900
+
+   in the output. 5900 is the default VNC listening port (just like 6000
+   is X11's default listening port). Had port 5900 been taken by some
+   other application, x11vnc would have next tried 5901. That would mean
+   the viewer command above should be changed to vncviewer
+   far-away.east:1. You can force the issue with the -rfbport NNNN
+   option.
+
+   Options:   x11vnc has (far too) many features that may be activated
+   via its [20]command line options. Useful options are -nap to use fewer
+   resources (it sleeps more between polls when activity is low) and
+   -rfbauth passwd-file to use VNC password protection (the vncpasswd or
+   storepasswd programs, or the x11vnc [21]-storepasswd option can be
+   used to create the password file).
+
+   Algorithm:   How does x11vnc do it? Rather brute-forcedly: it
+   continuously polls the X11 framebuffer for changes using
+   XShmGetImage(). When changes are discovered, it instructs libvncserver
+   which rectangular regions of the framebuffer have changed, and
+   libvncserver compresses the changes and sends them off to any
+   connected VNC viewers. A number of applications do similar things,
+   such as x0rfbserver, krfb, x0vncserver. x11vnc uses a 32 x 32 pixel
+   tile model (the desktop is decomposed into ~1000 such tiles), where
+   changed tiles are found by pseudo-randomly polling 1 pixel tall
+   horizontal scanlines. This is a surprisingly effective algorithm for
+   finding changed regions. For keyboard and mouse user input the XTEST
+   extension is used to pass the input events to the X server. To detect
+   XBell "beeps" the XKEYBOARD extension is used.
+
+   Barbershop mirrors effect:   What if x11vnc is started up, and
+   vncviewer is then started up on the same machine and displayed on the
+   same display x11vnc is polling? One might "accidentally" do this when
+   first testing out the programs. You get an interesting "feedback"
+   effect where vncviewer images keep popping up each one contained in
+   the previous one and slightly shifted a bit by the window manager
+   decorations. There will be an even more interesting effect if -scale
+   is used. Also, if the XKEYBOARD is supported and the XBell "beeps"
+   once, you get an infinite loop of beeps going off. Although all of
+   this is mildly exciting it is not much use: you will normally run and
+   display the viewer on a different machine!
+
+   SunRay notes:   You can run x11vnc on your (connected or disconnected)
+   [22]SunRay session (Please remember to use -nap and maybe -wait 200 to
+   avoid being a resource hog! It also helps a bit to have a solid
+   background color). You have to know the name of the machine your
+   SunRay session X server is running on. You also need to know the X11
+   DISPLAY number for the session: on a SunRay it could be a large
+   number, e.g. :137, since there are many people with X sessions (Xsun
+   processes) on the same machine. If you don't know it, you can get it
+   by running who(1) in a shell on the SunRay server and looking for the
+   dtlocal entry with your username (and if you don't even know which
+   server machine has your session, you could login to all possible ones
+   looking at the who output for your username...).
+
+   SunRay Gotcha:   Note that even though your SunRay X11 DISPLAY is
+   something like :137, x11vnc still tries for port 5900 as its listening
+   if it can get it, in which case the VNC display (i.e. the information
+   you supply to the VNC viewer) is something like sunray-server:0
+   (note the :0 corresponding to port 5900, it is not :137). If it cannot
+   get 5900, it tries for 5901, and so on. You can also try to force the
+   port (and thereby the VNC display) using the -rfbport NNNN option.
+
+    Limitations:
+
+     * Due to the polling nature, some activities (opaque window moves,
+       scrolling), can be pretty choppy/ragged and others (exposures of
+       large areas) slow. Experiment with interacting a bit differently
+       than you normally do to minimize the effects (e.g. do fullpage
+       paging rather than line-by-line scrolling, and move windows in a
+       single, quick motion). Work is in progress to attempt to speed
+       things up using the copyrect encoding and other things, but they
+       will likely only speed up certain activities, not all.
+     * A rate limiting factor for x11vnc performance is that video
+       hardware is optimized for writing, not reading (x11vnc reads the
+       video framebuffer for the screen image data). The difference can
+       be a factor of 10-50, and it usually takes about 0.5-1 sec to read
+       in the whole video hardware framebuffer (5MB for 1280x1024 at
+       depth 24). So whenever activity changes most of the screen there
+       is a delay of this length while x11vnc reads the changed regions
+       in. To get a sense of the read and write speeds of your video
+       card, you can run the benchmarks like: x11perf -getimage500,
+       x11perf -putimage500,  x11perf -shmput500 and for XFree86 displays
+       with direct graphics access the dga command (press "b" to run the
+       benchmark and then after a few seconds press "q" to quit).
+       On XFree86 it is actually possible to increase the framebuffer
+       read speed considerably (5-50 times) by using the Shadow
+       Framebuffer (a copy of the framebuffer is kept in main memory and
+       this can be read much more quickly). To do this one puts the line
+       Option "ShadowFB" "true" (and depending on video card driver,
+       Option "NoAccel" "true" may be needed too) in the Device section
+       of the /etc/X11/XF86Config file. Note that this disables 2D
+       acceleration at the physical display and so likely defeats the
+       purpose. Nevertheless this could be handy in some circumstances,
+       e.g. if the speed at the physical display was tolerable.
+       Unfortunately it does not seem shadowfb can't be turned on and off
+       dynamically...
+     * Somewhat surprisingly, the X11 mouse (cursor) shape is write-only
+       and cannot be queried from the X server. So in x11vnc the cursor
+       shape stays fixed at an arrow. (see the -mouseX option, however,
+       for a partial hack for the root window).
+     * Audio from applications is of course not redirected (separate
+       redirectors do exist, e.g. esd). The XBell() "beeps" will work if
+       the X server supports the XKEYBOARD extension. (Note that on
+       Solaris XKEYBOARD is disabled by default. Passing +kb to Xsun
+       enables it).
+     * Occasionally a patch of tiles will not get updated correctly.
+       Evidently a timing related bug and difficult to reproduce...
+     * Using -threads can expose some bugs in libvncserver.
+
+   Please feel free to [23]contact me if you have any questions,
+   problems, or comments about x11vnc, etc.
+     _________________________________________________________________
+
+    x11vnc FAQ:
+
+   [24]Q-1: I can't get x11vnc to start up. It says "XOpenDisplay failed
+   ((null))" or "Xlib: connection to ":0.0" refused by server". What do I
+   need to do? 
+
+   [25]Q-2: I can't get x11vnc and/or libvncserver to compile. 
+
+   [26]Q-3: Where can I get a precompiled x11vnc binary for my Operating
+   System? 
+
+   [27]Q-4: How can I see all of x11vnc's command line options and
+   documentation on how to use them? 
+
+   [28]Q-5: I don't like typing arcane command line options every time I
+   start x11vnc. What can I do? Is there a config file? 
+
+   [29]Q-6: Why does x11vnc exit as soon as the VNC viewer disconnects?
+   And why doesn't it allow more than one VNC viewer to connect at the
+   same time? 
+
+   [30]Q-7: I have two separate machine displays in front of me, one
+   Windows the other X11: can I use x11vnc in combination with Win2VNC in
+   dual-screen mode to pass the keystrokes and mouse motions to the X11
+   display? 
+
+   [31]Q-8: I am running Win2VNC on my windows machine and trying to
+   create a dual-screen mode with my second display by running x11vnc
+   -nofb. Whenever I initiate the connection Win2VNC quickly disconnects
+   and x11vnc says something like: rfbProcessClientNormalMessage: read:
+   Connection reset by peer 
+
+   [32]Q-9: The X display I run x11vnc on is only 8bpp PseudoColor (only
+   256 distinct colors). x11vnc starts out OK, but after a while the
+   colors are incorrect in certain windows. 
+
+   [33]Q-10: Color problems: I have an X display that has nice
+   "overlay-like" visuals of multiple color depths. E.g. there are both
+   depth 8 and 24 visuals available. Why are some of the colors messed up
+   in x11vnc? 
+
+   [34]Q-11: How do I figure out the window id to supply to the -id
+   windowid option? 
+
+   [35]Q-12: Why don't menus or other transient windows come up when I am
+   using the -id windowid option to view a single application window? 
+
+   [36]Q-13: Can I use x11vnc to view and interact with an Xterminal
+   (e.g. NCD) that is not running UNIX and so x11vnc cannot be run on it
+   directly? 
+
+   [37]Q-14: Can I make x11vnc more quiet and also go into the background
+   after starting up? 
+
+   [38]Q-15: Can I limit which machines incoming VNC clients can connect
+   from? 
+
+   [39]Q-16: How do I build x11vnc/libvncserver with libwrap
+   (tcp_wrappers) support? 
+
+   [40]Q-17: Can I prompt the user at the local X display whether the
+   incoming VNC client should be accepted or not? Can I decide to make
+   some clients view-only? How about running an arbitrary program to make
+   the decisions? 
+
+   [41]Q-18: How do I create a VNC password for use with x11vnc? 
+
+   [42]Q-19: How can I tunnel my connection to x11vnc via an encrypted
+   SSH channel between two Unix machines? 
+
+   [43]Q-20: How can I tunnel my connection to x11vnc via an encrypted
+   SSH channel from Windows using an SSH client like Putty? 
+
+   [44]Q-21: Does x11vnc support Unix usernames and passwords? Can I
+   further limit the set of Unix usernames who can connect to the VNC
+   desktop? 
+
+   [45]Q-22: Can I have two passwords for VNC viewers, one for full
+   access and the other for view-only access to the display? 
+
+   [46]Q-23: I use a screen-lock when I leave my workstation (e.g.
+   xscreensaver or xlock). When I remotely access my workstation desktop
+   via x11vnc I can unlock the desktop fine, but I am worried people will
+   see my activities on the physical monitor. What can I do to prevent
+   this, or at least make it more difficult? 
+
+   [47]Q-24: Can I have x11vnc automatically lock the screen when I
+   disconnect the VNC viewer? 
+
+   [48]Q-25: Are reverse connections (i.e. the VNC server connecting to
+   the VNC viewer) using "vncviewer -listen" and vncconnect(1) supported?
+   
+   [49]Q-26: Sometimes when a VNC viewer dies abruptly, x11vnc also dies
+   with the error message like: "Broken pipe". I'm using the -forever
+   mode and I want x11vnc to keep running. 
+
+   [50]Q-27: How can I use x11vnc to connect to an X login screen like
+   xdm, GNOME gdmgreeter, KDE kdm, or CDE dtlogin? 
+
+   [51]Q-28: Can I run x11vnc out of inetd(1)? 
+
+   [52]Q-29: How do I make x11vnc work with the Java VNC viewer applet in
+   a web browser? 
+
+   [53]Q-30: Why isn't the mouse cursor shape (the little icon shape
+   where the mouse pointer is) correct as I move from window to window? 
+
+   [54]Q-31: Why does the mouse arrow just stay in one corner in my
+   vncviewer, whereas my cursor (that does move) is just a dot? 
+
+   [55]Q-32: Can I take advantage of the TightVNC extension to the VNC
+   protocol where Cursor Positions Updates are sent back to all connected
+   clients (i.e. passive viewers can see the mouse cursor being moved
+   around by another viewer)? 
+
+   [56]Q-33: Is it possible to swap the mouse buttons (e.g. left-handed
+   operation), or arbitrarily remap them? How about mapping button clicks
+   to keystrokes, e.g. to partially emulate Mouse wheel scrolling? 
+
+   [57]Q-34: When I drag windows around with the mouse or scroll up and
+   down things really bog down (unless I do the drag in a single, quick
+   motion). Is there anything to do to improve things? 
+
+   [58]Q-35: I have lots of memory, but why does x11vnc fail with
+   shmget: No space left on device    or    Minor opcode of failed
+   request: 1 (X_ShmAttach)? 
+
+   [59]Q-36: How can I make x11vnc use less system resources? 
+
+   [60]Q-37: How can I make x11vnc use MORE system resources? 
+
+   [61]Q-38: I use x11vnc over a slow link with high latency (i.e. dialup
+   modem), is there anything I can do to speed things up? 
+
+   [62]Q-39: How can I get my AltGr and Shift modifiers to work between
+   keyboards for different languages? 
+
+   [63]Q-40: When I try to type a "<" (i.e. less than) instead I get ">"
+   (i.e. greater than)! Strangely, typing ">" works OK!! 
+
+   [64]Q-41: I'm using an "international" keyboard (e.g. German "de", or
+   Danish "dk") and the -modtweak mode works well if the VNC viewer is
+   run on a Unix/Linux machine with a similar keyboard. But if I run the
+   VNC viewer on Unix/Linux with a different keyboard (e.g. "us") or
+   Windows with any keyboard, I can't type some keys like: "@", "$", "<",
+   ">", etc. How can I fix this? 
+
+   [65]Q-42: When typing I sometimes get double, triple, or more of my
+   keystrokes repeated. I'm sure I only typed them once, what can I do? 
+
+   [66]Q-43: The machine where I run x11vnc has an AltGr key, but the
+   local machine where I run the VNC viewer does not. Is there a way I
+   can map a local unused key to send an AltGr? How about a Compose key
+   as well? 
+
+   [67]Q-44: I have a Sun machine I run x11vnc on. Its Sun keyboard has
+   just one Alt key labelled "Alt" and two Meta keys labelled with little
+   diamonds. The machine where I run the VNC viewer only has Alt keys.
+   How can I send a Meta keypress? (e.g. emacs needs this) 
+
+   [68]Q-45: Can I map a keystroke to a mouse button click on the remote
+   machine? 
+
+   [69]Q-46: The remote display is larger (in number of pixels) than the
+   local display I am running the vncviewer on. I don't like the
+   vncviewer scrollbars, what I can do? 
+
+   [70]Q-47: Does x11vnc support server-side framebuffer scaling? (E.g.
+   to make the desktop smaller). 
+
+   [71]Q-48: Does x11vnc work with Xinerama? (i.e. multiple monitors
+   joined together to form one big, single screen). 
+
+   [72]Q-49: Can I use x11vnc on a multi-headed display that is not
+   Xinerama (i.e. separate screens :0.0, :0.1, ... for each monitor)? 
+
+   [73]Q-50: Why is the view in my VNC viewer completely black? Or why is
+   everything flashing around randomly? 
+
+   [74]Q-51: I use Linux Virtual Consoles (VC's) to implement 'Fast User
+   Switching' between users' sessions (e.g. Betty is on Ctrl-Alt-F7,
+   Bobby is on Ctrl-Alt-F8, and Sid is on Ctrl-Alt-F1: they use those
+   keystrokes to switch between their sessions). How come the view in a
+   VNC viewer connecting to x11vnc is either completely black or
+   otherwise all messed up unless the X session x11vnc is attached to is
+   in the active VC? 
+
+   [75]Q-52: Does the Clipboard/Selection get transferred between the
+   vncviewer and the X display? 
+
+   [76]Q-53: Why don't I hear the "Beeps" in my X session (e.g. when
+   typing tput bel in an xterm)? 
+
+   [77]Q-54: I am using x11vnc where my local machine has "popup/hidden
+   taskbars" (e.g. GNOME or MacOS X) and the remote display where x11vnc
+   runs also has "popup/hidden taskbars" (e.g. GNOME). When I move the
+   mouse to the edge of the screen where the popups happen, the taskbars
+   interfere and fight with each other in strange ways. What can I do? 
+     _________________________________________________________________
+
+   Q-1: I can't get x11vnc to start up. It says "XOpenDisplay failed
+   ((null))" or "Xlib: connection to ":0.0" refused by server". What do I
+   need to do?
+
+   For the former error, you need to specify the X display to connect to
+   (it also needs to be on the same machine x11vnc is to run on). Set
+   your DISPLAY environment variable or use the -display option to
+   specify it. Nearly always the correct value will be ":0"
+
+   For the latter error, you need to set up the X11 permissions. See the
+   xauth(1), Xsecurity(1), and xhost(1) man pages. For example, you may
+   need to set your XAUTHORITY environment variable to point to the
+   correct cookie file (e.g. /home/joe/.Xauthority or
+   /var/lib/xdm/authdir/authfiles/A:0-nRySEi), or simply be sure you run
+   x11vnc as the correct user (i.e. the user who owns the X session you
+   wish to view). Less safe, but if the owner of the X session runs xhost
+   +localhost one should be able to attach x11vnc to the session (from
+   the same machine).
+
+   We have been informed that some recent Linux distribution display
+   managers set XAUTHORITY to random local filenames, e.g.:
+   /tmp/.gdmHaVtYy. So logging in as the correct user may not be
+   enough... you need to dig out where they have hidden the
+   MIT-MAGIC-COOKIE. The -e option to ps(1) may help, e.g.: ps wwwweaux |
+   tr ' ' '\n' | grep XAUTHORITY | sort -u
+
+   Note: use of Display Manager (gdm, kdm, ...) auth cookie files (i.e.
+   from /var/...,  /tmp/..., or elsewhere) may require modification via
+   xauth(1) to correctly include the display x11vnc refers to (e.g. xauth
+   -f cookie.file add :0 . 45be51ae2ce9dfbacd882ab3ef8e96b1, where
+   45be51... was found from an xauth -f /var/... list) or other reasons.
+   See xauth(1) manpage for full details on how to transfer an
+   MIT-MAGIC-COOKIE between machines and displays.
+
+   To test out your X11 permissions, set DISPLAY and type xclock in the
+   same place you will be typing (or otherwise running) x11vnc. If a
+   little clock comes up on the display, that means the X11 permissions
+   are OK. To test your X11 permissions when logged into the display
+   machine remotely, use xdpyinfo (if you see the informational output
+   about the display you know it connected to the X server successfully).
+   Important: if you cannot get your X11 permissions so that the xclock
+   or xdpyinfo tests work, x11vnc also will not work (all of these X
+   clients must be able to connect to the X server to function).
+
+   Q-2: I can't get x11vnc and/or libvncserver to compile.
+
+   Make sure you have all of the required -devel packages installed.
+   These include X11/XFree86, libjpeg, libz, ...
+
+   After running the libvncserver configure, carefully examine the output
+   and the messages in the config.log file looking for missing
+   components. If the configure output looks like:
+  checking how to run the C preprocessor... gcc -E
+  checking for X... no
+  checking for XkbSelectEvents in -lX11... no
+  checking for XineramaQueryScreens in -lXinerama... no
+  checking for XTestFakeKeyEvent in -lXtst... no
+
+   there is quite a bit wrong with the build environment. Hopefully
+   simply adding -devel packages will fix it.
+
+   For Debian the list seems to be:
+  gcc
+  make
+  libc6-dev
+  libjpeg62-dev
+  libx11-dev
+  libxext-dev
+  libxtst-dev
+  x-dev
+  xlibs-static-dev
+  zlib1g-dev
+
+   For Redhat the list seems to be:
+  gcc
+  make
+  glibc-devel
+  libjpeg-devel
+  XFree86-devel
+  zlib-devel
+
+   Q-3: Where can I get a precompiled x11vnc binary for my Operating
+   System?
+
+   Hopefully the [78]build steps above and [79]FAQ provide enough info
+   for a painless compile for most environments. Please report problems
+   with the x11vnc configure, make, etc. on your system (if your system
+   is known to compile other GNU packages successfully).
+
+   There are precompiled x11vnc binaries made by other groups available
+   at the following locations:
+    Debian:         [80]http://packages.debian.org/x11vnc
+
+   Slackware: [81]http://www.linuxpackages.net/ Redhat/Fedora:
+   [82]http://dag.wieers.com/packages/x11vnc/ wwexptools:
+   [83]http://www.bell-labs.com/project/wwexptools/packages.html The last
+   one, wwexptools, provides a variety of Unix binaries (Linux, Solaris,
+   HP-UX, Irix, ...) with the intent of being compatible on a wide range
+   of OS releases. Find x11vnc at that link and select 'download info'.
+   If any of the above binaries don't work and building x11vnc on your OS
+   fails, and all else fails, you can contact me as I occasionally have a
+   test binary I could give you.
+
+   As a general note, the x11vnc program is simple enough you don't
+   really need to install a package: the binary will in most cases work
+   as is and from any location (as long as your system libraries are not
+   too old, etc). So, for Linux distributions that are not one of the
+   above, the x11vnc binary from the above packages has a good chance of
+   working. You can "install" it by just copying the x11vnc binary to the
+   desired directory in your PATH. Tip on extracting files from a Debian
+   package: extract the archive via a command like: ar x
+   x11vnc_0.6-2_i386.deb and then you can find the binary in the
+   resulting data.tar.gz tar file. Also, rpm2cpio(1) is useful in
+   extracting files from rpm packages.
+
+   Q-4: How can I see all of x11vnc's command line options and
+   documentation on how to use them?
+
+   Run:  x11vnc -help    The output is listed [84]here as well.
+
+   Q-5: I don't like typing arcane command line options every time I
+   start x11vnc. What can I do? Is there a config file?
+
+   You could create a shell script that calls x11vnc with your options:
+#!/bin/sh
+#
+# filename: X11vnc  (i.e. not "x11vnc")
+# It resides in a directory in $PATH. "chmod 755 X11vnc" has been run on it.
+#
+x11vnc -nap -wait 50 -localhost -rfbauth $HOME/.vnc/passwd -display :0 $*
+
+   a similar thing can be via aliases in your shell (bash, tcsh, csh,
+   etc..).
+
+   Or as of Jun/2004 in the libvncserver CVS you can use the simple
+   $HOME/.x11vncrc config file support. If that file exists, each line is
+   taken as a command line option. E.g. the above would be:
+# this is a comment in my ~/.x11vncrc file
+nap
+wait 50        # comment to the end of the line
+-localhost     # note: the leading "-" is optional.
+rfbauth  /home/fred/.vnc/passwd
+display :0
+
+   At some point this config file support will be expanded.
+
+   Q-6: Why does x11vnc exit as soon as the VNC viewer disconnects? And
+   why doesn't it allow more than one VNC viewer to connect at the same
+   time?
+
+   These defaults are simple safety measures to avoid someone unknowingly
+   leaving his X11 desktop exposed (to the internet, say) for long
+   periods of time. Use the -forever option (aka -many) to have x11vnc
+   wait for more connections after the first client disconnects. Use the
+   -shared option to have x11vnc allow multiple clients to connect
+   simultaneously.
+
+   Recommended additional safety measures include using ssh (see above)
+   or a VPN to authenticate and encrypt the viewer connections or to at
+   least use the -rfbauth passwd-file [85]option to use VNC password
+   protection.
+
+   Q-7: I have two separate machine displays in front of me, one Windows
+   the other X11: can I use x11vnc in combination with Win2VNC in
+   dual-screen mode to pass the keystrokes and mouse motions to the X11
+   display?
+
+   Yes, for best response start up x11vnc with the "-nofb" option
+   (disables framebuffer polling, and does other optimizations) on the
+   secondary display (X11). Then start up Win2VNC on the primary display
+   (Windows) referring it to the secondary display.
+
+   This will also work X11 to X11 using [86]x2vnc, however you would
+   probably just want to avoid VNC and use x2x for that.
+
+   For reference, here are some links to Win2VNC-like programs for
+   multiple monitor setups:
+     * [87]Original Win2VNC
+     * [88]Enhanced Win2VNC and [89]sourceforge link
+     * [90]x2vnc
+     * [91]x2x also [92]here
+     * [93]zvnc (MorphOS)
+
+   All of them (except x2x) will work with x11vnc.
+
+   Q-8: I am running Win2VNC on my windows machine and trying to create a
+   dual-screen mode with my second display by running x11vnc -nofb.
+   Whenever I initiate the connection Win2VNC quickly disconnects and
+   x11vnc says something like: rfbProcessClientNormalMessage: read:
+   Connection reset by peer
+
+   Is the default visual of the X display you run x11vnc on low color
+   (e.g. 8bpp PseudoColor)? (you can run xdpyinfo to check). There seems
+   to be a bug in Win2VNC in that it cannot deal correctly with colormaps
+   (PseudoColor is the most common example of a visual with a colormap).
+
+   If so, there are a couple options. 1) Can you set the default visual
+   on your display to be depth 24 TrueColor? Sun machines often have 8+24
+   overlay visuals, and you can make the default visual depth 24
+   TrueColor (see fbconfig(1) and Xsun(1)). 2) As of Feb/2004, in the
+   libvncserver CVS, x11vnc has the -visual option to allow you to force
+   the framebuffer visual to whatever you want. This option provides a
+   convenient workaround for the Win2VNC bug:
+  x11vnc -nofb -visual TrueColor -display :0 ...
+
+   So the visual will be set to 8bpp TrueColor and Win2VNC can handle
+   this. Since Win2VNC does not use the framebuffer there should be no
+   problems in doing this.
+
+   Q-9: The X display I run x11vnc on is only 8bpp PseudoColor (only 256
+   distinct colors). x11vnc starts out OK, but after a while the colors
+   are incorrect in certain windows.
+
+   Use the -flashcmap to have x11vnc watch for changes in the colormap,
+   and propagate those changes back to connected clients. This can be
+   slow. The incorrect colors often happens if an application installs
+   its own private colormap when the mouse is in its window. netscape
+   -install is a well-known historical example of this.
+
+   Q-10: Color problems: I have an X display that has nice "overlay-like"
+   visuals of multiple color depths. E.g. there are both depth 8 and 24
+   visuals available. Why are some of the colors messed up in x11vnc?
+
+   First off, try the (rather slow) -flashcmap option just to be sure
+   your color problem isn't simply due to x11vnc not following the
+   changing 256 element colormap. The -notruecolor option has also been
+   known to resolve some color problems on 8bpp displays.
+
+   If that doesn't help, run xdpyinfo to see what the default visual is.
+   Does it have a depth of 8? If it does, can you possibly re-configure
+   your X server to make the depth 24 visual the default? If you can do
+   it, this will save you a lot of grief WRT colors and x11vnc (and for
+   general usage too). I do this on an old Sparcstation 20 with SX
+   graphics
+  xinit -- -dev /dev/fb defclass TrueColor defdepth 24
+
+   and it works nicely (to log into console from the dtlogin window,
+   select "Options -> Command Line Login", then login and enter the above
+   command). A more permanent and convenient option is to put a line
+   like:
+:0  Local local_uid@console root /usr/openwin/bin/Xsun -dev /dev/fb defclass Tr
+ueColor defdepth 24
+
+   in /etc/dt/config/Xservers (see /usr/dt/config/Xservers).
+
+   Still not working? Run xwininfo on the application with the messed up
+   colors to verify that the depth of its visual is different from the
+   default visual depth (gotten from xdpyinfo). One possible workaround
+   in this case is to use the -id option to point x11vnc at the
+   application window itself. If the application is complicated this may
+   not be acceptable, and may even crash x11vnc (but not the
+   application).
+
+   It is theoretically possible to solve this problem (see xwd(1) for
+   example), but it does not seem trivial or sufficiently fast for x11vnc
+   to be able to do.
+
+   Q-11: How do I figure out the window id to supply to the -id windowid
+   option?
+
+   Run the xwininfo program in a terminal. It will ask you to click on
+   the desired application window. After clicking, it will print out much
+   information, including the window id.
+
+   Note that some VNC viewers will have problems rendering screens that
+   have a width that is not a multiple of 4. Try to manually adjust the
+   window width before starting x11vnc -id ....
+
+   Q-12: Why don't menus or other transient windows come up when I am
+   using the -id windowid option to view a single application window?
+
+   This is related to the behavior of the XGetImage(3X11) and
+   XShmGetImage() interfaces regarding backingstore, saveunders, etc. The
+   way the image is retrieved depends on some aspects of how the X server
+   maintains the display image data and whether other windows are
+   clipping or obscuring it. See the XGetImage man page for more details.
+
+   If things are not working and you still want to do the single window
+   polling, feel free to ask for a version of x11vnc that has an
+   experimental -sid windowid option ("shifted" windowid). x11vnc is
+   known to crash under both -id and -sid, so both modes are still
+   experimental.
+
+   Q-13: Can I use x11vnc to view and interact with an Xterminal (e.g.
+   NCD) that is not running UNIX and so x11vnc cannot be run on it
+   directly?
+
+   You can, but it will likely be very wasteful of network bandwidth
+   since you will be polling the X display over the network as opposed to
+   over the local hardware. To do this, run x11vnc on a UNIX machine as
+   close as possible network-wise to the Xterminal machine. Use the
+   -display to point the display to that of the Xterminal (you'll of
+   course need basic X11 permission to do that) and also supply the
+   -noshm option (this enables the polling over the network).
+
+   The response will likely be sluggish. This mode is not recommended
+   except for "quick checks" of hard to get to X servers. Use something
+   like -wait 150 to cut down on the polling rate. You may also need
+   -flipbyteorder if the colors get messed up due to endian byte order
+   differences.
+
+   Q-14: Can I make x11vnc more quiet and also go into the background
+   after starting up?
+
+   Use the -q and -bg options, respectively.  (also: -quiet is an alias
+   for -q)
+
+   Note that under -bg the stderr messages will be lost unless you use
+   the "-o logfile" option.
+
+   Q-15: Can I limit which machines incoming VNC clients can connect
+   from?
+
+   Yes, look at the -allow and -localhost options to limit connections by
+   IP address. E.g.
+  x11vnc -allow 192.168.0.1,192.168.0.2
+
+   for those two hosts or
+  x11vnc -allow 192.168.0.
+
+   for a subnet. Note that -localhost is the same as "-allow 127.0.0.1"
+
+   For more control, build libvncserver with libwrap support
+   (tcp_wrappers) and then use /etc/hosts.allow.
+
+   Q-16: How do I build x11vnc/libvncserver with libwrap (tcp_wrappers)
+   support?
+
+   Here is one way to pass this information to the configure script:
+  env CPPFLAGS=-DUSE_LIBWRAP LDFLAGS=-lwrap ./configure
+
+   then run make as usual. This requires libwrap and its development
+   package (tcpd.h) to be installed on the build machine.
+
+   The resulting x11vnc then uses libwrap/tcp_wrappers for connections.
+   The service name you will use in /etc/hosts.allow and /etc/hosts.deny
+   is "vnc", e.g.:
+  vnc: 192.168.100.3 .example.com
+
+   Note that if you run x11vnc out of [94]inetd you do not need to build
+   x11vnc with libwrap support because the /usr/sbin/tcpd reference in
+   /etc/inetd.conf handles the tcp_wrappers stuff.
+
+   Q-17: Can I prompt the user at the local X display whether the
+   incoming VNC client should be accepted or not? Can I decide to make
+   some clients view-only? How about running an arbitrary program to make
+   the decisions?
+
+   Yes, look at the "-accept command" option, it allows you to specify an
+   external command that is run for each new client. (use quotes around
+   the command if it contains spaces, etc.). If the external command
+   returns 0 the client is accepted, otherwise the client is rejected.
+   See below how to also accept clients view-only.
+
+   The external command will have the RFB_CLIENT_IP environment variable
+   set to the client's numerical IP address, RFB_CLIENT_PORT its port
+   number. Similarly for RFB_SERVER_IP and RFB_SERVER_PORT to allow
+   identification of the tcp virtual circuit. DISPLAY will be set to that
+   of the X11 display being polled. Also, RFB_X11VNC_PID is set to the
+   x11vnc process id (e.g. in case you decided to kill it), RFB_CLIENT_ID
+   will be an id number, and RFB_CLIENT_COUNT the number of other clients
+   currently connected.
+
+   As a special case, "-accept popup" will instruct x11vnc to create its
+   own simple popup window. To accept the client press "y" or click mouse
+   on the "Yes" button. To reject the client press "n" or click mouse on
+   the "No" button. To accept the client View-only, press "v" or click
+   mouse on the "View" button. If the -viewonly option has been supplied,
+   the "View" action will not be present: the whole display is view only
+   in that case.
+
+   The popup window times out after 120 seconds, to change this behavior
+   use "-accept popup:N" where N is the number of seconds (use 0 for no
+   timeout). More tricks: "-accept popupmouse" will only take mouse click
+   responses, while "-accept popupkey" will only take keystroke responses
+   (popup takes both). After any of the 3 popup keywords you can supply a
+   position of the window: +N+M, (the default is to center the window)
+   e.g. -accept popupmouse+10+10.
+
+   Also as a special case "-accept xmessage" will run the xmessage(1)
+   program to prompt the user whether the client should be accepted or
+   not. This requires that you have xmessage installed and available via
+   PATH. In case it is not already on your system, the xmessage program
+   is available at [95]ftp://ftp.x.org/
+
+   To include view-only decisions for the external commands, prefix the
+   command something like this: "yes:0,no:*,view:3 mycommand ..." This
+   associates the three actions: yes(accept), no(reject), and
+   view(accept-view-only), with the numerical return codes. Use "*"
+   instead of a number to set the default action (e.g. in case the
+   external command returns an unexpected return code).
+
+   Here is an example -accept script called accept_or_lock. It uses
+   xmessage and xlock (replace with your screen lock command, maybe it is
+   "xscreensaver-command -lock", or kdesktop_lock, or "dtaction
+   LockDisplay"). It will prompt the user at the X display whether to
+   accept, reject, or accept view-only the client, but if the prompt
+   times out after 60 seconds the screen is locked and the VNC client is
+   accepted. This allows the remote access when no one is at the display.
+#!/bin/sh
+#
+# accept_or_lock: prompt user at X display whether to accept an incoming
+#                 VNC connection.  If timeout expires, screen is locked
+#                 and the VNC viewer is accepted (allows remote access
+#                 when no one is sitting at the display).
+#
+# usage: x11vnc ... -forever -accept 'yes:0,no:*,view:4 accept_or_lock'
+#
+xmessage -buttons yes:2,no:3,view-only:4 -center \
+         -timeout 60 "x11vnc: accept connection from $RFB_CLIENT_IP?"
+rc=$?
+if [ $rc = 0 ]; then
+        xlock &
+        sleep 5
+        exit 0
+elif [ $rc = 2 ]; then
+        exit 0
+elif [ $rc = 4 ]; then
+        exit 4
+fi
+exit 1
+
+   Stefan Radman has written a nice dtksh script [96]dtVncPopup for use
+   in CDE environments to do the same sort of thing. Information on how
+   to use it is found at the top of the file. He encourages you to
+   provide feedback to him to help improve the script.
+
+   Note that in all cases x11vnc will block while the external command or
+   popup is being run, so attached clients will not receive screen
+   updates, etc during this period. (use of -threads may or may not alter
+   this behavior).
+
+   To run a command when a client disconnects, use the "-gone command"
+   option. This is for the user's convenience only: the return code of
+   the command is not interpreted by x11vnc. The same environment
+   variables are set as in "-accept command"
+
+   Q-18: How do I create a VNC password for use with x11vnc?
+
+   You may already have one in $HOME/.vnc/passwd if you have used, say,
+   the vncserver program from the regular RealVNC or TightVNC packages
+   (i.e. launching the Xvnc server). Otherwise, you could use the
+   vncpasswd(1) program from those packages. The libvncserver package
+   also comes with a simple program: storepasswd in the examples
+   directory. And as of Jun/2004 in the libvncserver CVS x11vnc supports
+   the -storepasswd "pass" "file" option, which is the the same
+   functionality of storepasswd. Be sure to quote the "pass" if it
+   contains shell meta characters, spaces, etc.
+
+   You then use the password via the x11vnc option: -rfbauth filename
+
+   Compared to vncpasswd(1) the latter two methods are a somewhat unsafe
+   because the password is specified on the command line and so someone
+   may see it by using ps(1) or looking over your shoulder. Also watch
+   out for the command winding up in your shell's history file (history
+   -c is often a way to clear it).
+
+   x11vnc also has the [97]-passwdfile and -passwd/-viewpasswd plain text
+   (i.e. not obscured like the -rfbauth VNC passwords) password options.
+
+   Q-19: How can I tunnel my connection to x11vnc via an encrypted SSH
+   channel between two Unix machines?
+
+   See the description earlier on this page on [98]how to tunnel VNC via
+   SSH from Unix to Unix. A number of ways are described along with some
+   issues you may encounter.
+
+   Other secure encrypted methods exists, e.g. stunnel.
+
+   Q-20: How can I tunnel my connection to x11vnc via an encrypted SSH
+   channel from Windows using an SSH client like Putty?
+
+   [99]Above we described how to tunnel VNC via SSH from Unix to Unix. To
+   do this from Windows using Putty it would go something like this:
+     * In the Putty dialog window under 'Session' enter the hostname or
+       IP number of the Unix machine with display to be viewed.
+     * Make sure the SSH protocol is selected and the server port is
+       correct.
+     * Under 'Connections/SSH/Tunnels' Add a Local connection with
+       'Source port:  5900' and 'Destination:  localhost:5900'
+     * Log into the remote machine by pressing 'Open' and supplying
+       username, password, etc.
+     * In that SSH shell, start up x11vnc by typing the command: x11vnc
+       -display :0 plus any other desired options.
+     * Finally, start up your VNC Viewer in Windows and enter
+       'localhost:0' as the VNC server.
+
+   You can keep all of the settings in a Putty 'Saved Session'. Also,
+   once everything is working, you can consider putting x11vnc -display
+   :0 (plus other cmdline options) in the 'Remote command' Putty setting
+   under 'Connections/SSH'. It is likely possible to script the whole
+   process in a BAT file including launching the VNC viewer by using the
+   plink Putty utility. Send us the script if you get that working.
+
+   For extra protection feel free to run x11vnc with the -localhost and
+   -rfbauth/-passwdfile options.
+
+   If the machine you SSH into via Putty is not the same machine with the
+   X display you wish to view (e.g. your company provides incoming SSH
+   access to a gateway machine), then you need to change the above Putty
+   dialog setting to: 'Destination: otherhost:5900', Once logged in,
+   you'll need to do a second login (ssh or rsh) to the workstation
+   machine 'otherhost' and then start up x11vnc on it.
+
+   As discussed [100]above another option is to first start the VNC
+   viewer in "listen" mode, and then launch x11vnc with the "-connection
+   localhost" option to establish the reverse connection. In this case a
+   Remote port redirection (not Local) is needed for port 5500 instead of
+   5900 (i.e. 'Source port:  5500' and 'Destination:  localhost:5500' for
+   a Remote connection).
+
+   Q-21: Does x11vnc support Unix usernames and passwords? Can I further
+   limit the set of Unix usernames who can connect to the VNC desktop?
+
+   Until the VNC protocol and libvncserver support this things will be
+   approximate at best. Hopefully, it will not be too long to wait for
+   such support.
+
+   One approximate method involves starting x11vnc with the -localhost
+   option. This basically requires the viewer user to log into the
+   workstation where x11vnc is running via their Unix username and
+   password, and then somehow set up a port redirection of his vncviewer
+   connection to make it appear to emanate from the local machine. As
+   discussed above, ssh is useful for this: ssh -l username -L
+   5900:localhost:5900 hostname ... See the ssh wrapper scripts mentioned
+   [101]elsewhere on this page. Of course a malicious user could allow
+   other users to get in through his channel, but that is a problem with
+   every method. Another thing to watch out for is a malicious user on
+   the viewer side (where ssh is running) trying to sneak in through the
+   ssh port redirection.
+
+   Regarding limiting the set of Unix usernames who can connect, the
+   traditional way would be to further require a VNC password to supplied
+   (-rfbauth, -passwd, etc). A scheme that avoids a second password
+   involves using the -accept option that runs a program to examine the
+   connection information to determine which user is connecting from the
+   local machine. For example, the program could use the ident service on
+   the local machine (normally ident should not be trusted over the
+   network, but on the local machine it should be accurate: otherwise
+   root has been compromised and so there are more serious problems!). An
+   example script passed in via -accept scriptname that deduces the Unix
+   username and limits who can be accepted might look something like
+   this:
+#!/bin/sh
+if [ "$RFB_CLIENT_IP" != "127.0.0.1" -o "$RFB_SERVER_IP" != "127.0.0.1" ]; then
+        exit 1  # something fishy... reject it.
+fi
+user=`echo "$RFB_CLIENT_PORT, $RFB_SERVER_PORT" | nc -w 1 $RFB_CLIENT_IP 113 \
+        | grep 'USERID.*UNIX' | head -1 | sed -e 's/[\r ]//g' | awk -F: '{print
+ $4}'`
+
+for okuser in fred barney wilma betty
+do
+        if [ "X$user" = "X$okuser" ]; then
+                exit 0  # accept it
+        fi
+done
+exit 1  # reject it
+
+   For this to work with ssh port redirection, the ssh option
+   UsePrivilegeSeparation must be enabled.
+
+   Q-22: Can I have two passwords for VNC viewers, one for full access
+   and the other for view-only access to the display?
+
+   Yes, as of May/2004 in the libvncserver CVS there is the -viewpasswd
+   option to supply the view-only password. Note the full-access password
+   option -passwd must be supplied at the same time. E.g.: -passwd sword
+   -viewpasswd fish.
+
+   To avoid specifying the passwords on the command line (where they
+   could be observed via the ps(1) command by any user) you can use the
+   -passwdfile option to specify a file containing plain text passwords.
+   Presumably this file is readable only by you, and ideally it is
+   located on the machine x11vnc is run on (to avoid being snooped on
+   over the network). The first line of this file is the full-access
+   password. If there is a second line in the file and it is non-blank,
+   it is taken as the view-only password.
+
+   View-only passwords currently do not work for the -rfbauth password
+   option (standard VNC password storing mechanism). FWIW, note that
+   although the output (usually placed in $HOME/.vnc/passwd) by the
+   vncpasswd or storepasswd programs (or from x11vnc -storepasswd) looks
+   encrypted they are really just obscured to avoid "casual" password
+   stealing. It takes almost no skill to figure out how to extract the
+   plain text passwords from $HOME/.vnc/passwd since it is very
+   straight-forward to work out what to do from the VNC source code.
+
+   Q-23: I use a screen-lock when I leave my workstation (e.g.
+   xscreensaver or xlock). When I remotely access my workstation desktop
+   via x11vnc I can unlock the desktop fine, but I am worried people will
+   see my activities on the physical monitor. What can I do to prevent
+   this, or at least make it more difficult?
+
+   Probably most work environments would respect your privacy if you
+   powered off the monitor. Also remember if people have physical access
+   to your workstation they basically can do anything they want with it
+   (e.g. install a backdoor for later use, etc).
+
+   In any event, as of Jun/2004 there is an experimental utility to make
+   it more difficult for nosey people to see your x11vnc activities. The
+   source for it is [102]blockdpy.c The idea behind it is simple (but
+   obviously not bulletproof): when a VNC client attaches to x11vnc put
+   the display monitor in the DPMS "off" state, if the DPMS state ever
+   changes immediately start up the screen-lock program. The x11vnc user
+   will notice something is happening and think about what to do next
+   (while the screen is in a locked state).
+
+   This works (or at least has a chance of working) because if the
+   intruder moves the mouse or presses a key on the keyboard, the monitor
+   wakes up out of the DPMS off state, and this induces the screen lock
+   program to activate as soon as possible. Of course there are cracks in
+   this, the eavesdropper could detach your monitor and insert a non-DPMS
+   one, and there are race conditions. As mentioned above this is not
+   bulletproof. A really robust solution would likely require X server
+   and perhaps even video hardware support.
+
+   The blockdpy utility is launched by the -accept option and told to
+   exit via the -gone option (the vnc client user should obviously
+   re-lock the screen before disconnecting!). Instructions can be found
+   in the source code for the utility at the above link.
+
+   Q-24: Can I have x11vnc automatically lock the screen when I
+   disconnect the VNC viewer?
+
+   Yes, a user mentions he uses the -gone option under CDE to run a
+   screen lock program:
+  x11vnc -display :0.0 -forever -gone 'dtaction LockDisplay'
+
+   Other possibilities are:
+  x11vnc -display :0.0 -forever -gone 'xscreensaver-command -lock'
+  x11vnc -display :0.0 -forever -gone 'kdesktop_lock'
+  x11vnc -display :0.0 -forever -gone 'xlock &'
+
+   Q-25: Are reverse connections (i.e. the VNC server connecting to the
+   VNC viewer) using "vncviewer -listen" and vncconnect(1) supported?
+
+   As of Mar/2004 in the libvncserver CVS x11vnc supports reverse
+   connections. On Unix one starts the VNC viewer in listen mode:
+   vncviewer -listen, and then startus up x11vnc with the -connect
+   option. To connect immediately at x11vnc startup time use the
+   "-connect host:port" option (use commas for a list of hosts to connect
+   to). The ":port" is optional (default is 5500). If a file is specified
+   instead: -connect /path/to/some/file then that file is checked
+   periodically (about once a second) for new hosts to connect to.
+
+   To use the vncconnect(1) program (from the core VNC package at
+   www.realvnc.com) specify the -vncconnect option to x11vnc.
+   vncconnect(1) must be pointed to the same X11 DISPLAY as x11vnc (since
+   it uses X properties to communicate with x11vnc). If you do not have
+   or do not want to get the vncconnect(1) program, the following script
+   (named "Vncconnect") may work if your xprop(1) supports the -set
+   option:
+#!/bin/sh
+# usage: Vncconnect <host>
+#        Vncconnect <host:port>
+# note: not all xprop(1) support -set.
+#
+xprop -root -f VNC_CONNECT 8s -set VNC_CONNECT "$1"
+
+   Q-26: Sometimes when a VNC viewer dies abruptly, x11vnc also dies with
+   the error message like: "Broken pipe". I'm using the -forever mode and
+   I want x11vnc to keep running.
+
+   As of Jan/2004 in the libvncserver CVS the SIGPIPE signal is ignored.
+   So if a viewer client terminates abruptly, libvncserver will notice on
+   the next I/O operation and will close the connection and continue on.
+
+   Currently (Apr/2004) the above fix only works for BSD signal systems
+   (Linux, FreeBSD, ...) For SYSV systems there is a workaround in my
+   [103]x11vnc.c file. It also has an option -sigpipe exit to have x11vnc
+   clean up and exit upon receiving SIGPIPE.
+
+   Q-27: How can I use x11vnc to connect to an X login screen like xdm,
+   GNOME gdmgreeter, KDE kdm, or CDE dtlogin?
+
+   One time only.   If the X login screen is running and you just want to
+   connect to it once:
+
+   On Linux it seems it is possible to do this by just adjusting the
+   XAUTHORITY to point to the MIT-COOKIE auth file while running x11vnc
+   as root, e.g. for the gnome display manager, gdm:
+  env XAUTHORITY=/var/gdm/:0.Xauth x11vnc -display :0
+
+   or equivalently with newer x11vnc:
+  x11vnc -auth /var/gdm/:0.Xauth -display :0
+
+   There will be a similar thing for xdm using however a different auth
+   directory path (perhaps something like
+   /var/lib/xdm/authdir/authfiles/A:0-XQvaJk for xdm or
+   /var/lib/kdm/A:0-crWk72 for kdm, where the random characters in
+   basename will vary a bit).
+
+   Another place to look for the auth file is via ps(1) output for the X
+   server process to find any -auth argument.
+
+   gdm seems to have an annoying setting that causes x11vnc (and any
+   other X clients) to be killed after the user logs in. Setting
+   KillInitClients=false in /etc/X11/gdm/gdm.conf may avoid this.
+
+   For dtlogin in addition to the above sort of trick (the auth file
+   should be in /var/dt), you'll also need to add something like
+   Dtlogin*grabServer:False to the Xconfig file (/etc/dt/config/Xconfig
+   or /usr/dt/config/Xconfig on Solaris). Then restart dtlogin, e.g.:
+   /etc/init.d/dtlogin stop; /etc/init.d/dtlogin start or reboot.
+
+   Continuously.   Have x11vnc reattach each time the X server is
+   restarted (i.e. after each logout):
+
+   To make x11vnc always attached to the the X server (please consider
+   the security implications of this!) including the login screen you
+   will need to add a command to the display manager startup script. The
+   name of the script file depends on desktop used and seem to be:
+        GNOME        /etc/X11/gdm/PreSession/Default
+        KDE          /etc/kde*/kdm/Xsetup
+        XDM          /etc/X11/xdm/Xsetup
+        CDE          /etc/dt/config/Xsetup
+
+   although the exact location can depend on operating system and
+   distribution. See the documentation for your display manager:  gdm(1),
+   kdm(1), xdm(1), dtlogin(1) for additional details. The above
+   Dtlogin*grabServer:False step will be needed for dtlogin here as well.
+   There may also be display number specific scripts: e.g. Xsetup_0 vs.
+   Xsetup.
+
+   In any event, the line you will add to the script will look something
+   like:
+  /usr/local/bin/x11vnc -rfbauth /path/to/my/vnc/passwd -forever -bg
+
+   where you should customize the exact command to your needs. You may
+   want to redirect the x11vnc output to a separate log file for
+   debugging. In that case replace the -bg above with something like:
+        1>> /var/tmp/x11vnc.log 2>&1 &
+
+   (or use the "-o logfile" option).
+
+   If you do not want to deal with the display manager startup scripts,
+   here is a kludgey script that can be run manually or out of a boot
+   file like rc.local. [104]x11vnc_loop It will need some local
+   customization before running. Because the XAUTHORITY auth file must be
+   guessed by this script, use of the display manager script above is
+   preferred.
+
+   Xterminals:   Note that if the display machine is a traditional
+   Xterminal (where the X server runs on the Xterminal box, but all of
+   the X client applications run on a central server), the login display
+   manager, and hence the auth files, are on the central server and not
+   on the Xterminal where the X server and x11vnc processes are running.
+   Somehow the MIT-COOKIE auth file data must be copied to the Xterminal
+   (e.g. via ssh, possibly using xauth nextract). You can use xauth -f
+   cookie.file list to test the contents of the cookie in a file
+   "cookie.file"
+
+   Note: use of Display Manager (gdm, kdm, ...) auth cookie files (i.e.
+   from /var/...,  /tmp/..., or elsewhere) may require modification via
+   xauth(1) to correctly include the display x11vnc refers to (e.g. xauth
+   -f cookie.file add :0 . 45be51ae2ce9dfbacd882ab3ef8e96b1, where
+   45be51... was found from an xauth -f /var/... list) or other reasons.
+   See xauth(1) manpage for full details on how to transfer an
+   MIT-MAGIC-COOKIE between machines and displays.
+
+   Q-28: Can I run x11vnc out of inetd(1)?
+
+   Yes, perhaps a line something like this in /etc/inetd.conf will do it
+   for you:
+
+  5900 stream tcp nowait root /usr/sbin/tcpd /usr/local/bin/x11vnc_sh
+
+   where the shell script /usr/local/bin/x11vnc_sh looks something like
+   (you'll need to customize to your settings).
+#!/bin/sh
+XAUTHORITY=/home/fred/.Xauthority; export XAUTHORITY
+/usr/local/bin/x11vnc -inetd -display :0 -rfbauth /home/fred/.vnc/passwd 2>> /t
+mp/x11vnc_sh.log
+
+   Note that you must redirect the standard error output to a log file or
+   /dev/null for proper operation via inetd (otherwise the standard error
+   also goes to the VNC vncviewer, and that confuses it greatly). If you
+   do not use a wrapper script as above but rather call x11vnc directly
+   in /etc/inetd.conf and do not redirect stderr, then you must specify
+   the -q (aka -quiet) option: /usr/local/bin/x11vnc -q -inetd ... or use
+   the -o logfile to collect the output in a file. The wrapper script
+   with stderr redirection to a log file is the recommended method
+   because the errors and warnings printed out are very useful in
+   troubleshooting problems.
+
+   Note also the need to set XAUTHORITY to point to the MIT-COOKIE auth
+   file to get permission to connect to the X display (the x11vnc -auth
+   option could also have been used). See the x11vnc_loop file in the
+   previous question for more ideas on what that auth file may be, etc.
+
+   On Solaris you cannot have the bare number 5900 in /etc/inetd.conf,
+   you'll need to replace it with a word like x11vnc an then put
+   something like x11vnc 5900/tcp in /etc/services.
+
+   Be sure to look at your /etc/hosts.allow and /etc/hosts.deny settings
+   to limit the machines that can connect to this service (your
+   desktop!). For the above example with /etc/hosts.allow:
+  x11vnc_sh : 123.45.67.89
+
+   A really safe way to do things is to limit the above inetd to
+   localhost only (via /etc/hosts.allow) and use ssh to tunnel the
+   incoming connection. Using inetd for this prevents there being a tiny
+   window of opportunity between x11vnc starting up and your vncviewer
+   connecting to it. Always use a VNC password to further protect against
+   unwanted access.
+
+   Q-29: How do I make x11vnc work with the Java VNC viewer applet in a
+   web browser?
+
+   To have x11vnc serve up a Java VNC viewer applet to any web browsers
+   that connect to it, run x11vnc with this option:
+  -httpdir /path/to/the/java/classes/dir
+
+   (this directory will contain the files index.vnc and, for example,
+   VncViewer.jar) Note that libvncserver contains the TightVNC Java
+   classes jar file for your convenience. (it is the file
+   classes/VncViewer.jar in the source tree).
+
+   You will see output something like this:
+  14/05/2004 11:13:56 Autoprobing selected port 5900
+  14/05/2004 11:13:56 Listening for HTTP connections on TCP port 5800
+  14/05/2004 11:13:56   URL http://walnut:5800
+  14/05/2004 11:13:56 screen setup finished.
+  14/05/2004 11:13:56 The VNC desktop is walnut:0
+  PORT=5900
+
+   then you can connect to that URL with any Java enabled browser. Feel
+   free to customize the default index.vnc file in the classes directory.
+
+   Note that if you wanted to, you could also start the Java viewer
+   entirely from the viewer-side by having the jar file there and using
+   either the java or appletviewer commands to run the program.
+
+   Q-30: Why isn't the mouse cursor shape (the little icon shape where
+   the mouse pointer is) correct as I move from window to window?
+
+   As mentioned above, the X11 mouse cursor shape (i.e. little picture:
+   an arrow, X, I-beam, resizer, etc) is one of the few write-only
+   objects in X11. That is, an application can tell the X server what the
+   cursor shape should be when the pointer is in a given window, but a
+   program (like x11vnc) unfortunately cannot read this information. I
+   believe this is because the cursor shape is often downloaded to the
+   graphics hardware (video card), but I could be mistaken.
+
+   A simple kludge is provided by the -mouseX option that changes the
+   cursor when the mouse is on the root background (or any window has the
+   same cursor as the root background). Note that desktops like GNOME or
+   KDE often cover up the root background, so this won't work for those
+   cases.
+
+   It should be possible to apply some heuristics where x11vnc tries to
+   build up a table of cursors for the windows it sees, perhaps using a
+   user supplied hints file, but that has not been explored yet.
+
+   Q-31: Why does the mouse arrow just stay in one corner in my
+   vncviewer, whereas my cursor (that does move) is just a dot?
+
+   This default takes advantage of a [105]tightvnc extension that allows
+   specifying a cursor shape for the local VNC viewer. You may disable it
+   with the -nocursor option to x11vnc if your viewer does not have this
+   extension.
+
+   Q-32: Can I take advantage of the TightVNC extension to the VNC
+   protocol where Cursor Positions Updates are sent back to all connected
+   clients (i.e. passive viewers can see the mouse cursor being moved
+   around by another viewer)?
+
+   Use the -cursorpos option when starting x11vnc. A VNC viewer must
+   support the Cursor Positions Updates for the user to see the mouse
+   motions (the TightVNC viewers support this).
+
+   Q-33: Is it possible to swap the mouse buttons (e.g. left-handed
+   operation), or arbitrarily remap them? How about mapping button clicks
+   to keystrokes, e.g. to partially emulate Mouse wheel scrolling?
+
+   You can remap the mouse buttons via something like: -buttonmap 13-31
+   (or perhaps 12-21). Also, note that xmodmap(1) lets you directly
+   adjust the X server's button mappings, but in some circumstances it
+   might be more desirable to have x11vnc do it.
+
+   One user had an X server with only one mouse button(!) and was able to
+   map all of the VNC client mouse buttons to it via: -buttonmap 123-111.
+
+   Note that the -debug_pointer option prints out much info for every
+   mouse/pointer event.
+
+   To map mouse button clicks to keystrokes you can use the alternate
+   format where the keystrokes are enclosed between colons like this
+   :<KeySym>: in place of the mouse button digit. For a sequence of
+   keysyms separate them with "+" signs. Button clicks can also be
+   included in the sequence via the fake keysyms Button1, etc.
+
+   As an example, suppose the VNC viewer machine has a mouse wheel (these
+   generate button 4 and 5 events), but the machine that x11vnc is run on
+   only has the 3 regular buttons. In normal operation x11vnc will
+   discard the button 4 and 5 events. However, either of the following
+   button maps could possibly be of use emulating the mouse wheel events
+   in this case:
+  -buttonmap 12345-123:Prior::Next:
+  -buttonmap 12345-123:Up+Up+Up::Down+Down+Down:
+
+   Exactly what keystroke "scrolling" events they should be bound to
+   depends on one's taste. If this method is too approximate, one could
+   consider not using -buttonmap but rather configuring the X server to
+   think it has a mouse with 5 buttons even though the physical mouse
+   does not.
+
+   Note that when a keysym-mapped mouse button is clicked down this
+   immediately generates the key-press and key-release events (for each
+   keysym in turn if the mapping has a sequence of keysyms). When the
+   mouse button goes back up nothing is generated.
+
+   If you include modifier keys like Shift_L instead of key-press
+   immediately followed by key-release the state of the modifier key is
+   toggled (however the initial state of the modifier key is ignored). So
+   to map the right button to type my name 'Karl Runge' I could use this:
+  -buttonmap 3-:Shift_L+k+Shift_L+a+r+l+space+Shift_L+r+Shift_L+u+n+g+e:
+
+   (yes, this is getting a little silly).
+
+   Q-34: When I drag windows around with the mouse or scroll up and down
+   things really bog down (unless I do the drag in a single, quick
+   motion). Is there anything to do to improve things?
+
+   As of Jan/2004 there are some improvements in the libvncserver CVS
+   tree. The default should now be much better than before and dragging
+   small windows around should no longer be a huge pain. If for some
+   reason these changes make matters worse, you can go back to the old
+   way via the -old_pointer option.
+
+   Also added was the -nodragging option that disables all screen updates
+   while dragging with the mouse (i.e. mouse motion with a button held
+   down). This gives the snappiest response, but might be undesired in
+   some circumstances when you want to see the visual feedback while
+   dragging (e.g. menu traversal or text selection).
+
+   Q-35: I have lots of memory, but why does x11vnc fail with    shmget:
+   No space left on device    or    Minor opcode of failed request: 1
+   (X_ShmAttach)?
+
+   It is not a matter of free memory, but rather free shared memory (shm)
+   slots, also known as shm segments. This often occurs on a public
+   Solaris machine using the default of only 100 slots. You (or the owner
+   or root) can clean them out with ipcrm(1). x11vnc tries hard to
+   release its slots, but it, and other programs, are not always able to
+   (e.g. if kill -9'd).
+
+   Sometimes x11vnc will notice the problem with shm segments and tries
+   to get by with fewer, only giving a warning like this:
+  19/03/2004 10:10:58 shmat(tile_row) failed.
+  shmat: Too many open files
+  19/03/2004 10:10:58 error creating tile-row shm for len=4
+  19/03/2004 10:10:58 reverting to single_copytile mode
+
+   Here is a shell script [106]shm_clear to list and prompt for removal
+   of your unattached shm segments (attached ones are skipped). I use it
+   while debugging x11vnc (I use shm_clear -y to assume "yes" for each
+   prompt). If x11vnc is regularly not cleaning up its shm segments,
+   please contact me so we can work to improve the situation.
+
+   Longer term, on Solaris you can put something like this in
+   /etc/system:
+  set shmsys:shminfo_shmmax = 0x2000000
+  set shmsys:shminfo_shmmni = 0x1000
+
+   to sweep the problem under the rug (4096 slots). On Linux, examine
+   /proc/sys/kernel/shmmni; you can modify the value by writing to that
+   file.
+
+   Things are even more tight on Solaris 8 and earlier, there is a
+   default maximum number of shm segments per process of 6. The error is
+   the X server (not x11vnc) being unable to attach to the segments, and
+   looks something like this:
+  30/04/2004 14:04:26 Got connection from client 192.168.1.23
+  30/04/2004 14:04:26   other clients:
+  X Error of failed request:  BadAccess (attempt to access private resource den
+ied)
+     Major opcode of failed request:  131 (MIT-SHM)
+     Minor opcode of failed request:  1 (X_ShmAttach)
+     Serial number of failed request:  14
+     Current serial number in output stream:  17
+
+   This tight limit on Solaris 8 can be increased via:
+  set shmsys:shminfo_shmseg = 100
+
+   in /etc/system. See the next paragraph for more workarounds.
+
+   To minimize the number of shm segments used by x11vnc try using the
+   -onetile option (corresponds to only 3 shm segments used, and adding
+   -fs 1.0 knocks it down to 2). If you are having much trouble with shm
+   segments, consider disabling shm completely via the -noshm option.
+   Performance will be somewhat degraded but when done over local machine
+   sockets it should be acceptable (see an [107]earlier question
+   discussing -noshm).
+
+   Q-36: How can I make x11vnc use less system resources?
+
+   The -nap and "-wait n" (where n is the sleep between polls in
+   milliseconds, the default is 30 or so) option are good places to
+   start. Reducing the X server bits per pixel depth (e.g. to 16bpp or
+   even 8bpp) will further decrease memory I/O and network I/O. Using the
+   -onetile option will use less memory and use fewer shared memory slots
+   (add -fs 1.0 for one less slot).
+
+   Q-37: How can I make x11vnc use MORE system resources?
+
+   You can try -threads and dial down the wait time (e.g. -wait 1) and
+   possibly dial down -defer as well. Note that if you try to increase
+   the "frame rate" too much you can bog down the server end with the
+   extra work it needs to do compressing the framebuffer data, etc.
+
+   That said, it is possible to "stream" video via x11vnc if the video
+   window is small enough. E.g. a 256x192 xawtv TV capture window (using
+   the x11vnc -id option) can be streamed over a LAN or wireless at a
+   reasonable frame rate.
+
+   Q-38: I use x11vnc over a slow link with high latency (i.e. dialup
+   modem), is there anything I can do to speed things up?
+
+   Some things you might want to experiment with (most of which will help
+   performance on faster links as well):
+
+     X server/session parameters:
+     * Configure the X server bits per pixel to 16bpp or even 8bpp.
+       (reduces amount of data needed to be sent)
+     * Use a smaller desktop size (e.g. 1024x768 instead of 1280x1024)
+     * Make sure the desktop background is a solid color (the background
+       is resent every time it is re-exposed)
+     * Configure your window manager or desktop "theme" to not use fancy
+       images, shading, and gradients for the window decorations, etc.
+       Disable Opaque moves, resizes, and animations.
+     * Avoid small scrolls of large windows using the Arrow keys or
+       scrollbar. Try to use PageUp/PageDown instead.
+     * On XFree86 turn on the Shadow Framebuffer to speed up reading.
+       (Option "ShadowFB" "true", and possibly Option "NoAccel" "true" as
+       well, in the Device section of /etc/X11/XF86Config) This disables
+       2D acceleration on the physical display and so is probably not
+       worth it, but could be of use in some situations.
+
+     VNC viewer parameters:
+     * Use a [108]TightVNC enabled viewer!
+     * Make sure the tight encoding is being used (look at vncviewer and
+       x11vnc outputs)
+     * Request 8 bits per pixel using -bgr233 (up to 4X speedup over
+       depth 24 TrueColor (32bpp), but colors will be off)
+     * The -depth option is similar to -bgr233 in reducing the requested
+       number of bits per pixel.
+     * Try increasing the TightVNC -compresslevel (compresses more on
+       server side before sending, but uses more CPU)
+     * Try reducing the TightVNC -quality (increases JPEG compression,
+       but is lossy)
+     * Try other VNC encodings via -encodings (tight is probably fastest,
+       but you should check)
+     * On the machine where vncviewer is run, make sure Backing Store is
+       enabled (XFree86 disables it by default causing re-exposures of
+       vncviewer to be very slow)
+
+     x11vnc parameters:
+     * Try using -nodragging (no screen updates when dragging mouse, but
+       sometimes you miss visual feedback)
+     * Try the -progressive pixelheight mode with the block pixelheight
+       100 or so (delays sending vertical blocks since they may change
+       while viewer is receiving earlier ones)
+     * Set -fs 1.0 (disables fullscreen updates)
+     * Enable server-side scaling via -scale m/n to make the VNC
+       frambuffer smaller. (less data needs to be sent, but image may not
+       be sharp and requires extra resources on the server end, may
+       actually slow down transfers of text due to poorer compression)
+     * Try increasing -wait or -defer (reduces the maximum "frame rate",
+       but won't help much for large screen changes)
+     * If you just want to watch one (simple) window use -id (cuts down
+       extraneous polling and updates, but can be buggy or insufficient)
+     * Set -nosel (disables all clipboard selection exchange)
+     * Do not use -mouse or -mouseX (repainting the remote mouse takes
+       resources and round trips)
+
+   Q-39: How can I get my AltGr and Shift modifiers to work between
+   keyboards for different languages?
+
+   The option -modtweak should be of some use for this. It is a mode that
+   monitors the state of the Shift and AltGr Modifiers and tries to
+   deduce the correct keycode to send, possibly by sending fake modifier
+   key presses and releases in addition to the actual keystroke.
+
+   Update:  As of Jul/2004 in the libvncserver CVS, -modtweak is now the
+   default (use -nomodtweak to get the old behavior). This was done
+   because it was noticed on newer XFree86 setups even on bland "us"
+   keyboards like "pc104 us" XFree86 included a "ghost" key with both "<"
+   and ">" it. This key does not exist on the keyboard (see [109]this FAQ
+   for more info). Without -modtweak there was then an ambiguity in the
+   reverse map keysym => keycode, making it so the "<" symbol could not
+   be typed.
+
+   Also see the [110]FAQ about the -xkb option for a more powerful method
+   of modifier tweaking for use on X servers with the XKEYBOARD
+   extension.
+
+   When trying to resolve keyboard mapping problems, that the
+   -debug_keyboard option prints out much info for every keystroke and so
+   can be useful debugging things.
+
+   Q-40: When I try to type a "<" (i.e. less than) instead I get ">"
+   (i.e. greater than)! Strangely, typing ">" works OK!!
+
+   Does your keyboard have a single key with both "<" and ">" on it? Even
+   if it doesn't, your X server may think your keyboard has such a key
+   (e.g. pc105 in the XF86Config file when it should be something else,
+   say pc104).
+
+   The problem here is that on the Xserver where x11vnc is run there are
+   two keycodes that correspond to the "<" keysym. Run something like
+   this to see:
+
+  xmodmap -pk | egrep -i 'KeyCode|less|greater'
+  There are 4 KeySyms per KeyCode; KeyCodes range from 8 to 255.
+      KeyCode     Keysym (Keysym) ...
+       59         0x002c (comma)  0x003c (less)
+       60         0x002e (period) 0x003e (greater)
+       94         0x003c (less)   0x003e (greater)
+
+   That keycode 94 is the special key with both "<" and ">". When x11vnc
+   receives the "<" keysym over the wire from the remote VNC client, it
+   unfortunately maps it to keycode 94 instead of 59, and sends 94 to the
+   X server. Since Shift is down (i.e. you are Shifting the comma key),
+   the X server interprets this as Shifted-94, which is ">".
+
+   A workaround in the X server configuration is to "deaden" that special
+   key:
+
+  xmodmap -e "keycode 94 = "
+
+   However, one user said he had to do this:
+
+  xmodmap -e "keycode 94 = 0x002c 0x003c"
+
+   (If the numerical values are different for your setup, substitute the
+   ones that correspond to your display. The above xmodmap scheme can
+   often be used to work around other ambiguous keysym to keycode
+   mappings).
+
+   Alternatively, here are some x11vnc options to try to work around the
+   problem:
+   -modtweak
+
+   and
+   -remap less-comma
+
+   These are convenient in that they do not modify the actual X server
+   settings. The former is a mode that monitors the state of the Shift
+   and AltGr modifiers and tries to deduce the correct keycode sequence
+   to send. The latter is an immediate remapping of the keysym less to
+   the keysym comma when it comes in from a client (so when Shift is down
+   the comma press will yield "<").
+
+   See also the [111]FAQ about the -xkb option as a possible workaround
+   using the XKEYBOARD extension. Note that of Jul/2004 in the
+   libvncserver CVS the -modtweak option is now that default.
+
+   Note that the -debug_keyboard option prints out much info for every
+   keystroke to aid debugging keyboard problems.
+
+   Q-41: I'm using an "international" keyboard (e.g. German "de", or
+   Danish "dk") and the -modtweak mode works well if the VNC viewer is
+   run on a Unix/Linux machine with a similar keyboard. But if I run the
+   VNC viewer on Unix/Linux with a different keyboard (e.g. "us") or
+   Windows with any keyboard, I can't type some keys like: "@", "$", "<",
+   ">", etc. How can I fix this?
+
+   The problem with Windows is it does not seem to handle AltGr well. It
+   seems to fake it up by sending Control_L+Alt_R to applications. The
+   Windows VNC viewer sends those two down keystrokes out on the wire to
+   the VNC server, but when the user types the next key to get, e.g., "@"
+   the Windows VNC viewer sends events bringing the up the
+   Control_L+Alt_R keys, and then sends the "@" keysym by itself.
+
+   The Unix/Linux VNC viewer on a "us" keyboard does a similar thing
+   since "@" is the Shift of the "2" key. The keysyms Shift and "@" are
+   sent to the VNC server.
+
+   In both cases no AltGr is sent to the VNC server, but we know AltGr is
+   needed on the physical international keyboard to type a "@".
+
+   This all worked fine with x11vnc running with the -modtweak option (it
+   figures out how to adjust the Modifier keys (Shift or AltGr) to get
+   the "@"). However it fails under recent versions of XFree86 (and the
+   X.org fork). These run the XKEYBOARD extension by default and make
+   heavy use of it to handle international keyboards.
+
+   To make a long story short, on these newer XFree86 setups the
+   traditional X keymap lookup x11vnc uses is no longer accurate. x11vnc
+   can't find the keysym "@" anywhere in the keymapping! (even though it
+   is in the XKEYBOARD extended keymapping).
+
+   How to Solve: As of Jul/2004 in the libvncserver CVS x11vnc has two
+   changes:
+     * -modtweak (tweak Modifier keys) is now the default (use
+       -nomodtweak to go back to the old way)
+     * there is a new option -xkb to use the XKEYBOARD extension API to
+       do the Modifier key tweaking.
+
+   The -xkb option seems to fix all of the missing keys: "@", "<", ">",
+   etc.: it is recommended that you try it if you have this sort of
+   problem. Let us know if there are any remaining problems (see the next
+   paragraph for some known problems). If you specify the -debug_keyboard
+   (aka -dk) option twice you will get a huge amount of keystroke
+   debugging output (send it along with any problems you report).
+
+   Known problems:
+     * One user had to disable a "ghost" Mode_switch key that was causing
+       problems under -xkb. His physical AltGr key was bound to
+       ISO_Level3_Shift (which seems to be the XKEYBOARD way of doing
+       things), while there was a ghost key Mode_switch (which seems to
+       be obsolete) in the mapping as well. Both of these keysyms were
+       bound to Mod5 and x11vnc was unfortunately choosing Mode_switch.
+       From the x11vnc -xkb -dk -dk output it was noted that Mode_switch
+       was attached to keycode 93 while ISO_Level3_Shift was attached to
+       keycode 113. The keycode skipping option was used to disable the
+       ghost key: -skip_keycodes 93
+     * In implementing -xkb we noticed that some keys were still not
+       getting through, e.g. "~" and "^". This is not really an XKEYBOARD
+       problem. What was happening was the VNC viewer was sending the
+       keysyms asciitilde and asciicircum to x11vnc, but on the X server
+       with the international keyboard those keysyms were not mapped to
+       any keys. So x11vnc had to skip them.
+       The way these characters are typically entered on international
+       keyboards is by "dead" (aka "mute") keys. E.g. to enter "~" at the
+       physical display the keysym dead_tilde is pressed and released
+       (this usually involves holding AltGr down while another key is
+       pressed) and then space is pressed. (this can also be used get
+       characters with the "~" symbol on top, e.g. "ã" by typing "a"
+       instead of space).
+       What to do? In general the VNC protocol has not really solved this
+       problem: what should be done if the VNC viewer sends a keysym not
+       recognized by the VNC server side? Workarounds can possibly be
+       created using the -remap x11vnc option:
+  -remap asciitilde-dead_tilde,asciicircum-dead_circumflex
+       etc. Use -remap filename if the list is long. Please send us your
+       workarounds for this problem on your keyboard. Perhaps we can have
+       x11vnc adjust automatically at some point.
+     * To complement the above workaround using the -remap, an option
+       -add_keysyms was added. This option instructs x11vnc to bind any
+       unknown Keysyms coming in from VNC viewers to unused Keycodes in
+       the X server. This modifies the global state of the X server. When
+       x11vnc exits it removes the extra keymappings it created. Note
+       that the -remap mappings are applied first, right when the Keysym
+       is received from a VNC viewer, and only after that would
+       -add_keysyms, or anything else, come into play.
+
+   Q-42: When typing I sometimes get double, triple, or more of my
+   keystrokes repeated. I'm sure I only typed them once, what can I do?
+
+   This may be due to an interplay between your X server's key autorepeat
+   delay and the extra time delays caused by x11vnc processing.
+
+   Short answer: disable key autorepeating by running the command "xset r
+   off" on the Xserver where x11vnc is run (restore via "xset r on") or
+   use the new (Jul/2004) -norepeat x11vnc option. You will still have
+   autorepeating because that is taken care of on your VNC viewer side.
+
+   Details: suppose you press a key DOWN and it generates changes in
+   large regions of the screen. The CPU and I/O work x11vnc does for the
+   large screen change could be longer than your X server's key
+   autorepeat delay. x11vnc may not get to processing the key UP event
+   until after the screen work is completed. The X server believes the
+   key has been held down all this time, and applies its autorepeat
+   rules.
+
+   Even without inducing changes in large regions of the screen, this
+   problem could arise when accessing x11vnc via a dialup modem or
+   otherwise high latency link (e.g. > 250 ms latency).
+
+   Look at the output of "xset q" for the "auto repeat delay" setting. Is
+   it low (e.g. < 500 ms)? If you increase it to a very large delay, e.g.
+   "xset r rate 1500" or turn off autorepeat completely: "xset r off",
+   does the problem go away?
+
+   We are looking into a good way to fix this, but in the meantime as a
+   workaround try to use xset r rate N for large enough delay N or xset r
+   off to get rid of the problem. Also, as of Jul/2004 in the
+   libvncserver CVS there is the -norepeat option to automatically
+   disable autorepeating in the X server whenever VNC viewers are
+   attached. Note that the VNC viewer side of the connection will (nearly
+   always) do its own autorepeating so there is no big loss here, unless
+   someone is also working at the physical display and misses his
+   autorepeating.
+
+   Q-43: The machine where I run x11vnc has an AltGr key, but the local
+   machine where I run the VNC viewer does not. Is there a way I can map
+   a local unused key to send an AltGr? How about a Compose key as well?
+
+   Something like "-remap Super_R-Mode_switch" x11vnc option may work.
+   Note that Super_R is the "Right Windoze(tm) Flaggie" key; you may want
+   to choose another. The -debug_keyboard option comes in handy in
+   finding keysym names (so does xev(1)).
+
+   For Compose how about "-remap Menu-Multi_key" (note that Multi_key is
+   the official name for Compose) To do both at the same time: "-remap
+   Super_R-Mode_switch,Menu-Multi_key" or use "-remap filename" to
+   specify remappings from a file.
+
+   Q-44: I have a Sun machine I run x11vnc on. Its Sun keyboard has just
+   one Alt key labelled "Alt" and two Meta keys labelled with little
+   diamonds. The machine where I run the VNC viewer only has Alt keys.
+   How can I send a Meta keypress? (e.g. emacs needs this)
+
+   Here are a couple ideas. The first one is to simply use xmodmap(1) to
+   adjust the Sun X server. Perhaps xmodmap -e "keysym Alt_L = Meta_L
+   Alt_L" will do the trick. (there are other ways to do it, one user
+   used: xmodmap -e "keycode 26 = Meta_L" for his setup).
+
+   Since xmodmap(1) modifies the X server mappings you may not want to do
+   this (because it affects local work on that machine). Something like
+   the -remap Alt_L-Meta_L to x11vnc may be sufficient for ones needs,
+   and does not modify the X server environment. Note that you cannot
+   send Alt_L in this case, maybe -remap Super_L-Meta_L would be a better
+   choice.
+
+   Q-45: Can I map a keystroke to a mouse button click on the remote
+   machine?
+
+   This can be done directly in some X servers using AccessX and
+   Pointer_EnableKeys, but is a bit awkward. It may be more convenient to
+   have x11vnc do the remapping. This can be done via the -remap option
+   using the fake "keysyms" Button1, Button2, etc. as the "to" keys (i.e.
+   the ones after the "-")
+
+   As an example, consider a laptop that has a touchpad with only two
+   buttons. It is difficult to do a middle button "paste" because (using
+   XFree86 Emulate3Buttons) you have to click both buttons on the touch
+   pad at the same time. This remapping:
+  -remap Super_R-Button2
+
+   maps the Super_R "flag" key press to the Button2 click, thereby making
+   pasting a bit easier.
+
+   Note that once the key goes down, the button down and button up events
+   are generated immediately on the x11vnc side. When the key is released
+   (i.e. goes up) no events are generated.
+
+   Q-46: The remote display is larger (in number of pixels) than the
+   local display I am running the vncviewer on. I don't like the
+   vncviewer scrollbars, what I can do?
+
+   vncviewer has a option (usually accessible via F8 key or -fullscreen
+   option) for vncviewer to run in full screen, where it will
+   automatically scroll when the mouse is near the edge of the current
+   view. For quick scrolling, also make sure Backing Store is enabled on
+   the machine vncviewer is run on. (XFree86 disables it by default for
+   some reason, add Option "backingstore" to XF86Config on the vncviewer
+   side).
+
+   BTW, contact me if you are having problems with vncviewer in
+   fullscreen mode with your window manager (i.e. no keyboard response).
+   I have a workaround for vncviewer using XGrabServer().
+
+   There may also be scaling viewers out there (e.g. TightVNC on Windows)
+   that automatically shrink or expand the remote framebuffer to fit the
+   local display. Especially for hand-held devices. See also [112]this
+   FAQ
+
+   Q-47: Does x11vnc support server-side framebuffer scaling? (E.g. to
+   make the desktop smaller).
+
+   As of Jun/2004 in the libvncserver CVS x11vnc provides basic
+   server-side scaling. It is a global scaling of the desktop, not a
+   per-client setting. To enable it use the "-scale fraction" option.
+   "fraction" can either be a floating point number (e.g. -scale 0.5) or
+   the alternative m/n fraction notation (e.g. -scale 2/3).
+
+   The current implementation is experimental in that it still needs to
+   be optimized and there are some painting errors (evidently only with
+   fraction > 1; which is probably the less interesting case). Extra
+   resources (CPU, memory I/O, and memory) are required to do the
+   scaling. If the machine is slow where x11vnc is run with scaling
+   enabled, the interactive response can be unacceptable. OTOH, if run
+   with scaling on a fast machine the performance degradation is usually
+   not a big issue or even noticeable.
+
+   If you just want a quick, rough "thumbnail" of the display you can
+   append ":nb" to the fraction to turn on "no blending" mode. E.g.:
+   "-scale 1/3:nb" Fonts will be difficult to read, but the larger
+   features will be recognizable. BTW, "no blending" mode is forced on
+   when scaling 8bpp PseudoColor displays (because blending an indexed
+   colormap is a bad idea and leads to random colors).
+
+   In general for a scaled display if you are using a TightVNC viewer you
+   may want to turn off jpeg encoding (e.g. vncviewer -nojpeg host:0).
+   There appears to be a noise enhancement effect, especially for regions
+   containing font/text: the scaling can introduce some pixel artifacts
+   that evidently causes the TightVNC to incorrectly detect the regions
+   as image data and thereby introduce additional pixel artifacts due to
+   the lossiness of the jpeg compression algorithm. Experiment to see if
+   -nojpeg improves the readability of text when using -scale to shrink
+   the display size. Also note that scaling may actually slow down the
+   transfer of text regions because after being scaled they do not
+   compress as well.
+
+   Another issue is that it appears VNC viewers require the screen width
+   to be a multiple of 4. When scaling x11vnc will round the width to the
+   nearest multiple of 4. To disable this use the ":n4" sub option (like
+   ":nb" in the previous paragraph; to specify both use a comma:
+   ":nb,n4", etc.)
+
+   If one desires per-client scaling for something like 1:1 from a
+   workstation and 1:2 from a smaller device (e.g. handheld), currently
+   the only option is to run two (or more) x11vnc processes with
+   different scalings listening on separate ports (-rfbport option,
+   etc.).
+
+   Q-48: Does x11vnc work with Xinerama? (i.e. multiple monitors joined
+   together to form one big, single screen).
+
+   Yes, it should generally work because it simply polls the big
+   effective screen. If the viewing-end monitor is not as big as the
+   remote Xinerama display, then the vncviewer scrollbars, etc, will have
+   to be used to pan across the large area.
+
+   There are a couple potential issues however. If the screen is not
+   rectangular (e.g. 1280x1024 and 1024x768 monitors joined together),
+   then there will be "non-existent" areas on the screen. The X server
+   will return "garbage" image data for these areas and so they may be
+   distracting to the viewer. The -blackout x11vnc option allows you to
+   blacken-out rectangles by specifying their WxH+X+Y geometries. If your
+   system has the libXinerama library, the -xinerama x11vnc option can be
+   used to have it automatically determine the rectangles to be blackened
+   out. (Note on 8bpp PseudoColor displays the fill color may not be
+   black).
+
+   Some users have reported that the mouse does not behave properly for
+   their Xinerama display: i.e. the mouse cannot be moved to all regions
+   of the large display. If this happens try using the -xwarppointer
+   option. This instructs x11vnc to fake mouse pointer motions using the
+   XWarpPointer function instead of the XTestFakeMotionEvent XTEST
+   function. (This may be due to a bug in the X server for XTEST when
+   Xinerama is enabled).
+
+   Q-49: Can I use x11vnc on a multi-headed display that is not Xinerama
+   (i.e. separate screens :0.0, :0.1, ... for each monitor)?
+
+   You can, but it is a little bit awkward: you must start separate
+   x11vnc processes for each screen, and on the viewing end start up
+   separate VNC viewer processes connecting to them. e.g. on the remote
+   end:
+  x11vnc -display :0.0 -bg -q -rfbport 5900
+  x11vnc -display :0.1 -bg -q -rfbport 5901
+
+   (this could be automated in the display manager Xsetup for example)
+   and then on the local machine where you are sitting:
+  vncviewer somehost:0 &
+  vncviewer somehost:1 &
+
+   Note: if you are running on Solaris 8 or earlier you can easily hit up
+   against the maximum of 6 shm segments per process (for Xsun in this
+   case) from running multiple x11vnc processes. You should modify
+   /etc/system as mentioned in another [113]FAQ to increase the limit. It
+   is probably also a good idea to run with the -onetile option in this
+   case (to limit each x11vnc to 3 shm segments), or even -noshm to use
+   no shm segments.
+
+   Q-50: Why is the view in my VNC viewer completely black? Or why is
+   everything flashing around randomly?
+
+   See the next FAQ for a possible explanation.
+
+   Q-51: I use Linux Virtual Consoles (VC's) to implement 'Fast User
+   Switching' between users' sessions (e.g. Betty is on Ctrl-Alt-F7,
+   Bobby is on Ctrl-Alt-F8, and Sid is on Ctrl-Alt-F1: they use those
+   keystrokes to switch between their sessions). How come the view in a
+   VNC viewer connecting to x11vnc is either completely black or
+   otherwise all messed up unless the X session x11vnc is attached to is
+   in the active VC?
+
+   This seems to have to do with how applications (the X server processes
+   in this case) must "play nicely" if they are not on the active VC.
+   That is, they should not read from the keyboard or mouse or manage the
+   video display unless they have the active VC. Given that it appears
+   the XGetImage() call must ultimately retrieve the framebuffer data
+   from the video hardware itself, it would make sense x11vnc's polling
+   wouldn't work unless the X session had active control of the VC.
+
+   There does not seem to be an easy way to work around this. Even xwd(1)
+   doesn't work in this case (try it). Something would need to be done at
+   a lower level, say in the XFree86 X server. Also, using the XFree86
+   Shadow Framebuffer (a copy of the video framebuffer is kept in main
+   memory) does not appear to fix the problem.
+
+   If no one is sitting at the workstation and you just want to remotely
+   switch the VC over to the one associated with your X session (so
+   x11vnc can poll it), one can use the switchto(1) command, e.g.
+   switchto 7 for VC #7.
+
+   Q-52: Does the Clipboard/Selection get transferred between the
+   vncviewer and the X display?
+
+   As of Jan/2004 in the libvncserver CVS x11vnc supports the "CutText"
+   part of the rfb protocol. Furthermore, x11vnc is able to hold the
+   PRIMARY selection (Xvnc does not seem to do this). If you don't want
+   the Clipboard/Selection exchanged use the -nosel option. If you don't
+   want the PRIMARY selection to be polled for changes use the -noprimary
+   option.
+
+   Q-53: Why don't I hear the "Beeps" in my X session (e.g. when typing
+   tput bel in an xterm)?
+
+   As of Dec/2003 in the libvncserver CVS "Beep" XBell events are tracked
+   by default. The X server must support the XKEYBOARD extension (this is
+   not on by default in Solaris, see Xserver(1) for how to turn it on),
+   and so you won't hear them if the extension is not present.
+
+   If you don't want to hear the beeps use the -nobell option. If you
+   want to hear the audio from the remote applications, consider trying a
+   redirector such as esd.
+
+   Q-54: I am using x11vnc where my local machine has "popup/hidden
+   taskbars" (e.g. GNOME or MacOS X) and the remote display where x11vnc
+   runs also has "popup/hidden taskbars" (e.g. GNOME). When I move the
+   mouse to the edge of the screen where the popups happen, the taskbars
+   interfere and fight with each other in strange ways. What can I do?
+
+   No useful answer so far. Is there a way to temporarily disable one or
+   both of these magic desktop taskbars?
+
+References
+
+   1. http://www.karlrunge.com/x11vnc/index.html#faq
+   2. http://www.karlrunge.com/x11vnc/index.html#downloading
+   3. http://www.karlrunge.com/x11vnc/index.html#building
+   4. http://www.uk.research.att.com/vnc/
+   5. http://www.realvnc.com/
+   6. http://www.tightvnc.com/
+   7. http://www.karlrunge.com/x11vnc/index.html#downloading
+   8. http://www.sun.com/software/solaris/freeware/
+   9. http://www.karlrunge.com/x11vnc/x11vnc_opts.html
+  10. http://www.karlrunge.com/x11vnc/index.html#accept
+  11. http://www.karlrunge.com/x11vnc/index.html#passwd
+  12. http://www.karlrunge.com/x11vnc/index.html#passwdfile
+  13. http://sourceforge.net/projects/libvncserver/
+  14. http://sourceforge.net/project/showfiles.php?group_id=32584&package_id=119006&release_id=257442
+  15. http://www.karlrunge.com/x11vnc/x11vnc.c
+  16. http://www.karlrunge.com/x11vnc/index.html#binaries
+  17. http://www.karlrunge.com/x11vnc/rx11vnc
+  18. http://www.karlrunge.com/x11vnc/rx11vnc.pl
+  19. http://www.tightvnc.com/
+  20. http://www.karlrunge.com/x11vnc/x11vnc_opts.html
+  21. http://www.karlrunge.com/x11vnc/index.html#passwd
+  22. http://wwws.sun.com/sunray/index.html
+  23. mailto:xvml@karlrunge.com
+  24. http://www.karlrunge.com/x11vnc/index.html#FAQ-1
+  25. http://www.karlrunge.com/x11vnc/index.html#FAQ-2
+  26. http://www.karlrunge.com/x11vnc/index.html#FAQ-3
+  27. http://www.karlrunge.com/x11vnc/index.html#FAQ-4
+  28. http://www.karlrunge.com/x11vnc/index.html#FAQ-5
+  29. http://www.karlrunge.com/x11vnc/index.html#FAQ-6
+  30. http://www.karlrunge.com/x11vnc/index.html#FAQ-7
+  31. http://www.karlrunge.com/x11vnc/index.html#FAQ-8
+  32. http://www.karlrunge.com/x11vnc/index.html#FAQ-9
+  33. http://www.karlrunge.com/x11vnc/index.html#FAQ-10
+  34. http://www.karlrunge.com/x11vnc/index.html#FAQ-11
+  35. http://www.karlrunge.com/x11vnc/index.html#FAQ-12
+  36. http://www.karlrunge.com/x11vnc/index.html#FAQ-13
+  37. http://www.karlrunge.com/x11vnc/index.html#FAQ-14
+  38. http://www.karlrunge.com/x11vnc/index.html#FAQ-15
+  39. http://www.karlrunge.com/x11vnc/index.html#FAQ-16
+  40. http://www.karlrunge.com/x11vnc/index.html#FAQ-17
+  41. http://www.karlrunge.com/x11vnc/index.html#FAQ-18
+  42. http://www.karlrunge.com/x11vnc/index.html#FAQ-19
+  43. http://www.karlrunge.com/x11vnc/index.html#FAQ-20
+  44. http://www.karlrunge.com/x11vnc/index.html#FAQ-21
+  45. http://www.karlrunge.com/x11vnc/index.html#FAQ-22
+  46. http://www.karlrunge.com/x11vnc/index.html#FAQ-23
+  47. http://www.karlrunge.com/x11vnc/index.html#FAQ-24
+  48. http://www.karlrunge.com/x11vnc/index.html#FAQ-25
+  49. http://www.karlrunge.com/x11vnc/index.html#FAQ-26
+  50. http://www.karlrunge.com/x11vnc/index.html#FAQ-27
+  51. http://www.karlrunge.com/x11vnc/index.html#FAQ-28
+  52. http://www.karlrunge.com/x11vnc/index.html#FAQ-29
+  53. http://www.karlrunge.com/x11vnc/index.html#FAQ-30
+  54. http://www.karlrunge.com/x11vnc/index.html#FAQ-31
+  55. http://www.karlrunge.com/x11vnc/index.html#FAQ-32
+  56. http://www.karlrunge.com/x11vnc/index.html#FAQ-33
+  57. http://www.karlrunge.com/x11vnc/index.html#FAQ-34
+  58. http://www.karlrunge.com/x11vnc/index.html#FAQ-35
+  59. http://www.karlrunge.com/x11vnc/index.html#FAQ-36
+  60. http://www.karlrunge.com/x11vnc/index.html#FAQ-37
+  61. http://www.karlrunge.com/x11vnc/index.html#FAQ-38
+  62. http://www.karlrunge.com/x11vnc/index.html#FAQ-39
+  63. http://www.karlrunge.com/x11vnc/index.html#FAQ-40
+  64. http://www.karlrunge.com/x11vnc/index.html#FAQ-41
+  65. http://www.karlrunge.com/x11vnc/index.html#FAQ-42
+  66. http://www.karlrunge.com/x11vnc/index.html#FAQ-43
+  67. http://www.karlrunge.com/x11vnc/index.html#FAQ-44
+  68. http://www.karlrunge.com/x11vnc/index.html#FAQ-45
+  69. http://www.karlrunge.com/x11vnc/index.html#FAQ-46
+  70. http://www.karlrunge.com/x11vnc/index.html#FAQ-47
+  71. http://www.karlrunge.com/x11vnc/index.html#FAQ-48
+  72. http://www.karlrunge.com/x11vnc/index.html#FAQ-49
+  73. http://www.karlrunge.com/x11vnc/index.html#FAQ-50
+  74. http://www.karlrunge.com/x11vnc/index.html#FAQ-51
+  75. http://www.karlrunge.com/x11vnc/index.html#FAQ-52
+  76. http://www.karlrunge.com/x11vnc/index.html#FAQ-53
+  77. http://www.karlrunge.com/x11vnc/index.html#FAQ-54
+  78. http://www.karlrunge.com/x11vnc/index.html#building
+  79. http://www.karlrunge.com/x11vnc/index.html#buildfaq
+  80. http://packages.debian.org/x11vnc
+  81. http://www.linuxpackages.net/search_view.php?by=name&name=x11vnc
+  82. http://dag.wieers.com/packages/x11vnc/
+  83. http://www.bell-labs.com/project/wwexptools/packages.html
+  84. http://www.karlrunge.com/x11vnc/x11vnc_opts.html
+  85. http://www.karlrunge.com/x11vnc/index.html#passwd
+  86. http://fredrik.hubbe.net/x2vnc.html
+  87. http://www.hubbe.net/~hubbe/win2vnc.html
+  88. http://www.deboer.gmxhome.de/
+  89. http://sourceforge.net/projects/win2vnc/
+  90. http://fredrik.hubbe.net/x2vnc.html
+  91. http://freshmeat.net/projects/x2x/
+  92. http://ftp.digital.com/pub/Digital/SRC/x2x/
+  93. http://zapek.com/software/zvnc/
+  94. http://www.karlrunge.com/x11vnc/index.html#inetd
+  95. ftp://ftp.x.org/
+  96. http://www.karlrunge.com/x11vnc/dtVncPopup
+  97. http://www.karlrunge.com/x11vnc/index.html#passwdfile
+  98. http://www.karlrunge.com/x11vnc/index.html#tunnelling
+  99. http://www.karlrunge.com/x11vnc/index.html#tunnelling
+ 100. http://www.karlrunge.com/x11vnc/index.html#tunnelling
+ 101. http://www.karlrunge.com/x11vnc/index.html#tunnelling
+ 102. http://www.karlrunge.com/x11vnc/blockdpy.c
+ 103. http://www.karlrunge.com/x11vnc/x11vnc.c
+ 104. http://www.karlrunge.com/x11vnc/x11vnc_loop
+ 105. http://www.tightvnc.com/
+ 106. http://www.karlrunge.com/x11vnc/shm_clear
+ 107. http://www.karlrunge.com/x11vnc/index.html#noshm
+ 108. http://www.tightvnc.com/
+ 109. http://www.karlrunge.com/x11vnc/index.html#greaterless
+ 110. http://www.karlrunge.com/x11vnc/index.html#xkbmodtweak
+ 111. http://www.karlrunge.com/x11vnc/index.html#xkbmodtweak
+ 112. http://www.karlrunge.com/x11vnc/index.html#scaling
+ 113. http://www.karlrunge.com/x11vnc/index.html#solshm
+
+
+=======================================================================
+http://www.karlrunge.com/x11vnc/x11vnc_opts.html:
+
+     _________________________________________________________________
+
+x11vnc: a VNC server for real X displays
+
+   Here are all of x11vnc command line options:
+% x11vnc -help
+
+x11vnc: allow VNC connections to real X11 displays. 0.6.2 lastmod: 2004-07-31
+
+Typical usage is:
+
+   Run this command in a shell on the remote machine "far-host"
+   with X session you wish to view:
+
+       x11vnc -display :0
+
+   Then run this in another window on the machine you are sitting at:
+
+       vncviewer far-host:0
+
+Once x11vnc establishes connections with the X11 server and starts
+listening as a VNC server it will print out a string: PORT=XXXX where
+XXXX is typically 5900 (the default VNC port).  One would next run something
+like this on the local machine: "vncviewer host:N" where N is XXXX - 5900,
+i.e. usually "vncviewer host:0"
+
+By default x11vnc will not allow the screen to be shared and it will
+exit as soon as a client disconnects.  See -shared and -forever below
+to override these protections.
+
+For additional info see: http://www.karlrunge.com/x11vnc/
+                    and  http://www.karlrunge.com/x11vnc/#faq
+
+
+Rudimentary config file support: if the file $HOME/.x11vncrc exists then each
+line in it is treated as a single command line option.  Disable with -norc.
+For each option name, the leading character "-" is not required.  E.g. a
+line that is either "nap" or "-nap" may be used and are equivalent.
+Likewise "wait 100" or "-wait 100" are acceptable and equivalent lines.
+The "#" character comments out to the end of the line in the usual way.
+Leading and trailing whitespace is trimmed off.  Lines may be continued with
+a "\" as the last character of a line (it becomes a space character).
+
+Options:
+
+-display disp          X11 server display to connect to, usually :0.  The X
+                       server process must be running on same machine and
+                       support MIT-SHM.  Equivalent to setting the DISPLAY
+                       environment variable to "disp".
+-auth file             Set the X authority file to be "file", equivalent to
+                       setting the XAUTHORITY environment varirable to "file"
+                       before startup.  See Xsecurity(7), xauth(1) man pages.
+
+-id windowid           Show the window corresponding to <windowid> not the
+                       entire display. Warning: bugs! new toplevels missed!...
+-flashcmap             In 8bpp indexed color, let the installed colormap flash
+                       as the pointer moves from window to window (slow).
+-notruecolor           Force 8bpp indexed color even if it looks like TrueColor
+.
+-visual n              Experimental option: probably does not do what you
+                       think.  It simply *forces* the visual used for the
+                       framebuffer; this may be a bad thing... It is useful for
+                       testing and for some workarounds.  n may be a decimal
+                       number, or 0x hex.  Run xdpyinfo(1) for the values.
+                       One may also use "TrueColor", etc. see <X11/X.h>
+                       for a list.  If the string ends in ":m" for better
+                       or for worse the visual depth is forced to be m.
+
+-scale fraction        Scale the framebuffer by factor "fraction".  Values
+                       less than 1 shrink the fb.  Note: image may not be sharp
+                       and response may be slower.  If "fraction" contains
+                       a decimal point "." it is taken as a floating point
+                       number, alternatively the notation "m/n" may be used
+                       to denote fractions, e.g. -scale 2/3.
+
+                       Scaling Options: can be added after fraction via ":",
+                       to supply multiple ":" options use commas.
+                       If you just want a quick, rough scaling without
+                       blending, append ":nb" to "fraction" (e.g. -scale
+                       1/3:nb).  For compatibility with vncviewers the scaled
+                       width is adjusted to be a multiple of 4, to disable
+                       this use ":n4".  More esoteric options: ":in" use
+                       interpolation scheme even when shrinking, ":pad",
+                       pad scaled width and height to be multiples of scaling
+                       denominator (e.g. 3 for 2/3).
+
+-viewonly              All VNC clients can only watch (default off).
+-shared                VNC display is shared (default off).
+-once                  Exit after the first successfully connected viewer
+                       disconnects, opposite of -forever. This is the Default.
+-forever               Keep listening for more connections rather than exiting
+                       as soon as the first client(s) disconnect. Same as -many
+-connect string        For use with "vncviewer -listen" reverse connections.
+                       If string has the form "host" or "host:port"
+                       the connection is made once at startup.  Use commas
+                       for a list of host's and host:port's.  If string
+                       contains "/" it is instead interpreted as a file to
+                       periodically check for new hosts.  The first line is
+                       read and then the file is truncated.
+-vncconnect            Monitor the VNC_CONNECT X property set by the standard
+                       VNC program vncconnect(1).  When the property is set
+                       to host or host:port establish a reverse connection.
+                       Using xprop(1) instead of vncconnect may work, see FAQ.
+-inetd                 Launched by inetd(1): stdio instead of listening socket.
+                       Note: if you are not redirecting stderr to a log file
+                       (via shell 2> or -o option) you must also specify the
+                       -q option.
+
+-allow addr1[,addr2..] Only allow client connections from IP addresses matching
+                       the comma separated list of numerical addresses.
+                       Can be a prefix, e.g. "192.168.100." to match a
+                       simple subnet, for more control build libvncserver
+                       with libwrap support.  If the list contains a "/"
+                       it instead is a interpreted as a file containing
+                       addresses or prefixes that is re-read each time a new
+                       client connects.  Lines can be commented out with the
+                       "#" character in the usual way.
+-localhost             Same as -allow 127.0.0.1
+-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd
+                       (full-access) password must also be supplied.
+-passwdfile filename   Specify libvncserver -passwd via the first line of
+                       the file "filename" instead of via command line.
+                       If a second non blank line exists in the file it is
+                       taken as a view-only password (i.e. -viewpasswd) Note:
+                       this is a simple plaintext passwd, see also -rfbauth
+                       and -storepasswd below.
+-storepasswd pass file Store password "pass" as the VNC password in the
+                       file "file".  Once the password is stored the
+                       program exits.  Use the password via "-rfbauth file"
+-accept string         Run a command (possibly to prompt the user at the
+                       X11 display) to decide whether an incoming client
+                       should be allowed to connect or not.  "string" is
+                       an external command run via system(3) or some special
+                       cases described below.  Be sure to quote "string"
+                       if it contains spaces, etc.  If the external command
+                       returns 0 the client is accepted, otherwise the client
+                       is rejected.  See below for an extension to accept a
+                       client view-only.
+
+                       Environment: The RFB_CLIENT_IP environment variable will
+                       be set to the incoming client IP number and the port
+                       in RFB_CLIENT_PORT (or -1 if unavailable).  Similarly,
+                       RFB_SERVER_IP and RFB_SERVER_PORT (the x11vnc side
+                       of the connection), are set to allow identification
+                       of the tcp virtual circuit.  The x11vnc process
+                       id will be in RFB_X11VNC_PID, a client id number in
+                       RFB_CLIENT_ID, and the number of other connected clients
+                       in RFB_CLIENT_COUNT.
+
+                       If "string" is "popup" then a builtin popup window
+                       is used.  The popup will time out after 120 seconds,
+                       use "popup:N" to modify the timeout to N seconds
+                       (use 0 for no timeout)
+
+                       If "string" is "xmessage" then an xmessage(1)
+                       invocation is used for the command.
+
+                       Both "popup" and "xmessage" will present an option
+                       for accepting the client "View-Only" (the client
+                       can only watch).  This option will not be presented if
+                       -viewonly has been specified, in which case the entire
+                       display is view only.
+
+                       If the user supplied command is prefixed with something
+                       like "yes:0,no:*,view:3 mycommand ..." then this
+                       associates the numerical command return code with
+                       the actions: accept, reject, and accept-view-only,
+                       respectively.  Use "*" instead of a number to indicate
+                       the default action (in case the command returns an
+                       unexpected value).  E.g. "no:*" is a good choice.
+
+                       Note that x11vnc blocks while the external command or
+                       or popup is running (other clients may see no updates
+                       during this period).
+
+                       More -accept tricks: use "popupmouse" to only allow
+                       mouse clicks in the builtin popup to be recognized.
+                       Similarly use "popupkey" to only recognize keystroke
+                       responses.  All 3 of the popup keywords can be followed
+                       by +N+M to supply a position for the popup window.
+                       The default is to center the popup window.
+-gone string           As -accept string, except to run a user supplied command
+                       when a client goes away (disconnects).  Unlike -accept,
+                       the command return code is not interpreted by x11vnc.
+
+-noshm                 Do not use the MIT-SHM extension for the polling.
+                       Remote displays can be polled this way: be careful this
+                       can use large amounts of network bandwidth.  This is
+                       also of use if the local machine has a limited number
+                       of shm segments and -onetile is not sufficient.
+-flipbyteorder         Sometimes needed if remotely polled host has different
+                       endianness.  Ignored unless -noshm is set.
+-onetile               Do not use the new copy_tiles() framebuffer mechanism,
+                       just use 1 shm tile for polling.  Same as -old_copytile.
+                       Limits shm segments used to 3.
+
+-blackout string       Black out rectangles on the screen. string is a comma
+                       separated list of WxH+X+Y type geometries for each rect.
+-xinerama              If your screen is composed of multiple monitors
+                       glued together via XINERAMA, and that screen is
+                       non-rectangular this option will try to guess the areas
+                       to black out (if your system has libXinerama).
+
+-o logfile             Write stderr messages to file "logfile" instead of
+                       to the terminal.  Same as -logfile "file".
+-rc filename           Use "filename" instead of $HOME/.x11vncrc for rc file.
+-norc                  Do not process any .x11vncrc file for options.
+-h, -help              Print this help text.
+-V, -version           Print program version (last modification date).
+
+-q                     Be quiet by printing less informational output to
+                       stderr.  Same as -quiet.
+-bg                    Go into the background after screen setup.  Messages to
+                       stderr are lost unless -o logfile is used.  Something
+                       like this could be useful in a script:
+                         port=`ssh $host "x11vnc -display :0 -bg" | grep PORT`
+                         port=`echo "$port" | sed -e 's/PORT=//'`
+                         port=`expr $port - 5900`
+                         vncviewer $host:$port
+
+-modtweak              Option -modtweak automatically tries to adjust the AltGr
+-nomodtweak            and Shift modifiers for differing language keyboards
+                       between client and host.  Otherwise, only a single key
+                       press/release of a Keycode is simulated (i.e. ignoring
+                       the state of the modifiers: this usually works for
+                       identical keyboards).  Also useful in resolving cases
+                       where a Keysym is bound to multiple keys (e.g. "<" + ">"
+                       and "," + "<" keys).  Default: -modtweak
+-xkb                   When in modtweak mode, use the XKEYBOARD extension
+                       (if it exists) to do the modifier tweaking.
+-skip_keycodes string  Skip keycodes not on your keyboard but your X server
+                       thinks exist.  Currently only applies to -xkb mode.
+                       "string" is a comma separated list of decimal
+                       keycodes.  Use this option to help x11vnc in the reverse
+                       problem it tries to solve: Keysym -> Keycode(s) when
+                       ambiguities exist.  E.g. -skip_keycodes 94,114
+-add_keysyms           If a Keysym is received from a VNC viewer and
+                       that Keysym does not exist in the X server, then
+                       add the Keysym to the X server's keyboard mapping.
+                       Added Keysyms will be removed when exiting.
+-clear_mods            At startup and exit clear the modifier keys by sending
+                       KeyRelease for each one. The Lock modifiers are skipped.
+                       Used to clear the state if the display was accidentally
+                       left with any pressed down.
+-clear_keys            As -clear_mods, except try to release any pressed key.
+                       Note that this option and -clear_mods can interfere
+                       with a person typing at the physical keyboard.
+-remap string          Read Keysym remappings from file named "string".
+                       Format is one pair of Keysyms per line (can be name
+                       or hex value) separated by a space.  If no file named
+                       "string" exists, it is instead interpreted as this
+                       form: key1-key2,key3-key4,...  See <X11/keysymdef.h>
+                       header file for a list of Keysym names, or use
+                       xev(1). To map a key to a button click, use the
+                       fake Keysyms "Button1", ..., etc.
+                       E.g. -remap Super_R-Button2
+-norepeat              Option -norepeat disables X server key auto repeat
+-repeat                when VNC clients are connected.  This works around a
+                       repeating keystrokes bug (triggered by long processing
+                       delays between key down and key up client events:
+                       either from large screen changes or high latency).
+                       Note: your VNC viewer side will likely do autorepeating,
+                       so this is no loss unless someone is simultaneously at
+                       the real X display.  Default: -repeat
+
+-nofb                  Ignore video framebuffer: only process keyboard and
+                       pointer.  Intended for use with Win2VNC and x2vnc
+                       dual-monitor setups.
+-nobell                Do not watch for XBell events. (no beeps will be heard)
+                       Note: XBell monitoring requires the XKEYBOARD extension.
+-nosel                 Do not manage exchange of X selection/cutbuffer between
+                       VNC viewers and the X server.
+-noprimary             Do not poll the PRIMARY selection for changes to send
+                       back to clients.  (PRIMARY is still set on received
+                       changes, however).
+
+-nocursor              Do not have the VNC viewer show a local cursor.
+-mouse                 Draw a 2nd cursor at the current X pointer position.
+-mouseX                As -mouse, but also draw an "X" when pointer is on
+                       root background.
+-X                     Shorthand for -mouseX -nocursor.
+-xwarppointer          Move the pointer with XWarpPointer() instead of XTEST
+                       (try as a workaround if pointer behaves poorly, e.g.
+                       on touchscreens or other non-standard setups).
+-cursorpos             Option -cursorpos enables sending the X cursor position
+-nocursorpos           back to all vnc clients that support the TightVNC
+                       CursorPosUpdates extension.  Default: -cursorpos
+-buttonmap string      String to remap mouse buttons.  Format: IJK-LMN, this
+                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31
+
+                       Button presses can also be mapped to keystrokes: replace
+                       a button digit on the right of the dash with :<sym>:
+                       or :<sym1>+<sym2>: etc. for multiple keys. For example,
+                       if the viewing machine has a mouse-wheel (buttons 4 5)
+                       but the x11vnc side does not, these will do scrolls:
+                              -buttonmap 12345-123:Prior::Next:
+                              -buttonmap 12345-123:Up+Up+Up::Down+Down+Down:
+
+                       See <X11/keysymdef.h> header file for a list of Keysyms,
+                       or use the xev(1) program.  Note: mapping of button
+                       clicks to Keysyms may not work if -modtweak or -xkb is
+                       needed for the Keysym.
+
+                       If you include a modifier like "Shift_L" the
+                       modifier's up/down state is toggled, e.g. to send
+                       "The" use :Shift_L+t+Shift_L+h+e: (the 1st one is
+                       shift down and the 2nd one is shift up). (note: the
+                       initial state of the modifier is ignored and not reset)
+                       To include button events use "Button1", ... etc.
+
+-nodragging            Do not update the display during mouse dragging events
+                       (mouse motion with a button held down).  Greatly
+                       improves response on slow setups, but you lose all
+                       visual feedback for drags, text selection, and some
+                       menu traversals.
+-old_pointer           Do not use the new pointer input handling mechanisms.
+                       See check_input() and pointer() in source file for
+                       details.
+-input_skip n          For the old pointer handling when non-threaded: try to
+                       read n user input events before scanning display. n < 0
+                       means to act as though there is always user input.
+
+-debug_pointer         Print debugging output for every pointer event.
+-debug_keyboard        Print debugging output for every keyboard event.
+                       Same as -dp and -dk, respectively.  Use multiple
+                       times for more output.
+
+-defer time            Time in ms to wait for updates before sending to client
+                       [rfbDeferUpdateTime]  Default: 30
+-wait time             Time in ms to pause between screen polls.  Used to cut
+                       down on load.  Default: 30
+-nap                   Monitor activity and if low take longer naps between
+                       polls to really cut down load when idle.  Default: off
+
+-sigpipe string        Broken pipe (SIGPIPE) handling.  "string" can be
+                       "ignore" or "exit".  For "ignore" libvncserver
+                       will handle the abrupt loss of a client and continue,
+                       for "exit" x11vnc will cleanup and exit at the 1st
+                       broken connection.  Default: "ignore".
+-threads               Whether or not to use the threaded libvncserver
+-nothreads             algorithm [rfbRunEventLoop] if libpthread is available
+                       Default: -nothreads
+
+-fs f                  If the fraction of changed tiles in a poll is greater
+                       than f, the whole screen is updated.  Default: 0.75
+-gaps n                Heuristic to fill in gaps in rows or cols of n or
+                       less tiles.  Used to improve text paging.  Default: 4
+-grow n                Heuristic to grow islands of changed tiles n or wider
+                       by checking the tile near the boundary.  Default: 3
+-fuzz n                Tolerance in pixels to mark a tiles edges as changed.
+                       Default: 2
+
+
+These options are passed to libvncserver:
+
+-rfbport port          TCP port for RFB protocol
+-rfbwait time          max time in ms to wait for RFB client
+-rfbauth passwd-file   use authentication on RFB protocol
+                       (use 'storepasswd' to create a password file)
+-passwd plain-password use authentication 
+                       (use plain-password as password, USE AT YOUR RISK)
+-deferupdate time      time in ms to defer updates (default 40)
+-desktop name          VNC desktop name (default "LibVNCServer")
+-alwaysshared          always treat new clients as shared
+-nevershared           never treat new clients as shared
+-dontdisconnect        don't disconnect existing clients when a new non-shared
+                       connection comes in (refuse new connection instead)
+-httpdir dir-path      enable http server using dir-path home
+-httpport portnum      use portnum for http connection
+-enablehttpproxy       enable http proxy support
+-progressive height    enable progressive updating for slow links
+
+   Pretty wild huh? [1]Contact me if you have any questions or problems.
+
+   Personally, I use:
+x11vnc -rfbauth $HOME/.vnc/passwd -nap -flashcmap -cursorpos -norepeat
+
+   (the -flashcmap only matters on old 8-bit X displays)
+
+   [2]Back to main x11vnc page
+
+References
+
+   1. mailto:xvml@karlrunge.com
+   2. http://www.karlrunge.com/x11vnc/index.html
