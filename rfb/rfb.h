@@ -789,10 +789,11 @@ extern void rfbRefuseOnHoldClient(rfbClientPtr cl);
 /* call one of these two functions to service the vnc clients.
  usec are the microseconds the select on the fds waits.
  if you are using the event loop, set this to some value > 0, so the
- server doesn't get a high load just by listening. */
+ server doesn't get a high load just by listening.
+ rfbProcessEvents() returns TRUE if an update was pending. */
 
 extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, rfbBool runInBackground);
-extern void rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
+extern rfbBool rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
 
 #endif
 

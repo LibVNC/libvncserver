@@ -791,12 +791,13 @@ void gettimeofday(struct timeval* tv,char* dummy)
 /* defined in rfbserver.c, but kind of "private" */
 rfbClientPtr rfbClientIteratorHead(rfbClientIteratorPtr i);
 
-void
+rfbBool
 rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 {
   rfbClientIteratorPtr i;
   rfbClientPtr cl,clPrev;
   struct timeval tv;
+  rfbBool result=FALSE;
 
   if(usec<0)
     usec=screen->deferUpdateTime*1000;
@@ -812,6 +813,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
   while(cl) {
     if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) &&
         !sraRgnEmpty(cl->requestedRegion)) {
+      result=TRUE;
       if(screen->deferUpdateTime == 0) {
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
       } else if(cl->startDeferring.tv_usec == 0) {
@@ -831,10 +833,14 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
     }
     clPrev=cl;
     cl=rfbClientIteratorNext(i);
-    if(clPrev->sock==-1)
+    if(clPrev->sock==-1) {
       rfbClientConnectionGone(clPrev);
+      result=TRUE;
+    }
   }
   rfbReleaseClientIterator(i);
+
+  return result;
 }
 
 void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground)
