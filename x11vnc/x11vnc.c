@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-07-04";
+char lastmod[] = "lastmod:    2004-07-10";
 
 /* X display info */
 Display *dpy = 0;
@@ -236,6 +236,7 @@ int cursor_x, cursor_y;		/* x and y from the viewer(s) */
 int got_user_input = 0;
 int got_pointer_input = 0;
 int got_keyboard_input = 0;
+int last_keyboard_input = 0;
 int fb_copy_in_progress = 0;	
 int shut_down = 0;	
 
@@ -247,6 +248,7 @@ Atom vnc_connect_prop = None;
 /* function prototypes (see filename comment above) */
 
 int all_clients_initialized(void);
+void autorepeat(int restore);
 void blackout_tiles(void);
 void check_connect_inputs(void);
 void clean_up_exit(int);
@@ -337,6 +339,7 @@ int show_mouse = 0;		/* display a cursor for the real mouse */
 int use_xwarppointer = 0;	/* use XWarpPointer instead of XTestFake... */
 int show_root_cursor = 0;	/* show X when on root background */
 int show_dragging = 1;		/* process mouse movement events */
+int no_autorepeat = 0;		/* turn off autorepeat with clients */
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
 
 int old_pointer = 0;		/* use the old way of updating the pointer */
@@ -472,6 +475,10 @@ void clean_up_exit (int ret) {
 	} else if (clear_mods == 2) {
 		clear_keys();
 	}
+
+	if (no_autorepeat) {
+		autorepeat(1);
+	}
 	X_LOCK;
 	XTestDiscard(dpy);
 	XCloseDisplay(dpy);
@@ -528,6 +535,9 @@ static void interrupted (int sig) {
 		clear_modifiers(0);
 	} else if (clear_mods == 2) {
 		clear_keys();
+	}
+	if (no_autorepeat) {
+		autorepeat(1);
 	}
 	if (sig) {
 		exit(2);
@@ -705,6 +715,55 @@ static int run_user_command(char *cmd, rfbClientPtr client) {
 }
 
 /*
+ * Kludge for -norepeat option: we turn off keystroke autorepeat in
+ * the X server when clients are connected.  This may annoy people at
+ * the physical display.  We do this because 'key down' and 'key up'
+ * user input events may be separated by 100s of ms due to screen fb
+ * processing or link latency, thereby inducing the X server to apply
+ * autorepeat when it should not.  Since the *client* is likely doing
+ * keystroke autorepeating as well, it kind of makes sense to shut it
+ * off if no one is at the physical display...
+ */
+void autorepeat(int restore) {
+	XKeyboardState kstate;
+	XKeyboardControl kctrl;
+	static int save_auto_repeat = -1;
+
+	if (restore) {
+		if (save_auto_repeat < 0) {
+			return;		/* nothing to restore */
+		}
+		X_LOCK;
+		/* read state and skip restore if equal (e.g. no clients) */
+		XGetKeyboardControl(dpy, &kstate);
+		if (kstate.global_auto_repeat == save_auto_repeat) {
+			X_UNLOCK;
+			return;
+		}
+
+		kctrl.auto_repeat_mode = save_auto_repeat;
+		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
+		XFlush(dpy);
+		X_UNLOCK;
+
+		rfbLog("Restored X server key autorepeat to: %d\n",
+		    save_auto_repeat);
+	} else {
+		X_LOCK;
+		XGetKeyboardControl(dpy, &kstate);
+		save_auto_repeat = kstate.global_auto_repeat;
+
+		kctrl.auto_repeat_mode = AutoRepeatModeOff;
+		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
+		XFlush(dpy);
+		X_UNLOCK;
+
+		rfbLog("Disabled X server key autorepeat. (you can run the\n");
+		rfbLog("command: 'xset r on' to force it back on)\n");
+	}
+}
+
+/*
  * callback for when a client disconnects
  */
 static void client_gone(rfbClientPtr client) {
@@ -712,6 +771,9 @@ static void client_gone(rfbClientPtr client) {
 	client_count--;
 	rfbLog("client_count: %d\n", client_count);
 
+	if (no_autorepeat && client_count == 0) {
+		autorepeat(1);
+	}
 	if (gone_cmd) {
 		rfbLog("client_gone: using cmd for: %s\n", client->host);
 		run_user_command(gone_cmd, client);
@@ -1616,6 +1678,11 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	client->clientGoneHook = client_gone;
 	client_count++;
 
+	if (no_autorepeat && client_count == 1) {
+		/* first client, turn off X server autorepeat */
+		autorepeat(0);
+	}
+
 	accepted_client = 1;
 	last_client = time(0);
 
@@ -1911,6 +1978,11 @@ void myXTestFakeKeyEvent(Display* dpy, KeyCode key, Bool down,
 		rfbLog("XTestFakeKeyEvent(dpy, keycode=0x%x \"%s\", %s)\n",
 		    key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
 		    down ? "down":"up");
+	}
+	if (down) {
+		last_keyboard_input = -key;
+	} else {
+		last_keyboard_input = key;
 	}
 	XTestFakeKeyEvent(dpy, key, down, cur_time);
 }
@@ -6250,6 +6322,7 @@ static int scan_display(int ystart, int rescan) {
 	return tile_count;
 }
 
+
 /*
  * toplevel for the scanning, rescanning, and applying the heuristics.
  */
@@ -6951,6 +7024,13 @@ static void print_help(void) {
 "-input_skip n          For the old pointer handling when non-threaded: try to\n"
 "                       read n user input events before scanning display. n < 0\n"
 "                       means to act as though there is always user input.\n"
+"-norepeat              Disable X server key auto repeat when clients are\n"
+"                       connected.  This works around the repeating keystrokes\n"
+"                       bug (triggered by long processing delays between key\n"
+"                       down and key up client events: either from large screen\n"
+"                       changes or high latency).  Note: your VNC viewer side\n"
+"                       will likely do autorepeating, so this is no loss unless\n"
+"                       someone is simultaneously at the real X display.\n"
 "\n"
 "-debug_pointer         Print debugging output for every pointer event.\n"
 "-debug_keyboard        Print debugging output for every keyboard event.\n"
@@ -7413,6 +7493,8 @@ int main(int argc, char* argv[]) {
 			if (! ui_skip) ui_skip = 1;
 		} else if (!strcmp(arg, "-old_pointer")) {
 			old_pointer = 1;
+		} else if (!strcmp(arg, "-norepeat")) {
+			no_autorepeat = 1;
 		} else if (!strcmp(arg, "-onetile")
 			|| !strcmp(arg, "-old_copytile")) {
 			single_copytile = 1;
