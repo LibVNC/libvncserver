@@ -1,3 +1,6 @@
+#ifndef RFB_H
+#define RFB_H
+
 /*
  * rfb.h - header file for RFB DDX implementation.
  */
@@ -285,7 +288,9 @@ typedef struct
     Bool dontConvertRichCursorToXCursor;
     struct rfbCursor* cursor;
 
-    /* the following members have to be supplied by the serving process */
+    /* the frameBufferhas to be supplied by the serving process.
+     * The buffer will not be freed by 
+     */
     char* frameBuffer;
     KbdAddEventProcPtr kbdAddEvent;
     KbdReleaseAllKeysProcPtr kbdReleaseAllKeys;
@@ -720,6 +725,12 @@ extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,
 			Pixel foreColour, Pixel backColour,
 			int border,SelectionChangedHookPtr selChangedHook);
 
+/* cargs.c */
+
+extern void rfbUsage();
+extern void rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[]);
+extern void rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[]);
+
 /* main.c */
 
 extern void rfbLog(char *format, ...);
@@ -736,7 +747,7 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
 void doNothingWithClient(rfbClientPtr cl);
 
 /* functions to make a vnc server */
-extern rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
+extern rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel);
 extern void rfbInitServer(rfbScreenInfoPtr rfbScreen);
@@ -749,3 +760,5 @@ extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
 
 extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, Bool runInBackground);
 extern void rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
+
+#endif

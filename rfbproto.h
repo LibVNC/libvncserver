@@ -1,3 +1,6 @@
+#ifndef RFBPROTO_H
+#define RFBPROTO_H
+
 /*
  *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
@@ -783,3 +786,5 @@ typedef union {
     rfbPointerEventMsg pe;
     rfbClientCutTextMsg cct;
 } rfbClientToServerMsg;
+
+#endif

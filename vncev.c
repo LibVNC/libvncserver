@@ -99,7 +99,7 @@ void newclient(rfbClientPtr cl)
 
 int main(int argc,char** argv)
 {
-   rfbScreenInfoPtr s=rfbGetScreen(argc,argv,640,480,8,1,1);
+   rfbScreenInfoPtr s=rfbGetScreen(&argc,argv,640,480,8,1,1);
    s->colourMap.is16=FALSE;
    s->colourMap.count=2;
    s->colourMap.data.bytes="\xd0\xd0\xd0\x30\x01\xe0";

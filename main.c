@@ -209,8 +209,6 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
    sraRgnDestroy(region);
 }
 
-int rfbDeferUpdateTime = 40; /* ms */
-
 #ifdef HAVE_PTHREADS
 static void *
 clientOutput(void *data)
@@ -243,7 +241,7 @@ clientOutput(void *data)
         
         /* OK, now, to save bandwidth, wait a little while for more
            updates to come along. */
-        usleep(rfbDeferUpdateTime * 1000);
+        usleep(cl->screen->rfbDeferUpdateTime * 1000);
 
         /* Now, get the region we're going to update, and remove
            it from cl->modifiedRegion _before_ we send the update.
@@ -311,58 +309,6 @@ listenerRun(void *data)
     exit(1);
 }
 #endif
-
-static void
-usage(void)
-{
-    fprintf(stderr, "-rfbport port          TCP port for RFB protocol\n");
-    fprintf(stderr, "-rfbwait time          max time in ms to wait for RFB client\n");
-    fprintf(stderr, "-rfbauth passwd-file   use authentication on RFB protocol\n"
-                    "                       (use 'storepasswd' to create a password file)\n");
-    fprintf(stderr, "-deferupdate time      time in ms to defer updates "
-                                                             "(default 40)\n");
-    fprintf(stderr, "-desktop name          VNC desktop name (default \"LibVNCServer\")\n");
-    fprintf(stderr, "-alwaysshared          always treat new clients as shared\n");
-    fprintf(stderr, "-nevershared           never treat new clients as shared\n");
-    fprintf(stderr, "-dontdisconnect        don't disconnect existing clients when a "
-                                                             "new non-shared\n"
-                    "                       connection comes in (refuse new connection "
-                                                                "instead)\n");
-    exit(1);
-}
-
-static void 
-processArguments(rfbScreenInfoPtr rfbScreen,int argc, char *argv[])
-{
-    int i;
-
-    for (i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-rfbport") == 0) { /* -rfbport port */
-            if (i + 1 >= argc) usage();
-	   rfbScreen->rfbPort = atoi(argv[++i]);
-        } else if (strcmp(argv[i], "-rfbwait") == 0) {  /* -rfbwait ms */
-            if (i + 1 >= argc) usage();
-	   rfbScreen->rfbMaxClientWait = atoi(argv[++i]);
-        } else if (strcmp(argv[i], "-rfbauth") == 0) {  /* -rfbauth passwd-file */
-            if (i + 1 >= argc) usage();
-            rfbScreen->rfbAuthPasswdData = argv[++i];
-        } else if (strcmp(argv[i], "-deferupdate") == 0) {  /* -desktop desktop-name */
-            if (i + 1 >= argc) usage();
-            rfbScreen->rfbDeferUpdateTime = atoi(argv[++i]);
-        } else if (strcmp(argv[i], "-desktop") == 0) {  /* -desktop desktop-name */
-            if (i + 1 >= argc) usage();
-            rfbScreen->desktopName = argv[++i];
-        } else if (strcmp(argv[i], "-alwaysshared") == 0) {
-	    rfbScreen->rfbAlwaysShared = TRUE;
-        } else if (strcmp(argv[i], "-nevershared") == 0) {
-            rfbScreen->rfbNeverShared = TRUE;
-        } else if (strcmp(argv[i], "-dontdisconnect") == 0) {
-            rfbScreen->rfbDontDisconnect = TRUE;
-        } else {
-	  /* usage(); we no longer exit for unknown arguments */
-        }
-    }
-}
 
 void
 defaultKbdAddEvent(Bool down, KeySym keySym, rfbClientPtr cl)
@@ -451,11 +397,30 @@ Bool defaultPasswordCheck(rfbClientPtr cl,char* response,int len)
   return(TRUE);
 }
 
+/* for this method, rfbAuthPasswdData is really a pointer to an array
+   of char*'s, where the last pointer is 0. */
+Bool checkPasswordByList(rfbClientPtr cl,char* response,int len)
+{
+  int i;
+  char **passwds;
+
+  for(passwds=(char**)cl->screen->rfbAuthPasswdData;*passwds;passwds++) {
+    vncEncryptBytes(cl->authChallenge, *passwds);
+
+    if (memcmp(cl->authChallenge, response, len) == 0)
+      return(TRUE);
+  }
+
+  rfbLog("rfbAuthProcessClientMessage: authentication failed from %s\n",
+	 cl->host);
+  return(FALSE);
+}
+
 void doNothingWithClient(rfbClientPtr cl)
 {
 }
 
-rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
+rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel)
 {
@@ -495,11 +460,12 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbScreen->rfbDontDisconnect = FALSE;
    rfbScreen->rfbAuthPasswdData = 0;
    
-   processArguments(rfbScreen,argc,argv);
-
    rfbScreen->width = width;
    rfbScreen->height = height;
    rfbScreen->bitsPerPixel = rfbScreen->depth = 8*bytesPerPixel;
+
+   rfbProcessArguments(rfbScreen,argc,argv);
+
 #ifdef WIN32
    {
 	   DWORD dummy=255;
@@ -555,6 +521,8 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
 
    IF_PTHREADS(rfbScreen->backgroundLoop = FALSE);
 
+   rfbScreen->rfbDeferUpdateTime=5;
+
    /* proc's and hook's */
 
    rfbScreen->kbdAddEvent = defaultKbdAddEvent;
@@ -575,20 +543,14 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
 
 void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
 {
-  /* TODO */
-  if(rfbScreen->frameBuffer)
-    free(rfbScreen->frameBuffer);
+  /* TODO: hang up on all clients and free all reserved memory */
   if(rfbScreen->colourMap.data.bytes)
     free(rfbScreen->colourMap.data.bytes);
   TINI_MUTEX(rfbScreen->cursorMutex);
   free(rfbScreen);
 }
 
-#ifdef HAVE_PTHREADS
-void rfbInitServerWithPthreads(rfbScreenInfoPtr rfbScreen)
-#else
 void rfbInitServer(rfbScreenInfoPtr rfbScreen)
-#endif
 {
 #ifdef WIN32
   WSADATA trash;
@@ -629,7 +591,9 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
   cl=rfbClientIteratorNext(i);
   while(cl) {
     if(cl->sock>=0 && FB_UPDATE_PENDING(cl)) {
-      if(cl->startDeferring.tv_usec == 0) {
+      if(cl->screen->rfbDeferUpdateTime == 0) {
+	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
+      } else if(cl->startDeferring.tv_usec == 0) {
 	gettimeofday(&cl->startDeferring,NULL);
 	if(cl->startDeferring.tv_usec == 0)
 	  cl->startDeferring.tv_usec++;
@@ -667,6 +631,9 @@ void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground
     exit(-1);
 #endif
   }
+
+  if(usec<0)
+    usec=rfbScreen->rfbDeferUpdateTime*1000;
 
   while(1)
     rfbProcessEvents(rfbScreen,usec);

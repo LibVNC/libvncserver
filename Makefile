@@ -24,11 +24,11 @@ OSX_LIBS = -framework ApplicationServices -framework Carbon
 SOURCES=main.c rfbserver.c sraRegion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	zlib.c tight.c httpd.c cursor.c font.c \
-	draw.c selbox.c d3des.c vncauth.c
+	draw.c selbox.c d3des.c vncauth.c cargs.c
 OBJS=main.o rfbserver.o sraRegion.o auth.o sockets.o \
 	stats.o corre.o hextile.o rre.o translate.o cutpaste.o \
 	zlib.o tight.o httpd.o cursor.o font.o \
-	draw.o selbox.o d3des.o vncauth.o
+	draw.o selbox.o d3des.o vncauth.o cargs.o
 INSTALLHEADER=rfb.h rfbproto.h sraRegion.h keysym.h
 
 all: example pnmshow storepasswd
@@ -79,6 +79,10 @@ fontsel: fontsel.o libvncserver.a
 
 vncev: vncev.o libvncserver.a
 	$(CC) -o vncev vncev.o -L. -lvncserver -lz -ljpeg
+
+# Example from Justin
+zippy: zippy.o libvncserver.a
+	$(CC) -o zippy zippy.o -L. -lvncserver -lz -ljpeg
 
 clean:
 	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \

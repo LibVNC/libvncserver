@@ -1,3 +1,6 @@
+#ifndef D3DES_H
+#define D3DES_H
+
 /*
  * This is D3DES (V5.09) by Richard Outerbridge with the double and
  * triple-length support removed for use in VNC.
@@ -49,3 +52,5 @@ extern void des(unsigned char *, unsigned char *);
 
 /* d3des.h V5.09 rwo 9208.04 15:06 Graven Imagery
  ********************************************************************/
+
+#endif

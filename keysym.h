@@ -1,3 +1,6 @@
+#ifndef KEYSYM_H
+#define KEYSYM_H
+
 /* $XConsortium: keysym.h,v 1.15 94/04/17 20:10:55 rws Exp $ */
 
 /***********************************************************
@@ -1632,3 +1635,5 @@ SOFTWARE.
 
 /* Euro currency symbol */
 #define XK_EuroSign 0x20ac
+
+#endif

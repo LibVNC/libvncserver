@@ -239,7 +239,7 @@ void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
 int main(int argc,char** argv)
 {
   rfbScreenInfoPtr rfbScreen =
-    rfbGetScreen(argc,argv,maxx,maxy,8,3,bpp);
+    rfbGetScreen(&argc,argv,maxx,maxy,8,3,bpp);
   rfbScreen->desktopName = "LibVNCServer Example";
   rfbScreen->frameBuffer = (char*)malloc(maxx*maxy*bpp);
   rfbScreen->rfbAlwaysShared = TRUE;

@@ -38,7 +38,7 @@ void showFont(int index)
 int main(int argc,char** argv)
 {
   rfbFontDataPtr font;
-  rfbScreenInfoPtr s=rfbGetScreen(argc,argv,640,480,8,3,3);
+  rfbScreenInfoPtr s=rfbGetScreen(&argc,argv,640,480,8,3,3);
   int i,j;
 
   s->frameBuffer=(char*)malloc(640*480*3);

@@ -1,3 +1,6 @@
+#ifndef SRAREGION_H
+#define SRAREGION_H
+
 /* -=- SRA - Simple Region Algorithm
  * A simple rectangular region implementation.
  * Copyright (c) 2001 James "Wez" Weatherall, Johannes E. Schindelin
@@ -53,3 +56,5 @@ void sraRgnPrint(const sraRegion *s);
 
 extern Bool sraClipRect(int *x, int *y, int *w, int *h,
 			int cx, int cy, int cw, int ch);
+
+#endif

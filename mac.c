@@ -266,7 +266,7 @@ PtrAddEvent(buttonMask, x, y, cl)
 void 
 ScreenInit(int argc, char**argv)
 {
-  rfbScreen = rfbGetScreen(argc,argv,
+  rfbScreen = rfbGetScreen(&argc,argv,
 			   CGDisplayPixelsWide(kCGDirectMainDisplay),
 			   CGDisplayPixelsHigh(kCGDirectMainDisplay),
 			   CGDisplayBitsPerSample(kCGDirectMainDisplay),
