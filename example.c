@@ -39,8 +39,8 @@ void initBuffer(unsigned char* buffer)
   int i,j;
   for(i=0;i<maxx;++i)
     for(j=0;j<maxy;++j) {
-      buffer[(j*maxx+i)*bpp+1]=(i+j)*256/(maxx+maxy); /* red */
-      buffer[(j*maxx+i)*bpp+2]=i*256/maxx; /* green */
+      buffer[(j*maxx+i)*bpp+1]=(i+j)*128/(maxx+maxy); /* red */
+      buffer[(j*maxx+i)*bpp+2]=i*128/maxx; /* green */
       buffer[(j*maxx+i)*bpp+3]=j*256/maxy; /* blue */
     }
 }
@@ -111,25 +111,92 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
       /* we could get a selection like that:
 	 rfbGotXCutText(cl->screen,"Hallo",5);
       */
-
-      cd->oldx=x; cd->oldy=y; cd->oldButton=buttonMask;
    } else
      cd->oldButton=0;
+
+   cd->oldx=x; cd->oldy=y; cd->oldButton=buttonMask;
+}
+
+/* aux function to draw a character to x, y */
+
+#include "radon.h"
+int drawchar(unsigned char* buffer,int rowstride,int bpp,int x,int y,char c)
+{
+  int i,j,k,width,height;
+  unsigned char d;
+  unsigned char* data=bdffontdata+bdffontmetadata[c*5];
+  width=bdffontmetadata[c*5+1];
+  height=bdffontmetadata[c*5+2];
+  x+=bdffontmetadata[c*5+3];
+  y+=bdffontmetadata[c*5+4]-height+1;
+
+  for(j=0;j<height;j++) {
+    for(i=0;i<width;i++) {
+      if((i&7)==0) {
+	d=*data;
+	data++;
+      }
+      if(d&0x80) {
+	for(k=0;k<bpp;k++)
+	  buffer[(y+j)*rowstride+(x+i)*bpp+k]=0xff;
+      }
+      d<<=1;
+    }
+    if((i&7)==0)
+      data++;
+  }
+  return(width);
+}
+
+void drawstring(unsigned char* buffer,int rowstride,int bpp,int x,int y,char* string)
+{
+  while(*string) {
+    x+=drawchar(buffer,rowstride,bpp,x,y,*string);
+    string++;
+  }
+}
+
+int bdflength(char* string)
+{
+  int i;
+  while(*string) {
+    i+=bdffontmetadata[*string*5+1];
+    string++;
+  }
+  return(i);
+}
+
+void bdfbbox(char c,int* x1,int* y1,int* x2,int* y2)
+{
+  *x1+=bdffontmetadata[c*5+3];
+  *y1+=bdffontmetadata[c*5+4]-bdffontmetadata[c*5+2]+1;
+  *x2=*x1+bdffontmetadata[c*5+1];
+  *y2=*y1+bdffontmetadata[c*5+2];
 }
 
 /* Here the key events are handled */
 
 void dokey(Bool down,KeySym key,rfbClientPtr cl)
 {
-  if(down && key==XK_Escape)
-    rfbCloseClient(cl);
-  else if(down && key=='c') {
-    initBuffer(cl->screen->frameBuffer);
-    rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
+  if(down) {
+    if(key==XK_Escape)
+      rfbCloseClient(cl);
+    else if(key==XK_Page_Up) {
+      initBuffer(cl->screen->frameBuffer);
+      rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
+    } else if(key>=' ' && key<0x100) {
+      ClientData* cd=cl->clientData;
+      int x1=cd->oldx,y1=cd->oldy,x2,y2;
+      cd->oldx+=drawchar(cl->screen->frameBuffer,
+			 cl->screen->paddedWidthInBytes,bpp,cd->oldx,cd->oldy,
+			 key);
+      bdfbbox(key,&x1,&y1,&x2,&y2);
+      rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);
+    }
   }
 }
 
-/* Initialisation */
+/* Initialization */
 
 int main(int argc,char** argv)
 {
@@ -143,6 +210,8 @@ int main(int argc,char** argv)
   rfbScreen->newClientHook = newclient;
 
   initBuffer(rfbScreen->frameBuffer);
+
+  drawstring(rfbScreen->frameBuffer,maxx*bpp,bpp,20,100,"Hallo, Welt!");
 
   /* this is the blocking event loop, i.e. it never returns */
   /* 40000 are the microseconds, i.e. 0.04 seconds */

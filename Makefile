@@ -9,7 +9,7 @@ VNCSERVERLIB=-L. -lvncserver -lz -ljpeg
 
 # These two lines enable useage of PThreads
 #CFLAGS += -DHAVE_PTHREADS
-VNCSERVERLIB += -lpthread
+#VNCSERVERLIB += -lpthread
 
 LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(VNCAUTHLIB)
 
@@ -17,7 +17,6 @@ LIBS=$(LDFLAGS) $(VNCSERVERLIB) $(VNCAUTHLIB)
 OSX_LIBS = -framework ApplicationServices -framework Carbon
 
 # for Example
-PTHREAD_LIBS = -lpthread
 
 SOURCES=main.c rfbserver.c miregion.c auth.c sockets.c xalloc.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
@@ -39,10 +38,10 @@ libvncserver.a: $(OBJS)
 	$(RANLIB) $@
 
 example: example.o libvncauth/libvncauth.a libvncserver.a
-	$(CC) -o example example.o $(LIBS) $(PTHREAD_LIBS)
+	$(CC) -o example example.o $(LIBS)
 
 pnmshow: pnmshow.o libvncauth/libvncauth.a libvncserver.a
-	$(CC) -o pnmshow pnmshow.o $(LIBS) $(PTHREAD_LIBS)
+	$(CC) -o pnmshow pnmshow.o $(LIBS)
 
 OSXvnc-server: mac.o libvncauth/libvncauth.a libvncserver.a
 	$(CC) -o OSXvnc-server mac.o $(LIBS) $(OSX_LIBS)
