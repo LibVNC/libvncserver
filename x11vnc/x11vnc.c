@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-07-10";
+char lastmod[] = "lastmod:    2004-07-15";
 
 /* X display info */
 Display *dpy = 0;
@@ -321,7 +321,7 @@ int connect_once = 1;		/* disconnect after first connection session. */
 int flash_cmap = 0;		/* follow installed colormaps */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 
-int use_modifier_tweak = 0;	/* use the altgr_keyboard modifier tweak */
+int use_modifier_tweak = 1;	/* use the shift/altgr modifier tweak */
 int clear_mods = 0;		/* -clear_mods (1) and -clear_keys (2) */
 int nofb = 0;			/* do not send any fb updates */
 
@@ -1691,66 +1691,6 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 /* -- keyboard.c -- */
 /*
- * For tweaking modifiers wrt the Alt-Graph key, etc.
- */
-#define LEFTSHIFT 1
-#define RIGHTSHIFT 2
-#define ALTGR 4
-static char mod_state = 0;
-
-static char modifiers[0x100];
-static KeyCode keycodes[0x100];
-static KeyCode left_shift_code, right_shift_code, altgr_code;
-
-void initialize_modtweak(void) {
-	KeySym keysym, *keymap;
-	int i, j, minkey, maxkey, syms_per_keycode;
-
-	memset(modifiers, -1, sizeof(modifiers));
-
-	XDisplayKeycodes(dpy, &minkey, &maxkey);
-
-	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
-	    &syms_per_keycode);
-
-	/* handle alphabetic char with only one keysym (no upper + lower) */
-	for (i = minkey; i <= maxkey; i++) {
-		KeySym lower, upper;
-		/* 2nd one */
-		keysym = keymap[(i - minkey) * syms_per_keycode + 1];
-		if (keysym != NoSymbol) {
-			continue;
-		}
-		/* 1st one */
-		keysym = keymap[(i - minkey) * syms_per_keycode + 0];
-		if (keysym == NoSymbol) {
-			continue;
-		}
-		XConvertCase(keysym, &lower, &upper);
-		if (lower != upper) {
-			keymap[(i - minkey) * syms_per_keycode + 0] = lower;
-			keymap[(i - minkey) * syms_per_keycode + 1] = upper;
-		}
-	}
-	for (i = minkey; i <= maxkey; i++) {
-		for (j = 0; j < syms_per_keycode; j++) {
-			keysym = keymap[ (i - minkey) * syms_per_keycode + j ];
-			if ( keysym >= ' ' && keysym < 0x100
-			    && i == XKeysymToKeycode(dpy, keysym) ) {
-				keycodes[keysym] = i;
-				modifiers[keysym] = j;
-			}
-		}
-	}
-
-	left_shift_code = XKeysymToKeycode(dpy, XK_Shift_L);
-	right_shift_code = XKeysymToKeycode(dpy, XK_Shift_R);
-	altgr_code = XKeysymToKeycode(dpy, XK_Mode_switch);
-
-	XFree ((void *) keymap);
-}
-
-/*
  * Routine to retreive current state keyboard.  1 means down, 0 up.
  */
 static void get_keystate(int *keystate) {
@@ -1962,7 +1902,6 @@ void initialize_remap(char *infile) {
 			keyremaps = remap;
 		} else {
 			current->next = remap;
-			
 		}
 		current = remap;
 	}
@@ -1985,6 +1924,66 @@ void myXTestFakeKeyEvent(Display* dpy, KeyCode key, Bool down,
 		last_keyboard_input = key;
 	}
 	XTestFakeKeyEvent(dpy, key, down, cur_time);
+}
+
+/*
+ * For tweaking modifiers wrt the Alt-Graph key, etc.
+ */
+#define LEFTSHIFT 1
+#define RIGHTSHIFT 2
+#define ALTGR 4
+static char mod_state = 0;
+
+static char modifiers[0x100];
+static KeyCode keycodes[0x100];
+static KeyCode left_shift_code, right_shift_code, altgr_code;
+
+void initialize_modtweak(void) {
+	KeySym keysym, *keymap;
+	int i, j, minkey, maxkey, syms_per_keycode;
+
+	memset(modifiers, -1, sizeof(modifiers));
+
+	XDisplayKeycodes(dpy, &minkey, &maxkey);
+
+	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
+	    &syms_per_keycode);
+
+	/* handle alphabetic char with only one keysym (no upper + lower) */
+	for (i = minkey; i <= maxkey; i++) {
+		KeySym lower, upper;
+		/* 2nd one */
+		keysym = keymap[(i - minkey) * syms_per_keycode + 1];
+		if (keysym != NoSymbol) {
+			continue;
+		}
+		/* 1st one */
+		keysym = keymap[(i - minkey) * syms_per_keycode + 0];
+		if (keysym == NoSymbol) {
+			continue;
+		}
+		XConvertCase(keysym, &lower, &upper);
+		if (lower != upper) {
+			keymap[(i - minkey) * syms_per_keycode + 0] = lower;
+			keymap[(i - minkey) * syms_per_keycode + 1] = upper;
+		}
+	}
+	for (i = minkey; i <= maxkey; i++) {
+		for (j = 0; j < syms_per_keycode; j++) {
+			keysym = keymap[ (i - minkey) * syms_per_keycode + j ];
+			if ( keysym >= ' ' && keysym < 0x100
+			    && i == XKeysymToKeycode(dpy, keysym) ) {
+				keycodes[keysym] = i;
+				modifiers[keysym] = j;
+			}
+		}
+	}
+
+	left_shift_code = XKeysymToKeycode(dpy, XK_Shift_L);
+	right_shift_code = XKeysymToKeycode(dpy, XK_Shift_R);
+	altgr_code = XKeysymToKeycode(dpy, XK_Mode_switch);
+
+	XFree ((void *) keymap);
 }
 
 /*
@@ -2113,7 +2112,11 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	if (client->viewOnly) {
 		return;
 	}
+
 	last_keyboard_client = client;
+	last_event = last_input = time(0);
+	got_user_input++;
+	got_keyboard_input++;
 	
 	if (keyremaps) {
 		keyremap_t *remap = keyremaps;
@@ -2181,10 +2184,6 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	if ( k != NoSymbol ) {
 		myXTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
 		XFlush(dpy);
-
-		last_event = last_input = time(0);
-		got_user_input++;
-		got_keyboard_input++;
 	}
 
 	X_UNLOCK;
@@ -6790,16 +6789,17 @@ static void print_help(void) {
 "Rudimentary config file support: if the file $HOME/.x11vncrc exists then each\n"
 "line in it is treated as a single command line option.  Disable with -norc.\n"
 "For each option name, the leading character \"-\" is not required.  E.g. a\n"
-"line that is either \"nap\" or \"-nap\" may be used.  Likewise \"wait 100\"\n"
-"or \"-wait 100\" are acceptable lines.  The \"#\" character comments out to\n"
-"the end of the line in the usual way.  Leading and trailing whitespace is\n"
-"trimmed off.\n"
+"line that is either \"nap\" or \"-nap\" may be used and are equivalent.\n"
+"Likewise \"wait 100\" or \"-wait 100\" are acceptable lines.  The \"#\"\n"
+"character comments out to the end of the line in the usual way.  Leading and\n"
+"trailing whitespace is trimmed off.\n"
 "\n"
 "Options:\n"
 "\n"
-"-display disp          X11 server display to connect to, the X server process\n"
-"                       must be running on same machine and support MIT-SHM.\n"
-"                       Equivalent to setting the DISPLAY env. variable.\n"
+"-display disp          X11 server display to connect to, usually :0.  The X\n"
+"                       server process must be running on same machine and\n"
+"                       support MIT-SHM.  Equivalent to setting the DISPLAY\n"
+"                       environment variable to disp.\n"
 "-id windowid           Show the window corresponding to <windowid> not the\n"
 "                       entire display. Warning: bugs! new toplevels missed!...\n"
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
@@ -6850,8 +6850,8 @@ static void print_help(void) {
 "                       to host or host:port establish a reverse connection.\n"
 "                       Using xprop(1) instead of vncconnect may work, see FAQ.\n"
 "-auth file             Set the X authority file to be \"file\", equivalent\n"
-"                       to setting the XAUTHORITY env. var to \"file\" before\n"
-"                       startup.\n"
+"                       to setting the XAUTHORITY environment var to \"file\"\n"
+"                       before startup. See Xsecurity(7), xauth(1) man pages.\n"
 "-allow addr1[,addr2..] Only allow client connections from IP addresses matching\n"
 "                       the comma separated list of numerical addresses.\n"
 "                       Can be a prefix, e.g. \"192.168.100.\" to match a\n"
@@ -6931,7 +6931,8 @@ static void print_help(void) {
 "\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
 "                       Note: if you are not redirecting stderr to a log file\n"
-"                       you must also specify the -q option.\n"
+"                       (via shell 2> or -o option) you must also specify the\n"
+"                       -q option.\n"
 "\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
 "                       Remote displays can be polled this way: be careful this\n"
@@ -6950,7 +6951,7 @@ static void print_help(void) {
 "-o logfile             Write stderr messages to file \"logfile\" instead of\n"
 "                       to the terminal.  Same as -logfile.\n"
 "-rc filename           Use \"filename\" instead of $HOME/.x11vncrc for rc file.\n"
-"-norc                  Do not process the $HOME/.x11vncrc file for options.\n"
+"-norc                  Do not process any .x11vncrc file for options.\n"
 "\n"
 "-q                     Be quiet by printing less informational output to\n"
 "                       stderr.  Same as -quiet.\n"
@@ -6963,15 +6964,19 @@ static void print_help(void) {
 "                         vncviewer $host:$port\n"
 "\n"
 "-modtweak              Handle AltGr/Shift modifiers for differing languages\n"
-"                       between client and host (default %s).\n"
-"-nomodtweak            Send the keysym directly to the X server.\n"
+"                       between client and host (Default %s).  Also helps\n"
+"                       resolve cases with a keysym bound to multiple keys.\n"
+"-nomodtweak            Try to send the keysym directly to the X server.\n"
+"                       This may cause problems if a keysym is bound to multiple\n"
+"                       keys, e.g. when typing \"<\" if the Xserver defines a\n"
+"                       \"< and >\" key in addition to a \"< and comma\" key.\n"
 "-clear_mods            At startup and exit clear the modifier keys by sending\n"
 "                       KeyRelease for each one. The Lock modifiers are skipped.\n"
 "                       Used to clear the state if the display was accidentally\n"
-"                       left with any pressed down.  That should be rare.\n"
+"                       left with any pressed down.\n"
 "-clear_keys            As -clear_mods, except try to release any pressed key.\n"
-"                       Intended for debugging.  This option and -clear_mods\n"
-"                       can interfere with typing at the physical keyboard.\n"
+"                       Mostly for testing.  This option and -clear_mods can\n"
+"                       interfere with typing at the physical keyboard.\n"
 "-remap string          Read keysym remappings from file named \"string\".\n"
 "                       Format is one pair of keysyms per line (can be name\n"
 "                       or hex value) separated by a space.  If no file named\n"
@@ -6981,17 +6986,18 @@ static void print_help(void) {
 "                       etc. E.g. -remap Super_R-Button2\n"
 "\n"
 "-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
-"-nobell                Do not watch for XBell events.\n"
+"                       Intended for use with Win2VNC and x2vnc dual displays.\n"
+"-nobell                Do not watch for XBell events. (no beeps will be heard)\n"
 "-nosel                 Do not manage exchange of X selection/cutbuffer.\n"
-"-noprimary             Do not poll the PRIMARY selection for changes and send\n"
-"                       back to clients.  PRIMARY is still set on received\n"
-"                       changes, however.\n"
+"-noprimary             Do not poll the PRIMARY selection for changes to send\n"
+"                       back to clients.  (PRIMARY is still set on received\n"
+"                       changes, however).\n"
 "\n"
 "-nocursor              Do not have the viewer show a local cursor.\n"
 "-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
 "-mouseX                As -mouse, but also draw an X on root background.\n"
 "-X                     Shorthand for -mouseX -nocursor.\n"
-"-xwarppointer          Move the pointer with XWarpPointer instead of XTEST\n"
+"-xwarppointer          Move the pointer with XWarpPointer() instead of XTEST\n"
 "                       (try as a workaround if pointer behaves poorly, e.g.\n"
 "                       on touchscreens or other non-standard setups).\n"
 "-cursorpos             Send the X cursor position back to all vnc clients that\n"
@@ -7025,7 +7031,7 @@ static void print_help(void) {
 "                       read n user input events before scanning display. n < 0\n"
 "                       means to act as though there is always user input.\n"
 "-norepeat              Disable X server key auto repeat when clients are\n"
-"                       connected.  This works around the repeating keystrokes\n"
+"                       connected.  This works around a repeating keystrokes\n"
 "                       bug (triggered by long processing delays between key\n"
 "                       down and key up client events: either from large screen\n"
 "                       changes or high latency).  Note: your VNC viewer side\n"
@@ -7310,6 +7316,11 @@ int main(int argc, char* argv[]) {
 #	define argc argc2
 #	define argv argv2
 
+#	define CHECK_ARGC if (i >= argc-1) { \
+		fprintf(stderr, "not enough arguments for: %s\n", arg); \
+		exit(1); \
+	}
+
 	for (i=1; i < argc; i++) {
 		/* quick-n-dirty --option handling. */
 		arg = argv[i];
@@ -7318,8 +7329,10 @@ int main(int argc, char* argv[]) {
 		}
 
 		if (!strcmp(arg, "-display")) {
+			CHECK_ARGC
 			use_dpy = argv[++i];
 		} else if (!strcmp(arg, "-id")) {
+			CHECK_ARGC
 			if (sscanf(argv[++i], "0x%x", &subwin) != 1) {
 				if (sscanf(argv[i], "%d", &subwin) != 1) {
 					fprintf(stderr, "bad -id arg: %s\n",
@@ -7331,8 +7344,8 @@ int main(int argc, char* argv[]) {
 			int m, n;
 			char *p;
 			double f;
-			i++;
-			if ( (p = strchr(argv[i], ':')) != NULL) {
+			CHECK_ARGC
+			if ( (p = strchr(argv[++i], ':')) != NULL) {
 				/* options */
 				if (strstr(p+1, "nb") != NULL) {
 					scaling_noblend = 1;
@@ -7389,6 +7402,7 @@ int main(int argc, char* argv[]) {
 				scaling = 1;
 			}
 		} else if (!strcmp(arg, "-visual")) {
+			CHECK_ARGC
 			visual_str = argv[++i];
 		} else if (!strcmp(arg, "-flashcmap")) {
 			flash_cmap = 1;
@@ -7398,8 +7412,10 @@ int main(int argc, char* argv[]) {
 			view_only = 1;
 		} else if (!strcmp(arg, "-viewpasswd")) {
 			vpw_loc = i;
+			CHECK_ARGC
 			viewonly_passwd = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-passwdfile")) {
+			CHECK_ARGC
 			passwdfile = argv[++i];
 		} else if (!strcmp(arg, "-storepasswd")) {
 			if (i+2 >= argc || vncEncryptAndStorePasswd(argv[i+1],
@@ -7414,14 +7430,18 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-shared")) {
 			shared = 1;
 		} else if (!strcmp(arg, "-auth")) {
+			CHECK_ARGC
 			auth_file = argv[++i];
 		} else if (!strcmp(arg, "-allow")) {
+			CHECK_ARGC
 			allow_list = argv[++i];
 		} else if (!strcmp(arg, "-localhost")) {
 			allow_list = "127.0.0.1";
 		} else if (!strcmp(arg, "-accept")) {
+			CHECK_ARGC
 			accept_cmd = argv[++i];
 		} else if (!strcmp(arg, "-gone")) {
+			CHECK_ARGC
 			gone_cmd = argv[++i];
 		} else if (!strcmp(arg, "-once")) {
 			connect_once = 1;
@@ -7429,8 +7449,8 @@ int main(int argc, char* argv[]) {
 			|| !strcmp(arg, "-forever")) {
 			connect_once = 0;
 		} else if (!strcmp(arg, "-connect")) {
-			i++;
-			if (strchr(arg, '/')) {
+			CHECK_ARGC
+			if (strchr(argv[++i], '/')) {
 				client_connect_file = argv[i];
 			} else {
 				client_connect = strdup(argv[i]);
@@ -7452,15 +7472,17 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-clear_keys")) {
 			clear_mods = 2;
 		} else if (!strcmp(arg, "-remap")) {
+			CHECK_ARGC
 			remap_file = argv[++i];
 		} else if (!strcmp(arg, "-blackout")) {
+			CHECK_ARGC
 			blackout_string = argv[++i];
 		} else if (!strcmp(arg, "-xinerama")) {
 			xinerama = 1;
 		} else if (!strcmp(arg, "-norc")) {
-			;
+			;	/* done above */
 		} else if (!strcmp(arg, "-rc")) {
-			i++;
+			i++;	/* done above */
 		} else if (!strcmp(arg, "-nobell")) {
 			watch_bell = 0;
 		} else if (!strcmp(arg, "-nofb")) {
@@ -7485,10 +7507,12 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-cursorpos")) {
 			cursor_pos = 1;
 		} else if (!strcmp(arg, "-buttonmap")) {
+			CHECK_ARGC
 			pointer_remap = argv[++i];
 		} else if (!strcmp(arg, "-nodragging")) {
 			show_dragging = 0;
 		} else if (!strcmp(arg, "-input_skip")) {
+			CHECK_ARGC
 			ui_skip = atoi(argv[++i]);
 			if (! ui_skip) ui_skip = 1;
 		} else if (!strcmp(arg, "-old_pointer")) {
@@ -7503,9 +7527,11 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-debug_keyboard")) {
 			debug_keyboard++;
 		} else if (!strcmp(arg, "-defer")) {
+			CHECK_ARGC
 			defer_update = atoi(argv[++i]);
 			got_defer = 1;
 		} else if (!strcmp(arg, "-wait")) {
+			CHECK_ARGC
 			waitms = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-nap")) {
 			take_naps = 1;
@@ -7516,6 +7542,7 @@ int main(int argc, char* argv[]) {
 			use_threads = 0;
 #endif
 		} else if (!strcmp(arg, "-sigpipe")) {
+			CHECK_ARGC
 			if (!strcmp(argv[++i], "ignore"))  {
 				sigpipe = 1;
 			} else if (!strcmp(argv[i], "exit")) {
@@ -7528,12 +7555,16 @@ int main(int argc, char* argv[]) {
 				exit(1);
 			}
 		} else if (!strcmp(arg, "-fs")) {
+			CHECK_ARGC
 			fs_frac = atof(argv[++i]);
 		} else if (!strcmp(arg, "-gaps")) {
+			CHECK_ARGC
 			gaps_fill = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-grow")) {
+			CHECK_ARGC
 			grow_fill = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-fuzz")) {
+			CHECK_ARGC
 			tile_fuzz = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-hints") || !strcmp(arg, "-nohints")) {
 			fprintf(stderr, "warning: -hints/-nohints option "
@@ -7542,6 +7573,7 @@ int main(int argc, char* argv[]) {
 			|| !strcmp(arg, "-?")) {
 			print_help();
 		} else if (!strcmp(arg, "-o") || !strcmp(arg, "-logfile")) {
+			CHECK_ARGC
 			logfile = argv[++i];
 		} else if (!strcmp(arg, "-q") || !strcmp(arg, "-quiet")) {
 			quiet = 1;
@@ -7842,18 +7874,31 @@ int main(int argc, char* argv[]) {
 	} else {
 		if (! quiet) fprintf(stderr, "Using default X display.\n");
 	}
+	if (! dt) {
+		static char str[] = "-desktop";
+		argv_vnc[argc_vnc++] = str;
+		argv_vnc[argc_vnc++] = choose_title(use_dpy);
+	}
+	scr = DefaultScreen(dpy);
+	rootwin = RootWindow(dpy, scr);
 
 	/* check for XTEST */
 	if (! XTestQueryExtension(dpy, &ev, &er, &maj, &min)) {
 		fprintf(stderr, "Display does not support XTest extension.\n");
 		exit(1);
 	}
+	/*
+	 * Window managers will often grab the display during resize, etc.
+	 * To avoid deadlock (our user resize input is not processed)
+	 * we tell the server to process our requests during all grabs:
+	 */
+	XTestGrabControl(dpy, True);
 
 	/* check for MIT-SHM */
 	if (! nofb && ! XShmQueryExtension(dpy)) {
 		if (! using_shm) {
 			if (! quiet) {
-				fprintf(stderr, "warning: display does not "
+				fprintf(stderr, "info: display does not "
 				    "support XShm.\n");
 			}
 		} else {
@@ -7879,16 +7924,6 @@ int main(int argc, char* argv[]) {
 		}
 	}
 #endif
-
-	/*
-	 * Window managers will often grab the display during resize, etc.
-	 * To avoid deadlock (our user resize input is not processed)
-	 * we tell the server to process our requests during all grabs:
-	 */
-	XTestGrabControl(dpy, True);
-
-	scr = DefaultScreen(dpy);
-	rootwin = RootWindow(dpy, scr);
 
 	/* set up parameters for subwin or non-subwin cases: */
 	if (! subwin) {
@@ -7919,7 +7954,6 @@ int main(int argc, char* argv[]) {
 				    " for subwindow\n");
 			}
 		}
-
 		set_offset();
 	}
 
@@ -7985,11 +8019,6 @@ int main(int argc, char* argv[]) {
 	if (fb->bits_per_pixel == 24 && ! quiet) {
 		fprintf(stderr, "warning: 24 bpp may have poor"
 		    " performance.\n");
-	}
-	if (! dt) {
-		static char str[] = "-desktop";
-		argv_vnc[argc_vnc++] = str;
-		argv_vnc[argc_vnc++] = choose_title(use_dpy);
 	}
 
 	/*

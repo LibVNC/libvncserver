@@ -1,3 +1,7 @@
+2004-07-15  Karl Runge <runge@karlrunge.com>
+	* x11vnc: modtweak is now the default
+	* check X11/XKBlib.h in configure.ac to work around Solaris 7 bug.
+
 2004-07-10  Karl Runge <runge@karlrunge.com>
 	* x11vnc: norepeat to turn off X server autorepeat when clients exist,
 	  let the client side do the autorepeating.
