@@ -849,6 +849,7 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
     Bool sendCursorShape = FALSE;
     Bool cursorWasDrawn = FALSE;
 
+    
     /*
      * If this client understands cursor shape updates, cursor should be
      * removed from the framebuffer. Otherwise, make sure it's put up.
@@ -860,8 +861,9 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
       if (cl->screen->cursorIsDrawn) {
 	rfbUndrawCursor(cl);
       }
-      if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged)
-	sendCursorShape = TRUE;
+      if (!cl->screen->cursorIsDrawn && cl->cursorWasChanged &&
+	  cl->readyForSetColourMapEntries)
+	  sendCursorShape = TRUE;
     } else {
       if (!cl->screen->cursorIsDrawn) {
 	rfbDrawCursor(cl);

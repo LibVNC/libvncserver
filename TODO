@@ -1,24 +1,26 @@
 immediate:
 ----------
 
-fix bug in http (java) client with big endian server: byte swapping is broken
 udp
 documentation
 	perhaps the option (or just hint) not to mark very tiny regions as
 	modified, because that is inefficient for the encodings.
 optionally dont draw rich cursors as xcursors
+cursor smears on IRIX with pthreads, then has bus error.
 
 later:
 ------
 
 autoconf? at least Sun Solaris and Windows compilation
 CORBA
-cursor "smears" sometimes when not using cursor encoding
-	(seems to be gone now; haven't debugged properly, though)
 
 done:
 -----
 
+.fix bug in http (java) client with big endian server: byte swapping is broken
+	(was a cursorshape which was sent too soon; java vncviewer assumes
+	a rich cursor shape to be always 1 byte per pixel, however, framebuffer
+	updates before setting the pixel format can be server format)
 .rfbConnect, ConnectToTcpAddr
 .update to newest TridiaVNC version (1.2.1).
 .adapt rdp2vnc (rdesktop)
