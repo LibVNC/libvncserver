@@ -68,7 +68,7 @@ OSXvnc-server: mac.o libvncserver.a
 x11vnc.o: x11vnc.c 1instance.c
 
 x11vnc: x11vnc.o libvncserver.a
-	$(CC) -o x11vnc x11vnc.o $(LIBS) $(XLIBS)
+	$(CC) -g -o x11vnc x11vnc.o $(LIBS) $(XLIBS)
 
 x11vnc_static: x11vnc.o libvncserver.a
 	$(CC) -o x11vnc_static x11vnc.o libvncserver.a /usr/lib/libz.a /usr/lib/libjpeg.a $(XLIBS)

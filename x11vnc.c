@@ -73,11 +73,13 @@ void init_keycodes()
   XFree ((char *) keymap);
 }
 
+static Bool shutDownServer=0;
+
 /* the hooks */
 
 void clientGone(rfbClientPtr cl)
 {
-  exit(0);
+  shutDownServer=-1;
 }
 
 enum rfbNewClientAction newClient(rfbClientPtr cl)
@@ -502,6 +504,15 @@ int main(int argc,char** argv)
 #endif
 
     rfbProcessEvents(screen,-1);
+    if(shutDownServer) {
+      free(backupImage);
+      rfbScreenCleanup(screen);
+      XFree(dpy);
+#ifndef NO_SHM
+      XShmDetach(dpy,framebufferImage);
+#endif
+      exit(0);
+    }
 
     if(dontTile) {
       if(gotInput) {
