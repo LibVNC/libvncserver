@@ -1,3 +1,6 @@
+2004-11-30  "Leiradella, Andre V Matos Da Cunha" <ANDRE.LEIRADELLA@bra.xerox.com>
+	* libvncclient/sockets.c: return TRUE in every case of success
+
 2004-08-29  Karl Runge <runge@karlrunge.com>
 	* x11vnc: yet another pointer input handling algorithm in
 	  check_user_input(), revert to previous with -old_pointer2.

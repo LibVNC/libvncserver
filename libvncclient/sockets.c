@@ -162,17 +162,18 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       out += i;
       n -= i;
     }
+  }
 
 #ifdef DEBUG_READ_EXACT
 hexdump:
-    { int ii;
-      for(ii=0;ii<nn;ii++)
-	      fprintf(stderr,"%02x ",(unsigned char)oout[ii]);
-      fprintf(stderr,"\n");
-    }
-#endif
-    return TRUE;
+  { int ii;
+    for(ii=0;ii<nn;ii++)
+      fprintf(stderr,"%02x ",(unsigned char)oout[ii]);
+    fprintf(stderr,"\n");
   }
+#endif
+
+  return TRUE;
 }
 
 
