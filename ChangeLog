@@ -1,3 +1,7 @@
+   portability fixes
+   more portable way to determine endianness and types of a given size
+	through autoconf based methods
+0.5
    autoconf'ed the whole package (including optional support for zlib,
 	pthreads and libjpeg as well as zrle/c++)
    moved appropriate files to contrib/ and examples/ respectively
