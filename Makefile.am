@@ -17,7 +17,7 @@ $(PACKAGE)-$(VERSION).tar.gz: dist
 # Rule to build RPM distribution package
 rpm: $(PACKAGE)-$(VERSION).tar.gz $(PACKAGE).spec
 	cp $(PACKAGE)-$(VERSION).tar.gz @RPMSOURCEDIR@
-	rpm -ba $(PACKAGE).spec
+	rpmbuild -ba $(PACKAGE).spec
 endif
 
 all: make_config_executable

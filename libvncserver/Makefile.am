@@ -36,7 +36,7 @@ $(PACKAGE)-$(VERSION).tar.gz: dist
 # Rule to build RPM distribution package
 rpm: $(PACKAGE)-$(VERSION).tar.gz libvncserver.spec
 	cp $(PACKAGE)-$(VERSION).tar.gz @RPMSOURCEDIR@
-	rpm -ba libvncserver.spec
+	rpmbuild -ba libvncserver.spec
 endif
 
 

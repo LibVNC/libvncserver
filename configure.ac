@@ -248,7 +248,7 @@ AC_CHECK_HEADER(ApplicationServices/ApplicationServices.h, HAVE_OSX="true")
 AM_CONDITIONAL(OSX, test "$HAVE_OSX" = "true")
 
 # Check for rpm SOURCES path
-echo -n "checking for rpm sources path... "
+printf "checking for rpm sources path... "
 RPMSOURCEDIR="NOT-FOUND"
 for directory in packages OpenLinux redhat RedHat rpm RPM "" ; do
 	if test -d /usr/src/${directory}/SOURCES; then

@@ -1,3 +1,6 @@
+2005-03-05  Karl Runge <runge@karlrunge.com>
+	* autoconf: rpm -> rpmbuild and echo -n -> printf
+
 2005-03-04  Karl Runge <runge@karlrunge.com>
 	* libvncserver/{cargs.c,sockets.c}: add -listen option and
 	  rfbScreen member listenInterface.
