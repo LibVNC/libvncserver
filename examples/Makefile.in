@@ -1,0 +1,416 @@
+# Makefile.in generated automatically by automake 1.5 from Makefile.am.
+
+# Copyright 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001
+# Free Software Foundation, Inc.
+# This Makefile.in is free software; the Free Software Foundation
+# gives unlimited permission to copy and/or distribute it,
+# with or without modifications, as long as this notice is preserved.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY, to the extent permitted by law; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.
+
+@SET_MAKE@
+
+SHELL = @SHELL@
+
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+VPATH = @srcdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+
+bindir = @bindir@
+sbindir = @sbindir@
+libexecdir = @libexecdir@
+datadir = @datadir@
+sysconfdir = @sysconfdir@
+sharedstatedir = @sharedstatedir@
+localstatedir = @localstatedir@
+libdir = @libdir@
+infodir = @infodir@
+mandir = @mandir@
+includedir = @includedir@
+oldincludedir = /usr/include
+pkgdatadir = $(datadir)/@PACKAGE@
+pkglibdir = $(libdir)/@PACKAGE@
+pkgincludedir = $(includedir)/@PACKAGE@
+top_builddir = ..
+
+ACLOCAL = @ACLOCAL@
+AUTOCONF = @AUTOCONF@
+AUTOMAKE = @AUTOMAKE@
+AUTOHEADER = @AUTOHEADER@
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_SCRIPT = @INSTALL_SCRIPT@
+INSTALL_HEADER = $(INSTALL_DATA)
+transform = @program_transform_name@
+NORMAL_INSTALL = :
+PRE_INSTALL = :
+POST_INSTALL = :
+NORMAL_UNINSTALL = :
+PRE_UNINSTALL = :
+POST_UNINSTALL = :
+AMTAR = @AMTAR@
+AWK = @AWK@
+CC = @CC@
+CCLD = @CCLD@
+CXX = @CXX@
+DEPDIR = @DEPDIR@
+EXEEXT = @EXEEXT@
+INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+OBJEXT = @OBJEXT@
+PACKAGE = @PACKAGE@
+RANLIB = @RANLIB@
+RPMSOURCEDIR = @RPMSOURCEDIR@
+VERSION = @VERSION@
+X_CFLAGS = @X_CFLAGS@
+X_EXTRA_LIBS = @X_EXTRA_LIBS@
+X_LIBS = @X_LIBS@
+X_PRE_LIBS = @X_PRE_LIBS@
+am__include = @am__include@
+am__quote = @am__quote@
+install_sh = @install_sh@
+
+CFLAGS = -I..
+
+@HAVE_LIBPTHREAD_TRUE@BACKGROUND_TEST = blooptest
+
+@OSX_TRUE@MAC = mac
+@OSX_TRUE@mac_LDFLAGS = -framework ApplicationServices -framework Carbon -framework IOKit
+
+noinst_HEADERS = radon.h
+
+noinst_PROGRAMS = example pnmshow regiontest pnmshow24 fontsel \
+	vncev storepasswd colourmaptest $(BACKGROUND_TEST) $(MAC)
+
+
+LDADD = ../libvncserver.a
+subdir = examples
+mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
+CONFIG_HEADER = $(top_builddir)/rfb/rfbconfig.h
+CONFIG_CLEAN_FILES =
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@noinst_PROGRAMS = example$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	pnmshow$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	regiontest$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	pnmshow24$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	fontsel$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	vncev$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	storepasswd$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	colourmaptest$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_TRUE@	mac$(EXEEXT)
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@noinst_PROGRAMS = example$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	pnmshow$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	regiontest$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	pnmshow24$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	fontsel$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	vncev$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	storepasswd$(EXEEXT) \
+@HAVE_LIBPTHREAD_FALSE@@OSX_FALSE@	colourmaptest$(EXEEXT)
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@noinst_PROGRAMS = example$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	pnmshow$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	regiontest$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	pnmshow24$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	fontsel$(EXEEXT) vncev$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	storepasswd$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	colourmaptest$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_TRUE@	blooptest$(EXEEXT) mac$(EXEEXT)
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@noinst_PROGRAMS = example$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	pnmshow$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	regiontest$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	pnmshow24$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	fontsel$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	vncev$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	storepasswd$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	colourmaptest$(EXEEXT) \
+@HAVE_LIBPTHREAD_TRUE@@OSX_FALSE@	blooptest$(EXEEXT)
+PROGRAMS = $(noinst_PROGRAMS)
+
+blooptest_SOURCES = blooptest.c
+blooptest_OBJECTS = blooptest.$(OBJEXT)
+blooptest_LDADD = $(LDADD)
+blooptest_DEPENDENCIES = ../libvncserver.a
+blooptest_LDFLAGS =
+colourmaptest_SOURCES = colourmaptest.c
+colourmaptest_OBJECTS = colourmaptest.$(OBJEXT)
+colourmaptest_LDADD = $(LDADD)
+colourmaptest_DEPENDENCIES = ../libvncserver.a
+colourmaptest_LDFLAGS =
+example_SOURCES = example.c
+example_OBJECTS = example.$(OBJEXT)
+example_LDADD = $(LDADD)
+example_DEPENDENCIES = ../libvncserver.a
+example_LDFLAGS =
+fontsel_SOURCES = fontsel.c
+fontsel_OBJECTS = fontsel.$(OBJEXT)
+fontsel_LDADD = $(LDADD)
+fontsel_DEPENDENCIES = ../libvncserver.a
+fontsel_LDFLAGS =
+mac_SOURCES = mac.c
+mac_OBJECTS = mac.$(OBJEXT)
+mac_LDADD = $(LDADD)
+mac_DEPENDENCIES = ../libvncserver.a
+pnmshow_SOURCES = pnmshow.c
+pnmshow_OBJECTS = pnmshow.$(OBJEXT)
+pnmshow_LDADD = $(LDADD)
+pnmshow_DEPENDENCIES = ../libvncserver.a
+pnmshow_LDFLAGS =
+pnmshow24_SOURCES = pnmshow24.c
+pnmshow24_OBJECTS = pnmshow24.$(OBJEXT)
+pnmshow24_LDADD = $(LDADD)
+pnmshow24_DEPENDENCIES = ../libvncserver.a
+pnmshow24_LDFLAGS =
+regiontest_SOURCES = regiontest.c
+regiontest_OBJECTS = regiontest.$(OBJEXT)
+regiontest_LDADD = $(LDADD)
+regiontest_DEPENDENCIES = ../libvncserver.a
+regiontest_LDFLAGS =
+storepasswd_SOURCES = storepasswd.c
+storepasswd_OBJECTS = storepasswd.$(OBJEXT)
+storepasswd_LDADD = $(LDADD)
+storepasswd_DEPENDENCIES = ../libvncserver.a
+storepasswd_LDFLAGS =
+vncev_SOURCES = vncev.c
+vncev_OBJECTS = vncev.$(OBJEXT)
+vncev_LDADD = $(LDADD)
+vncev_DEPENDENCIES = ../libvncserver.a
+vncev_LDFLAGS =
+
+DEFS = @DEFS@
+DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)/rfb
+CPPFLAGS = @CPPFLAGS@
+LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@
+depcomp = $(SHELL) $(top_srcdir)/depcomp
+@AMDEP_TRUE@DEP_FILES = $(DEPDIR)/blooptest.Po \
+@AMDEP_TRUE@	$(DEPDIR)/colourmaptest.Po $(DEPDIR)/example.Po \
+@AMDEP_TRUE@	$(DEPDIR)/fontsel.Po $(DEPDIR)/mac.Po \
+@AMDEP_TRUE@	$(DEPDIR)/pnmshow.Po $(DEPDIR)/pnmshow24.Po \
+@AMDEP_TRUE@	$(DEPDIR)/regiontest.Po $(DEPDIR)/storepasswd.Po \
+@AMDEP_TRUE@	$(DEPDIR)/vncev.Po
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+DIST_SOURCES = blooptest.c colourmaptest.c example.c fontsel.c mac.c \
+	pnmshow.c pnmshow24.c regiontest.c storepasswd.c vncev.c
+HEADERS = $(noinst_HEADERS)
+
+DIST_COMMON = $(noinst_HEADERS) Makefile.am Makefile.in
+SOURCES = blooptest.c colourmaptest.c example.c fontsel.c mac.c pnmshow.c pnmshow24.c regiontest.c storepasswd.c vncev.c
+
+all: all-am
+
+.SUFFIXES:
+.SUFFIXES: .c .o .obj
+$(srcdir)/Makefile.in:  Makefile.am  $(top_srcdir)/configure.ac $(ACLOCAL_M4)
+	cd $(top_srcdir) && \
+	  $(AUTOMAKE) --gnu  examples/Makefile
+Makefile:  $(srcdir)/Makefile.in  $(top_builddir)/config.status
+	cd $(top_builddir) && \
+	  CONFIG_HEADERS= CONFIG_LINKS= \
+	  CONFIG_FILES=$(subdir)/$@ $(SHELL) ./config.status
+
+clean-noinstPROGRAMS:
+	-test -z "$(noinst_PROGRAMS)" || rm -f $(noinst_PROGRAMS)
+blooptest$(EXEEXT): $(blooptest_OBJECTS) $(blooptest_DEPENDENCIES) 
+	@rm -f blooptest$(EXEEXT)
+	$(LINK) $(blooptest_LDFLAGS) $(blooptest_OBJECTS) $(blooptest_LDADD) $(LIBS)
+colourmaptest$(EXEEXT): $(colourmaptest_OBJECTS) $(colourmaptest_DEPENDENCIES) 
+	@rm -f colourmaptest$(EXEEXT)
+	$(LINK) $(colourmaptest_LDFLAGS) $(colourmaptest_OBJECTS) $(colourmaptest_LDADD) $(LIBS)
+example$(EXEEXT): $(example_OBJECTS) $(example_DEPENDENCIES) 
+	@rm -f example$(EXEEXT)
+	$(LINK) $(example_LDFLAGS) $(example_OBJECTS) $(example_LDADD) $(LIBS)
+fontsel$(EXEEXT): $(fontsel_OBJECTS) $(fontsel_DEPENDENCIES) 
+	@rm -f fontsel$(EXEEXT)
+	$(LINK) $(fontsel_LDFLAGS) $(fontsel_OBJECTS) $(fontsel_LDADD) $(LIBS)
+mac$(EXEEXT): $(mac_OBJECTS) $(mac_DEPENDENCIES) 
+	@rm -f mac$(EXEEXT)
+	$(LINK) $(mac_LDFLAGS) $(mac_OBJECTS) $(mac_LDADD) $(LIBS)
+pnmshow$(EXEEXT): $(pnmshow_OBJECTS) $(pnmshow_DEPENDENCIES) 
+	@rm -f pnmshow$(EXEEXT)
+	$(LINK) $(pnmshow_LDFLAGS) $(pnmshow_OBJECTS) $(pnmshow_LDADD) $(LIBS)
+pnmshow24$(EXEEXT): $(pnmshow24_OBJECTS) $(pnmshow24_DEPENDENCIES) 
+	@rm -f pnmshow24$(EXEEXT)
+	$(LINK) $(pnmshow24_LDFLAGS) $(pnmshow24_OBJECTS) $(pnmshow24_LDADD) $(LIBS)
+regiontest$(EXEEXT): $(regiontest_OBJECTS) $(regiontest_DEPENDENCIES) 
+	@rm -f regiontest$(EXEEXT)
+	$(LINK) $(regiontest_LDFLAGS) $(regiontest_OBJECTS) $(regiontest_LDADD) $(LIBS)
+storepasswd$(EXEEXT): $(storepasswd_OBJECTS) $(storepasswd_DEPENDENCIES) 
+	@rm -f storepasswd$(EXEEXT)
+	$(LINK) $(storepasswd_LDFLAGS) $(storepasswd_OBJECTS) $(storepasswd_LDADD) $(LIBS)
+vncev$(EXEEXT): $(vncev_OBJECTS) $(vncev_DEPENDENCIES) 
+	@rm -f vncev$(EXEEXT)
+	$(LINK) $(vncev_LDFLAGS) $(vncev_OBJECTS) $(vncev_LDADD) $(LIBS)
+
+mostlyclean-compile:
+	-rm -f *.$(OBJEXT) core *.core
+
+distclean-compile:
+	-rm -f *.tab.c
+
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/blooptest.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/colourmaptest.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/example.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/fontsel.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/mac.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/pnmshow.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/pnmshow24.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/regiontest.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/storepasswd.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/vncev.Po@am__quote@
+
+distclean-depend:
+	-rm -rf $(DEPDIR)
+
+.c.o:
+@AMDEP_TRUE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/$*.Po' tmpdepfile='$(DEPDIR)/$*.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(COMPILE) -c `test -f $< || echo '$(srcdir)/'`$<
+
+.c.obj:
+@AMDEP_TRUE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/$*.Po' tmpdepfile='$(DEPDIR)/$*.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(COMPILE) -c `cygpath -w $<`
+CCDEPMODE = @CCDEPMODE@
+uninstall-info-am:
+
+tags: TAGS
+
+ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
+	list='$(SOURCES) $(HEADERS) $(TAGS_FILES)'; \
+	unique=`for i in $$list; do \
+	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
+	  done | \
+	  $(AWK) '    { files[$$0] = 1; } \
+	       END { for (i in files) print i; }'`; \
+	mkid -fID $$unique $(LISP)
+
+TAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
+		$(TAGS_FILES) $(LISP)
+	tags=; \
+	here=`pwd`; \
+	list='$(SOURCES) $(HEADERS) $(TAGS_FILES)'; \
+	unique=`for i in $$list; do \
+	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
+	  done | \
+	  $(AWK) '    { files[$$0] = 1; } \
+	       END { for (i in files) print i; }'`; \
+	test -z "$(ETAGS_ARGS)$$unique$(LISP)$$tags" \
+	  || etags $(ETAGS_ARGS) $$tags  $$unique $(LISP)
+
+GTAGS:
+	here=`CDPATH=: && cd $(top_builddir) && pwd` \
+	  && cd $(top_srcdir) \
+	  && gtags -i $(GTAGS_ARGS) $$here
+
+distclean-tags:
+	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH
+
+DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+
+top_distdir = ..
+distdir = $(top_distdir)/$(PACKAGE)-$(VERSION)
+
+distdir: $(DISTFILES)
+	@for file in $(DISTFILES); do \
+	  if test -f $$file; then d=.; else d=$(srcdir); fi; \
+	  dir=`echo "$$file" | sed -e 's,/[^/]*$$,,'`; \
+	  if test "$$dir" != "$$file" && test "$$dir" != "."; then \
+	    $(mkinstalldirs) "$(distdir)/$$dir"; \
+	  fi; \
+	  if test -d $$d/$$file; then \
+	    cp -pR $$d/$$file $(distdir) \
+	    || exit 1; \
+	  else \
+	    test -f $(distdir)/$$file \
+	    || cp -p $$d/$$file $(distdir)/$$file \
+	    || exit 1; \
+	  fi; \
+	done
+check-am: all-am
+check: check-am
+all-am: Makefile $(PROGRAMS) $(HEADERS)
+
+installdirs:
+
+install: install-am
+install-exec: install-exec-am
+install-data: install-data-am
+uninstall: uninstall-am
+
+install-am: all-am
+	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
+
+installcheck: installcheck-am
+install-strip:
+	$(MAKE) $(AM_MAKEFLAGS) INSTALL_PROGRAM="$(INSTALL_STRIP_PROGRAM)" \
+	  `test -z '$(STRIP)' || \
+	    echo "INSTALL_PROGRAM_ENV=STRIPPROG='$(STRIP)'"` install
+mostlyclean-generic:
+
+clean-generic:
+
+distclean-generic:
+	-rm -f Makefile $(CONFIG_CLEAN_FILES) stamp-h stamp-h[0-9]*
+
+maintainer-clean-generic:
+	@echo "This command is intended for maintainers to use"
+	@echo "it deletes files that may require special tools to rebuild."
+clean: clean-am
+
+clean-am: clean-generic clean-noinstPROGRAMS mostlyclean-am
+
+distclean: distclean-am
+
+distclean-am: clean-am distclean-compile distclean-depend \
+	distclean-generic distclean-tags
+
+dvi: dvi-am
+
+dvi-am:
+
+info: info-am
+
+info-am:
+
+install-data-am:
+
+install-exec-am:
+
+install-info: install-info-am
+
+install-man:
+
+installcheck-am:
+
+maintainer-clean: maintainer-clean-am
+
+maintainer-clean-am: distclean-am maintainer-clean-generic
+
+mostlyclean: mostlyclean-am
+
+mostlyclean-am: mostlyclean-compile mostlyclean-generic
+
+uninstall-am: uninstall-info-am
+
+.PHONY: GTAGS all all-am check check-am clean clean-generic \
+	clean-noinstPROGRAMS distclean distclean-compile \
+	distclean-depend distclean-generic distclean-tags distdir dvi \
+	dvi-am info info-am install install-am install-data \
+	install-data-am install-exec install-exec-am install-info \
+	install-info-am install-man install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic tags uninstall uninstall-am \
+	uninstall-info-am
+
+# Tell versions [3.59,3.63) of GNU make to not export all variables.
+# Otherwise a system limit (for SysV at least) may be exceeded.
+.NOEXPORT:
