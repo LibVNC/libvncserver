@@ -346,6 +346,9 @@ processArguments(rfbScreenInfoPtr rfbScreen,int argc, char *argv[])
         } else if (strcmp(argv[i], "-rfbauth") == 0) {  /* -rfbauth passwd-file */
             if (i + 1 >= argc) usage();
             rfbScreen->rfbAuthPasswdData = argv[++i];
+        } else if (strcmp(argv[i], "-deferupdate") == 0) {  /* -desktop desktop-name */
+            if (i + 1 >= argc) usage();
+            rfbScreen->rfbDeferUpdateTime = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-desktop") == 0) {  /* -desktop desktop-name */
             if (i + 1 >= argc) usage();
             rfbScreen->desktopName = argv[++i];

@@ -702,7 +702,10 @@ void rfbFreeFont(rfbFontDataPtr font);
 
 /* draw.c */
 
+/* You have to call rfbUndrawCursor before using these functions */
 void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,Pixel col);
+void rfbDrawPixel(rfbScreenInfoPtr s,int x,int y,Pixel col);
+void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,Pixel col);
 
 /* selbox.c */
 

@@ -76,6 +76,9 @@ pnmshow24: pnmshow24.o libvncserver.a
 fontsel: fontsel.o libvncserver.a
 	$(CC) -o fontsel fontsel.o -L. -lvncserver -lz -ljpeg
 
+vncev: vncev.o libvncserver.a
+	$(CC) -o vncev vncev.o -L. -lvncserver -lz -ljpeg
+
 clean:
 	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \
 	     	mac.o example.o pnmshow.o pnmshow24.o sratest.o \
