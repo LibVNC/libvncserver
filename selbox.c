@@ -66,17 +66,17 @@ static void selPaintLine(rfbSelectData* m,int line,Bool invert)
 			  invert?m->backColour:m->colour);
 }
 
-static void selSelect(rfbSelectData* m,int index)
+static void selSelect(rfbSelectData* m,int _index)
 {
   int delta;
 
-  if(index==m->selected || index<0 || index>=m->listSize)
+  if(_index==m->selected || _index<0 || _index>=m->listSize)
     return;
 
   if(m->selected>=0)
     selPaintLine(m,m->selected-m->displayStart,FALSE);
 
-  if(index<m->displayStart || index>=m->displayStart+m->pageH) {
+  if(_index<m->displayStart || _index>=m->displayStart+m->pageH) {
     /* targetLine is the screen line in which the selected line will
        be displayed.
        targetLine = m->pageH/2 doesn't look so nice */
@@ -84,11 +84,11 @@ static void selSelect(rfbSelectData* m,int index)
     int lineStart,lineEnd;
 
     /* scroll */
-    if(index<targetLine)
-      targetLine = index;
-    else if(index+m->pageH-targetLine>=m->listSize)
-      targetLine = index+m->pageH-m->listSize;
-    delta = index-(m->displayStart+targetLine);
+    if(_index<targetLine)
+      targetLine = _index;
+    else if(_index+m->pageH-targetLine>=m->listSize)
+      targetLine = _index+m->pageH-m->listSize;
+    delta = _index-(m->displayStart+targetLine);
 
     if(delta>-m->pageH && delta<m->pageH) {
       if(delta>0) {
@@ -109,15 +109,15 @@ static void selSelect(rfbSelectData* m,int index)
     }
     m->displayStart += delta;
     for(delta=lineStart;delta<lineEnd;delta++)
-      if(delta!=index)
+      if(delta!=_index)
 	selPaintLine(m,delta,FALSE);
   }
 
-  m->selected = index;
+  m->selected = _index;
   selPaintLine(m,m->selected-m->displayStart,TRUE);
 
   if(m->selChangedHook)
-    m->selChangedHook(index);
+    m->selChangedHook(_index);
 
   /* todo: scrollbars */
 }
