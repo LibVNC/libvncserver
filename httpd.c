@@ -167,7 +167,7 @@ httpCheckFds(rfbScreenInfoPtr rfbScreen)
 	  rfbLog("Rejected HTTP connection from client %s\n",
 		 inet_ntoa(addr.sin_addr));
 #else
-	flags = fcntl(rfbScreen->httpSock, F_SETFL);
+	flags = fcntl(rfbScreen->httpSock, F_GETFL);
 
 	if (flags < 0 || fcntl(rfbScreen->httpSock, F_SETFL, flags | O_NONBLOCK) == -1) {
 	    rfbLogPerror("httpCheckFds: fcntl");

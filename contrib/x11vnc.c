@@ -131,7 +131,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-05-14";
+char lastmod[] = "lastmod:    2004-05-21";
 
 
 /* X and rfb framebuffer */
@@ -207,6 +207,7 @@ hint_t *hint_list;
 int shared = 0;			/* share vnc display. */
 char *allow_list = NULL;	/* for -allow and -localhost */
 char *accept_cmd = NULL;	/* for -accept */
+char *gone_cmd = NULL;		/* for -gone */
 int view_only = 0;		/* clients can only watch. */
 int inetd = 0;			/* spawned from inetd(1) */
 int connect_once = 1;		/* disconnect after first connection session. */
@@ -353,6 +354,7 @@ void clean_up_exit (int ret) {
 	XTestDiscard(dpy);
 	X_UNLOCK;
 
+	fflush(stderr);
 	exit(ret);
 }
 
@@ -437,11 +439,18 @@ void set_signals(void) {
 	X_UNLOCK;
 }
 
+int run_user_command(char *, rfbClientPtr);
+
 int accepted_client = 0;
 void client_gone(rfbClientPtr client) {
 
 	client_count--;
 	rfbLog("client_count: %d\n", client_count);
+
+	if (gone_cmd) {
+		rfbLog("client_gone: using cmd for: %s\n", client->host);
+		run_user_command(gone_cmd, client);
+	}
 
 	if (inetd) {
 		rfbLog("viewer exited.\n");
@@ -506,7 +515,7 @@ int check_access(char *addr) {
  * We go through this pain to avoid dependency on libXt.
  */
 
-int ugly_accept_window(char *addr, int timeout) {
+int ugly_accept_window(char *addr, int X, int Y, int timeout, char *mode) {
 
 #define t2x2_width 16
 #define t2x2_height 16
@@ -534,22 +543,62 @@ static char t2x2_bits[] = {
 	double waited = 0.0;
 
 	/* strings and geometries y/n */
-	KeyCode key_y, key_n;
-	char str1[100];
-	char str2[] = "To accept: press \"y\" or click the \"Yes\" button";
-	char str3[] = "To reject: press \"n\" or click the \"No\" button";
-	char str4[] = "Yes";
-	char str5[] = "No";
-	int x, y, w = 345, h = 125, ret = 0;
+	KeyCode key_y, key_n, key_v;
+	char strh[100];
+	char str1_b[] = "To accept: press \"y\" or click the \"Yes\" button";
+	char str2_b[] = "To reject: press \"n\" or click the \"No\" button";
+	char str3_b[] = "View only: press \"v\" or click the \"View\" button";
+	char str1_m[] = "To accept: click the \"Yes\" button";
+	char str2_m[] = "To reject: click the \"No\" button";
+	char str3_m[] = "View only: click the \"View\" button";
+	char str1_k[] = "To accept: press \"y\"";
+	char str2_k[] = "To reject: press \"n\"";
+	char str3_k[] = "View only: press \"v\"";
+	char *str1, *str2, *str3;
+	char str_y[] = "Yes";
+	char str_n[] = "No";
+	char str_v[] = "View";
+	int x, y, w = 345, h = 150, ret = 0;
 	int X_sh = 20, Y_sh = 30, dY = 20;
-	int Ye_x = 20, Ye_y = 0, Ye_w = 40, Ye_h = 20;
-	int No_x = 70, No_y = 0, No_w = 40, No_h = 20; 
+	int Ye_x = 20,  Ye_y = 0, Ye_w = 45, Ye_h = 20;
+	int No_x = 75,  No_y = 0, No_w = 45, No_h = 20; 
+	int Vi_x = 130, Vi_y = 0, Vi_w = 45, Vi_h = 20; 
 
+	if (!strcmp(mode, "mouse_only")) {
+		str1 = str1_m;
+		str2 = str2_m;
+		str3 = str3_m;
+	} else if (!strcmp(mode, "key_only")) {
+		str1 = str1_k;
+		str2 = str2_k;
+		str3 = str3_k;
+		h -= dY;
+	} else {
+		str1 = str1_b;
+		str2 = str2_b;
+		str3 = str3_b;
+	}
+	if (view_only) {
+		h -= dY;
+	}
 
-	x = (dpy_x - w)/2;
-	y = (dpy_y - h)/2;
-	if (x < 0) x = 0;
-	if (y < 0) y = 0;
+	if (X < -dpy_x) {
+		x = (dpy_x - w)/2;	/* large negative: center */
+		if (x < 0) x = 0;
+	} else if (X < 0) {
+		x = dpy_x + X - w;	/* from lower right */
+	} else {
+		x = X;			/* from upper left */
+	}
+	
+	if (Y < -dpy_y) {
+		y = (dpy_y - h)/2;
+		if (y < 0) y = 0;
+	} else if (Y < 0) {
+		y = dpy_y + Y - h;
+	} else {
+		y = Y;
+	}
 
 	X_LOCK;
 
@@ -593,12 +642,13 @@ static char t2x2_bits[] = {
 	XMapWindow(dpy, awin);
 	XFlush(dpy);
 
-	sprintf(str1, "x11vnc: accept connection from %s?", addr);
+	sprintf(strh, "x11vnc: accept connection from %s?", addr);
 	key_y = XKeysymToKeycode(dpy, XStringToKeysym("y"));
 	key_n = XKeysymToKeycode(dpy, XStringToKeysym("n"));
+	key_v = XKeysymToKeycode(dpy, XStringToKeysym("v"));
 
 	while (1) {
-		int out = -1, l1, l2, l3, l4, l5, x, y, tw;
+		int out = -1, x, y, tw, k;
 
 		if (XCheckWindowEvent(dpy, awin, evmask, &ev)) {
 			;	/* proceed to handling */
@@ -623,29 +673,55 @@ static char t2x2_bits[] = {
 			while (XCheckTypedEvent(dpy, Expose, &ev)) {
 				;
 			}
-			l1 = strlen(str1); l2 = strlen(str2);
-			l3 = strlen(str3); l4 = strlen(str4); l5 = strlen(str5);
+			k=0;
 
-			XDrawString(dpy, awin, gc, X_sh, Y_sh+0*dY, str1, l1);
-			XDrawString(dpy, awin, gc, X_sh, Y_sh+1*dY, str2, l2);
-			XDrawString(dpy, awin, gc, X_sh, Y_sh+2*dY, str3, l3);
+			/* instructions */
+			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
+			    strh, strlen(strh));
+			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
+			    str1, strlen(str1));
+			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
+			    str2, strlen(str2));
+			if (! view_only) {
+				XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
+				    str3, strlen(str3));
+			}
 
-			Ye_y = Y_sh+3*dY;
-			No_y = Y_sh+3*dY;
+			if (!strcmp(mode, "key_only")) {
+				break;
+			}
+
+			/* buttons */
+			Ye_y = Y_sh+k*dY;
+			No_y = Y_sh+k*dY;
+			Vi_y = Y_sh+k*dY;
 			XDrawRectangle(dpy, awin, gc, Ye_x, Ye_y, Ye_w, Ye_h);
 			XDrawRectangle(dpy, awin, gc, No_x, No_y, No_w, No_h);
+			if (! view_only) {
+				XDrawRectangle(dpy, awin, gc, Vi_x, Vi_y,
+				    Vi_w, Vi_h);
+			}
 
-			tw = XTextWidth(font_info, str4, l4);
+			tw = XTextWidth(font_info, str_y, strlen(str_y));
 			tw = (Ye_w - tw)/2;
 			if (tw < 0) tw = 1;
 			XDrawString(dpy, awin, gc, Ye_x+tw, Ye_y+Ye_h-5,
-			    str4, l4);
+			    str_y, strlen(str_y));
 
-			tw = XTextWidth(font_info, str5, l5);
+			tw = XTextWidth(font_info, str_n, strlen(str_n));
 			tw = (No_w - tw)/2;
 			if (tw < 0) tw = 1;
 			XDrawString(dpy, awin, gc, No_x+tw, No_y+No_h-5,
-			    str5, l5);
+			    str_n, strlen(str_n));
+
+			if (! view_only) {
+				tw = XTextWidth(font_info, str_v,
+				    strlen(str_v));
+				tw = (Vi_w - tw)/2;
+				if (tw < 0) tw = 1;
+				XDrawString(dpy, awin, gc, Vi_x+tw, Vi_y+Vi_h-5,
+				    str_v, strlen(str_v));
+			}
 
 			break;
 
@@ -659,20 +735,29 @@ static char t2x2_bits[] = {
 		case ButtonPress:
 			x = ev.xbutton.x;
 			y = ev.xbutton.y;
-			if (x > No_x && x < No_x+No_w && y > No_y
+			if (!strcmp(mode, "key_only")) {
+				;
+			} else if (x > No_x && x < No_x+No_w && y > No_y
 			    && y < No_y+No_h) {
 				out = 0;
 			} else if (x > Ye_x && x < Ye_x+Ye_w && y > Ye_y
 			    && y < Ye_y+Ye_h) {
 				out = 1;
+			} else if (! view_only && x > Vi_x && x < Vi_x+Vi_w
+			    && y > Vi_y && y < Vi_y+Ye_h) {
+				out = 2;
 			}
 			break;
 
 		case KeyPress:
-			if (ev.xkey.keycode == key_y) {
+			if (!strcmp(mode, "mouse_only")) {
+				;
+			} else if (ev.xkey.keycode == key_y) {
 				out = 1;
 			} else if (ev.xkey.keycode == key_n) {
 				out = 0;
+			} else if (! view_only && ev.xkey.keycode == key_v) {
+				out = 2;
 			}
 			break;
 		default:
@@ -693,12 +778,172 @@ static char t2x2_bits[] = {
 }
 
 /*
+ * utility to run a user supplied command setting some RFB_ env vars.
+ * used by, e.g., accept_client() and client_gone()
+ */
+int run_user_command(char *cmd, rfbClientPtr client) {
+	char *dpystr = DisplayString(dpy);
+	static char *display_env = NULL;
+	static char env_rfb_client_id[100];
+	static char env_rfb_client_ip[100];
+	static char env_rfb_client_port[100];
+	static char env_rfb_x11vnc_pid[100];
+	char *addr = client->host;
+	int rc, fromlen, fromport;
+	struct sockaddr_in from;
+
+	if (addr == NULL || addr[0] == '\0') {
+		addr = "unknown-host";
+	}
+
+	/* set RFB_CLIENT_ID to semi unique id for command to use */
+	sprintf(env_rfb_client_id, "RFB_CLIENT_ID=%d", (int) client);
+	putenv(env_rfb_client_id);
+
+	/* set RFB_CLIENT_IP to IP addr for command to use */
+	sprintf(env_rfb_client_ip, "RFB_CLIENT_IP=%s", addr);
+	putenv(env_rfb_client_ip);
+
+	/* set RFB_X11VNC_PID to our pid for command to use */
+	sprintf(env_rfb_x11vnc_pid, "RFB_X11VNC_PID=%d", (int) getpid());
+	putenv(env_rfb_x11vnc_pid);
+
+	/* set RFB_CLIENT_PORT to peer port for command to use */
+	fromlen = sizeof(from);
+	memset(&from, 0, sizeof(from));
+	fromport = -1;
+	if (!getpeername(client->sock, (struct sockaddr *)&from, &fromlen)) {
+		fromport = ntohs(from.sin_port);
+	}
+	sprintf(env_rfb_client_port, "RFB_CLIENT_PORT=%d", fromport);
+	putenv(env_rfb_client_port);
+
+	/* 
+	 * Better set DISPLAY to the one we are polling, if they
+	 * want something trickier, they can handle on their own
+	 * via environment, etc.  XXX really should save/restore old.
+	 */
+	if (display_env == NULL) {
+		display_env = (char *) malloc(strlen(dpystr)+10);
+	}
+	sprintf(display_env, "DISPLAY=%s", dpystr);
+	putenv(display_env);
+
+	rfbLog("running command:\n");
+	rfbLog("  %s\n", cmd);
+
+	rc = system(cmd);
+
+	if (rc >= 256) {
+		rc = rc/256;
+	}
+	rfbLog("command returned: %d\n", rc);
+
+	sprintf(env_rfb_client_id, "RFB_CLIENT_ID=");
+	putenv(env_rfb_client_id);
+
+	sprintf(env_rfb_client_ip, "RFB_CLIENT_IP=");
+	putenv(env_rfb_client_ip);
+
+	sprintf(env_rfb_client_port, "RFB_CLIENT_PORT=");
+	putenv(env_rfb_client_port);
+
+	sprintf(env_rfb_x11vnc_pid, "RFB_X11VNC_PID=");
+	putenv(env_rfb_x11vnc_pid);
+
+	return rc;
+}
+
+/*
+ * process a "yes:0,no:*,view:3" type action list comparing to command
+ * return code rc.  * means the default action with no other match.
+ */
+int action_match(char *action, int rc) {
+	char *p, *q, *s = strdup(action);
+	int cases[4], i, result;
+	char *labels[4];
+
+	labels[1] = "yes";
+	labels[2] = "no";
+	labels[3] = "view";
+
+	rfbLog("accept_client: process action line: %s\n",
+	    action);
+
+	for (i=1; i <= 3; i++) {
+		cases[i] = -2;
+	}
+
+	p = strtok(s, ",");
+	while (p) {
+		if ((q = strchr(p, ':')) != NULL) {
+			int in, k;
+			*q = '\0';
+			q++;
+			if (strstr(p, "yes") == p) {
+				k = 1;
+			} else if (strstr(p, "no") == p) {
+				k = 2;
+			} else if (strstr(p, "view") == p) {
+				k = 3;
+			} else {
+				rfbLog("bad action line: %s\n", action);
+				clean_up_exit(1);
+			}
+			if (*q == '*') {
+				cases[k] = -1;
+			} else if (sscanf(q, "%d", &in) == 1) {
+				if (in < 0) {
+					rfbLog("bad action line: %s\n", action);
+					clean_up_exit(1);
+				}
+				cases[k] = in;
+			} else {
+				rfbLog("bad action line: %s\n", action);
+				clean_up_exit(1);
+			}
+		} else {
+			rfbLog("bad action line: %s\n", action);
+			clean_up_exit(1);
+		}
+		p = strtok(NULL, ",");
+	}
+	free(s);
+
+	result = -1;
+	for (i=1; i <= 3; i++) {
+		if (cases[i] == -1) {
+			rfbLog("accept_client: default action is case=%d %s\n",
+			    i, labels[i]);
+			result = i;
+			break;
+		}
+	}
+	if (result == -1) {
+		rfbLog("accept_client: no default action\n");
+	}
+	for (i=1; i <= 3; i++) {
+		if (cases[i] >= 0 && cases[i] == rc) {
+			rfbLog("accept_client: matched action is case=%d %s\n",
+			    i, labels[i]);
+			result = i;
+			break;
+		}
+	}
+	if (result < 0) {
+		rfbLog("no action match: %s rc=%d set to no\n", action, rc);
+		result = 2;
+	}
+	return result;
+}
+
+/*
  * Simple routine to prompt the user on the X display whether an incoming
  * client should be allowed to connect or not.  If a gui is involved it
  * will be running in the environment/context of the X11 DISPLAY.
  *
  * The command supplied via -accept is run as is (i.e. no string
- * substitution) with the RFB_CLIENT environment variable set to the
+ * substitution) with the RFB_CLIENT_IP environment variable set to the
  * incoming client's numerical IP address.
  * 
  * If the external command exits with 0 the client is accepted, otherwise
@@ -710,9 +955,11 @@ static char t2x2_bits[] = {
  *	popup:     use internal X widgets for prompting.
  * 
  */
-int accept_client(char *addr) {
+int accept_client(rfbClientPtr client) {
+
 	char xmessage[200], *cmd = NULL;
-	static char rfb_client_env[100], *display_env = NULL;
+	char *addr = client->host;
+	char *action = NULL;
 
 	if (accept_cmd == NULL) {
 		return 1;	/* no command specified, so we accept */
@@ -722,63 +969,131 @@ int accept_client(char *addr) {
 		addr = "unknown-host";
 	}
 
-	if (!strcmp(accept_cmd, "xmessage")) {
-		/* make our own command using xmessage(1) */
-		sprintf(xmessage, "xmessage -buttons yes:0,no:2 -center "
-		    "'x11vnc: accept connection from %s?'", addr);
-		cmd = xmessage;
-		
-	} else if (strstr(accept_cmd, "popup:") == accept_cmd ||
-	    !strcmp(accept_cmd, "popup")) {
-		int timeout = 120;
-		char *p;
+	if (strstr(accept_cmd, "popup") == accept_cmd) {
+		/* use our builtin popup button */
+
+		/* (popup|popupkey|popupmouse)[+-X+-Y][:timeout] */
+
+		int ret, timeout = 120;
+		int x = -64000, y = -64000;
+		char *p, *mode;
+
+		/* extract timeout */
 		if ((p = strchr(accept_cmd, ':')) != NULL) {
 			int in;
 			if (sscanf(p+1, "%d", &in) == 1) {
 				timeout = in;
 			}
 		}
+		/* extract geometry */
+		if ((p = strpbrk(accept_cmd, "+-")) != NULL) {
+			int x1, y1;
+			if (sscanf(p, "+%d+%d", &x1, &y1) == 2) {
+				x = x1;
+				y = y1;
+			} else if (sscanf(p, "+%d-%d", &x1, &y1) == 2) {
+				x = x1;
+				y = -y1;
+			} else if (sscanf(p, "-%d+%d", &x1, &y1) == 2) {
+				x = -x1;
+				y = y1;
+			} else if (sscanf(p, "-%d-%d", &x1, &y1) == 2) {
+				x = -x1;
+				y = -y1;
+			}
+		}
+
+		/* find mode: mouse, key, or both */
+		if (strstr(accept_cmd, "popupmouse") == accept_cmd) {
+			mode = "mouse_only";
+		} else if (strstr(accept_cmd, "popupkey") == accept_cmd) {
+			mode = "key_only";
+		} else {
+			mode = "both";
+		}
+
 		rfbLog("accept_client: using builtin popup for: %s\n", addr);
-		if (ugly_accept_window(addr, timeout)) {
+		if ((ret = ugly_accept_window(addr, x, y, timeout, mode))) {
+			if (ret == 2) {
+				rfbLog("accept_client: viewonly: %s\n", addr);
+				client->viewOnly = TRUE;
+			}
 			rfbLog("accept_client: popup accepted: %s\n", addr);
 			return 1;
 		} else {
 			rfbLog("accept_client: popup rejected: %s\n", addr);
 			return 0;
 		}
+
+	} else if (!strcmp(accept_cmd, "xmessage")) {
+		/* make our own command using xmessage(1) */
+
+		if (view_only) {
+			sprintf(xmessage, "xmessage -buttons yes:0,no:2 -center"
+			    " 'x11vnc: accept connection from %s?'", addr);
+		} else {
+			sprintf(xmessage, "xmessage -buttons yes:0,no:2,"
+			    "view-only:3 -center" " 'x11vnc: accept connection"
+			    " from %s?'", addr);
+			action = "yes:0,no:*,view:3";
+		}
+		cmd = xmessage;
+		
 	} else {
+		/* use the user supplied command: */
+
 		cmd = accept_cmd;
+
+		/* extract any action prefix:  yes:N,no:M,view:K */
+		if (strstr(accept_cmd, "yes:") == accept_cmd) {
+			char *p;
+			if ((p = strpbrk(accept_cmd, " \t")) != NULL) {
+				int i;
+				cmd = p;
+				p = accept_cmd;
+				for (i=0; i<200; i++) {
+					if (*p == ' ' || *p == '\t') {
+						xmessage[i] = '\0';
+						break;
+					}
+					xmessage[i] = *p;
+					p++;
+				}
+				xmessage[200-1] = '\0';
+				action = xmessage;
+			}
+		}
 	}
 
 	if (cmd) {
 		int rc;
-		char *dpystr = DisplayString(dpy);
 
-		/* set RFB_CLIENT to IP addr for command to use */
-		sprintf(rfb_client_env, "RFB_CLIENT=%s", addr);
-		putenv(rfb_client_env);
+		rfbLog("accept_client: using cmd for: %s\n", addr);
+		rc = run_user_command(cmd, client);
 
-		/* 
-		 * Better set DISPLAY to the one we are polling, if they
-		 * want something trickier, they can handle on their own
-		 * via environment, etc.  XXX really should save/restore old.
-		 */
-		if (display_env == NULL) {
-			display_env = (char *) malloc(strlen(dpystr)+10);
+		if (action) {
+			int result;
+
+			if (rc < 0) {
+				rfbLog("accept_client: cannot use negative "
+				    "rc: %d, action %s\n", rc, action);
+				result = 2;
+			} else {
+				result = action_match(action, rc);
+			}
+
+			if (result == 1) {
+				rc = 0;
+			} else if (result == 2) {
+				rc = 1;
+			} else if (result == 3) {
+				rc = 0;
+				rfbLog("accept_client: viewonly: %s\n", addr);
+				client->viewOnly = TRUE;
+			} else {
+				rc = 1;	/* NOTREACHED */
+			}
 		}
-		sprintf(display_env, "DISPLAY=%s", dpystr);
-		putenv(display_env);
-
-		rfbLog("accept_client: running command:\n");
-		rfbLog("  %s\n", cmd);
-		rc = system(cmd);
-		if (rc >= 256) {
-			rc = rc/256;
-		}
-		rfbLog("accept_client: command returned: %d\n", rc);
-
-		sprintf(rfb_client_env, "RFB_CLIENT=");
-		putenv(rfb_client_env);
 
 		if (rc == 0) {
 			rfbLog("accept_client: accepted: %s\n", addr);
@@ -1014,7 +1329,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		    allow_list ? allow_list : "(null)" );
 		return(RFB_CLIENT_REFUSE);
 	}
-	if (! accept_client(client->host)) {
+	if (! accept_client(client)) {
 		rfbLog("denying client: %s local user rejected connection.\n",
 		    client->host);
 		rfbLog("denying client: accept_cmd=\"%s\"\n",
@@ -1024,6 +1339,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	if (view_only)  {
 		client->clientData = (void *) -1;
+		client->viewOnly = TRUE;
 	} else {
 		client->clientData = (void *) 0;
 	}
@@ -1262,7 +1578,8 @@ void tweak_mod(signed char mod, rfbBool down) {
 	}
 }
 
-static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
+static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
+    rfbClientPtr client) {
 	KeyCode k;
 	int tweak = 0;
 	if (debug_keyboard) {
@@ -1271,6 +1588,9 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr
 	}
 
 	if (view_only) {
+		return;
+	}
+	if (client->viewOnly) {
 		return;
 	}
 
@@ -1331,6 +1651,9 @@ static void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	}
 
 	if (view_only) {
+		return;
+	}
+	if (client->viewOnly) {
 		return;
 	}
 	last_keyboard_client = client;
@@ -1669,7 +1992,9 @@ static void pointer(int mask, int x, int y, rfbClientPtr client) {
 	if (view_only) {
 		return;
 	}
-
+	if (client->viewOnly) {
+		return;
+	}
 
 	if (mask >= 0) {
 		/*
@@ -2376,6 +2701,9 @@ void watch_xevents() {
  */
 void xcut_receive(char *text, int len, rfbClientPtr cl) {
 
+	if (cl->viewOnly) {
+		return;
+	}
 	if (text == NULL || len == 0) {
 		return;
 	}
@@ -5419,7 +5747,7 @@ void print_help() {
 "Once x11vnc establishes connections with the X11 server and starts\n"
 "listening as a VNC server it will print out a string: PORT=XXXX where\n"
 "XXXX is typically 5900 (the default VNC port).  One would next run something\n"
-"like this on the local machine: \"vncviewer host:N\" where N is XXXX - 5900.\n" 
+"like this on the local machine: \"vncviewer host:N\" where N is XXXX - 5900.\n"
 "\n"
 "By default x11vnc will not allow the screen to be shared and it will\n"
 "exit as soon as a client disconnects.  See -shared and -forever below\n"
@@ -5439,68 +5767,113 @@ void print_help() {
 "                       as the pointer moves from window to window (slow).\n"
 "-notruecolor           Force 8bpp indexed color even if it looks like TrueColor.\n"
 "\n"
-"-visual n              Experimental option: probably does not do what you think.\n"
-"                       It simply *forces* the visual used for the framebuffer;\n"
-"                       this may be a bad thing... It is useful for testing and\n"
-"                       for some workarounds.  n may be a decimal number, or 0x\n"
-"                       hex.  Run xdpyinfo(1) for the values. One may also use\n"
-"                       \"TrueColor\", etc. see <X11/X.h> for a list.  If the\n"
-"                       string ends in \":m\" the visual depth is forced to be m.\n"
+"-visual n              Experimental option: probably does not do what you\n"
+"                       think.  It simply *forces* the visual used for the\n"
+"                       framebuffer; this may be a bad thing... It is useful for\n"
+"                       testing and for some workarounds.  n may be a decimal\n"
+"                       number, or 0x hex.  Run xdpyinfo(1) for the values.\n"
+"                       One may also use \"TrueColor\", etc. see <X11/X.h>\n"
+"                       for a list.  If the string ends in \":m\" for better\n"
+"                       or for worse the visual depth is forced to be m.\n"
 "\n"
-"-viewonly              Clients can only watch (default %s).\n"
+"-viewonly              All clients can only watch (default %s).\n"
 "-shared                VNC display is shared (default %s).\n"
 "-forever               Keep listening for more connections rather than exiting\n"
 "                       as soon as the first client(s) disconnect. Same as -many\n"
-"-connect string        For use with \"vncviewer -listen\" reverse connections. If\n"
-"                       string has the form \"host\" or \"host:port\" the connection\n"
-"                       is made once at startup. Use commas for a list. If string\n"
-"                       contains \"/\" it is a file to periodically check for new\n"
-"                       hosts. The first line is read and then file is truncated.\n"
+"-connect string        For use with \"vncviewer -listen\" reverse connections.\n"
+"                       If string has the form \"host\" or \"host:port\"\n"
+"                       the connection is made once at startup.  Use commas\n"
+"                       for a list.  If string contains \"/\" it is a file to\n"
+"                       periodically check for new hosts.  The first line is\n"
+"                       read and then file is truncated.\n"
 "-vncconnect            Monitor the VNC_CONNECT X property set by vncconnect(1).\n"
 "-auth file             Set the X authority file to be \"file\", equivalent to\n"
 "                       setting the XAUTHORITY env. var to \"file\" before startup.\n"
 "-allow addr1[,addr2..] Only allow client connections from IP addresses matching\n"
-"                       the comma separated list of numerical addresses. Can be\n"
-"                       a prefix, e.g. \"192.168.100.\" to match a simple subnet,\n"
-"                       for more control build libvncserver with libwrap support.\n"
+"                       the comma separated list of numerical addresses.\n"
+"                       Can be a prefix, e.g. \"192.168.100.\" to match a\n"
+"                       simple subnet, for more control build libvncserver with\n"
+"                       libwrap support.\n"
 "-localhost             Same as -allow 127.0.0.1\n"
-"-accept string         Prompt user at the X11 display whether an incoming\n"
-"                       client should be allowed to connect.  \"string\" is an\n"
-"                       external command run via system(3).  Be sure to quote\n"
-"                       \"string\" if it contains spaces, etc. The RFB_CLIENT env.\n"
-"                       variable will be set to the client's IP number.  If the\n"
-"                       external command returns 0 the client is accepted,\n"
-"                       otherwise the client is rejected.\n"
+"-passwdfile filename   Specify libvncserver -passwd via the first line of file\n"
+"                       \"filename\" instead of via command line.  Note: this\n"
+"                       is a simple plaintext passwd, see also -rfbauth below.\n"
+"-accept string         Run a command (possibly to prompt the user at the\n"
+"                       X11 display) to decide whether an incoming client\n"
+"                       should be allowed to connect or not.  \"string\" is\n"
+"                       an external command run via system(3) (see below for\n"
+"                       special cases).  Be sure to quote \"string\" if it\n"
+"                       contains spaces, etc.  The RFB_CLIENT_IP environment\n"
+"                       variable will be set to the incoming client IP number\n"
+"                       and the port in RFB_CLIENT_PORT (or -1 if unavailable).\n"
+"                       The x11vnc process id will be in RFB_X11VNC_PID and a\n"
+"                       client id number in RFB_CLIENT_ID.  If the external\n"
+"                       command returns 0 the client is accepted, otherwise\n"
+"                       the client is rejected.  See below for an extension to\n"
+"                       accept a client view-only.\n"
 "\n"
-"                       If string is \"xmessage\" then an xmessage(1) invocation\n"
-"                       is used for the command. If string is \"popup\" then a\n"
-"                       builtin popup window is used.  The popup will time out\n"
-"                       after 120 seconds, use \"popup:N\" to modify the timeout\n"
-"                       to N seconds (use 0 for no timeout)\n"
+"                       If \"string\" is \"popup\" then a builtin popup window\n"
+"                       is used.  The popup will time out after 120 seconds,\n"
+"                       use \"popup:N\" to modify the timeout to N seconds\n"
+"                       (use 0 for no timeout)\n"
+"\n"
+"                       If \"string\" is \"xmessage\" then an xmessage(1)\n"
+"                       invocation is used for the command.\n"
+"\n"
+"                       Both \"popup\" and \"xmessage\" will present an option\n"
+"                       for accepting the client \"View-Only\" (the client\n"
+"                       can only watch).  This option will not be presented if\n"
+"                       -viewonly has been specified, in which case the entire\n"
+"                       display is view only.\n"
+"\n"
+"                       If the user supplied command is prefixed with something\n"
+"                       like \"yes:0,no:*,view:3 mycommand ...\" then this\n"
+"                       associates the numerical command return code with\n"
+"                       the actions: accept, reject, and accept-view-only,\n"
+"                       respectively.  Use \"*\" instead of a number to indicate\n"
+"                       the default action (in case the command returns an\n"
+"                       unexpected value).  E.g. \"no:*\" is a good choice.\n"
 "\n"
 "                       Note that x11vnc blocks while the external command or\n"
 "                       or popup is running (other clients may see no updates\n"
 "                       during this period).\n"
+"\n"
+"                       More -accept tricks: use \"popupmouse\" to only allow\n"
+"                       mouse clicks in the builtin popup to be recognized.\n"
+"                       Similarly use \"popupkey\" to only recognize keystroke\n"
+"                       responses.  All 3 of the popup keywords can be followed\n"
+"                       by +N+M to supply a position for the popup window.\n"
+"                       The default is to center the popup window.\n"
+"\n"
+"-gone string           As -accept string, except to run a user supplied command\n"
+"                       when a client goes away (disconnects).  Unlike -accept,\n"
+"                       the command return code is not interpreted by x11vnc.\n"
+"\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
 "                       Note: if you are not redirecting stderr to a log file\n"
-"                       you must also specify -q as the first argument.\n"
+"                       you must also specify the -q option.\n"
 "\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
-"                       remote displays can be polled this way: be careful\n"
-"                       this can use large amounts of network bandwidth. Also\n"
-"                       of use if machine has a limited number of shm segments.\n"
+"                       Remote displays can be polled this way: be careful this\n"
+"                       can use large amounts of network bandwidth.  This is\n"
+"                       also of use if the local machine has a limited number\n"
+"                       of shm segments and -onetile is not sufficient.\n"
 "-flipbyteorder         Sometimes needed if remotely polled host has different\n"
 "                       endianness.  Ignored unless -noshm is set.\n"
 "-blackout string       Black out rectangles on the screen. string is a comma\n"
 "                       separated list of WxH+X+Y type geometries for each rect.\n"
-"-xinerama              If your screen is composed of multiple monitors glued\n"
-"                       together via XINERAMA, and that screen is non-rectangular\n"
-"                       this option will try to guess the areas to black out.\n"
+"-xinerama              If your screen is composed of multiple monitors\n"
+"                       glued together via XINERAMA, and that screen is\n"
+"                       non-rectangular this option will try to guess the areas\n"
+"                       to black out (if your system has libXinerama).\n"
 "\n"
-"-q                     Be quiet by printing less informational output to stderr.\n" 
-"                       Same as -quiet\n" 
-"-bg                    Go into the background after screen setup.\n" 
-"                       Something like this could be useful in a script:\n"
+"-o logfile             Write stderr messages to file \"logfile\" instead of\n"
+"                       to the terminal.  Same as -logfile.\n"
+"-q                     Be quiet by printing less informational output to\n"
+"                       stderr.  Same as -quiet.\n"
+"-bg                    Go into the background after screen setup.  Messages to\n"
+"                       stderr are lost unless -o logfile is used.  Something\n"
+"                       like this could be useful in a script:\n"
 "                         port=`ssh $host \"x11vnc -display :0 -bg\" | grep PORT`\n"
 "                         port=`echo \"$port\" | sed -e 's/PORT=//'`\n"
 "                         port=`expr $port - 5900`\n"
@@ -5518,7 +5891,8 @@ void print_help() {
 "-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
 "-nosel                 Do not manage exchange of X selection/cutbuffer.\n"
 "-noprimary             Do not poll the PRIMARY selection for changes and send\n"
-"                       back to clients.  PRIMARY is set for received changes.\n"
+"                       back to clients.  PRIMARY is still set on received\n"
+"                       changes, however.\n"
 "\n"
 "-nocursor              Do not have the viewer show a local cursor.\n"
 "-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
@@ -5532,7 +5906,7 @@ void print_help() {
 "-buttonmap string      String to remap mouse buttons.  Format: IJK-LMN, this\n"
 "                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31\n"
 "\n"
-"                       Button presses can also be mapped to keysyms: replace\n"
+"                       Button presses can also be mapped to keystrokes: replace\n"
 "                       a button digit on the right of the dash with :<sym>:\n"
 "                       or :<sym1>+<sym2>: etc. for multiple keys. For example,\n"
 "                       if the viewing machine has a mouse-wheel (buttons 4 5)\n"
@@ -5540,11 +5914,11 @@ void print_help() {
 "                              -buttonmap 12345-123:Prior::Next:\n"
 "                              -buttonmap 12345-123:Up+Up+Up::Down+Down+Down:\n"
 "\n"
-"                       If you include a modifier like \"Shift_L\" the modifier's\n"
-"                       up/down state is toggled, e.g. to send \"The\" use\n"
-"                       :Shift_L+t+Shift_L+h+e: (the 1st one is shift down and\n"
-"                       the 2nd one is shift up). (note: the initial state of\n"
-"                       the modifier is ignored and not reset)\n"
+"                       If you include a modifier like \"Shift_L\" the\n"
+"                       modifier's up/down state is toggled, e.g. to send\n"
+"                       \"The\" use :Shift_L+t+Shift_L+h+e: (the 1st one is\n"
+"                       shift down and the 2nd one is shift up). (note: the\n"
+"                       initial state of the modifier is ignored and not reset)\n"
 "                       To include button events use \"Button1\", ... etc.\n"
 "\n"
 "-nodragging            Do not update the display during mouse dragging events\n"
@@ -5561,17 +5935,17 @@ void print_help() {
 "-debug_pointer         Print debugging output for every pointer event.\n"
 "-debug_keyboard        Print debugging output for every keyboard event.\n"
 "\n"
-"-defer time            Time in ms to wait for updates before sending to\n"
-"                       client [rfbDeferUpdateTime]  (default %d).\n"
-"-wait time             Time in ms to pause between screen polls.  Used\n"
-"                       to cut down on load (default %d).\n"
-"-nap                   Monitor activity and if low take longer naps between\n" 
+"-defer time            Time in ms to wait for updates before sending to client\n"
+"                       [rfbDeferUpdateTime]  (default %d).\n"
+"-wait time             Time in ms to pause between screen polls.  Used to cut\n"
+"                       down on load (default %d).\n"
+"-nap                   Monitor activity and if low take longer naps between\n"
 "                       polls to really cut down load when idle (default %s).\n"
-"-sigpipe string        Broken pipe (SIGPIPE) handling. string can be \"ignore\"\n"
-"                       or \"exit\", for the 1st libvncserver will handle the\n"
-"                       abrupt loss of a client and continue, for the 2nd x11vnc\n"
-"                       will cleanup and exit at the 1st broken connection.\n"
-"                       Default is \"ignore\".\n"
+"-sigpipe string        Broken pipe (SIGPIPE) handling.  \"string\" can be\n"
+"                       \"ignore\" or \"exit\".  For \"ignore\" libvncserver\n"
+"                       will handle the abrupt loss of a client and continue,\n"
+"                       for \"exit\" x11vnc will cleanup and exit at the 1st\n"
+"                       broken connection.  Default is \"ignore\".\n"
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 "-threads               Whether or not to use the threaded libvncserver\n"
 "-nothreads             algorithm [rfbRunEventLoop] (default %s).\n"
@@ -5582,8 +5956,8 @@ void print_help() {
 "-onetile               Do not use the new copy_tiles() framebuffer mechanism,\n"
 "                       just use 1 shm tile for polling.  Same as -old_copytile.\n"
 "                       Limits shm segments used to 3.\n"
-"-gaps n                Heuristic to fill in gaps in rows or cols of n or less\n"
-"                       tiles.  Used to improve text paging (default %d).\n"
+"-gaps n                Heuristic to fill in gaps in rows or cols of n or\n"
+"                       less tiles.  Used to improve text paging (default %d).\n"
 "-grow n                Heuristic to grow islands of changed tiles n or wider\n"
 "                       by checking the tile near the boundary (default %d).\n"
 "-fuzz n                Tolerance in pixels to mark a tiles edges as changed\n"
@@ -5692,6 +6066,8 @@ int main(int argc, char** argv) {
 	char *use_dpy = NULL;
 	char *auth_file = NULL;
 	char *arg, *visual_str = NULL;
+	char *logfile = NULL;
+	char *passwdfile = NULL;
 	int pw_loc = -1;
 	int dt = 0;
 	int bg = 0;
@@ -5699,7 +6075,7 @@ int main(int argc, char** argv) {
 	int got_deferupdate = 0, got_defer = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
-	int argc2 = 1; char *argv2[100];
+	int argc2 = 1; char *argv2[128];
 
 	argv2[0] = strdup(argv[0]);
 	
@@ -5728,6 +6104,8 @@ int main(int argc, char** argv) {
 			force_indexed_color = 1;
 		} else if (!strcmp(arg, "-viewonly")) {
 			view_only = 1;
+		} else if (!strcmp(arg, "-passwdfile")) {
+			passwdfile = argv[++i];
 		} else if (!strcmp(arg, "-shared")) {
 			shared = 1;
 		} else if (!strcmp(arg, "-auth")) {
@@ -5738,6 +6116,8 @@ int main(int argc, char** argv) {
 			allow_list = "127.0.0.1";
 		} else if (!strcmp(arg, "-accept")) {
 			accept_cmd = argv[++i];
+		} else if (!strcmp(arg, "-gone")) {
+			gone_cmd = argv[++i];
 		} else if (!strcmp(arg, "-many")
 			|| !strcmp(arg, "-forever")) {
 			connect_once = 0;
@@ -5845,6 +6225,8 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(arg, "-h") || !strcmp(arg, "-help")
 			|| !strcmp(arg, "-?")) {
 			print_help();
+		} else if (!strcmp(arg, "-o") || !strcmp(arg, "-logfile")) {
+			logfile = argv[++i];
 		} else if (!strcmp(arg, "-q") || !strcmp(arg, "-quiet")) {
 			quiet = 1;
 #ifdef LIBVNCSERVER_HAVE_SETSID
@@ -5873,16 +6255,39 @@ int main(int argc, char** argv) {
 			if (!strcmp(arg, "-nevershared")) {
 				got_nevershared = 1;
 			}
-			/* otherwise copy it for use below. */
-			if (!quiet && !inetd && i != pw_loc && i != pw_loc+1) {
-			    fprintf(stderr, "passing arg to libvncserver: %s\n",
-				arg);
-			}
+			/* otherwise copy it for libvncserver use below. */
 			if (argc2 < 100) {
 				argv2[argc2++] = strdup(arg);
 			}
 		}
 	}
+	if (logfile) {
+		int n;
+		if ((n = open(logfile, O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0) {
+			fprintf(stderr, "error opening logfile: %s\n", logfile);
+			perror("open");
+			exit(1);
+		}
+		if (dup2(n, 2) < 0) {
+			fprintf(stderr, "dup2 failed\n");
+			perror("dup2");
+			exit(1);
+		}
+		if (n > 2) {
+			close(n);
+		}
+	}
+	if (! quiet && ! inetd) {
+		int i;
+		for (i=1; i < argc2; i++) {
+			fprintf(stderr, "passing arg to libvncserver: %s\n",
+			    argv2[i]);
+			if (!strcmp(argv2[i], "-passwd")) {
+				i++;
+			}
+		}
+	}
+
 
 	/*
 	 * If -passwd was used, clear it out of argv.  This does not
@@ -5898,6 +6303,26 @@ int main(int argc, char** argv) {
 			while (*p != '\0') {
 				*p++ = '\0';
 			}
+		}
+	} else if (passwdfile) {
+		char line[512];
+		FILE *in;
+		in = fopen(passwdfile, "r");
+		if (in == NULL) {
+			fprintf(stderr, "cannot open passwdfile: %s\n",
+			    passwdfile);
+			perror("fopen");
+			exit(1);
+		}
+		if (fgets(line, 512, in) != NULL) {
+			line[strlen(line)-1] = '\0';
+			argv2[argc2++] = "-passwd";
+			argv2[argc2++] = strdup(line);
+		} else {
+			fprintf(stderr, "cannot read passwdfile: %s\n",
+			    passwdfile);
+			perror("fgets");
+			exit(1);
 		}
 	}
 
@@ -5968,9 +6393,15 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "shared:     %d\n", shared);
 		fprintf(stderr, "authfile:   %s\n", auth_file ? auth_file
                     : "null");
+		fprintf(stderr, "passfile:   %s\n", passwdfile ? passwdfile
+                    : "null");
+		fprintf(stderr, "logfile:    %s\n", logfile ? logfile
+                    : "null");
 		fprintf(stderr, "allow:      %s\n", allow_list ? allow_list
                     : "null");
 		fprintf(stderr, "accept:     %s\n", accept_cmd ? accept_cmd
+                    : "null");
+		fprintf(stderr, "gone:       %s\n", gone_cmd ? gone_cmd
                     : "null");
 		fprintf(stderr, "conn_once:  %d\n", connect_once);
 		fprintf(stderr, "connect:    %s\n", client_connect
@@ -6296,7 +6727,9 @@ int main(int argc, char** argv) {
 		n = open("/dev/null", O_RDONLY);
 		dup2(n, 0);
 		dup2(n, 1);
-		dup2(n, 2);
+		if (! logfile) {
+			dup2(n, 2);
+		}
 		if (n > 2) {
 			close(n);
 		}

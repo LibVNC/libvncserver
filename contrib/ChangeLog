@@ -1,3 +1,10 @@
+2004-05-21  Karl Runge <runge@karlrunge.com>
+	* -accept: add view-only decision and other improvements.
+	* add -gone command option for when a client leaves.
+	  Thanks to Jesus Alvarez for these ideas.
+	* -passwdfile to keep passwd off of cmd line.
+	* -o logfile send stderr to a logfile.
+
 2004-05-14  Karl Runge <runge@karlrunge.com>
 	* improvements to -accept popup: yes/no buttons and timeout. 
 	* less fprintf under -q so '-q -inetd' has no stderr output. 
