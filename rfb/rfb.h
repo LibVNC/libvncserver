@@ -35,16 +35,16 @@ extern "C"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "rfbconfig.h"
+#include <rfb/rfbconfig.h>
 #undef VERSION
-#include "rfbint.h"
-#include "keysym.h"
+#include <rfb/rfbint.h>
+#include <rfb/keysym.h>
 
 #ifdef HAVE_LIBZ
 #include <zlib.h>
 #endif
 
-#include "rfbproto.h"
+#include <rfb/rfbproto.h>
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
