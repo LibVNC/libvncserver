@@ -47,6 +47,51 @@
  */
 
 
+#include <rfb/rfbconfig.h>
+#undef VERSION
+#include <rfb/rfbint.h>
+#include <rfb/keysym.h>
+
+#ifdef HAVE_LIBZ
+#include <zlib.h>
+#endif
+
+
+#if defined(WIN32)
+#define WORDS_BIGENDIAN
+#undef Bool
+#define Bool int
+#include <sys/timeb.h>
+#include <winsock.h>
+#undef SOCKET
+#define SOCKET int
+#else
+#define max(a,b) (((a)>(b))?(a):(b))
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#define SOCKET int
+#ifndef Bool
+typedef int8_t Bool;
+#undef FALSE
+#define FALSE 0
+#undef TRUE
+#define TRUE -1
+#endif
+#endif
+
+typedef uint32_t KeySym;
+typedef uint32_t Pixel;
+
+#ifndef INADDR_NONE
+#define                INADDR_NONE     ((in_addr_t) 0xffffffff)
+#endif
+
+#define MAX_ENCODINGS 20
+
 /*****************************************************************************
  *
  * Structures used in several messages
@@ -940,5 +985,18 @@ typedef union {
     rfbPointerEventMsg pe;
     rfbClientCutTextMsg cct;
 } rfbClientToServerMsg;
+
+/* 
+ * vncauth.h - describes the functions provided by the vncauth library.
+ */
+
+#define MAXPWLEN 8
+#define CHALLENGESIZE 16
+
+extern int vncEncryptAndStorePasswd(char *passwd, char *fname);
+extern char *vncDecryptPasswdFromFile(char *fname);
+extern void vncRandomBytes(unsigned char *bytes);
+extern void vncEncryptBytes(unsigned char *bytes, char *passwd);
+
 
 #endif

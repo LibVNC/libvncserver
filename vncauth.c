@@ -21,7 +21,8 @@
  * vncauth.c - Functions for VNC password management and authentication.
  */
 
-#include "rfb.h"
+#include <stdio.h>
+#include <rfb/rfbproto.h>
 #include "d3des.h"
 
 #include <string.h>
