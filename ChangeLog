@@ -1,4 +1,4 @@
-
+   http options in cargs
    when closing a client and no longer listening for new ones, don't crash
    fixed a bug with ClientConnectionGone
    endianness is checked at configure time

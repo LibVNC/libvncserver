@@ -32,6 +32,10 @@ rfbUsage(void)
                                                              "new non-shared\n"
                     "                       connection comes in (refuse new connection "
                                                                 "instead)\n");
+    fprintf(stderr, "-httpdir dir-path      enable http server using dir-path home\n");
+    fprintf(stderr, "-httpport portnum      use portnum for http connection\n");
+    fprintf(stderr, "-enablehttpproxy       enable http proxy support\n");
+
     exit(1);
 }
 
@@ -89,6 +93,14 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	    /* we just remove the processed arguments from the list */
 	    if(i != i1)
 	        rfbPurgeArguments(argc,&i1,i-i1,argv);
+        } else if (strcmp(argv[i], "-httpdir") == 0) {  /* -httpdir directory-path */
+            if (i + 1 >= *argc) rfbUsage();
+            rfbScreen->httpDir = argv[++i];
+        } else if (strcmp(argv[i], "-httpport") == 0) {  /* -httpport portnum */
+            if (i + 1 >= *argc) rfbUsage();
+            rfbScreen->httpPort = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-enablehttpproxy") == 0) {
+            rfbScreen->httpEnableProxyConnect = TRUE;
         }
 	i1++;
 	i=i1;
