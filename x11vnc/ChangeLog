@@ -1,3 +1,6 @@
+2004-07-28  Karl Runge <runge@karlrunge.com>
+	* -add_keysyms dynamically add missing keysyms to X server
+
 2004-07-26  Karl Runge <runge@karlrunge.com>
 	* first pass at doing modtweak via XKEYBOARD extension (-xkb)
 	* -skip_keycodes option for use with -xkb

@@ -1,3 +1,6 @@
+2004-07-28  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -add_keysyms dynamically add missing keysyms to X server
+
 2004-07-26  Karl Runge <runge@karlrunge.com>
 	* x11vnc: first pass at doing modtweak via XKEYBOARD extension (-xkb)
 	* -skip_keycodes; reset modtweaks on event MappingNotify.

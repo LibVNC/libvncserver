@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-07-26";
+char lastmod[] = "lastmod:    2004-07-28";
 
 /* X display info */
 Display *dpy = 0;
@@ -257,6 +257,10 @@ void clear_modifiers(int init);
 void clear_keys(void);
 void copy_screen(void);
 
+int add_keysym(KeySym);
+void delete_keycode(KeyCode);
+void delete_added_keycodes(void);
+
 double dtime(double *);
 
 void initialize_blackout(char *);
@@ -347,6 +351,7 @@ int xkbcompat = 0;		/* ignore XKEYBOARD extension */
 int use_xkb = 0;		/* try to open Xkb connection (for bell or other) */
 int use_xkb_modtweak = 0;	/* -xkb */
 char *skip_keycodes = NULL;
+int add_keysyms = 0;		/* automatically add keysyms to X server */
 
 int old_pointer = 0;		/* use the old way of updating the pointer */
 int single_copytile = 0;	/* use the old way copy_tiles() */
@@ -476,6 +481,9 @@ void clean_up_exit (int ret) {
 		}
 	}
 
+	/* X keyboard cleanups */
+	delete_added_keycodes();
+
 	if (clear_mods == 1) {
 		clear_modifiers(0);
 	} else if (clear_mods == 2) {
@@ -537,6 +545,10 @@ static void interrupted (int sig) {
 			break;
 		}
 	}
+
+	/* X keyboard cleanups */
+	delete_added_keycodes();
+
 	if (clear_mods == 1) {
 		clear_modifiers(0);
 	} else if (clear_mods == 2) {
@@ -1810,6 +1822,107 @@ void clear_keys(void) {
 	XFlush(dpy);
 }
 		
+static KeySym added_keysyms[0x100];
+
+int add_keysym(KeySym keysym) {
+	int minkey, maxkey, syms_per_keycode;
+	int kc, n, ret = 0;
+	static int first = 1;
+	KeySym *keymap;
+
+	if (first) {
+		for (n=0; n < 0x100; n++) {
+			added_keysyms[n] = NoSymbol;
+		}
+		first = 0;
+	}
+	if (keysym == NoSymbol) {
+		return 0;
+	}
+
+	XDisplayKeycodes(dpy, &minkey, &maxkey);
+	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
+	    &syms_per_keycode);
+
+	for (kc = minkey+1; kc <= maxkey; kc++) {
+		int i, is_empty = 1;
+		char *str;
+		KeySym new[8];
+
+		for (n=0; n < syms_per_keycode; n++) {
+			if (keymap[ (kc-minkey) * syms_per_keycode + n]
+			    != NoSymbol) {
+				is_empty = 0;
+				break;
+			}
+		}
+		if (! is_empty) {
+			continue;
+		}
+
+		for (i=0; i<8; i++) {
+			new[i] = NoSymbol;
+		}
+		if (add_keysyms == 2) {
+			for(i=0; i < syms_per_keycode; i++) {
+				new[i] = keysym;
+				if (i >= 7) break;
+			}
+		} else {
+			new[0] = keysym;
+			
+		}
+
+		XChangeKeyboardMapping(dpy, kc, syms_per_keycode,
+		    new, 1);
+
+		str = XKeysymToString(keysym);
+		rfbLog("added missing keysym to X display: %03d 0x%x \"%s\"\n",
+		    kc, keysym, str ? str : "null");
+
+		XFlush(dpy);
+		added_keysyms[kc] = keysym;
+		ret = kc;
+		break;
+	}
+	XFree(keymap);
+	return ret;
+}
+
+void delete_keycode(KeyCode kc) {
+	int minkey, maxkey, syms_per_keycode, i;
+	KeySym *keymap;
+	KeySym ksym, new[8];
+	char *str;
+
+	XDisplayKeycodes(dpy, &minkey, &maxkey);
+	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
+	    &syms_per_keycode);
+
+	for (i=0; i<8; i++) {
+		new[i] = NoSymbol;
+	}
+	XChangeKeyboardMapping(dpy, kc, syms_per_keycode, new, 1);
+
+	ksym = XKeycodeToKeysym(dpy, kc, 0);
+	str = XKeysymToString(ksym);
+	rfbLog("deleted keycode from X display: %03d 0x%x \"%s\"\n",
+	    kc, ksym, str ? str : "null");
+
+	XFree(keymap);
+	XFlush(dpy);
+}
+
+void delete_added_keycodes(void) {
+	int kc;
+	for (kc = 0; kc < 0x100; kc++) {
+		if (added_keysyms[kc] != NoSymbol) {
+			delete_keycode(kc);
+			added_keysyms[kc] = NoSymbol;
+		}
+	}
+}
+
 /*
  * The following is for an experimental -remap option to allow the user
  * to remap keystrokes.  It is currently confusing wrt modifiers...
@@ -2337,6 +2450,18 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 		got_kbstate = 1;
 		PKBSTATE
 	}
+
+	if (!found && add_keysyms && keysym && ! IsModifierKey(keysym)) {
+		int new_kc = add_keysym(keysym);
+		if (new_kc != 0) {
+			found = 1;
+			kc_f[0] = new_kc;
+			grp_f[0] = 0; 
+			lvl_f[0] = 0; 
+			state_f[0] = 0;
+		}
+	}
+
 	if (!found && debug_keyboard) {
 		char *str = XKeysymToString(keysym);
 		fprintf(stderr, "    *** NO key found for: 0x%x %s  "
@@ -2889,6 +3014,12 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 		k = XKeysymToKeycode(dpy, (KeySym) keysym);
 		X_UNLOCK;
 	}
+	if (k == NoSymbol && add_keysyms && ! IsModifierKey(keysym)) {
+		int new_kc = add_keysym(keysym);
+		if (new_kc) {
+			k = new_kc;
+		}
+	}
 	if (debug_keyboard) {
 		rfbLog("modifier_tweak_keyboard: KeySym 0x%x \"%s\" -> "
 		    "KeyCode 0x%x%s\n", (int) keysym, XKeysymToString(keysym),
@@ -2993,6 +3124,12 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 	k = XKeysymToKeycode(dpy, (KeySym) keysym);
 
+	if (k == NoSymbol && add_keysyms && ! IsModifierKey(keysym)) {
+		int new_kc = add_keysym(keysym);
+		if (new_kc) {
+			k = new_kc;
+		}
+	}
 	if (debug_keyboard) {
 		char *str = XKeysymToString(keysym);
 		rfbLog("keyboard(): KeySym 0x%x \"%s\" -> KeyCode 0x%x%s\n",
@@ -3846,6 +3983,7 @@ void watch_xevents(void) {
 	}
 
 	if (XCheckTypedEvent(dpy, MappingNotify, &xev)) {
+		XRefreshKeyboardMapping((XMappingEvent *) &xev);
 		if (use_modifier_tweak) {
 			X_UNLOCK;
 			initialize_modtweak();
@@ -7838,6 +7976,10 @@ static void print_help(void) {
 "                       keycodes.  Use this option to help x11vnc in the reverse\n"
 "                       problem it tries to solve: Keysym -> Keycode(s) when\n"
 "                       ambiguities exist.  E.g. -skip_keycodes 94,114\n"
+"-add_keysyms           If a keysym is received from a VNC viewer, but\n"
+"                       that keysym does not exist in the X server, then\n"
+"                       add the keysym to the X server's keyboard mapping.\n"
+"                       Added keysyms will be removed when exiting.\n"
 #if 0
 "-xkbcompat             Ignore the XKEYBOARD extension.  Use as a workaround for\n"
 "                       some keyboard mapping problems.  E.g. if you are using\n"
@@ -8394,6 +8536,8 @@ int main(int argc, char* argv[]) {
 			skip_keycodes = argv[++i];
 		} else if (!strcmp(arg, "-xkbcompat")) {
 			xkbcompat = 1;
+		} else if (!strcmp(arg, "-add_keysyms")) {
+			add_keysyms++;
 		} else if (!strcmp(arg, "-clear_mods")) {
 			clear_mods = 1;
 		} else if (!strcmp(arg, "-clear_keys")) {
@@ -8751,6 +8895,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "xkb:        %d\n", use_xkb_modtweak);
 		fprintf(stderr, "skipkeys:   %s\n", skip_keycodes ? skip_keycodes
                     : "null");
+		fprintf(stderr, "addkeysyms: %d\n", add_keysyms);
 		fprintf(stderr, "xkbcompat:  %d\n", xkbcompat);
 		fprintf(stderr, "clearmods:  %d\n", clear_mods);
 		fprintf(stderr, "remap:      %s\n", remap_file ? remap_file
