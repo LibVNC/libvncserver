@@ -23,8 +23,8 @@
  * This program is based heavily on the following programs:
  *
  *       the originial x11vnc.c in libvncserver (Johannes E. Schindelin)
- *       krfb, the KDE desktopsharing project (Tim Jansen)
  *	 x0rfbserver, the original native X vnc server (Jens Wagner)
+ *       krfb, the KDE desktopsharing project (Tim Jansen)
  *
  * The primary goal of this program is to create a portable and simple
  * command-line server utility that allows a VNC viewer to connect to an
@@ -156,7 +156,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-07-28";
+char lastmod[] = "lastmod:    2004-07-31";
 
 /* X display info */
 Display *dpy = 0;
@@ -340,7 +340,7 @@ char *client_connect_file = NULL;
 int vnc_connect = 0;		/* -vncconnect option */
 
 int local_cursor = 1;		/* whether the viewer draws a local cursor */
-int cursor_pos = 0;		/* cursor position updates -cursorpos */
+int cursor_pos = 1;		/* cursor position updates -cursorpos */
 int show_mouse = 0;		/* display a cursor for the real mouse */
 int use_xwarppointer = 0;	/* use XWarpPointer instead of XTestFake... */
 int show_root_cursor = 0;	/* show X when on root background */
@@ -1839,6 +1839,12 @@ int add_keysym(KeySym keysym) {
 	if (keysym == NoSymbol) {
 		return 0;
 	}
+	/* there can be a race before MappingNotify */
+	for (n=0; n < 0x100; n++) {
+		if (added_keysyms[n] == keysym) {
+			return n;
+		}
+	}
 
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
 	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
@@ -1864,13 +1870,12 @@ int add_keysym(KeySym keysym) {
 			new[i] = NoSymbol;
 		}
 		if (add_keysyms == 2) {
+			new[0] = keysym;
+		} else {
 			for(i=0; i < syms_per_keycode; i++) {
 				new[i] = keysym;
 				if (i >= 7) break;
 			}
-		} else {
-			new[0] = keysym;
-			
 		}
 
 		XChangeKeyboardMapping(dpy, kc, syms_per_keycode,
@@ -3231,6 +3236,9 @@ static void buttonparse(int from, char **s) {
 					n--;
 				}
 			} else {
+				/*
+				 * XXX may not work with -modtweak or -xkb
+				 */
 				kcode = XKeysymToKeycode(dpy, ksym);
 
 				pointer_map[from][n].keysym  = ksym;
@@ -3606,7 +3614,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	update_pointer(mask, x, y);
 }
 
-/* -- bell.c -- */
+/* -- xkb_bell.c -- */
 /*
  * Bell event handling.  Requires XKEYBOARD extension.
  */
@@ -4365,13 +4373,22 @@ static void blackout_nearby_tiles(x, y, dt) {
 static void cursor_pos_updates(int x, int y) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
-	static time_t last_warp = 0;
 	int cnt = 0;
+	int x_in = x, y_in = y;
 
 	if (! cursor_pos) {
 		return;
 	}
+
 	/* x and y are current positions of X11 pointer on the X11 display */
+
+	if (scaling) {
+		x = ((double) x / dpy_x) * scaled_x;
+		if (x >= scaled_x) x = scaled_x - 1;
+		y = ((double) y / dpy_y) * scaled_y;
+		if (y >= scaled_y) y = scaled_y - 1;
+	}
+
 	if (x == screen->cursorX && y == screen->cursorY) {
 		return;
 	}
@@ -4379,6 +4396,7 @@ static void cursor_pos_updates(int x, int y) {
 	if (screen->cursorIsDrawn) {
 		rfbUndrawCursor(screen);
 	}
+
 	LOCK(screen->cursorMutex);
 	if (! screen->cursorIsDrawn) {
 		screen->cursorX = x;
@@ -4392,12 +4410,11 @@ static void cursor_pos_updates(int x, int y) {
 			continue;
 		}
 		if (cl == last_pointer_client) {
-			time_t now = time(0);
 			/*
 			 * special case if this client was the last one to
 			 * send a pointer position.
 			 */
-			if (x == cursor_x && y == cursor_y && now>last_warp+5) {
+			if (x_in == cursor_x && y_in == cursor_y) {
 				cl->cursorWasMoved = FALSE;
 			} else {
 				/* an X11 app evidently warped the pointer */
@@ -4407,7 +4424,6 @@ static void cursor_pos_updates(int x, int y) {
 					    cursor_x - x, cursor_y - y);
 				}
 				cl->cursorWasMoved = TRUE;
-				last_warp = now;
 				cnt++;
 			}
 		} else {
@@ -7756,7 +7772,8 @@ static void print_help(void) {
 "\n"
 "Typical usage is:\n"
 "\n"
-"   Run this command in a shell on the remote machine \"far-host\":\n"
+"   Run this command in a shell on the remote machine \"far-host\"\n"
+"   with X session you wish to view:\n"
 "\n"
 "       x11vnc -display :0\n"
 "\n"
@@ -7767,7 +7784,8 @@ static void print_help(void) {
 "Once x11vnc establishes connections with the X11 server and starts\n"
 "listening as a VNC server it will print out a string: PORT=XXXX where\n"
 "XXXX is typically 5900 (the default VNC port).  One would next run something\n"
-"like this on the local machine: \"vncviewer host:N\" where N is XXXX - 5900.\n"
+"like this on the local machine: \"vncviewer host:N\" where N is XXXX - 5900,\n"
+"i.e. usually \"vncviewer host:0\"\n"
 "\n"
 "By default x11vnc will not allow the screen to be shared and it will\n"
 "exit as soon as a client disconnects.  See -shared and -forever below\n"
@@ -7781,22 +7799,34 @@ static void print_help(void) {
 "line in it is treated as a single command line option.  Disable with -norc.\n"
 "For each option name, the leading character \"-\" is not required.  E.g. a\n"
 "line that is either \"nap\" or \"-nap\" may be used and are equivalent.\n"
-"Likewise \"wait 100\" or \"-wait 100\" are acceptable lines.  The \"#\"\n"
-"character comments out to the end of the line in the usual way.  Leading and\n"
-"trailing whitespace is trimmed off.  Lines may be continued with a \"\\\"\n"
-"as the last character of a line (it becomes a space character).\n"
+"Likewise \"wait 100\" or \"-wait 100\" are acceptable and equivalent lines.\n"
+"The \"#\" character comments out to the end of the line in the usual way.\n"
+"Leading and trailing whitespace is trimmed off.  Lines may be continued with\n"
+"a \"\\\" as the last character of a line (it becomes a space character).\n"
 "\n"
 "Options:\n"
 "\n"
 "-display disp          X11 server display to connect to, usually :0.  The X\n"
 "                       server process must be running on same machine and\n"
 "                       support MIT-SHM.  Equivalent to setting the DISPLAY\n"
-"                       environment variable to disp.\n"
+"                       environment variable to \"disp\".\n"
+"-auth file             Set the X authority file to be \"file\", equivalent to\n"
+"                       setting the XAUTHORITY environment varirable to \"file\"\n"
+"                       before startup.  See Xsecurity(7), xauth(1) man pages.\n"
+"\n"
 "-id windowid           Show the window corresponding to <windowid> not the\n"
 "                       entire display. Warning: bugs! new toplevels missed!...\n"
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
 "-notruecolor           Force 8bpp indexed color even if it looks like TrueColor.\n"
+"-visual n              Experimental option: probably does not do what you\n"
+"                       think.  It simply *forces* the visual used for the\n"
+"                       framebuffer; this may be a bad thing... It is useful for\n"
+"                       testing and for some workarounds.  n may be a decimal\n"
+"                       number, or 0x hex.  Run xdpyinfo(1) for the values.\n"
+"                       One may also use \"TrueColor\", etc. see <X11/X.h>\n"
+"                       for a list.  If the string ends in \":m\" for better\n"
+"                       or for worse the visual depth is forced to be m.\n"
 "\n"
 "-scale fraction        Scale the framebuffer by factor \"fraction\".  Values\n"
 "                       less than 1 shrink the fb.  Note: image may not be sharp\n"
@@ -7815,19 +7845,11 @@ static void print_help(void) {
 "                       interpolation scheme even when shrinking, \":pad\",\n"
 "                       pad scaled width and height to be multiples of scaling\n"
 "                       denominator (e.g. 3 for 2/3).\n"
-"-visual n              Experimental option: probably does not do what you\n"
-"                       think.  It simply *forces* the visual used for the\n"
-"                       framebuffer; this may be a bad thing... It is useful for\n"
-"                       testing and for some workarounds.  n may be a decimal\n"
-"                       number, or 0x hex.  Run xdpyinfo(1) for the values.\n"
-"                       One may also use \"TrueColor\", etc. see <X11/X.h>\n"
-"                       for a list.  If the string ends in \":m\" for better\n"
-"                       or for worse the visual depth is forced to be m.\n"
 "\n"
-"-viewonly              All clients can only watch (default %s).\n"
+"-viewonly              All VNC clients can only watch (default %s).\n"
 "-shared                VNC display is shared (default %s).\n"
 "-once                  Exit after the first successfully connected viewer\n"
-"                       disconnects.  This is the Default behavior.\n"
+"                       disconnects, opposite of -forever. This is the Default.\n"
 "-forever               Keep listening for more connections rather than exiting\n"
 "                       as soon as the first client(s) disconnect. Same as -many\n"
 "-connect string        For use with \"vncviewer -listen\" reverse connections.\n"
@@ -7841,9 +7863,11 @@ static void print_help(void) {
 "                       VNC program vncconnect(1).  When the property is set\n"
 "                       to host or host:port establish a reverse connection.\n"
 "                       Using xprop(1) instead of vncconnect may work, see FAQ.\n"
-"-auth file             Set the X authority file to be \"file\", equivalent\n"
-"                       to setting the XAUTHORITY environment var to \"file\"\n"
-"                       before startup. See Xsecurity(7), xauth(1) man pages.\n"
+"-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
+"                       Note: if you are not redirecting stderr to a log file\n"
+"                       (via shell 2> or -o option) you must also specify the\n"
+"                       -q option.\n"
+"\n"
 "-allow addr1[,addr2..] Only allow client connections from IP addresses matching\n"
 "                       the comma separated list of numerical addresses.\n"
 "                       Can be a prefix, e.g. \"192.168.100.\" to match a\n"
@@ -7865,14 +7889,15 @@ static void print_help(void) {
 "-storepasswd pass file Store password \"pass\" as the VNC password in the\n"
 "                       file \"file\".  Once the password is stored the\n"
 "                       program exits.  Use the password via \"-rfbauth file\"\n"
-"-accept string         Run a command (possibly to prompt the user at the X11\n"
-"                       display) to decide whether an incoming client should be\n"
-"                       allowed to connect or not.  \"string\" is an external\n"
-"                       command run via system(3) (see below for special cases).\n"
-"                       Be sure to quote \"string\" if it contains spaces,\n"
-"                       etc.  If the external command returns 0 the client is\n"
-"                       accepted, otherwise the client is rejected.  See below\n"
-"                       for an extension to accept a client view-only.\n"
+"-accept string         Run a command (possibly to prompt the user at the\n"
+"                       X11 display) to decide whether an incoming client\n"
+"                       should be allowed to connect or not.  \"string\" is\n"
+"                       an external command run via system(3) or some special\n"
+"                       cases described below.  Be sure to quote \"string\"\n"
+"                       if it contains spaces, etc.  If the external command\n"
+"                       returns 0 the client is accepted, otherwise the client\n"
+"                       is rejected.  See below for an extension to accept a\n"
+"                       client view-only.\n"
 "\n"
 "                       Environment: The RFB_CLIENT_IP environment variable will\n"
 "                       be set to the incoming client IP number and the port\n"
@@ -7916,15 +7941,9 @@ static void print_help(void) {
 "                       responses.  All 3 of the popup keywords can be followed\n"
 "                       by +N+M to supply a position for the popup window.\n"
 "                       The default is to center the popup window.\n"
-"\n"
 "-gone string           As -accept string, except to run a user supplied command\n"
 "                       when a client goes away (disconnects).  Unlike -accept,\n"
 "                       the command return code is not interpreted by x11vnc.\n"
-"\n"
-"-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
-"                       Note: if you are not redirecting stderr to a log file\n"
-"                       (via shell 2> or -o option) you must also specify the\n"
-"                       -q option.\n"
 "\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
 "                       Remote displays can be polled this way: be careful this\n"
@@ -7933,6 +7952,10 @@ static void print_help(void) {
 "                       of shm segments and -onetile is not sufficient.\n"
 "-flipbyteorder         Sometimes needed if remotely polled host has different\n"
 "                       endianness.  Ignored unless -noshm is set.\n"
+"-onetile               Do not use the new copy_tiles() framebuffer mechanism,\n"
+"                       just use 1 shm tile for polling.  Same as -old_copytile.\n"
+"                       Limits shm segments used to 3.\n"
+"\n"
 "-blackout string       Black out rectangles on the screen. string is a comma\n"
 "                       separated list of WxH+X+Y type geometries for each rect.\n"
 "-xinerama              If your screen is composed of multiple monitors\n"
@@ -7941,7 +7964,7 @@ static void print_help(void) {
 "                       to black out (if your system has libXinerama).\n"
 "\n"
 "-o logfile             Write stderr messages to file \"logfile\" instead of\n"
-"                       to the terminal.  Same as -logfile.\n"
+"                       to the terminal.  Same as -logfile \"file\".\n"
 "-rc filename           Use \"filename\" instead of $HOME/.x11vncrc for rc file.\n"
 "-norc                  Do not process any .x11vncrc file for options.\n"
 "-h, -help              Print this help text.\n"
@@ -7957,29 +7980,30 @@ static void print_help(void) {
 "                         port=`expr $port - 5900`\n"
 "                         vncviewer $host:$port\n"
 "\n"
-"-modtweak              Handle AltGr/Shift modifiers for differing languages\n"
-"                       between client and host (Default %s).  Also helps\n"
-"                       resolve cases with a keysym bound to multiple keys.\n"
-"-nomodtweak            Try to send the keysym directly to the X server.\n"
-"                       This may cause problems if a keysym is bound to multiple\n"
-"                       keys, e.g. when typing \"<\" if the Xserver defines a\n"
-"                       \"< and >\" key in addition to a \"< and comma\" key.\n"
+"-modtweak              Option -modtweak automatically tries to adjust the AltGr\n"
+"-nomodtweak            and Shift modifiers for differing language keyboards\n"
+"                       between client and host.  Otherwise, only a single key\n"
+"                       press/release of a Keycode is simulated (i.e. ignoring\n"
+"                       the state of the modifiers: this usually works for\n"
+"                       identical keyboards).  Also useful in resolving cases\n"
+"                       where a Keysym is bound to multiple keys (e.g. \"<\" + \">\"\n"
+"                       and \",\" + \"<\" keys).  Default: %s\n"
 #if 0
-"-isolevel3             When in modtweak mode, send ISO_Level3_Shift to the X\n"
-"                       server instead of Mode_switch (AltGr).\n"
+"-isolevel3             When in modtweak mode, always send ISO_Level3_Shift to\n"
+"                       the X server instead of Mode_switch (AltGr).\n"
 #endif
-"-xkb                   Use XKEYBOARD extension (if it exists) to do the modifier\n"
-"                       tweaking.\n"
+"-xkb                   When in modtweak mode, use the XKEYBOARD extension\n"
+"                       (if it exists) to do the modifier tweaking.\n"
 "-skip_keycodes string  Skip keycodes not on your keyboard but your X server\n"
 "                       thinks exist.  Currently only applies to -xkb mode.\n"
 "                       \"string\" is a comma separated list of decimal\n"
 "                       keycodes.  Use this option to help x11vnc in the reverse\n"
 "                       problem it tries to solve: Keysym -> Keycode(s) when\n"
 "                       ambiguities exist.  E.g. -skip_keycodes 94,114\n"
-"-add_keysyms           If a keysym is received from a VNC viewer, but\n"
-"                       that keysym does not exist in the X server, then\n"
-"                       add the keysym to the X server's keyboard mapping.\n"
-"                       Added keysyms will be removed when exiting.\n"
+"-add_keysyms           If a Keysym is received from a VNC viewer and\n"
+"                       that Keysym does not exist in the X server, then\n"
+"                       add the Keysym to the X server's keyboard mapping.\n"
+"                       Added Keysyms will be removed when exiting.\n"
 #if 0
 "-xkbcompat             Ignore the XKEYBOARD extension.  Use as a workaround for\n"
 "                       some keyboard mapping problems.  E.g. if you are using\n"
@@ -7993,33 +8017,48 @@ static void print_help(void) {
 "                       Used to clear the state if the display was accidentally\n"
 "                       left with any pressed down.\n"
 "-clear_keys            As -clear_mods, except try to release any pressed key.\n"
-"                       Mostly for testing.  This option and -clear_mods can\n"
-"                       interfere with typing at the physical keyboard.\n"
-"-remap string          Read keysym remappings from file named \"string\".\n"
-"                       Format is one pair of keysyms per line (can be name\n"
+"                       Note that this option and -clear_mods can interfere\n"
+"                       with a person typing at the physical keyboard.\n"
+"-remap string          Read Keysym remappings from file named \"string\".\n"
+"                       Format is one pair of Keysyms per line (can be name\n"
 "                       or hex value) separated by a space.  If no file named\n"
 "                       \"string\" exists, it is instead interpreted as this\n"
-"                       form: key1-key2,key3-key4,...  To map a key to a\n"
-"                       button click, use the fake keysyms \"Button1\", ...,\n"
-"                       etc. E.g. -remap Super_R-Button2\n"
+"                       form: key1-key2,key3-key4,...  See <X11/keysymdef.h>\n"
+"                       header file for a list of Keysym names, or use\n"
+"                       xev(1). To map a key to a button click, use the\n"
+"                       fake Keysyms \"Button1\", ..., etc.\n"
+"                       E.g. -remap Super_R-Button2\n"
+"-norepeat              Option -norepeat disables X server key auto repeat\n"
+"-repeat                when VNC clients are connected.  This works around a\n"
+"                       repeating keystrokes bug (triggered by long processing\n"
+"                       delays between key down and key up client events:\n"
+"                       either from large screen changes or high latency).\n"
+"                       Note: your VNC viewer side will likely do autorepeating,\n"
+"                       so this is no loss unless someone is simultaneously at\n"
+"                       the real X display.  Default: %s\n"
 "\n"
-"-nofb                  Ignore framebuffer: only process keyboard and pointer.\n"
-"                       Intended for use with Win2VNC and x2vnc dual displays.\n"
+"-nofb                  Ignore video framebuffer: only process keyboard and\n"
+"                       pointer.  Intended for use with Win2VNC and x2vnc\n"
+"                       dual-monitor setups.\n"
 "-nobell                Do not watch for XBell events. (no beeps will be heard)\n"
-"-nosel                 Do not manage exchange of X selection/cutbuffer.\n"
+"                       Note: XBell monitoring requires the XKEYBOARD extension.\n"
+"-nosel                 Do not manage exchange of X selection/cutbuffer between\n"
+"                       VNC viewers and the X server.\n"
 "-noprimary             Do not poll the PRIMARY selection for changes to send\n"
 "                       back to clients.  (PRIMARY is still set on received\n"
 "                       changes, however).\n"
 "\n"
-"-nocursor              Do not have the viewer show a local cursor.\n"
+"-nocursor              Do not have the VNC viewer show a local cursor.\n"
 "-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
-"-mouseX                As -mouse, but also draw an X on root background.\n"
+"-mouseX                As -mouse, but also draw an \"X\" when pointer is on\n"
+"                       root background.\n"
 "-X                     Shorthand for -mouseX -nocursor.\n"
 "-xwarppointer          Move the pointer with XWarpPointer() instead of XTEST\n"
 "                       (try as a workaround if pointer behaves poorly, e.g.\n"
 "                       on touchscreens or other non-standard setups).\n"
-"-cursorpos             Send the X cursor position back to all vnc clients that\n"
-"                       support the TightVNC CursorPosUpdates extension.\n"
+"-cursorpos             Option -cursorpos enables sending the X cursor position\n"
+"-nocursorpos           back to all vnc clients that support the TightVNC\n"
+"                       CursorPosUpdates extension.  Default: %s\n"
 "-buttonmap string      String to remap mouse buttons.  Format: IJK-LMN, this\n"
 "                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31\n"
 "\n"
@@ -8030,6 +8069,11 @@ static void print_help(void) {
 "                       but the x11vnc side does not, these will do scrolls:\n"
 "                              -buttonmap 12345-123:Prior::Next:\n"
 "                              -buttonmap 12345-123:Up+Up+Up::Down+Down+Down:\n"
+"\n"
+"                       See <X11/keysymdef.h> header file for a list of Keysyms,\n"
+"                       or use the xev(1) program.  Note: mapping of button\n"
+"                       clicks to Keysyms may not work if -modtweak or -xkb is\n"
+"                       needed for the Keysym.\n"
 "\n"
 "                       If you include a modifier like \"Shift_L\" the\n"
 "                       modifier's up/down state is toggled, e.g. to send\n"
@@ -8044,17 +8088,11 @@ static void print_help(void) {
 "                       visual feedback for drags, text selection, and some\n"
 "                       menu traversals.\n"
 "-old_pointer           Do not use the new pointer input handling mechanisms.\n"
-"                       See check_input() and pointer() for details.\n"
+"                       See check_input() and pointer() in source file for\n"
+"                       details.\n"
 "-input_skip n          For the old pointer handling when non-threaded: try to\n"
 "                       read n user input events before scanning display. n < 0\n"
 "                       means to act as though there is always user input.\n"
-"-norepeat              Disable X server key auto repeat when clients are\n"
-"                       connected.  This works around a repeating keystrokes\n"
-"                       bug (triggered by long processing delays between key\n"
-"                       down and key up client events: either from large screen\n"
-"                       changes or high latency).  Note: your VNC viewer side\n"
-"                       will likely do autorepeating, so this is no loss unless\n"
-"                       someone is simultaneously at the real X display.\n"
 "\n"
 "-debug_pointer         Print debugging output for every pointer event.\n"
 "-debug_keyboard        Print debugging output for every keyboard event.\n"
@@ -8062,32 +8100,29 @@ static void print_help(void) {
 "                       times for more output.\n"
 "\n"
 "-defer time            Time in ms to wait for updates before sending to client\n"
-"                       [rfbDeferUpdateTime]  (default %d).\n"
+"                       [rfbDeferUpdateTime]  Default: %d\n"
 "-wait time             Time in ms to pause between screen polls.  Used to cut\n"
-"                       down on load (default %d).\n"
+"                       down on load.  Default: %d\n"
 "-nap                   Monitor activity and if low take longer naps between\n"
-"                       polls to really cut down load when idle (default %s).\n"
+"                       polls to really cut down load when idle.  Default: %s\n"
+"\n"
 "-sigpipe string        Broken pipe (SIGPIPE) handling.  \"string\" can be\n"
 "                       \"ignore\" or \"exit\".  For \"ignore\" libvncserver\n"
 "                       will handle the abrupt loss of a client and continue,\n"
 "                       for \"exit\" x11vnc will cleanup and exit at the 1st\n"
-"                       broken connection.  Default is \"ignore\".\n"
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+"                       broken connection.  Default: \"ignore\".\n"
 "-threads               Whether or not to use the threaded libvncserver\n"
-"-nothreads             algorithm [rfbRunEventLoop] (default %s).\n"
-#endif
+"-nothreads             algorithm [rfbRunEventLoop] if libpthread is available\n"
+"                       Default: %s\n"
 "\n"
 "-fs f                  If the fraction of changed tiles in a poll is greater\n"
-"                       than f, the whole screen is updated (default %.2f).\n"
-"-onetile               Do not use the new copy_tiles() framebuffer mechanism,\n"
-"                       just use 1 shm tile for polling.  Same as -old_copytile.\n"
-"                       Limits shm segments used to 3.\n"
+"                       than f, the whole screen is updated.  Default: %.2f\n"
 "-gaps n                Heuristic to fill in gaps in rows or cols of n or\n"
-"                       less tiles.  Used to improve text paging (default %d).\n"
+"                       less tiles.  Used to improve text paging.  Default: %d\n"
 "-grow n                Heuristic to grow islands of changed tiles n or wider\n"
-"                       by checking the tile near the boundary (default %d).\n"
-"-fuzz n                Tolerance in pixels to mark a tiles edges as changed\n"
-"                       (default %d).\n"
+"                       by checking the tile near the boundary.  Default: %d\n"
+"-fuzz n                Tolerance in pixels to mark a tiles edges as changed.\n"
+"                       Default: %d\n"
 "%s\n"
 "\n"
 "These options are passed to libvncserver:\n"
@@ -8098,13 +8133,13 @@ static void print_help(void) {
 	fprintf(stderr, help, lastmod,
 		view_only ? "on":"off",
 		shared ? "on":"off",
-		use_modifier_tweak ? "on":"off",
+		use_modifier_tweak ? "-modtweak":"-nomodtweak",
+		no_autorepeat ? "-norepeat":"-repeat",
+		cursor_pos ? "-cursorpos":"-nocursorpos",
 		defer_update,
 		waitms,
 		take_naps ? "on":"off",
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-		use_threads ? "on":"off",
-#endif
+		use_threads ? "-threads":"-nothreads",
 		fs_frac,
 		gaps_fill,
 		grow_fill,
@@ -8577,6 +8612,8 @@ int main(int argc, char* argv[]) {
 			use_xwarppointer = 1;
 		} else if (!strcmp(arg, "-cursorpos")) {
 			cursor_pos = 1;
+		} else if (!strcmp(arg, "-nocursorpos")) {
+			cursor_pos = 0;
 		} else if (!strcmp(arg, "-buttonmap")) {
 			CHECK_ARGC
 			pointer_remap = argv[++i];
@@ -8590,6 +8627,8 @@ int main(int argc, char* argv[]) {
 			old_pointer = 1;
 		} else if (!strcmp(arg, "-norepeat")) {
 			no_autorepeat = 1;
+		} else if (!strcmp(arg, "-repeat")) {
+			no_autorepeat = 0;
 		} else if (!strcmp(arg, "-onetile")
 			|| !strcmp(arg, "-old_copytile")) {
 			single_copytile = 1;
