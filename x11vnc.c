@@ -174,10 +174,9 @@ int main(int argc,char** argv)
 	XColor color[256];
 	int i;
 	screen->rfbServerFormat.trueColour = FALSE;
-	screen->colourMap = malloc(sizeof(rfbColourMap));
 	screen->colourMap.is16 = TRUE;
-	screen->colourMap.count = XQueryColors(dpy,DefaultColormap(dpy,xscreen),color,256);
-	screen->colourMap.data.shorts = malloc(6*screen->colourMap.count);
+	screen->colourMap.count = XQueryColors(dpy,DefaultColormap(dpy,xscreen),color,16);
+	screen->colourMap.data.shorts = (short*)malloc(3*sizeof(short)*screen->colourMap.count);
 	for(i=0;i<screen->colourMap.count;i++) {
 	   screen->colourMap.data.shorts[i*6+0] = color[i].red;
 	   screen->colourMap.data.shorts[i*6+2] = color[i].green;
@@ -241,7 +240,7 @@ int main(int argc,char** argv)
     } else if(screen->rfbClientHead && c++>updateCounter) {
       c=0;
       //fprintf(stderr,"*");
-      if(!useSHM)
+      //if(!useSHM)
 	framebufferImage->f.destroy_image(framebufferImage);
       getImage(screen->rfbServerFormat.bitsPerPixel,dpy,xscreen,&framebufferImage);
       checkForImageUpdates(screen,framebufferImage->data);
