@@ -2,7 +2,7 @@ INCLUDES=-I.
 VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 
 # for Solaris
-#CC=gcc
+CC=gcc
 #EXTRALIBS=-lsocket -lnsl -L/usr/X/lib
 
 # for FreeBSD
@@ -16,7 +16,7 @@ VNCSERVERLIB=-L. -lvncserver -L/usr/local/lib -lz -ljpeg
 # The code for 3 Bytes/Pixel is not very efficient!
 FLAG24 = -DALLOW24BPP
 
-OPTFLAGS=-g -Wall
+OPTFLAGS=-g -Wall -pedantic
 #OPTFLAGS=-O2 -Wall
 CFLAGS=$(OPTFLAGS) $(PTHREADDEF) $(FLAG24) $(INCLUDES) $(EXTRAINCLUDES) -DBACKCHANNEL
 RANLIB=ranlib

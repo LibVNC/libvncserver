@@ -429,12 +429,7 @@ ExtendSolidArea(cl, x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
     *w_ptr += cx - (*x_ptr + *w_ptr);
 }
 
-static Bool
-CheckSolidTile(cl, x, y, w, h, colorPtr, needSameColor)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    CARD32 *colorPtr;
-    Bool needSameColor;
+static Bool CheckSolidTile(rfbClientPtr cl, int x, int y, int w, int h, CARD32* colorPtr, Bool needSameColor)
 {
     switch(cl->screen->rfbServerFormat.bitsPerPixel) {
     case 32:
@@ -449,11 +444,7 @@ CheckSolidTile(cl, x, y, w, h, colorPtr, needSameColor)
 #define DEFINE_CHECK_SOLID_FUNCTION(bpp)                                      \
                                                                               \
 static Bool                                                                   \
-CheckSolidTile##bpp(cl, x, y, w, h, colorPtr, needSameColor)                  \
-    rfbClientPtr cl;  \
-    int x, y, w, h;                                                           \
-    CARD32 *colorPtr;                                                         \
-    Bool needSameColor;                                                       \
+CheckSolidTile##bpp(rfbClientPtr cl, int x, int y, int w, int h, CARD32* colorPtr, Bool needSameColor) \
 {                                                                             \
     CARD##bpp *fbptr;                                                         \
     CARD##bpp colorValue;                                                     \

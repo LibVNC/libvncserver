@@ -79,14 +79,14 @@ enum rfbNewClientAction newclient(rfbClientPtr cl)
 
 void newframebuffer(rfbScreenInfoPtr screen, int width, int height)
 {
-  char *oldfb, *newfb;
+  unsigned char *oldfb, *newfb;
 
   maxx = width;
   maxy = height;
-  oldfb = screen->frameBuffer;
-  newfb = (char*)malloc(maxx * maxy * bpp);
+  oldfb = (unsigned char*)screen->frameBuffer;
+  newfb = (unsigned char*)malloc(maxx * maxy * bpp);
   initBuffer(newfb);
-  rfbNewFramebuffer(screen, newfb, maxx, maxy, 8, 3, bpp);
+  rfbNewFramebuffer(screen, (char*)newfb, maxx, maxy, 8, 3, bpp);
   free(oldfb);
 
   /*** FIXME: Re-install cursor. ***/
@@ -133,7 +133,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 	 int i,j,x1,x2,y1,y2;
 
 	 if(cd->oldButton==buttonMask) { /* draw a line */
-	    drawline(cl->screen->frameBuffer,cl->screen->paddedWidthInBytes,bpp,
+	    drawline((unsigned char*)cl->screen->frameBuffer,cl->screen->paddedWidthInBytes,bpp,
 		     x,y,cd->oldx,cd->oldy);
 	    rfbMarkRectAsModified(cl->screen,x,y,cd->oldx,cd->oldy);
 	 } else { /* draw a point (diameter depends on button) */
@@ -174,7 +174,7 @@ void dokey(Bool down,KeySym key,rfbClientPtr cl)
     else if(key==XK_Page_Up) {
       if(cl->screen->cursorIsDrawn)
 	rfbUndrawCursor(cl->screen);
-      initBuffer(cl->screen->frameBuffer);
+      initBuffer((unsigned char*)cl->screen->frameBuffer);
       rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
     } else if (key == XK_Up) {
       if (maxx < 1024) {
@@ -283,7 +283,7 @@ int main(int argc,char** argv)
   rfbScreen->newClientHook = newclient;
   rfbScreen->httpDir = "./classes";
 
-  initBuffer(rfbScreen->frameBuffer);
+  initBuffer((unsigned char*)rfbScreen->frameBuffer);
   rfbDrawString(rfbScreen,&radonFont,20,100,"Hello, World!",0xffffff);
 
   /* This call creates a mask and then a cursor: */

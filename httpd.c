@@ -22,6 +22,7 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/types.h>
 #ifdef WIN32
 #include <winsock.h>
@@ -67,7 +68,6 @@ FILE* httpFP = NULL;
 
 static char buf[BUF_SIZE];
 static size_t buf_filled=0;
-
 
 /*
  * httpInitSockets sets up the TCP socket to listen for HTTP connections.
@@ -303,7 +303,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
     /* Open the file */
 
-    if ((fd = fopen(fullFname, "r")) <= 0) {
+    if ((fd = fopen(fullFname, "r")) == 0) {
         rfbLogPerror("httpProcessInput: open");
         WriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
         httpCloseSock(rfbScreen);

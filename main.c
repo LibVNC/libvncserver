@@ -32,7 +32,9 @@
 #include "rfb.h"
 #include "sraRegion.h"
 
+#ifdef HAVE_PTHREADS
 MUTEX(logMutex);
+#endif
 
 int rfbEnableLogging=1;
 
@@ -380,11 +382,11 @@ void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
 
 /* TODO: add a nice VNC or RFB cursor */
 
-#if defined(WIN32) || defined(sparc)
+#if defined(WIN32) || defined(sparc) || !defined(NO_STRICT_ANSI)
 static rfbCursor myCursor = 
 {
-   "\000\102\044\030\044\102\000",
-   "\347\347\176\074\176\347\347",
+   (unsigned char*)"\000\102\044\030\044\102\000",
+   (unsigned char*)"\347\347\176\074\176\347\347",
    8, 7, 3, 3,
    0, 0, 0,
    0xffff, 0xffff, 0xffff,

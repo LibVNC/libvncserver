@@ -143,7 +143,7 @@ rfbSendCursorShape(cl)
 	 bpp2=cl->format.bitsPerPixel/8;
        (*cl->translateFn)(cl->translateLookupTable,
 		       &(cl->screen->rfbServerFormat),
-                       &cl->format, pCursor->richSource,
+                       &cl->format, (char*)pCursor->richSource,
 		       &cl->updateBuf[cl->ublen],
                        pCursor->width*bpp1, pCursor->width, pCursor->height);
 
@@ -241,7 +241,7 @@ rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskSt
 	for(i=0,bit=0x80;i<width;i++,bit=(bit&1)?0x80:bit>>1,cp++)
 	  if(*cp!=' ') cursor->mask[j*w+i/8]|=bit;
    } else
-     cursor->mask = (unsigned char*)rfbMakeMaskForXCursor(width,height,cursor->source);
+     cursor->mask = (unsigned char*)rfbMakeMaskForXCursor(width,height,(char*)cursor->source);
 
    return(cursor);
 }

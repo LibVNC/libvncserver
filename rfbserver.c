@@ -25,6 +25,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "rfb.h"
 #include "sraRegion.h"
 #ifdef WIN32
@@ -76,7 +77,9 @@ void rfbIncrClientRef(rfbClientPtr cl) {}
 void rfbDecrClientRef(rfbClientPtr cl) {}
 #endif
 
+#ifdef HAVE_PTHREADS
 MUTEX(rfbClientListMutex);
+#endif
 
 struct rfbClientIterator {
   rfbClientPtr next;
@@ -86,6 +89,11 @@ struct rfbClientIterator {
 void
 rfbClientListInit(rfbScreenInfoPtr rfbScreen)
 {
+    if(sizeof(Bool)!=1) {
+        /* a sanity check */
+        fprintf(stderr,"Bool's size is not 1 (%d)!\n",sizeof(Bool));
+	exit(1);
+    }
     rfbScreen->rfbClientHead = NULL;
     INIT_MUTEX(rfbClientListMutex);
 }
