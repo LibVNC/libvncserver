@@ -729,7 +729,8 @@ extern rfbBool rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc
 /* main.c */
 
 extern void rfbLogEnable(int enabled);
-extern void rfbLog(const char *format, ...);
+typedef void (*rfbLogProc)(const char *format, ...);
+extern rfbLogProc rfbLog;
 extern void rfbLogPerror(const char *str);
 
 void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy);

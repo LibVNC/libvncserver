@@ -59,7 +59,7 @@ void rfbLogEnable(int enabled) {
  */
 
 void
-rfbLog(const char *format, ...)
+rfbDefaultLog(const char *format, ...)
 {
     va_list args;
     char buf[256];
@@ -81,6 +81,8 @@ rfbLog(const char *format, ...)
     va_end(args);
     UNLOCK(logMutex);
 }
+
+rfbLogProc rfbLog=rfbDefaultLog;
 
 void rfbLogPerror(const char *str)
 {

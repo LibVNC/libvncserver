@@ -415,6 +415,9 @@ ReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 #ifdef WIN32
 			errno = WSAGetLastError();
 #endif
+	    if (errno == EINTR)
+		continue;
+
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
                 return n;
             }
@@ -478,6 +481,9 @@ WriteExact(cl, buf, len)
 #ifdef WIN32
 			errno = WSAGetLastError();
 #endif
+	    if (errno == EINTR)
+		continue;
+
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
 	        UNLOCK(cl->outputMutex);
                 return n;
