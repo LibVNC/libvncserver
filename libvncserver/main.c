@@ -50,9 +50,6 @@ char rfbEndianTest = -1;
 void rfbIncrClientRef(rfbClientPtr cl);
 void rfbDecrClientRef(rfbClientPtr cl);
 
-/* cursor.c */
-void rfbRedrawAfterHideCursor(rfbClientPtr cl);
-
 void rfbLogEnable(int enabled) {
   rfbEnableLogging=enabled;
 }

@@ -64,7 +64,7 @@
 
 void rfbShowCursor(rfbClientPtr cl);
 void rfbHideCursor(rfbClientPtr cl);
-void rfbRedrawAfterHideCursor(rfbClientPtr cl);
+void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion);
 
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
@@ -828,7 +828,7 @@ rfbProcessClientNormalMessage(cl)
 			   cl->host);
 		    /* if cursor was drawn, hide the cursor */
 		    if(!cl->enableCursorShapeUpdates)
-		        rfbRedrawAfterHideCursor(cl);
+		        rfbRedrawAfterHideCursor(cl,0);
 
 		    cl->enableCursorShapeUpdates = TRUE;
 		    cl->cursorWasChanged = TRUE;
@@ -839,7 +839,7 @@ rfbProcessClientNormalMessage(cl)
 		       cl->host);
 		/* if cursor was drawn, hide the cursor */
 		if(!cl->enableCursorShapeUpdates)
-		    rfbRedrawAfterHideCursor(cl);
+		    rfbRedrawAfterHideCursor(cl,0);
 
 	        cl->enableCursorShapeUpdates = TRUE;
 	        cl->useRichCursorEncoding = TRUE;
@@ -1217,12 +1217,12 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
    
     if (!cl->enableCursorShapeUpdates) {
       if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
-	rfbRedrawAfterHideCursor(cl);
+	rfbRedrawAfterHideCursor(cl,updateRegion);
 	LOCK(cl->screen->cursorMutex);
 	cl->cursorX = cl->screen->cursorX;
 	cl->cursorY = cl->screen->cursorY;
 	UNLOCK(cl->screen->cursorMutex);
-	rfbRedrawAfterHideCursor(cl);
+	rfbRedrawAfterHideCursor(cl,updateRegion);
       }
       rfbShowCursor(cl);
     }
