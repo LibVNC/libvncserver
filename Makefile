@@ -38,7 +38,7 @@ install_OSX: OSXvnc-server
 .c.o:
 	$(CC) $(CFLAGS) -c $<
 
-$(OBJS): Makefile rfb.h
+$(OBJS) pnmshow24.o pnmshow.o example.o mac.o blooptest.o: Makefile rfb.h
 
 libvncserver.a: $(OBJS)
 	$(AR) cru $@ $(OBJS)
@@ -73,11 +73,10 @@ blooptest.o: example.c rfb.h
 pnmshow24: pnmshow24.o libvncserver.a
 	$(CC) -o pnmshow24 pnmshow24.o $(LIBS)
 
-pnmshow24.o: Makefile
-
 clean:
 	rm -f $(OBJS) *~ core "#"* *.bak *.orig storepasswd.o \
-	     	mac.o example.o pnmshow.o sratest.o $(OBJS)
+	     	mac.o example.o pnmshow.o pnmshow24.o sratest.o \
+		blooptest.o $(OBJS)
 
 realclean: clean
 	rm -f OSXvnc-server storepasswd example pnmshow libvncserver.a

@@ -1100,7 +1100,7 @@ rfbSendCopyRegion(cl, reg, dx, dy)
     sraRectangleIterator* i;
     sraRect rect1;
 
-    /* printf("copyrect: "); sraRgnPrint(reg); putchar('\n'); fflush(stdout); */
+    printf("copyrect: "); sraRgnPrint(reg); putchar('\n'); fflush(stdout);
     i = sraRgnGetReverseIterator(reg,dx>0,dy>0);
 
     while(sraRgnIteratorNext(i,&rect1)) {
