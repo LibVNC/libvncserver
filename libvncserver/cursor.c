@@ -585,7 +585,6 @@ void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion)
 
 	if(sraClipRect2(&x,&y,&x2,&y2,0,0,s->width,s->height)) {
 	    sraRegionPtr rect;
-	    fprintf(stderr,"%d %d %d %d\n",x,y,x2,y2);
 	    rect = sraRgnCreateRect(x,y,x2,y2);
 	    if(updateRegion)
 	    	sraRgnOr(updateRegion,rect);
