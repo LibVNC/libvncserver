@@ -130,7 +130,7 @@
 #endif
 
 /*        date +'"lastmod:    %Y-%m-%d";' */
-char lastmod[] = "lastmod:    2004-05-05";
+char lastmod[] = "lastmod:    2004-05-08";
 
 
 /* X and rfb framebuffer */
@@ -205,6 +205,7 @@ hint_t *hint_list;
 
 int shared = 0;			/* share vnc display. */
 char *allow_list = NULL;	/* for -allow and -localhost */
+char *accept_cmd = NULL;	/* for -accept */
 int view_only = 0;		/* clients can only watch. */
 int inetd = 0;			/* spawned from inetd(1) */
 int connect_once = 1;		/* disconnect after first connection session. */
@@ -478,6 +479,240 @@ int check_access(char *addr) {
 }
 
 /*
+ * x11vnc's first (and only) visible widget: accept/reject dialog window.
+ * We go through this pain to avoid dependency on libXt.
+ */
+
+int ugly_accept_window(char *addr) {
+
+#define t2x2_width 16
+#define t2x2_height 16
+static char t2x2_bits[] = {
+   0xff, 0xff, 0xff, 0xff, 0x33, 0x33, 0x33, 0x33, 0xff, 0xff, 0xff, 0xff,
+   0x33, 0x33, 0x33, 0x33, 0xff, 0xff, 0xff, 0xff, 0x33, 0x33, 0x33, 0x33,
+   0xff, 0xff, 0xff, 0xff, 0x33, 0x33, 0x33, 0x33};
+
+	Window awin;
+	GC gc;
+	XFontStruct *font_info;
+	XSizeHints hints;
+	Pixmap ico;
+	XGCValues values;
+	unsigned long valuemask = 0;
+	static char dash_list[] = {20, 40};
+	int list_length = sizeof(dash_list);
+
+	Atom wm_protocols;
+	Atom wm_delete_window;
+
+	XEvent ev;
+	KeyCode key_y, key_n;
+	char str1[100];
+	char str2[] = "To accept: press \"y\" or click Mouse Button1";
+	char str3[] = "To reject: press \"n\" or click Mouse Button3";
+
+	int x, y, w = 345, h = 120, ret = 0;
+
+	x = (dpy_x - w)/2;
+	y = (dpy_y - h)/2;
+	if (x < 0) x = 0;
+	if (y < 0) y = 0;
+
+	X_LOCK;
+
+	awin = XCreateSimpleWindow(dpy, window, x, y, w, h, 4,
+	    BlackPixel(dpy, scr), WhitePixel(dpy, scr));
+
+	wm_protocols = XInternAtom(dpy, "WM_PROTOCOLS", False);
+	wm_delete_window = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+	XSetWMProtocols(dpy, awin, &wm_delete_window, 1);
+
+	ico = XCreateBitmapFromData(dpy, awin, t2x2_bits, t2x2_width,
+	    t2x2_height);
+
+	hints.flags = PPosition | PSize | PMinSize;
+	hints.x = x;
+	hints.y = y;
+	hints.width = w;
+	hints.height = h;
+	hints.min_width = w;
+	hints.min_height = h;
+
+	XSetStandardProperties(dpy, awin, "new x11vnc client", "x11vnc query",
+	    ico, NULL, 0, &hints);
+
+	XSelectInput(dpy, awin, ExposureMask | KeyPressMask | ButtonPressMask
+	    | StructureNotifyMask);
+
+	if ((font_info =  XLoadQueryFont(dpy, "fixed")) == NULL) {
+		rfbLog("ugly_accept_window: cannot locate font fixed.\n");
+		X_UNLOCK;
+		clean_up_exit(1);
+	}
+
+	gc = XCreateGC(dpy, awin, valuemask, &values);
+	XSetFont(dpy, gc, font_info->fid);
+	XSetForeground(dpy, gc, BlackPixel(dpy, scr));
+	XSetLineAttributes(dpy, gc, 1, LineSolid, CapButt, JoinMiter);
+	XSetDashes(dpy, gc, 0, dash_list, list_length);
+
+	XMapWindow(dpy, awin);
+	XFlush(dpy);
+
+	sprintf(str1, "x11vnc: accept connection from %s?", addr);
+	key_y = XKeysymToKeycode(dpy, XStringToKeysym("y"));
+	key_n = XKeysymToKeycode(dpy, XStringToKeysym("n"));
+
+	while (1) {
+		int out = -1;
+
+		XNextEvent(dpy, &ev);
+
+		switch(ev.type) {
+		case Expose:
+			while (XCheckTypedEvent(dpy, Expose, &ev)) {
+				;
+			}
+			XDrawString(dpy, awin, gc, 20, 30, str1, strlen(str1));
+			XDrawString(dpy, awin, gc, 20, 50, str2, strlen(str2));
+			XDrawString(dpy, awin, gc, 20, 70, str3, strlen(str3));
+			break;
+
+		case ClientMessage:
+			if (ev.xclient.message_type == wm_protocols &&
+			    ev.xclient.data.l[0] == wm_delete_window) {
+				out = 0;
+			}
+			break;
+
+		case ButtonPress:
+			if (ev.xbutton.button == 1) {
+				out = 1;
+			} else if (ev.xbutton.button == 3) {
+				out = 0;
+			}
+			break;
+
+		case KeyPress:
+			if (ev.xkey.keycode == key_y) {
+				out = 1;
+			} else if (ev.xkey.keycode == key_n) {
+				out = 0;
+			}
+			break;
+		default:
+			break;
+		}
+		if (out != -1) {
+			ret = out;
+			XUnmapWindow(dpy, awin);
+			XFreeGC(dpy, gc);
+			XDestroyWindow(dpy, awin);
+			XFlush(dpy);
+			break;
+		}
+	}
+	X_UNLOCK;
+
+	return ret;
+}
+
+/*
+ * Simple routine to prompt the user on the X display whether an incoming
+ * client should be allowed to connect or not.  If a gui is involved it
+ * will be running in the environment/context of the X11 DISPLAY.
+ *
+ * The command supplied via -accept is run as is (i.e. no string
+ * substitution) with the RFB_CLIENT environment variable set to the
+ * incoming client's numerical IP address.
+ * 
+ * If the external command exits with 0 the client is accepted, otherwise
+ * the client is rejected.
+ * 
+ * Some builtins are provided:
+ *
+ *	xmessage:  use homebrew xmessage(1) for the external command.  
+ *	popup:     use internal X widgets for prompting.
+ * 
+ */
+int accept_client(char *addr) {
+	char xmessage[200], *cmd = NULL;
+	static char rfb_client_env[100], *display_env = NULL;
+
+	if (accept_cmd == NULL) {
+		return 1;	/* no command specified, so we accept */
+	}
+
+	if (addr == NULL || addr[0] == '\0') {
+		addr = "unknown-host";
+	}
+
+	if (!strcmp(accept_cmd, "xmessage")) {
+		/* make our own command using xmessage(1) */
+		sprintf(xmessage, "xmessage -buttons yes:0,no:2 -center "
+		    "'x11vnc: accept connection from %s?'", addr);
+		cmd = xmessage;
+		
+	} else if (!strcmp(accept_cmd, "popup") || !strcmp(accept_cmd,
+	    "builtin")) {
+		rfbLog("accept_client: using builtin popup for: %s\n", addr);
+		if (ugly_accept_window(addr)) {
+			rfbLog("accept_client: popup accepted: %s\n", addr);
+			return 1;
+		} else {
+			rfbLog("accept_client: popup rejected: %s\n", addr);
+			return 0;
+		}
+	} else {
+		cmd = accept_cmd;
+	}
+
+	if (cmd) {
+		int rc;
+		char *dpystr = DisplayString(dpy);
+
+		/* set RFB_CLIENT to IP addr for command to use */
+		sprintf(rfb_client_env, "RFB_CLIENT=%s", addr);
+		putenv(rfb_client_env);
+
+		/* 
+		 * Better set DISPLAY to the one we are polling, if they
+		 * want something trickier, they can handle on their own
+		 * via environment, etc.  XXX really should save/restore old.
+		 */
+		if (display_env == NULL) {
+			display_env = (char *) malloc(strlen(dpystr)+10);
+		}
+		sprintf(display_env, "DISPLAY=%s", dpystr);
+		putenv(display_env);
+
+		rfbLog("accept_client: running command:\n");
+		rfbLog("  %s\n", cmd);
+		rc = system(cmd);
+		if (rc >= 256) {
+			rc = rc/256;
+		}
+		rfbLog("accept_client: command returned: %d\n", rc);
+
+		sprintf(rfb_client_env, "RFB_CLIENT=");
+		putenv(rfb_client_env);
+
+		if (rc == 0) {
+			rfbLog("accept_client: accepted: %s\n", addr);
+			return 1;
+		} else {
+			rfbLog("accept_client: rejected: %s\n", addr);
+			return 0;
+		}
+	} else {
+		rfbLog("accept_client: no command, rejecting %s\n", addr);
+		return 0;
+	}
+
+	return 0;	/* NOTREACHED */
+}
+
+/*
  * For the -connect <file> option: periodically read the file looking for
  * a connect string.  If one is found set client_connect to it.
  */
@@ -675,11 +910,6 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	static accepted_client = 0;
 	last_event = last_input = time(0);
 
-	if (! check_access(client->host)) {
-		rfbLog("denying client: %s does not match %s\n", client->host,
-		    allow_list ? allow_list : "(null)" );
-		return(RFB_CLIENT_REFUSE);
-	}
 	if (connect_once) {
 		if (screen->rfbDontDisconnect && screen->rfbNeverShared) {
 			if (! shared && accepted_client) {
@@ -689,6 +919,19 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 			}
 		}
 	}
+	if (! check_access(client->host)) {
+		rfbLog("denying client: %s does not match %s\n", client->host,
+		    allow_list ? allow_list : "(null)" );
+		return(RFB_CLIENT_REFUSE);
+	}
+	if (! accept_client(client->host)) {
+		rfbLog("denying client: %s local user rejected connection.\n",
+		    client->host);
+		rfbLog("denying client: accept_cmd=\"%s\"\n",
+		    accept_cmd ? accept_cmd : "(null)" );
+		return(RFB_CLIENT_REFUSE);
+	}
+
 	client->clientGoneHook = client_gone;
 	if (view_only)  {
 		client->clientData = (void *) -1;
@@ -5125,6 +5368,16 @@ void print_help() {
 "                       a prefix, e.g. \"192.168.100.\" to match a simple subnet,\n"
 "                       for more control build libvncserver with libwrap support.\n"
 "-localhost             Same as -allow 127.0.0.1\n"
+"-accept string         Prompt user at the X11 display whether an incoming\n"
+"                       client should be allowed to connect.  \"string\" is an\n"
+"                       external command run via system(3).  The RFB_CLIENT env.\n"
+"                       variable will be set to the client's IP number.  If the\n"
+"                       command returns 0 the client is accepted, otherwise it\n"
+"                       is rejected.  If string is \"xmessage\" then an xmessage(1)\n"
+"                       invocation is used for the command. If string is \"popup\"\n"
+"                       then a builtin popup window is used.  Note that x11vnc\n"
+"                       blocks while the external command is running (other\n"
+"                       clients may see no updates during this period).\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
 "\n"
 "-noshm                 Do not use the MIT-SHM extension for the polling.\n"
@@ -5184,7 +5437,7 @@ void print_help() {
 "                       If you include a modifier like \"Shift_L\" the modifier's\n"
 "                       up/down state is toggled, e.g. to send \"The\" use\n"
 "                       :Shift_L+t+Shift_L+h+e: (the 1st one is shift down and\n"
-"                       the 2nd one is shift up. (note: the initial state of\n"
+"                       the 2nd one is shift up). (note: the initial state of\n"
 "                       the modifier is ignored and not reset)\n"
 "                       To include button events use \"Button1\", ... etc.\n"
 "\n"
@@ -5382,6 +5635,8 @@ int main(int argc, char** argv) {
 			allow_list = argv[++i];
 		} else if (!strcmp(arg, "-localhost")) {
 			allow_list = "127.0.0.1";
+		} else if (!strcmp(arg, "-accept")) {
+			accept_cmd = argv[++i];
 		} else if (!strcmp(arg, "-many")
 			|| !strcmp(arg, "-forever")) {
 			connect_once = 0;
@@ -5610,6 +5865,8 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "authfile:   %s\n", auth_file ? auth_file
                     : "null");
 		fprintf(stderr, "allow:      %s\n", allow_list ? allow_list
+                    : "null");
+		fprintf(stderr, "accept:     %s\n", accept_cmd ? accept_cmd
                     : "null");
 		fprintf(stderr, "conn_once:  %d\n", connect_once);
 		fprintf(stderr, "connect:    %s\n", client_connect

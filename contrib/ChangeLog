@@ -1,3 +1,7 @@
+2004-05-08  Karl Runge <runge@karlrunge.com>
+	* add -accept some-command/xmessage/popup to prompt local X11 user
+	  or otherwise decide to accept an incoming client. 
+
 2004-05-05  Karl Runge <runge@karlrunge.com>
 	* enable mouse button -> keystrokes mapping in -buttonmap (mousewheel)
 	* enable keystroke -> mouse button mapping in -remap (touchpad paste)

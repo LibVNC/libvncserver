@@ -1,6 +1,9 @@
+2004-05-08  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add -accept some-command/xmessage/popup
+
 2004-05-05  Karl Runge <runge@karlrunge.com>
-	* mouse button -> keystrokes and keystroke -> mouse button mappings
-	  in -buttonmap and -remap
+	* x11vnc: mouse button -> keystrokes and keystroke -> mouse button
+	  mappings in -buttonmap and -remap
 	* shm OS blacklist revert to -onetile
 
 2004-04-28  Karl Runge <runge@karlrunge.com>
