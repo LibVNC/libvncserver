@@ -1,3 +1,12 @@
+2004-08-29  Karl Runge <runge@karlrunge.com>
+	* remove old mouse patch code, now use rfbSetCursor (+ workarounds)
+	* changed cursor shape options (no more -mouse, ...) to '-cursor mode'
+	  where 'mode' can be empty "X", "some", or "most".  "some" adds
+	  heuristics for two more cursors.
+	* -nocursorshape added.
+	* ifdef checks for XSHM and XTEST.  Add *_wr wrappers as well.
+	* -vncconnect is now the default.
+
 2004-08-15  Karl Runge <runge@karlrunge.com>
 	* -overlay option to fix color problems on Sun machines with 8+24
 	  and 24+8 overlay visuals, uses Solaris XReadScreen().

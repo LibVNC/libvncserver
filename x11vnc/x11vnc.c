@@ -65,13 +65,9 @@
  * cursor, but we cannot extract what the cursor is...  
  * 
  * Nevertheless, the current *position* of the remote X mouse pointer
- * is shown with the -mouse option.  Further, if -mouseX or -X is used, a
+ * is shown with the -cursor option.  Further, if -cursorX or -X is used, a
  * trick is done to at least show the root window cursor vs non-root cursor.
  * (perhaps some heuristic can be done to further distinguish cases...)
- *
- * With -mouse there are occasionally some repainting errors involving
- * big areas near the cursor.  The mouse painting is in general a bit
- * ragged and not very pleasant.
  *
  * Windows using visuals other than the default X visual may have
  * their colors messed up.  When using 8bpp indexed color, the colormap
@@ -82,7 +78,7 @@
  * On Sun hardware we try to work around this with -overlay.
  *
  * Feature -id <windowid> can be picky: it can crash for things like the
- * window not sufficiently mapped into server memory, use of -mouse, etc.
+ * window not sufficiently mapped into server memory, use of -cursor, etc.
  * SaveUnders menus, popups, etc will not be seen.
  *
  * Occasionally, a few tile updates can be missed leaving a patch of
@@ -90,7 +86,8 @@
  * which is no longer the default.
  *
  * There seems to be a serious bug with simultaneous clients when
- * threaded, currently the only workaround in this case is -nothreads.
+ * threaded, currently the only workaround in this case is -nothreads
+ * (which is now the default).
  *
  */
 
@@ -108,17 +105,46 @@
 
 /* -- x11vnc.h -- */
 
+/*
+ * At some point beyond 0.7pre remove these two definitions since we
+ * have them set in configure (for all users of this x11vnc.c file).
+ * Then move them to the comment below.
+ */
+#define LIBVNCSERVER_HAVE_XSHM
+#define LIBVNCSERVER_HAVE_XTEST
+
+/* 
+ * If you are building in an older libvncserver tree with this newer
+ * x11vnc.c file you may need to uncomment some of these lines since
+ * your older libvncserver configure is not setting them.
+ *
+ * For LIBVNCSERVER_HAVE_LIBXINERAMA you may also need to add to the
+ * linking -lXinerama (by setting LDFLAGS=-lXinerama before configure).
+ *
+#define LIBVNCSERVER_HAVE_LIBXINERAMA
+#define LIBVNCSERVER_HAVE_XFIXES
+#define LIBVNCSERVER_HAVE_XDAMAGE
+ *
+ */
+
 #include <unistd.h>
 #include <signal.h>
 #include <sys/utsname.h>
 
-#include <sys/ipc.h>
-#include <sys/shm.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+
+#ifdef LIBVNCSERVER_HAVE_XSHM
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <X11/extensions/XShm.h>
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_XTEST
 #include <X11/extensions/XTest.h>
+#endif
+
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 
@@ -147,22 +173,12 @@
 #include <X11/extensions/transovl.h>
 #endif
 
-/* 
- * Temporary kludge: to run with -xinerama define the following
- * macro (uncomment) and be sure to link with -lXinerama
- * (e.g. LDFLAGS=-lXinerama before configure).  Support for this is
- * being added to libvncserver 'configure.ac' so it will all be done
- * automatically, but it won't be in users' build trees for a while,
- * so one can do it manually here.
-
-#define LIBVNCSERVER_HAVE_LIBXINERAMA
- */
 #ifdef LIBVNCSERVER_HAVE_LIBXINERAMA
 #include <X11/extensions/Xinerama.h>
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.6.3pre lastmod: 2004-08-15";
+char lastmod[] = "0.6.3pre lastmod: 2004-08-29";
 
 /* X display info */
 
@@ -182,31 +198,41 @@ XImage *scanline;
 XImage *fullscreen;
 XImage **tile_row;		/* for all possible row runs */
 
+#ifndef LIBVNCSERVER_HAVE_XSHM
+/*
+ * for simplicity, define these since we'll never use them
+ * under using_shm = 0.
+ */
+typedef struct {
+	int shmid; char *shmaddr; Bool readOnly;
+} XShmSegmentInfo;
+#endif
+
 /* corresponding shm structures */
 XShmSegmentInfo scanline_shm;
 XShmSegmentInfo fullscreen_shm;
 XShmSegmentInfo *tile_row_shm;	/* for all possible row runs */
 
-/* rfb info */
+/* rfb screen info */
 rfbScreenInfoPtr screen;
-rfbCursorPtr cursor;
 char *main_fb;			/* our copy of the X11 fb */
 char *rfb_fb;			/* same as main_fb unless transformation */
+int rfb_bytes_per_line;
 int main_bytes_per_line;
 unsigned long  main_red_mask,  main_green_mask,  main_blue_mask;
 unsigned short main_red_max,   main_green_max,   main_blue_max;
 unsigned short main_red_shift, main_green_shift, main_blue_shift;
-int rfb_bytes_per_line;
 
-/* scaling info */
-int scaling = 0;
-int scaling_noblend = 0;
-int scaling_nomult4 = 0;
-int scaling_pad = 0;
-int scaling_interpolate = 0;
+/* scaling parameters */
 double scale_fac = 1.0;
-int scaled_x = 0, scaled_y = 0;
-int scale_numer = 0, scale_denom = 0;
+int scaling = 0;
+int scaling_noblend = 0;	/* no blending option (very course) */
+int scaling_nomult4 = 0;	/* do not require width = n * 4 */
+int scaling_pad = 0;		/* pad out scaled sizes to fit denominator */
+int scaling_interpolate = 0;	/* use interpolation scheme when shrinking */
+int scaled_x = 0, scaled_y = 0;	/* dimensions of scaled display */
+int scale_numer = 0, scale_denom = 0;	/* n/m */
+
 
 /* size of the basic tile unit that is polled for changes: */
 int tile_x = 32;
@@ -215,25 +241,6 @@ int ntiles, ntiles_x, ntiles_y;
 
 /* arrays that indicate changed or checked tiles. */
 unsigned char *tile_has_diff, *tile_tried;
-
-/* blacked-out region (-blackout, -xinerama) */
-typedef struct bout {
-	int x1, y1, x2, y2;
-} blackout_t;
-#define BO_MAX 16
-typedef struct tbout {
-	blackout_t bo[BO_MAX];	/* hardwired max rectangles. */
-	int cover;
-	int count;
-} tile_blackout_t;
-
-#define BLACKR_MAX 100
-blackout_t blackr[BLACKR_MAX];	/* hardwired max blackouts */
-int blackouts = 0;
-tile_blackout_t *tile_blackout;
-
-/* saved cursor */
-int cur_save_x, cur_save_y, cur_save_w, cur_save_h, cur_saved = 0;
 
 /* times of recent events */
 time_t last_event, last_input, last_client = 0;
@@ -253,7 +260,6 @@ int shut_down = 0;
 #define VNC_CONNECT_MAX 512
 char vnc_connect_str[VNC_CONNECT_MAX+1];
 Atom vnc_connect_prop = None;
-
 
 /* function prototypes (see filename comment above) */
 
@@ -286,7 +292,14 @@ void initialize_xinerama(void);
 
 void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client);
 
-void myXTestFakeKeyEvent(Display*, KeyCode, Bool, time_t);
+void XTestFakeKeyEvent_wr(Display*, KeyCode, Bool, unsigned long);
+void XTestFakeButtonEvent_wr(Display*, unsigned int, Bool, unsigned long);
+void XTestFakeMotionEvent_wr(Display*, int, int, int, unsigned long);
+int XTestGrabControl_wr(Display*, Bool);
+Bool XTestCompareCurrentCursorWithWindow_wr(Display*, Window);
+Bool XTestCompareCursorWithWindow_wr(Display*, Window, Cursor);
+Bool XTestQueryExtension_wr(Display*, int*, int*, int*, int*);
+void XTestDiscard_wr(Display*);
 
 typedef struct hint {
 	/* location x, y, height, and width of a change-rectangle  */
@@ -299,22 +312,24 @@ void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force);
 enum rfbNewClientAction new_client(rfbClientPtr client);
 void nofb_hook(rfbClientPtr client);
 void pointer(int mask, int x, int y, rfbClientPtr client);
+void cursor_position(int, int);
 
 void read_vnc_connect_prop(void);
-void redraw_mouse(void);
-void restore_mouse_patch(void);
 void rfbPE(rfbScreenInfoPtr, long);
+void rfbCFD(rfbScreenInfoPtr, long);
 void scan_for_updates(void);
 void set_colormap(void);
 void set_offset(void);
 void set_visual(char *vstring);
+void set_cursor(int, int, int);
+int get_which_cursor(void);
 
 void shm_clean(XShmSegmentInfo *, XImage *);
 void shm_delete(XShmSegmentInfo *);
 
-void update_mouse(void);
-void watch_bell_event(void);
-void watch_xevents(void);
+void check_x11_pointer(void);
+void check_bell_event(void);
+void check_xevents(void);
 
 void xcut_receive(char *text, int len, rfbClientPtr client);
 
@@ -347,13 +362,14 @@ int xinerama = 0;		/* -xinerama */
 
 char *client_connect = NULL;	/* strings for -connect option */
 char *client_connect_file = NULL;
-int vnc_connect = 0;		/* -vncconnect option */
+int vnc_connect = 1;		/* -vncconnect option */
 
-int local_cursor = 1;		/* whether the viewer draws a local cursor */
-int cursor_pos = 1;		/* cursor position updates -cursorpos */
-int show_mouse = 0;		/* display a cursor for the real mouse */
+int show_cursor = 1;		/* show cursor shapes */
+int show_multiple_cursors = 0;	/* show X when on root background, etc */
+char *multiple_cursors_mode = "default";
+int cursor_pos_updates = 1;	/* cursor position updates -cursorpos */
+int cursor_shape_updates = 1;	/* cursor shape updates -nocursorshape */
 int use_xwarppointer = 0;	/* use XWarpPointer instead of XTestFake... */
-int show_root_cursor = 0;	/* show X when on root background */
 int show_dragging = 1;		/* process mouse movement events */
 int no_autorepeat = 0;		/* turn off autorepeat with clients */
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
@@ -391,8 +407,16 @@ int sigpipe = 1;		/* 0=skip, 1=ignore, 2=exit */
 /* visual stuff for -visual override or -overlay */
 VisualID visual_id = (VisualID) 0;
 int visual_depth = 0;
+
+/* for -overlay mode on Solaris.  X server draws cursor correctly.  */
 int overlay = 0;
-int overlay_mouse = 0;
+int overlay_cursor = 1;
+
+#ifdef LIBVNCSERVER_HAVE_XTEST
+int xtest_present = 1;
+#else
+int xtest_present = 0;
+#endif
 
 /* tile heuristics: */
 double fs_frac = 0.75;	/* threshold tile fraction to do fullscreen updates. */
@@ -467,6 +491,18 @@ int nfix(int i, int n) {
 	return i;
 }
 
+void lowercase(char *str) {
+	char *p;
+	if (str == NULL) {
+		return;
+	}
+	p = str;
+	while (*p != '\0') {
+		*p = tolower(*p);
+		p++;
+	}
+}
+
 /*
  * Kludge to interpose image gets and limit to a subset rectangle of
  * the rootwin.  This is the -sid option trying to work around invisible
@@ -481,7 +517,9 @@ int rootshift = 0;
 		y += off_y; \
 	}
 
-/* Wrappers for Image related X calls */
+/*
+ * Wrappers for Image related X calls
+ */
 Status XShmGetImage_wr(Display *disp, Drawable d, XImage *image, int x, int y,
     unsigned long mask) {
 
@@ -489,7 +527,47 @@ Status XShmGetImage_wr(Display *disp, Drawable d, XImage *image, int x, int y,
 
 	/* The Solaris overlay stuff is all non-shm (using_shm = 0) */
 
+#ifdef LIBVNCSERVER_HAVE_XSHM
 	return XShmGetImage(disp, d, image, x, y, mask); 
+#else
+	return (Status) 0;
+#endif
+}
+
+XImage *XShmCreateImage_wr(Display* disp, Visual* vis, unsigned int depth,
+    int format, char* data, XShmSegmentInfo* shminfo, unsigned int width,
+    unsigned int height) {
+
+#ifdef LIBVNCSERVER_HAVE_XSHM
+	return XShmCreateImage(disp, vis, depth, format, data, shminfo,
+	    width, height); 
+#else
+	return (XImage *) 0;
+#endif
+}
+
+Status XShmAttach_wr(Display *disp, XShmSegmentInfo *shminfo) {
+#ifdef LIBVNCSERVER_HAVE_XSHM
+	return XShmAttach(disp, shminfo);
+#else
+	return (Status) 0;
+#endif
+}
+
+Status XShmDetach_wr(Display *disp, XShmSegmentInfo *shminfo) {
+#ifdef LIBVNCSERVER_HAVE_XSHM
+	return XShmDetach(disp, shminfo);
+#else
+	return (Status) 0;
+#endif
+}
+
+Bool XShmQueryExtension_wr(Display *disp) {
+#ifdef LIBVNCSERVER_HAVE_XSHM
+	return XShmQueryExtension(disp);
+#else
+	return False;
+#endif
 }
 
 XImage *XGetSubImage_wr(Display *disp, Drawable d, int x, int y,
@@ -502,7 +580,7 @@ XImage *XGetSubImage_wr(Display *disp, Drawable d, int x, int y,
 	if (overlay && dest_x == 0 && dest_y == 0) {
 		size_t size = dest_image->height * dest_image->bytes_per_line;
 		XImage *xi = XReadScreen(disp, d, x, y, width, height,
-		    (Bool) overlay_mouse);
+		    (Bool) overlay_cursor);
 
 		/*
 		 * There is extra overhead from memcpy and free...
@@ -529,7 +607,7 @@ XImage *XGetImage_wr(Display *disp, Drawable d, int x, int y,
 #ifdef SOLARIS
 	if (overlay) {
 		return XReadScreen(disp, d, x, y, width, height,
-		    (Bool) overlay_mouse);
+		    (Bool) overlay_cursor);
 	}
 #endif
 	return XGetImage(disp, d, x, y, width, height, plane_mask, format);
@@ -561,6 +639,100 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 
 	return XCreateImage(disp, visual, depth, format, offset, data,
 	    width, height, bitmap_pad, bytes_per_line);
+}
+
+/*
+ * wrappers for XTestFakeKeyEvent, etc..
+ */
+void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
+    unsigned long delay) {
+	if (debug_keyboard) {
+		rfbLog("XTestFakeKeyEvent(dpy, keycode=0x%x \"%s\", %s)\n",
+		    key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
+		    down ? "down":"up");
+	}
+	if (! xtest_present) {
+		return;
+	}
+	if (down) {
+		last_keyboard_input = -key;
+	} else {
+		last_keyboard_input = key;
+	}
+#ifdef LIBVNCSERVER_HAVE_XTEST
+	XTestFakeKeyEvent(dpy, key, down, delay);
+#endif
+}
+
+void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
+    unsigned long delay) {
+	if (! xtest_present) {
+		return;
+	}
+#ifdef LIBVNCSERVER_HAVE_XTEST
+    	XTestFakeButtonEvent(dpy, button, is_press, delay);
+#endif
+}
+
+void XTestFakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
+    unsigned long delay) {
+	if (! xtest_present) {
+		return;
+	}
+#ifdef LIBVNCSERVER_HAVE_XTEST
+	XTestFakeMotionEvent(dpy, screen, x, y, delay);
+#endif
+}
+
+Bool XTestCompareCurrentCursorWithWindow_wr(Display* dpy, Window w) {
+	if (! xtest_present) {
+		return False;
+	}
+#ifdef LIBVNCSERVER_HAVE_XTEST
+	return XTestCompareCurrentCursorWithWindow(dpy, w);
+#else
+	return False;
+#endif
+}
+
+Bool XTestCompareCursorWithWindow_wr(Display* dpy, Window w, Cursor cursor) {
+	if (! xtest_present) {
+		return False;
+	}
+#ifdef LIBVNCSERVER_HAVE_XTEST
+	return XTestCompareCursorWithWindow(dpy, w, cursor);
+#else
+	return False;
+#endif
+}
+
+int XTestGrabControl_wr(Display* dpy, Bool impervious) {
+	if (! xtest_present) {
+		return 0;
+	}
+#ifdef LIBVNCSERVER_HAVE_XTEST
+	return XTestGrabControl(dpy, impervious);
+#else
+	return 0;
+#endif
+}
+
+Bool XTestQueryExtension_wr(Display *dpy, int *ev, int *er, int *maj,
+    int *min) {
+#ifdef LIBVNCSERVER_HAVE_XTEST
+	return XTestQueryExtension(dpy, ev, er, maj, min);
+#else
+	return False;
+#endif
+}
+
+void XTestDiscard_wr(Display *dpy) {
+	if (! xtest_present) {
+		return;
+	}
+#ifdef LIBVNCSERVER_HAVE_XTEST
+	XTestDiscard(dpy);
+#endif
 }
 
 
@@ -603,7 +775,7 @@ void clean_up_exit (int ret) {
 		autorepeat(1);
 	}
 	X_LOCK;
-	XTestDiscard(dpy);
+	XTestDiscard_wr(dpy);
 	XCloseDisplay(dpy);
 	X_UNLOCK;
 
@@ -847,54 +1019,6 @@ static int run_user_command(char *cmd, rfbClientPtr client) {
 	return rc;
 }
 
-/*
- * Kludge for -norepeat option: we turn off keystroke autorepeat in
- * the X server when clients are connected.  This may annoy people at
- * the physical display.  We do this because 'key down' and 'key up'
- * user input events may be separated by 100s of ms due to screen fb
- * processing or link latency, thereby inducing the X server to apply
- * autorepeat when it should not.  Since the *client* is likely doing
- * keystroke autorepeating as well, it kind of makes sense to shut it
- * off if no one is at the physical display...
- */
-void autorepeat(int restore) {
-	XKeyboardState kstate;
-	XKeyboardControl kctrl;
-	static int save_auto_repeat = -1;
-
-	if (restore) {
-		if (save_auto_repeat < 0) {
-			return;		/* nothing to restore */
-		}
-		X_LOCK;
-		/* read state and skip restore if equal (e.g. no clients) */
-		XGetKeyboardControl(dpy, &kstate);
-		if (kstate.global_auto_repeat == save_auto_repeat) {
-			X_UNLOCK;
-			return;
-		}
-
-		kctrl.auto_repeat_mode = save_auto_repeat;
-		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
-		XFlush(dpy);
-		X_UNLOCK;
-
-		rfbLog("Restored X server key autorepeat to: %d\n",
-		    save_auto_repeat);
-	} else {
-		X_LOCK;
-		XGetKeyboardControl(dpy, &kstate);
-		save_auto_repeat = kstate.global_auto_repeat;
-
-		kctrl.auto_repeat_mode = AutoRepeatModeOff;
-		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
-		XFlush(dpy);
-		X_UNLOCK;
-
-		rfbLog("Disabled X server key autorepeat. (you can run the\n");
-		rfbLog("command: 'xset r on' to force it back on)\n");
-	}
-}
 
 /*
  * callback for when a client disconnects
@@ -1907,7 +2031,7 @@ void clear_modifiers(int init) {
 			rfbLog("clear_modifiers: up: %-10s (0x%x) "
 			    "keycode=0x%x\n", keystrs[i], keysym, keycode);
 		}
-		myXTestFakeKeyEvent(dpy, keycode, False, CurrentTime);
+		XTestFakeKeyEvent_wr(dpy, keycode, False, CurrentTime);
 	}
 	XFlush(dpy);
 }
@@ -1925,12 +2049,61 @@ void clear_keys(void) {
 		if (keystate[k]) {
 			KeyCode keycode = (KeyCode) k;
 			rfbLog("clear_keys: keycode=%d\n", keycode);
-			myXTestFakeKeyEvent(dpy, keycode, False, CurrentTime);
+			XTestFakeKeyEvent_wr(dpy, keycode, False, CurrentTime);
 		}
 	}
 	XFlush(dpy);
 }
 		
+/*
+ * Kludge for -norepeat option: we turn off keystroke autorepeat in
+ * the X server when clients are connected.  This may annoy people at
+ * the physical display.  We do this because 'key down' and 'key up'
+ * user input events may be separated by 100s of ms due to screen fb
+ * processing or link latency, thereby inducing the X server to apply
+ * autorepeat when it should not.  Since the *client* is likely doing
+ * keystroke autorepeating as well, it kind of makes sense to shut it
+ * off if no one is at the physical display...
+ */
+void autorepeat(int restore) {
+	XKeyboardState kstate;
+	XKeyboardControl kctrl;
+	static int save_auto_repeat = -1;
+
+	if (restore) {
+		if (save_auto_repeat < 0) {
+			return;		/* nothing to restore */
+		}
+		X_LOCK;
+		/* read state and skip restore if equal (e.g. no clients) */
+		XGetKeyboardControl(dpy, &kstate);
+		if (kstate.global_auto_repeat == save_auto_repeat) {
+			X_UNLOCK;
+			return;
+		}
+
+		kctrl.auto_repeat_mode = save_auto_repeat;
+		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
+		XFlush(dpy);
+		X_UNLOCK;
+
+		rfbLog("Restored X server key autorepeat to: %d\n",
+		    save_auto_repeat);
+	} else {
+		X_LOCK;
+		XGetKeyboardControl(dpy, &kstate);
+		save_auto_repeat = kstate.global_auto_repeat;
+
+		kctrl.auto_repeat_mode = AutoRepeatModeOff;
+		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
+		XFlush(dpy);
+		X_UNLOCK;
+
+		rfbLog("Disabled X server key autorepeat. (you can run the\n");
+		rfbLog("command: 'xset r on' to force it back on)\n");
+	}
+}
+
 static KeySym added_keysyms[0x100];
 
 int add_keysym(KeySym keysym) {
@@ -2146,25 +2319,6 @@ void initialize_remap(char *infile) {
 	}
 	fclose(in);
 }
-
-/*
- * debugging wrapper for XTestFakeKeyEvent()
- */
-void myXTestFakeKeyEvent(Display* dpy, KeyCode key, Bool down,
-    time_t cur_time) {
-	if (debug_keyboard) {
-		rfbLog("XTestFakeKeyEvent(dpy, keycode=0x%x \"%s\", %s)\n",
-		    key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
-		    down ? "down":"up");
-	}
-	if (down) {
-		last_keyboard_input = -key;
-	} else {
-		last_keyboard_input = key;
-	}
-	XTestFakeKeyEvent(dpy, key, down, cur_time);
-}
-
 
 /*
  * preliminary support for using the Xkb (XKEYBOARD) extension for handling
@@ -2847,7 +3001,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				    "inadvertent Multi_key from Shift "
 				    "(doing %03d up now)\n", shift_is_down);
 			}
-			myXTestFakeKeyEvent(dpy, shift_is_down, False,
+			XTestFakeKeyEvent_wr(dpy, shift_is_down, False,
 			    CurrentTime);
 		} else {
 			involves_multi_key = 0;
@@ -2859,7 +3013,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			if (sentmods[i] == 0) continue;
 			dn = (Bool) needmods[i];
 			if (dn) continue;
-			myXTestFakeKeyEvent(dpy, sentmods[i], dn, CurrentTime);
+			XTestFakeKeyEvent_wr(dpy, sentmods[i], dn, CurrentTime);
 		}
 		for (j=0; j<8; j++) {
 			/* next, do the Mod downs */
@@ -2867,7 +3021,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			if (sentmods[i] == 0) continue;
 			dn = (Bool) needmods[i];
 			if (!dn) continue;
-			myXTestFakeKeyEvent(dpy, sentmods[i], dn, CurrentTime);
+			XTestFakeKeyEvent_wr(dpy, sentmods[i], dn, CurrentTime);
 		}
 
 		if (involves_multi_key) {
@@ -2879,14 +3033,14 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				    "inadvertent Multi_key from Shift "
 				    "(doing %03d down now)\n", shift_is_down);
 			}
-			myXTestFakeKeyEvent(dpy, shift_is_down, True,
+			XTestFakeKeyEvent_wr(dpy, shift_is_down, True,
 			    CurrentTime);
 		}
 
 		/*
 		 * With the above modifier work done, send the actual keycode:
 		 */
-		myXTestFakeKeyEvent(dpy, Kc_f, (Bool) down, CurrentTime);
+		XTestFakeKeyEvent_wr(dpy, Kc_f, (Bool) down, CurrentTime);
 
 		/*
 		 * Now undo the modifier work:
@@ -2897,7 +3051,8 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			if (sentmods[i] == 0) continue;
 			dn = (Bool) needmods[i];
 			if (!dn) continue;
-			myXTestFakeKeyEvent(dpy, sentmods[i], !dn, CurrentTime);
+			XTestFakeKeyEvent_wr(dpy, sentmods[i], !dn,
+			    CurrentTime);
 		}
 		for (j=7; j>=0; j--) {
 			/* finally reverse the Mod ups we did */
@@ -2905,12 +3060,13 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			if (sentmods[i] == 0) continue;
 			dn = (Bool) needmods[i];
 			if (dn) continue;
-			myXTestFakeKeyEvent(dpy, sentmods[i], !dn, CurrentTime);
+			XTestFakeKeyEvent_wr(dpy, sentmods[i], !dn,
+			    CurrentTime);
 		}
 
 	} else { /* for up case, hopefully just need to pop it up: */
 
-		myXTestFakeKeyEvent(dpy, Kc_f, (Bool) down, CurrentTime);
+		XTestFakeKeyEvent_wr(dpy, Kc_f, (Bool) down, CurrentTime);
 	}
 	X_UNLOCK;
 }
@@ -3059,20 +3215,20 @@ static void tweak_mod(signed char mod, rfbBool down) {
 	X_LOCK;
 	if (is_shift && mod != 1) {
 	    if (mod_state & LEFTSHIFT) {
-		myXTestFakeKeyEvent(dpy, left_shift_code, !dn, CurrentTime);
+		XTestFakeKeyEvent_wr(dpy, left_shift_code, !dn, CurrentTime);
 	    }
 	    if (mod_state & RIGHTSHIFT) {
-		myXTestFakeKeyEvent(dpy, right_shift_code, !dn, CurrentTime);
+		XTestFakeKeyEvent_wr(dpy, right_shift_code, !dn, CurrentTime);
 	    }
 	}
 	if ( ! is_shift && mod == 1 ) {
-	    myXTestFakeKeyEvent(dpy, left_shift_code, dn, CurrentTime);
+	    XTestFakeKeyEvent_wr(dpy, left_shift_code, dn, CurrentTime);
 	}
 	if ( altgr && (mod_state & ALTGR) && mod != 2 ) {
-	    myXTestFakeKeyEvent(dpy, altgr, !dn, CurrentTime);
+	    XTestFakeKeyEvent_wr(dpy, altgr, !dn, CurrentTime);
 	}
 	if ( altgr && ! (mod_state & ALTGR) && mod == 2 ) {
-	    myXTestFakeKeyEvent(dpy, altgr, dn, CurrentTime);
+	    XTestFakeKeyEvent_wr(dpy, altgr, dn, CurrentTime);
 	}
 	X_UNLOCK;
 	if (debug_keyboard) {
@@ -3141,7 +3297,7 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	}
 	if ( k != NoSymbol ) {
 		X_LOCK;
-		myXTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
+		XTestFakeKeyEvent_wr(dpy, k, (Bool) down, CurrentTime);
 		X_UNLOCK;
 	} 
 
@@ -3219,8 +3375,8 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			return;
 		}
 		X_LOCK;
-		XTestFakeButtonEvent(dpy, button, True, CurrentTime);
-		XTestFakeButtonEvent(dpy, button, False, CurrentTime);
+		XTestFakeButtonEvent_wr(dpy, button, True, CurrentTime);
+		XTestFakeButtonEvent_wr(dpy, button, False, CurrentTime);
 		XFlush(dpy);
 		X_UNLOCK;
 		return;
@@ -3252,7 +3408,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	}
 
 	if ( k != NoSymbol ) {
-		myXTestFakeKeyEvent(dpy, k, (Bool) down, CurrentTime);
+		XTestFakeKeyEvent_wr(dpy, k, (Bool) down, CurrentTime);
 		XFlush(dpy);
 	}
 
@@ -3261,7 +3417,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 /* -- pointer.c -- */
 /*
- * pointer event handling routines.
+ * pointer event (motion and button click) handling routines.
  */
 typedef struct ptrremap {
 	KeySym keysym;
@@ -3325,7 +3481,9 @@ static void buttonparse(int from, char **s) {
 			if (sscanf(t, "0x%x", &i) == 1) {
 				ksym = (KeySym) i;	/* hex value */
 			} else {
+				X_LOCK;
 				ksym = XStringToKeysym(t); /* string value */
+				X_UNLOCK;
 			}
 			if (ksym == NoSymbol) {
 				/* see if Button<N> "keysym" was used: */
@@ -3348,6 +3506,7 @@ static void buttonparse(int from, char **s) {
 				/*
 				 * XXX may not work with -modtweak or -xkb
 				 */
+				X_LOCK;
 				kcode = XKeysymToKeycode(dpy, ksym);
 
 				pointer_map[from][n].keysym  = ksym;
@@ -3374,6 +3533,7 @@ static void buttonparse(int from, char **s) {
 				    XKeysymToString(ksym), ksym, kcode,
 				    pointer_map[from][n].down,
 				    pointer_map[from][n].up);
+				X_UNLOCK;
 			}
 			t = strtok(NULL, "+");
 			n++;
@@ -3442,6 +3602,7 @@ void initialize_pointer_map(char *pointer_remap) {
 	
 	X_LOCK;
 	num_buttons = XGetPointerMapping(dpy, map, MAX_BUTTONS);
+	X_UNLOCK;
 
 	if (num_buttons < 0) {
 		num_buttons = 0;
@@ -3500,30 +3661,37 @@ void initialize_pointer_map(char *pointer_remap) {
 			}
 		}
 	}
-	X_UNLOCK;
 }
 
 /*
  * Send a pointer event to the X server.
  */
-static void update_pointer(int mask, int x, int y) {
+static void update_x11_pointer(int mask, int x, int y) {
 	int i, mb;
 
 	X_LOCK;
-
-	if (! use_xwarppointer) {
-		XTestFakeMotionEvent(dpy, scr, x+off_x, y+off_y, CurrentTime);
+	if (use_xwarppointer) {
+		XWarpPointer(dpy, None, window, 0, 0, 0, 0, x+off_x, y+off_y);
 	} else {
-		XWarpPointer(dpy, None, window, 0, 0, 0, 0,  x+off_x, y+off_y);
+		XTestFakeMotionEvent_wr(dpy, scr, x+off_x, y+off_y,
+		    CurrentTime);
 	}
+	X_UNLOCK;
 
 	cursor_x = x;
 	cursor_y = y;
 
+	/* record the x, y position for the rfb screen as well. */
+	cursor_position(x, y);
+
+	/* change the cursor shape if necessary */
+	set_cursor(x, y, get_which_cursor());
+
 	last_event = last_input = time(0);
 
+	X_LOCK;
+	/* look for buttons that have be clicked or released: */
 	for (i=0; i < MAX_BUTTONS; i++) {
-	    /* look for buttons that have be clicked or released: */
 	    if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
 		int k;
 		if (debug_pointer) {
@@ -3552,7 +3720,7 @@ static void update_pointer(int mask, int x, int y) {
 					    " %s (event %d)\n", mb, bmask
 					    ? "down" : "up", k+1);
 				}
-				XTestFakeButtonEvent(dpy, mb, (mask & (1<<i))
+				XTestFakeButtonEvent_wr(dpy, mb, (mask & (1<<i))
 				    ? True : False, CurrentTime);
 			} else {
 				/* sent keysym up or down */
@@ -3574,11 +3742,11 @@ static void update_pointer(int mask, int x, int y) {
 					    dpy, key, 0)));
 				}
 				if (down) {
-					myXTestFakeKeyEvent(dpy, key, True,
+					XTestFakeKeyEvent_wr(dpy, key, True,
 					    CurrentTime);
 				}
 				if (up) {
-					myXTestFakeKeyEvent(dpy, key, False,
+					XTestFakeKeyEvent_wr(dpy, key, False,
 					    CurrentTime);
 				}
 			}
@@ -3605,24 +3773,38 @@ static void update_pointer(int mask, int x, int y) {
 
 /*
  * Actual callback from libvncserver when it gets a pointer event.
+ * This may queue pointer events rather than sending them immediately
+ * to the X server. (see update_x11_pointer())
  */
 void pointer(int mask, int x, int y, rfbClientPtr client) {
 
 	if (debug_pointer && mask >= 0) {
-		rfbLog("pointer(mask: 0x%x, x:%4d, y:%4d)\n", mask, x, y);
+		static int show_motion = -1;
+		if (show_motion == -1) {
+			if (getenv("X11VNC_DB_NOMOTION")) {
+				show_motion = 0;
+			} else {
+				show_motion = 1;
+			}
+		}
+		if (show_motion) {
+			rfbLog("pointer(mask: 0x%x, x:%4d, y:%4d)\n",
+			    mask, x, y);
+		}
 	}
 
 	if (view_only) {
 		return;
 	}
-	if (client->viewOnly) {
+	if (client && client->viewOnly) {
 		return;
 	}
 	if (scaling) {
+		/* map from rfb size to X11 size: */
 		x = ((double) x / scaled_x) * dpy_x;
-		if (x >= dpy_x) x = dpy_x - 1;
+		x = nfix(x, dpy_x);
 		y = ((double) y / scaled_y) * dpy_y;
-		if (y >= dpy_y) y = dpy_y - 1;
+		y = nfix(y, dpy_y);
 	}
 
 	if (mask >= 0) {
@@ -3698,7 +3880,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			if (debug_pointer) {
 				rfbLog("pointer(): sending event %d\n", i+1);
 			}
-			update_pointer(ev[i][0], ev[i][1], ev[i][2]);
+			update_x11_pointer(ev[i][0], ev[i][1], ev[i][2]);
 		}
 		if (nevents && dt > maxwait) {
 			X_LOCK;
@@ -3720,7 +3902,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	}
 
 	/* update the X display with the event: */
-	update_pointer(mask, x, y);
+	update_x11_pointer(mask, x, y);
 }
 
 /* -- xkb_bell.c -- */
@@ -3782,7 +3964,7 @@ void initialize_watch_bell(void) {
  * We call this periodically to process any bell events that have 
  * taken place.
  */
-void watch_bell_event(void) {
+void check_bell_event(void) {
 	XEvent xev;
 	XkbAnyEvent *xkb_ev;
 	int got_bell = 0;
@@ -3804,7 +3986,7 @@ void watch_bell_event(void) {
 
 	if (got_bell) {
 		if (! all_clients_initialized()) {
-			rfbLog("watch_bell_event: not sending bell: "
+			rfbLog("check_bell_event: not sending bell: "
 			    "uninitialized clients\n");
 		} else {
 			rfbSendBell(screen);
@@ -3812,7 +3994,7 @@ void watch_bell_event(void) {
 	}
 }
 #else
-void watch_bell_event(void) {}
+void check_bell_event(void) {}
 #endif
 
 /* -- selection.c -- */
@@ -4060,7 +4242,7 @@ static void selection_send(XEvent *ev) {
  * This routine is periodically called to check for selection related
  * and other X11 events and respond to them as needed.
  */
-void watch_xevents(void) {
+void check_xevents(void) {
 	XEvent xev;
 	static int first = 1, sent_some_sel = 0;
 	static time_t last_request = 0;
@@ -4245,10 +4427,11 @@ typedef struct cursor_info {
 	int wx, wy;	/* size of cursor */
 	int sx, sy;	/* shift to its centering point */
 	int reverse;	/* swap black and white */
+	rfbCursorPtr rfb;
 } cursor_info_t;
 
 /* main cursor */
-static char* cur_data =
+static char* curs_arrow_data =
 "                  "
 " x                "
 " xx               "
@@ -4268,7 +4451,7 @@ static char* cur_data =
 "                  "
 "                  ";
 
-static char* cur_mask =
+static char* curs_arrow_mask =
 "xx                "
 "xxx               "
 "xxxx              "
@@ -4287,16 +4470,13 @@ static char* cur_mask =
 "      xx          "
 "                  "
 "                  ";
-#define CUR_SIZE 18
-#define CUR_DATA cur_data
-#define CUR_MASK cur_mask
-static cursor_info_t cur0 = {NULL, NULL, CUR_SIZE, CUR_SIZE, 0, 0, 0};
+static cursor_info_t cur_arrow = {NULL, NULL, 18, 18, 0, 0, 0, NULL};
 
 /*
  * It turns out we can at least detect mouse is on the root window so 
- * show it (under -mouseX or -X) with this familiar cursor... 
+ * show it (under -cursorX or -X) with this familiar cursor... 
  */
-static char* root_data =
+static char* curs_root_data =
 "                  "
 "                  "
 "  xxx        xxx  "
@@ -4316,7 +4496,7 @@ static char* root_data =
 "                  "
 "                  ";
 
-static char* root_mask =
+static char* curs_root_mask =
 "                  "
 " xxxx        xxxx "
 " xxxxx      xxxxx "
@@ -4335,74 +4515,178 @@ static char* root_mask =
 " xxxxx      xxxxx "
 " xxxx        xxxx "
 "                  ";
-static cursor_info_t cur1 = {NULL, NULL, 18, 18, 8, 8, 1};
+static cursor_info_t cur_root = {NULL, NULL, 18, 18, 8, 8, 1, NULL};
 
-static cursor_info_t *cursors[2];
+static char* curs_fleur_data = 
+"                "
+"       xx       "
+"      xxxx      "
+"     xxxxxx     "
+"       xx       "
+"   x   xx   x   "
+"  xx   xx   xx  "
+" xxxxxxxxxxxxxx "
+" xxxxxxxxxxxxxx "
+"  xx   xx   xx  "
+"   x   xx   x   "
+"       xx       "
+"     xxxxxx     "
+"      xxxx      "
+"       xx       "
+"                ";
+
+static char* curs_fleur_mask = 
+"      xxxx      "
+"      xxxxx     "
+"     xxxxxx     "
+"    xxxxxxxx    "
+"   x xxxxxx x   "
+"  xxx xxxx xxx  "
+"xxxxxxxxxxxxxxxx"
+"xxxxxxxxxxxxxxxx"
+"xxxxxxxxxxxxxxxx"
+"xxxxxxxxxxxxxxxx"
+"  xxx xxxx xxx  "
+"   x xxxxxx x   "
+"    xxxxxxxx    "
+"     xxxxxx     "
+"      xxxx      "
+"      xxxx      ";
+
+static cursor_info_t cur_fleur = {NULL, NULL, 16, 16, 8, 8, 1, NULL};
+
+static char* curs_plus_data = 
+"            "
+"     xx     "
+"     xx     "
+"     xx     "
+"     xx     "
+" xxxxxxxxxx "
+" xxxxxxxxxx "
+"     xx     "
+"     xx     "
+"     xx     "
+"     xx     "
+"            ";
+
+static char* curs_plus_mask = 
+"    xxxx    "
+"    xxxx    "
+"    xxxx    "
+"    xxxx    "
+"xxxxxxxxxxxx"
+"xxxxxxxxxxxx"
+"xxxxxxxxxxxx"
+"xxxxxxxxxxxx"
+"    xxxx    "
+"    xxxx    "
+"    xxxx    "
+"    xxxx    ";
+static cursor_info_t cur_plus = {NULL, NULL, 12, 12, 5, 6, 1, NULL};
+
+static char* curs_xterm_data = 
+"                "
+"     xxx xxx    "
+"       xxx      "
+"        x       "
+"        x       "
+"        x       "
+"        x       "
+"        x       "
+"        x       "
+"        x       "
+"        x       "
+"        x       "
+"        x       "
+"       xxx      "
+"     xxx xxx    "
+"                ";
+
+static char* curs_xterm_mask = 
+"    xxxx xxxx   "
+"    xxxxxxxxx   "
+"    xxxxxxxxx   "
+"      xxxxx     "
+"       xxx      "
+"       xxx      "
+"       xxx      "
+"       xxx      "
+"       xxx      "
+"       xxx      "
+"       xxx      "
+"       xxx      "
+"      xxxxx     "
+"    xxxxxxxxx   "
+"    xxxxxxxxx   "
+"    xxxx xxxx   ";
+static cursor_info_t cur_xterm = {NULL, NULL, 16, 16, 8, 8, 1, NULL};
+
+enum cursor_names {
+	CURS_ARROW = 0,
+	CURS_ROOT,
+	CURS_WM,
+	CURS_TERM
+};
+
+static cursor_info_t *cursors[10];
 
 static void setup_cursors(void) {
 	/* TODO clean this up if we ever do more cursors... */
+	rfbCursorPtr rfb_curs;
+	int i, n = 0;
 
-	cur0.data = cur_data;
-	cur0.mask = cur_mask;
+	cur_arrow.data	= curs_arrow_data;
+	cur_arrow.mask	= curs_arrow_mask;
 
-	cur1.data = root_data;
-	cur1.mask = root_mask;
+	cur_root.data	= curs_root_data;
+	cur_root.mask	= curs_root_mask;
 
-	cursors[0] = &cur0;
-	cursors[1] = &cur1;
-}
+	cur_plus.data	= curs_plus_data;
+	cur_plus.mask	= curs_plus_mask;
 
-/*
- * data and functions for -mouse real pointer position updates
- */
-static char cur_save[(4 * CUR_SIZE * CUR_SIZE)];
-static int cur_save_cx, cur_save_cy, cur_save_which;
+	cur_fleur.data	= curs_fleur_data;
+	cur_fleur.mask	= curs_fleur_mask;
 
-/*
- * save current cursor info and the patch of non-cursor data it covers
- */
-static void save_mouse_patch(int x, int y, int w, int h, int cx, int cy,
-    int which) {
-	int pixelsize = bpp >> 3;
-	char *fbp = main_fb;
-	int ly, i = 0;
+	cur_xterm.data	= curs_xterm_data;
+	cur_xterm.mask	= curs_xterm_mask;
 
-	for (ly = y; ly < y + h; ly++) {
-		memcpy(cur_save+i, fbp + ly * main_bytes_per_line
-		    + x * pixelsize, w * pixelsize);
+	cursors[CURS_ARROW] = &cur_arrow;	n++;
+	cursors[CURS_ROOT]  = &cur_root;	n++;
+	cursors[CURS_WM]    = &cur_fleur;	n++;
+	cursors[CURS_TERM]  = &cur_xterm;	n++;
 
-		i += w * pixelsize;
-	}
-	cur_save_x = x;		/* patch geometry */
-	cur_save_y = y;
-	cur_save_w = w;
-	cur_save_h = h;
+	for (i=0; i<n; i++) {
+		cursor_info_t *ci = cursors[i];
 
-	cur_save_which = which;	/* which cursor and its position  */
-	cur_save_cx = cx;
-	cur_save_cy = cy;
+		ci->data = strdup(ci->data);
+		ci->mask = strdup(ci->mask);
 
-	cur_saved = 1;
-}
+		rfb_curs = rfbMakeXCursor(ci->wx, ci->wy, ci->data, ci->mask);
 
-/*
- * put the non-cursor patch back in the rfb fb
- */
-void restore_mouse_patch(void) {
-	int pixelsize = bpp >> 3;
-	char *fbp = main_fb;
-	int ly, i = 0;
+		if (ci->reverse) {
+			rfb_curs->foreRed   = 0x0000;
+			rfb_curs->foreGreen = 0x0000;
+			rfb_curs->foreBlue  = 0x0000;
+			rfb_curs->backRed   = 0xffff;
+			rfb_curs->backGreen = 0xffff;
+			rfb_curs->backBlue  = 0xffff;
+		}
+		rfb_curs->xhot = ci->sx;
+		rfb_curs->yhot = ci->sy;
+		rfb_curs->cleanup = FALSE;
+		rfb_curs->cleanupSource = FALSE;
+		rfb_curs->cleanupMask = FALSE;
+		rfb_curs->cleanupRichSource = FALSE;
 
-	if (! cur_saved) {
-		return;		/* not yet saved */
-	}
-
-	for (ly = cur_save_y; ly < cur_save_y + cur_save_h; ly++) {
-		memcpy(fbp + ly * main_bytes_per_line + cur_save_x * pixelsize,
-		    cur_save+i, cur_save_w * pixelsize);
-		i += cur_save_w * pixelsize;
+		ci->rfb = rfb_curs;
 	}
 }
+
+typedef struct win_str_info {
+	char *wm_name;
+	char *res_name;
+	char *res_class;
+} win_str_info_t;
 
 /*
  * Descends window tree at pointer until the window cursor matches the current 
@@ -4412,95 +4696,306 @@ void restore_mouse_patch(void) {
  * It seems impossible to do, but if the actual cursor could ever be
  * determined we might want to hash that info on window ID or something...
  */
-static int tree_descend_cursor(void) {
+void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 	Window r, c;
-	int rx, ry, wx, wy;
+	int i, rx, ry, wx, wy;
 	unsigned int mask;
-	int descend = 0, tries = 0, maxtries = 1;
+	Window wins[10];
+	int descend, maxtries = 10;
+	char *name, a;
+	static XClassHint *classhint = NULL;
+	int nm_info = 1;
+	XErrorHandler old_handler;
 
 	X_LOCK;
+
+	a = multiple_cursors_mode[0];
+	if (a == 'd' || a == 'X') {
+		nm_info = 0;
+	}
+
+	*(winfo->wm_name)   = '\0';
+	*(winfo->res_name)  = '\0';
+	*(winfo->res_class) = '\0';
+
+
+	/* some times a window can go away before we get to it */
+	trapped_xerror = 0;
+	old_handler = XSetErrorHandler(trap_xerror);
+
 	c = window;
+	descend = -1;
+
 	while (c) {
-		if (++tries > maxtries) {
-			descend = maxtries;
+		wins[++descend] = c;
+		if (descend >= maxtries - 1) {
 			break;
 		}
-		if ( XTestCompareCurrentCursorWithWindow(dpy, c) ) {
+		if ( XTestCompareCurrentCursorWithWindow_wr(dpy, c) ) {
 			break;
 		}
 		XQueryPointer(dpy, c, &r, &c, &rx, &ry, &wx, &wy, &mask);
-		descend++;
 	}
+
+	if (nm_info) {
+		int got_wm_name = 0, got_res_name = 0, got_res_class = 0;
+
+		if (! classhint) {
+			classhint = XAllocClassHint();
+		}
+
+		for (i = descend; i >=0; i--) {
+			c = wins[i];
+			if (! c) {
+				continue;
+			}
+			
+			if (! got_wm_name && XFetchName(dpy, c, &name)) {
+				if (name) {
+					if (*name != '\0') {
+						strcpy(winfo->wm_name, name);
+						got_wm_name = 1;
+					}
+					XFree(name);
+				}
+			}
+			if (classhint && (! got_res_name || ! got_res_class)) {
+			    if (XGetClassHint(dpy, c, classhint)) {
+				char *p;
+				p = classhint->res_name;
+				if (p) {
+					if (*p != '\0' && ! got_res_name) {
+						strcpy(winfo->res_name, p);
+						got_res_name = 1;
+					}
+					XFree(p);
+					classhint->res_name = NULL;
+				}
+				p = classhint->res_class;
+				if (p) {
+					if (*p != '\0' && ! got_res_class) {
+						strcpy(winfo->res_class, p);
+						got_res_class = 1;
+					}
+					XFree(p);
+					classhint->res_class = NULL;
+				}
+			    }
+			}
+		}
+	}
+
+	XSetErrorHandler(old_handler);
+	trapped_xerror = 0;
+
 	X_UNLOCK;
-	return descend;
+
+	*depth = descend;
+	*w = wins[descend];
+}
+
+int get_which_cursor(void) {
+	int which = CURS_ARROW;
+
+	if (show_multiple_cursors) {
+		int depth;
+		static win_str_info_t winfo;
+		static int first = 1, depth_cutoff = -1;
+		Window win;
+		XErrorHandler old_handler;
+		int mode = 0;
+		char a = multiple_cursors_mode[0];
+
+		if (a == 'd') {
+			mode = 0;
+		} else if (a == 'X') {
+			mode = 1;
+		} else {
+			mode = 2;
+		}
+
+		if (depth_cutoff < 0) {
+			int din;
+			if (sscanf(multiple_cursors_mode, "X%d", &din) == 1) {
+				depth_cutoff = din;
+			} else {
+				depth_cutoff = 0;
+			}
+		}
+
+		if (first) {
+			winfo.wm_name   = (char *) malloc(1024);
+			winfo.res_name  = (char *) malloc(1024);
+			winfo.res_class = (char *) malloc(1024);
+		}
+		first = 0;
+		
+		tree_descend_cursor(&depth, &win, &winfo);
+
+		if (depth <= depth_cutoff) {
+			which = CURS_ROOT;
+		} else if (mode >= 2) {
+			int which0 = which;
+
+			if (win) {
+				int ratio = 10, x, y;
+				unsigned int w, h, bw, d;  
+				Window r;
+
+				trapped_xerror = 0;
+				old_handler = XSetErrorHandler(trap_xerror);
+				if (XGetGeometry(dpy, win, &r, &x, &y, &w, &h,
+				    &bw, &d)) {
+					if (w > ratio * h || h > ratio * w) {
+						which = CURS_WM;
+					}
+				}
+				XSetErrorHandler(old_handler);
+				trapped_xerror = 0;
+			}
+			if (which == which0) {
+				lowercase(winfo.res_name);
+				lowercase(winfo.res_class);
+				if (strstr(winfo.res_name, "term")) {
+					which = CURS_TERM;
+				} else if (strstr(winfo.res_class, "term")) {
+					which = CURS_TERM;
+				}
+			}
+		}
+	}
+	return which;
 }
 
 /*
- * This is for mouse patch drawing under -xinerama or -blackout
+ * Some utilities for marking the little cursor patch region as
+ * modified, etc.
  */
-static void blackout_nearby_tiles(int x, int y, int dt) {
-	int sx, sy, n, b;
-	int tx = x/tile_x;
-	int ty = y/tile_y;
-	
-	if (! blackouts) {
+void mark_cursor_patch_modified(rfbScreenInfoPtr s, int old) {
+	int curx, cury, xhot, yhot, w, h;
+	int x1, x2, y1, y2;
+
+	if (! s->cursor) {
 		return;
 	}
-	if (dt < 1) {
-		dt = 1;
-	}
-	/* loop over a range of tiles, blacking out as needed */
 
-	for (sx = tx - dt; sx <= tx + dt; sx++) {
-		if (sx < 0 || sx >= tile_x) {
-			continue;
-		}
-		for (sy = ty - dt; sy <= ty + dt; sy++) {
-			if (sy < 0 || sy >= tile_y) {
-				continue;
-			}
-			n = sx + sy * ntiles_x;
-			if (tile_blackout[n].cover == 0) {
-				continue;
-			}
-			for (b=0; b <= tile_blackout[n].count; b++) {
-				int x1, y1, x2, y2;
-				x1 = tile_blackout[n].bo[b].x1;
-				y1 = tile_blackout[n].bo[b].y1;
-				x2 = tile_blackout[n].bo[b].x2;
-				y2 = tile_blackout[n].bo[b].y2;
-				zero_fb(x1, y1, x2, y2);
-			}
-		}
+	if (old) {
+		/* use oldCursor pos */
+		curx = s->oldCursorX;
+		cury = s->oldCursorY;
+	} else {
+		curx = s->cursorX;
+		cury = s->cursorY;
 	}
+	
+	xhot = s->cursor->xhot;
+	yhot = s->cursor->yhot;
+	w = s->cursor->width;
+	h = s->cursor->height;
+
+	x1 = curx - xhot;
+	x2 = x1 + w;
+	x1 = nfix(x1, s->width);
+	x2 = nfix(x2, s->width);
+
+	y1 = cury - yhot;
+	y2 = y1 + h;
+	y1 = nfix(y1, s->height);
+	y2 = nfix(y2, s->height);
+
+	rfbMarkRectAsModified(s, x1, y1, x1+x2, y1+y2);
 }
 
-/*
- * Send rfbCursorPosUpdates back to clients that understand them.  This
- * seems to be TightVNC specific.
- */
-static void cursor_pos_updates(int x, int y) {
+void set_cursor_was_changed(rfbScreenInfoPtr s) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
-	int cnt = 0;
-	int x_in = x, y_in = y;
 
-	if (! cursor_pos) {
-		return;
+	iter = rfbGetClientIterator(s);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		cl->cursorWasChanged = TRUE;
 	}
+	rfbReleaseClientIterator(iter);
+}
+
+void set_cursor_was_moved(rfbScreenInfoPtr s) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+
+	iter = rfbGetClientIterator(s);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		cl->cursorWasMoved = TRUE;
+	}
+	rfbReleaseClientIterator(iter);
+}
+
+void unset_cursor_shape_updates(rfbScreenInfoPtr s) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+
+	iter = rfbGetClientIterator(s);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		cl->enableCursorShapeUpdates = FALSE;
+		cl->enableCursorPosUpdates = FALSE;
+		cl->cursorWasChanged = FALSE;
+	}
+	rfbReleaseClientIterator(iter);
+}
+
+int cursor_pos_updates_clients(rfbScreenInfoPtr s) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int count = 0;
+
+	iter = rfbGetClientIterator(s);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		if (cl->enableCursorPosUpdates) {
+			count++;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+	return count;
+}
+
+int cursor_shape_updates_clients(rfbScreenInfoPtr s) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int count = 0;
+
+	iter = rfbGetClientIterator(s);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		if (cl->enableCursorShapeUpdates) {
+			count++;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+	return count;
+}
+
+/*
+ * Record rfb cursor position screen->cursorX, etc (a la defaultPtrAddEvent())
+ * Then set up for sending rfbCursorPosUpdates back
+ * to clients that understand them.  This seems to be TightVNC specific.
+ */
+void cursor_position(int x, int y) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int cnt = 0, nonCursorPosUpdates_clients = 0;
+	int x_old, y_old, x_in = x, y_in = y;
 
 	/* x and y are current positions of X11 pointer on the X11 display */
 
 	if (scaling) {
 		x = ((double) x / dpy_x) * scaled_x;
-		if (x >= scaled_x) x = scaled_x - 1;
+		x = nfix(x, scaled_x);
 		y = ((double) y / dpy_y) * scaled_y;
-		if (y >= scaled_y) y = scaled_y - 1;
+		y = nfix(y, scaled_y);
 	}
 
 	if (x == screen->cursorX && y == screen->cursorY) {
 		return;
 	}
+	x_old = screen->oldCursorX;
+	y_old = screen->oldCursorY;
 
 	if (screen->cursorIsDrawn) {
 		rfbUndrawCursor(screen);
@@ -4516,6 +5011,10 @@ static void cursor_pos_updates(int x, int y) {
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		if (! cl->enableCursorPosUpdates) {
+			nonCursorPosUpdates_clients++;
+			continue;
+		}
+		if (! cursor_pos_updates) {
 			continue;
 		}
 		if (cl == last_pointer_client) {
@@ -4528,7 +5027,7 @@ static void cursor_pos_updates(int x, int y) {
 			} else {
 				/* an X11 app evidently warped the pointer */
 				if (debug_pointer) {
-					rfbLog("cursor_pos_updates: warp "
+					rfbLog("cursor_position: warp "
 					    "detected dx=%3d dy=%3d\n",
 					    cursor_x - x, cursor_y - y);
 				}
@@ -4542,190 +5041,76 @@ static void cursor_pos_updates(int x, int y) {
 	}
 	rfbReleaseClientIterator(iter);
 
+	if (nonCursorPosUpdates_clients && show_cursor) {
+		if (x_old != x || y_old != y) {
+			mark_cursor_patch_modified(screen, 0);
+		}
+	}
+
 	if (debug_pointer && cnt) {
-		rfbLog("cursor_pos_updates: sent position x=%3d y=%3d to %d"
+		rfbLog("cursor_position: sent position x=%3d y=%3d to %d"
 		    " clients\n", x, y, cnt);
 	}
 }
 
-/*
- * draw one of the mouse cursors into the rfb fb
- */
-static void draw_mouse(int x, int y, int which, int update) {
-	int px, py, i, offset;
-	int pixelsize = bpp >> 3;
-	char *fbp = main_fb;
-	char cdata, cmask;
-	char *data, *mask;
-	int white = 255, black = 0, shade;
-	int x0, x1, x2, y0, y1, y2;
-	int cur_x, cur_y, cur_sx, cur_sy, reverse;
-	static int first = 1;
+void set_rfb_cursor(int which) {
+	int workaround = 1; /* if rfbSetCursor does not mark modified  */
 
-	if (! show_mouse) {
+	if (! show_cursor) {
 		return;
 	}
-	if (first) {
-		first = 0;
-		setup_cursors();
-	}
+	
+	if (workaround && screen->cursor) {
+		int all_are_cursor_pos = 1;
+		rfbClientIteratorPtr iter;
+		rfbClientPtr cl;
 
-	data	= cursors[which]->data;		/* pattern data */
-	mask	= cursors[which]->mask;
-	cur_x	= cursors[which]->wx;		/* widths */
-	cur_y	= cursors[which]->wy;
-	cur_sx	= cursors[which]->sx;		/* shifts */
-	cur_sy	= cursors[which]->sy;
-	reverse	= cursors[which]->reverse;	/* reverse video */
-
-	if (indexed_colour) {
-		black = BlackPixel(dpy, scr) % 256;
-		white = WhitePixel(dpy, scr) % 256;
-	}
-	if (reverse) {
-		int tmp = black;
-		black = white;
-		white = tmp;
-	}
-
-	/*
-	 * notation:
-	 *   x0, y0: position after cursor shift (no edge corrections)
-	 *   x1, y1: corrected for lower boundary < 0
-	 *   x2, y2: position + cursor width and corrected for upper boundary
-	 */
-
-	x0 = x1 = x - cur_sx;		/* apply shift */
-	if (x1 < 0) x1 = 0;
-
-	y0 = y1 = y - cur_sy;
-	if (y1 < 0) y1 = 0;
-
-	x2 = x0 + cur_x;		/* apply width for upper endpoints */
-	if (x2 >= dpy_x) x2 = dpy_x - 1;
-
-	y2 = y0 + cur_y;
-	if (y2 >= dpy_y) y2 = dpy_y - 1;
-
-	/* save the patch and info about which cursor will overwrite it */
-	save_mouse_patch(x1, y1, x2 - x1, y2 - y1, x, y, which);
-
-	for (py = 0; py < cur_y; py++) {
-		if (y0 + py < 0 || y0 + py >= dpy_y) {
-			continue;		/* off screen */
+		iter = rfbGetClientIterator(screen);
+		while( (cl = rfbClientIteratorNext(iter)) ) {
+			if (! cl->enableCursorPosUpdates) {
+				all_are_cursor_pos = 0;
+			}
+			if (! cl->enableCursorShapeUpdates) {
+				all_are_cursor_pos = 0;
+			}
 		}
-		for (px = 0; px < cur_x; px++) {
-			if (x0 + px < 0 || x0 + px >= dpy_x){
-				continue;	/* off screen */
-			}
-			cdata = data[px + py * cur_x];
-			cmask = mask[px + py * cur_x];
+		rfbReleaseClientIterator(iter);
 
-			if (cmask != 'x') {
-				continue;	/* transparent */
-			}
-
-			shade = white;
-			if (cdata != cmask)  {
-				shade = black;
-			}
-
-			offset = (y0 + py)*main_bytes_per_line + (x0 + px)*pixelsize;
-
-			/* fill in each color byte in the fb */
-			for (i=0; i < pixelsize; i++) {
-				fbp[offset+i] = (char) shade;
-			}
+		if (! all_are_cursor_pos) {
+			mark_cursor_patch_modified(screen, 1);
 		}
 	}
 
-	if (blackouts) {
-		/*
-		 * loop over a range of tiles, blacking out as needed
-		 * note we currently disable mouse drawing under blackouts.
-		 */
-		static int mx = -1, my = -1;
-		int skip = 0;
-		if (mx < 0) {
-			mx = x;
-			my = y;
-		} else if (mx == x && my == y) {
-			skip = 1;
-		}
-		mx = x;
-		my = y;
+	rfbSetCursor(screen, cursors[which]->rfb, FALSE);
 
-		if (! skip) {
-			blackout_nearby_tiles(x, y, 2);
-		}
+	/* this is a 2nd workaround for rfbSetCursor() */
+	if (screen->underCursorBuffer == NULL &&
+	    screen->underCursorBufferLen != 0) {
+		screen->underCursorBufferLen = 0;
 	}
 
-	if (update) {
-		/* x and y of the real (X server) mouse */
-		static int mouse_x = -1;
-		static int mouse_y = -1;
-
-		if (x != mouse_x || y != mouse_y) { 
-			hint_t hint;
-
-			hint.x = x1;
-			hint.y = y2;
-			hint.w = x2 - x1;
-			hint.h = y2 - y1;
-
-			mark_hint(hint);
-			
-			if (mouse_x < 0) {
-				mouse_x = 0;
-			}
-			if (mouse_y < 0) {
-				mouse_y = 0;
-			}
-
-			/* XXX this ignores change of shift... */
-			x1 = mouse_x - cur_sx;
-			if (x1 < 0) x1 = 0;
-
-			y1 = mouse_y - cur_sy;
-			if (y1 < 0) y1 = 0;
-
-			x2 = mouse_x - cur_sx + cur_x;
-			if (x2 >= dpy_x) x2 = dpy_x - 1;
-
-			y2 = mouse_y - cur_sy + cur_y;
-			if (y2 >= dpy_y) y2 = dpy_y - 1;
-
-			hint.x = x1;
-			hint.y = y2;
-			hint.w = x2 - x1;
-			hint.h = y2 - y1;
-
-			mark_hint(hint);
-
-			mouse_x = x;
-			mouse_y = y;
-		}
+	if (workaround) {
+		set_cursor_was_changed(screen);
 	}
 }
 
-/*
- * wrapper to redraw the mouse patch
- */
-void redraw_mouse(void) {
-	if (cur_saved) {
-		/* redraw saved mouse from info (save_mouse_patch) */
-		draw_mouse(cur_save_cx, cur_save_cy, cur_save_which, 0);
+void set_cursor(int x, int y, int which) {
+	static int last = -1;
+	if (last < 0 || which != last) {
+		set_rfb_cursor(which);
 	}
+	last = which;
 }
 
 /*
- * routine called periodically to update the mouse aspects (drawn & 
- * cursorpos updates)
+ * routine called periodically to update cursor aspects, this catches
+ * warps and cursor shape changes. 
  */
-void update_mouse(void) {
+void check_x11_pointer(void) {
 	Window root_w, child_w;
 	rfbBool ret;
-	int root_x, root_y, win_x, win_y, which = 0;
+	int root_x, root_y, win_x, win_y;
+	int x, y;
 	unsigned int mask;
 
 	X_LOCK;
@@ -4736,18 +5121,25 @@ void update_mouse(void) {
 	if (! ret) {
 		return;
 	}
-
-	if (show_root_cursor) {
-		int descend;
-		if ( (descend = tree_descend_cursor()) ) {
-			which = 0;
-		} else {
-			which = 1;
+	if (debug_pointer) {
+		static int last_x = -1, last_y = -1;
+		if (root_x != last_x || root_y != last_y) {
+			rfbLog("XQueryPointer:     x:%4d, y:%4d)\n",
+			    root_x, root_y);
 		}
+		last_x = root_x;
+		last_y = root_y;
 	}
 
-	cursor_pos_updates(root_x - off_x, root_y - off_y);
-	draw_mouse(root_x - off_x, root_y - off_y, which, 1);
+	/* offset subtracted since XQueryPointer relative to rootwin */
+	x = root_x - off_x;
+	y = root_y - off_y;
+
+	/* record the cursor position in the rfb screen */
+	cursor_position(x, y);
+
+	/* change the cursor shape if necessary */
+	set_cursor(x, y, get_which_cursor());
 }
 
 /* -- screen.c -- */
@@ -4945,7 +5337,7 @@ void set_visual(char *str) {
 
 /*
  * Presumably under -nofb the clients will never request the framebuffer.
- * But we have gotten such a request... so let's just give them
+ * However, we have gotten such a request... so let's just give them
  * the current view on the display.  n.b. x2vnc and perhaps win2vnc
  * requests a 1x1 pixel for some workaround so sadly this evidently
  * nearly always happens.
@@ -5065,7 +5457,20 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 			for (i=1; i< *argc; i++)  {
 				rfbLog("\t[%d]  %s\n", i, argv[i]);
 			}
-			rfbLog("for a list of options run: x11vnc -help\n");
+			rfbLog("For a list of options run: x11vnc -help\n");
+			rfbLog("\n");
+			rfbLog("Here is a list of removed or obsolete"
+			    " options:\n");
+			rfbLog("\n");
+			rfbLog("removed: -hints, -nohints\n");
+			rfbLog("removed: -cursorposall\n");
+			rfbLog("\n");
+			rfbLog("renamed: -old_copytile, use -onetile\n");
+			rfbLog("renamed: -mouse,   use -cursor\n");
+			rfbLog("renamed: -mouseX,  use -cursor X\n");
+			rfbLog("renamed: -X,       use -cursor X\n");
+			rfbLog("renamed: -nomouse, use -nocursor\n");
+		
 			clean_up_exit(1);
 		}
 	}
@@ -5083,14 +5488,28 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	if ( ! have_masks && screen->rfbServerFormat.bitsPerPixel == 8
 	    && CellsOfScreen(ScreenOfDisplay(dpy,scr)) ) {
 		/* indexed colour */
-		if (!quiet) rfbLog("Using X display with 8bpp indexed color\n");
+		if (!quiet) {
+			rfbLog("X display %s is 8bpp indexed color\n",
+			    DisplayString(dpy));
+			if (! flash_cmap && ! overlay) {
+				rfbLog("\n");
+				rfbLog("In 8bpp PseudoColor mode if you "
+				    "experience color\n");
+				rfbLog("problems you may want to enable "
+				    "following the\n");
+				rfbLog("changing colormap by using the "
+				    "-flashcmap option.\n");
+				rfbLog("\n");
+			}
+		}
 		indexed_colour = 1;
 		set_colormap();
 	} else {
 		/* general case ... */
 		if (! quiet) {
-			rfbLog("Using X display with %dbpp depth=%d true "
-			    "color\n", fb->bits_per_pixel, fb->depth);
+			rfbLog("X display %s is %dbpp depth=%d true "
+			    "color\n", DisplayString(dpy), fb->bits_per_pixel,
+			    fb->depth);
 		}
 
 		/* convert masks to bit shifts and max # colors */
@@ -5129,6 +5548,15 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		main_red_shift   = screen->rfbServerFormat.redShift;
 		main_green_shift = screen->rfbServerFormat.greenShift;
 		main_blue_shift  = screen->rfbServerFormat.blueShift;
+	}
+	if (overlay && ! quiet) {
+		rfbLog("\n");
+		rfbLog("Overlay mode enabled:  If you experience color\n");
+		rfbLog("problems when popup menus are on the screen, try\n");
+		rfbLog("disabling SaveUnders in your X server, one way is\n");
+		rfbLog("to start the X server with the '-su' option, e.g.:\n");
+		rfbLog("Xsun -su ... see Xserver(1), xinit(1) for more info.\n");
+		rfbLog("\n");
 	}
 
 	/* nofb is for pointer/keyboard only handling.  */
@@ -5187,11 +5615,11 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		screen->setXCutText = xcut_receive;
 	}
 
-	if (local_cursor) {
-		cursor = rfbMakeXCursor(CUR_SIZE, CUR_SIZE, CUR_DATA, CUR_MASK);
-		screen->cursor = cursor;
-	} else {
+	setup_cursors();
+	if (! show_cursor) {
 		screen->cursor = NULL;
+	} else {
+		screen->cursor = cursors[0]->rfb;
 	}
 
 	rfbInitServer(screen);
@@ -5219,6 +5647,22 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 /*
  * routines related to xinerama and blacking out rectangles
  */
+
+/* blacked-out region (-blackout, -xinerama) */
+typedef struct bout {
+	int x1, y1, x2, y2;
+} blackout_t;
+#define BO_MAX 16
+typedef struct tbout {
+	blackout_t bo[BO_MAX];	/* hardwired max rectangles. */
+	int cover;
+	int count;
+} tile_blackout_t;
+
+#define BLACKR_MAX 100
+blackout_t blackr[BLACKR_MAX];	/* hardwired max blackouts */
+tile_blackout_t *tile_blackout;
+int blackouts = 0;
 
 /*
  * Take a comma separated list of geometries: WxH+X+Y and register them as
@@ -5292,10 +5736,6 @@ void blackout_tiles(void) {
 	 * to simplify things drop down to single copy mode, no vcr, etc...
 	 */
 	single_copytile = 1;
-	if (show_mouse) {
-		rfbLog("disabling remote mouse drawing due to blackouts\n");
-		show_mouse = 0;
-	}
 
 	/* loop over all tiles. */
 	for (ty=0; ty < ntiles_y; ty++) {
@@ -5604,6 +6044,20 @@ static void set_fs_factor(int max) {
 	}
 }
 
+char *flip_ximage_byte_order(XImage *xim) {
+	char *order;
+	if (xim->byte_order == LSBFirst) {
+		order = "MSBFirst";
+		xim->byte_order = MSBFirst;
+		xim->bitmap_bit_order = MSBFirst;
+	} else {
+		order = "LSBFirst";
+		xim->byte_order = LSBFirst;
+		xim->bitmap_bit_order = LSBFirst;
+	}
+	return order;
+}
+
 /*
  * set up an XShm image, or if not using shm just create the XImage.
  */
@@ -5611,6 +6065,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
     char *name) {
 
 	XImage *xim;
+	static int reported_flip = 0;
 
 	shm->shmid = -1;
 	shm->shmaddr = (char *) -1;
@@ -5639,21 +6094,11 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 			return 0;
 		}
 		if (flip_byte_order) {
-			static int reported = 0;
-			char *bo;
-			if (xim->byte_order == LSBFirst) {
-				bo = "MSBFirst";
-				xim->byte_order = MSBFirst;
-				xim->bitmap_bit_order = MSBFirst;
-			} else {
-				bo = "LSBFirst";
-				xim->byte_order = LSBFirst;
-				xim->bitmap_bit_order = LSBFirst;
-			}
-			if (! reported && ! quiet) {
-				rfbLog("changing XImage byte order"
-				    " to %s\n", bo);
-				reported = 1;
+			char *order = flip_ximage_byte_order(xim);
+			if (! reported_flip && ! quiet) {
+				rfbLog("Changing XImage byte order"
+				    " to %s\n", order);
+				reported_flip = 1;
 			}
 		}
 
@@ -5661,7 +6106,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 		return 1;
 	}
 
-	xim = XShmCreateImage(dpy, default_visual, depth, ZPixmap, NULL,
+	xim = XShmCreateImage_wr(dpy, default_visual, depth, ZPixmap, NULL,
 	    shm, w, h);
 
 	if (xim == NULL) {
@@ -5672,6 +6117,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	*ximg_ptr = xim;
 
+#ifdef LIBVNCSERVER_HAVE_XSHM
 	shm->shmid = shmget(IPC_PRIVATE,
 	    xim->bytes_per_line * xim->height, IPC_CREAT | 0777);
 
@@ -5704,7 +6150,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	shm->readOnly = False;
 
-	if (! XShmAttach(dpy, shm)) {
+	if (! XShmAttach_wr(dpy, shm)) {
 		rfbErr("XShmAttach(%s) failed.\n", name);
 		XDestroyImage(xim);
 		*ximg_ptr = NULL;
@@ -5718,6 +6164,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 		X_UNLOCK;
 		return 0;
 	}
+#endif
 
 	X_UNLOCK;
 	return 1;
@@ -5727,21 +6174,24 @@ void shm_delete(XShmSegmentInfo *shm) {
 	if (! using_shm) {
 		return;
 	}
+#ifdef LIBVNCSERVER_HAVE_XSHM
 	if (shm->shmaddr != (char *) -1) {
 		shmdt(shm->shmaddr);
 	}
 	if (shm->shmid != -1) {
 		shmctl(shm->shmid, IPC_RMID, 0);
 	}
+#endif
 }
 
 void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
-	if (! using_shm || nofb) {
+	if (! using_shm) {
 		return;
 	}
+#ifdef LIBVNCSERVER_HAVE_XSHM
 	X_LOCK;
 	if (shm->shmid != -1) {
-		XShmDetach(dpy, shm);
+		XShmDetach_wr(dpy, shm);
 	}
 	if (xim != NULL) {
 		XDestroyImage(xim);
@@ -5749,6 +6199,7 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 	X_UNLOCK;
 
 	shm_delete(shm);
+#endif
 }
 
 void initialize_shm(void) {
@@ -6423,7 +6874,7 @@ static void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 }
 
 void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force) {
-	
+
 	if (rfb_fb == main_fb || force) {
 		rfbMarkRectAsModified(screen, x1, y1, x2, y2);
 	} else if (scaling) {
@@ -6446,12 +6897,11 @@ void mark_hint(hint_t hint) {
 /*
  * copy_tiles() gives a slight improvement over copy_tile() since
  * adjacent runs of tiles are done all at once there is some savings
- * due to contiguous memory access.  Not a great speedup, but in
- * some cases it can be up to 2X.  Even more on a SunRay where no
- * graphics hardware is involved in the read.  Generally, graphics
- * devices are optimized for write, not read, so we are limited by
- * the read bandwidth, sometimes only 5 MB/sec on otherwise fast
- * hardware.
+ * due to contiguous memory access.  Not a great speedup, but in some
+ * cases it can be up to 2X.  Even more on a SunRay or ShadowFB where
+ * no graphics hardware is involved in the read.  Generally, graphics
+ * devices are optimized for write, not read, so we are limited by the
+ * read bandwidth, sometimes only 5 MB/sec on otherwise fast hardware.
  */
 static int *first_line = NULL, *last_line;
 static unsigned short *left_diff, *right_diff;
@@ -6463,8 +6913,6 @@ static void copy_tiles(int tx, int ty, int nt) {
 	int w1, w2, dx1, dx2;	/* tmps for normal and short tiles */
 	int pixelsize = bpp >> 3;
 	int first_min, last_max;
-
-	int restored_patch = 0; /* for show_mouse */
 
 	char *src, *dst, *s_src, *s_dst, *m_src, *m_dst;
 	char *h_src, *h_dst;
@@ -6554,24 +7002,6 @@ static void copy_tiles(int tx, int ty, int nt) {
 		}
 	}
 
-	/*
-	 * Some awkwardness wrt the little remote mouse patch we display.
-	 * When threaded we want to have as small a window of time
-	 * as possible when the mouse image is not in the fb, otherwise
-	 * a libvncserver thread may send the uncorrected patch to the
-	 * clients.
-	 */
-	if (show_mouse && use_threads && cur_saved) {
-		/* check for overlap */
-		if (cur_save_x + cur_save_w > x && x + size_x > cur_save_x &&
-		    cur_save_y + cur_save_h > y && y + size_y > cur_save_y) {
-
-			/* restore the real data to the rfb fb */
-			restore_mouse_patch();
-			restored_patch = 1;
-		}
-	}
-
 	src = tile_row[nt]->data;
 	dst = main_fb + y * main_bytes_per_line + x * pixelsize;
 
@@ -6623,9 +7053,6 @@ static void copy_tiles(int tx, int ty, int nt) {
 		/* no tile has a difference, note this and get out: */
 		for (t=1; t <= nt; t++) {
 			tile_has_diff[n+(t-1)] = 0;
-		}
-		if (restored_patch) {
-			redraw_mouse(); 
 		}
 		return;
 	} else {
@@ -6751,10 +7178,6 @@ static void copy_tiles(int tx, int ty, int nt) {
 		memcpy(s_dst, s_src, size_x * pixelsize);
 		s_src += tile_row[nt]->bytes_per_line;
 		s_dst += main_bytes_per_line;
-	}
-
-	if (restored_patch) {
-		redraw_mouse(); 
 	}
 
 	/* record all the info in the region array for this tile: */
@@ -7150,7 +7573,7 @@ static void nap_set(int tile_cnt) {
 		nap_diff_count = 0;
 	}
 
-	if (show_mouse) {
+	if (show_cursor) {
 		/* kludge for the up to 4 tiles the mouse patch could occupy */
 		if ( tile_cnt > 4) {
 			last_event = time(0);
@@ -7169,7 +7592,7 @@ static void nap_sleep(int ms, int split) {
 	for (i=0; i<split; i++) {
 		usleep(ms * 1000 / split);
 		if (! use_threads && i != split - 1) {
-			rfbProcessEvents(screen, -1);
+			rfbPE(screen, -1);
 		}
 		if (input != got_user_input) {
 			break;
@@ -7482,11 +7905,6 @@ void scan_for_updates(void) {
 		}
 	}
 
-	if (show_mouse && ! use_threads) {
-		/* single-thread is safe to do it here for all scanning */
-		restore_mouse_patch();
-	}
-
 	/* scan with the initial y to the jitter value from scanlines: */
 	scan_in_progress = 1;
 	tile_count = scan_display(scanlines[scan_count], 0);
@@ -7538,12 +7956,6 @@ void scan_for_updates(void) {
 		if (fs_factor && tile_count > fs_frac * ntiles) {
 			fb_copy_in_progress = 1;
 			copy_screen();
-			if (show_mouse || cursor_pos) {
-				if (show_mouse && ! use_threads) {
-					redraw_mouse();
-				}
-				update_mouse();
-			}
 			fb_copy_in_progress = 0;
 			if (use_threads && ! old_pointer) {
 				pointer(-1, 0, 0, NULL);
@@ -7616,13 +8028,6 @@ void scan_for_updates(void) {
 		ping_clients(tile_diffs);
 	}
 
-	/* Handle the remote mouse pointer */
-	if (show_mouse || cursor_pos) {
-		if (show_mouse && ! use_threads) {
-			redraw_mouse();
-		}
-		update_mouse();
-	}
 
 	nap_check(tile_diffs);
 }
@@ -7698,7 +8103,11 @@ static int check_user_input(double dt, int *cnt) {
 		 * likely they have all be sent already.
 		 */
 		while (1) {
-			rfbCheckFds(screen, 1000);
+			if (show_multiple_cursors) {
+				rfbPE(screen, 1000);
+			} else {
+				rfbCFD(screen, 1000);
+			}
 			XFlush(dpy);
 
 			spin += dtime(&tm);
@@ -7757,7 +8166,11 @@ static int check_user_input(double dt, int *cnt) {
 			miss = 0;
 			for (i=0; i<split; i++) {
 				usleep(ms * 1000);
-				rfbCheckFds(screen, 1000);
+				if (show_multiple_cursors) {
+					rfbPE(screen, 1000);
+				} else {
+					rfbCFD(screen, 1000);
+				}
 				spin += dtime(&tm);
 				if (got_pointer_input > g) {
 					XFlush(dpy);
@@ -7803,10 +8216,17 @@ double dtime(double *t_old) {
 
 /*
  * utility wrapper to call rfbProcessEvents
+ * checks that we are not in threaded mode.
  */
-void rfbPE(rfbScreenInfoPtr scr, long us) {
+void rfbPE(rfbScreenInfoPtr scr, long usec) {
 	if (! use_threads) {
-		rfbProcessEvents(scr, us);
+		rfbProcessEvents(scr, usec);
+	}
+}
+
+void rfbCFD(rfbScreenInfoPtr scr, long usec) {
+	if (! use_threads) {
+		rfbCheckFds(scr, usec);
 	}
 }
 
@@ -7828,7 +8248,10 @@ static void watch_loop(void) {
 		got_keyboard_input = 0;
 
 		if (! use_threads) {
-			rfbProcessEvents(screen, -1);
+			rfbPE(screen, -1);
+			if (! cursor_shape_updates) {
+				unset_cursor_shape_updates(screen);
+			}
 			if (check_user_input(dt, &cnt)) {
 				/* true means loop back for more input */
 				continue;
@@ -7839,7 +8262,7 @@ static void watch_loop(void) {
 			clean_up_exit(0);
 		}
 
-		watch_xevents();
+		check_xevents();
 		check_connect_inputs();		
 
 		if (! screen->rfbClientHead) {	/* waiting for a client */
@@ -7847,9 +8270,11 @@ static void watch_loop(void) {
 			continue;
 		}
 
-		if (nofb) {	/* no framebuffer polling needed */
-			if (cursor_pos) {
-				update_mouse();
+		if (nofb) {
+			/* no framebuffer polling needed */
+			if (cursor_pos_updates) {
+				/* -nofb -cursorpos usage is rare */
+				check_x11_pointer();
 			}
 			continue;
 		}
@@ -7859,7 +8284,7 @@ static void watch_loop(void) {
 			 * check for any bell events.
 			 * n.b. assumes -nofb folks do not want bell...
 			 */
-			watch_bell_event();
+			check_bell_event();
 		}
 		if (! show_dragging && button_mask) {
 			/* if any button is pressed do not update screen */
@@ -7874,6 +8299,7 @@ static void watch_loop(void) {
 
 			rfbUndrawCursor(screen);
 			scan_for_updates();
+			check_x11_pointer();
 
 			dt = dtime(&tm);
 		}
@@ -7936,11 +8362,15 @@ static void print_help(void) {
 "                       setting the XAUTHORITY environment varirable to \"file\"\n"
 "                       before startup.  See Xsecurity(7), xauth(1) man pages.\n"
 "\n"
-"-id windowid           Show the window corresponding to \"windowid\" not the\n"
-"                       entire display. Warning: bugs! new toplevels missed!...\n"
+"-id windowid           Show the window corresponding to \"windowid\" not\n"
+"                       the entire display.  New windows like popup menus,\n"
+"                       etc may not be seen, or will be clipped.  x11vnc may\n"
+"                       crash if the window changes size, is iconified, etc.\n"
+"                       Use xwininfo(1) to get the window id.  Primarily useful\n"
+"                       for exporting very simple applications.\n"
 "-sid windowid          As -id, but instead of using the window directly it\n"
-"                       shifts a root view to it: shows saveUnders menus, etc,\n"
-"                       although they will be clipped if they extend beyond\n"
+"                       shifts a root view to it: this shows saveUnders menus,\n"
+"                       etc, although they will be clipped if they extend beyond\n"
 "                       the window.\n"
 "-flashcmap             In 8bpp indexed color, let the installed colormap flash\n"
 "                       as the pointer moves from window to window (slow).\n"
@@ -7951,11 +8381,12 @@ static void print_help(void) {
 "                       packed with 8 for PseudoColor and 24 for TrueColor).\n"
 "\n"
 "                       Currently -overlay only works on Solaris (it uses\n"
-"                       XReadScreen(3X11)).  There are still some problems with\n"
-"                       surrounding-region painting for popup menus (but not\n"
-"                       for the popup menu itself); a workaround is to disable\n"
-"                       SaveUnders (pass -su to Xsun).  Amusingly, if -overlay\n"
-"                       is used with -mouse, the mouse cursor shape is correct.\n"
+"                       XReadScreen(3X11)).  There is a problem with image\n"
+"                       \"bleeding\" around transient popup menus (but not\n"
+"                       for the menu itself): a workaround is to disable\n"
+"                       SaveUnders by passing the \"-su\" argument to Xsun\n"
+"                       (in /etc/dt/config/Xservers, say).  Also note that,\n"
+"                       the mouse cursor shape is exactly correct in this mode.\n"
 "\n"
 "                       Use -overlay as a workaround for situations like these:\n"
 "                       Some legacy applications require the default visual\n"
@@ -7968,7 +8399,10 @@ static void print_help(void) {
 "                       due to the extra image transformations required.\n"
 "                       For optimal performance do not use -overlay, but rather\n"
 "                       configure the X server so that the default visual is\n"
-"                       depth 24 TrueColor and have all apps use that visual.\n"
+"                       depth 24 TrueColor and try to have all apps use that\n"
+"                       visual (some apps have -use24 or -visual options).\n"
+"-overlay_nocursor      Sets -overlay, but does not try to draw the exact mouse\n"
+"                       cursor shape using the overlay mechanism.\n"
 "-visual n              Experimental option: probably does not do what you\n"
 "                       think.  It simply *forces* the visual used for the\n"
 "                       framebuffer; this may be a bad thing... It is useful for\n"
@@ -7978,9 +8412,10 @@ static void print_help(void) {
 "                       for a list.  If the string ends in \":m\" for better\n"
 "                       or for worse the visual depth is forced to be m.\n"
 "\n"
-"-scale fraction        Scale the framebuffer by factor \"fraction\".  Values\n"
-"                       less than 1 shrink the fb.  Note: image may not be sharp\n"
-"                       and response may be slower.  If \"fraction\" contains\n"
+"-scale fraction        Scale the framebuffer by factor \"fraction\".\n"
+"                       Values less than 1 shrink the fb.  Note: image may not\n"
+"                       be sharp and response may be slower.  Currently the\n"
+"                       cursor shape is not scaled.  If \"fraction\" contains\n"
 "                       a decimal point \".\" it is taken as a floating point\n"
 "                       number, alternatively the notation \"m/n\" may be used\n"
 "                       to denote fractions exactly, e.g. -scale 2/3.\n"
@@ -7990,7 +8425,7 @@ static void print_help(void) {
 "                       If you just want a quick, rough scaling without\n"
 "                       blending, append \":nb\" to \"fraction\" (e.g. -scale\n"
 "                       1/3:nb).  For compatibility with vncviewers the scaled\n"
-"                       width is adjusted to be a multiple of 4, to disable\n"
+"                       width is adjusted to be a multiple of 4: to disable\n"
 "                       this use \":n4\".  More esoteric options: \":in\" use\n"
 "                       interpolation scheme even when shrinking, \":pad\",\n"
 "                       pad scaled width and height to be multiples of scaling\n"
@@ -8010,9 +8445,10 @@ static void print_help(void) {
 "                       periodically check for new hosts.  The first line is\n"
 "                       read and then the file is truncated.\n"
 "-vncconnect            Monitor the VNC_CONNECT X property set by the standard\n"
-"                       VNC program vncconnect(1).  When the property is set\n"
-"                       to host or host:port establish a reverse connection.\n"
-"                       Using xprop(1) instead of vncconnect may work, see FAQ.\n"
+"-novncconnect          VNC program vncconnect(1).  When the property is\n"
+"                       set to \"host\" or \"host:port\" establish a reverse\n"
+"                       connection.  Using xprop(1) instead of vncconnect may\n"
+"                       work, see the FAQ.  Default: %s\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
 "                       Note: if you are not redirecting stderr to a log file\n"
 "                       (via shell 2> or -o option) you must also specify the\n"
@@ -8103,16 +8539,18 @@ static void print_help(void) {
 "-flipbyteorder         Sometimes needed if remotely polled host has different\n"
 "                       endianness.  Ignored unless -noshm is set.\n"
 "-onetile               Do not use the new copy_tiles() framebuffer mechanism,\n"
-"                       just use 1 shm tile for polling.  Same as -old_copytile.\n"
-"                       Limits shm segments used to 3.\n"
+"                       just use 1 shm tile for polling.  Limits shm segments\n"
+"                       used to 3.\n"
 "\n"
 "-blackout string       Black out rectangles on the screen. \"string\" is a\n"
 "                       comma separated list of WxH+X+Y type geometries for\n"
 "                       each rectangle.\n"
 "-xinerama              If your screen is composed of multiple monitors\n"
 "                       glued together via XINERAMA, and that screen is\n"
-"                       non-rectangular this option will try to guess the areas\n"
-"                       to black out (if your system has libXinerama).\n"
+"                       non-rectangular this option will try to guess the\n"
+"                       areas to black out (if your system has libXinerama).\n"
+"                       In general on XINERAMA displays you may need to use the\n"
+"                       -xwarppointer option if the mouse pointer misbehaves.\n"
 "\n"
 "-o logfile             Write stderr messages to file \"logfile\" instead of\n"
 "                       to the terminal.  Same as -logfile \"file\".\n"
@@ -8144,7 +8582,9 @@ static void print_help(void) {
 "                       the X server instead of Mode_switch (AltGr).\n"
 #endif
 "-xkb                   When in modtweak mode, use the XKEYBOARD extension\n"
-"                       (if it exists) to do the modifier tweaking.\n"
+"                       (if it exists) to do the modifier tweaking.  This is\n"
+"                       powerful and should be tried if there are still\n"
+"                       keymapping problems when using the simpler -modtweak.\n"
 "-skip_keycodes string  Skip keycodes not on your keyboard but your X server\n"
 "                       thinks exist.  Currently only applies to -xkb mode.\n"
 "                       \"string\" is a comma separated list of decimal\n"
@@ -8199,17 +8639,70 @@ static void print_help(void) {
 "                       back to clients.  (PRIMARY is still set on received\n"
 "                       changes, however).\n"
 "\n"
-"-nocursor              Do not have the VNC viewer show a local cursor.\n"
-"-mouse                 Draw a 2nd cursor at the current X pointer position.\n"
-"-mouseX                As -mouse, but also draw an \"X\" when pointer is on\n"
-"                       root background.\n"
-"-X                     Shorthand for -mouseX -nocursor.\n"
-"-xwarppointer          Move the pointer with XWarpPointer() instead of XTEST\n"
-"                       (try as a workaround if pointer behaves poorly, e.g.\n"
-"                       on touchscreens or other non-standard setups).\n"
+"-cursor [mode]         Sets how the pointer cursor shape (little icon at the\n"
+"-nocursor              mouse pointer) should be handled.  The \"mode\" string\n"
+"                       is optional and is described below.  The default\n"
+"                       is to show some sort of cursor shape(s).  How this\n"
+"                       is done depends on the VNC viewer and the X server.\n"
+"                       Use -nocursor to disable cursor shapes completely.\n"
+"\n"
+"                       Some VNC viewers support the TightVNC CursorPosUpdates\n"
+"                       and CursorShapeUpdates extensions (cuts down on\n"
+"                       network traffic by not having to send the cursor image\n"
+"                       every time the pointer is moved), in which case these\n"
+"                       extensions are used (see -nocursorshape and -nocursorpos\n"
+"                       below).  For other viewers the cursor shape is written\n"
+"                       directly to the framebuffer every time the pointer is\n"
+"                       moved or changed and gets sent along with the other\n"
+"                       framebuffer updates.  In this case, there will be\n"
+"                       some lag between the vnc viewer pointer and the remote\n"
+"                       cursor position.\n"
+"\n"
+"                       If the X display supports retrieving the cursor shape\n"
+"                       information from the X server, then the default\n"
+"                       is to use that mode.  On Solaris this requires\n"
+"                       the SUN_OVL extension and the -overlay option to be\n"
+"                       supplied. (see also the -overlay_nomouse option). (Soon)\n"
+"                       on XFree86/Xorg the XFIXES extension is required.\n"
+"                       Either can be disabled with -nocursor, and also some\n"
+"                       values of the \"mode\" option below.\n"
+"\n"
+"                       The \"mode\" string can be used to fine-tune the\n"
+"                       displaying of cursor shapes.  It can be used the\n"
+"                       following ways:\n"
+"\n"
+"                       \"-cursor X\" - when the cursor appears to be on the\n"
+"                       root window, draw the familiar X shape.  Some desktops\n"
+"                       such as GNOME cover up the root window completely,\n"
+"                       and so this will not work, try \"X1\", etc, to try to\n"
+"                       shift the tree depth.  On high latency links or slow\n"
+"                       machines there will be a time lag between expected and\n"
+"                       the actual cursor shape.\n"
+"\n"
+"                       \"-cursor some\" - like \"X\" but use additional\n"
+"                       heuristics to try to guess if the window should have\n"
+"                       a windowmanager-like resizer cursor or a text input\n"
+"                       I-beam cursor.  This is a complete hack, but may be\n"
+"                       useful in some situations because it provides a little\n"
+"                       more feedback about the cursor shape.\n"
+"\n"
+"                       \"-cursor most\" - try to show as many cursors as\n"
+"                       possible.  Often this will only be the same as \"some\".\n"
+"                       On Solaris if XFIXES is not available, -overlay mode\n"
+"                       will be used.\n"
+"\n"
+"-nocursorshape         Do not use the TightVNC CursorShapeUpdates extension\n"
+"                       even if clients support it.  See -cursor above.\n"
 "-cursorpos             Option -cursorpos enables sending the X cursor position\n"
 "-nocursorpos           back to all vnc clients that support the TightVNC\n"
-"                       CursorPosUpdates extension.  Default: %s\n"
+"                       CursorPosUpdates extension.  Other clients will be able\n"
+"                       to see the pointer motions. Default: %s\n"
+"-xwarppointer          Move the pointer with XWarpPointer(3X) instead of XTEST\n"
+"                       extension.  Use this as a workaround if the pointer\n"
+"                       motion behaves incorrectly, e.g.  on touchscreens or\n"
+"                       other non-standard setups.  Also sometimes needed on\n"
+"                       XINERAMA displays.\n"
+"\n"
 "-buttonmap string      String to remap mouse buttons.  Format: IJK-LMN, this\n"
 "                       maps buttons I -> L, etc., e.g.  -buttonmap 13-31\n"
 "\n"
@@ -8284,9 +8777,10 @@ static void print_help(void) {
 	fprintf(stderr, help, lastmod,
 		view_only ? "on":"off",
 		shared ? "on":"off",
+		vnc_connect ? "-vncconnect":"-novncconnect",
 		use_modifier_tweak ? "-modtweak":"-nomodtweak",
 		no_autorepeat ? "-norepeat":"-repeat",
-		cursor_pos ? "-cursorpos":"-nocursorpos",
+		cursor_pos_updates ? "-cursorpos":"-nocursorpos",
 		defer_update,
 		waitms,
 		take_naps ? "on":"off",
@@ -8536,7 +9030,8 @@ static void check_rcfile(int argc, char **argv) {
 int main(int argc, char* argv[]) {
 
 	XImage *fb;
-	int i, ev, er, maj, min;
+	int i;
+	int ev, er, maj, min;
 	char *use_dpy = NULL;
 	char *auth_file = NULL;
 	char *arg, *visual_str = NULL;
@@ -8652,8 +9147,10 @@ int main(int argc, char* argv[]) {
 				scale_denom = n;
 			}
 			if (scale_fac == 1.0) {
-				fprintf(stderr, "scaling disabled for factor "
-				    "%f\n", scale_fac);
+				if (! quiet) {
+					rfbLog("scaling disabled for factor "
+					    " %f\n", scale_fac);
+				}
 			} else {
 				scaling = 1;
 			}
@@ -8662,6 +9159,9 @@ int main(int argc, char* argv[]) {
 			visual_str = argv[++i];
 		} else if (!strcmp(arg, "-overlay")) {
 			overlay = 1;
+		} else if (!strcmp(arg, "-overlay_nocursor")) {
+			overlay = 1;
+			overlay_cursor = 0;
 		} else if (!strcmp(arg, "-flashcmap")) {
 			flash_cmap = 1;
 		} else if (!strcmp(arg, "-notruecolor")) {
@@ -8715,6 +9215,8 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-vncconnect")) {
 			vnc_connect = 1;
+		} else if (!strcmp(arg, "-novncconnect")) {
+			vnc_connect = 0;
 		} else if (!strcmp(arg, "-inetd")) {
 			inetd = 1;
 		} else if (!strcmp(arg, "-noshm")) {
@@ -8760,23 +9262,28 @@ int main(int argc, char* argv[]) {
 			watch_selection = 0;
 		} else if (!strcmp(arg, "-noprimary")) {
 			watch_primary = 0;
-		} else if (!strcmp(arg, "-nocursor")) {
-			local_cursor = 0;
-		} else if (!strcmp(arg, "-mouse")) {
-			show_mouse = 1;
-		} else if (!strcmp(arg, "-mouseX")) {
-			show_mouse = 1;
-			show_root_cursor = 1;
-		} else if (!strcmp(arg, "-X")) {
-			show_mouse = 1;
-			show_root_cursor = 1;
-			local_cursor = 0;
+		} else if (!strcmp(arg, "-cursor")) {
+			show_cursor = 1;
+			if (i >= argc-1) {
+				;
+			} else {
+				char *s = argv[i+1];
+				if (*s == 'X' || !strcmp(s, "default") ||
+				    !strcmp(s, "some") || !strcmp(s, "most")) {
+					multiple_cursors_mode = strdup(s);
+					i++;
+				}
+			}
+		} else if (!strcmp(arg, "-nocursor")) { 
+			show_cursor = 0;
+		} else if (!strcmp(arg, "-cursorpos")) {
+			cursor_pos_updates = 1;
+		} else if (!strcmp(arg, "-nocursorpos")) {
+			cursor_pos_updates = 0;
+		} else if (!strcmp(arg, "-nocursorshape")) {
+			cursor_shape_updates = 0;
 		} else if (!strcmp(arg, "-xwarppointer")) {
 			use_xwarppointer = 1;
-		} else if (!strcmp(arg, "-cursorpos")) {
-			cursor_pos = 1;
-		} else if (!strcmp(arg, "-nocursorpos")) {
-			cursor_pos = 0;
 		} else if (!strcmp(arg, "-buttonmap")) {
 			CHECK_ARGC
 			pointer_remap = argv[++i];
@@ -8792,10 +9299,8 @@ int main(int argc, char* argv[]) {
 			no_autorepeat = 1;
 		} else if (!strcmp(arg, "-repeat")) {
 			no_autorepeat = 0;
-		} else if (!strcmp(arg, "-onetile")
-			|| !strcmp(arg, "-old_copytile")) {
+		} else if (!strcmp(arg, "-onetile")) {
 			single_copytile = 1;
-		} else if (!strcmp(arg, "-debug_pointer")) {
 		} else if (!strcmp(arg, "-debug_pointer")
 		    || !strcmp(arg, "-dp")) {
 			debug_pointer++;
@@ -8842,9 +9347,6 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-fuzz")) {
 			CHECK_ARGC
 			tile_fuzz = atoi(argv[++i]);
-		} else if (!strcmp(arg, "-hints") || !strcmp(arg, "-nohints")) {
-			fprintf(stderr, "warning: -hints/-nohints option "
-			    "has been removed.\n");
 		} else if (!strcmp(arg, "-h") || !strcmp(arg, "-help")
 			|| !strcmp(arg, "-?")) {
 			print_help();
@@ -8907,8 +9409,7 @@ int main(int argc, char* argv[]) {
 	if (! quiet && ! inetd) {
 		int i;
 		for (i=1; i < argc_vnc; i++) {
-			fprintf(stderr, "passing arg to libvncserver: %s\n",
-			    argv_vnc[i]);
+			rfbLog("passing arg to libvncserver: %s\n", argv_vnc[i]);
 			if (!strcmp(argv_vnc[i], "-passwd")) {
 				i++;
 			}
@@ -8937,9 +9438,8 @@ int main(int argc, char* argv[]) {
 		FILE *in;
 		in = fopen(passwdfile, "r");
 		if (in == NULL) {
-			fprintf(stderr, "cannot open passwdfile: %s\n",
-			    passwdfile);
-			perror("fopen");
+			rfbLog("cannot open passwdfile: %s\n", passwdfile);
+			rfbLog("fopen");
 			exit(1);
 		}
 		if (fgets(line, 1024, in) != NULL) {
@@ -8970,15 +9470,15 @@ int main(int argc, char* argv[]) {
 				if (ok) {
 					viewonly_passwd = strdup(line);
 				} else {
-					fprintf(stderr, "*** not setting"
+					rfbLog("*** not setting"
 					    " viewonly password to the 2nd"
 					    " line of %s. (blank or other"
 					    " problem)\n", passwdfile);
 				}
 			}
 		} else {
-			fprintf(stderr, "cannot read a line from "
-			    "passwdfile: %s\n", passwdfile);
+			rfbLog("cannot read a line from passwdfile: %s\n",
+			    passwdfile);
 			exit(1);
 		}
 		fclose(in);
@@ -8996,17 +9496,15 @@ int main(int argc, char* argv[]) {
 		}
 	} 
 	if (viewonly_passwd && pw_loc < 0) {
-		fprintf(stderr, "-passwd must be supplied when using "
-		    "-viewpasswd\n");
+		rfbLog("-passwd must be supplied when using -viewpasswd\n");
 		exit(1);
 	}
 
 	/* fixup settings that do not make sense */
 		
-	if (use_threads && nofb && cursor_pos) {
+	if (use_threads && nofb && cursor_pos_updates) {
 		if (! quiet) {
-			fprintf(stderr, "disabling -threads under -nofb "
-			    "-cursorpos\n");
+			rfbLog("disabling -threads under -nofb -cursorpos\n");
 		}
 		use_threads = 0;
 	}
@@ -9022,32 +9520,92 @@ int main(int argc, char* argv[]) {
 		bg = 0;
 	}
 
+	if (flip_byte_order && using_shm && ! quiet) {
+		rfbLog("warning: -flipbyte order only works with -noshm\n");
+	}
+
 	/* increase rfbwait if threaded */
 	if (use_threads && ! got_rfbwait) {
 		argv_vnc[argc_vnc++] = "-rfbwait";
 		argv_vnc[argc_vnc++] = "604800000"; /* one week... */
 	}
 
+	/* cursor shapes setup */
+
+#ifdef SOLARIS
+	if (show_cursor && ! overlay && overlay_cursor &&
+	    !strcmp(multiple_cursors_mode, "most")) {
+		overlay = 1;
+		if (! quiet) {
+			rfbLog("enabling -overlay mode to achieve "
+			    "'-cursor most'\n");
+			rfbLog("disable with: -overlay_nocursor.\n");
+		}
+	}
+#endif
+
 	if (overlay) {
 #ifdef SOLARIS
 		using_shm = 0;
 
 		if (flash_cmap && ! quiet) {
-			fprintf(stderr, "warning: -flashcmap may be "
-			    "incompatible with -overlay\n");
+			rfbLog("warning: -flashcmap may be incompatible "
+			    "with -overlay\n");
 		}
 		
-		if (show_mouse) {
-			show_mouse = 0;
-			overlay_mouse = 1;
+		if (show_cursor && overlay_cursor) {
+			char *s = multiple_cursors_mode;
+			if (*s == 'X' || !strcmp(s, "some")) {
+				/*
+				 * user wants these modes, so disable fb cursor
+				 */
+				overlay_cursor = 0;
+			} else {
+				/*
+				 * "default" and "most", we turn off
+				 * show_cursor since it will automatically
+				 * be in the framebuffer.
+				 */
+				show_cursor = 0;
+			}
 		}
 #else
 		if (! quiet) {
-			fprintf(stderr, "disabling -overlay: currently only "
-			    "available on Solaris Xsun.\n");
+			rfbLog("disabling -overlay: only available on "
+			    "Solaris Xsun.\n");
 		}
 		overlay = 0; 
 #endif
+	}
+
+	if (show_cursor) {
+		char *s = multiple_cursors_mode;
+		if (*s == 'X' || !strcmp(s, "some")) {
+			show_multiple_cursors = 1;
+		} else if (!strcmp(s, "most")) {
+			/* later check for XFIXES, for now "some" */
+			show_multiple_cursors = 1;
+		}
+	}
+
+	/* no framebuffer (Win2VNC) mode */
+
+	if (nofb) {
+		/* disable things that do not make sense */
+		using_shm = 0;
+		flash_cmap = 0;
+		show_cursor = 0;
+		show_multiple_cursors = 0;
+		overlay = 0;
+		if (! quiet) {
+			rfbLog("disabling -cursor, fb, shm, etc. in "
+			   "-nofb mode.\n");
+		}
+
+		if (! got_deferupdate && ! got_defer) {
+			/* reduce defer time under -nofb */
+			defer_update = defer_update_nofb;
+		}
 	}
 
 	/* check for OS with small shm limits */
@@ -9057,10 +9615,6 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	if (nofb && ! got_deferupdate && ! got_defer) {
-		/* reduce defer time under -nofb */
-		defer_update = defer_update_nofb;
-	}
 	if (! got_deferupdate) {
 		char tmp[40];
 		/* XXX not working yet in libvncserver */
@@ -9068,9 +9622,10 @@ int main(int argc, char* argv[]) {
 		argv_vnc[argc_vnc++] = "-deferupdate";
 		argv_vnc[argc_vnc++] = strdup(tmp);
 	}
+
 	if (debug_pointer || debug_keyboard) {
 		if (bg || quiet) {
-			fprintf(stderr, "disabling -bg/-q under -debug_pointer"
+			rfbLog("disabling -bg/-q under -debug_pointer"
 			    "/-debug_keyboard\n");
 			bg = 0;
 			quiet = 0;
@@ -9079,81 +9634,85 @@ int main(int argc, char* argv[]) {
 
 	if (! quiet) {
 		fprintf(stderr, "\n");
-		fprintf(stderr, "display:    %s\n", use_dpy ? use_dpy
+		fprintf(stderr, "Settings:\n");
+		fprintf(stderr, " display:    %s\n", use_dpy ? use_dpy
                     : "null");
-		fprintf(stderr, "subwin:     0x%x\n", subwin);
-		fprintf(stderr, "flashcmap:  %d\n", flash_cmap);
-		fprintf(stderr, "force_idx:  %d\n", force_indexed_color);
-		fprintf(stderr, "scaling:    %d %.5f\n", scaling, scale_fac);
-		fprintf(stderr, "visual:     %s\n", visual_str ? visual_str
+		fprintf(stderr, " subwin:     0x%x\n", subwin);
+		fprintf(stderr, " flashcmap:  %d\n", flash_cmap);
+		fprintf(stderr, " force_idx:  %d\n", force_indexed_color);
+		fprintf(stderr, " scaling:    %d %.5f\n", scaling, scale_fac);
+		fprintf(stderr, " visual:     %s\n", visual_str ? visual_str
                     : "null");
-		fprintf(stderr, "overlay:    %d\n", overlay);
-		fprintf(stderr, "ovl_mouse:  %d\n", overlay_mouse);
-		fprintf(stderr, "viewonly:   %d\n", view_only);
-		fprintf(stderr, "shared:     %d\n", shared);
-		fprintf(stderr, "conn_once:  %d\n", connect_once);
-		fprintf(stderr, "connect:    %s\n", client_connect
+		fprintf(stderr, " overlay:    %d\n", overlay);
+		fprintf(stderr, " ovl_cursor: %d\n", overlay_cursor);
+		fprintf(stderr, " viewonly:   %d\n", view_only);
+		fprintf(stderr, " shared:     %d\n", shared);
+		fprintf(stderr, " conn_once:  %d\n", connect_once);
+		fprintf(stderr, " connect:    %s\n", client_connect
 		    ? client_connect : "null");
-		fprintf(stderr, "connectfile %s\n", client_connect_file
+		fprintf(stderr, " connectfile %s\n", client_connect_file
 		    ? client_connect_file : "null");
-		fprintf(stderr, "vnc_conn:   %d\n", vnc_connect);
-		fprintf(stderr, "authfile:   %s\n", auth_file ? auth_file
+		fprintf(stderr, " vnc_conn:   %d\n", vnc_connect);
+		fprintf(stderr, " authfile:   %s\n", auth_file ? auth_file
                     : "null");
-		fprintf(stderr, "allow:      %s\n", allow_list ? allow_list
+		fprintf(stderr, " allow:      %s\n", allow_list ? allow_list
                     : "null");
-		fprintf(stderr, "passfile:   %s\n", passwdfile ? passwdfile
+		fprintf(stderr, " passfile:   %s\n", passwdfile ? passwdfile
                     : "null");
-		fprintf(stderr, "accept:     %s\n", accept_cmd ? accept_cmd
+		fprintf(stderr, " accept:     %s\n", accept_cmd ? accept_cmd
                     : "null");
-		fprintf(stderr, "gone:       %s\n", gone_cmd ? gone_cmd
+		fprintf(stderr, " gone:       %s\n", gone_cmd ? gone_cmd
                     : "null");
-		fprintf(stderr, "inetd:      %d\n", inetd);
-		fprintf(stderr, "using_shm:  %d\n", using_shm);
-		fprintf(stderr, "flipbytes:  %d\n", flip_byte_order);
-		fprintf(stderr, "blackout:   %s\n", blackout_string
+		fprintf(stderr, " inetd:      %d\n", inetd);
+		fprintf(stderr, " using_shm:  %d\n", using_shm);
+		fprintf(stderr, " flipbytes:  %d\n", flip_byte_order);
+		fprintf(stderr, " blackout:   %s\n", blackout_string
 		    ? blackout_string : "null");
-		fprintf(stderr, "xinerama:   %d\n", xinerama);
-		fprintf(stderr, "logfile:    %s\n", logfile ? logfile
+		fprintf(stderr, " xinerama:   %d\n", xinerama);
+		fprintf(stderr, " logfile:    %s\n", logfile ? logfile
                     : "null");
-		fprintf(stderr, "bg:         %d\n", bg);
-		fprintf(stderr, "mod_tweak:  %d\n", use_modifier_tweak);
-		fprintf(stderr, "isolevel3:  %d\n", use_iso_level3);
-		fprintf(stderr, "xkb:        %d\n", use_xkb_modtweak);
-		fprintf(stderr, "skipkeys:   %s\n", skip_keycodes ? skip_keycodes
+		fprintf(stderr, " bg:         %d\n", bg);
+		fprintf(stderr, " mod_tweak:  %d\n", use_modifier_tweak);
+		fprintf(stderr, " isolevel3:  %d\n", use_iso_level3);
+		fprintf(stderr, " xkb:        %d\n", use_xkb_modtweak);
+		fprintf(stderr, " skipkeys:   %s\n",
+		    skip_keycodes ? skip_keycodes : "null");
+		fprintf(stderr, " addkeysyms: %d\n", add_keysyms);
+		fprintf(stderr, " xkbcompat:  %d\n", xkbcompat);
+		fprintf(stderr, " clearmods:  %d\n", clear_mods);
+		fprintf(stderr, " remap:      %s\n", remap_file ? remap_file
                     : "null");
-		fprintf(stderr, "addkeysyms: %d\n", add_keysyms);
-		fprintf(stderr, "xkbcompat:  %d\n", xkbcompat);
-		fprintf(stderr, "clearmods:  %d\n", clear_mods);
-		fprintf(stderr, "remap:      %s\n", remap_file ? remap_file
-                    : "null");
-		fprintf(stderr, "nofb:       %d\n", nofb);
-		fprintf(stderr, "watchbell:  %d\n", watch_bell);
-		fprintf(stderr, "watchsel:   %d\n", watch_selection);
-		fprintf(stderr, "watchprim:  %d\n", watch_primary);
-		fprintf(stderr, "loc_curs:   %d\n", local_cursor);
-		fprintf(stderr, "mouse:      %d\n", show_mouse);
-		fprintf(stderr, "root_curs:  %d\n", show_root_cursor);
-		fprintf(stderr, "xwarpptr:   %d\n", use_xwarppointer);
-		fprintf(stderr, "cursorpos:  %d\n", cursor_pos);
-		fprintf(stderr, "buttonmap:  %s\n", pointer_remap
+		fprintf(stderr, " nofb:       %d\n", nofb);
+		fprintf(stderr, " watchbell:  %d\n", watch_bell);
+		fprintf(stderr, " watchsel:   %d\n", watch_selection);
+		fprintf(stderr, " watchprim:  %d\n", watch_primary);
+		fprintf(stderr, " cursor:     %d\n", show_cursor);
+		fprintf(stderr, " root_curs:  %d\n", show_multiple_cursors);
+		fprintf(stderr, " curs_mode:  %s\n", multiple_cursors_mode
+		    ? multiple_cursors_mode : "null");
+		fprintf(stderr, " xwarpptr:   %d\n", use_xwarppointer);
+		fprintf(stderr, " cursorpos:  %d\n", cursor_pos_updates);
+		fprintf(stderr, " cursorshp:  %d\n", cursor_shape_updates);
+		fprintf(stderr, " buttonmap:  %s\n", pointer_remap
 		    ? pointer_remap : "null");
-		fprintf(stderr, "dragging:   %d\n", show_dragging);
-		fprintf(stderr, "old_ptr:    %d\n", old_pointer);
-		fprintf(stderr, "inputskip:  %d\n", ui_skip);
-		fprintf(stderr, "norepeat:   %d\n", no_autorepeat);
-		fprintf(stderr, "debug_ptr:  %d\n", debug_pointer);
-		fprintf(stderr, "debug_key:  %d\n", debug_keyboard);
-		fprintf(stderr, "defer:      %d\n", defer_update);
-		fprintf(stderr, "waitms:     %d\n", waitms);
-		fprintf(stderr, "take_naps:  %d\n", take_naps);
-		fprintf(stderr, "sigpipe:    %d\n", sigpipe);
-		fprintf(stderr, "threads:    %d\n", use_threads);
-		fprintf(stderr, "fs_frac:    %.2f\n", fs_frac);
-		fprintf(stderr, "onetile:    %d\n", single_copytile);
-		fprintf(stderr, "gaps_fill:  %d\n", gaps_fill);
-		fprintf(stderr, "grow_fill:  %d\n", grow_fill);
-		fprintf(stderr, "tile_fuzz:  %d\n", tile_fuzz);
-		fprintf(stderr, "version: %s\n", lastmod);
+		fprintf(stderr, " dragging:   %d\n", show_dragging);
+		fprintf(stderr, " old_ptr:    %d\n", old_pointer);
+		fprintf(stderr, " inputskip:  %d\n", ui_skip);
+		fprintf(stderr, " norepeat:   %d\n", no_autorepeat);
+		fprintf(stderr, " debug_ptr:  %d\n", debug_pointer);
+		fprintf(stderr, " debug_key:  %d\n", debug_keyboard);
+		fprintf(stderr, " defer:      %d\n", defer_update);
+		fprintf(stderr, " waitms:     %d\n", waitms);
+		fprintf(stderr, " take_naps:  %d\n", take_naps);
+		fprintf(stderr, " sigpipe:    %d\n", sigpipe);
+		fprintf(stderr, " threads:    %d\n", use_threads);
+		fprintf(stderr, " fs_frac:    %.2f\n", fs_frac);
+		fprintf(stderr, " onetile:    %d\n", single_copytile);
+		fprintf(stderr, " gaps_fill:  %d\n", gaps_fill);
+		fprintf(stderr, " grow_fill:  %d\n", grow_fill);
+		fprintf(stderr, " tile_fuzz:  %d\n", tile_fuzz);
+		fprintf(stderr, "\n");
+		rfbLog("x11vnc version: %s\n", lastmod);
 	} else {
 		rfbLogEnable(0);
 	}
@@ -9182,11 +9741,11 @@ int main(int argc, char* argv[]) {
 	if (xkbcompat) {
 		Bool rc = XkbIgnoreExtension(True);
 		if (! quiet) {
-			fprintf(stderr, "disabling xkb extension. rc=%d\n", rc);
-			if (watch_bell) {
-				watch_bell = 0;
-				fprintf(stderr, "disabling bell.\n");
-			}
+			rfbLog("disabling xkb extension. rc=%d\n", rc);
+		}
+		if (watch_bell) {
+			watch_bell = 0;
+			if (! quiet) rfbLog("disabling bell.\n");
 		}
 	}
 #else
@@ -9194,6 +9753,7 @@ int main(int argc, char* argv[]) {
 	watch_bell = 0;
 	use_xkb_modtweak = 0;
 #endif
+
 	if (use_dpy) {
 		dpy = XOpenDisplay(use_dpy);
 	} else if ( (use_dpy = getenv("DISPLAY")) ) {
@@ -9203,13 +9763,12 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (! dpy) {
-		fprintf(stderr, "XOpenDisplay failed (%s)\n",
-		    use_dpy ? use_dpy:"null");
+		rfbLog("XOpenDisplay failed (%s)\n", use_dpy ? use_dpy:"null");
 		exit(1);
 	} else if (use_dpy) {
-		if (! quiet) fprintf(stderr, "Using X display %s\n", use_dpy);
+		if (! quiet) rfbLog("Using X display %s\n", use_dpy);
 	} else {
-		if (! quiet) fprintf(stderr, "Using default X display.\n");
+		if (! quiet) rfbLog("Using default X display.\n");
 	}
 
 	scr = DefaultScreen(dpy);
@@ -9222,28 +9781,43 @@ int main(int argc, char* argv[]) {
 	}
 
 	/* check for XTEST */
-	if (! XTestQueryExtension(dpy, &ev, &er, &maj, &min)) {
-		fprintf(stderr, "Display does not support XTest extension.\n");
-		exit(1);
+	if (! XTestQueryExtension_wr(dpy, &ev, &er, &maj, &min)) {
+		rfbLog("warning: XTest extension not available, most user"
+		    " input\n");
+		rfbLog("(pointer and keyboard) will be discarded.\n");
+		xtest_present = 0;
+		rfbLog("no XTest extension, switching to -xwarppointer mode\n");
+		rfbLog("for pointer motion input.\n");
+		use_xwarppointer = 1;
 	}
 	/*
 	 * Window managers will often grab the display during resize, etc.
 	 * To avoid deadlock (our user resize input is not processed)
 	 * we tell the server to process our requests during all grabs:
 	 */
-	XTestGrabControl(dpy, True);
+	XTestGrabControl_wr(dpy, True);
 
 	/* check for MIT-SHM */
-	if (! nofb && ! XShmQueryExtension(dpy)) {
+	if (! nofb && ! XShmQueryExtension_wr(dpy)) {
 		if (! using_shm) {
 			if (! quiet) {
-				fprintf(stderr, "info: display does not "
-				    "support XShm.\n");
+				rfbLog("info: display does not support"
+				    " XShm.\n");
 			}
 		} else {
-			fprintf(stderr, "Display does not support XShm "
-			    "extension (must be local).\n");
+			rfbLog("warning: XShm extension is not available.\n");
+			rfbLog("For best performance the X Display should be"
+			    " local. (i.e.\n");
+			rfbLog("the x11vnc and X server processes should be"
+			    " running on\n");
+			rfbLog("the same machine.)\n");
+#ifdef LIBVNCSERVER_HAVE_XSHM
+			rfbLog("Restart with -noshm to override this.\n");
 			exit(1);
+#else
+			rfbLog("Switching to -noshm mode.\n");
+			using_shm = 0;
+#endif
 		}
 	}
 
@@ -9286,8 +9860,10 @@ int main(int argc, char* argv[]) {
 	}
 	initialize_watch_bell();
 	if (!use_xkb && use_xkb_modtweak) {
-		fprintf(stderr, "warning: disabling xkb modtweak."
-		    " XKEYBOARD ext. not present.\n");
+		if (! quiet) {
+			fprintf(stderr, "warning: disabling xkb modtweak."
+			    " XKEYBOARD ext. not present.\n");
+		}
 		use_xkb_modtweak = 0;
 	}
 #endif
@@ -9316,9 +9892,8 @@ int main(int argc, char* argv[]) {
 		/* this may be overridden via visual_id below */
 		default_visual = attr.visual;
 
-		/* show_mouse has some segv crashes as well */
-		if (show_root_cursor) {
-			show_root_cursor = 0;
+		if (show_multiple_cursors) {
+			show_multiple_cursors = 0;
 			if (! quiet) {
 				fprintf(stderr, "disabling root cursor drawing"
 				    " for subwindow\n");
@@ -9368,6 +9943,10 @@ int main(int argc, char* argv[]) {
 		XFree(vinfo);
 	}
 
+	if (! quiet) {
+		rfbLog("default visual ID: 0x%x\n",
+		    (int) XVisualIDFromVisual(default_visual));
+	}
 
 	if (nofb) {
 		/* 
@@ -9388,7 +9967,7 @@ int main(int argc, char* argv[]) {
 		fb = XGetImage_wr(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes,
 		    ZPixmap);
 		if (! quiet) {
-			fprintf(stderr, "Read initial data from X display into"
+			rfbLog("Read initial data from X display into"
 			    " framebuffer.\n");
 		}
 	}
@@ -9432,6 +10011,7 @@ int main(int argc, char* argv[]) {
 	if (remap_file != NULL) {
 		initialize_remap(remap_file);
 	}
+
 	initialize_pointer_map(pointer_remap);
 
 	clear_modifiers(1);
@@ -9454,7 +10034,7 @@ int main(int argc, char* argv[]) {
 		if (host != NULL) {
 			/* note that vncviewer special cases 5900-5999 */
 			if (inetd) {
-				;	/* should not occur */
+				;	/* should not occur (rfbPort) */
 			} else if (quiet) {
 				if (port >= 5900) {
 					fprintf(stderr, "The VNC desktop is "
@@ -9478,7 +10058,11 @@ int main(int argc, char* argv[]) {
 			}
 		}
 		fflush(stderr);	
-		fprintf(stdout, "PORT=%d\n", screen->rfbPort);
+		if (inetd) {
+			;	/* should not occur (rfbPort) */
+		} else {
+			fprintf(stdout, "PORT=%d\n", screen->rfbPort);
+		}
 		fflush(stdout);	
 	}
 

@@ -2,7 +2,7 @@
 .TH X11VNC "1" "August 2004" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.6.3pre, lastmod: 2004-08-15
+         version: 0.6.3pre, lastmod: 2004-08-29
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -63,14 +63,20 @@ man pages.
 .PP
 \fB-id\fR \fIwindowid\fR
 .IP
-Show the window corresponding to \fIwindowid\fR not the
-entire display. Warning: bugs! new toplevels missed!...
+Show the window corresponding to \fIwindowid\fR not
+the entire display.  New windows like popup menus,
+etc may not be seen, or will be clipped.  x11vnc may
+crash if the window changes size, is iconified, etc.
+Use 
+.IR xwininfo (1)
+to get the window id.  Primarily useful
+for exporting very simple applications.
 .PP
 \fB-sid\fR \fIwindowid\fR
 .IP
 As \fB-id,\fR but instead of using the window directly it
-shifts a root view to it: shows saveUnders menus, etc,
-although they will be clipped if they extend beyond
+shifts a root view to it: this shows saveUnders menus,
+etc, although they will be clipped if they extend beyond
 the window.
 .PP
 \fB-flashcmap\fR
@@ -90,11 +96,12 @@ and 24+8 overlay visuals (the 32 bits per pixel are
 packed with 8 for PseudoColor and 24 for TrueColor).
 .IP
 Currently \fB-overlay\fR only works on Solaris (it uses
-XReadScreen(3X11)).  There are still some problems with
-surrounding-region painting for popup menus (but not
-for the popup menu itself); a workaround is to disable
-SaveUnders (pass \fB-su\fR to Xsun).  Amusingly, if \fB-overlay\fR
-is used with \fB-mouse,\fR the mouse cursor shape is correct.
+XReadScreen(3X11)).  There is a problem with image
+"bleeding" around transient popup menus (but not
+for the menu itself): a workaround is to disable
+SaveUnders by passing the "-su" argument to Xsun
+(in /etc/dt/config/Xservers, say).  Also note that,
+the mouse cursor shape is exactly correct in this mode.
 .IP
 Use \fB-overlay\fR as a workaround for situations like these:
 Some legacy applications require the default visual
@@ -107,7 +114,13 @@ Under \fB-overlay,\fR performance will be somewhat degraded
 due to the extra image transformations required.
 For optimal performance do not use \fB-overlay,\fR but rather
 configure the X server so that the default visual is
-depth 24 TrueColor and have all apps use that visual.
+depth 24 TrueColor and try to have all apps use that
+visual (some apps have \fB-use24\fR or \fB-visual\fR options).
+.PP
+\fB-overlay_nocursor\fR
+.IP
+Sets \fB-overlay,\fR but does not try to draw the exact mouse
+cursor shape using the overlay mechanism.
 .PP
 \fB-visual\fR \fIn\fR
 .IP
@@ -124,9 +137,10 @@ or for worse the visual depth is forced to be m.
 .PP
 \fB-scale\fR \fIfraction\fR
 .IP
-Scale the framebuffer by factor \fIfraction\fR.  Values
-less than 1 shrink the fb.  Note: image may not be sharp
-and response may be slower.  If \fIfraction\fR contains
+Scale the framebuffer by factor \fIfraction\fR.
+Values less than 1 shrink the fb.  Note: image may not
+be sharp and response may be slower.  Currently the
+cursor shape is not scaled.  If \fIfraction\fR contains
 a decimal point "." it is taken as a floating point
 number, alternatively the notation "m/n" may be used
 to denote fractions exactly, e.g. \fB-scale\fR 2/3.
@@ -136,7 +150,7 @@ Scaling Options: can be added after \fIfraction\fR via
 If you just want a quick, rough scaling without
 blending, append ":nb" to \fIfraction\fR (e.g. \fB-scale\fR
 1/3:nb).  For compatibility with vncviewers the scaled
-width is adjusted to be a multiple of 4, to disable
+width is adjusted to be a multiple of 4: to disable
 this use ":n4".  More esoteric options: ":in" use
 interpolation scheme even when shrinking, ":pad",
 pad scaled width and height to be multiples of scaling
@@ -173,13 +187,17 @@ read and then the file is truncated.
 \fB-vncconnect\fR
 .IP
 Monitor the VNC_CONNECT X property set by the standard
+.PP
+\fB-novncconnect\fR
+.IP
 VNC program 
 .IR vncconnect (1)
-.  When the property is set
-to host or host:port establish a reverse connection.
-Using 
+.  When the property is
+set to "host" or "host:port" establish a reverse
+connection.  Using 
 .IR xprop (1)
-instead of vncconnect may work, see FAQ.
+instead of vncconnect may
+work, see the FAQ.  Default: \fB-vncconnect\fR
 .PP
 \fB-inetd\fR
 .IP
@@ -306,8 +324,8 @@ endianness.  Ignored unless \fB-noshm\fR is set.
 \fB-onetile\fR
 .IP
 Do not use the new copy_tiles() framebuffer mechanism,
-just use 1 shm tile for polling.  Same as \fB-old_copytile.\fR
-Limits shm segments used to 3.
+just use 1 shm tile for polling.  Limits shm segments
+used to 3.
 .PP
 \fB-blackout\fR \fIstring\fR
 .IP
@@ -319,8 +337,10 @@ each rectangle.
 .IP
 If your screen is composed of multiple monitors
 glued together via XINERAMA, and that screen is
-non-rectangular this option will try to guess the areas
-to black out (if your system has libXinerama).
+non-rectangular this option will try to guess the
+areas to black out (if your system has libXinerama).
+In general on XINERAMA displays you may need to use the
+\fB-xwarppointer\fR option if the mouse pointer misbehaves.
 .PP
 \fB-o\fR \fIlogfile\fR
 .IP
@@ -376,7 +396,9 @@ and "," + "<" keys).  Default: \fB-modtweak\fR
 \fB-xkb\fR
 .IP
 When in modtweak mode, use the XKEYBOARD extension
-(if it exists) to do the modifier tweaking.
+(if it exists) to do the modifier tweaking.  This is
+powerful and should be tried if there are still
+keymapping problems when using the simpler \fB-modtweak.\fR
 .PP
 \fB-skip_keycodes\fR \fIstring\fR
 .IP
@@ -453,34 +475,79 @@ Do not poll the PRIMARY selection for changes to send
 back to clients.  (PRIMARY is still set on received
 changes, however).
 .PP
-\fB-nocursor\fR
+\fB-cursor\fR \fI[mode],\fR \fB-nocursor\fR
 .IP
-Do not have the VNC viewer show a local cursor.
+Sets how the pointer cursor shape (little icon at the
+mouse pointer) should be handled.  The "mode" string
+is optional and is described below.  The default
+is to show some sort of cursor shape(s).  How this
+is done depends on the VNC viewer and the X server.
+Use \fB-nocursor\fR to disable cursor shapes completely.
+.IP
+Some VNC viewers support the TightVNC CursorPosUpdates
+and CursorShapeUpdates extensions (cuts down on
+network traffic by not having to send the cursor image
+every time the pointer is moved), in which case these
+extensions are used (see \fB-nocursorshape\fR and \fB-nocursorpos\fR
+below).  For other viewers the cursor shape is written
+directly to the framebuffer every time the pointer is
+moved or changed and gets sent along with the other
+framebuffer updates.  In this case, there will be
+some lag between the vnc viewer pointer and the remote
+cursor position.
+.IP
+If the X display supports retrieving the cursor shape
+information from the X server, then the default
+is to use that mode.  On Solaris this requires
+the SUN_OVL extension and the \fB-overlay\fR option to be
+supplied. (see also the \fB-overlay_nomouse\fR option). (Soon)
+on XFree86/Xorg the XFIXES extension is required.
+Either can be disabled with \fB-nocursor,\fR and also some
+values of the "mode" option below.
+.IP
+The "mode" string can be used to fine-tune the
+displaying of cursor shapes.  It can be used the
+following ways:
+.IP
+"-cursor X" - when the cursor appears to be on the
+root window, draw the familiar X shape.  Some desktops
+such as GNOME cover up the root window completely,
+and so this will not work, try "X1", etc, to try to
+shift the tree depth.  On high latency links or slow
+machines there will be a time lag between expected and
+the actual cursor shape.
+.IP
+"-cursor some" - like "X" but use additional
+heuristics to try to guess if the window should have
+a windowmanager-like resizer cursor or a text input
+I-beam cursor.  This is a complete hack, but may be
+useful in some situations because it provides a little
+more feedback about the cursor shape.
+.IP
+"-cursor most" - try to show as many cursors as
+possible.  Often this will only be the same as "some".
+On Solaris if XFIXES is not available, \fB-overlay\fR mode
+will be used.
 .PP
-\fB-mouse\fR
+\fB-nocursorshape\fR
 .IP
-Draw a 2nd cursor at the current X pointer position.
-.PP
-\fB-mouseX\fR
-.IP
-As \fB-mouse,\fR but also draw an "X" when pointer is on
-root background.
-.PP
-\fB-X\fR
-.IP
-Shorthand for \fB-mouseX\fR \fB-nocursor.\fR
-.PP
-\fB-xwarppointer\fR
-.IP
-Move the pointer with XWarpPointer() instead of XTEST
-(try as a workaround if pointer behaves poorly, e.g.
-on touchscreens or other non-standard setups).
+Do not use the TightVNC CursorShapeUpdates extension
+even if clients support it.  See \fB-cursor\fR above.
 .PP
 \fB-cursorpos,\fR \fB-nocursorpos\fR
 .IP
 Option \fB-cursorpos\fR enables sending the X cursor position
 back to all vnc clients that support the TightVNC
-CursorPosUpdates extension.  Default: \fB-cursorpos\fR
+CursorPosUpdates extension.  Other clients will be able
+to see the pointer motions. Default: \fB-cursorpos\fR
+.PP
+\fB-xwarppointer\fR
+.IP
+Move the pointer with XWarpPointer(3X) instead of XTEST
+extension.  Use this as a workaround if the pointer
+motion behaves incorrectly, e.g.  on touchscreens or
+other non-standard setups.  Also sometimes needed on
+XINERAMA displays.
 .PP
 \fB-buttonmap\fR \fIstring\fR
 .IP

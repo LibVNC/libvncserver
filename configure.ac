@@ -39,29 +39,62 @@ AM_CONDITIONAL(WITH_FFMPEG, test ! -z "$with_ffmpeg")
 # Checks for X libraries
 HAVE_X="false"
 AC_PATH_XTRA
+AH_TEMPLATE(HAVE_XSHM, [MIT-SHM extension build environment present])
+AH_TEMPLATE(HAVE_XTEST, [XTEST extension build environment present])
 AH_TEMPLATE(HAVE_XKEYBOARD, [XKEYBOARD extension build environment present])
 AH_TEMPLATE(HAVE_LIBXINERAMA, [XINERAMA extension build environment present])
+AH_TEMPLATE(HAVE_LIBXRANDR, [XRANDR extension build environment present])
+AH_TEMPLATE(HAVE_LIBXFIXES, [XFIXES extension build environment present])
+AH_TEMPLATE(HAVE_LIBXDAMAGE, [XDAMAGE extension build environment present])
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
-	saved_CPPFLAGS="$CPPFLAGS"
-	CPPFLAGS="$CPPFLAGS $X_CFLAGS"
-	AC_CHECK_HEADER(X11/XKBlib.h, HAVE_XKBLIB_H="true",
-		HAVE_XKBLIB_H="false", [#include <X11/Xlib.h>])
-	CPPFLAGS="$saved_CPPFLAGS"
-	if test $HAVE_XKBLIB_H = "true"; then
-		AC_CHECK_LIB(X11, XkbSelectEvents,
-			[AC_DEFINE(HAVE_XKEYBOARD)], ,
+	AC_CHECK_LIB(X11, XGetImage, HAVE_X="true",
+		HAVE_X="false",
+		$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+	if test $HAVE_X = "true"; then
+		X_PRELIBS="$X_PRELIBS -lXext"
+
+		AC_CHECK_LIB(Xext, XShmGetImage, 
+			[AC_DEFINE(HAVE_XSHM)], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
-	fi
-	AC_CHECK_LIB(Xinerama, XineramaQueryScreens,
-		X_PRELIBS="$X_PRELIBS -lXinerama"
-		[AC_DEFINE(HAVE_LIBXINERAMA)], ,
-		$X_LIBS $X_PRELIBS -lX11 -lXext $X_EXTRA_LIBS)
-	AC_CHECK_LIB(Xtst, XTestFakeKeyEvent, HAVE_XTEST="true",
-		HAVE_XTEST="false",
-		$X_LIBS $X_PRELIBS -lX11 -lXext $X_EXTRA_LIBS)
-	if test $HAVE_XTEST = "true"; then
-		X_LIBS="$X_LIBS $X_PRELIBS -lXtst -lXext -lX11 $X_EXTRA_LIBS"
-		HAVE_X="true"
+
+		AC_CHECK_LIB(Xtst, XTestFakeKeyEvent, 
+			X_PRELIBS="$X_PRELIBS -lXtst"
+			[AC_DEFINE(HAVE_XTEST)], ,
+			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		saved_CPPFLAGS="$CPPFLAGS"
+		CPPFLAGS="$CPPFLAGS $X_CFLAGS"
+		AC_CHECK_HEADER(X11/XKBlib.h, HAVE_XKBLIB_H="true",
+			HAVE_XKBLIB_H="false", [#include <X11/Xlib.h>])
+		CPPFLAGS="$saved_CPPFLAGS"
+		if test $HAVE_XKBLIB_H = "true"; then
+			AC_CHECK_LIB(X11, XkbSelectEvents,
+				[AC_DEFINE(HAVE_XKEYBOARD)], ,
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		fi
+
+		AC_CHECK_LIB(Xinerama, XineramaQueryScreens,
+			X_PRELIBS="$X_PRELIBS -lXinerama"
+			[AC_DEFINE(HAVE_LIBXINERAMA)], ,
+			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		AC_CHECK_LIB(Xrandr, XRRSelectInput,
+			X_PRELIBS="$X_PRELIBS -lXrandr"
+			[AC_DEFINE(HAVE_LIBXRANDR)], ,
+			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		AC_CHECK_LIB(Xfixes, XFixesGetCursorImage,
+			X_PRELIBS="$X_PRELIBS -lXfixes"
+			[AC_DEFINE(HAVE_LIBXFIXES)], ,
+			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		AC_CHECK_LIB(Xdamage, XDamageQueryExtension,
+			X_PRELIBS="$X_PRELIBS -lXdamage"
+			[AC_DEFINE(HAVE_LIBXDAMAGE)], ,
+			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		X_LIBS="$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS"
 	fi
 fi
 AC_SUBST(X_LIBS)

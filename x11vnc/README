@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sun Aug 15 16:30:33 EDT 2004
+x11vnc README file                         Date: Sun Aug 29 15:33:42 EDT 2004
 
 The following information is taken from these URLs:
 
@@ -345,6 +345,9 @@ LDFLAGS="-L $JPEG/lib -R $JPEG/lib -L $ZLIB/lib -R $ZLIB/lib"
 CPPFLAGS="$CPPFLAGS -I /usr/openwin/include"
 LDFLAGS="$LDFLAGS -L /usr/openwin/lib -R /usr/openwin/lib"
 
+# Everything needs to built with _REENTRANT for thread safe errno:
+CPPFLAGS="$CPPFLAGS -D_REENTRANT"
+
 export PATH CPPFLAGS LDFLAGS
 
 ./configure
@@ -488,14 +491,16 @@ ls -l ./x11vnc/x11vnc
        acceleration at the physical display and so likely defeats the
        purpose. Nevertheless this could be handy in some circumstances,
        e.g. if the speed at the physical display was tolerable.
-       Unfortunately it does not seem shadowfb can't be turned on and off
+       Unfortunately it does not seem shadowfb can be turned on and off
        dynamically...
      * Somewhat surprisingly, the X11 mouse (cursor) shape is write-only
        and cannot be queried from the X server. So in x11vnc the cursor
-       shape stays fixed at an arrow. (see the -mouseX option, however,
-       for a partial hack for the root window). Also, on Solaris using
-       the SUN_OVL overlay extension, x11vnc can show the correct mouse
-       cursor when the -overlay is also supplied.
+       shape stays fixed at an arrow. (see the "-cursor X" and other
+       options, however, for a partial hack for the root window, etc.).
+       Also, on Solaris using the SUN_OVL overlay extension, x11vnc can
+       show the correct mouse cursor when the -overlay option is also
+       supplied. For XFree86/Xorg, the XFIXES extension should help this
+       as well.
      * Audio from applications is of course not redirected (separate
        redirectors do exist, e.g. esd). The XBell() "beeps" will work if
        the X server supports the XKEYBOARD extension. (Note that on
@@ -546,10 +551,10 @@ ls -l ./x11vnc/x11vnc
    start out OK, but after a while the colors are incorrect in certain
    windows. 
 
-   [36]Q-10: Color problems: Why are the colors for some of the windows
-   messed up in x11vnc? BTW, I have an X display that has nice overlay
-   visuals of multiple color depths. E.g. there are both depth 8 and 24
-   visuals available at the same time. 
+   [36]Q-10: Color problems: Why are the colors for some windows messed
+   up in x11vnc? BTW, I have an X display that has nice
+   overlay/multi-depth visuals of different color depths: e.g. there are
+   both depth 8 and 24 visuals available at the same time. 
 
    [37]Q-11: How do I figure out the window id to supply to the -id
    windowid option? 
@@ -909,8 +914,8 @@ display :0
 
    If so, there are a couple options. 1) Can you set the default visual
    on your display to be depth 24 TrueColor? Sun machines often have 8+24
-   overlay visuals, and you can make the default visual depth 24
-   TrueColor (see fbconfig(1) and Xsun(1)). 2) As of Feb/2004, in the
+   overlay/multi-depth visuals, and you can make the default visual depth
+   24 TrueColor (see fbconfig(1) and Xsun(1)). 2) As of Feb/2004, in the
    libvncserver CVS, x11vnc has the -visual option to allow you to force
    the framebuffer visual to whatever you want (this usually messes up
    the colors unless you are very careful). In this case, the option
@@ -940,16 +945,17 @@ display :0
    non-zero in 8bpp PseudoColor on an obscure setup, and this option
    corrected the problems.
 
-   Q-10: Color problems: Why are the colors for some of the windows
-   messed up in x11vnc? BTW, I have an X display that has nice overlay
-   visuals of multiple color depths. E.g. there are both depth 8 and 24
+   Q-10: Color problems: Why are the colors for some windows messed up in
+   x11vnc? BTW, I have an X display that has nice overlay/multi-depth
+   visuals of different color depths: e.g. there are both depth 8 and 24
    visuals available at the same time.
 
    You may want to review the [97]previous question regarding 8 bpp
    PseudoColor.
 
-   If that isn't the problem, run xdpyinfo to see what the default visual
-   is. Does it have a depth of 8? If it does, can you possibly
+   If that isn't the problem, run xdpyinfo(1) to see what the default
+   visual is and what the depths of the other visuals are. Does the
+   default visual have a depth of 8? If it does, can you possibly
    re-configure your X server to make the depth 24 visual the default? If
    you can do it, this will save you a lot of grief WRT colors and x11vnc
    (and for general usage too!). Here is how I do this on an old
@@ -958,12 +964,23 @@ display :0
 
    and it works nicely (note: to log into console from the dtlogin
    window, select "Options -> Command Line Login", then login and enter
-   the above command). If you have root permission, a more permanent and
-   convenient option is to put a line like:
+   the above command). See the -dev section of the Xsun(1) manpage for a
+   description of the above arguments. If you have root permission, a
+   more permanent and convenient thing to do is to record the arguments
+   in a line like:
   :0  Local local_uid@console root /usr/openwin/bin/Xsun -dev /dev/fb defclass
 TrueColor defdepth 24
 
-   in /etc/dt/config/Xservers (see /usr/dt/config/Xservers).
+   in /etc/dt/config/Xservers (see /usr/dt/config/Xservers). Also look at
+   the fbconfig(1) and related manpages (e.g. ffbconfig, m64config,
+   pgxconfig, SUNWjfb_config, etc ...) for hardware framebuffer settings
+   that may achieve the same effect. In general for non-Sun machines,
+   look at the "-cc class" and related options in your X server manpage
+   (perhaps Xserver(1)), it may allow modifying the default visual (e.g.
+   "-cc 4", see <X11/X.h> for the visual class numbers). On XFree86 some
+   video card drivers (e.g. Matrox mga) have settings like Option
+   "Overlay" "24,8" to support multi-depth overlays. For these, use the
+   "-cc 4" X server command line option to get a depth 24 default visual.
 
    Another option is if the system with overlay visuals is a Sun system
    running Solaris you can use the -overlay x11vnc option (Aug/2004) to
@@ -973,16 +990,15 @@ TrueColor defdepth 24
    mentioned by x11vnc users) that require the default depth be 8bpp, or
    will use a 8bpp visual even if depth 24 visuals are available, and so
    the default depth workaround described in the previous paragraph is
-   not sufficient.
+   not sufficient for these apps.
 
    Misc. notes on -overlay mode: An amusing by-product of -overlay mode
-   is that mouse cursor shape (e.g. use -X or -mouse options) is correct.
-   The -overlay mode may be somewhat slower than normal mode due to the
-   extra framebuffer manipulations that must be performed. Also, there is
-   a bug in that for some popup menus, the windows they overlap will have
-   painting problems while the popup is up (a workaround is to disable
-   SaveUnders by passing -su to Xsun, e.g. in your
-   /etc/dt/config/Xservers file).
+   is that mouse cursor shape is correct. The -overlay mode may be
+   somewhat slower than normal mode due to the extra framebuffer
+   manipulations that must be performed. Also, there is a bug in that for
+   some popup menus, the windows they overlap will have painting problems
+   while the popup is up (a workaround is to disable SaveUnders by
+   passing -su to Xsun, e.g. in your /etc/dt/config/Xservers file).
 
    Still not working? Run xwininfo on the application with the messed up
    colors to verify that the depth of its visual is different from the
@@ -1537,7 +1553,7 @@ mp/x11vnc_sh.log
 
    On Solaris you cannot have the bare number 5900 in /etc/inetd.conf,
    you'll need to replace it with a word like x11vnc an then put
-   something like x11vnc 5900/tcp in /etc/services.
+   something like "x11vnc 5900/tcp" in /etc/services.
 
    Be sure to look at your /etc/hosts.allow and /etc/hosts.deny settings
    to limit the machines that can connect to this service (your
@@ -1589,11 +1605,11 @@ mp/x11vnc_sh.log
    believe this is because the cursor shape is often downloaded to the
    graphics hardware (video card), but I could be mistaken.
 
-   A simple kludge is provided by the -mouseX option that changes the
+   A simple kludge is provided by the "-cursor X" option that changes the
    cursor when the mouse is on the root background (or any window has the
    same cursor as the root background). Note that desktops like GNOME or
    KDE often cover up the root background, so this won't work for those
-   cases.
+   cases. Also see the "-cursor some" option for additional kludges.
 
    It should be possible to apply some heuristics where x11vnc tries to
    build up a table of cursors for the windows it sees, perhaps using a
@@ -1602,7 +1618,8 @@ mp/x11vnc_sh.log
    Also note that as of Aug/2004 in the libvncserver CVS, on Solaris
    using the SUN_OVL overlay extension, x11vnc can show the correct mouse
    cursor when the -overlay is also supplied. (-overlay has some other
-   problems however, and can be slower).
+   problems however, and can be slower). Plans are in the works to use
+   XFIXES for this on XFree86, Xorg, and Xsun.
 
    Q-31: Why does the mouse arrow just stay in one corner in my
    vncviewer, whereas my cursor (that does move) is just a dot?
@@ -1612,6 +1629,10 @@ mp/x11vnc_sh.log
    with the -nocursor option to x11vnc if your viewer does not have this
    extension.
 
+   Note: as of Aug/2004 in the libvncserver CVS this should be fixed: the
+   default for non-tightvnc viewers will be to draw the moving cursor
+   into the framebuffer. This can also be disabled via -nocursor.
+
    Q-32: Can I take advantage of the TightVNC extension to the VNC
    protocol where Cursor Positions Updates are sent back to all connected
    clients (i.e. passive viewers can see the mouse cursor being moved
@@ -1619,7 +1640,9 @@ mp/x11vnc_sh.log
 
    Use the -cursorpos option when starting x11vnc. A VNC viewer must
    support the Cursor Positions Updates for the user to see the mouse
-   motions (the TightVNC viewers support this).
+   motions (the TightVNC viewers support this). As of Aug/2004 in the
+   libvncserver CVS -cursorpos is the default. See -nocursorpos and
+   -nocursorshape.
 
    Q-33: Is it possible to swap the mouse buttons (e.g. left-handed
    operation), or arbitrarily remap them? How about mapping button clicks
@@ -1823,8 +1846,8 @@ ied)
      * If you just want to watch one (simple) window use -id (cuts down
        extraneous polling and updates, but can be buggy or insufficient)
      * Set -nosel (disables all clipboard selection exchange)
-     * Do not use -mouse or -mouseX (repainting the remote mouse takes
-       resources and round trips)
+     * Use -nocursor (repainting the remote cursor position and shape
+       takes resources and round trips)
 
    Q-39: How can I get my AltGr and Shift modifiers to work between
    keyboards for different languages?
@@ -2403,8 +2426,8 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.6.3pre lastmod: 2004-08-1
-5
+x11vnc: allow VNC connections to real X11 displays. 0.6.3pre lastmod: 2004-08-2
+9
 
 Typical usage is:
 
@@ -2450,11 +2473,15 @@ Options:
                        setting the XAUTHORITY environment varirable to "file"
                        before startup.  See Xsecurity(7), xauth(1) man pages.
 
--id windowid           Show the window corresponding to "windowid" not the
-                       entire display. Warning: bugs! new toplevels missed!...
+-id windowid           Show the window corresponding to "windowid" not
+                       the entire display.  New windows like popup menus,
+                       etc may not be seen, or will be clipped.  x11vnc may
+                       crash if the window changes size, is iconified, etc.
+                       Use xwininfo(1) to get the window id.  Primarily useful
+                       for exporting very simple applications.
 -sid windowid          As -id, but instead of using the window directly it
-                       shifts a root view to it: shows saveUnders menus, etc,
-                       although they will be clipped if they extend beyond
+                       shifts a root view to it: this shows saveUnders menus,
+                       etc, although they will be clipped if they extend beyond
                        the window.
 -flashcmap             In 8bpp indexed color, let the installed colormap flash
                        as the pointer moves from window to window (slow).
@@ -2465,11 +2492,12 @@ Options:
                        packed with 8 for PseudoColor and 24 for TrueColor).
 
                        Currently -overlay only works on Solaris (it uses
-                       XReadScreen(3X11)).  There are still some problems with
-                       surrounding-region painting for popup menus (but not
-                       for the popup menu itself); a workaround is to disable
-                       SaveUnders (pass -su to Xsun).  Amusingly, if -overlay
-                       is used with -mouse, the mouse cursor shape is correct.
+                       XReadScreen(3X11)).  There is a problem with image
+                       "bleeding" around transient popup menus (but not
+                       for the menu itself): a workaround is to disable
+                       SaveUnders by passing the "-su" argument to Xsun
+                       (in /etc/dt/config/Xservers, say).  Also note that,
+                       the mouse cursor shape is exactly correct in this mode.
 
                        Use -overlay as a workaround for situations like these:
                        Some legacy applications require the default visual
@@ -2482,7 +2510,10 @@ Options:
                        due to the extra image transformations required.
                        For optimal performance do not use -overlay, but rather
                        configure the X server so that the default visual is
-                       depth 24 TrueColor and have all apps use that visual.
+                       depth 24 TrueColor and try to have all apps use that
+                       visual (some apps have -use24 or -visual options).
+-overlay_nocursor      Sets -overlay, but does not try to draw the exact mouse
+                       cursor shape using the overlay mechanism.
 -visual n              Experimental option: probably does not do what you
                        think.  It simply *forces* the visual used for the
                        framebuffer; this may be a bad thing... It is useful for
@@ -2492,9 +2523,10 @@ Options:
                        for a list.  If the string ends in ":m" for better
                        or for worse the visual depth is forced to be m.
 
--scale fraction        Scale the framebuffer by factor "fraction".  Values
-                       less than 1 shrink the fb.  Note: image may not be sharp
-                       and response may be slower.  If "fraction" contains
+-scale fraction        Scale the framebuffer by factor "fraction".
+                       Values less than 1 shrink the fb.  Note: image may not
+                       be sharp and response may be slower.  Currently the
+                       cursor shape is not scaled.  If "fraction" contains
                        a decimal point "." it is taken as a floating point
                        number, alternatively the notation "m/n" may be used
                        to denote fractions exactly, e.g. -scale 2/3.
@@ -2504,7 +2536,7 @@ Options:
                        If you just want a quick, rough scaling without
                        blending, append ":nb" to "fraction" (e.g. -scale
                        1/3:nb).  For compatibility with vncviewers the scaled
-                       width is adjusted to be a multiple of 4, to disable
+                       width is adjusted to be a multiple of 4: to disable
                        this use ":n4".  More esoteric options: ":in" use
                        interpolation scheme even when shrinking, ":pad",
                        pad scaled width and height to be multiples of scaling
@@ -2524,9 +2556,10 @@ Options:
                        periodically check for new hosts.  The first line is
                        read and then the file is truncated.
 -vncconnect            Monitor the VNC_CONNECT X property set by the standard
-                       VNC program vncconnect(1).  When the property is set
-                       to host or host:port establish a reverse connection.
-                       Using xprop(1) instead of vncconnect may work, see FAQ.
+-novncconnect          VNC program vncconnect(1).  When the property is
+                       set to "host" or "host:port" establish a reverse
+                       connection.  Using xprop(1) instead of vncconnect may
+                       work, see the FAQ.  Default: -vncconnect
 -inetd                 Launched by inetd(1): stdio instead of listening socket.
                        Note: if you are not redirecting stderr to a log file
                        (via shell 2> or -o option) you must also specify the
@@ -2617,16 +2650,18 @@ Options:
 -flipbyteorder         Sometimes needed if remotely polled host has different
                        endianness.  Ignored unless -noshm is set.
 -onetile               Do not use the new copy_tiles() framebuffer mechanism,
-                       just use 1 shm tile for polling.  Same as -old_copytile.
-                       Limits shm segments used to 3.
+                       just use 1 shm tile for polling.  Limits shm segments
+                       used to 3.
 
 -blackout string       Black out rectangles on the screen. "string" is a
                        comma separated list of WxH+X+Y type geometries for
                        each rectangle.
 -xinerama              If your screen is composed of multiple monitors
                        glued together via XINERAMA, and that screen is
-                       non-rectangular this option will try to guess the areas
-                       to black out (if your system has libXinerama).
+                       non-rectangular this option will try to guess the
+                       areas to black out (if your system has libXinerama).
+                       In general on XINERAMA displays you may need to use the
+                       -xwarppointer option if the mouse pointer misbehaves.
 
 -o logfile             Write stderr messages to file "logfile" instead of
                        to the terminal.  Same as -logfile "file".
@@ -2654,7 +2689,9 @@ Options:
                        where a Keysym is bound to multiple keys (e.g. "<" + ">"
                        and "," + "<" keys).  Default: -modtweak
 -xkb                   When in modtweak mode, use the XKEYBOARD extension
-                       (if it exists) to do the modifier tweaking.
+                       (if it exists) to do the modifier tweaking.  This is
+                       powerful and should be tried if there are still
+                       keymapping problems when using the simpler -modtweak.
 -skip_keycodes string  Skip keycodes not on your keyboard but your X server
                        thinks exist.  Currently only applies to -xkb mode.
                        "string" is a comma separated list of decimal
@@ -2701,17 +2738,70 @@ Options:
                        back to clients.  (PRIMARY is still set on received
                        changes, however).
 
--nocursor              Do not have the VNC viewer show a local cursor.
--mouse                 Draw a 2nd cursor at the current X pointer position.
--mouseX                As -mouse, but also draw an "X" when pointer is on
-                       root background.
--X                     Shorthand for -mouseX -nocursor.
--xwarppointer          Move the pointer with XWarpPointer() instead of XTEST
-                       (try as a workaround if pointer behaves poorly, e.g.
-                       on touchscreens or other non-standard setups).
+-cursor [mode]         Sets how the pointer cursor shape (little icon at the
+-nocursor              mouse pointer) should be handled.  The "mode" string
+                       is optional and is described below.  The default
+                       is to show some sort of cursor shape(s).  How this
+                       is done depends on the VNC viewer and the X server.
+                       Use -nocursor to disable cursor shapes completely.
+
+                       Some VNC viewers support the TightVNC CursorPosUpdates
+                       and CursorShapeUpdates extensions (cuts down on
+                       network traffic by not having to send the cursor image
+                       every time the pointer is moved), in which case these
+                       extensions are used (see -nocursorshape and -nocursorpos
+                       below).  For other viewers the cursor shape is written
+                       directly to the framebuffer every time the pointer is
+                       moved or changed and gets sent along with the other
+                       framebuffer updates.  In this case, there will be
+                       some lag between the vnc viewer pointer and the remote
+                       cursor position.
+
+                       If the X display supports retrieving the cursor shape
+                       information from the X server, then the default
+                       is to use that mode.  On Solaris this requires
+                       the SUN_OVL extension and the -overlay option to be
+                       supplied. (see also the -overlay_nomouse option). (Soon)
+                       on XFree86/Xorg the XFIXES extension is required.
+                       Either can be disabled with -nocursor, and also some
+                       values of the "mode" option below.
+
+                       The "mode" string can be used to fine-tune the
+                       displaying of cursor shapes.  It can be used the
+                       following ways:
+
+                       "-cursor X" - when the cursor appears to be on the
+                       root window, draw the familiar X shape.  Some desktops
+                       such as GNOME cover up the root window completely,
+                       and so this will not work, try "X1", etc, to try to
+                       shift the tree depth.  On high latency links or slow
+                       machines there will be a time lag between expected and
+                       the actual cursor shape.
+
+                       "-cursor some" - like "X" but use additional
+                       heuristics to try to guess if the window should have
+                       a windowmanager-like resizer cursor or a text input
+                       I-beam cursor.  This is a complete hack, but may be
+                       useful in some situations because it provides a little
+                       more feedback about the cursor shape.
+
+                       "-cursor most" - try to show as many cursors as
+                       possible.  Often this will only be the same as "some".
+                       On Solaris if XFIXES is not available, -overlay mode
+                       will be used.
+
+-nocursorshape         Do not use the TightVNC CursorShapeUpdates extension
+                       even if clients support it.  See -cursor above.
 -cursorpos             Option -cursorpos enables sending the X cursor position
 -nocursorpos           back to all vnc clients that support the TightVNC
-                       CursorPosUpdates extension.  Default: -cursorpos
+                       CursorPosUpdates extension.  Other clients will be able
+                       to see the pointer motions. Default: -cursorpos
+-xwarppointer          Move the pointer with XWarpPointer(3X) instead of XTEST
+                       extension.  Use this as a workaround if the pointer
+                       motion behaves incorrectly, e.g.  on touchscreens or
+                       other non-standard setups.  Also sometimes needed on
+                       XINERAMA displays.
+
 -buttonmap string      String to remap mouse buttons.  Format: IJK-LMN, this
                        maps buttons I -> L, etc., e.g.  -buttonmap 13-31
 
@@ -2800,7 +2890,8 @@ These options are passed to libvncserver:
    Pretty wild huh? [1]Contact me if you have any questions or problems.
 
    Personally, I use:
-x11vnc -rfbauth $HOME/.vnc/passwd -nap -flashcmap -cursorpos -norepeat
+x11vnc -rfbauth $HOME/.vnc/passwd -nap -flashcmap -cursor X -norepeat -add_keys
+yms
 
    (the -flashcmap only matters on old 8-bit X displays)
 
