@@ -44,7 +44,7 @@ void read_keys()
 	 for(j=0,i+=2;(k=hex2number(buffer[i]))>=0;i++)
 	   j=j*16+k;
 	 if(keys[j&0x3ff]) {
-	    char* x=malloc(1+strlen(keys[j&0x3ff])+1+strlen(buffer+strlen("#define ")));
+	    char* x=(char*)malloc(1+strlen(keys[j&0x3ff])+1+strlen(buffer+strlen("#define ")));
 	    strcpy(x,keys[j&0x3ff]);
 	    strcat(x,",");
 	    strcat(x,buffer+strlen("#define "));

@@ -1,3 +1,7 @@
+2004-02-04  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* Make examples (at least a few) compileable with g++,
+	  as pointed out by Juan Jose Costello
+
 2004-01-30  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* Thanks to Paul Fox from Bright Star Engineering,
 	  a few more memory leaks were fixed.

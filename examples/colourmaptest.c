@@ -21,7 +21,7 @@ int main(int argc,char** argv)
   bytes[128*3+2]=0;
   server->colourMap.data.bytes=bytes;
 
-  server->frameBuffer=malloc(256*256);
+  server->frameBuffer=(char*)malloc(256*256);
   for(i=0;i<256*256;i++)
      server->frameBuffer[i]=(i/256);
 

@@ -10,7 +10,7 @@ int main(int argc,char** argv)
                          
   rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,400,300,5,3,2);
 
-  server->frameBuffer=malloc(400*300*2);
+  server->frameBuffer=(char*)malloc(400*300*2);
   f=(uint16_t*)server->frameBuffer;
   for(j=0;j<300;j++)
     for(i=0;i<400;i++)
