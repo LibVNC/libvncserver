@@ -419,7 +419,7 @@ void rfbUndrawCursor(rfbScreenInfoPtr s)
 	    s->underCursorBuffer+j*x2*bpp,
 	    x2*bpp);
    
-   rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
+   /* rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2); */
    s->cursorIsDrawn = FALSE;
    UNLOCK(s->cursorMutex);
 }
@@ -430,6 +430,8 @@ void rfbDrawCursor(rfbScreenInfoPtr s)
    int i,j,x1,x2,y1,y2,i1,j1,bpp=s->rfbServerFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
      bufSize,w;
+   rfbBool wasChanged=FALSE;
+   
    if(!c) return;
    LOCK(s->cursorMutex);
    if(s->cursorIsDrawn) {
@@ -465,10 +467,15 @@ void rfbDrawCursor(rfbScreenInfoPtr s)
    }
 
    /* save data */
-   for(j=0;j<y2;j++)
-     memcpy(s->underCursorBuffer+j*x2*bpp,
-	    s->frameBuffer+(y1+j)*rowstride+x1*bpp,
-	    x2*bpp);
+   for(j=0;j<y2;j++) {
+     char* dest=s->underCursorBuffer+j*x2*bpp;
+     const char* src=s->frameBuffer+(y1+j)*rowstride+x1*bpp;
+     unsigned int count=x2*bpp;
+     if(wasChanged || memcmp(dest,src,count)) {
+       wasChanged=TRUE;
+       memcpy(dest,src,count);
+     }
+   }
    
    if(!c->richSource)
      MakeRichCursorFromXCursor(s,c);
@@ -480,8 +487,8 @@ void rfbDrawCursor(rfbScreenInfoPtr s)
 	 memcpy(s->frameBuffer+(j+y1)*rowstride+(i+x1)*bpp,
 		c->richSource+(j+j1)*c->width*bpp+(i+i1)*bpp,bpp);
 
-
-   rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
+   if(wasChanged)
+     rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
    s->cursorIsDrawn = TRUE;
    UNLOCK(s->cursorMutex);
 }
