@@ -1,3 +1,8 @@
+2004-08-31  Karl Runge <runge@karlrunge.com>
+	* new check_user_input() pointer input algorithm, it tries to avoid
+	  extra-draws. still needs tuning, get previous one with -old_pointer2
+	* add NON_CVS macro for building in older CVS trees.
+
 2004-08-29  Karl Runge <runge@karlrunge.com>
 	* remove old mouse patch code, now use rfbSetCursor (+ workarounds)
 	* changed cursor shape options (no more -mouse, ...) to '-cursor mode'

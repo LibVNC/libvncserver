@@ -2,7 +2,7 @@
 .TH X11VNC "1" "August 2004" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.6.3pre, lastmod: 2004-08-29
+         version: 0.6.3pre, lastmod: 2004-08-31
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -588,9 +588,14 @@ menu traversals.
 .PP
 \fB-old_pointer\fR
 .IP
-Do not use the new pointer input handling mechanisms.
+Use the original pointer input handling mechanism.
 See check_input() and pointer() in source file for
 details.
+.PP
+\fB-old_pointer2\fR
+.IP
+The default pointer input handling algorithm was changed
+again, this option indicates to use the second one.
 .PP
 \fB-input_skip\fR \fIn\fR
 .IP
@@ -612,7 +617,7 @@ times for more output.
 \fB-defer\fR \fItime\fR
 .IP
 Time in ms to wait for updates before sending to client
-[rfbDeferUpdateTime]  Default: 30
+(deferUpdateTime)  Default: 30
 .PP
 \fB-wait\fR \fItime\fR
 .IP

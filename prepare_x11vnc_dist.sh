@@ -16,7 +16,7 @@ sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
 mv Makefile.am Makefile.am.LibVNCServer
 
 cat Makefile.am.LibVNCServer | \
-sed -e "s/^SUBDIRS.*$/SUBDIRS=libvncserver x11vnc/" \
+sed -e "s/^SUBDIRS.*$/SUBDIRS=libvncserver x11vnc classes/" \
     -e "s/^DIST_SUBDIRS.*$/DIST_SUBDIRS=libvncserver x11vnc classes/" \
     -e "/all: make_config_executable/,\$d" \
     -e "/^.*bin_SCRIPTS.*$/d" \
@@ -49,6 +49,10 @@ cat libvncserver/Makefile.am.LibVNCServer | \
 sed -e "s/\(include\|LIB\|lib\)_/noinst_/g" \
 > libvncserver/Makefile.am
 
+cp classes/Makefile.am classes/Makefile.am.LibVNCServer
+echo 'pkgdatadir = $(datadir)/@PACKAGE@/classes' >> classes/Makefile.am
+echo 'pkgdata_DATA=VncViewer.jar index.vnc' >> classes/Makefile.am
+
 mv acinclude.m4 acinclude.m4.LibVNCServer
 
 cat acinclude.m4.LibVNCServer | \
@@ -56,7 +60,7 @@ sed -e "s/^\(_PKG.*\)\$PACKAGE\(.*\)$/\1LibVNCServer\2/" \
 > acinclude.m4
 
 make x11vnc-${VERSION}.tar.gz
-for f in configure.ac Makefile.am libvncserver/Makefile.am acinclude.m4; do
+for f in configure.ac Makefile.am libvncserver/Makefile.am classes/Makefile.am acinclude.m4; do
 	mv -f $f.LibVNCServer $f
 done
 

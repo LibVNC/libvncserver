@@ -105,13 +105,16 @@
 
 /* -- x11vnc.h -- */
 
+#define NON_CVS 0
 /*
  * At some point beyond 0.7pre remove these two definitions since we
  * have them set in configure (for all users of this x11vnc.c file).
  * Then move them to the comment below.
  */
+#if NON_CVS
 #define LIBVNCSERVER_HAVE_XSHM
 #define LIBVNCSERVER_HAVE_XTEST
+#endif
 
 /* 
  * If you are building in an older libvncserver tree with this newer
@@ -127,6 +130,22 @@
  *
  */
 
+/*
+ * This is another transient for building in older libvncserver trees.
+ */
+#if NON_CVS
+#define dontDisconnect	rfbDontDisconnect
+#define neverShared	rfbNeverShared
+#define alwaysShared	rfbAlwaysShared
+#define clientHead	rfbClientHead
+#define serverFormat	rfbServerFormat
+#define port		rfbPort
+#define listenSock	rfbListenSock
+#define deferUpdateTime	rfbDeferUpdateTime
+#define authPasswdData	rfbAuthPasswdData
+#define rfbEncryptAndStorePasswd	vncEncryptAndStorePasswd
+#endif
+
 #include <unistd.h>
 #include <signal.h>
 #include <sys/utsname.h>
@@ -134,16 +153,6 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-
-#ifdef LIBVNCSERVER_HAVE_XSHM
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <X11/extensions/XShm.h>
-#endif
-
-#ifdef LIBVNCSERVER_HAVE_XTEST
-#include <X11/extensions/XTest.h>
-#endif
 
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
@@ -155,17 +164,22 @@
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
 
+#ifdef LIBVNCSERVER_HAVE_XSHM
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <X11/extensions/XShm.h>
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_XTEST
+#include <X11/extensions/XTest.h>
+#endif
+
 #ifdef LIBVNCSERVER_HAVE_XKEYBOARD
 #include <X11/XKBlib.h>
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif
-#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
+#ifdef LIBVNCSERVER_HAVE_LIBXINERAMA
+#include <X11/extensions/Xinerama.h>
 #endif
 
 #if defined (__SVR4) && defined (__sun)
@@ -173,12 +187,18 @@
 #include <X11/extensions/transovl.h>
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_LIBXINERAMA
-#include <X11/extensions/Xinerama.h>
+#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
 #endif
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.6.3pre lastmod: 2004-08-29";
+char lastmod[] = "0.6.3pre lastmod: 2004-08-31";
 
 /* X display info */
 
@@ -317,7 +337,7 @@ void cursor_position(int, int);
 void read_vnc_connect_prop(void);
 void rfbPE(rfbScreenInfoPtr, long);
 void rfbCFD(rfbScreenInfoPtr, long);
-void scan_for_updates(void);
+int scan_for_updates(void);
 void set_colormap(void);
 void set_offset(void);
 void set_visual(char *vstring);
@@ -379,7 +399,7 @@ int use_xkb_modtweak = 0;	/* -xkb */
 char *skip_keycodes = NULL;
 int add_keysyms = 0;		/* automatically add keysyms to X server */
 
-int old_pointer = 0;		/* use the old way of updating the pointer */
+int old_pointer = 0;		/* use the old ways of updating the pointer */
 int single_copytile = 0;	/* use the old way copy_tiles() */
 
 int using_shm = 1;		/* whether mit-shm is used */
@@ -389,7 +409,7 @@ int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
  * poll times of 10-35ms, so maybe this value cuts the idle load by 2 or so.
  */
 int waitms = 30;
-int defer_update = 30;	/* rfbDeferUpdateTime ms to wait before sends. */
+int defer_update = 30;	/* deferUpdateTime ms to wait before sends. */
 
 int screen_blank = 60;	/* number of seconds of no activity to throttle */
 			/* down the screen polls.  zero to disable. */
@@ -1722,7 +1742,7 @@ static void check_connect_file(char *file) {
 static int do_reverse_connect(char *str) {
 	rfbClientPtr cl;
 	char *host, *p;
-	int port = 5500, len = strlen(str);
+	int rport = 5500, len = strlen(str);
 
 	if (len < 1) {
 		return 0;
@@ -1743,11 +1763,11 @@ static int do_reverse_connect(char *str) {
 
 	/* extract port, if any */
 	if ((p = strchr(host, ':')) != NULL) {
-		port = atoi(p+1);
+		rport = atoi(p+1);
 		*p = '\0';
 	}
 
-	cl = rfbReverseConnection(screen, host, port);
+	cl = rfbReverseConnection(screen, host, rport);
 	free(host);
 
 	if (cl == NULL) {
@@ -3823,7 +3843,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	 * See check_user_input() for the more complicated things we do
 	 * in the non-threaded case.
 	 */
-	if (use_threads && ! old_pointer) {
+	if (use_threads && old_pointer != 1) {
 #		define NEV 32
 		/* storage for the event queue */
 		static int mutex_init = 0;
@@ -5448,9 +5468,10 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
  * the x11vnc.c file by itself and plop it down into their libvncserver tree.
  * Remove at some point.  BTW, this assumes no usage of earlier "0.7pre".
  */
-#ifdef LIBVNCSERVER_VERSION
-	if (strcmp(LIBVNCSERVER_VERSION, "0.5") 
-	    && strcmp(LIBVNCSERVER_VERSION, "0.6")) {
+#if NON_CVS && defined(LIBVNCSERVER_VERSION)
+	if (strcmp(LIBVNCSERVER_VERSION, "0.6"))
+#endif
+	{ 
 		if (*argc != 1) {
 			int i;
 			rfbLog("*** unrecognized option(s) ***\n");
@@ -5474,7 +5495,6 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 			clean_up_exit(1);
 		}
 	}
-#endif
 
 	screen->paddedWidthInBytes = rfb_bytes_per_line;
 	screen->serverFormat.bitsPerPixel = fb->bits_per_pixel;
@@ -7876,8 +7896,9 @@ static int scan_display(int ystart, int rescan) {
 
 /*
  * toplevel for the scanning, rescanning, and applying the heuristics.
+ * returns number of changed tiles.
  */
-void scan_for_updates(void) {
+int scan_for_updates(void) {
 	int i, tile_count, tile_diffs;
 	double frac1 = 0.1;   /* tweak parameter to try a 2nd scan_display() */
 	double frac2 = 0.35;  /* or 3rd */
@@ -7957,11 +7978,11 @@ void scan_for_updates(void) {
 			fb_copy_in_progress = 1;
 			copy_screen();
 			fb_copy_in_progress = 0;
-			if (use_threads && ! old_pointer) {
+			if (use_threads && old_pointer != 1) {
 				pointer(-1, 0, 0, NULL);
 			}
 			nap_check(tile_count);
-			return;
+			return tile_count;
 		}
 	}
 	scan_in_progress = 0;
@@ -8000,7 +8021,7 @@ void scan_for_updates(void) {
 	}
 
 	fb_copy_in_progress = 0;
-	if (use_threads && ! old_pointer) {
+	if (use_threads && old_pointer != 1) {
 		/*
 		 * tell the pointer handler it can process any queued
 		 * pointer events:
@@ -8030,6 +8051,7 @@ void scan_for_updates(void) {
 
 
 	nap_check(tile_diffs);
+	return tile_diffs;
 }
 
 /* -- x11vnc.c -- */
@@ -8055,10 +8077,14 @@ static int defer_update_nofb = 6;	/* defer a shorter time under -nofb */
  *
  * return of 1 means watch_loop should short-circuit and reloop,
  * return of 0 means watch_loop should proceed to scan_for_updates().
+ * (this is for old_pointer == 1 mode, the others do it all internally,
+ * cnt is also only for that mode).
  */
-static int check_user_input(double dt, int *cnt) {
+static int check_user_input_old(double dt, int *cnt);
 
-	if (old_pointer) {
+static int check_user_input(double dt, int tile_diffs, int *cnt) {
+
+	if (old_pointer == 1) {
 		/* every n-th drops thru to scan */
 		if ((got_user_input || ui_skip < 0) && *cnt % ui_skip != 0) {
 			*cnt++;
@@ -8067,7 +8093,149 @@ static int check_user_input(double dt, int *cnt) {
 		} else {
 			return 0;
 		}
+	} else if (old_pointer == 2) {
+		/* this older way is similar to the method below */
+		return check_user_input_old(dt, cnt);
 	}
+
+	if (got_keyboard_input) {
+		if (*cnt % ui_skip != 0) {
+			*cnt++;
+			return 1;	/* short circuit watch_loop */
+		}
+		/* otherwise continue with pointer input */
+	}
+
+	if (got_pointer_input) {
+		int spun_out, missed_out, allowed_misses, g, g_in;
+		double spin, spin_max, tm, to, dtm, rpe_last;
+		static int rfb_wait_ms = 2;
+		static double grind_spin_time = 0.30, dt_min = 0.15;
+		static double quick_spin_fac = 0.65, spin_max_fac = 2.0;
+		static double rpe_wait = 0.15;
+		int grinding, gcnt, ms, split = 200;
+
+
+		/*
+		 * Try for some "quick" pointer input processing.
+		 *
+		 * About as fast as we can, we try to process user input
+		 * calling rfbProcessEvents or rfbCheckFds.  We do this
+		 * for a time on order of the last scan_for_updates() time,
+		 * dt, but if we stop getting user input we break out.
+		 *
+		 * Note that rfbCheckFds() does not send any framebuffer
+		 * updates, so is more what we want here, although it is
+		 * likely they have all be sent already.
+		 *
+		 * After our first spin_out or missed_out, we decide if we
+		 * should continue, if we do so we say we are "grinding"
+		 */
+
+		if (dt < dt_min) {
+			dt = dt_min;	/* this is to try to avoid early exit */
+		}
+		/* max spin time in 1st pass, comparable to last dt */
+		spin_max = quick_spin_fac * dt;
+
+		grinding = 0;		/* 1st pass is "not grinding" */
+		spin = 0.0;		/* amount of time spinning */
+		spun_out = 0;		/* whether we spun out of time */
+		missed_out = 0;		/* whether we received no ptr input */
+		allowed_misses = 3;	/* number of ptr inputs we can miss */
+		gcnt = 0;
+
+		tm = 0.0;		/* timer variable */
+		dtime(&tm);
+		rpe_last = to = tm;	/* last time we did rfbPE() */
+		g = g_in = got_pointer_input;
+
+		while (1) {
+			int got_input = 0;
+
+			gcnt++;
+			if (grinding) {
+				if (gcnt >= split) {
+					break;
+				}
+				usleep(ms * 1000);
+			}
+
+			if (show_multiple_cursors && tm > rpe_last + rpe_wait) {
+				rfbPE(screen, rfb_wait_ms * 1000);
+				rpe_last = tm;
+			} else {
+				rfbCFD(screen, rfb_wait_ms * 1000);
+			}
+
+			dtm = dtime(&tm);
+			spin += dtm;
+
+			if (spin > spin_max) {
+				/* get out if spin time over limit */
+				spun_out = 1;
+			} else if (got_pointer_input > g) {
+				/* received some input, flush to display. */
+				got_input = 1;
+				g = got_pointer_input;
+				XFlush(dpy);
+			} else if (--allowed_misses <= 0) {
+				/* too many misses */
+				missed_out = 1;
+			} else {
+				/* these are misses */
+				int wms = 0;
+				if (! grinding && gcnt == 1 && button_mask) {
+					/*
+					 * missed our first input, wait
+					 * for a defer time. (e.g. on
+					 * slow link) hopefully client
+					 * will batch them.
+					 */
+					wms = 1000 * (0.5 * (spin_max - spin));
+				} else if (button_mask) {
+					wms = 10;
+				}
+				if (wms) {
+					usleep(wms * 1000);
+				}
+			}
+			if (spun_out && ! grinding) {
+				/* set parameters for grinding mode. */
+
+				grinding = 1;
+
+				if (spin > grind_spin_time || button_mask) {
+					spin_max = spin +
+					    grind_spin_time * spin_max_fac;
+				} else {
+					spin_max = spin + dt * spin_max_fac;
+				}
+				ms = (int) (1000 * ((spin_max - spin)/split));
+				if (ms < 1) {
+					ms = 1;
+				}
+
+				/* reset for second pass */
+				spun_out = 0;
+				missed_out = 0;
+				allowed_misses = 5;
+				g = got_pointer_input;
+				gcnt = 0;
+			} else if (spun_out && grinding) {
+				/* done in 2nd pass */
+				break;
+			} else if (missed_out) {
+				/* done in either pass */
+				break;
+			}
+		}
+	}
+	return 0;
+}
+
+/* this is the -old_pointer2 way */
+static int check_user_input_old(double dt, int *cnt) {
 
 	if (got_keyboard_input) {
 		if (*cnt % ui_skip != 0) {
@@ -8083,7 +8251,6 @@ static int check_user_input(double dt, int *cnt) {
 		double spin = 0.0, tm = 0.0;
 		double quick_spin_fac  = 0.40;
 		double grind_spin_time = 0.175;
-
 
 		dtime(&tm);
 		g = g_in = got_pointer_input;
@@ -8234,7 +8401,7 @@ void rfbCFD(rfbScreenInfoPtr scr, long usec) {
  * main x11vnc loop: polls, checks for events, iterate libvncserver, etc.
  */
 static void watch_loop(void) {
-	int cnt = 0;
+	int cnt = 0, tile_diffs = 0;
 	double dt = 0.0;
 
 	if (use_threads) {
@@ -8250,9 +8417,10 @@ static void watch_loop(void) {
 		if (! use_threads) {
 			rfbPE(screen, -1);
 			if (! cursor_shape_updates) {
+				/* undo any cursor shape requests */
 				unset_cursor_shape_updates(screen);
 			}
-			if (check_user_input(dt, &cnt)) {
+			if (check_user_input(dt, tile_diffs, &cnt)) {
 				/* true means loop back for more input */
 				continue;
 			}
@@ -8273,7 +8441,6 @@ static void watch_loop(void) {
 		if (nofb) {
 			/* no framebuffer polling needed */
 			if (cursor_pos_updates) {
-				/* -nofb -cursorpos usage is rare */
 				check_x11_pointer();
 			}
 			continue;
@@ -8287,8 +8454,10 @@ static void watch_loop(void) {
 			check_bell_event();
 		}
 		if (! show_dragging && button_mask) {
-			/* if any button is pressed do not update screen */
-			/* XXX consider: use_threads || got_pointer_input */
+			/*
+			 * if any button is pressed do not update rfb
+			 * screen, but do flush the X11 display.
+			 */
 			X_LOCK;
 			XFlush(dpy);
 			X_UNLOCK;
@@ -8298,10 +8467,9 @@ static void watch_loop(void) {
 			dtime(&tm);
 
 			rfbUndrawCursor(screen);
-			scan_for_updates();
-			check_x11_pointer();
-
+			tile_diffs = scan_for_updates();
 			dt = dtime(&tm);
+			check_x11_pointer();
 		}
 
 		/* sleep a bit to lessen load */
@@ -8731,9 +8899,11 @@ static void print_help(void) {
 "                       improves response on slow setups, but you lose all\n"
 "                       visual feedback for drags, text selection, and some\n"
 "                       menu traversals.\n"
-"-old_pointer           Do not use the new pointer input handling mechanisms.\n"
+"-old_pointer           Use the original pointer input handling mechanism.\n"
 "                       See check_input() and pointer() in source file for\n"
 "                       details.\n"
+"-old_pointer2          The default pointer input handling algorithm was changed\n"
+"                       again, this option indicates to use the second one.\n"
 "-input_skip n          For the old pointer handling when non-threaded: try to\n"
 "                       read n user input events before scanning display. n < 0\n"
 "                       means to act as though there is always user input.\n"
@@ -8744,7 +8914,7 @@ static void print_help(void) {
 "                       times for more output.\n"
 "\n"
 "-defer time            Time in ms to wait for updates before sending to client\n"
-"                       [rfbDeferUpdateTime]  Default: %d\n"
+"                       (deferUpdateTime)  Default: %d\n"
 "-wait time             Time in ms to pause between screen polls.  Used to cut\n"
 "                       down on load.  Default: %d\n"
 "-nap                   Monitor activity and if low take longer naps between\n"
@@ -9295,6 +9465,8 @@ int main(int argc, char* argv[]) {
 			if (! ui_skip) ui_skip = 1;
 		} else if (!strcmp(arg, "-old_pointer")) {
 			old_pointer = 1;
+		} else if (!strcmp(arg, "-old_pointer2")) {
+			old_pointer = 2;
 		} else if (!strcmp(arg, "-norepeat")) {
 			no_autorepeat = 1;
 		} else if (!strcmp(arg, "-repeat")) {
@@ -10030,36 +10202,36 @@ int main(int argc, char* argv[]) {
 	}
 	if (screen->port) {
 		char *host = this_host();
-		int port = screen->port;
+		int lport = screen->port;
 		if (host != NULL) {
 			/* note that vncviewer special cases 5900-5999 */
 			if (inetd) {
-				;	/* should not occur (rfbPort) */
+				;	/* should not occur (port) */
 			} else if (quiet) {
-				if (port >= 5900) {
+				if (lport >= 5900) {
 					fprintf(stderr, "The VNC desktop is "
-					    "%s:%d\n", host, port - 5900);
+					    "%s:%d\n", host, lport - 5900);
 				} else {
 					fprintf(stderr, "The VNC desktop is "
-					    "%s:%d\n", host, port);
+					    "%s:%d\n", host, lport);
 				}
-			} else if (port >= 5900) {
+			} else if (lport >= 5900) {
 				rfbLog("The VNC desktop is %s:%d\n", host,
-				    port - 5900);
-				if (port >= 6000) {
+				    lport - 5900);
+				if (lport >= 6000) {
 					rfbLog("possible aliases:  %s:%d, "
-					    "%s::%d\n", host, port, host, port);
+					    "%s::%d\n", host, lport, host, lport);
 				}
 			} else {
 				rfbLog("The VNC desktop is %s:%d\n", host,
-				    port);
+				    lport);
 				rfbLog("possible alias:    %s::%d\n",
-				    host, port);
+				    host, lport);
 			}
 		}
 		fflush(stderr);	
 		if (inetd) {
-			;	/* should not occur (rfbPort) */
+			;	/* should not occur (port) */
 		} else {
 			fprintf(stdout, "PORT=%d\n", screen->port);
 		}
