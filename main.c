@@ -306,29 +306,17 @@ void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
 
 static rfbCursor myCursor = 
 {
-   //width: 8, height: 7, xhot: 3, yhot: 3,
-   width: 8, height: 7, xhot: 0, yhot: 0,
-   //source: "\000\102\044\030\044\102\000",
-   //mask:   "\347\347\176\074\176\347\347",
-   source: "\000\074\176\146\176\074\000",
-   mask:   "\176\377\377\377\377\377\176",
+   width: 8, height: 7, xhot: 3, yhot: 3,
+   source: "\000\102\044\030\044\102\000",
+   mask:   "\347\347\176\074\176\347\347",
+   /*
+     width: 8, height: 7, xhot: 0, yhot: 0,
+     source: "\000\074\176\146\176\074\000",
+     mask:   "\176\377\377\377\377\377\176",
+   */
    foreRed: 0, foreGreen: 0, foreBlue: 0,
    backRed: 0xffff, backGreen: 0xffff, backBlue: 0xffff,
- #define D "\000\000\000\000"
- #define R "\377\000\000\000"
- #define G "\000\377\000\000"
- #define B "\000\000\377\000"
- #define S "\377\377\000\000"
- #define H "\000\377\377\000"
- #define C "\377\000\377\000"
    richSource: 0
-   /*D D D D D D D D
-     D D R R R R D D
-     D S S S S S S D
-     D G G D D G G D
-     D H H H H H H D
-     D D B B B B D D
-     D D D D D D D D*/
 };
 
 rfbCursorPtr defaultGetCursorPtr(rfbClientPtr cl)
@@ -433,6 +421,12 @@ rfbScreenInfoPtr rfbGetScreen(int argc,char** argv,
    rfbClientListInit(rfbScreen);
 
    return(rfbScreen);
+}
+
+void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
+{
+  /* TODO */
+  free(rfbScreen);
 }
 
 void rfbInitServer(rfbScreenInfoPtr rfbScreen)

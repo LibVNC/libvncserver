@@ -3,18 +3,20 @@ immediate:
 
 fix bug in http (java) client with big endian server: byte swapping is broken
 cursor "smears" sometimes when not using cursor encoding
+really support pthreads.
 
 in the works:
 -------------
 
 adapt rdp2vnc (rdesktop)
 optionally dont draw rich cursors as xcursors
-use sraRegion from rdp2vnc instead of miregion, because it is much smaller
+use sraRegion from Wez instead of miregion, because it is much smaller
 
 later:
 ------
 
 udp
+autoconf
 rfbCloseClient, rfbConnect, ConnectToTcpAddr
 CORBA
 translate.c: warning about non 8-bit colourmaps

@@ -612,7 +612,8 @@ extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
 
 /* call one of these two functions to service the vnc clients.
  usec are the microseconds the select on the fds waits.
- if you are using the event loop, set this to some value > 0. */
+ if you are using the event loop, set this to some value > 0, so the
+ server doesn't get a high load just by listening. */
 
 extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, Bool runInBackground);
 extern void rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);

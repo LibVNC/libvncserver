@@ -241,42 +241,42 @@ void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
     "              xxxxxx            "
     "       xxxxxxxxxxxxxxxxx        "
     "      xxxxxxxxxxxxxxxxxxxxxx    "
-    "    xxxxxxxxxxxxxxxxxxxxxxxxx   "
+    "    xxxxx  xxxxxxxx  xxxxxxxx   "
     "   xxxxxxxxxxxxxxxxxxxxxxxxxxx  "
     "  xxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
-    "  xxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+    "  xxxxx   xxxxxxxxxxx   xxxxxxx "
+    "  xxxx     xxxxxxxxx     xxxxxx "
+    "  xxxxx   xxxxxxxxxxx   xxxxxxx "
     " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
     " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
-    " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
-    " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
-    " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+    " xxxxxxxxxxxx  xxxxxxxxxxxxxxx  "
     " xxxxxxxxxxxxxxxxxxxxxxxxxxxx   "
-    " xxxxxxxxxxxxxxxxxxxxxxxxxxx    "
-    " xxxxxxxxxxxxxxxxxxxxxxxxxx     "
-    " xxxxxxxxxxxxxxxxxxxxxxxxxx     "
-    "  xxxxxxxxxxxxxxxxxxxxxxxx      "
-    "   xxxxxxxxxxxxxxxxxxxxxx       "
+    " xxxxxxxxxxxxxxxxxxxxxxxxxxxx   "
+    " xxxxxxxxxxx   xxxxxxxxxxxxxx   "
+    " xxxxxxxxxx     xxxxxxxxxxxx    "
+    "  xxxxxxxxx      xxxxxxxxx      "
+    "   xxxxxxxxxx   xxxxxxxxx       "
     "      xxxxxxxxxxxxxxxxxxx       "
-    "        xxxxxxxxxxxxxxxxx       "
-    "           xxxxxxxxxxxxxxx      "
-    "             xxxxxxxxxxxxxx     "
-    "               xxxxxxxxxxxx     "
-    "                xxxxxxxxxxxx    "
-    "  xx             xxxxxxxxxxx    "
-    "  xxx             xxxxxxxxxxx   "
-    "  xxxx            xxxxxxxxxxx   "
-    "   xxxxxx      xxxxxxxxxxxxx    "
+    "       xxxxxxxxxxxxxxxxxxx      "
+    "         xxxxxxxxxxxxxxxxxxx    "
+    "             xxxxxxxxxxxxxxxxx  "
+    "                xxxxxxxxxxxxxxx "
+    "   xxxx           xxxxxxxxxxxxx "
+    "  xx   x            xxxxxxxxxxx "
+    "  xxx               xxxxxxxxxxx "
+    "  xxxx             xxxxxxxxxxx  "
+    "   xxxxxx       xxxxxxxxxxxx    "
     "    xxxxxxxxxxxxxxxxxxxxxx      "
     "      xxxxxxxxxxxxxxxx          "
     "                                ";
-  c=rfbScreen->cursor = rfbMakeXCursor(w,h,bitmap,0);
-  c->xhot = 2; c->yhot = 10;
+  c=rfbScreen->cursor = rfbMakeXCursor(w,h,bitmap,bitmap);
+  c->xhot = 16; c->yhot = 24;
 
   c->richSource = malloc(w*h*bpp);
   for(j=0;j<h;j++) {
     for(i=0;i<w;i++) {
-      c->richSource[j*w*bpp+i*bpp+0]=0; //i*0xff/w;
-      c->richSource[j*w*bpp+i*bpp+1]=0;
+      c->richSource[j*w*bpp+i*bpp+0]=i*0xff/w;
+      c->richSource[j*w*bpp+i*bpp+1]=(i+j)*0xff/(w+h);
       c->richSource[j*w*bpp+i*bpp+2]=j*0xff/h;
       c->richSource[j*w*bpp+i*bpp+3]=0;
     }
