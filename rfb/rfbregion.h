@@ -59,4 +59,7 @@ void sraRgnPrint(const sraRegion *s);
 extern rfbBool sraClipRect(int *x, int *y, int *w, int *h,
 			int cx, int cy, int cw, int ch);
 
+extern rfbBool sraClipRect2(int *x, int *y, int *x2, int *y2,
+			int cx, int cy, int cx2, int cy2);
+
 #endif
