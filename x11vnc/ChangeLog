@@ -1,3 +1,13 @@
+2005-04-10  Karl Runge <runge@karlrunge.com>
+	* -rawfb non X-polling (i.e. shm, mmap, lseek).
+	* -pipeinput enable external user input processing command.
+	* -xtrap use XESimulateXEventRequest to inject user input.
+	* scaling blend for StaticGray, add :fb scaling option.
+	* default password macros.
+	* improve -norepeat use under -viewonly.
+	* -flag flagfile to aid wrapper scripts.
+	* add utility scripts, etc. dir ./misc
+
 2005-04-03  Karl Runge <runge@karlrunge.com>
 	* try DEC-XTRAP on X11R5 if XTestGrabControl is missing.
 	* -shiftcmap n, for 8bpp displays using < 256 color cells

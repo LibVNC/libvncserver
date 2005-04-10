@@ -1,6 +1,9 @@
 DEFINES = -I ..
 LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
 
+SUBDIRS = misc
+DIST_SUBDIRS = misc
+
 man_MANS=x11vnc.1
 EXTRA_DIST=ChangeLog README tkx11vnc $(man_MANS)
 

@@ -1,0 +1,109 @@
+#!/usr/dt/bin/dtksh
+#
+# accept dialog script for x11vnc
+# 2004-07-13 stefan.radman@ctbto.org
+# should work in any CDE environment (Sun,HP,IBM,...)
+# 
+# when called without parameters shows a CDE question dialog:
+#   Do you want to accept a VNC connection
+#   from IP address $RFB_CLIENT_IP to your desktop?
+#   Note:
+#   After 30 seconds the screen will
+#   be locked and the connection will be
+#   accepted automatically."
+#       [Yes} {__No__] [View/Only]
+# and counts down a timer in the dialog title bar
+# when the timer is down to 0, it locks the display and returns 0
+# (if the screenlock was successful or if the login prompt was active)
+#
+# buttons=retcode:
+#    Yes = 0
+#    No = 1 (same as closing the dialog windows)
+#    View/Only = 3
+#
+# usage: x11vnc -forever -shared -accept "yes:0,no:*,view:3 dtVncPopup" -gone "dtVncPopup lock"
+#
+# security considerations: when you return to your console and unlock the display 
+#                  you can never know if enyone else is connected to your display
+#
+
+# timeout until accept
+timeout=30
+
+# dialog message
+test -z "${RFB_CLIENT_IP}" && unknown="an unknown " || ip="$RFB_CLIENT_IP "
+message="\
+Do you want to accept a VNC connection
+from ${unknown}IP address ${ip}to your desktop?
+Note:
+After $timeout seconds the screen will
+be locked and the connection will be
+accepted automatically."
+
+# action functions
+accept () {
+	exit 0
+}
+reject () {
+	exit 1
+}
+view () {
+	exit 3
+}
+lock () {
+        # lock only if dtsession active
+        xrdb -query | grep -c '^dtsession*' || accept
+	# accept only if lock succeeds
+	/usr/dt/bin/dtaction LockDisplay && accept || reject
+}
+
+# main
+
+# actions can be called directly
+test $# -gt 0 && $@
+
+# initialize the display
+XtInitialize TOPLEVEL vncPopup VncPopup "$0" "$@"
+
+# create a message dialog containing the contents of the specified file
+XmCreateQuestionDialog DIALOG $TOPLEVEL dialog \
+	dialogTitle:"$DTKSH_APPNAME" \
+        messageString:"$message" \
+	unmapCallback:reject \
+#        symbolPixmap:/usr/dt/appconfig/icons/C/DtFlag.m.pm
+
+# change the OK button to "Yes"
+XmMessageBoxGetChild OK_BUTTON $DIALOG DIALOG_OK_BUTTON
+XtSetValues $OK_BUTTON \
+	labelString:"Yes" \
+	activateCallback:accept
+
+# change the Cancel Button to "No"
+XmMessageBoxGetChild CANCEL_BUTTON $DIALOG DIALOG_CANCEL_BUTTON
+XtSetValues $CANCEL_BUTTON \
+	labelString:"No" \
+	activateCallback:reject
+
+# change Help button to View-Only, set focus and make it the default
+XmMessageBoxGetChild HELP_BUTTON $DIALOG DIALOG_HELP_BUTTON
+XtSetValues $HELP_BUTTON \
+	labelString:"View\nOnly" \
+	activateCallback:view
+
+# make "No" the default (for unmap as well)
+XtSetValues $DIALOG \
+	defaultButton:$CANCEL_BUTTON initialFocus:$CANCEL_BUTTON \
+
+# create the ticker
+ticker () {
+        test $timeout -eq 0 && lock
+	XtSetValues $DIALOG dialogTitle:"accepting in $timeout seconds"
+	XtAddTimeOut TICKER 1000 ticker
+        timeout=`expr $timeout - 1`
+}
+
+# display dialog and activate ticker
+XtAddTimeOut TICKER 1000 ticker
+XtManageChild $DIALOG
+XtMainLoop
+

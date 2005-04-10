@@ -1,0 +1,133 @@
+#!/bin/sh
+#
+# usage: rx11vnc [-s] <host>:<xdisplay>
+#        rx11vnc [-s] <host>            (assumes xdisplay is 0)
+#
+# -s means use ssh instead of rsh.
+# -S tries to tunnel the vnc traffic thru ssh.  (experimental...)
+#
+#set -xv
+
+#
+# Place your x11vnc cmd + options here (must have -bg and -display
+# with -display as the last one)
+#
+cmd="x11vnc -nap -q -bg -display"
+viewer="vncviewer"
+rsh=rsh
+
+#
+# The following two settings are only used under -S (ssh tunnel)
+#
+# Unfortunately, we have to set up the ssh port redirection *before*
+# x11vnc has started and selected its listening port.
+# tunnel_ports is a list of ports we expect/hope to be free on both
+# the local and remote machines:
+#
+tunnel_ports="5900 5901 5902 5903"
+#
+# VNC has a poor default in that if the client appears to be emanating
+# from the local machine, then raw encoding is preferred.  With ssh port
+# redirection we appear to be coming from the localhost, but we are not.
+# We pass this encoding list to the viewer to give lowest preference to
+# raw encoding:
+#
+tunnel_encodings="copyrect tight zrle hextile zlib corre rre"
+
+if [ "$USER" = "runge" ]; then
+	cmd="x11vnc.expt -nap -q -bg -rfbauth .vnc/passwd -display"
+	viewer="vncviewerz"
+fi
+
+if [ "X$1" = "X-s" ]; then
+	shift
+	rsh=ssh
+elif [ "X$1" = "X-S" ]; then
+	shift
+	rsh=ssh
+	tunnel=1
+	cmd=`echo "$cmd" | sed -e 's/ / -localhost /'`
+fi
+
+remote=$1
+if echo "$remote" | grep ':' > /dev/null; then
+	:
+else
+	remote="$remote:0"
+fi
+
+host=`echo "$remote" | awk -F: '{print $1}'` 
+disp=`echo "$remote" | awk -F: '{print $2}'` 
+disp=":$disp"
+if [ "X$host" = "X" ]; then
+	echo "bad host."
+	exit 1
+fi
+
+# start the remote x11vnc:
+if [ $tunnel ]; then
+	# much more kludgy for tunnelling:
+	tmp=/tmp/rx11vnc.$$
+	redir=""
+	used_ports=`netstat -an | egrep '(ESTABLISHED|LISTEN) *$' \
+	    | sed -e 's/^[ 	]*//'   -e 's/^tcp[ 	0-9][ 	0-9]*//' \
+	          -e 's/[ 	].*$//' -e 's/^.*[^0-9]//' | sort -nu`
+	for p in $tunnel_ports
+	do
+		ok=1
+		for u in $used_ports
+		do
+			if [ "X$p" = "X$u" ]; then
+				echo "port $u is in use. skipping it"
+				ok=
+				break
+			fi
+		done
+		if [ $ok ]; then
+			redir="$redir -L $p:localhost:$p"
+		fi
+	done
+	#
+	# Have ssh put the command in the bg, then we look for PORT=
+	# in the tmp file.  The sleep at the end is to give us enough
+	# time to connect thru the port redir, otherwise ssh will exit
+	# before we can connect.
+	#
+	time=15
+	$rsh -f $redir $host "$cmd $disp; echo END; sleep $time" > $tmp
+
+	i=0
+	while [ $i -lt $time ]
+	do
+		sleep 1
+		if grep '^PORT=' $tmp > /dev/null; then
+			port=`grep '^PORT=' $tmp | sed -e 's/PORT=//'`
+			if [ "X$port" != "X" ]; then
+				break
+			fi
+		fi
+		i=`expr $i + 1`
+	done
+	cat $tmp
+	rm -f $tmp
+else
+	port=`$rsh $host "$cmd $disp" | grep '^PORT=' | sed -e 's/PORT=//'`
+fi
+
+echo "x11vnc port is '$port'"
+
+# now start up the viewer on this end:
+if echo "$port" | grep '^[0-9][0-9]*$' > /dev/null; then
+	if [ $port -lt 6000 -a $port -ge 5900 ]; then
+		# vncviewer special cases 0-99
+		port=`expr $port - 5900` 
+	fi
+	if [ $tunnel ]; then
+		$viewer -encodings "$tunnel_encodings" "localhost:$port"
+	else
+		$viewer "$host:$port"
+	fi
+else
+	echo "bad port."
+	exit 1
+fi

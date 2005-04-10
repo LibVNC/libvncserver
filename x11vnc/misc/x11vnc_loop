@@ -1,0 +1,89 @@
+#!/bin/sh
+#
+# x11vnc_loop:
+#
+# Example startup script for connecting x11vnc to an X display
+# at system boot up and having it reconnect when the X server restarts.
+#
+# Run, in rc.local say, via, e.g.:
+#
+#	/path/to/x11vnc_loop 1>> /var/tmp/x11vnc_loop.log 2>&1 &
+#
+# call with argument "once" or a number to limit the number of loops.
+# 
+##########################################################################
+# The following needs to be customized:
+x11vnc_cmd=x11vnc		# or use full path (or set PATH).
+pwfile=/path/to/vnc/passwd	# always use a password
+display=:0			# display of interest
+restart_sleep=5 		# pause between X server restarts.
+
+# modify cmdline args if desired:
+x11vnc_args="-display $display -rfbauth $pwfile -forever -nap"
+
+# you may need to customize the "grep", etc, below in get_xauthority_file()
+##########################################################################
+
+if [ "X$1" != "X" ]; then
+	max=$1
+	shift
+fi
+
+get_xauthority_file() {
+	#
+	# We need to find the MIT-COOKIE file... this not portable at all,
+	# depends on OS, distro, desktop, phase of moon, etc...
+	#
+	# If the cookie file was fixed and you knew it, you could just
+	# return it here e.g.:
+	#
+	## echo "/var/gdm/:0.Xauth"; return
+	#
+	# or, if you knew the directory, you could look for the youngest
+	# file there and return it e.g.:
+	#
+	## echo `ls -t /var/lib/xdm/authdir/authfiles/* | head -1`; return
+
+	# this hack tries to grep it out of ps output...
+	xauth=""
+	for i in 1 2 3
+	do
+		# very linux specific, and you likely need to tweak..
+		patt="X11R6.*/X.*-auth"
+		xauth=`ps wwwaux | grep "$patt" \
+			| egrep -v 'grep|Xprt' | head -1 \
+			| sed -e 's/^.*-auth//' | awk '{print $1}'` 
+
+		if [ "X$xauth" != "X" ]; then
+			break
+		fi
+		sleep 2	# wait a bit in case X server is restarting slowly.
+	done
+	echo $xauth
+}
+
+try=1
+while [ 1 ]
+do
+	echo "`date`  $0 try number: $try"; try=`expr $try + 1`
+
+	auth=`get_xauthority_file`
+	if [ ! -r "$auth" ]; then
+		echo "`date`  bad auth file: \"$auth\""
+	else
+		cmd="$x11vnc_cmd $x11vnc_args"
+		sleep 1
+		echo "`date`  running: $cmd -auth $auth"
+		# run x11vnc:
+		$cmd -auth $auth
+		if [ "X$max" = "Xonce" ]; then
+			exit $?
+		fi
+	fi
+	if echo "$max" | grep '[0-9]' > /dev/null; then
+		if [ $try -gt $max ]; then
+			exit
+		fi
+	fi
+	sleep $restart_sleep
+done

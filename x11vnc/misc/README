@@ -1,0 +1,32 @@
+
+In this directory you'll find a hodgepodge of wrapper scripts and
+utility programs that have found some use with x11vnc.  
+
+Some are on the rough side and will need some customization for your
+use.  Many of them are described on the webpage:
+
+	http://www.karlrunge.com/x11vnc
+
+(use your browser's Find action to find them!).  Some of them also have
+documentation near the top of the file.
+
+x11vnc -accept scripts: 
+
+   blockdpy.c	try to lock screen if local person knocks monitor out of DPMS
+   dtVncPopup	CDE/dtksh by Stefan Radman to accept connections, lock screen
+
+x11vnc launch wrappers:
+
+   rx11vnc	simple ssh/rsh x11vnc launcher.  -S option needs work...
+   rx11vnc.pl	perl script tries to do rx11vnc -S tunnelling better.
+
+x11vnc -pipeinput/-rawfb utilities:
+
+   vcinject.pl	perl script like LinuxVNC.c, for x11vnc viewing of linux console 
+   slide.pl	amusing example using x11vnc -rawfb for jpeg slideshow. 
+
+Misc. scripts:
+
+   shm_clear	list or remove orphaned shm slots from hard x11vnc crashes.
+   x11vnc_loop	kludge to run in bg attaching x11vnc to X login.  Better to
+		use Xsetup mechanism.

@@ -112,17 +112,17 @@ Screen
 	overlay
 	overlay_nocursor
 	--
+	=D solid
+	solid_color:
 	visual:
 	flashcmap
 	shiftcmap:
 	notruecolor
 	--
-	clip:
 	=P blackout:
 	xinerama
-	--
-	=D solid
-	solid_color:
+	clip:
+	rawfb:
 	--
 	= xrandr
 	=-C:resize,newfbsize,exit xrandr_mode:
@@ -169,6 +169,8 @@ Misc
 	=D nosel
 	noprimary
 	nolookup
+	--
+	xtrap
 	--
 	bg
 	=-C:ignore,exit sigpipe:
@@ -2883,7 +2885,7 @@ proc start_x11vnc {} {
 
 proc run_remote_cmd {opts} {
 	global menu_var x11vnc_prog x11vnc_cmdline x11vnc_xdisplay
-	global x11vnc_auth_file
+	global x11vnc_auth_file x11vnc_connect_file
 
 	set debug [in_debug_mode]
 
@@ -2902,13 +2904,18 @@ proc run_remote_cmd {opts} {
 
 	lappend cmd $x11vnc_prog;
 
-	if {$x11vnc_xdisplay != ""} {
-		lappend cmd "-display"
-		lappend cmd $x11vnc_xdisplay
-	}
-	if {$x11vnc_auth_file != ""} {
-		lappend cmd "-auth"
-		lappend cmd $x11vnc_auth_file
+	if {$x11vnc_connect_file != ""} {
+		lappend cmd "-connect"
+		lappend cmd $x11vnc_connect_file
+	} else {
+		if {$x11vnc_xdisplay != ""} {
+			lappend cmd "-display"
+			lappend cmd $x11vnc_xdisplay
+		}
+		if {$x11vnc_auth_file != ""} {
+			lappend cmd "-auth"
+			lappend cmd $x11vnc_auth_file
+		}
 	}
 	lappend cmd "-sync"
 	foreach word $opts {
@@ -2998,7 +3005,7 @@ proc try_connect {} {
 # main:
 
 global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
-global x11vnc_auth_file beginner_mode simple_gui_created
+global x11vnc_auth_file x11vnc_connect_file beginner_mode simple_gui_created
 global helpall helptext helpremote helplabel hostname;
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
@@ -3067,6 +3074,12 @@ if {[info exists env(X11VNC_CONNECT)]} {
 	set x11vnc_connect 1
 } else {
 	set x11vnc_connect 0;
+}
+
+if {[info exists env(X11VNC_CONNECT_FILE)]} {
+	set x11vnc_connect_file $env(X11VNC_CONNECT_FILE);
+} else {
+	set x11vnc_connect_file "";
 }
 
 if {[info exists env(X11VNC_XDISPLAY)]} {

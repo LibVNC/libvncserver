@@ -266,7 +266,7 @@ AC_FUNC_VPRINTF
 AC_FUNC_FORK
 AC_CHECK_LIB(nsl,gethostbyname)
 AC_CHECK_LIB(socket,socket)
-AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mkfifo select socket strchr strcspn strdup strerror strstr setsid getpwuid getpwnam getuid geteuid setuid waitpid setutxent])
+AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr setsid getpwuid getpwnam getuid geteuid setuid waitpid setutxent])
 
 # check, if shmget is in cygipc.a
 AC_CHECK_LIB(cygipc,shmget)
@@ -295,6 +295,7 @@ AC_CONFIG_FILES([Makefile
                  libvncserver/Makefile
                  contrib/Makefile
                  x11vnc/Makefile
+                 x11vnc/misc/Makefile
                  examples/Makefile
 		 vncterm/Makefile
 		 classes/Makefile
