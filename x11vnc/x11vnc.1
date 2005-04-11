@@ -2,7 +2,7 @@
 .TH X11VNC "1" "April 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2pre, lastmod: 2005-04-10
+         version: 0.7.2, lastmod: 2005-04-11
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1164,8 +1164,8 @@ or where window tearing is a problem.
 Experimental option, instead of polling X, poll the
 memory object specified in \fIstring\fR.  For shared
 memory segments it is of the form: "shm:N@WxHxB"
-which specifies a shmid N and framebuffer width, height,
-and bits per pixel.  To memory map 
+which specifies a shmid N and framebuffer Width, Height,
+and Bits per pixel.  To memory map 
 .IR mmap (2)
 a file use:
 "map:/path/to/a/file@WxHxB".  If there is trouble
@@ -1174,15 +1174,25 @@ with mmap, use  "file:/..." for slower
 based
 reading.
 .IP
+If string is "setup:cmd", then the command "cmd"
+is run and the first line from it is read and used
+as \fIstring\fR.  This allows initializing the device,
+determining WxHxB, etc. These are often done as root
+so take care.
+.IP
 Optional suffixes are ":R/G/B" and "+O" to specify
 red, green, and blue masks and an offset into the
 memory object.  If the masks are not provided x11vnc
 guesses them based on the bpp.
 .IP
 Examples:
+.IP
 \fB-rawfb\fR shm:210337933@800x600x32:ff/ff00/ff0000
+.IP
 \fB-rawfb\fR map:/dev/fb0@1024x768x32
+.IP
 \fB-rawfb\fR map:/tmp/Xvfb_screen0@640x480x8+3232
+.IP
 \fB-rawfb\fR file:/tmp/my.pnm@250x200x24+37
 .IP
 (see 
@@ -1197,19 +1207,20 @@ will cause this mode to crash, so please think twice
 before setting/changing them.  If you don't want x11vnc
 to close the DISPLAY in rawfb mode, then capitalize
 the prefix, SHM:, MAP: etc.  Keeping the display open
-enables defautl remote control channel.
+enables default remote-control channel.
 .PP
 \fB-pipeinput\fR \fIcmd\fR
 .IP
-Another experimental option: it lets you supply an
-extern command in \fIcmd\fR that x11vnc will pipe all of
-the user input events to in a simple format.  By default
-x11vnc will not process any of the user input events.
-If you prefix \fIcmd\fR with "tee:" it will both send
-them to the pipe command and process them.  For a
-description of the format run "\fB-pipeinput\fR \fItee:cat\fR".
-Another prefix is "reopen" which means to reopen pipe
-if it exits.  Separate multiple prefixes with commas.
+Another experimental option: it lets you supply
+an extern command in \fIcmd\fR that x11vnc will pipe
+all of the user input events to in a simple format.
+In \fB-pipeinput\fR mode by default x11vnc will not process
+any of the user input events.  If you prefix \fIcmd\fR
+with "tee:" it will both send them to the pipe
+command and process them.  For a description of the
+format run "\fB-pipeinput\fR \fItee:/bin/cat\fR".  Another prefix
+is "reopen" which means to reopen pipe if it exits.
+Separate multiple prefixes with commas.
 .IP
 In combination with \fB-rawfb\fR one might be able to
 do amusing things (e.g. control non-X devices).
@@ -1717,25 +1728,26 @@ noalpharemove alphablend noalphablend xwarp xwarppointer
 noxwarp noxwarppointer buttonmap dragging nodragging
 pointer_mode pm input_skip input client_input speeds
 debug_pointer dp nodebug_pointer nodp debug_keyboard dk
-nodebug_keyboard nodk deferupdate defer wait rfbwait
-nap nonap sb screen_blank fs gaps grow fuzz snapfb
-nosnapfb rawfb progressive rfbport http nohttp httpport
+nodebug_keyboard nodk deferupdate defer wait rfbwait nap
+nonap sb screen_blank fs gaps grow fuzz snapfb nosnapfb
+rawfb setup: progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop noremote
 .IP
-aro=  display vncdisplay desktopname http_url auth
-users rootshift clipshift scale_str scaled_x scaled_y
-scale_numer scale_denom scale_fac scaling_blend
-scaling_nomult4 scaling_pad scaling_interpolate
-inetd safer unsafe passwdfile using_shm logfile o
-flag rc norc h help V version lastmod bg sigpipe
-threads clients client_count pid ext_xtest ext_xtrap
-ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes
-ext_xdamage ext_xrandr rootwin num_buttons button_mask
-mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y
-wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y
-rfbauth passwd
+aro=  debug_xevents: display vncdisplay desktopname
+http_url auth users rootshift clipshift scale_str
+scaled_x scaled_y scale_numer scale_denom
+scale_fac scaling_blend scaling_nomult4 scaling_pad
+scaling_interpolate inetd safer unsafe passwdfile
+using_shm logfile o flag rc norc h help V version
+lastmod bg sigpipe threads pipeinput clients
+client_count pid ext_xtest ext_xtrap ext_xkb ext_xshm
+ext_xinerama ext_overlay ext_xfixes ext_xdamage
+ext_xrandr rootwin num_buttons button_mask mouse_x
+mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x
+wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth
+passwd
 .PP
 \fB-sync\fR
 .IP

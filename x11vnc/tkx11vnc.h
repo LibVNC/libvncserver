@@ -182,6 +182,7 @@
 "	=-C:ignore,exit sigpipe:\n"
 "	=0 inetd\n"
 "	rfbwait:\n"
+"	pipeinput:\n"
 "	--\n"
 "	=RA remote-cmd:\n"
 "	=GA all-settings\n"

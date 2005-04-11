@@ -176,6 +176,7 @@ Misc
 	=-C:ignore,exit sigpipe:
 	=0 inetd
 	rfbwait:
+	pipeinput:
 	--
 	=RA remote-cmd:
 	=GA all-settings

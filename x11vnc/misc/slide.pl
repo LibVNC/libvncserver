@@ -75,7 +75,7 @@ $I = 0;
 
 while (<>) {
 	# read the next user input event, watch for button press or spacebar:
-	last if /^Keysym.* [qQ] /;
+	###last if /^Keysym.* [qQ] /;
 	next unless /^(Pointer.*ButtonPress|Keysym.*space.*KeyPress)/;
 	$I = ($I + 1) % $N;
 	showpic($I);
@@ -108,5 +108,5 @@ sub showpic {
 }
 
 close(FB);
-#unlink($fb);	# this (probably) won't kill x11vnc
+###unlink($fb);	# this (probably) won't kill x11vnc
 print STDERR "$0 done.\n";

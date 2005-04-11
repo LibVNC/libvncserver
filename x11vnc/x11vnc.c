@@ -405,7 +405,7 @@ int overlay_present = 0;
 #if LIBVNCSERVER_HAVE_LIBXRANDR
 #include <X11/extensions/Xrandr.h>
 #endif
-static int xrandr_base_event_type = 0;
+int xrandr_base_event_type = 0;
 
 
 int xfixes_present = 0;
@@ -419,8 +419,8 @@ int alt_arrow = 1;
 
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 #include <X11/extensions/Xfixes.h>
-static int xfixes_base_event_type = 0;
 #endif
+int xfixes_base_event_type = 0;
 
 
 int xdamage_present = 0;
@@ -428,15 +428,15 @@ int use_xdamage = 1;	/* just use the xdamage rects. for scanline hints */
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 #include <X11/extensions/Xdamage.h>
 Damage xdamage = 0;
-static int xdamage_base_event_type = 0;
 #endif
+int xdamage_base_event_type = 0;
 int xdamage_max_area = 20000;	/* pixels */
 double xdamage_memory = 1.0;	/* in units of NSCAN */
 int xdamage_tile_count;
 
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2pre lastmod: 2005-04-10";
+char lastmod[] = "0.7.2 lastmod: 2005-04-11";
 int hack_val = 0;
 
 /* X display info */
@@ -559,7 +559,6 @@ unsigned char *tile_has_xdamage_diff, *tile_row_has_xdamage_diff;
 
 /* times of recent events */
 time_t last_event, last_input, last_client = 0;
-time_t last_sendevent = 0;
 
 /* last client to move pointer */
 rfbClientPtr last_pointer_client = NULL;
@@ -819,6 +818,8 @@ int pipeinput_tee = 0;
 
 unsigned long subwin = 0x0;	/* -id, -sid */
 int subwin_wait_mapped = 0;
+
+int debug_xevents = 0;		/* -R debug_xevents:1 */
 
 int xtrap_input = 0;		/* -xtrap for user input insertion */
 int xinerama = 0;		/* -xinerama */
@@ -2315,20 +2316,23 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 	char *src, *dst;
 	int line, pixelsize = bpp/8;
+	int bpl = wdpy_x * pixelsize;
 
+	if (clipshift) {
+		x += coff_x;
+		y += coff_y;
+	}
 	if (! raw_fb_seek) {
-		src = (raw_fb_addr + raw_fb_offset)
-		    + raw_fb_image->bytes_per_line*y + pixelsize*x;
+		src = raw_fb_addr + raw_fb_offset + bpl*y + pixelsize*x;
 		dst = dest->data;
 
 		for (line = 0; line < h; line++) {
 			memcpy(dst, src, w * pixelsize);
-			src += raw_fb_image->bytes_per_line;
+			src += bpl;
 			dst += dest->bytes_per_line;
 		}
 	} else{
 		int n, len, del, sz = w * pixelsize;
-		int bpl = raw_fb_image->bytes_per_line;
 		off_t off = (off_t) (raw_fb_offset + bpl*y + pixelsize*x);
 
 		lseek(raw_fb_fd, off, SEEK_SET);
@@ -2351,6 +2355,10 @@ void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 						break;
 					}
 				}
+			}
+			if (bpl > sz) {
+				off = (off_t) (bpl - sz);
+				lseek(raw_fb_fd, off, SEEK_CUR);
 			}
 			dst += dest->bytes_per_line;
 		}
@@ -3185,6 +3193,25 @@ void set_client_input(char *str) {
 
 	free(val);
 	free(cl_list);
+}
+
+void set_child_info(void) {
+	char pid[16];
+	/* set up useful environment for child process */
+	sprintf(pid, "%d", (int) getpid());
+	set_env("X11VNC_PID", pid);
+	if (program_name) {
+		/* e.g. for remote control -R */
+		set_env("X11VNC_PROG", program_name);
+	}
+	if (program_cmdline) {
+		set_env("X11VNC_CMDLINE", program_cmdline);
+	}
+	if (raw_fb_str) {
+		set_env("X11VNC_RAWFB_STR", raw_fb_str);
+	} else {
+		set_env("X11VNC_RAWFB_STR", "");
+	}
 }
 
 /*
@@ -6751,7 +6778,6 @@ int check_pipeinput(void) {
 
 void initialize_pipeinput(void) {
 	char *p;
-	char pid[16];
 
 	if (pipeinput_fh != NULL) {
 		rfbLog("closing pipeinput stream: %p\n", pipeinput_fh);
@@ -6803,20 +6829,7 @@ void initialize_pipeinput(void) {
 		p = pipeinput_str;
 	}
 
-	/* set up useful environment for child process */
-	sprintf(pid, "%d", (int) getpid());
-	set_env("X11VNC_PID", pid);
-	if (program_name) {
-		/* e.g. for remote control -R */
-		set_env("X11VNC_PROG", program_name);
-	}
-	if (program_cmdline) {
-		set_env("X11VNC_CMDLINE", program_cmdline);
-	}
-	if (raw_fb_str) {
-		set_env("X11VNC_RAWFB_STR", raw_fb_str);
-	}
-
+	set_child_info();
 	rfbLog("pipeinput: starting: \"%s\"...\n", p);
 	pipeinput_fh = popen(p, "w");
 
@@ -6862,7 +6875,7 @@ void initialize_pipeinput(void) {
 "# if two more more buttons change state in one event they are listed\n"
 "# separated by commas.\n"
 "#\n"
-"# One might parse a Pointer like with:\n"
+"# One might parse a Pointer line with:\n"
 "#\n"
 "# int client, x, y, mask; char *hint;\n"
 "# sscanf(line, \"Pointer %d %d %d %s\", &client, &x, &y, &mask, &hint);\n"
@@ -6887,7 +6900,7 @@ void initialize_pipeinput(void) {
 "# You basically remove the leading 'XK_' prefix from the macro name in\n"
 "# that file to get the Keysym name.\n"
 "#\n"
-"# One might parse a Pointer like with:\n"
+"# One might parse a Keysym line with:\n"
 "#\n"
 "# int client, down, keysym; char *name, *hint;\n"
 "# sscanf(line, \"Keysym %d %d %s %s\", &client, &down, &keysym, &name, &hint);\n"
@@ -6907,7 +6920,8 @@ void initialize_pipeinput(void) {
 "# info will be enough for most purposes (having identical keyboards on\n"
 "# both sides helps).\n"
 "#\n"
-"# Here comes yours stream:\n"
+"# Here comes your stream.  The following token will always indicate the\n"
+"# end of this informational text:\n"
 "# END_OF_TOP\n"
 );
 	fflush(pipeinput_fh);
@@ -6921,10 +6935,9 @@ void initialize_pipeinput(void) {
 /*
  * Bell event handling.  Requires XKEYBOARD extension.
  */
+int xkb_base_event_type = 0;
+
 #if LIBVNCSERVER_HAVE_XKEYBOARD
-
-static int xkb_base_event_type = 0;
-
 /*
  * check for XKEYBOARD, set up xkb_base_event_type
  */
@@ -7374,7 +7387,6 @@ static void selection_request(XEvent *ev) {
 	if (! trapped_xerror) {
 		XSendEvent(req_event->display, req_event->requestor, False, 0,
 		    (XEvent *)&notify_event);
-		last_sendevent = time(0);
 	} 
 	if (trapped_xerror) {
 		rfbLog("selection_request: ignored XError while sending "
@@ -7586,6 +7598,18 @@ void initialize_xevents(void) {
 	}
 }
 
+void print_xevent_bases(void) {
+	fprintf(stderr, "X event bases: xkb=%d, xtest=%d, xrandr=%d, "
+	    "xfixes=%d, xdamage=%d, xtrap=%d\n", xkb_base_event_type,
+	    xtest_base_event_type, xrandr_base_event_type,
+	    xfixes_base_event_type, xdamage_base_event_type,
+	    xtrap_base_event_type);
+	fprintf(stderr, "  MapNotify=%d, ClientMsg=%d PropNotify=%d "
+	    "SelNotify=%d, SelRequest=%d\n", MappingNotify, ClientMessage,
+	    PropertyNotify, SelectionNotify, SelectionRequest);
+	fprintf(stderr, "  SelClear=%d, Expose=%d\n", SelectionClear, Expose);
+}
+
 /*
  * This routine is periodically called to check for selection related
  * and other X11 events and respond to them as needed.
@@ -7685,9 +7709,6 @@ void check_xevents(void) {
 				;
 			}
 		}
-	}
-
-	if (last_sendevent && (now > last_sendevent+1 || now % 10 == 0)) {
 		/*
 		 * we can get ClientMessage from our XSendEvent() call in 
 		 * selection_request().
@@ -7695,7 +7716,6 @@ void check_xevents(void) {
 		while (XCheckTypedEvent(dpy, ClientMessage, &xev)) {
 			;
 		}
-		last_sendevent = 0;
 	}
 
 	/* check for CUT_BUFFER0 and VNC_CONNECT changes: */
@@ -7804,28 +7824,44 @@ void check_xevents(void) {
 #define DEBUG_XEVENTS 1
 #endif
 #if DEBUG_XEVENTS
-	if (hack_val) {
+	if (debug_xevents) {
 		static time_t last_check = 0;
+		static time_t reminder = 0;
+		static int freq = 0;
+
+		if (! freq) {
+			if (getenv("X11VNC_REMINDER_RATE")) {
+				freq = atoi(getenv("X11VNC_REMINDER_RATE"));
+			} else {
+				freq = 300;
+			}
+		}
 
 		if (now > last_check + 1) {
+			int ev_max = 300, ev_size = 400;
 			XEvent xevs[400];
 			int i, tot = XEventsQueued(dpy, QueuedAlready);
 
+			if (reminder == 0 || (tot && now > reminder + freq)) {
+				print_xevent_bases();
+				reminder = now;
+			}
 			last_check = now;
+
 			if (tot) {
 		    		fprintf(stderr, "Total events queued: %d\n",
 				    tot);
 			}
-			for (i=1; i<300; i++) {
+			for (i=1; i<ev_max; i++) {
 				int k, n = 0;
 				while (XCheckTypedEvent(dpy, i, xevs+n)) {
-					if (++n >= 400) {
+					if (++n >= ev_size) {
 						break;
 					}
 				}
 				if (n) {
-					fprintf(stderr, "%d events of type %d "
-					    "queued\n", n, i);
+					fprintf(stderr, "  %d events of type %d"
+					    " queued\n", n, i);
 				}
 				for (k=n-1; k >= 0; k--) {
 					XPutBackEvent(dpy, xevs+k);
@@ -7843,6 +7879,8 @@ void check_xevents(void) {
 			if (qlen >= bugout) {
 				rfbLog("event leak: %d queued, "
 				    " calling XSync(dpy, True)\n", qlen);  
+				rfbLog("  for diagnostics run: 'x11vnc -R"
+				    " debug_xevents:1'\n");
 				XSync(dpy, True);
 			}
 		}
@@ -10344,6 +10382,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("rawfb:");
 		if (raw_fb_str) free(raw_fb_str);
 		raw_fb_str = strdup(p);
+		if (safe_remote_only && strstr(p, "setup:") == p) {
+			/* n.b. we still allow filename, shm, of rawfb */
+			fprintf(stderr, "unsafe rawfb setup: %s\n", p);
+			exit(1);
+		}
 
 		rfbLog("process_remote_cmd: setting -rawfb to:\n"
 		    "\t'%s'\n", p);
@@ -10538,6 +10581,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("process_remote_cmd: disabling remote commands.\n");
 		accept_remote_cmds = 0; /* cannot be turned back on. */
 
+	} else if (strstr(p, "debug_xevents:") == p) {
+		COLON_CHECK("debug_xevents:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, debug_xevents);
+			goto qry;
+		}
+		p += strlen("debug_xevents:");
+		debug_xevents = atoi(p);
+		rfbLog("set debug_xevents to: %d\n", debug_xevents);
+
 	} else if (strstr(p, "hack:") == p) { /* skip-cmd-list */
 		COLON_CHECK("hack:")
 		if (query) {
@@ -10640,6 +10693,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(sigpipe));
 		} else if (!strcmp(p, "threads")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, use_threads);
+		} else if (!strcmp(p, "pipeinput")) {
+			snprintf(buf, bufn, "aro=%s:%s", p,
+			    NONUL(pipeinput_str));
 		} else if (!strcmp(p, "clients")) {
 			char *str = list_clients();
 			snprintf(buf, bufn, "aro=%s:%s", p, str);
@@ -11064,7 +11120,7 @@ void check_xdamage_state(void) {
 	 * Create or destroy the Damage object as needed, we don't want
 	 * one if no clients are connected.
 	 */
-	if (client_count) {
+	if (client_count && use_xdamage) {
 		create_xdamage_if_needed();
 	} else {
 		destroy_xdamage_if_needed();
@@ -13391,7 +13447,7 @@ XImage *initialize_raw_fb(void) {
 	int w, h, b, shmid = 0;
 	unsigned long rm = 0, gm = 0, bm = 0;
 	static XImage ximage_struct;	/* n.b.: not (XImage *) */
-	int closedpy = 1;
+	int closedpy = 1, i, m;
 	
 	if (raw_fb_addr || raw_fb_seek) {
 		if (raw_fb_shm) {
@@ -13415,7 +13471,38 @@ XImage *initialize_raw_fb(void) {
 	}
 
 
-	str = strdup(raw_fb_str);
+	if ( (q = strstr(raw_fb_str, "setup:")) == raw_fb_str) {
+		FILE *pipe;
+		char line[1024], *t;
+
+		set_child_info();
+		q += strlen("setup:");
+		rfbLog("running command to setup rawfb: %s\n", q);
+		pipe = popen(q, "r");
+		if (! pipe) {
+			rfbLog("popen of setup command failed.\n");
+			rfbLogPerror("popen");
+			clean_up_exit(1);
+		}
+		line[0] = '\0';
+		if (fgets(line, 1024, pipe) == NULL) {
+			rfbLog("read of setup command failed.\n");
+			clean_up_exit(1);
+		}
+		pclose(pipe);
+		str = strdup(line);
+		t = str;
+		while (*t != '\0') {
+			if (*t == '\n') {
+				*t = '\0';
+			}
+			t++;
+		}
+		rfbLog("setup command returned: %s\n", str);
+
+	} else {
+		str = strdup(raw_fb_str);
+	}
 
 	/*
 	 * uppercase means do not close the display (e.g. for remote control)
@@ -13480,12 +13567,12 @@ XImage *initialize_raw_fb(void) {
 		}
 	}
 	if ((q = strrchr(str, '@')) == NULL) {
-		rfbLog("invalid rawfb str: %s\n", raw_fb_str);
+		rfbLog("invalid rawfb str: %s\n", str);
 		clean_up_exit(1);
 	}
 	/* @WxHxB */
 	if (sscanf(q, "@%dx%dx%d", &w, &h, &b) != 3) {
-		rfbLog("invalid rawfb str: %s\n", raw_fb_str);
+		rfbLog("invalid rawfb str: %s\n", str);
 		clean_up_exit(1);
 	}
 
@@ -13505,8 +13592,7 @@ XImage *initialize_raw_fb(void) {
 		/* shm:N */
 		raw_fb_addr = (char *) shmat(shmid, 0, SHM_RDONLY);
 		if (! raw_fb_addr) {
-			rfbLog("failed to attach to shm: %d, %s\n", shmid,
-			    raw_fb_str);
+			rfbLog("failed to attach to shm: %d, %s\n", shmid, str);
 			rfbLogPerror("shmat");
 			clean_up_exit(1);
 		}
@@ -13528,7 +13614,7 @@ XImage *initialize_raw_fb(void) {
 
 		fd = open(q, O_RDONLY);
 		if (fd < 0) {
-			rfbLog("failed to open file: %s, %s\n", q, raw_fb_str);
+			rfbLog("failed to open file: %s, %s\n", q, str);
 			rfbLogPerror("open");
 			clean_up_exit(1);
 		}
@@ -13549,8 +13635,7 @@ XImage *initialize_raw_fb(void) {
 			    fd, 0);
 
 			if (raw_fb_addr == MAP_FAILED || raw_fb_addr == NULL) {
-				rfbLog("failed to mmap file: %s, %s\n",
-				    q, raw_fb_str);
+				rfbLog("failed to mmap file: %s, %s\n", q, str);
 				rfbLog("   raw_fb_addr: %p\n", raw_fb_addr);
 				rfbLogPerror("mmap");
 				clean_up_exit(1);
@@ -13572,7 +13657,7 @@ XImage *initialize_raw_fb(void) {
 			rfbLog("   W: %d H: %d B: %d sz: %d\n", w, h, b, size);
 		}
 	} else {
-		rfbLog("invalid rawfb str: %s\n", raw_fb_str);
+		rfbLog("invalid rawfb str: %s\n", str);
 		clean_up_exit(1);
 	}
 
@@ -13580,14 +13665,15 @@ XImage *initialize_raw_fb(void) {
 		raw_fb_image = &ximage_struct;
 	}
 
-	raw_fb = (char *) malloc(w*h*b/8);
+	initialize_clipshift();
+
+	raw_fb = (char *) malloc(dpy_x * dpy_y * b/8);
 	raw_fb_image->data = raw_fb;
 	raw_fb_image->format = ZPixmap;
-	raw_fb_image->width = w;
-	raw_fb_image->height = h;
+	raw_fb_image->width  = dpy_x;
+	raw_fb_image->height = dpy_y;
 	raw_fb_image->bits_per_pixel = b;
-	raw_fb_image->depth = (b == 32) ? 24 : b;
-	raw_fb_image->bytes_per_line = w*b/8;
+	raw_fb_image->bytes_per_line = dpy_x*b/8;
 
 	if (rm == 0 && gm == 0 && bm == 0) {
 		/* guess masks... */
@@ -13610,17 +13696,35 @@ XImage *initialize_raw_fb(void) {
 	raw_fb_image->green_mask = gm;
 	raw_fb_image->blue_mask = bm;
 
-	if (raw_fb_addr) {
-		memcpy(raw_fb, raw_fb_addr + raw_fb_offset, w*h*(b/8));
+	raw_fb_image->depth = 0;
+	m = 1;
+	for (i=0; i<32; i++)  {
+		if (rm & m) {
+			raw_fb_image->depth++;
+		}
+		if (gm & m) {
+			raw_fb_image->depth++;
+		}
+		if (bm & m) {
+			raw_fb_image->depth++;
+		}
+		m = m << 1;
+	}
+	if (! raw_fb_image->depth) { 
+		raw_fb_image->depth = (b == 32) ? 24 : b;
+	}
+
+	if (clipshift) {
+		memset(raw_fb, 0xff, dpy_x * dpy_y * b/8);
+	} else if (raw_fb_addr) {
+		memcpy(raw_fb, raw_fb_addr + raw_fb_offset, dpy_x*dpy_y*b/8);
 	} else {
-		memset(raw_fb, 0xff, w*h*(b/8));
+		memset(raw_fb, 0xff, dpy_x * dpy_y * b/8);
 	}
 
 	rfbLog("rawfb:  raw_fb %p\n", raw_fb);
 
 	free(str);
-
-	initialize_clipshift();
 
 	return raw_fb_image;
 }
@@ -16614,7 +16718,7 @@ void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force) {
 	if (damage_time != 0) {
 		/*
 		 * This is not XDAMAGE, rather a hack for testing
-		 * were we allow the framebuffer to be corrupted for
+		 * where we allow the framebuffer to be corrupted for
 		 * damage_delay seconds.
 		 */
 		int debug = 0;
@@ -20204,11 +20308,17 @@ static void print_help(int mode) {
 "-rawfb string          Experimental option, instead of polling X, poll the\n"
 "                       memory object specified in \"string\".  For shared\n"
 "                       memory segments it is of the form: \"shm:N@WxHxB\"\n"
-"                       which specifies a shmid N and framebuffer width, height,\n"
-"                       and bits per pixel.  To memory map mmap(2) a file use:\n"
+"                       which specifies a shmid N and framebuffer Width, Height,\n"
+"                       and Bits per pixel.  To memory map mmap(2) a file use:\n"
 "                       \"map:/path/to/a/file@WxHxB\".  If there is trouble\n"
 "                       with mmap, use  \"file:/...\" for slower lseek(2) based\n"
 "                       reading.\n"
+"\n"
+"                       If string is \"setup:cmd\", then the command \"cmd\"\n"
+"                       is run and the first line from it is read and used\n"
+"                       as \"string\".  This allows initializing the device,\n"
+"                       determining WxHxB, etc. These are often done as root\n"
+"                       so take care.\n"
 "\n"
 "                       Optional suffixes are \":R/G/B\" and \"+O\" to specify\n"
 "                       red, green, and blue masks and an offset into the\n"
@@ -20229,17 +20339,18 @@ static void print_help(int mode) {
 "                       before setting/changing them.  If you don't want x11vnc\n"
 "                       to close the DISPLAY in rawfb mode, then capitalize\n"
 "                       the prefix, SHM:, MAP: etc.  Keeping the display open\n"
-"                       enables defautl remote control channel.\n"
+"                       enables default remote-control channel.\n"
 "\n"
-"-pipeinput cmd         Another experimental option: it lets you supply an\n"
-"                       extern command in \"cmd\" that x11vnc will pipe all of\n"
-"                       the user input events to in a simple format.  By default\n"
-"                       x11vnc will not process any of the user input events.\n"
-"                       If you prefix \"cmd\" with \"tee:\" it will both send\n"
-"                       them to the pipe command and process them.  For a\n"
-"                       description of the format run \"-pipeinput tee:cat\".\n"
-"                       Another prefix is \"reopen\" which means to reopen pipe\n"
-"                       if it exits.  Separate multiple prefixes with commas.\n"
+"-pipeinput cmd         Another experimental option: it lets you supply\n"
+"                       an extern command in \"cmd\" that x11vnc will pipe\n"
+"                       all of the user input events to in a simple format.\n"
+"                       In -pipeinput mode by default x11vnc will not process\n"
+"                       any of the user input events.  If you prefix \"cmd\"\n"
+"                       with \"tee:\" it will both send them to the pipe\n"
+"                       command and process them.  For a description of the\n"
+"                       format run \"-pipeinput tee:/bin/cat\".  Another prefix\n"
+"                       is \"reopen\" which means to reopen pipe if it exits.\n"
+"                       Separate multiple prefixes with commas.\n"
 "\n"
 "                       In combination with -rawfb one might be able to\n"
 "                       do amusing things (e.g. control non-X devices).\n"
@@ -20588,25 +20699,26 @@ static void print_help(int mode) {
 "                       noxwarp noxwarppointer buttonmap dragging nodragging\n"
 "                       pointer_mode pm input_skip input client_input speeds\n"
 "                       debug_pointer dp nodebug_pointer nodp debug_keyboard dk\n"
-"                       nodebug_keyboard nodk deferupdate defer wait rfbwait\n"
-"                       nap nonap sb screen_blank fs gaps grow fuzz snapfb\n"
-"                       nosnapfb rawfb progressive rfbport http nohttp httpport\n"
+"                       nodebug_keyboard nodk deferupdate defer wait rfbwait nap\n"
+"                       nonap sb screen_blank fs gaps grow fuzz snapfb nosnapfb\n"
+"                       rawfb setup: progressive rfbport http nohttp httpport\n"
 "                       httpdir enablehttpproxy noenablehttpproxy alwaysshared\n"
 "                       noalwaysshared nevershared noalwaysshared dontdisconnect\n"
 "                       nodontdisconnect desktop noremote\n"
 "\n"
-"                       aro=  display vncdisplay desktopname http_url auth\n"
-"                       users rootshift clipshift scale_str scaled_x scaled_y\n"
-"                       scale_numer scale_denom scale_fac scaling_blend\n"
-"                       scaling_nomult4 scaling_pad scaling_interpolate\n"
-"                       inetd safer unsafe passwdfile using_shm logfile o\n"
-"                       flag rc norc h help V version lastmod bg sigpipe\n"
-"                       threads clients client_count pid ext_xtest ext_xtrap\n"
-"                       ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes\n"
-"                       ext_xdamage ext_xrandr rootwin num_buttons button_mask\n"
-"                       mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y\n"
-"                       wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y\n"
-"                       rfbauth passwd\n"
+"                       aro=  debug_xevents: display vncdisplay desktopname\n"
+"                       http_url auth users rootshift clipshift scale_str\n"
+"                       scaled_x scaled_y scale_numer scale_denom\n"
+"                       scale_fac scaling_blend scaling_nomult4 scaling_pad\n"
+"                       scaling_interpolate inetd safer unsafe passwdfile\n"
+"                       using_shm logfile o flag rc norc h help V version\n"
+"                       lastmod bg sigpipe threads pipeinput clients\n"
+"                       client_count pid ext_xtest ext_xtrap ext_xkb ext_xshm\n"
+"                       ext_xinerama ext_overlay ext_xfixes ext_xdamage\n"
+"                       ext_xrandr rootwin num_buttons button_mask mouse_x\n"
+"                       mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x\n"
+"                       wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth\n"
+"                       passwd\n"
 "\n"
 "-sync                  By default -remote commands are run asynchronously, that\n"
 "                       is, the request is posted and the program immediately\n"
@@ -22215,6 +22327,10 @@ int main(int argc, char* argv[]) {
 	} else {
 		xtest_present = 1;
 		xtest_base_event_type = ev;
+		if (maj <= 1 || (maj == 2 && min <= 2)) {
+			/* no events defined as of 2.2 */
+			xtest_base_event_type = 0;
+		}
 	}
 
 	if (! XETrapQueryExtension_wr(dpy, &ev, &er, &maj)) {

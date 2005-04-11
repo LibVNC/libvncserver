@@ -1,3 +1,7 @@
+2005-04-11  Karl Runge <runge@karlrunge.com>
+	* fix -clip under -rawfb, fix offset bug under file lseeking.
+	* add -rawfb setup:cmd mode to initialize fb.
+
 2005-04-10  Karl Runge <runge@karlrunge.com>
 	* -rawfb non X-polling (i.e. shm, mmap, lseek).
 	* -pipeinput enable external user input processing command.
