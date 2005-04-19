@@ -229,6 +229,10 @@ Tuning
 	input_skip:
 	=D nodragging
 	--
+	wireframe
+	wireframe_mode:
+	=-C:never,top,always wirecopyrect:
+	--
 	noshm
 	flipbyteorder
 	onetile
@@ -370,6 +374,10 @@ Set the -solid color value.
 
 	set helptext(xrandr_mode) "
 Set the -xrandr mode value.
+"
+
+	set helptext(wireframe_mode) "
+Set the -wireframe mode string value.
 "
 
 	set helptext(simple-gui) "
@@ -2821,6 +2829,8 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 						set nitem "sb"
 					} elseif {$nitem == "xrandr_mode"} {
 						set nitem "xrandr"
+					} elseif {$nitem == "wireframe_mode"} {
+						set nitem "wireframe"
 					} elseif {$nitem == "solid_color"} {
 						set nitem "solid"
 					}

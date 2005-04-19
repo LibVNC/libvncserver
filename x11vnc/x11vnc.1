@@ -2,7 +2,7 @@
 .TH X11VNC "1" "April 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-04-11
+         version: 0.7.2, lastmod: 2005-04-19
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -948,6 +948,65 @@ slow setups, but you lose all visual feedback for drags,
 text selection, and some menu traversals.  It overrides
 any \fB-pointer_mode\fR setting
 .PP
+\fB-wireframe\fR \fI[str],\fR \fB-nowireframe\fR
+.IP
+Try to detect window moves or resizes when a mouse
+button is held down and show a wireframe instead of
+the full opaque window.  This is based completely on
+heuristics and may not always work: it depends on your
+window manager and even how you move things around.
+See \fB-pointer_mode\fR below for discussion of the "bogging
+down" problem this tries to avoid. Default: \fB-wireframe\fR
+.IP
+The value "str" is optional and, of course, is
+packed with many tunable parameters for this scheme:
+.IP
+Format: shade,linewidth,percent,T+B+L+R,t1+t2+t3+t4
+Default: 0xff,3,0,32+8+8+8,0.15+0.35+4.0+0.1
+.IP
+If you leave nothing between commas: ",," the default
+value is used.  If you don't specify enough commas,
+the trailing parameters are set to their defaults.
+.IP
+"shade" indicate the "color" for the wireframe,
+usually a greyscale: 0-255, however for 16 and 32bpp you
+can specify an rgb.txt X color (e.g. "dodgerblue") or
+a value > 255 is treated as RGB (e.g. red is 0xff0000).
+"linewidth" sets the width of the wireframe in pixels.
+"percent" indicates to not apply the wireframe scheme
+to windows with area less than this percent of the
+full screen.
+.IP
+"T+B+L+R" indicates four integers for how close in
+pixels the pointer has to be from the Top, Bottom, Left,
+or Right edges of the window to consider wireframing.
+This is a speedup to quickly exclude a window from being
+wireframed: set them all to zero to not try the speedup
+(scrolling and selecting text will likely be slower).
+.IP
+"t1+t2+t3+t4" specify four floating point times in
+seconds: t1 is how long to wait for the pointer to move,
+t2 is how long to wait for the window to start moving
+or being resized (for some window managers this can be
+rather long), t3 is how long to keep a wireframe moving
+before repainting the window. t4 is the minimum time
+between sending wireframe "animations".  For a slow
+link this might be a better choice: 0.25+0.6+6.0+0.15
+.PP
+\fB-wirecopyrect\fR \fImode,\fR \fB-nowirecopyrect\fR
+.IP
+Since the \fB-wireframe\fR mechanism evidently tracks moving
+windows, a speedup can be obtained by telling the VNC
+viewers to locally copy the translated window region.
+This is the VNC CopyRect encoding: the framebuffer
+update doesn't need to send the actual new image data.
+"mode" can be "never" (same as \fB-nowirecopyrect)\fR
+to never try the copyrect, "top" means only do it if
+the window was not covered by any other windows, and
+"always" means to translate the orginally unobscured
+region (this may look odd as the remaining pieces come
+in, but helps on a slow link) Default: always
+.PP
 \fB-pointer_mode\fR \fIn\fR
 .IP
 Various pointer motion update schemes. "\fB-pm\fR" is
@@ -973,7 +1032,6 @@ events before repolling the screen.
 n=2 is an improved scheme: by watching the current rate
 of input events it tries to detect if it should try to
 "eat" additional pointer events before continuing.
-This mode was the default until Apr 2005.
 .IP
 n=3 is basically the same as n=2 except with slightly
 tweaked parameters.  We made this a new one so one
@@ -1171,8 +1229,8 @@ a file use:
 "map:/path/to/a/file@WxHxB".  If there is trouble
 with mmap, use  "file:/..." for slower 
 .IR lseek (2)
-based
-reading.
+based reading.  If you do not supply a type "map"
+is assumed if the file exists.
 .IP
 If string is "setup:cmd", then the command "cmd"
 is run and the first line from it is read and used
@@ -1204,10 +1262,16 @@ for the first two examples)
 All user input is discarded.  Most of the X11 (screen,
 keyboard, mouse) options do not make sense and many
 will cause this mode to crash, so please think twice
-before setting/changing them.  If you don't want x11vnc
-to close the DISPLAY in rawfb mode, then capitalize
-the prefix, SHM:, MAP: etc.  Keeping the display open
-enables default remote-control channel.
+before setting/changing them.
+.IP
+If you don't want x11vnc to close the X DISPLAY in
+rawfb mode, then capitalize the prefix, SHM:, MAP:,
+FILE:   Keeping the display open enables the default
+remote-control channel, which could be useful.  Also,
+if you also specify \fB-noviewonly,\fR then the mouse and
+keyboard input are still sent to the X display, this
+usage should be very rare, i.e. doing something strange
+with /dev/fb0.
 .PP
 \fB-pipeinput\fR \fIcmd\fR
 .IP
@@ -1569,6 +1633,16 @@ dragging        disable \fB-nodragging\fR mode.
 .IP
 nodragging      enable  \fB-nodragging\fR mode.
 .IP
+wireframe       enable  \fB-wireframe\fR mode.
+.IP
+nowireframe     disable \fB-wireframe\fR mode.
+.IP
+wireframe:str   enable  \fB-wireframe\fR mode string.
+.IP
+wireframe_mode:str enable  \fB-wireframe\fR mode string.
+.IP
+wirecopyrect:str set \fB-wirecopyrect\fR string.
+.IP
 pointer_mode:n  set \fB-pointer_mode\fR to n. same as "pm"
 .IP
 input_skip:n    set \fB-input_skip\fR to n.
@@ -1719,31 +1793,33 @@ solid nosolid blackout xinerama noxinerama xtrap
 noxtrap xrandr noxrandr xrandr_mode padgeom quiet q
 noquiet modtweak nomodtweak xkb noxkb skip_keycodes
 add_keysyms noadd_keysyms clear_mods noclear_mods
-clear_keys noclear_keys remap repeat norepeat fb nofb
-bell nobell sel nosel primary noprimary cursorshape
-nocursorshape cursorpos nocursorpos cursor show_cursor
-noshow_cursor nocursor arrow xfixes noxfixes xdamage
-noxdamage xd_area xd_mem alphacut alphafrac alpharemove
-noalpharemove alphablend noalphablend xwarp xwarppointer
-noxwarp noxwarppointer buttonmap dragging nodragging
+clear_keys noclear_keys remap repeat norepeat
+fb nofb bell nobell sel nosel primary noprimary
+cursorshape nocursorshape cursorpos nocursorpos
+cursor show_cursor noshow_cursor nocursor arrow
+xfixes noxfixes xdamage noxdamage xd_area xd_mem
+alphacut alphafrac alpharemove noalpharemove alphablend
+noalphablend xwarp xwarppointer noxwarp noxwarppointer
+buttonmap dragging nodragging wireframe_mode
+wireframe nowireframe wirecopyrect nowirecopyrect
 pointer_mode pm input_skip input client_input speeds
 debug_pointer dp nodebug_pointer nodp debug_keyboard dk
-nodebug_keyboard nodk deferupdate defer wait rfbwait nap
-nonap sb screen_blank fs gaps grow fuzz snapfb nosnapfb
-rawfb setup: progressive rfbport http nohttp httpport
+nodebug_keyboard nodk deferupdate defer wait rfbwait
+nap nonap sb screen_blank fs gaps grow fuzz snapfb
+nosnapfb rawfb progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop noremote
 .IP
-aro=  debug_xevents: display vncdisplay desktopname
-http_url auth users rootshift clipshift scale_str
-scaled_x scaled_y scale_numer scale_denom
+aro=  debug_xevents debug_xdamage display vncdisplay
+desktopname http_url auth users rootshift clipshift
+scale_str scaled_x scaled_y scale_numer scale_denom
 scale_fac scaling_blend scaling_nomult4 scaling_pad
-scaling_interpolate inetd safer unsafe passwdfile
-using_shm logfile o flag rc norc h help V version
-lastmod bg sigpipe threads pipeinput clients
-client_count pid ext_xtest ext_xtrap ext_xkb ext_xshm
-ext_xinerama ext_overlay ext_xfixes ext_xdamage
+scaling_interpolate inetd privremote unsafe safer
+nocmds passwdfile using_shm logfile o flag rc norc h
+help V version lastmod bg sigpipe threads pipeinput
+clients client_count pid ext_xtest ext_xtrap ext_xkb
+ext_xshm ext_xinerama ext_overlay ext_xfixes ext_xdamage
 ext_xrandr rootwin num_buttons button_mask mouse_x
 mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x
 wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth
@@ -1785,27 +1861,46 @@ of the desktop.  If the  "\fB-connect\fR \fI/path/to/file\fR"
 channel is being used, obviously anyone who can write
 to /path/to/file can remotely control x11vnc.  So be
 sure to protect the X display and that file's write
-permissions.
+permissions.  See \fB-privremote\fR below.
 .IP
 If you are paranoid and do not think \fB-noremote\fR is
 enough, to disable the VNC_CONNECT property channel
-completely use \fB-novncconnect.\fR
+completely use \fB-novncconnect,\fR or use the \fB-safer\fR
+option that shuts many things off.
 .PP
 \fB-unsafe\fR
 .IP
-If x11vnc is running as root (e.g. inetd or Xsetup for
-a display manager) a few remote commands are disabled
-(currently: id:pick, accept:<cmd>, and gone:<cmd>)
-because they are associated with running external
-programs.  If you specify \fB-unsafe,\fR then these remote
-control commands are allowed when running as root.
-When running as non-root all commands are allowed.
-See \fB-safer\fR below.
+A few remote commands are disabled by default
+(currently: id:pick, accept:<cmd>, gone:<cmd>, and
+rawfb:setup:<cmd>) because they are associated with
+running external programs.  If you specify \fB-unsafe,\fR then
+these remote-control commands are allowed.  Note that
+you can still specify these parameters on the command
+line, they just cannot be changed via remote-control.
 .PP
 \fB-safer\fR
 .IP
-Even if not running as root, disable the above unsafe
-remote control commands.
+Equivalent to: \fB-novncconnect\fR \fB-noremote\fR and prohibiting
+\fB-gui\fR and the \fB-connect\fR file. Shuts off communcation
+channels.
+.PP
+\fB-privremote\fR
+.IP
+Perform some sanity checks and only allow remote-control
+commands if it appears that the X DISPLAY and/or
+connectfile cannot be accessed by other users. (not
+complete, does not check for empty access control list)
+.PP
+\fB-nocmds\fR
+.IP
+No external commands (e.g. 
+.IR system (3)
+, 
+.IR popen (3)
+, 
+.IR exec (3)
+)
+will be run.
 .PP
 \fB-deny_all\fR
 .IP

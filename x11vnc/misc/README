@@ -24,6 +24,7 @@ x11vnc -pipeinput/-rawfb utilities:
 
    vcinject.pl	perl script like LinuxVNC.c, for x11vnc viewing of linux console 
    slide.pl	amusing example using x11vnc -rawfb for jpeg slideshow. 
+   ranfb.pl	example -rawfb setup:./ranfb.pl to set up a framebuffer.
 
 Misc. scripts:
 

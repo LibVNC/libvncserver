@@ -436,7 +436,7 @@ int xdamage_tile_count;
 
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-04-11";
+char lastmod[] = "0.7.2 lastmod: 2005-04-19";
 int hack_val = 0;
 
 /* X display info */
@@ -452,6 +452,7 @@ int off_x, off_y;		/* offsets for -sid */
 int wdpy_x, wdpy_y;		/* for actual sizes in case of -clip */
 int cdpy_x, cdpy_y, coff_x, coff_y;	/* the -clip params */
 int button_mask = 0;		/* button state and info */
+int button_mask_prev = 0;
 int num_buttons = -1;
 
 /* image structures */
@@ -569,6 +570,7 @@ int clients_served = 0;
 
 /* more transient kludge variables: */
 int cursor_x, cursor_y;		/* x and y from the viewer(s) */
+int button_change_x, button_change_y;
 int got_user_input = 0;
 int got_pointer_input = 0;
 int got_keyboard_input = 0;
@@ -683,6 +685,8 @@ void pipe_pointer(int mask, int x, int y, rfbClientPtr client);
 int check_pipeinput(void);
 void cursor_position(int, int);
 
+void parse_wireframe(void);
+void set_wirecopyrect_mode(char *);
 void read_vnc_connect_prop(void);
 void set_vnc_connect_prop(char *);
 char *process_remote_cmd(char *, int);
@@ -725,6 +729,7 @@ int get_read_rate(void);
 int get_net_rate(void);
 int get_net_latency(void);
 void measure_send_rates(int);
+int fb_update_sent(int *);
 
 int get_remote_port(int sock);
 int get_local_port(int sock);
@@ -785,7 +790,10 @@ int connect_once = 0;
 #endif
 int deny_all = 0;		/* global locking of new clients */
 int accept_remote_cmds = 1;	/* -noremote */
-int safe_remote_only = 0;	/* -safer, -unsafe */
+int safe_remote_only = 1;	/* -unsafe */
+int priv_remote = 0;		/* -privremote */
+int more_safe = 0;		/* -safer */
+int no_external_cmds = 0;	/* -nocmds */
 int started_as_root = 0;
 int host_lookup = 1;
 char *users_list = NULL;	/* -users */
@@ -820,6 +828,7 @@ unsigned long subwin = 0x0;	/* -id, -sid */
 int subwin_wait_mapped = 0;
 
 int debug_xevents = 0;		/* -R debug_xevents:1 */
+int debug_xdamage = 0;		/* -R debug_xdamage:1 or 2 ... */
 
 int xtrap_input = 0;		/* -xtrap for user input insertion */
 int xinerama = 0;		/* -xinerama */
@@ -846,6 +855,20 @@ int cursor_pos_updates = 1;	/* cursor position updates -cursorpos */
 int cursor_shape_updates = 1;	/* cursor shape updates -nocursorshape */
 int use_xwarppointer = 0;	/* use XWarpPointer instead of XTestFake... */
 int show_dragging = 1;		/* process mouse movement events */
+#ifndef WIREFRAME
+#define WIREFRAME 1
+#endif
+int wireframe = WIREFRAME;	/* try to emulate wireframe wm moves */
+/* shade,linewidth,percent,T+B+L+R,t1+t2+t3+t4 */
+#ifndef WIREFRAME_PARMS
+#define WIREFRAME_PARMS "0xff,3,0,32+8+8+8,0.15+0.35+4.0+0.1"
+#endif
+char *wireframe_str = NULL;
+char *wireframe_copyrect = NULL;
+char *wireframe_copyrect_default = "always";
+int wireframe_in_progress = 0;
+Window *stack_list = NULL;
+int stack_num  = 0;
 int no_autorepeat = 1;		/* turn off autorepeat with clients */
 int no_repeat_countdown = 2;
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
@@ -923,6 +946,7 @@ int got_alwaysshared = 0;
 int got_nevershared = 0;
 int got_cursorpos = 0;
 int got_pointer_mode = -1;
+int got_noviewonly = 0;
 
 /* threaded vs. non-threaded (default) */
 #if LIBVNCSERVER_X11VNC_THREADED && ! defined(X11VNC_THREADED)
@@ -1073,6 +1097,12 @@ int pick_windowid(unsigned long *num) {
 
 	if (use_dpy) {
 		set_env("DISPLAY", use_dpy);
+	}
+	if (no_external_cmds) {
+		rfbLog("cannot run external commands in -nocmds mode:\n");
+		rfbLog("   \"%s\"\n", "xwininfo");
+		rfbLog("   exiting.\n");
+		clean_up_exit(1);
 	}
 	p = popen("xwininfo", "r");
 
@@ -2707,9 +2737,7 @@ void clean_up_exit (int ret) {
 	/* remove the shm areas: */
 	clean_shm(0);
 
-	if (! dpy) {
-		exit(ret);	/* raw_rb hack */
-	}
+	if (! dpy) exit(ret);	/* raw_rb hack */
 
 	/* X keyboard cleanups */
 	delete_added_keycodes();
@@ -2878,14 +2906,20 @@ void interrupted (int sig) {
 }
 
 /* trapping utility to check for a valid window: */
-int valid_window(Window win) {
+int valid_window(Window win, XWindowAttributes *attr_ret) {
 	XErrorHandler old_handler;
-	XWindowAttributes attr;
+	XWindowAttributes attr, *pattr;
 	int ok = 0;
+
+	if (attr_ret == NULL) {
+		pattr = &attr;
+	} else {
+		pattr = attr_ret;
+	}
 
 	trapped_xerror = 0;
 	old_handler = XSetErrorHandler(trap_xerror);
-	if (XGetWindowAttributes(dpy, win, &attr)) {
+	if (XGetWindowAttributes(dpy, win, pattr)) {
 		ok = 1;
 	}
 	if (trapped_xerror && trapped_xerror_event && ! quiet) {
@@ -2904,7 +2938,7 @@ int wait_until_mapped(Window win) {
 	XWindowAttributes attr;
 
 	while (1) {
-		if (! valid_window(win)) {
+		if (! valid_window(win, NULL)) {
 			if (time(0) > start + waittime) {
 				return 0;
 			}
@@ -3219,7 +3253,6 @@ void set_child_info(void) {
  * used by, e.g., accept_client() and client_gone()
  */
 static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
-	char *dpystr = DisplayString(dpy);
 	char *old_display = NULL;
 	char *addr = client->host;
 	char str[100];
@@ -3285,7 +3318,12 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	if (getenv("DISPLAY")) {
 		old_display = strdup(getenv("DISPLAY"));
 	}
-	set_env("DISPLAY", dpystr);
+
+	if (raw_fb && ! dpy) {	/* raw_fb hack */
+		set_env("DISPLAY", "rawfb");
+	} else {
+		set_env("DISPLAY", DisplayString(dpy));
+	}
 
 	/*
 	 * work out the number of clients (have to use client_count
@@ -3294,6 +3332,12 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	sprintf(str, "%d", client_count);
 	set_env("RFB_CLIENT_COUNT", str);
 
+	if (no_external_cmds) {
+		rfbLog("cannot run external commands in -nocmds mode:\n");
+		rfbLog("   \"%s\"\n", cmd);
+		rfbLog("   exiting.\n");
+		clean_up_exit(1);
+	}
 	rfbLog("running command:\n");
 	rfbLog("  %s\n", cmd);
 
@@ -3575,6 +3619,8 @@ static char t2x2_bits[] = {
 	int Ye_x = 20,  Ye_y = 0, Ye_w = 45, Ye_h = 20;
 	int No_x = 75,  No_y = 0, No_w = 45, No_h = 20; 
 	int Vi_x = 130, Vi_y = 0, Vi_w = 45, Vi_h = 20; 
+
+	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
 
 	if (!strcmp(mode, "mouse_only")) {
 		str1 = str1_m;
@@ -4587,6 +4633,8 @@ void autorepeat(int restore) {
 	XKeyboardControl kctrl;
 	static int save_auto_repeat = -1;
 
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+
 	if (restore) {
 		if (save_auto_repeat < 0) {
 			return;		/* nothing to restore */
@@ -4632,6 +4680,8 @@ int add_keysym(KeySym keysym) {
 	int kc, n, ret = 0;
 	static int first = 1;
 	KeySym *keymap;
+
+	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
 
 	if (first) {
 		for (n=0; n < 0x100; n++) {
@@ -4702,6 +4752,8 @@ void delete_keycode(KeyCode kc) {
 	KeySym *keymap;
 	KeySym ksym, new[8];
 	char *str;
+
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
 	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
@@ -5728,6 +5780,7 @@ void initialize_allowed_input(void) {
 }
 
 void initialize_keyboard_and_pointer(void) {
+
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
 	if (use_modifier_tweak) {
@@ -6070,6 +6123,8 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	got_user_input++;
 	got_keyboard_input++;
 	
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+
 	if (keyremaps) {
 		keyremap_t *remap = keyremaps;
 		while (remap != NULL) {
@@ -6398,9 +6453,30 @@ void initialize_pointer_map(char *pointer_remap) {
 }
 
 /*
+ * For use in the -wireframe stuff, save the stacking order of the direct
+ * children of the root window.  Ideally done before we send ButtonPress
+ * to the X server.
+ */
+void snapshot_stack_list(void) {
+	Window r, w;
+	if (stack_list) {
+		XFree(stack_list);
+		stack_list = NULL;
+		stack_num  = 0;
+	}
+	XSync(dpy, False);
+	if (! XQueryTree(dpy, rootwin, &r, &w, &stack_list, &stack_num)) {
+		stack_list = NULL;
+		stack_num = 0;
+	}
+}
+
+/*
  * Send a pointer position event to the X server.
  */
 static void update_x11_pointer_position(int x, int y) {
+
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
 	X_LOCK;
 	if (use_xwarppointer) {
@@ -6426,16 +6502,6 @@ static void update_x11_pointer_position(int x, int y) {
 	set_cursor(x, y, get_which_cursor());
 
 	last_event = last_input = time(0);
-
-	if (nofb) {
-		/* 
-		 * nofb is for, e.g. Win2VNC, where fastest pointer
-		 * updates are desired.
-		 */
-		X_LOCK;
-		XFlush(dpy);
-		X_UNLOCK;
-	}
 }
 
 /*
@@ -6446,7 +6512,17 @@ static void update_x11_pointer_mask(int mask) {
 
 	last_event = last_input = time(0);
 
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+
 	X_LOCK;
+	if (mask && !button_mask) {
+		/* button down, snapshot the stacking list before flushing */
+		if (wireframe && !wireframe_in_progress &&
+		    strcmp(wireframe_copyrect, "never")) {
+			snapshot_stack_list();
+		}
+	}
+
 	/* look for buttons that have be clicked or released: */
 	for (i=0; i < MAX_BUTTONS; i++) {
 	    if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
@@ -6511,12 +6587,14 @@ static void update_x11_pointer_mask(int mask) {
 	    }
 	}
 
+
 	X_UNLOCK;
 
 	/*
 	 * Remember the button state for next time and also for the
 	 * -nodragging case:
 	 */
+	button_mask_prev = button_mask;
 	button_mask = mask;
 }
 
@@ -6589,6 +6667,7 @@ void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
  */
 void pointer(int mask, int x, int y, rfbClientPtr client) {
 	allowed_input_t input;
+	int sent = 0;
 
 	if (debug_pointer && mask >= 0) {
 		static int show_motion = -1;
@@ -6623,6 +6702,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			}
 			if (view_only && raw_fb) {
 				/* raw_fb hack track button state */
+				button_mask_prev = button_mask;
 				button_mask = mask;
 			}
 			return;
@@ -6725,7 +6805,9 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		}
 		if (nevents && dt > maxwait) {
 			X_LOCK;
-			XFlush(dpy);	
+			if (dpy) {	/* raw_fb hack */
+				XFlush(dpy);	
+			}
 			X_UNLOCK;
 		}
 		nevents = 0;	/* reset everything */
@@ -6745,9 +6827,25 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	/* update the X display with the event: */
 	if (input.motion) {
 		update_x11_pointer_position(x, y);
+		sent = 1;
 	}
 	if (input.button) {
+		if (mask != button_mask) {
+			button_change_x = cursor_x;
+			button_change_y = cursor_y;
+		}
 		update_x11_pointer_mask(mask);
+		sent = 1;
+	}
+
+	if (nofb && sent) {
+		/* 
+		 * nofb is for, e.g. Win2VNC, where fastest pointer
+		 * updates are desired.
+		 */
+		X_LOCK;
+		XFlush(dpy);
+		X_UNLOCK;
 	}
 }
 
@@ -6830,6 +6928,12 @@ void initialize_pipeinput(void) {
 	}
 
 	set_child_info();
+	if (no_external_cmds) {
+		rfbLog("cannot run external commands in -nocmds mode:\n");
+		rfbLog("   \"%s\"\n", p);
+		rfbLog("   exiting.\n");
+		clean_up_exit(1);
+	}
 	rfbLog("pipeinput: starting: \"%s\"...\n", p);
 	pipeinput_fh = popen(p, "w");
 
@@ -7123,7 +7227,7 @@ int handle_subwin_resize(char *msg) {
 	if (! subwin) {
 		return 0;	/* hmmm... */
 	}
-	if (! valid_window(subwin)) {
+	if (! valid_window(subwin, NULL)) {
 		rfbLog("subwin 0x%lx went away!\n", subwin);
 		X_UNLOCK;
 		clean_up_exit(1);
@@ -7625,9 +7729,8 @@ void check_xevents(void) {
 	static time_t last_sync = 0;
 	time_t now = time(0);
 
-	if (! dpy) {	/* raw_fb hack */
-		return;
-	}
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+
 	if (now > last_init_check+1) {
 		last_init_check = now;
 		initialize_xevents();
@@ -7838,7 +7941,7 @@ void check_xevents(void) {
 		}
 
 		if (now > last_check + 1) {
-			int ev_max = 300, ev_size = 400;
+			int ev_type_max = 300, ev_size = 400;
 			XEvent xevs[400];
 			int i, tot = XEventsQueued(dpy, QueuedAlready);
 
@@ -7852,7 +7955,7 @@ void check_xevents(void) {
 		    		fprintf(stderr, "Total events queued: %d\n",
 				    tot);
 			}
-			for (i=1; i<ev_max; i++) {
+			for (i=1; i<ev_type_max; i++) {
 				int k, n = 0;
 				while (XCheckTypedEvent(dpy, i, xevs+n)) {
 					if (++n >= ev_size) {
@@ -7860,8 +7963,9 @@ void check_xevents(void) {
 					}
 				}
 				if (n) {
-					fprintf(stderr, "  %d events of type %d"
-					    " queued\n", n, i);
+					fprintf(stderr, "  %d%s events of type"
+					    " %d queued\n", n,
+					    (n >= ev_size) ? "+" : "", i);
 				}
 				for (k=n-1; k >= 0; k--) {
 					XPutBackEvent(dpy, xevs+k);
@@ -7896,6 +8000,8 @@ void check_xevents(void) {
  */
 void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	allowed_input_t input;
+
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
 	if (!watch_selection) {
 		return;
@@ -8326,6 +8432,105 @@ void reset_rfbport(int old, int new)  {
 }
 
 /*
+ * Do some sanity checking of the permissions on the XAUTHORITY and the
+ * -connect file.  This is -privremote.  What should be done is check
+ * for an empty host access list, currently we lazily do not bring in
+ * libXau yet.
+ */
+int remote_control_access_ok(void) {
+	struct stat sbuf;
+
+	if (client_connect_file) {
+		if (stat(client_connect_file, &sbuf) == 0) {
+			if (sbuf.st_mode & S_IWOTH) {
+				rfbLog("connect file is writable by others.\n");
+				rfbLog("   %s\n", client_connect_file);
+				return 0;
+			}
+			if (sbuf.st_mode & S_IWGRP) {
+				rfbLog("connect file is writable by group.\n");
+				rfbLog("   %s\n", client_connect_file);
+				return 0;
+			}
+		}
+	}
+
+	if (dpy) {
+		char tmp[1000];
+		char *home, *xauth;
+		char *dpy_str = DisplayString(dpy);
+		Display *dpy2;
+
+		home = get_home_dir();
+		if (getenv("XAUTHORITY") != NULL) {
+			xauth = getenv("XAUTHORITY");
+		} else if (home) {
+			int len = 1000 - strlen("/.Xauthority") - 1;
+			strncpy(tmp, home, len); 
+			strcat(tmp, "/.Xauthority");
+			xauth = tmp;
+		} else {
+			rfbLog("cannot determine default XAUTHORITY.\n");
+			return 0;
+		}
+		if (home) {
+			free(home);
+		}
+		if (stat(xauth, &sbuf) == 0) {
+			if (sbuf.st_mode & S_IWOTH) {
+				rfbLog("XAUTHORITY is writable by others!!\n");
+				rfbLog("   %s\n", xauth);
+				return 0;
+			}
+			if (sbuf.st_mode & S_IWGRP) {
+				rfbLog("XAUTHORITY is writable by group!!\n");
+				rfbLog("   %s\n", xauth);
+				return 0;
+			}
+			if (sbuf.st_mode & S_IROTH) {
+				rfbLog("XAUTHORITY is readable by others.\n");
+				rfbLog("   %s\n", xauth);
+				return 0;
+			}
+			if (sbuf.st_mode & S_IRGRP) {
+				rfbLog("XAUTHORITY is readable by group.\n");
+				rfbLog("   %s\n", xauth);
+				return 0;
+			}
+		}
+
+		if (getenv("XAUTHORITY")) {
+			xauth = strdup(getenv("XAUTHORITY"));
+		} else {
+			xauth = NULL;
+		}
+		set_env("XAUTHORITY", "/impossible/xauthfile");
+
+		fprintf(stderr, "\nChecking if display %s requires "
+		    "XAUTHORITY\n", dpy_str);
+		fprintf(stderr, "   (ignore any Xlib: errors that follow)\n");
+		dpy2 = XOpenDisplay(dpy_str); 
+
+		if (xauth) {
+			set_env("XAUTHORITY", xauth);
+			free(xauth);
+		} else {
+			xauth = getenv("XAUTHORITY");
+			if (xauth) {
+				*(xauth-2) = '_';	/* yow */
+			}
+		}
+		if (dpy2) {
+			rfbLog("XAUTHORITY is not required on display.\n");
+			rfbLog("   %s\n", DisplayString(dpy));
+			XCloseDisplay(dpy2);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/*
  * Huge, ugly switch to handle all remote commands and queries
  * -remote/-R and -query/-Q.
  */
@@ -8337,11 +8542,22 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	int bufn = VNC_CONNECT_MAX;
 	int query = 0;
 	static char *prev_cursors_mode = NULL;
+	static int first = 1; 
 
 	if (! accept_remote_cmds) {
 		rfbLog("remote commands disabled: %s\n", cmd);
 		return NULL;
 	}
+
+	if (first && priv_remote) {
+		if (! remote_control_access_ok()) {
+			rfbLog("disabling remote commands in -privremote "
+			    "mode.\n");
+			accept_remote_cmds = 0;
+			return NULL;
+		}
+	}
+	first = 0;
 
 	strcpy(buf, "");
 	if (strstr(cmd, "cmd=") == cmd) {
@@ -8425,7 +8641,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	    !strcmp(p, "exit") || !strcmp(p, "shutdown")) {
 		NOTAPP
 		close_all_clients();
-		rfbLog("process_remote_cmd: setting shut_down flag\n");
+		rfbLog("remote_cmd: setting shut_down flag\n");
 		shut_down = 1;
 
 	} else if (!strcmp(p, "ping")) {
@@ -8515,7 +8731,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			ok = 1;
 		}
 		if (ok) {
-			if (twin && ! valid_window(twin)) {
+			if (twin && ! valid_window(twin, NULL)) {
 				rfbLog("skipping invalid sub-window: 0x%lx\n",
 				    twin);
 			} else {
@@ -8552,7 +8768,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			ok = 1;
 		}
 		if (ok) {
-			if (twin && ! valid_window(twin)) {
+			if (twin && ! valid_window(twin, NULL)) {
 				rfbLog("skipping invalid sub-window: 0x%lx\n",
 				    twin);
 			} else {
@@ -8596,14 +8812,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, flash_cmap);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on flashcmap mode.\n");
+		rfbLog("remote_cmd: turning on flashcmap mode.\n");
 		flash_cmap = 1;
 	} else if (!strcmp(p, "noflashcmap")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !flash_cmap);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off flashcmap mode.\n");
+		rfbLog("remote_cmd: turning off flashcmap mode.\n");
 		flash_cmap = 0;
 		
 	} else if (strstr(p, "shiftcmap") == p) {
@@ -8614,7 +8830,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("shiftcmap:");
 		shift_cmap = atoi(p);
-		rfbLog("process_remote_cmd: set -shiftcmap %d\n", shift_cmap);
+		rfbLog("remote_cmd: set -shiftcmap %d\n", shift_cmap);
 		do_new_fb(1);
 
 	} else if (!strcmp(p, "truecolor")) {
@@ -8624,7 +8840,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    !force_indexed_color);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off notruecolor mode.\n");
+		rfbLog("remote_cmd: turning off notruecolor mode.\n");
 		force_indexed_color = 0;
 		if (orig != force_indexed_color) {
 			if_8bpp_do_new_fb();
@@ -8636,7 +8852,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    force_indexed_color);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on notruecolor mode.\n");
+		rfbLog("remote_cmd: turning on notruecolor mode.\n");
 		force_indexed_color = 1;
 		if (orig != force_indexed_color) {
 			if_8bpp_do_new_fb();
@@ -8647,7 +8863,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, overlay);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on -overlay mode.\n");
+		rfbLog("remote_cmd: turning on -overlay mode.\n");
 		if (!overlay_present) {
 			rfbLog("skipping: overlay extension not present.\n");
 		} else if (overlay) {
@@ -8669,7 +8885,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !overlay);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off overlay mode\n");
+		rfbLog("remote_cmd: turning off overlay mode\n");
 		overlay = 0;
 		if (!overlay_present) {
 			rfbLog("warning: overlay extension not present.\n");
@@ -8687,7 +8903,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, overlay_cursor);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on overlay_cursor mode.\n");
+		rfbLog("remote_cmd: turning on overlay_cursor mode.\n");
 		overlay_cursor = 1;
 		if (!overlay_present) {
 			rfbLog("warning: overlay extension not present.\n");
@@ -8705,7 +8921,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !overlay_cursor);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off overlay_cursor mode\n");
+		rfbLog("remote_cmd: turning off overlay_cursor mode\n");
 		overlay_cursor = 0;
 		if (!overlay_present) {
 			rfbLog("warning: overlay extension not present.\n");
@@ -8768,14 +8984,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, view_only);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enable viewonly mode.\n");
+		rfbLog("remote_cmd: enable viewonly mode.\n");
 		view_only = 1;
 	} else if (!strcmp(p, "noviewonly")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !view_only);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disable viewonly mode.\n");
+		rfbLog("remote_cmd: disable viewonly mode.\n");
 		view_only = 0;
 		if (raw_fb) set_raw_fb_params(0);
 
@@ -8783,7 +8999,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, shared); goto qry;
 		}
-		rfbLog("process_remote_cmd: enable sharing.\n");
+		rfbLog("remote_cmd: enable sharing.\n");
 		shared = 1;
 		if (screen) {
 			screen->alwaysShared = TRUE;
@@ -8793,7 +9009,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !shared); goto qry;
 		}
-		rfbLog("process_remote_cmd: disable sharing.\n");
+		rfbLog("remote_cmd: disable sharing.\n");
 		shared = 0;
 		if (screen) {
 			screen->alwaysShared = FALSE;
@@ -8805,14 +9021,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, 1-connect_once);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enable -forever mode.\n");
+		rfbLog("remote_cmd: enable -forever mode.\n");
 		connect_once = 0;
 	} else if (!strcmp(p, "noforever") || !strcmp(p, "once")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, connect_once);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disable -forever mode.\n");
+		rfbLog("remote_cmd: disable -forever mode.\n");
 		connect_once = 1;
 
 	} else if (strstr(p, "timeout") == p) {
@@ -8829,21 +9045,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			to = -to;
 		}
 		first_conn_timeout = to;
-		rfbLog("process_remote_cmd: set -timeout to %d\n", -to);
+		rfbLog("remote_cmd: set -timeout to %d\n", -to);
 
 	} else if (!strcmp(p, "deny") || !strcmp(p, "lock")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, deny_all);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: denying new connections.\n");
+		rfbLog("remote_cmd: denying new connections.\n");
 		deny_all = 1;
 	} else if (!strcmp(p, "nodeny") || !strcmp(p, "unlock")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !deny_all);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: allowing new connections.\n");
+		rfbLog("remote_cmd: allowing new connections.\n");
 		deny_all = 0;
 
 	} else if (strstr(p, "connect") == p) {
@@ -8862,7 +9078,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("allowonce:");
 		allow_once = strdup(p);
-		rfbLog("process_remote_cmd: set allow_once %s\n", allow_once);
+		rfbLog("remote_cmd: set allow_once %s\n", allow_once);
 
 	} else if (strstr(p, "allow") == p) {
 		char *before, *old;
@@ -8874,7 +9090,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("allow:");
 		if (allow_list && strchr(allow_list, '/')) {
-			rfbLog("process_remote_cmd: cannot use allow:host\n");
+			rfbLog("remote_cmd: cannot use allow:host\n");
 			rfbLog("in '-allow %s' mode.\n", allow_list);
 			goto done;
 		}
@@ -8896,7 +9112,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 
 		if (strcmp(before, allow_list)) {
-			rfbLog("process_remote_cmd: modified allow_list:\n");
+			rfbLog("remote_cmd: modified allow_list:\n");
 			rfbLog(" from: \"%s\"\n", before);
 			rfbLog(" to:   \"%s\"\n", allow_list);
 		}
@@ -8925,7 +9141,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		allow_list = strdup("127.0.0.1");
 
 		if (strcmp(before, allow_list)) {
-			rfbLog("process_remote_cmd: modified allow_list:\n");
+			rfbLog("remote_cmd: modified allow_list:\n");
 			rfbLog(" from: \"%s\"\n", before);
 			rfbLog(" to:   \"%s\"\n", allow_list);
 		}
@@ -8966,7 +9182,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		allow_list = strdup("");
 
 		if (strcmp(before, allow_list)) {
-			rfbLog("process_remote_cmd: modified allow_list:\n");
+			rfbLog("remote_cmd: modified allow_list:\n");
 			rfbLog(" from: \"%s\"\n", before);
 			rfbLog(" to:   \"%s\"\n", allow_list);
 		}
@@ -9006,7 +9222,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		listen_str = strdup(p);
 
 		if (strcmp(before, listen_str)) {
-			rfbLog("process_remote_cmd: modified listen_str:\n");
+			rfbLog("remote_cmd: modified listen_str:\n");
 			rfbLog(" from: \"%s\"\n", before);
 			rfbLog(" to:   \"%s\"\n", listen_str);
 			mod = 1;
@@ -9079,14 +9295,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, host_lookup);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling hostname lookup.\n");
+		rfbLog("remote_cmd: enabling hostname lookup.\n");
 		host_lookup = 1;
 	} else if (!strcmp(p, "nolookup")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !host_lookup);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disabling hostname lookup.\n");
+		rfbLog("remote_cmd: disabling hostname lookup.\n");
 		host_lookup = 0;
 
 	} else if (strstr(p, "accept") == p) {
@@ -9125,7 +9341,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, using_shm);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off noshm mode.\n");
+		rfbLog("remote_cmd: turning off noshm mode.\n");
 		using_shm = 1;
 		if (raw_fb) set_raw_fb_params(0);
 
@@ -9140,7 +9356,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !using_shm);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on noshm mode.\n");
+		rfbLog("remote_cmd: turning on noshm mode.\n");
 		using_shm = 0;
 		if (orig != using_shm) {
 			do_new_fb(1);
@@ -9154,7 +9370,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, flip_byte_order);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on flipbyteorder mode.\n");
+		rfbLog("remote_cmd: turning on flipbyteorder mode.\n");
 		flip_byte_order = 1;
 		if (orig != flip_byte_order) {
 			if (! using_shm) {
@@ -9169,7 +9385,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !flip_byte_order);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off flipbyteorder mode.\n");
+		rfbLog("remote_cmd: turning off flipbyteorder mode.\n");
 		flip_byte_order = 0;
 		if (orig != flip_byte_order) {
 			if (! using_shm) {
@@ -9184,14 +9400,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, single_copytile);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enable -onetile mode.\n");
+		rfbLog("remote_cmd: enable -onetile mode.\n");
 		single_copytile = 1;
 	} else if (!strcmp(p, "noonetile")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !single_copytile);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disable -onetile mode.\n");
+		rfbLog("remote_cmd: disable -onetile mode.\n");
 		if (tile_shm_count < ntiles_x) {
 			rfbLog(" this has no effect: tile_shm_count=%d"
 			    " ntiles_x=%d\n", tile_shm_count, ntiles_x);
@@ -9200,6 +9416,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		single_copytile = 0;
 
 	} else if (strstr(p, "solid_color") == p) {
+		/*
+		 * n.b. this solid stuff perhaps should reflect
+		 * safe_remote_only but at least the command names
+		 * are fixed.
+		 */
 		char *new;
 		int doit = 1;
 		COLON_CHECK("solid_color:")
@@ -9214,8 +9435,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		} else {
 			new = strdup(solid_default);
 		}
-		rfbLog("process_remote_cmd: solid %s -> %s\n",
-		    NONUL(solid_str), new);
+		rfbLog("remote_cmd: solid %s -> %s\n", NONUL(solid_str), new);
 
 		if (solid_str) {
 			if (!strcmp(solid_str, new)) {
@@ -9236,7 +9456,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, use_solid_bg);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enable -solid mode\n");
+		rfbLog("remote_cmd: enable -solid mode\n");
 		if (! solid_str) {
 			solid_str = strdup(solid_default);
 		}
@@ -9251,7 +9471,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !use_solid_bg);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disable -solid mode\n");
+		rfbLog("remote_cmd: disable -solid mode\n");
 		use_solid_bg = 0;
 		if (client_count && orig) {
 			solid_bg(1);
@@ -9282,7 +9502,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			blackout_str = strdup(p);
 		}
 		if (strcmp(before, blackout_str)) {
-			rfbLog("process_remote_cmd: changing -blackout\n");
+			rfbLog("remote_cmd: changing -blackout\n");
 			rfbLog(" from: %s\n", before);
 			rfbLog(" to:   %s\n", blackout_str);
 			if (0 && !strcmp(blackout_str, "") &&
@@ -9301,8 +9521,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, xinerama);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enable xinerama mode."
-		    "(if applicable).\n");
+		rfbLog("remote_cmd: enable xinerama mode. (if applicable).\n");
 		xinerama = 1;
 		initialize_blackouts_and_xinerama();
 	} else if (!strcmp(p, "noxinerama")) {
@@ -9310,8 +9529,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !xinerama);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disable xinerama mode."
-		    "(if applicable).\n");
+		rfbLog("remote_cmd: disable xinerama mode. (if applicable).\n");
 		xinerama = 0;
 		initialize_blackouts_and_xinerama();
 
@@ -9320,7 +9538,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, xtrap_input);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enable xtrap input mode."
+		rfbLog("remote_cmd: enable xtrap input mode."
 		    "(if applicable).\n");
 		if (! xtrap_input) {
 			xtrap_input = 1;
@@ -9332,7 +9550,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !xtrap_input);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disable xtrap input mode."
+		rfbLog("remote_cmd: disable xtrap input mode."
 		    "(if applicable).\n");
 		if (xtrap_input) {
 			xtrap_input = 0;
@@ -9345,7 +9563,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, xrandr); goto qry;
 		}
 		if (xrandr_present) {
-			rfbLog("process_remote_cmd: enable xrandr mode.\n");
+			rfbLog("remote_cmd: enable xrandr mode.\n");
 			xrandr = 1;
 			if (raw_fb) set_raw_fb_params(0);
 			if (! xrandr_mode) {
@@ -9355,8 +9573,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				initialize_xrandr();
 			}
 		} else {
-			rfbLog("process_remote_cmd: XRANDR ext. not "
-			    "present.\n");
+			rfbLog("remote_cmd: XRANDR ext. not present.\n");
 		}
 	} else if (!strcmp(p, "noxrandr")) {
 		int orig = xrandr;
@@ -9365,13 +9582,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		xrandr = 0;
 		if (xrandr_present) {
-			rfbLog("process_remote_cmd: disable xrandr mode.\n");
+			rfbLog("remote_cmd: disable xrandr mode.\n");
 			if (orig != xrandr) {
 				initialize_xrandr();
 			}
 		} else {
-			rfbLog("process_remote_cmd: XRANDR ext. not "
-			    "present.\n");
+			rfbLog("remote_cmd: XRANDR ext. not present.\n");
 		}
 	} else if (strstr(p, "xrandr_mode") == p) {
 		int orig = xrandr;
@@ -9396,11 +9612,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		if (xrandr_present) {
 			if (xrandr) {
-				rfbLog("process_remote_cmd: enable xrandr"
-				    " mode.\n");
+				rfbLog("remote_cmd: enable xrandr mode.\n");
 			} else {
-				rfbLog("process_remote_cmd: disable xrandr"
-				    " mode.\n");
+				rfbLog("remote_cmd: disable xrandr mode.\n");
 			}
 			if (! xrandr_mode) {
 				xrandr_mode = strdup("default");
@@ -9409,8 +9623,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				initialize_xrandr();
 			}
 		} else {
-			rfbLog("process_remote_cmd: XRANDR ext. not "
-			    "present.\n");
+			rfbLog("remote_cmd: XRANDR ext. not present.\n");
 		}
 
 	} else if (strstr(p, "padgeom") == p) {
@@ -9422,13 +9635,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("padgeom:");
 		if (!strcmp("force", p) || !strcmp("do",p) || !strcmp("go",p)) {
-			rfbLog("process_remote_cmd: invoking "
-			    "install_padded_fb()\n");
+			rfbLog("remote_cmd: invoking install_padded_fb()\n");
 			install_padded_fb(pad_geometry);
 		} else {
 			if (pad_geometry) free(pad_geometry);
 			pad_geometry = strdup(p);
-			rfbLog("process_remote_cmd: set padgeom to: %s\n",
+			rfbLog("remote_cmd: set padgeom to: %s\n",
 			    pad_geometry);
 		}
 
@@ -9436,13 +9648,13 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, quiet); goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on quiet mode.\n");
+		rfbLog("remote_cmd: turning on quiet mode.\n");
 		quiet = 1;
 	} else if (!strcmp(p, "noquiet")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !quiet); goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off quiet mode.\n");
+		rfbLog("remote_cmd: turning off quiet mode.\n");
 		quiet = 0;
 		
 	} else if (!strcmp(p, "modtweak")) {
@@ -9450,7 +9662,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, use_modifier_tweak);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling -modtweak mode.\n");
+		rfbLog("remote_cmd: enabling -modtweak mode.\n");
 		if (! use_modifier_tweak) {
 			use_modifier_tweak = 1;
 			initialize_modtweak();
@@ -9463,7 +9675,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    !use_modifier_tweak);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling -nomodtweak mode.\n");
+		rfbLog("remote_cmd: enabling -nomodtweak mode.\n");
 		use_modifier_tweak = 0;
 
 	} else if (!strcmp(p, "xkb")) {
@@ -9472,11 +9684,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (! xkb_present) {
-			rfbLog("process_remote_cmd: cannot enable -xkb "
+			rfbLog("remote_cmd: cannot enable -xkb "
 			    "modtweak mode (not supported on X display)\n");
 			goto done;
 		}
-		rfbLog("process_remote_cmd: enabling -xkb modtweak mode"
+		rfbLog("remote_cmd: enabling -xkb modtweak mode"
 		    " (if supported).\n");
 		if (! use_modifier_tweak || ! use_xkb_modtweak) {
 			use_modifier_tweak = 1;
@@ -9492,11 +9704,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (! xkb_present) {
-			rfbLog("process_remote_cmd: cannot disable -xkb "
+			rfbLog("remote_cmd: cannot disable -xkb "
 			    "modtweak mode (not supported on X display)\n");
 			goto done;
 		}
-		rfbLog("process_remote_cmd: disabling -xkb modtweak mode.\n");
+		rfbLog("remote_cmd: disabling -xkb modtweak mode.\n");
 		use_xkb_modtweak = 0;
 
 	} else if (strstr(p, "skip_keycodes") == p) {
@@ -9507,16 +9719,15 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		p += strlen("skip_keycodes:");
-		rfbLog("process_remote_cmd: setting xkb -skip_keycodes"
+		rfbLog("remote_cmd: setting xkb -skip_keycodes"
 		    " to:\n\t'%s'\n", p);
 		if (! xkb_present) {
-			rfbLog("process_remote_cmd: warning xkb not present\n");
+			rfbLog("remote_cmd: warning xkb not present\n");
 		} else if (! use_xkb_modtweak) {
-			rfbLog("process_remote_cmd: turning on xkb.\n");
+			rfbLog("remote_cmd: turning on xkb.\n");
 			use_xkb_modtweak = 1;
 			if (! use_modifier_tweak) {
-				rfbLog("process_remote_cmd: turning on "
-				    "modtweak.\n");
+				rfbLog("remote_cmd: turning on modtweak.\n");
 				use_modifier_tweak = 1;
 			}
 		}
@@ -9529,7 +9740,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, add_keysyms);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling -add_keysyms mode.\n");
+		rfbLog("remote_cmd: enabling -add_keysyms mode.\n");
 		add_keysyms = 1;
 
 	} else if (!strcmp(p, "noadd_keysyms")) {
@@ -9537,7 +9748,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !add_keysyms);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disabling -add_keysyms mode.\n");
+		rfbLog("remote_cmd: disabling -add_keysyms mode.\n");
 		add_keysyms = 0;
 
 	} else if (!strcmp(p, "clear_mods")) {
@@ -9545,7 +9756,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, clear_mods == 1);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling -clear_mods mode.\n");
+		rfbLog("remote_cmd: enabling -clear_mods mode.\n");
 		clear_mods = 1;
 		clear_modifiers(0);
 
@@ -9555,7 +9766,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    !(clear_mods == 1));
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disabling -clear_mods mode.\n");
+		rfbLog("remote_cmd: disabling -clear_mods mode.\n");
 		clear_mods = 0;
 
 	} else if (!strcmp(p, "clear_keys")) {
@@ -9564,7 +9775,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    clear_mods == 2);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling -clear_keys mode.\n");
+		rfbLog("remote_cmd: enabling -clear_keys mode.\n");
 		clear_mods = 2;
 		clear_keys();
 
@@ -9574,7 +9785,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    !(clear_mods == 2));
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disabling -clear_keys mode.\n");
+		rfbLog("remote_cmd: disabling -clear_keys mode.\n");
 		clear_mods = 0;
 
 	} else if (strstr(p, "remap") == p) {
@@ -9588,7 +9799,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("remap:");
 		if ((*p == '+' || *p == '-') && remap_file &&
 		    strchr(remap_file, '/')) {
-			rfbLog("process_remote_cmd: cannot use remap:+/-\n");
+			rfbLog("remote_cmd: cannot use remap:+/-\n");
 			rfbLog("in '-remap %s' mode.\n", remap_file);
 			goto done;
 		}
@@ -9611,7 +9822,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			remap_file = strdup(p);
 		}
 		if (strcmp(before, remap_file)) {
-			rfbLog("process_remote_cmd: changed -remap\n");
+			rfbLog("remote_cmd: changed -remap\n");
 			rfbLog(" from: %s\n", before);
 			rfbLog(" to:   %s\n", remap_file);
 			initialize_remap(remap_file);
@@ -9624,7 +9835,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !no_autorepeat);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling -repeat mode.\n");
+		rfbLog("remote_cmd: enabling -repeat mode.\n");
 		autorepeat(1);		/* restore initial setting */
 		no_autorepeat = 0;
 
@@ -9633,7 +9844,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, no_autorepeat);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling -norepeat mode.\n");
+		rfbLog("remote_cmd: enabling -norepeat mode.\n");
 		no_autorepeat = 1;
 		if (no_repeat_countdown >= 0) {
 			no_repeat_countdown = 2;
@@ -9648,7 +9859,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (nofb) {
-			rfbLog("process_remote_cmd: disabling nofb mode.\n");
+			rfbLog("remote_cmd: disabling nofb mode.\n");
 			rfbLog("  you may need to these turn back on:\n");
 			rfbLog("     xfixes, xdamage, solid, flashcmap\n");
 			rfbLog("     overlay, shm, noonetile, nap, cursor\n");
@@ -9662,7 +9873,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (!nofb) {
-			rfbLog("process_remote_cmd: enabling nofb mode.\n");
+			rfbLog("remote_cmd: enabling nofb mode.\n");
 			if (main_fb) {
 				push_black_screen(4);
 			}
@@ -9678,7 +9889,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, sound_bell);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling bell (if supported).\n");
+		rfbLog("remote_cmd: enabling bell (if supported).\n");
 		initialize_watch_bell();
 		sound_bell = 1;
 
@@ -9687,7 +9898,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !sound_bell);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disabling bell.\n");
+		rfbLog("remote_cmd: disabling bell.\n");
 		initialize_watch_bell();
 		sound_bell = 0;
 
@@ -9696,8 +9907,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, watch_selection);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling watch "
-		    "selection+primary.\n");
+		rfbLog("remote_cmd: enabling watch selection+primary.\n");
 		watch_selection = 1;
 		watch_primary = 1;
 
@@ -9706,8 +9916,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !watch_selection);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disabling watch "
-		    "selection+primary.\n");
+		rfbLog("remote_cmd: disabling watch selection+primary.\n");
 		watch_selection = 0;
 		watch_primary = 0;
 
@@ -9716,7 +9925,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, watch_primary);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling watch_primary.\n");
+		rfbLog("remote_cmd: enabling watch_primary.\n");
 		watch_primary = 1;
 
 	} else if (!strcmp(p, "noprimary")) {
@@ -9724,11 +9933,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !watch_primary);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disabling watch_primary.\n");
+		rfbLog("remote_cmd: disabling watch_primary.\n");
 		watch_primary = 0;
 
 	} else if (!strcmp(p, "set_no_cursor")) { /* skip-cmd-list */
-		rfbLog("process_remote_cmd: calling set_no_cursor()\n");
+		rfbLog("remote_cmd: calling set_no_cursor()\n");
 		set_no_cursor();
 
 	} else if (!strcmp(p, "cursorshape")) {
@@ -9737,7 +9946,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    cursor_shape_updates);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on cursorshape mode.\n");
+		rfbLog("remote_cmd: turning on cursorshape mode.\n");
 
 		set_no_cursor();
 		cursor_shape_updates = 1;
@@ -9750,7 +9959,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    !cursor_shape_updates);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off cursorshape mode.\n");
+		rfbLog("remote_cmd: turning off cursorshape mode.\n");
 		
 		set_no_cursor();
 		for (i=0; i<max; i++) {
@@ -9767,7 +9976,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    cursor_pos_updates);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on cursorpos mode.\n");
+		rfbLog("remote_cmd: turning on cursorpos mode.\n");
 		cursor_pos_updates = 1;
 	} else if (!strcmp(p, "nocursorpos")) {
 		if (query) {
@@ -9775,7 +9984,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    !cursor_pos_updates);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off cursorpos mode.\n");
+		rfbLog("remote_cmd: turning off cursorpos mode.\n");
 		cursor_pos_updates = 0;
 
 	} else if (strstr(p, "cursor") == p) {
@@ -9793,12 +10002,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		multiple_cursors_mode = strdup(p);
 
-		rfbLog("process_remote_cmd: changed -cursor mode "
+		rfbLog("remote_cmd: changed -cursor mode "
 		    "to: %s\n", multiple_cursors_mode);
 
 		if (strcmp(multiple_cursors_mode, "none") && !show_cursor) {
 			show_cursor = 1;
-			rfbLog("process_remote_cmd: changed show_cursor "
+			rfbLog("remote_cmd: changed show_cursor "
 			    "to: %d\n", show_cursor);
 		}
 		initialize_cursors_mode();
@@ -9809,7 +10018,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, show_cursor);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling show_cursor.\n");
+		rfbLog("remote_cmd: enabling show_cursor.\n");
 		show_cursor = 1;
 		if (multiple_cursors_mode && !strcmp(multiple_cursors_mode,
 		    "none")) {
@@ -9820,7 +10029,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			} else {
 				multiple_cursors_mode = strdup("default");
 			}
-			rfbLog("process_remote_cmd: changed -cursor mode "
+			rfbLog("remote_cmd: changed -cursor mode "
 			    "to: %s\n", multiple_cursors_mode);
 		}
 		initialize_cursors_mode();
@@ -9833,7 +10042,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (prev_cursors_mode) free(prev_cursors_mode);
 		prev_cursors_mode = strdup(multiple_cursors_mode);
 
-		rfbLog("process_remote_cmd: disabling show_cursor.\n");
+		rfbLog("remote_cmd: disabling show_cursor.\n");
 		show_cursor = 0;
 		initialize_cursors_mode();
 		first_cursor();
@@ -9846,8 +10055,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("arrow:");
 		alt_arrow = atoi(p);
-		rfbLog("process_remote_cmd: setting alt_arrow: %d.\n",
-		    alt_arrow);
+		rfbLog("remote_cmd: setting alt_arrow: %d.\n", alt_arrow);
 		setup_cursors_and_push();
 
 	} else if (!strcmp(p, "xfixes")) {
@@ -9856,11 +10064,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (! xfixes_present) {
-			rfbLog("process_remote_cmd: cannot enable xfixes "
+			rfbLog("remote_cmd: cannot enable xfixes "
 			    "(not supported on X display)\n");
 			goto done;
 		}
-		rfbLog("process_remote_cmd: enabling -xfixes"
+		rfbLog("remote_cmd: enabling -xfixes"
 		    " (if supported).\n");
 		use_xfixes = 1;
 		initialize_xfixes();
@@ -9871,11 +10079,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (! xfixes_present) {
-			rfbLog("process_remote_cmd: disabling xfixes  "
+			rfbLog("remote_cmd: disabling xfixes  "
 			    "(but not supported on X display)\n");
 			goto done;
 		}
-		rfbLog("process_remote_cmd: disabling -xfixes.\n");
+		rfbLog("remote_cmd: disabling -xfixes.\n");
 		use_xfixes = 0;
 		initialize_xfixes();
 		first_cursor();
@@ -9887,11 +10095,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (! xdamage_present) {
-			rfbLog("process_remote_cmd: cannot enable xdamage hints "
+			rfbLog("remote_cmd: cannot enable xdamage hints "
 			    "(not supported on X display)\n");
 			goto done;
 		}
-		rfbLog("process_remote_cmd: enabling xdamage hints"
+		rfbLog("remote_cmd: enabling xdamage hints"
 		    " (if supported).\n");
 		use_xdamage = 1;
 		if (use_xdamage != orig) {
@@ -9905,11 +10113,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (! xdamage_present) {
-			rfbLog("process_remote_cmd: disabling xdamage hints "
+			rfbLog("remote_cmd: disabling xdamage hints "
 			    "(but not supported on X display)\n");
 			goto done;
 		}
-		rfbLog("process_remote_cmd: disabling xdamage hints.\n");
+		rfbLog("remote_cmd: disabling xdamage hints.\n");
 		use_xdamage = 0;
 		if (use_xdamage != orig) {
 			initialize_xdamage();
@@ -9927,7 +10135,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("xd_area:");
 		a = atoi(p);
 		if (a >= 0) {
-			rfbLog("process_remote_cmd: setting xdamage_max_area "
+			rfbLog("remote_cmd: setting xdamage_max_area "
 			    "%d -> %d.\n", xdamage_max_area, a);
 			xdamage_max_area = a;
 		}
@@ -9942,7 +10150,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("xd_mem:");
 		a = atof(p);
 		if (a >= 0.0) {
-			rfbLog("process_remote_cmd: setting xdamage_memory "
+			rfbLog("remote_cmd: setting xdamage_memory "
 			    "%.3f -> %.3f.\n", xdamage_memory, a);
 			xdamage_memory = a;
 		}
@@ -9960,7 +10168,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (a < 0) a = 0;
 		if (a > 256) a = 256;	/* allow 256 for testing. */
 		if (alpha_threshold != a) {
-			rfbLog("process_remote_cmd: setting alphacut "
+			rfbLog("remote_cmd: setting alphacut "
 			    "%d -> %d.\n", alpha_threshold, a);
 			if (a == 256) {
 				rfbLog("note: alphacut=256 leads to completely"
@@ -9982,7 +10190,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (a < 0.0) a = 0.0;
 		if (a > 1.0) a = 1.0;
 		if (alpha_frac != a) {
-			rfbLog("process_remote_cmd: setting alphafrac "
+			rfbLog("remote_cmd: setting alphafrac "
 			    "%f -> %f.\n", alpha_frac, a);
 			alpha_frac = a;
 			setup_cursors_and_push();
@@ -9993,7 +10201,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (!alpha_remove) {
-			rfbLog("process_remote_cmd: enable alpharemove\n");
+			rfbLog("remote_cmd: enable alpharemove\n");
 			alpha_remove = 1;
 			setup_cursors_and_push();
 		}
@@ -10003,7 +10211,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (alpha_remove) {
-			rfbLog("process_remote_cmd: disable alpharemove\n");
+			rfbLog("remote_cmd: disable alpharemove\n");
 			alpha_remove = 0;
 			setup_cursors_and_push();
 		}
@@ -10013,7 +10221,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (!alpha_blend) {
-			rfbLog("process_remote_cmd: enable alphablend\n");
+			rfbLog("remote_cmd: enable alphablend\n");
 			alpha_remove = 0;
 			alpha_blend = 1;
 			setup_cursors_and_push();
@@ -10024,7 +10232,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		if (alpha_blend) {
-			rfbLog("process_remote_cmd: disable alphablend\n");
+			rfbLog("remote_cmd: disable alphablend\n");
 			alpha_blend = 0;
 			setup_cursors_and_push();
 		}
@@ -10034,7 +10242,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, use_xwarppointer);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on xwarppointer mode.\n");
+		rfbLog("remote_cmd: turning on xwarppointer mode.\n");
 		use_xwarppointer = 1;
 	} else if (strstr(p, "noxwarp") == p ||
 		    strstr(p, "noxwarppointer") == p) {
@@ -10042,7 +10250,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !use_xwarppointer);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off xwarppointer mode.\n");
+		rfbLog("remote_cmd: turning off xwarppointer mode.\n");
 		use_xwarppointer = 0;
 
 	} else if (strstr(p, "buttonmap") == p) {
@@ -10056,8 +10264,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (pointer_remap) free(pointer_remap);
 		pointer_remap = strdup(p);
 
-		rfbLog("process_remote_cmd: setting -buttonmap to:\n"
-		    "\t'%s'\n", p);
+		rfbLog("remote_cmd: setting -buttonmap to:\n\t'%s'\n", p);
 		initialize_pointer_map(p);
 
 	} else if (!strcmp(p, "dragging")) {
@@ -10065,15 +10272,86 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, show_dragging);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling mouse dragging mode.\n");
+		rfbLog("remote_cmd: enabling mouse dragging mode.\n");
 		show_dragging = 1;
 	} else if (!strcmp(p, "nodragging")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !show_dragging);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: enabling mouse nodragging mode.\n");
+		rfbLog("remote_cmd: enabling mouse nodragging mode.\n");
 		show_dragging = 0;
+
+	} else if (strstr(p, "wireframe_mode") == p) {
+		COLON_CHECK("wireframe_mode:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    wireframe_str ? wireframe_str : WIREFRAME_PARMS);
+			goto qry;
+		}
+		p += strlen("wireframe_mode:");
+		if (*p) {
+			if (wireframe_str) {
+				free(wireframe_str);
+			}
+			wireframe_str = strdup(p);
+			parse_wireframe();
+		}
+		rfbLog("remote_cmd: enabling -wireframe mode.\n");
+		wireframe = 1;
+	} else if (strstr(p, "wireframe:") == p) {	/* skip-cmd-list */
+		COLON_CHECK("wireframe:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, wireframe);
+			goto qry;
+		}
+		p += strlen("wireframe:");
+		if (*p) {
+			if (wireframe_str) {
+				free(wireframe_str);
+			}
+			wireframe_str = strdup(p);
+			parse_wireframe();
+		}
+		rfbLog("remote_cmd: enabling -wireframe mode.\n");
+		wireframe = 1;
+	} else if (!strcmp(p, "wireframe")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, wireframe);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling -wireframe mode.\n");
+		wireframe = 1;
+	} else if (!strcmp(p, "nowireframe")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !wireframe);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling -nowireframe mode.\n");
+		wireframe = 0;
+
+	} else if (strstr(p, "wirecopyrect") == p) {
+		COLON_CHECK("wirecopyrect:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(wireframe_copyrect));
+			goto qry;
+		}
+		p += strlen("wirecopyrect:");
+
+		set_wirecopyrect_mode(p);
+		rfbLog("remote_cmd: changed -wirecopyrect mode "
+		    "to: %s\n", NONUL(wireframe_copyrect));
+	} else if (!strcmp(p, "nowirecopyrect")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%s", p,
+			    NONUL(wireframe_copyrect));
+			goto qry;
+		}
+
+		set_wirecopyrect_mode("never");
+		rfbLog("remote_cmd: changed -wirecopyrect mode "
+		    "to: %s\n", NONUL(wireframe_copyrect));
 
 	} else if (strstr(p, "pointer_mode") == p) {
 		int pm;
@@ -10085,11 +10363,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("pointer_mode:");
 		pm = atoi(p);
 		if (pm < 0 || pm > pointer_mode_max) {
-			rfbLog("process_remote_cmd: pointer_mode out of range:"
+			rfbLog("remote_cmd: pointer_mode out of range:"
 			   " 1-%d: %d\n", pointer_mode_max, pm);
 		} else {
-			rfbLog("process_remote_cmd: setting pointer_mode %d\n",
-			    pm);
+			rfbLog("remote_cmd: setting pointer_mode %d\n", pm);
 			pointer_mode = pm;
 		}
 	} else if (strstr(p, "pm") == p) {
@@ -10102,11 +10379,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("pm:");
 		pm = atoi(p);
 		if (pm < 0 || pm > pointer_mode_max) {
-			rfbLog("process_remote_cmd: pointer_mode out of range:"
+			rfbLog("remote_cmd: pointer_mode out of range:"
 			   " 1-%d: %d\n", pointer_mode_max, pm);
 		} else {
-			rfbLog("process_remote_cmd: setting pointer_mode %d\n",
-			    pm);
+			rfbLog("remote_cmd: setting pointer_mode %d\n", pm);
 			pointer_mode = pm;
 		}
 
@@ -10119,7 +10395,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("input_skip:");
 		is = atoi(p);
-		rfbLog("process_remote_cmd: setting input_skip %d\n", is);
+		rfbLog("remote_cmd: setting input_skip %d\n", is);
 		ui_skip = is;
 
 	} else if (strstr(p, "input") == p) {
@@ -10134,7 +10410,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (allowed_input_str && !strcmp(p, allowed_input_str)) {
 			doit = 0;
 		}
-		rfbLog("process_remote_cmd: setting input %s\n", p);
+		rfbLog("remote_cmd: setting input %s\n", p);
 		if (allowed_input_str) free(allowed_input_str);
 		if (*p == '\0') {
 			allowed_input_str = NULL;
@@ -10161,8 +10437,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (speeds_str) free(speeds_str);
 		speeds_str = strdup(p);
 
-		rfbLog("process_remote_cmd: setting -speeds to:\n"
-		    "\t'%s'\n", p);
+		rfbLog("remote_cmd: setting -speeds to:\n\t'%s'\n", p);
 		initialize_speeds();
 
 	} else if (!strcmp(p, "debug_pointer") || !strcmp(p, "dp")) {
@@ -10170,14 +10445,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, debug_pointer);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on debug_pointer.\n");
+		rfbLog("remote_cmd: turning on debug_pointer.\n");
 		debug_pointer = 1;
 	} else if (!strcmp(p, "nodebug_pointer") || !strcmp(p, "nodp")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !debug_pointer);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off debug_pointer.\n");
+		rfbLog("remote_cmd: turning off debug_pointer.\n");
 		debug_pointer = 0;
 
 	} else if (!strcmp(p, "debug_keyboard") || !strcmp(p, "dk")) {
@@ -10185,14 +10460,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, debug_keyboard);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on debug_keyboard.\n");
+		rfbLog("remote_cmd: turning on debug_keyboard.\n");
 		debug_keyboard = 1;
 	} else if (!strcmp(p, "nodebug_keyboard") || !strcmp(p, "nodk")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !debug_keyboard);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off debug_keyboard.\n");
+		rfbLog("remote_cmd: turning off debug_keyboard.\n");
 		debug_keyboard = 0;
 
 	} else if (strstr(p, "deferupdate") == p) {
@@ -10206,7 +10481,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("deferupdate:");
 		d = atoi(p);
 		if (d < 0) d = 0;
-		rfbLog("process_remote_cmd: setting defer to %d ms.\n", d);
+		rfbLog("remote_cmd: setting defer to %d ms.\n", d);
 		screen->deferUpdateTime = d;
 		
 	} else if (strstr(p, "defer") == p) {
@@ -10220,7 +10495,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("defer:");
 		d = atoi(p);
 		if (d < 0) d = 0;
-		rfbLog("process_remote_cmd: setting defer to %d ms.\n", d);
+		rfbLog("remote_cmd: setting defer to %d ms.\n", d);
 		/* XXX not part of API? */
 		screen->deferUpdateTime = d;
 		
@@ -10234,8 +10509,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("wait:");
 		w = atoi(p);
 		if (w < 0) w = 0;
-		rfbLog("process_remote_cmd: setting wait %d -> %d ms.\n",
-		    waitms, w);
+		rfbLog("remote_cmd: setting wait %d -> %d ms.\n", waitms, w);
 		waitms = w;
 
 	} else if (strstr(p, "rfbwait") == p) {
@@ -10249,7 +10523,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("rfbwait:");
 		w = atoi(p);
 		if (w < 0) w = 0;
-		rfbLog("process_remote_cmd: setting rfbMaxClientWait %d -> "
+		rfbLog("remote_cmd: setting rfbMaxClientWait %d -> "
 		    "%d ms.\n", orig, w);
 		rfbMaxClientWait = w;
 		if (screen) {
@@ -10262,14 +10536,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, take_naps);
 			    goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on nap mode.\n");
+		rfbLog("remote_cmd: turning on nap mode.\n");
 		take_naps = 1;
 	} else if (!strcmp(p, "nonap")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !take_naps);
 			    goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off nap mode.\n");
+		rfbLog("remote_cmd: turning off nap mode.\n");
 		take_naps = 0;
 
 	} else if (strstr(p, "sb") == p) {
@@ -10282,8 +10556,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("sb:");
 		w = atoi(p);
 		if (w < 0) w = 0;
-		rfbLog("process_remote_cmd: setting screen_blank %d -> %d"
-		    " sec.\n", screen_blank, w);
+		rfbLog("remote_cmd: setting screen_blank %d -> %d sec.\n",
+		    screen_blank, w);
 		screen_blank = w;
 	} else if (strstr(p, "screen_blank") == p) {
 		int w;
@@ -10295,8 +10569,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("screen_blank:");
 		w = atoi(p);
 		if (w < 0) w = 0;
-		rfbLog("process_remote_cmd: setting screen_blank %d -> %d"
-		    " sec.\n", screen_blank, w);
+		rfbLog("remote_cmd: setting screen_blank %d -> %d sec.\n",
+		    screen_blank, w);
 		screen_blank = w;
 
 	} else if (strstr(p, "fs") == p) {
@@ -10307,7 +10581,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("fs:");
 		fs_frac = atof(p);
-		rfbLog("process_remote_cmd: setting -fs frac to %f\n", fs_frac);
+		rfbLog("remote_cmd: setting -fs frac to %f\n", fs_frac);
 
 	} else if (strstr(p, "gaps") == p) {
 		int g;
@@ -10319,7 +10593,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("gaps:");
 		g = atoi(p);
 		if (g < 0) g = 0;
-		rfbLog("process_remote_cmd: setting gaps_fill %d -> %d.\n",
+		rfbLog("remote_cmd: setting gaps_fill %d -> %d.\n",
 		    gaps_fill, g);
 		gaps_fill = g;
 	} else if (strstr(p, "grow") == p) {
@@ -10332,7 +10606,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("grow:");
 		g = atoi(p);
 		if (g < 0) g = 0;
-		rfbLog("process_remote_cmd: setting grow_fill %d -> %d.\n",
+		rfbLog("remote_cmd: setting grow_fill %d -> %d.\n",
 		    grow_fill, g);
 		grow_fill = g;
 	} else if (strstr(p, "fuzz") == p) {
@@ -10345,7 +10619,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("fuzz:");
 		f = atoi(p);
 		if (f < 0) f = 0;
-		rfbLog("process_remote_cmd: setting tile_fuzz %d -> %d.\n",
+		rfbLog("remote_cmd: setting tile_fuzz %d -> %d.\n",
 		    tile_fuzz, f);
 		grow_fill = f;
 
@@ -10355,7 +10629,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, use_snapfb);
 			    goto qry;
 		}
-		rfbLog("process_remote_cmd: turning on snapfb mode.\n");
+		rfbLog("remote_cmd: turning on snapfb mode.\n");
 		use_snapfb = 1;
 		if (orig != use_snapfb) {
 			do_new_fb(1);
@@ -10366,7 +10640,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !use_snapfb);
 			    goto qry;
 		}
-		rfbLog("process_remote_cmd: turning off snapfb mode.\n");
+		rfbLog("remote_cmd: turning off snapfb mode.\n");
 		use_snapfb = 0;
 		if (orig != use_snapfb) {
 			do_new_fb(1);
@@ -10382,14 +10656,13 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("rawfb:");
 		if (raw_fb_str) free(raw_fb_str);
 		raw_fb_str = strdup(p);
-		if (safe_remote_only && strstr(p, "setup:") == p) {
+		if (safe_remote_only && strstr(p, "setup:") == p) { /* skip-cmd-list */
 			/* n.b. we still allow filename, shm, of rawfb */
 			fprintf(stderr, "unsafe rawfb setup: %s\n", p);
 			exit(1);
 		}
 
-		rfbLog("process_remote_cmd: setting -rawfb to:\n"
-		    "\t'%s'\n", p);
+		rfbLog("remote_cmd: setting -rawfb to:\n\t'%s'\n", p);
 
 		if (*raw_fb_str == '\0') {
 			free(raw_fb_str);
@@ -10411,7 +10684,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("progressive:");
 		f = atoi(p);
 		if (f < 0) f = 0;
-		rfbLog("process_remote_cmd: setting progressive %d -> %d.\n",
+		rfbLog("remote_cmd: setting progressive %d -> %d.\n",
 		    screen->progressiveSliceHeight, f);
 		screen->progressiveSliceHeight = f;
 
@@ -10569,7 +10842,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfb_desktop_name = strdup(p);
 		screen->desktopName = rfb_desktop_name;
-		rfbLog("process_remote_cmd: setting desktop name to %s\n",
+		rfbLog("remote_cmd: setting desktop name to %s\n",
 		    rfb_desktop_name);
 
 	} else if (!strcmp(p, "noremote")) {
@@ -10578,10 +10851,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    !accept_remote_cmds);
 			goto qry;
 		}
-		rfbLog("process_remote_cmd: disabling remote commands.\n");
+		rfbLog("remote_cmd: disabling remote commands.\n");
 		accept_remote_cmds = 0; /* cannot be turned back on. */
 
-	} else if (strstr(p, "debug_xevents:") == p) {
+	} else if (strstr(p, "debug_xevents") == p) {
 		COLON_CHECK("debug_xevents:")
 		if (query) {
 			snprintf(buf, bufn, "ans=%s%s%d", p, co, debug_xevents);
@@ -10591,7 +10864,17 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		debug_xevents = atoi(p);
 		rfbLog("set debug_xevents to: %d\n", debug_xevents);
 
-	} else if (strstr(p, "hack:") == p) { /* skip-cmd-list */
+	} else if (strstr(p, "debug_xdamage") == p) {
+		COLON_CHECK("debug_xdamage:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, debug_xdamage);
+			goto qry;
+		}
+		p += strlen("debug_xdamage:");
+		debug_xdamage = atoi(p);
+		rfbLog("set debug_xdamage to: %d\n", debug_xdamage);
+
+	} else if (strstr(p, "hack") == p) { /* skip-cmd-list */
 		COLON_CHECK("hack:")
 		if (query) {
 			snprintf(buf, bufn, "ans=%s%s%d", p, co, hack_val);
@@ -10667,10 +10950,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    scaling_interpolate);
 		} else if (!strcmp(p, "inetd")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, inetd);
-		} else if (!strcmp(p, "safer")) {
-			snprintf(buf, bufn, "aro=%s:%d", p, safe_remote_only);
+		} else if (!strcmp(p, "privremote")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, priv_remote);
 		} else if (!strcmp(p, "unsafe")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, !safe_remote_only);
+		} else if (!strcmp(p, "safer")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, more_safe);
+		} else if (!strcmp(p, "nocmds")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, no_external_cmds);
 		} else if (!strcmp(p, "passwdfile")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(passwdfile));
 		} else if (!strcmp(p, "using_shm")) {
@@ -10770,7 +11057,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else {
 		char tmp[100];
 		NOTAPP
-		rfbLog("process_remote_cmd: warning unknown\n");
+		rfbLog("remote_cmd: warning unknown\n");
 		strncpy(tmp, p, 90);
 		rfbLog("command \"%s\"\n", tmp);
 		goto done;
@@ -10839,10 +11126,10 @@ void record_desired_xdamage_rect(int x, int y, int w, int h) {
 	dt_x = w / tile_x;
 	dt_y = h / tile_y;
 
-	if (!always_accept && dt_y >= 2 && area > 1000)  {
+	if (!always_accept && dt_y >= 3 && area > 2000)  {
 		/*
-		 * should be caught by a normal scanline poll, but we might
-		 * as well keep if small.
+		 * if it is real it should be caught by a normal scanline
+		 * poll, but we might as well keep if small (tall line?).
 		 */
 		return;
 	}
@@ -10851,6 +11138,7 @@ void record_desired_xdamage_rect(int x, int y, int w, int h) {
 	nt_x2 = nfix((x+w)/tile_x, ntiles_x);
 	nt_y1 = nfix(  (y)/tile_y, ntiles_y);
 	nt_y2 = nfix((y+h)/tile_y, ntiles_y);
+
 
 	/* loop over the rectangle of tiles (1 tile for a small input rect */
 	for (ix = nt_x1; ix <= nt_x2; ix++) {
@@ -10864,6 +11152,11 @@ void record_desired_xdamage_rect(int x, int y, int w, int h) {
 			tile_row_has_xdamage_diff[iy] = 1;
 			xdamage_tile_count++;
 		}
+	}
+	if (debug_xdamage > 1) {
+		fprintf(stderr, "xdamage: desired: %dx%d+%d+%d\tA: %6d  tiles="
+		    "%02d-%02d/%02d-%02d  tilecnt: %d\n", w, h, x, y,
+		    w * h, nt_x1, nt_x2, nt_y1, nt_y2, cnt);
 	}
 }
 
@@ -10973,6 +11266,11 @@ void collect_xdamage(int scancnt) {
 				continue;
 			}
 		}
+		if (debug_xdamage > 2) {
+			fprintf(stderr, "xdamage: -> event %dx%d+%d+%d area:"
+			    " %d  dups: %d  %s\n", w, h, x, y, w*h, dcount,
+			    (w*h > xdamage_max_area) ? "TOO_BIG" : "");
+		}
 
 		record_desired_xdamage_rect(x, y, w, h);
 
@@ -10995,6 +11293,11 @@ void collect_xdamage(int scancnt) {
 
 		if (XD_tot) {
 			rat = ((double) XD_skip)/XD_tot;
+		}
+		if (debug_xdamage) {
+			fprintf(stderr, "xdamage: == scanline skip/tot: "
+			    "%04d/%04d =%.3f  rects: %d  desired: %d\n",
+			    XD_skip, XD_tot, rat, rect_count, XD_des);
 		}
 			
 		XD_skip = 0;
@@ -11081,6 +11384,9 @@ void initialize_xdamage(void) {
 }
 
 void create_xdamage_if_needed(void) {
+
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (! xdamage) {
 		X_LOCK;
@@ -11093,6 +11399,9 @@ void create_xdamage_if_needed(void) {
 }
 
 void destroy_xdamage_if_needed(void) {
+
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (xdamage) {
 		XEvent ev;
@@ -12422,6 +12731,7 @@ int get_which_cursor(void) {
 		int mode = 0;
 
 		if (drag_in_progress || button_mask) {
+			/* XXX not exactly what we want for menus */
 			return -1;
 		}
 
@@ -12878,7 +13188,7 @@ void check_x11_pointer(void) {
 	int x, y;
 	unsigned int mask;
 
-	if (raw_fb) return;	/* raw_fb hack */
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
 	X_LOCK;
 	ret = XQueryPointer(dpy, rootwin, &root_w, &child_w, &root_x, &root_y,
@@ -13228,32 +13538,34 @@ void set_raw_fb_params(int restore) {
 	if (first) {
 		/* at least save the initial settings... */
 		vo0 = view_only;
-		us0 = use_snapfb;
-		sm0 = using_shm;
 		ws0 = watch_selection;
 		wp0 = watch_primary;
 		wb0 = watch_bell;
 		na0 = no_autorepeat;
-		tn0 = take_naps;
-		mc0 = multiple_cursors_mode;
-		xr0 = xrandr;
 		sb0 = use_solid_bg;
+
+		us0 = use_snapfb;
+		sm0 = using_shm;
+		tn0 = take_naps;
+		xr0 = xrandr;
+		mc0 = multiple_cursors_mode;
 
 		first = 0;
 	}
 
 	if (restore) {
 		view_only = vo0;
-		use_snapfb = us0;
-		using_shm = sm0;
 		watch_selection = ws0;
 		watch_primary = wp0;
 		watch_bell = wb0;
 		no_autorepeat = na0;
-		take_naps = tn0;
-		multiple_cursors_mode = mc0;
-		xrandr = xr0;
 		use_solid_bg = sb0;
+
+		use_snapfb = us0;
+		using_shm = sm0;
+		take_naps = tn0;
+		xrandr = xr0;
+		multiple_cursors_mode = mc0;
 
 		if (! dpy && raw_fb_orig_dpy) {
 			dpy = XOpenDisplay(raw_fb_orig_dpy);
@@ -13268,9 +13580,44 @@ void set_raw_fb_params(int restore) {
 		return;
 	}
 
-	if (! view_only) {
-		rfbLog("rawfb: setting view_only\n");
-		view_only = 1;
+	rfbLog("set_raw_fb_params: modifying settings for -rawfb mode.\n");
+
+	if (got_noviewonly) {
+		/*
+		 * The user input parameters are not unset under
+		 * -noviewonly... this usage should be very rare
+		 * (i.e. rawfb but also send user input to the X
+		 * display, most likely using /dev/fb0 for some reason...)
+		 */
+		rfbLog("rawfb: -noviewonly mode: still sending mouse and\n");
+		rfbLog("rawfb:   keyboard input to the X DISPLAY!!\n");
+	} else {
+		/* Normal case: */
+		if (! view_only) {
+			rfbLog("rawfb: setting view_only\n");
+			view_only = 1;
+		}
+		if (watch_selection) {
+			rfbLog("rawfb: turning off watch_selection\n");
+			watch_selection = 0;
+		}
+		if (watch_primary) {
+			rfbLog("rawfb: turning off watch_primary\n");
+			watch_primary = 0;
+		}
+		if (watch_bell) {
+			rfbLog("rawfb: turning off watch_bell\n");
+			watch_bell = 0;
+		}
+		if (no_autorepeat) {
+			rfbLog("rawfb: turning off no_autorepeat\n");
+			no_autorepeat = 0;
+		}
+		if (use_solid_bg) {
+			rfbLog("rawfb: turning off use_solid_bg\n");
+			use_solid_bg = 0;
+		}
+		multiple_cursors_mode = strdup("arrow");
 	}
 	if (use_snapfb) {
 		rfbLog("rawfb: turning off use_snapfb\n");
@@ -13280,34 +13627,13 @@ void set_raw_fb_params(int restore) {
 		rfbLog("rawfb: turning off using_shm\n");
 		using_shm = 0;
 	}
-	if (watch_selection) {
-		rfbLog("rawfb: turning off watch_selection\n");
-		watch_selection = 0;
-	}
-	if (watch_primary) {
-		rfbLog("rawfb: turning off watch_primary\n");
-		watch_primary = 0;
-	}
-	if (watch_bell) {
-		rfbLog("rawfb: turning off watch_bell\n");
-		watch_bell = 0;
-	}
-	if (no_autorepeat) {
-		rfbLog("rawfb: turning off no_autorepeat\n");
-		no_autorepeat = 0;
-	}
 	if (take_naps) {
 		rfbLog("rawfb: turning off take_naps\n");
 		take_naps = 0;
 	}
-	multiple_cursors_mode = strdup("arrow");
 	if (xrandr) {
 		rfbLog("rawfb: turning off xrandr\n");
 		xrandr = 0;
-	}
-	if (use_solid_bg) {
-		rfbLog("rawfb: turning off use_solid_bg\n");
-		use_solid_bg = 0;
 	}
 }
 
@@ -13477,6 +13803,13 @@ XImage *initialize_raw_fb(void) {
 
 		set_child_info();
 		q += strlen("setup:");
+		if (no_external_cmds) {
+			rfbLog("cannot run external commands in -nocmds "
+			    "mode:\n");
+			rfbLog("   \"%s\"\n", q);
+			rfbLog("   exiting.\n");
+			clean_up_exit(1);
+		}
 		rfbLog("running command to setup rawfb: %s\n", q);
 		pipe = popen(q, "r");
 		if (! pipe) {
@@ -13521,6 +13854,14 @@ XImage *initialize_raw_fb(void) {
 		closedpy = 0;
 	}
 
+	if (closedpy && !view_only && got_noviewonly) {
+		rfbLog("not closing X DISPLAY under -noviewonly option.\n");
+		closedpy = 0;
+		if (! window) {
+			window = rootwin;
+		}
+	}
+
 	if (! raw_fb_orig_dpy && dpy) {
 		raw_fb_orig_dpy = strdup(DisplayString(dpy));
 	}
@@ -13530,6 +13871,8 @@ XImage *initialize_raw_fb(void) {
 #if BOLDLY_CLOSE_DISPLAY
 	if (closedpy) {
 		if (dpy) {
+			rfbLog("closing X DISPLAY: %s in rawfb mode.\n",
+			    DisplayString(dpy));
 			XCloseDisplay(dpy);	/* yow! */
 		}
 		dpy = 0;
@@ -13575,6 +13918,25 @@ XImage *initialize_raw_fb(void) {
 		rfbLog("invalid rawfb str: %s\n", str);
 		clean_up_exit(1);
 	}
+	*q = '\0';
+
+	if (strstr(str, "shm:") != str && strstr(str, "mmap:") != str &&
+	    strstr(str, "map:") != str && strstr(str, "file:") != str) {
+		/* hmmm, not following directions, see if map: applies */
+		struct stat sbuf;
+		if (stat(str, &sbuf) == 0) {
+			char *new;
+			int len = strlen("map:") + strlen(str) + 1;
+			rfbLog("no type prefix: %s\n", raw_fb_str);
+			rfbLog("  but file exists, so assuming: map:%s\n",
+			    raw_fb_str);
+			new = (char *)malloc(len);
+			strcpy(new, "map:");
+			strcat(new, str);
+			free(str);
+			str = new;
+		}
+	}
 
 	dpy_x = wdpy_x = w;
 	dpy_y = wdpy_y = h;
@@ -13587,7 +13949,6 @@ XImage *initialize_raw_fb(void) {
 	raw_fb_fd = -1;
 	raw_fb_addr = NULL;
 
-	*q = '\0';
 	if (sscanf(str, "shm:%d", &shmid) == 1) {
 		/* shm:N */
 		raw_fb_addr = (char *) shmat(shmid, 0, SHM_RDONLY);
@@ -13625,7 +13986,7 @@ XImage *initialize_raw_fb(void) {
 			if (S_ISREG(sbuf.st_mode)) {
 				if (0) size = sbuf.st_size;
 			} else {
-				rfbLog("non-regular file: %s\n", q);
+				rfbLog("raw fb is non-regular file: %s\n", q);
 			}
 		}
 
@@ -13790,7 +14151,7 @@ XImage *initialize_xdisplay_fb(void) {
 		if (subwin_wait_mapped) {
 			wait_until_mapped(subwin);
 		}
-		if (!valid_window((Window) subwin)) {
+		if (!valid_window((Window) subwin, NULL)) {
 			rfbLog("invalid sub-window: 0x%lx\n", subwin);
 			X_UNLOCK;
 			clean_up_exit(1);
@@ -14198,6 +14559,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	main_bytes_per_line = fb->bytes_per_line;
 
 	setup_scaling(&width, &height);
+	
 
 	if (scaling) {
 		rfbLog("scaling screen: %dx%d -> %dx%d  scale_fac=%.5f\n",
@@ -14452,7 +14814,6 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		rfbLog("\n");
 	}
 #endif
-
 	/* nofb is for pointer/keyboard only handling.  */
 	if (nofb) {
 		main_fb = NULL;
@@ -14476,6 +14837,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	bpp   = screen->serverFormat.bitsPerPixel;
 	depth = screen->serverFormat.depth;
+
+	/* may need, bpp, main_red_max, etc. */
+	parse_wireframe();
 
 	setup_cursors_and_push();
 
@@ -14597,6 +14961,13 @@ int dt_cmd(char *cmd) {
 		return 0;
 	}
 
+	if (no_external_cmds) {
+		rfbLog("cannot run external commands in -nocmds mode:\n");
+		rfbLog("   \"%s\"\n", cmd);
+		rfbLog("   dt_cmd: returning 1\n");
+		return 1;
+	}
+
 	rfbLog("running command:\n  %s\n", cmd);
 	usr_bin_path(0);
 	rc = system(cmd);
@@ -14615,6 +14986,13 @@ char *cmd_output(char *cmd) {
 	int rc;
 
 	if (!cmd || *cmd == '\0') {
+		return "";
+	}
+
+	if (no_external_cmds) {
+		rfbLog("cannot run external commands in -nocmds mode:\n");
+		rfbLog("   \"%s\"\n", cmd);
+		rfbLog("   cmd_output: null string.\n");
 		return "";
 	}
 
@@ -14786,7 +15164,7 @@ void solid_cde(char *color) {
 			if (! twin) {
 				twin = rootwin;
 			}
-			if (! valid_window(twin)) {
+			if (! valid_window(twin, NULL)) {
 				continue;
 			}
 
@@ -15123,6 +15501,10 @@ void solid_kde(char *color) {
 
 char *guess_desktop() {
 	Atom prop;
+	prop = XInternAtom(dpy, "XFCE_DESKTOP_WINDOW", True);
+	if (prop != None) {
+		return "xfce";
+	}
 	prop = XInternAtom(dpy, "_QT_DESKTOP_PROPERTIES", True);
 	if (prop != None) {
 		return "kde";
@@ -15447,6 +15829,8 @@ void initialize_xinerama (void) {
 	sraRect rect;
 	char *bstr, *tstr;
 	int ev, er, i, n, rcnt;
+
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
 	if (! XineramaQueryExtension(dpy, &ev, &er)) {
 		rfbLog("Xinerama: disabling: display does not support it.\n");
@@ -15875,7 +16259,7 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 
 	X_LOCK;
 #if LIBVNCSERVER_HAVE_XSHM
-	if (shm != NULL && shm->shmid != -1 && dpy) {
+	if (shm != NULL && shm->shmid != -1 && dpy) {	/* raw_fb hack */
 		XShmDetach_wr(dpy, shm);
 	}
 #endif
@@ -18217,6 +18601,15 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		set_env("X11VNC_SIMPLE_GUI", "1");
 	}
 
+	if (no_external_cmds) {
+		fprintf(stderr, "cannot run external commands in -nocmds "
+		    "mode:\n");
+		fprintf(stderr, "   \"%s\"\n", "gui + wish");
+		fprintf(stderr, "   exiting.\n");
+		fflush(stderr);
+		exit(1);
+	}
+
 	sprintf(cmd, "%s -", wish);
 	tmpf = tmpfile();
 	if (tmpf == NULL) {
@@ -18357,12 +18750,1141 @@ void do_gui(char *opts) {
 	}
 }
 
-/* -- x11vnc.c -- */
+/* -- userinput.c -- */
 /*
- * main routine for the x11vnc program
+ * user input handling heuristics
  */
 
+/*
+ * For -wireframe: find the direct child of rootwin that has the
+ * pointer, assume that is the WM frame that contains the application
+ * (i.e. wm reparents the app toplevel) return frame position and size
+ * if successful.
+ */
+
+int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h, Window *win) {
+	Window r, c;
+	XWindowAttributes attr;
+	Bool ret;
+	int rootx, rooty, wx, wy;
+	unsigned int mask;
+	
+	ret = XQueryPointer(dpy, rootwin, &r, &c, &rootx, &rooty, &wx, &wy, &mask);
+
+	*win = c;
+
+	/* current pointer position is returned too */
+	*px = rootx;
+	*py = rooty;
+
+	if (!ret || ! c || c == rootwin) {
+		/* no immediate child */
+		return 0;
+	}
+
+	/* child window position and size */
+	if (! valid_window(c, &attr)) {
+		return 0;
+	}
+#if 0
+	XTranslateCoordinates(dpy, c, rootwin, 0, 0, &rootx, &rooty, &c2);
+	*x = rootx;
+	*y = rooty;
+#endif
+	*x = attr.x;
+	*y = attr.y;
+	*w = attr.width;
+	*h = attr.height;
+
+	return 1;
+}
+
 static int defer_update_nofb = 6;	/* defer a shorter time under -nofb */
+static Window maybe_scrolling = 0;
+
+/*
+WIREFRAME_PARMS "0xff,2,0,30+6+6+6,0.05+0.3+2.0,8"
+shade,linewidth,percent,T+B+L+R,t1+t2+t3
+ */
+#define LW_MAX 8
+unsigned long wireframe_shade;
+int wireframe_lw;
+double wireframe_frac;
+int wireframe_top, wireframe_bot, wireframe_left, wireframe_right;
+double wireframe_t1, wireframe_t2, wireframe_t3, wireframe_t4;
+
+/*
+ * Parse the gory -wireframe string for parameters.
+ */
+void parse_wireframe_str(char *wf) {
+	char *p, *str;
+	int i;
+	char *part[10];
+
+	for (i=0; i<10; i++) {
+		part[i] = NULL;
+	}
+
+	if (wf == NULL || *wf == '\0') {
+		return;
+	}
+
+	str = strdup(wf);
+
+	/* leading ",", make it start with ignorable string "z" */
+	if (*str == ',') {
+		char *tmp = (char *) malloc(strlen(str)+2);	
+		strcpy(tmp, "z");
+		strcat(tmp, str);
+		free(str);
+		str = tmp;
+	}
+
+	p = strtok(str, ",");
+	i = 0;
+	while (p) {
+		part[i++] = strdup(p);
+		p = strtok(NULL, ",");
+	}
+	free(str);
+
+
+	/* Wireframe shade, color, RGB: */
+	if ((str = part[0]) != NULL) {
+		unsigned long n;
+		int r, g, b, ok = 0;
+		XColor cdef;
+		Colormap cmap;
+		if (dpy && (bpp == 32 || bpp == 16)) {
+		 	cmap = DefaultColormap (dpy, scr);
+			if (XParseColor(dpy, cmap, str, &cdef) &&
+			    XAllocColor(dpy, cmap, &cdef)) {
+				r = cdef.red   >> 8;
+				g = cdef.green >> 8;
+				b = cdef.blue  >> 8;
+				if (r == 0 && g == 0) {
+					g = 1;	/* need to be > 255 */
+				}
+				n = 0;
+				n |= (r << main_red_shift);
+				n |= (g << main_green_shift);
+				n |= (b << main_blue_shift);
+				wireframe_shade = n;
+				ok = 1;
+			}
+		}
+		if (ok) {
+			;
+		} else if (sscanf(str, "0x%lx", &n) == 1) {
+			wireframe_shade = n;	
+		} else if (sscanf(str, "%ld", &n) == 1) {
+			wireframe_shade = n;	
+		} else if (sscanf(str, "%lx", &n) == 1) {
+			wireframe_shade = n;	
+		}
+		free(str);
+	}
+
+	/* linewidth: # of pixels wide for the wireframe lines */
+	if ((str = part[1]) != NULL) {
+		int n;
+		if (sscanf(str, "%d", &n) == 1) {
+			wireframe_lw = n;	
+			if (wireframe_lw < 1) {
+				wireframe_lw = 1; 
+			}
+			if (wireframe_lw > LW_MAX) {
+				wireframe_lw = LW_MAX; 
+			}
+		}
+		free(str);
+	}
+
+	/* percentage cutoff for opaque move/resize (like WM's) */
+	if ((str = part[2]) != NULL) {
+		if (*str == '\0') {
+			;
+		} else if (strchr(str, '.')) {
+			wireframe_frac = atof(str);
+		} else {
+			wireframe_frac = ((double) atoi(str))/100.0;
+		}
+		free(str);
+	}
+
+	/*
+	 * Top, Bottom, Left, Right tolerances to guess the wm frame is
+	 * being grabbed (Top is traditionally bigger, i.e. titlebar):
+	 */
+	if ((str = part[3]) != NULL) {
+		int t, b, l, r;
+		if (sscanf(str, "%d+%d+%d+%d", &t, &b, &l, &r) == 4) {
+			wireframe_top   = t;
+			wireframe_bot   = b;
+			wireframe_left  = l;
+			wireframe_right = r;
+		}
+		free(str);
+	}
+
+	/* check_wireframe() timing heuristics. */
+	if ((str = part[4]) != NULL) {
+		double t1, t2, t3, t4;
+		if (sscanf(str, "%lf+%lf+%lf+%lf", &t1, &t2, &t3, &t4) == 4) {
+			wireframe_t1 = t1;
+			wireframe_t2 = t2;
+			wireframe_t3 = t3;
+			wireframe_t4 = t4;
+		}
+		free(str);
+	}
+}
+
+/*
+ * First parse the defaults and apply any user supplied ones (may be a subset)
+ */
+void parse_wireframe(void) {
+	parse_wireframe_str(WIREFRAME_PARMS);
+	if (! wireframe_str) {
+		wireframe_str = strdup(WIREFRAME_PARMS);
+	}
+	parse_wireframe_str(wireframe_str);
+}
+
+/*
+ * Set wireframe_copyrect based on desired mode.
+ */
+void set_wirecopyrect_mode(char *str) {
+	char *orig = wireframe_copyrect;
+	if (str == NULL || *str == '\0') {
+		wireframe_copyrect = strdup(wireframe_copyrect_default);
+	} else if (!strcmp(str, "always") || !strcmp(str, "all")) {
+		wireframe_copyrect = strdup("always");
+	} else if (!strcmp(str, "top")) {
+		wireframe_copyrect = strdup("top");
+	} else if (!strcmp(str, "never") || !strcmp(str, "none")) {
+		wireframe_copyrect = strdup("never");
+	} else {
+		if (! wireframe_copyrect) {
+			wireframe_copyrect = strdup(wireframe_copyrect_default);
+		}
+		rfbLog("unknown -wirecopyrect mode: %s, using: %s\n", str,
+		    wireframe_copyrect);
+	}
+	if (orig) {
+		free(orig);
+	}
+}
+
+typedef struct saveline {
+	int x0, y0, x1, y1;
+	int shift;
+	int vert;
+	int saved;
+	char *data;
+} saveline_t;
+
+/*
+ * Draw the wireframe box onto the framebuffer.  Saves the real
+ * framebuffer data to some storage lines.  Restores previous lines.
+ * use restore = 1 to clean up (done with animation).
+ * This works with -scale.
+ */
+void draw_box(int x, int y, int w, int h, int restore) {
+	int x0, y0, x1, y1, i, pixelsize = bpp/8;
+	char *dst, *src;
+	static saveline_t *save[4];
+	static int first = 1, len = 0;
+	int max = dpy_x > dpy_y ? dpy_x : dpy_y;
+	int sz, lw = wireframe_lw;
+	unsigned long shade = wireframe_shade;
+	int color = 0;
+	unsigned short us;
+	unsigned long ul;
+
+	if (max > len) {
+		/* create/resize storage lines: */
+		for (i=0; i<4; i++) {
+			len = max;
+			if (! first && save[i]) {
+				if (save[i]->data) {
+					free(save[i]->data);
+				}
+				free(save[i]);
+			}
+			save[i] = (saveline_t *) malloc(sizeof(saveline_t));
+			save[i]->saved = 0;
+			sz = (LW_MAX+1)*len*pixelsize;
+			save[i]->data = (char *)malloc(sz);
+
+			/* 
+			 * Four types of lines:
+			 *	0) top horizontal
+			 *	1) bottom horizontal
+			 *	2) left vertical
+			 *	3) right vertical
+			 *
+			 * shift means shifted by width or height.
+			 */
+			if (i == 0) {
+				save[i]->vert  = 0;
+				save[i]->shift = 0;
+			} else if (i == 1) {
+				save[i]->vert  = 0;
+				save[i]->shift = 1;
+			} else if (i == 2) {
+				save[i]->vert  = 1;
+				save[i]->shift = 0;
+			} else if (i == 3) {
+				save[i]->vert  = 1;
+				save[i]->shift = 1;
+			}
+		}
+	}
+	first = 0;
+
+	/*
+	 * restore any saved lines. see below for algorithm and
+	 * how x0, etc. are used.  we just reverse those steps.
+	 */
+	for (i=0; i<4; i++) {
+		int s = save[i]->shift;
+		int yu, y_min = -1, y_max = -1;
+		int y_start, y_stop, y_step;
+
+		if (! save[i]->saved) {
+			continue;
+		}
+		x0 = save[i]->x0;
+		y0 = save[i]->y0;
+		x1 = save[i]->x1;
+		y1 = save[i]->y1;
+		if (save[i]->vert) {
+			y_start = y0+lw;
+			y_stop  = y1-lw;
+			y_step  = lw*pixelsize;
+		} else {
+			y_start = y0 - s*lw;
+			y_stop  = y_start + lw;
+			y_step  = max*pixelsize;
+		}
+		for (yu = y_start; yu < y_stop; yu++) {
+			if (x0 == x1) {
+				continue;
+			}
+			if (yu < 0 || yu >= dpy_y) {
+				continue;
+			}
+			if (y_min < 0 || yu < y_min) {
+				y_min = yu;
+			}
+			if (y_max < 0 || yu > y_max) {
+				y_max = yu;
+			}
+			src = save[i]->data + (yu-y_start)*y_step;
+			dst = main_fb + yu*main_bytes_per_line +
+			    x0*pixelsize;
+			memcpy(dst, src, (x1-x0)*pixelsize);
+		}
+		if (y_min >= 0) {
+			mark_rect_as_modified(x0, y_min, x1, y_max+1, 0);
+		}
+		save[i]->saved = 0;
+	}
+
+	if (restore) {
+		return;
+	}
+
+if (0) fprintf(stderr, "  DrawBox: %dx%d+%d+%d\n", w, h, x, y);
+
+	/*
+	 * work out shade/color for the wireframe line, could be a color
+	 * for 16bpp or 24bpp.
+	 */
+	if (shade > 255) {
+		if (pixelsize == 2) {
+			us = (unsigned short) (shade & 0xffff);
+			color = 1;
+		} else if (pixelsize == 4) {
+			ul = (unsigned long) shade;
+			color = 1;
+		} else {
+			shade = shade % 256;
+		}
+	}
+
+	for (i=0; i<4; i++)  {
+		int s = save[i]->shift;
+		int yu, y_min = -1, y_max = -1;
+		int yblack = -1, xblack1 = -1, xblack2 = -1;
+		int y_start, y_stop, y_step;
+
+		if (save[i]->vert) {
+			/*
+			 * make the narrow x's be on the screen, let
+			 * the y's hang off (not drawn).
+			 */
+			save[i]->x0 = x0 = nfix(x + s*w - s*lw, dpy_x);
+			save[i]->y0 = y0 = y;
+			save[i]->x1 = x1 = nfix(x + s*w - s*lw + lw, dpy_x);
+			save[i]->y1 = y1 = y + h;
+
+			/*
+			 * start and stop a linewidth away from true edge,
+			 * to avoid interfering with horizontal lines.
+			 */
+			y_start = y0+lw;
+			y_stop  = y1-lw;
+			y_step  = lw*pixelsize;
+
+			/* draw a black pixel for the border if lw > 1 */
+			if (s) {
+				xblack1 = x1-1;
+			} else {
+				xblack1 = x0;
+			}
+		} else {
+			/*
+			 * make the wide x's be on the screen, let the y's
+			 * hang off (not drawn).
+			 */
+			save[i]->x0 = x0 = nfix(x,     dpy_x);
+			save[i]->y0 = y0 = y + s*h;
+			save[i]->x1 = x1 = nfix(x + w, dpy_x);
+			save[i]->y1 = y1 = y0 + lw;
+			y_start = y0 - s*lw;
+			y_stop  = y_start + lw;
+			y_step  = max*pixelsize;
+
+			/* draw a black pixels for the border if lw > 1 */
+			if (s) {
+				yblack = y_stop - 1;
+			} else {
+				yblack = y_start;
+			}
+			xblack1 = x0;
+			xblack2 = x1-1;
+		}
+
+		/* now loop over the allowed y's for either case */
+		for (yu = y_start; yu < y_stop; yu++) {
+			if (x0 == x1) {
+				continue;
+			}
+			if (yu < 0 || yu >= dpy_y) {
+				continue;
+			}
+
+			/* record min and max y's for marking rectangle: */
+			if (y_min < 0 || yu < y_min) {
+				y_min = yu;
+			}
+			if (y_max < 0 || yu > y_max) {
+				y_max = yu;
+			}
+
+			/* save fb data for this line: */
+			save[i]->saved = 1;
+			src = main_fb + yu*main_bytes_per_line +
+			    x0*pixelsize;
+			dst = save[i]->data + (yu-y_start)*y_step;
+			memcpy(dst, src,   (x1-x0)*pixelsize);
+
+			/* apply the shade/color to make the wireframe line: */
+			if (! color) {
+				memset(src, shade, (x1-x0)*pixelsize);
+			} else {
+				char *csrc = src;
+				unsigned short *usp;
+				unsigned long *ulp;
+				int k;
+				for (k=0; k < x1 - x0; k++) {
+					if (pixelsize == 4) {
+						ulp = (unsigned long *)csrc;
+						*ulp = ul;
+					} else if (pixelsize == 2) {
+						usp = (unsigned short *)csrc;
+						*usp = us;
+					}
+					csrc += pixelsize;
+				}
+			}
+
+			/* apply black border for lw >= 2 */
+			if (lw > 1) {
+				if (yu == yblack) {
+					memset(src, 0, (x1-x0)*pixelsize);
+				}
+				if (xblack1 >= 0) {
+					src = src + (xblack1 - x0)*pixelsize;
+					memset(src, 0, pixelsize);
+				}
+				if (xblack2 >= 0) {
+					src = src + (xblack2 - x0)*pixelsize;
+					memset(src, 0, pixelsize);
+				}
+			}
+		}
+		/* mark it for sending: */
+		if (save[i]->saved) {
+			mark_rect_as_modified(x0, y_min, x1, y_max+1, 0);
+		}
+	}
+}
+
+/* 
+ * utility routine for CopyRect of the window (but not CopyRegion)
+ */
+int crfix(int x, int dx, int Lx) {
+	/* adjust x so that copy source is on screen */
+	if (dx > 0) {
+		if (x-dx < 0) {
+			/* off on the left */
+			x = dx;	
+		}
+	} else {
+		if (x-dx >= Lx) {
+			/* off on the right */
+			x = Lx + dx - 1;
+		}
+	}
+	return x;
+}
+
+/*
+ * Applied just before any check_user_input() modes.  Look for a
+ * ButtonPress; find window it happened in; find the wm frame window
+ * for it; watch for that window moving or resizing.  If it does, do the
+ * wireframe animation.  Do this until ButtonRelease or timeouts occur.
+ * Remove wireframe.
+ *
+ * Under -nowirecopyrect, return control to base scheme
+ * (check_user_input() ...) that will repaint the screen with the window
+ * in the new postion or size.  Under -wirecopyrect, apply rfbDoCopyRect
+ * or rfbDoCopyRegion: this "pollutes" our framebuffer, but the normal
+ * polling will quickly repair it. Under happy circumstances, this
+ * reduces actual XShmGetImage work (i.e. if we correctly predicted how
+ * the X fb has changed.
+ *
+ * -scale doesn't work under -wirecopyrect, but the wireframe does.
+ *
+ * testing of this mode under -threads is incomplete.
+ *
+ * returns 1 if it did an animation, 0 if no move/resize triggers
+ * went off.
+ *
+ * TBD: see if we can select StructureNotify ConfigureNotify events for
+ * the toplevel windows to get better info on moves and resizes.
+ */
+int check_wireframe(void) {
+	Window frame, orig_frame;
+	XWindowAttributes attr;
+	int dx, dy;
+
+	int orig_px, orig_py, orig_x, orig_y, orig_w, orig_h;
+	int px, py, x, y, w, h;
+	int box_x, box_y, box_w, box_h;
+	int orig_cursor_x, orig_cursor_y, g, g_in;
+	int already_down = 0, win_gone = 0, win_unmapped = 0;
+	double spin = 0.0, tm = 0.0, last_ptr, last_draw;
+	int frame_changed = 0, drew_box = 0, got_2nd_pointer = 0;
+	int break_reason = 0;
+	static double first_dt_ave = 0.0;
+	static int first_dt_cnt = 0;
+	static time_t last_save_stacklist = 0;
+	
+	/* heuristics: */
+	int wf_t = wireframe_top;
+	int wf_b = wireframe_bot;
+	int wf_l = wireframe_left;
+	int wf_r = wireframe_right;
+	double first_event_spin   = wireframe_t1;
+	double frame_changed_spin = wireframe_t2;
+	double max_spin = wireframe_t3;
+	double min_draw = wireframe_t4;
+
+	int db = 0;
+	int db2 = 0;
+
+	if (subwin) {
+		return 0;	/* don't even bother for -id case */
+	}
+	if (! button_mask) {
+		return 0;	/* no button pressed down */
+	}
+	if (!use_threads && !got_pointer_input) {
+		return 0;	/* need ptr input, e.g. button down, motion */
+	}
+
+if (db || db2) fprintf(stderr, "\n*** button down!!  x: %d  y: %d\n", cursor_x, cursor_y);
+
+	/*
+	 * Query where the pointer is and which child of the root
+	 * window.  We will assume this is the frame the window manager
+	 * makes when it reparents the toplevel window.
+	 */
+	X_LOCK;
+	if (! get_wm_frame_pos(&px, &py, &x, &y, &w, &h, &frame)) {
+if (db) fprintf(stderr, "NO get_wm_frame_pos: 0x%lx\n", frame);
+		X_UNLOCK;
+		return 0;
+	}
+	X_UNLOCK;
+if (db) fprintf(stderr, "a: %d  wf: %.3f  A: %d\n", w*h, wireframe_frac, (dpy_x*dpy_y));
+
+	if (nabs(x + w - px) < 35) {
+		maybe_scrolling = frame;	/* not yet used... */
+	}
+
+	/*
+	 * apply the percentage size criterion (allow opaque moves for
+	 * small windows)
+	 */
+	if ((double) w*h < wireframe_frac * (dpy_x * dpy_y)) {
+if (db) fprintf(stderr, "small window %.3f\n", ((double) w*h)/(dpy_x * dpy_y));
+		return 0;
+	}
+if (db) fprintf(stderr, "  frame: x: %d  y: %d  w: %d  h: %d  px: %d  py: %d  fr: 0x%lx\n", x, y, w, h, px, py, orig_frame);	
+
+	/*
+	 * see if the pointer is within range of the assumed wm frame
+	 * decorations on the edge of the window.
+	 */
+	if (wf_t || wf_b || wf_l || wf_r) {
+		int near_edge = 0;
+		if (nabs(y - py) < wf_t) {
+			near_edge = 1;
+		}
+		if (nabs(y + h - py) < wf_b) {
+			near_edge = 1;
+		}
+		if (nabs(x - px) < wf_l) {
+			near_edge = 1;
+		}
+		if (nabs(x + w - px) < wf_r) {
+			near_edge = 1;
+		}
+		if (! near_edge) {
+if (db) fprintf(stderr, "INTERIOR %d %d %d %d\n", wf_t, wf_b, wf_l, wf_r);
+			return 0;
+		}
+	}
+
+	wireframe_in_progress = 1;
+
+	if (button_mask_prev) {
+		already_down = 1;
+	}
+
+	/*
+	 * pointer() should have snapped the stacking list for us, if
+	 * not, do it now (if the XFakeButtonEvent has been flushed by
+	 * now the stacking order may be incorrect).
+	 */
+	if (strcmp(wireframe_copyrect, "never")) {
+		if (already_down) {
+			/*
+			 * see if we can reuse the stack list (pause
+			 * with button down)
+			 */
+			if (stack_list) {
+				int k, got_me = 0;
+				for (k = stack_num -1; k >=0; k--) {
+					if (frame == stack_list[k]) {
+						got_me = 1;
+						break;
+					}
+				}
+				if (! got_me) {
+					last_save_stacklist = 0;
+				}
+			}
+			if (stack_list && time(0) > last_save_stacklist + 1) {
+				/* stack_list too old */
+				X_LOCK;
+				XFree(stack_list);
+				stack_list = NULL;
+				stack_num  = 0;
+				X_UNLOCK;
+			}
+		} else if (! stack_list) {
+			/* ! already_down, might as well get a copy */
+			X_LOCK;
+			snapshot_stack_list();
+			X_UNLOCK;
+		}
+	}
+
+	/* store initial parameters, we look for changes in them */
+	orig_frame = frame;
+	orig_px = px;		/* pointer position */
+	orig_py = py;
+	orig_x = x;		/* frame position */
+	orig_y = y;
+	orig_w = w;		/* frame size */
+	orig_h = h;
+
+	orig_cursor_x = cursor_x;
+	orig_cursor_y = cursor_y;
+
+	/* this is the box frame we would draw */
+	box_x = x;
+	box_y = y; 
+	box_w = w;
+	box_h = h; 
+
+	dtime(&tm);
+
+	last_draw = spin;
+
+	/* -threads support for check_wireframe() is rough... crash? */
+	if (use_threads) {
+		/* purge any stored up pointer events: */
+		pointer(-1, 0, 0, NULL);
+	}
+
+	g = g_in = got_pointer_input;
+
+	while (1) {
+
+		X_LOCK;
+		XFlush(dpy);
+		X_UNLOCK;
+
+		/* try do induce/waitfor some more user input */
+		if (use_threads) {
+			usleep(1000);
+		} else if (drew_box) {
+			rfbPE(screen, 1000);
+		} else {
+			rfbCFD(screen, 1000);
+		}
+
+		spin += dtime(&tm);
+
+		/* check for any timeouts: */
+		if (frame_changed) {
+			/* max time we play this game: */
+			if (spin > max_spin) {
+if (db || db2) fprintf(stderr, " SPIN-OUT-MAX: %.3f\n", spin);
+				break_reason = 1;
+				break;
+			}
+			/* pointer events slowing down: */
+			if (spin > last_ptr + frame_changed_spin) {
+if (db || db2) fprintf(stderr, " SPIN-OUT-NOT-FAST: %.3f\n", spin);
+				break_reason = 2;
+				break;
+			}
+		} else if(got_2nd_pointer) {
+			/*
+			 * pointer is moving, max time we wait for wm
+			 * move or resize to be detected
+			 */
+			if (spin > frame_changed_spin) {
+if (db || db2) fprintf(stderr, " SPIN-OUT-NOFRAME-SPIN: %.3f\n", spin);
+				break_reason = 3;
+				break;
+			}
+		} else {
+			/* max time we wait for any pointer input */
+			if (spin > first_event_spin) {
+if (db || db2) fprintf(stderr, " SPIN-OUT-NO2ND_PTR: %.3f\n", spin);
+				break_reason = 4;
+				break;
+			}
+		}
+
+		/* see if some pointer input occurred: */
+		if (got_pointer_input > g) {
+if (db) fprintf(stderr, "  ++pointer event!! [%02d]  dt: %.3f  x: %d  y: %d  mask: %d\n", got_2nd_pointer+1, spin, cursor_x, cursor_y, button_mask);	
+
+			g = got_pointer_input;
+
+			/* periodically try to let the wm get moving: */
+			if (!frame_changed && got_2nd_pointer % 4 == 0) {
+#if 0
+				X_LOCK;
+				XSync(dpy, False);	
+				X_UNLOCK;
+#endif
+				if (got_2nd_pointer == 0) {
+					usleep(50 * 1000);
+				} else {
+					usleep(25 * 1000);
+				}
+			}
+			got_2nd_pointer++;
+			last_ptr = spin;
+
+			/*
+			 * see where the pointer currently is.  It may
+			 * not be our starting frame (i.e. mouse now
+			 * outside of the moving window).
+			 */
+			frame = 0x0;
+			X_LOCK;
+
+			if (! get_wm_frame_pos(&px, &py, &x, &y, &w, &h,
+			    &frame)) {
+				frame = 0x0;
+if (db) fprintf(stderr, "NO get_wm_frame_pos: 0x%lx\n", frame);
+			}
+
+			if (frame != orig_frame) {
+				/* see if our original frame is still there */
+				if (!valid_window(orig_frame, &attr)) {
+					X_UNLOCK;
+					/* our window frame went away! */
+					win_gone = 1;
+if (db) fprintf(stderr, "FRAME-GONE: 0x%lx\n", orig_frame);
+					break_reason = 5;
+					break;
+				}
+				if (attr.map_state == IsUnmapped) {
+					X_UNLOCK;
+					/* our window frame is now unmapped! */
+					win_unmapped = 1;
+if (db) fprintf(stderr, "FRAME-UNMAPPED: 0x%lx\n", orig_frame);
+					break_reason = 5;
+					break;
+				}
+
+if (db) fprintf(stderr, "OUT-OF-FRAME: old: x: %d  y: %d  px: %d py: %d 0x%lx\n", x, y, px, py, frame);
+
+				/* new parameters for our frame */
+				x = attr.x;	/* n.b. rootwin is parent */
+				y = attr.y;
+				w = attr.width;
+				h = attr.height;
+			}
+			X_UNLOCK;
+
+			/* debugging output, to be removed: */
+if (db) fprintf(stderr, "  frame: x: %d  y: %d  w: %d  h: %d  px: %d  py: %d  fr: 0x%lx\n", x, y, w, h, px, py, frame);	
+if (db) fprintf(stderr, "        MO,PT,FR: %d/%d %d/%d %d/%d\n", cursor_x - orig_cursor_x, cursor_y - orig_cursor_y, px - orig_px, py - orig_py, x - orig_x, y - orig_y);	
+
+			if (frame_changed && frame != orig_frame) {
+if (db) fprintf(stderr, "CHANGED and window switch: 0x%lx\n", frame);
+			}
+			if (frame_changed && px - orig_px != x - orig_x) {
+if (db) fprintf(stderr, "MOVED and diff DX\n");
+			}
+			if (frame_changed && py - orig_py != y - orig_y) {
+if (db) fprintf(stderr, "MOVED and diff DY\n");
+			}
+
+			/* check and see if our frame has been resized: */
+			if (!frame_changed && (w != orig_w || h != orig_h)) {
+				int n;
+				if (!already_down) {
+					first_dt_ave += spin;
+					first_dt_cnt++;
+				}
+				n = first_dt_cnt ? first_dt_cnt : 1;
+				frame_changed = 2;
+
+if (db) fprintf(stderr, "WIN RESIZE  1st-dt: %.3f\n", first_dt_ave/n);
+			}
+
+			/* check and see if our frame has been moved: */
+			if (!frame_changed && (x != orig_x || y != orig_y)) {
+				int n;
+				if (!already_down) {
+					first_dt_ave += spin;
+					first_dt_cnt++;
+				}
+				n = first_dt_cnt ? first_dt_cnt : 1;
+				frame_changed = 1;
+if (db) fprintf(stderr, "FRAME MOVE  1st-dt: %.3f\n", first_dt_ave/n);
+			}
+
+			/*
+			 * see if it is time to draw any or a new wireframe box
+			 */
+			if (frame_changed) {
+				int drawit = 0;
+				if (x != box_x || y != box_y) {
+					/* moved since last */
+					drawit = 1;
+				} else if (w != box_w || h != box_h) {
+					/* resize since last */
+					drawit = 1;
+				}
+				if (drawit) {
+					/*
+					 * check time (to avoid too much
+					 * animations on slow machines
+					 * or links).
+					 */
+					if (spin > last_draw + min_draw ||
+					    ! drew_box) {
+						draw_box(x, y, w, h, 0);
+						drew_box = 1;
+						rfbPE(screen, 1000);
+						last_draw = spin;
+					}
+				}
+				box_x = x;
+				box_y = y;
+				box_w = w;
+				box_h = h;
+			}
+		}
+
+		/* 
+		 * Now (not earlier) check if the button has come back up.
+		 * we check here to get a better location and size of
+		 * the final window.
+		 */
+		if (! button_mask) {
+if (db || db2) fprintf(stderr, "NO button_mask\n");
+			break_reason = 6;
+			break;	
+		}
+	}
+
+	if (! drew_box) {
+		/* nice try, but no move or resize detected.  cleanup. */
+		if (stack_list) {
+			X_LOCK;
+			XFree(stack_list);
+			X_UNLOCK;
+			stack_list = NULL;
+			stack_num = 0;
+		}
+		wireframe_in_progress = 0;
+		return 0;
+	}
+
+	/* remove the wireframe */
+	draw_box(0, 0, 0, 0, 1);
+
+	dx = x - orig_x;
+	dy = y - orig_y;
+
+	/*
+	 * see if we can apply CopyRect or CopyRegion to the change:
+	 */
+	if (!scaling && w == orig_w && h == orig_h && (dx != 0 || dy != 0) &&
+	   !win_gone && !win_unmapped && strcmp(wireframe_copyrect, "never")) {
+
+		int x1, y1, x2, y2, t, tmax = 50;
+		int spin_ms = (int) (spin * 1000 * 1000);
+		int sent_copyrect = 0;
+		int obscured = 0;
+		static int dt_bad = 0;
+		static time_t dt_bad_check = 0;
+
+		/*
+		 * set a timescale comparable to the spin time,
+		 * but not too short or too long.
+		 */
+		if (spin_ms < 30) {
+			spin_ms = 30;
+		} else if (spin_ms > 400) {
+			spin_ms = 400;
+		}
+
+		/* try to flush the wireframe removal: */
+		fb_update_sent(NULL);
+		rfbPE(screen, spin_ms/3);	/* long select */
+		for (t=0; t<tmax; t++) {
+			if (fb_update_sent(NULL)) {
+if (db2) fprintf(stderr, "A-FB_UPDATE_SENT: t=%d\n", t);
+				break;
+			}
+			rfbPE(screen, 1000);	/* short selects. */
+		}
+
+		/*
+		 * XXX KDE and xfce do some weird things with the 
+		 * stacking, it does not match XQueryTree.  Work around
+		 * it for now by CopyRect-ing the *whole* on-screen 
+		 * rectangle (whether obscured or not!)
+		 */
+		if (time(0) > dt_bad_check + 5) {
+			if (!strcmp(guess_desktop(), "kde")) {
+				dt_bad = 1;
+			} else if (!strcmp(guess_desktop(), "xfce")) {
+				dt_bad = 1;
+			} else {
+				dt_bad = 0;
+			}
+			dt_bad_check = time(0);
+		}
+
+		if (dt_bad) {
+			/* send the whole thing... */
+			x1 = crfix(nfix(x,   dpy_x), dx, dpy_x);
+			y1 = crfix(nfix(y,   dpy_y), dy, dpy_y);
+			x2 = crfix(nfix(x+w, dpy_x), dx, dpy_x);
+			y2 = crfix(nfix(y+h, dpy_y), dy, dpy_y);
+
+			rfbDoCopyRect(screen, x1, y1, x2, y2, dx, dy);
+
+			sent_copyrect = 1;
+			obscured = 1;	/* set to avoid an aggressive push */
+
+if (db2) fprintf(stderr, "CopyRect: x1: %d  y1: %d  x2: %d  y2: %d  dx: %d dy: %d  spin: %.3f\n", x1, y1, x2, y2, dx, dy, spin);
+
+		} else if (stack_list) {
+			int k, tx1, tx2, ty1, ty2;
+			sraRegionPtr moved_win, tmp_win;
+			int saw_me = 0;
+
+			tx1 = nfix(orig_x,   dpy_x);
+			ty1 = nfix(orig_y,   dpy_y);
+			tx2 = nfix(orig_x+w, dpy_x);
+			ty2 = nfix(orig_y+h, dpy_y);
+
+if (db2) fprintf(stderr, "moved_win: %4d %3d, %4d %3d  0x%lx ---\n", tx1, ty1, tx2, ty2, frame);
+
+			moved_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
+
+			X_LOCK;
+
+			/*
+			 * loop over the stack, top to bottom until we
+			 * find our wm frame:
+			 */
+			for (k = stack_num - 1; k >= 0; k--) {
+				Window win = stack_list[k];
+				if (win == frame) {
+if (db2) {
+	saw_me = 1;
+	fprintf(stderr, "  ----------\n");
+} else {
+					break;	
+}
+				}
+
+				/* skip some unwanted cases: */
+				if (win == None) {
+					continue;
+				}
+				if (!valid_window(win, &attr)) {
+					continue;
+				}
+				if (attr.map_state != IsViewable) {
+					continue;
+				}
+
+				/* clip the window to the visable screen: */
+				tx1 = nfix(attr.x, dpy_x);
+				ty1 = nfix(attr.y, dpy_y);
+				tx2 = nfix(attr.x + attr.width,  dpy_x);
+				ty2 = nfix(attr.y + attr.height, dpy_y);
+
+if (db2) fprintf(stderr, "  tmp_win: %4d %3d, %4d %3d  0x%lx\n", tx1, ty1, tx2, ty2, win);
+if (db2 && saw_me) continue;
+
+				/* see if window clips us: */
+				tmp_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
+				if (sraRgnAnd(tmp_win, moved_win)) {
+					obscured = 1;
+if (db2) fprintf(stderr, "         : clips it.\n");
+				}
+				sraRgnDestroy(tmp_win);
+
+				/* subtract it from our region: */
+				tmp_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
+				sraRgnSubtract(moved_win, tmp_win);
+				sraRgnDestroy(tmp_win);
+			}
+			X_UNLOCK;
+
+			if (obscured && !strcmp(wireframe_copyrect, "top")) {
+				;	/* cannot send CopyRegion */
+			} else if (! sraRgnEmpty(moved_win)) {
+				sraRectangleIterator *iter;
+				sraRegionPtr whole, shifted_region;
+				sraRect rect;
+
+				/*
+				 * prepare for CopyRegion, apply dx and
+				 * dy to each rectangle in the region.
+				 * keep only the part on the screen.
+				 */
+				whole = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
+				shifted_region = sraRgnCreate();
+	
+if (db2) fprintf(stderr, "\n");
+
+				iter = sraRgnGetIterator(moved_win);
+				while (sraRgnIteratorNext(iter, &rect)) {
+					tx1 = rect.x1 + dx;
+					ty1 = rect.y1 + dy;
+					tx2 = rect.x2 + dx;
+					ty2 = rect.y2 + dy;
+
+if (db2) fprintf(stderr, "  shf_win: %4d %3d, %4d %3d\n", tx1, ty1, tx2, ty2);
+
+					tmp_win = sraRgnCreateRect(tx1, ty1,
+					    tx2, ty2);
+					sraRgnAnd(tmp_win, whole);
+					if (! sraRgnEmpty(tmp_win)) {
+						sraRgnOr(shifted_region,
+						    tmp_win);
+					}
+					sraRgnDestroy(tmp_win);
+				}
+				sraRgnReleaseIterator(iter);
+				sraRgnDestroy(whole);
+
+				/* now send the CopyRegion: */
+				if (! sraRgnEmpty(shifted_region)) {
+					rfbDoCopyRegion(screen, shifted_region,
+					    dx, dy);
+					sent_copyrect = 1;
+if (db2) fprintf(stderr, "  rfbDoCopyRegion\n");
+				}
+				sraRgnDestroy(shifted_region);
+			}
+			sraRgnDestroy(moved_win);
+		}
+
+		if (sent_copyrect) {
+
+			/* try to push the changes to viewers: */
+			fb_update_sent(NULL);
+			rfbPE(screen, spin_ms/3);
+			if (! obscured) {
+				for (t=0; t<tmax; t++) {
+					if (fb_update_sent(NULL)) {
+if (db2) fprintf(stderr, "B-FB_UPDATE_SENT: t=%d\n", t);
+						break;
+					}
+					rfbPE(screen, 1000);
+				}
+			}
+		}
+	}
+
+	if (stack_list) {
+		/* clean up stack_list for next time: */
+		if (break_reason == 1 || break_reason == 2) {
+			/*
+			 * save the stack list, perhaps the user has
+			 * paused with button down. XXX unstable if
+			 * windows in the list go away?
+			 */
+			last_save_stacklist = time(0);
+		} else {
+			X_LOCK;
+			XFree(stack_list);
+			X_UNLOCK;
+			stack_list = NULL;
+			stack_num = 0;
+		}
+	}
+
+	/* final push (for -nowirecopyrect) */
+	rfbPE(screen, 1000);
+	wireframe_in_progress = 0;
+	return 1;
+}
 
 /*
  * We need to handle user input, particularly pointer input, carefully.
@@ -18416,7 +19938,9 @@ static void check_user_input2(double dt) {
 		} else {
 			rfbCFD(screen, 1000);
 		}
+		X_LOCK;
 		XFlush(dpy);
+		X_UNLOCK;
 
 		spin += dtime(&tm);
 
@@ -18481,7 +20005,9 @@ static void check_user_input2(double dt) {
 			}
 			spin += dtime(&tm);
 			if (got_pointer_input > g) {
+				X_LOCK;
 				XFlush(dpy);
+				X_UNLOCK;
 				miss = 0;
 			} else {
 				miss++;
@@ -18533,7 +20059,9 @@ static void check_user_input3(double dt) {
 		} else {
 			rfbCFD(screen, 1000);
 		}
+		X_LOCK;
 		XFlush(dpy);
+		X_UNLOCK;
 
 
 		spin += dtime(&tm);
@@ -18614,7 +20142,9 @@ static void check_user_input3(double dt) {
 			}
 			spin += dtime(&tm);
 			if (got_pointer_input > g) {
+				X_LOCK;
 				XFlush(dpy);
+				X_UNLOCK;
 				miss = 0;
 			} else {
 				miss++;
@@ -18984,6 +20514,17 @@ static void check_user_input5(double dt, double dtr, int tile_diffs) {
 }
 
 static int check_user_input(double dt, double dtr, int tile_diffs, int *cnt) {
+
+	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
+
+	maybe_scrolling = None;
+
+	if (wireframe) {
+		if (check_wireframe()) {
+			return 0;
+		}
+	}
+
 	if (pointer_mode == 1) {
 		if ((got_user_input || ui_skip < 0) && *cnt % ui_skip != 0) {
 			/* every ui_skip-th drops thru to scan */
@@ -19021,6 +20562,11 @@ static int check_user_input(double dt, double dtr, int tile_diffs, int *cnt) {
 	}
 	return 0;
 }
+
+/* -- x11vnc.c -- */
+/*
+ * main routine for the x11vnc program
+ */
 
 /*
  * simple function for measuring sub-second time differences, using
@@ -19351,6 +20897,8 @@ static void watch_loop(void) {
 				/* true means loop back for more input */
 				continue;
 			}
+		} else if (use_threads && wireframe && button_mask) {
+			check_wireframe();
 		}
 
 		if (shut_down) {
@@ -20146,6 +21694,62 @@ static void print_help(int mode) {
 "                       slow setups, but you lose all visual feedback for drags,\n"
 "                       text selection, and some menu traversals.  It overrides\n"
 "                       any -pointer_mode setting\n"
+"\n"
+"-wireframe [str]       Try to detect window moves or resizes when a mouse\n"
+"-nowireframe           button is held down and show a wireframe instead of\n"
+"                       the full opaque window.  This is based completely on\n"
+"                       heuristics and may not always work: it depends on your\n"
+"                       window manager and even how you move things around.\n"
+"                       See -pointer_mode below for discussion of the \"bogging\n"
+"                       down\" problem this tries to avoid. Default: %s\n"
+"\n"
+"                       The value \"str\" is optional and, of course, is\n"
+"                       packed with many tunable parameters for this scheme:\n"
+"\n"
+"                       Format: shade,linewidth,percent,T+B+L+R,t1+t2+t3+t4\n"
+"                       Default: %s\n"
+"\n"
+"                       If you leave nothing between commas: \",,\" the default\n"
+"                       value is used.  If you don't specify enough commas,\n"
+"                       the trailing parameters are set to their defaults.\n"
+"\n"
+"                       \"shade\" indicate the \"color\" for the wireframe,\n"
+"                       usually a greyscale: 0-255, however for 16 and 32bpp you\n"
+"                       can specify an rgb.txt X color (e.g. \"dodgerblue\") or\n"
+"                       a value > 255 is treated as RGB (e.g. red is 0xff0000).\n"
+"                       \"linewidth\" sets the width of the wireframe in pixels.\n"
+"                       \"percent\" indicates to not apply the wireframe scheme\n"
+"                       to windows with area less than this percent of the\n"
+"                       full screen.\n"
+"\n"
+"                       \"T+B+L+R\" indicates four integers for how close in\n"
+"                       pixels the pointer has to be from the Top, Bottom, Left,\n"
+"                       or Right edges of the window to consider wireframing.\n"
+"                       This is a speedup to quickly exclude a window from being\n"
+"                       wireframed: set them all to zero to not try the speedup\n"
+"                       (scrolling and selecting text will likely be slower).\n"
+"\n"
+"                       \"t1+t2+t3+t4\" specify four floating point times in\n"
+"                       seconds: t1 is how long to wait for the pointer to move,\n"
+"                       t2 is how long to wait for the window to start moving\n"
+"                       or being resized (for some window managers this can be\n"
+"                       rather long), t3 is how long to keep a wireframe moving\n"
+"                       before repainting the window. t4 is the minimum time\n"
+"                       between sending wireframe \"animations\".  For a slow\n"
+"                       link this might be a better choice: 0.25+0.6+6.0+0.15\n"
+"\n"
+"-wirecopyrect mode     Since the -wireframe mechanism evidently tracks moving\n"
+"-nowirecopyrect        windows, a speedup can be obtained by telling the VNC\n"
+"                       viewers to locally copy the translated window region.\n"
+"                       This is the VNC CopyRect encoding: the framebuffer\n"
+"                       update doesn't need to send the actual new image data.\n"
+"                       \"mode\" can be \"never\" (same as -nowirecopyrect)\n"
+"                       to never try the copyrect, \"top\" means only do it if\n"
+"                       the window was not covered by any other windows, and\n"
+"                       \"always\" means to translate the orginally unobscured\n"
+"                       region (this may look odd as the remaining pieces come\n"
+"                       in, but helps on a slow link) Default: %s\n"
+"\n"
 "-pointer_mode n        Various pointer motion update schemes. \"-pm\" is\n"
 "                       an alias.  The problem is pointer motion can cause\n"
 "                       rapid changes on the screen: consider the rapid changes\n"
@@ -20169,7 +21773,6 @@ static void print_help(int mode) {
 "                       n=2 is an improved scheme: by watching the current rate\n"
 "                       of input events it tries to detect if it should try to\n"
 "                       \"eat\" additional pointer events before continuing.\n"
-"                       This mode was the default until Apr 2005.\n"
 "\n"
 "                       n=3 is basically the same as n=2 except with slightly\n"
 "                       tweaked parameters.  We made this a new one so one\n"
@@ -20311,8 +21914,9 @@ static void print_help(int mode) {
 "                       which specifies a shmid N and framebuffer Width, Height,\n"
 "                       and Bits per pixel.  To memory map mmap(2) a file use:\n"
 "                       \"map:/path/to/a/file@WxHxB\".  If there is trouble\n"
-"                       with mmap, use  \"file:/...\" for slower lseek(2) based\n"
-"                       reading.\n"
+"                       with mmap, use  \"file:/...\" for slower lseek(2)\n"
+"                       based reading.  If you do not supply a type \"map\"\n"
+"                       is assumed if the file exists.\n"
 "\n"
 "                       If string is \"setup:cmd\", then the command \"cmd\"\n"
 "                       is run and the first line from it is read and used\n"
@@ -20336,10 +21940,16 @@ static void print_help(int mode) {
 "                       All user input is discarded.  Most of the X11 (screen,\n"
 "                       keyboard, mouse) options do not make sense and many\n"
 "                       will cause this mode to crash, so please think twice\n"
-"                       before setting/changing them.  If you don't want x11vnc\n"
-"                       to close the DISPLAY in rawfb mode, then capitalize\n"
-"                       the prefix, SHM:, MAP: etc.  Keeping the display open\n"
-"                       enables default remote-control channel.\n"
+"                       before setting/changing them.\n"
+"\n"
+"                       If you don't want x11vnc to close the X DISPLAY in\n"
+"                       rawfb mode, then capitalize the prefix, SHM:, MAP:,\n"
+"                       FILE:   Keeping the display open enables the default\n"
+"                       remote-control channel, which could be useful.  Also,\n"
+"                       if you also specify -noviewonly, then the mouse and\n"
+"                       keyboard input are still sent to the X display, this\n"
+"                       usage should be very rare, i.e. doing something strange\n"
+"                       with /dev/fb0.\n"
 "\n"
 "-pipeinput cmd         Another experimental option: it lets you supply\n"
 "                       an extern command in \"cmd\" that x11vnc will pipe\n"
@@ -20594,6 +22204,11 @@ static void print_help(int mode) {
 "                       buttonmap:str   set -buttonmap \"str\", empty to disable\n"
 "                       dragging        disable -nodragging mode.\n"
 "                       nodragging      enable  -nodragging mode.\n"
+"                       wireframe       enable  -wireframe mode.\n"
+"                       nowireframe     disable -wireframe mode.\n"
+"                       wireframe:str   enable  -wireframe mode string.\n"
+"                       wireframe_mode:str enable  -wireframe mode string.\n"
+"                       wirecopyrect:str set -wirecopyrect string.\n"
 "                       pointer_mode:n  set -pointer_mode to n. same as \"pm\"\n"
 "                       input_skip:n    set -input_skip to n.\n"
 "                       speeds:str      set -speeds to str.\n"
@@ -20690,31 +22305,33 @@ static void print_help(int mode) {
 "                       noxtrap xrandr noxrandr xrandr_mode padgeom quiet q\n"
 "                       noquiet modtweak nomodtweak xkb noxkb skip_keycodes\n"
 "                       add_keysyms noadd_keysyms clear_mods noclear_mods\n"
-"                       clear_keys noclear_keys remap repeat norepeat fb nofb\n"
-"                       bell nobell sel nosel primary noprimary cursorshape\n"
-"                       nocursorshape cursorpos nocursorpos cursor show_cursor\n"
-"                       noshow_cursor nocursor arrow xfixes noxfixes xdamage\n"
-"                       noxdamage xd_area xd_mem alphacut alphafrac alpharemove\n"
-"                       noalpharemove alphablend noalphablend xwarp xwarppointer\n"
-"                       noxwarp noxwarppointer buttonmap dragging nodragging\n"
+"                       clear_keys noclear_keys remap repeat norepeat\n"
+"                       fb nofb bell nobell sel nosel primary noprimary\n"
+"                       cursorshape nocursorshape cursorpos nocursorpos\n"
+"                       cursor show_cursor noshow_cursor nocursor arrow\n"
+"                       xfixes noxfixes xdamage noxdamage xd_area xd_mem\n"
+"                       alphacut alphafrac alpharemove noalpharemove alphablend\n"
+"                       noalphablend xwarp xwarppointer noxwarp noxwarppointer\n"
+"                       buttonmap dragging nodragging wireframe_mode\n"
+"                       wireframe nowireframe wirecopyrect nowirecopyrect\n"
 "                       pointer_mode pm input_skip input client_input speeds\n"
 "                       debug_pointer dp nodebug_pointer nodp debug_keyboard dk\n"
-"                       nodebug_keyboard nodk deferupdate defer wait rfbwait nap\n"
-"                       nonap sb screen_blank fs gaps grow fuzz snapfb nosnapfb\n"
-"                       rawfb setup: progressive rfbport http nohttp httpport\n"
+"                       nodebug_keyboard nodk deferupdate defer wait rfbwait\n"
+"                       nap nonap sb screen_blank fs gaps grow fuzz snapfb\n"
+"                       nosnapfb rawfb progressive rfbport http nohttp httpport\n"
 "                       httpdir enablehttpproxy noenablehttpproxy alwaysshared\n"
 "                       noalwaysshared nevershared noalwaysshared dontdisconnect\n"
 "                       nodontdisconnect desktop noremote\n"
 "\n"
-"                       aro=  debug_xevents: display vncdisplay desktopname\n"
-"                       http_url auth users rootshift clipshift scale_str\n"
-"                       scaled_x scaled_y scale_numer scale_denom\n"
+"                       aro=  debug_xevents debug_xdamage display vncdisplay\n"
+"                       desktopname http_url auth users rootshift clipshift\n"
+"                       scale_str scaled_x scaled_y scale_numer scale_denom\n"
 "                       scale_fac scaling_blend scaling_nomult4 scaling_pad\n"
-"                       scaling_interpolate inetd safer unsafe passwdfile\n"
-"                       using_shm logfile o flag rc norc h help V version\n"
-"                       lastmod bg sigpipe threads pipeinput clients\n"
-"                       client_count pid ext_xtest ext_xtrap ext_xkb ext_xshm\n"
-"                       ext_xinerama ext_overlay ext_xfixes ext_xdamage\n"
+"                       scaling_interpolate inetd privremote unsafe safer\n"
+"                       nocmds passwdfile using_shm logfile o flag rc norc h\n"
+"                       help V version lastmod bg sigpipe threads pipeinput\n"
+"                       clients client_count pid ext_xtest ext_xtrap ext_xkb\n"
+"                       ext_xshm ext_xinerama ext_overlay ext_xfixes ext_xdamage\n"
 "                       ext_xrandr rootwin num_buttons button_mask mouse_x\n"
 "                       mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x\n"
 "                       wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth\n"
@@ -20752,22 +22369,29 @@ static void print_help(int mode) {
 "                       channel is being used, obviously anyone who can write\n"
 "                       to /path/to/file can remotely control x11vnc.  So be\n"
 "                       sure to protect the X display and that file's write\n"
-"                       permissions.\n"
+"                       permissions.  See -privremote below.\n"
 "\n"
 "                       If you are paranoid and do not think -noremote is\n"
 "                       enough, to disable the VNC_CONNECT property channel\n"
-"                       completely use -novncconnect.\n"
+"                       completely use -novncconnect, or use the -safer\n"
+"                       option that shuts many things off.\n"
 "\n"
-"-unsafe                If x11vnc is running as root (e.g. inetd or Xsetup for\n"
-"                       a display manager) a few remote commands are disabled\n"
-"                       (currently: id:pick, accept:<cmd>, and gone:<cmd>)\n"
-"                       because they are associated with running external\n"
-"                       programs.  If you specify -unsafe, then these remote\n"
-"                       control commands are allowed when running as root.\n"
-"                       When running as non-root all commands are allowed.\n"
-"                       See -safer below.\n"
-"-safer                 Even if not running as root, disable the above unsafe\n"
-"                       remote control commands.\n"
+"-unsafe                A few remote commands are disabled by default\n"
+"                       (currently: id:pick, accept:<cmd>, gone:<cmd>, and\n"
+"                       rawfb:setup:<cmd>) because they are associated with\n"
+"                       running external programs.  If you specify -unsafe, then\n"
+"                       these remote-control commands are allowed.  Note that\n"
+"                       you can still specify these parameters on the command\n"
+"                       line, they just cannot be changed via remote-control.\n"
+"-safer                 Equivalent to: -novncconnect -noremote and prohibiting\n"
+"                       -gui and the -connect file. Shuts off communcation\n"
+"                       channels.\n"
+"-privremote            Perform some sanity checks and only allow remote-control\n"
+"                       commands if it appears that the X DISPLAY and/or\n"
+"                       connectfile cannot be accessed by other users. (not\n"
+"                       complete, does not check for empty access control list)\n"
+"-nocmds                No external commands (e.g. system(3), popen(3), exec(3))\n"
+"                       will be run.\n"
 "\n"
 "-deny_all              For use with -remote nodeny: start out denying all\n"
 "                       incoming clients until \"-remote nodeny\" is used to\n"
@@ -20814,6 +22438,9 @@ static void print_help(int mode) {
 		alpha_threshold,
 		alpha_frac,
 		cursor_pos_updates ? "-cursorpos":"-nocursorpos",
+		wireframe ? "-wireframe":"-nowireframe",
+		WIREFRAME_PARMS,
+		wireframe_copyrect_default,
 		pointer_mode_max, pointer_mode,
 		ui_skip,
 		defer_update,
@@ -20942,7 +22569,7 @@ static char *choose_title(char *display) {
 		}
 	}
 	strncat(title, display, MAXN - strlen(title));
-	if (subwin && valid_window(subwin)) {
+	if (subwin && valid_window(subwin, NULL)) {
 		char *name;
 		if (XFetchName(dpy, subwin, &name)) {
 			strncat(title, " ",  MAXN - strlen(title));
@@ -21204,9 +22831,7 @@ int main(int argc, char* argv[]) {
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc = 1; char *argv_vnc[128];
 
-	/* if we are root limit some remote commands, etc: */
 	if (!getuid() || !geteuid()) {
-		safe_remote_only = 1;
 		started_as_root = 1;
 
 		/* check for '-users =bob' */
@@ -21270,7 +22895,7 @@ int main(int argc, char* argv[]) {
 			}
 			i++;
 			if (!strcmp("pick", argv[i])) {
-				if (safe_remote_only) {
+				if (started_as_root) {
 					fprintf(stderr, "unsafe: %s pick\n",
 					    arg);
 					exit(1);
@@ -21314,6 +22939,9 @@ int main(int argc, char* argv[]) {
 			scale_cursor_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-viewonly")) {
 			view_only = 1;
+		} else if (!strcmp(arg, "-noviewonly")) {
+			view_only = 0;
+			got_noviewonly = 1;
 		} else if (!strcmp(arg, "-shared")) {
 			shared = 1;
 		} else if (!strcmp(arg, "-once")) {
@@ -21532,6 +23160,21 @@ int main(int argc, char* argv[]) {
 			pointer_remap = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-nodragging")) {
 			show_dragging = 0;
+		} else if (!strcmp(arg, "-wireframe")) {
+			wireframe = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (*s != '-') {
+					wireframe_str = strdup(argv[++i]);
+				}
+			}
+		} else if (!strcmp(arg, "-nowireframe")) {
+			wireframe = 0;
+		} else if (!strcmp(arg, "-wirecopyrect")) {
+			CHECK_ARGC
+			set_wirecopyrect_mode(argv[++i]);
+		} else if (!strcmp(arg, "-nowirecopyrect")) {
+			set_wirecopyrect_mode("never");
 		} else if (!strcmp(arg, "-pointer_mode")
 		    || !strcmp(arg, "-pm")) {
 			char *p, *s;
@@ -21658,8 +23301,12 @@ int main(int argc, char* argv[]) {
 			accept_remote_cmds = 0;
 		} else if (!strcmp(arg, "-unsafe")) {
 			safe_remote_only = 0;
+		} else if (!strcmp(arg, "-privremote")) {
+			priv_remote = 1;
 		} else if (!strcmp(arg, "-safer")) {
-			safe_remote_only = 1;
+			more_safe = 1;
+		} else if (!strcmp(arg, "-nocmds")) {
+			no_external_cmds = 1;
 		} else if (!strcmp(arg, "-deny_all")) {
 			deny_all = 1;
 		} else if (!strcmp(arg, "-httpdir")) {
@@ -21857,6 +23504,20 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
+	if (more_safe) {
+		if (! quiet) {
+			rfbLog("-safer mode:\n");
+			rfbLog("   vnc_connect=0\n");
+			rfbLog("   accept_remote_cmds=0\n");
+			rfbLog("   safe_remote_only=1\n");
+			rfbLog("   launch_gui=0\n");
+		}
+		vnc_connect = 0;
+		accept_remote_cmds = 0;
+		safe_remote_only = 1;
+		launch_gui = 0;
+	}
+
 	/* fixup settings that do not make sense */
 		
 	if (use_threads && nofb && cursor_pos_updates) {
@@ -21896,6 +23557,10 @@ int main(int argc, char* argv[]) {
 
 	if (flip_byte_order && using_shm && ! quiet) {
 		rfbLog("warning: -flipbyte order only works with -noshm\n");
+	}
+
+	if (! wireframe_copyrect) {
+		set_wirecopyrect_mode(NULL);
 	}
 
 	/* increase rfbwait if threaded */
@@ -22055,6 +23720,8 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " buttonmap:  %s\n", pointer_remap
 		    ? pointer_remap : "null");
 		fprintf(stderr, " dragging:   %d\n", show_dragging);
+		fprintf(stderr, " wireframe:  %s\n", wireframe_str ?
+		    wireframe_str : WIREFRAME_PARMS);
 		fprintf(stderr, " ptr_mode:   %d\n", pointer_mode);
 		fprintf(stderr, " inputskip:  %d\n", ui_skip);
 		fprintf(stderr, " speeds:     %s\n", speeds_str
@@ -22085,6 +23752,9 @@ int main(int argc, char* argv[]) {
 		    ? gui_str : "null");
 		fprintf(stderr, " noremote:   %d\n", !accept_remote_cmds);
 		fprintf(stderr, " safemode:   %d\n", safe_remote_only);
+		fprintf(stderr, " privremote: %d\n", priv_remote);
+		fprintf(stderr, " safer:      %d\n", more_safe);
+		fprintf(stderr, " nocmds:     %d\n", no_external_cmds);
 		fprintf(stderr, " deny_all:   %d\n", deny_all);
 		fprintf(stderr, "\n");
 		rfbLog("x11vnc version: %s\n", lastmod);

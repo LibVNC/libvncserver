@@ -1,6 +1,17 @@
+2005-04-19  Karl Runge <runge@karlrunge.com>
+	* somewhat safer remote-control defaults, and addnl options for
+	  more safe operation: -privremote, -safer, -nocmds, -unsafe
+	* -wireframe, -wirecopyrect: instead of having user look at a
+	  slowly moving, lurching window, guess when a window is being
+	  moved/resized and just show a wireframe. -wirecopyrect means to
+	  apply rfbDoCopyRegion to the detected move as well.
+	* debugging switches for X events and X damage: debug_xevents
+	  debug_xdamage.
+	* -rawfb bugfixes. -noviewonly hack to still send UI to X.
+
 2005-04-11  Karl Runge <runge@karlrunge.com>
 	* fix -clip under -rawfb, fix offset bug under file lseeking.
-	* add -rawfb setup:cmd mode to initialize fb. ex: misc/ranfb.pl
+	* add -rawfb setup:cmd mode to initialize fb. example: misc/ranfb.pl
 
 2005-04-10  Karl Runge <runge@karlrunge.com>
 	* -rawfb non X-polling (i.e. shm, mmap, lseek).
