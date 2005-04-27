@@ -1,3 +1,6 @@
+2005-04-27  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* clear requested region (long standing TODO, pointed out by Karl)
+
 2005-04-19  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -wireframe, -wirecopyrect.  Back to the 90's with
 	  wireframes to avoid window move/resize lurching.
