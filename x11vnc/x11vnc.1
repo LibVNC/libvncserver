@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "April 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "May 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-04-19
+         version: 0.7.2, lastmod: 2005-05-02
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -956,13 +956,16 @@ the full opaque window.  This is based completely on
 heuristics and may not always work: it depends on your
 window manager and even how you move things around.
 See \fB-pointer_mode\fR below for discussion of the "bogging
-down" problem this tries to avoid. Default: \fB-wireframe\fR
+down" problem this tries to avoid.
+Default: \fB-wireframe\fR
+.IP
+Shorter aliases:  \fB-wf\fR [str]  and \fB-nowf\fR
 .IP
 The value "str" is optional and, of course, is
 packed with many tunable parameters for this scheme:
 .IP
 Format: shade,linewidth,percent,T+B+L+R,t1+t2+t3+t4
-Default: 0xff,3,0,32+8+8+8,0.15+0.35+4.0+0.1
+Default: 0xff,3,0,32+8+8+8,0.15+0.30+5.0+0.125
 .IP
 If you leave nothing between commas: ",," the default
 value is used.  If you don't specify enough commas,
@@ -996,16 +999,71 @@ link this might be a better choice: 0.25+0.6+6.0+0.15
 \fB-wirecopyrect\fR \fImode,\fR \fB-nowirecopyrect\fR
 .IP
 Since the \fB-wireframe\fR mechanism evidently tracks moving
-windows, a speedup can be obtained by telling the VNC
-viewers to locally copy the translated window region.
-This is the VNC CopyRect encoding: the framebuffer
-update doesn't need to send the actual new image data.
+windows accurately, a speedup can be obtained by
+telling the VNC viewers to locally copy the translated
+window region.  This is the VNC CopyRect encoding:
+the framebuffer update doesn't need to send the actual
+new image data.
+.IP
+Shorter aliases:  \fB-wcr\fR [mode]  and \fB-nowcr\fR
+.IP
 "mode" can be "never" (same as \fB-nowirecopyrect)\fR
 to never try the copyrect, "top" means only do it if
 the window was not covered by any other windows, and
 "always" means to translate the orginally unobscured
 region (this may look odd as the remaining pieces come
-in, but helps on a slow link) Default: always
+in, but helps on a slow link).  Default: "always"
+.IP
+Note: there can be painting errors when using \fB-scale\fR
+so CopyRect is skipped when scaling unless you specify
+\fB-wirecopyrect\fR on the command line or by remote-control.
+.PP
+\fB-scrollcopyrect\fR \fImode,\fR \fB-noscrollcopyrect\fR
+.IP
+Like \fB-wirecopyrect,\fR but use heuristics to try to guess
+if a window has scrolled its contents (either vertically
+or horizontally).  This requires the RECORD X extension
+to "snoop" on X applications (currently for certain
+XCopyArea and XConfigureWindow X protocol requests).
+Examples: Hitting <Return> in a terminal window when the
+cursor was at the bottom, the text scrolls up one line.
+Hitting <Down> arrow in a web browser window, the web
+page scrolls up a small amount.
+.IP
+Shorter aliases:  \fB-scr\fR [mode]  and \fB-noscr\fR
+.IP
+This scheme will not always detect scrolls, but when
+it does there is a nice speedup from using the VNC
+CopyRect encoding (see \fB-wirecopyrect).\fR  The speedup
+is both in reduced network traffic and reduced X
+framebuffer polling/copying.  On the other hand,
+it may induce undesired transients (e.g. a terminal
+cursor being scrolled up when it should not be) or other
+painting errors.  These are automatically repaired in a
+short period of time.  If this is unacceptable disable
+the feature with \fB-noscrollcopyrect.\fR
+.IP
+"mode" can be "never" (same as \fB-noscrollcopyrect)\fR
+to never try the copyrect, "keys" means to try it
+in response to keystrokes only, "mouse" means to
+try it in response to mouse events only, "always"
+means to do both. Default: "always"
+.IP
+Note: there can be painting errors when using
+\fB-scale\fR so CopyRect is skipped when scaling unless
+you specify \fB-scrollcopyrect\fR on the command line or
+by remote-control.
+.PP
+\fB-scr_area\fR \fIn\fR
+.IP
+Set the minimum area in pixels for a rectangle
+to be considered for the \fB-scrollcopyrect\fR detection
+scheme.  This is to avoid wasting the effort on small
+rectangles that would be quickly updated the normal way.
+E.g. suppose an app updated the position of its skinny
+scrollbar first and then shifted the large panel
+it controlled.  We want to be sure to skip the small
+scrollbar and get the large panel. Default: 60000
 .PP
 \fB-pointer_mode\fR \fIn\fR
 .IP
@@ -1633,15 +1691,21 @@ dragging        disable \fB-nodragging\fR mode.
 .IP
 nodragging      enable  \fB-nodragging\fR mode.
 .IP
-wireframe       enable  \fB-wireframe\fR mode.
+wireframe       enable  \fB-wireframe\fR mode. same as "wf"
 .IP
-nowireframe     disable \fB-wireframe\fR mode.
+nowireframe     disable \fB-wireframe\fR mode. same as "nowf"
 .IP
 wireframe:str   enable  \fB-wireframe\fR mode string.
 .IP
 wireframe_mode:str enable  \fB-wireframe\fR mode string.
 .IP
-wirecopyrect:str set \fB-wirecopyrect\fR string.
+wirecopyrect:str set \fB-wirecopyrect\fR string. same as "wcr:"
+.IP
+scrollcopyrect:str set \fB-scrollcopyrect\fR string. same "scr"
+.IP
+noscrollcopyrect disable \fB-scrollcopyrect__mode_.\fR "noscr"
+.IP
+scr_area:n      set \fB-scr_area\fR to n
 .IP
 pointer_mode:n  set \fB-pointer_mode\fR to n. same as "pm"
 .IP
@@ -1721,6 +1785,23 @@ dontdisconnect   enable  \fB-dontdisconnect\fR mode.
 nodontdisconnect disable \fB-dontdisconnect\fR mode.
                 (may interfere with other options)
 .IP
+debug_xevents   enable  debugging X events.
+.IP
+nodebug_xevents disable debugging X events.
+.IP
+debug_xdamage   enable  debugging X DAMAGE mechanism.
+.IP
+nodebug_xdamage disable debugging X DAMAGE mechanism.
+.IP
+debug_wireframe enable   debugging wireframe mechanism.
+.IP
+nodebug_wireframe disable debugging wireframe mechanism.
+.IP
+debug_scroll    enable  debugging scrollcopy mechanism.
+.IP
+nodebug_scroll  disable debugging scrollcopy mechanism.
+.IP
+.IP
 noremote        disable the \fB-remote\fR command processing,
                 it cannot be turned back on.
 .IP
@@ -1795,13 +1876,14 @@ noquiet modtweak nomodtweak xkb noxkb skip_keycodes
 add_keysyms noadd_keysyms clear_mods noclear_mods
 clear_keys noclear_keys remap repeat norepeat
 fb nofb bell nobell sel nosel primary noprimary
-cursorshape nocursorshape cursorpos nocursorpos
-cursor show_cursor noshow_cursor nocursor arrow
-xfixes noxfixes xdamage noxdamage xd_area xd_mem
-alphacut alphafrac alpharemove noalpharemove alphablend
-noalphablend xwarp xwarppointer noxwarp noxwarppointer
-buttonmap dragging nodragging wireframe_mode
-wireframe nowireframe wirecopyrect nowirecopyrect
+cursorshape nocursorshape cursorpos nocursorpos cursor
+show_cursor noshow_cursor nocursor arrow xfixes noxfixes
+xdamage noxdamage xd_area xd_mem alphacut alphafrac
+alpharemove noalpharemove alphablend noalphablend
+xwarp xwarppointer noxwarp noxwarppointer buttonmap
+dragging nodragging wireframe_mode wireframe wf
+nowireframe nowf wirecopyrect wcr nowirecopyrect nowcr
+scr_area scrollcopyrect scr noscrollcopyrect noscr
 pointer_mode pm input_skip input client_input speeds
 debug_pointer dp nodebug_pointer nodp debug_keyboard dk
 nodebug_keyboard nodk deferupdate defer wait rfbwait
@@ -1811,19 +1893,23 @@ httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop noremote
 .IP
-aro=  debug_xevents debug_xdamage display vncdisplay
-desktopname http_url auth users rootshift clipshift
-scale_str scaled_x scaled_y scale_numer scale_denom
-scale_fac scaling_blend scaling_nomult4 scaling_pad
-scaling_interpolate inetd privremote unsafe safer
-nocmds passwdfile using_shm logfile o flag rc norc h
-help V version lastmod bg sigpipe threads pipeinput
-clients client_count pid ext_xtest ext_xtrap ext_xkb
-ext_xshm ext_xinerama ext_overlay ext_xfixes ext_xdamage
-ext_xrandr rootwin num_buttons button_mask mouse_x
-mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x
-wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth
-passwd
+aro=  debug_xevents nodebug_xevents debug_xevents
+debug_xdamage nodebug_xdamage debug_xdamage
+debug_wireframe nodebug_wireframe debug_wireframe
+debug_scroll nodebug_scroll debug_scroll display
+vncdisplay desktopname http_url auth users rootshift
+clipshift scale_str scaled_x scaled_y scale_numer
+scale_denom scale_fac scaling_blend scaling_nomult4
+scaling_pad scaling_interpolate inetd privremote
+unsafe safer nocmds passwdfile using_shm logfile
+o flag rc norc h help V version lastmod bg sigpipe
+threads readrate netrate netlatency pipeinput clients
+client_count pid ext_xtest ext_xtrap ext_xrecord
+ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes
+ext_xdamage ext_xrandr rootwin num_buttons button_mask
+mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y
+wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y
+rfbauth passwd
 .PP
 \fB-sync\fR
 .IP
@@ -1846,9 +1932,11 @@ if the x11vnc takes longer than that to process the
 requests the requestor will think that a failure has
 taken place.
 .PP
-\fB-noremote\fR
+\fB-noremote,\fR \fB-yesremote\fR
 .IP
 Do not process any remote control commands or queries.
+Do process remote control commands or queries.
+Default: \fB-yesremote\fR
 .IP
 A note about security wrt remote control commands.
 If someone can connect to the X display and change
@@ -1886,10 +1974,10 @@ channels.
 .PP
 \fB-privremote\fR
 .IP
-Perform some sanity checks and only allow remote-control
+Perform some sanity checks and disable remote-control
 commands if it appears that the X DISPLAY and/or
-connectfile cannot be accessed by other users. (not
-complete, does not check for empty access control list)
+connectfile can be accessed by other users.  Once
+remote-control is disabled it cannot be turned back on.
 .PP
 \fB-nocmds\fR
 .IP

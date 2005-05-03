@@ -1,3 +1,9 @@
+2005-05-02  Karl Runge <runge@karlrunge.com>
+	* configure.ac: fatal error for x11vnc package if no X present
+	* configure.ac: give warnings and info about missing libjpeg/libz
+	* x11vnc: X RECORD heuristics to detect scrolls: -scrollcopyrect,
+	  build customizations, bandwidth/latency estimates.
+
 2005-04-27  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* clear requested region (long standing TODO, pointed out by Karl)
 

@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Tue Apr 19 16:26:20 EDT 2005
+x11vnc README file                         Date: Mon May  2 21:41:13 EDT 2005
 
 The following information is taken from these URLs:
 
@@ -527,7 +527,9 @@ make
 
    Here is what is shaping up to be [52]the release notes for 0.7.2..
    Note that the [53]X DAMAGE feature will be on by default and so I am
-   interested if that causes any problems. Thanks!
+   interested if that causes any problems. I'd also like to have the new
+   "wireframe" move/resize stuff on by default as well, let me know of
+   any issues you find. Thanks!
      _________________________________________________________________
 
     Some Notes:
@@ -576,11 +578,10 @@ make
    note below)
 
    Options:   x11vnc has (far too) many features that may be activated
-   via its [57]command line options. Useful options are -nap to use fewer
-   resources (it sleeps more between polls when activity is low) and
-   -rfbauth passwd-file to use VNC password protection (the vncpasswd or
-   storepasswd programs, or the x11vnc [58]-storepasswd option can be
-   used to create the password file).
+   via its [57]command line options. Useful options are, e.g., -scale to
+   do server-side scaling, and -rfbauth passwd-file to use VNC password
+   protection (the vncpasswd or storepasswd programs, or the x11vnc
+   [58]-storepasswd option can be used to create the password file).
 
    Algorithm:   How does x11vnc do it? Rather brute-forcedly: it
    continuously polls the X11 framebuffer for changes using
@@ -588,18 +589,18 @@ make
    which rectangular regions of the framebuffer have changed, and
    libvncserver compresses the changes and sends them off to any
    connected VNC viewers. A number of applications do similar things,
-   such as x0rfbserver, krfb, x0vncserver. x11vnc uses a 32 x 32 pixel
-   tile model (the desktop is decomposed into roughly 1000 such tiles),
-   where changed tiles are found by pseudo-randomly polling 1 pixel tall
-   horizontal scanlines. This is a surprisingly effective algorithm for
-   finding changed regions. For keyboard and mouse user input the XTEST
-   extension is used to pass the input events to the X server. To detect
-   XBell "beeps" the XKEYBOARD extension is used. If available, the
-   XFIXES extension is used to retrieve the current mouse cursor shape.
-   Also, if available the X DAMAGE extension is used to receive hints
-   from the X server where modified regions on the screen are. This
-   greatly reduces the system load when not much is changing on the
-   screen and also improves how quickly the screen is updated.
+   such as x0rfbserver, krfb, x0vncserver, vino. x11vnc uses a 32 x 32
+   pixel tile model (the desktop is decomposed into roughly 1000 such
+   tiles), where changed tiles are found by pseudo-randomly polling 1
+   pixel tall horizontal scanlines. This is a surprisingly effective
+   algorithm for finding changed regions. For keyboard and mouse user
+   input the XTEST extension is used to pass the input events to the X
+   server. To detect XBell "beeps" the XKEYBOARD extension is used. If
+   available, the XFIXES extension is used to retrieve the current mouse
+   cursor shape. Also, if available the X DAMAGE extension is used to
+   receive hints from the X server where modified regions on the screen
+   are. This greatly reduces the system load when not much is changing on
+   the screen and also improves how quickly the screen is updated.
 
    Barbershop mirrors effect:   What if x11vnc is started up, and
    vncviewer is then started up on the same machine and displayed on the
@@ -1375,7 +1376,9 @@ display :0
    unintendeds. Perhaps this is of use in remote access for an embedded
    application, etc...
 
-   Let us know if more build-time customizations would be useful.
+   Let us know if more build-time customizations would be useful. Look
+   near the top of the source file for any additional customization
+   macros.
 
    If the system does not have the XTEST XTestGrabControl interface (some
    early X11R5 systems have XTEST but not this interface), then configure
@@ -2761,18 +2764,20 @@ ied)
    polling and updates will be suspended and only an animated "wireframe"
    (a rectangle outline drawn where the moved/resized window would be) is
    shown. When the window move/resize stops, it returns to normal
-   processing: you should just see the window appear in the new position.
-   This spares you from interacting with a "lurching" window during all
-   of the intermediate steps. (the lurching is due to [297]slow video
-   card read rates)
+   processing: you should only see the window appear in the new position.
+   This spares you from interacting with a "lurching" window between all
+   of the intermediate steps. BTW the lurching is due to [297]slow video
+   card read rates. A displacement, even a small one, of a large window
+   requires a non-negligible amount of time, a good fraction of a second,
+   to read in from the hardware framebuffer.
 
-   The mode is currently on be default because most people are inflicted
+   The mode is currently on by default because most people are inflicted
    with the problem. It can be disabled with the [298]-nowireframe
    option. Why might one want to turn off the wireframing? Since x11vnc
    is merely guessing when windows are being moved/resized, it may guess
    poorly for your window-manager or desktop, or even for the way you
    move the pointer. If your window-manager or desktop already does its
-   own wireframing then this mode is a waste of time or could do the
+   own wireframing then this mode is a waste of time and could do the
    wrong thing occasionally. There may be other reasons the new mode
    feels unnatural. If you have very expensive video hardware (SGI) or
    are using an in-RAM video framebuffer (SunRay, ShadowFB, Xvfb), the
@@ -2785,16 +2790,16 @@ ied)
    are not fool proof: x11vnc is sometimes tricked and so you'll
    occasionally see the lurching opaque move and rarely something even
    worse. First it assumes that the move/resize will occur with a mouse
-   button pressed and held down (of course this is only mostly true).
-   Next it will only consider a window for wireframing if the mouse
-   pointer is initially "close enough" to the edges of the window frame,
-   e.g. you have grabbed the title bar or a resizer edge (this
+   button pressed, held down and dragged (of course this is only mostly
+   true). Next it will only consider a window for wireframing if the
+   mouse pointer is initially "close enough" to the edges of the window
+   frame, e.g. you have grabbed the title bar or a resizer edge (this
    requirement can be disabled). If these are true, it will wait an
    amount of time to see if the window starts moving or resizing. If it
-   does, it starts drawing the wireframe "animation" of where the window
-   would be. If the mouse button is released, or a timeout occurs, it
-   goes back to the standard mode to allow the framebuffer changes to
-   propagate to the viewers.
+   does, it starts drawing the wireframe "outline" of where the window
+   would be. When the mouse button is released, or a timeout occurs, it
+   goes back to the standard mode to allow the actual framebuffer changes
+   to propagate to the viewers.
 
    These parameters can be tweaked:
      * Color/Shade of the wireframe.
@@ -2835,6 +2840,12 @@ ied)
    around the problem by applying the CopyRect even if obscuring windows'
    data is translated! Use -nowirecopyrect if this yields undesirable
    effects for your desktop.
+
+   Also, the CopyRect encoding may give incorrect results under -scale
+   (depending on the scale factor the CopyRect operation is often only
+   approximate: the correctly scaled framebuffer will be slightly
+   different from the translated one). Use -nowirecopyrect if this or
+   other painting errors are unacceptable.
 
 
    Q-51: Does x11vnc support the X DAMAGE Xserver extension to find
@@ -4222,7 +4233,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-04-19
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-05-02
 
 x11vnc options:
   -display disp            -auth file             
@@ -4266,21 +4277,23 @@ x11vnc options:
   -xwarppointer            -buttonmap string      
   -nodragging              -wireframe [str]       
   -nowireframe             -wirecopyrect mode     
-  -nowirecopyrect          -pointer_mode n        
-  -input_skip n            -speeds rd,bw,lat      
-  -debug_pointer           -debug_keyboard        
-  -defer time              -wait time             
-  -nap                     -nonap                 
-  -sb time                 -noxdamage             
-  -xd_area A               -xd_mem f              
-  -sigpipe string          -threads               
-  -nothreads               -fs f                  
-  -gaps n                  -grow n                
-  -fuzz n                  -snapfb                
-  -rawfb string            -pipeinput cmd         
-  -gui [gui-opts]          -remote command        
-  -query variable          -sync                  
-  -noremote                -unsafe                
+  -nowirecopyrect          -scrollcopyrect mode   
+  -noscrollcopyrect        -scr_area n            
+  -pointer_mode n          -input_skip n          
+  -speeds rd,bw,lat        -debug_pointer         
+  -debug_keyboard          -defer time            
+  -wait time               -nap                   
+  -nonap                   -sb time               
+  -noxdamage               -xd_area A             
+  -xd_mem f                -sigpipe string        
+  -threads                 -nothreads             
+  -fs f                    -gaps n                
+  -grow n                  -fuzz n                
+  -snapfb                  -rawfb string          
+  -pipeinput cmd           -gui [gui-opts]        
+  -remote command          -query variable        
+  -sync                    -noremote              
+  -yesremote               -unsafe                
   -safer                   -privremote            
   -nocmds                  -deny_all              
 
@@ -4309,7 +4322,7 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-04-19
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-05-02
 
 Typical usage is:
 
@@ -5009,13 +5022,16 @@ Options:
                        heuristics and may not always work: it depends on your
                        window manager and even how you move things around.
                        See -pointer_mode below for discussion of the "bogging
-                       down" problem this tries to avoid. Default: -wireframe
+                       down" problem this tries to avoid.
+                       Default: -wireframe
+
+                       Shorter aliases:  -wf [str]  and -nowf
 
                        The value "str" is optional and, of course, is
                        packed with many tunable parameters for this scheme:
 
                        Format: shade,linewidth,percent,T+B+L+R,t1+t2+t3+t4
-                       Default: 0xff,3,0,32+8+8+8,0.15+0.35+4.0+0.1
+                       Default: 0xff,3,0,32+8+8+8,0.15+0.30+5.0+0.125
 
                        If you leave nothing between commas: ",," the default
                        value is used.  If you don't specify enough commas,
@@ -5047,16 +5063,67 @@ Options:
                        link this might be a better choice: 0.25+0.6+6.0+0.15
 
 -wirecopyrect mode     Since the -wireframe mechanism evidently tracks moving
--nowirecopyrect        windows, a speedup can be obtained by telling the VNC
-                       viewers to locally copy the translated window region.
-                       This is the VNC CopyRect encoding: the framebuffer
-                       update doesn't need to send the actual new image data.
+-nowirecopyrect        windows accurately, a speedup can be obtained by
+                       telling the VNC viewers to locally copy the translated
+                       window region.  This is the VNC CopyRect encoding:
+                       the framebuffer update doesn't need to send the actual
+                       new image data.
+
+                       Shorter aliases:  -wcr [mode]  and -nowcr
+
                        "mode" can be "never" (same as -nowirecopyrect)
                        to never try the copyrect, "top" means only do it if
                        the window was not covered by any other windows, and
                        "always" means to translate the orginally unobscured
                        region (this may look odd as the remaining pieces come
-                       in, but helps on a slow link) Default: always
+                       in, but helps on a slow link).  Default: "always"
+
+                       Note: there can be painting errors when using -scale
+                       so CopyRect is skipped when scaling unless you specify
+                       -wirecopyrect on the command line or by remote-control.
+
+-scrollcopyrect mode   Like -wirecopyrect, but use heuristics to try to guess
+-noscrollcopyrect      if a window has scrolled its contents (either vertically
+                       or horizontally).  This requires the RECORD X extension
+                       to "snoop" on X applications (currently for certain
+                       XCopyArea and XConfigureWindow X protocol requests).
+                       Examples: Hitting <Return> in a terminal window when the
+                       cursor was at the bottom, the text scrolls up one line.
+                       Hitting <Down> arrow in a web browser window, the web
+                       page scrolls up a small amount.
+
+                       Shorter aliases:  -scr [mode]  and -noscr
+
+                       This scheme will not always detect scrolls, but when
+                       it does there is a nice speedup from using the VNC
+                       CopyRect encoding (see -wirecopyrect).  The speedup
+                       is both in reduced network traffic and reduced X
+                       framebuffer polling/copying.  On the other hand,
+                       it may induce undesired transients (e.g. a terminal
+                       cursor being scrolled up when it should not be) or other
+                       painting errors.  These are automatically repaired in a
+                       short period of time.  If this is unacceptable disable
+                       the feature with -noscrollcopyrect.
+
+                       "mode" can be "never" (same as -noscrollcopyrect)
+                       to never try the copyrect, "keys" means to try it
+                       in response to keystrokes only, "mouse" means to
+                       try it in response to mouse events only, "always"
+                       means to do both. Default: "always"
+
+                       Note: there can be painting errors when using
+                       -scale so CopyRect is skipped when scaling unless
+                       you specify -scrollcopyrect on the command line or
+                       by remote-control.
+
+-scr_area n            Set the minimum area in pixels for a rectangle
+                       to be considered for the -scrollcopyrect detection
+                       scheme.  This is to avoid wasting the effort on small
+                       rectangles that would be quickly updated the normal way.
+                       E.g. suppose an app updated the position of its skinny
+                       scrollbar first and then shifted the large panel
+                       it controlled.  We want to be sure to skip the small
+                       scrollbar and get the large panel. Default: 60000
 
 -pointer_mode n        Various pointer motion update schemes. "-pm" is
                        an alias.  The problem is pointer motion can cause
@@ -5503,11 +5570,16 @@ Options:
                        buttonmap:str   set -buttonmap "str", empty to disable
                        dragging        disable -nodragging mode.
                        nodragging      enable  -nodragging mode.
-                       wireframe       enable  -wireframe mode.
-                       nowireframe     disable -wireframe mode.
+                       wireframe       enable  -wireframe mode. same as "wf"
+                       nowireframe     disable -wireframe mode. same as "nowf"
                        wireframe:str   enable  -wireframe mode string.
                        wireframe_mode:str enable  -wireframe mode string.
-                       wirecopyrect:str set -wirecopyrect string.
+                       wirecopyrect:str set -wirecopyrect string. same as "wcr:
+"
+                       scrollcopyrect:str set -scrollcopyrect string. same "scr
+"
+                       noscrollcopyrect disable -scrollcopyrect mode. "noscr"
+                       scr_area:n      set -scr_area to n
                        pointer_mode:n  set -pointer_mode to n. same as "pm"
                        input_skip:n    set -input_skip to n.
                        speeds:str      set -speeds to str.
@@ -5550,6 +5622,15 @@ Options:
                        dontdisconnect   enable  -dontdisconnect mode.
                        nodontdisconnect disable -dontdisconnect mode.
                                         (may interfere with other options)
+                       debug_xevents   enable  debugging X events.
+                       nodebug_xevents disable debugging X events.
+                       debug_xdamage   enable  debugging X DAMAGE mechanism.
+                       nodebug_xdamage disable debugging X DAMAGE mechanism.
+                       debug_wireframe enable   debugging wireframe mechanism.
+                       nodebug_wireframe disable debugging wireframe mechanism.
+                       debug_scroll    enable  debugging scrollcopy mechanism.
+                       nodebug_scroll  disable debugging scrollcopy mechanism.
+
                        noremote        disable the -remote command processing,
                                        it cannot be turned back on.
 
@@ -5606,13 +5687,14 @@ Options:
                        add_keysyms noadd_keysyms clear_mods noclear_mods
                        clear_keys noclear_keys remap repeat norepeat
                        fb nofb bell nobell sel nosel primary noprimary
-                       cursorshape nocursorshape cursorpos nocursorpos
-                       cursor show_cursor noshow_cursor nocursor arrow
-                       xfixes noxfixes xdamage noxdamage xd_area xd_mem
-                       alphacut alphafrac alpharemove noalpharemove alphablend
-                       noalphablend xwarp xwarppointer noxwarp noxwarppointer
-                       buttonmap dragging nodragging wireframe_mode
-                       wireframe nowireframe wirecopyrect nowirecopyrect
+                       cursorshape nocursorshape cursorpos nocursorpos cursor
+                       show_cursor noshow_cursor nocursor arrow xfixes noxfixes
+                       xdamage noxdamage xd_area xd_mem alphacut alphafrac
+                       alpharemove noalpharemove alphablend noalphablend
+                       xwarp xwarppointer noxwarp noxwarppointer buttonmap
+                       dragging nodragging wireframe_mode wireframe wf
+                       nowireframe nowf wirecopyrect wcr nowirecopyrect nowcr
+                       scr_area scrollcopyrect scr noscrollcopyrect noscr
                        pointer_mode pm input_skip input client_input speeds
                        debug_pointer dp nodebug_pointer nodp debug_keyboard dk
                        nodebug_keyboard nodk deferupdate defer wait rfbwait
@@ -5622,19 +5704,23 @@ Options:
                        noalwaysshared nevershared noalwaysshared dontdisconnect
                        nodontdisconnect desktop noremote
 
-                       aro=  debug_xevents debug_xdamage display vncdisplay
-                       desktopname http_url auth users rootshift clipshift
-                       scale_str scaled_x scaled_y scale_numer scale_denom
-                       scale_fac scaling_blend scaling_nomult4 scaling_pad
-                       scaling_interpolate inetd privremote unsafe safer
-                       nocmds passwdfile using_shm logfile o flag rc norc h
-                       help V version lastmod bg sigpipe threads pipeinput
-                       clients client_count pid ext_xtest ext_xtrap ext_xkb
-                       ext_xshm ext_xinerama ext_overlay ext_xfixes ext_xdamage
-                       ext_xrandr rootwin num_buttons button_mask mouse_x
-                       mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x
-                       wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth
-                       passwd
+                       aro=  debug_xevents nodebug_xevents debug_xevents
+                       debug_xdamage nodebug_xdamage debug_xdamage
+                       debug_wireframe nodebug_wireframe debug_wireframe
+                       debug_scroll nodebug_scroll debug_scroll display
+                       vncdisplay desktopname http_url auth users rootshift
+                       clipshift scale_str scaled_x scaled_y scale_numer
+                       scale_denom scale_fac scaling_blend scaling_nomult4
+                       scaling_pad scaling_interpolate inetd privremote
+                       unsafe safer nocmds passwdfile using_shm logfile
+                       o flag rc norc h help V version lastmod bg sigpipe
+                       threads readrate netrate netlatency pipeinput clients
+                       client_count pid ext_xtest ext_xtrap ext_xrecord
+                       ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes
+                       ext_xdamage ext_xrandr rootwin num_buttons button_mask
+                       mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y
+                       wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y
+                       rfbauth passwd
 
 -sync                  By default -remote commands are run asynchronously, that
                        is, the request is posted and the program immediately
@@ -5656,6 +5742,8 @@ Options:
                        taken place.
 
 -noremote              Do not process any remote control commands or queries.
+-yesremote             Do process remote control commands or queries.
+                       Default: -yesremote
 
                        A note about security wrt remote control commands.
                        If someone can connect to the X display and change
@@ -5685,10 +5773,10 @@ Options:
 -safer                 Equivalent to: -novncconnect -noremote and prohibiting
                        -gui and the -connect file. Shuts off communcation
                        channels.
--privremote            Perform some sanity checks and only allow remote-control
+-privremote            Perform some sanity checks and disable remote-control
                        commands if it appears that the X DISPLAY and/or
-                       connectfile cannot be accessed by other users. (not
-                       complete, does not check for empty access control list)
+                       connectfile can be accessed by other users.  Once
+                       remote-control is disabled it cannot be turned back on.
 -nocmds                No external commands (e.g. system(3), popen(3), exec(3))
                        will be run.
 

@@ -127,60 +127,9 @@
 
 /* -- x11vnc.h -- */
 
-/*
- ***************************************************************************
- * if you are inserting this file, x11vnc.c into an old CVS tree you
- * may need to set OLD_TREE to 1.  Or use -DOLD_TREE=1 in CPPFLAGS.
- * See below for LibVNCServer 0.7 tips.
- */
-
-#ifndef OLD_TREE
-#define OLD_TREE 0
-#endif
-#if OLD_TREE
-
-/* BEGIN OLD TREE */
-
-/*
- * if you have a very old tree (LibVNCServer 0.6) and get errors these may
- * be need to be uncommented.  LibVNCServer <= 0.5 is no longer supported.
- * note the maxRectsPerUpdate below is a hack that may break some usage.
-#define oldCursorX cursorX
-#define oldCursorY cursorY
-#define thisHost rfbThisHost
-#define framebufferUpdateMessagesSent rfbFramebufferUpdateMessagesSent
-#define bytesSent rfbBytesSent
-#define rawBytesEquivalent rfbRawBytesEquivalent
-#define progressiveSliceHeight maxRectsPerUpdate
- */
-
-/* 
- * If you are building in an older libvncserver tree with this newer
- * x11vnc.c file using OLD_TREE=1 you may need to set some of these lines
- * since your older libvncserver configure is not setting them.
- *
- * For the features LIBVNCSERVER_HAVE_LIBXINERAMA and
- * LIBVNCSERVER_HAVE_XFIXES you may also need to add 
- * -lXinerama or -lXfixes, respectively, to the linking line, e.g.
- * by setting them in LD_FLAGS before running configure.
- */
-
-#define LIBVNCSERVER_HAVE_XSHM 1
-#define LIBVNCSERVER_HAVE_XTEST 1
-#define LIBVNCSERVER_HAVE_XTESTGRABCONTROL 1
-
-#define LIBVNCSERVER_HAVE_PWD_H 1
-#define LIBVNCSERVER_HAVE_SYS_WAIT_H 1
-#define LIBVNCSERVER_HAVE_UTMPX_H 1
-#define LIBVNCSERVER_HAVE_MMAP 1
-
-/*
-#define LIBVNCSERVER_HAVE_LIBXINERAMA 1
-#define LIBVNCSERVER_HAVE_XFIXES 1
-#define LIBVNCSERVER_HAVE_LIBXDAMAGE 1
- */
-
-/* END OLD TREE */
+/* TODO: autoconf */
+#if 1
+#define LIBVNCSERVER_HAVE_RECORD 1
 #endif
 
 /****************************************************************************/
@@ -206,63 +155,41 @@
 #include <rfb/rfbregion.h>
 
 /****************************************************************************/
-#if OLD_TREE
-/*
- * This is another transient for building in older libvncserver trees,
- * due to the API change:
- */
-#define dontDisconnect	rfbDontDisconnect
-#define neverShared	rfbNeverShared
-#define alwaysShared	rfbAlwaysShared
-#define clientHead	rfbClientHead
-#define serverFormat	rfbServerFormat
-#define port		rfbPort
-#define listenSock	rfbListenSock
-#define deferUpdateTime	rfbDeferUpdateTime
-#define authPasswdData	rfbAuthPasswdData
-#define rfbEncryptAndStorePasswd	vncEncryptAndStorePasswd
-#define maxClientWait	rfbMaxClientWait
-#define rfbHttpInitSockets	httpInitSockets
-
-#define RFBUNDRAWCURSOR(s) if (s) {rfbUndrawCursor(s);}
-#else	/* OLD_TREE */
-#define RFBUNDRAWCURSOR(s)
-#endif	/* !OLD_TREE */
-/*
- * To get a clean build in a LibVNCServer 0.7 source tree no need for
- * OLD_TREE, you just need to either download the forgotten tkx11vnc.h
- * file or run:
- *
- *	echo 'char gui_code[] = "";' > tkx11vnc.h
- *
- * (this disables the gui) and uncomment this line:
-#define rfbSetCursor(a, b) rfbSetCursor((a), (b), FALSE)
- */
-
-/*
- * To get a clean build on LibVNCServer 0.7.1 no need for OLD_TREE,
- * just uncomment this line (note the maxRectsPerUpdate below is a hack
- * that may break some usage):
- *
-#define listenInterface maxRectsPerUpdate
- *
- */
-/****************************************************************************/
-
 
 /* Build-time customization via CPPFLAGS. */
 
 /*
- * -DX11VNC_SHARED to have the vnc display shared by default.
- */
-
-/*
- * -DX11VNC_FOREVER to have -forever on by default.
+ * Summary of options to include in CPPFLAGS for custom builds:
+ *
+ * -DSHARED  to have the vnc display shared by default.
+ * -DFOREVER  to have -forever on by default.
+ * -DNOREPEAT=0  to have -repeat on by default.
+ *
+ * -DREMOTE_DEFAULT=0  to disable remote-control on by default (-yesremote).
+ * -DREMOTE_CONTROL=0  to disable remote-control mechanism completely.
+ * -DEXTERNAL_COMMANDS=0  to disable the running of all external commands.
+ *
+ * -DHARDWIRE_PASSWD=...      hardwired passwords, quoting necessary.
+ * -DHARDWIRE_VIEWPASSWD=...
+ *
+ * -DWIREFRAME=0  to have -nowireframe as the default.
+ * -DWIREFRAME_COPYRECT=0  to have -nowirecopyrect as the default.
+ * -DSCROLL_COPYRECT=0     to have -noscrollcopyrect as the default.
+ * -DXDAMAGE=0    to have -noxdamage as the default.
+ *
+ * -DPOINTER_MODE_DEFAULT={0,1,2,3,4,5}  set default -pointer_mode.
+ * -DBOLDLY_CLOSE_DISPLAY=0  to not close X DISPLAY under -rawfb.
+ * -DSMALL_FOOTPRINT=1  for smaller binary size (no help, no gui, etc) 
+ *                      use 2 or 3 for even smaller footprint.
+ *
+ * Set these in CPPFLAGS before running configure. E.g.:
+ *
+ *   % env CPPFLAGS="-DFOREVER -DREMOTE_CONTROL=0" ./configure
+ *   % make
  */
 
 /*
  * This can be used to disable the remote control mechanism.
- * E.g. -DREMOTE_CONTROL=0 in CPPFLAGS.
  */
 #ifndef REMOTE_CONTROL
 #define REMOTE_CONTROL 1
@@ -333,6 +260,11 @@ int xtest_base_event_type = 0;
 XETC *trap_ctx = NULL;
 #endif
 int xtrap_base_event_type = 0;
+
+#if LIBVNCSERVER_HAVE_RECORD
+#include <X11/Xproto.h>
+#include <X11/extensions/record.h>
+#endif
 
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 #include <X11/XKBlib.h>
@@ -423,8 +355,11 @@ int alt_arrow = 1;
 int xfixes_base_event_type = 0;
 
 
+#ifndef XDAMAGE
+#define XDAMAGE 1
+#endif
+int use_xdamage = XDAMAGE;	/* use the xdamage rects for scanline hints */
 int xdamage_present = 0;
-int use_xdamage = 1;	/* just use the xdamage rects. for scanline hints */
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 #include <X11/extensions/Xdamage.h>
 Damage xdamage = 0;
@@ -436,7 +371,7 @@ int xdamage_tile_count;
 
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-04-19";
+char lastmod[] = "0.7.2 lastmod: 2005-05-02";
 int hack_val = 0;
 
 /* X display info */
@@ -504,7 +439,6 @@ unsigned short main_red_max,   main_green_max,   main_blue_max;
 unsigned short main_red_shift, main_green_shift, main_blue_shift;
 
 /* struct with client specific data: */
-#define RATE_SAMPLES 5
 #define CILEN 10
 typedef struct _ClientData {
 	int uid;
@@ -522,11 +456,9 @@ typedef struct _ClientData {
 	double timer;
 	double send_cmp_rate;
 	double send_raw_rate;
-	int set_cmp_bytes;
-	int set_raw_bytes;
-	double cmp_samp[RATE_SAMPLES];
-	double raw_samp[RATE_SAMPLES];
-	int sample;
+	double latency;
+	int cmp_bytes_sent;
+	int raw_bytes_sent;
 } ClientData;
 
 /* scaling parameters */
@@ -560,6 +492,7 @@ unsigned char *tile_has_xdamage_diff, *tile_row_has_xdamage_diff;
 
 /* times of recent events */
 time_t last_event, last_input, last_client = 0;
+double servertime_diff = 0.0;
 
 /* last client to move pointer */
 rfbClientPtr last_pointer_client = NULL;
@@ -574,7 +507,9 @@ int button_change_x, button_change_y;
 int got_user_input = 0;
 int got_pointer_input = 0;
 int got_keyboard_input = 0;
+int urgent_update = 0;
 int last_keyboard_input = 0;
+rfbKeySym last_keysym = 0;
 int fb_copy_in_progress = 0;	
 int drag_in_progress = 0;	
 int shut_down = 0;	
@@ -649,6 +584,7 @@ void initialize_watch_bell(void);
 void initialize_xinerama(void);
 void initialize_xfixes(void);
 void initialize_xdamage(void);
+int valid_window(Window, XWindowAttributes *);
 void create_xdamage_if_needed(void);
 void destroy_xdamage_if_needed(void);
 void initialize_xrandr(void);
@@ -686,12 +622,21 @@ int check_pipeinput(void);
 void cursor_position(int, int);
 
 void parse_wireframe(void);
+void parse_scroll_copyrect(void);
 void set_wirecopyrect_mode(char *);
+void set_scrollcopyrect_mode(char *);
+int try_copyrect(Window, int, int, int, int, int, int, int *);
+void do_copyregion(sraRegionPtr, int, int);
+int direct_fb_copy(int, int, int, int, int);
+int get_wm_frame_pos(int *, int *, int *, int *, int *, int *, Window *);
+int near_wm_edge(int, int, int, int, int, int);
+int near_scrollbar_edge(int, int, int, int, int, int);
 void read_vnc_connect_prop(void);
 void set_vnc_connect_prop(char *);
+void fb_push(void);
 char *process_remote_cmd(char *, int);
-void rfbPE(rfbScreenInfoPtr, long);
-void rfbCFD(rfbScreenInfoPtr, long);
+void rfbPE(long);
+void rfbCFD(long);
 int scan_for_updates(int);
 void set_colormap(int);
 void set_offset(void);
@@ -728,8 +673,10 @@ int get_raw_rate(void);
 int get_read_rate(void);
 int get_net_rate(void);
 int get_net_latency(void);
+int get_latency(void);
 void measure_send_rates(int);
 int fb_update_sent(int *);
+void snapshot_stack_list(int, double);
 
 int get_remote_port(int sock);
 int get_local_port(int sock);
@@ -771,29 +718,42 @@ char *solid_default = "cyan4";
 char *speeds_str = NULL;	/* -speeds TBD */
 int measure_speeds = 1;
 int speeds_net_rate = 0;
+int speeds_net_rate_measured = 0;
 int speeds_net_latency = 0;
+int speeds_net_latency_measured = 0;
 int speeds_read_rate = 0;
+int speeds_read_rate_measured = 0;
 
 char *rc_rcfile = NULL;		/* -rc */
 int rc_norc = 0;
 int opts_bg = 0;
 
-#ifndef X11VNC_SHARED
+#ifndef SHARED
 int shared = 0;			/* share vnc display. */
 #else
 int shared = 1;
 #endif
-#ifndef X11VNC_FOREVER
+#ifndef FOREVER
 int connect_once = 1;		/* disconnect after first connection session. */
 #else
 int connect_once = 0;
 #endif
 int deny_all = 0;		/* global locking of new clients */
-int accept_remote_cmds = 1;	/* -noremote */
+#ifndef REMOTE_DEFAULT
+#define REMOTE_DEFAULT 1
+#endif
+int accept_remote_cmds = REMOTE_DEFAULT;	/* -noremote */
 int safe_remote_only = 1;	/* -unsafe */
 int priv_remote = 0;		/* -privremote */
 int more_safe = 0;		/* -safer */
+#ifndef EXTERNAL_COMMANDS
+#define EXTERNAL_COMMANDS 1
+#endif
+#if EXTERNAL_COMMANDS
 int no_external_cmds = 0;	/* -nocmds */
+#else
+int no_external_cmds = 1;	/* cannot be turned back on. */
+#endif
 int started_as_root = 0;
 int host_lookup = 1;
 char *users_list = NULL;	/* -users */
@@ -829,6 +789,8 @@ int subwin_wait_mapped = 0;
 
 int debug_xevents = 0;		/* -R debug_xevents:1 */
 int debug_xdamage = 0;		/* -R debug_xdamage:1 or 2 ... */
+int debug_wireframe = 0;
+int debug_wireframe2 = 0;
 
 int xtrap_input = 0;		/* -xtrap for user input insertion */
 int xinerama = 0;		/* -xinerama */
@@ -843,6 +805,10 @@ char *xrandr_mode = NULL;
 char *pad_geometry = NULL;
 time_t pad_geometry_time;
 int use_snapfb = 0;
+
+Display *rdpy_data = 0;		/* Data connection for RECORD */
+Display *rdpy_ctrl = 0;		/* Control connection for RECORD */
+int use_xrecord = 0;
 
 char *client_connect = NULL;	/* strings for -connect option */
 char *client_connect_file = NULL;
@@ -861,15 +827,47 @@ int show_dragging = 1;		/* process mouse movement events */
 int wireframe = WIREFRAME;	/* try to emulate wireframe wm moves */
 /* shade,linewidth,percent,T+B+L+R,t1+t2+t3+t4 */
 #ifndef WIREFRAME_PARMS
-#define WIREFRAME_PARMS "0xff,3,0,32+8+8+8,0.15+0.35+4.0+0.1"
+#define WIREFRAME_PARMS "0xff,3,0,32+8+8+8,0.15+0.30+5.0+0.125"
 #endif
 char *wireframe_str = NULL;
 char *wireframe_copyrect = NULL;
+#ifndef WIREFRAME_COPYRECT
+#define WIREFRAME_COPYRECT 1
+#endif
+#if WIREFRAME_COPYRECT
 char *wireframe_copyrect_default = "always";
+#else
+char *wireframe_copyrect_default = "never";
+#endif
 int wireframe_in_progress = 0;
 Window *stack_list = NULL;
 int stack_num  = 0;
-int no_autorepeat = 1;		/* turn off autorepeat with clients */
+
+/* T+B+L+R,tkey+presist_key,tmouse+persist_mouse */
+#ifndef SCROLL_COPYRECT_PARMS
+#define SCROLL_COPYRECT_PARMS "0+64+32+32,0.02+0.4,0.08+0.4"
+#endif
+char *scroll_copyrect_str = NULL;
+#ifndef SCROLL_COPYRECT
+#define SCROLL_COPYRECT 1
+#endif
+char *scroll_copyrect = NULL;
+#if SCROLL_COPYRECT
+#if 1
+char *scroll_copyrect_default = "always";	/* -scrollcopyrect */
+#else
+char *scroll_copyrect_default = "keys";
+#endif
+#else
+char *scroll_copyrect_default = "never";
+#endif
+int scrollcopyrect_min_area = 60000;	/* minimum rectangle area */
+int debug_scroll = 0;
+
+#ifndef NOREPEAT
+#define NOREPEAT 1
+#endif
+int no_autorepeat = NOREPEAT;	/* turn off autorepeat with clients */
 int no_repeat_countdown = 2;
 int watch_bell = 1;		/* watch for the bell using XKEYBOARD */
 int sound_bell = 1;		/* actually send it */
@@ -925,6 +923,7 @@ int overlay_cursor = 1;
 int xshm_present = 0;
 int xtest_present = 0;
 int xtrap_present = 0;
+int xrecord_present = 0;
 int xkb_present = 0;
 int xinerama_present = 0;
 
@@ -947,6 +946,8 @@ int got_nevershared = 0;
 int got_cursorpos = 0;
 int got_pointer_mode = -1;
 int got_noviewonly = 0;
+int got_wirecopyrect = 0;
+int got_scrollcopyrect = 0;
 
 /* threaded vs. non-threaded (default) */
 #if LIBVNCSERVER_X11VNC_THREADED && ! defined(X11VNC_THREADED)
@@ -1010,6 +1011,14 @@ int nabs(int n) {
 		return -n;
 	} else {
 		return n;
+	}
+}
+
+double dabs(double x) {
+	if (x < 0.0) {
+		return -x;
+	} else {
+		return x;
 	}
 }
 
@@ -1136,7 +1145,7 @@ int pick_windowid(unsigned long *num) {
 				 * select timedout or error.
 				 * note this rfbPE takes about 30ms too:
 				 */
-				rfbPE(screen, -1);
+				rfbPE(-1);
 				XFlush(dpy);
 				continue;
 			}
@@ -1952,6 +1961,30 @@ char *host2ip(char *host) {
 	return str;
 }
 
+char *raw2host(char *raw, int len) {
+	char *str;
+#if LIBVNCSERVER_HAVE_NETDB_H && LIBVNCSERVER_HAVE_NETINET_IN_H
+	struct hostent *hp;
+
+	if (! host_lookup) {
+		return strdup("unknown");
+	}
+
+	hp = gethostbyaddr(raw, len, AF_INET);
+	if (!hp) {
+		return strdup(inet_ntoa(*((struct in_addr *)raw)));
+	}
+	str = strdup(hp->h_name);
+#else
+	str = strdup("unknown");
+#endif
+	return str;
+}
+
+char *raw2ip(char *raw) {
+	return strdup(inet_ntoa(*((struct in_addr *)raw)));
+}
+
 char *ip2host(char *ip) {
 	char *str;
 #if LIBVNCSERVER_HAVE_NETDB_H && LIBVNCSERVER_HAVE_NETINET_IN_H
@@ -2558,15 +2591,6 @@ Bool XTestCompareCursorWithWindow_wr(Display* dpy, Window w, Cursor cursor) {
 #endif
 }
 
-/* how to handle old tree for this w/o OLD_TREE? */
-#if 0
-#if LIBVNCSERVER_HAVE_XTEST
-#ifndef LIBVNCSERVER_HAVE_XTESTGRABCONTROL
-#define LIBVNCSERVER_HAVE_XTESTGRABCONTROL 1
-#endif
-#endif
-#endif
-
 Bool XTestQueryExtension_wr(Display *dpy, int *ev, int *er, int *maj,
     int *min) {
 #if LIBVNCSERVER_HAVE_XTEST
@@ -2642,40 +2666,1010 @@ int XTRAP_GrabControl_wr(Display *dpy, Bool impervious) {
 	return 0;
 }
 
-void disable_grabserver(void) {
+void disable_grabserver(Display *dpy) {
 	int ok = 0;
+	static int didmsg = 0;
 
 	if (! xtrap_input) {
 		if (XTestGrabControl_wr(dpy, True)) {
 			XTRAP_GrabControl_wr(dpy, False);
-			rfbLog("GrabServer control via XTEST.\n"); 
+			if (! didmsg) {
+				rfbLog("GrabServer control via XTEST.\n"); 
+				didmsg = 1;
+			}
 			ok = 1;
 		} else {
 			if (XTRAP_GrabControl_wr(dpy, True)) {
 				ok = 1;
-				rfbLog("Using DEC-XTRAP for protection from "
-				    "XGrabServer.\n");
+				if (! didmsg) {
+					rfbLog("Using DEC-XTRAP for protection"
+					    " from XGrabServer.\n");
+					didmsg = 1;
+				}
 			}
 		}
 	} else {
 		if (XTRAP_GrabControl_wr(dpy, True)) {
 			XTestGrabControl_wr(dpy, False);
-			rfbLog("GrabServer control via DEC-XTRAP.\n"); 
+			if (! didmsg) {
+				rfbLog("GrabServer control via DEC-XTRAP.\n"); 
+				didmsg = 1;
+			}
 			ok = 1;
 		} else {
 			if (XTestGrabControl_wr(dpy, True)) {
 				ok = 1;
-				rfbLog("DEC-XTRAP XGrabServer protection not "
-				    "available, using XTEST.\n");
+				if (! didmsg) {
+					rfbLog("DEC-XTRAP XGrabServer "
+					    "protection not available, "
+					    "using XTEST.\n");
+					didmsg = 1;
+				}
 			}
 		}
 	}
-	if (! ok) {
+	if (! ok && ! didmsg) {
 		rfbLog("No XTEST or DEC-XTRAP protection from XGrabServer.\n");
 		rfbLog("Deadlock if your window manager calls XGrabServer!!\n");
 	}
 }
 
+Bool XRecordQueryVersion_wr(Display *dpy, int *maj, int *min) {
+#if LIBVNCSERVER_HAVE_RECORD
+	return XRecordQueryVersion(dpy, maj, min);
+#else
+	return False;
+#endif
+}
+
+#if LIBVNCSERVER_HAVE_RECORD
+XRecordRange *rr_CA;
+XRecordRange *rr_CW;
+XRecordRange *rr_scroll[10];
+XRecordContext rc_scroll;
+XRecordClientSpec rcs_scroll;
+#endif
+
+int xrecording = 0;
+int xrecord_set_by_keys = 0;
+int xrecord_set_by_mouse = 0;
+Window xrecord_focus_window = None;
+Window xrecord_wm_window = None;
+
+void initialize_xrecord(void) {
+	use_xrecord = 0;
+	if (! xrecord_present) {
+		return;
+	}
+#if LIBVNCSERVER_HAVE_RECORD
+	rr_CA = XRecordAllocRange();
+	rr_CW = XRecordAllocRange();
+	if (! rr_CA || ! rr_CW) {
+		return;
+	}
+	/* protocol request ranges: */
+	rr_CA->core_requests.first = X_CopyArea;
+	rr_CA->core_requests.last  = X_CopyArea;
+	
+	rr_CW->core_requests.first = X_ConfigureWindow;
+	rr_CW->core_requests.last  = X_ConfigureWindow;
+
+	/* open a 2nd control connection to DISPLAY: */
+	rdpy_ctrl = XOpenDisplay(DisplayString(dpy));
+	XSync(dpy, True);
+	XSync(rdpy_ctrl, True);
+	/* open datalink connection to DISPLAY: */
+	rdpy_data = XOpenDisplay(DisplayString(dpy));
+	if (!rdpy_ctrl || ! rdpy_data) {
+		return;
+	}
+	disable_grabserver(rdpy_ctrl);
+	disable_grabserver(rdpy_data);
+	use_xrecord = 1;
+#endif
+}
+
+int xrecord_skip_keysym(rfbKeySym keysym) {
+	KeySym sym = (KeySym) keysym;
+
+	if (IsModifierKey(sym)) {
+		return 1;
+	}
+	return 0;
+}
+
+int xrecord_skip_button(int new, int old) {
+	return 0;
+}
+
+int xrecord_scroll_keysym(rfbKeySym keysym) {
+	KeySym sym = (KeySym) keysym;
+	/* X11/keysymdef.h */
+
+	if (sym == XK_Return || sym == XK_KP_Enter || sym == XK_Linefeed) {
+		return 1;	/* Enter */
+	}
+	if (sym==XK_Up || sym==XK_KP_Up || sym==XK_Down || sym==XK_KP_Down) {
+		return 1;	/* U/D arrows */
+	}
+	if (sym == XK_Left || sym == XK_KP_Left || sym == XK_Right ||
+	    sym == XK_KP_Right) {
+		return 1;	/* L/R arrows */
+	}
+	if (sym == XK_J || sym == XK_j || sym == XK_K || sym == XK_k) {
+		return 1;	/* vi */
+	}
+	if (sym == XK_N || sym == XK_n || sym == XK_P || sym == XK_p) {
+		return 1;	/* emacs */
+	}
+	return 0;
+}
+
+typedef struct scroll_event {
+	Window win, frame;
+	int dx, dy;
+	int x, y, w, h, t;
+	int win_x, win_y, win_w, win_h;	
+	int new_x, new_y, new_w, new_h;	
+} scroll_event_t;
+
+#define SCR_EV_MAX 128
+scroll_event_t scr_ev[SCR_EV_MAX];
+int scr_ev_cnt = 0;
+
+XID xrecord_seq = 0;
+double xrecord_start = 0.0;
+
+#if LIBVNCSERVER_HAVE_RECORD
+void record_CA(XPointer ptr, XRecordInterceptData *rec_data) {
+	xCopyAreaReq *req;
+	Window src = None, dst = None, c;
+	XWindowAttributes attr;
+	int src_x, src_y, dst_x, dst_y, rx, ry;
+	int good = 1, dx, dy, k=0, i;
+	unsigned int w, h;
+	int dba = 0, db = debug_scroll;
+
+//dba = 1;
+
+	if (dba || db) {
+		if (rec_data->category == XRecordFromClient) {
+			req = (xCopyAreaReq *) rec_data->data;
+			if (req->reqType == X_CopyArea) {
+				src = req->srcDrawable;
+				dst = req->dstDrawable;
+			}
+		}
+	}
+
+if (dba || db) fprintf(stderr, "record_CA-%d id_base: 0x%lx  ptr: 0x%lx "
+	"seq: 0x%lx rc: 0x%lx  cat: %d  swapped: %d 0x%lx/0x%lx\n", k++,
+	rec_data->id_base, (unsigned long) ptr, xrecord_seq, rc_scroll,
+	rec_data->category, rec_data->client_swapped, src, dst);
+
+	if (! xrecording) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CA-%d\n", k++);
+
+	if (rec_data->id_base == 0) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CA-%d\n", k++);
+
+	if ((XID) ptr != xrecord_seq) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CA-%d\n", k++);
+
+	if (rec_data->category != XRecordFromClient) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CA-%d\n", k++);
+
+	req = (xCopyAreaReq *) rec_data->data;
+
+	if (req->reqType != X_CopyArea) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CA-%d\n", k++);
+
+/*
+
+xterm, gnome-terminal, others.
+
+Note we miss the X_ImageText8 that clears the block cursor.  So there is a
+short period of time with a painting error: two cursors, one above the other.
+
+ X_ImageText8 
+    draw: 0x8c00017 nChars: 1, gc: 0x8c00013, x: 101, y: 585, chars=' '
+ X_ClearArea 
+    window: 0x8c00018, x:   2, y: 217, w:  10, h:   5
+ X_FillPoly 
+    draw: 0x8c00018 gc: 0x8c0000a, shape: 0, coordMode: 0,
+ X_FillPoly 
+    draw: 0x8c00018 gc: 0x8c0000b, shape: 0, coordMode: 0,
+ X_CopyArea 
+    src: 0x8c00017, dst: 0x8c00017, gc: 0x8c00013, srcX:  17, srcY:  15, dstX:  17, dstY:   2, w: 480, h: 572
+ X_ChangeWindowAttributes 
+ X_ClearArea 
+    window: 0x8c00017, x:  17, y: 574, w: 480, h:  13
+ X_ChangeWindowAttributes 
+
+ */
+
+	src = req->srcDrawable;
+	dst = req->dstDrawable;
+	src_x = req->srcX;
+	src_y = req->srcY;
+	dst_x = req->dstX;
+	dst_y = req->dstY;
+	w = req->width;
+	h = req->height;
+
+	if (w*h < scrollcopyrect_min_area) {
+		good = 0;
+	} else if (!src || !dst) {
+		good = 0;
+	} else if (src != dst) {
+		good = 0;
+	}
+
+	dx = dst_x - src_x;
+	dy = dst_y - src_y;
+
+	if (dx != 0 && dy != 0) {
+		good = 0;
+	}
+
+	if (! good) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CA-%d\n", k++);
+
+	if (! valid_window(src, &attr)) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CA-%d\n", k++);
+
+	if (attr.map_state != IsViewable) {
+		return;
+	}
+
+	XTranslateCoordinates(dpy, src, rootwin, 0, 0, &rx, &ry, &c); 
+
+if (dba || db) fprintf(stderr, "record_CA-%d *FOUND: src: 0x%lx dx: %d dy: %d "
+	"x: %d y: %d w: %d h: %d st: %.4f\n", k++, src, dx, dy, src_x,
+	src_y, w, h, (double) rec_data->server_time/1000.0);
+
+	if (scr_ev_cnt >= SCR_EV_MAX) {
+		return;
+	}
+
+	i = scr_ev_cnt;
+
+	scr_ev[i].win = src;
+	scr_ev[i].frame = None;
+	scr_ev[i].dx = dx;
+	scr_ev[i].dy = dy;
+	scr_ev[i].x = rx + dst_x;
+	scr_ev[i].y = ry + dst_y;
+	scr_ev[i].w = w;
+	scr_ev[i].h = h;
+	scr_ev[i].t = (int) rec_data->server_time;
+	scr_ev[i].win_x = rx;
+	scr_ev[i].win_y = ry;
+	scr_ev[i].win_w = attr.width;
+	scr_ev[i].win_h = attr.height;
+	scr_ev[i].new_x = 0;
+	scr_ev[i].new_y = 0;
+	scr_ev[i].new_w = 0;
+	scr_ev[i].new_h = 0;
+
+	if (dx == 0) {
+		if (dy > 0) {
+			scr_ev[i].new_x = rx + src_x;
+			scr_ev[i].new_y = ry + src_y;
+			scr_ev[i].new_w = w;
+			scr_ev[i].new_h = dy;
+		} else {
+			scr_ev[i].new_x = rx + src_x;
+			scr_ev[i].new_y = ry + dst_y + h;
+			scr_ev[i].new_w = w;
+			scr_ev[i].new_h = -dy;
+		}
+	} else if (dy == 0) {
+		if (dx > 0) {
+			scr_ev[i].new_x = rx + src_x;
+			scr_ev[i].new_y = rx + src_y;
+			scr_ev[i].new_w = dx;
+			scr_ev[i].new_h = h;
+		} else {
+			scr_ev[i].new_x = rx + dst_x + w;
+			scr_ev[i].new_y = ry + src_y;
+			scr_ev[i].new_w = -dx;
+			scr_ev[i].new_h = h;
+		}
+	}
+
+	scr_ev_cnt++;
+}
+
+typedef struct cw_event {
+	Window win;
+	int x, y, w, h;
+} cw_event_t;
+
+#define MAX_CW 128
+cw_event_t cw_events[MAX_CW];
+
+void record_CW(XPointer ptr, XRecordInterceptData *rec_data) {
+	xConfigureWindowReq *req;
+	Window win = None, c;
+	Window src = None, dst = None;
+	XWindowAttributes attr;
+	int absent = 0x100000;
+	int src_x, src_y, dst_x, dst_y, rx, ry;
+	int good = 1, dx, dy, k=0, i, j, match, list[3];
+	int f_x, f_y, f_w, f_h;
+	int x, y, w, h;
+	int x0, y0, w0, h0, x1, y1, w1, h1, x2, y2, w2, h2;
+	static int index = 0;
+	unsigned long vals[4];
+	unsigned tmask;
+	char *data;
+	int dba = 0, db = debug_scroll;
+
+//dba = 1;
+//db = 1;
+
+	if (1 || db) {
+		if (rec_data->category == XRecordFromClient) {
+			req = (xConfigureWindowReq *) rec_data->data;
+			if (req->reqType == X_ConfigureWindow) {
+				src = req->window;
+			}
+		}
+	}
+
+if (dba || db) fprintf(stderr, "record_CW-%d id_base: 0x%lx  ptr: 0x%lx "
+	"seq: 0x%lx rc: 0x%lx  cat: %d  swapped: %d 0x%lx/0x%lx\n", k++,
+	rec_data->id_base, (unsigned long) ptr, xrecord_seq, rc_scroll,
+	rec_data->category, rec_data->client_swapped, src, dst);
+
+
+	if (! xrecording) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	if ((XID) ptr != xrecord_seq) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	if (rec_data->id_base == 0) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	if (rec_data->category == XRecordStartOfData) {
+		index = 0;
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	if (rec_data->category != XRecordFromClient) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	if (rec_data->client_swapped) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	req = (xConfigureWindowReq *) rec_data->data;
+
+	if (req->reqType != X_ConfigureWindow) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	tmask = req->mask;
+
+	tmask &= ~CWX;
+	tmask &= ~CWY;
+	tmask &= ~CWWidth;
+	tmask &= ~CWHeight;
+
+	if (tmask) {
+		/* require no more than these 4 flags */
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	f_x = req->mask & CWX;
+	f_y = req->mask & CWY;
+	f_w = req->mask & CWWidth;
+	f_h = req->mask & CWHeight;
+
+	if (! f_x || ! f_y)  {
+		if (f_w && f_h) {
+			;	/* netscape 4.x style */
+		} else {
+			return;
+		}
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	if ( (f_w && !f_h) || (!f_w && f_h) ) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+		
+	for (i=0; i<4; i++) {
+		vals[i] = 0;
+	}
+
+	data = (char *)req;
+	data += sz_xConfigureWindowReq;
+
+	for (i=0; i<req->length; i++) {
+		unsigned long v;
+		v = *( (unsigned long *) data);
+		vals[i] = v;
+		data += 4;
+	}
+
+
+	if (index >= MAX_CW) {
+		int i, j;
+
+		/* FIXME, circular, etc. */
+		for (i=0; i<2; i++) {
+			j = MAX_CW - 2 + i;
+			cw_events[i].win = cw_events[j].win;
+			cw_events[i].x = cw_events[j].x;
+			cw_events[i].y = cw_events[j].y;
+			cw_events[i].w = cw_events[j].w;
+			cw_events[i].h = cw_events[j].h;
+			index = 2;
+		}
+	}
+
+	if (! f_x && ! f_y) {
+		/* netscape 4.x style  CWWidth,CWHeight */
+		vals[2] = vals[0];
+		vals[3] = vals[1];
+		vals[0] = 0;
+		vals[1] = 0;
+	}
+
+	cw_events[index].win = req->window;
+
+	if (! f_x) {
+		cw_events[index].x = absent;
+	} else {
+		cw_events[index].x = (int) vals[0];
+	}
+	if (! f_y) {
+		cw_events[index].y = absent;
+	} else {
+		cw_events[index].y = (int) vals[1];
+	}
+
+	if (! f_w) {
+		cw_events[index].w = absent;
+	} else {
+		cw_events[index].w = (int) vals[2];
+	}
+	if (! f_h) {
+		cw_events[index].h = absent;
+	} else {
+		cw_events[index].h = (int) vals[3];
+	}
+
+	x = cw_events[index].x;
+	y = cw_events[index].y;
+	w = cw_events[index].w;
+	h = cw_events[index].h;
+	win = cw_events[index].win;
+
+if (dba || db) fprintf(stderr, "  record_CW ind: %d win: 0x%lx x: %d y: %d w: %d h: %d\n",
+	index, win, x, y, w, h);
+
+	index++;
+
+	if (index < 3) {
+		good = 0;
+	} else if (w != absent && h != absent &&
+	    w*h < scrollcopyrect_min_area) {
+		good = 0;
+	}
+
+	if (! good) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	match = 0;
+	for (j=index - 1; j >= 0; j--) {
+		if (cw_events[j].win == win) {
+			list[match++] = j;
+		}
+		if (match >= 3) {
+			break;
+		}
+	}
+
+	if (match != 3) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+/*
+
+Mozilla:
+
+Up arrow: window moves down a bit (dy > 0):
+
+ X_ConfigureWindow 
+    length: 7, window: 0x2e000cd, mask: 0xf, v0 0,  v1 -18,  v2 760,  v3 906,  v4 327692,  v5 48234701,  v6 3, 
+        CW-mask: CWX,CWY,CWWidth,CWHeight,
+ X_ConfigureWindow 
+    length: 5, window: 0x2e000cd, mask: 0x3, v0 0,  v1 0,  v2 506636,  v3 48234701,  v4 48234511, 
+        CW-mask: CWX,CWY,
+ X_ConfigureWindow 
+    length: 7, window: 0x2e000cd, mask: 0xf, v0 0,  v1 0,  v2 760,  v3 888,  v4 65579,  v5 0,  v6 108009, 
+        CW-mask: CWX,CWY,CWWidth,CWHeight,
+
+Down arrow: window moves up a bit (dy < 0):
+
+ X_ConfigureWindow 
+    length: 7, window: 0x2e000cd, mask: 0xf, v0 0,  v1 0,  v2 760,  v3 906,  v4 327692,  v5 48234701,  v6 262147, 
+        CW-mask: CWX,CWY,CWWidth,CWHeight,
+ X_ConfigureWindow 
+    length: 5, window: 0x2e000cd, mask: 0x3, v0 0,  v1 -18,  v2 506636,  v3 48234701,  v4 48234511, 
+        CW-mask: CWX,CWY,
+ X_ConfigureWindow 
+    length: 7, window: 0x2e000cd, mask: 0xf, v0 0,  v1 0,  v2 760,  v3 888,  v4 96555,  v5 48265642,  v6 48265262, 
+        CW-mask: CWX,CWY,CWWidth,CWHeight,
+
+
+Netscape 4.x
+
+Up arrow:
+71.76142   0.01984 X_ConfigureWindow
+    length: 7, window: 0x9800488, mask: 0xf, v0 0,  v1 -15,  v2 785,  v3 882,  v4 327692,  v5 159384712,  v6 1769484,
+        CW-mask: CWX,CWY,CWWidth,CWHeight,
+71.76153   0.00011 X_ConfigureWindow
+    length: 5, window: 0x9800488, mask: 0xc, v0 785,  v1 867,  v2 329228,  v3 159384712,  v4 159383555,
+        CW-mask:       CWWidth,CWHeight,
+                XXX,XXX
+71.76157   0.00003 X_ConfigureWindow
+    length: 5, window: 0x9800488, mask: 0x3, v0 0,  v1 0,  v2 131132,  v3 159385313,  v4 328759,
+        CW-mask: CWX,CWY,
+                         XXX,XXX
+
+Down arrow:
+72.93147   0.01990 X_ConfigureWindow
+    length: 5, window: 0x9800488, mask: 0xc, v0 785,  v1 882,  v2 328972,  v3 159384712,  v4 159383555,
+        CW-mask:       CWWidth,CWHeight,
+                XXX,XXX
+72.93156   0.00009 X_ConfigureWindow
+    length: 5, window: 0x9800488, mask: 0x3, v0 0,  v1 -15,  v2 458764,  v3 159384712,  v4 159383567,
+        CW-mask: CWX,CWY,
+72.93160   0.00004 X_ConfigureWindow
+    length: 7, window: 0x9800488, mask: 0xf, v0 0,  v1 0,  v2 785,  v3 867,  v4 131132,  v5 159385335,  v6 328759,
+        CW-mask: CWX,CWY,CWWidth,CWHeight,
+
+
+sadly, probably need to handle some more...
+
+ */
+	x0 = cw_events[list[2]].x;
+	y0 = cw_events[list[2]].y;
+	w0 = cw_events[list[2]].w;
+	h0 = cw_events[list[2]].h;
+
+	x1 = cw_events[list[1]].x;
+	y1 = cw_events[list[1]].y;
+	w1 = cw_events[list[1]].w;
+	h1 = cw_events[list[1]].h;
+
+	x2 = cw_events[list[0]].x;
+	y2 = cw_events[list[0]].y;
+	w2 = cw_events[list[0]].w;
+	h2 = cw_events[list[0]].h;
+
+	/* see NS4 XXX's above: */
+	if (w2 == absent || h2 == absent) {
+		/* up arrow */
+		if (w2 == absent) {
+			w2 = w1;
+		}
+		if (h2 == absent) {
+			h2 = h1;
+		}
+	}
+	if (x1 == absent || y1 == absent) {
+		/* up arrow */
+		if (x1 == absent) {
+			x1 = x2;
+		}
+		if (y1 == absent) {
+			y1 = y2;
+		}
+	}
+	if (x0 == absent || y0 == absent) {
+		/* down arrow */
+		if (x0 == absent) {
+			/* hmmm... what to do */
+			x0 = x2;
+		}
+		if (y0 == absent) {
+			y0 = y2;
+		}
+	}
+
+if (dba) fprintf(stderr, "%d/%d/%d/%d  %d/%d/%d/%d  %d/%d/%d/%d\n", x0, y0, w0, h0, x1, y1, w1, h1, x2, y2, w2, h2);
+
+	dy = y1 - y0;
+	dx = x1 - x0;
+
+	src_x = x2;
+	src_y = y2;
+	w = w2;
+	h = h2;
+
+	/* check w and h before we modify them */
+	if (w <= 0 || h <= 0) {
+		good = 0;
+	} else if (w == absent || h == absent) {
+		good = 0;
+	}
+	if (! good) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	if (dy > 0) {
+		h -= dy;	
+	} else {
+		h += dy;	
+		src_y -= dy;
+	}
+	if (dx > 0) {
+		w -= dx;	
+	} else {
+		w += dx;	
+		src_x -= dx;
+	}
+
+	dst_x = src_x + dx;
+	dst_y = src_y + dy;
+
+	if (x0 == absent || x1 == absent || x2 == absent) {
+		good = 0;
+	} else if (y0 == absent || y1 == absent || y2 == absent) {
+		good = 0;
+	} else if (dx != 0 && dy != 0) {
+		good = 0;
+	} else if (w0 - w2 != nabs(dx)) {
+		good = 0;
+	} else if (h0 - h2 != nabs(dy)) {
+		good = 0;
+	}
+
+	if (! good) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	/* geometry OK, now check with the X server: */
+	if (! valid_window(win, &attr)) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	if (attr.map_state != IsViewable) {
+		return;
+	}
+if (db) fprintf(stderr, "record_CW-%d\n", k++);
+
+	XTranslateCoordinates(dpy, win, rootwin, 0, 0, &rx, &ry, &c); 
+
+if (dba || db) fprintf(stderr, "record_CW-%d *FOUND: win: 0x%lx dx: %d dy: %d "
+	"x: %d y: %d w: %d h: %d  st: %.4f\n", k++, win, dx, dy, src_x, src_y,
+	w, h, (double) rec_data->server_time/1000.0);
+
+	if (scr_ev_cnt >= SCR_EV_MAX) {
+		return;
+	}
+
+	i = scr_ev_cnt;
+
+	scr_ev[i].win = win;
+	scr_ev[i].frame = None;
+	scr_ev[i].dx = dx;
+	scr_ev[i].dy = dy;
+	scr_ev[i].x = rx + dst_x;
+	scr_ev[i].y = ry + dst_y;
+	scr_ev[i].w = w;
+	scr_ev[i].h = h;
+	scr_ev[i].t = (int) rec_data->server_time;
+	scr_ev[i].win_x = rx;
+	scr_ev[i].win_y = ry;
+	scr_ev[i].win_w = attr.width;
+	scr_ev[i].win_h = attr.height;
+	scr_ev[i].new_x = 0;
+	scr_ev[i].new_y = 0;
+	scr_ev[i].new_w = 0;
+	scr_ev[i].new_h = 0;
+
+	if (dx == 0) {
+		if (dy > 0) {
+			scr_ev[i].new_x = rx + src_x;
+			scr_ev[i].new_y = ry + src_y;
+			scr_ev[i].new_w = w;
+			scr_ev[i].new_h = dy;
+		} else {
+			scr_ev[i].new_x = rx + src_x;
+			scr_ev[i].new_y = ry + dst_y + h;
+			scr_ev[i].new_w = w;
+			scr_ev[i].new_h = -dy;
+		}
+	} else if (dy == 0) {
+		if (dx > 0) {
+			scr_ev[i].new_x = rx + src_x;
+			scr_ev[i].new_y = rx + src_y;
+			scr_ev[i].new_w = dx;
+			scr_ev[i].new_h = h;
+		} else {
+			scr_ev[i].new_x = rx + dst_x + w;
+			scr_ev[i].new_y = ry + src_y;
+			scr_ev[i].new_w = -dx;
+			scr_ev[i].new_h = h;
+		}
+	}
+
+	/* indicate we have a new one */
+	scr_ev_cnt++;
+
+	index = 0;
+}
+
+void record_switch(XPointer ptr, XRecordInterceptData *rec_data) {
+	xReq *req;
+
+//fprintf(stderr, "XRecordFreeData-0: %p\n", rec_data);
+	/* should handle control msgs, start/stop/etc */
+	if (rec_data->category == XRecordStartOfData) {
+		record_CW(ptr, rec_data);
+	} else if (rec_data->category == XRecordEndOfData) {
+		;
+	} else if (rec_data->category == XRecordClientStarted) {
+		;
+	} else if (rec_data->category == XRecordClientDied) {
+		;
+	} else if (rec_data->category == XRecordFromServer) {
+		;
+	}
+
+	if (rec_data->category != XRecordFromClient) {
+//fprintf(stderr, "XRecordFreeData-1: %p\n", rec_data);
+		XRecordFreeData(rec_data);
+		return;
+	}
+
+	req = (xReq *) rec_data->data;
+
+	if (req->reqType == X_CopyArea) {
+		record_CA(ptr, rec_data);
+	} else if (req->reqType == X_ConfigureWindow) {
+		record_CW(ptr, rec_data);
+	} else {
+		;
+	}
+//fprintf(stderr, "XRecordFreeData-2: %p\n", rec_data);
+	XRecordFreeData(rec_data);
+}
+#endif
+
+void xrecord_watch(int start) {
+	Window focus, wm, r, c, clast;
+	int rx, ry, wx, wy;
+	int depth = 0, i;
+	unsigned int m;
+	int db = debug_scroll;
+	int do_shutdown = 0;
+
+//db = 1;
+
+#if LIBVNCSERVER_HAVE_RECORD
+	if (! start) {
+		xrecording = 0;
+		if (! rc_scroll) {
+			xrecord_focus_window = None;
+			xrecord_wm_window = None;
+			rcs_scroll = 0;
+			return;
+		}
+		if (do_shutdown) {
+if (db) fprintf(stderr, "=== shutdown-scroll 0x%lx\n", rc_scroll);
+			X_LOCK;
+			if (! XRecordDisableContext(rdpy_ctrl, rc_scroll)) {
+				rfbLog("XRecordDisableContext(rc_scroll)"
+				    " failed.\n");	
+			}
+			if (! XRecordFreeContext(rdpy_ctrl, rc_scroll)) {
+				rfbLog("XRecordFreeContext(rc_scroll)"
+				    " failed.\n");	
+			}
+			XRecordProcessReplies(rdpy_data);
+			X_UNLOCK;
+			rc_scroll = 0;
+		} else {
+			if (rcs_scroll) {
+if (db) fprintf(stderr, "=== disab-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scroll);
+				X_LOCK;
+				rcs_scroll = XRecordCurrentClients;
+				XRecordUnregisterClients(rdpy_ctrl, rc_scroll,
+				    &rcs_scroll, 1);
+				XRecordDisableContext(rdpy_ctrl, rc_scroll);
+				XFlush(rdpy_ctrl);
+				XRecordProcessReplies(rdpy_data);
+				X_UNLOCK;
+			}
+		}
+		/*
+		 * XXX if we do a XFlush(rdpy_ctrl) here we get:
+		 *
+
+		X Error of failed request:  XRecordBadContext
+		  Major opcode of failed request:  145 (RECORD)
+		  Minor opcode of failed request:  5 (XRecordEnableContext)
+		  Context in failed request:  0x2200013
+		  Serial number of failed request:  29
+		  Current serial number in output stream:  29
+
+		 *
+		 * need to figure out what is going on... since it may lead
+		 * infrequent failures.
+		 */
+		xrecord_focus_window = None;
+		xrecord_wm_window = None;
+		rcs_scroll = 0;
+		return;
+	}
+
+	if (xrecording) {
+		return;
+	}
+
+	if (do_shutdown && rc_scroll) {
+		static int didmsg = 0;
+		/* should not happen... */
+		if (!didmsg) {
+			rfbLog("warning: do_shutdown && rc_scroll\n");
+			didmsg = 1;
+		}
+		xrecord_watch(0);
+	}
+
+	xrecording = 0;
+	xrecord_focus_window = None;
+	xrecord_wm_window = None;
+	xrecord_set_by_keys  = 0;
+	xrecord_set_by_mouse = 0;
+
+	X_LOCK;
+
+	/* get the window with focus and mouse pointer: */
+	clast = None;
+	focus = None;
+	wm = None;
+
+	XGetInputFocus(dpy, &focus, &i);
+
+	XQueryPointer(dpy, rootwin, &r, &wm, &rx, &ry, &wx, &wy, &m);
+	if (wm) {
+		c = wm;
+	} else {
+		c = rootwin;
+	}
+	for (i=0; i<3; i++) {
+		/* descend a bit to avoid wm frames: */
+		clast = c;
+		if (! XQueryPointer(dpy, c, &r, &c, &rx, &ry, &wx, &wy, &m)) {
+			break;
+		}
+		if (! c) {
+			break;
+		}
+		depth++;
+	}
+	if (!clast || clast == rootwin) {
+if (db) fprintf(stderr, "--- xrecord_watch: skip.\n");
+		X_UNLOCK;
+		return;
+	}
+
+	/* set protocol request ranges: */
+	rr_scroll[0] = rr_CA;
+	rr_scroll[1] = rr_CW;
+
+	if (! rc_scroll) {
+		/* do_shutdown case or first time in */
+		rcs_scroll = (XRecordClientSpec) clast;
+		rc_scroll = XRecordCreateContext(rdpy_ctrl, 0, &rcs_scroll, 1,
+		    rr_scroll, 2);
+
+	} else if (! do_shutdown) {
+		if (rcs_scroll) {
+if (db) fprintf(stderr, "=2= unreg-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scroll);
+			rcs_scroll = XRecordCurrentClients;
+			XRecordUnregisterClients(rdpy_ctrl, rc_scroll,
+			    &rcs_scroll, 1);
+		}
+		
+		rcs_scroll = (XRecordClientSpec) clast;
+if (db) fprintf(stderr, "=-=   reg-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scroll);
+
+		if (!XRecordRegisterClients(rdpy_ctrl, rc_scroll, 0,
+		    &rcs_scroll, 1, rr_scroll, 2)) {
+			static time_t last_err = 0;
+			time_t now = time(0);
+			if (now > last_err + 60) {
+				rfbLog("failed to register client 0x%lx with"
+				    " X RECORD context rc_scroll.\n", clast);
+				last_err = now;
+			}
+			/* continue on for now... */
+		}
+	}
+	XFlush(rdpy_ctrl);
+
+if (db) fprintf(stderr, "rc_scroll: 0x%lx\n", rc_scroll);
+
+	if (! rc_scroll) {
+		X_UNLOCK;
+		use_xrecord = 0;
+		rfbLog("failed to create X RECORD context rc_scroll.\n");
+		rfbLog("  switching to -noscrollcopyrect mode.\n");
+		return;
+	}
+
+	xrecord_focus_window = focus;
+	if (! xrecord_focus_window) {
+		xrecord_focus_window = clast;
+	}
+	xrecord_wm_window = wm;
+	if (! xrecord_wm_window) {
+		xrecord_wm_window = clast;
+	}
+
+	xrecording = 1;
+	xrecord_seq++;
+	xrecord_start = 0.0;
+	dtime(&xrecord_start);
+
+	if (!XRecordEnableContextAsync(rdpy_data, rc_scroll, record_switch,
+	    (XPointer) xrecord_seq)) {
+		static time_t last_err = 0;
+		time_t now = time(0);
+		if (now > last_err + 60) {
+			rfbLog("failed to enable RECORD context "
+			    "rc_scroll.\n");
+			last_err = now;
+		}
+		/* continue on for now... */
+	}
+	XFlush(rdpy_data);
+	X_UNLOCK;
+#endif
+}
 
 /* -- cleanup.c -- */
 /*
@@ -2765,6 +3759,14 @@ void clean_up_exit (int ret) {
 	if (trap_ctx) {
 		XEFreeTC(trap_ctx);
 	}
+#endif
+#if LIBVNCSERVER_HAVE_RECORD
+	/* XXX currently blocks: */
+#if 0
+	if (rdpy_ctrl && rc_scroll) XRecordDisableContext(rdpy_ctrl, rc_scroll);
+	if (rdpy_data) XCloseDisplay(rdpy_data);
+	if (rdpy_ctrl) XCloseDisplay(rdpy_ctrl);
+#endif
 #endif
 	XCloseDisplay(dpy);
 	X_UNLOCK;
@@ -4229,7 +5231,7 @@ static void reverse_connect(char *str) {
 	p = strtok(tmp, ", \t\r\n");
 	while (p) {
 		if ((n = do_reverse_connect(p)) != 0) {
-			rfbPE(screen, -1);
+			rfbPE(-1);
 		}
 		cnt += n;
 
@@ -4238,7 +5240,7 @@ static void reverse_connect(char *str) {
 			t = 0;
 			while (t < sleep_between_host) {
 				usleep(dt * 1000);
-				rfbPE(screen, -1);
+				rfbPE(-1);
 				t += dt;
 			}
 		}
@@ -4264,7 +5266,7 @@ static void reverse_connect(char *str) {
 
 	t = 0;
 	while (t < tot) {
-		rfbPE(screen, -1);
+		rfbPE(-1);
 		usleep(dt * 1000);
 		t += dt;
 	}
@@ -4374,7 +5376,8 @@ void check_connect_inputs(void) {
  */
 enum rfbNewClientAction new_client(rfbClientPtr client) {
 	ClientData *cd; 
-	int i;
+	double tmr = 0.0;
+
 	last_event = last_input = time(0);
 
 	if (inetd) {
@@ -4441,11 +5444,13 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		install_padded_fb(pad_geometry);
 	}
 
-	for (i=0; i<RATE_SAMPLES; i++) {
-		cd->cmp_samp[i] = 5000;	/* 56k modem */
-		cd->raw_samp[i] = 50000;
-	}
-	cd->sample = 0;
+	dtime(&tmr);
+	cd->timer = tmr;
+	cd->send_cmp_rate = 0.0;
+	cd->send_raw_rate = 0.0;
+	cd->latency = 0.0;
+	cd->cmp_bytes_sent = 0;
+	cd->raw_bytes_sent = 0;
 
 	accepted_client = 1;
 	last_client = time(0);
@@ -6103,6 +7108,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			if (! view_only || raw_fb) {	/* raw_fb hack */
 				last_keyboard_client = client;
 				last_event = last_input = time(0);
+				last_keysym = keysym;
 				got_user_input++;
 				got_keyboard_input++;
 			}
@@ -6120,6 +7126,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 	last_keyboard_client = client;
 	last_event = last_input = time(0);
+	last_keysym = keysym;
 	got_user_input++;
 	got_keyboard_input++;
 	
@@ -6168,6 +7175,20 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		XFlush(dpy);
 		X_UNLOCK;
 		return;
+	}
+
+	if (use_xrecord && ! xrecording && down) {
+		if (scaling && ! got_scrollcopyrect) {
+			;
+		} else if (!strcmp(scroll_copyrect, "never")) {
+			;
+		} else if (!strcmp(scroll_copyrect, "mouse")) {
+			;
+		} else if (! xrecord_skip_keysym(keysym)) {
+			snapshot_stack_list(0, 0.25);
+			xrecord_watch(1);
+			xrecord_set_by_keys = 1;
+		}
 	}
 
 	if (use_modifier_tweak) {
@@ -6457,18 +7478,50 @@ void initialize_pointer_map(char *pointer_remap) {
  * children of the root window.  Ideally done before we send ButtonPress
  * to the X server.
  */
-void snapshot_stack_list(void) {
+void snapshot_stack_list(int free_only, double allowed_age) {
+	static double last_snap = 0.0, last_sync = 0.0, last_free = 0.0;
+	double now = 0.0, xsync_max = 0.25; 
 	Window r, w;
+
+	dtime(&now);
+	if (free_only) {
+		if (stack_list) {
+			X_LOCK;
+			XFree(stack_list);
+			X_UNLOCK;
+			stack_list = NULL;
+			stack_num  = 0;
+			last_free = now;
+		}
+		return;
+	}
+
+	if (stack_list && now < last_snap + allowed_age) {
+		return;
+	}
+
 	if (stack_list) {
 		XFree(stack_list);
 		stack_list = NULL;
 		stack_num  = 0;
+		last_free = now;
 	}
-	XSync(dpy, False);
+
+	X_LOCK;
+	if (now > last_sync + xsync_max) {
+		XSync(dpy, False);
+		last_sync = now;
+	}
+
 	if (! XQueryTree(dpy, rootwin, &r, &w, &stack_list, &stack_num)) {
 		stack_list = NULL;
 		stack_num = 0;
+		last_free = now;
+		last_snap = 0.0;
+	} else {
+		last_snap = now;
 	}
+	X_UNLOCK;
 }
 
 /*
@@ -6509,20 +7562,69 @@ static void update_x11_pointer_position(int x, int y) {
  */
 static void update_x11_pointer_mask(int mask) {
 	int i, mb;
+	int xr_mouse = 1;
+	int snapped = 0;
 
 	last_event = last_input = time(0);
 
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
-	X_LOCK;
+	if (scaling && ! got_scrollcopyrect) {
+		xr_mouse = 0;
+	} else if (!strcmp(scroll_copyrect, "never")) {
+		xr_mouse = 0;
+	} else if (!strcmp(scroll_copyrect, "keys")) {
+		xr_mouse = 0;
+	} else if (xrecord_skip_button(mask, button_mask)) {
+		xr_mouse = 0;
+	}
+
+	if (mask && use_xrecord && ! xrecording && xr_mouse) {
+		static int px, py, x, y, w, h, ok;
+		Window frame;
+		int skip = 0;
+
+		if (!button_mask) {
+			if (get_wm_frame_pos(&px, &py, &x, &y, &w, &h,
+			    &frame)) {
+				ok = 1;
+			} else {
+				ok = 0;
+			}
+		}
+		if (ok) {
+			if (! near_scrollbar_edge(x, y, w, h, px, py)) {
+				skip = 1;
+			}
+			if (near_wm_edge(x, y, w, h, px, py)) {
+				/* step out of wireframe's way */
+				skip = 1;
+			}
+		}
+
+		if (! skip) {
+			snapshot_stack_list(0, 0.25);
+			snapped = 1;
+			xrecord_watch(1);
+			if (button_mask) {
+				xrecord_set_by_mouse = 1;
+			} else {
+				xrecord_set_by_mouse = 2;
+			}
+		}
+	}
+
 	if (mask && !button_mask) {
 		/* button down, snapshot the stacking list before flushing */
 		if (wireframe && !wireframe_in_progress &&
 		    strcmp(wireframe_copyrect, "never")) {
-			snapshot_stack_list();
+			if (! snapped) {
+				snapshot_stack_list(0, 0.0);
+			}
 		}
 	}
 
+	X_LOCK;
 	/* look for buttons that have be clicked or released: */
 	for (i=0; i < MAX_BUTTONS; i++) {
 	    if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
@@ -7714,6 +8816,55 @@ void print_xevent_bases(void) {
 	fprintf(stderr, "  SelClear=%d, Expose=%d\n", SelectionClear, Expose);
 }
 
+void sync_tod_with_servertime() {
+	static Atom servertime = None;
+	XEvent xev;
+	char diff[64];
+	static int seq = 0;
+	int i;
+
+	if (! servertime) {
+		servertime = XInternAtom(dpy, "X11VNC_SERVERTIME_DIFF", False);
+	}
+	if (! servertime) {
+		return;
+	}
+
+	XSync(dpy, False);
+	while (XCheckTypedEvent(dpy, PropertyNotify, &xev)) {
+		;
+	}
+
+	snprintf(diff, 64, "%.6f/%08d", servertime_diff, seq++); 
+	XChangeProperty(dpy, rootwin, servertime, XA_STRING, 8,
+	    PropModeReplace, (unsigned char *) diff, strlen(diff));
+	XSync(dpy, False);
+
+	for (i=0; i<10; i++) {
+		int k, got = 0;
+		
+		for (k = 0; k<5; k++) {
+			while (XCheckTypedEvent(dpy, PropertyNotify, &xev)) {
+				if (xev.xproperty.atom == servertime) {
+					double now = 0.0, stime;
+					
+					dtime(&now);
+					stime = (double) xev.xproperty.time;
+					stime = stime/1000.0;
+					servertime_diff = now - stime;
+					if (0) rfbLog("set servertime_diff: "
+					    "%.6f\n", servertime_diff);
+					got = 1;
+				}
+			}
+		}
+		if (got) {
+			break;
+		}
+		usleep(1000);
+	}
+}
+
 /*
  * This routine is periodically called to check for selection related
  * and other X11 events and respond to them as needed.
@@ -7727,6 +8878,7 @@ void check_xevents(void) {
 	static time_t last_bell = 0;
 	static time_t last_init_check = 0;
 	static time_t last_sync = 0;
+	static time_t last_time_sync = 0;
 	time_t now = time(0);
 
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
@@ -7739,6 +8891,7 @@ void check_xevents(void) {
 	if (screen && screen->clientHead) {
 		have_clients = 1;
 	}
+
 	X_LOCK;
 	/*
 	 * There is a bug where we have to wait before sending text to
@@ -7846,6 +8999,11 @@ void check_xevents(void) {
 				read_vnc_connect_prop();
 			}
 		}
+	}
+
+	if (now > last_time_sync + 30) {
+		sync_tod_with_servertime();
+		last_time_sync = now;
 	}
 
 #if LIBVNCSERVER_HAVE_LIBXRANDR
@@ -8460,6 +9618,9 @@ int remote_control_access_ok(void) {
 		char *home, *xauth;
 		char *dpy_str = DisplayString(dpy);
 		Display *dpy2;
+		XHostAddress *xha;
+		Bool enabled;
+		int n;
 
 		home = get_home_dir();
 		if (getenv("XAUTHORITY") != NULL) {
@@ -8499,6 +9660,32 @@ int remote_control_access_ok(void) {
 			}
 		}
 
+		xha = XListHosts(dpy, &n, &enabled);
+		if (! enabled) {
+			rfbLog("X access control is disabled, X clients can\n");
+			rfbLog("   connect from any host.  Run 'xhost -'\n");
+			return 0;
+		}
+		if (xha) {
+			int i;
+			rfbLog("The following hosts can connect w/o X11 "
+			    "auth:\n");
+			for (i=0; i<n; i++) {
+				if (xha[i].family == FamilyInternet) {
+					char *str = raw2host(xha[i].address,
+					    xha[i].length);
+					char *ip = raw2ip(xha[i].address);
+					rfbLog("  %s/%s\n", str, ip);
+					free(str);
+					free(ip);
+				} else {
+					rfbLog("  unknown-%d\n", i+1);
+				}
+			}
+			XFree(xha);
+			return 0;
+		}
+
 		if (getenv("XAUTHORITY")) {
 			xauth = strdup(getenv("XAUTHORITY"));
 		} else {
@@ -8508,8 +9695,11 @@ int remote_control_access_ok(void) {
 
 		fprintf(stderr, "\nChecking if display %s requires "
 		    "XAUTHORITY\n", dpy_str);
-		fprintf(stderr, "   (ignore any Xlib: errors that follow)\n");
+		fprintf(stderr, "   -- (ignore any Xlib: errors that"
+		    " follow) --\n");
 		dpy2 = XOpenDisplay(dpy_str); 
+		fflush(stderr);
+		fprintf(stderr, "   -- (done checking) --\n\n");
 
 		if (xauth) {
 			set_env("XAUTHORITY", xauth);
@@ -8526,6 +9716,7 @@ int remote_control_access_ok(void) {
 			XCloseDisplay(dpy2);
 			return 0;
 		}
+
 	}
 	return 1;
 }
@@ -8542,22 +9733,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	int bufn = VNC_CONNECT_MAX;
 	int query = 0;
 	static char *prev_cursors_mode = NULL;
-	static int first = 1; 
 
 	if (! accept_remote_cmds) {
 		rfbLog("remote commands disabled: %s\n", cmd);
 		return NULL;
 	}
 
-	if (first && priv_remote) {
+	if (priv_remote) {
 		if (! remote_control_access_ok()) {
-			rfbLog("disabling remote commands in -privremote "
+			rfbLog("** Disabling remote commands in -privremote "
 			    "mode.\n");
 			accept_remote_cmds = 0;
 			return NULL;
 		}
 	}
-	first = 0;
 
 	strcpy(buf, "");
 	if (strstr(cmd, "cmd=") == cmd) {
@@ -9542,7 +10731,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    "(if applicable).\n");
 		if (! xtrap_input) {
 			xtrap_input = 1;
-			disable_grabserver();
+			disable_grabserver(dpy);
 		}
 
 	} else if (!strcmp(p, "noxtrap")) {
@@ -9554,7 +10743,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    "(if applicable).\n");
 		if (xtrap_input) {
 			xtrap_input = 0;
-			disable_grabserver();
+			disable_grabserver(dpy);
 		}
 
 	} else if (!strcmp(p, "xrandr")) {
@@ -9964,7 +11153,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		set_no_cursor();
 		for (i=0; i<max; i++) {
 			/* XXX: try to force empty cursor back to client */
-			rfbPE(screen, -1);
+			rfbPE(-1);
 		}
 		cursor_shape_updates = 0;
 		disable_cursor_shape_updates(screen);
@@ -10315,14 +11504,30 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: enabling -wireframe mode.\n");
 		wireframe = 1;
-	} else if (!strcmp(p, "wireframe")) {
+	} else if (strstr(p, "wf:") == p) {	/* skip-cmd-list */
+		COLON_CHECK("wf:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, wireframe);
+			goto qry;
+		}
+		p += strlen("wf:");
+		if (*p) {
+			if (wireframe_str) {
+				free(wireframe_str);
+			}
+			wireframe_str = strdup(p);
+			parse_wireframe();
+		}
+		rfbLog("remote_cmd: enabling -wireframe mode.\n");
+		wireframe = 1;
+	} else if (!strcmp(p, "wireframe") || !strcmp(p, "wf")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, wireframe);
 			goto qry;
 		}
 		rfbLog("remote_cmd: enabling -wireframe mode.\n");
 		wireframe = 1;
-	} else if (!strcmp(p, "nowireframe")) {
+	} else if (!strcmp(p, "nowireframe") || !strcmp(p, "nowf")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !wireframe);
 			goto qry;
@@ -10342,7 +11547,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		set_wirecopyrect_mode(p);
 		rfbLog("remote_cmd: changed -wirecopyrect mode "
 		    "to: %s\n", NONUL(wireframe_copyrect));
-	} else if (!strcmp(p, "nowirecopyrect")) {
+		got_wirecopyrect = 1;
+	} else if (strstr(p, "wcr") == p) {
+		COLON_CHECK("wcr:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(wireframe_copyrect));
+			goto qry;
+		}
+		p += strlen("wcr:");
+
+		set_wirecopyrect_mode(p);
+		rfbLog("remote_cmd: changed -wirecopyrect mode "
+		    "to: %s\n", NONUL(wireframe_copyrect));
+		got_wirecopyrect = 1;
+	} else if (!strcmp(p, "nowirecopyrect") || !strcmp(p, "nowcr")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%s", p,
 			    NONUL(wireframe_copyrect));
@@ -10352,6 +11571,56 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		set_wirecopyrect_mode("never");
 		rfbLog("remote_cmd: changed -wirecopyrect mode "
 		    "to: %s\n", NONUL(wireframe_copyrect));
+
+	} else if (strstr(p, "scr_area") == p) {
+		COLON_CHECK("scr_area:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
+			    scrollcopyrect_min_area);
+			goto qry;
+		}
+		p += strlen("scr_area:");
+
+		scrollcopyrect_min_area = atoi(p);
+		rfbLog("remote_cmd: changed -scr_area to: %d\n",
+		    scrollcopyrect_min_area);
+
+	} else if (strstr(p, "scrollcopyrect") == p) {
+		COLON_CHECK("scrollcopyrect:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(scroll_copyrect));
+			goto qry;
+		}
+		p += strlen("scrollcopyrect:");
+
+		set_scrollcopyrect_mode(p);
+		rfbLog("remote_cmd: changed -scrollcopyrect mode "
+		    "to: %s\n", NONUL(scroll_copyrect));
+		got_scrollcopyrect = 1;
+	} else if (strstr(p, "scr") == p) {
+		COLON_CHECK("scr:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(scroll_copyrect));
+			goto qry;
+		}
+		p += strlen("scr:");
+
+		set_scrollcopyrect_mode(p);
+		rfbLog("remote_cmd: changed -scrollcopyrect mode "
+		    "to: %s\n", NONUL(scroll_copyrect));
+		got_scrollcopyrect = 1;
+	} else if (!strcmp(p, "noscrollcopyrect") || !strcmp(p, "noscr")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%s", p,
+			    NONUL(scroll_copyrect));
+			goto qry;
+		}
+
+		set_scrollcopyrect_mode("never");
+		rfbLog("remote_cmd: changed -scrollcopyrect mode "
+		    "to: %s\n", NONUL(scroll_copyrect));
 
 	} else if (strstr(p, "pointer_mode") == p) {
 		int pm;
@@ -10854,6 +12123,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: disabling remote commands.\n");
 		accept_remote_cmds = 0; /* cannot be turned back on. */
 
+	} else if (!strcmp(p, "debug_xevents")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, debug_xevents);
+			goto qry;
+		}
+		debug_xevents = 1;
+		rfbLog("set debug_xevents to: %d\n", debug_xevents);
+	} else if (!strcmp(p, "nodebug_xevents")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !debug_xevents);
+			goto qry;
+		}
+		debug_xevents = 0;
+		rfbLog("set debug_xevents to: %d\n", debug_xevents);
 	} else if (strstr(p, "debug_xevents") == p) {
 		COLON_CHECK("debug_xevents:")
 		if (query) {
@@ -10864,6 +12147,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		debug_xevents = atoi(p);
 		rfbLog("set debug_xevents to: %d\n", debug_xevents);
 
+	} else if (!strcmp(p, "debug_xdamage")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, debug_xdamage);
+			goto qry;
+		}
+		debug_xdamage = 1;
+		rfbLog("set debug_xdamage to: %d\n", debug_xdamage);
+	} else if (!strcmp(p, "nodebug_xdamage")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !debug_xdamage);
+			goto qry;
+		}
+		debug_xdamage = 0;
+		rfbLog("set debug_xdamage to: %d\n", debug_xdamage);
 	} else if (strstr(p, "debug_xdamage") == p) {
 		COLON_CHECK("debug_xdamage:")
 		if (query) {
@@ -10873,6 +12170,56 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("debug_xdamage:");
 		debug_xdamage = atoi(p);
 		rfbLog("set debug_xdamage to: %d\n", debug_xdamage);
+
+	} else if (!strcmp(p, "debug_wireframe")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, debug_wireframe);
+			goto qry;
+		}
+		debug_wireframe = 1;
+		rfbLog("set debug_wireframe to: %d\n", debug_wireframe);
+	} else if (!strcmp(p, "nodebug_wireframe")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !debug_wireframe);
+			goto qry;
+		}
+		debug_wireframe = 0;
+		rfbLog("set debug_wireframe to: %d\n", debug_wireframe);
+	} else if (strstr(p, "debug_wireframe") == p) {
+		COLON_CHECK("debug_wireframe:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
+			    debug_wireframe);
+			goto qry;
+		}
+		p += strlen("debug_wireframe:");
+		debug_wireframe = atoi(p);
+		rfbLog("set debug_wireframe to: %d\n", debug_wireframe);
+
+	} else if (!strcmp(p, "debug_scroll")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, debug_scroll);
+			goto qry;
+		}
+		debug_scroll = 1;
+		rfbLog("set debug_scroll to: %d\n", debug_scroll);
+	} else if (!strcmp(p, "nodebug_scroll")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !debug_scroll);
+			goto qry;
+		}
+		debug_scroll = 0;
+		rfbLog("set debug_scroll to: %d\n", debug_scroll);
+	} else if (strstr(p, "debug_scroll") == p) {
+		COLON_CHECK("debug_scroll:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
+			    debug_scroll);
+			goto qry;
+		}
+		p += strlen("debug_scroll:");
+		debug_scroll = atoi(p);
+		rfbLog("set debug_scroll to: %d\n", debug_scroll);
 
 	} else if (strstr(p, "hack") == p) { /* skip-cmd-list */
 		COLON_CHECK("hack:")
@@ -10980,6 +12327,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(sigpipe));
 		} else if (!strcmp(p, "threads")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, use_threads);
+		} else if (!strcmp(p, "readrate")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, get_read_rate());
+		} else if (!strcmp(p, "netrate")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, get_net_rate());
+		} else if (!strcmp(p, "netlatency")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, get_net_latency());
 		} else if (!strcmp(p, "pipeinput")) {
 			snprintf(buf, bufn, "aro=%s:%s", p,
 			    NONUL(pipeinput_str));
@@ -10995,6 +12348,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, xtest_present);
 		} else if (!strcmp(p, "ext_xtrap")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, xtrap_present);
+		} else if (!strcmp(p, "ext_xrecord")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, xrecord_present);
 		} else if (!strcmp(p, "ext_xkb")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, xkb_present);
 		} else if (!strcmp(p, "ext_xshm")) {
@@ -11114,6 +12469,7 @@ void record_desired_xdamage_rect(int x, int y, int w, int h) {
 	int dt_x, dt_y, nt_x1, nt_y1, nt_x2, nt_y2, nt;
 	int ix, iy, cnt = 0;
 	int area = w*h, always_accept = 0;
+	int use_direct_fb_copy = 0;	/* TBD: not working yet */
 
 	if (xdamage_max_area <= 0) {
 		always_accept = 1;
@@ -11133,24 +12489,33 @@ void record_desired_xdamage_rect(int x, int y, int w, int h) {
 		 */
 		return;
 	}
+	
+	if (use_direct_fb_copy) {
+		X_UNLOCK;
+		direct_fb_copy(x, y, x + w, y + h, 1);
+		X_LOCK;
+	} else {
+		nt_x1 = nfix(  (x)/tile_x, ntiles_x);
+		nt_x2 = nfix((x+w)/tile_x, ntiles_x);
+		nt_y1 = nfix(  (y)/tile_y, ntiles_y);
+		nt_y2 = nfix((y+h)/tile_y, ntiles_y);
 
-	nt_x1 = nfix(  (x)/tile_x, ntiles_x);
-	nt_x2 = nfix((x+w)/tile_x, ntiles_x);
-	nt_y1 = nfix(  (y)/tile_y, ntiles_y);
-	nt_y2 = nfix((y+h)/tile_y, ntiles_y);
-
-
-	/* loop over the rectangle of tiles (1 tile for a small input rect */
-	for (ix = nt_x1; ix <= nt_x2; ix++) {
-		for (iy = nt_y1; iy <= nt_y2; iy++) {
-			nt = ix + iy * ntiles_x;
-			cnt++;
-			if (! tile_has_xdamage_diff[nt]) {
-				XD_des++;
+		/*
+		 * loop over the rectangle of tiles (1 tile for a small
+		 * input rect).
+		 */
+		for (ix = nt_x1; ix <= nt_x2; ix++) {
+			for (iy = nt_y1; iy <= nt_y2; iy++) {
+				nt = ix + iy * ntiles_x;
+				cnt++;
+				if (! tile_has_xdamage_diff[nt]) {
+					XD_des++;
+				}
+				tile_has_xdamage_diff[nt] = 1;
+				/* not used: */
+				tile_row_has_xdamage_diff[iy] = 1;
+				xdamage_tile_count++;
 			}
-			tile_has_xdamage_diff[nt] = 1;
-			tile_row_has_xdamage_diff[iy] = 1;
-			xdamage_tile_count++;
 		}
 	}
 	if (debug_xdamage > 1) {
@@ -11940,7 +13305,6 @@ void setup_cursors(void) {
 	first = 0;
 
 	if (screen) {
-		RFBUNDRAWCURSOR(screen);
 		screen->cursor = NULL;
 		LOCK(screen->cursorMutex);
 	}
@@ -12515,7 +13879,6 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 	c->cleanupRichSource = FALSE;
 	c->richSource = rich;
 
-#if !OLD_TREE
 	if (alpha_blend && !indexed_color) {
 		c->alphaSource = alpha;
 		c->alphaPreMultiplied = TRUE;
@@ -12523,8 +13886,6 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 		free(alpha);
 		c->alphaSource = NULL;
 	}
-#endif
-
 	return c;
 }
 
@@ -12618,8 +13979,6 @@ int get_xfixes_cursor(int init) {
 			}
 		}
 
-		RFBUNDRAWCURSOR(screen);
-
 		/* we need to create the cursor and overwrite oldest */
 		use = oldest;
 		if (cursors[use]->rfb) {
@@ -12627,11 +13986,9 @@ int get_xfixes_cursor(int init) {
 			if (cursors[use]->rfb->richSource) {
 				free(cursors[use]->rfb->richSource);
 			}
-#if !OLD_TREE
 			if (cursors[use]->rfb->alphaSource) {
 				free(cursors[use]->rfb->alphaSource);
 			}
-#endif
 			if (cursors[use]->rfb->source) {
 				free(cursors[use]->rfb->source);
 			}
@@ -12831,47 +14188,6 @@ int get_which_cursor(void) {
 	return which;
 }
 
-#if OLD_TREE
-/*
- * Some utilities for marking the little cursor patch region as
- * modified, etc.
- */
-void mark_cursor_patch_modified(rfbScreenInfoPtr s, int old) {
-	int curx, cury, xhot, yhot, w, h;
-	int x1, x2, y1, y2;
-
-	if (! s || ! s->cursor) {
-		return;
-	}
-
-	if (old) {
-		/* use oldCursor pos */
-		curx = s->oldCursorX;
-		cury = s->oldCursorY;
-	} else {
-		curx = s->cursorX;
-		cury = s->cursorY;
-	}
-	
-	xhot = s->cursor->xhot;
-	yhot = s->cursor->yhot;
-	w = s->cursor->width;
-	h = s->cursor->height;
-
-	x1 = curx - xhot;
-	x2 = x1 + w;
-	x1 = nfix(x1, s->width);
-	x2 = nfix(x2, s->width);
-
-	y1 = cury - yhot;
-	y2 = y1 + h;
-	y1 = nfix(y1, s->height);
-	y2 = nfix(y2, s->height);
-
-	rfbMarkRectAsModified(s, x1, y1, x1+x2, y1+y2);
-}
-#endif
-
 void set_cursor_was_changed(rfbScreenInfoPtr s) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
@@ -13006,9 +14322,6 @@ void cursor_position(int x, int y) {
 	rfbClientPtr cl;
 	int cnt = 0, nonCursorPosUpdates_clients = 0;
 	int x_in = x, y_in = y;
-#if OLD_TREE
-	int x_old, y_old;
-#endif
 
 	/* x and y are current positions of X11 pointer on the X11 display */
 	if (!screen) {
@@ -13026,26 +14339,10 @@ void cursor_position(int x, int y) {
 		return;
 	}
 
-#if OLD_TREE
-	x_old = screen->oldCursorX;
-	y_old = screen->oldCursorY;
-
-	if (screen->cursorIsDrawn) {
-		rfbUndrawCursor(screen);
-	}
-
-	LOCK(screen->cursorMutex);
-	if (! screen->cursorIsDrawn) {
-		screen->cursorX = x;
-		screen->cursorY = y;
-	}
-	UNLOCK(screen->cursorMutex);
-#else
 	LOCK(screen->cursorMutex);
 	screen->cursorX = x;
 	screen->cursorY = y;
 	UNLOCK(screen->cursorMutex);
-#endif
 
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
@@ -13080,21 +14377,12 @@ void cursor_position(int x, int y) {
 	}
 	rfbReleaseClientIterator(iter);
 
-#if OLD_TREE
-	if (nonCursorPosUpdates_clients && show_cursor) {
-		if (x_old != x || y_old != y) {
-			mark_cursor_patch_modified(screen, 0);
-		}
-	}
-#endif
-
 	if (debug_pointer && cnt) {
 		rfbLog("cursor_position: sent position x=%3d y=%3d to %d"
 		    " clients\n", x, y, cnt);
 	}
 }
 
-#if !OLD_TREE
 void set_rfb_cursor(int which) {
 
 	if (! show_cursor) {
@@ -13112,57 +14400,7 @@ void set_rfb_cursor(int which) {
 	}
 }
 
-#else
-
-void set_rfb_cursor(int which) {
-
-	if (! show_cursor) {
-		return;
-	}
-	if (! screen) {
-		return;
-	}
-	
-	if (screen->cursor) {
-		int all_are_cursor_pos = 1;
-		rfbClientIteratorPtr iter;
-		rfbClientPtr cl;
-
-		iter = rfbGetClientIterator(screen);
-		while( (cl = rfbClientIteratorNext(iter)) ) {
-			if (! cl->enableCursorPosUpdates) {
-				all_are_cursor_pos = 0;
-			}
-			if (! cl->enableCursorShapeUpdates) {
-				all_are_cursor_pos = 0;
-			}
-		}
-		rfbReleaseClientIterator(iter);
-
-		if (! all_are_cursor_pos) {
-			mark_cursor_patch_modified(screen, 1);
-		}
-	}
-
-	if (!cursors[which] || !cursors[which]->rfb) {
-		rfbLog("non-existent cursor: which=%d\n", which);
-		return;
-	} else {
-		rfbSetCursor(screen, cursors[which]->rfb, FALSE);
-	}
-
-	if (screen->underCursorBuffer == NULL &&
-	    screen->underCursorBufferLen != 0) {
-		LOCK(screen->cursorMutex);
-		screen->underCursorBufferLen = 0;
-		UNLOCK(screen->cursorMutex);
-	}
-	set_cursor_was_changed(screen);
-}
-#endif
-
 void set_no_cursor(void) {
-	RFBUNDRAWCURSOR(screen);
 	set_rfb_cursor(CURS_EMPTY);
 }
 
@@ -14607,38 +15845,28 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		clean_up_exit(1);
 	}
 
-/*
- * This ifdef is a transient for source compatibility for people who download
- * the x11vnc.c file by itself and plop it down into their libvncserver tree.
- * Remove at some point.  BTW, this assumes no usage of earlier "0.7pre".
- */
-#if OLD_TREE && defined(LIBVNCSERVER_VERSION)
-	if (strcmp(LIBVNCSERVER_VERSION, "0.6"))
-#endif
-	{ 
-		if (create_screen && *argc != 1) {
-			int i;
-			rfbLog("*** unrecognized option(s) ***\n");
-			for (i=1; i< *argc; i++)  {
-				rfbLog("\t[%d]  %s\n", i, argv[i]);
-			}
-			rfbLog("For a list of options run: x11vnc -help\n");
-			rfbLog("\n");
-			rfbLog("Here is a list of removed or obsolete"
-			    " options:\n");
-			rfbLog("\n");
-			rfbLog("removed: -hints, -nohints\n");
-			rfbLog("removed: -cursorposall\n");
-			rfbLog("\n");
-			rfbLog("renamed: -old_copytile, use -onetile\n");
-			rfbLog("renamed: -mouse,   use -cursor\n");
-			rfbLog("renamed: -mouseX,  use -cursor X\n");
-			rfbLog("renamed: -X,       use -cursor X\n");
-			rfbLog("renamed: -nomouse, use -nocursor\n");
-			rfbLog("renamed: -old_pointer, use -pointer_mode 1\n");
-		
-			clean_up_exit(1);
+	if (create_screen && *argc != 1) {
+		int i;
+		rfbLog("*** unrecognized option(s) ***\n");
+		for (i=1; i< *argc; i++)  {
+			rfbLog("\t[%d]  %s\n", i, argv[i]);
 		}
+		rfbLog("For a list of options run: x11vnc -help\n");
+		rfbLog("\n");
+		rfbLog("Here is a list of removed or obsolete"
+		    " options:\n");
+		rfbLog("\n");
+		rfbLog("removed: -hints, -nohints\n");
+		rfbLog("removed: -cursorposall\n");
+		rfbLog("\n");
+		rfbLog("renamed: -old_copytile, use -onetile\n");
+		rfbLog("renamed: -mouse,   use -cursor\n");
+		rfbLog("renamed: -mouseX,  use -cursor X\n");
+		rfbLog("renamed: -X,       use -cursor X\n");
+		rfbLog("renamed: -nomouse, use -nocursor\n");
+		rfbLog("renamed: -old_pointer, use -pointer_mode 1\n");
+	
+		clean_up_exit(1);
 	}
 
 	/* set up format from scratch: */
@@ -14840,6 +16068,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	/* may need, bpp, main_red_max, etc. */
 	parse_wireframe();
+	parse_scroll_copyrect();
 
 	setup_cursors_and_push();
 
@@ -15936,7 +17165,7 @@ void initialize_blackouts_and_xinerama(void) {
 void push_sleep(n) {
 	int i;
 	for (i=0; i<n; i++) {
-		rfbPE(screen, -1);
+		rfbPE(-1);
 		if (i != n-1 && defer_update) {
 			usleep(defer_update * 1000);
 		}
@@ -15960,7 +17189,7 @@ void refresh_screen(void) {
 		return;
 	}
 	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 1);
-	rfbPE(screen, -1);
+	rfbPE(-1);
 }
 
 /*
@@ -17928,7 +19157,7 @@ static void nap_sleep(int ms, int split) {
 	for (i=0; i<split; i++) {
 		usleep(ms * 1000 / split);
 		if (! use_threads && i != split - 1) {
-			rfbPE(screen, -1);
+			rfbPE(-1);
 		}
 		if (input != got_user_input) {
 			break;
@@ -18451,7 +19680,7 @@ int scan_for_updates(int count_only) {
 }
 
 /* -- gui.c -- */
-#if OLD_TREE || SMALL_FOOTPRINT
+#if SMALL_FOOTPRINT
 char gui_code[] = "";
 #else
 #include "tkx11vnc.h"
@@ -18800,7 +20029,77 @@ int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h, Window *w
 }
 
 static int defer_update_nofb = 6;	/* defer a shorter time under -nofb */
-static Window maybe_scrolling = 0;
+
+int scrollcopyrect_top, scrollcopyrect_bot;
+int scrollcopyrect_left, scrollcopyrect_right;
+double scr_key_time, scr_key_persist, scr_mouse_time, scr_mouse_persist;
+
+void parse_scroll_copyrect_str(char *scr) {
+	char *p, *str;
+	int i;
+	char *part[10];
+
+	for (i=0; i<10; i++) {
+		part[i] = NULL;
+	}
+
+	if (scr == NULL || *scr == '\0') {
+		return;
+	}
+
+	str = strdup(scr);
+
+	p = strtok(str, ",");
+	i = 0;
+	while (p) {
+		part[i++] = strdup(p);
+		p = strtok(NULL, ",");
+	}
+	free(str);
+
+
+	/*
+	 * Top, Bottom, Left, Right tolerances for scrollbar locations.
+	 */
+	if ((str = part[0]) != NULL) {
+		int t, b, l, r;
+		if (sscanf(str, "%d+%d+%d+%d", &t, &b, &l, &r) == 4) {
+			scrollcopyrect_top   = t;
+			scrollcopyrect_bot   = b;
+			scrollcopyrect_left  = l;
+			scrollcopyrect_right = r;
+		}
+		free(str);
+	}
+
+	/* key scrolling timing heuristics. */
+	if ((str = part[1]) != NULL) {
+		double t1, t2;
+		if (sscanf(str, "%lf+%lf", &t1, &t2) == 2) {
+			scr_key_time = t1;
+			scr_key_persist = t2;
+		}
+		free(str);
+	}
+
+	/* mouse scrolling timing heuristics. */
+	if ((str = part[2]) != NULL) {
+		double t1, t2;
+		if (sscanf(str, "%lf+%lf", &t1, &t2) == 2) {
+			scr_mouse_time = t1;
+			scr_mouse_persist = t2;
+		}
+		free(str);
+	}
+}
+
+void parse_scroll_copyrect(void) {
+	parse_scroll_copyrect_str(SCROLL_COPYRECT_PARMS);
+	if (! scroll_copyrect_str) {
+		scroll_copyrect_str = strdup(SCROLL_COPYRECT_PARMS);
+	}
+	parse_scroll_copyrect_str(scroll_copyrect_str);
+}
 
 /*
 WIREFRAME_PARMS "0xff,2,0,30+6+6+6,0.05+0.3+2.0,8"
@@ -18970,6 +20269,34 @@ void set_wirecopyrect_mode(char *str) {
 		}
 		rfbLog("unknown -wirecopyrect mode: %s, using: %s\n", str,
 		    wireframe_copyrect);
+	}
+	if (orig) {
+		free(orig);
+	}
+}
+
+/*
+ * Set scroll_copyrect based on desired mode.
+ */
+void set_scrollcopyrect_mode(char *str) {
+	char *orig = scroll_copyrect;
+	if (str == NULL || *str == '\0') {
+		scroll_copyrect = strdup(scroll_copyrect_default);
+	} else if (!strcmp(str, "always") || !strcmp(str, "all") ||
+		    !strcmp(str, "both")) {
+		scroll_copyrect = strdup("always");
+	} else if (!strcmp(str, "keys") || !strcmp(str, "keyboard")) {
+		scroll_copyrect = strdup("keys");
+	} else if (!strcmp(str, "mouse") || !strcmp(str, "pointer")) {
+		scroll_copyrect = strdup("mouse");
+	} else if (!strcmp(str, "never") || !strcmp(str, "none")) {
+		scroll_copyrect = strdup("never");
+	} else {
+		if (! scroll_copyrect) {
+			scroll_copyrect = strdup(scroll_copyrect_default);
+		}
+		rfbLog("unknown -scrollcopyrect mode: %s, using: %s\n", str,
+		    scroll_copyrect);
 	}
 	if (orig) {
 		free(orig);
@@ -19233,6 +20560,519 @@ if (0) fprintf(stderr, "  DrawBox: %dx%d+%d+%d\n", w, h, x, y);
 	}
 }
 
+int direct_fb_copy(int x1, int y1, int x2, int y2, int mark) {
+	char *src, *dst;
+	int y, pixelsize = bpp/8;
+	int xmin = -1, xmax = -1, ymin = -1, ymax = -1;
+	int do_cmp = 0;
+
+	x1 = nfix(x1, dpy_x);
+	y1 = nfix(y1, dpy_y);
+	x2 = nfix(x2, dpy_x);
+	y2 = nfix(y2, dpy_y);
+
+	if (x1 == x2) {
+		return 1;
+	}
+	if (y1 == y2) {
+		return 1;
+	}
+
+	X_LOCK;
+	for (y = y1; y < y2; y++) {
+		XRANDR_SET_TRAP_RET(0, "direct_fb_copy-set");
+		copy_image(scanline, x1, y, x2 - x1, 1);
+		XRANDR_CHK_TRAP_RET(0, "direct_fb_copy-chk");
+		
+		src = scanline->data;
+		dst = main_fb + y * main_bytes_per_line + x1 * pixelsize;
+
+		if (do_cmp == 0 || !mark) {
+			memcpy(dst, src, (x2 - x1)*pixelsize);
+
+		} else if (do_cmp == 1) {
+			if (memcmp(dst, src, (x2 - x1)*pixelsize)) {
+				if (ymin == -1 || y < ymin) {
+					ymin = y;
+				}
+				if (ymax == -1 || y > ymax) {
+					ymax = y;
+				}
+				memcpy(dst, src, (x2 - x1)*pixelsize);
+			}
+
+		} else if (do_cmp == 2) {
+			int n, shift, xlo, xhi, k, block = 32;
+			char *dst2, *src2;
+
+			for (k=0; k*block < (x2 - x1); k++) {
+				shift = k*block;
+				xlo = x1  + shift;
+				xhi = xlo + block;
+				if (xhi > x2) {
+					xhi = x2;
+				}
+				n = xhi - xlo;
+				if (n < 1) {
+					continue;
+				}
+				src2 = src + shift*pixelsize;
+				dst2 = dst + shift*pixelsize;
+				if (memcmp(dst2, src2, n*pixelsize)) {
+					if (ymin == -1 || y < ymin) {
+						ymin = y;
+					}
+					if (ymax == -1 || y > ymax) {
+						ymax = y;
+					}
+					if (xmin == -1 || xlo < xmin) {
+						xmin = xlo;
+					}
+					if (xmax == -1 || xhi > xmax) {
+						xmax = xhi;
+					}
+					memcpy(dst2, src2, n*pixelsize);
+				}
+			}
+		}
+	}
+	X_UNLOCK;
+
+	if (do_cmp == 0) {
+		xmin = x1;
+		ymin = y1;
+		xmax = x2;
+		ymax = y2;
+	} else if (do_cmp == 1) {
+		xmin = x1;
+		xmax = x2;
+	}
+
+	if (xmin < 0 || ymin < 0 || xmax < 0 || xmin < 0) {
+		/* no diffs */
+		return 1;
+	}
+
+	if (xmax < x2) {
+		xmax++;
+	}
+	if (ymax < y2) {
+		ymax++;
+	}
+
+	if (mark) {
+		mark_rect_as_modified(xmin, ymin, xmax, ymax, 1);
+	}
+	return 1;
+}
+
+#define PUSH_TEST(n)  \
+if (n) { \
+	double dt = 0.0, tm = 0.0; dtime(&tm); \
+	fprintf(stderr, "PUSH---\n"); \
+	while (dt < 2.0) { rfbPE(50000); dt += dtime(&tm); } \
+	fprintf(stderr, "---PUSH\n"); \
+}
+
+int push_scr_ev(double bdpush) {
+	Window frame, win, win0;
+	int x, y, w, h, wx, wy, ww, wh, dx, dy;
+	int x0, y0, w0, h0;
+	int nx, ny, nw, nh;
+	int dret = 1, obscured;
+	int ev, ev_tot = scr_ev_cnt;
+	double st, dnow = 0.0;
+	int db = 0, rrate = get_read_rate();
+	sraRegionPtr backfill, whole, tmpregion;
+	XWindowAttributes attr;
+
+//db = 1;
+
+	dtime(&dnow);
+
+	if (ev_tot == 0) {
+		return dret;
+	}
+	backfill = sraRgnCreate();
+	whole = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
+
+	win0 = scr_ev[0].win;
+	x0 = scr_ev[0].win_x;
+	y0 = scr_ev[0].win_y;
+	w0 = scr_ev[0].win_w;
+	h0 = scr_ev[0].win_h;
+
+	for (ev=0; ev < ev_tot; ev++) {
+	
+		x   = scr_ev[ev].x;
+		y   = scr_ev[ev].y;
+		w   = scr_ev[ev].w;
+		h   = scr_ev[ev].h;
+		dx  = scr_ev[ev].dx;
+		dy  = scr_ev[ev].dy;
+		win = scr_ev[ev].win;
+		wx  = scr_ev[ev].win_x;
+		wy  = scr_ev[ev].win_y;
+		ww  = scr_ev[ev].win_w;
+		wh  = scr_ev[ev].win_h;
+		nx  = scr_ev[ev].new_x;
+		ny  = scr_ev[ev].new_y;
+		nw  = scr_ev[ev].new_w;
+		nh  = scr_ev[ev].new_h;
+		st  = (double) scr_ev[ev].t/1000.0;
+
+		if (dabs((dnow - servertime_diff) - st) > 0.15) {
+if (db) fprintf(stderr, "push_scr_ev: TOO OLD: %.4f\n", (dnow - servertime_diff) - st);				
+			dret = 0;
+			break;
+		} else {
+if (db) fprintf(stderr, "push_scr_ev: AGE:     %.4f\n", (dnow - servertime_diff) - st);				
+		}
+		if (win != win0) {
+if (db) fprintf(stderr, "push_scr_ev: DIFF WIN: 0x%lx != 0x%lx\n", win, win0);
+			dret = 0;
+			break;
+		}
+		if (wx != x0 || wy != y0) {
+if (db) fprintf(stderr, "push_scr_ev: WIN SHIFT: %d %d, %d %d", wx, x0, wy, y0);
+			dret = 0;
+			break;
+		}
+		if (ww != w0 || wh != h0) {
+if (db) fprintf(stderr, "push_scr_ev: WIN RESIZE: %d %d, %d %d", ww, w0, wh, h0);
+			dret = 0;
+			break;
+		}
+		if (w < 1 || h < 1 || ww < 1 || wh < 1) {
+if (db) fprintf(stderr, "push_scr_ev: NEGATIVE h/w: %d %d %d %d\n", w, h, ww, wh);
+			dret = 0;
+			break;
+		}
+
+if (db) fprintf(stderr, "push_scr_ev: got: %d x: %4d y: %3d"
+	" w: %4d h: %3d  dx: %d dy: %d %dx%d+%d+%d   win: 0x%lx\n",
+	ev, x, y, w, h, dx, dy, w, h, x, y, win);
+
+if (db) fprintf(stderr, "------------ got: %d x: %4d y: %3d"
+	" w: %4d h: %3d %dx%d+%d+%d\n",
+	ev, wx, wy, ww, wh, ww, wh, wx, wy);
+
+if (db) fprintf(stderr, "------------ got: %d x: %4d y: %3d"
+	" w: %4d h: %3d %dx%d+%d+%d\n",
+	ev, nx, ny, nw, nh, nw, nh, nx, ny);
+
+		frame = None;
+		if (xrecord_wm_window) {
+			frame = xrecord_wm_window;
+		}
+		if (! frame) {
+			Window r;
+			int rx, ry, wx, wy;
+			unsigned int m;
+			if (! XQueryPointer(dpy, rootwin, &r, &frame,
+			    &rx, &ry, &wx, &wy, &m)) {
+				frame = None;    	
+			}
+		}
+		if (! frame) {
+			frame = win;
+		}
+
+		if (try_copyrect(frame, x, y, w, h, dx, dy, &obscured)) {
+			fb_push();
+			urgent_update = 1;
+PUSH_TEST(0);
+
+		} else {
+			dret = 0;
+			break;	
+		}
+
+		if (ev > 0) {
+			sraRgnOffset(backfill, dx, dy);
+			sraRgnAnd(backfill, whole);
+		}
+
+		tmpregion = sraRgnCreateRect(nx, ny, nx + nw, ny + nh);
+		sraRgnAnd(tmpregion, whole);
+		sraRgnOr(backfill, tmpregion);
+		sraRgnDestroy(tmpregion);
+	}
+
+	if (dret != 0) {
+		double est, win_area = 0.0, area = 0.0;
+		sraRectangleIterator *iter;
+		sraRect rect;
+		int tx1, ty1, tx2, ty2;
+		double tm = 0.0, dt = 0.0;
+
+		tmpregion = sraRgnCreateRect(x0, y0, x0 + w0, y0 + h0);
+		sraRgnAnd(tmpregion, whole);
+
+		sraRgnAnd(backfill, tmpregion);
+
+		iter = sraRgnGetIterator(tmpregion);
+		while (sraRgnIteratorNext(iter, &rect)) {
+			tx1 = rect.x1;
+			ty1 = rect.y1;
+			tx2 = rect.x2;
+			ty2 = rect.y2;
+
+			win_area += (tx2 - tx1)*(ty2 - ty1);
+		}
+		sraRgnReleaseIterator(iter);
+		sraRgnDestroy(tmpregion);
+
+
+		iter = sraRgnGetIterator(backfill);
+		while (sraRgnIteratorNext(iter, &rect)) {
+			tx1 = rect.x1;
+			ty1 = rect.y1;
+			tx2 = rect.x2;
+			ty2 = rect.y2;
+
+			area += (tx2 - tx1)*(ty2 - ty1);
+		}
+		sraRgnReleaseIterator(iter);
+
+		est = (area * (bpp/8)) / (1000000.0 * rrate);
+if (db) fprintf(stderr, "  area %.1f win_area %.1f est: %.4f", area, win_area, est);
+		if (area > 0.85 * win_area) {
+if (db) fprintf(stderr, "  AREA_TOO_MUCH");
+			dret = 0;
+		} else if (est > 0.6) {
+if (db) fprintf(stderr, "  EST_TOO_LARGE");
+			dret = 0;
+		} else if (area <= 0.0) {
+			;
+		} else {
+			dtime(&tm);
+			iter = sraRgnGetIterator(backfill);
+			while (sraRgnIteratorNext(iter, &rect)) {
+				tx1 = rect.x1;
+				ty1 = rect.y1;
+				tx2 = rect.x2;
+				ty2 = rect.y2;
+				tx1 = nfix(tx1, dpy_x);
+				ty1 = nfix(ty1, dpy_y);
+				tx2 = nfix(tx2, dpy_x);
+				ty2 = nfix(ty2, dpy_y);
+
+				dtime(&tm);
+if (db) fprintf(stderr, "  DFC(%d,%d-%d,%d)", tx1, ty1, tx2, ty2);
+				direct_fb_copy(tx1, ty1, tx2, ty2, 1);
+				dt = dtime(&tm);
+				fb_push();
+PUSH_TEST(0);
+			}
+			dt = dtime(&tm);
+			sraRgnReleaseIterator(iter);
+if (db) fprintf(stderr, "  dt: %.4f", dt);
+
+		}
+if (db &&  dret) fprintf(stderr, " **** dret=%d", dret);
+if (db && !dret) fprintf(stderr, " ---- dret=%d", dret);
+if (db) fprintf(stderr, "\n");
+	}
+
+if (db || bdpush > 0.0) fprintf(stderr, "BDPUSH-TIME: %.3f  0x%lx\n", bdpush, xrecord_wm_window);
+
+	if (bdpush > 0.0 && xrecord_wm_window != None &&
+	    valid_window(xrecord_wm_window, &attr)) {
+
+		double wm_area = 0.0, win_area = 0.0, d_area;
+		sraRectangleIterator *iter;
+		sraRect rect;
+		sraRegionPtr frame;
+		int tx1, ty1, tx2, ty2;
+
+		/* wm frame: */
+		tx1 = attr.x;
+		ty1 = attr.y;
+		tx2 = attr.x + attr.width;
+		ty2 = attr.y + attr.height;
+
+		frame = sraRgnCreateRect(tx1, ty1, tx2, ty2);
+		sraRgnAnd(frame, whole);
+
+		iter = sraRgnGetIterator(frame);
+		while (sraRgnIteratorNext(iter, &rect)) {
+			tx1 = rect.x1;
+			ty1 = rect.y1;
+			tx2 = rect.x2;
+			ty2 = rect.y2;
+
+			wm_area += (tx2 - tx1)*(ty2 - ty1);
+		}
+		sraRgnReleaseIterator(iter);
+
+		/* scrolling window: */
+		tmpregion = sraRgnCreateRect(x0, y0, x0 + w0, y0 + h0);
+		sraRgnAnd(tmpregion, whole);
+
+		iter = sraRgnGetIterator(tmpregion);
+		while (sraRgnIteratorNext(iter, &rect)) {
+			tx1 = rect.x1;
+			ty1 = rect.y1;
+			tx2 = rect.x2;
+			ty2 = rect.y2;
+
+			win_area += (tx2 - tx1)*(ty2 - ty1);
+		}
+		sraRgnReleaseIterator(iter);
+
+		d_area = wm_area - win_area;
+		sraRgnSubtract(frame, tmpregion);
+		sraRgnDestroy(tmpregion);
+
+if (db) fprintf(stderr, "d_area: %.4f  wm_area: %.4f\n", d_area, wm_area);
+
+		if (d_area >= 0.0 && d_area < bdpush * wm_area &&
+		    !sraRgnEmpty(frame)) {
+			double dt = 0.0, dm = 0.0;
+			dtime(&dm);
+			iter = sraRgnGetIterator(frame);
+			while (sraRgnIteratorNext(iter, &rect)) {
+				tx1 = rect.x1;
+				ty1 = rect.y1;
+				tx2 = rect.x2;
+				ty2 = rect.y2;
+				direct_fb_copy(tx1, ty1, tx2, ty2, 1);
+				fb_push();
+				dt += dtime(&dm);
+if (db) fprintf(stderr, "  BDP(%d,%d-%d,%d)  dt: %.4f\n", tx1, ty1, tx2, ty2, dt);
+			}
+			sraRgnReleaseIterator(iter);
+		}
+		sraRgnDestroy(frame);
+	}
+
+	sraRgnDestroy(backfill);
+	sraRgnDestroy(whole);
+	return dret;
+}
+/*
+ * Wrapper to apply the rfbDoCopyRegion taking into account if scaling
+ * is being done.  Note that copyrect under the scaling case is often
+ * only approximate.
+ */
+void do_copyregion(sraRegionPtr region, int dx, int dy)  {
+	sraRectangleIterator *iter;
+	sraRect rect;
+	int Bpp = bpp/8;
+	int x1, y1, x2, y2, w, stride;
+	int sx1, sy1, sx2, sy2, sdx, sdy;
+	char *dst, *src;
+
+	if (!scaling || rfb_fb == main_fb) {
+		rfbDoCopyRegion(screen, region, dx, dy);
+		return;
+	}
+
+	stride = dpy_x * Bpp;
+
+	iter = sraRgnGetIterator(region);
+	while(sraRgnIteratorNext(iter, &rect)) {
+		int j;
+
+		x1 = rect.x1;
+		y1 = rect.y1;
+		x2 = rect.x2;
+		y2 = rect.y2;
+
+		w = (x2 - x1)*Bpp; 
+		dst = main_fb + y1*stride + x1*Bpp;
+		src = main_fb + (y1-dy)*stride + (x1-dx)*Bpp;
+
+		if (dy < 0) {
+			for (j=y1; j<y2; j++) {
+				memmove(dst, src, w);
+				dst += stride;
+				src += stride;
+			}
+		} else {
+			dst += (y2 - y1 - 1)*stride;
+			src += (y2 - y1 - 1)*stride;
+			for (j=y2-1; j>y1; j--) {
+				memmove(dst, src, w);
+				dst -= stride;
+				src -= stride;
+			}
+		}
+
+		sx1 = ((double) x1 / dpy_x) * scaled_x;
+		sy1 = ((double) y1 / dpy_y) * scaled_y;
+		sx2 = ((double) x2 / dpy_x) * scaled_x;
+		sy2 = ((double) y2 / dpy_y) * scaled_y;
+		sdx = ((double) dx / dpy_x) * scaled_x;
+		sdy = ((double) dy / dpy_y) * scaled_y;
+
+		rfbDoCopyRect(screen, sx1, sy1, sx2, sy2, sdx, sdy);
+	}
+	sraRgnReleaseIterator(iter);
+}
+
+void fb_push0(int first_ms, int loop_ms, int loop_max) {
+	int t;
+	fb_update_sent(NULL);
+	rfbPE(1000 * first_ms);	/* long select */
+	for (t=0; t<loop_max; t++) {
+		if (fb_update_sent(NULL)) {
+if (1 || debug_wireframe) fprintf(stderr, "FB_UPDATE_SENT: t=%d\n", t);
+			break;
+		}
+		rfbPE(1000 * loop_ms);	/* short selects. */
+	}
+}
+
+void get_client_regions(int *req, int *mod, int *cpy)  {
+	
+	rfbClientIteratorPtr i;
+	rfbClientPtr cl;
+
+	*req = 0;
+	*mod = 0;
+	*cpy = 0;
+
+	i = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(i)) ) {
+		*req += sraRgnCountRects(cl->requestedRegion);
+		*mod += sraRgnCountRects(cl->modifiedRegion);
+		*cpy += sraRgnCountRects(cl->copyRegion);
+	}
+	rfbReleaseClientIterator(i);
+}
+
+void fb_push(void) {
+	char *httpdir = screen->httpDir;
+	int defer = screen->deferUpdateTime;
+	int i, req0, mod0, cpy0, req1, mod1, cpy1;
+	int db = 0;
+//db = 1;
+
+	screen->httpDir = NULL;
+	screen->deferUpdateTime = 0;
+
+	get_client_regions(&req0, &mod0, &cpy0);
+
+	rfbPE(0);
+
+	screen->httpDir = httpdir;
+	screen->deferUpdateTime = defer;
+
+	get_client_regions(&req1, &mod1, &cpy1);
+if (db) fprintf(stderr, "\nFB_push: req: %d/%d  mod: %d/%d  cpy: %d/%d\n",
+	req0, req1, mod0, mod1, cpy0, cpy1);
+
+	for (i = 0; i < 0; i++) {
+		get_client_regions(&req0, &mod0, &cpy0);
+		rfbCFD(1000);
+		get_client_regions(&req1, &mod1, &cpy1);
+if (db) fprintf(stderr, "-------: req: %d/%d  mod: %d/%d  cpy: %d/%d\n",
+	req0, req1, mod0, mod1, cpy0, cpy1);
+	}
+}
+
 /* 
  * utility routine for CopyRect of the window (but not CopyRegion)
  */
@@ -19252,6 +21092,541 @@ int crfix(int x, int dx, int Lx) {
 	return x;
 }
 
+int check_xrecord_keys(void) {
+	double spin = 0.0, tm = 0.0;
+	int gk, gk0, extra_keys = 0, ret = 0;
+	int db = debug_scroll;
+	int get_out = 1, got_one = 0, flush1 = 0, flush2 = 0;
+	static double last_key_scroll = 0.0;
+	static double persist_start = 0.0;
+	double this_scroll, scroll_persist = scr_key_persist;
+	double spin_fac = 1.0, scroll_fac = 2.0;
+	double max_spin, tnow = 0.0;
+
+//db = 1;
+
+	if (got_keyboard_input) {
+		get_out = 0;
+	} 
+
+	dtime(&tnow);
+	if (tnow < last_key_scroll + scroll_persist) {
+		get_out = 0;
+	}
+
+	if (get_out) {
+		persist_start = 0.0;
+		xrecord_watch(0);
+		return 0;
+	}
+
+if (db) fprintf(stderr, "xrecord_set_by_mouse: %d\n", xrecord_set_by_mouse);
+if (db) fprintf(stderr, "xrecord_set_by_keys:  %d\n", xrecord_set_by_keys);
+
+	max_spin = scr_key_time;
+
+	if (tnow < last_key_scroll + scroll_persist) {
+		max_spin = 1.25*(tnow - last_key_scroll);
+	} else if (xrecord_scroll_keysym(last_keysym)) {
+		spin_fac = scroll_fac;
+	}
+
+	gk = gk0 = got_keyboard_input;
+	dtime(&tm);
+
+if (db) fprintf(stderr, "check_xrecord: LOOP: scr_ev_cnt: %d max: %.3f\n",
+    scr_ev_cnt, max_spin);
+
+	while (1) {
+
+		if (scr_ev_cnt) {
+			got_one = 1;
+			this_scroll = 0.0;
+			dtime(&this_scroll);
+			break;
+		}
+
+		X_LOCK;
+		XFlush(dpy);
+		flush1 = 1;
+		X_UNLOCK;
+
+		if (use_threads) {
+			usleep(1000);
+		} else {
+			rfbCFD(1000);
+		}
+		spin += dtime(&tm);
+
+		if (spin >= max_spin * spin_fac) {
+if (db) fprintf(stderr, "check_xrecord: SPIN-OUT: %.3f/%.3f\n", spin,
+    max_spin * spin_fac);
+			break;
+		}
+
+		if (got_keyboard_input > gk) {
+			gk = got_keyboard_input;
+			if (xrecord_scroll_keysym(last_keysym)) {
+				spin_fac = scroll_fac;
+			}
+			extra_keys++;
+if (db) fprintf(stderr, "check_xrecord: more keys: %d  %.3f\n", extra_keys,
+	spin);
+			flush2 = 1;
+		}
+
+		X_LOCK;
+		if (flush2) {
+			XFlush(dpy);
+		}
+		XRecordProcessReplies(rdpy_data);
+		X_UNLOCK;
+	}
+
+if (db) fprintf(stderr, "  f1: %d  f2: %d  spin: %.4f\n", flush1, flush2, spin);
+	/* since we've flushed it, we might as well avoid -input_skip */
+	if (flush1 || flush2) {
+		got_keyboard_input = 0;
+		got_pointer_input = 0;
+	}
+
+	if (scr_ev_cnt) {
+		int dret;
+		double bdpush = 0.0;
+		static double last_border_push = 0.0;
+
+		if (persist_start > 0.0 && 
+			this_scroll > last_border_push + 1.00) {
+			bdpush = 0.0;
+			last_border_push = this_scroll;
+		}
+		dret = push_scr_ev(bdpush);
+		ret = 1 + dret;
+		scr_ev_cnt = 0;
+	}
+
+	if (xrecording) {
+		if (ret < 2) {
+			xrecord_watch(0);
+		}
+	}
+
+	if (this_scroll > 0.0) {
+		last_key_scroll = this_scroll;
+	}
+
+	if (ret == 2) {
+		if (persist_start == 0.0) {
+			dtime(&persist_start);
+		}
+	} else {
+		persist_start = 0.0;
+	}
+
+	return ret;
+}
+
+int check_xrecord_mouse(void) {
+	double spin = 0.0, tm = 0.0;
+	int gp, gp0, ret = 0;
+	int db = debug_scroll;
+	int flush1 = 0, flush2 = 0;
+	int get_out = 1, got_one = 0;
+	static double last_mouse_scroll = 0.0;
+	static double persist_start = 0.0;
+	double this_scroll, scroll_persist = scr_mouse_persist;
+	double spin_fac = 1.0;
+	double max_spin, tnow = 0.0;
+
+//db = 1;
+
+	if (button_mask) {
+		get_out = 0;
+	} 
+	dtime(&tnow);
+	if (tnow < last_mouse_scroll + scroll_persist) {
+		get_out = 0;
+	}
+
+	if (get_out) {
+		persist_start = 0.0;
+		xrecord_watch(0);
+		return 0;
+	}
+
+if (db) fprintf(stderr, "xrecord_set_by_mouse: %d\n", xrecord_set_by_mouse);
+if (db) fprintf(stderr, "xrecord_set_by_keys:  %d\n", xrecord_set_by_keys);
+
+	max_spin = scr_mouse_time;
+
+	if (tnow < last_mouse_scroll + scroll_persist) {
+		max_spin = 1.25*(tnow - last_mouse_scroll);
+	}
+
+	gp = gp0 = got_pointer_input;
+	dtime(&tm);
+
+if (db) fprintf(stderr, "check_xrecord: LOOP: scr_ev_cnt: %d max: %.3f\n",
+    scr_ev_cnt, max_spin);
+
+	while (1) {
+
+		if (scr_ev_cnt) {
+			got_one = 1;
+			this_scroll = 0.0;
+			dtime(&this_scroll);
+			break;
+		}
+
+		X_LOCK;
+		XFlush(dpy);
+		flush1 = 1;
+		X_UNLOCK;
+
+		if (use_threads) {
+			usleep(1000);
+		} else {
+			rfbCFD(1000);
+		}
+		spin += dtime(&tm);
+
+		if (spin >= max_spin * spin_fac) {
+if (db) fprintf(stderr, "check_xrecord: SPIN-OUT: %.3f/%.3f\n", spin,
+    max_spin * spin_fac);
+			break;
+		}
+		if (got_pointer_input > gp) {
+			gp = got_pointer_input;
+			flush2 = 1;
+		}
+
+		X_LOCK;
+		if (flush2) {
+			XFlush(dpy);
+		}
+		XRecordProcessReplies(rdpy_data);
+		X_UNLOCK;
+		if (! button_mask) {
+			break;
+		}
+	}
+
+if (db) fprintf(stderr, "  f1: %d  f2: %d\n", flush1, flush2);
+	/* since we've flushed it, we might as well avoid -input_skip */
+	if (flush1 || flush2) {
+		got_keyboard_input = 0;
+		got_pointer_input = 0;
+	}
+
+	if (scr_ev_cnt) {
+		int dret;
+		double bdpush = 0.0;
+		static double last_border_push = 0.0;
+
+		if (persist_start > 0.0 && 
+			this_scroll > last_border_push + 1.00) {
+			bdpush = 0.0;
+			last_border_push = this_scroll;
+		}
+		dret = push_scr_ev(bdpush);
+		if (! button_mask) {
+			dret = 0;
+		}
+		ret = 1 + dret;
+		scr_ev_cnt = 0;
+	}
+
+	if (xrecording) {
+		if (ret < 2) {
+			xrecord_watch(0);
+		}
+	}
+
+	if (this_scroll > 0.0) {
+		last_mouse_scroll = this_scroll;
+	}
+
+	if (ret == 2) {
+		if (persist_start == 0.0) {
+			dtime(&persist_start);
+		}
+	} else {
+		persist_start = 0.0;
+	}
+
+	return ret;
+}
+
+int check_xrecord(void) {
+	int watch_keys = 0, watch_mouse = 0;
+
+	if (! use_xrecord) {
+		return 0;
+	}
+	if (scaling && ! got_scrollcopyrect) {
+		return 0;
+	}
+
+	if (! xrecording) {
+		return 0;
+	}
+
+	if (!strcmp(scroll_copyrect, "always")) {
+		watch_keys = 1;
+		watch_mouse = 1;
+	} else if (!strcmp(scroll_copyrect, "keys")) {
+		watch_keys = 1;
+	} else if (!strcmp(scroll_copyrect, "mouse")) {
+		watch_mouse = 1;
+	}
+
+	if (watch_mouse && button_mask && xrecord_set_by_mouse) {
+		return check_xrecord_mouse();
+	} else if (watch_keys && xrecord_set_by_keys) {
+		return check_xrecord_keys();
+	} else {
+		return 0;
+	}
+}
+
+#define DB_SET \
+	int db  = 0; \
+	int db2 = 0; \
+	if (debug_wireframe == 1) { \
+		db = 1; \
+	} \
+	if (debug_wireframe == 2) { \
+		db2 = 1; \
+	} \
+	if (debug_wireframe == 3) { \
+		db = 1; \
+		db2 = 1; \
+	}
+
+int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy,
+    int *obscured) {
+
+	static int dt_bad = 0;
+	static time_t dt_bad_check = 0;
+	int x1, y1, x2, y2, sent_copyrect = 0;
+	DB_SET
+
+	*obscured = 0;
+	/*
+	 * XXX KDE and xfce do some weird things with the 
+	 * stacking, it does not match XQueryTree.  Work around
+	 * it for now by CopyRect-ing the *whole* on-screen 
+	 * rectangle (whether obscured or not!)
+	 */
+	if (time(0) > dt_bad_check + 5) {
+		char *dt = guess_desktop();
+		if (!strcmp(dt, "kde")) {
+			dt_bad = 1;
+		} else if (!strcmp(dt, "xfce")) {
+			dt_bad = 1;
+		} else {
+			dt_bad = 0;
+		}
+		dt_bad_check = time(0);
+	}
+
+	if (dt_bad) {
+		sraRegionPtr rect;
+		/* send the whole thing... */
+		x1 = crfix(nfix(x,   dpy_x), dx, dpy_x);
+		y1 = crfix(nfix(y,   dpy_y), dy, dpy_y);
+		x2 = crfix(nfix(x+w, dpy_x), dx, dpy_x);
+		y2 = crfix(nfix(y+h, dpy_y), dy, dpy_y);
+
+		rect = sraRgnCreateRect(x1, y1, x2, y2);
+		do_copyregion(rect, dx, dy);
+		sraRgnDestroy(rect);
+
+		sent_copyrect = 1;
+		*obscured = 1;	/* set to avoid an aggressive push */
+
+	} else if (stack_list) {
+		int k, tx1, tx2, ty1, ty2;
+		sraRegionPtr moved_win, tmp_win;
+		int saw_me = 0;
+		int orig_x, orig_y;
+		XWindowAttributes attr;
+
+		orig_x = x - dx;
+		orig_y = y - dy;
+
+		tx1 = nfix(orig_x,   dpy_x);
+		ty1 = nfix(orig_y,   dpy_y);
+		tx2 = nfix(orig_x+w, dpy_x);
+		ty2 = nfix(orig_y+h, dpy_y);
+
+if (db2) fprintf(stderr, "moved_win: %4d %3d, %4d %3d  0x%lx ---\n",
+	tx1, ty1, tx2, ty2, frame);
+
+		moved_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
+
+		X_LOCK;
+
+		/*
+		 * loop over the stack, top to bottom until we
+		 * find our wm frame:
+		 */
+		for (k = stack_num - 1; k >= 0; k--) {
+			Window swin = stack_list[k];
+			if (swin == frame) {
+if (db2) {
+saw_me = 1;
+fprintf(stderr, "  ----------\n");
+} else {
+				break;	
+}
+			}
+
+			/* skip some unwanted cases: */
+			if (swin == None) {
+				continue;
+			}
+			if (!valid_window(swin, &attr)) {
+				continue;
+			}
+			if (attr.map_state != IsViewable) {
+				continue;
+			}
+
+			/*
+			 * first subtract any overlap from the initial
+			 * window rectangle
+			 */
+
+			/* clip the window to the visible screen: */
+			tx1 = nfix(attr.x, dpy_x);
+			ty1 = nfix(attr.y, dpy_y);
+			tx2 = nfix(attr.x + attr.width,  dpy_x);
+			ty2 = nfix(attr.y + attr.height, dpy_y);
+
+if (db2) fprintf(stderr, "  tmp_win-1: %4d %3d, %4d %3d  0x%lx\n",
+	tx1, ty1, tx2, ty2, swin);
+if (db2 && saw_me) continue;
+
+			/* see if window clips us: */
+			tmp_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
+			if (sraRgnAnd(tmp_win, moved_win)) {
+				*obscured = 1;
+if (db2) fprintf(stderr, "         : clips it.\n");
+			}
+			sraRgnDestroy(tmp_win);
+
+			/* subtract it from our region: */
+			tmp_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
+			sraRgnSubtract(moved_win, tmp_win);
+			sraRgnDestroy(tmp_win);
+
+			/*
+			 * next, subtract from the initial window rectangle
+			 * anything that woul
+			 * window rectangle
+			 */
+
+			/* clip the window to the visible screen: */
+			tx1 = nfix(attr.x - dx, dpy_x);
+			ty1 = nfix(attr.y - dy, dpy_y);
+			tx2 = nfix(attr.x - dx + attr.width,  dpy_x);
+			ty2 = nfix(attr.y - dy + attr.height, dpy_y);
+
+if (db2) fprintf(stderr, "  tmp_win-2: %4d %3d, %4d %3d  0x%lx\n",
+	tx1, ty1, tx2, ty2, swin);
+if (db2 && saw_me) continue;
+
+			/* subtract it from our region: */
+			tmp_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
+			sraRgnSubtract(moved_win, tmp_win);
+			sraRgnDestroy(tmp_win);
+		}
+		X_UNLOCK;
+
+		if (*obscured && !strcmp(wireframe_copyrect, "top")) {
+			;	/* cannot send CopyRegion */
+		} else if (! sraRgnEmpty(moved_win)) {
+			sraRegionPtr whole, shifted_region;
+
+			whole = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
+			shifted_region = sraRgnCreateRgn(moved_win);
+			sraRgnOffset(shifted_region, dx, dy);
+			sraRgnAnd(shifted_region, whole);
+
+			sraRgnDestroy(whole);
+
+			/* now send the CopyRegion: */
+			if (! sraRgnEmpty(shifted_region)) {
+if (db2) fprintf(stderr, "do_copyregion: %d %d %d %d  dx: %d  dy: %d\n", tx1, ty1, tx2, ty2, dx, dy);
+				do_copyregion(shifted_region, dx, dy);
+				sent_copyrect = 1;
+			}
+			sraRgnDestroy(shifted_region);
+		}
+		sraRgnDestroy(moved_win);
+	}
+	return sent_copyrect;
+}
+		
+int near_wm_edge(int x, int y, int w, int h, int px, int py) {
+	/* heuristics: */
+	int wf_t = wireframe_top;
+	int wf_b = wireframe_bot;
+	int wf_l = wireframe_left;
+	int wf_r = wireframe_right;
+
+	int near_edge = 0;
+	
+	if (wf_t || wf_b || wf_l || wf_r) {
+		if (nabs(y - py) < wf_t) {
+			near_edge = 1;
+		}
+		if (nabs(y + h - py) < wf_b) {
+			near_edge = 1;
+		}
+		if (nabs(x - px) < wf_l) {
+			near_edge = 1;
+		}
+		if (nabs(x + w - px) < wf_r) {
+			near_edge = 1;
+		}
+	} else {
+		/* all zero; always "near" edge: */
+		near_edge = 1;
+	}
+	return near_edge;
+}
+
+int near_scrollbar_edge(int x, int y, int w, int h, int px, int py) {
+	/* heuristics: */
+	int sb_t = scrollcopyrect_top;
+	int sb_b = scrollcopyrect_bot;
+	int sb_l = scrollcopyrect_left;
+	int sb_r = scrollcopyrect_right;
+
+	int near_edge = 0;
+	
+	if (sb_t || sb_b || sb_l || sb_r) {
+		if (nabs(y - py) < sb_t) {
+			near_edge = 1;
+		}
+		if (nabs(y + h - py) < sb_b) {
+			near_edge = 1;
+		}
+		if (nabs(x - px) < sb_l) {
+			near_edge = 1;
+		}
+		if (nabs(x + w - px) < sb_r) {
+			near_edge = 1;
+		}
+	} else {
+		/* all zero; always "near" edge: */
+		near_edge = 1;
+	}
+	return near_edge;
+}
+
 /*
  * Applied just before any check_user_input() modes.  Look for a
  * ButtonPress; find window it happened in; find the wm frame window
@@ -19267,7 +21642,7 @@ int crfix(int x, int dx, int Lx) {
  * reduces actual XShmGetImage work (i.e. if we correctly predicted how
  * the X fb has changed.
  *
- * -scale doesn't work under -wirecopyrect, but the wireframe does.
+ * -scale doesn't always work under -wirecopyrect, but the wireframe does.
  *
  * testing of this mode under -threads is incomplete.
  *
@@ -19285,27 +21660,22 @@ int check_wireframe(void) {
 	int orig_px, orig_py, orig_x, orig_y, orig_w, orig_h;
 	int px, py, x, y, w, h;
 	int box_x, box_y, box_w, box_h;
-	int orig_cursor_x, orig_cursor_y, g, g_in;
+	int orig_cursor_x, orig_cursor_y, g;
 	int already_down = 0, win_gone = 0, win_unmapped = 0;
 	double spin = 0.0, tm = 0.0, last_ptr, last_draw;
 	int frame_changed = 0, drew_box = 0, got_2nd_pointer = 0;
-	int break_reason = 0;
+	int special_t1 = 0, break_reason = 0;
 	static double first_dt_ave = 0.0;
 	static int first_dt_cnt = 0;
 	static time_t last_save_stacklist = 0;
 	
 	/* heuristics: */
-	int wf_t = wireframe_top;
-	int wf_b = wireframe_bot;
-	int wf_l = wireframe_left;
-	int wf_r = wireframe_right;
 	double first_event_spin   = wireframe_t1;
 	double frame_changed_spin = wireframe_t2;
 	double max_spin = wireframe_t3;
 	double min_draw = wireframe_t4;
-
-	int db = 0;
-	int db2 = 0;
+	int near_edge;
+	DB_SET
 
 	if (subwin) {
 		return 0;	/* don't even bother for -id case */
@@ -19317,7 +21687,7 @@ int check_wireframe(void) {
 		return 0;	/* need ptr input, e.g. button down, motion */
 	}
 
-if (db || db2) fprintf(stderr, "\n*** button down!!  x: %d  y: %d\n", cursor_x, cursor_y);
+if (db) fprintf(stderr, "\n*** button down!!  x: %d  y: %d\n", cursor_x, cursor_y);
 
 	/*
 	 * Query where the pointer is and which child of the root
@@ -19333,10 +21703,6 @@ if (db) fprintf(stderr, "NO get_wm_frame_pos: 0x%lx\n", frame);
 	X_UNLOCK;
 if (db) fprintf(stderr, "a: %d  wf: %.3f  A: %d\n", w*h, wireframe_frac, (dpy_x*dpy_y));
 
-	if (nabs(x + w - px) < 35) {
-		maybe_scrolling = frame;	/* not yet used... */
-	}
-
 	/*
 	 * apply the percentage size criterion (allow opaque moves for
 	 * small windows)
@@ -19351,30 +21717,38 @@ if (db) fprintf(stderr, "  frame: x: %d  y: %d  w: %d  h: %d  px: %d  py: %d  fr
 	 * see if the pointer is within range of the assumed wm frame
 	 * decorations on the edge of the window.
 	 */
-	if (wf_t || wf_b || wf_l || wf_r) {
-		int near_edge = 0;
-		if (nabs(y - py) < wf_t) {
-			near_edge = 1;
-		}
-		if (nabs(y + h - py) < wf_b) {
-			near_edge = 1;
-		}
-		if (nabs(x - px) < wf_l) {
-			near_edge = 1;
-		}
-		if (nabs(x + w - px) < wf_r) {
-			near_edge = 1;
-		}
-		if (! near_edge) {
-if (db) fprintf(stderr, "INTERIOR %d %d %d %d\n", wf_t, wf_b, wf_l, wf_r);
-			return 0;
-		}
+
+	near_edge = near_wm_edge(x, y, w, h, px, py);
+	if (! near_edge) {
+if (db) fprintf(stderr, "INTERIOR\n");
+		return 0;
 	}
 
 	wireframe_in_progress = 1;
 
 	if (button_mask_prev) {
 		already_down = 1;
+	}
+	
+	if (! wireframe_str || !strcmp(wireframe_str, WIREFRAME_PARMS)) {
+		int latency = get_net_latency();
+		int netrate = get_net_rate();
+		static int didmsg = 0;
+
+		if (latency > 100 || netrate < 10) { /* 100ms, 10KB/sec */
+			/* slow link, e.g. dialup, increase timeouts: */
+			first_event_spin   *= 2.0;
+			frame_changed_spin *= 2.0;
+			max_spin *= 2.0;
+			min_draw *= 1.5;
+			if (! didmsg) {
+				rfbLog("increased wireframe timeouts for "
+				    "slow network connection.\n");
+				rfbLog("netrate: %d KB/sec, latency: %d ms\n",
+				    netrate, latency);
+				didmsg = 1;
+			}
+		}
 	}
 
 	/*
@@ -19384,6 +21758,7 @@ if (db) fprintf(stderr, "INTERIOR %d %d %d %d\n", wf_t, wf_b, wf_l, wf_r);
 	 */
 	if (strcmp(wireframe_copyrect, "never")) {
 		if (already_down) {
+			double age = 0.0;
 			/*
 			 * see if we can reuse the stack list (pause
 			 * with button down)
@@ -19396,25 +21771,17 @@ if (db) fprintf(stderr, "INTERIOR %d %d %d %d\n", wf_t, wf_b, wf_l, wf_r);
 						break;
 					}
 				}
-				if (! got_me) {
-					last_save_stacklist = 0;
+				if (got_me) {
+					age = 1.0;
 				}
+				snapshot_stack_list(0, age);
 			}
-			if (stack_list && time(0) > last_save_stacklist + 1) {
-				/* stack_list too old */
-				X_LOCK;
-				XFree(stack_list);
-				stack_list = NULL;
-				stack_num  = 0;
-				X_UNLOCK;
-			}
-		} else if (! stack_list) {
-			/* ! already_down, might as well get a copy */
-			X_LOCK;
-			snapshot_stack_list();
-			X_UNLOCK;
+		}
+		if (! stack_list) {
+			snapshot_stack_list(0, 0.0);
 		}
 	}
+
 
 	/* store initial parameters, we look for changes in them */
 	orig_frame = frame;
@@ -19444,7 +21811,7 @@ if (db) fprintf(stderr, "INTERIOR %d %d %d %d\n", wf_t, wf_b, wf_l, wf_r);
 		pointer(-1, 0, 0, NULL);
 	}
 
-	g = g_in = got_pointer_input;
+	g = got_pointer_input;
 
 	while (1) {
 
@@ -19456,28 +21823,37 @@ if (db) fprintf(stderr, "INTERIOR %d %d %d %d\n", wf_t, wf_b, wf_l, wf_r);
 		if (use_threads) {
 			usleep(1000);
 		} else if (drew_box) {
-			rfbPE(screen, 1000);
+			rfbPE(1000);
 		} else {
-			rfbCFD(screen, 1000);
+			rfbCFD(1000);
 		}
 
 		spin += dtime(&tm);
 
 		/* check for any timeouts: */
 		if (frame_changed) {
+			double delay;
 			/* max time we play this game: */
 			if (spin > max_spin) {
 if (db || db2) fprintf(stderr, " SPIN-OUT-MAX: %.3f\n", spin);
 				break_reason = 1;
 				break;
 			}
-			/* pointer events slowing down: */
-			if (spin > last_ptr + frame_changed_spin) {
+			/* watch for pointer events slowing down: */
+			if (special_t1) {
+				delay = max_spin;
+			} else {
+				delay = 2.0* frame_changed_spin;
+				if (spin > 3.0 * frame_changed_spin) {
+					delay = 1.5 * delay;
+				}
+			}
+			if (spin > last_ptr + delay) {
 if (db || db2) fprintf(stderr, " SPIN-OUT-NOT-FAST: %.3f\n", spin);
 				break_reason = 2;
 				break;
 			}
-		} else if(got_2nd_pointer) {
+		} else if (got_2nd_pointer) {
 			/*
 			 * pointer is moving, max time we wait for wm
 			 * move or resize to be detected
@@ -19501,6 +21877,10 @@ if (db || db2) fprintf(stderr, " SPIN-OUT-NO2ND_PTR: %.3f\n", spin);
 if (db) fprintf(stderr, "  ++pointer event!! [%02d]  dt: %.3f  x: %d  y: %d  mask: %d\n", got_2nd_pointer+1, spin, cursor_x, cursor_y, button_mask);	
 
 			g = got_pointer_input;
+
+			X_LOCK;
+			XFlush(dpy);
+			X_UNLOCK;
 
 			/* periodically try to let the wm get moving: */
 			if (!frame_changed && got_2nd_pointer % 4 == 0) {
@@ -19622,7 +22002,7 @@ if (db) fprintf(stderr, "FRAME MOVE  1st-dt: %.3f\n", first_dt_ave/n);
 					    ! drew_box) {
 						draw_box(x, y, w, h, 0);
 						drew_box = 1;
-						rfbPE(screen, 1000);
+						rfbPE(1000);
 						last_draw = spin;
 					}
 				}
@@ -19667,15 +22047,19 @@ if (db || db2) fprintf(stderr, "NO button_mask\n");
 	/*
 	 * see if we can apply CopyRect or CopyRegion to the change:
 	 */
-	if (!scaling && w == orig_w && h == orig_h && (dx != 0 || dy != 0) &&
-	   !win_gone && !win_unmapped && strcmp(wireframe_copyrect, "never")) {
-
-		int x1, y1, x2, y2, t, tmax = 50;
+	if (!strcmp(wireframe_copyrect, "never")) {
+		;
+	} else if (win_gone || win_unmapped) {
+		;
+	} else if (scaling && ! got_wirecopyrect) {
+		;
+	} else if (w != orig_w || h != orig_h) {
+		;
+	} else if (dx == 0 && dy == 0) {
+		;
+	} else {
 		int spin_ms = (int) (spin * 1000 * 1000);
-		int sent_copyrect = 0;
-		int obscured = 0;
-		static int dt_bad = 0;
-		static time_t dt_bad_check = 0;
+		int obscured, sent_copyrect = 0;
 
 		/*
 		 * set a timescale comparable to the spin time,
@@ -19688,176 +22072,18 @@ if (db || db2) fprintf(stderr, "NO button_mask\n");
 		}
 
 		/* try to flush the wireframe removal: */
-		fb_update_sent(NULL);
-		rfbPE(screen, spin_ms/3);	/* long select */
-		for (t=0; t<tmax; t++) {
-			if (fb_update_sent(NULL)) {
-if (db2) fprintf(stderr, "A-FB_UPDATE_SENT: t=%d\n", t);
-				break;
-			}
-			rfbPE(screen, 1000);	/* short selects. */
-		}
+		fb_push();
 
-		/*
-		 * XXX KDE and xfce do some weird things with the 
-		 * stacking, it does not match XQueryTree.  Work around
-		 * it for now by CopyRect-ing the *whole* on-screen 
-		 * rectangle (whether obscured or not!)
-		 */
-		if (time(0) > dt_bad_check + 5) {
-			if (!strcmp(guess_desktop(), "kde")) {
-				dt_bad = 1;
-			} else if (!strcmp(guess_desktop(), "xfce")) {
-				dt_bad = 1;
-			} else {
-				dt_bad = 0;
-			}
-			dt_bad_check = time(0);
-		}
-
-		if (dt_bad) {
-			/* send the whole thing... */
-			x1 = crfix(nfix(x,   dpy_x), dx, dpy_x);
-			y1 = crfix(nfix(y,   dpy_y), dy, dpy_y);
-			x2 = crfix(nfix(x+w, dpy_x), dx, dpy_x);
-			y2 = crfix(nfix(y+h, dpy_y), dy, dpy_y);
-
-			rfbDoCopyRect(screen, x1, y1, x2, y2, dx, dy);
-
-			sent_copyrect = 1;
-			obscured = 1;	/* set to avoid an aggressive push */
-
-if (db2) fprintf(stderr, "CopyRect: x1: %d  y1: %d  x2: %d  y2: %d  dx: %d dy: %d  spin: %.3f\n", x1, y1, x2, y2, dx, dy, spin);
-
-		} else if (stack_list) {
-			int k, tx1, tx2, ty1, ty2;
-			sraRegionPtr moved_win, tmp_win;
-			int saw_me = 0;
-
-			tx1 = nfix(orig_x,   dpy_x);
-			ty1 = nfix(orig_y,   dpy_y);
-			tx2 = nfix(orig_x+w, dpy_x);
-			ty2 = nfix(orig_y+h, dpy_y);
-
-if (db2) fprintf(stderr, "moved_win: %4d %3d, %4d %3d  0x%lx ---\n", tx1, ty1, tx2, ty2, frame);
-
-			moved_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
-
-			X_LOCK;
-
-			/*
-			 * loop over the stack, top to bottom until we
-			 * find our wm frame:
-			 */
-			for (k = stack_num - 1; k >= 0; k--) {
-				Window win = stack_list[k];
-				if (win == frame) {
-if (db2) {
-	saw_me = 1;
-	fprintf(stderr, "  ----------\n");
-} else {
-					break;	
-}
-				}
-
-				/* skip some unwanted cases: */
-				if (win == None) {
-					continue;
-				}
-				if (!valid_window(win, &attr)) {
-					continue;
-				}
-				if (attr.map_state != IsViewable) {
-					continue;
-				}
-
-				/* clip the window to the visable screen: */
-				tx1 = nfix(attr.x, dpy_x);
-				ty1 = nfix(attr.y, dpy_y);
-				tx2 = nfix(attr.x + attr.width,  dpy_x);
-				ty2 = nfix(attr.y + attr.height, dpy_y);
-
-if (db2) fprintf(stderr, "  tmp_win: %4d %3d, %4d %3d  0x%lx\n", tx1, ty1, tx2, ty2, win);
-if (db2 && saw_me) continue;
-
-				/* see if window clips us: */
-				tmp_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
-				if (sraRgnAnd(tmp_win, moved_win)) {
-					obscured = 1;
-if (db2) fprintf(stderr, "         : clips it.\n");
-				}
-				sraRgnDestroy(tmp_win);
-
-				/* subtract it from our region: */
-				tmp_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
-				sraRgnSubtract(moved_win, tmp_win);
-				sraRgnDestroy(tmp_win);
-			}
-			X_UNLOCK;
-
-			if (obscured && !strcmp(wireframe_copyrect, "top")) {
-				;	/* cannot send CopyRegion */
-			} else if (! sraRgnEmpty(moved_win)) {
-				sraRectangleIterator *iter;
-				sraRegionPtr whole, shifted_region;
-				sraRect rect;
-
-				/*
-				 * prepare for CopyRegion, apply dx and
-				 * dy to each rectangle in the region.
-				 * keep only the part on the screen.
-				 */
-				whole = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
-				shifted_region = sraRgnCreate();
-	
-if (db2) fprintf(stderr, "\n");
-
-				iter = sraRgnGetIterator(moved_win);
-				while (sraRgnIteratorNext(iter, &rect)) {
-					tx1 = rect.x1 + dx;
-					ty1 = rect.y1 + dy;
-					tx2 = rect.x2 + dx;
-					ty2 = rect.y2 + dy;
-
-if (db2) fprintf(stderr, "  shf_win: %4d %3d, %4d %3d\n", tx1, ty1, tx2, ty2);
-
-					tmp_win = sraRgnCreateRect(tx1, ty1,
-					    tx2, ty2);
-					sraRgnAnd(tmp_win, whole);
-					if (! sraRgnEmpty(tmp_win)) {
-						sraRgnOr(shifted_region,
-						    tmp_win);
-					}
-					sraRgnDestroy(tmp_win);
-				}
-				sraRgnReleaseIterator(iter);
-				sraRgnDestroy(whole);
-
-				/* now send the CopyRegion: */
-				if (! sraRgnEmpty(shifted_region)) {
-					rfbDoCopyRegion(screen, shifted_region,
-					    dx, dy);
-					sent_copyrect = 1;
-if (db2) fprintf(stderr, "  rfbDoCopyRegion\n");
-				}
-				sraRgnDestroy(shifted_region);
-			}
-			sraRgnDestroy(moved_win);
-		}
+		/* try to send a clipped copyrect of translation: */
+		sent_copyrect = try_copyrect(frame, x, y, w, h, dx, dy,
+		    &obscured);
 
 		if (sent_copyrect) {
-
 			/* try to push the changes to viewers: */
-			fb_update_sent(NULL);
-			rfbPE(screen, spin_ms/3);
 			if (! obscured) {
-				for (t=0; t<tmax; t++) {
-					if (fb_update_sent(NULL)) {
-if (db2) fprintf(stderr, "B-FB_UPDATE_SENT: t=%d\n", t);
-						break;
-					}
-					rfbPE(screen, 1000);
-				}
+				fb_push();
+			} else {
+				fb_push();
 			}
 		}
 	}
@@ -19867,8 +22093,7 @@ if (db2) fprintf(stderr, "B-FB_UPDATE_SENT: t=%d\n", t);
 		if (break_reason == 1 || break_reason == 2) {
 			/*
 			 * save the stack list, perhaps the user has
-			 * paused with button down. XXX unstable if
-			 * windows in the list go away?
+			 * paused with button down.
 			 */
 			last_save_stacklist = time(0);
 		} else {
@@ -19881,7 +22106,7 @@ if (db2) fprintf(stderr, "B-FB_UPDATE_SENT: t=%d\n", t);
 	}
 
 	/* final push (for -nowirecopyrect) */
-	rfbPE(screen, 1000);
+	rfbPE(1000);
 	wireframe_in_progress = 0;
 	return 1;
 }
@@ -19934,9 +22159,9 @@ static void check_user_input2(double dt) {
 	 */
 	while (1) {
 		if (show_multiple_cursors) {
-			rfbPE(screen, 1000);
+			rfbPE(1000);
 		} else {
-			rfbCFD(screen, 1000);
+			rfbCFD(1000);
 		}
 		X_LOCK;
 		XFlush(dpy);
@@ -19999,9 +22224,9 @@ static void check_user_input2(double dt) {
 		for (i=0; i<split; i++) {
 			usleep(ms * 1000);
 			if (show_multiple_cursors) {
-				rfbPE(screen, 1000);
+				rfbPE(1000);
 			} else {
-				rfbCFD(screen, 1000);
+				rfbCFD(1000);
 			}
 			spin += dtime(&tm);
 			if (got_pointer_input > g) {
@@ -20055,9 +22280,9 @@ static void check_user_input3(double dt) {
 		int mcut = miss_max;
 
 		if (show_multiple_cursors) {
-			rfbPE(screen, 1000);
+			rfbPE(1000);
 		} else {
-			rfbCFD(screen, 1000);
+			rfbCFD(1000);
 		}
 		X_LOCK;
 		XFlush(dpy);
@@ -20136,9 +22361,9 @@ static void check_user_input3(double dt) {
 		for (i=0; i<split; i++) {
 			usleep(ms * 1000);
 			if (show_multiple_cursors) {
-				rfbPE(screen, 1000);
+				rfbPE(1000);
 			} else {
-				rfbCFD(screen, 1000);
+				rfbCFD(1000);
 			}
 			spin += dtime(&tm);
 			if (got_pointer_input > g) {
@@ -20212,7 +22437,7 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 			drag_in_progress = 1;
 		}
 
-		rfbCFD(screen, rfb_wait_ms * 1000);
+		rfbCFD(rfb_wait_ms * 1000);
 
 		dtm = dtime(&tm);
 		spin += dtm;
@@ -20272,7 +22497,7 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 	if (ginput >= 2) {
 		/* try for a couple more quick ones */
 		for (i=0; i<2; i++) {
-			rfbCFD(screen, rfb_wait_ms * 1000);
+			rfbCFD(rfb_wait_ms * 1000);
 		}
 	}
 
@@ -20385,7 +22610,7 @@ static void check_user_input5(double dt, double dtr, int tile_diffs) {
 			}
 			/* damn, they didn't push our frame! */
 			iter++;
-			rfbPE(screen, rfb_wait_ms * 1000);
+			rfbPE(rfb_wait_ms * 1000);
 			
 			push_spin += dtime(&tp);
 		}
@@ -20443,7 +22668,7 @@ static void check_user_input5(double dt, double dtr, int tile_diffs) {
 		}
 
 		/* turn libvncserver crank to process events: */
-		rfbCFD(screen, rfb_wait_ms * 1000);
+		rfbCFD(rfb_wait_ms * 1000);
 
 		dtm = dtime(&tm);
 		spin += dtm;
@@ -20507,7 +22732,7 @@ static void check_user_input5(double dt, double dtr, int tile_diffs) {
 	if (ginput >= 2) {
 		/* try for a couple more quick ones */
 		for (i=0; i<2; i++) {
-			rfbCFD(screen, rfb_wait_ms * 1000);
+			rfbCFD(rfb_wait_ms * 1000);
 		}
 	}
 	drag_in_progress = 0;
@@ -20517,7 +22742,15 @@ static int check_user_input(double dt, double dtr, int tile_diffs, int *cnt) {
 
 	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
 
-	maybe_scrolling = None;
+	if (use_xrecord) {
+		int rc = check_xrecord();
+		if (rc == 1) {
+			return 0;
+		} else if (rc == 2) {
+if (0) fprintf(stderr, "  CXR: check_user_input ret 1\n");
+			return 1;
+		}
+	}
 
 	if (wireframe) {
 		if (check_wireframe()) {
@@ -20593,67 +22826,90 @@ double dtime(double *t_old) {
 
 void measure_display_hook(rfbClientPtr cl) {
 	ClientData *cd = (ClientData *) cl->clientData;
+#if 0
+double tm = 0.0;
+dtime(&tm);
+fprintf(stderr, "   MDH: %.4f\n", tm); 
+#endif
 	cd->timer = 0.0;
 	dtime(&cd->timer);
-}
-
-void measure_send_rates_init(void) {
-	int i, bs, rbs;
-	rfbClientIteratorPtr iter;
-	rfbClientPtr cl;
-
-	screen->displayHook = measure_display_hook;
-
-	iter = rfbGetClientIterator(screen);
-	while( (cl = rfbClientIteratorNext(iter)) ) {
-		ClientData *cd = (ClientData *) cl->clientData;
-		bs = 0;
-		for (i=0; i<MAX_ENCODINGS; i++) {
-			bs += cl->bytesSent[i];
-		}
-		rbs = cl->rawBytesEquivalent;
-		
-		cd->set_cmp_bytes = bs;
-		cd->set_raw_bytes = rbs;
-		cd->timer = -1.0;
-	}
-	rfbReleaseClientIterator(iter);
 }
 
 int get_rate(int which) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
-	int i, samples = RATE_SAMPLES;
-	double dslowest = -1.0, dsum;
+	int irate, irate_min = 1;	/* 1 KB/sec */
+	int irate_max = 100000;		/* 100 MB/sec */
+	double slowest = -1.0, rate;
+	static double save_rate = 10000.0;	/* 10000.0 B/sec */
 	
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
-
-		dsum = 0.0;
-		for (i=0; i<samples; i++) {
-			if (which == 0) {
-				dsum += cd->cmp_samp[i];
-			} else {
-				dsum += cd->raw_samp[i];
-			}
+		
+		if (which == 0) {
+			rate = cd->send_cmp_rate;
+		} else {
+			rate = cd->send_raw_rate;
 		}
-		dsum = dsum / samples;
-		if (dsum > dslowest) {
-			dslowest = dsum;
+		if (slowest == -1.0 || rate < slowest) {
+			slowest = rate;
 		}
 		
 	}
 	rfbReleaseClientIterator(iter);
 
-	if (dslowest < 0.0) {
-		if (which == 0) {
-			dslowest = 5000.0;
-		} else {
-			dslowest = 50000.0;
+	if (slowest == -1.0) {
+		slowest = save_rate;
+	} else {
+		save_rate = slowest;
+	}
+
+	irate = (int) (slowest/1000.0);
+	if (irate < irate_min) {
+		irate = irate_min;
+	}
+	if (irate > irate_max) {
+		irate = irate_max;
+	}
+
+	return irate;
+}
+
+int get_latency(void) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int ilat, ilat_min = 1;	/* 1 ms */
+	int ilat_max = 2000;	/* 2 sec */
+	double slowest = -1.0, lat;
+	static double save_lat = 0.020;	/* 20 ms */
+	
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		ClientData *cd = (ClientData *) cl->clientData;
+		
+		lat = cd->latency;
+		if (slowest == -1.0 || lat > slowest) {
+			slowest = lat;
 		}
 	}
-	return (int) dslowest;
+	rfbReleaseClientIterator(iter);
+
+	if (slowest == -1.0) {
+		slowest = save_lat;
+	} else {
+		save_lat = slowest;
+	}
+
+	ilat = (int) (slowest * 1000.0);
+	if (ilat < ilat_min) {
+		ilat = ilat_min;
+	}
+	if (ilat > ilat_max) {
+		ilat = ilat_max;
+	}
+
+	return ilat;
 }
 
 int get_cmp_rate(void) {
@@ -20665,24 +22921,26 @@ int get_raw_rate(void) {
 }
 
 void initialize_speeds(void) {
-	char *s, *p;
+	char *s, *s_in, *p;
 	int i;
 
 	speeds_read_rate = 0;
 	speeds_net_rate = 0;
 	speeds_net_latency = 0;
 	if (! speeds_str || *speeds_str == '\0') {
-		return;
+		s_in = strdup("");
+	} else {
+		s_in = strdup(speeds_str);
 	}
 
-	if (!strcmp(speeds_str, "modem")) {
+	if (!strcmp(s_in, "modem")) {
 		s = strdup("6,4,200");
-	} else if (!strcmp(speeds_str, "dsl")) {
+	} else if (!strcmp(s_in, "dsl")) {
 		s = strdup("6,100,50");
-	} else if (!strcmp(speeds_str, "lan")) {
+	} else if (!strcmp(s_in, "lan")) {
 		s = strdup("6,5000,1");
 	} else {
-		s = strdup(speeds_str);
+		s = strdup(s_in);
 	}
 
 	p = strtok(s, ",");
@@ -20703,11 +22961,39 @@ void initialize_speeds(void) {
 		p = strtok(NULL, ",");
 	}
 	free(s);
+	free(s_in);
+
+	if (! speeds_read_rate) {
+		int n = 0;
+		double dt, timer = 0.0;
+		dtime(&timer);
+		if (fullscreen) {
+			copy_image(fullscreen, 0, 0, 0, 0);
+			n = fullscreen->bytes_per_line * fullscreen->height;
+		} else if (scanline) {
+			copy_image(scanline, 0, 0, 0, 0);
+			n = scanline->bytes_per_line * scanline->height;
+		}
+		dt = dtime(&timer);
+		if (n && dt > 0.0) {
+			double rate = ((double) n) / dt;
+			speeds_read_rate_measured = (int) (rate/1000000.0);
+			if (speeds_read_rate_measured < 1) {
+				speeds_read_rate_measured = 1;
+			} else {
+				rfbLog("fb read rate: %d MB/sec\n",
+				    speeds_read_rate_measured);
+			}
+		}
+	}
 }
 
 int get_read_rate(void) {
 	if (speeds_read_rate) {
 		return speeds_read_rate;
+	}
+	if (speeds_read_rate_measured) {
+		return speeds_read_rate_measured;
 	}
 	return 0;
 }
@@ -20716,6 +23002,12 @@ int get_net_rate(void) {
 	if (speeds_net_rate) {
 		return speeds_net_rate;
 	}
+	if (! speeds_net_rate_measured) {
+		speeds_net_rate_measured = get_cmp_rate();
+	}
+	if (speeds_net_rate_measured) {
+		return speeds_net_rate_measured;
+	}
 	return 0;
 }
 
@@ -20723,100 +23015,61 @@ int get_net_latency(void) {
 	if (speeds_net_latency) {
 		return speeds_net_latency;
 	}
+	if (! speeds_net_latency_measured) {
+		speeds_net_latency_measured = get_latency();
+	}
+	if (speeds_net_latency_measured) {
+		return speeds_net_latency_measured;
+	}
 	return 0;
 }
 
 void measure_send_rates(int init) {
-	int i, j, nclient = 0;
-	int min_width = 200;
-	double dt, cmp_rate, raw_rate;
-	rfbClientPtr id[100]; 
-	double dts[100], dts_sorted[100], dtmp;
-	int sorted[100], did[100], best;
+	double cmp_rate, raw_rate;
+	static double now, start = 0.0;
+	static rfbDisplayHookPtr orig_display_hook = NULL;
+	double cmp_max = 1.0e+08;	/* 100 MB/sec */
+	double cmp_min = 1000.0;	/* 9600baud */
+	double lat_max = 5.0;		/* 5 sec */
+	double lat_min = .0005;		/* 0.5 ms */
+	int min_cmp = 10000, nclients;
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
+	int db = 0;
 
 	if (! measure_speeds) {
 		return;
 	}
-	if (init) {
-		measure_send_rates_init();
+	if (speeds_net_rate && speeds_net_latency) {
 		return;
 	}
 
-	iter = rfbGetClientIterator(screen);
-	while( (cl = rfbClientIteratorNext(iter)) ) {
-		double tmp2;
-		ClientData *cd = (ClientData *) cl->clientData;
-		tmp2 = 0.0;
-		dtime(&tmp2);
-if (init) {
-	continue;
-}
-		if (cd->timer <= 0.0) {
-			continue;
-		}
-		dt = dtime(&cd->timer);
-		cd->timer = dt;
-		if (nclient < 100) {
-			id[nclient] = cl;
-			dts[nclient] = dt;
-			nclient++;
-		}
+	if (! orig_display_hook) {
+		orig_display_hook = screen->displayHook;
 	}
-	rfbReleaseClientIterator(iter);
-if (init) {
-	return;
-}
 
-	for (i=0; i<nclient; i++) {
-		did[i] = 0;
+	if (start == 0.0) {
+		dtime(&start);
 	}
-	for (i=0; i<nclient; i++) {
-		dtmp = -1.0;
-		best = -1;
-		for (j=0; j<nclient; j++) {
-			if (did[j]) {
-				continue;
-			}
-			if (dts[j] > dtmp) {
-				best = j;
-				dtmp = dts[j];
-			}
-		} 
-		did[best] = 1;
-		sorted[i] = best;
-		dts_sorted[i] = dts[best];
-	}
-	
+	now = 0.0;
+	dtime(&now);
+	now = now - start;
+
+	nclients = 0;
 
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
-		int db, dbr, cbs, rbs;
+		int defer, i, cbs, rbs;
+		char *httpdir;
+		double dt, dt1 = 0.0, dt2, dt3;
+		double tm, spin_max = 15.0, spin_lat_max = 1.5;
+		int got_t2 = 0, got_t3 = 0;
 		ClientData *cd = (ClientData *) cl->clientData;
 
-		dt = cd->timer;
-		if (dt <= 0.0) {
+		if (cd->send_cmp_rate > 0.0) {
 			continue;
 		}
-		if (nclient > 1) {
-			for (i=0; i<nclient; i++) {
-				if (cl != id[i]) {
-					continue;
-				}
-				for (j=0; j<nclient; j++) {
-					if (sorted[j] == i) {
-						if (j < nclient - 1) {
-							dt -= dts_sorted[j+1];
-						}
-					}
-				}
-				break;
-			}
-		}
-		if (dt <= 0.0) {
-			continue;
-		}
+		nclients++;
 
 		cbs = 0;
 		for (i=0; i<MAX_ENCODINGS; i++) {
@@ -20824,42 +23077,257 @@ if (init) {
 		}
 		rbs = cl->rawBytesEquivalent;
 
-		db  = cbs - cd->set_cmp_bytes;
-		dbr = rbs - cd->set_raw_bytes;
-		cmp_rate = db/dt;
-		raw_rate = dbr/dt;
-		if (dbr > min_width * min_width * bpp/8) {
-			cd->sample++;
-			if (cd->sample >= RATE_SAMPLES) {
-				cd->sample = 0;
-			}
-			i = cd->sample;
-			cd->cmp_samp[i] = cmp_rate;
-			cd->raw_samp[i] = raw_rate;
+		if (init) {
+			double tmr = 0.0;
+
+if (db) fprintf(stderr, "%d client num rects req: %d  mod: %d  cbs: %d  "
+    "rbs: %d  dt1: %.3f  t: %.3f\n", init,
+    (int) sraRgnCountRects(cl->requestedRegion),
+    (int) sraRgnCountRects(cl->modifiedRegion), cbs, rbs, dt1, now);
+
+			dtime(&tmr);
+			cd->timer = tmr;
+			cd->cmp_bytes_sent = cbs;
+			cd->raw_bytes_sent = rbs;
+			continue;
 		}
+
+		/* first part of the bulk transfer of initial screen */
+		dt1 = dtime(&cd->timer);
+
+if (db) fprintf(stderr, "%d client num rects req: %d  mod: %d  cbs: %d  "
+    "rbs: %d  dt1: %.3f  t: %.3f\n", init,
+    (int) sraRgnCountRects(cl->requestedRegion),
+    (int) sraRgnCountRects(cl->modifiedRegion), cbs, rbs, dt1, now);
+
+		if (dt1 <= 0.0) {
+			continue;
+		}
+
+		cbs = cbs - cd->cmp_bytes_sent;
+		rbs = rbs - cd->raw_bytes_sent;
+
+		if (cbs < min_cmp) {
+			continue;
+		}
+
+		rfbPE(1000);
+		if (sraRgnCountRects(cl->modifiedRegion)) {
+			rfbPE(1000);
+		}
+
+		defer = screen->deferUpdateTime;
+		httpdir = screen->httpDir;
+		screen->deferUpdateTime = 0;
+		screen->httpDir = NULL;
+
+		/* mark a small rectangle: */
+		mark_rect_as_modified(0, 0, 16, 16, 1);
+
+		tm = 0.0;
+		dtime(&tm);
+
+		dt2 = 0.0;
+		dt3 = 0.0;
+
+		if (dt1 < 0.25) {
+			/* try to cut it down to avoid long pauses. */
+			spin_max = 5.0;
+		}
+
+		/* when req1 = 1 mod1 == 0, end of 2nd part of bulk transfer */
+		while (1) {
+			int req0, req1, mod0, mod1;
+			req0 = sraRgnCountRects(cl->requestedRegion);
+			mod0 = sraRgnCountRects(cl->modifiedRegion);
+			if (use_threads) {
+				usleep(1000);
+			} else {
+				if (mod0) {
+					rfbPE(1000);
+				} else {
+					rfbCFD(1000);
+				}
+			}
+			dt = dtime(&tm);
+			dt2 += dt;
+			if (dt2 > spin_max) {
+				break;
+			}
+			req1 = sraRgnCountRects(cl->requestedRegion);
+			mod1 = sraRgnCountRects(cl->modifiedRegion);
+
+if (db) fprintf(stderr, "dt2 calc: num rects req: %d/%d mod: %d/%d  "
+    "fbu-sent: %d  dt: %.4f dt2: %.4f  tm: %.4f\n",
+    req0, req1, mod0, mod1, cl->framebufferUpdateMessagesSent, dt, dt2, tm);
+			if (req1 != 0 && mod1 == 0) {
+				got_t2 = 1;
+				break;
+			}
+		}
+
+		if (! got_t2) {
+			dt2 = 0.0;
+		} else {
+			int tr, trm = 3;
+			double dts[10];
+			
+			/*
+			 * Note: since often select(2) cannot sleep
+			 * less than 1/HZ (e.g. 10ms), the resolution
+			 * of the latency may be messed up by something
+			 * of this order.  Effect may occur on both ends,
+			 * i.e. the viewer may not respond immediately.
+			 */
+		
+			for (tr = 0; tr < trm; tr++) {
+				usleep(5000);
+
+				/* mark a 2nd small rectangle: */
+				mark_rect_as_modified(0, 0, 16, 16, 1);
+				i = 0;
+				tm = 0.0;
+				dtime(&tm);
+				dt3 = 0.0;
+
+				/*
+				 * when req1 > 0 and mod1 == 0, we say
+				 * that is the "ping" time.
+				 */
+				while (1) {
+					int req0, req1, mod0, mod1;
+
+					req0 = sraRgnCountRects(
+					    cl->requestedRegion);
+					mod0 = sraRgnCountRects(
+					    cl->modifiedRegion);
+
+					if (i == 0) {
+						rfbPE(0);
+					} else {
+						if (use_threads) {
+							usleep(1000);
+						} else {
+							/* try to get it all */
+							rfbCFD(1000*1000);
+						}
+					}
+					dt = dtime(&tm);
+					i++;
+
+					dt3 += dt;
+					if (dt3 > spin_lat_max) {
+						break;
+					}
+					req1 = sraRgnCountRects(
+					    cl->requestedRegion);
+
+					mod1 = sraRgnCountRects(
+					    cl->modifiedRegion);
+
+if (db) fprintf(stderr, "dt3 calc: num rects req: %d/%d mod: %d/%d  "
+    "fbu-sent: %d  dt: %.4f dt3: %.4f  tm: %.4f\n",
+    req0, req1, mod0, mod1, cl->framebufferUpdateMessagesSent, dt, dt3, tm);
+
+					if (req1 != 0 && mod1 == 0) {
+						dts[got_t3++] = dt3;
+						break;
+					}
+				}
+			}
+		
+			if (! got_t3) {
+				dt3 = 0.0;
+			} else {
+				if (got_t3 == 1) {
+					dt3 = dts[0];
+				} else if (got_t3 == 2) {
+					dt3 = dts[1];
+				} else {
+					if (dts[2] >= 0.0) {
+						double rat = dts[1]/dts[2];
+						if (rat > 0.5 && rat < 2.0) {
+							dt3 = dts[1]+dts[2];
+							dt3 *= 0.5;
+						} else {
+							dt3 = dts[1];
+						}
+					} else {
+						dt3 = dts[1];
+					}
+				}
+			}
+		}
+		
+		screen->deferUpdateTime = defer;
+		screen->httpDir = httpdir;
+
+		dt = dt1 + dt2;
+
+
+		if (dt3 <= dt2/2.0) {
+			/* guess only 1/2 a ping for reply... */
+			dt = dt - dt3/2.0;
+		}
+
+		cmp_rate = cbs/dt;
+		raw_rate = rbs/dt;
+
+		if (cmp_rate > cmp_max) {
+			cmp_rate = cmp_max;
+		}
+		if (cmp_rate <= cmp_min) {
+			cmp_rate = cmp_min;
+		}
+
+		cd->send_cmp_rate = cmp_rate;
+		cd->send_raw_rate = raw_rate;
+
+		if (dt3 > lat_max) {
+			dt3 = lat_max;
+		}
+		if (dt3 <= lat_min) {
+			dt3 = lat_min;
+		}
+
+		cd->latency = dt3;
+		
+		rfbLog("client %d network rate %.1f KB/sec (%.1f eff KB/sec)\n",
+		    cd->uid, cmp_rate/1000.0, raw_rate/1000.0);
+		rfbLog("client %d latency:  %.1f ms\n", cd->uid, 1000.0*dt3);
+		rfbLog("dt1: %.4f, dt2: %.4f dt3: %.4f bytes: %d\n",
+		    dt1, dt2, dt3, cbs);
 	}
 	rfbReleaseClientIterator(iter);
+
+	if (init) {
+		if (nclients) {
+			screen->displayHook = measure_display_hook;
+		}
+	} else {
+		screen->displayHook = orig_display_hook;
+	}
 }
 
 /*
  * utility wrapper to call rfbProcessEvents
  * checks that we are not in threaded mode.
  */
-void rfbPE(rfbScreenInfoPtr scr, long usec) {
-	if (! scr) {
+void rfbPE(long usec) {
+	if (! screen) {
 		return;
 	}
 	if (! use_threads) {
-		rfbProcessEvents(scr, usec);
+		rfbProcessEvents(screen, usec);
 	}
 }
 
-void rfbCFD(rfbScreenInfoPtr scr, long usec) {
-	if (! scr) {
+void rfbCFD(long usec) {
+	if (! screen) {
 		return;
 	}
 	if (! use_threads) {
-		rfbCheckFds(scr, usec);
+		rfbCheckFds(screen, usec);
 	}
 }
 
@@ -20880,11 +23348,14 @@ static void watch_loop(void) {
 		got_user_input = 0;
 		got_pointer_input = 0;
 		got_keyboard_input = 0;
+		urgent_update = 0;
 
 		if (! use_threads) {
 			double tm = 0.0;
 			dtime(&tm);
-			rfbPE(screen, -1);
+			measure_send_rates(1);
+			rfbPE(-1);
+			measure_send_rates(0);
 			dtr = dtime(&tm);
 			fb_update_sent(NULL);
 
@@ -20895,6 +23366,7 @@ static void watch_loop(void) {
 			if (screen && screen->clientHead && 
 			    check_user_input(dt, dtr, tile_diffs, &cnt)) {
 				/* true means loop back for more input */
+if (0) fprintf(stderr, "watch_loop: LOOP-BACK\n");
 				continue;
 			}
 		} else if (use_threads && wireframe && button_mask) {
@@ -20905,23 +23377,25 @@ static void watch_loop(void) {
 			clean_up_exit(0);
 		}
 
-		if (do_copy_screen) {
-			do_copy_screen = 0;
-			copy_screen();
-		}
+		if (! urgent_update) {
+			if (do_copy_screen) {
+				do_copy_screen = 0;
+				copy_screen();
+			}
 
-		check_new_clients();
-		check_xevents();
-		check_connect_inputs();		
-		check_padded_fb();		
-		check_xdamage_state();
-		if (started_as_root) {
-			check_switched_user();
-		}
+			check_new_clients();
+			check_xevents();
+			check_connect_inputs();		
+			check_padded_fb();		
+			check_xdamage_state();
+			if (started_as_root) {
+				check_switched_user();
+			}
 
-		if (first_conn_timeout < 0) {
-			start = time(0);
-			first_conn_timeout = -first_conn_timeout;
+			if (first_conn_timeout < 0) {
+				start = time(0);
+				first_conn_timeout = -first_conn_timeout;
+			}
 		}
 
 		if (! screen || ! screen->clientHead) {
@@ -20962,7 +23436,6 @@ static void watch_loop(void) {
 			double tm = 0.0;
 			dtime(&tm);
 
-			RFBUNDRAWCURSOR(screen);
 			if (use_snapfb) {
 				int t, tries = 5;
 				copy_snap();
@@ -20973,6 +23446,9 @@ static void watch_loop(void) {
 				tile_diffs = scan_for_updates(0);
 			}
 			dt = dtime(&tm);
+if (0 && tile_diffs > 4) {
+fprintf(stderr, "TILES: %d  dt: %.4f  t: %.4f\n", tile_diffs, dt, tm);
+}
 			check_x11_pointer();
 		}
 
@@ -21701,7 +24177,10 @@ static void print_help(int mode) {
 "                       heuristics and may not always work: it depends on your\n"
 "                       window manager and even how you move things around.\n"
 "                       See -pointer_mode below for discussion of the \"bogging\n"
-"                       down\" problem this tries to avoid. Default: %s\n"
+"                       down\" problem this tries to avoid.\n"
+"                       Default: %s\n"
+"\n"
+"                       Shorter aliases:  -wf [str]  and -nowf\n"
 "\n"
 "                       The value \"str\" is optional and, of course, is\n"
 "                       packed with many tunable parameters for this scheme:\n"
@@ -21739,16 +24218,67 @@ static void print_help(int mode) {
 "                       link this might be a better choice: 0.25+0.6+6.0+0.15\n"
 "\n"
 "-wirecopyrect mode     Since the -wireframe mechanism evidently tracks moving\n"
-"-nowirecopyrect        windows, a speedup can be obtained by telling the VNC\n"
-"                       viewers to locally copy the translated window region.\n"
-"                       This is the VNC CopyRect encoding: the framebuffer\n"
-"                       update doesn't need to send the actual new image data.\n"
+"-nowirecopyrect        windows accurately, a speedup can be obtained by\n"
+"                       telling the VNC viewers to locally copy the translated\n"
+"                       window region.  This is the VNC CopyRect encoding:\n"
+"                       the framebuffer update doesn't need to send the actual\n"
+"                       new image data.\n"
+"\n"
+"                       Shorter aliases:  -wcr [mode]  and -nowcr\n"
+"\n"
 "                       \"mode\" can be \"never\" (same as -nowirecopyrect)\n"
 "                       to never try the copyrect, \"top\" means only do it if\n"
 "                       the window was not covered by any other windows, and\n"
 "                       \"always\" means to translate the orginally unobscured\n"
 "                       region (this may look odd as the remaining pieces come\n"
-"                       in, but helps on a slow link) Default: %s\n"
+"                       in, but helps on a slow link).  Default: \"%s\"\n"
+"\n"
+"                       Note: there can be painting errors when using -scale\n"
+"                       so CopyRect is skipped when scaling unless you specify\n"
+"                       -wirecopyrect on the command line or by remote-control.\n"
+"\n"
+"-scrollcopyrect mode   Like -wirecopyrect, but use heuristics to try to guess\n"
+"-noscrollcopyrect      if a window has scrolled its contents (either vertically\n"
+"                       or horizontally).  This requires the RECORD X extension\n"
+"                       to \"snoop\" on X applications (currently for certain\n"
+"                       XCopyArea and XConfigureWindow X protocol requests).\n"
+"                       Examples: Hitting <Return> in a terminal window when the\n"
+"                       cursor was at the bottom, the text scrolls up one line.\n"
+"                       Hitting <Down> arrow in a web browser window, the web\n"
+"                       page scrolls up a small amount.\n"
+"\n"
+"                       Shorter aliases:  -scr [mode]  and -noscr\n"
+"\n"
+"                       This scheme will not always detect scrolls, but when\n"
+"                       it does there is a nice speedup from using the VNC\n"
+"                       CopyRect encoding (see -wirecopyrect).  The speedup\n"
+"                       is both in reduced network traffic and reduced X\n"
+"                       framebuffer polling/copying.  On the other hand,\n"
+"                       it may induce undesired transients (e.g. a terminal\n"
+"                       cursor being scrolled up when it should not be) or other\n"
+"                       painting errors.  These are automatically repaired in a\n"
+"                       short period of time.  If this is unacceptable disable\n"
+"                       the feature with -noscrollcopyrect.\n"
+"\n"
+"                       \"mode\" can be \"never\" (same as -noscrollcopyrect)\n"
+"                       to never try the copyrect, \"keys\" means to try it\n"
+"                       in response to keystrokes only, \"mouse\" means to\n"
+"                       try it in response to mouse events only, \"always\"\n"
+"                       means to do both. Default: \"%s\"\n"
+"\n"
+"                       Note: there can be painting errors when using\n"
+"                       -scale so CopyRect is skipped when scaling unless\n"
+"                       you specify -scrollcopyrect on the command line or\n"
+"                       by remote-control.\n"
+"\n"
+"-scr_area n            Set the minimum area in pixels for a rectangle\n"
+"                       to be considered for the -scrollcopyrect detection\n"
+"                       scheme.  This is to avoid wasting the effort on small\n"
+"                       rectangles that would be quickly updated the normal way.\n"
+"                       E.g. suppose an app updated the position of its skinny\n"
+"                       scrollbar first and then shifted the large panel\n"
+"                       it controlled.  We want to be sure to skip the small\n"
+"                       scrollbar and get the large panel. Default: %d\n"
 "\n"
 "-pointer_mode n        Various pointer motion update schemes. \"-pm\" is\n"
 "                       an alias.  The problem is pointer motion can cause\n"
@@ -22204,11 +24734,14 @@ static void print_help(int mode) {
 "                       buttonmap:str   set -buttonmap \"str\", empty to disable\n"
 "                       dragging        disable -nodragging mode.\n"
 "                       nodragging      enable  -nodragging mode.\n"
-"                       wireframe       enable  -wireframe mode.\n"
-"                       nowireframe     disable -wireframe mode.\n"
+"                       wireframe       enable  -wireframe mode. same as \"wf\"\n"
+"                       nowireframe     disable -wireframe mode. same as \"nowf\"\n"
 "                       wireframe:str   enable  -wireframe mode string.\n"
 "                       wireframe_mode:str enable  -wireframe mode string.\n"
-"                       wirecopyrect:str set -wirecopyrect string.\n"
+"                       wirecopyrect:str set -wirecopyrect string. same as \"wcr:\"\n"
+"                       scrollcopyrect:str set -scrollcopyrect string. same \"scr\"\n"
+"                       noscrollcopyrect disable -scrollcopyrect mode. \"noscr\"\n"
+"                       scr_area:n      set -scr_area to n\n"
 "                       pointer_mode:n  set -pointer_mode to n. same as \"pm\"\n"
 "                       input_skip:n    set -input_skip to n.\n"
 "                       speeds:str      set -speeds to str.\n"
@@ -22251,6 +24784,15 @@ static void print_help(int mode) {
 "                       dontdisconnect   enable  -dontdisconnect mode.\n"
 "                       nodontdisconnect disable -dontdisconnect mode.\n"
 "                                        (may interfere with other options)\n"
+"                       debug_xevents   enable  debugging X events.\n"
+"                       nodebug_xevents disable debugging X events.\n"
+"                       debug_xdamage   enable  debugging X DAMAGE mechanism.\n"
+"                       nodebug_xdamage disable debugging X DAMAGE mechanism.\n"
+"                       debug_wireframe enable   debugging wireframe mechanism.\n"
+"                       nodebug_wireframe disable debugging wireframe mechanism.\n"
+"                       debug_scroll    enable  debugging scrollcopy mechanism.\n"
+"                       nodebug_scroll  disable debugging scrollcopy mechanism.\n"
+"\n"
 "                       noremote        disable the -remote command processing,\n"
 "                                       it cannot be turned back on.\n"
 "\n"
@@ -22307,13 +24849,14 @@ static void print_help(int mode) {
 "                       add_keysyms noadd_keysyms clear_mods noclear_mods\n"
 "                       clear_keys noclear_keys remap repeat norepeat\n"
 "                       fb nofb bell nobell sel nosel primary noprimary\n"
-"                       cursorshape nocursorshape cursorpos nocursorpos\n"
-"                       cursor show_cursor noshow_cursor nocursor arrow\n"
-"                       xfixes noxfixes xdamage noxdamage xd_area xd_mem\n"
-"                       alphacut alphafrac alpharemove noalpharemove alphablend\n"
-"                       noalphablend xwarp xwarppointer noxwarp noxwarppointer\n"
-"                       buttonmap dragging nodragging wireframe_mode\n"
-"                       wireframe nowireframe wirecopyrect nowirecopyrect\n"
+"                       cursorshape nocursorshape cursorpos nocursorpos cursor\n"
+"                       show_cursor noshow_cursor nocursor arrow xfixes noxfixes\n"
+"                       xdamage noxdamage xd_area xd_mem alphacut alphafrac\n"
+"                       alpharemove noalpharemove alphablend noalphablend\n"
+"                       xwarp xwarppointer noxwarp noxwarppointer buttonmap\n"
+"                       dragging nodragging wireframe_mode wireframe wf\n"
+"                       nowireframe nowf wirecopyrect wcr nowirecopyrect nowcr\n"
+"                       scr_area scrollcopyrect scr noscrollcopyrect noscr\n"
 "                       pointer_mode pm input_skip input client_input speeds\n"
 "                       debug_pointer dp nodebug_pointer nodp debug_keyboard dk\n"
 "                       nodebug_keyboard nodk deferupdate defer wait rfbwait\n"
@@ -22323,19 +24866,23 @@ static void print_help(int mode) {
 "                       noalwaysshared nevershared noalwaysshared dontdisconnect\n"
 "                       nodontdisconnect desktop noremote\n"
 "\n"
-"                       aro=  debug_xevents debug_xdamage display vncdisplay\n"
-"                       desktopname http_url auth users rootshift clipshift\n"
-"                       scale_str scaled_x scaled_y scale_numer scale_denom\n"
-"                       scale_fac scaling_blend scaling_nomult4 scaling_pad\n"
-"                       scaling_interpolate inetd privremote unsafe safer\n"
-"                       nocmds passwdfile using_shm logfile o flag rc norc h\n"
-"                       help V version lastmod bg sigpipe threads pipeinput\n"
-"                       clients client_count pid ext_xtest ext_xtrap ext_xkb\n"
-"                       ext_xshm ext_xinerama ext_overlay ext_xfixes ext_xdamage\n"
-"                       ext_xrandr rootwin num_buttons button_mask mouse_x\n"
-"                       mouse_y bpp depth indexed_color dpy_x dpy_y wdpy_x\n"
-"                       wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth\n"
-"                       passwd\n"
+"                       aro=  debug_xevents nodebug_xevents debug_xevents\n"
+"                       debug_xdamage nodebug_xdamage debug_xdamage\n"
+"                       debug_wireframe nodebug_wireframe debug_wireframe\n"
+"                       debug_scroll nodebug_scroll debug_scroll display\n"
+"                       vncdisplay desktopname http_url auth users rootshift\n"
+"                       clipshift scale_str scaled_x scaled_y scale_numer\n"
+"                       scale_denom scale_fac scaling_blend scaling_nomult4\n"
+"                       scaling_pad scaling_interpolate inetd privremote\n"
+"                       unsafe safer nocmds passwdfile using_shm logfile\n"
+"                       o flag rc norc h help V version lastmod bg sigpipe\n"
+"                       threads readrate netrate netlatency pipeinput clients\n"
+"                       client_count pid ext_xtest ext_xtrap ext_xrecord\n"
+"                       ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes\n"
+"                       ext_xdamage ext_xrandr rootwin num_buttons button_mask\n"
+"                       mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y\n"
+"                       wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y\n"
+"                       rfbauth passwd\n"
 "\n"
 "-sync                  By default -remote commands are run asynchronously, that\n"
 "                       is, the request is posted and the program immediately\n"
@@ -22357,6 +24904,8 @@ static void print_help(int mode) {
 "                       taken place.\n"
 "\n"
 "-noremote              Do not process any remote control commands or queries.\n"
+"-yesremote             Do process remote control commands or queries.\n"
+"                       Default: %s\n"
 "\n"
 "                       A note about security wrt remote control commands.\n"
 "                       If someone can connect to the X display and change\n"
@@ -22386,10 +24935,10 @@ static void print_help(int mode) {
 "-safer                 Equivalent to: -novncconnect -noremote and prohibiting\n"
 "                       -gui and the -connect file. Shuts off communcation\n"
 "                       channels.\n"
-"-privremote            Perform some sanity checks and only allow remote-control\n"
+"-privremote            Perform some sanity checks and disable remote-control\n"
 "                       commands if it appears that the X DISPLAY and/or\n"
-"                       connectfile cannot be accessed by other users. (not\n"
-"                       complete, does not check for empty access control list)\n"
+"                       connectfile can be accessed by other users.  Once\n"
+"                       remote-control is disabled it cannot be turned back on.\n"
 "-nocmds                No external commands (e.g. system(3), popen(3), exec(3))\n"
 "                       will be run.\n"
 "\n"
@@ -22441,6 +24990,8 @@ static void print_help(int mode) {
 		wireframe ? "-wireframe":"-nowireframe",
 		WIREFRAME_PARMS,
 		wireframe_copyrect_default,
+		scroll_copyrect_default,
+		scrollcopyrect_min_area,
 		pointer_mode_max, pointer_mode,
 		ui_skip,
 		defer_update,
@@ -22453,6 +25004,7 @@ static void print_help(int mode) {
 		gaps_fill,
 		grow_fill,
 		tile_fuzz,
+		accept_remote_cmds ? "-yesremote":"-noremote",
 		""
 	);
 
@@ -23134,6 +25686,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-arrow")) {
 			CHECK_ARGC
 			alt_arrow = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-xfixes")) { 
+			use_xfixes = 1;
 		} else if (!strcmp(arg, "-noxfixes")) { 
 			use_xfixes = 0;
 		} else if (!strcmp(arg, "-alphacut")) {
@@ -23160,7 +25714,8 @@ int main(int argc, char* argv[]) {
 			pointer_remap = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-nodragging")) {
 			show_dragging = 0;
-		} else if (!strcmp(arg, "-wireframe")) {
+		} else if (!strcmp(arg, "-wireframe")
+		    || !strcmp(arg, "-wf")) {
 			wireframe = 1;
 			if (i < argc-1) {
 				char *s = argv[i+1];
@@ -23168,13 +25723,32 @@ int main(int argc, char* argv[]) {
 					wireframe_str = strdup(argv[++i]);
 				}
 			}
-		} else if (!strcmp(arg, "-nowireframe")) {
+		} else if (!strcmp(arg, "-nowireframe")
+		    || !strcmp(arg, "-nowf")) {
 			wireframe = 0;
-		} else if (!strcmp(arg, "-wirecopyrect")) {
+		} else if (!strcmp(arg, "-wirecopyrect")
+		    || !strcmp(arg, "-wcr")) {
 			CHECK_ARGC
 			set_wirecopyrect_mode(argv[++i]);
-		} else if (!strcmp(arg, "-nowirecopyrect")) {
+			got_wirecopyrect = 1;
+		} else if (!strcmp(arg, "-nowirecopyrect")
+		    || !strcmp(arg, "-nowf")) {
 			set_wirecopyrect_mode("never");
+		} else if (!strcmp(arg, "-scrollcopyrect")
+		    || !strcmp(arg, "-scr")) {
+			CHECK_ARGC
+			set_scrollcopyrect_mode(argv[++i]);
+			got_scrollcopyrect = 1;
+		} else if (!strcmp(arg, "-noscrollcopyrect")
+		    || !strcmp(arg, "-noscr")) {
+			set_scrollcopyrect_mode("never");
+		} else if (!strcmp(arg, "-scr_area")) {
+			int tn;
+			CHECK_ARGC
+			tn = atoi(argv[++i]);
+			if (tn >= 0) {
+				scrollcopyrect_min_area = tn;
+			}
 		} else if (!strcmp(arg, "-pointer_mode")
 		    || !strcmp(arg, "-pm")) {
 			char *p, *s;
@@ -23219,6 +25793,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-sb")) {
 			CHECK_ARGC
 			screen_blank = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-xdamage")) {
+			use_xdamage = 1;
 		} else if (!strcmp(arg, "-noxdamage")) {
 			use_xdamage = 0;
 		} else if (!strcmp(arg, "-xd_area")) {
@@ -23280,7 +25856,7 @@ int main(int argc, char* argv[]) {
 				} 
 			}
 		} else if (!strcmp(arg, "-remote") || !strcmp(arg, "-R")
-		    || !strcmp(arg, "-r")) {
+		    || !strcmp(arg, "-r") || !strcmp(arg, "-remote-control")) {
 			CHECK_ARGC
 			i++;
 			if (!strcmp(argv[i], "ping")) {
@@ -23299,6 +25875,8 @@ int main(int argc, char* argv[]) {
 			remote_sync = 1;
 		} else if (!strcmp(arg, "-noremote")) {
 			accept_remote_cmds = 0;
+		} else if (!strcmp(arg, "-yesremote")) {
+			accept_remote_cmds = 1;
 		} else if (!strcmp(arg, "-unsafe")) {
 			safe_remote_only = 0;
 		} else if (!strcmp(arg, "-privremote")) {
@@ -23561,6 +26139,9 @@ int main(int argc, char* argv[]) {
 
 	if (! wireframe_copyrect) {
 		set_wirecopyrect_mode(NULL);
+	}
+	if (! scroll_copyrect) {
+		set_scrollcopyrect_mode(NULL);
 	}
 
 	/* increase rfbwait if threaded */
@@ -23852,6 +26433,14 @@ int main(int argc, char* argv[]) {
 		exit(rc);
 	}
 
+	if (priv_remote) {
+		if (! remote_control_access_ok()) {
+			rfbLog("** Disabling remote commands in -privremote "
+			    "mode.\n");
+			accept_remote_cmds = 0;
+		}
+	}
+
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 	if (! XFixesQueryExtension(dpy, &xfixes_base_event_type, &er)) {
 		if (! quiet) {
@@ -24016,7 +26605,16 @@ int main(int argc, char* argv[]) {
 	 * input is not processed) we tell the server to process our
 	 * requests during all grabs:
 	 */
-	disable_grabserver();
+	disable_grabserver(dpy);
+
+	/* check for RECORD */
+	if (! XRecordQueryVersion_wr(dpy, &maj, &min)) {
+		xrecord_present = 0;
+	} else {
+		xrecord_present = 1;
+	}
+
+	initialize_xrecord();
 
 	/* check for OS with small shm limits */
 	if (using_shm && ! single_copytile) {
@@ -24174,4 +26772,5 @@ int main(int argc, char* argv[]) {
 #undef argc
 #undef argv
 }
+
 

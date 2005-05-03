@@ -189,6 +189,11 @@ Debugging
 	=GA tail-logfile
 	quiet
 	--
+	debug_xevents
+	debug_xdamage
+	debug_wireframe
+	debug_scroll
+	--
 	=GA show-start-cmd
 	=DG debug_gui
 
@@ -232,6 +237,8 @@ Tuning
 	wireframe
 	wireframe_mode:
 	=-C:never,top,always wirecopyrect:
+	=-C:never,keys,mouse,always scrollcopyrect:
+	scr_area:
 	--
 	noshm
 	flipbyteorder

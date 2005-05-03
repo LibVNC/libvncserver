@@ -1,3 +1,14 @@
+2005-05-02  Karl Runge <runge@karlrunge.com>
+	* initial support for using RECORD to detect some types of window
+	  scrolls.  This is "-scrollcopyrect" mode, use -noscrollcopyrect
+	  to disable.  Much tuning and painting error repair still required.  
+	* more build time customizations: REMOTE_DEFAULT, REMOTE_CONTROL,
+	  EXTERNAL_COMMANDS, NOREPEAT, WIREFRAME*, SCROLL*, ...
+	* added bandwidth and latency measurements.
+	* added XListHosts to -privremote check.
+	* debug_* remote-control variables.
+	* removed OLD_TREE stuff.
+
 2005-04-19  Karl Runge <runge@karlrunge.com>
 	* somewhat safer remote-control defaults, and addnl options for
 	  more safe operation: -privremote, -safer, -nocmds, -unsafe

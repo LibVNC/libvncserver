@@ -52,6 +52,7 @@ AH_TEMPLATE(HAVE_LIBXRANDR, [XRANDR extension build environment present])
 AH_TEMPLATE(HAVE_LIBXFIXES, [XFIXES extension build environment present])
 AH_TEMPLATE(HAVE_LIBXDAMAGE, [XDAMAGE extension build environment present])
 AH_TEMPLATE(HAVE_LIBXTRAP, [DEC-XTRAP extension build environment present])
+AH_TEMPLATE(HAVE_RECORD, [RECORD extension build environment present])
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 	AC_CHECK_LIB(X11, XGetImage, HAVE_X="true",
 		HAVE_X="false",
@@ -72,6 +73,11 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 		AC_CHECK_LIB(Xtst, XTestFakeKeyEvent, 
 			X_PRELIBS="$X_PRELIBS -lXtst"
 			[AC_DEFINE(HAVE_XTEST)], ,
+			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		AC_CHECK_LIB(Xtst, XRecordEnableContextAsync, 
+			X_PRELIBS="$X_PRELIBS -lXtst"
+			[AC_DEFINE(HAVE_RECORD)], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
 		# we use XTRAP on X11R5, or user can set X11VNC_USE_XTRAP
@@ -131,6 +137,19 @@ fi
 AC_SUBST(X_LIBS)
 AM_CONDITIONAL(HAVE_X, test $HAVE_X != "false")
 
+if test "$PACKAGE_NAME" = "x11vnc" -a $HAVE_X = "false"; then
+	AC_MSG_ERROR([
+==========================================================================
+a working X window system build environment is required to build x11vnc.
+Make sure any required X development packages are installed.  If they are
+installed in non-standard locations, one can use the --x-includes=DIR
+and --x-libraries=DIR configure options or set the CPPFLAGS and LDFLAGS
+environment variables to indicate where the X window system header files
+and libraries may be found.
+==========================================================================
+])
+fi
+
 # Checks for libraries.
 
 AC_ARG_WITH(jpeg,
@@ -168,6 +187,17 @@ if test "x$with_jpeg" != "xno"; then
 			LDFLAGS="$saved_LDFLAGS"
 		fi
 	fi
+	if test "$PACKAGE_NAME" = "x11vnc"; then
+		if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
+			AC_MSG_WARN([
+libjpeg compression library was not found: this may lead to reduced performance
+especially over slow links.  If libjpeg is in a non-standard location
+use --with-jpeg=DIR to indicate the header file is in DIR/include/jpeglib.h
+and the library in DIR/lib/libjpeg.a.  A copy of libjpeg may be obtained
+from: ftp://ftp.uu.net/graphics/jpeg/
+])
+		fi
+	fi
 fi
 
 AC_ARG_WITH(libz,
@@ -196,6 +226,17 @@ if test "x$with_zlib" != "xno" -a "x$with_libz" != "xno"; then
 		if test "x$HAVE_ZLIB_H" != "xtrue"; then
 			CPPFLAGS="$saved_CPPFLAGS"
 			LDFLAGS="$saved_LDFLAGS"
+		fi
+	fi
+	if test "$PACKAGE_NAME" = "x11vnc"; then
+		if test "x$HAVE_ZLIB_H" != "xtrue"; then
+			AC_MSG_WARN([
+libz compression library was not found: this may lead to reduced performance,
+especially over slow links.  If libz is in a non-standard location
+use --with-zlib=DIR to indicate the header file is in DIR/include/zlib.h
+and the library in DIR/lib/libz.a.  A copy of libz may be obtained
+from: http://www.gzip.org/zlib/
+])
 		fi
 	fi
 fi
