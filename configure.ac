@@ -137,10 +137,10 @@ fi
 AC_SUBST(X_LIBS)
 AM_CONDITIONAL(HAVE_X, test $HAVE_X != "false")
 
-if test "$PACKAGE_NAME" = "x11vnc" -a $HAVE_X = "false"; then
+if test "$PACKAGE_NAME" = "x11vnc" -a "x$HAVE_X" = "xfalse"; then
 	AC_MSG_ERROR([
 ==========================================================================
-a working X window system build environment is required to build x11vnc.
+A working X window system build environment is required to build x11vnc.
 Make sure any required X development packages are installed.  If they are
 installed in non-standard locations, one can use the --x-includes=DIR
 and --x-libraries=DIR configure options or set the CPPFLAGS and LDFLAGS
@@ -190,11 +190,13 @@ if test "x$with_jpeg" != "xno"; then
 	if test "$PACKAGE_NAME" = "x11vnc"; then
 		if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
 			AC_MSG_WARN([
-libjpeg compression library was not found: this may lead to reduced performance
-especially over slow links.  If libjpeg is in a non-standard location
-use --with-jpeg=DIR to indicate the header file is in DIR/include/jpeglib.h
-and the library in DIR/lib/libjpeg.a.  A copy of libjpeg may be obtained
-from: ftp://ftp.uu.net/graphics/jpeg/
+==========================================================================
+The libjpeg compression library was not found: this may lead to reduced
+performance, especially over slow links.  If libjpeg is in a non-standard
+location use --with-jpeg=DIR to indicate the header file is in
+DIR/include/jpeglib.h and the library in DIR/lib/libjpeg.a.  A copy of
+libjpeg may be obtained from: ftp://ftp.uu.net/graphics/jpeg/
+==========================================================================
 ])
 		fi
 	fi
@@ -231,11 +233,13 @@ if test "x$with_zlib" != "xno" -a "x$with_libz" != "xno"; then
 	if test "$PACKAGE_NAME" = "x11vnc"; then
 		if test "x$HAVE_ZLIB_H" != "xtrue"; then
 			AC_MSG_WARN([
-libz compression library was not found: this may lead to reduced performance,
-especially over slow links.  If libz is in a non-standard location
-use --with-zlib=DIR to indicate the header file is in DIR/include/zlib.h
-and the library in DIR/lib/libz.a.  A copy of libz may be obtained
-from: http://www.gzip.org/zlib/
+==========================================================================
+The libz compression library was not found: this may lead to reduced
+performance, especially over slow links.  If libz is in a non-standard
+location use --with-zlib=DIR to indicate the header file is in
+DIR/include/zlib.h and the library in DIR/lib/libz.a.  A copy of
+libz may be obtained from: http://www.gzip.org/zlib/
+==========================================================================
 ])
 		fi
 	fi

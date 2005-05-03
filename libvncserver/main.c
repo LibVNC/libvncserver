@@ -172,12 +172,14 @@ void rfbDoCopyRect(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2,int dx,in
 {
   sraRegionPtr region = sraRgnCreateRect(x1,y1,x2,y2);
   rfbDoCopyRegion(screen,region,dx,dy);
+  sraRgnDestroy(region);
 }
 
 void rfbScheduleCopyRect(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2,int dx,int dy)
 {
   sraRegionPtr region = sraRgnCreateRect(x1,y1,x2,y2);
   rfbScheduleCopyRegion(screen,region,dx,dy);
+  sraRgnDestroy(region);
 }
 
 void rfbMarkRegionAsModified(rfbScreenInfoPtr screen,sraRegionPtr modRegion)

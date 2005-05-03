@@ -1,3 +1,7 @@
+2005-05-03  Karl Runge <runge@karlrunge.com>
+	* libvncserver/main.c: fix leak in rfbDoCopyRect/rfbScheduleCopyRect
+	* configure.ac: guard against empty HAVE_X
+
 2005-05-02  Karl Runge <runge@karlrunge.com>
 	* configure.ac: fatal error for x11vnc package if no X present
 	* configure.ac: give warnings and info about missing libjpeg/libz
