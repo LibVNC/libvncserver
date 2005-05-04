@@ -1,0 +1,75 @@
+   memory leaks squashed (localtime pseudo leak is still there :-)
+   small improvements for OSXvnc (still not working correctly)
+   synced with TightVNC 1.2.3
+   solaris compile cleanups
+   many x11vnc improvements
+   added backchannel, an encoding which needs special clients to pass
+	arbitrary data to the client
+   changes from Tim Jansen regarding multi threading and client blocking
+	as well as C++ compliancy
+   x11vnc can be controlled by starting again with special options if compiling
+	with LOCAL_CONTROL defined
+0.3
+   added x11vnc, a x0rfbserver clone
+   regard deferUpdateTime in processEvents, if usec<0
+   initialize deferUpdateTime (memory "leak"!)
+   changed command line handling (arguments are parsed and then removed)
+   added very simple example: zippy
+   added rfbDrawLine, rfbDrawPixel
+0.2
+   inserted a deferUpdate mechanism (X11 independent).
+   removed deletion of requestedRegion
+   added rfbLoadConsoleFont
+   fixed font colour handling.
+   added rfbSelectBox
+   added rfbDrawCharWithClip to allow for clipping and a background colour.
+   fixed font colours
+   added rfbFillRect
+   added IO function to check password.
+   rfbNewClient now sets the socket in the fd_set (for the select() call)
+   when compiling the library with HAVE_PTHREADS and an application
+	which includes "rfb.h" without, the structures got mixed up.
+	So, the pthreads section is now always at the end, and also
+	you get a linker error for rfbInitServer when using two different
+	pthread setups.
+   fixed two deadlocks: when setting a cursor and when using CopyRect
+   fixed CopyRect when copying modified regions (they lost the modified
+	 property)
+   WIN32 target compiles and works for example :-)
+   fixed CopyRect (was using the wrong order of rectangles...)
+   	 should also work with pthreads, because copyrects are
+	 always sent immediately (so that two consecutive copy rects
+	 cannot conflict).
+   changed rfbUndrawCursor(rfbClientPtr) to (rfbScreenInfoPtr), because
+   	   this makes more sense!
+   flag backgroundLoop in rfbScreenInfo (if having pthreads)
+   CopyRect & CopyRegion were implemented.
+	if you use a rfbDoCopyR* function, it copies the data in the
+	framebuffer. If you prefer to do that yourself, use rfbScheduleCopyR*
+	instead; this doesn't modify the frameBuffer.
+   added flag to optionally not send XCursor updates, but only RichCursor,
+	or if that is not possible, fall back to server side cursor.
+	This is useful if your cursor has many nice colours.
+   fixed java viewer on server side:
+	SendCursorUpdate would send data even before the client pixel format
+	was set, but the java applet doesn't like the server's format.
+   fixed two pthread issues:
+	rfbSendFramebuffer was sent by a ProcessClientMessage function
+	(unprotected by updateMutex).
+	cursor coordinates were set without protection by cursorMutex
+   source is now equivalent to TridiaVNC 1.2.1
+   pthreads now work (use iterators!)
+   cursors are supported (rfbSetCursor automatically undraws cursor)
+   support for 3 bytes/pixel (slow!)
+   server side colourmap support
+   fixed rfbCloseClient not to close the connection (pthreads!)
+	this is done lazily (and with proper signalling).
+   cleaned up mac.c (from original OSXvnc); now compiles (untested!)
+   compiles cleanly on Linux, IRIX, BSD, Apple (Darwin)
+   fixed prototypes
+0.1
+   rewrote API to use pseudo-methods instead of required functions.
+   lots of clean up.
+   Example can show symbols now.
+   All encodings
+   HTTP

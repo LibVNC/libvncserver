@@ -1,0 +1,80 @@
+immediate:
+----------
+
+x11vnc: clipboard, cursor, updates interruptible by input (doesn't work yet)
+extra_bytes in rfbDrawCharWithClip.
+tested mouse buttons make copy rect, but text is not marked as mod.
+cursor drawing: set optional grain to mark bigger rectangles as drawn (else
+	you end up with thousands of one-pixel-rectangles to encode).
+selectbox: scroll bars
+documentation
+	hint that to mark very tiny regions as
+	modified is possibly inefficient for the encodings.
+	(a trail of points could better be a small rectangle).
+
+later:
+------
+
+authentification schemes (secure vnc)
+	IO function ptr exists; now explain how to tunnel and implement a
+	client address restriction scheme.
+autoconf? at least Sun Solaris and Windows compilation
+	(maybe Michael makes a small autconf)
+using Hermes library for fast colour translations.
+CORBA
+internal HTTP tunnelling feature (needs a special GET target and a few
+	changes to java applet).
+
+done:
+-----
+
+.x11vnc: sometimes XTest fails (but doesn't with x0rfbserver)
+.DeferUpdateTime (timing problems!)
+.empty cursor sending doesn't work.
+.udp (need an rfbClientPtr udpClient in rfbScreen)
+	input only; nearly untested (don't have the clients).
+.font handling: bpp>1
+.test copyRect and pthreads.
+.optionally dont draw rich cursors as xcursors
+.cursor smears on IRIX with pthreads, then has bus error. has to be a mutex
+	problem in cursor routines.
+.fix bug in http (java) client with big endian server: byte swapping is broken
+	(was a cursorshape which was sent too soon; java vncviewer assumes
+	a rich cursor shape to be always 1 byte per pixel, however, framebuffer
+	updates before setting the pixel format can be server format)
+.rfbConnect, ConnectToTcpAddr
+.update to newest TridiaVNC version (1.2.1).
+.adapt rdp2vnc (rdesktop)
+.pthreads concept: How to iterate over rfbClientPtr's? So that it can be
+	 either called from rfbProcessEvents (which locks the list mutex)
+	 or from the main thread (where the background loop sometimes
+	 locks the list mutex).
+	- cursor drawing!
+	- cursor setting!
+	- rfbMarkRectAsModified
+  (did that by adding a refcount to clients secured by refCountMutex;
+   it also was necessary to check for cl->sock<0 in SendUpdateBuf)
+.translate.c: warning about non 8-bit colourmaps
+	16-bit colourmaps are 192k -> no use without fast net.
+.rfbCloseClient
+.set colourmap
+.support 3 bytes per pixel
+.cursors
+.cutpaste
+.httpd
+.other encodings
+.test drawing of cursors when not using xcursor or rich cursor encoding
+fix bug with odd width (depends on client depth: width has to be multiple of server.bytesPerPixel/client.bytesPerPixel). only raw!! -> bug of vncviewer!
+.use sraRegion from Wez instead of miregion, because it is much smaller
+.	- connection gone and then reconnect is a problem
+	  the reason: there are in fact three threads accessing
+	  the clientPtr: input, output and the application thread.
+	  if you kill the viewer or do rfbCloseClient, all of those
+	  three have to be warned that this is happening.
+	-> rfbClientConnectionGone can only be called by the outer loop
+	(with background loop, it is input, else it is processEvents).
+. fixed pthreads issues:
+	cursor deadlock,
+	CopyRect deadlock.
+. when copying a region with modified parts, they were not marked
+	as modified
