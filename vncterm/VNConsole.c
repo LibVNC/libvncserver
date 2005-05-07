@@ -328,7 +328,7 @@ char vcGetCh(vncConsolePtr c)
 
 char vcGetChar(vncConsolePtr c)
 {
-  while(c->inputCount==0)
+  while(rfbIsActive(c->screen) && c->inputCount==0)
     vcProcessEvents(c);
   return(vcGetCh(c));
 }
@@ -352,7 +352,8 @@ char *vcGetString(vncConsolePtr c,char *buffer,int bufferSize)
   count=c->inputSize;
   c->inputSize=bufferSize;
   c->inputBuffer=buffer;
-  while(c->inputCount<bufferSize-1 && buffer[c->inputCount-1]!='\n')
+  while(rfbIsActive(c->screen)
+      && c->inputCount<bufferSize-1 && buffer[c->inputCount-1]!='\n')
     vcProcessEvents(c);
   buffer[c->inputCount]=0;
   c->inputBuffer=bufferBackup;

@@ -104,10 +104,10 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 {
     in_addr_t iface = rfbScreen->listenInterface;
 
-    if (rfbScreen->socketInitDone)
+    if (rfbScreen->socketState!=RFB_SOCKET_INIT)
 	return;
 
-    rfbScreen->socketInitDone = TRUE;
+    rfbScreen->socketState = RFB_SOCKET_READY;
 
     if (rfbScreen->inetdSock != -1) {
 	const int one = 1;
@@ -176,6 +176,31 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     }
 }
 
+void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
+{
+    if (rfbScreen->socketState!=RFB_SOCKET_READY)
+	return;
+
+    rfbScreen->socketState = RFB_SOCKET_SHUTDOWN;
+
+    if(rfbScreen->inetdSock>-1) {
+	close(rfbScreen->inetdSock);
+	FD_CLR(rfbScreen->inetdSock,&rfbScreen->allFds);
+	rfbScreen->inetdSock=-1;
+    }
+
+    if(rfbScreen->listenSock>-1) {
+	close(rfbScreen->listenSock);
+	FD_CLR(rfbScreen->listenSock,&rfbScreen->allFds);
+	rfbScreen->listenSock=-1;
+    }
+
+    if(rfbScreen->udpSock>-1) {
+	close(rfbScreen->udpSock);
+	FD_CLR(rfbScreen->udpSock,&rfbScreen->allFds);
+	rfbScreen->udpSock=-1;
+    }
+}
 
 /*
  * rfbCheckFds is called from ProcessInputEvents to check for input on the RFB

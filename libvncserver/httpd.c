@@ -111,6 +111,13 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
    /*AddEnabledDevice(httpListenSock);*/
 }
 
+void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
+    if(rfbScreen->httpSock>-1) {
+	close(rfbScreen->httpSock);
+	FD_CLR(rfbScreen->httpSock,&rfbScreen->allFds);
+	rfbScreen->httpSock=-1;
+    }
+}
 
 /*
  * httpCheckFds is called from ProcessInputEvents to check for input on the

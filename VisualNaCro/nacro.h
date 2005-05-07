@@ -29,11 +29,12 @@ typedef double timeout_t;
 /* the return values of process() and friends */
 typedef int result_t;
 /*
- * %constant int RESULT_TIMEOUT=1;
+%constant int RESULT_TIMEOUT=1;
 %constant int RESULT_KEY=2;
 %constant int RESULT_MOUSE=4;
 %constant int RESULT_SCREEN=8;
 %constant int RESULT_FOUNDIMAGE=16;
+%constant int RESULT_SHUTDOWN=32;
 */
 
 %}
@@ -52,6 +53,7 @@ typedef int result_t;
 #define  RESULT_MOUSE 4
 #define  RESULT_SCREEN 8
 #define  RESULT_FOUNDIMAGE 16
+#define  RESULT_SHUTDOWN 32
 
 /* init/shutdown */
 

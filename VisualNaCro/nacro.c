@@ -327,7 +327,11 @@ result_t private_process(resource_t resource,timeout_t timeout_in_seconds,result
 			rfbBool loop;
 			do {
 				loop=rfbProcessEvents(res->server,res->server->deferUpdateTime);
-			} while(loop && (res->result&return_mask)==0);
+			} while(loop && (res->result&return_mask)==0
+				&& rfbIsActive(res->server));
+
+			if(!rfbIsActive(res->server))
+				return RESULT_SHUTDOWN;
 
 			if((res->result&return_mask)!=0)
 				return res->result;

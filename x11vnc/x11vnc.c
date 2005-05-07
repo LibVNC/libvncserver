@@ -9558,7 +9558,7 @@ void reset_rfbport(int old, int new)  {
 			screen->autoPort = FALSE;
 		}
 		screen->port = rp;
-		screen->socketInitDone = FALSE;
+		screen->socketState = RFB_SOCKET_INIT;
 
 		if (screen->listenSock > -1) {
 			close(screen->listenSock);

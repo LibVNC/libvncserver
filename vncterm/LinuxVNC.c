@@ -137,7 +137,7 @@ int main(int argc,char **argv)
   sprintf(tty_device,"/dev/vcsa%d",tty);
 #endif
 
-  while(1) {
+  while(rfbIsActive(console->screen)) {
     if(!console->currentlyMarking) {
       tty_file=fopen(tty_device,"rb");
       if(!tty_file) {

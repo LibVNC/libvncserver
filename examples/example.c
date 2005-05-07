@@ -168,6 +168,12 @@ void dokey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
   if(down) {
     if(key==XK_Escape)
       rfbCloseClient(cl);
+    else if(key==XK_F12)
+      /* close down server, disconnecting clients */
+      rfbShutdownServer(cl->screen,TRUE);
+    else if(key==XK_F11)
+      /* close down server, but wait for all clients to disconnect */
+      rfbShutdownServer(cl->screen,FALSE);
     else if(key==XK_Page_Up) {
       initBuffer((unsigned char*)cl->screen->frameBuffer);
       rfbMarkRectAsModified(cl->screen,0,0,maxx,maxy);
@@ -294,7 +300,7 @@ int main(int argc,char** argv)
 #ifdef USE_OWN_LOOP
   {
     int i;
-    for(i=0;;i++) {
+    for(i=0;rfbIsActive(rfbScreen);i++) {
       fprintf(stderr,"%d\r",i);
       rfbProcessEvents(rfbScreen,100000);
     }
@@ -315,7 +321,6 @@ int main(int argc,char** argv)
   while(1) sleep(5); /* render(); */
 #endif /* BACKGROUND_LOOP */
 
-  rfbFreeCursor(rfbScreen->cursor);
   free(rfbScreen->frameBuffer);
   rfbScreenCleanup(rfbScreen);
 

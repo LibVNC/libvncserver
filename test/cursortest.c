@@ -343,7 +343,6 @@ int main(int argc,char** argv)
 	/* 40000 are the microseconds to wait on select(), i.e. 0.04 seconds */
 	rfbRunEventLoop(rfbScreen,40000,FALSE);
 
-	rfbFreeCursor(rfbScreen->cursor);
 	free(rfbScreen->frameBuffer);
 	rfbScreenCleanup(rfbScreen);
 

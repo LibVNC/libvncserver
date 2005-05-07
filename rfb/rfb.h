@@ -116,6 +116,12 @@ enum rfbNewClientAction {
 	RFB_CLIENT_REFUSE
 };
 
+enum rfbSocketState {
+	RFB_SOCKET_INIT,
+	RFB_SOCKET_READY,
+	RFB_SOCKET_SHUTDOWN
+};
+
 typedef void (*rfbKbdAddEventProcPtr) (rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl);
 typedef void (*rfbKbdReleaseAllKeysProcPtr) (struct _rfbClientRec* cl);
 typedef void (*rfbPtrAddEventProcPtr) (int buttonMask, int x, int y, struct _rfbClientRec* cl);
@@ -178,7 +184,7 @@ typedef struct _rfbScreenInfo
     fd_set allFds;
 #endif
 
-    rfbBool socketInitDone;
+    enum rfbSocketState socketState;
     SOCKET inetdSock;
     rfbBool inetdInitDone;
 
@@ -500,6 +506,7 @@ extern char rfbEndianTest;
 extern int rfbMaxClientWait;
 
 extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
+extern void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen);
 extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
 extern void rfbCloseClient(rfbClientPtr cl);
 extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
@@ -563,6 +570,7 @@ extern void rfbSetClientColourMaps(rfbScreenInfoPtr rfbScreen, int firstColour, 
 /* httpd.c */
 
 extern void rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen);
+extern void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen);
 extern void rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen);
 
 
@@ -741,6 +749,7 @@ extern rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel);
 extern void rfbInitServer(rfbScreenInfoPtr rfbScreen);
+extern void rfbShutdownServer(rfbScreenInfoPtr rfbScreen,rfbBool disconnectClients);
 extern void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen,char *framebuffer,
  int width,int height, int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel);
@@ -761,6 +770,7 @@ extern void rfbRefuseOnHoldClient(rfbClientPtr cl);
 
 extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, rfbBool runInBackground);
 extern rfbBool rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
+extern rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo);
 
 #endif
 

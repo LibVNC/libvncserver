@@ -543,7 +543,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->clientHead=0;
    screen->pointerClient=0;
    screen->port=5900;
-   screen->socketInitDone=FALSE;
+   screen->socketState=RFB_SOCKET_INIT;
 
    screen->inetdInitDone = FALSE;
    screen->inetdSock=-1;
@@ -729,7 +729,7 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   FREE_IF(colourMap.data.bytes);
   FREE_IF(underCursorBuffer);
   TINI_MUTEX(screen->cursorMutex);
-  if(screen->cursor)
+  if(screen->cursor && screen->cursor->cleanup)
     rfbFreeCursor(screen->cursor);
   free(screen);
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
@@ -749,6 +749,20 @@ void rfbInitServer(rfbScreenInfoPtr screen)
   if(screen->ignoreSIGPIPE)
     signal(SIGPIPE,SIG_IGN);
 #endif
+}
+
+void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
+  if(disconnectClients) {
+    rfbClientPtr cl;
+    rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
+    while( (cl = rfbClientIteratorNext(iter)) )
+      if (cl->sock > -1)
+	/* we don't care about maxfd here, because the server goes away */
+	rfbCloseClient(cl);
+  }
+
+  rfbShutdownSockets(screen);
+  rfbHttpShutdownSockets(screen);
 }
 
 #ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
@@ -820,6 +834,10 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
   return result;
 }
 
+rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo) {
+  return screenInfo->socketState!=RFB_SOCKET_SHUTDOWN || screenInfo->clientHead!=NULL;
+}
+
 void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground)
 {
   if(runInBackground) {
@@ -839,6 +857,6 @@ void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground
   if(usec<0)
     usec=screen->deferUpdateTime*1000;
 
-  while(1)
+  while(rfbIsActive(screen))
     rfbProcessEvents(screen,usec);
 }

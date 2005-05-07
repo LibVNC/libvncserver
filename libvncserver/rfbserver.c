@@ -354,10 +354,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       if (rfbWriteExact(cl, pv, sz_rfbProtocolVersionMsg) < 0) {
         rfbLogPerror("rfbNewClient: write");
         rfbCloseClient(cl);
-	/* TODO: memory leak here (cl is never freed)
-	 * can rfbClientConnectionGone called at this time?
-	 * tim@tjansen.de
-	 */
+	rfbClientConnectionGone(cl);
         return NULL;
       }
     }
