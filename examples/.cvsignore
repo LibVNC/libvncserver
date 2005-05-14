@@ -10,4 +10,6 @@ Makefile.in
 .deps
 simple
 simple15
+colourmaptest
+regiontest
 

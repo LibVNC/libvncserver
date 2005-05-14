@@ -1,5 +1,6 @@
 Makefile
 Makefile.in
+compile
 configure
 configure.lineno
 config.status
