@@ -413,7 +413,7 @@ rfbClientConnectionGone(cl)
     if (cl->next)
         cl->next->prev = cl->prev;
 
-    if(cl->sock)
+    if(cl->sock>0)
 	close(cl->sock);
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -610,6 +610,8 @@ rfbProcessClientInitMessage(cl)
         return;
     }
 
+    memset(buf,0,256);
+
     si->framebufferWidth = Swap16IfLE(cl->screen->width);
     si->framebufferHeight = Swap16IfLE(cl->screen->height);
     si->format = cl->screen->serverFormat;
@@ -617,10 +619,7 @@ rfbProcessClientInitMessage(cl)
     si->format.greenMax = Swap16IfLE(si->format.greenMax);
     si->format.blueMax = Swap16IfLE(si->format.blueMax);
 
-    if (strlen(cl->screen->desktopName) > 128)      /* sanity check on desktop name len */
-        ((char*)cl->screen->desktopName)[128] = 0;
-
-    strcpy(buf + sz_rfbServerInitMsg, cl->screen->desktopName);
+    strncpy(buf + sz_rfbServerInitMsg, cl->screen->desktopName, 127);
     len = strlen(buf + sz_rfbServerInitMsg);
     si->nameLength = Swap32IfLE(len);
 

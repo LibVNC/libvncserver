@@ -532,7 +532,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int width,int height,int bitsPerSample,int samplesPerPixel,
  int bytesPerPixel)
 {
-   rfbScreenInfoPtr screen=malloc(sizeof(rfbScreenInfo));
+   rfbScreenInfoPtr screen=calloc(sizeof(rfbScreenInfo),1);
 
    INIT_MUTEX(logMutex);
 
@@ -759,6 +759,7 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
       if (cl->sock > -1)
 	/* we don't care about maxfd here, because the server goes away */
 	rfbCloseClient(cl);
+    rfbReleaseClientIterator(iter);
   }
 
   rfbShutdownSockets(screen);
