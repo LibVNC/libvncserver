@@ -132,6 +132,7 @@ Keyboard
 	=D norepeat
 	=D add_keysyms
 	skip_keycodes:
+	skip_dups
 	modtweak
 	xkb
 	--
@@ -180,6 +181,15 @@ Misc
 	--
 	=RA remote-cmd:
 	=GA all-settings
+	--
+	=GAL Misc-Tuning::
+	fs:
+	gaps:
+	grow:
+	fuzz:
+	readtimeout:
+	snapfb
+	threads
 
 Debugging
 	debug_pointer
@@ -191,8 +201,10 @@ Debugging
 	--
 	debug_xevents
 	debug_xdamage
-	debug_wireframe
+	=-C:0,1,2,3 debug_wireframe:
 	debug_scroll
+	debug_tiles
+	dbg
 	--
 	=GA show-start-cmd
 	=DG debug_gui
@@ -234,33 +246,30 @@ Tuning
 	input_skip:
 	=D nodragging
 	--
-	wireframe
-	wireframe_mode:
-	=-C:never,top,always wirecopyrect:
-	=-C:never,keys,mouse,always scrollcopyrect:
-	scr_area:
-	--
 	noshm
 	flipbyteorder
 	onetile
+	--
+	xdamage
+	xd_area:
+	xd_mem:
+	--
+	wireframe
+	wireframe_mode:
+	=-C:never,top,always wirecopyrect:
+	--
+	=-C:never,keys,mouse,always scrollcopyrect:
+	scr_area:
+	scr_skip:
+	scr_inc:
+	scr_keys:
+	scr_parms:
 	-- D
 	speeds:
 	=D wait:
 	defer:
 	=D nap
 	screen_blank:
-	--
-	fs:
-	gaps:
-	grow:
-	fuzz:
-	snapfb
-	--
-	xdamage
-	xd_area:
-	xd_mem:
-	--
-	threads
 	--
 	progressive:
 "
@@ -394,6 +403,11 @@ and one for power users.
 "
 
 	set helptext(all) $helpall
+
+	set helptext(Misc-Tuning:) "
+These contain some miscellaneous tuning parameters that are not
+often used.  Placed here to avoid overcrowding in the Tuning menu.
+"
 
 	set helptext(gui) "
 tkx11vnc is a simple frontend to x11vnc.  Nothing fancy, it merely
@@ -701,7 +715,7 @@ proc help_win {item} {
 	set text "Help on $item:\n\n"
 
 	if {[is_gui_internal $item]} {
-		if {$item != "gui" && $item != "all"} {
+		if {$item != "gui" && $item != "all" && $item != "Misc-Tuning:"} {
 			append text "    + Is a gui internal Action (cannot be set).\n";
 		}
 	} elseif {[is_action $item]} {
@@ -1157,6 +1171,9 @@ proc push_new_value {item name new {query 1}} {
 	if {$do_query_all} {
 		set all [all_query_vars]
 		set qargs [list "-Q" $all]
+
+		global last_query_all_time
+		set last_query_all_time [clock seconds]
 	}
 
 	set rqargs [concat $rargs $qargs]
@@ -1646,6 +1663,7 @@ proc all_query_vars {} {
 
 proc query_all {{quiet 0}} {
 	global query_ans_list query_aro_list all_settings
+	global last_query_all_time
 
 	set qry [all_query_vars]
 
@@ -1663,6 +1681,7 @@ proc query_all {{quiet 0}} {
 			append_text "Failed to retrieve settings.\n"
 		}
 	}
+	set last_query_all_time [clock seconds]
 	return $all
 }
 
@@ -1815,6 +1834,9 @@ proc do_action {item} {
 		return
 	} elseif {$item == "tail-logfile"} {
 		tail_logfile
+		return
+	} elseif {$item == "Misc-Tuning:"} {
+		menu_help "$item"
 		return
 	} elseif {$item == "stop+quit"} {
 		push_new_value "stop" "stop" 1 0
@@ -2481,6 +2503,29 @@ proc make_menu_items {} {
 	}
 }
 
+proc menu_posted {} {
+	global last_query_all_time query_all_freq
+	global connected_to_x11vnc
+	set now [clock seconds]
+
+
+	if {$connected_to_x11vnc} {
+		set quiet 0
+		set refresh [expr "$last_query_all_time + $query_all_freq"]
+
+		# puts "menu_posted $now $last_query_all_time"
+		# puts "menu_posted $refresh"
+
+		if {$now > $refresh} {
+			append_text "Refreshing settings... "
+			query_all $quiet
+			if {$quiet} {
+				append_text "done\n"
+			}
+		}
+	}
+}
+
 proc make_widgets {} {
 	global template 
 	global menu_b menu_m menu_count
@@ -2557,7 +2602,7 @@ proc make_widgets {} {
 				-anchor w -menu $menu -background $fbg \
 				-font $bfont
 			pack $menub -side top -fill x
-			menu $menu -tearoff 0
+			menu $menu -tearoff 0 -postcommand menu_posted
 		}
 	}
 	pack $f -side top -fill x
@@ -3032,6 +3077,7 @@ global bfont ffont old_labels
 global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
 global cache_all_query_vars
+global last_query_all_time query_all_freq
 
 set unset_str "(unset)"
 set connected_to_x11vnc 0
@@ -3045,6 +3091,8 @@ set reply_xdisplay ""
 set all_settings "None so far."
 set always_update 1
 set cache_all_query_vars ""
+set query_all_freq 120
+set last_query_all_time [clock seconds]
 
 # these are no longer used under x11vnc -sync:
 set delay_sleep 350

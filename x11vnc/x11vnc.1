@@ -2,7 +2,7 @@
 .TH X11VNC "1" "May 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-05-02
+         version: 0.7.2, lastmod: 2005-05-14
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -647,6 +647,11 @@ Print this help text.
 .IP
 Print program version and last modification date.
 .PP
+\fB-dbg\fR
+.IP
+instead of exiting after cleaning up, run a simple
+"debug crash shell" when fatal errors are trapped.
+.PP
 \fB-q\fR
 .IP
 Be quiet by printing less informational output to
@@ -677,12 +682,16 @@ identical keyboards).  Also useful in resolving cases
 where a Keysym is bound to multiple keys (e.g. "<" + ">"
 and "," + "<" keys).  Default: \fB-modtweak\fR
 .PP
-\fB-xkb\fR
+\fB-xkb,\fR \fB-noxkb\fR
 .IP
 When in modtweak mode, use the XKEYBOARD extension (if
 the X display supports it) to do the modifier tweaking.
 This is powerful and should be tried if there are still
 keymapping problems when using \fB-modtweak\fR by itself.
+The default is to check whether some common keysyms,
+e.g. !, @, [, are only accessible via \fB-xkb\fR mode and if
+so then automatically enable the mode.  To disable this
+automatic detection use \fB-noxkb.\fR
 .PP
 \fB-skip_keycodes\fR \fIstring\fR
 .IP
@@ -695,12 +704,21 @@ when ambiguities exist (more than one Keycode per
 Keysym).  Run 'xmodmap \fB-pk'\fR to see your keymapping.
 Example: "\fB-skip_keycodes\fR \fI94,114\fR"
 .PP
-\fB-add_keysyms\fR
+\fB-skip_dups,\fR \fB-noskip_dups\fR
+.IP
+Some VNC viewers send impossible repeated key events,
+e.g. key-down, key-down, key-up, key-up all for the
+same key, or 20 downs in a row for the same key!
+Setting \fB-skip_dups\fR means to skip these duplicates and
+just process the first event.  Default: \fB-skip_dups\fR
+.PP
+\fB-add_keysyms,\fR \fB-noadd_keysyms\fR
 .IP
 If a Keysym is received from a VNC viewer and
 that Keysym does not exist in the X server, then
 add the Keysym to the X server's keyboard mapping.
-Added Keysyms will be removed when x11vnc exits.
+Added Keysyms will be removed periodically and also
+when x11vnc exits.  Default: \fB-add_keysyms\fR
 .PP
 \fB-clear_mods\fR
 .IP
@@ -727,17 +745,57 @@ header file for a list of Keysym names, or use
 To map a key to a button click, use the fake Keysyms
 "Button1", ..., etc. E.g: "\fB-remap\fR \fISuper_R-Button2\fR"
 (useful for pasting on a laptop)
+.IP
+Dead keys: "dead" (or silent, mute) keys are keys that
+do not produce a character but must be followed by a 2nd
+keystroke.  This is often used for accenting characters,
+e.g. to put "'" on top of "a" by pressing the dead
+key and then "a".  Note that this interpretation
+is not part of core X11, it is up to the toolkit or
+application to decide how to react to the sequence.
+The X11 names for these keysyms are "dead_grave",
+"dead_acute", etc.  However some VNC viewers send the
+keysyms "grave", "acute" instead thereby disabling
+the accenting.  To work around this \fB-remap\fR can be used.
+For example "\fB-remap\fR \fIgrave-dead_grave,acute-dead_acute\fR"
+.IP
+As a convenience, "\fB-remap\fR \fIDEAD\fR" applies these remaps:
+.IP
+      g     grave-dead_grave
+      a     acute-dead_acute
+      c     asciicircum-dead_circumflex
+      t     asciitilde-dead_tilde
+      m     macron-dead_macron
+      b     breve-dead_breve
+      D     abovedot-dead_abovedot
+      d     diaeresis-dead_diaeresis
+      o     degree-dead_abovering
+      A     doubleacute-dead_doubleacute
+      r     caron-dead_caron
+      e     cedilla-dead_cedilla
+.IP
+.IP
+If you just want a subset use the first letter
+label, e.g. "\fB-remap\fR \fIDEAD=ga\fR" to get the first two.
+Additional remaps may also be supplied via commas,
+e.g.  "\fB-remap\fR \fIDEAD=ga,Super_R-Button2\fR".  Finally,
+"DEAD=missing" means to apply all of the above as
+long as the left hand member is not already in the
+X11 keymap.
 .PP
 \fB-norepeat,\fR \fB-repeat\fR
 .IP
-Option \fB-norepeat\fR disables X server key auto repeat
-when VNC clients are connected.  This works around a
+Option \fB-norepeat\fR disables X server key auto repeat when
+VNC clients are connected and VNC keyboard input is
+not idle for more than 5 minutes.  This works around a
 repeating keystrokes bug (triggered by long processing
-delays between key down and key up client events:
-either from large screen changes or high latency).
+delays between key down and key up client events: either
+from large screen changes or high latency).
+Default: \fB-norepeat\fR
+.IP
 Note: your VNC viewer side will likely do autorepeating,
 so this is no loss unless someone is simultaneously at
-the real X display.  Default: \fB-norepeat\fR
+the real X display.
 .IP
 Use "\fB-norepeat\fR \fIN\fR" to set how many times norepeat will
 be reset if something else (e.g. X session manager)
@@ -1018,6 +1076,12 @@ Note: there can be painting errors when using \fB-scale\fR
 so CopyRect is skipped when scaling unless you specify
 \fB-wirecopyrect\fR on the command line or by remote-control.
 .PP
+\fB-debug_wireframe\fR
+.IP
+Turn on debugging info printout for the wireframe
+heuristics.  "\fB-dwf\fR" is an alias.  Specify multiple
+times for more output.
+.PP
 \fB-scrollcopyrect\fR \fImode,\fR \fB-noscrollcopyrect\fR
 .IP
 Like \fB-wirecopyrect,\fR but use heuristics to try to guess
@@ -1036,12 +1100,13 @@ This scheme will not always detect scrolls, but when
 it does there is a nice speedup from using the VNC
 CopyRect encoding (see \fB-wirecopyrect).\fR  The speedup
 is both in reduced network traffic and reduced X
-framebuffer polling/copying.  On the other hand,
-it may induce undesired transients (e.g. a terminal
-cursor being scrolled up when it should not be) or other
-painting errors.  These are automatically repaired in a
-short period of time.  If this is unacceptable disable
-the feature with \fB-noscrollcopyrect.\fR
+framebuffer polling/copying.  On the other hand, it may
+induce undesired transients (e.g. a terminal cursor
+being scrolled up when it should not be) or other
+painting errors (window tearing, bunching-up, etc).
+These are automatically repaired in a short period
+of time.  If this is unacceptable disable the feature
+with \fB-noscrollcopyrect.\fR
 .IP
 "mode" can be "never" (same as \fB-noscrollcopyrect)\fR
 to never try the copyrect, "keys" means to try it
@@ -1065,6 +1130,113 @@ scrollbar first and then shifted the large panel
 it controlled.  We want to be sure to skip the small
 scrollbar and get the large panel. Default: 60000
 .PP
+\fB-scr_skip\fR \fIlist\fR
+.IP
+Skip scroll detection for applications matching
+the comma separated list of strings in \fIlist\fR.
+Some applications implement their scrolling in
+strange ways where the XCopyArea, etc, also applies
+to invisible portions of the window: if we CopyRect
+those areas it looks awful during the scroll and
+there may be painting errors left after the scroll.
+Soffice.bin is the worst known offender.
+.IP
+Use "##" to denote the start of the application class
+(e.g. "##XTerm") and "++" to denote the start
+of the application instance name (e.g. "++xterm").
+The string your list is matched against is of the form
+"^^WM_NAME##Class++Instance<same-for-any-subwindows>"
+The "xlsclients \fB-la"\fR command will provide this info.
+.IP
+If a pattern is prefixed with "KEY:" it only applies
+to Keystroke generated scrolls (e.g. Up arrow).  If it
+is prefixed with "MOUSE:" it only applies to Mouse
+induced scrolls (e.g. dragging on a scrollbar).
+Default: ##Soffice.bin
+.PP
+\fB-scr_inc\fR \fIlist\fR
+.IP
+Opposite of \fB-scr_skip:\fR this list is consulted first
+and if there is a match the window will be monitored
+via RECORD for scrolls irrespective of \fB-scr_skip.\fR
+Use \fB-scr_skip\fR '*' to skip anything that does not match
+your \fB-scr_inc.\fR  Use \fB-scr_inc\fR '*' to include everything.
+.PP
+\fB-scr_keys\fR \fIlist\fR
+.IP
+For keystroke scroll detection, only apply the RECORD
+heuristics to the comma separated list of keysyms in
+\fIlist\fR.  You may find the RECORD overhead for every
+one of your keystrokes disrupts typing too much, but you
+don't want to turn it off completely with "\fB-scr\fR \fImouse\fR"
+and \fB-scr_parms\fR does not work or is too confusing.
+.IP
+The listed keysyms can be numeric or the keysym
+names in the <X11/keysymdef.h> header file or from the
+.IR xev (1)
+program.  Example: "\fB-scr_keys\fR \fIUp,Down,Return\fR".
+One probably wants to have application specific lists
+(e.g. for terminals, etc) but that is too icky to think
+about for now...
+.IP
+If \fIlist\fR begins with the "-" character the list
+is taken as an exclude list: all keysyms except those
+list will be considered.  The special string "builtin"
+expands to an internal list of keysyms that are likely
+to cause scrolls.  BTW, by default modifier keys,
+Shift_L, Control_R, etc, are skipped since they almost
+never induce scrolling by themselves.
+.PP
+\fB-scr_parms\fR \fIstring\fR
+.IP
+Set various parameters for the scrollcopyrect mode.
+The format is similar to that for \fB-wireframe\fR and packed
+with lots of parameters:
+.IP
+Format: T+B+L+R,t1+t2+t3,s1+s2+s3+s4+s5
+Default: 0+64+32+32,0.02+0.10+0.9,0.03+0.06+0.5+0.1+5.0
+.IP
+If you leave nothing between commas: ",," the default
+value is used.  If you don't specify enough commas,
+the trailing parameters are set to their defaults.
+.IP
+"T+B+L+R" indicates four integers for how close in
+pixels the pointer has to be from the Top, Bottom, Left,
+or Right edges of the window to consider scrollcopyrect.
+If \fB-wireframe\fR overlaps it takes precedence.  This is a
+speedup to quickly exclude a window from being watched
+for scrollcopyrect: set them all to zero to not try
+the speedup (things like selecting text will likely
+be slower).
+.IP
+"t1+t2+t3" specify three floating point times in
+seconds that apply to scrollcopyrect detection with
+*Keystroke* input: t1 is how long to wait after a key
+is pressed for the first scroll, t2 is how long to keep
+looking after a Keystroke scroll for more scrolls.
+t3 is how frequently to try to update surrounding
+scrollbars outside of the scrolling area (0.0 to
+disable)
+.IP
+"s1+s2+s3+s4+s5" specify five floating point times
+in seconds that apply to scrollcopyrect detection with
+*Mouse* input: s1 is how long to wait after a mouse
+button is pressed for the first scroll, s2 is how long
+to keep waiting for additional scrolls after the first
+Mouse scroll was detected.  s3 is how frequently to
+try to update surrounding scrollbars outside of the
+scrolling area (0.0 to disable).  s4 is how long to
+buffer pointer motion (to try to get fewer, bigger
+mouse scrolls). s5 is the maximum time to spend just
+updating the scroll window without updating the rest
+of the screen.
+.PP
+\fB-debug_scroll\fR
+.IP
+Turn on debugging info printout for the scroll
+heuristics.  "\fB-ds\fR" is an alias.  Specify it multiple
+times for more output.
+.PP
 \fB-pointer_mode\fR \fIn\fR
 .IP
 Various pointer motion update schemes. "\fB-pm\fR" is
@@ -1077,7 +1249,7 @@ screen changes: everything will bog down when dragging
 or scrolling.  So a scheme has to be used to "eat"
 much of that pointer input before re-polling the screen
 and sending out framebuffer updates. The mode number
-\fIn\fR can be 0 to 5 and selects one of the schemes
+\fIn\fR can be 0 to 4 and selects one of the schemes
 desribed below.
 .IP
 n=0: does the same as \fB-nodragging.\fR (all screen polling
@@ -1091,22 +1263,18 @@ n=2 is an improved scheme: by watching the current rate
 of input events it tries to detect if it should try to
 "eat" additional pointer events before continuing.
 .IP
-n=3 is basically the same as n=2 except with slightly
-tweaked parameters.  We made this a new one so one
-could use \fB-pm\fR 2 for the old behavior.  NOT FINISHED.
-.IP
-n=4 is basically a dynamic \fB-nodragging\fR mode: it detects
+n=3 is basically a dynamic \fB-nodragging\fR mode: it detects
 when the mouse motion has paused and then refreshes
 the display.
 .IP
-n=5 attempts to measures network rates and latency,
+n=4 attempts to measures network rates and latency,
 the video card read rate, and how many tiles have been
 changed on the screen.  From this, it aggressively tries
 to push screen "frames" when it decides it has enough
 resources to do so.  NOT FINISHED.
 .IP
-The default n is 2. Note that modes 2, 3, 4, 5 will
-skip \fB-input_skip\fR keyboard events (but it will not count
+The default n is 2. Note that modes 2, 3, 4 will skip
+\fB-input_skip\fR keyboard events (but it will not count
 pointer events).  Also note that these modes are not
 available in \fB-threads\fR mode which has its own pointer
 event handling mechanism.
@@ -1128,7 +1296,7 @@ Default: 10
 .IP
 x11vnc tries to estimate some speed parameters that
 are used to optimize scheduling (e.g. \fB-pointer_mode\fR
-5) and other things.  Use the \fB-speeds\fR option to set
+4) and other things.  Use the \fB-speeds\fR option to set
 these manually.  The triple \fIrd,bw,lat\fR corresponds
 to video h/w read rate in MB/sec, network bandwidth to
 clients in KB/sec, and network latency to clients in
@@ -1173,6 +1341,13 @@ Time in ms to wait for updates before sending to client
 Time in ms to pause between screen polls.  Used to cut
 down on load.  Default: 30
 .PP
+\fB-readtimeout\fR \fIn\fR
+.IP
+Set libvncserver rfbMaxClientWait to n seconds. On
+slow links that take a long time to paint the first
+screen libvncserver may hit the timeout and drop the
+connection.  Default: 20 seconds.
+.PP
 \fB-nap\fR
 .IP
 Monitor activity and if it is low take longer naps
@@ -1191,7 +1366,8 @@ for about 1.5 secs). Use 0 to disable.  Default: 60
 \fB-noxdamage\fR
 .IP
 Do not use the X DAMAGE extension to detect framebuffer
-changes even if it is available.
+changes even if it is available.  Use \fB-xdamage\fR if your
+default is to have it off.
 .IP
 x11vnc's use of the DAMAGE extension: 1) significantly
 reduces the load when the screen is not changing much,
@@ -1258,6 +1434,10 @@ by checking the tile near the boundary.  Default: 3
 .IP
 Tolerance in pixels to mark a tiles edges as changed.
 Default: 2
+.PP
+\fB-debug_tiles\fR
+.IP
+Print debugging output for tiles, fb updates, etc.
 .PP
 \fB-snapfb\fR
 .IP
@@ -1436,22 +1616,22 @@ Please report reproducible bugs.
 The following \fB-remote/-R\fR commands are supported:
 .IP
 stop            terminate the server, same as "quit"
-                "exit" or "shutdown".
+"exit" or "shutdown".
 .IP
 ping            see if the x11vnc server responds.
-                Return is: ans=ping:<xdisplay>
+Return is: ans=ping:<xdisplay>
 .IP
 blacken         try to push a black fb update to all
-                clients (due to timings a client
-                could miss it). Same as "zero", also
-                "zero:x1,y1,x2,y2" for a rectangle.
+clients (due to timings a client
+could miss it). Same as "zero", also
+"zero:x1,y1,x2,y2" for a rectangle.
 .IP
 refresh         send the entire fb to all clients.
 .IP
 reset           recreate the fb, polling memory, etc.
 .IP
 id:windowid     set \fB-id\fR window to "windowid". empty
-                or "root" to go back to root window
+or "root" to go back to root window
 .IP
 sid:windowid    set \fB-sid\fR window to "windowid"
 .IP
@@ -1478,7 +1658,7 @@ nooverlay       disable \fB-overlay\fR mode.
 overlay_cursor  in \fB-overlay\fR mode, enable cursor drawing.
 .IP
 overlay_nocursor disable cursor drawing. same as
-                nooverlay_cursor.
+nooverlay_cursor.
 .IP
 visual:vis      set \fB-visual\fR to "vis"
 .IP
@@ -1499,8 +1679,8 @@ forever         enable  \fB-forever\fR mode.
 noforever       disable \fB-forever\fR mode.
 .IP
 timeout:n       reset \fB-timeout\fR to n, if there are
-                currently no clients, exit unless one
-                connects in the next n secs.
+currently no clients, exit unless one
+connects in the next n secs.
 .IP
 http            enable  http client connections.
 .IP
@@ -1511,24 +1691,24 @@ deny            deny any new connections, same as "lock"
 nodeny          allow new connections, same as "unlock"
 .IP
 connect:host    do reverse connection to host, "host"
-                may be a comma separated list of hosts
-                or host:ports.  See \fB-connect.\fR
+may be a comma separated list of hosts
+or host:ports.  See \fB-connect.\fR
 .IP
 disconnect:host disconnect any clients from "host"
-                same as "close:host".  Use host
-                "all" to close all current clients.
-                If you know the client internal hex ID,
-                e.g. 0x3 (returned by "\fB-query\fR \fIclients\fR"
-                and RFB_CLIENT_ID) you can use that too.
+same as "close:host".  Use host
+"all" to close all current clients.
+If you know the client internal hex ID,
+e.g. 0x3 (returned by "\fB-query\fR \fIclients\fR"
+and RFB_CLIENT_ID) you can use that too.
 .IP
 allowonce:host  For the next connection only, allow
-                connection from "host".
+connection from "host".
 .IP
 allow:hostlist  set \fB-allow\fR list to (comma separated)
-                "hostlist". See \fB-allow\fR and \fB-localhost.\fR
-                Do not use with \fB-allow\fR /path/to/file
-                Use "+host" to add a single host, and
-                use "\fB-host\fR" to delete a single host
+"hostlist". See \fB-allow\fR and \fB-localhost.\fR
+Do not use with \fB-allow\fR /path/to/file
+Use "+host" to add a single host, and
+use "\fB-host\fR" to delete a single host
 .IP
 localhost       enable  \fB-localhost\fR mode
 .IP
@@ -1543,9 +1723,9 @@ lookup          disable \fB-nolookup\fR mode.
 input:str       set \fB-input\fR to "str", empty to disable.
 .IP
 client_input:str set the K, M, B \fB-input\fR on a per-client
-                basis.  select which client as for
-                disconnect, e.g. client_input:host:MB
-                or client_input:0x2:K
+basis.  select which client as for
+disconnect, e.g. client_input:host:MB
+or client_input:0x2:K
 .IP
 accept:cmd      set \fB-accept\fR "cmd" (empty to disable).
 .IP
@@ -1556,12 +1736,12 @@ noshm           enable  \fB-noshm\fR mode.
 shm             disable \fB-noshm\fR mode (i.e. use shm).
 .IP
 flipbyteorder   enable \fB-flipbyteorder\fR mode, you may need
-                to set noshm for this to do something.
+to set noshm for this to do something.
 .IP
 noflipbyteorder disable \fB-flipbyteorder\fR mode.
 .IP
 onetile         enable  \fB-onetile\fR mode. (you may need to
-                set shm for this to do something)
+set shm for this to do something)
 .IP
 noonetile       disable \fB-onetile\fR mode.
 .IP
@@ -1572,10 +1752,10 @@ nosolid         disable \fB-solid\fR mode.
 solid_color:color set \fB-solid\fR color (and apply it).
 .IP
 blackout:str    set \fB-blackout\fR "str" (empty to disable).
-                See \fB-blackout\fR for the form of "str"
-                (basically: WxH+X+Y,...)
-                Use "+WxH+X+Y" to append a single
-                rectangle use "-WxH+X+Y" to delete one
+See \fB-blackout\fR for the form of "str"
+(basically: WxH+X+Y,...)
+Use "+WxH+X+Y" to append a single
+rectangle use "-WxH+X+Y" to delete one
 .IP
 xinerama        enable  \fB-xinerama\fR mode. (if applicable)
 .IP
@@ -1592,8 +1772,8 @@ noxrandr        disable \fB-xrandr\fR mode.
 xrandr_mode:mode set the \fB-xrandr\fR mode to "mode".
 .IP
 padgeom:WxH     set \fB-padgeom\fR to WxH (empty to disable)
-                If WxH is "force" or "do" the padded
-                geometry fb is immediately applied.
+If WxH is "force" or "do" the padded
+geometry fb is immediately applied.
 .IP
 quiet           enable  \fB-quiet\fR mode.
 .IP
@@ -1609,10 +1789,14 @@ noxkb           disable \fB-xkb\fR modtweak mode.
 .IP
 skip_keycodes:str enable \fB-xkb\fR \fB-skip_keycodes\fR "str".
 .IP
+skip_dups       enable  \fB-skip_dups\fR mode.
+.IP
+noskip_dups     disable \fB-skip_dups\fR mode.
+.IP
 add_keysyms     enable \fB-add_keysyms\fR mode.
 .IP
 noadd_keysyms   stop adding keysyms. those added will
-                still be removed at exit.
+still be removed at exit.
 .IP
 clear_mods      enable  \fB-clear_mods\fR mode and clear them.
 .IP
@@ -1623,10 +1807,10 @@ clear_keys      enable  \fB-clear_keys\fR mode and clear them.
 noclear_keys    disable \fB-clear_keys\fR mode.
 .IP
 remap:str       set \fB-remap\fR "str" (empty to disable).
-                See \fB-remap\fR for the form of "str"
-                (basically: key1-key2,key3-key4,...)
-                Use "+key1-key2" to append a single
-                keymapping, use "-key1-key2" to delete.
+See \fB-remap\fR for the form of "str"
+(basically: key1-key2,key3-key4,...)
+Use "+key1-key2" to append a single
+keymapping, use "-key1-key2" to delete.
 .IP
 norepeat        enable  \fB-norepeat\fR mode.
 .IP
@@ -1653,7 +1837,7 @@ cursor:mode     enable  \fB-cursor\fR "mode".
 show_cursor     enable  showing a cursor.
 .IP
 noshow_cursor   disable showing a cursor. (same as
-                "nocursor")
+"nocursor")
 .IP
 arrow:n         set \fB-arrow\fR to alternate n.
 .IP
@@ -1707,6 +1891,14 @@ noscrollcopyrect disable \fB-scrollcopyrect__mode_.\fR "noscr"
 .IP
 scr_area:n      set \fB-scr_area\fR to n
 .IP
+scr_skip:list   set \fB-scr_skip\fR to "list"
+.IP
+scr_inc:list    set \fB-scr_inc\fR to "list"
+.IP
+scr_keys:list   set \fB-scr_keys\fR to "list"
+.IP
+scr_parms:str   set \fB-scr_parms\fR parameters.
+.IP
 pointer_mode:n  set \fB-pointer_mode\fR to n. same as "pm"
 .IP
 input_skip:n    set \fB-input_skip\fR to n.
@@ -1725,7 +1917,7 @@ defer:n         set \fB-defer\fR to n ms,same as deferupdate:n
 .IP
 wait:n          set \fB-wait\fR to n ms.
 .IP
-rfbwait:n       set \fB-rfbwait\fR (rfbMaxClientWait) to n ms.
+readtimeout:n   set read timeout to n seconds.
 .IP
 nap             enable  \fB-nap\fR mode.
 .IP
@@ -1756,7 +1948,7 @@ nosnapfb        disable \fB-snapfb\fR mode.
 rawfb:str       set \fB-rawfb\fR mode to "str".
 .IP
 progressive:n   set libvncserver \fB-progressive\fR slice
-                height parameter to n.
+height parameter to n.
 .IP
 desktop:str     set \fB-desktop\fR name to str for new clients.
 .IP
@@ -1773,17 +1965,17 @@ noenablehttpproxy disable \fB-enablehttpproxy\fR mode.
 alwaysshared     enable  \fB-alwaysshared\fR mode.
 .IP
 noalwaysshared   disable \fB-alwaysshared\fR mode.
-                (may interfere with other options)
+(may interfere with other options)
 .IP
 nevershared      enable  \fB-nevershared\fR mode.
 .IP
 nonevershared    disable \fB-nevershared\fR mode.
-                (may interfere with other options)
+(may interfere with other options)
 .IP
 dontdisconnect   enable  \fB-dontdisconnect\fR mode.
 .IP
 nodontdisconnect disable \fB-dontdisconnect\fR mode.
-                (may interfere with other options)
+(may interfere with other options)
 .IP
 debug_xevents   enable  debugging X events.
 .IP
@@ -1801,9 +1993,17 @@ debug_scroll    enable  debugging scrollcopy mechanism.
 .IP
 nodebug_scroll  disable debugging scrollcopy mechanism.
 .IP
+debug_tiles     enable  \fB-debug_tiles\fR
+.IP
+nodebug_tiles   disable \fB-debug_tiles\fR
+.IP
+dbg             enable  \fB-dbg\fR crash shell
+.IP
+nodbg           disable \fB-dbg\fR crash shell
+.IP
 .IP
 noremote        disable the \fB-remote\fR command processing,
-                it cannot be turned back on.
+it cannot be turned back on.
 .IP
 .IP
 The 
@@ -1873,38 +2073,40 @@ noflipbyteorder onetile noonetile solid_color
 solid nosolid blackout xinerama noxinerama xtrap
 noxtrap xrandr noxrandr xrandr_mode padgeom quiet q
 noquiet modtweak nomodtweak xkb noxkb skip_keycodes
-add_keysyms noadd_keysyms clear_mods noclear_mods
-clear_keys noclear_keys remap repeat norepeat
-fb nofb bell nobell sel nosel primary noprimary
-cursorshape nocursorshape cursorpos nocursorpos cursor
-show_cursor noshow_cursor nocursor arrow xfixes noxfixes
-xdamage noxdamage xd_area xd_mem alphacut alphafrac
-alpharemove noalpharemove alphablend noalphablend
-xwarp xwarppointer noxwarp noxwarppointer buttonmap
-dragging nodragging wireframe_mode wireframe wf
-nowireframe nowf wirecopyrect wcr nowirecopyrect nowcr
-scr_area scrollcopyrect scr noscrollcopyrect noscr
-pointer_mode pm input_skip input client_input speeds
-debug_pointer dp nodebug_pointer nodp debug_keyboard dk
-nodebug_keyboard nodk deferupdate defer wait rfbwait
-nap nonap sb screen_blank fs gaps grow fuzz snapfb
-nosnapfb rawfb progressive rfbport http nohttp httpport
+skip_dups noskip_dups add_keysyms noadd_keysyms
+clear_mods noclear_mods clear_keys noclear_keys
+remap repeat norepeat fb nofb bell nobell sel nosel
+primary noprimary cursorshape nocursorshape cursorpos
+nocursorpos cursor show_cursor noshow_cursor nocursor
+arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem
+alphacut alphafrac alpharemove noalpharemove alphablend
+noalphablend xwarppointer xwarp noxwarppointer noxwarp
+buttonmap dragging nodragging wireframe_mode wireframe
+wf nowireframe nowf wirecopyrect wcr nowirecopyrect
+nowcr scr_area scr_skip scr_inc scr_keys scr_parms
+scrollcopyrect scr noscrollcopyrect noscr pointer_mode
+pm input_skip input client_input speeds debug_pointer dp
+nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+nodk deferupdate defer wait readtimeout nap nonap
+sb screen_blank fs gaps grow fuzz snapfb nosnapfb
+rawfb progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
-nodontdisconnect desktop noremote
+nodontdisconnect desktop debug_xevents nodebug_xevents
+debug_xevents debug_xdamage nodebug_xdamage
+debug_xdamage debug_wireframe nodebug_wireframe
+debug_wireframe debug_scroll nodebug_scroll debug_scroll
+debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg
+nodbg noremote
 .IP
-aro=  debug_xevents nodebug_xevents debug_xevents
-debug_xdamage nodebug_xdamage debug_xdamage
-debug_wireframe nodebug_wireframe debug_wireframe
-debug_scroll nodebug_scroll debug_scroll display
-vncdisplay desktopname http_url auth users rootshift
-clipshift scale_str scaled_x scaled_y scale_numer
-scale_denom scale_fac scaling_blend scaling_nomult4
-scaling_pad scaling_interpolate inetd privremote
-unsafe safer nocmds passwdfile using_shm logfile
-o flag rc norc h help V version lastmod bg sigpipe
-threads readrate netrate netlatency pipeinput clients
-client_count pid ext_xtest ext_xtrap ext_xrecord
+aro=  display vncdisplay desktopname http_url auth
+users rootshift clipshift scale_str scaled_x scaled_y
+scale_numer scale_denom scale_fac scaling_blend
+scaling_nomult4 scaling_pad scaling_interpolate inetd
+privremote unsafe safer nocmds passwdfile using_shm
+logfile o flag rc norc h help V version lastmod bg
+sigpipe threads readrate netrate netlatency pipeinput
+clients client_count pid ext_xtest ext_xtrap ext_xrecord
 ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes
 ext_xdamage ext_xrandr rootwin num_buttons button_mask
 mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y

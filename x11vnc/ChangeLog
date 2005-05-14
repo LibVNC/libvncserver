@@ -1,3 +1,12 @@
+2005-05-14  Karl Runge <runge@karlrunge.com>
+	* much more work on  "-scrollcopyrect" mode... getting usable.
+	* remove -pointer_mode 3, shift everyone back down
+	* -dbg "crash shell" for debugging
+	* -add_keysyms now the default, periodically clears if needed.
+	* try to autodetect if -xkb would be a good idea.
+	* improve keycode guessing for -xkb mode (force ISO_Level3_Shift)
+	* -remap DEAD, etc. for dead/mute keys remappings.
+
 2005-05-02  Karl Runge <runge@karlrunge.com>
 	* initial support for using RECORD to detect some types of window
 	  scrolls.  This is "-scrollcopyrect" mode, use -noscrollcopyrect

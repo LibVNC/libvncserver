@@ -1,3 +1,6 @@
+2005-05-14  Karl Runge <runge@karlrunge.com>
+	* x11vnc: more work on -scrollcopyrect and -xkb modes.
+
 2005-05-07  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* libvncserver/rfbserver.c: fix memory leak pointed out by Tim Jansen
 	* libvncserver/{httpd,main,rfbserver,sockets}.c, rfb/rfb.h:
