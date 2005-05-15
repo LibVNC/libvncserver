@@ -1315,8 +1315,6 @@ rfbSendFramebufferUpdate(cl, givenUpdateRegion)
 	        goto updateFailed;
     }
 
-    sraRgnDestroy(updateCopyRegion);
-
     for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
         int x = rect.x1;
         int y = rect.y1;
@@ -1381,6 +1379,7 @@ updateFailed:
     if(i)
         sraRgnReleaseIterator(i);
     sraRgnDestroy(updateRegion);
+    sraRgnDestroy(updateCopyRegion);
     return result;
 }
 
@@ -1434,6 +1433,7 @@ rfbSendCopyRegion(cl, reg, dx, dy)
 	+= sz_rfbFramebufferUpdateRectHeader + sz_rfbCopyRect;
 
     }
+    sraRgnReleaseIterator(i);
 
     return TRUE;
 }

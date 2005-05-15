@@ -164,6 +164,7 @@ void rfbDoCopyRegion(rfbScreenInfoPtr screen,sraRegionPtr copyRegion,int dx,int 
 	 memmove(out,in,widthInBytes);
      }
    }
+   sraRgnReleaseIterator(i);
   
    rfbScheduleCopyRegion(screen,copyRegion,dx,dy);
 }
