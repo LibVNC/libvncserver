@@ -24,7 +24,6 @@ unsigned char colourMap16[16*3]={
 
 void MakeColourMap16(vncConsolePtr c)
 {
-  int i,j;
   rfbColourMap* colourMap=&(c->screen->colourMap);
   if(colourMap->count)
     free(colourMap->data.bytes);

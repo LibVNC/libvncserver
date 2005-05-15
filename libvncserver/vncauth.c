@@ -21,6 +21,8 @@
  * vncauth.c - Functions for VNC password management and authentication.
  */
 
+#define _BSD_SOURCE
+#define _POSIX_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -46,6 +48,9 @@
 #include <sys/time.h>
 #endif
 
+
+/* libvncclient does not need this */
+#ifndef rfbEncryptBytes
 
 /*
  * We use a fixed key to store passwords, since we assume that our local
@@ -147,7 +152,7 @@ rfbRandomBytes(unsigned char *bytes)
     static rfbBool s_srandom_called = FALSE;
 
     if (!s_srandom_called) {
-	srandom((unsigned int)time(0) ^ (unsigned int)getpid());
+	srandom((unsigned int)time(NULL) ^ (unsigned int)getpid());
 	s_srandom_called = TRUE;
     }
 
@@ -156,6 +161,7 @@ rfbRandomBytes(unsigned char *bytes)
     }
 }
 
+#endif
 
 /*
  * Encrypt CHALLENGESIZE bytes in memory using a password.

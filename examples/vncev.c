@@ -1,4 +1,5 @@
 /* This program is a simple server to show events coming from the client */
+#define _BSD_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -8,10 +9,12 @@
 #include <rfb/rfb.h>
 #include <rfb/default8x16.h>
 
-char f[640*480];
-char* keys[0x400];
+#define width 100
+#define height 100
+static char f[width*height];
+static char* keys[0x400];
 
-int hex2number(unsigned char c)
+static int hex2number(unsigned char c)
 {
    if(c>'f') return(-1);
    else if(c>'F')
@@ -22,7 +25,7 @@ int hex2number(unsigned char c)
      return(c-'0');
 }
 
-void read_keys()
+static void read_keys(void)
 {
    int i,j,k;
    char buffer[1024];
@@ -60,15 +63,15 @@ void read_keys()
    fclose(keysyms);
 }
 
-int lineHeight=16,lineY=480-16;
-void output(rfbScreenInfoPtr s,char* line)
+static int lineHeight=16,lineY=height-16;
+static void output(rfbScreenInfoPtr s,char* line)
 {
-   rfbDoCopyRect(s,0,0,640,480-lineHeight,0,-lineHeight);
+   rfbDoCopyRect(s,0,0,width,height-lineHeight,0,-lineHeight);
    rfbDrawString(s,&default8x16Font,10,lineY,line,0x01);
    rfbLog("%s\n",line);
 }
 
-void dokey(rfbBool down,rfbKeySym k,rfbClientPtr cl)
+static void dokey(rfbBool down,rfbKeySym k,rfbClientPtr cl)
 {
    char buffer[1024+32];
    
@@ -77,7 +80,7 @@ void dokey(rfbBool down,rfbKeySym k,rfbClientPtr cl)
    output(cl->screen,buffer);
 }
 
-void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
+static void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 {
    char buffer[1024];
    if(buttonMask) {
@@ -87,7 +90,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
    
 }
 
-enum rfbNewClientAction newclient(rfbClientPtr cl)
+static enum rfbNewClientAction newclient(rfbClientPtr cl)
 {
    char buffer[1024];
    struct sockaddr_in addr;
@@ -103,7 +106,7 @@ enum rfbNewClientAction newclient(rfbClientPtr cl)
 
 int main(int argc,char** argv)
 {
-   rfbScreenInfoPtr s=rfbGetScreen(&argc,argv,640,480,8,1,1);
+   rfbScreenInfoPtr s=rfbGetScreen(&argc,argv,width,height,8,1,1);
    s->colourMap.is16=FALSE;
    s->colourMap.count=2;
    s->colourMap.data.bytes=(unsigned char*)"\xd0\xd0\xd0\x30\x01\xe0";
@@ -113,7 +116,7 @@ int main(int argc,char** argv)
    s->ptrAddEvent=doptr;
    s->newClientHook=newclient;
    
-   memset(f,0,640*480);
+   memset(f,0,width*height);
    read_keys();
    rfbInitServer(s);
    

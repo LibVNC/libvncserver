@@ -1,3 +1,4 @@
+#define _BSD_SOURCE
 #include <time.h>
 #include <stdarg.h>
 #include <rfb/rfb.h>
@@ -8,12 +9,12 @@
 #endif
 
 #define ALL_AT_ONCE
-//#define VERY_VERBOSE
+/*#define VERY_VERBOSE*/
 
-MUTEX(frameBufferMutex);
+static MUTEX(frameBufferMutex);
 
 typedef struct { int id; char* str; } encoding_t;
-encoding_t testEncodings[]={
+static encoding_t testEncodings[]={
 	{ rfbEncodingRaw, "raw" },
 	{ rfbEncodingRRE, "rre" },
 	/* TODO: fix corre */
@@ -28,22 +29,22 @@ encoding_t testEncodings[]={
 	{ rfbEncodingTight, "tight" },
 #endif
 #endif
-	{ 0, 0 }
+	{ 0, NULL }
 };
 
 #define NUMBER_OF_ENCODINGS_TO_TEST (sizeof(testEncodings)/sizeof(encoding_t)-1)
-//#define NUMBER_OF_ENCODINGS_TO_TEST 1
+/*#define NUMBER_OF_ENCODINGS_TO_TEST 1*/
 
 /* Here come the variables/functions to handle the test output */
 
-const int width=400,height=300;
-struct { int x1,y1,x2,y2; } lastUpdateRect;
-unsigned int statistics[2][NUMBER_OF_ENCODINGS_TO_TEST];
-unsigned int totalFailed,totalCount;
-unsigned int countGotUpdate;
-MUTEX(statisticsMutex);
+static const int width=400,height=300;
+static struct { int x1,y1,x2,y2; } lastUpdateRect;
+static unsigned int statistics[2][NUMBER_OF_ENCODINGS_TO_TEST];
+static unsigned int totalFailed,totalCount;
+static unsigned int countGotUpdate;
+static MUTEX(statisticsMutex);
 
-void initStatistics() {
+static void initStatistics(void) {
 	memset(statistics[0],0,sizeof(int)*NUMBER_OF_ENCODINGS_TO_TEST);
 	memset(statistics[1],0,sizeof(int)*NUMBER_OF_ENCODINGS_TO_TEST);
 	totalFailed=totalCount=0;
@@ -54,7 +55,7 @@ void initStatistics() {
 	INIT_MUTEX(statisticsMutex);
 }
 
-void updateServerStatistics(int x1,int y1,int x2,int y2) {
+static void updateServerStatistics(int x1,int y1,int x2,int y2) {
 	LOCK(statisticsMutex);
 	countGotUpdate=0;
 	lastUpdateRect.x1=x1;
@@ -64,7 +65,7 @@ void updateServerStatistics(int x1,int y1,int x2,int y2) {
 	UNLOCK(statisticsMutex);
 }
 
-void updateStatistics(int encodingIndex,rfbBool failed) {
+static void updateStatistics(int encodingIndex,rfbBool failed) {
 	LOCK(statisticsMutex);
 	if(failed) {
 		statistics[1][encodingIndex]++;
@@ -83,7 +84,7 @@ void updateStatistics(int encodingIndex,rfbBool failed) {
 
 /* maxDelta=0 means they are expected to match exactly;
  * maxDelta>0 means that the average difference must be lower than maxDelta */
-rfbBool doFramebuffersMatch(rfbScreenInfo* server,rfbClient* client,
+static rfbBool doFramebuffersMatch(rfbScreenInfo* server,rfbClient* client,
 		int maxDelta)
 {
 	int i,j,k;
@@ -116,7 +117,10 @@ static rfbBool resize(rfbClient* cl) {
 	if(cl->frameBuffer)
 		free(cl->frameBuffer);
 	cl->frameBuffer=(char*)malloc(cl->width*cl->height*cl->format.bitsPerPixel/8);
+	if(!cl->frameBuffer)
+		return FALSE;
 	SendFramebufferUpdateRequest(cl,0,0,cl->width,cl->height,FALSE);
+	return TRUE;
 }
 
 typedef struct clientData {
@@ -169,11 +173,11 @@ static void* clientLoop(void* data) {
 	rfbClientLog("Starting client (encoding %s, display %s)\n",
 			testEncodings[cd->encodingIndex].str,
 			cd->display);
-	if(!rfbInitClient(client,0,0)) {
+	if(!rfbInitClient(client,NULL,NULL)) {
 		rfbClientErr("Had problems starting client (encoding %s)\n",
 				testEncodings[cd->encodingIndex].str);
 		updateStatistics(cd->encodingIndex,TRUE);
-		return 0;
+		return NULL;
 	}
 	while(1) {
 		if(WaitForMessage(client,50)>=0)
@@ -185,7 +189,7 @@ static void* clientLoop(void* data) {
 	if(client->frameBuffer)
 		free(client->frameBuffer);
 	rfbClientCleanup(client);
-	return 0;
+	return NULL;
 }
 
 static void startClient(int encodingIndex,rfbScreenInfo* server) {
@@ -258,7 +262,7 @@ static void idle(rfbScreenInfo* server)
 
 /* log function (to show what messages are from the client) */
 
-void
+static void
 rfbTestLog(const char *format, ...)
 {
 	va_list args;
@@ -295,7 +299,7 @@ int main(int argc,char** argv)
 	server=rfbGetScreen(&argc,argv,width,height,8,3,4);
 
 	server->frameBuffer=malloc(400*300*4);
-	server->cursor=0;
+	server->cursor=NULL;
 	for(j=0;j<400*300*4;j++)
 		server->frameBuffer[j]=j;
 	rfbInitServer(server);
@@ -311,9 +315,9 @@ int main(int argc,char** argv)
 #endif
 		startClient(i,server);
 
-	t=time(0);
+	t=time(NULL);
 	/* test 20 seconds */
-	while(time(0)-t<20) {
+	while(time(NULL)-t<20) {
 
 		idle(server);
 

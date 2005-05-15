@@ -10,8 +10,10 @@
  *  see GPL (latest version) for full details
  */
 
+#define _BSD_SOURCE
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
+#include "private.h"
 
 #include <stdarg.h>
 #include <errno.h>
@@ -35,20 +37,16 @@
 #include <time.h>
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-MUTEX(logMutex);
+static MUTEX(logMutex);
 #endif
 
-int rfbEnableLogging=1;
+static int rfbEnableLogging=1;
 
 #ifdef LIBVNCSERVER_WORDS_BIGENDIAN
 char rfbEndianTest = 0;
 #else
 char rfbEndianTest = -1;
 #endif
-
-/* from rfbserver.c */
-void rfbIncrClientRef(rfbClientPtr cl);
-void rfbDecrClientRef(rfbClientPtr cl);
 
 void rfbLogEnable(int enabled) {
   rfbEnableLogging=enabled;
@@ -58,7 +56,7 @@ void rfbLogEnable(int enabled) {
  * rfbLog prints a time-stamped message to the log file (stderr).
  */
 
-void
+static void
 rfbDefaultLog(const char *format, ...)
 {
     va_list args;
@@ -220,6 +218,8 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
 }
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#include <unistd.h>
+
 static void *
 clientOutput(void *data)
 {
@@ -305,7 +305,7 @@ listenerRun(void *data)
     int client_fd;
     struct sockaddr_in peer;
     rfbClientPtr cl;
-    size_t len;
+    socklen_t len;
 
     len = sizeof(peer);
 
@@ -355,7 +355,6 @@ rfbDefaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
   rfbClientIteratorPtr iterator;
   rfbClientPtr other_client;
   rfbScreenInfoPtr s = cl->screen;
-  rfbCursorPtr c = s->cursor;
 
   if (x != s->cursorX || y != s->cursorY) {
     LOCK(s->cursorMutex);
@@ -378,7 +377,7 @@ rfbDefaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
   }
 }
 
-void rfbDefaultSetXCutText(char* text, int len, rfbClientPtr cl)
+static void rfbDefaultSetXCutText(char* text, int len, rfbClientPtr cl)
 {
 }
 
@@ -393,7 +392,7 @@ static rfbCursor myCursor =
    8, 7, 3, 3,
    0, 0, 0,
    0xffff, 0xffff, 0xffff,
-   0
+   NULL
 };
 #else
 static rfbCursor myCursor = 
@@ -407,17 +406,17 @@ static rfbCursor myCursor =
    width: 8, height: 7, xhot: 3, yhot: 3,
    foreRed: 0, foreGreen: 0, foreBlue: 0,
    backRed: 0xffff, backGreen: 0xffff, backBlue: 0xffff,
-   richSource: 0
+   richSource: NULL
 };
 #endif
 
-rfbCursorPtr rfbDefaultGetCursorPtr(rfbClientPtr cl)
+static rfbCursorPtr rfbDefaultGetCursorPtr(rfbClientPtr cl)
 {
    return(cl->screen->cursor);
 }
 
 /* response is cl->authChallenge vncEncrypted with passwd */
-rfbBool rfbDefaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
+static rfbBool rfbDefaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
 {
   int i;
   char *passwd=rfbDecryptPasswdFromFile(cl->screen->authPasswdData);
@@ -473,12 +472,12 @@ void rfbDoNothingWithClient(rfbClientPtr cl)
 {
 }
 
-enum rfbNewClientAction rfbDefaultNewClientHook(rfbClientPtr cl)
+static enum rfbNewClientAction rfbDefaultNewClientHook(rfbClientPtr cl)
 {
 	return RFB_CLIENT_ACCEPT;
 }
 
-rfbBool rfbDefaultProcessCustomClientMessage(rfbClientPtr cl,uint8_t type)
+static rfbBool rfbDefaultProcessCustomClientMessage(rfbClientPtr cl,uint8_t type)
 {
 	return FALSE;
 }
@@ -541,8 +540,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
      rfbErr("WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
 
    screen->autoPort=FALSE;
-   screen->clientHead=0;
-   screen->pointerClient=0;
+   screen->clientHead=NULL;
+   screen->pointerClient=NULL;
    screen->port=5900;
    screen->socketState=RFB_SOCKET_INIT;
 
@@ -552,7 +551,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->udpSock=-1;
    screen->udpSockConnected=FALSE;
    screen->udpPort=0;
-   screen->udpClient=0;
+   screen->udpClient=NULL;
 
    screen->maxFd=0;
    screen->listenSock=-1;
@@ -568,7 +567,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->alwaysShared = FALSE;
    screen->neverShared = FALSE;
    screen->dontDisconnect = FALSE;
-   screen->authPasswdData = 0;
+   screen->authPasswdData = NULL;
    screen->authPasswdFirstViewOnly = 1;
    
    screen->width = width;
@@ -586,7 +585,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);
-     return 0;
+     return NULL;
    }
 
 #ifdef WIN32
@@ -626,7 +625,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->getCursorPtr = rfbDefaultGetCursorPtr;
    screen->setTranslateFunction = rfbSetTranslateFunction;
    screen->newClientHook = rfbDefaultNewClientHook;
-   screen->displayHook = 0;
+   screen->displayHook = NULL;
    screen->processCustomClientMessage = rfbDefaultProcessCustomClientMessage;
 
    /* initialize client list and iterator mutex */
@@ -709,10 +708,6 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
   rfbReleaseClientIterator(iterator);
 }
 
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-extern void TightCleanup();
-#endif
-
 /* hang up on all clients and free all reserved memory */
 
 void rfbScreenCleanup(rfbScreenInfoPtr screen)
@@ -732,10 +727,10 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   TINI_MUTEX(screen->cursorMutex);
   if(screen->cursor && screen->cursor->cleanup)
     rfbFreeCursor(screen->cursor);
-  free(screen);
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
-  rfbTightCleanup();
+  rfbTightCleanup(screen);
 #endif
+  free(screen);
 }
 
 void rfbInitServer(rfbScreenInfoPtr screen)
@@ -780,9 +775,6 @@ void gettimeofday(struct timeval* tv,char* dummy)
    tv->tv_usec=t.wMilliseconds*1000;
 }
 #endif
-
-/* defined in rfbserver.c, but kind of "private" */
-rfbClientPtr rfbClientIteratorHead(rfbClientIteratorPtr i);
 
 rfbBool
 rfbProcessEvents(rfbScreenInfoPtr screen,long usec)

@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <rfb/rfb.h>
 
-void usage(void)
+static void usage(void)
 {
     printf("\nusage:  storepasswd <password> <filename>\n\n");
 

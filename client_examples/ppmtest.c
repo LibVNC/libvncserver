@@ -6,11 +6,11 @@
 #include <errno.h>
 #include <rfb/rfbclient.h>
 
-void PrintRect(rfbClient* client, int x, int y, int w, int h) {
+static void PrintRect(rfbClient* client, int x, int y, int w, int h) {
 	rfbClientLog("Received an update for %d,%d,%d,%d.\n",x,y,w,h);
 }
 
-void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) {
+static void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) {
 	static time_t t=0,t1;
 	FILE* f;
 	int i,j;
@@ -19,7 +19,7 @@ void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) {
 	int row_stride=client->width*bpp;
 
 	/* save one picture only if the last is older than 2 seconds */
-	t1=time(0);
+	t1=time(NULL);
 	if(t1-t>2)
 		t=t1;
 	else
@@ -46,6 +46,8 @@ void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) {
 				v=*(unsigned int*)p;
 			else if(bpp==2)
 				v=*(unsigned short*)p;
+			else
+				v=*(unsigned char*)p;
 			fputc((v>>pf->redShift)*256/(pf->redMax+1),f);
 			fputc((v>>pf->greenShift)*256/(pf->greenMax+1),f);
 			fputc((v>>pf->blueShift)*256/(pf->blueMax+1),f);
@@ -53,14 +55,11 @@ void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) {
 	fclose(f);
 }
 
-	int
+int
 main(int argc, char **argv)
 {
-	int i;
 	rfbClient* client = rfbGetClient(8,3,4);
-	const char* vncServerHost="";
-	int vncServerPort=5900;
-	time_t t=time(0);
+	time_t t=time(NULL);
 
 	if(argc>1 && !strcmp("-print",argv[1])) {
 		client->GotFrameBufferUpdate = PrintRect;
@@ -81,7 +80,8 @@ main(int argc, char **argv)
 	if (!rfbInitClient(client,&argc,argv))
 		return 1;
 
-	while (time(0)-t<5) {
+	/* TODO: better wait for update completion */
+	while (time(NULL)-t<5) {
 		static int i=0;
 		fprintf(stderr,"\r%d",i++);
 		if(WaitForMessage(client,50)<0)

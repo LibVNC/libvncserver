@@ -180,7 +180,7 @@ AC_ARG_WITH(perl5,[  --with-perl5=path       Set location of Perl5 executable],[
 # First figure out what the name of Perl5 is
 
 if test -z "$PERLBIN"; then
-AC_CHECK_PROGS(PERL, perl perl5.6.1 perl5.6.0 perl5.004 perl5.003 perl5.002 perl5.001 perl5 perl)
+AC_CHECK_PROGS(PERL, perl perl5.8.1 perl5.6.1 perl5.6.0 perl5.004 perl5.003 perl5.002 perl5.001 perl5 perl)
 else
 PERL="$PERLBIN"
 fi

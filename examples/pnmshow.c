@@ -2,7 +2,7 @@
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
 
-void HandleKey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
+static void HandleKey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
 {
   if(down && (key==XK_Escape || key=='q' || key=='Q'))
     rfbCloseClient(cl);
@@ -95,6 +95,8 @@ int main(int argc,char** argv)
 		    for(i=width*4;i<paddedWidth*4;i++)
 		      rfbScreen->frameBuffer[j*paddedWidth*4+i]=0;
 		  }
+		  break;
+	case GRAY:
 		  break;
 	case BW:
 		  /* correct the format from 1 bit to 8 bits */

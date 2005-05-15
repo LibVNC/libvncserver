@@ -4,7 +4,7 @@
 #include <rfb/keysym.h>
 #include <rfb/default8x16.h>
 
-int maxx=400, maxy=400, bpp=4;
+static int maxx=400, maxy=400, bpp=4;
 /* odd maxx doesn't work (vncviewer bug) */
 
 /* Here we create a structure so that every client has it's own pointer */
@@ -74,7 +74,7 @@ void draw_primary_colors (char* frame_buffer, int x1, int y1, int x2, int y2)
  }
 
 /* Dscho's versions (slower, but works for bpp != 3 or 4) */
-void draw_primary_colours_generic(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
+static void draw_primary_colours_generic(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
 {
   rfbPixelFormat f=s->serverFormat;
   int i,j;
@@ -88,7 +88,7 @@ void draw_primary_colours_generic(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2
 	rfbDrawPixel(s,i,j,f.blueMax<<f.blueShift);
 }
 
-void draw_primary_colours_generic_fast(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
+static void draw_primary_colours_generic_fast(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
 {
   rfbPixelFormat f=s->serverFormat;
   int i,j,y3=(y1*2+y2)/3,y4=(y1+y2*2)/3;
@@ -106,7 +106,7 @@ void draw_primary_colours_generic_fast(rfbScreenInfoPtr s,int x1,int y1,int x2,i
     }
 }
 
-void draw_primary_colours_generic_ultrafast(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
+static void draw_primary_colours_generic_ultrafast(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
 {
   rfbPixelFormat f=s->serverFormat;
   int y3=(y1*2+y2)/3,y4=(y1+y2*2)/3;

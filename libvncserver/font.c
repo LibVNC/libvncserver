@@ -145,7 +145,7 @@ void rfbWholeFontBBox(rfbFontDataPtr font,
    int i;
    int* m=font->metaData;
    
-   (*x1)=(*y1)=INT_MAX; (*x2)=(*y2)=-INT_MAX+1;
+   (*x1)=(*y1)=INT_MAX; (*x2)=(*y2)=1-(INT_MAX);
    for(i=0;i<256;i++) {
       if(m[i*5+1]-m[i*5+3]>(*x2))
 	(*x2)=m[i*5+1]-m[i*5+3];
@@ -164,14 +164,14 @@ rfbFontDataPtr rfbLoadConsoleFont(char *filename)
   rfbFontDataPtr p;
   int i;
 
-  if(!f) return(0);
+  if(!f) return NULL;
 
   p=(rfbFontDataPtr)malloc(sizeof(rfbFontData));
   p->data=(unsigned char*)malloc(4096);
   if(1!=fread(p->data,4096,1,f)) {
     free(p->data);
     free(p);
-    return(0);
+    return NULL;
   }
   fclose(f);
   p->metaData=(int*)malloc(256*5*sizeof(int));

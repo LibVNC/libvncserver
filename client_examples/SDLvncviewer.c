@@ -46,7 +46,7 @@ static rfbBool resize(rfbClient* client) {
 	return TRUE;
 }
 
-rfbKeySym SDL_keysym2rfbKeySym(int keysym) {
+static rfbKeySym SDL_keysym2rfbKeySym(int keysym) {
 	switch(keysym) {
 	case SDLK_BACKSPACE: return XK_BackSpace;
 	case SDLK_TAB: return XK_ISO_Left_Tab;
@@ -184,9 +184,10 @@ rfbKeySym SDL_keysym2rfbKeySym(int keysym) {
 	case SDLK_BREAK: return XK_Break;
 	default: rfbClientLog("Unknown keysym: %d\n",keysym);
 	}
+	return 0;
 }
 
-void update(rfbClient* cl,int x,int y,int w,int h) {
+static void update(rfbClient* cl,int x,int y,int w,int h) {
 	SDL_UpdateRect(cl->clientData, x, y, w, h);
 }
 

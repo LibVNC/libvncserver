@@ -517,6 +517,7 @@ extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern int rfbConnectToTcpAddr(char* host, int port);
 extern int rfbListenOnTCPPort(int port, in_addr_t iface);
 extern int rfbListenOnUDPPort(int port, in_addr_t iface);
+extern int rfbStringToAddr(char* string,in_addr_t* addr);
 
 /* rfbserver.c */
 
@@ -528,6 +529,8 @@ extern void rfbClientListInit(rfbScreenInfoPtr rfbScreen);
 extern rfbClientIteratorPtr rfbGetClientIterator(rfbScreenInfoPtr rfbScreen);
 extern rfbClientPtr rfbClientIteratorNext(rfbClientIteratorPtr iterator);
 extern void rfbReleaseClientIterator(rfbClientIteratorPtr iterator);
+extern void rfbIncrClientRef(rfbClientPtr cl);
+extern void rfbDecrClientRef(rfbClientPtr cl);
 
 extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,int sock);
 extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,int sock);
@@ -624,6 +627,7 @@ extern rfbBool rfbTightDisableGradient;
 
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
+
 #endif
 #endif
 
@@ -661,7 +665,6 @@ extern void rfbDefaultPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl);
 /* zrle.c */
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 extern rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w,int h);
-extern void rfbFreeZrleData(rfbClientPtr cl);
 #endif
 
 /* stats.c */

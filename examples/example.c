@@ -34,13 +34,13 @@
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
 
-const int bpp=4;
-int maxx=800, maxy=600;
+static const int bpp=4;
+static int maxx=800, maxy=600;
 /* TODO: odd maxx doesn't work (vncviewer bug) */
 
 /* This initializes a nice (?) background */
 
-void initBuffer(unsigned char* buffer)
+static void initBuffer(unsigned char* buffer)
 {
   int i,j;
   for(j=0;j<maxy;++j) {
@@ -63,12 +63,12 @@ typedef struct ClientData {
   int oldx,oldy;
 } ClientData;
 
-void clientgone(rfbClientPtr cl)
+static void clientgone(rfbClientPtr cl)
 {
   free(cl->clientData);
 }
 
-enum rfbNewClientAction newclient(rfbClientPtr cl)
+static enum rfbNewClientAction newclient(rfbClientPtr cl)
 {
   cl->clientData = (void*)calloc(sizeof(ClientData),1);
   cl->clientGoneHook = clientgone;
@@ -77,7 +77,7 @@ enum rfbNewClientAction newclient(rfbClientPtr cl)
 
 /* switch to new framebuffer contents */
 
-void newframebuffer(rfbScreenInfoPtr screen, int width, int height)
+static void newframebuffer(rfbScreenInfoPtr screen, int width, int height)
 {
   unsigned char *oldfb, *newfb;
 
@@ -94,7 +94,7 @@ void newframebuffer(rfbScreenInfoPtr screen, int width, int height)
 
 /* aux function to draw a line */
 
-void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,int x2,int y2)
+static void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,int x2,int y2)
 {
   int i,j;
   i=x1-x2; j=y1-y2;
@@ -121,7 +121,7 @@ void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,int x2,i
     
 /* Here the pointer events are handled */
 
-void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
+static void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 {
    ClientData* cd=cl->clientData;
 
@@ -163,7 +163,7 @@ void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 
 /* Here the key events are handled */
 
-void dokey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
+static void dokey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
 {
   if(down) {
     if(key==XK_Escape)
@@ -205,8 +205,10 @@ void dokey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
 
 /* Example for an XCursor (foreground/background only) */
 
-int exampleXCursorWidth=9,exampleXCursorHeight=7;
-char exampleXCursor[]=
+#ifdef JUST_AN_EXAMPLE
+
+static int exampleXCursorWidth=9,exampleXCursorHeight=7;
+static char exampleXCursor[]=
   "         "
   " xx   xx "
   "  xx xx  "
@@ -215,9 +217,11 @@ char exampleXCursor[]=
   " xx   xx "
   "         ";
 
+#endif
+
 /* Example for a rich cursor (full-colour) */
 
-void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
+static void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
 {
   int i,j,w=32,h=32;
   rfbCursorPtr c = rfbScreen->cursor;

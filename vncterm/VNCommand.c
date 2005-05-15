@@ -1,3 +1,5 @@
+#define _BSD_SOURCE
+#define _POSIX_SOURCE
 #include "VNConsole.h"
 #include "vga.h"
 #ifdef LIBVNCSERVER_HAVE_FCNTL_H

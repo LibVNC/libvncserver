@@ -25,6 +25,7 @@
  */
 
 #include "rfb/rfb.h"
+#include "private.h"
 #include "zrleoutstream.h"
 
 
@@ -174,7 +175,7 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
 }
 
 
-void FreeZrleData(rfbClientPtr cl)
+void rfbFreeZrleData(rfbClientPtr cl)
 {
   if (cl->zrleData)
     zrleOutStreamFree(cl->zrleData);

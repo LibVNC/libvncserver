@@ -216,7 +216,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     fd_set fds;
     struct timeval tv;
     struct sockaddr_in addr;
-    size_t addrlen = sizeof(addr);
+    socklen_t addrlen = sizeof(addr);
     char buf[6];
     const int one = 1;
     int sock;
@@ -342,8 +342,7 @@ rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen)
 
 
 void
-rfbCloseClient(cl)
-     rfbClientPtr cl;
+rfbCloseClient(rfbClientPtr cl)
 {
     LOCK(cl->updateMutex);
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
@@ -371,10 +370,9 @@ rfbCloseClient(cl)
  */
 
 int
-rfbConnect(rfbScreen, host, port)
-    rfbScreenInfoPtr rfbScreen;
-    char *host;
-    int port;
+rfbConnect(rfbScreenInfoPtr rfbScreen,
+           char *host,
+           int port)
 {
     int sock;
     int one = 1;
@@ -476,10 +474,9 @@ int rfbReadExact(rfbClientPtr cl,char* buf,int len)
  */
 
 int
-rfbWriteExact(cl, buf, len)
-     rfbClientPtr cl;
-     const char *buf;
-     int len;
+rfbWriteExact(rfbClientPtr cl,
+              const char *buf,
+              int len)
 {
     int sock = cl->sock;
     int n;
@@ -573,9 +570,8 @@ rfbStringToAddr(char *str, in_addr_t *addr)  {
 }
 
 int
-rfbListenOnTCPPort(port, iface)
-    int port;
-    in_addr_t iface;
+rfbListenOnTCPPort(int port,
+                   in_addr_t iface)
 {
     struct sockaddr_in addr;
     int sock;
@@ -607,9 +603,8 @@ rfbListenOnTCPPort(port, iface)
 }
 
 int
-rfbConnectToTcpAddr(host, port)
-    char *host;
-    int port;
+rfbConnectToTcpAddr(char *host,
+                    int port)
 {
     struct hostent *hp;
     int sock;
@@ -641,9 +636,8 @@ rfbConnectToTcpAddr(host, port)
 }
 
 int
-rfbListenOnUDPPort(port, iface)
-    int port;
-    in_addr_t iface;
+rfbListenOnUDPPort(int port,
+                   in_addr_t iface)
 {
     struct sockaddr_in addr;
     int sock;

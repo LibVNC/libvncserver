@@ -24,14 +24,14 @@
 
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
+#include "private.h"
 
 /*
  * Send cursor shape either in X-style format or in client pixel format.
  */
 
 rfbBool
-rfbSendCursorShape(cl)
-    rfbClientPtr cl;
+rfbSendCursorShape(rfbClientPtr cl)
 {
     rfbCursorPtr pCursor;
     rfbFramebufferUpdateRectHeader rect;
@@ -360,8 +360,8 @@ void rfbFreeCursor(rfbCursorPtr cursor)
        else {
 	   cursor->cleanup=cursor->cleanupSource=cursor->cleanupMask
 	       =cursor->cleanupRichSource=FALSE;
-	   cursor->source=cursor->mask=cursor->richSource=0;
-	   cursor->alphaSource=0;
+	   cursor->source=cursor->mask=cursor->richSource=NULL;
+	   cursor->alphaSource=NULL;
        }
    }
    
@@ -633,9 +633,9 @@ void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion)
     }
 }
 
-/* for debugging */
+#ifdef DEBUG
 
-void rfbPrintXCursor(rfbCursorPtr cursor)
+static void rfbPrintXCursor(rfbCursorPtr cursor)
 {
    int i,i1,j,w=(cursor->width+7)/8;
    unsigned char bit;
@@ -649,6 +649,8 @@ void rfbPrintXCursor(rfbCursorPtr cursor)
    }
 }
 
+#endif
+
 void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
 {
   rfbClientIteratorPtr iterator;
@@ -660,7 +662,7 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
     iterator=rfbGetClientIterator(rfbScreen);
     while((cl=rfbClientIteratorNext(iterator)))
 	if(!cl->enableCursorShapeUpdates)
-	  rfbRedrawAfterHideCursor(cl,0);
+	  rfbRedrawAfterHideCursor(cl,NULL);
     rfbReleaseClientIterator(iterator);
 
     if(rfbScreen->cursor->cleanup)
@@ -673,7 +675,7 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
   while((cl=rfbClientIteratorNext(iterator))) {
     cl->cursorWasChanged = TRUE;
     if(!cl->enableCursorShapeUpdates)
-      rfbRedrawAfterHideCursor(cl,0);
+      rfbRedrawAfterHideCursor(cl,NULL);
   }
   rfbReleaseClientIterator(iterator);
 

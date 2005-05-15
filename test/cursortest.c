@@ -24,12 +24,12 @@
 
 #include <rfb/rfb.h>
 
-const int bpp=4;
-int maxx=800, maxy=600;
+static const int bpp=4;
+static int maxx=800, maxy=600;
 
 /* This initializes a nice (?) background */
 
-void initBuffer(unsigned char* buffer)
+static void initBuffer(unsigned char* buffer)
 {
 	int i,j;
 	for(j=0;j<maxy;++j) {
@@ -43,7 +43,7 @@ void initBuffer(unsigned char* buffer)
 
 /* Example for an XCursor (foreground/background only) */
 
-void SetXCursor(rfbScreenInfoPtr rfbScreen)
+static void SetXCursor(rfbScreenInfoPtr rfbScreen)
 {
 	int width=13,height=11;
 	char cursor[]=
@@ -78,7 +78,7 @@ void SetXCursor(rfbScreenInfoPtr rfbScreen)
 	rfbSetCursor(rfbScreen, c);
 }
 
-void SetXCursor2(rfbScreenInfoPtr rfbScreen)
+static void SetXCursor2(rfbScreenInfoPtr rfbScreen)
 {
 	int width=13,height=22;
 	char cursor[]=
@@ -136,7 +136,7 @@ void SetXCursor2(rfbScreenInfoPtr rfbScreen)
 
 /* Example for a rich cursor (full-colour) */
 
-void SetRichCursor(rfbScreenInfoPtr rfbScreen)
+static void SetRichCursor(rfbScreenInfoPtr rfbScreen)
 {
 	int i,j,w=32,h=32;
 	/* runge */
@@ -192,7 +192,7 @@ void SetRichCursor(rfbScreenInfoPtr rfbScreen)
 }
 
 /* runge */
-void SetRichCursor2(rfbScreenInfoPtr rfbScreen)
+static void SetRichCursor2(rfbScreenInfoPtr rfbScreen)
 {
 	int i,j,w=17,h=16;
 	/*  rfbCursorPtr c = rfbScreen->cursor; */
@@ -232,7 +232,7 @@ void SetRichCursor2(rfbScreenInfoPtr rfbScreen)
 
 /* alpha channel */
 
-void SetAlphaCursor(rfbScreenInfoPtr screen,int mode)
+static void SetAlphaCursor(rfbScreenInfoPtr screen,int mode)
 {
 	int i,j;
 	rfbCursorPtr c = screen->cursor;
@@ -243,7 +243,7 @@ void SetAlphaCursor(rfbScreenInfoPtr screen,int mode)
 
 	if(c->alphaSource) {
 		free(c->alphaSource);
-		c->alphaSource=0;
+		c->alphaSource=NULL;
 	}
 
 	if(mode==0)
@@ -265,7 +265,7 @@ void SetAlphaCursor(rfbScreenInfoPtr screen,int mode)
 
 /* Here the pointer events are handled */
 
-void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
+static void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 {
 	static int oldButtonMask=0;
 	static int counter=0;

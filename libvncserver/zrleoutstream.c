@@ -209,8 +209,7 @@ static int zrleOutStreamOverrun(zrleOutStream *os,
   return size;
 }
 
-static inline int zrleOutStreamCheck(zrleOutStream *os,
-				     int            size)
+static int zrleOutStreamCheck(zrleOutStream *os, int size)
 {
   if (os->in.ptr + size > os->in.end) {
     return zrleOutStreamOverrun(os, size);

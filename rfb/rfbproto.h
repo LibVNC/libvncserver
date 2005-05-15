@@ -62,6 +62,10 @@
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
+#ifdef __CHECKER__
+#undef Z_NULL
+#define Z_NULL NULL
+#endif
 #endif
 
 

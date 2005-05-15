@@ -69,7 +69,7 @@
 
 #define OK_STR "HTTP/1.0 200 OK\nContent-Type: text/html\r\n\r\n"
 
-static void httpProcessInput();
+static void httpProcessInput(rfbScreenInfoPtr screen);
 static rfbBool compareAndSkip(char **ptr, const char *str);
 static rfbBool parseParams(const char *request, char *result, int max_bytes);
 static rfbBool validateString(char *str);
@@ -131,7 +131,7 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
     fd_set fds;
     struct timeval tv;
     struct sockaddr_in addr;
-    size_t addrlen = sizeof(addr);
+    socklen_t addrlen = sizeof(addr);
 
     if (!rfbScreen->httpDir)
 	return;
@@ -221,7 +221,7 @@ static void
 httpProcessInput(rfbScreenInfoPtr rfbScreen)
 {
     struct sockaddr_in addr;
-    size_t addrlen = sizeof(addr);
+    socklen_t addrlen = sizeof(addr);
     char fullFname[512];
     char params[1024];
     char *ptr;

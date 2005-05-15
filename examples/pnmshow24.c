@@ -6,7 +6,7 @@
 #error "I need the ALLOW24BPP flag to work"
 #endif
 
-void HandleKey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
+static void HandleKey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
 {
   if(down && (key==XK_Escape || key=='q' || key=='Q'))
     rfbCloseClient(cl);

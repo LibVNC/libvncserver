@@ -14,7 +14,7 @@
 
 #include <rfb/rfb.h>
 
-extern rfbStringToAddr(char *str, in_addr_t *iface);
+extern int rfbStringToAddr(char *str, in_addr_t *iface);
 
 void
 rfbUsage(void)
@@ -88,7 +88,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		return FALSE;
 	    }
 	    passwds[0] = argv[++i];
-	    passwds[1] = 0;
+	    passwds[1] = NULL;
 	    rfbScreen->authPasswdData = (void*)passwds;
 	    rfbScreen->passwordCheck = rfbCheckPasswordByList;
         } else if (strcmp(argv[i], "-deferupdate") == 0) {  /* -deferupdate milliseconds */
@@ -147,12 +147,6 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	i=i1;
     }
     return TRUE;
-}
-
-void rfbSizeUsage()
-{
-    fprintf(stderr, "-width                 sets the width of the framebuffer\n");
-    fprintf(stderr, "-height                sets the height of the framebuffer\n");
 }
 
 rfbBool 

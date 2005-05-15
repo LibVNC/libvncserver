@@ -53,9 +53,11 @@ static uint32_t getBgColour(char *data, int size, int bpp);
  */
 
 rfbBool
-rfbSendRectEncodingRRE(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbSendRectEncodingRRE(rfbClientPtr cl,
+                       int x,
+                       int y,
+                       int w,
+                       int h)
 {
     rfbFramebufferUpdateRectHeader rect;
     rfbRREHeader hdr;
@@ -175,26 +177,22 @@ rfbSendRectEncodingRRE(cl, x, y, w, h)
 
 #define DEFINE_SUBRECT_ENCODE(bpp)                                            \
 static int                                                                    \
-subrectEncode##bpp(data,w,h)                                                  \
-    uint##bpp##_t *data;                                                          \
-    int w;                                                                    \
-    int h;                                                                    \
-{                                                                             \
-    uint##bpp##_t cl;                                                             \
+subrectEncode##bpp(uint##bpp##_t *data, int w, int h) {                       \
+    uint##bpp##_t cl;                                                         \
     rfbRectangle subrect;                                                     \
     int x,y;                                                                  \
     int i,j;                                                                  \
     int hx=0,hy,vx=0,vy;                                                      \
     int hyflag;                                                               \
-    uint##bpp##_t *seg;                                                           \
-    uint##bpp##_t *line;                                                          \
+    uint##bpp##_t *seg;                                                       \
+    uint##bpp##_t *line;                                                      \
     int hw,hh,vw,vh;                                                          \
     int thex,they,thew,theh;                                                  \
     int numsubs = 0;                                                          \
     int newLen;                                                               \
-    uint##bpp##_t bg = (uint##bpp##_t)getBgColour((char*)data,w*h,bpp);               \
+    uint##bpp##_t bg = (uint##bpp##_t)getBgColour((char*)data,w*h,bpp);       \
                                                                               \
-    *((uint##bpp##_t*)rreAfterBuf) = bg;                                          \
+    *((uint##bpp##_t*)rreAfterBuf) = bg;                                      \
                                                                               \
     rreAfterBufLen = (bpp/8);                                                 \
                                                                               \
@@ -246,7 +244,7 @@ subrectEncode##bpp(data,w,h)                                                  \
             return -1;                                                        \
                                                                               \
           numsubs += 1;                                                       \
-          *((uint##bpp##_t*)(rreAfterBuf + rreAfterBufLen)) = cl;                 \
+          *((uint##bpp##_t*)(rreAfterBuf + rreAfterBufLen)) = cl;             \
           rreAfterBufLen += (bpp/8);                                          \
           memcpy(&rreAfterBuf[rreAfterBufLen],&subrect,sz_rfbRectangle);      \
           rreAfterBufLen += sz_rfbRectangle;                                  \
@@ -275,10 +273,7 @@ DEFINE_SUBRECT_ENCODE(32)
  * getBgColour() gets the most prevalent colour in a byte array.
  */
 static uint32_t
-getBgColour(data,size,bpp)
-    char *data;
-    int size;
-    int bpp;
+getBgColour(char *data, int size, int bpp)
 {
     
 #define NUMCLRS 256

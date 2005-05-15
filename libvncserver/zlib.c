@@ -52,10 +52,12 @@ static int zlibAfterBufLen;
  *                              rectangle encoding.
  */
 
-rfbBool
-rfbSendOneRectEncodingZlib(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+static rfbBool
+rfbSendOneRectEncodingZlib(rfbClientPtr cl,
+                           int x,
+                           int y,
+                           int w,
+                           int h)
 {
     rfbFramebufferUpdateRectHeader rect;
     rfbZlibHeader hdr;
@@ -230,9 +232,11 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
  */
 
 rfbBool
-rfbSendRectEncodingZlib(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbSendRectEncodingZlib(rfbClientPtr cl,
+                        int x,
+                        int y,
+                        int w,
+                        int h)
 {
     int  maxLines;
     int  linesRemaining;

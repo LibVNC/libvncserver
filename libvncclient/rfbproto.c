@@ -23,6 +23,8 @@
  * rfbproto.c - functions to deal with client side of RFB protocol.
  */
 
+#define _BSD_SOURCE
+#define _POSIX_SOURCE
 #include <unistd.h>
 #include <errno.h>
 #ifndef __MINGW32__
@@ -31,6 +33,10 @@
 #include <rfb/rfbclient.h>
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
+#ifdef __CHECKER__
+#undef Z_NULL
+#define Z_NULL NULL
+#endif
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 #include <jpeglib.h>
@@ -44,7 +50,7 @@
 
 rfbBool rfbEnableClientLogging=TRUE;
 
-void
+static void
 rfbDefaultClientLog(const char *format, ...)
 {
     va_list args;
@@ -69,7 +75,7 @@ rfbDefaultClientLog(const char *format, ...)
 rfbClientLogProc rfbClientLog=rfbDefaultClientLog;
 rfbClientLogProc rfbClientErr=rfbDefaultClientLog;
 
-void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_t colour) {
+static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_t colour) {
   int i,j;
 
 #define FILL_RECT(BPP) \
@@ -86,7 +92,7 @@ void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_t colou
   }
 }
 
-void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
+static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
   int i,j;
 
 #define COPY_RECT(BPP) \
@@ -108,7 +114,7 @@ void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int 
 }
 
 /* TODO: test */
-void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y) {
+static void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y) {
   int i,j;
 
 #define COPY_RECT_FROM_RECT(BPP) \
@@ -225,7 +231,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
       rfbClientLog("Could not open %s.\n",client->serverHost);
       return FALSE;
     }
-    setbuf(rec->file,0);
+    setbuf(rec->file,NULL);
     fread(buffer,1,strlen(magic),rec->file);
     if (strncmp(buffer,magic,strlen(magic))) {
       rfbClientLog("File %s was not recorded by vncrec.\n",client->serverHost);
@@ -265,7 +271,7 @@ InitialiseRFBConnection(rfbClient* client)
   uint32_t authScheme, reasonLen, authResult;
   char *reason;
   uint8_t challenge[CHALLENGESIZE];
-  char *passwd;
+  char *passwd=NULL;
   int i;
   rfbClientInitMsg ci;
 
@@ -1028,8 +1034,7 @@ HandleRFBServerMessage(rfbClient* client)
  */
 
 void
-PrintPixelFormat(format)
-    rfbPixelFormat *format;
+PrintPixelFormat(rfbPixelFormat *format)
 {
   if (format->bitsPerPixel == 1) {
     rfbClientLog("  Single bit per pixel.\n");
@@ -1143,9 +1148,6 @@ JpegSetSrcManager(j_decompress_ptr cinfo, uint8_t *compressedData,
 /* avoid name clashes with LibVNCServer */
 
 #define rfbEncryptBytes rfbClientEncryptBytes
-#define rfbEncryptAndStorePasswd rfbClientEncryptAndStorePasswdUnused
-#define rfbDecryptPasswdFromFile rfbClientDecryptPasswdFromFileUnused
-#define rfbRandomBytes rfbClientRandomBytesUnused
 #define rfbDes rfbClientDes
 #define rfbDesKey rfbClientDesKey
 #define rfbUseKey rfbClientUseKey

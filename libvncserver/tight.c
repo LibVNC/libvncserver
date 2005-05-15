@@ -26,6 +26,7 @@
 
 /*#include <stdio.h>*/
 #include <rfb/rfb.h>
+#include "private.h"
 
 #ifdef WIN32
 #define XMD_H
@@ -98,6 +99,7 @@ typedef struct PALETTE_s {
     COLOR_LIST list[256];
 } PALETTE;
 
+/* TODO: move into rfbScreen struct */
 static int paletteNumColors, paletteMaxColors;
 static uint32_t monoBackground, monoForeground;
 static PALETTE palette;
@@ -112,7 +114,7 @@ static char *tightAfterBuf = NULL;
 
 static int *prevRowBuf = NULL;
 
-void rfbTightCleanup()
+void rfbTightCleanup(rfbScreenInfoPtr screen)
 {
   if(tightBeforeBufSize) {
     free(tightBeforeBuf);
@@ -197,9 +199,11 @@ static void JpegSetDstManager(j_compress_ptr cinfo);
  */
 
 int
-rfbNumCodedRectsTight(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbNumCodedRectsTight(rfbClientPtr cl,
+                      int x,
+                      int y,
+                      int w,
+                      int h)
 {
     int maxRectSize, maxRectWidth;
     int subrectMaxWidth, subrectMaxHeight;
@@ -223,9 +227,11 @@ rfbNumCodedRectsTight(cl, x, y, w, h)
 }
 
 rfbBool
-rfbSendRectEncodingTight(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbSendRectEncodingTight(rfbClientPtr cl,
+                         int x,
+                         int y,
+                         int w,
+                         int h)
 {
     int nMaxRows;
     uint32_t colorValue;
@@ -363,11 +369,14 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
 }
 
 static void
-FindBestSolidArea(cl, x, y, w, h, colorValue, w_ptr, h_ptr)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    uint32_t colorValue;
-    int *w_ptr, *h_ptr;
+FindBestSolidArea(rfbClientPtr cl,
+                  int x,
+                  int y,
+                  int w,
+                  int h,
+                  uint32_t colorValue,
+                  int *w_ptr,
+                  int *h_ptr)
 {
     int dx, dy, dw, dh;
     int w_prev;
@@ -405,11 +414,16 @@ FindBestSolidArea(cl, x, y, w, h, colorValue, w_ptr, h_ptr)
 }
 
 static void
-ExtendSolidArea(cl, x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    uint32_t colorValue;
-    int *x_ptr, *y_ptr, *w_ptr, *h_ptr;
+ExtendSolidArea(rfbClientPtr cl,
+                int x,
+                int y,
+                int w,
+                int h,
+                uint32_t colorValue,
+                int *x_ptr,
+                int *y_ptr,
+                int *w_ptr,
+                int *h_ptr)
 {
     int cx, cy;
 
@@ -463,18 +477,19 @@ static rfbBool CheckSolidTile(rfbClientPtr cl, int x, int y, int w, int h, uint3
 
 #define DEFINE_CHECK_SOLID_FUNCTION(bpp)                                      \
                                                                               \
-static rfbBool                                                                   \
-CheckSolidTile##bpp(rfbClientPtr cl, int x, int y, int w, int h, uint32_t* colorPtr, rfbBool needSameColor) \
+static rfbBool                                                                \
+CheckSolidTile##bpp(rfbClientPtr cl, int x, int y, int w, int h,              \
+		uint32_t* colorPtr, rfbBool needSameColor)                    \
 {                                                                             \
-    uint##bpp##_t *fbptr;                                                         \
-    uint##bpp##_t colorValue;                                                     \
+    uint##bpp##_t *fbptr;                                                     \
+    uint##bpp##_t colorValue;                                                 \
     int dx, dy;                                                               \
                                                                               \
-    fbptr = (uint##bpp##_t *)                                                     \
+    fbptr = (uint##bpp##_t *)                                                 \
         &cl->screen->frameBuffer[y * cl->screen->paddedWidthInBytes + x * (bpp/8)]; \
                                                                               \
     colorValue = *fbptr;                                                      \
-    if (needSameColor && (uint32_t)colorValue != *colorPtr)                     \
+    if (needSameColor && (uint32_t)colorValue != *colorPtr)                   \
         return FALSE;                                                         \
                                                                               \
     for (dy = 0; dy < h; dy++) {                                              \
@@ -485,7 +500,7 @@ CheckSolidTile##bpp(rfbClientPtr cl, int x, int y, int w, int h, uint32_t* color
         fbptr = (uint##bpp##_t *)((uint8_t *)fbptr + cl->screen->paddedWidthInBytes); \
     }                                                                         \
                                                                               \
-    *colorPtr = (uint32_t)colorValue;                                           \
+    *colorPtr = (uint32_t)colorValue;                                         \
     return TRUE;                                                              \
 }
 
@@ -494,9 +509,7 @@ DEFINE_CHECK_SOLID_FUNCTION(16)
 DEFINE_CHECK_SOLID_FUNCTION(32)
 
 static rfbBool
-SendRectSimple(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+SendRectSimple(rfbClientPtr cl, int x, int y, int w, int h)
 {
     int maxBeforeSize, maxAfterSize;
     int maxRectSize, maxRectWidth;
@@ -549,9 +562,11 @@ SendRectSimple(cl, x, y, w, h)
 }
 
 static rfbBool
-SendSubrect(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+SendSubrect(rfbClientPtr cl,
+            int x,
+            int y,
+            int w,
+            int h)
 {
     char *fbptr;
     rfbBool success = FALSE;
@@ -625,9 +640,11 @@ SendSubrect(cl, x, y, w, h)
 }
 
 static rfbBool
-SendTightHeader(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+SendTightHeader(rfbClientPtr cl,
+                int x,
+                int y,
+                int w,
+                int h)
 {
     rfbFramebufferUpdateRectHeader rect;
 
@@ -657,8 +674,7 @@ SendTightHeader(cl, x, y, w, h)
  */
 
 static rfbBool
-SendSolidRect(cl)
-    rfbClientPtr cl;
+SendSolidRect(rfbClientPtr cl)
 {
     int len;
 
@@ -683,9 +699,9 @@ SendSolidRect(cl)
 }
 
 static rfbBool
-SendMonoRect(cl, w, h)
-    rfbClientPtr cl;
-    int w, h;
+SendMonoRect(rfbClientPtr cl,
+             int w,
+             int h)
 {
     int streamId = 1;
     int paletteLen, dataLen;
@@ -748,9 +764,9 @@ SendMonoRect(cl, w, h)
 }
 
 static rfbBool
-SendIndexedRect(cl, w, h)
-    rfbClientPtr cl;
-    int w, h;
+SendIndexedRect(rfbClientPtr cl,
+                int w,
+                int h)
 {
     int streamId = 2;
     int i, entryLen;
@@ -811,9 +827,9 @@ SendIndexedRect(cl, w, h)
 }
 
 static rfbBool
-SendFullColorRect(cl, w, h)
-    rfbClientPtr cl;
-    int w, h;
+SendFullColorRect(rfbClientPtr cl,
+                  int w,
+                  int h)
 {
     int streamId = 0;
     int len;
@@ -838,9 +854,9 @@ SendFullColorRect(cl, w, h)
 }
 
 static rfbBool
-SendGradientRect(cl, w, h)
-    rfbClientPtr cl;
-    int w, h;
+SendGradientRect(rfbClientPtr cl,
+                 int w,
+                 int h)
 {
     int streamId = 3;
     int len;
@@ -877,9 +893,11 @@ SendGradientRect(cl, w, h)
 }
 
 static rfbBool
-CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
-    rfbClientPtr cl;
-    int streamId, dataLen, zlibLevel, zlibStrategy;
+CompressData(rfbClientPtr cl,
+             int streamId,
+             int dataLen,
+             int zlibLevel,
+             int zlibStrategy)
 {
     z_streamp pz;
     int err;
@@ -931,9 +949,8 @@ CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
     return SendCompressedData(cl, tightAfterBufSize - pz->avail_out);
 }
 
-static rfbBool SendCompressedData(cl, compressedLen)
-    rfbClientPtr cl;
-    int compressedLen;
+static rfbBool SendCompressedData(rfbClientPtr cl,
+                                  int compressedLen)
 {
     int i, portionLen;
 
@@ -972,8 +989,7 @@ static rfbBool SendCompressedData(cl, compressedLen)
  */
 
 static void
-FillPalette8(count)
-    int count;
+FillPalette8(int count)
 {
     uint8_t *data = (uint8_t *)tightBeforeBuf;
     uint8_t c0, c1;
@@ -1017,11 +1033,9 @@ FillPalette8(count)
 #define DEFINE_FILL_PALETTE_FUNCTION(bpp)                               \
                                                                         \
 static void                                                             \
-FillPalette##bpp(count)                                                 \
-    int count;                                                          \
-{                                                                       \
-    uint##bpp##_t *data = (uint##bpp##_t *)tightBeforeBuf;                      \
-    uint##bpp##_t c0, c1, ci;                                               \
+FillPalette##bpp(int count) {                                           \
+    uint##bpp##_t *data = (uint##bpp##_t *)tightBeforeBuf;              \
+    uint##bpp##_t c0, c1, ci;                                           \
     int i, n0, n1, ni;                                                  \
                                                                         \
     c0 = data[0];                                                       \
@@ -1050,32 +1064,32 @@ FillPalette##bpp(count)                                                 \
     }                                                                   \
     if (i >= count) {                                                   \
         if (n0 > n1) {                                                  \
-            monoBackground = (uint32_t)c0;                                \
-            monoForeground = (uint32_t)c1;                                \
+            monoBackground = (uint32_t)c0;                              \
+            monoForeground = (uint32_t)c1;                              \
         } else {                                                        \
-            monoBackground = (uint32_t)c1;                                \
-            monoForeground = (uint32_t)c0;                                \
+            monoBackground = (uint32_t)c1;                              \
+            monoForeground = (uint32_t)c0;                              \
         }                                                               \
         paletteNumColors = 2;   /* Two colors */                        \
         return;                                                         \
     }                                                                   \
                                                                         \
     PaletteReset();                                                     \
-    PaletteInsert (c0, (uint32_t)n0, bpp);                                \
-    PaletteInsert (c1, (uint32_t)n1, bpp);                                \
+    PaletteInsert (c0, (uint32_t)n0, bpp);                              \
+    PaletteInsert (c1, (uint32_t)n1, bpp);                              \
                                                                         \
     ni = 1;                                                             \
     for (i++; i < count; i++) {                                         \
         if (data[i] == ci) {                                            \
             ni++;                                                       \
         } else {                                                        \
-            if (!PaletteInsert (ci, (uint32_t)ni, bpp))                   \
+            if (!PaletteInsert (ci, (uint32_t)ni, bpp))                 \
                 return;                                                 \
             ci = data[i];                                               \
             ni = 1;                                                     \
         }                                                               \
     }                                                                   \
-    PaletteInsert (ci, (uint32_t)ni, bpp);                                \
+    PaletteInsert (ci, (uint32_t)ni, bpp);                              \
 }
 
 DEFINE_FILL_PALETTE_FUNCTION(16)
@@ -1097,10 +1111,9 @@ PaletteReset(void)
 }
 
 static int
-PaletteInsert(rgb, numPixels, bpp)
-    uint32_t rgb;
-    int numPixels;
-    int bpp;
+PaletteInsert(uint32_t rgb,
+              int numPixels,
+              int bpp)
 {
     COLOR_LIST *pnode;
     COLOR_LIST *prev_pnode = NULL;
@@ -1169,11 +1182,10 @@ PaletteInsert(rgb, numPixels, bpp)
  * Color components assumed to be byte-aligned.
  */
 
-static void Pack24(cl, buf, fmt, count)
-    rfbClientPtr cl;
-    char *buf;
-    rfbPixelFormat *fmt;
-    int count;
+static void Pack24(rfbClientPtr cl,
+                   char *buf,
+                   rfbPixelFormat *fmt,
+                   int count)
 {
     uint32_t *buf32;
     uint32_t pix;
@@ -1207,16 +1219,13 @@ static void Pack24(cl, buf, fmt, count)
 #define DEFINE_IDX_ENCODE_FUNCTION(bpp)                                 \
                                                                         \
 static void                                                             \
-EncodeIndexedRect##bpp(buf, count)                                      \
-    uint8_t *buf;                                                         \
-    int count;                                                          \
-{                                                                       \
+EncodeIndexedRect##bpp(uint8_t *buf, int count) {                       \
     COLOR_LIST *pnode;                                                  \
-    uint##bpp##_t *src;                                                     \
-    uint##bpp##_t rgb;                                                      \
+    uint##bpp##_t *src;                                                 \
+    uint##bpp##_t rgb;                                                  \
     int rep = 0;                                                        \
                                                                         \
-    src = (uint##bpp##_t *) buf;                                            \
+    src = (uint##bpp##_t *) buf;                                        \
                                                                         \
     while (count--) {                                                   \
         rgb = *src++;                                                   \
@@ -1225,10 +1234,10 @@ EncodeIndexedRect##bpp(buf, count)                                      \
         }                                                               \
         pnode = palette.hash[HASH_FUNC##bpp(rgb)];                      \
         while (pnode != NULL) {                                         \
-            if ((uint##bpp##_t)pnode->rgb == rgb) {                         \
-                *buf++ = (uint8_t)pnode->idx;                             \
+            if ((uint##bpp##_t)pnode->rgb == rgb) {                     \
+                *buf++ = (uint8_t)pnode->idx;                           \
                 while (rep) {                                           \
-                    *buf++ = (uint8_t)pnode->idx;                         \
+                    *buf++ = (uint8_t)pnode->idx;                       \
                     rep--;                                              \
                 }                                                       \
                 break;                                                  \
@@ -1244,18 +1253,15 @@ DEFINE_IDX_ENCODE_FUNCTION(32)
 #define DEFINE_MONO_ENCODE_FUNCTION(bpp)                                \
                                                                         \
 static void                                                             \
-EncodeMonoRect##bpp(buf, w, h)                                          \
-    uint8_t *buf;                                                         \
-    int w, h;                                                           \
-{                                                                       \
-    uint##bpp##_t *ptr;                                                     \
-    uint##bpp##_t bg;                                                       \
+EncodeMonoRect##bpp(uint8_t *buf, int w, int h) {                       \
+    uint##bpp##_t *ptr;                                                 \
+    uint##bpp##_t bg;                                                   \
     unsigned int value, mask;                                           \
     int aligned_width;                                                  \
     int x, y, bg_bits;                                                  \
                                                                         \
-    ptr = (uint##bpp##_t *) buf;                                            \
-    bg = (uint##bpp##_t) monoBackground;                                    \
+    ptr = (uint##bpp##_t *) buf;                                        \
+    bg = (uint##bpp##_t) monoBackground;                                \
     aligned_width = w - w % 8;                                          \
                                                                         \
     for (y = 0; y < h; y++) {                                           \
@@ -1276,7 +1282,7 @@ EncodeMonoRect##bpp(buf, w, h)                                          \
                     value |= mask;                                      \
                 }                                                       \
             }                                                           \
-            *buf++ = (uint8_t)value;                                      \
+            *buf++ = (uint8_t)value;                                    \
         }                                                               \
                                                                         \
         mask = 0x80;                                                    \
@@ -1290,7 +1296,7 @@ EncodeMonoRect##bpp(buf, w, h)                                          \
             }                                                           \
             mask >>= 1;                                                 \
         }                                                               \
-        *buf++ = (uint8_t)value;                                          \
+        *buf++ = (uint8_t)value;                                        \
     }                                                                   \
 }
 
@@ -1306,11 +1312,7 @@ DEFINE_MONO_ENCODE_FUNCTION(32)
  */
 
 static void
-FilterGradient24(cl, buf, fmt, w, h)
-    rfbClientPtr cl;
-    char *buf;
-    rfbPixelFormat *fmt;
-    int w, h;
+FilterGradient24(rfbClientPtr cl, char *buf, rfbPixelFormat *fmt, int w, int h)
 {
     uint32_t *buf32;
     uint32_t pix32;
@@ -1368,14 +1370,10 @@ FilterGradient24(cl, buf, fmt, w, h)
 #define DEFINE_GRADIENT_FILTER_FUNCTION(bpp)                             \
                                                                          \
 static void                                                              \
-FilterGradient##bpp(cl, buf, fmt, w, h)                                      \
-    rfbClientPtr cl; \
-    uint##bpp##_t *buf;                                                      \
-    rfbPixelFormat *fmt;                                                 \
-    int w, h;                                                            \
-{                                                                        \
-    uint##bpp##_t pix, diff;                                                 \
-    rfbBool endianMismatch;                                                 \
+FilterGradient##bpp(rfbClientPtr cl, uint##bpp##_t *buf,                 \
+		rfbPixelFormat *fmt, int w, int h) {                     \
+    uint##bpp##_t pix, diff;                                             \
+    rfbBool endianMismatch;                                              \
     int *prevRowPtr;                                                     \
     int maxColor[3], shiftBits[3];                                       \
     int pixHere[3], pixUpper[3], pixLeft[3], pixUpperLeft[3];            \
@@ -1445,10 +1443,7 @@ DEFINE_GRADIENT_FILTER_FUNCTION(32)
 #define DETECT_MIN_HEIGHT      8
 
 static int
-DetectSmoothImage (cl, fmt, w, h)
-    rfbClientPtr cl;
-    rfbPixelFormat *fmt;
-    int w, h;
+DetectSmoothImage (rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h)
 {
     long avgError;
 
@@ -1488,10 +1483,10 @@ DetectSmoothImage (cl, fmt, w, h)
 }
 
 static unsigned long
-DetectSmoothImage24 (cl, fmt, w, h)
-    rfbClientPtr cl;
-    rfbPixelFormat *fmt;
-    int w, h;
+DetectSmoothImage24 (rfbClientPtr cl,
+                     rfbPixelFormat *fmt,
+                     int w,
+                     int h)
 {
     int off;
     int x, y, d, dx, c;
@@ -1550,13 +1545,9 @@ DetectSmoothImage24 (cl, fmt, w, h)
 #define DEFINE_DETECT_FUNCTION(bpp)                                          \
                                                                              \
 static unsigned long                                                         \
-DetectSmoothImage##bpp (cl, fmt, w, h)                                           \
-    rfbClientPtr cl; \
-    rfbPixelFormat *fmt;                                                     \
-    int w, h;                                                                \
-{                                                                            \
-    rfbBool endianMismatch;                                                     \
-    uint##bpp##_t pix;                                                           \
+DetectSmoothImage##bpp (rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h) {\
+    rfbBool endianMismatch;                                                  \
+    uint##bpp##_t pix;                                                       \
     int maxColor[3], shiftBits[3];                                           \
     int x, y, d, dx, c;                                                      \
     int diffStat[256];                                                       \
@@ -1564,7 +1555,7 @@ DetectSmoothImage##bpp (cl, fmt, w, h)                                          
     int sample, sum, left[3];                                                \
     unsigned long avgError;                                                  \
                                                                              \
-    endianMismatch = (!cl->screen->serverFormat.bigEndian != !fmt->bigEndian);        \
+    endianMismatch = (!cl->screen->serverFormat.bigEndian != !fmt->bigEndian); \
                                                                              \
     maxColor[0] = fmt->redMax;                                               \
     maxColor[1] = fmt->greenMax;                                             \
@@ -1578,7 +1569,7 @@ DetectSmoothImage##bpp (cl, fmt, w, h)                                          
     y = 0, x = 0;                                                            \
     while (y < h && x < w) {                                                 \
         for (d = 0; d < h - y && d < w - x - DETECT_SUBROW_WIDTH; d++) {     \
-            pix = ((uint##bpp##_t *)tightBeforeBuf)[(y+d)*w+x+d];                \
+            pix = ((uint##bpp##_t *)tightBeforeBuf)[(y+d)*w+x+d];            \
             if (endianMismatch) {                                            \
                 pix = Swap##bpp(pix);                                        \
             }                                                                \
@@ -1586,7 +1577,7 @@ DetectSmoothImage##bpp (cl, fmt, w, h)                                          
                 left[c] = (int)(pix >> shiftBits[c] & maxColor[c]);          \
             }                                                                \
             for (dx = 1; dx <= DETECT_SUBROW_WIDTH; dx++) {                  \
-                pix = ((uint##bpp##_t *)tightBeforeBuf)[(y+d)*w+x+d+dx];         \
+                pix = ((uint##bpp##_t *)tightBeforeBuf)[(y+d)*w+x+d+dx];     \
                 if (endianMismatch) {                                        \
                     pix = Swap##bpp(pix);                                    \
                 }                                                            \
@@ -1641,10 +1632,7 @@ static rfbBool jpegError;
 static int jpegDstDataLen;
 
 static rfbBool
-SendJpegRect(cl, x, y, w, h, quality)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    int quality;
+SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
 {
     struct jpeg_compress_struct cinfo;
     struct jpeg_error_mgr jerr;
@@ -1704,10 +1692,11 @@ SendJpegRect(cl, x, y, w, h, quality)
 }
 
 static void
-PrepareRowForJpeg(cl, dst, x, y, count)
-    rfbClientPtr cl;
-    uint8_t *dst;
-    int x, y, count;
+PrepareRowForJpeg(rfbClientPtr cl,
+                  uint8_t *dst,
+                  int x,
+                  int y,
+                  int count)
 {
     if (cl->screen->serverFormat.bitsPerPixel == 32) {
         if ( cl->screen->serverFormat.redMax == 0xFF &&
@@ -1724,10 +1713,11 @@ PrepareRowForJpeg(cl, dst, x, y, count)
 }
 
 static void
-PrepareRowForJpeg24(cl, dst, x, y, count)
-    rfbClientPtr cl;
-    uint8_t *dst;
-    int x, y, count;
+PrepareRowForJpeg24(rfbClientPtr cl,
+                    uint8_t *dst,
+                    int x,
+                    int y,
+                    int count)
 {
     uint32_t *fbptr;
     uint32_t pix;
@@ -1746,35 +1736,31 @@ PrepareRowForJpeg24(cl, dst, x, y, count)
 #define DEFINE_JPEG_GET_ROW_FUNCTION(bpp)                                   \
                                                                             \
 static void                                                                 \
-PrepareRowForJpeg##bpp(cl, dst, x, y, count)                                    \
-    rfbClientPtr cl; \
-    uint8_t *dst;                                                             \
-    int x, y, count;                                                        \
-{                                                                           \
-    uint##bpp##_t *fbptr;                                                       \
-    uint##bpp##_t pix;                                                          \
+PrepareRowForJpeg##bpp(rfbClientPtr cl, uint8_t *dst, int x, int y, int count) { \
+    uint##bpp##_t *fbptr;                                                   \
+    uint##bpp##_t pix;                                                      \
     int inRed, inGreen, inBlue;                                             \
                                                                             \
-    fbptr = (uint##bpp##_t *)                                                   \
-        &cl->screen->frameBuffer[y * cl->screen->paddedWidthInBytes +             \
+    fbptr = (uint##bpp##_t *)                                               \
+        &cl->screen->frameBuffer[y * cl->screen->paddedWidthInBytes +       \
                              x * (bpp / 8)];                                \
                                                                             \
     while (count--) {                                                       \
         pix = *fbptr++;                                                     \
                                                                             \
         inRed = (int)                                                       \
-            (pix >> cl->screen->serverFormat.redShift   & cl->screen->serverFormat.redMax);   \
+            (pix >> cl->screen->serverFormat.redShift   & cl->screen->serverFormat.redMax); \
         inGreen = (int)                                                     \
             (pix >> cl->screen->serverFormat.greenShift & cl->screen->serverFormat.greenMax); \
         inBlue  = (int)                                                     \
-            (pix >> cl->screen->serverFormat.blueShift  & cl->screen->serverFormat.blueMax);  \
+            (pix >> cl->screen->serverFormat.blueShift  & cl->screen->serverFormat.blueMax); \
                                                                             \
-	*dst++ = (uint8_t)((inRed   * 255 + cl->screen->serverFormat.redMax / 2) /     \
-                         cl->screen->serverFormat.redMax);                           \
-	*dst++ = (uint8_t)((inGreen * 255 + cl->screen->serverFormat.greenMax / 2) /   \
-                         cl->screen->serverFormat.greenMax);                         \
-	*dst++ = (uint8_t)((inBlue  * 255 + cl->screen->serverFormat.blueMax / 2) /    \
-                         cl->screen->serverFormat.blueMax);                          \
+	*dst++ = (uint8_t)((inRed   * 255 + cl->screen->serverFormat.redMax / 2) / \
+                         cl->screen->serverFormat.redMax);                  \
+	*dst++ = (uint8_t)((inGreen * 255 + cl->screen->serverFormat.greenMax / 2) / \
+                         cl->screen->serverFormat.greenMax);                \
+	*dst++ = (uint8_t)((inBlue  * 255 + cl->screen->serverFormat.blueMax / 2) / \
+                         cl->screen->serverFormat.blueMax);                 \
     }                                                                       \
 }
 

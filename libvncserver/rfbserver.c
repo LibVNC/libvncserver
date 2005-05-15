@@ -24,9 +24,11 @@
  *  USA.
  */
 
+#define _BSD_SOURCE
 #include <string.h>
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
+#include "private.h"
 
 #ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
@@ -60,11 +62,6 @@
 #define DEBUGPROTO(x)
 #endif
 
-/* from cursor.c */
-
-void rfbShowCursor(rfbClientPtr cl);
-void rfbHideCursor(rfbClientPtr cl);
-void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion);
 
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
@@ -92,7 +89,7 @@ void rfbDecrClientRef(rfbClientPtr cl) {}
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-MUTEX(rfbClientListMutex);
+static MUTEX(rfbClientListMutex);
 #endif
 
 struct rfbClientIterator {
@@ -118,7 +115,7 @@ rfbGetClientIterator(rfbScreenInfoPtr rfbScreen)
 {
   rfbClientIteratorPtr i =
     (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
-  i->next = 0;
+  i->next = NULL;
   i->screen = rfbScreen;
   return i;
 }
@@ -175,9 +172,8 @@ rfbReleaseClientIterator(rfbClientIteratorPtr iterator)
  */
 
 void
-rfbNewClientConnection(rfbScreen,sock)
-    rfbScreenInfoPtr rfbScreen;
-    int sock;
+rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,
+                       int sock)
 {
     rfbClientPtr cl;
 
@@ -195,10 +191,9 @@ rfbNewClientConnection(rfbScreen,sock)
  */
 
 rfbClientPtr
-rfbReverseConnection(rfbScreen,host, port)
-    rfbScreenInfoPtr rfbScreen;
-    char *host;
-    int port;
+rfbReverseConnection(rfbScreenInfoPtr rfbScreen,
+                     char *host,
+                     int port)
 {
     int sock;
     rfbClientPtr cl;
@@ -221,17 +216,16 @@ rfbReverseConnection(rfbScreen,host, port)
  * means.
  */
 
-rfbClientPtr
-rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
-    rfbScreenInfoPtr rfbScreen;
-    int sock;
-    rfbBool isUDP;
+static rfbClientPtr
+rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
+                     int sock,
+                     rfbBool isUDP)
 {
     rfbProtocolVersionMsg pv;
     rfbClientIteratorPtr iterator;
     rfbClientPtr cl,cl_;
     struct sockaddr_in addr;
-    size_t addrlen = sizeof(struct sockaddr_in);
+    socklen_t addrlen = sizeof(struct sockaddr_in);
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
 
@@ -287,7 +281,7 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
       cl->correMaxWidth = 48;
       cl->correMaxHeight = 48;
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-      cl->zrleData = 0;
+      cl->zrleData = NULL;
 #endif
 
       cl->copyRegion = sraRgnCreate();
@@ -378,16 +372,14 @@ rfbNewTCPOrUDPClient(rfbScreen,sock,isUDP)
 }
 
 rfbClientPtr
-rfbNewClient(rfbScreen,sock)
-    rfbScreenInfoPtr rfbScreen;
-    int sock;
+rfbNewClient(rfbScreenInfoPtr rfbScreen,
+             int sock)
 {
   return(rfbNewTCPOrUDPClient(rfbScreen,sock,FALSE));
 }
 
 rfbClientPtr
-rfbNewUDPClient(rfbScreen)
-     rfbScreenInfoPtr rfbScreen;
+rfbNewUDPClient(rfbScreenInfoPtr rfbScreen)
 {
   return((rfbScreen->udpClient=
 	  rfbNewTCPOrUDPClient(rfbScreen,rfbScreen->udpSock,TRUE)));
@@ -399,8 +391,7 @@ rfbNewUDPClient(rfbScreen)
  */
 
 void
-rfbClientConnectionGone(cl)
-     rfbClientPtr cl;
+rfbClientConnectionGone(rfbClientPtr cl)
 {
     int i;
 
@@ -417,7 +408,7 @@ rfbClientConnectionGone(cl)
 	close(cl->sock);
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-    FreeZrleData(cl);
+    rfbFreeZrleData(cl);
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
@@ -456,7 +447,7 @@ rfbClientConnectionGone(cl)
 #endif
 
     if (cl->screen->pointerClient == cl)
-        cl->screen->pointerClient = 0;
+        cl->screen->pointerClient = NULL;
 
     sraRgnDestroy(cl->modifiedRegion);
     sraRgnDestroy(cl->requestedRegion);
@@ -485,8 +476,7 @@ rfbClientConnectionGone(cl)
  */
 
 void
-rfbProcessClientMessage(cl)
-     rfbClientPtr cl;
+rfbProcessClientMessage(rfbClientPtr cl)
 {
     switch (cl->state) {
     case RFB_PROTOCOL_VERSION:
@@ -511,8 +501,7 @@ rfbProcessClientMessage(cl)
  */
 
 static void
-rfbProcessClientProtocolVersion(cl)
-    rfbClientPtr cl;
+rfbProcessClientProtocolVersion(rfbClientPtr cl)
 {
     rfbProtocolVersionMsg pv;
     int n, major_, minor_;
@@ -566,9 +555,8 @@ rfbProcessClientProtocolVersion(cl)
  */
 
 void
-rfbClientConnFailed(cl, reason)
-    rfbClientPtr cl;
-    char *reason;
+rfbClientConnFailed(rfbClientPtr cl,
+                    char *reason)
 {
     char *buf;
     int len = strlen(reason);
@@ -591,8 +579,7 @@ rfbClientConnFailed(cl, reason)
  */
 
 static void
-rfbProcessClientInitMessage(cl)
-    rfbClientPtr cl;
+rfbProcessClientInitMessage(rfbClientPtr cl)
 {
     rfbClientInitMsg ci;
     char buf[256];
@@ -686,8 +673,7 @@ static rfbBool rectSwapIfLEAndClip(uint16_t* x,uint16_t* y,uint16_t* w,uint16_t*
  */
 
 static void
-rfbProcessClientNormalMessage(cl)
-    rfbClientPtr cl;
+rfbProcessClientNormalMessage(rfbClientPtr cl)
 {
     int n=0;
     rfbClientToServerMsg msg;
@@ -824,7 +810,7 @@ rfbProcessClientNormalMessage(cl)
 			   cl->host);
 		    /* if cursor was drawn, hide the cursor */
 		    if(!cl->enableCursorShapeUpdates)
-		        rfbRedrawAfterHideCursor(cl,0);
+		        rfbRedrawAfterHideCursor(cl,NULL);
 
 		    cl->enableCursorShapeUpdates = TRUE;
 		    cl->cursorWasChanged = TRUE;
@@ -835,7 +821,7 @@ rfbProcessClientNormalMessage(cl)
 		       cl->host);
 		/* if cursor was drawn, hide the cursor */
 		if(!cl->enableCursorShapeUpdates)
-		    rfbRedrawAfterHideCursor(cl,0);
+		    rfbRedrawAfterHideCursor(cl,NULL);
 
 	        cl->enableCursorShapeUpdates = TRUE;
 	        cl->useRichCursorEncoding = TRUE;
@@ -1001,7 +987,7 @@ rfbProcessClientNormalMessage(cl)
 	    return;
 
 	if (msg.pe.buttonMask == 0)
-	    cl->screen->pointerClient = 0;
+	    cl->screen->pointerClient = NULL;
 	else
 	    cl->screen->pointerClient = cl;
 
@@ -1065,11 +1051,10 @@ rfbProcessClientNormalMessage(cl)
  */
 
 rfbBool
-rfbSendFramebufferUpdate(cl, givenUpdateRegion)
-     rfbClientPtr cl;
-     sraRegionPtr givenUpdateRegion;
+rfbSendFramebufferUpdate(rfbClientPtr cl,
+                         sraRegionPtr givenUpdateRegion)
 {
-    sraRectangleIterator* i=0;
+    sraRectangleIterator* i=NULL;
     sraRect rect;
     int nUpdateRegionRects;
     rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
@@ -1392,10 +1377,10 @@ updateFailed:
  */
 
 rfbBool
-rfbSendCopyRegion(cl, reg, dx, dy)
-    rfbClientPtr cl;
-    sraRegionPtr reg;
-    int dx, dy;
+rfbSendCopyRegion(rfbClientPtr cl,
+                  sraRegionPtr reg,
+                  int dx,
+                  int dy)
 {
     int x, y, w, h;
     rfbFramebufferUpdateRectHeader rect;
@@ -1443,9 +1428,11 @@ rfbSendCopyRegion(cl, reg, dx, dy)
  */
 
 rfbBool
-rfbSendRectEncodingRaw(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbSendRectEncodingRaw(rfbClientPtr cl,
+                       int x,
+                       int y,
+                       int w,
+                       int h)
 {
     rfbFramebufferUpdateRectHeader rect;
     int nlines;
@@ -1516,8 +1503,7 @@ rfbSendRectEncodingRaw(cl, x, y, w, h)
  */
 
 rfbBool
-rfbSendLastRectMarker(cl)
-    rfbClientPtr cl;
+rfbSendLastRectMarker(rfbClientPtr cl)
 {
     rfbFramebufferUpdateRectHeader rect;
 
@@ -1548,9 +1534,9 @@ rfbSendLastRectMarker(cl)
  */
 
 rfbBool
-rfbSendNewFBSize(cl, w, h)
-    rfbClientPtr cl;
-    int w, h;
+rfbSendNewFBSize(rfbClientPtr cl,
+                 int w,
+                 int h)
 {
     rfbFramebufferUpdateRectHeader rect;
 
@@ -1582,8 +1568,7 @@ rfbSendNewFBSize(cl, w, h)
  */
 
 rfbBool
-rfbSendUpdateBuf(cl)
-    rfbClientPtr cl;
+rfbSendUpdateBuf(rfbClientPtr cl)
 {
     if(cl->sock<0)
       return FALSE;
@@ -1604,10 +1589,9 @@ rfbSendUpdateBuf(cl)
  */
 
 rfbBool
-rfbSendSetColourMapEntries(cl, firstColour, nColours)
-    rfbClientPtr cl;
-    int firstColour;
-    int nColours;
+rfbSendSetColourMapEntries(rfbClientPtr cl,
+                           int firstColour,
+                           int nColours)
 {
     char buf[sz_rfbSetColourMapEntriesMsg + 256 * 3 * 2];
     rfbSetColourMapEntriesMsg *scme = (rfbSetColourMapEntriesMsg *)buf;
@@ -1707,12 +1691,11 @@ rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len)
  * packets (such as 100s of pen readings per second!).
  */
 
-unsigned char ptrAcceleration = 50;
+static unsigned char ptrAcceleration = 50;
 
 void
-rfbNewUDPConnection(rfbScreen,sock)
-    rfbScreenInfoPtr rfbScreen;
-    int sock;
+rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,
+                    int sock)
 {
     if (write(sock, &ptrAcceleration, 1) < 0) {
 	rfbLogPerror("rfbNewUDPConnection: write");

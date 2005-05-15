@@ -70,7 +70,7 @@ static zrlePaletteHelper paletteHelper;
 
 void ZRLE_ENCODE_TILE (PIXEL_T* data, int w, int h, zrleOutStream* os);
 
-void ZRLE_ENCODE (int x, int y, int w, int h,
+static void ZRLE_ENCODE (int x, int y, int w, int h,
 		  zrleOutStream* os, void* buf
                   EXTRA_ARGS
                   )

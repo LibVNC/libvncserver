@@ -36,14 +36,14 @@ typedef struct private_resource_t {
 static private_resource_t resource_pool[MAX_RESOURCE_COUNT];
 static int resource_count=0;
 
-private_resource_t* get_resource(int resource)
+static private_resource_t* get_resource(int resource)
 {
 	if(resource>=MAX_RESOURCE_COUNT || resource<0 || resource_pool[resource].client==0)
-		return 0;
+		return NULL;
 	return resource_pool+resource;
 }
 
-private_resource_t* get_next_resource()
+static private_resource_t* get_next_resource(void)
 {
 	if(resource_count<MAX_RESOURCE_COUNT) {
 		memset(resource_pool+resource_count,0,sizeof(private_resource_t));
@@ -56,19 +56,19 @@ private_resource_t* get_next_resource()
 		if(i<MAX_RESOURCE_COUNT)
 			return resource_pool+i;
 	}
-	return 0;
+	return NULL;
 }
 
-void free_resource(int resource)
+static void free_resource(int resource)
 {
 	private_resource_t* res=get_resource(resource);
 	if(res)
-		res->client=0;
+		res->client=NULL;
 }
 
 /* hooks */
 
-void got_key(rfbBool down,rfbKeySym keysym,rfbClientRec* cl)
+static void got_key(rfbBool down,rfbKeySym keysym,rfbClientRec* cl)
 {
 	private_resource_t* res=(private_resource_t*)cl->screen->screenData;
 	
@@ -77,7 +77,7 @@ void got_key(rfbBool down,rfbKeySym keysym,rfbClientRec* cl)
 	res->result|=RESULT_KEY;
 }
 
-void got_mouse(int buttons,int x,int y,rfbClientRec* cl)
+static void got_mouse(int buttons,int x,int y,rfbClientRec* cl)
 {
 	private_resource_t* res=(private_resource_t*)cl->screen->screenData;
 	
@@ -87,7 +87,7 @@ void got_mouse(int buttons,int x,int y,rfbClientRec* cl)
 	res->result|=RESULT_MOUSE;
 }
 
-rfbBool malloc_frame_buffer(rfbClient* cl)
+static rfbBool malloc_frame_buffer(rfbClient* cl)
 {
 	private_resource_t* res=(private_resource_t*)cl->clientData;
 
@@ -96,7 +96,7 @@ rfbBool malloc_frame_buffer(rfbClient* cl)
 		
 		res->client->frameBuffer=malloc(w*4*h);
 		
-		res->server=rfbGetScreen(0,0,w,h,8,3,4);
+		res->server=rfbGetScreen(NULL,NULL,w,h,8,3,4);
 		res->server->screenData=res;
 		res->server->port=res->listen_port;
 		res->server->frameBuffer=res->client->frameBuffer;
@@ -110,7 +110,7 @@ rfbBool malloc_frame_buffer(rfbClient* cl)
 	}
 }
 
-bool_t do_visual_grep(private_resource_t* res,int x,int y,int w,int h)
+static bool_t do_visual_grep(private_resource_t* res,int x,int y,int w,int h)
 {
 	rfbClient* cl;
 	image_t* image;
@@ -146,7 +146,7 @@ bool_t do_visual_grep(private_resource_t* res,int x,int y,int w,int h)
 	return 0;
 }
 
-void got_frame_buffer(rfbClient* cl,int x,int y,int w,int h)
+static void got_frame_buffer(rfbClient* cl,int x,int y,int w,int h)
 {
 	private_resource_t* res=(private_resource_t*)cl->clientData;
 	
@@ -182,8 +182,8 @@ resource_t initvnc(const char* server,int server_port,int listen_port)
 	res->client->serverHost=strdup(server);
 	res->client->serverPort=server_port;
 	res->client->appData.encodingsString="raw";
-	if(!rfbInitClient(res->client,&dummy,0)) {
-		res->client=0;
+	if(!rfbInitClient(res->client,&dummy,NULL)) {
+		res->client=NULL;
 		return -1;
 	}
 	return res-resource_pool;
@@ -202,7 +202,7 @@ void closevnc(resource_t resource)
 
 	rfbClientCleanup(res->client);
 
-	res->client=0;
+	res->client=NULL;
 }
 
 /* PNM (image) helpers */
@@ -240,7 +240,7 @@ bool_t savepnm(resource_t resource,const char* filename,int x1,int y1,int x2,int
 	return TRUE;
 }
 
-image_t* loadpnm(const char* filename)
+static image_t* loadpnm(const char* filename)
 {
 	FILE* f=fopen(filename,"rb");
 	char buffer[1024];
@@ -248,25 +248,25 @@ image_t* loadpnm(const char* filename)
 	image_t* image;
 	
 	if(f==0)
-		return 0;
+		return NULL;
 	
 	if(!fgets(buffer,1024,f) || strcmp("P6\n",buffer)) {
 		fclose(f);
-		return 0;
+		return NULL;
 	}
 
 	do {
 		fgets(buffer,1024,f);
 		if(feof(f)) {
 			fclose(f);
-			return 0;
+			return NULL;
 		}
 	} while(buffer[0]=='#');
 
 	if( sscanf(buffer,"%d %d",&w,&h)!=2
 			|| !fgets(buffer,1024,f) || strcmp("255\n",buffer)) {
 		fclose(f);
-		return 0;
+		return NULL;
 	}
 		
 	image=(image_t*)malloc(sizeof(image_t));
@@ -276,7 +276,7 @@ image_t* loadpnm(const char* filename)
 	if(!image->buffer) {
 		fclose(f);
 		free(image);
-		return 0;
+		return NULL;
 	}
 	
 	for(j=0;j<h;j++)
@@ -286,7 +286,7 @@ image_t* loadpnm(const char* filename)
 				fclose(f);
 				free(image->buffer);
 				free(image);
-				return 0;
+				return NULL;
 			}
 
 	fclose(f);
@@ -294,7 +294,7 @@ image_t* loadpnm(const char* filename)
 	return image;
 }
 
-void free_image(image_t* image)
+static void free_image(image_t* image)
 {
 	if(image->buffer)
 		free(image->buffer);
@@ -304,7 +304,7 @@ void free_image(image_t* image)
 /* process() and friends */
 
 /* this function returns only if res->result in return_mask */
-result_t private_process(resource_t resource,timeout_t timeout_in_seconds,result_t return_mask)
+static result_t private_process(resource_t resource,timeout_t timeout_in_seconds,result_t return_mask)
 {
 	private_resource_t* res=get_resource(resource);
 	fd_set fds;
@@ -317,7 +317,7 @@ result_t private_process(resource_t resource,timeout_t timeout_in_seconds,result
 
 	assert(res->client);
 
-	gettimeofday(&tv_start,0);
+	gettimeofday(&tv_start,NULL);
 	res->result=0;
 
 	do {
@@ -346,7 +346,7 @@ result_t private_process(resource_t resource,timeout_t timeout_in_seconds,result
 		if(res->client->sock>max_fd)
 			max_fd=res->client->sock;
 
-		gettimeofday(&tv_end,0);
+		gettimeofday(&tv_end,NULL);
 		timeout_done=tv_end.tv_usec-tv_start.tv_usec+
 			1000000L*(tv_end.tv_sec-tv_start.tv_sec);
 		if(timeout_done>=timeout)
@@ -355,7 +355,7 @@ result_t private_process(resource_t resource,timeout_t timeout_in_seconds,result
 		tv.tv_usec=((timeout-timeout_done)%1000000);
 		tv.tv_sec=(timeout-timeout_done)/1000000;
 
-		count=select(max_fd+1,&fds,0,0,&tv);
+		count=select(max_fd+1,&fds,NULL,NULL,&tv);
 		if(count<0)
 			return 0;
 
@@ -422,7 +422,7 @@ result_t visualgrep(resource_t resource,const char* filename,timeout_t timeout)
 	/* free image */
 	if(res->grep_image) {
 		free_image(res->grep_image);
-		res->grep_image=0;
+		res->grep_image=NULL;
 	}
 
 	return result;
@@ -432,7 +432,7 @@ result_t visualgrep(resource_t resource,const char* filename,timeout_t timeout)
 
 #include "default8x16.h"
 
-void center_text(rfbScreenInfo* screen,const char* message,int* x,int* y,int* w,int* h)
+static void center_text(rfbScreenInfo* screen,const char* message,int* x,int* y,int* w,int* h)
 {
 	rfbFontData* font=&default8x16Font;
 	const char* pointer;

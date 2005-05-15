@@ -197,7 +197,7 @@ static void selPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl)
 
 static rfbCursorPtr selGetCursorPtr(rfbClientPtr cl)
 {
-  return(0);
+  return NULL;
 }
 
 int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
@@ -263,7 +263,7 @@ int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
    rfbScreen->kbdAddEvent = selKbdAddEvent;
    rfbScreen->ptrAddEvent = selPtrAddEvent;
    rfbScreen->getCursorPtr = selGetCursorPtr;
-   rfbScreen->displayHook = 0;
+   rfbScreen->displayHook = NULL;
    
    /* backup screen */
    for(j=0;j<y2-y1;j++)

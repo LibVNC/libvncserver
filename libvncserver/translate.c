@@ -134,7 +134,7 @@ typedef void (*rfbInitCMTableFnType)(char **table, rfbPixelFormat *in,
 typedef void (*rfbInitTableFnType)(char **table, rfbPixelFormat *in,
                                    rfbPixelFormat *out);
 
-rfbInitCMTableFnType rfbInitColourMapSingleTableFns[COUNT_OFFSETS] = {
+static rfbInitCMTableFnType rfbInitColourMapSingleTableFns[COUNT_OFFSETS] = {
     rfbInitColourMapSingleTable8,
     rfbInitColourMapSingleTable16,
 #ifdef LIBVNCSERVER_ALLOW24BPP
@@ -143,7 +143,7 @@ rfbInitCMTableFnType rfbInitColourMapSingleTableFns[COUNT_OFFSETS] = {
     rfbInitColourMapSingleTable32
 };
 
-rfbInitTableFnType rfbInitTrueColourSingleTableFns[COUNT_OFFSETS] = {
+static rfbInitTableFnType rfbInitTrueColourSingleTableFns[COUNT_OFFSETS] = {
     rfbInitTrueColourSingleTable8,
     rfbInitTrueColourSingleTable16,
 #ifdef LIBVNCSERVER_ALLOW24BPP
@@ -152,7 +152,7 @@ rfbInitTableFnType rfbInitTrueColourSingleTableFns[COUNT_OFFSETS] = {
     rfbInitTrueColourSingleTable32
 };
 
-rfbInitTableFnType rfbInitTrueColourRGBTablesFns[COUNT_OFFSETS] = {
+static rfbInitTableFnType rfbInitTrueColourRGBTablesFns[COUNT_OFFSETS] = {
     rfbInitTrueColourRGBTables8,
     rfbInitTrueColourRGBTables16,
 #ifdef LIBVNCSERVER_ALLOW24BPP
@@ -161,7 +161,7 @@ rfbInitTableFnType rfbInitTrueColourRGBTablesFns[COUNT_OFFSETS] = {
     rfbInitTrueColourRGBTables32
 };
 
-rfbTranslateFnType rfbTranslateWithSingleTableFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
+static rfbTranslateFnType rfbTranslateWithSingleTableFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
     { rfbTranslateWithSingleTable8to8,
       rfbTranslateWithSingleTable8to16,
 #ifdef LIBVNCSERVER_ALLOW24BPP
@@ -188,7 +188,7 @@ rfbTranslateFnType rfbTranslateWithSingleTableFns[COUNT_OFFSETS][COUNT_OFFSETS] 
       rfbTranslateWithSingleTable32to32 }
 };
 
-rfbTranslateFnType rfbTranslateWithRGBTablesFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
+static rfbTranslateFnType rfbTranslateWithRGBTablesFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
     { rfbTranslateWithRGBTables8to8,
       rfbTranslateWithRGBTables8to16,
 #ifdef LIBVNCSERVER_ALLOW24BPP
@@ -242,8 +242,7 @@ rfbTranslateNone(char *table, rfbPixelFormat *in, rfbPixelFormat *out,
  */
 
 rfbBool
-rfbSetTranslateFunction(cl)
-    rfbClientPtr cl;
+rfbSetTranslateFunction(rfbClientPtr cl)
 {
     rfbLog("Pixel format for client %s:\n",cl->host);
     PrintPixelFormat(&cl->format);
@@ -359,8 +358,7 @@ rfbSetTranslateFunction(cl)
  */
 
 static rfbBool
-rfbSetClientColourMapBGR233(cl)
-    rfbClientPtr cl;
+rfbSetClientColourMapBGR233(rfbClientPtr cl)
 {
     char buf[sz_rfbSetColourMapEntriesMsg + 256 * 3 * 2];
     rfbSetColourMapEntriesMsg *scme = (rfbSetColourMapEntriesMsg *)buf;
@@ -414,10 +412,7 @@ rfbSetClientColourMapBGR233(cl)
  */
 
 rfbBool
-rfbSetClientColourMap(cl, firstColour, nColours)
-    rfbClientPtr cl;
-    int firstColour;
-    int nColours;
+rfbSetClientColourMap(rfbClientPtr cl, int firstColour, int nColours)
 {
     if (cl->screen->serverFormat.trueColour || !cl->readyForSetColourMapEntries) {
 	return TRUE;
@@ -448,10 +443,7 @@ rfbSetClientColourMap(cl, firstColour, nColours)
  */
 
 void
-rfbSetClientColourMaps(rfbScreen, firstColour, nColours)
-    rfbScreenInfoPtr rfbScreen;
-    int firstColour;
-    int nColours;
+rfbSetClientColourMaps(rfbScreenInfoPtr rfbScreen, int firstColour, int nColours)
 {
     rfbClientIteratorPtr i;
     rfbClientPtr cl;
@@ -463,8 +455,7 @@ rfbSetClientColourMaps(rfbScreen, firstColour, nColours)
 }
 
 static void
-PrintPixelFormat(pf)
-    rfbPixelFormat *pf;
+PrintPixelFormat(rfbPixelFormat *pf)
 {
     if (pf->bitsPerPixel == 1) {
         rfbLog("  1 bpp, %s sig bit in each byte is leftmost on the screen.\n",

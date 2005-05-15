@@ -1,7 +1,8 @@
+#define _BSD_SOURCE
 #include <rfb/rfb.h>
 #include <math.h>
 
-void initBackground(rfbScreenInfoPtr server)
+static void initBackground(rfbScreenInfoPtr server)
 {
   unsigned int i,j;
 
@@ -16,7 +17,7 @@ void initBackground(rfbScreenInfoPtr server)
 int main(int argc,char** argv)
 {             
   int width=400,height=300,w=20,x,y;
-  double r,phi;
+  double r,phi=0;
   
   rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,width,height,8,3,4);
   server->frameBuffer=(char*)malloc(width*height*4);

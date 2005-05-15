@@ -21,6 +21,8 @@
  * vncviewer.c - the Xt-based VNC viewer.
  */
 
+#define _BSD_SOURCE
+#define _POSIX_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,11 +36,12 @@ static rfbBool DummyPoint(rfbClient* client, int x, int y) {
 }
 static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 }
+
+#ifdef __MINGW32__
 static char* NoPassword(rfbClient* client) {
   return strdup("");
 }
-
-#ifndef __MINGW32__
+#else
 #include <stdio.h>
 #include <termios.h>
 #endif
@@ -103,10 +106,10 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   rfbClient* client=(rfbClient*)calloc(sizeof(rfbClient),1);
   if(!client) {
     rfbClientErr("Couldn't allocate client structure!\n");
-    return 0;
+    return NULL;
   }
   initAppData(&client->appData);
-  client->programName = 0;
+  client->programName = NULL;
   client->endianTest = 1;
   client->programName="";
   client->serverHost="";

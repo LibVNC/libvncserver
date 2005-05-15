@@ -3,16 +3,16 @@
 #define FONTDIR "/usr/lib/kbd/consolefonts/"
 #define DEFAULTFONT FONTDIR "default8x16"
 
-char *fontlist[50]={
+static char *fontlist[50]={
 "8x16alt", "b.fnt", "c.fnt", "default8x16", "m.fnt", "ml.fnt", "mod_d.fnt",
 "mod_s.fnt", "mr.fnt", "mu.fnt", "r.fnt", "rl.fnt", "ro.fnt", "s.fnt",
 "sc.fnt", "scrawl_s.fnt", "scrawl_w.fnt", "sd.fnt", "t.fnt",
-  0
+  NULL
 };
 
-rfbScreenInfoPtr rfbScreen = 0;
-rfbFontDataPtr curFont = 0;
-void showFont(int index)
+static rfbScreenInfoPtr rfbScreen = NULL;
+static rfbFontDataPtr curFont = NULL;
+static void showFont(int index)
 {
   char buffer[1024];
 

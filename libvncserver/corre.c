@@ -57,9 +57,11 @@ static rfbBool rfbSendSmallRectEncodingCoRRE(rfbClientPtr cl, int x, int y,
  */
 
 rfbBool
-rfbSendRectEncodingCoRRE(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbSendRectEncodingCoRRE(rfbClientPtr cl,
+                         int x,
+                         int y,
+                         int w,
+                         int h)
 {
     if (h > cl->correMaxHeight) {
         return (rfbSendRectEncodingCoRRE(cl, x, y, w, cl->correMaxHeight) &&
@@ -85,9 +87,11 @@ rfbSendRectEncodingCoRRE(cl, x, y, w, h)
  */
 
 static rfbBool
-rfbSendSmallRectEncodingCoRRE(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbSendSmallRectEncodingCoRRE(rfbClientPtr cl,
+                              int x,
+                              int y,
+                              int w,
+                              int h)
 {
     rfbFramebufferUpdateRectHeader rect;
     rfbRREHeader hdr;
@@ -206,11 +210,7 @@ rfbSendSmallRectEncodingCoRRE(cl, x, y, w, h)
 
 #define DEFINE_SUBRECT_ENCODE(bpp)                                            \
 static int                                                                    \
-subrectEncode##bpp(data,w,h)                                                  \
-    uint##bpp##_t *data;                                                      \
-    int w;                                                                    \
-    int h;                                                                    \
-{                                                                             \
+subrectEncode##bpp(uint##bpp##_t *data, int w, int h) {                       \
     uint##bpp##_t cl;                                                         \
     rfbCoRRERectangle subrect;                                                \
     int x,y;                                                                  \
@@ -277,7 +277,7 @@ subrectEncode##bpp(data,w,h)                                                  \
             return -1;                                                        \
                                                                               \
           numsubs += 1;                                                       \
-          *((uint##bpp##_t*)(rreAfterBuf + rreAfterBufLen)) = cl;                 \
+          *((uint##bpp##_t*)(rreAfterBuf + rreAfterBufLen)) = cl;             \
           rreAfterBufLen += (bpp/8);                                          \
           memcpy(&rreAfterBuf[rreAfterBufLen],&subrect,sz_rfbCoRRERectangle); \
           rreAfterBufLen += sz_rfbCoRRERectangle;                             \
@@ -306,12 +306,9 @@ DEFINE_SUBRECT_ENCODE(32)
  * getBgColour() gets the most prevalent colour in a byte array.
  */
 static uint32_t
-getBgColour(data,size,bpp)
-    char *data;
-    int size;
-    int bpp;
+getBgColour(char *data, int size, int bpp)
 {
-    
+
 #define NUMCLRS 256
   
   static int counts[NUMCLRS];

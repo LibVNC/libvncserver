@@ -35,8 +35,7 @@
  */
 
 void
-rfbAuthNewClient(cl)
-    rfbClientPtr cl;
+rfbAuthNewClient(rfbClientPtr cl)
 {
     char buf[4 + CHALLENGESIZE];
     int len;
@@ -68,8 +67,7 @@ rfbAuthNewClient(cl)
  */
 
 void
-rfbAuthProcessClientMessage(cl)
-    rfbClientPtr cl;
+rfbAuthProcessClientMessage(rfbClientPtr cl)
 {
     int n;
     uint8_t response[CHALLENGESIZE];

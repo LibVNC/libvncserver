@@ -37,9 +37,11 @@ static rfbBool sendHextiles32(rfbClientPtr cl, int x, int y, int w, int h);
  */
 
 rfbBool
-rfbSendRectEncodingHextile(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbSendRectEncodingHextile(rfbClientPtr cl,
+                           int x,
+                           int y,
+                           int w,
+                           int h)
 {
     rfbFramebufferUpdateRectHeader rect;
 
@@ -89,29 +91,26 @@ rfbSendRectEncodingHextile(cl, x, y, w, h)
 #define DEFINE_SEND_HEXTILES(bpp)                                               \
                                                                                 \
                                                                                 \
-static rfbBool subrectEncode##bpp(rfbClientPtr cli, uint##bpp##_t *data, int w, int h, \
-                               uint##bpp##_t bg, uint##bpp##_t fg, rfbBool mono);          \
-static void testColours##bpp(uint##bpp##_t *data, int size, rfbBool *mono,             \
-                             rfbBool *solid, uint##bpp##_t *bg, uint##bpp##_t *fg);        \
+static rfbBool subrectEncode##bpp(rfbClientPtr cli, uint##bpp##_t *data,        \
+		int w, int h, uint##bpp##_t bg, uint##bpp##_t fg, rfbBool mono);\
+static void testColours##bpp(uint##bpp##_t *data, int size, rfbBool *mono,      \
+                  rfbBool *solid, uint##bpp##_t *bg, uint##bpp##_t *fg);        \
                                                                                 \
                                                                                 \
 /*                                                                              \
  * rfbSendHextiles                                                              \
  */                                                                             \
                                                                                 \
-static rfbBool                                                                     \
-sendHextiles##bpp(cl, rx, ry, rw, rh)                                           \
-    rfbClientPtr cl;                                                            \
-    int rx, ry, rw, rh;                                                         \
-{                                                                               \
+static rfbBool                                                                  \
+sendHextiles##bpp(rfbClientPtr cl, int rx, int ry, int rw, int rh) {            \
     int x, y, w, h;                                                             \
     int startUblen;                                                             \
     char *fbptr;                                                                \
-    uint##bpp##_t bg = 0, fg = 0, newBg, newFg;                                     \
-    rfbBool mono, solid;                                                           \
-    rfbBool validBg = FALSE;                                                       \
-    rfbBool validFg = FALSE;                                                       \
-    uint##bpp##_t clientPixelData[16*16*(bpp/8)];                                   \
+    uint##bpp##_t bg = 0, fg = 0, newBg, newFg;                                 \
+    rfbBool mono, solid;                                                        \
+    rfbBool validBg = FALSE;                                                    \
+    rfbBool validFg = FALSE;                                                    \
+    uint##bpp##_t clientPixelData[16*16*(bpp/8)];                               \
                                                                                 \
     for (y = ry; y < ry+rh; y += 16) {                                          \
         for (x = rx; x < rx+rw; x += 16) {                                      \
@@ -128,11 +127,11 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
             }                                                                   \
                                                                                 \
             fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)   \
-                     + (x * (cl->screen->bitsPerPixel / 8)));                     \
+                     + (x * (cl->screen->bitsPerPixel / 8)));                   \
                                                                                 \
             (*cl->translateFn)(cl->translateLookupTable, &(cl->screen->serverFormat),      \
                                &cl->format, fbptr, (char *)clientPixelData,     \
-                               cl->screen->paddedWidthInBytes, w, h);             \
+                               cl->screen->paddedWidthInBytes, w, h);           \
                                                                                 \
             startUblen = cl->ublen;                                             \
             cl->updateBuf[startUblen] = 0;                                      \
@@ -149,7 +148,7 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
             }                                                                   \
                                                                                 \
             if (solid) {                                                        \
-                cl->bytesSent[rfbEncodingHextile] += cl->ublen - startUblen; \
+                cl->bytesSent[rfbEncodingHextile] += cl->ublen - startUblen;    \
                 continue;                                                       \
             }                                                                   \
                                                                                 \
@@ -176,7 +175,7 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
                 (*cl->translateFn)(cl->translateLookupTable,                    \
                                    &(cl->screen->serverFormat), &cl->format, fbptr,        \
                                    (char *)clientPixelData,                     \
-                                   cl->screen->paddedWidthInBytes, w, h);         \
+                                   cl->screen->paddedWidthInBytes, w, h);       \
                                                                                 \
                 memcpy(&cl->updateBuf[cl->ublen], (char *)clientPixelData,      \
                        w * h * (bpp/8));                                        \
@@ -184,7 +183,7 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
                 cl->ublen += w * h * (bpp/8);                                   \
             }                                                                   \
                                                                                 \
-            cl->bytesSent[rfbEncodingHextile] += cl->ublen - startUblen;     \
+            cl->bytesSent[rfbEncodingHextile] += cl->ublen - startUblen;        \
         }                                                                       \
     }                                                                           \
                                                                                 \
@@ -192,17 +191,17 @@ sendHextiles##bpp(cl, rx, ry, rw, rh)                                           
 }                                                                               \
                                                                                 \
                                                                                 \
-static rfbBool                                                                     \
-subrectEncode##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w, int h,              \
-                   uint##bpp##_t bg, uint##bpp##_t fg, rfbBool mono)                       \
+static rfbBool                                                                  \
+subrectEncode##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w, int h,          \
+                   uint##bpp##_t bg, uint##bpp##_t fg, rfbBool mono)            \
 {                                                                               \
-    uint##bpp##_t cl2;                                                              \
+    uint##bpp##_t cl2;                                                          \
     int x,y;                                                                    \
     int i,j;                                                                    \
     int hx=0,hy,vx=0,vy;                                                        \
     int hyflag;                                                                 \
-    uint##bpp##_t *seg;                                                             \
-    uint##bpp##_t *line;                                                            \
+    uint##bpp##_t *seg;                                                         \
+    uint##bpp##_t *line;                                                        \
     int hw,hh,vw,vh;                                                            \
     int thex,they,thew,theh;                                                    \
     int numsubs = 0;                                                            \
@@ -295,15 +294,9 @@ subrectEncode##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w, int h,          
  */                                                                             \
                                                                                 \
 static void                                                                     \
-testColours##bpp(data,size,mono,solid,bg,fg)                                    \
-    uint##bpp##_t *data;                                                            \
-    int size;                                                                   \
-    rfbBool *mono;                                                                 \
-    rfbBool *solid;                                                                \
-    uint##bpp##_t *bg;                                                              \
-    uint##bpp##_t *fg;                                                              \
-{                                                                               \
-    uint##bpp##_t colour1 = 0, colour2 = 0;                                         \
+testColours##bpp(uint##bpp##_t *data, int size, rfbBool *mono, rfbBool *solid,  \
+                 uint##bpp##_t *bg, uint##bpp##_t *fg) {                        \
+    uint##bpp##_t colour1 = 0, colour2 = 0;                                     \
     int n1 = 0, n2 = 0;                                                         \
     *mono = TRUE;                                                               \
     *solid = TRUE;                                                              \
