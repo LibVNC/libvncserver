@@ -235,6 +235,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
     rfbResetStats(cl);
 
+    cl->clientData = NULL;
+    cl->clientGoneHook = rfbDoNothingWithClient;
+
     if(isUDP) {
       rfbLog(" accepted UDP client\n");
     } else {
@@ -353,8 +356,6 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       }
     }
 
-    cl->clientData = NULL;
-    cl->clientGoneHook = rfbDoNothingWithClient;
     switch (cl->screen->newClientHook(cl)) {
     case RFB_CLIENT_ON_HOLD:
 	    cl->onHold = TRUE;
@@ -458,7 +459,9 @@ rfbClientConnectionGone(rfbClientPtr cl)
     TINI_COND(cl->updateCond);
     TINI_MUTEX(cl->updateMutex);
 
+    /* make sure outputMutex is unlocked before destroying */
     LOCK(cl->outputMutex);
+    UNLOCK(cl->outputMutex);
     TINI_MUTEX(cl->outputMutex);
 
 #ifdef CORBA
