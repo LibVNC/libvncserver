@@ -7,7 +7,7 @@ include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h ../rfb/rfbint.h \
 	../rfb/rfbproto.h ../rfb/keysym.h ../rfb/rfbregion.h ../rfb/rfbclient.h
 
 noinst_HEADERS=d3des.h ../rfb/default8x16.h zrleoutstream.h \
-	zrlepalettehelper.h zrletypes.h
+	zrlepalettehelper.h zrletypes.h private.h
 
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 	tableinitcmtemplate.c tabletrans24template.c \
