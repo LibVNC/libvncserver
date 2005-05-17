@@ -1,6 +1,7 @@
 immediate:
 ----------
 
+more smatch, sparse and valgrinding
 VisualNaCro testing
 test IRIX -overlay (x11vnc)
 java vncviewer doesn't do colour cursors?
