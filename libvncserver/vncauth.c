@@ -21,8 +21,13 @@
  * vncauth.c - Functions for VNC password management and authentication.
  */
 
+#ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #define _POSIX_SOURCE
+#endif
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -32,9 +37,6 @@
 #include <string.h>
 #include <math.h>
 
-#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
 #ifdef LIBVNCSERVER_HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif

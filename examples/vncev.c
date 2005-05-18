@@ -1,5 +1,7 @@
 /* This program is a simple server to show events coming from the client */
+#ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>

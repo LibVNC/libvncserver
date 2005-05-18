@@ -1,4 +1,6 @@
+#ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
+#endif
 #include <time.h>
 #include <stdarg.h>
 #include <rfb/rfb.h>

@@ -21,7 +21,9 @@
  * sockets.c - functions to deal with sockets.
  */
 
+#ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
+#endif
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>

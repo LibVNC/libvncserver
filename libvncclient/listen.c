@@ -21,7 +21,9 @@
  * listen.c - listen for incoming connections
  */
 
+#ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
+#endif
 #include <unistd.h>
 #include <sys/types.h>
 #ifdef __MINGW32__

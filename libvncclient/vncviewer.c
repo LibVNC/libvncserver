@@ -21,8 +21,10 @@
  * vncviewer.c - the Xt-based VNC viewer.
  */
 
+#ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #define _POSIX_SOURCE
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

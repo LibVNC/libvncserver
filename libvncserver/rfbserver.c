@@ -24,7 +24,9 @@
  *  USA.
  */
 
+#ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
+#endif
 #include <string.h>
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
