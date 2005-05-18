@@ -206,12 +206,12 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
 
    if(x1>x2) { i=x1; x1=x2; x2=i; }
    if(x1<0) x1=0;
-   if(x2>=screen->width) x2=screen->width-1;
+   if(x2>screen->width) x2=screen->width;
    if(x1==x2) return;
    
    if(y1>y2) { i=y1; y1=y2; y2=i; }
    if(y1<0) y1=0;
-   if(y2>=screen->height) y2=screen->height-1;
+   if(y2>screen->height) y2=screen->height;
    if(y1==y2) return;
    
    region = sraRgnCreateRect(x1,y1,x2,y2);
