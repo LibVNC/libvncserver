@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat May 14 00:07:44 EDT 2005
+x11vnc README file                         Date: Tue May 17 14:39:38 EDT 2005
 
 The following information is taken from these URLs:
 
@@ -4238,7 +4238,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-05-14
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-05-17
 
 x11vnc options:
   -display disp            -auth file             
@@ -4288,26 +4288,28 @@ x11vnc options:
   -debug_wireframe         -scrollcopyrect mode   
   -noscrollcopyrect        -scr_area n            
   -scr_skip list           -scr_inc list          
-  -scr_keys list           -scr_parms string      
-  -debug_scroll            -pointer_mode n        
-  -input_skip n            -speeds rd,bw,lat      
-  -debug_pointer           -debug_keyboard        
-  -defer time              -wait time             
-  -readtimeout n           -nap                   
-  -nonap                   -sb time               
-  -noxdamage               -xd_area A             
-  -xd_mem f                -sigpipe string        
-  -threads                 -nothreads             
-  -fs f                    -gaps n                
-  -grow n                  -fuzz n                
-  -debug_tiles             -snapfb                
-  -rawfb string            -pipeinput cmd         
-  -gui [gui-opts]          -remote command        
-  -query variable          -sync                  
-  -noremote                -yesremote             
-  -unsafe                  -safer                 
-  -privremote              -nocmds                
-  -deny_all              
+  -scr_keys list           -scr_term list         
+  -scr_parms string        -debug_scroll          
+  -pointer_mode n          -input_skip n          
+  -speeds rd,bw,lat        -debug_pointer         
+  -debug_keyboard          -defer time            
+  -wait time               -wait_ui factor        
+  -nowait_bog              -readtimeout n         
+  -nap                     -nonap                 
+  -sb time                 -noxdamage             
+  -xd_area A               -xd_mem f              
+  -sigpipe string          -threads               
+  -nothreads               -fs f                  
+  -gaps n                  -grow n                
+  -fuzz n                  -debug_tiles           
+  -snapfb                  -rawfb string          
+  -pipeinput cmd           -gui [gui-opts]        
+  -remote command          -query variable        
+  -sync                    -noremote              
+  -yesremote               -unsafe                
+  -safer                   -privremote            
+  -nocmds                  -deny_all              
+
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -4333,7 +4335,7 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-05-14
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-05-17
 
 Typical usage is:
 
@@ -5243,6 +5245,29 @@ Options:
                        Shift_L, Control_R, etc, are skipped since they almost
                        never induce scrolling by themselves.
 
+-scr_term list         Yet another cosmetic kludge.  Apply shell/terminal
+                       heuristics to applications matching comma separated list
+                       (same as -scr_skip/-scr_inc).  For example an annoying
+                       transient under scroll detection is if you hit Enter in
+                       a terminal shell with full text window, the solid text
+                       cursor block will be scrolled up.  So for a short time
+                       there are two (or more) block cursors on the screen.
+                       There are similar scenarios, (e.g. an output line is
+                       duplicated).
+
+                       These transients are induced by the approximation of
+                       scroll detection (e.g. it detects the scroll, but not
+                       the fact that the block cursor was cleared just before
+                       the scroll).  In nearly all cases these transient errors
+                       are repaired when the true X framebuffer is consulted
+                       by the normal polling.  But they are distracting, so
+                       what this option provides is extra "padding" near the
+                       bottom of the terminal window: a few extra lines near
+                       the bottom will not be scrolled, but rather updated
+                       from the actual X framebuffer.  This usually reduces
+                       the annoying artifacts.  Use "none" to disable.
+                       Default: "term"
+
 -scr_parms string      Set various parameters for the scrollcopyrect mode.
                        The format is similar to that for -wireframe and packed
                        with lots of parameters:
@@ -5374,6 +5399,18 @@ Options:
                        (deferUpdateTime)  Default: 30
 -wait time             Time in ms to pause between screen polls.  Used to cut
                        down on load.  Default: 30
+-wait_ui factor        Factor by which to cut the -wait time if there
+                       has been recent user input (pointer or keyboard).
+                       Improves response, but increases the load whenever you
+                       are moving the mouse or typing.  Default: 2.00
+-nowait_bog            Do not detect if the screen polling is "bogging down"
+                       and sleep more.  Some activities with no user input can
+                       slow things down a lot: consider a large terminal window
+                       with a long build running in it continously streaming
+                       text output.  By default x11vnc will try to detect this
+                       (3 screen polls in a row each longer than 0.25 sec with
+                       no user input), and sleep up to 1.5 secs to let things
+                       "catch up".  Use this option to disable the detection.
 -readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On
                        slow links that take a long time to paint the first
                        screen libvncserver may hit the timeout and drop the
@@ -5751,6 +5788,7 @@ Options:
                        scr_skip:list   set -scr_skip to "list"
                        scr_inc:list    set -scr_inc to "list"
                        scr_keys:list   set -scr_keys to "list"
+                       scr_term:list   set -scr_term to "list"
                        scr_parms:str   set -scr_parms parameters.
                        pointer_mode:n  set -pointer_mode to n. same as "pm"
                        input_skip:n    set -input_skip to n.
@@ -5761,6 +5799,9 @@ Options:
                        nodebug_keyboard disable -debug_keyboard, same as "nodk"
                        defer:n         set -defer to n ms,same as deferupdate:n
                        wait:n          set -wait to n ms.
+                       wait_ui:f       set -wait_ui factor to f.
+                       wait_bog        disable -nowait_bog mode.
+                       nowait_bog      enable  -nowait_bog mode.
                        readtimeout:n   set read timeout to n seconds.
                        nap             enable  -nap mode.
                        nonap           disable -nap mode.
@@ -5856,35 +5897,35 @@ Options:
                        forever noforever once timeout deny lock nodeny unlock
                        connect allowonce allow localhost nolocalhost listen
                        lookup nolookup accept gone shm noshm flipbyteorder
-                       noflipbyteorder onetile noonetile solid_color
-                       solid nosolid blackout xinerama noxinerama xtrap
-                       noxtrap xrandr noxrandr xrandr_mode padgeom quiet q
-                       noquiet modtweak nomodtweak xkb noxkb skip_keycodes
-                       skip_dups noskip_dups add_keysyms noadd_keysyms
-                       clear_mods noclear_mods clear_keys noclear_keys
-                       remap repeat norepeat fb nofb bell nobell sel nosel
-                       primary noprimary cursorshape nocursorshape cursorpos
-                       nocursorpos cursor show_cursor noshow_cursor nocursor
-                       arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem
-                       alphacut alphafrac alpharemove noalpharemove alphablend
-                       noalphablend xwarppointer xwarp noxwarppointer noxwarp
-                       buttonmap dragging nodragging wireframe_mode wireframe
-                       wf nowireframe nowf wirecopyrect wcr nowirecopyrect
-                       nowcr scr_area scr_skip scr_inc scr_keys scr_parms
+                       noflipbyteorder onetile noonetile solid_color solid
+                       nosolid blackout xinerama noxinerama xtrap noxtrap
+                       xrandr noxrandr xrandr_mode padgeom quiet q noquiet
+                       modtweak nomodtweak xkb noxkb skip_keycodes skip_dups
+                       noskip_dups add_keysyms noadd_keysyms clear_mods
+                       noclear_mods clear_keys noclear_keys remap repeat
+                       norepeat fb nofb bell nobell sel nosel primary noprimary
+                       cursorshape nocursorshape cursorpos nocursorpos cursor
+                       show_cursor noshow_cursor nocursor arrow xfixes noxfixes
+                       xdamage noxdamage xd_area xd_mem alphacut alphafrac
+                       alpharemove noalpharemove alphablend noalphablend
+                       xwarppointer xwarp noxwarppointer noxwarp buttonmap
+                       dragging nodragging wireframe_mode wireframe wf
+                       nowireframe nowf wirecopyrect wcr nowirecopyrect nowcr
+                       scr_area scr_skip scr_inc scr_keys scr_term scr_parms
                        scrollcopyrect scr noscrollcopyrect noscr pointer_mode
                        pm input_skip input client_input speeds debug_pointer dp
                        nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-                       nodk deferupdate defer wait readtimeout nap nonap
-                       sb screen_blank fs gaps grow fuzz snapfb nosnapfb
-                       rawfb progressive rfbport http nohttp httpport
-                       httpdir enablehttpproxy noenablehttpproxy alwaysshared
-                       noalwaysshared nevershared noalwaysshared dontdisconnect
-                       nodontdisconnect desktop debug_xevents nodebug_xevents
-                       debug_xevents debug_xdamage nodebug_xdamage
-                       debug_xdamage debug_wireframe nodebug_wireframe
-                       debug_wireframe debug_scroll nodebug_scroll debug_scroll
-                       debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg
-                       nodbg noremote
+                       nodk deferupdate defer wait_ui wait_bog nowait_bog wait
+                       readtimeout nap nonap sb screen_blank fs gaps grow fuzz
+                       snapfb nosnapfb rawfb progressive rfbport http nohttp
+                       httpport httpdir enablehttpproxy noenablehttpproxy
+                       alwaysshared noalwaysshared nevershared noalwaysshared
+                       dontdisconnect nodontdisconnect desktop debug_xevents
+                       nodebug_xevents debug_xevents debug_xdamage
+                       nodebug_xdamage debug_xdamage debug_wireframe
+                       nodebug_wireframe debug_wireframe debug_scroll
+                       nodebug_scroll debug_scroll debug_tiles dbt
+                       nodebug_tiles nodbt debug_tiles dbg nodbg noremote
 
                        aro=  display vncdisplay desktopname http_url auth
                        users rootshift clipshift scale_str scaled_x scaled_y

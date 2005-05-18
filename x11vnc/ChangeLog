@@ -1,3 +1,7 @@
+2005-05-17  Karl Runge <runge@karlrunge.com>
+	* more -scrollcopyrect, -scr_term hacks for terminals.
+	* -wait_ui, -nowait_bog tunables.  push cursor sooner.
+
 2005-05-14  Karl Runge <runge@karlrunge.com>
 	* much more work on  "-scrollcopyrect" mode... getting usable.
 	* remove -pointer_mode 3, shift everyone back down

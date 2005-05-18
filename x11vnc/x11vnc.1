@@ -2,7 +2,7 @@
 .TH X11VNC "1" "May 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-05-14
+         version: 0.7.2, lastmod: 2005-05-17
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1187,6 +1187,31 @@ to cause scrolls.  BTW, by default modifier keys,
 Shift_L, Control_R, etc, are skipped since they almost
 never induce scrolling by themselves.
 .PP
+\fB-scr_term\fR \fIlist\fR
+.IP
+Yet another cosmetic kludge.  Apply shell/terminal
+heuristics to applications matching comma separated
+list (same as for \fB-scr_skip/-scr_inc).\fR  For example an
+annoying transient under scroll detection is if you
+hit Enter in a terminal shell with full text window,
+the solid text cursor block will be scrolled up.
+So for a short time there are two (or more) block
+cursors on the screen.  There are similar scenarios,
+(e.g. an output line is duplicated).
+.IP
+These transients are induced by the approximation of
+scroll detection (e.g. it detects the scroll, but not
+the fact that the block cursor was cleared just before
+the scroll).  In nearly all cases these transient errors
+are repaired when the true X framebuffer is consulted
+by the normal polling.  But they are distracting, so
+what this option provides is extra "padding" near the
+bottom of the terminal window: a few extra lines near
+the bottom will not be scrolled, but rather updated
+from the actual X framebuffer.  This usually reduces
+the annoying artifacts.  Use "none" to disable.
+Default: "term"
+.PP
 \fB-scr_parms\fR \fIstring\fR
 .IP
 Set various parameters for the scrollcopyrect mode.
@@ -1340,6 +1365,24 @@ Time in ms to wait for updates before sending to client
 .IP
 Time in ms to pause between screen polls.  Used to cut
 down on load.  Default: 30
+.PP
+\fB-wait_ui\fR \fIfactor\fR
+.IP
+Factor by which to cut the \fB-wait\fR time if there
+has been recent user input (pointer or keyboard).
+Improves response, but increases the load whenever you
+are moving the mouse or typing.  Default: 2.00
+.PP
+\fB-nowait_bog\fR
+.IP
+Do not detect if the screen polling is "bogging down"
+and sleep more.  Some activities with no user input can
+slow things down a lot: consider a large terminal window
+with a long build running in it continously streaming
+text output.  By default x11vnc will try to detect this
+(3 screen polls in a row each longer than 0.25 sec with
+no user input), and sleep up to 1.5 secs to let things
+"catch up".  Use this option to disable the detection.
 .PP
 \fB-readtimeout\fR \fIn\fR
 .IP
@@ -1513,8 +1556,8 @@ with /dev/fb0.
 .PP
 \fB-pipeinput\fR \fIcmd\fR
 .IP
-Another experimental option: it lets you supply
-an extern command in \fIcmd\fR that x11vnc will pipe
+Another experimental option: it lets you supply an
+external command in \fIcmd\fR that x11vnc will pipe
 all of the user input events to in a simple format.
 In \fB-pipeinput\fR mode by default x11vnc will not process
 any of the user input events.  If you prefix \fIcmd\fR
@@ -1897,6 +1940,8 @@ scr_inc:list    set \fB-scr_inc\fR to "list"
 .IP
 scr_keys:list   set \fB-scr_keys\fR to "list"
 .IP
+scr_term:list   set \fB-scr_term\fR to "list"
+.IP
 scr_parms:str   set \fB-scr_parms\fR parameters.
 .IP
 pointer_mode:n  set \fB-pointer_mode\fR to n. same as "pm"
@@ -1916,6 +1961,12 @@ nodebug_keyboard disable \fB-debug_keyboard,\fR same as "nodk"
 defer:n         set \fB-defer\fR to n ms,same as deferupdate:n
 .IP
 wait:n          set \fB-wait\fR to n ms.
+.IP
+wait_ui:f       set \fB-wait_ui\fR factor to f.
+.IP
+wait_bog        disable \fB-nowait_bog\fR mode.
+.IP
+nowait_bog      enable  \fB-nowait_bog\fR mode.
 .IP
 readtimeout:n   set read timeout to n seconds.
 .IP
@@ -2069,35 +2120,35 @@ scale_cursor viewonly noviewonly shared noshared
 forever noforever once timeout deny lock nodeny unlock
 connect allowonce allow localhost nolocalhost listen
 lookup nolookup accept gone shm noshm flipbyteorder
-noflipbyteorder onetile noonetile solid_color
-solid nosolid blackout xinerama noxinerama xtrap
-noxtrap xrandr noxrandr xrandr_mode padgeom quiet q
-noquiet modtweak nomodtweak xkb noxkb skip_keycodes
-skip_dups noskip_dups add_keysyms noadd_keysyms
-clear_mods noclear_mods clear_keys noclear_keys
-remap repeat norepeat fb nofb bell nobell sel nosel
-primary noprimary cursorshape nocursorshape cursorpos
-nocursorpos cursor show_cursor noshow_cursor nocursor
-arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem
-alphacut alphafrac alpharemove noalpharemove alphablend
-noalphablend xwarppointer xwarp noxwarppointer noxwarp
-buttonmap dragging nodragging wireframe_mode wireframe
-wf nowireframe nowf wirecopyrect wcr nowirecopyrect
-nowcr scr_area scr_skip scr_inc scr_keys scr_parms
+noflipbyteorder onetile noonetile solid_color solid
+nosolid blackout xinerama noxinerama xtrap noxtrap
+xrandr noxrandr xrandr_mode padgeom quiet q noquiet
+modtweak nomodtweak xkb noxkb skip_keycodes skip_dups
+noskip_dups add_keysyms noadd_keysyms clear_mods
+noclear_mods clear_keys noclear_keys remap repeat
+norepeat fb nofb bell nobell sel nosel primary noprimary
+cursorshape nocursorshape cursorpos nocursorpos cursor
+show_cursor noshow_cursor nocursor arrow xfixes noxfixes
+xdamage noxdamage xd_area xd_mem alphacut alphafrac
+alpharemove noalpharemove alphablend noalphablend
+xwarppointer xwarp noxwarppointer noxwarp buttonmap
+dragging nodragging wireframe_mode wireframe wf
+nowireframe nowf wirecopyrect wcr nowirecopyrect nowcr
+scr_area scr_skip scr_inc scr_keys scr_term scr_parms
 scrollcopyrect scr noscrollcopyrect noscr pointer_mode
 pm input_skip input client_input speeds debug_pointer dp
 nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-nodk deferupdate defer wait readtimeout nap nonap
-sb screen_blank fs gaps grow fuzz snapfb nosnapfb
-rawfb progressive rfbport http nohttp httpport
-httpdir enablehttpproxy noenablehttpproxy alwaysshared
-noalwaysshared nevershared noalwaysshared dontdisconnect
-nodontdisconnect desktop debug_xevents nodebug_xevents
-debug_xevents debug_xdamage nodebug_xdamage
-debug_xdamage debug_wireframe nodebug_wireframe
-debug_wireframe debug_scroll nodebug_scroll debug_scroll
-debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg
-nodbg noremote
+nodk deferupdate defer wait_ui wait_bog nowait_bog wait
+readtimeout nap nonap sb screen_blank fs gaps grow fuzz
+snapfb nosnapfb rawfb progressive rfbport http nohttp
+httpport httpdir enablehttpproxy noenablehttpproxy
+alwaysshared noalwaysshared nevershared noalwaysshared
+dontdisconnect nodontdisconnect desktop debug_xevents
+nodebug_xevents debug_xevents debug_xdamage
+nodebug_xdamage debug_xdamage debug_wireframe
+nodebug_wireframe debug_wireframe debug_scroll
+nodebug_scroll debug_scroll debug_tiles dbt
+nodebug_tiles nodbt debug_tiles dbg nodbg noremote
 .IP
 aro=  display vncdisplay desktopname http_url auth
 users rootshift clipshift scale_str scaled_x scaled_y

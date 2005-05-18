@@ -170,8 +170,11 @@
  *
  * -DWIREFRAME=0  to have -nowireframe as the default.
  * -DWIREFRAME_COPYRECT=0  to have -nowirecopyrect as the default.
+ * -DWIREFRAME_PARMS=...   set default -wirecopyrect parameters.
  * -DSCROLL_COPYRECT=0     to have -noscrollcopyrect as the default.
+ * -DSCROLL_COPYRECT_PARMS=...  set default -scrollcopyrect parameters.
  * -DXDAMAGE=0    to have -noxdamage as the default.
+ * -DSKIDPUPS=0   to have -noskip_dups as the default.
  *
  * -DPOINTER_MODE_DEFAULT={0,1,2,3,4}  set default -pointer_mode.
  * -DBOLDLY_CLOSE_DISPLAY=0  to not close X DISPLAY under -rawfb.
@@ -339,6 +342,7 @@ int xrandr_base_event_type = 0;
 int xfixes_present = 0;
 int use_xfixes = 1;
 int got_xfixes_cursor_notify = 0;
+int cursor_changes = 0;
 int alpha_threshold = 240;
 double alpha_frac = 0.33;
 int alpha_remove = 0;
@@ -364,10 +368,11 @@ int xdamage_base_event_type = 0;
 int xdamage_max_area = 20000;	/* pixels */
 double xdamage_memory = 1.0;	/* in units of NSCAN */
 int xdamage_tile_count, xdamage_direct_count;
-
+double xdamage_scheduled_mark = 0.0;
+sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-05-14";
+char lastmod[] = "0.7.2 lastmod: 2005-05-17";
 int hack_val = 0;
 
 /* X display info */
@@ -590,6 +595,8 @@ void initialize_xdamage(void);
 int valid_window(Window, XWindowAttributes *, int);
 void create_xdamage_if_needed(void);
 void destroy_xdamage_if_needed(void);
+void mark_for_xdamage(int, int, int, int);
+void mark_region_for_xdamage(sraRegionPtr);
 void initialize_xrandr(void);
 XImage *initialize_xdisplay_fb(void);
 
@@ -630,6 +637,7 @@ void parse_scroll_copyrect(void);
 void set_wirecopyrect_mode(char *);
 void set_scrollcopyrect_mode(char *);
 void initialize_scroll_matches(void);
+void initialize_scroll_term(void);
 void initialize_scroll_keys(void);
 int try_copyrect(Window, int, int, int, int, int, int, int *, sraRegionPtr,
     double);
@@ -643,7 +651,10 @@ int near_scrollbar_edge(int, int, int, int, int, int);
 void read_vnc_connect_prop(void);
 void set_vnc_connect_prop(char *);
 void fb_push(void);
-void fb_push_wait(double);
+#define FB_COPY 0x1
+#define FB_MOD  0x2
+#define FB_REQ  0x4
+void fb_push_wait(double, int);
 char *process_remote_cmd(char *, int);
 void rfbPE(long);
 void rfbCFD(long);
@@ -652,7 +663,7 @@ void set_colormap(int);
 void set_offset(void);
 void set_rfb_cursor(int);
 void set_visual(char *vstring);
-void set_cursor(int, int, int);
+int set_cursor(int, int, int);
 void setup_cursors(void);
 void setup_cursors_and_push(void);
 void first_cursor(void);
@@ -671,7 +682,7 @@ void get_client_regions(int *, int *, int *, int *);
 void shm_clean(XShmSegmentInfo *, XImage *);
 void shm_delete(XShmSegmentInfo *);
 
-void check_x11_pointer(void);
+int check_x11_pointer(void);
 void check_bell_event(void);
 void check_xevents(void);
 char *this_host(void);
@@ -942,6 +953,12 @@ char *scroll_skip_str0 =
 	"##Soffice.bin" /* big problems, no clips, scrolls outside area */
 ;
 
+char **scroll_term = NULL;
+char *scroll_term_str = NULL;
+char *scroll_term_str0 =
+	"term"
+;
+
 #ifndef NOREPEAT
 #define NOREPEAT 1
 #endif
@@ -982,6 +999,8 @@ int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
  * poll times of 10-35ms, so maybe this value cuts the idle load by 2 or so.
  */
 int waitms = 30;
+double wait_ui = 2.0;
+int wait_bog = 1;
 int defer_update = 30;	/* deferUpdateTime ms to wait before sends. */
 
 int screen_blank = 60;	/* number of seconds of no activity to throttle */
@@ -1075,9 +1094,22 @@ struct timeval _mysleep;
  * avoid XIO crashes.
  */
 MUTEX(x11Mutex);
+#define X_INIT INIT_MUTEX(x11Mutex)
+#if 1
 #define X_LOCK       LOCK(x11Mutex)
 #define X_UNLOCK   UNLOCK(x11Mutex)
-#define X_INIT INIT_MUTEX(x11Mutex)
+#else
+int hxl = 0;
+#define X_LOCK       fprintf(stderr, "*** X_LOCK**[%05d]  %d%s\n", \
+	__LINE__, hxl, hxl ? "  BAD-PRE-LOCK":""); LOCK(x11Mutex); hxl = 1;
+#define X_UNLOCK     fprintf(stderr, "    x_unlock[%05d]  %d%s\n", \
+	__LINE__, hxl, !hxl ? "  BAD-PRE-UNLOCK":""); UNLOCK(x11Mutex); hxl = 0;
+#endif
+
+MUTEX(scrollMutex);
+#define SCR_LOCK   if (use_threads) {LOCK(scrollMutex);}
+#define SCR_UNLOCK if (use_threads) {UNLOCK(scrollMutex);}
+#define SCR_INIT INIT_MUTEX(scrollMutex)
 
 /* -- util.c -- */
 
@@ -1254,6 +1286,20 @@ int pick_windowid(unsigned long *num) {
 	}
 	pclose(p);
 	return ok;
+}
+
+Window query_pointer(Window start) {
+	Window r, c;	
+	int rx, ry, wx, wy;
+	unsigned int mask;
+	if (start == None) {
+		start = rootwin;
+	}
+	if (XQueryPointer(dpy, start, &r, &c, &rx, &ry, &wx, &wy, &mask)) {
+		return c;
+	} else {
+		return None;
+	}
 }
 
 char *bitprint(unsigned int st, int nbits) {
@@ -2835,10 +2881,16 @@ int xrecord_set_by_mouse = 0;
 Window xrecord_focus_window = None;
 Window xrecord_wm_window = None;
 Window xrecord_ptr_window = None;
+KeySym xrecord_keysym = NoSymbol;
+#define NAMEINFO 2048
+char xrecord_name_info[NAMEINFO];
 
 void initialize_xrecord(void) {
 	use_xrecord = 0;
 	if (! xrecord_present) {
+		return;
+	}
+	if (nofb) {
 		return;
 	}
 #if LIBVNCSERVER_HAVE_RECORD
@@ -2903,9 +2955,40 @@ int xrecord_skip_keysym(rfbKeySym keysym) {
 		return 0;
 	} else if (ok == 0) {
 		return 1;
-	} else if (IsModifierKey(sym)) {
+	}
+
+	/* apply various heuristics: */
+
+	if (IsModifierKey(sym)) {
+		/* Shift, Control, etc, usu. generate no scrolls */
 		return 1;
 	}
+	if (sym == XK_space && scroll_term) {
+		/* space in a terminal is usu. full page... */
+		Window win;
+		static Window prev_top = None;
+		int size = 256;
+		static char name[256];
+
+		X_LOCK;
+		win = query_pointer(rootwin);
+		X_UNLOCK;
+		if (win != None && win != rootwin) {
+			if (prev_top != None && win == prev_top) {
+				;	/* use cached result */
+			} else {
+				prev_top = win;
+				X_LOCK;
+				win = descend_pointer(6, win, name, size);
+				X_UNLOCK;
+			}
+			if (match_str_list(name, scroll_term)) {
+				return 1;
+			}
+		}
+	}
+
+	/* TBD use typing_rate() so */
 	return 0;
 }
 
@@ -3813,7 +3896,7 @@ void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) {
 		rfbLog("XRecordDisableContext(0x%lx) failed.\n", rc);	
 	}
 	ret2 = XRecordFreeContext(rdpy_ctrl, rc_scroll);
-	if (!ret2 && ! bequiet && !quiet) {
+	if (!ret2 && !bequiet && !quiet) {
 		rfbLog("XRecordFreeContext(0x%lx) failed.\n", rc);	
 	}
 	XFlush(rdpy_ctrl);
@@ -3871,18 +3954,26 @@ XErrorEvent *trapped_record_xerror_event;
 	}
 
 void xrecord_watch(int start, int setby) {
-	Window focus, wm, r, c, clast;
+	Window focus, wm, c, clast;
 	static double create_time = 0.0;
 	double dnow;
 	static double last_error = 0.0;
-	int rx, ry, wx, wy;
-	unsigned int m;
 	int rc, db = debug_scroll;
 	int do_shutdown = 0;
 	int reopen_dpys = 1;
-	char name_info[2048];
 	XErrorHandler old_handler = NULL;
 	static Window last_win = None, last_result = None;
+
+	if (nofb) {
+		xrecording = 0;
+		return;
+	}
+	if (use_threads) {
+		/* XXX not working */
+		use_xrecord = 0;
+		xrecording = 0;
+		return;
+	}
 
 	dtime0(&dnow);
 	if (dnow < last_error + 0.5) {
@@ -3891,22 +3982,25 @@ void xrecord_watch(int start, int setby) {
 
 #if LIBVNCSERVER_HAVE_RECORD
 	if (! start) {
-		int shut_reopen = 2;
+		int shut_reopen = 2, shut_time = 25;
 if (db) fprintf(stderr, "XRECORD OFF: %d/%d  %.4f\n", xrecording, setby, dnow - x11vnc_start);
 		xrecording = 0;
 		if (! rc_scroll) {
 			xrecord_focus_window = None;
 			xrecord_wm_window = None;
 			xrecord_ptr_window = None;
+			xrecord_keysym = NoSymbol;
 			rcs_scroll = 0;
 			return;
 		}
 
-		if (! do_shutdown && dnow > create_time + 45) {
+		if (! do_shutdown && dnow > create_time + shut_time) {
 			/* XXX unstable if we keep a RECORD going forever */
 			do_shutdown = 1;
 			shut_reopen = 1;
 		}
+
+		SCR_LOCK;
 		
 		if (do_shutdown) {
 if (db > 1) fprintf(stderr, "=== shutdown-scroll 0x%lx\n", rc_scroll);
@@ -3948,15 +4042,18 @@ if (db > 1) fprintf(stderr, "=== disab-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scr
 
 					shutdown_record_context(rc_scroll,
 					    0, reopen_dpys);
-					if (! use_xrecord) return;
 
 					last_error = dnow;
 					rc_scroll = 0;
+
+					if (! use_xrecord) return;
 				}
 				XSetErrorHandler(old_handler);
 				X_UNLOCK;
 			}
 		}
+
+		SCR_UNLOCK;
 		/*
 		 * XXX if we do a XFlush(rdpy_ctrl) here we get:
 		 *
@@ -3975,6 +4072,7 @@ if (db > 1) fprintf(stderr, "=== disab-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scr
 		xrecord_focus_window = None;
 		xrecord_wm_window = None;
 		xrecord_ptr_window = None;
+		xrecord_keysym = NoSymbol;
 		rcs_scroll = 0;
 		return;
 	}
@@ -3998,6 +4096,7 @@ if (db) fprintf(stderr, "XRECORD ON:  %d/%d  %.4f\n", xrecording, setby, dnow - 
 	xrecord_focus_window = None;
 	xrecord_wm_window = None;
 	xrecord_ptr_window = None;
+	xrecord_keysym = NoSymbol;
 	xrecord_set_by_keys  = 0;
 	xrecord_set_by_mouse = 0;
 
@@ -4007,6 +4106,7 @@ if (db) fprintf(stderr, "XRECORD ON:  %d/%d  %.4f\n", xrecording, setby, dnow - 
 	wm = None;
 
 	X_LOCK;
+	SCR_LOCK;
 #if 0
 	/*
 	 * xrecord_focus_window / focus not currently used... save a
@@ -4020,7 +4120,7 @@ if (db) fprintf(stderr, "XRECORD ON:  %d/%d  %.4f\n", xrecording, setby, dnow - 
 	XGetInputFocus(dpy, &focus, &i);
 #endif
 
-	XQueryPointer(dpy, rootwin, &r, &wm, &rx, &ry, &wx, &wy, &m);
+	wm = query_pointer(rootwin);
 	if (wm) {
 		c = wm;
 	} else {
@@ -4033,15 +4133,16 @@ if (db) fprintf(stderr, "XRECORD ON:  %d/%d  %.4f\n", xrecording, setby, dnow - 
 		clast = last_result;
 	} else if (scroll_good_all == NULL && scroll_skip_all == NULL) {
 		/* more efficient if name info not needed. */
+		xrecord_name_info[0] = '\0';
 		clast = descend_pointer(6, c, NULL, 0);
 	} else {
 		char *nm;
 		int matched_good = 0, matched_skip = 0;
 
-		clast = descend_pointer(6, c, name_info, 2048);
-if (db) fprintf(stderr, "name_info: %s\n", name_info);
+		clast = descend_pointer(6, c, xrecord_name_info, NAMEINFO);
+if (db) fprintf(stderr, "name_info: %s\n", xrecord_name_info);
 
-		nm = name_info;
+		nm = xrecord_name_info;
 
 		if (scroll_good_all) {
 			matched_good += match_str_list(nm, scroll_good_all);
@@ -4075,6 +4176,7 @@ if (db) fprintf(stderr, "name_info: %s\n", name_info);
 	if (!clast || clast == rootwin) {
 if (db) fprintf(stderr, "--- xrecord_watch: SKIP.\n");
 		X_UNLOCK;
+		SCR_UNLOCK;
 		return;
 	}
 
@@ -4089,6 +4191,7 @@ if (db) fprintf(stderr, "--- xrecord_watch: SKIP.\n");
 	 */
 	trapped_record_xerror = 0;
 	old_handler = XSetErrorHandler(trap_record_xerror);
+
 
 	if (! rc_scroll) {
 		/* do_shutdown case or first time in */
@@ -4141,6 +4244,7 @@ if (db) fprintf(stderr, "rc_scroll: 0x%lx\n", rc_scroll);
 	if (! rc_scroll) {
 		XSetErrorHandler(old_handler);
 		X_UNLOCK;
+		SCR_UNLOCK;
 		use_xrecord = 0;
 		rfbLog("failed to create X RECORD context rc_scroll.\n");
 		rfbLog("  switching to -noscrollcopyrect mode.\n");
@@ -4154,6 +4258,7 @@ if (db) fprintf(stderr, "rc_scroll: 0x%lx\n", rc_scroll);
 
 		XSetErrorHandler(old_handler);
 		X_UNLOCK;
+		SCR_UNLOCK;
 
 		return;
 	}
@@ -4200,6 +4305,7 @@ if (db) fprintf(stderr, "rc_scroll: 0x%lx\n", rc_scroll);
 	XFlush(rdpy_data);
 
 	X_UNLOCK;
+	SCR_UNLOCK;
 #endif
 }
 
@@ -4594,7 +4700,7 @@ int wait_until_mapped(Window win) {
 int get_window_size(Window win, int *x, int *y) {
 	XWindowAttributes attr;
 	/* valid_window? */
-	if (XGetWindowAttributes(dpy, win, &attr)) {
+	if (valid_window(win, &attr, 1)) {
 		*x = attr.width;
 		*y = attr.height;
 		return 1;
@@ -4999,6 +5105,9 @@ static void client_gone(rfbClientPtr client) {
 
 	client_count--;
 	if (client_count < 0) client_count = 0;
+
+	speeds_net_rate_measured = 0;
+	speeds_net_latency_measured = 0;
 
 	rfbLog("client_count: %d\n", client_count);
 
@@ -6059,6 +6168,11 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	cd->login_viewonly = -1;
 
 	client->clientGoneHook = client_gone;
+
+	if (client_count) {
+		speeds_net_rate_measured = 0;
+		speeds_net_latency_measured = 0;
+	}
 	client_count++;
 
 	last_keyboard_input = last_pointer_input = time(0);
@@ -8348,6 +8462,58 @@ typedef struct keyevent {
 	rfbBool down;
 	double time;
 } keyevent_t;
+
+#define KEY_HIST 256
+int key_history_idx = -1;
+keyevent_t key_history[KEY_HIST];
+
+double typing_rate(double time_window, int *repeating) {
+	double dt = 1.0, now = dnow();
+	KeySym key = NoSymbol;
+	int i, idx, cnt = 0, diff_keys = 0;
+
+	if (key_history_idx == -1) {
+		if (repeating) {
+			*repeating = 0;
+		}
+		return 0.0;
+	}
+	if (time_window > 0.0) {
+		dt = time_window;
+	}
+	for (i=0; i<KEY_HIST; i++) {
+		idx = key_history_idx - i;
+		if (idx < 0) {
+			idx += KEY_HIST;
+		}
+		if (! key_history[idx].down) {
+			continue;
+		}
+		if (now > key_history[idx].time + dt) {
+			break;
+		}
+		cnt++;
+		if (key != NoSymbol && key != key_history[idx].sym) {
+			diff_keys++;
+		}
+		key = key_history[idx].sym;
+	}
+
+	if (repeating) {
+		if (! diff_keys && cnt > 4) {
+			*repeating = 1;
+		} else {
+			*repeating = 0;
+		}
+	}
+
+	/*
+	 * n.b. keyrate could seem very high with libvncserver buffering them
+	 * so avoid using small dt.
+	 */
+	return ((double) cnt)/dt;
+}
+
 /*
  * key event handler.  See the above functions for contortions for
  * running under -modtweak.
@@ -8356,7 +8522,7 @@ static rfbClientPtr last_keyboard_client = NULL;
 
 void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
-	int isbutton = 0;
+	int idx, isbutton = 0;
 	allowed_input_t input;
 	time_t now = time(0);
 	double dnow;
@@ -8387,6 +8553,22 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	last_down = down;
 	last_keysym = keysym;
 	last_keyboard_time = dnow;
+
+	if (key_history_idx == -1) {
+		for (idx=0; idx<KEY_HIST; idx++) {
+			key_history[idx].sym = NoSymbol;
+			key_history[idx].down = FALSE;
+			key_history[idx].time = 0.0;
+		}
+	}
+	idx = ++key_history_idx;
+	if (key_history_idx >= KEY_HIST) {
+		key_history_idx = 0;
+		idx = 0;
+	}
+	key_history[idx].sym = keysym;
+	key_history[idx].down = down;
+	key_history[idx].time = dnow;
 
 	if (0 && max_scroll_keyrate) {
 		/* XXX not working... */
@@ -8522,6 +8704,7 @@ if (0) fprintf(stderr, "key_dt: %.4f  %d %d %.4f\n", key_dt, history[idx].sym,
 			snapshot_stack_list(0, 0.25);
 			xrecord_watch(1, SCR_KEY);
 			xrecord_set_by_keys = 1;
+			xrecord_keysym = keysym;
 		} else {
 			if (debug_scroll) {
 				char *str = XKeysymToString(keysym);
@@ -8844,8 +9027,8 @@ void initialize_pointer_map(char *pointer_remap) {
  * to the X server.
  */
 void snapshot_stack_list(int free_only, double allowed_age) {
-	static double last_snap = 0.0, last_sync = 0.0, last_free = 0.0;
-	double now, xsync_max = 0.25; 
+	static double last_snap = 0.0, last_free = 0.0;
+	double now; 
 	int num, rc, i;
 	Window r, w;
 	Window *list;
@@ -8858,6 +9041,7 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 
 	dtime0(&now);
 	if (free_only) {
+		/* we really don't free it, just reset to zero windows */
 		stack_list_num = 0;
 		last_free = now;
 		return;
@@ -8871,17 +9055,13 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 	last_free = now;
 
 	X_LOCK;
-	if (0 && now > last_sync + xsync_max) {
-		XSync(dpy, False);
-		last_sync = now;
-	}
 	rc = XQueryTree(dpy, rootwin, &r, &w, &list, &num);
-	X_UNLOCK;
 
 	if (! rc) {
 		stack_list_num = 0;
 		last_free = now;
 		last_snap = 0.0;
+		X_UNLOCK;
 		return;
 	}
 
@@ -8900,7 +9080,6 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 	}
 	stack_list_num = num;
 
-	X_LOCK;
 	XFree(list);
 	X_UNLOCK;
 }
@@ -8948,6 +9127,7 @@ if (0) fprintf(stderr, "update_stack_list[%d]: %.4f  %.4f\n", stack_list_num, no
  * Send a pointer position event to the X server.
  */
 static void update_x11_pointer_position(int x, int y) {
+	int rc;
 
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
@@ -8972,7 +9152,8 @@ static void update_x11_pointer_position(int x, int y) {
 	cursor_position(x, y);
 
 	/* change the cursor shape if necessary */
-	set_cursor(x, y, get_which_cursor());
+	rc = set_cursor(x, y, get_which_cursor());
+	cursor_changes += rc;
 
 	last_event = last_input = last_pointer_input = time(0);
 }
@@ -9050,6 +9231,8 @@ static void update_x11_pointer_mask(int mask) {
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
 	if (scaling && ! got_scrollcopyrect) {
+		xr_mouse = 0;
+	} else if (nofb) {
 		xr_mouse = 0;
 	} else if (!strcmp(scroll_copyrect, "never")) {
 		xr_mouse = 0;
@@ -9802,6 +9985,7 @@ void initialize_xrandr(void) {
 #if LIBVNCSERVER_HAVE_LIBXRANDR
 		Rotation rot;
 
+		X_LOCK;
 		xrandr_width  = XDisplayWidth(dpy, scr);
 		xrandr_height = XDisplayHeight(dpy, scr);
 		XRRRotations(dpy, scr, &rot);
@@ -9811,6 +9995,7 @@ void initialize_xrandr(void) {
 		} else {
 			XRRSelectInput(dpy, rootwin, 0);
 		}
+		X_UNLOCK;
 #endif
 	} else if (xrandr) {
 		rfbLog("-xrandr mode specified, but no RANDR support on\n");
@@ -13198,6 +13383,23 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: changed -scr_keys to: %s\n",
 		    scroll_key_list_str);
 		initialize_scroll_keys();
+	} else if (strstr(p, "scr_term") == p) {
+		char *s = scroll_term_str;
+		if (!s || *s == '\0') s = scroll_term_str0;
+		COLON_CHECK("scr_term:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co, NONUL(s));
+			goto qry;
+		}
+		p += strlen("scr_term:");
+		if (scroll_term_str) {
+			free(scroll_term_str);
+		}
+
+		scroll_term_str = strdup(p);
+		rfbLog("remote_cmd: changed -scr_term to: %s\n",
+		    scroll_term_str);
+		initialize_scroll_term();
 
 	} else if (strstr(p, "scr_parms") == p) {
 		COLON_CHECK("scr_parms:")
@@ -13404,6 +13606,35 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		/* XXX not part of API? */
 		screen->deferUpdateTime = d;
 		
+	} else if (strstr(p, "wait_ui") == p) {
+		double w;
+		COLON_CHECK("wait_ui:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%.2f", p, co, wait_ui);
+			goto qry;
+		}
+		p += strlen("wait_ui:");
+		w = atof(p);
+		if (w <= 0) w = 1.0;
+		rfbLog("remote_cmd: setting wait_ui factor %.2f -> %.2f\n",
+		    wait_ui, w);
+		wait_ui = w;
+
+	} else if (!strcmp(p, "wait_bog")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, wait_bog);
+			goto qry;
+		}
+		wait_bog = 1;
+		rfbLog("remote_cmd: setting wait_bog to %d\n", wait_bog);
+	} else if (!strcmp(p, "nowait_bog")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, !wait_bog);
+			goto qry;
+		}
+		wait_bog = 0;
+		rfbLog("remote_cmd: setting wait_bog to %d\n", wait_bog);
+
 	} else if (strstr(p, "wait") == p) {
 		int w;
 		COLON_CHECK("wait:")
@@ -14253,6 +14484,7 @@ void clear_xdamage_mark_region(sraRegionPtr markregion, int flush) {
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	XEvent ev;
 	sraRegionPtr tmpregion;
+	int count = 0;
 
 	if (! xdamage_present || ! use_xdamage) {
 		return;
@@ -14269,11 +14501,15 @@ void clear_xdamage_mark_region(sraRegionPtr markregion, int flush) {
 		XFlush(dpy);
 	}
 	while (XCheckTypedEvent(dpy, xdamage_base_event_type+XDamageNotify, &ev)) {
-		;
+		count++;
 	}
 	/* clear the whole damage region */
 	XDamageSubtract(dpy, xdamage, None, None);
 	X_UNLOCK;
+
+	if (debug_tiles || debug_xdamage) {
+		fprintf(stderr, "clear_xdamage_mark_region: %d\n", count);
+	}
 
 	if (! markregion) {
 		/* NULL means mark the whole display */
@@ -14298,7 +14534,7 @@ int collect_xdamage(int scancnt, int call) {
 	time_t now;
 	int x, y, w, h, x2, y2;
 	int i, dup, next, dup_max = 0;
-#define DUPSZ 16
+#define DUPSZ 32
 	int dup_x[DUPSZ], dup_y[DUPSZ], dup_w[DUPSZ], dup_h[DUPSZ];
 	double tm, dt;
 
@@ -14397,12 +14633,12 @@ if (0)	XEventsQueued(dpy, QueuedAfterFlush);
 
 			x2 = x + w;		/* upper point */
 			x  = nfix(x,  dpy_x);	/* place both in fb area */
-			x2 = nfix(x2, dpy_x);
+			x2 = nfix(x2, dpy_x+1);
 			w = x2 - x;		/* recompute w */
 			
 			y2 = y + h;
 			y  = nfix(y,  dpy_y);
-			y2 = nfix(y2, dpy_y);
+			y2 = nfix(y2, dpy_y+1);
 			h = y2 - y;
 
 			if (w <= 0 || h <= 0) {
@@ -14479,6 +14715,7 @@ int xdamage_hint_skip(int y) {
 	}
 
 	if (! scanline) {
+		/* keep it around to avoid malloc etc, recreate */
 		scanline = sraRgnCreate();
 	}
 
@@ -14588,6 +14825,18 @@ void check_xdamage_state(void) {
 	 */
 	if (client_count && use_xdamage) {
 		create_xdamage_if_needed();
+		if (xdamage_scheduled_mark > 0.0 && dnow() >
+		    xdamage_scheduled_mark) {
+			if (xdamage_scheduled_mark_region) {
+				mark_region_for_xdamage(
+				    xdamage_scheduled_mark_region);
+				sraRgnDestroy(xdamage_scheduled_mark_region);
+				xdamage_scheduled_mark_region = NULL;
+			} else {
+				mark_for_xdamage(0, 0, dpy_x, dpy_y);
+			}
+			xdamage_scheduled_mark = 0.0;
+		}
 	} else {
 		destroy_xdamage_if_needed();
 	}
@@ -15388,6 +15637,7 @@ void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 		if ( XTestCompareCurrentCursorWithWindow_wr(dpy, c) ) {
 			break;
 		}
+		/* TBD: query_pointer() */
 		XQueryPointer(dpy, c, &r, &c, &rx, &ry, &wx, &wy, &mask);
 	}
 
@@ -15451,12 +15701,14 @@ void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 void initialize_xfixes(void) {
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 	if (xfixes_present) {
+		X_LOCK;
 		if (use_xfixes) {
 			XFixesSelectCursorInput(dpy, rootwin,
 				XFixesDisplayCursorNotifyMask);
 		} else {
 			XFixesSelectCursorInput(dpy, rootwin, 0);
 		}
+		X_UNLOCK;
 	}
 #endif
 }
@@ -16194,29 +16446,34 @@ void set_no_cursor(void) {
 	set_rfb_cursor(CURS_EMPTY);
 }
 
-void set_cursor(int x, int y, int which) {
+int set_cursor(int x, int y, int which) {
 	static int last = -1;
+	int changed_cursor = 0;
+
 	if (which < 0) {
 		which = last;	
 	}
 	if (last < 0 || which != last) {
 		set_rfb_cursor(which);
+		changed_cursor = 1;
 	}
 	last = which;
+
+	return changed_cursor;
 }
 
 /*
  * routine called periodically to update cursor aspects, this catches
  * warps and cursor shape changes. 
  */
-void check_x11_pointer(void) {
+int check_x11_pointer(void) {
 	Window root_w, child_w;
 	rfbBool ret;
 	int root_x, root_y, win_x, win_y;
 	int x, y;
 	unsigned int mask;
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
 
 	X_LOCK;
 	ret = XQueryPointer(dpy, rootwin, &root_w, &child_w, &root_x, &root_y,
@@ -16224,7 +16481,7 @@ void check_x11_pointer(void) {
 	X_UNLOCK;
 
 	if (! ret) {
-		return;
+		return 0;
 	}
 	if (debug_pointer) {
 		static int last_x = -1, last_y = -1;
@@ -16244,7 +16501,7 @@ void check_x11_pointer(void) {
 	cursor_position(x, y);
 
 	/* change the cursor shape if necessary */
-	set_cursor(x, y, get_which_cursor());
+	return set_cursor(x, y, get_which_cursor());
 }
 
 /* -- screen.c -- */
@@ -16313,14 +16570,12 @@ void set_colormap(int reset) {
 
 	if (flash_cmap && ! first) {
 		XWindowAttributes attr;
-		Window r, c;
-		int rx, ry, wx, wy, tries = 0;
-		unsigned int m;
+		Window c;
+		int tries = 0;
 
 		c = window;
 		while (c && tries++ < 16) {
-			/* XXX XQueryTree somehow? */
-			XQueryPointer(dpy, c, &r, &c, &rx, &ry, &wx, &wy, &m);
+			c = query_pointer(c);
 			if (valid_window(c, &attr, 0)) {
 				if (attr.colormap && attr.map_installed) {
 					cmap = attr.colormap;
@@ -16524,6 +16779,8 @@ void set_visual(char *str) {
 void set_nofb_params(void) {
 	use_xfixes = 0;
 	use_xdamage = 0;
+	use_xrecord = 0;
+	wireframe = 0;
 
 	use_solid_bg = 0;
 	overlay = 0;
@@ -16544,6 +16801,7 @@ void set_nofb_params(void) {
 
 	if (! quiet) {
 		rfbLog("disabling: xfixes, xdamage, solid, overlay, shm,\n");
+		rfbLog("  wireframe, scrollcopyrect,\n");
 		rfbLog("  noonetile, nap, cursor, %scursorshape\n",
 		    got_cursorpos ? "" : "cursorpos, " );
 		rfbLog("  in -nofb mode.\n");
@@ -16979,6 +17237,7 @@ XImage *initialize_raw_fb(void) {
 
 	if (sscanf(str, "shm:%d", &shmid) == 1) {
 		/* shm:N */
+#if LIBVNCSERVER_HAVE_XSHM
 		raw_fb_addr = (char *) shmat(shmid, 0, SHM_RDONLY);
 		if (! raw_fb_addr) {
 			rfbLog("failed to attach to shm: %d, %s\n", shmid, str);
@@ -16988,7 +17247,11 @@ XImage *initialize_raw_fb(void) {
 		raw_fb_shm = 1;
 		rfbLog("rawfb: shm: %d W: %d H: %d B: %d addr: %p\n",
 		    shmid, w, h, b, raw_fb_addr);
-
+#else
+		rfbLog("x11vnc was compiled without shm support.\n");
+		rfbLogPerror("shmat");
+		clean_up_exit(1);
+#endif
 	} else if (strstr(str, "map:") == str || strstr(str, "mmap:") == str
 	    || strstr(str, "file:") == str) {
 		/* map:/path/... or file:/path  */
@@ -18666,8 +18929,8 @@ void initialize_blackouts(char *list) {
 		y = nfix(y, dpy_y);
 		X = x + w;
 		Y = y + h;
-		X = nfix(X, dpy_x);
-		Y = nfix(Y, dpy_y);
+		X = nfix(X, dpy_x+1);
+		Y = nfix(Y, dpy_y+1);
 		if (x > X) {
 			t = X; X = x; x = t;
 		}
@@ -20447,10 +20710,15 @@ static int copy_tiles(int tx, int ty, int nt) {
 		if (nt == 1) {
 			/*
 			 * optimization for tall skinny lines, e.g. wm
-			 * frame. try to find first_x and last_x
-			 * we like to think the above memcpy leaves the
-			 * data we use below in the cache... (but it
-			 * could be two 128 byte segments at 32bpp)
+			 * frame. try to find first_x and last_x to limit
+			 * the size of the hint.  could help for a slow
+			 * link.  Unfortunately we spent a lot of time
+			 * reading in the many tiles.
+			 *
+			 * BTW, we like to think the above memcpy leaves
+			 * the data we use below in the cache... (but
+			 * it could be two 128 byte segments at 32bpp)
+			 * so this inner loop is not as bad as it seems.
 			 */
 			int k, kx;
 			kx = pixelsize;
@@ -20612,6 +20880,10 @@ static int copy_all_tile_runs(void) {
 				}
 			}
 		}
+		/*
+		 * Could some activity go here, to emulate threaded
+		 * behavior by servicing some libvncserver tasks?
+		 */
 	}
 	return diffs;
 }
@@ -21314,6 +21586,7 @@ int scan_for_updates(int count_only) {
 			set_colormap(0);
 		}
 		if (use_xdamage) {
+			/* first pass collecting DAMAGE events: */
 			collect_xdamage(scan_count, 0);
 		}
 	}
@@ -21333,7 +21606,9 @@ int scan_for_updates(int count_only) {
 	/*
 	 * we do the XDAMAGE here too since after scan_display()
 	 * there is a better chance we have received the events from
-	 * the server.
+	 * the X server (otherwise the DAMAGE events will be processed
+	 * in the *next* call, usually too late and wasteful since
+	 * the unchanged tiles are read in again).
 	 */
 	if (use_xdamage) {
 		collect_xdamage(scan_count, 1);
@@ -21869,24 +22144,23 @@ Window descend_pointer(int depth, Window start, char *name_info, int len) {
 		clast = c;
 		if (store && ! filled) {
 			char *name;
-			if (XFetchName(dpy, clast, &name)) {
+			if (XFetchName(dpy, clast, &name) && name != NULL) {
 				int l = strlen(name);
 				if (written + l+2 < len) {
 					strcat(store, "^^");
 					written += 2;
 					strcat(store, name);
 					written += l;
-					XFree(name);
 				} else {
 					filled = 1;
 				}
+				XFree(name);
 			}
 		}
 		if (store && classhint && ! filled) {
 			classhint->res_name = NULL;
 			classhint->res_class = NULL;
 			if (XGetClassHint(dpy, clast, classhint)) {
-				char *p;
 				int l = 0;
 				if (classhint->res_class) {
 					l += strlen(classhint->res_class); 
@@ -21896,20 +22170,24 @@ Window descend_pointer(int depth, Window start, char *name_info, int len) {
 				}
 				if (written + l+4 < len) {
 					strcat(store, "##");
-					p = classhint->res_class;	
-					if (p) {
-						strcat(store, p);
-						XFree(p);
+					if (classhint->res_class) {
+						strcat(store,
+						    classhint->res_class);
 					}
 					strcat(store, "++");
-					p = classhint->res_name;	
-					if (p) {
-						strcat(store, p);
-						XFree(p);
+					if (classhint->res_name) {
+						strcat(store,
+						    classhint->res_name);
 					}
 					written += l+4;
 				} else {
 					filled = 1;
+				}
+				if (classhint->res_class) {
+					XFree(classhint->res_class);
+				}
+				if (classhint->res_name) {
+					XFree(classhint->res_name);
 				}
 			}
 		}
@@ -22489,6 +22767,31 @@ void initialize_scroll_matches(void) {
 	}
 }
 
+void initialize_scroll_term(void) {
+	char *str;
+	int n;
+
+	destroy_str_list(scroll_term);
+	scroll_term = NULL;
+
+	if (scroll_term_str != NULL && *scroll_term_str != '\0') {
+		str = scroll_term_str;
+	} else {
+		str = scroll_term_str0;
+	}
+	if (!strcmp(str, "none")) {
+		return;
+	}
+	scroll_term = create_str_list(str);
+
+	n = 0;
+	while (scroll_term[n] != NULL) {
+		char *s = scroll_good_all[n++];
+		/* pull parameters out at some point */
+		s = NULL;
+	}
+}
+
 typedef struct saveline {
 	int x0, y0, x1, y1;
 	int shift;
@@ -22758,8 +23061,8 @@ if (db) dtime0(&tm);
 
 	x1 = nfix(x1, dpy_x);
 	y1 = nfix(y1, dpy_y);
-	x2 = nfix(x2, dpy_x);
-	y2 = nfix(y2, dpy_y);
+	x2 = nfix(x2, dpy_x+1);
+	y2 = nfix(y2, dpy_y+1);
 
 	if (x1 == x2) {
 		return 1;
@@ -22875,7 +23178,6 @@ int do_bdpush(Window wm_win, int x0, int y0, int w0, int h0, int bdx,
 	int do_fb_push = 0;
 	int db = debug_scroll;
 
-
 	if (wm_win == last_wm_win) {
 		attr.x = last_x;
 		attr.y = last_y;
@@ -22959,6 +23261,119 @@ if (db > 1) fprintf(stderr, "  BDP(%d,%d-%d,%d)  dt: %.4f\n", tx1, ty1, tx2, ty2
 	return do_fb_push;
 }
 
+int set_ypad(void) {
+	int ev, ev_tot = scr_ev_cnt;
+	static Window last_win = None;
+	static double last_time = 0.0;
+	static int y_accum = 0, last_sign = 0;
+	double now, cut = 0.1;
+	int dy_sum = 0, ys = 0, sign;
+	int font_size = 15;
+	int win_y, scr_y, loc_cut = 4*font_size, y_cut = 10*font_size;
+	
+	if (!xrecord_set_by_keys || !xrecord_name_info) {
+		return 0;
+	}
+	if (xrecord_name_info[0] == '\0') {
+		return 0;
+	}
+	if (! ev_tot) {
+		return 0;
+	}
+	if (xrecord_keysym == NoSymbol)  {
+		return 0;
+	}
+	if (!xrecord_scroll_keysym(xrecord_keysym)) {
+		return 0;
+	}
+	if (!scroll_term) {
+		return 0;
+	}
+	if (!match_str_list(xrecord_name_info, scroll_term)) {
+		return 0;
+	}
+
+	for (ev=0; ev < ev_tot; ev++) {
+		dy_sum += nabs(scr_ev[ev].dy);
+		if (scr_ev[ev].dy < 0) {
+			ys--;
+		} else if (scr_ev[ev].dy > 0) {
+			ys++;
+		} else {
+			ys = 0;
+			break;
+		}
+		if (scr_ev[ev].win != scr_ev[0].win) {
+			ys = 0;
+			break;
+		}
+		if (scr_ev[ev].dx != 0) {
+			ys = 0;
+			break;
+		}
+	}
+	if (ys != ev_tot && ys != -ev_tot) {
+		return 0;
+	}
+	if (ys < 0) {
+		sign = -1;
+	} else {
+		sign = 1;
+	}
+
+	if (sign > 0) {
+		/*
+		 * this case is not as useful as scrolling near the
+		 * bottom of a terminal.  But there are problems for it too.
+		 */
+		return 0;
+	}
+
+	win_y = scr_ev[0].win_y + scr_ev[0].win_h;
+	scr_y = scr_ev[0].y + scr_ev[0].h;
+	if (nabs(scr_y - win_y) > loc_cut) {
+		/* require it to be near the bottom. */
+		return 0;
+	}
+
+	now = dnow();
+
+	if (now < last_time + cut) {
+		int ok = 1;
+		if (last_win && scr_ev[0].win != last_win) {
+			ok = 0;
+		}
+		if (last_sign && sign != last_sign) {
+			ok = 0;
+		}
+		if (! ok) {
+			last_win = None;
+			last_sign = 0;
+			y_accum = 0;
+			last_time = 0.0;
+			return 0;
+		}
+	} else {
+		last_win = None;
+		last_sign = 0;
+		last_time = 0.0;
+		y_accum = 0;
+	}
+
+	y_accum += sign * dy_sum;
+
+	if (4 * nabs(y_accum) > scr_ev[0].h && y_cut) {
+		;	/* TBD */
+	}
+
+	last_sign = sign;
+	last_win = scr_ev[0].win;
+	last_time = now;
+
+	return y_accum;
+}
+
+
 #define PUSH_TEST(n)  \
 if (n) { \
 	double dt = 0.0, tm; dtime0(&tm); \
@@ -22979,6 +23394,7 @@ int push_scr_ev(double max_age, int type, int bdpush, int bdx, int bdy,
 	int db = debug_scroll, rrate = get_read_rate();
 	sraRegionPtr backfill, whole, tmpregion, tmpregion2;
 	int link, latency, netrate;
+	int ypad = 0;
 
 	if (ev_tot == 0) {
 		return dret;
@@ -23004,6 +23420,10 @@ int push_scr_ev(double max_age, int type, int bdpush, int bdx, int bdy,
 	y0 = scr_ev[0].win_y;
 	w0 = scr_ev[0].win_w;
 	h0 = scr_ev[0].win_h;
+
+	ypad = set_ypad();
+
+if (db) fprintf(stderr, "ypad: %d  dy[0]: %d\n", ypad, scr_ev[0].dy);
 
 	for (ev=0; ev < ev_tot; ev++) {
 	
@@ -23069,13 +23489,9 @@ if (db > 1) fprintf(stderr, "------------ got: %d x: %4d y: %3d"
 			frame = xrecord_wm_window;
 		}
 		if (! frame) {
-			Window r;
-			int rx, ry, wx, wy;
-			unsigned int m;
-			if (! XQueryPointer(dpy, rootwin, &r, &frame,
-			    &rx, &ry, &wx, &wy, &m)) {
-				frame = None;    	
-			}
+			X_LOCK;
+			frame = query_pointer(rootwin);
+			X_UNLOCK;
 		}
 		if (! frame) {
 			frame = win;
@@ -23121,6 +23537,21 @@ if (db > 1) fprintf(stderr, "------------ got: %d x: %4d y: %3d"
 		 * ignore for now... probably will make some apps
 		 * act very strangely.
 		 */
+if (ypad) {
+	if (ypad < 0) {
+		if (h > -ypad) {
+			h += ypad;
+		} else {
+			ypad = 0;
+		}
+	} else {
+		if (h > ypad) {
+			y += ypad;
+		} else {
+			ypad = 0;
+		}
+	}
+}
 		
 		if (try_copyrect(frame, x, y, w, h, dx, dy, &obscured,
 		    tmpregion, waittime)) {
@@ -23145,6 +23576,15 @@ if (0) fprintf(stderr, "  try_copyrect dt: %.4f\n", dt);
 			sraRgnOffset(backfill, dx, dy);
 			sraRgnAnd(backfill, whole);
 		}
+
+if (ypad) {
+	if (ypad < 0) {
+		ny += ypad;	
+		nh -= ypad;
+	} else {
+		;
+	}
+}
 
 		tmpregion = sraRgnCreateRect(nx, ny, nx + nw, ny + nh);
 		sraRgnAnd(tmpregion, whole);
@@ -23208,8 +23648,8 @@ if (db) fprintf(stderr, "  EST_TOO_LARGE");
 				ty2 = rect.y2;
 				tx1 = nfix(tx1, dpy_x);
 				ty1 = nfix(ty1, dpy_y);
-				tx2 = nfix(tx2, dpy_x);
-				ty2 = nfix(ty2, dpy_y);
+				tx2 = nfix(tx2, dpy_x+1);
+				ty2 = nfix(ty2, dpy_y+1);
 
 				dtime(&tm);
 if (db) fprintf(stderr, "  DFC(%d,%d-%d,%d)", tx1, ty1, tx2, ty2);
@@ -23217,8 +23657,8 @@ if (db) fprintf(stderr, "  DFC(%d,%d-%d,%d)", tx1, ty1, tx2, ty2);
 				do_fb_push++;
 PUSH_TEST(0);
 			}
-			dt = dtime(&tm);
 			sraRgnReleaseIterator(iter);
+			dt = dtime(&tm);
 if (0) fprintf(stderr, "  dfc---- dt: %.4f", dt);
 
 		}
@@ -23341,17 +23781,28 @@ if (debug_scroll > 1) fprintf(stderr, ">>>-rfbDoCopyRect req: %d mod: %d cpy: %d
 	sraRgnReleaseIterator(iter);
 }
 
-void fb_push_wait(double max_wait) {
+void fb_push_wait(double max_wait, int flags) {
 	double tm, dt = 0.0;
 	int req, mod, cpy, ncli;
 
 	dtime0(&tm);	
 	while (dt < max_wait) {
+		int done = 1;
 		rfbCFD(0);
 		get_client_regions(&req, &mod, &cpy, &ncli);
-		if (! cpy) {
+		if (flags & FB_COPY && cpy) {
+			done = 0;
+		}
+		if (flags & FB_MOD && mod) {
+			done = 0;
+		}
+		if (flags & FB_REQ && req) {
+			done = 0;
+		}
+		if (done) {
 			break;
 		}
+
 		usleep(1000);
 		fb_push();
 		dt += dtime(&tm);
@@ -23516,12 +23967,43 @@ void mark_for_xdamage(int x, int y, int w, int h) {
 
 	tx1 = nfix(x, dpy_x);
 	ty1 = nfix(y, dpy_y);
-	tx2 = nfix(x + w, dpy_x);
-	ty2 = nfix(y + h, dpy_y);
+	tx2 = nfix(x + w, dpy_x+1);
+	ty2 = nfix(y + h, dpy_y+1);
 
 	tmpregion = sraRgnCreateRect(tx1, ty1, tx2, ty2);
 	add_region_xdamage(tmpregion);
 	sraRgnDestroy(tmpregion);
+}
+
+void mark_region_for_xdamage(sraRegionPtr region) {
+	sraRectangleIterator *iter;
+	sraRect rect;
+	iter = sraRgnGetIterator(region);
+	while (sraRgnIteratorNext(iter, &rect)) {
+		int x1 = rect.x1;
+		int y1 = rect.y1;
+		int x2 = rect.x2;
+		int y2 = rect.y2;
+		mark_for_xdamage(x1, y1, x2 - x1, y2 - y1);
+	}
+	sraRgnReleaseIterator(iter);
+}
+
+void set_xdamage_mark(int x, int y, int w, int h) {
+	sraRegionPtr region;
+
+	mark_for_xdamage(x, y, w, h);
+
+	if (xdamage_scheduled_mark == 0.0) {
+		xdamage_scheduled_mark = dnow() + 2.0;
+	}
+
+	if (xdamage_scheduled_mark_region == NULL) {
+		xdamage_scheduled_mark_region = sraRgnCreate();
+	}
+	region = sraRgnCreateRect(x, y, x + w, y + w);
+	sraRgnOr(xdamage_scheduled_mark_region, region);
+	sraRgnDestroy(region);
 }
 
 int check_xrecord_keys(void) {
@@ -23621,7 +24103,9 @@ if (db) fprintf(stderr, "check_xrecord: more keys: %.3f\n", spin);
 			flush2 = 1;
 			XFlush(dpy);
 		}
+		SCR_LOCK;
 		XRecordProcessReplies(rdpy_data);
+		SCR_UNLOCK;
 		X_UNLOCK;
 
 		if (spin >= max_spin * spin_fac) {
@@ -23659,7 +24143,7 @@ if (db) fprintf(stderr, "check_xrecord: SPIN-OUT: %.3f/%.3f\n", spin,
 	}
 
 	if ((got_one && ret < 2) || persist_count) {
-		mark_for_xdamage(last_wx, last_wy, last_ww, last_wh);
+		set_xdamage_mark(last_wx, last_wy, last_ww, last_wh);
 	}
 
 	if (fail) {
@@ -23879,7 +24363,9 @@ if (db) fprintf(stderr, "check_xrecord: BUTTON_UP_SCROLL: %.3f\n", spin);
 			input++;
 		}
 		X_LOCK;
+		SCR_LOCK;
 		XRecordProcessReplies(rdpy_data);
+		SCR_UNLOCK;
 		X_UNLOCK;
 
 		if (! input) {
@@ -23941,12 +24427,12 @@ if (db) fprintf(stderr, "check_xrecord: BUTTON-UP-KEEP-GOING:  %.3f/%.3f %d/%d %
 		last_y = cursor_y;
 	}
 
-	if (fail) {
-		scrollability(xrecord_ptr_window, SCR_FAIL);
+	if (got_one) {
+		set_xdamage_mark(last_wx, last_wy, last_ww, last_wh);
 	}
 
-	if (got_one) {
-		mark_for_xdamage(last_wx, last_wy, last_ww, last_wh);
+	if (fail) {
+		scrollability(xrecord_ptr_window, SCR_FAIL);
 	}
 
 	/* flush any remaining pointer events. */
@@ -24099,7 +24585,7 @@ int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy,
 	get_client_regions(&req, &mod, &cpy, &ncli);
 	if (cpy) {
 		/* one is still pending... try to force it out: */
-		fb_push_wait(max_wait);
+		fb_push_wait(max_wait, FB_COPY);
 
 		get_client_regions(&req, &mod, &cpy, &ncli);
 	}
@@ -24131,8 +24617,8 @@ int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy,
 		/* send the whole thing... */
 		x1 = crfix(nfix(x,   dpy_x), dx, dpy_x);
 		y1 = crfix(nfix(y,   dpy_y), dy, dpy_y);
-		x2 = crfix(nfix(x+w, dpy_x), dx, dpy_x);
-		y2 = crfix(nfix(y+h, dpy_y), dy, dpy_y);
+		x2 = crfix(nfix(x+w, dpy_x+1), dx, dpy_x+1);
+		y2 = crfix(nfix(y+h, dpy_y+1), dy, dpy_y+1);
 
 		rect = sraRgnCreateRect(x1, y1, x2, y2);
 		do_copyregion(rect, dx, dy);
@@ -24155,8 +24641,8 @@ int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy,
 
 		tx1 = nfix(orig_x,   dpy_x);
 		ty1 = nfix(orig_y,   dpy_y);
-		tx2 = nfix(orig_x+w, dpy_x);
-		ty2 = nfix(orig_y+h, dpy_y);
+		tx2 = nfix(orig_x+w, dpy_x+1);
+		ty2 = nfix(orig_y+h, dpy_y+1);
 
 if (db2) fprintf(stderr, "moved_win: %4d %3d, %4d %3d  0x%lx ---\n",
 	tx1, ty1, tx2, ty2, frame);
@@ -24234,8 +24720,8 @@ saw_me = 1; fprintf(stderr, "  ----------\n");
 			/* clip the window to the visible screen: */
 			tx1 = nfix(attr.x, dpy_x);
 			ty1 = nfix(attr.y, dpy_y);
-			tx2 = nfix(attr.x + attr.width,  dpy_x);
-			ty2 = nfix(attr.y + attr.height, dpy_y);
+			tx2 = nfix(attr.x + attr.width,  dpy_x+1);
+			ty2 = nfix(attr.y + attr.height, dpy_y+1);
 
 if (db2) fprintf(stderr, "  tmp_win-1: %4d %3d, %4d %3d  0x%lx\n",
 	tx1, ty1, tx2, ty2, swin);
@@ -24262,8 +24748,8 @@ if (db2) fprintf(stderr, "         : clips it.\n");
 			/* clip the window to the visible screen: */
 			tx1 = nfix(attr.x - dx, dpy_x);
 			ty1 = nfix(attr.y - dy, dpy_y);
-			tx2 = nfix(attr.x - dx + attr.width,  dpy_x);
-			ty2 = nfix(attr.y - dy + attr.height, dpy_y);
+			tx2 = nfix(attr.x - dx + attr.width,  dpy_x+1);
+			ty2 = nfix(attr.y - dy + attr.height, dpy_y+1);
 
 if (db2) fprintf(stderr, "  tmp_win-2: %4d %3d, %4d %3d  0x%lx\n",
 	tx1, ty1, tx2, ty2, swin);
@@ -24457,6 +24943,9 @@ int check_wireframe(void) {
 	int near_edge;
 	DB_SET
 
+	if (nofb) {
+		return 0;
+	}
 	if (subwin) {
 		return 0;	/* don't even bother for -id case */
 	}
@@ -24843,7 +25332,7 @@ if (db || db2) fprintf(stderr, "NO button_mask\n");
 		}
 
 		/* try to flush the wireframe removal: */
-		fb_push_wait(0.1);
+		fb_push_wait(0.1, FB_COPY|FB_MOD);
 
 		/* try to send a clipped copyrect of translation: */
 		sent_copyrect = try_copyrect(frame, x, y, w, h, dx, dy,
@@ -24853,9 +25342,9 @@ if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
 		if (sent_copyrect) {
 			/* try to push the changes to viewers: */
 			if (! obscured) {
-				fb_push_wait(0.1);
+				fb_push_wait(0.1, FB_COPY);
 			} else {
-				fb_push_wait(0.1);
+				fb_push_wait(0.1, FB_COPY);
 			}
 		}
 	}
@@ -24880,6 +25369,7 @@ if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
 	if (use_xdamage) {
 		/* DAMAGE can queue ~1000 rectangles for a move */
 		clear_xdamage_mark_region(NULL, 1);
+		xdamage_scheduled_mark = dnow() + 2.0;
 	}
 
 	return 1;
@@ -25516,12 +26006,21 @@ int get_rate(int which) {
 	rfbClientPtr cl;
 	int irate, irate_min = 1;	/* 1 KB/sec */
 	int irate_max = 100000;		/* 100 MB/sec */
+	int count = 0;
 	double slowest = -1.0, rate;
 	static double save_rate = 1000 * NETRATE0;
 	
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
+
+		if (cl->state != RFB_NORMAL) {
+			continue;
+		}
+		if (cd->send_cmp_rate == 0.0 || cd->send_raw_rate == 0.0) {
+			continue;
+		}
+		count++;
 		
 		if (which == 0) {
 			rate = cd->send_cmp_rate;
@@ -25534,6 +26033,10 @@ int get_rate(int which) {
 		
 	}
 	rfbReleaseClientIterator(iter);
+
+	if (! count) {
+		return NETRATE0;
+	}
 
 	if (slowest == -1.0) {
 		slowest = save_rate;
@@ -25548,6 +26051,7 @@ int get_rate(int which) {
 	if (irate > irate_max) {
 		irate = irate_max;
 	}
+if (0) fprintf(stderr, "get_rate(%d) %d %.3f/%.3f\n", which, irate, save_rate, slowest); 
 
 	return irate;
 }
@@ -25559,17 +26063,30 @@ int get_latency(void) {
 	int ilat_max = 2000;	/* 2 sec */
 	double slowest = -1.0, lat;
 	static double save_lat = ((double) LATENCY0)/1000.0;
+	int count = 0;
 	
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
 		
+		if (cl->state != RFB_NORMAL) {
+			continue;
+		}
+		if (cd->latency == 0.0) {
+			continue;
+		}
+		count++;
+
 		lat = cd->latency;
 		if (slowest == -1.0 || lat > slowest) {
 			slowest = lat;
 		}
 	}
 	rfbReleaseClientIterator(iter);
+
+	if (! count) {
+		return LATENCY0;
+	}
 
 	if (slowest == -1.0) {
 		slowest = save_lat;
@@ -26030,6 +26547,47 @@ if (db) fprintf(stderr, "dt3 calc: num rects req: %d/%d mod: %d/%d  "
 	}
 }
 
+void check_cursor_changes(void) {
+	static double last_push = 0.0;
+
+	cursor_changes += check_x11_pointer();
+
+	if (cursor_changes) {
+		double tm, max_push = 0.125, multi_push = 0.01, wait = 0.02;
+		int cursor_shape, dopush = 0, link, latency, netrate;
+		cursor_shape = cursor_shape_updates_clients(screen);
+	
+		dtime0(&tm);
+		link = link_rate(&latency, &netrate);
+		if (link == LR_DIALUP) {
+			max_push = 0.2;
+			wait = 0.05;
+		} else if (link == LR_BROADBAND) {
+			max_push = 0.075;
+			wait = 0.05;
+		} else if (link == LR_LAN) {
+			max_push = 0.01;
+		} else if (latency < 5 && netrate > 200) {
+			max_push = 0.01;
+		}
+		
+		if (tm > last_push + max_push) {
+			dopush = 1;
+		} else if (cursor_changes > 1 && tm > last_push + multi_push) {
+			dopush = 1;
+		}
+
+		if (dopush) { 
+			mark_rect_as_modified(0, 0, 1, 1, 1);
+			fb_push_wait(wait, FB_MOD);
+			last_push = tm;
+		} else {
+			rfbPE(0);
+		}
+	}
+	cursor_changes = 0;
+}
+
 /*
  * utility wrapper to call rfbProcessEvents
  * checks that we are not in threaded mode.
@@ -26060,17 +26618,103 @@ void rfbCFD(long usec) {
 	}
 }
 
-int choose_delay(void) {
-	static double t0 = 0.0, t1 = 0.0, t2 = 0.0; 
-	static int x0, y0, x1, y1, x2, y2;
-	int dx0, dy0, dx1, dy1, dm, ms = waitms;
-	double cut1 = 0.2, cut2 = 0.1, cut3 = 0.25;
-	int fac = 1;
+int choose_delay(double dt) {
+	static double t0 = 0.0, t1 = 0.0, t2 = 0.0, now; 
+	static int x0, y0, x1, y1, x2, y2, first = 1;
+	int dx0, dy0, dx1, dy1, dm, i, msec = waitms;
+	double cut1 = 0.15, cut2 = 0.075, cut3 = 0.25;
+	double bogdown_time = 0.25, bave = 0.0;
+	int bogdown = 1, bcnt = 0;
+	int ndt = 8, nave = 3;
+	double fac = 1.0;
+	int db = 0;
+	static double dts[8];
 
 	if (waitms == 0) {
 		return waitms;
 	}
+	if (nofb) {
+		return waitms;
+	}
 
+	if (first) {
+		for(i=0; i<ndt; i++) {
+			dts[i] = 0.0;
+		}
+		first = 0;
+	}
+
+	now = dnow();
+
+	/*
+	 * first check for bogdown, e.g. lots of activity, scrolling text
+	 * from command output, etc.
+	 */
+	if (nap_ok) {
+		dt = 0.0;
+	}
+	if (! wait_bog) {
+		bogdown = 0;
+
+	} else if (button_mask || now < last_keyboard_time + 2*bogdown_time) {
+		/*
+		 * let scrolls & keyboard input through the normal way
+		 * otherwise, it will likely just annoy them.
+		 */
+		bogdown = 0;
+
+	} else if (dt > 0.0) {
+		/*
+		 * inspect recent dt's:
+		 * 0 1 2 3 4 5 6 7 dt
+		 *             ^ ^ ^
+		 */
+		for (i = ndt - (nave - 1); i < ndt; i++) {
+			bave += dts[i];
+			bcnt++;
+			if (dts[i] < bogdown_time) {
+				bogdown = 0;
+				break;
+			}
+		}
+		bave += dt;
+		bcnt++;
+		bave = bave / bcnt;
+		if (dt < bogdown_time) {
+			bogdown = 0;
+		}
+	} else {
+		bogdown = 0;
+	}
+	/* shift for next time */
+	for (i = 0; i < ndt-1; i++) {
+		dts[i] = dts[i+1];
+	}
+	dts[ndt-1] = dt;
+
+if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnow() - x11vnc_start);
+	if (bogdown) {
+		if (use_xdamage) {
+			/* DAMAGE can queue ~1000 rectangles for a scroll */
+			clear_xdamage_mark_region(NULL, 0);
+		}
+		msec = (int) (1000 * 1.75 * bave);
+		if (dts[ndt - nave - 1] > 0.75 * bave) {
+			msec = 1.5 * msec;
+		}
+		if (msec > 1500) {
+			msec = 1500;
+		}
+		if (msec < waitms) {
+			msec = waitms;
+		}
+		db = (db || debug_tiles);
+		if (db) fprintf(stderr, "bogg[%d] %.3f %.3f %.3f %.3f\n",
+		    msec, dts[ndt-4], dts[ndt-3], dts[ndt-2], dts[ndt-1]);
+		return msec;
+	}
+
+	/* next check for pointer motion, keystrokes, to speed up */
 	t2 = dnow();
 	x2 = cursor_x;
 	y2 = cursor_y;
@@ -26087,18 +26731,18 @@ int choose_delay(void) {
 
 	if ((dx0 || dy0) && (dx1 || dy1)) {
 		if (t2 < t0 + cut1 || t2 < t1 + cut2 || dm > 20) {
-			fac = 3;
+			fac = wait_ui * 1.25;
 		}
 	} else if ((dx1 || dy1) && dm > 40) {
-		fac = 3;
+		fac = wait_ui;
 	}
 
 	if (fac == 1 && t2 < last_keyboard_time + cut3) {
-		fac = 2;
+		fac = wait_ui;
 	}
-	ms = waitms / fac;
-	if (ms == 0) {
-		ms = 1;
+	msec = (int) ((double) waitms / fac);
+	if (msec == 0) {
+		msec = 1;
 	}
 
 	x0 = x1;
@@ -26109,7 +26753,7 @@ int choose_delay(void) {
 	y1 = y2;
 	t1 = t2;
 
-	return ms;
+	return msec;
 }
 
 /*
@@ -26117,7 +26761,7 @@ int choose_delay(void) {
  */
 static void watch_loop(void) {
 	int cnt = 0, tile_diffs = 0, skip_pe = 0;
-	double tm = 0.0, dt = 0.0, dtr = 0.0;
+	double tm, dtr, dt = 0.0;
 	time_t start = time(0);
 
 	if (use_threads) {
@@ -26132,7 +26776,7 @@ static void watch_loop(void) {
 		urgent_update = 0;
 
 		if (! use_threads) {
-			dtime(&tm);
+			dtime0(&tm);
 			if (! skip_pe) {
 				measure_send_rates(1);
 				rfbPE(-1);
@@ -26157,8 +26801,14 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 					continue;
 				}
 			}
-		} else if (use_threads && wireframe && button_mask) {
-			check_wireframe();
+		} else {
+			if (0 && use_xrecord) {
+				/* XXX not working */
+				check_xrecord();
+			}
+			if (wireframe && button_mask) {
+				check_wireframe();
+			}
 		}
 		skip_pe = 0;
 
@@ -26222,11 +26872,19 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			X_LOCK;
 			XFlush(dpy);
 			X_UNLOCK;
+			dt = 0.0;
 		} else {
-			/* for timing the scan to try to detect thrashing */
-			double tm;
-			dtime0(&tm);
+			static double last_dt = 0.0;
+			double xdamage_thrash = 0.4; 
 
+			check_cursor_changes();
+
+			/* for timing the scan to try to detect thrashing */
+
+			if (use_xdamage && last_dt > xdamage_thrash)  {
+				clear_xdamage_mark_region(NULL, 0);
+			}
+			dtime0(&tm);
 			if (use_snapfb) {
 				int t, tries = 5;
 				copy_snap();
@@ -26237,6 +26895,9 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 				tile_diffs = scan_for_updates(0);
 			}
 			dt = dtime(&tm);
+			if (! nap_ok) {
+				last_dt = dt;
+			}
 
 if ((debug_tiles || debug_scroll > 1 || debug_wireframe > 1)
     && (tile_diffs > 4 || debug_tiles > 1)) {
@@ -26245,13 +26906,18 @@ if ((debug_tiles || debug_scroll > 1 || debug_wireframe > 1)
 	    "  t: %.4f  %.2f MB/s\n", tile_diffs, dt, tm - x11vnc_start,
 	    rate/1000000.0);
 }
-			check_x11_pointer();
+
 		}
 
 		/* sleep a bit to lessen load */
 		if (! urgent_update) {
-			int wait = choose_delay();
-			usleep(wait * 1000);
+			int wait = choose_delay(dt);
+			if (wait > 2*waitms) {
+				/* bog case, break it up */
+				nap_sleep(wait, 10);
+			} else {
+				usleep(wait * 1000);
+			}
 		}
 		cnt++;
 	}
@@ -27186,6 +27852,29 @@ static void print_help(int mode) {
 "                       Shift_L, Control_R, etc, are skipped since they almost\n"
 "                       never induce scrolling by themselves.\n"
 "\n"
+"-scr_term list         Yet another cosmetic kludge.  Apply shell/terminal\n"
+"                       heuristics to applications matching comma separated\n"
+"                       list (same as for -scr_skip/-scr_inc).  For example an\n"
+"                       annoying transient under scroll detection is if you\n"
+"                       hit Enter in a terminal shell with full text window,\n"
+"                       the solid text cursor block will be scrolled up.\n"
+"                       So for a short time there are two (or more) block\n"
+"                       cursors on the screen.  There are similar scenarios,\n"
+"                       (e.g. an output line is duplicated).\n"
+"                       \n"
+"                       These transients are induced by the approximation of\n"
+"                       scroll detection (e.g. it detects the scroll, but not\n"
+"                       the fact that the block cursor was cleared just before\n"
+"                       the scroll).  In nearly all cases these transient errors\n"
+"                       are repaired when the true X framebuffer is consulted\n"
+"                       by the normal polling.  But they are distracting, so\n"
+"                       what this option provides is extra \"padding\" near the\n"
+"                       bottom of the terminal window: a few extra lines near\n"
+"                       the bottom will not be scrolled, but rather updated\n"
+"                       from the actual X framebuffer.  This usually reduces\n"
+"                       the annoying artifacts.  Use \"none\" to disable.\n"
+"                       Default: \"%s\"\n"
+"\n"
 "-scr_parms string      Set various parameters for the scrollcopyrect mode.\n"
 "                       The format is similar to that for -wireframe and packed\n"
 "                       with lots of parameters:\n"
@@ -27317,6 +28006,18 @@ static void print_help(int mode) {
 "                       (deferUpdateTime)  Default: %d\n"
 "-wait time             Time in ms to pause between screen polls.  Used to cut\n"
 "                       down on load.  Default: %d\n"
+"-wait_ui factor        Factor by which to cut the -wait time if there\n"
+"                       has been recent user input (pointer or keyboard).\n"
+"                       Improves response, but increases the load whenever you\n"
+"                       are moving the mouse or typing.  Default: %.2f\n"
+"-nowait_bog            Do not detect if the screen polling is \"bogging down\"\n"
+"                       and sleep more.  Some activities with no user input can\n"
+"                       slow things down a lot: consider a large terminal window\n"
+"                       with a long build running in it continously streaming\n"
+"                       text output.  By default x11vnc will try to detect this\n"
+"                       (3 screen polls in a row each longer than 0.25 sec with\n"
+"                       no user input), and sleep up to 1.5 secs to let things\n"
+"                       \"catch up\".  Use this option to disable the detection.\n"
 "-readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On\n"
 "                       slow links that take a long time to paint the first\n"
 "                       screen libvncserver may hit the timeout and drop the\n"
@@ -27435,8 +28136,8 @@ static void print_help(int mode) {
 "                       usage should be very rare, i.e. doing something strange\n"
 "                       with /dev/fb0.\n"
 "\n"
-"-pipeinput cmd         Another experimental option: it lets you supply\n"
-"                       an extern command in \"cmd\" that x11vnc will pipe\n"
+"-pipeinput cmd         Another experimental option: it lets you supply an\n"
+"                       external command in \"cmd\" that x11vnc will pipe\n"
 "                       all of the user input events to in a simple format.\n"
 "                       In -pipeinput mode by default x11vnc will not process\n"
 "                       any of the user input events.  If you prefix \"cmd\"\n"
@@ -27701,6 +28402,7 @@ static void print_help(int mode) {
 "                       scr_skip:list   set -scr_skip to \"list\"\n"
 "                       scr_inc:list    set -scr_inc to \"list\"\n"
 "                       scr_keys:list   set -scr_keys to \"list\"\n"
+"                       scr_term:list   set -scr_term to \"list\"\n"
 "                       scr_parms:str   set -scr_parms parameters.\n"
 "                       pointer_mode:n  set -pointer_mode to n. same as \"pm\"\n"
 "                       input_skip:n    set -input_skip to n.\n"
@@ -27711,6 +28413,9 @@ static void print_help(int mode) {
 "                       nodebug_keyboard disable -debug_keyboard, same as \"nodk\"\n"
 "                       defer:n         set -defer to n ms,same as deferupdate:n\n"
 "                       wait:n          set -wait to n ms.\n"
+"                       wait_ui:f       set -wait_ui factor to f.\n"
+"                       wait_bog        disable -nowait_bog mode.\n"
+"                       nowait_bog      enable  -nowait_bog mode.\n"
 "                       readtimeout:n   set read timeout to n seconds.\n"
 "                       nap             enable  -nap mode.\n"
 "                       nonap           disable -nap mode.\n"
@@ -27806,35 +28511,35 @@ static void print_help(int mode) {
 "                       forever noforever once timeout deny lock nodeny unlock\n"
 "                       connect allowonce allow localhost nolocalhost listen\n"
 "                       lookup nolookup accept gone shm noshm flipbyteorder\n"
-"                       noflipbyteorder onetile noonetile solid_color\n"
-"                       solid nosolid blackout xinerama noxinerama xtrap\n"
-"                       noxtrap xrandr noxrandr xrandr_mode padgeom quiet q\n"
-"                       noquiet modtweak nomodtweak xkb noxkb skip_keycodes\n"
-"                       skip_dups noskip_dups add_keysyms noadd_keysyms\n"
-"                       clear_mods noclear_mods clear_keys noclear_keys\n"
-"                       remap repeat norepeat fb nofb bell nobell sel nosel\n"
-"                       primary noprimary cursorshape nocursorshape cursorpos\n"
-"                       nocursorpos cursor show_cursor noshow_cursor nocursor\n"
-"                       arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem\n"
-"                       alphacut alphafrac alpharemove noalpharemove alphablend\n"
-"                       noalphablend xwarppointer xwarp noxwarppointer noxwarp\n"
-"                       buttonmap dragging nodragging wireframe_mode wireframe\n"
-"                       wf nowireframe nowf wirecopyrect wcr nowirecopyrect\n"
-"                       nowcr scr_area scr_skip scr_inc scr_keys scr_parms\n"
+"                       noflipbyteorder onetile noonetile solid_color solid\n"
+"                       nosolid blackout xinerama noxinerama xtrap noxtrap\n"
+"                       xrandr noxrandr xrandr_mode padgeom quiet q noquiet\n"
+"                       modtweak nomodtweak xkb noxkb skip_keycodes skip_dups\n"
+"                       noskip_dups add_keysyms noadd_keysyms clear_mods\n"
+"                       noclear_mods clear_keys noclear_keys remap repeat\n"
+"                       norepeat fb nofb bell nobell sel nosel primary noprimary\n"
+"                       cursorshape nocursorshape cursorpos nocursorpos cursor\n"
+"                       show_cursor noshow_cursor nocursor arrow xfixes noxfixes\n"
+"                       xdamage noxdamage xd_area xd_mem alphacut alphafrac\n"
+"                       alpharemove noalpharemove alphablend noalphablend\n"
+"                       xwarppointer xwarp noxwarppointer noxwarp buttonmap\n"
+"                       dragging nodragging wireframe_mode wireframe wf\n"
+"                       nowireframe nowf wirecopyrect wcr nowirecopyrect nowcr\n"
+"                       scr_area scr_skip scr_inc scr_keys scr_term scr_parms\n"
 "                       scrollcopyrect scr noscrollcopyrect noscr pointer_mode\n"
 "                       pm input_skip input client_input speeds debug_pointer dp\n"
 "                       nodebug_pointer nodp debug_keyboard dk nodebug_keyboard\n"
-"                       nodk deferupdate defer wait readtimeout nap nonap\n"
-"                       sb screen_blank fs gaps grow fuzz snapfb nosnapfb\n"
-"                       rawfb progressive rfbport http nohttp httpport\n"
-"                       httpdir enablehttpproxy noenablehttpproxy alwaysshared\n"
-"                       noalwaysshared nevershared noalwaysshared dontdisconnect\n"
-"                       nodontdisconnect desktop debug_xevents nodebug_xevents\n"
-"                       debug_xevents debug_xdamage nodebug_xdamage\n"
-"                       debug_xdamage debug_wireframe nodebug_wireframe\n"
-"                       debug_wireframe debug_scroll nodebug_scroll debug_scroll\n"
-"                       debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg\n"
-"                       nodbg noremote\n"
+"                       nodk deferupdate defer wait_ui wait_bog nowait_bog wait\n"
+"                       readtimeout nap nonap sb screen_blank fs gaps grow fuzz\n"
+"                       snapfb nosnapfb rawfb progressive rfbport http nohttp\n"
+"                       httpport httpdir enablehttpproxy noenablehttpproxy\n"
+"                       alwaysshared noalwaysshared nevershared noalwaysshared\n"
+"                       dontdisconnect nodontdisconnect desktop debug_xevents\n"
+"                       nodebug_xevents debug_xevents debug_xdamage\n"
+"                       nodebug_xdamage debug_xdamage debug_wireframe\n"
+"                       nodebug_wireframe debug_wireframe debug_scroll\n"
+"                       nodebug_scroll debug_scroll debug_tiles dbt\n"
+"                       nodebug_tiles nodbt debug_tiles dbg nodbg noremote\n"
 "\n"
 "                       aro=  display vncdisplay desktopname http_url auth\n"
 "                       users rootshift clipshift scale_str scaled_x scaled_y\n"
@@ -27961,11 +28666,13 @@ static void print_help(int mode) {
 		scroll_copyrect_default,
 		scrollcopyrect_min_area,
 		scroll_skip_str0 ? scroll_skip_str0 : "(empty)",
+		scroll_term_str0,
 		SCROLL_COPYRECT_PARMS,
 		pointer_mode_max, pointer_mode,
 		ui_skip,
 		defer_update,
 		waitms,
+		wait_ui,
 		rfbMaxClientWait/1000,
 		take_naps ? "take naps":"no naps",
 		screen_blank,
@@ -28791,6 +29498,11 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-wait")) {
 			CHECK_ARGC
 			waitms = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-wait_ui")) {
+			CHECK_ARGC
+			wait_ui = atof(argv[++i]);
+		} else if (!strcmp(arg, "-nowait_bog")) {
+			wait_bog = 0;
 		} else if (!strcmp(arg, "-readtimeout")) {
 			CHECK_ARGC
 			rfbMaxClientWait = atoi(argv[++i]) * 1000;
@@ -29155,6 +29867,7 @@ int main(int argc, char* argv[]) {
 		set_scrollcopyrect_mode(NULL);
 	}
 	initialize_scroll_matches();
+	initialize_scroll_term();
 
 	/* increase rfbwait if threaded */
 	if (use_threads && ! got_rfbwait) {
@@ -29338,6 +30051,8 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " debug_key:  %d\n", debug_keyboard);
 		fprintf(stderr, " defer:      %d\n", defer_update);
 		fprintf(stderr, " waitms:     %d\n", waitms);
+		fprintf(stderr, " wait_ui:    %.2f\n", wait_ui);
+		fprintf(stderr, " nowait_bog: %d\n", !wait_bog);
 		fprintf(stderr, " readtimeout: %d\n", rfbMaxClientWait/1000);
 		fprintf(stderr, " take_naps:  %d\n", take_naps);
 		fprintf(stderr, " sb:         %d\n", screen_blank);
@@ -29371,8 +30086,10 @@ int main(int argc, char* argv[]) {
 		rfbLogEnable(0);
 	}
 
-	/* open the X display: */
 	X_INIT;
+	SCR_INIT;
+	
+	/* open the X display: */
 	if (auth_file) {
 		set_env("XAUTHORITY", auth_file);
 	}

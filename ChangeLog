@@ -1,3 +1,6 @@
+2005-05-17  Karl Runge <runge@karlrunge.com>
+	* x11vnc: more scrolling, -scr_term, -wait_ui, -nowait_bog
+
 2005-05-15  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* almost every file: ANSIfy, fix warnings from Linus' sparse
 

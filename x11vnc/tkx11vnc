@@ -187,6 +187,8 @@ Misc
 	gaps:
 	grow:
 	fuzz:
+	wait_ui:
+	nowait_bog
 	readtimeout:
 	snapfb
 	threads
@@ -263,6 +265,7 @@ Tuning
 	scr_skip:
 	scr_inc:
 	scr_keys:
+	scr_term:
 	scr_parms:
 	-- D
 	speeds:
