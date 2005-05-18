@@ -559,7 +559,8 @@ else
   AC_MSG_NOTICE(creating $_OUT - prefix $_UPP for $_INP defines)
   if test -f $_INP ; then
     echo "s/@%:@undef  *\\(@<:@m4_cr_LETTERS[]_@:>@\\)/@%:@undef $_UPP""_\\1/" > _script
-    echo "s/@%:@undef  *\\(@<:@m4_cr_letters@:>@\\)/@%:@undef $_LOW""_\\1/" >> _script
+    # no! these are things like socklen_t, const, vfork
+    # echo "s/@%:@undef  *\\(@<:@m4_cr_letters@:>@\\)/@%:@undef $_LOW""_\\1/" >> _script
     echo "s/@%:@def[]ine  *\\(@<:@m4_cr_LETTERS[]_@:>@@<:@_symbol@:>@*\\)\\(.*\\)/@%:@ifndef $_UPP""_\\1 \\" >> _script
     echo "@%:@def[]ine $_UPP""_\\1 \\2 \\" >> _script
     echo "@%:@endif/" >>_script

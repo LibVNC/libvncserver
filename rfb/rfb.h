@@ -45,10 +45,6 @@ extern "C"
 #include <winsock2.h>
 #endif
 
-#ifndef LIBVNCSERVER_HAVE_SOCKLEN_T
-typedef int socklen_t;
-#endif
-
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 #include <pthread.h>
 #if 0 /* debugging */
