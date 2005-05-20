@@ -566,8 +566,8 @@ else
     echo "@%:@endif/" >>_script
     # no! these are things like socklen_t, const, vfork
     # echo "s/@%:@def[]ine  *\\(@<:@m4_cr_letters@:>@@<:@_symbol@:>@*\\)\\(.*\\)/@%:@ifndef $_LOW""_\\1 \\" >> _script
-    echo "@%:@define $_LOW""_\\1 \\2 \\" >> _script
-    echo "@%:@endif/" >> _script
+    # echo "@%:@define $_LOW""_\\1 \\2 \\" >> _script
+    # echo "@%:@endif/" >> _script
     # now executing _script on _DEF input to create _OUT output file
     echo "@%:@ifndef $_DEF"      >$tmp/pconfig.h
     echo "@%:@def[]ine $_DEF 1" >>$tmp/pconfig.h
