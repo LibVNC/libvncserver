@@ -71,6 +71,7 @@ AVStream *add_video_stream(AVFormatContext *oc, int codec_id, int w, int h)
 #else
     c->time_base.den = STREAM_FRAME_RATE;
     c->time_base.num = 1;
+    c->pix_fmt = PIX_FMT_YUV420P;
 #endif
     c->gop_size = 12; /* emit one intra frame every twelve frames at most */
     if (c->codec_id == CODEC_ID_MPEG2VIDEO) {
