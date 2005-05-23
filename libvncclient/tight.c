@@ -622,7 +622,6 @@ JpegInitSource(j_decompress_ptr cinfo)
 {
   rfbClient* client=(rfbClient*)cinfo->client_data;
   client->jpegError = FALSE;
-  client->jpegSrcManager = malloc(sizeof(struct jpeg_source_mgr));
 }
 
 static boolean
@@ -665,6 +664,8 @@ JpegSetSrcManager(j_decompress_ptr cinfo,
   client->jpegBufferPtr = compressedData;
   client->jpegBufferLen = (size_t)compressedLen;
 
+  if(client->jpegSrcManager == NULL)
+    client->jpegSrcManager = malloc(sizeof(struct jpeg_source_mgr));
   client->jpegSrcManager->init_source = JpegInitSource;
   client->jpegSrcManager->fill_input_buffer = JpegFillInputBuffer;
   client->jpegSrcManager->skip_input_data = JpegSkipInputData;

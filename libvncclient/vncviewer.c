@@ -161,6 +161,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
   memset(client->zlibStreamActive,0,sizeof(rfbBool)*4);
+  client->jpegSrcManager = NULL;
 #endif
 
   client->HandleCursorPos = DummyPoint;
