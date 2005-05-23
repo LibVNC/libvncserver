@@ -297,14 +297,6 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
  *
  */
 
-/*
-   The following variables are defined in rfbproto.c:
-     static rfbBool cutZeros;
-     static int rectWidth, rectColors;
-     static uint8_t tightPalette[256*4];
-     static uint8_t tightPrevRow[2048*3*sizeof(CARD16)];
-*/
-
 static int
 InitFilterCopyBPP (rfbClient* client, int rw, int rh)
 {
@@ -525,14 +517,6 @@ FilterPaletteBPP (rfbClient* client, int numRows, CARDBPP *dst)
  * JPEG decompression.
  *
  */
-
-/*
-   The following variables are defined in rfbproto.c:
-     static rfbBool jpegError;
-     static struct jpeg_source_mgr jpegSrcManager;
-     static JOCTET *jpegBufferPtr;
-     static size_t *jpegBufferLen;
-*/
 
 static rfbBool
 DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
