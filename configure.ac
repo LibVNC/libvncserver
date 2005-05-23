@@ -303,7 +303,6 @@ if test $inaddrt = no ; then
 fi
 
 # Checks for library functions.
-AC_FUNC_MALLOC
 AC_FUNC_MEMCMP
 AC_FUNC_STAT
 AC_FUNC_STRFTIME
