@@ -154,6 +154,15 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->bufoutptr=client->buf;
   client->buffered=0;
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+  client->raw_buffer_size = -1;
+  client->decompStreamInited = FALSE;
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+  memset(client->zlibStreamActive,0,sizeof(rfbBool)*4);
+#endif
+
   client->HandleCursorPos = DummyPoint;
   client->SoftCursorLockArea = DummyRect;
   client->SoftCursorUnlockScreen = Dummy;

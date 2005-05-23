@@ -132,6 +132,50 @@ typedef struct _rfbClient {
 	char *bufoutptr;
 	int buffered;
 
+	/* The zlib encoding requires expansion/decompression/deflation of the
+	   compressed data in the "buffer" above into another, result buffer.
+	   However, the size of the result buffer can be determined precisely
+	   based on the bitsPerPixel, height and width of the rectangle.  We
+	   allocate this buffer one time to be the full size of the buffer. */
+
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+	int raw_buffer_size;
+	char *raw_buffer;
+
+	z_stream decompStream;
+	rfbBool decompStreamInited;
+
+#endif
+
+
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+	/*
+	 * Variables for the ``tight'' encoding implementation.
+	 */
+
+	/* Separate buffer for compressed data. */
+#define ZLIB_BUFFER_SIZE 30000
+	char zlib_buffer[ZLIB_BUFFER_SIZE];
+
+	/* Four independent compression streams for zlib library. */
+	z_stream zlibStream[4];
+	rfbBool zlibStreamActive[4];
+
+	/* Filter stuff. Should be initialized by filter initialization code. */
+	rfbBool cutZeros;
+	int rectWidth, rectColors;
+	char tightPalette[256*4];
+	uint8_t tightPrevRow[2048*3*sizeof(uint16_t)];
+
+	/* JPEG decoder state. */
+	rfbBool jpegError;
+
+	struct jpeg_source_mgr* jpegSrcManager;
+	void* jpegBufferPtr;
+	size_t jpegBufferLen;
+
+#endif
+
 
 	/* cursor.c */
 	uint8_t *rcSource, *rcMask;

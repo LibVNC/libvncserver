@@ -46,16 +46,16 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
    * buffer, this buffer allocation should only happen once, on the
    * first update.
    */
-  if ( raw_buffer_size < (( rw * rh ) * ( BPP / 8 ))) {
+  if ( client->raw_buffer_size < (( rw * rh ) * ( BPP / 8 ))) {
 
-    if ( raw_buffer != NULL ) {
+    if ( client->raw_buffer != NULL ) {
 
-      free( raw_buffer );
+      free( client->raw_buffer );
 
     }
 
-    raw_buffer_size = (( rw * rh ) * ( BPP / 8 ));
-    raw_buffer = (char*) malloc( raw_buffer_size );
+    client->raw_buffer_size = (( rw * rh ) * ( BPP / 8 ));
+    client->raw_buffer = (char*) malloc( client->raw_buffer_size );
 
   }
 
@@ -65,26 +65,26 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   remaining = rfbClientSwap32IfLE(hdr.nBytes);
 
   /* Need to initialize the decompressor state. */
-  decompStream.next_in   = ( Bytef * )client->buffer;
-  decompStream.avail_in  = 0;
-  decompStream.next_out  = ( Bytef * )raw_buffer;
-  decompStream.avail_out = raw_buffer_size;
-  decompStream.data_type = Z_BINARY;
+  client->decompStream.next_in   = ( Bytef * )client->buffer;
+  client->decompStream.avail_in  = 0;
+  client->decompStream.next_out  = ( Bytef * )client->raw_buffer;
+  client->decompStream.avail_out = client->raw_buffer_size;
+  client->decompStream.data_type = Z_BINARY;
 
   /* Initialize the decompression stream structures on the first invocation. */
-  if ( decompStreamInited == FALSE ) {
+  if ( client->decompStreamInited == FALSE ) {
 
-    inflateResult = inflateInit( &decompStream );
+    inflateResult = inflateInit( &client->decompStream );
 
     if ( inflateResult != Z_OK ) {
       rfbClientLog(
               "inflateInit returned error: %d, msg: %s\n",
               inflateResult,
-              decompStream.msg);
+              client->decompStream.msg);
       return FALSE;
     }
 
-    decompStreamInited = TRUE;
+    client->decompStreamInited = TRUE;
 
   }
 
@@ -107,11 +107,11 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     if (!ReadFromRFBServer(client, client->buffer,toRead))
       return FALSE;
 
-    decompStream.next_in  = ( Bytef * )client->buffer;
-    decompStream.avail_in = toRead;
+    client->decompStream.next_in  = ( Bytef * )client->buffer;
+    client->decompStream.avail_in = toRead;
 
     /* Need to uncompress buffer full. */
-    inflateResult = inflate( &decompStream, Z_SYNC_FLUSH );
+    inflateResult = inflate( &client->decompStream, Z_SYNC_FLUSH );
 
     /* We never supply a dictionary for compression. */
     if ( inflateResult == Z_NEED_DICT ) {
@@ -122,15 +122,15 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
       rfbClientLog(
               "zlib inflate returned error: %d, msg: %s\n",
               inflateResult,
-              decompStream.msg);
+              client->decompStream.msg);
       return FALSE;
     }
 
     /* Result buffer allocated to be at least large enough.  We should
      * never run out of space!
      */
-    if (( decompStream.avail_in > 0 ) &&
-        ( decompStream.avail_out <= 0 )) {
+    if (( client->decompStream.avail_in > 0 ) &&
+        ( client->decompStream.avail_out <= 0 )) {
       rfbClientLog("zlib inflate ran out of space!\n");
       return FALSE;
     }
@@ -142,14 +142,14 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   if ( inflateResult == Z_OK ) {
 
     /* Put the uncompressed contents of the update on the screen. */
-    CopyRectangle(client, raw_buffer, rx, ry, rw, rh);
+    CopyRectangle(client, client->raw_buffer, rx, ry, rw, rh);
   }
   else {
 
     rfbClientLog(
             "zlib inflate returned error: %d, msg: %s\n",
             inflateResult,
-            decompStream.msg);
+            client->decompStream.msg);
     return FALSE;
 
   }
