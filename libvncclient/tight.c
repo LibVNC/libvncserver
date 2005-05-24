@@ -679,5 +679,7 @@ JpegSetSrcManager(j_decompress_ptr cinfo,
 
 #endif
 
+#undef CARDBPP
+
 #endif
 

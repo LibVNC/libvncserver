@@ -30,7 +30,7 @@
  */
 
 #define HandleZlibBPP CONCAT2E(HandleZlib,BPP)
-#define CARDBPP CONCAT2E(uint,BPP,_t)
+#define CARDBPP CONCAT3E(uint,BPP,_t)
 
 static rfbBool
 HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)

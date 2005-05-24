@@ -164,6 +164,12 @@ static void JpegTermSource(j_decompress_ptr cinfo);
 static void JpegSetSrcManager(j_decompress_ptr cinfo, uint8_t *compressedData,
                               int compressedLen);
 #endif
+static rfbBool HandleZRLE8(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleZRLE16(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleZRLE24(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleZRLE24Up(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleZRLE24Down(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleZRLE32(rfbClient* client, int rx, int ry, int rw, int rh);
 #endif
 
 /*
@@ -497,6 +503,7 @@ SetFormatAndEncodings(rfbClient* client)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingHextile);
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZlib);
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZRLE);
 #endif
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCoRRE);
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRRE);
@@ -879,6 +886,40 @@ HandleRFBServerMessage(rfbClient* client)
 	break;
       }
 #endif
+      case rfbEncodingZRLE:
+      {
+	switch (client->format.bitsPerPixel) {
+	case 8:
+	  if (!HandleZRLE8(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	    return FALSE;
+	  break;
+	case 16:
+	  if (!HandleZRLE16(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	    return FALSE;
+	  break;
+	case 32:
+	{
+	  uint32_t maxColor=(client->format.redMax<<client->format.redShift)|
+		(client->format.greenMax<<client->format.greenShift)|
+		(client->format.blueMax<<client->format.blueShift);
+	  if ((client->format.bigEndian && (maxColor&0xff)==0) ||
+	      (!client->format.bigEndian && (maxColor&0xff000000)==0)) {
+	    if (!HandleZRLE24(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	      return FALSE;
+	  } else if (!client->format.bigEndian && (maxColor&0xff)==0) {
+	    if (!HandleZRLE24Up(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	      return FALSE;
+	  } else if (client->format.bigEndian && (maxColor&0xff000000)==0) {
+	    if (!HandleZRLE24Down(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	      return FALSE;
+	  } else if (!HandleZRLE32(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+	    return FALSE;
+	  break;
+	}
+	}
+	break;
+     }
+
 #endif
 
       default:
@@ -972,6 +1013,7 @@ HandleRFBServerMessage(rfbClient* client)
 #include "hextile.c"
 #include "zlib.c"
 #include "tight.c"
+#include "zrle.c"
 #undef BPP
 #define BPP 16
 #include "rre.c"
@@ -979,6 +1021,7 @@ HandleRFBServerMessage(rfbClient* client)
 #include "hextile.c"
 #include "zlib.c"
 #include "tight.c"
+#include "zrle.c"
 #undef BPP
 #define BPP 32
 #include "rre.c"
@@ -986,6 +1029,15 @@ HandleRFBServerMessage(rfbClient* client)
 #include "hextile.c"
 #include "zlib.c"
 #include "tight.c"
+#include "zrle.c"
+#define REALBPP 24
+#include "zrle.c"
+#define REALBPP 24
+#define UNCOMP 8
+#include "zrle.c"
+#define REALBPP 24
+#define UNCOMP -8
+#include "zrle.c"
 #undef BPP
 
 

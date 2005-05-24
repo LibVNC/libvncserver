@@ -25,8 +25,7 @@ static encoding_t testEncodings[]={
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	{ rfbEncodingZlib, "zlib" },
 	{ rfbEncodingZlibHex, "zlibhex" },
-	/* TODO: implement ZRLE decoding */
-	/* { rfbEncodingZRLE, "zrle" }, */
+	{ rfbEncodingZRLE, "zrle" },
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	{ rfbEncodingTight, "tight" },
 #endif
