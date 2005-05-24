@@ -20,11 +20,6 @@ rpm: $(PACKAGE)-$(VERSION).tar.gz $(PACKAGE).spec
 	rpmbuild -ba $(PACKAGE).spec
 endif
 
-all: make_config_executable
-
-make_config_executable:
-	chmod a+x libvncserver-config
-
 t:
 	$(MAKE) -C test test
 
