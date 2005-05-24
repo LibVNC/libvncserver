@@ -131,8 +131,8 @@ void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int
 {
   *x1+=font->metaData[c*5+3];
   *y1+=-font->metaData[c*5+4]-font->metaData[c*5+2]+1;
-  *x2=*x1+font->metaData[c*5+1];
-  *y2=*y1+font->metaData[c*5+2];
+  *x2=*x1+font->metaData[c*5+1]+1;
+  *y2=*y1+font->metaData[c*5+2]+1;
 }
 
 #ifndef INT_MAX
@@ -156,6 +156,8 @@ void rfbWholeFontBBox(rfbFontDataPtr font,
       if(-m[i*5+4]>(*y2))
 	(*y2)=-m[i*5+4];
    }
+   (*x2)++;
+   (*y2)++;
 }
 
 rfbFontDataPtr rfbLoadConsoleFont(char *filename)

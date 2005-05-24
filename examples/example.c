@@ -107,7 +107,6 @@ static void drawline(unsigned char* buffer,int rowstride,int bpp,int x1,int y1,i
   if(j<0) j=-j;
   if(i<j) {
     if(y1>y2) { i=y2; y2=y1; y1=i; i=x2; x2=x1; x1=i; }
-    if(y2==y1) { if(y2>0) y1--; else y2++; }
     for(j=y1;j<=y2;j++)
       for(i=0;i<bpp;i++)
 	buffer[j*rowstride+(x1+(j-y1)*(x2-x1)/(y2-y1))*bpp+i]=0xff;
@@ -132,6 +131,9 @@ static void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 	 if(cd->oldButton==buttonMask) { /* draw a line */
 	    drawline((unsigned char*)cl->screen->frameBuffer,cl->screen->paddedWidthInBytes,bpp,
 		     x,y,cd->oldx,cd->oldy);
+	    x1=x; y1=y;
+	    if(x1>cd->oldx) x1++; else cd->oldx++;
+	    if(y1>cd->oldy) y1++; else cd->oldy++;
 	    rfbMarkRectAsModified(cl->screen,x,y,cd->oldx,cd->oldy);
 	 } else { /* draw a point (diameter depends on button) */
 	    int w=cl->screen->paddedWidthInBytes;
@@ -143,7 +145,7 @@ static void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 	    for(i=x1*bpp;i<x2*bpp;i++)
 	      for(j=y1;j<y2;j++)
 		cl->screen->frameBuffer[j*w+i]=(char)0xff;
-	    rfbMarkRectAsModified(cl->screen,x1,y1,x2-1,y2-1);
+	    rfbMarkRectAsModified(cl->screen,x1,y1,x2,y2);
 	 }
 
 	 /* we could get a selection like that:
