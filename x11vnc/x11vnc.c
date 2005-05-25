@@ -372,12 +372,12 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-05-17";
+char lastmod[] = "0.7.2 lastmod: 2005-05-24";
 int hack_val = 0;
 
 /* X display info */
 
-Display *dpy = 0;		/* the single display screen we connect to */
+Display *dpy = NULL;		/* the single display screen we connect to */
 int scr;
 Window window, rootwin;		/* polled window, root window (usu. same) */
 Visual *default_visual;		/* the default visual (unless -visual) */
@@ -494,6 +494,10 @@ unsigned char *tile_has_xdamage_diff, *tile_row_has_xdamage_diff;
 time_t last_event, last_input = 0, last_client = 0;
 time_t last_keyboard_input = 0, last_pointer_input = 0; 
 double last_keyboard_time = 0.0;
+double last_pointer_time = 0.0;
+double last_pointer_click_time = 0.0;
+double last_pointer_motion_time = 0.0;
+double last_key_to_button_remap_time = 0.0;
 double servertime_diff = 0.0;
 double x11vnc_start = 0.0;
 
@@ -512,7 +516,10 @@ int got_pointer_input = 0;
 int got_keyboard_input = 0;
 int urgent_update = 0;
 int last_keyboard_keycode = 0;
-rfbKeySym last_keysym = 0;
+rfbBool last_rfb_down = FALSE;
+rfbBool last_rfb_key_accepted = FALSE;
+rfbKeySym last_rfb_keysym = 0;
+double last_rfb_keytime = 0.0;
 int fb_copy_in_progress = 0;	
 int drag_in_progress = 0;	
 int shut_down = 0;	
@@ -593,10 +600,12 @@ void initialize_xinerama(void);
 void initialize_xfixes(void);
 void initialize_xdamage(void);
 int valid_window(Window, XWindowAttributes *, int);
+int xtranslate(Window, Window, int, int, int*, int*, Window*, int);
 void create_xdamage_if_needed(void);
 void destroy_xdamage_if_needed(void);
 void mark_for_xdamage(int, int, int, int);
 void mark_region_for_xdamage(sraRegionPtr);
+void set_xdamage_mark(int, int, int, int);
 void initialize_xrandr(void);
 XImage *initialize_xdisplay_fb(void);
 
@@ -638,6 +647,7 @@ void set_wirecopyrect_mode(char *);
 void set_scrollcopyrect_mode(char *);
 void initialize_scroll_matches(void);
 void initialize_scroll_term(void);
+void initialize_max_keyrepeat(void);
 void initialize_scroll_keys(void);
 int try_copyrect(Window, int, int, int, int, int, int, int *, sraRegionPtr,
     double);
@@ -721,7 +731,7 @@ int scale_round(int, double);
 void zero_fb(int, int, int, int);
 void push_black_screen(int);
 void push_sleep(int);
-void refresh_screen(void);
+void refresh_screen(int);
 
 
 /* -- options.h -- */
@@ -842,9 +852,14 @@ char *pad_geometry = NULL;
 time_t pad_geometry_time;
 int use_snapfb = 0;
 
-Display *rdpy_data = 0;		/* Data connection for RECORD */
-Display *rdpy_ctrl = 0;		/* Control connection for RECORD */
+Display *rdpy_data = NULL;		/* Data connection for RECORD */
+Display *rdpy_ctrl = NULL;		/* Control connection for RECORD */
 int use_xrecord = 0;
+int noxrecord = 0;
+
+Display *gdpy_data = NULL;		/* Ditto for GrabServer watcher */
+Display *gdpy_ctrl = NULL;
+int xserver_grabbed = 0;
 
 char *client_connect = NULL;	/* strings for -connect option */
 char *client_connect_file = NULL;
@@ -924,6 +939,10 @@ int debug_scroll = 0;
 double pointer_flush_delay = 0.0;
 double last_scroll_event = 0.0;
 int max_scroll_keyrate = 0;
+double max_keyrepeat_time = 0.0;
+char *max_keyrepeat_str = NULL;
+char *max_keyrepeat_str0 = "4-20";
+int max_keyrepeat_lo = 1, max_keyrepeat_hi = 40;
 enum scroll_types {
 	SCR_NONE = 0,
 	SCR_MOUSE,
@@ -950,7 +969,8 @@ char **scroll_skip_mouse = NULL;
 char *scroll_skip_str = NULL;
 char *scroll_skip_str0 =
 /*	"##Konsole,"	 * no problems, known heuristics do not work */
-	"##Soffice.bin" /* big problems, no clips, scrolls outside area */
+	"##Soffice.bin," /* big problems, no clips, scrolls outside area */
+	"##StarOffice"
 ;
 
 char **scroll_term = NULL;
@@ -1924,7 +1944,7 @@ int try_user_and_display(uid_t uid, char *dpystr) {
 		return 0;
 	} else {
 		/* child */
-		Display *dpy2 = 0;
+		Display *dpy2 = NULL;
 		int rc;
 
 		rc = switch_user_env(uid, name, home, 0); 
@@ -2811,13 +2831,15 @@ int XTRAP_GrabControl_wr(Display *dpy, Bool impervious) {
 	return 0;
 }
 
-void disable_grabserver(Display *in_dpy) {
+void disable_grabserver(Display *in_dpy, int change) {
 	int ok = 0;
 	static int didmsg = 0;
 
 	if (! xtrap_input) {
 		if (XTestGrabControl_wr(in_dpy, True)) {
-			XTRAP_GrabControl_wr(in_dpy, False);
+			if (change) {
+				XTRAP_GrabControl_wr(in_dpy, False);
+			}
 			if (! didmsg) {
 				rfbLog("GrabServer control via XTEST.\n"); 
 				didmsg = 1;
@@ -2835,7 +2857,9 @@ void disable_grabserver(Display *in_dpy) {
 		}
 	} else {
 		if (XTRAP_GrabControl_wr(in_dpy, True)) {
-			XTestGrabControl_wr(in_dpy, False);
+			if (change) {
+				XTestGrabControl_wr(in_dpy, False);
+			}
 			if (! didmsg) {
 				rfbLog("GrabServer control via DEC-XTRAP.\n"); 
 				didmsg = 1;
@@ -2868,11 +2892,17 @@ Bool XRecordQueryVersion_wr(Display *dpy, int *maj, int *min) {
 }
 
 #if LIBVNCSERVER_HAVE_RECORD
-XRecordRange *rr_CA;
-XRecordRange *rr_CW;
+XRecordRange *rr_CA = NULL;
+XRecordRange *rr_CW = NULL;
+XRecordRange *rr_GS = NULL;
 XRecordRange *rr_scroll[10];
 XRecordContext rc_scroll;
 XRecordClientSpec rcs_scroll;
+XRecordRange *rr_grab[10];
+XRecordContext rc_grab;
+XRecordClientSpec rcs_grab;
+
+void record_grab(XPointer, XRecordInterceptData *);
 #endif
 
 int xrecording = 0;
@@ -2885,6 +2915,63 @@ KeySym xrecord_keysym = NoSymbol;
 #define NAMEINFO 2048
 char xrecord_name_info[NAMEINFO];
 
+char *xerror_string(XErrorEvent *error);
+int trap_record_xerror(Display *, XErrorEvent *);
+int trapped_record_xerror;
+XErrorEvent *trapped_record_xerror_event;
+
+void xrecord_grabserver(int start) {
+	XErrorHandler old_handler = NULL;
+	int rc;
+
+	if (! gdpy_ctrl || ! gdpy_data) {
+		return;
+	}
+#if LIBVNCSERVER_HAVE_RECORD
+	if (!start) {
+		if (! rc_grab) {
+			return;
+		}
+		XRecordDisableContext(gdpy_ctrl, rc_grab);
+		XRecordFreeContext(gdpy_ctrl, rc_grab);
+		XFlush(gdpy_ctrl);
+		rc_grab = 0;
+		return;
+	}
+
+	xserver_grabbed = 0;
+
+	rr_grab[0] = rr_GS;
+	rcs_grab = XRecordAllClients;
+
+	rc_grab = XRecordCreateContext(gdpy_ctrl, 0, &rcs_grab, 1, rr_grab, 1);
+	trapped_record_xerror = 0;
+	old_handler = XSetErrorHandler(trap_record_xerror);
+
+	XSync(gdpy_ctrl, True);
+
+	if (! rc_grab || trapped_record_xerror) {
+		XCloseDisplay(gdpy_ctrl);
+		XCloseDisplay(gdpy_data);
+		gdpy_ctrl = NULL;
+		gdpy_data = NULL;
+		XSetErrorHandler(old_handler);
+		return;
+	}
+	rc = XRecordEnableContextAsync(gdpy_data, rc_grab, record_grab, NULL);
+	if (!rc || trapped_record_xerror) {
+		XCloseDisplay(gdpy_ctrl);
+		XCloseDisplay(gdpy_data);
+		gdpy_ctrl = NULL;
+		gdpy_data = NULL;
+		XSetErrorHandler(old_handler);
+		return;
+	}
+	XSetErrorHandler(old_handler);
+	XFlush(gdpy_data);
+#endif
+}
+
 void initialize_xrecord(void) {
 	use_xrecord = 0;
 	if (! xrecord_present) {
@@ -2893,10 +2980,19 @@ void initialize_xrecord(void) {
 	if (nofb) {
 		return;
 	}
+	if (noxrecord) {
+		return;
+	}
 #if LIBVNCSERVER_HAVE_RECORD
+
+	if (rr_CA) XFree(rr_CA);
+	if (rr_CW) XFree(rr_CW);
+	if (rr_GS) XFree(rr_GS);
+
 	rr_CA = XRecordAllocRange();
 	rr_CW = XRecordAllocRange();
-	if (! rr_CA || ! rr_CW) {
+	rr_GS = XRecordAllocRange();
+	if (!rr_CA || !rr_CW || !rr_GS) {
 		return;
 	}
 	/* protocol request ranges: */
@@ -2906,19 +3002,107 @@ void initialize_xrecord(void) {
 	rr_CW->core_requests.first = X_ConfigureWindow;
 	rr_CW->core_requests.last  = X_ConfigureWindow;
 
+	rr_GS->core_requests.first = X_GrabServer;
+	rr_GS->core_requests.last  = X_UngrabServer;
+
+	X_LOCK;
 	/* open a 2nd control connection to DISPLAY: */
+	if (rdpy_data) {
+		XCloseDisplay(rdpy_data);
+		rdpy_data = NULL;
+	}
+	if (rdpy_ctrl) {
+		XCloseDisplay(rdpy_ctrl);
+		rdpy_ctrl = NULL;
+	}
 	rdpy_ctrl = XOpenDisplay(DisplayString(dpy));
 	XSync(dpy, True);
 	XSync(rdpy_ctrl, True);
 	/* open datalink connection to DISPLAY: */
 	rdpy_data = XOpenDisplay(DisplayString(dpy));
 	if (!rdpy_ctrl || ! rdpy_data) {
+		X_UNLOCK;
 		return;
 	}
-	disable_grabserver(rdpy_ctrl);
-	disable_grabserver(rdpy_data);
+	disable_grabserver(rdpy_ctrl, 0);
+	disable_grabserver(rdpy_data, 0);
+
 	use_xrecord = 1;
+
+	/*
+	 * now set up the GrabServer watcher.  We get GrabServer
+	 * deadlock in XRecordCreateContext() even with XTestGrabServer
+	 * in place, why?  Not sure, so we manually watch for grabs...
+	 */
+	if (gdpy_data) {
+		XCloseDisplay(gdpy_data);
+		gdpy_data = NULL;
+	}
+	if (gdpy_ctrl) {
+		XCloseDisplay(gdpy_ctrl);
+		gdpy_ctrl = NULL;
+	}
+	xserver_grabbed = 0;
+
+	gdpy_ctrl = XOpenDisplay(DisplayString(dpy));
+	XSync(dpy, True);
+	XSync(gdpy_ctrl, True);
+	gdpy_data = XOpenDisplay(DisplayString(dpy));
+	if (gdpy_ctrl && gdpy_data) {
+		disable_grabserver(gdpy_ctrl, 0);
+		disable_grabserver(gdpy_data, 0);
+		xrecord_grabserver(1);
+	}
+	X_UNLOCK;
 #endif
+}
+
+void shutdown_xrecord(void) {
+#if LIBVNCSERVER_HAVE_RECORD
+
+	if (rr_CA) XFree(rr_CA);
+	if (rr_CW) XFree(rr_CW);
+	if (rr_GS) XFree(rr_GS);
+
+	rr_CA = NULL;
+	rr_CW = NULL;
+	rr_GS = NULL;
+
+	X_LOCK;
+	if (rdpy_ctrl && rc_scroll) {
+		XRecordDisableContext(rdpy_ctrl, rc_scroll);
+		XRecordFreeContext(rdpy_ctrl, rc_scroll);
+		XSync(rdpy_ctrl, False);
+		rc_scroll = 0;
+	}
+		
+	if (gdpy_ctrl && rc_grab) {
+		XRecordDisableContext(gdpy_ctrl, rc_grab);
+		XRecordFreeContext(gdpy_ctrl, rc_grab);
+		XSync(gdpy_ctrl, False);
+		rc_grab = 0;
+	}
+		
+	if (rdpy_data) {
+		XCloseDisplay(rdpy_data);
+		rdpy_data = NULL;
+	}
+	if (rdpy_ctrl) {
+		XCloseDisplay(rdpy_ctrl);
+		rdpy_ctrl = NULL;
+	}
+	if (gdpy_data) {
+		XCloseDisplay(gdpy_data);
+		gdpy_data = NULL;
+	}
+	if (gdpy_ctrl) {
+		XCloseDisplay(gdpy_ctrl);
+		gdpy_ctrl = NULL;
+	}
+	xserver_grabbed = 0;
+	X_UNLOCK;
+#endif
+	use_xrecord = 0;
 }
 
 int xrecord_skip_keysym(rfbKeySym keysym) {
@@ -3047,7 +3231,7 @@ winattr_t scr_attr_cache[SCR_ATTR_CACHE];
 double attr_cache_max_age = 1.5;
 
 int lookup_attr_cache(Window win, int *cache_index, int *next_index) {
-	double dnow, t, oldest;
+	double now, t, oldest;
 	int i, old_index = -1, count = 0;
 	Window cwin;
 
@@ -3061,13 +3245,13 @@ int lookup_attr_cache(Window win, int *cache_index, int *next_index) {
 		return 0;
 	}
 
-	dtime0(&dnow);
+	dtime0(&now);
 	for (i=0; i < SCR_ATTR_CACHE; i++) {
 
 		cwin = scr_attr_cache[i].win;
 		t = scr_attr_cache[i].time;
 
-		if (dnow > t + attr_cache_max_age) {
+		if (now > t + attr_cache_max_age) {
 			/* expire it even if it is the one we want */
 			scr_attr_cache[i].win = cwin = None;
 			scr_attr_cache[i].fetched = 0;
@@ -3109,6 +3293,7 @@ if (0) fprintf(stderr, "lookup_attr_cache count: %d\n", count);
 		return 0;
 	}
 }
+
 
 typedef struct scroll_event {
 	Window win, frame;
@@ -3253,8 +3438,9 @@ if (db > 1) fprintf(stderr, "record_CA-%d\n", k++);
 		valid = valid_window(src, &attr, 1);
 
 		if (valid) {
-			XTranslateCoordinates(dpy, src, rootwin, 0, 0,
-			    &rx, &ry, &c); 
+			if (!xtranslate(src, rootwin, 0, 0, &rx, &ry, &c, 1)) {
+				valid = 0;
+			}
 		}
 		if (next_index >= 0) {
 			i = next_index;
@@ -3289,7 +3475,7 @@ if (db > 1) fprintf(stderr, "record_CA-%d\n", k++);
 	}
 
 
-if (dba || db) {
+if (0 || dba || db) {
 	double st, dt;
 	st = (double) rec_data->server_time/1000.0;
 	dt = (dnow() - servertime_diff) - st;
@@ -3744,8 +3930,9 @@ if (0) fprintf(stderr, "lookup_attr_cache MISS: %2d %2d 0x%lx %d\n",
     cache_index, next_index, win, valid);
 
 		if (valid) {
-			XTranslateCoordinates(dpy, win, rootwin, 0, 0,
-			    &rx, &ry, &c); 
+			if (!xtranslate(win, rootwin, 0, 0, &rx, &ry, &c, 1)) {
+				valid = 0;
+			}
 		}
 		if (next_index >= 0) {
 			i = next_index;
@@ -3780,7 +3967,7 @@ if (db > 1) fprintf(stderr, "record_CW-%d\n", k++);
 	}
 if (db > 1) fprintf(stderr, "record_CW-%d\n", k++);
 
-if (dba || db) {
+if (0 || dba || db) {
 	double st, dt;
 	st = (double) rec_data->server_time/1000.0;
 	dt = (dnow() - servertime_diff) - st;
@@ -3885,18 +4072,101 @@ void record_switch(XPointer ptr, XRecordInterceptData *rec_data) {
 	}
 	XRecordFreeData(rec_data);
 }
+
+void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
+	xReq *req;
+
+	/* should handle control msgs, start/stop/etc */
+	if (rec_data->category == XRecordStartOfData) {
+		;
+	} else if (rec_data->category == XRecordEndOfData) {
+		;
+	} else if (rec_data->category == XRecordClientStarted) {
+		;
+	} else if (rec_data->category == XRecordClientDied) {
+		;
+	} else if (rec_data->category == XRecordFromServer) {
+		;
+	}
+
+	if (rec_data->category != XRecordFromClient) {
+		XRecordFreeData(rec_data);
+		return;
+	}
+
+	req = (xReq *) rec_data->data;
+
+	if (req->reqType == X_GrabServer) {
+		double now = dnow() - x11vnc_start;
+		xserver_grabbed++;
+		if (0) rfbLog("X server Grabbed:    %d %.5f\n", xserver_grabbed, now);
+		if (xserver_grabbed > 1) {
+			/* 
+			 * some apps do multiple grabs... very unlikely
+			 * two apps will be doing it at same time.
+			 */
+			xserver_grabbed = 1;
+		}
+	} else if (req->reqType == X_UngrabServer) {
+		double now = dnow() - x11vnc_start;
+		xserver_grabbed--;
+		if (xserver_grabbed < 0) {
+			xserver_grabbed = 0;
+		}
+		if (0) rfbLog("X server Un-Grabbed: %d %.5f\n", xserver_grabbed, now);
+	} else {
+		;
+	}
+	XRecordFreeData(rec_data);
+}
 #endif
+
+void check_xrecord_grabserver(void) {
+	int last_val, cnt = 0, i, max = 10;
+	double d;
+#if LIBVNCSERVER_HAVE_RECORD
+	if (!gdpy_ctrl || !gdpy_data) {
+		return;
+	}
+
+if (0)	dtime0(&d);
+	XFlush(gdpy_ctrl);
+	for (i=0; i<max; i++) {
+		last_val = xserver_grabbed;
+		XRecordProcessReplies(gdpy_data);
+		if (xserver_grabbed != last_val) {
+			cnt++;
+		} else if (i > 2) {
+			break;
+		}
+	}
+	if (cnt) {
+		XFlush(gdpy_ctrl);
+	}
+if (0) {
+	d = dtime(&d);
+fprintf(stderr, "check_xrecord_grabserver: cnt=%d i=%d %.4f\n", cnt, i, d);
+}
+#endif
+}
 
 #if LIBVNCSERVER_HAVE_RECORD
 void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) {
 	int ret1, ret2;
+	int verb = (!bequiet && !quiet);
+
+	if (0 || debug_scroll) {
+		rfbLog("shutdown_record_context(0x%lx, %d, %d)\n", rc,
+		    bequiet, reopen);
+		verb = 1;
+	}
 
 	ret1 = XRecordDisableContext(rdpy_ctrl, rc);
-	if (!ret1 && !bequiet && !quiet) {
+	if (!ret1 && verb) {
 		rfbLog("XRecordDisableContext(0x%lx) failed.\n", rc);	
 	}
-	ret2 = XRecordFreeContext(rdpy_ctrl, rc_scroll);
-	if (!ret2 && !bequiet && !quiet) {
+	ret2 = XRecordFreeContext(rdpy_ctrl, rc);
+	if (!ret2 && verb) {
 		rfbLog("XRecordFreeContext(0x%lx) failed.\n", rc);	
 	}
 	XFlush(rdpy_ctrl);
@@ -3904,21 +4174,29 @@ void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) {
 	if (reopen == 2 && ret1 && ret2) {
 		reopen = 0;	/* 2 means reopen only on failure  */
 	}
+	if (reopen && gdpy_ctrl) {
+		check_xrecord_grabserver();
+		if (xserver_grabbed) {
+			rfbLog("shutdown_record_context: skip reopen,"
+			    " server grabbed\n");	
+			reopen = 0;
+		}
+	}
 	if (reopen) {
 		char *dpystr = DisplayString(dpy);
 
-		XCloseDisplay(rdpy_data);
-		rdpy_data = XOpenDisplay(dpystr);
-
-		if (! rdpy_data) {
-			rfbLog("Failed to reopen RECORD data connection:"
-			    "%s\n", dpystr);
-			rfbLog("  disabling RECORD scroll detection.\n");
-			use_xrecord = 0;
-			return;
+		if (debug_scroll) {
+			rfbLog("closing RECORD data connection.\n");
 		}
+		XCloseDisplay(rdpy_data);
+		rdpy_data = NULL;
 
+		if (debug_scroll) {
+			rfbLog("closing RECORD control connection.\n");
+		}
 		XCloseDisplay(rdpy_ctrl);
+		rdpy_ctrl = NULL;
+
 		rdpy_ctrl = XOpenDisplay(dpystr);
 
 		if (! rdpy_ctrl) {
@@ -3928,20 +4206,107 @@ void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) {
 			use_xrecord = 0;
 			return;
 		}
-		if (! bequiet && reopen == 2) {
+		XSync(dpy, False);
+
+		disable_grabserver(rdpy_ctrl, 0);
+		XSync(rdpy_ctrl, True);
+
+		rdpy_data = XOpenDisplay(dpystr);
+
+		if (! rdpy_data) {
+			rfbLog("Failed to reopen RECORD data connection:"
+			    "%s\n", dpystr);
+			rfbLog("  disabling RECORD scroll detection.\n");
+			XCloseDisplay(rdpy_ctrl);
+			rdpy_ctrl = NULL;
+			use_xrecord = 0;
+			return;
+		}
+		disable_grabserver(rdpy_data, 0);
+
+		if (debug_scroll || (! bequiet && reopen == 2)) {
 			rfbLog("reopened RECORD data and control display"
 			    " connections: %s\n", dpystr);
 		}
-		disable_grabserver(rdpy_ctrl);
-		disable_grabserver(rdpy_data);
 	}
 }
 #endif
 
-char *xerror_string(XErrorEvent *error);
-int trap_record_xerror(Display *, XErrorEvent *);
-int trapped_record_xerror;
-XErrorEvent *trapped_record_xerror_event;
+void check_xrecord_reset(void) {
+	static double last_reset = 0.0;
+	int reset_time  = 120, reset_idle  = 15;
+	int reset_time2 = 600, reset_idle2 = 40;
+	double now;
+	XErrorHandler old_handler = NULL;
+
+	if (gdpy_ctrl) {
+		X_LOCK;
+		check_xrecord_grabserver();
+		X_UNLOCK;
+	} else {
+		/* more dicey if not watching grabserver */
+		reset_time = reset_time2;
+		reset_idle = reset_idle2;
+	}
+
+	if (!use_xrecord) {
+		return;
+	}
+	if (xrecording) {
+		return;
+	}
+	if (button_mask) {
+		return;
+	}
+	if (xserver_grabbed) {
+		return;
+	}
+
+#if LIBVNCSERVER_HAVE_RECORD
+	if (! rc_scroll) {
+		return;
+	}
+	now = dnow();
+	if (last_reset == 0.0) {
+		last_reset = now;
+		return;
+	}
+	/*
+	 * try to wait for a break in input to reopen the displays
+	 * this is only to avoid XGrabServer deadlock on the repopens.
+	 */
+	if (now < last_reset + reset_time) {
+		return;
+	}
+	if (now < last_pointer_click_time + reset_idle)  {
+		return;
+	}
+	if (now < last_keyboard_time + reset_idle)  {
+		return;
+	}
+	X_LOCK;
+	trapped_record_xerror = 0;
+	old_handler = XSetErrorHandler(trap_record_xerror);
+
+	/* unlikely, but check again since we will definitely be doing it. */
+	if (gdpy_ctrl) {
+		check_xrecord_grabserver();
+		if (xserver_grabbed) {
+			XSetErrorHandler(old_handler);
+			X_UNLOCK;
+			return;
+		}
+	}
+	
+	shutdown_record_context(rc_scroll, 0, 1);
+	rc_scroll = 0;
+
+	XSetErrorHandler(old_handler);
+	X_UNLOCK;
+
+	last_reset = now;
+#endif
+}
 
 #define RECORD_ERROR_MSG \
 	if (! quiet) { \
@@ -3956,13 +4321,15 @@ XErrorEvent *trapped_record_xerror_event;
 void xrecord_watch(int start, int setby) {
 	Window focus, wm, c, clast;
 	static double create_time = 0.0;
-	double dnow;
+	double now;
 	static double last_error = 0.0;
 	int rc, db = debug_scroll;
 	int do_shutdown = 0;
 	int reopen_dpys = 1;
 	XErrorHandler old_handler = NULL;
 	static Window last_win = None, last_result = None;
+
+if (0) db = 1;
 
 	if (nofb) {
 		xrecording = 0;
@@ -3975,15 +4342,25 @@ void xrecord_watch(int start, int setby) {
 		return;
 	}
 
-	dtime0(&dnow);
-	if (dnow < last_error + 0.5) {
+	dtime0(&now);
+	if (now < last_error + 0.5) {
 		return;
+	}
+
+	if (gdpy_ctrl) {
+		X_LOCK;
+		check_xrecord_grabserver();
+		X_UNLOCK;
+		if (xserver_grabbed) {
+if (db) fprintf(stderr, "xrecord_watch: %d/%d  out xserver_grabbed\n", start, setby);
+			return;
+		}
 	}
 
 #if LIBVNCSERVER_HAVE_RECORD
 	if (! start) {
 		int shut_reopen = 2, shut_time = 25;
-if (db) fprintf(stderr, "XRECORD OFF: %d/%d  %.4f\n", xrecording, setby, dnow - x11vnc_start);
+if (db) fprintf(stderr, "XRECORD OFF: %d/%d  %.4f\n", xrecording, setby, now - x11vnc_start);
 		xrecording = 0;
 		if (! rc_scroll) {
 			xrecord_focus_window = None;
@@ -3994,10 +4371,9 @@ if (db) fprintf(stderr, "XRECORD OFF: %d/%d  %.4f\n", xrecording, setby, dnow - 
 			return;
 		}
 
-		if (! do_shutdown && dnow > create_time + shut_time) {
+		if (! do_shutdown && now > create_time + shut_time) {
 			/* XXX unstable if we keep a RECORD going forever */
 			do_shutdown = 1;
-			shut_reopen = 1;
 		}
 
 		SCR_LOCK;
@@ -4009,18 +4385,36 @@ if (db > 1) fprintf(stderr, "=== shutdown-scroll 0x%lx\n", rc_scroll);
 			old_handler = XSetErrorHandler(trap_record_xerror);
 
 			shutdown_record_context(rc_scroll, 0, shut_reopen);
-			if (! use_xrecord) return;
+			rc_scroll = 0;
+
+			/*
+			 * n.b. there is a grabserver issue wrt
+			 * XRecordCreateContext() even though rdpy_ctrl
+			 * is set imprevious to grabs.  Perhaps a bug
+			 * in the X server or library...
+			 *
+			 * If there are further problems, a thought
+			 * to recreate rc_scroll right after the
+			 * reopen.
+			 */
+
+			if (! use_xrecord) {
+				XSetErrorHandler(old_handler);
+				X_UNLOCK;
+				SCR_UNLOCK;
+				return;
+			}
 
 			XRecordProcessReplies(rdpy_data);
 
 			if (trapped_record_xerror) {
 				RECORD_ERROR_MSG;
-				last_error = dnow;
+				last_error = now;
 			}
+
 			XSetErrorHandler(old_handler);
 			X_UNLOCK;
-
-			rc_scroll = 0;
+			SCR_UNLOCK;
 
 		} else {
 			if (rcs_scroll) {
@@ -4042,11 +4436,16 @@ if (db > 1) fprintf(stderr, "=== disab-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scr
 
 					shutdown_record_context(rc_scroll,
 					    0, reopen_dpys);
-
-					last_error = dnow;
 					rc_scroll = 0;
 
-					if (! use_xrecord) return;
+					last_error = now;
+
+					if (! use_xrecord) {
+						XSetErrorHandler(old_handler);
+						X_UNLOCK;
+						SCR_UNLOCK;
+						return;
+					}
 				}
 				XSetErrorHandler(old_handler);
 				X_UNLOCK;
@@ -4076,7 +4475,7 @@ if (db > 1) fprintf(stderr, "=== disab-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scr
 		rcs_scroll = 0;
 		return;
 	}
-if (db) fprintf(stderr, "XRECORD ON:  %d/%d  %.4f\n", xrecording, setby, dnow - x11vnc_start);
+if (db) fprintf(stderr, "XRECORD ON:  %d/%d  %.4f\n", xrecording, setby, now - x11vnc_start);
 
 	if (xrecording) {
 		return;
@@ -4085,7 +4484,7 @@ if (db) fprintf(stderr, "XRECORD ON:  %d/%d  %.4f\n", xrecording, setby, dnow - 
 	if (do_shutdown && rc_scroll) {
 		static int didmsg = 0;
 		/* should not happen... */
-		if (1 || !didmsg) {
+		if (0 || !didmsg) {
 			rfbLog("warning: do_shutdown && rc_scroll\n");
 			didmsg = 1;
 		}
@@ -4192,13 +4591,31 @@ if (db) fprintf(stderr, "--- xrecord_watch: SKIP.\n");
 	trapped_record_xerror = 0;
 	old_handler = XSetErrorHandler(trap_record_xerror);
 
-
 	if (! rc_scroll) {
 		/* do_shutdown case or first time in */
+
+		if (gdpy_ctrl) {
+			/*
+			 * Even though rdpy_ctrl is impervious to grabs
+			 * at this point, we still get deadlock, why?
+			 * It blocks in the library find_display() call.
+			 */
+			check_xrecord_grabserver();
+			if (xserver_grabbed) {
+				XSetErrorHandler(old_handler);
+				X_UNLOCK;
+				SCR_UNLOCK;
+				return;
+			}
+		}
 		rcs_scroll = (XRecordClientSpec) clast;
 		rc_scroll = XRecordCreateContext(rdpy_ctrl, 0, &rcs_scroll, 1,
 		    rr_scroll, 2);
 
+		if (! do_shutdown) {
+			XSync(rdpy_ctrl, False);
+		}
+if (db) fprintf(stderr, "NEW rc:    0x%lx\n", rc_scroll);
 		if (rc_scroll) {
 			dtime0(&create_time);
 		} else {
@@ -4224,11 +4641,11 @@ if (db > 1) fprintf(stderr, "=-=   reg-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scr
 
 		if (!XRecordRegisterClients(rdpy_ctrl, rc_scroll, 0,
 		    &rcs_scroll, 1, rr_scroll, 2)) {
-			if (1 || dnow > last_error + 60) {
+			if (1 || now > last_error + 60) {
 				rfbLog("failed to register client 0x%lx with"
 				    " X RECORD context rc_scroll.\n", clast);
 			}
-			last_error = dnow;
+			last_error = now;
 			rcs_scroll = 0;
 			/* continue on for now... */
 		}
@@ -4252,14 +4669,12 @@ if (db) fprintf(stderr, "rc_scroll: 0x%lx\n", rc_scroll);
 	} else if (! rcs_scroll || trapped_record_xerror) {
 		/* try again later */
 		shutdown_record_context(rc_scroll, 0, reopen_dpys);
-		if (! use_xrecord) return;
 		rc_scroll = 0;
-		last_error = dnow;
+		last_error = now;
 
 		XSetErrorHandler(old_handler);
 		X_UNLOCK;
 		SCR_UNLOCK;
-
 		return;
 	}
 
@@ -4285,24 +4700,25 @@ if (db) fprintf(stderr, "rc_scroll: 0x%lx\n", rc_scroll);
 	    (XPointer) xrecord_seq);
 
 	if (!rc || trapped_record_xerror) {
-		if (1 || dnow > last_error + 60) {
+		if (1 || now > last_error + 60) {
 			rfbLog("failed to enable RECORD context "
-			    "rc_scroll: 0x%lx\n", rc_scroll);
+			    "rc_scroll: 0x%lx rc: %d\n", rc_scroll, rc);
 			if (trapped_record_xerror) {
 				RECORD_ERROR_MSG;
 			}
 		}
 		shutdown_record_context(rc_scroll, 0, reopen_dpys);
-		if (! use_xrecord) return;
 		rc_scroll = 0;
-		last_error = dnow;
+		last_error = now;
 		xrecording = 0;
 		/* continue on for now... */
 	}
 	XSetErrorHandler(old_handler);
 
 	/* XXX this may cause more problems than it solves... */
-	XFlush(rdpy_data);
+	if (use_xrecord) {
+		XFlush(rdpy_data);
+	}
 
 	X_UNLOCK;
 	SCR_UNLOCK;
@@ -4398,14 +4814,7 @@ void clean_up_exit (int ret) {
 		XEFreeTC(trap_ctx);
 	}
 #endif
-#if LIBVNCSERVER_HAVE_RECORD
-	/* XXX currently blocks: */
-#if 0
-	if (rdpy_ctrl && rc_scroll) XRecordDisableContext(rdpy_ctrl, rc_scroll);
-	if (rdpy_data) XCloseDisplay(rdpy_data);
-	if (rdpy_ctrl) XCloseDisplay(rdpy_ctrl);
-#endif
-#endif
+	/* XXX rdpy_ctrl, etc. cannot close w/o blocking */
 	XCloseDisplay(dpy);
 	X_UNLOCK;
 
@@ -4666,6 +5075,30 @@ int valid_window(Window win, XWindowAttributes *attr_ret, int bequiet) {
 			    xerror_string(trapped_xerror_event), win);
 		}
 		ok = 0;
+	}
+	XSetErrorHandler(old_handler);
+	trapped_xerror = 0;
+	
+	return ok;
+}
+
+Bool xtranslate(Window src, Window dst, int src_x, int src_y, int *dst_x,
+    int *dst_y, Window *child, int bequiet) {
+	XErrorHandler old_handler;
+	Bool ok = False;
+
+	trapped_xerror = 0;
+	old_handler = XSetErrorHandler(trap_xerror);
+	if (XTranslateCoordinates(dpy, src, dst, src_x, src_y, dst_x,
+	    dst_y, child)) {
+		ok = True;
+	}
+	if (trapped_xerror && trapped_xerror_event) {
+		if (! quiet && ! bequiet) {
+			rfbLog("xtranslate: trapped XError: %s (0x%lx)\n",
+			    xerror_string(trapped_xerror_event), src);
+		}
+		ok = False;
 	}
 	XSetErrorHandler(old_handler);
 	trapped_xerror = 0;
@@ -8470,7 +8903,7 @@ keyevent_t key_history[KEY_HIST];
 double typing_rate(double time_window, int *repeating) {
 	double dt = 1.0, now = dnow();
 	KeySym key = NoSymbol;
-	int i, idx, cnt = 0, diff_keys = 0;
+	int i, idx, cnt = 0, repeat_keys = 0;
 
 	if (key_history_idx == -1) {
 		if (repeating) {
@@ -8493,15 +8926,17 @@ double typing_rate(double time_window, int *repeating) {
 			break;
 		}
 		cnt++;
-		if (key != NoSymbol && key != key_history[idx].sym) {
-			diff_keys++;
+		if (key == NoSymbol) {
+			key = key_history[idx].sym;
+			repeat_keys = 1;
+		} else if (key == key_history[idx].sym) {
+			repeat_keys++;
 		}
-		key = key_history[idx].sym;
 	}
 
 	if (repeating) {
-		if (! diff_keys && cnt > 4) {
-			*repeating = 1;
+		if (repeat_keys >= 2) {
+			*repeating = repeat_keys;
 		} else {
 			*repeating = 0;
 		}
@@ -8525,18 +8960,21 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	int idx, isbutton = 0;
 	allowed_input_t input;
 	time_t now = time(0);
-	double dnow;
+	double tnow;
+	static int skipped_last_down;
 	static rfbBool last_down;
-	static rfbKeySym last_keysym;
+	static rfbKeySym last_keysym = NoSymbol;
+	static rfbKeySym max_keyrepeat_last_keysym = NoSymbol;
+	static double max_keyrepeat_last_time = 0.0;
 
-	dtime0(&dnow);
+	dtime0(&tnow);
 
 	if (debug_keyboard) {
 		char *str;
 		X_LOCK;
 		str = XKeysymToString(keysym);
 		rfbLog("keyboard(%s, 0x%x \"%s\")  %.4f\n", down ? "down":"up",
-		    (int) keysym, str ? str : "null", dnow - x11vnc_start);
+		    (int) keysym, str ? str : "null", tnow - x11vnc_start);
 		X_UNLOCK;
 	}
 
@@ -8552,7 +8990,12 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 	last_down = down;
 	last_keysym = keysym;
-	last_keyboard_time = dnow;
+	last_keyboard_time = tnow;
+
+	last_rfb_down = down;
+	last_rfb_keysym = keysym;
+	last_rfb_keytime = tnow;
+	last_rfb_key_accepted = FALSE;
 
 	if (key_history_idx == -1) {
 		for (idx=0; idx<KEY_HIST; idx++) {
@@ -8568,73 +9011,80 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	}
 	key_history[idx].sym = keysym;
 	key_history[idx].down = down;
-	key_history[idx].time = dnow;
+	key_history[idx].time = tnow;
 
-	if (0 && max_scroll_keyrate) {
-		/* XXX not working... */
-		static int hlen = 256, hidx = 0;
-		static keyevent_t history[256];
-		static rfbKeySym last_down_skip_keysym = None;
-		double key_dt, keytimes[256];
-		int idx, i, nrep = 0, skip = 0;
-
-		if (!down) {
-			if (last_down_skip_keysym != None) {
-				if (keysym == last_down_skip_keysym) {
-					skip = 1;
-				}
+	if (use_xdamage && down && skip_duplicate_key_events &&
+	    (keysym == XK_Alt_L || keysym == XK_Super_L)) {
+		int i, k, run = 0;
+		double delay = 1.0;
+		for (i=0; i<16; i++) {
+			k = idx - i;
+			if (k < 0) k += KEY_HIST;
+			if (!key_history[k].down) {
+				continue;
 			}
-		} else {
-			if (last_scroll_type == SCR_KEY &&
-			    dnow < last_scroll_event + 1.0) {
-				key_dt = 1.0/max_scroll_keyrate;
-if (0) fprintf(stderr, "key_dt: %.4f\n", key_dt);
-				for (i=0; i<hlen; i++) {
-					idx = hidx - i - 1;
-					if (idx < 0) idx += hlen;
-
-					if (history[idx].sym != keysym) {
-						break;
-					}
-					if (dnow > history[idx].time + 1.5) {
-						break;
-					}
-					if (history[idx].down == down) {
-
-if (0) fprintf(stderr, "key_dt: %.4f  %d %d %.4f\n", key_dt, history[idx].sym,
-	history[idx].down, history[idx].time - x11vnc_start);
-
-						keytimes[nrep++] =
-						    history[idx].time;
-					}
-				}
-				if (nrep > 0) {
-					idx = hidx - 1;
-					if (idx < 0) idx += hlen;
-					if (dnow < keytimes[0] + key_dt) {
-						skip = 1;
-					}
-				}
+			if (key_history[k].time < tnow - delay) {
+				break;
+			} else if (key_history[k].sym == XK_Alt_L) {
+				run++;
+			} else if (key_history[k].sym == XK_Super_L) {
+				run++;
+			} else {
+				break;
 			}
 		}
-		if (skip) {
-			rfbLog("--- scroll keyrate skipping 0x%lx %s rep:%d  "
-			    "%.4f\n", keysym, down ? "down":"up", nrep,
-			    down ? dnow - keytimes[0] : dnow - x11vnc_start); 
-			if (down) {
-				last_down_skip_keysym = keysym;
-			}
-			return;
-		}
-		last_down_skip_keysym = None;
-
-		history[hidx].sym = keysym;
-		history[hidx].time = dnow;
-		history[hidx].down = down;
-		if (++hidx >= hlen) {
-			hidx = 0;
+		if (run == 3) {
+			rfbLog("3*Alt_L, calling: set_xdamage_mark()\n");
+			set_xdamage_mark(0, 0, dpy_x, dpy_y);
+		} else if (run == 4) {
+			rfbLog("4*Alt_L, calling: refresh_screen(0)\n");
+			refresh_screen(0);
+		} else if (run == 5) {
+			rfbLog("5*Alt_L, setting: do_copy_screen\n");
+			do_copy_screen = 1;
 		}
 	}
+
+	if (!down && skipped_last_down) {
+		int db = debug_scroll;
+		if (keysym == max_keyrepeat_last_keysym) {
+			skipped_last_down = 0;
+			if (db) rfbLog("--- scroll keyrate skipping 0x%lx %s "
+			    "%.4f  %.4f\n", keysym, down ? "down":"up  ",
+			    tnow - x11vnc_start, tnow - max_keyrepeat_last_time); 
+			return;
+		}
+	}
+	if (down && max_keyrepeat_time > 0.0) {
+		int skip = 0;
+		int db = debug_scroll;
+
+		if (max_keyrepeat_last_keysym != NoSymbol &&
+		    max_keyrepeat_last_keysym != keysym) {
+			;
+		} else {
+			if (tnow < max_keyrepeat_last_time+max_keyrepeat_time) {
+				skip = 1;
+			}
+		}
+		max_keyrepeat_time = 0.0;
+		if (skip) {
+			if (db) rfbLog("--- scroll keyrate skipping 0x%lx %s "
+			    "%.4f  %.4f\n", keysym, down ? "down":"up  ",
+			    tnow - x11vnc_start, tnow - max_keyrepeat_last_time); 
+			max_keyrepeat_last_keysym = keysym;
+			skipped_last_down = 1;
+			return;
+		} else {
+			if (db) rfbLog("--- scroll keyrate KEEPING  0x%lx %s "
+			    "%.4f  %.4f\n", keysym, down ? "down":"up  ",
+			    tnow - x11vnc_start, tnow - max_keyrepeat_last_time); 
+		}
+	}
+	max_keyrepeat_last_keysym = keysym;
+	max_keyrepeat_last_time = tnow;
+	skipped_last_down = 0;
+	last_rfb_key_accepted = TRUE;
 
 	if (pipeinput_fh != NULL) {
 		pipe_keyboard(down, keysym, client);
@@ -8645,6 +9095,11 @@ if (0) fprintf(stderr, "key_dt: %.4f  %d %d %.4f\n", key_dt, history[idx].sym,
 				last_keyboard_input = now;
 		
 				last_keysym = keysym;
+
+				last_rfb_down = down;
+				last_rfb_keysym = keysym;
+				last_rfb_keytime = tnow;
+
 				got_user_input++;
 				got_keyboard_input++;
 			}
@@ -8665,6 +9120,11 @@ if (0) fprintf(stderr, "key_dt: %.4f  %d %d %.4f\n", key_dt, history[idx].sym,
 	last_keyboard_input = now;
 
 	last_keysym = keysym;
+
+	last_rfb_down = down;
+	last_rfb_keysym = keysym;
+	last_rfb_keytime = tnow;
+
 	got_user_input++;
 	got_keyboard_input++;
 	
@@ -8723,6 +9183,7 @@ if (0) fprintf(stderr, "key_dt: %.4f  %d %d %.4f\n", key_dt, history[idx].sym,
 			rfbLog("keyboard(): remapping keystroke to button %d"
 			    " click\n", button);
 		}
+		dtime0(&last_key_to_button_remap_time);
 
 		X_LOCK;
 		/*
@@ -9145,6 +9606,10 @@ static void update_x11_pointer_position(int x, int y) {
 	}
 	X_UNLOCK;
 
+	if (cursor_x != x || cursor_y != y) {
+		last_pointer_motion_time = dnow();
+	}
+
 	cursor_x = x;
 	cursor_y = y;
 
@@ -9230,6 +9695,10 @@ static void update_x11_pointer_mask(int mask) {
 
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
+	if (mask != button_mask) {
+		last_pointer_click_time = dnow();
+	}
+
 	if (scaling && ! got_scrollcopyrect) {
 		xr_mouse = 0;
 	} else if (nofb) {
@@ -9268,10 +9737,18 @@ if (debug_scroll > 1) fprintf(stderr, "wm_win: 0x%lx\n", mwin);
 				skip = 1;
 			} else {
 				int ok = 0;
+				int btn4 = (1<<3);
+				int btn5 = (1<<4);
+
 				if (near_scrollbar_edge(x, y, w, h, px, py)) {
 					ok = 1;
 				}
-				if (! ok && mwin != None) {
+				if (mask & (btn4|btn5)) {
+					/* scroll wheel mouse */
+					ok = 1;
+				}
+				if (mwin != None) {
+					/* skinny internal window */
 					int w = attr.width;
 					int h = attr.height;
 					if (h > 10 * w || w > 10 * h) {
@@ -9401,6 +9878,7 @@ void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
 void pointer(int mask, int x, int y, rfbClientPtr client) {
 	allowed_input_t input;
 	int sent = 0, buffer_it = 0;
+	double now;
 
 	if (debug_pointer && mask >= 0) {
 		static int show_motion = -1;
@@ -9455,6 +9933,9 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	if (view_only) {
 		return;
 	}
+
+	now = dnow();
+
 	if (mask >= 0) {
 		/*
 		 * mask = -1 is a special case call from scan_for_updates()
@@ -9468,6 +9949,8 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		got_user_input++;
 		got_pointer_input++;
 		last_pointer_client = client;
+
+		last_pointer_time = now;
 	}
 
 	/*
@@ -10863,8 +11346,9 @@ void check_xevents(void) {
 	if (now > last_sync + 1200) {
 		/* kludge for any remaining event leaks */
 		int bugout = use_xdamage ? 500 : 50;
+		int qlen, i;
 		if (last_sync != 0) {
-			int qlen = XEventsQueued(dpy, QueuedAlready);
+			qlen = XEventsQueued(dpy, QueuedAlready);
 			if (qlen >= bugout) {
 				rfbLog("event leak: %d queued, "
 				    " calling XSync(dpy, True)\n", qlen);  
@@ -10874,6 +11358,20 @@ void check_xevents(void) {
 			}
 		}
 		last_sync = now;
+
+		/* clear these, we don't want any events on them */
+		if (rdpy_ctrl) {
+			qlen = XEventsQueued(rdpy_ctrl, QueuedAlready);
+			for (i=0; i<qlen; i++) {
+				XNextEvent(rdpy_ctrl, &xev);
+			}
+		}
+		if (gdpy_ctrl) {
+			qlen = XEventsQueued(gdpy_ctrl, QueuedAlready);
+			for (i=0; i<qlen; i++) {
+				XNextEvent(gdpy_ctrl, &xev);
+			}
+		}
 	}
 	X_UNLOCK;
 
@@ -11574,7 +12072,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		push_black_screen(4);
 	} else if (!strcmp(p, "refresh")) {
 		NOTAPP
-		refresh_screen();
+		refresh_screen(1);
 	} else if (!strcmp(p, "reset")) {
 		NOTAPP
 		do_new_fb(1);
@@ -12459,7 +12957,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    "(if applicable).\n");
 		if (! xtrap_input) {
 			xtrap_input = 1;
-			disable_grabserver(dpy);
+			disable_grabserver(dpy, 1);
 		}
 
 	} else if (!strcmp(p, "noxtrap")) {
@@ -12471,7 +12969,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    "(if applicable).\n");
 		if (xtrap_input) {
 			xtrap_input = 0;
-			disable_grabserver(dpy);
+			disable_grabserver(dpy, 1);
 		}
 
 	} else if (!strcmp(p, "xrandr")) {
@@ -13401,6 +13899,24 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    scroll_term_str);
 		initialize_scroll_term();
 
+	} else if (strstr(p, "scr_keyrepeat") == p) {
+		char *s = max_keyrepeat_str;
+		if (!s || *s == '\0') s = max_keyrepeat_str0;
+		COLON_CHECK("scr_keyrepeat:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co, NONUL(s));
+			goto qry;
+		}
+		p += strlen("scr_keyrepeat:");
+		if (max_keyrepeat_str) {
+			free(max_keyrepeat_str);
+		}
+
+		max_keyrepeat_str = strdup(p);
+		rfbLog("remote_cmd: changed -scr_keyrepeat to: %s\n",
+		    max_keyrepeat_str);
+		initialize_max_keyrepeat();
+
 	} else if (strstr(p, "scr_parms") == p) {
 		COLON_CHECK("scr_parms:")
 		if (query) {
@@ -13459,6 +13975,29 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		set_scrollcopyrect_mode("never");
 		rfbLog("remote_cmd: changed -scrollcopyrect mode "
 		    "to: %s\n", NONUL(scroll_copyrect));
+
+	} else if (!strcmp(p, "noxrecord")) {
+		int orig = noxrecord;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, noxrecord);
+			goto qry;
+		}
+		noxrecord = 1;
+		rfbLog("set noxrecord to: %d\n", noxrecord);
+		if (orig != noxrecord) {
+			shutdown_xrecord();
+		}
+	} else if (!strcmp(p, "xrecord")) {
+		int orig = noxrecord;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !noxrecord);
+			goto qry;
+		}
+		noxrecord = 0;
+		rfbLog("set noxrecord to: %d\n", noxrecord);
+		if (orig != noxrecord) {
+			initialize_xrecord();
+		}
 
 	} else if (strstr(p, "pointer_mode") == p) {
 		int pm;
@@ -14476,6 +15015,7 @@ void add_region_xdamage(sraRegionPtr new_region) {
 
 	reg = xdamage_regions[prev_tick];  
 	if (reg != NULL) {
+if (0) fprintf(stderr, "add_region_xdamage: prev_tick: %d reg %p\n", prev_tick, reg);
 		sraRgnOr(reg, new_region);
 	}
 }
@@ -17161,7 +17701,7 @@ XImage *initialize_raw_fb(void) {
 			    DisplayString(dpy));
 			XCloseDisplay(dpy);	/* yow! */
 		}
-		dpy = 0;
+		dpy = NULL;
 	}
 #endif
 
@@ -17580,8 +18120,11 @@ XImage *initialize_xdisplay_fb(void) {
 		int disp_y = DisplayHeight(dpy, scr);
 		Window twin;
 		/* subwins can be a dicey if they are changing size... */
+		trapped_xerror = 0;
+		old_handler = XSetErrorHandler(trap_xerror);
 		XTranslateCoordinates(dpy, window, rootwin, 0, 0, &subwin_x,
 		    &subwin_y, &twin);
+
 		if (subwin_x + wdpy_x > disp_x) {
 			shift = 1;
 			subwin_x = disp_x - wdpy_x - 3;
@@ -17599,8 +18142,6 @@ XImage *initialize_xdisplay_fb(void) {
 			subwin_y = 1;
 		}
 
-		trapped_xerror = 0;
-		old_handler = XSetErrorHandler(trap_xerror);
 		if (shift) {
 			XMoveWindow(dpy, window, subwin_x, subwin_y);
 		}
@@ -18982,10 +19523,9 @@ void blackout_tiles(void) {
 	}
 
 	/* 
-	 * to simplify things drop down to single copy mode, no vcr, etc...
+	 * to simplify things drop down to single copy mode, etc...
 	 */
 	single_copytile = 1;
-
 	/* loop over all tiles. */
 	for (ty=0; ty < ntiles_y; ty++) {
 		for (tx=0; tx < ntiles_x; tx++) {
@@ -19237,12 +19777,15 @@ void push_black_screen(int n) {
 	push_sleep(n);
 }
 
-void refresh_screen(void) {
+void refresh_screen(int push) {
+	int i;
 	if (!screen) {
 		return;
 	}
 	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 1);
-	rfbPE(-1);
+	for (i=0; i<push; i++) {
+		rfbPE(-1);
+	}
 }
 
 /*
@@ -19635,6 +20178,7 @@ void initialize_polling_images(void) {
 			    " to manually\n");
 			rfbLog("shm: delete unattached shm segments.\n");
 			single_copytile_count = i;
+			single_copytile = 1;
 		}
 		tile_shm_count++;
 		if (single_copytile && i >= 1) {
@@ -19756,7 +20300,6 @@ static void hint_updates(void) {
 			in_run = 0;
 		}
 	}
-
 
 	for (i=0; i < hint_count; i++) {
 		/* pass update info to vnc: */
@@ -21432,7 +21975,7 @@ void set_offset(void) {
 		return;
 	}
 	X_LOCK;
-	XTranslateCoordinates(dpy, window, rootwin, 0, 0, &off_x, &off_y, &w);
+	xtranslate(window, rootwin, 0, 0, &off_x, &off_y, &w, 0);
 	X_UNLOCK;
 }
 
@@ -21880,6 +22423,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		}
 		if (dpy)  {
 			XCloseDisplay(dpy);
+			dpy = NULL;
 		}
 		if (old_xauth) {
 			if (*old_xauth == '\0') {
@@ -22792,6 +23336,30 @@ void initialize_scroll_term(void) {
 	}
 }
 
+void initialize_max_keyrepeat(void) {
+	char *str;
+	int lo, hi;
+
+	if (max_keyrepeat_str != NULL && *max_keyrepeat_str != '\0') {
+		str = max_keyrepeat_str;
+	} else {
+		str = max_keyrepeat_str0;
+	}
+
+	if (sscanf(str, "%d-%d", &lo, &hi) != 2) {
+		rfbLog("skipping invalid -scr_keyrepeat string: %s\n", str);
+		sscanf(max_keyrepeat_str0, "%d-%d", &lo, &hi);
+	}
+	max_keyrepeat_lo = lo;
+	max_keyrepeat_hi = hi;
+	if (max_keyrepeat_lo < 1) {
+		max_keyrepeat_lo = 1;
+	}
+	if (max_keyrepeat_hi > 40) {
+		max_keyrepeat_hi = 40;
+	}
+}
+
 typedef struct saveline {
 	int x0, y0, x1, y1;
 	int shift;
@@ -23382,7 +23950,7 @@ if (n) { \
 	fprintf(stderr, "---PUSH\n"); \
 }
 
-int push_scr_ev(double max_age, int type, int bdpush, int bdx, int bdy,
+int push_scr_ev(double *age, int type, int bdpush, int bdx, int bdy,
     int bdskinny) {
 	Window frame, win, win0;
 	int x, y, w, h, wx, wy, ww, wh, dx, dy;
@@ -23390,11 +23958,15 @@ int push_scr_ev(double max_age, int type, int bdpush, int bdx, int bdy,
 	int nx, ny, nw, nh;
 	int dret = 1, do_fb_push = 0, obscured;
 	int ev, ev_tot = scr_ev_cnt;
-	double tm, dt, st, dnow, waittime = 0.125;
+	double tm, dt, st, waittime = 0.125;
+	double max_age = *age;
 	int db = debug_scroll, rrate = get_read_rate();
 	sraRegionPtr backfill, whole, tmpregion, tmpregion2;
 	int link, latency, netrate;
 	int ypad = 0;
+
+	/* we return the oldest one. */
+	*age = 0.0;
 
 	if (ev_tot == 0) {
 		return dret;
@@ -23410,8 +23982,6 @@ int push_scr_ev(double max_age, int type, int bdpush, int bdx, int bdy,
 		waittime *= 3;
 	}
 
-	dtime0(&dnow);
-
 	backfill = sraRgnCreate();
 	whole = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
 
@@ -23426,6 +23996,7 @@ int push_scr_ev(double max_age, int type, int bdpush, int bdx, int bdy,
 if (db) fprintf(stderr, "ypad: %d  dy[0]: %d\n", ypad, scr_ev[0].dy);
 
 	for (ev=0; ev < ev_tot; ev++) {
+		double ag;
 	
 		x   = scr_ev[ev].x;
 		y   = scr_ev[ev].y;
@@ -23444,12 +24015,18 @@ if (db) fprintf(stderr, "ypad: %d  dy[0]: %d\n", ypad, scr_ev[0].dy);
 		nh  = scr_ev[ev].new_h;
 		st  = scr_ev[ev].t;
 
-		if (dabs((dnow - servertime_diff) - st) > max_age) {
-if (db) fprintf(stderr, "push_scr_ev: TOO OLD: %.4f :: (%.4f - %.4f) - %.4f \n", (dnow - servertime_diff) - st, dnow, servertime_diff, st);				
+		ag = (dnow() - servertime_diff) - st;
+		if (ag > *age) {
+			*age = ag;
+		}
+
+		if (dabs(ag) > max_age) {
+if (db) fprintf(stderr, "push_scr_ev: TOO OLD: %.4f :: (%.4f - %.4f) "
+    "- %.4f \n", ag, dnow(), servertime_diff, st);				
 			dret = 0;
 			break;
 		} else {
-if (db) fprintf(stderr, "push_scr_ev: AGE:     %.4f\n", (dnow - servertime_diff) - st);				
+if (db) fprintf(stderr, "push_scr_ev: AGE:     %.4f\n", ag);
 		}
 		if (win != win0) {
 if (db) fprintf(stderr, "push_scr_ev: DIFF WIN: 0x%lx != 0x%lx\n", win, win0);
@@ -23659,7 +24236,7 @@ PUSH_TEST(0);
 			}
 			sraRgnReleaseIterator(iter);
 			dt = dtime(&tm);
-if (0) fprintf(stderr, "  dfc---- dt: %.4f", dt);
+if (db) fprintf(stderr, "  dfc---- dt: %.4f", dt);
 
 		}
 if (db &&  dret) fprintf(stderr, " **** dret=%d", dret);
@@ -23992,6 +24569,9 @@ void mark_region_for_xdamage(sraRegionPtr region) {
 void set_xdamage_mark(int x, int y, int w, int h) {
 	sraRegionPtr region;
 
+	if (! use_xdamage) {
+		return;
+	}
 	mark_for_xdamage(x, y, w, h);
 
 	if (xdamage_scheduled_mark == 0.0) {
@@ -24021,8 +24601,12 @@ int check_xrecord_keys(void) {
 	static int persist_count = 0;
 	double last_scroll, scroll_persist = scr_key_persist;
 	double spin_fac = 1.0, scroll_fac = 2.0;
-	double max_spin;
-	double max_long_spin = 0.3;
+	double max_spin, max_long_spin = 0.3;
+	double set_repeat_in;
+	static double set_repeat = 0.0;
+
+	set_repeat_in = set_repeat;
+	set_repeat = 0.0;
 
 	get_out = 1;
 	if (got_keyboard_input) {
@@ -24031,6 +24615,10 @@ int check_xrecord_keys(void) {
 
 	dtime0(&tnow);
 	if (tnow < last_key_scroll + scroll_persist) {
+		get_out = 0;
+	}
+
+	if (set_repeat_in > 0.0 && tnow < last_key_scroll + set_repeat_in) {
 		get_out = 0;
 	}
 
@@ -24048,9 +24636,14 @@ int check_xrecord_keys(void) {
 
 	max_spin = scr_key_time;
 
-	if (tnow < last_key_scroll + scroll_persist) {
+	if (set_repeat_in > 0.0 && tnow < last_key_scroll + 2*set_repeat_in) {
+		max_spin = 2 * set_repeat_in;
+	} else if (tnow < last_key_scroll + scroll_persist) {
 		max_spin = 1.25*(tnow - last_key_scroll);
-	} else if (xrecord_scroll_keysym(last_keysym)) {
+	} else if (tnow < last_key_to_button_remap_time + scroll_persist) {
+		/* mostly a hack I use for testing -remap key -> btn4/btn5 */
+		max_spin = scroll_persist;
+	} else if (xrecord_scroll_keysym(last_rfb_keysym)) {
 		spin_fac = scroll_fac;
 	}
 	if (max_spin > max_long_spin) {
@@ -24058,13 +24651,13 @@ int check_xrecord_keys(void) {
 	}
 
 	/* XXX use this somehow  */
-	link = link_rate(&latency, &netrate);
+if (0)	link = link_rate(&latency, &netrate);
 
 	gk = gk0 = got_keyboard_input;
 	dtime0(&tm);
 
-if (db) fprintf(stderr, "check_xrecord_keys: BEGIN LOOP: scr_ev_cnt: %d max: %.3f\n",
-    scr_ev_cnt, max_spin);
+if (db) fprintf(stderr, "check_xrecord_keys: BEGIN LOOP: scr_ev_cnt: "
+    "%d max: %.3f  %.4f\n", scr_ev_cnt, max_spin, tm - x11vnc_start);
 
 	while (1) {
 
@@ -24085,6 +24678,10 @@ if (db) fprintf(stderr, "check_xrecord_keys: BEGIN LOOP: scr_ev_cnt: %d max: %.3
 		XFlush(dpy);
 		X_UNLOCK;
 
+		if (set_repeat_in > 0.0) {
+			max_keyrepeat_time = set_repeat_in;
+		}
+
 		if (use_threads) {
 			usleep(1000);
 		} else {
@@ -24096,10 +24693,14 @@ if (db) fprintf(stderr, "check_xrecord_keys: BEGIN LOOP: scr_ev_cnt: %d max: %.3
 		if (got_keyboard_input > gk) {
 			gk = got_keyboard_input;
 			input++;
-			if (xrecord_scroll_keysym(last_keysym)) {
+			if (set_repeat_in) {
+				;
+			} else if (xrecord_scroll_keysym(last_rfb_keysym)) {
 				spin_fac = scroll_fac;
 			}
-if (db) fprintf(stderr, "check_xrecord: more keys: %.3f\n", spin);
+if (0 || db) fprintf(stderr, "check_xrecord: more keys: %.3f  0x%x "
+    " %.4f  %s  %s\n", spin, last_rfb_keysym, last_rfb_keytime - x11vnc_start,
+    last_rfb_down ? "down":"up  ", last_rfb_key_accepted ? "accept":"skip");
 			flush2 = 1;
 			XFlush(dpy);
 		}
@@ -24109,16 +24710,20 @@ if (db) fprintf(stderr, "check_xrecord: more keys: %.3f\n", spin);
 		X_UNLOCK;
 
 		if (spin >= max_spin * spin_fac) {
-if (db) fprintf(stderr, "check_xrecord: SPIN-OUT: %.3f/%.3f\n", spin,
+if (0 || db) fprintf(stderr, "check_xrecord: SPIN-OUT: %.3f/%.3f\n", spin,
     max_spin * spin_fac);
 			fail = 1;
 			break;
 		}
 	}
 
+	max_keyrepeat_time = 0.0;
+
 	if (scr_ev_cnt) {
 		int dret, ev = scr_ev_cnt - 1;
 		int bdx, bdy, bdskinny, bdpush = 0;
+		double max_age = 0.25, age, tm, dt;
+		static double last_scr_ev = 0.0;
 
 		last_wx = scr_ev[ev].win_x;
 		last_wy = scr_ev[ev].win_y;
@@ -24136,10 +24741,34 @@ if (db) fprintf(stderr, "check_xrecord: SPIN-OUT: %.3f/%.3f\n", spin,
 			set_bdpush(SCR_KEY, &last_bdpush, &bdpush);
 		}
 
-		dret = push_scr_ev(0.25, SCR_KEY, bdpush, bdx, bdy, bdskinny);
+		dtime0(&tm);
+		age = max_age;
+		dret = push_scr_ev(&age, SCR_KEY, bdpush, bdx, bdy, bdskinny);
+		dt = dtime(&tm);
 
 		ret = 1 + dret;
 		scr_ev_cnt = 0;
+
+		if (ret == 2 && xrecord_scroll_keysym(last_rfb_keysym)) {
+			int repeating;
+			double time_lo = 1.0/max_keyrepeat_lo;
+			double time_hi = 1.0/max_keyrepeat_hi;
+			double rate = typing_rate(0.0, &repeating);
+if (0 || db) fprintf(stderr, "Typing: dt: %.4f rate: %.1f\n", dt, rate);
+			if (repeating) {
+				/* n.b. the "quantum" is about 1/30 sec. */
+				max_keyrepeat_time = 1.0*dt;
+				if (max_keyrepeat_time > time_lo ||
+				    max_keyrepeat_time < time_hi) {
+					max_keyrepeat_time = 0.0;
+				} else {
+					set_repeat = max_keyrepeat_time;
+if (0 || db) fprintf(stderr, "set max_keyrepeat_time: %.2f\n", max_keyrepeat_time);
+				}
+			}
+		}
+
+		last_scr_ev = dnow();
 	}
 
 	if ((got_one && ret < 2) || persist_count) {
@@ -24197,6 +24826,10 @@ int check_xrecord_mouse(void) {
 	static int want_back_in = 0;
 	int came_back_in;
 
+	int scroll_wheel = 0;
+	int btn4 = (1<<3);
+	int btn5 = (1<<4);
+
 	get_out = 1;
 	if (button_mask) {
 		get_out = 0;
@@ -24225,6 +24858,10 @@ if (0) fprintf(stderr, "check_xrecord_mouse: IN xrecording: %d\n", xrecording);
 		came_back_in = 0;
 	}
 	want_back_in = 0;
+
+	if (button_mask & (btn4|btn5)) {
+		scroll_wheel = 1;
+	}
 
 	/*
 	 * set up times for the various "reputations"
@@ -24278,15 +24915,15 @@ if (0) fprintf(stderr, "check_xrecord_mouse: IN xrecording: %d\n", xrecording);
 	last_x = start_x = cursor_x;
 	last_y = start_y = cursor_y;
 
-if (db) fprintf(stderr, "check_xrecord_mouse: BEGIN LOOP: scr_ev_cnt: %d max: %.3f\n",
-    scr_ev_cnt, max_spin[scroll_rep]);
+if (db) fprintf(stderr, "check_xrecord_mouse: BEGIN LOOP: scr_ev_cnt: "
+    "%d max: %.3f  %.4f\n", scr_ev_cnt, max_spin[scroll_rep], tm - x11vnc_start);
 
 	while (1) {
 		double spin_check;
 		if (scr_ev_cnt) {
 			int dret, ev = scr_ev_cnt - 1;
 			int bdpush = 0, bdx, bdy, bdskinny;
-			double tm, dt;
+			double tm, dt, age = 0.35;
 
 			got_one = 1;
 			scrollability(xrecord_ptr_window, SCR_SUCCESS);
@@ -24309,7 +24946,7 @@ if (db) fprintf(stderr, "check_xrecord_mouse: BEGIN LOOP: scr_ev_cnt: %d max: %.
 
 			dtime0(&tm);
 
-			dret = push_scr_ev(0.35, SCR_MOUSE, bdpush, bdx,
+			dret = push_scr_ev(&age, SCR_MOUSE, bdpush, bdx,
 			    bdy, bdskinny);
 			ret = 1 + dret;
 
@@ -24406,6 +25043,10 @@ if (db) fprintf(stderr, "check_xrecord: SPIN-OUT-3: %.3f/%.3f\n", spin, max_long
 			} else if (came_back_in) {
 				dtime0(&button_up_time);
 				doflush = 1;
+			} else if (scroll_wheel) {
+if (db) fprintf(stderr, "check_xrecord: SCROLL-WHEEL-BUTTON-UP-KEEP-GOING:  %.3f/%.3f %d/%d %d/%d\n", spin, max_long[scroll_rep], last_x, last_y, cursor_x, cursor_y);
+				doflush = 1;
+				dtime0(&button_up_time);
 			} else if (last_x == cursor_x && last_y == cursor_y) {
 if (db) fprintf(stderr, "check_xrecord: BUTTON-UP:  %.3f/%.3f %d/%d %d/%d\n", spin, max_long[scroll_rep], last_x, last_y, cursor_x, cursor_y);
 				break;
@@ -26701,6 +27342,7 @@ if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnow() - x11vnc_start)
 		msec = (int) (1000 * 1.75 * bave);
 		if (dts[ndt - nave - 1] > 0.75 * bave) {
 			msec = 1.5 * msec;
+			set_xdamage_mark(0, 0, dpy_x, dpy_y);
 		}
 		if (msec > 1500) {
 			msec = 1500;
@@ -26828,6 +27470,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_connect_inputs();		
 			check_padded_fb();		
 			check_xdamage_state();
+			check_xrecord_reset();
 			check_add_keysyms();
 			if (started_as_root) {
 				check_switched_user();
@@ -26952,8 +27595,12 @@ static void print_help(int mode) {
 "\n"
 "By default x11vnc will not allow the screen to be shared and it will exit\n"
 "as soon as the client disconnects.  See -shared and -forever below to override\n"
-"these protections.  See the FAQ on how to tunnel the VNC connection through\n"
-"an encrypted channel such as ssh(1).\n"
+"these protections.  See the FAQ for details how to tunnel the VNC connection\n"
+"through an encrypted channel such as ssh(1).  In brief:\n"
+"\n"
+"       ssh -L 5900:localhost:5900 far-host 'x11vnc -localhost -display :0'\n"
+"\n"
+"       vncviewer -encodings 'copyrect tight zrle hextile' localhost:0\n"
 "\n"
 "For additional info see: http://www.karlrunge.com/x11vnc/\n"
 "                    and  http://www.karlrunge.com/x11vnc/#faq\n"
@@ -27875,6 +28522,19 @@ static void print_help(int mode) {
 "                       the annoying artifacts.  Use \"none\" to disable.\n"
 "                       Default: \"%s\"\n"
 "\n"
+"-scr_keyrepeat lo-hi   If a key is held down (or otherwise repeats rapidly) and\n"
+"                       this induces a rapid sequence of scrolls (e.g. holding\n"
+"                       down an Arrow key) the \"scrollcopyrect\" detection\n"
+"                       and overhead may not be able to keep up.  A time per\n"
+"                       single scroll estimate is performed and if that estimate\n"
+"                       predicts a sustainable scrollrate of keys per second\n"
+"                       between \"lo\" and \"hi\" then repeated keys will be\n"
+"                       DISCARDED to maintain the scrollrate. For example your\n"
+"                       key autorepeat may be 25 keys/sec, but for a large\n"
+"                       window or slow link only 8 scrolls per second can be\n"
+"                       sustained, then roughly 2 out of every 3 repeated keys\n"
+"                       will be discarded during this period. Default: \"%s\"\n"
+"\n"
 "-scr_parms string      Set various parameters for the scrollcopyrect mode.\n"
 "                       The format is similar to that for -wireframe and packed\n"
 "                       with lots of parameters:\n"
@@ -27920,6 +28580,10 @@ static void print_help(int mode) {
 "-debug_scroll          Turn on debugging info printout for the scroll\n"
 "                       heuristics.  \"-ds\" is an alias.  Specify it multiple\n"
 "                       times for more output.\n"
+"\n"
+"-noxrecord             Disable any use of the RECORD extension.  This is\n"
+"                       currently used by the -scrollcopyrect scheme and to\n"
+"                       monitor X server grabs.\n"
 "\n"
 "-pointer_mode n        Various pointer motion update schemes. \"-pm\" is\n"
 "                       an alias.  The problem is pointer motion can cause\n"
@@ -28403,7 +29067,10 @@ static void print_help(int mode) {
 "                       scr_inc:list    set -scr_inc to \"list\"\n"
 "                       scr_keys:list   set -scr_keys to \"list\"\n"
 "                       scr_term:list   set -scr_term to \"list\"\n"
+"                       scr_keyrepeat:str set -scr_keyrepeat to \"str\"\n"
 "                       scr_parms:str   set -scr_parms parameters.\n"
+"                       noxrecord       disable all use of RECORD extension.\n"
+"                       xrecord         enable  use of RECORD extension.\n"
 "                       pointer_mode:n  set -pointer_mode to n. same as \"pm\"\n"
 "                       input_skip:n    set -input_skip to n.\n"
 "                       speeds:str      set -speeds to str.\n"
@@ -28519,14 +29186,15 @@ static void print_help(int mode) {
 "                       noclear_mods clear_keys noclear_keys remap repeat\n"
 "                       norepeat fb nofb bell nobell sel nosel primary noprimary\n"
 "                       cursorshape nocursorshape cursorpos nocursorpos cursor\n"
-"                       show_cursor noshow_cursor nocursor arrow xfixes noxfixes\n"
-"                       xdamage noxdamage xd_area xd_mem alphacut alphafrac\n"
-"                       alpharemove noalpharemove alphablend noalphablend\n"
-"                       xwarppointer xwarp noxwarppointer noxwarp buttonmap\n"
-"                       dragging nodragging wireframe_mode wireframe wf\n"
-"                       nowireframe nowf wirecopyrect wcr nowirecopyrect nowcr\n"
-"                       scr_area scr_skip scr_inc scr_keys scr_term scr_parms\n"
-"                       scrollcopyrect scr noscrollcopyrect noscr pointer_mode\n"
+"                       show_cursor noshow_cursor nocursor arrow xfixes\n"
+"                       noxfixes xdamage noxdamage xd_area xd_mem alphacut\n"
+"                       alphafrac alpharemove noalpharemove alphablend\n"
+"                       noalphablend xwarppointer xwarp noxwarppointer\n"
+"                       noxwarp buttonmap dragging nodragging wireframe_mode\n"
+"                       wireframe wf nowireframe nowf wirecopyrect wcr\n"
+"                       nowirecopyrect nowcr scr_area scr_skip scr_inc scr_keys\n"
+"                       scr_term scr_keyrepeat scr_parms scrollcopyrect scr\n"
+"                       noscrollcopyrect noscr noxrecord xrecord pointer_mode\n"
 "                       pm input_skip input client_input speeds debug_pointer dp\n"
 "                       nodebug_pointer nodp debug_keyboard dk nodebug_keyboard\n"
 "                       nodk deferupdate defer wait_ui wait_bog nowait_bog wait\n"
@@ -28667,6 +29335,7 @@ static void print_help(int mode) {
 		scrollcopyrect_min_area,
 		scroll_skip_str0 ? scroll_skip_str0 : "(empty)",
 		scroll_term_str0,
+		max_keyrepeat_str0,
 		SCROLL_COPYRECT_PARMS,
 		pointer_mode_max, pointer_mode,
 		ui_skip,
@@ -28825,6 +29494,8 @@ static int limit_shm(void) {
 				limit = 1;
 			}
 		}
+	} else if (!strcmp(UT.sysname, "Darwin")) {
+		limit = 1;
 	}
 	if (limit && ! quiet) {
 		fprintf(stderr, "reducing shm usage on %s %s (adding "
@@ -29455,12 +30126,20 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-scr_keys")) {
 			CHECK_ARGC
 			scroll_key_list_str = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-scr_term")) {
+			CHECK_ARGC
+			scroll_term_str = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-scr_keyrepeat")) {
+			CHECK_ARGC
+			max_keyrepeat_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-scr_parms")) {
 			CHECK_ARGC
 			scroll_copyrect_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-debug_scroll")
 		    || !strcmp(arg, "-ds")) {
 			debug_scroll++;
+		} else if (!strcmp(arg, "-noxrecord")) {
+			noxrecord = 1;
 		} else if (!strcmp(arg, "-pointer_mode")
 		    || !strcmp(arg, "-pm")) {
 			char *p, *s;
@@ -29868,6 +30547,7 @@ int main(int argc, char* argv[]) {
 	}
 	initialize_scroll_matches();
 	initialize_scroll_term();
+	initialize_max_keyrepeat();
 
 	/* increase rfbwait if threaded */
 	if (use_threads && ! got_rfbwait) {
@@ -30384,7 +31064,7 @@ int main(int argc, char* argv[]) {
 	 * input is not processed) we tell the server to process our
 	 * requests during all grabs:
 	 */
-	disable_grabserver(dpy);
+	disable_grabserver(dpy, 0);
 
 	/* check for RECORD */
 	if (! XRecordQueryVersion_wr(dpy, &maj, &min)) {
@@ -30508,7 +31188,6 @@ int main(int argc, char* argv[]) {
 
 	initialize_signals();
 
-
 	initialize_speeds();
 
 	initialize_keyboard_and_pointer();
@@ -30562,5 +31241,3 @@ int main(int argc, char* argv[]) {
 #undef argc
 #undef argv
 }
-
-

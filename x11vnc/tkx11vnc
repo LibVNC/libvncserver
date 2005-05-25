@@ -172,6 +172,7 @@ Misc
 	nolookup
 	--
 	xtrap
+	xrecord
 	--
 	bg
 	=-C:ignore,exit sigpipe:
@@ -266,6 +267,7 @@ Tuning
 	scr_inc:
 	scr_keys:
 	scr_term:
+	scr_keyrepeat:
 	scr_parms:
 	-- D
 	speeds:

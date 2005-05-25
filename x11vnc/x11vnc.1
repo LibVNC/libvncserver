@@ -2,7 +2,7 @@
 .TH X11VNC "1" "May 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-05-17
+         version: 0.7.2, lastmod: 2005-05-24
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -28,9 +28,14 @@ the name of the machine running x11vnc and N is XXXX - 5900, i.e. usually
 .PP
 By default x11vnc will not allow the screen to be shared and it will exit
 as soon as the client disconnects.  See \fB-shared\fR and \fB-forever\fR below to override
-these protections.  See the FAQ on how to tunnel the VNC connection through
-an encrypted channel such as 
+these protections.  See the FAQ for details how to tunnel the VNC connection
+through an encrypted channel such as 
 .IR ssh (1).
+In brief:
+.IP
+ssh -L 5900:localhost:5900 far-host 'x11vnc -localhost -display :0'
+.IP
+vncviewer -encodings 'copyrect tight zrle hextile' localhost:0
 .PP
 For additional info see: http://www.karlrunge.com/x11vnc/
 and  http://www.karlrunge.com/x11vnc/#faq
@@ -1152,7 +1157,7 @@ If a pattern is prefixed with "KEY:" it only applies
 to Keystroke generated scrolls (e.g. Up arrow).  If it
 is prefixed with "MOUSE:" it only applies to Mouse
 induced scrolls (e.g. dragging on a scrollbar).
-Default: ##Soffice.bin
+Default: ##Soffice.bin,##StarOffice
 .PP
 \fB-scr_inc\fR \fIlist\fR
 .IP
@@ -1212,6 +1217,21 @@ from the actual X framebuffer.  This usually reduces
 the annoying artifacts.  Use "none" to disable.
 Default: "term"
 .PP
+\fB-scr_keyrepeat\fR \fIlo-hi\fR
+.IP
+If a key is held down (or otherwise repeats rapidly) and
+this induces a rapid sequence of scrolls (e.g. holding
+down an Arrow key) the "scrollcopyrect" detection
+and overhead may not be able to keep up.  A time per
+single scroll estimate is performed and if that estimate
+predicts a sustainable scrollrate of keys per second
+between "lo" and "hi" then repeated keys will be
+DISCARDED to maintain the scrollrate. For example your
+key autorepeat may be 25 keys/sec, but for a large
+window or slow link only 8 scrolls per second can be
+sustained, then roughly 2 out of every 3 repeated keys
+will be discarded during this period. Default: "4-20"
+.PP
 \fB-scr_parms\fR \fIstring\fR
 .IP
 Set various parameters for the scrollcopyrect mode.
@@ -1261,6 +1281,12 @@ of the screen.
 Turn on debugging info printout for the scroll
 heuristics.  "\fB-ds\fR" is an alias.  Specify it multiple
 times for more output.
+.PP
+\fB-noxrecord\fR
+.IP
+Disable any use of the RECORD extension.  This is
+currently used by the \fB-scrollcopyrect\fR scheme and to
+monitor X server grabs.
 .PP
 \fB-pointer_mode\fR \fIn\fR
 .IP
@@ -1942,7 +1968,13 @@ scr_keys:list   set \fB-scr_keys\fR to "list"
 .IP
 scr_term:list   set \fB-scr_term\fR to "list"
 .IP
+scr_keyrepeat:str set \fB-scr_keyrepeat\fR to "str"
+.IP
 scr_parms:str   set \fB-scr_parms\fR parameters.
+.IP
+noxrecord       disable all use of RECORD extension.
+.IP
+xrecord         enable  use of RECORD extension.
 .IP
 pointer_mode:n  set \fB-pointer_mode\fR to n. same as "pm"
 .IP
@@ -2128,14 +2160,15 @@ noskip_dups add_keysyms noadd_keysyms clear_mods
 noclear_mods clear_keys noclear_keys remap repeat
 norepeat fb nofb bell nobell sel nosel primary noprimary
 cursorshape nocursorshape cursorpos nocursorpos cursor
-show_cursor noshow_cursor nocursor arrow xfixes noxfixes
-xdamage noxdamage xd_area xd_mem alphacut alphafrac
-alpharemove noalpharemove alphablend noalphablend
-xwarppointer xwarp noxwarppointer noxwarp buttonmap
-dragging nodragging wireframe_mode wireframe wf
-nowireframe nowf wirecopyrect wcr nowirecopyrect nowcr
-scr_area scr_skip scr_inc scr_keys scr_term scr_parms
-scrollcopyrect scr noscrollcopyrect noscr pointer_mode
+show_cursor noshow_cursor nocursor arrow xfixes
+noxfixes xdamage noxdamage xd_area xd_mem alphacut
+alphafrac alpharemove noalpharemove alphablend
+noalphablend xwarppointer xwarp noxwarppointer
+noxwarp buttonmap dragging nodragging wireframe_mode
+wireframe wf nowireframe nowf wirecopyrect wcr
+nowirecopyrect nowcr scr_area scr_skip scr_inc scr_keys
+scr_term scr_keyrepeat scr_parms scrollcopyrect scr
+noscrollcopyrect noscr noxrecord xrecord pointer_mode
 pm input_skip input client_input speeds debug_pointer dp
 nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
 nodk deferupdate defer wait_ui wait_bog nowait_bog wait

@@ -1,3 +1,7 @@
+2005-05-24  Karl Runge <runge@karlrunge.com>
+	* x11vnc: scrollcopyrect: GrabServer detection, autorepeat throttling..
+	* prepare_x11vnc_dist.sh: grep out new libvncserver-config line.
+
 2005-05-23  Karl Runge <runge@karlrunge.com>
 	* configure.ac: malloc(0) is never used, so we don't need the check
 

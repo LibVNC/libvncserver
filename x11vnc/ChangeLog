@@ -1,3 +1,8 @@
+2005-05-24  Karl Runge <runge@karlrunge.com>
+	* more -scrollcopyrect: GrabServer detection, autorepeat throttling,
+	  hack to clean screen 3,4,5 Alt_L in a row, mouse wheel detect.
+	* fix bug wrt switching to single_copytile, add Darwin to shm limit.
+
 2005-05-17  Karl Runge <runge@karlrunge.com>
 	* more -scrollcopyrect, -scr_term hacks for terminals.
 	* -wait_ui, -nowait_bog tunables.  push cursor sooner.
