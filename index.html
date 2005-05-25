@@ -16,6 +16,14 @@
 <p>
 
     <h2> News </h2>
+    <strong>2005/05/25</strong> LibVNCClient now features ZRLE decoding!
+<p>
+    <strong>2005/05/15</strong> Another round of valgrinding completed. This time it is augmented by changes instigated by using Linus' sparse. In the course, the complete sources were converted to ANSI C.
+<p>
+    <strong>2005/05/07</strong> The member socketInitDone was renamed to socketState, and no longer contains a bool value. This allows us to quit a server cleanly from the event loop via rfbShutdownServer(), so that the structures can be cleaned up properly. This is demonstrated in examples/example.c.
+<p>
+    <strong>2005/01/21</strong> The function rfbMakeMaskFromAlphaSource() applies a Floyd-Steinberg dither to approximate a binary mask from a cursor with alpha channel. A demonstration can be found in test/cursortest.c.
+<p>
     <strong>2005/01/16</strong> Renamed this page to reflect that LibVNCClient is actually very usable.
 <p>
     <strong>2005/01/16</strong> Karl Runge has done awesome work to support cursors with alpha blending! You can try it with x11vnc as in CVS, or wait a few more days for x11vnc to be released officially!
