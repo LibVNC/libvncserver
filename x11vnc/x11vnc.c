@@ -372,7 +372,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-05-24";
+char lastmod[] = "0.7.2 lastmod: 2005-05-30";
 int hack_val = 0;
 
 /* X display info */
@@ -4232,9 +4232,9 @@ void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) {
 }
 #endif
 
-void check_xrecord_reset(void) {
+void check_xrecord_reset(int force) {
 	static double last_reset = 0.0;
-	int reset_time  = 120, reset_idle  = 15;
+	int reset_time  = 90, reset_idle  = 10;
 	int reset_time2 = 600, reset_idle2 = 40;
 	double now;
 	XErrorHandler old_handler = NULL;
@@ -4275,13 +4275,13 @@ void check_xrecord_reset(void) {
 	 * try to wait for a break in input to reopen the displays
 	 * this is only to avoid XGrabServer deadlock on the repopens.
 	 */
-	if (now < last_reset + reset_time) {
+	if (force) {
+		;
+	} else if (now < last_reset + reset_time) {
 		return;
-	}
-	if (now < last_pointer_click_time + reset_idle)  {
+	} else if (now < last_pointer_click_time + reset_idle)  {
 		return;
-	}
-	if (now < last_keyboard_time + reset_idle)  {
+	} else if (now < last_keyboard_time + reset_idle)  {
 		return;
 	}
 	X_LOCK;
@@ -8973,7 +8973,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		char *str;
 		X_LOCK;
 		str = XKeysymToString(keysym);
-		rfbLog("keyboard(%s, 0x%x \"%s\")  %.4f\n", down ? "down":"up",
+		rfbLog("# keyboard(%s, 0x%x \"%s\")  %.4f\n", down ? "down":"up",
 		    (int) keysym, str ? str : "null", tnow - x11vnc_start);
 		X_UNLOCK;
 	}
@@ -9013,35 +9013,45 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	key_history[idx].down = down;
 	key_history[idx].time = tnow;
 
-	if (use_xdamage && down && skip_duplicate_key_events &&
+	if (down && skip_duplicate_key_events &&
 	    (keysym == XK_Alt_L || keysym == XK_Super_L)) {
 		int i, k, run = 0;
 		double delay = 1.0;
+		KeySym ks;
 		for (i=0; i<16; i++) {
 			k = idx - i;
 			if (k < 0) k += KEY_HIST;
 			if (!key_history[k].down) {
 				continue;
 			}
+			ks = key_history[k].sym;
 			if (key_history[k].time < tnow - delay) {
 				break;
-			} else if (key_history[k].sym == XK_Alt_L) {
+			} else if (ks == keysym && ks == XK_Alt_L) {
 				run++;
-			} else if (key_history[k].sym == XK_Super_L) {
+			} else if (ks == keysym && ks == XK_Super_L) {
 				run++;
 			} else {
 				break;
 			}
 		}
-		if (run == 3) {
-			rfbLog("3*Alt_L, calling: set_xdamage_mark()\n");
-			set_xdamage_mark(0, 0, dpy_x, dpy_y);
-		} else if (run == 4) {
-			rfbLog("4*Alt_L, calling: refresh_screen(0)\n");
+		if (run == 3 && keysym == XK_Alt_L) {
+			rfbLog("3*Alt_L, calling: refresh_screen(0)\n");
 			refresh_screen(0);
-		} else if (run == 5) {
-			rfbLog("5*Alt_L, setting: do_copy_screen\n");
+		} else if (run == 4 && keysym == XK_Alt_L) {
+			rfbLog("4*Alt_L, setting: do_copy_screen\n");
 			do_copy_screen = 1;
+		} else if (run == 5 && keysym == XK_Alt_L) {
+			;
+		} else if (run == 3 && keysym == XK_Super_L) {
+			rfbLog("3*Super_L, calling: set_xdamage_mark()\n");
+			set_xdamage_mark(0, 0, dpy_x, dpy_y);
+		} else if (run == 4 && keysym == XK_Super_L) {
+			rfbLog("4*Super_L, calling: check_xrecord_reset()\n");
+			check_xrecord_reset(1);
+		} else if (run == 5 && keysym == XK_Super_L) {
+			rfbLog("5*Super_L, calling: push_black_screen(0)\n");
+			push_black_screen(0);
 		}
 	}
 
@@ -9897,7 +9907,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		dt = tnow - last_pointer;
 		last_pointer = tnow;
 		if (show_motion) {
-			rfbLog("pointer(mask: 0x%x, x:%4d, y:%4d) "
+			rfbLog("# pointer(mask: 0x%x, x:%4d, y:%4d) "
 			    "dx: %3d dy: %3d dt: %.4f t: %.4f\n", mask, x, y,
 			    x - last_x, y - last_y, dt, tnow);
 		}
@@ -25465,7 +25475,7 @@ if (db2) fprintf(stderr, "  stack_work dt: %.4f\n", dt);
 				dtime0(&tm);
 				do_copyregion(shifted_region, dx, dy);
 				dt = dtime(&tm);
-if (db2) fprintf(stderr, "do_copyregion: %d %d %d %d  dx: %d  dy: %d dt: %.4f\n",
+if (0 || db2) fprintf(stderr, "do_copyregion: %d %d %d %d  dx: %d  dy: %d dt: %.4f\n",
 	tx1, ty1, tx2, ty2, dx, dy, dt);
 				sent_copyrect = 1;
 			}
@@ -27470,7 +27480,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_connect_inputs();		
 			check_padded_fb();		
 			check_xdamage_state();
-			check_xrecord_reset();
+			check_xrecord_reset(0);
 			check_add_keysyms();
 			if (started_as_root) {
 				check_switched_user();
@@ -27732,7 +27742,8 @@ static void print_help(int mode) {
 "                       options apply here as well.\n"
 "\n"
 "-viewonly              All VNC clients can only watch (default %s).\n"
-"-shared                VNC display is shared (default %s).\n"
+"-shared                VNC display is shared, i.e. more than one viewer can\n"
+"                       connect at the same time (default %s).\n"
 "-once                  Exit after the first successfully connected viewer\n"
 "                       disconnects, opposite of -forever. This is the Default.\n"
 "-forever               Keep listening for more connections rather than exiting\n"
@@ -27762,7 +27773,8 @@ static void print_help(int mode) {
 "-novncconnect          VNC program vncconnect(1).  When the property is\n"
 "                       set to \"host\" or \"host:port\" establish a reverse\n"
 "                       connection.  Using xprop(1) instead of vncconnect may\n"
-"                       work (see the FAQ).  Default: %s\n"
+"                       work (see the FAQ).  The -remote control mechanism also\n"
+"                       uses this VNC_CONNECT channel.  Default: %s\n"
 "\n"
 "-allow host1[,host2..] Only allow client connections from hosts matching\n"
 "                       the comma separated list of hostnames or IP addresses.\n"
@@ -28413,7 +28425,8 @@ static void print_help(int mode) {
 "                       Examples: Hitting <Return> in a terminal window when the\n"
 "                       cursor was at the bottom, the text scrolls up one line.\n"
 "                       Hitting <Down> arrow in a web browser window, the web\n"
-"                       page scrolls up a small amount.\n"
+"                       page scrolls up a small amount.  Or scrolling with a\n"
+"                       scrollbar or mouse wheel.\n"
 "\n"
 "                       Shorter aliases:  -scr [mode]  and -noscr\n"
 "\n"
@@ -28428,6 +28441,17 @@ static void print_help(int mode) {
 "                       These are automatically repaired in a short period\n"
 "                       of time.  If this is unacceptable disable the feature\n"
 "                       with -noscrollcopyrect.\n"
+"\n"
+"                       Screen clearing kludges:  for testing at least, there\n"
+"                       are some \"magic key sequences\" (must be done in less\n"
+"                       than 1 second) to aid repairing painting errors that\n"
+"                       may be seen when using this mode:\n"
+"\n"
+"                       3 Alt_L's   in a row: resend whole screen,\n"
+"                       4 Alt_L's   in a row: reread and resend whole screen,\n"
+"                       3 Super_L's in a row: mark whole screen for polling,\n"
+"                       4 Super_L's in a row: reset RECORD context,\n"
+"                       5 Super_L's in a row: try to push a black screen\n"
 "\n"
 "                       \"mode\" can be \"never\" (same as -noscrollcopyrect)\n"
 "                       to never try the copyrect, \"keys\" means to try it\n"

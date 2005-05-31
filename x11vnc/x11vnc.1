@@ -2,7 +2,7 @@
 .TH X11VNC "1" "May 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-05-24
+         version: 0.7.2, lastmod: 2005-05-30
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -215,7 +215,8 @@ All VNC clients can only watch (default off).
 .PP
 \fB-shared\fR
 .IP
-VNC display is shared (default off).
+VNC display is shared, i.e. more than one viewer can
+connect at the same time (default off).
 .PP
 \fB-once\fR
 .IP
@@ -276,7 +277,8 @@ set to "host" or "host:port" establish a reverse
 connection.  Using 
 .IR xprop (1)
 instead of vncconnect may
-work (see the FAQ).  Default: \fB-vncconnect\fR
+work (see the FAQ).  The \fB-remote\fR control mechanism also
+uses this VNC_CONNECT channel.  Default: \fB-vncconnect\fR
 .PP
 \fB-allow\fR \fIhost1[,host2..]\fR
 .IP
@@ -1097,7 +1099,8 @@ XCopyArea and XConfigureWindow X protocol requests).
 Examples: Hitting <Return> in a terminal window when the
 cursor was at the bottom, the text scrolls up one line.
 Hitting <Down> arrow in a web browser window, the web
-page scrolls up a small amount.
+page scrolls up a small amount.  Or scrolling with a
+scrollbar or mouse wheel.
 .IP
 Shorter aliases:  \fB-scr\fR [mode]  and \fB-noscr\fR
 .IP
@@ -1112,6 +1115,17 @@ painting errors (window tearing, bunching-up, etc).
 These are automatically repaired in a short period
 of time.  If this is unacceptable disable the feature
 with \fB-noscrollcopyrect.\fR
+.IP
+Screen clearing kludges:  for testing at least, there
+are some "magic key sequences" (must be done in less
+than 1 second) to aid repairing painting errors that
+may be seen when using this mode:
+.IP
+3 Alt_L's   in a row: resend whole screen,
+4 Alt_L's   in a row: reread and resend whole screen,
+3 Super_L's in a row: mark whole screen for polling,
+4 Super_L's in a row: reset RECORD context,
+5 Super_L's in a row: try to push a black screen
 .IP
 "mode" can be "never" (same as \fB-noscrollcopyrect)\fR
 to never try the copyrect, "keys" means to try it

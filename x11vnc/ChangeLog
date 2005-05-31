@@ -1,3 +1,7 @@
+2005-05-30  Karl Runge <runge@karlrunge.com>
+	* alter "magic cleanup key sequences" (N*Alt_L and N*Super_L)
+	* dial down check_xrecord_reset() reset times.
+
 2005-05-24  Karl Runge <runge@karlrunge.com>
 	* more -scrollcopyrect: GrabServer detection, autorepeat throttling,
 	  hack to clean screen 3,4,5 Alt_L in a row, mouse wheel detect.
