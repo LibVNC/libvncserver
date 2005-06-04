@@ -372,7 +372,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-05-30";
+char lastmod[] = "0.7.2 lastmod: 2005-06-03";
 int hack_val = 0;
 
 /* X display info */
@@ -498,6 +498,8 @@ double last_pointer_time = 0.0;
 double last_pointer_click_time = 0.0;
 double last_pointer_motion_time = 0.0;
 double last_key_to_button_remap_time = 0.0;
+double last_copyrect = 0.0;
+double last_copyrect_fix = 0.0;
 double servertime_diff = 0.0;
 double x11vnc_start = 0.0;
 
@@ -643,6 +645,7 @@ void do_button_mask_change(int, int);
 
 void parse_wireframe(void);
 void parse_scroll_copyrect(void);
+void parse_fixscreen(void);
 void set_wirecopyrect_mode(char *);
 void set_scrollcopyrect_mode(char *);
 void initialize_scroll_matches(void);
@@ -978,6 +981,11 @@ char *scroll_term_str = NULL;
 char *scroll_term_str0 =
 	"term"
 ;
+
+char* screen_fixup_str = NULL;
+double screen_fixup_V = 0.0;
+double screen_fixup_C = 0.0;
+double screen_fixup_X = 0.0;
 
 #ifndef NOREPEAT
 #define NOREPEAT 1
@@ -12101,7 +12109,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 			zero_fb(x1, y1, x2, y2);
 			if (mark) {
-				mark_rect_as_modified(x1, y1, x2, y2, 1);
+				mark_rect_as_modified(x1, y1, x2, y2, 0);
 			}
 			push_sleep(4);
 		}
@@ -13985,6 +13993,22 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		set_scrollcopyrect_mode("never");
 		rfbLog("remote_cmd: changed -scrollcopyrect mode "
 		    "to: %s\n", NONUL(scroll_copyrect));
+
+	} else if (strstr(p, "fixscreen") == p) {
+		COLON_CHECK("fixscreen:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(screen_fixup_str));
+			goto qry;
+		}
+		p += strlen("fixscreen:");
+		if (screen_fixup_str) {
+			free(screen_fixup_str);
+		}
+		screen_fixup_str = strdup(p);
+		parse_fixscreen();
+		rfbLog("remote_cmd: set -fixscreen %s.\n",
+		    NONUL(screen_fixup_str));
 
 	} else if (!strcmp(p, "noxrecord")) {
 		int orig = noxrecord;
@@ -18256,6 +18280,11 @@ void parse_scale_string(char *str, double *factor, int *scaling, int *blend,
 		if (strstr(p+1, "pad") != NULL) {
 			*pad = 1;
 		}
+		if (strstr(p+1, "cr") != NULL) {
+			/* global */
+			got_scrollcopyrect = 1;
+			got_wirecopyrect = 1;
+		}
 		*p = '\0';
 	}
 	if (strchr(tstr, '.') != NULL) {
@@ -19783,7 +19812,7 @@ void push_black_screen(int n) {
 		return;
 	}
 	zero_fb(0, 0, dpy_x, dpy_y);
-	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 1);
+	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
 	push_sleep(n);
 }
 
@@ -19792,7 +19821,7 @@ void refresh_screen(int push) {
 	if (!screen) {
 		return;
 	}
-	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 1);
+	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
 	for (i=0; i<push; i++) {
 		rfbPE(-1);
 	}
@@ -22885,6 +22914,38 @@ void parse_scroll_copyrect(void) {
 	parse_scroll_copyrect_str(scroll_copyrect_str);
 }
 
+void parse_fixscreen(void) {
+	char *str, *p;
+
+	screen_fixup_V = 0.0;
+	screen_fixup_C = 0.0;
+	screen_fixup_X = 0.0;
+
+	if (! screen_fixup_str) {
+		return;
+	}
+
+	str = strdup(screen_fixup_str);
+
+	p = strtok(str, ",");
+	while (p) {
+		double t;
+		if (*p == 'V' && sscanf(p, "V=%lf", &t) == 1) {
+			screen_fixup_V = t;
+		} else if (*p == 'C' && sscanf(p, "C=%lf", &t) == 1) {
+			screen_fixup_C = t;
+		} else if (*p == 'X' && sscanf(p, "X=%lf", &t) == 1) {
+			screen_fixup_X = t;
+		}
+		p = strtok(NULL, ",");
+	}
+	free(str);
+
+	if (screen_fixup_V < 0.0) screen_fixup_V = 0.0;
+	if (screen_fixup_C < 0.0) screen_fixup_C = 0.0;
+	if (screen_fixup_X < 0.0) screen_fixup_X = 0.0;
+}
+
 /*
 WIREFRAME_PARMS "0xff,2,0,30+6+6+6,0.05+0.3+2.0,8"
 shade,linewidth,percent,T+B+L+R,t1+t2+t3
@@ -23732,7 +23793,7 @@ if (db) dtime0(&tm);
 	}
 
 	if (mark) {
-		mark_rect_as_modified(xmin, ymin, xmax, ymax, 1);
+		mark_rect_as_modified(xmin, ymin, xmax, ymax, 0);
 	}
 
 if (db) {
@@ -24124,21 +24185,21 @@ if (db > 1) fprintf(stderr, "------------ got: %d x: %4d y: %3d"
 		 * ignore for now... probably will make some apps
 		 * act very strangely.
 		 */
-if (ypad) {
-	if (ypad < 0) {
-		if (h > -ypad) {
-			h += ypad;
-		} else {
-			ypad = 0;
+		if (ypad) {
+			if (ypad < 0) {
+				if (h > -ypad) {
+					h += ypad;
+				} else {
+					ypad = 0;
+				}
+			} else {
+				if (h > ypad) {
+					y += ypad;
+				} else {
+					ypad = 0;
+				}
+			}
 		}
-	} else {
-		if (h > ypad) {
-			y += ypad;
-		} else {
-			ypad = 0;
-		}
-	}
-}
 		
 		if (try_copyrect(frame, x, y, w, h, dx, dy, &obscured,
 		    tmpregion, waittime)) {
@@ -24164,14 +24225,14 @@ if (0) fprintf(stderr, "  try_copyrect dt: %.4f\n", dt);
 			sraRgnAnd(backfill, whole);
 		}
 
-if (ypad) {
-	if (ypad < 0) {
-		ny += ypad;	
-		nh -= ypad;
-	} else {
-		;
-	}
-}
+		if (ypad) {
+			if (ypad < 0) {
+				ny += ypad;	
+				nh -= ypad;
+			} else {
+				;
+			}
+		}
 
 		tmpregion = sraRgnCreateRect(nx, ny, nx + nw, ny + nh);
 		sraRgnAnd(tmpregion, whole);
@@ -24271,6 +24332,21 @@ if (db && bdpush) fprintf(stderr, "BDPUSH-TIME:  0x%lx\n", xrecord_wm_window);
 		fb_push();
 		dt = dtime(&tm);
 if (0) fprintf(stderr, "  fb_push dt: %.4f", dt);
+		if (scaling) {
+			static double last_time = 0.0;
+			double now = dnow(), delay = 0.35;
+
+			if (now > last_time + delay) {
+				int s = 2;
+				int x1 = nfix(x0 - s, dpy_x);
+				int y1 = nfix(y0 - s, dpy_y);
+				int x2 = nfix(x0 + w0 + s, dpy_x+1);
+				int y2 = nfix(y0 + h0 + s, dpy_y+1);
+				scale_and_mark_rect(x1, y1, x2, y2);
+				last_time = now;
+				last_copyrect_fix = now;
+			}
+		}
 	}
 
 	sraRgnDestroy(backfill);
@@ -24312,6 +24388,8 @@ void do_copyregion(sraRegionPtr region, int dx, int dy)  {
 	int req, mod, cpy, ncli;
 	char *dst, *src;
 
+	last_copyrect = dnow();
+
 	if (!scaling || rfb_fb == main_fb) {
 		/* normal case */
 		get_client_regions(&req, &mod, &cpy, &ncli);
@@ -24327,7 +24405,7 @@ if (debug_scroll > 1) fprintf(stderr, ">>>-rfbDoCopyRect req: %d mod: %d cpy: %d
 	/* rarer case, we need to call rfbDoCopyRect with scaled xy */
 	stride = dpy_x * Bpp;
 
-	iter = sraRgnGetIterator(region);
+	iter = sraRgnGetReverseIterator(region, dx < 0, dy < 0);
 	while(sraRgnIteratorNext(iter, &rect)) {
 		int j;
 
@@ -24349,7 +24427,7 @@ if (debug_scroll > 1) fprintf(stderr, ">>>-rfbDoCopyRect req: %d mod: %d cpy: %d
 		} else {
 			dst += (y2 - y1 - 1)*stride;
 			src += (y2 - y1 - 1)*stride;
-			for (j=y2-1; j>y1; j--) {
+			for (j=y2-1; j>=y1; j--) {
 				memmove(dst, src, w);
 				dst -= stride;
 				src -= stride;
@@ -24596,6 +24674,17 @@ void set_xdamage_mark(int x, int y, int w, int h) {
 	sraRgnDestroy(region);
 }
 
+int repeat_check(double last_key_scroll) {
+	int repeating;
+	double rate = typing_rate(0.0, &repeating);
+	double now = dnow(), delay = 0.5;
+	if (rate > 2.0 && repeating && now > last_key_scroll + delay) {
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
 int check_xrecord_keys(void) {
 	static int last_wx, last_wy, last_ww, last_wh;
 	double spin = 0.0, tm, tnow;
@@ -24609,8 +24698,9 @@ int check_xrecord_keys(void) {
 	static double persist_start = 0.0;
 	static double last_bdpush = 0.0;
 	static int persist_count = 0;
+	int scroll_keysym = 0;
 	double last_scroll, scroll_persist = scr_key_persist;
-	double spin_fac = 1.0, scroll_fac = 2.0;
+	double spin_fac = 1.0, scroll_fac = 2.0, noscroll_fac = 0.75;
 	double max_spin, max_long_spin = 0.3;
 	double set_repeat_in;
 	static double set_repeat = 0.0;
@@ -24644,6 +24734,8 @@ int check_xrecord_keys(void) {
 
 	scroll_rep = scrollability(xrecord_ptr_window, SCR_NONE) + 1;
 
+	scroll_keysym = xrecord_scroll_keysym(last_rfb_keysym);
+
 	max_spin = scr_key_time;
 
 	if (set_repeat_in > 0.0 && tnow < last_key_scroll + 2*set_repeat_in) {
@@ -24653,8 +24745,12 @@ int check_xrecord_keys(void) {
 	} else if (tnow < last_key_to_button_remap_time + scroll_persist) {
 		/* mostly a hack I use for testing -remap key -> btn4/btn5 */
 		max_spin = scroll_persist;
-	} else if (xrecord_scroll_keysym(last_rfb_keysym)) {
-		spin_fac = scroll_fac;
+	} else if (scroll_keysym) {
+		if (repeat_check(last_key_scroll)) {
+			spin_fac = scroll_fac;
+		} else {
+			spin_fac = noscroll_fac;
+		}
 	}
 	if (max_spin > max_long_spin) {
 		max_spin = max_long_spin;
@@ -24706,7 +24802,11 @@ if (db) fprintf(stderr, "check_xrecord_keys: BEGIN LOOP: scr_ev_cnt: "
 			if (set_repeat_in) {
 				;
 			} else if (xrecord_scroll_keysym(last_rfb_keysym)) {
-				spin_fac = scroll_fac;
+				if (repeat_check(last_key_scroll)) {
+					spin_fac = scroll_fac;
+				} else {
+					spin_fac = noscroll_fac;
+				}
 			}
 if (0 || db) fprintf(stderr, "check_xrecord: more keys: %.3f  0x%x "
     " %.4f  %s  %s\n", spin, last_rfb_keysym, last_rfb_keytime - x11vnc_start,
@@ -25544,6 +25644,63 @@ int near_scrollbar_edge(int x, int y, int w, int h, int px, int py) {
 	return near_edge;
 }
 
+void check_fixscreen(void) {
+	double now = dnow();
+	int didfull = 0, db = 0;
+
+	if (!client_count) {
+		return;
+	}
+
+	if (screen_fixup_X > 0.0) {
+		static double last = 0.0;
+		if (now > last + screen_fixup_X) {
+			if (db) rfbLog("doing screen_fixup_X\n");
+			do_copy_screen = 1;
+			last = now;
+			didfull = 1;
+		}
+		
+	}
+	if (screen_fixup_V > 0.0) {
+		static double last = 0.0;
+		if (now > last + screen_fixup_V) {
+			if (! didfull) {
+				refresh_screen(0);
+				if (db) rfbLog("doing screen_fixup_V\n");
+			}
+			last = now;
+			didfull = 1;
+		}
+	}
+	if (screen_fixup_C > 0.0) {
+		static double last = 0.0;
+		if (last_copyrect_fix < last_copyrect &&
+		    now > last_copyrect + screen_fixup_C) {
+			if (! didfull) {
+				refresh_screen(0);
+				if (db) rfbLog("doing screen_fixup_C\n");
+			}
+			last_copyrect_fix = now;
+			last = now;
+			didfull = 1;
+		}
+	}
+	if (scaling && last_copyrect_fix < last_copyrect) {
+		static double last = 0.0;
+		double delay = 3.0;
+		if (now > last + delay) {
+			if (! didfull) {
+				scale_and_mark_rect(0, 0, dpy_x, dpy_y);
+				if (db) rfbLog("doing scale screen_fixup\n");
+			}
+			last_copyrect_fix = now;
+			last = now;
+			didfull = 1;
+		}
+	}
+}
+
 /*
  * Applied just before any check_user_input() modes.  Look for a
  * ButtonPress; find window it happened in; find the wm frame window
@@ -25996,6 +26153,21 @@ if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
 				fb_push_wait(0.1, FB_COPY);
 			} else {
 				fb_push_wait(0.1, FB_COPY);
+			}
+			if (scaling) {
+				static double last_time = 0.0;
+				double now = dnow(), delay = 0.35;
+
+				if (now > last_time + delay) {
+					int s = 2;
+					int x1 = nfix(x - s, dpy_x);
+					int y1 = nfix(y - s, dpy_y);
+					int x2 = nfix(x + w + s, dpy_x+1);
+					int y2 = nfix(y + h + s, dpy_y+1);
+					scale_and_mark_rect(x1, y1, x2, y2);
+					last_time = now;
+					last_copyrect_fix = now;
+				}
 			}
 		}
 	}
@@ -27479,6 +27651,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_autorepeat();
 			check_connect_inputs();		
 			check_padded_fb();		
+			check_fixscreen();		
 			check_xdamage_state();
 			check_xrecord_reset(0);
 			check_add_keysyms();
@@ -27719,18 +27892,21 @@ static void print_help(int mode) {
 "                       the notation \"m/n\" may be used to denote fractions\n"
 "                       exactly, e.g. -scale 2/3\n"
 "\n"
-"                       Scaling Options: can be added after \"fraction\"\n"
-"                       via \":\", to supply multiple \":\" options use\n"
-"                       commas.  If you just want a quick, rough scaling\n"
-"                       without blending, append \":nb\" to \"fraction\"\n"
-"                       (e.g. -scale 1/3:nb).  No blending is the default\n"
-"                       for 8bpp indexed color, to force blending for this\n"
-"                       case use \":fb\".  For compatibility with vncviewers\n"
+"                       Scaling Options: can be added after \"fraction\" via\n"
+"                       \":\", to supply multiple \":\" options use commas.  If\n"
+"                       you just want a quick, rough scaling without blending,\n"
+"                       append \":nb\" to \"fraction\" (e.g. -scale 1/3:nb).\n"
+"                       No blending is the default for 8bpp indexed color, to\n"
+"                       force blending for this case use \":fb\".  By default\n"
+"                       -scrollcopyrect and -wirecopyrect are disabled under\n"
+"                       -scale, to enable them use \":cr\".\n"
+"\n"
+"                       More esoteric options: for compatibility with vncviewers\n"
 "                       the scaled width is adjusted to be a multiple of 4:\n"
-"                       to disable this use \":n4\".  More esoteric options:\n"
-"                       \":in\" use interpolation scheme even when shrinking,\n"
-"                       \":pad\", pad scaled width and height to be multiples\n"
-"                       of scaling denominator (e.g. 3 for 2/3).\n"
+"                       to disable this use \":n4\".  \":in\" use interpolation\n"
+"                       scheme even when shrinking, \":pad\", pad scaled width\n"
+"                       and height to be multiples of scaling denominator\n"
+"                       (e.g. 3 for 2/3).\n"
 "\n"
 "-scale_cursor frac     By default if -scale is supplied the cursor shape is\n"
 "                       scaled by the same factor.  Depending on your usage,\n"
@@ -28411,7 +28587,8 @@ static void print_help(int mode) {
 "\n"
 "                       Note: there can be painting errors when using -scale\n"
 "                       so CopyRect is skipped when scaling unless you specify\n"
-"                       -wirecopyrect on the command line or by remote-control.\n"
+"                       \"-wirecopyrect always\" on the command line or by\n"
+"                       remote-control.  Or you can also use \"-scale xxx:cr\"\n"
 "\n"
 "-debug_wireframe       Turn on debugging info printout for the wireframe\n"
 "                       heuristics.  \"-dwf\" is an alias.  Specify multiple\n"
@@ -28459,10 +28636,10 @@ static void print_help(int mode) {
 "                       try it in response to mouse events only, \"always\"\n"
 "                       means to do both. Default: \"%s\"\n"
 "\n"
-"                       Note: there can be painting errors when using\n"
-"                       -scale so CopyRect is skipped when scaling unless\n"
-"                       you specify -scrollcopyrect on the command line or\n"
-"                       by remote-control.\n"
+"                       Note: there can be painting errors when using -scale\n"
+"                       so CopyRect is skipped when scaling unless you specify\n"
+"                       \"-scrollcopyrect always\" on the command line or by\n"
+"                       remote-control.  You can also use \"-scale xxx:cr\"\n"
 "\n"
 "-scr_area n            Set the minimum area in pixels for a rectangle\n"
 "                       to be considered for the -scrollcopyrect detection\n"
@@ -28600,6 +28777,30 @@ static void print_help(int mode) {
 "                       mouse scrolls). s5 is the maximum time to spend just\n"
 "                       updating the scroll window without updating the rest\n"
 "                       of the screen.\n"
+"\n"
+"-fixscreen string      Periodically \"repair\" the screen based on settings\n"
+"                       in \"string\".  Hopefully you won't need this option,\n"
+"                       it is intended for cases when the -scrollcopyrect or\n"
+"                       -wirecopyrect features leave too many painting errors,\n"
+"                       but it can be used for any scenario.  This option\n"
+"                       periodically performs costly operations and so\n"
+"                       interactive response may be reduced when it is on.\n"
+"                       The 3 Alt_L's in a row described under -scrollcopyrect\n"
+"                       can be used instead to manually request a screen repaint\n"
+"                       when it is needed.\n"
+"\n"
+"                       \"string\" is a comma separated list of one or more\n"
+"                       of the following: \"V=t\", \"C=t\", and \"X=t\".\n"
+"                       In these \"t\" stands for a time in seconds (it is\n"
+"                       a floating point even though one should usually use\n"
+"                       values > 2 to avoid wasting resources).  V sets how\n"
+"                       frequently the entire screen should be sent to viewers\n"
+"                       (it is like the 3 Alt_L's).  C sets how long after a\n"
+"                       CopyRect the full screen should be repainted.  X sets\n"
+"                       how frequently to reread the full X11 framebuffer from\n"
+"                       the X server and push it out to connected viewers.\n"
+"                       Use of X should be rare.  Examples: -fixscreen V=10\n"
+"                       -fixscreen C=10\n"
 "\n"
 "-debug_scroll          Turn on debugging info printout for the scroll\n"
 "                       heuristics.  \"-ds\" is an alias.  Specify it multiple\n"
@@ -29093,6 +29294,7 @@ static void print_help(int mode) {
 "                       scr_term:list   set -scr_term to \"list\"\n"
 "                       scr_keyrepeat:str set -scr_keyrepeat to \"str\"\n"
 "                       scr_parms:str   set -scr_parms parameters.\n"
+"                       fixscreen:str   set -fixscreen to \"str\".\n"
 "                       noxrecord       disable all use of RECORD extension.\n"
 "                       xrecord         enable  use of RECORD extension.\n"
 "                       pointer_mode:n  set -pointer_mode to n. same as \"pm\"\n"
@@ -29218,20 +29420,21 @@ static void print_help(int mode) {
 "                       wireframe wf nowireframe nowf wirecopyrect wcr\n"
 "                       nowirecopyrect nowcr scr_area scr_skip scr_inc scr_keys\n"
 "                       scr_term scr_keyrepeat scr_parms scrollcopyrect scr\n"
-"                       noscrollcopyrect noscr noxrecord xrecord pointer_mode\n"
-"                       pm input_skip input client_input speeds debug_pointer dp\n"
-"                       nodebug_pointer nodp debug_keyboard dk nodebug_keyboard\n"
-"                       nodk deferupdate defer wait_ui wait_bog nowait_bog wait\n"
-"                       readtimeout nap nonap sb screen_blank fs gaps grow fuzz\n"
-"                       snapfb nosnapfb rawfb progressive rfbport http nohttp\n"
-"                       httpport httpdir enablehttpproxy noenablehttpproxy\n"
-"                       alwaysshared noalwaysshared nevershared noalwaysshared\n"
-"                       dontdisconnect nodontdisconnect desktop debug_xevents\n"
-"                       nodebug_xevents debug_xevents debug_xdamage\n"
-"                       nodebug_xdamage debug_xdamage debug_wireframe\n"
-"                       nodebug_wireframe debug_wireframe debug_scroll\n"
-"                       nodebug_scroll debug_scroll debug_tiles dbt\n"
-"                       nodebug_tiles nodbt debug_tiles dbg nodbg noremote\n"
+"                       noscrollcopyrect noscr fixscreen noxrecord xrecord\n"
+"                       pointer_mode pm input_skip input client_input speeds\n"
+"                       debug_pointer dp nodebug_pointer nodp debug_keyboard\n"
+"                       dk nodebug_keyboard nodk deferupdate defer wait_ui\n"
+"                       wait_bog nowait_bog wait readtimeout nap nonap sb\n"
+"                       screen_blank fs gaps grow fuzz snapfb nosnapfb\n"
+"                       rawfb progressive rfbport http nohttp httpport\n"
+"                       httpdir enablehttpproxy noenablehttpproxy alwaysshared\n"
+"                       noalwaysshared nevershared noalwaysshared dontdisconnect\n"
+"                       nodontdisconnect desktop debug_xevents nodebug_xevents\n"
+"                       debug_xevents debug_xdamage nodebug_xdamage\n"
+"                       debug_xdamage debug_wireframe nodebug_wireframe\n"
+"                       debug_wireframe debug_scroll nodebug_scroll debug_scroll\n"
+"                       debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg\n"
+"                       nodbg noremote\n"
 "\n"
 "                       aro=  display vncdisplay desktopname http_url auth\n"
 "                       users rootshift clipshift scale_str scaled_x scaled_y\n"
@@ -30159,6 +30362,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-scr_parms")) {
 			CHECK_ARGC
 			scroll_copyrect_str = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-fixscreen")) {
+			CHECK_ARGC
+			screen_fixup_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-debug_scroll")
 		    || !strcmp(arg, "-ds")) {
 			debug_scroll++;
@@ -30569,6 +30775,9 @@ int main(int argc, char* argv[]) {
 	if (! scroll_copyrect) {
 		set_scrollcopyrect_mode(NULL);
 	}
+	if (screen_fixup_str) {
+		parse_fixscreen();
+	}
 	initialize_scroll_matches();
 	initialize_scroll_term();
 	initialize_max_keyrepeat();
@@ -30745,8 +30954,15 @@ int main(int argc, char* argv[]) {
 		    scroll_good_str : scroll_good_str0);
 		fprintf(stderr, "  scr_keys:  %s\n", scroll_key_list_str ?
 		    scroll_key_list_str : "null");
+		fprintf(stderr, "  scr_term:  %s\n", scroll_term_str ?
+		    scroll_term_str : "null");
+		fprintf(stderr, "  scr_keyrep: %s\n", max_keyrepeat_str ?
+		    max_keyrepeat_str : "null");
 		fprintf(stderr, "  scr_parms: %s\n", scroll_copyrect_str ?
 		    scroll_copyrect_str : SCROLL_COPYRECT_PARMS);
+		fprintf(stderr, " fixscreen:  %s\n", screen_fixup_str ?
+		    screen_fixup_str : "null");
+		fprintf(stderr, " noxrecord:  %d\n", noxrecord);
 		fprintf(stderr, " ptr_mode:   %d\n", pointer_mode);
 		fprintf(stderr, " inputskip:  %d\n", ui_skip);
 		fprintf(stderr, " speeds:     %s\n", speeds_str

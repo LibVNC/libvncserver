@@ -1,3 +1,7 @@
+2005-06-03  Karl Runge <runge@karlrunge.com>
+	* libvncserver/main.c: remove sraRgnSubtract from copyRegion
+	* x11vnc: scrollcopyrect under -scale, add -fixscreen.
+
 2005-05-30  Karl Runge <runge@karlrunge.com>
 	* libvncserver/main.c: fix copyRect for non-cursor-shape-aware clients.
 

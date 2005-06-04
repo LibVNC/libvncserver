@@ -109,6 +109,7 @@
 "	=DRA refresh\n"
 "	=RA reset\n"
 "	=DRA blacken\n"
+"	fixscreen:\n"
 "	-- D\n"
 "	id:\n"
 "	sid:\n"

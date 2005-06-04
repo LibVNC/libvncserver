@@ -148,10 +148,8 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
           if(!sraRgnEmpty(cursorRegion)) {
              /*
               * current cursor rect overlaps with the copy region *dest*,
-              * so remove it from the copy-rect treatment, and mark it as
-              * modified since we won't copy-rect stuff to it.
+              * mark it as modified since we won't copy-rect stuff to it.
               */
-             sraRgnSubtract(cl->copyRegion, cursorRegion);
              sraRgnOr(cl->modifiedRegion, cursorRegion);
           }
           sraRgnDestroy(cursorRegion);
@@ -163,11 +161,9 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
           if(!sraRgnEmpty(cursorRegion)) {
              /*
               * current cursor rect overlaps with the copy region *source*,
-              * so remove it from the copy-rect treatment, and mark the
-              * *displaced* cursorRegion as modified since we won't copyrect
-              * stuff to it.
+              * mark the *displaced* cursorRegion as modified since we
+              * won't copyrect stuff to it.
               */
-             sraRgnSubtract(cl->copyRegion, cursorRegion);
              sraRgnOr(cl->modifiedRegion, cursorRegion);
           }
           sraRgnDestroy(cursorRegion);

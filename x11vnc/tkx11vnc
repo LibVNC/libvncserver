@@ -103,6 +103,7 @@ Screen
 	=DRA refresh
 	=RA reset
 	=DRA blacken
+	fixscreen:
 	-- D
 	id:
 	sid:

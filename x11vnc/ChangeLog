@@ -1,3 +1,8 @@
+2005-06-03  Karl Runge <runge@karlrunge.com>
+	* make scrollcopyrect more or less usable under -scale
+	* add -fixscreen for periodic cleanup of painting errors.
+	* adjust keyrepeat scroll behavior.
+
 2005-05-30  Karl Runge <runge@karlrunge.com>
 	* alter "magic cleanup key sequences" (N*Alt_L and N*Super_L)
 	* dial down check_xrecord_reset() reset times.

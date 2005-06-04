@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Tue May 31 00:10:51 EDT 2005
+x11vnc README file                         Date: Fri Jun  3 23:10:08 EDT 2005
 
 The following information is taken from these URLs:
 
@@ -4260,7 +4260,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-05-30
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-06-03
 
 x11vnc options:
   -display disp            -auth file             
@@ -4312,27 +4312,27 @@ x11vnc options:
   -scr_skip list           -scr_inc list          
   -scr_keys list           -scr_term list         
   -scr_keyrepeat lo-hi     -scr_parms string      
-  -debug_scroll            -noxrecord             
-  -pointer_mode n          -input_skip n          
-  -speeds rd,bw,lat        -debug_pointer         
-  -debug_keyboard          -defer time            
-  -wait time               -wait_ui factor        
-  -nowait_bog              -readtimeout n         
-  -nap                     -nonap                 
-  -sb time                 -noxdamage             
-  -xd_area A               -xd_mem f              
-  -sigpipe string          -threads               
-  -nothreads               -fs f                  
-  -gaps n                  -grow n                
-  -fuzz n                  -debug_tiles           
-  -snapfb                  -rawfb string          
-  -pipeinput cmd           -gui [gui-opts]        
-  -remote command          -query variable        
-  -sync                    -noremote              
-  -yesremote               -unsafe                
-  -safer                   -privremote            
-  -nocmds                  -deny_all              
-
+  -fixscreen string        -debug_scroll          
+  -noxrecord               -pointer_mode n        
+  -input_skip n            -speeds rd,bw,lat      
+  -debug_pointer           -debug_keyboard        
+  -defer time              -wait time             
+  -wait_ui factor          -nowait_bog            
+  -readtimeout n           -nap                   
+  -nonap                   -sb time               
+  -noxdamage               -xd_area A             
+  -xd_mem f                -sigpipe string        
+  -threads                 -nothreads             
+  -fs f                    -gaps n                
+  -grow n                  -fuzz n                
+  -debug_tiles             -snapfb                
+  -rawfb string            -pipeinput cmd         
+  -gui [gui-opts]          -remote command        
+  -query variable          -sync                  
+  -noremote                -yesremote             
+  -unsafe                  -safer                 
+  -privremote              -nocmds                
+  -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -4358,7 +4358,7 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-05-30
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-06-03
 
 Typical usage is:
 
@@ -4494,18 +4494,21 @@ Options:
                        the notation "m/n" may be used to denote fractions
                        exactly, e.g. -scale 2/3
 
-                       Scaling Options: can be added after "fraction"
-                       via ":", to supply multiple ":" options use
-                       commas.  If you just want a quick, rough scaling
-                       without blending, append ":nb" to "fraction"
-                       (e.g. -scale 1/3:nb).  No blending is the default
-                       for 8bpp indexed color, to force blending for this
-                       case use ":fb".  For compatibility with vncviewers
+                       Scaling Options: can be added after "fraction" via
+                       ":", to supply multiple ":" options use commas.  If
+                       you just want a quick, rough scaling without blending,
+                       append ":nb" to "fraction" (e.g. -scale 1/3:nb).
+                       No blending is the default for 8bpp indexed color, to
+                       force blending for this case use ":fb".  By default
+                       -scrollcopyrect and -wirecopyrect are disabled under
+                       -scale, to enable them use ":cr".
+
+                       More esoteric options: for compatibility with vncviewers
                        the scaled width is adjusted to be a multiple of 4:
-                       to disable this use ":n4".  More esoteric options:
-                       ":in" use interpolation scheme even when shrinking,
-                       ":pad", pad scaled width and height to be multiples
-                       of scaling denominator (e.g. 3 for 2/3).
+                       to disable this use ":n4".  ":in" use interpolation
+                       scheme even when shrinking, ":pad", pad scaled width
+                       and height to be multiples of scaling denominator
+                       (e.g. 3 for 2/3).
 
 -scale_cursor frac     By default if -scale is supplied the cursor shape is
                        scaled by the same factor.  Depending on your usage,
@@ -5174,7 +5177,8 @@ Options:
 
                        Note: there can be painting errors when using -scale
                        so CopyRect is skipped when scaling unless you specify
-                       -wirecopyrect on the command line or by remote-control.
+                       "-wirecopyrect always" on the command line or by
+                       remote-control.  Or you can also use "-scale xxx:cr"
 
 -debug_wireframe       Turn on debugging info printout for the wireframe
                        heuristics.  "-dwf" is an alias.  Specify multiple
@@ -5222,10 +5226,10 @@ Options:
                        try it in response to mouse events only, "always"
                        means to do both. Default: "always"
 
-                       Note: there can be painting errors when using
-                       -scale so CopyRect is skipped when scaling unless
-                       you specify -scrollcopyrect on the command line or
-                       by remote-control.
+                       Note: there can be painting errors when using -scale
+                       so CopyRect is skipped when scaling unless you specify
+                       "-scrollcopyrect always" on the command line or by
+                       remote-control.  You can also use "-scale xxx:cr"
 
 -scr_area n            Set the minimum area in pixels for a rectangle
                        to be considered for the -scrollcopyrect detection
@@ -5363,6 +5367,30 @@ Options:
                        mouse scrolls). s5 is the maximum time to spend just
                        updating the scroll window without updating the rest
                        of the screen.
+
+-fixscreen string      Periodically "repair" the screen based on settings
+                       in "string".  Hopefully you won't need this option,
+                       it is intended for cases when the -scrollcopyrect or
+                       -wirecopyrect features leave too many painting errors,
+                       but it can be used for any scenario.  This option
+                       periodically performs costly operations and so
+                       interactive response may be reduced when it is on.
+                       The 3 Alt_L's in a row described under -scrollcopyrect
+                       can be used instead to manually request a screen repaint
+                       when it is needed.
+
+                       "string" is a comma separated list of one or more
+                       of the following: "V=t", "C=t", and "X=t".
+                       In these "t" stands for a time in seconds (it is
+                       a floating point even though one should usually use
+                       values > 2 to avoid wasting resources).  V sets how
+                       frequently the entire screen should be sent to viewers
+                       (it is like the 3 Alt_L's).  C sets how long after a
+                       CopyRect the full screen should be repainted.  X sets
+                       how frequently to reread the full X11 framebuffer from
+                       the X server and push it out to connected viewers.
+                       Use of X should be rare.  Examples: -fixscreen V=10
+                       -fixscreen C=10
 
 -debug_scroll          Turn on debugging info printout for the scroll
                        heuristics.  "-ds" is an alias.  Specify it multiple
@@ -5849,6 +5877,7 @@ Options:
                        scr_term:list   set -scr_term to "list"
                        scr_keyrepeat:str set -scr_keyrepeat to "str"
                        scr_parms:str   set -scr_parms parameters.
+                       fixscreen:str   set -fixscreen to "str".
                        noxrecord       disable all use of RECORD extension.
                        xrecord         enable  use of RECORD extension.
                        pointer_mode:n  set -pointer_mode to n. same as "pm"
@@ -5974,20 +6003,21 @@ Options:
                        wireframe wf nowireframe nowf wirecopyrect wcr
                        nowirecopyrect nowcr scr_area scr_skip scr_inc scr_keys
                        scr_term scr_keyrepeat scr_parms scrollcopyrect scr
-                       noscrollcopyrect noscr noxrecord xrecord pointer_mode
-                       pm input_skip input client_input speeds debug_pointer dp
-                       nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-                       nodk deferupdate defer wait_ui wait_bog nowait_bog wait
-                       readtimeout nap nonap sb screen_blank fs gaps grow fuzz
-                       snapfb nosnapfb rawfb progressive rfbport http nohttp
-                       httpport httpdir enablehttpproxy noenablehttpproxy
-                       alwaysshared noalwaysshared nevershared noalwaysshared
-                       dontdisconnect nodontdisconnect desktop debug_xevents
-                       nodebug_xevents debug_xevents debug_xdamage
-                       nodebug_xdamage debug_xdamage debug_wireframe
-                       nodebug_wireframe debug_wireframe debug_scroll
-                       nodebug_scroll debug_scroll debug_tiles dbt
-                       nodebug_tiles nodbt debug_tiles dbg nodbg noremote
+                       noscrollcopyrect noscr fixscreen noxrecord xrecord
+                       pointer_mode pm input_skip input client_input speeds
+                       debug_pointer dp nodebug_pointer nodp debug_keyboard
+                       dk nodebug_keyboard nodk deferupdate defer wait_ui
+                       wait_bog nowait_bog wait readtimeout nap nonap sb
+                       screen_blank fs gaps grow fuzz snapfb nosnapfb
+                       rawfb progressive rfbport http nohttp httpport
+                       httpdir enablehttpproxy noenablehttpproxy alwaysshared
+                       noalwaysshared nevershared noalwaysshared dontdisconnect
+                       nodontdisconnect desktop debug_xevents nodebug_xevents
+                       debug_xevents debug_xdamage nodebug_xdamage
+                       debug_xdamage debug_wireframe nodebug_wireframe
+                       debug_wireframe debug_scroll nodebug_scroll debug_scroll
+                       debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg
+                       nodbg noremote
 
                        aro=  display vncdisplay desktopname http_url auth
                        users rootshift clipshift scale_str scaled_x scaled_y

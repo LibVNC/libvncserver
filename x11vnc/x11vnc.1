@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "May 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "June 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-05-30
+         version: 0.7.2, lastmod: 2005-06-03
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -185,18 +185,21 @@ is taken as a floating point number, alternatively
 the notation "m/n" may be used to denote fractions
 exactly, e.g. \fB-scale\fR 2/3
 .IP
-Scaling Options: can be added after \fIfraction\fR
-via ":", to supply multiple ":" options use
-commas.  If you just want a quick, rough scaling
-without blending, append ":nb" to \fIfraction\fR
-(e.g. \fB-scale\fR 1/3:nb).  No blending is the default
-for 8bpp indexed color, to force blending for this
-case use ":fb".  For compatibility with vncviewers
+Scaling Options: can be added after \fIfraction\fR via
+":", to supply multiple ":" options use commas.  If
+you just want a quick, rough scaling without blending,
+append ":nb" to \fIfraction\fR (e.g. \fB-scale\fR 1/3:nb).
+No blending is the default for 8bpp indexed color, to
+force blending for this case use ":fb".  By default
+\fB-scrollcopyrect\fR and \fB-wirecopyrect\fR are disabled under
+\fB-scale,\fR to enable them use ":cr".
+.IP
+More esoteric options: for compatibility with vncviewers
 the scaled width is adjusted to be a multiple of 4:
-to disable this use ":n4".  More esoteric options:
-":in" use interpolation scheme even when shrinking,
-":pad", pad scaled width and height to be multiples
-of scaling denominator (e.g. 3 for 2/3).
+to disable this use ":n4".  ":in" use interpolation
+scheme even when shrinking, ":pad", pad scaled width
+and height to be multiples of scaling denominator
+(e.g. 3 for 2/3).
 .PP
 \fB-scale_cursor\fR \fIfrac\fR
 .IP
@@ -1081,7 +1084,8 @@ in, but helps on a slow link).  Default: "always"
 .IP
 Note: there can be painting errors when using \fB-scale\fR
 so CopyRect is skipped when scaling unless you specify
-\fB-wirecopyrect\fR on the command line or by remote-control.
+"\fB-wirecopyrect\fR \fIalways\fR" on the command line or by
+remote-control.  Or you can also use "\fB-scale\fR \fIxxx:cr\fR"
 .PP
 \fB-debug_wireframe\fR
 .IP
@@ -1133,10 +1137,10 @@ in response to keystrokes only, "mouse" means to
 try it in response to mouse events only, "always"
 means to do both. Default: "always"
 .IP
-Note: there can be painting errors when using
-\fB-scale\fR so CopyRect is skipped when scaling unless
-you specify \fB-scrollcopyrect\fR on the command line or
-by remote-control.
+Note: there can be painting errors when using \fB-scale\fR
+so CopyRect is skipped when scaling unless you specify
+"\fB-scrollcopyrect\fR \fIalways\fR" on the command line or by
+remote-control.  You can also use "\fB-scale\fR \fIxxx:cr\fR"
 .PP
 \fB-scr_area\fR \fIn\fR
 .IP
@@ -1289,6 +1293,32 @@ buffer pointer motion (to try to get fewer, bigger
 mouse scrolls). s5 is the maximum time to spend just
 updating the scroll window without updating the rest
 of the screen.
+.PP
+\fB-fixscreen\fR \fIstring\fR
+.IP
+Periodically "repair" the screen based on settings
+in \fIstring\fR.  Hopefully you won't need this option,
+it is intended for cases when the \fB-scrollcopyrect\fR or
+\fB-wirecopyrect\fR features leave too many painting errors,
+but it can be used for any scenario.  This option
+periodically performs costly operations and so
+interactive response may be reduced when it is on.
+The 3 Alt_L's in a row described under \fB-scrollcopyrect\fR
+can be used instead to manually request a screen repaint
+when it is needed.
+.IP
+\fIstring\fR is a comma separated list of one or more
+of the following: "V=t", "C=t", and "X=t".
+In these "t" stands for a time in seconds (it is
+a floating point even though one should usually use
+values > 2 to avoid wasting resources).  V sets how
+frequently the entire screen should be sent to viewers
+(it is like the 3 Alt_L's).  C sets how long after a
+CopyRect the full screen should be repainted.  X sets
+how frequently to reread the full X11 framebuffer from
+the X server and push it out to connected viewers.
+Use of X should be rare.  Examples: \fB-fixscreen\fR V=10
+\fB-fixscreen\fR C=10
 .PP
 \fB-debug_scroll\fR
 .IP
@@ -1986,6 +2016,8 @@ scr_keyrepeat:str set \fB-scr_keyrepeat\fR to "str"
 .IP
 scr_parms:str   set \fB-scr_parms\fR parameters.
 .IP
+fixscreen:str   set \fB-fixscreen\fR to "str".
+.IP
 noxrecord       disable all use of RECORD extension.
 .IP
 xrecord         enable  use of RECORD extension.
@@ -2182,20 +2214,21 @@ noxwarp buttonmap dragging nodragging wireframe_mode
 wireframe wf nowireframe nowf wirecopyrect wcr
 nowirecopyrect nowcr scr_area scr_skip scr_inc scr_keys
 scr_term scr_keyrepeat scr_parms scrollcopyrect scr
-noscrollcopyrect noscr noxrecord xrecord pointer_mode
-pm input_skip input client_input speeds debug_pointer dp
-nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-nodk deferupdate defer wait_ui wait_bog nowait_bog wait
-readtimeout nap nonap sb screen_blank fs gaps grow fuzz
-snapfb nosnapfb rawfb progressive rfbport http nohttp
-httpport httpdir enablehttpproxy noenablehttpproxy
-alwaysshared noalwaysshared nevershared noalwaysshared
-dontdisconnect nodontdisconnect desktop debug_xevents
-nodebug_xevents debug_xevents debug_xdamage
-nodebug_xdamage debug_xdamage debug_wireframe
-nodebug_wireframe debug_wireframe debug_scroll
-nodebug_scroll debug_scroll debug_tiles dbt
-nodebug_tiles nodbt debug_tiles dbg nodbg noremote
+noscrollcopyrect noscr fixscreen noxrecord xrecord
+pointer_mode pm input_skip input client_input speeds
+debug_pointer dp nodebug_pointer nodp debug_keyboard
+dk nodebug_keyboard nodk deferupdate defer wait_ui
+wait_bog nowait_bog wait readtimeout nap nonap sb
+screen_blank fs gaps grow fuzz snapfb nosnapfb
+rawfb progressive rfbport http nohttp httpport
+httpdir enablehttpproxy noenablehttpproxy alwaysshared
+noalwaysshared nevershared noalwaysshared dontdisconnect
+nodontdisconnect desktop debug_xevents nodebug_xevents
+debug_xevents debug_xdamage nodebug_xdamage
+debug_xdamage debug_wireframe nodebug_wireframe
+debug_wireframe debug_scroll nodebug_scroll debug_scroll
+debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg
+nodbg noremote
 .IP
 aro=  display vncdisplay desktopname http_url auth
 users rootshift clipshift scale_str scaled_x scaled_y
