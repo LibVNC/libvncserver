@@ -174,6 +174,14 @@ typedef struct {
 
 #define sz_rfbPixelFormat 16
 
+/* UltraVNC: Color settings values */
+#define rfbPFFullColors		0
+#define rfbPF256Colors		1
+#define rfbPF64Colors		2
+#define rfbPF8Colors		3
+#define rfbPF8GreyColors	4
+#define rfbPF4GreyColors	5
+#define rfbPF2GreyColors	6
 
 
 /*****************************************************************************
@@ -228,6 +236,14 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 #define rfbConnFailed 0
 #define rfbNoAuth 1
 #define rfbVncAuth 2
+
+#define rfbRA2 5
+#define rfbRA2ne 6
+#define rfbSSPI 7
+#define rfbSSPIne 8
+#define rfbTight 16
+#define rfbUltra 17
+#define rfbTLS 18
 
 /*
  * rfbConnFailed:	For some reason the connection failed (e.g. the server
@@ -319,6 +335,10 @@ typedef struct {
 #define rfbSetColourMapEntries 1
 #define rfbBell 2
 #define rfbServerCutText 3
+/* Modif sf@2002 */
+#define rfbResizeFrameBuffer 4
+#define rfbKeyFrameUpdate 5
+#define rfbPalmVNCReSizeFrameBuffer 0xF
 #ifdef LIBVNCSERVER_BACKCHANNEL
 #define rfbBackChannel 15
 #endif
@@ -332,6 +352,20 @@ typedef struct {
 #define rfbKeyEvent 4
 #define rfbPointerEvent 5
 #define rfbClientCutText 6
+/* Modif sf@2002 - actually bidirectionnal */
+#define rfbFileTransfer 7
+/* Modif sf@2002 */
+#define rfbSetScale 8
+/* Modif rdv@2002 */
+#define rfbSetServerInput	9
+/* Modif rdv@2002 */
+#define rfbSetSW	10
+/* Modif sf@2002 - TextChat - Bidirectionnal */
+#define rfbTextChat	11
+/* Modif cs@2005 */
+#define rfbKeyFrameRequest 12
+/* PalmVNC 1.4 & 2.0 SetScale Factor message */
+#define rfbPalmVNCSetScaleFactor 0xF
 
 
 
@@ -359,6 +393,20 @@ typedef struct {
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbEncodingZRLE 16
 #endif
+
+/* Cache & XOR-Zlib - rdv@2002 */
+#define rfbEncodingCache                 0xFFFF0000
+#define rfbEncodingCacheEnable           0xFFFF0001
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+#define rfbEncodingXOR_Zlib              0xFFFF0002
+#define rfbEncodingXORMonoColor_Zlib     0xFFFF0003
+#define rfbEncodingXORMultiColor_Zlib    0xFFFF0004
+#endif
+#define rfbEncodingSolidColor            0xFFFF0005
+#define rfbEncodingXOREnable             0xFFFF0006
+#define rfbEncodingCacheZip              0xFFFF0007
+#define rfbEncodingSolMonoZip            0xFFFF0008
+#define rfbEncodingUltraZip              0xFFFF0009
 
 /*
  * Special encoding numbers:
@@ -424,6 +472,18 @@ typedef struct {
 } rfbFramebufferUpdateMsg;
 
 #define sz_rfbFramebufferUpdateMsg 4
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * KeyFrameUpdate - Acknowledgment of a key frame request, it tells the client
+ * that the next update received will be a key frame.
+ */
+
+typedef struct {
+    uint8_t type;
+} rfbKeyFrameUpdateMsg;
+
+#define sz_rfbKeyFrameUpdateMsg 1
+
 
 /*
  * Each rectangle of pixel data consists of a header describing the position
@@ -755,6 +815,21 @@ typedef struct {
 #define rfbZRLETileHeight 64
 
 
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * ZLIBHEX - zlib compressed Hextile Encoding.  Essentially, this is the
+ * hextile encoding with zlib compression on the tiles that can not be
+ * efficiently encoded with one of the other hextile subencodings.  The
+ * new zlib subencoding uses two bytes to specify the length of the
+ * compressed tile and then the compressed data follows.  As with the
+ * raw sub-encoding, the zlib subencoding invalidates the other
+ * values, if they are also set.
+ */
+
+#define rfbHextileZlibRaw		(1 << 5)
+#define rfbHextileZlibHex		(1 << 6)
+#define rfbHextileZlibMono		(1 << 7)
+
+
 /*-----------------------------------------------------------------------------
  * SetColourMapEntries - these messages are only sent if the pixel
  * format uses a "colour map" (i.e. trueColour false) and the client has not
@@ -812,6 +887,143 @@ typedef rfbServerCutTextMsg rfbBackChannelMsg;
 
 
 /*-----------------------------------------------------------------------------
+ * //  Modif sf@2002
+ * FileTransferMsg - The client sends FileTransfer message.
+ * Bidirectional message - Files can be sent from client to server & vice versa
+ */
+
+typedef struct _rfbFileTransferMsg {
+    uint8_t type;			/* always rfbFileTransfer */
+    uint8_t contentType;  /*  See defines below */
+    uint16_t contentParam;/*  Other possible content classification (Dir or File name, etc..) */
+	uint32_t size;		/*  FileSize or packet index or error or other  */
+	/*  uint32_t sizeH;		// Additional 32Bits params to handle big values. Only for V2 (we want backward compatibility between all V1 versions) */
+    uint32_t length;
+    /* followed by data char text[length] */
+} rfbFileTransferMsg;
+
+#define sz_rfbFileTransferMsg	12
+
+#define rfbFileTransferVersion  2 /*  v1 is the old FT version ( <= 1.0.0 RC18 versions) */
+
+/*  FileTransfer Content types and Params defines */
+#define rfbDirContentRequest	1 /*  Client asks for the content of a given Server directory */
+#define rfbDirPacket			2 /*  Full directory name or full file name. */
+								  /*  Null content means end of Directory */
+#define rfbFileTransferRequest	3 /*  Client asks the server for the transfer of a given file */
+#define rfbFileHeader			4 /*  First packet of a file transfer, containing file's features */
+#define rfbFilePacket			5 /*  One chunk of the file */
+#define rfbEndOfFile			6 /*  End of file transfer (the file has been received or error) */
+#define rfbAbortFileTransfer	7 /*  The file transfer must be aborted, whatever the state */
+#define rfbFileTransferOffer	8 /*  The client offers to send a file to the server */
+#define rfbFileAcceptHeader		9 /*  The server accepts or rejects the file */
+#define rfbCommand				10 /*  The Client sends a simple command (File Delete, Dir create etc...) */
+#define rfbCommandReturn		11 /*  The Client receives the server's answer about a simple command */
+#define rfbFileChecksums		12 /*  The zipped checksums of the destination file (Delta Transfer) */
+#define rfbFileTransferAccess	14 /*  Request FileTransfer authorization */
+
+								/*  rfbDirContentRequest client Request - content params  */
+#define rfbRDirContent			1 /*  Request a Server Directory contents */
+#define rfbRDrivesList			2 /*  Request the server's drives list */
+#define rfbRDirRecursiveList	3 /*  Request a server directory content recursive sorted list */
+#define rfbRDirRecursiveSize	4 /*  Request a server directory content recursive size */
+
+								/*  rfbDirPacket & rfbCommandReturn  server Answer - content params */
+#define rfbADirectory			1 /*  Reception of a directory name */
+#define rfbAFile				2 /*  Reception of a file name  */
+#define rfbADrivesList			3 /*  Reception of a list of drives */
+#define rfbADirCreate			4 /*  Response to a create dir command  */
+#define rfbADirDelete			5 /*  Response to a delete dir command  */
+#define rfbAFileCreate			6 /*  Response to a create file command  */
+#define rfbAFileDelete			7 /*  Response to a delete file command  */
+#define rfbAFileRename			8 /*  Response to a rename file command  */
+#define rfbADirRename			9 /*  Response to a rename dir command  */
+#define rfbADirRecursiveListItem	10 
+#define rfbADirRecursiveSize		11 
+
+								/*  rfbCommand Command - content params */
+#define rfbCDirCreate			1 /*  Request the server to create the given directory */
+#define rfbCDirDelete			2 /*  Request the server to delete the given directory */
+#define rfbCFileCreate			3 /*  Request the server to create the given file */
+#define rfbCFileDelete			4 /*  Request the server to delete the given file */
+#define rfbCFileRename			5 /*  Request the server to rename the given file  */
+#define rfbCDirRename			6 /*  Request the server to rename the given directory */
+
+								/*  Errors - content params or "size" field */
+#define rfbRErrorUnknownCmd     1  /*  Unknown FileTransfer command. */
+#define rfbRErrorCmd			0xFFFFFFFF/*  Error when a command fails on remote side (ret in "size" field) */
+
+#define sz_rfbBlockSize			8192  /*  Size of a File Transfer packet (before compression) */
+#define rfbZipDirectoryPrefix   "!UVNCDIR-\0" /*  Transfered directory are zipped in a file with this prefix. Must end with "-" */
+#define sz_rfbZipDirectoryPrefix 9 
+#define rfbDirPrefix			"[ "
+#define rfbDirSuffix			" ]"		
+
+
+
+/*-----------------------------------------------------------------------------
+ * Modif sf@2002
+ * TextChatMsg - Utilized to order the TextChat mode on server or client
+ * Bidirectional message
+ */
+
+typedef struct _rfbTextChatMsg {
+    uint8_t type;			/* always rfbTextChat */
+    uint8_t pad1;         /*  Could be used later as an additionnal param */
+    uint16_t pad2;		/*  Could be used later as text offset, for instance */
+    uint32_t length;      /*  Specific values for Open, close, finished (-1, -2, -3) */
+    /* followed by char text[length] */
+} rfbTextChatMsg;
+
+#define sz_rfbTextChatMsg 8
+
+#define rfbTextMaxSize		4096
+#define rfbTextChatOpen		0xFFFFFFFF 
+#define rfbTextChatClose	0xFFFFFFFE  
+#define rfbTextChatFinished 0xFFFFFFFD  
+
+
+
+/*-----------------------------------------------------------------------------
+ * Modif sf@2002
+ * ResizeFrameBuffer - The Client must change the size of its framebuffer  
+ */
+
+typedef struct _rfbResizeFrameBufferMsg {
+    uint8_t type;			/* always rfbResizeFrameBuffer */
+	uint8_t pad1;
+	uint16_t framebufferWidth;	/*  FrameBuffer width */
+	uint16_t framebufferHeigth;	/*  FrameBuffer height */
+} rfbResizeFrameBufferMsg;
+
+#define sz_rfbResizeFrameBufferMsg 6
+
+
+/*-----------------------------------------------------------------------------
+ * Copyright (C) 2001 Harakan Software
+ * PalmVNC 1.4 & 2.? ResizeFrameBuffer message
+ * ReSizeFrameBuffer - tell the RFB client to alter its framebuffer, either
+ * due to a resize of the server desktop or a client-requested scaling factor.
+ * The pixel format remains unchanged.
+ */
+
+typedef struct {
+    uint8_t type;			/* always rfbReSizeFrameBuffer */
+	uint8_t pad1;
+	uint16_t desktop_w;	/* Desktop width */
+	uint16_t desktop_h;	/* Desktop height */
+	uint16_t buffer_w;	/* FrameBuffer width */
+	uint16_t buffer_h;	/* Framebuffer height */
+    uint16_t pad2;
+
+} rfbPalmVNCReSizeFrameBufferMsg;
+
+#define sz_rfbPalmVNCReSizeFrameBufferMsg (12)
+
+
+
+
+/*-----------------------------------------------------------------------------
  * Union of all server->client messages.
  */
 
@@ -821,7 +1033,26 @@ typedef union {
     rfbSetColourMapEntriesMsg scme;
     rfbBellMsg b;
     rfbServerCutTextMsg sct;
+	rfbResizeFrameBufferMsg rsfb;
+	rfbPalmVNCReSizeFrameBufferMsg prsfb; 
+	rfbFileTransferMsg ft;
+	rfbTextChatMsg tc;
 } rfbServerToClientMsg;
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * RDV Cache Encoding.  
+ * special is not used at this point, can be used to reset cache or other specials
+ * just put it to make sure we don't have to change the encoding again.  
+ */
+
+typedef struct {
+    uint16_t special;
+} rfbCacheRect;
+
+#define sz_rfbCacheRect 2
+
 
 
 
@@ -957,6 +1188,11 @@ typedef struct {
 #define rfbButton1Mask 1
 #define rfbButton2Mask 2
 #define rfbButton3Mask 4
+#define rfbButton4Mask 8
+#define rfbButton5Mask 16
+/* RealVNC 335 method */
+#define rfbWheelUpMask rfbButton4Mask
+#define rfbWheelDownMask rfbButton5Mask
 
 #define sz_rfbPointerEventMsg 6
 
@@ -979,6 +1215,64 @@ typedef struct {
 
 
 /*-----------------------------------------------------------------------------
+ * sf@2002 - Set Server Scale
+ * SetServerScale - Server must change the scale of the client buffer.
+ */
+
+typedef struct _rfbSetScaleMsg {
+    uint8_t type;			/* always rfbSetScale */
+    uint8_t scale;		/* Scale value 1<sv<n */
+    uint16_t pad;
+} rfbSetScaleMsg;
+
+#define sz_rfbSetScaleMsg 4
+
+
+/*-----------------------------------------------------------------------------
+ * Copyright (C) 2001 Harakan Software
+ * PalmVNC 1.4 & 2.? SetScale Factor message 
+ * SetScaleFactor - tell the RFB server to alter the scale factor for the
+ * client buffer.
+ */
+typedef struct {
+    uint8_t type;			/* always rfbSetScaleFactor */
+
+    uint8_t scale;		/* Scale factor (positive non-zero integer) */
+    uint16_t pad2;
+} rfbPalmVNCSetScaleFactorMsg;
+
+#define sz_rfbPalmVNCSetScaleFactorMsg (4)
+
+
+/*-----------------------------------------------------------------------------
+ * rdv@2002 - Set input status
+ * SetServerInput - Server input is dis/enabled
+ */
+
+typedef struct _rfbSetServerInputMsg {
+    uint8_t type;			/* always rfbSetScale */
+    uint8_t status;		/* Scale value 1<sv<n */
+    uint16_t pad;
+} rfbSetServerInputMsg;
+
+#define sz_rfbSetServerInputMsg 4
+
+/*-----------------------------------------------------------------------------
+ * rdv@2002 - Set SW
+ * SetSW - Server SW/full desktop
+ */
+
+typedef struct _rfbSetSWMsg {
+    uint8_t type;			/* always rfbSetSW */
+    uint8_t status;		
+    uint16_t x;
+    uint16_t y;
+} rfbSetSWMsg;
+
+#define sz_rfbSetSWMsg 6
+
+
+/*-----------------------------------------------------------------------------
  * Union of all client->server messages.
  */
 
@@ -991,6 +1285,12 @@ typedef union {
     rfbKeyEventMsg ke;
     rfbPointerEventMsg pe;
     rfbClientCutTextMsg cct;
+	rfbSetScaleMsg ssc;
+	rfbPalmVNCSetScaleFactorMsg pssf;
+	rfbSetServerInputMsg sim;
+	rfbFileTransferMsg ft;
+	rfbSetSWMsg sw;
+	rfbTextChatMsg tc;
 } rfbClientToServerMsg;
 
 /* 
