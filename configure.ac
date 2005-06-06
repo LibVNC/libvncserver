@@ -34,7 +34,10 @@ AC_ARG_WITH(ffmpeg,
 	[  --with-ffmpeg=dir       set ffmpeg home directory],,)
 AC_SUBST(with_ffmpeg)
 AM_CONDITIONAL(WITH_FFMPEG, test ! -z "$with_ffmpeg")
-
+if test ! -z "$with_ffmpeg"; then
+	AC_CHECK_LIB(mp3lame, lame_init, HAVE_MP3LAME="true", HAVE_MP3LAME="false" )
+fi
+AM_CONDITIONAL(HAVE_MP3LAME, test "$HAVE_MP3LAME" = "true")
 
 # Seem to need this dummy here to induce the 'checking for egrep... grep -E', etc.
 # before it seemed to be inside the with_jpeg conditional. 
