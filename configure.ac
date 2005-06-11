@@ -13,6 +13,8 @@ else
 fi
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
+AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
+                  [$PATH:/usr/ccs/bin])
 
 # Options
 AH_TEMPLATE(BACKCHANNEL, [Enable BackChannel communication])
