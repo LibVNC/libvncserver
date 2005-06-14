@@ -525,7 +525,7 @@ void rfbShowCursor(rfbClientPtr cl)
 	int gmax, gshift;
 	int bmax, bshift;
 	int amax = 255;	/* alphaSource is always 8bits of info per pixel */
-	unsigned long rmask, gmask, bmask;
+	unsigned int rmask, gmask, bmask;
 
 	rmax   = s->serverFormat.redMax;
 	gmax   = s->serverFormat.greenMax;
@@ -544,8 +544,9 @@ void rfbShowCursor(rfbClientPtr cl)
 			 * we loop over the whole cursor ignoring c->mask[],
 			 * using the extracted alpha value instead.
 			 */
-			char *dest, *src, *aptr;
-			unsigned long val, *dv, *sv;
+			char *dest;
+			unsigned char *src, *aptr;
+			unsigned int val, dval, sval;
 			int rdst, gdst, bdst;		/* fb RGB */
 			int asrc, rsrc, gsrc, bsrc;	/* rich source ARGB */
 
@@ -553,23 +554,42 @@ void rfbShowCursor(rfbClientPtr cl)
 			src  = c->richSource  + (j+j1)*c->width*bpp + (i+i1)*bpp;
 			aptr = c->alphaSource + (j+j1)*c->width + (i+i1);
 
-			dv = (unsigned long *)dest;
-			sv = (unsigned long *)src;
-
-			asrc = *((unsigned char *)aptr);
-
+			asrc = *aptr;
 			if (!asrc) {
 				continue;
 			}
 
-			/* extract dest and src RGB */
-			rdst = (*dv & rmask) >> rshift;	/* fb */
-			gdst = (*dv & gmask) >> gshift;
-			bdst = (*dv & bmask) >> bshift;
+			if (bpp == 1) {
+				dval = *((unsigned char*) dest);
+				sval = *((unsigned char*) src);
+			} else if (bpp == 2) {
+				dval = *((unsigned short*) dest);
+				sval = *((unsigned short*) src);
+			} else if (bpp == 3) {
+				unsigned char *dst = (unsigned char *) dest;
+				dval = 0;
+				dval |= ((*(dst+0)) << 0);
+				dval |= ((*(dst+1)) << 8);
+				dval |= ((*(dst+2)) << 16);
+				sval = 0;
+				sval |= ((*(src+0)) << 0);
+				sval |= ((*(src+1)) << 8);
+				sval |= ((*(src+2)) << 16);
+			} else if (bpp == 4) {
+				dval = *((unsigned int*) dest);
+				sval = *((unsigned int*) src);
+			} else {
+				continue;
+			}
 
-			rsrc = (*sv & rmask) >> rshift;	/* richcursor */
-			gsrc = (*sv & gmask) >> gshift;
-			bsrc = (*sv & bmask) >> bshift;
+			/* extract dest and src RGB */
+			rdst = (dval & rmask) >> rshift;	/* fb */
+			gdst = (dval & gmask) >> gshift;
+			bdst = (dval & bmask) >> bshift;
+
+			rsrc = (sval & rmask) >> rshift;	/* richcursor */
+			gsrc = (sval & gmask) >> gshift;
+			bsrc = (sval & bmask) >> bshift;
 
 			/* blend in fb data. */
 			if (! c->alphaPreMultiplied) {

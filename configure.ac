@@ -58,6 +58,8 @@ AH_TEMPLATE(HAVE_LIBXFIXES, [XFIXES extension build environment present])
 AH_TEMPLATE(HAVE_LIBXDAMAGE, [XDAMAGE extension build environment present])
 AH_TEMPLATE(HAVE_LIBXTRAP, [DEC-XTRAP extension build environment present])
 AH_TEMPLATE(HAVE_RECORD, [RECORD extension build environment present])
+AH_TEMPLATE(HAVE_SOLARIS_XREADSCREEN, [Solaris XReadScreen available])
+AH_TEMPLATE(HAVE_IRIX_XREADDISPLAY, [IRIX XReadDisplay available])
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 	AC_CHECK_LIB(X11, XGetImage, HAVE_X="true",
 		HAVE_X="false",
@@ -69,6 +71,14 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 		AC_CHECK_LIB(Xext, XShmGetImage, 
 			[AC_DEFINE(HAVE_XSHM)], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		AC_CHECK_LIB(Xext, XReadScreen, 
+			[AC_DEFINE(HAVE_SOLARIS_XREADSCREEN)], ,
+			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+
+		AC_CHECK_HEADER(X11/extensions/readdisplay.h,
+			[AC_DEFINE(HAVE_IRIX_XREADDISPLAY)], ,
+			[#include <X11/Xlib.h>])
 
 		AC_CHECK_LIB(Xtst, XTestGrabControl, 
 			X_PRELIBS="$X_PRELIBS -lXtst"

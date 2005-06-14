@@ -2,7 +2,7 @@
 .TH X11VNC "1" "June 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-06-03
+         version: 0.7.2, lastmod: 2005-06-14
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -186,13 +186,17 @@ the notation "m/n" may be used to denote fractions
 exactly, e.g. \fB-scale\fR 2/3
 .IP
 Scaling Options: can be added after \fIfraction\fR via
-":", to supply multiple ":" options use commas.  If
-you just want a quick, rough scaling without blending,
-append ":nb" to \fIfraction\fR (e.g. \fB-scale\fR 1/3:nb).
-No blending is the default for 8bpp indexed color, to
-force blending for this case use ":fb".  By default
-\fB-scrollcopyrect\fR and \fB-wirecopyrect\fR are disabled under
-\fB-scale,\fR to enable them use ":cr".
+":", to supply multiple ":" options use commas.
+If you just want a quick, rough scaling without
+blending, append ":nb" to \fIfraction\fR (e.g. \fB-scale\fR
+1/3:nb).  No blending is the default for 8bpp indexed
+color, to force blending for this case use ":fb".
+.IP
+To disable \fB-scrollcopyrect\fR and \fB-wirecopyrect\fR under
+\fB-scale\fR use ":nocr".  If you need to to enable them use
+":cr" or specify them explicitly on the command line.
+If a slow link is detected, ":nocr" may be applied
+automatically.  Default: :cr
 .IP
 More esoteric options: for compatibility with vncviewers
 the scaled width is adjusted to be a multiple of 4:
@@ -717,10 +721,14 @@ Example: "\fB-skip_keycodes\fR \fI94,114\fR"
 \fB-skip_dups,\fR \fB-noskip_dups\fR
 .IP
 Some VNC viewers send impossible repeated key events,
-e.g. key-down, key-down, key-up, key-up all for the
-same key, or 20 downs in a row for the same key!
+e.g. key-down, key-down, key-up, key-up all for the same
+key, or 20 downs in a row for the same modifier key!
 Setting \fB-skip_dups\fR means to skip these duplicates and
-just process the first event.  Default: \fB-skip_dups\fR
+just process the first event. Note: some VNC viewers
+assume they can send down's without the corresponding
+up's and so you should not set this option for
+these viewers (symptom: some keys do not autorepeat)
+Default: \fB-noskip_dups\fR
 .PP
 \fB-add_keysyms,\fR \fB-noadd_keysyms\fR
 .IP
@@ -833,6 +841,15 @@ VNC viewers and the X server.
 Do not poll the PRIMARY selection for changes to send
 back to clients.  (PRIMARY is still set on received
 changes, however).
+.PP
+\fB-seldir\fR \fIstring\fR
+.IP
+If direction string is "send", only send the selection
+to viewers, and if it is "recv" only receive it from
+viewers.  To work around apps setting the selection
+too frequently and messing up the other end.  You can
+actually supply a comma separated list of directions,
+including "debug" to turn on debugging output.
 .PP
 \fB-cursor\fR \fI[mode],\fR \fB-nocursor\fR
 .IP
@@ -1032,8 +1049,8 @@ Shorter aliases:  \fB-wf\fR [str]  and \fB-nowf\fR
 The value "str" is optional and, of course, is
 packed with many tunable parameters for this scheme:
 .IP
-Format: shade,linewidth,percent,T+B+L+R,t1+t2+t3+t4
-Default: 0xff,3,0,32+8+8+8,0.15+0.30+5.0+0.125
+Format: shade,linewidth,percent,T+B+L+R,mod,t1+t2+t3+t4
+Default: 0xff,3,0,32+8+8+8,all,0.15+0.30+5.0+0.125
 .IP
 If you leave nothing between commas: ",," the default
 value is used.  If you don't specify enough commas,
@@ -1054,6 +1071,14 @@ or Right edges of the window to consider wireframing.
 This is a speedup to quickly exclude a window from being
 wireframed: set them all to zero to not try the speedup
 (scrolling and selecting text will likely be slower).
+.IP
+"mod" specifies if a button down event in the
+interior of the window with a modifier key (Alt, Shift,
+etc.) down should indicate a wireframe opportunity.
+It can be "0" or "none" to skip it, "1" or "all"
+to apply it to any modifier, or "Shift", "Alt",
+"Control", "Meta", "Super", or "Hyper" to only
+apply for that type of modifier key.
 .IP
 "t1+t2+t3+t4" specify four floating point times in
 seconds: t1 is how long to wait for the pointer to move,
@@ -1082,10 +1107,11 @@ the window was not covered by any other windows, and
 region (this may look odd as the remaining pieces come
 in, but helps on a slow link).  Default: "always"
 .IP
-Note: there can be painting errors when using \fB-scale\fR
-so CopyRect is skipped when scaling unless you specify
-"\fB-wirecopyrect\fR \fIalways\fR" on the command line or by
-remote-control.  Or you can also use "\fB-scale\fR \fIxxx:cr\fR"
+Note: there can be painting errors or slow response
+when using \fB-scale\fR so you may want to disable CopyRect
+in this case "\fB-wirecopyrect\fR \fInever\fR" on the command
+line or by remote-control.  Or you can also use the
+"\fB-scale\fR \fIxxx:nocr\fR" scale option.
 .PP
 \fB-debug_wireframe\fR
 .IP
@@ -1131,16 +1157,24 @@ may be seen when using this mode:
 4 Super_L's in a row: reset RECORD context,
 5 Super_L's in a row: try to push a black screen
 .IP
+note: Alt_L is the Left "Alt" key (a single key)
+Super_L is the Left "Super" key (Windows flag).
+Both of these are modifier keys, and so should not
+generate characters when pressed by themselves.  Also,
+your VNC viewer may have its own refresh hot-key
+or button.
+.IP
 "mode" can be "never" (same as \fB-noscrollcopyrect)\fR
 to never try the copyrect, "keys" means to try it
 in response to keystrokes only, "mouse" means to
 try it in response to mouse events only, "always"
 means to do both. Default: "always"
 .IP
-Note: there can be painting errors when using \fB-scale\fR
-so CopyRect is skipped when scaling unless you specify
-"\fB-scrollcopyrect\fR \fIalways\fR" on the command line or by
-remote-control.  You can also use "\fB-scale\fR \fIxxx:cr\fR"
+Note: there can be painting errors or slow response
+when using \fB-scale\fR so you may want to disable CopyRect
+in this case "\fB-scrollcopyrect\fR \fInever\fR" on the command
+line or by remote-control.  Or you can also use the
+"\fB-scale\fR \fIxxx:nocr\fR" scale option.
 .PP
 \fB-scr_area\fR \fIn\fR
 .IP
@@ -1303,22 +1337,22 @@ it is intended for cases when the \fB-scrollcopyrect\fR or
 but it can be used for any scenario.  This option
 periodically performs costly operations and so
 interactive response may be reduced when it is on.
-The 3 Alt_L's in a row described under \fB-scrollcopyrect\fR
-can be used instead to manually request a screen repaint
-when it is needed.
+The 3 Alt_L's (the Left "Alt" key) taps in a row
+described under \fB-scrollcopyrect\fR can be used instead to
+manually request a screen repaint when it is needed.
 .IP
-\fIstring\fR is a comma separated list of one or more
-of the following: "V=t", "C=t", and "X=t".
-In these "t" stands for a time in seconds (it is
-a floating point even though one should usually use
-values > 2 to avoid wasting resources).  V sets how
-frequently the entire screen should be sent to viewers
-(it is like the 3 Alt_L's).  C sets how long after a
-CopyRect the full screen should be repainted.  X sets
-how frequently to reread the full X11 framebuffer from
-the X server and push it out to connected viewers.
-Use of X should be rare.  Examples: \fB-fixscreen\fR V=10
-\fB-fixscreen\fR C=10
+\fIstring\fR is a comma separated list of one or more of
+the following: "V=t", "C=t", and "X=t".  In these
+"t" stands for a time in seconds (it is a floating
+point even though one should usually use values > 2 to
+avoid wasting resources).  V sets how frequently the
+entire screen should be sent to viewers (it is like the
+3 Alt_L's).  C sets how long to wait after a CopyRect
+to repaint the full screen.  X sets how frequently
+to reread the full X11 framebuffer from the X server
+and push it out to connected viewers.  Use of X should
+be rare, please report a bug if you find you need it.
+Examples: \fB-fixscreen\fR V=10 \fB-fixscreen\fR C=10
 .PP
 \fB-debug_scroll\fR
 .IP
@@ -1945,6 +1979,8 @@ noprimary       enable  \fB-noprimary\fR mode.
 .IP
 primary         disable \fB-noprimary\fR mode.
 .IP
+seldir:str      set \fB-seldir\fR to "str"
+.IP
 cursor:mode     enable  \fB-cursor\fR "mode".
 .IP
 show_cursor     enable  showing a cursor.
@@ -2021,6 +2057,8 @@ fixscreen:str   set \fB-fixscreen\fR to "str".
 noxrecord       disable all use of RECORD extension.
 .IP
 xrecord         enable  use of RECORD extension.
+.IP
+reset_record    reset RECORD extension (if avail.).
 .IP
 pointer_mode:n  set \fB-pointer_mode\fR to n. same as "pm"
 .IP
@@ -2180,14 +2218,6 @@ in these cases the value returned is "N/A".  To direct
 a query straight to the VNC_CONNECT property or connect
 file use "qry=..." instead of "cmd=..."
 .IP
-Here is the current list of "variables" that can
-be supplied to the \fB-query\fR command. This includes the
-"N/A" ones that return no useful info.  For variables
-names that do not correspond to an x11vnc option or
-remote command, we hope the name makes it obvious what
-the returned value corresponds to (hint: the ext_*
-variables correspond to the presence of X extensions):
-.IP
 ans= stop quit exit shutdown ping blacken zero
 refresh reset close disconnect id sid waitmapped
 nowaitmapped clip flashcmap noflashcmap shiftcmap
@@ -2204,23 +2234,23 @@ xrandr noxrandr xrandr_mode padgeom quiet q noquiet
 modtweak nomodtweak xkb noxkb skip_keycodes skip_dups
 noskip_dups add_keysyms noadd_keysyms clear_mods
 noclear_mods clear_keys noclear_keys remap repeat
-norepeat fb nofb bell nobell sel nosel primary noprimary
-cursorshape nocursorshape cursorpos nocursorpos cursor
-show_cursor noshow_cursor nocursor arrow xfixes
-noxfixes xdamage noxdamage xd_area xd_mem alphacut
-alphafrac alpharemove noalpharemove alphablend
-noalphablend xwarppointer xwarp noxwarppointer
-noxwarp buttonmap dragging nodragging wireframe_mode
-wireframe wf nowireframe nowf wirecopyrect wcr
-nowirecopyrect nowcr scr_area scr_skip scr_inc scr_keys
-scr_term scr_keyrepeat scr_parms scrollcopyrect scr
+norepeat fb nofb bell nobell sel nosel primary
+noprimary seldir cursorshape nocursorshape cursorpos
+nocursorpos cursor show_cursor noshow_cursor nocursor
+arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem
+alphacut alphafrac alpharemove noalpharemove alphablend
+noalphablend xwarppointer xwarp noxwarppointer noxwarp
+buttonmap dragging nodragging wireframe_mode wireframe
+wf nowireframe nowf wirecopyrect wcr nowirecopyrect
+nowcr scr_area scr_skip scr_inc scr_keys scr_term
+scr_keyrepeat scr_parms scrollcopyrect scr
 noscrollcopyrect noscr fixscreen noxrecord xrecord
-pointer_mode pm input_skip input client_input speeds
-debug_pointer dp nodebug_pointer nodp debug_keyboard
-dk nodebug_keyboard nodk deferupdate defer wait_ui
-wait_bog nowait_bog wait readtimeout nap nonap sb
-screen_blank fs gaps grow fuzz snapfb nosnapfb
-rawfb progressive rfbport http nohttp httpport
+reset_record pointer_mode pm input_skip input
+client_input speeds debug_pointer dp nodebug_pointer
+nodp debug_keyboard dk nodebug_keyboard nodk deferupdate
+defer wait_ui wait_bog nowait_bog wait readtimeout
+nap nonap sb screen_blank fs gaps grow fuzz snapfb
+nosnapfb rawfb progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop debug_xevents nodebug_xevents
@@ -2230,19 +2260,19 @@ debug_wireframe debug_scroll nodebug_scroll debug_scroll
 debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg
 nodbg noremote
 .IP
-aro=  display vncdisplay desktopname http_url auth
-users rootshift clipshift scale_str scaled_x scaled_y
-scale_numer scale_denom scale_fac scaling_blend
-scaling_nomult4 scaling_pad scaling_interpolate inetd
-privremote unsafe safer nocmds passwdfile using_shm
-logfile o flag rc norc h help V version lastmod bg
-sigpipe threads readrate netrate netlatency pipeinput
-clients client_count pid ext_xtest ext_xtrap ext_xrecord
-ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes
-ext_xdamage ext_xrandr rootwin num_buttons button_mask
-mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y
-wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y
-rfbauth passwd
+aro=  display vncdisplay desktopname guess_desktop
+http_url auth users rootshift clipshift scale_str
+scaled_x scaled_y scale_numer scale_denom
+scale_fac scaling_blend scaling_nomult4 scaling_pad
+scaling_interpolate inetd privremote unsafe safer nocmds
+passwdfile using_shm logfile o flag rc norc h help V
+version lastmod bg sigpipe threads readrate netrate
+netlatency pipeinput clients client_count pid ext_xtest
+ext_xtrap ext_xrecord ext_xkb ext_xshm ext_xinerama
+ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin
+num_buttons button_mask mouse_x mouse_y bpp depth
+indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y
+cdpy_x cdpy_y coff_x coff_y rfbauth passwd
 .PP
 \fB-sync\fR
 .IP

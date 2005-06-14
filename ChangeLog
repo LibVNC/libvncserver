@@ -1,3 +1,8 @@
+2005-06-14  Karl Runge <runge@karlrunge.com>
+	* configure.ac: XReadScreen and XReadDisplay checks.
+	* libvncserver/cursor.c: fix unsigned long crash for 64bits.
+	* x11vnc: first round of beta-testing fixes, RFE's.
+
 2005-06-10  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* configure.ac: fix that annoying SUN /usr/ccs location of "ar"
 

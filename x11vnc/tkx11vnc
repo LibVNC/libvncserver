@@ -164,16 +164,18 @@ Misc
 	-- D
 	=F rc:
 	norc
+	nolookup
 	--
 	nofb
 	--
 	=D nobell
 	=D nosel
 	noprimary
-	nolookup
+	seldir:
 	--
 	xtrap
 	xrecord
+	=RA reset_record
 	--
 	bg
 	=-C:ignore,exit sigpipe:

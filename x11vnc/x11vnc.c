@@ -6,8 +6,7 @@
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
+ *  the Free Software Foundation; version 2 of the License.
  *
  *  This software is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -174,12 +173,13 @@
  * -DSCROLL_COPYRECT=0     to have -noscrollcopyrect as the default.
  * -DSCROLL_COPYRECT_PARMS=...  set default -scrollcopyrect parameters.
  * -DXDAMAGE=0    to have -noxdamage as the default.
- * -DSKIDPUPS=0   to have -noskip_dups as the default.
+ * -DSKIPDUPS=0   to have -noskip_dups as the default or vice versa.
  *
  * -DPOINTER_MODE_DEFAULT={0,1,2,3,4}  set default -pointer_mode.
  * -DBOLDLY_CLOSE_DISPLAY=0  to not close X DISPLAY under -rawfb.
  * -DSMALL_FOOTPRINT=1  for smaller binary size (no help, no gui, etc) 
  *                      use 2 or 3 for even smaller footprint.
+ * -DNOGUI  do not include the gui tkx11vnc.
  *
  * Set these in CPPFLAGS before running configure. E.g.:
  *
@@ -207,6 +207,10 @@
  */
 #ifndef SMALL_FOOTPRINT
 #define SMALL_FOOTPRINT 0
+#endif
+
+#if SMALL_FOOTPRINT
+#define NOGUI
 #endif
 
 #if (SMALL_FOOTPRINT > 1)
@@ -308,20 +312,26 @@ extern int h_errno;
 
 /* solaris/sun */
 #if defined (__SVR4) && defined (__sun)
-#define SOLARIS
-#define SOLARIS_OVERLAY
-#define OVERLAY_OS
+# define SOLARIS
+# ifdef LIBVNCSERVER_HAVE_SOLARIS_XREADSCREEN
+#  define SOLARIS_OVERLAY
+#  define OVERLAY_OS
+# endif
 #endif
+
 #ifdef SOLARIS_OVERLAY
 #include <X11/extensions/transovl.h>
 #endif
 
 /* irix/sgi */
 #if defined(__sgi)
-#define IRIX
-#define IRIX_OVERLAY
-#define OVERLAY_OS
+# define IRIX
+# ifdef LIBVNCSERVER_HAVE_IRIX_XREADDISPLAY
+#  define IRIX_OVERLAY
+#  define OVERLAY_OS
+# endif
 #endif
+
 #ifdef IRIX_OVERLAY
 #include <X11/extensions/readdisplay.h>
 #endif
@@ -372,7 +382,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-06-03";
+char lastmod[] = "0.7.2 lastmod: 2005-06-14";
 int hack_val = 0;
 
 /* X display info */
@@ -472,6 +482,7 @@ int scaling_pad = 0;		/* pad out scaled sizes to fit denominator */
 int scaling_interpolate = 0;	/* use interpolation scheme when shrinking */
 int scaled_x = 0, scaled_y = 0;	/* dimensions of scaled display */
 int scale_numer = 0, scale_denom = 0;	/* n/m */
+
 
 /* scale cursor */
 char *scale_cursor_str = NULL;
@@ -811,7 +822,10 @@ char *listen_str = NULL;
 char *allow_once = NULL;	/* one time -allow */
 char *accept_cmd = NULL;	/* for -accept */
 char *gone_cmd = NULL;		/* for -gone */
-int view_only = 0;		/* clients can only watch. */
+#ifndef VIEWONLY
+#define VIEWONLY 0
+#endif
+int view_only = VIEWONLY;		/* clients can only watch. */
 char *allowed_input_view_only = NULL;
 char *allowed_input_normal = NULL;
 char *allowed_input_str = NULL;
@@ -881,7 +895,7 @@ int show_dragging = 1;		/* process mouse movement events */
 int wireframe = WIREFRAME;	/* try to emulate wireframe wm moves */
 /* shade,linewidth,percent,T+B+L+R,t1+t2+t3+t4 */
 #ifndef WIREFRAME_PARMS
-#define WIREFRAME_PARMS "0xff,3,0,32+8+8+8,0.15+0.30+5.0+0.125"
+#define WIREFRAME_PARMS "0xff,3,0,32+8+8+8,all,0.15+0.30+5.0+0.125"
 #endif
 char *wireframe_str = NULL;
 char *wireframe_copyrect = NULL;
@@ -936,6 +950,12 @@ char *scroll_copyrect_default = "never";
 char *scroll_key_list_str = NULL;
 KeySym *scroll_key_list = NULL;
 int pointer_queued_sent = 0;
+
+#ifndef SCALING_COPYRECT
+#define SCALING_COPYRECT 1
+#endif
+int scaling_copyrect0 = SCALING_COPYRECT;
+int scaling_copyrect  = SCALING_COPYRECT;
 
 int scrollcopyrect_min_area = 60000;	/* minimum rectangle area */
 int debug_scroll = 0;
@@ -997,7 +1017,7 @@ int sound_bell = 1;		/* actually send it */
 int xkbcompat = 0;		/* ignore XKEYBOARD extension */
 int use_xkb_modtweak = 0;	/* -xkb */
 #ifndef SKIPDUPS
-#define SKIPDUPS 1
+#define SKIPDUPS 0
 #endif
 int skip_duplicate_key_events = SKIPDUPS;
 char *skip_keycodes = NULL;
@@ -1041,6 +1061,7 @@ int ui_skip = 10;	/* see watchloop.  negative means ignore input */
 
 int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
 int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */
+char *sel_direction = NULL;	/* "send" or "recv" for one-way */
 
 char *sigpipe = NULL;		/* skip, ignore, exit */
 
@@ -1206,7 +1227,7 @@ char *lblanks(char *str) {
 
 int scan_hexdec(char *str, unsigned long *num) {
 	if (sscanf(str, "0x%lx", num) != 1) {
-		if (sscanf(str, "%ld", num) != 1) {
+		if (sscanf(str, "%lu", num) != 1) {
 			return 0;
 		}
 	}
@@ -1241,7 +1262,7 @@ int parse_geom(char *str, int *wp, int *hp, int *xp, int *yp, int W, int H) {
 
 void set_env(char *name, char *value) {
 	char *str;
-	str = (char *)malloc(strlen(name)+strlen(value)+2);
+	str = (char *) malloc(strlen(name)+strlen(value)+2);
 	sprintf(str, "%s=%s", name, value);
 	putenv(str);
 }
@@ -1255,6 +1276,7 @@ int pick_windowid(unsigned long *num) {
 		set_env("DISPLAY", use_dpy);
 	}
 	if (no_external_cmds) {
+		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");
 		rfbLog("   \"%s\"\n", "xwininfo");
 		rfbLog("   exiting.\n");
@@ -1608,7 +1630,7 @@ char **user_list(char *user_str) {
 			n++;
 		}
 	}
-	list = (char **) malloc((n+1)*(sizeof(char *)));
+	list = (char **) malloc((n+1)*sizeof(char *));
 
 	p = strtok(user_str, ",");
 	i = 0;
@@ -1996,7 +2018,7 @@ int switch_user(char *user, int fb_mode) {
 
 	user2uid(user, &uid, &name, &home);
 
-	if (uid == -1 || uid == 0) {
+	if (uid == (uid_t) -1 || uid == 0) {
 		return 0;
 	}
 
@@ -2186,7 +2208,8 @@ int dotted_ip(char *host) {
 
 int get_port(int sock, int remote) {
 	struct sockaddr_in saddr;
-	int saddr_len, saddr_port;
+	unsigned int saddr_len;
+	int saddr_port;
 	
 	saddr_len = sizeof(saddr);
 	memset(&saddr, 0, sizeof(saddr));
@@ -2213,7 +2236,8 @@ int get_local_port(int sock) {
 
 char *get_host(int sock, int remote) {
 	struct sockaddr_in saddr;
-	int saddr_len, saddr_port;
+	unsigned int saddr_len;
+	int saddr_port;
 	char *saddr_ip_str = NULL;
 	
 	saddr_len = sizeof(saddr);
@@ -2326,7 +2350,7 @@ char *ident_username(rfbClientPtr client) {
 	}
 	newhost = ip2host(client->host);
 	len = strlen(user) + 1 + strlen(newhost) + 1;
-	str = (char *)malloc(len);
+	str = (char *) malloc(len);
 	sprintf(str, "%s@%s", user, newhost);
 	free(newhost);
 	return str;
@@ -2438,15 +2462,20 @@ XImage *xreadscreen(Display *disp, Drawable d, int x, int y,
 #ifdef SOLARIS_OVERLAY
 	return XReadScreen(disp, d, x, y, width, height,
 	    show_cursor);
-#endif
-#ifdef IRIX_OVERLAY
+#else
+#  ifdef IRIX_OVERLAY
 	{	unsigned long hints = 0, hints_ret;
 		if (show_cursor) hints |= XRD_READ_POINTER;
 		return XReadDisplay(disp, d, x, y, width, height,
 		    hints, &hints_ret);
 	}
-#endif
+#  else
+	/* unused vars warning: */
+	if (disp || d || x || y || width || height || show_cursor) {} 
+
 	return NULL;
+#  endif
+#endif
 }
 
 XImage *XGetSubImage_wr(Display *disp, Drawable d, int x, int y,
@@ -2539,7 +2568,8 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 
 void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 	char *src, *dst;
-	int line, pixelsize = bpp/8;
+	unsigned int line;
+	int pixelsize = bpp/8;
 	int bpl = wdpy_x * pixelsize;
 
 	if (clipshift) {
@@ -2600,7 +2630,8 @@ void copy_image(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 
 	if (use_snapfb && snap_fb && dest != snaprect) {
 		char *src, *dst;
-		int line, pixelsize = bpp/8;
+		unsigned int line;
+		int pixelsize = bpp/8;
 
 		src = snap->data + snap->bytes_per_line*y + pixelsize*x;
 		dst = dest->data;
@@ -2613,7 +2644,8 @@ void copy_image(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 	} else if (raw_fb) {
 		copy_raw_fb(dest, x, y, w, h);
 
-	} else if (using_shm && w == dest->width && h == dest->height) {
+	} else if (using_shm && (int) w == dest->width &&
+	    (int) h == dest->height) {
 		XShmGetImage_wr(dpy, window, dest, x, y, AllPlanes);
 
 	} else {
@@ -2639,6 +2671,9 @@ void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 		DEBUG_SKIPPED_INPUT(debug_keyboard, "keyboard: no-XTRAP");
 		return;
 	}
+	/* unused vars warning: */
+	if (dpy || key || down || delay) {} 
+
 #if LIBVNCSERVER_HAVE_LIBXTRAP
 	XESimulateXEventRequest(trap_ctx, down ? KeyPress : KeyRelease,
 	    key, 0, 0, 0);
@@ -2661,7 +2696,8 @@ void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 	}
 
 	if (xtrap_input) {
-		return XTRAP_FakeKeyEvent_wr(dpy, key, down, delay);
+		XTRAP_FakeKeyEvent_wr(dpy, key, down, delay);
+		return;
 	}
 
 	if (! xtest_present) {
@@ -2684,6 +2720,9 @@ void XTRAP_FakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
 		DEBUG_SKIPPED_INPUT(debug_keyboard, "button: no-XTRAP");
 		return;
 	}
+	/* unused vars warning: */
+	if (dpy || button || is_press || delay) {} 
+
 #if LIBVNCSERVER_HAVE_LIBXTRAP
 	XESimulateXEventRequest(trap_ctx,
 	    is_press ? ButtonPress : ButtonRelease, button, 0, 0, 0);
@@ -2696,7 +2735,8 @@ void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
     unsigned long delay) {
 
 	if (xtrap_input) {
-		return XTRAP_FakeButtonEvent_wr(dpy, button, is_press, delay);
+		XTRAP_FakeButtonEvent_wr(dpy, button, is_press, delay);
+		return;
 	}
 
 	if (! xtest_present) {
@@ -2719,6 +2759,9 @@ void XTRAP_FakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
 		DEBUG_SKIPPED_INPUT(debug_keyboard, "motion: no-XTRAP");
 		return;
 	}
+	/* unused vars warning: */
+	if (dpy || screen || x || y || delay) {} 
+
 #if LIBVNCSERVER_HAVE_LIBXTRAP
 	XESimulateXEventRequest(trap_ctx, MotionNotify, 0, x, y, 0);
 #else
@@ -2730,7 +2773,8 @@ void XTestFakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
     unsigned long delay) {
 
 	if (xtrap_input) {
-		return XTRAP_FakeMotionEvent_wr(dpy, screen, x, y, delay);
+		XTRAP_FakeMotionEvent_wr(dpy, screen, x, y, delay);
+		return;
 	}
 
 	if (debug_pointer) {
@@ -2787,6 +2831,8 @@ Bool XETrapQueryExtension_wr(Display *dpy, int *ev, int *er, int *op) {
 	return XETrapQueryExtension(dpy, (INT32 *)ev, (INT32 *)er,
 	    (INT32 *)op);
 #else
+	/* unused vars warning: */
+	if (dpy || ev || er || op) {} 
 	return False;
 #endif
 }
@@ -2805,6 +2851,8 @@ int XTestGrabControl_wr(Display *dpy, Bool impervious) {
 
 int XTRAP_GrabControl_wr(Display *dpy, Bool impervious) {
 	if (! xtrap_present) {
+		/* unused vars warning: */
+		if (dpy || impervious) {} 
 		return 0;
 	}
 #if LIBVNCSERVER_HAVE_LIBXTRAP
@@ -3185,6 +3233,9 @@ int xrecord_skip_keysym(rfbKeySym keysym) {
 }
 
 int xrecord_skip_button(int new, int old) {
+	/* unused vars warning: */
+	if (new || old) {} 
+
 	return 0;
 }
 
@@ -3405,7 +3456,7 @@ short period of time with a painting error: two cursors, one above the other.
 	w = req->width;
 	h = req->height;
 
-	if (w*h < scrollcopyrect_min_area) {
+	if (w*h < (unsigned int) scrollcopyrect_min_area) {
 		good = 0;
 	} else if (!src || !dst) {
 		good = 0;
@@ -3561,7 +3612,7 @@ void record_CW(XPointer ptr, XRecordInterceptData *rec_data) {
 	int x, y, w, h;
 	int x0, y0, w0, h0, x1, y1, w1, h1, x2, y2, w2, h2;
 	static int index = 0;
-	unsigned long vals[4];
+	unsigned int vals[4];
 	unsigned tmask;
 	char *data;
 	int dba = 0, db = debug_scroll;
@@ -3660,12 +3711,17 @@ if (db > 1) fprintf(stderr, "record_CW-%d\n", k++);
 	data += sz_xConfigureWindowReq;
 
 	for (i=0; i<req->length; i++) {
-		unsigned long v;
-		v = *( (unsigned long *) data);
+		unsigned int v;
+		/*
+		 * We use unsigned int for the values.  There were
+		 * some crashes on 64bit machines with unsigned longs.
+		 * Need to check that X protocol sends 32bit values.
+		 */
+		v = *( (unsigned int *) data);
+if (db > 1) fprintf(stderr, "  vals[%d]  0x%x/%d\n", i, v, v);
 		vals[i] = v;
-		data += 4;
+		data += sizeof(unsigned int);
 	}
-
 
 	if (index >= MAX_CW) {
 		int i, j;
@@ -4126,6 +4182,9 @@ void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
 		;
 	}
 	XRecordFreeData(rec_data);
+
+	/* unused vars warning: */
+	if (ptr) {} 
 }
 #endif
 
@@ -4242,8 +4301,8 @@ void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) {
 
 void check_xrecord_reset(int force) {
 	static double last_reset = 0.0;
-	int reset_time  = 90, reset_idle  = 10;
-	int reset_time2 = 600, reset_idle2 = 40;
+	int reset_time  = 60, require_idle  = 10;
+	int reset_time2 = 600, require_idle2 = 40;
 	double now;
 	XErrorHandler old_handler = NULL;
 
@@ -4254,7 +4313,7 @@ void check_xrecord_reset(int force) {
 	} else {
 		/* more dicey if not watching grabserver */
 		reset_time = reset_time2;
-		reset_idle = reset_idle2;
+		require_idle = require_idle2;
 	}
 
 	if (!use_xrecord) {
@@ -4287,9 +4346,9 @@ void check_xrecord_reset(int force) {
 		;
 	} else if (now < last_reset + reset_time) {
 		return;
-	} else if (now < last_pointer_click_time + reset_idle)  {
+	} else if (now < last_pointer_click_time + require_idle)  {
 		return;
-	} else if (now < last_keyboard_time + reset_idle)  {
+	} else if (now < last_keyboard_time + require_idle)  {
 		return;
 	}
 	X_LOCK;
@@ -4843,23 +4902,35 @@ int trapped_record_xerror = 0;
 int trap_xerror(Display *d, XErrorEvent *error) {
 	trapped_xerror = 1;
 	trapped_xerror_event = error;
+
+	if (d) {} /* unused vars warning: */
+
 	return 0;
 }
 
 int trap_xioerror(Display *d) {
 	trapped_xioerror = 1;
+
+	if (d) {} /* unused vars warning: */
+
 	return 0;
 }
 
 int trap_getimage_xerror(Display *d, XErrorEvent *error) {
 	trapped_getimage_xerror = 1;
 	trapped_xerror_event = error;
+
+	if (d) {} /* unused vars warning: */
+
 	return 0;
 }
 
 int trap_record_xerror(Display *d, XErrorEvent *error) {
 	trapped_record_xerror = 1;
 	trapped_record_xerror_event = error;
+
+	if (d) {} /* unused vars warning: */
+
 	return 0;
 }
 
@@ -4868,12 +4939,18 @@ void interrupted(int);
 static int Xerror(Display *d, XErrorEvent *error) {
 	X_UNLOCK;
 	interrupted(0);
+
+	if (d) {} /* unused vars warning: */
+
 	return (*Xerror_def)(d, error);
 }
 
 static int XIOerr(Display *d) {
 	X_UNLOCK;
 	interrupted(-1);
+
+	if (d) {} /* unused vars warning: */
+
 	return (*XIOerr_def)(d);
 }
 
@@ -4919,9 +4996,9 @@ int crash_debug = 1;
 
 void initialize_crash_handler(void) {
 	int pid = program_pid;
-	crash_stack_command1 = malloc(1000);
-	crash_stack_command2 = malloc(1000);
-	crash_debug_command = malloc(1000);
+	crash_stack_command1 = (char *) malloc(1000);
+	crash_stack_command2 = (char *) malloc(1000);
+	crash_debug_command =  (char *) malloc(1000);
 
 	snprintf(crash_stack_command1, 500, "echo where > /tmp/gdb.%d;"
 	    " env PATH=$PATH:/usr/local/bin:/usr/sfw/bin:/usr/bin"
@@ -5122,7 +5199,7 @@ int wait_until_mapped(Window win) {
 	while (1) {
 		if (! valid_window(win, NULL, 0)) {
 			if (time(0) > start + waittime) {
-				return 0;
+				break;
 			}
 			usleep(ms * 1000);
 			continue;
@@ -5311,16 +5388,19 @@ rfbClientPtr *client_match(char *str) {
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		if (strstr(str, "0x") == str) {
+			unsigned int in;
 			int id;
 			ClientData *cd = (ClientData *) cl->clientData;
-			if (sscanf(str, "0x%x", &id) != 1) {
+			if (sscanf(str, "0x%x", &in) != 1) {
 				if (hex_warn++) {
 					continue;
 				}
-				rfbLog("skipping bad client hex id: %s\n", str);
+				rfbLog("skipping invalid client hex id: %s\n",
+				    str);
 				continue;
 			}
-			if ( cd->uid == id) {
+			id = (unsigned int) in;
+			if (cd->uid == id) {
 				cl_list[i++] = cl;
 			}
 		} else {
@@ -5515,6 +5595,7 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	set_env("RFB_CLIENT_COUNT", str);
 
 	if (no_external_cmds) {
+		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");
 		rfbLog("   \"%s\"\n", cmd);
 		rfbLog("   exiting.\n");
@@ -5591,7 +5672,7 @@ static void client_gone(rfbClientPtr client) {
 		 */
 		if ((client->state == RFB_PROTOCOL_VERSION ||
 		     client->state == RFB_AUTHENTICATION) && accepted_client) {
-			rfbLog("connect_once: bad password or early "
+			rfbLog("connect_once: invalid password or early "
 			   "disconnect.\n");
 			rfbLog("connect_once: waiting for next connection.\n"); 
 			accepted_client = 0;
@@ -5643,6 +5724,7 @@ static int check_access(char *addr) {
 		char line[1024], *q;
 
 		if (stat(allow_list, &sbuf) != 0) {
+			rfbLogEnable(1);
 			rfbLog("check_access: failure stating file: %s\n",
 			    allow_list);
 			rfbLogPerror("stat");
@@ -5653,11 +5735,12 @@ static int check_access(char *addr) {
 			len2 = strlen(allow_once) + 2;
 			len += len2;
 		}
-		list = malloc(len);
+		list = (char *) malloc(len);
 		list[0] = '\0';
 		
 		in = fopen(allow_list, "r");
 		if (in == NULL) {
+			rfbLogEnable(1);
 			rfbLog("check_access: cannot open: %s\n", allow_list);
 			rfbLogPerror("fopen");
 			clean_up_exit(1);
@@ -5666,7 +5749,8 @@ static int check_access(char *addr) {
 			if ( (q = strchr(line, '#')) != NULL) {
 				*q = '\0';
 			}
-			if (strlen(list) + strlen(line) >= len - len2) {
+			if (strlen(list) + strlen(line) >=
+			    (size_t) (len - len2)) {
 				/* file grew since our stat() */
 				break;
 			}
@@ -5683,7 +5767,7 @@ static int check_access(char *addr) {
 		if (allow_once) {
 			len += strlen(allow_once) + 1;
 		}
-		list = malloc(len);
+		list = (char *) malloc(len);
 		list[0] = '\0';
 		strcat(list, allow_list);
 		if (allow_once) {
@@ -5759,7 +5843,7 @@ static int ugly_accept_window(char *addr, char *userhost, int X, int Y,
 
 #define t2x2_width 16
 #define t2x2_height 16
-static char t2x2_bits[] = {
+static unsigned char t2x2_bits[] = {
    0xff, 0xff, 0xff, 0xff, 0x33, 0x33, 0x33, 0x33, 0xff, 0xff, 0xff, 0xff,
    0x33, 0x33, 0x33, 0x33, 0xff, 0xff, 0xff, 0xff, 0x33, 0x33, 0x33, 0x33,
    0xff, 0xff, 0xff, 0xff, 0x33, 0x33, 0x33, 0x33};
@@ -5854,8 +5938,8 @@ static char t2x2_bits[] = {
 	XSetWMProtocols(dpy, awin, &wm_delete_window, 1);
 
 	if (! ico) {
-		ico = XCreateBitmapFromData(dpy, awin, t2x2_bits, t2x2_width,
-		    t2x2_height);
+		ico = XCreateBitmapFromData(dpy, awin, (char *) t2x2_bits,
+		    t2x2_width, t2x2_height);
 	}
 
 	hints.flags = PPosition | PSize | PMinSize;
@@ -5872,6 +5956,7 @@ static char t2x2_bits[] = {
 	XSelectInput(dpy, awin, evmask);
 
 	if (! font_info && (font_info = XLoadQueryFont(dpy, "fixed")) == NULL) {
+		rfbLogEnable(1);
 		rfbLog("ugly_accept_window: cannot locate font fixed.\n");
 		X_UNLOCK;
 		clean_up_exit(1);
@@ -5974,7 +6059,7 @@ static char t2x2_bits[] = {
 
 		case ClientMessage:
 			if (ev.xclient.message_type == wm_protocols &&
-			    ev.xclient.data.l[0] == wm_delete_window) {
+			    (Atom) ev.xclient.data.l[0] == wm_delete_window) {
 				out = 0;
 			}
 			break;
@@ -6058,23 +6143,28 @@ static int action_match(char *action, int rc) {
 			} else if (strstr(p, "view") == p) {
 				k = 3;
 			} else {
-				rfbLog("bad action line: %s\n", action);
+				rfbLogEnable(1);
+				rfbLog("invalid action line: %s\n", action);
 				clean_up_exit(1);
 			}
 			if (*q == '*') {
 				cases[k] = -1;
 			} else if (sscanf(q, "%d", &in) == 1) {
 				if (in < 0) {
-					rfbLog("bad action line: %s\n", action);
+					rfbLogEnable(1);
+					rfbLog("invalid action line: %s\n",
+					    action);
 					clean_up_exit(1);
 				}
 				cases[k] = in;
 			} else {
-				rfbLog("bad action line: %s\n", action);
+				rfbLogEnable(1);
+				rfbLog("invalid action line: %s\n", action);
 				clean_up_exit(1);
 			}
 		} else {
-			rfbLog("bad action line: %s\n", action);
+			rfbLogEnable(1);
+			rfbLog("invalid action line: %s\n", action);
 			clean_up_exit(1);
 		}
 		p = strtok(NULL, ",");
@@ -6282,7 +6372,7 @@ static int accept_client(rfbClientPtr client) {
 		return 0;
 	}
 
-	return 0;	/* NOTREACHED */
+	/* return 0; NOTREACHED */
 }
 
 /*
@@ -6376,7 +6466,7 @@ static int do_reverse_connect(char *str) {
 	}
 
 	/* copy in to host */
-	host = (char *) malloc((size_t) len+1);
+	host = (char *) malloc(len+1);
 	if (! host) {
 		rfbLog("reverse_connect: could not malloc string %d\n", len);
 		return 0;
@@ -6784,6 +6874,73 @@ void clear_modifiers(int init) {
 	XFlush(dpy);
 }
 
+KeySym simple_mods[] = {
+	XK_Shift_L, XK_Shift_R,
+	XK_Control_L, XK_Control_R,
+	XK_Meta_L, XK_Meta_R,
+	XK_Alt_L, XK_Alt_R,
+	XK_Super_L, XK_Super_R,
+	XK_Hyper_L, XK_Hyper_R,
+	XK_Mode_switch,
+	NoSymbol
+};
+#define NSIMPLE_MODS 13
+
+int track_mod_state(rfbKeySym keysym, rfbBool down, rfbBool set) {
+	KeySym sym = (KeySym) keysym;	
+	static rfbBool isdown[NSIMPLE_MODS];
+	static int first = 1;
+	int i;
+
+	/*
+	 * simple tracking method for the modifier state without
+	 * contacting the Xserver.  Ignores, of course what keys are
+	 * pressed on the physical display.
+	 *
+	 * This is unrelated to our mod_tweak and xkb stuff.
+	 * Just a simple thing for heuristics, etc.
+	 */
+
+	if (first) {
+		for (i=0; i<NSIMPLE_MODS; i++) {
+			isdown[i] = FALSE;
+		}
+		first = 0;
+	}
+
+	if (sym != NoSymbol) {
+		for (i=0; i<NSIMPLE_MODS; i++) {
+			if (sym == simple_mods[i]) {
+				if (set) {
+					isdown[i] = down;
+					return 1;
+				} else {
+					if (isdown[i]) {
+						return 1;
+					} else {
+						return 0;
+					}
+				}
+				break;
+			}
+		}
+		/* not a modifier */
+		if (set) {
+			return 0;
+		} else {
+			return -1;
+		}
+	}
+
+	/* called with NoSymbol: return 1 if any pressed: */
+	for (i=0; i<NSIMPLE_MODS; i++) {
+		if (isdown[i]) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 /*
  * Attempt to set all keys to Up position.  Can mess up typing at the
  * physical keyboard so use with caution.
@@ -7070,12 +7227,14 @@ static keyremap_t *keyremaps = NULL;
 void add_remap(char *line) {
 	char str1[256], str2[256];
 	KeySym ksym1, ksym2;
-	int isbtn = 0, i;
+	int isbtn = 0;
+	unsigned int i;
 	static keyremap_t *current = NULL;
 	keyremap_t *remap;
 
 	if (sscanf(line, "%s %s", str1, str2) != 2) {
-		rfbLog("remap: bad line: %s\n", line);
+		rfbLogEnable(1);
+		rfbLog("remap: invalid line: %s\n", line);
 		clean_up_exit(1);
 	}
 	if (sscanf(str1, "0x%x", &i) == 1) {
@@ -7089,14 +7248,13 @@ void add_remap(char *line) {
 		ksym2 = XStringToKeysym(str2);
 	}
 	if (ksym2 == NoSymbol) {
-		int i;
-		if (sscanf(str2, "Button%d", &i) == 1) {
+		if (sscanf(str2, "Button%u", &i) == 1) {
 			ksym2 = (KeySym) i;
 			isbtn = 1; 
 		}
 	}
 	if (ksym1 == NoSymbol || ksym2 == NoSymbol) {
-		rfbLog("warning: skipping bad remap line: %s", line);
+		rfbLog("warning: skipping invalid remap line: %s", line);
 		return;
 	}
 	remap = (keyremap_t *) malloc((size_t) sizeof(keyremap_t));
@@ -7242,11 +7400,13 @@ void initialize_remap(char *infile) {
 		if (strstr(infile, "DEAD") == infile) {
 			;
 		} else if (!strchr(infile, '-')) {
+			rfbLogEnable(1);
 			rfbLog("remap: cannot open: %s\n", infile);
 			rfbLogPerror("fopen");
 			clean_up_exit(1);
 		}
 		if ((in = tmpfile()) == NULL) {
+			rfbLogEnable(1);
 			rfbLog("remap: cannot open tmpfile for %s\n", infile);
 			rfbLogPerror("tmpfile");
 			clean_up_exit(1);
@@ -7833,7 +7993,8 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 				}
 				state++;
 			}
-			if (xkbstate[kc][grp][lvl] == -1 && grp == 1) {
+			if (xkbstate[kc][grp][lvl] == (unsigned int) -1
+			    && grp == 1) {
 				/*
 				 * Hack on Solaris 9 for Mode_switch
 				 * for Group2 characters.  We force the 
@@ -7896,7 +8057,8 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 		while (p) {
 			k = 1;
 			if (sscanf(p, "%d", &k) != 1 || k < 0 || k >= 0x100) {
-				rfbLog("bad skip_keycodes: %s %s\n",
+				rfbLogEnable(1);
+				rfbLog("invalid skip_keycodes: %s %s\n",
 				    skip_keycodes, p);
 				clean_up_exit(1);
 			}
@@ -7931,6 +8093,8 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	int Kc_f, Grp_f, Lvl_f;
 	static int Kc_last_down = -1;
 	static KeySym Ks_last_down = NoSymbol;
+
+	if (client) {} /* unused vars warning: */
 
 	X_LOCK;
 
@@ -7990,7 +8154,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			}
 
 			/* save it if state is OK and not told to skip */
-			if (state == -1) {
+			if (state == (unsigned int) -1) {
 				continue;
 			}
 			if (skipkeycode[kc] && debug_keyboard) {
@@ -8295,7 +8459,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				kc = kc_vec[kci];
 
 				ms = xkbmodifiers[kc][grp][lvl];
-				if (! ms || ms != b) {
+				if (! ms || ms != (unsigned int) b) {
 					continue;
 				}
 
@@ -8957,6 +9121,42 @@ double typing_rate(double time_window, int *repeating) {
 	return ((double) cnt)/dt;
 }
 
+int skip_cr_when_scaling(char *mode) {
+	int got = 0;
+	
+	if (!scaling) {
+		return 0;
+	}
+
+	if (scaling_copyrect != scaling_copyrect0) {
+		/* user override via -scale: */
+		if (! scaling_copyrect) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+	if (*mode == 's') {
+		got = got_scrollcopyrect;
+	} else if (*mode == 'w') {
+		got = got_wirecopyrect;
+	}
+	if (scaling_copyrect || got) {
+		int lat, rate;
+		int link = link_rate(&lat, &rate);
+		if (link == LR_DIALUP) {
+			return 1;
+		} else if (rate < 25) {
+			/* the fill-in of the repair may be too slow */
+			return 1;
+		} else {
+			return 0;
+		}
+	} else {
+		return 1;
+	}
+}
+
 /*
  * key event handler.  See the above functions for contortions for
  * running under -modtweak.
@@ -9021,15 +9221,15 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	key_history[idx].down = down;
 	key_history[idx].time = tnow;
 
-	if (down && skip_duplicate_key_events &&
-	    (keysym == XK_Alt_L || keysym == XK_Super_L)) {
-		int i, k, run = 0;
+	if (down && (keysym == XK_Alt_L || keysym == XK_Super_L)) {
+		int i, k, run = 0, ups = 0;
 		double delay = 1.0;
 		KeySym ks;
 		for (i=0; i<16; i++) {
 			k = idx - i;
 			if (k < 0) k += KEY_HIST;
 			if (!key_history[k].down) {
+				ups++;
 				continue;
 			}
 			ks = key_history[k].sym;
@@ -9043,7 +9243,9 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 				break;
 			}
 		}
-		if (run == 3 && keysym == XK_Alt_L) {
+		if (ups < 2) {
+			;
+		} else if (run == 3 && keysym == XK_Alt_L) {
 			rfbLog("3*Alt_L, calling: refresh_screen(0)\n");
 			refresh_screen(0);
 		} else if (run == 4 && keysym == XK_Alt_L) {
@@ -9133,6 +9335,8 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		return;
 	}
 
+	track_mod_state(keysym, down, TRUE);	/* ignores remaps */
+
 	last_keyboard_client = client;
 	last_event = last_input = now;
 	last_keyboard_input = now;
@@ -9172,11 +9376,12 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	}
 
 	if (use_xrecord && ! xrecording && down) {
-		if (scaling && ! got_scrollcopyrect) {
-			;
-		} else if (!strcmp(scroll_copyrect, "never")) {
+
+		if (!strcmp(scroll_copyrect, "never")) {
 			;
 		} else if (!strcmp(scroll_copyrect, "mouse")) {
+			;
+		} else if (skip_cr_when_scaling("scroll")) {
 			;
 		} else if (! xrecord_skip_keysym(keysym)) {
 			snapshot_stack_list(0, 0.25);
@@ -9308,14 +9513,15 @@ static void buttonparse(int from, char **s) {
 		t = strtok(list, "+");
 		while (t) {
 			KeySym ksym;
+			unsigned int ui;
 			int i;
 			if (n >= MAX_BUTTON_EVENTS - 20) {
 				rfbLog("buttonparse: too many button map "
 					"events: %s\n", list);
 				break;
 			}
-			if (sscanf(t, "0x%x", &i) == 1) {
-				ksym = (KeySym) i;	/* hex value */
+			if (sscanf(t, "0x%x", &ui) == 1) {
+				ksym = (KeySym) ui;	/* hex value */
 			} else {
 				X_LOCK;
 				ksym = XStringToKeysym(t); /* string value */
@@ -9509,6 +9715,7 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 	static double last_snap = 0.0, last_free = 0.0;
 	double now; 
 	int num, rc, i;
+	unsigned int ui;
 	Window r, w;
 	Window *list;
 
@@ -9534,7 +9741,8 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 	last_free = now;
 
 	X_LOCK;
-	rc = XQueryTree(dpy, rootwin, &r, &w, &list, &num);
+	rc = XQueryTree(dpy, rootwin, &r, &w, &list, &ui);
+	num = (int) ui;
 
 	if (! rc) {
 		stack_list_num = 0;
@@ -9558,6 +9766,10 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 		stack_list[i].time = now;
 	}
 	stack_list_num = num;
+	if (debug_wireframe > 1) {
+		fprintf(stderr, "snapshot_stack_list: num=%d len=%d\n",
+		    stack_list_num, stack_list_len);
+	}
 
 	XFree(list);
 	X_UNLOCK;
@@ -9717,13 +9929,13 @@ static void update_x11_pointer_mask(int mask) {
 		last_pointer_click_time = dnow();
 	}
 
-	if (scaling && ! got_scrollcopyrect) {
-		xr_mouse = 0;
-	} else if (nofb) {
+	if (nofb) {
 		xr_mouse = 0;
 	} else if (!strcmp(scroll_copyrect, "never")) {
 		xr_mouse = 0;
 	} else if (!strcmp(scroll_copyrect, "keys")) {
+		xr_mouse = 0;
+	} else if (skip_cr_when_scaling("scroll")) {
 		xr_mouse = 0;
 	} else if (xrecord_skip_button(mask, button_mask)) {
 		xr_mouse = 0;
@@ -10215,6 +10427,7 @@ void initialize_pipeinput(void) {
 
 	set_child_info();
 	if (no_external_cmds) {
+		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");
 		rfbLog("   \"%s\"\n", p);
 		rfbLog("   exiting.\n");
@@ -10512,15 +10725,18 @@ int handle_subwin_resize(char *msg) {
 	int new_x, new_y;
 	int i, check = 10, ms = 250;	/* 2.5 secs total... */
 
+	if (msg) {}	/* unused vars warning: */
 	if (! subwin) {
 		return 0;	/* hmmm... */
 	}
 	if (! valid_window(subwin, NULL, 0)) {
+		rfbLogEnable(1);
 		rfbLog("subwin 0x%lx went away!\n", subwin);
 		X_UNLOCK;
 		clean_up_exit(1);
 	}
 	if (! get_window_size(subwin, &new_x, &new_y)) {
+		rfbLogEnable(1);
 		rfbLog("could not get size of subwin 0x%lx\n", subwin);
 		X_UNLOCK;
 		clean_up_exit(1);
@@ -10536,6 +10752,7 @@ int handle_subwin_resize(char *msg) {
 		usleep(ms * 1000);
 
 		if (! get_window_size(subwin, &newer_x, &newer_y)) {
+			rfbLogEnable(1);
 			rfbLog("could not get size of subwin 0x%lx\n", subwin);
 			clean_up_exit(1);
 		}
@@ -10790,6 +11007,36 @@ static void selection_request(XEvent *ev) {
 	XFlush(dpy);
 }
 
+int check_sel_direction(char *dir, char *label, char *sel, int len) {
+	int db = 0, ok = 1;
+	if (sel_direction) {
+		if (strstr(sel_direction, "debug")) {
+			db = 1;
+		}
+		if (strcmp(sel_direction, "debug")) {
+			if (strstr(sel_direction, dir) == NULL) {
+				ok = 0;
+			}
+		}
+	}
+	if (db) {
+		char str[40];
+		int n = 40;
+		strncpy(str, sel, n);
+		str[n-1] = '\0';
+		if (len < n) {
+			str[len] = '\0';
+		}
+		rfbLog("%s: %s...\n", label, str);
+		if (ok) {
+			rfbLog("%s: %s-ing it.\n", label, dir);
+		} else {
+			rfbLog("%s: NOT %s-ing it.\n", label, dir);
+		}
+	}
+	return ok;
+}
+
 /*
  * CUT_BUFFER0 property on the local display has changed, we read and
  * store it and send it out to any connected VNC clients.
@@ -10798,7 +11045,7 @@ static void selection_request(XEvent *ev) {
  */
 static void cutbuffer_send(void) {
 	Atom type;
-	int format, slen, dlen;
+	int format, slen, dlen, len;
 	unsigned long nitems = 0, bytes_after = 0;
 	unsigned char* data = NULL;
 
@@ -10838,7 +11085,10 @@ static void cutbuffer_send(void) {
 	if (!screen) {
 		return;
 	}
-	rfbSendServerCutText(screen, selection_str, strlen(selection_str));
+	len = strlen(selection_str);
+	if (check_sel_direction("send", "cutbuffer_send", selection_str, len)) {
+		rfbSendServerCutText(screen, selection_str, len);
+	}
 }
 
 /* 
@@ -10856,7 +11106,7 @@ static void cutbuffer_send(void) {
 #define CHKSZ 32
 static void selection_send(XEvent *ev) {
 	Atom type;
-	int format, slen, dlen, oldlen, newlen, toobig = 0;
+	int format, slen, dlen, oldlen, newlen, toobig = 0, len;
 	static int err = 0, sent_one = 0;
 	char before[CHKSZ], after[CHKSZ];
 	unsigned long nitems = 0, bytes_after = 0;
@@ -10934,7 +11184,11 @@ static void selection_send(XEvent *ev) {
 	if (!screen) {
 		return;
 	}
-	rfbSendServerCutText(screen, selection_str, newlen);
+
+	len = newlen;
+	if (check_sel_direction("send", "selection_send", selection_str, len)) {
+		rfbSendServerCutText(screen, selection_str, len);
+	}
 }
 
 /* -- xevents.c -- */
@@ -11419,6 +11673,10 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 		return;
 	}
 
+	if (! check_sel_direction("recv", "xcut_receive", text, len)) {
+		return;
+	}
+
 	X_LOCK;
 
 	/* associate this text with PRIMARY (and SECONDARY...) */
@@ -11432,9 +11690,9 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	/* duplicate the text string for our own use. */
 	if (xcut_str != NULL) {
 		free(xcut_str);
+		xcut_str = NULL;
 	}
-	xcut_str = (unsigned char *)
-	    malloc((size_t) (len+1) * sizeof(unsigned char));
+	xcut_str = (char *) malloc((size_t) (len+1));
 	strncpy(xcut_str, text, len);
 	xcut_str[len] = '\0';	/* make sure null terminated */
 
@@ -11541,12 +11799,12 @@ int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync) {
 	int rc = 1;
 
 	if (remote_cmd) {
-		rcmd = (char *)malloc(strlen(remote_cmd) + 5);
+		rcmd = (char *) malloc(strlen(remote_cmd) + 5);
 		strcpy(rcmd, "cmd=");
 		strcat(rcmd, remote_cmd);
 	}
 	if (query_cmd) {
-		qcmd = (char *)malloc(strlen(query_cmd) + 5);
+		qcmd = (char *) malloc(strlen(query_cmd) + 5);
 		strcpy(qcmd, "qry=");
 		strcat(qcmd, query_cmd);
 	}
@@ -11578,7 +11836,7 @@ char *add_item(char *instr, char *item) {
 		return str;
 	}
 	len = strlen(instr) + 1 + strlen(item) + 1;
-	str = (char *)malloc(len);
+	str = (char *) malloc(len);
 	str[0] = '\0';
 
 	/* n.b. instr will be modified; caller replaces with returned string */
@@ -11618,7 +11876,7 @@ char *delete_item(char *instr, char *item) {
 		return str;
 	}
 	len = strlen(instr) + 1;
-	str = (char *)malloc(len);
+	str = (char *) malloc(len);
 	str[0] = '\0';
 
 	/* n.b. instr will be modified; caller replaces with returned string */
@@ -11764,7 +12022,7 @@ void http_connections(int on) {
 void reset_httpport(int old, int new) {
 	int hp = new;
 	if (hp < 0) {
-		rfbLog("reset_httpport: bad httpport: %d\n", hp);
+		rfbLog("reset_httpport: invalid httpport: %d\n", hp);
 	} else if (hp == old) {
 		rfbLog("reset_httpport: unchanged httpport: %d\n", hp);
 	} else if (inetd) {
@@ -11785,7 +12043,7 @@ void reset_httpport(int old, int new) {
 void reset_rfbport(int old, int new)  {
 	int rp = new;
 	if (rp < 0) {
-		rfbLog("reset_rfbport: bad rfbport: %d\n", rp);
+		rfbLog("reset_rfbport: invalid rfbport: %d\n", rp);
 	} else if (rp == old) {
 		rfbLog("reset_rfbport: unchanged rfbport: %d\n", rp);
 	} else if (inetd) {
@@ -12719,7 +12977,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			}
 			free(before);
 		} else {
-			rfbLog("bad listen string: %s\n", listen_str);
+			rfbLog("invalid listen string: %s\n", listen_str);
 			free(listen_str);
 			listen_str = before;
 		}
@@ -13389,6 +13647,18 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: disabling watch_primary.\n");
 		watch_primary = 0;
 
+	} else if (strstr(p, "seldir") == p) {
+		COLON_CHECK("seldir:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(sel_direction));
+			goto qry;
+		}
+		p += strlen("seldir:");
+		rfbLog("remote_cmd: setting -seldir to %s\n", p);
+		if (sel_direction) free(sel_direction);
+		sel_direction = strdup(p);
+
 	} else if (!strcmp(p, "set_no_cursor")) { /* skip-cmd-list */
 		rfbLog("remote_cmd: calling set_no_cursor()\n");
 		set_no_cursor();
@@ -14031,6 +14301,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("set noxrecord to: %d\n", noxrecord);
 		if (orig != noxrecord) {
 			initialize_xrecord();
+		}
+	} else if (!strcmp(p, "reset_record")) {
+		NOTAPP
+		if (use_xrecord) {
+			rfbLog("resetting RECORD\n");
+			check_xrecord_reset(1);
+		} else {
+			rfbLog("RECORD is disabled, not resetting.\n");
 		}
 
 	} else if (strstr(p, "pointer_mode") == p) {
@@ -14735,6 +15013,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		} else if (!strcmp(p, "desktopname")) {
 			snprintf(buf, bufn, "aro=%s:%s", p,
 			    NONUL(rfb_desktop_name));
+		} else if (!strcmp(p, "guess_desktop")) {
+			snprintf(buf, bufn, "aro=%s:%s", p,
+			    NONUL(guess_desktop()));
 		} else if (!strcmp(p, "http_url")) {
 			if (screen->httpListenSock > -1) {
 				snprintf(buf, bufn, "aro=%s:http://%s:%d", p,
@@ -15049,7 +15330,7 @@ void add_region_xdamage(sraRegionPtr new_region) {
 
 	reg = xdamage_regions[prev_tick];  
 	if (reg != NULL) {
-if (0) fprintf(stderr, "add_region_xdamage: prev_tick: %d reg %p\n", prev_tick, reg);
+if (0) fprintf(stderr, "add_region_xdamage: prev_tick: %d reg %p\n", prev_tick, (void *)reg);
 		sraRgnOr(reg, new_region);
 	}
 }
@@ -15111,6 +15392,8 @@ int collect_xdamage(int scancnt, int call) {
 #define DUPSZ 32
 	int dup_x[DUPSZ], dup_y[DUPSZ], dup_w[DUPSZ], dup_h[DUPSZ];
 	double tm, dt;
+
+	if (scancnt) {} /* unused vars warning: */
 
 	if (! xdamage_present || ! use_xdamage) {
 		return 0;
@@ -16043,22 +16326,23 @@ void setup_cursors(void) {
 		cursor_info_t *ci = cursors[i];
 
 		if (scaling_cursor && scale_cursor_fac != 1.0) {
-			int w, h, x, y, i;
+			int w, h, x, y, k;
 			unsigned long *pixels;
 
 			w = ci->wx;
 			h = ci->wy;
 
-			pixels = (unsigned long *) malloc(4*w*h);
+			pixels = (unsigned long *) malloc(w * h
+			    * sizeof(unsigned long));
 
-			i = 0;
+			k = 0;
 			for (y=0; y<h; y++) {
 				for (x=0; x<w; x++) {
-					char d = ci->data[i];
-					char m = ci->mask[i];
+					char d = ci->data[k];
+					char m = ci->mask[k];
 					unsigned long *p;
 
-					p = pixels + i;
+					p = pixels + k;
 
 					/* set alpha on */
 					*p = 0xff000000;
@@ -16081,7 +16365,7 @@ void setup_cursors(void) {
 							*p |= 0x00000000;
 						}
 					}
-					i++;
+					k++;
 				}
 			}
 
@@ -16125,8 +16409,8 @@ void setup_cursors(void) {
 					white = WhitePixel(dpy, scr);
 				}
 
-				rfb_curs->richSource
-				    = (char *)calloc(ci->wx * ci->wy, 1);
+				rfb_curs->richSource = (unsigned char *)
+				    calloc(ci->wx * ci->wy, 1);
 
 				for (y = 0; y < ci->wy; y++) {
 				    for (x = 0; x < ci->wx; x++) {
@@ -16293,7 +16577,7 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 	static unsigned long black = 0, white = 1;
 	static int first = 1;
 	char *bitmap, *rich, *alpha;
-	char *new_pixels = NULL;
+	char *pixels_new = NULL;
 	int n_opaque, n_trans, n_alpha, len, histo[256];
 	int send_alpha = 0, alpha_shift, thresh;
 	int i, x, y;
@@ -16308,6 +16592,8 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 
 	if (scaling_cursor && scale_cursor_fac != 1.0) {
 		int W, H;
+		char *pixels_use = (char *) pixels;
+		unsigned int *pixels32 = NULL;
 
 		W = w;
 		H = h;
@@ -16315,15 +16601,52 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 		w = scale_round(W, scale_cursor_fac);
 		h = scale_round(H, scale_cursor_fac);
 
-		new_pixels = (char *) malloc(4 * w * h);
+		pixels_new = (char *) malloc(4*w*h);
+
+		if (sizeof(unsigned long) == 8) {
+			int i, j, k = 0;
+			/*
+			 * to avoid 64bpp code in scale_rect() we knock
+			 * down to unsigned int on 64bit machines:
+			 */
+			pixels32 = (unsigned int*) malloc(4*W*H);
+			for (j=0; j<H; j++) {
+			    for (i=0; i<W; i++) {
+				*(pixels32+k) = 0xffffffff & (*(pixels+k));
+				k++;
+			    }
+			}
+			pixels_use = (char *) pixels32;
+		}
 
 		scale_rect(scale_cursor_fac, scaling_cursor_blend,
-		    scaling_cursor_interpolate, 4,
-		    (char *) pixels, 4*W, new_pixels, 4*w,
-		    W, H, w, h,
-		    0, 0, W, H, 0);
+		    scaling_cursor_interpolate,
+		    4, pixels_use, 4*W, pixels_new, 4*w,
+		    W, H, w, h, 0, 0, W, H, 0);
 
-		pixels = (unsigned long *) new_pixels;
+		if (sizeof(unsigned long) == 8) {
+			int i, j, k = 0;
+			unsigned long *pixels64;
+			unsigned int* source = (unsigned int*) pixels_new;
+			/*
+			 * now knock it back up to unsigned long:
+			 */
+			pixels64 = (unsigned long*) malloc(8*w*h);
+			for (j=0; j<h; j++) {
+			    for (i=0; i<w; i++) {
+				*(pixels64+k) = (unsigned long) (*(source+k));
+				k++;
+			    }
+			}
+			free(pixels_new);
+			pixels_new = (char *) pixels64;
+			if (pixels32) {
+				free(pixels32);
+				pixels32 = NULL;
+			}
+		}
+			
+		pixels = (unsigned long *) pixels_new;
 
 		xhot = scale_round(xhot, scale_cursor_fac);
 		yhot = scale_round(yhot, scale_cursor_fac);
@@ -16331,7 +16654,7 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 
 	len = w * h;
 	/* for bitmap data */
-	bitmap = (char *)malloc(len+1);
+	bitmap = (char *) malloc(len+1);
 	bitmap[len] = '\0';
 
 	/* for rich cursor pixel data */
@@ -16356,7 +16679,7 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 				n_alpha++;
 			}
 			histo[a]++;
-			if (a < alpha_threshold) {
+			if (a < (unsigned int) alpha_threshold) {
 				n_trans++;
 			} else {
 				n_opaque++;
@@ -16399,7 +16722,7 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 			a = a >> 24;	/* alpha channel */
 
 
-			if (a < thresh) {
+			if (a < (unsigned int) thresh) {
 				bitmap[i] = ' ';
 			} else {
 				bitmap[i] = 'x';
@@ -16482,8 +16805,8 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 	c = rfbMakeXCursor(w, h, bitmap, bitmap);
 	free(bitmap);
 
-	if (new_pixels) {
-		free(new_pixels);
+	if (pixels_new) {
+		free(pixels_new);
 	}
 
 	/* set up the cursor parameters: */
@@ -16493,10 +16816,10 @@ rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 	c->cleanupSource = FALSE;
 	c->cleanupMask = FALSE;
 	c->cleanupRichSource = FALSE;
-	c->richSource = rich;
+	c->richSource = (unsigned char *) rich;
 
 	if (alpha_blend && !indexed_color) {
-		c->alphaSource = alpha;
+		c->alphaSource = (unsigned char *) alpha;
 		c->alphaPreMultiplied = TRUE;
 	} else {
 		free(alpha);
@@ -17024,6 +17347,8 @@ int set_cursor(int x, int y, int which) {
 	static int last = -1;
 	int changed_cursor = 0;
 
+	if (x || y) {} /* unused vars warning: */
+
 	if (which < 0) {
 		which = last;	
 	}
@@ -17106,8 +17431,8 @@ void set_colormap(int reset) {
 		screen->colourMap.count = NCOLOR;
 		screen->serverFormat.trueColour = FALSE;
 		screen->colourMap.is16 = TRUE;
-		screen->colourMap.data.shorts = (unsigned short*)
-			malloc(3*sizeof(short) * NCOLOR);
+		screen->colourMap.data.shorts = (unsigned short *)
+			malloc(3*sizeof(unsigned short) * NCOLOR);
 	}
 
 	for (i=0; i < NCOLOR; i++) {
@@ -17319,13 +17644,14 @@ void set_visual(char *str) {
 	} else if (strcmp(vstring, "DirectColor") == 0) {
 		vis = DirectColor;
 	} else {
-		int v_in;
+		unsigned int v_in;
 		if (sscanf(vstring, "0x%x", &v_in) != 1) {
-			if (sscanf(vstring, "%d", &v_in) == 1) {
+			if (sscanf(vstring, "%u", &v_in) == 1) {
 				visual_id = (VisualID) v_in;
 				return;
 			}
-			rfbLog("bad -visual arg: %s\n", vstring);
+			rfbLogEnable(1);
+			rfbLog("invalid -visual arg: %s\n", vstring);
 			X_UNLOCK;
 			clean_up_exit(1);
 		}
@@ -17340,6 +17666,7 @@ void set_visual(char *str) {
 	} else if (XMatchVisualInfo(dpy, scr, defdepth, vis, &vinfo)) {
 		;
 	} else {
+		rfbLogEnable(1);
 		rfbLog("could not find visual: %s\n", vstring);
 		X_UNLOCK;
 		clean_up_exit(1);
@@ -17430,17 +17757,20 @@ void set_raw_fb_params(int restore) {
 		if (! dpy && raw_fb_orig_dpy) {
 			dpy = XOpenDisplay(raw_fb_orig_dpy);
 			if (dpy) {
-				rfbLog("reopened DISPLAY: %s\n",
+				if (! quiet) rfbLog("reopened DISPLAY: %s\n",
 				    raw_fb_orig_dpy);
 			} else {
-				rfbLog("WARNING: failed to reopen "
+				if (! quiet) rfbLog("WARNING: failed to reopen "
 				    "DISPLAY: %s\n", raw_fb_orig_dpy);
 			}
 		}
 		return;
 	}
 
-	rfbLog("set_raw_fb_params: modifying settings for -rawfb mode.\n");
+	if (! quiet) {
+		rfbLog("set_raw_fb_params: modifying settings for "
+		    "-rawfb mode.\n");
+	}
 
 	if (got_noviewonly) {
 		/*
@@ -17449,50 +17779,56 @@ void set_raw_fb_params(int restore) {
 		 * (i.e. rawfb but also send user input to the X
 		 * display, most likely using /dev/fb0 for some reason...)
 		 */
-		rfbLog("rawfb: -noviewonly mode: still sending mouse and\n");
-		rfbLog("rawfb:   keyboard input to the X DISPLAY!!\n");
+		if (! quiet) {
+		   rfbLog("rawfb: -noviewonly mode: still sending mouse and\n");
+		   rfbLog("rawfb:   keyboard input to the X DISPLAY!!\n");
+		}
 	} else {
 		/* Normal case: */
 		if (! view_only) {
-			rfbLog("rawfb: setting view_only\n");
+			if (! quiet) rfbLog("rawfb: setting view_only\n");
 			view_only = 1;
 		}
 		if (watch_selection) {
-			rfbLog("rawfb: turning off watch_selection\n");
+			if (! quiet) rfbLog("rawfb: turning off "
+			    "watch_selection\n");
 			watch_selection = 0;
 		}
 		if (watch_primary) {
-			rfbLog("rawfb: turning off watch_primary\n");
+			if (! quiet) rfbLog("rawfb: turning off "
+			    "watch_primary\n");
 			watch_primary = 0;
 		}
 		if (watch_bell) {
-			rfbLog("rawfb: turning off watch_bell\n");
+			if (! quiet) rfbLog("rawfb: turning off watch_bell\n");
 			watch_bell = 0;
 		}
 		if (no_autorepeat) {
-			rfbLog("rawfb: turning off no_autorepeat\n");
+			if (! quiet) rfbLog("rawfb: turning off "
+			    "no_autorepeat\n");
 			no_autorepeat = 0;
 		}
 		if (use_solid_bg) {
-			rfbLog("rawfb: turning off use_solid_bg\n");
+			if (! quiet) rfbLog("rawfb: turning off "
+			    "use_solid_bg\n");
 			use_solid_bg = 0;
 		}
 		multiple_cursors_mode = strdup("arrow");
 	}
 	if (use_snapfb) {
-		rfbLog("rawfb: turning off use_snapfb\n");
+		if (! quiet) rfbLog("rawfb: turning off use_snapfb\n");
 		use_snapfb = 0;
 	}
 	if (using_shm) {
-		rfbLog("rawfb: turning off using_shm\n");
+		if (! quiet) rfbLog("rawfb: turning off using_shm\n");
 		using_shm = 0;
 	}
 	if (take_naps) {
-		rfbLog("rawfb: turning off take_naps\n");
+		if (! quiet) rfbLog("rawfb: turning off take_naps\n");
 		take_naps = 0;
 	}
 	if (xrandr) {
-		rfbLog("rawfb: turning off xrandr\n");
+		if (! quiet) rfbLog("rawfb: turning off xrandr\n");
 		xrandr = 0;
 	}
 }
@@ -17664,6 +18000,7 @@ XImage *initialize_raw_fb(void) {
 		set_child_info();
 		q += strlen("setup:");
 		if (no_external_cmds) {
+			rfbLogEnable(1);
 			rfbLog("cannot run external commands in -nocmds "
 			    "mode:\n");
 			rfbLog("   \"%s\"\n", q);
@@ -17673,12 +18010,14 @@ XImage *initialize_raw_fb(void) {
 		rfbLog("running command to setup rawfb: %s\n", q);
 		pipe = popen(q, "r");
 		if (! pipe) {
+			rfbLogEnable(1);
 			rfbLog("popen of setup command failed.\n");
 			rfbLogPerror("popen");
 			clean_up_exit(1);
 		}
 		line[0] = '\0';
 		if (fgets(line, 1024, pipe) == NULL) {
+			rfbLogEnable(1);
 			rfbLog("read of setup command failed.\n");
 			clean_up_exit(1);
 		}
@@ -17770,11 +18109,13 @@ XImage *initialize_raw_fb(void) {
 		}
 	}
 	if ((q = strrchr(str, '@')) == NULL) {
+		rfbLogEnable(1);
 		rfbLog("invalid rawfb str: %s\n", str);
 		clean_up_exit(1);
 	}
 	/* @WxHxB */
 	if (sscanf(q, "@%dx%dx%d", &w, &h, &b) != 3) {
+		rfbLogEnable(1);
 		rfbLog("invalid rawfb str: %s\n", str);
 		clean_up_exit(1);
 	}
@@ -17790,7 +18131,7 @@ XImage *initialize_raw_fb(void) {
 			rfbLog("no type prefix: %s\n", raw_fb_str);
 			rfbLog("  but file exists, so assuming: map:%s\n",
 			    raw_fb_str);
-			new = (char *)malloc(len);
+			new = (char *) malloc(len);
 			strcpy(new, "map:");
 			strcat(new, str);
 			free(str);
@@ -17814,6 +18155,7 @@ XImage *initialize_raw_fb(void) {
 #if LIBVNCSERVER_HAVE_XSHM
 		raw_fb_addr = (char *) shmat(shmid, 0, SHM_RDONLY);
 		if (! raw_fb_addr) {
+			rfbLogEnable(1);
 			rfbLog("failed to attach to shm: %d, %s\n", shmid, str);
 			rfbLogPerror("shmat");
 			clean_up_exit(1);
@@ -17822,6 +18164,7 @@ XImage *initialize_raw_fb(void) {
 		rfbLog("rawfb: shm: %d W: %d H: %d B: %d addr: %p\n",
 		    shmid, w, h, b, raw_fb_addr);
 #else
+		rfbLogEnable(1);
 		rfbLog("x11vnc was compiled without shm support.\n");
 		rfbLogPerror("shmat");
 		clean_up_exit(1);
@@ -17840,6 +18183,7 @@ XImage *initialize_raw_fb(void) {
 
 		fd = open(q, O_RDONLY);
 		if (fd < 0) {
+			rfbLogEnable(1);
 			rfbLog("failed to open file: %s, %s\n", q, str);
 			rfbLogPerror("open");
 			clean_up_exit(1);
@@ -17861,6 +18205,7 @@ XImage *initialize_raw_fb(void) {
 			    fd, 0);
 
 			if (raw_fb_addr == MAP_FAILED || raw_fb_addr == NULL) {
+				rfbLogEnable(1);
 				rfbLog("failed to mmap file: %s, %s\n", q, str);
 				rfbLog("   raw_fb_addr: %p\n", raw_fb_addr);
 				rfbLogPerror("mmap");
@@ -17883,6 +18228,7 @@ XImage *initialize_raw_fb(void) {
 			rfbLog("   W: %d H: %d B: %d sz: %d\n", w, h, b, size);
 		}
 	} else {
+		rfbLogEnable(1);
 		rfbLog("invalid rawfb str: %s\n", str);
 		clean_up_exit(1);
 	}
@@ -18017,6 +18363,7 @@ XImage *initialize_xdisplay_fb(void) {
 			wait_until_mapped(subwin);
 		}
 		if (!valid_window((Window) subwin, NULL, 0)) {
+			rfbLogEnable(1);
 			rfbLog("invalid sub-window: 0x%lx\n", subwin);
 			X_UNLOCK;
 			clean_up_exit(1);
@@ -18073,6 +18420,7 @@ XImage *initialize_xdisplay_fb(void) {
 
 		window = (Window) subwin;
 		if (! XGetWindowAttributes(dpy, window, &attr)) {
+			rfbLogEnable(1);
 			rfbLog("invalid window: 0x%lx\n", window);
 			X_UNLOCK;
 			clean_up_exit(1);
@@ -18107,6 +18455,7 @@ XImage *initialize_xdisplay_fb(void) {
 		vinfo_tmpl.visualid = visual_id; 
 		vinfo = XGetVisualInfo(dpy, VisualIDMask, &vinfo_tmpl, &n);
 		if (vinfo == NULL || n == 0) {
+			rfbLogEnable(1);
 			rfbLog("could not match visual_id: 0x%x\n",
 			    (int) visual_id);
 			X_UNLOCK;
@@ -18120,7 +18469,8 @@ XImage *initialize_xdisplay_fb(void) {
 		}
 		if (! quiet) {
 			fprintf(stderr, " initialize_xdisplay_fb()\n");
-			fprintf(stderr, " Visual*:    %p\n", vinfo->visual);
+			fprintf(stderr, " Visual*:    %p\n",
+			    (void *) vinfo->visual);
 			fprintf(stderr, " visualid:   0x%x\n",
 			    (int) vinfo->visualid);
 			fprintf(stderr, " screen:     %d\n", vinfo->screen);
@@ -18217,6 +18567,7 @@ XImage *initialize_xdisplay_fb(void) {
 		    if (try < subwin_tries) {
 			usleep(250 * 1000);
 			if (!get_window_size(window, &wdpy_x, &wdpy_y)) {
+				rfbLogEnable(1);
 				rfbLog("could not get size of subwin "
 				    "0x%lx\n", subwin);
 				X_UNLOCK;
@@ -18280,17 +18631,20 @@ void parse_scale_string(char *str, double *factor, int *scaling, int *blend,
 		if (strstr(p+1, "pad") != NULL) {
 			*pad = 1;
 		}
-		if (strstr(p+1, "cr") != NULL) {
+		if (strstr(p+1, "nocr") != NULL) {
 			/* global */
-			got_scrollcopyrect = 1;
-			got_wirecopyrect = 1;
+			scaling_copyrect = 0;
+		} else if (strstr(p+1, "cr") != NULL) {
+			/* global */
+			scaling_copyrect = 1;
 		}
 		*p = '\0';
 	}
 	if (strchr(tstr, '.') != NULL) {
 		double test, diff, eps = 1.0e-7;
 		if (sscanf(tstr, "%lf", &f) != 1) {
-			rfbLog("bad -scale arg: %s\n", tstr);
+			rfbLogEnable(1);
+			rfbLog("invalid -scale arg: %s\n", tstr);
 			clean_up_exit(1);
 		}
 		*factor = (double) f;
@@ -18311,13 +18665,15 @@ void parse_scale_string(char *str, double *factor, int *scaling, int *blend,
 			}
 		}
 		if (*factor < 0.01) {
+			rfbLogEnable(1);
 			rfbLog("-scale factor too small: %f\n", scale_fac);
 			clean_up_exit(1);
 		}
 	} else {
 		if (sscanf(tstr, "%d/%d", &m, &n) != 2) {
 			if (sscanf(tstr, "%d", &m) != 1) {
-				rfbLog("bad -scale arg: %s\n", tstr);
+				rfbLogEnable(1);
+				rfbLog("invalid -scale arg: %s\n", tstr);
 				clean_up_exit(1);
 			} else {
 				/* e.g. -scale 1 or -scale 2 */
@@ -18325,11 +18681,13 @@ void parse_scale_string(char *str, double *factor, int *scaling, int *blend,
 			}
 		}
 		if (n <= 0 || m <=0) {
-			rfbLog("bad -scale arg: %s\n", tstr);
+			rfbLogEnable(1);
+			rfbLog("invalid -scale arg: %s\n", tstr);
 			clean_up_exit(1);
 		}
 		*factor = ((double) m)/ n;
 		if (*factor < 0.01) {
+			rfbLogEnable(1);
 			rfbLog("-scale factor too small: %f\n", *factor);
 			clean_up_exit(1);
 		}
@@ -18470,6 +18828,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	}
 	if (! screen) {
 		int i;
+		rfbLogEnable(1);
 		rfbLog("\n");
 		rfbLog("failed to create rfb screen.\n");
 		for (i=0; i< *argc; i++)  {
@@ -18480,6 +18839,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	if (create_screen && *argc != 1) {
 		int i;
+		rfbLogEnable(1);
 		rfbLog("*** unrecognized option(s) ***\n");
 		for (i=1; i< *argc; i++)  {
 			rfbLog("\t[%d]  %s\n", i, argv[i]);
@@ -18740,6 +19100,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	if (inetd) {
 		int fd = dup(0);
 		if (fd < 3) {
+			rfbLogEnable(1);
 			rfbErr("dup(0) = %d failed.\n", fd);
 			rfbLogPerror("dup");
 			clean_up_exit(1);
@@ -18778,7 +19139,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	if (viewonly_passwd) {
 		/* append the view only passwd after the normal passwd */
-		char **passwds_new = malloc(3*sizeof(char**));
+		char **passwds_new = (char **) malloc(3*sizeof(char *));
 		char **passwds_old = (char **) screen->authPasswdData;
 		passwds_new[0] = passwds_old[0];
 		passwds_new[1] = viewonly_passwd;
@@ -19148,7 +19509,7 @@ void solid_cde(char *color) {
 
 			cnt = 0;
 			twin = 0x0;
-			for (i=0; i<length; i++) {
+			for (i=0; i< (int) length; i++) {
 				if (*(data+i) != '\0') {
 					continue;
 				}
@@ -19259,19 +19620,19 @@ void solid_gnome(char *color) {
 			orig_option = strdup("stretched");
 		}
 		if (strstr(orig_color, "'") != NULL)  {
-			rfbLog("bad color: %s\n", orig_color);
+			rfbLog("invalid color: %s\n", orig_color);
 			return;
 		}
 		if (strstr(orig_option, "'") != NULL)  {
-			rfbLog("bad option: %s\n", orig_option);
+			rfbLog("invalid option: %s\n", orig_option);
 			return;
 		}
-		cmd = (char *)malloc(strlen(set_option) - 2 +
+		cmd = (char *) malloc(strlen(set_option) - 2 +
 		    strlen(orig_option) + 1);
 		sprintf(cmd, set_option, orig_option);
 		dt_cmd(cmd);
 		free(cmd);
-		cmd = (char *)malloc(strlen(set_color) - 2 +
+		cmd = (char *) malloc(strlen(set_color) - 2 +
 		    strlen(orig_color) + 1);
 		sprintf(cmd, set_color, orig_color);
 		dt_cmd(cmd);
@@ -19300,15 +19661,15 @@ void solid_gnome(char *color) {
 		}
 	}
 	if (strstr(color, "'") != NULL)  {
-		rfbLog("bad color: %s\n", color);
+		rfbLog("invalid color: %s\n", color);
 		return;
 	}
-	cmd = (char *)malloc(strlen(set_color) + strlen(color) + 1);
+	cmd = (char *) malloc(strlen(set_color) + strlen(color) + 1);
 	sprintf(cmd, set_color, color);
 	dt_cmd(cmd);
 	free(cmd);
 
-	cmd = (char *)malloc(strlen(set_option) + strlen("none") + 1);
+	cmd = (char *) malloc(strlen(set_option) + strlen("none") + 1);
 	sprintf(cmd, set_option, "none");
 	dt_cmd(cmd);
 	free(cmd);
@@ -19326,14 +19687,14 @@ void solid_kde(char *color) {
 
 	user = get_user_name();
 	if (strstr(user, "'") != NULL)  {
-		rfbLog("bad user: %s\n", user);
+		rfbLog("invalid user: %s\n", user);
 		free(user);
 		return;
 	}
 
 	if (! color) {
 		len = strlen(bg_on) + strlen(user) + 1;
-		cmd = (char *)malloc(len);
+		cmd = (char *) malloc(len);
 		sprintf(cmd, bg_on, user);
 		dt_cmd(cmd);
 		free(cmd);
@@ -19343,18 +19704,18 @@ void solid_kde(char *color) {
 	}
 
 	if (strstr(color, "'") != NULL)  {
-		rfbLog("bad color: %s\n", color);
+		rfbLog("invalid color: %s\n", color);
 		return;
 	}
 
 	len = strlen(set_color) + strlen(user) + strlen(color) + 1;
-	cmd = (char *)malloc(len);
+	cmd = (char *) malloc(len);
 	sprintf(cmd, set_color, user, color);
 	dt_cmd(cmd);
 	free(cmd);
 
 	len = strlen(bg_off) + strlen(user) + 1;
-	cmd = (char *)malloc(len);
+	cmd = (char *) malloc(len);
 	sprintf(cmd, bg_off, user);
 	dt_cmd(cmd);
 	free(cmd);
@@ -19364,23 +19725,25 @@ void solid_kde(char *color) {
 char *guess_desktop() {
 	Atom prop;
 	prop = XInternAtom(dpy, "XFCE_DESKTOP_WINDOW", True);
-	if (prop != None) {
-		return "xfce";
-	}
-	prop = XInternAtom(dpy, "_QT_DESKTOP_PROPERTIES", True);
-	if (prop != None) {
-		return "kde";
-	}
+	if (prop != None) return "xfce";
+
+	/* special case windowmaker */
+	prop = XInternAtom(dpy, "_WINDOWMAKER_WM_PROTOCOLS", True);
+	if (prop != None)  return "root";
+
+	prop = XInternAtom(dpy, "_WINDOWMAKER_COMMAND", True);
+	if (prop != None) return "root";
+
 	prop = XInternAtom(dpy, "NAUTILUS_DESKTOP_WINDOW_ID", True);
-	if (prop != None) {
-		return "gnome";
-	}
+	if (prop != None) return "gnome";
+
+	prop = XInternAtom(dpy, "KWIN_RUNNING", True);
+	if (prop != None) return "kde";
+
 	prop = XInternAtom(dpy, "_MOTIF_WM_INFO", True);
 	if (prop != None) {
 		prop = XInternAtom(dpy, "_DT_WORKSPACE_LIST", True);
-		if (prop != None) {
-			return "cde";
-		}
+		if (prop != None) return "cde";
 	}
 	return "root";
 }
@@ -19747,8 +20110,8 @@ void initialize_xinerama (void) {
 
 	/* max len is 10000x10000+10000+10000 (23 chars) per geometry */
 	rcnt = (int) sraRgnCountRects(black_region);
-	bstr = (char *) malloc(30 * (rcnt+1) * sizeof(char));
-	tstr = (char *) malloc(30 * sizeof(char));
+	bstr = (char *) malloc(30 * (rcnt+1));
+	tstr = (char *) malloc(30);
 	bstr[0] = '\0';
 
 	iter = sraRgnGetIterator(black_region);
@@ -19794,7 +20157,7 @@ void initialize_blackouts_and_xinerama(void) {
 	}
 }
 
-void push_sleep(n) {
+void push_sleep(int n) {
 	int i;
 	for (i=0; i<n; i++) {
 		rfbPE(-1);
@@ -20025,11 +20388,19 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 		if (xim == NULL) {
 			rfbErr("XCreateImage(%s) failed.\n", name);
+			if (quiet) {
+				fprintf(stderr, "XCreateImage(%s) failed.\n",
+				    name);
+			}
 			return 0;
 		}
 		xim->data = (char *) malloc(xim->bytes_per_line * xim->height);
 		if (xim->data == NULL) {
 			rfbErr("XCreateImage(%s) data malloc failed.\n", name);
+			if (quiet) {
+				fprintf(stderr, "XCreateImage(%s) data malloc"
+				    " failed.\n", name);
+			}
 			return 0;
 		}
 		if (flip_byte_order) {
@@ -20050,6 +20421,9 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	if (xim == NULL) {
 		rfbErr("XShmCreateImage(%s) failed.\n", name);
+		if (quiet) {
+			fprintf(stderr, "XShmCreateImage(%s) failed.\n", name);
+		}
 		X_UNLOCK;
 		return 0;
 	}
@@ -22371,7 +22745,7 @@ int scan_for_updates(int count_only) {
 }
 
 /* -- gui.c -- */
-#if SMALL_FOOTPRINT
+#ifdef NOGUI
 char gui_code[] = "";
 #else
 #include "tkx11vnc.h"
@@ -22390,7 +22764,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	FILE *pipe, *tmpf;
 
 	if (*gui_code == '\0') {
-		rfbLog("gui not available in this program.\n");
+		rfbLog("gui not compiled into this program.\n");
 		exit(0);
 	}
 	if (getenv("DISPLAY") != NULL) {
@@ -22496,7 +22870,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		    "wish8.0"};
 		int nwishes = 3, i;
 
-		try = (char *)malloc(strlen(p) + 1 + strlen("wish8.4") + 1);
+		try = (char *) malloc(strlen(p) + 1 + strlen("wish8.4") + 1);
 		for (i=0; i<nwishes; i++) {
 			sprintf(try, "%s/%s", p, wishes[i]);
 			if (stat(try, &sbuf) == 0) {
@@ -22692,7 +23066,7 @@ Window descend_pointer(int depth, Window start, char *name_info, int len) {
 	}
 
 	if (! nm_cache) {
-		nm_cache = (char *)malloc(1024);
+		nm_cache = (char *) malloc(1024);
 		nm_cache_len = 1024;
 		nm_cache[0] = '\0';
 	}
@@ -22701,7 +23075,7 @@ Window descend_pointer(int depth, Window start, char *name_info, int len) {
 			free(nm_cache);
 		}
 		nm_cache_len = 2*len;
-		nm_cache = (char *)malloc(nm_cache_len);
+		nm_cache = (char *) malloc(nm_cache_len);
 	}
 
 	if (name_info) {
@@ -22947,8 +23321,8 @@ void parse_fixscreen(void) {
 }
 
 /*
-WIREFRAME_PARMS "0xff,2,0,30+6+6+6,0.05+0.3+2.0,8"
-shade,linewidth,percent,T+B+L+R,t1+t2+t3
+WIREFRAME_PARMS "0xff,2,0,30+6+6+6,Alt,0.05+0.3+2.0,8"
+shade,linewidth,percent,T+B+L+R,mods,t1+t2+t3+t4
  */
 #define LW_MAX 8
 unsigned long wireframe_shade;
@@ -22956,6 +23330,7 @@ int wireframe_lw;
 double wireframe_frac;
 int wireframe_top, wireframe_bot, wireframe_left, wireframe_right;
 double wireframe_t1, wireframe_t2, wireframe_t3, wireframe_t4;
+char *wireframe_mods = NULL;
 
 /*
  * Parse the gory -wireframe string for parameters.
@@ -23021,7 +23396,7 @@ void parse_wireframe_str(char *wf) {
 			;
 		} else if (sscanf(str, "0x%lx", &n) == 1) {
 			wireframe_shade = n;	
-		} else if (sscanf(str, "%ld", &n) == 1) {
+		} else if (sscanf(str, "%lu", &n) == 1) {
 			wireframe_shade = n;	
 		} else if (sscanf(str, "%lx", &n) == 1) {
 			wireframe_shade = n;	
@@ -23071,8 +23446,30 @@ void parse_wireframe_str(char *wf) {
 		free(str);
 	}
 
-	/* check_wireframe() timing heuristics. */
+	/*
+	 * wireframe in interior with Modifier down.
+	 * 0 => no mods
+	 * 1 => all mods
+	 * Shift,Alt,Control,Meta,Super,Hyper
+	 */
+	if (wireframe_mods) {
+		free(wireframe_mods);
+	}
+	wireframe_mods = NULL;
 	if ((str = part[4]) != NULL) {
+		if (*str == '0' || !strcmp(str, "none")) {
+			;
+		} else if (*str == '1' || !strcmp(str, "all")) {
+			wireframe_mods = strdup("all");	
+		} else if (!strcmp(str, "Alt") || !strcmp(str, "Shift")
+		    || !strcmp(str, "Control") || !strcmp(str, "Meta")
+		    || !strcmp(str, "Super") || !strcmp(str, "Hyper")) {
+			wireframe_mods = strdup(str);
+		}
+	}
+
+	/* check_wireframe() timing heuristics. */
+	if ((str = part[5]) != NULL) {
 		double t1, t2, t3, t4;
 		if (sscanf(str, "%lf+%lf+%lf+%lf", &t1, &t2, &t3, &t4) == 4) {
 			wireframe_t1 = t1;
@@ -23232,7 +23629,7 @@ void initialize_scroll_keys(void) {
 	nkeys++;	/* exclude/include 0 element */
 	nkeys++;	/* trailing NoSymbol */
 
-	scroll_key_list = (KeySym *)malloc(nkeys*sizeof(KeySym)); 
+	scroll_key_list = (KeySym *) malloc(nkeys*sizeof(KeySym)); 
 	for (i=0; i<nkeys; i++) {
 		scroll_key_list[i] = NoSymbol;
 	}
@@ -23257,8 +23654,8 @@ void initialize_scroll_keys(void) {
 				}
 			}
 		} else {
-			int in;
-			if (sscanf(p, "%d", &in) == 1) {
+			unsigned int in;
+			if (sscanf(p, "%u", &in) == 1) {
 				scroll_key_list[i++] = (rfbKeySym) in;
 			} else if (sscanf(p, "0x%x", &in) == 1) {
 				scroll_key_list[i++] = (rfbKeySym) in;
@@ -23320,11 +23717,11 @@ void initialize_scroll_matches(void) {
 		if (strstr(s, "MOUSE:") == s) nmouse++;
 	}
 	if (nkey++) {
-		scroll_good_key = (char **)malloc(nkey*sizeof(char *));
+		scroll_good_key = (char **) malloc(nkey*sizeof(char *));
 		for (i=0; i<nkey; i++) scroll_good_key[i] = NULL;
 	}
 	if (nmouse++) {
-		scroll_good_mouse = (char **)malloc(nmouse*sizeof(char *));
+		scroll_good_mouse = (char **) malloc(nmouse*sizeof(char *));
 		for (i=0; i<nmouse; i++) scroll_good_mouse[i] = NULL;
 	}
 	nkey = 0;
@@ -23359,11 +23756,11 @@ void initialize_scroll_matches(void) {
 		if (strstr(s, "MOUSE:") == s) nmouse++;
 	}
 	if (nkey++) {
-		scroll_skip_key = (char **)malloc(nkey*sizeof(char *));
+		scroll_skip_key = (char **) malloc(nkey*sizeof(char *));
 		for (i=0; i<nkey; i++) scroll_skip_key[i] = NULL;
 	}
 	if (nmouse++) {
-		scroll_skip_mouse = (char **)malloc(nmouse*sizeof(char *));
+		scroll_skip_mouse = (char **) malloc(nmouse*sizeof(char *));
 		for (i=0; i<nmouse; i++) scroll_skip_mouse[i] = NULL;
 	}
 	nkey = 0;
@@ -23470,7 +23867,7 @@ void draw_box(int x, int y, int w, int h, int restore) {
 			save[i] = (saveline_t *) malloc(sizeof(saveline_t));
 			save[i]->saved = 0;
 			sz = (LW_MAX+1)*len*pixelsize;
-			save[i]->data = (char *)malloc(sz);
+			save[i]->data = (char *) malloc(sz);
 
 			/* 
 			 * Four types of lines:
@@ -24012,6 +24409,14 @@ int set_ypad(void) {
 	return y_accum;
 }
 
+void scale_mark(int x1, int y1, int x2, int y2) {
+	int s = 2;
+	x1 = nfix(x1 - s, dpy_x);
+	y1 = nfix(y1 - s, dpy_y);
+	x2 = nfix(x2 + s, dpy_x+1);
+	y2 = nfix(y2 + s, dpy_y+1);
+	scale_and_mark_rect(x1, y1, x2, y2);
+}
 
 #define PUSH_TEST(n)  \
 if (n) { \
@@ -24035,6 +24440,7 @@ int push_scr_ev(double *age, int type, int bdpush, int bdx, int bdy,
 	sraRegionPtr backfill, whole, tmpregion, tmpregion2;
 	int link, latency, netrate;
 	int ypad = 0;
+	double last_scroll_event_save = last_scroll_event;
 
 	/* we return the oldest one. */
 	*age = 0.0;
@@ -24334,18 +24740,37 @@ if (db && bdpush) fprintf(stderr, "BDPUSH-TIME:  0x%lx\n", xrecord_wm_window);
 if (0) fprintf(stderr, "  fb_push dt: %.4f", dt);
 		if (scaling) {
 			static double last_time = 0.0;
-			double now = dnow(), delay = 0.35;
+			double now = dnow(), delay = 0.4, first_wait = 3.0;
+			double trate;
+			int repeating, lat, rate;
+			int link = link_rate(&lat, &rate);
+			int skip_first = 0;
 
-			if (now > last_time + delay) {
-				int s = 2;
-				int x1 = nfix(x0 - s, dpy_x);
-				int y1 = nfix(y0 - s, dpy_y);
-				int x2 = nfix(x0 + w0 + s, dpy_x+1);
-				int y2 = nfix(y0 + h0 + s, dpy_y+1);
-				scale_and_mark_rect(x1, y1, x2, y2);
-				last_time = now;
+			if (link == LR_DIALUP || rate < 35) {
+				delay *= 4;
+			} else if (link != LR_LAN || rate < 100) {
+				delay *= 2;
+			}
+
+			trate = typing_rate(0.0, &repeating);
+			
+			if (xrecord_set_by_mouse || repeating >= 3) {
+				if (now > last_scroll_event_save + first_wait) {
+					skip_first = 1;
+				}
+			}
+
+			if (skip_first) {
+				/* 
+				 * try not to send the first one, but a
+				 * single keystroke scroll would be OK.
+				 */
+			} else if (now > last_time + delay) {
+
+				scale_mark(x0, y0, x0 + w0, y0 + h0);
 				last_copyrect_fix = now;
 			}
+			last_time = now;
 		}
 	}
 
@@ -24523,12 +24948,22 @@ typedef struct scroll_result {
 	int result;
 } scroll_result_t;
 
-#define SCR_RESULTS_MAX 64
+#define SCR_RESULTS_MAX 256
 scroll_result_t scroll_results[SCR_RESULTS_MAX];
 
 int scrollability(Window win, int set) {
 	double oldest = -1.0;
 	int i, index = -1, next_index = -1;
+	static int first = 1;
+
+	if (first) {
+		for (i=0; i<SCR_RESULTS_MAX; i++) {
+			scroll_results[i].win = None;
+			scroll_results[i].time = 0.0;
+			scroll_results[i].result = 0;
+		}
+		first = 0;
+	}
 
 	if (win == None) {
 		return 0;
@@ -24538,6 +24973,9 @@ int scrollability(Window win, int set) {
 		for (i=0; i<SCR_RESULTS_MAX; i++) {
 			if (win == scroll_results[i].win) {
 				return scroll_results[i].result;
+			}
+			if (scroll_results[i].win == None) {
+				break;
 			}
 		}
 		return 0;
@@ -24550,6 +24988,9 @@ int scrollability(Window win, int set) {
 		}
 		if (win == scroll_results[i].win) {
 			index = i;
+			break;
+		}
+		if (next_index >= 0 && scroll_results[i].win == None) {
 			break;
 		}
 	}
@@ -24573,10 +25014,11 @@ int scrollability(Window win, int set) {
 			 */
 			set = 1;
 		} else {
-			scroll_results[index].time = dnow();
 			scroll_results[index].result = set;
 		}
+		scroll_results[index].time = dnow();
 	}
+
 	return set;
 }
 
@@ -24732,7 +25174,13 @@ int check_xrecord_keys(void) {
 		return 0;
 	}
 
+#if 0
+	/* not used for keyboard yet */
 	scroll_rep = scrollability(xrecord_ptr_window, SCR_NONE) + 1;
+	if (scroll_rep == 1) {
+		scroll_rep = 2;		/* if no info, assume the best. */
+	}
+#endif
 
 	scroll_keysym = xrecord_scroll_keysym(last_rfb_keysym);
 
@@ -24742,7 +25190,7 @@ int check_xrecord_keys(void) {
 		max_spin = 2 * set_repeat_in;
 	} else if (tnow < last_key_scroll + scroll_persist) {
 		max_spin = 1.25*(tnow - last_key_scroll);
-	} else if (tnow < last_key_to_button_remap_time + scroll_persist) {
+	} else if (tnow < last_key_to_button_remap_time + 1.5*scroll_persist) {
 		/* mostly a hack I use for testing -remap key -> btn4/btn5 */
 		max_spin = scroll_persist;
 	} else if (scroll_keysym) {
@@ -24814,9 +25262,11 @@ if (0 || db) fprintf(stderr, "check_xrecord: more keys: %.3f  0x%x "
 			flush2 = 1;
 			XFlush(dpy);
 		}
+#if LIBVNCSERVER_HAVE_RECORD
 		SCR_LOCK;
 		XRecordProcessReplies(rdpy_data);
 		SCR_UNLOCK;
+#endif
 		X_UNLOCK;
 
 		if (spin >= max_spin * spin_fac) {
@@ -24958,6 +25408,9 @@ if (0) fprintf(stderr, "check_xrecord_mouse: IN xrecording: %d\n", xrecording);
 	}
 
 	scroll_rep = scrollability(xrecord_ptr_window, SCR_NONE) + 1;
+	if (scroll_rep == 1) {
+		scroll_rep = 2;		/* if no info, assume the best. */
+	}
 
 	if (button_mask_prev) {
 		already_down = 1;
@@ -25110,9 +25563,11 @@ if (db) fprintf(stderr, "check_xrecord: BUTTON_UP_SCROLL: %.3f\n", spin);
 			input++;
 		}
 		X_LOCK;
+#if LIBVNCSERVER_HAVE_RECORD
 		SCR_LOCK;
 		XRecordProcessReplies(rdpy_data);
 		SCR_UNLOCK;
+#endif
 		X_UNLOCK;
 
 		if (! input) {
@@ -25250,23 +25705,12 @@ if (db) fprintf(stderr, "FLUSH-2\n");
 
 int check_xrecord(void) {
 	int watch_keys = 0, watch_mouse = 0, consider_mouse;
-	static int first = 1;
 	static int mouse_wants_back_in = 0;
-
-	if (first) {
-		int i;
-		for (i=0; i<SCR_RESULTS_MAX; i++) {
-			scroll_results[i].win = None;
-			scroll_results[i].time = 0.0;
-			scroll_results[i].result = 0;
-		}
-		first = 0;
-	}
 
 	if (! use_xrecord) {
 		return 0;
 	}
-	if (scaling && ! got_scrollcopyrect) {
+	if (skip_cr_when_scaling("scroll")) {
 		return 0;
 	}
 
@@ -25411,7 +25855,7 @@ if (db2) fprintf(stderr, "moved_win: %4d %3d, %4d %3d  0x%lx ---\n",
 		for (k = stack_list_num - 1; k >= 0; k--) {
 			Window swin;
 
-			if (dt_bad) {
+			if (0 && dt_bad) {
 				break;
 			}
 
@@ -25701,6 +26145,53 @@ void check_fixscreen(void) {
 	}
 }
 
+int wireframe_mod_state() {
+	if (! wireframe_mods) {
+		return 0;
+	}
+	if (!strcmp(wireframe_mods, "all")) {
+		return track_mod_state(NoSymbol, FALSE, FALSE);
+
+	} else if (!strcmp(wireframe_mods, "Alt")) {
+		if (track_mod_state(XK_Alt_L, FALSE, FALSE) == 1) {
+			return 1;
+		} else if (track_mod_state(XK_Alt_R, FALSE, FALSE) == 1) {
+			return 1;
+		}
+	} else if (!strcmp(wireframe_mods, "Shift")) {
+		if (track_mod_state(XK_Shift_L, FALSE, FALSE) == 1) {
+			return 1;
+		} else if (track_mod_state(XK_Shift_R, FALSE, FALSE) == 1) {
+			return 1;
+		}
+	} else if (!strcmp(wireframe_mods, "Control")) {
+		if (track_mod_state(XK_Control_L, FALSE, FALSE) == 1) {
+			return 1;
+		} else if (track_mod_state(XK_Control_R, FALSE, FALSE) == 1) {
+			return 1;
+		}
+	} else if (!strcmp(wireframe_mods, "Meta")) {
+		if (track_mod_state(XK_Meta_L, FALSE, FALSE) == 1) {
+			return 1;
+		} else if (track_mod_state(XK_Meta_R, FALSE, FALSE) == 1) {
+			return 1;
+		}
+	} else if (!strcmp(wireframe_mods, "Super")) {
+		if (track_mod_state(XK_Super_L, FALSE, FALSE) == 1) {
+			return 1;
+		} else if (track_mod_state(XK_Super_R, FALSE, FALSE) == 1) {
+			return 1;
+		}
+	} else if (!strcmp(wireframe_mods, "Hyper")) {
+		if (track_mod_state(XK_Hyper_L, FALSE, FALSE) == 1) {
+			return 1;
+		} else if (track_mod_state(XK_Hyper_R, FALSE, FALSE) == 1) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 /*
  * Applied just before any check_user_input() modes.  Look for a
  * ButtonPress; find window it happened in; find the wm frame window
@@ -25748,7 +26239,7 @@ int check_wireframe(void) {
 	double frame_changed_spin = wireframe_t2;
 	double max_spin = wireframe_t3;
 	double min_draw = wireframe_t4;
-	int near_edge;
+	int try_it = 0;
 	DB_SET
 
 	if (nofb) {
@@ -25795,8 +26286,13 @@ if (db) fprintf(stderr, "  frame: x: %d  y: %d  w: %d  h: %d  px: %d  py: %d  fr
 	 * decorations on the edge of the window.
 	 */
 
-	near_edge = near_wm_edge(x, y, w, h, px, py);
-	if (! near_edge) {
+	try_it = near_wm_edge(x, y, w, h, px, py);
+
+	/* Often Alt+ButtonDown starts a window move: */
+	if (! try_it && wireframe_mod_state()) {
+		try_it = 1;
+	}
+	if (! try_it) {
 if (db) fprintf(stderr, "INTERIOR\n");
 		return 0;
 	}
@@ -26119,7 +26615,7 @@ if (db || db2) fprintf(stderr, "NO button_mask\n");
 		;
 	} else if (win_gone || win_unmapped) {
 		;
-	} else if (scaling && ! got_wirecopyrect) {
+	} else if (skip_cr_when_scaling("wireframe")) {
 		;
 	} else if (w != orig_w || h != orig_h) {
 		;
@@ -26152,19 +26648,18 @@ if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
 			if (! obscured) {
 				fb_push_wait(0.1, FB_COPY);
 			} else {
+				/* no diff for now... */
 				fb_push_wait(0.1, FB_COPY);
 			}
 			if (scaling) {
 				static double last_time = 0.0;
 				double now = dnow(), delay = 0.35;
 
+				fb_push_wait(0.1, FB_COPY);
+
 				if (now > last_time + delay) {
-					int s = 2;
-					int x1 = nfix(x - s, dpy_x);
-					int y1 = nfix(y - s, dpy_y);
-					int x2 = nfix(x + w + s, dpy_x+1);
-					int y2 = nfix(y + h + s, dpy_y+1);
-					scale_and_mark_rect(x1, y1, x2, y2);
+
+					scale_mark(x, y, x+w, y+h);
 					last_time = now;
 					last_copyrect_fix = now;
 				}
@@ -26374,6 +26869,8 @@ static void check_user_input3(double dt, double dtr, int tile_diffs) {
 	int gcnt, ginput;
 	static int first = 1;
 
+	if (dtr || tile_diffs) {} /* unused vars warning: */
+
 	if (first) {
 		char *p = getenv("SPIN");
 		if (p) {
@@ -26535,6 +27032,8 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 		}
 		first = 0;
 		ssec = time(0);
+
+		if (dtr) {}	/* unused vars warning: */
 	}
 
 	total_calls++;
@@ -27893,13 +28392,17 @@ static void print_help(int mode) {
 "                       exactly, e.g. -scale 2/3\n"
 "\n"
 "                       Scaling Options: can be added after \"fraction\" via\n"
-"                       \":\", to supply multiple \":\" options use commas.  If\n"
-"                       you just want a quick, rough scaling without blending,\n"
-"                       append \":nb\" to \"fraction\" (e.g. -scale 1/3:nb).\n"
-"                       No blending is the default for 8bpp indexed color, to\n"
-"                       force blending for this case use \":fb\".  By default\n"
-"                       -scrollcopyrect and -wirecopyrect are disabled under\n"
-"                       -scale, to enable them use \":cr\".\n"
+"                       \":\", to supply multiple \":\" options use commas.\n"
+"                       If you just want a quick, rough scaling without\n"
+"                       blending, append \":nb\" to \"fraction\" (e.g. -scale\n"
+"                       1/3:nb).  No blending is the default for 8bpp indexed\n"
+"                       color, to force blending for this case use \":fb\".\n"
+"\n"
+"                       To disable -scrollcopyrect and -wirecopyrect under\n"
+"                       -scale use \":nocr\".  If you need to to enable them use\n"
+"                       \":cr\" or specify them explicitly on the command line.\n"
+"                       If a slow link is detected, \":nocr\" may be applied\n"
+"                       automatically.  Default: %s\n"
 "\n"
 "                       More esoteric options: for compatibility with vncviewers\n"
 "                       the scaled width is adjusted to be a multiple of 4:\n"
@@ -28280,10 +28783,14 @@ static void print_help(int mode) {
 "                       Keysym).  Run 'xmodmap -pk' to see your keymapping.\n"
 "                       Example: \"-skip_keycodes 94,114\"\n"
 "-skip_dups             Some VNC viewers send impossible repeated key events,\n"
-"-noskip_dups           e.g. key-down, key-down, key-up, key-up all for the\n"
-"                       same key, or 20 downs in a row for the same key!\n"
+"-noskip_dups           e.g. key-down, key-down, key-up, key-up all for the same\n"
+"                       key, or 20 downs in a row for the same modifier key!\n"
 "                       Setting -skip_dups means to skip these duplicates and\n"
-"                       just process the first event.  Default: %s\n"
+"                       just process the first event. Note: some VNC viewers\n"
+"                       assume they can send down's without the corresponding\n"
+"                       up's and so you should not set this option for\n"
+"                       these viewers (symptom: some keys do not autorepeat)\n"
+"                       Default: %s\n"
 "-add_keysyms           If a Keysym is received from a VNC viewer and\n"
 "-noadd_keysyms         that Keysym does not exist in the X server, then\n"
 "                       add the Keysym to the X server's keyboard mapping.\n"
@@ -28376,6 +28883,12 @@ static void print_help(int mode) {
 "-noprimary             Do not poll the PRIMARY selection for changes to send\n"
 "                       back to clients.  (PRIMARY is still set on received\n"
 "                       changes, however).\n"
+"-seldir string         If direction string is \"send\", only send the selection\n"
+"                       to viewers, and if it is \"recv\" only receive it from\n"
+"                       viewers.  To work around apps setting the selection\n"
+"                       too frequently and messing up the other end.  You can\n"
+"                       actually supply a comma separated list of directions,\n"
+"                       including \"debug\" to turn on debugging output.\n"
 "\n"
 "-cursor [mode]         Sets how the pointer cursor shape (little icon at the\n"
 "-nocursor              mouse pointer) should be handled.  The \"mode\" string\n"
@@ -28537,7 +29050,7 @@ static void print_help(int mode) {
 "                       The value \"str\" is optional and, of course, is\n"
 "                       packed with many tunable parameters for this scheme:\n"
 "\n"
-"                       Format: shade,linewidth,percent,T+B+L+R,t1+t2+t3+t4\n"
+"                       Format: shade,linewidth,percent,T+B+L+R,mod,t1+t2+t3+t4\n"
 "                       Default: %s\n"
 "\n"
 "                       If you leave nothing between commas: \",,\" the default\n"
@@ -28559,6 +29072,14 @@ static void print_help(int mode) {
 "                       This is a speedup to quickly exclude a window from being\n"
 "                       wireframed: set them all to zero to not try the speedup\n"
 "                       (scrolling and selecting text will likely be slower).\n"
+"\n"
+"                       \"mod\" specifies if a button down event in the\n"
+"                       interior of the window with a modifier key (Alt, Shift,\n"
+"                       etc.) down should indicate a wireframe opportunity.\n"
+"                       It can be \"0\" or \"none\" to skip it, \"1\" or \"all\"\n"
+"                       to apply it to any modifier, or \"Shift\", \"Alt\",\n"
+"                       \"Control\", \"Meta\", \"Super\", or \"Hyper\" to only\n"
+"                       apply for that type of modifier key.\n"
 "\n"
 "                       \"t1+t2+t3+t4\" specify four floating point times in\n"
 "                       seconds: t1 is how long to wait for the pointer to move,\n"
@@ -28585,10 +29106,11 @@ static void print_help(int mode) {
 "                       region (this may look odd as the remaining pieces come\n"
 "                       in, but helps on a slow link).  Default: \"%s\"\n"
 "\n"
-"                       Note: there can be painting errors when using -scale\n"
-"                       so CopyRect is skipped when scaling unless you specify\n"
-"                       \"-wirecopyrect always\" on the command line or by\n"
-"                       remote-control.  Or you can also use \"-scale xxx:cr\"\n"
+"                       Note: there can be painting errors or slow response\n"
+"                       when using -scale so you may want to disable CopyRect\n"
+"                       in this case \"-wirecopyrect never\" on the command\n"
+"                       line or by remote-control.  Or you can also use the\n"
+"                       \"-scale xxx:nocr\" scale option.\n"
 "\n"
 "-debug_wireframe       Turn on debugging info printout for the wireframe\n"
 "                       heuristics.  \"-dwf\" is an alias.  Specify multiple\n"
@@ -28630,16 +29152,24 @@ static void print_help(int mode) {
 "                       4 Super_L's in a row: reset RECORD context,\n"
 "                       5 Super_L's in a row: try to push a black screen\n"
 "\n"
+"                       note: Alt_L is the Left \"Alt\" key (a single key)\n"
+"                       Super_L is the Left \"Super\" key (Windows flag).\n"
+"                       Both of these are modifier keys, and so should not\n"
+"                       generate characters when pressed by themselves.  Also,\n"
+"                       your VNC viewer may have its own refresh hot-key\n"
+"                       or button.\n"
+"\n"
 "                       \"mode\" can be \"never\" (same as -noscrollcopyrect)\n"
 "                       to never try the copyrect, \"keys\" means to try it\n"
 "                       in response to keystrokes only, \"mouse\" means to\n"
 "                       try it in response to mouse events only, \"always\"\n"
 "                       means to do both. Default: \"%s\"\n"
 "\n"
-"                       Note: there can be painting errors when using -scale\n"
-"                       so CopyRect is skipped when scaling unless you specify\n"
-"                       \"-scrollcopyrect always\" on the command line or by\n"
-"                       remote-control.  You can also use \"-scale xxx:cr\"\n"
+"                       Note: there can be painting errors or slow response\n"
+"                       when using -scale so you may want to disable CopyRect\n"
+"                       in this case \"-scrollcopyrect never\" on the command\n"
+"                       line or by remote-control.  Or you can also use the\n"
+"                       \"-scale xxx:nocr\" scale option.\n"
 "\n"
 "-scr_area n            Set the minimum area in pixels for a rectangle\n"
 "                       to be considered for the -scrollcopyrect detection\n"
@@ -28785,22 +29315,22 @@ static void print_help(int mode) {
 "                       but it can be used for any scenario.  This option\n"
 "                       periodically performs costly operations and so\n"
 "                       interactive response may be reduced when it is on.\n"
-"                       The 3 Alt_L's in a row described under -scrollcopyrect\n"
-"                       can be used instead to manually request a screen repaint\n"
-"                       when it is needed.\n"
+"                       The 3 Alt_L's (the Left \"Alt\" key) taps in a row\n"
+"                       described under -scrollcopyrect can be used instead to\n"
+"                       manually request a screen repaint when it is needed.\n"
 "\n"
-"                       \"string\" is a comma separated list of one or more\n"
-"                       of the following: \"V=t\", \"C=t\", and \"X=t\".\n"
-"                       In these \"t\" stands for a time in seconds (it is\n"
-"                       a floating point even though one should usually use\n"
-"                       values > 2 to avoid wasting resources).  V sets how\n"
-"                       frequently the entire screen should be sent to viewers\n"
-"                       (it is like the 3 Alt_L's).  C sets how long after a\n"
-"                       CopyRect the full screen should be repainted.  X sets\n"
-"                       how frequently to reread the full X11 framebuffer from\n"
-"                       the X server and push it out to connected viewers.\n"
-"                       Use of X should be rare.  Examples: -fixscreen V=10\n"
-"                       -fixscreen C=10\n"
+"                       \"string\" is a comma separated list of one or more of\n"
+"                       the following: \"V=t\", \"C=t\", and \"X=t\".  In these\n"
+"                       \"t\" stands for a time in seconds (it is a floating\n"
+"                       point even though one should usually use values > 2 to\n"
+"                       avoid wasting resources).  V sets how frequently the\n"
+"                       entire screen should be sent to viewers (it is like the\n"
+"                       3 Alt_L's).  C sets how long to wait after a CopyRect\n"
+"                       to repaint the full screen.  X sets how frequently\n"
+"                       to reread the full X11 framebuffer from the X server\n"
+"                       and push it out to connected viewers.  Use of X should\n"
+"                       be rare, please report a bug if you find you need it.\n"
+"                       Examples: -fixscreen V=10 -fixscreen C=10\n"
 "\n"
 "-debug_scroll          Turn on debugging info printout for the scroll\n"
 "                       heuristics.  \"-ds\" is an alias.  Specify it multiple\n"
@@ -29258,6 +29788,7 @@ static void print_help(int mode) {
 "                       sel             disable -nosel mode.\n"
 "                       noprimary       enable  -noprimary mode.\n"
 "                       primary         disable -noprimary mode.\n"
+"                       seldir:str      set -seldir to \"str\"\n"
 "                       cursor:mode     enable  -cursor \"mode\".\n"
 "                       show_cursor     enable  showing a cursor.\n"
 "                       noshow_cursor   disable showing a cursor. (same as\n"
@@ -29297,6 +29828,7 @@ static void print_help(int mode) {
 "                       fixscreen:str   set -fixscreen to \"str\".\n"
 "                       noxrecord       disable all use of RECORD extension.\n"
 "                       xrecord         enable  use of RECORD extension.\n"
+"                       reset_record    reset RECORD extension (if avail.).\n"
 "                       pointer_mode:n  set -pointer_mode to n. same as \"pm\"\n"
 "                       input_skip:n    set -input_skip to n.\n"
 "                       speeds:str      set -speeds to str.\n"
@@ -29386,14 +29918,6 @@ static void print_help(int mode) {
 "                       a query straight to the VNC_CONNECT property or connect\n"
 "                       file use \"qry=...\" instead of \"cmd=...\"\n"
 "\n"
-"                       Here is the current list of \"variables\" that can\n"
-"                       be supplied to the -query command. This includes the\n"
-"                       \"N/A\" ones that return no useful info.  For variables\n"
-"                       names that do not correspond to an x11vnc option or\n"
-"                       remote command, we hope the name makes it obvious what\n"
-"                       the returned value corresponds to (hint: the ext_*\n"
-"                       variables correspond to the presence of X extensions):\n"
-"\n"
 "                       ans= stop quit exit shutdown ping blacken zero\n"
 "                       refresh reset close disconnect id sid waitmapped\n"
 "                       nowaitmapped clip flashcmap noflashcmap shiftcmap\n"
@@ -29410,23 +29934,23 @@ static void print_help(int mode) {
 "                       modtweak nomodtweak xkb noxkb skip_keycodes skip_dups\n"
 "                       noskip_dups add_keysyms noadd_keysyms clear_mods\n"
 "                       noclear_mods clear_keys noclear_keys remap repeat\n"
-"                       norepeat fb nofb bell nobell sel nosel primary noprimary\n"
-"                       cursorshape nocursorshape cursorpos nocursorpos cursor\n"
-"                       show_cursor noshow_cursor nocursor arrow xfixes\n"
-"                       noxfixes xdamage noxdamage xd_area xd_mem alphacut\n"
-"                       alphafrac alpharemove noalpharemove alphablend\n"
-"                       noalphablend xwarppointer xwarp noxwarppointer\n"
-"                       noxwarp buttonmap dragging nodragging wireframe_mode\n"
-"                       wireframe wf nowireframe nowf wirecopyrect wcr\n"
-"                       nowirecopyrect nowcr scr_area scr_skip scr_inc scr_keys\n"
-"                       scr_term scr_keyrepeat scr_parms scrollcopyrect scr\n"
+"                       norepeat fb nofb bell nobell sel nosel primary\n"
+"                       noprimary seldir cursorshape nocursorshape cursorpos\n"
+"                       nocursorpos cursor show_cursor noshow_cursor nocursor\n"
+"                       arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem\n"
+"                       alphacut alphafrac alpharemove noalpharemove alphablend\n"
+"                       noalphablend xwarppointer xwarp noxwarppointer noxwarp\n"
+"                       buttonmap dragging nodragging wireframe_mode wireframe\n"
+"                       wf nowireframe nowf wirecopyrect wcr nowirecopyrect\n"
+"                       nowcr scr_area scr_skip scr_inc scr_keys scr_term\n"
+"                       scr_keyrepeat scr_parms scrollcopyrect scr\n"
 "                       noscrollcopyrect noscr fixscreen noxrecord xrecord\n"
-"                       pointer_mode pm input_skip input client_input speeds\n"
-"                       debug_pointer dp nodebug_pointer nodp debug_keyboard\n"
-"                       dk nodebug_keyboard nodk deferupdate defer wait_ui\n"
-"                       wait_bog nowait_bog wait readtimeout nap nonap sb\n"
-"                       screen_blank fs gaps grow fuzz snapfb nosnapfb\n"
-"                       rawfb progressive rfbport http nohttp httpport\n"
+"                       reset_record pointer_mode pm input_skip input\n"
+"                       client_input speeds debug_pointer dp nodebug_pointer\n"
+"                       nodp debug_keyboard dk nodebug_keyboard nodk deferupdate\n"
+"                       defer wait_ui wait_bog nowait_bog wait readtimeout\n"
+"                       nap nonap sb screen_blank fs gaps grow fuzz snapfb\n"
+"                       nosnapfb rawfb progressive rfbport http nohttp httpport\n"
 "                       httpdir enablehttpproxy noenablehttpproxy alwaysshared\n"
 "                       noalwaysshared nevershared noalwaysshared dontdisconnect\n"
 "                       nodontdisconnect desktop debug_xevents nodebug_xevents\n"
@@ -29436,19 +29960,19 @@ static void print_help(int mode) {
 "                       debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg\n"
 "                       nodbg noremote\n"
 "\n"
-"                       aro=  display vncdisplay desktopname http_url auth\n"
-"                       users rootshift clipshift scale_str scaled_x scaled_y\n"
-"                       scale_numer scale_denom scale_fac scaling_blend\n"
-"                       scaling_nomult4 scaling_pad scaling_interpolate inetd\n"
-"                       privremote unsafe safer nocmds passwdfile using_shm\n"
-"                       logfile o flag rc norc h help V version lastmod bg\n"
-"                       sigpipe threads readrate netrate netlatency pipeinput\n"
-"                       clients client_count pid ext_xtest ext_xtrap ext_xrecord\n"
-"                       ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes\n"
-"                       ext_xdamage ext_xrandr rootwin num_buttons button_mask\n"
-"                       mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y\n"
-"                       wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y\n"
-"                       rfbauth passwd\n"
+"                       aro=  display vncdisplay desktopname guess_desktop\n"
+"                       http_url auth users rootshift clipshift scale_str\n"
+"                       scaled_x scaled_y scale_numer scale_denom\n"
+"                       scale_fac scaling_blend scaling_nomult4 scaling_pad\n"
+"                       scaling_interpolate inetd privremote unsafe safer nocmds\n"
+"                       passwdfile using_shm logfile o flag rc norc h help V\n"
+"                       version lastmod bg sigpipe threads readrate netrate\n"
+"                       netlatency pipeinput clients client_count pid ext_xtest\n"
+"                       ext_xtrap ext_xrecord ext_xkb ext_xshm ext_xinerama\n"
+"                       ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin\n"
+"                       num_buttons button_mask mouse_x mouse_y bpp depth\n"
+"                       indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y\n"
+"                       cdpy_x cdpy_y coff_x coff_y rfbauth passwd\n"
 "\n"
 "-sync                  By default -remote commands are run asynchronously, that\n"
 "                       is, the request is posted and the program immediately\n"
@@ -29544,6 +30068,7 @@ static void print_help(int mode) {
 		exit(1);
 	}
 	fprintf(stderr, help, lastmod,
+		scaling_copyrect ? ":cr":":nocr",
 		view_only ? "on":"off",
 		shared ? "on":"off",
 		vnc_connect ? "-vncconnect":"-novncconnect",
@@ -29978,7 +30503,7 @@ int main(int argc, char* argv[]) {
 	for (i=1; i < argc; i++) {
 		len += strlen(argv[i]) + 4 + 1;
 	}
-	program_cmdline = (char *)malloc(len+1);
+	program_cmdline = (char *) malloc(len+1);
 	program_cmdline[0] = '\0';
 	for (i=1; i < argc; i++) {
 		char *s = argv[i];
@@ -30031,11 +30556,12 @@ int main(int argc, char* argv[]) {
 					    arg);
 					exit(1);
 				} else if (! pick_windowid(&subwin)) {
-					fprintf(stderr, "bad %s pick\n", arg);
+					fprintf(stderr, "invalid %s pick\n",
+					    arg);
 					exit(1);
 				}
 			} else if (! scan_hexdec(argv[i], &subwin)) {
-				fprintf(stderr, "bad %s arg: %s\n", arg,
+				fprintf(stderr, "invalid %s arg: %s\n", arg,
 				    argv[i]);
 				exit(1);
 			}
@@ -30260,6 +30786,9 @@ int main(int argc, char* argv[]) {
 			watch_primary = 0;
 		} else if (!strcmp(arg, "-noprimary")) {
 			watch_primary = 0;
+		} else if (!strcmp(arg, "-seldir")) {
+			CHECK_ARGC
+			sel_direction = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-cursor")) {
 			show_cursor = 1;
 			if (i < argc-1) {
@@ -30445,8 +30974,8 @@ int main(int argc, char* argv[]) {
 			if (known_sigpipe_mode(argv[++i])) {
 				sigpipe = strdup(argv[i]);
 			} else {
-				fprintf(stderr, "bad -sigpipe arg: %s, must "
-				    "be \"ignore\" or \"exit\"\n", argv[i]);
+				fprintf(stderr, "invalid -sigpipe arg: %s, must"
+				    " be \"ignore\" or \"exit\"\n", argv[i]);
 				exit(1);
 			}
 #if LIBVNCSERVER_HAVE_LIBPTHREAD
@@ -30925,6 +31454,8 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " watchbell:  %d\n", watch_bell);
 		fprintf(stderr, " watchsel:   %d\n", watch_selection);
 		fprintf(stderr, " watchprim:  %d\n", watch_primary);
+		fprintf(stderr, " seldir:     %s\n", sel_direction ?
+		    sel_direction : "null");
 		fprintf(stderr, " cursor:     %d\n", show_cursor);
 		fprintf(stderr, " multicurs:  %d\n", show_multiple_cursors);
 		fprintf(stderr, " curs_mode:  %s\n", multiple_cursors_mode
@@ -31150,32 +31681,25 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (! quiet && wireframe) {
-		rfbLog("Wireframing: -wireframe mode is in effect for window moves.\n");
-		rfbLog("  If this yields undesired behavior (poor response, painting\n");
+		rfbLog("Wireframing: -wireframe mode is in effect for window "
+		    "moves.\n");
+		rfbLog("  If this yields undesired behavior (poor response, "
+		    "painting\n");
 		rfbLog("  errors, etc) it may be disabled:\n");
 		rfbLog("   - use '-nowf' to disable wireframing completely.\n");
-		rfbLog("   - use '-nowcr' to disable the Copy Rectangle after the\n");
+		rfbLog("   - use '-nowcr' to disable the Copy Rectangle after "
+		    "the\n");
 		rfbLog("     moved window is released in the new position.\n");
 		rfbLog("  Also see the -help entry for tuning parameters.\n");
-	}
-
-	tmpi = 1;
-	if (scroll_copyrect) {
-		if (strstr(scroll_copyrect, "never")) {
-			tmpi = 0;
+		rfbLog("  You can press 3 Alt_L's (Left \"Alt\" key) in a row"
+		    " to \n");
+		rfbLog("  repaint the screen, also see the -fixscreen option"
+		    " for\n");
+		rfbLog("  periodic repaints.\n");
+		if (scale_str && !strstr(scale_str, "nocr")) {
+			rfbLog("  Note: '-scale' is on and this can cause "
+			    "more problems.\n");
 		}
-	} else if (scroll_copyrect_default) {
-		if (strstr(scroll_copyrect_default, "never")) {
-			tmpi = 0;
-		}
-	}
-	if (! quiet && tmpi) {
-		rfbLog("Scroll Detection: -scrollcopyrect mode is in effect to\n");
-		rfbLog("  use RECORD extension to try to detect scrolling windows\n");
-		rfbLog("  (induced by either user keystroke or mouse input).\n");
-		rfbLog("  If this yields undesired behavior (poor response, painting\n");
-		rfbLog("  errors, etc) it may be disabled via: '-noscr'\n");
-		rfbLog("  Also see the -help entry for tuning parameters.\n");
 	}
 
 	overlay_present = 0;
@@ -31315,6 +31839,43 @@ int main(int argc, char* argv[]) {
 
 	initialize_xrecord();
 
+	tmpi = 1;
+	if (scroll_copyrect) {
+		if (strstr(scroll_copyrect, "never")) {
+			tmpi = 0;
+		}
+	} else if (scroll_copyrect_default) {
+		if (strstr(scroll_copyrect_default, "never")) {
+			tmpi = 0;
+		}
+	}
+	if (! xrecord_present) {
+		tmpi = 0;
+	}
+#if !LIBVNCSERVER_HAVE_RECORD
+	tmpi = 0;
+#endif
+	if (! quiet && tmpi) {
+		rfbLog("Scroll Detection: -scrollcopyrect mode is in effect "
+		    "to\n");
+		rfbLog("  use RECORD extension to try to detect scrolling "
+		    "windows\n");
+		rfbLog("  (induced by either user keystroke or mouse input).\n");
+		rfbLog("  If this yields undesired behavior (poor response, "
+		    "painting\n");
+		rfbLog("  errors, etc) it may be disabled via: '-noscr'\n");
+		rfbLog("  Also see the -help entry for tuning parameters.\n");
+		rfbLog("  You can press 3 Alt_L's (Left \"Alt\" key) in a row"
+		    " to \n");
+		rfbLog("  repaint the screen, also see the -fixscreen option"
+		    " for\n");
+		rfbLog("  periodic repaints.\n");
+		if (scale_str && !strstr(scale_str, "nocr")) {
+			rfbLog("  Note: '-scale' is on and this can cause "
+			    "more problems.\n");
+		}
+	}
+
 	/* check for OS with small shm limits */
 	if (using_shm && ! single_copytile) {
 		if (limit_shm()) {
@@ -31436,6 +31997,7 @@ int main(int argc, char* argv[]) {
 
 	if (! inetd) {
 		if (! screen->port || screen->listenSock < 0) {
+			rfbLogEnable(1);
 			rfbLog("Error: could not obtain listening port.\n");
 			clean_up_exit(1);
 		}
@@ -31452,11 +32014,13 @@ int main(int argc, char* argv[]) {
 		if ((p = fork()) > 0)  {
 			exit(0);
 		} else if (p == -1) {
+			rfbLogEnable(1);
 			fprintf(stderr, "could not fork\n");
 			perror("fork");
 			clean_up_exit(1);
 		}
 		if (setsid() == -1) {
+			rfbLogEnable(1);
 			fprintf(stderr, "setsid failed\n");
 			perror("setsid");
 			clean_up_exit(1);

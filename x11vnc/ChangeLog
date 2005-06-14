@@ -1,3 +1,18 @@
+2005-06-14  Karl Runge <runge@karlrunge.com>
+	* -DNOGUI and -DVIEWONLY build options
+	* -noskip_dups the default (windows viewer sends no ups when
+	  repeating)
+	* HAVE_SOLARIS_XREADSCREEN and HAVE_IRIX_XREADDISPLAY
+	* Alt+Button+Motion to wireframe.  tunable in WIREFRAME_PARMS
+	* copyrect now the default under -scale (works OK, but must
+	  send a cleanup update)
+	* fix -pedantic and Sun cc warnings and errors (unsigned, etc..)
+	* print out fatal error messages under -quiet
+	* -seldir to control and debug selection transfers.
+	* fix crashes on 64bit wrt unsigned long in rich cursors.
+	* fix kde guessing errors
+	* more scrolling and wireframe tweaks.
+
 2005-06-03  Karl Runge <runge@karlrunge.com>
 	* make scrollcopyrect more or less usable under -scale
 	* add -fixscreen for periodic cleanup of painting errors.
