@@ -2,7 +2,7 @@
 .TH X11VNC "1" "June 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-06-14
+         version: 0.7.2, lastmod: 2005-06-18
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -246,8 +246,10 @@ Launched by
 .IR inetd (1):
 stdio instead of listening socket.
 Note: if you are not redirecting stderr to a log file
-(via shell 2> or \fB-o\fR option) you must also specify the
-\fB-q\fR option, otherwise the stderr goes to the viewer.
+(via shell 2> or \fB-o\fR option) you must also specify the \fB-q\fR
+option, otherwise the stderr goes to the viewer which
+will cause it to abort.  Specifying both \fB-inetd\fR and \fB-q\fR
+and no \fB-o\fR will automatically close the stderr.
 .PP
 \fB-http\fR
 .IP

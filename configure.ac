@@ -184,7 +184,12 @@ if test "x$with_jpeg" != "xno"; then
 		saved_LDFLAGS="$LDFLAGS"
 		CPPFLAGS="$CPPFLAGS -I$with_jpeg/include"
 		LDFLAGS="$LDFLAGS -L$with_jpeg/lib"
-		if test "x$GCC" = "xyes"; then
+		uname_s=`(uname -s) 2>/dev/null`
+		if test "x$uname_s" = "xHP-UX"; then
+			:
+		elif test "x$uname_s" = "xOSF1"; then
+			:
+		elif test "x$GCC" = "xyes"; then
 			# this is not complete... in general a rat's nest.
 			LDFLAGS="$LDFLAGS -Xlinker -R$with_jpeg/lib"
 		else
@@ -229,7 +234,12 @@ if test "x$with_zlib" != "xno" -a "x$with_libz" != "xno"; then
 		saved_LDFLAGS="$LDFLAGS"
 		CPPFLAGS="$CPPFLAGS -I$with_zlib/include"
 		LDFLAGS="$LDFLAGS -L$with_zlib/lib"
-		if test "x$GCC" = "xyes"; then
+		uname_s=`(uname -s) 2>/dev/null`
+		if test "x$uname_s" = "xHP-UX"; then
+			:
+		elif test "x$uname_s" = "xOSF1"; then
+			:
+		elif test "x$GCC" = "xyes"; then
 			LDFLAGS="$LDFLAGS -Xlinker -R$with_zlib/lib"
 		else
 			LDFLAGS="$LDFLAGS -R$with_zlib/lib"

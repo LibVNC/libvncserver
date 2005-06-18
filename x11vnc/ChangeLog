@@ -1,3 +1,8 @@
+2005-06-18  Karl Runge <runge@karlrunge.com>
+	* clean up some malloc/free problems (don't free the current cursor)
+	* set DISPLAY before calling gconf, dcop under -solid
+	* -inetd -q and no -o logfile implies closing stderr.
+
 2005-06-14  Karl Runge <runge@karlrunge.com>
 	* -DNOGUI and -DVIEWONLY build options
 	* -noskip_dups the default (windows viewer sends no ups when

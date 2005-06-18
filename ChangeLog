@@ -1,3 +1,9 @@
+2005-06-18  Karl Runge <runge@karlrunge.com>
+	* configure.ac: don't use -R on HP-UX and OSF1.
+	* x11vnc: don't free the current cursor, close stderr
+	  for -inetd -q and no -o logfile, set DISPLAY for -solid
+	  external calls.
+
 2005-06-14  Karl Runge <runge@karlrunge.com>
 	* configure.ac: XReadScreen and XReadDisplay checks.
 	* libvncserver/cursor.c: fix unsigned long crash for 64bits.

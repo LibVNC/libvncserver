@@ -382,7 +382,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-06-14";
+char lastmod[] = "0.7.2 lastmod: 2005-06-18";
 int hack_val = 0;
 
 /* X display info */
@@ -1262,6 +1262,9 @@ int parse_geom(char *str, int *wp, int *hp, int *xp, int *yp, int W, int H) {
 
 void set_env(char *name, char *value) {
 	char *str;
+	if (!value) {
+		value = "";
+	}
 	str = (char *) malloc(strlen(name)+strlen(value)+2);
 	sprintf(str, "%s=%s", name, value);
 	putenv(str);
@@ -2343,7 +2346,9 @@ char *ident_username(rfbClientPtr client) {
 			newuser = strdup("unknown-user");
 		}
 		if (cd) {
-			free(cd->username);
+			if (cd->username) {
+				free(cd->username);
+			}
 			cd->username = newuser;
 		}
 		user = newuser;
@@ -4139,6 +4144,7 @@ void record_switch(XPointer ptr, XRecordInterceptData *rec_data) {
 
 void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
 	xReq *req;
+	int db = 0;
 
 	/* should handle control msgs, start/stop/etc */
 	if (rec_data->category == XRecordStartOfData) {
@@ -4163,7 +4169,7 @@ void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
 	if (req->reqType == X_GrabServer) {
 		double now = dnow() - x11vnc_start;
 		xserver_grabbed++;
-		if (0) rfbLog("X server Grabbed:    %d %.5f\n", xserver_grabbed, now);
+		if (db) rfbLog("X server Grabbed:    %d %.5f\n", xserver_grabbed, now);
 		if (xserver_grabbed > 1) {
 			/* 
 			 * some apps do multiple grabs... very unlikely
@@ -4177,7 +4183,7 @@ void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
 		if (xserver_grabbed < 0) {
 			xserver_grabbed = 0;
 		}
-		if (0) rfbLog("X server Un-Grabbed: %d %.5f\n", xserver_grabbed, now);
+		if (db) rfbLog("X server Un-Grabbed: %d %.5f\n", xserver_grabbed, now);
 	} else {
 		;
 	}
@@ -5562,7 +5568,7 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	} else {
 		char *sip = get_local_host(client->sock);
 		set_env("RFB_SERVER_IP", sip);
-		free(sip);
+		if (sip) free(sip);
 	}
 
 	if (cd && cd->server_port > 0) {
@@ -5649,15 +5655,19 @@ static void client_gone(rfbClientPtr client) {
 		if (cd) {
 			if (cd->server_ip) {
 				free(cd->server_ip);
+				cd->server_ip = NULL;
 			}
 			if (cd->hostname) {
 				free(cd->hostname);
+				cd->hostname = NULL;
 			}
 			if (cd->username) {
 				free(cd->username);
+				cd->username = NULL;
 			}
 		}
 		free(client->clientData);
+		client->clientData = NULL;
 	}
 
 	if (inetd) {
@@ -8697,9 +8707,11 @@ void initialize_allowed_input(void) {
 
 	if (allowed_input_normal) {
 		free(allowed_input_normal);
+		allowed_input_normal = NULL;
 	}
 	if (allowed_input_view_only) {
 		free(allowed_input_view_only);
+		allowed_input_view_only = NULL;
 	}
 
 	if (! allowed_input_str) {
@@ -12956,7 +12968,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    if (is_loopback) {
 				rfbLog("re-setting -allow list to all "
 				   "hosts for non-loopback listening.\n");
-				free(allow_list);
+				if (allow_list) {
+					free(allow_list);
+				}
 				allow_list = NULL;
 			    }
 			} else {
@@ -16216,22 +16230,29 @@ void setup_cursors(void) {
 				/* this is the rfbCursor part: */
 				if (ci->rfb->richSource) {
 					free(ci->rfb->richSource);
+					ci->rfb->richSource = NULL;
 				}
 				if (ci->rfb->source) {
 					free(ci->rfb->source);
+					ci->rfb->source = NULL;
 				}
 				if (ci->rfb->mask) {
 					free(ci->rfb->mask);
+					ci->rfb->mask = NULL;
 				}
 				free(ci->rfb);
+				ci->rfb = NULL;
 			}
 			if (ci->data) {
 				free(ci->data);
+				ci->data = NULL;
 			}
 			if (ci->mask) {
 				free(ci->mask);
+				ci->mask = NULL;
 			}
 			free(ci);
+			ci = NULL;
 		}
 
 		/* create new struct: */
@@ -16388,6 +16409,8 @@ void setup_cursors(void) {
 				rfb_curs->backGreen = 0xffff;
 				rfb_curs->backBlue  = 0xffff;
 			}
+			rfb_curs->alphaSource = NULL;
+
 			rfb_curs->xhot = ci->sx;
 			rfb_curs->yhot = ci->sy;
 			rfb_curs->cleanup = FALSE;
@@ -16895,10 +16918,15 @@ int get_xfixes_cursor(int init) {
 		}
 
 		oldest = CURS_DYN_MIN;
+		if (screen && screen->cursor == cursors[oldest]->rfb) {
+			oldest++;
+		}
 		oldtime = curs_times[oldest];
 		now = time(0);
 		for (i = CURS_DYN_MIN; i <= CURS_DYN_MAX; i++) {
-			if (curs_times[i] < oldtime) {
+			if (screen && screen->cursor == cursors[i]->rfb) {
+				;
+			} else if (curs_times[i] < oldtime) {
 				/* watch for oldest one to overwrite */
 				oldest = i;
 				oldtime = curs_times[i];
@@ -16924,17 +16952,22 @@ int get_xfixes_cursor(int init) {
 			/* clean up oldest if it exists */
 			if (cursors[use]->rfb->richSource) {
 				free(cursors[use]->rfb->richSource);
+				cursors[use]->rfb->richSource = NULL;
 			}
 			if (cursors[use]->rfb->alphaSource) {
 				free(cursors[use]->rfb->alphaSource);
+				cursors[use]->rfb->alphaSource = NULL;
 			}
 			if (cursors[use]->rfb->source) {
 				free(cursors[use]->rfb->source);
+				cursors[use]->rfb->source = NULL;
 			}
 			if (cursors[use]->rfb->mask) {
 				free(cursors[use]->rfb->mask);
+				cursors[use]->rfb->mask = NULL;
 			}
 			free(cursors[use]->rfb);
+			cursors[use]->rfb = NULL;
 		}
 
 		/* place cursor into our collection */
@@ -17424,6 +17457,7 @@ void set_colormap(int reset) {
 		first = 1;
 		if (screen->colourMap.data.shorts) {
 			free(screen->colourMap.data.shorts);
+			screen->colourMap.data.shorts = NULL;
 		}
 	}
 
@@ -19099,7 +19133,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	/* called from inetd, we need to treat stdio as our socket */
 	if (inetd) {
 		int fd = dup(0);
-		if (fd < 3) {
+		if (fd < 0) {
 			rfbLogEnable(1);
 			rfbErr("dup(0) = %d failed.\n", fd);
 			rfbLogPerror("dup");
@@ -19189,6 +19223,10 @@ int dt_cmd(char *cmd) {
 		rfbLog("   \"%s\"\n", cmd);
 		rfbLog("   dt_cmd: returning 1\n");
 		return 1;
+	}
+
+	if (getenv("DISPLAY") == NULL) {
+		set_env("DISPLAY", DisplayString(dpy));
 	}
 
 	rfbLog("running command:\n  %s\n", cmd);
@@ -23175,7 +23213,7 @@ int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
 	Bool ret;
 	int rootx, rooty, wx, wy;
 	unsigned int mask;
-	
+
 	ret = XQueryPointer(dpy, rootwin, &r, &c, &rootx, &rooty, &wx, &wy,
 	    &mask);
 
@@ -23508,6 +23546,8 @@ void set_wirecopyrect_mode(char *str) {
 	} else {
 		if (! wireframe_copyrect) {
 			wireframe_copyrect = strdup(wireframe_copyrect_default);
+		} else {
+			orig = NULL;
 		}
 		rfbLog("unknown -wirecopyrect mode: %s, using: %s\n", str,
 		    wireframe_copyrect);
@@ -23536,6 +23576,8 @@ void set_scrollcopyrect_mode(char *str) {
 	} else {
 		if (! scroll_copyrect) {
 			scroll_copyrect = strdup(scroll_copyrect_default);
+		} else {
+			orig = NULL;
 		}
 		rfbLog("unknown -scrollcopyrect mode: %s, using: %s\n", str,
 		    scroll_copyrect);
@@ -23861,6 +23903,7 @@ void draw_box(int x, int y, int w, int h, int restore) {
 			if (! first && save[i]) {
 				if (save[i]->data) {
 					free(save[i]->data);
+					save[i]->data = NULL;
 				}
 				free(save[i]);
 			}
@@ -26403,6 +26446,8 @@ if (db) fprintf(stderr, "INTERIOR\n");
 
 		spin += dtime(&tm);
 
+if (0) fprintf(stderr, "wf-spin: %.3f\n", spin);
+
 		/* check for any timeouts: */
 		if (frame_changed) {
 			double delay;
@@ -26509,7 +26554,6 @@ if (db) fprintf(stderr, "OUT-OF-FRAME: old: x: %d  y: %d  px: %d py: %d 0x%lx\n"
 			}
 			X_UNLOCK;
 
-			/* debugging output, to be removed: */
 if (db) fprintf(stderr, "  frame: x: %d  y: %d  w: %d  h: %d  px: %d  py: %d  fr: 0x%lx\n", x, y, w, h, px, py, frame);	
 if (db) fprintf(stderr, "        MO,PT,FR: %d/%d %d/%d %d/%d\n", cursor_x - orig_cursor_x, cursor_y - orig_cursor_y, px - orig_px, py - orig_py, x - orig_x, y - orig_y);	
 
@@ -28431,8 +28475,10 @@ static void print_help(int mode) {
 "                       of startup.\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
 "                       Note: if you are not redirecting stderr to a log file\n"
-"                       (via shell 2> or -o option) you must also specify the\n"
-"                       -q option, otherwise the stderr goes to the viewer.\n"
+"                       (via shell 2> or -o option) you must also specify the -q\n"
+"                       option, otherwise the stderr goes to the viewer which\n"
+"                       will cause it to abort.  Specifying both -inetd and -q\n"
+"                       and no -o will automatically close the stderr.\n"
 "-http                  Instead of using -httpdir (see below) to specify\n"
 "                       where the Java vncviewer applet is, have x11vnc try\n"
 "                       to *guess* where the directory is by looking relative\n"
@@ -31113,6 +31159,24 @@ int main(int argc, char* argv[]) {
 			close(n);
 		}
 	}
+	if (inetd && quiet && !logfile) {
+		int n;
+		/*
+		 * Redir stderr to /dev/null under -inetd and -quiet
+		 * but no -o logfile.  Typical problem:
+		 *   Xlib:  extension "RECORD" missing on display ":1.0".
+		 * If they want this info, they should use -o logfile,
+		 * or no -q and 2>logfile.
+		 */
+		n = open("/dev/null", O_WRONLY);
+		if (n >= 0) {
+			if (dup2(n, 2) >= 0) {
+				if (n > 2) {
+					close(n);
+				}
+			}
+		}
+	}
 	if (! quiet && ! inetd) {
 		int i;
 		for (i=1; i < argc_vnc; i++) {
@@ -31292,6 +31356,7 @@ int main(int argc, char* argv[]) {
 		shared = 0;
 		connect_once = 1;
 		bg = 0;
+		/* others? */
 	}
 
 	if (flip_byte_order && using_shm && ! quiet) {
