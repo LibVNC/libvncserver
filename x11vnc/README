@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat Jun 18 12:32:19 EDT 2005
+x11vnc README file                         Date: Tue Jun 21 09:58:37 EDT 2005
 
 The following information is taken from these URLs:
 
@@ -207,8 +207,8 @@ x11vnc: a VNC server for real X displays
    However, if you "know" port 5900 will be free on the local and remote
    machines, you can easily automate the above two steps by using the
    x11vnc option [26]-bg (forks into background after connection to the
-   display is set up) or using the -f option of ssh. Three example
-   scripts are shown below.
+   display is set up) or using the -f option of ssh. Some example scripts
+   are shown below.
      _________________________________________________________________
 
    #1. A simple example script, assuming no problems with port 5900 being
@@ -301,7 +301,7 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
 
 
    Chaining ssh's: Note that for use of a ssh gateway and -L redirection
-   to a internal host (e.g. "-L 5900:otherhost:5900") the VNC traffic
+   to an internal host (e.g. "-L 5900:otherhost:5900") the VNC traffic
    inside the firewall is not encrypted and you have to manually log into
    otherhost to start x11vnc. Kyle Amon shows a method where you chain
    two ssh's together that encrypts all network traffic and also
@@ -578,7 +578,7 @@ make
    I'd like to release version 0.7.2 in Jun/2005 sometime, here is the
    current tarball:
 
-      RC-3 lastmod: 2005-06-18    [51]x11vnc-0.7.2beta.tar.gz
+      RC-3 lastmod: 2005-06-20    [51]x11vnc-0.7.2beta.tar.gz
 
    There are also some Linux and Solaris test binaries [52]here. Please
    kick the tires and report bugs, performance regressions, undesired
@@ -1134,6 +1134,7 @@ make
    your DISPLAY environment variable or use the [156]-display option to
    specify it. Nearly always the correct value will be ":0"
 
+
    For the latter error, you need to set up the X11 permissions
    correctly.
 
@@ -1148,13 +1149,19 @@ make
    How to Solve:  See the xauth(1), Xsecurity(7), and xhost(1) man pages
    for much info on X11 permissions. For example, you may need to set
    your XAUTHORITY environment variable or use the [157]-auth option to
-   point to the correct cookie file (e.g. /home/joe/.Xauthority or
-   /var/gdm/:0.Xauth), or simply be sure you run x11vnc as the correct
-   user (i.e. the user who owns the X session you wish to view). If sshd
-   has set XAUTHORITY to point to a random file it has created for X
-   forwarding that will cause problems. Running x11vnc as root is not
-   enough: you need to know where the XAUTHORITY file for the desired X
-   display is.   Example:
+   point to the correct MIT-MAGIC-COOKIE file (e.g. /home/joe/.Xauthority
+   or /var/gdm/:0.Xauth), or simply be sure you run x11vnc as the correct
+   user (i.e. the user who owns the X session you wish to view).
+
+   The cookie file contains the secret key that allows x11vnc to connect
+   to the desired X display.
+
+   If, say, sshd has set XAUTHORITY to point to a random file it has
+   created for X forwarding that will cause problems. (Under some
+   circumstances even su(1) and telnet(1) can set XAUTHORITY.) Running
+   x11vnc as root is often not enough: you need to know where the
+   MIT-MAGIC-COOKIE file for the desired X display is.   Example
+   solution:
   x11vnc -display :0 -auth /var/gdm/:0.Xauth
 
    (this is for the display manager gdm, see [158]this faq for other
@@ -4419,7 +4426,7 @@ References
  314. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-wireframe
  315. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-wireframe
  316. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-wireframe
- 317. http://www.karlrunge.com/x11vnc/fb_read_slow
+ 317. http://www.karlrunge.com/x11vnc/index.html#fb_read_slow
  318. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-scrollcopyrect
  319. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-wireframe
  320. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-wirecopyrect
@@ -4508,7 +4515,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-06-18
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-06-21
 
 x11vnc options:
   -display disp            -auth file             
@@ -4607,7 +4614,7 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-06-18
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-06-21
 
 Typical usage is:
 

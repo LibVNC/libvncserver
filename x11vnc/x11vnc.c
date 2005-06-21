@@ -382,7 +382,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-06-18";
+char lastmod[] = "0.7.2 lastmod: 2005-06-21";
 int hack_val = 0;
 
 /* X display info */
@@ -25850,7 +25850,7 @@ int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy,
 		dt_bad_check = time(0);
 	}
 
-	if (0 && dt_bad) {
+	if (dt_bad && wireframe_in_progress) {
 		sraRegionPtr rect;
 		/* send the whole thing... */
 		x1 = crfix(nfix(x,   dpy_x), dx, dpy_x);
@@ -27921,7 +27921,13 @@ void check_cursor_changes(void) {
 	if (cursor_changes) {
 		double tm, max_push = 0.125, multi_push = 0.01, wait = 0.02;
 		int cursor_shape, dopush = 0, link, latency, netrate;
-		cursor_shape = cursor_shape_updates_clients(screen);
+
+		if (! all_clients_initialized()) {
+			/* play it safe */
+			return;
+		}
+
+		if (0) cursor_shape = cursor_shape_updates_clients(screen);
 	
 		dtime0(&tm);
 		link = link_rate(&latency, &netrate);
@@ -30512,6 +30518,78 @@ void immediate_switch_user(int argc, char* argv[]) {
 	}
 }
 
+void xopen_display_fail_message(char *disp) {
+	fprintf(stderr, "\n");
+	fprintf(stderr, "*** x11vnc was unable to open the X DISPLAY: \"%s\","
+	    " it cannot continue.\n", disp);
+	fprintf(stderr, "*** There may be \"Xlib:\" error messages above"
+	    " with details about the failure.\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Some tips and guidelines:\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, " * An X server (the one you wish to view) must"
+	    " be running before x11vnc is\n");
+	fprintf(stderr, "   started: x11vnc does not start the X server.\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, " * You must use -display <disp>, -OR- set and"
+	    " export your DISPLAY\n");
+	fprintf(stderr, "   environment variable to refer to the display of"
+	    " the desired X server.\n");
+	fprintf(stderr, " - Usually the display is simply \":0\" (in fact"
+	    " x11vnc uses this if you forget\n");
+	fprintf(stderr, "   to specify it), but in some multi-user"
+	    " situations it could be \":1\", \":2\",\n"); 
+	fprintf(stderr, "   or even \":137\".  Ask your administrator"
+	    " or a guru if you are having\n");
+	fprintf(stderr, "   difficulty determining what your X DISPLAY is.\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, " * Next, you need to have sufficient permissions"
+	    " (Xauthority) \n");
+	fprintf(stderr, "   to connect to the X DISPLAY.   Here are some"
+	    " Tips:\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, " - Often, you just need to run x11vnc as the user"
+	    " logged into the X session.\n");
+	fprintf(stderr, "   So make sure to be that user when you type"
+	    " x11vnc.\n");
+	fprintf(stderr, " - Being root is usually not enough because the"
+	    " incorrect MIT-MAGIC-COOKIE\n");
+	fprintf(stderr, "   file will be accessed.  The cookie file contains"
+	    " the secret key that\n");
+	fprintf(stderr, "   allows x11vnc to connect to the desired"
+	    " X DISPLAY.\n");
+	fprintf(stderr, " - You can explicity indicate which MIT-MAGIC-COOKIE"
+	    " file should be used\n");
+	fprintf(stderr, "   by the -auth option, e.g.:\n");
+	fprintf(stderr, "       x11vnc -auth /home/someuser/.Xauthority"
+	    " -display :0\n");
+	fprintf(stderr, "   you must have read permission for that file.\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, " - If NO ONE is logged into an X session yet, but"
+	    " there is a greeter login\n");
+	fprintf(stderr, "   program like \"gdm\", \"kdm\", \"xdm\", or"
+	    " \"dtlogin\" running, you will need\n");
+	fprintf(stderr, "   to find and use the raw display manager"
+	    " MIT-MAGIC-COOKIE file.\n");
+	fprintf(stderr, "   Some examples for various display managers:\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "     gdm:     -auth /var/gdm/:0.Xauth\n");
+	fprintf(stderr, "     kdm:     -auth /var/lib/kdm/A:0-crWk72\n");
+	fprintf(stderr, "     xdm:     -auth /var/lib/xdm/authdir/authfiles/A:0-XQvaJk\n");
+	fprintf(stderr, "     dtlogin: -auth /var/dt/A:0-UgaaXa\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "   Only root will have read permission for the"
+	    " file, and so x11vnc must be run\n");
+	fprintf(stderr, "   as root.  The random characters in the filenames"
+	    " will of course change,\n");
+	fprintf(stderr, "   and the directory the cookie file resides in may"
+	    " also be system dependent.\n");
+	fprintf(stderr, "   Sometimes the command \"ps wwaux | grep auth\""
+	    " can reveal the file location.\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "See also: http://www.karlrunge.com/x11vnc/#faq\n");
+}
+
 int main(int argc, char* argv[]) {
 
 	int i, len, tmpi;
@@ -31654,6 +31732,7 @@ int main(int argc, char* argv[]) {
 
 	if (! dpy && ! use_dpy && ! getenv("DISPLAY")) {
 		int i, s = 4;
+		rfbLogEnable(1);
 		rfbLog("\a\n");
 		rfbLog("*** XOpenDisplay failed. No -display or DISPLAY.\n");
 		rfbLog("*** Trying \":0\" in %d seconds.  Press Ctrl-C to"
@@ -31670,10 +31749,18 @@ int main(int argc, char* argv[]) {
 			rfbLog("*** XOpenDisplay of \":0\" successful.\n");
 		}
 		rfbLog("\n");
+		if (quiet) rfbLogEnable(0);
 	}
 
 	if (! dpy) {
-		rfbLog("XOpenDisplay failed (%s)\n", use_dpy ? use_dpy:"null");
+		char *d = use_dpy;
+		if (!d) d = getenv("DISPLAY");
+		if (!d) d = "null";
+		rfbLogEnable(1);
+		fprintf(stderr, "\n");
+		rfbLog("***************************************\n", d);
+		rfbLog("*** XOpenDisplay failed (%s)\n", d);
+		xopen_display_fail_message(d);
 		exit(1);
 	} else if (use_dpy) {
 		if (! quiet) rfbLog("Using X display %s\n", use_dpy);

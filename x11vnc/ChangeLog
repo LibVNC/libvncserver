@@ -1,3 +1,7 @@
+2005-06-21  Karl Runge <runge@karlrunge.com>
+	* reinstate "bad desktop" for wireframe.
+	* extra long info and tips of XOpenDisplay fails.
+
 2005-06-18  Karl Runge <runge@karlrunge.com>
 	* clean up some malloc/free problems (don't free the current cursor)
 	* set DISPLAY before calling gconf, dcop under -solid
