@@ -382,7 +382,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-06-21";
+char lastmod[] = "0.7.2 lastmod: 2005-06-25";
 int hack_val = 0;
 
 /* X display info */
@@ -576,6 +576,8 @@ void check_padded_fb(void);
 void clean_up_exit(int);
 void clear_modifiers(int init);
 void clear_keys(void);
+void init_track_keycode_state(void);
+void get_keystate(int *);
 int copy_screen(void);
 void check_black_fb(void);
 void do_new_fb(int);
@@ -764,6 +766,8 @@ char *clip_str = NULL;		/* -clip */
 int use_solid_bg = 0;		/* -solid */
 char *solid_str = NULL;
 char *solid_default = "cyan4";
+
+char *wmdt_str = NULL;		/* -wmdt */
 
 #define LATENCY0 20	/* 20ms */
 #define NETRATE0 20	/* 20KB/sec */
@@ -1021,6 +1025,7 @@ int use_xkb_modtweak = 0;	/* -xkb */
 #endif
 int skip_duplicate_key_events = SKIPDUPS;
 char *skip_keycodes = NULL;
+int sloppy_keys = 0;
 #ifndef ADDKEYSYMS
 #define ADDKEYSYMS 1
 #endif
@@ -2664,6 +2669,24 @@ void copy_image(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 		rfbLog("skipped input: %s\n", str); \
 	}
 
+int keycode_state[256];
+
+void init_track_keycode_state(void) {
+	int i;
+	for (i=0; i<256; i++) {
+		keycode_state[i] = 0;
+	}
+	get_keystate(keycode_state);
+}
+
+void upup_downdown_warning(KeyCode key, Bool down) {
+	if ((down ? 1:0) == keycode_state[(int) key]) {
+		rfbLog("XTestFakeKeyEvent: keycode=0x%x \"%s\" is *already* "
+		    "%s\n", key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
+		    down ? "down":"up");
+	}
+}
+
 /*
  * wrappers for XTestFakeKeyEvent, etc..
  * also for XTrap equivalents XESimulateXEventRequest
@@ -2682,6 +2705,10 @@ void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 #if LIBVNCSERVER_HAVE_LIBXTRAP
 	XESimulateXEventRequest(trap_ctx, down ? KeyPress : KeyRelease,
 	    key, 0, 0, 0);
+	if (debug_keyboard) {
+		upup_downdown_warning(key, down);
+	}
+	keycode_state[(int) key] = down ? 1 : 0;
 #else
 	DEBUG_SKIPPED_INPUT(debug_keyboard, "keyboard: no-XTRAP-build");
 #endif
@@ -2689,10 +2716,15 @@ void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 
 void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
     unsigned long delay) {
+	static int first = 1;
 	if (debug_keyboard) {
 		rfbLog("XTestFakeKeyEvent(dpy, keycode=0x%x \"%s\", %s)\n",
 		    key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
 		    down ? "down":"up");
+	}
+	if (first) { 
+		init_track_keycode_state();
+		first = 0;
 	}
 	if (down) {
 		last_keyboard_keycode = -key;
@@ -2715,6 +2747,10 @@ void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 	}
 #if LIBVNCSERVER_HAVE_XTEST
 	XTestFakeKeyEvent(dpy, key, down, delay);
+	if (debug_keyboard) {
+		upup_downdown_warning(key, down);
+	}
+	keycode_state[(int) key] = down ? 1 : 0;
 #endif
 }
 
@@ -6798,7 +6834,7 @@ void check_new_clients(void) {
 /*
  * Routine to retreive current state keyboard.  1 means down, 0 up.
  */
-static void get_keystate(int *keystate) {
+void get_keystate(int *keystate) {
 	int i, k;
 	char keys[32];
 	
@@ -6900,7 +6936,7 @@ int track_mod_state(rfbKeySym keysym, rfbBool down, rfbBool set) {
 	KeySym sym = (KeySym) keysym;	
 	static rfbBool isdown[NSIMPLE_MODS];
 	static int first = 1;
-	int i;
+	int i, cnt = 0;
 
 	/*
 	 * simple tracking method for the modifier state without
@@ -6908,7 +6944,8 @@ int track_mod_state(rfbKeySym keysym, rfbBool down, rfbBool set) {
 	 * pressed on the physical display.
 	 *
 	 * This is unrelated to our mod_tweak and xkb stuff.
-	 * Just a simple thing for heuristics, etc.
+	 * Just a simple thing for wireframe/scroll heuristics, 
+	 * sloppy keys etc.
 	 */
 
 	if (first) {
@@ -6942,13 +6979,13 @@ int track_mod_state(rfbKeySym keysym, rfbBool down, rfbBool set) {
 		}
 	}
 
-	/* called with NoSymbol: return 1 if any pressed: */
+	/* called with NoSymbol: return number currently pressed: */
 	for (i=0; i<NSIMPLE_MODS; i++) {
 		if (isdown[i]) {
-			return 1;
+			cnt++;
 		}
 	}
-	return 0;
+	return cnt;
 }
 
 /*
@@ -8082,6 +8119,58 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 	}
 }
 
+int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
+	if (!sloppy_keys) {
+		return 0;
+	}
+	
+	if (!down && !keycode_state[key] && !IsModifierKey(keysym)) {
+		int i, cnt = 0, downkey;
+		int nmods_down = track_mod_state(NoSymbol, FALSE, FALSE);
+		int mods_down[256];
+
+		if (nmods_down) {
+			/* tracking to skip down modifier keycodes. */
+			for(i=0; i<256; i++) {
+				mods_down[i] = 0;
+			}
+			i = 0;
+			while (simple_mods[i] != NoSymbol) {
+				KeySym ksym = simple_mods[i];
+				KeyCode k = XKeysymToKeycode(dpy, ksym);
+				if (k != NoSymbol && keycode_state[(int) k]) {
+					mods_down[(int) k] = 1;
+				}
+				
+				i++;
+			}
+		}
+		/*
+		 * the keycode is already up... look for a single one
+		 * (non modifier) that is down
+		 */
+		for (i=0; i<256; i++) {
+			if (keycode_state[i]) {
+				if (nmods_down && mods_down[i]) {
+					continue;
+				}
+				cnt++;
+				downkey = i;
+			}
+		}
+		if (cnt == 1) {
+			if (debug_keyboard) {
+				fprintf(stderr, "    sloppy_keys: %d/0x%x "
+				    "-> %d/0x%x  (nmods: %d)\n", (int) key,
+				    (int) key, downkey, downkey, nmods_down);
+			}
+			*new = downkey;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 /*
  * Called on user keyboard input.  Try to solve the reverse mapping
  * problem: KeySym (from VNC client) => KeyCode(s) to press to generate
@@ -8270,6 +8359,18 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				/* throw in some minimization of lvl too: */
 				myscore += 2*lvl_f[l] + grp_f[l];
 
+				/*
+				 * XXX since we now internally track
+				 * keycode_state[], we could throw that into
+				 * the score as well.  I.e. if it is already
+				 * down, it is pointless to think we can
+				 * press it down further!  E.g.
+				 *   myscore += 1000 * keycode_state[kc_f[l]];
+				 * Also could watch multiple modifier
+				 * problem, e.g. Shift+key -> Alt
+				 * keycode = 125 on my keyboard.
+				 */
+
 				score[l] = myscore;
 				if (debug_keyboard > 1) {
 					fprintf(stderr, "    *** score for "
@@ -8290,12 +8391,32 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			state = state_f[best];
 			
 		} else {
+			/* up */
 			Kc_f = -1;
 			if (keysym == Ks_last_down) {
 				int l;
 				for (l=0; l < found; l++) {
 					if (Kc_last_down == kc_f[l]) {
 						Kc_f = Kc_last_down;
+						break;
+					}
+				}
+			}
+			if (Kc_f == -1) {
+				int l;
+				/*
+				 * If it is already down, that is
+				 * a great hint.  Use it.
+				 *
+				 * note: keycode_state in internal and
+				 * ignores someone pressing keys on the
+				 * physical display (but is updated
+				 * periodically to clean out stale info).
+				 */
+				for (l=0; l < found; l++) {
+					int key = (int) kc_f[l];
+					if (keycode_state[key]) {
+						Kc_f = kc_f[l];
 						break;
 					}
 				}
@@ -8326,6 +8447,13 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 		}
 		fprintf(stderr, ", picked this one: %03d  (last down: %03d)\n",
 		    Kc_f, Kc_last_down);
+	}
+
+	if (sloppy_keys) {
+		int new_kc;
+		if (sloppy_key_check(Kc_f, down, keysym, &new_kc)) {
+			Kc_f = new_kc;
+		}
 	}
 
 	if (down) {
@@ -8977,6 +9105,14 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			k = new_kc;
 		}
 	}
+
+	if (sloppy_keys) {
+		int new_kc;
+		if (sloppy_key_check((int) k, down, keysym, &new_kc)) {
+			k = (KeyCode) new_kc;
+		}
+	}
+
 	if (debug_keyboard) {
 		rfbLog("modifier_tweak_keyboard: KeySym 0x%x \"%s\" -> "
 		    "KeyCode 0x%x%s\n", (int) keysym, XKeysymToString(keysym),
@@ -11316,7 +11452,28 @@ void sync_tod_with_servertime() {
 	}
 }
 
-void check_autorepeat() {
+void check_keycode_state(void) {
+	static time_t last_check = 0;
+	int delay = 10, noinput = 3;
+	time_t now = time(0);
+
+	if (! client_count) {
+		return;
+	}
+	/*
+	 * periodically update our model of the keycode_state[]
+	 * by correlating with the Xserver.  wait for a pause in
+	 * keyboard input to be on the safe side.  the idea here
+	 * is to remove stale keycode state, not to be perfectly
+	 * in sync with the Xserver at every instant of time.
+	 */
+	if (now > last_check + delay && now > last_keyboard_input + noinput) {
+		init_track_keycode_state();
+		last_check = now;
+	}
+}
+
+void check_autorepeat(void) {
 	static time_t last_check = 0;
 	time_t now = time(0);
 	int autorepeat_is_on, autorepeat_initially_on, idle_timeout = 300;
@@ -13443,6 +13600,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		skip_keycodes = strdup(p);
 		initialize_modtweak();
 
+	} else if (!strcmp(p, "sloppy_keys")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, sloppy_keys);
+			goto qry;
+		}
+		sloppy_keys += 1;
+		rfbLog("remote_cmd: set sloppy_keys to: %d\n", sloppy_keys);
+	} else if (!strcmp(p, "nosloppy_keys")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !sloppy_keys);
+			goto qry;
+		}
+		sloppy_keys = 0;
+		rfbLog("remote_cmd: set sloppy_keys to: %d\n", sloppy_keys);
+
 	} else if (!strcmp(p, "skip_dups")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p,
@@ -14411,6 +14583,19 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 		rfbLog("remote_cmd: setting -speeds to:\n\t'%s'\n", p);
 		initialize_speeds();
+
+	} else if (strstr(p, "wmdt") == p) {
+		COLON_CHECK("wmdt:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(wmdt_str));
+			goto qry;
+		}
+		p += strlen("wmdt:");
+		if (wmdt_str) free(wmdt_str);
+		wmdt_str = strdup(p);
+
+		rfbLog("remote_cmd: setting -wmdt to: %s\n", p);
 
 	} else if (!strcmp(p, "debug_pointer") || !strcmp(p, "dp")) {
 		if (query) {
@@ -19762,6 +19947,25 @@ void solid_kde(char *color) {
 
 char *guess_desktop() {
 	Atom prop;
+
+	if (wmdt_str && *wmdt_str != '\0') {
+		char *s = wmdt_str;
+		lowercase(s);
+		if (strstr(s, "xfce")) {
+			return "xfce";
+		}
+		if (strstr(s, "gnome") || strstr(s, "metacity")) {
+			return "gnome";
+		}
+		if (strstr(s, "kde") || strstr(s, "kwin")) {
+			return "kde";
+		}
+		if (strstr(s, "cde")) {
+			return "cde";
+		}
+		return "root";
+	}
+
 	prop = XInternAtom(dpy, "XFCE_DESKTOP_WINDOW", True);
 	if (prop != None) return "xfce";
 
@@ -26193,7 +26397,11 @@ int wireframe_mod_state() {
 		return 0;
 	}
 	if (!strcmp(wireframe_mods, "all")) {
-		return track_mod_state(NoSymbol, FALSE, FALSE);
+		if (track_mod_state(NoSymbol, FALSE, FALSE)) {
+			return 1;
+		} else {
+			return 0;
+		}
 
 	} else if (!strcmp(wireframe_mods, "Alt")) {
 		if (track_mod_state(XK_Alt_L, FALSE, FALSE) == 1) {
@@ -28198,6 +28406,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_new_clients();
 			check_xevents();
 			check_autorepeat();
+			check_keycode_state();
 			check_connect_inputs();		
 			check_padded_fb();		
 			check_fixscreen();		
@@ -28834,6 +29043,13 @@ static void print_help(int mode) {
 "                       when ambiguities exist (more than one Keycode per\n"
 "                       Keysym).  Run 'xmodmap -pk' to see your keymapping.\n"
 "                       Example: \"-skip_keycodes 94,114\"\n"
+"-sloppy_keys           Experimental option that tries to correct some\n"
+"                       \"sloppy\" key behavior.  E.g. if at the viewer you\n"
+"                       press Shift+Key but then release the Shift before\n"
+"                       Key that could give rise to extra unwanted characters\n"
+"                       (usually only between keyboards of different languages).\n"
+"                       Only use this option if you observe problems with\n"
+"                       some keystrokes.  This option may be extended.\n"
 "-skip_dups             Some VNC viewers send impossible repeated key events,\n"
 "-noskip_dups           e.g. key-down, key-down, key-up, key-up all for the same\n"
 "                       key, or 20 downs in a row for the same modifier key!\n"
@@ -29453,8 +29669,6 @@ static void print_help(int mode) {
 "                       e.g. \"-speeds ,100,15\", then the internal scheme is\n"
 "                       used to estimate the empty value(s).\n"
 "\n"
-"                       Note: use this option is currently NOT FINISHED.\n"
-"\n"
 "                       Typical PC video cards have read rates of 5-10 MB/sec.\n"
 "                       If the framebuffer is in main memory instead of video\n"
 "                       h/w (e.g. SunRay, shadowfb, Xvfb), the read rate may\n"
@@ -29467,6 +29681,15 @@ static void print_help(int mode) {
 "                       For convenience there are some aliases provided,\n"
 "                       e.g. \"-speeds modem\".  The aliases are: \"modem\" for\n"
 "                       6,4,200; \"dsl\" for 6,100,50; and \"lan\" for 6,5000,1\n"
+"\n"
+"-wmdt string           For some features, e.g. -wireframe and -scrollcopyrect,\n"
+"                       x11vnc has to work around issues for certain window\n"
+"                       managers or desktops (currently kde and xfce).\n"
+"                       By default it tries to guess which one, but it can\n"
+"                       guess incorrectly.  Use this option to indicate which\n"
+"                       wm/dt.  \"string\" can be \"gnome\", \"kde\", \"cde\",\n"
+"                       \"xfce\", or \"root\" (classic X wm).  Anything else\n"
+"                       is interpreted as \"root\".\n"
 "\n"
 "-debug_pointer         Print debugging output for every pointer event.\n"
 "-debug_keyboard        Print debugging output for every keyboard event.\n"
@@ -29815,6 +30038,8 @@ static void print_help(int mode) {
 "                       xkb             enable  -xkb modtweak mode.\n"
 "                       noxkb           disable -xkb modtweak mode.\n"
 "                       skip_keycodes:str enable -xkb -skip_keycodes \"str\".\n"
+"                       sloppy_keys     enable  -sloppy_keys mode.\n"
+"                       nosloppy_keys   disable -sloppy_keys mode.\n"
 "                       skip_dups       enable  -skip_dups mode.\n"
 "                       noskip_dups     disable -skip_dups mode.\n"
 "                       add_keysyms     enable -add_keysyms mode.\n"
@@ -29884,6 +30109,7 @@ static void print_help(int mode) {
 "                       pointer_mode:n  set -pointer_mode to n. same as \"pm\"\n"
 "                       input_skip:n    set -input_skip to n.\n"
 "                       speeds:str      set -speeds to str.\n"
+"                       wmdt:str        set -wmdt to str.\n"
 "                       debug_pointer   enable  -debug_pointer, same as \"dp\"\n"
 "                       nodebug_pointer disable -debug_pointer, same as \"nodp\"\n"
 "                       debug_keyboard   enable  -debug_keyboard, same as \"dk\"\n"
@@ -29983,23 +30209,24 @@ static void print_help(int mode) {
 "                       noflipbyteorder onetile noonetile solid_color solid\n"
 "                       nosolid blackout xinerama noxinerama xtrap noxtrap\n"
 "                       xrandr noxrandr xrandr_mode padgeom quiet q noquiet\n"
-"                       modtweak nomodtweak xkb noxkb skip_keycodes skip_dups\n"
-"                       noskip_dups add_keysyms noadd_keysyms clear_mods\n"
-"                       noclear_mods clear_keys noclear_keys remap repeat\n"
-"                       norepeat fb nofb bell nobell sel nosel primary\n"
-"                       noprimary seldir cursorshape nocursorshape cursorpos\n"
-"                       nocursorpos cursor show_cursor noshow_cursor nocursor\n"
-"                       arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem\n"
-"                       alphacut alphafrac alpharemove noalpharemove alphablend\n"
-"                       noalphablend xwarppointer xwarp noxwarppointer noxwarp\n"
-"                       buttonmap dragging nodragging wireframe_mode wireframe\n"
-"                       wf nowireframe nowf wirecopyrect wcr nowirecopyrect\n"
-"                       nowcr scr_area scr_skip scr_inc scr_keys scr_term\n"
-"                       scr_keyrepeat scr_parms scrollcopyrect scr\n"
-"                       noscrollcopyrect noscr fixscreen noxrecord xrecord\n"
-"                       reset_record pointer_mode pm input_skip input\n"
-"                       client_input speeds debug_pointer dp nodebug_pointer\n"
-"                       nodp debug_keyboard dk nodebug_keyboard nodk deferupdate\n"
+"                       modtweak nomodtweak xkb noxkb skip_keycodes sloppy_keys\n"
+"                       nosloppy_keys skip_dups noskip_dups add_keysyms\n"
+"                       noadd_keysyms clear_mods noclear_mods clear_keys\n"
+"                       noclear_keys remap repeat norepeat fb nofb bell\n"
+"                       nobell sel nosel primary noprimary seldir cursorshape\n"
+"                       nocursorshape cursorpos nocursorpos cursor show_cursor\n"
+"                       noshow_cursor nocursor arrow xfixes noxfixes xdamage\n"
+"                       noxdamage xd_area xd_mem alphacut alphafrac alpharemove\n"
+"                       noalpharemove alphablend noalphablend xwarppointer\n"
+"                       xwarp noxwarppointer noxwarp buttonmap dragging\n"
+"                       nodragging wireframe_mode wireframe wf nowireframe\n"
+"                       nowf wirecopyrect wcr nowirecopyrect nowcr scr_area\n"
+"                       scr_skip scr_inc scr_keys scr_term scr_keyrepeat\n"
+"                       scr_parms scrollcopyrect scr noscrollcopyrect\n"
+"                       noscr fixscreen noxrecord xrecord reset_record\n"
+"                       pointer_mode pm input_skip input client_input\n"
+"                       speeds wmdt debug_pointer dp nodebug_pointer nodp\n"
+"                       debug_keyboard dk nodebug_keyboard nodk deferupdate\n"
 "                       defer wait_ui wait_bog nowait_bog wait readtimeout\n"
 "                       nap nonap sb screen_blank fs gaps grow fuzz snapfb\n"
 "                       nosnapfb rawfb progressive rfbport http nohttp httpport\n"
@@ -30845,6 +31072,8 @@ int main(int argc, char* argv[]) {
 			exit(0);
 		} else if (!strcmp(arg, "-dbg")) {
 			crash_debug = 1;
+		} else if (!strcmp(arg, "-nodbg")) {
+			crash_debug = 0;
 		} else if (!strcmp(arg, "-q") || !strcmp(arg, "-quiet")) {
 			quiet = 1;
 		} else if (!strcmp(arg, "-bg") || !strcmp(arg, "-background")) {
@@ -30872,6 +31101,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-skip_keycodes")) {
 			CHECK_ARGC
 			skip_keycodes = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-sloppy_keys")) {
+			sloppy_keys++;
 		} else if (!strcmp(arg, "-skip_dups")) {
 			skip_duplicate_key_events = 1;
 		} else if (!strcmp(arg, "-noskip_dups")) {
@@ -31047,6 +31278,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-speeds")) {
 			CHECK_ARGC
 			speeds_str = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-wmdt")) {
+			CHECK_ARGC
+			wmdt_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-debug_pointer")
 		    || !strcmp(arg, "-dp")) {
 			debug_pointer++;
@@ -31585,6 +31819,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " xkb:        %d\n", use_xkb_modtweak);
 		fprintf(stderr, " skipkeys:   %s\n",
 		    skip_keycodes ? skip_keycodes : "null");
+		fprintf(stderr, " sloppykeys: %d\n", sloppy_keys);
 		fprintf(stderr, " skip_dups:  %d\n", skip_duplicate_key_events);
 		fprintf(stderr, " addkeysyms: %d\n", add_keysyms);
 		fprintf(stderr, " xkbcompat:  %d\n", xkbcompat);
@@ -31641,6 +31876,8 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " inputskip:  %d\n", ui_skip);
 		fprintf(stderr, " speeds:     %s\n", speeds_str
 		    ? speeds_str : "null");
+		fprintf(stderr, " wmdt:       %s\n", wmdt_str
+		    ? wmdt_str : "null");
 		fprintf(stderr, " debug_ptr:  %d\n", debug_pointer);
 		fprintf(stderr, " debug_key:  %d\n", debug_keyboard);
 		fprintf(stderr, " defer:      %d\n", defer_update);

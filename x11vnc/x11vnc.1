@@ -2,7 +2,7 @@
 .TH X11VNC "1" "June 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-06-21
+         version: 0.7.2, lastmod: 2005-06-25
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -720,6 +720,16 @@ when ambiguities exist (more than one Keycode per
 Keysym).  Run 'xmodmap \fB-pk'\fR to see your keymapping.
 Example: "\fB-skip_keycodes\fR \fI94,114\fR"
 .PP
+\fB-sloppy_keys\fR
+.IP
+Experimental option that tries to correct some
+"sloppy" key behavior.  E.g. if at the viewer you
+press Shift+Key but then release the Shift before
+Key that could give rise to extra unwanted characters
+(usually only between keyboards of different languages).
+Only use this option if you observe problems with
+some keystrokes.  This option may be extended.
+.PP
 \fB-skip_dups,\fR \fB-noskip_dups\fR
 .IP
 Some VNC viewers send impossible repeated key events,
@@ -1435,8 +1445,6 @@ milliseconds, respectively.  If a value is left blank,
 e.g. "\fB-speeds\fR \fI,100,15\fR", then the internal scheme is
 used to estimate the empty value(s).
 .IP
-Note: use this option is currently NOT FINISHED.
-.IP
 Typical PC video cards have read rates of 5-10 MB/sec.
 If the framebuffer is in main memory instead of video
 h/w (e.g. SunRay, shadowfb, Xvfb), the read rate may
@@ -1450,6 +1458,17 @@ command can be used.
 For convenience there are some aliases provided,
 e.g. "\fB-speeds\fR \fImodem\fR".  The aliases are: "modem" for
 6,4,200; "dsl" for 6,100,50; and "lan" for 6,5000,1
+.PP
+\fB-wmdt\fR \fIstring\fR
+.IP
+For some features, e.g. \fB-wireframe\fR and \fB-scrollcopyrect,\fR
+x11vnc has to work around issues for certain window
+managers or desktops (currently kde and xfce).
+By default it tries to guess which one, but it can
+guess incorrectly.  Use this option to indicate which
+wm/dt.  \fIstring\fR can be "gnome", "kde", "cde",
+"xfce", or "root" (classic X wm).  Anything else
+is interpreted as "root".
 .PP
 \fB-debug_pointer\fR
 .IP
@@ -1938,6 +1957,10 @@ noxkb           disable \fB-xkb\fR modtweak mode.
 .IP
 skip_keycodes:str enable \fB-xkb\fR \fB-skip_keycodes\fR "str".
 .IP
+sloppy_keys     enable  \fB-sloppy_keys\fR mode.
+.IP
+nosloppy_keys   disable \fB-sloppy_keys\fR mode.
+.IP
 skip_dups       enable  \fB-skip_dups\fR mode.
 .IP
 noskip_dups     disable \fB-skip_dups\fR mode.
@@ -2067,6 +2090,8 @@ pointer_mode:n  set \fB-pointer_mode\fR to n. same as "pm"
 input_skip:n    set \fB-input_skip\fR to n.
 .IP
 speeds:str      set \fB-speeds\fR to str.
+.IP
+wmdt:str        set \fB-wmdt\fR to str.
 .IP
 debug_pointer   enable  \fB-debug_pointer,\fR same as "dp"
 .IP
@@ -2233,23 +2258,24 @@ lookup nolookup accept gone shm noshm flipbyteorder
 noflipbyteorder onetile noonetile solid_color solid
 nosolid blackout xinerama noxinerama xtrap noxtrap
 xrandr noxrandr xrandr_mode padgeom quiet q noquiet
-modtweak nomodtweak xkb noxkb skip_keycodes skip_dups
-noskip_dups add_keysyms noadd_keysyms clear_mods
-noclear_mods clear_keys noclear_keys remap repeat
-norepeat fb nofb bell nobell sel nosel primary
-noprimary seldir cursorshape nocursorshape cursorpos
-nocursorpos cursor show_cursor noshow_cursor nocursor
-arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem
-alphacut alphafrac alpharemove noalpharemove alphablend
-noalphablend xwarppointer xwarp noxwarppointer noxwarp
-buttonmap dragging nodragging wireframe_mode wireframe
-wf nowireframe nowf wirecopyrect wcr nowirecopyrect
-nowcr scr_area scr_skip scr_inc scr_keys scr_term
-scr_keyrepeat scr_parms scrollcopyrect scr
-noscrollcopyrect noscr fixscreen noxrecord xrecord
-reset_record pointer_mode pm input_skip input
-client_input speeds debug_pointer dp nodebug_pointer
-nodp debug_keyboard dk nodebug_keyboard nodk deferupdate
+modtweak nomodtweak xkb noxkb skip_keycodes sloppy_keys
+nosloppy_keys skip_dups noskip_dups add_keysyms
+noadd_keysyms clear_mods noclear_mods clear_keys
+noclear_keys remap repeat norepeat fb nofb bell
+nobell sel nosel primary noprimary seldir cursorshape
+nocursorshape cursorpos nocursorpos cursor show_cursor
+noshow_cursor nocursor arrow xfixes noxfixes xdamage
+noxdamage xd_area xd_mem alphacut alphafrac alpharemove
+noalpharemove alphablend noalphablend xwarppointer
+xwarp noxwarppointer noxwarp buttonmap dragging
+nodragging wireframe_mode wireframe wf nowireframe
+nowf wirecopyrect wcr nowirecopyrect nowcr scr_area
+scr_skip scr_inc scr_keys scr_term scr_keyrepeat
+scr_parms scrollcopyrect scr noscrollcopyrect
+noscr fixscreen noxrecord xrecord reset_record
+pointer_mode pm input_skip input client_input
+speeds wmdt debug_pointer dp nodebug_pointer nodp
+debug_keyboard dk nodebug_keyboard nodk deferupdate
 defer wait_ui wait_bog nowait_bog wait readtimeout
 nap nonap sb screen_blank fs gaps grow fuzz snapfb
 nosnapfb rawfb progressive rfbport http nohttp httpport

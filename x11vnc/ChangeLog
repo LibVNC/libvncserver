@@ -1,3 +1,7 @@
+2005-06-26  Karl Runge <runge@karlrunge.com>
+	* track keycode state for heuristics, -sloppy_keys, -wmdt
+	* add -nodbg as option
+
 2005-06-21  Karl Runge <runge@karlrunge.com>
 	* reinstate "bad desktop" for wireframe.
 	* extra long info and tips of XOpenDisplay fails.

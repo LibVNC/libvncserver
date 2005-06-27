@@ -132,10 +132,12 @@ Screen
 Keyboard
 	=D norepeat
 	=D add_keysyms
-	skip_keycodes:
-	skip_dups
 	modtweak
 	xkb
+	--
+	skip_keycodes:
+	sloppy_keys
+	skip_dups
 	--
 	=FP remap:
 	--
@@ -196,6 +198,7 @@ Misc
 	readtimeout:
 	snapfb
 	threads
+	wmdt:
 
 Debugging
 	debug_pointer
