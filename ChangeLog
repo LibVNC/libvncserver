@@ -1,3 +1,7 @@
+2005-06-27  Karl Runge <runge@karlrunge.com>
+	* libvncserver/main.c: move deferUpdateTime and maxRectsPerUpdate
+	  defaults to before rfbProcessArguments().
+
 2005-06-18  Karl Runge <runge@karlrunge.com>
 	* configure.ac: don't use -R on HP-UX and OSF1.
 	* x11vnc: don't free the current cursor, close stderr

@@ -624,6 +624,9 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    screen->listenInterface = htonl(INADDR_ANY);
 
+   screen->deferUpdateTime=5;
+   screen->maxRectsPerUpdate=50;
+
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);
      return NULL;
@@ -653,9 +656,6 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    INIT_MUTEX(screen->cursorMutex);
 
    IF_PTHREADS(screen->backgroundLoop = FALSE);
-
-   screen->deferUpdateTime=5;
-   screen->maxRectsPerUpdate=50;
 
    /* proc's and hook's */
 
