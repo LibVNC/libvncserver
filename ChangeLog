@@ -1,3 +1,7 @@
+2005-06-28  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* libvncclient/zrle.c: fix handling of raw and fill subtypes
+	  (off-by-one and off-by-many bug)
+
 2005-06-27  Karl Runge <runge@karlrunge.com>
 	* libvncserver/main.c: move deferUpdateTime and maxRectsPerUpdate
 	  defaults to before rfbProcessArguments().

@@ -229,6 +229,7 @@ static int HandleZRLETile(rfbClient* client,
 					((CARDBPP*)client->frameBuffer)[j+i] = UncompressCPixel(buffer);
 #else
 			CopyRectangle(client, buffer, x, y, w, h);
+			buffer+=w*h*REALBPP/8;
 #endif
 			break;
 		}
@@ -240,6 +241,8 @@ static int HandleZRLETile(rfbClient* client,
 				return -4;
 				
 			FillRectangle(client, x, y, w, h, color);
+
+			buffer+=REALBPP/8;
 
 			break;
 		}

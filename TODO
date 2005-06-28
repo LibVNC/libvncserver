@@ -1,7 +1,6 @@
 immediate:
 ----------
 
-fix ZRLE errors (-9)
 VisualNaCro testing
 test IRIX -overlay (x11vnc)
 java vncviewer doesn't do colour cursors?
