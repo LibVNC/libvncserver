@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sun Jun 26 22:02:44 EDT 2005
+x11vnc README file                         Date: Fri Jul  1 21:48:07 EDT 2005
 
 The following information is taken from these URLs:
 
@@ -347,10 +347,12 @@ exec /usr/bin/ssh -t -L 5900:localhost:5900 $gateway \
 
    The x11vnc package is the subset of the libvncserver package needed to
    build the x11vnc program. Also, you can get a copy of my latest,
-   bleeding edge [38]x11vnc-0.7.2.tar.gz tarball.
+   bleeding edge [38]x11vnc-0.7.2.tar.gz tarball to build the most up to
+   date one.
 
-   See the [39]FAQ below for information about where you might obtain a
-   precompiled x11vnc binary from 3rd parties.
+   Precompiled Binaries/Packages:  See the [39]FAQ below for information
+   about where you might obtain a precompiled x11vnc binary from 3rd
+   parties and some ones I create.
 
    To obtain VNC viewers for the viewing side (Windows, Mac OS, or Unix)
    try these links:
@@ -575,10 +577,10 @@ make
    I don't have any formal beta-testers for the releases of x11vnc, so
    I'd appreciate any additional testing very much!
 
-   I'd like to release version 0.7.2 in Jun/2005 sometime, here is the
-   current tarball:
+   I'd like to release version 0.7.2 in Jun/Jul/2005 sometime, here is
+   the current tarball:
 
-      RC-3 lastmod: 2005-06-22    [51]x11vnc-0.7.2beta.tar.gz
+      RC-4 lastmod: 2005-06-25    [51]x11vnc-0.7.2beta.tar.gz
 
    There are also some Linux, Solaris, and other OS test binaries
    [52]here. Please kick the tires and report bugs, performance
@@ -1353,9 +1355,8 @@ typedef unsigned int in_addr_t;
    http://www.sunfreeware.com/ packages are built with libz and libjpeg.
 
    If the above binaries don't work and building x11vnc on your OS fails
-   (and all else fails!) you can try one of my motley collection of
-   [172]test binaries. Some may be old, some may have extra debugging
-   output, etc. One of them may work on your OS...
+   (and all else fails!) you can try one of [172]my collection of
+   binaries for various OS's and x11vnc releases.
 
    As a general note, the x11vnc program is simple enough you don't
    really need to install a package: the binary will in most cases work
@@ -2658,7 +2659,7 @@ xmodmap -e "add Control = Control_L Control_R"
    The framebuffer is kept in main memory like Xvfb except that the
    server code is closely correlated with the real XFree86/Xorg Xserver
    unlike Xvfb. The main drawback to this method (besides requiring extra
-   configuration and possibly root permission) is that is also does the
+   configuration and possibly root permission) is that it also does the
    Linux Virtual Console/Terminal (VC/VT) [278]switching even though it
    does not need to (since it doesn't use a real framebuffer). There are
    some "dual headed" (actually multi-headed/multi-user) patches to the X
@@ -4541,7 +4542,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-06-25
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-01
 
 x11vnc options:
   -display disp            -auth file             
@@ -4641,7 +4642,7 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-06-25
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-01
 
 Typical usage is:
 
@@ -5971,8 +5972,8 @@ Options:
 
                        "gui-opts" can be a comma separated list of items.
                        Currently there are these types of items: 1) a gui mode,
-                       a 2) gui "simplicity", and 3) the X display the gui
-                       should display on.
+                       a 2) gui "simplicity", 3) the X display the gui
+                       should display on, and 4) a "tray" (or icon) mode.
 
                        1) The gui mode can be "start", "conn", or "wait"
                        "start" is the default mode above and is not required.
@@ -5996,9 +5997,6 @@ Options:
                        the gui to come back to you via your ssh redirected X
                        display (e.g. localhost:10).
 
-                       Examples: "x11vnc -gui", "x11vnc -gui ez"
-                       "x11vnc -gui localhost:10", "x11vnc -gui conn,host:0"
-
                        If you do not specify a gui X display in "gui-opts"
                        then the DISPLAY environment variable and -display
                        option are tried (in that order).  Regarding the x11vnc
@@ -6006,6 +6004,24 @@ Options:
                        tries -display and then DISPLAY.  For example, "x11vnc
                        -display :0 -gui otherhost:0", will remote control an
                        x11vnc polling :0 and display the gui on otherhost:0
+                       The "tray" mode below reverses this preference.
+
+                       4) When "tray" is specified, the gui presents itself
+                       as a small icon with behavior similar to a "system
+                       tray" or "dock" applet.  The color of the icon
+                       indicates status (connected clients) and there is also a
+                       balloon status.  Clicking on the icon gives a menu from
+                       which properties, etc, can be set and the full gui is
+                       available under "Advanced".  To be fully functional,
+                       the gui mode should be "start" (the default).  At some
+                       point it is hoped the icon can be automatically embedded
+                       in common destkop trays/docks.  Currently one can only
+                       embed it in a window via, e.g., "tray=0x3600028".
+                       Otherwise the icon is just a normal standalone window.
+
+                       Examples: "x11vnc -gui", "x11vnc -gui ez"
+                       "x11vnc -gui localhost:10", "x11vnc -gui conn,host:0"
+                       "x11vnc -gui tray,ez"
 
                        If you do not intend to start x11vnc from the gui
                        (i.e. just remote control an existing one), then the

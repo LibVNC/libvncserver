@@ -1,3 +1,8 @@
+2005-07-01  Karl Runge <runge@karlrunge.com>
+	* libvncserver/httpd.c: make sure httpListenSock >=0 in rfbHttpCheckFds
+	* x11vnc: add simple "-gui tray" mode for small icon like x0rfbserver
+	  had (someday/somehow to auto embed in a tray/dock)
+
 2005-06-28  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* libvncclient/zrle.c: fix handling of raw and fill subtypes
 	  (off-by-one and off-by-many bug)

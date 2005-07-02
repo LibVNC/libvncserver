@@ -392,7 +392,7 @@ by selecting any of the Keystrokes, Mouse Motion, or Button Clicks
 checkboxes and pressing \"OK\".  This is like the \"-input\" option
 but on a per-client basis.
 
-To not change any aspects of the VNC client press \"Skip\".
+To not change any aspects of the VNC client press \"Cancel\".
 "
 
 	set helptext(solid_color) "
@@ -412,6 +412,95 @@ Toggle between menu items corresponding the most basic ones
 and all possible settings.  I.e. toggle between a simple gui
 and one for power users.
 "
+
+	set helptext(Tray) "
+The tray/icon mode (started with \"x11vnc -gui tray ...\") presents a
+small icon that indicates the status of a running x11vnc server.
+
+Depending on your environment, this icon may be embedded in a system
+tray or applet dock, or simply be a standalone window.
+
+When the icon has a light background, that means no VNC viewers are
+currently connected to the display.
+
+When the icon has a dark background (i.e. reverse-video), that means at
+least one VNC viewer is connected to the display.
+
+Moving the mouse pointer over the icon will popup a \"status balloon\"
+indicating the VNC display name and the names and other info of any
+connected VNC viewers.
+
+Clicking the right mouse button on the icon displays a menu of actions:
+
+    Properties      - Brings up the Properties dialog.  The full tkx11vnc
+                      GUI may be accessed via the \"Advanced ...\" button.
+    
+    Help            - Displays this help text.
+    
+    New Client      - Presents an entry box where you type in the name
+                      of a computer that is running a VNC viewer in
+                      \"listen\" mode (e.g. vncviewer -listen).  For a
+                      non-standard listening port use \"host:port\".
+                      Pressing \"OK\" will initiate the reverse
+                      connection.  Use a blank hostname to skip it.
+    
+    Disconnect All  - Disconnects all current VNC viewers.
+    
+    Stop x11vnc     - Directs the x11vnc server to disconnect all vncviewers
+                      and then exit.  The tray/icon GUI then exits as well.
+
+
+If the x11vnc server stops for any reason, the tray/icon gui will exit.
+
+If you delete the tray/icon (e.g. X out button), that is the same
+as the \"Stop x11vnc\" action in the menu.
+"
+
+	set helptext(Properties) "
+The Properties dialog allows you to set some basic parameters of a
+running x11vnc server.  After modifying them press \"OK\" or \"Apply\"
+to apply the changes, or press \"Cancel\" to skip applying them.
+
+\"Accept Connections\" toggles whether VNC viewers are allowed
+to connect or not.  It corresponds to the \"-R unlock\" and \"-R lock\"
+remote-control commands.
+
+\"Ask for Confirmation\" toggles whether a popup menu will be presented
+at the X display when a new VNC viewer attempts to connects.  The person
+sitting at the X display can chose to accept or reject the connection
+or accept the connection in View-Only mode.  It corresponds to the 
+\"-R accept:popup\" and \"-R accept:\" remote-control commands.
+
+\"All Clients ViewOnly\" toggles whether the entire VNC desktop is
+view only.  All clients will only be able to watch when this is set
+(regardless of how they logged in).  It corresponds to the \"-R viewonly\"
+and \"-R noviewonly\" remote-control commands.
+
+\"Shared\" toggles whether multiple simultaneous connections are
+allowed or not.  It corresponds to the \"-R shared\" and \"-R noshared\"
+remote-control commands.
+
+\"Password\" lets you set the session password viewers may use to gain full
+access to the display.
+
+\"ViewOnly Password\" lets you set the session password viewers may
+use to gain view only access to the display.
+
+NOTE: These passwords only last for the current x11vnc session (they are
+not remembered, see the -storepasswd, -passwdfile, and -rfbauth x11vnc
+options for using stored passwords).
+
+If you set \"Password\" to the empty string that makes the \"View-Only
+Password\" empty as well and removes the need for any password to log in.
+
+If you set \"ViewOnly Password\" to the empty string that just removes
+the ViewOnly log in aspect: \"Password\" is still required to log in.
+
+The \"Help ...\" button shows this help text.
+
+The \"Advanced ...\" button replaces the Properties dialog with the full
+tkx11vnc GUI.  Any dynamic settings can be modified in the full GUI.
+" 
 
 	set helptext(all) $helpall
 
@@ -488,7 +577,7 @@ To scroll click in the area and use PageUp/PageDown or the arrow keys.
 requires supplying a string value, the label will be set to the
 parameter name and one types in the new value.  Then one presses the
 \"OK\" button or presses \"Enter\" to set the value.  Or you can press
-\"Skip\" or \"Escape\" to avoid changing the variable.  Some variables
+\"Cancel\" or \"Escape\" to avoid changing the variable.  Some variables
 are boolean toggles (for example, \"Permissions -> viewonly\") or Radio
 button selections.  Selecting these menu items will not activate the
 entry area but rather toggle the variable directly.
@@ -561,7 +650,7 @@ To scroll click in the area and use PageUp/PageDown or the arrow keys.
 requires supplying a string value, the label will be set to the
 parameter name and one types in the new value.  Then one presses the
 \"OK\" button or presses \"Enter\" to set the value.  Or you can press
-\"Skip\" or \"Escape\" to avoid changing the variable.  Some variables
+\"Cancel\" or \"Escape\" to avoid changing the variable.  Some variables
 are boolean toggles (for example, \"Permissions -> viewonly\") or Radio
 button selections.  Selecting these menu items will not activate the
 entry area but rather toggle the variable directly.
@@ -607,8 +696,14 @@ proc textheight {text} {
 }
 
 proc set_name {name} {
-	wm title    . "$name"
-	wm iconname . "$name"
+	global full_win
+	if [info exists full_win] {
+		set w $full_win
+	} else {
+		set w "."
+	}
+	wm title    $w "$name"
+	wm iconname $w "$name"
 }
 
 proc make_toplevel {w {title ""}} {
@@ -726,7 +821,8 @@ proc help_win {item} {
 	set text "Help on $item:\n\n"
 
 	if {[is_gui_internal $item]} {
-		if {$item != "gui" && $item != "all" && $item != "Misc-Tuning:"} {
+		if {$item != "gui" && $item != "all" && $item != "Misc-Tuning:" \
+		    && $item != "Properties" && $item != "Tray"} {
 			append text "    + Is a gui internal Action (cannot be set).\n";
 		}
 	} elseif {[is_action $item]} {
@@ -1167,7 +1263,11 @@ proc push_new_value {item name new {query 1}} {
 	set query_output ""
 
 	if {!$debug} {
-		append_text "x11vnc $rargs ..."
+		if [regexp {passwd} $rargs] {
+			append_text "x11vnc ..."
+		} else {
+			append_text "x11vnc $rargs ..."
+		}
 	}
 
 	if {$getout} {
@@ -1258,7 +1358,7 @@ proc insert_input_window {} {
 
 	append_text "\nUse these checkboxes to set the input permissions, "
 	append_text "or type in the \"KMB...\"\n"
-	append_text "-input string manually.  Then press \"OK\" or \"Skip\".\n"
+	append_text "-input string manually.  Then press \"OK\" or \"Cancel\".\n"
 	append_text "(note: an empty setting means use the default behavior, "
 	append_text "see viewonly)\n\n"
 	set w "$text_area.wk_f"
@@ -1369,7 +1469,7 @@ proc insert_client_action_window {input} {
 
 	append_text "\nUse these checkboxes to set the input permissions "
 	append_text "for this client\n-or- whether to disconnect it instead.  "
-	append_text "Then press \"OK\" or \"Skip\".\n\n"
+	append_text "Then press \"OK\" or \"Cancel\".\n\n"
 	set w "$text_area.ca_f"
 	catch {destroy $w}
 	frame $w -bd 1 -relief ridge -cursor {top_left_arrow}
@@ -1414,7 +1514,7 @@ proc cleanup_text_window {} {
 	}
 }
 
-# For updating a string variable.   Also used for simple OK/Skip dialogs
+# For updating a string variable.   Also used for simple OK/Cancel dialogs
 # with entry = 0.
 proc entry_dialog {item {entry 1}} {
 	global menu_var entry_str entry_set entry_dialog_item
@@ -1579,6 +1679,9 @@ proc see_if_ok {query item expected} {
 		return 1
 	} elseif {$item == "connect" || $item == "disconnect"
 	    || $item == "client" || $item == "client_input"} {
+		append_text "\t($msg)\n"
+		return 1
+	} elseif {$item == "passwd" || $item == "viewpasswd"} {
 		append_text "\t($msg)\n"
 		return 1
 	} else {
@@ -1804,6 +1907,14 @@ proc detach_from_display {} {
 	set_connected no
 }
 
+proc do_stop_quit {} {
+	push_new_value "stop" "stop" 1 0
+	set_connected no
+	update
+	after 250
+	destroy .
+}
+
 # Menu item is an action:
 proc do_action {item} {
 	global menu_var connected_to_x11vnc beginner_mode
@@ -1850,11 +1961,7 @@ proc do_action {item} {
 		menu_help "$item"
 		return
 	} elseif {$item == "stop+quit"} {
-		push_new_value "stop" "stop" 1 0
-		set_connected no
-		update
-		after 500
-		destroy .
+		do_stop_quit
 	}
 
 	if {[value_is_string $item]} {
@@ -1961,6 +2068,12 @@ proc is_action {item} {
 }
 
 proc is_gui_internal {item} {
+	if {$item == "Properties"} {
+		return 1
+	}
+	if {$item == "Tray"} {
+		return 1
+	}
 	return [opt_match G $item]
 }
 
@@ -2194,7 +2307,7 @@ proc disconnect_dialog {client} {
 		append_text "Invalid client info string: $client\n"
 		return
 	}
-	append msg "*** To *DISCONNECT* this client press \"OK\", otherwise press \"Skip\"\n"
+	append msg "*** To *DISCONNECT* this client press \"OK\", otherwise press \"Cancel\"\n"
 	bell
 	if {[warning_dialog $msg "current"]} {
 		push_new_value "disconnect" "disconnect" $cid 1
@@ -2255,7 +2368,7 @@ proc update_clients_menu {list} {
 			regsub {:.*$} $client "" clabel
 		}
 		$subm add command -label "$clabel" \
-			-command "client_dialog $client"
+			-command "client_dialog \{$client\}"
 		incr count
 	}
 	$subm entryconfigure 0 -label "num-clients: $count"
@@ -2537,6 +2650,497 @@ proc menu_posted {} {
 	}
 }
 
+proc props_apply {} {
+	global props_accept props_confirm props_viewonly props_shared
+	global props_passwd props_viewpasswd
+	global prop0_accept prop0_confirm prop0_viewonly prop0_shared
+	global prop0_passwd prop0_viewpasswd
+	global menu_var
+
+	if {$props_accept != $prop0_accept} {
+		if {$props_accept} {
+			push_new_value "unlock" "unlock" 1 0
+		} else {
+			push_new_value "lock" "lock" 1 0
+		}
+		set prop0_accept $props_accept
+		after 500
+	}
+
+	if {$props_confirm != $prop0_confirm} {
+		if {$props_confirm} {
+			push_new_value "accept" "accept" "popup" 1
+		} else {
+			push_new_value "accept" "accept" "" 1
+		}
+		if {$menu_var(accept) == "popup"} {
+			set props_confirm 1
+		} elseif {$menu_var(accept) == ""} {
+			set props_confirm 0
+		}
+		set prop0_confirm $props_confirm
+		after 500
+	}
+
+	if {$props_viewonly != $prop0_viewonly} {
+		if {$props_viewonly} {
+			push_new_value "viewonly" "viewonly" 1 1
+		} else {
+			push_new_value "viewonly" "noviewonly" 1 1
+		}
+		if {$menu_var(viewonly)} {
+			set props_viewonly 1
+		} else {
+			set props_viewonly 0
+		}
+		set prop0_viewonly $props_viewonly
+		after 500
+	}
+
+	if {$props_shared != $prop0_shared} {
+		if {$props_shared} {
+			push_new_value "shared" "shared" 1 1
+		} else {
+			push_new_value "shared" "noshared" 1 1
+		}
+		if {$menu_var(shared)} {
+			set props_shared 1
+		} else {
+			set props_shared 0
+		}
+		set prop0_shared $props_shared
+		after 500
+	}
+
+	if {$props_passwd != $prop0_passwd} {
+		push_new_value "passwd" "passwd" "$props_passwd" 0
+		set prop0_passwd $props_passwd
+		if {$props_passwd == ""} {
+			set props_viewpasswd ""
+		}
+		after 500
+	}
+
+	if {$props_viewpasswd != $prop0_viewpasswd} {
+		push_new_value "viewpasswd" "viewpasswd" "$props_viewpasswd" 0
+		set prop0_viewpasswd $props_viewpasswd
+		after 500
+	}
+}
+
+proc props_advanced {} {
+	global tray_mode icon_win props_win full_win
+	global props_advanced_first
+
+
+	if ![info exists props_advanced_first] {
+		center_win $full_win
+		set props_advanced_first 1
+		set first 1
+	} else {
+		set first 0
+	}
+	wm deiconify $full_win
+	update
+
+	if {$first} {
+		set w $full_win
+		wm minsize $w [winfo width $w] [winfo height $w]
+	}
+}
+
+proc do_props {} {
+	global props_accept props_confirm props_viewonly props_shared
+	global props_passwd props_viewpasswd
+	global prop0_accept prop0_confirm prop0_viewonly prop0_shared
+	global prop0_passwd prop0_viewpasswd
+	global menu_var unset_str
+	global have_labelframes ffont bfont
+
+	if ![info exists props_accept] {
+		set props_accept 1
+	}
+	set prop0_accept $props_accept
+
+	if [info exists menu_var(accept)] {
+		if {$menu_var(accept) == $unset_str || $menu_var(accept) == ""} {
+			set props_confirm 0
+		} else {
+			set props_confirm 1
+		}
+	} else {
+		set menu_var(accept) ""
+		set props_confirm 0
+	}
+	set prop0_confirm $props_confirm
+
+	if [info exists menu_var(viewonly)] {
+		if {$menu_var(viewonly) == $unset_str || $menu_var(viewonly) == ""} {
+			set props_viewonly 0
+		} elseif ($menu_var(viewonly)) {
+			set props_viewonly 1
+		} else {
+			set props_viewonly 0
+		}
+	} else {
+		set menu_var(viewonly) 0
+		set props_viewonly 0
+	}
+	set prop0_viewonly $props_viewonly
+
+	if [info exists menu_var(shared)] {
+		if {$menu_var(shared) == $unset_str || $menu_var(shared) == ""} {
+			set props_shared 0
+		} elseif ($menu_var(shared)) {
+			set props_shared 1
+		} else {
+			set props_shared 0
+		}
+	} else {
+		set menu_var(shared) 0
+		set props_shared 0
+	}
+	set prop0_shared $props_shared
+
+	if ![info exists props_passwd] {
+		set props_passwd ""
+	}
+	set prop0_passwd $props_passwd
+
+	if ![info exists props_viewpasswd] {
+		set props_viewpasswd ""
+	}
+	set prop0_viewpasswd $props_viewpasswd
+
+	set w .props
+	catch {destroy $w}
+	toplevel $w
+	wm title $w "Properties"
+	set b1 "$w.buttons1"
+	frame $b1
+	button $b1.ok -text OK -command "props_apply; destroy $w" -font $bfont
+	button $b1.cancel -text Cancel -command "destroy $w" -font $bfont
+	button $b1.apply  -text Apply -command "props_apply" -font $bfont
+
+	pack $b1.apply $b1.cancel $b1.ok -side right -expand 1
+
+	set b2 "$w.buttons2"
+	frame $b2
+
+	button $b2.advanced -text "Advanced ..." \
+		-command "destroy $w; props_advanced" -font $bfont
+	button $b2.help -text "Help ..." -command "menu_help Properties" -font $bfont
+	pack $b2.advanced $b2.help -side right -expand 1
+
+	set vp "$w.viewpw"
+	if {$have_labelframes} {
+		labelframe $vp -text "ViewOnly Password" -font $bfont
+	} else {
+		frame $vp
+		set l $vp.l
+		label $l -text "ViewOnly Password:" -justify left -anchor w -font $bfont
+		pack $vp.l -fill x -expand 1 -padx 1m -pady 0m -side top
+	}
+	entry $vp.e -show "*" -textvariable props_viewpasswd -font $bfont
+	pack $vp.e -fill x -expand 1 -padx 1m -pady 1m -side top
+
+	set pw "$w.passwd"
+	if {$have_labelframes} {
+		labelframe $pw -text "Password" -font $bfont
+	} else {
+		frame $pw
+		set l $pw.l
+		label $l -text "Password:" -justify left -anchor w -font $bfont
+		pack $pw.l -fill x -expand 1 -padx 1m -pady 0m -side top
+	}
+	entry $pw.e -show "*" -textvariable props_passwd -font $bfont
+	pack $pw.e -fill x -expand 1 -padx 1m -pady 1m -side top
+
+	set sh "$w.shared"
+	frame $sh
+	checkbutton $sh.button -text "Shared" \
+		-variable props_shared -anchor w -font $bfont
+	pack $sh.button -fill x -expand 1 -padx 1m -pady 1m
+
+	set vo "$w.viewonly"
+	frame $vo
+	checkbutton $vo.button -text "All Clients ViewOnly" \
+		-variable props_viewonly -anchor w -font $bfont
+	pack $vo.button -fill x -expand 1 -padx 1m -pady 1m
+
+	set cf "$w.confirm"
+	frame $cf
+	checkbutton $cf.button -text "Ask for Confirmation" \
+		-variable props_confirm -anchor w -font $bfont
+	pack $cf.button -fill x -expand 1 -padx 1m -pady 1m
+
+	set ac "$w.accept"
+	frame $ac
+	checkbutton $ac.button -text "Accept Connections" \
+		-variable props_accept -anchor w -font $bfont
+	pack $ac.button -fill x -expand 1 -padx 1m -pady 1m
+
+	pack $b1 -side bottom -fill x -pady 1m -padx 2m
+	pack $b2 -side bottom -fill x -pady 1m -padx 2m
+	pack $vp -side bottom -fill x -pady 1m -padx 2m
+	pack $pw -side bottom -fill x -pady 1m -padx 2m
+	pack $sh -side bottom -fill x -pady 0m -padx 2m
+	pack $vo -side bottom -fill x -pady 0m -padx 2m
+	pack $cf -side bottom -fill x -pady 0m -padx 2m
+	pack $ac -side bottom -fill x -pady 0m -padx 2m
+
+	wm resizable $w 1 0
+	center_win $w
+	update
+	wm minsize $w [winfo width $w] [winfo height $w]
+
+	tkwait window $w
+}
+
+proc do_new_client {} {
+	global newclient ffont bfont
+
+	set w .newclient
+	catch {destroy $w}
+	toplevel $w
+	label $w.l -text "Hostname: " -font $bfont
+	set newclient ""
+	entry $w.e -width 16 -textvariable newclient -font $bfont 
+	button $w.b -text OK -command "destroy $w" -font $bfont
+	bind $w.e <Return> "update; after 100; destroy $w"
+
+	pack $w.l $w.e $w.b -side left -pady 1m -padx 1m
+	focus $w.e
+	center_win $w
+	update 
+	
+	tkwait window $w
+
+	if {$newclient != ""} {
+		push_new_value "connect" "connect" "$newclient" 1
+	}
+}
+
+proc do_disconnect_all {} {
+	push_new_value "disconnect" "disconnect" "all" 1
+}
+
+proc pmenu {m x y} {
+	set x [expr $x-10]
+	set y [expr $y-10]
+	$m post $x $y
+}
+
+proc set_client_balloon {str} {
+	global client_balloon vnc_display
+	
+	set client_balloon "$vnc_display"
+	set count 0
+	foreach client [split $str ","] {
+		if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
+		    $client m0 m1 m2 m3 m4 m5 m6 m7]} {
+			# id:ip:port:user:hostname:input:loginvo
+			set id    $m1
+			set ip    $m2
+			set port  $m3
+			set user  $m4
+			if {[string length $user] >= 24} {
+				# weird identd hash...
+				set user [string range $user 0 8]
+				set user "${user}..."
+			}
+			set host  $m5
+			set input $m6
+			set vo    $m7
+			if [regexp {^[ 	]*$} $host] {
+				set host $ip
+			}
+			set client_balloon "${client_balloon}\n$user\@$host"
+			if {$vo == "1"} {
+				set client_balloon "${client_balloon} - view"
+			} else {
+				set client_balloon "${client_balloon} - full"
+			}
+		} else {
+			set i [expr $count+1]
+			set client_balloon "${client_balloon}\nunknown-host$i"
+		}
+		incr count
+	}
+	if {$count == 0} {
+		set client_balloon "${client_balloon}\nNo connections."
+	}
+	icon_win_cfg $count
+}
+
+proc read_client_info {} {
+	global x11vnc_client_file client_tail client_str
+	global unlinked_x11vnc_client_file
+	if {$client_tail != ""} {
+		after 100
+		set str ""
+		set count [gets $client_tail str]
+
+		# we can unlink the file early since both processes
+		# have it open.
+		if ![info exists unlinked_x11vnc_client_file] {
+			set unlinked_x11vnc_client_file 0
+		} elseif {$unlinked_x11vnc_client_file == ""} {
+			set unlinked_x11vnc_client_file 0
+		}
+		if {! $unlinked_x11vnc_client_file} {
+			after 500
+			catch {file delete $x11vnc_client_file}
+			set unlinked_x11vnc_client_file 1
+		}
+
+		if {$count == -1} {
+			close $client_tail
+			catch {file delete $x11vnc_client_file}
+			clean_icon_exit
+		}
+		if {$count > 0 && ![regexp {^[ 	]*$} $str]} {
+			if {$str == "quit"} {
+				catch {file delete $x11vnc_client_file}
+				clean_icon_exit
+			} elseif {$str != "skip"} {
+				if {$str == "none"} {
+					set str ""
+				}
+				update_clients_menu $str
+				set client_str $str
+				set_client_balloon $str
+			}
+		}
+	}
+}
+
+proc show_client_balloon {} {
+	global tray_mode icon_win props_win full_win
+	global client_balloon ffont
+
+	if ![info exists client_balloon] {
+		set client_balloon "tkx11vnc ..."
+	}
+	if {$client_balloon == ""} {
+		set client_balloon "tkx11vnc ..."
+	}
+
+	set x [expr [winfo rootx $icon_win] + ([winfo width $icon_win]/2)]
+	set y [expr [winfo rooty $icon_win] + [winfo height $icon_win] + 4]
+
+	set w .client_balloon
+	catch {destroy $w}
+	toplevel $w -bg black -screen [winfo screen $icon_win]
+	wm overrideredirect $w 1
+	label $w.l -text "$client_balloon" -relief flat -bg "#ffffaa" -fg black \
+		-padx 2 -pady 0 -anchor w -justify left -font $ffont
+	pack $w.l -side left -padx 1 -pady 1
+
+	set w2 [winfo reqwidth  $w.l]
+	set h2 [winfo reqheight $w.l]
+
+	set W [winfo screenwidth  $w]
+	set H [winfo screenheight $w]
+
+	if {[expr $x+$w2] > $W} {
+		set w3 [winfo width $icon_win]
+		set x [expr "$W - $w2 - $w3 - 4"] 
+	}
+	if {[expr $y+$h2] > $H} {
+		set h3 [winfo height $icon_win]
+		set y [expr "$H - $h2 - $h3 - 4"] 
+	}
+
+	wm geometry $w +${x}+${y}
+}
+
+proc kill_client_balloon {} {
+	global client_balloon_id client_balloon_win
+	if [info exists client_balloon_id] {
+		catch {after cancel $client_balloon_id}
+	}
+	if [winfo exists .client_balloon] {
+		destroy .client_balloon
+	}
+}
+
+proc icon_win_cfg {clients} {
+	global icon_win
+	if {$clients > 0} {
+		$icon_win configure -bg black -fg white
+	} else {
+		$icon_win configure -bg white -fg black
+	}
+}
+
+proc make_icon {} {
+	global tray_mode tray_embed_id icon_win props_win full_win
+	global x11vnc_client_file client_tail client_str
+	global client_balloon_id
+	global bfont ffont
+	
+#	if {$tray_embed_id != ""} {
+#		wm withdraw .
+#		set top ".icon"
+#		toplevel $top -use $tray_embed_id
+#	}
+
+	set l .label
+	set icon_win $l
+	label $l -text "x11\nvnc" -borderwidth 5 -font $bfont
+	icon_win_cfg 0
+
+	pack $l
+	set menu "$l.menu"
+	menu $menu -tearoff 0
+	$menu add command -font $bfont -label "Properties" -command do_props
+	$menu add command -font $bfont -label "Help" -command "menu_help Tray"
+	$menu add separator
+	$menu add command -font $bfont -label "New Client" -command do_new_client
+	$menu add command -font $bfont -label "Disconnect All" -command do_disconnect_all
+	$menu add separator
+	$menu add command -font $bfont -label "Stop x11vnc" -command clean_icon_exit
+
+	bind . <Button-1> "pmenu $menu %X %Y"
+	bind . <Button-3> "pmenu $menu %X %Y"
+	bind $menu <Leave> "after 200; $menu unpost"
+
+	if {$x11vnc_client_file != "" } {
+		if ![file exists $x11vnc_client_file] {
+			set fh [open $x11vnc_client_file "w"]
+			puts $fh "skip"
+			close $fh
+		}
+		if [file exists $x11vnc_client_file] {
+			set client_tail [open "|tail -f $x11vnc_client_file" "r"]
+		}
+	}
+
+	bind $icon_win <Enter> {set client_balloon_id [after 500 show_client_balloon]}
+	bind $icon_win <Button> {kill_client_balloon}
+	bind $icon_win <Leave>  {kill_client_balloon}
+}
+
+proc clean_icon_exit {} {
+	global client_tail
+	if [info exists client_tail] {
+		if {$client_tail != ""} {
+			set p [pid $client_tail]
+			if {$p != ""} {
+				catch {exec kill -TERM $p >/dev/null 2>/dev/null}
+			}
+			catch {close $client_tail}
+			set client_tail ""
+		}
+	}
+	push_new_value "stop" "stop" 1 0
+	set_connected no
+	update
+	destroy .
+	exit
+}
+
 proc make_widgets {} {
 	global template 
 	global menu_b menu_m menu_count
@@ -2548,10 +3152,24 @@ proc make_widgets {} {
 	global entry_help entry_skip
 	global bfont ffont beginner_mode
 	global helptext helpremote helplabel
+	global tray_mode icon_win props_win full_win
+
+	if {$tray_mode} {
+		set top ".advanced"
+		toplevel $top
+		wm withdraw $top
+		set full_win $top
+		wm protocol $top WM_DELETE_WINDOW "wm withdraw $top"
+		wm protocol . WM_DELETE_WINDOW "clean_icon_exit"
+		make_icon
+	} else {
+		set top ""
+		set full_win "."
+	}
 
 	# Make the top label
 	set label_width 80
-	set info_label .info
+	set info_label "$top.info"
 	label $info_label -textvariable info_str -bd 2 -relief groove \
 		-anchor w -width $label_width -font $ffont
 	pack $info_label -side top -fill x -expand 0
@@ -2588,7 +3206,7 @@ proc make_widgets {} {
 	}
 
 	# Make frames for the rows and make the menu buttons.
-	set f ".menuframe"
+	set f "$top.menuframe"
 	frame $f
 	for {set c 0} {$c < $colmax} {incr c} {
 		set colf "$f.menuframe$c"
@@ -2621,7 +3239,7 @@ proc make_widgets {} {
 	make_menu_items
 
 	# Make the x11 and vnc display label bar:
-	set df .displayframe
+	set df "$top.displayframe"
 	frame $df -bd 1 -relief groove
 
 	set df_x11 "$df.xdisplay"
@@ -2640,16 +3258,16 @@ proc make_widgets {} {
 	pack $df -side top -fill x
 
 	# text area
-	text .text -height 12 -relief ridge -font $ffont
-	set text_area .text
-	pack .text -side top -fill both -expand 1
+	set text_area "$top.text"
+	text $text_area -height 12 -relief ridge -font $ffont
+	pack $text_area -side top -fill both -expand 1
 
 
 	set str "Click Help -> gui for overview."
 	append_text "\n$str\n\n"
 
 	# Make entry box stuff
-	set ef .entryframe
+	set ef "$top.entryframe"
 	frame $ef -bd 1 -relief groove
 
 	# Entry Label
@@ -2673,7 +3291,7 @@ proc make_widgets {} {
 
 	# Entry Skip button
 	set ef_skip "$ef.skip"
-	button $ef_skip -text Skip -pady $bpy -padx $bpx -command {set entry_set 0} \
+	button $ef_skip -text Cancel -pady $bpy -padx $bpx -command {set entry_set 0} \
 		-highlightthickness $hlt \
 		-font $bfont
 
@@ -2704,13 +3322,13 @@ proc make_widgets {} {
 	set entry_label $ef_label
 	entry_disable
 
-	update
-	wm minsize . [winfo width .] [winfo height .]
-
-	#set w [winfo width .info]
-	#puts "w1: $w"
-	#set w [winfo reqwidth .info]
-	#puts "w2: $w"
+	if {$top == ""} {
+		set w "."
+	} else {
+		set w $top
+	}
+	update idletasks
+	wm minsize $w [winfo width $w] [winfo height $w]
 }
 
 proc menu_bindings {} {
@@ -2797,7 +3415,7 @@ proc double_check_noremote {} {
 	set msg "\n\n"
 	append msg "*** WARNING: setting \"noremote\" will disable ALL remote control commands (i.e.\n"
 	append msg "*** WARNING: *this* gui will be locked out). Do you really want to do this?\n"
-	append msg "*** WARNING: If so, press \"OK\", otherwise press \"Skip\"\n"
+	append msg "*** WARNING: If so, press \"OK\", otherwise press \"Cancel\"\n"
 	append msg "\n"
 	bell
 	return [warning_dialog $msg "noremote"]
@@ -2808,7 +3426,7 @@ proc double_check_start_x11vnc {} {
 	set msg [get_start_x11vnc_txt]
 	append msg "\n"
 	append msg "*** To run the above command on machine \"$hostname\" to\n"
-	append msg "*** start x11vnc press \"OK\" otherwise press \"Skip\".\n"
+	append msg "*** start x11vnc press \"OK\" otherwise press \"Cancel\".\n"
 	return [warning_dialog $msg "start"]
 }
 
@@ -3079,16 +3697,18 @@ proc try_connect {} {
 # main:
 
 global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
+global x11vnc_client_file
 global x11vnc_auth_file x11vnc_connect_file beginner_mode simple_gui_created
 global helpall helptext helpremote helplabel hostname;
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
 global menu_var unset_str menus_disabled
-global bfont ffont old_labels
+global bfont ffont old_labels have_labelframes
 global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
 global cache_all_query_vars
 global last_query_all_time query_all_freq
+global tray_mode tray_embed_id client_tail
 
 set unset_str "(unset)"
 set connected_to_x11vnc 0
@@ -3104,6 +3724,7 @@ set always_update 1
 set cache_all_query_vars ""
 set query_all_freq 120
 set last_query_all_time [clock seconds]
+set client_tail ""
 
 # these are no longer used under x11vnc -sync:
 set delay_sleep 350
@@ -3114,6 +3735,10 @@ if {[regexp {^[34]} $tk_version] || $tk_version == "8.0"} {
 	set old_labels 1
 } else {
 	set old_labels 0
+}
+set have_labelframes 1
+if {$tk_version < 8.4} {
+	set have_labelframes 0
 }
 
 if {"$argv" == "-spit"} {
@@ -3159,6 +3784,12 @@ if {[info exists env(X11VNC_CONNECT_FILE)]} {
 	set x11vnc_connect_file "";
 }
 
+if {[info exists env(X11VNC_CLIENT_FILE)]} {
+	set x11vnc_client_file $env(X11VNC_CLIENT_FILE);
+} else {
+	set x11vnc_client_file "";
+}
+
 if {[info exists env(X11VNC_XDISPLAY)]} {
 	set x11vnc_xdisplay $env(X11VNC_XDISPLAY);
 	set x11vnc_connect 1
@@ -3186,6 +3817,19 @@ if {[info exists env(X11VNC_SIMPLE_GUI)]} {
 	set beginner_mode 0
 }
 
+set tray_mode 0
+if {[info exists env(X11VNC_TRAY_MODE)]} {
+	set tray_mode 1
+} else {
+	set tray_mode 0
+}
+set tray_mode 1
+
+if {[info exists env(X11VNC_TRAY_EMBED_ID)]} {
+	set tray_embed_id $env(X11VNC_TRAY_EMBED_ID)
+} else {
+	set tray_embed_id ""
+}
 
 set hostname [exec uname -n]
 #puts [exec env]
@@ -3219,5 +3863,9 @@ if {$x11vnc_connect} {
 	try_connect_and_query_all
 }
 set_widgets
+
+if {$tray_mode && $client_tail != ""} {
+	fileevent $client_tail readable read_client_info
+}
 
 # main loop.

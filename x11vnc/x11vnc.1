@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "June 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "July 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-06-25
+         version: 0.7.2, lastmod: 2005-07-01
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1709,8 +1709,8 @@ up on the X display in the environment variable DISPLAY.
 .IP
 "gui-opts" can be a comma separated list of items.
 Currently there are these types of items: 1) a gui mode,
-a 2) gui "simplicity", and 3) the X display the gui
-should display on.
+a 2) gui "simplicity", 3) the X display the gui
+should display on, and 4) a "tray" (or icon) mode.
 .IP
 1) The gui mode can be "start", "conn", or "wait"
 "start" is the default mode above and is not required.
@@ -1734,9 +1734,6 @@ you ssh in and x11vnc is not running yet you may want
 the gui to come back to you via your ssh redirected X
 display (e.g. localhost:10).
 .IP
-Examples: "x11vnc \fB-gui",\fR "x11vnc \fB-gui\fR ez"
-"x11vnc \fB-gui\fR localhost:10", "x11vnc \fB-gui\fR conn,host:0"
-.IP
 If you do not specify a gui X display in "gui-opts"
 then the DISPLAY environment variable and \fB-display\fR
 option are tried (in that order).  Regarding the x11vnc
@@ -1744,6 +1741,24 @@ X display the gui will try to connect to, it first
 tries \fB-display\fR and then DISPLAY.  For example, "x11vnc
 \fB-display\fR :0 \fB-gui\fR otherhost:0", will remote control an
 x11vnc polling :0 and display the gui on otherhost:0
+The "tray" mode below reverses this preference.
+.IP
+4) When "tray" is specified, the gui presents itself
+as a small icon with behavior similar to a "system
+tray" or "dock" applet.  The color of the icon
+indicates status (connected clients) and there is also a
+balloon status.  Clicking on the icon gives a menu from
+which properties, etc, can be set and the full gui is
+available under "Advanced".  To be fully functional,
+the gui mode should be "start" (the default).  At some
+point it is hoped the icon can be automatically embedded
+in common destkop trays/docks.  Currently one can only
+embed it in a window via, e.g., "tray=0x3600028".
+Otherwise the icon is just a normal standalone window.
+.IP
+Examples: "x11vnc \fB-gui",\fR "x11vnc \fB-gui\fR ez"
+"x11vnc \fB-gui\fR localhost:10", "x11vnc \fB-gui\fR conn,host:0"
+"x11vnc \fB-gui\fR tray,ez"
 .IP
 If you do not intend to start x11vnc from the gui
 (i.e. just remote control an existing one), then the

@@ -1,3 +1,9 @@
+2005-07-01  Karl Runge <runge@karlrunge.com>
+	* support for simple "-gui tray" mode (small icon like the original
+	  x0rfbserver had).  Can't figure how to get a tray to swallow it..
+	* passwd, viewpasswd changing in tray mode.
+	* allow typos like: x11vnc -R -scale 3/4
+
 2005-06-26  Karl Runge <runge@karlrunge.com>
 	* track keycode state for heuristics, -sloppy_keys, -wmdt
 	* add -nodbg as option

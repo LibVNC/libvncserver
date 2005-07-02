@@ -155,7 +155,7 @@
 /*
  * Summary of options to include in CPPFLAGS for custom builds:
  *
- * -DSHARED  to have the vnc display shared by default.
+ * -DVNCSHARED  to have the vnc display shared by default.
  * -DFOREVER  to have -forever on by default.
  * -DNOREPEAT=0  to have -repeat on by default.
  * -DADDKEYSYMS=0  to have -noadd_keysyms the default.
@@ -382,7 +382,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-06-25";
+char lastmod[] = "0.7.2 lastmod: 2005-07-01";
 int hack_val = 0;
 
 /* X display info */
@@ -792,7 +792,7 @@ char *rc_rcfile = NULL;		/* -rc */
 int rc_norc = 0;
 int opts_bg = 0;
 
-#ifndef SHARED
+#ifndef VNCSHARED
 int shared = 0;			/* share vnc display. */
 #else
 int shared = 1;
@@ -802,6 +802,7 @@ int connect_once = 1;		/* disconnect after first connection session. */
 #else
 int connect_once = 0;
 #endif
+int got_connect_once = 0;
 int deny_all = 0;		/* global locking of new clients */
 #ifndef REMOTE_DEFAULT
 #define REMOTE_DEFAULT 1
@@ -840,6 +841,11 @@ int flash_cmap = 0;		/* follow installed colormaps */
 int shift_cmap = 0;		/* ncells < 256 and needs shift of pixel values */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 int launch_gui = 0;		/* -gui */
+
+int tray_mode = 0;		/* hack for -gui tray */
+char *tray_mode_file = NULL;
+char *tray_mode_params = NULL;
+FILE *tray_mode_fh = NULL;
 
 int use_modifier_tweak = 1;	/* use the shift/altgr modifier tweak */
 int use_iso_level3 = 0;		/* ISO_Level3_Shift instead of Mode_switch */
@@ -1055,6 +1061,8 @@ int waitms = 30;
 double wait_ui = 2.0;
 int wait_bog = 1;
 int defer_update = 30;	/* deferUpdateTime ms to wait before sends. */
+int got_defer = 0;
+int got_deferupdate = 0;
 
 int screen_blank = 60;	/* number of seconds of no activity to throttle */
 			/* down the screen polls.  zero to disable. */
@@ -4885,11 +4893,28 @@ void clean_shm(int quick) {
 	}
 }
 
+void clean_tray_mode(void) {
+	if (tray_mode && tray_mode_fh) {
+		fprintf(tray_mode_fh, "quit\n");
+		fflush(tray_mode_fh);
+		fclose(tray_mode_fh);
+		tray_mode_fh = NULL;
+		if (tray_mode_file) {
+			unlink(tray_mode_file);
+			tray_mode_file = NULL;
+		}
+	}
+}
+
 /*
  * Normal exiting
  */
 void clean_up_exit (int ret) {
 	exit_flag = 1;
+
+	if (tray_mode) {
+		clean_tray_mode();
+	}
 
 	/* remove the shm areas: */
 	clean_shm(0);
@@ -5147,6 +5172,9 @@ void interrupted (int sig) {
 
 	X_UNLOCK;
 
+	if (tray_mode) {
+		clean_tray_mode();
+	}
 	/* remove the shm areas with quick=1: */
 	clean_shm(1);
 
@@ -6605,6 +6633,7 @@ void read_vnc_connect_prop(void) {
 	int format, slen, dlen;
 	unsigned long nitems = 0, bytes_after = 0;
 	unsigned char* data = NULL;
+	int db = 1;
 
 	vnc_connect_str[0] = '\0';
 	slen = 0;
@@ -6637,7 +6666,12 @@ void read_vnc_connect_prop(void) {
 	} while (bytes_after > 0);
 
 	vnc_connect_str[VNC_CONNECT_MAX] = '\0';
-	if (strlen(vnc_connect_str) > 38) {
+	if (! db) {
+		;
+	} else if (strstr(vnc_connect_str, "cmd=") &&
+	    strstr(vnc_connect_str, "passwd")) {
+		rfbLog("read VNC_CONNECT\n");
+	} else if (strlen(vnc_connect_str) > 38) {
 		char trim[100]; 
 		trim[0] = '\0';
 		strncat(trim, vnc_connect_str, 38);
@@ -6796,10 +6830,15 @@ void check_new_clients(void) {
 	}
 
 	last_count = client_count;
-	if (! client_count) {
+
+	if (! screen) {
 		return;
 	}
-	if (! screen) {
+	if (! client_count) {
+		if (tray_mode_fh) {
+			fprintf(tray_mode_fh, "none\n");
+			fflush(tray_mode_fh);
+		}
 		return;
 	}
 
@@ -6828,6 +6867,13 @@ void check_new_clients(void) {
 		}
 	}
 	rfbReleaseClientIterator(iter);
+
+	if (tray_mode_fh) {
+		char *str = list_clients();
+		fprintf(tray_mode_fh, "%s\n", str);
+		fflush(tray_mode_fh);
+		free(str);
+	}
 }
 
 /* -- keyboard.c -- */
@@ -7530,6 +7576,58 @@ static int kc1_shift, kc1_control, kc1_caplock, kc1_alt;
 static int kc1_meta, kc1_numlock, kc1_super, kc1_hyper;
 static int kc1_mode_switch, kc1_iso_level3_shift, kc1_multi_key;
 	
+int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
+	if (!sloppy_keys) {
+		return 0;
+	}
+	
+	if (!down && !keycode_state[key] && !IsModifierKey(keysym)) {
+		int i, cnt = 0, downkey;
+		int nmods_down = track_mod_state(NoSymbol, FALSE, FALSE);
+		int mods_down[256];
+
+		if (nmods_down) {
+			/* tracking to skip down modifier keycodes. */
+			for(i=0; i<256; i++) {
+				mods_down[i] = 0;
+			}
+			i = 0;
+			while (simple_mods[i] != NoSymbol) {
+				KeySym ksym = simple_mods[i];
+				KeyCode k = XKeysymToKeycode(dpy, ksym);
+				if (k != NoSymbol && keycode_state[(int) k]) {
+					mods_down[(int) k] = 1;
+				}
+				
+				i++;
+			}
+		}
+		/*
+		 * the keycode is already up... look for a single one
+		 * (non modifier) that is down
+		 */
+		for (i=0; i<256; i++) {
+			if (keycode_state[i]) {
+				if (nmods_down && mods_down[i]) {
+					continue;
+				}
+				cnt++;
+				downkey = i;
+			}
+		}
+		if (cnt == 1) {
+			if (debug_keyboard) {
+				fprintf(stderr, "    sloppy_keys: %d/0x%x "
+				    "-> %d/0x%x  (nmods: %d)\n", (int) key,
+				    (int) key, downkey, downkey, nmods_down);
+			}
+			*new = downkey;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 #if !LIBVNCSERVER_HAVE_XKEYBOARD
 
 /* empty functions for no xkb */
@@ -8117,58 +8215,6 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 	if (debug_keyboard > 1) {
 		fprintf(stderr, "grp_max=%d lvl_max=%d\n", grp_max, lvl_max);
 	}
-}
-
-int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
-	if (!sloppy_keys) {
-		return 0;
-	}
-	
-	if (!down && !keycode_state[key] && !IsModifierKey(keysym)) {
-		int i, cnt = 0, downkey;
-		int nmods_down = track_mod_state(NoSymbol, FALSE, FALSE);
-		int mods_down[256];
-
-		if (nmods_down) {
-			/* tracking to skip down modifier keycodes. */
-			for(i=0; i<256; i++) {
-				mods_down[i] = 0;
-			}
-			i = 0;
-			while (simple_mods[i] != NoSymbol) {
-				KeySym ksym = simple_mods[i];
-				KeyCode k = XKeysymToKeycode(dpy, ksym);
-				if (k != NoSymbol && keycode_state[(int) k]) {
-					mods_down[(int) k] = 1;
-				}
-				
-				i++;
-			}
-		}
-		/*
-		 * the keycode is already up... look for a single one
-		 * (non modifier) that is down
-		 */
-		for (i=0; i<256; i++) {
-			if (keycode_state[i]) {
-				if (nmods_down && mods_down[i]) {
-					continue;
-				}
-				cnt++;
-				downkey = i;
-			}
-		}
-		if (cnt == 1) {
-			if (debug_keyboard) {
-				fprintf(stderr, "    sloppy_keys: %d/0x%x "
-				    "-> %d/0x%x  (nmods: %d)\n", (int) key,
-				    (int) key, downkey, downkey, nmods_down);
-			}
-			*new = downkey;
-			return 1;
-		}
-	}
-	return 0;
 }
 
 /*
@@ -12459,6 +12505,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		goto done;
 	}
 
+	/* allow var=val usage */
+	if (!strchr(p, ':')) {
+		char *q = strchr(p, '=');
+		if (q) *q = ':';
+	}
+
 	/* always call like: COLON_CHECK("foobar:") */
 #define COLON_CHECK(str) \
 	if (strstr(p, str) != p) { \
@@ -13168,16 +13220,26 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		host_lookup = 0;
 
 	} else if (strstr(p, "accept") == p) {
+		int doit = 1;
 		COLON_CHECK("accept:")
 		if (query) {
 			snprintf(buf, bufn, "ans=%s%s%s", p, co,
 			    NONUL(accept_cmd));
 			goto qry;
 		}
+		p += strlen("accept:");
 		if (safe_remote_only) {
-			rfbLog("unsafe: %s\n", p);
-		} else {
-			p += strlen("accept:");
+			if (tray_mode && !strcmp(p, "")) {
+				;
+			} else if (tray_mode && !strcmp(p, "popup")) {
+				;
+			} else {
+				rfbLog("unsafe: %s\n", p);
+				doit = 0;
+			}
+		}
+
+		if (doit) {
 			if (accept_cmd) free(accept_cmd);
 			accept_cmd = strdup(p);
 		}
@@ -14640,6 +14702,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (d < 0) d = 0;
 		rfbLog("remote_cmd: setting defer to %d ms.\n", d);
 		screen->deferUpdateTime = d;
+		got_defer = 1;
 		
 	} else if (strstr(p, "defer") == p) {
 		int d;
@@ -14653,8 +14716,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		d = atoi(p);
 		if (d < 0) d = 0;
 		rfbLog("remote_cmd: setting defer to %d ms.\n", d);
-		/* XXX not part of API? */
 		screen->deferUpdateTime = d;
+		got_defer = 1;
 		
 	} else if (strstr(p, "wait_ui") == p) {
 		double w;
@@ -15184,6 +15247,57 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: disabling remote commands.\n");
 		accept_remote_cmds = 0; /* cannot be turned back on. */
+
+	} else if (tray_mode && !query && strstr(p, "passwd") == p) { /* skip-cmd-list */
+		char **passwds_new = (char **) malloc(3*sizeof(char *));
+		char **passwds_old = (char **) screen->authPasswdData;
+
+		COLON_CHECK("passwd:")
+		p += strlen("passwd:");
+
+		passwds_new[0] = strdup(p);
+
+		if (screen->authPasswdData &&
+		    screen->passwordCheck == rfbCheckPasswordByList) {
+				passwds_new[1] = passwds_old[1];
+		} else {
+			passwds_new[1] = NULL;
+			screen->passwordCheck = rfbCheckPasswordByList;
+		}
+		passwds_new[2] = NULL;
+
+		screen->authPasswdData = (void*) passwds_new;
+		if (*p == '\0') {
+			screen->authPasswdData = (void*) NULL;
+		}
+		rfbLog("remote_cmd: changed full access passwd.\n");
+
+	} else if (tray_mode && !query && strstr(p, "viewpasswd") == p) { /* skip-cmd-list */
+		char **passwds_new = (char **) malloc(3*sizeof(char *));
+		char **passwds_old = (char **) screen->authPasswdData;
+		
+		COLON_CHECK("viewpasswd:")
+		p += strlen("viewpasswd:");
+
+		passwds_new[1] = strdup(p);
+
+		if (screen->authPasswdData &&
+		    screen->passwordCheck == rfbCheckPasswordByList) {
+				passwds_new[0] = passwds_old[0];
+		} else {
+			char *tmp = (char *) malloc(4 + CHALLENGESIZE);
+			rfbRandomBytes((unsigned char*)tmp);
+			passwds_new[0] = tmp;
+			screen->passwordCheck = rfbCheckPasswordByList;
+		}
+		passwds_new[2] = NULL;
+
+		if (*p == '\0') {
+			passwds_new[1] = NULL;
+		}
+
+		screen->authPasswdData = (void*) passwds_new;
+		rfbLog("remote_cmd: changed view only passwd.\n");
 
 	} else if (query) {
 		/* read-only variables that can only be queried: */
@@ -19338,13 +19452,11 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		if (shared) {
 			screen->alwaysShared = TRUE;
 		} else {
-			screen->dontDisconnect = TRUE;
 			screen->neverShared = TRUE;
 		}
+		screen->dontDisconnect = TRUE;
 	}
-	/* XXX the following is based on libvncserver defaults. */
-	if (screen->deferUpdateTime == 5) {
-		/* XXX will be fixed someday */
+	if (! got_deferupdate) {
 		screen->deferUpdateTime = defer_update;
 	}
 
@@ -23137,6 +23249,13 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	if (simple_gui) {
 		set_env("X11VNC_SIMPLE_GUI", "1");
 	}
+	if (tray_mode && tray_mode_file) {
+		set_env("X11VNC_TRAY_MODE", "1");
+		set_env("X11VNC_CLIENT_FILE", tray_mode_file);
+		if (tray_mode_params) {
+			set_env("X11VNC_TRAY_EMBED_ID", tray_mode_params);
+		}
+	}
 
 	if (no_external_cmds) {
 		fprintf(stderr, "cannot run external commands in -nocmds "
@@ -23147,10 +23266,15 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		exit(1);
 	}
 
-	sprintf(cmd, "%s -", wish);
 	tmpf = tmpfile();
 	if (tmpf == NULL) {
 		/* if no tmpfile, use a pipe */
+		if (tray_mode_params) {
+			if (strlen(tray_mode_params) < 20) {
+				strcat(cmd, " -use ");
+				strcat(cmd, tray_mode_params);
+			}
+		}
 		pipe = popen(cmd, "w");
 		if (! pipe) {
 			fprintf(stderr, "could not run: %s\n", cmd);
@@ -23170,7 +23294,12 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		rewind(tmpf);
 		dup2(n, 0);
 		close(n);
-		execlp(wish, wish, "-", (char *) NULL); 
+		if (tray_mode_params) {
+			execlp(wish, wish, "-", "-use", tray_mode_params,
+			    (char *) NULL); 
+		} else {
+			execlp(wish, wish, "-", (char *) NULL); 
+		}
 		fprintf(stderr, "could not exec wish: %s -\n", wish);
 		perror("execlp");
 	}
@@ -23181,6 +23310,7 @@ void do_gui(char *opts) {
 	char *s, *p;
 	char *old_xauth = NULL;
 	char *gui_xdisplay = NULL;
+	int got_gui_xdisplay = 0;
 	int start_x11vnc = 1;
 	int connect_to_x11vnc = 0;
 	int simple_gui = 0;
@@ -23209,7 +23339,11 @@ void do_gui(char *opts) {
 			;
 		} else if (strchr(p, ':') != NULL) {
 			/* best */
+			if (gui_xdisplay) {
+				free(gui_xdisplay);
+			}
 			gui_xdisplay = strdup(p);
+			got_gui_xdisplay = 1;
 		} else if (!strcmp(p, "wait")) {
 			start_x11vnc = 0;
 			connect_to_x11vnc = 0;
@@ -23218,6 +23352,12 @@ void do_gui(char *opts) {
 			connect_to_x11vnc = 1;
 		} else if (!strcmp(p, "ez") || !strcmp(p, "simple")) {
 			simple_gui = 1;
+		} else if (strstr(p, "tray") || strstr(p, "icon")) {
+			char *q;
+			tray_mode = 1;
+			if ((q = strchr(p, '=')) != NULL) {
+				tray_mode_params = strdup(q+1);
+			}
 		} else {
 			fprintf(stderr, "unrecognized gui opt: %s\n", p);
 		}
@@ -23227,6 +23367,16 @@ void do_gui(char *opts) {
 	free(s);
 	if (start_x11vnc) {
 		connect_to_x11vnc = 1;
+	}
+
+	if (tray_mode && !got_gui_xdisplay) {
+		/* for tray mode, prefer the polled DISPLAY */
+		if (use_dpy) {
+			if (gui_xdisplay) {
+				free(gui_xdisplay);
+			}
+			gui_xdisplay = strdup(use_dpy);
+		}
 	}
 
 	if (! gui_xdisplay) {
@@ -23257,10 +23407,37 @@ void do_gui(char *opts) {
 	XCloseDisplay(test_dpy);
 
 	if (start_x11vnc) {
+
 #if LIBVNCSERVER_HAVE_FORK
 		/* fork into the background now */
 		int p;
 		pid_t parent = getpid();
+
+		if (tray_mode) {
+			char tf[100]; 
+			struct stat sbuf;
+			/* FIXME */
+			sprintf(tf, "/tmp/x11vnc.tray.%d", (int) getpid());
+			unlink(tf);
+			if (stat(tf, &sbuf) == 0) {
+				tray_mode = 0;
+			} else {
+				tray_mode_fh = fopen(tf, "w");
+				if (! tray_mode_fh) {
+					tray_mode = 0;
+				} else {
+					chmod(tf, 0600);
+					tray_mode_file = strdup(tf);
+					fprintf(tray_mode_fh, "none\n");
+					fflush(tray_mode_fh);
+					if (! got_connect_once) {
+						/* want -forever for tray */
+						connect_once = 0;
+					}
+				}
+			}
+		}
+
 		if ((p = fork()) > 0)  {
 			;	/* parent */
 		} else if (p == -1) {
@@ -29856,8 +30033,8 @@ static void print_help(int mode) {
 "\n"
 "                       \"gui-opts\" can be a comma separated list of items.\n"
 "                       Currently there are these types of items: 1) a gui mode,\n"
-"                       a 2) gui \"simplicity\", and 3) the X display the gui\n"
-"                       should display on.\n"
+"                       a 2) gui \"simplicity\", 3) the X display the gui\n"
+"                       should display on, and 4) a \"tray\" (or icon) mode.\n"
 "\n"
 "                       1) The gui mode can be \"start\", \"conn\", or \"wait\"\n"
 "                       \"start\" is the default mode above and is not required.\n"
@@ -29881,9 +30058,6 @@ static void print_help(int mode) {
 "                       the gui to come back to you via your ssh redirected X\n"
 "                       display (e.g. localhost:10).\n"
 "\n"
-"                       Examples: \"x11vnc -gui\", \"x11vnc -gui ez\"\n"
-"                       \"x11vnc -gui localhost:10\", \"x11vnc -gui conn,host:0\"\n"
-"\n"
 "                       If you do not specify a gui X display in \"gui-opts\"\n"
 "                       then the DISPLAY environment variable and -display\n"
 "                       option are tried (in that order).  Regarding the x11vnc\n"
@@ -29891,6 +30065,24 @@ static void print_help(int mode) {
 "                       tries -display and then DISPLAY.  For example, \"x11vnc\n"
 "                       -display :0 -gui otherhost:0\", will remote control an\n"
 "                       x11vnc polling :0 and display the gui on otherhost:0\n"
+"                       The \"tray\" mode below reverses this preference.\n"
+"\n"
+"                       4) When \"tray\" is specified, the gui presents itself\n"
+"                       as a small icon with behavior similar to a \"system\n"
+"                       tray\" or \"dock\" applet.  The color of the icon\n"
+"                       indicates status (connected clients) and there is also a\n"
+"                       balloon status.  Clicking on the icon gives a menu from\n"
+"                       which properties, etc, can be set and the full gui is\n"
+"                       available under \"Advanced\".  To be fully functional,\n"
+"                       the gui mode should be \"start\" (the default).  At some\n"
+"                       point it is hoped the icon can be automatically embedded\n"
+"                       in common destkop trays/docks.  Currently one can only\n"
+"                       embed it in a window via, e.g., \"tray=0x3600028\".\n"
+"                       Otherwise the icon is just a normal standalone window.\n"
+"\n"
+"                       Examples: \"x11vnc -gui\", \"x11vnc -gui ez\"\n"
+"                       \"x11vnc -gui localhost:10\", \"x11vnc -gui conn,host:0\"\n"
+"                       \"x11vnc -gui tray,ez\"\n"
 "\n"
 "                       If you do not intend to start x11vnc from the gui\n"
 "                       (i.e. just remote control an existing one), then the\n"
@@ -30829,7 +31021,7 @@ int main(int argc, char* argv[]) {
 	int pw_loc = -1, got_passwd = 0, got_rfbauth = 0;
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
-	int got_rfbwait = 0, got_deferupdate = 0, got_defer = 0;
+	int got_rfbwait = 0;
 	int got_httpdir = 0, try_http = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
@@ -30954,6 +31146,7 @@ int main(int argc, char* argv[]) {
 			shared = 1;
 		} else if (!strcmp(arg, "-once")) {
 			connect_once = 1;
+			got_connect_once = 1;
 		} else if (!strcmp(arg, "-many") || !strcmp(arg, "-forever")) {
 			connect_once = 0;
 		} else if (!strcmp(arg, "-timeout")) {
@@ -31376,12 +31569,33 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-remote") || !strcmp(arg, "-R")
 		    || !strcmp(arg, "-r") || !strcmp(arg, "-remote-control")) {
+			char *str;
 			CHECK_ARGC
 			i++;
-			if (!strcmp(argv[i], "ping")) {
-				query_cmd = strdup(argv[i]);
+			str = argv[i];
+			if (*str == '-') {
+				/* accidental leading '-' */
+				str++;
+			}
+			if (!strcmp(str, "ping")) {
+				query_cmd = strdup(str);
 			} else {
-				remote_cmd = strdup(argv[i]);
+				remote_cmd = strdup(str);
+			}
+			if (remote_cmd && strchr(remote_cmd, ':') == NULL) {
+			    /* interpret -R -scale 3/4 at least */
+		 	    if (i < argc-1 && *(argv[i+1]) != '-') {
+				int n;
+
+				/* it must be the parameter value */
+				i++;
+				n = strlen(remote_cmd) + strlen(argv[i]) + 2;
+
+				str = (char *) malloc(n);
+				sprintf(str, "%s:%s", remote_cmd, argv[i]);
+				free(remote_cmd);
+				remote_cmd = str;
+			    }
 			}
 			quiet = 1;
 			xkbcompat = 0;
@@ -31713,7 +31927,6 @@ int main(int argc, char* argv[]) {
 	}
 	if (! got_deferupdate) {
 		char tmp[40];
-		/* XXX not working yet in libvncserver */
 		sprintf(tmp, "%d", defer_update);
 		argv_vnc[argc_vnc++] = strdup("-deferupdate");
 		argv_vnc[argc_vnc++] = strdup(tmp);

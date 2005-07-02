@@ -136,6 +136,9 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
     if (!rfbScreen->httpDir)
 	return;
 
+    if (rfbScreen->httpListenSock < 0)
+	return;
+
     FD_ZERO(&fds);
     FD_SET(rfbScreen->httpListenSock, &fds);
     if (rfbScreen->httpSock >= 0) {
