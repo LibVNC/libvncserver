@@ -1,3 +1,7 @@
+2005-07-06  Karl Runge <runge@karlrunge.com>
+	* many improvements to the gui. now embeds into system tray ok.
+	  x11vnc -debug_grabs, -printgui, -nosync
+
 2005-07-01  Karl Runge <runge@karlrunge.com>
 	* support for simple "-gui tray" mode (small icon like the original
 	  x0rfbserver had).  Can't figure how to get a tray to swallow it..

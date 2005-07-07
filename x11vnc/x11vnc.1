@@ -2,7 +2,7 @@
 .TH X11VNC "1" "July 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-07-01
+         version: 0.7.2, lastmod: 2005-07-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1378,6 +1378,11 @@ Disable any use of the RECORD extension.  This is
 currently used by the \fB-scrollcopyrect\fR scheme and to
 monitor X server grabs.
 .PP
+\fB-debug_grabs\fR
+.IP
+Turn on debugging info printout with respect to
+XGrabServer() deadlock for \fB-scrollcopyrect__mode_.\fR
+.PP
 \fB-pointer_mode\fR \fIn\fR
 .IP
 Various pointer motion update schemes. "\fB-pm\fR" is
@@ -1708,9 +1713,10 @@ to start up both the gui and x11vnc with the gui showing
 up on the X display in the environment variable DISPLAY.
 .IP
 "gui-opts" can be a comma separated list of items.
-Currently there are these types of items: 1) a gui mode,
-a 2) gui "simplicity", 3) the X display the gui
-should display on, and 4) a "tray" (or icon) mode.
+Currently there are these types of items: 1) a gui
+mode, a 2) gui "simplicity", 3) the X display the
+gui should display on, 4) a "tray" or "icon" mode,
+and 5) a gui geometry.
 .IP
 1) The gui mode can be "start", "conn", or "wait"
 "start" is the default mode above and is not required.
@@ -1743,22 +1749,44 @@ tries \fB-display\fR and then DISPLAY.  For example, "x11vnc
 x11vnc polling :0 and display the gui on otherhost:0
 The "tray" mode below reverses this preference.
 .IP
-4) When "tray" is specified, the gui presents itself
-as a small icon with behavior similar to a "system
-tray" or "dock" applet.  The color of the icon
-indicates status (connected clients) and there is also a
-balloon status.  Clicking on the icon gives a menu from
-which properties, etc, can be set and the full gui is
-available under "Advanced".  To be fully functional,
-the gui mode should be "start" (the default).  At some
-point it is hoped the icon can be automatically embedded
-in common destkop trays/docks.  Currently one can only
-embed it in a window via, e.g., "tray=0x3600028".
-Otherwise the icon is just a normal standalone window.
+4) When "tray" or "icon" is specified, the gui
+presents itself as a small icon with behavior typical
+of a "system tray" or "dock" applet.  The color
+of the icon indicates status (connected clients) and
+there is also a balloon status.  Clicking on the icon
+gives a menu from which properties, etc, can be set and
+the full gui is available under "Advanced".  To be
+fully functional, the gui mode should be "start"
+(the default).
 .IP
-Examples: "x11vnc \fB-gui",\fR "x11vnc \fB-gui\fR ez"
-"x11vnc \fB-gui\fR localhost:10", "x11vnc \fB-gui\fR conn,host:0"
-"x11vnc \fB-gui\fR tray,ez"
+For "icon" the gui just a small standalone window.
+For "tray" it will attempt to embed itself in the
+"system tray". If "=setpass" is appended then
+at startup the X11 user will be prompted to set the
+VNC session password.  If =<hexnumber> is appended
+that icon will attempt to embed itself in the window
+given by hexnumber.  Use =noadvanced to disable the
+full gui. (To supply more than one, use "+" sign).
+E.g. \fB-gui\fR tray=setpass and \fB-gui\fR icon=0x3600028
+.IP
+5) When "geom=+X+Y" is specified, that geometry
+is passed to the gui toplevel.  This is the icon in
+icon/tray mode, or the full gui otherwise.  You can
+also specify width and height, i.e. WxH+X+Y, but it
+is not recommended.  In "tray" mode the geometry is
+ignored unless the system tray manager does not seem
+to be running.  One could imagine using something like
+"\fB-gui\fR \fItray,geom=+4000+4000\fR" with a display manager
+to keep the gui invisible until someone logs in...
+.IP
+More icon tricks, "icon=minimal" gives an icon just
+with the VNC display number.  You can also set the font
+with "iconfont=...".  The following could be useful:
+"\fB-gui\fR \fIicon=minimal,iconfont=5x8,geom=24x10+0-0\fR"
+.IP
+General examples of the \fB-gui\fR option: "x11vnc \fB-gui",\fR
+"x11vnc \fB-gui\fR ez" "x11vnc \fB-gui\fR localhost:10",
+"x11vnc \fB-gui\fR conn,host:0", "x11vnc \fB-gui\fR tray,ez"
 .IP
 If you do not intend to start x11vnc from the gui
 (i.e. just remote control an existing one), then the
@@ -2206,6 +2234,10 @@ debug_tiles     enable  \fB-debug_tiles\fR
 .IP
 nodebug_tiles   disable \fB-debug_tiles\fR
 .IP
+debug_grabs     enable  \fB-debug_grabs\fR
+.IP
+nodebug_grabs   disable \fB-debug_grabs\fR
+.IP
 dbg             enable  \fB-dbg\fR crash shell
 .IP
 nodbg           disable \fB-dbg\fR crash shell
@@ -2266,10 +2298,10 @@ nowaitmapped clip flashcmap noflashcmap shiftcmap
 truecolor notruecolor overlay nooverlay overlay_cursor
 overlay_yescursor nooverlay_nocursor nooverlay_cursor
 nooverlay_yescursor overlay_nocursor visual scale
-scale_cursor viewonly noviewonly shared noshared
-forever noforever once timeout deny lock nodeny unlock
-connect allowonce allow localhost nolocalhost listen
-lookup nolookup accept gone shm noshm flipbyteorder
+scale_cursor viewonly noviewonly shared noshared forever
+noforever once timeout deny lock nodeny unlock connect
+allowonce allow localhost nolocalhost listen lookup
+nolookup accept  popup gone shm noshm flipbyteorder
 noflipbyteorder onetile noonetile solid_color solid
 nosolid blackout xinerama noxinerama xtrap noxtrap
 xrandr noxrandr xrandr_mode padgeom quiet q noquiet
@@ -2300,8 +2332,8 @@ nodontdisconnect desktop debug_xevents nodebug_xevents
 debug_xevents debug_xdamage nodebug_xdamage
 debug_xdamage debug_wireframe nodebug_wireframe
 debug_wireframe debug_scroll nodebug_scroll debug_scroll
-debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg
-nodbg noremote
+debug_tiles dbt nodebug_tiles nodbt debug_tiles
+debug_grabs nodebug_grabs dbg nodbg noremote
 .IP
 aro=  display vncdisplay desktopname guess_desktop
 http_url auth users rootshift clipshift scale_str

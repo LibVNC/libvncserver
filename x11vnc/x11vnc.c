@@ -382,7 +382,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-07-01";
+char lastmod[] = "0.7.2 lastmod: 2005-07-06";
 int hack_val = 0;
 
 /* X display info */
@@ -593,6 +593,7 @@ int count_added_keycodes(void);
 double dtime(double *);
 double dtime0(double *);
 double dnow(void);
+double dnowx(void);
 
 void initialize_blackouts(char *);
 void initialize_blackouts_and_xinerama(void);
@@ -615,6 +616,7 @@ void initialize_xinerama(void);
 void initialize_xfixes(void);
 void initialize_xdamage(void);
 int valid_window(Window, XWindowAttributes *, int);
+Window parent_window(Window, char**);
 int xtranslate(Window, Window, int, int, int*, int*, Window*, int);
 void create_xdamage_if_needed(void);
 void destroy_xdamage_if_needed(void);
@@ -749,6 +751,8 @@ void push_black_screen(int);
 void push_sleep(int);
 void refresh_screen(int);
 
+int tray_embed(Window, int);
+int tray_manager_running(Display *, Window *);
 
 /* -- options.h -- */
 /* 
@@ -841,11 +845,22 @@ int flash_cmap = 0;		/* follow installed colormaps */
 int shift_cmap = 0;		/* ncells < 256 and needs shift of pixel values */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
 int launch_gui = 0;		/* -gui */
+char *gui_geometry = NULL;
 
-int tray_mode = 0;		/* hack for -gui tray */
-char *tray_mode_file = NULL;
-char *tray_mode_params = NULL;
-FILE *tray_mode_fh = NULL;
+int icon_mode = 0;		/* hack for -gui tray */
+int icon_in_tray = 0;
+char *icon_mode_file = NULL;
+char *icon_mode_params = NULL;
+char *icon_mode_embed_id = NULL;
+char *icon_mode_font = NULL;
+FILE *icon_mode_fh = NULL;
+#define ICON_MODE_SOCKS 16
+int icon_mode_socks[ICON_MODE_SOCKS];
+
+int tray_manager_ok = 0;
+Window tray_request = None;
+Window tray_window = None;
+int tray_unembed = 0;
 
 int use_modifier_tweak = 1;	/* use the shift/altgr modifier tweak */
 int use_iso_level3 = 0;		/* ISO_Level3_Shift instead of Mode_switch */
@@ -864,6 +879,7 @@ int debug_xevents = 0;		/* -R debug_xevents:1 */
 int debug_xdamage = 0;		/* -R debug_xdamage:1 or 2 ... */
 int debug_wireframe = 0;
 int debug_tiles = 0;
+int debug_grabs = 0;
 
 int xtrap_input = 0;		/* -xtrap for user input insertion */
 int xinerama = 0;		/* -xinerama */
@@ -2940,6 +2956,12 @@ void disable_grabserver(Display *in_dpy, int change) {
 	int ok = 0;
 	static int didmsg = 0;
 
+	if (debug_grabs) {
+		fprintf(stderr, "disable_grabserver/%d %.5f\n",
+			xserver_grabbed, dnowx());
+		didmsg = 0;
+	}
+
 	if (! xtrap_input) {
 		if (XTestGrabControl_wr(in_dpy, True)) {
 			if (change) {
@@ -3029,6 +3051,11 @@ void xrecord_grabserver(int start) {
 	XErrorHandler old_handler = NULL;
 	int rc;
 
+	if (debug_grabs) {
+		fprintf(stderr, "xrecord_grabserver%d/%d %.5f\n",
+			xserver_grabbed, start, dnowx());
+	}
+
 	if (! gdpy_ctrl || ! gdpy_data) {
 		return;
 	}
@@ -3075,6 +3102,9 @@ void xrecord_grabserver(int start) {
 	XSetErrorHandler(old_handler);
 	XFlush(gdpy_data);
 #endif
+	if (debug_grabs) {
+		fprintf(stderr, "xrecord_grabserver-done: %.5f\n", dnowx());
+	}
 }
 
 void initialize_xrecord(void) {
@@ -3165,6 +3195,11 @@ void initialize_xrecord(void) {
 void shutdown_xrecord(void) {
 #if LIBVNCSERVER_HAVE_RECORD
 
+	if (debug_grabs) {
+		fprintf(stderr, "shutdown_xrecord%d %.5f\n",
+			xserver_grabbed, dnowx());
+	}
+
 	if (rr_CA) XFree(rr_CA);
 	if (rr_CW) XFree(rr_CW);
 	if (rr_GS) XFree(rr_GS);
@@ -3208,6 +3243,10 @@ void shutdown_xrecord(void) {
 	X_UNLOCK;
 #endif
 	use_xrecord = 0;
+
+	if (debug_grabs) {
+		fprintf(stderr, "shutdown_xrecord-done: %.5f\n", dnowx());
+	}
 }
 
 int xrecord_skip_keysym(rfbKeySym keysym) {
@@ -4190,6 +4229,8 @@ void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
 	xReq *req;
 	int db = 0;
 
+	if (debug_grabs) db = 1;
+
 	/* should handle control msgs, start/stop/etc */
 	if (rec_data->category == XRecordStartOfData) {
 		;
@@ -4246,7 +4287,7 @@ void check_xrecord_grabserver(void) {
 		return;
 	}
 
-if (0)	dtime0(&d);
+	dtime0(&d);
 	XFlush(gdpy_ctrl);
 	for (i=0; i<max; i++) {
 		last_val = xserver_grabbed;
@@ -4260,7 +4301,7 @@ if (0)	dtime0(&d);
 	if (cnt) {
 		XFlush(gdpy_ctrl);
 	}
-if (0) {
+if (debug_grabs && cnt > 0) {
 	d = dtime(&d);
 fprintf(stderr, "check_xrecord_grabserver: cnt=%d i=%d %.4f\n", cnt, i, d);
 }
@@ -4469,7 +4510,7 @@ if (0) db = 1;
 		check_xrecord_grabserver();
 		X_UNLOCK;
 		if (xserver_grabbed) {
-if (db) fprintf(stderr, "xrecord_watch: %d/%d  out xserver_grabbed\n", start, setby);
+if (db || debug_grabs) fprintf(stderr, "xrecord_watch: %d/%d  out xserver_grabbed\n", start, setby);
 			return;
 		}
 	}
@@ -4477,7 +4518,7 @@ if (db) fprintf(stderr, "xrecord_watch: %d/%d  out xserver_grabbed\n", start, se
 #if LIBVNCSERVER_HAVE_RECORD
 	if (! start) {
 		int shut_reopen = 2, shut_time = 25;
-if (db) fprintf(stderr, "XRECORD OFF: %d/%d  %.4f\n", xrecording, setby, now - x11vnc_start);
+if (db || debug_grabs) fprintf(stderr, "XRECORD OFF: %d/%d  %.4f\n", xrecording, setby, now - x11vnc_start);
 		xrecording = 0;
 		if (! rc_scroll) {
 			xrecord_focus_window = None;
@@ -4592,7 +4633,7 @@ if (db > 1) fprintf(stderr, "=== disab-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scr
 		rcs_scroll = 0;
 		return;
 	}
-if (db) fprintf(stderr, "XRECORD ON:  %d/%d  %.4f\n", xrecording, setby, now - x11vnc_start);
+if (db || debug_grabs) fprintf(stderr, "XRECORD ON:  %d/%d  %.4f\n", xrecording, setby, now - x11vnc_start);
 
 	if (xrecording) {
 		return;
@@ -4893,15 +4934,15 @@ void clean_shm(int quick) {
 	}
 }
 
-void clean_tray_mode(void) {
-	if (tray_mode && tray_mode_fh) {
-		fprintf(tray_mode_fh, "quit\n");
-		fflush(tray_mode_fh);
-		fclose(tray_mode_fh);
-		tray_mode_fh = NULL;
-		if (tray_mode_file) {
-			unlink(tray_mode_file);
-			tray_mode_file = NULL;
+void clean_icon_mode(void) {
+	if (icon_mode && icon_mode_fh) {
+		fprintf(icon_mode_fh, "quit\n");
+		fflush(icon_mode_fh);
+		fclose(icon_mode_fh);
+		icon_mode_fh = NULL;
+		if (icon_mode_file) {
+			unlink(icon_mode_file);
+			icon_mode_file = NULL;
 		}
 	}
 }
@@ -4912,8 +4953,8 @@ void clean_tray_mode(void) {
 void clean_up_exit (int ret) {
 	exit_flag = 1;
 
-	if (tray_mode) {
-		clean_tray_mode();
+	if (icon_mode) {
+		clean_icon_mode();
 	}
 
 	/* remove the shm areas: */
@@ -5172,8 +5213,8 @@ void interrupted (int sig) {
 
 	X_UNLOCK;
 
-	if (tray_mode) {
-		clean_tray_mode();
+	if (icon_mode) {
+		clean_icon_mode();
 	}
 	/* remove the shm areas with quick=1: */
 	clean_shm(1);
@@ -5207,6 +5248,27 @@ void interrupted (int sig) {
 	}
 }
 
+Window parent_window(Window win, char **name) {
+	Window r, parent;
+	Window *list;
+	unsigned int nchild;
+
+	if (name != NULL) {
+		*name = NULL;
+	}
+
+	if (! XQueryTree(dpy, win, &r, &parent, &list, &nchild)) {
+		return None;
+	}
+	if (list) {
+		XFree(list);
+	}
+	if (parent && name) {
+		XFetchName(dpy, parent, name);
+	}
+	return parent;
+}
+
 /* trapping utility to check for a valid window: */
 int valid_window(Window win, XWindowAttributes *attr_ret, int bequiet) {
 	XErrorHandler old_handler;
@@ -5217,6 +5279,10 @@ int valid_window(Window win, XWindowAttributes *attr_ret, int bequiet) {
 		pattr = &attr;
 	} else {
 		pattr = attr_ret;
+	}
+
+	if (win == None) {
+		return 0;
 	}
 
 	trapped_xerror = 0;
@@ -6668,6 +6734,10 @@ void read_vnc_connect_prop(void) {
 	vnc_connect_str[VNC_CONNECT_MAX] = '\0';
 	if (! db) {
 		;
+	} else if (strstr(vnc_connect_str, "ans=stop:N/A,ans=quit:N/A,ans=")) {
+		;
+	} else if (strstr(vnc_connect_str, "qry=stop,quit,exit")) {
+		;
 	} else if (strstr(vnc_connect_str, "cmd=") &&
 	    strstr(vnc_connect_str, "passwd")) {
 		rfbLog("read VNC_CONNECT\n");
@@ -6816,10 +6886,136 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	return(RFB_CLIENT_ACCEPT);
 }
 
+void start_client_info_sock(char *host_port_cookie) {
+	char *host = NULL, *cookie = NULL, *p;
+	char *str = strdup(host_port_cookie);
+	int i, port, sock, next = -1;
+	static time_t start_time[ICON_MODE_SOCKS];
+	time_t oldest = 0;
+	int db = 0;
+
+	for (i = 0; i < ICON_MODE_SOCKS; i++) {
+		if (icon_mode_socks[i] < 0) {
+			next = i;
+			break;
+		}
+		if (oldest == 0 || start_time[i] < oldest) {
+			next = i;
+			oldest = start_time[i];
+		}
+	}
+
+	p = strtok(str, ":");
+	i = 0;
+	while (p) {
+		if (i == 0) {
+			host = strdup(p);
+		} else if (i == 1) {
+			port = atoi(p);
+		} else if (i == 2) {
+			cookie = strdup(p);
+		}
+		i++;
+		p = strtok(NULL, ":");
+	}
+	free(str);
+
+	if (db) fprintf(stderr, "%s/%d/%s next=%d\n", host, port, cookie, next);
+
+	if (host && port && cookie) {
+		if (*host == '\0') {
+			free(host);
+			host = strdup("localhost");
+		}
+		sock = rfbConnectToTcpAddr(host, port);
+		if (sock < 0) {
+			usleep(200 * 1000);
+			sock = rfbConnectToTcpAddr(host, port);
+		}
+		if (sock >= 0) {
+			char *lst = list_clients();
+			icon_mode_socks[next] = sock;
+			start_time[next] = time(0);
+			write(sock, "COOKIE:", strlen("COOKIE:"));
+			write(sock, cookie, strlen(cookie));
+			write(sock, "\n", strlen("\n"));
+			write(sock, "none\n", strlen("none\n"));
+			write(sock, "none\n", strlen("none\n"));
+			write(sock, lst, strlen(lst));
+			write(sock, "\n", strlen("\n"));
+			if (db) {
+				fprintf(stderr, "list: %s\n", lst);
+			}
+			free(lst);
+			rfbLog("client_info_sock to: %s:%d\n", host, port);
+		} else {
+			rfbLog("failed client_info_sock: %s:%d\n", host, port);
+		}
+	} else {
+		rfbLog("malformed client_info_sock: %s\n", host_port_cookie);	
+	}
+
+	if (host) free(host);
+	if (cookie) free(cookie);
+}
+
+void send_client_info(char *str) {
+	int i;
+	static char *pstr = NULL;
+	static int len = 128; 
+
+	if (!str || strlen(str) == 0) {
+		return;
+	}
+
+	if (!pstr)  {
+		pstr = (char *)malloc(len);
+	}
+	if (strlen(str) + 2 > (size_t) len) {
+		free(pstr);
+		len *= 2;
+		pstr = (char *)malloc(len);
+	}
+	strcpy(pstr, str);
+	strcat(pstr, "\n");
+
+	if (icon_mode_fh) {
+		fprintf(icon_mode_fh, "%s", pstr);
+		fflush(icon_mode_fh);
+	}
+
+	for (i=0; i<ICON_MODE_SOCKS; i++) {
+		int len, n, sock = icon_mode_socks[i];
+		char *buf = pstr;
+
+		if (sock < 0) {
+			continue;
+		}
+
+		len = strlen(pstr);
+		while (len > 0) {
+			n = write(sock, buf, len);
+			if (n > 0) {
+				buf += n;
+				len -= n;
+				continue;
+			} 
+
+			if (n < 0 && errno == EINTR) {
+				continue;
+			} 
+			close(sock);
+			icon_mode_socks[i] = -1;
+			break;
+		}
+	}
+}
+
 void check_new_clients(void) {
 	static int last_count = 0;
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
+	int i, send_info = 0;
 	
 	if (client_count == last_count) {
 		return;
@@ -6835,10 +7031,7 @@ void check_new_clients(void) {
 		return;
 	}
 	if (! client_count) {
-		if (tray_mode_fh) {
-			fprintf(tray_mode_fh, "none\n");
-			fflush(tray_mode_fh);
-		}
+		send_client_info("none");
 		return;
 	}
 
@@ -6868,10 +7061,18 @@ void check_new_clients(void) {
 	}
 	rfbReleaseClientIterator(iter);
 
-	if (tray_mode_fh) {
+	if (icon_mode_fh) {
+		send_info++;
+	}
+	for (i = 0; i < ICON_MODE_SOCKS; i++) {
+		if (send_info || icon_mode_socks[i] >= 0) {
+			send_info++;
+			break;
+		}
+	}
+	if (send_info) {
 		char *str = list_clients();
-		fprintf(tray_mode_fh, "%s\n", str);
-		fflush(tray_mode_fh);
+		send_client_info(str);
 		free(str);
 	}
 }
@@ -11777,6 +11978,16 @@ void check_xevents(void) {
 		last_bell = now;
 		check_bell_event();
 	}
+	if (tray_request != None) {
+		static time_t last_tray_request = 0;
+		if (now > last_tray_request + 2) {
+			last_tray_request = now;
+			if (tray_embed(tray_request, tray_unembed)) {
+				tray_window = tray_request;
+				tray_request = None;
+			}
+		}
+	}
 
 #ifndef DEBUG_XEVENTS
 #define DEBUG_XEVENTS 1
@@ -13229,9 +13440,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("accept:");
 		if (safe_remote_only) {
-			if (tray_mode && !strcmp(p, "")) {
+			if (icon_mode && !strcmp(p, "")) {
 				;
-			} else if (tray_mode && !strcmp(p, "popup")) {
+			} else if (icon_mode && !strcmp(p, "popup")) {
 				;
 			} else {
 				rfbLog("unsafe: %s\n", p);
@@ -15214,6 +15425,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		debug_tiles = atoi(p);
 		rfbLog("set debug_tiles to: %d\n", debug_tiles);
 
+	} else if (!strcmp(p, "debug_grabs")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, debug_grabs);
+			goto qry;
+		}
+		debug_grabs = 1;
+		rfbLog("set debug_grabs to: %d\n", debug_grabs);
+	} else if (!strcmp(p, "nodebug_grabs")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !debug_grabs);
+			goto qry;
+		}
+		debug_grabs = 0;
+		rfbLog("set debug_grabs to: %d\n", debug_grabs);
+
 	} else if (!strcmp(p, "dbg")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, crash_debug);
@@ -15248,7 +15474,18 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: disabling remote commands.\n");
 		accept_remote_cmds = 0; /* cannot be turned back on. */
 
-	} else if (tray_mode && !query && strstr(p, "passwd") == p) { /* skip-cmd-list */
+	} else if (strstr(p, "client_info_sock") == p) { /* skip-cmd-list */
+		NOTAPP
+		p += strlen("client_info_sock:");
+		if (*p != '\0') {
+			start_client_info_sock(p);
+		}
+
+	} else if (strstr(p, "noop") == p) {
+		NOTAPP
+		rfbLog("remote_cmd: noop\n");
+
+	} else if (icon_mode && !query && strstr(p, "passwd") == p) { /* skip-cmd-list */
 		char **passwds_new = (char **) malloc(3*sizeof(char *));
 		char **passwds_old = (char **) screen->authPasswdData;
 
@@ -15272,7 +15509,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: changed full access passwd.\n");
 
-	} else if (tray_mode && !query && strstr(p, "viewpasswd") == p) { /* skip-cmd-list */
+	} else if (icon_mode && !query && strstr(p, "viewpasswd") == p) { /* skip-cmd-list */
 		char **passwds_new = (char **) malloc(3*sizeof(char *));
 		char **passwds_old = (char **) screen->authPasswdData;
 		
@@ -15298,6 +15535,32 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 		screen->authPasswdData = (void*) passwds_new;
 		rfbLog("remote_cmd: changed view only passwd.\n");
+
+	} else if (strstr(p, "trayembed") == p) { /* skip-cmd-list */
+		unsigned long id;
+		NOTAPP
+
+		COLON_CHECK("trayembed:")
+		p += strlen("trayembed:");
+		if (scan_hexdec(p, &id)) {
+			tray_request = (Window) id;
+			tray_unembed = 0;
+			rfbLog("remote_cmd: will try to embed 0x%x in"
+			    " the system tray.\n", id);
+		}
+	} else if (strstr(p, "trayunembed") == p) { /* skip-cmd-list */
+		unsigned long id;
+		NOTAPP
+
+		COLON_CHECK("trayunembed:")
+		p += strlen("trayunembed:");
+		if (scan_hexdec(p, &id)) {
+			tray_request = (Window) id;
+			tray_unembed = 1;
+			rfbLog("remote_cmd: will try to unembed 0x%x out"
+			    " of the system tray.\n", id);
+		}
+
 
 	} else if (query) {
 		/* read-only variables that can only be queried: */
@@ -23098,6 +23361,150 @@ int scan_for_updates(int count_only) {
 	return tile_diffs;
 }
 
+Window tweak_tk_window_id(Window win) {
+	char *name = NULL;
+	Window parent, new;
+
+	/* hack for tk, does not report outermost window */
+	new = win;
+	parent = parent_window(win, &name);
+	if (parent && name != NULL) {
+		lowercase(name);
+		if (strstr(name, "wish") || strstr(name, "x11vnc")) {
+			new = parent;
+			rfbLog("tray_embed: using parent: %s\n", name);
+		}
+	}
+	if (name != NULL) {
+		XFree(name);
+	}
+	return new;
+}
+
+#define SYSTEM_TRAY_REQUEST_DOCK    0
+#define SYSTEM_TRAY_BEGIN_MESSAGE   1
+#define SYSTEM_TRAY_CANCEL_MESSAGE  2
+#define XEMBED_VERSION 0
+#define XEMBED_MAPPED  (1 << 0)
+
+int tray_embed(Window iconwin, int remove) {
+	XEvent ev;
+	XErrorHandler old_handler;
+	Window manager;
+	Atom xembed_info;
+	Atom tatom;
+	XWindowAttributes attr;
+	long info[2] = {XEMBED_VERSION, XEMBED_MAPPED};
+	long data = 0;
+
+	if (remove) {
+		if (!valid_window(iconwin, &attr, 1)) {
+			return 0;
+		}
+		iconwin = tweak_tk_window_id(iconwin);
+		trapped_xerror = 0;
+		old_handler = XSetErrorHandler(trap_xerror);
+
+		/*
+		 * unfortunately no desktops seem to obey this
+		 * part of the XEMBED spec yet...
+		 */
+		XReparentWindow(dpy, iconwin, rootwin, 0, 0);
+
+		XSetErrorHandler(old_handler);
+		if (trapped_xerror) {
+			trapped_xerror = 0;
+			return 0;
+		}
+		trapped_xerror = 0;
+		return 1;
+	}
+
+	xembed_info = XInternAtom(dpy, "_XEMBED_INFO", False);
+	if (xembed_info == None) {
+		return 0;
+	}
+
+	if (!tray_manager_running(dpy, &manager)) {
+		return 0;
+	}
+
+	memset(&ev, 0, sizeof(ev));
+	ev.xclient.type = ClientMessage;
+	ev.xclient.window = manager;
+	ev.xclient.message_type = XInternAtom(dpy, "_NET_SYSTEM_TRAY_OPCODE",
+	    False);
+	ev.xclient.format = 32;
+	ev.xclient.data.l[0] = CurrentTime;
+	ev.xclient.data.l[1] = SYSTEM_TRAY_REQUEST_DOCK;
+	ev.xclient.data.l[2] = iconwin;
+	ev.xclient.data.l[3] = 0;
+	ev.xclient.data.l[4] = 0;
+
+	if (!valid_window(iconwin, &attr, 1)) {
+		return 0;
+	}
+
+	iconwin = tweak_tk_window_id(iconwin);
+	ev.xclient.data.l[2] = iconwin;
+
+	XUnmapWindow(dpy, iconwin);
+
+	trapped_xerror = 0;
+	old_handler = XSetErrorHandler(trap_xerror);
+
+	XSendEvent(dpy, manager, False, NoEventMask, &ev);
+	XSync(dpy, False);
+
+	if (trapped_xerror) {
+		XSetErrorHandler(old_handler);
+		trapped_xerror = 0;
+		return 0;
+	}
+
+	XChangeProperty(dpy, iconwin, xembed_info, xembed_info, 32,
+	    PropModeReplace, (unsigned char *)&info, 2);
+
+	/* kludge for KDE evidently needed... */
+	tatom = XInternAtom(dpy, "KWM_DOCKWINDOW", False);
+	XChangeProperty(dpy, iconwin, tatom, tatom, 32, PropModeReplace,
+	    (unsigned char *)&data, 1);
+	tatom = XInternAtom(dpy, "_KDE_NET_WM_SYSTEM_TRAY_WINDOW_FOR", False);
+	XChangeProperty(dpy, iconwin, tatom, XA_WINDOW, 32, PropModeReplace,
+	    (unsigned char *)&data, 1);
+
+	XSetErrorHandler(old_handler);
+	trapped_xerror = 0;
+	return 1;
+}
+
+int tray_manager_running(Display *d, Window *manager) {
+	char tray_string[100];
+	Atom tray_manager;
+	Window tray_win;
+
+	if (manager) {
+		*manager = None;
+	}
+	sprintf(tray_string, "_NET_SYSTEM_TRAY_S%d", scr);
+
+	tray_manager = XInternAtom(d, tray_string, True);
+	if (tray_manager == None) {
+		return 0;
+	}
+
+	tray_win = XGetSelectionOwner(d, tray_manager);
+	if (manager) {
+		*manager = tray_win;
+	}
+
+	if (tray_win == None) {
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
 /* -- gui.c -- */
 #ifdef NOGUI
 char gui_code[] = "";
@@ -23157,7 +23564,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 			rootwin = RootWindow(dpy, scr);
 			initialize_vnc_connect_prop();
 		}
-		usleep(1000*1000);
+		usleep(2200*1000);
 		fprintf(stderr, "\n");
 		for (i=0; i<try_max; i++) {
 			usleep(sleep*1000);
@@ -23246,15 +23653,49 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	set_env("DISPLAY", gui_xdisplay);
 	set_env("X11VNC_PROG", program_name);
 	set_env("X11VNC_CMDLINE", program_cmdline);
+	set_env("X11VNC_WISHCMD", wish);
 	if (simple_gui) {
 		set_env("X11VNC_SIMPLE_GUI", "1");
 	}
-	if (tray_mode && tray_mode_file) {
-		set_env("X11VNC_TRAY_MODE", "1");
-		set_env("X11VNC_CLIENT_FILE", tray_mode_file);
-		if (tray_mode_params) {
-			set_env("X11VNC_TRAY_EMBED_ID", tray_mode_params);
+	if (gui_geometry) {
+		set_env("X11VNC_GUI_GEOM", gui_geometry);
+	}
+	if (connect_to_x11vnc) {
+		set_env("X11VNC_STARTED", "1");
+	}
+	if (icon_mode && icon_mode_file) {
+		set_env("X11VNC_ICON_MODE", "1");
+		set_env("X11VNC_CLIENT_FILE", icon_mode_file);
+		if (icon_in_tray) {
+			if (tray_manager_ok) {
+				set_env("X11VNC_ICON_MODE", "TRAY:RUNNING");
+			} else {
+				set_env("X11VNC_ICON_MODE", "TRAY");
+			}
+		} else {
+			set_env("X11VNC_ICON_MODE", "ICON");
 		}
+		if (icon_mode_params) {
+			char *p, *str = strdup(icon_mode_params);
+			p = strtok(str, ":-/,.+");
+			while (p) {
+				if(strstr(p, "setp") == p) {
+					set_env("X11VNC_ICON_SETPASS", "1");
+				} else if(strstr(p, "noadvanced") == p) {
+					set_env("X11VNC_ICON_NOADVANCED", "1");
+				} else if(strstr(p, "minimal") == p) {
+					set_env("X11VNC_ICON_MINIMAL", "1");
+				} else if (strstr(p, "0x") == p) {
+					set_env("X11VNC_ICON_EMBED_ID", p);
+					icon_mode_embed_id = strdup(p);
+				}
+				p = strtok(NULL, ":-/,.+");
+			}
+			free(str);
+		}
+	}
+	if (icon_mode_font) {
+		set_env("X11VNC_ICON_FONT", icon_mode_font);
 	}
 
 	if (no_external_cmds) {
@@ -23269,10 +23710,10 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	tmpf = tmpfile();
 	if (tmpf == NULL) {
 		/* if no tmpfile, use a pipe */
-		if (tray_mode_params) {
-			if (strlen(tray_mode_params) < 20) {
+		if (icon_mode_embed_id) {
+			if (strlen(icon_mode_embed_id) < 20) {
 				strcat(cmd, " -use ");
-				strcat(cmd, tray_mode_params);
+				strcat(cmd, icon_mode_embed_id);
 			}
 		}
 		pipe = popen(cmd, "w");
@@ -23294,8 +23735,8 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		rewind(tmpf);
 		dup2(n, 0);
 		close(n);
-		if (tray_mode_params) {
-			execlp(wish, wish, "-", "-use", tray_mode_params,
+		if (icon_mode_embed_id) {
+			execlp(wish, wish, "-", "-use", icon_mode_embed_id,
 			    (char *) NULL); 
 		} else {
 			execlp(wish, wish, "-", (char *) NULL); 
@@ -23352,11 +23793,27 @@ void do_gui(char *opts) {
 			connect_to_x11vnc = 1;
 		} else if (!strcmp(p, "ez") || !strcmp(p, "simple")) {
 			simple_gui = 1;
-		} else if (strstr(p, "tray") || strstr(p, "icon")) {
+		} else if (strstr(p, "iconfont") == p) {
 			char *q;
-			tray_mode = 1;
 			if ((q = strchr(p, '=')) != NULL) {
-				tray_mode_params = strdup(q+1);
+				icon_mode_font = strdup(q+1);
+			}
+		} else if (strstr(p, "tray") == p || strstr(p, "icon") == p) {
+			char *q;
+			icon_mode = 1;
+			if ((q = strchr(p, '=')) != NULL) {
+				icon_mode_params = strdup(q+1);
+				if (strstr(icon_mode_params, "setp")) {
+					deny_all = 1;
+				}
+			}
+			if (strstr(p, "tray") == p) {
+				icon_in_tray = 1;
+			}
+		} else if (strstr(p, "geom") == p) {
+			char *q;
+			if ((q = strchr(p, '=')) != NULL) {
+				gui_geometry = strdup(q+1);
 			}
 		} else {
 			fprintf(stderr, "unrecognized gui opt: %s\n", p);
@@ -23369,7 +23826,7 @@ void do_gui(char *opts) {
 		connect_to_x11vnc = 1;
 	}
 
-	if (tray_mode && !got_gui_xdisplay) {
+	if (icon_mode && !got_gui_xdisplay) {
 		/* for tray mode, prefer the polled DISPLAY */
 		if (use_dpy) {
 			if (gui_xdisplay) {
@@ -23404,6 +23861,13 @@ void do_gui(char *opts) {
 		    gui_xdisplay);
 		exit(1);
 	}
+	if (icon_mode && icon_in_tray) {
+		if (tray_manager_running(test_dpy, NULL)) {
+			tray_manager_ok = 1;
+		} else {
+			tray_manager_ok = 0;
+		}
+	}
 	XCloseDisplay(test_dpy);
 
 	if (start_x11vnc) {
@@ -23413,23 +23877,28 @@ void do_gui(char *opts) {
 		int p;
 		pid_t parent = getpid();
 
-		if (tray_mode) {
+		if (icon_mode) {
 			char tf[100]; 
+			double dn = dnow();
 			struct stat sbuf;
 			/* FIXME */
-			sprintf(tf, "/tmp/x11vnc.tray.%d", (int) getpid());
+			dn = dn - ((int) dn);
+			sprintf(tf, "/tmp/x11vnc.tray%d%d", (int) (1000000*dn),
+			    (int) getpid());
 			unlink(tf);
+			/* race begins.. */
 			if (stat(tf, &sbuf) == 0) {
-				tray_mode = 0;
+				icon_mode = 0;
 			} else {
-				tray_mode_fh = fopen(tf, "w");
-				if (! tray_mode_fh) {
-					tray_mode = 0;
+				icon_mode_fh = fopen(tf, "w");
+				if (! icon_mode_fh) {
+					icon_mode = 0;
 				} else {
-					chmod(tf, 0600);
-					tray_mode_file = strdup(tf);
-					fprintf(tray_mode_fh, "none\n");
-					fflush(tray_mode_fh);
+					chmod(tf, 0400);
+					icon_mode_file = strdup(tf);
+					fprintf(icon_mode_fh, "none\n");
+					fprintf(icon_mode_fh, "none\n");
+					fflush(icon_mode_fh);
 					if (! got_connect_once) {
 						/* want -forever for tray */
 						connect_once = 0;
@@ -27747,6 +28216,10 @@ double dnow(void) {
 	return dtime0(&t);
 }
 
+double dnowx(void) {
+	return dnow() - x11vnc_start;
+}
+
 void measure_display_hook(rfbClientPtr cl) {
 	ClientData *cd = (ClientData *) cl->clientData;
 	dtime0(&cd->timer);
@@ -29785,6 +30258,9 @@ static void print_help(int mode) {
 "                       currently used by the -scrollcopyrect scheme and to\n"
 "                       monitor X server grabs.\n"
 "\n"
+"-debug_grabs           Turn on debugging info printout with respect to\n"
+"                       XGrabServer() deadlock for -scrollcopyrect mode.\n"
+"\n"
 "-pointer_mode n        Various pointer motion update schemes. \"-pm\" is\n"
 "                       an alias.  The problem is pointer motion can cause\n"
 "                       rapid changes on the screen: consider the rapid changes\n"
@@ -30032,9 +30508,10 @@ static void print_help(int mode) {
 "                       up on the X display in the environment variable DISPLAY.\n"
 "\n"
 "                       \"gui-opts\" can be a comma separated list of items.\n"
-"                       Currently there are these types of items: 1) a gui mode,\n"
-"                       a 2) gui \"simplicity\", 3) the X display the gui\n"
-"                       should display on, and 4) a \"tray\" (or icon) mode.\n"
+"                       Currently there are these types of items: 1) a gui\n"
+"                       mode, a 2) gui \"simplicity\", 3) the X display the\n"
+"                       gui should display on, 4) a \"tray\" or \"icon\" mode,\n"
+"                       and 5) a gui geometry.\n"
 "\n"
 "                       1) The gui mode can be \"start\", \"conn\", or \"wait\"\n"
 "                       \"start\" is the default mode above and is not required.\n"
@@ -30067,22 +30544,44 @@ static void print_help(int mode) {
 "                       x11vnc polling :0 and display the gui on otherhost:0\n"
 "                       The \"tray\" mode below reverses this preference.\n"
 "\n"
-"                       4) When \"tray\" is specified, the gui presents itself\n"
-"                       as a small icon with behavior similar to a \"system\n"
-"                       tray\" or \"dock\" applet.  The color of the icon\n"
-"                       indicates status (connected clients) and there is also a\n"
-"                       balloon status.  Clicking on the icon gives a menu from\n"
-"                       which properties, etc, can be set and the full gui is\n"
-"                       available under \"Advanced\".  To be fully functional,\n"
-"                       the gui mode should be \"start\" (the default).  At some\n"
-"                       point it is hoped the icon can be automatically embedded\n"
-"                       in common destkop trays/docks.  Currently one can only\n"
-"                       embed it in a window via, e.g., \"tray=0x3600028\".\n"
-"                       Otherwise the icon is just a normal standalone window.\n"
+"                       4) When \"tray\" or \"icon\" is specified, the gui\n"
+"                       presents itself as a small icon with behavior typical\n"
+"                       of a \"system tray\" or \"dock\" applet.  The color\n"
+"                       of the icon indicates status (connected clients) and\n"
+"                       there is also a balloon status.  Clicking on the icon\n"
+"                       gives a menu from which properties, etc, can be set and\n"
+"                       the full gui is available under \"Advanced\".  To be\n"
+"                       fully functional, the gui mode should be \"start\"\n"
+"                       (the default).\n"
 "\n"
-"                       Examples: \"x11vnc -gui\", \"x11vnc -gui ez\"\n"
-"                       \"x11vnc -gui localhost:10\", \"x11vnc -gui conn,host:0\"\n"
-"                       \"x11vnc -gui tray,ez\"\n"
+"                       For \"icon\" the gui just a small standalone window.\n"
+"                       For \"tray\" it will attempt to embed itself in the\n"
+"                       \"system tray\". If \"=setpass\" is appended then\n"
+"                       at startup the X11 user will be prompted to set the\n"
+"                       VNC session password.  If =<hexnumber> is appended\n"
+"                       that icon will attempt to embed itself in the window\n"
+"                       given by hexnumber.  Use =noadvanced to disable the\n"
+"                       full gui. (To supply more than one, use \"+\" sign).\n"
+"                       E.g. -gui tray=setpass and -gui icon=0x3600028\n"
+"\n"
+"                       5) When \"geom=+X+Y\" is specified, that geometry\n"
+"                       is passed to the gui toplevel.  This is the icon in\n"
+"                       icon/tray mode, or the full gui otherwise.  You can\n"
+"                       also specify width and height, i.e. WxH+X+Y, but it\n"
+"                       is not recommended.  In \"tray\" mode the geometry is\n"
+"                       ignored unless the system tray manager does not seem\n"
+"                       to be running.  One could imagine using something like\n"
+"                       \"-gui tray,geom=+4000+4000\" with a display manager\n"
+"                       to keep the gui invisible until someone logs in...\n"
+"\n"
+"                       More icon tricks, \"icon=minimal\" gives an icon just\n"
+"                       with the VNC display number.  You can also set the font\n"
+"                       with \"iconfont=...\".  The following could be useful:\n"
+"                       \"-gui icon=minimal,iconfont=5x8,geom=24x10+0-0\"\n"
+"\n"
+"                       General examples of the -gui option: \"x11vnc -gui\",\n"
+"                       \"x11vnc -gui ez\" \"x11vnc -gui localhost:10\",\n"
+"                       \"x11vnc -gui conn,host:0\", \"x11vnc -gui tray,ez\"\n"
 "\n"
 "                       If you do not intend to start x11vnc from the gui\n"
 "                       (i.e. just remote control an existing one), then the\n"
@@ -30354,6 +30853,8 @@ static void print_help(int mode) {
 "                       nodebug_scroll  disable debugging scrollcopy mechanism.\n"
 "                       debug_tiles     enable  -debug_tiles\n"
 "                       nodebug_tiles   disable -debug_tiles\n"
+"                       debug_grabs     enable  -debug_grabs\n"
+"                       nodebug_grabs   disable -debug_grabs\n"
 "                       dbg             enable  -dbg crash shell\n"
 "                       nodbg           disable -dbg crash shell\n"
 "\n"
@@ -30394,10 +30895,10 @@ static void print_help(int mode) {
 "                       truecolor notruecolor overlay nooverlay overlay_cursor\n"
 "                       overlay_yescursor nooverlay_nocursor nooverlay_cursor\n"
 "                       nooverlay_yescursor overlay_nocursor visual scale\n"
-"                       scale_cursor viewonly noviewonly shared noshared\n"
-"                       forever noforever once timeout deny lock nodeny unlock\n"
-"                       connect allowonce allow localhost nolocalhost listen\n"
-"                       lookup nolookup accept gone shm noshm flipbyteorder\n"
+"                       scale_cursor viewonly noviewonly shared noshared forever\n"
+"                       noforever once timeout deny lock nodeny unlock connect\n"
+"                       allowonce allow localhost nolocalhost listen lookup\n"
+"                       nolookup accept  popup gone shm noshm flipbyteorder\n"
 "                       noflipbyteorder onetile noonetile solid_color solid\n"
 "                       nosolid blackout xinerama noxinerama xtrap noxtrap\n"
 "                       xrandr noxrandr xrandr_mode padgeom quiet q noquiet\n"
@@ -30428,8 +30929,8 @@ static void print_help(int mode) {
 "                       debug_xevents debug_xdamage nodebug_xdamage\n"
 "                       debug_xdamage debug_wireframe nodebug_wireframe\n"
 "                       debug_wireframe debug_scroll nodebug_scroll debug_scroll\n"
-"                       debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg\n"
-"                       nodbg noremote\n"
+"                       debug_tiles dbt nodebug_tiles nodbt debug_tiles\n"
+"                       debug_grabs nodebug_grabs dbg nodbg noremote\n"
 "\n"
 "                       aro=  display vncdisplay desktopname guess_desktop\n"
 "                       http_url auth users rootshift clipshift scale_str\n"
@@ -30741,6 +31242,11 @@ static void check_rcfile(int argc, char **argv) {
 	FILE *rc; 
 
 	for (i=1; i < argc; i++) {
+		if (!strcmp(argv[i], "-printgui")) {
+			fprintf(stdout, "%s", gui_code);
+			fflush(stdout);
+			exit(0);
+		}
 		if (!strcmp(argv[i], "-norc")) {
 			norc = 1;
 		}
@@ -31060,6 +31566,10 @@ int main(int argc, char* argv[]) {
 			strcat(program_cmdline, s);
 			strcat(program_cmdline, "}}");
 		}
+	}
+
+	for (i=0; i<ICON_MODE_SOCKS; i++) {
+		icon_mode_socks[i] = -1;
 	}
 
 	check_rcfile(argc, argv);
@@ -31550,6 +32060,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-debug_tiles")
 		    || !strcmp(arg, "-dbt")) {
 			debug_tiles++;
+		} else if (!strcmp(arg, "-debug_grabs")) {
+			debug_grabs++;
 		} else if (!strcmp(arg, "-snapfb")) {
 			use_snapfb = 1;
 		} else if (!strcmp(arg, "-rawfb")) {
@@ -31606,6 +32118,8 @@ int main(int argc, char* argv[]) {
 			xkbcompat = 0;
 		} else if (!strcmp(arg, "-sync")) {
 			remote_sync = 1;
+		} else if (!strcmp(arg, "-nosync")) {
+			remote_sync = 0;
 		} else if (!strcmp(arg, "-noremote")) {
 			accept_remote_cmds = 0;
 		} else if (!strcmp(arg, "-yesremote")) {

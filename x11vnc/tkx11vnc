@@ -102,32 +102,41 @@ Displays
 Screen
 	=DRA refresh
 	=RA reset
-	=DRA blacken
+	=RA blacken
 	fixscreen:
 	-- D
-	id:
-	sid:
 	=D scale:
 	scale_cursor:
 	--
-	overlay
-	overlay_nocursor
-	--
 	=D solid
 	solid_color:
-	visual:
+	--
+	=GAL OverlayVisuals::
+	overlay
+	overlay_nocursor
+	=GAL LOFF
+	=GAL 8-Bit-Color::
 	flashcmap
 	shiftcmap:
 	notruecolor
+	=GAL LOFF
+	=GAL SubWindow::
+	id:
+	sid:
+	=GAL LOFF
+	=GAL ResizeRotate::
+	= xrandr
+	=-C:resize,newfbsize,exit xrandr_mode:
+	padgeom:
+	=GAL LOFF
 	--
 	=P blackout:
 	xinerama
 	clip:
-	rawfb:
 	--
-	= xrandr
-	=-C:resize,newfbsize,exit xrandr_mode:
-	padgeom:
+	visual:
+	rawfb:
+	pipeinput:
 
 Keyboard
 	=D norepeat
@@ -135,11 +144,11 @@ Keyboard
 	modtweak
 	xkb
 	--
+	=FP remap:
+	--
 	skip_keycodes:
 	sloppy_keys
 	skip_dups
-	--
-	=FP remap:
 	--
 	clear_mods
 	clear_keys
@@ -152,43 +161,137 @@ Pointer
 	=D nocursorshape
 	--
 	noxfixes
+	=GAL AlphaBlending::
 	noalphablend
 	alphacut:
 	alphafrac:
 	alpharemove
+	=GAL LOFF
 	--
 	buttonmap:
 	--
 	xwarppointer
 
 Misc
+	=GD-C:full,icon,tray WindowView:
 	=GD simple-gui
 	-- D
+	=GA all-settings
+	=RA remote-cmd:
+	--
 	=F rc:
 	norc
-	nolookup
-	--
 	nofb
-	--
 	=D nobell
+	nolookup
+	=GAL Selection::
 	=D nosel
 	noprimary
 	seldir:
+	=GAL LOFF
 	--
 	xtrap
 	xrecord
-	=RA reset_record
+	=RQA reset_record
 	--
 	bg
 	=-C:ignore,exit sigpipe:
 	=0 inetd
 	rfbwait:
-	pipeinput:
+
+Debugging
+	debug_pointer
+	debug_keyboard
+	=F logfile:
+	=GA show-logfile
+	=GA tail-logfile
+	quiet
 	--
-	=RA remote-cmd:
-	=GA all-settings
+	=GAL Misc-Debug::
+	debug_xevents
+	debug_xdamage
+	=-C:0,1,2,3 debug_wireframe:
+	debug_scroll
+	debug_tiles
+	debug_grabs
+	dbg
+	=GAL LOFF
+	=GA show-start-cmd
+	=DG debug_gui
+
+Permissions
+	=DRQA lock
+	=DRQA unlock
 	--
+	=DFP allow:
+	=D localhost
+	=RA allowonce:
+	listen:
+	-- D
+	=D shared
+	=D forever
+	timeout:
+	--
+	=D viewonly
+	input:
+	--
+	safer
+	unsafe
+	=RA noremote
+	--
+	=GAL Passwords::
+	passwd:
+	viewpasswd:
+	=F passwdfile:
+	=F rfbauth:
+	=0 storepasswd
+	=GAL LOFF
+	=GAL Misc-Perms::
+	=S alwaysshared
+	=S nevershared
+	=S dontdisconnect
+	=SQA deny_all
+	=GAL LOFF
+
+Tuning
+	=D-C:0,1,2,3,4 pointer_mode:
+	input_skip:
+	=D nodragging
+	--
+	=GAL WireFrame::
+	wireframe
+	wireframe_mode:
+	=-C:never,top,always wirecopyrect:
+	=GAL LOFF
+	=GAL ScrollCopyRect::
+	=-C:never,keys,mouse,always scrollcopyrect:
+	scr_area:
+	scr_skip:
+	scr_inc:
+	scr_keys:
+	scr_term:
+	scr_keyrepeat:
+	scr_parms:
+	=GAL LOFF
+	=GAL XDAMAGE::
+	xdamage
+	xd_area:
+	xd_mem:
+	=GAL LOFF
+	-- D
+	speeds:
+	=D wait:
+	defer:
+	=D nap
+	screen_blank:
+	--
+	=GAL SharedMemory::
+	noshm
+	flipbyteorder
+	onetile
+	=GAL LOFF
 	=GAL Misc-Tuning::
+	progressive:
 	fs:
 	gaps:
 	grow:
@@ -199,90 +302,7 @@ Misc
 	snapfb
 	threads
 	wmdt:
-
-Debugging
-	debug_pointer
-	debug_keyboard
-	=F logfile:
-	=GA show-logfile
-	=GA tail-logfile
-	quiet
-	--
-	debug_xevents
-	debug_xdamage
-	=-C:0,1,2,3 debug_wireframe:
-	debug_scroll
-	debug_tiles
-	dbg
-	--
-	=GA show-start-cmd
-	=DG debug_gui
-
-Permissions
-	=DRQA lock
-	=DRQA unlock
-	=SQA deny_all
-	--
-	=DFP allow:
-	=D localhost
-	=RA allowonce:
-	listen:
-	-- D
-	=RA noremote
-	--
-	=D viewonly
-	=D shared
-	=D forever
-	timeout:
-	--
-	input:
-	--
-	=S alwaysshared
-	=S nevershared
-	=S dontdisconnect
-	--
-	viewpasswd:
-	=F passwdfile:
-	=0 storepasswd
-	=F rfbauth:
-	passwd:
-	--
-	safer
-	unsafe
-
-Tuning
-	=D-C:0,1,2,3,4 pointer_mode:
-	input_skip:
-	=D nodragging
-	--
-	noshm
-	flipbyteorder
-	onetile
-	--
-	xdamage
-	xd_area:
-	xd_mem:
-	--
-	wireframe
-	wireframe_mode:
-	=-C:never,top,always wirecopyrect:
-	--
-	=-C:never,keys,mouse,always scrollcopyrect:
-	scr_area:
-	scr_skip:
-	scr_inc:
-	scr_keys:
-	scr_term:
-	scr_keyrepeat:
-	scr_parms:
-	-- D
-	speeds:
-	=D wait:
-	defer:
-	=D nap
-	screen_blank:
-	--
-	progressive:
+	=GAL LOFF
 "
 }
 
@@ -414,26 +434,32 @@ and one for power users.
 "
 
 	set helptext(Tray) "
-The tray/icon mode (started with \"x11vnc -gui tray ...\") presents a
-small icon that indicates the status of a running x11vnc server.
+The tray/icon mode (started with \"x11vnc -gui tray ...\", etc.) presents
+a small icon that indicates the status of the running x11vnc server.
 
 Depending on your environment, this icon may be embedded in a system
-tray or applet dock, or simply be a standalone window.
+tray or applet dock, or simply be a standalone window.  \"-gui tray\"
+will attempt to embed the icon in the system tray, while \"-gui icon\"
+is for a standalone window.  Use \"-gui tray=setpass\" (or icon=setpass)
+to be prompted to set the session password at startup.
 
 When the icon has a light background, that means no VNC viewers are
-currently connected to the display.
+currently connected to the VNC display.
 
 When the icon has a dark background (i.e. reverse-video), that means at
-least one VNC viewer is connected to the display.
+least one VNC viewer is connected to the VNC display.
 
 Moving the mouse pointer over the icon will popup a \"status balloon\"
-indicating the VNC display name and the names and other info of any
-connected VNC viewers.
+indicating the VNC display name and the names and info of any connected VNC
+viewers.  Press the middle mouse button if the balloon does not appear.
 
-Clicking the right mouse button on the icon displays a menu of actions:
+Clicking the left or right mouse button on the icon displays a menu
+of actions:
 
-    Properties      - Brings up the Properties dialog.  The full tkx11vnc
-                      GUI may be accessed via the \"Advanced ...\" button.
+    Properties      - Brings up the Properties dialog to set some basic
+                      parameters.  The full tkx11vnc GUI may be accessed
+                      via the \"Advanced ...\" button.  Press \"Help ...\"
+                      in the Properties dialog for more info.
     
     Help            - Displays this help text.
     
@@ -441,10 +467,17 @@ Clicking the right mouse button on the icon displays a menu of actions:
                       of a computer that is running a VNC viewer in
                       \"listen\" mode (e.g. vncviewer -listen).  For a
                       non-standard listening port use \"host:port\".
+
                       Pressing \"OK\" will initiate the reverse
                       connection.  Use a blank hostname to skip it.
     
     Disconnect All  - Disconnects all current VNC viewers.
+
+    Window View     - Switch between the \"full\" gui (also known as
+                      \"Advanced\"), \"icon\" mode (small icon window with
+                      popups), or \"tray\" mode (small icon embedded in the
+                      system tray).  This is a shortcut for the action:
+                      \"Properties -> Advanced -> Misc -> WindowView\".
     
     Stop x11vnc     - Directs the x11vnc server to disconnect all vncviewers
                       and then exit.  The tray/icon GUI then exits as well.
@@ -453,7 +486,8 @@ Clicking the right mouse button on the icon displays a menu of actions:
 If the x11vnc server stops for any reason, the tray/icon gui will exit.
 
 If you delete the tray/icon (e.g. X out button), that is the same
-as the \"Stop x11vnc\" action in the menu.
+as the \"Stop x11vnc\" action in the menu. (This will disconnect any
+VNC viewer you are currently using to access the display).
 "
 
 	set helptext(Properties) "
@@ -461,34 +495,34 @@ The Properties dialog allows you to set some basic parameters of a
 running x11vnc server.  After modifying them press \"OK\" or \"Apply\"
 to apply the changes, or press \"Cancel\" to skip applying them.
 
-\"Accept Connections\" toggles whether VNC viewers are allowed
-to connect or not.  It corresponds to the \"-R unlock\" and \"-R lock\"
-remote-control commands.
+ - \"Accept Connections\" toggles whether VNC viewers are allowed
+   to connect or not.  It corresponds to the \"-R unlock\" and \"-R lock\"
+   remote-control commands.
+   
+ - \"Ask for Confirmation\" toggles whether a popup menu will be presented
+   at the X display when a new VNC viewer attempts to connects.  The person
+   sitting at the X display can chose to accept or reject the connection
+   or accept the connection in View-Only mode.  It corresponds to the 
+   \"-R accept:popup\" and \"-R accept:\" remote-control commands.
+   
+ - \"All Clients ViewOnly\" toggles whether the entire VNC desktop is
+   view only.  All clients will only be able to watch when this is set
+   (regardless of how they logged in).  It corresponds to the
+   \"-R viewonly\" and \"-R noviewonly\" remote-control commands.
+   
+ - \"Shared\" toggles whether multiple simultaneous connections are
+   allowed or not.  It corresponds to the \"-R shared\" and \"-R noshared\"
+   remote-control commands.
 
-\"Ask for Confirmation\" toggles whether a popup menu will be presented
-at the X display when a new VNC viewer attempts to connects.  The person
-sitting at the X display can chose to accept or reject the connection
-or accept the connection in View-Only mode.  It corresponds to the 
-\"-R accept:popup\" and \"-R accept:\" remote-control commands.
+ - \"Password\" lets you set the session password viewers may use to gain full
+   access to the display.
+   
+ - \"ViewOnly Password\" lets you set the session password viewers may
+   use to gain view only access to the display.
 
-\"All Clients ViewOnly\" toggles whether the entire VNC desktop is
-view only.  All clients will only be able to watch when this is set
-(regardless of how they logged in).  It corresponds to the \"-R viewonly\"
-and \"-R noviewonly\" remote-control commands.
-
-\"Shared\" toggles whether multiple simultaneous connections are
-allowed or not.  It corresponds to the \"-R shared\" and \"-R noshared\"
-remote-control commands.
-
-\"Password\" lets you set the session password viewers may use to gain full
-access to the display.
-
-\"ViewOnly Password\" lets you set the session password viewers may
-use to gain view only access to the display.
-
-NOTE: These passwords only last for the current x11vnc session (they are
-not remembered, see the -storepasswd, -passwdfile, and -rfbauth x11vnc
-options for using stored passwords).
+NOTE: These \"session\" passwords only last for the current x11vnc
+session (they are not remembered, see the -storepasswd, -passwdfile,
+and -rfbauth x11vnc options for using stored passwords).
 
 If you set \"Password\" to the empty string that makes the \"View-Only
 Password\" empty as well and removes the need for any password to log in.
@@ -496,17 +530,269 @@ Password\" empty as well and removes the need for any password to log in.
 If you set \"ViewOnly Password\" to the empty string that just removes
 the ViewOnly log in aspect: \"Password\" is still required to log in.
 
-The \"Help ...\" button shows this help text.
-
-The \"Advanced ...\" button replaces the Properties dialog with the full
-tkx11vnc GUI.  Any dynamic settings can be modified in the full GUI.
+ - The \"Help ...\" button shows this help text.
+   
+ - The \"Advanced ...\" button replaces the Properties dialog with the full
+   tkx11vnc GUI.  All dynamic settings can be modified in the full GUI.
 " 
 
 	set helptext(all) $helpall
 
 	set helptext(Misc-Tuning:) "
-These contain some miscellaneous tuning parameters that are not
-often used.  Placed here to avoid overcrowding in the Tuning menu.
+x11vnc has what seems like hundreds of tuning parameters.  In this
+sub-menu we place some lesser used ones.  Mostly likely you'll want to
+leave them at their default values, but you can try them out quickly
+with the gui to see if they improve things.
+"
+
+	set helptext(Passwords:) "
+The items in this sub-menu pertain to setting passwords.  Note that x11vnc
+has two types of password files: RealVNC-style ones (you can create them
+with x11vnc -storepasswd or other VNC utility program) you use these
+via -rfbauth; and plain-text file passwords you use via -passwdfile.
+
+Normally passwords cannot be changed by remote-control (e.g. the gui),
+but for the case of the \"Icon\" and \"Tray\" modes this constraint has
+been relaxed.
+
+In neither the RealVNC-style nor the plain-text file cases should the
+password files be readable by users you do not want to access the VNC
+server.  Contrary to popular belief, the  RealVNC-style passwords are
+not encrypted, merely obscured.
+
+x11vnc has the even less secure -passwd and -viewpasswd supplied on
+the command line.  Be careful with these since they could be read by
+users with something like the ps(1) command.  On some operating systems
+x11vnc tries to quickly overwrite them on the command line but it doesn't
+work everywhere.
+
+Regarding ViewOnly passwords (where a VNC client using that password
+can only watch the screen, not interact with it), this is not available
+with -rfbauth, but only with -passwdfile, -passwd, and -viewpasswd.
+"
+
+	set helptext(Misc-Perms:) "
+In this sub-menu we provide some lesser used permission options.
+Regarding -alwaysshared, -nevershared, and -dontdisconnect, you probably
+should never use them and just use x11vnc's -shared and -forever options
+instead (these give basically the same functionality and if you mixed
+them too much unexpected things may happen).
+"
+
+	set helptext(AlphaBlending:) "
+In this sub-menu we provide some tweak parameters for cursors (little
+icon at the mouse pointer) that have transparency (i.e. an Alpha channel
+in addition to Red, Green, and Blue RGB channels).  For these cursors,
+some of the graphics underneath the cursor is allowed to be blended in:
+e.g. a drop-shadow (a terrible effect IMNSHO).
+
+AlphaBlending for x11vnc is only available when the XFIXES X extension is
+present (since otherwise it cannot see the cursors at all and so applies
+heuristics to show some fake cursors).  AlphaBlending is only a problem
+with x11vnc when the cursors are not opaque.
+
+Opaque cursors (e.g. bitmap or simply colored cursor) are rendered
+correctly by x11vnc.  Only when there is transparency does x11vnc have
+to make some approximation to transform the cursor to be opaque (the
+VNC protocol does not provide for an alpha channel in cursors, only RGB).
+
+The items in this sub-menu let you tweak x11vnc's approximation scheme
+for cursors with transparency.  Hopefully you won't have to use them.
+Certain cursor \"themes\" may require adjustment however.
+"
+	set helptext(OverlayVisuals:) "
+In this sub-menu are some options that involve fixing color problems
+for \"Overlay\" or \"Multi-Depth\" visuals.  This problem is rare
+since overlay and multi-depth visual video hardware is rare. 
+Some Sun, SGI, and HP machines are known to have them.
+
+The short answer is if you have a multi-depth visual display (e.g.  8 and
+24 bits), and you see messed up colors in x11vnc try the \"-overlay\"
+option on Solaris or IRIX.
+
+A brief Background on pixels, color, and visuals:
+
+   Pixels (picture elements) are kept in video memory as a certain number
+   of bits-per-pixel (bpp).  Most common are 8bpp, 16bpp, and 32bpp.
+   Less common are 24bpp, 4bpp, and 1bpp (monochrome).
+
+   How pixel values (i.e. values of the bits) are rendered into colors on
+   the screen can be done via different \"Recipes\".  These different
+   recipes are referred to as \"visuals\".  E.g. for 8bpp there is
+   a PseudoColor visual that maintains a mapping (that can be changed
+   dynamically) of the pixel values (256 possible ones) into RGB values.
+   Other 8bpp visuals, e.g. StaticGrey and TrueColor have fixed, regular
+   mappings and so provide less variation in kinds of colors.
+
+   A visual's \"depth\" is how many of the pixels are used in the
+   actual recipe.  This may sound wasteful (i.t. not using some of the
+   bits), but for 32bpp (4 billion colors) that is too much and nearly
+   always only 24 for them are used.  The most common Visual seems to
+   be depth 24 TrueColor at 32bpp.  This provides 16 million colors
+   which is more than the number of pixels on most screens (1280x1024 =
+   1.3 million pixels).  Another sometimes used visual that ignores some
+   bits is depth 15 TrueColor at 16bpp.
+
+OK, now, finally, to the Overlay Visuals.  Some hardware (or software
+emulations) allow different depth visuals to be used on the display
+at the same time.  The pixels of windows using different depth visuals
+may overlap.
+
+The most common seems to be both 8 and 24 depth visuals on a 32bpp setup.
+24 of the pixels can be used for one visual and the remaining 8 for the
+other.  This is sometimes referred to as \"8+24\" mode.  Furthermore,
+a speedup is achieved because writing graphics data to, say, the 8bit
+visual does not destroy the image data in the 24bit visual.  Evidently
+popup menus can be done very quickly this way: they use the 8bit visual
+and when the popup goes away the graphics data in the 24bit visual is
+immediately reexposed without having the application redrawing it.
+
+Also, some legacy applications can only use 8bpp visuals.  But in these
+days of high color graphics and web browsers one would like the rest
+of the desktop to use depth 24 visuals.  They often work on the multi
+depth visuals.
+
+How does this effect x11vnc?  x11vnc nearly always polls the root window
+(container of all other windows).  The root window will be one depth,
+e.g. 8 or 24.  Any windows using the *other* depth will appear to have
+messed up colors (or just be black or some other solid color) when viewed
+via x11vnc.
+
+How to fix?  Solaris and IRIX provide an API to extract the full snapshot
+of the display with all the colors correct.  It comes to x11vnc as depth
+24 TrueColor.  To enable this use the \"-overlay\" option.  Performance
+may be slower, but if the colors are correct that is a big improvement.
+"
+
+	set helptext(8-Bit-Color:) "
+Some older displays (e.g. with limited Video RAM) use 8 bits-per-pixel
+color.  This allows for only 256 different colors on the screen at the
+same time.  This sometimes leads to problems with viewing these 8bpp
+displays via x11vnc.  This sub-menu has some options that correspond to
+workarounds for this case.  If you can configure the machine to use 16bpp
+it may be worth it to avoid the color problems (e.g. color flashing
+as the 8bit colormap is switched).
+"
+	set helptext(SubWindow:) "
+This sub-menu has a couple options regarding having x11vnc poll a 
+single window, not the entire display.  This way just the window
+is shared.
+
+Note if the application pops up multiple windows they are not tracked
+and shared.  So this is not application sharing.  The application has to
+be very simple (e.g. a simple terminal or the image window on a webcam)
+for this mode to be useable.
+"
+	set helptext(ResizeRotate:) "
+This sub-menu has some options regarding screens that support the X
+Resize, Reflection, and Rotation Extension (RANDR), and one expects screen
+resizing, reflection, or rotation to take place during the x11vnc session.
+This is pretty rare, but x11vnc seems to handle it reasonably well using
+this X extension.
+
+This mode is on by default in -id mode to try to track the changing
+size of the SubWindow.  It is not on by default for full-screen mode
+because of the extra overhead, etc.
+"
+
+	set helptext(WireFrame:) "
+This sub-menu has some options for the x11vnc wireframing speedup scheme.
+
+For x11vnc, Wireframing means to watch for toplevel windows being Opaquely
+Moved or Resized.  When x11vnc detects this, it stops polling the screen
+and simply shows a \"wireframe\" outline of the window as it is being
+moved or resized.  This avoids \"screen polling thrashing\" when the
+screen is changing so rapidly during this period.  For various reasons
+this is usually much faster then letting the window manager do its
+own wireframing (you are encouraged to do Opaque moves and resizes
+when using x11vnc!)
+
+Also, once a moved window is released in its new position, x11vnc uses
+the VNC CopyRect encoding to very efficiently update the VNC viewers
+(each just copies the image data locally).
+
+This sort of scheme was used much in the 1990's on local displays because
+video hardware was slow at the time.  x11vnc tries to use this same trick
+as a speedup for its activities (the network is much slower than video
+hardware writes, and the video hardware reads that x11vnc uses to poll
+the screen are still slow today).
+"
+
+	set helptext(ScrollCopyRect:) "
+This sub-menu has some options for the x11vnc Scroll detection and
+CopyRect speedup scheme.
+
+For this mode, x11vnc \"spies\" on communication be the X server and
+applications using the RECORD extension.  It looks for various patterns
+to detect a scrolled window.  This only works for some applications,
+fortunately some important ones.
+
+Once the scroll is detected it uses the VNC CopyRect encoding for a
+big speedup.  Screen polling is also sped up for this scheme.
+
+There are many tweakable parameters for this mode and they are described
+in the sub-menu items.
+"
+
+	set helptext(XDAMAGE:) "
+The DAMAGE X extension allows the X server to send signals to x11vnc
+telling it which regions of the screen have been changed.  This improves
+x11vnc's performance markedly.  The DAMAGE extension must be available
+on the display for this to work.
+
+Unfortunately DAMAGE cannot be trusted completely for the changed regions,
+because often the reported changed region is much larger than the actual
+changed regions.  Nevertheless, x11vnc uses the DAMAGE information very
+effectively as hints to improve its performance.
+
+The items in the sub-menu allow tweaking x11vnc's DAMAGE algorithm.
+"
+
+	set helptext(SharedMemory:) "
+This sub-menu provides some options regarding SYSV shared memory usage
+(shm) by x11vnc.  Usually you want shm turned on because the x11vnc
+process is nearly always running on the same machine the X server process
+is running on.  SharedMemory gives a performance speedup.  However,
+if you need to modify this scenario these options allow you to.
+"
+
+	set helptext(Misc-Debug:) "
+This sub-menu contains a lot of debugging parameters usually used
+for debugging x11vnc itself.  This is unlike the -debug_pointer and
+-debug_keyboard options that are useful in learning information, quirks,
+etc. about your local display and environment.
+"
+
+	set helptext(Selection:) "
+This sub-menu contains some options centering around the Selection
+(also referred to as the Clipboard, Cutbuffers, etc).  x11vnc will try
+to exchange the selections between the VNC viewers and the X server.
+"
+
+	set helptext(WindowView) "
+Set the Window View Mode for the gui.  There are three modes:
+
+  - full:  Presents the full gui (Actions, Clients, etc, buttons,
+           and the Text area and Set/Entry box).
+
+  - icon:  Presents a small icon instead of the full gui.  Moving
+           the mouse over it shows the VNC display name and any
+           connected clients.  Clicking on the icon pops up a menu
+           of actions to perform.  Among them is \"Properties\" that
+           allows setting more parameters.  Clicking on \"Advanced\"
+           in \"Properties\" brings up the full gui.
+
+  - tray:  Attempt to embed the small icon in the system tray.  If
+           this fails it will resort to icon mode where the small icon
+           is a standalone window.
+
+Note that in \"full\" mode if you delete the full gui window the gui
+terminates (but the x11vnc server keeps running).  However under \"icon\"
+or \"tray\" mode if you bring up the full gui window via \"Properties ->
+Advanced\" and then delete it the gui does NOT terminate.
+
+Also note that by default in \"icon\" mode if you delete the icon
+window both the gui and the x11vnc server terminate.
 "
 
 	set helptext(gui) "
@@ -514,23 +800,30 @@ tkx11vnc is a simple frontend to x11vnc.  Nothing fancy, it merely
 provides an interface to each of the many x11vnc command line options and
 remote control commands.  See \"Help -> all\" for much info about x11vnc.
 
+For a simplier gui, run x11vnc in \"tray\" or \"icon\" mode such as
+\"-gui tray\", \"-gui icon\", or \"-gui tray=setpass\".  In that
+mode the full gui is only available under \"Advanced ...\".
+
+Also, \"-gui ez\" will show fewer menu items (toggle via Misc -> simple_gui)
+
 All menu items have a (?) button one can click on to get more information
 about the option or command.
 
 There are two states tkx11vnc can be in:
 
 	1) Available to control a running x11vnc process.
+
 	2) Getting ready to start a x11vnc process.
+
+Most people will just use state 1).
 
 In state 1) the Menu items available in the menus are those that
 correspond to the x11vnc \"remote control\" commands.  See the -remote
 entry under \"Help -> all\" for a complete list.  Also available is
 the \"Actions -> stop\" item to shut down the running x11vnc server,
-thereby changing to state 2).  One could also simply \"Actions -> detach\"
-leaving the x11vnc server running.  \"Actions -> attach\" would
-reestablish the connection.
+thereby changing to state 2).  There are other actions available too.
 
-In state 2) the Menu items available in the menus (Actions, Clients,
+In state 2) the Menu items available in the menus (\"Actions\", \"Clients\",
 etc.) are those that correspond to command line options used in starting
 an x11vnc process, and the \"Actions -> start\" item executes
 x11vnc thereby changing to state 1).  To see what x11vnc startup command
@@ -540,11 +833,13 @@ and it will show you what the command looks like.
 There is much overlap between the menu items available in state 1)
 and state 2), but it is worth keeping in mind it is not 100%.
 For example, you cannot set passwords or password files in state 1).
+(update: simple password setting is now allowed in \"tray\" or \"icon\" mode).
 
 
 Also note that there may be *two* separate X displays involved, not just
 one:  1) the X display x11vnc will be polling (and making available to
 VNC viewers), and 2) the X display this GUI is intended to display on.
+
 For example, one might use ssh to access the remote machine where the
 GUI would display on :11 and x11vnc would poll display :0.  By default
 the gui will display on the value in the DISPLAY env. variable followed
@@ -556,34 +851,36 @@ GUI components:
 --- ----------
 
 1) At the top of the gui is a info text label where information will
-be posted, e.g. when traversing menu items text indicating how to get
-help on the item and its current value will be displayed.
+   be posted, e.g. when traversing menu items text indicating how to get
+   help on the item and its current value will be displayed.
 
-2) Below the info label is the area where the menu buttons, Actions,
-Clients, etc., are presented.  If a menu item has a checkbox,
-it corresponds to a boolean on/off variable.  Otherwise it is
-either a string variable, or an action not associated with a
-variable (for the most part).
+2) Below the info label is the area where the menu buttons, \"Actions\",
+   \"Clients\", etc., are presented.  If a menu item has a checkbox,
+   it corresponds to a boolean on/off variable.  Otherwise it is
+   either a string variable, or an action not associated with a
+   variable (for the most part).
 
-3) Below the menu button area is a text label indicating the current x11vnc
-X display being polled and the corresponding VNC display name.  Both
-will be \"(*none*)\" when there is no connection established.
+3) Below the menu button area is a label indicating the current x11vnc
+   X display being polled and the corresponding VNC display name.  Both
+   will be \"(*none*)\" when there is no connection established.
 
-4) Below the x11 and vnc displays text label is a text area there scrolling
-information about actions being taken and commands being run is displayed.
-To scroll click in the area and use PageUp/PageDown or the arrow keys.
+4) Below the x11 and vnc displays label is a text area there scrolling
+   information about actions being taken and commands being run is displayed.
+   To scroll click in the area and use PageUp/PageDown or the arrow keys.
 
 5) At the bottom is an entry area.  When one selects a menu item that
-requires supplying a string value, the label will be set to the
-parameter name and one types in the new value.  Then one presses the
-\"OK\" button or presses \"Enter\" to set the value.  Or you can press
-\"Cancel\" or \"Escape\" to avoid changing the variable.  Some variables
-are boolean toggles (for example, \"Permissions -> viewonly\") or Radio
-button selections.  Selecting these menu items will not activate the
-entry area but rather toggle the variable directly.
+   requires supplying a string value, the label will be set to the
+   parameter name and one types in the new value.  Then one presses the
+   \"OK\" button or presses \"Enter\" to set the value.  Or you can press
+   \"Cancel\" or \"Escape\" to avoid changing the variable.
+
+   Many variables are boolean toggles (for example, \"Permissions ->
+   viewonly\") or Radio button selections.  Selecting these menu items
+   will NOT activate the entry area but rather toggle the variable
+   immediately.
 
 
-Cascades Bug: There is a bug not yet worked around for the cascade menus
+CASCADES BUG: There is a bug not yet worked around for the cascade menus
 where the (?) help button gets in the way.  To get the mouse over to
 the cascade menu click and release mouse to activate the cascade, then
 you can click on its items.  Dragging with a mouse button held down will
@@ -671,7 +968,7 @@ proc center_win {w} {
 	wm withdraw $w
 	set x [expr [winfo screenwidth  $w]/2 - [winfo reqwidth  $w]/2];
 	set y [expr [winfo screenheight $w]/2 - [winfo reqheight $w]/2];
-	wm geom $w +$x+$y
+	wm geometry $w +$x+$y
 	wm deiconify $w
 	update
 }
@@ -696,8 +993,21 @@ proc textheight {text} {
 }
 
 proc set_name {name} {
-	global full_win
-	if [info exists full_win] {
+	global full_win icon_mode
+	global saved_set_name
+
+	if {![info exists saved_set_name]} {
+		set saved_set_name "tkx11vnc"
+	}
+	if {$name == "RESTORE"} {
+		set name $saved_set_name
+	} else {
+		set saved_set_name $name
+	}
+	if {![info exists full_win]} {
+		return
+	}
+	if {$icon_mode} {
 		set w $full_win
 	} else {
 		set w "."
@@ -757,6 +1067,16 @@ proc textwin {name title text} {
 
 proc active_when_connected {item} {
 	global helpremote helptext
+	global icon_mode
+
+	if {$icon_mode} {
+		if {$item == "passwd"} {
+			return 1
+		}
+		if {$item == "viewpasswd"} {
+			return 1
+		}
+	}
 
 	if {[opt_match G $item]} {
 		return 1
@@ -869,7 +1189,10 @@ proc help_win {item} {
 		append text "\n\n"
 		append text "==== current $item value: ====\n";
 		append text "\n"
-		if {$menu_var($item) == ""} {
+
+		if {$item == "passwd" || $item == "viewpasswd"} {
+			;
+		} elseif {$menu_var($item) == ""} {
 			append text "$unset_str\n"
 		} else {
 			append text "$menu_var($item)\n"
@@ -1107,6 +1430,9 @@ proc menus_state {state} {
 
 	foreach case [array names menu_b] {
 		set menu_button $menu_b($case)
+		if {![winfo exists $menu_button]} {
+			continue
+		}
 		$menu_button configure -state $state
 	}
 }
@@ -1468,7 +1794,7 @@ proc insert_client_action_window {input} {
 	global ca_bk ca_bm ca_bb ca_bk ca_di
 
 	append_text "\nUse these checkboxes to set the input permissions "
-	append_text "for this client\n-or- whether to disconnect it instead.  "
+	append_text "for this client\n-OR- whether to disconnect it instead.  "
 	append_text "Then press \"OK\" or \"Cancel\".\n\n"
 	set w "$text_area.ca_f"
 	catch {destroy $w}
@@ -1518,7 +1844,7 @@ proc cleanup_text_window {} {
 # with entry = 0.
 proc entry_dialog {item {entry 1}} {
 	global menu_var entry_str entry_set entry_dialog_item
-	global unset_str connected_to_x11vnc
+	global unset_str connected_to_x11vnc entry_box
 
 	set entry_str "Set $item"
 	set entry_set 0
@@ -1526,6 +1852,10 @@ proc entry_dialog {item {entry 1}} {
 
 	entry_enable
 	menus_disable
+
+	if {$item == "passwd" || $item == "viewpasswd"} {
+		$entry_box configure -show "*"
+	}
 
 	if {$entry} {
 		entry_insert ""
@@ -1584,6 +1914,9 @@ proc entry_dialog {item {entry 1}} {
 			append_text "skipped setting $item\n"
 		}
 	}
+
+	$entry_box configure -show ""
+
 	return $rc
 }
 
@@ -1810,7 +2143,26 @@ proc set_info {str} {
 }
 
 proc append_text {str} {
-	global text_area
+	global text_area text_area_str
+
+	if {![info exists text_area_str]} {
+		set text_area_str ""
+	}
+	append text_area_str $str
+
+	if {![info exists text_area]} {
+		puts stderr $str
+		return
+	}
+	if {$text_area == ""} {
+		puts stderr $str
+		return
+	}
+	if {![winfo exists $text_area]} {
+		puts stderr $str
+		return
+	}
+	
 	$text_area insert end $str
 	$text_area see end
 }
@@ -1922,6 +2274,7 @@ proc do_action {item} {
 	if {[in_debug_mode]} {
 		append_text "action: \"$item\"\n"
 	}
+#puts "action: \"$item\"\n"
 
 	if {$item == "ping"} {
 		if {$beginner_mode} {
@@ -1959,6 +2312,9 @@ proc do_action {item} {
 		return
 	} elseif {$item == "Misc-Tuning:"} {
 		menu_help "$item"
+		return
+	} elseif {$item == "WindowView"} {
+		change_view_state
 		return
 	} elseif {$item == "stop+quit"} {
 		do_stop_quit
@@ -2002,7 +2358,7 @@ proc do_var {item} {
 	set debug [in_debug_mode]
 
 	set string 0
-	if {[is_action $item]} {
+	if {[is_action $item] || $item == "WindowView"} {
 		# Menu item is action:
 		if {$debug} {
 			ptime [time {do_action $item}]
@@ -2011,6 +2367,7 @@ proc do_var {item} {
 		}
 		return
 	}
+
 
 	if {[value_is_string $item]} {
 		# Menu item is a string:
@@ -2158,8 +2515,12 @@ proc set_x11_display {name} {
 	set_name "tkx11vnc - $name"
 }
 proc set_vnc_display {name} {
-	global vnc_display
+	global vnc_display icon_mode
 	set vnc_display "VNC display: $name"
+
+	if {$icon_mode} {
+		set_icon_label
+	}
 }
 proc set_vnc_url {name} {
 	global vnc_url
@@ -2174,6 +2535,22 @@ proc no_vnc_display {} {
 }
 proc no_vnc_url {} {
 	set_vnc_url "(*none*)"
+}
+
+proc get_vnc_display_number {} {
+	global vnc_display
+	if ![info exists vnc_display] {
+		return "none"
+	}
+	if {$vnc_display == ""} {
+		return "none"
+	}
+	set str $vnc_display
+	regsub {VNC display: *} $str "" str
+	if [regexp {:([0-9][0-9]*)} $str m0 n] {
+		return $n
+	}
+	return "none"
 }
 
 proc fetch_displays {} {
@@ -2350,14 +2727,34 @@ proc update_clients_and_repost {} {
 
 proc update_clients_menu {list} {
 	global item_cascade ffont
+	global saved_clients_str
+
+	if {![info exists saved_clients_str]} {
+		set saved_clients_str ""
+	}
+	if {$list == "INIT"} {
+		set list $saved_clients_str
+	} else {
+		set saved_clients_str $list
+	}
+
 	set subm $item_cascade(current);
 	catch {destroy $subm}
 	menu $subm -tearoff 0 -font $ffont
 	$subm add command
-	$subm add command -label "refresh-list" -command "update_clients_and_repost"
+	$subm add command -label "refresh-list" \
+		-command "update_clients_and_repost"
 	$subm add separator
 	set count 0
 	foreach client [split $list ","] {
+		if {![regexp {^[a-z0-9]*[a-z0-9]:} $client]} {
+			append_text "Skipping client line: "
+			append_text $client
+			append_text "\n"
+			continue
+		}
+		regsub -all {[{}()~!$&*|;'"`{}<>\[\]]} $client "" client
+		#'
 		if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
 		    $client m0 m1 m2 m3 m4 m5 m6 m7]} {
 			# id:ip:port:user:hostname:input:loginvo
@@ -2375,11 +2772,12 @@ proc update_clients_menu {list} {
 }
 
 proc set_widgets {} {
-	global connected_to_x11vnc item_case item_entry menu_m
+	global connected_to_x11vnc item_case item_menu item_entry menu_m
 
 	foreach item [array names item_case] {
 		set case $item_case($item)
-		set menu $menu_m($case)
+#		set menu $menu_m($case)
+		set menu $item_menu($item)
 		set entry $item_entry($item)
 		if {$entry < 0} {
 			# skip case under beginner_mode 
@@ -2389,21 +2787,20 @@ proc set_widgets {} {
 		if {$type == "separator" || $type == "tearoff"} {
 			continue
 		}
+		if {![winfo exists $menu]} {
+			continue
+		}
 		if {$connected_to_x11vnc} {
 			if {[active_when_connected $item]} {
 				$menu entryconfigure $entry -state normal
-#puts "n-1 $case / $item / $entry"
 			} else {
 				$menu entryconfigure $entry -state disabled
-#puts "I-1 $case / $item / $entry"
 			}
 		} else {
 			if {[active_when_starting $item]} {
 				$menu entryconfigure $entry -state normal
-#puts "n-2 $case / $item / $entry"
 			} else {
 				$menu entryconfigure $entry -state disabled
-#puts "I-2 $case / $item / $entry"
 			}
 		}
 	}
@@ -2411,7 +2808,7 @@ proc set_widgets {} {
 
 proc toggle_simple_gui {} {
 	global beginner_mode simple_gui_created
-	global connected_to_x11vnc
+	global connected_to_x11vnc make_gui_count
 
 	if {$beginner_mode} {
 		append_text "\nSwitching to simple-gui mode.\n"
@@ -2419,26 +2816,81 @@ proc toggle_simple_gui {} {
 		append_text "\nSwitching to power-user gui mode.\n"
 	}
 
+	if {$make_gui_count == 1} {
+		incr make_gui_count
+	}
 	set simple_gui_created 1
 	make_menu_items
 	set_widgets
 	set_internal_help
-	if {$connected_to_x11vnc} {
-		query_all
-	}
+#	if {$connected_to_x11vnc} {
+#		query_all
+#	}
 	append_text "\n"
+}
+
+proc little_qs {m} {
+	global bfont ffont beginner_mode
+	global helpremote helptext helplabel
+	global tk_version
+
+	if {$tk_version < 8.0} {
+		return
+	}
+
+	set n [$m index end]
+
+	for {set i 0} {$i <= $n} {incr i} {
+		set type [$m type $i]
+#puts "$m - $i - $type"
+		if {$type == "separator"} {
+			$m add separator
+		} elseif {$type == "tearoff"} {
+			continue;
+		} else {
+			set label [$m entrycget $i -label]
+			set str ""
+			if {[info exists helpremote($label)]} {
+				set str "(?)"
+			} elseif {[info exists helptext($label)]} {
+				set str "(?)"
+			}
+			$m add command -label $str \
+				-font $ffont \
+				-command "menu_help $label";
+
+			if {$str == ""} {
+				$m entryconfigure end -state disabled
+			}
+			set arg "$m,$i"
+#puts "helplabel: $arg -> $label"
+			set helplabel($arg) $label
+			set j [$m index end]
+			set arg "$m,$j"
+			set helplabel($arg) $label
+		}
+		if {$i == 0} {
+			$m entryconfigure end -columnbreak 1
+		}
+	}
+
+	menu_bindings $m
 }
 
 proc make_menu_items {} {
 	global template 
 	global menu_b menu_m menu_count
-	global item_opts item_bool item_case item_entry menu_var unset_str
+	global item_opts item_bool item_case item_menu item_entry menu_var unset_str
 	global item_cascade
 	global bfont ffont beginner_mode simple_gui_created
 	global helptext helpremote helplabel
 
-	# Extract the menu items:
 	set case "";
+	set L_casc ""
+	set L_casc_count 0
+	set L_menus [list]
+
+	# Extract the menu items:
 	foreach line [split $template "\n"] {
 		if {[regexp {^Row:} $line]} {
 			continue
@@ -2448,10 +2900,9 @@ proc make_menu_items {} {
 
 			if {$simple_gui_created} {
 				set i0 0
-				if {$case == "Misc"} {
-					# kludge for simple_gui
-					set i0 1
-				}
+				#if {$case == "Misc"} { # kludge for simple_gui
+				#	set i0 1
+				#}
 				catch {$menu_m($case) delete $i0 end}
 			}
 			set menu_count($case) 0
@@ -2479,6 +2930,11 @@ proc make_menu_items {} {
 		}
 		regsub {:$} $item {} item
 
+		if {$item == "LOFF"} {
+			set L_casc ""
+			continue
+		}
+
 		if {$item == "-- D"} {
 			set beginner_sep 1
 			set item "--"
@@ -2490,17 +2946,27 @@ proc make_menu_items {} {
 		set item_case($item) $case
 		set item_bool($item) $bool
 		set item_cascade($item) ""
-		set item_entry($item) $menu_count($case)
+
+		if {$L_casc == ""} {
+			set item_entry($item) $menu_count($case)
+			set m $menu_m($case)
+		} else {
+			# hack for cascades for crowded menus.  See =GAL opts.
+			set item_entry($item) $L_casc_count
+			set m $L_casc
+		}
 
 		set mvar 0 
-		set m $menu_m($case)
 
 		if {$beginner_mode && ! $beginner_sep && ![opt_match D $item]} {
 			set item_entry($item) "-1"
 			continue;
 		}
 
-		if {0} { puts "ITEM: $item\t- $opts\t- $case\t- $bool\t- $menu_count($case)" }
+		set item_menu($item) $m
+
+		if {0} { puts "ITEM: $item\t- $opts\t- $case\t- \
+			$bool\t- $menu_count($case)" }
 
 		# Create the menu items, its variables, etc., etc.
 
@@ -2519,12 +2985,25 @@ proc make_menu_items {} {
 				-font $ffont \
 				-command "menu_help $item"
 
+		} elseif {[opt_match L $item]} {
+			# Special sub-menu cascade (=GAL ends with LOFF)
+			set subm $m.casc_L$menu_count($case)
+			catch {destroy $subm}
+			menu $subm -tearoff 0 -font $ffont
+			set item_cascade($item) $subm
+			$m add cascade -label "$item" \
+				-font $ffont \
+				-menu $subm
+			set L_casc $subm
+			set L_casc_count -1
+			lappend L_menus $L_casc
+
 		} elseif {$item == "current"} {
 			# Current clients cascade
 			set subm $m.current_cascade
 			catch {destroy $subm}
 			set item_cascade($item) $subm
-			update_clients_menu ""
+			update_clients_menu "INIT"
 			$m add cascade -label "$item" \
 				-font $ffont \
 				-menu $subm
@@ -2534,7 +3013,9 @@ proc make_menu_items {} {
 			$m add command -label "$item" \
 				-font $ffont \
 				-command "do_var $item"
-			set menu_var($item) "";	# for convenience
+			if {![info exists menu_var($item)]} {
+				set menu_var($item) "";	# for convenience
+			}
 
 		} elseif {! $item_bool($item)} {
 			# String
@@ -2563,25 +3044,34 @@ proc make_menu_items {} {
 			set mvar 1
 
 		} elseif {$item == "simple-gui"} {
-			if {! $simple_gui_created} {
-				$m add checkbutton -label "$item" \
-					-command "toggle_simple_gui" \
-					-font $ffont \
-					-variable beginner_mode
-			}
+			$m add checkbutton -label "$item" \
+				-command "toggle_simple_gui" \
+				-font $ffont \
+				-variable beginner_mode
 		} else {
 			# Boolean
 			$m add checkbutton -label "$item" \
 				-command "do_var $item" \
 				-font $ffont \
 				-variable menu_var($item)
-			set menu_var($item) 0
+			if {![info exists menu_var($item)]} {
+				set menu_var($item) 0
+			}
 		}
 
-		incr menu_count($case)
+		if {$L_casc_count == -1} {
+			incr menu_count($case)
+			incr L_casc_count
+		} elseif {$L_casc != ""} {
+			incr L_casc_count
+		} else {
+			incr menu_count($case)
+		}
 
 		if {$mvar} {
-			set menu_var($item) $unset_str
+			if {![info exists menu_var($item)]} {
+				set menu_var($item) $unset_str
+			}
 		}
 	}
 
@@ -2590,52 +3080,28 @@ proc make_menu_items {} {
 		if {$case == "Help"} {
 			continue;
 		}
-		set m $menu_m($case);
-		set n [$m index end]
-
-		for {set i 0} {$i <= $n} {incr i} {
-			set type [$m type $i]
-			if {$type == "separator"} {
-				$m add separator
-			} elseif {$type == "tearoff"} {
-				continue;
-			} else {
-				set label [$m entrycget $i -label]
-				set str ""
-				if {[info exists helpremote($label)]} {
-					set str "(?)"
-				} elseif {[info exists helptext($label)]} {
-					set str "(?)"
-				}
-				$m add command -label $str \
-					-font $ffont \
-					-command "menu_help $label";
-
-				if {$str == ""} {
-					$m entryconfigure end -state disabled
-				}
-				set arg "$m,$i"
-				set helplabel($arg) $label
-				set j [$m index end]
-				set arg "$m,$j"
-				set helplabel($arg) $label
-			}
-			if {$i == 0} {
-				$m entryconfigure end -columnbreak 1
-			}
-		}
+		little_qs $menu_m($case);
+	}
+	foreach m $L_menus {
+		little_qs $m
 	}
 }
 
 proc menu_posted {} {
-	global last_query_all_time query_all_freq
-	global connected_to_x11vnc
+	global last_query_all_time query_all_freq icon_mode
+	global connected_to_x11vnc client_tail
+
 	set now [clock seconds]
 
+	if {$icon_mode && $client_tail != ""} {
+		set delay [expr 2 * $query_all_freq]
+	} else {
+		set delay $query_all_freq
+	}
 
 	if {$connected_to_x11vnc} {
 		set quiet 0
-		set refresh [expr "$last_query_all_time + $query_all_freq"]
+		set refresh [expr "$last_query_all_time + $delay"]
 
 		# puts "menu_posted $now $last_query_all_time"
 		# puts "menu_posted $refresh"
@@ -2650,12 +3116,22 @@ proc menu_posted {} {
 	}
 }
 
+proc props_widgets {state} {
+	global props_buttons
+	foreach w $props_buttons {
+		$w configure -state $state	
+	}
+	update
+}
+
 proc props_apply {} {
 	global props_accept props_confirm props_viewonly props_shared
 	global props_passwd props_viewpasswd
 	global prop0_accept prop0_confirm prop0_viewonly prop0_shared
 	global prop0_passwd prop0_viewpasswd
 	global menu_var
+
+	props_widgets disabled
 
 	if {$props_accept != $prop0_accept} {
 		if {$props_accept} {
@@ -2726,12 +3202,12 @@ proc props_apply {} {
 		set prop0_viewpasswd $props_viewpasswd
 		after 500
 	}
+	props_widgets normal
 }
 
 proc props_advanced {} {
-	global tray_mode icon_win props_win full_win
+	global icon_mode icon_win props_win full_win
 	global props_advanced_first
-
 
 	if ![info exists props_advanced_first] {
 		center_win $full_win
@@ -2749,13 +3225,14 @@ proc props_advanced {} {
 	}
 }
 
-proc do_props {} {
+proc do_props {{msg ""}} {
 	global props_accept props_confirm props_viewonly props_shared
 	global props_passwd props_viewpasswd
 	global prop0_accept prop0_confirm prop0_viewonly prop0_shared
 	global prop0_passwd prop0_viewpasswd
 	global menu_var unset_str
 	global have_labelframes ffont bfont
+	global props_buttons icon_noadvanced
 
 	if ![info exists props_accept] {
 		set props_accept 1
@@ -2812,10 +3289,15 @@ proc do_props {} {
 	}
 	set prop0_viewpasswd $props_viewpasswd
 
+	if [info exists props_buttons] {
+		catch {unset props_buttons}
+	}
+	set props_buttons [list]
+
 	set w .props
 	catch {destroy $w}
 	toplevel $w
-	wm title $w "Properties"
+	wm title $w "x11vnc Properties"
 	set b1 "$w.buttons1"
 	frame $b1
 	button $b1.ok -text OK -command "props_apply; destroy $w" -font $bfont
@@ -2823,14 +3305,21 @@ proc do_props {} {
 	button $b1.apply  -text Apply -command "props_apply" -font $bfont
 
 	pack $b1.apply $b1.cancel $b1.ok -side right -expand 1
+	lappend props_buttons $b1.apply $b1.cancel $b1.ok
 
 	set b2 "$w.buttons2"
 	frame $b2
 
 	button $b2.advanced -text "Advanced ..." \
 		-command "destroy $w; props_advanced" -font $bfont
+	if {! $icon_noadvanced} {
+		lappend props_buttons $b2.advanced
+		pack $b2.advanced -side right -expand 1
+	}
+
 	button $b2.help -text "Help ..." -command "menu_help Properties" -font $bfont
-	pack $b2.advanced $b2.help -side right -expand 1
+	lappend props_buttons $b2.help
+	pack $b2.help -side right -expand 1
 
 	set vp "$w.viewpw"
 	if {$have_labelframes} {
@@ -2844,6 +3333,8 @@ proc do_props {} {
 	entry $vp.e -show "*" -textvariable props_viewpasswd -font $bfont
 	pack $vp.e -fill x -expand 1 -padx 1m -pady 1m -side top
 
+	lappend props_buttons $vp.e
+
 	set pw "$w.passwd"
 	if {$have_labelframes} {
 		labelframe $pw -text "Password" -font $bfont
@@ -2855,6 +3346,8 @@ proc do_props {} {
 	}
 	entry $pw.e -show "*" -textvariable props_passwd -font $bfont
 	pack $pw.e -fill x -expand 1 -padx 1m -pady 1m -side top
+
+	lappend props_buttons $pw.e
 
 	set sh "$w.shared"
 	frame $sh
@@ -2880,14 +3373,27 @@ proc do_props {} {
 		-variable props_accept -anchor w -font $bfont
 	pack $ac.button -fill x -expand 1 -padx 1m -pady 1m
 
-	pack $b1 -side bottom -fill x -pady 1m -padx 2m
-	pack $b2 -side bottom -fill x -pady 1m -padx 2m
-	pack $vp -side bottom -fill x -pady 1m -padx 2m
-	pack $pw -side bottom -fill x -pady 1m -padx 2m
-	pack $sh -side bottom -fill x -pady 0m -padx 2m
-	pack $vo -side bottom -fill x -pady 0m -padx 2m
-	pack $cf -side bottom -fill x -pady 0m -padx 2m
-	pack $ac -side bottom -fill x -pady 0m -padx 2m
+	set px "6m"
+	pack $b1 -side bottom -fill x -pady 1m -padx $px
+	pack $b2 -side bottom -fill x -pady 1m -padx $px
+	pack $vp -side bottom -fill x -pady 1m -padx $px
+	pack $pw -side bottom -fill x -pady 1m -padx $px
+	pack $sh -side bottom -fill x -pady 0m -padx $px
+	pack $vo -side bottom -fill x -pady 0m -padx $px
+	pack $cf -side bottom -fill x -pady 0m -padx $px
+	pack $ac -side bottom -fill x -pady 0m -padx $px
+
+	if {$msg != ""} {
+		set tw [textwidth $msg]
+		set th [textheight $msg]
+		set th [expr $th - 1]
+		set ms "$w.msg"
+		text $ms -font $ffont -relief ridge -width $tw -height $th
+		$ms insert 1.0 $msg
+		pack $ms -side bottom -fill x -pady 1m -padx $px
+	}
+
+	lappend props_buttons $ac.button $cf.button $vo.button $sh.button
 
 	wm resizable $w 1 0
 	center_win $w
@@ -2916,6 +3422,8 @@ proc do_new_client {} {
 	
 	tkwait window $w
 
+	regsub -all {[{}()~!$&*|;'"`{}<>\[\]]} $newclient "" newclient
+	#'
 	if {$newclient != ""} {
 		push_new_value "connect" "connect" "$newclient" 1
 	}
@@ -2926,6 +3434,9 @@ proc do_disconnect_all {} {
 }
 
 proc pmenu {m x y} {
+	if {![winfo exists $m]} {
+		return
+	}
 	set x [expr $x-10]
 	set y [expr $y-10]
 	$m post $x $y
@@ -2975,31 +3486,22 @@ proc set_client_balloon {str} {
 
 proc read_client_info {} {
 	global x11vnc_client_file client_tail client_str
-	global unlinked_x11vnc_client_file
+	global client_tail_read
+	set db 0
+
 	if {$client_tail != ""} {
 		after 100
 		set str ""
 		set count [gets $client_tail str]
+		if {$db} {puts stderr "read_client_info: $str"}
 
-		# we can unlink the file early since both processes
-		# have it open.
-		if ![info exists unlinked_x11vnc_client_file] {
-			set unlinked_x11vnc_client_file 0
-		} elseif {$unlinked_x11vnc_client_file == ""} {
-			set unlinked_x11vnc_client_file 0
-		}
-		if {! $unlinked_x11vnc_client_file} {
-			after 500
-			catch {file delete $x11vnc_client_file}
-			set unlinked_x11vnc_client_file 1
-		}
-
-		if {$count == -1} {
+		if {$count == -1 || [eof $client_tail]} {
 			close $client_tail
 			catch {file delete $x11vnc_client_file}
 			clean_icon_exit
 		}
 		if {$count > 0 && ![regexp {^[ 	]*$} $str]} {
+			set client_tail_read 1
 			if {$str == "quit"} {
 				catch {file delete $x11vnc_client_file}
 				clean_icon_exit
@@ -3016,14 +3518,16 @@ proc read_client_info {} {
 }
 
 proc show_client_balloon {} {
-	global tray_mode icon_win props_win full_win
+	global icon_mode icon_win props_win full_win
 	global client_balloon ffont
 
+	set noinfo "tkx11vnc: no client information"
+	set noinfo "$noinfo\navailable from x11vnc ..."
 	if ![info exists client_balloon] {
-		set client_balloon "tkx11vnc ..."
+		set client_balloon $noinfo
 	}
 	if {$client_balloon == ""} {
-		set client_balloon "tkx11vnc ..."
+		set client_balloon $noinfo
 	}
 
 	set x [expr [winfo rootx $icon_win] + ([winfo width $icon_win]/2)]
@@ -3066,67 +3570,288 @@ proc kill_client_balloon {} {
 }
 
 proc icon_win_cfg {clients} {
-	global icon_win
+	global icon_win client_tail client_tail_read
 	if {$clients > 0} {
 		$icon_win configure -bg black -fg white
 	} else {
 		$icon_win configure -bg white -fg black
 	}
+	if {$client_tail == "" || !$client_tail_read} {
+		$icon_win configure -fg red
+	}
+}
+
+proc server_accept {sock addr port} {
+	global socket_cookie server socket_got_callback
+	global client_tail
+	set db 0
+
+	if {$db} {puts stderr "sock=$sock addr=$addr port=$port"}
+
+	update; update idletasks
+	after 50
+	update; update idletasks
+	set count [gets $sock str]
+
+	if {$count >= 0} {
+		set str [string trim $str]
+		if {$db} {puts stderr "server_accept: \"$str\""}
+		if {$str == "COOKIE:$socket_cookie"} {
+			set client_tail $sock
+			if {$db} {puts stderr "cookie matched. $client_tail"}
+		} else {
+			if {$db} {puts stderr "cookie NO matched."}
+		}
+	}
+	catch {close $server}
+	set socket_got_callback 1
+	if {$db} {puts stderr "socket_got_callback $socket_got_callback"}
+}
+
+proc try_client_info_sock {} {
+	global socket_cookie server socket_got_callback
+	global x11vnc_started hostname
+	set start 13037
+	set tries 100
+	set socket_got_callback 0
+
+	if {$x11vnc_started} {
+		set myaddr "127.0.0.1"
+	} else {
+		set myaddr $hostname
+	}
+	set socket_cookie [clock clicks]
+	
+	for {set i 0} {$i <= $tries} {incr i} {
+		set port [expr $start + $i]
+		set server [socket -server server_accept -myaddr $myaddr $port]
+		if {$server == ""} {
+			continue
+		}
+		if {[eof $server]} {
+			continue
+		}
+		set err ""
+		catch {set err [fconfigure $server -error]}
+		#puts "err: $server: $err"
+		if {$err == ""} {
+			break
+		}
+	}
+	if {$server == ""} {
+		append_text "try_client_info_sock: server socket failed.\n"
+		return
+	}
+	run_remote_cmd [list "-nosync" "-R" "noop"]
+	after 500
+	run_remote_cmd [list "-nosync" "-R" \
+		"client_info_sock:$myaddr:$port:$socket_cookie"]
+	after 500
+
+	set aftid ""
+	if {$socket_got_callback == 0} {
+		set aftid [after 10000 {set socket_got_callback 2}]
+		tkwait variable socket_got_callback
+	}
+
+	if {$aftid != ""} {
+		catch {after cancel $aftid}
+	}
+
+	if {$socket_got_callback != 1} {
+		puts stderr "try_client_info_sock failed: no callback\n"
+		catch {close $server}
+	} else {
+		setup_client_tail
+	}
+}
+
+proc set_icon_label {} {
+	global icon_win
+
+	set lab [get_icon_label]
+	
+	if {[info exists icon_win]} {
+		$icon_win configure -text $lab
+	}
+}
+
+proc get_icon_label {{set 0}} {
+	global icon_minimal 
+
+	set lab0 "x11\nvnc"
+	
+	if {$icon_minimal} {
+		set lab [get_vnc_display_number]
+		if {$lab != "none"} {
+			set lab "  :$lab"
+		}
+	} else {
+		set lab $lab0
+	}
+	return $lab
+}
+
+proc lmenu {menu} {
+	global window_view_posted
+	after 100
+	if {!$window_view_posted} {
+		after 100
+		if {!$window_view_posted} {
+			$menu unpost
+			return
+		}
+	}
+	# kludge for WindowView
+	focus $menu
+}
+
+proc old_balloon {} {
+	global client_str saved_client_str
+	set str ""
+	if {[info exists client_str]} {
+		if {$client_str != ""} {
+			set str $client_str
+		}
+	}
+	if {$str == ""} {
+		if {[info exists saved_client_str]} {
+			set str $saved_client_str
+		}
+	}
+	if {$str != ""} {
+		set_client_balloon $str
+	}
 }
 
 proc make_icon {} {
-	global tray_mode tray_embed_id icon_win props_win full_win
-	global x11vnc_client_file client_tail client_str
+	global icon_mode icon_embed_id icon_win props_win full_win
+	global tray_embed tray_running env
+	global x11vnc_client_file client_tail client_str saved_clients_str
 	global client_balloon_id
-	global bfont ffont
+	global bfont sfont ffont
+	global icon_minimal gui_start_mode
+	global window_view_posted menu_var x11vnc_gui_geom
+	set min_x 24
+	set min_y 24
 	
-#	if {$tray_embed_id != ""} {
-#		wm withdraw .
-#		set top ".icon"
-#		toplevel $top -use $tray_embed_id
-#	}
-
-	set l .label
-	set icon_win $l
-	label $l -text "x11\nvnc" -borderwidth 5 -font $bfont
-	icon_win_cfg 0
-
-	pack $l
-	set menu "$l.menu"
-	menu $menu -tearoff 0
-	$menu add command -font $bfont -label "Properties" -command do_props
-	$menu add command -font $bfont -label "Help" -command "menu_help Tray"
-	$menu add separator
-	$menu add command -font $bfont -label "New Client" -command do_new_client
-	$menu add command -font $bfont -label "Disconnect All" -command do_disconnect_all
-	$menu add separator
-	$menu add command -font $bfont -label "Stop x11vnc" -command clean_icon_exit
-
-	bind . <Button-1> "pmenu $menu %X %Y"
-	bind . <Button-3> "pmenu $menu %X %Y"
-	bind $menu <Leave> "after 200; $menu unpost"
-
-	if {$x11vnc_client_file != "" } {
-		if ![file exists $x11vnc_client_file] {
-			set fh [open $x11vnc_client_file "w"]
-			puts $fh "skip"
-			close $fh
+	set font $bfont
+	if {$tray_embed} {
+		set font $sfont
+	}
+	if {[info exists env(X11VNC_ICON_FONT)]} {
+		set font $env(X11VNC_ICON_FONT)
+	}
+	if {[regexp {([0-9][0-9]*)x([0-9][0-9]*)} $x11vnc_gui_geom m mx my]} {
+		if {$mx < $min_x} {
+			set min_x $mx
 		}
-		if [file exists $x11vnc_client_file] {
-			set client_tail [open "|tail -f $x11vnc_client_file" "r"]
+		if {$my < $min_y} {
+			set min_y $my
 		}
 	}
+	wm minsize . $min_x $min_y
 
+	if {$tray_embed && $tray_running} {
+		wm withdraw .
+	}
+
+	set l .icon
+	set icon_win $l
+	catch destroy {$icon_win}
+	if {$icon_minimal} {
+		set bw 1
+	} else {
+		set bw 5
+	}
+	set lab [get_icon_label]
+	label $l -text $lab -borderwidth $bw -font $font
+	icon_win_cfg 0
+
+	set window_view_posted 0
+	pack $l -fill both -expand 1
+	set menu "$l.menu"
+	menu $menu -tearoff 0 -postcommand {set window_view_posted 0}
+	$menu add command -font $font -label "Properties" -command do_props
+	$menu add command -font $font -label "Help" -command "menu_help Tray"
+	$menu add separator
+	$menu add command -font $font -label "New Client" -command do_new_client
+	$menu add command -font $font -label "Disconnect All" -command do_disconnect_all
+	$menu add separator
+
+	set wv "$menu.casc1"
+	catch {destroy $wv}
+	menu $wv -tearoff 0 -font $ffont \
+		-postcommand {set window_view_posted 1}
+	foreach val {full icon tray} {
+		$wv add radiobutton -label "$val" \
+			-value "$val" -font $ffont \
+			-command "do_var WindowView" \
+			-variable menu_var(WindowView)
+	}
+	$menu add cascade -font $font -label "Window View" -menu $wv
+
+	$menu add command -font $font -label "Stop x11vnc" -command clean_icon_exit
+
+	bind $icon_win <ButtonPress-1> "pmenu $menu %X %Y"
+	bind $icon_win <ButtonPress-3> "pmenu $menu %X %Y"
 	bind $icon_win <Enter> {set client_balloon_id [after 500 show_client_balloon]}
 	bind $icon_win <Button> {kill_client_balloon}
 	bind $icon_win <Leave>  {kill_client_balloon}
+	bind $icon_win <ButtonPress-2> {kill_client_balloon; show_client_balloon}
+	bind $menu <Leave> "lmenu $menu"
+	bind $menu <KeyPress-Escape> "$menu unpost"
+
+	if {!$tray_embed || !$tray_running} {
+		global x11vnc_gui_geom
+		if {$x11vnc_gui_geom != ""} {
+			set doit 1
+			if {[regexp {x} $x11vnc_gui_geom]} {
+				if {$gui_start_mode == "full"} {
+					set doit 0
+				}
+			} 
+			if {$doit} {
+				wm geometry . $x11vnc_gui_geom
+			}
+		}
+	}
+	wm deiconify .
+
+	if {$client_tail == "" } {
+		stop_watch on
+		try_client_info_sock
+		if {$client_tail == "" } {
+			after 500
+			try_client_info_sock
+		}
+		stop_watch off
+	}
+	if {$client_tail == "" } {
+		set m "\n"
+		set m "${m}tkx11vnc:\n"
+		set m "${m}\n"
+		set m "${m}    Warning -- running in icon/tray mode but the\n"
+		set m "${m}    connected client info channel from x11vnc is\n"
+		set m "${m}    not working.  The viewer client list and icon\n"
+		set m "${m}    color indicator will not be accurate.\n"
+		set m "${m}\n"
+		set m "${m}    You may need to restart \"x11vnc -gui tray ...\"\n"
+		set m "${m}    for this to work properly.\n"
+		set m "${m}\n"
+		textwin "Warning" "Warning" $m
+		update
+	}
+
+	old_balloon
 }
 
-proc clean_icon_exit {} {
-	global client_tail
+proc clean_client_tail {} {
+	global client_tail client_tail_read
 	if [info exists client_tail] {
 		if {$client_tail != ""} {
-			set p [pid $client_tail]
+			set p ""
+			catch {set p [pid $client_tail]}
 			if {$p != ""} {
 				catch {exec kill -TERM $p >/dev/null 2>/dev/null}
 			}
@@ -3134,6 +3859,11 @@ proc clean_icon_exit {} {
 			set client_tail ""
 		}
 	}
+	set client_tail_read 0
+}
+
+proc clean_icon_exit {} {
+	clean_client_tail
 	push_new_value "stop" "stop" 1 0
 	set_connected no
 	update
@@ -3141,31 +3871,122 @@ proc clean_icon_exit {} {
 	exit
 }
 
-proc make_widgets {} {
-	global template 
+proc make_gui {mode} {
+	global icon_mode tray_embed full_win icon_win
+	global top_widget_names x11vnc_gui_geom
+	global gui_current_state make_gui_count
+	global x11vnc_connect connected_to_x11vnc
+	global x11_display
+	global gui_start_mode
+
+	incr make_gui_count
+
+	if {$gui_start_mode == ""} {
+		set gui_start_mode $mode
+	}
+
+	wm withdraw .
+
+	set full_geom ""
+	if {[winfo exists .full]} {
+		catch {set full_geom [wm geometry .full]}
+	}
+
+	set fw .full
+	set full_win $fw
+	catch {pack forget $full_win}
+	catch {pack forget $icon_win}
+	catch {destroy $full_win}
+	catch {destroy $icon_win}
+
+	wm minsize . 1 1
+
+	if {$mode == "full"} {
+		frame $fw
+		set icon_mode 0
+
+		wm protocol .     WM_DELETE_WINDOW "destroy .; exit"
+		make_widgets $fw
+
+		set w "."
+		wm geometry $w ""
+		if {$x11vnc_gui_geom != ""} {
+			set doit 1
+			if {[regexp {x} $x11vnc_gui_geom]} {
+				if {$gui_start_mode != $mode} {
+					set doit 0
+				}
+			}
+			if {$doit} {
+				wm geometry $w $x11vnc_gui_geom
+			}
+		}
+		pack $fw -fill both -expand 1
+
+	} elseif {$mode == "icon" || $mode == "tray"} {
+
+		toplevel $fw
+		wm withdraw $fw
+
+		wm protocol $fw WM_DELETE_WINDOW "wm withdraw .full"
+		wm protocol .   WM_DELETE_WINDOW "clean_icon_exit"
+		
+		if {$mode == "icon"} {
+			set tray_embed 0
+		} elseif {$mode == "tray"} {
+			set tray_embed 1
+		}
+		set icon_mode 1
+		make_widgets $fw
+		set w $fw
+		make_icon
+		wm geometry $fw ""
+		wm geometry .   ""
+	} else {
+		return
+	}
+	set_view_variable $mode
+	set gui_current_state $mode
+
+
+	wm deiconify .
+	update idletasks
+	wm minsize $w [winfo width $w] [winfo height $w]
+	if {$mode == "full" && $make_gui_count > 1} {
+		center_win .
+	}
+
+	if {$make_gui_count == 1} {
+		if {$x11vnc_connect} {
+			try_connect_and_query_all
+		}
+	} else {
+		set_name "RESTORE"
+	}
+	set_widgets
+
+	if {$mode == "icon" || $mode == "tray"} {
+		setup_client_tail
+		if {$mode == "tray"} {
+			setup_tray_embed
+		}
+	}
+}
+
+proc make_widgets {top} {
+	global template make_gui_count
 	global menu_b menu_m menu_count
-	global item_opts item_bool item_case item_entry menu_var unset_str
+	global item_opts item_bool item_case item_menu item_entry menu_var unset_str
 	global item_cascade
 	global info_label info_str x11_display vnc_display
-	global text_area
+	global text_area text_area_str
 	global entry_box entry_str entry_set entry_label entry_ok entry_browse
 	global entry_help entry_skip
 	global bfont ffont beginner_mode
 	global helptext helpremote helplabel
-	global tray_mode icon_win props_win full_win
+	global icon_mode icon_win props_win full_win
+	global top_widget_names
 
-	if {$tray_mode} {
-		set top ".advanced"
-		toplevel $top
-		wm withdraw $top
-		set full_win $top
-		wm protocol $top WM_DELETE_WINDOW "wm withdraw $top"
-		wm protocol . WM_DELETE_WINDOW "clean_icon_exit"
-		make_icon
-	} else {
-		set top ""
-		set full_win "."
-	}
 
 	# Make the top label
 	set label_width 80
@@ -3173,6 +3994,8 @@ proc make_widgets {} {
 	label $info_label -textvariable info_str -bd 2 -relief groove \
 		-anchor w -width $label_width -font $ffont
 	pack $info_label -side top -fill x -expand 0
+
+	set top_widget_names(info) $info_label
 
 	# Extract the Rows:
 	set row 0;
@@ -3235,22 +4058,29 @@ proc make_widgets {} {
 		}
 	}
 	pack $f -side top -fill x
+	set top_widget_names(menuframe) $f
 
 	make_menu_items
 
 	# Make the x11 and vnc display label bar:
 	set df "$top.displayframe"
 	frame $df -bd 1 -relief groove
+	set top_widget_names(displayframe) $df
 
 	set df_x11 "$df.xdisplay"
-	no_x11_display
 
+	if {$make_gui_count == 1} {
+		no_x11_display
+	}
 	set lw [expr {$label_width / 2}]
 	label $df_x11 -textvariable x11_display -width $lw -anchor w \
 		-font $ffont
 
 	set df_vnc "$df.vdisplay"
-	no_vnc_display
+
+	if {$make_gui_count == 1} {
+		no_vnc_display
+	}
 	label $df_vnc -textvariable vnc_display -width $lw -anchor w \
 		-font $ffont
 
@@ -3261,14 +4091,20 @@ proc make_widgets {} {
 	set text_area "$top.text"
 	text $text_area -height 12 -relief ridge -font $ffont
 	pack $text_area -side top -fill both -expand 1
+	set top_widget_names(text) $text_area
 
 
-	set str "Click Help -> gui for overview."
-	append_text "\n$str\n\n"
+	if {$text_area_str == ""} {
+		set str "Click Help -> gui for overview."
+		append_text "\n$str\n\n"
+	} else {
+		append_text $text_area_str
+	}
 
 	# Make entry box stuff
 	set ef "$top.entryframe"
 	frame $ef -bd 1 -relief groove
+	set top_widget_names(entryframe) $ef
 
 	# Entry Label
 	set ef_label "$ef.label"
@@ -3322,30 +4158,32 @@ proc make_widgets {} {
 	set entry_label $ef_label
 	entry_disable
 
-	if {$top == ""} {
-		set w "."
-	} else {
-		set w $top
-	}
-	update idletasks
-	wm minsize $w [winfo width $w] [winfo height $w]
 }
 
-proc menu_bindings {} {
-	bind Menu <<MenuSelect>> {
+proc menu_bindings {m} {
+	set db 0
+	if {$db} {puts "menu_bindings $m"}
+
+	bind $m <<MenuSelect>> {
 #syntax hilite bug \
 MenuSelect>>
 		set n [%W index active]
+		set db 0
+		if {$db} {puts stderr "menu_bindings %W $n"}
 		set label "    "
 		if {$n != "none"} {
 			set str %W,$n
 			set which ""
+
+			if {$db} {puts "menu_bindings $str"}
 			if {[info exists helplabel($str)]} {
 				set vname [format %%-16s $helplabel($str)]
 				set label "Click (?) for help on: $vname"
 				set which $helplabel($str)
 			}
 			if {$which == ""} {
+				;
+			} elseif {$which == "passwd" || $which == "viewpasswd"} {
 				;
 			} elseif {[is_action $which]} {
 				if {[info exists menu_var($which)] 
@@ -3397,14 +4235,30 @@ proc key_bindings {} {
 proc stop_watch {onoff} {
 	global orig_cursor text_area entry_box
 
-	set widgets [list . $text_area $entry_box] 
+	set widgets [list .]
+	if [info exists text_area] {
+		if {$text_area != ""} {
+			lappend widgets $text_area
+		}
+	}
+	if [info exists entry_box] {
+		if {$entry_box != ""} {
+			lappend widgets $entry_box
+		}
+	}
 
 	if {$onoff == "on"} {
 		foreach item $widgets {
+			if {![winfo exists $item]} {
+				continue
+			}
 			$item config -cursor {watch}
 		}
 	} else {
 		foreach item $widgets {
+			if {![winfo exists $item]} {
+				continue
+			}
 			$item config -cursor {}
 		}
 	}
@@ -3615,6 +4469,7 @@ proc run_remote_cmd {opts} {
 	}
 	lappend cmd "2>"
 	lappend cmd "/dev/null"
+#	lappend cmd "/tmp/nono"
 
 	if {0} {
 		set str [join $cmd]
@@ -3626,9 +4481,12 @@ proc run_remote_cmd {opts} {
 
 	set output ""
 	menus_disable
+
 	stop_watch on
 	catch {set output [eval exec $cmd]}
 	stop_watch off
+#puts stderr [exec cat /tmp/nono]
+
 	menus_enable
 	if {$debug} {
 		if {[string length $output] > 100} {
@@ -3693,13 +4551,150 @@ proc try_connect {} {
 	}
 }
 
+proc set_view_variable {val} {
+	global menu_var
+	set menu_var(WindowView) $val
+}
+proc get_view_variable {} {
+	global menu_var
+	if {![info exists menu_var(WindowView)]} {
+		set menu_var(WindowView) "none"
+	}
+	return $menu_var(WindowView)
+}
+
+proc change_view_state {} {
+	global menu_var gui_current_state
+
+	set new [get_view_variable]
+
+	set old $gui_current_state
+	#puts "$old -> $new"
+
+	if {$old == $new} {
+		return
+	}
+
+	if {$old == "full" || $old == "icon" || $old == "tray"} {
+		;
+	} else {
+		set old "none"
+	}
+
+	if {$new == "full" || $new == "icon" || $new == "tray"} {
+		if {$old == "tray"} {
+			# sigh XReparentWindow would be too easy...
+			# undo_tray_embed
+			restart_everything $new
+			destroy .
+			exit
+		}
+		make_gui $new
+	} else {
+		set_view_variable $old
+	}
+}
+
+proc setup_client_tail {} {
+	global client_tail
+	if {$client_tail != ""} {
+		fileevent $client_tail readable read_client_info
+	}
+}
+
+proc setup_tray_embed {} {
+	global icon_win
+	update
+	set w [winfo width .]
+	set h [winfo height .]
+	if {$w < 24} {
+		set w 24
+	}
+	if {$h < 24} {
+		set h 24
+	}
+	wm minsize . $w $h
+	set wid [winfo id .]	
+	push_new_value "remote-cmd" "remote-cmd" "trayembed:$wid" 0
+}
+
+proc restart_everything {gui_mode} {
+	global env gui_argv0 x11vnc_prog full_win
+	if {$gui_mode == "full"} {
+		set env(X11VNC_ICON_MODE) 0
+	} elseif {$gui_mode == "icon"} {
+		set env(X11VNC_ICON_MODE) 1
+	} elseif {$gui_mode == "tray"} {
+		if {![regexp -nocase {TRAY} $env(X11VNC_ICON_MODE)]} 	{
+			set env(X11VNC_ICON_MODE) "TRAY"
+		}
+	}
+	puts stderr ""
+	puts stderr "tkx11vnc: restarting gui to leave tray mode."
+	puts stderr "  new gui will be running in the background."
+	puts stderr "  use kill(1) rather than Ctrl-C to kill it."
+	puts stderr ""
+	if {[info exists env(X11VNC_RESTART_DEPTH)]} {
+		set n $env(X11VNC_RESTART_DEPTH)
+		incr n
+		set env(X11VNC_RESTART_DEPTH) $n
+	} else {
+		set env(X11VNC_RESTART_DEPTH) 0
+	}
+	set env(X11VNC_ICON_SETPASS) ""
+
+	if {![info exists env(X11VNC_WISHCMD)]} {
+		puts stderr "failure in restart_everything."
+		exit 1;
+	}
+
+	set code [exec $x11vnc_prog -printgui]
+	if {[string length $code] < 20000} {
+		puts stderr "failure in restart_everything."
+		exit 1;
+	}
+	set tmp "/tmp/x11vnc[pid]"
+	file delete -force $tmp
+	if {[file exists $tmp]} {
+		puts stderr "failure in restart_everything."
+		exit 1;
+	}
+	set fh [open $tmp "a"]
+	if {![file owned $tmp]}  {
+		puts stderr "failure in restart_everything."
+		exit 1;
+	}
+	file attributes $tmp -permissions "0400"
+	puts $fh $code
+	close $fh
+
+	#puts stderr [exec ls -l $tmp]
+
+	wm withdraw .
+	catch {wm withdraw $full_win}
+	update
+
+	exec $env(X11VNC_WISHCMD) $tmp &
+	after 2000
+	file delete -force $tmp
+	
+	destroy .
+	exit
+}
+
+proc undo_tray_embed {} {
+	global icon_win
+	set wid [winfo id .]	
+	push_new_value "remote-cmd" "remote-cmd" "trayunembed:$wid" 0
+}
+
 ############################################################################
 # main:
 
 global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
-global x11vnc_client_file
+global x11vnc_client_file x11vnc_gui_geom x11vnc_started vnc_url
 global x11vnc_auth_file x11vnc_connect_file beginner_mode simple_gui_created
-global helpall helptext helpremote helplabel hostname;
+global helpall helptext helpremote helplabel hostname osname
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
 global menu_var unset_str menus_disabled
@@ -3707,15 +4702,21 @@ global bfont ffont old_labels have_labelframes
 global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
 global cache_all_query_vars
-global last_query_all_time query_all_freq
-global tray_mode tray_embed_id client_tail
+global last_query_all_time query_all_freq client_tail client_tail_read
+global icon_mode tray_embed tray_running icon_setpasswd icon_embed_id
+global icon_noadvanced icon_minimal
+global make_gui_count text_area_str
+global gui_argv0 gui_start_mode
 
 set unset_str "(unset)"
+set vnc_url $unset_str
 set connected_to_x11vnc 0
 set menus_disabled 0
 set max_text_height 40
 set max_text_width 90
 set bfont "-adobe-helvetica-bold-r-*-*-*-120-*-*-*-*-*-*"
+set sfont "-adobe-helvetica-bold-r-*-*-*-100-*-*-*-*-*-*"
+set snfont "-adobe-helvetica-medium-r-*-*-*-100-*-*-*-*-*-*"
 set ffont "fixed"
 set help_indent 24;
 set reply_xdisplay ""
@@ -3725,12 +4726,23 @@ set cache_all_query_vars ""
 set query_all_freq 120
 set last_query_all_time [clock seconds]
 set client_tail ""
+set client_tail_read 0
+set make_gui_count 0
+set text_area_str ""
+set gui_argv0 $argv0
+set gui_start_mode ""
 
 # these are no longer used under x11vnc -sync:
 set delay_sleep 350
 set extra_sleep 1000
 set extra_sleep_split 4
 
+if {$tk_version < 8.0} {
+	puts stderr ""
+	puts stderr "*** tkx11vnc: tk version is old $tk_version, please use 8.0 or higher."
+	puts stderr "***           will try to continue with reduced functionality..."
+	puts stderr ""
+}
 if {[regexp {^[34]} $tk_version] || $tk_version == "8.0"} {
 	set old_labels 1
 } else {
@@ -3759,7 +4771,34 @@ if {"$argv" == "-spit"} {
 	exit 0
 }
 
+
+set_view_variable "full"
+
+#puts [exec env | grep X11VNC]
+
 # Read environment for clues:
+
+set x11vnc_client_file "";
+if {[info exists env(X11VNC_CLIENT_FILE)]} {
+	set x11vnc_client_file $env(X11VNC_CLIENT_FILE);
+	set file $x11vnc_client_file
+
+	set client_tail ""
+	if {[file exists $file] && [file isfile $file]} {
+		if {[file readable $file] && [file owned $file]} {
+			set client_tail [open "|tail -f $x11vnc_client_file" "r"]
+		}
+	}
+	if {$client_tail != ""} {
+		gets $client_tail tmp
+		if [eof $client_tail] {
+			clean_client_tail
+			set client_tail ""
+		}
+	}
+	catch {file delete -force $x11vnc_client_file}
+}
+
 if {[info exists env(X11VNC_PROG)]} {
 	set x11vnc_prog $env(X11VNC_PROG);
 } else {
@@ -3778,16 +4817,21 @@ if {[info exists env(X11VNC_CONNECT)]} {
 	set x11vnc_connect 0;
 }
 
+if {[info exists env(X11VNC_GUI_GEOM)]} {
+	set x11vnc_gui_geom $env(X11VNC_GUI_GEOM);
+} else {
+	set x11vnc_gui_geom ""
+}
+
 if {[info exists env(X11VNC_CONNECT_FILE)]} {
 	set x11vnc_connect_file $env(X11VNC_CONNECT_FILE);
 } else {
 	set x11vnc_connect_file "";
 }
 
-if {[info exists env(X11VNC_CLIENT_FILE)]} {
-	set x11vnc_client_file $env(X11VNC_CLIENT_FILE);
-} else {
-	set x11vnc_client_file "";
+set x11vnc_started 0
+if {[info exists env(X11VNC_STARTED)]} {
+	set x11vnc_started 1
 }
 
 if {[info exists env(X11VNC_XDISPLAY)]} {
@@ -3795,6 +4839,7 @@ if {[info exists env(X11VNC_XDISPLAY)]} {
 	set x11vnc_connect 1
 
 } elseif {$argv != "" && [regexp {:[0-9]} $argv]} {
+	set env(X11VNC_XDISPLAY) "$argv"
 	set x11vnc_xdisplay "$argv"
 	set x11vnc_connect 1
 
@@ -3817,21 +4862,55 @@ if {[info exists env(X11VNC_SIMPLE_GUI)]} {
 	set beginner_mode 0
 }
 
-set tray_mode 0
-if {[info exists env(X11VNC_TRAY_MODE)]} {
-	set tray_mode 1
+set icon_mode 0
+set tray_embed 0
+set tray_running 0
+if {![info exists env(X11VNC_ICON_MODE)]} {
+	set icon_mode 0
+} elseif {$env(X11VNC_ICON_MODE) == "" || $env(X11VNC_ICON_MODE) == "0"} {
+	set icon_mode 0
 } else {
-	set tray_mode 0
+	set icon_mode 1
+	set_view_variable "icon"
+	if [regexp -nocase {TRAY} $env(X11VNC_ICON_MODE)] {
+		set tray_embed 1
+	}
+	if [regexp -nocase {RUNNING} $env(X11VNC_ICON_MODE)] {
+		set tray_running 1
+	}
 }
-set tray_mode 1
+set icon_setpasswd 0
+if {[info exists env(X11VNC_ICON_SETPASS)]} {
+	if {$env(X11VNC_ICON_SETPASS) != ""} {
+		set icon_setpasswd 1
+	}
+}
 
-if {[info exists env(X11VNC_TRAY_EMBED_ID)]} {
-	set tray_embed_id $env(X11VNC_TRAY_EMBED_ID)
-} else {
-	set tray_embed_id ""
+set icon_noadvanced 0
+if {[info exists env(X11VNC_ICON_NOADVANCED)]} {
+	set icon_noadvanced 1
 }
+
+set icon_minimal 0
+if {[info exists env(X11VNC_ICON_MINIMAL)]} {
+	set icon_minimal 1
+}
+
+if {[info exists env(X11VNC_ICON_EMBED_ID)]} {
+	set icon_embed_id $env(X11VNC_ICON_EMBED_ID)
+} else {
+	set icon_embed_id ""
+}
+
 
 set hostname [exec uname -n]
+set osname [exec uname]
+
+if {[regexp -nocase {IRIX} $osname]} {
+	# IRIX "fixed" font is huge and doublespaced... 
+	set ffont $snfont
+}
+
 #puts [exec env]
 #puts "x11vnc_xdisplay: $x11vnc_xdisplay"
 
@@ -3854,18 +4933,28 @@ tweak_both screen_blank sb
 set_template
 
 set_name "tkx11vnc"
-make_widgets;
 
-menu_bindings;
 key_bindings;
 
-if {$x11vnc_connect} {
-	try_connect_and_query_all
-}
-set_widgets
-
-if {$tray_mode && $client_tail != ""} {
-	fileevent $client_tail readable read_client_info
+if {$icon_mode} {
+	if {$tray_embed} {
+		make_gui "tray"
+	} else {
+		make_gui "icon"
+	}
+	old_balloon
+	if {$icon_setpasswd} {
+		set m "You must specify a Session\n" 
+		set m "${m}Password before VNC clients can\n" 
+		set m "${m}connect. Enter one in the Password\n" 
+		set m "${m}field and then Press \"OK\". This\n" 
+		set m "${m}password is not stored, it is only\n" 
+		set m "${m}used for this x11vnc session.\n" 
+		do_props $m
+		push_new_value "unlock" "unlock" 1 0
+	}
+} else {
+	make_gui "full"
 }
 
 # main loop.

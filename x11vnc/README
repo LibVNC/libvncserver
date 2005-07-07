@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Fri Jul  1 21:48:07 EDT 2005
+x11vnc README file                         Date: Wed Jul  6 22:35:15 EDT 2005
 
 The following information is taken from these URLs:
 
@@ -580,7 +580,7 @@ make
    I'd like to release version 0.7.2 in Jun/Jul/2005 sometime, here is
    the current tarball:
 
-      RC-4 lastmod: 2005-06-25    [51]x11vnc-0.7.2beta.tar.gz
+      RC-6 lastmod: 2005-07-07    [51]x11vnc-0.7.2beta.tar.gz
 
    There are also some Linux, Solaris, and other OS test binaries
    [52]here. Please kick the tires and report bugs, performance
@@ -2363,10 +2363,16 @@ x11vnc -logfile $HOME/.x11vnc.log -rfbauth $HOME/.vnc/passwd -forever -bg
    Continuously.   Have x11vnc reattach each time the X server is
    restarted (i.e. after each logout):
 
-   To make x11vnc always attached to the the X server (please consider
-   the security implications of this!) including the login screen you
-   will need to add a command to a display manager startup script. The
-   name of the script file depends on desktop used and seem to be:
+   To make x11vnc always attached to the the X server including the login
+   screen you will need to add a command to a display manager startup
+   script. Please consider the security implications of this! Besides
+   having the VNC display for the X session always available, there are
+   other issues: .e.g. if you run the tkx11vnc gui (via say -gui or -gui
+   tray), then the gui controls (insecure) are available on the physical
+   X display before anyone has logged in.
+
+   The name of the display manager startup script file depends on desktop
+   used and seem to be:
         GNOME        /etc/X11/gdm/Init/Default  (or Init/:0)
         KDE          /etc/kde*/kdm/Xsetup
         XDM          /etc/X11/xdm/Xsetup        (or xdm/Xsetup_0)
@@ -4542,7 +4548,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-01
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-06
 
 x11vnc options:
   -display disp            -auth file             
@@ -4596,27 +4602,27 @@ x11vnc options:
   -scr_keys list           -scr_term list         
   -scr_keyrepeat lo-hi     -scr_parms string      
   -fixscreen string        -debug_scroll          
-  -noxrecord               -pointer_mode n        
-  -input_skip n            -speeds rd,bw,lat      
-  -wmdt string             -debug_pointer         
-  -debug_keyboard          -defer time            
-  -wait time               -wait_ui factor        
-  -nowait_bog              -readtimeout n         
-  -nap                     -nonap                 
-  -sb time                 -noxdamage             
-  -xd_area A               -xd_mem f              
-  -sigpipe string          -threads               
-  -nothreads               -fs f                  
-  -gaps n                  -grow n                
-  -fuzz n                  -debug_tiles           
-  -snapfb                  -rawfb string          
-  -pipeinput cmd           -gui [gui-opts]        
-  -remote command          -query variable        
-  -sync                    -noremote              
-  -yesremote               -unsafe                
-  -safer                   -privremote            
-  -nocmds                  -deny_all              
-
+  -noxrecord               -debug_grabs           
+  -pointer_mode n          -input_skip n          
+  -speeds rd,bw,lat        -wmdt string           
+  -debug_pointer           -debug_keyboard        
+  -defer time              -wait time             
+  -wait_ui factor          -nowait_bog            
+  -readtimeout n           -nap                   
+  -nonap                   -sb time               
+  -noxdamage               -xd_area A             
+  -xd_mem f                -sigpipe string        
+  -threads                 -nothreads             
+  -fs f                    -gaps n                
+  -grow n                  -fuzz n                
+  -debug_tiles             -snapfb                
+  -rawfb string            -pipeinput cmd         
+  -gui [gui-opts]          -remote command        
+  -query variable          -sync                  
+  -noremote                -yesremote             
+  -unsafe                  -safer                 
+  -privremote              -nocmds                
+  -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -4642,7 +4648,7 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-01
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-06
 
 Typical usage is:
 
@@ -5724,6 +5730,9 @@ Options:
                        currently used by the -scrollcopyrect scheme and to
                        monitor X server grabs.
 
+-debug_grabs           Turn on debugging info printout with respect to
+                       XGrabServer() deadlock for -scrollcopyrect mode.
+
 -pointer_mode n        Various pointer motion update schemes. "-pm" is
                        an alias.  The problem is pointer motion can cause
                        rapid changes on the screen: consider the rapid changes
@@ -5971,9 +5980,10 @@ Options:
                        up on the X display in the environment variable DISPLAY.
 
                        "gui-opts" can be a comma separated list of items.
-                       Currently there are these types of items: 1) a gui mode,
-                       a 2) gui "simplicity", 3) the X display the gui
-                       should display on, and 4) a "tray" (or icon) mode.
+                       Currently there are these types of items: 1) a gui
+                       mode, a 2) gui "simplicity", 3) the X display the
+                       gui should display on, 4) a "tray" or "icon" mode,
+                       and 5) a gui geometry.
 
                        1) The gui mode can be "start", "conn", or "wait"
                        "start" is the default mode above and is not required.
@@ -6006,22 +6016,44 @@ Options:
                        x11vnc polling :0 and display the gui on otherhost:0
                        The "tray" mode below reverses this preference.
 
-                       4) When "tray" is specified, the gui presents itself
-                       as a small icon with behavior similar to a "system
-                       tray" or "dock" applet.  The color of the icon
-                       indicates status (connected clients) and there is also a
-                       balloon status.  Clicking on the icon gives a menu from
-                       which properties, etc, can be set and the full gui is
-                       available under "Advanced".  To be fully functional,
-                       the gui mode should be "start" (the default).  At some
-                       point it is hoped the icon can be automatically embedded
-                       in common destkop trays/docks.  Currently one can only
-                       embed it in a window via, e.g., "tray=0x3600028".
-                       Otherwise the icon is just a normal standalone window.
+                       4) When "tray" or "icon" is specified, the gui
+                       presents itself as a small icon with behavior typical
+                       of a "system tray" or "dock" applet.  The color
+                       of the icon indicates status (connected clients) and
+                       there is also a balloon status.  Clicking on the icon
+                       gives a menu from which properties, etc, can be set and
+                       the full gui is available under "Advanced".  To be
+                       fully functional, the gui mode should be "start"
+                       (the default).
 
-                       Examples: "x11vnc -gui", "x11vnc -gui ez"
-                       "x11vnc -gui localhost:10", "x11vnc -gui conn,host:0"
-                       "x11vnc -gui tray,ez"
+                       For "icon" the gui just a small standalone window.
+                       For "tray" it will attempt to embed itself in the
+                       "system tray". If "=setpass" is appended then
+                       at startup the X11 user will be prompted to set the
+                       VNC session password.  If =<hexnumber> is appended
+                       that icon will attempt to embed itself in the window
+                       given by hexnumber.  Use =noadvanced to disable the
+                       full gui. (To supply more than one, use "+" sign).
+                       E.g. -gui tray=setpass and -gui icon=0x3600028
+
+                       5) When "geom=+X+Y" is specified, that geometry
+                       is passed to the gui toplevel.  This is the icon in
+                       icon/tray mode, or the full gui otherwise.  You can
+                       also specify width and height, i.e. WxH+X+Y, but it
+                       is not recommended.  In "tray" mode the geometry is
+                       ignored unless the system tray manager does not seem
+                       to be running.  One could imagine using something like
+                       "-gui tray,geom=+4000+4000" with a display manager
+                       to keep the gui invisible until someone logs in...
+
+                       More icon tricks, "icon=minimal" gives an icon just
+                       with the VNC display number.  You can also set the font
+                       with "iconfont=...".  The following could be useful:
+                       "-gui icon=minimal,iconfont=5x8,geom=24x10+0-0"
+
+                       General examples of the -gui option: "x11vnc -gui",
+                       "x11vnc -gui ez" "x11vnc -gui localhost:10",
+                       "x11vnc -gui conn,host:0", "x11vnc -gui tray,ez"
 
                        If you do not intend to start x11vnc from the gui
                        (i.e. just remote control an existing one), then the
@@ -6286,6 +6318,8 @@ Options:
                        nodebug_scroll  disable debugging scrollcopy mechanism.
                        debug_tiles     enable  -debug_tiles
                        nodebug_tiles   disable -debug_tiles
+                       debug_grabs     enable  -debug_grabs
+                       nodebug_grabs   disable -debug_grabs
                        dbg             enable  -dbg crash shell
                        nodbg           disable -dbg crash shell
 
@@ -6326,10 +6360,10 @@ Options:
                        truecolor notruecolor overlay nooverlay overlay_cursor
                        overlay_yescursor nooverlay_nocursor nooverlay_cursor
                        nooverlay_yescursor overlay_nocursor visual scale
-                       scale_cursor viewonly noviewonly shared noshared
-                       forever noforever once timeout deny lock nodeny unlock
-                       connect allowonce allow localhost nolocalhost listen
-                       lookup nolookup accept gone shm noshm flipbyteorder
+                       scale_cursor viewonly noviewonly shared noshared forever
+                       noforever once timeout deny lock nodeny unlock connect
+                       allowonce allow localhost nolocalhost listen lookup
+                       nolookup accept  popup gone shm noshm flipbyteorder
                        noflipbyteorder onetile noonetile solid_color solid
                        nosolid blackout xinerama noxinerama xtrap noxtrap
                        xrandr noxrandr xrandr_mode padgeom quiet q noquiet
@@ -6360,8 +6394,8 @@ Options:
                        debug_xevents debug_xdamage nodebug_xdamage
                        debug_xdamage debug_wireframe nodebug_wireframe
                        debug_wireframe debug_scroll nodebug_scroll debug_scroll
-                       debug_tiles dbt nodebug_tiles nodbt debug_tiles dbg
-                       nodbg noremote
+                       debug_tiles dbt nodebug_tiles nodbt debug_tiles
+                       debug_grabs nodebug_grabs dbg nodbg noremote
 
                        aro=  display vncdisplay desktopname guess_desktop
                        http_url auth users rootshift clipshift scale_str
