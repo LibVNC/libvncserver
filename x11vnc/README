@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Wed Jul  6 22:35:15 EDT 2005
+x11vnc README file                         Date: Sat Jul  9 00:07:21 EDT 2005
 
 The following information is taken from these URLs:
 
@@ -577,10 +577,10 @@ make
    I don't have any formal beta-testers for the releases of x11vnc, so
    I'd appreciate any additional testing very much!
 
-   I'd like to release version 0.7.2 in Jun/Jul/2005 sometime, here is
+   I'd like to release version 0.7.2 in Jun-Jul/2005 sometime, here is
    the current tarball:
 
-      RC-6 lastmod: 2005-07-07    [51]x11vnc-0.7.2beta.tar.gz
+      RC-6 lastmod: 2005-07-08    [51]x11vnc-0.7.2beta.tar.gz
 
    There are also some Linux, Solaris, and other OS test binaries
    [52]here. Please kick the tires and report bugs, performance
@@ -4548,7 +4548,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-06
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-09
 
 x11vnc options:
   -display disp            -auth file             
@@ -4602,7 +4602,8 @@ x11vnc options:
   -scr_keys list           -scr_term list         
   -scr_keyrepeat lo-hi     -scr_parms string      
   -fixscreen string        -debug_scroll          
-  -noxrecord               -debug_grabs           
+  -noxrecord               -grab_buster           
+  -nograb_buster           -debug_grabs           
   -pointer_mode n          -input_skip n          
   -speeds rd,bw,lat        -wmdt string           
   -debug_pointer           -debug_keyboard        
@@ -4648,7 +4649,7 @@ libvncserver options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-06
+x11vnc: allow VNC connections to real X11 displays. 0.7.2 lastmod: 2005-07-09
 
 Typical usage is:
 
@@ -5729,6 +5730,21 @@ Options:
 -noxrecord             Disable any use of the RECORD extension.  This is
                        currently used by the -scrollcopyrect scheme and to
                        monitor X server grabs.
+
+-grab_buster           Some of the use of the RECORD extension can leave a
+-nograb_buster         tiny window for XGrabServer deadlock.  This is only if
+                       the whole-server grabbing application expects mouse
+                       or keyboard input before releasing the grab.  It is
+                       usually a window manager that does this.  x11vnc takes
+                       care to avoid the the problem, but if caught x11vnc
+                       will freeze.  Without -grab_buster, the only solution
+                       is to go the physical display and give it some input
+                       to satisfy the grabbing app.  Or manually kill and
+                       restart the window manager.  With -grab_buster, x11vnc
+                       will fork a helper thread and if x11vnc appears to be
+                       stuck in a grab after a period of time (20-30 sec)
+                       then it will inject some user input: button clicks,
+                       Escape, mouse motion, etc to try to break the grab.
 
 -debug_grabs           Turn on debugging info printout with respect to
                        XGrabServer() deadlock for -scrollcopyrect mode.

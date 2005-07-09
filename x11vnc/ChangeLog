@@ -1,3 +1,8 @@
+2005-07-09  Karl Runge <runge@karlrunge.com>
+	* add -grab_buster helper thread to break up grabs (might not be
+	  need any longer due to gett XFlush-ing).  Fix scrolls and
+	  copyrect for -clip and -id cases.
+
 2005-07-06  Karl Runge <runge@karlrunge.com>
 	* many improvements to the gui. now embeds into system tray ok.
 	  x11vnc -debug_grabs, -printgui, -nosync

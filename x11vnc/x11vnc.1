@@ -2,7 +2,7 @@
 .TH X11VNC "1" "July 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-07-06
+         version: 0.7.2, lastmod: 2005-07-09
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1377,6 +1377,23 @@ times for more output.
 Disable any use of the RECORD extension.  This is
 currently used by the \fB-scrollcopyrect\fR scheme and to
 monitor X server grabs.
+.PP
+\fB-grab_buster,\fR \fB-nograb_buster\fR
+.IP
+Some of the use of the RECORD extension can leave a
+tiny window for XGrabServer deadlock.  This is only if
+the whole-server grabbing application expects mouse
+or keyboard input before releasing the grab.  It is
+usually a window manager that does this.  x11vnc takes
+care to avoid the the problem, but if caught x11vnc
+will freeze.  Without \fB-grab_buster,\fR the only solution
+is to go the physical display and give it some input
+to satisfy the grabbing app.  Or manually kill and
+restart the window manager.  With \fB-grab_buster,\fR x11vnc
+will fork a helper thread and if x11vnc appears to be
+stuck in a grab after a period of time (20-30 sec)
+then it will inject some user input: button clicks,
+Escape, mouse motion, etc to try to break the grab.
 .PP
 \fB-debug_grabs\fR
 .IP

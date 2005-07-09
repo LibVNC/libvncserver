@@ -1,3 +1,7 @@
+2005-07-09  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -grab_buster for breaking XGrabServer deadlock, fix
+	  scrolls and copyrect for -clip and -id cases.
+
 2005-07-06  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -gui tray now embeds in systray; more improvements to gui.
 

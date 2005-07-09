@@ -382,7 +382,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-07-06";
+char lastmod[] = "0.7.2 lastmod: 2005-07-09";
 int hack_val = 0;
 
 /* X display info */
@@ -594,6 +594,8 @@ double dtime(double *);
 double dtime0(double *);
 double dnow(void);
 double dnowx(void);
+double rnow(void);
+double rfac(void);
 
 void initialize_blackouts(char *);
 void initialize_blackouts_and_xinerama(void);
@@ -903,6 +905,12 @@ int noxrecord = 0;
 Display *gdpy_data = NULL;		/* Ditto for GrabServer watcher */
 Display *gdpy_ctrl = NULL;
 int xserver_grabbed = 0;
+
+/* XXX CHECK BEFORE RELEASE */
+int grab_buster = 1;
+int grab_buster_delay = 20;
+int sync_tod_delay = 3;
+pid_t grab_buster_pid = 0;
 
 char *client_connect = NULL;	/* strings for -connect option */
 char *client_connect_file = NULL;
@@ -3008,6 +3016,7 @@ void disable_grabserver(Display *in_dpy, int change) {
 		rfbLog("No XTEST or DEC-XTRAP protection from XGrabServer.\n");
 		rfbLog("Deadlock if your window manager calls XGrabServer!!\n");
 	}
+	XFlush(in_dpy);
 }
 
 Bool XRecordQueryVersion_wr(Display *dpy, int *maj, int *min) {
@@ -5100,6 +5109,7 @@ char *xerror_string(XErrorEvent *error) {
 char *crash_stack_command1 = NULL;
 char *crash_stack_command2 = NULL;
 char *crash_debug_command = NULL;
+/* XXX CHECK BEFORE RELEASE */
 int crash_debug = 1;
 
 void initialize_crash_handler(void) {
@@ -11651,17 +11661,406 @@ void print_xevent_bases(void) {
 	fprintf(stderr, "  SelClear=%d, Expose=%d\n", SelectionClear, Expose);
 }
 
-void sync_tod_with_servertime() {
-	static Atom servertime = None;
+
+void get_prop(char *str, int len, Atom prop) {
+	Atom type;
+	int format, slen, dlen, i;
+	unsigned long nitems = 0, bytes_after = 0;
+	unsigned char* data = NULL;
+
+	for (i=0; i<len; i++) {
+		str[i] = '\0';
+	}
+	if (prop == None) {
+		return;
+	}
+
+	slen = 0;
+	
+	do {
+		if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
+		    prop, nitems/4, len/16, False,
+		    AnyPropertyType, &type, &format, &nitems, &bytes_after,
+		    &data) == Success) {
+
+			dlen = nitems * (format/8);
+			if (slen + dlen > len) {
+				/* too big */
+				XFree(data);
+				break;
+			}
+			memcpy(str+slen, data, dlen);
+			slen += dlen;
+			str[slen] = '\0';
+			XFree(data);
+		}
+	} while (bytes_after > 0);
+}
+
+void bust_grab(int reset) {
+	static int bust_count = 0;
+	static time_t last_bust = 0;
+	time_t now = time(0);
+	KeyCode key;
+	int button, x, y, nb;
+
+	if (now > last_bust + 180) {
+		bust_count = 0;
+	}
+	if (reset) {
+		bust_count = 0;
+		return;
+	}
+
+	x = 0;
+	y = 0;
+	button = 0;
+	key = NoSymbol;
+
+	nb = 8;
+	if (bust_count >= 3 * nb)  {
+		fprintf(stderr, "too many bust_grab's %d for me\n", bust_count);
+		exit(0);
+	}
+	if (bust_count % nb == 0) {
+		button = 1;
+	} else if (bust_count % nb == 1) {
+		button = 1;
+	} else if (bust_count % nb == 2) {
+		key = XKeysymToKeycode(dpy, XK_Escape);
+	} else if (bust_count % nb == 3) {
+		button = 3;
+	} else if (bust_count % nb == 4) {
+		key = XKeysymToKeycode(dpy, XK_space);
+	} else if (bust_count % nb == 5) {
+		x = bust_count * 23;
+		y = bust_count * 17;
+	} else if (bust_count % nb == 5) {
+		button = 2;
+	} else if (bust_count % nb == 6) {
+		key = XKeysymToKeycode(dpy, XK_a);
+	}
+
+	if (key == NoSymbol) {
+		key = XKeysymToKeycode(dpy, XK_a);
+		if (key == NoSymbol) {
+			button = 1;
+		}
+	}
+
+	bust_count++;
+
+	if (button) {
+		/* try button press+release */
+		fprintf(stderr, "**bust_grab: button%d  %.4f\n",
+		    button, dnowx());
+		XTestFakeButtonEvent_wr(dpy, button, True, CurrentTime);
+		XFlush(dpy);
+		usleep(50 * 1000);
+		XTestFakeButtonEvent_wr(dpy, button, False, CurrentTime);
+	} else if (x > 0) {
+		/* try button motion*/
+		int scr = DefaultScreen(dpy);
+
+		fprintf(stderr, "**bust_grab: x=%d y=%d  %.4f\n", x, y,
+		    dnowx());
+		XTestFakeMotionEvent_wr(dpy, scr, x, y, CurrentTime);
+		XFlush(dpy);
+		usleep(50 * 1000);
+
+		/* followed by button press */
+		button = 1;
+		fprintf(stderr, "**bust_grab: button%d\n", button);
+		XTestFakeButtonEvent_wr(dpy, button, True, CurrentTime);
+		XFlush(dpy);
+		usleep(50 * 1000);
+		XTestFakeButtonEvent_wr(dpy, button, False, CurrentTime);
+	} else {
+		/* try Escape or Space press+release */
+		fprintf(stderr, "**bust_grab: keycode: %d  %.4f\n",
+		    (int) key, dnowx());
+		XTestFakeKeyEvent_wr(dpy, key, True, CurrentTime);
+		XFlush(dpy);
+		usleep(50 * 1000);
+		XTestFakeKeyEvent_wr(dpy, key, False, CurrentTime);
+	}
+	XFlush(dpy);
+	last_bust = time(0);
+}
+
+typedef struct _grabwatch {
+	int pid;
+	int tick;
+	unsigned long time;
+	time_t change;
+} grabwatch_t;
+#define GRABWATCH 16
+
+int grab_npids = 1;
+
+int process_watch(char *str, int parent, int db) {
+	int i, pid, ticker, npids;
+	char diff[128];
+	unsigned long xtime;
+	static grabwatch_t watches[GRABWATCH];
+	static int first = 1;
+	time_t now = time(0);
+	static time_t last_bust = 0;
+	int too_long, problems = 0;
+
+	if (first) {
+		for (i=0; i < GRABWATCH; i++) {
+			watches[i].pid = 0;
+			watches[i].tick = 0;
+			watches[i].time = 0;
+			watches[i].change = 0;
+		}
+		first = 0;
+	}
+
+	/* record latest value of prop */
+	if (str && *str != '\0') {
+		if (sscanf(str, "%d/%d/%lu/%s", &pid, &ticker, &xtime, diff)
+		    == 4) {
+			int got = -1, free = -1;
+
+			if (db) fprintf(stderr, "grab_buster %d - %d - %lu - %s"
+			    "\n", pid, ticker, xtime, diff);
+
+			if (pid == parent && !strcmp(diff, "QUIT")) {
+				/* that's it. */
+				return 0;
+			}
+			if (pid == 0 || ticker == 0 || xtime == 0) {
+				/* bad prop read. */
+				goto badtickerstr;
+			}
+			for (i=0; i < GRABWATCH; i++) {
+				if (watches[i].pid == pid) {
+					got = i;
+					break;
+				}
+				if (free == -1 && watches[i].pid == 0) {
+					free = i;
+				}
+			}
+			if (got == -1) {
+				if (free == -1) {
+					/* bad news */;
+					free = GRABWATCH - 1;
+				}
+				watches[free].pid  = pid;
+				watches[free].tick = ticker;
+				watches[free].time = xtime;
+				watches[free].change = now;
+				if (db) fprintf(stderr, "grab_buster free slot: %d\n", free);
+			} else {
+				if (db) fprintf(stderr, "grab_buster got  slot: %d\n", got);
+				if (watches[got].tick != ticker) {
+					watches[got].change = now;
+				}
+				if (watches[got].time != xtime) {
+					watches[got].change = now;
+				}
+				watches[got].tick = ticker;
+				watches[got].time = xtime;
+			}
+		} else {
+			if (db) fprintf(stderr, "grab_buster bad prop str: %s\n", str);
+		}
+	}
+
+	badtickerstr:
+
+	too_long = grab_buster_delay;
+	if (too_long < 3 * sync_tod_delay) {
+		too_long = 3 * sync_tod_delay;
+	}
+
+	npids = 0;
+	for (i=0; i < GRABWATCH; i++) {
+		if (watches[i].pid) {
+			npids++;
+		}
+	}
+	grab_npids = npids;
+	if (npids > 4) {
+		npids = 4;
+	}
+
+	/* now check everyone we are tracking */
+	for (i=0; i < GRABWATCH; i++) {
+		int fac = 1;
+		if (!watches[i].pid) {
+			continue;
+		}
+		if (watches[i].change == 0) {
+			watches[i].change = now;	/* just to be sure */
+			continue;
+		}
+
+		pid = watches[i].pid;
+
+		if (pid != parent) {
+			fac = 2;
+		}
+		if (npids > 0) {
+			fac *= npids;
+		}
+
+		if (now > watches[i].change + fac*too_long) {
+			int process_alive = 1;
+
+			fprintf(stderr, "grab_buster: problem with pid: "
+			    "%d - %d/%d/%d\n", pid, (int) now,
+			    (int) watches[i].change, too_long);
+
+			if (kill((pid_t) pid, 0) != 0) {
+				if (1 || errno == ESRCH) {
+					process_alive = 0;	
+				}
+			}
+
+			if (!process_alive) {
+				watches[i].pid = 0;
+				watches[i].tick = 0;
+				watches[i].time = 0;
+				watches[i].change = 0;
+				fprintf(stderr, "grab_buster: pid gone: %d\n",
+				    pid);
+				if (pid == parent) {
+					/* that's it */
+					return 0;
+				}
+			} else {
+				int sleep = sync_tod_delay * 1000 * 1000;
+
+				bust_grab(0);
+				problems++;
+				last_bust = now;
+				usleep(1 * sleep);
+				break;
+			}
+		}
+	}
+
+	if (!problems) {
+		bust_grab(1);
+	}
+	return 1;
+}
+
+void grab_buster_watch(int parent, char *dstr) {
+	Atom ticker_atom = None;
+	int sleep = sync_tod_delay * 921 * 1000;
+	char propval[200];
+	int ev, er, maj, min;
+	int db = 0;
+
+	if (grab_buster > 1) {
+		db = 1;
+	}
+
+	/* overwrite original dpy, we let orig connection sit unused. */
+	dpy = XOpenDisplay(dstr);
+	if (!dpy) {
+		fprintf(stderr, "grab_buster_watch: could not reopen: %s\n",
+		    dstr);
+		return;
+	}
+	rfbLogEnable(0);
+
+	/* check for XTEST, etc, and then disable grabs for us */
+	if (! XTestQueryExtension_wr(dpy, &ev, &er, &maj, &min)) {
+		xtest_present = 0;
+	} else {
+		xtest_present = 1;
+	}
+	if (! XETrapQueryExtension_wr(dpy, &ev, &er, &maj)) {
+		xtrap_present = 0;
+	} else {
+		xtrap_present = 1;
+	}
+
+	if (! xtest_present && ! xtrap_present) {
+		fprintf(stderr, "grab_buster_watch: no grabserver "
+		    "protection on display: %s\n", dstr);
+		return;
+	}
+	disable_grabserver(dpy, 0);
+
+	usleep(3 * sleep);
+
+	ticker_atom = XInternAtom(dpy, "X11VNC_TICKER", False);
+	if (! ticker_atom) {
+		fprintf(stderr, "grab_buster_watch: no ticker atom\n");
+		return;
+	}
+
+	while(1) {
+		int slp = sleep;
+		if (grab_npids > 1) {
+			slp = slp / 8;	
+		}
+		usleep(slp);
+		usleep((int) (0.60 * rfac() * slp));
+
+		if (kill((pid_t) parent, 0) != 0) {
+			break;
+		}
+
+		get_prop(propval, 128, ticker_atom);
+		if (db) fprintf(stderr, "got_prop:   %s\n", propval);
+
+		if (!process_watch(propval, parent, db)) {
+			break;
+		}
+	}
+}
+
+void spawn_grab_buster(void) {
+#if LIBVNCSERVER_HAVE_FORK
+	pid_t pid;
+	int parent = (int) getpid();
+	char *dstr = strdup(DisplayString(dpy));
+
+	XCloseDisplay(dpy); 
+	dpy = NULL;
+
+	if ((pid = fork()) > 0) {
+		grab_buster_pid = pid;
+		if (! quiet) {
+			rfbLog("grab_buster pid is: %d\n", (int) pid);
+		}
+	} else if (pid == -1) {
+		fprintf(stderr, "spawn_grab_buster: could not fork\n");
+		rfbLogPerror("fork");
+	} else {
+		grab_buster_watch(parent, dstr);
+		exit(0);
+	}
+
+	dpy = XOpenDisplay(dstr);
+	if (!dpy) {
+		rfbLog("failed to reopen display %s in spawn_grab_buster\n",
+		    dstr);
+		exit(1);
+	}
+#endif
+}
+
+void sync_tod_with_servertime(void) {
+	static Atom ticker_atom = None;
 	XEvent xev;
-	char diff[64];
+	char diff[128];
 	static int seq = 0;
+	static unsigned long xserver_ticks = 1;
 	int i, db = 0;
 
-	if (! servertime) {
-		servertime = XInternAtom(dpy, "X11VNC_SERVERTIME_DIFF", False);
+	if (! ticker_atom) {
+		ticker_atom = XInternAtom(dpy, "X11VNC_TICKER", False);
 	}
-	if (! servertime) {
+	if (! ticker_atom) {
 		return;
 	}
 
@@ -11670,8 +12069,9 @@ void sync_tod_with_servertime() {
 		;
 	}
 
-	snprintf(diff, 64, "%.6f/%08d", servertime_diff, seq++); 
-	XChangeProperty(dpy, rootwin, servertime, XA_STRING, 8,
+	snprintf(diff, 128, "%d/%08d/%lu/%.6f", (int) getpid(), seq++,
+	    xserver_ticks, servertime_diff); 
+	XChangeProperty(dpy, rootwin, ticker_atom, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *) diff, strlen(diff));
 	XSync(dpy, False);
 
@@ -11680,9 +12080,10 @@ void sync_tod_with_servertime() {
 		
 		for (k=0; k < 5; k++) {
 			while (XCheckTypedEvent(dpy, PropertyNotify, &xev)) {
-				if (xev.xproperty.atom == servertime) {
+				if (xev.xproperty.atom == ticker_atom) {
 					double stime;
 					
+					xserver_ticks = xev.xproperty.time;
 					stime = (double) xev.xproperty.time;
 					stime = stime/1000.0;
 					servertime_diff = dnow() - stime;
@@ -11793,7 +12194,7 @@ void check_autorepeat(void) {
  */
 void check_xevents(void) {
 	XEvent xev;
-	int have_clients = 0;
+	int tmp, have_clients = 0;
 	static int sent_some_sel = 0;
 	static time_t last_request = 0;
 	static time_t last_call = 0;
@@ -11899,7 +12300,12 @@ void check_xevents(void) {
 		}
 	}
 
-	if (now > last_time_sync + 30) {
+	/* do this now that we have just cleared PropertyNotify */
+	tmp = 0;
+	if (rfac() < 0.6) {
+		tmp = 1;
+	}
+	if (now > last_time_sync + sync_tod_delay + tmp) {
 		sync_tod_with_servertime();
 		last_time_sync = now;
 	}
@@ -18289,6 +18695,9 @@ void set_nofb_params(void) {
 	take_naps = 0;
 	measure_speeds = 0;
 
+	/* got_grab_buster? */
+	grab_buster = 0;
+
 	show_cursor = 0;
 	show_multiple_cursors = 0;
 	cursor_shape_updates = 0;
@@ -19440,7 +19849,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		for (i=1; i< *argc; i++)  {
 			rfbLog("\t[%d]  %s\n", i, argv[i]);
 		}
-		rfbLog("For a list of options run: x11vnc -help\n");
+		rfbLog("For a list of options run: x11vnc -opts\n");
+		rfbLog("or for the full help: x11vnc -help\n");
 		rfbLog("\n");
 		rfbLog("Here is a list of removed or obsolete"
 		    " options:\n");
@@ -23663,9 +24073,11 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	if (connect_to_x11vnc) {
 		set_env("X11VNC_STARTED", "1");
 	}
-	if (icon_mode && icon_mode_file) {
+	if (icon_mode) {
 		set_env("X11VNC_ICON_MODE", "1");
-		set_env("X11VNC_CLIENT_FILE", icon_mode_file);
+		if (icon_mode_file) {
+			set_env("X11VNC_CLIENT_FILE", icon_mode_file);
+		}
 		if (icon_in_tray) {
 			if (tray_manager_ok) {
 				set_env("X11VNC_ICON_MODE", "TRAY:RUNNING");
@@ -23841,6 +24253,7 @@ void do_gui(char *opts) {
 		    " to display on.\n");
 		exit(1);
 	}
+	fprintf(stderr, "starting gui, trying display: %s\n", gui_xdisplay);
 	test_dpy = XOpenDisplay(gui_xdisplay);
 	if (! test_dpy && auth_file) {
 		if (getenv("XAUTHORITY") != NULL) {
@@ -24746,6 +25159,12 @@ void draw_box(int x, int y, int w, int h, int restore) {
 	unsigned short us;
 	unsigned long ul;
 
+	if (clipshift) {
+		x -= coff_x;
+		y -= coff_y;
+	}
+	/* no subwin for wireframe */
+
 	if (max > len) {
 		/* create/resize storage lines: */
 		for (i=0; i<4; i++) {
@@ -25132,6 +25551,12 @@ if (db > 1) fprintf(stderr, "BDP  %d %d %d %d  %d %d %d  %d %d %d %d\n",
 	ty2 = attr.y + attr.height;
 
 	whole = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
+	if (clipshift) {
+		sraRgnOffset(whole, coff_x, coff_y);
+	}
+	if (subwin) {
+		sraRgnOffset(whole, off_x, off_y);
+	}
 	frame = sraRgnCreateRect(tx1, ty1, tx2, ty2);
 	sraRgnAnd(frame, whole);
 
@@ -25174,6 +25599,18 @@ if (db > 1) fprintf(stderr, "BDP  %d %d %d %d  %d %d %d  %d %d %d %d\n",
 				if (bdy < ty1 || ty2 <= bdy) {
 					continue;
 				}
+			}
+			if (clipshift) {
+				tx1 -= coff_x;
+				ty1 -= coff_y;
+				tx2 -= coff_x;
+				ty2 -= coff_y;
+			}
+			if (subwin) {
+				tx1 -= off_x;
+				ty1 -= off_y;
+				tx2 -= off_x;
+				ty2 -= off_y;
 			}
 
 			direct_fb_copy(tx1, ty1, tx2, ty2, 1);
@@ -25354,6 +25791,12 @@ int push_scr_ev(double *age, int type, int bdpush, int bdx, int bdy,
 
 	backfill = sraRgnCreate();
 	whole = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
+	if (clipshift) {
+		sraRgnOffset(whole, coff_x, coff_y);
+	}
+	if (subwin) {
+		sraRgnOffset(whole, off_x, off_y);
+	}
 
 	win0 = scr_ev[0].win;
 	x0 = scr_ev[0].win_x;
@@ -25447,6 +25890,12 @@ if (db > 1) fprintf(stderr, "------------ got: %d x: %4d y: %3d"
 		dtime0(&tm);
 
 		tmpregion = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
+		if (clipshift) {
+			sraRgnOffset(tmpregion, coff_x, coff_y);
+		}
+		if (subwin) {
+			sraRgnOffset(tmpregion, off_x, off_y);
+		}
 		tmpregion2 = sraRgnCreateRect(wx, wy, wx+ww, wy+wh);
 		sraRgnAnd(tmpregion2, whole);
 		sraRgnSubtract(tmpregion, tmpregion2);
@@ -25593,6 +26042,19 @@ if (db) fprintf(stderr, "  EST_TOO_LARGE");
 				ty1 = rect.y1;
 				tx2 = rect.x2;
 				ty2 = rect.y2;
+
+				if (clipshift) {
+					tx1 -= coff_x;
+					ty1 -= coff_y;
+					tx2 -= coff_x;
+					ty2 -= coff_y;
+				}
+				if (subwin) {
+					tx1 -= off_x;
+					ty1 -= off_y;
+					tx2 -= off_x;
+					ty2 -= off_y;
+				}
 				tx1 = nfix(tx1, dpy_x);
 				ty1 = nfix(ty1, dpy_y);
 				tx2 = nfix(tx2, dpy_x+1);
@@ -26396,6 +26858,14 @@ if (db) fprintf(stderr, "check_xrecord_mouse: BEGIN LOOP: scr_ev_cnt: "
 
 			bdx = start_x;
 			bdy = start_y;
+			if (clipshift) {
+				bdx += coff_x;
+				bdy += coff_y;
+			}
+			if (subwin) {
+				bdx += off_x;
+				bdy += off_y;
+			}
 			bdskinny = 32;
 			
 			set_bdpush(SCR_MOUSE, &last_bdpush, &bdpush);
@@ -26700,6 +27170,15 @@ int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy,
 		dt_bad_check = time(0);
 	}
 
+	if (clipshift) {
+		x -= coff_x;
+		y -= coff_y;
+	}
+	if (subwin) {
+		x -= off_x;
+		y -= off_y;
+	}
+
 	if (dt_bad && wireframe_in_progress) {
 		sraRegionPtr rect;
 		/* send the whole thing... */
@@ -26800,6 +27279,15 @@ saw_me = 1; fprintf(stderr, "  ----------\n");
 				continue;
 			}
 
+			if (clipshift) {
+				attr.x -= coff_x;
+				attr.y -= coff_y;
+			}
+			if (subwin) {
+				attr.x -= off_x;
+				attr.y -= off_y;
+			}
+
 			/*
 			 * first subtract any overlap from the initial
 			 * window rectangle
@@ -26852,6 +27340,13 @@ if (db2 && saw_me) continue;
 
 		if (extra_clip && ! sraRgnEmpty(extra_clip)) {
 		    whole = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
+
+		    if (clipshift) {
+			sraRgnOffset(extra_clip, -coff_x, -coff_y);
+		    }
+		    if (subwin) {
+			sraRgnOffset(extra_clip, -off_x, -off_y);
+		    }
 
 		    iter = sraRgnGetIterator(extra_clip);
 		    while (sraRgnIteratorNext(iter, &rect)) {
@@ -27556,8 +28051,18 @@ if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
 				fb_push_wait(0.1, FB_COPY);
 
 				if (now > last_time + delay) {
+					int xt = x, yt = y;
 
-					scale_mark(x, y, x+w, y+h);
+					if (clipshift) {
+						xt -= coff_x;
+						yt -= coff_y;
+					}
+					if (subwin) {
+						xt -= off_x;
+						yt -= off_y;
+					}
+
+					scale_mark(xt, yt, xt+w, yt+h);
 					last_time = now;
 					last_copyrect_fix = now;
 				}
@@ -28218,6 +28723,23 @@ double dnow(void) {
 
 double dnowx(void) {
 	return dnow() - x11vnc_start;
+}
+
+double rnow(void) {
+	double t = dnowx();
+	t = t - ((int) t); 
+	if (t > 1.0) {
+		t = 1.0;
+	} else if (t < 0.0) {
+		t = 0.0;
+	}
+	return t;
+}
+
+double rfac(void) {
+	double f = (double) rand();
+	f = f / ((double) RAND_MAX);
+	return f;
 }
 
 void measure_display_hook(rfbClientPtr cl) {
@@ -30258,6 +30780,21 @@ static void print_help(int mode) {
 "                       currently used by the -scrollcopyrect scheme and to\n"
 "                       monitor X server grabs.\n"
 "\n"
+"-grab_buster           Some of the use of the RECORD extension can leave a\n"
+"-nograb_buster         tiny window for XGrabServer deadlock.  This is only if\n"
+"                       the whole-server grabbing application expects mouse\n"
+"                       or keyboard input before releasing the grab.  It is\n"
+"                       usually a window manager that does this.  x11vnc takes\n"
+"                       care to avoid the the problem, but if caught x11vnc\n"
+"                       will freeze.  Without -grab_buster, the only solution\n"
+"                       is to go the physical display and give it some input\n"
+"                       to satisfy the grabbing app.  Or manually kill and\n"
+"                       restart the window manager.  With -grab_buster, x11vnc\n"
+"                       will fork a helper thread and if x11vnc appears to be\n"
+"                       stuck in a grab after a period of time (20-30 sec)\n"
+"                       then it will inject some user input: button clicks,\n"
+"                       Escape, mouse motion, etc to try to break the grab.\n"
+"\n"
 "-debug_grabs           Turn on debugging info printout with respect to\n"
 "                       XGrabServer() deadlock for -scrollcopyrect mode.\n"
 "\n"
@@ -32062,6 +32599,10 @@ int main(int argc, char* argv[]) {
 			debug_tiles++;
 		} else if (!strcmp(arg, "-debug_grabs")) {
 			debug_grabs++;
+		} else if (!strcmp(arg, "-grab_buster")) {
+			grab_buster++;
+		} else if (!strcmp(arg, "-nograb_buster")) {
+			grab_buster = 0;
 		} else if (!strcmp(arg, "-snapfb")) {
 			use_snapfb = 1;
 		} else if (!strcmp(arg, "-rawfb")) {
@@ -32599,6 +33140,7 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, " fixscreen:  %s\n", screen_fixup_str ?
 		    screen_fixup_str : "null");
 		fprintf(stderr, " noxrecord:  %d\n", noxrecord);
+		fprintf(stderr, " grabbuster: %d\n", grab_buster);
 		fprintf(stderr, " ptr_mode:   %d\n", pointer_mode);
 		fprintf(stderr, " inputskip:  %d\n", ui_skip);
 		fprintf(stderr, " speeds:     %s\n", speeds_str
@@ -32756,6 +33298,11 @@ int main(int argc, char* argv[]) {
 			    "mode.\n");
 			accept_remote_cmds = 0;
 		}
+	}
+
+	sync_tod_with_servertime();
+	if (grab_buster) {
+		spawn_grab_buster();
 	}
 
 #if LIBVNCSERVER_HAVE_LIBXFIXES

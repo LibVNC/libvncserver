@@ -403,7 +403,7 @@ After selecting a VNC client from the \"Clients -> current\" menu,
 you will be presented with a dialog that shows the information
 about the VNC client.
 
-You can chose to disconnect the client by clicking on the 
+You can choose to disconnect the client by clicking on the 
 \"Disconnect\" checkbox and pressing \"OK\".  There will be a
 confirmation dialog to doublecheck.
 
@@ -500,8 +500,8 @@ to apply the changes, or press \"Cancel\" to skip applying them.
    remote-control commands.
    
  - \"Ask for Confirmation\" toggles whether a popup menu will be presented
-   at the X display when a new VNC viewer attempts to connects.  The person
-   sitting at the X display can chose to accept or reject the connection
+   at the X display when a new VNC viewer attempts to connect.  The person
+   sitting at the X display can choose to accept or reject the connection
    or accept the connection in View-Only mode.  It corresponds to the 
    \"-R accept:popup\" and \"-R accept:\" remote-control commands.
    
@@ -540,7 +540,7 @@ the ViewOnly log in aspect: \"Password\" is still required to log in.
 
 	set helptext(Misc-Tuning:) "
 x11vnc has what seems like hundreds of tuning parameters.  In this
-sub-menu we place some lesser used ones.  Mostly likely you'll want to
+sub-menu we place some lesser used ones.  Most likely you'll want to
 leave them at their default values, but you can try them out quickly
 with the gui to see if they improve things.
 "
@@ -625,7 +625,7 @@ A brief Background on pixels, color, and visuals:
    mappings and so provide less variation in kinds of colors.
 
    A visual's \"depth\" is how many of the pixels are used in the
-   actual recipe.  This may sound wasteful (i.t. not using some of the
+   actual recipe.  This may sound wasteful (i.e. not using some of the
    bits), but for 32bpp (4 billion colors) that is too much and nearly
    always only 24 for them are used.  The most common Visual seems to
    be depth 24 TrueColor at 32bpp.  This provides 16 million colors
@@ -645,7 +645,7 @@ a speedup is achieved because writing graphics data to, say, the 8bit
 visual does not destroy the image data in the 24bit visual.  Evidently
 popup menus can be done very quickly this way: they use the 8bit visual
 and when the popup goes away the graphics data in the 24bit visual is
-immediately reexposed without having the application redrawing it.
+immediately reexposed without having the application redraw it.
 
 Also, some legacy applications can only use 8bpp visuals.  But in these
 days of high color graphics and web browsers one would like the rest
@@ -681,7 +681,7 @@ is shared.
 Note if the application pops up multiple windows they are not tracked
 and shared.  So this is not application sharing.  The application has to
 be very simple (e.g. a simple terminal or the image window on a webcam)
-for this mode to be useable.
+for this mode to be usable.
 "
 	set helptext(ResizeRotate:) "
 This sub-menu has some options regarding screens that support the X
@@ -722,7 +722,7 @@ the screen are still slow today).
 This sub-menu has some options for the x11vnc Scroll detection and
 CopyRect speedup scheme.
 
-For this mode, x11vnc \"spies\" on communication be the X server and
+For this mode, x11vnc \"spies\" on communication between the X server and
 applications using the RECORD extension.  It looks for various patterns
 to detect a scrolled window.  This only works for some applications,
 fortunately some important ones.
@@ -2037,9 +2037,11 @@ proc update_menu_vars {{query ""}} {
 	}
 
 	foreach piece $query_result_list {
+#puts stderr "UMV: $piece"
 		if {[regexp {^([^:][^:]*):(.*)$} $piece m0 item val]} {
 			if {[info exists menu_var($item)]} {
 				set old $menu_var($item)
+#puts stderr "     $old"
 				if {$val == "N/A"} {
 					continue
 				}
@@ -2885,6 +2887,11 @@ proc make_menu_items {} {
 	global bfont ffont beginner_mode simple_gui_created
 	global helptext helpremote helplabel
 
+	# some tweaks...
+	if {![info exists menu_var(deny)]} {
+		set menu_var(deny) 0
+	}
+
 	set case "";
 	set L_casc ""
 	set L_casc_count 0
@@ -3234,7 +3241,14 @@ proc do_props {{msg ""}} {
 	global have_labelframes ffont bfont
 	global props_buttons icon_noadvanced
 
-	if ![info exists props_accept] {
+	if [info exists menu_var(deny)] {
+		if {$menu_var(deny) == $unset_str || $menu_var(deny) == 0} {
+			set props_accept 1
+		} else {
+			set props_accept 0
+		}
+	} else {
+		set menu_var(deny) 0
 		set props_accept 1
 	}
 	set prop0_accept $props_accept
@@ -3729,15 +3743,18 @@ proc make_icon {} {
 	global tray_embed tray_running env
 	global x11vnc_client_file client_tail client_str saved_clients_str
 	global client_balloon_id
-	global bfont sfont ffont
+	global bfont sfont snfont ffont
 	global icon_minimal gui_start_mode
 	global window_view_posted menu_var x11vnc_gui_geom
 	set min_x 24
 	set min_y 24
 	
 	set font $bfont
+	set mfont $font
+
 	if {$tray_embed} {
 		set font $sfont
+		set mfont $snfont
 	}
 	if {[info exists env(X11VNC_ICON_FONT)]} {
 		set font $env(X11VNC_ICON_FONT)
@@ -3768,15 +3785,16 @@ proc make_icon {} {
 	label $l -text $lab -borderwidth $bw -font $font
 	icon_win_cfg 0
 
+
 	set window_view_posted 0
 	pack $l -fill both -expand 1
 	set menu "$l.menu"
 	menu $menu -tearoff 0 -postcommand {set window_view_posted 0}
-	$menu add command -font $font -label "Properties" -command do_props
-	$menu add command -font $font -label "Help" -command "menu_help Tray"
+	$menu add command -font $mfont -label "Properties" -command do_props
+	$menu add command -font $mfont -label "Help" -command "menu_help Tray"
 	$menu add separator
-	$menu add command -font $font -label "New Client" -command do_new_client
-	$menu add command -font $font -label "Disconnect All" -command do_disconnect_all
+	$menu add command -font $mfont -label "New Client" -command do_new_client
+	$menu add command -font $mfont -label "Disconnect All" -command do_disconnect_all
 	$menu add separator
 
 	set wv "$menu.casc1"
@@ -3789,9 +3807,9 @@ proc make_icon {} {
 			-command "do_var WindowView" \
 			-variable menu_var(WindowView)
 	}
-	$menu add cascade -font $font -label "Window View" -menu $wv
+	$menu add cascade -font $mfont -label "Window View" -menu $wv
 
-	$menu add command -font $font -label "Stop x11vnc" -command clean_icon_exit
+	$menu add command -font $mfont -label "Stop x11vnc" -command clean_icon_exit
 
 	bind $icon_win <ButtonPress-1> "pmenu $menu %X %Y"
 	bind $icon_win <ButtonPress-3> "pmenu $menu %X %Y"
@@ -4698,7 +4716,7 @@ global helpall helptext helpremote helplabel hostname osname
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
 global menu_var unset_str menus_disabled
-global bfont ffont old_labels have_labelframes
+global bfont ffont sfont snfont old_labels have_labelframes
 global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
 global cache_all_query_vars
