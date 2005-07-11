@@ -1,3 +1,8 @@
+2005-07-10  Karl Runge <runge@karlrunge.com>
+	* more improvements to gui, default values, save-settings..
+	* x11vnc scary password warnings. Release settings. -QD option.
+	  add \# to rc files and fix rcfile read bug.
+
 2005-07-09  Karl Runge <runge@karlrunge.com>
 	* add -grab_buster helper thread to break up grabs (might not be
 	  need any longer due to gett XFlush-ing).  Fix scrolls and

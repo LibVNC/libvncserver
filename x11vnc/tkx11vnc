@@ -64,12 +64,17 @@ Row: Displays  Screen    Tuning       Debugging   Misc
 Actions
 	=SA start
 	=RA stop
-	=DGA attach
+	--
+	=DSA attach
 	=DRA detach
 	--
 	=RA ping
 	=RA update-all
-	=GA clear-all
+	--
+	=GA save-settings
+	=SFA load-settings:
+	=SA defaults-all
+	=0SA clear-all
 	-- D
 	=DRA stop+quit 
 	=DGA Quit 
@@ -314,6 +319,23 @@ proc set_internal_help {} {
 Launch x11vnc with the settings you have prescribed in the gui.
 The x11vnc process is started in an xterm window so you can see the
 output, kill it, etc.
+
+By viewing this help item, the command built so far will be displayed
+in the gui text area.  Have a look.  If you Press start it will be shown
+as well and you will be asked to confirm running it.
+
+If you want to use a saved profile \"rc file\" you can do \"Misc -> rc\" and
+select the file and simply start x11vnc using the rc file.  Alternatively,
+you could first use the \"Actions -> load-settings\" action to load in
+an \"rc file\" and then press \"Actions -> start\" to start up x11vnc
+based on those values.
+"
+	set helptext(stop) "
+The \"Actions -> stop\" action sends a signal to the running x11vnc
+server indicating it should shutdown all connections and exit.
+
+The GUI stays running in case you want to start a new x11vnc or attach
+to another one.  Use \"Actions -> Quit\" if you want to have the gui exit.
 "
 
 	set helptext(show-start-cmd) "
@@ -322,6 +344,9 @@ run by \"Actions -> start\") looks like for the current values of the
 settings.  This can be done even in the attached state.  Intended for
 debugging the gui.  The help item for \"Actions -> start\" gives the
 same info.
+
+If you want to load in a saved profile \"rc file\" use Misc -> rc
+and select the file.
 "
 
 	set helptext(debug_gui) "
@@ -329,13 +354,22 @@ Set debug_gui to get more output printed in the text area.
 "
 
 	set helptext(detach) "
-No longer be associated with the x11vnc server.  Switch to non-connected
-state.
+No longer be associated with the x11vnc server.  Switch to the
+non-connected state.  The x11vnc server keeps running: it does not exit.
+
+You can either later reattach to it \"Actions -> attach\", or start
+up a new x11vnc \"Actions -> start\", or exit \"Actions -> Quit\".
 "
 
 	set helptext(attach) "
-Attach to the x11vnc server, if possible.  Switches to connected state
-if successful.  To change or set the X display use \"Displays -> display\"
+Attach to a running x11vnc server, if possible.  Switches to connected
+state if successful.  Usually the channel used to attach is via the X
+display (VNC_CONNECT rootwin property) being polled by the x11vnc server.
+To change or set the X display to use do \"Displays -> display\".
+
+Sometimes the \"-connect /path/to/filename\" is used as the communcation
+channel.  The running x11vnc has to know that \"/path/to/filename\"
+is the communication channel (i.e. it is using the same -connect option).
 "
 
 	set helptext(ping) "
@@ -346,16 +380,60 @@ Check if x11vnc still responds to \"ping\" remote command.
 Query the x11vnc server for the current values of all variables.
 Populate the values into the gui's database.
 
-Normally the gui will refresh this info every time it interacts
-with the x11vnc server, so one doesn't need to use this action
-very often (unless something else is changing the state of the
-x11vnc server, or new clients have connected, etc).
+Normally the gui will refresh this info every time it interacts with
+the x11vnc server (including after a few minutes of inactivity), so one
+doesn't need to use this action very often (unless something else is
+changing the state of the x11vnc server, or new clients have connected,
+etc).
 "
 
 	set helptext(clear-all) "
-Forget any variable settings either entered in by you or retrieved
-from a running x11vnc server.  Basically sets everything to 0 or
-the string (unset).
+Forget any variable settings either entered in by you or set at the
+default.  Basically sets everything to 0 or the string (unset).
+
+This action is only available in \"startup\" mode, not when connected
+to a running x11vnc server (in that case the variable settings reflect
+the state of the running x11vnc).
+"
+
+	set helptext(defaults-all) "
+Reset all variable settings to the default values.  Basically sets
+everything to the default queries \"x11vnc -QD var\" retrieved at startup.
+
+This action is only available in \"startup\" mode, not when connected
+to a running x11vnc server (in that case the variable settings reflect
+the state of the running x11vnc).
+"
+
+	set helptext(load-settings) "
+Read in the \"rc file\" you prescribe in the dialog and then set the
+variables to those in the rc-file.  Any variables not mentioned in the
+rc-file are set to their default value.
+
+You could then do \"Actions -> start\" to start x11vnc with these
+parameters.  Or you could make some further changes to variables
+using the gui before starting x11vnc.
+
+This action is only available in \"startup\" mode, not when connected
+to a running x11vnc server (in that case the variable settings reflect
+the state of the running x11vnc).
+"
+
+	set helptext(save-settings) "
+Construct a ~/.x11vncrc file based on the current settings and
+offer to save it in a file (default ~/.x11vncrc).  If saved in a
+file other than the default, you can access the profile by using
+the \"-rc <filename>\" option when starting x11vnc.
+
+If an rc file entry begins with \"#d\" that means the current
+setting is at the Default value and so you probably want to leave
+it commented out with the \"#\" character.
+
+If an rc file entry begins with \"#?\" that means we think
+you probably do not really want to force the value to this setting.
+
+In either case, feel free to uncomment the line and/or change any
+of the parameter values in the file. 
 "
 
 	set helptext(all-settings) "
@@ -383,10 +461,11 @@ by the gui process).
 
 	set helptext(tail-logfile) "
 Run the tail(1) command with -f option on the logfile in an xterm.
+(if it exists and is accessible by the gui process).
 "
 
 	set helptext(Quit) "
-Terminate the tkx11vnc gui.  Any x11vnc servers will be left running.
+Terminate the tkx11vnc gui.  Any x11vnc server will be left running.
 "
 
 	set helptext(current) "
@@ -539,7 +618,7 @@ the ViewOnly log in aspect: \"Password\" is still required to log in.
 	set helptext(all) $helpall
 
 	set helptext(Misc-Tuning:) "
-x11vnc has what seems like hundreds of tuning parameters.  In this
+x11vnc has what seems like hundreds of tuning parameters!  In this
 sub-menu we place some lesser used ones.  Most likely you'll want to
 leave them at their default values, but you can try them out quickly
 with the gui to see if they improve things.
@@ -752,8 +831,8 @@ The items in the sub-menu allow tweaking x11vnc's DAMAGE algorithm.
 This sub-menu provides some options regarding SYSV shared memory usage
 (shm) by x11vnc.  Usually you want shm turned on because the x11vnc
 process is nearly always running on the same machine the X server process
-is running on.  SharedMemory gives a performance speedup.  However,
-if you need to modify this scenario these options allow you to.
+is running on.  SharedMemory gives a performance speedup.  However, if you
+need to modify this scenario for special usage these options allow you to.
 "
 
 	set helptext(Misc-Debug:) "
@@ -767,6 +846,7 @@ etc. about your local display and environment.
 This sub-menu contains some options centering around the Selection
 (also referred to as the Clipboard, Cutbuffers, etc).  x11vnc will try
 to exchange the selections between the VNC viewers and the X server.
+You can adjust that behavior with these options.
 "
 
 	set helptext(WindowView) "
@@ -792,7 +872,7 @@ or \"tray\" mode if you bring up the full gui window via \"Properties ->
 Advanced\" and then delete it the gui does NOT terminate.
 
 Also note that by default in \"icon\" mode if you delete the icon
-window both the gui and the x11vnc server terminate.
+window both the gui *and* the x11vnc server terminate.
 "
 
 	set helptext(gui) "
@@ -926,34 +1006,35 @@ GUI components:
 --- ----------
 
 1) At the top of the gui is a info text label where information will
-be posted, e.g. when traversing menu items text indicating how to get
-help on the item and its current value will be displayed.
+   be posted, e.g. when traversing menu items text indicating how to get
+   help on the item and its current value will be displayed.
 
-2) Below the info label is the area where the menu buttons, Actions,
-Clients, etc., are presented.  If a menu item has a checkbox,
-it corresponds to a boolean on/off variable.  Otherwise it is
-either a string variable, or an action not associated with a
-variable (for the most part).
+2) Below the info label is the area where the menu buttons, \"Actions\",
+   \"Clients\", etc., are presented.  If a menu item has a checkbox,
+   it corresponds to a boolean on/off variable.  Otherwise it is
+   either a string variable, or an action not associated with a
+   variable (for the most part).
 
-3) Below the menu button area is a text label indicating the current x11vnc
-X display being polled and the corresponding VNC display name.  Both
-will be \"(*none*)\" when there is no connection established.
+3) Below the menu button area is a label indicating the current x11vnc
+   X display being polled and the corresponding VNC display name.  Both
+   will be \"(*none*)\" when there is no connection established.
 
-4) Below the x11 and vnc displays text label is a text area there scrolling
-information about actions being taken and commands being run is displayed.
-To scroll click in the area and use PageUp/PageDown or the arrow keys.
+4) Below the x11 and vnc displays label is a text area there scrolling
+   information about actions being taken and commands being run is displayed.
+   To scroll click in the area and use PageUp/PageDown or the arrow keys.
 
 5) At the bottom is an entry area.  When one selects a menu item that
-requires supplying a string value, the label will be set to the
-parameter name and one types in the new value.  Then one presses the
-\"OK\" button or presses \"Enter\" to set the value.  Or you can press
-\"Cancel\" or \"Escape\" to avoid changing the variable.  Some variables
-are boolean toggles (for example, \"Permissions -> viewonly\") or Radio
-button selections.  Selecting these menu items will not activate the
-entry area but rather toggle the variable directly.
+   requires supplying a string value, the label will be set to the
+   parameter name and one types in the new value.  Then one presses the
+   \"OK\" button or presses \"Enter\" to set the value.  Or you can press
+   \"Cancel\" or \"Escape\" to avoid changing the variable.
 
+   Many variables are boolean toggles (for example, \"Permissions ->
+   viewonly\") or Radio button selections.  Selecting these menu items
+   will NOT activate the entry area but rather toggle the variable
+   immediately.
 
-Cascades Bug: There is a bug not yet worked around for the cascade menus
+CASCADES BUG: There is a bug not yet worked around for the cascade menus
 where the (?) help button gets in the way.  To get the mouse over to
 the cascade menu click and release mouse to activate the cascade, then
 you can click on its items.  Dragging with a mouse button held down will
@@ -1026,7 +1107,7 @@ proc make_toplevel {w {title ""}} {
 	}
 }
 
-proc textwin {name title text} {
+proc textwin {name title text {entry ""}} {
 	global max_text_height max_text_width
 	global bfont ffont
 
@@ -1056,13 +1137,40 @@ proc textwin {name title text} {
 
 	bind $w <Enter> "focus $w.f.t"
 
+	if {$entry != ""} {
+		# varname+Label Name
+		set list [split $entry "+"]
+		set varname [lindex $list 0]
+		set labname [lindex $list 1]
+		frame $w.f.ef -bd 1 -relief groove
+		label $w.f.ef.l -text "$labname" -anchor w -font $bfont
+		entry $w.f.ef.e -relief sunken -font $ffont \
+			-textvariable $varname
+		button $w.f.ef.b -text "OK" -font $bfont \
+			-command "set ${varname}_ok 1; destroy $w" 
+		bind $w.f.ef.e <KeyPress-Return> "set ${varname}_ok 1; destroy $w"
+		
+		pack $w.f.ef.l -side left
+		pack $w.f.ef.e -side left -fill x -expand 1
+		pack $w.f.ef.b -side right
+	}
+
 	wm withdraw $w
 	pack $w.f.b -side bottom -fill x 
+	if {$entry != ""} {
+		pack $w.f.ef -side bottom -fill x 
+		bind $w <Enter> "focus $w.f.ef.e"
+		$w.f.ef.e icursor end
+	} else {
+		bind $w <Enter> "focus $w.f.t"
+	}
 	pack $w.f.y -side right -fill y;
 	pack $w.f.t -side top -fill both -expand 1;
 	update
 
 	center_win $w
+
+	return $w
 }
 
 proc active_when_connected {item} {
@@ -1105,6 +1213,9 @@ proc active_when_starting {item} {
 			return 1
 		}
 		if {$item == "display"} {
+			return 1
+		}
+		if {$item == "attach"} {
 			return 1
 		}
 		if {$item == "debug_gui"} {
@@ -1205,11 +1316,10 @@ proc help_win {item} {
 
 	if {$item == "start"} {
 		set str [get_start_x11vnc_txt]
-		append text $str
 		append_text "$str\n"
-		append text "\nPossible \$HOME/.x11vncrc settings for this command:\n\n"
-		set rctxt [get_start_x11vnc_cmd 1]
-		append text "$rctxt\n"
+#		append text "\nPossible \$HOME/.x11vncrc settings for this command:\n\n"
+#		set rctxt [get_start_x11vnc_cmd 1]
+#		append text "$rctxt\n"
 	}
 
 	regsub -all { } $item " " name
@@ -2023,6 +2133,75 @@ proc see_if_ok {query item expected} {
 	}
 }
 
+proc get_default_vars {} {
+	global default_var
+
+	set qry [all_query_vars]
+
+	append qry ",vncconnect"
+
+	set qargs [list "-QD" $qry]
+	set all [run_remote_cmd $qargs]
+
+	if {[regexp {ans=} $all]} {
+		#append_text "Retrieved all default settings.\n"
+	} else {
+		#append_text "Failed to retrieve default settings.\n"
+	}
+
+	set query_result_list [split_query $all]
+
+	set default_var(gui) ""
+
+	foreach piece $query_result_list {
+		if {[regexp {^([^:][^:]*):(.*)$} $piece m0 item val]} {
+			if {$val == "N/A"} {
+				if {$item == "vncconnect"} {
+					set val 1
+				} else {
+					set val ""
+				}
+			}
+			if {$item == "display"} {
+				set val ""
+			} elseif {$item == "desktop"} {
+				set val ""
+			} elseif {$item == "auth"} {
+				set val ""
+			} 
+			# some hacks we do here for now..
+			if {$item == "cursor" && $val == ""} {
+				set val "most"
+			} elseif {$item == "scrollcopyrect" && $val == ""} {
+				set val "always"
+			} elseif {$item == "wirecopyrect" && $val == ""} {
+				set val "always"
+			} elseif {$item == "overlay_nocursor" && $val == 0} {
+				set val 1
+			}
+
+			set default_var($item) $val
+#puts "default: $item -> $val"
+		}
+	}
+}
+
+proc copy_default_vars {} {
+	global menu_var default_var
+	foreach item [array names default_var] {
+		if {[info exists menu_var($item)]} {
+			if {[info exists default_var($item)]} {
+				set menu_var($item) $default_var($item)
+			}
+		}
+	}
+	foreach item [array names menu_var] {
+		if {[info exists default_var($item)]} {
+			set menu_var($item) $default_var($item)
+		}
+	}
+}
+
 proc update_menu_vars {{query ""}} {
 	global all_settings menu_var query_result_list
 
@@ -2060,6 +2239,163 @@ proc update_menu_vars {{query ""}} {
 	}
 }
 
+proc load_settings {} {
+	global menu_var default_var
+
+	if {![info exists menu_var(load-settings)]} {
+		return
+	}
+	set file $menu_var(load-settings)
+	if {$file == ""} {
+		return
+	}
+
+	set fh ""
+	catch {set fh [open $file "r"]}
+
+	if {$fh == ""} {
+		append_text "load_settings: *** failed to open $file ***\n"
+		return
+	}
+	copy_default_vars
+
+	set str ""
+	while {[gets $fh line] > -1} {
+		regsub -all {\\#} $line {__QUOTED_HASH__} line
+		if {[regexp {^[ \t]*#} $line]} {
+			continue
+		}
+		for {set i 0} {$i < 5} {incr i} {
+			regsub {#.*$} $line "" line
+		}
+		if {[regexp {^[ \t]*$} $line]} {
+			continue
+		}
+		regsub -all {__QUOTED_HASH__} $line {#} line
+		if {[regexp {\\$} $line]} {
+			regsub {\\$} $line " " line
+			append str "$line"
+		} else {
+			append str "$line\n"
+		}
+	}
+	close $fh
+
+	foreach line [split $str "\n"] {
+		set line [string trim $line]
+		regsub {^--*} $line "" line
+		regsub -all {[ \t][ \t]*} $line " " line
+		set list [split $line]
+		set item [lindex $list 0]
+		set value [lindex $list 1]
+		if {[regexp {^[ \t]*$} $item]} {
+			continue
+		}
+		if {[info exists menu_var($item)]} {
+			if {[value_is_bool $item]} {
+				set menu_var($item) 1
+			} elseif {[value_is_string $item]} {
+				if {$value != ""} {
+					set menu_var($item) $value
+				}
+			}
+		}
+	}
+}
+
+proc save_settings {} {
+	set rc_text [get_settings_rcfile]
+
+	set top "#
+# This file is based on the current x11vnc settings and can be used as
+# as a ~/.x11vncrc defaults file.  If saved to another filename, these
+# settings can be passed to x11vnc at startup via \"-rc <filename>\".
+#
+# The rc file comment character is \"#\".  Use \"\\#\" for the literal char.
+# You can continue lines using \"\\\" as the last character of a line.
+#
+# Lines beginning with \"#d\" indicate the parameter value is at its default
+# setting and you probably want to leave it commented out.
+#
+# Lines beginning with \"#?\" indicate parameters you probably do not
+# want to hardwire to the current setting (uncomment if you want that).
+# 
+# Some parameters are boolean, e.g. -forever, and take no value; while
+# the others, e.g. -wait 50, take a string or numerical value.
+#
+# For booleans, the line will end with comment \"default: on\" or
+# \"default: off\" indicating the default setting.  (Note: often
+# \"-nofoobar\" corresponds to option \"-foobar\" and the former is
+# \"the default\", e.g. -norepeat).
+#
+# For string or numerical options, the value \"\" in a line below
+# means the default is unset and you will need to supply some non-empty
+# value to use the parameter.  For reference, if the default differs
+# from your value it placed at the end of the line as a comment.
+# 
+# Feel free to uncomment or comment any of the lines or to change any
+# of the values of the parameters.  Don't be surprised that most if not
+# all of the lines below are commented out (x11vnc has so many parameters,
+# most of them will be at their default values).
+#-------------------------------------------------------------------------
+
+"
+
+	set rc_text "$top$rc_text"
+
+	global env save_settings_var save_settings_var_ok
+	if {[info exists env(HOME)]} {
+		set save_settings_var "$env(HOME)/.x11vncrc"
+	} else {
+		set save_settings_var ".x11vncrc"
+	}
+	set save_settings_var_ok 0
+
+	set w [textwin "save_settings" "Save Settings..." $rc_text \
+		"save_settings_var+Save as:"]
+
+	tkwait window $w
+
+	if {$save_settings_var_ok == 1} {
+		set file $save_settings_var
+		if {$file == ""} {
+			return
+		}
+		append_text "\nSaving current settings to $file ...\n" 
+		if {[file exists $file]} {
+			set backup "${file}~"
+			append_text "Backing up $file -> $backup ...\n"
+			catch {file delete -force $backup}
+			set emsg "*** Backup to $backup failed. ***\n"
+			if {![file exists $backup]} {
+				catch {file copy -force $file $backup}
+				if {![file exists $backup]} {
+					append_text $emsg
+					bell
+				}
+			} else {
+				append_text $emsg
+				bell
+			}
+		}
+		set fh ""
+		catch {set fh [open $file "w"]}
+		if {$fh != ""} {
+			puts $fh $rc_text
+			close $fh
+			if {![file exists $file]} {
+				append_text "*** Saving to $file failed. ***\n"
+				bell
+			} else {
+				append_text "Done.\n"
+			}
+		} else {
+			append_text "*** Open of $file failed. ***\n"
+			bell
+		}
+	}
+}
+
 proc clear_all {} {
 	global menu_var unset_str
 
@@ -2080,6 +2416,11 @@ proc clear_all {} {
 		}
 	}
 	append_text "Cleared all settings.\n"
+}
+
+proc defaults_all {} {
+	copy_default_vars
+	append_text "Reset all variables to default values.\n"
 }
 
 proc all_query_vars {} {
@@ -2121,13 +2462,13 @@ proc query_all {{quiet 0}} {
 
 	if {[regexp {ans=} $all]} {
 		if {! $quiet} {
-			append_text "Retrieved all settings.\n"
+			append_text "Retrieved all current settings.\n"
 		}
 		set all_settings $all
 		update_menu_vars $all
 	} else {
 		if {! $quiet} {
-			append_text "Failed to retrieve settings.\n"
+			append_text "Failed to retrieve current settings.\n"
 		}
 	}
 	set last_query_all_time [clock seconds]
@@ -2187,7 +2528,7 @@ proc show_logfile {} {
 	set logfile $menu_var(logfile)
 	
 	if {$logfile == "" || $logfile == $unset_str} {
-		set txt "\nNo logfile has been specified.\n\n"	
+		set txt "\nNo logfile was specified at x11vnc startup.\n\n"	
 	} elseif {![file exists $logfile]} {
 		set txt "\nLogfile \"$logfile\" does not exist.\n\n"
 	} else {
@@ -2213,7 +2554,7 @@ proc tail_logfile {} {
 	
 	set txt ""
 	if {$logfile == "" || $logfile == $unset_str} {
-		set txt "\nNo logfile has been specified.\n\n"	
+		set txt "\nNo logfile was specified at x11vnc startup.\n\n"	
 	} elseif {![file exists $logfile]} {
 		set txt "\nLogfile \"$logfile\" does not exist.\n\n"
 	} else {
@@ -2300,6 +2641,12 @@ proc do_action {item} {
 	} elseif {$item == "clear-all"} {
 		clear_all
 		return
+	} elseif {$item == "defaults-all"} {
+		defaults_all
+		return
+	} elseif {$item == "save-settings"} {
+		save_settings
+		return
 	} elseif {$item == "show-start-cmd"} {
 		show_start_cmd
 		return
@@ -2333,6 +2680,11 @@ proc do_action {item} {
 		set name $item
 	}
 
+	if {$item == "load-settings"} {
+		load_settings
+		return
+	}
+
 	if {! $connected_to_x11vnc} {
 		;
 	} elseif {[regexp {^(stop|quit|exit|shutdown)$} $item]} {
@@ -2359,6 +2711,7 @@ proc do_var {item} {
 
 	set debug [in_debug_mode]
 
+
 	set string 0
 	if {[is_action $item] || $item == "WindowView"} {
 		# Menu item is action:
@@ -2369,7 +2722,6 @@ proc do_var {item} {
 		}
 		return
 	}
-
 
 	if {[value_is_string $item]} {
 		# Menu item is a string:
@@ -2442,6 +2794,9 @@ proc is_browse {item} {
 
 proc value_is_string {item} {
 	global item_bool
+	if {![info exists item_bool($item)]} {
+		return 0
+	}
 	if {! $item_bool($item)} {
 		return 1
 	} else {
@@ -2451,6 +2806,9 @@ proc value_is_string {item} {
 
 proc value_is_bool {item} {
 	global item_bool
+	if {![info exists item_bool($item)]} {
+		return 0
+	}
 	if {$item_bool($item)} {
 		return 1
 	} else {
@@ -2825,9 +3183,6 @@ proc toggle_simple_gui {} {
 	make_menu_items
 	set_widgets
 	set_internal_help
-#	if {$connected_to_x11vnc} {
-#		query_all
-#	}
 	append_text "\n"
 }
 
@@ -3114,7 +3469,7 @@ proc menu_posted {} {
 		# puts "menu_posted $refresh"
 
 		if {$now > $refresh} {
-			append_text "Refreshing settings... "
+			append_text "Refreshing current settings... "
 			query_all $quiet
 			if {$quiet} {
 				append_text "done\n"
@@ -3195,20 +3550,79 @@ proc props_apply {} {
 		after 500
 	}
 
+	set fpw 0
 	if {$props_passwd != $prop0_passwd} {
-		push_new_value "passwd" "passwd" "$props_passwd" 0
-		set prop0_passwd $props_passwd
-		if {$props_passwd == ""} {
-			set props_viewpasswd ""
-		}
-		after 500
+		set fpw 1
+	}
+	set vpw 0
+	if {$props_viewpasswd != $prop0_viewpasswd} {
+		set vpw 1
 	}
 
-	if {$props_viewpasswd != $prop0_viewpasswd} {
-		push_new_value "viewpasswd" "viewpasswd" "$props_viewpasswd" 0
-		set prop0_viewpasswd $props_viewpasswd
-		after 500
+	set pw_ord [list]
+	if {!$fpw && !$vpw } {
+		# neither change
+		;
+	} elseif {$fpw && !$vpw} {
+		# full password change
+		if {$props_passwd == ""} {
+			if {$prop0_viewpasswd != ""} {
+				# set view to "" as well and first
+				set props_viewpasswd ""
+				set pw_ord [list vpw fpw]
+			} else {
+				set pw_ord [list fpw]
+			}
+		} else {
+			# assume view state OK
+			set pw_ord [list fpw]
+		}
+		
+	} elseif {!$fpw && $vpw} {
+		# view password change
+		if {$props_viewpasswd == ""} {
+			# assume full state OK
+			set pw_ord [list vpw]
+		} else {
+			if {$prop0_passwd == ""} {
+				# could be trouble, x11vnc makes random
+				# full passwd...
+				set pw_ord [list vpw]
+			} else {
+				# OK, full non-null.
+				set pw_ord [list vpw]
+			}
+		}
+	} elseif {$fpw && $vpw} {
+		# both full and view password change
+		if {$props_passwd == "" && $props_viewpasswd == ""} {
+			# OK, do view first
+			set pw_ord [list vpw fpw]
+		} elseif {$props_passwd == "" && $props_viewpasswd != ""} {
+			# Not good, do view first anyway x11vnc will fix.
+			set pw_ord [list vpw fpw]
+		} elseif {$props_passwd != "" && $props_viewpasswd == ""} {
+			# OK, view first
+			set pw_ord [list vpw fpw]
+		} elseif {$props_passwd != "" && $props_viewpasswd != ""} {
+			# OK, full first
+			set pw_ord [list fpw vpw]
+		}
 	}
+
+	foreach case $pw_ord {
+		if {$case == "fpw"} {
+			push_new_value "passwd" "passwd" "$props_passwd" 1
+			set prop0_passwd $props_passwd
+			after 500
+		}
+		if {$case == "vpw"} {
+			push_new_value "viewpasswd" "viewpasswd" "$props_viewpasswd" 1
+			set prop0_viewpasswd $props_viewpasswd
+			after 500
+		}
+	}
+
 	props_widgets normal
 }
 
@@ -3533,7 +3947,7 @@ proc read_client_info {} {
 
 proc show_client_balloon {} {
 	global icon_mode icon_win props_win full_win
-	global client_balloon ffont
+	global client_balloon ffont connected_to_x11vnc
 
 	set noinfo "tkx11vnc: no client information"
 	set noinfo "$noinfo\navailable from x11vnc ..."
@@ -3547,11 +3961,16 @@ proc show_client_balloon {} {
 	set x [expr [winfo rootx $icon_win] + ([winfo width $icon_win]/2)]
 	set y [expr [winfo rooty $icon_win] + [winfo height $icon_win] + 4]
 
+	set infotext $client_balloon
+	if {!$connected_to_x11vnc} {
+		set infotext "Not currently attached to x11vnc\nLast available info:\n$infotext"
+	}
+
 	set w .client_balloon
 	catch {destroy $w}
 	toplevel $w -bg black -screen [winfo screen $icon_win]
 	wm overrideredirect $w 1
-	label $w.l -text "$client_balloon" -relief flat -bg "#ffffaa" -fg black \
+	label $w.l -text "$infotext" -relief flat -bg "#ffffaa" -fg black \
 		-padx 2 -pady 0 -anchor w -justify left -font $ffont
 	pack $w.l -side left -padx 1 -pady 1
 
@@ -3975,6 +4394,7 @@ proc make_gui {mode} {
 	}
 
 	if {$make_gui_count == 1} {
+		copy_default_vars
 		if {$x11vnc_connect} {
 			try_connect_and_query_all
 		}
@@ -4293,6 +4713,139 @@ proc double_check_noremote {} {
 	return [warning_dialog $msg "noremote"]
 }
 
+proc get_settings_rcfile {} {
+	global menu_var default_var unset_str
+	global x11vnc_gui_params
+
+	set rc_txt ""
+
+	set menu_var(gui) $x11vnc_gui_params
+
+	foreach item [lsort [array names menu_var]] {
+		if {$item == "gui"} {
+			;
+		} elseif {![active_when_starting $item]} {
+			continue
+		} elseif {[is_action $item]} {
+			continue
+		}
+		if {$item == "debug_gui"} {
+			continue
+		}
+		if {$item == "WindowView"} {
+			continue
+		}
+		if {$item == "rc" || $item == "norc"} {
+			continue
+		}
+		set def ""
+		if {[info exists default_var($item)]} {
+			set def $default_var($item)
+		}
+
+		set qst ""
+		set hmm "#? "
+		if {$item == "display"} {
+			set qst $hmm
+		} elseif {$item == "desktop"} {
+			set qst $hmm
+		} elseif {$item == "dontdisconnect"} {
+			set qst $hmm
+		} elseif {$item == "alwaysshared"} {
+			set qst $hmm
+		} elseif {$item == "nevershared"} {
+			set qst $hmm
+		}
+
+		if {![info exists menu_var($item)]} {
+			set mv $def
+		} else {
+			set mv $menu_var($item)
+		}
+		if {$mv == $unset_str} {
+			set mv ""
+		}
+		set ntab 3
+
+		if {$item == "gui" || [value_is_string $item]} {
+			set nitem $item
+			if {$nitem == "screen_blank"} {
+				set nitem "sb"
+			} elseif {$nitem == "xrandr_mode"} {
+				set nitem "xrandr"
+			} elseif {$nitem == "wireframe_mode"} {
+				set nitem "wireframe"
+			} elseif {$nitem == "solid_color"} {
+				set nitem "solid"
+			}
+
+			if {$mv == "" && $def != ""}  {
+				set qst $hmm
+			}
+			set n 0
+			if {$qst != ""} {
+				append rc_txt $qst
+				incr n [string length $qst]
+			} elseif {$mv == $def} {
+				append rc_txt "#d "
+				incr n [string length "#d "]
+			}
+			set mt $mv
+			regsub -all {#} $mt {\#} mt
+			if {$mt == ""} {
+				set mt {""}
+			}
+			append rc_txt "-$nitem $mt"
+
+			if {$mv != $def} {
+				set m [string length "-$nitem $mt"]
+				incr n $m
+				set n [expr $n / 8]
+				set c 0
+				for {set i $n} {$i <= $ntab} {incr i} {
+					append rc_txt "\t"
+					incr c
+				}
+				if {$c == 0} {
+					append rc_txt "\t"
+				}
+				regsub -all {#} $def {\#} def
+				if {$def == ""} {
+					set def {""}
+				}
+				append rc_txt "# default:  $def"
+			}
+			append rc_txt "\n"
+
+		} elseif {[value_is_bool $item]} {
+			set n 0
+			if {$qst != ""} {
+				append rc_txt $qst
+				incr n [string length $qst]
+			} elseif {$mv == $def} {
+				append rc_txt "#d "
+				incr n [string length "#d "]
+			}
+			if {$def == 1} {
+				set dv "on"
+			} else {
+				set dv "off"
+			}
+			append rc_txt "-$item"
+			set m [string length "-$item"]
+			incr n $m
+			set n [expr $n / 8]
+			for {set i $n} {$i <= $ntab} {incr i} {
+				append rc_txt "\t"
+			}
+			append rc_txt "# default: $dv"
+			append rc_txt "\n"
+
+		}
+	}
+	return $rc_txt
+}
+
 proc double_check_start_x11vnc {} {
 	global hostname
 	set msg [get_start_x11vnc_txt]
@@ -4319,7 +4872,7 @@ proc show_start_cmd {} {
 }
 
 proc get_start_x11vnc_cmd {{show_rc 0}} {
-	global menu_var unset_str x11vnc_prog
+	global menu_var default_var unset_str x11vnc_prog
 
 	set xterm_cmd "xterm -iconic -geometry 80x35 -title x11vnc-console -e"
 
@@ -4332,13 +4885,17 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 	set saw_id 0
 
 	foreach item [lsort [array names menu_var]] {
-		if {![active_when_starting $item]} {
+		if {$item == "gui"} {
+			;
+		} elseif {![active_when_starting $item]} {
 			continue
-		}
-		if {[is_action $item]} {
+		} elseif {[is_action $item]} {
 			continue
 		}
 		if {$item == "debug_gui"} {
+			continue
+		}
+		if {$item == "WindowView"} {
 			continue
 		}
 		if {$item == "id" || $item == "sid"} {
@@ -4368,7 +4925,15 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 
 		if {[value_is_bool $item]} {
 			if {[info exists menu_var($item)]} {
-				if {$menu_var($item)} {
+				set add 1
+				if {[info exists default_var($item)]} {
+					if {$menu_var($item) == $default_var($item)} {
+						set add 0;
+					}
+				} elseif {! $menu_var($item)} {
+					set add 0
+				}
+				if {$add} {
 					lappend cmd "-$item"
 					append rc_txt "-$item\n"
 				}
@@ -4377,6 +4942,7 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 			if {[info exists menu_var($item)]} {
 				if {$menu_var($item) != ""
 				    && $menu_var($item) != $unset_str} {
+					set add 1
 					set nitem $item
 					if {$nitem == "screen_blank"} {
 						set nitem "sb"
@@ -4387,9 +4953,18 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 					} elseif {$nitem == "solid_color"} {
 						set nitem "solid"
 					}
-					lappend cmd "-$nitem"
-					lappend cmd $menu_var($item)
-					append rc_txt "-$nitem $menu_var($item)\n"
+					if {[info exists default_var($item)]} {
+						if {$menu_var($item) == $default_var($item)} {
+							set add 0;
+						}
+					}
+					if {$add} {
+						lappend cmd "-$nitem"
+						lappend cmd $menu_var($item)
+						set mt $menu_var($item)
+						regsub -all {#} $mt {\#} mt
+						append rc_txt "-$nitem $mt\n"
+					}
 				}
 			}
 		}
@@ -4445,6 +5020,15 @@ proc start_x11vnc {} {
 	catch {[eval exec $cmd]}
 	after 500
 	try_connect_and_query_all 3
+	if {!$connected_to_x11vnc} {
+		append_text "\nStarting x11vnc seems to have failed.\n"
+		if {[regexp -- {-o } $str] || [regexp -- {-logfile} $str]} {
+			append_text "Examine the logfile (Debugging -> show-logfile) for error messages.\n"
+		} else {
+			append_text "Rerun with a logfile (if needed) and examine the logfile\n"
+			append_text "(Debugging -> show-logfile) for error messages.\n"
+		}
+	}
 }
 
 proc run_remote_cmd {opts} {
@@ -4711,6 +5295,7 @@ proc undo_tray_embed {} {
 
 global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
 global x11vnc_client_file x11vnc_gui_geom x11vnc_started vnc_url
+global x11vnc_gui_params
 global x11vnc_auth_file x11vnc_connect_file beginner_mode simple_gui_created
 global helpall helptext helpremote helplabel hostname osname
 global all_settings reply_xdisplay always_update
@@ -4840,6 +5425,11 @@ if {[info exists env(X11VNC_GUI_GEOM)]} {
 } else {
 	set x11vnc_gui_geom ""
 }
+if {[info exists env(X11VNC_GUI_PARAMS)]} {
+	set x11vnc_gui_params $env(X11VNC_GUI_PARAMS);
+} else {
+	set x11vnc_gui_params ""
+}
 
 if {[info exists env(X11VNC_CONNECT_FILE)]} {
 	set x11vnc_connect_file $env(X11VNC_CONNECT_FILE);
@@ -4953,6 +5543,8 @@ set_template
 set_name "tkx11vnc"
 
 key_bindings;
+
+get_default_vars
 
 if {$icon_mode} {
 	if {$tray_embed} {

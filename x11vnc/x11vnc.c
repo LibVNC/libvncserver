@@ -166,6 +166,7 @@
  *
  * -DHARDWIRE_PASSWD=...      hardwired passwords, quoting necessary.
  * -DHARDWIRE_VIEWPASSWD=...
+ * -DNOPW=1                   make -nopw the default (skip warning)
  *
  * -DWIREFRAME=0  to have -nowireframe as the default.
  * -DWIREFRAME_COPYRECT=0  to have -nowirecopyrect as the default.
@@ -192,6 +193,10 @@
  */
 #ifndef REMOTE_CONTROL
 #define REMOTE_CONTROL 1
+#endif
+
+#ifndef NOPW
+#define NOPW 0
 #endif
 
 /*
@@ -382,7 +387,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-07-09";
+char lastmod[] = "0.7.2 lastmod: 2005-07-10";
 int hack_val = 0;
 
 /* X display info */
@@ -814,6 +819,7 @@ int deny_all = 0;		/* global locking of new clients */
 #define REMOTE_DEFAULT 1
 #endif
 int accept_remote_cmds = REMOTE_DEFAULT;	/* -noremote */
+int query_default = 0;
 int safe_remote_only = 1;	/* -unsafe */
 int priv_remote = 0;		/* -privremote */
 int more_safe = 0;		/* -safer */
@@ -907,7 +913,7 @@ Display *gdpy_ctrl = NULL;
 int xserver_grabbed = 0;
 
 /* XXX CHECK BEFORE RELEASE */
-int grab_buster = 1;
+int grab_buster = 0;
 int grab_buster_delay = 20;
 int sync_tod_delay = 3;
 pid_t grab_buster_pid = 0;
@@ -5110,7 +5116,7 @@ char *crash_stack_command1 = NULL;
 char *crash_stack_command2 = NULL;
 char *crash_debug_command = NULL;
 /* XXX CHECK BEFORE RELEASE */
-int crash_debug = 1;
+int crash_debug = 0;
 
 void initialize_crash_handler(void) {
 	int pid = program_pid;
@@ -6750,7 +6756,7 @@ void read_vnc_connect_prop(void) {
 		;
 	} else if (strstr(vnc_connect_str, "cmd=") &&
 	    strstr(vnc_connect_str, "passwd")) {
-		rfbLog("read VNC_CONNECT\n");
+		rfbLog("read VNC_CONNECT: *\n");
 	} else if (strlen(vnc_connect_str) > 38) {
 		char trim[100]; 
 		trim[0] = '\0';
@@ -7381,7 +7387,6 @@ int add_keysym(KeySym keysym) {
 	int kc, n, ret = 0;
 	static int first = 1;
 	KeySym *keymap;
-
 
 	if (first) {
 		for (n=0; n < 0x100; n++) {
@@ -12108,6 +12113,9 @@ void check_keycode_state(void) {
 	if (! client_count) {
 		return;
 	}
+
+	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+
 	/*
 	 * periodically update our model of the keycode_state[]
 	 * by correlating with the Xserver.  wait for a pause in
@@ -12626,9 +12634,15 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 	return 0;
 }
 
-int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync) {
+int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync,
+    int qdefault) {
 	char *rcmd = NULL, *qcmd = NULL;
 	int rc = 1;
+
+	if (qdefault && !query_cmd) {
+		query_cmd = remote_cmd;
+		remote_cmd = NULL;
+	}
 
 	if (remote_cmd) {
 		rcmd = (char *) malloc(strlen(remote_cmd) + 5);
@@ -12639,6 +12653,16 @@ int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync) {
 		qcmd = (char *) malloc(strlen(query_cmd) + 5);
 		strcpy(qcmd, "qry=");
 		strcat(qcmd, query_cmd);
+	}
+	if (qdefault) {
+		char *res;
+		if (!qcmd) {
+			return 1;
+		}
+		res = process_remote_cmd(qcmd, 1);
+		fprintf(stdout, "%s\n", res);
+		fflush(stdout);
+		return 0;
 	}
 	
 	if (rcmd && qcmd) {
@@ -13067,12 +13091,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	int query = 0;
 	static char *prev_cursors_mode = NULL;
 
-	if (! accept_remote_cmds) {
+	if (!query_default && !accept_remote_cmds) {
 		rfbLog("remote commands disabled: %s\n", cmd);
 		return NULL;
 	}
 
-	if (priv_remote) {
+	if (!query_default && priv_remote) {
 		if (! remote_control_access_ok()) {
 			rfbLog("** Disabling remote commands in -privremote "
 			    "mode.\n");
@@ -13846,9 +13870,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		p += strlen("accept:");
 		if (safe_remote_only) {
-			if (icon_mode && !strcmp(p, "")) {
+			if (icon_mode && !strcmp(p, "")) { /* skip-cmd-list */
 				;
-			} else if (icon_mode && !strcmp(p, "popup")) {
+			} else if (icon_mode && !strcmp(p, "popup")) { /* skip-cmd-list */
 				;
 			} else {
 				rfbLog("unsafe: %s\n", p);
@@ -15310,8 +15334,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int d;
 		COLON_CHECK("deferupdate:")
 		if (query) {
-			snprintf(buf, bufn, "ans=%s%s%d", p, co,
-			    screen->deferUpdateTime);
+			if (!screen) {
+				d = defer_update;
+			} else {
+				d = screen->deferUpdateTime;
+			}
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, d);
 			goto qry;
 		}
 		p += strlen("deferupdate:");
@@ -15325,8 +15353,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int d;
 		COLON_CHECK("defer:")
 		if (query) {
-			snprintf(buf, bufn, "ans=%s%s%d", p, co,
-			    screen->deferUpdateTime);
+			if (!screen) {
+				d = defer_update;
+			} else {
+				d = screen->deferUpdateTime;
+			}
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, d);
 			goto qry;
 		}
 		p += strlen("defer:");
@@ -15352,14 +15384,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "wait_bog")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s%s%d", p, co, wait_bog);
+			snprintf(buf, bufn, "ans=%s:%d", p, wait_bog);
 			goto qry;
 		}
 		wait_bog = 1;
 		rfbLog("remote_cmd: setting wait_bog to %d\n", wait_bog);
 	} else if (!strcmp(p, "nowait_bog")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s%s%d", p, co, !wait_bog);
+			snprintf(buf, bufn, "ans=%s:%d", p, !wait_bog);
 			goto qry;
 		}
 		wait_bog = 0;
@@ -15539,8 +15571,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int f;
 		COLON_CHECK("progressive:")
 		if (query) {
-			snprintf(buf, bufn, "ans=%s%s%d", p, co,
-			    screen->progressiveSliceHeight);
+			if (!screen) {
+				f = 0;
+			} else {
+				f = screen->progressiveSliceHeight;
+			}
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, f);
 			goto qry;
 		}
 		p += strlen("progressive:");
@@ -15551,10 +15587,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		screen->progressiveSliceHeight = f;
 
 	} else if (strstr(p, "rfbport") == p) {
-		int rp, orig = screen->port;
+		int rp, orig = screen ? screen->port : 5900;
 		COLON_CHECK("rfbport:")
 		if (query) {
-			snprintf(buf, bufn, "ans=%s%s%d", p, co, screen->port);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, orig);
 			goto qry;
 		}
 		p += strlen("rfbport:");
@@ -15563,8 +15599,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "http")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    (screen->httpListenSock > -1));
+			int ls = screen ? screen->httpListenSock : -1;
+			snprintf(buf, bufn, "ans=%s:%d", p, (ls > -1));
 			goto qry;
 		}
 		if (screen->httpListenSock > -1) {
@@ -15577,8 +15613,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 	} else if (!strcmp(p, "nohttp")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    !(screen->httpListenSock > -1));
+			int ls = screen ? screen->httpListenSock : -1;
+			snprintf(buf, bufn, "ans=%s:%d", p, !(ls > -1));
 			goto qry;
 		}
 		if (screen->httpListenSock < 0) {
@@ -15591,11 +15627,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 
 	} else if (strstr(p, "httpport") == p) {
-		int hp, orig = screen->httpPort;
+		int hp, orig = screen ? screen->httpPort : 0;
 		COLON_CHECK("httpport:")
 		if (query) {
-			snprintf(buf, bufn, "ans=%s%s%d", p, co,
-			    screen->httpPort);
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, orig);
 			goto qry;
 		}
 		p += strlen("httpport:");
@@ -15625,16 +15660,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "enablehttpproxy")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    screen->httpEnableProxyConnect != 0);
+			int ht = screen ? screen->httpEnableProxyConnect : 0;
+			snprintf(buf, bufn, "ans=%s:%d", p, ht != 0);
 			goto qry;
 		}
 		rfbLog("turning on enablehttpproxy.\n");
 		screen->httpEnableProxyConnect = 1;
 	} else if (!strcmp(p, "noenablehttpproxy")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    screen->httpEnableProxyConnect == 0);
+			int ht = screen ? screen->httpEnableProxyConnect : 0;
+			snprintf(buf, bufn, "ans=%s:%d", p, ht == 0);
 			goto qry;
 		}
 		rfbLog("turning off enablehttpproxy.\n");
@@ -15642,16 +15677,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "alwaysshared")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    screen->alwaysShared != 0);
+			int t = screen ? screen->alwaysShared : 0;
+			snprintf(buf, bufn, "ans=%s:%d", p, t != 0);
 			goto qry;
 		}
 		rfbLog("turning on alwaysshared.\n");
 		screen->alwaysShared = 1;
 	} else if (!strcmp(p, "noalwaysshared")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    screen->alwaysShared == 0);
+			int t = screen ? screen->alwaysShared : 0;
+			snprintf(buf, bufn, "ans=%s:%d", p, t == 0);
 			goto qry;
 		}
 		rfbLog("turning off alwaysshared.\n");
@@ -15659,16 +15694,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "nevershared")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    screen->neverShared != 0);
+			int t = screen ? screen->neverShared : 1;
+			snprintf(buf, bufn, "ans=%s:%d", p, t != 0);
 			goto qry;
 		}
 		rfbLog("turning on nevershared.\n");
 		screen->neverShared = 1;
 	} else if (!strcmp(p, "noalwaysshared")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    screen->neverShared == 0);
+			int t = screen ? screen->neverShared : 1;
+			snprintf(buf, bufn, "ans=%s:%d", p, t == 0);
 			goto qry;
 		}
 		rfbLog("turning off nevershared.\n");
@@ -15676,16 +15711,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	} else if (!strcmp(p, "dontdisconnect")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    screen->dontDisconnect != 0);
+			int t = screen ? screen->dontDisconnect : 1;
+			snprintf(buf, bufn, "ans=%s:%d", p, t != 0);
 			goto qry;
 		}
 		rfbLog("turning on dontdisconnect.\n");
 		screen->dontDisconnect = 1;
 	} else if (!strcmp(p, "nodontdisconnect")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p,
-			    screen->dontDisconnect == 0);
+			int t = screen ? screen->dontDisconnect : 1;
+			snprintf(buf, bufn, "ans=%s:%d", p, t == 0);
 			goto qry;
 		}
 		rfbLog("turning off dontdisconnect.\n");
@@ -15976,8 +16011,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				snprintf(buf, bufn, "aro=%s:rawfb:%p",
 				    p, raw_fb_addr);
 			} else if (! dpy) {
-				snprintf(buf, bufn, "aro=%s:%s", p,
-				    "no-display");
+				snprintf(buf, bufn, "aro=%s:", p);
 			} else {
 				char *d;
 				d = DisplayString(dpy);
@@ -15999,14 +16033,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p,
 			    NONUL(guess_desktop()));
 		} else if (!strcmp(p, "http_url")) {
-			if (screen->httpListenSock > -1) {
+			if (!screen) {
+				snprintf(buf, bufn, "aro=%s:", p);
+			} else if (screen->httpListenSock > -1) {
 				snprintf(buf, bufn, "aro=%s:http://%s:%d", p,
 				    NONUL(screen->thisHost), screen->httpPort);
 			} else {
 				snprintf(buf, bufn, "aro=%s:%s", p,
 				    "http_not_active");
 			}
-		} else if (!strcmp(p, "auth")) {
+		} else if (!strcmp(p, "auth") || !strcmp(p, "xauth")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(auth_file));
 		} else if (!strcmp(p, "users")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(users_list));
@@ -16144,6 +16180,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		} else if (!strcmp(p, "rfbauth")) {
 			NOTAPPRO
 		} else if (!strcmp(p, "passwd")) {
+			NOTAPPRO
+		} else if (!strcmp(p, "viewpasswd")) {
 			NOTAPPRO
 		} else {
 			NOTAPP
@@ -20751,6 +20789,10 @@ char *guess_desktop() {
 		return "root";
 	}
 
+	if (! dpy) {
+		return "";
+	}
+
 	prop = XInternAtom(dpy, "XFCE_DESKTOP_WINDOW", True);
 	if (prop != None) return "xfce";
 
@@ -23923,7 +23965,7 @@ char gui_code[] = "";
 #endif
 
 void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
-    pid_t parent) {
+    pid_t parent, char *gui_opts) {
 	char *x11vnc_xdisplay = NULL;
 	char extra_path[] = ":/usr/local/bin:/usr/bin/X11:/usr/sfw/bin"
 	    ":/usr/X11R6/bin:/usr/openwin/bin:/usr/dt/bin";
@@ -24067,6 +24109,9 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	if (simple_gui) {
 		set_env("X11VNC_SIMPLE_GUI", "1");
 	}
+	if (gui_opts) {
+		set_env("X11VNC_GUI_PARAMS", gui_opts);
+	}
 	if (gui_geometry) {
 		set_env("X11VNC_GUI_GEOM", gui_geometry);
 	}
@@ -24159,7 +24204,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	exit(0);
 }
 
-void do_gui(char *opts) {
+void do_gui(char *opts, int sleep) {
 	char *s, *p;
 	char *old_xauth = NULL;
 	char *gui_xdisplay = NULL;
@@ -24327,8 +24372,11 @@ void do_gui(char *opts) {
 			perror("fork");
 			clean_up_exit(1);
 		} else {
+			if (sleep > 0) {
+				usleep(sleep * 1000 * 1000);
+			}
 			run_gui(gui_xdisplay, connect_to_x11vnc, simple_gui,
-			    parent);
+			    parent, opts);
 			exit(1);
 		}
 #else
@@ -24338,7 +24386,7 @@ void do_gui(char *opts) {
 #endif
 	}
 	if (!start_x11vnc) {
-		run_gui(gui_xdisplay, connect_to_x11vnc, simple_gui, 0);
+		run_gui(gui_xdisplay, connect_to_x11vnc, simple_gui, 0, opts);
 		exit(1);
 	}
 	if (old_xauth) {
@@ -28755,7 +28803,11 @@ int get_rate(int which) {
 	int count = 0;
 	double slowest = -1.0, rate;
 	static double save_rate = 1000 * NETRATE0;
-	
+
+	if (!screen) {
+		return 0;
+	}
+
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
@@ -28811,6 +28863,10 @@ int get_latency(void) {
 	static double save_lat = ((double) LATENCY0)/1000.0;
 	int count = 0;
 	
+	if (!screen) {
+		return 0;
+	}
+
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
@@ -29023,6 +29079,10 @@ void measure_send_rates(int init) {
 	now = now - start;
 
 	nclients = 0;
+
+	if (!screen) {
+		return;
+	}
 
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
@@ -29715,6 +29775,8 @@ static void print_help(int mode) {
 "\n"
 "       vncviewer -encodings 'copyrect tight zrle hextile' localhost:0\n"
 "\n"
+"Also, use of a VNC password (-rfbauth or -passwdfile) is strongly recommend.\n"
+"\n"
 "For additional info see: http://www.karlrunge.com/x11vnc/\n"
 "                    and  http://www.karlrunge.com/x11vnc/#faq\n"
 "\n"
@@ -29724,9 +29786,10 @@ static void print_help(int mode) {
 "For each option name, the leading character \"-\" is not required.  E.g. a\n"
 "line that is either \"forever\" or \"-forever\" may be used and are equivalent.\n"
 "Likewise \"wait 100\" or \"-wait 100\" are acceptable and equivalent lines.\n"
-"The \"#\" character comments out to the end of the line in the usual way.\n"
-"Leading and trailing whitespace is trimmed off.  Lines may be continued with\n"
-"a \"\\\" as the last character of a line (it becomes a space character).\n"
+"The \"#\" character comments out to the end of the line in the usual way\n"
+"(backslash it for a literal).  Leading and trailing whitespace is trimmed off.\n"
+"Lines may be continued with a \"\\\" as the last character of a line (it\n"
+"becomes a space character).\n"
 "\n"
 "Options:\n"
 "\n"
@@ -29793,19 +29856,18 @@ static void print_help(int mode) {
 "                       around transient popup menus (but not for the menu\n"
 "                       itself): a workaround is to disable SaveUnders\n"
 "                       by passing the \"-su\" argument to Xsun (in\n"
-"                       /etc/dt/config/Xservers).  Also note that the mouse\n"
-"                       cursor shape is exactly correct in this mode.\n"
+"                       /etc/dt/config/Xservers).\n"
 "\n"
 "                       Use -overlay as a workaround for situations like these:\n"
 "                       Some legacy applications require the default visual to\n"
 "                       be 8bpp (8+24), or they will use 8bpp PseudoColor even\n"
 "                       when the default visual is depth 24 TrueColor (24+8).\n"
-"                       In these cases colors in some windows will be messed\n"
-"                       up in x11vnc unless -overlay is used.  Another use of\n"
+"                       In these cases colors in some windows will be incorrect\n"
+"                       in x11vnc unless -overlay is used.  Another use of\n"
 "                       -overlay is to enable showing the exact mouse cursor\n"
 "                       shape (details below).\n"
 "\n"
-"                       Under -overlay, performance will be somewhat degraded\n"
+"                       Under -overlay, performance will be somewhat slower\n"
 "                       due to the extra image transformations required.\n"
 "                       For optimal performance do not use -overlay, but rather\n"
 "                       configure the X server so that the default visual is\n"
@@ -29838,7 +29900,7 @@ static void print_help(int mode) {
 "                       More esoteric options: for compatibility with vncviewers\n"
 "                       the scaled width is adjusted to be a multiple of 4:\n"
 "                       to disable this use \":n4\".  \":in\" use interpolation\n"
-"                       scheme even when shrinking, \":pad\", pad scaled width\n"
+"                       scheme even when shrinking, \":pad\" pad scaled width\n"
 "                       and height to be multiples of scaling denominator\n"
 "                       (e.g. 3 for 2/3).\n"
 "\n"
@@ -29859,10 +29921,10 @@ static void print_help(int mode) {
 "-forever               Keep listening for more connections rather than exiting\n"
 "                       as soon as the first client(s) disconnect. Same as -many\n"
 "-timeout n             Exit unless a client connects within the first n seconds\n"
-"                       of startup.\n"
+"                       after startup.\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
 "                       Note: if you are not redirecting stderr to a log file\n"
-"                       (via shell 2> or -o option) you must also specify the -q\n"
+"                       (via shell 2> or -o option) you MUST also specify the -q\n"
 "                       option, otherwise the stderr goes to the viewer which\n"
 "                       will cause it to abort.  Specifying both -inetd and -q\n"
 "                       and no -o will automatically close the stderr.\n"
@@ -29880,7 +29942,7 @@ static void print_help(int mode) {
 "                       as a file to periodically check for new hosts.\n"
 "                       The first line is read and then the file is truncated.\n"
 "                       Be careful for this usage mode if x11vnc is running as\n"
-"                       root (e.g. via inetd(1) or gdm(1)).\n"
+"                       root (e.g. via gdm(1), etc).\n"
 "-vncconnect            Monitor the VNC_CONNECT X property set by the standard\n"
 "-novncconnect          VNC program vncconnect(1).  When the property is\n"
 "                       set to \"host\" or \"host:port\" establish a reverse\n"
@@ -29914,7 +29976,7 @@ static void print_help(int mode) {
 "-nolookup              Do not use gethostbyname() or gethostbyaddr() to look up\n"
 "                       host names or IP numbers.  Use this if name resolution\n"
 "                       is incorrectly set up and leads to long pauses as name\n"
-"                       lookup times out, etc.\n"
+"                       lookups time out, etc.\n"
 "\n"
 "-input string          Fine tuning of allowed user input.  If \"string\" does\n"
 "                       not contain a comma \",\" the tuning applies only to\n"
@@ -29927,7 +29989,7 @@ static void print_help(int mode) {
 "                       the mouse and  \"-input KMB,M\" lets normal users do\n"
 "                       anything and enables view-only users to move the mouse.\n"
 "                       This option is ignored when a global -viewonly is in\n"
-"                       effect (all input is discarded).\n"
+"                       effect (all input is discarded in that case).\n"
 "-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd\n"
 "                       (full-access) password must also be supplied.\n"
 "-passwdfile filename   Specify libvncserver -passwd via the first line of the\n"
@@ -29939,7 +30001,9 @@ static void print_help(int mode) {
 "                       Note: -passwdfile is a simple plaintext passwd, see\n"
 "                       also -rfbauth and -storepasswd below for obfuscated\n"
 "                       VNC password files.  Neither file should be readable\n"
-"                       by others.\n"
+"                       by untrusted users.\n"
+"-nopw                  Disable the big warning message when you use x11vnc\n"
+"                       without some sort of password.\n"
 "-storepasswd pass file Store password \"pass\" as the VNC password in the\n"
 "                       file \"file\".  Once the password is stored the\n"
 "                       program exits.  Use the password via \"-rfbauth file\"\n"
@@ -29972,7 +30036,7 @@ static void print_help(int mode) {
 "                       If \"string\" is \"popup\" then a builtin popup window\n"
 "                       is used.  The popup will time out after 120 seconds,\n"
 "                       use \"popup:N\" to modify the timeout to N seconds\n"
-"                       (use 0 for no timeout)\n"
+"                       (use 0 for no timeout).\n"
 "\n"
 "                       If \"string\" is \"xmessage\" then an xmessage(1)\n"
 "                       invocation is used for the command.  xmessage must be\n"
@@ -29994,7 +30058,9 @@ static void print_help(int mode) {
 "\n"
 "                       Note that x11vnc blocks while the external command\n"
 "                       or popup is running (other clients may see no updates\n"
-"                       during this period).\n"
+"                       during this period).  So a person sitting a the physical\n"
+"                       display is needed to respond to an popup prompt. (use\n"
+"                       a 2nd x11vnc if you lock yourself out).\n"
 "\n"
 "                       More -accept tricks: use \"popupmouse\" to only allow\n"
 "                       mouse clicks in the builtin popup to be recognized.\n"
@@ -30111,11 +30177,12 @@ static void print_help(int mode) {
 "                       each rectangle.\n"
 "-xinerama              If your screen is composed of multiple monitors\n"
 "                       glued together via XINERAMA, and that screen is\n"
-"                       non-rectangular this option will try to guess the\n"
+"                       not a rectangle this option will try to guess the\n"
 "                       areas to black out (if your system has libXinerama).\n"
 "\n"
-"                       In general on XINERAMA displays you may need to use the\n"
-"                       -xwarppointer option if the mouse pointer misbehaves.\n"
+"                       In general, we have noticed on XINERAMA displays you\n"
+"                       may need to use the \"-xwarppointer\" option if the mouse\n"
+"                       pointer misbehaves.\n"
 "\n"
 "-xtrap                 Use the DEC-XTRAP extension for keystroke and mouse\n"
 "                       input insertion.  For use on legacy systems, e.g. X11R5,\n"
@@ -30174,7 +30241,7 @@ static void print_help(int mode) {
 "-?, -opts              Only list the x11vnc options.\n"
 "-V, -version           Print program version and last modification date.\n"
 "\n"
-"-dbg                   instead of exiting after cleaning up, run a simple\n"
+"-dbg                   Instead of exiting after cleaning up, run a simple\n"
 "                       \"debug crash shell\" when fatal errors are trapped.\n"
 "\n"
 "-q                     Be quiet by printing less informational output to\n"
@@ -30195,10 +30262,6 @@ static void print_help(int mode) {
 "                       identical keyboards).  Also useful in resolving cases\n"
 "                       where a Keysym is bound to multiple keys (e.g. \"<\" + \">\"\n"
 "                       and \",\" + \"<\" keys).  Default: %s\n"
-#if 0
-"-isolevel3             When in modtweak mode, always send ISO_Level3_Shift to\n"
-"                       the X server instead of Mode_switch (AltGr).\n"
-#endif
 "-xkb                   When in modtweak mode, use the XKEYBOARD extension (if\n"
 "-noxkb                 the X display supports it) to do the modifier tweaking.\n"
 "                       This is powerful and should be tried if there are still\n"
@@ -30221,7 +30284,7 @@ static void print_help(int mode) {
 "                       Key that could give rise to extra unwanted characters\n"
 "                       (usually only between keyboards of different languages).\n"
 "                       Only use this option if you observe problems with\n"
-"                       some keystrokes.  This option may be extended.\n"
+"                       some keystrokes.\n"
 "-skip_dups             Some VNC viewers send impossible repeated key events,\n"
 "-noskip_dups           e.g. key-down, key-down, key-up, key-up all for the same\n"
 "                       key, or 20 downs in a row for the same modifier key!\n"
@@ -30231,11 +30294,11 @@ static void print_help(int mode) {
 "                       up's and so you should not set this option for\n"
 "                       these viewers (symptom: some keys do not autorepeat)\n"
 "                       Default: %s\n"
-"-add_keysyms           If a Keysym is received from a VNC viewer and\n"
-"-noadd_keysyms         that Keysym does not exist in the X server, then\n"
-"                       add the Keysym to the X server's keyboard mapping.\n"
-"                       Added Keysyms will be removed periodically and also\n"
-"                       when x11vnc exits.  Default: %s\n"
+"-add_keysyms           If a Keysym is received from a VNC viewer and that\n"
+"-noadd_keysyms         Keysym does not exist in the X server, then add the\n"
+"                       Keysym to the X server's keyboard mapping on an unused\n"
+"                       key.  Added Keysyms will be removed periodically and\n"
+"                       also when x11vnc exits.  Default: %s\n"
 #if 0
 "-xkbcompat             Ignore the XKEYBOARD extension.  Use as a workaround for\n"
 "                       some keyboard mapping problems.  E.g. if you are using\n"
@@ -30264,7 +30327,7 @@ static void print_help(int mode) {
 "                       Dead keys: \"dead\" (or silent, mute) keys are keys that\n"
 "                       do not produce a character but must be followed by a 2nd\n"
 "                       keystroke.  This is often used for accenting characters,\n"
-"                       e.g. to put \"'\" on top of \"a\" by pressing the dead\n"
+"                       e.g. to put \"`\" on top of \"a\" by pressing the dead\n"
 "                       key and then \"a\".  Note that this interpretation\n"
 "                       is not part of core X11, it is up to the toolkit or\n"
 "                       application to decide how to react to the sequence.\n"
@@ -30310,7 +30373,7 @@ static void print_help(int mode) {
 "\n"
 "                       Use \"-norepeat N\" to set how many times norepeat will\n"
 "                       be reset if something else (e.g. X session manager)\n"
-"                       disables it.  The default is 2.  Use a negative value\n"
+"                       undoes it.  The default is 2.  Use a negative value\n"
 "                       for unlimited resets.\n"
 "\n"
 "-nofb                  Ignore video framebuffer: only process keyboard and\n"
@@ -30353,7 +30416,7 @@ static void print_help(int mode) {
 "                       information from the X server, then the default is\n"
 "                       to use that mode.  On Solaris this can be done with\n"
 "                       the SUN_OVL extension using -overlay (see also the\n"
-"                       -overlay_nomouse option).  A similar overlay scheme\n"
+"                       -overlay_nocursor option).  A similar overlay scheme\n"
 "                       is used on IRIX.  Xorg (e.g. Linux) and recent Solaris\n"
 "                       Xsun servers support the XFIXES extension to retrieve\n"
 "                       the exact cursor shape from the X server.  If XFIXES\n"
@@ -30363,10 +30426,10 @@ static void print_help(int mode) {
 "                       option below.\n"
 "                       \n"
 "                       Note that under XFIXES cursors with transparency (alpha\n"
-"                       channel) will not be exactly represented and one may\n"
-"                       find Overlay preferable.  See also the -alphacut and\n"
-"                       -alphafrac options below as fudge factors to try to\n"
-"                       improve the situation for cursors with transparency\n"
+"                       channel) will usually not be exactly represented and one\n"
+"                       may find Overlay preferable.  See also the -alphacut\n"
+"                       and -alphafrac options below as fudge factors to try\n"
+"                       to improve the situation for cursors with transparency\n"
 "                       for a given theme.\n"
 "\n"
 "                       The \"mode\" string can be used to fine-tune the\n"
@@ -30401,20 +30464,19 @@ static void print_help(int mode) {
 "\n"
 "-arrow n               Choose an alternate \"arrow\" cursor from a set of\n"
 "                       some common ones.  n can be 1 to %d.  Default is: %d\n"
+"                       Ignored when in XFIXES cursor-grabbing mode.\n"
 "\n"
 "-noxfixes              Do not use the XFIXES extension to draw the exact cursor\n"
 "                       shape even if it is available.\n"
 "-alphacut n            When using the XFIXES extension for the cursor shape,\n"
-"                       cursors with transparency will not be displayed exactly\n"
-"                       (but opaque ones will).  This option sets n as a cutoff\n"
-"                       for cursors that have transparency (\"alpha channel\"\n"
-"                       with values ranging from 0 to 255) Any cursor pixel with\n"
-"                       alpha value less than n becomes completely transparent.\n"
-"                       Otherwise the pixel is completely opaque.  Default %d\n"
+"                       cursors with transparency will not usually be displayed\n"
+"                       exactly (but opaque ones will).  This option sets n as\n"
+"                       a cutoff for cursors that have transparency (\"alpha\n"
+"                       channel\" with values ranging from 0 to 255) Any cursor\n"
+"                       pixel with alpha value less than n becomes completely\n"
+"                       transparent.  Otherwise the pixel is completely opaque.\n"
+"                       Default %d\n"
 "                       \n"
-"                       Note: the options -alphacut, -alphafrac, and -alphafrac\n"
-"                       may be removed if a more accurate internal method for\n"
-"                       handling cursor transparency is implemented.\n"
 "-alphafrac fraction    With the threshold in -alphacut some cursors will become\n"
 "                       almost completely transparent because their alpha values\n"
 "                       are not high enough.  For those cursors adjust the\n"
@@ -30474,7 +30536,7 @@ static void print_help(int mode) {
 "                       (mouse button held down).  Greatly improves response on\n"
 "                       slow setups, but you lose all visual feedback for drags,\n"
 "                       text selection, and some menu traversals.  It overrides\n"
-"                       any -pointer_mode setting\n"
+"                       any -pointer_mode setting.\n"
 "\n"
 "-wireframe [str]       Try to detect window moves or resizes when a mouse\n"
 "-nowireframe           button is held down and show a wireframe instead of\n"
@@ -30527,8 +30589,9 @@ static void print_help(int mode) {
 "                       or being resized (for some window managers this can be\n"
 "                       rather long), t3 is how long to keep a wireframe moving\n"
 "                       before repainting the window. t4 is the minimum time\n"
-"                       between sending wireframe \"animations\".  For a slow\n"
-"                       link this might be a better choice: 0.25+0.6+6.0+0.15\n"
+"                       between sending wireframe \"animations\".  If a slow\n"
+"                       link is detected, these values may be automatically\n"
+"                       changed to something better for a slow link.\n"
 "\n"
 "-wirecopyrect mode     Since the -wireframe mechanism evidently tracks moving\n"
 "-nowirecopyrect        windows accurately, a speedup can be obtained by\n"
@@ -30755,9 +30818,9 @@ static void print_help(int mode) {
 "                       but it can be used for any scenario.  This option\n"
 "                       periodically performs costly operations and so\n"
 "                       interactive response may be reduced when it is on.\n"
-"                       The 3 Alt_L's (the Left \"Alt\" key) taps in a row\n"
-"                       described under -scrollcopyrect can be used instead to\n"
-"                       manually request a screen repaint when it is needed.\n"
+"                       You can use 3 Alt_L's (the Left \"Alt\" key) taps in a\n"
+"                       row described under -scrollcopyrect instead to manually\n"
+"                       request a screen repaint when it is needed.\n"
 "\n"
 "                       \"string\" is a comma separated list of one or more of\n"
 "                       the following: \"V=t\", \"C=t\", and \"X=t\".  In these\n"
@@ -30782,34 +30845,39 @@ static void print_help(int mode) {
 "\n"
 "-grab_buster           Some of the use of the RECORD extension can leave a\n"
 "-nograb_buster         tiny window for XGrabServer deadlock.  This is only if\n"
-"                       the whole-server grabbing application expects mouse\n"
-"                       or keyboard input before releasing the grab.  It is\n"
-"                       usually a window manager that does this.  x11vnc takes\n"
-"                       care to avoid the the problem, but if caught x11vnc\n"
-"                       will freeze.  Without -grab_buster, the only solution\n"
-"                       is to go the physical display and give it some input\n"
-"                       to satisfy the grabbing app.  Or manually kill and\n"
-"                       restart the window manager.  With -grab_buster, x11vnc\n"
+"                       the whole-server grabbing application expects mouse or\n"
+"                       keyboard input before releasing the grab.  It is usually\n"
+"                       a window manager that does this.  x11vnc takes care to\n"
+"                       avoid the the problem, but if caught x11vnc will freeze.\n"
+"                       Without -grab_buster, the only solution is to go the\n"
+"                       physical display and give it some input to satisfy the\n"
+"                       grabbing app.  Or manually kill and restart the window\n"
+"                       manager if that is feasible.  With -grab_buster, x11vnc\n"
 "                       will fork a helper thread and if x11vnc appears to be\n"
-"                       stuck in a grab after a period of time (20-30 sec)\n"
-"                       then it will inject some user input: button clicks,\n"
-"                       Escape, mouse motion, etc to try to break the grab.\n"
+"                       stuck in a grab after a period of time (20-30 sec) then\n"
+"                       it will inject some user input: button clicks, Escape,\n"
+"                       mouse motion, etc to try to break the grab.  If you\n"
+"                       experience a lot of grab deadlock, please report a bug.\n"
 "\n"
 "-debug_grabs           Turn on debugging info printout with respect to\n"
 "                       XGrabServer() deadlock for -scrollcopyrect mode.\n"
 "\n"
 "-pointer_mode n        Various pointer motion update schemes. \"-pm\" is\n"
 "                       an alias.  The problem is pointer motion can cause\n"
-"                       rapid changes on the screen: consider the rapid changes\n"
-"                       when you drag a large window around.  Neither x11vnc's\n"
-"                       screen polling and vnc compression routines nor the\n"
-"                       bandwidth to the vncviewers can keep up these rapid\n"
-"                       screen changes: everything will bog down when dragging\n"
-"                       or scrolling.  So a scheme has to be used to \"eat\"\n"
-"                       much of that pointer input before re-polling the screen\n"
-"                       and sending out framebuffer updates. The mode number\n"
-"                       \"n\" can be 0 to %d and selects one of the schemes\n"
-"                       desribed below.\n"
+"                       rapid changes on the screen: consider the rapid\n"
+"                       changes when you drag a large window around opaquely.\n"
+"                       Neither x11vnc's screen polling and vnc compression\n"
+"                       routines nor the bandwidth to the vncviewers can keep\n"
+"                       up these rapid screen changes: everything will bog down\n"
+"                       when dragging or scrolling.  So a scheme has to be used\n"
+"                       to \"eat\" much of that pointer input before re-polling\n"
+"                       the screen and sending out framebuffer updates. The\n"
+"                       mode number \"n\" can be 0 to %d and selects one of\n"
+"                       the schemes desribed below.\n"
+"\n"
+"                       Note that the -wireframe and -scrollcopyrect modes\n"
+"                       complement -pointer_mode by detecting (and improving)\n"
+"                       certain periods of \"rapid screen change\".\n"
 "\n"
 "                       n=0: does the same as -nodragging. (all screen polling\n"
 "                       is suspended if a mouse button is pressed.)\n"
@@ -30851,22 +30919,23 @@ static void print_help(int mode) {
 "\n"
 "-speeds rd,bw,lat      x11vnc tries to estimate some speed parameters that\n"
 "                       are used to optimize scheduling (e.g. -pointer_mode\n"
-"                       4) and other things.  Use the -speeds option to set\n"
-"                       these manually.  The triple \"rd,bw,lat\" corresponds\n"
-"                       to video h/w read rate in MB/sec, network bandwidth to\n"
-"                       clients in KB/sec, and network latency to clients in\n"
-"                       milliseconds, respectively.  If a value is left blank,\n"
-"                       e.g. \"-speeds ,100,15\", then the internal scheme is\n"
-"                       used to estimate the empty value(s).\n"
+"                       4, -wireframe, -scrollcopyrect) and other things.\n"
+"                       Use the -speeds option to set these manually.\n"
+"                       The triple \"rd,bw,lat\" corresponds to video h/w\n"
+"                       read rate in MB/sec, network bandwidth to clients in\n"
+"                       KB/sec, and network latency to clients in milliseconds,\n"
+"                       respectively.  If a value is left blank, e.g. \"-speeds\n"
+"                       ,100,15\", then the internal scheme is used to estimate\n"
+"                       the empty value(s).\n"
 "\n"
 "                       Typical PC video cards have read rates of 5-10 MB/sec.\n"
 "                       If the framebuffer is in main memory instead of video\n"
-"                       h/w (e.g. SunRay, shadowfb, Xvfb), the read rate may\n"
-"                       be much faster.  \"x11perf -getimage500\" can be used\n"
-"                       to get a lower bound (remember to factor in the bytes\n"
-"                       per pixel).  It is up to you to estimate the network\n"
-"                       bandwith and latency to clients.  For the latency the\n"
-"                       ping(1) command can be used.\n"
+"                       h/w (e.g. SunRay, shadowfb, dummy driver, Xvfb), the\n"
+"                       read rate may be much faster.  \"x11perf -getimage500\"\n"
+"                       can be used to get a lower bound (remember to factor\n"
+"                       in the bytes per pixel).  It is up to you to estimate\n"
+"                       the network bandwith and latency to clients.  For the\n"
+"                       latency the ping(1) command can be used.\n"
 "\n"
 "                       For convenience there are some aliases provided,\n"
 "                       e.g. \"-speeds modem\".  The aliases are: \"modem\" for\n"
@@ -30901,7 +30970,7 @@ static void print_help(int mode) {
 "                       text output.  By default x11vnc will try to detect this\n"
 "                       (3 screen polls in a row each longer than 0.25 sec with\n"
 "                       no user input), and sleep up to 1.5 secs to let things\n"
-"                       \"catch up\".  Use this option to disable the detection.\n"
+"                       \"catch up\".  Use this option to disable that detection.\n"
 "-readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On\n"
 "                       slow links that take a long time to paint the first\n"
 "                       screen libvncserver may hit the timeout and drop the\n"
@@ -30948,7 +31017,8 @@ static void print_help(int mode) {
 "                       \"ignore\" or \"exit\".  For \"ignore\" libvncserver\n"
 "                       will handle the abrupt loss of a client and continue,\n"
 "                       for \"exit\" x11vnc will cleanup and exit at the 1st\n"
-"                       broken connection.  Default: \"ignore\".\n"
+"                       broken connection.  Default: \"ignore\".  This option\n"
+"                       is obsolete.\n"
 "-threads               Whether or not to use the threaded libvncserver\n"
 "-nothreads             algorithm [rfbRunEventLoop] if libpthread is available\n"
 "                       Default: %s\n"
@@ -30968,7 +31038,7 @@ static void print_help(int mode) {
 "                       memory and examine that copy for changes.  Under some\n"
 "                       circumstances this will improve interactive response,\n"
 "                       or at least make things look smoother, but in others\n"
-"                       (many) it will make the response worse.  If the video\n"
+"                       (most!) it will make the response worse.  If the video\n"
 "                       h/w fb is such that reading small tiles is very slow\n"
 "                       this mode could help.  To keep the \"framerate\" up\n"
 "                       the screen size x bpp cannot be too large.  Note that\n"
@@ -31006,17 +31076,18 @@ static void print_help(int mode) {
 "\n"
 "                       (see ipcs(1) and fbset(1) for the first two examples)\n"
 "\n"
-"                       All user input is discarded.  Most of the X11 (screen,\n"
-"                       keyboard, mouse) options do not make sense and many\n"
-"                       will cause this mode to crash, so please think twice\n"
-"                       before setting/changing them.\n"
+"                       All user input is discarded by default (but see the\n"
+"                       -pipeinput option).  Most of the X11 (screen, keyboard,\n"
+"                       mouse) options do not make sense and many will cause\n"
+"                       this mode to crash, so please think twice before\n"
+"                       setting/changing them.\n"
 "\n"
 "                       If you don't want x11vnc to close the X DISPLAY in\n"
 "                       rawfb mode, then capitalize the prefix, SHM:, MAP:,\n"
 "                       FILE:   Keeping the display open enables the default\n"
 "                       remote-control channel, which could be useful.  Also,\n"
 "                       if you also specify -noviewonly, then the mouse and\n"
-"                       keyboard input are still sent to the X display, this\n"
+"                       keyboard input are STILL sent to the X display, this\n"
 "                       usage should be very rare, i.e. doing something strange\n"
 "                       with /dev/fb0.\n"
 "\n"
@@ -31040,9 +31111,10 @@ static void print_help(int mode) {
 "-gui [gui-opts]        Start up a simple tcl/tk gui based on the the remote\n"
 "                       control options -remote/-query described below.\n"
 "                       Requires the \"wish\" program to be installed on the\n"
-"                       machine.  \"gui-opts\" is not required: the default is\n"
-"                       to start up both the gui and x11vnc with the gui showing\n"
-"                       up on the X display in the environment variable DISPLAY.\n"
+"                       machine.  \"gui-opts\" is not required: the default\n"
+"                       is to start up both the full gui and x11vnc with the\n"
+"                       gui showing up on the X display in the environment\n"
+"                       variable DISPLAY.\n"
 "\n"
 "                       \"gui-opts\" can be a comma separated list of items.\n"
 "                       Currently there are these types of items: 1) a gui\n"
@@ -31075,15 +31147,16 @@ static void print_help(int mode) {
 "                       If you do not specify a gui X display in \"gui-opts\"\n"
 "                       then the DISPLAY environment variable and -display\n"
 "                       option are tried (in that order).  Regarding the x11vnc\n"
-"                       X display the gui will try to connect to, it first\n"
-"                       tries -display and then DISPLAY.  For example, \"x11vnc\n"
-"                       -display :0 -gui otherhost:0\", will remote control an\n"
-"                       x11vnc polling :0 and display the gui on otherhost:0\n"
-"                       The \"tray\" mode below reverses this preference.\n"
+"                       X display the gui will try to communication with, it\n"
+"                       first tries -display and then DISPLAY.  For example,\n"
+"                       \"x11vnc -display :0 -gui otherhost:0\", will remote\n"
+"                       control an x11vnc polling :0 and display the gui on\n"
+"                       otherhost:0 The \"tray/icon\" mode below reverses this\n"
+"                       preference, preferring to display on the x11vnc display.\n"
 "\n"
 "                       4) When \"tray\" or \"icon\" is specified, the gui\n"
 "                       presents itself as a small icon with behavior typical\n"
-"                       of a \"system tray\" or \"dock\" applet.  The color\n"
+"                       of a \"system tray\" or \"dock applet\".  The color\n"
 "                       of the icon indicates status (connected clients) and\n"
 "                       there is also a balloon status.  Clicking on the icon\n"
 "                       gives a menu from which properties, etc, can be set and\n"
@@ -31093,7 +31166,7 @@ static void print_help(int mode) {
 "\n"
 "                       For \"icon\" the gui just a small standalone window.\n"
 "                       For \"tray\" it will attempt to embed itself in the\n"
-"                       \"system tray\". If \"=setpass\" is appended then\n"
+"                       \"system tray\" if possible. If \"=setpass\" is appended then\n"
 "                       at startup the X11 user will be prompted to set the\n"
 "                       VNC session password.  If =<hexnumber> is appended\n"
 "                       that icon will attempt to embed itself in the window\n"
@@ -31119,6 +31192,7 @@ static void print_help(int mode) {
 "                       General examples of the -gui option: \"x11vnc -gui\",\n"
 "                       \"x11vnc -gui ez\" \"x11vnc -gui localhost:10\",\n"
 "                       \"x11vnc -gui conn,host:0\", \"x11vnc -gui tray,ez\"\n"
+"                       \"x11vnc -gui tray=setpass\"\n"
 "\n"
 "                       If you do not intend to start x11vnc from the gui\n"
 "                       (i.e. just remote control an existing one), then the\n"
@@ -31148,10 +31222,6 @@ static void print_help(int mode) {
 "                       'x11vnc -R stop') will close down the x11vnc server.\n"
 "                       'x11vnc -R shared' will enable shared connections, and\n"
 "                       'x11vnc -R scale:3/4' will rescale the desktop.\n"
-"\n"
-"                       Note: the more drastic the change induced by the -remote\n"
-"                       command, the bigger the chance for bugs or crashes.\n"
-"                       Please report reproducible bugs.\n"
 "\n"
 "                       The following -remote/-R commands are supported:\n"
 "\n"
@@ -31251,7 +31321,7 @@ static void print_help(int mode) {
 "                                       rectangle use \"-WxH+X+Y\" to delete one\n"
 "                       xinerama        enable  -xinerama mode. (if applicable)\n"
 "                       noxinerama      disable -xinerama mode.\n"
-"                       xtrap           enable  -xtrap input mode.\n"
+"                       xtrap           enable  -xtrap input mode(if applicable)\n"
 "                       noxtrap         disable -xtrap input mode.\n"
 "                       xrandr          enable  -xrandr mode. (if applicable)\n"
 "                       noxrandr        disable -xrandr mode.\n"
@@ -31333,7 +31403,7 @@ static void print_help(int mode) {
 "                       fixscreen:str   set -fixscreen to \"str\".\n"
 "                       noxrecord       disable all use of RECORD extension.\n"
 "                       xrecord         enable  use of RECORD extension.\n"
-"                       reset_record    reset RECORD extension (if avail.).\n"
+"                       reset_record    reset RECORD extension (if avail.)\n"
 "                       pointer_mode:n  set -pointer_mode to n. same as \"pm\"\n"
 "                       input_skip:n    set -input_skip to n.\n"
 "                       speeds:str      set -speeds to str.\n"
@@ -31426,16 +31496,24 @@ static void print_help(int mode) {
 "                       a query straight to the VNC_CONNECT property or connect\n"
 "                       file use \"qry=...\" instead of \"cmd=...\"\n"
 "\n"
+"                       Here is the current list of \"variables\" that can\n"
+"                       be supplied to the -query command. This includes the\n"
+"                       \"N/A\" ones that return no useful info.  For variables\n"
+"                       names that do not correspond to an x11vnc option or\n"
+"                       remote command, we hope the name makes it obvious what\n"
+"                       the returned value corresponds to (hint: the ext_*\n"
+"                       variables correspond to the presence of X extensions):\n"
+"\n"
 "                       ans= stop quit exit shutdown ping blacken zero\n"
 "                       refresh reset close disconnect id sid waitmapped\n"
 "                       nowaitmapped clip flashcmap noflashcmap shiftcmap\n"
 "                       truecolor notruecolor overlay nooverlay overlay_cursor\n"
 "                       overlay_yescursor nooverlay_nocursor nooverlay_cursor\n"
 "                       nooverlay_yescursor overlay_nocursor visual scale\n"
-"                       scale_cursor viewonly noviewonly shared noshared forever\n"
-"                       noforever once timeout deny lock nodeny unlock connect\n"
-"                       allowonce allow localhost nolocalhost listen lookup\n"
-"                       nolookup accept  popup gone shm noshm flipbyteorder\n"
+"                       scale_cursor viewonly noviewonly shared noshared\n"
+"                       forever noforever once timeout deny lock nodeny unlock\n"
+"                       connect allowonce allow localhost nolocalhost listen\n"
+"                       lookup nolookup accept gone shm noshm flipbyteorder\n"
 "                       noflipbyteorder onetile noonetile solid_color solid\n"
 "                       nosolid blackout xinerama noxinerama xtrap noxtrap\n"
 "                       xrandr noxrandr xrandr_mode padgeom quiet q noquiet\n"
@@ -31469,9 +31547,9 @@ static void print_help(int mode) {
 "                       debug_tiles dbt nodebug_tiles nodbt debug_tiles\n"
 "                       debug_grabs nodebug_grabs dbg nodbg noremote\n"
 "\n"
-"                       aro=  display vncdisplay desktopname guess_desktop\n"
-"                       http_url auth users rootshift clipshift scale_str\n"
-"                       scaled_x scaled_y scale_numer scale_denom\n"
+"                       aro=  noop display vncdisplay desktopname guess_desktop\n"
+"                       http_url auth xauth users rootshift clipshift\n"
+"                       scale_str scaled_x scaled_y scale_numer scale_denom\n"
 "                       scale_fac scaling_blend scaling_nomult4 scaling_pad\n"
 "                       scaling_interpolate inetd privremote unsafe safer nocmds\n"
 "                       passwdfile using_shm logfile o flag rc norc h help V\n"
@@ -31481,7 +31559,11 @@ static void print_help(int mode) {
 "                       ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin\n"
 "                       num_buttons button_mask mouse_x mouse_y bpp depth\n"
 "                       indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y\n"
-"                       cdpy_x cdpy_y coff_x coff_y rfbauth passwd\n"
+"                       cdpy_x cdpy_y coff_x coff_y rfbauth passwd viewpasswd\n"
+"\n"
+"-QD variable           Just like -query variable, but returns the default\n"
+"                       value for that parameter (no running x11vnc server\n"
+"                       is consulted)\n"
 "\n"
 "-sync                  By default -remote commands are run asynchronously, that\n"
 "                       is, the request is posted and the program immediately\n"
@@ -31489,7 +31571,7 @@ static void print_help(int mode) {
 "                       acknowledgement from the x11vnc server that command was\n"
 "                       processed (somehow).  On the other hand -query requests\n"
 "                       are always processed synchronously because they have\n"
-"                       to wait for the result.\n"
+"                       to wait for the answer.\n"
 "\n"
 "                       Also note that if both -remote and -query requests are\n"
 "                       supplied on the command line, the -remote is processed\n"
@@ -31530,7 +31612,7 @@ static void print_help(int mode) {
 "                       running external programs.  If you specify -unsafe, then\n"
 "                       these remote-control commands are allowed.  Note that\n"
 "                       you can still specify these parameters on the command\n"
-"                       line, they just cannot be changed via remote-control.\n"
+"                       line, they just cannot be invoked via remote-control.\n"
 "-safer                 Equivalent to: -novncconnect -noremote and prohibiting\n"
 "                       -gui and the -connect file. Shuts off communcation\n"
 "                       channels.\n"
@@ -31773,7 +31855,7 @@ static int argc2 = 0;
 static char **argv2;
 
 static void check_rcfile(int argc, char **argv) {
-	int i, pwlast, norc = 0, argmax = 1024;
+	int i, j, pwlast, norc = 0, argmax = 1024;
 	char *infile = NULL;
 	char rcfile[1024];
 	FILE *rc; 
@@ -31785,6 +31867,9 @@ static void check_rcfile(int argc, char **argv) {
 			exit(0);
 		}
 		if (!strcmp(argv[i], "-norc")) {
+			norc = 1;
+		}
+		if (!strcmp(argv[i], "-QD")) {
 			norc = 1;
 		}
 		if (!strcmp(argv[i], "-rc")) {
@@ -31833,7 +31918,7 @@ static void check_rcfile(int argc, char **argv) {
 
 	if (! norc) {
 		char line[4096], parm[100], tmp[101];
-		char *buf;
+		char *buf, *tbuf;
 		struct stat sbuf;
 		int sz;
 
@@ -31848,13 +31933,28 @@ static void check_rcfile(int argc, char **argv) {
 		}
 
 		buf = (char *) malloc(sz);
+		buf[0] = '\0';
 
 		while (fgets(line, 4096, rc) != NULL) {
 			char *q, *p = line;
-			char c = '\0';
+			char c;
 			int cont = 0;
 
 			q = p;
+			c = '\0';
+			while (*q) {
+				if (*q == '#') {
+					if (c != '\\') {
+						*q = '\0';
+						break;
+					}
+				}
+				c = *q;
+				q++;
+			}
+
+			q = p;
+			c = '\0';
 			while (*q) {
 				if (*q == '\n') {
 					if (c == '\\') {
@@ -31875,9 +31975,19 @@ static void check_rcfile(int argc, char **argv) {
 				c = *q;
 				q++;
 			}
-			if ( (q = strchr(p, '#')) != NULL) {
-				*q = '\0';
+			if (q != p) {
+				if (*q == '\0') {
+					q--;
+				}
+				while (isspace(*q)) {
+					*q = '\0';
+					if (q == p) {
+						break;
+					}
+					q--;
+				}
 			}
+
 			p = lblanks(p);
 
 			strncat(buf, p, sz - strlen(buf) - 1);
@@ -31886,6 +31996,22 @@ static void check_rcfile(int argc, char **argv) {
 			}
 			if (buf[0] == '\0') {
 				continue;
+			}
+
+			i = 0;
+			q = buf;
+			while (*q) {
+				i++;
+				if (*q == '\n' || isspace(*q)) {
+					break;
+				}
+				q++;
+			}
+
+			if (i >= 100) {
+				fprintf(stderr, "invalid rcfile line: %s/%s\n",
+				    p, buf);
+				exit(1);
 			}
 
 			if (sscanf(buf, "%s", parm) != 1) {
@@ -31908,12 +32034,26 @@ static void check_rcfile(int argc, char **argv) {
 			p = buf;
 			p += strlen(parm);
 			p = lblanks(p);
+
 			if (*p == '\0') {
 				buf[0] = '\0';
 				continue;
 			}
 
-			argv2[argc2++] = strdup(p);
+			tbuf = (char *) calloc(strlen(p) + 1, 1);
+
+			j = 0;
+			while (*p) {
+				if (*p == '\\' && *(p+1) == '#') {
+					;
+				} else {
+					tbuf[j++] = *p;
+				}
+				p++;
+			}
+
+			argv2[argc2++] = strdup(tbuf);
+			free(tbuf);
 			if (argc2 >= argmax) {
 				fprintf(stderr, "too many rcfile options\n");
 				exit(1);
@@ -32052,6 +32192,77 @@ void xopen_display_fail_message(char *disp) {
 	fprintf(stderr, "See also: http://www.karlrunge.com/x11vnc/#faq\n");
 }
 
+void nopassword_warning_msg(int gotloc) {
+
+	char str1[] =
+"###############################################################\n"
+"#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#\n"
+"#@                                                           @#\n"
+"#@  **  WARNING  **  WARNING  **  WARNING  **  WARNING  **   @#\n"
+"#@                                                           @#\n"
+"#@        YOU ARE RUNNING X11VNC WITHOUT A PASSWORD!!        @#\n"
+"#@                                                           @#\n"
+"#@  This means anyone with network access to this computer   @#\n"
+"#@  will be able to easily view and control your desktop.    @#\n"
+"#@                                                           @#\n"
+"#@ >>> If you did not mean to do this Press CTRL-C now!! <<< @#\n"
+"#@                                                           @#\n"
+"#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#\n"
+;
+	char str2[] =
+"#@                                                           @#\n"
+"#@  You can create an x11vnc password file by running:       @#\n"
+"#@                                                           @#\n"
+"#@      x11vnc -storepasswd password /path/to/passfile       @#\n"
+"#@                                                           @#\n"
+"#@  and then starting x11vnc via:                            @#\n"
+"#@                                                           @#\n"
+"#@      x11vnc -rfbauth /path/to/passfile                    @#\n"
+"#@                                                           @#\n"
+"#@  an existing ~/.vnc/passwd file will work too.            @#\n"
+"#@                                                           @#\n"
+"#@  You can also use the -passwdfile or -passwd options.     @#\n"
+"#@  (note -passwd is unsafe if local users are not trusted)  @#\n"
+"#@                                                           @#\n"
+"#@  Make sure any -rfbauth and -passwdfile password files    @#\n"
+"#@  cannot be read by untrusted users.                       @#\n"
+"#@                                                           @#\n"
+"#@  Please Read the documention for more info about          @#\n"
+"#@  passwords, security, and encryption.                     @#\n"
+;
+	char str3[] =
+"#@                                                           @#\n"
+"#@  You are using the -localhost option and that is a good   @#\n"
+"#@  thing!! Especially if you ssh(1) into this machine and   @#\n"
+"#@  use port redirection.  Nevertheless, without a password  @#\n"
+"#@  other users could possibly do redirection as well to     @#\n"
+"#@  gain access to your desktop.                             @#\n"
+;
+	char str4[] =
+"#@                                                           @#\n"
+"#@  To disable this warning use the -nopw option, or put     @#\n"
+"#@  the setting in your ~/.x11vncrc file.                    @#\n"
+"#@                                                           @#\n"
+"#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#\n"
+"###############################################################\n"
+;
+	if (quiet) {
+		return;
+	}
+
+	fprintf(stderr, "%s", str1);
+	fflush(stderr);
+	usleep(2500 * 1000);
+	fprintf(stderr, "%s", str2);
+	if (gotloc) {
+		fprintf(stderr, "%s", str3);
+	}
+	fprintf(stderr, "%s", str4);
+	fflush(stderr);
+	usleep(500 * 1000);
+
+}
+
 int main(int argc, char* argv[]) {
 
 	int i, len, tmpi;
@@ -32061,7 +32272,9 @@ int main(int argc, char* argv[]) {
 	char *remote_cmd = NULL;
 	char *query_cmd  = NULL;
 	char *gui_str = NULL;
-	int pw_loc = -1, got_passwd = 0, got_rfbauth = 0;
+	int pw_loc = -1, got_passwd = 0, got_rfbauth = 0, nopw = NOPW;
+	int got_viewpasswd = 0, got_localhost = 0, got_passwdfile = 0;
+	int running_without_passwd = 0;
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0;
@@ -32222,6 +32435,7 @@ int main(int argc, char* argv[]) {
 			allow_list = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-localhost")) {
 			allow_list = strdup("127.0.0.1");
+			got_localhost = 1;
 		} else if (!strcmp(arg, "-nolookup")) {
 			host_lookup = 0;
 		} else if (!strcmp(arg, "-input")) {
@@ -32231,9 +32445,13 @@ int main(int argc, char* argv[]) {
 			vpw_loc = i;
 			CHECK_ARGC
 			viewonly_passwd = strdup(argv[++i]);
+			got_viewpasswd = 1;
 		} else if (!strcmp(arg, "-passwdfile")) {
 			CHECK_ARGC
 			passwdfile = strdup(argv[++i]);
+			got_passwdfile = 1;
+		} else if (!strcmp(arg, "-nopw")) {
+			nopw = 1;
 		} else if (!strcmp(arg, "-storepasswd")) {
 			if (i+2 >= argc || rfbEncryptAndStorePasswd(argv[i+1],
 			    argv[i+2]) != 0) {
@@ -32657,6 +32875,10 @@ int main(int argc, char* argv[]) {
 			query_cmd = strdup(argv[++i]);
 			quiet = 1;
 			xkbcompat = 0;
+		} else if (!strcmp(arg, "-QD")) {
+			CHECK_ARGC
+			query_cmd = strdup(argv[++i]);
+			query_default = 1;
 		} else if (!strcmp(arg, "-sync")) {
 			remote_sync = 1;
 		} else if (!strcmp(arg, "-nosync")) {
@@ -32715,9 +32937,15 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
-
+	if (!got_passwd && !got_rfbauth && !got_passwdfile && !nopw)  {
+		running_without_passwd = 1;
+	}
 	if (launch_gui) {
-		do_gui(gui_str);
+		int sleep = 0;
+		if (running_without_passwd && !quiet) {
+			sleep = 3;
+		}
+		do_gui(gui_str, sleep);
 	}
 	if (logfile) {
 		int n;
@@ -32768,12 +32996,18 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	if (client_connect_file && (remote_cmd || query_cmd)) {
-		/* no need to open DISPLAY, just write it to the file now */
-		int rc = do_remote_query(remote_cmd, query_cmd, remote_sync);
-		fflush(stderr);
-		fflush(stdout);
-		exit(rc);
+	if (remote_cmd || query_cmd) {
+		/*
+		 * no need to open DISPLAY, just write it to the file now
+		 * similar for query_default.
+		 */
+		if (client_connect_file || query_default) {
+			int rc = do_remote_query(remote_cmd, query_cmd,
+			     remote_sync, query_default);
+			fflush(stderr);
+			fflush(stdout);
+			exit(rc);
+		}
 	}
 
 
@@ -32886,6 +33120,10 @@ int main(int argc, char* argv[]) {
 	if (viewonly_passwd && pw_loc < 0) {
 		rfbLog("-passwd must be supplied when using -viewpasswd\n");
 		exit(1);
+	}
+
+	if (!got_passwd && !got_rfbauth && !got_passwdfile && !nopw) {
+		nopassword_warning_msg(got_localhost);
 	}
 
 	if (more_safe) {
@@ -33283,7 +33521,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (remote_cmd || query_cmd) {
-		int rc = do_remote_query(remote_cmd, query_cmd, remote_sync);
+		int rc = do_remote_query(remote_cmd, query_cmd, remote_sync,
+		    query_default);
 		XFlush(dpy);
 		fflush(stderr);
 		fflush(stdout);
@@ -33667,6 +33906,13 @@ int main(int argc, char* argv[]) {
 	}
 	if (! quiet) {
 		rfbLog("screen setup finished.\n");
+		if (!got_passwd && !got_rfbauth && !got_passwdfile && !nopw) {
+			rfbLog("\n");
+			rfbLog("WARNING: You are running x11vnc WITHOUT"
+			    " a password.  See\n");
+			rfbLog("WARNING: the warning message printed above"
+			    " for more info.\n");
+		}
 	}
 	set_vnc_desktop_name();
 
