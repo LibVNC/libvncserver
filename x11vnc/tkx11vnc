@@ -252,9 +252,9 @@ Permissions
 	=0 storepasswd
 	=GAL LOFF
 	=GAL Misc-Perms::
-	=S alwaysshared
-	=S nevershared
-	=S dontdisconnect
+	=0S alwaysshared
+	=0S nevershared
+	=0S dontdisconnect
 	=SQA deny_all
 	=GAL LOFF
 
@@ -335,7 +335,8 @@ The \"Actions -> stop\" action sends a signal to the running x11vnc
 server indicating it should shutdown all connections and exit.
 
 The GUI stays running in case you want to start a new x11vnc or attach
-to another one.  Use \"Actions -> Quit\" if you want to have the gui exit.
+to another one.  Use \"Actions -> Quit\" if you then want to have the
+gui exit. Use \"Actions -> stop+quit\" to have both exit at once.
 "
 
 	set helptext(show-start-cmd) "
@@ -345,8 +346,10 @@ settings.  This can be done even in the attached state.  Intended for
 debugging the gui.  The help item for \"Actions -> start\" gives the
 same info.
 
-If you want to load in a saved profile \"rc file\" use Misc -> rc
-and select the file.
+If you want to load in a saved profile \"rc file\" use \"Misc -> rc\"
+and select the file.  \"Actions -> load-settings\" does a similar thing
+with an rc-file, but reading the file and setting the gui variables to
+its values.
 "
 
 	set helptext(debug_gui) "
@@ -393,7 +396,9 @@ default.  Basically sets everything to 0 or the string (unset).
 
 This action is only available in \"startup\" mode, not when connected
 to a running x11vnc server (in that case the variable settings reflect
-the state of the running x11vnc).
+the state of the running x11vnc).  To detach from a running x11vnc
+server use \"Actions -> detach\"; to completely stop the x11vnc server
+use \"Actions -> stop\".
 "
 
 	set helptext(defaults-all) "
@@ -402,7 +407,9 @@ everything to the default queries \"x11vnc -QD var\" retrieved at startup.
 
 This action is only available in \"startup\" mode, not when connected
 to a running x11vnc server (in that case the variable settings reflect
-the state of the running x11vnc).
+the state of the running x11vnc).  To detach from a running x11vnc
+server use \"Actions -> detach\"; to completely stop the x11vnc server
+use \"Actions -> stop\".
 "
 
 	set helptext(load-settings) "
@@ -416,7 +423,9 @@ using the gui before starting x11vnc.
 
 This action is only available in \"startup\" mode, not when connected
 to a running x11vnc server (in that case the variable settings reflect
-the state of the running x11vnc).
+the state of the running x11vnc).  To detach from a running x11vnc
+server use \"Actions -> detach\"; to completely stop the x11vnc server
+use \"Actions -> stop\".
 "
 
 	set helptext(save-settings) "
@@ -652,6 +661,7 @@ with -rfbauth, but only with -passwdfile, -passwd, and -viewpasswd.
 
 	set helptext(Misc-Perms:) "
 In this sub-menu we provide some lesser used permission options.
+
 Regarding -alwaysshared, -nevershared, and -dontdisconnect, you probably
 should never use them and just use x11vnc's -shared and -forever options
 instead (these give basically the same functionality and if you mixed
@@ -974,8 +984,9 @@ Key Bindings:
 	Anywhere: Control-a invokes \"Actions -> attach\"
 	Anywhere: Control-p invokes \"Actions -> ping\"
 	Anywhere: Control-u and Control-r invoke \"Actions -> update-all\"
+"
 
-
+set under_wally "
 Misc:
 
 Since x11vnc has so many settings and to avoid further confusion,
@@ -2168,6 +2179,8 @@ proc get_default_vars {} {
 				set val ""
 			} elseif {$item == "auth"} {
 				set val ""
+			} elseif {$item == "gui"} {
+				continue
 			} 
 			# some hacks we do here for now..
 			if {$item == "cursor" && $val == ""} {
@@ -2176,12 +2189,100 @@ proc get_default_vars {} {
 				set val "always"
 			} elseif {$item == "wirecopyrect" && $val == ""} {
 				set val "always"
-			} elseif {$item == "overlay_nocursor" && $val == 0} {
-				set val 1
+#			} elseif {$item == "overlay_nocursor" && $val == 0} {
+#				set val 1
 			}
 
 			set default_var($item) $val
 #puts "default: $item -> $val"
+		}
+	}
+}
+
+proc tilde_expand {file} {
+	global env
+	if {[file exists $file]} {
+		return $file
+	}
+
+	set user ""
+	if {[info exists env(USER)]} {
+		set user $env(USER)
+	}
+	if {$user == "" && [info exists env(LOGNAME)]} {
+		set user $env(LOGNAME)
+	}
+
+	set home ""
+	if {[info exists env(HOME)]} {
+		set home $env(HOME)
+	} elseif {$user != ""} {
+		set home "/home/$user"
+	}
+
+	if {[regexp {^~} $file]} {
+		if {[regexp {^~/} $file]} {
+			if {$home != ""} {
+				regsub {^~} $file $home file
+			}
+		} else {
+			regsub {^~} $file "/home/" file
+		}
+	}
+	return $file
+}
+
+proc insert_cmdline_vars {} {
+	global env cmd_var menu_var default_var x11vnc_cmdline
+	if {![info exists x11vnc_cmdline]} {
+		return
+	}
+	if {$x11vnc_cmdline == ""} {
+		return
+	}
+	set cmd_var(novar) 1 
+	set str [string trim $x11vnc_cmdline]
+
+	while {[regexp -- {^-} $str]} {
+		if {[regexp -- {^--*([^ \t][^ \t]*)(.*)$} $str m var rest]} {
+			set rest [string trim $rest]
+			set var [string trim $var]
+			if {[regexp {^\{\{([^\}]*)\}\}(.*)} $rest m val rest]} {
+				set str [string trim $rest]
+				set cmd_var($var) $val
+			} else {
+				set str $rest
+				set cmd_var($var) "boolean"
+			}
+		} else {
+			break
+		}
+	}
+
+	if {[info exists cmd_var(rc)]} {
+		load_settings $cmd_var(rc)
+	} elseif {[info exists cmd_var(norc)]} {
+		;
+	} else {
+		set filex [tilde_expand "~/.x11vncrc"]
+		if {[file exists $filex]} {
+			load_settings $filex
+		}
+	}
+
+	foreach var [array names cmd_var] {
+		if {$var == "novar"} {
+			continue
+		}
+		if {[regexp {^[ \t]*$} $var]} {
+			continue
+		}
+		if {[info exists menu_var($var)]} {
+			if {$cmd_var($var) == "boolean"} {
+				set menu_var($var) 1
+			} else {
+				set menu_var($var) $cmd_var($var)
+			}
 		}
 	}
 }
@@ -2239,22 +2340,25 @@ proc update_menu_vars {{query ""}} {
 	}
 }
 
-proc load_settings {} {
-	global menu_var default_var
+proc load_settings {{file ""}} {
+	global menu_var default_var env
 
-	if {![info exists menu_var(load-settings)]} {
-		return
+	if {$file == ""} {
+		if {![info exists menu_var(load-settings)]} {
+			return
+		}
+		set file $menu_var(load-settings)
 	}
-	set file $menu_var(load-settings)
 	if {$file == ""} {
 		return
 	}
 
 	set fh ""
-	catch {set fh [open $file "r"]}
+	set filex [tilde_expand $file]
+	catch {set fh [open $filex "r"]}
 
 	if {$fh == ""} {
-		append_text "load_settings: *** failed to open $file ***\n"
+		append_text "load_settings: *** failed to open $filex ***\n"
 		return
 	}
 	copy_default_vars
@@ -2281,6 +2385,9 @@ proc load_settings {} {
 	}
 	close $fh
 
+	set count 0
+	set parms ""
+
 	foreach line [split $str "\n"] {
 		set line [string trim $line]
 		regsub {^--*} $line "" line
@@ -2291,15 +2398,30 @@ proc load_settings {} {
 		if {[regexp {^[ \t]*$} $item]} {
 			continue
 		}
+		if {$item == "gui"} {
+			continue
+		}
 		if {[info exists menu_var($item)]} {
 			if {[value_is_bool $item]} {
 				set menu_var($item) 1
+				incr count
+				append parms "  -$item\n"
 			} elseif {[value_is_string $item]} {
 				if {$value != ""} {
 					set menu_var($item) $value
+					set nitem [get_nitem $item]
+					append parms "  -$nitem $value\n"
+					incr count
 				}
 			}
 		}
+	}
+	append_text "loaded $count parameter settings from $filex"
+	if {$count > 0} {
+		append_text ":\n"
+		append_text $parms
+	} else {
+		append_text ".\n"
 	}
 }
 
@@ -2361,6 +2483,7 @@ proc save_settings {} {
 		if {$file == ""} {
 			return
 		}
+		set file [tilde_expand $file]
 		append_text "\nSaving current settings to $file ...\n" 
 		if {[file exists $file]} {
 			set backup "${file}~"
@@ -2525,7 +2648,8 @@ proc show_all_settings {} {
 
 proc show_logfile {} {
 	global menu_var unset_str
-	set logfile $menu_var(logfile)
+
+	set logfile [tilde_expand $menu_var(logfile)]
 	
 	if {$logfile == "" || $logfile == $unset_str} {
 		set txt "\nNo logfile was specified at x11vnc startup.\n\n"	
@@ -3843,6 +3967,8 @@ proc do_new_client {} {
 	button $w.b -text OK -command "destroy $w" -font $bfont
 	bind $w.e <Return> "update; after 100; destroy $w"
 
+	wm title $w "New Client"
+
 	pack $w.l $w.e $w.b -side left -pady 1m -padx 1m
 	focus $w.e
 	center_win $w
@@ -4338,6 +4464,8 @@ proc make_gui {mode} {
 
 	wm minsize . 1 1
 
+	set gui_current_state ""
+
 	if {$mode == "full"} {
 		frame $fw
 		set icon_mode 0
@@ -4397,6 +4525,8 @@ proc make_gui {mode} {
 		copy_default_vars
 		if {$x11vnc_connect} {
 			try_connect_and_query_all
+		} else {
+			insert_cmdline_vars
 		}
 	} else {
 		set_name "RESTORE"
@@ -4731,13 +4861,12 @@ proc get_settings_rcfile {} {
 		}
 		if {$item == "debug_gui"} {
 			continue
-		}
-		if {$item == "WindowView"} {
+		} elseif {$item == "WindowView"} {
+			continue
+		} elseif {$item == "rc" || $item == "norc"} {
 			continue
 		}
-		if {$item == "rc" || $item == "norc"} {
-			continue
-		}
+
 		set def ""
 		if {[info exists default_var($item)]} {
 			set def $default_var($item)
@@ -4768,16 +4897,7 @@ proc get_settings_rcfile {} {
 		set ntab 3
 
 		if {$item == "gui" || [value_is_string $item]} {
-			set nitem $item
-			if {$nitem == "screen_blank"} {
-				set nitem "sb"
-			} elseif {$nitem == "xrandr_mode"} {
-				set nitem "xrandr"
-			} elseif {$nitem == "wireframe_mode"} {
-				set nitem "wireframe"
-			} elseif {$nitem == "solid_color"} {
-				set nitem "solid"
-			}
+			set nitem [get_nitem $item]
 
 			if {$mv == "" && $def != ""}  {
 				set qst $hmm
@@ -4871,8 +4991,22 @@ proc show_start_cmd {} {
 	append_text "$msg\n"
 }
 
+proc get_nitem {item} {
+	set nitem $item
+	if {$nitem == "screen_blank"} {
+		set nitem "sb"
+	} elseif {$nitem == "xrandr_mode"} {
+		set nitem "xrandr"
+	} elseif {$nitem == "wireframe_mode"} {
+		set nitem "wireframe"
+	} elseif {$nitem == "solid_color"} {
+		set nitem "solid"
+	}
+	return $nitem
+}
+
 proc get_start_x11vnc_cmd {{show_rc 0}} {
-	global menu_var default_var unset_str x11vnc_prog
+	global cmd_var menu_var default_var unset_str x11vnc_prog
 
 	set xterm_cmd "xterm -iconic -geometry 80x35 -title x11vnc-console -e"
 
@@ -4880,24 +5014,26 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 
 	lappend cmd $x11vnc_prog
 
+	lappend cmd "-gui"
+	lappend cmd "none"
+
 	set rc_txt ""
 
 	set saw_id 0
 
 	foreach item [lsort [array names menu_var]] {
 		if {$item == "gui"} {
-			;
+			continue
 		} elseif {![active_when_starting $item]} {
 			continue
 		} elseif {[is_action $item]} {
 			continue
-		}
-		if {$item == "debug_gui"} {
+		} elseif {$item == "debug_gui"} {
+			continue
+		} elseif {$item == "WindowView"} {
 			continue
 		}
-		if {$item == "WindowView"} {
-			continue
-		}
+
 		if {$item == "id" || $item == "sid"} {
 			set val $menu_var($item);
 			if {$val == "0x0" || $val == "root"} {
@@ -4909,17 +5045,13 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 		}
 		if {$item == "id"} {
 			set saw_id 1
-		}
-		if {$item == "httpport" && $menu_var($item) == "0"} {
+		} elseif {$item == "httpport" && $menu_var($item) == "0"} {
 			continue
-		}
-		if {$item == "progressive" && $menu_var($item) == "0"} {
+		} elseif {$item == "progressive" && $menu_var($item) == "0"} {
 			continue
-		}
-		if {$item == "dontdisconnect" && $menu_var($item) == "-1"} {
+		} elseif {$item == "dontdisconnect" && $menu_var($item) == "-1"} {
 			continue
-		}
-		if {$item == "alwaysshared" && $menu_var($item) == "-1"} {
+		} elseif {$item == "alwaysshared" && $menu_var($item) == "-1"} {
 			continue
 		}
 
@@ -4939,32 +5071,41 @@ proc get_start_x11vnc_cmd {{show_rc 0}} {
 				}
 			}
 		} elseif {[value_is_string $item]} {
-			if {[info exists menu_var($item)]} {
-				if {$menu_var($item) != ""
-				    && $menu_var($item) != $unset_str} {
-					set add 1
-					set nitem $item
-					if {$nitem == "screen_blank"} {
-						set nitem "sb"
-					} elseif {$nitem == "xrandr_mode"} {
-						set nitem "xrandr"
-					} elseif {$nitem == "wireframe_mode"} {
-						set nitem "wireframe"
-					} elseif {$nitem == "solid_color"} {
-						set nitem "solid"
+			if {![info exists menu_var($item)]} {
+				continue
+			}
+			if {$menu_var($item) != "" && $menu_var($item) != $unset_str} {
+				set add 1
+				set nitem [get_nitem $item]
+
+				if {[info exists default_var($item)]} {
+					if {$menu_var($item) == $default_var($item)} {
+						set add 0;
 					}
-					if {[info exists default_var($item)]} {
-						if {$menu_var($item) == $default_var($item)} {
-							set add 0;
+				}
+				if {$add} {
+					lappend cmd "-$nitem"
+					set mv $menu_var($item)
+
+					if {[regexp {^~} $mv]}  {
+						if {$item == "auth" ||
+						    $item == "rc" ||
+						    $item == "accept" || 
+						    $item == "connect" || 
+						    $item == "allow" || 
+						    $item == "passwdfile" || 
+						    $item == "o" || 
+						    $item == "logfile" || 
+						    $item == "remap" || 
+						    $item == "httpdir"} { 
+							set mv [tilde_expand $mv]
 						}
 					}
-					if {$add} {
-						lappend cmd "-$nitem"
-						lappend cmd $menu_var($item)
-						set mt $menu_var($item)
-						regsub -all {#} $mt {\#} mt
-						append rc_txt "-$nitem $mt\n"
-					}
+					
+					lappend cmd $mv
+					set mt $mv
+					regsub -all {#} $mt {\#} mt
+					append rc_txt "-$nitem $mt\n"
 				}
 			}
 		}
@@ -5073,7 +5214,7 @@ proc run_remote_cmd {opts} {
 	lappend cmd "/dev/null"
 #	lappend cmd "/tmp/nono"
 
-	if {0} {
+	if {0 || $debug} {
 		set str [join $cmd]
 		puts "running: $str"
 		foreach word $cmd {
@@ -5170,6 +5311,9 @@ proc change_view_state {} {
 
 	set new [get_view_variable]
 
+	if {![info exists gui_current_state]} {
+		set gui_current_state ""
+	}
 	set old $gui_current_state
 	#puts "$old -> $new"
 

@@ -387,7 +387,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-07-10";
+char lastmod[] = "0.7.2 lastmod: 2005-07-12";
 int hack_val = 0;
 
 /* X display info */
@@ -531,7 +531,9 @@ int cursor_x, cursor_y;		/* x and y from the viewer(s) */
 int button_change_x, button_change_y;
 int got_user_input = 0;
 int got_pointer_input = 0;
+int got_pointer_calls = 0;
 int got_keyboard_input = 0;
+int got_keyboard_calls = 0;
 int urgent_update = 0;
 int last_keyboard_keycode = 0;
 rfbBool last_rfb_down = FALSE;
@@ -800,7 +802,9 @@ enum {
 
 
 char *rc_rcfile = NULL;		/* -rc */
+int rc_rcfile_default = 0;
 int rc_norc = 0;
+int got_norc = 0;
 int opts_bg = 0;
 
 #ifndef VNCSHARED
@@ -9586,6 +9590,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	static double max_keyrepeat_last_time = 0.0;
 
 	dtime0(&tnow);
+	got_keyboard_calls++;
 
 	if (debug_keyboard) {
 		char *str;
@@ -10519,6 +10524,10 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	allowed_input_t input;
 	int sent = 0, buffer_it = 0;
 	double now;
+
+	if (mask >= 0) {
+		got_pointer_calls++;
+	}
 
 	if (debug_pointer && mask >= 0) {
 		static int show_motion = -1;
@@ -12573,13 +12582,13 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 	}
 
 	if (in != NULL) {
-		fprintf(stderr, "sending remote command: \"%s\"\nvia connect"
-		    " file: %s\n", cmd, client_connect_file);
+		fprintf(stderr, ">>> sending remote command: \"%s\"\n  via"
+		    " connect file: %s\n", cmd, client_connect_file);
 		fprintf(in, "%s\n", cmd);
 		fclose(in);
 	} else {
-		fprintf(stderr, "sending remote command: \"%s\" via VNC_CONNECT"
-		    " X property.\n", cmd);
+		fprintf(stderr, ">>> sending remote command: \"%s\" via"
+		    " VNC_CONNECT X property.\n", cmd);
 		set_vnc_connect_prop(cmd);
 		XFlush(dpy);
 	}
@@ -16090,9 +16099,13 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		} else if (!strcmp(p, "flag")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(flagfile));
 		} else if (!strcmp(p, "rc")) {
-			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(rc_rcfile));
+			char *s = rc_rcfile;
+			if (rc_rcfile_default) {
+				s = NULL;
+			}
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(s));
 		} else if (!strcmp(p, "norc")) {
-			snprintf(buf, bufn, "aro=%s:%d", p, rc_norc);
+			snprintf(buf, bufn, "aro=%s:%d", p, got_norc);
 		} else if (!strcmp(p, "h") || !strcmp(p, "help") ||
 		    !strcmp(p, "V") || !strcmp(p, "version") ||
 		    !strcmp(p, "lastmod")) {
@@ -18230,6 +18243,8 @@ void restore_cursor_shape_updates(rfbScreenInfoPtr s) {
 void disable_cursor_shape_updates(rfbScreenInfoPtr s) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
+	static int changed = 0;
+	int count = 0;
 
 	if (! s || ! s->clientHead) {
 		return;
@@ -18242,9 +18257,17 @@ void disable_cursor_shape_updates(rfbScreenInfoPtr s) {
 
 		if (cl->enableCursorShapeUpdates) {
 			cd->had_cursor_shape_updates = 1;
+			count++;
+			if (debug_pointer) {
+				rfbLog("%s disable HCSU\n", cl->host);
+			}
 		}
 		if (cl->enableCursorPosUpdates) {
 			cd->had_cursor_pos_updates = 1;
+			count++;
+			if (debug_pointer) {
+				rfbLog("%s disable HCPU\n", cl->host);
+			}
 		}
 		
 		cl->enableCursorShapeUpdates = FALSE;
@@ -18252,6 +18275,10 @@ void disable_cursor_shape_updates(rfbScreenInfoPtr s) {
 		cl->cursorWasChanged = FALSE;
 	}
 	rfbReleaseClientIterator(iter);
+
+	if (count) {
+		changed = 1;
+	}
 }
 
 int cursor_shape_updates_clients(rfbScreenInfoPtr s) {
@@ -23977,7 +24004,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	FILE *pipe, *tmpf;
 
 	if (*gui_code == '\0') {
-		rfbLog("gui not compiled into this program.\n");
+		rfbLog("gui: gui not compiled into this program.\n");
 		exit(0);
 	}
 	if (getenv("DISPLAY") != NULL) {
@@ -23990,7 +24017,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	}
 	if (connect_to_x11vnc) {
 		int rc, i;
-		rfbLogEnable(0);
+		rfbLogEnable(1);
 		if (! client_connect_file) {
 			if (getenv("XAUTHORITY") != NULL) {
 				old_xauth = strdup(getenv("XAUTHORITY"));
@@ -24008,7 +24035,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 				dpy = XOpenDisplay(x11vnc_xdisplay); 
 			}
 			if (! dpy) {
-				fprintf(stderr, "gui: could not open x11vnc "
+				rfbLog("gui: could not open x11vnc "
 				    "display: %s\n", NONUL(x11vnc_xdisplay));
 				exit(1);
 			}
@@ -24018,16 +24045,18 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 		}
 		usleep(2200*1000);
 		fprintf(stderr, "\n");
+		rfbLog("gui: trying to contact a x11vnc server at X display "
+		    "%s ...\n", NONUL(x11vnc_xdisplay));
 		for (i=0; i<try_max; i++) {
 			usleep(sleep*1000);
-			fprintf(stderr, "gui: pinging %s try=%d ...\n",
+			rfbLog("gui: pinging %s try=%d ...\n",
 			    NONUL(x11vnc_xdisplay), i+1);
 			rc = send_remote_cmd("qry=ping", 1, 1);
 			if (rc == 0) {
 				break;
 			}
 			if (parent && mypid != parent && kill(parent, 0) != 0) {
-				fprintf(stderr, "gui: parent process %d has gone"
+				rfbLog("gui: parent process %d has gone"
 				    " away: bailing out.\n", parent);
 				rc = 1;
 				break;
@@ -24038,10 +24067,10 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 			set_env("X11VNC_AUTH_FILE", getenv("XAUTHORITY"));
 		}
 		if (rc == 0) {
-			fprintf(stderr, "gui: ping succeeded.\n");
+			rfbLog("gui: ping succeeded.\n");
 			set_env("X11VNC_CONNECT", "1");
 		} else {
-			fprintf(stderr, "gui: could not connect to: '%s', try"
+			rfbLog("gui: could not connect to: '%s', try"
 			    " again manually.\n", x11vnc_xdisplay);
 		}
 		if (client_connect_file) {
@@ -24063,6 +24092,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 			}
 			free(old_xauth);
 		}
+		rfbLogEnable(0);
 	}
 
 	orig_path = getenv("PATH");
@@ -24211,7 +24241,7 @@ void do_gui(char *opts, int sleep) {
 	int got_gui_xdisplay = 0;
 	int start_x11vnc = 1;
 	int connect_to_x11vnc = 0;
-	int simple_gui = 0;
+	int simple_gui = 0, none_gui = 0;
 	Display *test_dpy;
 
 	if (opts) {
@@ -24245,6 +24275,8 @@ void do_gui(char *opts, int sleep) {
 		} else if (!strcmp(p, "wait")) {
 			start_x11vnc = 0;
 			connect_to_x11vnc = 0;
+		} else if (!strcmp(p, "none")) {
+			none_gui = 1;
 		} else if (!strcmp(p, "conn") || !strcmp(p, "connect")) {
 			start_x11vnc = 0;
 			connect_to_x11vnc = 1;
@@ -24255,6 +24287,8 @@ void do_gui(char *opts, int sleep) {
 			if ((q = strchr(p, '=')) != NULL) {
 				icon_mode_font = strdup(q+1);
 			}
+		} else if (!strcmp(p, "full")) {
+			;
 		} else if (strstr(p, "tray") == p || strstr(p, "icon") == p) {
 			char *q;
 			icon_mode = 1;
@@ -24279,6 +24313,13 @@ void do_gui(char *opts, int sleep) {
 		p = strtok(NULL, ",");
 	}
 	free(s);
+
+	if (none_gui) {
+		if (!start_x11vnc) {
+			exit(0);
+		}
+		return;
+	}
 	if (start_x11vnc) {
 		connect_to_x11vnc = 1;
 	}
@@ -26423,6 +26464,32 @@ int scrollability(Window win, int set) {
 	}
 
 	return set;
+}
+
+void eat_viewonly_input(int max_eat, int keep) {
+	int i, gp, gk;
+	
+	for (i=0; i<max_eat; i++) {
+		int cont = 0;
+		gp = got_pointer_calls;
+		gk = got_keyboard_calls;
+		rfbCFD(0);
+		if (got_pointer_calls > gp)  {
+			if (debug_pointer) {
+				rfbLog("eat_viewonly_input: pointer: %d\n", i);
+			}
+			cont++;
+		}
+		if (got_keyboard_calls > gk)  {
+			if (debug_keyboard) {
+				rfbLog("eat_viewonly_input: keyboard: %d\n", i);
+			}
+			cont++;
+		}
+		if (i >= keep - 1 && ! cont) {
+			break;
+		}
+	}
 }
 
 int eat_pointer(int max_ptr_eat, int keep) {
@@ -29585,7 +29652,9 @@ static void watch_loop(void) {
 
 		got_user_input = 0;
 		got_pointer_input = 0;
+		got_pointer_calls = 0;
 		got_keyboard_input = 0;
+		got_keyboard_calls = 0;
 		urgent_update = 0;
 
 		if (! use_threads) {
@@ -29613,6 +29682,12 @@ static void watch_loop(void) {
 if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 					continue;
 				}
+			}
+
+			/* watch for viewonly input piling up: */
+			if ((got_pointer_calls > got_pointer_input)
+			    || (got_keyboard_calls > got_keyboard_input)) {
+				eat_viewonly_input(10, 3);
 			}
 		} else {
 			if (0 && use_xrecord) {
@@ -31174,6 +31249,10 @@ static void print_help(int mode) {
 "                       full gui. (To supply more than one, use \"+\" sign).\n"
 "                       E.g. -gui tray=setpass and -gui icon=0x3600028\n"
 "\n"
+"                       Other modes: \"full\", the default and need not be\n"
+"                       specified.  \"-gui none\", do not show a gui, useful\n"
+"                       to override a ~/.x11vncrc setting, etc.\n"
+"\n"
 "                       5) When \"geom=+X+Y\" is specified, that geometry\n"
 "                       is passed to the gui toplevel.  This is the icon in\n"
 "                       icon/tray mode, or the full gui otherwise.  You can\n"
@@ -31868,6 +31947,7 @@ static void check_rcfile(int argc, char **argv) {
 		}
 		if (!strcmp(argv[i], "-norc")) {
 			norc = 1;
+			got_norc = 1;
 		}
 		if (!strcmp(argv[i], "-QD")) {
 			norc = 1;
@@ -31909,6 +31989,7 @@ static void check_rcfile(int argc, char **argv) {
 				norc = 1;
 			} else {
 				rc_rcfile = strdup(rcfile);
+				rc_rcfile_default = 1;
 			}
 		}
 	}
@@ -31975,7 +32056,7 @@ static void check_rcfile(int argc, char **argv) {
 				c = *q;
 				q++;
 			}
-			if (q != p) {
+			if (q != p && !cont) {
 				if (*q == '\0') {
 					q--;
 				}
@@ -32252,7 +32333,7 @@ void nopassword_warning_msg(int gotloc) {
 
 	fprintf(stderr, "%s", str1);
 	fflush(stderr);
-	usleep(2500 * 1000);
+	usleep(2000 * 1000);
 	fprintf(stderr, "%s", str2);
 	if (gotloc) {
 		fprintf(stderr, "%s", str3);
@@ -32939,6 +33020,10 @@ int main(int argc, char* argv[]) {
 	}
 	if (!got_passwd && !got_rfbauth && !got_passwdfile && !nopw)  {
 		running_without_passwd = 1;
+	}
+	if (launch_gui && (query_cmd || remote_cmd)) {
+		launch_gui = 0;
+		gui_str = NULL;
 	}
 	if (launch_gui) {
 		int sleep = 0;

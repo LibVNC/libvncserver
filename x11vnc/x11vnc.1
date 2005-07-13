@@ -2,7 +2,7 @@
 .TH X11VNC "1" "July 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.2, lastmod: 2005-07-10
+         version: 0.7.2, lastmod: 2005-07-12
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1803,6 +1803,10 @@ that icon will attempt to embed itself in the window
 given by hexnumber.  Use =noadvanced to disable the
 full gui. (To supply more than one, use "+" sign).
 E.g. \fB-gui\fR tray=setpass and \fB-gui\fR icon=0x3600028
+.IP
+Other modes: "full", the default and need not be
+specified.  "\fB-gui\fR \fInone\fR", do not show a gui, useful
+to override a ~/.x11vncrc setting, etc.
 .IP
 5) When "geom=+X+Y" is specified, that geometry
 is passed to the gui toplevel.  This is the icon in

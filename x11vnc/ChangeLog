@@ -1,4 +1,8 @@
 2005-07-10  Karl Runge <runge@karlrunge.com>
+	* gui: remove nevershared etc., parse cmd line, bug fixes.
+	* x11vnc: fix pointer queue buildup under -viewonly.
+
+2005-07-10  Karl Runge <runge@karlrunge.com>
 	* more improvements to gui, default values, save-settings..
 	* x11vnc scary password warnings. Release settings. -QD option.
 	  add \# to rc files and fix rcfile read bug.
