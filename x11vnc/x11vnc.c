@@ -387,7 +387,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.2 lastmod: 2005-07-12";
+char lastmod[] = "0.7.3 lastmod: 2005-07-13";
 int hack_val = 0;
 
 /* X display info */

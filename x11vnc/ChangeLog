@@ -1,4 +1,4 @@
-2005-07-10  Karl Runge <runge@karlrunge.com>
+2005-07-12  Karl Runge <runge@karlrunge.com>
 	* gui: remove nevershared etc., parse cmd line, bug fixes.
 	* x11vnc: fix pointer queue buildup under -viewonly.
 
