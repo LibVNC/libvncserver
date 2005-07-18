@@ -167,6 +167,8 @@
  * -DHARDWIRE_PASSWD=...      hardwired passwords, quoting necessary.
  * -DHARDWIRE_VIEWPASSWD=...
  * -DNOPW=1                   make -nopw the default (skip warning)
+ * -DPASSWD_REQUIRED=1        exit unless a password is supplied.
+ * -DPASSWD_UNLESS_NOPW=1     exit unless a password is supplied and no -nopw.
  *
  * -DWIREFRAME=0  to have -nowireframe as the default.
  * -DWIREFRAME_COPYRECT=0  to have -nowirecopyrect as the default.
@@ -197,6 +199,14 @@
 
 #ifndef NOPW
 #define NOPW 0
+#endif
+
+#ifndef PASSWD_REQUIRED
+#define PASSWD_REQUIRED 0
+#endif
+
+#ifndef PASSWD_UNLESS_NOPW
+#define PASSWD_UNLESS_NOPW 0
 #endif
 
 /*
@@ -387,7 +397,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.3 lastmod: 2005-07-13";
+char lastmod[] = "0.7.3 lastmod: 2005-07-17";
 int hack_val = 0;
 
 /* X display info */
@@ -579,6 +589,7 @@ char *bitprint(unsigned int, int);
 void blackout_tiles(void);
 void solid_bg(int);
 void check_connect_inputs(void);
+void check_gui_inputs(void);
 void check_padded_fb(void);
 void clean_up_exit(int);
 void clear_modifiers(int init);
@@ -6758,6 +6769,8 @@ void read_vnc_connect_prop(void) {
 		;
 	} else if (strstr(vnc_connect_str, "qry=stop,quit,exit")) {
 		;
+	} else if (strstr(vnc_connect_str, "ack=") == vnc_connect_str) {
+		;
 	} else if (strstr(vnc_connect_str, "cmd=") &&
 	    strstr(vnc_connect_str, "passwd")) {
 		rfbLog("read VNC_CONNECT: *\n");
@@ -6780,7 +6793,8 @@ static void send_client_connect(void) {
 		char *str = client_connect;
 		if (strstr(str, "cmd=") == str || strstr(str, "qry=") == str) {
 			process_remote_cmd(client_connect, 0);
-		} else if (strstr(str, "ans=") || strstr(str, "aro=") == str) {
+		} else if (strstr(str, "ans=") == str
+		    || strstr(str, "aro=") == str) {
 			;
 		} else if (strstr(str, "ack=") == str) {
 			;
@@ -6812,6 +6826,77 @@ void check_connect_inputs(void) {
 		vnc_connect_str[0] = '\0';
 	}
 	send_client_connect();
+}
+
+void check_gui_inputs(void) {
+	int i, nmax = 0, n = 0, nfds;
+	int socks[ICON_MODE_SOCKS];
+	fd_set fds;
+	struct timeval tv;
+	char buf[VNC_CONNECT_MAX+1];
+	ssize_t nbytes;
+
+	for (i=0; i<ICON_MODE_SOCKS; i++) {
+		if (icon_mode_socks[i] >= 0) {
+			socks[n++] = i;
+			if (icon_mode_socks[i] > nmax) {
+				nmax = icon_mode_socks[i];
+			}
+		}
+	}
+
+	if (! n) {
+		return;
+	}
+
+	FD_ZERO(&fds);
+	for (i=0; i<n; i++) {
+		FD_SET(icon_mode_socks[socks[i]], &fds);
+	}
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
+
+	nfds = select(nmax+1, &fds, NULL, NULL, &tv);
+	if (nfds <= 0) {
+		return;
+	}
+	
+	for (i=0; i<n; i++) {
+		int k, fd = icon_mode_socks[socks[i]];
+		char *p;
+		if (! FD_ISSET(fd, &fds)) {
+			continue;
+		}
+		for (k=0; k<=VNC_CONNECT_MAX; k++) {
+			buf[k] = '\0';
+		}
+		nbytes = read(fd, buf, VNC_CONNECT_MAX);
+		if (nbytes <= 0) {
+			close(fd);
+			icon_mode_socks[socks[i]] = -1;
+			continue;
+		}
+
+		p = strtok(buf, "\r\n");
+		while (p) {
+			if (strstr(p, "cmd=") == p ||
+			    strstr(p, "qry=") == p) {
+				char *str = process_remote_cmd(p, 1);
+				if (! str) {
+					str = strdup("");
+				}
+				nbytes = write(fd, str, strlen(str));
+				write(fd, "\n", 1);
+				free(str);
+				if (nbytes < 0) {
+					close(fd);
+					icon_mode_socks[socks[i]] = -1;
+					break;
+				}
+			}
+			p = strtok(NULL, "\r\n");
+		}
+	}
 }
 
 /*
@@ -23991,8 +24076,8 @@ char gui_code[] = "";
 #include "tkx11vnc.h"
 #endif
 
-void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
-    pid_t parent, char *gui_opts) {
+void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int start_x11vnc,
+    int simple_gui, pid_t parent, char *gui_opts) {
 	char *x11vnc_xdisplay = NULL;
 	char extra_path[] = ":/usr/local/bin:/usr/bin/X11:/usr/sfw/bin"
 	    ":/usr/X11R6/bin:/usr/openwin/bin:/usr/dt/bin";
@@ -24145,7 +24230,7 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int simple_gui,
 	if (gui_geometry) {
 		set_env("X11VNC_GUI_GEOM", gui_geometry);
 	}
-	if (connect_to_x11vnc) {
+	if (start_x11vnc) {
 		set_env("X11VNC_STARTED", "1");
 	}
 	if (icon_mode) {
@@ -24416,8 +24501,8 @@ void do_gui(char *opts, int sleep) {
 			if (sleep > 0) {
 				usleep(sleep * 1000 * 1000);
 			}
-			run_gui(gui_xdisplay, connect_to_x11vnc, simple_gui,
-			    parent, opts);
+			run_gui(gui_xdisplay, connect_to_x11vnc, start_x11vnc,
+			    simple_gui, parent, opts);
 			exit(1);
 		}
 #else
@@ -24427,7 +24512,8 @@ void do_gui(char *opts, int sleep) {
 #endif
 	}
 	if (!start_x11vnc) {
-		run_gui(gui_xdisplay, connect_to_x11vnc, simple_gui, 0, opts);
+		run_gui(gui_xdisplay, connect_to_x11vnc, start_x11vnc,
+		    simple_gui, 0, opts);
 		exit(1);
 	}
 	if (old_xauth) {
@@ -29715,6 +29801,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_autorepeat();
 			check_keycode_state();
 			check_connect_inputs();		
+			check_gui_inputs();		
 			check_padded_fb();		
 			check_fixscreen();		
 			check_xdamage_state();
@@ -32273,6 +32360,175 @@ void xopen_display_fail_message(char *disp) {
 	fprintf(stderr, "See also: http://www.karlrunge.com/x11vnc/#faq\n");
 }
 
+void print_settings(int try_http, int bg, char *gui_str) {
+
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Settings:\n");
+	fprintf(stderr, " display:    %s\n", use_dpy ? use_dpy
+	    : "null");
+	fprintf(stderr, " authfile:   %s\n", auth_file ? auth_file
+	    : "null");
+	fprintf(stderr, " subwin:     0x%lx\n", subwin);
+	fprintf(stderr, " -sid mode:  %d\n", rootshift);
+	fprintf(stderr, " clip:       %s\n", clip_str ? clip_str
+	    : "null");
+	fprintf(stderr, " flashcmap:  %d\n", flash_cmap);
+	fprintf(stderr, " shiftcmap:  %d\n", shift_cmap);
+	fprintf(stderr, " force_idx:  %d\n", force_indexed_color);
+	fprintf(stderr, " visual:     %s\n", visual_str ? visual_str
+	    : "null");
+	fprintf(stderr, " overlay:    %d\n", overlay);
+	fprintf(stderr, " ovl_cursor: %d\n", overlay_cursor);
+	fprintf(stderr, " scaling:    %d %.4f\n", scaling, scale_fac);
+	fprintf(stderr, " viewonly:   %d\n", view_only);
+	fprintf(stderr, " shared:     %d\n", shared);
+	fprintf(stderr, " conn_once:  %d\n", connect_once);
+	fprintf(stderr, " timeout:    %d\n", first_conn_timeout);
+	fprintf(stderr, " inetd:      %d\n", inetd);
+	fprintf(stderr, " http:       %d\n", try_http);
+	fprintf(stderr, " connect:    %s\n", client_connect
+	    ? client_connect : "null");
+	fprintf(stderr, " connectfile %s\n", client_connect_file
+	    ? client_connect_file : "null");
+	fprintf(stderr, " vnc_conn:   %d\n", vnc_connect);
+	fprintf(stderr, " allow:      %s\n", allow_list ? allow_list
+	    : "null");
+	fprintf(stderr, " input:      %s\n", allowed_input_str
+	    ? allowed_input_str : "null");
+	fprintf(stderr, " passfile:   %s\n", passwdfile ? passwdfile
+	    : "null");
+	fprintf(stderr, " accept:     %s\n", accept_cmd ? accept_cmd
+	    : "null");
+	fprintf(stderr, " gone:       %s\n", gone_cmd ? gone_cmd
+	    : "null");
+	fprintf(stderr, " users:      %s\n", users_list ? users_list
+	    : "null");
+	fprintf(stderr, " using_shm:  %d\n", using_shm);
+	fprintf(stderr, " flipbytes:  %d\n", flip_byte_order);
+	fprintf(stderr, " onetile:    %d\n", single_copytile);
+	fprintf(stderr, " solid:      %s\n", solid_str
+	    ? solid_str : "null");
+	fprintf(stderr, " blackout:   %s\n", blackout_str
+	    ? blackout_str : "null");
+	fprintf(stderr, " xinerama:   %d\n", xinerama);
+	fprintf(stderr, " xtrap:      %d\n", xtrap_input);
+	fprintf(stderr, " xrandr:     %d\n", xrandr);
+	fprintf(stderr, " xrandrmode: %s\n", xrandr_mode ? xrandr_mode
+	    : "null");
+	fprintf(stderr, " padgeom:    %s\n", pad_geometry
+	    ? pad_geometry : "null");
+	fprintf(stderr, " logfile:    %s\n", logfile ? logfile
+	    : "null");
+	fprintf(stderr, " logappend:  %d\n", logfile_append);
+	fprintf(stderr, " flag:       %s\n", flagfile ? flagfile
+	    : "null");
+	fprintf(stderr, " rc_file:    \"%s\"\n", rc_rcfile ? rc_rcfile
+	    : "null");
+	fprintf(stderr, " norc:       %d\n", rc_norc);
+	fprintf(stderr, " dbg:        %d\n", crash_debug);
+	fprintf(stderr, " bg:         %d\n", bg);
+	fprintf(stderr, " mod_tweak:  %d\n", use_modifier_tweak);
+	fprintf(stderr, " isolevel3:  %d\n", use_iso_level3);
+	fprintf(stderr, " xkb:        %d\n", use_xkb_modtweak);
+	fprintf(stderr, " skipkeys:   %s\n",
+	    skip_keycodes ? skip_keycodes : "null");
+	fprintf(stderr, " sloppykeys: %d\n", sloppy_keys);
+	fprintf(stderr, " skip_dups:  %d\n", skip_duplicate_key_events);
+	fprintf(stderr, " addkeysyms: %d\n", add_keysyms);
+	fprintf(stderr, " xkbcompat:  %d\n", xkbcompat);
+	fprintf(stderr, " clearmods:  %d\n", clear_mods);
+	fprintf(stderr, " remap:      %s\n", remap_file ? remap_file
+	    : "null");
+	fprintf(stderr, " norepeat:   %d\n", no_autorepeat);
+	fprintf(stderr, " norepeatcnt:%d\n", no_repeat_countdown);
+	fprintf(stderr, " nofb:       %d\n", nofb);
+	fprintf(stderr, " watchbell:  %d\n", watch_bell);
+	fprintf(stderr, " watchsel:   %d\n", watch_selection);
+	fprintf(stderr, " watchprim:  %d\n", watch_primary);
+	fprintf(stderr, " seldir:     %s\n", sel_direction ?
+	    sel_direction : "null");
+	fprintf(stderr, " cursor:     %d\n", show_cursor);
+	fprintf(stderr, " multicurs:  %d\n", show_multiple_cursors);
+	fprintf(stderr, " curs_mode:  %s\n", multiple_cursors_mode
+	    ? multiple_cursors_mode : "null");
+	fprintf(stderr, " arrow:      %d\n", alt_arrow);
+	fprintf(stderr, " xfixes:     %d\n", use_xfixes);
+	fprintf(stderr, " alphacut:   %d\n", alpha_threshold);
+	fprintf(stderr, " alphafrac:  %.2f\n", alpha_frac);
+	fprintf(stderr, " alpharemove:%d\n", alpha_remove);
+	fprintf(stderr, " alphablend: %d\n", alpha_blend);
+	fprintf(stderr, " cursorshape:%d\n", cursor_shape_updates);
+	fprintf(stderr, " cursorpos:  %d\n", cursor_pos_updates);
+	fprintf(stderr, " xwarpptr:   %d\n", use_xwarppointer);
+	fprintf(stderr, " buttonmap:  %s\n", pointer_remap
+	    ? pointer_remap : "null");
+	fprintf(stderr, " dragging:   %d\n", show_dragging);
+	fprintf(stderr, " wireframe:  %s\n", wireframe_str ?
+	    wireframe_str : WIREFRAME_PARMS);
+	fprintf(stderr, " wirecopy:   %s\n", wireframe_copyrect ?
+	    wireframe_copyrect : wireframe_copyrect_default);
+	fprintf(stderr, " scrollcopy: %s\n", scroll_copyrect ?
+	    scroll_copyrect : scroll_copyrect_default);
+	fprintf(stderr, "  scr_area:  %d\n", scrollcopyrect_min_area);
+	fprintf(stderr, "  scr_skip:  %s\n", scroll_skip_str ?
+	    scroll_skip_str : scroll_skip_str0);
+	fprintf(stderr, "  scr_inc:   %s\n", scroll_good_str ?
+	    scroll_good_str : scroll_good_str0);
+	fprintf(stderr, "  scr_keys:  %s\n", scroll_key_list_str ?
+	    scroll_key_list_str : "null");
+	fprintf(stderr, "  scr_term:  %s\n", scroll_term_str ?
+	    scroll_term_str : "null");
+	fprintf(stderr, "  scr_keyrep: %s\n", max_keyrepeat_str ?
+	    max_keyrepeat_str : "null");
+	fprintf(stderr, "  scr_parms: %s\n", scroll_copyrect_str ?
+	    scroll_copyrect_str : SCROLL_COPYRECT_PARMS);
+	fprintf(stderr, " fixscreen:  %s\n", screen_fixup_str ?
+	    screen_fixup_str : "null");
+	fprintf(stderr, " noxrecord:  %d\n", noxrecord);
+	fprintf(stderr, " grabbuster: %d\n", grab_buster);
+	fprintf(stderr, " ptr_mode:   %d\n", pointer_mode);
+	fprintf(stderr, " inputskip:  %d\n", ui_skip);
+	fprintf(stderr, " speeds:     %s\n", speeds_str
+	    ? speeds_str : "null");
+	fprintf(stderr, " wmdt:       %s\n", wmdt_str
+	    ? wmdt_str : "null");
+	fprintf(stderr, " debug_ptr:  %d\n", debug_pointer);
+	fprintf(stderr, " debug_key:  %d\n", debug_keyboard);
+	fprintf(stderr, " defer:      %d\n", defer_update);
+	fprintf(stderr, " waitms:     %d\n", waitms);
+	fprintf(stderr, " wait_ui:    %.2f\n", wait_ui);
+	fprintf(stderr, " nowait_bog: %d\n", !wait_bog);
+	fprintf(stderr, " readtimeout: %d\n", rfbMaxClientWait/1000);
+	fprintf(stderr, " take_naps:  %d\n", take_naps);
+	fprintf(stderr, " sb:         %d\n", screen_blank);
+	fprintf(stderr, " xdamage:    %d\n", use_xdamage);
+	fprintf(stderr, "  xd_area:   %d\n", xdamage_max_area);
+	fprintf(stderr, "  xd_mem:    %.3f\n", xdamage_memory);
+	fprintf(stderr, " sigpipe:    %s\n", sigpipe
+	    ? sigpipe : "null");
+	fprintf(stderr, " threads:    %d\n", use_threads);
+	fprintf(stderr, " fs_frac:    %.2f\n", fs_frac);
+	fprintf(stderr, " gaps_fill:  %d\n", gaps_fill);
+	fprintf(stderr, " grow_fill:  %d\n", grow_fill);
+	fprintf(stderr, " tile_fuzz:  %d\n", tile_fuzz);
+	fprintf(stderr, " snapfb:     %d\n", use_snapfb);
+	fprintf(stderr, " rawfb:      %s\n", raw_fb_str
+	    ? raw_fb_str : "null");
+	fprintf(stderr, " pipeinput:  %s\n", pipeinput_str
+	    ? pipeinput_str : "null");
+	fprintf(stderr, " gui:        %d\n", launch_gui);
+	fprintf(stderr, " gui_mode:   %s\n", gui_str
+	    ? gui_str : "null");
+	fprintf(stderr, " noremote:   %d\n", !accept_remote_cmds);
+	fprintf(stderr, " unsafe:     %d\n", !safe_remote_only);
+	fprintf(stderr, " privremote: %d\n", priv_remote);
+	fprintf(stderr, " safer:      %d\n", more_safe);
+	fprintf(stderr, " nocmds:     %d\n", no_external_cmds);
+	fprintf(stderr, " deny_all:   %d\n", deny_all);
+	fprintf(stderr, "\n");
+	rfbLog("x11vnc version: %s\n", lastmod);
+}
+
 void nopassword_warning_msg(int gotloc) {
 
 	char str1[] =
@@ -32308,8 +32564,15 @@ void nopassword_warning_msg(int gotloc) {
 "#@  Make sure any -rfbauth and -passwdfile password files    @#\n"
 "#@  cannot be read by untrusted users.                       @#\n"
 "#@                                                           @#\n"
+"#@  Even with a password, the subsequent VNC traffic is      @#\n"
+"#@  sent in the clear.  Consider tunnelling via ssh(1):      @#\n"
+"#@                                                           @#\n"
+"#@    http://www.karlrunge.com/x11vnc/#tunnelling            @#\n"
+"#@                                                           @#\n"
 "#@  Please Read the documention for more info about          @#\n"
 "#@  passwords, security, and encryption.                     @#\n"
+"#@                                                           @#\n"
+"#@    http://www.karlrunge.com/x11vnc/#faq-passwd            @#\n"
 ;
 	char str3[] =
 "#@                                                           @#\n"
@@ -32333,15 +32596,18 @@ void nopassword_warning_msg(int gotloc) {
 
 	fprintf(stderr, "%s", str1);
 	fflush(stderr);
+#if !PASSWD_REQUIRED
 	usleep(2000 * 1000);
+#endif
 	fprintf(stderr, "%s", str2);
 	if (gotloc) {
 		fprintf(stderr, "%s", str3);
 	}
 	fprintf(stderr, "%s", str4);
 	fflush(stderr);
+#if !PASSWD_REQUIRED
 	usleep(500 * 1000);
-
+#endif
 }
 
 int main(int argc, char* argv[]) {
@@ -32355,7 +32621,6 @@ int main(int argc, char* argv[]) {
 	char *gui_str = NULL;
 	int pw_loc = -1, got_passwd = 0, got_rfbauth = 0, nopw = NOPW;
 	int got_viewpasswd = 0, got_localhost = 0, got_passwdfile = 0;
-	int running_without_passwd = 0;
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0;
@@ -33018,16 +33283,16 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
-	if (!got_passwd && !got_rfbauth && !got_passwdfile && !nopw)  {
-		running_without_passwd = 1;
-	}
 	if (launch_gui && (query_cmd || remote_cmd)) {
 		launch_gui = 0;
 		gui_str = NULL;
 	}
+	if (more_safe) {
+		launch_gui = 0;
+	}
 	if (launch_gui) {
 		int sleep = 0;
-		if (running_without_passwd && !quiet) {
+		if (!got_passwd && !got_rfbauth && !got_passwdfile && !nopw) {
 			sleep = 3;
 		}
 		do_gui(gui_str, sleep);
@@ -33207,8 +33472,23 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	if (!got_passwd && !got_rfbauth && !got_passwdfile && !nopw) {
-		nopassword_warning_msg(got_localhost);
+	if (!got_passwd && !got_rfbauth && !got_passwdfile) {
+		char message[] =
+		    "-rfbauth, -passwdfile, or -passwd password required.";
+		if (! nopw) {
+			nopassword_warning_msg(got_localhost);
+		}
+#if PASSWD_REQUIRED
+		rfbLog("%s\n", message);
+		exit(1);
+#endif
+#if PASSWD_UNLESS_NOPW
+		if (! nopw) {
+			rfbLog("%s\n", message);
+			exit(1);
+		}
+#endif
+		if (0) message[0] = '\0';
 	}
 
 	if (more_safe) {
@@ -33340,171 +33620,7 @@ int main(int argc, char* argv[]) {
 	initialize_crash_handler();
 
 	if (! quiet) {
-		fprintf(stderr, "\n");
-		fprintf(stderr, "Settings:\n");
-		fprintf(stderr, " display:    %s\n", use_dpy ? use_dpy
-                    : "null");
-		fprintf(stderr, " authfile:   %s\n", auth_file ? auth_file
-                    : "null");
-		fprintf(stderr, " subwin:     0x%lx\n", subwin);
-		fprintf(stderr, " -sid mode:  %d\n", rootshift);
-		fprintf(stderr, " clip:       %s\n", clip_str ? clip_str
-                    : "null");
-		fprintf(stderr, " flashcmap:  %d\n", flash_cmap);
-		fprintf(stderr, " shiftcmap:  %d\n", shift_cmap);
-		fprintf(stderr, " force_idx:  %d\n", force_indexed_color);
-		fprintf(stderr, " visual:     %s\n", visual_str ? visual_str
-                    : "null");
-		fprintf(stderr, " overlay:    %d\n", overlay);
-		fprintf(stderr, " ovl_cursor: %d\n", overlay_cursor);
-		fprintf(stderr, " scaling:    %d %.5f\n", scaling, scale_fac);
-		fprintf(stderr, " viewonly:   %d\n", view_only);
-		fprintf(stderr, " shared:     %d\n", shared);
-		fprintf(stderr, " conn_once:  %d\n", connect_once);
-		fprintf(stderr, " timeout:    %d\n", first_conn_timeout);
-		fprintf(stderr, " inetd:      %d\n", inetd);
-		fprintf(stderr, " http:       %d\n", try_http);
-		fprintf(stderr, " connect:    %s\n", client_connect
-		    ? client_connect : "null");
-		fprintf(stderr, " connectfile %s\n", client_connect_file
-		    ? client_connect_file : "null");
-		fprintf(stderr, " vnc_conn:   %d\n", vnc_connect);
-		fprintf(stderr, " allow:      %s\n", allow_list ? allow_list
-                    : "null");
-		fprintf(stderr, " input:      %s\n", allowed_input_str
-		    ? allowed_input_str : "null");
-		fprintf(stderr, " passfile:   %s\n", passwdfile ? passwdfile
-                    : "null");
-		fprintf(stderr, " accept:     %s\n", accept_cmd ? accept_cmd
-                    : "null");
-		fprintf(stderr, " gone:       %s\n", gone_cmd ? gone_cmd
-                    : "null");
-		fprintf(stderr, " users:      %s\n", users_list ? users_list
-                    : "null");
-		fprintf(stderr, " using_shm:  %d\n", using_shm);
-		fprintf(stderr, " flipbytes:  %d\n", flip_byte_order);
-		fprintf(stderr, " onetile:    %d\n", single_copytile);
-		fprintf(stderr, " solid:      %s\n", solid_str
-		    ? solid_str : "null");
-		fprintf(stderr, " blackout:   %s\n", blackout_str
-		    ? blackout_str : "null");
-		fprintf(stderr, " xinerama:   %d\n", xinerama);
-		fprintf(stderr, " xtrap:      %d\n", xtrap_input);
-		fprintf(stderr, " xrandr:     %d\n", xrandr);
-		fprintf(stderr, " xrandrmode: %s\n", xrandr_mode ? xrandr_mode
-		    : "null");
-		fprintf(stderr, " padgeom:    %s\n", pad_geometry
-		    ? pad_geometry : "null");
-		fprintf(stderr, " logfile:    %s\n", logfile ? logfile
-                    : "null");
-		fprintf(stderr, " logappend:  %d\n", logfile_append);
-		fprintf(stderr, " flag:       %s\n", flagfile ? flagfile
-                    : "null");
-		fprintf(stderr, " rc_file:    \"%s\"\n", rc_rcfile ? rc_rcfile
-                    : "null");
-		fprintf(stderr, " norc:       %d\n", rc_norc);
-		fprintf(stderr, " dbg:        %d\n", crash_debug);
-		fprintf(stderr, " bg:         %d\n", bg);
-		fprintf(stderr, " mod_tweak:  %d\n", use_modifier_tweak);
-		fprintf(stderr, " isolevel3:  %d\n", use_iso_level3);
-		fprintf(stderr, " xkb:        %d\n", use_xkb_modtweak);
-		fprintf(stderr, " skipkeys:   %s\n",
-		    skip_keycodes ? skip_keycodes : "null");
-		fprintf(stderr, " sloppykeys: %d\n", sloppy_keys);
-		fprintf(stderr, " skip_dups:  %d\n", skip_duplicate_key_events);
-		fprintf(stderr, " addkeysyms: %d\n", add_keysyms);
-		fprintf(stderr, " xkbcompat:  %d\n", xkbcompat);
-		fprintf(stderr, " clearmods:  %d\n", clear_mods);
-		fprintf(stderr, " remap:      %s\n", remap_file ? remap_file
-                    : "null");
-		fprintf(stderr, " norepeat:   %d\n", no_autorepeat);
-		fprintf(stderr, " norepeatcnt:%d\n", no_repeat_countdown);
-		fprintf(stderr, " nofb:       %d\n", nofb);
-		fprintf(stderr, " watchbell:  %d\n", watch_bell);
-		fprintf(stderr, " watchsel:   %d\n", watch_selection);
-		fprintf(stderr, " watchprim:  %d\n", watch_primary);
-		fprintf(stderr, " seldir:     %s\n", sel_direction ?
-		    sel_direction : "null");
-		fprintf(stderr, " cursor:     %d\n", show_cursor);
-		fprintf(stderr, " multicurs:  %d\n", show_multiple_cursors);
-		fprintf(stderr, " curs_mode:  %s\n", multiple_cursors_mode
-		    ? multiple_cursors_mode : "null");
-		fprintf(stderr, " arrow:      %d\n", alt_arrow);
-		fprintf(stderr, " xfixes:     %d\n", use_xfixes);
-		fprintf(stderr, " alphacut:   %d\n", alpha_threshold);
-		fprintf(stderr, " alphafrac:  %.2f\n", alpha_frac);
-		fprintf(stderr, " alpharemove:%d\n", alpha_remove);
-		fprintf(stderr, " alphablend: %d\n", alpha_blend);
-		fprintf(stderr, " cursorshape:%d\n", cursor_shape_updates);
-		fprintf(stderr, " cursorpos:  %d\n", cursor_pos_updates);
-		fprintf(stderr, " xwarpptr:   %d\n", use_xwarppointer);
-		fprintf(stderr, " buttonmap:  %s\n", pointer_remap
-		    ? pointer_remap : "null");
-		fprintf(stderr, " dragging:   %d\n", show_dragging);
-		fprintf(stderr, " wireframe:  %s\n", wireframe_str ?
-		    wireframe_str : WIREFRAME_PARMS);
-		fprintf(stderr, " wirecopy:   %s\n", wireframe_copyrect ?
-		    wireframe_copyrect : wireframe_copyrect_default);
-		fprintf(stderr, " scrollcopy: %s\n", scroll_copyrect ?
-		    scroll_copyrect : scroll_copyrect_default);
-		fprintf(stderr, "  scr_area:  %d\n", scrollcopyrect_min_area);
-		fprintf(stderr, "  scr_skip:  %s\n", scroll_skip_str ?
-		    scroll_skip_str : scroll_skip_str0);
-		fprintf(stderr, "  scr_inc:   %s\n", scroll_good_str ?
-		    scroll_good_str : scroll_good_str0);
-		fprintf(stderr, "  scr_keys:  %s\n", scroll_key_list_str ?
-		    scroll_key_list_str : "null");
-		fprintf(stderr, "  scr_term:  %s\n", scroll_term_str ?
-		    scroll_term_str : "null");
-		fprintf(stderr, "  scr_keyrep: %s\n", max_keyrepeat_str ?
-		    max_keyrepeat_str : "null");
-		fprintf(stderr, "  scr_parms: %s\n", scroll_copyrect_str ?
-		    scroll_copyrect_str : SCROLL_COPYRECT_PARMS);
-		fprintf(stderr, " fixscreen:  %s\n", screen_fixup_str ?
-		    screen_fixup_str : "null");
-		fprintf(stderr, " noxrecord:  %d\n", noxrecord);
-		fprintf(stderr, " grabbuster: %d\n", grab_buster);
-		fprintf(stderr, " ptr_mode:   %d\n", pointer_mode);
-		fprintf(stderr, " inputskip:  %d\n", ui_skip);
-		fprintf(stderr, " speeds:     %s\n", speeds_str
-		    ? speeds_str : "null");
-		fprintf(stderr, " wmdt:       %s\n", wmdt_str
-		    ? wmdt_str : "null");
-		fprintf(stderr, " debug_ptr:  %d\n", debug_pointer);
-		fprintf(stderr, " debug_key:  %d\n", debug_keyboard);
-		fprintf(stderr, " defer:      %d\n", defer_update);
-		fprintf(stderr, " waitms:     %d\n", waitms);
-		fprintf(stderr, " wait_ui:    %.2f\n", wait_ui);
-		fprintf(stderr, " nowait_bog: %d\n", !wait_bog);
-		fprintf(stderr, " readtimeout: %d\n", rfbMaxClientWait/1000);
-		fprintf(stderr, " take_naps:  %d\n", take_naps);
-		fprintf(stderr, " sb:         %d\n", screen_blank);
-		fprintf(stderr, " xdamage:    %d\n", use_xdamage);
-		fprintf(stderr, "  xd_area:   %d\n", xdamage_max_area);
-		fprintf(stderr, "  xd_mem:    %.3f\n", xdamage_memory);
-		fprintf(stderr, " sigpipe:    %s\n", sigpipe
-		    ? sigpipe : "null");
-		fprintf(stderr, " threads:    %d\n", use_threads);
-		fprintf(stderr, " fs_frac:    %.2f\n", fs_frac);
-		fprintf(stderr, " gaps_fill:  %d\n", gaps_fill);
-		fprintf(stderr, " grow_fill:  %d\n", grow_fill);
-		fprintf(stderr, " tile_fuzz:  %d\n", tile_fuzz);
-		fprintf(stderr, " snapfb:     %d\n", use_snapfb);
-		fprintf(stderr, " rawfb:      %s\n", raw_fb_str
-		    ? raw_fb_str : "null");
-		fprintf(stderr, " pipeinput:  %s\n", pipeinput_str
-		    ? pipeinput_str : "null");
-		fprintf(stderr, " gui:        %d\n", launch_gui);
-		fprintf(stderr, " gui_mode:   %s\n", gui_str
-		    ? gui_str : "null");
-		fprintf(stderr, " noremote:   %d\n", !accept_remote_cmds);
-		fprintf(stderr, " unsafe:     %d\n", !safe_remote_only);
-		fprintf(stderr, " privremote: %d\n", priv_remote);
-		fprintf(stderr, " safer:      %d\n", more_safe);
-		fprintf(stderr, " nocmds:     %d\n", no_external_cmds);
-		fprintf(stderr, " deny_all:   %d\n", deny_all);
-		fprintf(stderr, "\n");
-		rfbLog("x11vnc version: %s\n", lastmod);
+		print_settings(try_http, bg, gui_str);
 	} else {
 		rfbLogEnable(0);
 	}

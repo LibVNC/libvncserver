@@ -22,7 +22,7 @@ catch {rename send {}}
 #  USA.
 
 #
-# tkx11vnc v0.1
+# tkx11vnc v0.2
 # This is a simple frontend to x11vnc.  It uses the remote control
 # and query features (-remote/-query aka -R/-Q) to interact with it. 
 # It is just a quick-n-dirty hack (it parses -help output, etc), but
@@ -559,7 +559,9 @@ of actions:
                       Pressing \"OK\" will initiate the reverse
                       connection.  Use a blank hostname to skip it.
     
-    Disconnect All  - Disconnects all current VNC viewers.
+    Disconnect      - Shows a popup menu of connected clients.  Click on
+                      one to disconnect it, or click on \"All Clients\"
+                      disconnect all clients.
 
     Window View     - Switch between the \"full\" gui (also known as
                       \"Advanced\"), \"icon\" mode (small icon window with
@@ -571,11 +573,29 @@ of actions:
                       and then exit.  The tray/icon GUI then exits as well.
 
 
+Termination:
+
 If the x11vnc server stops for any reason, the tray/icon gui will exit.
 
 If you delete the tray/icon (e.g. X out button), that is the same
 as the \"Stop x11vnc\" action in the menu. (This will disconnect any
-VNC viewer you are currently using to access the display).
+VNC viewer you are currently using to access the display since the
+x11vnc server is terminated).
+
+To terminate the tray/icon gui window but not the x11vnc server press
+Control-C on the tray/icon window.  You can also do this (and much
+more) via Properties -> Advanced -> Actions -> Quit
+"
+
+	set helptext(NewClient) "
+    New Client      - Presents an entry box where you type in the name
+                      of a computer that is running a VNC viewer in
+                      \"listen\" mode (e.g. vncviewer -listen).  For a
+                      non-standard listening port use \"host:port\".
+
+                      Pressing \"OK\" will initiate the reverse
+                      connection.  Use a blank hostname to skip it.
+    
 "
 
 	set helptext(Properties) "
@@ -622,7 +642,39 @@ the ViewOnly log in aspect: \"Password\" is still required to log in.
    
  - The \"Advanced ...\" button replaces the Properties dialog with the full
    tkx11vnc GUI.  All dynamic settings can be modified in the full GUI.
-" 
+
+
+--------------------------------------------------------------------
+Don't Lock Yourself Out:
+
+   If you are sitting at the physical X display you cannot get into too
+   much trouble setting the Properties dialog values.
+
+   However IF you are using a VNC Viewer to REMOTELY access the X display
+   some items in the Properties dialog can lock you out of further access:
+
+      \"Accept Connections\"  if you disable this remotely, and
+      accidentally disconnect your VNC viewer then you will not be
+      able to reconnect.
+   
+      \"Ask for Confirmation\"  if you enable this only someone
+      sitting at the X display can confirm any new VNC connections.
+      Furthermore, any current VNC viewers will be blocked while
+      waiting for the confirmation (times out in 120 sec by default). 
+   
+      \"All Clients ViewOnly\"  if you enable this remotely, well
+      you can no longer provide input to disable it.
+   
+   If you do lock yourself out you could log in remotely and start up
+   a second x11vnc and connect to that one to try to fix things in the
+   first one.
+
+   Note that if there are two or more x11vnc's on the same display the
+   use of the GUI may be ill-behaved.  Terminate the second x11vnc as
+   soon as you have fixed the setting in the first one.  Use of a remote
+   control command, e.g. \"x11vnc -R noviewonly\" or \"x11vnc -R unlock\"
+   is a good way to avoid this problem.
+"
 
 	set helptext(all) $helpall
 
@@ -1099,10 +1151,11 @@ proc set_name {name} {
 	if {![info exists full_win]} {
 		return
 	}
+	set w "."
 	if {$icon_mode} {
+		wm title    $w "$name"
+		wm iconname $w "$name"
 		set w $full_win
-	} else {
-		set w "."
 	}
 	wm title    $w "$name"
 	wm iconname $w "$name"
@@ -2635,14 +2688,32 @@ proc append_text {str} {
 
 proc show_all_settings {} {
 	global all_settings
-	set txt "\nRead-Write setting:\n\n"
+	global client_sock client_tail
+	global x11vnc_client_file
+
+	set txt "\nRead-Write settings:\n\n"
 	foreach item [split_query $all_settings]  {
 		regsub {:} $item {: } item
 		append txt "  $item\n"
 		if {[regexp {noremote} $item]} {
-			append txt "\nRead-Only setting:\n\n"
+			append txt "\nRead-Only settings:\n\n"
 		}
 	}
+	append txt "\nInternal settings:\n\n"
+	append txt "x11vnc_client_file: $x11vnc_client_file\n"
+	if {[info exists client_tail]} {
+		append txt "client_tail: $client_tail\n"
+	} else {
+		append txt "client_tail: unset\n"
+	}
+	if {[info exists client_sock]} {
+		append txt "client_sock: $client_sock\n"
+	} else {
+		append txt "client_sock: unset\n"
+	}
+	set estr ""
+	catch {set estr [exec env | grep -i X11VNC]}
+	append txt "$estr\n"
 	textwin "Settings" "All Current Settings" $txt
 }
 
@@ -3573,16 +3644,15 @@ proc make_menu_items {} {
 	}
 }
 
-proc menu_posted {} {
+proc check_update_vars {} {
 	global last_query_all_time query_all_freq icon_mode
-	global connected_to_x11vnc client_tail
+	global connected_to_x11vnc client_tail client_sock
 
 	set now [clock seconds]
 
-	if {$icon_mode && $client_tail != ""} {
+	set delay $query_all_freq
+	if {$client_tail != "" && $client_sock == ""} {
 		set delay [expr 2 * $query_all_freq]
-	} else {
-		set delay $query_all_freq
 	}
 
 	if {$connected_to_x11vnc} {
@@ -3602,6 +3672,10 @@ proc menu_posted {} {
 	}
 }
 
+proc menu_posted {} {
+	check_update_vars
+}
+
 proc props_widgets {state} {
 	global props_buttons
 	foreach w $props_buttons {
@@ -3616,20 +3690,30 @@ proc props_apply {} {
 	global prop0_accept prop0_confirm prop0_viewonly prop0_shared
 	global prop0_passwd prop0_viewpasswd
 	global menu_var
+	global client_sock
 
 	props_widgets disabled
 
+	set aft 500
+	if {[info exists client_sock]} {
+		if {$client_sock != ""} {
+			set aft 150
+		}
+	}
+	set did 0
+
 	if {$props_accept != $prop0_accept} {
+		if {$did > 0} {after $aft}; incr did
 		if {$props_accept} {
 			push_new_value "unlock" "unlock" 1 0
 		} else {
 			push_new_value "lock" "lock" 1 0
 		}
 		set prop0_accept $props_accept
-		after 500
 	}
 
 	if {$props_confirm != $prop0_confirm} {
+		if {$did > 0} {after $aft}; incr did
 		if {$props_confirm} {
 			push_new_value "accept" "accept" "popup" 1
 		} else {
@@ -3641,10 +3725,10 @@ proc props_apply {} {
 			set props_confirm 0
 		}
 		set prop0_confirm $props_confirm
-		after 500
 	}
 
 	if {$props_viewonly != $prop0_viewonly} {
+		if {$did > 0} {after $aft}; incr did
 		if {$props_viewonly} {
 			push_new_value "viewonly" "viewonly" 1 1
 		} else {
@@ -3656,10 +3740,10 @@ proc props_apply {} {
 			set props_viewonly 0
 		}
 		set prop0_viewonly $props_viewonly
-		after 500
 	}
 
 	if {$props_shared != $prop0_shared} {
+		if {$did > 0} {after $aft}; incr did
 		if {$props_shared} {
 			push_new_value "shared" "shared" 1 1
 		} else {
@@ -3671,7 +3755,6 @@ proc props_apply {} {
 			set props_shared 0
 		}
 		set prop0_shared $props_shared
-		after 500
 	}
 
 	set fpw 0
@@ -3736,14 +3819,14 @@ proc props_apply {} {
 
 	foreach case $pw_ord {
 		if {$case == "fpw"} {
+			if {$did > 0} {after $aft}; incr did
 			push_new_value "passwd" "passwd" "$props_passwd" 1
 			set prop0_passwd $props_passwd
-			after 500
 		}
 		if {$case == "vpw"} {
+			if {$did > 0} {after $aft}; incr did
 			push_new_value "viewpasswd" "viewpasswd" "$props_viewpasswd" 1
 			set prop0_viewpasswd $props_viewpasswd
-			after 500
 		}
 	}
 
@@ -3778,6 +3861,8 @@ proc do_props {{msg ""}} {
 	global menu_var unset_str
 	global have_labelframes ffont bfont
 	global props_buttons icon_noadvanced
+
+	check_update_vars
 
 	if [info exists menu_var(deny)] {
 		if {$menu_var(deny) == $unset_str || $menu_var(deny) == 0} {
@@ -3855,6 +3940,8 @@ proc do_props {{msg ""}} {
 	button $b1.ok -text OK -command "props_apply; destroy $w" -font $bfont
 	button $b1.cancel -text Cancel -command "destroy $w" -font $bfont
 	button $b1.apply  -text Apply -command "props_apply" -font $bfont
+
+	bind $w <KeyPress-Escape> "destroy $w"
 
 	pack $b1.apply $b1.cancel $b1.ok -side right -expand 1
 	lappend props_buttons $b1.apply $b1.cancel $b1.ok
@@ -3965,11 +4052,12 @@ proc do_new_client {} {
 	set newclient ""
 	entry $w.e -width 16 -textvariable newclient -font $bfont 
 	button $w.b -text OK -command "destroy $w" -font $bfont
+	button $w.h -text Help -command "menu_help NewClient" -font $bfont
 	bind $w.e <Return> "update; after 100; destroy $w"
 
 	wm title $w "New Client"
 
-	pack $w.l $w.e $w.b -side left -pady 1m -padx 1m
+	pack $w.l $w.e $w.h $w.b -side left -pady 1m -padx 0.5m
 	focus $w.e
 	center_win $w
 	update 
@@ -3987,6 +4075,43 @@ proc do_disconnect_all {} {
 	push_new_value "disconnect" "disconnect" "all" 1
 }
 
+proc do_disconnect_client {id} {
+	push_new_value "disconnect" "disconnect" "$id" 1
+}
+
+proc popup_post {m} {
+	global popup_cascade_posted client_balloon
+	global client_id_list
+
+	set popup_cascade_posted 0
+	
+	set wd "$m.disconnect"
+
+	if {![winfo exists $wd]} {
+		return
+	}
+
+	catch {$wd delete 0 end}
+
+	$wd add command -label "Disconnect client:"
+	$wd add separator
+	$wd add command -label "All Clients" -command do_disconnect_all
+
+	if {![info exists client_id_list]} {
+		return
+	}
+
+	foreach client $client_id_list {
+		if {$client == ""} {
+			continue
+		}
+		if {[regexp {^([^:]*):(.*)$} $client mat id lab]} {
+			$wd add command -label "$lab" \
+				-command "do_disconnect_client $id"
+		}
+	}
+}
+
 proc pmenu {m x y} {
 	if {![winfo exists $m]} {
 		return
@@ -3998,6 +4123,9 @@ proc pmenu {m x y} {
 
 proc set_client_balloon {str} {
 	global client_balloon vnc_display
+	global client_id_list
+
+	set client_id_list [list]
 	
 	set client_balloon "$vnc_display"
 	set count 0
@@ -4023,8 +4151,10 @@ proc set_client_balloon {str} {
 			set client_balloon "${client_balloon}\n$user\@$host"
 			if {$vo == "1"} {
 				set client_balloon "${client_balloon} - view"
+				lappend client_id_list "$id:$user\@$host - view"
 			} else {
 				set client_balloon "${client_balloon} - full"
+				lappend client_id_list "$id:$user\@$host - full"
 			}
 		} else {
 			set i [expr $count+1]
@@ -4038,26 +4168,37 @@ proc set_client_balloon {str} {
 	icon_win_cfg $count
 }
 
-proc read_client_info {} {
-	global x11vnc_client_file client_tail client_str
-	global client_tail_read
+proc read_client_info {channel} {
+	global x11vnc_client_file client_str client_info_read
+	global read_client_info_lock
 	set db 0
 
-	if {$client_tail != ""} {
+	if {![info exists read_client_info_lock]} {
+		set read_client_info_lock 0
+	}
+
+	if {$channel != ""} {
+
+		if {$read_client_info_lock} {
+			return
+		}
+		set read_client_info_lock 1
 		after 100
 		set str ""
-		set count [gets $client_tail str]
-		if {$db} {puts stderr "read_client_info: $str"}
+		set count [gets $channel str]
+		if {$db} {puts stderr "read_client_info-$channel: $str"}
 
-		if {$count == -1 || [eof $client_tail]} {
-			close $client_tail
+		if {$count == -1 || [eof $channel]} {
+			close $channel
 			catch {file delete $x11vnc_client_file}
+			set read_client_info_lock 0
 			clean_icon_exit
 		}
 		if {$count > 0 && ![regexp {^[ 	]*$} $str]} {
-			set client_tail_read 1
+			set client_info_read 1
 			if {$str == "quit"} {
 				catch {file delete $x11vnc_client_file}
+				set read_client_info_lock 0
 				clean_icon_exit
 			} elseif {$str != "skip"} {
 				if {$str == "none"} {
@@ -4068,6 +4209,23 @@ proc read_client_info {} {
 				set_client_balloon $str
 			}
 		}
+		set read_client_info_lock 0
+	}
+}
+
+proc read_client_tail {} {
+	global client_tail
+
+	if {$client_tail != ""} {
+		read_client_info $client_tail
+	}
+}
+
+proc read_client_sock {} {
+	global client_sock
+
+	if {$client_sock != ""} {
+		read_client_info $client_sock
 	}
 }
 
@@ -4129,20 +4287,30 @@ proc kill_client_balloon {} {
 }
 
 proc icon_win_cfg {clients} {
-	global icon_win client_tail client_tail_read
+	global icon_win client_tail client_sock client_info_read
+
+	if {![info exists icon_win]} {
+		return
+	}
+	if {$icon_win == ""} {
+		return
+	}
 	if {$clients > 0} {
 		$icon_win configure -bg black -fg white
 	} else {
 		$icon_win configure -bg white -fg black
 	}
-	if {$client_tail == "" || !$client_tail_read} {
-		$icon_win configure -fg red
+
+	if {$client_tail == "" || !$client_info_read} {
+		if {$client_sock == ""} {
+			$icon_win configure -fg red
+		}
 	}
 }
 
 proc server_accept {sock addr port} {
 	global socket_cookie server socket_got_callback
-	global client_tail
+	global client_tail client_sock
 	set db 0
 
 	if {$db} {puts stderr "sock=$sock addr=$addr port=$port"}
@@ -4156,8 +4324,8 @@ proc server_accept {sock addr port} {
 		set str [string trim $str]
 		if {$db} {puts stderr "server_accept: \"$str\""}
 		if {$str == "COOKIE:$socket_cookie"} {
-			set client_tail $sock
-			if {$db} {puts stderr "cookie matched. $client_tail"}
+			set client_sock $sock
+			if {$db} {puts stderr "cookie matched. $client_sock"}
 		} else {
 			if {$db} {puts stderr "cookie NO matched."}
 		}
@@ -4169,17 +4337,39 @@ proc server_accept {sock addr port} {
 
 proc try_client_info_sock {} {
 	global socket_cookie server socket_got_callback
-	global x11vnc_started hostname
+	global x11vnc_started x11vnc_xdisplay hostname client_sock
+	global x11vnc_xdisplay0 menu_var
+
+	set db 0
 	set start 13037
 	set tries 100
 	set socket_got_callback 0
 
+	set xd $x11vnc_xdisplay
+	if {$xd == "" && $x11vnc_xdisplay0 != ""} {
+		set xd $x11vnc_xdisplay0
+	}
+	if {$xd == "" && [info exists menu_var(display)]} {
+		set xd $menu_var(display)
+	}
+
+	set myaddr ""
+	regsub {\..*$} $hostname "" shost
 	if {$x11vnc_started} {
 		set myaddr "127.0.0.1"
+	} elseif {$xd != ""} {
+		if {[regexp {^:} $xd]} {
+			set myaddr "127.0.0.1"
+		} elseif {[regexp -nocase "^$shost" $xd]} {
+			set myaddr "127.0.0.1"
+		} elseif {[regexp -nocase "^localhost" $xd]} {
+			set myaddr "127.0.0.1"
+		} else {
+			set myaddr $hostname
+		}
 	} else {
 		set myaddr $hostname
 	}
-	set socket_cookie [clock clicks]
 	
 	for {set i 0} {$i <= $tries} {incr i} {
 		set port [expr $start + $i]
@@ -4203,8 +4393,25 @@ proc try_client_info_sock {} {
 	}
 	run_remote_cmd [list "-nosync" "-R" "noop"]
 	after 500
+
+	# set the cookie to some obscured randomness
+	set socket_cookie [clock clicks]
+	set r [expr rand()]
+	if {$r != ""} {
+		append socket_cookie $r
+	}
+	set r ""
+	catch {set r [winfo id .]}
+	if {$r != ""} {
+		append socket_cookie $r
+	}
+	if {[regexp {([0-9])([0-9])$} [clock clicks] m m1 m2]} {
+		regsub -all {\.} $socket_cookie $m1 socket_cookie
+		regsub -all {x}  $socket_cookie $m2 socket_cookie
+	}
 	run_remote_cmd [list "-nosync" "-R" \
 		"client_info_sock:$myaddr:$port:$socket_cookie"]
+	if {$db} {puts "client_info_sock:$myaddr:$port:$socket_cookie"}
 	after 500
 
 	set aftid ""
@@ -4221,7 +4428,7 @@ proc try_client_info_sock {} {
 		puts stderr "try_client_info_sock failed: no callback\n"
 		catch {close $server}
 	} else {
-		setup_client_tail
+		setup_client_sock 1
 	}
 }
 
@@ -4252,11 +4459,11 @@ proc get_icon_label {{set 0}} {
 }
 
 proc lmenu {menu} {
-	global window_view_posted
+	global popup_cascade_posted
 	after 100
-	if {!$window_view_posted} {
+	if {!$popup_cascade_posted} {
 		after 100
-		if {!$window_view_posted} {
+		if {!$popup_cascade_posted} {
 			$menu unpost
 			return
 		}
@@ -4286,11 +4493,11 @@ proc old_balloon {} {
 proc make_icon {} {
 	global icon_mode icon_embed_id icon_win props_win full_win
 	global tray_embed tray_running env
-	global x11vnc_client_file client_tail client_str saved_clients_str
+	global x11vnc_client_file client_tail client_sock client_str saved_clients_str
 	global client_balloon_id
 	global bfont sfont snfont ffont
 	global icon_minimal gui_start_mode
-	global window_view_posted menu_var x11vnc_gui_geom
+	global popup_cascade_posted menu_var x11vnc_gui_geom
 	set min_x 24
 	set min_y 24
 	
@@ -4331,28 +4538,37 @@ proc make_icon {} {
 	icon_win_cfg 0
 
 
-	set window_view_posted 0
+	set popup_cascade_posted 0
 	pack $l -fill both -expand 1
 	set menu "$l.menu"
-	menu $menu -tearoff 0 -postcommand {set window_view_posted 0}
+	menu $menu -tearoff 0 -postcommand "popup_post $menu"
 	$menu add command -font $mfont -label "Properties" -command do_props
 	$menu add command -font $mfont -label "Help" -command "menu_help Tray"
 	$menu add separator
 	$menu add command -font $mfont -label "New Client" -command do_new_client
-	$menu add command -font $mfont -label "Disconnect All" -command do_disconnect_all
+
+	set wd "$menu.disconnect"
+	catch {destroy $wd}
+	menu $wd -tearoff 0 -font $ffont \
+		-postcommand {set popup_cascade_posted 1}
+	$wd add command -label "Disconnect client:"
+	$wd add separator
+	$wd add command -label "All Clients" -command do_disconnect_all
+	$menu add cascade -font $mfont -label "Disconnect:" -menu $wd
+
 	$menu add separator
 
-	set wv "$menu.casc1"
+	set wv "$menu.windowview"
 	catch {destroy $wv}
 	menu $wv -tearoff 0 -font $ffont \
-		-postcommand {set window_view_posted 1}
+		-postcommand {set popup_cascade_posted 1}
 	foreach val {full icon tray} {
 		$wv add radiobutton -label "$val" \
 			-value "$val" -font $ffont \
 			-command "do_var WindowView" \
 			-variable menu_var(WindowView)
 	}
-	$menu add cascade -font $mfont -label "Window View" -menu $wv
+	$menu add cascade -font $mfont -label "Window View:" -menu $wv
 
 	$menu add command -font $mfont -label "Stop x11vnc" -command clean_icon_exit
 
@@ -4363,7 +4579,9 @@ proc make_icon {} {
 	bind $icon_win <Leave>  {kill_client_balloon}
 	bind $icon_win <ButtonPress-2> {kill_client_balloon; show_client_balloon}
 	bind $menu <Leave> "lmenu $menu"
-	bind $menu <KeyPress-Escape> "$menu unpost"
+##	bind $menu <KeyPress-Escape> "$menu unpost"
+
+	bind . <Control-KeyPress-c> {destroy .; exit 0}
 
 	if {!$tray_embed || !$tray_running} {
 		global x11vnc_gui_geom
@@ -4379,18 +4597,27 @@ proc make_icon {} {
 			}
 		}
 	}
+	wm iconname . "tkx11vnc"
+	wm title . "tkx11vnc"
 	wm deiconify .
 
-	if {$client_tail == "" } {
+	old_balloon
+}
+
+proc setup_client_channel {} {
+	global client_sock client_tail
+
+# XXX/setup_client_channel
+	if {$client_sock == "" } {
 		stop_watch on
 		try_client_info_sock
-		if {$client_tail == "" } {
+		if {$client_sock == "" } {
 			after 500
 			try_client_info_sock
 		}
 		stop_watch off
 	}
-	if {$client_tail == "" } {
+	if {$client_tail == "" && $client_sock == ""} {
 		set m "\n"
 		set m "${m}tkx11vnc:\n"
 		set m "${m}\n"
@@ -4405,12 +4632,10 @@ proc make_icon {} {
 		textwin "Warning" "Warning" $m
 		update
 	}
-
-	old_balloon
 }
 
 proc clean_client_tail {} {
-	global client_tail client_tail_read
+	global client_tail client_info_read
 	if [info exists client_tail] {
 		if {$client_tail != ""} {
 			set p ""
@@ -4422,7 +4647,7 @@ proc clean_client_tail {} {
 			set client_tail ""
 		}
 	}
-	set client_tail_read 0
+	set client_info_read 0
 }
 
 proc clean_icon_exit {} {
@@ -4521,6 +4746,7 @@ proc make_gui {mode} {
 		center_win .
 	}
 
+
 	if {$make_gui_count == 1} {
 		copy_default_vars
 		if {$x11vnc_connect} {
@@ -4531,13 +4757,13 @@ proc make_gui {mode} {
 	} else {
 		set_name "RESTORE"
 	}
+
+	setup_client_tail
+
 	set_widgets
 
-	if {$mode == "icon" || $mode == "tray"} {
-		setup_client_tail
-		if {$mode == "tray"} {
-			setup_tray_embed
-		}
+	if {$mode == "tray"} {
+		setup_tray_embed
 	}
 }
 
@@ -4776,7 +5002,7 @@ proc key_bindings {} {
 	global env menus_disabled
 	if {[info exists env(USER)] && $env(USER) == "runge"} {
 		# quick restart
-		bind . <Control-KeyPress-c> {exec $argv0 $argv &; destroy .}
+		bind . <Control-KeyPress-k> {exec $argv0 $argv &; destroy .}
 	}
 	bind . <Control-KeyPress-p> { \
 		global menus_disabled; \
@@ -5172,9 +5398,67 @@ proc start_x11vnc {} {
 	}
 }
 
+proc run_remote_cmd_via_sock {opts} {
+	global client_sock
+
+	set db 0
+	if {[eof $client_sock]} {
+		close $client_sock
+		set client_sock ""
+		return "fail"
+	}
+	set result ""
+		
+	setup_client_sock 0
+
+	set docmd ""
+	foreach opt $opts {
+		if {$opt == "-R"} {
+			set docmd "-R"
+			continue
+		} elseif {$opt == "-Q"} {
+			set docmd "-Q"
+			continue
+		}
+
+		if {$docmd == ""} {
+			continue
+		} elseif {$docmd == "-R"} {
+			set str "cmd=$opt"
+		} elseif {$docmd == "-Q"} {
+			set str "qry=$opt"
+		} else {
+			set docmd ""
+			continue
+		}
+
+		if {$db} {puts stderr "run_remote_cmd_via_sock: $docmd \"$str\""}
+		puts $client_sock $str
+		if {$db} {puts stderr "run_remote_cmd_via_sock: flush"}
+		flush $client_sock
+		if {$db} {puts stderr "run_remote_cmd_via_sock: gets"}
+		gets $client_sock res
+		if {$db} {puts stderr "run_remote_cmd_via_sock: \"$res\""}
+		set res [string trim $res]
+
+		set docmd ""
+
+		if {$res != ""} {
+			append result "$res\n"
+		}
+	}
+	
+	setup_client_sock 1
+
+	set result [string trim $result]
+
+	return $result
+}
+
 proc run_remote_cmd {opts} {
 	global menu_var x11vnc_prog x11vnc_cmdline x11vnc_xdisplay
 	global x11vnc_auth_file x11vnc_connect_file
+	global client_sock
 
 	set debug [in_debug_mode]
 
@@ -5186,6 +5470,17 @@ proc run_remote_cmd {opts} {
 		} else {
 			append_text "running: x11vnc $str (please do \"Actions -> detach\" to clean things up)\n"
 			append_text "subsequent -R/-Q commands should fail..."
+		}
+	}
+
+	if {$client_sock != ""} {
+		menus_disable
+		stop_watch on
+		set result [run_remote_cmd_via_sock $opts]
+		stop_watch off
+		menus_enable
+		if {$result != "fail"} {
+			return $result
 		}
 	}
 
@@ -5212,7 +5507,6 @@ proc run_remote_cmd {opts} {
 	}
 	lappend cmd "2>"
 	lappend cmd "/dev/null"
-#	lappend cmd "/tmp/nono"
 
 	if {0 || $debug} {
 		set str [join $cmd]
@@ -5228,7 +5522,6 @@ proc run_remote_cmd {opts} {
 	stop_watch on
 	catch {set output [eval exec $cmd]}
 	stop_watch off
-#puts stderr [exec cat /tmp/nono]
 
 	menus_enable
 	if {$debug} {
@@ -5259,6 +5552,8 @@ proc try_connect {} {
 	global x11vnc_xdisplay connected_to_x11vnc reply_xdisplay
 	global menu_var unset_str
 
+	set db 0
+
 	if {! $connected_to_x11vnc} {
 		if {[info exists menu_var(display)]} {
 			set d $menu_var(display)
@@ -5273,12 +5568,19 @@ proc try_connect {} {
 	set rargs [list "-Q" "ping"]
 	set result [run_remote_cmd $rargs]
 
+	if {$db} {puts "try_connect: \"$result\""}
+
 	if {[regexp {^ans=ping:} $result]} {
 		regsub {^ans=ping:} $result {} reply_xdisplay
 		set msg "Connected to $reply_xdisplay"
 		set_info $msg
 		append_text "$msg\n"
 		set_connected yes
+
+		setup_client_channel
+		setup_client_sock 1
+		setup_client_tail
+
 		fetch_displays
 		return 1
 	} else {
@@ -5344,7 +5646,18 @@ proc change_view_state {} {
 proc setup_client_tail {} {
 	global client_tail
 	if {$client_tail != ""} {
-		fileevent $client_tail readable read_client_info
+		fileevent $client_tail readable read_client_tail
+	}
+}
+
+proc setup_client_sock {{enable 1}} {
+	global client_sock
+	if {$client_sock != ""} {
+		if {$enable} {
+			fileevent $client_sock readable read_client_sock
+		} else {
+			fileevent $client_sock readable ""
+		}
 	}
 }
 
@@ -5438,6 +5751,7 @@ proc undo_tray_embed {} {
 # main:
 
 global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
+global x11vnc_xdisplay0
 global x11vnc_client_file x11vnc_gui_geom x11vnc_started vnc_url
 global x11vnc_gui_params
 global x11vnc_auth_file x11vnc_connect_file beginner_mode simple_gui_created
@@ -5449,7 +5763,7 @@ global bfont ffont sfont snfont old_labels have_labelframes
 global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
 global cache_all_query_vars
-global last_query_all_time query_all_freq client_tail client_tail_read
+global last_query_all_time query_all_freq client_tail client_sock client_info_read
 global icon_mode tray_embed tray_running icon_setpasswd icon_embed_id
 global icon_noadvanced icon_minimal
 global make_gui_count text_area_str
@@ -5473,7 +5787,8 @@ set cache_all_query_vars ""
 set query_all_freq 120
 set last_query_all_time [clock seconds]
 set client_tail ""
-set client_tail_read 0
+set client_sock ""
+set client_info_read 0
 set make_gui_count 0
 set text_area_str ""
 set gui_argv0 $argv0
@@ -5539,6 +5854,7 @@ if {[info exists env(X11VNC_CLIENT_FILE)]} {
 	if {$client_tail != ""} {
 		gets $client_tail tmp
 		if [eof $client_tail] {
+puts "eof $client_tail"
 			clean_client_tail
 			set client_tail ""
 		}
@@ -5586,6 +5902,7 @@ if {[info exists env(X11VNC_STARTED)]} {
 	set x11vnc_started 1
 }
 
+set x11vnc_xdisplay ""
 if {[info exists env(X11VNC_XDISPLAY)]} {
 	set x11vnc_xdisplay $env(X11VNC_XDISPLAY);
 	set x11vnc_connect 1
@@ -5600,6 +5917,7 @@ if {[info exists env(X11VNC_XDISPLAY)]} {
 } else {
 	set x11vnc_xdisplay ":0";
 }
+set x11vnc_xdisplay0 $x11vnc_xdisplay
 
 if {[info exists env(X11VNC_AUTH_FILE)]} {
 	set x11vnc_auth_file $env(X11VNC_AUTH_FILE)

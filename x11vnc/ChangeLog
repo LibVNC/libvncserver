@@ -1,3 +1,7 @@
+2005-07-17  Karl Runge <runge@karlrunge.com>
+	* more improvements to gui UE.  gui requests via client_sock
+	  PASSWD_REQUIRED and PASSWD_UNLESS_NOPW build options.
+
 2005-07-12  Karl Runge <runge@karlrunge.com>
 	* gui: remove nevershared etc., parse cmd line, bug fixes.
 	* x11vnc: fix pointer queue buildup under -viewonly.
