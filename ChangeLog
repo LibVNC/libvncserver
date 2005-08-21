@@ -1,3 +1,6 @@
+2005-08-21  Alberto Lusiani <alusiani@gmail.com>
+	* libvncserver.spec.in: split rpm into libvncserver, -devel and x11vnc
+
 2005-07-12  Karl Runge <runge@karlrunge.com>
 	* x11vnc: tweaks for release, fix queue buildup under -viewonly
 
