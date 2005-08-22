@@ -32,8 +32,8 @@ cat LibVNCServer.spec.in | \
 sed -e "s/Johannes.Schindelin@gmx.de/runge@karlrunge.com/gi" \
     -e "s/Johannes.Schindelin/Karl Runge/g" \
     -e "s/a library to make writing a vnc server easy/a VNC server for the current X11 session/" \
-    -e "/%description/,/%prep/d" \
-    -e '/%setup/s/^\(.*\)$/%description\
+    -e "/^%description$/,/%description devel$/d" \
+    -e '/^Static libraries.*$/%description\
 x11vnc is to Xwindows what WinVNC is to Windows, i.e. a server\
 which serves the current Xwindows desktop via RFB (VNC) protocol\
 to the user.\
