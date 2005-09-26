@@ -487,6 +487,9 @@ rfbProcessClientMessage(rfbClientPtr cl)
     case RFB_PROTOCOL_VERSION:
         rfbProcessClientProtocolVersion(cl);
         return;
+    case RFB_SECURITY_TYPE:
+        rfbProcessClientSecurityType(cl);
+        return;
     case RFB_AUTHENTICATION:
         rfbAuthProcessClientMessage(cl);
         return;
@@ -545,9 +548,17 @@ rfbProcessClientProtocolVersion(rfbClientPtr cl)
         return;
     }
 
-    if (minor_ != rfbProtocolMinorVersion) {
-        /* Minor version mismatch - warn but try to continue */
-        rfbLog("Ignoring minor version mismatch\n");
+    // Chk for the minor version use either of the two standard version of RFB
+    cl->protocolMinorVersion = minor_;
+    if (minor_ > rfbProtocolMinorVersion) {
+       cl->protocolMinorVersion = rfbProtocolMinorVersion;
+    } else if (minor_ < rfbProtocolMinorVersion) {
+       cl->protocolMinorVersion = rfbProtocolFallbackMinorVersion;
+    }
+    if (minor_ != rfbProtocolMinorVersion &&
+       minor_ != rfbProtocolFallbackMinorVersion) {
+       rfbLog("Non-standard protocol version %d.%d, using %d.%d instead\n",
+              major_, minor_, rfbProtocolMajorVersion, cl->protocolMinorVersion);
     }
 
     rfbAuthNewClient(cl);

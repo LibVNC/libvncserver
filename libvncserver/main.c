@@ -668,6 +668,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->newClientHook = rfbDefaultNewClientHook;
    screen->displayHook = NULL;
    screen->processCustomClientMessage = rfbDefaultProcessCustomClientMessage;
+   screen->securityHandlers = NULL;
 
    /* initialize client list and iterator mutex */
    rfbClientListInit(screen);

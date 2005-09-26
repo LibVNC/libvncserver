@@ -6,6 +6,8 @@
  */
 
 /*
+ *  Copyright (C) 2005 Rohit Kumar <rokumar@novell.com>,
+ *                     Johannes E. Schindelin <johannes.schindelin@gmx.de>
  *  Copyright (C) 2002 RealVNC Ltd.
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
  *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
@@ -143,6 +145,17 @@ typedef struct {
 } rfbColourMap;
 
 /*
+ *  Security handling (RFB protocol version 3.7
+ */
+
+typedef struct _rfbSecurity {
+	uint8_t type;
+	void (*handler)(struct _rfbClientRec* cl);
+	struct _rfbSecurity* next;
+} rfbSecurityHandler;
+
+
+/*
  * Per-screen (framebuffer) structure.  There can be as many as you wish,
  * each serving different clients. However, you have to call
  * rfbProcessEvents for each of these.
@@ -265,6 +278,8 @@ typedef struct _rfbScreenInfo
     rfbProcessCustomClientMessageProcPtr processCustomClientMessage;
 
     in_addr_t listenInterface;
+
+    rfbSecurityHandler* securityHandlers;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -307,12 +322,16 @@ typedef struct _rfbClientRec {
     SOCKET sock;
     char *host;
 
+    /* RFB protocol minor version number */
+    int protocolMinorVersion;
+
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t client_thread;
 #endif
                                 /* Possible client states: */
     enum {
         RFB_PROTOCOL_VERSION,   /* establishing protocol version */
+	RFB_SECURITY_TYPE,      /* negotiating security (RFB v.3.7) */
         RFB_AUTHENTICATION,     /* authenticating */
         RFB_INITIALISATION,     /* sending initialisation messages */
         RFB_NORMAL              /* normal protocol messages */
@@ -582,7 +601,8 @@ extern void rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen);
 
 extern void rfbAuthNewClient(rfbClientPtr cl);
 extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
-
+extern void rfbRegisterSecurityHandler(rfbScreenInfoPtr server,
+	rfbSecurityHandler* handler);
 
 /* rre.c */
 

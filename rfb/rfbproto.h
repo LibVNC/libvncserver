@@ -2,6 +2,7 @@
 #define RFBPROTO_H
 
 /*
+ *  Copyright (C) 2005 Rohit Kumar, Johannes E. Schindelin
  *  Copyright (C) 2000-2002 Constantin Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
@@ -217,11 +218,29 @@ typedef struct {
 
 #define rfbProtocolVersionFormat "RFB %03d.%03d\n"
 #define rfbProtocolMajorVersion 3
-#define rfbProtocolMinorVersion 3
+#define rfbProtocolMinorVersion 7
+#define rfbProtocolFallbackMinorVersion 3
 
 typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 
 #define sz_rfbProtocolVersionMsg 12
+
+/*
+ * Negotiation of the security type (protocol version 3.7)
+ *
+ * Once the protocol version has been decided, the server either sends a list
+ * of supported security types, or informs the client about an error (when the
+ * number of security types is 0).  Security type rfbSecTypeTight is used to
+ * enable TightVNC-specific protocol extensions.  The value rfbSecTypeVncAuth
+ * stands for classic VNC authentication.
+ *
+ * The client selects a particular security type from the list provided by the
+ * server.
+ */
+
+#define rfbSecTypeInvalid 0
+#define rfbSecTypeNone 1
+#define rfbSecTypeVncAuth 2
 
 
 /*-----------------------------------------------------------------------------

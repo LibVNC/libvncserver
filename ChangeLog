@@ -1,3 +1,8 @@
+2005-09-26  Rohit Kumar <rokumar@novell.com>
+	* libvncserver/{auth,main,rfbserver}.c, rfb/{rfb,rfbproto}.h:
+	  support VNC protocol version 3.7. This allows to add security
+	  types.
+
 2005-08-21  Alberto Lusiani <alusiani@gmail.com>
 	* libvncserver.spec.in: split rpm into libvncserver, -devel and x11vnc
 
