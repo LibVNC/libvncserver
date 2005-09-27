@@ -3,6 +3,7 @@
  */
 
 /*
+ *  Copyright (C) 2005 Rohit Kumar, Johannes E. Schindelin
  *  Copyright (C) 2002 RealVNC Ltd.
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
  *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
@@ -347,6 +348,8 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
       cl->progressiveSliceY = 0;
 
+      cl->extensions = NULL;
+
       sprintf(pv,rfbProtocolVersionFormat,rfbProtocolMajorVersion,
 	      rfbProtocolMinorVersion);
 
@@ -603,6 +606,7 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
     int len, n;
     rfbClientIteratorPtr iterator;
     rfbClientPtr otherCl;
+    rfbProtocolExtension* extension;
 
     if ((n = rfbReadExact(cl, (char *)&ci,sz_rfbClientInitMsg)) <= 0) {
         if (n == 0)
@@ -613,7 +617,7 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
         return;
     }
 
-    memset(buf,0,256);
+    memset(buf,0,sizeof(buf));
 
     si->framebufferWidth = Swap16IfLE(cl->screen->width);
     si->framebufferHeight = Swap16IfLE(cl->screen->height);
@@ -631,6 +635,19 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
         rfbCloseClient(cl);
         return;
     }
+
+    for(extension=rfbGetExtensionIterator();extension;extension=extension->next)
+	if(extension->init) {
+	    void* data;
+	    if(extension->init(cl, &data)) {
+		rfbExtensionData* extensionData=calloc(sizeof(rfbExtensionData),1);
+		extensionData->extension=extension;
+		extensionData->data=data;
+		extensionData->next=cl->extensions;
+		cl->extensions=extensionData;
+	    }
+	}
+    rfbReleaseExtensionIterator();
 
     cl->state = RFB_NORMAL;
 
@@ -1046,15 +1063,27 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 
     default:
+	{
+	    rfbExtensionData* extension;
 
-	if(cl->screen->processCustomClientMessage(cl,msg.type))
+	    for(extension=cl->extensions; extension; extension=extension->next)
+		if(extension->extension->handleMessage &&
+			extension->extension->handleMessage(cl, extension->data, msg))
+		    return;
+
+	    if(cl->screen->processCustomClientMessage(cl,msg.type)) {
+		rfbLog("Warning: this program uses processCustomClientMessage, "
+			"which is deprecated.\n"
+			"Please use rfbRegisterProtocolExtension instead.\n");
 		return;
+	    }
 
-        rfbLog("rfbProcessClientNormalMessage: unknown message type %d\n",
-                msg.type);
-        rfbLog(" ... closing connection\n");
-        rfbCloseClient(cl);
-        return;
+	    rfbLog("rfbProcessClientNormalMessage: unknown message type %d\n",
+		    msg.type);
+	    rfbLog(" ... closing connection\n");
+	    rfbCloseClient(cl);
+	    return;
+	}
     }
 }
 

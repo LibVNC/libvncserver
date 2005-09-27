@@ -19,6 +19,7 @@
  */
 
 /*
+ *  Copyright (C) 2005 Rohit Kumar, Johannes E. Schindelin
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
  *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
  *  All Rights Reserved.
@@ -344,6 +345,12 @@ rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen)
 void
 rfbCloseClient(rfbClientPtr cl)
 {
+    rfbExtensionData* extension;
+
+    for(extension=cl->extensions; extension; extension=extension->next)
+	if(extension->extension->close)
+	    extension->extension->close(cl, extension->data);
+
     LOCK(cl->updateMutex);
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     if (cl->sock != -1)

@@ -145,7 +145,7 @@ typedef struct {
 } rfbColourMap;
 
 /*
- *  Security handling (RFB protocol version 3.7
+ * Security handling (RFB protocol version 3.7)
  */
 
 typedef struct _rfbSecurity {
@@ -154,6 +154,29 @@ typedef struct _rfbSecurity {
 	struct _rfbSecurity* next;
 } rfbSecurityHandler;
 
+/*
+ * Protocol extension handling.
+ */
+
+typedef struct _rfbProtocolExtension {
+	/* returns TRUE if extension should be activated */
+	rfbBool (*init)(struct _rfbClientRec* client, void** data);
+	/* returns TRUE if message was handled */
+	rfbBool (*handleMessage)(struct _rfbClientRec* client,
+				void* data,
+				rfbClientToServerMsg message);
+	void (*close)(struct _rfbClientRec* client, void* data);
+	void (*usage)(void);
+	/* processArguments returns the number of handled arguments */
+	int (*processArgument)(char *argv[]);
+	struct _rfbProtocolExtension* next;
+} rfbProtocolExtension;
+
+typedef struct _rfbExtensionData {
+	rfbProtocolExtension* extension;
+	void* data;
+	struct _rfbExtensionData* next;
+} rfbExtensionData;
 
 /*
  * Per-screen (framebuffer) structure.  There can be as many as you wish,
@@ -481,6 +504,8 @@ typedef struct _rfbClientRec {
     /* if progressive updating is on, this variable holds the current
      * y coordinate of the progressive slice. */
     int progressiveSliceY;
+
+    rfbExtensionData* extensions;
 } rfbClientRec, *rfbClientPtr;
 
 /*
@@ -760,6 +785,10 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y
 void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
 void rfbDoNothingWithClient(rfbClientPtr cl);
 enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
+void rfbRegisterProtocolExtension(rfbProtocolExtension* extension);
+struct _rfbProtocolExtension* rfbGetExtensionIterator();
+void rfbReleaseExtensionIterator();
+rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension);
 
 /* to check against plain passwords */
 rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len);

@@ -1,3 +1,10 @@
+2005-09-27  Rohit Kumar <rokumar@novell.com>
+	* libvncserver/{cargs,sockets,main,rfbserver}.c,
+	  rfb/rfb.h: Provide a generic means to extend the RFB
+	  protocol: rfbRegisterProtocolExtension(extension). This
+	  deprecates the current (very limited) option to override
+	  rfbScreenInfoPtr->processCustomClientMessage(client).
+
 2005-09-26  Rohit Kumar <rokumar@novell.com>
 	* libvncserver/{auth,main,rfbserver}.c, rfb/{rfb,rfbproto}.h:
 	  support VNC protocol version 3.7. This allows to add security

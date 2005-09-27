@@ -19,6 +19,8 @@ extern int rfbStringToAddr(char *str, in_addr_t *iface);
 void
 rfbUsage(void)
 {
+    rfbProtocolExtension* extension;
+
     fprintf(stderr, "-rfbport port          TCP port for RFB protocol\n");
     fprintf(stderr, "-rfbwait time          max time in ms to wait for RFB client\n");
     fprintf(stderr, "-rfbauth passwd-file   use authentication on RFB protocol\n"
@@ -40,6 +42,11 @@ rfbUsage(void)
     fprintf(stderr, "-progressive height    enable progressive updating for slow links\n");
     fprintf(stderr, "-listen ipaddr         listen for connections only on network interface with\n");
     fprintf(stderr, "                       addr ipaddr. '-listen localhost' and hostname work too.\n");
+
+    for(extension=rfbGetExtensionIterator();extension;extension=extension->next)
+	if(extension->usage)
+		extension->usage();
+    rfbReleaseExtensionIterator();
 }
 
 /* purges COUNT arguments from ARGV at POSITION and decrements ARGC.
@@ -138,9 +145,21 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
                 return FALSE;
             }
         } else {
-	    i++;
-	    i1=i;
-	    continue;
+	    rfbProtocolExtension* extension;
+	    int handled=0;
+
+	    for(extension=rfbGetExtensionIterator();handled==0 && extension;
+			extension=extension->next)
+		if(extension->processArgument)
+			handled = extension->processArgument(argv + i);
+	    rfbReleaseExtensionIterator();
+
+	    if(handled==0) {
+		i++;
+		i1=i;
+		continue;
+	    }
+	    i+=handled-1;
 	}
 	/* we just remove the processed arguments from the list */
 	rfbPurgeArguments(argc,&i1,i-i1+1,argv);

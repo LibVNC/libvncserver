@@ -40,6 +40,7 @@
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 static MUTEX(logMutex);
+static MUTEX(extMutex);
 #endif
 
 static int rfbEnableLogging=1;
@@ -49,6 +50,43 @@ char rfbEndianTest = 0;
 #else
 char rfbEndianTest = -1;
 #endif
+
+/*
+ * Protocol extensions
+ */
+
+static rfbProtocolExtension* rfbExtensionHead = NULL;
+
+void
+rfbRegisterProtocolExtension(rfbProtocolExtension* extension)
+{
+	rfbProtocolExtension* last;
+
+	LOCK(extMutex);
+	last = extension;
+
+	while(last->next)
+		last = last->next;
+
+	last->next = rfbExtensionHead;
+	rfbExtensionHead = extension;
+	UNLOCK(extMutex);
+}
+
+rfbProtocolExtension* rfbGetExtensionIterator()
+{
+	LOCK(extMutex);
+	return rfbExtensionHead;
+}
+
+void rfbReleaseExtensionIterator()
+{
+	UNLOCK(extMutex);
+}
+
+/*
+ * Logging
+ */
 
 void rfbLogEnable(int enabled) {
   rfbEnableLogging=enabled;
