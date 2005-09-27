@@ -8,7 +8,7 @@ if HAVE_MP3LAME
 MP3LAME_LIB=-lmp3lame
 endif
 
-vnc2mpg_CFLAGS=-I$(FFMPEG_HOME)/libavformat -I$(FFMPEG_HOME)/libavcodec
+vnc2mpg_CFLAGS=-I$(FFMPEG_HOME)/libavformat -I$(FFMPEG_HOME)/libavcodec -I$(FFMPEG_HOME)/libavutil
 vnc2mpg_LDADD=$(LDADD) $(FFMPEG_HOME)/libavformat/libavformat.a $(FFMPEG_HOME)/libavcodec/libavcodec.a $(MP3LAME_LIB) -lm
 
 FFMPEG_CLIENT=vnc2mpg

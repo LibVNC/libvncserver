@@ -54,13 +54,17 @@ AVStream *add_video_stream(AVFormatContext *oc, int codec_id, int w, int h)
         fprintf(stderr, "Could not alloc stream\n");
         exit(1);
     }
-    
+   
+#if LIBAVFORMAT_BUILD<4629
     c = &st->codec;
+#else
+    c = st->codec;
+#endif
     c->codec_id = codec_id;
     c->codec_type = CODEC_TYPE_VIDEO;
 
     /* put sample parameters */
-    c->bit_rate = 400000;
+    c->bit_rate = 800000;
     /* resolution must be a multiple of two */
     c->width = w;  
     c->height = h;
@@ -116,7 +120,11 @@ void open_video(AVFormatContext *oc, AVStream *st)
     AVCodec *codec;
     AVCodecContext *c;
 
+#if LIBAVFORMAT_BUILD<4629
     c = &st->codec;
+#else
+    c = st->codec;
+#endif
 
     /* find the video encoder */
     codec = avcodec_find_encoder(c->codec_id);
@@ -164,8 +172,12 @@ void write_video_frame(AVFormatContext *oc, AVStream *st)
     int out_size, ret;
     AVCodecContext *c;
     AVFrame *picture_ptr;
-    
+   
+#if LIBAVFORMAT_BUILD<4629
     c = &st->codec;
+#else
+    c = st->codec;
+#endif
     
         if (c->pix_fmt != PIX_FMT_RGB565) {
             /* as we only generate a RGB565 picture, we must convert it
@@ -219,7 +231,7 @@ void write_video_frame(AVFormatContext *oc, AVStream *st)
 
 void close_video(AVFormatContext *oc, AVStream *st)
 {
-    avcodec_close(&st->codec);
+    avcodec_close(st->codec);
     av_free(picture->data[0]);
     av_free(picture);
     if (tmp_picture) {
