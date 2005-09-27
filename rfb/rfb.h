@@ -278,8 +278,6 @@ typedef struct _rfbScreenInfo
     rfbProcessCustomClientMessageProcPtr processCustomClientMessage;
 
     in_addr_t listenInterface;
-
-    rfbSecurityHandler* securityHandlers;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -601,8 +599,7 @@ extern void rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen);
 
 extern void rfbAuthNewClient(rfbClientPtr cl);
 extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
-extern void rfbRegisterSecurityHandler(rfbScreenInfoPtr server,
-	rfbSecurityHandler* handler);
+extern void rfbRegisterSecurityHandler(rfbSecurityHandler* handler);
 
 /* rre.c */
 

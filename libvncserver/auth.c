@@ -33,16 +33,18 @@
  * Handle security types
  */
 
+static rfbSecurityHandler* securityHandlers = NULL;
+
 void
-rfbRegisterSecurityHandler(rfbScreenInfoPtr server, rfbSecurityHandler* handler)
+rfbRegisterSecurityHandler(rfbSecurityHandler* handler)
 {
 	rfbSecurityHandler* last = handler;
 
 	while(last->next)
 		last = last->next;
 
-	last->next = server->securityHandlers;
-	server->securityHandlers = handler;
+	last->next = securityHandlers;
+	securityHandlers = handler;
 }
 
 
@@ -93,10 +95,10 @@ rfbSendSecurityTypeList(rfbClientPtr cl, int primaryType)
 	handler->type = primaryType;
 	handler->handler = rfbVncAuthSendChallenge;
 	handler->next = NULL;
-	rfbRegisterSecurityHandler(cl->screen, handler);
+	rfbRegisterSecurityHandler(handler);
     }
 
-    for (handler = cl->screen->securityHandlers;
+    for (handler = securityHandlers;
 	    handler && size<MAX_SECURITY_TYPES; handler = handler->next) {
 	buffer[size] = handler->type;
 	size++;
@@ -227,7 +229,7 @@ rfbProcessClientSecurityType(rfbClientPtr cl)
 	
 
     /* Make sure it was present in the list sent by the server. */
-    for (handler = cl->screen->securityHandlers; handler;
+    for (handler = securityHandlers; handler;
 	    handler = handler->next)
 	if (chosenType == handler->type) {
 	    handler->handler(cl);
