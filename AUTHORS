@@ -19,6 +19,9 @@ original proof-of-concept. It really deserves to replace the old version,
 as it is a state-of-the-art, fast and usable program by now! However, he
 maintains it and improves it still in amazing ways!
 
+The file transfer protocol from TightVNC was implemented by Rohit Kumar.
+This includes an implementation of RFB protocol version 3.7t.
+
 Occasional important patches were sent by (in order I found the names in my
 archives and please don't beat me, if I forgot you, but just send me an
 email!): Akira Hatakeyama, Karl J. Runge, Justin "Zippy" Dearing,

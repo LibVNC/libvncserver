@@ -229,6 +229,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     rfbClientPtr cl,cl_;
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(struct sockaddr_in);
+    rfbProtocolExtension* extension;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
 
@@ -360,6 +361,16 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
         return NULL;
       }
     }
+
+    for(extension = rfbGetExtensionIterator(); extension;
+	    extension=extension->next) {
+	void* data = NULL;
+	/* if the extension does not have a newClient method, it wants
+	 * to be initialized later. */
+	if(extension->newClient && extension->newClient(cl, &data))
+		rfbEnableExtension(cl, extension, data);
+    }
+    rfbReleaseExtensionIterator();
 
     switch (cl->screen->newClientHook(cl)) {
     case RFB_CLIENT_ON_HOLD:
@@ -606,7 +617,7 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
     int len, n;
     rfbClientIteratorPtr iterator;
     rfbClientPtr otherCl;
-    rfbProtocolExtension* extension;
+    rfbExtensionData* extension;
 
     if ((n = rfbReadExact(cl, (char *)&ci,sz_rfbClientInitMsg)) <= 0) {
         if (n == 0)
@@ -636,18 +647,14 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
         return;
     }
 
-    for(extension=rfbGetExtensionIterator();extension;extension=extension->next)
-	if(extension->init) {
-	    void* data;
-	    if(extension->init(cl, &data)) {
-		rfbExtensionData* extensionData=calloc(sizeof(rfbExtensionData),1);
-		extensionData->extension=extension;
-		extensionData->data=data;
-		extensionData->next=cl->extensions;
-		cl->extensions=extensionData;
-	    }
-	}
-    rfbReleaseExtensionIterator();
+    for(extension = cl->extensions; extension;) {
+	rfbExtensionData* next = extension->next;
+	if(extension->extension->init &&
+		!extension->extension->init(cl, extension->data))
+	    /* extension requested that it be removed */
+	    rfbDisableExtension(cl, extension->extension);
+	extension = next;
+    }
 
     cl->state = RFB_NORMAL;
 
@@ -1068,7 +1075,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	    for(extension=cl->extensions; extension; extension=extension->next)
 		if(extension->extension->handleMessage &&
-			extension->extension->handleMessage(cl, extension->data, msg))
+			extension->extension->handleMessage(cl, extension->data, &msg))
 		    return;
 
 	    if(cl->screen->processCustomClientMessage(cl,msg.type)) {

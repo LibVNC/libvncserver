@@ -466,6 +466,14 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
             }
         }
     }
+#undef DEBUG_READ_EXACT
+#ifdef DEBUG_READ_EXACT
+    rfbLog("ReadExact %d bytes\n",len);
+    for(n=0;n<len;n++)
+	    fprintf(stderr,"%02x ",(unsigned char)buf[n]);
+    fprintf(stderr,"\n");
+#endif
+
     return 1;
 }
 

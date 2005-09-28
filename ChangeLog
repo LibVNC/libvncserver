@@ -1,3 +1,9 @@
+2005-09-28  Rohit Kumar <rokumar@novell.com>
+	* examples/filetransfer.c, rfb/rfb.h, configure.ac,
+	  libvncserver/{auth,cargs,main,rfbserver,sockets}.c,
+	  libvncserver/tightvnc-extension/*:
+	  Implement TightVNC's file transfer protocol.
+
 2005-09-27  Rohit Kumar <rokumar@novell.com>
 	* libvncserver/{cargs,sockets,main,rfbserver}.c,
 	  rfb/rfb.h: Provide a generic means to extend the RFB

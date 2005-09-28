@@ -151,7 +151,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	    for(extension=rfbGetExtensionIterator();handled==0 && extension;
 			extension=extension->next)
 		if(extension->processArgument)
-			handled = extension->processArgument(argv + i);
+			handled = extension->processArgument(*argc - i, argv + i);
 	    rfbReleaseExtensionIterator();
 
 	    if(handled==0) {

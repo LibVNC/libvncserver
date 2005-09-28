@@ -17,6 +17,14 @@ AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
                   [$PATH:/usr/ccs/bin])
 
 # Options
+AH_TEMPLATE(WITH_TIGHTVNC_FILETRANSFER, [Disable TightVNCFileTransfer protocol])
+AC_ARG_WITH(tightvnc-filetransfer,
+	[  --without-filetransfer   disable TightVNC file transfer protocol],
+	, [ with_tightvnc_filetransfer=yes ])
+if test "x$with_tightvnc_filetransfer" == "xyes"; then
+	AC_DEFINE(WITH_TIGHTVNC_FILETRANSFER)
+fi
+AM_CONDITIONAL(WITH_TIGHTVNC_FILETRANSFER, test "$with_tightvnc_filetransfer" == "yes")
 AH_TEMPLATE(BACKCHANNEL, [Enable BackChannel communication])
 AC_ARG_WITH(backchannel,
 	[  --without-backchannel   disable backchannel method],

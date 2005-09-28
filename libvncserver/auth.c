@@ -207,7 +207,7 @@ rfbAuthNewClient(rfbClientPtr cl)
 void
 rfbProcessClientSecurityType(rfbClientPtr cl)
 {
-    int n, i;
+    int n;
     uint8_t chosenType;
     rfbSecurityHandler* handler;
 

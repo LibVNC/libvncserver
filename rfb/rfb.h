@@ -159,16 +159,20 @@ typedef struct _rfbSecurity {
  */
 
 typedef struct _rfbProtocolExtension {
-	/* returns TRUE if extension should be activated */
-	rfbBool (*init)(struct _rfbClientRec* client, void** data);
+	/* returns FALSE if extension should be deactivated for client.
+	   if newClient == NULL, it is always deactivated. */
+	rfbBool (*newClient)(struct _rfbClientRec* client, void** data);
+	/* returns FALSE if extension should be deactivated for client.
+	   if init == NULL, it stays activated. */
+	rfbBool (*init)(struct _rfbClientRec* client, void* data);
 	/* returns TRUE if message was handled */
 	rfbBool (*handleMessage)(struct _rfbClientRec* client,
 				void* data,
-				rfbClientToServerMsg message);
+				const rfbClientToServerMsg* message);
 	void (*close)(struct _rfbClientRec* client, void* data);
 	void (*usage)(void);
 	/* processArguments returns the number of handled arguments */
-	int (*processArgument)(char *argv[]);
+	int (*processArgument)(int argc, char *argv[]);
 	struct _rfbProtocolExtension* next;
 } rfbProtocolExtension;
 
@@ -623,6 +627,7 @@ extern void rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen);
 /* auth.c */
 
 extern void rfbAuthNewClient(rfbClientPtr cl);
+extern void rfbProcessClientSecurityType(rfbClientPtr cl);
 extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
 extern void rfbRegisterSecurityHandler(rfbSecurityHandler* handler);
 
@@ -788,7 +793,9 @@ enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
 void rfbRegisterProtocolExtension(rfbProtocolExtension* extension);
 struct _rfbProtocolExtension* rfbGetExtensionIterator();
 void rfbReleaseExtensionIterator();
-rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension);
+rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
+	void* data);
+rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension);
 
 /* to check against plain passwords */
 rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len);
@@ -820,6 +827,9 @@ extern void rfbRefuseOnHoldClient(rfbClientPtr cl);
 extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, rfbBool runInBackground);
 extern rfbBool rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
 extern rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo);
+
+/* TightVNC file transfer extension */
+void rfbRegisterTightVNCFileTransferExtension();
 
 #endif
 

@@ -1,5 +1,5 @@
 .deps
 Makefile
 Makefile.in
-client_test
+libvncclient.a
 

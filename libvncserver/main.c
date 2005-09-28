@@ -84,6 +84,46 @@ void rfbReleaseExtensionIterator()
 	UNLOCK(extMutex);
 }
 
+rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
+	void* data)
+{
+	rfbExtensionData* extData;
+
+	/* make sure extension is not yet enabled. */
+	for(extData = cl->extensions; extData; extData = extData->next)
+		if(extData->extension == extension)
+			return FALSE;
+
+	extData = calloc(sizeof(rfbExtensionData),1);
+	extData->extension = extension;
+	extData->data = data;
+	extData->next = cl->extensions;
+	cl->extensions = extData;
+
+	return TRUE;
+}
+
+rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension)
+{
+	rfbExtensionData* extData;
+	rfbExtensionData* prevData = NULL;
+
+	for(extData = cl->extensions; extData; extData = extData->next) {
+		if(extData->extension == extension) {
+			if(extData->data)
+				free(extData->data);
+			if(prevData == NULL)
+				cl->extensions = extData->next;
+			else
+				prevData->next = extData->next;
+			return TRUE;
+		}
+		prevData = extData;
+	}
+
+	return FALSE;
+}
+
 /*
  * Logging
  */
