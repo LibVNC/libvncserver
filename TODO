@@ -1,6 +1,8 @@
 immediate:
 ----------
 
+ANSIfy tightvnc-filetransfer
+implement PseudoEncoding support in rfbProtocolExtension
 VisualNaCro testing
 test IRIX -overlay (x11vnc)
 java vncviewer doesn't do colour cursors?
@@ -11,7 +13,6 @@ teach SDLvncviewer about CopyRect...
 implement "-record" in libvncclient
 libtoolize
 come up with an alpha cursor patch for Windows vncviewer
-release ;-)
 
 later:
 ------
