@@ -1,3 +1,9 @@
+2005-10-03  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* libvncserver/rfbserver.c, rfb/rfb.h: add a method to the
+	  extension struct which is called to enable pseudo encodings.
+	  This is a versatile mechanism to enable/disable custom
+	  extensions with custom clients and servers.
+
 2005-09-28  Rohit Kumar <rokumar@novell.com>
 	* examples/filetransfer.c, rfb/rfb.h, configure.ac,
 	  libvncserver/{auth,cargs,main,rfbserver,sockets}.c,

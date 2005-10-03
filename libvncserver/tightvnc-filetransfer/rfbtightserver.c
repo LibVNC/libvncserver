@@ -156,7 +156,6 @@ static void
 rfbSendAuthCaps(cl)
     rfbClientPtr cl;
 {
-    rfbBool authRequired;
     rfbAuthenticationCapsMsg caps;
     rfbCapabilityInfo caplist[MAX_AUTH_CAPS];
     int count = 0;
@@ -485,6 +484,7 @@ rfbHandleSecTypeTight(rfbClientPtr cl) {
 rfbProtocolExtension tightVncFileTransferExtension = {
 	NULL,
 	rfbTightExtensionInit,
+	NULL,
 	rfbTightExtensionMsgHandler,
 	rfbTightExtensionClientClose,
 	rfbTightUsage,

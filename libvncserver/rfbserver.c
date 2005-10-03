@@ -105,7 +105,7 @@ rfbClientListInit(rfbScreenInfoPtr rfbScreen)
 {
     if(sizeof(rfbBool)!=1) {
         /* a sanity check */
-        fprintf(stderr,"rfbBool's size is not 1 (%d)!\n",sizeof(rfbBool));
+        fprintf(stderr,"rfbBool's size is not 1 (%d)!\n",(int)sizeof(rfbBool));
 	/* we cannot continue, because rfbBool is supposed to be char everywhere */
 	exit(1);
     }
@@ -924,8 +924,22 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 #endif
 		} else
 #endif
-		 rfbLog("rfbProcessClientNormalMessage: ignoring unknown "
-                       "encoding type %d\n", (int)enc);
+		{
+			rfbExtensionData* e;
+			for(e = cl->extensions; e;) {
+				rfbExtensionData* next = e->next;
+				if(e->extension->enablePseudoEncoding &&
+					e->extension->enablePseudoEncoding(cl,
+						e->data, (int)enc))
+					/* ext handles this encoding */
+					break;
+				e = next;
+			}
+			if(e == NULL)
+				rfbLog("rfbProcessClientNormalMessage: ignoring"
+						"unknown encoding type %d\n",
+						(int)enc);
+		}
             }
         }
 
@@ -1071,12 +1085,15 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
     default:
 	{
-	    rfbExtensionData* extension;
+	    rfbExtensionData *e,*next;
 
-	    for(extension=cl->extensions; extension; extension=extension->next)
-		if(extension->extension->handleMessage &&
-			extension->extension->handleMessage(cl, extension->data, &msg))
+	    for(e=cl->extensions; e;) {
+		next = e->next;
+		if(e->extension->handleMessage &&
+			e->extension->handleMessage(cl, e->data, &msg))
 		    return;
+		e = next;
+	    }
 
 	    if(cl->screen->processCustomClientMessage(cl,msg.type)) {
 		rfbLog("Warning: this program uses processCustomClientMessage, "
