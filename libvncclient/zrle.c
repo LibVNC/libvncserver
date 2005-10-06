@@ -217,7 +217,7 @@ static int HandleZRLETile(rfbClient* client,
 		case 0: /* raw */
 		{
 #if REALBPP!=BPP
-			int i,j,j2;
+			int i,j;
 
 			if(1+w*h*REALBPP/8>buffer_length) {
 				rfbClientLog("expected %d bytes, got only %d (%dx%d)\n",1+w*h*REALBPP/8,buffer_length,w,h);
