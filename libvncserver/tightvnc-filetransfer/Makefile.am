@@ -1,4 +1,4 @@
-DEFINES=-g -Wall
+AM_CFLAGS=-g -Wall
 
 includedir=$(prefix)/include/rfb
 

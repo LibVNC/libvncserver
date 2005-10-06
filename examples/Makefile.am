@@ -1,4 +1,4 @@
-DEFINES=-I.. -g -Wall
+AM_CFLAGS=-I.. -g -Wall
 LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
 
 if OSX

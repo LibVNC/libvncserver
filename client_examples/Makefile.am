@@ -1,4 +1,4 @@
-DEFINES=-I.. -g -Wall
+AM_CFLAGS=-I.. -g -Wall
 LDADD = ../libvncclient/libvncclient.a @WSOCKLIB@
 
 if WITH_FFMPEG

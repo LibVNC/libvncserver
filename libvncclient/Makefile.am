@@ -1,4 +1,4 @@
-DEFINES=-g -I.. -I. -Wall
+AM_CFLAGS=-g -I.. -I. -Wall
 
 libvncclient_a_SOURCES=cursor.c listen.c rfbproto.c sockets.c vncviewer.c
 

@@ -1,4 +1,4 @@
-DEFINES=-I.. -g -Wall
+AM_CFLAGS=-I.. -g -Wall
 LDADD = ../libvncserver/libvncserver.a ../libvncclient/libvncclient.a @WSOCKLIB@
 
 if HAVE_LIBPTHREAD
