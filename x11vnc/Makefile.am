@@ -1,4 +1,4 @@
-DEFINES = -I ..
+AM_CFLAGS = -I ..
 LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
 
 SUBDIRS = misc
