@@ -23,7 +23,7 @@ SDLvncviewer_CFLAGS=$(SDL_CFLAGS)
 SDLvncviewer_LDADD=$(LDADD) $(SDL_LIBS)
 endif
 
-noinst_PROGRAMS=ppmtest $(SDLVIEWER) $(FFMPEG_CLIENT)
+noinst_PROGRAMS=ppmtest $(SDLVIEWER) $(FFMPEG_CLIENT) backchannel
 
 
 

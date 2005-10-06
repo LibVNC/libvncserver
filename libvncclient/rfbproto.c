@@ -77,6 +77,49 @@ rfbDefaultClientLog(const char *format, ...)
 rfbClientLogProc rfbClientLog=rfbDefaultClientLog;
 rfbClientLogProc rfbClientErr=rfbDefaultClientLog;
 
+/* extensions */
+
+rfbClientProtocolExtension* rfbClientExtensions = NULL;
+
+void rfbClientRegisterExtension(rfbClientProtocolExtension* e)
+{
+	e->next = rfbClientExtensions;
+	rfbClientExtensions = e;
+}
+
+/* client data */
+
+void rfbClientSetClientData(rfbClient* client, void* tag, void* data)
+{
+	rfbClientData* clientData = client->clientData;
+
+	while(clientData && clientData->tag != tag)
+		clientData = clientData->next;
+	if(clientData == NULL) {
+		clientData = calloc(sizeof(rfbClientData), 1);
+		clientData->next = client->clientData;
+		client->clientData = clientData;
+		clientData->tag = tag;
+	}
+
+	clientData->data = data;
+}
+
+void* rfbClientGetClientData(rfbClient* client, void* tag)
+{
+	rfbClientData* clientData = client->clientData;
+
+	while(clientData) {
+		if(clientData->tag == tag)
+			return clientData->data;
+		clientData = clientData->next;
+	}
+
+	return NULL;
+}
+
+/* messages */
+
 static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_t colour) {
   int i,j;
 
@@ -259,6 +302,12 @@ InitialiseRFBConnection(rfbClient* client)
     return FALSE;
   }
 
+#if rfbProtocolMinorVersion == 7
+  /* work around LibVNCClient not yet speaking RFB 3.7 */
+#undef rfbProtocolMinorVersion
+#define rfbProtocolMinorVersion 3
+#endif
+
   rfbClientLog("VNC server supports protocol version %d.%d (viewer %d.%d)\n",
 	  major, minor, rfbProtocolMajorVersion, rfbProtocolMinorVersion);
 
@@ -394,6 +443,7 @@ SetFormatAndEncodings(rfbClient* client)
   rfbBool requestCompressLevel = FALSE;
   rfbBool requestQualityLevel = FALSE;
   rfbBool requestLastRectEncoding = FALSE;
+  rfbClientProtocolExtension* e;
 
   spf.type = rfbSetPixelFormat;
   spf.format = client->format;
@@ -534,6 +584,13 @@ SetFormatAndEncodings(rfbClient* client)
 
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingLastRect);
   }
+
+  for(e = rfbClientExtensions; e; e = e->next)
+    if(e->encodings) {
+      int* enc;
+      for(enc = e->encodings; *enc; enc++)
+	encs[se->nEncodings++] = rfbClientSwap32IfLE(*enc);
+    }
 
   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
 
@@ -923,9 +980,20 @@ HandleRFBServerMessage(rfbClient* client)
 #endif
 
       default:
-	rfbClientLog("Unknown rect encoding %d\n",
-		(int)rect.encoding);
-	return FALSE;
+	 {
+	   rfbBool handled = FALSE;
+	   rfbClientProtocolExtension* e;
+
+	   for(e = rfbClientExtensions; !handled && e; e = e->next)
+	     if(e->handleEncoding && e->handleEncoding(client, &rect))
+	       handled = TRUE;
+
+	   if(!handled) {
+	     rfbClientLog("Unknown rect encoding %d\n",
+		 (int)rect.encoding);
+	     return FALSE;
+	   }
+	 }
       }
 
       /* Now we may discard "soft cursor locks". */
@@ -933,16 +1001,6 @@ HandleRFBServerMessage(rfbClient* client)
 
       client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
     }
-
-#ifdef MITSHM
-    /* if using shared memory PutImage, make sure that the X server has
-       updated its framebuffer before we reuse the shared memory.  This is
-       mainly to avoid copyrect using invalid screen contents - not sure
-       if we'd need it otherwise. */
-
-    if (client->appData.useShm)
-      XSync(dpy, FALSE);
-#endif
 
     if (!SendIncrementalFramebufferUpdateRequest(client))
       return FALSE;
@@ -981,8 +1039,21 @@ HandleRFBServerMessage(rfbClient* client)
   }
 
   default:
-    rfbClientLog("Unknown message type %d from VNC server\n",msg.type);
-    return FALSE;
+    {
+      rfbBool handled = FALSE;
+      rfbClientProtocolExtension* e;
+
+      for(e = rfbClientExtensions; !handled && e; e = e->next)
+	if(e->handleMessage && e->handleMessage(client, &msg))
+	  handled = TRUE;
+
+      if(!handled) {
+	char buffer[256];
+	ReadFromRFBServer(client, buffer, 256);
+	rfbClientLog("Unknown message type %d from VNC server\n",msg.type);
+	return FALSE;
+      }
+    }
   }
 
   return TRUE;

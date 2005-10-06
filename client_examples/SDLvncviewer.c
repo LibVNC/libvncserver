@@ -16,7 +16,7 @@ static rfbBool resize(rfbClient* client) {
 			okay=SDL_VideoModeOK(width,height,depth,flags);
 	if(okay) {
 		SDL_Surface* sdl=SDL_SetVideoMode(width,height,depth,flags);
-		client->clientData=sdl;
+		rfbClientSetClientData(client, SDL_Init, sdl);
 		client->frameBuffer=sdl->pixels;
 		if(first || depth!=client->format.bitsPerPixel) {
 			first=FALSE;
@@ -30,7 +30,7 @@ static rfbBool resize(rfbClient* client) {
 			SetFormatAndEncodings(client);
 		}
 	} else {
-		SDL_Surface* sdl=client->clientData;
+		SDL_Surface* sdl=rfbClientGetClientData(client, SDL_Init);
 		rfbClientLog("Could not set resolution %dx%d!\n",
 				client->width,client->height);
 		if(sdl) {
@@ -188,7 +188,7 @@ static rfbKeySym SDL_keysym2rfbKeySym(int keysym) {
 }
 
 static void update(rfbClient* cl,int x,int y,int w,int h) {
-	SDL_UpdateRect(cl->clientData, x, y, w, h);
+	SDL_UpdateRect(rfbClientGetClientData(cl, SDL_Init), x, y, w, h);
 }
 
 #ifdef __MINGW32__

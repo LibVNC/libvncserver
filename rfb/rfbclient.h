@@ -63,6 +63,15 @@ typedef struct {
   rfbBool doNotSleep;
 } rfbVNCRec;
 
+/* client data */
+
+typedef struct rfbClientData {
+	void* tag;
+	void* data;
+	struct rfbClientData* next;
+} rfbClientData;
+
+/* app data (belongs into rfbClient?) */
 
 typedef struct {
   rfbBool shareDesktop;
@@ -181,7 +190,7 @@ typedef struct _rfbClient {
 	uint8_t *rcSource, *rcMask;
 
 	/* private data pointer */
-	void* clientData;
+	rfbClientData* clientData;
 
 	rfbVNCRec* vncRec;
 
@@ -222,6 +231,26 @@ extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);
 extern rfbBool HandleRFBServerMessage(rfbClient* client);
 
 extern void PrintPixelFormat(rfbPixelFormat *format);
+
+/* client data */
+
+void rfbClientSetClientData(rfbClient* client, void* tag, void* data);
+void* rfbClientGetClientData(rfbClient* client, void* tag);
+
+/* protocol extensions */
+
+typedef struct _rfbClientProtocolExtension {
+	int* encodings;
+	/* returns TRUE if the encoding was handled */
+	rfbBool (*handleEncoding)(rfbClient* cl,
+		rfbFramebufferUpdateRectHeader* rect);
+	/* returns TRUE if it handled the message */
+	rfbBool (*handleMessage)(rfbClient* cl,
+		 rfbServerToClientMsg* message);
+	struct _rfbClientProtocolExtension* next;
+} rfbClientProtocolExtension;
+
+void rfbClientRegisterExtension(rfbClientProtocolExtension* e);
 
 /* sockets.c */
 
