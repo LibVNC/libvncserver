@@ -1,3 +1,11 @@
+2005-10-06  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* many a files: kill BackChannel and CustomClientMessage
+	  support. The new extension mechanism is much more versatile.
+	  To prove this, a new example shows how to implement the back
+	  channel as an extension. Of course, this had to be tested, so
+	  LibVNCClient now has beginnings of an extension mechanism, too.
+	  And an example implementing the client side of the back channel.
+
 2005-10-03  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* libvncserver/rfbserver.c, rfb/rfb.h: add a method to the
 	  extension struct which is called to enable pseudo encodings.
