@@ -25,13 +25,6 @@ if test "x$with_tightvnc_filetransfer" == "xyes"; then
 	AC_DEFINE(WITH_TIGHTVNC_FILETRANSFER)
 fi
 AM_CONDITIONAL(WITH_TIGHTVNC_FILETRANSFER, test "$with_tightvnc_filetransfer" == "yes")
-AH_TEMPLATE(BACKCHANNEL, [Enable BackChannel communication])
-AC_ARG_WITH(backchannel,
-	[  --without-backchannel   disable backchannel method],
-	, [ with_backchannel=yes ])
-if test "x$with_backchannel" = "xyes"; then
-	AC_DEFINE(BACKCHANNEL)
-fi
 AH_TEMPLATE(ALLOW24BPP, [Enable 24 bit per pixel in native framebuffer])
 AC_ARG_WITH(24bpp,
 	[  --without-24bpp         disable 24 bpp framebuffers],

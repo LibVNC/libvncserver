@@ -889,15 +889,6 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		    cl->useNewFBSize = TRUE;
 		}
 		break;
-#ifdef LIBVNCSERVER_BACKCHANNEL
-	    case rfbEncodingBackChannel:
-	        if (!cl->enableBackChannel) {
-		    rfbLog("Enabling BackChannel protocol extension for "
-			   "client %s\n", cl->host);
-		    cl->enableBackChannel = TRUE;
-		}
-		break;
-#endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
            case rfbEncodingZRLE:
                if (cl->preferredEncoding == -1) {
@@ -1126,13 +1117,6 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 			e->extension->handleMessage(cl, e->data, &msg))
 		    return;
 		e = next;
-	    }
-
-	    if(cl->screen->processCustomClientMessage(cl,msg.type)) {
-		rfbLog("Warning: this program uses processCustomClientMessage, "
-			"which is deprecated.\n"
-			"Please use rfbRegisterProtocolExtension instead.\n");
-		return;
 	    }
 
 	    rfbLog("rfbProcessClientNormalMessage: unknown message type %d\n",
@@ -1857,30 +1841,4 @@ rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
     }
 }
 
-#ifdef LIBVNCSERVER_BACKCHANNEL
-void rfbSendBackChannel(rfbScreenInfoPtr rfbScreen,char* str,int len)
-{
-    rfbClientPtr cl;
-    rfbBackChannelMsg sct;
-    rfbClientIteratorPtr iterator;
 
-    iterator = rfbGetClientIterator(rfbScreen);
-    while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
-        if (cl->enableBackChannel) {
-	    sct.type = rfbBackChannel;
-	    sct.length = Swap32IfLE(len);
-	    if (rfbWriteExact(cl, (char *)&sct,
-			   sz_rfbBackChannelMsg) < 0) {
-	        rfbLogPerror("rfbSendBackChannel: write");
-		rfbCloseClient(cl);
-		continue;
-	    }
-	    if (rfbWriteExact(cl, str, len) < 0) {
-	        rfbLogPerror("rfbSendBackChannel: write");
-		rfbCloseClient(cl);
-	    }
-	}
-    }
-    rfbReleaseClientIterator(iterator);
-}
-#endif

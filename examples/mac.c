@@ -27,10 +27,6 @@
  * 
  */
 
-#ifdef LOCAL_CONTROL
-#include "1instance.c"
-#endif
-
 #include <unistd.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
@@ -476,38 +472,10 @@ ScreenInit(int argc, char**argv)
   rfbInitServer(rfbScreen);
 }
 
-#ifdef LOCAL_CONTROL
-single_instance_struct single_instance = { "/tmp/OSXvnc_control" };
-#endif
-
 static void 
 refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
 {
   int i;
-
-#ifdef LOCAL_CONTROL
-  char message[1024];
-
-  if(get_next_message(message,1024,&single_instance,50)) {
-    if(message[0]=='l' && message[1]==0) {
-      rfbClientPtr cl;
-      int i;
-      for(i=0,cl=rfbScreen->rfbClientHead;cl;cl=cl->next,i++)
-	rfbLog("%02d: %s\n",i,cl->host);
-    } else if(message[0]=='t') {
-      rfbClientPtr cl;
-      for(cl=rfbScreen->rfbClientHead;cl;cl=cl->next)
-	if(!strcmp(message+1,cl->host)) {
-	  cl->clientData=(void*)((cl->clientData==0)?-1:0);
-	  break;
-	}
-    }
-#ifdef LIBVNCSERVER_BACKCHANNEL
-      else if(message[0]=='b')
-	rfbSendBackChannel(rfbScreen,message+1,strlen(message+1));
-#endif
-  }
-#endif
 
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
     rfbShutdown(0);
@@ -541,35 +509,7 @@ int main(int argc,char *argv[])
 {
   int i;
 
-#ifdef LOCAL_CONTROL
-  char message[1024];
-
-  open_control_file(&single_instance);
-#endif
-
   for(i=argc-1;i>0;i--)
-#ifdef LOCAL_CONTROL
-    if(i<argc-1 && !strcmp(argv[i],"-toggleviewonly")) {
-      if(strlen(argv[i+1])>1022)
-	argv[i+1][1022]=0;
-      sprintf(message,"t%s",argv[i+1]);
-      send_message(&single_instance,message);
-      exit(0);
-    } else if(!strcmp(argv[i],"-listclients")) {
-      rfbLog("list clients\n");
-      send_message(&single_instance,"l");
-      exit(0);
-    } else
-#ifdef LIBVNCSERVER_BACKCHANNEL
-    if(i<argc-1 && !strcmp(argv[i],"-backchannel")) {
-      if(strlen(argv[i+1])>1022)
-	argv[i+1][1022]=0;
-      sprintf(message,"b%s",argv[i+1]);
-      send_message(&single_instance,message);
-      exit(0);
-    } else
-#endif
-#endif
     if(i<argc-1 && strcmp(argv[i],"-wait4client")==0) {
       maxSecsToConnect = atoi(argv[i+1])/1000;
       startTime = time(0);

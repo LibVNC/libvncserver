@@ -319,6 +319,7 @@ GetFileDownloadResponseMsgInBlocks(rfbClientPtr cl, rfbTightClientPtr rtcp)
 		}
 	return CreateFileDownloadBlockSizeDataMsg(numOfBytesRead, pBuf);
 	}
+	return GetFileDownLoadErrMsg();
 }
 
 

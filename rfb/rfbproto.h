@@ -358,9 +358,6 @@ typedef struct {
 #define rfbResizeFrameBuffer 4
 #define rfbKeyFrameUpdate 5
 #define rfbPalmVNCReSizeFrameBuffer 0xF
-#ifdef LIBVNCSERVER_BACKCHANNEL
-#define rfbBackChannel 15
-#endif
 
 /* client -> server */
 
@@ -405,9 +402,6 @@ typedef struct {
 #define rfbEncodingTight 7
 #define rfbEncodingZlibHex 8
 #define rfbEncodingUltra 9
-#endif
-#ifdef LIBVNCSERVER_BACKCHANNEL
-#define rfbEncodingBackChannel 15
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbEncodingZRLE 16
@@ -898,11 +892,6 @@ typedef struct {
 } rfbServerCutTextMsg;
 
 #define sz_rfbServerCutTextMsg 8
-
-#ifdef LIBVNCSERVER_BACKCHANNEL
-typedef rfbServerCutTextMsg rfbBackChannelMsg;
-#define sz_rfbBackChannelMsg 8
-#endif
 
 
 /*-----------------------------------------------------------------------------

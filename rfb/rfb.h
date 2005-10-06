@@ -133,7 +133,6 @@ typedef rfbBool (*rfbSetTranslateFunctionProcPtr)(struct _rfbClientRec* cl);
 typedef rfbBool (*rfbPasswordCheckProcPtr)(struct _rfbClientRec* cl,const char* encryptedPassWord,int len);
 typedef enum rfbNewClientAction (*rfbNewClientHookPtr)(struct _rfbClientRec* cl);
 typedef void (*rfbDisplayHookPtr)(struct _rfbClientRec* cl);
-typedef rfbBool (*rfbProcessCustomClientMessageProcPtr)(struct _rfbClientRec* cl,uint8_t type);
 
 typedef struct {
   uint32_t count;
@@ -306,10 +305,6 @@ typedef struct _rfbScreenInfo
      * an update should be sent. This should make working on a slow
      * link more interactive. */
     int progressiveSliceHeight;
-
-    /* if LibVNCServer doesn't know the normal message, it calls this
-     * hook. If the hook handles the message, it returns TRUE. */
-    rfbProcessCustomClientMessageProcPtr processCustomClientMessage;
 
     in_addr_t listenInterface;
 } rfbScreenInfo, *rfbScreenInfoPtr;
@@ -486,10 +481,6 @@ typedef struct _rfbClientRec {
     rfbBool useNewFBSize;             /* client supports NewFBSize encoding */
     rfbBool newFBSizePending;         /* framebuffer size was changed */
 
-#ifdef LIBVNCSERVER_BACKCHANNEL
-    rfbBool enableBackChannel;        /* custom channel for special clients */
-#endif
-
     struct _rfbClientRec *prev;
     struct _rfbClientRec *next;
 
@@ -605,10 +596,6 @@ extern rfbBool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int 
 extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
 
 void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
-
-#ifdef LIBVNCSERVER_BACKCHANNEL
-extern void rfbSendBackChannel(rfbScreenInfoPtr s,char* message,int len);
-#endif
 
 /* translate.c */
 
