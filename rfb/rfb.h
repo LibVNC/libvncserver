@@ -165,7 +165,11 @@ typedef struct _rfbProtocolExtension {
 	/* returns FALSE if extension should be deactivated for client.
 	   if init == NULL, it stays activated. */
 	rfbBool (*init)(struct _rfbClientRec* client, void* data);
-	/* returns TRUE if that pseudo encoding is handled by the extension */
+	/* if pseudoEncodings is not NULL, it contains a 0 terminated
+	   list of the pseudo encodings handled by this extension. */
+	int *pseudoEncodings;
+	/* returns TRUE if that pseudo encoding is handled by the extension.
+	   encodingNumber==0 means "reset encodings". */
 	rfbBool (*enablePseudoEncoding)(struct _rfbClientRec* client,
 			void* data, int encodingNumber);
 	/* returns TRUE if message was handled */

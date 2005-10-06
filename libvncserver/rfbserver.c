@@ -935,10 +935,43 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 					break;
 				e = next;
 			}
-			if(e == NULL)
-				rfbLog("rfbProcessClientNormalMessage: ignoring"
-						"unknown encoding type %d\n",
-						(int)enc);
+			if(e == NULL) {
+				rfbBool handled = FALSE;
+				/* if the pseudo encoding is not handled by the
+				   enabled extensions, search through all
+				   extensions. */
+				rfbProtocolExtension* e;
+
+				for(e = rfbGetExtensionIterator(); e;) {
+					int* encs = e->pseudoEncodings;
+					while(encs && *encs!=0) {
+						if(*encs==(int)enc) {
+							void* data = NULL;
+							if(e->newClient)
+								e->newClient(cl, &data);
+							if(!e->enablePseudoEncoding(cl, data, (int)enc)) {
+								rfbLog("Installed extension pretends to handle pseudo encoding 0x%x, but does not!\n",(int)enc);
+							} else {
+								rfbEnableExtension(cl, e, data);
+								handled = TRUE;
+								e = NULL;
+								break;
+							}
+						}
+						encs++;
+					}
+					rfbReleaseExtensionIterator();
+
+
+					if(e)
+						e = e->next;
+				}
+
+				if(!handled)
+					rfbLog("rfbProcessClientNormalMessage: ignoring"
+							" unknown encoding type %d\n",
+							(int)enc);
+			}
 		}
             }
         }

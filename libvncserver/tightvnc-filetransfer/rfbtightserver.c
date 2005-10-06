@@ -485,6 +485,7 @@ rfbProtocolExtension tightVncFileTransferExtension = {
 	NULL,
 	rfbTightExtensionInit,
 	NULL,
+	NULL,
 	rfbTightExtensionMsgHandler,
 	rfbTightExtensionClientClose,
 	rfbTightUsage,
