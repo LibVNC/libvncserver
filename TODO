@@ -1,8 +1,9 @@
 immediate:
 ----------
 
+LibVNCClient cleanup: prefix with "rfbClient", and make sure it does
+	not deliberately die() or exit() anywhere!
 ANSIfy tightvnc-filetransfer
-implement PseudoEncoding support in rfbProtocolExtension
 VisualNaCro testing
 test IRIX -overlay (x11vnc)
 java vncviewer doesn't do colour cursors?
