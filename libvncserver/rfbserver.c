@@ -921,7 +921,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 				rfbExtensionData* next = e->next;
 				if(e->extension->enablePseudoEncoding &&
 					e->extension->enablePseudoEncoding(cl,
-						e->data, (int)enc))
+						&e->data, (int)enc))
 					/* ext handles this encoding */
 					break;
 				e = next;
@@ -938,9 +938,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 					while(encs && *encs!=0) {
 						if(*encs==(int)enc) {
 							void* data = NULL;
-							if(e->newClient)
-								e->newClient(cl, &data);
-							if(!e->enablePseudoEncoding(cl, data, (int)enc)) {
+							if(!e->enablePseudoEncoding(cl, &data, (int)enc)) {
 								rfbLog("Installed extension pretends to handle pseudo encoding 0x%x, but does not!\n",(int)enc);
 							} else {
 								rfbEnableExtension(cl, e, data);

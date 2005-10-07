@@ -170,7 +170,7 @@ typedef struct _rfbProtocolExtension {
 	/* returns TRUE if that pseudo encoding is handled by the extension.
 	   encodingNumber==0 means "reset encodings". */
 	rfbBool (*enablePseudoEncoding)(struct _rfbClientRec* client,
-			void* data, int encodingNumber);
+			void** data, int encodingNumber);
 	/* returns TRUE if message was handled */
 	rfbBool (*handleMessage)(struct _rfbClientRec* client,
 				void* data,

@@ -33,7 +33,7 @@ typedef struct backChannelMsg {
 	uint32_t size;
 } backChannelMsg;
 
-rfbBool enableBackChannel(rfbClientPtr cl, void* data, int encoding)
+rfbBool enableBackChannel(rfbClientPtr cl, void** data, int encoding)
 {
 	if(encoding == rfbBackChannel) {
 		backChannelMsg msg;
