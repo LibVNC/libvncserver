@@ -55,6 +55,7 @@ catch {rename send {}}
 #	0 means to skip the item.
 #	-- means add a separator
 #
+
 proc set_template {} {
 	global template
 	set template "
@@ -186,6 +187,8 @@ Misc
 	--
 	=F rc:
 	norc
+	filexfer
+	--
 	nofb
 	=D nobell
 	nolookup
@@ -572,6 +575,22 @@ of actions:
     Stop x11vnc     - Directs the x11vnc server to disconnect all vncviewers
                       and then exit.  The tray/icon GUI then exits as well.
 
+    Custom          - If you have a \$HOME/.x11vnc.gui file each uncommented
+                      line in it becomes an additional menu item for this
+                      menu.  The remote control command is run directly
+                      via \"x11vnc -R <command>\", or if prefixed with 
+                      \"action:\" runs a gui internal action, or if \"sep\"
+                      adds a separator.  Set X11VNC_CUSTOM_GUI to use
+                      a different filename.  Example file contents:
+
+                             scale:3/4
+                             scale:1
+                             scale_cursor:1
+                             sep
+                             action:all-settings
+                             #debug_keyboard
+                             sep
+                             action:Quit
 
 Termination:
 
@@ -1315,7 +1334,9 @@ proc help_win {item} {
 	set ok 0
 	set text "Help on $item:\n\n"
 
-	if {[is_gui_internal $item]} {
+	if {$item == "NewClient"} {
+		;
+	} elseif {[is_gui_internal $item]} {
 		if {$item != "gui" && $item != "all" && $item != "Misc-Tuning:" \
 		    && $item != "Properties" && $item != "Tray"} {
 			append text "    + Is a gui internal Action (cannot be set).\n";
@@ -1327,7 +1348,9 @@ proc help_win {item} {
 	} else {
 		append text "    - Cannot be changed in a running x11vnc.\n";
 	}
-	if {[is_gui_internal $item]} {
+	if {$item == "NewClient"} {
+		;
+	} elseif {[is_gui_internal $item]} {
 		;
 	} elseif {[active_when_starting $item]} {
 		append text "    + Can be set at x11vnc startup.\n";
@@ -2860,6 +2883,9 @@ proc do_action {item} {
 	} elseif {$item == "WindowView"} {
 		change_view_state
 		return
+	} elseif {$item == "quit" || $item == "Quit"} {
+		destroy .
+		exit 0
 	} elseif {$item == "stop+quit"} {
 		do_stop_quit
 	}
@@ -3844,6 +3870,7 @@ proc props_advanced {} {
 	} else {
 		set first 0
 	}
+	update
 	wm deiconify $full_win
 	update
 
@@ -4119,6 +4146,8 @@ proc pmenu {m x y} {
 	set x [expr $x-10]
 	set y [expr $y-10]
 	$m post $x $y
+	# XXX more care needed
+	grab set -global $m
 }
 
 proc set_client_balloon {str} {
@@ -4158,7 +4187,9 @@ proc set_client_balloon {str} {
 			}
 		} else {
 			set i [expr $count+1]
-			set client_balloon "${client_balloon}\nunknown-host$i"
+			if {$i == 1} {
+				set client_balloon "${client_balloon}\nunknown-host$i"
+			}
 		}
 		incr count
 	}
@@ -4458,18 +4489,27 @@ proc get_icon_label {{set 0}} {
 	return $lab
 }
 
+# currently unused
 proc lmenu {menu} {
 	global popup_cascade_posted
+	global left_iconwin_menu
+	set left_iconwin_menu 1
 	after 100
-	if {!$popup_cascade_posted} {
-		after 100
-		if {!$popup_cascade_posted} {
+	update
+	if {!$popup_cascade_posted && $left_iconwin_menu} {
+		for {set i 0} {$i < 3} {incr i} {
+			after 100
+			update
+		}
+		if {!$popup_cascade_posted && $left_iconwin_menu} {
 			$menu unpost
 			return
 		}
 	}
 	# kludge for WindowView
-	focus $menu
+	if {$popup_cascade_posted} {
+		focus $menu
+	}
 }
 
 proc old_balloon {} {
@@ -4487,6 +4527,78 @@ proc old_balloon {} {
 	}
 	if {$str != ""} {
 		set_client_balloon $str
+	}
+}
+
+proc get_custom_menu_items {} {
+	global env custom_last_read
+
+	if {![info exists custom_last_read]} {
+		set custom_last_read 0
+	}
+	if {[info exists env(X11VNC_CUSTOM_GUI)]} {
+		set custom "$env(X11VNC_CUSTOM_GUI)"
+	} elseif {![info exists env(HOME)]} {
+		return [list "none"]
+	} else {
+		set custom "$env(HOME)/.x11vnc.gui"
+	}
+	if {![file exists $custom]} {
+		return [list "none"]
+	}
+
+#	if {[file mtime $custom] <= $custom_last_read} {
+#		return [list "nochange"]
+#	}
+
+	set in ""
+	catch {set in [open $custom "r"]} 
+	if {$in == ""} {
+		return [list "none"]
+	}
+
+	set custom_last_read [clock seconds]
+
+	set count 0
+	while {[gets $in line] > -1} {
+		if {[regexp {^[ \t]*#} $line]} {
+			continue
+		}
+		set line [string trim $line]
+		if {$line != ""} {
+			lappend items $line
+			incr count
+		}
+	}
+	close $in
+	
+	if {$count > 0} {
+		return $items
+	} else {
+		return [list "none"]
+	}
+}
+
+proc make_custom_menu {menu font} {
+	set items [get_custom_menu_items]
+	set i0 [lindex $items 0]
+	catch {$menu delete 0 end}
+	if {$i0 != "none"} {
+		$menu add command -font $font -label "Custom items:"
+		$menu add separator
+		foreach item $items {
+			if {$item == "sep" || $item == "separator"} {
+				$menu add separator
+				continue
+			}
+			if {[regexp {^action:(.*)$} $item m action]} {
+				$menu add command -font $font -label "$action" \
+				    -command "do_var $action"
+				continue
+			}
+			$menu add command -font $font -label "$item" \
+		 	    -command "run_remote_cmd \[list \"-R\" \"$item\"\]"
+		}
 	}
 }
 
@@ -4572,13 +4684,25 @@ proc make_icon {} {
 
 	$menu add command -font $mfont -label "Stop x11vnc" -command clean_icon_exit
 
-	bind $icon_win <ButtonPress-1> "pmenu $menu %X %Y"
-	bind $icon_win <ButtonPress-3> "pmenu $menu %X %Y"
+	set items [get_custom_menu_items]
+	set i0 [lindex $items 0]
+	if {$i0 != "none" && $i0 != "nochange"} {
+		$menu add separator
+		set cm "$menu.custom"
+		catch {destroy $cm}
+		menu $cm -tearoff 0 -font $ffont \
+			-postcommand "set popup_cascade_posted 1; make_custom_menu $cm $ffont"
+		$menu add cascade -font $mfont -label "Custom:" -menu $cm
+	}
+
+	bind $icon_win <ButtonRelease-1> "pmenu $menu %X %Y"
+	bind $icon_win <ButtonRelease-3> "pmenu $menu %X %Y"
 	bind $icon_win <Enter> {set client_balloon_id [after 500 show_client_balloon]}
 	bind $icon_win <Button> {kill_client_balloon}
 	bind $icon_win <Leave>  {kill_client_balloon}
 	bind $icon_win <ButtonPress-2> {kill_client_balloon; show_client_balloon}
-	bind $menu <Leave> "lmenu $menu"
+#	bind $menu <Leave> "lmenu $menu"
+#	bind $menu <Enter> "set left_iconwin_menu 0"
 ##	bind $menu <KeyPress-Escape> "$menu unpost"
 
 	bind . <Control-KeyPress-c> {destroy .; exit 0}
@@ -4599,7 +4723,9 @@ proc make_icon {} {
 	}
 	wm iconname . "tkx11vnc"
 	wm title . "tkx11vnc"
+	update
 	wm deiconify .
+	update
 
 	old_balloon
 }
@@ -4739,6 +4865,7 @@ proc make_gui {mode} {
 	set gui_current_state $mode
 
 
+	update
 	wm deiconify .
 	update idletasks
 	wm minsize $w [winfo width $w] [winfo height $w]
@@ -5195,9 +5322,10 @@ proc get_settings_rcfile {} {
 proc double_check_start_x11vnc {} {
 	global hostname
 	set msg [get_start_x11vnc_txt]
+	bell
 	append msg "\n"
-	append msg "*** To run the above command on machine \"$hostname\" to\n"
-	append msg "*** start x11vnc press \"OK\" otherwise press \"Cancel\".\n"
+	append msg "*** To run the above command on machine \"$hostname\" (thereby\n"
+	append msg "*** starting x11vnc) press \"OK\", otherwise press \"Cancel\".\n"
 	return [warning_dialog $msg "start"]
 }
 
@@ -5402,8 +5530,12 @@ proc run_remote_cmd_via_sock {opts} {
 	global client_sock
 
 	set db 0
+	if {[file channels $client_sock] == ""} {
+		set client_sock ""
+		return "fail"
+	}
 	if {[eof $client_sock]} {
-		close $client_sock
+		catch {close $client_sock}
 		set client_sock ""
 		return "fail"
 	}
@@ -5749,6 +5881,8 @@ proc undo_tray_embed {} {
 
 ############################################################################
 # main:
+
+wm withdraw .
 
 global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
 global x11vnc_xdisplay0

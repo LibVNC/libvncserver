@@ -35,8 +35,8 @@
  * respectively.  To increase portability it is written in plain C.
  *
  * Another goal is to improve performance and interactive response.
- * The algorithm of x0rfbserver was used as a base.  Additional heuristics
- * are also applied.
+ * The algorithm of x0rfbserver was used as a base.  Many additional
+ * heuristics are also applied.
  *
  * Another goal is to add many features that enable and incourage creative
  * usage and application of the tool.  Apologies for the large number
@@ -163,6 +163,7 @@
  * -DREMOTE_DEFAULT=0  to disable remote-control on by default (-yesremote).
  * -DREMOTE_CONTROL=0  to disable remote-control mechanism completely.
  * -DEXTERNAL_COMMANDS=0  to disable the running of all external commands.
+ * -DFILEXFER=1  enable -filexfer as the default.
  *
  * -DHARDWIRE_PASSWD=...      hardwired passwords, quoting necessary.
  * -DHARDWIRE_VIEWPASSWD=...
@@ -397,7 +398,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.3 lastmod: 2005-07-17";
+char lastmod[] = "0.7.3 lastmod: 2005-10-22";
 int hack_val = 0;
 
 /* X display info */
@@ -669,7 +670,7 @@ void mark_hint(hint_t);
 void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force);
 
 enum rfbNewClientAction new_client(rfbClientPtr client);
-void set_nofb_params(void);
+void set_nofb_params(int);
 void set_raw_fb_params(int);
 void nofb_hook(rfbClientPtr client);
 void pointer(int mask, int x, int y, rfbClientPtr client);
@@ -786,6 +787,7 @@ int logfile_append = 0;
 char *flagfile = NULL;		/* -flag */
 char *passwdfile = NULL;	/* -passwdfile */
 char *blackout_str = NULL;	/* -blackout */
+int blackout_ptr = 0;
 char *clip_str = NULL;		/* -clip */
 int use_solid_bg = 0;		/* -solid */
 char *solid_str = NULL;
@@ -863,6 +865,10 @@ char *allowed_input_normal = NULL;
 char *allowed_input_str = NULL;
 char *viewonly_passwd = NULL;	/* view only passwd. */
 int inetd = 0;			/* spawned from inetd(1) */
+#ifndef FILEXFER
+#define FILEXFER 0
+#endif
+int filexfer = FILEXFER; 
 int first_conn_timeout = 0;	/* -timeout */
 int flash_cmap = 0;		/* follow installed colormaps */
 int shift_cmap = 0;		/* ncells < 256 and needs shift of pixel values */
@@ -980,9 +986,11 @@ typedef struct winattr {
 winattr_t *stack_list = NULL;
 int stack_list_len = 0;
 int stack_list_num = 0;
+#if 0
 winattr_t *stack_clip = NULL;
 int stack_clip_len = 0;
 int stack_clip_num = 0;
+#endif
 
 /* T+B+L+R,tkey+presist_key,tmouse+persist_mouse */
 #ifndef SCROLL_COPYRECT_PARMS
@@ -1104,6 +1112,7 @@ int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
  */
 int waitms = 30;
 double wait_ui = 2.0;
+double slow_fb = 0.0;
 int wait_bog = 1;
 int defer_update = 30;	/* deferUpdateTime ms to wait before sends. */
 int got_defer = 0;
@@ -6771,6 +6780,9 @@ void read_vnc_connect_prop(void) {
 		;
 	} else if (strstr(vnc_connect_str, "ack=") == vnc_connect_str) {
 		;
+	} else if (quiet && strstr(vnc_connect_str, "qry=ping") ==
+	    vnc_connect_str) {
+		;
 	} else if (strstr(vnc_connect_str, "cmd=") &&
 	    strstr(vnc_connect_str, "passwd")) {
 		rfbLog("read VNC_CONNECT: *\n");
@@ -10206,6 +10218,12 @@ void initialize_pointer_map(char *pointer_remap) {
 	}
 }
 
+typedef struct bout {
+	int x1, y1, x2, y2;
+} blackout_t;
+int blackouts;
+blackout_t blackr[];
+
 /*
  * For use in the -wireframe stuff, save the stacking order of the direct
  * children of the root window.  Ideally done before we send ButtonPress
@@ -10214,7 +10232,7 @@ void initialize_pointer_map(char *pointer_remap) {
 void snapshot_stack_list(int free_only, double allowed_age) {
 	static double last_snap = 0.0, last_free = 0.0;
 	double now; 
-	int num, rc, i;
+	int num, rc, i, j;
 	unsigned int ui;
 	Window r, w;
 	Window *list;
@@ -10253,19 +10271,40 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 	}
 
 	last_snap = now;
-	if (num > stack_list_len) {
+	if (num > stack_list_len + blackouts) {
 		int n = 2*num;
 		free(stack_list);
 		stack_list = (winattr_t *) malloc(n*sizeof(winattr_t));
 		stack_list_len = n;
 	}
+	j = 0;
 	for (i=0; i<num; i++) {
-		stack_list[i].win = list[i];
-		stack_list[i].fetched = 0;
-		stack_list[i].valid = 0;
-		stack_list[i].time = now;
+		stack_list[j].win = list[i];
+		stack_list[j].fetched = 0;
+		stack_list[j].valid = 0;
+		stack_list[j].time = now;
+		j++;
 	}
-	stack_list_num = num;
+	for (i=0; i<blackouts; i++) {
+		stack_list[j].win = 0x1;
+		stack_list[j].fetched = 1;
+		stack_list[j].valid = 1;
+		stack_list[j].x = blackr[i].x1;
+		stack_list[j].y = blackr[i].y1;
+		stack_list[j].width  = blackr[i].x2 - blackr[i].x1;
+		stack_list[j].height = blackr[i].y2 - blackr[i].y1;
+		stack_list[j].time = now;
+		stack_list[j].map_state = IsViewable;
+		stack_list[j].rx = -1;
+		stack_list[j].ry = -1;
+		j++;
+
+if (0) fprintf(stderr, "blackr: %d %dx%d+%d+%d\n", i,
+	stack_list[j-1].width, stack_list[j-1].height,
+	stack_list[j-1].x, stack_list[j-1].y);
+
+	}
+	stack_list_num = num + blackouts;
 	if (debug_wireframe > 1) {
 		fprintf(stderr, "snapshot_stack_list: num=%d len=%d\n",
 		    stack_list_num, stack_list_len);
@@ -10291,7 +10330,9 @@ void update_stack_list(void) {
 	
 	for (k=0; k < stack_list_num; k++) {
 		Window win = stack_list[k].win;
-		if (!valid_window(win, &attr, 1)) {
+		if (win != None && win < 10) {
+			;	/* special, blackout */
+		} else if (!valid_window(win, &attr, 1)) {
 			stack_list[k].valid = 0;
 		} else {
 			stack_list[k].valid = 1;
@@ -10685,6 +10726,31 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		last_pointer_client = client;
 
 		last_pointer_time = now;
+
+		if (blackout_ptr && blackouts) {
+			int b, ok = 1;
+			/* see if it goes into the blacked out region */
+			for (b=0; b < blackouts; b++) {
+				if (x < blackr[b].x1 || x > blackr[b].x2) {
+					continue;
+				}
+				if (y < blackr[b].y1 || y > blackr[b].y2) {
+					continue;
+				}
+				/* x1 <= x <= x2 and y1 <= y <= y2 */
+				ok = 0;
+				break;
+			}
+			if (! ok) {
+				if (debug_pointer) {
+				    rfbLog("pointer(): blackout_ptr skipping "
+					"x=%d y=%d in rectangle %d,%d %d,%d\n", x, y,
+					blackr[b].x1, blackr[b].y1,
+					blackr[b].x2, blackr[b].y2);
+				}
+				return;
+			}
+		}
 	}
 
 	/*
@@ -13694,6 +13760,18 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		first_conn_timeout = to;
 		rfbLog("remote_cmd: set -timeout to %d\n", -to);
 
+#if 0
+	} else if (!strcmp(p, "filexfer")) {
+		/* does this work after rfbInitServer? */
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, filexfer);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling -filexfer.\n");
+		filexfer = 1;
+		rfbRegisterTightVNCFileTransferExtension();
+#endif
+
 	} else if (!strcmp(p, "deny") || !strcmp(p, "lock")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, deny_all);
@@ -14559,6 +14637,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			rfbLog("     overlay, shm, noonetile, nap, cursor\n");
 			rfbLog("     cursorpos, cursorshape, bell.\n");
 			nofb = 0;
+			set_nofb_params(1);
 			do_new_fb(1);
 		}
 	} else if (!strcmp(p, "nofb")) {
@@ -14574,7 +14653,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			nofb = 1;
 			sound_bell = 0;
 			initialize_watch_bell();
-			set_nofb_params();
+			set_nofb_params(0);
 			do_new_fb(1);
 		}
 
@@ -15490,6 +15569,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		wait_bog = 0;
 		rfbLog("remote_cmd: setting wait_bog to %d\n", wait_bog);
+
+	} else if (strstr(p, "slow_fb") == p) {
+		double w;
+		COLON_CHECK("slow_fb:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%.2f", p, co, slow_fb);
+			goto qry;
+		}
+		p += strlen("slow_fb:");
+		w = atof(p);
+		if (w <= 0) w = 0.0;
+		rfbLog("remote_cmd: setting slow_fb factor %.2f -> %.2f\n",
+		    slow_fb, w);
+		slow_fb = w;
 
 	} else if (strstr(p, "wait") == p) {
 		int w;
@@ -18829,7 +18922,55 @@ void set_visual(char *str) {
 	visual_id = vinfo.visualid;
 }
 
-void set_nofb_params(void) {
+void set_nofb_params(int restore) {
+	static int first = 1;
+	static int save[100];
+	int i = 0;
+
+	if (first) {
+		first = 0;
+		save[i++] = use_xfixes;
+		save[i++] = use_xdamage;
+		save[i++] = use_xrecord;
+		save[i++] = wireframe;
+		save[i++] = use_solid_bg;
+		save[i++] = overlay;
+		save[i++] = overlay_cursor;
+		save[i++] = using_shm;
+		save[i++] = single_copytile;
+		save[i++] = take_naps;
+		save[i++] = measure_speeds;
+		save[i++] = grab_buster;
+		save[i++] = show_cursor;
+		save[i++] = cursor_shape_updates;
+		save[i++] = cursor_pos_updates;
+	}
+	if (restore) {
+		i = 0;
+		use_xfixes            = save[i++];
+		use_xdamage           = save[i++];
+		use_xrecord           = save[i++];
+		wireframe             = save[i++];
+		use_solid_bg          = save[i++];
+		overlay               = save[i++];
+		overlay_cursor        = save[i++];
+		using_shm             = save[i++];
+		single_copytile       = save[i++];
+		take_naps             = save[i++];
+		measure_speeds        = save[i++];
+		grab_buster           = save[i++];
+		show_cursor           = save[i++];
+		cursor_shape_updates  = save[i++];
+		cursor_pos_updates    = save[i++];
+
+		if (cursor_shape_updates) {
+			restore_cursor_shape_updates(screen);
+		}
+		initialize_cursors_mode();
+
+		return;
+	}
+
 	use_xfixes = 0;
 	use_xdamage = 0;
 	use_xrecord = 0;
@@ -20289,6 +20430,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->ptrAddEvent = pointer;
 	screen->setXCutText = xcut_receive;
 
+	if (filexfer) {
+		rfbRegisterTightVNCFileTransferExtension();
+	}
 	rfbInitServer(screen);
 
 	if (viewonly_passwd) {
@@ -21013,10 +21157,7 @@ void solid_bg(int restore) {
  */
 
 /* blacked-out region (-blackout, -xinerama) */
-typedef struct bout {
-	int x1, y1, x2, y2;
-} blackout_t;
-#define BO_MAX 16
+#define BO_MAX 32
 typedef struct tbout {
 	blackout_t bo[BO_MAX];	/* hardwired max rectangles. */
 	int cover;
@@ -21036,10 +21177,15 @@ void initialize_blackouts(char *list) {
 	char *p, *blist = strdup(list);
 	int x, y, X, Y, h, w, t;
 
-	blackouts = 0;
-
 	p = strtok(blist, ", \t");
 	while (p) {
+		if (!strcmp("noptr", p)) {
+			blackout_ptr = 1;
+			rfbLog("pointer will be blocked from blackout "
+			    "regions\n");
+			p = strtok(NULL, ", \t");
+			continue;
+		}
 		if (! parse_geom(p, &w, &h, &x, &y, dpy_x, dpy_y)) {
 			if (*p != '\0') {
 				rfbLog("skipping invalid geometry: %s\n", p);
@@ -21325,6 +21471,10 @@ void initialize_xinerama (void) {
 }
 
 void initialize_blackouts_and_xinerama(void) {
+
+	blackouts = 0;
+	blackout_ptr = 0;
+
 	if (blackout_str != NULL) {
 		initialize_blackouts(blackout_str);
 	}
@@ -23693,6 +23843,16 @@ int scan_for_updates(int count_only) {
 	double frac1 = 0.1;   /* tweak parameter to try a 2nd scan_display() */
 	double frac2 = 0.35;  /* or 3rd */
 	double frac3 = 0.02;  /* do scan_display() again after copy_tiles() */
+	static double last_poll = 0.0;
+
+	if (slow_fb > 0.0) {
+		double now = dnow();
+		if (now < last_poll + slow_fb) {
+			return 0;
+		}
+		last_poll = now;
+	}
+
 	for (i=0; i < ntiles; i++) {
 		tile_has_diff[i] = 0;
 		tile_has_xdamage_diff[i] = 0;
@@ -24130,12 +24290,16 @@ void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int start_x11vnc,
 		}
 		usleep(2200*1000);
 		fprintf(stderr, "\n");
-		rfbLog("gui: trying to contact a x11vnc server at X display "
-		    "%s ...\n", NONUL(x11vnc_xdisplay));
+		if (!quiet) {
+			rfbLog("gui: trying to contact a x11vnc server at X"
+			    " display %s ...\n", NONUL(x11vnc_xdisplay));
+		}
 		for (i=0; i<try_max; i++) {
 			usleep(sleep*1000);
-			rfbLog("gui: pinging %s try=%d ...\n",
-			    NONUL(x11vnc_xdisplay), i+1);
+			if (!quiet) {
+				rfbLog("gui: pinging %s try=%d ...\n",
+				    NONUL(x11vnc_xdisplay), i+1);
+			}
 			rc = send_remote_cmd("qry=ping", 1, 1);
 			if (rc == 0) {
 				break;
@@ -24424,7 +24588,10 @@ void do_gui(char *opts, int sleep) {
 		    " to display on.\n");
 		exit(1);
 	}
-	fprintf(stderr, "starting gui, trying display: %s\n", gui_xdisplay);
+	if (!quiet) {
+		fprintf(stderr, "starting gui, trying display: %s\n",
+		    gui_xdisplay);
+	}
 	test_dpy = XOpenDisplay(gui_xdisplay);
 	if (! test_dpy && auth_file) {
 		if (getenv("XAUTHORITY") != NULL) {
@@ -27389,6 +27556,17 @@ int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy,
 		y2 = crfix(nfix(y+h, dpy_y+1), dy, dpy_y+1);
 
 		rect = sraRgnCreateRect(x1, y1, x2, y2);
+
+		if (blackouts) {
+			int i;
+			sraRegionPtr bo_rect;
+			for (i=0; i<blackouts; i++) {
+				bo_rect = sraRgnCreateRect(blackr[i].x1,
+				    blackr[i].y1, blackr[i].x2, blackr[i].y2);
+				sraRgnSubtract(rect, bo_rect);
+				sraRgnDestroy(bo_rect);
+			}
+		}
 		do_copyregion(rect, dx, dy);
 		sraRgnDestroy(rect);
 
@@ -27440,12 +27618,17 @@ saw_me = 1; fprintf(stderr, "  ----------\n");
 				break;	
 }
 			}
+#if 0
+fprintf(stderr, "bo: %d/%lx\n", k, swin);
+#endif
 
 			/* skip some unwanted cases: */
 			if (swin == None) {
 				continue;
 			}
-			if (! stack_list[k].fetched ||
+			if (swin < 10) {
+				;	/* blackouts */
+			} else if (! stack_list[k].fetched ||
 			    stack_list[k].time > tm + 2.0) {
 				if (!valid_window(swin, &attr, 1)) {
 					stack_list[k].valid = 0;
@@ -29214,6 +29397,8 @@ void measure_send_rates(int init) {
 	rfbClientPtr cl;
 	int db = 0, msg = 0;
 
+db = 0;
+
 	if (! measure_speeds) {
 		return;
 	}
@@ -30090,6 +30275,7 @@ static void print_help(int mode) {
 "                       option, otherwise the stderr goes to the viewer which\n"
 "                       will cause it to abort.  Specifying both -inetd and -q\n"
 "                       and no -o will automatically close the stderr.\n"
+"-filexfer              Enable the TightVNC file transfer extension.\n"
 "-http                  Instead of using -httpdir (see below) to specify\n"
 "                       where the Java vncviewer applet is, have x11vnc try\n"
 "                       to *guess* where the directory is by looking relative\n"
@@ -30336,7 +30522,9 @@ static void print_help(int mode) {
 "                       color with \"gnome:\", \"kde:\", \"cde:\" or \"root:\".\n"
 "-blackout string       Black out rectangles on the screen. \"string\" is a\n"
 "                       comma separated list of WxH+X+Y type geometries for\n"
-"                       each rectangle.\n"
+"                       each rectangle.  If one of the items on the list is the\n"
+"                       string \"noptr\" the mouse pointer will not be allowed\n"
+"                       to go into a blacked out region.\n"
 "-xinerama              If your screen is composed of multiple monitors\n"
 "                       glued together via XINERAMA, and that screen is\n"
 "                       not a rectangle this option will try to guess the\n"
@@ -31133,6 +31321,10 @@ static void print_help(int mode) {
 "                       (3 screen polls in a row each longer than 0.25 sec with\n"
 "                       no user input), and sleep up to 1.5 secs to let things\n"
 "                       \"catch up\".  Use this option to disable that detection.\n"
+"-slow_fb time          Floating point time in seconds delay all screen polling.\n"
+"                       For special purpose usage where a low frame rate is\n"
+"                       acceptable and desirable, but you want the user input\n"
+"                       processed at the normal rate so you cannot use -wait.\n"
 "-readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On\n"
 "                       slow links that take a long time to paint the first\n"
 "                       screen libvncserver may hit the timeout and drop the\n"
@@ -31583,6 +31775,7 @@ static void print_help(int mode) {
 "                       wait_ui:f       set -wait_ui factor to f.\n"
 "                       wait_bog        disable -nowait_bog mode.\n"
 "                       nowait_bog      enable  -nowait_bog mode.\n"
+"                       slow_fb:f       set -slow_fb to f seconds.\n"
 "                       readtimeout:n   set read timeout to n seconds.\n"
 "                       nap             enable  -nap mode.\n"
 "                       nonap           disable -nap mode.\n"
@@ -31696,14 +31889,14 @@ static void print_help(int mode) {
 "                       nodragging wireframe_mode wireframe wf nowireframe\n"
 "                       nowf wirecopyrect wcr nowirecopyrect nowcr scr_area\n"
 "                       scr_skip scr_inc scr_keys scr_term scr_keyrepeat\n"
-"                       scr_parms scrollcopyrect scr noscrollcopyrect\n"
-"                       noscr fixscreen noxrecord xrecord reset_record\n"
-"                       pointer_mode pm input_skip input client_input\n"
-"                       speeds wmdt debug_pointer dp nodebug_pointer nodp\n"
-"                       debug_keyboard dk nodebug_keyboard nodk deferupdate\n"
-"                       defer wait_ui wait_bog nowait_bog wait readtimeout\n"
-"                       nap nonap sb screen_blank fs gaps grow fuzz snapfb\n"
-"                       nosnapfb rawfb progressive rfbport http nohttp httpport\n"
+"                       scr_parms scrollcopyrect scr noscrollcopyrect noscr\n"
+"                       fixscreen noxrecord xrecord reset_record pointer_mode\n"
+"                       pm input_skip input client_input speeds wmdt\n"
+"                       debug_pointer dp nodebug_pointer nodp debug_keyboard\n"
+"                       dk nodebug_keyboard nodk deferupdate defer wait_ui\n"
+"                       wait_bog nowait_bog slow_fb wait readtimeout nap nonap\n"
+"                       sb screen_blank fs gaps grow fuzz snapfb nosnapfb\n"
+"                       rawfb progressive rfbport http nohttp httpport\n"
 "                       httpdir enablehttpproxy noenablehttpproxy alwaysshared\n"
 "                       noalwaysshared nevershared noalwaysshared dontdisconnect\n"
 "                       nodontdisconnect desktop debug_xevents nodebug_xevents\n"
@@ -32385,6 +32578,7 @@ void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " conn_once:  %d\n", connect_once);
 	fprintf(stderr, " timeout:    %d\n", first_conn_timeout);
 	fprintf(stderr, " inetd:      %d\n", inetd);
+	fprintf(stderr, " filexfer:   %d\n", filexfer);
 	fprintf(stderr, " http:       %d\n", try_http);
 	fprintf(stderr, " connect:    %s\n", client_connect
 	    ? client_connect : "null");
@@ -32498,6 +32692,7 @@ void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " waitms:     %d\n", waitms);
 	fprintf(stderr, " wait_ui:    %.2f\n", wait_ui);
 	fprintf(stderr, " nowait_bog: %d\n", !wait_bog);
+	fprintf(stderr, " slow_fb:    %.2f\n", slow_fb);
 	fprintf(stderr, " readtimeout: %d\n", rfbMaxClientWait/1000);
 	fprintf(stderr, " take_naps:  %d\n", take_naps);
 	fprintf(stderr, " sb:         %d\n", screen_blank);
@@ -32590,20 +32785,27 @@ void nopassword_warning_msg(int gotloc) {
 "#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@#\n"
 "###############################################################\n"
 ;
-	if (quiet) {
+	char str5[] =
+"###############################################################\n\n"
+;
+	if (inetd) {
 		return;
 	}
 
 	fprintf(stderr, "%s", str1);
 	fflush(stderr);
 #if !PASSWD_REQUIRED
-	usleep(2000 * 1000);
+	usleep(2500 * 1000);
 #endif
-	fprintf(stderr, "%s", str2);
-	if (gotloc) {
-		fprintf(stderr, "%s", str3);
+	if (!quiet) {
+		fprintf(stderr, "%s", str2);
+		if (gotloc) {
+			fprintf(stderr, "%s", str3);
+		}
+		fprintf(stderr, "%s", str4);
+	} else {
+		fprintf(stderr, "%s", str5);
 	}
-	fprintf(stderr, "%s", str4);
 	fflush(stderr);
 #if !PASSWD_REQUIRED
 	usleep(500 * 1000);
@@ -32763,6 +32965,8 @@ int main(int argc, char* argv[]) {
 			users_list = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-inetd")) {
 			inetd = 1;
+		} else if (!strcmp(arg, "-filexfer")) {
+			filexfer = 1;
 		} else if (!strcmp(arg, "-http")) {
 			try_http = 1;
 		} else if (!strcmp(arg, "-connect")) {
@@ -33103,6 +33307,9 @@ int main(int argc, char* argv[]) {
 			wait_ui = atof(argv[++i]);
 		} else if (!strcmp(arg, "-nowait_bog")) {
 			wait_bog = 0;
+		} else if (!strcmp(arg, "-slow_fb")) {
+			CHECK_ARGC
+			slow_fb = atof(argv[++i]);
 		} else if (!strcmp(arg, "-readtimeout")) {
 			CHECK_ARGC
 			rfbMaxClientWait = atoi(argv[++i]) * 1000;
@@ -33283,6 +33490,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
+
 	if (launch_gui && (query_cmd || remote_cmd)) {
 		launch_gui = 0;
 		gui_str = NULL;
@@ -33472,7 +33680,8 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	if (!got_passwd && !got_rfbauth && !got_passwdfile) {
+	if (!got_passwd && !got_rfbauth && !got_passwdfile &&
+	    !query_cmd && !remote_cmd) {
 		char message[] =
 		    "-rfbauth, -passwdfile, or -passwd password required.";
 		if (! nopw) {
@@ -33569,7 +33778,7 @@ int main(int argc, char* argv[]) {
 
 	if (nofb) {
 		/* disable things that do not make sense with no fb */
-		set_nofb_params();
+		set_nofb_params(0);
 
 		if (! got_deferupdate && ! got_defer) {
 			/* reduce defer time under -nofb */

@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "July 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "October 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.3, lastmod: 2005-07-17
+         version: 0.7.3, lastmod: 2005-10-22
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -252,6 +252,10 @@ Note: if you are not redirecting stderr to a log file
 option, otherwise the stderr goes to the viewer which
 will cause it to abort.  Specifying both \fB-inetd\fR and \fB-q\fR
 and no \fB-o\fR will automatically close the stderr.
+.PP
+\fB-filexfer\fR
+.IP
+Enable the TightVNC file transfer extension.
 .PP
 \fB-http\fR
 .IP
@@ -577,7 +581,9 @@ color with "gnome:", "kde:", "cde:" or "root:".
 .IP
 Black out rectangles on the screen. \fIstring\fR is a
 comma separated list of WxH+X+Y type geometries for
-each rectangle.
+each rectangle.  If one of the items on the list is the
+string "noptr" the mouse pointer will not be allowed
+to go into a blacked out region.
 .PP
 \fB-xinerama\fR
 .IP
@@ -1545,6 +1551,13 @@ text output.  By default x11vnc will try to detect this
 no user input), and sleep up to 1.5 secs to let things
 "catch up".  Use this option to disable that detection.
 .PP
+\fB-slow_fb\fR \fItime\fR
+.IP
+Floating point time in seconds delay all screen polling.
+For special purpose usage where a low frame rate is
+acceptable and desirable, but you want the user input
+processed at the normal rate so you cannot use \fB-wait.\fR
+.PP
 \fB-readtimeout\fR \fIn\fR
 .IP
 Set libvncserver rfbMaxClientWait to n seconds. On
@@ -2190,6 +2203,8 @@ wait_bog        disable \fB-nowait_bog\fR mode.
 .IP
 nowait_bog      enable  \fB-nowait_bog\fR mode.
 .IP
+slow_fb:f       set \fB-slow_fb\fR to f seconds.
+.IP
 readtimeout:n   set read timeout to n seconds.
 .IP
 nap             enable  \fB-nap\fR mode.
@@ -2362,14 +2377,14 @@ xwarp noxwarppointer noxwarp buttonmap dragging
 nodragging wireframe_mode wireframe wf nowireframe
 nowf wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-scr_parms scrollcopyrect scr noscrollcopyrect
-noscr fixscreen noxrecord xrecord reset_record
-pointer_mode pm input_skip input client_input
-speeds wmdt debug_pointer dp nodebug_pointer nodp
-debug_keyboard dk nodebug_keyboard nodk deferupdate
-defer wait_ui wait_bog nowait_bog wait readtimeout
-nap nonap sb screen_blank fs gaps grow fuzz snapfb
-nosnapfb rawfb progressive rfbport http nohttp httpport
+scr_parms scrollcopyrect scr noscrollcopyrect noscr
+fixscreen noxrecord xrecord reset_record pointer_mode
+pm input_skip input client_input speeds wmdt
+debug_pointer dp nodebug_pointer nodp debug_keyboard
+dk nodebug_keyboard nodk deferupdate defer wait_ui
+wait_bog nowait_bog slow_fb wait readtimeout nap nonap
+sb screen_blank fs gaps grow fuzz snapfb nosnapfb
+rawfb progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop debug_xevents nodebug_xevents

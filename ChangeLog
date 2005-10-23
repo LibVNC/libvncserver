@@ -1,3 +1,6 @@
+2005-10-22  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -filexfer file transfer, -slow_fb, -blackout noptr...
+
 2005-10-06  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* many a files: kill BackChannel and CustomClientMessage
 	  support. The new extension mechanism is much more versatile.

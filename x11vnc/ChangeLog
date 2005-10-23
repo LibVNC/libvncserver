@@ -1,3 +1,10 @@
+2005-10-22  Karl Runge <runge@karlrunge.com>
+	* add tightVNC FileTransfer (-filexfer) and -DFILEXFER=1
+	* -slow_fb for special purpose infrequent polling.
+	* make -blackout work with copyrect clipping.
+	* -blackout noptr,WxH+X+Y,... to prevent pointer from going
+	  into a blacked out region.
+
 2005-07-17  Karl Runge <runge@karlrunge.com>
 	* more improvements to gui UE.  gui requests via client_sock
 	  PASSWD_REQUIRED and PASSWD_UNLESS_NOPW build options.
