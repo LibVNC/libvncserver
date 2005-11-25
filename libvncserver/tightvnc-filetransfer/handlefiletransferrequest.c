@@ -984,5 +984,3 @@ HandleFileCreateDirRequest(rfbClientPtr cl, rfbTightClientPtr rtcp)
 
 	CreateDirectory(dirName);
 }
-
-

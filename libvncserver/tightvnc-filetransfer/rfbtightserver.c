@@ -62,7 +62,7 @@ rfbVncAuthSendChallenge(cl)
     rfbClientPtr cl;
 {
 	
-    // 4 byte header is alreay sent. Which is rfbSecTypeVncAuth (same as rfbVncAuth). Just send the challenge.
+    /* 4 byte header is alreay sent. Which is rfbSecTypeVncAuth (same as rfbVncAuth). Just send the challenge. */
     rfbRandomBytes(cl->authChallenge);
     if (rfbWriteExact(cl, (char *)cl->authChallenge, CHALLENGESIZE) < 0) {
         rfbLogPerror("rfbAuthNewClient: write");
@@ -165,7 +165,7 @@ rfbSendAuthCaps(cl)
 	return;
 
     if (cl->screen->authPasswdData && !cl->reverseConnection) {
-	// chk if this condition is valid or not.
+	/* chk if this condition is valid or not. */
 	    SetCapInfo(&caplist[count], rfbAuthVNC, rfbStandardVendor);
 	    rtcp->authCaps[count++] = rfbAuthVNC;
     }
@@ -294,8 +294,10 @@ rfbSendInteractionCaps(cl)
     SetCapInfo(&enc_list[i++],  rfbEncodingRRE,            rfbStandardVendor);
     SetCapInfo(&enc_list[i++],  rfbEncodingCoRRE,          rfbStandardVendor);
     SetCapInfo(&enc_list[i++],  rfbEncodingHextile,        rfbStandardVendor);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
     SetCapInfo(&enc_list[i++],  rfbEncodingZlib,           rfbTridiaVncVendor);
     SetCapInfo(&enc_list[i++],  rfbEncodingTight,          rfbTightVncVendor);
+#endif
     SetCapInfo(&enc_list[i++],  rfbEncodingCompressLevel0, rfbTightVncVendor);
     SetCapInfo(&enc_list[i++],  rfbEncodingQualityLevel0,  rfbTightVncVendor);
     SetCapInfo(&enc_list[i++],  rfbEncodingXCursor,        rfbTightVncVendor);
@@ -404,7 +406,7 @@ const rfbClientToServerMsg* msg;
 
 	/*
 
-	// We shouldn't close the connection here for unhandled msg, it should be left to libvncserver.
+	We shouldn't close the connection here for unhandled msg, it should be left to libvncserver.
 	rfbLog(" ... closing connection\n");
 	rfbCloseClient(cl);
 
@@ -466,7 +468,7 @@ rfbHandleSecTypeTight(rfbClientPtr cl) {
     rfbTightClientPtr rtcp = (rfbTightClientPtr) malloc(sizeof(rfbTightClientRec));
 
     if(rtcp == NULL) {
-        // Error condition close socket
+        /* Error condition close socket */
         rfbLog("Memory error has occured while handling Tight security type... closing connection.\n");
 	 rfbCloseClient(cl);
 	 return;

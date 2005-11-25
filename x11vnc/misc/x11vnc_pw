@@ -1,0 +1,24 @@
+#!/bin/sh
+# usage: x11vnc_pw [file]  (default: ~/.vnc/passwd)
+
+if [ "X$1" = "X" ]; then
+	file=$HOME/.vnc/passwd
+else
+	file=$1
+fi
+
+stty -echo
+printf "Password: "
+read pw1; echo ""
+printf "Verify:   "
+read pw2; echo ""
+stty  echo
+
+if [ "X$pw1" != "X$pw2" ]; then
+	echo "passwords do not match."
+	exit 1
+fi
+
+x11vnc -help > /dev/null 2>&1
+x11vnc -storepasswd "$pw1" "$file"
+ls -l "$file"

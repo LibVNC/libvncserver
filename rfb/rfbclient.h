@@ -157,6 +157,7 @@ typedef struct _rfbClient {
 #endif
 
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	/*
 	 * Variables for the ``tight'' encoding implementation.
@@ -183,6 +184,7 @@ typedef struct _rfbClient {
 	void* jpegBufferPtr;
 	size_t jpegBufferLen;
 
+#endif
 #endif
 
 

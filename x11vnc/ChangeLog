@@ -1,3 +1,7 @@
+2005-11-25  Karl Runge <runge@karlrunge.com>
+	* x11vnc: throttle load if fb update requests not taking place.
+	* misc/x11vnc_pw: add utility script
+
 2005-10-22  Karl Runge <runge@karlrunge.com>
 	* add tightVNC FileTransfer (-filexfer) and -DFILEXFER=1
 	* -slow_fb for special purpose infrequent polling.

@@ -179,7 +179,7 @@ rfbAuthNewClient(rfbClientPtr cl)
     int32_t securityType = rfbSecTypeInvalid;
 
     if (!cl->screen->authPasswdData || cl->reverseConnection) {
-	// chk if this condition is valid or not.
+	/* chk if this condition is valid or not. */
 	securityType = rfbSecTypeNone;
     } else if (cl->screen->authPasswdData) {
  	    securityType = rfbSecTypeVncAuth;

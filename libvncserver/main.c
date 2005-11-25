@@ -840,8 +840,10 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   TINI_MUTEX(screen->cursorMutex);
   if(screen->cursor && screen->cursor->cleanup)
     rfbFreeCursor(screen->cursor);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
   rfbTightCleanup(screen);
+#endif
 #endif
   free(screen);
 }

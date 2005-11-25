@@ -398,7 +398,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.3 lastmod: 2005-10-22";
+char lastmod[] = "0.7.3 lastmod: 2005-11-25";
 int hack_val = 0;
 
 /* X display info */
@@ -520,6 +520,7 @@ unsigned char *tile_has_xdamage_diff, *tile_row_has_xdamage_diff;
 /* times of recent events */
 time_t last_event, last_input = 0, last_client = 0;
 time_t last_keyboard_input = 0, last_pointer_input = 0; 
+time_t last_fb_bytes_sent = 0;
 double last_keyboard_time = 0.0;
 double last_pointer_time = 0.0;
 double last_pointer_click_time = 0.0;
@@ -591,6 +592,7 @@ void blackout_tiles(void);
 void solid_bg(int);
 void check_connect_inputs(void);
 void check_gui_inputs(void);
+void record_last_fb_update(void);
 void check_padded_fb(void);
 void clean_up_exit(int);
 void clear_modifiers(int init);
@@ -1120,6 +1122,7 @@ int got_deferupdate = 0;
 
 int screen_blank = 60;	/* number of seconds of no activity to throttle */
 			/* down the screen polls.  zero to disable. */
+int no_fbu_blank = 30;	/* nap if no client updates in this many secs. */
 int take_naps = 1;	/* -nap/-nonap */
 int naptile = 4;	/* tile change threshold per poll to take a nap */
 int napfac = 4;		/* time = napfac*waitms, cut load with extra waits */
@@ -20431,7 +20434,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->setXCutText = xcut_receive;
 
 	if (filexfer) {
+#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
 		rfbRegisterTightVNCFileTransferExtension();
+#endif
 	}
 	rfbInitServer(screen);
 
@@ -23504,6 +23509,7 @@ int copy_snap(void) {
  */
 static void nap_set(int tile_cnt) {
 	int nap_in = nap_ok;
+	time_t now = time(0);
 
 	if (scan_count == 0) {
 		/* roll up check for all NSCAN scans */
@@ -23520,14 +23526,23 @@ static void nap_set(int tile_cnt) {
 			nap_ok = 0;
 		}
 	}
+	if (! nap_ok && client_count) {
+		if(now > last_fb_bytes_sent + no_fbu_blank) {
+			if (debug_tiles > 1) {
+				printf("nap_set: nap_ok=1: now: %d last: %d\n",
+				    now, last_fb_bytes_sent);
+			}
+			nap_ok = 1;
+		}
+	}
 
 	if (show_cursor) {
 		/* kludge for the up to 4 tiles the mouse patch could occupy */
 		if ( tile_cnt > 4) {
-			last_event = time(0);
+			last_event = now;
 		}
 	} else if (tile_cnt != 0) {
-		last_event = time(0);
+		last_event = now;
 	}
 }
 
@@ -23563,11 +23578,17 @@ static void nap_check(int tile_cnt) {
 	now = time(0);
 
 	if (screen_blank > 0) {
-		int dt = (int) (now - last_event);
-		int ms = 1500;
+		int dt_ev, dt_fbu, ms = 2000;
 
 		/* if no activity, pause here for a second or so. */
-		if (dt > screen_blank) {
+		dt_ev  = (int) (now - last_event);
+		dt_fbu = (int) (now - last_fb_bytes_sent);
+		if (dt_fbu > screen_blank) {
+			/* sleep longer for no fb requests */
+			nap_sleep(2 * ms, 16);
+			return;
+		}
+		if (dt_ev > screen_blank) {
 			nap_sleep(ms, 8);
 			return;
 		}
@@ -29756,6 +29777,45 @@ void rfbPE(long usec) {
 	}
 }
 
+void record_last_fb_update(void) {
+	static int rbs0 = -1;
+	static time_t last_call = 0;
+	time_t now = time(0);
+	int rbs;
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+
+	if (last_fb_bytes_sent == 0) {
+		last_fb_bytes_sent = now;
+		last_call = now;
+	}
+
+	if (now <= last_call + 1) {
+		/* check every second or so */
+		return;
+	}
+	last_call = now;
+
+	if (! screen) {
+		return;
+	}
+
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		rbs += cl->rawBytesEquivalent;
+	}
+	rfbReleaseClientIterator(iter);
+
+	if (rbs != rbs0) {
+		rbs0 = rbs;
+		if (debug_tiles > 1) {
+			printf("record_last_fb_update: %d %d\n", now,
+			    last_fb_bytes_sent);
+		}
+		last_fb_bytes_sent = now;
+	}
+}
+
 void rfbCFD(long usec) {
 	if (! screen) {
 		return;
@@ -29987,6 +30047,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_keycode_state();
 			check_connect_inputs();		
 			check_gui_inputs();		
+			record_last_fb_update();
 			check_padded_fb();		
 			check_fixscreen();		
 			check_xdamage_state();
@@ -30066,8 +30127,8 @@ if ((debug_tiles || debug_scroll > 1 || debug_wireframe > 1)
     && (tile_diffs > 4 || debug_tiles > 1)) {
 	double rate = (tile_x * tile_y * bpp/8 * tile_diffs) / dt;
 	fprintf(stderr, "============================= TILES: %d  dt: %.4f"
-	    "  t: %.4f  %.2f MB/s\n", tile_diffs, dt, tm - x11vnc_start,
-	    rate/1000000.0);
+	    "  t: %.4f  %.2f MB/s nap_ok: %d\n", tile_diffs, dt,
+	    tm - x11vnc_start, rate/1000000.0, nap_ok);
 }
 
 		}

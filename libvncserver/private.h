@@ -13,7 +13,11 @@ rfbClientPtr rfbClientIteratorHead(rfbClientIteratorPtr i);
 
 /* from tight.c */
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 extern void rfbTightCleanup(rfbScreenInfoPtr screen);
+#endif
+#endif
 
 /* from zrle.c */
 

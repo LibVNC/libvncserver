@@ -292,7 +292,7 @@ GetFileDownloadLengthErrResponseMsg()
 FileTransferMsg
 GetFileDownloadResponseMsgInBlocks(rfbClientPtr cl, rfbTightClientPtr rtcp)
 {
-	//const unsigned int sz_rfbBlockSize = SZ_RFBBLOCKSIZE;
+	/* const unsigned int sz_rfbBlockSize = SZ_RFBBLOCKSIZE; */
     int numOfBytesRead = 0;
 	char pBuf[SZ_RFBBLOCKSIZE];
 	char* path = rtcp->rcft.rcfd.fName;

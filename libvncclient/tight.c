@@ -17,6 +17,7 @@
  *  USA.
  */
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 
 /*
@@ -681,5 +682,7 @@ JpegSetSrcManager(j_decompress_ptr cinfo,
 
 #undef CARDBPP
 
+/* LIBVNCSERVER_HAVE_LIBZ and LIBVNCSERVER_HAVE_LIBJPEG */
+#endif
 #endif
 

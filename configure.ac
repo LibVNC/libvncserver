@@ -21,10 +21,8 @@ AH_TEMPLATE(WITH_TIGHTVNC_FILETRANSFER, [Disable TightVNCFileTransfer protocol])
 AC_ARG_WITH(tightvnc-filetransfer,
 	[  --without-filetransfer   disable TightVNC file transfer protocol],
 	, [ with_tightvnc_filetransfer=yes ])
-if test "x$with_tightvnc_filetransfer" = "xyes"; then
-	AC_DEFINE(WITH_TIGHTVNC_FILETRANSFER)
-fi
-AM_CONDITIONAL(WITH_TIGHTVNC_FILETRANSFER, test "$with_tightvnc_filetransfer" = "yes")
+# AC_DEFINE moved to after libpthread check.
+
 AH_TEMPLATE(ALLOW24BPP, [Enable 24 bit per pixel in native framebuffer])
 AC_ARG_WITH(24bpp,
 	[  --without-24bpp         disable 24 bpp framebuffers],
@@ -271,14 +269,27 @@ libz may be obtained from: http://www.gzip.org/zlib/
 	fi
 fi
 
-AC_CHECK_HEADER(pthread.h, HAVE_PTHREAD_H="true")
-if test ! -z "$HAVE_PTHREAD_H"; then
-	# why twice?
-	AC_CHECK_LIB(pthread, pthread_mutex_lock)
-	AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
-fi
+AC_ARG_WITH(pthread,
+[  --without-pthread       disable support for libpthread],,)
 
+if test "x$with_pthread" != "xno"; then
+	AC_CHECK_HEADER(pthread.h, HAVE_PTHREAD_H="true")
+	if test ! -z "$HAVE_PTHREAD_H"; then
+		AC_CHECK_LIB(pthread, pthread_mutex_lock)
+		AC_CHECK_LIB(pthread, pthread_mutex_lock, HAVE_LIBPTHREAD="true")
+	fi
+fi
 AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
+
+# tightvnc-filetransfer implemented using threads:
+if test -z "$HAVE_LIBPTHREAD"; then
+	with_tightvnc_filetransfer=""
+fi
+if test "x$with_tightvnc_filetransfer" = "xyes"; then
+	AC_DEFINE(WITH_TIGHTVNC_FILETRANSFER)
+fi
+AM_CONDITIONAL(WITH_TIGHTVNC_FILETRANSFER, test "$with_tightvnc_filetransfer" = "yes")
+
 AM_CONDITIONAL(HAVE_LIBZ, test ! -z "$HAVE_ZLIB_H")
 AM_CONDITIONAL(HAVE_LIBJPEG, test ! -z "$HAVE_JPEGLIB_H")
 

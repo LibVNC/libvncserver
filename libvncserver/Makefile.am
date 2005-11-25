@@ -1,6 +1,6 @@
 AM_CFLAGS=-g -Wall
 
-#if WITH_TIGHTVNC_FILETRANSFER
+if WITH_TIGHTVNC_FILETRANSFER
 TIGHTVNCFILETRANSFERHDRS=tightvnc-filetransfer/filelistinfo.h \
 	tightvnc-filetransfer/filetransfermsg.h \
 	tightvnc-filetransfer/handlefiletransferrequest.h \
@@ -10,7 +10,7 @@ TIGHTVNCFILETRANSFERSRCS = tightvnc-filetransfer/rfbtightserver.c \
 	tightvnc-filetransfer/handlefiletransferrequest.c \
 	tightvnc-filetransfer/filetransfermsg.c \
 	tightvnc-filetransfer/filelistinfo.c
-#endif
+endif
 
 includedir=$(prefix)/include/rfb
 #include_HEADERS=rfb.h rfbconfig.h rfbint.h rfbproto.h keysym.h rfbregion.h

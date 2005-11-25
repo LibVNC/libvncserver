@@ -905,7 +905,7 @@ typedef struct _rfbFileTransferMsg {
     uint8_t contentType;  /*  See defines below */
     uint16_t contentParam;/*  Other possible content classification (Dir or File name, etc..) */
 	uint32_t size;		/*  FileSize or packet index or error or other  */
-	/*  uint32_t sizeH;		// Additional 32Bits params to handle big values. Only for V2 (we want backward compatibility between all V1 versions) */
+	/*  uint32_t sizeH;		 Additional 32Bits params to handle big values. Only for V2 (we want backward compatibility between all V1 versions) */
     uint32_t length;
     /* followed by data char text[length] */
 } rfbFileTransferMsg;

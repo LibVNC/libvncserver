@@ -473,6 +473,7 @@ SetFormatAndEncodings(rfbClient* client)
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRaw);
       } else if (strncasecmp(encStr,"copyrect",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCopyRect);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
       } else if (strncasecmp(encStr,"tight",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingTight);
@@ -481,6 +482,7 @@ SetFormatAndEncodings(rfbClient* client)
 	  requestCompressLevel = TRUE;
 	if (client->appData.enableJPEG)
 	  requestQualityLevel = TRUE;
+#endif
 #endif
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingHextile);
@@ -547,8 +549,10 @@ SetFormatAndEncodings(rfbClient* client)
     }
 
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCopyRect);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingTight);
+#endif
 #endif
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingHextile);
 #ifdef LIBVNCSERVER_HAVE_LIBZ

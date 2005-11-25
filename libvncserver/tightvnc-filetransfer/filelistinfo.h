@@ -28,6 +28,10 @@
 
 #include <limits.h>
 
+#if !defined(NAME_MAX)
+#define NAME_MAX 255
+#endif
+
 
 #define SUCCESS 1
 #define FAILURE 0

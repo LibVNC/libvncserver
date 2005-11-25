@@ -318,6 +318,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       rfbScreen->clientHead = cl;
       UNLOCK(rfbClientListMutex);
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
       cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
       cl->tightQualityLevel = -1;
@@ -326,6 +327,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 	for (i = 0; i < 4; i++)
           cl->zsActive[i] = FALSE;
       }
+#endif
 #endif
 
       cl->enableCursorShapeUpdates = FALSE;
@@ -562,7 +564,7 @@ rfbProcessClientProtocolVersion(rfbClientPtr cl)
         return;
     }
 
-    // Chk for the minor version use either of the two standard version of RFB
+    /* Chk for the minor version use either of the two standard version of RFB */
     cl->protocolMinorVersion = minor_;
     if (minor_ > rfbProtocolMinorVersion) {
        cl->protocolMinorVersion = rfbProtocolMinorVersion;
@@ -949,17 +951,16 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 						}
 						encs++;
 					}
-					rfbReleaseExtensionIterator();
-
 
 					if(e)
 						e = e->next;
 				}
+				rfbReleaseExtensionIterator();
 
 				if(!handled)
-					rfbLog("rfbProcessClientNormalMessage: ignoring"
-							" unknown encoding type %d\n",
-							(int)enc);
+					rfbLog("rfbProcessClientNormalMessage: "
+					    "ignoring unknown encoding type %d\n",
+					    (int)enc);
 			}
 		}
             }
@@ -1348,10 +1349,13 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     fu->type = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
 	if(cl->screen->maxRectsPerUpdate>0
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	   /* Tight encoding counts the rectangles differently */
 	   && cl->preferredEncoding != rfbEncodingTight
+	   /* XXX Should rfbEncodingCoRRE be in here? */
 	   && cl->preferredEncoding != rfbEncodingCoRRE
+#endif
 #endif
 	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {
 	    sraRegion* newUpdateRegion = sraRgnBBox(updateRegion);
