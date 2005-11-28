@@ -1,3 +1,6 @@
+2005-11-28  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add -loop option.
+
 2005-11-25  Karl Runge <runge@karlrunge.com>
 	* x11vnc: throttle load if fb update requests not taking place.
 	* misc/x11vnc_pw: add utility script

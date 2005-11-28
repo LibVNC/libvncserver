@@ -33,8 +33,8 @@ sed -e "s/Johannes.Schindelin@gmx.de/runge@karlrunge.com/gi" \
     -e "s/Johannes.Schindelin/Karl Runge/g" \
     -e "s/a library to make writing a vnc server easy/a VNC server for the current X11 session/" \
     -e "/^%description$/,/%description devel$/d" \
-    -e '/^Static libraries.*$/%description\
-x11vnc is to Xwindows what WinVNC is to Windows, i.e. a server\
+    -e 's/^Static libraries.*$/%description\
+x11vnc is to X Window System what WinVNC is to Windows, i.e. a server\
 which serves the current Xwindows desktop via RFB (VNC) protocol\
 to the user.\
 \
@@ -45,7 +45,7 @@ x11vnc was put together and is (actively ;-) maintained by\
 Karl Runge <runge@karlrunge.com>\
 \
 %prep\
-\1/' \
+/' \
 > x11vnc.spec.in
 
 mv libvncserver/Makefile.am libvncserver/Makefile.am.LibVNCServer

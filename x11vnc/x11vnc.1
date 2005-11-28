@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "October 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "November 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.3, lastmod: 2005-10-22
+         version: 0.7.3, lastmod: 2005-11-28
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -236,6 +236,17 @@ disconnects, opposite of \fB-forever.\fR This is the Default.
 .IP
 Keep listening for more connections rather than exiting
 as soon as the first client(s) disconnect. Same as \fB-many\fR
+.PP
+\fB-loop\fR
+.IP
+Create an outer loop restarting the x11vnc process
+whenever it terminates.  \fB-bg\fR and \fB-inetd\fR are ignored in
+this mode.  Useful for continuing even if the X server
+terminates and restarts (you will need permission to
+reconnect of course).   Use, e.g., \fB-loop100\fR to sleep
+100 millisecs between restarts, etc.  Default is 2000ms
+(i.e. 2 secs)  Use, e.g. \fB-loop300,5\fR to sleep 300 ms
+and only loop 5 times.
 .PP
 \fB-timeout\fR \fIn\fR
 .IP

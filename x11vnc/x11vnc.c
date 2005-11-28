@@ -398,7 +398,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.3 lastmod: 2005-11-25";
+char lastmod[] = "0.7.3 lastmod: 2005-11-28";
 int hack_val = 0;
 
 /* X display info */
@@ -23530,7 +23530,7 @@ static void nap_set(int tile_cnt) {
 		if(now > last_fb_bytes_sent + no_fbu_blank) {
 			if (debug_tiles > 1) {
 				printf("nap_set: nap_ok=1: now: %d last: %d\n",
-				    now, last_fb_bytes_sent);
+				    (int) now, (int) last_fb_bytes_sent);
 			}
 			nap_ok = 1;
 		}
@@ -29809,8 +29809,8 @@ void record_last_fb_update(void) {
 	if (rbs != rbs0) {
 		rbs0 = rbs;
 		if (debug_tiles > 1) {
-			printf("record_last_fb_update: %d %d\n", now,
-			    last_fb_bytes_sent);
+			printf("record_last_fb_update: %d %d\n",
+			    (int) now, (int) last_fb_bytes_sent);
 		}
 		last_fb_bytes_sent = now;
 	}
@@ -30328,6 +30328,14 @@ static void print_help(int mode) {
 "                       disconnects, opposite of -forever. This is the Default.\n"
 "-forever               Keep listening for more connections rather than exiting\n"
 "                       as soon as the first client(s) disconnect. Same as -many\n"
+"-loop                  Create an outer loop restarting the x11vnc process\n"
+"                       whenever it terminates.  -bg and -inetd are ignored in\n"
+"                       this mode.  Useful for continuing even if the X server\n"
+"                       terminates and restarts (you will need permission to\n"
+"                       reconnect of course).   Use, e.g., -loop100 to sleep\n"
+"                       100 millisecs between restarts, etc.  Default is 2000ms\n"
+"                       (i.e. 2 secs)  Use, e.g. -loop300,5 to sleep 300 ms\n"
+"                       and only loop 5 times.\n"
 "-timeout n             Exit unless a client connects within the first n seconds\n"
 "                       after startup.\n"
 "-inetd                 Launched by inetd(1): stdio instead of listening socket.\n"
@@ -32873,6 +32881,83 @@ void nopassword_warning_msg(int gotloc) {
 #endif
 }
 
+void check_loop_mode(int argc, char* argv[]) {
+	int i;
+	int loop_mode = 0, loop_sleep = 2000, loop_max = 0;
+
+	for (i=1; i < argc; i++) {
+		char *p = argv[i];
+		if (strstr(p, "--") == p) {
+			p++;
+		}
+		if (strstr(p, "-loop") == p) {
+			char *q;
+			loop_mode = 1;
+			if ((q = strchr(p, ',')) != NULL) {
+				loop_max = atoi(q+1);
+				*q = '\0';
+			}
+			
+			q = strpbrk(p, "0123456789");
+			if (q) {
+				loop_sleep = atoi(q);
+				if (loop_sleep <= 0) {
+					loop_sleep = 10;
+				}
+			}
+		}
+	}
+	if (loop_mode && getenv("X11VNC_LOOP_MODE") == NULL) {
+#if LIBVNCSERVER_HAVE_FORK
+		char **argv2;
+		int k, i = 1;
+
+		set_env("X11VNC_LOOP_MODE", "1");
+		argv2 = (char **) malloc((argc+1)*sizeof(char *));
+
+		for (k=0; k < argc+1; k++) {
+			argv2[k] = NULL;
+			if (k < argc) {
+				argv2[k] = argv[k];
+			}
+		}
+		while (1) {
+			int status;
+			pid_t p;
+			fprintf(stderr, "\n --- x11vnc loop: %d ---\n\n", i++);
+			fflush(stderr);
+			usleep(500 * 1000);
+			if ((p = fork()) > 0)  {
+				fprintf(stderr, " --- x11vnc loop: waiting "
+				    "for: %d\n\n", p);
+				wait(&status);
+			} else if (p == -1) {
+				fprintf(stderr, "could not fork\n");
+				perror("fork");
+				exit(1);
+			} else {
+				execvp(argv[0], argv2); 
+				exit(1);
+			}
+
+			if (loop_max > 0 && i > loop_max) {
+				fprintf(stderr, "\n --- x11vnc loop: did %d"
+				    " done. ---\n\n", loop_max);
+				break;
+			}
+			
+			fprintf(stderr, "\n --- x11vnc loop: sleeping %d ms "
+			    "---\n\n", loop_sleep);
+			usleep(loop_sleep * 1000);
+		}
+		exit(0);
+#else
+		fprintf(stderr, "fork unavailable, cannot do -loop mode\n");
+		exit(1);
+#endif
+	}
+}
+
 int main(int argc, char* argv[]) {
 
 	int i, len, tmpi;
@@ -32891,6 +32976,9 @@ int main(int argc, char* argv[]) {
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc = 1; char *argv_vnc[128];
+
+	/* check for -loop mode: */
+	check_loop_mode(argc, argv);
 
 	dtime0(&x11vnc_start);
 
@@ -33018,6 +33106,8 @@ int main(int argc, char* argv[]) {
 			got_connect_once = 1;
 		} else if (!strcmp(arg, "-many") || !strcmp(arg, "-forever")) {
 			connect_once = 0;
+		} else if (strstr(arg, "-loop") == arg) {
+			;	/* handled above */
 		} else if (!strcmp(arg, "-timeout")) {
 			CHECK_ARGC
 			first_conn_timeout = atoi(argv[++i]);
@@ -33549,6 +33639,24 @@ int main(int argc, char* argv[]) {
 			if (argc_vnc < 100) {
 				argv_vnc[argc_vnc++] = strdup(arg);
 			}
+		}
+	}
+
+
+	if (getenv("X11VNC_LOOP_MODE")) {
+		if (bg) {
+			if (! quiet) {
+				fprintf(stderr, "disabling -bg in -loop "
+				    "mode\n");
+			}
+			bg = 0;
+		}
+		if (inetd) {
+			if (! quiet) {
+				fprintf(stderr, "disabling -inetd in -loop "
+				    "mode\n");
+			}
+			inetd = 0;
 		}
 	}
 
