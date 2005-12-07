@@ -268,6 +268,11 @@ void rfbClientCleanup(rfbClient* client) {
       rfbClientLog("inflateEnd: %s\n", client->decompStream.msg );
   }
 
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+  if (client->jpegSrcManager)
+    free(client->jpegSrcManager);
+#endif
+
   free(client->desktopName);
   free(client->serverHost);
   free(client);
