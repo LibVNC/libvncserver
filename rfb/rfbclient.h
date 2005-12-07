@@ -273,6 +273,7 @@ extern int WaitForMessage(rfbClient* client,unsigned int usecs);
 /* vncviewer.c */
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
 rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv);
+/* rfbClientCleanup() does not touch client->frameBuffer */
 void rfbClientCleanup(rfbClient* client);
 
 #endif

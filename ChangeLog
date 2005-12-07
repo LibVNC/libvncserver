@@ -1,3 +1,10 @@
+2005-12-07  Giampiero Giancipoli <giampiero.giancipoli@fredreggiane.com>
+	* libvncclient/vncviewer.c: plug memory leaks
+
+2005-12-07  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* client_examples/SDLvncviewer.c: use unicode to determine the keysym
+	  (much more reliable than the old method)
+
 2005-11-25  Karl Runge <runge@karlrunge.com>
 	* configure.ac: disable tightvnc-filetransfer if no libpthread.
 	  add --without-pthread option.
