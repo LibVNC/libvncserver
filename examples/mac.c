@@ -381,9 +381,11 @@ static int keyTable[] = {
     XK_Alt_R,             55,      /* Alt Right (-> Command) */
 
     /* Weirdness I can't figure out */
-    /*    XK_3270_PrintScreen,     105,     /* PrintScrn */  /* XXX ? */
-    /*  ???  94,          50,      /* International */
-    XK_Menu,              50,      /* Menu (-> International) */
+#if 0
+    XK_3270_PrintScreen,     105,     /* PrintScrn */
+    ???  94,          50,      /* International */
+    XK_Menu,              50,      /* Menu (-> International)
+#endif
 };
 
 void
