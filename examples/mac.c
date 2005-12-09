@@ -384,7 +384,7 @@ static int keyTable[] = {
 #if 0
     XK_3270_PrintScreen,     105,     /* PrintScrn */
     ???  94,          50,      /* International */
-    XK_Menu,              50,      /* Menu (-> International)
+    XK_Menu,              50,      /* Menu (-> International) */
 #endif
 };
 
