@@ -360,6 +360,14 @@ AM_CONDITIONAL(LINUX, test -c /dev/vcsa1)
 AC_CHECK_HEADER(ApplicationServices/ApplicationServices.h, HAVE_OSX="true")
 AM_CONDITIONAL(OSX, test "$HAVE_OSX" = "true")
 
+# On Solaris 2.7, write() returns ENOENT when it really means EAGAIN
+AH_TEMPLATE(ENOENT_WORKAROUND, [work around when write() returns ENOENT but does not mean it])
+case `(uname -sr) 2>/dev/null` in
+    "SunOS 5.7")
+	AC_DEFINE(ENOENT_WORKAROUND)
+    ;;
+esac
+
 # Check for rpm SOURCES path
 printf "checking for rpm sources path... "
 RPMSOURCEDIR="NOT-FOUND"

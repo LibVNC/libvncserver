@@ -447,6 +447,9 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 	    if (errno == EINTR)
 		continue;
 
+#ifdef LIBVNCSERVER_ENOENT_WORKAROUND
+	    if (errno != ENOENT)
+#endif
             if (errno != EWOULDBLOCK && errno != EAGAIN) {
                 return n;
             }

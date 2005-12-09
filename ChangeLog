@@ -1,3 +1,7 @@
+2005-12-08  "Mazin, Malvina" <Malvina.Mazin@kla-tencor.com>
+	* configure.ac, libvncserver/sockets.c: on Solaris 2.7, write may
+	  return ENOENT when it really means EAGAIN.
+
 2005-12-07  Giampiero Giancipoli <giampiero.giancipoli@fredreggiane.com>
 	* libvncclient/vncviewer.c: plug memory leaks
 

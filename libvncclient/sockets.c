@@ -217,7 +217,11 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
     j = write(client->sock, buf + i, (n - i));
     if (j <= 0) {
       if (j < 0) {
-	if (errno == EWOULDBLOCK || errno == EAGAIN) {
+	if (errno == EWOULDBLOCK ||
+#ifdef LIBVNCSERVER_ENOENT_WORKAROUND
+		errno == ENOENT ||
+#endif
+		errno == EAGAIN) {
 	  FD_ZERO(&fds);
 	  FD_SET(client->sock,&fds);
 
