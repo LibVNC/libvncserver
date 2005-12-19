@@ -252,6 +252,7 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 }
 
 void rfbClientCleanup(rfbClient* client) {
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
   int i;
 
   for ( i = 0; i < 4; i++ ) {
@@ -268,7 +269,6 @@ void rfbClientCleanup(rfbClient* client) {
       rfbClientLog("inflateEnd: %s\n", client->decompStream.msg );
   }
 
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
   if (client->jpegSrcManager)
     free(client->jpegSrcManager);
 #endif

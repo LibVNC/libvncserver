@@ -412,7 +412,9 @@ rfbNewUDPClient(rfbScreenInfoPtr rfbScreen)
 void
 rfbClientConnectionGone(rfbClientPtr cl)
 {
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
     int i;
+#endif
 
     LOCK(rfbClientListMutex);
 

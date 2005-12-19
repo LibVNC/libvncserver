@@ -84,12 +84,15 @@ int deny_severity=LOG_WARNING;
 #endif
 
 #if defined(WIN32)
+#ifndef __MINGW32__
 #pragma warning (disable: 4018 4761)
-#define close closesocket
+#endif
 #define read(sock,buf,len) recv(sock,buf,len,0)
 #define EWOULDBLOCK WSAEWOULDBLOCK
 #define ETIMEDOUT WSAETIMEDOUT
 #define write(sock,buf,len) send(sock,buf,len,0)
+#else
+#define closesocket close
 #endif
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
@@ -185,19 +188,19 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
     rfbScreen->socketState = RFB_SOCKET_SHUTDOWN;
 
     if(rfbScreen->inetdSock>-1) {
-	close(rfbScreen->inetdSock);
+	closesocket(rfbScreen->inetdSock);
 	FD_CLR(rfbScreen->inetdSock,&rfbScreen->allFds);
 	rfbScreen->inetdSock=-1;
     }
 
     if(rfbScreen->listenSock>-1) {
-	close(rfbScreen->listenSock);
+	closesocket(rfbScreen->listenSock);
 	FD_CLR(rfbScreen->listenSock,&rfbScreen->allFds);
 	rfbScreen->listenSock=-1;
     }
 
     if(rfbScreen->udpSock>-1) {
-	close(rfbScreen->udpSock);
+	closesocket(rfbScreen->udpSock);
 	FD_CLR(rfbScreen->udpSock,&rfbScreen->allFds);
 	rfbScreen->udpSock=-1;
     }
@@ -256,7 +259,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 #ifndef WIN32
 	if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
 	    rfbLogPerror("rfbCheckFds: fcntl");
-	    close(sock);
+	    closesocket(sock);
 	    return;
 	}
 #endif
@@ -264,7 +267,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		       (char *)&one, sizeof(one)) < 0) {
 	    rfbLogPerror("rfbCheckFds: setsockopt");
-	    close(sock);
+	    closesocket(sock);
 	    return;
 	}
 
@@ -273,7 +276,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 		      STRING_UNKNOWN)) {
 	  rfbLog("Rejected connection from client %s\n",
 		 inet_ntoa(addr.sin_addr));
-	  close(sock);
+	  closesocket(sock);
 	  return;
 	}
 #endif
@@ -364,7 +367,7 @@ rfbCloseClient(rfbClientPtr cl)
 #ifndef __MINGW32__
 	shutdown(cl->sock,SHUT_RDWR);
 #endif
-	close(cl->sock);
+	closesocket(cl->sock);
 	cl->sock = -1;
       }
     TSIGNAL(cl->updateCond);
@@ -395,7 +398,7 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
 #ifndef WIN32
     if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
 	rfbLogPerror("fcntl failed");
-	close(sock);
+	closesocket(sock);
 	return -1;
     }
 #endif
@@ -403,7 +406,7 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
     if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		   (char *)&one, sizeof(one)) < 0) {
 	rfbLogPerror("setsockopt failed");
-	close(sock);
+	closesocket(sock);
 	return -1;
     }
 
@@ -605,15 +608,15 @@ rfbListenOnTCPPort(int port,
     }
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		   (char *)&one, sizeof(one)) < 0) {
-	close(sock);
+	closesocket(sock);
 	return -1;
     }
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-	close(sock);
+	closesocket(sock);
 	return -1;
     }
     if (listen(sock, 5) < 0) {
-	close(sock);
+	closesocket(sock);
 	return -1;
     }
 
@@ -646,7 +649,7 @@ rfbConnectToTcpAddr(char *host,
     }
 
     if (connect(sock, (struct sockaddr *)&addr, (sizeof(addr))) < 0) {
-	close(sock);
+	closesocket(sock);
 	return -1;
     }
 

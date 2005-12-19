@@ -91,12 +91,11 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  diff.tv_sec--;
 	  diff.tv_usec+=1000000;
         }
-        sleep (diff.tv_sec);
 #ifndef __MINGW32__
-	/* FIXME */
+        sleep (diff.tv_sec);
         usleep (diff.tv_usec);
 #else
-	rfbClientErr("usleep on MinGW32 NOT IMPLEMENTED\n");
+	Sleep (diff.tv_sec * 1000 + diff.tv_usec/1000);
 #endif
       }
 

@@ -852,7 +852,7 @@ void rfbInitServer(rfbScreenInfoPtr screen)
 {
 #ifdef WIN32
   WSADATA trash;
-  int i=WSAStartup(MAKEWORD(2,2),&trash);
+  WSAStartup(MAKEWORD(2,2),&trash);
 #endif
   rfbInitSockets(screen);
   rfbHttpInitSockets(screen);

@@ -197,6 +197,7 @@ int main(int argc,char** argv) {
 #endif
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
+	SDL_EnableUNICODE(1);
 
 	/* 16-bit: cl=rfbGetClient(5,3,2); */
 	cl=rfbGetClient(8,3,4);
