@@ -353,6 +353,8 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
       cl->extensions = NULL;
 
+      cl->lastPtrX = -1;
+
       sprintf(pv,rfbProtocolVersionFormat,rfbProtocolMajorVersion,
 	      rfbProtocolMinorVersion);
 
@@ -1071,11 +1073,19 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    cl->screen->pointerClient = cl;
 
 	if(!cl->viewOnly) {
-	    cl->screen->ptrAddEvent(msg.pe.buttonMask,
-				    Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), cl);
-	}
+	    if (msg.pe.buttonMask != cl->lastPtrButtons ||
+		    cl->screen->deferPtrUpdateTime == 0) {
+		cl->screen->ptrAddEvent(msg.pe.buttonMask,
+			Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), cl);
+		cl->lastPtrButtons = msg.pe.buttonMask;
+	    } else {
+		cl->lastPtrX = Swap16IfLE(msg.pe.x);
+		cl->lastPtrY = Swap16IfLE(msg.pe.y);
+		cl->lastPtrButtons = msg.pe.buttonMask;
+	    }
+      }      
+      return;
 
-        return;
 
 
     case rfbClientCutText:

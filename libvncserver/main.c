@@ -931,6 +931,27 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	}
       }
     }
+
+    if (!cl->viewOnly && cl->lastPtrX >= 0) {
+      if(cl->startPtrDeferring.tv_usec == 0) {
+        gettimeofday(&cl->startPtrDeferring,NULL);
+        if(cl->startPtrDeferring.tv_usec == 0)
+          cl->startPtrDeferring.tv_usec++;
+      } else {
+        struct timeval tv;
+        gettimeofday(&tv,NULL);
+        if(tv.tv_sec < cl->startPtrDeferring.tv_sec /* at midnight */
+           || ((tv.tv_sec-cl->startPtrDeferring.tv_sec)*1000
+           +(tv.tv_usec-cl->startPtrDeferring.tv_usec)/1000)
+           > cl->screen->deferPtrUpdateTime) {
+          cl->startPtrDeferring.tv_usec = 0;
+          cl->screen->ptrAddEvent(cl->lastPtrButtons, 
+                                  cl->lastPtrX, 
+                                  cl->lastPtrY, cl);
+	  cl->lastPtrX = -1;
+        }
+      }
+    }
     clPrev=cl;
     cl=rfbClientIteratorNext(i);
     if(clPrev->sock==-1) {

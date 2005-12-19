@@ -1,3 +1,12 @@
+2005-12-19  Dave Stuart <dave@justdave.us>
+	* libvncserver/{main.c,rfbserver.c,cargs.c}, rfb/rfb.h: introduce
+	  deferPtrUpdateTime, which defers the handling of pointer events
+	  for a couple of milliseconds.
+
+2005-12-19  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* client_examples/SDLvncviewer.c, libvncclient/{sockets.c,vncviewer.c},
+	  libvncserver/{main.c,rfbserver.c,sockets.c}: fix MinGW32 compilation
+
 2005-12-08  "Mazin, Malvina" <Malvina.Mazin@kla-tencor.com>
 	* configure.ac, libvncserver/sockets.c: on Solaris 2.7, write may
 	  return ENOENT when it really means EAGAIN.

@@ -29,6 +29,8 @@ rfbUsage(void)
                     "                       (use plain-password as password, USE AT YOUR RISK)\n");
     fprintf(stderr, "-deferupdate time      time in ms to defer updates "
                                                              "(default 40)\n");
+    fprintf(stderr, "-deferptrupdate time   time in ms to defer pointer updates"
+                                                           " (default none)\n");
     fprintf(stderr, "-desktop name          VNC desktop name (default \"LibVNCServer\")\n");
     fprintf(stderr, "-alwaysshared          always treat new clients as shared\n");
     fprintf(stderr, "-nevershared           never treat new clients as shared\n");
@@ -104,6 +106,12 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		return FALSE;
 	    }
             rfbScreen->deferUpdateTime = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-deferptrupdate") == 0) {  /* -deferptrupdate milliseconds */
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
+            rfbScreen->deferPtrUpdateTime = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-desktop") == 0) {  /* -desktop desktop-name */
             if (i + 1 >= *argc) {
 		rfbUsage();

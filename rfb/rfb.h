@@ -62,8 +62,10 @@ extern "C"
 #define TINI_COND(cond) (rfbLog("%s:%d TINI_COND(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_destroy(&(cond)))
 #define IF_PTHREADS(x) x
 #else
+#if !NONETWORK
 #define LOCK(mutex) pthread_mutex_lock(&(mutex));
 #define UNLOCK(mutex) pthread_mutex_unlock(&(mutex));
+#endif
 #define MUTEX(mutex) pthread_mutex_t (mutex)
 #define INIT_MUTEX(mutex) pthread_mutex_init(&(mutex),NULL)
 #define TINI_MUTEX(mutex) pthread_mutex_destroy(&(mutex))
@@ -307,6 +309,7 @@ typedef struct _rfbScreenInfo
     int progressiveSliceHeight;
 
     in_addr_t listenInterface;
+    int deferPtrUpdateTime;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -418,6 +421,10 @@ typedef struct _rfbClientRec {
        into a single update. */
 
       struct timeval startDeferring;
+      struct timeval startPtrDeferring;
+      int lastPtrX;
+      int lastPtrY;
+      int lastPtrButtons;
 
     /* translateFn points to the translation function which is used to copy
        and translate a rectangle from the framebuffer to an output buffer. */
