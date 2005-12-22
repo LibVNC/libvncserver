@@ -435,7 +435,8 @@ rfbClientConnectionGone(rfbClientPtr cl)
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-    if(cl->screen->backgroundLoop != FALSE)
+    if(cl->screen->backgroundLoop != FALSE) {
+      int i;
       do {
 	LOCK(cl->refCountMutex);
 	i=cl->refCount;
@@ -443,6 +444,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
 	if(i>0)
 	  WAIT(cl->deleteCond,cl->refCountMutex);
       } while(i>0);
+    }
 #endif
 
     UNLOCK(rfbClientListMutex);
@@ -547,7 +549,7 @@ rfbProcessClientProtocolVersion(rfbClientPtr cl)
     pv[sz_rfbProtocolVersionMsg] = 0;
     if (sscanf(pv,rfbProtocolVersionFormat,&major_,&minor_) != 2) {
         char name[1024]; 
-	if(sscanf(pv,"RFB %03d.%03d %1024s\n",&major_,&minor_,name) != 3) {
+	if(sscanf(pv,"RFB %03d.%03d %1023s\n",&major_,&minor_,name) != 3) {
 	    rfbErr("rfbProcessClientProtocolVersion: not a valid RFB client\n");
 	    rfbCloseClient(cl);
 	    return;
