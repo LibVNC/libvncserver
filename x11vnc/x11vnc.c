@@ -163,7 +163,7 @@
  * -DREMOTE_DEFAULT=0  to disable remote-control on by default (-yesremote).
  * -DREMOTE_CONTROL=0  to disable remote-control mechanism completely.
  * -DEXTERNAL_COMMANDS=0  to disable the running of all external commands.
- * -DFILEXFER=1  enable -filexfer as the default.
+ * -DFILEXFER=0  disable filexfer.
  *
  * -DHARDWIRE_PASSWD=...      hardwired passwords, quoting necessary.
  * -DHARDWIRE_VIEWPASSWD=...
@@ -398,7 +398,7 @@ double xdamage_scheduled_mark = 0.0;
 sraRegionPtr xdamage_scheduled_mark_region = NULL;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.7.3 lastmod: 2005-11-28";
+char lastmod[] = "0.7.3 lastmod: 2005-12-24";
 int hack_val = 0;
 
 /* X display info */
@@ -866,9 +866,11 @@ char *allowed_input_view_only = NULL;
 char *allowed_input_normal = NULL;
 char *allowed_input_str = NULL;
 char *viewonly_passwd = NULL;	/* view only passwd. */
+char **passwd_list = NULL;	/* for -passwdfile */
+int begin_viewonly = -1;
 int inetd = 0;			/* spawned from inetd(1) */
 #ifndef FILEXFER
-#define FILEXFER 0
+#define FILEXFER 1
 #endif
 int filexfer = FILEXFER; 
 int first_conn_timeout = 0;	/* -timeout */
@@ -20433,11 +20435,6 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->ptrAddEvent = pointer;
 	screen->setXCutText = xcut_receive;
 
-	if (filexfer) {
-#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
-		rfbRegisterTightVNCFileTransferExtension();
-#endif
-	}
 	rfbInitServer(screen);
 
 	if (viewonly_passwd) {
@@ -20448,6 +20445,16 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		passwds_new[1] = viewonly_passwd;
 		passwds_new[2] = NULL;
 		screen->authPasswdData = (void*) passwds_new;
+	} else if (passwd_list) {
+		int i = 0;
+		while(passwd_list[i] != NULL) {
+			i++;
+		}
+		if (begin_viewonly < 0) {
+			begin_viewonly = i+1;
+		}
+		screen->authPasswdData = (void*) passwd_list;
+		screen->authPasswdFirstViewOnly = begin_viewonly;
 	}
 }
 
@@ -30344,7 +30351,13 @@ static void print_help(int mode) {
 "                       option, otherwise the stderr goes to the viewer which\n"
 "                       will cause it to abort.  Specifying both -inetd and -q\n"
 "                       and no -o will automatically close the stderr.\n"
-"-filexfer              Enable the TightVNC file transfer extension.\n"
+"-nofilexfer            Disable the TightVNC file transfer extension.  (same as\n"
+"                       -disablefiletransfer).  Note that when the -viewonly\n"
+"                       option is supplied all file transfers are disabled.\n"
+"                       Also clients that log in viewonly cannot transfer files.\n"
+"                       However, if the remote control mechanism is used to\n"
+"                       change the global or per-client viewonly state the\n"
+"                       filetransfer permissions will NOT change.\n"
 "-http                  Instead of using -httpdir (see below) to specify\n"
 "                       where the Java vncviewer applet is, have x11vnc try\n"
 "                       to *guess* where the directory is by looking relative\n"
@@ -30407,18 +30420,41 @@ static void print_help(int mode) {
 "                       anything and enables view-only users to move the mouse.\n"
 "                       This option is ignored when a global -viewonly is in\n"
 "                       effect (all input is discarded in that case).\n"
+"\n"
 "-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd\n"
 "                       (full-access) password must also be supplied.\n"
-"-passwdfile filename   Specify libvncserver -passwd via the first line of the\n"
-"                       file \"filename\" instead of via command line (where\n"
-"                       others might see it via ps(1)).  If a second non blank\n"
-"                       line exists in the file it is taken as a view-only\n"
-"                       password (i.e. -viewpasswd) To supply an empty password\n"
-"                       for either field the string \"__EMPTY__\" may be used.\n"
-"                       Note: -passwdfile is a simple plaintext passwd, see\n"
-"                       also -rfbauth and -storepasswd below for obfuscated\n"
-"                       VNC password files.  Neither file should be readable\n"
-"                       by untrusted users.\n"
+"\n"
+"-passwdfile filename   Specify the libvncserver password via the first line\n"
+"                       of the file \"filename\" (instead of via -passwd on\n"
+"                       the command line where others might see it via ps(1)).\n"
+"\n"
+"                       If the filename is prefixed with \"rm:\" it will be\n"
+"                       removed after being read.  In general, the password file\n"
+"                       should not be readable by untrusted users (BTW: neither\n"
+"                       should the VNC -rfbauth file: it is NOT encrypted).\n"
+"\n"
+"                       Note that only the first 8 characters of a password\n"
+"                       are used.\n"
+"\n"
+"                       If multiple non-blank lines exist in the file they are\n"
+"                       all taken as valid passwords.  Blank lines are ignored.\n"
+"                       Password lines may be \"commented out\" (ignored) if\n"
+"                       they begin with the charactor \"#\" or the line contains\n"
+"                       the string \"__SKIP__\".  Lines may be annotated by use\n"
+"                       of the \"__COMM__\" string: from it to the end of the\n"
+"                       line is ignored.  An empty password may be specified\n"
+"                       via the \"__EMPTY__\" string on a line by itself (note\n"
+"                       your viewer might not accept empty passwords).\n"
+"\n"
+"                       If the string \"__BEGIN_VIEWONLY__\" appears on a\n"
+"                       line by itself, the remaining passwords are used for\n"
+"                       viewonly access.  For compatibility, as a special case\n"
+"                       if the file contains only two password lines the 2nd\n"
+"                       one is automatically taken as the viewonly password.\n"
+"                       Otherwise the \"__BEGIN_VIEWONLY__\" token must be used\n"
+"                       to have viewonly passwords.  (tip: make it the 3rd and\n"
+"                       last line to have 2 full-access passwords)\n"
+
 "-nopw                  Disable the big warning message when you use x11vnc\n"
 "                       without some sort of password.\n"
 "-storepasswd pass file Store password \"pass\" as the VNC password in the\n"
@@ -32062,6 +32098,11 @@ static void print_help(int mode) {
 	/* have both our help and rfbUsage to stdout for more(1), etc. */
 	dup2(1, 2);
 
+	/* register extention(s) to get their help output */
+#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+	rfbRegisterTightVNCFileTransferExtension();
+#endif
+
 	if (mode == 1) {
 		char *p;	
 		int l = 0;
@@ -33116,6 +33157,8 @@ int main(int argc, char* argv[]) {
 			users_list = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-inetd")) {
 			inetd = 1;
+		} else if (!strcmp(arg, "-nofilexfer")) {
+			filexfer = 0;
 		} else if (!strcmp(arg, "-filexfer")) {
 			filexfer = 1;
 		} else if (!strcmp(arg, "-http")) {
@@ -33737,6 +33780,16 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	if (got_rfbauth && (got_passwd || got_viewpasswd || got_passwdfile)) {
+		fprintf(stderr, "option -rfbauth is incompatible with:\n");
+		fprintf(stderr, "            -passwd, -viewpasswd, and -passwdfile\n");
+		exit(1);
+	}
+	if (got_passwdfile && (got_passwd || got_viewpasswd)) {
+		fprintf(stderr, "option -passwdfile is incompatible with:\n");
+		fprintf(stderr, "            -passwd and -viewpasswd\n");
+		exit(1);
+	}
 
 	/*
 	 * If -passwd was used, clear it out of argv.  This does not
@@ -33753,72 +33806,129 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	} else if (passwdfile) {
-		/* read passwd from file */
+		/* read passwd(s) from file */
 		char line[1024];
+		char *filename;
+		int remove = 0;
+		struct stat sbuf;
+		int linecount = 0, i, max;
 		FILE *in;
-		in = fopen(passwdfile, "r");
+
+		filename = passwdfile;
+		if (strstr(filename, "rm:") == filename) {
+			filename += strlen("rm:");
+			remove = 1;
+		}
+
+		if (stat(filename, &sbuf) == 0) {
+			/* upper bound to number of lines... */
+			max = (int) sbuf.st_size;
+		} else {
+			max = 16;
+		}
+
+		/* create 1 more than max to have it be the ending NULL */
+		passwd_list = (char **) malloc( (max+1) * (sizeof(char *)) );
+		for (i=0; i<max+1; i++) {
+			passwd_list[i] = NULL;
+		}
+		
+		in = fopen(filename, "r");
 		if (in == NULL) {
 			rfbLog("cannot open passwdfile: %s\n", passwdfile);
 			rfbLogPerror("fopen");
+			if (remove) {
+				unlink(filename);
+			}
 			exit(1);
 		}
-		if (fgets(line, 1024, in) != NULL) {
-			char *q;
+
+		while (fgets(line, 1024, in) != NULL) {
+			char *p;
+			int blank = 1;
 			int len = strlen(line); 
-			if (len > 0 && line[len-1] == '\n') {
+
+			if (len == 0) {
+				continue;
+			} else if (line[len-1] == '\n') {
 				line[len-1] = '\0';
 			}
-			argv_vnc[argc_vnc++] = strdup("-passwd");
-			got_passwd = 1;
-			if (!strcmp(line, "__EMPTY__")) {
-				argv_vnc[argc_vnc++] = strdup("");
-			} else if ((q = strstr(line, "__ENDPASSWD__")) !=NULL) {
-				*q = '\0';
-				argv_vnc[argc_vnc++] = strdup(line);
-			} else {
-				argv_vnc[argc_vnc++] = strdup(line);
+			if (line[0] == '\0') {
+				continue;
 			}
-			pw_loc = 100;	/* just for pw_loc check below */
-			if (fgets(line, 1024, in) != NULL) {
-				/* try to read viewonly passwd from file */
-				int ok = 0;
-				len = strlen(line); 
-				if (len > 0 && line[len-1] == '\n') {
-					line[len-1] = '\0';
-				}
-				if (strlen(line) > 0) {
-					char *p = line;
-					/* check for non-blank line */
-					while (*p != '\0') {
-						if (! isspace(*p)) {
-							ok = 1;
-						}
-						p++;
-					}
-				}
-				if (ok) {
-					if (!strcmp(line, "__EMPTY__")) {
-						viewonly_passwd = strdup("");
-					} else if ((q = strstr(line,
-					    "__ENDPASSWD__")) != NULL) {
-						*q = '\0';
-						viewonly_passwd = strdup(line);
-					} else {
-						viewonly_passwd = strdup(line);
-					}
-				} else {
-					rfbLog("*** not setting"
-					    " viewonly password to the 2nd"
-					    " line of %s. (blank or other"
-					    " problem)\n", passwdfile);
-				}
+			if (strstr(line, "__SKIP__") != NULL) {
+				continue;
 			}
-		} else {
-			rfbLog("cannot read a line from passwdfile: %s\n",
+			if (strstr(line, "__COMM__") == line) {
+				continue;
+			}
+			if (!strcmp(line, "__BEGIN_VIEWONLY__")) {
+				if (begin_viewonly < 0) {
+					begin_viewonly = linecount;
+				}
+				continue;
+			}
+			if (line[0] == '#') {
+				/* commented out, cannot have password beginning with # */
+				continue;
+			}
+			p = line;
+			while (*p != '\0') {
+				if (! isspace(*p)) {
+					blank = 0;
+					break;
+				}
+				p++;
+			}
+			if (blank) {
+				continue;
+			}
+
+			passwd_list[linecount++] = strdup(line);
+
+			if (linecount >= max) {
+				break;
+			}
+		}
+		fclose(in);
+
+		for (i=0; i<1024; i++) {
+			line[i] = '\0';
+		}
+
+		if (remove) {
+			unlink(filename);
+		}
+
+		if (! linecount) {
+			rfbLog("cannot read a valid line from passwdfile: %s\n",
 			    passwdfile);
 			exit(1);
 		}
-		fclose(in);
+
+		for (i=0; i<linecount; i++) {
+			char *q, *p = passwd_list[i];
+			if (!strcmp(p, "__EMPTY__")) {
+				*p = '\0';
+			} else if ((q = strstr(p, "__COMM__")) != NULL) {
+				*q = '\0';
+			}
+			passwd_list[i] = strdup(p);
+			while (*p != '\0') {
+				*p = '\0'; p++;
+			}
+		}
+		argv_vnc[argc_vnc++] = strdup("-passwd");
+		argv_vnc[argc_vnc++] = strdup(passwd_list[0]);
+		got_passwd = 1;
+		pw_loc = 100;	/* just for pw_loc check below */
+
+		if (begin_viewonly < 0 && linecount == 2) {
+			/* for compatibility with previous 2-line usage: */
+			viewonly_passwd = strdup(passwd_list[1]);
+			begin_viewonly = 1;
+		}
+
 	}
 	if (vpw_loc > 0) {
 		int i;
@@ -33832,7 +33942,7 @@ int main(int argc, char* argv[]) {
 		}
 	} 
 #ifdef HARDWIRE_PASSWD
-	if (! got_rfbauth && ! got_passwd) {
+	if (!got_rfbauth && !got_passwd) {
 		argv_vnc[argc_vnc++] = strdup("-passwd");
 		argv_vnc[argc_vnc++] = strdup(HARDWIRE_PASSWD);
 		got_passwd = 1;
@@ -33840,7 +33950,7 @@ int main(int argc, char* argv[]) {
 	}
 #endif
 #ifdef HARDWIRE_VIEWPASSWD
-	if (! got_rfbauth && got_passwd && ! viewonly_passwd) {
+	if (!got_rfbauth && got_passwd && !viewonly_passwd && !passwd_list) {
 		viewonly_passwd = strdup(HARDWIRE_VIEWPASSWD);
 	}
 #endif
@@ -33849,8 +33959,8 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	if (!got_passwd && !got_rfbauth && !got_passwdfile &&
-	    !query_cmd && !remote_cmd) {
+	if (!got_passwd && !got_rfbauth && (!got_passwdfile || !passwd_list)
+	    && !query_cmd && !remote_cmd) {
 		char message[] =
 		    "-rfbauth, -passwdfile, or -passwd password required.";
 		if (! nopw) {
@@ -33866,7 +33976,7 @@ int main(int argc, char* argv[]) {
 			exit(1);
 		}
 #endif
-		if (0) message[0] = '\0';
+		message[0] = '\0';	/* avoid compiler warning */
 	}
 
 	if (more_safe) {
@@ -33912,6 +34022,13 @@ int main(int argc, char* argv[]) {
 	}
 	if (alpha_blend) {
 		alpha_remove = 0;
+	}
+
+	if (filexfer && view_only) {
+		if (! quiet) {
+			rfbLog("setting -nofilexfer in -viewonly mode.\n");
+		}
+		filexfer = 0;
 	}
 
 	if (inetd) {
@@ -34426,6 +34543,12 @@ int main(int argc, char* argv[]) {
 		xrandr_present = 1;
 	}
 #endif
+
+	if (filexfer) {
+#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+		rfbRegisterTightVNCFileTransferExtension();
+#endif
+	}
 
 	if (! quiet) {
 		rfbLog("--------------------------------------------------------\n");

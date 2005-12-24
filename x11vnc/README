@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Mon Nov 28 10:42:40 EST 2005
+x11vnc README file                         Date: Sat Dec 24 10:14:27 EST 2005
 
 The following information is taken from these URLs:
 
@@ -4757,7 +4757,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.3 lastmod: 2005-11-28
+x11vnc: allow VNC connections to real X11 displays. 0.7.3 lastmod: 2005-12-24
 
 x11vnc options:
   -display disp            -auth file             
@@ -4770,7 +4770,7 @@ x11vnc options:
   -shared                  -once                  
   -forever                 -loop                  
   -timeout n               -inetd                 
-  -filexfer                -http                  
+  -nofilexfer              -http                  
   -connect string          -vncconnect            
   -novncconnect            -allow host1[,host2..] 
   -localhost               -nolookup              
@@ -4845,6 +4845,7 @@ libvncserver options:
 -passwd plain-password use authentication 
                        (use plain-password as password, USE AT YOUR RISK)
 -deferupdate time      time in ms to defer updates (default 40)
+-deferptrupdate time   time in ms to defer pointer updates (default none)
 -desktop name          VNC desktop name (default "LibVNCServer")
 -alwaysshared          always treat new clients as shared
 -nevershared           never treat new clients as shared
@@ -4857,11 +4858,16 @@ libvncserver options:
 -listen ipaddr         listen for connections only on network interface with
                        addr ipaddr. '-listen localhost' and hostname work too.
 
+libvncserver-tight-extension options:
+-disablefiletransfer   disable file transfer
+-ftproot string        set ftp root
+
+
 
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.3 lastmod: 2005-11-28
+x11vnc: allow VNC connections to real X11 displays. 0.7.3 lastmod: 2005-12-24
 
 Typical usage is:
 
@@ -5051,7 +5057,13 @@ Options:
                        option, otherwise the stderr goes to the viewer which
                        will cause it to abort.  Specifying both -inetd and -q
                        and no -o will automatically close the stderr.
--filexfer              Enable the TightVNC file transfer extension.
+-nofilexfer            Disable the TightVNC file transfer extension.  (same as
+                       -disablefiletransfer).  Note that when the -viewonly
+                       option is supplied all file transfers are disabled.
+                       Also clients that log in viewonly cannot transfer files.
+                       However, if the remote control mechanism is used to
+                       change the global or per-client viewonly state the
+                       filetransfer permissions will NOT change.
 -http                  Instead of using -httpdir (see below) to specify
                        where the Java vncviewer applet is, have x11vnc try
                        to *guess* where the directory is by looking relative
@@ -5114,18 +5126,40 @@ Options:
                        anything and enables view-only users to move the mouse.
                        This option is ignored when a global -viewonly is in
                        effect (all input is discarded in that case).
+
 -viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd
                        (full-access) password must also be supplied.
--passwdfile filename   Specify libvncserver -passwd via the first line of the
-                       file "filename" instead of via command line (where
-                       others might see it via ps(1)).  If a second non blank
-                       line exists in the file it is taken as a view-only
-                       password (i.e. -viewpasswd) To supply an empty password
-                       for either field the string "__EMPTY__" may be used.
-                       Note: -passwdfile is a simple plaintext passwd, see
-                       also -rfbauth and -storepasswd below for obfuscated
-                       VNC password files.  Neither file should be readable
-                       by untrusted users.
+
+-passwdfile filename   Specify the libvncserver password via the first line
+                       of the file "filename" (instead of via -passwd on
+                       the command line where others might see it via ps(1)).
+
+                       If the filename is prefixed with "rm:" it will be
+                       removed after being read.  In general, the password file
+                       should not be readable by untrusted users (BTW: neither
+                       should the VNC -rfbauth file: it is NOT encrypted).
+
+                       Note that only the first 8 characters of a password
+                       are used.
+
+                       If multiple non-blank lines exist in the file they are
+                       all taken as valid passwords.  Blank lines are ignored.
+                       Password lines may be "commented out" (ignored) if
+                       they begin with the charactor "#" or the line contains
+                       the string "__SKIP__".  Lines may be annotated by use
+                       of the "__COMM__" string: from it to the end of the
+                       line is ignored.  An empty password may be specified
+                       via the "__EMPTY__" string on a line by itself (note
+                       your viewer might not accept empty passwords).
+
+                       If the string "__BEGIN_VIEWONLY__" appears on a
+                       line by itself, the remaining passwords are used for
+                       viewonly access.  For compatibility, as a special case
+                       if the file contains only two password lines the 2nd
+                       one is automatically taken as the viewonly password.
+                       Otherwise the "__BEGIN_VIEWONLY__" token must be used
+                       to have viewonly passwords.  (tip: make it the 3rd and
+                       last line to have 2 full-access passwords)
 -nopw                  Disable the big warning message when you use x11vnc
                        without some sort of password.
 -storepasswd pass file Store password "pass" as the VNC password in the
@@ -6758,6 +6792,7 @@ These options are passed to libvncserver:
 -passwd plain-password use authentication
                        (use plain-password as password, USE AT YOUR RISK)
 -deferupdate time      time in ms to defer updates (default 40)
+-deferptrupdate time   time in ms to defer pointer updates (default none)
 -desktop name          VNC desktop name (default "LibVNCServer")
 -alwaysshared          always treat new clients as shared
 -nevershared           never treat new clients as shared
@@ -6769,6 +6804,10 @@ These options are passed to libvncserver:
 -progressive height    enable progressive updating for slow links
 -listen ipaddr         listen for connections only on network interface with
                        addr ipaddr. '-listen localhost' and hostname work too.
+
+libvncserver-tight-extension options:
+-disablefiletransfer   disable file transfer
+-ftproot string        set ftp root
 
    Pretty wild huh? [1]Contact me if you have any questions or problems.
 

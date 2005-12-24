@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "November 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "December 2005" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.3, lastmod: 2005-11-28
+         version: 0.7.3, lastmod: 2005-12-24
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -264,9 +264,15 @@ option, otherwise the stderr goes to the viewer which
 will cause it to abort.  Specifying both \fB-inetd\fR and \fB-q\fR
 and no \fB-o\fR will automatically close the stderr.
 .PP
-\fB-filexfer\fR
+\fB-nofilexfer\fR
 .IP
-Enable the TightVNC file transfer extension.
+Disable the TightVNC file transfer extension.  (same as
+\fB-disablefiletransfer).\fR  Note that when the \fB-viewonly\fR
+option is supplied all file transfers are disabled.
+Also clients that log in viewonly cannot transfer files.
+However, if the remote control mechanism is used to
+change the global or per-client viewonly state the
+filetransfer permissions will NOT change.
 .PP
 \fB-http\fR
 .IP
@@ -361,18 +367,38 @@ Supply a 2nd password for view-only logins.  The \fB-passwd\fR
 .PP
 \fB-passwdfile\fR \fIfilename\fR
 .IP
-Specify libvncserver \fB-passwd\fR via the first line of the
-file \fIfilename\fR instead of via command line (where
-others might see it via 
+Specify the libvncserver password via the first line
+of the file \fIfilename\fR (instead of via \fB-passwd\fR on
+the command line where others might see it via 
 .IR ps (1)
-).  If a second non blank
-line exists in the file it is taken as a view-only
-password (i.e. \fB-viewpasswd)\fR To supply an empty password
-for either field the string "__EMPTY__" may be used.
-Note: \fB-passwdfile\fR is a simple plaintext passwd, see
-also \fB-rfbauth\fR and \fB-storepasswd\fR below for obfuscated
-VNC password files.  Neither file should be readable
-by untrusted users.
+).
+.IP
+If the filename is prefixed with "rm:" it will be
+removed after being read.  In general, the password file
+should not be readable by untrusted users (BTW: neither
+should the VNC \fB-rfbauth\fR file: it is NOT encrypted).
+.IP
+Note that only the first 8 characters of a password
+are used.
+.IP
+If multiple non-blank lines exist in the file they are
+all taken as valid passwords.  Blank lines are ignored.
+Password lines may be "commented out" (ignored) if
+they begin with the charactor "#" or the line contains
+the string "__SKIP__".  Lines may be annotated by use
+of the "__COMM__" string: from it to the end of the
+line is ignored.  An empty password may be specified
+via the "__EMPTY__" string on a line by itself (note
+your viewer might not accept empty passwords).
+.IP
+If the string "__BEGIN_VIEWONLY__" appears on a
+line by itself, the remaining passwords are used for
+viewonly access.  For compatibility, as a special case
+if the file contains only two password lines the 2nd
+one is automatically taken as the viewonly password.
+Otherwise the "__BEGIN_VIEWONLY__" token must be used
+to have viewonly passwords.  (tip: make it the 3rd and
+last line to have 2 full-access passwords)
 .PP
 \fB-nopw\fR
 .IP
@@ -2534,6 +2560,10 @@ use authentication
 .IP
 time in ms to defer updates (default 40)
 .PP
+\fB-deferptrupdate\fR \fItime\fR
+.IP
+time in ms to defer pointer updates (default none)
+.PP
 \fB-desktop\fR \fIname\fR
 .IP
 VNC desktop name (default "LibVNCServer")
@@ -2571,6 +2601,16 @@ enable progressive updating for slow links
 .IP
 listen for connections only on network interface with
 addr ipaddr. '-listen localhost' and hostname work too.
+.PP
+libvncserver-tight-extension options:
+.PP
+\fB-disablefiletransfer\fR
+.IP
+disable file transfer
+.PP
+\fB-ftproot\fR \fIstring\fR
+.IP
+set ftp root
 .SH "FILES"
 .IR $HOME/.x11vncrc ,
 .IR $HOME/.Xauthority
