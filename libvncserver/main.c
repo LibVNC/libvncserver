@@ -61,7 +61,7 @@ void
 rfbRegisterProtocolExtension(rfbProtocolExtension* extension)
 {
 	rfbProtocolExtension* last;
-	static extMutex_initialized = 0;
+	static int extMutex_initialized = 0;
 
 	if (! extMutex_initialized) {
 		INIT_MUTEX(extMutex);

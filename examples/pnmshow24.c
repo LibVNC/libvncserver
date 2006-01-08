@@ -3,8 +3,10 @@
 #include <rfb/keysym.h>
 
 #ifndef LIBVNCSERVER_ALLOW24BPP
-#error "I need the ALLOW24BPP flag to work"
-#endif
+int main() {
+	printf("I need the ALLOW24BPP LibVNCSever flag to work\n");
+}
+#else
 
 static void HandleKey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
 {
@@ -88,3 +90,4 @@ int main(int argc,char** argv)
 
   return(0);
 }
+#endif

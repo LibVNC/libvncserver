@@ -157,11 +157,11 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 #ifdef LIBVNCSERVER_HAVE_LIBZ
   client->raw_buffer_size = -1;
   client->decompStreamInited = FALSE;
-#endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
   memset(client->zlibStreamActive,0,sizeof(rfbBool)*4);
   client->jpegSrcManager = NULL;
+#endif
 #endif
 
   client->HandleCursorPos = DummyPoint;
@@ -252,6 +252,7 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 }
 
 void rfbClientCleanup(rfbClient* client) {
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
   int i;
 
@@ -271,6 +272,7 @@ void rfbClientCleanup(rfbClient* client) {
 
   if (client->jpegSrcManager)
     free(client->jpegSrcManager);
+#endif
 #endif
 
   free(client->desktopName);
