@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "December 2005" "x11vnc " "User Commands"
+.TH X11VNC "1" "January 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.7.3, lastmod: 2005-12-24
+         version: 0.7.3, lastmod: 2006-01-08
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -372,11 +372,17 @@ of the file \fIfilename\fR (instead of via \fB-passwd\fR on
 the command line where others might see it via 
 .IR ps (1)
 ).
+See below for how to supply multiple passwords.
 .IP
 If the filename is prefixed with "rm:" it will be
-removed after being read.  In general, the password file
-should not be readable by untrusted users (BTW: neither
-should the VNC \fB-rfbauth\fR file: it is NOT encrypted).
+removed after being read.  Perhaps this is useful in
+limiting the readability of the file.  In general,
+the password file should not be readable by untrusted
+users (BTW: neither should the VNC \fB-rfbauth\fR file:
+it is NOT encrypted).
+.IP
+If the filename is prefixed with "read:" it will
+periodically be checked for changes and reread.
 .IP
 Note that only the first 8 characters of a password
 are used.
@@ -396,9 +402,10 @@ line by itself, the remaining passwords are used for
 viewonly access.  For compatibility, as a special case
 if the file contains only two password lines the 2nd
 one is automatically taken as the viewonly password.
-Otherwise the "__BEGIN_VIEWONLY__" token must be used
-to have viewonly passwords.  (tip: make it the 3rd and
-last line to have 2 full-access passwords)
+Otherwise the "__BEGIN_VIEWONLY__" token must be
+used to have viewonly passwords.  (tip: make the 3rd
+and last line be "__BEGIN_VIEWONLY__" to have 2
+full-access passwords)
 .PP
 \fB-nopw\fR
 .IP
@@ -444,7 +451,13 @@ of the connection), are set to allow identification
 of the tcp virtual circuit.  The x11vnc process
 id will be in RFB_X11VNC_PID, a client id number in
 RFB_CLIENT_ID, and the number of other connected clients
-in RFB_CLIENT_COUNT.  RFB_MODE will be "accept"
+in RFB_CLIENT_COUNT.  RFB_MODE will be "accept".
+RFB_STATE will be PROTOCOL_VERSION, SECURITY_TYPE,
+AUTHENTICATION, INITIALISATION, NORMAL, or UNKNOWN
+indicating up to which state the client has acheived.
+RFB_LOGIN_VIEWONLY will be 0, 1, or -1 (unknown).
+RFB_USERNAME, RFB_LOGIN_TIME, and RFB_CURRENT_TIME may
+also be set.
 .IP
 If \fIstring\fR is "popup" then a builtin popup window
 is used.  The popup will time out after 120 seconds,
@@ -484,6 +497,15 @@ user accidentally accepting a client by typing or
 clicking. All 3 of the popup keywords can be followed
 by +N+M to supply a position for the popup window.
 The default is to center the popup window.
+.PP
+\fB-afteraccept\fR \fIstring\fR
+.IP
+As \fB-accept,\fR except to run a user supplied command after
+a client has been accepted and authenticated. RFB_MODE
+will be set to "afteraccept" and the other RFB_*
+variables are as in \fB-accept.\fR  Unlike \fB-accept,\fR the
+command return code is not interpreted by x11vnc.
+Example: \fB-afteraccept\fR 'killall xlock &'
 .PP
 \fB-gone\fR \fIstring\fR
 .IP
@@ -2026,6 +2048,8 @@ or client_input:0x2:K
 .IP
 accept:cmd      set \fB-accept\fR "cmd" (empty to disable).
 .IP
+afteraccept:cmd set \fB-afteraccept\fR (empty to disable).
+.IP
 gone:cmd        set \fB-gone\fR "cmd" (empty to disable).
 .IP
 noshm           enable  \fB-noshm\fR mode.
@@ -2395,20 +2419,21 @@ truecolor notruecolor overlay nooverlay overlay_cursor
 overlay_yescursor nooverlay_nocursor nooverlay_cursor
 nooverlay_yescursor overlay_nocursor visual scale
 scale_cursor viewonly noviewonly shared noshared
-forever noforever once timeout deny lock nodeny unlock
-connect allowonce allow localhost nolocalhost listen
-lookup nolookup accept gone shm noshm flipbyteorder
-noflipbyteorder onetile noonetile solid_color solid
-nosolid blackout xinerama noxinerama xtrap noxtrap
-xrandr noxrandr xrandr_mode padgeom quiet q noquiet
-modtweak nomodtweak xkb noxkb skip_keycodes sloppy_keys
-nosloppy_keys skip_dups noskip_dups add_keysyms
-noadd_keysyms clear_mods noclear_mods clear_keys
-noclear_keys remap repeat norepeat fb nofb bell
-nobell sel nosel primary noprimary seldir cursorshape
-nocursorshape cursorpos nocursorpos cursor show_cursor
-noshow_cursor nocursor arrow xfixes noxfixes xdamage
-noxdamage xd_area xd_mem alphacut alphafrac alpharemove
+forever noforever once timeout filexfer deny lock
+nodeny unlock connect allowonce allow localhost
+nolocalhost listen lookup nolookup accept afteraccept
+gone shm noshm flipbyteorder noflipbyteorder onetile
+noonetile solid_color solid nosolid blackout xinerama
+noxinerama xtrap noxtrap xrandr noxrandr xrandr_mode
+padgeom quiet q noquiet modtweak nomodtweak xkb
+noxkb skip_keycodes sloppy_keys nosloppy_keys
+skip_dups noskip_dups add_keysyms noadd_keysyms
+clear_mods noclear_mods clear_keys noclear_keys
+remap repeat norepeat fb nofb bell nobell sel nosel
+primary noprimary seldir cursorshape nocursorshape
+cursorpos nocursorpos cursor show_cursor noshow_cursor
+nocursor arrow xfixes noxfixes xdamage noxdamage
+xd_area xd_mem alphacut alphafrac alpharemove
 noalpharemove alphablend noalphablend xwarppointer
 xwarp noxwarppointer noxwarp buttonmap dragging
 nodragging wireframe_mode wireframe wf nowireframe

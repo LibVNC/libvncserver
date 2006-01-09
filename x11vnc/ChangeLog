@@ -1,3 +1,6 @@
+2006-01-08  Karl Runge <runge@karlrunge.com>
+	* x11vnc: the big split. opts: -afteraccept and -passwdfile read:
+
 2005-12-24  Karl Runge <runge@karlrunge.com>
 	* x11vnc: enhance -passwdfile features, filetransfer on by default,
 	  call rfbRegisterTightVNCFileTransferExtension() earlier.

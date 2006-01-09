@@ -4,7 +4,8 @@
 
 #ifndef LIBVNCSERVER_ALLOW24BPP
 int main() {
-	printf("I need the ALLOW24BPP LibVNCSever flag to work\n");
+	printf("I need the ALLOW24BPP LibVNCServer flag to work\n");
+	exit(1);
 }
 #else
 

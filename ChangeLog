@@ -1,4 +1,8 @@
 2006-01-08  Karl Runge <runge@karlrunge.com>
+	* x11vnc: the big split. (and -afteraccept and -passwdfile read:..)
+	* examples/pnmshow24.c: fix typo.
+
+2006-01-08  Karl Runge <runge@karlrunge.com>
 	* libvncclient/vncviewer.c: fix non-jpeg/libz builds.
 	* examples/pnmshow24.c: fix non-ALLOW24BPP builds.
 	* libvncserver/main.c: fix 'static int' defn.
