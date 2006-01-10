@@ -98,6 +98,7 @@ static MUTEX(rfbClientListMutex);
 struct rfbClientIterator {
   rfbClientPtr next;
   rfbScreenInfoPtr screen;
+  rfbBool closedToo;
 };
 
 void
@@ -120,6 +121,18 @@ rfbGetClientIterator(rfbScreenInfoPtr rfbScreen)
     (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
   i->next = NULL;
   i->screen = rfbScreen;
+  i->closedToo = FALSE;
+  return i;
+}
+
+rfbClientIteratorPtr
+rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen)
+{
+  rfbClientIteratorPtr i =
+    (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
+  i->next = NULL;
+  i->screen = rfbScreen;
+  i->closedToo = TRUE;
   return i;
 }
 
@@ -152,8 +165,9 @@ rfbClientIteratorNext(rfbClientIteratorPtr i)
   }
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-    while(i->next && i->next->sock<0)
-      i->next = i->next->next;
+    if(!i->closedToo)
+      while(i->next && i->next->sock<0)
+        i->next = i->next->next;
     if(i->next)
       rfbIncrClientRef(i->next);
 #endif

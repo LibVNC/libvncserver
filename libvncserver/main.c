@@ -904,6 +904,8 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
   rfbClientPtr cl,clPrev;
   struct timeval tv;
   rfbBool result=FALSE;
+  extern rfbClientIteratorPtr
+    rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen);
 
   if(usec<0)
     usec=screen->deferUpdateTime*1000;
@@ -914,7 +916,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
   corbaCheckFds(screen);
 #endif
 
-  i = rfbGetClientIterator(screen);
+  i = rfbGetClientIteratorWithClosed(screen);
   cl=rfbClientIteratorHead(i);
   while(cl) {
     if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) &&
