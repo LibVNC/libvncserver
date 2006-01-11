@@ -1064,7 +1064,7 @@ XImage *initialize_xdisplay_fb(void) {
 	XImage *fb;
 	char *vis_str = visual_str;
 	int try = 0, subwin_tries = 3;
-	XErrorHandler old_handler;
+	XErrorHandler old_handler = NULL;
 	int subwin_bs;
 
 	if (raw_fb_str) {

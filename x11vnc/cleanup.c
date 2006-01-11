@@ -299,6 +299,11 @@ static void crash_shell(void) {
 			crash_shell_help();
 		} else if (*str == 's' && *(str+1) == '\0') {
 			sprintf(cmd, "sh -c '(%s) &'", crash_stack_command1);
+			if (no_external_cmds) {
+				fprintf(stderr, "\nno_external_cmds=%d\n",
+				    no_external_cmds);
+				goto crash_prompt;
+			}
 			fprintf(stderr, "\nrunning:\n\t%s\n\n",
 			    crash_stack_command1);
 			system(cmd);
@@ -316,6 +321,7 @@ static void crash_shell(void) {
 			free(p);
 		}
 		
+crash_prompt:
 		fprintf(stderr, "crash> ");
 	}
 }

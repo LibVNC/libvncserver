@@ -428,8 +428,29 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	rfbLog("running command:\n");
 	rfbLog("  %s\n", cmd);
 
-	/* XXX need to close port 5900, etc.. */
+#if LIBVNCSERVER_HAVE_FORK
+	{
+		pid_t pid, pidw;
+		if ((pid = fork()) > 0) {
+			pidw = waitpid(pid, &rc, 0);
+		} else if (pid == -1) {
+			fprintf(stderr, "could not fork\n");
+			rfbLogPerror("fork");
+			rc = system(cmd);
+		} else {
+			/* this should close port 5900, etc.. */
+			int fd;
+			for (fd=3; fd<256; fd++) {
+				close(fd);
+			}
+			execlp("/bin/sh", "/bin/sh", "-c", cmd, (char *) NULL);
+			exit(1);
+		}
+	}
+#else
+	/* this will still have port 5900 open */
 	rc = system(cmd);
+#endif
 
 	if (rc >= 256) {
 		rc = rc/256;
@@ -963,7 +984,7 @@ static int action_match(char *action, int rc) {
 	p = strtok(s, ",");
 	while (p) {
 		if ((q = strchr(p, ':')) != NULL) {
-			int in, k;
+			int in, k = 1;
 			*q = '\0';
 			q++;
 			if (strstr(p, "yes") == p) {
@@ -1661,6 +1682,8 @@ void start_client_info_sock(char *host_port_cookie) {
 	static time_t start_time[ICON_MODE_SOCKS];
 	time_t oldest = 0;
 	int db = 0;
+
+	port = -1;
 
 	for (i = 0; i < ICON_MODE_SOCKS; i++) {
 		if (icon_mode_socks[i] < 0) {

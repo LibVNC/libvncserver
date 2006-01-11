@@ -300,7 +300,7 @@ static void solid_cde(char *color) {
 		int format;
 		unsigned long length, after;
 		unsigned char *data;
-		unsigned int * dp;
+		unsigned long *dp;	/* crash on 64bit with int */
 
 		nws = 0;
 
@@ -323,7 +323,7 @@ static void solid_cde(char *color) {
 			return;
 		}
 
-		dp = (unsigned int *) data;
+		dp = (unsigned long *) data;
 		wm_win = (Window) *(dp+1);	/* 2nd item. */
 
 

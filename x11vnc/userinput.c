@@ -722,8 +722,8 @@ static void draw_box(int x, int y, int w, int h, int restore) {
 	int sz, lw = wireframe_lw;
 	unsigned long shade = wireframe_shade;
 	int color = 0;
-	unsigned short us;
-	unsigned long ul;
+	unsigned short us = 0;
+	unsigned long ul = 0;
 
 	if (clipshift) {
 		x -= coff_x;
@@ -3218,7 +3218,7 @@ static int wireframe_mod_state() {
  * the toplevel windows to get better info on moves and resizes.
  */
 int check_wireframe(void) {
-	Window frame, orig_frame;
+	Window frame = None, orig_frame = None;
 	XWindowAttributes attr;
 	int dx, dy;
 
@@ -3227,7 +3227,7 @@ int check_wireframe(void) {
 	int box_x, box_y, box_w, box_h;
 	int orig_cursor_x, orig_cursor_y, g;
 	int already_down = 0, win_gone = 0, win_unmapped = 0;
-	double spin = 0.0, tm, last_ptr, last_draw;
+	double spin = 0.0, tm, last_ptr = 0.0, last_draw;
 	int frame_changed = 0, drew_box = 0, got_2nd_pointer = 0;
 	int special_t1 = 0, break_reason = 0;
 	static double first_dt_ave = 0.0;

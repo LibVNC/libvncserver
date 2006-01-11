@@ -207,7 +207,7 @@ static void record_last_fb_update(void) {
 	static int rbs0 = -1;
 	static time_t last_call = 0;
 	time_t now = time(0);
-	int rbs;
+	int rbs = -1;
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
 
@@ -629,7 +629,7 @@ static void check_rcfile(int argc, char **argv) {
 	int i, j, pwlast, norc = 0, argmax = 1024;
 	char *infile = NULL;
 	char rcfile[1024];
-	FILE *rc; 
+	FILE *rc = NULL; 
 
 	for (i=1; i < argc; i++) {
 		if (!strcmp(argv[i], "-printgui")) {

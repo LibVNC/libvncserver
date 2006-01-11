@@ -58,6 +58,10 @@ static void record_desired_xdamage_rect(int x, int y, int w, int h) {
 	int use_direct_fb_copy = 0;
 	int wh_min, wh_max;
 	static int first = 1, udfb = 0;
+
+	/* compiler warning: */
+	nt_x1 = 0; nt_y1 = 0; nt_x2 = 0; nt_y2 = 0;
+
 	if (first) {
 		if (getenv("XD_DFC")) {
 			udfb = 1;
@@ -214,7 +218,7 @@ int collect_xdamage(int scancnt, int call) {
 	static time_t last_rpt = 0;
 	time_t now;
 	int x, y, w, h, x2, y2;
-	int i, dup, next, dup_max = 0;
+	int i, dup, next = 0, dup_max = 0;
 #define DUPSZ 32
 	int dup_x[DUPSZ], dup_y[DUPSZ], dup_w[DUPSZ], dup_h[DUPSZ];
 	double tm, dt;

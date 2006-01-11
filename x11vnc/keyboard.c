@@ -751,7 +751,7 @@ int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
 	}
 	
 	if (!down && !keycode_state[key] && !IsModifierKey(keysym)) {
-		int i, cnt = 0, downkey;
+		int i, cnt = 0, downkey = -1;
 		int nmods_down = track_mod_state(NoSymbol, FALSE, FALSE);
 		int mods_down[256];
 
@@ -1156,7 +1156,7 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 	    for (grp = 0; grp < GRP; grp++) {
 		for (lvl = 0; lvl < LVL; lvl++) {
 			unsigned int ms, mods;
-			int state_save = -1, mods_save;
+			int state_save = -1, mods_save = -1;
 			KeySym ks2;
 
 			/* look up the Keysym, if any */
@@ -1398,13 +1398,13 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	int kc, grp, lvl, i, kci;
 	int kc_f[0x100], grp_f[0x100], lvl_f[0x100], state_f[0x100], found;
 	int ignore_f[0x100];
-	unsigned int state;
+	unsigned int state = 0;
 
 
 	/* these are used for finding modifiers, etc */
 	XkbStateRec kbstate;
 	int got_kbstate = 0;
-	int Kc_f, Grp_f, Lvl_f;
+	int Kc_f, Grp_f = 0, Lvl_f = 0;
 	static int Kc_last_down = -1;
 	static KeySym Ks_last_down = NoSymbol;
 
@@ -1544,7 +1544,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	if (found > 1) {
 		if (down) {
 			int l, score[0x100];
-			int best, best_score = -1;
+			int best = 0, best_score = -1;
 			/* need to break the tie... */
 			if (! got_kbstate) {
 				XkbGetState(dpy, XkbUseCoreKbd, &kbstate);

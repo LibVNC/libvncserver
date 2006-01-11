@@ -382,7 +382,7 @@ void do_button_mask_change(int mask, int button) {
  * Send a pointer button event to the X server.
  */
 static void update_x11_pointer_mask(int mask) {
-	int snapped, xr_mouse = 1, i;
+	int snapped = 0, xr_mouse = 1, i;
 
 	last_event = last_input = last_pointer_input = time(0);
 

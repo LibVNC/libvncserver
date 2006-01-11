@@ -724,14 +724,14 @@ void scale_rect(double factor, int blend, int interpolate, int Bpp,
 
 	double x1, y1, x2, y2;	/* x-y coords for destination pixels edges */
 	double dx, dy;		/* size of destination pixel */
-	double ddx, ddy;	/* for interpolation expansion */
+	double ddx=0, ddy=0;	/* for interpolation expansion */
 
 	char *src, *dest;	/* pointers to the two framebuffers */
 
 
-	unsigned short us;
-	unsigned char  uc;
-	unsigned int   ui;
+	unsigned short us = 0;
+	unsigned char  uc = 0;
+	unsigned int   ui = 0;
 
 	int use_noblend_shortcut = 1;
 	int shrink;		/* whether shrinking or expanding */

@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sun Jan  8 17:44:25 EST 2006
+x11vnc README file                         Date: Wed Jan 11 09:49:16 EST 2006
 
 The following information is taken from these URLs:
 
@@ -2367,7 +2367,7 @@ if [ "X$RFB_MODE" = "Xafteraccept" ]; then
 elif [ "X$RFB_MODE" = "Xgone" ]; then
         if [ "X$RFB_STATE" = "XNORMAL" ]; then  # require valid login
                 if [ "X$RFB_CLIENT_COUNT" = "X0" ]; then
-                        xlock &
+                        xlock -mode blank &
                 fi
         fi
 fi
@@ -4783,7 +4783,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.3 lastmod: 2006-01-08
+x11vnc: allow VNC connections to real X11 displays. 0.7.3 lastmod: 2006-01-10
 
 x11vnc options:
   -display disp            -auth file             
@@ -4893,7 +4893,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.7.3 lastmod: 2006-01-08
+x11vnc: allow VNC connections to real X11 displays. 0.7.3 lastmod: 2006-01-10
 
 Typical usage is:
 

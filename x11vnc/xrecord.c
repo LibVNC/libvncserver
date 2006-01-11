@@ -408,7 +408,7 @@ int xrecord_scroll_keysym(rfbKeySym keysym) {
 }
 
 static int lookup_attr_cache(Window win, int *cache_index, int *next_index) {
-	double now, t, oldest;
+	double now, t, oldest = 0.0;
 	int i, old_index = -1, count = 0;
 	Window cwin;
 

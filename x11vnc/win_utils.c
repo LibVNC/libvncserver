@@ -330,7 +330,7 @@ int pick_windowid(unsigned long *num) {
 }
 
 Window descend_pointer(int depth, Window start, char *name_info, int len) {
-	Window r, c, clast;
+	Window r, c, clast = None;
 	int i, rx, ry, wx, wy;
 	int written = 0, filled = 0;
 	char *store = NULL;

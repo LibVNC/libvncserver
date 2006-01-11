@@ -932,7 +932,7 @@ static rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 	char *bitmap, *rich, *alpha;
 	char *pixels_new = NULL;
 	int n_opaque, n_trans, n_alpha, len, histo[256];
-	int send_alpha = 0, alpha_shift, thresh;
+	int send_alpha = 0, alpha_shift = 0, thresh;
 	int i, x, y;
 
 	if (first && dpy) {	/* raw_fb hack */
