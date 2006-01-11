@@ -38,6 +38,8 @@
 #include <signal.h>
 #include <time.h>
 
+static int extMutex_initialized = 0;
+static int logMutex_initialized = 0;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 static MUTEX(logMutex);
 static MUTEX(extMutex);
@@ -61,7 +63,6 @@ void
 rfbRegisterProtocolExtension(rfbProtocolExtension* extension)
 {
 	rfbProtocolExtension* last;
-	static int extMutex_initialized = 0;
 
 	if (! extMutex_initialized) {
 		INIT_MUTEX(extMutex);
@@ -151,6 +152,11 @@ rfbDefaultLog(const char *format, ...)
 
     if(!rfbEnableLogging)
       return;
+
+    if (! logMutex_initialized) {
+      INIT_MUTEX(logMutex);
+      logMutex_initialized = 1;
+    }
 
     LOCK(logMutex);
     va_start(args, format);
@@ -654,7 +660,11 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 {
    rfbScreenInfoPtr screen=calloc(sizeof(rfbScreenInfo),1);
 
-   INIT_MUTEX(logMutex);
+   if (! logMutex_initialized) {
+     INIT_MUTEX(logMutex);
+     logMutex_initialized = 1;
+   }
+
 
    if(width&3)
      rfbErr("WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
