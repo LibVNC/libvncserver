@@ -19,7 +19,7 @@ AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
 # Options
 AH_TEMPLATE(WITH_TIGHTVNC_FILETRANSFER, [Disable TightVNCFileTransfer protocol])
 AC_ARG_WITH(tightvnc-filetransfer,
-	[  --without-filetransfer   disable TightVNC file transfer protocol],
+	[  --without-filetransfer  disable TightVNC file transfer protocol],
 	, [ with_tightvnc_filetransfer=yes ])
 # AC_DEFINE moved to after libpthread check.
 
@@ -59,6 +59,22 @@ AH_TEMPLATE(HAVE_LIBXTRAP, [DEC-XTRAP extension build environment present])
 AH_TEMPLATE(HAVE_RECORD, [RECORD extension build environment present])
 AH_TEMPLATE(HAVE_SOLARIS_XREADSCREEN, [Solaris XReadScreen available])
 AH_TEMPLATE(HAVE_IRIX_XREADDISPLAY, [IRIX XReadDisplay available])
+
+AC_ARG_WITH(xkeyboard,
+[  --without-xkeyboard     disable xkeyboard extension support],,)
+AC_ARG_WITH(xinerama,
+[  --without-xinerama      disable xinerama extension support],,)
+AC_ARG_WITH(xrandr,
+[  --without-xrandr        disable xrandr extension support],,)
+AC_ARG_WITH(xfixes,
+[  --without-xfixes        disable xfixes extension support],,)
+AC_ARG_WITH(xdamage,
+[  --without-xdamage       disable xdamage extension support],,)
+AC_ARG_WITH(xtrap,
+[  --without-xtrap         disable xtrap extension support],,)
+AC_ARG_WITH(xrecord,
+[  --without-xrecord       disable xrecord extension support],,)
+
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 	AC_CHECK_LIB(X11, XGetImage, HAVE_X="true",
 		HAVE_X="false",
@@ -89,13 +105,16 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			[AC_DEFINE(HAVE_XTEST)], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
-		AC_CHECK_LIB(Xtst, XRecordEnableContextAsync, 
-			X_PRELIBS="$X_PRELIBS -lXtst"
-			[AC_DEFINE(HAVE_RECORD)], ,
-			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		if test "x$with_xrecord" != "xno"; then
+			AC_CHECK_LIB(Xtst, XRecordEnableContextAsync, 
+				X_PRELIBS="$X_PRELIBS -lXtst"
+				[AC_DEFINE(HAVE_RECORD)], ,
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		fi
 
 		# we use XTRAP on X11R5, or user can set X11VNC_USE_XTRAP
-		if test ! -z "$X11VNC_USE_XTRAP" -o -z "$HAVE_XTESTGRABCONTROL"; then
+		if test "x$with_xtrap" != "xno"; then
+		    if test ! -z "$X11VNC_USE_XTRAP" -o -z "$HAVE_XTESTGRABCONTROL"; then
 			AC_CHECK_LIB(XTrap, XETrapSetGrabServer, 
 				X_PRELIBS="$X_PRELIBS -lXTrap"
 				[AC_DEFINE(HAVE_LIBXTRAP)], ,
@@ -105,38 +124,49 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 				X_PRELIBS="$X_PRELIBS -lXETrap"
 				[AC_DEFINE(HAVE_LIBXTRAP)], ,
 				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		    fi
 		fi
 
-		saved_CPPFLAGS="$CPPFLAGS"
-		CPPFLAGS="$CPPFLAGS $X_CFLAGS"
-		AC_CHECK_HEADER(X11/XKBlib.h, HAVE_XKBLIB_H="true",
-			HAVE_XKBLIB_H="false", [#include <X11/Xlib.h>])
-		CPPFLAGS="$saved_CPPFLAGS"
-		if test $HAVE_XKBLIB_H = "true"; then
-			AC_CHECK_LIB(X11, XkbSelectEvents,
-				[AC_DEFINE(HAVE_XKEYBOARD)], ,
+		if test "x$with_xkeyboard" != "xno"; then
+			saved_CPPFLAGS="$CPPFLAGS"
+			CPPFLAGS="$CPPFLAGS $X_CFLAGS"
+			AC_CHECK_HEADER(X11/XKBlib.h, HAVE_XKBLIB_H="true",
+				HAVE_XKBLIB_H="false", [#include <X11/Xlib.h>])
+			CPPFLAGS="$saved_CPPFLAGS"
+			if test $HAVE_XKBLIB_H = "true"; then
+				AC_CHECK_LIB(X11, XkbSelectEvents,
+					[AC_DEFINE(HAVE_XKEYBOARD)], ,
+					$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+			fi
+		fi
+
+		if test "x$with_xinerama" != "xno"; then
+			AC_CHECK_LIB(Xinerama, XineramaQueryScreens,
+				X_PRELIBS="$X_PRELIBS -lXinerama"
+				[AC_DEFINE(HAVE_LIBXINERAMA)], ,
 				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 		fi
 
-		AC_CHECK_LIB(Xinerama, XineramaQueryScreens,
-			X_PRELIBS="$X_PRELIBS -lXinerama"
-			[AC_DEFINE(HAVE_LIBXINERAMA)], ,
-			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		if test "x$with_xrandr" != "xno"; then
+			AC_CHECK_LIB(Xrandr, XRRSelectInput,
+				X_PRELIBS="$X_PRELIBS -lXrandr"
+				[AC_DEFINE(HAVE_LIBXRANDR)], ,
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		fi
 
-		AC_CHECK_LIB(Xrandr, XRRSelectInput,
-			X_PRELIBS="$X_PRELIBS -lXrandr"
-			[AC_DEFINE(HAVE_LIBXRANDR)], ,
-			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		if test "x$with_xfixes" != "xno"; then
+			AC_CHECK_LIB(Xfixes, XFixesGetCursorImage,
+				X_PRELIBS="$X_PRELIBS -lXfixes"
+				[AC_DEFINE(HAVE_LIBXFIXES) HAVE_LIBXFIXES="true"], ,
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		fi
 
-		AC_CHECK_LIB(Xfixes, XFixesGetCursorImage,
-			X_PRELIBS="$X_PRELIBS -lXfixes"
-			[AC_DEFINE(HAVE_LIBXFIXES) HAVE_LIBXFIXES="true"], ,
-			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
-
-		AC_CHECK_LIB(Xdamage, XDamageQueryExtension,
-			X_PRELIBS="$X_PRELIBS -lXdamage"
-			[AC_DEFINE(HAVE_LIBXDAMAGE) HAVE_LIBXDAMAGE="true"], ,
-			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		if test "x$with_xdamage" != "xno"; then
+			AC_CHECK_LIB(Xdamage, XDamageQueryExtension,
+				X_PRELIBS="$X_PRELIBS -lXdamage"
+				[AC_DEFINE(HAVE_LIBXDAMAGE) HAVE_LIBXDAMAGE="true"], ,
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		fi
 
 		if test ! -z "$HAVE_LIBXFIXES" -o ! -z "$HAVE_LIBXDAMAGE"; then
 			# need /usr/sfw/lib in RPATH for Solaris 10 and later

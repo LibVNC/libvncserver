@@ -1,3 +1,6 @@
+2006-01-12  Karl Runge <runge@karlrunge.com>
+	* fix -DSMALL_FOOTPRINT=N builds.
+
 2006-01-11  Karl Runge <runge@karlrunge.com>
 	* x11vnc: close fd > 2 in run_user_command(), -nocmds in crash_debug,
 	  fix 64bit bug for -solid.
