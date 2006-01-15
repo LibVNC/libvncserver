@@ -63,6 +63,7 @@ extern int first_conn_timeout;
 extern int flash_cmap;
 extern int shift_cmap;
 extern int force_indexed_color;
+extern int cmap8to24;
 extern int launch_gui;
 
 extern int use_modifier_tweak;

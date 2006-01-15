@@ -1783,4 +1783,3 @@ int check_x11_pointer(void) {
 	return set_cursor(x, y, get_which_cursor());
 }
 
-

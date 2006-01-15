@@ -1512,7 +1512,7 @@ void check_connect_inputs(void) {
 }
 
 void check_gui_inputs(void) {
-	int i, nmax = 0, n = 0, nfds;
+	int i, gnmax = 0, n = 0, nfds;
 	int socks[ICON_MODE_SOCKS];
 	fd_set fds;
 	struct timeval tv;
@@ -1522,8 +1522,8 @@ void check_gui_inputs(void) {
 	for (i=0; i<ICON_MODE_SOCKS; i++) {
 		if (icon_mode_socks[i] >= 0) {
 			socks[n++] = i;
-			if (icon_mode_socks[i] > nmax) {
-				nmax = icon_mode_socks[i];
+			if (icon_mode_socks[i] > gnmax) {
+				gnmax = icon_mode_socks[i];
 			}
 		}
 	}
@@ -1539,7 +1539,7 @@ void check_gui_inputs(void) {
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 
-	nfds = select(nmax+1, &fds, NULL, NULL, &tv);
+	nfds = select(gnmax+1, &fds, NULL, NULL, &tv);
 	if (nfds <= 0) {
 		return;
 	}

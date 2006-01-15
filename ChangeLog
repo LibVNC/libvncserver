@@ -1,3 +1,6 @@
+2006-01-14  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add -8to24 option for some multi-depth displays.
+
 2006-01-12  Karl Runge <runge@karlrunge.com>
 	* configure.ac: add switches for most X extensions.
 

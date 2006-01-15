@@ -2,7 +2,7 @@
 .TH X11VNC "1" "January 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8, lastmod: 2006-01-11
+         version: 0.8, lastmod: 2006-01-14
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -176,6 +176,40 @@ visual (e.g. some apps have \fB-use24\fR or \fB-visual\fR options).
 .IP
 Sets \fB-overlay,\fR but does not try to draw the exact mouse
 cursor shape using the overlay mechanism.
+.PP
+\fB-8to24\fR
+.IP
+If \fB-overlay\fR is not supported on your OS, and you have a
+legacy 8bpp app that you want to view on a multi-depth
+display with default depth 24 (and is 32 bpp), try
+this option.  This option may not work on all X servers
+and hardware (tested on XFree86/Xorg mga driver).
+.IP
+It enables a hack where x11vnc monitors windows within 3
+levels from the root window.  If it finds any that are
+8bpp it will apply a transformation for pixel data in
+these regions where it extracts the 8bpp index color
+value from bits 25-32 and maps them on to TrueColor
+values and inserts them into bits 1-24 (i.e. overwrites
+bits 1-24).  This method appears to work, but may still
+have bugs and note that it does hog resources.  If there
+are multiple 8bpp windows using different colormaps,
+one may have to iconify all but one for the colors to
+be correct.
+.IP
+There may also be painting errors for clipping
+and switching between windows of depths 8 and 24.
+Heuristics are applied to try to minimize the painting
+errors.  One can also press 3 Alt_L's in a row to
+refresh the screen if the error does not repair itself.
+Also the option, say, \fB-fixscreen\fR V=3.0 may be use
+to periodically refresh the screen (at the cost of
+bandwidth).
+.IP
+Note that \fB-8to24\fR does not work on displays with 8bpp
+default visual with depth 24 applications.  The Xserver
+\fB-cc\fR option can be used to switch the default depth on
+multidepth setups.
 .PP
 \fB-scale\fR \fIfraction\fR
 .IP
@@ -1979,6 +2013,10 @@ overlay_cursor  in \fB-overlay\fR mode, enable cursor drawing.
 overlay_nocursor disable cursor drawing. same as
 nooverlay_cursor.
 .IP
+8to24           enable  \fB-8to24\fR mode (if applicable).
+.IP
+no8to24         disable \fB-8to24\fR mode.
+.IP
 visual:vis      set \fB-visual\fR to "vis"
 .IP
 scale:frac      set \fB-scale\fR to "frac"
@@ -2417,10 +2455,10 @@ refresh reset close disconnect id sid waitmapped
 nowaitmapped clip flashcmap noflashcmap shiftcmap
 truecolor notruecolor overlay nooverlay overlay_cursor
 overlay_yescursor nooverlay_nocursor nooverlay_cursor
-nooverlay_yescursor overlay_nocursor visual scale
-scale_cursor viewonly noviewonly shared noshared
-forever noforever once timeout filexfer deny lock
-nodeny unlock connect allowonce allow localhost
+nooverlay_yescursor overlay_nocursor 8to24 no8to24
+visual scale scale_cursor viewonly noviewonly shared
+noshared forever noforever once timeout filexfer deny
+lock nodeny unlock connect allowonce allow localhost
 nolocalhost listen lookup nolookup accept afteraccept
 gone shm noshm flipbyteorder noflipbyteorder onetile
 noonetile solid_color solid nosolid blackout xinerama

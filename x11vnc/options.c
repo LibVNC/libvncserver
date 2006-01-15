@@ -88,6 +88,7 @@ int first_conn_timeout = 0;	/* -timeout */
 int flash_cmap = 0;		/* follow installed colormaps */
 int shift_cmap = 0;		/* ncells < 256 and needs shift of pixel values */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
+int cmap8to24 = 0;		/* -8to24 */
 int launch_gui = 0;		/* -gui */
 
 int use_modifier_tweak = 1;	/* use the shift/altgr modifier tweak */

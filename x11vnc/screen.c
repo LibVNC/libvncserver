@@ -544,8 +544,9 @@ static void nofb_hook(rfbClientPtr cl) {
 
 void do_new_fb(int reset_mem) {
 	XImage *fb;
-	char *old_main = main_fb;
-	char *old_rfb  = rfb_fb;
+	char *old_main  = main_fb;
+	char *old_rfb   = rfb_fb;
+	char *old_8to24 = cmap8to24_fb;
 
 	/* for threaded we really should lock libvncserver out. */
 	if (use_threads) {
@@ -569,11 +570,14 @@ void do_new_fb(int reset_mem) {
 		initialize_polling_images();
 	}
 
-	if (old_main != old_rfb && old_main) {
+	if (old_main) {
 		free(old_main);
 	}
-	if (old_rfb) {
+	if (old_rfb && old_rfb != old_main) {
 		free(old_rfb);
+	}
+	if (old_8to24 && old_8to24 != old_main && old_8to24 != old_rfb) {
+		free(old_8to24);
 	}
 	fb0 = fb;
 }
@@ -1754,12 +1758,31 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	if (nofb) {
 		main_fb = NULL;
 		rfb_fb = main_fb;
+		cmap8to24_fb = NULL;
 		screen->displayHook = nofb_hook;
 	} else {
 		main_fb = fb->data;
+		rfb_fb = NULL;
+		cmap8to24_fb = NULL;
+
+		if (cmap8to24) {
+			if (screen->serverFormat.bitsPerPixel != 32 ||
+			    screen->serverFormat.depth != 24) {
+				if (!quiet) rfbLog("disabling -8to24 mode:"
+				    " bpp != 32 or depth != 24\n");
+				cmap8to24 = 0;
+			}
+		}
+		if (cmap8to24) {
+			int n = main_bytes_per_line * fb->height;
+			cmap8to24_fb = (char *) malloc(n);
+			memset(cmap8to24_fb, 0, n);
+		}
 		if (scaling) {
 			rfb_fb = (char *) malloc(rfb_bytes_per_line * height);
 			memset(rfb_fb, 0, rfb_bytes_per_line * height);
+		} else if (cmap8to24) {
+			rfb_fb = cmap8to24_fb;	
 		} else {
 			rfb_fb = main_fb;
 		}
@@ -1768,6 +1791,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	if (!quiet) {
 		fprintf(stderr, " main_fb:     %p\n", main_fb);
 		fprintf(stderr, " rfb_fb:      %p\n", rfb_fb);
+		fprintf(stderr, " 8to24_fb:    %p\n", cmap8to24_fb);
 		fprintf(stderr, "\n");
 	}
 
@@ -1780,7 +1804,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	setup_cursors_and_push();
 
-	if (scaling) {
+	if (scaling || cmap8to24) {
 		mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
 	}
 

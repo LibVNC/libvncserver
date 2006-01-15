@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8 lastmod: 2006-01-11";
+char lastmod[] = "0.8 lastmod: 2006-01-14";
 
 /* X display info */
 
@@ -57,6 +57,7 @@ char *main_fb = NULL;		/* our copy of the X11 fb */
 char *rfb_fb = NULL;		/* same as main_fb unless transformation */
 char *fake_fb = NULL;		/* used under -padgeom */
 char *snap_fb = NULL;		/* used under -snapfb */
+char *cmap8to24_fb = NULL;	/* used under -8to24 */
 char *raw_fb = NULL;
 char *raw_fb_addr = NULL;
 int raw_fb_offset = 0;

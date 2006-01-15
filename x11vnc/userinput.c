@@ -14,6 +14,7 @@
 #include "keyboard.h"
 #include "solid.h"
 #include "xrandr.h"
+#include "8to24.h"
 
 /*
  * user input handling heuristics
@@ -241,7 +242,7 @@ WIREFRAME_PARMS "0xff,2,0,30+6+6+6,Alt,0.05+0.3+2.0,8"
 shade,linewidth,percent,T+B+L+R,mods,t1+t2+t3+t4
  */
 #define LW_MAX 8
-static unsigned long wireframe_shade;
+static unsigned long wireframe_shade = 0xff;
 static int wireframe_lw;
 static double wireframe_frac;
 static int wireframe_top, wireframe_bot, wireframe_left, wireframe_right;
@@ -3694,6 +3695,25 @@ if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
 	/* final push (for -nowirecopyrect) */
 	rfbPE(1000);
 	wireframe_in_progress = 0;
+
+	if (frame_changed && cmap8to24 && multivis_count) {
+		/* handle -8to24 tweak, mark area and check 8bpp... */
+		int x1, x2, y1, y2, f = 16;
+		x1 = nmin(box_x, orig_x) - f;
+		y1 = nmin(box_y, orig_y) - f;
+		x2 = nmax(box_x + box_w, orig_x + orig_w) + f;
+		y2 = nmax(box_y + box_h, orig_y + orig_h) + f;
+		x1 = nfix(x1, dpy_x);
+		x2 = nfix(x2, dpy_x);
+		y1 = nfix(y1, dpy_y);
+		y2 = nfix(y2, dpy_y);
+if (0) fprintf(stderr, "wireframe_in_progress over: %d %d %d %d\n", x1, y1, x2, y2);
+		check_for_multivis();
+		if (1) mark_rect_as_modified(x1, y1, x2, y2, 0);
+		if (0) mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
+		if (0) rfbPE(-1);
+	}
+
 	urgent_update = 1;
 	if (use_xdamage) {
 		/* DAMAGE can queue ~1000 rectangles for a move */

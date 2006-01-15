@@ -6,6 +6,7 @@
 #include "xdamage.h"
 #include "xrandr.h"
 #include "win_utils.h"
+#include "8to24.h"
 #include "screen.h"
 #include "pointer.h"
 #include "cleanup.h"
@@ -1158,6 +1159,7 @@ void scale_rect(double factor, int blend, int interpolate, int Bpp,
 }
 
 void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
+	char *src_fb = main_fb;
 
 	if (!screen || !rfb_fb || !main_fb) {
 		return;
@@ -1181,8 +1183,12 @@ void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 		}
 	}
 
+	if (cmap8to24 && cmap8to24_fb) {
+		src_fb = cmap8to24_fb;
+	}
+
 	scale_rect(scale_fac, scaling_blend, scaling_interpolate, bpp/8,
-	    main_fb, main_bytes_per_line, rfb_fb, rfb_bytes_per_line,
+	    src_fb, main_bytes_per_line, rfb_fb, rfb_bytes_per_line,
 	    dpy_x, dpy_y, scaled_x, scaled_y, X1, Y1, X2, Y2, 1);
 }
 
@@ -1212,8 +1218,17 @@ void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force) {
 
 	if (rfb_fb == main_fb || force) {
 		rfbMarkRectAsModified(screen, x1, y1, x2, y2);
-	} else if (scaling) {
+		return;
+	}
+
+	if (cmap8to24) {
+		bpp8to24(x1, y1, x2, y2);
+	}
+
+	if (scaling) {
 		scale_and_mark_rect(x1, y1, x2, y2);
+	} else {
+		rfbMarkRectAsModified(screen, x1, y1, x2, y2);
 	}
 }
 
@@ -2415,6 +2430,9 @@ int scan_for_updates(int count_only) {
 		if (indexed_color && scan_count % 4 == 0) {
 			/* check for changed colormap */
 			set_colormap(0);
+		}
+		if (cmap8to24 && scan_count % 4 == 0) {
+			check_for_multivis();
 		}
 		if (use_xdamage) {
 			/* first pass collecting DAMAGE events: */

@@ -979,6 +979,24 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			rfbLog(" -R cursor:... to re-enable any cursors.\n");
 		}
 		
+	} else if (!strcmp(p, "8to24")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, cmap8to24);
+			goto qry;
+		}
+		rfbLog("remote_cmd: turning on -8to24 mode.\n");
+		cmap8to24 = 1;
+		do_new_fb(0);
+
+	} else if (!strcmp(p, "no8to24")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !cmap8to24);
+			goto qry;
+		}
+		rfbLog("remote_cmd: turning off -8to24 mode.\n");
+		cmap8to24 = 0;
+		do_new_fb(0);
+
 	} else if (strstr(p, "visual") == p) {
 		COLON_CHECK("visual:")
 		if (query) {

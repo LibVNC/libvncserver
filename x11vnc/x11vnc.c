@@ -907,6 +907,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " flashcmap:  %d\n", flash_cmap);
 	fprintf(stderr, " shiftcmap:  %d\n", shift_cmap);
 	fprintf(stderr, " force_idx:  %d\n", force_indexed_color);
+	fprintf(stderr, " cmap8to24:  %d\n", cmap8to24);
 	fprintf(stderr, " visual:     %s\n", visual_str ? visual_str
 	    : "null");
 	fprintf(stderr, " overlay:    %d\n", overlay);
@@ -1270,6 +1271,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-overlay_yescursor")) {
 			overlay = 1;
 			overlay_cursor = 2;
+		} else if (!strcmp(arg, "-8to24")) {
+			cmap8to24 = 1;
 		} else if (!strcmp(arg, "-visual")) {
 			CHECK_ARGC
 			visual_str = strdup(argv[++i]);

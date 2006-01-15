@@ -14,6 +14,8 @@ MUTEX(scrollMutex);
 #endif
 
 int nfix(int i, int n);
+int nmin(int n, int m);
+int nmax(int n, int m);
 int nabs(int n);
 double dabs(double x);
 void lowercase(char *str);
@@ -42,6 +44,9 @@ double rfac(void);
 void rfbPE(long usec);
 void rfbCFD(long usec);
 
+double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
+    int X2, int Y2);
+
 
 /*
  * routine to keep 0 <= i < n, should use in more places...
@@ -53,6 +58,22 @@ int nfix(int i, int n) {
 		i = n - 1;
 	}
 	return i;
+}
+
+int nmin(int n, int m) {
+	if (n < m) {
+		return n;
+	} else {
+		return m;
+	}
+}
+
+int nmax(int n, int m) {
+	if (n > m) {
+		return n;
+	} else {
+		return m;
+	}
 }
 
 int nabs(int n) {
@@ -394,4 +415,39 @@ void rfbCFD(long usec) {
 	}
 }
 
+double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
+    int X2, int Y2) {
+	double a, A, o;
+	sraRegionPtr r, R, overlap;
+	sraRectangleIterator *iter;
+	sraRect rt;
+
+	a = nabs((x2 - x1) * (y2 - y1));
+	A = nabs((X2 - X1) * (Y2 - Y1));
+
+	r = sraRgnCreateRect(x1, y1, x2, y2);
+	R = sraRgnCreateRect(X1, Y1, X2, Y2);
+
+	overlap = sraRgnCreateRect(x1, y1, x2, y2);
+
+	sraRgnAnd(overlap, R);
+	
+	o = 0.0;
+	iter = sraRgnGetIterator(overlap);
+	while (sraRgnIteratorNext(iter, &rt)) {
+		o += nabs( (rt.x2 - rt.x1) * (rt.y2 - rt.y1) );
+	}
+	sraRgnReleaseIterator(iter);
+
+	sraRgnDestroy(r);
+	sraRgnDestroy(R);
+	sraRgnDestroy(overlap);
+
+	if (a < A) {
+		o = o/a;
+	} else {
+		o = o/A;
+	}
+	return o;
+}
 

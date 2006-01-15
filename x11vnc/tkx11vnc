@@ -121,6 +121,7 @@ Screen
 	=GAL OverlayVisuals::
 	overlay
 	overlay_nocursor
+	8to24
 	=GAL LOFF
 	=GAL 8-Bit-Color::
 	flashcmap
@@ -1446,7 +1447,7 @@ proc parse_help {} {
 		if {! $sawopts} {
 			continue;
 		}
-		if {[regexp {^-([A-z_][A-z_]*)} $line match name]} {
+		if {[regexp {^-([0-9A-z_][0-9A-z_]*)} $line match name]} {
 			set allnames($name) 1;
 			if {"$curropt" != "no$name" && "no$curropt" != "$name"} {
 				set curropt $name;
@@ -1525,7 +1526,7 @@ proc parse_remote_help {} {
 		if {! $sawopts} {
 			continue;
 		}
-		if {[regexp {^([A-z_][A-z_:]*)} $line match name]} {
+		if {[regexp {^([0-9A-z_][0-9A-z_:]*)} $line match name]} {
 			regsub {:.*$} $name "" popt
 			lappend possopts $popt
 			if {"$curropt" != "no$name" && "no$curropt" != "$name"} {

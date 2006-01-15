@@ -4,6 +4,8 @@
 /* -- util.h -- */
 
 extern int nfix(int i, int n);
+extern int nmin(int n, int m);
+extern int nmax(int n, int m);
 extern int nabs(int n);
 extern double dabs(double x);
 extern void lowercase(char *str);
@@ -31,6 +33,8 @@ extern double rfac(void);
 
 extern void rfbPE(long usec);
 extern void rfbCFD(long usec);
+extern double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
+    int X2, int Y2);
 
 
 #define NONUL(x) ((x) ? (x) : "")
