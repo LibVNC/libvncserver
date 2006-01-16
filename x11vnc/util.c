@@ -418,7 +418,7 @@ void rfbCFD(long usec) {
 double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
     int X2, int Y2) {
 	double a, A, o;
-	sraRegionPtr r, R, overlap;
+	sraRegionPtr r, R;
 	sraRectangleIterator *iter;
 	sraRect rt;
 
@@ -428,12 +428,10 @@ double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
 	r = sraRgnCreateRect(x1, y1, x2, y2);
 	R = sraRgnCreateRect(X1, Y1, X2, Y2);
 
-	overlap = sraRgnCreateRect(x1, y1, x2, y2);
-
-	sraRgnAnd(overlap, R);
+	sraRgnAnd(r, R);
 	
 	o = 0.0;
-	iter = sraRgnGetIterator(overlap);
+	iter = sraRgnGetIterator(r);
 	while (sraRgnIteratorNext(iter, &rt)) {
 		o += nabs( (rt.x2 - rt.x1) * (rt.y2 - rt.y1) );
 	}
@@ -441,7 +439,6 @@ double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
 
 	sraRgnDestroy(r);
 	sraRgnDestroy(R);
-	sraRgnDestroy(overlap);
 
 	if (a < A) {
 		o = o/a;

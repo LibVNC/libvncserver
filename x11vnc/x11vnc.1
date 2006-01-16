@@ -2,7 +2,7 @@
 .TH X11VNC "1" "January 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8, lastmod: 2006-01-14
+         version: 0.8, lastmod: 2006-01-16
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -206,10 +206,21 @@ Also the option, say, \fB-fixscreen\fR V=3.0 may be use
 to periodically refresh the screen (at the cost of
 bandwidth).
 .IP
+Debugging for this mode can be enabled by setting the
+environment variable DEBUG_8TO24 to 1, 2, or 3.
+.IP
+If there are problems, to enable an even more
+experimental mode, set the environment variable
+XGETIMAGE_8TO24=1 before starting x11vnc.  This enables
+a scheme were XGetImage() is used to retrieve the 8bpp
+data instead of assuming that data is in bits 25-32.
+This mode is significantly slower than the above mode.
+.IP
 Note that \fB-8to24\fR does not work on displays with 8bpp
 default visual with depth 24 applications.  The Xserver
-\fB-cc\fR option can be used to switch the default depth on
-multidepth setups.
+\fB-cc\fR option can be used to switch the default depth
+on multidepth setups.  It may be possible to handle
+this case.
 .PP
 \fB-scale\fR \fIfraction\fR
 .IP
