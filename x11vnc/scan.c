@@ -1160,6 +1160,7 @@ void scale_rect(double factor, int blend, int interpolate, int Bpp,
 
 void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 	char *src_fb = main_fb;
+	int Bpp = bpp/8, fac = 1;
 
 	if (!screen || !rfb_fb || !main_fb) {
 		return;
@@ -1185,10 +1186,13 @@ void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 
 	if (cmap8to24 && cmap8to24_fb) {
 		src_fb = cmap8to24_fb;
+		if (scaling && depth == 8) {
+			fac = 4;
+		}
 	}
 
-	scale_rect(scale_fac, scaling_blend, scaling_interpolate, bpp/8,
-	    src_fb, main_bytes_per_line, rfb_fb, rfb_bytes_per_line,
+	scale_rect(scale_fac, scaling_blend, scaling_interpolate, fac * Bpp,
+	    src_fb, fac * main_bytes_per_line, rfb_fb, rfb_bytes_per_line,
 	    dpy_x, dpy_y, scaled_x, scaled_y, X1, Y1, X2, Y2, 1);
 }
 

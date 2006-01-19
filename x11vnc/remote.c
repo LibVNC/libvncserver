@@ -984,8 +984,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, cmap8to24);
 			goto qry;
 		}
+		if (overlay) {
+			rfbLog("disabling -overlay in -8to24 mode.\n");
+			overlay = 0;
+		}
 		rfbLog("remote_cmd: turning on -8to24 mode.\n");
 		cmap8to24 = 1;
+		if (overlay) {
+			rfbLog("disabling -overlay in -8to24 mode.\n");
+			overlay = 0;
+		}
 		do_new_fb(0);
 
 	} else if (!strcmp(p, "no8to24")) {

@@ -1502,11 +1502,39 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	int height = fb->height;
 	int create_screen = screen ? 0 : 1;
 	int bits_per_color;
+	int fb_bpp, fb_Bpl, fb_depth;
 	
+	bpp = fb->bits_per_pixel;
+
+	fb_bpp   = (int) fb->bits_per_pixel;
+	fb_Bpl   = (int) fb->bytes_per_line;
+	fb_depth = (int) fb->depth;
+
 	main_bytes_per_line = fb->bytes_per_line;
 
+	if (cmap8to24) {
+		if (raw_fb) {
+			if (!quiet) rfbLog("disabling -8to24 mode"
+			    " in raw_fb mode.\n");
+			cmap8to24 = 0;
+		} else if (depth == 24) {
+			if (fb_bpp != 32)  {
+				if (!quiet) rfbLog("disabling -8to24 mode:"
+				    " bpp != 32 with depth == 24\n");
+				cmap8to24 = 0;
+			}
+		} else if (depth == 8) {
+			/* need to cook up the screen fb to be depth 24 */
+			fb_bpp = 32;
+			fb_depth = 24;
+		} else {
+			if (!quiet) rfbLog("disabling -8to24 mode:"
+			    " default depth not 24 or 8\n");
+			cmap8to24 = 0;
+		}
+	}
+
 	setup_scaling(&width, &height);
-	
 
 	if (scaling) {
 		rfbLog("scaling screen: %dx%d -> %dx%d  scale_fac=%.5f\n",
@@ -1517,32 +1545,35 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		rfb_bytes_per_line = main_bytes_per_line;
 	}
 
+	if (cmap8to24 && depth == 8) {
+		rfb_bytes_per_line *= 4;
+	}
+
 	/*
 	 * These are just hints wrt pixel format just to let
 	 * rfbGetScreen/rfbNewFramebuffer proceed with reasonable
 	 * defaults.  We manually set them in painful detail below.
 	 */
-	bits_per_color = guess_bits_per_color(fb->bits_per_pixel);
+	bits_per_color = guess_bits_per_color(fb_bpp);
 
 	/* n.b. samplesPerPixel (set = 1 here) seems to be unused. */
 	if (create_screen) {
 		screen = rfbGetScreen(argc, argv, width, height,
-		    bits_per_color, 1, (int) fb->bits_per_pixel/8);
+		    bits_per_color, 1, fb_bpp/8);
 		if (screen && http_dir) {
 			http_connections(1);
 		}
 	} else {
 		/* set set frameBuffer member below. */
 		rfbLog("rfbNewFramebuffer(0x%x, 0x%x, %d, %d, %d, %d, %d)\n",
-		    screen, NULL, width, height,
-		    bits_per_color, 1, fb->bits_per_pixel/8);
+		    screen, NULL, width, height, bits_per_color, 1, fb_bpp/8);
 
 		/* these are probably overwritten, but just to be safe: */
-		screen->bitsPerPixel = fb->bits_per_pixel;
-		screen->depth = fb->depth;
+		screen->bitsPerPixel = fb_bpp;
+		screen->depth = fb_depth;
 
 		rfbNewFramebuffer(screen, NULL, width, height,
-		    bits_per_color, 1, (int) fb->bits_per_pixel/8);
+		    bits_per_color, 1, (int) fb_bpp/8);
 	}
 	if (! screen) {
 		int i;
@@ -1583,8 +1614,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	/* set up format from scratch: */
 	screen->paddedWidthInBytes = rfb_bytes_per_line;
-	screen->serverFormat.bitsPerPixel = fb->bits_per_pixel;
-	screen->serverFormat.depth = fb->depth;
+	screen->serverFormat.bitsPerPixel = fb_bpp;
+	screen->serverFormat.depth = fb_depth;
 	screen->serverFormat.trueColour = TRUE;
 
 	screen->serverFormat.redShift   = 0;
@@ -1605,10 +1636,31 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	main_green_mask  = fb->green_mask;
 	main_blue_mask   = fb->blue_mask;
 
-
 	have_masks = ((fb->red_mask|fb->green_mask|fb->blue_mask) != 0);
 	if (force_indexed_color) {
 		have_masks = 0;
+	}
+
+	if (cmap8to24 && depth == 8) {
+		XVisualInfo vinfo;
+		/* more cooking up... */
+		have_masks = 2;
+		/* need to fetch TrueColor visual */
+		X_LOCK;
+		if (XMatchVisualInfo(dpy, scr, 24, TrueColor, &vinfo)) {
+			main_red_mask   = vinfo.red_mask;
+			main_green_mask = vinfo.green_mask;
+			main_blue_mask  = vinfo.blue_mask;
+		} else if (fb->byte_order == LSBFirst) {
+			main_red_mask   = 0x00ff0000;
+			main_green_mask = 0x0000ff00;
+			main_blue_mask  = 0x000000ff;
+		} else {
+			main_red_mask   = 0x000000ff;
+			main_green_mask = 0x0000ff00;
+			main_blue_mask  = 0x00ff0000;
+		}
+		X_UNLOCK;
 	}
 
 	if (! have_masks && screen->serverFormat.bitsPerPixel == 8
@@ -1641,41 +1693,45 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 			if (raw_fb) {
 				rfbLog("Raw fb at addr %p is %dbpp depth=%d "
 				    "true color\n", raw_fb_addr,
+				    fb_bpp, fb_depth);
+			} else if (have_masks == 2) {
+				rfbLog("X display %s is %dbpp depth=%d indexed "
+				    "color (-8to24 mode)\n", DisplayString(dpy),
 				    fb->bits_per_pixel, fb->depth);
 			} else {
 				rfbLog("X display %s is %dbpp depth=%d true "
 				    "color\n", DisplayString(dpy),
-				    fb->bits_per_pixel, fb->depth);
+				    fb_bpp, fb_depth);
 			}
 		}
 
 		indexed_color = 0;
 
 		/* convert masks to bit shifts and max # colors */
-		if (fb->red_mask) {
-			while (! (fb->red_mask
+		if (main_red_mask) {
+			while (! (main_red_mask
 			    & (1 << screen->serverFormat.redShift))) {
 				    screen->serverFormat.redShift++;
 			}
 		}
-		if (fb->green_mask) {
-			while (! (fb->green_mask
+		if (main_green_mask) {
+			while (! (main_green_mask
 			    & (1 << screen->serverFormat.greenShift))) {
 				    screen->serverFormat.greenShift++;
 			}
 		}
-		if (fb->blue_mask) {
-			while (! (fb->blue_mask
+		if (main_blue_mask) {
+			while (! (main_blue_mask
 			    & (1 << screen->serverFormat.blueShift))) {
 				    screen->serverFormat.blueShift++;
 			}
 		}
 		screen->serverFormat.redMax
-		    = fb->red_mask   >> screen->serverFormat.redShift;
+		    = main_red_mask   >> screen->serverFormat.redShift;
 		screen->serverFormat.greenMax
-		    = fb->green_mask >> screen->serverFormat.greenShift;
+		    = main_green_mask >> screen->serverFormat.greenShift;
 		screen->serverFormat.blueMax
-		    = fb->blue_mask  >> screen->serverFormat.blueShift;
+		    = main_blue_mask  >> screen->serverFormat.blueShift;
 
 		main_red_max     = screen->serverFormat.redMax;
 		main_green_max   = screen->serverFormat.greenMax;
@@ -1703,6 +1759,17 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		    bitprint(fb->green_mask, 32));
 		fprintf(stderr, " blue_mask:  0x%08lx  %s\n", fb->blue_mask,
 		    bitprint(fb->blue_mask, 32));
+		if (cmap8to24) {
+			fprintf(stderr, " 8to24 info:\n");
+			fprintf(stderr, " fb_bpp:           %d\n", fb_bpp);
+			fprintf(stderr, " fb_depth:         %d\n", fb_depth);
+			fprintf(stderr, " red_mask:   0x%08lx  %s\n", main_red_mask,
+			    bitprint(main_red_mask, 32));
+			fprintf(stderr, " green_mask: 0x%08lx  %s\n", main_green_mask,
+			    bitprint(main_green_mask, 32));
+			fprintf(stderr, " blue_mask:  0x%08lx  %s\n", main_blue_mask,
+			    bitprint(main_blue_mask, 32));
+		}
 		fprintf(stderr, " red:   max: %3d  shift: %2d\n",
 			main_red_max, main_red_shift);
 		fprintf(stderr, " green: max: %3d  shift: %2d\n",
@@ -1766,15 +1833,10 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		cmap8to24_fb = NULL;
 
 		if (cmap8to24) {
-			if (screen->serverFormat.bitsPerPixel != 32 ||
-			    screen->serverFormat.depth != 24) {
-				if (!quiet) rfbLog("disabling -8to24 mode:"
-				    " bpp != 32 or depth != 24\n");
-				cmap8to24 = 0;
-			}
-		}
-		if (cmap8to24) {
 			int n = main_bytes_per_line * fb->height;
+			if (depth == 8) {
+				n *= 4;
+			}
 			cmap8to24_fb = (char *) malloc(n);
 			memset(cmap8to24_fb, 0, n);
 		}
@@ -1794,9 +1856,6 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		fprintf(stderr, " 8to24_fb:    %p\n", cmap8to24_fb);
 		fprintf(stderr, "\n");
 	}
-
-	bpp   = screen->serverFormat.bitsPerPixel;
-	depth = screen->serverFormat.depth;
 
 	/* may need, bpp, main_red_max, etc. */
 	parse_wireframe();

@@ -1560,7 +1560,7 @@ int main(int argc, char* argv[]) {
 			set_wirecopyrect_mode(argv[++i]);
 			got_wirecopyrect = 1;
 		} else if (!strcmp(arg, "-nowirecopyrect")
-		    || !strcmp(arg, "-nowf")) {
+		    || !strcmp(arg, "-nowcr")) {
 			set_wirecopyrect_mode("never");
 		} else if (!strcmp(arg, "-debug_wireframe")
 		    || !strcmp(arg, "-dwf")) {
@@ -2054,10 +2054,18 @@ int main(int argc, char* argv[]) {
 		alpha_remove = 0;
 	}
 
+	if (cmap8to24 && overlay) {
+		if (! quiet) {
+			rfbLog("disabling -overlay in -8to24 mode.\n");
+		}
+		overlay = 0;
+	}
+
 	if (filexfer && view_only) {
 		if (! quiet) {
 			rfbLog("setting -nofilexfer in -viewonly mode.\n");
 		}
+		/* how to undo via -R? */
 		filexfer = 0;
 	}
 

@@ -1729,16 +1729,16 @@ static void get_client_regions(int *req, int *mod, int *cpy, int *num)  {
 static void do_copyregion(sraRegionPtr region, int dx, int dy)  {
 	sraRectangleIterator *iter;
 	sraRect rect;
-	int Bpp = bpp/8;
-	int x1, y1, x2, y2, w, stride;
+	int Bpp0 = bpp/8, Bpp;
+	int x1, y1, x2, y2, w, stride, stride0;
 	int sx1, sy1, sx2, sy2, sdx, sdy;
 	int req, mod, cpy, ncli;
-	char *dst, *src;
+	char *dst = NULL, *src = NULL;
 
 	last_copyrect = dnow();
 
-	if (!scaling || rfb_fb == main_fb) {
-		/* normal case */
+	if (rfb_fb == main_fb) {
+		/* normal case, no -scale or -8to24 */
 		get_client_regions(&req, &mod, &cpy, &ncli);
 if (debug_scroll > 1) fprintf(stderr, "<<<-rfbDoCopyRect req: %d mod: %d cpy: %d\n", req, mod, cpy); 
 		rfbDoCopyRegion(screen, region, dx, dy);
@@ -1750,43 +1750,73 @@ if (debug_scroll > 1) fprintf(stderr, ">>>-rfbDoCopyRect req: %d mod: %d cpy: %d
 	}
 
 	/* rarer case, we need to call rfbDoCopyRect with scaled xy */
-	stride = dpy_x * Bpp;
+	stride0 = dpy_x * Bpp0;
 
 	iter = sraRgnGetReverseIterator(region, dx < 0, dy < 0);
 	while(sraRgnIteratorNext(iter, &rect)) {
-		int j;
+		int j, c;
 
 		x1 = rect.x1;
 		y1 = rect.y1;
 		x2 = rect.x2;
 		y2 = rect.y2;
 
-		w = (x2 - x1)*Bpp; 
-		dst = main_fb + y1*stride + x1*Bpp;
-		src = main_fb + (y1-dy)*stride + (x1-dx)*Bpp;
 
-		if (dy < 0) {
-			for (j=y1; j<y2; j++) {
-				memmove(dst, src, w);
-				dst += stride;
-				src += stride;
+		for (c= 0; c < 2; c++) {
+
+			Bpp = Bpp0;
+			stride = stride0;
+
+			if (c == 0) {
+				dst = main_fb + y1*stride + x1*Bpp;
+				src = main_fb + (y1-dy)*stride + (x1-dx)*Bpp;
+
+			} else if (c == 1) {
+				if (! cmap8to24_fb || cmap8to24_fb == rfb_fb) {
+					continue;
+				}
+				if (cmap8to24 && depth == 8) {
+					Bpp = 4 * Bpp0;
+					stride = 4 * stride0;
+				}
+				dst = cmap8to24_fb + y1*stride + x1*Bpp;
+				src = cmap8to24_fb + (y1-dy)*stride + (x1-dx)*Bpp;
 			}
-		} else {
-			dst += (y2 - y1 - 1)*stride;
-			src += (y2 - y1 - 1)*stride;
-			for (j=y2-1; j>=y1; j--) {
-				memmove(dst, src, w);
-				dst -= stride;
-				src -= stride;
+
+			w = (x2 - x1)*Bpp; 
+			
+			if (dy < 0) {
+				for (j=y1; j<y2; j++) {
+					memmove(dst, src, w);
+					dst += stride;
+					src += stride;
+				}
+			} else {
+				dst += (y2 - y1 - 1)*stride;
+				src += (y2 - y1 - 1)*stride;
+				for (j=y2-1; j>=y1; j--) {
+					memmove(dst, src, w);
+					dst -= stride;
+					src -= stride;
+				}
 			}
 		}
 
-		sx1 = ((double) x1 / dpy_x) * scaled_x;
-		sy1 = ((double) y1 / dpy_y) * scaled_y;
-		sx2 = ((double) x2 / dpy_x) * scaled_x;
-		sy2 = ((double) y2 / dpy_y) * scaled_y;
-		sdx = ((double) dx / dpy_x) * scaled_x;
-		sdy = ((double) dy / dpy_y) * scaled_y;
+		if (scaling) {
+			sx1 = ((double) x1 / dpy_x) * scaled_x;
+			sy1 = ((double) y1 / dpy_y) * scaled_y;
+			sx2 = ((double) x2 / dpy_x) * scaled_x;
+			sy2 = ((double) y2 / dpy_y) * scaled_y;
+			sdx = ((double) dx / dpy_x) * scaled_x;
+			sdy = ((double) dy / dpy_y) * scaled_y;
+		} else {
+			sx1 = x1;
+			sy1 = y1;
+			sx2 = x2;
+			sy2 = y2;
+			sdx = dx;
+			sdy = dy;
+		}
 
 		rfbDoCopyRect(screen, sx1, sy1, sx2, sy2, sdx, sdy);
 	}
@@ -3710,8 +3740,6 @@ if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
 if (0) fprintf(stderr, "wireframe_in_progress over: %d %d %d %d\n", x1, y1, x2, y2);
 		check_for_multivis();
 		if (1) mark_rect_as_modified(x1, y1, x2, y2, 0);
-		if (0) mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
-		if (0) rfbPE(-1);
 	}
 
 	urgent_update = 1;

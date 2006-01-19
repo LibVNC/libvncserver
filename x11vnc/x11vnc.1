@@ -2,7 +2,7 @@
 .TH X11VNC "1" "January 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8, lastmod: 2006-01-16
+         version: 0.8, lastmod: 2006-01-18
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -110,6 +110,7 @@ of the selected window.
 .IP
 In 8bpp indexed color, let the installed colormap flash
 as the pointer moves from window to window (slow).
+Also try the \fB-8to24\fR option to avoid flash altogether.
 .PP
 \fB-shiftcmap\fR \fIn\fR
 .IP
@@ -182,8 +183,10 @@ cursor shape using the overlay mechanism.
 If \fB-overlay\fR is not supported on your OS, and you have a
 legacy 8bpp app that you want to view on a multi-depth
 display with default depth 24 (and is 32 bpp), try
-this option.  This option may not work on all X servers
-and hardware (tested on XFree86/Xorg mga driver).
+this option.  It will also work for a default depth 8
+display with depth 24 overlay windows.  This option
+may not work on all X servers and hardware (tested on
+XFree86/Xorg mga driver).
 .IP
 It enables a hack where x11vnc monitors windows within 3
 levels from the root window.  If it finds any that are
@@ -191,14 +194,22 @@ levels from the root window.  If it finds any that are
 these regions where it extracts the 8bpp index color
 value from bits 25-32 and maps them on to TrueColor
 values and inserts them into bits 1-24 (i.e. overwrites
-bits 1-24).  This method appears to work, but may still
-have bugs and note that it does hog resources.  If there
+bits 1-24).
+.IP
+For default depth 8 displays, everything is tranformed
+to 32bpp (and is potentially a improvement over
+\fB-flashcmap).\fR  Also for default depth 8 displays, setting
+the env. var. HIGHBITS_8TO24 may give a speedup for
+transforming 8bpp pixel data.
+.IP
+These schemes appear to work, but may still have
+bugs and note that they do hog resources.  If there
 are multiple 8bpp windows using different colormaps,
 one may have to iconify all but one for the colors to
 be correct.
 .IP
-There may also be painting errors for clipping
-and switching between windows of depths 8 and 24.
+There may also be painting errors for clipping and
+switching between windows of depths 8 and 24.
 Heuristics are applied to try to minimize the painting
 errors.  One can also press 3 Alt_L's in a row to
 refresh the screen if the error does not repair itself.
@@ -215,12 +226,8 @@ XGETIMAGE_8TO24=1 before starting x11vnc.  This enables
 a scheme were XGetImage() is used to retrieve the 8bpp
 data instead of assuming that data is in bits 25-32.
 This mode is significantly slower than the above mode.
-.IP
-Note that \fB-8to24\fR does not work on displays with 8bpp
-default visual with depth 24 applications.  The Xserver
-\fB-cc\fR option can be used to switch the default depth
-on multidepth setups.  It may be possible to handle
-this case.
+For the default depth 8 case, XGetImage() is always
+used to access depth 24 pixel data.
 .PP
 \fB-scale\fR \fIfraction\fR
 .IP

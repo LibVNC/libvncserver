@@ -943,6 +943,12 @@ static rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 		first = 0;
 	}
 
+	if (cmap8to24 && cmap8to24_fb && depth == 8) {
+		if (Bpp == 1) {
+			Bpp = 4;
+		}
+	}
+
 	if (scaling_cursor && scale_cursor_fac != 1.0) {
 		int W, H;
 		char *pixels_use = (char *) pixels;

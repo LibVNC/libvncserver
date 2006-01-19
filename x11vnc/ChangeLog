@@ -1,3 +1,6 @@
+2006-01-18  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -8to24 now works on default depth 8 screens.
+
 2006-01-16  Karl Runge <runge@karlrunge.com>
 	* x11vnc: more tweaks to -8to24, add XGETIMAGE_8TO24 mode to call
 	  XGetImage() on the 8bpp regions.

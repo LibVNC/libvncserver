@@ -4,6 +4,7 @@
 /* -- 8to24.h -- */
 
 extern int multivis_count;
+extern int multivis_24count;
 
 extern void check_for_multivis(void);
 extern void bpp8to24(int, int, int, int);
