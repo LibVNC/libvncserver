@@ -133,6 +133,7 @@ char gui_code[] = "";
 "	overlay\n"
 "	overlay_nocursor\n"
 "	8to24\n"
+"	8to24_opts:\n"
 "	=GAL LOFF\n"
 "	=GAL 8-Bit-Color::\n"
 "	flashcmap\n"

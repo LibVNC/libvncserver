@@ -411,6 +411,7 @@ static void update_x11_pointer_mask(int mask) {
 		int skip = 0;
 
 		if (!button_mask) {
+			X_LOCK;
 			if (get_wm_frame_pos(&px, &py, &x, &y, &w, &h,
 			    &frame, &mwin)) {
 				got_wm_frame = 1;
@@ -423,6 +424,7 @@ if (debug_scroll > 1) fprintf(stderr, "wm_win: 0x%lx\n", mwin);
 			} else {
 				got_wm_frame = 0;
 			}
+			X_UNLOCK;
 		}
 		if (got_wm_frame) {
 			if (wireframe && near_wm_edge(x, y, w, h, px, py)) {

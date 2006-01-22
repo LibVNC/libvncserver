@@ -1,3 +1,7 @@
+2006-01-21  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -8to24 opts, use XGetSubImage. fix -threads deadlocks and
+	  -rawfb crash.
+
 2006-01-18  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -8to24 now works on default depth 8 screens.
 

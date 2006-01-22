@@ -64,6 +64,7 @@ extern int flash_cmap;
 extern int shift_cmap;
 extern int force_indexed_color;
 extern int cmap8to24;
+extern char *cmap8to24_str;
 extern int launch_gui;
 
 extern int use_modifier_tweak;

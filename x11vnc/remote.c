@@ -563,6 +563,7 @@ int remote_control_access_ok(void) {
 			rfbLog("XAUTHORITY is not required on display.\n");
 			rfbLog("   %s\n", DisplayString(dpy));
 			XCloseDisplay(dpy2);
+			dpy2 = NULL;
 			return 0;
 		}
 
@@ -1003,6 +1004,26 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: turning off -8to24 mode.\n");
 		cmap8to24 = 0;
+		do_new_fb(0);
+
+	} else if (strstr(p, "8to24_opts") == p) {
+		COLON_CHECK("8to24_opts:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(cmap8to24_str));
+			goto qry;
+		}
+		p += strlen("8to24_opts:");
+		if (cmap8to24_str) {
+			free(cmap8to24_str);
+		}
+		cmap8to24_str = strdup(p);
+		if (*p == '\0') {
+			cmap8to24 = 0;
+		} else {
+			cmap8to24 = 1;
+		}
+		rfbLog("remote_cmd: set cmap8to24_str to: %s\n", cmap8to24_str);
 		do_new_fb(0);
 
 	} else if (strstr(p, "visual") == p) {

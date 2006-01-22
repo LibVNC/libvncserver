@@ -980,6 +980,8 @@ static XImage *initialize_raw_fb(void) {
 		raw_fb_image->depth = (b == 32) ? 24 : b;
 	}
 
+	depth = raw_fb_image->depth;
+
 	if (clipshift) {
 		memset(raw_fb, 0xff, dpy_x * dpy_y * b/8);
 	} else if (raw_fb_addr) {

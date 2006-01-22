@@ -14,6 +14,7 @@ void mark_8bpp(void);
 
 static void set_root_cmap(void);
 static void check_pointer_in_depth24(void);
+static void parse_cmap8to24(void);
 static int check_depth(Window win, Window top, int doall);
 static int check_depth_win(Window win, Window top, XWindowAttributes attr);
 static int get_8pp_region(sraRegionPtr region8bpp, sraRegionPtr rect,
@@ -44,10 +45,12 @@ static void set_root_cmap(void) {
 		root_cmap = 0;
 	}
 	if (! root_cmap) {
+		X_LOCK;
 		if (valid_window(window, &attr, 1)) {
 			last_set = now;
 			root_cmap = attr.colormap;
 		}
+		X_UNLOCK;
 	}
 }
 
@@ -58,6 +61,7 @@ static window8bpp_t windows_8bpp[MAX_8BPP_WINDOWS];
 static int db24 = 0;
 static int xgetimage_8to24 = 0;
 static int do_hibits = 0;
+static double poll_8to24_delay = 0.0;
 
 static void check_pointer_in_depth24(void) {
 	int tries = 0, in_24 = 0;
@@ -98,13 +102,50 @@ if (db24 > 1) fprintf(stderr, "check_pointer_in_depth24 %d %d %d %d\n", x1, y1, 
 	}
 }
 
+static void parse_cmap8to24(void) {
+	if (cmap8to24_str) {
+		char *p, *str = strdup(cmap8to24_str);
+		p = strtok(str, ",");
+		db24 = 0;
+		xgetimage_8to24 = 0;
+		do_hibits = 0;
+		while (p) {
+			if (strstr(p, "dbg=") == p) {
+				db24 = atoi(p + strlen("dbg="));
+			} else if (!strcmp(p, "highbits")) {
+				do_hibits = 1;
+			} else if (!strcmp(p, "getimage")) {
+				xgetimage_8to24 = 1;
+			}
+			p = strtok(NULL, ",");
+		}
+		free(str);
+	} else {
+		if (getenv("DEBUG_8TO24") != NULL) {
+			db24 = atoi(getenv("DEBUG_8TO24"));
+		}
+		if (getenv("XGETIMAGE_8TO24") != NULL) {
+			xgetimage_8to24 = 1;
+		}
+		if (getenv("HIGHBITS_8TO24") != NULL) {
+			do_hibits = 1;
+		}
+	}
+}
+
+void poll_8bpp(void) {
+	
+}
+
 void check_for_multivis(void) {
 	XWindowAttributes attr;
 	int doall = 0;
 	int k, i, cnt, diff;
 	static int first = 1;
+	static double last_parse = 0.0;
 	static double last_update = 0.0;
 	static double last_clear = 0.0;
+	static double last_poll = 0.0;
 	double now = dnow();
 	static Window *stack_old = NULL;
 	static int stack_old_len = 0;
@@ -119,18 +160,15 @@ void check_for_multivis(void) {
 			windows_8bpp[i].cmap = (Colormap) 0;
 			windows_8bpp[i].fetched = 0;
 		}
-		if (getenv("DEBUG_8TO24") != NULL) {
-			db24 = atoi(getenv("DEBUG_8TO24"));
-		}
-		if (getenv("XGETIMAGE_8TO24") != NULL) {
-			xgetimage_8to24 = 1;
-		}
-		if (getenv("HIGHBITS_8TO24") != NULL) {
-			do_hibits = 1;
-		}
 		first = 0;
 		doall = 1;	/* fetch everything first time */
 	}
+
+	if (now > last_parse + 0.75) {
+		last_parse = now;
+		parse_cmap8to24();
+	}
+
 	set_root_cmap();
 
 	/*
@@ -176,6 +214,10 @@ void check_for_multivis(void) {
 			}
 			cnt++;
 		}
+	}
+
+	if (poll_8to24_delay > 0.0 && now > last_poll + poll_8to24_delay) {
+		last_poll = now;
 	}
 
 	/*
@@ -410,7 +452,9 @@ if (db24 > 1) fprintf(stderr, "multivis: STORE 0x%lx j: %3d ms: %d dep=%d\n", wi
 			windows_8bpp[j].h = attr.height;
 
 			/* translate x y to be WRT the root window (not parent) */
+			X_LOCK;
 			xtranslate(win, window, 0, 0, &x, &y, &w, 1);
+			X_UNLOCK;
 			windows_8bpp[j].x = x;
 			windows_8bpp[j].y = y;
 
@@ -670,7 +714,7 @@ static void do_8bpp_region(sraRect rect) {
 	int ps, pixelsize = bpp/8;
 
 	int do_getimage = xgetimage_8to24;
-	int line, n_off, j, h, w;
+	int line, n_off, j, h, w, vw;
 	unsigned int hi, idx;
 	XWindowAttributes attr;
 	XErrorHandler old_handler = NULL;
@@ -770,9 +814,18 @@ if (db24 > 1) fprintf(stderr, "transform %d %d %d %d\n", rect.x1, rect.y1, rect.
 		}
 	}
 
-	if (do_getimage && valid_window(best_win, &attr, 1)) {
-		XImage *xi;
+	if (do_getimage) {
+		X_LOCK;
+		vw = valid_window(best_win, &attr, 1);
+		X_UNLOCK;
+	}
+
+	if (do_getimage && vw) {
+		static XImage *xi_8  = NULL;
+		static XImage *xi_24 = NULL;
+		XImage *xi = NULL;
 		Window c;
+		char *d;
 		unsigned int wu, hu;
 		int xo, yo;
 
@@ -792,11 +845,44 @@ if (db24 > 1) fprintf(stderr, "skipping due to potential bad match...\n");
 			return;
 		}
 
+#define GETSUBIMAGE
+#ifdef GETSUBIMAGE
+		if (best_depth == 8) {
+		    if (xi_8 == NULL || xi_8->width != dpy_x || xi_8->height != dpy_y) {
+			if (xi_8) {
+				XDestroyImage(xi_8);
+			}
+			d = (char *) malloc(dpy_x * dpy_y * attr.depth/8);
+			xi_8 = XCreateImage(dpy, attr.visual, attr.depth,
+			    ZPixmap, 0, d, dpy_x, dpy_y, 8, 0);
+if (db24) fprintf(stderr, "xi_8:  %p\n", (void *) xi_8);
+		    }
+		    xi = xi_8;
+		} else if (best_depth == 24) {
+		    if (xi_24 == NULL || xi_24->width != dpy_x || xi_24->height != dpy_y) {
+			if (xi_24) {
+				XDestroyImage(xi_24);
+			}
+			d = (char *) malloc(dpy_x * dpy_y * attr.depth/8);
+			xi_24 = XCreateImage(dpy, attr.visual, attr.depth,
+			    ZPixmap, 0, d, dpy_x, dpy_y, 8, 0);
+if (db24) fprintf(stderr, "xi_24: %p\n", (void *) xi_24);
+		    }
+		    xi = xi_24;
+		}
+#endif
+
+
 		trapped_xerror = 0;
 		old_handler = XSetErrorHandler(trap_xerror);
 		/* FIXME: XGetSubImage? */
+#ifndef GETSUBIMAGE
 		xi = XGetImage(dpy, best_win, xo, yo, wu, hu,
 		    AllPlanes, ZPixmap);
+#else
+		XGetSubImage(dpy, best_win, xo, yo, wu, hu, AllPlanes,
+		    ZPixmap, xi, 0, 0);
+#endif
 		XSetErrorHandler(old_handler);
 		X_UNLOCK;
 
@@ -810,9 +896,11 @@ if (db24 > 1) fprintf(stderr, "xi: 0x%p  %d %d %d %d -- %d %d\n", (void *)xi, xo
 		trapped_xerror = 0;
 
 		if (xi->depth != 8 && xi->depth != 24) {
+#ifndef GETSUBIMAGE
 			X_LOCK;
 			XDestroyImage(xi);
 			X_UNLOCK;
+#endif
 if (db24) fprintf(stderr, "xi: wrong depth: %d\n", xi->depth);
 			return;
 		}
@@ -835,9 +923,9 @@ if (db24) fprintf(stderr, "xi: wrong depth: %d\n", xi->depth);
 
 
 			/* line by line ... */
-			for (line = 0; line < xi->height; line++) {
+			for (line = 0; line < h; line++) {
 				/* pixel by pixel... */
-				for (j = 0; j < xi->width; j++) {
+				for (j = 0; j < w; j++) {
 
 					uc = (unsigned char *) (src + ps1 * j);
 					ui = (unsigned int *)  (dst + ps2 * j);
@@ -861,16 +949,18 @@ if (db24) fprintf(stderr, "xi: wrong depth: %d\n", xi->depth);
 			src = xi->data;
 			dst = cmap8to24_fb + fac * n_off;
 
-			for (line = 0; line < xi->height; line++) {
+			for (line = 0; line < h; line++) {
 				memcpy(dst, src, w * ps1);
 				src += xi->bytes_per_line;
 				dst += main_bytes_per_line * fac;
 			}
 		}
 
+#ifndef GETSUBIMAGE
 		X_LOCK;
 		XDestroyImage(xi);
 		X_UNLOCK;
+#endif
 
 	} else if (! do_getimage) {
 		/* normal mode. */

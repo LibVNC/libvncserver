@@ -122,6 +122,7 @@ Screen
 	overlay
 	overlay_nocursor
 	8to24
+	8to24_opts:
 	=GAL LOFF
 	=GAL 8-Bit-Color::
 	flashcmap

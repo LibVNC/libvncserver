@@ -2,7 +2,7 @@
 .TH X11VNC "1" "January 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8, lastmod: 2006-01-18
+         version: 0.8, lastmod: 2006-01-21
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -178,29 +178,26 @@ visual (e.g. some apps have \fB-use24\fR or \fB-visual\fR options).
 Sets \fB-overlay,\fR but does not try to draw the exact mouse
 cursor shape using the overlay mechanism.
 .PP
-\fB-8to24\fR
+\fB-8to24\fR \fI[opts]\fR
 .IP
-If \fB-overlay\fR is not supported on your OS, and you have a
-legacy 8bpp app that you want to view on a multi-depth
-display with default depth 24 (and is 32 bpp), try
-this option.  It will also work for a default depth 8
-display with depth 24 overlay windows.  This option
+Try this option if \fB-overlay\fR is not supported on your
+OS, and you have a legacy 8bpp app that you want to
+view on a multi-depth display with default depth 24
+(and is 32 bpp) or have default depth 8 display with
+depth 24 overlay windows for some apps.  This option
 may not work on all X servers and hardware (tested on
-XFree86/Xorg mga driver).
+XFree86/Xorg mga driver).  The "opts" string is not
+required and is described below.
 .IP
-It enables a hack where x11vnc monitors windows within 3
-levels from the root window.  If it finds any that are
-8bpp it will apply a transformation for pixel data in
-these regions where it extracts the 8bpp index color
-value from bits 25-32 and maps them on to TrueColor
-values and inserts them into bits 1-24 (i.e. overwrites
-bits 1-24).
-.IP
-For default depth 8 displays, everything is tranformed
-to 32bpp (and is potentially a improvement over
-\fB-flashcmap).\fR  Also for default depth 8 displays, setting
-the env. var. HIGHBITS_8TO24 may give a speedup for
-transforming 8bpp pixel data.
+This mode enables a hack where x11vnc monitors windows
+within 3 levels from the root window.  If it finds
+any that are 8bpp it will apply a transformation for
+pixel data in these regions where it extracts the 8bpp
+index color value from bits 25-32 and maps them on
+to TrueColor values and inserts them into bits 1-24
+(i.e. overwrites bits 1-24).  Whereas for default
+depth 8 displays, everything is tranformed to 32bpp
+(and is potentially a improvement over \fB-flashcmap).\fR
 .IP
 These schemes appear to work, but may still have
 bugs and note that they do hog resources.  If there
@@ -217,17 +214,24 @@ Also the option, say, \fB-fixscreen\fR V=3.0 may be use
 to periodically refresh the screen (at the cost of
 bandwidth).
 .IP
-Debugging for this mode can be enabled by setting the
-environment variable DEBUG_8TO24 to 1, 2, or 3.
+The [opts] string can contain the following settings.
+Multiple settings are separated by commas.
 .IP
-If there are problems, to enable an even more
-experimental mode, set the environment variable
-XGETIMAGE_8TO24=1 before starting x11vnc.  This enables
-a scheme were XGetImage() is used to retrieve the 8bpp
-data instead of assuming that data is in bits 25-32.
-This mode is significantly slower than the above mode.
-For the default depth 8 case, XGetImage() is always
-used to access depth 24 pixel data.
+For when there are still color problems, enable an even
+more experimental mode via the option "getimage".
+This enables a scheme were XGetImage() is used to
+retrieve the 8bpp data instead of assuming that data
+is in bits 25-32.  This mode is significantly slower
+than the above mode.  For the default depth 8 case,
+XGetImage() is always used to access depth 24 pixel
+data.
+.IP
+For default depth 8 displays, setting option
+"highbits" may give a speedup for transforming 8bpp
+pixel data.
+.IP
+Debugging for this mode can be enabled by setting
+"dbg=1", "dbg=2", or "dbg=3"
 .PP
 \fB-scale\fR \fIfraction\fR
 .IP
@@ -2035,6 +2039,8 @@ nooverlay_cursor.
 .IP
 no8to24         disable \fB-8to24\fR mode.
 .IP
+8to24_opts:str  set the \fB-8to24\fR opts to "str".
+.IP
 visual:vis      set \fB-visual\fR to "vis"
 .IP
 scale:frac      set \fB-scale\fR to "frac"
@@ -2474,22 +2480,22 @@ nowaitmapped clip flashcmap noflashcmap shiftcmap
 truecolor notruecolor overlay nooverlay overlay_cursor
 overlay_yescursor nooverlay_nocursor nooverlay_cursor
 nooverlay_yescursor overlay_nocursor 8to24 no8to24
-visual scale scale_cursor viewonly noviewonly shared
-noshared forever noforever once timeout filexfer deny
-lock nodeny unlock connect allowonce allow localhost
-nolocalhost listen lookup nolookup accept afteraccept
-gone shm noshm flipbyteorder noflipbyteorder onetile
-noonetile solid_color solid nosolid blackout xinerama
-noxinerama xtrap noxtrap xrandr noxrandr xrandr_mode
-padgeom quiet q noquiet modtweak nomodtweak xkb
-noxkb skip_keycodes sloppy_keys nosloppy_keys
-skip_dups noskip_dups add_keysyms noadd_keysyms
-clear_mods noclear_mods clear_keys noclear_keys
-remap repeat norepeat fb nofb bell nobell sel nosel
-primary noprimary seldir cursorshape nocursorshape
-cursorpos nocursorpos cursor show_cursor noshow_cursor
-nocursor arrow xfixes noxfixes xdamage noxdamage
-xd_area xd_mem alphacut alphafrac alpharemove
+8to24_opts visual scale scale_cursor viewonly
+noviewonly shared noshared forever noforever once
+timeout filexfer deny lock nodeny unlock connect
+allowonce allow localhost nolocalhost listen lookup
+nolookup accept afteraccept gone shm noshm flipbyteorder
+noflipbyteorder onetile noonetile solid_color solid
+nosolid blackout xinerama noxinerama xtrap noxtrap
+xrandr noxrandr xrandr_mode padgeom quiet q noquiet
+modtweak nomodtweak xkb noxkb skip_keycodes sloppy_keys
+nosloppy_keys skip_dups noskip_dups add_keysyms
+noadd_keysyms clear_mods noclear_mods clear_keys
+noclear_keys remap repeat norepeat fb nofb bell
+nobell sel nosel primary noprimary seldir cursorshape
+nocursorshape cursorpos nocursorpos cursor show_cursor
+noshow_cursor nocursor arrow xfixes noxfixes xdamage
+noxdamage xd_area xd_mem alphacut alphafrac alpharemove
 noalpharemove alphablend noalphablend xwarppointer
 xwarp noxwarppointer noxwarp buttonmap dragging
 nodragging wireframe_mode wireframe wf nowireframe

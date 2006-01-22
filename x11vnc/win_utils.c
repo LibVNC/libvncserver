@@ -217,6 +217,7 @@ void update_stack_list(void) {
 
 	dtime0(&now);
 	
+	X_LOCK;
 	for (k=0; k < stack_list_num; k++) {
 		Window win = stack_list[k].win;
 		if (win != None && win < 10) {
@@ -241,6 +242,7 @@ void update_stack_list(void) {
 		stack_list[k].fetched = 1;
 		stack_list[k].time = now;
 	}
+	X_UNLOCK;
 if (0) fprintf(stderr, "update_stack_list[%d]: %.4f  %.4f\n", stack_list_num, now - x11vnc_start, dtime(&now));
 }
 

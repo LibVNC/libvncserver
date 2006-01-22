@@ -1273,6 +1273,12 @@ int main(int argc, char* argv[]) {
 			overlay_cursor = 2;
 		} else if (!strcmp(arg, "-8to24")) {
 			cmap8to24 = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					cmap8to24_str = strdup(s);
+				}
+			}
 		} else if (!strcmp(arg, "-visual")) {
 			CHECK_ARGC
 			visual_str = strdup(argv[++i]);
