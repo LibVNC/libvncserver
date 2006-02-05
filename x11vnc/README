@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat Jan 21 20:25:28 EST 2006
+x11vnc README file                         Date: Sat Feb  4 22:21:00 EST 2006
 
 The following information is taken from these URLs:
 
@@ -585,7 +585,7 @@ make
    I'd appreciate any additional testing very much!
 
    Please help test and debug the 0.8 version for release sometime in
-   Jan/2006.
+   Feb/2006.
 
       [53]x11vnc-0.8.tar.gz
 
@@ -4289,7 +4289,7 @@ ied)
    Based on the bpp x11vnc will try to guess the red, green, and blue
    masks (these indicate which bits correspond to each color). It if gets
    it wrong you can specify them manually via the optional ":R/G/B"
-   field. E.g. ":0xff000/0x00ff00/0x0000ff" (this is the default for
+   field. E.g. ":0xff0000/0x00ff00/0x0000ff" (this is the default for
    32bpp).
 
    Finally, the framebuffer may not begin at the beginning of the memory
@@ -4898,7 +4898,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8 lastmod: 2006-01-21
+x11vnc: allow VNC connections to real X11 displays. 0.8 lastmod: 2006-02-04
 
 x11vnc options:
   -display disp            -auth file             
@@ -5009,7 +5009,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8 lastmod: 2006-01-21
+x11vnc: allow VNC connections to real X11 displays. 0.8 lastmod: 2006-02-04
 
 Typical usage is:
 
@@ -5143,55 +5143,66 @@ Options:
 -8to24 [opts]          Try this option if -overlay is not supported on your
                        OS, and you have a legacy 8bpp app that you want to
                        view on a multi-depth display with default depth 24
-                       (and is 32 bpp) or have default depth 8 display with
+                       (and is 32 bpp) OR have a default depth 8 display with
                        depth 24 overlay windows for some apps.  This option
-                       may not work on all X servers and hardware (tested on
-                       XFree86/Xorg mga driver).  The "opts" string is not
-                       required and is described below.
+                       may not work on all X servers and hardware (tested
+                       on XFree86/Xorg mga driver and Xsun).  The "opts"
+                       string is not required and is described below.
 
                        This mode enables a hack where x11vnc monitors windows
                        within 3 levels from the root window.  If it finds
-                       any that are 8bpp it will apply a transformation for
-                       pixel data in these regions where it extracts the 8bpp
-                       index color value from bits 25-32 and maps them on
-                       to TrueColor values and inserts them into bits 1-24
-                       (i.e. overwrites bits 1-24).  Whereas for default
-                       depth 8 displays, everything is tranformed to 32bpp
-                       (and is potentially a improvement over -flashcmap).
+                       any that are 8bpp it extracts the indexed color
+                       pixel values using XGetImage() and then applies a
+                       transformation using the colormap(s) to create TrueColor
+                       RGB values that it in turn inserts into bits 1-24 of
+                       the framebuffer.  This creates a depth 24 "view"
+                       of the display that is then exported via VNC.
 
-                       These schemes appear to work, but may still have
-                       bugs and note that they do hog resources.  If there
-                       are multiple 8bpp windows using different colormaps,
-                       one may have to iconify all but one for the colors to
-                       be correct.
+                       Conversely, for default depth 8 displays, the depth
+                       24 regions are read by XGetImage() and everything is
+                       transformed and inserted into a depth 24 TrueColor
+                       framebuffer.
 
-                       There may also be painting errors for clipping and
-                       switching between windows of depths 8 and 24.
-                       Heuristics are applied to try to minimize the painting
-                       errors.  One can also press 3 Alt_L's in a row to
-                       refresh the screen if the error does not repair itself.
-                       Also the option, say, -fixscreen V=3.0 may be use
-                       to periodically refresh the screen (at the cost of
-                       bandwidth).
+                       Note that even if there are *no* depth 24 visuals or
+                       windows (i.e. pure 8bpp), this mode is potentially
+                       a improvement over -flashcmap because it avoids the
+                       flashing and shows each window in the correct color.
+
+                       This method appear to work, but may still have bugs
+                       and it does hog resources.  If there are multiple 8bpp
+                       windows using different colormaps, one may have to
+                       iconify all but one for the colors to be correct.
+
+                       There may be painting errors for clipping and switching
+                       between windows of depths 8 and 24.  Heuristics are
+                       applied to try to minimize the painting errors.
+                       One can also press 3 Alt_L's in a row to refresh the
+                       screen if the error does not repair itself.  Also the
+                       option -fixscreen 8=3.0 or -fixscreen V=3.0 may be
+                       use to periodically refresh the screen at the cost of
+                       bandwidth (every 3 sec for this example).
 
                        The [opts] string can contain the following settings.
                        Multiple settings are separated by commas.
 
-                       For when there are still color problems, enable an even
-                       more experimental mode via the option "getimage".
-                       This enables a scheme were XGetImage() is used to
-                       retrieve the 8bpp data instead of assuming that data
-                       is in bits 25-32.  This mode is significantly slower
-                       than the above mode.  For the default depth 8 case,
-                       XGetImage() is always used to access depth 24 pixel
-                       data.
+                       For for some X servers with default depth 24 a
+                       speedup may be achieved via the option "nogetimage".
+                       This enables a scheme were XGetImage() is not used
+                       to retrieve the 8bpp data.  Instead, it assumes that
+                       the 8bpp data is in bits 25-32 of the 32bit X pixels.
+                       There is no reason the X server should put the data
+                       there for our poll requests, but some do and so the
+                       extra steps to retrieve it can be skipped.  Tested with
+                       mga driver with XFree86/Xorg.  For the default depth
+                       8 case this option is ignored.
 
-                       For default depth 8 displays, setting option
-                       "highbits" may give a speedup for transforming 8bpp
-                       pixel data.
+                       To adjust how often XGetImage() is used to poll the
+                       non-default visual regions for changes, use the option
+                       "poll=t" where "t" is a floating point time.
+                       (default: 0.05)
 
                        Debugging for this mode can be enabled by setting
-                       "dbg=1", "dbg=2", or "dbg=3"
+                       "dbg=1", "dbg=2", or "dbg=3".
 
 -scale fraction        Scale the framebuffer by factor "fraction".  Values
                        less than 1 shrink the fb, larger ones expand it.  Note:
@@ -6185,22 +6196,25 @@ Options:
                        but it can be used for any scenario.  This option
                        periodically performs costly operations and so
                        interactive response may be reduced when it is on.
-                       You can use 3 Alt_L's (the Left "Alt" key) taps in a
-                       row described under -scrollcopyrect instead to manually
-                       request a screen repaint when it is needed.
+                       You can use 3 Alt_L's (the Left "Alt" key) taps in
+                       a row (as described under -scrollcopyrect) instead to
+                       manually request a screen repaint when it is needed.
 
                        "string" is a comma separated list of one or more of
-                       the following: "V=t", "C=t", and "X=t".  In these
-                       "t" stands for a time in seconds (it is a floating
-                       point even though one should usually use values > 2 to
-                       avoid wasting resources).  V sets how frequently the
-                       entire screen should be sent to viewers (it is like the
-                       3 Alt_L's).  C sets how long to wait after a CopyRect
-                       to repaint the full screen.  X sets how frequently
-                       to reread the full X11 framebuffer from the X server
-                       and push it out to connected viewers.  Use of X should
-                       be rare, please report a bug if you find you need it.
-                       Examples: -fixscreen V=10 -fixscreen C=10
+                       the following: "V=t", "C=t", "X=t", and "8=t".
+                       In these "t" stands for a time in seconds (it is
+                       a floating point even though one should usually use
+                       values > 2 to avoid wasting resources).  V sets how
+                       frequently the entire screen should be sent to viewers
+                       (it is like the 3 Alt_L's).  C sets how long to wait
+                       after a CopyRect to repaint the full screen.  X sets
+                       how frequently to reread the full X11 framebuffer from
+                       the X server and push it out to connected viewers.
+                       Use of X should be rare, please report a bug if you
+                       find you need it. 8= applies only for -8to24 mode: it
+                       sets how often the non-default visual regions of the
+                       screen (e.g. 8bpp windows) are refreshed.  Examples:
+                       -fixscreen V=10 -fixscreen C=10
 
 -debug_scroll          Turn on debugging info printout for the scroll
                        heuristics.  "-ds" is an alias.  Specify it multiple

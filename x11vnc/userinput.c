@@ -211,6 +211,7 @@ void parse_fixscreen(void) {
 	screen_fixup_V = 0.0;
 	screen_fixup_C = 0.0;
 	screen_fixup_X = 0.0;
+	screen_fixup_8 = 0.0;
 
 	if (! screen_fixup_str) {
 		return;
@@ -227,6 +228,8 @@ void parse_fixscreen(void) {
 			screen_fixup_C = t;
 		} else if (*p == 'X' && sscanf(p, "X=%lf", &t) == 1) {
 			screen_fixup_X = t;
+		} else if (*p == 'X' && sscanf(p, "8=%lf", &t) == 1) {
+			screen_fixup_8 = t;
 		}
 		p = strtok(NULL, ",");
 	}
@@ -235,6 +238,7 @@ void parse_fixscreen(void) {
 	if (screen_fixup_V < 0.0) screen_fixup_V = 0.0;
 	if (screen_fixup_C < 0.0) screen_fixup_C = 0.0;
 	if (screen_fixup_X < 0.0) screen_fixup_X = 0.0;
+	if (screen_fixup_8 < 0.0) screen_fixup_8 = 0.0;
 }
 
 /*
@@ -716,11 +720,11 @@ typedef struct saveline {
  */
 static void draw_box(int x, int y, int w, int h, int restore) {
 	int x0, y0, x1, y1, i, pixelsize = bpp/8;
-	char *dst, *src;
+	char *dst, *src, *use_fb;
 	static saveline_t *save[4];
 	static int first = 1, len = 0;
 	int max = dpy_x > dpy_y ? dpy_x : dpy_y;
-	int sz, lw = wireframe_lw;
+	int use_Bpl, lw = wireframe_lw;
 	unsigned long shade = wireframe_shade;
 	int color = 0;
 	unsigned short us = 0;
@@ -730,7 +734,18 @@ static void draw_box(int x, int y, int w, int h, int restore) {
 		x -= coff_x;
 		y -= coff_y;
 	}
-	/* no subwin for wireframe */
+
+	/* handle -8to24 mode: use 2nd fb only */
+	use_fb  = main_fb;
+	use_Bpl = main_bytes_per_line; 
+	
+	if (cmap8to24 && cmap8to24_fb) {
+		use_fb = cmap8to24_fb;
+		pixelsize = 4;
+		if (depth == 8) {
+			use_Bpl *= 4;
+		}
+	}
 
 	if (max > len) {
 		/* create/resize storage lines: */
@@ -745,8 +760,7 @@ static void draw_box(int x, int y, int w, int h, int restore) {
 			}
 			save[i] = (saveline_t *) malloc(sizeof(saveline_t));
 			save[i]->saved = 0;
-			sz = (LW_MAX+1)*len*pixelsize;
-			save[i]->data = (char *) malloc(sz);
+			save[i]->data = (char *) malloc( (LW_MAX+1)*len*4 );
 
 			/* 
 			 * Four types of lines:
@@ -813,8 +827,7 @@ static void draw_box(int x, int y, int w, int h, int restore) {
 				y_max = yu;
 			}
 			src = save[i]->data + (yu-y_start)*y_step;
-			dst = main_fb + yu*main_bytes_per_line +
-			    x0*pixelsize;
+			dst = use_fb + yu*use_Bpl + x0*pixelsize;
 			memcpy(dst, src, (x1-x0)*pixelsize);
 		}
 		if (y_min >= 0) {
@@ -917,10 +930,9 @@ if (0) fprintf(stderr, "  DrawBox: %dx%d+%d+%d\n", w, h, x, y);
 
 			/* save fb data for this line: */
 			save[i]->saved = 1;
-			src = main_fb + yu*main_bytes_per_line +
-			    x0*pixelsize;
+			src = use_fb + yu*use_Bpl + x0*pixelsize;
 			dst = save[i]->data + (yu-y_start)*y_step;
-			memcpy(dst, src,   (x1-x0)*pixelsize);
+			memcpy(dst, src, (x1-x0)*pixelsize);
 
 			/* apply the shade/color to make the wireframe line: */
 			if (! color) {
@@ -1577,6 +1589,7 @@ if (0) fprintf(stderr, "  try_copyrect dt: %.4f\n", dt);
 			win_area += (tx2 - tx1)*(ty2 - ty1);
 		}
 		sraRgnReleaseIterator(iter);
+
 		sraRgnDestroy(tmpregion);
 
 
@@ -1634,6 +1647,7 @@ if (db) fprintf(stderr, "  DFC(%d,%d-%d,%d)", tx1, ty1, tx2, ty2);
 PUSH_TEST(0);
 			}
 			sraRgnReleaseIterator(iter);
+
 			dt = dtime(&tm);
 if (db) fprintf(stderr, "  dfc---- dt: %.4f", dt);
 
@@ -3726,20 +3740,22 @@ if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
 	rfbPE(1000);
 	wireframe_in_progress = 0;
 
-	if (frame_changed && cmap8to24 && multivis_count) {
-		/* handle -8to24 tweak, mark area and check 8bpp... */
+	if (0) {
+	/* No longer needed.  see draw_box() */
+	    if (frame_changed && cmap8to24 && multivis_count) {
+		/* handle -8to24 kludge, mark area and check 8bpp... */
 		int x1, x2, y1, y2, f = 16;
 		x1 = nmin(box_x, orig_x) - f;
 		y1 = nmin(box_y, orig_y) - f;
 		x2 = nmax(box_x + box_w, orig_x + orig_w) + f;
 		y2 = nmax(box_y + box_h, orig_y + orig_h) + f;
 		x1 = nfix(x1, dpy_x);
-		x2 = nfix(x2, dpy_x);
+		x2 = nfix(x2, dpy_x+1);
 		y1 = nfix(y1, dpy_y);
-		y2 = nfix(y2, dpy_y);
-if (0) fprintf(stderr, "wireframe_in_progress over: %d %d %d %d\n", x1, y1, x2, y2);
+		y2 = nfix(y2, dpy_y+1);
 		check_for_multivis();
-		if (1) mark_rect_as_modified(x1, y1, x2, y2, 0);
+		mark_rect_as_modified(x1, y1, x2, y2, 0);
+	    }
 	}
 
 	urgent_update = 1;

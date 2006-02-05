@@ -908,6 +908,8 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " shiftcmap:  %d\n", shift_cmap);
 	fprintf(stderr, " force_idx:  %d\n", force_indexed_color);
 	fprintf(stderr, " cmap8to24:  %d\n", cmap8to24);
+	fprintf(stderr, " 8to24_opts: %s\n", cmap8to24_str ? cmap8to24_str
+	    : "null");
 	fprintf(stderr, " visual:     %s\n", visual_str ? visual_str
 	    : "null");
 	fprintf(stderr, " overlay:    %d\n", overlay);
@@ -1277,6 +1279,7 @@ int main(int argc, char* argv[]) {
 				char *s = argv[i+1];
 				if (s[0] != '-') {
 					cmap8to24_str = strdup(s);
+					i++;
 				}
 			}
 		} else if (!strcmp(arg, "-visual")) {

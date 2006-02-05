@@ -24,7 +24,7 @@ char *solid_default = "cyan4";
 
 char *wmdt_str = NULL;		/* -wmdt */
 
-char *speeds_str = NULL;	/* -speeds TBD */
+char *speeds_str = NULL;	/* -speeds */
 
 char *rc_rcfile = NULL;		/* -rc */
 int rc_rcfile_default = 0;
@@ -208,6 +208,7 @@ char* screen_fixup_str = NULL;
 double screen_fixup_V = 0.0;
 double screen_fixup_C = 0.0;
 double screen_fixup_X = 0.0;
+double screen_fixup_8 = 0.0;
 
 #ifndef NOREPEAT
 #define NOREPEAT 1

@@ -8,6 +8,6 @@ extern int multivis_24count;
 
 extern void check_for_multivis(void);
 extern void bpp8to24(int, int, int, int);
-extern void mark_8bpp(void);
+extern void mark_8bpp(int);
 
 #endif /* _X11VNC_8TO24_H */

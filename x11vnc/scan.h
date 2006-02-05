@@ -4,6 +4,7 @@
 /* -- scan.h -- */
 
 extern int nap_ok;
+extern int scanlines[];
 
 extern void initialize_tiles(void);
 extern void free_tiles(void);

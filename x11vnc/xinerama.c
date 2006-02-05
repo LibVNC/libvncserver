@@ -213,8 +213,8 @@ static void blackout_tiles(void) {
 					break;
 				}
 			}
-
 			sraRgnReleaseIterator(iter);
+
 			sraRgnDestroy(black_reg);
 			sraRgnDestroy(tile_reg);
 
@@ -322,6 +322,7 @@ static void initialize_xinerama (void) {
 		sprintf(tstr, "%dx%d+%d+%d,", w, h, x, y);
 		strcat(bstr, tstr);
 	}
+	sraRgnReleaseIterator(iter);
 	initialize_blackouts(bstr);
 
 	free(bstr);

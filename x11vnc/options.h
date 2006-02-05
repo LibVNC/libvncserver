@@ -154,6 +154,7 @@ extern char* screen_fixup_str;
 extern double screen_fixup_V;
 extern double screen_fixup_C;
 extern double screen_fixup_X;
+extern double screen_fixup_8;
 
 extern int no_autorepeat;
 extern int no_repeat_countdown;

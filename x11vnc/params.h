@@ -13,6 +13,10 @@
 #define SCROLL_COPYRECT_PARMS "0+64+32+32,0.02+0.10+0.9,0.03+0.06+0.5+0.1+5.0"
 #endif
 
+#ifndef POLL_8TO24_DELAY
+#define POLL_8TO24_DELAY 0.05
+#endif
+
 #define LATENCY0 20     /* 20ms */
 #define NETRATE0 20     /* 20KB/sec */
 

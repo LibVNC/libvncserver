@@ -2379,7 +2379,7 @@ static int scan_display(int ystart, int rescan) {
 }
 
 
-static int scanlines[NSCAN] = {
+int scanlines[NSCAN] = {
 	 0, 16,  8, 24,  4, 20, 12, 28,
 	10, 26, 18,  2, 22,  6, 30, 14,
 	 1, 17,  9, 25,  7, 23, 15, 31,
@@ -2435,7 +2435,7 @@ int scan_for_updates(int count_only) {
 			/* check for changed colormap */
 			set_colormap(0);
 		}
-		if (cmap8to24 && scan_count % 4 == 0) {
+		if (cmap8to24 && scan_count % 1 == 0) {
 			check_for_multivis();
 		}
 		if (use_xdamage) {
