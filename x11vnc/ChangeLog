@@ -1,3 +1,6 @@
+2006-02-06  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -8to24 more speedups; tunables for very slow machines.
+
 2006-02-04  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -8to24 speedups and improvements.
 

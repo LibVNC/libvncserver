@@ -25,15 +25,25 @@ Window descend_pointer(int depth, Window start, char *name_info, int len);
 Window parent_window(Window win, char **name) {
 	Window r, parent;
 	Window *list;
+	XErrorHandler old_handler;
 	unsigned int nchild;
+	int rc;
 
 	if (name != NULL) {
 		*name = NULL;
 	}
 
-	if (! XQueryTree(dpy, win, &r, &parent, &list, &nchild)) {
+	old_handler = XSetErrorHandler(trap_xerror);
+	trapped_xerror = 0;
+	rc = XQueryTree(dpy, win, &r, &parent, &list, &nchild);
+	XSetErrorHandler(old_handler);
+
+	if (! rc || trapped_xerror) {
+		trapped_xerror = 0;
 		return None;
 	}
+	trapped_xerror = 0;
+
 	if (list) {
 		XFree(list);
 	}
@@ -59,8 +69,8 @@ int valid_window(Window win, XWindowAttributes *attr_ret, int bequiet) {
 		return 0;
 	}
 
-	trapped_xerror = 0;
 	old_handler = XSetErrorHandler(trap_xerror);
+	trapped_xerror = 0;
 	if (XGetWindowAttributes(dpy, win, pattr)) {
 		ok = 1;
 	}
@@ -148,6 +158,7 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 	last_free = now;
 
 	X_LOCK;
+	/* no need to trap error since rootwin */
 	rc = XQueryTree(dpy, rootwin, &r, &w, &list, &ui);
 	num = (int) ui;
 

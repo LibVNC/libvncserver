@@ -17,7 +17,7 @@ static int check_pointer_in_depth24(void);
 static void parse_cmap8to24(void);
 static void set_poll_fb(void);
 static int check_depth(Window win, Window top, int doall);
-static int check_depth_win(Window win, Window top, XWindowAttributes attr);
+static int check_depth_win(Window win, Window top, XWindowAttributes *attr);
 static XImage *p_xi(XImage *xi, Visual *visual, int win_depth, int *w);
 static int poll_line(int x1, int x2, int y1, int n, sraRegionPtr mod);
 static void poll_line_complement(int x1, int x2, int y1, sraRegionPtr mod);
@@ -27,7 +27,7 @@ static void mark_rgn_rects(sraRegionPtr mod);
 static int get_8bpp_regions(int validate);
 static int get_cmap(int j, Colormap cmap);
 static void do_8bpp_region(int n, sraRegionPtr mark);
-static XImage *cmap_xi(XImage *xi, Visual *visual, int win_depth);
+static XImage *cmap_xi(XImage *xi, Window win, int win_depth);
 static void transform_rect(sraRect rect, Window win, int win_depth, int cm);
 
 /* struct for keeping info about the 8bpp windows: */
@@ -41,6 +41,7 @@ typedef struct window8 {
 	Colormap cmap;
 	Bool map_installed;
 	int fetched;
+	double last_fetched;
 	sraRegionPtr clip_region;
 } window8bpp_t;
 
@@ -50,21 +51,59 @@ enum mark_8bpp_modes {
 	MARK_8BPP_TOP
 };
 
+#define NCOLOR 256
+
 static Colormap root_cmap = 0;
+static unsigned int root_rgb[NCOLOR];
 
 static void set_root_cmap(void) {
 	static time_t last_set = 0;
 	time_t now = time(0);
 	XWindowAttributes attr;
+	static XColor color[NCOLOR];
+	int redo = 0;
 
-	if (now > last_set + 5) {
-		root_cmap = 0;
+	if (now > last_set + 10) {
+		redo = 1;
 	}
-	if (! root_cmap) {
+	if (! root_cmap || redo) {
 		X_LOCK;
-		if (valid_window(window, &attr, 1)) {
+		if (! valid_window(window, &attr, 1)) {
+			X_UNLOCK;
+			return;
+		}
+		if (attr.colormap) {
+			int i, ncells = NCOLOR;
+			for (i=0; i < ncells; i++) {
+				color[i].pixel = i;
+				color[i].pad = 0;
+			}
 			last_set = now;
 			root_cmap = attr.colormap;
+			XQueryColors(dpy, root_cmap, color, ncells);
+			for (i=0; i < ncells; i++) {
+				unsigned int red, green, blue;
+				/* strip out highest 8 bits of values: */
+				red   = (color[i].red   & 0xff00) >> 8;
+				green = (color[i].green & 0xff00) >> 8;
+				blue  = (color[i].blue  & 0xff00) >> 8;
+
+				/*
+				 * the maxes should be at 255 already,
+				 * but just in case...
+				 */
+				red   = (main_red_max   * red  )/255;
+				green = (main_green_max * green)/255;
+				blue  = (main_blue_max  * blue )/255;
+
+				/* shift them over and or together for value */
+				red   = red    << main_red_shift;
+				green = green  << main_green_shift;
+				blue  = blue   << main_blue_shift;
+
+				/* store it in the array to be used later */
+				root_rgb[i] = red | green | blue;
+			}
 		}
 		X_UNLOCK;
 	}
@@ -77,6 +116,8 @@ static window8bpp_t windows_8bpp[MAX_8BPP_WINDOWS];
 static int db24 = 0;
 static int xgetimage_8to24 = 1;
 static double poll_8to24_delay = POLL_8TO24_DELAY;
+static double cache_win = 0.0;
+static int level2_8to24 = 0;
 
 static int check_pointer_in_depth24(void) {
 	int tries = 0, in_24 = 0;
@@ -129,13 +170,19 @@ static void parse_cmap8to24(void) {
 		db24 = 0;
 		xgetimage_8to24 = 1;
 		poll_8to24_delay = POLL_8TO24_DELAY;
+		level2_8to24 = 0;
+		cache_win = 0.0;
 		while (p) {
 			if (strstr(p, "dbg=") == p) {
 				db24 = atoi(p + strlen("dbg="));
 			} else if (strstr(p, "poll=") == p) {
 				poll_8to24_delay = atof(p + strlen("poll="));
+			} else if (strstr(p, "cachewin=") == p) {
+				cache_win = atof(p + strlen("cachewin="));
 			} else if (!strcmp(p, "nogetimage")) {
 				xgetimage_8to24 = 0;
+			} else if (!strcmp(p, "level2")) {
+				level2_8to24 = 1;
 			}
 			p = strtok(NULL, ",");
 		}
@@ -175,6 +222,11 @@ static void set_poll_fb(void) {
 	pfb(1, &poll8_fb,  &poll8_fb_w,  &poll8_fb_h);
 }
 
+int MV_glob = 0;
+int MV_count;
+int MV_hit;
+double MV_start;
+
 void check_for_multivis(void) {
 	XWindowAttributes attr;
 	int doall = 0;
@@ -190,8 +242,9 @@ void check_for_multivis(void) {
 	static double last_call = 0.0;
 	static double last_query = 0.0;
 	double now = dnow();
+	double delay;
 
-	if (now > last_parse + 0.75) {
+	if (now > last_parse + 1.0) {
 		last_parse = now;
 		parse_cmap8to24();
 	}
@@ -207,12 +260,17 @@ if (db24 > 2) fprintf(stderr, " check_for_multivis: %.4f\n", now - last_call);
 			windows_8bpp[i].map_state = IsUnmapped;
 			windows_8bpp[i].cmap = (Colormap) 0;
 			windows_8bpp[i].fetched = 0;
+			windows_8bpp[i].last_fetched = -1.0;
 			windows_8bpp[i].clip_region = NULL;
 		}
 		set_poll_fb();
 
 		first = 0;
 		doall = 1;	/* fetch everything first time */
+	}
+
+	if (wireframe_in_progress) {
+		return;
 	}
 
 	set_root_cmap();
@@ -243,7 +301,13 @@ if (db24 > 2) fprintf(stderr, " check_for_multivis: %.4f\n", now - last_call);
 	}
 
 	/* snapshot + update the current stacking order: */
-	if (doall || now > last_update + 0.15) {
+	/* TUNABLE */
+	if (poll_8to24_delay >= POLL_8TO24_DELAY) {
+		delay = 3.0 * poll_8to24_delay;
+	} else {
+		delay = 3.0 * POLL_8TO24_DELAY;	/* 0.15 */
+	}
+	if (doall || now > last_update + delay) {
 		snapshot_stack_list(0, 0.0);
 		update_stack_list();
 		last_update = now;
@@ -282,22 +346,41 @@ if (db24 > 2) fprintf(stderr, " check_for_multivis: %.4f\n", now - last_call);
 				windows_8bpp[i].map_state = IsUnmapped;
 				windows_8bpp[i].cmap = (Colormap) 0;
 				windows_8bpp[i].fetched = 0;
+				windows_8bpp[i].last_fetched = -1.0;
 			}
 		}
 		X_UNLOCK;
 	}
 
+	MV_count = 0;
+	MV_hit = 0;
+	MV_start = dnow();
+
+	set_root_cmap();
+
 	/* loop over all toplevels, both 8 and 24 depths: */
+
+	X_LOCK;	/* a giant lock around the whole activity */
+
 	for (k=0; k < stack_list_num; k++) {
 		Window r, parent;
 		Window *list0;
 		Status rc;
 		unsigned int nc0;
 		int i1;
+		XErrorHandler old_handler;
+		double delay;
 
 		Window win = stack_list[k].win;
 
-		if (now < last_query + 0.05) {
+		/* TUNABLE */
+		if (poll_8to24_delay >= POLL_8TO24_DELAY) {
+			delay = 1.5 * poll_8to24_delay;
+		} else {
+			delay = 1.5 * POLL_8TO24_DELAY;	/* 0.075 */
+		}
+
+		if (now < last_query + delay) {
 			break;
 		}
 
@@ -328,12 +411,17 @@ if (db24 > 2) fprintf(stderr, " check_for_multivis: %.4f\n", now - last_call);
 		}
 
 		/* we recurse up to two levels down from stack_list windows */
-		X_LOCK;
+
+		old_handler = XSetErrorHandler(trap_xerror);
+		trapped_xerror = 0;
 		rc = XQueryTree(dpy, win, &r, &parent, &list0, &nc0);
-		X_UNLOCK;
-		if (! rc) {
+		XSetErrorHandler(old_handler);
+
+		if (! rc || trapped_xerror) {
+			trapped_xerror = 0;
 			continue;
 		}
+		trapped_xerror = 0;
 
 		/* loop over grandchildren of rootwin: */
 		for (i1=0; i1 < (int) nc0; i1++) {
@@ -345,12 +433,22 @@ if (db24 > 2) fprintf(stderr, " check_for_multivis: %.4f\n", now - last_call);
 			if (check_depth(win1, win, doall)) {
 				continue;
 			}
-			X_LOCK;
-			rc = XQueryTree(dpy, win1, &r, &parent, &list1, &nc1);
-			X_UNLOCK;
-			if (! rc) {
+
+			if (level2_8to24) {
 				continue;
 			}
+
+			old_handler = XSetErrorHandler(trap_xerror);
+			trapped_xerror = 0;
+			rc = XQueryTree(dpy, win1, &r, &parent, &list1, &nc1);
+			XSetErrorHandler(old_handler);
+
+			if (! rc || trapped_xerror) {
+				trapped_xerror = 0;
+				continue;
+			}
+			trapped_xerror = 0;
+
 			/* loop over great-grandchildren of rootwin: */
 			for (i2=0; i2< (int) nc1; i2++) {
 				Window win2 = list1[i2];
@@ -361,18 +459,19 @@ if (db24 > 2) fprintf(stderr, " check_for_multivis: %.4f\n", now - last_call);
 				/* more? Which wm does this? */
 			}
 			if (nc1) {
-				X_LOCK;
 				XFree(list1);
-				X_UNLOCK;
 			}
 		}
 		if (nc0) {
-			X_LOCK;
 			XFree(list0);
-			X_UNLOCK;
 		}
 	}
+	X_UNLOCK;
+
 	last_query = dnow();
+
+MV_glob += MV_count;
+if (0) fprintf(stderr, "MV_count: %d hit: %d %.4f  %10.2f\n", MV_count, MV_hit, last_query - MV_start, MV_glob / (last_query - x11vnc_start));
 
 	if (screen_fixup_8 > 0.0 && now > last_fixup + screen_fixup_8) {
 		last_fixup = now;
@@ -416,44 +515,124 @@ if (db24 > 2) fprintf(stderr, " check_for_multivis: %.4f\n", now - last_call);
 			}
 		}
 	}
+if (0) fprintf(stderr, "done: %.4f\n", dnow() - last_query);
+}
+
+#define VW_CACHE_MAX 1024
+static XWindowAttributes vw_cache_attr[VW_CACHE_MAX];
+static Window vw_cache_win[VW_CACHE_MAX];
+
+static void set_attr(XWindowAttributes *attr, int j) {
+	memcpy((void *) (vw_cache_attr+j), (void *) attr,
+	    sizeof(XWindowAttributes));
+}
+#if 0
+static int get_attr(XWindowAttributes *attr, int j) {
+	memcpy((void *) attr, (void *) (vw_cache_attr+j),
+	    sizeof(XWindowAttributes));
+	return 1;
+}
+#endif
+
+static XWindowAttributes wattr;
+
+static XWindowAttributes *vw_lookup(Window win) {
+	static double last_purge = 0.0;
+	double now;
+	int i, j, k;
+
+	if (win == None) {
+		return NULL;
+	}
+
+	now = dnow();
+	if (now > last_purge + cache_win) {
+		last_purge = now;
+		for (i=0; i<VW_CACHE_MAX; i++) {
+			vw_cache_win[i] = None;
+		}
+	}
+
+	j = -1;
+	k = -1;
+	for (i=0; i<VW_CACHE_MAX; i++) {
+		if (vw_cache_win[i] == win) {
+			j = i;
+			break;
+		} else if (vw_cache_win[i] == None) {
+			k = i;
+			break;
+		}
+	}
+
+	if (j >= 0) {
+MV_hit++;
+		return vw_cache_attr+j;
+		
+	} else if (k >= 0) {
+		XWindowAttributes attr2;
+		int rc = valid_window(win, &attr2, 1);
+		if (rc) {
+			vw_cache_win[k] = win;
+			set_attr(&attr2, k);
+			return vw_cache_attr+k;
+		} else {
+			return NULL;
+		}
+	} else {
+		/* Full */
+		int rc = valid_window(win, &wattr, 1);
+		if (rc) {
+			return &wattr;
+		} else {
+			return NULL;
+		}
+	}
 }
 
 static int check_depth(Window win, Window top, int doall) {
-	XWindowAttributes attr;
+	XWindowAttributes attr, *pattr;
 
-	X_LOCK;
 	/* first see if it is (still) a valid window: */
-	if (! valid_window(win, &attr, 1)) {
-		X_UNLOCK;
-		return 1;	/* indicate done */
+MV_count++;
+
+	if (cache_win > 0.0) {
+		pattr = vw_lookup(win);
+		if (pattr == NULL) {
+			return 1;	/* indicate done */
+		}
+	} else {
+		if (! valid_window(win, &attr, 1)) {
+			return 1;	/* indicate done */
+		}
+		pattr = &attr;
 	}
-	X_UNLOCK;
-	if (! doall && attr.map_state != IsViewable) {
+
+	if (! doall && pattr->map_state != IsViewable) {
 		/*
 		 * store results anyway...  this may lead to table
 		 * filling up, but currently this allows us to update
 		 * state of onetime mapped windows.
 		 */
-		check_depth_win(win, top, attr);
+		check_depth_win(win, top, pattr);
 		return 1;	/* indicate done */
-	} else if (check_depth_win(win, top, attr)) {
+	} else if (check_depth_win(win, top, pattr)) {
 		return 1;	/* indicate done */
 	} else {
 		return 0;	/* indicate not done */
 	}
 }
 
-static int check_depth_win(Window win, Window top, XWindowAttributes attr) {
+static int check_depth_win(Window win, Window top, XWindowAttributes *attr) {
 	int store_it = 0;
 	/*
 	 * only store windows with depth not equal to the default visual's
 	 * depth note some windows can have depth == 0 ... (skip them).
 	 */
-	if (attr.depth > 0) {
-		set_root_cmap();
-		if (depth == 24 && attr.depth != 24) {
+	if (attr->depth > 0) {
+		if (depth == 24 && attr->depth != 24) {
 			store_it = 1;
-		} else if (depth == 8 && root_cmap && attr.colormap !=
+		} else if (depth == 8 && root_cmap && attr->colormap !=
 		    root_cmap) {
 			store_it = 1;
 		}
@@ -462,13 +641,13 @@ static int check_depth_win(Window win, Window top, XWindowAttributes attr) {
 	if (store_it) {
 		int i, j = -1, none = -1, nomap = -1;
 		int new = 0;
-		if (attr.map_state == IsViewable) {
+		if (attr->map_state == IsViewable) {
 			/* count the visible ones: */
 			multivis_count++;
-			if (attr.depth == 24) {
+			if (attr->depth == 24) {
 				multivis_24count++;
 			}
-if (db24 > 1) fprintf(stderr, "multivis: 0x%lx %d\n", win, attr.depth);
+if (db24 > 1) fprintf(stderr, "multivis: 0x%lx %d\n", win, attr->depth);
 		}
 
 		/* try to find a table slot for this window: */
@@ -489,7 +668,7 @@ if (db24 > 1) fprintf(stderr, "multivis: 0x%lx %d\n", win, attr.depth);
 			}
 		}
 		if (j < 0) {
-			if (attr.map_state != IsViewable) {
+			if (attr->map_state != IsViewable) {
 				/* no slot and not visible: not worth keeping */
 				return 1;
 			} else if (none >= 0) {
@@ -503,7 +682,7 @@ if (db24 > 1) fprintf(stderr, "multivis: 0x%lx %d\n", win, attr.depth);
 			/* otherwise we cannot store it... */
 		}
 
-if (db24 > 1) fprintf(stderr, "multivis: 0x%lx ms: %d j: %d no: %d nm: %d dep=%d\n", win, attr.map_state, j, none, nomap, attr.depth);
+if (db24 > 1) fprintf(stderr, "multivis: 0x%lx ms: %d j: %d no: %d nm: %d dep=%d\n", win, attr->map_state, j, none, nomap, attr->depth);
 
 		/* store if if we found a slot j: */
 		if (j >= 0) {
@@ -511,33 +690,34 @@ if (db24 > 1) fprintf(stderr, "multivis: 0x%lx ms: %d j: %d no: %d nm: %d dep=%d
 			int x, y;
 			int now_vis = 0;
 
-			if (attr.map_state == IsViewable &&
+			if (attr->map_state == IsViewable &&
 			    windows_8bpp[j].map_state != IsViewable) {
 				now_vis = 1;
 			} 
-if (db24 > 1) fprintf(stderr, "multivis: STORE 0x%lx j: %3d ms: %d dep=%d\n", win, j, attr.map_state, attr.depth);
+if (db24 > 1) fprintf(stderr, "multivis: STORE 0x%lx j: %3d ms: %d dep=%d\n", win, j, attr->map_state, attr->depth);
 			windows_8bpp[j].win = win;
 			windows_8bpp[j].top = top;
-			windows_8bpp[j].depth = attr.depth;
-			windows_8bpp[j].map_state = attr.map_state;
-			windows_8bpp[j].cmap = attr.colormap;
-			windows_8bpp[j].map_installed = attr.map_installed;
-			windows_8bpp[j].w = attr.width;
-			windows_8bpp[j].h = attr.height;
+			windows_8bpp[j].depth = attr->depth;
+			windows_8bpp[j].map_state = attr->map_state;
+			windows_8bpp[j].cmap = attr->colormap;
+			windows_8bpp[j].map_installed = attr->map_installed;
+			windows_8bpp[j].w = attr->width;
+			windows_8bpp[j].h = attr->height;
 			windows_8bpp[j].fetched = 1;
+			windows_8bpp[j].last_fetched = dnow();
 
 			/* translate x y to be WRT the root window (not parent) */
-			X_LOCK;
 			xtranslate(win, window, 0, 0, &x, &y, &w, 1);
-			X_UNLOCK;
 			windows_8bpp[j].x = x;
 			windows_8bpp[j].y = y;
 
 			if (new || now_vis) {
 if (db24) fprintf(stderr, "new/now_vis: 0x%lx %d/%d\n", win, new, now_vis);
 				/* mark it immediately if a new one: */
-				mark_rect_as_modified(x, y, x + attr.width,
-				    y + attr.height, 0);
+				X_UNLOCK;	/* dont forget the giant lock */
+				mark_rect_as_modified(x, y, x + attr->width,
+				    y + attr->height, 0);
+				X_LOCK;
 			}
 		} else {
 			/*
@@ -583,9 +763,13 @@ static int poll_line(int x1, int x2, int y1, int n, sraRegionPtr mod) {
 	static int xi8_w = 0, xi24_w = 0;
 
 	XErrorHandler old_handler = NULL;
-	XWindowAttributes attr;
 	XImage *xi;
 	Window c, win = windows_8bpp[n].win;
+
+	static XWindowAttributes attr;
+	static Window last_win = None; 
+	static double last_time = 0.0;
+	double now;
 
 	sraRegionPtr rect;
 	int mx1, mx2, my1, my2;
@@ -602,9 +786,17 @@ static int poll_line(int x1, int x2, int y1, int n, sraRegionPtr mod) {
 	}
 
 	X_LOCK;
-	if (! valid_window(windows_8bpp[n].win, &attr, 1)) {
-		X_UNLOCK;
-		return 0;
+	now = dnow();
+	if (last_win != None && win == last_win && now < last_time + 0.5) {
+		;	/* use previous attr */
+	} else {
+		if (! valid_window(win, &attr, 1)) {
+			X_UNLOCK;
+			last_win = None;
+			return 0;
+		}
+		last_time = now;
+		last_win = win;
 	}
 
 	if (attr.depth != 8 && attr.depth != 24) {
@@ -624,19 +816,25 @@ static int poll_line(int x1, int x2, int y1, int n, sraRegionPtr mod) {
 		n_off = poll24_fb_w * y1 + x1;
 	}
 
-	xtranslate(win, window, 0, 0, &xo, &yo, &c, 1);
+	old_handler = XSetErrorHandler(trap_xerror);
+	trapped_xerror = 0;
+
+	/* xtranslate() not used to save two XSetErrorHandler calls */
+	XTranslateCoordinates(dpy, win, window, 0, 0, &xo, &yo, &c);
+
 	xo = x1 - xo;
 	yo = y1 - yo;
 	w = x2 - x1;
 
-	if (xo < 0 || yo < 0 || xo + w > attr.width) {
+	if (trapped_xerror || xo < 0 || yo < 0 || xo + w > attr.width) {
 if (db24 > 2) fprintf(stderr, "avoid bad match...\n");
+		XSetErrorHandler(old_handler);
+		trapped_xerror = 0;
 		X_UNLOCK;
 		return 0;
 	}
 
 	trapped_xerror = 0;
-	old_handler = XSetErrorHandler(trap_xerror);
 	xi_r = XGetSubImage(dpy, win, xo, yo, w, 1, AllPlanes, ZPixmap, xi,
 	    0, 0);
 	XSetErrorHandler(old_handler);
@@ -943,6 +1141,7 @@ if (db24 > 1) fprintf(stderr, "get_8bpp_regions: 0x%lx ms=%d dep=%d i=%d\n", w, 
 				windows_8bpp[i].map_state = IsUnmapped;
 				windows_8bpp[i].cmap = (Colormap) 0;
 				windows_8bpp[i].fetched = 0;
+				windows_8bpp[i].last_fetched = -1.0;
 				continue;
 			}
 			X_UNLOCK;
@@ -954,6 +1153,7 @@ if (db24 > 1) fprintf(stderr, "get_8bpp_regions: 0x%lx ms=%d dep=%d i=%d\n", w, 
 			windows_8bpp[i].w = attr.width;
 			windows_8bpp[i].h = attr.height;
 			windows_8bpp[i].fetched = 1;
+			windows_8bpp[i].last_fetched = dnow();
 
 			if (attr.map_state != IsViewable) {
 				continue;
@@ -1053,7 +1253,6 @@ if (db24 > 1) fprintf(stderr, "subtract:  0x%lx %d -- %d %d %d %d\n", swin, k, s
 	return mapcount;
 }
 
-#define NCOLOR 256
 static XColor color[CMAPMAX][NCOLOR];
 static unsigned int rgb[CMAPMAX][NCOLOR];
 static int cmap_failed[CMAPMAX];
@@ -1188,19 +1387,26 @@ if (db24 > 1) fprintf(stderr, "ncmaps: %d\n", ncmaps);
 	sraRgnDestroy(clip);
 }
 
-static XImage *cmap_xi(XImage *xi, Visual *visual, int win_depth) {
+static XImage *cmap_xi(XImage *xi, Window win, int win_depth) {
+	XWindowAttributes attr;
 	char *d;
+
 	if (xi) {
 		XDestroyImage(xi);
 	}
-	if (win_depth == 8) {
+	if (! valid_window(win, &attr, 1)) {
+		return (XImage *) NULL;
+	}
+	if (attr.depth != win_depth) {
+		return (XImage *) NULL;
+	} else if (win_depth == 8) {
 		d = (char *) malloc(dpy_x * dpy_y * 1);
 	} else if (win_depth == 24) {
 		d = (char *) malloc(dpy_x * dpy_y * 4);
 	} else {
 		return (XImage *) NULL;
 	}
-	return XCreateImage(dpy, visual, win_depth, ZPixmap, 0, d, dpy_x,
+	return XCreateImage(dpy, attr.visual, win_depth, ZPixmap, 0, d, dpy_x,
 	    dpy_y, 8, 0);
 }
 
@@ -1214,7 +1420,7 @@ static void transform_rect(sraRect rect, Window win, int win_depth, int cm) {
 	int poll_Bpl;
 
 	int do_getimage = xgetimage_8to24;
-	int line, n_off, j, h, w, vw;
+	int line, n_off, j, h, w;
 	unsigned int hi, idx;
 	XWindowAttributes attr;
 	XErrorHandler old_handler = NULL;
@@ -1232,6 +1438,7 @@ if (db24 > 1) fprintf(stderr, "transform %4d %4d %4d %4d cm: %d\n", rect.x1, rec
 		do_getimage = 1;
 	}
 
+#if 0
 	if (do_getimage) {
 		X_LOCK;
 		vw = valid_window(win, &attr, 1);
@@ -1239,6 +1446,9 @@ if (db24 > 1) fprintf(stderr, "transform %4d %4d %4d %4d cm: %d\n", rect.x1, rec
 	}
 
 	if (do_getimage && vw) {
+#else
+	if (do_getimage) {
+#endif
 		static XImage *xi_8  = NULL;
 		static XImage *xi_24 = NULL;
 		XImage *xi = NULL, *xi_r;
@@ -1250,37 +1460,43 @@ if (db24 > 1) fprintf(stderr, "transform %4d %4d %4d %4d cm: %d\n", rect.x1, rec
 		hu = (unsigned int) h;
 
 		X_LOCK;
-		xtranslate(win, window, 0, 0, &xo, &yo, &c, 1);
-		xo = rect.x1 - xo;
-		yo = rect.y1 - yo;
-
-if (db24 > 1) fprintf(stderr, "xywh: %d %d %d %d vs. %d %d\n", xo, yo, w, h, attr.width, attr.height);
-
-		if (xo < 0 || yo < 0 || w > attr.width || h > attr.height) {
-			X_UNLOCK;
-if (db24 > 1) fprintf(stderr, "skipping due to potential bad match...\n");
-			return;
-		}
-
 #define GETSUBIMAGE
 #ifdef GETSUBIMAGE
 		if (win_depth == 8) {
 			if (xi_8 == NULL || xi_8->width != dpy_x ||
 			    xi_8->height != dpy_y) {
-				xi_8 = cmap_xi(xi_8, attr.visual, attr.depth);
+				xi_8 = cmap_xi(xi_8, win, 8);
 			}
 			xi = xi_8;
 		} else if (win_depth == 24) {
 			if (xi_24 == NULL || xi_24->width != dpy_x ||
 			    xi_24->height != dpy_y) {
-				xi_24 = cmap_xi(xi_24, attr.visual, attr.depth);
+				xi_24 = cmap_xi(xi_24, win, 24);
 			}
 			xi = xi_24;
 		}
 #endif
 
-		trapped_xerror = 0;
 		old_handler = XSetErrorHandler(trap_xerror);
+		trapped_xerror = 0;
+
+		XTranslateCoordinates(dpy, win, window, 0, 0, &xo, &yo, &c);
+
+		xo = rect.x1 - xo;
+		yo = rect.y1 - yo;
+
+if (db24 > 1) fprintf(stderr, "xywh: %d %d %d %d vs. %d %d\n", xo, yo, w, h, attr.width, attr.height);
+
+		if (trapped_xerror || xo < 0 || yo < 0) {
+		        /* w > attr.width || h > attr.height */
+			XSetErrorHandler(old_handler);
+			X_UNLOCK;
+			trapped_xerror = 0;
+if (db24 > 1) fprintf(stderr, "skipping due to potential bad match...\n");
+			return;
+		}
+		trapped_xerror = 0;
+
 #ifndef GETSUBIMAGE
 		xi = XGetImage(dpy, win, xo, yo, wu, hu, AllPlanes, ZPixmap);
 		xi_r = xi;
@@ -1427,15 +1643,15 @@ void bpp8to24(int x1, int y1, int x2, int y2) {
 	static int last_map_count = 0, call_count = 0;
 	static double last_get_8bpp_validate = 0.0;
 	static double last_snapshot = 0.0;
-	double now, dt, d0;
+	double now;
+	double dt, d0 = 0.0, t2;
 
 	if (! cmap8to24 || ! cmap8to24_fb) {
 		/* hmmm, why were we called? */
 		return;
 	}
 
-	now = dnow();
-if (db24 > 1) fprintf(stderr, "bpp8to24 %d %d %d %d %.4f\n", x1, y1, x2, y2, now - last_get_8bpp_validate);
+if (db24 > 1) fprintf(stderr, "bpp8to24 %d %d %d %d %.4f\n", x1, y1, x2, y2, dnow() - last_get_8bpp_validate);
 
 	call_count++;
 
@@ -1453,10 +1669,6 @@ if (db24 > 1) fprintf(stderr, "bpp8to24 %d %d %d %d %.4f\n", x1, y1, x2, y2, now
 		return;
 	}
 
-	X_LOCK;
-	XFlush(dpy);	/* make sure X server is up to date WRT input, etc */
-	X_UNLOCK;
-
 	/* copy from main_fb to cmap8to24_fb regardless of 8bpp windows: */
 
 	h = y2 - y1;
@@ -1465,7 +1677,6 @@ if (db24 > 1) fprintf(stderr, "bpp8to24 %d %d %d %d %.4f\n", x1, y1, x2, y2, now
 	if (depth == 8) {
 		/* need to cook up to depth 24 TrueColor  */
 		/* pixelsize = 1 */
-		int tcm = CMAPMAX - 1;
 
 		n_off = main_bytes_per_line * y1 + pixelsize * x1;
 
@@ -1473,7 +1684,7 @@ if (db24 > 1) fprintf(stderr, "bpp8to24 %d %d %d %d %.4f\n", x1, y1, x2, y2, now
 		dst = cmap8to24_fb + 4 * n_off;
 
 		set_root_cmap();
-		if (get_cmap(tcm, root_cmap)) {
+		if (root_cmap) {
 			int ps1 = 1, ps2 = 4;
 #if 0
 			unsigned int hi;
@@ -1496,7 +1707,7 @@ if (db24 > 1) fprintf(stderr, "bpp8to24 %d %d %d %d %.4f\n", x1, y1, x2, y2, now
 					} else {
 					}
 #endif
-					*ui = rgb[tcm][idx];
+					*ui = root_rgb[idx];
 if (db24 > 2) histo[idx]++;
 				}
 				src += main_bytes_per_line;
@@ -1534,21 +1745,36 @@ if (db24 > 2) histo[idx]++;
 
 if (db24 > 2) {for(i=0;i<256;i++){histo[i]=0;}}
 
+	now = dnow();
 	dt = now - last_get_8bpp_validate;
-	d0 = dnow();
-	if (dt < 0.0025) {
+	/* TUNABLES  */
+	if (dt < 0.003) {
 		;	/* XXX does this still give painting errors? */
 	} else {
 		int snapit = 0;
-		if (dt < 0.04) {
+		double delay1, delay2, delay3;
+		if (poll_8to24_delay >= POLL_8TO24_DELAY) {
+			delay1 = 1.0 * poll_8to24_delay;
+			delay2 = 2.0 * poll_8to24_delay;
+			delay3 = 10. * poll_8to24_delay;
+		} else {
+			delay1 = 1.0 * POLL_8TO24_DELAY;	/* 0.05 */
+			delay2 = 2.0 * POLL_8TO24_DELAY;	/* 0.1  */
+			delay3 = 10. * POLL_8TO24_DELAY;	/* 0.5  */
+		}
+		if (cache_win > 1.0) {
+			delay2 *= 2;
+			delay3 *= 2;
+		}
+		if (dt < delay1) {
 			validate = 0;
 		}
 		if (last_map_count) {
-			if (now > last_snapshot + 0.05) {
+			if (now > last_snapshot + delay2) {
 				snapit = 1;
 			}
 		} else {
-			if (now > last_snapshot + 0.4) {
+			if (now > last_snapshot + delay3) {
 				snapit = 1;
 			}
 		}
@@ -1556,15 +1782,20 @@ if (db24 > 2) {for(i=0;i<256;i++){histo[i]=0;}}
 		if (snapit) {
 			/* less problems if we update the stack frequently */
 			snapshot_stack_list(0, 0.0);
+if (0) fprintf(stderr, "SNAP time: %.4f\n", dnow() - now);
 			update_stack_list();
-			last_snapshot = now;
+			last_snapshot = dnow();
+if (0) fprintf(stderr, "UPDA time: %.4f\n", last_snapshot - now);
 		}
 
+if (0) t2 = dnow();
 		last_map_count = get_8bpp_regions(validate);
 		if (validate) {
-			last_get_8bpp_validate = now;
+			last_get_8bpp_validate = dnow();
 		}
+if (0) fprintf(stderr, "get8bpp-%d: %.4f\n", validate, dnow() - t2);
 	}
+if (db24) d0 = dnow();
 
 if (db24 > 1) fprintf(stderr, "bpp8to24 w=%d h=%d m=%p c=%p r=%p ncmaps=%d\n", w, h, main_fb, cmap8to24_fb, rfb_fb, ncmaps);
 
@@ -1630,6 +1861,7 @@ if (db24 > 2) fprintf(stderr, "cmap %d  %.4f\n", (int) cmaps[j], dnow() - d0);
 			sraRgnDestroy(rect);
 		}
 	}
+if (0) fprintf(stderr, "done time: %.4f\n", dnow() - d0);
 
 if (db24 > 2) {for(i=0; i<256;i++) {fprintf(stderr, " cmap histo[%03d] %d\n", i, histo[i]);}}
 }

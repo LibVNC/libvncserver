@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat Feb  4 22:21:00 EST 2006
+x11vnc README file                         Date: Mon Feb  6 00:16:18 EST 2006
 
 The following information is taken from these URLs:
 
@@ -4898,7 +4898,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8 lastmod: 2006-02-04
+x11vnc: allow VNC connections to real X11 displays. 0.8 lastmod: 2006-02-06
 
 x11vnc options:
   -display disp            -auth file             
@@ -5009,7 +5009,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8 lastmod: 2006-02-04
+x11vnc: allow VNC connections to real X11 displays. 0.8 lastmod: 2006-02-06
 
 Typical usage is:
 
@@ -5200,6 +5200,18 @@ Options:
                        non-default visual regions for changes, use the option
                        "poll=t" where "t" is a floating point time.
                        (default: 0.05)
+
+                       Setting the option "level2" will limit the search
+                       for non-default visual windows to two levels from the
+                       root window.  Do this on slow machines where you know
+                       the window manager only imposes one extra window between
+                       the app window and the root window.
+
+                       Also for very slow machines use "cachewin=t"
+                       where t is a floating point amount of time to cache
+                       XGetWindowAttributes results.  E.g. cachewin=5.0.
+                       This may lead to the windows being unnoticed for this
+                       amount of time when deiconifying, painting errors, etc.
 
                        Debugging for this mode can be enabled by setting
                        "dbg=1", "dbg=2", or "dbg=3".

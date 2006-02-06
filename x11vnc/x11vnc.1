@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8, lastmod: 2006-02-04
+         version: 0.8, lastmod: 2006-02-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -240,6 +240,18 @@ To adjust how often XGetImage() is used to poll the
 non-default visual regions for changes, use the option
 "poll=t" where "t" is a floating point time.
 (default: 0.05)
+.IP
+Setting the option "level2" will limit the search
+for non-default visual windows to two levels from the
+root window.  Do this on slow machines where you know
+the window manager only imposes one extra window between
+the app window and the root window.
+.IP
+Also for very slow machines use "cachewin=t"
+where t is a floating point amount of time to cache
+XGetWindowAttributes results.  E.g. cachewin=5.0.
+This may lead to the windows being unnoticed for this
+amount of time when deiconifying, painting errors, etc.
 .IP
 Debugging for this mode can be enabled by setting
 "dbg=1", "dbg=2", or "dbg=3".
