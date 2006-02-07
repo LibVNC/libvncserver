@@ -205,7 +205,7 @@ framebuffer.
 .IP
 Note that even if there are *no* depth 24 visuals or
 windows (i.e. pure 8bpp), this mode is potentially
-a improvement over \fB-flashcmap\fR because it avoids the
+an improvement over \fB-flashcmap\fR because it avoids the
 flashing and shows each window in the correct color.
 .IP
 This method appear to work, but may still have bugs
@@ -215,12 +215,12 @@ iconify all but one for the colors to be correct.
 .IP
 There may be painting errors for clipping and switching
 between windows of depths 8 and 24.  Heuristics are
-applied to try to minimize the painting errors.
-One can also press 3 Alt_L's in a row to refresh the
-screen if the error does not repair itself.  Also the
-option \fB-fixscreen\fR 8=3.0 or \fB-fixscreen\fR V=3.0 may be
-use to periodically refresh the screen at the cost of
-bandwidth (every 3 sec for this example).
+applied to try to minimize the painting errors.  One can
+also press 3 Alt_L's in a row to refresh the screen
+if the error does not repair itself.  Also the option
+\fB-fixscreen\fR 8=3.0 or \fB-fixscreen\fR V=3.0 may be used to
+periodically refresh the screen at the cost of bandwidth
+(every 3 sec for this example).
 .IP
 The [opts] string can contain the following settings.
 Multiple settings are separated by commas.
@@ -252,6 +252,11 @@ where t is a floating point amount of time to cache
 XGetWindowAttributes results.  E.g. cachewin=5.0.
 This may lead to the windows being unnoticed for this
 amount of time when deiconifying, painting errors, etc.
+.IP
+While testing on a very old SS20 these options gave
+tolerable response: \fB-8to24\fR poll=0.2,cachewin=5.0. For
+this machine \fB-overlay\fR is supported and gives better
+response.
 .IP
 Debugging for this mode can be enabled by setting
 "dbg=1", "dbg=2", or "dbg=3".

@@ -192,7 +192,9 @@ extern int xtrap_base_event_type;
 #endif
 
 #include <netdb.h>
+#ifndef _AIX
 extern int h_errno;
+#endif
 
 #if LIBVNCSERVER_HAVE_NETINET_IN_H
 #include <netinet/in.h>
