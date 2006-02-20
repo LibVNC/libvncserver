@@ -557,6 +557,11 @@ static int try_user_and_display(uid_t uid, char *dpystr) {
 		Display *dpy2 = NULL;
 		int rc;
 
+		signal(SIGHUP,  SIG_DFL);
+		signal(SIGINT,  SIG_DFL);
+		signal(SIGQUIT, SIG_DFL);
+		signal(SIGTERM, SIG_DFL);
+
 		rc = switch_user_env(uid, name, home, 0); 
 		if (! rc) {
 			exit(1);

@@ -1,3 +1,7 @@
+2006-02-20  Karl Runge <runge@karlrunge.com>
+	* main.c, cursor.c, tightvnc-filetransfer: fix some non-gcc
+	  compiler warnings.
+
 2006-01-14  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add -8to24 option for some multi-depth displays.
 

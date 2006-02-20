@@ -42,6 +42,9 @@ DisplayFileList(FileListInfo fli)
     rfbLog("DISPLAYING FILE NAMES IN THE LIST ...END\n\n");
 }
 
+#ifndef __GNUC__
+#define __FUNCTION__ "unknown"
+#endif
 
 int 
 AddFileListItemInfo(FileListInfoPtr fileListInfoPtr, char* name, 

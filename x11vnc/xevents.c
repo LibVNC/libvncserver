@@ -473,6 +473,11 @@ void spawn_grab_buster(void) {
 		fprintf(stderr, "spawn_grab_buster: could not fork\n");
 		rfbLogPerror("fork");
 	} else {
+		signal(SIGHUP,  SIG_DFL);
+		signal(SIGINT,  SIG_DFL);
+		signal(SIGQUIT, SIG_DFL);
+		signal(SIGTERM, SIG_DFL);
+
 		grab_buster_watch(parent, dstr);
 		exit(0);
 	}

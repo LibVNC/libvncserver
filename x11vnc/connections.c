@@ -431,15 +431,39 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 #if LIBVNCSERVER_HAVE_FORK
 	{
 		pid_t pid, pidw;
-		if ((pid = fork()) > 0) {
-			pidw = waitpid(pid, &rc, 0);
-		} else if (pid == -1) {
-			fprintf(stderr, "could not fork\n");
-			rfbLogPerror("fork");
-			rc = system(cmd);
+		struct sigaction sa, intr, quit;
+		sigset_t omask;
+
+		sa.sa_handler = SIG_IGN;
+		sa.sa_flags = 0;
+		sigemptyset(&sa.sa_mask);
+		sigaction(SIGINT,  &sa, &intr);
+		sigaction(SIGQUIT, &sa, &quit);
+
+		sigaddset(&sa.sa_mask, SIGCHLD);
+		sigprocmask(SIG_BLOCK, &sa.sa_mask, &omask);
+
+		if ((pid = fork()) > 0 || pid == -1) {
+
+			if (pid != -1) {
+				pidw = waitpid(pid, &rc, 0);
+			}
+
+			sigaction(SIGINT,  &intr, (struct sigaction *) NULL);
+			sigaction(SIGQUIT, &quit, (struct sigaction *) NULL);
+			sigprocmask(SIG_SETMASK, &omask, (sigset_t *) NULL);
+
+			if (pid == -1) {
+				fprintf(stderr, "could not fork\n");
+				rfbLogPerror("fork");
+				rc = system(cmd);
+			}
 		} else {
 			/* this should close port 5900, etc.. */
 			int fd;
+			sigaction(SIGINT,  &intr, (struct sigaction *) NULL);
+			sigaction(SIGQUIT, &quit, (struct sigaction *) NULL);
+			sigprocmask(SIG_SETMASK, &omask, (sigset_t *) NULL);
 			for (fd=3; fd<256; fd++) {
 				close(fd);
 			}

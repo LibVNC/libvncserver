@@ -84,6 +84,9 @@ InitFileTransfer()
 	fileTransferInitted = TRUE;
 }
 
+#ifndef __GNUC__
+#define __FUNCTION__ "unknown"
+#endif
 
 /*
  *  This method is called from InitFileTransfer method and

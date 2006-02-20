@@ -400,6 +400,7 @@ clientOutput(void *data)
 	sraRgnDestroy(updateRegion);
     }
 
+    /* Not reached. */
     return NULL;
 }
 

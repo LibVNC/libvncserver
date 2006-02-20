@@ -100,6 +100,9 @@ GetFileListResponseMsg(char* path, char flags)
 	return fileListMsg;
 }
 
+#ifndef __GNUC__
+#define __FUNCTION__ "unknown"
+#endif
 
 int
 CreateFileListInfo(FileListInfoPtr pFileListInfo, char* path, int flag)

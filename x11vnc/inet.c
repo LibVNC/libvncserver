@@ -177,8 +177,47 @@ char *ident_username(rfbClientPtr client) {
 	if (!user || *user == '\0') {
 		char msg[128];
 		int n, sock, ok = 0;
+		int block = 0;
 
-		if ((sock = rfbConnectToTcpAddr(client->host, 113)) < 0) {
+		/*
+		 * need to check to see if the operation will block for
+		 * a long time: a firewall may just ignore our packets.
+		 */
+#if LIBVNCSERVER_HAVE_FORK
+	    {	pid_t pid, pidw;
+		int rc;
+		if ((pid = fork()) > 0) {
+			usleep(100 * 1000);	/* 0.1 sec */
+			pidw = waitpid(pid, &rc, WNOHANG);
+			if (pidw <= 0) {
+				usleep(1000 * 1000);	/* 1.0 sec */
+				pidw = waitpid(pid, &rc, WNOHANG);
+				if (pidw <= 0) {
+					block = 1;
+					kill(pid, SIGTERM);
+				}
+			}
+		} else if (pid == -1) {
+			;
+		} else {
+			/* child */
+			signal(SIGHUP,  SIG_DFL);
+			signal(SIGINT,  SIG_DFL);
+			signal(SIGQUIT, SIG_DFL);
+			signal(SIGTERM, SIG_DFL);
+
+			if ((sock = rfbConnectToTcpAddr(client->host, 113)) < 0) {
+				exit(1);
+			} else {
+				close(sock);
+				exit(0);
+			}
+		}
+	    }
+#endif
+		if (block) {
+			;
+		} else if ((sock = rfbConnectToTcpAddr(client->host, 113)) < 0) {
 			rfbLog("could not connect to ident: %s:%d\n",
 			    client->host, 113);
 		} else {

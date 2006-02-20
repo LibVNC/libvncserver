@@ -341,7 +341,7 @@ char* rfbMakeMaskFromAlphaSource(int width,int height,unsigned char* alphaSource
 			}
 		}
 	free(error);
-	return result;
+	return (char *) result;
 }
 
 void rfbFreeCursor(rfbCursorPtr cursor)

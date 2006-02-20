@@ -1,3 +1,8 @@
+2006-02-20  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add SIGINT SIGQUIT handling for run_user_command(),
+	  set some signal handlers to SIG_DLF for forked children, 
+	  put a timeout on port 113 connection to viewer machine.
+
 2006-02-06  Karl Runge <runge@karlrunge.com>
 	* x11vnc: fix AIX build wrt h_errno.
 
