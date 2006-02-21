@@ -96,18 +96,18 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			[#include <X11/Xlib.h>])
 
 		AC_CHECK_LIB(Xtst, XTestGrabControl, 
-			X_PRELIBS="$X_PRELIBS -lXtst"
+			X_PRELIBS="-lXtst $X_PRELIBS"
 			[AC_DEFINE(HAVE_XTESTGRABCONTROL) HAVE_XTESTGRABCONTROL="true"], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
 		AC_CHECK_LIB(Xtst, XTestFakeKeyEvent, 
-			X_PRELIBS="$X_PRELIBS -lXtst"
+			X_PRELIBS="-lXtst $X_PRELIBS"
 			[AC_DEFINE(HAVE_XTEST)], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
 		if test "x$with_xrecord" != "xno"; then
 			AC_CHECK_LIB(Xtst, XRecordEnableContextAsync, 
-				X_PRELIBS="$X_PRELIBS -lXtst"
+				X_PRELIBS="-lXtst $X_PRELIBS"
 				[AC_DEFINE(HAVE_RECORD)], ,
 				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 		fi
