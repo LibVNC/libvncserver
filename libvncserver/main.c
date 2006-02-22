@@ -59,10 +59,21 @@ char rfbEndianTest = -1;
 
 static rfbProtocolExtension* rfbExtensionHead = NULL;
 
+/*
+ * This method registers a list of new extensions.  
+ * It avoids same extension getting registered multiple times. 
+ * The order is not preserved if multiple extensions are
+ * registered at one-go.
+ */
 void
 rfbRegisterProtocolExtension(rfbProtocolExtension* extension)
 {
-	rfbProtocolExtension* last;
+	rfbProtocolExtension *head = rfbExtensionHead, *next = NULL;
+
+	if(extension == NULL)
+		return;
+
+	next = extension->next;
 
 	if (! extMutex_initialized) {
 		INIT_MUTEX(extMutex);
@@ -70,14 +81,66 @@ rfbRegisterProtocolExtension(rfbProtocolExtension* extension)
 	}
 
 	LOCK(extMutex);
-	last = extension;
 
-	while(last->next)
-		last = last->next;
+	while(head != NULL) {
+		if(head == extension) {
+			UNLOCK(extMutex);
+			rfbRegisterProtocolExtension(next);
+			return;
+		}
 
-	last->next = rfbExtensionHead;
+		head = head->next;
+	}
+
+	extension->next = rfbExtensionHead;
 	rfbExtensionHead = extension;
+
 	UNLOCK(extMutex);
+	rfbRegisterProtocolExtension(next);
+}
+
+/*
+ * This method unregisters a list of extensions.  
+ * These extensions won't be available for any new
+ * client connection. 
+ */
+void
+rfbUnregisterProtocolExtension(rfbProtocolExtension* extension)
+{
+
+	rfbProtocolExtension *cur = NULL, *pre = NULL;
+
+	if(extension == NULL)
+		return;
+
+	if (! extMutex_initialized) {
+		INIT_MUTEX(extMutex);
+		extMutex_initialized = 1;
+	}
+
+	LOCK(extMutex);
+
+	if(rfbExtensionHead == extension) {
+		rfbExtensionHead = rfbExtensionHead->next;
+		UNLOCK(extMutex);
+		rfbUnregisterProtocolExtension(extension->next);
+		return;
+	}
+
+	cur = pre = rfbExtensionHead;
+
+	while(cur) {
+		if(cur == extension) {
+			pre->next = cur->next;
+			break;
+		}
+		pre = cur;
+		cur = cur->next;
+	}
+
+	UNLOCK(extMutex);
+
+	rfbUnregisterProtocolExtension(extension->next);
 }
 
 rfbProtocolExtension* rfbGetExtensionIterator()

@@ -35,18 +35,68 @@
 
 static rfbSecurityHandler* securityHandlers = NULL;
 
+/*
+ * This method registers a list of new security types.  
+ * It avoids same security type getting registered multiple times. 
+ * The order is not preserved if multiple security types are
+ * registered at one-go.
+ */
 void
 rfbRegisterSecurityHandler(rfbSecurityHandler* handler)
 {
-	rfbSecurityHandler* last = handler;
+	rfbSecurityHandler *head = securityHandlers, *next = NULL;
 
-	while(last->next)
-		last = last->next;
+	if(handler == NULL)
+		return;
 
-	last->next = securityHandlers;
+	next = handler->next;
+
+	while(head != NULL) {
+		if(head == handler) {
+			rfbRegisterSecurityHandler(next);
+			return;
+		}
+
+		head = head->next;
+	}
+
+	handler->next = securityHandlers;
 	securityHandlers = handler;
+
+	rfbRegisterSecurityHandler(next);
 }
 
+/*
+ * This method unregisters a list of security types. 
+ * These security types won't be available for any new
+ * client connection. 
+ */
+void
+rfbUnregisterSecurityHandler(rfbSecurityHandler* handler)
+{
+	rfbSecurityHandler *cur = NULL, *pre = NULL;
+
+	if(handler == NULL)
+		return;
+
+	if(securityHandlers == handler) {
+		securityHandlers = securityHandlers->next;
+		rfbUnregisterSecurityHandler(handler->next);
+		return;
+	}
+
+	cur = pre = securityHandlers;
+
+	while(cur) {
+		if(cur == handler) {
+			pre->next = cur->next;
+			break;
+		}
+		pre = cur;
+		cur = cur->next;
+	}
+	rfbUnregisterSecurityHandler(handler->next);
+}
 
 /*
  * Send the authentication challenge.

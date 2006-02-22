@@ -506,4 +506,9 @@ void rfbRegisterTightVNCFileTransferExtension() {
 	rfbRegisterSecurityHandler(&tightVncSecurityHandler);
 }
 
+void 
+rfbUnregisterTightVNCFileTransferExtension() {
+	rfbUnregisterProtocolExtension(&tightVncFileTransferExtension);
+	rfbUnregisterSecurityHandler(&tightVncSecurityHandler);
+}
 

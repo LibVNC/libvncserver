@@ -1,3 +1,7 @@
+2006-02-22  Rohit Kumar <rokumar@novell.com>
+	* auth.c, main.c, rfbtightserver.c, rfb.h: add methods to
+	  unregister extensions and security types.
+
 2006-02-20  Karl Runge <runge@karlrunge.com>
 	* main.c, cursor.c, tightvnc-filetransfer: fix some non-gcc
 	  compiler warnings.

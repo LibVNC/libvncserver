@@ -631,6 +631,7 @@ extern void rfbAuthNewClient(rfbClientPtr cl);
 extern void rfbProcessClientSecurityType(rfbClientPtr cl);
 extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
 extern void rfbRegisterSecurityHandler(rfbSecurityHandler* handler);
+extern void rfbUnregisterSecurityHandler(rfbSecurityHandler* handler);
 
 /* rre.c */
 
@@ -792,6 +793,7 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
 void rfbDoNothingWithClient(rfbClientPtr cl);
 enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
 void rfbRegisterProtocolExtension(rfbProtocolExtension* extension);
+void rfbUnregisterProtocolExtension(rfbProtocolExtension* extension);
 struct _rfbProtocolExtension* rfbGetExtensionIterator();
 void rfbReleaseExtensionIterator();
 rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
@@ -831,6 +833,7 @@ extern rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo);
 
 /* TightVNC file transfer extension */
 void rfbRegisterTightVNCFileTransferExtension();
+void rfbUnregisterTightVNCFileTransferExtension(); 
 
 #endif
 
