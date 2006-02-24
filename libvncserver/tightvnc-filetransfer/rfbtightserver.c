@@ -37,20 +37,18 @@
 
 extern rfbProtocolExtension tightVncFileTransferExtension;
 
-rfbTightClientPtr rfbGetTightClientData(rfbClientPtr cl)
+rfbTightClientPtr 
+rfbGetTightClientData(rfbClientPtr cl)
 {
-    rfbExtensionData* data = cl->extensions;
-
-    while(data && data->extension != &tightVncFileTransferExtension)
-	data = data->next;
-
-    if(data == NULL) {
-	rfbLog("TightVNC enabled, but client data missing?!\n");
+    rfbTightClientPtr rtcp = (rfbTightClientPtr) 
+				rfbGetExtensionClientData(cl, 
+				&tightVncFileTransferExtension);
+    if(rtcp == NULL) {
+        rfbLog("Extension client data is null, closing the connection !\n");
 	rfbCloseClient(cl);
-	return NULL;
     }
 
-    return (rfbTightClientPtr)data->data;
+    return rtcp;
 }
 
 /*
@@ -58,8 +56,7 @@ rfbTightClientPtr rfbGetTightClientData(rfbClientPtr cl)
  */
 
 static void
-rfbVncAuthSendChallenge(cl)
-    rfbClientPtr cl;
+rfbVncAuthSendChallenge(rfbClientPtr cl)
 {
 	
     /* 4 byte header is alreay sent. Which is rfbSecTypeVncAuth (same as rfbVncAuth). Just send the challenge. */
@@ -81,8 +78,7 @@ rfbVncAuthSendChallenge(cl)
  */
 
 void
-rfbProcessClientAuthType(cl)
-    rfbClientPtr cl;
+rfbProcessClientAuthType(rfbClientPtr cl)
 {
     uint32_t auth_type;
     int n, i;
@@ -137,8 +133,7 @@ rfbProcessClientAuthType(cl)
  */
 
 void
-rfbProcessClientTunnelingType(cl)
-    rfbClientPtr cl;
+rfbProcessClientTunnelingType(rfbClientPtr cl)
 {
     /* If we were called, then something's really wrong. */
     rfbLog("rfbProcessClientTunnelingType: not implemented\n");
@@ -153,8 +148,7 @@ rfbProcessClientTunnelingType(cl)
  */
 
 static void
-rfbSendAuthCaps(cl)
-    rfbClientPtr cl;
+rfbSendAuthCaps(rfbClientPtr cl)
 {
     rfbAuthenticationCapsMsg caps;
     rfbCapabilityInfo caplist[MAX_AUTH_CAPS];
@@ -195,16 +189,12 @@ rfbSendAuthCaps(cl)
 }
 
 
-
-
-
 /*
  * Send the list of our tunneling capabilities (protocol 3.7t).
  */
 
 static void
-rfbSendTunnelingCaps(cl)
-    rfbClientPtr cl;
+rfbSendTunnelingCaps(rfbClientPtr cl)
 {
     rfbTunnelingCapsMsg caps;
     uint32_t nTypes = 0;		/* we don't support tunneling yet */
@@ -241,8 +231,7 @@ rfbSendTunnelingCaps(cl)
 #define N_ENC_CAPS  12
 
 void
-rfbSendInteractionCaps(cl)
-    rfbClientPtr cl;
+rfbSendInteractionCaps(rfbClientPtr cl)
 {
     rfbInteractionCapsMsg intr_caps;
     rfbCapabilityInfo smsg_list[N_SMSG_CAPS];
@@ -331,9 +320,7 @@ rfbSendInteractionCaps(cl)
 
 
 rfbBool
-rfbTightExtensionInit(cl, data)
-rfbClientPtr cl;
-void** data;
+rfbTightExtensionInit(rfbClientPtr cl, void** data)
 {
 
    rfbSendInteractionCaps(cl);
@@ -364,10 +351,8 @@ handleMessage(rfbClientPtr cl,
 }
 
 rfbBool
-rfbTightExtensionMsgHandler(cl, data, msg)
-struct _rfbClientRec* cl;
-void* data;
-const rfbClientToServerMsg* msg;
+rfbTightExtensionMsgHandler(struct _rfbClientRec* cl, void* data,
+				const rfbClientToServerMsg* msg)
 {
     switch (msg->type) {
 		
@@ -406,7 +391,8 @@ const rfbClientToServerMsg* msg;
 
 	/*
 
-	We shouldn't close the connection here for unhandled msg, it should be left to libvncserver.
+	We shouldn't close the connection here for unhandled msg, 
+	it should be left to libvncserver.
 	rfbLog(" ... closing connection\n");
 	rfbCloseClient(cl);
 
@@ -469,7 +455,8 @@ rfbHandleSecTypeTight(rfbClientPtr cl) {
 
     if(rtcp == NULL) {
         /* Error condition close socket */
-        rfbLog("Memory error has occured while handling Tight security type... closing connection.\n");
+        rfbLog("Memory error has occured while handling "
+		"Tight security type... closing connection.\n");
 	 rfbCloseClient(cl);
 	 return;
     }

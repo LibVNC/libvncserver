@@ -799,6 +799,7 @@ void rfbReleaseExtensionIterator();
 rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
 	void* data);
 rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension);
+void* rfbGetExtensionClientData(rfbClientPtr cl, rfbExtensionData* extension);
 
 /* to check against plain passwords */
 rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len);

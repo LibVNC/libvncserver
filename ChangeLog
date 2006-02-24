@@ -1,3 +1,7 @@
+2006-02-24  Rohit Kumar <rokumar@novell.com>
+	* main.c, rfbtightserver.c, rfb.h: added method to get 
+	  extension specific client data.
+
 2006-02-22  Rohit Kumar <rokumar@novell.com>
 	* auth.c, main.c, rfbtightserver.c, rfb.h: add methods to
 	  unregister extensions and security types.

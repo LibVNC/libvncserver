@@ -194,6 +194,22 @@ rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension)
 	return FALSE;
 }
 
+void* rfbGetExtensionClientData(rfbClientPtr cl, rfbExtensionData* extension)
+{
+    rfbExtensionData* data = cl->extensions;
+
+    while(data && data->extension != extension)
+	data = data->next;
+
+    if(data == NULL) {
+	rfbLog("Extension is not enabled !\n");
+	/* rfbCloseClient(cl); */
+	return NULL;
+    }
+
+    return data->data;
+}
+
 /*
  * Logging
  */
