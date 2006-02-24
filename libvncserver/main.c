@@ -194,7 +194,7 @@ rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension)
 	return FALSE;
 }
 
-void* rfbGetExtensionClientData(rfbClientPtr cl, rfbExtensionData* extension)
+void* rfbGetExtensionClientData(rfbClientPtr cl, rfbProtocolExtension* extension)
 {
     rfbExtensionData* data = cl->extensions;
 
