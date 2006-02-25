@@ -502,9 +502,9 @@ You can choose to disconnect the client by clicking on the
 confirmation dialog to doublecheck.
 
 Alternatively, you can fine tune the VNC client's input permissions
-by selecting any of the Keystrokes, Mouse Motion, or Button Clicks
-checkboxes and pressing \"OK\".  This is like the \"-input\" option
-but on a per-client basis.
+by selecting any of the Keystrokes, Mouse-Motion, Button-Clicks, or
+Clipboard-Input checkboxes and pressing \"OK\".  This is like the
+\"-input\" option but on a per-client basis.
 
 To not change any aspects of the VNC client press \"Cancel\".
 "
@@ -1849,8 +1849,8 @@ proc push_new_value {item name new {query 1}} {
 	}
 }
 
-proc set_kmb_str {} {
-	global vl_bk vl_bm vl_bb vr_bk vr_bm vr_bb 
+proc set_kmbc_str {} {
+	global vl_bk vl_bm vl_bb vl_bc vr_bk vr_bm vr_bb vr_bc
 
 	set str ""
 	if {$vl_bk} {
@@ -1862,7 +1862,10 @@ proc set_kmb_str {} {
 	if {$vl_bb} {
 		append str "B"
 	}
-	if {$vr_bk || $vr_bm || $vr_bb} {
+	if {$vl_bc} {
+		append str "C"
+	}
+	if {$vr_bk || $vr_bm || $vr_bb || $vr_bc} {
 		append str ","
 	}
 	if {$vr_bk} {
@@ -1874,16 +1877,19 @@ proc set_kmb_str {} {
 	if {$vr_bb} {
 		append str "B"
 	}
+	if {$vr_bc} {
+		append str "C"
+	}
 	entry_insert $str
 }
 
 proc insert_input_window {} {
 	global text_area cleanup_window
 	global ffont menu_var
-	global vl_bk vl_bm vl_bb vr_bk vr_bm vr_bb 
+	global vl_bk vl_bm vl_bb vl_bc vr_bk vr_bm vr_bb vr_bc
 
 	append_text "\nUse these checkboxes to set the input permissions, "
-	append_text "or type in the \"KMB...\"\n"
+	append_text "or type in the \"KMBC...\"\n"
 	append_text "-input string manually.  Then press \"OK\" or \"Cancel\".\n"
 	append_text "(note: an empty setting means use the default behavior, "
 	append_text "see viewonly)\n\n"
@@ -1896,18 +1902,22 @@ proc insert_input_window {} {
 	frame $fr
 	label $fl.l -font $ffont -text "Normal clients:   "
 	checkbutton $fl.bk -pady 1 -font $ffont -anchor w -variable vl_bk \
-		-pady 1 -command set_kmb_str -text "Keystrokes" 
+		-pady 1 -command set_kmbc_str -text "Keystrokes" 
 	checkbutton $fl.bm -font $ffont -anchor w -variable vl_bm \
-		-pady 1 -command set_kmb_str -text "Mouse Motion" 
+		-pady 1 -command set_kmbc_str -text "Mouse-Motion" 
 	checkbutton $fl.bb -font $ffont -anchor w -variable vl_bb \
-		-pady 1 -command set_kmb_str -text "Button Clicks"
+		-pady 1 -command set_kmbc_str -text "Button-Clicks"
+	checkbutton $fl.bc -font $ffont -anchor w -variable vl_bc \
+		-pady 1 -command set_kmbc_str -text "Clipboard-Input"
 	label $fr.l -pady 1 -font $ffont -text "View-Only clients:"
 	checkbutton $fr.bk -font $ffont -anchor w -variable vr_bk \
-		-pady 1 -command set_kmb_str -text "Keystrokes" 
+		-pady 1 -command set_kmbc_str -text "Keystrokes" 
 	checkbutton $fr.bm -font $ffont -anchor w -variable vr_bm \
-		-pady 1 -command set_kmb_str -text "Mouse Motion" 
+		-pady 1 -command set_kmbc_str -text "Mouse-Motion" 
 	checkbutton $fr.bb -font $ffont -anchor w -variable vr_bb \
-		-pady 1 -command set_kmb_str -text "Button Clicks"
+		-pady 1 -command set_kmbc_str -text "Button-Clicks"
+	checkbutton $fr.bc -font $ffont -anchor w -variable vr_bc \
+		-pady 1 -command set_kmbc_str -text "Clipboard-Input"
 
 	if {[info exists menu_var(input)]} {
 		set input_str $menu_var(input)
@@ -1924,9 +1934,11 @@ proc insert_input_window {} {
 	set vl_bk 0
 	set vl_bm 0
 	set vl_bb 0
+	set vl_bc 0
 	set vr_bk 0
 	set vr_bm 0
 	set vr_bb 0
+	set vr_bc 0
 
 	if {[regexp -nocase {K} $normal]} {
 		set vl_bk 1
@@ -1937,6 +1949,9 @@ proc insert_input_window {} {
 	if {[regexp -nocase {B} $normal]} {
 		set vl_bb 1
 	}
+	if {[regexp -nocase {C} $normal]} {
+		set vl_bc 1
+	}
 	if {[regexp -nocase {K} $viewonly]} {
 		set vr_bk 1
 	}
@@ -1946,9 +1961,12 @@ proc insert_input_window {} {
 	if {[regexp -nocase {B} $viewonly]} {
 		set vr_bb 1
 	}
+	if {[regexp -nocase {C} $viewonly]} {
+		set vr_bc 1
+	}
 
-	pack $fl.l $fl.bk $fl.bm $fl.bb -side top -fill x
-	pack $fr.l $fr.bk $fr.bm $fr.bb -side top -fill x
+	pack $fl.l $fl.bk $fl.bm $fl.bb $fl.bc -side top -fill x
+	pack $fr.l $fr.bk $fr.bm $fr.bb $fr.bc -side top -fill x
 	pack $fl $fr -side left
 	update
 	update idletasks
@@ -1961,19 +1979,21 @@ proc insert_input_window {} {
 }
 
 proc set_ca_str {w} {
-	global ca_bk ca_bm ca_bb ca_bk ca_di
+	global ca_bk ca_bm ca_bb ca_bc ca_di
 
 	if {$ca_di} {
 		entry_insert "disconnect"
 		$w.bk configure -state disabled
 		$w.bm configure -state disabled
 		$w.bb configure -state disabled
+		$w.bc configure -state disabled
 		return
 	}
 
 	$w.bk configure -state normal
 	$w.bm configure -state normal
 	$w.bb configure -state normal
+	$w.bc configure -state normal
 
 	set str ""
 	if {$ca_bk} {
@@ -1985,13 +2005,16 @@ proc set_ca_str {w} {
 	if {$ca_bb} {
 		append str "B"
 	}
+	if {$ca_bc} {
+		append str "C"
+	}
 	entry_insert $str
 }
 
 proc insert_client_action_window {input} {
 	global text_area cleanup_window
 	global ffont menu_var
-	global ca_bk ca_bm ca_bb ca_bk ca_di
+	global ca_bk ca_bm ca_bb ca_bc ca_di
 
 	append_text "\nUse these checkboxes to set the input permissions "
 	append_text "for this client\n-OR- whether to disconnect it instead.  "
@@ -2004,14 +2027,17 @@ proc insert_client_action_window {input} {
 	checkbutton $w.bk -font $ffont -anchor w -variable ca_bk \
 		-pady 1 -command "set_ca_str $w" -text "Keystrokes" 
 	checkbutton $w.bm -font $ffont -anchor w -variable ca_bm \
-		-pady 1 -command "set_ca_str $w" -text "Mouse Motion" 
+		-pady 1 -command "set_ca_str $w" -text "Mouse-Motion" 
 	checkbutton $w.bb -font $ffont -anchor w -variable ca_bb \
-		-pady 1 -command "set_ca_str $w" -text "Button Clicks"
+		-pady 1 -command "set_ca_str $w" -text "Button-Clicks"
+	checkbutton $w.bc -font $ffont -anchor w -variable ca_bc \
+		-pady 1 -command "set_ca_str $w" -text "Clipboard"
 
 	set ca_di 0
 	set ca_bk 0
 	set ca_bm 0
 	set ca_bb 0
+	set ca_bc 0
 
 	if {[regexp -nocase {K} $input]} {
 		set ca_bk 1
@@ -2022,8 +2048,11 @@ proc insert_client_action_window {input} {
 	if {[regexp -nocase {B} $input]} {
 		set ca_bb 1
 	}
+	if {[regexp -nocase {C} $input]} {
+		set ca_bc 1
+	}
 
-	pack $w.di $w.bk $w.bm $w.bb -side left
+	pack $w.di $w.bk $w.bm $w.bb $w.bc -side left
 	update
 	update idletasks
 	$text_area window create end -window $w
@@ -3188,16 +3217,17 @@ proc client_dialog {client} {
 		set input $m6
 		set logvo $m7
 		append_text "Host: $host, Port: $port, User: $user, IP: $ip, Id: $cid\n"
-		append_text "    - originally logged in as:  "
+		append_text " - originally logged in as: "
 		if {$logvo == "1" } {
 			append_text "View-Only Client\n"
 		} else {
 			append_text "Normal Client\n"
 		}
-		append_text "    - currently allowed input:  "
+		append_text " - currently allowed input: "
 		set sk 0
 		set sm 0
 		set sb 0
+		set sc 0
 		if {[regexp -nocase {K} $input]} {
 			append_text "Keystrokes"
 			set sk 1
@@ -3216,7 +3246,14 @@ proc client_dialog {client} {
 			append_text "Button-Clicks"
 			set sb 1
 		}
-		if {! $sk && ! $sm && ! $sb} {
+		if {[regexp -nocase {C} $input]} {
+			if {$sk || $sm || $sb} {
+				append_text ", "
+			}
+			append_text "Clipboard"
+			set sm 1
+		}
+		if {! $sk && ! $sm && ! $sb && ! $sm} {
 			append_text "None"
 		}
 		append_text "\n"
@@ -3243,7 +3280,7 @@ proc client_dialog {client} {
 	} elseif {[regexp -nocase {(disconnect|close)} $val]} {
 		disconnect_dialog $client
 	} else {
-		regsub -all -nocase {[^KMB]} $val "" val
+		regsub -all -nocase {[^KMBC]} $val "" val
 		set item_bool(client_input) 0
 		push_new_value "client_input" "client_input" "$cid:$val" 0
 	}

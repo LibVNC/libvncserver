@@ -5,6 +5,7 @@
 #include "cleanup.h"
 #include "scan.h"
 #include "screen.h"
+#include "unixpw.h"
 
 void check_switched_user(void);
 void lurk_loop(char *str);
@@ -43,6 +44,8 @@ void check_switched_user(void) {
 	static int did_dummy = 0;
 	int delay = 15;
 	time_t now = time(0);
+
+	if (unixpw_in_progress) return;
 
 	if (started_as_root == 1 && users_list) {
 		try_to_switch_users();
@@ -923,6 +926,8 @@ void check_new_passwds(void) {
 	if (strstr(passwdfile, "read:") != passwdfile) {
 		return;
 	}
+	if (unixpw_in_progress) return;
+
 	now = time(0);
 	if (now > last_check + 1) {
 		if (read_passwds(passwdfile)) {

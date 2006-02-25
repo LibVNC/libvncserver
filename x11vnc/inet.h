@@ -13,5 +13,6 @@ extern int get_local_port(int sock);
 extern char *get_remote_host(int sock);
 extern char *get_local_host(int sock);
 extern char *ident_username(rfbClientPtr client);
+extern int find_free_port(int start, int end);
 
 #endif /* _X11VNC_INET_H */

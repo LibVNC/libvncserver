@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.1, lastmod: 2006-02-20
+         version: 0.8.1, lastmod: 2006-02-24
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -433,16 +433,17 @@ lookups time out, etc.
 .IP
 Fine tuning of allowed user input.  If \fIstring\fR does
 not contain a comma "," the tuning applies only to
-normal clients.  Otherwise the part before "," is
-for normal clients and the part after for view-only
-clients.  "K" is for Keystroke input, "M" for
-Mouse-motion input, and "B" for Button-click input.
-Their presence in the string enables that type of input.
-E.g. "\fB-input\fR \fIM\fR" means normal users can only move
-the mouse and  "\fB-input\fR \fIKMB,M\fR" lets normal users do
-anything and enables view-only users to move the mouse.
-This option is ignored when a global \fB-viewonly\fR is in
-effect (all input is discarded in that case).
+normal clients.  Otherwise the part before "," is for
+normal clients and the part after for view-only clients.
+"K" is for Keystroke input, "M" for Mouse-motion
+input, "B" for Button-click input, and "C" is for
+Clipboard input.  Their presence in the string enables
+that type of input.  E.g. "\fB-input\fR \fIM\fR" means normal
+users can only move the mouse and  "\fB-input\fR \fIKMBC,M\fR"
+lets normal users do anything and enables view-only
+users to move the mouse.  This option is ignored when
+a global \fB-viewonly\fR is in effect (all input is discarded
+in that case).
 .PP
 \fB-viewpasswd\fR \fIstring\fR
 .IP
@@ -490,6 +491,94 @@ Otherwise the "__BEGIN_VIEWONLY__" token must be
 used to have viewonly passwords.  (tip: make the 3rd
 and last line be "__BEGIN_VIEWONLY__" to have 2
 full-access passwords)
+.PP
+\fB-unixpw\fR \fI[list]\fR
+.IP
+Experimental option: use Unix username and password
+authentication.  x11vnc uses the 
+.IR su (1)
+program to
+verify the user's password.  [list] is an optional
+comma separated list of allowed Unix usernames.
+.IP
+A familiar "login:" and "Password:" dialog is
+presented to the user on a black screen inside the
+vncviewer.  The connection is dropped if the user fails
+to supply the correct password in 3 tries or does not
+send one before a 20 second timeout.  Existing clients
+are view-only during this period.
+.IP
+*IMPORTANT*: to prevent the Unix password being sent in
+*clear text* over the network, two x11vnc options are
+enforced: 1) \fB-localhost\fR and 2) \fB-stunnel.\fR  The former
+requires the viewer connection to appear to come from
+the same machine x11vnc is running on (e.g. from a ssh
+\fB-L\fR port redirection).  The latter requires the \fB-stunnel\fR
+SSL mode be used (see the description below).
+.IP
+To override these restrictions you can set environment
+variables before starting x11vnc:
+.IP
+Set UNIXPW_DISABLE_STUNNEL=1 to disable using \fB-stunnel.\fR
+Evidently you will be using a different method to
+encrypt the data between the vncviewer and x11vnc:
+e.g. 
+.IR ssh (1)
+or a VPN.  Note that use of 
+.IR ssh (1)
+with
+\fB-localhost\fR is roughly the same as requiring a Unix
+user login (since Unix password or the user's public
+key authentication is used by ssh)
+.IP
+Set UNIXPW_DISABLE_LOCALHOST=1 to disable the \fB-localhost\fR
+requirement.  One should never do this (i.e. allow the
+Unix passwords to be sniffed on the network).
+.IP
+NOTE: in \fB-inetd\fR mode the two settings are not enforced
+since x11vnc does not make network connections in
+that case.  Be sure to use encryption from the viewer
+to inetd.  One can also have your own stunnel spawn
+x11vnc in \fB-inetd\fR mode.
+.PP
+\fB-stunnel\fR \fI[pem]\fR
+.IP
+Use the 
+.IR stunnel (1)
+(www.stunnel.org) to provide an
+encrypted SSL tunnel between viewers and x11vnc.
+This requires stunnel be installed on the system and
+available via PATH (n.b. stunnel is often installed in
+sbin directories).  Version 4.x of stunnel is assumed.
+.IP
+[pem] is optional, use "\fB-stunnel\fR \fI/path/to/stunnel.pem\fR"
+to specify a PEM certificate file to pass to stunnel.
+.IP
+stunnel is started up as a child process and any SSL
+connections it receives are decrypted and sent to x11vnc
+over a local socket.  The strings "The SSL VNC desktop
+is ..." and SSLPORT=... are printed out at startup.
+.IP
+The \fB-localhost\fR option is enforced by default.  Set
+STUNNEL_DISABLE_LOCALHOST=1 to disable the requirement.
+.IP
+Your VNC viewer will need to be able to connect via SSL.
+Unfortunately not too many do this.  UltraVNC seems to
+have a SSL plugin.   It is not too difficult to set up
+an stunnel or other SSL tunnel on the viewer side.
+.IP
+A simple example on Unix using stunnel 3.x is:
+.IP
+% stunnel \fB-c\fR \fB-d\fR localhost:5901 \fB-r\fR remote:5900
+% vncviewer localhost:1
+.IP
+For Windows, stunnel has been ported to it and there
+are probably other such tools available.
+.PP
+\fB-stunnel3\fR \fI[pem]\fR
+.IP
+Use version 3.x stunnel command line syntax instead of
+version 4.x
 .PP
 \fB-nopw\fR
 .IP

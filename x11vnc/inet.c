@@ -16,6 +16,7 @@ int get_local_port(int sock);
 char *get_remote_host(int sock);
 char *get_local_host(int sock);
 char *ident_username(rfbClientPtr client);
+int find_free_port(int start, int end);
 
 
 static int get_port(int sock, int remote);
@@ -295,4 +296,21 @@ char *ident_username(rfbClientPtr client) {
 	return str;
 }
 
+int find_free_port(int start, int end) {
+	int port;
+	if (start <= 0) {
+		start = 1024;
+	}
+	if (end <= 0) {
+		end = 65530;
+	}
+	for (port = start; port <= end; port++)  {
+		int sock = rfbListenOnTCPPort(port, htonl(INADDR_ANY));
+		if (sock >= 0) {
+			close(sock);
+			return port;
+		}
+	}
+	return 0;
+}
 

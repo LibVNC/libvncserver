@@ -3,6 +3,7 @@
 #include "x11vnc.h"
 #include "xwrappers.h"
 #include "userinput.h"
+#include "unixpw.h"
 
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 Damage xdamage = 0;
@@ -177,6 +178,7 @@ void clear_xdamage_mark_region(sraRegionPtr markregion, int flush) {
 	if (! xdamage_base_event_type) {
 		return;
 	}
+	if (unixpw_in_progress) return;
 
 	X_LOCK;
 	if (flush) {

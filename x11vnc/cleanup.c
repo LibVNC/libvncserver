@@ -8,6 +8,8 @@
 #include "scan.h"
 #include "gui.h"
 #include "solid.h"
+#include "unixpw.h"
+#include "sslcmds.h"
 
 /*
  * Exiting and error handling routines
@@ -130,6 +132,8 @@ void clean_up_exit (int ret) {
 	if (use_solid_bg) {
 		solid_bg(1);
 	}
+	stop_stunnel();
+
 	X_LOCK;
 	XTestDiscard_wr(dpy);
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
@@ -380,6 +384,7 @@ static void interrupted (int sig) {
 	if (use_solid_bg) {
 		solid_bg(1);
 	}
+	stop_stunnel();
 
 	if (crash_debug) {
 		crash_shell();

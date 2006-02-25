@@ -137,6 +137,7 @@
 #include "screen.h"
 #include "connections.h"
 #include "rates.h"
+#include "unixpw.h"
 
 /*
  * main routine for the x11vnc program
@@ -158,6 +159,8 @@ static void check_loop_mode(int argc, char* argv[]);
 
 static void check_cursor_changes(void) {
 	static double last_push = 0.0;
+
+	if (unixpw_in_progress) return;
 
 	cursor_changes += check_x11_pointer();
 
@@ -220,6 +223,9 @@ static void record_last_fb_update(void) {
 		/* check every second or so */
 		return;
 	}
+
+	if (unixpw_in_progress) return;
+
 	last_call = now;
 
 	if (! screen) {
@@ -933,6 +939,8 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	    ? allowed_input_str : "null");
 	fprintf(stderr, " passfile:   %s\n", passwdfile ? passwdfile
 	    : "null");
+	fprintf(stderr, " unixpw:     %d\n", unixpw);
+	fprintf(stderr, " stunnel:    %d\n", use_stunnel);
 	fprintf(stderr, " accept:     %s\n", accept_cmd ? accept_cmd
 	    : "null");
 	fprintf(stderr, " accept:     %s\n", afteraccept_cmd ? afteraccept_cmd
@@ -1157,6 +1165,7 @@ int main(int argc, char* argv[]) {
 	char *gui_str = NULL;
 	int pw_loc = -1, got_passwd = 0, got_rfbauth = 0, nopw = NOPW;
 	int got_viewpasswd = 0, got_localhost = 0, got_passwdfile = 0;
+	int got_stunnel = 0;
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0;
@@ -1350,6 +1359,35 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			passwdfile = strdup(argv[++i]);
 			got_passwdfile = 1;
+		} else if (!strcmp(arg, "-unixpw")) {
+			unixpw = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					unixpw_list = strdup(s);
+					i++;
+				}
+			}
+		} else if (!strcmp(arg, "-stunnel")) {
+			use_stunnel = 1;
+			got_stunnel = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					stunnel_pem = strdup(s);
+					i++;
+				}
+			}
+		} else if (!strcmp(arg, "-stunnel3")) {
+			use_stunnel = 3;
+			got_stunnel = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					stunnel_pem = strdup(s);
+					i++;
+				}
+			}
 		} else if (!strcmp(arg, "-nopw")) {
 			nopw = 1;
 		} else if (!strcmp(arg, "-storepasswd")) {
@@ -1825,8 +1863,8 @@ int main(int argc, char* argv[]) {
 			if (!strcmp(arg, "-deferupdate")) {
 				got_deferupdate = 1;
 			}
-			if (!strcmp(arg, "-rfbport")) {
-				got_rfbport = 1;
+			if (!strcmp(arg, "-rfbport") && i < argc-1) {
+				got_rfbport = atoi(argv[i+1]);
 			}
 			if (!strcmp(arg, "-alwaysshared ")) {
 				got_alwaysshared = 1;
@@ -1999,9 +2037,9 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (!got_passwd && !got_rfbauth && (!got_passwdfile || !passwd_list)
-	    && !query_cmd && !remote_cmd) {
-		char message[] =
-		    "-rfbauth, -passwdfile, or -passwd password required.";
+	    && !query_cmd && !remote_cmd && !unixpw) {
+		char message[] = "-rfbauth, -passwdfile, -passwd password, "
+		    "or -unixpw required.";
 		if (! nopw) {
 			nopassword_warning_msg(got_localhost);
 		}
@@ -2030,6 +2068,33 @@ int main(int argc, char* argv[]) {
 		accept_remote_cmds = 0;
 		safe_remote_only = 1;
 		launch_gui = 0;
+	}
+
+	if (! inetd) {
+	    if (unixpw) {
+		if (! got_localhost && ! getenv("UNIXPW_DISABLE_LOCALHOST")) {
+			if (! quiet) {
+				rfbLog("Setting -localhost in -unixpw mode.\n");
+			}
+			allow_list = strdup("127.0.0.1");
+			got_localhost = 1;
+		}
+		if (! got_stunnel && ! getenv("UNIXPW_DISABLE_STUNNEL")) {
+			if (! quiet) {
+				rfbLog("Setting -stunnel in -unixpw mode.\n");
+			}
+			use_stunnel = 1;
+		}
+	    } else if (use_stunnel) {
+
+		if (! got_localhost && ! getenv("STUNNEL_DISABLE_LOCALHOST")) {
+			if (! quiet) {
+				rfbLog("Setting -localhost in -stunnel mode.\n");
+			}
+			allow_list = strdup("127.0.0.1");
+			got_localhost = 1;
+		}
+	    }
 	}
 
 	/* fixup settings that do not make sense */
@@ -2082,6 +2147,7 @@ int main(int argc, char* argv[]) {
 		shared = 0;
 		connect_once = 1;
 		bg = 0;
+		use_stunnel = 0;
 		/* others? */
 	}
 
@@ -2591,11 +2657,6 @@ int main(int argc, char* argv[]) {
 	}
 #endif
 
-	if (filexfer) {
-#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
-		rfbRegisterTightVNCFileTransferExtension();
-#endif
-	}
 
 	if (! quiet) {
 		rfbLog("--------------------------------------------------------\n");
@@ -2604,6 +2665,13 @@ int main(int argc, char* argv[]) {
 
 	raw_fb_pass_go_and_collect_200_dollars:
 
+#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+	if (filexfer) {
+		rfbRegisterTightVNCFileTransferExtension();
+	} else {
+		rfbUnregisterTightVNCFileTransferExtension();
+	}
+#endif
 	if (! dt) {
 		static char str[] = "-desktop";
 		argv_vnc[argc_vnc++] = str;
@@ -2655,7 +2723,8 @@ int main(int argc, char* argv[]) {
 	}
 	if (! quiet) {
 		rfbLog("screen setup finished.\n");
-		if (!got_passwd && !got_rfbauth && !got_passwdfile && !nopw) {
+		if (!got_passwd && !got_rfbauth && !got_passwdfile && !unixpw
+		    && !nopw) {
 			rfbLog("\n");
 			rfbLog("WARNING: You are running x11vnc WITHOUT"
 			    " a password.  See\n");

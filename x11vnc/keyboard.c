@@ -10,6 +10,7 @@
 #include "rates.h"
 #include "cleanup.h"
 #include "allowed_input_t.h"
+#include "unixpw.h"
 
 void get_keystate(int *keystate);
 void clear_modifiers(int init);
@@ -24,7 +25,7 @@ void delete_added_keycodes(int bequiet);
 void initialize_remap(char *infile);
 int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new);
 void switch_to_xkb_if_better(void);
-char *short_kmb(char *str);
+char *short_kmbc(char *str);
 void initialize_allowed_input(void);
 void initialize_modtweak(void);
 void initialize_keyboard_and_pointer(void);
@@ -313,6 +314,9 @@ void check_add_keysyms(void) {
 	static time_t last_check = 0;
 	int clear_freq = 300, quiet = 1, count; 
 	time_t now = time(0);
+
+	if (unixpw_in_progress) return;
+
 	if (now > last_check + clear_freq) {
 		count = count_added_keycodes();
 		/*
@@ -2019,8 +2023,8 @@ if (sym >> 8 == 0) { \
 }
 #endif
 
-char *short_kmb(char *str) {
-	int i, saw_k = 0, saw_m = 0, saw_b = 0, n = 10;
+char *short_kmbc(char *str) {
+	int i, saw_k = 0, saw_m = 0, saw_b = 0, saw_c = 0, n = 10;
 	char *p, tmp[10];
 	
 	for (i=0; i<n; i++) {
@@ -2039,6 +2043,9 @@ char *short_kmb(char *str) {
 		} else if ((*p == 'B' || *p == 'b') && !saw_b) {
 			tmp[i++] = 'B';
 			saw_b = 1;
+		} else if ((*p == 'C' || *p == 'c') && !saw_c) {
+			tmp[i++] = 'C';
+			saw_c = 1;
 		}
 		p++;
 	}
@@ -2058,7 +2065,7 @@ void initialize_allowed_input(void) {
 	}
 
 	if (! allowed_input_str) {
-		allowed_input_normal = strdup("KMB");
+		allowed_input_normal = strdup("KMBC");
 		allowed_input_view_only = strdup("");
 	} else {
 		char *p, *str = strdup(allowed_input_str);
@@ -2075,11 +2082,11 @@ void initialize_allowed_input(void) {
 	}
 
 	/* shorten them */
-	str = short_kmb(allowed_input_normal);
+	str = short_kmbc(allowed_input_normal);
 	free(allowed_input_normal);
 	allowed_input_normal = str;
 
-	str = short_kmb(allowed_input_view_only);
+	str = short_kmbc(allowed_input_view_only);
 	free(allowed_input_view_only);
 	allowed_input_view_only = str;
 
@@ -2351,6 +2358,7 @@ void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
 	input->keystroke = 0;
 	input->motion    = 0;
 	input->button    = 0;
+	input->clipboard = 0;
 
 	if (! client) {
 		return;
@@ -2370,7 +2378,7 @@ void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
 		if (allowed_input_normal) {
 			str = allowed_input_normal;
 		} else {
-			str = "KMB";
+			str = "KMBC";
 		}
 	}
 
@@ -2381,6 +2389,8 @@ void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
 			input->motion = 1;
 		} else if (*str == 'B') {
 			input->button = 1;
+		} else if (*str == 'C') {
+			input->clipboard = 1;
 		}
 		str++;
 	}
@@ -2542,6 +2552,14 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		rfbLog("# keyboard(%s, 0x%x \"%s\")  %.4f\n", down ? "down":"up",
 		    (int) keysym, str ? str : "null", tnow - x11vnc_start);
 		X_UNLOCK;
+	}
+	
+	if (unixpw && unixpw_in_progress) {
+		if (client != unixpw_client) {
+			return;
+		}
+		unixpw_keystroke(down, keysym, 0);
+		return;
 	}
 
 	if (skip_duplicate_key_events) {

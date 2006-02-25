@@ -10,6 +10,7 @@
 #include "screen.h"
 #include "pointer.h"
 #include "cleanup.h"
+#include "unixpw.h"
 
 /*
  * routines for scanning and reading the X11 display for changes, and
@@ -1951,6 +1952,7 @@ int copy_screen(void) {
 	if (! fs_factor) {
 		return 0;
 	}
+	if (unixpw_in_progress) return 0;
 
 	block_size = (dpy_x * (dpy_y/fs_factor) * pixelsize);
 
@@ -2398,6 +2400,8 @@ int scan_for_updates(int count_only) {
 	double frac3 = 0.02;  /* do scan_display() again after copy_tiles() */
 	static double last_poll = 0.0;
 
+	if (unixpw_in_progress) return 0;
+ 
 	if (slow_fb > 0.0) {
 		double now = dnow();
 		if (now < last_poll + slow_fb) {

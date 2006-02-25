@@ -1,3 +1,8 @@
+2006-02-24  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -unixpw for Unix password auth, -stunnel to setup
+	  stunnel(1) for an SSL tunnel on the server end.  Add clipboard
+	  input to per-client input controls.
+
 2006-02-20  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add SIGINT SIGQUIT handling for run_user_command(),
 	  set some signal handlers to SIG_DLF for forked children, 

@@ -7,6 +7,7 @@
 #include "userinput.h"
 #include "winattr_t.h"
 #include "scrollevent_t.h"
+#include "unixpw.h"
 
 #define SCR_EV_MAX 128
 scroll_event_t scr_ev[SCR_EV_MAX];
@@ -1303,6 +1304,7 @@ static void check_xrecord_grabserver(void) {
 	if (!gdpy_ctrl || !gdpy_data) {
 		return;
 	}
+	if (unixpw_in_progress) return;
 
 	dtime0(&d);
 	XFlush(gdpy_ctrl);
@@ -1436,6 +1438,8 @@ void check_xrecord_reset(int force) {
 	if (xserver_grabbed) {
 		return;
 	}
+
+	if (unixpw_in_progress) return;
 
 #if LIBVNCSERVER_HAVE_RECORD
 	if (! rc_scroll) {

@@ -1141,18 +1141,6 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		first_conn_timeout = to;
 		rfbLog("remote_cmd: set -timeout to %d\n", -to);
 
-#if 0
-	} else if (!strcmp(p, "filexfer")) {
-		/* does this work after rfbInitServer? */
-		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p, filexfer);
-			goto qry;
-		}
-		rfbLog("remote_cmd: enabling -filexfer.\n");
-		filexfer = 1;
-		rfbRegisterTightVNCFileTransferExtension();
-#endif
-
 	} else if (!strcmp(p, "deny") || !strcmp(p, "lock")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, deny_all);
@@ -1193,6 +1181,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s%s%s", p, co,
 			    NONUL(allow_list));
 			goto qry;
+		}
+
+		if (unixpw) {
+			rfbLog("remote_cmd: cannot change allow in -unixpw\n");
+			goto done;
 		}
 		p += strlen("allow:");
 		if (allow_list && strchr(allow_list, '/')) {
@@ -1278,6 +1271,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !state);
 			goto qry;
 		}
+		if (unixpw) {
+			rfbLog("remote_cmd: cannot change localhost in -unixpw\n");
+			goto done;
+		}
 		if (allow_list) {
 			before = strdup(allow_list);
 		} else {
@@ -1317,6 +1314,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s%s%s", p, co,
 			    NONUL(listen_str));
 			goto qry;
+		}
+		if (unixpw) {
+			rfbLog("remote_cmd: cannot change listen in -unixpw\n");
+			goto done;
 		}
 		if (listen_str) {
 			before = strdup(listen_str);
@@ -3666,6 +3667,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, no_external_cmds);
 		} else if (!strcmp(p, "passwdfile")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(passwdfile));
+		} else if (!strcmp(p, "unixpw")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, unixpw);
 		} else if (!strcmp(p, "using_shm")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, !using_shm);
 		} else if (!strcmp(p, "logfile") || !strcmp(p, "o")) {

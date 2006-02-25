@@ -11,6 +11,7 @@
 #include "cursor.h"
 #include "gui.h"
 #include "connections.h"
+#include "unixpw.h"
 
 /* XXX CHECK BEFORE RELEASE */
 int grab_buster = 0;
@@ -553,6 +554,8 @@ void check_keycode_state(void) {
 
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
+	if (unixpw_in_progress) return;
+
 	/*
 	 * periodically update our model of the keycode_state[]
 	 * by correlating with the Xserver.  wait for a pause in
@@ -578,6 +581,9 @@ void check_autorepeat(void) {
 	if (now <= last_check + 1) {
 		return;
 	}
+
+	if (unixpw_in_progress) return;
+
 	last_check = now;
 
 	autorepeat_is_on = get_autorepeat_state();
@@ -650,6 +656,8 @@ void check_xevents(void) {
 	time_t now = time(0);
 
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+
+	if (unixpw_in_progress) return;
 
 	if (now > last_init_check+1) {
 		last_init_check = now;
@@ -935,6 +943,8 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
+	if (unixpw_in_progress) return;
+
 	if (!watch_selection) {
 		return;
 	}
@@ -945,8 +955,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 		return;
 	}
 	get_allowed_input(cl, &input);
-	if (!input.keystroke && !input.motion && !input.button) {
-		/* maybe someday KMBC for cut text... */
+	if (!input.clipboard) {
 		return;
 	}
 

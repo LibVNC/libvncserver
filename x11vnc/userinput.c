@@ -15,6 +15,7 @@
 #include "solid.h"
 #include "xrandr.h"
 #include "8to24.h"
+#include "unixpw.h"
 
 /*
  * user input handling heuristics
@@ -2710,6 +2711,8 @@ int check_xrecord(void) {
 	if (! use_xrecord) {
 		return 0;
 	}
+	if (unixpw_in_progress) return 0;
+
 	if (skip_cr_when_scaling("scroll")) {
 		return 0;
 	}
@@ -3136,6 +3139,7 @@ void check_fixscreen(void) {
 	if (!client_count) {
 		return;
 	}
+	if (unixpw_in_progress) return;
 
 	if (screen_fixup_X > 0.0) {
 		static double last = 0.0;
@@ -3287,6 +3291,7 @@ int check_wireframe(void) {
 	int try_it = 0;
 	DB_SET
 
+	if (unixpw_in_progress) return 0;
 	if (nofb) {
 		return 0;
 	}

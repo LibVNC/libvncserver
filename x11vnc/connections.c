@@ -9,6 +9,7 @@
 #include "solid.h"
 #include "rates.h"
 #include "screen.h"
+#include "unixpw.h"
 
 /*
  * routines for handling incoming, outgoing, etc connections
@@ -262,7 +263,7 @@ void set_client_input(char *str) {
 	}
 	*p = '\0';
 	p++;
-	val = short_kmb(p);
+	val = short_kmbc(p);
 	
 	cl_list = client_match(str);
 
@@ -503,6 +504,14 @@ static void client_gone(rfbClientPtr client) {
 	speeds_net_latency_measured = 0;
 
 	rfbLog("client_count: %d\n", client_count);
+
+	if (unixpw_in_progress && unixpw_client) {
+		if (client == unixpw_client) {
+			unixpw_in_progress = 0;
+			unixpw_client = NULL;
+			copy_screen();
+		}
+	}
 
 	if (no_autorepeat && client_count == 0) {
 		autorepeat(1, 0);
@@ -1518,6 +1527,8 @@ static void send_client_connect(void) {
  */
 void check_connect_inputs(void) {
 
+	if (unixpw_in_progress) return;
+
 	/* flush any already set: */
 	send_client_connect();
 
@@ -1542,6 +1553,8 @@ void check_gui_inputs(void) {
 	struct timeval tv;
 	char buf[VNC_CONNECT_MAX+1];
 	ssize_t nbytes;
+
+	if (unixpw_in_progress) return;
 
 	for (i=0; i<ICON_MODE_SOCKS; i++) {
 		if (icon_mode_socks[i] >= 0) {
@@ -1624,6 +1637,11 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	clients_served++;
 
+	if (unixpw && unixpw_in_progress) {
+		rfbLog("denying additional client: %s during -unixpw login.\n",
+		     client->host);
+		return(RFB_CLIENT_REFUSE);
+	}
 	if (connect_once) {
 		if (screen->dontDisconnect && screen->neverShared) {
 			if (! shared && accepted_client) {
@@ -1695,6 +1713,14 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	accepted_client = 1;
 	last_client = time(0);
+
+	if (unixpw) {
+		unixpw_in_progress = 1;
+		unixpw_client = client;
+		unixpw_last_try_time = time(0);
+		unixpw_screen(1);
+		unixpw_keystroke(0, 0, 1);
+	}
 
 	return(RFB_CLIENT_ACCEPT);
 }
@@ -1832,6 +1858,15 @@ void check_new_clients(void) {
 	rfbClientPtr cl;
 	int i, send_info = 0;
 	int run_after_accept = 0;
+
+	if (unixpw_in_progress) {
+		int present = 0;
+		if (time(0) > unixpw_last_try_time + 20) {
+			rfbLog("unixpw_deny: timed out waiting for reply.\n");
+			unixpw_deny();
+			return;
+		}
+	}
 	
 	if (client_count == last_count) {
 		return;

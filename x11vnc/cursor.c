@@ -5,6 +5,7 @@
 #include "cleanup.h"
 #include "screen.h"
 #include "scan.h"
+#include "unixpw.h"
 
 int xfixes_present = 0;
 int use_xfixes = 1;
@@ -1569,6 +1570,7 @@ void disable_cursor_shape_updates(rfbScreenInfoPtr s) {
 	if (! s || ! s->clientHead) {
 		return;
 	}
+	if (unixpw_in_progress) return;
 
 	iter = rfbGetClientIterator(s);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
@@ -1759,6 +1761,8 @@ int check_x11_pointer(void) {
 	unsigned int mask;
 
 	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
+
+	if (unixpw_in_progress) return 0;
 
 	X_LOCK;
 	ret = XQueryPointer(dpy, rootwin, &root_w, &child_w, &root_x, &root_y,

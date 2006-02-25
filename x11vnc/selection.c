@@ -3,6 +3,7 @@
 #include "x11vnc.h"
 #include "cleanup.h"
 #include "connections.h"
+#include "unixpw.h"
 
 /*
  * Selection/Cutbuffer/Clipboard handlers.
@@ -184,6 +185,9 @@ void cutbuffer_send(void) {
 		rfbLog("cutbuffer_send: no send: uninitialized clients\n");
 		return; /* some clients initializing, cannot send */ 
 	}
+	if (unixpw_in_progress) {
+		return;
+	}
 
 	/* now send it to any connected VNC clients (rfbServerCutText) */
 	if (!screen) {
@@ -282,6 +286,10 @@ void selection_send(XEvent *ev) {
 	if (! all_clients_initialized()) {
 		rfbLog("selection_send: no send: uninitialized clients\n");
 		return; /* some clients initializing, cannot send */ 
+	}
+
+	if (unixpw_in_progress) {
+		return;
 	}
 
 	/* now send it to any connected VNC clients (rfbServerCutText) */

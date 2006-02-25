@@ -16,6 +16,8 @@
 #include "cursor.h"
 #include "connections.h"
 #include "remote.h"
+#include "unixpw.h"
+#include "sslcmds.h"
 
 void set_colormap(int reset);
 void set_nofb_params(int restore);
@@ -40,6 +42,7 @@ static void initialize_snap_fb(void);
 static XImage *initialize_raw_fb(void);
 static void initialize_clipshift(void);
 static int wait_until_mapped(Window win);
+static void announce(int lport, int ssl, char *iface);
 static void setup_scaling(int *width_in, int *height_in);
 
 
@@ -622,6 +625,8 @@ void check_padded_fb(void) {
 	if (! fake_fb) {
 		return;
 	}
+	if (unixpw_in_progress) return;
+
 	if (time(0) > pad_geometry_time+1 && all_clients_initialized()) {
 		remove_fake_fb();
 	}
@@ -1560,6 +1565,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	/* n.b. samplesPerPixel (set = 1 here) seems to be unused. */
 	if (create_screen) {
+		if (use_stunnel) {
+			setup_stunnel(0, argc, argv);
+		}
 		screen = rfbGetScreen(argc, argv, width, height,
 		    bits_per_color, 1, fb_bpp/8);
 		if (screen && http_dir) {
@@ -1669,6 +1677,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	    && dpy && CellsOfScreen(ScreenOfDisplay(dpy, scr))) {
 		/* indexed color */
 		if (!quiet) {
+			rfbLog("\n");
 			rfbLog("X display %s is 8bpp indexed color\n",
 			    DisplayString(dpy));
 			if (! flash_cmap && ! overlay) {
@@ -1693,14 +1702,17 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		 */
 		if (! quiet) {
 			if (raw_fb) {
+				rfbLog("\n");
 				rfbLog("Raw fb at addr %p is %dbpp depth=%d "
 				    "true color\n", raw_fb_addr,
 				    fb_bpp, fb_depth);
 			} else if (have_masks == 2) {
+				rfbLog("\n");
 				rfbLog("X display %s is %dbpp depth=%d indexed "
 				    "color (-8to24 mode)\n", DisplayString(dpy),
 				    fb->bits_per_pixel, fb->depth);
 			} else {
+				rfbLog("\n");
 				rfbLog("X display %s is %dbpp depth=%d true "
 				    "color\n", DisplayString(dpy),
 				    fb_bpp, fb_depth);
@@ -1938,67 +1950,89 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	install_passwds();
 }
 
+static void announce(int lport, int ssl, char *iface) {
+	
+	char *host = this_host();
+	char *tvdt;
+
+	if (! ssl) {
+		tvdt = "The VNC desktop";
+	} else {
+		tvdt = "The SSL VNC desktop";
+	}
+
+	if (iface != NULL && *iface != '\0' && strcmp(iface, "any")) {
+		host = iface;
+	}
+	if (host != NULL) {
+		/* note that vncviewer special cases 5900-5999 */
+		int sz = 256;
+		if (inetd) {
+			;	/* should not occur (port) */
+		} else if (quiet) {
+			if (lport >= 5900) {
+				snprintf(vnc_desktop_name, sz, "%s:%d",
+				    host, lport - 5900);
+				fprintf(stderr, "%s is %s\n", tvdt,
+				    vnc_desktop_name);
+			} else {
+				snprintf(vnc_desktop_name, sz, "%s:%d",
+				    host, lport);
+				fprintf(stderr, "%s is %s\n", tvdt,
+				    vnc_desktop_name);
+			}
+		} else if (lport >= 5900) {
+			snprintf(vnc_desktop_name, sz, "%s:%d",
+			    host, lport - 5900);
+			fprintf(stderr, "%s is %s\n", tvdt, vnc_desktop_name);
+			if (lport >= 6000) {
+				rfbLog("possible aliases:  %s:%d, "
+				    "%s::%d\n", host, lport,
+				    host, lport);
+			}
+		} else {
+			snprintf(vnc_desktop_name, sz, "%s:%d",
+			    host, lport);
+			fprintf(stderr, "%s is %s\n", tvdt, vnc_desktop_name);
+			rfbLog("possible alias:    %s::%d\n",
+			    host, lport);
+		}
+	}
+}
+
 void set_vnc_desktop_name(void) {
-	int sz = 256;
 	sprintf(vnc_desktop_name, "unknown");
 	if (inetd) {
 		sprintf(vnc_desktop_name, "inetd-no-further-clients");
 	}
 	if (screen->port) {
-		char *host = this_host();
-		int lport = screen->port;
-		char *iface = listen_str;
 
-		if (iface != NULL && *iface != '\0' && strcmp(iface, "any")) {
-			host = iface;
+		if (! quiet) {
+			rfbLog("\n");
 		}
-		if (host != NULL) {
-			/* note that vncviewer special cases 5900-5999 */
-			if (inetd) {
-				;	/* should not occur (port) */
-			} else if (quiet) {
-				if (lport >= 5900) {
-					snprintf(vnc_desktop_name, sz, "%s:%d",
-					    host, lport - 5900);
-					fprintf(stderr, "The VNC desktop is "
-					    "%s\n", vnc_desktop_name);
-				} else {
-					snprintf(vnc_desktop_name, sz, "%s:%d",
-					    host, lport);
-					fprintf(stderr, "The VNC desktop is "
-					    "%s\n", vnc_desktop_name);
-				}
-			} else if (lport >= 5900) {
-				snprintf(vnc_desktop_name, sz, "%s:%d",
-				    host, lport - 5900);
-				rfbLog("\n");
-				rfbLog("The VNC desktop is %s\n",
-				    vnc_desktop_name);
-				if (lport >= 6000) {
-					rfbLog("possible aliases:  %s:%d, "
-					    "%s::%d\n", host, lport,
-					    host, lport);
-				}
-			} else {
-				snprintf(vnc_desktop_name, sz, "%s:%d",
-				    host, lport);
-				rfbLog("\n");
-				rfbLog("The VNC desktop is %s\n",
-				    vnc_desktop_name);
-				rfbLog("possible alias:    %s::%d\n",
-				    host, lport);
-			}
+
+		announce(screen->port, 0, listen_str);
+		if (stunnel_port) {
+			announce(stunnel_port, 1, NULL);
 		}
+		
 		fflush(stderr);	
 		if (inetd) {
 			;	/* should not occur (port != 0) */
 		} else {
 			fprintf(stdout, "PORT=%d\n", screen->port);
+			if (stunnel_port) {
+				fprintf(stdout, "SSLPORT=%d\n", stunnel_port);
+			}
 			fflush(stdout);	
 			if (flagfile) {
 				FILE *flag = fopen(flagfile, "w");
 				if (flag) {
 					fprintf(flag, "PORT=%d\n",screen->port);
+					if (stunnel_port) {
+						fprintf(flag, "SSL_PORT=%d\n",
+						    stunnel_port);
+					}
 					fflush(flag);	
 					fclose(flag);
 				} else {

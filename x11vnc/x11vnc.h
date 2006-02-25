@@ -435,6 +435,7 @@ typedef struct _ClientData {
 	double latency;
 	int cmp_bytes_sent;
 	int raw_bytes_sent;
+
 } ClientData;
 
 #include "params.h"

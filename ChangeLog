@@ -1,3 +1,7 @@
+2006-02-24  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -unixpw and -stunnel options.  Add clipboard input
+	  to per-client input controls.
+
 2006-02-24  Rohit Kumar <rokumar@novell.com>
 	* main.c, rfbtightserver.c, rfb.h: added method to get 
 	  extension specific client data.

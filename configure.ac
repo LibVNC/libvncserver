@@ -345,7 +345,7 @@ AC_SUBST(WSOCKLIB)
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h pwd.h sys/wait.h utmpx.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h pwd.h sys/wait.h utmpx.h termios.h sys/ioctl.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -377,7 +377,7 @@ AC_FUNC_VPRINTF
 AC_FUNC_FORK
 AC_CHECK_LIB(nsl,gethostbyname)
 AC_CHECK_LIB(socket,socket)
-AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr setsid getpwuid getpwnam getuid geteuid setuid waitpid setutxent])
+AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr setsid getpwuid getpwnam getuid geteuid setuid seteuid setegid waitpid setutxent grantpt])
 
 # check, if shmget is in cygipc.a
 AC_CHECK_LIB(cygipc,shmget)
