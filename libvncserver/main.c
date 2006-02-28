@@ -796,6 +796,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->deferUpdateTime=5;
    screen->maxRectsPerUpdate=50;
 
+   screen->handleEventsEagerly = FALSE;
+
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);
      return NULL;

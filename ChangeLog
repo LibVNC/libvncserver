@@ -1,3 +1,7 @@
+2006-02-28  Donald Dugger <donald.d.dugger@intel.com>
+	* rfb.h, sockets.c, main.c: add a flag to handle all pending
+	  input events instead of one at a time.
+
 2006-02-24  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -unixpw and -stunnel options.  Add clipboard input
 	  to per-client input controls.

@@ -213,7 +213,7 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
  * rfbProcessClientMessage, etc).
  */
 
-void
+int
 rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 {
     int nfds;
@@ -232,108 +232,112 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	rfbScreen->inetdInitDone = TRUE;
     }
 
-    memcpy((char *)&fds, (char *)&(rfbScreen->allFds), sizeof(fd_set));
-    tv.tv_sec = 0;
-    tv.tv_usec = usec;
-    nfds = select(rfbScreen->maxFd + 1, &fds, NULL, NULL /* &fds */, &tv);
-    if (nfds == 0) {
-	return;
-    }
-    if (nfds < 0) {
+    do {
+	memcpy((char *)&fds, (char *)&(rfbScreen->allFds), sizeof(fd_set));
+	tv.tv_sec = 0;
+	tv.tv_usec = usec;
+	nfds = select(rfbScreen->maxFd + 1, &fds, NULL, NULL /* &fds */, &tv);
+	if (nfds == 0) {
+	    return 0;
+	}
+	if (nfds < 0) {
 #ifdef WIN32
-		errno = WSAGetLastError();
+	    errno = WSAGetLastError();
 #endif
-	if (errno != EINTR)
+	    if (errno != EINTR)
 		rfbLogPerror("rfbCheckFds: select");
-	return;
-    }
-
-    if (rfbScreen->listenSock != -1 && FD_ISSET(rfbScreen->listenSock, &fds)) {
-
-	if ((sock = accept(rfbScreen->listenSock,
-			   (struct sockaddr *)&addr, &addrlen)) < 0) {
-	    rfbLogPerror("rfbCheckFds: accept");
-	    return;
+	    return 0;
 	}
 
-#ifndef WIN32
-	if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
-	    rfbLogPerror("rfbCheckFds: fcntl");
-	    closesocket(sock);
-	    return;
-	}
-#endif
+	if (rfbScreen->listenSock != -1 && FD_ISSET(rfbScreen->listenSock, &fds)) {
 
-	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
-		       (char *)&one, sizeof(one)) < 0) {
-	    rfbLogPerror("rfbCheckFds: setsockopt");
-	    closesocket(sock);
-	    return;
-	}
-
-#ifdef USE_LIBWRAP
-	if(!hosts_ctl("vnc",STRING_UNKNOWN,inet_ntoa(addr.sin_addr),
-		      STRING_UNKNOWN)) {
-	  rfbLog("Rejected connection from client %s\n",
-		 inet_ntoa(addr.sin_addr));
-	  closesocket(sock);
-	  return;
-	}
-#endif
-
-	rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
-
-	rfbNewClient(rfbScreen,sock);
-	
-	FD_CLR(rfbScreen->listenSock, &fds);
-	if (--nfds == 0)
-	    return;
-    }
-
-    if ((rfbScreen->udpSock != -1) && FD_ISSET(rfbScreen->udpSock, &fds)) {
-        if(!rfbScreen->udpClient)
-	    rfbNewUDPClient(rfbScreen);
-	if (recvfrom(rfbScreen->udpSock, buf, 1, MSG_PEEK,
-		     (struct sockaddr *)&addr, &addrlen) < 0) {
-	    rfbLogPerror("rfbCheckFds: UDP: recvfrom");
-	    rfbDisconnectUDPSock(rfbScreen);
-	    rfbScreen->udpSockConnected = FALSE;
-	} else {
-	    if (!rfbScreen->udpSockConnected ||
-		(memcmp(&addr, &rfbScreen->udpRemoteAddr, addrlen) != 0))
-	    {
-		/* new remote end */
-		rfbLog("rfbCheckFds: UDP: got connection\n");
-
-		memcpy(&rfbScreen->udpRemoteAddr, &addr, addrlen);
-		rfbScreen->udpSockConnected = TRUE;
-
-		if (connect(rfbScreen->udpSock,
-			    (struct sockaddr *)&addr, addrlen) < 0) {
-		    rfbLogPerror("rfbCheckFds: UDP: connect");
-		    rfbDisconnectUDPSock(rfbScreen);
-		    return;
-		}
-
-		rfbNewUDPConnection(rfbScreen,rfbScreen->udpSock);
+	    if ((sock = accept(rfbScreen->listenSock,
+			    (struct sockaddr *)&addr, &addrlen)) < 0) {
+		rfbLogPerror("rfbCheckFds: accept");
+		return 0;
 	    }
 
-	    rfbProcessUDPInput(rfbScreen);
+#ifndef WIN32
+	    if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
+		rfbLogPerror("rfbCheckFds: fcntl");
+		closesocket(sock);
+		return 0;
+	    }
+#endif
+
+	    if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+			(char *)&one, sizeof(one)) < 0) {
+		rfbLogPerror("rfbCheckFds: setsockopt");
+		closesocket(sock);
+		return 0;
+	    }
+
+#ifdef USE_LIBWRAP
+	    if(!hosts_ctl("vnc",STRING_UNKNOWN,inet_ntoa(addr.sin_addr),
+			STRING_UNKNOWN)) {
+		rfbLog("Rejected connection from client %s\n",
+			inet_ntoa(addr.sin_addr));
+		closesocket(sock);
+		return 0;
+	    }
+#endif
+
+	    rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
+
+	    rfbNewClient(rfbScreen,sock);
+
+	    FD_CLR(rfbScreen->listenSock, &fds);
+	    if (--nfds == 0)
+		return 0;
 	}
 
-	FD_CLR(rfbScreen->udpSock, &fds);
-	if (--nfds == 0)
-	    return;
-    }
+	if ((rfbScreen->udpSock != -1) && FD_ISSET(rfbScreen->udpSock, &fds)) {
+	    if(!rfbScreen->udpClient)
+		rfbNewUDPClient(rfbScreen);
+	    if (recvfrom(rfbScreen->udpSock, buf, 1, MSG_PEEK,
+			(struct sockaddr *)&addr, &addrlen) < 0) {
+		rfbLogPerror("rfbCheckFds: UDP: recvfrom");
+		rfbDisconnectUDPSock(rfbScreen);
+		rfbScreen->udpSockConnected = FALSE;
+	    } else {
+		if (!rfbScreen->udpSockConnected ||
+			(memcmp(&addr, &rfbScreen->udpRemoteAddr, addrlen) != 0))
+		{
+		    /* new remote end */
+		    rfbLog("rfbCheckFds: UDP: got connection\n");
 
-    i = rfbGetClientIterator(rfbScreen);
-    while((cl = rfbClientIteratorNext(i))) {
-      if (cl->onHold)
-	continue;
-      if (FD_ISSET(cl->sock, &fds) && FD_ISSET(cl->sock, &(rfbScreen->allFds)))
-	rfbProcessClientMessage(cl);
-    }
-    rfbReleaseClientIterator(i);
+		    memcpy(&rfbScreen->udpRemoteAddr, &addr, addrlen);
+		    rfbScreen->udpSockConnected = TRUE;
+
+		    if (connect(rfbScreen->udpSock,
+				(struct sockaddr *)&addr, addrlen) < 0) {
+			rfbLogPerror("rfbCheckFds: UDP: connect");
+			rfbDisconnectUDPSock(rfbScreen);
+			return 0;
+		    }
+
+		    rfbNewUDPConnection(rfbScreen,rfbScreen->udpSock);
+		}
+
+		rfbProcessUDPInput(rfbScreen);
+	    }
+
+	    FD_CLR(rfbScreen->udpSock, &fds);
+	    if (--nfds == 0)
+		return 0;
+	}
+
+	i = rfbGetClientIterator(rfbScreen);
+	while((cl = rfbClientIteratorNext(i))) {
+	    if (cl->onHold)
+		continue;
+	    if (FD_ISSET(cl->sock, &fds) &&
+		    FD_ISSET(cl->sock, &(rfbScreen->allFds)))
+		rfbProcessClientMessage(cl);
+	}
+	rfbReleaseClientIterator(i);
+    } while(rfbScreen->handleEventsEagerly);
+    return 1;
 }
 
 

@@ -310,6 +310,9 @@ typedef struct _rfbScreenInfo
 
     in_addr_t listenInterface;
     int deferPtrUpdateTime;
+
+    /* handle as many input events as possible (default off) */
+    rfbBool handleEventsEagerly;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -563,7 +566,7 @@ extern void rfbCloseClient(rfbClientPtr cl);
 extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
 extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
-extern void rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
+extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern int rfbConnectToTcpAddr(char* host, int port);
 extern int rfbListenOnTCPPort(int port, in_addr_t iface);
