@@ -226,6 +226,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     int sock;
     rfbClientIteratorPtr i;
     rfbClientPtr cl;
+    int result = 0;
 
     if (!rfbScreen->inetdInitDone && rfbScreen->inetdSock != -1) {
 	rfbNewClientConnection(rfbScreen,rfbScreen->inetdSock); 
@@ -238,7 +239,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	tv.tv_usec = usec;
 	nfds = select(rfbScreen->maxFd + 1, &fds, NULL, NULL /* &fds */, &tv);
 	if (nfds == 0) {
-	    return 0;
+	    return result;
 	}
 	if (nfds < 0) {
 #ifdef WIN32
@@ -246,22 +247,24 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 #endif
 	    if (errno != EINTR)
 		rfbLogPerror("rfbCheckFds: select");
-	    return 0;
+	    return -1;
 	}
+
+	result += nfds;
 
 	if (rfbScreen->listenSock != -1 && FD_ISSET(rfbScreen->listenSock, &fds)) {
 
 	    if ((sock = accept(rfbScreen->listenSock,
 			    (struct sockaddr *)&addr, &addrlen)) < 0) {
 		rfbLogPerror("rfbCheckFds: accept");
-		return 0;
+		return -1;
 	    }
 
 #ifndef WIN32
 	    if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
 		rfbLogPerror("rfbCheckFds: fcntl");
 		closesocket(sock);
-		return 0;
+		return -1;
 	    }
 #endif
 
@@ -269,7 +272,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 			(char *)&one, sizeof(one)) < 0) {
 		rfbLogPerror("rfbCheckFds: setsockopt");
 		closesocket(sock);
-		return 0;
+		return -1;
 	    }
 
 #ifdef USE_LIBWRAP
@@ -278,7 +281,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 		rfbLog("Rejected connection from client %s\n",
 			inet_ntoa(addr.sin_addr));
 		closesocket(sock);
-		return 0;
+		return -1;
 	    }
 #endif
 
@@ -288,7 +291,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 
 	    FD_CLR(rfbScreen->listenSock, &fds);
 	    if (--nfds == 0)
-		return 0;
+		return result;
 	}
 
 	if ((rfbScreen->udpSock != -1) && FD_ISSET(rfbScreen->udpSock, &fds)) {
@@ -313,7 +316,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 				(struct sockaddr *)&addr, addrlen) < 0) {
 			rfbLogPerror("rfbCheckFds: UDP: connect");
 			rfbDisconnectUDPSock(rfbScreen);
-			return 0;
+			return -1;
 		    }
 
 		    rfbNewUDPConnection(rfbScreen,rfbScreen->udpSock);
@@ -324,7 +327,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 
 	    FD_CLR(rfbScreen->udpSock, &fds);
 	    if (--nfds == 0)
-		return 0;
+		return result;
 	}
 
 	i = rfbGetClientIterator(rfbScreen);
@@ -337,7 +340,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	}
 	rfbReleaseClientIterator(i);
     } while(rfbScreen->handleEventsEagerly);
-    return 1;
+    return result;
 }
 
 
