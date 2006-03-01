@@ -324,6 +324,7 @@ int main(int argc,char** argv)
 
   /* this is the non-blocking event loop; a background thread is started */
   rfbRunEventLoop(rfbScreen,-1,TRUE);
+  fprintf(stderr, "Running background loop...\n");
   /* now we could do some cool things like rendering in idle time */
   while(1) sleep(5); /* render(); */
 #endif /* BACKGROUND_LOOP */

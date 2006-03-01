@@ -20,8 +20,3 @@ noinst_PROGRAMS=example pnmshow regiontest pnmshow24 fontsel \
 	vncev storepasswd colourmaptest simple simple15 $(MAC) \
 	$(FILETRANSFER) backchannel $(BLOOPTEST)
 
-blooptest.o: example.c
-	$(CC) $(AM_CFLAGS) $(CFLAGS) -c -o $@ $<
-
-
-
