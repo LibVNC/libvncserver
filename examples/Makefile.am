@@ -10,10 +10,18 @@ if WITH_TIGHTVNC_FILETRANSFER
 FILETRANSFER=filetransfer
 endif
 
+if HAVE_LIBPTHREAD
+BLOOPTEST=blooptest
+endif
+
 noinst_HEADERS=radon.h
 
 noinst_PROGRAMS=example pnmshow regiontest pnmshow24 fontsel \
 	vncev storepasswd colourmaptest simple simple15 $(MAC) \
-	$(FILETRANSFER) backchannel
+	$(FILETRANSFER) backchannel $(BLOOPTEST)
+
+blooptest.o: example.c
+	$(CC) $(AM_CFLAGS) $(CFLAGS) -c -o $@ $<
+
 
 
