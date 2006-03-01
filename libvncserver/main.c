@@ -491,6 +491,21 @@ clientInput(void *data)
     pthread_create(&output_thread, NULL, clientOutput, (void *)cl);
 
     while (1) {
+	fd_set fds;
+	struct timeval tv;
+	int n;
+
+	FD_ZERO(&fds);
+	FD_SET(cl->sock, &fds);
+	tv.tv_sec = 60; /* 1 minute */
+	tv.tv_usec = 0;
+	n = select(cl->sock + 1, &fds, NULL, &fds, &tv);
+	if (n < 0) {
+	    rfbLogPerror("ReadExact: select");
+	    break;
+	}
+	if (n == 0) /* timeout */
+	    continue;
         rfbProcessClientMessage(cl);
         if (cl->sock == -1) {
             /* Client has disconnected. */
@@ -521,6 +536,7 @@ listenerRun(void *data)
     len = sizeof(peer);
 
     /* TODO: this thread wont die by restarting the server */
+    /* TODO: HTTP is not handled */
     while ((client_fd = accept(screen->listenSock, 
                                (struct sockaddr*)&peer, &len)) >= 0) {
         cl = rfbNewClient(screen,client_fd);
