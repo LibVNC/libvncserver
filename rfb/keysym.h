@@ -1,5 +1,4 @@
-#ifndef KEYSYM_H
-#define KEYSYM_H
+#ifndef XK_0
 
 /* $XConsortium: keysym.h,v 1.15 94/04/17 20:10:55 rws Exp $ */
 
