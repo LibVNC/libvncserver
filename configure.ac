@@ -377,7 +377,7 @@ AC_FUNC_VPRINTF
 AC_FUNC_FORK
 AC_CHECK_LIB(nsl,gethostbyname)
 AC_CHECK_LIB(socket,socket)
-AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr setsid getpwuid getpwnam getuid geteuid setuid seteuid setegid waitpid setutxent grantpt])
+AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr setsid setpgrp getpwuid getpwnam getuid geteuid setuid setgid seteuid setegid waitpid setutxent grantpt])
 
 # check, if shmget is in cygipc.a
 AC_CHECK_LIB(cygipc,shmget)

@@ -12,6 +12,13 @@ void check_for_multivis(void);
 void bpp8to24(int, int, int, int);
 void mark_8bpp(int);
 
+#if SKIP_8TO24
+void check_for_multivis(void) {}
+void bpp8to24(int x, int y, int z, int t) {}
+void mark_8bpp(int x) {}
+#else
+/* lots... */
+
 static void set_root_cmap(void);
 static int check_pointer_in_depth24(void);
 static void parse_cmap8to24(void);
@@ -1961,4 +1968,6 @@ if (db24 > 1) fprintf(stderr, "mark_8bpp: 0x%lx %d %d %d %d\n", windows_8bpp[i].
 		rfbPE(-1);
 	}
 }
+
+#endif /* SKIP_8TO24 */
 

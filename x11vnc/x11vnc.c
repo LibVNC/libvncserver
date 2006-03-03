@@ -904,6 +904,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, "Settings:\n");
 	fprintf(stderr, " display:    %s\n", use_dpy ? use_dpy
 	    : "null");
+#if SMALL_FOOTPRINT < 2
 	fprintf(stderr, " authfile:   %s\n", auth_file ? auth_file
 	    : "null");
 	fprintf(stderr, " subwin:     0x%lx\n", subwin);
@@ -940,6 +941,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " passfile:   %s\n", passwdfile ? passwdfile
 	    : "null");
 	fprintf(stderr, " unixpw:     %d\n", unixpw);
+	fprintf(stderr, " unixpw_lst: %s\n", unixpw_list ? unixpw_list:"null");
 	fprintf(stderr, " stunnel:    %d\n", use_stunnel);
 	fprintf(stderr, " accept:     %s\n", accept_cmd ? accept_cmd
 	    : "null");
@@ -1073,6 +1075,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " nocmds:     %d\n", no_external_cmds);
 	fprintf(stderr, " deny_all:   %d\n", deny_all);
 	fprintf(stderr, "\n");
+#endif
 	rfbLog("x11vnc version: %s\n", lastmod);
 }
 
@@ -1282,6 +1285,7 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-overlay_yescursor")) {
 			overlay = 1;
 			overlay_cursor = 2;
+#if !SKIP_8TO24
 		} else if (!strcmp(arg, "-8to24")) {
 			cmap8to24 = 1;
 			if (i < argc-1) {
@@ -1291,6 +1295,7 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 			}
+#endif
 		} else if (!strcmp(arg, "-visual")) {
 			CHECK_ARGC
 			visual_str = strdup(argv[++i]);
@@ -1359,14 +1364,36 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			passwdfile = strdup(argv[++i]);
 			got_passwdfile = 1;
-		} else if (!strcmp(arg, "-unixpw")) {
+		} else if (!strcmp(arg, "-unixpw")
+		    || !strcmp(arg, "-unixpw_unsafe")) {
 			unixpw = 1;
 			if (i < argc-1) {
-				char *s = argv[i+1];
+				char *p, *q, *s = argv[i+1];
 				if (s[0] != '-') {
 					unixpw_list = strdup(s);
 					i++;
 				}
+				if (s[0] == '%') {
+					p = unixpw_list;
+					unixpw_list = NULL;
+					strcpy(p, s+1);
+					strcat(p, "\n");	/* just fits */
+					if ((q = strchr(p, ':')) == NULL) {
+						exit(1);
+					}
+					*q = '\0';
+					if (su_verify(p, q+1)) {
+						fprintf(stderr, "\nY\n");
+					} else {
+						fprintf(stderr, "\nN\n");
+					}
+					exit(0);
+				}
+			}
+			if (!strcmp(arg, "-unixpw_unsafe")) {
+				/* hidden option for testing. */
+				set_env("UNIXPW_DISABLE_STUNNEL", "1");
+				set_env("UNIXPW_DISABLE_LOCALHOST", "1");
 			}
 		} else if (!strcmp(arg, "-stunnel")) {
 			use_stunnel = 1;
@@ -2079,11 +2106,15 @@ int main(int argc, char* argv[]) {
 			allow_list = strdup("127.0.0.1");
 			got_localhost = 1;
 		}
-		if (! got_stunnel && ! getenv("UNIXPW_DISABLE_STUNNEL")) {
-			if (! quiet) {
-				rfbLog("Setting -stunnel in -unixpw mode.\n");
+		if (! got_stunnel) {
+			if (! getenv("UNIXPW_DISABLE_STUNNEL") &&
+			    ! have_ssh_env()) {
+				if (! quiet) {
+					rfbLog("Setting -stunnel in -unixpw "
+					    "mode.\n");
+				}
+				use_stunnel = 1;
 			}
-			use_stunnel = 1;
 		}
 	    } else if (use_stunnel) {
 

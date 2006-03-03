@@ -94,6 +94,7 @@ Clients
 	gone:
 	vncconnect
 	-- D
+	filexfer
 	=D http
 	httpdir:
 	httpport:
@@ -255,6 +256,8 @@ Permissions
 	viewpasswd:
 	=F passwdfile:
 	=F rfbauth:
+	unixpw
+	unixpw_list:
 	=0 storepasswd
 	=GAL LOFF
 	=GAL Misc-Perms::
@@ -262,6 +265,8 @@ Permissions
 	=0S nevershared
 	=0S dontdisconnect
 	=SQA deny_all
+	stunnel
+	=F stunnel_pem:
 	=GAL LOFF
 
 Tuning
@@ -515,6 +520,14 @@ Set the -solid color value.
 
 	set helptext(xrandr_mode) "
 Set the -xrandr mode value.
+"
+
+	set helptext(unixpw_list) "
+Set the -unixpw_list usernames list value.
+"
+
+	set helptext(stunnel_pem) "
+Set the -stunnel pem filename value.
 "
 
 	set helptext(wireframe_mode) "
@@ -3396,9 +3409,11 @@ proc set_widgets {} {
 	global connected_to_x11vnc item_case item_menu item_entry menu_m
 
 	foreach item [array names item_case] {
+		if ![info exists item_case($item)] { continue; }
 		set case $item_case($item)
-#		set menu $menu_m($case)
+		if ![info exists item_menu($item)] { continue; }
 		set menu $item_menu($item)
+		if ![info exists item_entry($item)] { continue; }
 		set entry $item_entry($item)
 		if {$entry < 0} {
 			# skip case under beginner_mode 
@@ -5391,6 +5406,10 @@ proc get_nitem {item} {
 		set nitem "sb"
 	} elseif {$nitem == "xrandr_mode"} {
 		set nitem "xrandr"
+	} elseif {$nitem == "unixpw_list"} {
+		set nitem "unixpw"
+	} elseif {$nitem == "stunnel_pem"} {
+		set nitem "stunnel"
 	} elseif {$nitem == "wireframe_mode"} {
 		set nitem "wireframe"
 	} elseif {$nitem == "solid_color"} {
@@ -5987,6 +6006,13 @@ if {[regexp {^[34]} $tk_version] || $tk_version == "8.0"} {
 set have_labelframes 1
 if {$tk_version < 8.4} {
 	set have_labelframes 0
+}
+
+if {[info exists env(X11VNC_GUI_TEXT_HEIGHT)]} {
+	set max_text_height $env(X11VNC_GUI_TEXT_HEIGHT)
+}
+if {[info exists env(X11VNC_GUI_TEXT_WIDTH)]} {
+	set max_text_width  $env(X11VNC_GUI_TEXT_WIDTH)
 }
 
 if {"$argv" == "-spit"} {

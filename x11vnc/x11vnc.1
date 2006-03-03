@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "February 2006" "x11vnc " "User Commands"
+.TH X11VNC "1" "March 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.1, lastmod: 2006-02-24
+         version: 0.8.1, lastmod: 2006-03-02
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -497,9 +497,10 @@ full-access passwords)
 Experimental option: use Unix username and password
 authentication.  x11vnc uses the 
 .IR su (1)
-program to
-verify the user's password.  [list] is an optional
-comma separated list of allowed Unix usernames.
+program to verify
+the user's password.  [list] is an optional comma
+separated list of allowed Unix usernames.  See below
+for per-user options that can be applied.
 .IP
 A familiar "login:" and "Password:" dialog is
 presented to the user on a black screen inside the
@@ -507,6 +508,25 @@ vncviewer.  The connection is dropped if the user fails
 to supply the correct password in 3 tries or does not
 send one before a 20 second timeout.  Existing clients
 are view-only during this period.
+.IP
+Since the detailed behavior of 
+.IR su (1)
+can vary from
+OS to OS and for local configurations, please test
+the mode carefully on your systems before using it.
+Try different combinations of valid/invalid usernames
+and passwords.
+.IP
+For example, on FreeBSD and the other BSD's and Tru64
+it does not appear to be possible for the user running
+x11vnc to validate his *own* password via 
+.IR su (1).
+The x11vnc login will always fail in this case.
+A possible workaround would be to start x11vnc as
+root with the "\fB-users\fR \fI+nobody\fR" option to immediately
+switch to user nobody.  Another source of problems are
+PAM modules that prompt for extra info, e.g. password
+aging modules.  These logins will always fail as well.
 .IP
 *IMPORTANT*: to prevent the Unix password being sent in
 *clear text* over the network, two x11vnc options are
@@ -531,6 +551,15 @@ with
 user login (since Unix password or the user's public
 key authentication is used by ssh)
 .IP
+As a convenience, if you 
+.IR ssh (1)
+in and start x11vnc
+it will look to see if the environment variable
+SSH_CONNECTION is set and appears reasonable.  If it
+does, then the stunnel requirement is dropped since
+it is assumed you are using ssh for the encrypted
+tunnelling.  Use \fB-stunnel\fR to force stunnel usage.
+.IP
 Set UNIXPW_DISABLE_LOCALHOST=1 to disable the \fB-localhost\fR
 requirement.  One should never do this (i.e. allow the
 Unix passwords to be sniffed on the network).
@@ -539,7 +568,19 @@ NOTE: in \fB-inetd\fR mode the two settings are not enforced
 since x11vnc does not make network connections in
 that case.  Be sure to use encryption from the viewer
 to inetd.  One can also have your own stunnel spawn
-x11vnc in \fB-inetd\fR mode.
+x11vnc in \fB-inetd\fR mode.  See the FAQ.
+.IP
+The user names in the comma separated [list] can have
+per-user options after a ":", e.g. "fred:opts"
+where "opts" is a "+" separated list of
+"viewonly", "fullaccess", "input=XXXX", or
+"deny", e.g. "karl,fred:viewonly,boss:input=M".
+For "input=" it is the K,M,B,C describe under \fB-input.\fR
+.IP
+If a user in the list is "*" that means those options
+apply to all users.  It also means all users are allowed
+to log in.  Use "deny" to explicitly deny some users
+if you use "*" to set a global option.
 .PP
 \fB-stunnel\fR \fI[pem]\fR
 .IP
@@ -549,17 +590,22 @@ Use the
 encrypted SSL tunnel between viewers and x11vnc.
 This requires stunnel be installed on the system and
 available via PATH (n.b. stunnel is often installed in
-sbin directories).  Version 4.x of stunnel is assumed.
+sbin directories).  Version 4.x of stunnel is assumed;
+see \fB-stunnel3\fR below.
 .IP
 [pem] is optional, use "\fB-stunnel\fR \fI/path/to/stunnel.pem\fR"
 to specify a PEM certificate file to pass to stunnel.
+Whether one is needed or not depends on your stunnel
+configuration.
 .IP
-stunnel is started up as a child process and any SSL
-connections it receives are decrypted and sent to x11vnc
-over a local socket.  The strings "The SSL VNC desktop
-is ..." and SSLPORT=... are printed out at startup.
+stunnel is started up as a child process of x11vnc and
+any SSL connections stunnel receives are decrypted and
+sent to x11vnc over a local socket.  The strings "The
+SSL VNC desktop is ..." and SSLPORT=... are printed
+out at startup.
 .IP
-The \fB-localhost\fR option is enforced by default.  Set
+The \fB-localhost\fR option is enforced by default to
+avoid people routing around the SSL channel.  Set
 STUNNEL_DISABLE_LOCALHOST=1 to disable the requirement.
 .IP
 Your VNC viewer will need to be able to connect via SSL.
@@ -573,7 +619,8 @@ A simple example on Unix using stunnel 3.x is:
 % vncviewer localhost:1
 .IP
 For Windows, stunnel has been ported to it and there
-are probably other such tools available.
+are probably other such tools available.  See the FAQ
+for more examples.
 .PP
 \fB-stunnel3\fR \fI[pem]\fR
 .IP
@@ -685,8 +732,9 @@ Example: \fB-afteraccept\fR 'killall xlock &'
 As \fB-accept,\fR except to run a user supplied command when
 a client goes away (disconnects).  RFB_MODE will be
 set to "gone" and the other RFB_* variables are as
-in \fB-accept.\fR  Unlike \fB-accept,\fR the command return code
-is not interpreted by x11vnc.  Example: \fB-gone\fR 'xlock &'
+in \fB-accept.\fR  The "popup" actions apply as well.
+Unlike \fB-accept,\fR the command return code is not
+interpreted by x11vnc.  Example: \fB-gone\fR 'xlock &'
 .PP
 \fB-users\fR \fIlist\fR
 .IP
@@ -2183,6 +2231,10 @@ timeout:n       reset \fB-timeout\fR to n, if there are
 currently no clients, exit unless one
 connects in the next n secs.
 .IP
+filexfer        enable  filetransfer for new clients.
+.IP
+nofilexfer      disable filetransfer for new clients.
+.IP
 http            enable  http client connections.
 .IP
 nohttp          disable http client connections.
@@ -2600,11 +2652,11 @@ nowaitmapped clip flashcmap noflashcmap shiftcmap
 truecolor notruecolor overlay nooverlay overlay_cursor
 overlay_yescursor nooverlay_nocursor nooverlay_cursor
 nooverlay_yescursor overlay_nocursor 8to24 no8to24
-8to24_opts visual scale scale_cursor viewonly
-noviewonly shared noshared forever noforever once
-timeout filexfer deny lock nodeny unlock connect
-allowonce allow localhost nolocalhost listen lookup
-nolookup accept afteraccept gone shm noshm flipbyteorder
+8to24_opts visual scale scale_cursor viewonly noviewonly
+shared noshared forever noforever once timeout filexfer
+nofilexfer deny lock nodeny unlock connect allowonce
+allow localhost nolocalhost listen lookup nolookup
+accept afteraccept gone shm noshm flipbyteorder
 noflipbyteorder onetile noonetile solid_color solid
 nosolid blackout xinerama noxinerama xtrap noxtrap
 xrandr noxrandr xrandr_mode padgeom quiet q noquiet
@@ -2643,14 +2695,15 @@ http_url auth xauth users rootshift clipshift
 scale_str scaled_x scaled_y scale_numer scale_denom
 scale_fac scaling_blend scaling_nomult4 scaling_pad
 scaling_interpolate inetd privremote unsafe safer nocmds
-passwdfile using_shm logfile o flag rc norc h help V
-version lastmod bg sigpipe threads readrate netrate
-netlatency pipeinput clients client_count pid ext_xtest
-ext_xtrap ext_xrecord ext_xkb ext_xshm ext_xinerama
-ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin
-num_buttons button_mask mouse_x mouse_y bpp depth
-indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y
-cdpy_x cdpy_y coff_x coff_y rfbauth passwd viewpasswd
+passwdfile unixpw unixpw_list stunnel stunnel_pem
+using_shm logfile o flag rc norc h help V version
+lastmod bg sigpipe threads readrate netrate netlatency
+pipeinput clients client_count pid ext_xtest ext_xtrap
+ext_xrecord ext_xkb ext_xshm ext_xinerama ext_overlay
+ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
+button_mask mouse_x mouse_y bpp depth indexed_color
+dpy_x dpy_y wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y
+coff_x coff_y rfbauth passwd viewpasswd
 .PP
 \fB-QD\fR \fIvariable\fR
 .IP

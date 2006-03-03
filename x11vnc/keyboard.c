@@ -801,7 +801,7 @@ int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
 	return 0;
 }
 
-#if !LIBVNCSERVER_HAVE_XKEYBOARD
+#if !LIBVNCSERVER_HAVE_XKEYBOARD || SKIP_XKB
 
 /* empty functions for no xkb */
 static void initialize_xkb_modtweak(void) {}

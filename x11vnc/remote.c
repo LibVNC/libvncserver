@@ -1141,6 +1141,36 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		first_conn_timeout = to;
 		rfbLog("remote_cmd: set -timeout to %d\n", -to);
 
+	} else if (!strcmp(p, "filexfer")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, filexfer);
+			goto qry;
+		}
+#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+		if (! filexfer) {
+			rfbLog("remote_cmd: enabling -filexfer for new clients.\n");
+			filexfer = 1;
+			rfbRegisterTightVNCFileTransferExtension();
+		}
+#else
+		rfbLog("remote_cmd: -filexfer not supported in this binary.\n");
+#endif
+
+	} else if (!strcmp(p, "nofilexfer")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !filexfer);
+			goto qry;
+		}
+#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+		if (filexfer) {
+			rfbLog("remote_cmd: disabling -filexfer for new clients.\n");
+			filexfer = 0;
+			rfbUnregisterTightVNCFileTransferExtension();
+		}
+#else
+		rfbLog("remote_cmd: -filexfer not supported in this binary.\n");
+#endif
+
 	} else if (!strcmp(p, "deny") || !strcmp(p, "lock")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, deny_all);
@@ -1415,7 +1445,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		host_lookup = 0;
 
 	} else if (strstr(p, "accept") == p) {
-		int doit = 1;
+		int doit = 1, safe = 0;
 		COLON_CHECK("accept:")
 		if (query) {
 			snprintf(buf, bufn, "ans=%s%s%s", p, co,
@@ -1423,15 +1453,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		p += strlen("accept:");
-		if (safe_remote_only) {
-			if (icon_mode && !strcmp(p, "")) { /* skip-cmd-list */
-				;
-			} else if (icon_mode && !strcmp(p, "popup")) { /* skip-cmd-list */
-				;
-			} else {
-				rfbLog("unsafe: %s\n", p);
-				doit = 0;
-			}
+		if (!strcmp(p, "") || strstr(p, "popup") == p) { /* skip-cmd-list */
+			safe = 1;
+		}
+		if (safe_remote_only && ! safe) {
+			rfbLog("unsafe: %s\n", p);
+			doit = 0;
 		}
 
 		if (doit) {
@@ -1440,31 +1467,39 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 
 	} else if (strstr(p, "afteraccept") == p) {
+		int safe = 0;
 		COLON_CHECK("afteraccept:")
 		if (query) {
 			snprintf(buf, bufn, "ans=%s%s%s", p, co,
 			    NONUL(afteraccept_cmd));
 			goto qry;
 		}
-		if (safe_remote_only) {
+		p += strlen("afteraccept:");
+		if (!strcmp(p, "")) { /* skip-cmd-list */
+			safe = 1;
+		}
+		if (safe_remote_only && ! safe) {
 			rfbLog("unsafe: %s\n", p);
 		} else {
-			p += strlen("afteraccept:");
 			if (afteraccept_cmd) free(afteraccept_cmd);
 			afteraccept_cmd = strdup(p);
 		}
 
 	} else if (strstr(p, "gone") == p) {
+		int safe = 0;
 		COLON_CHECK("gone:")
 		if (query) {
 			snprintf(buf, bufn, "ans=%s%s%s", p, co,
 			    NONUL(gone_cmd));
 			goto qry;
 		}
-		if (safe_remote_only) {
+		p += strlen("gone:");
+		if (!strcmp(p, "") || strstr(p, "popup") == p) { /* skip-cmd-list */
+			safe = 1;
+		}
+		if (safe_remote_only && ! safe) {
 			rfbLog("unsafe: %s\n", p);
 		} else {
-			p += strlen("gone:");
 			if (gone_cmd) free(gone_cmd);
 			gone_cmd = strdup(p);
 		}
@@ -3669,6 +3704,12 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(passwdfile));
 		} else if (!strcmp(p, "unixpw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, unixpw);
+		} else if (!strcmp(p, "unixpw_list")) {
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(unixpw_list));
+		} else if (!strcmp(p, "stunnel")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, use_stunnel);
+		} else if (!strcmp(p, "stunnel_pem")) {
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(stunnel_pem));
 		} else if (!strcmp(p, "using_shm")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, !using_shm);
 		} else if (!strcmp(p, "logfile") || !strcmp(p, "o")) {

@@ -39,10 +39,12 @@ void check_new_clients(void);
 
 static rfbClientPtr *client_match(char *str);
 static int run_user_command(char *cmd, rfbClientPtr client, char *mode);
+static void free_client_data(rfbClientPtr client);
 static void client_gone(rfbClientPtr client);
 static int check_access(char *addr);
-static int ugly_accept_window(char *addr, char *userhost, int X, int Y,
-    int timeout, char *mode);
+static void ugly_geom(char *p, int *x, int *y);
+static int ugly_window(char *addr, char *userhost, int X, int Y,
+    int timeout, char *mode, int accept);
 static int action_match(char *action, int rc);
 static int accept_client(rfbClientPtr client);
 static void check_connect_file(char *file);
@@ -490,6 +492,31 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	return rc;
 }
 
+static void free_client_data(rfbClientPtr client) {
+	if (! client) {
+		return;
+	}
+	if (client->clientData) {
+		ClientData *cd = (ClientData *) client->clientData;
+		if (cd) {
+			if (cd->server_ip) {
+				free(cd->server_ip);
+				cd->server_ip = NULL;
+			}
+			if (cd->hostname) {
+				free(cd->hostname);
+				cd->hostname = NULL;
+			}
+			if (cd->username) {
+				free(cd->username);
+				cd->username = NULL;
+			}
+		}
+		free(client->clientData);
+		client->clientData = NULL;
+	}
+}
+
 static int accepted_client = 0;
 
 /*
@@ -520,29 +547,48 @@ static void client_gone(rfbClientPtr client) {
 		solid_bg(1);
 	}
 	if (gone_cmd && *gone_cmd != '\0') {
-		rfbLog("client_gone: using cmd for: %s\n", client->host);
-		run_user_command(gone_cmd, client, "gone");
+		ClientData *cd = NULL;
+		if (client->clientData) {
+			cd = (ClientData *) client->clientData;
+		}
+		if (strstr(gone_cmd, "popup") == gone_cmd) {
+			int x = -64000, y = -64000, timeout = 120;
+			char *userhost = ident_username(client);
+			char *addr, *p, *mode;
+
+			/* extract timeout */
+			if ((p = strchr(gone_cmd, ':')) != NULL) {
+				int in;
+				if (sscanf(p+1, "%d", &in) == 1) {
+					timeout = in;
+				}
+			}
+			/* extract geometry */
+			if ((p = strpbrk(gone_cmd, "+-")) != NULL) {
+				ugly_geom(p, &x, &y);
+			}
+
+			/* find mode: mouse, key, or both */
+			if (strstr(gone_cmd, "popupmouse") == gone_cmd) {
+				mode = "mouse_only";
+			} else if (strstr(gone_cmd, "popupkey") == gone_cmd) {
+				mode = "key_only";
+			} else {
+				mode = "both";
+			}
+
+			addr = client->host;
+
+			ugly_window(addr, userhost, x, y, timeout, mode, 0);
+
+			free(userhost);
+		} else {
+			rfbLog("client_gone: using cmd: %s\n", client->host);
+			run_user_command(gone_cmd, client, "gone");
+		}
 	}
 
-	if (client->clientData) {
-		ClientData *cd = (ClientData *) client->clientData;
-		if (cd) {
-			if (cd->server_ip) {
-				free(cd->server_ip);
-				cd->server_ip = NULL;
-			}
-			if (cd->hostname) {
-				free(cd->hostname);
-				cd->hostname = NULL;
-			}
-			if (cd->username) {
-				free(cd->username);
-				cd->username = NULL;
-			}
-		}
-		free(client->clientData);
-		client->clientData = NULL;
-	}
+	free_client_data(client);
 
 	if (inetd) {
 		rfbLog("viewer exited.\n");
@@ -722,8 +768,8 @@ static int check_access(char *addr) {
  * x11vnc's first (and only) visible widget: accept/reject dialog window.
  * We go through this pain to avoid dependency on libXt...
  */
-static int ugly_accept_window(char *addr, char *userhost, int X, int Y,
-    int timeout, char *mode) {
+static int ugly_window(char *addr, char *userhost, int X, int Y,
+    int timeout, char *mode, int accept) {
 
 #define t2x2_width 16
 #define t2x2_height 16
@@ -772,10 +818,17 @@ static unsigned char t2x2_bits[] = {
 	int Ye_x = 20,  Ye_y = 0, Ye_w = 45, Ye_h = 20;
 	int No_x = 75,  No_y = 0, No_w = 45, No_h = 20; 
 	int Vi_x = 130, Vi_y = 0, Vi_w = 45, Vi_h = 20; 
+	char *sprop = "new x11vnc client";
+
+	KeyCode key_o;
 
 	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
 
-	if (!strcmp(mode, "mouse_only")) {
+	if (! accept) {
+		sprintf(str_y, "OK");
+		sprop = "x11vnc client disconnected";
+		h = 110;
+	} else if (!strcmp(mode, "mouse_only")) {
 		str1 = str1_m;
 		str2 = str2_m;
 		str3 = str3_m;
@@ -834,14 +887,14 @@ static unsigned char t2x2_bits[] = {
 	hints.min_width = w;
 	hints.min_height = h;
 
-	XSetStandardProperties(dpy, awin, "new x11vnc client", "x11vnc query",
-	    ico, NULL, 0, &hints);
+	XSetStandardProperties(dpy, awin, sprop, "x11vnc query", ico, NULL,
+	    0, &hints);
 
 	XSelectInput(dpy, awin, evmask);
 
 	if (! font_info && (font_info = XLoadQueryFont(dpy, "fixed")) == NULL) {
 		rfbLogEnable(1);
-		rfbLog("ugly_accept_window: cannot locate font fixed.\n");
+		rfbLog("ugly_window: cannot locate font fixed.\n");
 		X_UNLOCK;
 		clean_up_exit(1);
 	}
@@ -855,8 +908,14 @@ static unsigned char t2x2_bits[] = {
 	XMapWindow(dpy, awin);
 	XFlush(dpy);
 
-	snprintf(strh, 100, "x11vnc: accept connection from %s?", addr);
+	if (accept) {
+		snprintf(strh, 100, "x11vnc: accept connection from %s?", addr);
+	} else {
+		snprintf(strh, 100, "x11vnc: client disconnected from %s", addr);
+	}
 	snprintf(stri, 100, "        (%s)", userhost);
+
+	key_o = XKeysymToKeycode(dpy, XStringToKeysym("o"));
 	key_y = XKeysymToKeycode(dpy, XStringToKeysym("y"));
 	key_n = XKeysymToKeycode(dpy, XStringToKeysym("n"));
 	key_v = XKeysymToKeycode(dpy, XStringToKeysym("v"));
@@ -873,7 +932,7 @@ static unsigned char t2x2_bits[] = {
 			usleep(ms * 1000);
 			waited += ((double) ms)/1000.;
 			if (timeout && (int) waited >= timeout) {
-				rfbLog("accept_client: popup timed out after "
+				rfbLog("ugly_window: popup timed out after "
 				    "%d seconds.\n", timeout);
 				out = 0;
 				ev.type = 0;
@@ -894,13 +953,15 @@ static unsigned char t2x2_bits[] = {
 			    strh, strlen(strh));
 			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
 			    stri, strlen(stri));
-			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
+			if (accept) {
+			  XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
 			    str1, strlen(str1));
-			XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
+			  XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
 			    str2, strlen(str2));
-			if (! view_only) {
+			  if (! view_only) {
 				XDrawString(dpy, awin, gc, X_sh, Y_sh+(k++)*dY,
 				    str3, strlen(str3));
+			  }
 			}
 
 			if (!strcmp(mode, "key_only")) {
@@ -912,10 +973,13 @@ static unsigned char t2x2_bits[] = {
 			No_y = Y_sh+k*dY;
 			Vi_y = Y_sh+k*dY;
 			XDrawRectangle(dpy, awin, gc, Ye_x, Ye_y, Ye_w, Ye_h);
-			XDrawRectangle(dpy, awin, gc, No_x, No_y, No_w, No_h);
-			if (! view_only) {
+
+			if (accept) {
+			  XDrawRectangle(dpy, awin, gc, No_x, No_y, No_w, No_h);
+			  if (! view_only) {
 				XDrawRectangle(dpy, awin, gc, Vi_x, Vi_y,
 				    Vi_w, Vi_h);
+			  }
 			}
 
 			tw = XTextWidth(font_info, str_y, strlen(str_y));
@@ -924,6 +988,9 @@ static unsigned char t2x2_bits[] = {
 			XDrawString(dpy, awin, gc, Ye_x+tw, Ye_y+Ye_h-5,
 			    str_y, strlen(str_y));
 
+			if (!accept) {
+				break;
+			}
 			tw = XTextWidth(font_info, str_n, strlen(str_n));
 			tw = (No_w - tw)/2;
 			if (tw < 0) tw = 1;
@@ -953,12 +1020,14 @@ static unsigned char t2x2_bits[] = {
 			y = ev.xbutton.y;
 			if (!strcmp(mode, "key_only")) {
 				;
-			} else if (x > No_x && x < No_x+No_w && y > No_y
-			    && y < No_y+No_h) {
-				out = 0;
 			} else if (x > Ye_x && x < Ye_x+Ye_w && y > Ye_y
 			    && y < Ye_y+Ye_h) {
 				out = 1;
+			} else if (! accept) {
+				;
+			} else if (x > No_x && x < No_x+No_w && y > No_y
+			    && y < No_y+No_h) {
+				out = 0;
 			} else if (! view_only && x > Vi_x && x < Vi_x+Vi_w
 			    && y > Vi_y && y < Vi_y+Ye_h) {
 				out = 2;
@@ -968,8 +1037,16 @@ static unsigned char t2x2_bits[] = {
 		case KeyPress:
 			if (!strcmp(mode, "mouse_only")) {
 				;
+			} else if (! accept) {
+				if (ev.xkey.keycode == key_o) {
+					out = 1;
+				}
+				if (ev.xkey.keycode == key_y) {
+					out = 1;
+				}
 			} else if (ev.xkey.keycode == key_y) {
 				out = 1;
+				;
 			} else if (ev.xkey.keycode == key_n) {
 				out = 0;
 			} else if (! view_only && ev.xkey.keycode == key_v) {
@@ -1082,6 +1159,24 @@ static int action_match(char *action, int rc) {
 	return result;
 }
 
+static void ugly_geom(char *p, int *x, int *y) {
+	int x1, y1;
+
+	if (sscanf(p, "+%d+%d", &x1, &y1) == 2) {
+		*x = x1;
+		*y = y1;
+	} else if (sscanf(p, "+%d-%d", &x1, &y1) == 2) {
+		*x = x1;
+		*y = -y1;
+	} else if (sscanf(p, "-%d+%d", &x1, &y1) == 2) {
+		*x = -x1;
+		*y = y1;
+	} else if (sscanf(p, "-%d-%d", &x1, &y1) == 2) {
+		*x = -x1;
+		*y = -y1;
+	}
+}
+
 /*
  * Simple routine to prompt the user on the X display whether an incoming
  * client should be allowed to connect or not.  If a gui is involved it
@@ -1133,20 +1228,7 @@ static int accept_client(rfbClientPtr client) {
 		}
 		/* extract geometry */
 		if ((p = strpbrk(accept_cmd, "+-")) != NULL) {
-			int x1, y1;
-			if (sscanf(p, "+%d+%d", &x1, &y1) == 2) {
-				x = x1;
-				y = y1;
-			} else if (sscanf(p, "+%d-%d", &x1, &y1) == 2) {
-				x = x1;
-				y = -y1;
-			} else if (sscanf(p, "-%d+%d", &x1, &y1) == 2) {
-				x = -x1;
-				y = y1;
-			} else if (sscanf(p, "-%d-%d", &x1, &y1) == 2) {
-				x = -x1;
-				y = -y1;
-			}
+			ugly_geom(p, &x, &y);
 		}
 
 		/* find mode: mouse, key, or both */
@@ -1159,8 +1241,8 @@ static int accept_client(rfbClientPtr client) {
 		}
 
 		rfbLog("accept_client: using builtin popup for: %s\n", addr);
-		if ((ret = ugly_accept_window(addr, userhost, x, y, timeout,
-		    mode))) {
+		if ((ret = ugly_window(addr, userhost, x, y, timeout,
+		    mode, 1))) {
 			free(userhost);
 			if (ret == 2) {
 				rfbLog("accept_client: viewonly: %s\n", addr);
@@ -1656,18 +1738,9 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		    allow_list ? allow_list : "(null)" );
 		return(RFB_CLIENT_REFUSE);
 	}
-	if (! accept_client(client)) {
-		rfbLog("denying client: %s local user rejected connection.\n",
-		    client->host);
-		rfbLog("denying client: accept_cmd=\"%s\"\n",
-		    accept_cmd ? accept_cmd : "(null)" );
-		return(RFB_CLIENT_REFUSE);
-	}
 
 	client->clientData = (void *) calloc(sizeof(ClientData), 1);
 	cd = (ClientData *) client->clientData;
-
-	cd->uid = clients_served;
 
 	cd->client_port = get_remote_port(client->sock);
 	cd->server_port = get_local_port(client->sock);
@@ -1678,6 +1751,20 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	cd->input[0] = '-';
 	cd->login_viewonly = -1;
 	cd->login_time = time(0);
+
+	if (! accept_client(client)) {
+		rfbLog("denying client: %s local user rejected connection.\n",
+		    client->host);
+		rfbLog("denying client: accept_cmd=\"%s\"\n",
+		    accept_cmd ? accept_cmd : "(null)" );
+
+		free_client_data(client);
+
+		return(RFB_CLIENT_REFUSE);
+	}
+
+	cd->uid = clients_served;
+
 
 	client->clientGoneHook = client_gone;
 
@@ -1861,11 +1948,11 @@ void check_new_clients(void) {
 
 	if (unixpw_in_progress) {
 		int present = 0;
-		if (time(0) > unixpw_last_try_time + 20) {
+		if (time(0) > unixpw_last_try_time + 30) {
 			rfbLog("unixpw_deny: timed out waiting for reply.\n");
 			unixpw_deny();
-			return;
 		}
+		return;
 	}
 	
 	if (client_count == last_count) {
@@ -1895,23 +1982,24 @@ void check_new_clients(void) {
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
+		char *s;
 
 		if (cd->login_viewonly < 0) {
 			/* this is a general trigger to initialize things */
 			if (cl->viewOnly) {
 				cd->login_viewonly = 1;
-				if (allowed_input_view_only) {
+				s = allowed_input_view_only;
+				if (s && cd->input[0] == '-') {
 					cl->viewOnly = FALSE;
 					cd->input[0] = '\0';
-					strncpy(cd->input,
-					    allowed_input_view_only, CILEN);
+					strncpy(cd->input, s, CILEN);
 				}
 			} else {
 				cd->login_viewonly = 0;
-				if (allowed_input_normal) {
+				s = allowed_input_normal;
+				if (s && cd->input[0] == '-') {
 					cd->input[0] = '\0';
-					strncpy(cd->input,
-					    allowed_input_normal, CILEN);
+					strncpy(cd->input, s, CILEN);
 				}
 			}
 			if (run_after_accept) {

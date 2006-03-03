@@ -1,3 +1,7 @@
+2006-03-02  Karl Runge <runge@karlrunge.com>
+	* x11vnc: more tweaks to -unixpw mode.  Add -gone popup mode.
+	  Change filexfer via -R.  Tune SMALL_FOOTPRINT.  gui fixes.
+
 2006-02-24  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -unixpw for Unix password auth, -stunnel to setup
 	  stunnel(1) for an SSL tunnel on the server end.  Add clipboard

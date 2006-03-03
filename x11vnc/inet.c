@@ -17,7 +17,7 @@ char *get_remote_host(int sock);
 char *get_local_host(int sock);
 char *ident_username(rfbClientPtr client);
 int find_free_port(int start, int end);
-
+int have_ssh_env(void);
 
 static int get_port(int sock, int remote);
 static char *get_host(int sock, int remote);
@@ -311,6 +311,57 @@ int find_free_port(int start, int end) {
 			return port;
 		}
 	}
+	return 0;
+}
+
+int have_ssh_env(void) {
+	char *str, *p = getenv("SSH_CONNECTION");
+	char *rhost, *rport, *lhost, *lport;
+	
+	if (! p) return 0;
+
+	str = strdup(p);
+	
+	p = strtok(str, " ");
+	rhost = p;
+
+	p = strtok(NULL, " ");
+	if (! p) goto fail;
+
+	rport = p;
+
+	p = strtok(NULL, " ");
+	if (! p) goto fail;
+
+	lhost = p;
+	
+	p = strtok(NULL, " ");
+	if (! p) goto fail;
+
+	lport = p;
+
+if (0) fprintf(stderr, "%d/%d - '%s' '%s'\n", atoi(rport), atoi(lport), rhost, lhost);
+
+	if (atoi(rport) < 0 || atoi(rport) > 65535) {
+		goto fail;
+	}
+	if (atoi(lport) < 0 || atoi(lport) > 65535) {
+		goto fail;
+	}
+
+	if (!strcmp(rhost, lhost)) {
+		goto fail;
+	}
+
+	free(str);
+
+	return 1;
+	
+	fail:
+fprintf(stderr, "failed:\n");
+
+	free(str);
+
 	return 0;
 }
 
