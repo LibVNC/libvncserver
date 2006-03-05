@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.1, lastmod: 2006-03-02
+         version: 0.8.1, lastmod: 2006-03-04
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -32,10 +32,10 @@ these protections.  See the FAQ for details how to tunnel the VNC connection
 through an encrypted channel such as 
 .IR ssh (1).
 In brief:
-.IP
-ssh -L 5900:localhost:5900 far-host 'x11vnc -localhost -display :0'
-.IP
-vncviewer -encodings 'copyrect tight zrle hextile' localhost:0
+.PP
+% ssh -L 5900:localhost:5900 far-host 'x11vnc -localhost -display :0'
+.PP
+% vncviewer -encodings 'copyrect tight zrle hextile' localhost:0
 .PP
 Also, use of a VNC password (-rfbauth or \fB-passwdfile)\fR is strongly recommend.
 .PP
@@ -494,19 +494,19 @@ full-access passwords)
 .PP
 \fB-unixpw\fR \fI[list]\fR
 .IP
-Experimental option: use Unix username and password
-authentication.  x11vnc uses the 
+Use Unix username and password authentication.  x11vnc
+uses the 
 .IR su (1)
-program to verify
-the user's password.  [list] is an optional comma
-separated list of allowed Unix usernames.  See below
-for per-user options that can be applied.
+program to verify the user's password.
+[list] is an optional comma separated list of allowed
+Unix usernames.  See below for per-user options that
+can be applied.
 .IP
 A familiar "login:" and "Password:" dialog is
 presented to the user on a black screen inside the
 vncviewer.  The connection is dropped if the user fails
 to supply the correct password in 3 tries or does not
-send one before a 20 second timeout.  Existing clients
+send one before a 25 second timeout.  Existing clients
 are view-only during this period.
 .IP
 Since the detailed behavior of 
@@ -514,19 +514,24 @@ Since the detailed behavior of
 can vary from
 OS to OS and for local configurations, please test
 the mode carefully on your systems before using it.
-Try different combinations of valid/invalid usernames
-and passwords.
+E.g. try different combinations of valid/invalid
+usernames and valid/invalid passwords to see if it
+behaves correctly.  x11vnc will be conservative and
+reject a user if anything abnormal occurs.
 .IP
-For example, on FreeBSD and the other BSD's and Tru64
-it does not appear to be possible for the user running
-x11vnc to validate his *own* password via 
-.IR su (1).
-The x11vnc login will always fail in this case.
-A possible workaround would be to start x11vnc as
-root with the "\fB-users\fR \fI+nobody\fR" option to immediately
-switch to user nobody.  Another source of problems are
-PAM modules that prompt for extra info, e.g. password
-aging modules.  These logins will always fail as well.
+For example, on FreeBSD and the other BSD's by default
+it is impossible for the user running x11vnc to validate
+his *own* password via 
+.IR su (1)
+(evidently commenting
+out the pam_self.so entry in /etc/pam.d/su eliminates
+the problem).  So the x11vnc login will always fail for
+this case.  A possible workaround would be to start
+x11vnc as root with the "\fB-users\fR \fI+nobody\fR" option to
+immediately switch to user nobody.  Another source of
+problems are PAM modules that prompt for extra info,
+e.g. password aging modules.  These logins will always
+fail as well.
 .IP
 *IMPORTANT*: to prevent the Unix password being sent in
 *clear text* over the network, two x11vnc options are
@@ -544,21 +549,22 @@ Evidently you will be using a different method to
 encrypt the data between the vncviewer and x11vnc:
 e.g. 
 .IR ssh (1)
-or a VPN.  Note that use of 
+or a VPN.  Note that use of \fB-localhost\fR
+with 
 .IR ssh (1)
-with
-\fB-localhost\fR is roughly the same as requiring a Unix
-user login (since Unix password or the user's public
-key authentication is used by ssh)
+is roughly the same as requiring a Unix
+user login (since a Unix password or the user's public
+key authentication is used by ssh on the machine where
+x11vnc runs and only local connections are accepted)
 .IP
 As a convenience, if you 
 .IR ssh (1)
-in and start x11vnc
-it will look to see if the environment variable
-SSH_CONNECTION is set and appears reasonable.  If it
-does, then the stunnel requirement is dropped since
-it is assumed you are using ssh for the encrypted
-tunnelling.  Use \fB-stunnel\fR to force stunnel usage.
+in and start x11vnc it
+will check if the environment variable SSH_CONNECTION
+is set and appears reasonable.  If it does, then the
+stunnel requirement is dropped since it is assumed
+you are using ssh for the encrypted tunnelling.
+Use \fB-stunnel\fR to force stunnel usage.
 .IP
 Set UNIXPW_DISABLE_LOCALHOST=1 to disable the \fB-localhost\fR
 requirement.  One should never do this (i.e. allow the
@@ -575,20 +581,36 @@ per-user options after a ":", e.g. "fred:opts"
 where "opts" is a "+" separated list of
 "viewonly", "fullaccess", "input=XXXX", or
 "deny", e.g. "karl,fred:viewonly,boss:input=M".
-For "input=" it is the K,M,B,C describe under \fB-input.\fR
+For "input=" it is the K,M,B,C described under \fB-input.\fR
 .IP
-If a user in the list is "*" that means those options
-apply to all users.  It also means all users are allowed
-to log in.  Use "deny" to explicitly deny some users
-if you use "*" to set a global option.
+If a user in the list is "*" that means those
+options apply to all users.  It also means all users
+are allowed to log in after supplying a valid password.
+Use "deny" to explicitly deny some users if you use
+"*" to set a global option.
+.PP
+\fB-unixpw_nis\fR \fI[list]\fR
+.IP
+As \fB-unixpw\fR above, however do not run 
+.IR su (1)
+but rather
+use the traditional getpwnam() + crypt() method instead.
+This requires that the encrpyted passwords be readable.
+Passwords stored in /etc/shadow will be inaccessible
+unless run as root.  This is called "NIS" mode
+simply because in most NIS setups the user encrypted
+passwords are accessible (e.g. "ypcat passwd").
+NIS is not required for this mode to work, but it
+is unlikely it will work for any other environment.
+All of the \fB-unixpw\fR options and contraints apply.
 .PP
 \fB-stunnel\fR \fI[pem]\fR
 .IP
 Use the 
 .IR stunnel (1)
-(www.stunnel.org) to provide an
-encrypted SSL tunnel between viewers and x11vnc.
-This requires stunnel be installed on the system and
+(www.stunnel.org) to provide
+an encrypted SSL tunnel between viewers and x11vnc.
+This requires stunnel to be installed on the system and
 available via PATH (n.b. stunnel is often installed in
 sbin directories).  Version 4.x of stunnel is assumed;
 see \fB-stunnel3\fR below.
@@ -600,9 +622,9 @@ configuration.
 .IP
 stunnel is started up as a child process of x11vnc and
 any SSL connections stunnel receives are decrypted and
-sent to x11vnc over a local socket.  The strings "The
-SSL VNC desktop is ..." and SSLPORT=... are printed
-out at startup.
+sent to x11vnc over a local socket.  The strings
+"The SSL VNC desktop is ..." and "SSLPORT=..."
+are printed out at startup.
 .IP
 The \fB-localhost\fR option is enforced by default to
 avoid people routing around the SSL channel.  Set
@@ -610,7 +632,7 @@ STUNNEL_DISABLE_LOCALHOST=1 to disable the requirement.
 .IP
 Your VNC viewer will need to be able to connect via SSL.
 Unfortunately not too many do this.  UltraVNC seems to
-have a SSL plugin.   It is not too difficult to set up
+have a SSL plugin.  It is not too difficult to set up
 an stunnel or other SSL tunnel on the viewer side.
 .IP
 A simple example on Unix using stunnel 3.x is:
@@ -2694,16 +2716,16 @@ aro=  noop display vncdisplay desktopname guess_desktop
 http_url auth xauth users rootshift clipshift
 scale_str scaled_x scaled_y scale_numer scale_denom
 scale_fac scaling_blend scaling_nomult4 scaling_pad
-scaling_interpolate inetd privremote unsafe safer nocmds
-passwdfile unixpw unixpw_list stunnel stunnel_pem
-using_shm logfile o flag rc norc h help V version
-lastmod bg sigpipe threads readrate netrate netlatency
-pipeinput clients client_count pid ext_xtest ext_xtrap
-ext_xrecord ext_xkb ext_xshm ext_xinerama ext_overlay
-ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
-button_mask mouse_x mouse_y bpp depth indexed_color
-dpy_x dpy_y wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y
-coff_x coff_y rfbauth passwd viewpasswd
+scaling_interpolate inetd privremote unsafe safer
+nocmds passwdfile unixpw unixpw_nis unixpw_list stunnel
+stunnel_pem using_shm logfile o flag rc norc h help
+V version lastmod bg sigpipe threads readrate netrate
+netlatency pipeinput clients client_count pid ext_xtest
+ext_xtrap ext_xrecord ext_xkb ext_xshm ext_xinerama
+ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin
+num_buttons button_mask mouse_x mouse_y bpp depth
+indexed_color dpy_x dpy_y wdpy_x wdpy_y off_x off_y
+cdpy_x cdpy_y coff_x coff_y rfbauth passwd viewpasswd
 .PP
 \fB-QD\fR \fIvariable\fR
 .IP
@@ -2896,15 +2918,26 @@ run by \fB-accept\fR and \fB-gone\fR:
 .IR vncconnect (1),
 .IR vncserver (1),
 .IR Xvnc (1),
-.IR inetd (1),
 .IR xev (1),
+.IR xdpyinfo (1),
+.IR xwininfo (1),
+.IR xprop (1),
 .IR xmodmap (1),
+.IR xrandr (1),
 .IR Xserver (1),
 .IR xauth (1),
 .IR xhost (1),
 .IR Xsecurity (7),
 .IR xmessage (1),
+.IR XGetImage (3X11),
 .IR ipcrm (1),
+.IR inetd (1),
+.IR xdm (1),
+.IR gdm (1),
+.IR kdm (1),
+.IR ssh (1),
+.IR stunnel (8),
+.IR su (1),
 .IR http://www.tightvnc.com ,
 .IR http://www.realvnc.com ,
 .IR http://www.karlrunge.com/x11vnc/ ,

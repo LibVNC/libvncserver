@@ -5,6 +5,7 @@
 extern int grantpt(int);
 extern int unlockpt(int);
 extern char *ptsname(int);
+extern char *crypt(const char*, const char *);
 #endif
 
 #include "x11vnc.h"
@@ -14,10 +15,14 @@ extern char *ptsname(int);
 #include <rfb/default8x16.h>
 
 #if LIBVNCSERVER_HAVE_FORK
-#if LIBVNCSERVER_HAVE_SYS_WAIT_H
-#if LIBVNCSERVER_HAVE_WAITPID
-#define UNIXPW
+#if LIBVNCSERVER_HAVE_SYS_WAIT_H && LIBVNCSERVER_HAVE_WAITPID
+#define UNIXPW_SU
 #endif
+#endif
+
+#if LIBVNCSERVER_HAVE_PWD_H && LIBVNCSERVER_HAVE_GETPWNAM
+#if LIBVNCSERVER_HAVE_CRYPT || LIBVNCSERVER_HAVE_LIBCRYPT
+#define UNIXPW_CRYPT
 #endif
 #endif
 
@@ -27,9 +32,10 @@ extern char *ptsname(int);
 #if LIBVNCSERVER_HAVE_TERMIOS_H
 #include <termios.h>
 #endif
-#if 0
+#if LIBVNCSERVER_HAVE_SYS_STROPTS_H
 #include <sys/stropts.h>
 #endif
+
 #if defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__NetBSD__)
 #define IS_BSD
 #endif
@@ -39,6 +45,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init);
 void unixpw_accept(char *user);
 void unixpw_deny(void);
 int su_verify(char *user, char *pass);
+int crypt_verify(char *user, char *pass);
 
 static int white(void);
 static int text_x(void);
@@ -84,10 +91,17 @@ static int text_y(void) {
 }
 
 void unixpw_screen(int init) {
-#ifndef UNIXPW
+	if (unixpw_nis) {
+#ifndef UNIXPW_CRYPT
+	rfbLog("-unixpw_nis is not supported on this OS/machine\n");
+	clean_up_exit(1);
+#endif
+	} else {
+#ifndef UNIXPW_SU
 	rfbLog("-unixpw is not supported on this OS/machine\n");
 	clean_up_exit(1);
 #endif
+	}
 	if (init) {
 		int x, y;
 		char log[] = "login: ";
@@ -115,6 +129,8 @@ static char slave_str[MAXPATHLEN];
 static char slave_str[4096];
 #endif
 
+static int used_get_pty_ptmx = 0;
+
 char *get_pty_ptmx(int *fd_p) {
 	char *slave;
 	int fd = -1, i, ndevs = 4, tmp;
@@ -130,7 +146,6 @@ char *get_pty_ptmx(int *fd_p) {
 #if LIBVNCSERVER_HAVE_GRANTPT
 
 	for (i=0; i < ndevs; i++) {
-
 #ifdef O_NOCTTY
 		fd = open(devs[i], O_RDWR|O_NOCTTY);
 #else
@@ -145,13 +160,6 @@ char *get_pty_ptmx(int *fd_p) {
 		rfbLogPerror("open /dev/ptmx");
 		return NULL;
 	}
-
-#if 0
-#if defined(FIONBIO) 
-	tmp = 1;
-	ioctl(fd, FIONBIO, &tmp);
-#endif
-#endif
 
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H && defined(TIOCPKT)
 	tmp = 0;
@@ -180,8 +188,6 @@ char *get_pty_ptmx(int *fd_p) {
 	ioctl(fd, TIOCFLUSH, (char *) 0);
 #endif
 
-
-
 	strcpy(slave_str, slave);
 	*fd_p = fd;
 	return slave_str;
@@ -194,7 +200,6 @@ char *get_pty_ptmx(int *fd_p) {
 
 
 char *get_pty_loop(int *fd_p) {
-	char *slave;
 	char master_str[16];
 	int fd = -1, i;
 	char c;
@@ -233,6 +238,7 @@ char *get_pty_loop(int *fd_p) {
 }
 
 char *get_pty(int *fd_p) {
+	used_get_pty_ptmx = 0;
 	if (getenv("BSD_PTY")) {
 		return get_pty_loop(fd_p);
 	}
@@ -240,6 +246,7 @@ char *get_pty(int *fd_p) {
 	return get_pty_loop(fd_p);
 #else
 #if LIBVNCSERVER_HAVE_GRANTPT
+	used_get_pty_ptmx = 1;
 	return get_pty_ptmx(fd_p);
 #else
 	return get_pty_loop(fd_p);
@@ -267,28 +274,76 @@ void try_to_be_nobody(void) {
 		setegid(pw->pw_gid);
 #endif
 	}
-
 #endif	/* PWD_H */
 }
 
 
-static int slave_fd = -1;
+static int slave_fd = -1, alarm_fired = 0;;
+
 static void close_alarm (int sig) {
 	if (slave_fd >= 0) {
 		close(slave_fd);
 	}
+	alarm_fired = 1;
+	if (0) sig = 0;	/* compiler warning */
+}
+
+static void kill_child (pid_t pid, int fd) {
+	int status;
+
+	slave_fd = -1;
+	alarm_fired = 0;
+	if (fd >= 0) {
+		close(fd);
+	}
+	kill(pid, SIGTERM);
+	waitpid(pid, &status, WNOHANG); 
+}
+
+int crypt_verify(char *user, char *pass) {
+#ifndef UNIXPW_CRYPT
+	return 0;
+#else
+	struct passwd *pwd;
+	char *realpw, *cr;
+	int n;
+	pwd = getpwnam(user);
+	if (! pwd) {
+		return 0;
+	}
+
+	realpw = pwd->pw_passwd;
+	if (realpw == NULL || realpw[0] == '\0') {
+		return 0;
+	}
+
+	n = strlen(pass);
+	if (pass[n-1] == '\n') {
+		pass[n-1] = '\0';
+	}
+	cr = crypt(pass, realpw);
+	if (cr == NULL) {
+		return 0;
+	}
+	if (!strcmp(cr, realpw)) {
+		return 1;
+	} else {
+		return 0;
+	}
+#endif	/* UNIXPW_CRYPT */
 }
 
 int su_verify(char *user, char *pass) {
-#ifndef UNIXPW
+#ifndef UNIXPW_SU
 	return 0;
 #else
 	int i, j, status, fd = -1, sfd, tfd;
+	int slow_pw = 1;
 	char *slave, *bin_true = NULL, *bin_su = NULL;
 	pid_t pid, pidw;
 	struct stat sbuf;
 	static int first = 1;
-	char instr[16];
+	char instr[32], buf[10];
 
 	if (first) {
 		set_db();
@@ -316,7 +371,15 @@ int su_verify(char *user, char *pass) {
 		}
 	}
 
-	if (stat("/bin/su", &sbuf) == 0) {
+#define SU_DEBUG 0
+#if SU_DEBUG
+	if (stat("/su", &sbuf) == 0) {
+		bin_su = "/su";	/* Freesbie read-only-fs /bin/su not suid! */
+#else
+	if (0) {
+		;
+#endif
+	} else if (stat("/bin/su", &sbuf) == 0) {
 		bin_su = "/bin/su";
 	} else if (stat("/usr/bin/su", &sbuf) == 0) {
 		bin_su = "/usr/bin/su";
@@ -337,10 +400,12 @@ int su_verify(char *user, char *pass) {
 	}
 
 	slave = get_pty(&fd);
+
 	if (slave == NULL) {
 		rfbLogPerror("get_pty failed.");
 		return 0;
 	}
+
 if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 
 	if (fd < 0) {
@@ -358,8 +423,10 @@ if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 	}
 
 	if (pid == 0) {
+		/* child */
+
 		int ttyfd;
-		char tmp[256];
+		ttyfd = -1;	/* compiler warning */
 
 #if LIBVNCSERVER_HAVE_SETSID
 		if (setsid() == -1) {
@@ -371,7 +438,6 @@ if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 			perror("setpgrp");
 			exit(1);
 		}
-
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H && defined(TIOCNOTTY)
 		ttyfd = open("/dev/tty", O_RDWR);
 		if (ttyfd >= 0) {
@@ -390,11 +456,21 @@ if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 		if (sfd < 0) {
 			exit(1);
 		}
-		/* sfd should be 0 since we closed 0. */
 
-#ifdef F_SETFL
-		fcntl (sfd, F_SETFL, O_NONBLOCK);
+/* streams options fixups, handle cases as they are found: */
+#if defined(__hpux)
+#if LIBVNCSERVER_HAVE_SYS_STROPTS_H
+#if LIBVNCSERVER_HAVE_SYS_IOCTL_H && defined(I_PUSH)
+		if (used_get_pty_ptmx) {
+			ioctl(sfd, I_PUSH, "ptem");
+			ioctl(sfd, I_PUSH, "ldterm");
+			ioctl(sfd, I_PUSH, "ttcompat");
+		}
 #endif
+#endif
+#endif
+
+		/* n.b. sfd will be 0 since we closed 0. so dup it to 1 and 2 */
 		if (fcntl(sfd, F_DUPFD, 1) == -1) {
 			exit(1);
 		}
@@ -402,32 +478,23 @@ if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 			exit(1);
 		}
 
-		unlink("/tmp/isatty");
-		unlink("/tmp/isastream");
-#if LIBVNCSERVER_HAVE_SYS_IOCTL_H
-#if 0
-	if (isastream(sfd)) {
-tfd = open("/tmp/isastream", O_CREAT|O_WRONLY, 0600);
-close(tfd);
-		ioctl(sfd, I_PUSH, "ptem");
-		ioctl(sfd, I_PUSH, "ldterm");
-		ioctl(sfd, I_PUSH, "ttcompat");
-	}
-#endif
-#if 1
-#if defined(TIOCSCTTY) && !defined(sun) && !defined(hpux)
+#if LIBVNCSERVER_HAVE_SYS_IOCTL_H && defined(TIOCSCTTY)
 		ioctl(sfd, TIOCSCTTY, (char *) 0);
 #endif
-#endif
-		if (isatty(sfd)) {
-			char nam[256];
-tfd = open("/tmp/isatty", O_CREAT|O_WRONLY, 0600);
-close(tfd);
-			sprintf(nam, "stty -a < %s > /tmp/isatty 2>&1", slave);
-			system(nam);
-		}
 
-#endif	/* SYS_IOCTL_H */
+		if (db > 2) {
+			char nam[256];
+			unlink("/tmp/isatty");
+			tfd = open("/tmp/isatty", O_CREAT|O_WRONLY, 0600);
+			if (isatty(sfd)) {
+				close(tfd);
+				sprintf(nam, "stty -a < %s > /tmp/isatty 2>&1", slave);
+				system(nam);
+			} else {
+				write(tfd, "NOTTTY\n", 7);
+				close(tfd);
+			}
+		}
 
 		chdir("/");
 
@@ -444,102 +511,139 @@ close(tfd);
 		set_env("LANG", "C");
 		set_env("SHELL", "/bin/sh");
 
+		/* synchronize with parent: */
+		write(2, "C", 1);
+
 		execlp(bin_su, bin_su, user, "-c", bin_true, (char *) NULL);
 		exit(1);
 	}
+	/* parent */
 
 	if (db)	fprintf(stderr, "pid: %d\n", pid);
-	if (db > 3) {
-		char cmd[32];
-		usleep( 100 * 1000 );
-		sprintf(cmd, "ps wu %d", pid);
-		system(cmd);
-		sprintf(cmd, "stty -a < %s", slave);
-		system(cmd);
-	}
-
-	usleep( 500 * 1000 );
-
-	/* send the password "early" (i.e. before we drain) */
-if (0) {
-	int k;
-	for (k = 0; k < strlen(pass); k++) {
-		write(fd, pass+k, 1); 
-		usleep(100 * 1000);
-	}
-} else {
-	write(fd, pass, strlen(pass)); 
-}
 
 	/*
 	 * set an alarm for blocking read() to close the master
-	 * (presumably terminating the child.  we avoid SIGTERM for now)
+	 * (presumably terminating the child. SIGTERM too...)
 	 */
 	slave_fd = fd;
+	alarm_fired = 0;
 	signal(SIGALRM, close_alarm);
 	alarm(10);
 
+	/* synchronize with child: */
+	for (i=0; i<10; i++) {
+		int n;
+		buf[0] = '\0';
+		buf[1] = '\0';
+		n = read(fd, buf, 1);
+		if (n < 0 && errno == EINTR) {
+			continue;
+		} else {
+			break;
+		}
+	}
+
+	if (db) {
+		fprintf(stderr, "read from child: '%s'\n", buf);
+	}
+
+	alarm(0);
+	signal(SIGALRM, SIG_DFL);
+	if (alarm_fired) {
+		kill_child(pid, fd);
+		return 0;
+	}
+
+#if LIBVNCSERVER_HAVE_SYS_IOCTL_H && defined(TIOCTRAP)
+	{
+		int control = 1;
+		ioctl(fd, TIOCTRAP, &control);
+	}
+#endif
+	
 	/*
 	 * In addition to checking exit code below, we watch for the
 	 * appearance of the string "Password:".  BSD does not seem to
-	 * ask for a password trying to su to yourself.
+	 * ask for a password trying to su to yourself.  This is the
+	 * setting in /etc/pam.d/su:
+	 * 	auth      sufficient  pam_self.so
+	 * it may be commented out without problem.
 	 */
-	for (i=0; i<16; i++) {
+	for (i=0; i<32; i++) {
 		instr[i] = '\0';
 	}
+
+	alarm_fired = 0;
+	signal(SIGALRM, close_alarm);
+	alarm(10);
+
 	j = 0;
-	for (i=0; i < strlen("Password:"); i++) {
+	for (i=0; i < (int) strlen("Password:"); i++) {
 		char pstr[] = "password:";
-		char buf[2];
 		int n;	
 
 		buf[0] = '\0';
 		buf[1] = '\0';
 
 		n = read(fd, buf, 1);
+		if (n < 0 && errno == EINTR) {
+			i--;
+			continue;
+		}
 
-if (db == 1) fprintf(stderr, "%d ", n, db > 1 ? buf : "");
-if (db > 1)  fprintf(stderr, "%s", buf);
+if (db) fprintf(stderr, "%s", buf);
 
 		if (db > 3 && n == 1 && buf[0] == ':') {
 			char cmd[32];
 			usleep( 100 * 1000 );
+			fprintf(stderr, "\n\n");
 			sprintf(cmd, "ps wu %d", pid);
 			system(cmd);
 			sprintf(cmd, "stty -a < %s", slave);
 			system(cmd);
+			fprintf(stderr, "\n\n");
 		}
 
 		if (n == 1) {
 			if (isspace(buf[0])) {
+				i--;
 				continue;
 			}
 			instr[j++] = tolower(buf[0]);
 		}
 		if (n <= 0 || strstr(pstr, instr) != pstr) {
-			rfbLog("\"Password:\" did not appear: '%s' n=%d\n",
-			    instr, n);
-			if (db > 3 && n == 1) {
-				continue;
-			}
+if (db) {
+	fprintf(stderr, "\"Password:\" did not appear: '%s'" " n=%d\n", instr, n);
+	if (db > 3 && n == 1 && j < 32) {
+		continue;
+	}
+}
 			alarm(0);
 			signal(SIGALRM, SIG_DFL);
-			slave_fd = -1;
-			close(fd);
-			kill(pid, SIGTERM);
-			waitpid(pid, &status, WNOHANG); 
+			kill_child(pid, fd);
 			return 0;
 		}
 	}
+
 	alarm(0);
 	signal(SIGALRM, SIG_DFL);
+	if (alarm_fired) {
+		kill_child(pid, fd);
+		return 0;
+	}
 
-	usleep( 250 * 1000 );
+	usleep(100 * 1000);
+	if (slow_pw) {
+		unsigned int k;
+		for (k = 0; k < strlen(pass); k++) {
+			write(fd, pass+k, 1); 
+			usleep(100 * 1000);
+		}
+	} else {
+		write(fd, pass, strlen(pass)); 
+	}
 
-#if 0
-	tcdrain(fd);
-#endif
-
+	alarm_fired = 0;
 	signal(SIGALRM, close_alarm);
 	alarm(15);
 
@@ -549,16 +653,17 @@ if (db > 1)  fprintf(stderr, "%s", buf);
 	 * make cause child to die by signal.
 	 */
 	for (i = 0; i<4096; i++) {
-		char buf[2];
 		int n;	
 		
 		buf[0] = '\0';
 		buf[1] = '\0';
 
 		n = read(fd, buf, 1);
+		if (n < 0 && errno == EINTR) {
+			continue;
+		}
 
-if (db == 1) fprintf(stderr, "%d ", n, db > 1 ? buf : "");
-if (db > 1)  fprintf(stderr, "%s", buf);
+if (db) fprintf(stderr, "%s", buf);
 
 		if (n <= 0) {
 			break;
@@ -569,6 +674,11 @@ if (db) fprintf(stderr, "\n");
 
 	alarm(0);
 	signal(SIGALRM, SIG_DFL);
+	if (alarm_fired) {
+		kill_child(pid, fd);
+		return 0;
+	}
+
 	slave_fd = -1;
 	
 	pidw = waitpid(pid, &status, 0); 
@@ -577,12 +687,13 @@ if (db) fprintf(stderr, "\n");
 	if (pid != pidw) {
 		return 0;
 	}
+
 	if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
 		return 1; /* this is the only return of success. */
 	} else {
 		return 0;
 	}
-#endif	/* UNIXPW */
+#endif	/* UNIXPW_SU */
 }
 
 static void unixpw_verify(char *user, char *pass) {
@@ -593,9 +704,18 @@ static void unixpw_verify(char *user, char *pass) {
 if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "********");
 	rfbLog("unixpw_verify: %s\n", user);
 
-	if (su_verify(user, pass)) {
-		unixpw_accept(user);
-		return;
+	if (unixpw_nis) {
+		if (crypt_verify(user, pass)) {
+			unixpw_accept(user);
+			return;
+		} else {
+			usleep(3000*1000);
+		}
+	} else {
+		if (su_verify(user, pass)) {
+			unixpw_accept(user);
+			return;
+		}
 	}
 
 	if (tries < 2) {
@@ -794,6 +914,13 @@ static void apply_opts (char *user) {
 	rfbClientPtr cl = unixpw_client;
 	int i;
 	
+	if (user) {
+		if (cd->unixname) {
+			free(cd->unixname);
+		}
+		cd->unixname = strdup(user);
+	}
+
 	if (! unixpw_list) {
 		return;
 	}
@@ -808,7 +935,7 @@ static void apply_opts (char *user) {
 			p = strtok(NULL, ",");
 			continue;
 		}
-		if (!strcmp(user, p)) {
+		if (user && !strcmp(user, p)) {
 			opts = strdup(q+1);
 		}
 		if (!strcmp("*", p)) {
@@ -846,7 +973,6 @@ static void apply_opts (char *user) {
 }
 
 void unixpw_accept(char *user) {
-
 	apply_opts(user);
 
 	unixpw_in_progress = 0;

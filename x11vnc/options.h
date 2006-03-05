@@ -16,6 +16,7 @@ extern int logfile_append;
 extern char *flagfile;
 extern char *passwdfile;
 extern int unixpw;
+extern int unixpw_nis;
 extern char *unixpw_list;
 extern int use_stunnel;
 extern int stunnel_port;

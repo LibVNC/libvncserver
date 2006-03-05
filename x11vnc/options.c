@@ -16,6 +16,7 @@ int logfile_append = 0;
 char *flagfile = NULL;		/* -flag */
 char *passwdfile = NULL;	/* -passwdfile */
 int unixpw = 0;			/* -unixpw */
+int unixpw_nis = 0;		/* -unixpw_nis */
 char *unixpw_list = NULL;
 int use_stunnel = 0;		/* -stunnel */
 int stunnel_port = 0;

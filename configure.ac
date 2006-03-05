@@ -175,6 +175,21 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			esac
 		fi
 
+		# only x11vnc uses crypt()
+		AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
+		AC_ARG_WITH(crypt,
+		[  --without-crypt         disable support for libcrypt],,)
+		if test "x$with_crypt" != "xno"; then
+			AC_CHECK_FUNCS([crypt], HAVE_LIBC_CRYPT="true")
+			if test -z "$HAVE_LIBC_CRYPT"; then
+				AC_CHECK_LIB(crypt, crypt,
+					X_PRELIBS="$X_PRELIBS -lcrypt"
+					[AC_DEFINE(HAVE_LIBCRYPT)], ,
+					$X_LIBS $X_PRELIBS -lcrypt $X_EXTRA_LIBS)
+			fi
+		fi
+
+
 		X_LIBS="$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS"
 	fi
 fi
@@ -345,7 +360,7 @@ AC_SUBST(WSOCKLIB)
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h pwd.h sys/wait.h utmpx.h termios.h sys/ioctl.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h pwd.h sys/wait.h utmpx.h termios.h sys/ioctl.h sys/stropts.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

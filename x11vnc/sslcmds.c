@@ -19,6 +19,27 @@ void setup_stunnel(int rport, int *argc, char **argv);
 
 static pid_t stunnel_pid = 0;
 
+void check_stunnel(void) {
+	static time_t last_check = 0;
+	time_t now = time(0);
+
+	if (last_check + 3 >= now) {
+		return;
+	}
+	last_check = now;
+
+	if (stunnel_pid > 0) {
+		int status;
+		waitpid(stunnel_pid, &status, WNOHANG); 
+		if (kill(stunnel_pid, 0) != 0) {
+			waitpid(stunnel_pid, &status, WNOHANG); 
+			rfbLog("stunnel subprocess %d died.\n", stunnel_pid); 
+			stunnel_pid = 0;
+			clean_up_exit(1);
+		}
+	}
+}
+
 int start_stunnel(int stunnel_port, int x11vnc_port) {
 #ifdef SSLCMDS
 	char extra[] = ":/usr/sbin:/usr/local/sbin";

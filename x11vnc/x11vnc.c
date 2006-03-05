@@ -138,6 +138,7 @@
 #include "connections.h"
 #include "rates.h"
 #include "unixpw.h"
+#include "inet.h"
 
 /*
  * main routine for the x11vnc program
@@ -467,6 +468,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_keycode_state();
 			check_connect_inputs();		
 			check_gui_inputs();		
+			check_stunnel();		
 			record_last_fb_update();
 			check_padded_fb();		
 			check_fixscreen();		
@@ -896,6 +898,82 @@ static void immediate_switch_user(int argc, char* argv[]) {
 		free(u);
 		break;
 	}
+}
+
+static void quick_pw(char *str) {
+	char *p, *q;
+	char tmp[1024];
+	int db = 0;
+
+	if (db) fprintf(stderr, "quick_pw: %s\n", str);
+
+	if (! str || str[0] == '\0') {
+		exit(1);
+	}
+	if (str[0] != '%') {
+		exit(1);
+	}
+	/*
+	 * "%-" or "%stdin" means read one line from stdin.
+	 *
+	 * "%env" means it is in $UNIXPW env var.
+	 *
+	 * starting "%/" or "%." means read the first line from that file.
+	 *
+	 * otherwise: %user:pass
+	 */
+	if (!strcmp(str, "%-") || !strcmp(str, "%stdin")) {
+		if(fgets(tmp, 1024, stdin) == NULL) {
+			exit(1);
+		}
+		q = strdup(tmp);
+	} else if (!strcmp(str, "%env")) {
+		if (getenv("UNIXPW") == NULL) {
+			exit(1);
+		}
+		q = strdup(getenv("UNIXPW"));
+	} else if (str[1] == '/' || str[1] == '.') {
+		FILE *in = fopen(str+1, "r");
+		if (in == NULL) {
+			exit(1);
+		}
+		if(fgets(tmp, 1024, in) == NULL) {
+			exit(1);
+		}
+		q = strdup(tmp);
+	} else {
+		q = strdup(str+1);
+	}
+	p = (char *) malloc(strlen(q) + 10);
+	strcpy(p, q);
+	if (strchr(p, '\n') == NULL) {
+		strcat(p, "\n");
+	}
+
+	if ((q = strchr(p, ':')) == NULL) {
+		exit(1);
+	}
+	*q = '\0';
+	if (db) fprintf(stderr, "'%s' '%s'\n", p, q+1);
+	if (unixpw_nis) {
+		if (crypt_verify(p, q+1)) {
+			fprintf(stdout, "Y %s\n", p);
+			exit(0);
+		} else {
+			fprintf(stdout, "N %s\n", p);
+			exit(1);
+		}
+	} else {
+		if (su_verify(p, q+1)) {
+			fprintf(stdout, "Y %s\n", p);
+			exit(0);
+		} else {
+			fprintf(stdout, "N %s\n", p);
+			exit(1);
+		}
+	}
+	/* NOTREACHED */
+	exit(1);
 }
 
 static void print_settings(int try_http, int bg, char *gui_str) {
@@ -1364,9 +1442,11 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			passwdfile = strdup(argv[++i]);
 			got_passwdfile = 1;
-		} else if (!strcmp(arg, "-unixpw")
-		    || !strcmp(arg, "-unixpw_unsafe")) {
+		} else if (strstr(arg, "-unixpw") == arg) {
 			unixpw = 1;
+			if (strstr(arg, "-unixpw_nis")) {
+				unixpw_nis = 1;
+			}
 			if (i < argc-1) {
 				char *p, *q, *s = argv[i+1];
 				if (s[0] != '-') {
@@ -1374,23 +1454,12 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 				if (s[0] == '%') {
-					p = unixpw_list;
 					unixpw_list = NULL;
-					strcpy(p, s+1);
-					strcat(p, "\n");	/* just fits */
-					if ((q = strchr(p, ':')) == NULL) {
-						exit(1);
-					}
-					*q = '\0';
-					if (su_verify(p, q+1)) {
-						fprintf(stderr, "\nY\n");
-					} else {
-						fprintf(stderr, "\nN\n");
-					}
-					exit(0);
+					quick_pw(s);
+					exit(1);
 				}
 			}
-			if (!strcmp(arg, "-unixpw_unsafe")) {
+			if (strstr(arg, "_unsafe")) {
 				/* hidden option for testing. */
 				set_env("UNIXPW_DISABLE_STUNNEL", "1");
 				set_env("UNIXPW_DISABLE_LOCALHOST", "1");
@@ -2114,6 +2183,17 @@ int main(int argc, char* argv[]) {
 					    "mode.\n");
 				}
 				use_stunnel = 1;
+			} else if (! getenv("UNIXPW_DISABLE_STUNNEL")) {
+				char *s = getenv("SSH_CONNECTION");
+				if (! s) s = getenv("SSH_CLIENT");
+				if (! s) s = "SSH_CONNECTION";
+				fprintf(stderr, "\n");
+				rfbLog("Skipping -stunnel contraint in -unixpw mode,\n");
+				rfbLog("assuming your SSH encryption is: %s\n", s);
+				fprintf(stderr, "\n");
+				if (! nopw) {
+					usleep(2000*1000);
+				}
 			}
 		}
 	    } else if (use_stunnel) {

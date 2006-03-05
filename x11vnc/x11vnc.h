@@ -247,6 +247,19 @@ extern int h_errno;
 # endif
 #endif
 
+/*
+ * For reference, the OS header defines:
+ __SVR4 && __sun   is solaris
+ __sgi
+ __hpux
+ __osf__
+ __OpenBSD__
+ __FreeBSD__
+ __NetBSD__
+ __linux__
+ _AIX
+ */
+
 #ifdef IRIX_OVERLAY
 #include <X11/extensions/readdisplay.h>
 #endif
@@ -422,6 +435,7 @@ typedef struct _ClientData {
 	int uid;
 	char *hostname;
 	char *username;
+	char *unixname;
 	int client_port;
 	int server_port;
 	char *server_ip;

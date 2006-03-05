@@ -10,6 +10,7 @@
 #include "rates.h"
 #include "screen.h"
 #include "unixpw.h"
+#include "scan.h"
 
 /*
  * routines for handling incoming, outgoing, etc connections
@@ -78,7 +79,7 @@ int all_clients_initialized(void) {
 char *list_clients(void) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
-	char *list, tmp[32];
+	char *list, tmp[256];
 	int count = 0;
 
 	if (!screen) {
@@ -93,12 +94,12 @@ char *list_clients(void) {
 
 	/*
 	 * each client:
-         * <id>:<ip>:<port>:<user>:<hostname>:<input>:<loginview>,
-	 * 8+1+16+1+5+1+24+1+256+1+5+1+1+1
+         * <id>:<ip>:<port>:<user>:<unix>:<hostname>:<input>:<loginview>:<time>,
+	 * 8+1+64+1+5+1+24+1+24+1+256+1+5+1+1+1+10+1
 	 * 123.123.123.123:60000/0x11111111-rw,
-	 * so count+1 * 400 must cover it.
+	 * so count+1 * 500 must cover it.
 	 */
-	list = (char *) malloc((count+1)*400);
+	list = (char *) malloc((count+1)*500);
 	
 	list[0] = '\0';
 
@@ -114,17 +115,26 @@ char *list_clients(void) {
 		strcat(list, ":");
 		sprintf(tmp, "%d:", cd->client_port);
 		strcat(list, tmp);
-		if (*(cd->username) == '\0') {
+		if (cd->username[0] == '\0') {
 			char *s = ident_username(cl);
 			if (s) free(s);
 		}
 		strcat(list, cd->username);
+		strcat(list, ":");
+		if (cd->unixname[0] == '\0') {
+			strcat(list, "none");
+		} else {
+			strcat(list, cd->unixname);
+		}
 		strcat(list, ":");
 		strcat(list, cd->hostname);
 		strcat(list, ":");
 		strcat(list, cd->input);
 		strcat(list, ":");
 		sprintf(tmp, "%d", cd->login_viewonly);
+		strcat(list, tmp);
+		strcat(list, ":");
+		sprintf(tmp, "%d", (int) cd->login_time);
 		strcat(list, tmp);
 	}
 	rfbReleaseClientIterator(iter);
@@ -511,6 +521,10 @@ static void free_client_data(rfbClientPtr client) {
 				free(cd->username);
 				cd->username = NULL;
 			}
+			if (cd->unixname) {
+				free(cd->unixname);
+				cd->unixname = NULL;
+			}
 		}
 		free(client->clientData);
 		client->clientData = NULL;
@@ -828,6 +842,9 @@ static unsigned char t2x2_bits[] = {
 		sprintf(str_y, "OK");
 		sprop = "x11vnc client disconnected";
 		h = 110;
+		str1 = "";
+		str2 = "";
+		str3 = "";
 	} else if (!strcmp(mode, "mouse_only")) {
 		str1 = str1_m;
 		str2 = str2_m;
@@ -1747,6 +1764,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	cd->server_ip   = get_local_host(client->sock);
 	cd->hostname = ip2host(client->host);
 	cd->username = strdup("");
+	cd->unixname = strdup("");
 
 	cd->input[0] = '-';
 	cd->login_viewonly = -1;
@@ -1947,7 +1965,6 @@ void check_new_clients(void) {
 	int run_after_accept = 0;
 
 	if (unixpw_in_progress) {
-		int present = 0;
 		if (time(0) > unixpw_last_try_time + 30) {
 			rfbLog("unixpw_deny: timed out waiting for reply.\n");
 			unixpw_deny();

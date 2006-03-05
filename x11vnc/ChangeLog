@@ -1,3 +1,8 @@
+2006-03-04  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -unixpw on *bsd, hpux and tru64.  Add -unixpw_nis for
+	  non-shadow systems. check stunnel dying.  check SSH_CONNECTION
+	  in -unixpw.  gui icon tweaks, unix username.
+
 2006-03-02  Karl Runge <runge@karlrunge.com>
 	* x11vnc: more tweaks to -unixpw mode.  Add -gone popup mode.
 	  Change filexfer via -R.  Tune SMALL_FOOTPRINT.  gui fixes.

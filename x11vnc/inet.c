@@ -288,6 +288,9 @@ char *ident_username(rfbClientPtr client) {
 		}
 		user = newuser;
 	}
+	if (!strcmp(user, "unknown-user") && cd && cd->unixname[0] != '\0') {
+		user = cd->unixname;
+	}
 	newhost = ip2host(client->host);
 	len = strlen(user) + 1 + strlen(newhost) + 1;
 	str = (char *) malloc(len);
@@ -318,7 +321,20 @@ int have_ssh_env(void) {
 	char *str, *p = getenv("SSH_CONNECTION");
 	char *rhost, *rport, *lhost, *lport;
 	
-	if (! p) return 0;
+	if (! p) {
+		char *q = getenv("SSH_CLIENT");
+		if (! q) {
+			return 0;
+		}
+		if (strstr(q, "127.0.0.1") != NULL) {
+			return 0;
+		}
+		return 1;
+	}
+
+	if (strstr(p, "127.0.0.1") != NULL) {
+		return 0;
+	}
 
 	str = strdup(p);
 	
@@ -342,10 +358,10 @@ int have_ssh_env(void) {
 
 if (0) fprintf(stderr, "%d/%d - '%s' '%s'\n", atoi(rport), atoi(lport), rhost, lhost);
 
-	if (atoi(rport) < 0 || atoi(rport) > 65535) {
+	if (atoi(rport) <= 16 || atoi(rport) > 65535) {
 		goto fail;
 	}
-	if (atoi(lport) < 0 || atoi(lport) > 65535) {
+	if (atoi(lport) <= 16 || atoi(lport) > 65535) {
 		goto fail;
 	}
 
@@ -358,7 +374,6 @@ if (0) fprintf(stderr, "%d/%d - '%s' '%s'\n", atoi(rport), atoi(lport), rhost, l
 	return 1;
 	
 	fail:
-fprintf(stderr, "failed:\n");
 
 	free(str);
 

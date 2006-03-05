@@ -14,7 +14,7 @@
 #define XEMBED_VERSION 0
 #define XEMBED_MAPPED  (1 << 0)
 
-int icon_mode = 0;		/* hack for -gui tray */
+int icon_mode = 0;		/* hack for -gui tray/icon */
 char *icon_mode_file = NULL;
 FILE *icon_mode_fh = NULL;
 int icon_mode_socks[ICON_MODE_SOCKS];

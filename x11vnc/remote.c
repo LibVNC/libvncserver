@@ -3704,6 +3704,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(passwdfile));
 		} else if (!strcmp(p, "unixpw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, unixpw);
+		} else if (!strcmp(p, "unixpw_nis")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, unixpw_nis);
 		} else if (!strcmp(p, "unixpw_list")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(unixpw_list));
 		} else if (!strcmp(p, "stunnel")) {

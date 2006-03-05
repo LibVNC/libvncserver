@@ -258,6 +258,8 @@ Permissions
 	=F rfbauth:
 	unixpw
 	unixpw_list:
+	unixpw_nis
+	unixpw_nis_list:
 	=0 storepasswd
 	=GAL LOFF
 	=GAL Misc-Perms::
@@ -523,7 +525,11 @@ Set the -xrandr mode value.
 "
 
 	set helptext(unixpw_list) "
-Set the -unixpw_list usernames list value.
+Set the -unixpw usernames list value.
+"
+
+	set helptext(unixpw_nis_list) "
+Set the -unixpw_nis usernames list value.
 "
 
 	set helptext(stunnel_pem) "
@@ -658,10 +664,12 @@ to apply the changes, or press \"Cancel\" to skip applying them.
    remote-control commands.
 
  - \"Password\" lets you set the session password viewers may use to gain full
-   access to the display.
+   access to the display.  This will only work if x11vnc was started with 
+   the -gui icon or -gui tray mode.
    
  - \"ViewOnly Password\" lets you set the session password viewers may
-   use to gain view only access to the display.
+   use to gain view only access to the display.  This will only work if
+   x11vnc was started with the -gui icon or -gui tray mode.
 
 NOTE: These \"session\" passwords only last for the current x11vnc
 session (they are not remembered, see the -storepasswd, -passwdfile,
@@ -3217,25 +3225,36 @@ proc client_dialog {client} {
 	set ip ""
 	global menu_var text_area cleanup_window item_bool
 
-	append_text "\nClient info string:  $client\n\n"
-	if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
-	    $client m0 m1 m2 m3 m4 m5 m6 m7]} {
-		# id:ip:port:user:hostname:input:loginvo
-		set cid $m1
-		set ip $m2
+	#<id>:<ip>:<port>:<user>:<unix>:<hostname>:<input>:<loginview>:<time>
+	append_text "\nClient info string:\n - $client\n\n"
+	if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
+	    $client m0 m1 m2 m3 m4 m5 m6 m7 m8 m9]} {
+		set cid  $m1
+		set ip   $m2
 		set port $m3
 		set user $m4
-		set host $m5
+		set unix $m5
+		set host $m6
 		regsub {\..*$} $host "" host
-		set input $m6
-		set logvo $m7
-		append_text "Host: $host, Port: $port, User: $user, IP: $ip, Id: $cid\n"
+		set input $m7
+		set logvo $m8
+		set ltime $m9
+		append_text "Host: $host, Port: $port, User: $user"
+		if {$unix != "" && $unix != "none"} {
+			append_text ", Unix: $unix"
+		}
+		append_text ", IP: $ip, Id: $cid\n"
 		append_text " - originally logged in as: "
 		if {$logvo == "1" } {
-			append_text "View-Only Client\n"
+			append_text "View-Only Client"
 		} else {
-			append_text "Normal Client\n"
+			append_text "Normal Client"
 		}
+		if {$ltime != ""} {
+			set tim [clock format $ltime]
+			append_text ",  $tim"
+		}
+		append_text "\n"
 		append_text " - currently allowed input: "
 		set sk 0
 		set sm 0
@@ -3303,22 +3322,30 @@ proc disconnect_dialog {client} {
 	set cid ""
 	set host ""
 	set msg "\n"
-	append msg "*** Client info string: $client\n"
-	if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*)$} $client m0 m1 m2 m3 m4 m5 m6]} {
-		set cid $m1
-		set ip $m2
+	append msg "*** Client info string:\n    $client\n"
+	if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
+	    $client m0 m1 m2 m3 m4 m5 m6 m7 m8 m9]} {
+		set cid  $m1
+		set ip   $m2
 		set port $m3
-		set host $m4
+		set user $m4
+		set unix $m5
+		set host $m6
 		regsub {\..*$} $host "" host
-		set input $m5
-		set logvo $m6
-		append_text "Host: $host, Port: $port, IP: $ip, Id: $cid\n"
+		set input $m7
+		set logvo $m8
+		set ltime $m9
+		append_text "Host: $host, Port: $port, IP: $ip, User: $user"
+		if {$unix != "" && $unix != "none"} {
+			append_text ", Unix: $unix"
+		}
+		append_text ", Id: $cid\n"
 	}
 	if {$cid == ""} {
 		append_text "Invalid client info string: $client\n"
 		return
 	}
-	append msg "*** To *DISCONNECT* this client press \"OK\", otherwise press \"Cancel\"\n"
+	append msg "*** To *DISCONNECT* this client press \"OK\" again, otherwise press \"Cancel\"\n"
 	bell
 	if {[warning_dialog $msg "current"]} {
 		push_new_value "disconnect" "disconnect" $cid 1
@@ -3389,12 +3416,19 @@ proc update_clients_menu {list} {
 		}
 		regsub -all {[{}()~!$&*|;'"`{}<>\[\]]} $client "" client
 		#'
-		if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
-		    $client m0 m1 m2 m3 m4 m5 m6 m7]} {
-			# id:ip:port:user:hostname:input:loginvo
-			set host $m5
+		if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
+		    $client m0 m1 m2 m3 m4 m5 m6 m7 m8 m9]} {
+			set id   $m1
+			set user $m4
+			set unix $m5
+			set host $m6
 			regsub {\..*$} $host "" host
-			set clabel "$host $m1"
+			set clabel "$host $id"
+			if {$unix != "" && $unix != "none"} {
+				set clabel "$unix@$clabel"
+			} elseif {$user != "unknown-user"} {
+				set clabel "$user@$clabel"
+			}
 		} else {
 			regsub {:.*$} $client "" clabel
 		}
@@ -3943,6 +3977,7 @@ proc do_props {{msg ""}} {
 	global menu_var unset_str
 	global have_labelframes ffont bfont
 	global props_buttons icon_noadvanced
+	global icon_mode icon_mode_at_startup
 
 	check_update_vars
 
@@ -4054,6 +4089,7 @@ proc do_props {{msg ""}} {
 	entry $vp.e -show "*" -textvariable props_viewpasswd -font $bfont
 	pack $vp.e -fill x -expand 1 -padx 1m -pady 1m -side top
 
+
 	lappend props_buttons $vp.e
 
 	set pw "$w.passwd"
@@ -4067,6 +4103,17 @@ proc do_props {{msg ""}} {
 	}
 	entry $pw.e -show "*" -textvariable props_passwd -font $bfont
 	pack $pw.e -fill x -expand 1 -padx 1m -pady 1m -side top
+
+	if {! $icon_mode_at_startup} {
+		$vp.e configure -state disabled
+		catch {$vp.l configure -state disabled}
+		catch {$vp configure -state disabled}
+		catch {$vp configure -foreground grey60}
+		$pw.e configure -state disabled
+		catch {$pw.l configure -state disabled}
+		catch {$pw configure -state disabled}
+		catch {$pw configure -foreground grey60}
+	}
 
 	lappend props_buttons $pw.e
 
@@ -4188,7 +4235,8 @@ proc popup_post {m} {
 			continue
 		}
 		if {[regexp {^([^:]*):(.*)$} $client mat id lab]} {
-			$wd add command -label "$lab" \
+			set nid [expr "$id + 0"]
+			$wd add command -label "$nid $lab" \
 				-command "do_disconnect_client $id"
 		}
 	}
@@ -4213,26 +4261,38 @@ proc set_client_balloon {str} {
 	
 	set client_balloon "$vnc_display"
 	set count 0
+	regsub -all {^.*aro=clients:} $str "" str
+	regsub -all {aro=.*$} $str "" str
+	regsub -all {ans=.*$} $str "" str
 	foreach client [split $str ","] {
-		if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
-		    $client m0 m1 m2 m3 m4 m5 m6 m7]} {
-			# id:ip:port:user:hostname:input:loginvo
+		#puts "client: $client"
+		if [regexp {^[ 	]*$} $client] {
+			continue
+		}
+		if {[regexp {^(.*):(.*):(.*):(.*):(.*):(.*):(.*):(.*):(.*)$} \
+		    $client m0 m1 m2 m3 m4 m5 m6 m7 m8 m9]} {
 			set id    $m1
+			set nid   [expr "$m1 + 0"]
 			set ip    $m2
 			set port  $m3
 			set user  $m4
+			set unix  $m5
 			if {[string length $user] >= 24} {
 				# weird identd hash...
 				set user [string range $user 0 8]
 				set user "${user}..."
 			}
-			set host  $m5
-			set input $m6
-			set vo    $m7
+			if {$unix != "" && $unix != "none"} {
+				set user $unix
+			}
+			set host  $m6
+			set input $m7
+			set vo    $m8
+			set ltime $m9
 			if [regexp {^[ 	]*$} $host] {
 				set host $ip
 			}
-			set client_balloon "${client_balloon}\n$user\@$host"
+			set client_balloon "${client_balloon}\n$nid $user\@$host"
 			if {$vo == "1"} {
 				set client_balloon "${client_balloon} - view"
 				lappend client_id_list "$id:$user\@$host - view"
@@ -5408,6 +5468,8 @@ proc get_nitem {item} {
 		set nitem "xrandr"
 	} elseif {$nitem == "unixpw_list"} {
 		set nitem "unixpw"
+	} elseif {$nitem == "unixpw_nis_list"} {
+		set nitem "unixpw_nis"
 	} elseif {$nitem == "stunnel_pem"} {
 		set nitem "stunnel"
 	} elseif {$nitem == "wireframe_mode"} {
@@ -5870,12 +5932,16 @@ proc setup_tray_embed {} {
 
 proc restart_everything {gui_mode} {
 	global env gui_argv0 x11vnc_prog full_win
+	global icon_mode_at_startup
+	global tray_embed tray_running
 	if {$gui_mode == "full"} {
 		set env(X11VNC_ICON_MODE) 0
 	} elseif {$gui_mode == "icon"} {
 		set env(X11VNC_ICON_MODE) 1
 	} elseif {$gui_mode == "tray"} {
-		if {![regexp -nocase {TRAY} $env(X11VNC_ICON_MODE)]} 	{
+		if {$tray_running} {
+			set env(X11VNC_ICON_MODE) "RUNNING"
+		} else {
 			set env(X11VNC_ICON_MODE) "TRAY"
 		}
 	}
@@ -5957,7 +6023,8 @@ global connected_to_x11vnc
 global delay_sleep extra_sleep extra_sleep_split
 global cache_all_query_vars
 global last_query_all_time query_all_freq client_tail client_sock client_info_read
-global icon_mode tray_embed tray_running icon_setpasswd icon_embed_id
+global icon_mode icon_mode_at_startup
+global tray_embed tray_running icon_setpasswd icon_embed_id
 global icon_noadvanced icon_minimal
 global make_gui_count text_area_str
 global gui_argv0 gui_start_mode
@@ -6144,6 +6211,20 @@ if {[info exists env(X11VNC_SIMPLE_GUI)]} {
 set icon_mode 0
 set tray_embed 0
 set tray_running 0
+
+if {![info exists env(X11VNC_ICON_MODE_AT_STARTUP)]} {
+	if {[info exists env(X11VNC_ICON_MODE)]} {
+		if {$env(X11VNC_ICON_MODE) != 0} {
+			set env(X11VNC_ICON_MODE_AT_STARTUP) 1
+		} else {
+			set env(X11VNC_ICON_MODE_AT_STARTUP) 0
+		}
+	} else {
+		set env(X11VNC_ICON_MODE_AT_STARTUP) 0
+	}
+}
+set icon_mode_at_startup $env(X11VNC_ICON_MODE_AT_STARTUP)
+
 if {![info exists env(X11VNC_ICON_MODE)]} {
 	set icon_mode 0
 } elseif {$env(X11VNC_ICON_MODE) == "" || $env(X11VNC_ICON_MODE) == "0"} {
@@ -6158,6 +6239,7 @@ if {![info exists env(X11VNC_ICON_MODE)]} {
 		set tray_running 1
 	}
 }
+
 set icon_setpasswd 0
 if {[info exists env(X11VNC_ICON_SETPASS)]} {
 	if {$env(X11VNC_ICON_SETPASS) != ""} {
