@@ -11,6 +11,7 @@ extern int tray_manager_ok;
 extern Window tray_request;
 extern Window tray_window;
 extern int tray_unembed;
+extern pid_t run_gui_pid;
 
 extern char *get_gui_code(void);
 extern int tray_embed(Window iconwin, int remove);

@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.1, lastmod: 2006-03-04
+         version: 0.8.1, lastmod: 2006-03-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -391,8 +391,9 @@ set to "host" or "host:port" establish a reverse
 connection.  Using 
 .IR xprop (1)
 instead of vncconnect may
-work (see the FAQ).  The \fB-remote\fR control mechanism also
-uses this VNC_CONNECT channel.  Default: \fB-vncconnect\fR
+work (see the FAQ).  The \fB-remote\fR control mechanism uses
+X11VNC_REMOTE channel, and this option disables/enables
+it as well.  Default: \fB-vncconnect\fR
 .PP
 \fB-allow\fR \fIhost1[,host2..]\fR
 .IP
@@ -530,8 +531,8 @@ this case.  A possible workaround would be to start
 x11vnc as root with the "\fB-users\fR \fI+nobody\fR" option to
 immediately switch to user nobody.  Another source of
 problems are PAM modules that prompt for extra info,
-e.g. password aging modules.  These logins will always
-fail as well.
+e.g. password aging modules.  These logins will fail
+as well even when the correct password is supplied.
 .IP
 *IMPORTANT*: to prevent the Unix password being sent in
 *clear text* over the network, two x11vnc options are
@@ -564,17 +565,28 @@ will check if the environment variable SSH_CONNECTION
 is set and appears reasonable.  If it does, then the
 stunnel requirement is dropped since it is assumed
 you are using ssh for the encrypted tunnelling.
-Use \fB-stunnel\fR to force stunnel usage.
+Use \fB-stunnel\fR to force stunnel usage for this case.
 .IP
 Set UNIXPW_DISABLE_LOCALHOST=1 to disable the \fB-localhost\fR
 requirement.  One should never do this (i.e. allow the
 Unix passwords to be sniffed on the network).
 .IP
-NOTE: in \fB-inetd\fR mode the two settings are not enforced
-since x11vnc does not make network connections in
-that case.  Be sure to use encryption from the viewer
-to inetd.  One can also have your own stunnel spawn
-x11vnc in \fB-inetd\fR mode.  See the FAQ.
+Regarding reverse connections (e.g. \fB-R\fR connect:host),
+the \fB-localhost\fR constraint is in effect and the reverse
+connections can only be used to connect to the same
+machine x11vnc is running on (default port 5500).
+Please use a ssh or stunnel port redirection to the
+viewer machine to tunnel the reverse connection over
+an encrypted channel.  Note that Unix username and
+password *will* be prompted for (unlike VNC passwords
+that are skipped for reverse connections).
+.IP
+NOTE: in \fB-inetd\fR mode the two settings are attempted
+to be enforced for reverse connections.  Be sure to
+use encryption from the viewer to inetd since x11vnc
+cannot guess easily if it is encrpyted.  Note: you can
+also have your own stunnel spawn x11vnc in \fB-inetd\fR mode
+(i.e. bypassing inetd).  See the FAQ.
 .IP
 The user names in the comma separated [list] can have
 per-user options after a ":", e.g. "fred:opts"
@@ -588,21 +600,30 @@ options apply to all users.  It also means all users
 are allowed to log in after supplying a valid password.
 Use "deny" to explicitly deny some users if you use
 "*" to set a global option.
+.IP
+There are also some tools for testing password if [list]
+starts with the "%" character.  See the quick_pw()
+function for details.
 .PP
 \fB-unixpw_nis\fR \fI[list]\fR
 .IP
-As \fB-unixpw\fR above, however do not run 
+As \fB-unixpw\fR above, however do not use 
 .IR su (1)
 but rather
-use the traditional getpwnam() + crypt() method instead.
-This requires that the encrpyted passwords be readable.
-Passwords stored in /etc/shadow will be inaccessible
-unless run as root.  This is called "NIS" mode
-simply because in most NIS setups the user encrypted
-passwords are accessible (e.g. "ypcat passwd").
-NIS is not required for this mode to work, but it
-is unlikely it will work for any other environment.
-All of the \fB-unixpw\fR options and contraints apply.
+use the traditional 
+.IR getpwnam (3)
++ 
+.IR crypt (3)
+method
+instead.  This requires that the encrpyted passwords
+be readable.  Passwords stored in /etc/shadow will
+be inaccessible unless run as root.  This is called
+"NIS" mode simply because in most NIS setups the
+user encrypted passwords are accessible (e.g. "ypcat
+passwd").  NIS is not required for this mode to
+work, but it is unlikely it will work for any other
+environment.  All of the \fB-unixpw\fR options and contraints
+apply.
 .PP
 \fB-stunnel\fR \fI[pem]\fR
 .IP
@@ -2163,7 +2184,7 @@ command exits.  You can often use the \fB-query\fR command
 \fB-remote\fR command.
 .IP
 The default communication channel is that of X
-properties (specifically VNC_CONNECT), and so this
+properties (specifically X11VNC_REMOTE), and so this
 command must be run with correct settings for DISPLAY
 and possibly XAUTHORITY to connect to the X server
 and set the property.  Alternatively, use the \fB-display\fR
@@ -2655,9 +2676,9 @@ to the standard output.  If a variable is read-only,
 it comes back with prefix "aro=" instead of "ans=".
 .IP
 Some \fB-remote\fR commands are pure actions that do not make
-sense as variables, e.g. "stop" or "disconnect",
-in these cases the value returned is "N/A".  To direct
-a query straight to the VNC_CONNECT property or connect
+sense as variables, e.g. "stop" or "disconnect", in
+these cases the value returned is "N/A".  To direct a
+query straight to the X11VNC_REMOTE property or connect
 file use "qry=..." instead of "cmd=..."
 .IP
 Here is the current list of "variables" that can
@@ -2762,9 +2783,9 @@ Default: \fB-yesremote\fR
 .IP
 A note about security wrt remote control commands.
 If someone can connect to the X display and change
-the property VNC_CONNECT, then they can remotely
+the property X11VNC_REMOTE, then they can remotely
 control x11vnc.  Normally access to the X display is
-protected.  Note that if they can modify VNC_CONNECT
+protected.  Note that if they can modify X11VNC_REMOTE
 on the X server, they have enough permissions to also
 run their own x11vnc and thus have complete control
 of the desktop.  If the  "\fB-connect\fR \fI/path/to/file\fR"
@@ -2774,9 +2795,9 @@ sure to protect the X display and that file's write
 permissions.  See \fB-privremote\fR below.
 .IP
 If you are paranoid and do not think \fB-noremote\fR is
-enough, to disable the VNC_CONNECT property channel
-completely use \fB-novncconnect,\fR or use the \fB-safer\fR
-option that shuts many things off.
+enough, to disable the X11VNC_REMOTE property channel
+completely use \fB-novncconnect,\fR or use the \fB-safer\fR option
+that shuts many things off.
 .PP
 \fB-unsafe\fR
 .IP

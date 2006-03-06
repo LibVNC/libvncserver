@@ -13,6 +13,7 @@
 #endif
 
 
+void check_stunnel(void);
 int start_stunnel(int stunnel_port, int x11vnc_port);
 void stop_stunnel(void);
 void setup_stunnel(int rport, int *argc, char **argv);

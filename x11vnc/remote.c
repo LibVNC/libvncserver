@@ -55,11 +55,11 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 			perror("fopen");
 			return 1;
 		}
-	} else if (vnc_connect_prop == None) {
-		initialize_vnc_connect_prop();
-		if (vnc_connect_prop == None) {
+	} else if (x11vnc_remote_prop == None) {
+		initialize_x11vnc_remote_prop();
+		if (x11vnc_remote_prop == None) {
 			fprintf(stderr, "send_remote_cmd: could not obtain "
-			    "VNC_CONNECT X property\n");
+			    "X11VNC_REMOTE X property\n");
 			return 1;
 		}
 	}
@@ -71,13 +71,13 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 		fclose(in);
 	} else {
 		fprintf(stderr, ">>> sending remote command: \"%s\" via"
-		    " VNC_CONNECT X property.\n", cmd);
-		set_vnc_connect_prop(cmd);
+		    " X11VNC_REMOTE X property.\n", cmd);
+		set_x11vnc_remote_prop(cmd);
 		XFlush(dpy);
 	}
 
 	if (query || wait) {
-		char line[VNC_CONNECT_MAX];	
+		char line[X11VNC_REMOTE_MAX];	
 		int rc=1, i=0, max=70, ms_sl=50;
 
 		if (!strcmp(cmd, "cmd=stop")) {
@@ -95,7 +95,7 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 					perror("fopen");
 					return 1;
 				}
-				fgets(line, VNC_CONNECT_MAX, in);
+				fgets(line, X11VNC_REMOTE_MAX, in);
 				fclose(in);
 				q = line;
 				while (*q != '\0') {
@@ -103,8 +103,9 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 					q++;
 				}
 			} else {
-				read_vnc_connect_prop();
-				strncpy(line, vnc_connect_str, VNC_CONNECT_MAX);
+				read_x11vnc_remote_prop(1);
+				strncpy(line, x11vnc_remote_str,
+				    X11VNC_REMOTE_MAX);
 			}
 			if (strcmp(cmd, line)){
 				if (query) {
@@ -581,8 +582,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 #if REMOTE_CONTROL
 	char *p = cmd;
 	char *co = "";
-	char buf[VNC_CONNECT_MAX]; 
-	int bufn = VNC_CONNECT_MAX;
+	char buf[X11VNC_REMOTE_MAX]; 
+	int bufn = X11VNC_REMOTE_MAX;
 	int query = 0;
 	static char *prev_cursors_mode = NULL;
 
@@ -617,7 +618,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				strncat(tmp, q, 500);
 				res = process_remote_cmd(tmp, 1);
 				if (res && strlen(buf)+strlen(res)
-				    >= VNC_CONNECT_MAX - 1) {
+				    >= X11VNC_REMOTE_MAX - 1) {
 					rfbLog("overflow in process_remote_cmd:"
 					    " %s -- %s\n", buf, res);
 					free(res);
@@ -3848,7 +3849,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 	} else {
 		if (dpy) {	/* raw_fb hack */
-			set_vnc_connect_prop(buf);
+			set_x11vnc_remote_prop(buf);
 			XFlush(dpy);
 		}
 	}

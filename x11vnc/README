@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat Mar  4 17:57:40 EST 2006
+x11vnc README file                         Date: Mon Mar  6 10:24:41 EST 2006
 
 The following information is taken from these URLs:
 
@@ -5382,7 +5382,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.1 lastmod: 2006-03-04
+x11vnc: allow VNC connections to real X11 displays. 0.8.1 lastmod: 2006-03-06
 
 x11vnc options:
   -display disp            -auth file             
@@ -5495,7 +5495,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.1 lastmod: 2006-03-04
+x11vnc: allow VNC connections to real X11 displays. 0.8.1 lastmod: 2006-03-06
 
 Typical usage is:
 
@@ -5793,8 +5793,9 @@ Options:
 -novncconnect          VNC program vncconnect(1).  When the property is
                        set to "host" or "host:port" establish a reverse
                        connection.  Using xprop(1) instead of vncconnect may
-                       work (see the FAQ).  The -remote control mechanism also
-                       uses this VNC_CONNECT channel.  Default: -vncconnect
+                       work (see the FAQ).  The -remote control mechanism uses
+                       X11VNC_REMOTE channel, and this option disables/enables
+                       it as well.  Default: -vncconnect
 
 -allow host1[,host2..] Only allow client connections from hosts matching
                        the comma separated list of hostnames or IP addresses.
@@ -5909,8 +5910,8 @@ Options:
                        x11vnc as root with the "-users +nobody" option to
                        immediately switch to user nobody.  Another source of
                        problems are PAM modules that prompt for extra info,
-                       e.g. password aging modules.  These logins will always
-                       fail as well.
+                       e.g. password aging modules.  These logins will fail
+                       as well even when the correct password is supplied.
 
                        *IMPORTANT*: to prevent the Unix password being sent in
                        *clear text* over the network, two x11vnc options are
@@ -5937,17 +5938,28 @@ Options:
                        is set and appears reasonable.  If it does, then the
                        stunnel requirement is dropped since it is assumed
                        you are using ssh for the encrypted tunnelling.
-                       Use -stunnel to force stunnel usage.
+                       Use -stunnel to force stunnel usage for this case.
 
                        Set UNIXPW_DISABLE_LOCALHOST=1 to disable the -localhost
                        requirement.  One should never do this (i.e. allow the
                        Unix passwords to be sniffed on the network).
 
-                       NOTE: in -inetd mode the two settings are not enforced
-                       since x11vnc does not make network connections in
-                       that case.  Be sure to use encryption from the viewer
-                       to inetd.  One can also have your own stunnel spawn
-                       x11vnc in -inetd mode.  See the FAQ.
+                       Regarding reverse connections (e.g. -R connect:host),
+                       the -localhost constraint is in effect and the reverse
+                       connections can only be used to connect to the same
+                       machine x11vnc is running on (default port 5500).
+                       Please use a ssh or stunnel port redirection to the
+                       viewer machine to tunnel the reverse connection over
+                       an encrypted channel.  Note that Unix username and
+                       password *will* be prompted for (unlike VNC passwords
+                       that are skipped for reverse connections).
+
+                       NOTE: in -inetd mode the two settings are attempted
+                       to be enforced for reverse connections.  Be sure to
+                       use encryption from the viewer to inetd since x11vnc
+                       cannot guess easily if it is encrpyted.  Note: you can
+                       also have your own stunnel spawn x11vnc in -inetd mode
+                       (i.e. bypassing inetd).  See the FAQ.
 
                        The user names in the comma separated [list] can have
                        per-user options after a ":", e.g. "fred:opts"
@@ -5962,16 +5974,21 @@ Options:
                        Use "deny" to explicitly deny some users if you use
                        "*" to set a global option.
 
--unixpw_nis [list]     As -unixpw above, however do not run su(1) but rather
-                       use the traditional getpwnam() + crypt() method instead.
-                       This requires that the encrpyted passwords be readable.
-                       Passwords stored in /etc/shadow will be inaccessible
-                       unless run as root.  This is called "NIS" mode
-                       simply because in most NIS setups the user encrypted
-                       passwords are accessible (e.g. "ypcat passwd").
-                       NIS is not required for this mode to work, but it
-                       is unlikely it will work for any other environment.
-                       All of the -unixpw options and contraints apply.
+                       There are also some tools for testing password if [list]
+                       starts with the "%" character.  See the quick_pw()
+                       function for details.
+
+-unixpw_nis [list]     As -unixpw above, however do not use su(1) but rather
+                       use the traditional getpwnam(3) + crypt(3) method
+                       instead.  This requires that the encrpyted passwords
+                       be readable.  Passwords stored in /etc/shadow will
+                       be inaccessible unless run as root.  This is called
+                       "NIS" mode simply because in most NIS setups the
+                       user encrypted passwords are accessible (e.g. "ypcat
+                       passwd").  NIS is not required for this mode to
+                       work, but it is unlikely it will work for any other
+                       environment.  All of the -unixpw options and contraints
+                       apply.
 
 -stunnel [pem]         Use the stunnel(1) (www.stunnel.org) to provide
                        an encrypted SSL tunnel between viewers and x11vnc.
@@ -7238,7 +7255,7 @@ n
                        -remote command.
 
                        The default communication channel is that of X
-                       properties (specifically VNC_CONNECT), and so this
+                       properties (specifically X11VNC_REMOTE), and so this
                        command must be run with correct settings for DISPLAY
                        and possibly XAUTHORITY to connect to the X server
                        and set the property.  Alternatively, use the -display
@@ -7520,9 +7537,9 @@ n
                        it comes back with prefix "aro=" instead of "ans=".
 
                        Some -remote commands are pure actions that do not make
-                       sense as variables, e.g. "stop" or "disconnect",
-                       in these cases the value returned is "N/A".  To direct
-                       a query straight to the VNC_CONNECT property or connect
+                       sense as variables, e.g. "stop" or "disconnect", in
+                       these cases the value returned is "N/A".  To direct a
+                       query straight to the X11VNC_REMOTE property or connect
                        file use "qry=..." instead of "cmd=..."
 
                        Here is the current list of "variables" that can
@@ -7621,9 +7638,9 @@ n
 
                        A note about security wrt remote control commands.
                        If someone can connect to the X display and change
-                       the property VNC_CONNECT, then they can remotely
+                       the property X11VNC_REMOTE, then they can remotely
                        control x11vnc.  Normally access to the X display is
-                       protected.  Note that if they can modify VNC_CONNECT
+                       protected.  Note that if they can modify X11VNC_REMOTE
                        on the X server, they have enough permissions to also
                        run their own x11vnc and thus have complete control
                        of the desktop.  If the  "-connect /path/to/file"
@@ -7633,9 +7650,9 @@ n
                        permissions.  See -privremote below.
 
                        If you are paranoid and do not think -noremote is
-                       enough, to disable the VNC_CONNECT property channel
-                       completely use -novncconnect, or use the -safer
-                       option that shuts many things off.
+                       enough, to disable the X11VNC_REMOTE property channel
+                       completely use -novncconnect, or use the -safer option
+                       that shuts many things off.
 
 -unsafe                A few remote commands are disabled by default
                        (currently: id:pick, accept:<cmd>, gone:<cmd>, and

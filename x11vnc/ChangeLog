@@ -1,3 +1,10 @@
+2006-03-06  Karl Runge <runge@karlrunge.com>
+	* x11vnc: switch remote control to X11VNC_REMOTE property.  Put
+	  in -unixpw constraints for reverse connections under -inetd.
+	  -inetd won't quit when reverse conn client leaves. Allow keyboard
+	  input for viewonly -unixpw logins.  "%*" utils for testing
+	  -unixpw.  improve start time fix bugs, small screen in gui.
+
 2006-03-04  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -unixpw on *bsd, hpux and tru64.  Add -unixpw_nis for
 	  non-shadow systems. check stunnel dying.  check SSH_CONNECTION

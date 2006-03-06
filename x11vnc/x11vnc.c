@@ -139,6 +139,7 @@
 #include "rates.h"
 #include "unixpw.h"
 #include "inet.h"
+#include "sslcmds.h"
 
 /*
  * main routine for the x11vnc program
@@ -920,6 +921,8 @@ static void quick_pw(char *str) {
 	 *
 	 * starting "%/" or "%." means read the first line from that file.
 	 *
+	 * "%%" or "%" means prompt user.
+	 *
 	 * otherwise: %user:pass
 	 */
 	if (!strcmp(str, "%-") || !strcmp(str, "%stdin")) {
@@ -932,6 +935,31 @@ static void quick_pw(char *str) {
 			exit(1);
 		}
 		q = strdup(getenv("UNIXPW"));
+	} else if (!strcmp(str, "%%") || !strcmp(str, "%")) {
+		char *t, inp[1024];
+		fprintf(stdout, "username: ");
+		if(fgets(tmp, 128, stdin) == NULL) {
+			exit(1);
+		}
+		strcpy(inp, tmp);
+		t = strchr(inp, '\n');
+		if (t) {
+			*t = ':'; 
+		} else {
+			strcat(inp, ":");
+			
+		}
+		fprintf(stdout, "password: ");
+		system("stty -echo");
+		if(fgets(tmp, 128, stdin) == NULL) {
+			fprintf(stdout, "\n");
+			system("stty echo");
+			exit(1);
+		}
+		system("stty echo");
+		fprintf(stdout, "\n");
+		strcat(inp, tmp);
+		q = strdup(inp);
 	} else if (str[1] == '/' || str[1] == '.') {
 		FILE *in = fopen(str+1, "r");
 		if (in == NULL) {
@@ -1235,6 +1263,10 @@ static void check_loop_mode(int argc, char* argv[]) {
 	}
 }
 
+#define	SHOW_NO_PASSWORD_WARNING \
+	(!got_passwd && !got_rfbauth && (!got_passwdfile || !passwd_list) \
+	    && !query_cmd && !remote_cmd && !unixpw && !got_gui_pw)
+
 int main(int argc, char* argv[]) {
 
 	int i, len, tmpi;
@@ -1244,6 +1276,7 @@ int main(int argc, char* argv[]) {
 	char *remote_cmd = NULL;
 	char *query_cmd  = NULL;
 	char *gui_str = NULL;
+	int got_gui_pw = 0;
 	int pw_loc = -1, got_passwd = 0, got_rfbauth = 0, nopw = NOPW;
 	int got_viewpasswd = 0, got_localhost = 0, got_passwdfile = 0;
 	int got_stunnel = 0;
@@ -1448,7 +1481,7 @@ int main(int argc, char* argv[]) {
 				unixpw_nis = 1;
 			}
 			if (i < argc-1) {
-				char *p, *q, *s = argv[i+1];
+				char *s = argv[i+1];
 				if (s[0] != '-') {
 					unixpw_list = strdup(s);
 					i++;
@@ -1875,6 +1908,9 @@ int main(int argc, char* argv[]) {
 				char *s = argv[i+1];
 				if (*s != '-') {
 					gui_str = strdup(s);
+					if (strstr(gui_str, "setp")) {
+						got_gui_pw = 1;
+					}
 					i++;
 				} 
 			}
@@ -2005,8 +2041,8 @@ int main(int argc, char* argv[]) {
 	}
 	if (launch_gui) {
 		int sleep = 0;
-		if (!got_passwd && !got_rfbauth && !got_passwdfile && !nopw) {
-			sleep = 3;
+		if (SHOW_NO_PASSWORD_WARNING && !nopw) {
+			sleep = 2;
 		}
 		do_gui(gui_str, sleep);
 	}
@@ -2132,8 +2168,7 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	if (!got_passwd && !got_rfbauth && (!got_passwdfile || !passwd_list)
-	    && !query_cmd && !remote_cmd && !unixpw) {
+	if (SHOW_NO_PASSWORD_WARNING) {
 		char message[] = "-rfbauth, -passwdfile, -passwd password, "
 		    "or -unixpw required.";
 		if (! nopw) {
@@ -2834,8 +2869,7 @@ int main(int argc, char* argv[]) {
 	}
 	if (! quiet) {
 		rfbLog("screen setup finished.\n");
-		if (!got_passwd && !got_rfbauth && !got_passwdfile && !unixpw
-		    && !nopw) {
+		if (SHOW_NO_PASSWORD_WARNING && !nopw) {
 			rfbLog("\n");
 			rfbLog("WARNING: You are running x11vnc WITHOUT"
 			    " a password.  See\n");

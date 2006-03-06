@@ -7,6 +7,7 @@ extern int grab_buster;
 extern int sync_tod_delay;
 
 extern void initialize_vnc_connect_prop(void);
+extern void initialize_x11vnc_remote_prop(void);
 extern void spawn_grab_buster(void);
 extern void sync_tod_with_servertime(void);
 extern void check_keycode_state(void);

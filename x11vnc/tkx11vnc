@@ -56,6 +56,30 @@ catch {rename send {}}
 #	-- means add a separator
 #
 
+global env started time_count
+set started ""
+proc dtime {{msg ""}} {
+	global started time_count
+	if {$started == ""} {
+		return
+	}
+	set diff [expr "[exec gtod.bin] - $started"]
+	set diff [format "%.2f" $diff]
+	incr time_count
+	if {$msg == ""} {
+		set msg $time_count
+	}
+	puts -nonewline stderr "$msg $diff " 
+	puts stderr [clock format [clock seconds]]
+}
+
+if [info exists env(X11VNC_GUI_TIME)] {
+	global started time_count
+	set started [exec gtod.bin]
+	set time_count 0
+	dtime "S"
+}
+
 proc set_template {} {
 	global template
 	set template "
@@ -1746,7 +1770,6 @@ proc entry_delete {} {
 
 proc push_new_value {item name new {query 1}} {
 	global menu_var always_update remote_output query_output
-	global delay_sleep extra_sleep extra_sleep_split
 	global query_result_list
 
 	set debug [in_debug_mode]
@@ -2985,7 +3008,6 @@ proc do_var {item} {
 
 	set debug [in_debug_mode]
 
-
 	set string 0
 	if {[is_action $item] || $item == "WindowView"} {
 		# Menu item is action:
@@ -3409,9 +3431,9 @@ proc update_clients_menu {list} {
 	set count 0
 	foreach client [split $list ","] {
 		if {![regexp {^[a-z0-9]*[a-z0-9]:} $client]} {
-			append_text "Skipping client line: "
-			append_text $client
-			append_text "\n"
+			#append_text "Skipping client line: "
+			#append_text $client
+			#append_text "\n"
 			continue
 		}
 		regsub -all {[{}()~!$&*|;'"`{}<>\[\]]} $client "" client
@@ -3978,8 +4000,14 @@ proc do_props {{msg ""}} {
 	global have_labelframes ffont bfont
 	global props_buttons icon_noadvanced
 	global icon_mode icon_mode_at_startup
+	global screen_height screen_width
 
 	check_update_vars
+
+	set pady 1m
+	if {$screen_height <= 360} {
+		set pady 0m
+	}
 
 	if [info exists menu_var(deny)] {
 		if {$menu_var(deny) == $unset_str || $menu_var(deny) == 0} {
@@ -4087,7 +4115,7 @@ proc do_props {{msg ""}} {
 		pack $vp.l -fill x -expand 1 -padx 1m -pady 0m -side top
 	}
 	entry $vp.e -show "*" -textvariable props_viewpasswd -font $bfont
-	pack $vp.e -fill x -expand 1 -padx 1m -pady 1m -side top
+	pack $vp.e -fill x -expand 1 -padx 1m -pady $pady -side top
 
 
 	lappend props_buttons $vp.e
@@ -4102,7 +4130,7 @@ proc do_props {{msg ""}} {
 		pack $pw.l -fill x -expand 1 -padx 1m -pady 0m -side top
 	}
 	entry $pw.e -show "*" -textvariable props_passwd -font $bfont
-	pack $pw.e -fill x -expand 1 -padx 1m -pady 1m -side top
+	pack $pw.e -fill x -expand 1 -padx 1m -pady $pady -side top
 
 	if {! $icon_mode_at_startup} {
 		$vp.e configure -state disabled
@@ -4121,31 +4149,31 @@ proc do_props {{msg ""}} {
 	frame $sh
 	checkbutton $sh.button -text "Shared" \
 		-variable props_shared -anchor w -font $bfont
-	pack $sh.button -fill x -expand 1 -padx 1m -pady 1m
+	pack $sh.button -fill x -expand 1 -padx 1m -pady $pady
 
 	set vo "$w.viewonly"
 	frame $vo
 	checkbutton $vo.button -text "All Clients ViewOnly" \
 		-variable props_viewonly -anchor w -font $bfont
-	pack $vo.button -fill x -expand 1 -padx 1m -pady 1m
+	pack $vo.button -fill x -expand 1 -padx 1m -pady $pady
 
 	set cf "$w.confirm"
 	frame $cf
 	checkbutton $cf.button -text "Ask for Confirmation" \
 		-variable props_confirm -anchor w -font $bfont
-	pack $cf.button -fill x -expand 1 -padx 1m -pady 1m
+	pack $cf.button -fill x -expand 1 -padx 1m -pady $pady
 
 	set ac "$w.accept"
 	frame $ac
 	checkbutton $ac.button -text "Accept Connections" \
 		-variable props_accept -anchor w -font $bfont
-	pack $ac.button -fill x -expand 1 -padx 1m -pady 1m
+	pack $ac.button -fill x -expand 1 -padx 1m -pady $pady
 
 	set px "6m"
-	pack $b1 -side bottom -fill x -pady 1m -padx $px
-	pack $b2 -side bottom -fill x -pady 1m -padx $px
-	pack $vp -side bottom -fill x -pady 1m -padx $px
-	pack $pw -side bottom -fill x -pady 1m -padx $px
+	pack $b1 -side bottom -fill x -pady $pady -padx $px
+	pack $b2 -side bottom -fill x -pady $pady -padx $px
+	pack $vp -side bottom -fill x -pady $pady -padx $px
+	pack $pw -side bottom -fill x -pady $pady -padx $px
 	pack $sh -side bottom -fill x -pady 0m -padx $px
 	pack $vo -side bottom -fill x -pady 0m -padx $px
 	pack $cf -side bottom -fill x -pady 0m -padx $px
@@ -4158,7 +4186,8 @@ proc do_props {{msg ""}} {
 		set ms "$w.msg"
 		text $ms -font $ffont -relief ridge -width $tw -height $th
 		$ms insert 1.0 $msg
-		pack $ms -side bottom -fill x -pady 1m -padx $px
+		pack $ms -side bottom -fill x -pady $pady -padx $px
+		update
 	}
 
 	lappend props_buttons $ac.button $cf.button $vo.button $sh.button
@@ -4346,7 +4375,10 @@ proc read_client_info {channel} {
 				catch {file delete $x11vnc_client_file}
 				set read_client_info_lock 0
 				clean_icon_exit
-			} elseif {$str != "skip"} {
+			} elseif {$str == "skip"} {
+				;
+			} elseif [regexp {^clients:} $str] {
+				regsub {^clients:} $str "" str
 				if {$str == "none"} {
 					set str ""
 				}
@@ -4487,6 +4519,7 @@ proc try_client_info_sock {} {
 	global x11vnc_xdisplay0 menu_var
 
 	set db 0
+#dtime t1
 	set start 13037
 	set tries 100
 	set socket_got_callback 0
@@ -4537,8 +4570,12 @@ proc try_client_info_sock {} {
 		append_text "try_client_info_sock: server socket failed.\n"
 		return
 	}
-	run_remote_cmd [list "-nosync" "-R" "noop"]
-	after 500
+	if {! $x11vnc_started} {
+		run_remote_cmd [list "-nosync" "-R" "noop"]
+		if {$db} {dtime A}
+		after 250
+		if {$db} {dtime A}
+	}
 
 	# set the cookie to some obscured randomness
 	set socket_cookie [clock clicks]
@@ -4557,8 +4594,18 @@ proc try_client_info_sock {} {
 	}
 	run_remote_cmd [list "-nosync" "-R" \
 		"client_info_sock:$myaddr:$port:$socket_cookie"]
+#dtime t2
 	if {$db} {puts "client_info_sock:$myaddr:$port:$socket_cookie"}
-	after 500
+	for {set i 0} {$i < 10} {incr i} {
+		after 50
+		update; update idletasks
+#dtime aa
+		if {$socket_got_callback != 0} {
+#puts "break-"
+			break
+		}
+	}
+#dtime t3
 
 	set aftid ""
 	if {$socket_got_callback == 0} {
@@ -4576,6 +4623,7 @@ proc try_client_info_sock {} {
 	} else {
 		setup_client_sock 1
 	}
+#dtime t4
 }
 
 proc set_icon_label {} {
@@ -5022,10 +5070,14 @@ proc make_widgets {top} {
 	global helptext helpremote helplabel
 	global icon_mode icon_win props_win full_win
 	global top_widget_names
+	global screen_height screen_width
 
 
 	# Make the top label
 	set label_width 80
+	if {$screen_width <= 400} {
+		set label_width 64
+	}
 	set info_label "$top.info"
 	label $info_label -textvariable info_str -bd 2 -relief groove \
 		-anchor w -width $label_width -font $ffont
@@ -5124,8 +5176,14 @@ proc make_widgets {top} {
 	pack $df -side top -fill x
 
 	# text area
+	global text_height
 	set text_area "$top.text"
-	text $text_area -height 12 -relief ridge -font $ffont
+	if {$screen_width <= 400} {
+		text $text_area -height $text_height -width $label_width \
+			-relief ridge -font $ffont
+	} else {
+		text $text_area -height $text_height -relief ridge -font $ffont
+	}
 	pack $text_area -side top -fill both -expand 1
 	set top_widget_names(text) $text_area
 
@@ -5694,6 +5752,24 @@ proc run_remote_cmd_via_sock {opts} {
 		if {$db} {puts stderr "run_remote_cmd_via_sock: \"$res\""}
 		set res [string trim $res]
 
+		if [regexp {^clients:} $res] {
+			regsub {^clients:} $res "" tmp
+			if {$tmp == "none"} {
+				set tmp ""
+			}
+			update_clients_menu $tmp
+			set client_str $tmp
+			set_client_balloon $tmp
+
+			if ![regexp {^clients} $opt] {
+				# we could block here...
+				if {$db} {puts stderr "run_remote_cmd_via_sock: gets"}
+				gets $client_sock res
+				if {$db} {puts stderr "run_remote_cmd_via_sock: \"$res\""}
+				set res [string trim $res]
+			}
+		}
+
 		set docmd ""
 
 		if {$res != ""} {
@@ -5806,6 +5882,7 @@ proc try_connect {} {
 	global menu_var unset_str
 
 	set db 0
+#dtime c1
 
 	if {! $connected_to_x11vnc} {
 		if {[info exists menu_var(display)]} {
@@ -5820,6 +5897,7 @@ proc try_connect {} {
 	set_info "Pinging $x11vnc_xdisplay ..."
 	set rargs [list "-Q" "ping"]
 	set result [run_remote_cmd $rargs]
+#dtime c2a
 
 	if {$db} {puts "try_connect: \"$result\""}
 
@@ -5831,10 +5909,12 @@ proc try_connect {} {
 		set_connected yes
 
 		setup_client_channel
+#dtime c2b
 		setup_client_sock 1
 		setup_client_tail
 
 		fetch_displays
+#dtime c3a
 		return 1
 	} else {
 		set str "x11vnc server."
@@ -6007,6 +6087,10 @@ proc undo_tray_embed {} {
 ############################################################################
 # main:
 
+if [info exists env(X11VNC_GUI_TIME)] {
+	dtime M
+}
+
 wm withdraw .
 
 global env x11vnc_prog x11vnc_cmdline x11vnc_xdisplay x11vnc_connect;
@@ -6017,10 +6101,10 @@ global x11vnc_auth_file x11vnc_connect_file beginner_mode simple_gui_created
 global helpall helptext helpremote helplabel hostname osname
 global all_settings reply_xdisplay always_update
 global max_text_height max_text_width
+global text_height
 global menu_var unset_str menus_disabled
 global bfont ffont sfont snfont old_labels have_labelframes
 global connected_to_x11vnc
-global delay_sleep extra_sleep extra_sleep_split
 global cache_all_query_vars
 global last_query_all_time query_all_freq client_tail client_sock client_info_read
 global icon_mode icon_mode_at_startup
@@ -6028,6 +6112,7 @@ global tray_embed tray_running icon_setpasswd icon_embed_id
 global icon_noadvanced icon_minimal
 global make_gui_count text_area_str
 global gui_argv0 gui_start_mode
+global screen_height screen_width
 
 set unset_str "(unset)"
 set vnc_url $unset_str
@@ -6035,6 +6120,7 @@ set connected_to_x11vnc 0
 set menus_disabled 0
 set max_text_height 40
 set max_text_width 90
+set text_height 14
 set bfont "-adobe-helvetica-bold-r-*-*-*-120-*-*-*-*-*-*"
 set sfont "-adobe-helvetica-bold-r-*-*-*-100-*-*-*-*-*-*"
 set snfont "-adobe-helvetica-medium-r-*-*-*-100-*-*-*-*-*-*"
@@ -6054,11 +6140,6 @@ set text_area_str ""
 set gui_argv0 $argv0
 set gui_start_mode ""
 
-# these are no longer used under x11vnc -sync:
-set delay_sleep 350
-set extra_sleep 1000
-set extra_sleep_split 4
-
 if {$tk_version < 8.0} {
 	puts stderr ""
 	puts stderr "*** tkx11vnc: tk version is old $tk_version, please use 8.0 or higher."
@@ -6075,6 +6156,19 @@ if {$tk_version < 8.4} {
 	set have_labelframes 0
 }
 
+set screen_height [winfo screenheight .]
+set screen_width  [winfo screenwidth  .]
+if {$screen_height < 500} {
+	# short screen, PDA?
+	set max_text_height 22
+	set text_height 13
+	if {$screen_height <= 360} {
+		# very short.
+		set max_text_height 16
+		set max_text_width  60
+		set text_height 11
+	}
+}
 if {[info exists env(X11VNC_GUI_TEXT_HEIGHT)]} {
 	set max_text_height $env(X11VNC_GUI_TEXT_HEIGHT)
 }
@@ -6130,7 +6224,7 @@ if {[info exists env(X11VNC_CLIENT_FILE)]} {
 	if {$client_tail != ""} {
 		gets $client_tail tmp
 		if [eof $client_tail] {
-puts "eof $client_tail"
+#puts "eof $client_tail"
 			clean_client_tail
 			set client_tail ""
 		}
@@ -6299,25 +6393,29 @@ key_bindings;
 
 get_default_vars
 
+dtime D
+
 if {$icon_mode} {
 	if {$tray_embed} {
 		make_gui "tray"
 	} else {
 		make_gui "icon"
 	}
+	dtime G
 	old_balloon
 	if {$icon_setpasswd} {
-		set m "You must specify a Session\n" 
-		set m "${m}Password before VNC clients can\n" 
-		set m "${m}connect. Enter one in the Password\n" 
-		set m "${m}field and then Press \"OK\". This\n" 
-		set m "${m}password is not stored, it is only\n" 
-		set m "${m}used for this x11vnc session.\n" 
+		set m "You must specify a Session Password\n" 
+		set m "${m}before VNC clients can connect.\n" 
+		set m "${m}Enter one in the Password field\n" 
+		set m "${m}and Press \"OK\". The password(s) is\n" 
+		set m "${m}only for this x11vnc session.\n" 
 		do_props $m
-		push_new_value "unlock" "unlock" 1 0
+		#push_new_value "unlock" "unlock" 1 0
 	}
 } else {
 	make_gui "full"
+	dtime G
 }
+
 
 # main loop.

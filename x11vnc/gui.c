@@ -22,6 +22,7 @@ int tray_manager_ok = 0;
 Window tray_request = None;
 Window tray_window = None;
 int tray_unembed = 0;
+pid_t run_gui_pid = 0;
 
 
 char *get_gui_code(void);
@@ -183,6 +184,12 @@ static char *icon_mode_embed_id = NULL;
 static char *icon_mode_font = NULL;
 static char *icon_mode_params = NULL;
 
+static int got_sigusr1 = 0;
+
+static void sigusr1 (int sig) {
+	got_sigusr1 = 1;
+}
+
 static void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int start_x11vnc,
     int simple_gui, pid_t parent, char *gui_opts) {
 	char *x11vnc_xdisplay = NULL;
@@ -191,10 +198,11 @@ static void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int start_x11vnc,
 	char cmd[100];
 	char *wish = NULL, *orig_path, *full_path, *tpath, *p;
 	char *old_xauth = NULL;
-	int try_max = 4, sleep = 300;
+	int try_max = 4, sleep = 300, totms;
 	pid_t mypid = getpid();
 	FILE *pipe, *tmpf;
 
+if (0) fprintf(stderr, "run_gui: %s -- %d %d\n", gui_xdisplay, connect_to_x11vnc, (int) parent);
 	if (*gui_code == '\0') {
 		rfbLog("gui: gui not compiled into this program.\n");
 		exit(0);
@@ -234,21 +242,44 @@ static void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int start_x11vnc,
 			scr = DefaultScreen(dpy);
 			rootwin = RootWindow(dpy, scr);
 			initialize_vnc_connect_prop();
+			initialize_x11vnc_remote_prop();
 		}
-		usleep(2200*1000);
-		fprintf(stderr, "\n");
-		if (!quiet) {
+		
+		signal(SIGUSR1, sigusr1);
+		got_sigusr1 = 0;
+		totms = 0;
+		while (totms < 3500) {
+			usleep(50*1000);
+			totms += 50;
+			if (got_sigusr1) {
+				fprintf(stderr, "\n");
+				if (! quiet) rfbLog("gui: got SIGUSR1\n");
+				break;
+			}
+			if (! start_x11vnc && totms >= 150) {
+				break;
+			}
+		}
+		signal(SIGUSR1, SIG_DFL);
+		if (! got_sigusr1) fprintf(stderr, "\n");
+
+		if (!quiet && ! got_sigusr1) {
 			rfbLog("gui: trying to contact a x11vnc server at X"
 			    " display %s ...\n", NONUL(x11vnc_xdisplay));
 		}
+
 		for (i=0; i<try_max; i++) {
-			usleep(sleep*1000);
-			if (!quiet) {
-				rfbLog("gui: pinging %s try=%d ...\n",
-				    NONUL(x11vnc_xdisplay), i+1);
-			}
-			rc = send_remote_cmd("qry=ping", 1, 1);
-			if (rc == 0) {
+			if (! got_sigusr1) {
+				if (!quiet) {
+					rfbLog("gui: pinging %s try=%d ...\n",
+					    NONUL(x11vnc_xdisplay), i+1);
+				}
+				rc = send_remote_cmd("qry=ping", 1, 1);
+				if (rc == 0) {
+					break;
+				}
+			} else {
+				rc = 0;
 				break;
 			}
 			if (parent && mypid != parent && kill(parent, 0) != 0) {
@@ -257,6 +288,7 @@ static void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int start_x11vnc,
 				rc = 1;
 				break;
 			}
+			usleep(sleep*1000);
 		}
 		set_env("X11VNC_XDISPLAY", x11vnc_xdisplay);
 		if (getenv("XAUTHORITY") != NULL) {
@@ -618,6 +650,9 @@ void do_gui(char *opts, int sleep) {
 			run_gui(gui_xdisplay, connect_to_x11vnc, start_x11vnc,
 			    simple_gui, parent, opts);
 			exit(1);
+		}
+		if (connect_to_x11vnc) {
+			run_gui_pid = p;
 		}
 #else
 		fprintf(stderr, "system does not support fork: start "

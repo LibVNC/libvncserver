@@ -54,6 +54,7 @@ static void set_db(void);
 static void unixpw_verify(char *user, char *pass);
 
 int unixpw_in_progress = 0;
+int unixpw_login_viewonly = 0;
 time_t unixpw_last_try_time = 0;
 rfbClientPtr unixpw_client = NULL;
 
@@ -975,6 +976,9 @@ static void apply_opts (char *user) {
 void unixpw_accept(char *user) {
 	apply_opts(user);
 
+	if (unixpw_login_viewonly) {
+		unixpw_client->viewOnly = TRUE;
+	}
 	unixpw_in_progress = 0;
 	unixpw_client = NULL;
 	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);

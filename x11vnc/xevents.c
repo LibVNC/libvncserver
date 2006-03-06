@@ -18,6 +18,7 @@ int grab_buster = 0;
 int sync_tod_delay = 3;
 
 void initialize_vnc_connect_prop(void);
+void initialize_x11vnc_remote_prop(void);
 void spawn_grab_buster(void);
 void sync_tod_with_servertime(void);
 void check_keycode_state(void);
@@ -39,10 +40,16 @@ void initialize_vnc_connect_prop(void) {
 	vnc_connect_prop = XInternAtom(dpy, "VNC_CONNECT", False);
 }
 
+void initialize_x11vnc_remote_prop(void) {
+	x11vnc_remote_str[0] = '\0';
+	x11vnc_remote_prop = XInternAtom(dpy, "X11VNC_REMOTE", False);
+}
+
 static void initialize_xevents(void) {
 	static int did_xselect_input = 0;
 	static int did_xcreate_simple_window = 0;
 	static int did_vnc_connect_prop = 0;
+	static int did_x11vnc_remote_prop = 0;
 	static int did_xfixes = 0;
 	static int did_xdamage = 0;
 	static int did_xrandr = 0;
@@ -74,6 +81,14 @@ static void initialize_xevents(void) {
 	if (vnc_connect && !did_vnc_connect_prop) {
 		initialize_vnc_connect_prop();
 		did_vnc_connect_prop = 1;
+	}
+	if (vnc_connect && !did_x11vnc_remote_prop) {
+		initialize_x11vnc_remote_prop();
+		did_x11vnc_remote_prop = 1;
+	}
+	if (run_gui_pid > 0) {
+		kill(run_gui_pid, SIGUSR1);
+		run_gui_pid = 0;
 	}
 	if (xfixes_present && use_xfixes && !did_xfixes) {
 		initialize_xfixes();
@@ -744,11 +759,16 @@ void check_xevents(void) {
 				set_cutbuffer = 0;
 			} else if (vnc_connect && vnc_connect_prop != None
 		    	    && xev.xproperty.atom == vnc_connect_prop) {
-	
 				/*
 				 * Go retrieve VNC_CONNECT string.
 				 */
-				read_vnc_connect_prop();
+				read_vnc_connect_prop(0);
+			} else if (vnc_connect && x11vnc_remote_prop != None
+		    	    && xev.xproperty.atom == x11vnc_remote_prop) {
+				/*
+				 * Go retrieve X11VNC_REMOTE string.
+				 */
+				read_x11vnc_remote_prop(0);
 			}
 		}
 	}

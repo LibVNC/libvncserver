@@ -19,6 +19,9 @@
 /* string for the VNC_CONNECT property */
 char vnc_connect_str[VNC_CONNECT_MAX+1];
 Atom vnc_connect_prop = None;
+char x11vnc_remote_str[X11VNC_REMOTE_MAX+1];
+Atom x11vnc_remote_prop = None;
+rfbClientPtr inetd_client = NULL;
 
 int all_clients_initialized(void);
 char *list_clients(void);
@@ -29,7 +32,9 @@ void set_client_input(char *str);
 void set_child_info(void);
 void reverse_connect(char *str);
 void set_vnc_connect_prop(char *str);
-void read_vnc_connect_prop(void);
+void read_vnc_connect_prop(int);
+void set_x11vnc_remote_prop(char *str);
+void read_x11vnc_remote_prop(int);
 void check_connect_inputs(void);
 void check_gui_inputs(void);
 enum rfbNewClientAction new_client(rfbClientPtr client);
@@ -604,8 +609,8 @@ static void client_gone(rfbClientPtr client) {
 
 	free_client_data(client);
 
-	if (inetd) {
-		rfbLog("viewer exited.\n");
+	if (inetd && client == inetd_client) {
+		rfbLog("inetd viewer exited.\n");
 		clean_up_exit(0);
 	}
 	if (connect_once) {
@@ -1463,6 +1468,21 @@ static int do_reverse_connect(char *str) {
 		*p = '\0';
 	}
 
+	if (inetd && unixpw) {
+	    if(strcmp(host, "localhost") && strcmp(host, "127.0.0.1")) {
+		if (! getenv("UNIXPW_DISABLE_LOCALHOST")) {
+			rfbLog("reverse_connect: in -inetd only localhost\n");
+			rfbLog("connections allowed under -unixpw\n");
+			return 0;
+		}
+	    }
+		if (! getenv("UNIXPW_DISABLE_STUNNEL") && ! have_ssh_env()) {
+			rfbLog("reverse_connect: in -inetd stunnel/ssh\n");
+			rfbLog("required under -unixpw\n");
+			return 0;
+		}
+	}
+
 	cl = rfbReverseConnection(screen, host, rport);
 	free(host);
 
@@ -1529,15 +1549,20 @@ void reverse_connect(char *str) {
 }
 
 /*
- * Routines for monitoring the VNC_CONNECT property for changes.
- * The vncconnect(1) will set it on our X display.
+ * Routines for monitoring the VNC_CONNECT and X11VNC_REMOTE properties
+ * for changes.  The vncconnect(1) will set it on our X display.
  */
 void set_vnc_connect_prop(char *str) {
 	XChangeProperty(dpy, rootwin, vnc_connect_prop, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *)str, strlen(str));
 }
 
-void read_vnc_connect_prop(void) {
+void set_x11vnc_remote_prop(char *str) {
+	XChangeProperty(dpy, rootwin, x11vnc_remote_prop, XA_STRING, 8,
+	    PropModeReplace, (unsigned char *)str, strlen(str));
+}
+
+void read_vnc_connect_prop(int nomsg) {
 	Atom type;
 	int format, slen, dlen;
 	unsigned long nitems = 0, bytes_after = 0;
@@ -1575,28 +1600,73 @@ void read_vnc_connect_prop(void) {
 	} while (bytes_after > 0);
 
 	vnc_connect_str[VNC_CONNECT_MAX] = '\0';
-	if (! db) {
+	if (! db || nomsg) {
 		;
-	} else if (strstr(vnc_connect_str, "ans=stop:N/A,ans=quit:N/A,ans=")) {
-		;
-	} else if (strstr(vnc_connect_str, "qry=stop,quit,exit")) {
-		;
-	} else if (strstr(vnc_connect_str, "ack=") == vnc_connect_str) {
-		;
-	} else if (quiet && strstr(vnc_connect_str, "qry=ping") ==
-	    vnc_connect_str) {
-		;
-	} else if (strstr(vnc_connect_str, "cmd=") &&
-	    strstr(vnc_connect_str, "passwd")) {
-		rfbLog("read VNC_CONNECT: *\n");
-	} else if (strlen(vnc_connect_str) > 38) {
-		char trim[100]; 
-		trim[0] = '\0';
-		strncat(trim, vnc_connect_str, 38);
-		rfbLog("read VNC_CONNECT: %s ...\n", trim);
-		
 	} else {
 		rfbLog("read VNC_CONNECT: %s\n", vnc_connect_str);
+	}
+}
+
+void read_x11vnc_remote_prop(int nomsg) {
+	Atom type;
+	int format, slen, dlen;
+	unsigned long nitems = 0, bytes_after = 0;
+	unsigned char* data = NULL;
+	int db = 1;
+
+	x11vnc_remote_str[0] = '\0';
+	slen = 0;
+
+	if (! vnc_connect || x11vnc_remote_prop == None) {
+		/* not active or problem with X11VNC_REMOTE atom */
+		return;
+	}
+
+	/* read the property value into x11vnc_remote_str: */
+	do {
+		if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
+		    x11vnc_remote_prop, nitems/4, X11VNC_REMOTE_MAX/16, False,
+		    AnyPropertyType, &type, &format, &nitems, &bytes_after,
+		    &data) == Success) {
+
+			dlen = nitems * (format/8);
+			if (slen + dlen > X11VNC_REMOTE_MAX) {
+				/* too big */
+				rfbLog("warning: truncating large X11VNC_REMOTE"
+				   " string > %d bytes.\n", X11VNC_REMOTE_MAX);
+				XFree(data);
+				break;
+			}
+			memcpy(x11vnc_remote_str+slen, data, dlen);
+			slen += dlen;
+			x11vnc_remote_str[slen] = '\0';
+			XFree(data);
+		}
+	} while (bytes_after > 0);
+
+	x11vnc_remote_str[X11VNC_REMOTE_MAX] = '\0';
+	if (! db || nomsg) {
+		;
+	} else if (strstr(x11vnc_remote_str, "ans=stop:N/A,ans=quit:N/A,ans=")) {
+		;
+	} else if (strstr(x11vnc_remote_str, "qry=stop,quit,exit")) {
+		;
+	} else if (strstr(x11vnc_remote_str, "ack=") == x11vnc_remote_str) {
+		;
+	} else if (quiet && strstr(x11vnc_remote_str, "qry=ping") ==
+	    x11vnc_remote_str) {
+		;
+	} else if (strstr(x11vnc_remote_str, "cmd=") &&
+	    strstr(x11vnc_remote_str, "passwd")) {
+		rfbLog("read X11VNC_REMOTE: *\n");
+	} else if (strlen(x11vnc_remote_str) > 38) {
+		char trim[100]; 
+		trim[0] = '\0';
+		strncat(trim, x11vnc_remote_str, 38);
+		rfbLog("read X11VNC_REMOTE: %s ...\n", trim);
+		
+	} else {
+		rfbLog("read X11VNC_REMOTE: %s\n", x11vnc_remote_str);
 	}
 }
 
@@ -1643,6 +1713,13 @@ void check_connect_inputs(void) {
 		vnc_connect_str[0] = '\0';
 	}
 	send_client_connect();
+
+	/* X11VNC_REMOTE property */
+	if (vnc_connect && *x11vnc_remote_str != '\0') {
+		client_connect = strdup(x11vnc_remote_str);
+		x11vnc_remote_str[0] = '\0';
+	}
+	send_client_connect();
 }
 
 void check_gui_inputs(void) {
@@ -1650,7 +1727,7 @@ void check_gui_inputs(void) {
 	int socks[ICON_MODE_SOCKS];
 	fd_set fds;
 	struct timeval tv;
-	char buf[VNC_CONNECT_MAX+1];
+	char buf[X11VNC_REMOTE_MAX+1];
 	ssize_t nbytes;
 
 	if (unixpw_in_progress) return;
@@ -1686,10 +1763,10 @@ void check_gui_inputs(void) {
 		if (! FD_ISSET(fd, &fds)) {
 			continue;
 		}
-		for (k=0; k<=VNC_CONNECT_MAX; k++) {
+		for (k=0; k<=X11VNC_REMOTE_MAX; k++) {
 			buf[k] = '\0';
 		}
-		nbytes = read(fd, buf, VNC_CONNECT_MAX);
+		nbytes = read(fd, buf, X11VNC_REMOTE_MAX);
 		if (nbytes <= 0) {
 			close(fd);
 			icon_mode_socks[socks[i]] = -1;
@@ -1726,15 +1803,20 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	last_event = last_input = time(0);
 
+
 	if (inetd) {
 		/* 
 		 * Set this so we exit as soon as connection closes,
 		 * otherwise client_gone is only called after RFB_CLIENT_ACCEPT
 		 */
-		client->clientGoneHook = client_gone;
+		if (inetd_client == NULL) {
+			inetd_client = client;
+			client->clientGoneHook = client_gone;
+		}
 	}
 
 	clients_served++;
+if (0) fprintf(stderr, "new_client: %s %d\n", client->host, clients_served);
 
 	if (unixpw && unixpw_in_progress) {
 		rfbLog("denying additional client: %s during -unixpw login.\n",
@@ -1822,6 +1904,11 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	if (unixpw) {
 		unixpw_in_progress = 1;
 		unixpw_client = client;
+		unixpw_login_viewonly = 0;
+		if (client->viewOnly) {
+			unixpw_login_viewonly = 1;
+			client->viewOnly = FALSE;
+		}
 		unixpw_last_try_time = time(0);
 		unixpw_screen(1);
 		unixpw_keystroke(0, 0, 1);
@@ -1926,6 +2013,7 @@ void send_client_info(char *str) {
 	strcat(pstr, "\n");
 
 	if (icon_mode_fh) {
+		if (0) fprintf(icon_mode_fh, "\n");
 		fprintf(icon_mode_fh, "%s", pstr);
 		fflush(icon_mode_fh);
 	}
@@ -1940,6 +2028,7 @@ void send_client_info(char *str) {
 
 		len = strlen(pstr);
 		while (len > 0) {
+			if (0) write(sock, "\n", 1);
 			n = write(sock, buf, len);
 			if (n > 0) {
 				buf += n;
@@ -1965,7 +2054,11 @@ void check_new_clients(void) {
 	int run_after_accept = 0;
 
 	if (unixpw_in_progress) {
-		if (time(0) > unixpw_last_try_time + 30) {
+		if (unixpw_client && unixpw_client->viewOnly) {
+			unixpw_login_viewonly = 1;
+			unixpw_client->viewOnly = FALSE;
+		}
+		if (time(0) > unixpw_last_try_time + 25) {
 			rfbLog("unixpw_deny: timed out waiting for reply.\n");
 			unixpw_deny();
 		}
@@ -1992,7 +2085,7 @@ void check_new_clients(void) {
 		return;
 	}
 	if (! client_count) {
-		send_client_info("none");
+		send_client_info("clients:none");
 		return;
 	}
 
@@ -2037,9 +2130,12 @@ void check_new_clients(void) {
 		}
 	}
 	if (send_info) {
-		char *str = list_clients();
+		char *str, *s = list_clients();
+		str = (char *) malloc(strlen("clients:") + strlen(s) + 1);
+		sprintf(str, "clients:%s", s);
 		send_client_info(str);
 		free(str);
+		free(s);
 	}
 }
 

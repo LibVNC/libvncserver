@@ -11,6 +11,7 @@ extern int su_verify(char *user, char *pass);
 extern int crypt_verify(char *user, char *pass);
 
 extern int unixpw_in_progress;
+extern int unixpw_login_viewonly;
 extern time_t unixpw_last_try_time;
 extern rfbClientPtr unixpw_client;
 
