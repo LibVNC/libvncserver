@@ -37,9 +37,10 @@
 
 /****************************************************************************/
 
-/* Build-time customization via CPPFLAGS. */
 
 /*
+ * Build-time customization via CPPFLAGS.
+ *
  * Summary of options to include in CPPFLAGS for custom builds:
  *
  * -DVNCSHARED  to have the vnc display shared by default.
@@ -63,6 +64,7 @@
  * -DWIREFRAME_PARMS=...   set default -wirecopyrect parameters.
  * -DSCROLL_COPYRECT=0     to have -noscrollcopyrect as the default.
  * -DSCROLL_COPYRECT_PARMS=...  set default -scrollcopyrect parameters.
+ * -DSCALING_COPYRECT=0
  * -DXDAMAGE=0    to have -noxdamage as the default.
  * -DSKIPDUPS=0   to have -noskip_dups as the default or vice versa.
  *
@@ -71,6 +73,8 @@
  * -DSMALL_FOOTPRINT=1  for smaller binary size (no help, no gui, etc) 
  *                      use 2 or 3 for even smaller footprint.
  * -DNOGUI  do not include the gui tkx11vnc.
+ * -DPOLL_8TO24_DELAY=N  
+ * -DDEBUG_XEVENTS=1  enable printout for X events.
  *
  * Set these in CPPFLAGS before running configure. E.g.:
  *

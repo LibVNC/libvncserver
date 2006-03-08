@@ -140,6 +140,7 @@
 #include "unixpw.h"
 #include "inet.h"
 #include "sslcmds.h"
+#include "selection.h"
 
 /*
  * main routine for the x11vnc program
@@ -950,6 +951,7 @@ static void quick_pw(char *str) {
 			
 		}
 		fprintf(stdout, "password: ");
+		/* no_external_cmds does not apply */
 		system("stty -echo");
 		if(fgets(tmp, 128, stdin) == NULL) {
 			fprintf(stdout, "\n");
@@ -1241,6 +1243,7 @@ static void check_loop_mode(int argc, char* argv[]) {
 				perror("fork");
 				exit(1);
 			} else {
+				/* no_external_cmds does not apply */
 				execvp(argv[0], argv2); 
 				exit(1);
 			}
@@ -1261,6 +1264,91 @@ static void check_loop_mode(int argc, char* argv[]) {
 		exit(1);
 #endif
 	}
+}
+static void store_homedir_passwd(void) {
+	char str1[32], str2[32], *p, *h, *f;
+	struct stat sbuf;
+
+	str1[0] = '\0';
+	str2[0] = '\0';
+
+	if (no_external_cmds) {
+		fprintf(stderr, "-nocmds cannot be used with -storepasswd\n");
+		exit(1);
+	}
+
+	fprintf(stderr, "Enter VNC password: ");
+	system("stty -echo");
+	if (fgets(str1, 32, stdin) == NULL) {
+		system("stty echo");
+		exit(1);
+	}
+	fprintf(stderr, "\n");
+
+	fprintf(stderr, "Verify password:    ");
+	if (fgets(str2, 32, stdin) == NULL) {
+		system("stty echo");
+		exit(1);
+	}
+	fprintf(stderr, "\n");
+	system("stty echo");
+
+	if ((p = strchr(str1, '\n')) != NULL) {
+		*p = '\0';
+	}
+	if ((p = strchr(str2, '\n')) != NULL) {
+		*p = '\0';
+	}
+	if (strcmp(str1, str2)) {
+		fprintf(stderr, "** passwords differ.\n");
+		exit(1);
+	}
+	if (str1[0] == '\0') {
+		fprintf(stderr, "** no password supplied.\n");
+		exit(1);
+	}
+
+	h = getenv("HOME");
+	if (! h) {
+		fprintf(stderr, "** $HOME not set.\n");
+		exit(1);
+	}
+
+	f = (char *) malloc(strlen(h) + strlen("/.vnc/passwd") + 1);
+	sprintf(f, "%s/.vnc", h);
+
+	if (stat(f, &sbuf) != 0) {
+		if (mkdir(f, 0755) != 0) {
+			fprintf(stderr, "** could not create directory %s\n", f);
+			perror("mkdir");
+			exit(1);
+		}
+	} else if (! S_ISDIR(sbuf.st_mode)) {
+		fprintf(stderr, "** not a directory %s\n", f);
+		exit(1);
+	}
+
+	sprintf(f, "%s/.vnc/passwd", h);
+	fprintf(stderr, "Write password to %s?  [y]/n ", f);
+
+	if (fgets(str2, 32, stdin) == NULL) {
+		exit(1);
+	}
+	if (str2[0] == 'n' || str2[0] == 'N') {
+		fprintf(stderr, "not creating password.\n");
+		exit(1);
+	}
+
+	if (rfbEncryptAndStorePasswd(str1, f) != 0) {
+		fprintf(stderr, "** error creating password.\n");
+		perror("storepasswd");
+		exit(1);
+	}
+	fprintf(stderr, "Password written to: %s\n", f);
+	if (stat(f, &sbuf) != 0) {
+		exit(1);
+	}
+	exit(0);
 }
 
 #define	SHOW_NO_PASSWORD_WARNING \
@@ -1284,6 +1372,7 @@ int main(int argc, char* argv[]) {
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0;
 	int got_httpdir = 0, try_http = 0;
+	int usepw = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc = 1; char *argv_vnc[128];
@@ -1519,7 +1608,13 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-nopw")) {
 			nopw = 1;
+		} else if (!strcmp(arg, "-usepw")) {
+			usepw = 1;
 		} else if (!strcmp(arg, "-storepasswd")) {
+			if (i+1 >= argc) {
+				store_homedir_passwd();
+				exit(0);
+			}
 			if (i+2 >= argc || rfbEncryptAndStorePasswd(argv[i+1],
 			    argv[i+2]) != 0) {
 				fprintf(stderr, "-storepasswd failed\n");
@@ -1667,8 +1762,15 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-nosel")) {
 			watch_selection = 0;
 			watch_primary = 0;
+			watch_clipboard = 0;
 		} else if (!strcmp(arg, "-noprimary")) {
 			watch_primary = 0;
+		} else if (!strcmp(arg, "-nosetprimary")) {
+			set_primary = 0;
+		} else if (!strcmp(arg, "-noclipboard")) {
+			watch_clipboard = 0;
+		} else if (!strcmp(arg, "-nosetclipboard")) {
+			set_clipboard = 0;
 		} else if (!strcmp(arg, "-seldir")) {
 			CHECK_ARGC
 			sel_direction = strdup(argv[++i]);
@@ -1890,6 +1992,8 @@ int main(int argc, char* argv[]) {
 			debug_tiles++;
 		} else if (!strcmp(arg, "-debug_grabs")) {
 			debug_grabs++;
+		} else if (!strcmp(arg, "-debug_sel")) {
+			debug_sel++;
 		} else if (!strcmp(arg, "-grab_buster")) {
 			grab_buster++;
 		} else if (!strcmp(arg, "-nograb_buster")) {
@@ -2107,6 +2211,83 @@ int main(int argc, char* argv[]) {
 			fflush(stdout);
 			exit(rc);
 		}
+	}
+
+	if (usepw && ! got_rfbauth && ! got_passwd && ! got_passwdfile) {
+		char *f, *h = getenv("HOME");
+		struct stat sbuf;
+		int found = 0, set_rfbauth = 0;
+
+		if (!h) {
+			rfbLog("HOME unset in -usepw mode.\n");
+			exit(1);
+		}
+		f = (char *) malloc(strlen(h)+strlen("/.vnc/passwdfile") + 1);
+
+		sprintf(f, "%s/.vnc/passwd", h);
+		if (stat(f, &sbuf) == 0) {
+			found = 1;
+			if (! quiet) {
+				rfbLog("-usepw: found %s\n", f);
+			}
+			got_rfbauth = 1;
+			set_rfbauth = 1;
+		}
+
+		sprintf(f, "%s/.vnc/passwdfile", h);
+		if (! found && stat(f, &sbuf) == 0) {
+			found = 1;
+			if (! quiet) {
+				rfbLog("-usepw: found %s\n", f);
+			}
+			got_passwdfile = 1;
+			passwdfile = strdup(f);
+		}
+
+#if LIBVNCSERVER_HAVE_FORK
+#if LIBVNCSERVER_HAVE_SYS_WAIT_H
+#if LIBVNCSERVER_HAVE_WAITPID
+		if (! found) {
+			pid_t pid = fork();
+			if (pid < 0) {
+				;
+			} else if (pid == 0) {
+				execlp(argv[0], argv[0], "-storepasswd",
+				    (char *) NULL);
+				exit(1);
+			} else {
+				int s;
+				waitpid(pid, &s, 0); 
+				if (WIFEXITED(s) && WEXITSTATUS(s) == 0) {
+					got_rfbauth = 1;
+					set_rfbauth = 1;
+					found = 1;
+				}
+			}
+		}
+#endif
+#endif
+#endif
+
+		if (set_rfbauth) {
+			sprintf(f, "%s/.vnc/passwd", h);
+			if (argc_vnc < 100) {
+				argv_vnc[argc_vnc++] = strdup("-rfbauth");
+			} else {
+				exit(1);
+			}
+			if (argc_vnc < 100) {
+				argv_vnc[argc_vnc++] = strdup(f);
+			} else {
+				exit(1);
+			}
+		}
+		if (! found) {
+			fprintf(stderr, "x11vnc -usepw: could not find"
+			    " a password to use.\n");
+			exit(1);
+		}
+		free(f);
 	}
 
 	if (got_rfbauth && (got_passwd || got_viewpasswd || got_passwdfile)) {

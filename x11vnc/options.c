@@ -116,6 +116,7 @@ int debug_xdamage = 0;		/* -R debug_xdamage:1 or 2 ... */
 int debug_wireframe = 0;
 int debug_tiles = 0;
 int debug_grabs = 0;
+int debug_sel = 0;
 
 int xtrap_input = 0;		/* -xtrap for user input insertion */
 int xinerama = 0;		/* -xinerama */
@@ -274,6 +275,7 @@ int ui_skip = 10;	/* see watchloop.  negative means ignore input */
 
 int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
 int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */
+int watch_clipboard = 1;
 char *sel_direction = NULL;	/* "send" or "recv" for one-way */
 
 char *sigpipe = NULL;		/* skip, ignore, exit */

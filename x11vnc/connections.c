@@ -1491,6 +1491,12 @@ static int do_reverse_connect(char *str) {
 		return 0;
 	} else {
 		rfbLog("reverse_connect: %s/%s OK\n", str, cl->host);
+		/* let's see if anyone complains: */
+		if (! getenv("X11VNC_REVERSE_CONNECTION_NO_AUTH")) {
+			rfbLog("reverse_connect: turning on auth for %s\n",
+			    cl->host);
+			cl->reverseConnection = FALSE;
+		}
 		return 1;
 	}
 }

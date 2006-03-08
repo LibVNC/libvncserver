@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.1, lastmod: 2006-03-06
+         version: 0.8.1, lastmod: 2006-03-08
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -373,6 +373,13 @@ If \fIstring\fR has the form "host" or "host:port"
 the connection is made once at startup.  Use commas
 for a list of host's and host:port's.
 .IP
+Note that unlike most vnc servers, x11vnc will require a
+password for reverse as well as for forward connections.
+(provided password auth has been enabled, \fB-rfbauth,\fR etc)
+If you do not want to require a password for reverse
+connections set X11VNC_REVERSE_CONNECTION_NO_AUTH=1 in
+your environment before starting x11vnc.
+.IP
 If \fIstring\fR contains "/" it is instead interpreted
 as a file to periodically check for new hosts.
 The first line is read and then the file is truncated.
@@ -620,10 +627,13 @@ be readable.  Passwords stored in /etc/shadow will
 be inaccessible unless run as root.  This is called
 "NIS" mode simply because in most NIS setups the
 user encrypted passwords are accessible (e.g. "ypcat
-passwd").  NIS is not required for this mode to
-work, but it is unlikely it will work for any other
-environment.  All of the \fB-unixpw\fR options and contraints
-apply.
+passwd").  NIS is not required for this mode to work
+(only that 
+.IR getpwnam (3)
+return the encrpyted password
+is required), but it is unlikely it will work for any
+other environment.  All of the \fB-unixpw\fR options and
+contraints apply.
 .PP
 \fB-stunnel\fR \fI[pem]\fR
 .IP
@@ -670,16 +680,33 @@ for more examples.
 Use version 3.x stunnel command line syntax instead of
 version 4.x
 .PP
-\fB-nopw\fR
+\fB-usepw\fR
 .IP
-Disable the big warning message when you use x11vnc
-without some sort of password.
+If no other password method was supplied on the command
+line, first look for ~/.vnc/passwd and if found use it
+with \fB-rfbauth;\fR next, look for ~/.vnc/passwdfile and
+use it with \fB-passwdfile;\fR otherwise, prompt the user
+for a password to create ~/.vnc/passwd and use it with
+the \fB-rfbauth\fR option.  If none of these succeed x11vnc
+exits immediately.
+.IP
+Note: \fB-unixpw\fR currently does not count as a password
+method by this option.
 .PP
 \fB-storepasswd\fR \fIpass\fR \fIfile\fR
 .IP
 Store password \fIpass\fR as the VNC password in the
 file \fIfile\fR.  Once the password is stored the
 program exits.  Use the password via "\fB-rfbauth\fR \fIfile\fR"
+.IP
+If called with no arguments, i.e., "\fB-storepasswd\fR",
+the user is prompted for a password and it is stored
+in the file ~/.vnc/passwd
+.PP
+\fB-nopw\fR
+.IP
+Disable the big warning message when you use x11vnc
+without some sort of password.
 .PP
 \fB-accept\fR \fIstring\fR
 .IP
@@ -1183,13 +1210,29 @@ Note: XBell monitoring requires the XKEYBOARD extension.
 \fB-nosel\fR
 .IP
 Do not manage exchange of X selection/cutbuffer between
-VNC viewers and the X server.
+VNC viewers and the X server at all.
 .PP
 \fB-noprimary\fR
 .IP
 Do not poll the PRIMARY selection for changes to send
 back to clients.  (PRIMARY is still set on received
 changes, however).
+.PP
+\fB-nosetprimary\fR
+.IP
+Do not set the PRIMARY selection for changes received
+from VNC clients.
+.PP
+\fB-noclipboard\fR
+.IP
+Do not poll the CLIPBOARD selection for changes to send
+back to clients.  (CLIPBOARD is still set on received
+changes, however).
+.PP
+\fB-nosetclipboard\fR
+.IP
+Do not set the CLIPBOARD selection for changes
+received from VNC clients.
 .PP
 \fB-seldir\fR \fIstring\fR
 .IP
@@ -1740,6 +1783,11 @@ experience a lot of grab deadlock, please report a bug.
 Turn on debugging info printout with respect to
 XGrabServer() deadlock for \fB-scrollcopyrect__mode_.\fR
 .PP
+\fB-debug_sel\fR
+.IP
+Turn on debugging info printout with respect to
+PRIMARY, CLIPBOARD, and CUTBUFFER0 selections.
+.PP
 \fB-pointer_mode\fR \fIn\fR
 .IP
 Various pointer motion update schemes. "\fB-pm\fR" is
@@ -2288,7 +2336,9 @@ nodeny          allow new connections, same as "unlock"
 .IP
 connect:host    do reverse connection to host, "host"
 may be a comma separated list of hosts
-or host:ports.  See \fB-connect.\fR
+or host:ports.  See \fB-connect.\fR  Passwords
+required as with fwd connections.
+See X11VNC_REVERSE_CONNECTION_NO_AUTH=1
 .IP
 disconnect:host disconnect any clients from "host"
 same as "close:host".  Use host
@@ -2433,6 +2483,18 @@ sel             disable \fB-nosel\fR mode.
 noprimary       enable  \fB-noprimary\fR mode.
 .IP
 primary         disable \fB-noprimary\fR mode.
+.IP
+nosetprimary    enable  \fB-nosetprimary\fR mode.
+.IP
+setprimary      disable \fB-nosetprimary\fR mode.
+.IP
+noclipboard     enable  \fB-noclipboard\fR mode.
+.IP
+clipboard       disable \fB-noclipboard\fR mode.
+.IP
+nosetclipboard  enable  \fB-nosetclipboard\fR mode.
+.IP
+setclipboard    disable \fB-nosetclipboard\fR mode.
 .IP
 seldir:str      set \fB-seldir\fR to "str"
 .IP
@@ -2627,6 +2689,10 @@ debug_grabs     enable  \fB-debug_grabs\fR
 .IP
 nodebug_grabs   disable \fB-debug_grabs\fR
 .IP
+debug_sel       enable  \fB-debug_sel\fR
+.IP
+nodebug_sel     disable \fB-debug_sel\fR
+.IP
 dbg             enable  \fB-dbg\fR crash shell
 .IP
 nodbg           disable \fB-dbg\fR crash shell
@@ -2700,17 +2766,19 @@ shared noshared forever noforever once timeout filexfer
 nofilexfer deny lock nodeny unlock connect allowonce
 allow localhost nolocalhost listen lookup nolookup
 accept afteraccept gone shm noshm flipbyteorder
-noflipbyteorder onetile noonetile solid_color solid
-nosolid blackout xinerama noxinerama xtrap noxtrap
-xrandr noxrandr xrandr_mode padgeom quiet q noquiet
-modtweak nomodtweak xkb noxkb skip_keycodes sloppy_keys
-nosloppy_keys skip_dups noskip_dups add_keysyms
-noadd_keysyms clear_mods noclear_mods clear_keys
-noclear_keys remap repeat norepeat fb nofb bell
-nobell sel nosel primary noprimary seldir cursorshape
-nocursorshape cursorpos nocursorpos cursor show_cursor
-noshow_cursor nocursor arrow xfixes noxfixes xdamage
-noxdamage xd_area xd_mem alphacut alphafrac alpharemove
+noflipbyteorder onetile noonetile solid_color
+solid nosolid blackout xinerama noxinerama xtrap
+noxtrap xrandr noxrandr xrandr_mode padgeom quiet q
+noquiet modtweak nomodtweak xkb noxkb skip_keycodes
+sloppy_keys nosloppy_keys skip_dups noskip_dups
+add_keysyms noadd_keysyms clear_mods noclear_mods
+clear_keys noclear_keys remap repeat norepeat fb nofb
+bell nobell sel nosel primary noprimary setprimary
+nosetprimary clipboard noclipboard setclipboard
+nosetclipboard seldir cursorshape nocursorshape
+cursorpos nocursorpos cursor show_cursor noshow_cursor
+nocursor arrow xfixes noxfixes xdamage noxdamage
+xd_area xd_mem alphacut alphafrac alpharemove
 noalpharemove alphablend noalphablend xwarppointer
 xwarp noxwarppointer noxwarp buttonmap dragging
 nodragging wireframe_mode wireframe wf nowireframe

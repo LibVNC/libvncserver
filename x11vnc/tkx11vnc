@@ -95,18 +95,22 @@ Actions
 	--
 	=RA ping
 	=RA update-all
-	--
+	=GAL Settings::
 	=GA save-settings
 	=SFA load-settings:
 	=SA defaults-all
 	=0SA clear-all
+	--
+	=F rc:
+	norc
+	=GAL LOFF
 	-- D
 	=DRA stop+quit 
 	=DGA Quit 
 
 Help
 	=DGA gui
-	=GA all
+	=DGA all
 
 Clients
 	=DRQA current:
@@ -119,10 +123,12 @@ Clients
 	vncconnect
 	-- D
 	filexfer
+	=GAL Java-applet::
 	=D http
 	httpdir:
 	httpport:
 	enablehttpproxy
+	=GAL LOFF
 
 Displays
 	=D display:
@@ -135,7 +141,6 @@ Screen
 	=DRA refresh
 	=RA reset
 	=RA blacken
-	fixscreen:
 	-- D
 	=D scale:
 	scale_cursor:
@@ -163,14 +168,17 @@ Screen
 	=-C:resize,newfbsize,exit xrandr_mode:
 	padgeom:
 	=GAL LOFF
-	--
+	=GAL Clipping::
 	=P blackout:
 	xinerama
 	clip:
-	--
+	=GAL LOFF
+	=GAL Misc-Screen::
+	fixscreen:
 	visual:
 	rawfb:
 	pipeinput:
+	=GAL LOFF
 
 Keyboard
 	=D norepeat
@@ -212,28 +220,26 @@ Misc
 	-- D
 	=GA all-settings
 	=RA remote-cmd:
-	--
-	=F rc:
-	norc
-	filexfer
+	=GAL Selection::
+	=D nosel
+	noprimary
+	nosetprimary
+	noclipboard
+	nosetclipboard
+	seldir:
+	=GAL LOFF
+	=GAL X-ext::
+	xtrap
+	xrecord
+	=RQA reset_record
+	=GAL LOFF
 	--
 	nofb
 	=D nobell
 	nolookup
-	=GAL Selection::
-	=D nosel
-	noprimary
-	seldir:
-	=GAL LOFF
-	--
-	xtrap
-	xrecord
-	=RQA reset_record
-	--
 	bg
 	=-C:ignore,exit sigpipe:
 	=0 inetd
-	rfbwait:
 
 Debugging
 	debug_pointer
@@ -250,6 +256,7 @@ Debugging
 	debug_scroll
 	debug_tiles
 	debug_grabs
+	debug_sel
 	dbg
 	=GAL LOFF
 	=GA show-start-cmd
@@ -258,39 +265,41 @@ Debugging
 Permissions
 	=DRQA lock
 	=DRQA unlock
+	=D shared
+	=D forever
 	--
 	=DFP allow:
 	=D localhost
 	=RA allowonce:
 	listen:
 	-- D
-	=D shared
-	=D forever
-	timeout:
-	--
 	=D viewonly
 	input:
-	--
-	safer
-	unsafe
-	=RA noremote
 	--
 	=GAL Passwords::
 	passwd:
 	viewpasswd:
 	=F passwdfile:
 	=F rfbauth:
+	usepw
+	--
 	unixpw
 	unixpw_list:
 	unixpw_nis
 	unixpw_nis_list:
 	=0 storepasswd
 	=GAL LOFF
+	=GAL Safe::
+	safer
+	unsafe
+	=RA noremote
+	=GAL LOFF
 	=GAL Misc-Perms::
 	=0S alwaysshared
 	=0S nevershared
 	=0S dontdisconnect
 	=SQA deny_all
+	timeout:
 	stunnel
 	=F stunnel_pem:
 	=GAL LOFF
@@ -344,6 +353,7 @@ Tuning
 	snapfb
 	threads
 	wmdt:
+	rfbwait:
 	=GAL LOFF
 "
 }
@@ -786,6 +796,7 @@ should never use them and just use x11vnc's -shared and -forever options
 instead (these give basically the same functionality and if you mixed
 them too much unexpected things may happen).
 "
+#'
 
 	set helptext(AlphaBlending:) "
 In this sub-menu we provide some tweak parameters for cursors (little
@@ -808,6 +819,7 @@ The items in this sub-menu let you tweak x11vnc's approximation scheme
 for cursors with transparency.  Hopefully you won't have to use them.
 Certain cursor \"themes\" may require adjustment however.
 "
+#'
 	set helptext(OverlayVisuals:) "
 In this sub-menu are some options that involve fixing color problems
 for \"Overlay\" or \"Multi-Depth\" visuals.  This problem is rare
@@ -924,6 +936,48 @@ video hardware was slow at the time.  x11vnc tries to use this same trick
 as a speedup for its activities (the network is much slower than video
 hardware writes, and the video hardware reads that x11vnc uses to poll
 the screen are still slow today).
+"
+#'"
+
+	set helptext(Safe:) "
+In this sub-menu are some options for making x11vnc operations
+more, or less, safe.  E.g. disable the running of external commands, etc.
+
+You can also turn off the Remote control channel (NOTE that doing that
+will disable the GUI from being able to communicate with x11vnc).
+"
+
+	set helptext(X-ext:) "
+In this sub-menu are a few rarely used options regarding some X extensions
+used by x11vnc.
+"
+	set helptext(Clipping:) "
+In this sub-menu are some options regarding clipping or blacking out
+portions of the Screen.  E.g. under XINERAMA when the multiple monitors
+are not the same size.
+
+"
+	set helptext(Misc-Screen:) "
+In this sub-menu are some little used options modifying aspects of
+the screen source.
+"
+
+	set helptext(Settings:) "
+In this sub-menu are some options for saving and loading option settings.
+The default file to store settings in is ~/.x11vncrc, but you can save
+different \"profiles\" in other files for later use.
+
+"
+	set helptext(Java-applet:) "
+In this sub-menu are some options for running the built-in HTTP server
+that delivers the TightVNC Java VNC Viewer applet (VncViewer.jar) to
+clients.  The viewer runs in their Web browser.
+
+The default port listened on is 5800, so the URL is typically:
+
+	http://hostname:5800/
+
+but this can be altered by -httpport, etc.
 "
 
 	set helptext(ScrollCopyRect:) "

@@ -9,19 +9,24 @@
  * Selection/Cutbuffer/Clipboard handlers.
  */
 
-int own_selection = 0;	/* whether we currently own PRIMARY or not */
+int own_primary = 0;	/* whether we currently own PRIMARY or not */
+int set_primary = 1;
+int own_clipboard = 0;	/* whether we currently own CLIPBOARD or not */
+int set_clipboard = 1;
 int set_cutbuffer = 0;	/* to avoid bouncing the CutText right back */
 int sel_waittime = 15;	/* some seconds to skip before first send */
 Window selwin;		/* special window for our selection */
+Atom clipboard_atom = None;
 
 /*
  * This is where we keep our selection: the string sent TO us from VNC
  * clients, and the string sent BY us to requesting X11 clients.
  */
-char *xcut_str = NULL;
+char *xcut_str_primary = NULL;
+char *xcut_str_clipboard = NULL;
 
 
-void selection_request(XEvent *ev);
+void selection_request(XEvent *ev, char *type);
 int check_sel_direction(char *dir, char *label, char *sel, int len);
 void cutbuffer_send(void);
 void selection_send(XEvent *ev);
@@ -29,14 +34,14 @@ void selection_send(XEvent *ev);
 
 /*
  * Our callbacks instruct us to check for changes in the cutbuffer
- * and PRIMARY selection on the local X11 display.
+ * and PRIMARY and CLIPBOARD selection on the local X11 display.
  *
- * We store the new cutbuffer and/or PRIMARY selection data in this
- * constant sized array selection_str[].
  * TODO: check if malloc does not cause performance issues (esp. WRT
  * SelectionNotify handling).
  */
-static char selection_str[PROP_MAX+1];
+static char cutbuffer_str[PROP_MAX+1];
+static char primary_str[PROP_MAX+1];
+static char clipboard_str[PROP_MAX+1];
 
 /*
  * An X11 (not VNC) client on the local display has requested the selection
@@ -44,10 +49,11 @@ static char selection_str[PROP_MAX+1];
  *
  * n.b.: our caller already has the X_LOCK.
  */
-void selection_request(XEvent *ev) {
+void selection_request(XEvent *ev, char *type) {
 	XSelectionEvent notify_event;
 	XSelectionRequestEvent *req_event;
 	XErrorHandler old_handler;
+	char *str;
 	unsigned int length;
 	unsigned char *data;
 #ifndef XA_LENGTH
@@ -67,10 +73,23 @@ void selection_request(XEvent *ev) {
 	} else {
 		notify_event.property = req_event->property;
 	}
-	if (xcut_str) {
-		length = strlen(xcut_str);
+
+	if (!strcmp(type, "PRIMARY")) {
+		str = xcut_str_primary;
+	} else if (!strcmp(type, "CLIPBOARD")) {
+		str = xcut_str_clipboard;
+	} else {
+		return;
+	}
+	if (str) {
+		length = strlen(str);
 	} else {
 		length = 0;
+	}
+	if (debug_sel) {
+		rfbLog("%s\trequest event:   owner=0x%x requestor=0x%x sel=%03d targ=%d prop=%d\n",
+			type, req_event->owner, req_event->requestor, req_event->selection,
+			req_event->target, req_event->property);
 	}
 
 	/* the window may have gone away, so trap errors */
@@ -89,7 +108,7 @@ void selection_request(XEvent *ev) {
 	} else {
 		/* data request */
 
-		data = (unsigned char *)xcut_str;
+		data = (unsigned char *)str;
 
 		XChangeProperty(ev->xselectionrequest.display,
 		    ev->xselectionrequest.requestor,
@@ -104,7 +123,7 @@ void selection_request(XEvent *ev) {
 	} 
 	if (trapped_xerror) {
 		rfbLog("selection_request: ignored XError while sending "
-		    "PRIMARY selection to 0x%x.\n", req_event->requestor);
+		    "%s selection to 0x%x.\n", type, req_event->requestor);
 	}
 	XSetErrorHandler(old_handler);
 	trapped_xerror = 0;
@@ -114,6 +133,9 @@ void selection_request(XEvent *ev) {
 
 int check_sel_direction(char *dir, char *label, char *sel, int len) {
 	int db = 0, ok = 1;
+	if (debug_sel) {
+		db = 1;
+	}
 	if (sel_direction) {
 		if (strstr(sel_direction, "debug")) {
 			db = 1;
@@ -132,7 +154,7 @@ int check_sel_direction(char *dir, char *label, char *sel, int len) {
 		if (len < n) {
 			str[len] = '\0';
 		}
-		rfbLog("%s: %s...\n", label, str);
+		rfbLog("%s: '%s'\n", label, str);
 		if (ok) {
 			rfbLog("%s: %s-ing it.\n", label, dir);
 		} else {
@@ -154,10 +176,11 @@ void cutbuffer_send(void) {
 	unsigned long nitems = 0, bytes_after = 0;
 	unsigned char* data = NULL;
 
-	selection_str[0] = '\0';
+	cutbuffer_str[0] = '\0';
 	slen = 0;
 
-	/* read the property value into selection_str: */
+
+	/* read the property value into cutbuffer_str: */
 	do {
 		if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
 		    XA_CUT_BUFFER0, nitems/4, PROP_MAX/16, False,
@@ -172,14 +195,18 @@ void cutbuffer_send(void) {
 				XFree(data);
 				break;
 			}
-			memcpy(selection_str+slen, data, dlen);
+			memcpy(cutbuffer_str+slen, data, dlen);
 			slen += dlen;
-			selection_str[slen] = '\0';
+			cutbuffer_str[slen] = '\0';
 			XFree(data);
 		}
 	} while (bytes_after > 0);
 
-	selection_str[PROP_MAX] = '\0';
+	cutbuffer_str[PROP_MAX] = '\0';
+
+	if (debug_sel) {
+		rfbLog("cutbuffer_send: '%s'\n", cutbuffer_str);
+	}
 
 	if (! all_clients_initialized()) {
 		rfbLog("cutbuffer_send: no send: uninitialized clients\n");
@@ -193,9 +220,9 @@ void cutbuffer_send(void) {
 	if (!screen) {
 		return;
 	}
-	len = strlen(selection_str);
-	if (check_sel_direction("send", "cutbuffer_send", selection_str, len)) {
-		rfbSendServerCutText(screen, selection_str, len);
+	len = strlen(cutbuffer_str);
+	if (check_sel_direction("send", "cutbuffer_send", cutbuffer_str, len)) {
+		rfbSendServerCutText(screen, cutbuffer_str, len);
 	}
 }
 
@@ -219,18 +246,41 @@ void selection_send(XEvent *ev) {
 	char before[CHKSZ], after[CHKSZ];
 	unsigned long nitems = 0, bytes_after = 0;
 	unsigned char* data = NULL;
+	char *selection_str;
 
 	/*
 	 * remember info about our last value of PRIMARY (or CUT_BUFFER0)
 	 * so we can check for any changes below.
 	 */
+	if (ev->xselection.selection == XA_PRIMARY) {
+		if (! watch_primary) {
+			return;
+		}
+		selection_str = primary_str;
+		if (debug_sel) {
+			rfbLog("selection_send: event PRIMARY   prop: %d  requestor: 0x%x  atom: %d\n",
+			    ev->xselection.property, ev->xselection.requestor, ev->xselection.selection);
+		}
+	} else if (clipboard_atom && ev->xselection.selection == clipboard_atom)  {
+		if (! watch_clipboard) {
+			return;
+		}
+		selection_str = clipboard_str;
+		if (debug_sel) {
+			rfbLog("selection_send: event CLIPBOARD prop: %d  requestor: 0x%x atom: %d\n",
+			    ev->xselection.property, ev->xselection.requestor, ev->xselection.selection);
+		}
+	} else {
+		return;
+	}
+	
 	oldlen = strlen(selection_str);
 	strncpy(before, selection_str, CHKSZ);
 
 	selection_str[0] = '\0';
 	slen = 0;
 
-	/* read in the current value of PRIMARY: */
+	/* read in the current value of PRIMARY or CLIPBOARD: */
 	do {
 		if (XGetWindowProperty(dpy, ev->xselection.requestor,
 		    ev->xselection.property, nitems/4, PROP_MAX/16, True,
@@ -248,9 +298,11 @@ void selection_send(XEvent *ev) {
 					err = 5;
 				}
 				rfbLog("warning: truncating large PRIMARY"
-				   " selection > %d bytes.\n", PROP_MAX);
+				    "/CLIPBOARD selection > %d bytes.\n",
+				    PROP_MAX);
 				break;
 			}
+if (debug_sel) fprintf(stderr, "selection_send: data: '%s' dlen: %d nitems: %d ba: %d\n", data, dlen, nitems, bytes_after);
 			memcpy(selection_str+slen, data, dlen);
 			slen += dlen;
 			selection_str[slen] = '\0';
@@ -269,6 +321,11 @@ void selection_send(XEvent *ev) {
 		oldlen = -1;
 		sent_one = 1;
 	}
+	if (debug_sel) {
+		rfbLog("selection_send:  %s '%s'\n",
+		    ev->xselection.selection == XA_PRIMARY ? "PRIMARY  " : "CLIPBOARD",
+		    selection_str);
+	}
 
 	/* look for changes in the new value */
 	newlen = strlen(selection_str);
@@ -276,6 +333,9 @@ void selection_send(XEvent *ev) {
 
 	if (oldlen == newlen && strncmp(before, after, CHKSZ) == 0) {
 		/* evidently no change */
+		if (debug_sel) {
+			rfbLog("selection_send:  no change.\n");
+		}
 		return;
 	}
 	if (newlen == 0) {

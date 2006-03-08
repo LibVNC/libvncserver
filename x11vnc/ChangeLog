@@ -1,3 +1,8 @@
+2006-03-08  Karl Runge <runge@karlrunge.com>
+	* x11vnc: manage CLIPBOARD in addition to PRIMARY.  -debug_sel
+	  Make reverse connections require passwords.  -usepw option.
+	  -storepasswd w/o args prompts and writes ~/.vnc/passwd.
+
 2006-03-06  Karl Runge <runge@karlrunge.com>
 	* x11vnc: switch remote control to X11VNC_REMOTE property.  Put
 	  in -unixpw constraints for reverse connections under -inetd.

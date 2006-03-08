@@ -22,6 +22,7 @@
 #include "cursor.h"
 #include "userinput.h"
 #include "keyboard.h"
+#include "selection.h"
 
 int send_remote_cmd(char *cmd, int query, int wait);
 int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync,
@@ -2116,6 +2117,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: enabling watch selection+primary.\n");
 		watch_selection = 1;
 		watch_primary = 1;
+		watch_clipboard = 1;
 
 	} else if (!strcmp(p, "nosel")) {
 		if (query) {
@@ -2125,6 +2127,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: disabling watch selection+primary.\n");
 		watch_selection = 0;
 		watch_primary = 0;
+		watch_clipboard = 0;
 
 	} else if (!strcmp(p, "primary")) {
 		if (query) {
@@ -2141,6 +2144,54 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: disabling watch_primary.\n");
 		watch_primary = 0;
+
+	} else if (!strcmp(p, "setprimary")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, set_primary);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling set_primary.\n");
+		set_primary = 1;
+
+	} else if (!strcmp(p, "nosetprimary")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !set_primary);
+			goto qry;
+		}
+		rfbLog("remote_cmd: disabling set_primary.\n");
+		set_primary = 0;
+
+	} else if (!strcmp(p, "clipboard")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, watch_clipboard);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling watch_clipboard.\n");
+		watch_clipboard = 1;
+
+	} else if (!strcmp(p, "noclipboard")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !watch_clipboard);
+			goto qry;
+		}
+		rfbLog("remote_cmd: disabling watch_clipboard.\n");
+		watch_clipboard = 0;
+
+	} else if (!strcmp(p, "setclipboard")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, set_clipboard);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling set_clipboard.\n");
+		set_clipboard = 1;
+
+	} else if (!strcmp(p, "nosetclipboard")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !set_clipboard);
+			goto qry;
+		}
+		rfbLog("remote_cmd: disabling set_clipboard.\n");
+		set_clipboard = 0;
 
 	} else if (strstr(p, "seldir") == p) {
 		COLON_CHECK("seldir:")
@@ -3500,6 +3551,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		debug_grabs = 0;
 		rfbLog("set debug_grabs to: %d\n", debug_grabs);
+
+	} else if (!strcmp(p, "debug_sel")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, debug_sel);
+			goto qry;
+		}
+		debug_sel = 1;
+		rfbLog("set debug_sel to: %d\n", debug_sel);
+	} else if (!strcmp(p, "nodebug_sel")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !debug_sel);
+			goto qry;
+		}
+		debug_sel = 0;
+		rfbLog("set debug_sel to: %d\n", debug_sel);
 
 	} else if (!strcmp(p, "dbg")) {
 		if (query) {

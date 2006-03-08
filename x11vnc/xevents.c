@@ -19,6 +19,7 @@ int sync_tod_delay = 3;
 
 void initialize_vnc_connect_prop(void);
 void initialize_x11vnc_remote_prop(void);
+void initialize_clipboard_atom(void);
 void spawn_grab_buster(void);
 void sync_tod_with_servertime(void);
 void check_keycode_state(void);
@@ -45,11 +46,25 @@ void initialize_x11vnc_remote_prop(void) {
 	x11vnc_remote_prop = XInternAtom(dpy, "X11VNC_REMOTE", False);
 }
 
+void initialize_clipboard_atom(void) {
+	clipboard_atom = XInternAtom(dpy, "CLIPBOARD", False);
+	if (clipboard_atom == None) {
+		if (! quiet) rfbLog("could not find atom CLIPBOARD\n");
+		if (watch_clipboard) {
+			watch_clipboard = 0;
+		}
+		if (set_clipboard) {
+			set_clipboard = 0;
+		}
+	}
+}
+
 static void initialize_xevents(void) {
 	static int did_xselect_input = 0;
 	static int did_xcreate_simple_window = 0;
 	static int did_vnc_connect_prop = 0;
 	static int did_x11vnc_remote_prop = 0;
+	static int did_clipboard_atom = 0;
 	static int did_xfixes = 0;
 	static int did_xdamage = 0;
 	static int did_xrandr = 0;
@@ -89,6 +104,10 @@ static void initialize_xevents(void) {
 	if (run_gui_pid > 0) {
 		kill(run_gui_pid, SIGUSR1);
 		run_gui_pid = 0;
+	}
+	if (!did_clipboard_atom) {
+		initialize_clipboard_atom();
+		did_clipboard_atom = 1;
 	}
 	if (xfixes_present && use_xfixes && !did_xfixes) {
 		initialize_xfixes();
@@ -662,13 +681,13 @@ void check_xevents(void) {
 	XEvent xev;
 	int tmp, have_clients = 0;
 	static int sent_some_sel = 0;
-	static time_t last_request = 0;
 	static time_t last_call = 0;
 	static time_t last_bell = 0;
 	static time_t last_init_check = 0;
 	static time_t last_sync = 0;
 	static time_t last_time_sync = 0;
 	time_t now = time(0);
+	static double last_request = 0.0;
 
 	if (raw_fb && ! dpy) return;	/* raw_fb hack */
 
@@ -798,56 +817,119 @@ void check_xevents(void) {
 #endif
 
 	/* check for our PRIMARY request notification: */
-	if (watch_primary) {
+	if (watch_primary || watch_clipboard) {
+		int doprimary = 1, doclipboard = 2, which, own;
+		double delay = 1.0;
+		Atom atom;
+		char *req;
+
 		if (XCheckTypedEvent(dpy, SelectionNotify, &xev)) {
 			if (xev.type == SelectionNotify &&
 			    xev.xselection.requestor == selwin &&
-			    xev.xselection.selection == XA_PRIMARY &&
 			    xev.xselection.property != None &&
 			    xev.xselection.target == XA_STRING) {
-
-				/* go retrieve PRIMARY and check it */
-				if (now > last_client + sel_waittime
-				    || sent_some_sel) {
-					selection_send(&xev);
+				Atom s = xev.xselection.selection;
+			        if (s == XA_PRIMARY || s == clipboard_atom) {
+					/* go retrieve it and check it */
+					if (now > last_client + sel_waittime
+					    || sent_some_sel) {
+						selection_send(&xev);
+					}
 				}
 			}
 		}
-		if (now > last_request) {
+		/*
+		 * Every second or so, request PRIMARY or CLIPBOARD,
+		 * unless we already own it or there is no owner or we
+		 * have no clients. 
+		 * TODO: even at this low rate we should look into
+		 * and performance problems in odds cases (large text,
+		 * modem, etc.)
+		 */
+		which = 0;
+		if (watch_primary && watch_clipboard && ! own_clipboard &&
+		    ! own_primary) {
+			delay = 0.6;
+		}
+		if (dnow() > last_request + delay) {
 			/*
-			 * Every second or two, request PRIMARY, unless we
-			 * already own it or there is no owner or we have
-			 * no clients.
-			 * TODO: even at this low rate we should look into
-			 * and performance problems in odds cases, etc.
+			 * It is not a good idea to do both at the same
+			 * time so we must choose one:
 			 */
-			last_request = now;
-			if (! own_selection && have_clients &&
-			    XGetSelectionOwner(dpy, XA_PRIMARY) != None) {
-				XConvertSelection(dpy, XA_PRIMARY, XA_STRING,
-				    XA_STRING, selwin, CurrentTime);
+			if (watch_primary && watch_clipboard) {
+				static int count = 0;
+				if (own_clipboard) {
+					which = doprimary;
+				} else if (own_primary) {
+					which = doclipboard;
+				} else if (count++ % 3 == 0) {
+					which = doclipboard;
+				} else {
+					which = doprimary;
+				}
+			} else if (watch_primary) {
+				which = doprimary;
+			} else if (watch_clipboard) {
+				which = doclipboard;
+			}
+			last_request = dnow();
+		}
+		atom = None;
+		req = "none";
+		if (which == doprimary) {
+			own = own_primary;
+			atom = XA_PRIMARY;
+			req = "PRIMARY";
+		} else if (which == doclipboard) {
+			own = own_clipboard;
+			atom = clipboard_atom;
+			req = "CLIPBOARD";
+		}
+		if (which != 0 && ! own && have_clients &&
+		    XGetSelectionOwner(dpy, atom) != None) {
+			XConvertSelection(dpy, atom, XA_STRING, XA_STRING,
+			    selwin, CurrentTime);
+			if (debug_sel) {
+				rfbLog("request %s\n", req);
 			}
 		}
 	}
 
-	if (own_selection) {
-		/* we own PRIMARY, see if someone requested it: */
+	if (own_primary || own_clipboard) {
+		/* we own PRIMARY or CLIPBOARD, see if someone requested it: */
 		if (XCheckTypedEvent(dpy, SelectionRequest, &xev)) {
-			if (xev.type == SelectionRequest &&
+			if (own_primary && xev.type == SelectionRequest &&
 			    xev.xselectionrequest.selection == XA_PRIMARY) {
-				selection_request(&xev);
+				selection_request(&xev, "PRIMARY");
+			}
+			if (own_clipboard && xev.type == SelectionRequest &&
+			    xev.xselectionrequest.selection == clipboard_atom) {
+				selection_request(&xev, "CLIPBOARD");
 			}
 		}
 
-		/* we own PRIMARY, see if we no longer own it: */
+		/* we own PRIMARY or CLIPBOARD, see if we no longer own it: */
 		if (XCheckTypedEvent(dpy, SelectionClear, &xev)) {
-			if (xev.type == SelectionClear &&
+			if (own_primary && xev.type == SelectionClear &&
 			    xev.xselectionclear.selection == XA_PRIMARY) {
-
-				own_selection = 0;
-				if (xcut_str) {
-					free(xcut_str);
-					xcut_str = NULL;
+				own_primary = 0;
+				if (xcut_str_primary) {
+					free(xcut_str_primary);
+					xcut_str_primary = NULL;
+				}
+				if (debug_sel) {
+					rfbLog("Released PRIMARY.\n");
+				}
+			}
+			if (own_clipboard && xev.type == SelectionClear &&
+			    xev.xselectionclear.selection == clipboard_atom) {
+				own_clipboard = 0;
+				if (xcut_str_clipboard) {
+					free(xcut_str_clipboard);
+					xcut_str_clipboard = NULL;
+				}
+				if (debug_sel) {
+					rfbLog("Released CLIPBOARD.\n");
 				}
 			}
 		}
@@ -986,21 +1068,51 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	X_LOCK;
 
 	/* associate this text with PRIMARY (and SECONDARY...) */
-	if (! own_selection) {
-		own_selection = 1;
+	if (set_primary && ! own_primary) {
+		own_primary = 1;
 		/* we need to grab the PRIMARY selection */
 		XSetSelectionOwner(dpy, XA_PRIMARY, selwin, CurrentTime);
 		XFlush(dpy);
+		if (debug_sel) {
+			rfbLog("Own PRIMARY.\n");
+		}
+	}
+
+	if (set_clipboard && ! own_clipboard && clipboard_atom != None) {
+		own_clipboard = 1;
+		/* we need to grab the CLIPBOARD selection */
+		XSetSelectionOwner(dpy, clipboard_atom, selwin, CurrentTime);
+		XFlush(dpy);
+		if (debug_sel) {
+			rfbLog("Own CLIPBOARD.\n");
+		}
 	}
 
 	/* duplicate the text string for our own use. */
-	if (xcut_str != NULL) {
-		free(xcut_str);
-		xcut_str = NULL;
+	if (set_primary) {
+		if (xcut_str_primary != NULL) {
+			free(xcut_str_primary);
+			xcut_str_primary = NULL;
+		}
+		xcut_str_primary = (char *) malloc((size_t) (len+1));
+		strncpy(xcut_str_primary, text, len);
+		xcut_str_primary[len] = '\0';	/* make sure null terminated */
+		if (debug_sel) {
+			rfbLog("Set PRIMARY   '%s'\n", xcut_str_primary);
+		}
 	}
-	xcut_str = (char *) malloc((size_t) (len+1));
-	strncpy(xcut_str, text, len);
-	xcut_str[len] = '\0';	/* make sure null terminated */
+	if (set_clipboard) {
+		if (xcut_str_clipboard != NULL) {
+			free(xcut_str_clipboard);
+			xcut_str_clipboard = NULL;
+		}
+		xcut_str_clipboard = (char *) malloc((size_t) (len+1));
+		strncpy(xcut_str_clipboard, text, len);
+		xcut_str_clipboard[len] = '\0';	/* make sure null terminated */
+		if (debug_sel) {
+			rfbLog("Set CLIPBOARD '%s'\n", xcut_str_clipboard);
+		}
+	}
 
 	/* copy this text to CUT_BUFFER0 as well: */
 	XChangeProperty(dpy, rootwin, XA_CUT_BUFFER0, XA_STRING, 8,

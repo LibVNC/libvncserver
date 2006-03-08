@@ -91,6 +91,7 @@ extern int debug_xdamage;
 extern int debug_wireframe;
 extern int debug_tiles;
 extern int debug_grabs;
+extern int debug_sel;
 
 extern int xtrap_input;
 extern int xinerama;
@@ -203,6 +204,7 @@ extern int ui_skip;
 
 extern int watch_selection;
 extern int watch_primary;
+extern int watch_clipboard;
 extern char *sel_direction;
 
 extern char *sigpipe;

@@ -96,6 +96,14 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		return 0;
 	}
 
+	if (no_external_cmds) {
+		rfbLogEnable(1);
+		rfbLog("start_stunnel: cannot run external commands in -nocmds mode:\n");
+		rfbLog("   \"%s\"\n", stunnel_path);
+		rfbLog("   exiting.\n");
+		clean_up_exit(1);
+	}
+
 	if (! quiet) {
 		rfbLog("\n");
 		rfbLog("starting ssl tunnel: %s  %d -> %d\n", stunnel_path,

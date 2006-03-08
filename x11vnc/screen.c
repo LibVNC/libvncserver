@@ -407,7 +407,7 @@ static char *raw_fb_orig_dpy = NULL;
 
 void set_raw_fb_params(int restore) {
 	static int first = 1;
-	static int vo0, us0, sm0, ws0, wp0, wb0, na0, tn0;  
+	static int vo0, us0, sm0, ws0, wp0, wc0, wb0, na0, tn0;  
 	static int xr0, sb0;
 	static char *mc0;
 
@@ -421,6 +421,7 @@ void set_raw_fb_params(int restore) {
 		vo0 = view_only;
 		ws0 = watch_selection;
 		wp0 = watch_primary;
+		wc0 = watch_clipboard;
 		wb0 = watch_bell;
 		na0 = no_autorepeat;
 		sb0 = use_solid_bg;
@@ -438,6 +439,7 @@ void set_raw_fb_params(int restore) {
 		view_only = vo0;
 		watch_selection = ws0;
 		watch_primary = wp0;
+		watch_clipboard = wc0;
 		watch_bell = wb0;
 		no_autorepeat = na0;
 		use_solid_bg = sb0;
@@ -492,6 +494,11 @@ void set_raw_fb_params(int restore) {
 			if (! quiet) rfbLog("rawfb: turning off "
 			    "watch_primary\n");
 			watch_primary = 0;
+		}
+		if (watch_clipboard) {
+			if (! quiet) rfbLog("rawfb: turning off "
+			    "watch_clipboard\n");
+			watch_clipboard = 0;
 		}
 		if (watch_bell) {
 			if (! quiet) rfbLog("rawfb: turning off watch_bell\n");

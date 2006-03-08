@@ -371,6 +371,10 @@ int su_verify(char *user, char *pass) {
 			return 0;
 		}
 	}
+	if (no_external_cmds) {
+		rfbLog("su_verify: cannot run external commands.\n");	
+		clean_up_exit(1);
+	}
 
 #define SU_DEBUG 0
 #if SU_DEBUG
@@ -710,6 +714,7 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 			unixpw_accept(user);
 			return;
 		} else {
+			rfbLog("unixpw_verify: crypt_verify login for %s failed.\n", user);
 			usleep(3000*1000);
 		}
 	} else {
@@ -717,6 +722,7 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 			unixpw_accept(user);
 			return;
 		}
+		rfbLog("unixpw_verify: su_verify login for %s failed.\n", user);
 	}
 
 	if (tries < 2) {
