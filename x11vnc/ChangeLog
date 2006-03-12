@@ -1,3 +1,7 @@
+2006-03-11  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add -ssl mode using libssl.  Include Xdummy in misc.
+	  a few more macros for smallerfoot, etc.
+
 2006-03-08  Karl Runge <runge@karlrunge.com>
 	* x11vnc: manage CLIPBOARD in addition to PRIMARY.  -debug_sel
 	  Make reverse connections require passwords.  -usepw option.

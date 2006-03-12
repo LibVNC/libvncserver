@@ -302,7 +302,7 @@ void selection_send(XEvent *ev) {
 				    PROP_MAX);
 				break;
 			}
-if (debug_sel) fprintf(stderr, "selection_send: data: '%s' dlen: %d nitems: %d ba: %d\n", data, dlen, nitems, bytes_after);
+if (debug_sel) fprintf(stderr, "selection_send: data: '%s' dlen: %d nitems: %lu ba: %lu\n", data, dlen, nitems, bytes_after);
 			memcpy(selection_str+slen, data, dlen);
 			slen += dlen;
 			selection_str[slen] = '\0';

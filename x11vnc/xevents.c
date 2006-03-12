@@ -818,7 +818,7 @@ void check_xevents(void) {
 
 	/* check for our PRIMARY request notification: */
 	if (watch_primary || watch_clipboard) {
-		int doprimary = 1, doclipboard = 2, which, own;
+		int doprimary = 1, doclipboard = 2, which, own = 0;
 		double delay = 1.0;
 		Atom atom;
 		char *req;

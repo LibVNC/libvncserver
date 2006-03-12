@@ -140,6 +140,7 @@
 #include "unixpw.h"
 #include "inet.h"
 #include "sslcmds.h"
+#include "sslhelper.h"
 #include "selection.h"
 
 /*
@@ -471,6 +472,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_connect_inputs();		
 			check_gui_inputs();		
 			check_stunnel();		
+			check_openssl();		
 			record_last_fb_update();
 			check_padded_fb();		
 			check_fixscreen();		
@@ -1353,7 +1355,8 @@ static void store_homedir_passwd(void) {
 
 #define	SHOW_NO_PASSWORD_WARNING \
 	(!got_passwd && !got_rfbauth && (!got_passwdfile || !passwd_list) \
-	    && !query_cmd && !remote_cmd && !unixpw && !got_gui_pw)
+	    && !query_cmd && !remote_cmd && !unixpw && !got_gui_pw \
+	    && ! ssl_verify)
 
 int main(int argc, char* argv[]) {
 
@@ -1367,12 +1370,10 @@ int main(int argc, char* argv[]) {
 	int got_gui_pw = 0;
 	int pw_loc = -1, got_passwd = 0, got_rfbauth = 0, nopw = NOPW;
 	int got_viewpasswd = 0, got_localhost = 0, got_passwdfile = 0;
-	int got_stunnel = 0;
 	int vpw_loc = -1;
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0;
 	int got_httpdir = 0, try_http = 0;
-	int usepw = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc = 1; char *argv_vnc[128];
@@ -1583,12 +1584,23 @@ int main(int argc, char* argv[]) {
 			}
 			if (strstr(arg, "_unsafe")) {
 				/* hidden option for testing. */
-				set_env("UNIXPW_DISABLE_STUNNEL", "1");
+				set_env("UNIXPW_DISABLE_SSL", "1");
 				set_env("UNIXPW_DISABLE_LOCALHOST", "1");
 			}
+		} else if (!strcmp(arg, "-ssl")) {
+			use_openssl = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					openssl_pem = strdup(s);
+					i++;
+				}
+			}
+		} else if (!strcmp(arg, "-sslverify")) {
+			CHECK_ARGC
+			ssl_verify = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-stunnel")) {
 			use_stunnel = 1;
-			got_stunnel = 1;
 			if (i < argc-1) {
 				char *s = argv[i+1];
 				if (s[0] != '-') {
@@ -1598,7 +1610,6 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-stunnel3")) {
 			use_stunnel = 3;
-			got_stunnel = 1;
 			if (i < argc-1) {
 				char *s = argv[i+1];
 				if (s[0] != '-') {
@@ -2301,6 +2312,16 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
+	if (ssl_verify) {
+		struct stat sbuf;
+		if (stat(ssl_verify, &sbuf) != 0) {
+			rfbLog("x11vnc: -sslverify %s does not exist\n",
+			    ssl_verify);
+			rfbLogPerror("stat");
+			exit(1);
+		}
+	}
+
 	/*
 	 * If -passwd was used, clear it out of argv.  This does not
 	 * work on all UNIX, have to use execvp() in general...
@@ -2382,46 +2403,49 @@ int main(int argc, char* argv[]) {
 		launch_gui = 0;
 	}
 
-	if (! inetd) {
-	    if (unixpw) {
-		if (! got_localhost && ! getenv("UNIXPW_DISABLE_LOCALHOST")) {
-			if (! quiet) {
-				rfbLog("Setting -localhost in -unixpw mode.\n");
-			}
-			allow_list = strdup("127.0.0.1");
-			got_localhost = 1;
-		}
-		if (! got_stunnel) {
-			if (! getenv("UNIXPW_DISABLE_STUNNEL") &&
-			    ! have_ssh_env()) {
-				if (! quiet) {
-					rfbLog("Setting -stunnel in -unixpw "
-					    "mode.\n");
-				}
-				use_stunnel = 1;
-			} else if (! getenv("UNIXPW_DISABLE_STUNNEL")) {
+	if (! inetd && unixpw) {
+		if (! use_stunnel && ! use_openssl) {
+			if (have_ssh_env()) {
 				char *s = getenv("SSH_CONNECTION");
 				if (! s) s = getenv("SSH_CLIENT");
 				if (! s) s = "SSH_CONNECTION";
 				fprintf(stderr, "\n");
-				rfbLog("Skipping -stunnel contraint in -unixpw mode,\n");
-				rfbLog("assuming your SSH encryption is: %s\n", s);
+				rfbLog("Skipping -ssl/-stunnel contraint in"
+				    " -unixpw\n");
+				rfbLog("mode, assuming your SSH encryption"
+				    " is: %s\n", s);
 				fprintf(stderr, "\n");
 				if (! nopw) {
 					usleep(2000*1000);
 				}
+			} else if (getenv("UNIXPW_DISABLE_SSL")) {
+				rfbLog("Skipping -ssl/-stunnel requirement"
+				    " due to\n");
+				rfbLog("UNIXPW_DISABLE_SSL setting.\n");
+			} else {
+				if (openssl_present()) {
+					rfbLog("set -ssl in -unixpw mode.\n");
+					use_openssl = 1;
+				} else {
+					rfbLog("set -stunnel in -unixpw mode.\n");
+					use_stunnel = 1;
+				}
 			}
 		}
-	    } else if (use_stunnel) {
-
-		if (! got_localhost && ! getenv("STUNNEL_DISABLE_LOCALHOST")) {
+	}
+	if (use_stunnel && ! got_localhost) {
+		if (! getenv("STUNNEL_DISABLE_LOCALHOST") &&
+		    ! getenv("UNIXPW_DISABLE_LOCALHOST")) {
 			if (! quiet) {
 				rfbLog("Setting -localhost in -stunnel mode.\n");
 			}
 			allow_list = strdup("127.0.0.1");
 			got_localhost = 1;
 		}
-	    }
+	}
+	if (ssl_verify && ! use_stunnel && ! use_openssl) {
+		rfbLog("-sslverify must be used with -ssl or -stunnel\n");
+		exit(1);
 	}
 
 	/* fixup settings that do not make sense */
@@ -3041,7 +3065,7 @@ int main(int argc, char* argv[]) {
 
 	initialize_allowed_input();
 
-	if (! inetd) {
+	if (! inetd && ! use_openssl) {
 		if (! screen->port || screen->listenSock < 0) {
 			rfbLogEnable(1);
 			rfbLog("Error: could not obtain listening port.\n");

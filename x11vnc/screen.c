@@ -18,11 +18,13 @@
 #include "remote.h"
 #include "unixpw.h"
 #include "sslcmds.h"
+#include "sslhelper.h"
 
 void set_colormap(int reset);
 void set_nofb_params(int restore);
 void set_raw_fb_params(int restore);
 void do_new_fb(int reset_mem);
+void free_old_fb(char *old_main, char *old_rfb, char *old_8to24);
 void check_padded_fb(void);
 void install_padded_fb(char *geom);
 XImage *initialize_xdisplay_fb(void);
@@ -552,6 +554,18 @@ static void nofb_hook(rfbClientPtr cl) {
 	screen->displayHook = NULL;
 }
 
+void free_old_fb(char *old_main, char *old_rfb, char *old_8to24) {
+	if (old_main) {
+		free(old_main);
+	}
+	if (old_rfb && old_rfb != old_main) {
+		free(old_rfb);
+	}
+	if (old_8to24 && old_8to24 != old_main && old_8to24 != old_rfb) {
+		free(old_8to24);
+	}
+}
+
 void do_new_fb(int reset_mem) {
 	XImage *fb;
 	char *old_main  = main_fb;
@@ -580,15 +594,8 @@ void do_new_fb(int reset_mem) {
 		initialize_polling_images();
 	}
 
-	if (old_main) {
-		free(old_main);
-	}
-	if (old_rfb && old_rfb != old_main) {
-		free(old_rfb);
-	}
-	if (old_8to24 && old_8to24 != old_main && old_8to24 != old_rfb) {
-		free(old_8to24);
-	}
+	free_old_fb(old_main, old_rfb, old_8to24);
+
 	fb0 = fb;
 }
 
@@ -1572,7 +1579,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	/* n.b. samplesPerPixel (set = 1 here) seems to be unused. */
 	if (create_screen) {
-		if (use_stunnel) {
+		if (use_openssl) {
+			openssl_init();
+		} else if (use_stunnel) {
 			setup_stunnel(0, argc, argv);
 		}
 		screen = rfbGetScreen(argc, argv, width, height,
@@ -1953,6 +1962,10 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->setXCutText = xcut_receive;
 
 	rfbInitServer(screen);
+
+	if (use_openssl) {
+		openssl_port();
+	}
 
 	install_passwds();
 }

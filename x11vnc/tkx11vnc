@@ -249,6 +249,8 @@ Debugging
 	=GA tail-logfile
 	quiet
 	--
+	=GA show-start-cmd
+	=DG debug_gui
 	=GAL Misc-Debug::
 	debug_xevents
 	debug_xdamage
@@ -259,8 +261,6 @@ Debugging
 	debug_sel
 	dbg
 	=GAL LOFF
-	=GA show-start-cmd
-	=DG debug_gui
 
 Permissions
 	=DRQA lock
@@ -289,19 +289,22 @@ Permissions
 	unixpw_nis_list:
 	=0 storepasswd
 	=GAL LOFF
-	=GAL Safe::
+	=GAL SSL::
+	ssl
+	=F ssl_pem:
+	stunnel
+	=F stunnel_pem:
+	=F sslverify:
+	=GAL LOFF
+	=GAL Misc-Perms::
 	safer
 	unsafe
 	=RA noremote
-	=GAL LOFF
-	=GAL Misc-Perms::
 	=0S alwaysshared
 	=0S nevershared
 	=0S dontdisconnect
 	=SQA deny_all
 	timeout:
-	stunnel
-	=F stunnel_pem:
 	=GAL LOFF
 
 Tuning
@@ -570,6 +573,10 @@ Set the -unixpw_nis usernames list value.
 Set the -stunnel pem filename value.
 "
 
+	set helptext(ssl_pem) "
+Set the -ssl pem filename value.
+"
+
 	set helptext(wireframe_mode) "
 Set the -wireframe mode string value.
 "
@@ -786,6 +793,17 @@ work everywhere.
 Regarding ViewOnly passwords (where a VNC client using that password
 can only watch the screen, not interact with it), this is not available
 with -rfbauth, but only with -passwdfile, -passwd, and -viewpasswd.
+"
+
+	set helptext(SSL:) "
+In this sub-menu we provide the options related to SSL encrpytion
+and authentication.
+
+There is a built-in mode (-ssl) using the OpenSSL library, and a 2nd
+using the external stunnel program (-stunnel, that needs to be installed
+on the system).  Either may require or benefit from having PEM certificate
+files specified.
+
 "
 
 	set helptext(Misc-Perms:) "
@@ -5584,6 +5602,8 @@ proc get_nitem {item} {
 		set nitem "unixpw_nis"
 	} elseif {$nitem == "stunnel_pem"} {
 		set nitem "stunnel"
+	} elseif {$nitem == "ssl_pem"} {
+		set nitem "ssl"
 	} elseif {$nitem == "wireframe_mode"} {
 		set nitem "wireframe"
 	} elseif {$nitem == "solid_color"} {

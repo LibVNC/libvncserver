@@ -2146,8 +2146,9 @@ static void ping_clients(int tile_cnt) {
 	}
 	if (tile_cnt) {
 		last_send = now;
-	} else if (now - last_send > 1) {
+	} else if (now - last_send > 2) {
 		/* Send small heartbeat to client */
+if (0) fprintf(stderr, "ping_clients 2\n");
 		mark_rect_as_modified(0, 0, 1, 1, 1);
 		last_send = now;
 	}
@@ -2638,6 +2639,8 @@ int scan_for_updates(int count_only) {
 	/* Work around threaded rfbProcessClientMessage() calls timeouts */
 	if (use_threads) {
 		ping_clients(tile_diffs);
+	} else if (use_openssl && !tile_diffs) {
+		ping_clients(0);
 	}
 
 

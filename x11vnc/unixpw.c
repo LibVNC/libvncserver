@@ -279,7 +279,7 @@ void try_to_be_nobody(void) {
 }
 
 
-static int slave_fd = -1, alarm_fired = 0;;
+static int slave_fd = -1, alarm_fired = 0;
 
 static void close_alarm (int sig) {
 	if (slave_fd >= 0) {

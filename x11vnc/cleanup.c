@@ -10,6 +10,7 @@
 #include "solid.h"
 #include "unixpw.h"
 #include "sslcmds.h"
+#include "sslhelper.h"
 
 /*
  * Exiting and error handling routines
@@ -133,6 +134,9 @@ void clean_up_exit (int ret) {
 		solid_bg(1);
 	}
 	stop_stunnel();
+	if (use_openssl) {
+		ssh_helper_pid(0, 0);	/* killall */
+	}
 
 	X_LOCK;
 	XTestDiscard_wr(dpy);

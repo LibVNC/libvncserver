@@ -175,7 +175,7 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			esac
 		fi
 
-		# only x11vnc uses crypt()
+		# currently only x11vnc uses crypt() or libssl:
 		AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
 		AC_ARG_WITH(crypt,
 		[  --without-crypt         disable support for libcrypt],,)
@@ -187,6 +187,25 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 					[AC_DEFINE(HAVE_LIBCRYPT)], ,
 					$X_LIBS $X_PRELIBS -lcrypt $X_EXTRA_LIBS)
 			fi
+		fi
+		AH_TEMPLATE(HAVE_LIBSSL, [openssl libssl library present])
+		AC_ARG_WITH(ssl,
+		[  --without-ssl           disable support for openssl libssl],,)
+		if test "x$with_ssl" != "xno"; then
+			AC_CHECK_LIB(ssl, SSL_library_init,
+				X_PRELIBS="$X_PRELIBS -lssl"
+				[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,
+				$X_LIBS $X_PRELIBS -lssl $X_EXTRA_LIBS)
+		fi
+		AH_TEMPLATE(HAVE_LIBCRYPTO, [openssl libcrypto library present])
+		AC_ARG_WITH(crypto,
+		[  --without-crypto        disable support for openssl libcrypto],,)
+		# some OS's need both -lssl and -lcrypto
+		if test "x$HAVE_LIBSSL" = "xtrue"; then
+			AC_CHECK_LIB(crypto, RAND_load_file,
+				X_PRELIBS="$X_PRELIBS -lcrypto"
+				[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,
+				$X_LIBS $X_PRELIBS -lcrypto $X_EXTRA_LIBS)
 		fi
 
 

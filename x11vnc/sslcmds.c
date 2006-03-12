@@ -46,6 +46,7 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 	char extra[] = ":/usr/sbin:/usr/local/sbin";
 	char *path, *p, *exe;
 	char *stunnel_path = NULL;
+	struct stat verify_buf;
 	int status;
 
 	if (stunnel_pid) {
@@ -110,13 +111,11 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		    stunnel_port, x11vnc_port);
 	}
 
-	if (0) {
-		fprintf(stderr, "foreground = yes\n");
-		fprintf(stderr, "pid =\n");
-		fprintf(stderr, ";debug = 7\n");
-		fprintf(stderr, "[x11vnc_stunnel]\n");
-		fprintf(stderr, "accept = %d\n", stunnel_port);
-		fprintf(stderr, "connect = %d\n", x11vnc_port);
+	if (ssl_verify) {
+		if (stat(ssl_verify, &verify_buf) != 0) {
+			rfbLog("stunnel: %s does not exist.\n", ssl_verify);
+			return 0;
+		}
 	}
 
 	stunnel_pid = fork();
@@ -137,18 +136,37 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		}
 
 		if (use_stunnel == 3) {
-			char sp[20], xp[20];
+			char sp[20], xp[20], *a = NULL;
+			char *st = stunnel_path;
+			char *pm = stunnel_pem;
+			char *sv = ssl_verify;
 
 			sprintf(sp, "%d", stunnel_port);
 			sprintf(xp, "%d", x11vnc_port);
+
+			if (ssl_verify) {
+				if(S_ISDIR(verify_buf.st_mode)) {
+					a = "-a";
+				} else {
+					a = "-A";
+				}
+			}
 			
-			if (stunnel_pem) {
-				execlp(stunnel_path, stunnel_path, "-f", "-d",
-				    sp, "-r", xp, "-P", "none", "-p",
-				    stunnel_pem, (char *) NULL);
+			if (stunnel_pem && ssl_verify) {
+				execlp(st, st, "-f", "-d", sp, "-r", xp, "-P",
+				    "none", "-p", pm, a, sv, "-v", "2",
+				    (char *) NULL);
+			} else if (stunnel_pem && !ssl_verify) {
+				execlp(st, st, "-f", "-d", sp, "-r", xp, "-P",
+				    "none", "-p", pm,
+				    (char *) NULL);
+			} else if (!stunnel_pem && ssl_verify) {
+				execlp(st, st, "-f", "-d", sp, "-r", xp, "-P",
+				    "none", a, sv, "-v", "2",
+				    (char *) NULL);
 			} else {
-				execlp(stunnel_path, stunnel_path, "-f", "-d",
-				    sp, "-r", xp, "-P", "none", (char *) NULL);
+				execlp(st, st, "-f", "-d", sp, "-r", xp, "-P",
+				    "none", (char *) NULL);
 			}
 			exit(1);
 		}
@@ -162,7 +180,15 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		if (stunnel_pem) {
 			fprintf(in, "cert = %s\n", stunnel_pem);
 		}
-		fprintf(in, ";debug = 7\n");
+		if (ssl_verify) {
+			if(S_ISDIR(verify_buf.st_mode)) {
+				fprintf(in, "CApath = %s\n", ssl_verify);
+			} else {
+				fprintf(in, "CAfile = %s\n", ssl_verify);
+			}
+			fprintf(in, "verify = 2\n");
+		}
+		fprintf(in, ";debug = 7\n\n");
 		fprintf(in, "[x11vnc_stunnel]\n");
 		fprintf(in, "accept = %d\n", stunnel_port);
 		fprintf(in, "connect = %d\n", x11vnc_port);
@@ -256,6 +282,7 @@ void setup_stunnel(int rport, int *argc, char **argv) {
 			}
 		}
 		stunnel_port = rport;
+		ssl_initialized = 1;
 		return;
 	}
 

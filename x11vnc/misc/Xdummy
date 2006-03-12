@@ -1,0 +1,1207 @@
+#!/bin/sh
+#
+# Xdummy: an LD_PRELOAD hack to run a stock XFree86(1) or Xorg(1) server
+# with the "dummy" video driver to make it avoid Linux VT switching, etc.
+#
+# Run "Xdummy -help" for more info.
+#
+xserver=""
+geom=""
+install=""
+uninstall=""
+root=1
+debug=""
+strace=""
+runit=1
+prconf=""
+noconf=""
+
+PATH=$PATH:/bin:/usr/bin
+export PATH
+
+program=`basename "$0"`
+
+help () {
+	cat << END
+
+$program: a hack to run a stock XFree86(1) or Xorg(1) server with the
+"dummy" video driver such that it AVOIDS the Linux VT switching, keyboard
+mouse conflicts, etc associated with normal use of "dummy".  
+
+In other words, try to make XFree86/Xorg with the Device "dummy" driver
+act more like Xvfb(1).
+
+To achieve this, while running the real Xserver $program intercepts system
+and library calls via the LD_PRELOAD method and modifies the behavior
+to make it work correctly (i.e. avoid the VT stuff).  LD_PRELOAD tricks
+are usually "clever hacks" and so might not work in all circumstances.
+
+The primary motivation for the Xdummy script is to provide a virtual X
+server for x11vnc but with more features than Xvfb (or Xvnc), however
+it could be used for other reasons (e.g. better automated testing than
+with Xvfb).
+
+Currently this program needs to be run as root, since it is too difficult
+to trick it otherwise.  Hopefully this will be relaxed at a later date
+if the needed tricks are discovered.
+
+Also, gcc/cc is required to compile the LD_PRELOAD shared object.
+See -install and -uninstall described below.
+
+
+Usage:
+
+	$program <${program}-args> [--] <Xserver-args>
+
+
+Examples:
+
+	$program :1
+
+	$program -debug -tmpdir ~/mytmp :1
+
+	$program -install
+
+startx example:
+
+	startx -e bash -- $program :2 -depth 16
+
+	(startx needs to be run as root, you can su(1) to a normal user
+	in the bash shell and then launch ~/.xinitrc or ~/.xsession,
+	gnome-session, startkde, startxfce4, etc.)
+
+xdm example:
+
+	xdm -config /usr/local/dummy/xdm-config -nodaemon
+
+	where the xdm-config file has line:
+
+	     DisplayManager.servers:         /usr/local/dummy/Xservers
+
+	and /usr/local/dummy/Xservers has lines:
+
+	     :1 local /usr/local/dummy/Xdummy :1 -debug
+	     :2 local /usr/local/dummy/Xdummy :2 -debug
+
+gdm/kdm example:
+
+	TBD.
+
+
+Options:
+
+    ${program}-args:
+
+	-install	Compile the LD_PRELOAD shared object and install it
+			next to the $program script file as: $0.so
+
+			When that file exists it is used as the LD_PRELOAD
+			shared object without recompiling.  Otherwise,
+			each time $program is run the LD_PRELOAD shared
+			object is compiled as a file in /tmp (or -tmpdir).
+
+	-uninstall	Remove the file: $0.so
+			The LD_PRELOAD shared object will then be compiled
+			each time this program is run.
+
+	Note: the X server is not started under -install or -uninstall.
+
+
+	:N		The DISPLAY can be the first $program argument.
+			It is passed to the real X server.  This is to
+			aid use with startx(1), xinit(1), xdm(1), etc.
+
+	-geom geom1[,geom2...]  Take the geometry (e.g. 1024x768) or
+			list of geometries and insert them into the
+			Screen section of the tweaked X server 
+			config file.  Use this to have a smaller geometry
+			than the one in the system config file.
+
+	-tmpdir dir	Specify a temporary directory, owned by you and
+			only writable by you.  This is used in place of
+			/tmp/Xdummy.\$USER/  to placed the $program.so
+			shared object, tweaked config files, etc.
+
+	-nonroot	Try to run in non-root mode (XXX NOT yet working).
+
+	-xserver path	Specify the path to the Xserver to use.  Default
+			is to try "Xorg" first and then "XFree86".  If
+			those are not in \$PATH, use these locations:
+				/usr/X11R6/bin/Xorg
+				/usr/X11R6/bin/XFree86
+
+	-n		Do not run the command to start the X server,
+			just show the command that $program would run.
+			The LD_PRELOAD shared object will be built,
+			if needed.
+
+	-prconf		Print, to stdout, the tweaked Xorg or XFree86
+			config file (-config and -xf86config server
+			options, respectively).  The Xserver is not
+			started.
+
+	-noconf		Do not tweak the Xorg or XFree86 config file
+			(system or server command line) at all.  It is
+			up to you to make sure it is a working config
+			file (e.g. "dummy" driver, etc).  Perhaps you
+			want to use a file based on -prconf output.
+
+	-debug		Extra debugging output.
+
+	-strace		strace(1) the Xserver process (for debugging).
+
+	-h, -help	Print out this help.
+
+
+    Xserver-args:
+
+	Most of the XFree86 and Xorg options will work.  Important ones
+	that may be supplied if missing:
+
+	:N		X Display number for server to use.
+
+	vtNN		Linux virtual terminal (VT) to use (a VT is currently
+			still used, just not switched to and from).
+
+	-config file		Driver "dummy" tweaked config file, a
+	-xf86config file	number of settings are tweaked besides Driver.
+
+	If -config/-xf86config is not given, the system one is used.
+	Any settings in the config file that are not consistent with
+	"dummy" mode will be overwritten (unless -noconf is used).
+
+Notes:
+
+    The XFree86/Xorg "dummy" driver is currently undocmented.  It works
+    well in this mode, but it is evidently not intended for end users.
+
+    If the display Xserver-arg (e.g. :1) is not given, or ":" or ":9999"
+    is given that indicates $program should try to find a free one.
+
+    If the display virtual terminal, VT, (e.g. vt9) is not given that
+    indicates $program should try to find a free one (or guess a high one). 
+    
+    This program is not completely secure WRT files in /tmp (but it
+    tries to some degree).  Better is to use the -tmpdir option to supply a
+    directory only writable by you.  Even better is to get rid of users on
+    the local machine you do not trust :-)
+
+END
+}
+
+warn() {
+	echo "$*" 1>&2
+}
+
+#warn "id: `id -u`"
+# See if it needs to be run as root:
+if [ "X$XDUMMY_SU_EXEC" = "X" -a "X`id -u`" != "X0"  ]; then
+	dosu=1
+	XDUMMY_SU_EXEC=1
+	export XDUMMY_SU_EXEC
+	for arg in $*
+	do
+		if [ "X$arg" = "X-nonroot" ]; then
+			dosu=""
+		elif [ "X$arg" = "X-help" ]; then
+			dosu=""
+		elif [ "X$arg" = "X-h" ]; then
+			dosu=""
+		elif [ "X$arg" = "X-install" ]; then
+			dosu=""
+		elif [ "X$arg" = "X-uninstall" ]; then
+			dosu=""
+		elif [ "X$arg" = "X-n" ]; then
+			dosu=""
+		elif [ "X$arg" = "X-prconf" ]; then
+			dosu=""
+		elif [ "X$arg" = "X--" ]; then
+			break
+		fi
+	done
+	if [ $dosu ]; then
+		warn "$program: currently needs to be run as root to work."
+		warn "$program: supply the root password to restart as root:"
+		exec su -c "$0 $*"
+		exit
+	fi
+fi
+
+#warn "args: $*"
+disp=""
+# Process Xdummy args:
+while [ "X$1" != "X" ]
+do
+    case $1 in 
+	":"*)	disp=$1
+                ;;
+	"-install") install=1
+                ;;
+	"-uninstall") uninstall=1
+                ;;
+	"-nonroot") root=""
+                ;;
+	"-xserver") xserver="$2"; shift
+                ;;
+	"-geom"*) geom="$2"; shift
+                ;;
+	"-tmpdir") XDUMMY_TMPDIR="$2"; shift
+                ;;
+	"-n") runit=""
+                ;;
+	"-no") runit=""
+                ;;
+	"-prconf") prconf=1
+                ;;
+	"-noconf") noconf=1
+                ;;
+	"-debug") debug=1
+                ;;
+	"-nodebug") debug=""
+                ;;
+	"-strace") strace=1
+                ;;
+	"-h"*)	help; exit 0
+                ;;
+	"--")	shift; break
+                ;;
+	*)	break
+                ;;
+    esac
+    shift
+done
+
+# Try to get a username for use in our tmp directory, etc.
+user=""
+if [ X`id -u` = "X0"  ]; then
+	user=root	# this will also be used below for id=0
+elif [ "X$USER" != "X" ]; then
+	user=$USER
+elif [ "X$LOGNAME" != "X" ]; then
+	user=$LOGNAME
+fi
+# keep trying...
+if [ "X$user" = "X" ]; then
+	user=`whoami 2>/dev/null`
+fi
+if [ "X$user" = "X" ]; then
+	user=`basename $HOME`
+fi
+if [ "X$user" = "X" -o "X$user" = "X." ]; then
+	user="u$$"
+fi
+
+# Function to compile the LD_PRELOAD shared object:
+make_so() {
+
+	# extract code embedded in this script into a tmp C file: 
+	n1=`grep -n '^#code_begin' $0 | head -1 | awk -F: '{print $1}'`
+	n2=`grep -n '^#code_end'   $0 | head -1 | awk -F: '{print $1}'`
+	n1=`expr $n1 + 1`
+	dn=`expr $n2 - $n1`
+
+	tmp=$tdir/Xdummy.$$.c
+	rm -f $tmp
+	if [ -e $tmp -o -h $tmp ]; then
+		warn "$tmp still exists."
+		exit 1
+	fi
+	tail +$n1 $0 | head -$dn > $tmp
+
+	# compile it to Xdummy.so:
+	rm -f $SO
+	touch $SO
+	if [ ! -f $SO ]; then
+		SO=$tdir/Xdummy.$user.so
+		warn "warning switch LD_PRELOAD shared object to: $SO"
+	fi
+	rm -f $SO
+
+	# we assume gcc:
+	cc -shared -fPIC -o $SO $tmp
+	rc=$?
+	rm -f $tmp
+	if [ $rc != 0 ]; then
+		warn "$program: cannot build $SO"
+		exit 1
+	fi
+	if [ "X$debug" != "X" -o "X$install" != "X" ]; then
+		warn "$program: created $SO"
+		ls -l "$SO"
+	fi
+}
+
+# Set tdir to tmp dir for make_so():
+if [ "X$XDUMMY_TMPDIR" != "X" ]; then
+	tdir=$XDUMMY_TMPDIR
+	mkdir -p $tdir
+else
+	tdir="/tmp"
+fi
+
+# Handle -install/-uninstall case:
+SO=$0.so
+if [ "X$install" != "X" -o "X$uninstall" != "X" ]; then
+	if [ -e $SO -o -h $SO ]; then
+		warn "removing $SO"
+	fi
+	rm -f $SO
+	if [ -e $SO -o -h $SO ]; then
+		# not good...
+		warn "warning: $SO still exists."
+		exit 1
+	fi
+	if [ $install ]; then
+		make_so
+		if [ ! -f $SO ]; then
+			exit 1
+		fi
+	fi
+	exit 0
+fi
+
+# We need a tmp directory for the .so, tweaked config file, and for
+# redirecting filenames we cannot create (under -nonroot, not yet
+# working).
+#
+if [ "X$XDUMMY_TMPDIR" = "X" ]; then
+	XDUMMY_TMPDIR="/tmp/Xdummy.$user"
+fi
+tmp=$XDUMMY_TMPDIR
+if echo "$tmp" | grep '^/tmp' > /dev/null; then
+	if [ "X$tmp" != "X/tmp" -a "X$tmp" != "X/tmp/" ]; then
+		# clean this subdir of /tmp out, otherwise leave it...
+		rm -rf $XDUMMY_TMPDIR
+		if [ -e $XDUMMY_TMPDIR ]; then
+			warn "$XDUMMY_TMPDIR still exists"
+			exit 1
+		fi
+	fi
+fi
+
+mkdir -p $XDUMMY_TMPDIR
+chmod 700 $XDUMMY_TMPDIR
+
+# see if we can write something there:
+tfile="$XDUMMY_TMPDIR/test.file"
+touch $tfile
+if [ ! -f $tfile ]; then
+	XDUMMY_TMPDIR="/tmp/Xdummy.$$.$USER"
+	warn "warning: setting tmpdir to $XDUMMY_TMPDIR ..."
+	rm -rf $XDUMMY_TMPDIR || exit 1
+	mkdir -p $XDUMMY_TMPDIR || exit 1
+fi
+rm -f $tfile
+
+export XDUMMY_TMPDIR
+
+# compile the LD_PRELOAD shared object if needed:
+if [ ! -f $SO ]; then
+	SO="$XDUMMY_TMPDIR/Xdummy.so"
+	make_so
+fi
+
+# decide which X server to use:
+if [ "X$xserver" = "X" ]; then
+	if type Xorg >/dev/null 2>&1; then
+		xserver="Xorg"
+	elif type XFree86 >/dev/null 2>&1; then
+		xserver="XFree86"
+	elif -x /usr/X11R6/bin/Xorg; then
+		xserver="/usr/X11R6/bin/Xorg"
+	elif -x /usr/X11R6/bin/XFree86; then
+		xserver="/usr/X11R6/bin/XFree86"
+	fi
+	if [ "X$xserver" = "X" ]; then
+		# just let it fail below.
+		xserver="/usr/X11R6/bin/Xorg"
+		warn "$program: cannot locate a stock Xserver... assuming $xserver"
+	fi
+fi
+
+# see if the binary is suid or not readable under -nonroot (XXX not yet useful):
+xserver_path=`type -p $xserver 2>/dev/null`
+if [ -e "$xserver_path" -a "X$root" = "X" -a "X$runit" != "X" ]; then
+	if [ ! -r $xserver_path -o -u $xserver_path ]; then
+		# XXX not quite correct with rm -rf $XDUMMY_TMPDIR ...
+		base=`basename "$xserver_path"`
+		new="$tdir/$base.$user"
+		if [ ! -e $new ]; then
+			warn "need to copy $xserver_path to $new as root:"
+			ls -l $xserver_path 1>&2
+			warn "please supply root passwd to 'su -c'"
+			touch $new || exit 1
+			chmod 700 $new || exit 1
+			su -c "cat $xserver_path > $new"
+		elif [ ! -O $new ]; then
+			warn "file \"$new\" not owned by us!"
+			ls -l $new
+			exit 1
+		fi
+		xserver=$new
+	fi 
+fi
+
+# work out display:
+if [ "X$disp" != "X" ]; then
+	:
+elif [ "X$1" != "X" ]; then
+	if echo "$1" | grep '^:[0-9]' > /dev/null; then
+		disp=$1
+		shift
+	elif [ "X$1" = "X:" ]; then
+		# ":" means for us to find one.
+		shift
+	fi
+fi
+if [ "X$disp" = "X" -o "X$disp" = "X:" ]; then
+	# try to find an open display port:
+	ports=`netstat -ant | grep LISTEN | awk '{print $4}' | sed -e 's/^.*://'`
+	n=0
+	while [ $n -le 20 ]
+	do
+		port=`printf "60%02d" $n`
+		if echo "$ports" | grep "^${port}\$" > /dev/null; then
+			:
+		else
+			disp=":$n"
+			warn "$program: auto-selected DISPLAY $disp"
+			break	
+		fi
+		n=`expr $n + 1`
+	done
+fi
+
+# work out which vt to use, try to find an open one if necessary.
+vt=""
+for arg in $*
+do
+	if echo "$arg" | grep '^vt' > /dev/null; then
+		vt=$arg
+		break
+	fi
+done
+if [ "X$vt" = "X" ]; then
+	if [ "X$user" = "Xroot" ]; then
+		# root can user fuser(1) to see if it is in use:
+		if type fuser >/dev/null 2>&1; then
+			# try /dev/tty17 thru /dev/tty32
+			n=17
+			while [ $n -le 32 ]
+			do
+				dev="/dev/tty$n"
+				if fuser $dev >/dev/null 2>&1; then
+					:
+				else
+					vt="vt$n"
+					warn "$program: auto-selected VT $vt => $dev"
+					break
+				fi
+				n=`expr $n + 1`
+			done
+		fi
+	fi
+	if [ "X$vt" = "X" ]; then
+		# take a wild guess...
+		vt=vt16
+		warn "$program: selected VT $vt"
+	fi
+else
+	vt=""
+fi
+
+# decide flavor of Xserver:
+stype=`basename "$xserver"`
+if echo "$stype" | grep -i xorg > /dev/null; then
+	stype=xorg
+else
+	stype=xfree86
+fi
+
+# work out config file and tweak it.
+next=""
+config=""
+got_config=""
+for arg in $*
+do
+	if [ $next ]; then
+		config="$arg"
+		got_config=1
+		break
+	fi
+	if [ "X$arg" = "X-xf86config" ]; then
+		stype="xfree86"
+		next=1
+	elif [ "X$arg" = "X-config" ]; then
+		stype="xorg"
+		next=1
+	fi
+done
+
+tweak_config() {
+    in="$1"
+    config2="$XDUMMY_TMPDIR/xconfig"
+    if [ "X$disp" != "X" ]; then
+    	d=`echo "$disp" | sed -e 's,/,,g' -e 's/:/_:/g'`
+	config2="$config2$d"
+    fi
+    
+    # perl script to tweak the config file... add/delete options, etc.
+    XDUMMY_GEOM=$geom; export XDUMMY_GEOM
+    perl > $config2 < $in -e '
+    $n = 0;
+    $geom = $ENV{XDUMMY_GEOM};
+    if ($geom ne "") {
+    	$tmp = "";
+	foreach $g (split(/,/, $geom)) {
+		$tmp .= "\"$g\" ";
+	}
+	$tmp =~ s/\s*$//;
+	$geom = $tmp;
+    }
+    while (<>) {
+	$n++;
+	if (/^\s*#/) {
+		# pass comments straight thru
+		print;
+		next;
+	}
+	if (/^\s*Section\s+(\S+)/i) {
+		# start of Section
+		$sect = $1;
+		$sect =~ s/\W//g;
+		$sect =~ y/A-Z/a-z/;
+		$sects{$sect} = 1;
+		print;
+		next;
+	}
+	if (/^\s*EndSection/) {
+		# end of Section
+		if ($sect eq "serverflags") {
+			if (!$got_DontVTSwitch) {
+				print "  ##Xdummy:##\n";
+				print "  Option \"DontVTSwitch\" \"true\"\n";
+			}
+			if (!$got_AllowMouseOpenFail) {
+				print "  ##Xdummy:##\n";
+				print "  Option \"AllowMouseOpenFail\" \"true\"\n";
+			}
+			if (!$got_PciForceNone) {
+				print "  ##Xdummy:##\n";
+				print "  Option \"PciForceNone\" \"true\"\n";
+			}
+		} elsif ($sect eq "device") {
+			if (!$got_Driver) {
+				print "  ##Xdummy:##\n";
+				print "  Driver \"dummy\"\n";
+			}
+			if (!$got_VideoRam) {
+				print "  ##Xdummy:##\n";
+				print "  VideoRam 16000\n";
+			}
+		}
+		$sect = "";
+		print;
+		next;
+	}
+	$l = $_;
+	$l =~ s/#.*$//;
+	if ($sect eq "serverflags") {
+		if ($l =~ /^\s*Option.*DontVTSwitch/i) {
+			$_ =~ s/false/true/ig;
+			$got_DontVTSwitch = 1;
+		}
+		if ($l =~ /^\s*Option.*AllowMouseOpenFail/i) {
+			$_ =~ s/false/true/ig;
+			$got_AllowMouseOpenFail = 1;
+		}
+		if ($l =~ /^\s*Option.*PciForceNone/i) {
+			$_ =~ s/false/true/ig;
+			$got_PciForceNone= 1;
+		}
+	}
+	if ($sect eq "module") {
+		if ($l =~ /^\s*Load.*\b(dri|fbdevhw)\b/i) {
+			$_ = "##Xdummy## $_";
+		}
+	}
+	if ($sect eq "device") {
+		if ($l =~ /^(\s*Driver)\b/i) {
+			$_ = "$1 \"dummy\"\n";
+			$got_Driver = 1;
+		}
+		if ($l =~ /^\s*VideoRam/i) {
+			$got_VideoRam= 1;
+		}
+	}
+	if ($sect eq "inputdevice") {
+		if ($l =~ /^\s*Option.*\bDevice\b/i) {
+			print "  ##Xdummy:##\n";
+			$_ = "  Option \"Device\" \"/dev/dilbert$n\"\n";
+		}
+	}
+	if ($sect eq "screen") {
+		if ($geom ne "") {
+			if ($l =~ /^(\s*Modes)\b/i) {
+				$_ = "$1 $geom\n";
+				print "  ##Xdummy:##\n";
+				$got_Modes = 1;
+			}
+		}
+	}
+	print;
+    }
+    # create any crucial sections that are missing:
+    if (! exists($sects{serverflags})) {
+	print "\n##Xdummy:##\n";
+    	print "Section \"ServerFlags\"\n";
+    	print "  Option \"DontVTSwitch\" \"true\"\n";
+    	print "  Option \"AllowMouseOpenFail\" \"true\"\n";
+    	print "  Option \"PciForceNone\" \"true\"\n";
+    	print "EndSection\n";
+    }
+    if (! exists($sects{device})) {
+	print "\n##Xdummy:##\n";
+    	print "Section \"Device\"\n";
+    	print "  Identifier \"Videocard0\"\n";
+    	print "  Driver \"dummy\"\n";
+	print "  VideoRam 16000\n";
+    	print "EndSection\n";
+    }
+    if (! exists($sects{monitor})) {
+	print "\n##Xdummy:##\n";
+    	print "Section \"Monitor\"\n";
+    	print "  Identifier \"Monitor0\"\n";
+    	print "  HorizSync   30.0 - 130.0\n";
+    	print "  VertRefresh 50.0 - 250.0\n";
+    	print "EndSection\n";
+    }
+    if (! exists($sects{screen})) {
+	print "\n##Xdummy:##\n";
+    	print "Section \"Screen\"\n";
+    	print "  Identifier \"Screen0\"\n";
+    	print "  Device \"Videocard0\"\n";
+    	print "  Monitor \"Monitor0\"\n";
+    	print "  DefaultDepth 16\n";
+    	print "  SubSection \"Display\"\n";
+    	print "    Viewport 0 0\n";
+    	print "    Depth 16\n";
+    	print "    Modes \"1024x768\" \"800x600\" \"640x480\"\n";
+    	print "  EndSubSection\n";
+    	print "EndSection\n";
+    }
+';
+}
+
+args="$*"
+if [ ! $noconf ]; then
+	# tweaked config will be put in $config2:
+	config2=""
+	if [ "X$config" != "X" ]; then
+		if [ ! -f $config ]; then
+			config="/etc/X11/$config"
+		fi
+	else
+		# use the default one:
+		if [ "X$stype" = "Xxorg" ]; then
+			config=/etc/X11/xorg.conf
+		else
+			if [ -f "/etc/X11/XF86Config-4" ]; then
+				config="/etc/X11/XF86Config-4"
+			else
+				config="/etc/X11/XF86Config"
+			fi
+		fi
+		if [ ! -f $config ]; then
+			for c in /etc/X11/xorg.conf /etc/X11/XF86Config-4 /etc/X11/XF86Config
+			do
+				if [ -f $c ]; then
+					config=$c
+					break
+				fi
+			done
+		fi
+	fi
+
+	if [ -f $config ]; then
+		tweak_config $config
+	fi
+
+	# now we need to get our tweaked config file onto the command line:
+	if [ ! $got_config ]; then
+		# append:
+		if [ "X$stype" = "Xxorg" ]; then
+			args="$args -config FUBAR"
+		else
+			args="$args -xf86config FUBAR"
+		fi
+	fi
+	if [ "X$config2" != "X" ]; then
+		# or modify $args:
+		args=`echo "$args" | sed \
+			-e "s,-config  *[^ ][^ ]*,-config $config2,g" \
+			-e "s,-xf86config  *[^ ][^ ]*,-xf86config $config2,g"`
+	fi
+fi
+
+if [ $prconf ]; then
+	warn ""
+	warn "The Xorg/XFree86 server config file is:"
+	warn ""
+	if [ "X$config2" = "X" ]; then
+		warn "NO CONFIG GENERATED."
+	else
+		cat "$config2"
+	fi
+	exit
+fi
+
+if [ $debug ]; then
+	XDUMMY_DEBUG=1
+	export XDUMMY_DEBUG
+fi
+if [ $root ]; then
+	XDUMMY_ROOT=1
+	export XDUMMY_ROOT
+fi
+
+# finally, run it:
+if [ "X$debug" != "X" -o "X$runit" = "X" ]; then
+	warn ""
+	warn "The command to run is:"
+	warn ""
+	so=$SO
+	pwd=`pwd`
+	if echo "$so" | grep '^\./' > /dev/null; then
+		so=`echo "$so" | sed -e "s,^\.,$pwd,"`
+	fi
+	if echo "$so" | grep '/' > /dev/null; then
+		:
+	else
+		so="$pwd/$so"
+	fi
+	warn "env LD_PRELOAD=$so $xserver $disp $args $vt"
+	warn ""
+	if [ ! $runit ]; then
+		exit 0
+	fi
+fi
+if [ $strace ]; then
+	strace -f env LD_PRELOAD=$SO $xserver $disp $args $vt
+else
+	exec env LD_PRELOAD=$SO $xserver $disp $args $vt
+fi
+
+exit $?
+#########################################################################
+
+code() {
+#code_begin
+#include <stdio.h>
+#define O_ACCMODE          0003
+#define O_RDONLY             00
+#define O_WRONLY             01
+#define O_RDWR               02
+#define O_CREAT            0100 /* not fcntl */
+#define O_EXCL             0200 /* not fcntl */
+#define O_NOCTTY           0400 /* not fcntl */
+#define O_TRUNC           01000 /* not fcntl */
+#define O_APPEND          02000
+#define O_NONBLOCK        04000
+#define O_NDELAY        O_NONBLOCK
+#define O_SYNC           010000
+#define O_FSYNC          O_SYNC
+#define O_ASYNC          020000
+
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <linux/vt.h>
+#include <linux/kd.h>
+
+#define __USE_GNU
+#include <dlfcn.h>
+
+static char tmpdir[1024];
+static char str1[1024];
+static char str2[1024];
+
+static char devs[256][1024];
+static int debug = -1;
+static int root = -1;
+
+void check_debug(void) {
+	if (debug < 0) {
+		if (getenv("XDUMMY_DEBUG") != NULL) {
+			debug = 1;
+		} else {
+			debug = 0;
+		}
+		putenv("LD_PRELOAD=");
+	}
+}
+void check_root(void) {
+	if (root < 0) {
+		if (getenv("XDUMMY_ROOT") != NULL) {
+			root = 1;
+		} else {
+			root = 0;
+		}
+	}
+}
+#define CHECKIT if (debug < 0) check_debug(); \
+		if (root  < 0) check_root();
+
+static void set_tmpdir(void) {
+	char *s;
+	static int didset = 0;
+	if (didset) {
+		return;
+	}
+	s = getenv("XDUMMY_TMPDIR");
+	if (! s) {
+		s = "/tmp";
+	}
+	tmpdir[0] = '\0';
+	strcat(tmpdir, s);
+	strcat(tmpdir, "/");
+	didset = 1;
+}
+
+static char *tmpdir_path(const char *path) {
+	char *str;
+	set_tmpdir();
+	strcpy(str2, path);
+	str = str2;
+	while (*str) {
+		if (*str == '/') {
+			*str = '_';
+		}
+		str++;
+	}
+	strcpy(str1, tmpdir);
+	strcat(str1, str2);
+	return str1;
+}
+
+int open(const char *pathname, int flags, unsigned short mode) {
+	int fd;
+	char *store_dev = NULL;
+	static int (*real_open)(const char *, int , unsigned short) = NULL;
+
+	CHECKIT
+	if (! real_open) {
+		real_open = (int (*)(const char *, int , unsigned short))
+			dlsym(RTLD_NEXT, "open");
+	}
+
+	if (! root) {
+		if (!strcmp(pathname, "/dev/mem")) {
+			;
+		} else if (!strcmp(pathname, "/dev/tty")) {
+			;
+		} else if (strstr(pathname, "/dev") == pathname) {
+			store_dev = strdup(pathname);
+			pathname = tmpdir_path(pathname);
+			if (debug) fprintf(stderr, "OPEN: -> %s\n", pathname, mode);
+			fd = real_open(pathname, O_WRONLY|O_CREAT, 0777);
+			close(fd);
+		}
+	}
+
+	fd = real_open(pathname, flags, mode);
+
+	if (debug) fprintf(stderr, "OPEN: %s %d %d fd=%d\n",
+	    pathname, flags, mode, fd);
+
+	if (! root) {
+		if (store_dev && fd < 256) {
+			if (fd < 256) {
+				strcpy(devs[fd], store_dev);
+			}
+			free(store_dev);
+		}
+	}
+
+	return(fd);
+}
+
+int open64(const char *pathname, int flags, unsigned short mode) {
+	int fd;
+
+	CHECKIT
+	if (debug) fprintf(stderr, "OPEN64: %s %d %d\n", pathname, flags, mode);
+
+	fd = open(pathname, flags, mode);
+	return(fd);
+}
+
+FILE *fopen(const char *pathname, const char *mode) {
+	static FILE* (*real_fopen)(const char *, const char *) = NULL;
+	char *str;
+
+	CHECKIT
+	if (! real_fopen) {
+		real_fopen = (FILE* (*)(const char *, const char *))
+			dlsym(RTLD_NEXT, "fopen");
+	}
+	if (debug) fprintf(stderr, "FOPEN: %s %s\n", pathname, mode);
+
+	if (root) {
+		return(real_fopen(pathname, mode));
+	}
+
+	str = (char *) pathname;
+	if (strstr(pathname, "/var/log") == pathname) {
+		str = tmpdir_path(pathname);
+		if (debug) fprintf(stderr, "FOPEN: -> %s\n", str, mode);
+	}
+
+}
+
+
+#define RETURN0 if (debug) \
+	{fprintf(stderr, "IOCTL: covered %d 0x%x\n", fd, req);} return 0;
+#define RETURN1 if (debug) \
+	{fprintf(stderr, "IOCTL: covered %d 0x%x\n", fd, req);} return -1;
+
+int ioctl(int fd, int req, void *ptr) {
+	static int closed_xf86Info_consoleFd = 0;
+	static int (*real_ioctl)(int, int , void *) = NULL;
+
+	CHECKIT
+	if (! real_ioctl) {
+		real_ioctl = (int (*)(int, int , void *))
+			dlsym(RTLD_NEXT, "open");
+	}
+	if (debug) fprintf(stderr, "IOCTL: %d 0x%x %p\n", fd, req, ptr);
+
+	/* based on xorg-x11-6.8.1-dualhead.patch */
+	if (req == VT_GETMODE) {
+		/* close(xf86Info.consoleFd) */
+		if (0 && ! closed_xf86Info_consoleFd) {
+			/* I think better not to close it... */
+			close(fd);
+			closed_xf86Info_consoleFd = 1;
+		}
+		RETURN0
+	} else if (req == VT_SETMODE) {
+		RETURN0
+	} else if (req == VT_GETSTATE) {
+		RETURN0
+	} else if (req == KDSETMODE) {
+		RETURN0
+	} else if (req == KDSETLED) {
+		RETURN0
+	} else if (req == KDGKBMODE) {
+		RETURN0
+	} else if (req == VT_ACTIVATE) {
+		RETURN0
+	} else if (req == VT_WAITACTIVE) {
+		RETURN0
+	} else if (req == VT_RELDISP) {
+		if (ptr == (void *) 1) {
+			RETURN1
+		} else if (ptr == (void *) VT_ACKACQ) {
+			RETURN0
+		}
+	}
+
+	return(real_ioctl(fd, req, ptr));
+}
+
+typedef void (*sighandler_t)(int);
+#define SIGUSR1       10
+#define SIG_DFL       ((sighandler_t)0)
+
+sighandler_t signal(int signum, sighandler_t handler) {
+	static sighandler_t (*real_signal)(int, sighandler_t) = NULL;
+
+	CHECKIT
+	if (! real_signal) {
+		real_signal = (sighandler_t (*)(int, sighandler_t))
+			dlsym(RTLD_NEXT, "signal");
+	}
+
+	if (debug) fprintf(stderr, "SIGNAL: %d %p\n", signum, handler);
+
+	if (signum == SIGUSR1) {
+		if (debug) fprintf(stderr, "SIGNAL: skip SIGUSR1\n");
+		return SIG_DFL;
+	}
+	
+	return(real_signal(signum, handler));
+}
+
+int close(int fd) {
+	static int (*real_close)(int) = NULL;
+
+	CHECKIT
+	if (! real_close) {
+		real_close = (int (*)(int)) dlsym(RTLD_NEXT, "close");
+	}
+
+	if (debug) fprintf(stderr, "CLOSE: %d\n", fd);
+	if (! root) {
+		if (fd < 256) {
+			devs[fd][0] = '\0';
+		}
+	}
+	return(real_close(fd));
+}
+
+/*
+ * Note: the following just call the real function if root is
+ * true.  They will be used if -nonroot is ever figured out.
+ */
+
+int chown(const char *path, uid_t owner, gid_t group) {
+	static int (*real_chown)(const char *, uid_t, gid_t) = NULL;
+
+	CHECKIT
+	if (! real_chown) {
+		real_chown = (int (*)(const char *, uid_t, gid_t))
+			dlsym(RTLD_NEXT, "chown");
+	}
+
+	if (root) {
+		return(real_chown(path, owner, group));
+	}
+
+	if (debug) fprintf(stderr, "CHOWN: %s %d %d\n", path, owner, group);
+
+	if (strstr(path, "/dev") == path) {
+		if (debug) fprintf(stderr, "CHOWN: return 0\n");
+		return 0;
+	}
+
+	return(real_chown(path, owner, group));
+}
+
+
+int ioperm(unsigned long from, unsigned long num, int turn_on) {
+	static int (*real_ioperm)(unsigned long, unsigned long, int) = NULL;
+	CHECKIT
+	if (! real_ioperm) {
+		real_ioperm = (int (*)(unsigned long, unsigned long, int))
+			dlsym(RTLD_NEXT, "ioperm");
+	}
+	if (root) {
+		return(real_ioperm(from, num, turn_on));
+	}
+	return 0;
+}
+
+int iopl(int level) {
+	static int (*real_iopl)(int) = NULL;
+	CHECKIT
+	if (! real_iopl) {
+		real_iopl = (int (*)(int)) dlsym(RTLD_NEXT, "iopl");
+	}
+	if (root) {
+		return(real_iopl(level));
+	}
+	return 0;
+}
+
+uid_t getuid(void) {
+	static uid_t (*real_getuid)(void) = NULL;
+	CHECKIT
+	if (! real_getuid) {
+		real_getuid = (uid_t (*)(void)) dlsym(RTLD_NEXT, "getuid");
+	}
+	if (root) {
+		return(real_getuid());
+	}
+	if (debug) fprintf(stderr, "GETUID: 0\n");
+	return 0;
+}
+uid_t geteuid(void) {
+	static uid_t (*real_geteuid)(void) = NULL;
+	CHECKIT
+	if (! real_geteuid) {
+		real_geteuid = (uid_t (*)(void)) dlsym(RTLD_NEXT, "geteuid");
+	}
+	if (root) {
+		return(real_geteuid());
+	}
+	if (debug) fprintf(stderr, "GETEUID: 0\n");
+	return 0;
+}
+uid_t getuid32(void) {
+	static uid_t (*real_getuid32)(void) = NULL;
+	CHECKIT
+	if (! real_getuid32) {
+		real_getuid32 = (uid_t (*)(void)) dlsym(RTLD_NEXT, "getuid32");
+	}
+	if (root) {
+		return(real_getuid32());
+	}
+	if (debug) fprintf(stderr, "GETUID32: 0\n");
+	return 0;
+}
+uid_t geteuid32(void) {
+	static uid_t (*real_geteuid32)(void) = NULL;
+	CHECKIT
+	if (! real_geteuid32) {
+		real_geteuid32 = (uid_t (*)(void)) dlsym(RTLD_NEXT, "geteuid32");
+	}
+	if (root) {
+		return(real_geteuid32());
+	}
+	if (debug) fprintf(stderr, "GETEUID32: 0\n");
+	return 0;
+}
+
+gid_t getgid(void) {
+	static gid_t (*real_getgid)(void) = NULL;
+	CHECKIT
+	if (! real_getgid) {
+		real_getgid = (gid_t (*)(void)) dlsym(RTLD_NEXT, "getgid");
+	}
+	if (root) {
+		return(real_getgid());
+	}
+	if (debug) fprintf(stderr, "GETGID: 0\n");
+	return 0;
+}
+gid_t getegid(void) {
+	static gid_t (*real_getegid)(void) = NULL;
+	CHECKIT
+	if (! real_getegid) {
+		real_getegid = (gid_t (*)(void)) dlsym(RTLD_NEXT, "getegid");
+	}
+	if (root) {
+		return(real_getegid());
+	}
+	if (debug) fprintf(stderr, "GETEGID: 0\n");
+	return 0;
+}
+gid_t getgid32(void) {
+	static gid_t (*real_getgid32)(void) = NULL;
+	CHECKIT
+	if (! real_getgid32) {
+		real_getgid32 = (gid_t (*)(void)) dlsym(RTLD_NEXT, "getgid32");
+	}
+	if (root) {
+		return(real_getgid32());
+	}
+	if (debug) fprintf(stderr, "GETGID32: 0\n");
+	return 0;
+}
+gid_t getegid32(void) {
+	static gid_t (*real_getegid32)(void) = NULL;
+	CHECKIT
+	if (! real_getegid32) {
+		real_getegid32 = (gid_t (*)(void)) dlsym(RTLD_NEXT, "getegid32");
+	}
+	if (root) {
+		return(real_getegid32());
+	}
+	if (debug) fprintf(stderr, "GETEGID32: 0\n");
+	return 0;
+}
+
+#code_end
+}

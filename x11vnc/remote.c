@@ -3775,10 +3775,18 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, unixpw_nis);
 		} else if (!strcmp(p, "unixpw_list")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(unixpw_list));
+		} else if (!strcmp(p, "ssl")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, use_openssl);
+		} else if (!strcmp(p, "ssl_pem")) {
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(openssl_pem));
+		} else if (!strcmp(p, "sslverify")) {
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(ssl_verify));
 		} else if (!strcmp(p, "stunnel")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, use_stunnel);
 		} else if (!strcmp(p, "stunnel_pem")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(stunnel_pem));
+		} else if (!strcmp(p, "usepw")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, usepw);
 		} else if (!strcmp(p, "using_shm")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, !using_shm);
 		} else if (!strcmp(p, "logfile") || !strcmp(p, "o")) {

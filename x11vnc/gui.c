@@ -188,6 +188,7 @@ static int got_sigusr1 = 0;
 
 static void sigusr1 (int sig) {
 	got_sigusr1 = 1;
+	if (0) sig = 0;
 }
 
 static void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int start_x11vnc,

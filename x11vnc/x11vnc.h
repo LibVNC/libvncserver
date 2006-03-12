@@ -56,6 +56,7 @@
  * -DHARDWIRE_PASSWD=...      hardwired passwords, quoting necessary.
  * -DHARDWIRE_VIEWPASSWD=...
  * -DNOPW=1                   make -nopw the default (skip warning)
+ * -DUSEPW=1                  make -usepw the default
  * -DPASSWD_REQUIRED=1        exit unless a password is supplied.
  * -DPASSWD_UNLESS_NOPW=1     exit unless a password is supplied and no -nopw.
  *
@@ -73,6 +74,9 @@
  * -DSMALL_FOOTPRINT=1  for smaller binary size (no help, no gui, etc) 
  *                      use 2 or 3 for even smaller footprint.
  * -DNOGUI  do not include the gui tkx11vnc.
+ * -DSKIP_HELP=1   smaller.
+ * -DSKIP_XKB=1    a little smaller.
+ * -DSKIP_8to24=1  a little smaller.
  * -DPOLL_8TO24_DELAY=N  
  * -DDEBUG_XEVENTS=1  enable printout for X events.
  *
@@ -91,6 +95,10 @@
 
 #ifndef NOPW
 #define NOPW 0
+#endif
+
+#ifndef USEPW
+#define USEPW 0
 #endif
 
 #ifndef PASSWD_REQUIRED
@@ -116,12 +124,22 @@
 #define SMALL_FOOTPRINT 0
 #endif
 
-#if SMALL_FOOTPRINT
-#define NOGUI
+#ifndef SKIP_XKB
+#define SKIP_XKB 0
+#endif
+#ifndef SKIP_8TO24
+#define SKIP_8TO24 0
+#endif
+#ifndef SKIP_HELP
+#define SKIP_HELP 0
 #endif
 
-#define SKIP_XKB 0
-#define SKIP_8TO24 0
+#if SMALL_FOOTPRINT
+#undef  NOGUI
+#define NOGUI
+#undef  SKIP_HELP
+#define SKIP_HELP 0
+#endif
 
 #if (SMALL_FOOTPRINT > 1)
 #undef SKIP_XKB
@@ -446,6 +464,8 @@ typedef struct _ClientData {
 	char input[CILEN];
 	int login_viewonly;
 	time_t login_time;
+
+	pid_t ssh_helper_pid;
 
 	int had_cursor_shape_updates;
 	int had_cursor_pos_updates;

@@ -11,6 +11,8 @@
 #include "screen.h"
 #include "unixpw.h"
 #include "scan.h"
+#include "sslcmds.h"
+#include "sslhelper.h"
 
 /*
  * routines for handling incoming, outgoing, etc connections
@@ -542,6 +544,7 @@ static int accepted_client = 0;
  * callback for when a client disconnects
  */
 static void client_gone(rfbClientPtr client) {
+	ClientData *cd = NULL;
 
 	client_count--;
 	if (client_count < 0) client_count = 0;
@@ -559,17 +562,27 @@ static void client_gone(rfbClientPtr client) {
 		}
 	}
 
+
 	if (no_autorepeat && client_count == 0) {
 		autorepeat(1, 0);
 	}
 	if (use_solid_bg && client_count == 0) {
 		solid_bg(1);
 	}
-	if (gone_cmd && *gone_cmd != '\0') {
-		ClientData *cd = NULL;
-		if (client->clientData) {
-			cd = (ClientData *) client->clientData;
+	if (client->clientData) {
+		cd = (ClientData *) client->clientData;
+		if (cd->ssh_helper_pid > 0) {
+			int status;
+			rfbLog("sending SIGTERM to ssh_helper_pid: %d\n",
+			    cd->ssh_helper_pid);
+			kill(cd->ssh_helper_pid, SIGTERM);
+#if LIBVNCSERVER_HAVE_SYS_WAIT_H && LIBVNCSERVER_HAVE_WAITPID 
+			waitpid(cd->ssh_helper_pid, &status, WNOHANG); 
+#endif
+			ssh_helper_pid(cd->ssh_helper_pid, -1);	/* delete */
 		}
+	}
+	if (gone_cmd && *gone_cmd != '\0') {
 		if (strstr(gone_cmd, "popup") == gone_cmd) {
 			int x = -64000, y = -64000, timeout = 120;
 			char *userhost = ident_username(client);
@@ -1452,6 +1465,10 @@ static int do_reverse_connect(char *str) {
 		rfbLog("reverse_connect: screen not setup yet.\n");
 		return 0;
 	}
+	if (use_openssl && !getenv("X11VNC_SSL_ALLOW_REVERSE")) {
+		rfbLog("reverse connections disabled in -ssl mode.\n");
+		return 0;
+	}
 
 	/* copy in to host */
 	host = (char *) malloc(len+1);
@@ -1476,7 +1493,7 @@ static int do_reverse_connect(char *str) {
 			return 0;
 		}
 	    }
-		if (! getenv("UNIXPW_DISABLE_STUNNEL") && ! have_ssh_env()) {
+		if (! getenv("UNIXPW_DISABLE_SSL") && ! have_ssh_env()) {
 			rfbLog("reverse_connect: in -inetd stunnel/ssh\n");
 			rfbLog("required under -unixpw\n");
 			return 0;
@@ -1824,6 +1841,13 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	clients_served++;
 if (0) fprintf(stderr, "new_client: %s %d\n", client->host, clients_served);
 
+	if (use_openssl || use_stunnel) {
+		if (! ssl_initialized) {
+			rfbLog("denying additional client: %s ssl not setup"
+			    " yet.\n", client->host);
+			return(RFB_CLIENT_REFUSE);
+		}
+	}
 	if (unixpw && unixpw_in_progress) {
 		rfbLog("denying additional client: %s during -unixpw login.\n",
 		     client->host);
@@ -1857,6 +1881,13 @@ if (0) fprintf(stderr, "new_client: %s %d\n", client->host, clients_served);
 	cd->input[0] = '-';
 	cd->login_viewonly = -1;
 	cd->login_time = time(0);
+	cd->ssh_helper_pid = 0;
+
+	if (use_openssl && openssl_last_helper_pid) {
+if (0) fprintf(stderr, "SET ssh_helper_pid: %d\n", openssl_last_helper_pid);
+		cd->ssh_helper_pid = openssl_last_helper_pid;
+		openssl_last_helper_pid = 0;
+	}
 
 	if (! accept_client(client)) {
 		rfbLog("denying client: %s local user rejected connection.\n",
