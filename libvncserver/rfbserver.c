@@ -1383,6 +1383,8 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	   && cl->preferredEncoding != rfbEncodingTight
 	   /* XXX Should rfbEncodingCoRRE be in here? */
 	   && cl->preferredEncoding != rfbEncodingCoRRE
+	   /* Zlib encoding splits rectangles up into smaller chunks */
+	   && cl->preferredEncoding != rfbEncodingZlib
 #endif
 #endif
 	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {

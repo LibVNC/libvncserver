@@ -1,3 +1,7 @@
+2006-03-27  Steven Carr <scarr@jsa-usa.com>
+	* rfbserver.c: Zlib encoding cannot have a limit via
+	  maxRectsPerUpdate
+
 2006-02-28  Donald Dugger <donald.d.dugger@intel.com>
 	* rfb.h, sockets.c, main.c: add a flag to handle all pending
 	  input events instead of one at a time.
