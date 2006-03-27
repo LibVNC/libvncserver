@@ -221,6 +221,12 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       } else if (i+1<*argc && strcmp(argv[i], "-encodings") == 0) {
 	client->appData.encodingsString = argv[i+1];
 	j+=2;
+      } else if (i+1<*argc && strcmp(argv[i], "-compress") == 0) {
+	client->appData.compressLevel = atoi(argv[i+1]);
+	j+=2;
+      } else if (i+1<*argc && strcmp(argv[i], "-quality") == 0) {
+	client->appData.qualityLevel = atoi(argv[i+1]);
+	j+=2;
       } else {
 	char* colon=strchr(argv[i],':');
 
