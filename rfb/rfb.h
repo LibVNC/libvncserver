@@ -135,6 +135,9 @@ typedef rfbBool (*rfbSetTranslateFunctionProcPtr)(struct _rfbClientRec* cl);
 typedef rfbBool (*rfbPasswordCheckProcPtr)(struct _rfbClientRec* cl,const char* encryptedPassWord,int len);
 typedef enum rfbNewClientAction (*rfbNewClientHookPtr)(struct _rfbClientRec* cl);
 typedef void (*rfbDisplayHookPtr)(struct _rfbClientRec* cl);
+/* support the capability to view the caps/num/scroll states of the X server */
+typedef int (*rfbGetKeyboardLedStateHookPtr)(struct _rfbScreenInfo* screen);
+
 
 typedef struct {
   uint32_t count;
@@ -294,6 +297,9 @@ typedef struct _rfbScreenInfo
     rfbNewClientHookPtr newClientHook;
     /* displayHook is called just before a frame buffer update */
     rfbDisplayHookPtr displayHook;
+
+    /* These hooks are called to pass keyboard state back to the client */
+    rfbGetKeyboardLedStateHookPtr getKeyboardLedStateHook;
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     MUTEX(cursorMutex);
@@ -478,7 +484,8 @@ typedef struct _rfbClientRec {
     int tightQualityLevel;
 #endif
 #endif
-
+    int     lastKeyboardLedState;     /* keep track of last value so we can send *change* events */
+    rfbBool enableKeyboardLedState;   /* client supports KeyboardState encoding */
     rfbBool enableLastRectEncoding;   /* client supports LastRect encoding */
     rfbBool enableCursorShapeUpdates; /* client supports cursor shape updates */
     rfbBool enableCursorPosUpdates;   /* client supports cursor position updates */

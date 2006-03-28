@@ -1,3 +1,7 @@
+2006-03-28  Steven Carr <scarr@jsa-usa.com>
+	* SDLvncviewer.c, rfbproto.c, vncviewer.c, main.c, rfbserver.c,
+	  rfb.h, rfbclient.h, rfbproto.h: add new encoding: KeyboardLedState
+
 2006-03-28  Karl Runge <runge@karlrunge.com>
 	* classes/ssl: patch to tightvnc Java viewer for SSL support
 	  plus other fixes (richcursor colors, Tab keysym, etc).

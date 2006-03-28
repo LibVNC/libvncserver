@@ -348,6 +348,8 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->enableCursorPosUpdates = FALSE;
       cl->useRichCursorEncoding = FALSE;
       cl->enableLastRectEncoding = FALSE;
+      cl->enableKeyboardLedState = FALSE;
+      cl->lastKeyboardLedState = -1;
       cl->cursorX = rfbScreen->cursorX;
       cl->cursorY = rfbScreen->cursorY;
       cl->useNewFBSize = FALSE;
@@ -730,6 +732,40 @@ static rfbBool rectSwapIfLEAndClip(uint16_t* x,uint16_t* y,uint16_t* w,uint16_t*
 }
 
 /*
+ * Send keyboard state (PointerPos pseudo-encoding).
+ */
+
+rfbBool
+rfbSendKeyboardLedState(rfbClientPtr cl)
+{
+    rfbFramebufferUpdateRectHeader rect;
+
+    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
+    rect.encoding = Swap32IfLE(rfbEncodingKeyboardLedState);
+    rect.r.x = Swap16IfLE(cl->lastKeyboardLedState);
+    rect.r.y = 0;
+    rect.r.w = 0;
+    rect.r.h = 0;
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+        sz_rfbFramebufferUpdateRectHeader);
+    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    cl->cursorPosBytesSent += sz_rfbFramebufferUpdateRectHeader;
+    cl->cursorPosUpdatesSent++;
+
+    if (!rfbSendUpdateBuf(cl))
+        return FALSE;
+
+    return TRUE;
+}
+
+
+/*
  * rfbProcessClientNormalMessage is called when the client has sent a normal
  * protocol message.
  */
@@ -911,6 +947,13 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		    cl->useNewFBSize = TRUE;
 		}
 		break;
+            case rfbEncodingKeyboardLedState:
+                if (!cl->enableKeyboardLedState) {
+                  rfbLog("Enabling KeyboardLedState protocol extension for client "
+                          "%s\n", cl->host);
+                  cl->enableKeyboardLedState = TRUE;
+                }
+                break;           
 #ifdef LIBVNCSERVER_HAVE_LIBZ
            case rfbEncodingZRLE:
                if (cl->preferredEncoding == -1) {
@@ -1175,7 +1218,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     int dx, dy;
     rfbBool sendCursorShape = FALSE;
     rfbBool sendCursorPos = FALSE;
+    rfbBool sendKeyboardLedState = FALSE;
     rfbBool result = TRUE;
+    
 
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
@@ -1215,6 +1260,21 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 
     if (cl->enableCursorPosUpdates && cl->cursorWasMoved)
       sendCursorPos = TRUE;
+
+    /*
+     * Do we plan to send a keyboard state update?
+     */
+    if ((cl->enableKeyboardLedState) &&
+	(cl->screen->getKeyboardLedStateHook!=NULL))
+    {
+        int x;
+        x=cl->screen->getKeyboardLedStateHook(cl->screen);
+        if (x!=cl->lastKeyboardLedState)
+        {
+            sendKeyboardLedState = TRUE;
+            cl->lastKeyboardLedState=x;
+        }
+    }
 
     LOCK(cl->updateMutex);
 
@@ -1259,7 +1319,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
        sraRgnEmpty(updateRegion) &&
        (cl->enableCursorShapeUpdates ||
 	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY)) &&
-       !sendCursorShape && !sendCursorPos) {
+       !sendCursorShape && !sendCursorPos && !sendKeyboardLedState) {
       sraRgnDestroy(updateRegion);
       UNLOCK(cl->updateMutex);
       return TRUE;
@@ -1395,7 +1455,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	}
 	fu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
 					   nUpdateRegionRects +
-					   !!sendCursorShape + !!sendCursorPos));
+					   !!sendCursorShape + !!sendCursorPos + !!sendKeyboardLedState));
     } else {
 	fu->nRects = 0xFFFF;
     }
@@ -1411,6 +1471,11 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	cl->cursorWasMoved = FALSE;
 	if (!rfbSendCursorPos(cl))
 	        goto updateFailed;
+   }
+   
+   if (sendKeyboardLedState) {
+       if (!rfbSendKeyboardLedState(cl))
+           goto updateFailed;
    }
    
     if (!sraRgnEmpty(updateCopyRegion)) {

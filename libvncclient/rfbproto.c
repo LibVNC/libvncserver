@@ -521,6 +521,7 @@ SetFormatAndEncodings(rfbClient* client)
 					  rfbEncodingQualityLevel0);
     }
 
+
     if (client->appData.useRemoteCursor) {
       if (se->nEncodings < MAX_ENCODINGS)
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingXCursor);
@@ -528,6 +529,11 @@ SetFormatAndEncodings(rfbClient* client)
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRichCursor);
       if (se->nEncodings < MAX_ENCODINGS)
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingPointerPos);
+    }
+
+    /* Let's receive keyboard state encoding if available */
+    if (se->nEncodings < MAX_ENCODINGS) {
+        encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingKeyboardLedState);
     }
 
     if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
@@ -584,6 +590,11 @@ SetFormatAndEncodings(rfbClient* client)
       encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingXCursor);
       encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRichCursor);
       encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingPointerPos);
+    }
+
+    /* Keyboard State Encodings */
+    if (se->nEncodings < MAX_ENCODINGS) {
+      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingKeyboardLedState);
     }
 
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingLastRect);
@@ -784,6 +795,16 @@ HandleRFBServerMessage(rfbClient* client)
 	  return FALSE;
 	}
 	continue;
+      }
+      
+      if (rect.encoding == rfbEncodingKeyboardLedState) {
+          /* OK! We have received a keyboard state message!!! */
+          client->KeyboardLedStateEnabled = 1;
+          if (client->HandleKeyboardLedState!=NULL)
+              client->HandleKeyboardLedState(client, rect.r.x, 0);
+          // stash it for the future
+          client->CurrentKeyboardLedState = rect.r.x;
+          continue;
       }
 
       if ((rect.r.x + rect.r.w > client->si.framebufferWidth) ||

@@ -854,6 +854,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->setTranslateFunction = rfbSetTranslateFunction;
    screen->newClientHook = rfbDefaultNewClientHook;
    screen->displayHook = NULL;
+   screen->getKeyboardLedStateHook = NULL;
 
    /* initialize client list and iterator mutex */
    rfbClientListInit(screen);

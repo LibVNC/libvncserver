@@ -116,7 +116,10 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->programName="";
   client->serverHost="";
   client->serverPort=5900;
-
+  
+  client->CurrentKeyboardLedState = 0;
+  client->HandleKeyboardLedState = DummyPoint;
+  
   client->format.bitsPerPixel = bytesPerPixel*8;
   client->format.depth = bitsPerSample*samplesPerPixel;
   client->appData.requestedDepth=client->format.depth;
@@ -171,6 +174,8 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->GetPassword = ReadPassword;
   client->MallocFrameBuffer = MallocFrameBuffer;
   client->Bell = Dummy;
+  client->CurrentKeyboardLedState = 0;
+  client->HandleKeyboardLedState = DummyPoint;
 
   return client;
 }

@@ -94,6 +94,7 @@ typedef struct {
 
 struct _rfbClient;
 
+typedef void (*HandleKeyboardLedStateProc)(struct _rfbClient* client, int value, int pad);
 typedef rfbBool (*HandleCursorPosProc)(struct _rfbClient* client, int x, int y);
 typedef void (*SoftCursorLockAreaProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef void (*SoftCursorUnlockScreenProc)(struct _rfbClient* client);
@@ -196,7 +197,12 @@ typedef struct _rfbClient {
 
 	rfbVNCRec* vncRec;
 
+	/* Keyboard State support (is 'Caps Lock' set on the remote display???) */
+	int KeyboardLedStateEnabled;
+	int CurrentKeyboardLedState;
+
 	/* hooks */
+	HandleKeyboardLedStateProc HandleKeyboardLedState;
 	HandleCursorPosProc HandleCursorPos;
 	SoftCursorLockAreaProc SoftCursorLockArea;
 	SoftCursorUnlockScreenProc SoftCursorUnlockScreen;

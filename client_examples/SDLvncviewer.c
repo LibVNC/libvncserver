@@ -143,6 +143,12 @@ static void update(rfbClient* cl,int x,int y,int w,int h) {
 	SDL_UpdateRect(rfbClientGetClientData(cl, SDL_Init), x, y, w, h);
 }
 
+static void kbd_leds(rfbClient* cl, int value, int pad) {
+	/* note: pad is for future expansion 0=unused */
+	fprintf(stderr,"Led State= 0x%02X\n", value);
+	fflush(stderr);
+}
+
 #ifdef __MINGW32__
 #define LOG_TO_FILE
 #endif
@@ -203,6 +209,8 @@ int main(int argc,char** argv) {
 	cl=rfbGetClient(8,3,4);
 	cl->MallocFrameBuffer=resize;
 	cl->GotFrameBufferUpdate=update;
+	cl->HandleKeyboardLedState=kbd_leds;
+	
 	if(!rfbInitClient(cl,&argc,argv))
 		return 1;
 
