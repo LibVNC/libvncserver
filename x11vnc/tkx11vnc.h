@@ -306,6 +306,7 @@ char gui_code[] = "";
 "	stunnel\n"
 "	=F stunnel_pem:\n"
 "	=F sslverify:\n"
+"	https:\n"
 "	=GAL LOFF\n"
 "	=GAL Misc-Perms::\n"
 "	safer\n"

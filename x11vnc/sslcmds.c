@@ -29,6 +29,8 @@ void check_stunnel(void) {
 	}
 	last_check = now;
 
+	/* double check that stunnel is still running: */
+
 	if (stunnel_pid > 0) {
 		int status;
 		waitpid(stunnel_pid, &status, WNOHANG); 

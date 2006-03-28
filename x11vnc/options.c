@@ -23,6 +23,7 @@ int stunnel_port = 0;
 char *stunnel_pem = NULL;
 int use_openssl = 0;
 char *openssl_pem = NULL;
+int https_port_num = -1;
 char *ssl_verify = NULL;
 int ssl_initialized = 0;
 int usepw = USEPW;
@@ -124,7 +125,7 @@ int debug_grabs = 0;
 int debug_sel = 0;
 
 int xtrap_input = 0;		/* -xtrap for user input insertion */
-int xinerama = 0;		/* -xinerama */
+int xinerama = XINERAMA;	/* -xinerama */
 int xrandr = 0;			/* -xrandr */
 char *xrandr_mode = NULL;
 char *pad_geometry = NULL;

@@ -184,30 +184,36 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			if test -z "$HAVE_LIBC_CRYPT"; then
 				AC_CHECK_LIB(crypt, crypt,
 					X_PRELIBS="$X_PRELIBS -lcrypt"
-					[AC_DEFINE(HAVE_LIBCRYPT)], ,
-					$X_LIBS $X_PRELIBS -lcrypt $X_EXTRA_LIBS)
+					[AC_DEFINE(HAVE_LIBCRYPT)], ,)
 			fi
 		fi
-		AH_TEMPLATE(HAVE_LIBSSL, [openssl libssl library present])
-		AC_ARG_WITH(ssl,
-		[  --without-ssl           disable support for openssl libssl],,)
-		if test "x$with_ssl" != "xno"; then
-			AC_CHECK_LIB(ssl, SSL_library_init,
-				X_PRELIBS="$X_PRELIBS -lssl"
-				[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,
-				$X_LIBS $X_PRELIBS -lssl $X_EXTRA_LIBS)
-		fi
+
+		# some OS's need both -lssl and -lcrypto on link line:
 		AH_TEMPLATE(HAVE_LIBCRYPTO, [openssl libcrypto library present])
 		AC_ARG_WITH(crypto,
 		[  --without-crypto        disable support for openssl libcrypto],,)
-		# some OS's need both -lssl and -lcrypto
-		if test "x$HAVE_LIBSSL" = "xtrue"; then
-			AC_CHECK_LIB(crypto, RAND_load_file,
-				X_PRELIBS="$X_PRELIBS -lcrypto"
-				[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,
-				$X_LIBS $X_PRELIBS -lcrypto $X_EXTRA_LIBS)
+
+		AH_TEMPLATE(HAVE_LIBSSL, [openssl libssl library present])
+		AC_ARG_WITH(ssl,
+		[  --without-ssl           disable support for openssl libssl],,)
+
+		if test "x$with_crypto" != "xno" -a "x$with_ssl" != "xno"; then
+			AC_CHECK_LIB(crypto, RAND_file_name,
+				[AC_DEFINE(HAVE_LIBCRYPTO) HAVE_LIBCRYPTO="true"], ,)
 		fi
 
+		if test "x$with_ssl" != "xno"; then
+			if test "x$HAVE_LIBCRYPTO" = "xtrue"; then
+				AC_CHECK_LIB(ssl, SSL_library_init,
+					X_PRELIBS="$X_PRELIBS -lssl -lcrypto"
+					[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,
+					-lcrypto)
+			else
+				AC_CHECK_LIB(ssl, SSL_library_init,
+					X_PRELIBS="$X_PRELIBS -lssl"
+					[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,)
+			fi
+		fi
 
 		X_LIBS="$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS"
 	fi
@@ -452,6 +458,7 @@ AC_CONFIG_FILES([Makefile
                  examples/Makefile
 		 vncterm/Makefile
 		 classes/Makefile
+		 classes/ssl/Makefile
 		 libvncclient/Makefile
 		 client_examples/Makefile
 		 test/Makefile

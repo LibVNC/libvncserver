@@ -135,7 +135,7 @@ void clean_up_exit (int ret) {
 	}
 	stop_stunnel();
 	if (use_openssl) {
-		ssh_helper_pid(0, 0);	/* killall */
+		ssl_helper_pid(0, 0);	/* killall */
 	}
 
 	X_LOCK;

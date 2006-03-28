@@ -1,3 +1,8 @@
+2006-03-28  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: patch to tightvnc Java viewer for SSL support
+	  plus other fixes (richcursor colors, Tab keysym, etc).
+	* libvncserver/httpd.c: add missing \r in 200 OK.
+
 2006-03-27  Steven Carr <scarr@jsa-usa.com>
 	* rfbserver.c: Zlib encoding cannot have a limit via
 	  maxRectsPerUpdate

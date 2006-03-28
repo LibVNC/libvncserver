@@ -295,6 +295,7 @@ Permissions
 	stunnel
 	=F stunnel_pem:
 	=F sslverify:
+	https:
 	=GAL LOFF
 	=GAL Misc-Perms::
 	safer

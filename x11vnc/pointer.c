@@ -508,7 +508,7 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 
 
 static void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
-	int can_input = 0, uid;
+	int can_input = 0, uid = 0;
 	allowed_input_t input;
 	ClientData *cd = (ClientData *) client->clientData;
 	char hint[MAX_BUTTONS * 20];
@@ -523,7 +523,9 @@ static void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
 			can_input = 1;	/* XXX distinguish later */
 		}
 	}
-	uid = cd->uid;
+	if (cd) {
+		uid = cd->uid;
+	}
 	if (! can_input) {
 		uid = -uid;
 	}

@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.1, lastmod: 2006-03-11
+         version: 0.8.1, lastmod: 2006-03-27
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -519,22 +519,24 @@ are view-only during this period.
 .IP
 Since the detailed behavior of 
 .IR su (1)
-can vary from OS
-to OS and for local configurations, please test the mode
+can vary from
+OS to OS and for local configurations, test the mode
 carefully on your systems before using it in production.
-E.g. try different combinations of valid/invalid
-usernames and valid/invalid passwords to see if it
-behaves correctly.  x11vnc will be conservative and
-reject a user if anything abnormal occurs.
+Test different combinations of valid/invalid usernames
+and valid/invalid passwords to see if it behaves as
+expected.  x11vnc will attempt to be conservative and
+reject a login if anything abnormal occurs.
 .IP
-For example, on FreeBSD and the other BSD's by default
-it is impossible for the user running x11vnc to validate
+On FreeBSD and the other BSD's by default it is
+impossible for the user running x11vnc to validate
 his *own* password via 
 .IR su (1)
-(evidently commenting
-out the pam_self.so entry in /etc/pam.d/su eliminates
-the problem).  So the x11vnc login will always fail for
-this case.  A possible workaround would be to start
+(evidently commenting out
+the pam_self.so entry in /etc/pam.d/su eliminates this
+problem).  So the x11vnc login will always *fail* for
+this case (even when the correct password is supplied).
+.IP
+A possible workaround for this would be to start
 x11vnc as root with the "\fB-users\fR \fI+nobody\fR" option to
 immediately switch to user nobody.  Another source of
 problems are PAM modules that prompt for extra info,
@@ -557,54 +559,56 @@ to come from the same machine x11vnc is running on
 \fB-stunnel\fR SSL mode be used for encryption over the
 network.(see the description of \fB-stunnel\fR below).
 .IP
-As a convenience, if you 
+Note: as a convenience, if you 
 .IR ssh (1)
-in and start x11vnc it
-will check if the environment variable SSH_CONNECTION
-is set and appears reasonable.  If it does, then the
-\fB-ssl\fR or \fB-stunnel\fR requirement will be dropped since it is
-assumed you are using ssh for the encrypted tunnelling.
-\fB-localhost\fR is still enforced.  Use \fB-ssl\fR or \fB-stunnel\fR to
-force SSL usage for this case.
+in and start
+x11vnc it will check if the environment variable
+SSH_CONNECTION is set and appears reasonable.  If it
+does, then the \fB-ssl\fR or \fB-stunnel\fR requirement will be
+dropped since it is assumed you are using ssh for the
+encrypted tunnelling.  \fB-localhost\fR is still enforced.
+Use \fB-ssl\fR or \fB-stunnel\fR to force SSL usage even if
+SSH_CONNECTION is set.
 .IP
-To override these restrictions you can set environment
-variables before starting x11vnc:
+To override the above restrictions you can set
+environment variables before starting x11vnc:
 .IP
 Set UNIXPW_DISABLE_SSL=1 to disable requiring either
 \fB-ssl\fR or \fB-stunnel.\fR  Evidently you will be using a
 different method to encrypt the data between the
-vncviewer and x11vnc: e.g. 
+vncviewer and x11vnc: perhaps 
 .IR ssh (1)
-or a VPN.  Note that
-use of \fB-localhost\fR with 
+or an IPSEC VPN.
+.IP
+Note that use of \fB-localhost\fR with 
 .IR ssh (1)
-is roughly the same as
-requiring a Unix user login (since a Unix password or
-the user's public key authentication is used by sshd on
-the machine where x11vnc runs and only local connections
-are accepted)
+is roughly
+the same as requiring a Unix user login (since a Unix
+password or the user's public key authentication is
+used by sshd on the machine where x11vnc runs and only
+local connections from that machine are accepted)
 .IP
 Set UNIXPW_DISABLE_LOCALHOST=1 to disable the \fB-localhost\fR
 requirement in Method 2).  One should never do this
 (i.e. allow the Unix passwords to be sniffed on the
 network).
 .IP
-Regarding reverse connections (e.g. \fB-R\fR connect:host),
-if the \fB-localhost\fR constraint is in effect then reverse
-connections can only be used to connect to the same
-machine x11vnc is running on (default port 5500).
-Please use a ssh or stunnel port redirection to the
-viewer machine to tunnel the reverse connection over
-an encrypted channel. Note that in \fB-ssl\fR mode reverse
-connection are disabled.
+Regarding reverse connections (e.g. \fB-R\fR connect:host
+and \fB-connect\fR host), when the \fB-localhost\fR constraint is
+in effect then reverse connections can only be used
+to connect to the same machine x11vnc is running on
+(default port 5500).  Please use a ssh or stunnel port
+redirection to the viewer machine to tunnel the reverse
+connection over an encrypted channel. Note that in \fB-ssl\fR
+mode reverse connection are disabled (see below).
 .IP
-XXX \fB-inetd\fR + \fB-ssl\fR
-In \fB-inetd\fR mode the two settings are attempted to be
-enforced for reverse connections.  Be sure to also
-use encryption from the viewer to inetd since x11vnc
-cannot guess easily if it is encrpyted.  Tip: you can
-also have your own stunnel spawn x11vnc in \fB-inetd\fR mode
-(i.e. bypassing inetd).  See the FAQ for details.
+In \fB-inetd\fR mode the Method 1) will be enforced (not
+Method 2).  With \fB-ssl\fR in effect reverse connections
+are disabled.  If you override this via env. var, be
+sure to also use encryption from the viewer to inetd.
+Tip: you can also have your own stunnel spawn x11vnc
+in \fB-inetd\fR mode (thereby bypassing inetd).  See the FAQ
+for details.
 .IP
 The user names in the comma separated [list] can have
 per-user options after a ":", e.g. "fred:opts"
@@ -619,9 +623,9 @@ are allowed to log in after supplying a valid password.
 Use "deny" to explicitly deny some users if you use
 "*" to set a global option.
 .IP
-There are also some tools for testing password if [list]
-starts with the "%" character.  See the quick_pw()
-function for details.
+There are also some utilities for testing password
+if [list] starts with the "%" character.  See the
+quick_pw() function in the source for details.
 .PP
 \fB-unixpw_nis\fR \fI[list]\fR
 .IP
@@ -632,19 +636,21 @@ use the traditional
 .IR getpwnam (3)
 + 
 .IR crypt (3)
-method
-instead.  This requires that the encrpyted passwords
-be readable.  Passwords stored in /etc/shadow will
-be inaccessible unless run as root.  This is called
-"NIS" mode simply because in most NIS setups the
-user encrypted passwords are accessible (e.g. "ypcat
-passwd").  NIS is not required for this mode to work
-(only that 
+method to
+verify passwords instead.  This requires that the
+encrpyted passwords be readable.  Passwords stored
+in /etc/shadow will be inaccessible unless x11vnc
+is run as root.
+.IP
+This is called "NIS" mode simply because in most
+NIS setups the user encrypted passwords are accessible
+(e.g. "ypcat passwd").  NIS is not required for this
+mode to work (only that 
 .IR getpwnam (3)
-return the encrpyted password
-is required), but it is unlikely it will work for any
-other environment.  All of the \fB-unixpw\fR options and
-contraints apply.
+return the encrpyted
+password is required), but it is unlikely it will work
+for any other modern environment.  All of the \fB-unixpw\fR
+options and contraints apply.
 .PP
 \fB-ssl\fR \fI[pem]\fR
 .IP
@@ -655,25 +661,28 @@ into x11vnc at build time.  If x11vnc is not built
 with libssl support it will exit immediately when \fB-ssl\fR
 is prescribed.
 .IP
-[pem] is optional, use "\fB-ssl\fR \fI/path/to/mycert.pem\fR" to
-specify a PEM certificate file to use to identify and
-provide a key for this server.
+[pem] is optional, use "\fB-ssl\fR \fI/path/to/mycert.pem\fR"
+to specify a PEM certificate file to use to identify
+and provide a key for this server.  See 
+.IR openssl (1)
+for what a PEM can be.
 .IP
-Connecting VNC viewer SSL tunnels can authenticate
-this server if they have the public key part of the
-certificate (or a common certificate authority, CA,
-verifies this server's cert).  This is used to prevent
-man-in-the-middle attacks.  Otherwise, if the VNC viewer
-accepts this server's key without verification, at
-least the traffic is protected from passive sniffing
-on the network.
+Connecting VNC viewer SSL tunnels can optionally
+authenticate this server if they have the public
+key part of the certificate (or a common certificate
+authority, CA, is a more sophisicated way to verify
+this server's cert).  This is used to prevent
+man-in-the-middle attacks.  Otherwise, if the VNC
+viewer accepts this server's key without verification,
+at least the traffic is protected from passive sniffing
+on the network (but NOT from man-in-the-middle attacks).
 .IP
 If [pem] is not supplied and the 
 .IR openssl (1)
 utility
 command exists in PATH, then a temporary, self-signed
 certificate will be generated for this session (this
-may take 5-20 seconds on slow machines).  If 
+may take 5-30 seconds on slow machines).  If 
 .IR openssl (1)
 cannot be used to generate a temporary certificate
 x11vnc exits immediately.
@@ -681,9 +690,10 @@ x11vnc exits immediately.
 If successful in using 
 .IR openssl (1)
 to generate a
-certificate, the public part of it will be displayed
-to stdout (e.g. one could copy it to the client-side
-to provide authentication of the server to VNC viewers.)
+temporary certificate, the public part of it will be
+displayed to stderr (e.g. one could copy it to the
+client-side to provide authentication of the server to
+VNC viewers.)
 .IP
 Set the env. var. X11VNC_SHOW_TMP_PEM=1 to have x11vnc
 print out the entire certificate, including the PRIVATE
@@ -693,22 +703,25 @@ to not delete the temporary PEM file: the file name
 will be printed to stderr (so one could move it to a
 safe place for reuse).
 .IP
-Reverse connections are disabled in \fB-ssl\fR
-mode because the data cannot be encrypted.
-Set X11VNC_SSL_ALLOW_REVERSE=1 to override this.
+Reverse connections are disabled in \fB-ssl\fR mode because
+there is no way to ensure that data channel will
+be encrypted.  Set X11VNC_SSL_ALLOW_REVERSE=1 to
+override this.
 .IP
 Your VNC viewer will also need to be able to connect
-via SSL.  See the discussion below under \fB-stunnel\fR and
-the FAQ for how this might be achieved.  E.g. on Unix it
-is easy to write a shell script that starts up stunnel
-and then vncviewer.
+via SSL.  See the discussion below under \fB-stunnel\fR
+and the FAQ for how this might be achieved.  E.g. on
+Unix it is easy to write a shell script that starts up
+stunnel and then vncviewer.  Also in the x11vnc source
+a SSL enabled Java VNC Viewer applet is provided in
+the classes/ssl directory.
 .PP
 \fB-sslverify\fR \fI[path]\fR
 .IP
 For either of the \fB-ssl\fR or \fB-stunnel\fR modes, use [path]
 to provide certificates to authenticate incoming VNC
 client connections.  This can be used as a method to
-replace standard password authentication.
+replace standard password authentication of clients.
 .IP
 If [path] is a directory it contains the client (or CA)
 certificates in separate files.  If [path] is a file, it
@@ -721,7 +734,7 @@ manpage for details.
 To create certificates for all sorts of authentications
 (clients, servers, via CA, etc) see the 
 .IR openssl (1)
-command.  Of particular usefulness is the x509
+command.  Of particular usefulness is the "x509"
 subcommand of 
 .IR openssl (1).
 .PP
@@ -729,34 +742,41 @@ subcommand of
 .IP
 Use the 
 .IR stunnel (8)
-(www.stunnel.org) to provide
-an encrypted SSL tunnel between viewers and x11vnc.
-This requires stunnel to be installed on the system and
-available via PATH (n.b. stunnel is often installed in
-sbin directories).  Version 4.x of stunnel is assumed
-(but see \fB-stunnel3\fR below.)
+(www.stunnel.org) to provide an
+encrypted SSL tunnel between viewers and x11vnc.  This
+was implemented prior to the integrated \fB-ssl\fR encrpytion.
+It works well.  This requires stunnel to be installed
+on the system and available via PATH (n.b. stunnel is
+often installed in sbin directories).  Version 4.x of
+stunnel is assumed (but see \fB-stunnel3\fR below.)
 .IP
 [pem] is optional, use "\fB-stunnel\fR \fI/path/to/stunnel.pem\fR"
 to specify a PEM certificate file to pass to stunnel.
 Whether one is needed or not depends on your stunnel
 configuration.  stunnel often generates one at install
-time.
+time.  See the stunnel documentation for details.
 .IP
 stunnel is started up as a child process of x11vnc and
 any SSL connections stunnel receives are decrypted and
 sent to x11vnc over a local socket.  The strings
 "The SSL VNC desktop is ..." and "SSLPORT=..."
-are printed out at startup.
+are printed out at startup to indicate this.
 .IP
-The \fB-localhost\fR option is enforced by default to
-avoid people routing around the SSL channel.  Set
-STUNNEL_DISABLE_LOCALHOST=1 to disable the requirement.
+The \fB-localhost\fR option is enforced by default
+to avoid people routing around the SSL channel.
+Set STUNNEL_DISABLE_LOCALHOST=1 before starting x11vnc
+to disable the requirement.
 .IP
-Your VNC viewer will also need to be able to connect
-via SSL.  Unfortunately not too many do this.  UltraVNC
-seems to have an encryption plugin.  It is not too
-difficult to set up an stunnel or other SSL tunnel on
-the viewer side.
+Your VNC viewer will also need to be able to connect via
+SSL.  Unfortunately not too many do this.  UltraVNC has
+an encryption plugin but it does not seem to be SSL.
+.IP
+In the x11vnc distribution, a patched TightVNC Java
+applet is provided in classes/ssl that does SSL
+connections (only).
+.IP
+It is also not too difficult to set up an stunnel or
+other SSL tunnel on the viewer side.
 .IP
 A simple example on Unix using stunnel 3.x is:
 .IP
@@ -771,6 +791,37 @@ for more examples.
 .IP
 Use version 3.x stunnel command line syntax instead of
 version 4.x
+.PP
+\fB-https\fR \fI[port]\fR
+.IP
+Choose a separate HTTPS port (-ssl mode only).
+.IP
+In \fB-ssl\fR mode, it turns out you can use the
+single VNC port (e.g. 5900) for both VNC and HTTPS
+connections. (HTTPS is used to retrieve a SSL-aware
+VncViewer.jar applet that is provided with x11vnc).
+Since both use SSL the implementation was extended to
+detect if HTTP traffic (i.e. GET) is taking place and
+handle it accordingly.  The URL would be, e.g.:
+.IP
+https://mymachine.org:5900/
+.IP
+This is convenient for firewalls, etc, because only one
+port needs to be allowed in.  However, this heuristic
+adds a few seconds delay to each connection and can be
+unreliable (especially if the user takes much time to
+ponder the Certificate dialogs in his browser, Java VM,
+or VNC Viewer applet.  That's right 3 separate "Are
+you sure you want to connect" dialogs!)
+.IP
+So use the \fB-https\fR option to provide a separate, more
+reliable HTTPS port that x11vnc will listen on.  If
+[port] is not provided (or is 0), one is autoselected.
+The URL to use is printed out at startup.
+.IP
+The SSL Java applet directory is specified via the
+\fB-httpdir\fR option.  If not supplied it will try to guess
+the directory as though the \fB-http\fR option was supplied.
 .PP
 \fB-usepw\fR
 .IP
@@ -1030,9 +1081,13 @@ to go into a blacked out region.
 \fB-xinerama\fR
 .IP
 If your screen is composed of multiple monitors
+.PP
+\fB-noxinerama\fR
+.IP
 glued together via XINERAMA, and that screen is
 not a rectangle this option will try to guess the
 areas to black out (if your system has libXinerama).
+default: \fB-xinerama\fR
 .IP
 In general, we have noticed on XINERAMA displays you
 may need to use the "\fB-xwarppointer\fR" option if the mouse
@@ -2898,9 +2953,9 @@ aro=  noop display vncdisplay desktopname guess_desktop
 http_url auth xauth users rootshift clipshift
 scale_str scaled_x scaled_y scale_numer scale_denom
 scale_fac scaling_blend scaling_nomult4 scaling_pad
-scaling_interpolate inetd privremote unsafe safer
-nocmds passwdfile unixpw unixpw_nis unixpw_list ssl
-ssl_pem sslverify stunnel stunnel_pem usepw using_shm
+scaling_interpolate inetd privremote unsafe safer nocmds
+passwdfile unixpw unixpw_nis unixpw_list ssl ssl_pem
+sslverify stunnel stunnel_pem https usepw using_shm
 logfile o flag rc norc h help V version lastmod bg
 sigpipe threads readrate netrate netlatency pipeinput
 clients client_count pid ext_xtest ext_xtrap ext_xrecord

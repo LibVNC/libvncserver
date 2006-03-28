@@ -67,7 +67,11 @@
     "<HEAD><TITLE>Invalid Request</TITLE></HEAD>\n" \
     "<BODY><H1>Invalid request</H1></BODY>\n"
 
-#define OK_STR "HTTP/1.0 200 OK\nContent-Type: text/html\r\n\r\n"
+#if 1
+#define OK_STR "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n"
+#else
+#define OK_STR "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n"
+#endif
 
 static void httpProcessInput(rfbScreenInfoPtr screen);
 static rfbBool compareAndSkip(char **ptr, const char *str);

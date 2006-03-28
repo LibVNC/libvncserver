@@ -2098,6 +2098,16 @@ void initialize_allowed_input(void) {
 		while( (cl = rfbClientIteratorNext(iter)) ) {
 			ClientData *cd = (ClientData *) cl->clientData;
 
+			if (! cd) {
+				continue;
+			}
+#if 0
+rfbLog("cd: %p\n", cd);
+rfbLog("cd->input: %s\n", cd->input);
+rfbLog("cd->login_viewonly: %d\n", cd->login_viewonly);
+rfbLog("allowed_input_view_only: %s\n", allowed_input_view_only);
+#endif
+
 			if (cd->input[0] == '=') {
 				;	/* custom setting */
 			} else if (cd->login_viewonly) {
@@ -2365,6 +2375,10 @@ void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
 	}
 
 	cd = (ClientData *) client->clientData;
+
+	if (! cd) {
+		return;
+	}
 	
 	if (cd->input[0] != '-') {
 		str = cd->input;
@@ -2398,7 +2412,7 @@ void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
 
 /* for -pipeinput mode */
 static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
-	int can_input = 0, uid;
+	int can_input = 0, uid = 0;
 	allowed_input_t input;
 	char *name;
 	ClientData *cd = (ClientData *) client->clientData;
@@ -2413,7 +2427,9 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			can_input = 1;	/* XXX distinguish later */
 		}
 	}
-	uid = cd->uid;
+	if (cd) {
+		uid = cd->uid;
+	}
 	if (! can_input) {
 		uid = -uid;
 	}

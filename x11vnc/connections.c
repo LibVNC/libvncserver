@@ -32,6 +32,7 @@ void close_all_clients(void);
 void close_clients(char *str);
 void set_client_input(char *str);
 void set_child_info(void);
+void client_gone(rfbClientPtr client);
 void reverse_connect(char *str);
 void set_vnc_connect_prop(char *str);
 void read_vnc_connect_prop(int);
@@ -48,7 +49,6 @@ void check_new_clients(void);
 static rfbClientPtr *client_match(char *str);
 static int run_user_command(char *cmd, rfbClientPtr client, char *mode);
 static void free_client_data(rfbClientPtr client);
-static void client_gone(rfbClientPtr client);
 static int check_access(char *addr);
 static void ugly_geom(char *p, int *x, int *y);
 static int ugly_window(char *addr, char *userhost, int X, int Y,
@@ -113,6 +113,9 @@ char *list_clients(void) {
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
+		if (! cd) {
+			continue;
+		}
 		if (*list != '\0') {
 			strcat(list, ",");
 		}
@@ -199,6 +202,9 @@ static rfbClientPtr *client_match(char *str) {
 			unsigned int in;
 			int id;
 			ClientData *cd = (ClientData *) cl->clientData;
+			if (! cd) {
+				continue;
+			}
 			if (sscanf(str, "0x%x", &in) != 1) {
 				if (hex_warn++) {
 					continue;
@@ -289,6 +295,9 @@ void set_client_input(char *str) {
 	cp = cl_list;
 	while (*cp) {
 		ClientData *cd = (ClientData *) (*cp)->clientData;
+		if (! cd) {
+			continue;
+		}
 		cd->input[0] = '\0';
 		strcat(cd->input, "_");
 		strcat(cd->input, val);
@@ -543,7 +552,7 @@ static int accepted_client = 0;
 /*
  * callback for when a client disconnects
  */
-static void client_gone(rfbClientPtr client) {
+void client_gone(rfbClientPtr client) {
 	ClientData *cd = NULL;
 
 	client_count--;
@@ -571,15 +580,16 @@ static void client_gone(rfbClientPtr client) {
 	}
 	if (client->clientData) {
 		cd = (ClientData *) client->clientData;
-		if (cd->ssh_helper_pid > 0) {
+		if (cd->ssl_helper_pid > 0) {
 			int status;
-			rfbLog("sending SIGTERM to ssh_helper_pid: %d\n",
-			    cd->ssh_helper_pid);
-			kill(cd->ssh_helper_pid, SIGTERM);
+			rfbLog("sending SIGTERM to ssl_helper_pid: %d\n",
+			    cd->ssl_helper_pid);
+			kill(cd->ssl_helper_pid, SIGTERM);
+			usleep(200*1000);
 #if LIBVNCSERVER_HAVE_SYS_WAIT_H && LIBVNCSERVER_HAVE_WAITPID 
-			waitpid(cd->ssh_helper_pid, &status, WNOHANG); 
+			waitpid(cd->ssl_helper_pid, &status, WNOHANG); 
 #endif
-			ssh_helper_pid(cd->ssh_helper_pid, -1);	/* delete */
+			ssl_helper_pid(cd->ssl_helper_pid, -1);	/* delete */
 		}
 	}
 	if (gone_cmd && *gone_cmd != '\0') {
@@ -1486,13 +1496,13 @@ static int do_reverse_connect(char *str) {
 	}
 
 	if (inetd && unixpw) {
-	    if(strcmp(host, "localhost") && strcmp(host, "127.0.0.1")) {
-		if (! getenv("UNIXPW_DISABLE_LOCALHOST")) {
-			rfbLog("reverse_connect: in -inetd only localhost\n");
-			rfbLog("connections allowed under -unixpw\n");
-			return 0;
+		if(strcmp(host, "localhost") && strcmp(host, "127.0.0.1")) {
+			if (! getenv("UNIXPW_DISABLE_LOCALHOST")) {
+				rfbLog("reverse_connect: in -inetd only localhost\n");
+				rfbLog("connections allowed under -unixpw\n");
+				return 0;
+			}
 		}
-	    }
 		if (! getenv("UNIXPW_DISABLE_SSL") && ! have_ssh_env()) {
 			rfbLog("reverse_connect: in -inetd stunnel/ssh\n");
 			rfbLog("required under -unixpw\n");
@@ -1839,7 +1849,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	}
 
 	clients_served++;
-if (0) fprintf(stderr, "new_client: %s %d\n", client->host, clients_served);
+if (getenv("NEW_CLIENT")) fprintf(stderr, "new_client: %s %d\n", client->host, clients_served);
 
 	if (use_openssl || use_stunnel) {
 		if (! ssl_initialized) {
@@ -1881,11 +1891,11 @@ if (0) fprintf(stderr, "new_client: %s %d\n", client->host, clients_served);
 	cd->input[0] = '-';
 	cd->login_viewonly = -1;
 	cd->login_time = time(0);
-	cd->ssh_helper_pid = 0;
+	cd->ssl_helper_pid = 0;
 
 	if (use_openssl && openssl_last_helper_pid) {
-if (0) fprintf(stderr, "SET ssh_helper_pid: %d\n", openssl_last_helper_pid);
-		cd->ssh_helper_pid = openssl_last_helper_pid;
+if (0) fprintf(stderr, "SET ssl_helper_pid: %d\n", openssl_last_helper_pid);
+		cd->ssl_helper_pid = openssl_last_helper_pid;
 		openssl_last_helper_pid = 0;
 	}
 
@@ -2130,6 +2140,10 @@ void check_new_clients(void) {
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
 		char *s;
+
+		if (! cd) {
+			continue;
+		}
 
 		if (cd->login_viewonly < 0) {
 			/* this is a general trigger to initialize things */

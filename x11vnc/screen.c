@@ -1924,8 +1924,17 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	 * at screen creation time.
 	 */
 
+	/* event callbacks: */
+	screen->newClientHook = new_client;
+	screen->kbdAddEvent = keyboard;
+	screen->ptrAddEvent = pointer;
+	screen->setXCutText = xcut_receive;
+
 	/* called from inetd, we need to treat stdio as our socket */
-	if (inetd) {
+	if (inetd && use_openssl) {
+		/* accept_openssl() called later */
+		screen->port = 0;
+	} else if (inetd) {
 		int fd = dup(0);
 		if (fd < 0) {
 			rfbLogEnable(1);
@@ -1955,16 +1964,13 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		screen->deferUpdateTime = defer_update;
 	}
 
-	/* event callbacks: */
-	screen->newClientHook = new_client;
-	screen->kbdAddEvent = keyboard;
-	screen->ptrAddEvent = pointer;
-	screen->setXCutText = xcut_receive;
-
 	rfbInitServer(screen);
 
 	if (use_openssl) {
 		openssl_port();
+		if (https_port_num >= 0) {
+			https_port();
+		}
 	}
 
 	install_passwds();
@@ -1976,9 +1982,9 @@ static void announce(int lport, int ssl, char *iface) {
 	char *tvdt;
 
 	if (! ssl) {
-		tvdt = "The VNC desktop";
+		tvdt = "The VNC desktop is:     ";
 	} else {
-		tvdt = "The SSL VNC desktop";
+		tvdt = "The SSL VNC desktop is: ";
 	}
 
 	if (iface != NULL && *iface != '\0' && strcmp(iface, "any")) {
@@ -1993,18 +1999,18 @@ static void announce(int lport, int ssl, char *iface) {
 			if (lport >= 5900) {
 				snprintf(vnc_desktop_name, sz, "%s:%d",
 				    host, lport - 5900);
-				fprintf(stderr, "%s is %s\n", tvdt,
+				fprintf(stderr, "%s %s\n", tvdt,
 				    vnc_desktop_name);
 			} else {
 				snprintf(vnc_desktop_name, sz, "%s:%d",
 				    host, lport);
-				fprintf(stderr, "%s is %s\n", tvdt,
+				fprintf(stderr, "%s %s\n", tvdt,
 				    vnc_desktop_name);
 			}
 		} else if (lport >= 5900) {
 			snprintf(vnc_desktop_name, sz, "%s:%d",
 			    host, lport - 5900);
-			fprintf(stderr, "%s is %s\n", tvdt, vnc_desktop_name);
+			fprintf(stderr, "%s %s\n", tvdt, vnc_desktop_name);
 			if (lport >= 6000) {
 				rfbLog("possible aliases:  %s:%d, "
 				    "%s::%d\n", host, lport,
@@ -2013,9 +2019,32 @@ static void announce(int lport, int ssl, char *iface) {
 		} else {
 			snprintf(vnc_desktop_name, sz, "%s:%d",
 			    host, lport);
-			fprintf(stderr, "%s is %s\n", tvdt, vnc_desktop_name);
+			fprintf(stderr, "%s %s\n", tvdt, vnc_desktop_name);
 			rfbLog("possible alias:    %s::%d\n",
 			    host, lport);
+		}
+	}
+}
+
+static void announce_http(int lport, int ssl, char *iface) {
+	
+	char *host = this_host();
+	char *jvu;
+
+	if (ssl == 1) {
+		jvu = "Java SSL viewer URL:     https";
+	} else if (ssl == 2) {
+		jvu = "Java SSL viewer URL:     http";
+	} else {
+		jvu = "Java viewer URL:         http";
+	}
+
+	if (iface != NULL && *iface != '\0' && strcmp(iface, "any")) {
+		host = iface;
+	}
+	if (host != NULL) {
+		if (! inetd) {
+			fprintf(stderr, "%s://%s:%d/\n", jvu, host, lport);
 		}
 	}
 }
@@ -2023,7 +2052,8 @@ static void announce(int lport, int ssl, char *iface) {
 void set_vnc_desktop_name(void) {
 	sprintf(vnc_desktop_name, "unknown");
 	if (inetd) {
-		sprintf(vnc_desktop_name, "inetd-no-further-clients");
+		sprintf(vnc_desktop_name, "%s/inetd-no-further-clients",
+		    this_host());
 	}
 	if (screen->port) {
 
@@ -2031,9 +2061,27 @@ void set_vnc_desktop_name(void) {
 			rfbLog("\n");
 		}
 
-		announce(screen->port, 0, listen_str);
+		if (use_openssl) {
+			announce(screen->port, 1, listen_str);
+		} else {
+			announce(screen->port, 0, listen_str);
+		}
 		if (stunnel_port) {
 			announce(stunnel_port, 1, NULL);
+		}
+		if (screen->httpListenSock > -1 && screen->httpPort) {
+			if (use_openssl) {
+				announce_http(screen->port, 1, listen_str);
+				if (https_port_num >= 0) {
+					announce_http(https_port_num, 1,
+					    listen_str);
+				}
+				announce_http(screen->httpPort, 2, listen_str);
+			} else if (use_stunnel) {
+				announce_http(screen->httpPort, 2, listen_str);
+			} else {
+				announce_http(screen->httpPort, 0, listen_str);
+			}
 		}
 		
 		fflush(stderr);	
@@ -2043,6 +2091,8 @@ void set_vnc_desktop_name(void) {
 			fprintf(stdout, "PORT=%d\n", screen->port);
 			if (stunnel_port) {
 				fprintf(stdout, "SSLPORT=%d\n", stunnel_port);
+			} else if (use_openssl) {
+				fprintf(stdout, "SSLPORT=%d\n", screen->port);
 			}
 			fflush(stdout);	
 			if (flagfile) {

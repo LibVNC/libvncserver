@@ -58,6 +58,12 @@ cp classes/Makefile.am classes/Makefile.am.LibVNCServer
 echo 'pkgdatadir = $(datadir)/@PACKAGE@/classes' >> classes/Makefile.am
 echo 'pkgdata_DATA=VncViewer.jar index.vnc' >> classes/Makefile.am
 
+cp classes/ssl/Makefile.am classes/ssl/Makefile.am.LibVNCServer
+sed -e 's/EXTRA_DIST=/EXTRA_DIST=tightvnc-1.3dev7_javasrc-vncviewer-ssl.patch tightvnc-1.3dev7_javasrc-vncviewer-cursor-colors+no-tab-traversal.patch /' \
+	classes/ssl/Makefile.am.LibVNCServer > classes/ssl/Makefile.am
+echo 'pkgdatadir = $(datadir)/@PACKAGE@/classes/ssl' >> classes/ssl/Makefile.am
+echo 'pkgdata_DATA=VncViewer.jar index.vnc' >> classes/ssl/Makefile.am
+
 mv acinclude.m4 acinclude.m4.LibVNCServer
 
 cat acinclude.m4.LibVNCServer | \
@@ -65,7 +71,7 @@ sed -e "s/^\(_PKG.*\)\$PACKAGE\(.*\)$/\1LibVNCServer\2/" \
 > acinclude.m4
 
 make x11vnc-${VERSION}.tar.gz
-for f in configure.ac Makefile.am libvncserver/Makefile.am classes/Makefile.am acinclude.m4 README; do
+for f in configure.ac Makefile.am libvncserver/Makefile.am classes/Makefile.am classes/ssl/Makefile.am acinclude.m4 README; do
 	mv -f $f.LibVNCServer $f
 done
 

@@ -473,6 +473,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_gui_inputs();		
 			check_stunnel();		
 			check_openssl();		
+			check_https();		
 			record_last_fb_update();
 			check_padded_fb();		
 			check_fixscreen();		
@@ -1617,6 +1618,16 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 			}
+		} else if (!strcmp(arg, "-https")) {
+			https_port_num = 0;
+			try_http = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					https_port_num = atoi(s);
+					i++;
+				}
+			}
 		} else if (!strcmp(arg, "-nopw")) {
 			nopw = 1;
 		} else if (!strcmp(arg, "-usepw")) {
@@ -2403,7 +2414,10 @@ int main(int argc, char* argv[]) {
 		launch_gui = 0;
 	}
 
-	if (! inetd && unixpw) {
+	if (unixpw) {
+		if (inetd) {
+			use_stunnel = 0;
+		}
 		if (! use_stunnel && ! use_openssl) {
 			if (have_ssh_env()) {
 				char *s = getenv("SSH_CONNECTION");
@@ -2426,6 +2440,9 @@ int main(int argc, char* argv[]) {
 				if (openssl_present()) {
 					rfbLog("set -ssl in -unixpw mode.\n");
 					use_openssl = 1;
+				} else if (inetd) {
+					rfbLog("could not set -ssl in -inetd + -unixpw mode.\n");
+					exit(1);
 				} else {
 					rfbLog("set -stunnel in -unixpw mode.\n");
 					use_stunnel = 1;
@@ -2445,6 +2462,10 @@ int main(int argc, char* argv[]) {
 	}
 	if (ssl_verify && ! use_stunnel && ! use_openssl) {
 		rfbLog("-sslverify must be used with -ssl or -stunnel\n");
+		exit(1);
+	}
+	if (https_port_num >= 0 && ! use_openssl) {
+		rfbLog("-https must be used with -ssl\n");
 		exit(1);
 	}
 
@@ -2498,7 +2519,9 @@ int main(int argc, char* argv[]) {
 		shared = 0;
 		connect_once = 1;
 		bg = 0;
-		use_stunnel = 0;
+		if (use_stunnel) {
+			exit(1);
+		}
 		/* others? */
 	}
 
@@ -3065,6 +3088,9 @@ int main(int argc, char* argv[]) {
 
 	initialize_allowed_input();
 
+	if (inetd && use_openssl) {
+		accept_openssl(OPENSSL_INETD);
+	}
 	if (! inetd && ! use_openssl) {
 		if (! screen->port || screen->listenSock < 0) {
 			rfbLogEnable(1);

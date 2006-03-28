@@ -1,3 +1,11 @@
+2006-03-26  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -xinerama now on by default.  In -ssl mode accept https
+	  applet downloads thru VNC port.  -https option for 2nd https
+	  port.  Look for classes/ssl under -http.  add Java URL messages
+	  to final output lines.  make -inetd work with -ssl (even for
+	  https).  fix -unixpw login prompt under -scale.  guard against
+	  clientData = NULL. 
+
 2006-03-11  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add -ssl mode using libssl.  Include Xdummy in misc.
 	  a few more macros for smallerfoot, etc.

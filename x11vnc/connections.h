@@ -17,6 +17,7 @@ extern void close_all_clients(void);
 extern void close_clients(char *str);
 extern void set_client_input(char *str);
 extern void set_child_info(void);
+extern void client_gone(rfbClientPtr client);
 extern void reverse_connect(char *str);
 extern void set_vnc_connect_prop(char *str);
 extern void read_vnc_connect_prop(int);

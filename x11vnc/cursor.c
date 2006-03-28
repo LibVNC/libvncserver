@@ -799,6 +799,7 @@ static void setup_cursors(void) {
 		UNLOCK(screen->cursorMutex);
 	}
 	rfbLog("  done.\n");
+	rfbLog("\n");
 }
 
 void setup_cursors_and_push(void) {
@@ -1541,6 +1542,9 @@ void restore_cursor_shape_updates(rfbScreenInfoPtr s) {
 		int changed = 0;
 		ClientData *cd = (ClientData *) cl->clientData;
 
+		if (! cd) {
+			continue;
+		}
 		if (cd->had_cursor_shape_updates) {
 			rfbLog("restoring enableCursorShapeUpdates for client"
 			    " 0x%x\n", cl);
@@ -1578,14 +1582,18 @@ void disable_cursor_shape_updates(rfbScreenInfoPtr s) {
 		cd = (ClientData *) cl->clientData;
 
 		if (cl->enableCursorShapeUpdates) {
-			cd->had_cursor_shape_updates = 1;
+			if (cd) {
+				cd->had_cursor_shape_updates = 1;
+			}
 			count++;
 			if (debug_pointer) {
 				rfbLog("%s disable HCSU\n", cl->host);
 			}
 		}
 		if (cl->enableCursorPosUpdates) {
-			cd->had_cursor_pos_updates = 1;
+			if (cd) {
+				cd->had_cursor_pos_updates = 1;
+			}
 			count++;
 			if (debug_pointer) {
 				rfbLog("%s disable HCPU\n", cl->host);

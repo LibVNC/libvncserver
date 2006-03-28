@@ -310,6 +310,8 @@ int check_httpdir(void) {
 		 * /path/to/bin/x11vnc
 		 * /path/to/bin/../share/x11vnc/classes
 		 *                    12345678901234567
+		 * /path/to/bin/../share/x11vnc/classes/ssl
+		 *                    123456789012345678901
 		 */
 		if ((q = strrchr(prog, '/')) == NULL) {
 			rfbLog("check_httpdir: bad program path: %s\n", prog);
@@ -317,10 +319,14 @@ int check_httpdir(void) {
 			return 0;
 		}
 
-		len = strlen(prog) + 17 + 1;
+		len = strlen(prog) + 21 + 1;
 		*q = '\0';
 		httpdir = (char *) malloc(len);
-		snprintf(httpdir, len, "%s/../share/x11vnc/classes", prog);
+		if (use_openssl || use_stunnel) {
+			snprintf(httpdir, len, "%s/../share/x11vnc/classes/ssl", prog);
+		} else {
+			snprintf(httpdir, len, "%s/../share/x11vnc/classes", prog);
+		}
 		free(prog);
 
 		if (stat(httpdir, &sbuf) == 0) {
@@ -331,16 +337,32 @@ int check_httpdir(void) {
 			return 1;
 		} else {
 			/* try some hardwires: */
-			if (stat("/usr/local/share/x11vnc/classes",
-			    &sbuf) == 0) {
-				http_dir =
-				    strdup("/usr/local/share/x11vnc/classes");	
-				return 1;
+			int i;
+			char **use;
+			char *list[] = {
+				"/usr/local/share/x11vnc/classes",
+				"/usr/share/x11vnc/classes",
+				NULL
+			};
+			char *ssllist[] = {
+				"/usr/local/share/x11vnc/classes/ssl",
+				"/usr/share/x11vnc/classes/ssl",
+				NULL
+			};
+			if (use_openssl || use_stunnel) {
+				use = ssllist;
+			} else {
+				use = list;
 			}
-			if (stat("/usr/share/x11vnc/classes", &sbuf) == 0) {
-				http_dir = strdup("/usr/share/x11vnc/classes");	
-				return 1;
+			i = 0;
+			while (use[i] != NULL) {
+				if (stat(use[i], &sbuf) == 0) {
+					http_dir = strdup(use[i]);	
+					return 1;
+				}
+				i++;
 			}
+
 			rfbLog("check_httpdir: bad guess:\n");
 			rfbLog("   %s\n", httpdir);
 			return 0;
@@ -354,6 +376,19 @@ void http_connections(int on) {
 	}
 	if (on) {
 		rfbLog("http_connections: turning on http service.\n");
+
+		if (inetd && use_openssl) {
+			/*
+			 * try to work around rapid fire https requests
+			 * in inetd mode... ugh.
+			 */
+			if (screen->httpPort == 0) {
+				int port = find_free_port(5800, 5850);
+				if (port) {
+					screen->httpPort = port;
+				}
+			}
+		}
 		screen->httpInitDone = FALSE;
 		screen->httpDir = http_dir;
 		if (check_httpdir()) {
@@ -3785,6 +3820,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, use_stunnel);
 		} else if (!strcmp(p, "stunnel_pem")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(stunnel_pem));
+		} else if (!strcmp(p, "https")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, https_port_num);
 		} else if (!strcmp(p, "usepw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, usepw);
 		} else if (!strcmp(p, "using_shm")) {

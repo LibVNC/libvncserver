@@ -46,6 +46,7 @@
  * -DVNCSHARED  to have the vnc display shared by default.
  * -DFOREVER  to have -forever on by default.
  * -DNOREPEAT=0  to have -repeat on by default.
+ * -DXINERAMA=0  to have -noxinerama on by default.
  * -DADDKEYSYMS=0  to have -noadd_keysyms the default.
  *
  * -DREMOTE_DEFAULT=0  to disable remote-control on by default (-yesremote).
@@ -91,6 +92,10 @@
  */
 #ifndef REMOTE_CONTROL
 #define REMOTE_CONTROL 1
+#endif
+
+#ifndef XINERAMA
+#define XINERAMA 1
 #endif
 
 #ifndef NOPW
@@ -465,7 +470,7 @@ typedef struct _ClientData {
 	int login_viewonly;
 	time_t login_time;
 
-	pid_t ssh_helper_pid;
+	pid_t ssl_helper_pid;
 
 	int had_cursor_shape_updates;
 	int had_cursor_pos_updates;

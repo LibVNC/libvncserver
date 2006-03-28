@@ -30,6 +30,9 @@ static int get_latency(void);
 
 static void measure_display_hook(rfbClientPtr cl) {
 	ClientData *cd = (ClientData *) cl->clientData;
+	if (! cd) {
+		return;
+	}
 	dtime0(&cd->timer);
 }
 
@@ -50,6 +53,9 @@ static int get_rate(int which) {
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
 
+		if (! cd) {
+			continue;
+		}
 		if (cl->state != RFB_NORMAL) {
 			continue;
 		}
@@ -109,6 +115,9 @@ static int get_latency(void) {
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
 		
+		if (! cd) {
+			continue;
+		}
 		if (cl->state != RFB_NORMAL) {
 			continue;
 		}
@@ -335,6 +344,9 @@ db = 0;
 		int got_t2 = 0, got_t3 = 0;
 		ClientData *cd = (ClientData *) cl->clientData;
 
+		if (! cd) {
+			continue;
+		}
 		if (cd->send_cmp_rate > 0.0) {
 			continue;
 		}

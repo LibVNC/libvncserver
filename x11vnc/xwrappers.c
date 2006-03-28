@@ -680,8 +680,10 @@ void disable_grabserver(Display *in_dpy, int change) {
 		}
 	}
 	if (! ok && ! didmsg) {
-		rfbLog("No XTEST or DEC-XTRAP protection from XGrabServer.\n");
-		rfbLog("Deadlock if your window manager calls XGrabServer!!\n");
+		rfbLog("*********************************************************\n");
+		rfbLog("* No XTEST or DEC-XTRAP protection from XGrabServer !!! *\n");
+		rfbLog("* DEADLOCK if your window manager calls XGrabServer !!! *\n");
+		rfbLog("*********************************************************\n");
 	}
 	XFlush(in_dpy);
 }
