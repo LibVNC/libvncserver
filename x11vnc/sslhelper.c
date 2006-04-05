@@ -6,6 +6,7 @@
 #include "screen.h"
 #include "scan.h"
 #include "connections.h"
+#include "sslcmds.h"
 
 #define OPENSSL_INETD 1
 #define OPENSSL_VNC   2
@@ -24,16 +25,21 @@ pid_t openssl_last_helper_pid = 0;
 
 #if !LIBVNCSERVER_HAVE_LIBSSL
 int openssl_present(void) {return 0;}
-void openssl_init(void) {
-	rfbLog("not compiled with libssl support.\n");
+static void badnews(void) {
+	use_openssl = 0;
+	use_stunnel = 0;
+	rfbLog("** not compiled with libssl OpenSSL support **\n");
 	clean_up_exit(1);
 }
-void openssl_port(void) {}
-void https_port(void) {}
-void check_openssl(void) {}
-void check_https(void) {}
-void ssl_helper_pid(pid_t pid, int sock) {sock = pid;}
-void accept_openssl(int mode) {mode = 0; clean_up_exit(1);}
+void openssl_init(void) {badnews();}
+void openssl_port(void) {badnews();}
+void https_port(void) {badnews();}
+void check_openssl(void) {badnews();}
+void check_https(void) {badnews();}
+void ssl_helper_pid(pid_t pid, int sock) {badnews(); sock = pid;}
+void accept_openssl(int mode) {mode = 0; badnews();}
+char *find_openssl_bin(void) {badnews(); return NULL;}
+char *get_saved_pem(char *string, int create) {badnews(); return NULL;}
 #else
 
 #include <openssl/ssl.h>
@@ -47,6 +53,8 @@ void check_openssl(void);
 void check_https(void);
 void ssl_helper_pid(pid_t pid, int sock);
 void accept_openssl(int mode);
+char *find_openssl_bin(void);
+char *get_saved_pem(char *string, int create);
 
 static SSL_CTX *ctx = NULL;
 static RSA *rsa_512 = NULL;
@@ -56,8 +64,9 @@ static SSL *ssl = NULL;
 
 static void init_prng(void);
 static void sslerrexit(void);
-static char *create_tmp_pem(void);
+static char *create_tmp_pem(char *path, int prompt);
 static int  ssl_init(int s_in, int s_out);
+static void raw_xfer(int csock, int s_in, int s_out);
 static void ssl_xfer(int csock, int s_in, int s_out, int is_https);
 
 #ifndef FORK_OK
@@ -81,61 +90,82 @@ static void sslerrexit(void) {
 	clean_up_exit(1);
 }
 
-/* uses /usr/bin/openssl to create a tmp cert */
-
-static char *create_tmp_pem(void) {
-	pid_t pid, pidw;
-	FILE *in, *out;
-	char cnf[] = "/tmp/x11vnc-cnf.XXXXXX";
-	char pem[] = "/tmp/x11vnc-pem.XXXXXX";
-	char str[4096], line[1024], *path, *p, *exe;
-	int found_openssl = 0, cnf_fd, pem_fd, status, show_cert = 1;
+char *get_saved_pem(char *save, int create) {
+	char *s = NULL, *path, *cdir, *tmp;
+	int prompt = 0, len;
 	struct stat sbuf;
-	char tmpl[] = 
-"[ req ]\n"
-"prompt = no\n"
-"default_bits = 1024\n"
-"encrypt_key = yes\n"
-"distinguished_name = req_dn\n"
-"x509_extensions = cert_type\n"
-"\n"
-"[ req_dn ]\n"
-"countryName=AU\n"
-"localityName=%s\n"
-"organizationalUnitName=%s-%f\n"
-"organizationName=x11vnc\n"
-"commonName=x11vnc-SELF-SIGNED-TEMPORARY-CERT-%d\n"
-"emailAddress=nobody@x11vnc.server\n"
-"\n"
-"[ cert_type ]\n"
-"nsCertType = server\n"
-;
 
-	if (no_external_cmds) {
-		rfbLog("create_tmp_pem: cannot run external commands.\n");	
-		return NULL;
+	if (strstr(save, "SAVE_PROMPT") == save) {
+		prompt = 1;
+		s = save + strlen("SAVE_PROMPT");
+	} else if (strstr(save, "SAVE") == save) {
+		s = save + strlen("SAVE");
+	} else {
+		rfbLog("get_saved_pem: invalid save string: %s\n", save);
+		clean_up_exit(1);
 	}
-	rfbLog("\n");	
-	rfbLog("Creating a temporary, self-signed PEM certificate...\n");	
-	rfbLog("\n");	
-	rfbLog("This will NOT prevent man-in-the-middle attacks UNLESS you\n");	
-	rfbLog("get the certificate information to the VNC viewers SSL\n");	
-	rfbLog("tunnel configuration. However, it will prevent passive\n");	
-	rfbLog("network sniffing.\n");	
-	rfbLog("\n");	
-	rfbLog("The cert inside -----BEGIN CERTIFICATE-----\n");	
-	rfbLog("                           ....\n");	
-	rfbLog("                -----END CERTIFICATE-----\n");	
-	rfbLog("printed below may be used on the VNC viewer-side to\n");	
-	rfbLog("authenticate this server for this session.  See the -ssl\n");
-	rfbLog("help output and the FAQ for how to create a permanent\n");
-	rfbLog("server certificate.\n");	
-	rfbLog("\n");	
+	if (strchr(s, '/')) {
+		rfbLog("get_saved_pem: invalid save string: %s\n", s);
+		clean_up_exit(1);
+	}
 
+	cdir = get_Cert_dir(NULL, &tmp);
+	if (! cdir) {
+		rfbLog("get_saved_pem: could not find Cert dir.\n");
+		clean_up_exit(1);
+	}
+	len = strlen(cdir) + strlen("/server.pem") + strlen(s) + 1;
+	path = (char *) malloc(len);
+	sprintf(path, "%s/server%s.pem", cdir, s);
+
+	if (stat(path, &sbuf) != 0) {
+		char *new = NULL;
+		if (create) {
+			new = create_tmp_pem(path, prompt);
+			sslEncKey(new, 0);
+		}
+		return new;
+	} else {
+		return strdup(path);
+	}
+}
+
+static char *get_input(char *tag, char **in) {
+	char line[1024], *str;
+	fprintf(stderr, "%s:\n     [%s] ", tag, *in);
+	if (fgets(line, 1024, stdin) == NULL) {
+		rfbLog("could not read stdin!\n");
+		rfbLogPerror("fgets");
+		clean_up_exit(1);
+	}
+	if ((str = strrchr(line, '\n')) != NULL) {
+		*str = '\0';
+	}
+	str = lblanks(line);
+	if (! strcmp(str, "")) {
+		return *in;
+	} else if (0 && !strcmp(str, "none")) {
+		free(*in);
+		return strdup("");
+	} else {
+		free(*in);
+		return strdup(line);
+	}
+}
+
+char *find_openssl_bin(void) {
+	char *path, *exe, *p;
+	struct stat sbuf;
+	int found_openssl = 0;
+	char extra[] = ":/usr/bin:/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/usr/sfw/bin";
+	
 	if (! getenv("PATH")) {
+		fprintf(stderr, "could not find openssl(1) program in PATH.\n");
 		return NULL;
 	}
-	path = strdup(getenv("PATH"));
+	path = (char *) malloc(strlen(getenv("PATH")) + strlen(extra) + 1);
+	strcpy(path, getenv("PATH"));
+	strcat(path, extra);
 
 	/* find openssl binary: */
 	exe = (char *) malloc(strlen(path) + strlen("/openssl") + 1);
@@ -154,8 +184,105 @@ static char *create_tmp_pem(void) {
 	free(path);
 
 	if (! found_openssl) {
+		fprintf(stderr, "could not find openssl(1) program in PATH.\n");
+		fprintf(stderr, "(also checked: %s)\n", extra);
 		return NULL;
 	}
+	return exe;
+}
+
+/* uses /usr/bin/openssl to create a tmp cert */
+
+static char *create_tmp_pem(char *pathin, int prompt) {
+	pid_t pid, pidw;
+	FILE *in, *out;
+	char cnf[] = "/tmp/x11vnc-cnf.XXXXXX";
+	char pem[] = "/tmp/x11vnc-pem.XXXXXX";
+	char str[7*1024], line[1024], *exe;
+	int cnf_fd, pem_fd, status, show_cert = 1;
+	char *days;
+	char *C, *L, *OU, *O, *CN, *EM;
+	char tmpl[] = 
+"[ req ]\n"
+"prompt = no\n"
+"default_bits = 2048\n"
+"encrypt_key = yes\n"
+"distinguished_name = req_dn\n"
+"x509_extensions = cert_type\n"
+"\n"
+"[ req_dn ]\n"
+"countryName=%s\n"
+"localityName=%s\n"
+"organizationalUnitName=%s\n"
+"organizationName=%s\n"
+"commonName=%s\n"
+"emailAddress=%s\n"
+"\n"
+"[ cert_type ]\n"
+"nsCertType = server\n"
+;
+
+	C = strdup("AU");
+	L = strdup(UT.sysname);
+	snprintf(line, 1024, "%s-%f", UT.nodename, dnow());
+	line[1024-1] = '\0';
+	OU = strdup(line);
+	O = strdup("x11vnc");
+	if (pathin) {
+		snprintf(line, 1024, "x11vnc-SELF-SIGNED-CERT-%d", getpid());
+	} else {
+		snprintf(line, 1024, "x11vnc-SELF-SIGNED-TEMPORARY-CERT-%d", getpid());
+	}
+	line[1024-1] = '\0';
+	CN = strdup(line);
+	EM = strdup("x11vnc@server.nowhere");
+
+	if (no_external_cmds) {
+		rfbLog("create_tmp_pem: cannot run external commands.\n");	
+		return NULL;
+	}
+	rfbLog("\n");	
+	if (pathin) {
+		rfbLog("Creating a self-signed PEM certificate...\n");	
+	} else {
+		rfbLog("Creating a temporary, self-signed PEM certificate...\n");	
+	}
+	rfbLog("\n");	
+	rfbLog("This will NOT prevent man-in-the-middle attacks UNLESS you\n");	
+	rfbLog("get the certificate information to the VNC viewers SSL\n");	
+	rfbLog("tunnel configuration or you take the extra steps to sign it\n");
+	rfbLog("with a CA key. However, it will prevent passive network\n");
+	rfbLog("sniffing.\n");	
+	rfbLog("\n");	
+	rfbLog("The cert inside -----BEGIN CERTIFICATE-----\n");	
+	rfbLog("                           ....\n");	
+	rfbLog("                -----END CERTIFICATE-----\n");	
+	rfbLog("printed below may be used on the VNC viewer-side to\n");	
+	rfbLog("authenticate this server for this session.  See the -ssl\n");
+	rfbLog("help output and the FAQ for how to create a permanent\n");
+	rfbLog("server certificate.\n");	
+	rfbLog("\n");	
+
+
+	exe = find_openssl_bin();
+	if (exe == NULL) {
+		return NULL;
+	}
+
+	/* create template file with our made up stuff: */
+	if (prompt) {
+		fprintf(stderr, "\nReply to the following prompts to set"
+		    " your Certificate parameters.\n");
+		fprintf(stderr, "(press Enter to accept the default in [...], "
+		    "or type in the value you want)\n\n");
+		C = get_input("CountryName", &C);
+		L = get_input("LocalityName", &L);
+		OU = get_input("OrganizationalUnitName", &OU);
+		O = get_input("OrganizationalName", &O);
+		CN = get_input("CommonName", &CN);
+		EM = get_input("EmailAddress", &EM);
+	}
+	sprintf(str, tmpl, C, L, OU, O, CN, EM);
 
 	cnf_fd = mkstemp(cnf);
 	pem_fd = mkstemp(pem);
@@ -166,10 +293,14 @@ static char *create_tmp_pem(void) {
 
 	close(pem_fd);
 
-	/* create template file with our made up stuff: */
-	sprintf(str, tmpl, UT.sysname, UT.nodename, dnow(), (int) getpid());
 	write(cnf_fd, str, strlen(str));
 	close(cnf_fd);
+
+	if (pathin) {
+		days = "365";
+	} else {
+		days = "30";
+	}
 
 	/* make RSA key */
 	pid = fork();
@@ -181,7 +312,8 @@ static char *create_tmp_pem(void) {
 			close(i);
 		}
 		execlp(exe, exe, "req", "-new", "-x509", "-nodes",
-		    "-config", cnf, "-out", pem, "-keyout", pem, (char *)0);
+		    "-days", days, "-config", cnf, "-out", pem,
+		    "-keyout", pem, (char *)0);
 		exit(1);
 	}
 	pidw = waitpid(pid, &status, 0); 
@@ -194,6 +326,7 @@ static char *create_tmp_pem(void) {
 		return NULL;
 	}
 
+#if DO_DH
 	/* make DH parameters */
 	pid = fork();
 	if (pid < 0) {
@@ -203,6 +336,7 @@ static char *create_tmp_pem(void) {
 		for (i=0; i<256; i++) {
 			close(i);
 		}
+		/* rather slow at 1024 */
 		execlp(exe, exe, "dhparam", "-out", cnf, "512", (char *)0);
 		exit(1);
 	}
@@ -231,9 +365,66 @@ static char *create_tmp_pem(void) {
 	}
 	fclose(in);
 	fclose(out);
+#endif
 
 	unlink(cnf);
 	free(exe);
+
+	if (pathin != NULL) {
+		char *q, *pathcrt = strdup(pathin);
+		FILE *crt = NULL;
+		int on = 0;
+
+		q = strrchr(pathcrt, '/');
+		if (q) {
+			q = strstr(q, ".pem");
+			if (q) {
+				*(q+1) = 'c';
+				*(q+2) = 'r';
+				*(q+3) = 't';
+				crt = fopen(pathcrt, "w");
+			}
+		}
+		if (crt == NULL) {
+			rfbLog("could not open: %s\n", pathcrt);
+			rfbLogPerror("fopen");
+			return NULL;
+		}
+		out = fopen(pathin, "w");
+		if (out == NULL) {
+			rfbLog("could not open: %s\n", pathin);
+			rfbLogPerror("fopen");
+			fclose(crt);
+			return NULL;
+		}
+		chmod(pathin,  0600);
+
+		in = fopen(pem, "r");
+		if (in == NULL) {
+			rfbLog("could not open: %s\n", pem);
+			rfbLogPerror("fopen");
+			fclose(out);
+			fclose(crt);
+			unlink(pathin);
+			unlink(pathcrt);
+			return NULL;
+		}
+		while (fgets(line, 1024, in) != NULL) {
+			if (strstr(line, "-----BEGIN CERTIFICATE-----")) {
+				on = 1;
+			}
+			fprintf(out, "%s", line);
+			if (on) {
+				fprintf(crt, "%s", line);
+			}
+			if (strstr(line, "-----END CERTIFICATE-----")) {
+				on = 0;
+			}
+		}
+		fclose(in);
+		fclose(out);
+		fclose(crt);
+	}
 
 	if (show_cert) {
 		char cmd[100];
@@ -247,14 +438,171 @@ static char *create_tmp_pem(void) {
 		fprintf(stderr, "\n");
 	}
 
-	return strdup(pem);
+	if (pathin) {
+		unlink(pem);
+		return strdup(pathin);
+	} else {
+		return strdup(pem);
+	}
+}
+
+static int pem_passwd_callback(char *buf, int size, int rwflag,
+    void *userdata) {
+	char *q, line[1024];
+
+	fprintf(stderr, "\nA passphrase is needed to unlock an OpenSSL "
+	    "private key (PEM file).\n");
+	fprintf(stderr, "Enter passphrase> ");
+	system("stty -echo");
+	if(fgets(line, 1024, stdin) == NULL) {
+		fprintf(stdout, "\n");
+		system("stty echo");
+		exit(1);
+	}
+	system("stty echo");
+	fprintf(stdout, "\n\n");
+	q = strrchr(line, '\n');
+	if (q) {
+		*q = '\0';
+	}
+	line[1024 - 1] = '\0';
+	strncpy(buf, line, size);                                  
+	buf[size - 1] = '\0';
+
+	if (0) rwflag = 0;	/* compiler warning. */
+	if (0) userdata = 0;	/* compiler warning. */
+
+	return strlen(buf);
+}
+
+static int appendfile(FILE *out, char *infile) {
+	char line[1024];
+	FILE *in = fopen(infile, "r");
+
+	if (in == NULL) {
+		rfbLog("appendfile: %s\n", infile);
+		rfbLogPerror("fopen");
+		return 0;
+	}
+
+	while (fgets(line, 1024, in) != NULL) {
+		fprintf(out, "%s", line);
+	}
+	fclose(in);
+	return 1;
+}
+	
+static char *get_ssl_verify_file(char *str_in) {
+	char *p, *str, *cdir, *tmp;
+	char *tfile, *tfile2;
+	FILE *file;
+	struct stat sbuf;
+	int count = 0;
+
+	if (! str_in) {
+		rfbLog("get_ssl_verify_file: no filename\n");
+		exit(1);
+	}
+
+	if (stat(str_in, &sbuf) == 0) {
+		/* assume he knows what he is doing. */
+		return str_in;
+	}
+
+	str = strdup(str_in);
+	p = strtok(str, ",");
+
+	cdir = get_Cert_dir(NULL, &tmp);
+	if (! cdir) {
+		rfbLog("get_ssl_verify_file: invalid cert-dir.\n");
+		exit(1);
+	}
+
+	tfile  = (char *) malloc(strlen(tmp) + 1024);
+	tfile2 = (char *) malloc(strlen(tmp) + 1024);
+
+	sprintf(tfile, "%s/sslverify-load-%d.crts", tmp, getpid());
+
+	file = fopen(tfile, "w");
+	if (file == NULL) {
+		rfbLog("get_ssl_verify_file: %s\n", tfile);
+		rfbLogPerror("fopen");
+		exit(1);
+	}
+	chmod(tfile, 0600);
+
+	while (p) {
+		if (!strcmp(p, "CA")) {
+			sprintf(tfile2, "%s/CA/cacert.pem", cdir);
+			if (! appendfile(file, tfile2)) {
+				unlink(tfile);
+				exit(1);
+			}
+			fprintf(stderr, "sslverify: loaded %s\n", tfile2);
+			count++;
+		} else if (!strcmp(p, "clients")) {
+			DIR *dir;
+			struct dirent *dp;
+			sprintf(tfile2, "%s/clients", cdir);
+			dir = opendir(tfile2);
+			if (! dir) {
+				rfbLog("get_ssl_verify_file: %s\n", tfile2);
+				rfbLogPerror("opendir");
+				unlink(tfile);
+				exit(1);
+			}
+			while ( (dp = readdir(dir)) != NULL) {
+				char *n = dp->d_name;
+				char *q = strstr(n, ".crt");
+				if (! q || strlen(q) != strlen(".crt")) {
+					continue;
+				}
+				sprintf(tfile2, "%s/clients/%s", cdir, n);
+				if (! appendfile(file, tfile2)) {
+					unlink(tfile);
+					exit(1);
+				}
+				fprintf(stderr, "sslverify: loaded %s\n", tfile2);
+				count++;
+			}
+			closedir(dir);
+			
+		} else {
+			if (strlen(p) > 512) {
+				unlink(tfile);
+				exit(1);
+			}
+			sprintf(tfile2, "%s/clients/%s.crt", cdir, p);
+			if (stat(tfile2, &sbuf) != 0) {
+				sprintf(tfile2, "%s/clients/%s", cdir, p);
+			}
+			if (! appendfile(file, tfile2)) {
+				unlink(tfile);
+				exit(1);
+			}
+			fprintf(stderr, "sslverify: loaded %s\n", tfile2);
+			count++;
+		}
+		p = strtok(NULL, ",");
+	}
+	fclose(file);
+	free(tfile2);
+	free(str);
+	fprintf(stderr, "sslverify: using %d client certs in %s\n", count, tfile);
+	return tfile;
 }
 
 void openssl_init(void) {
-	int db = 0, tmp_pem = 0, do_dh = 1;
+	int db = 0, tmp_pem = 0, do_dh;
 	FILE *in;
 	double ds;
 	long mode;
+
+#if DO_DH
+	do_dh = 1;
+#else
+	do_dh = 0;
+#endif
 
 	if (! quiet) {
 		rfbLog("\n");
@@ -314,16 +662,26 @@ void openssl_init(void) {
 
 	ds = dnow();
 	if (! openssl_pem) {
-		openssl_pem = create_tmp_pem();
+		openssl_pem = create_tmp_pem(NULL, 0);
 		if (! openssl_pem) {
 			rfbLog("openssl_init: could not create temporary,"
 			    " self-signed PEM.\n");	
 			clean_up_exit(1);
 		}
 		tmp_pem = 1;
+	} else if (strstr(openssl_pem, "SAVE") == openssl_pem) {
+		openssl_pem = get_saved_pem(openssl_pem, 1);
+		if (! openssl_pem) {
+			rfbLog("openssl_init: could not create or open"
+			    " saved PEM:\n", openssl_pem);	
+			clean_up_exit(1);
+		}
+		tmp_pem = 0;
 	}
 
 	rfbLog("using PEM %s  %.3fs\n", openssl_pem, dnow() - ds);
+
+	SSL_CTX_set_default_passwd_cb(ctx, pem_passwd_callback);
 
 	if (do_dh) {
 		DH *dh;
@@ -387,23 +745,23 @@ void openssl_init(void) {
 
 	if (ssl_verify) {
 		struct stat sbuf;
+		char *file;
 		int lvl;
-		if (stat(ssl_verify, &sbuf) != 0) {
+		file = get_ssl_verify_file(ssl_verify);
+		if (stat(file, &sbuf) != 0) {
 			rfbLog("openssl_init: -sslverify does not exists %s.\n",
-			    ssl_verify);	
+			    file);	
 			rfbLogPerror("stat");
 			clean_up_exit(1);
 		}
 		if (! S_ISDIR(sbuf.st_mode)) {
-			if (! SSL_CTX_load_verify_locations(ctx, ssl_verify,
-			    NULL)) {
+			if (! SSL_CTX_load_verify_locations(ctx, file, NULL)) {
 				rfbLog("openssl_init: SSL_CTX_load_verify_"
 				    "locations() failed.\n");	
 				sslerrexit();
 			}
 		} else {
-			if (! SSL_CTX_load_verify_locations(ctx, NULL,
-			    ssl_verify)) {
+			if (! SSL_CTX_load_verify_locations(ctx, NULL, file)) {
 				rfbLog("openssl_init: SSL_CTX_load_verify_"
 				    "locations() failed.\n");	
 				sslerrexit();
@@ -411,6 +769,10 @@ void openssl_init(void) {
 		}
 		lvl = SSL_VERIFY_FAIL_IF_NO_PEER_CERT|SSL_VERIFY_PEER;
 		SSL_CTX_set_verify(ctx, lvl, NULL);
+		if (strstr(file, "tmp/sslverify-load-")) {
+			/* temporary file */
+			unlink(file);
+		}
 	} else {
 		SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
 	}
@@ -510,10 +872,6 @@ static void lose_ram(void) {
 	if (snap_fb) {
 		free(snap_fb);
 		snap_fb = NULL;
-	}
-	if (raw_fb) {
-		free(raw_fb);
-		raw_fb = NULL;
 	}
 	free_tiles();
 }
@@ -645,6 +1003,7 @@ static int is_ssl_readable(int s_in, time_t last_https, char *last_get,
 			tv.tv_sec  = 4;
 		}
 	}
+if (1) fprintf(stderr, "tv_sec: %d - %s\n", (int) tv.tv_sec, last_get);
 
 	FD_ZERO(&rd);
 	FD_SET(s_in, &rd);
@@ -662,10 +1021,10 @@ static int is_ssl_readable(int s_in, time_t last_https, char *last_get,
 }
 
 #define BSIZE 16384
-static int watch_for_http_traffic(char **buf_a, int *n_a) {
+static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	int is_http, err, n, n2;
-	char *buf = *buf_a;
-	int db = 0;
+	char *buf;
+	int db = 1;
 	/*
 	 * sniff the first couple bytes of the stream and try to see
 	 * if it is http or not.  if we read them OK, we must read the
@@ -674,6 +1033,7 @@ static int watch_for_http_traffic(char **buf_a, int *n_a) {
 	 * *buf_a is BSIZE+1 long and zeroed.
 	 */
 
+	buf = (char *) calloc(sizeof(BSIZE+1), 1);
 	*n_a = 0;
 
 	n = SSL_read(ssl, buf, 2);
@@ -681,6 +1041,7 @@ static int watch_for_http_traffic(char **buf_a, int *n_a) {
 
 	if (err != SSL_ERROR_NONE || n < 2) {
 		if (n > 0) {
+			strncpy(buf_a, buf, n);
 			*n_a = n;
 		}
 		return -1;
@@ -708,6 +1069,9 @@ static int watch_for_http_traffic(char **buf_a, int *n_a) {
 		n += n2;
 	}
 	*n_a = n;
+	if (n > 0) {
+		strncpy(buf_a, buf, n);
+	}
 	return is_http;
 }
 
@@ -720,8 +1084,91 @@ static void csock_timeout (int sig) {
 	}
 }
 
+static int wait_conn(int sock) {
+	int conn;
+	struct sockaddr_in addr;
+	socklen_t addrlen = sizeof(addr);
+
+	signal(SIGALRM, csock_timeout);
+	csock_timeout_sock = sock;
+	
+	alarm(15);
+	conn = accept(sock, (struct sockaddr *)&addr, &addrlen);
+	alarm(0);
+
+	signal(SIGALRM, SIG_DFL);
+	return conn;
+}
+
+int proxy_hack(int vncsock, int listen, int s_in, int s_out, char *cookie,
+    int mode) {
+	char reply[] = "HTTP/1.1 200 OK\r\n"
+	    "Content-Type: octet-stream\r\n"
+	    "Pragma: no-cache\r\n\r\n";
+	char reply0[] = "HTTP/1.0 200 OK\r\n"
+	    "Content-Type: octet-stream\r\n"
+	    "Content-Length: 9\r\n"
+	    "Pragma: no-cache\r\n\r\nGO_AHEAD\n";
+	int sock1, db = 0;
+
+	rfbLog("SSL: accept_openssl: detected https proxied connection"
+	    " request.\n");
+
+	SSL_write(ssl, reply0, strlen(reply0));
+	SSL_shutdown(ssl);
+	SSL_shutdown(ssl);
+	close(s_in);
+	close(s_out);
+	SSL_free(ssl);
+
+	if (mode == OPENSSL_VNC) {
+		listen = openssl_sock;
+	} else if (mode == OPENSSL_HTTPS) {
+		listen = https_sock;
+	} else {
+		return 0;
+	}
+	sock1 = wait_conn(listen);
+
+	if (csock_timeout_sock < 0 || sock1 < 0) {
+		close(sock1);
+		return 0;
+	}
+if (db) fprintf(stderr, "got applet input sock1: %d\n", sock1);
+
+	if (! ssl_init(sock1, sock1)) {
+if (db) fprintf(stderr, "ssl_init FAILED\n");
+		exit(1);
+	}
+	SSL_write(ssl, reply, strlen(reply));
+
+	{
+		char *buf;
+		int n, ptr;
+	
+		buf  = (char *) calloc((8192+1), 1);
+		n = 0;
+		ptr = 0;
+		while (ptr < 8192) {
+			n = SSL_read(ssl, buf + ptr, 8192 - ptr);
+			if (n > 0) {
+				ptr += n;
+			}
+if (db) fprintf(stderr, "buf: '%s'\n", buf);
+			if (strstr(buf, "\r\n\r\n") || strstr(buf, "\n\n")) {
+				break;
+			}
+		}
+	}
+
+	write(vncsock, cookie, strlen(cookie));
+	ssl_xfer(vncsock, sock1, sock1, 0);
+
+	return 1;
+}
+
 void accept_openssl(int mode) {
-	int sock = -1, cport, csock, vsock;	
+	int sock = -1, cport, csock, vsock, listen = -1;	
 	int status, n, i, db = 0;
 	struct sockaddr_in addr;
 	socklen_t addrlen = sizeof(addr);
@@ -751,6 +1198,7 @@ void accept_openssl(int mode) {
 
 	} else if (mode == OPENSSL_VNC && openssl_sock >= 0) {
 		sock = accept(openssl_sock, (struct sockaddr *)&addr, &addrlen);
+		listen = openssl_sock;
 		if (sock < 0)  {
 			rfbLog("SSL: accept_openssl: accept connection failed\n");
 			rfbLogPerror("accept");
@@ -759,6 +1207,7 @@ void accept_openssl(int mode) {
 
 	} else if (mode == OPENSSL_HTTPS && https_sock >= 0) {
 		sock = accept(https_sock, (struct sockaddr *)&addr, &addrlen);
+		listen = https_sock;
 		if (sock < 0)  {
 			rfbLog("SSL: accept_openssl: accept connection failed\n");
 			rfbLogPerror("accept");
@@ -834,21 +1283,25 @@ void accept_openssl(int mode) {
 		int f_out = fileno(stdout);
 
 		/* reset all handlers to default (no interrupted() calls) */
-		signal(SIGHUP,  SIG_DFL);
-		signal(SIGINT,  SIG_DFL);
-		signal(SIGQUIT, SIG_DFL);
-		signal(SIGTERM, SIG_DFL);
+		unset_signals();
 
 		/* close all non-essential fd's */
 		for (i=0; i<256; i++) {
-			if (i != sslsock && i != 2) {
-				if (mode == OPENSSL_INETD) {
-					if (i == f_in || i == f_out) {
-						continue;
-					}
+			if (mode == OPENSSL_INETD) {
+				if (i == f_in || i == f_out) {
+					continue;
 				}
-				close(i);
 			}
+			if (i == sslsock) {
+				continue;
+			}
+			if (i == 2) {
+				continue;
+			}
+			if (i == listen) {
+				continue;	
+			}
+			close(i);
 		}
 
 		/*
@@ -861,6 +1314,7 @@ void accept_openssl(int mode) {
 		/* now connect back to parent socket: */
 		vncsock = rfbConnectToTcpAddr("127.0.0.1", cport);
 		if (vncsock < 0) {
+			rfbLog("SSL: ssl_helper: could not connect back to: %d\n", cport);
 			close(vncsock);
 			exit(1);
 		}
@@ -898,11 +1352,10 @@ void accept_openssl(int mode) {
 			int n, is_http;
 			int hport = screen->httpPort; 
 			char *iface = NULL;
-			static char *buf = NULL;
+			char *buf, *tbuf;
 
-			if (buf == NULL) {
-				buf = (char *) calloc(sizeof(BSIZE+1), 1);
-			}
+			buf  = (char *) calloc((BSIZE+1), 1);
+			tbuf = (char *) calloc((2*BSIZE+1), 1);
 
 			if (mode == OPENSSL_HTTPS) {
 				/*
@@ -918,6 +1371,7 @@ void accept_openssl(int mode) {
 			 * Check if there is stuff to read from remote end
 			 * if so it is likely a GET or HEAD.
 			 */
+			if (1) fprintf(stderr, "is_ssl_readable\n");
 			if (! is_ssl_readable(s_in, last_https, last_get,
 			    mode)) {
 				goto write_cookie;
@@ -930,7 +1384,8 @@ void accept_openssl(int mode) {
 			 * is ever sent.  So often we timeout here.
 			 */
 
-			is_http = watch_for_http_traffic(&buf, &n);
+			if (1) fprintf(stderr, "watch_for_http_traffic\n");
+			is_http = watch_for_http_traffic(buf, &n);
 
 			if (is_http < 0 || is_http == 0) {
 				/*
@@ -943,7 +1398,38 @@ void accept_openssl(int mode) {
 				}
 				goto wrote_cookie;
 			}
+			if (1) fprintf(stderr, "buf: '%s'\n", buf);
 
+			if (strstr(buf, "/request.https.proxy.connection")) {
+				/*
+				 * special case proxy coming thru https
+				 * instead of a direct SSL connection.
+				 */
+				if (! proxy_hack(vncsock, listen, s_in, s_out,
+				    cookie, mode)) {
+					strcpy(tbuf, uniq);
+					strcat(tbuf, cookie);
+					write(vncsock, tbuf, strlen(tbuf));
+					close(vncsock);
+				}
+				exit(0);
+
+			} else if (strstr(buf, "/check.https.proxy.connection")) {
+				char reply[] = "HTTP/1.0 200 OK\r\n"
+				    "Connection: close\r\n"
+				    "Content-Type: octet-stream\r\n"
+				    "Pragma: no-cache\r\n\r\n";
+
+				SSL_write(ssl, reply, strlen(reply));
+				SSL_shutdown(ssl);
+
+				strcpy(tbuf, uniq);
+				strcat(tbuf, cookie);
+				write(vncsock, tbuf, strlen(tbuf));
+				close(vncsock);
+
+				exit(0);
+			}
 			connect_to_httpd:
 
 			/*
@@ -953,18 +1439,19 @@ void accept_openssl(int mode) {
 			 */
 
 			/* send the failure tag: */
-			write(vncsock, uniq, strlen(uniq));
+			strcpy(tbuf, uniq);
 
 			if (strstr(buf, "HTTP/") != NULL)  {
+				char *q, *str;
 				/*
 				 * Also send back the GET line for heuristics.
 				 * (last_https, get file).
 				 */
-				char *q, *str = strdup(buf);
+				str = strdup(buf);
 				q = strstr(str, "HTTP/");
 				if (q != NULL) {
 					*q = '\0';	
-					write(vncsock, str, strlen(str));
+					strcat(tbuf, str);
 				}
 				free(str);
 			}
@@ -975,10 +1462,12 @@ void accept_openssl(int mode) {
 			 * Since this is the failure case, it does not
 			 * matter that we send more than strlen(cookie).
 			 */
-			write(vncsock, cookie, strlen(cookie));
-			usleep(150*1000);
-			close(vncsock);
+			strcat(tbuf, cookie);
+			write(vncsock, tbuf, strlen(tbuf));
 
+			usleep(150*1000);
+if (db) fprintf(stderr, "close vncsock: %d\n", vncsock);
+			close(vncsock);
 
 			/* now, finally, connect to the libvncserver httpd: */
 			if (screen->listenInterface == htonl(INADDR_ANY) ||
@@ -992,6 +1481,7 @@ void accept_openssl(int mode) {
 			if (iface == NULL || !strcmp(iface, "")) {
 				iface = "127.0.0.1";
 			}
+if (db) fprintf(stderr, "iface: %s\n", iface);
 			usleep(150*1000);
 
 			httpsock = rfbConnectToTcpAddr(iface, hport);
@@ -1069,7 +1559,7 @@ void accept_openssl(int mode) {
 
 		if (strstr(rcookie, uniq) == rcookie) {
 			int i;
-			rfbLog("SSL: https for helper process succeeded.\n");
+			rfbLog("SSL: but https for helper process succeeded.\n");
 			if (mode != OPENSSL_HTTPS) {
 				last_https = time(0);
 				for (i=0; i<128; i++) {
@@ -1081,6 +1571,7 @@ void accept_openssl(int mode) {
 			ssl_helper_pid(pid, -2);
 
 			if (mode == OPENSSL_INETD) {
+				double start;
 				/* to expand $PORT correctly in index.vnc */
 				if (screen->port == 0) {
 					int fd = fileno(stdin);
@@ -1097,7 +1588,7 @@ void accept_openssl(int mode) {
 				rfbLog("SSL: screen->port %d\n", screen->port);
 
 				/* kludge for https fetch via inetd */
-				double start = dnow();
+				start = dnow();
 				while (dnow() < start + 10.0) {
 					rfbPE(10000);
 					usleep(10000);
@@ -1127,6 +1618,7 @@ void accept_openssl(int mode) {
 
 	openssl_last_helper_pid = pid;
 	ssl_helper_pid(pid, vsock);
+
 	client = rfbNewClient(screen, vsock);
 	openssl_last_helper_pid = 0;
 
@@ -1159,17 +1651,19 @@ static void ssl_timeout (int sig) {
 static int ssl_init(int s_in, int s_out) {
 	unsigned char *sid = (unsigned char *) "x11vnc SID";
 	char *name;
-	int db = 0, rc, err;
+	int db = 1, rc, err;
 	int ssock = s_in;
 	double start = dnow();
 	int timeout = 20;
 
 	if (db) fprintf(stderr, "ssl_init: %d/%d\n", s_in, s_out);
+
 	ssl = SSL_new(ctx);
 	if (ssl == NULL) {
 		fprintf(stderr, "SSL_new failed\n");
 		return 0;
 	}
+if (db > 1) fprintf(stderr, "a\n");
 
 	SSL_set_session_id_context(ssl, sid, strlen((char *)sid));
 
@@ -1188,10 +1682,13 @@ static int ssl_init(int s_in, int s_out) {
 			return 0;
 		}
 	}
+if (db > 1) fprintf(stderr, "b\n");
 
 	SSL_set_accept_state(ssl);
+if (db > 1) fprintf(stderr, "c\n");
 
 	name = get_remote_host(ssock);
+if (db > 1) fprintf(stderr, "d\n");
 
 	while (1) {
 		if (db) fprintf(stderr, "calling SSL_accept...\n");
@@ -1258,9 +1755,9 @@ static int ssl_init(int s_in, int s_out) {
 	return 1;
 }
 
-static void ssl_xfer_debug(int csock, int s_in, int s_out) {
-	char buf[2048];
-	int sz = 2048, n, m, status;
+static void raw_xfer(int csock, int s_in, int s_out) {
+	char buf[8192];
+	int sz = 8192, n, m, status;
 	pid_t pid = fork();
 	int db = 1;
 
@@ -1269,7 +1766,7 @@ static void ssl_xfer_debug(int csock, int s_in, int s_out) {
 		exit(1);
 	}
 	if (pid) {
-		if (db) fprintf(stderr, "ssl_xfer start: %d -> %d/%d\n", csock, s_in, s_out);
+		if (db) fprintf(stderr, "raw_xfer start: %d -> %d/%d\n", csock, s_in, s_out);
 
 		while (1) {
 			n = read(csock, buf, sz);
@@ -1277,8 +1774,9 @@ static void ssl_xfer_debug(int csock, int s_in, int s_out) {
 				break;
 			} else if (n > 0) {
 				m = write(s_out, buf, n);
+if (db > 1) write(2, buf, n);
 				if (m != n) {
-		if (db) fprintf(stderr, "ssl_xfer bad write:  %d -> %d | %d/%d\n", csock, s_out, m, n);
+		if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d\n", csock, s_out, m, n);
 					break;
 				}
 			
@@ -1286,10 +1784,10 @@ static void ssl_xfer_debug(int csock, int s_in, int s_out) {
 		}
 		kill(pid, SIGTERM);
 		waitpid(pid, &status, WNOHANG); 
-		if (db) fprintf(stderr, "ssl_xfer done:  %d -> %d\n", csock, s_out);
+		if (db) fprintf(stderr, "raw_xfer done:  %d -> %d\n", csock, s_out);
 
 	} else {
-		if (db) fprintf(stderr, "ssl_xfer start: %d <- %d\n", csock, s_in);
+		if (db) fprintf(stderr, "raw_xfer start: %d <- %d\n", csock, s_in);
 
 		while (1) {
 			n = read(s_in, buf, sz);
@@ -1297,19 +1795,19 @@ static void ssl_xfer_debug(int csock, int s_in, int s_out) {
 				break;
 			} else if (n > 0) {
 				m = write(csock, buf, n);
+if (db > 1) write(2, buf, n);
 				if (m != n) {
-		if (db) fprintf(stderr, "ssl_xfer bad write:  %d <- %d | %d/%d\n", csock, s_in, m, n);
+		if (db) fprintf(stderr, "raw_xfer bad write:  %d <- %d | %d/%d\n", csock, s_in, m, n);
 					break;
 				}
 			}
 		}
-		if (db) fprintf(stderr, "ssl_xfer done:  %d <- %d\n", csock, s_in);
+		if (db) fprintf(stderr, "raw_xfer done:  %d <- %d\n", csock, s_in);
 
 	}
 	close(csock);
 	close(s_in);
 	close(s_out);
-	exit(0);
 }
 
 static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
@@ -1321,16 +1819,18 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	int ssock;
 
 	if (dbxfer) {
-		ssl_xfer_debug(csock, s_in, s_out);
+		raw_xfer(csock, s_in, s_out);
 		return;
 	}
+
+if (db) fprintf(stderr, "ssl_xfer begin\n");
 
 	/*
 	 * csock: clear text socket with libvncserver.    "C"
 	 * ssock: ssl data socket with remote vnc viewer. "S"
 	 *
-	 * to cover inetd mode, we have s_in and s_out, but in non-ssl mode they
-	 * both ssock.
+	 * to cover inetd mode, we have s_in and s_out, but in non-inetd
+	 * mode they both ssock.
 	 *
 	 * cbuf[] is data from csock that we have read but not passed on to ssl 
 	 * sbuf[] is data from ssl that we have read but not passed on to csock 
@@ -1428,9 +1928,9 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 		}
 
 		if (is_https) {
-			tv.tv_sec  = 45;
+			tv.tv_sec  = 50;
 		} else {
-			tv.tv_sec  = 20;
+			tv.tv_sec  = 35;
 		}
 		tv.tv_usec = 0;
 

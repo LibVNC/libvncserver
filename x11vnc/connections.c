@@ -2190,4 +2190,3 @@ void check_new_clients(void) {
 	}
 }
 
-

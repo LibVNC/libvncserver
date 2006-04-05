@@ -20,6 +20,7 @@ extern int trap_getimage_xerror(Display *d, XErrorEvent *error);
 extern char *xerror_string(XErrorEvent *error);
 extern void initialize_crash_handler(void);
 extern void initialize_signals(void);
+extern void unset_signals(void);
 extern int known_sigpipe_mode(char *s);
 
 #endif /* _X11VNC_CLEANUP_H */

@@ -8,6 +8,8 @@
 #define OPENSSL_VNC   2
 #define OPENSSL_HTTPS 3
 
+#define DO_DH 0
+
 extern int openssl_sock;
 extern int openssl_port_num;
 extern int https_sock;
@@ -21,6 +23,8 @@ extern void check_openssl(void);
 extern void check_https(void);
 extern void ssl_helper_pid(pid_t pid, int sock);
 extern void accept_openssl(int mode);
+extern char *find_openssl_bin(void);
+extern char *get_saved_pem(char *string, int create);
 
 
 #endif /* _X11VNC_SSLHELPER_H */

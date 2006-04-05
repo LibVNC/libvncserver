@@ -704,7 +704,9 @@ static XImage *initialize_raw_fb(void) {
 	if (! raw_fb_str) {
 		return NULL;
 	}
-
+	if (!strcasecmp(raw_fb_str, "NULL") || !strcasecmp(raw_fb_str, "ZERO")) {
+		raw_fb_str = strdup("map:/dev/zero@640x480x32");
+	}
 
 	if ( (q = strstr(raw_fb_str, "setup:")) == raw_fb_str) {
 		FILE *pipe;

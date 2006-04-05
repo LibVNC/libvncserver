@@ -1,0 +1,142 @@
+#!/bin/sh
+#
+# ssl_vncviewer:  wrapper for vncviewer to use stunnel SSL tunnel.
+#
+# You must have stunnel(8) installed on the system and in your
+# PATH (n.b. stunnel is usually in an sbin subdir).
+#
+# You should have "x11vnc -ssl ..." or "x11vnc -stunnel ..." 
+# running as the VNC server. 
+#
+# usage: ssl_vncviewer [cert-args] host:display <vncviewer-args>
+#
+# e.g.:  ssl_vncviewer snoopy:0
+#        ssl_vncviewer snoopy:0 -encodings "copyrect tight zrle hextile"
+#
+# [cert-args] can be:
+#	-verify /path/to/cacert.pem		
+#	-mycert /path/to/mycert.pem		
+#
+# -verify specifies a CA cert PEM file (or a self-signed one) for
+#         authenticating the VNC server.
+#
+# -mycert specifies this client's cert+key PEM file for the VNC server to
+#	  authenticate this client. 
+#
+
+VNCVIEWERCMD="vncviewer"
+PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
+
+help() {
+	head -26 $0 | tail +2
+}
+
+# grab our cmdline options:
+while [ "X$1" != "X" ]
+do
+    case $1 in 
+	"-verify")	shift; verify="$1"
+                ;;
+	"-mycert")	shift; mycert="$1"
+                ;;
+	"-h"*)	help; exit 0
+                ;;
+	*)	break
+                ;;
+    esac
+    shift
+done
+
+orig="$1"
+shift
+
+# play around with host:display port:
+if ! echo "$orig" | grep ':' > /dev/null; then
+	orig="$orig:0"
+fi
+
+host=`echo "$orig" | awk -F: '{print $1}'`
+disp=`echo "$orig" | awk -F: '{print $2}'`
+if [ $disp -lt 200 ]; then
+	port=`expr $disp + 5900`
+fi
+
+# try to find an open listening port via netstat(1):
+use=""
+if uname | grep Linux > /dev/null; then
+	inuse=`netstat -ant | grep LISTEN | awk '{print $4}' | sed 's/^.*://'`
+	try=5920
+	while [ $try -lt 6000 ]
+	do
+		if ! echo "$inuse" | grep -w $try > /dev/null; then
+			use=$try
+			break
+		fi
+		try=`expr $try + 1`
+	done
+fi
+if [ "X$use" = "X" ]; then
+	# otherwise choose a "random" one:
+	use=`date +%S`
+	use=`expr $use + 5920`
+fi
+
+# create the stunnel config file:
+if [ "X$verify" != "X" ]; then
+	if [ -d $verify ]; then
+		verify="CApath = $verify"
+	else
+		verify="CAfile = $verify"
+	fi
+	verify="$verify
+verify = 2"
+fi
+if [ "X$mycert" != "X" ]; then
+	cert="cert = $mycert"
+fi
+
+##debug = 7
+tmp=/tmp/ssl_vncviewer.$$
+cat > $tmp <<END
+foreground = yes
+pid =
+client = yes
+$verify
+$cert
+
+[vnc_stunnel]
+accept = $use
+connect= $host:$port
+END
+
+echo ""
+echo "Using this stunnel configuration:"
+cat $tmp
+echo ""
+sleep 1
+
+echo "running: stunnel $tmp"
+stunnel $tmp < /dev/tty > /dev/tty &
+pid=$!
+echo ""
+
+# pause here to let the user supply a possible passphrase for the
+# mycert key:
+if [ "X$mycert" != "X" ]; then
+	sleep 4
+fi
+sleep 2
+rm -f $tmp
+
+if [ $use -ge 5900 ]; then
+	n=`expr $use - 5900`
+fi
+
+if echo "$0" | grep vncip > /dev/null; then
+	# hack for runge's special wrapper script vncip.
+	vncip "$@" localhost:$n
+else
+	$VNCVIEWERCMD "$@" localhost:$n
+fi
+
+kill $pid

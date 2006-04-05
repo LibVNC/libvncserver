@@ -23,6 +23,7 @@ extern int stunnel_port;
 extern char *stunnel_pem;
 extern int use_openssl;
 extern char *openssl_pem;
+extern char *ssl_certs_dir;
 extern int https_port_num;
 extern char *ssl_verify;
 extern int ssl_initialized;
@@ -207,6 +208,8 @@ extern int naptile;
 extern int napfac;
 extern int napmax;
 extern int ui_skip;
+
+extern int watch_fbpm;
 
 extern int watch_selection;
 extern int watch_primary;

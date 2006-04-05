@@ -1,3 +1,10 @@
+2006-04-05  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add FBPM support (-fbpm) for Suns. -rawfb ZERO for
+	  testing.  Basic key+cert management utilities: -sslGenCA,
+	  -sslGenCert, -sslEncKey, -sslDelCert, -sslCertInfo, and
+	  addln features.  SSL proxy connection.  -storepasswd with
+	  no args or pw echo.
+
 2006-03-26  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -xinerama now on by default.  In -ssl mode accept https
 	  applet downloads thru VNC port.  -https option for 2nd https

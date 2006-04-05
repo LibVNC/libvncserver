@@ -190,6 +190,8 @@
 #include <X11/extensions/XShm.h>
 #endif
 
+#include <dirent.h>
+
 #if LIBVNCSERVER_HAVE_XTEST
 #include <X11/extensions/XTest.h>
 #endif

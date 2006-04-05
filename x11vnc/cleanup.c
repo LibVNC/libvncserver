@@ -33,6 +33,7 @@ int trap_getimage_xerror(Display *d, XErrorEvent *error);
 char *xerror_string(XErrorEvent *error);
 void initialize_crash_handler(void);
 void initialize_signals(void);
+void unset_signals(void);
 int known_sigpipe_mode(char *s);
 
 
@@ -107,7 +108,12 @@ static void clean_icon_mode(void) {
  * Normal exiting
  */
 void clean_up_exit (int ret) {
+	static int depth = 0;
 	exit_flag = 1;
+
+	if (depth++ > 2) {
+		exit(ret);
+	}
 
 	if (icon_mode) {
 		clean_icon_mode();
@@ -426,6 +432,19 @@ void initialize_signals(void) {
 	XIOerr_def = XSetIOErrorHandler(XIOerr);
 	X_UNLOCK;
 }
+
+void unset_signals(void) {
+	signal(SIGHUP,  SIG_DFL);
+	signal(SIGINT,  SIG_DFL);
+	signal(SIGQUIT, SIG_DFL);
+	signal(SIGABRT, SIG_DFL);
+	signal(SIGTERM, SIG_DFL);
+	signal(SIGBUS,  SIG_DFL);
+	signal(SIGSEGV, SIG_DFL);
+	signal(SIGFPE,  SIG_DFL);
+	signal(SIGPIPE, SIG_DFL);
+}
+
 
 int known_sigpipe_mode(char *s) {
 /*

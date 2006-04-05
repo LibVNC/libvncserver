@@ -23,6 +23,7 @@ int stunnel_port = 0;
 char *stunnel_pem = NULL;
 int use_openssl = 0;
 char *openssl_pem = NULL;
+char *ssl_certs_dir = NULL;
 int https_port_num = -1;
 char *ssl_verify = NULL;
 int ssl_initialized = 0;
@@ -278,6 +279,13 @@ int naptile = 4;	/* tile change threshold per poll to take a nap */
 int napfac = 4;		/* time = napfac*waitms, cut load with extra waits */
 int napmax = 1500;	/* longest nap in ms. */
 int ui_skip = 10;	/* see watchloop.  negative means ignore input */
+
+
+#if LIBVNCSERVER_HAVE_FBPM
+int watch_fbpm = 1;	/* -nofbpm */
+#else
+int watch_fbpm = 0;
+#endif
 
 int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
 int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */

@@ -1,0 +1,72 @@
+This directory contains a patched Java applet VNC viewer that is SSL
+enabled.
+
+The patches in the *.patch files are relative to the source tarball:
+
+	tightvnc-1.3dev7_javasrc.tar.gz  
+
+currently (4/06) available here:
+
+   http://prdownloads.sourceforge.net/vnc-tight/tightvnc-1.3dev7_javasrc.tar.gz?download
+
+It also includes some simple patches to:
+
+	- fix richcursor colors
+
+	- make the Java Applet cursor (not the cursor drawn to the canvas
+	  framebuffer) invisible when it is inside the canvas.
+
+	- allow Tab (and some other) keystrokes to be sent to the vnc
+	  server instead of doing widget traversal.
+
+
+This SSL applet should work with any VNC viewer that has an SSL tunnel in
+front of it.  It has been tested on x11vnc and using the stunnel tunnel
+to other VNC servers.
+
+By default this Vnc Viewer will only do SSL.  To do unencrypted traffic
+see the "DisableSSL" applet parameter (e.g. set it to Yes in index.vnc).
+
+Proxies: they are a general problem with java socket applets (a socket
+connection does not go through the proxy).  See the info in the proxy.vnc
+file for a workaround.  It uses SignedVncViewer.jar which is simply
+a signed version of VncViewer.jar.  The basic idea is the user clicks
+"Yes" to trust the applet and then it can connect directly to the proxy
+and issue a CONNECT request.
+
+This applet has been tested on versions 1.4.2 and 1.5.0 of the Sun
+Java plugin.  It may not work on older releases or different vendor VM's.
+Send full Java Console output for failures.
+
+---------------------------------------------------------------
+Tips:
+
+When doing single-port proxy connections (e.g. both VNC and HTTPS
+thru port 5900) it helps to move through the 'do you trust this site'
+dialogs quickly.   x11vnc has to wait to see if the traffic is VNC or
+HTTP and this can cause timeouts if you don't move thru them quickly.
+
+You may have to restart your browser completely if it gets into a
+weird state.  For one case we saw the JVM requesting VncViewer.class
+even when no such file exists.
+
+
+---------------------------------------------------------------
+Extras:
+
+ssl_vncviewer (not Java):
+
+        Wrapper script for native VNC viewer to connect to x11vnc in
+        SSL mode.  Script launches stunnel(8) and then connects to it
+        via localhost which in turn is then redirected to x11vnc via an
+        SSL tunnel.  stunnel(8) must be installed and available in PATH.
+
+
+Running Java SSL VncViewer from the command line:
+
+	From this directory:
+
+	java -cp ./VncViewer.jar VncViewer HOST <thehost> PORT <theport>
+
+	substitute <thehost> and <theport> with the actual values.
+

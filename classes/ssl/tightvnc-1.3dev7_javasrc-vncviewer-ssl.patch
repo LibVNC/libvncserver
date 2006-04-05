@@ -38,7 +38,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/Makefile vnc_javasrc/Makefile
  	@$(ExportJavaClasses)
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto.java
 --- vnc_javasrc.orig/RfbProto.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/RfbProto.java	2006-03-27 22:26:25.000000000 -0500
++++ vnc_javasrc/RfbProto.java	2006-04-03 11:22:30.000000000 -0400
 @@ -199,7 +199,21 @@
      host = h;
      port = p;
@@ -64,8 +64,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
        try {
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2006-03-27 20:45:59.000000000 -0500
-@@ -0,0 +1,481 @@
++++ vnc_javasrc/SSLSocketToMe.java	2006-04-04 13:17:39.000000000 -0400
+@@ -0,0 +1,1040 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -92,7 +92,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +import java.io.*;
 +import javax.net.ssl.*;
 +import java.security.cert.*;
-+import java.util.Vector;
++import java.util.*;
 +
 +import java.awt.*;
 +import java.awt.event.*;
@@ -109,14 +109,32 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +	SSLSocket socket = null;
 +	SSLSocketFactory factory;
 +
++	/* fallback for Proxy connection */
++	boolean proxy_in_use = false;
++	boolean proxy_failure = false;
++	public DataInputStream is = null;
++	public OutputStream os = null;
++
++	Socket proxySock;
++	DataInputStream proxy_is;
++	OutputStream proxy_os;
++
 +	/* trust contexts */
++	SSLContext trustloc_ctx;
 +	SSLContext trustall_ctx;
++	SSLContext trusturl_ctx;
 +	SSLContext trustone_ctx;
++
 +	TrustManager[] trustAllCerts;
++	TrustManager[] trustUrlCert;
 +	TrustManager[] trustOneCert;
 +
++	boolean use_url_cert_for_auth = true;
++	boolean user_wants_to_see_cert = true;
++
 +	/* cert(s) we retrieve from VNC server */
-+	java.security.cert.Certificate[] serverCerts = null;
++	java.security.cert.Certificate[] trustallCerts = null;
++	java.security.cert.Certificate[] trusturlCerts = null;
 +
 +	SSLSocketToMe(String h, int p, VncViewer v) throws Exception {
 +		host = h;
@@ -130,6 +148,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		dbg("SSL startup: " + host + " " + port);
 +
 +		/* create trust managers used if initial handshake fails: */
++
 +
 +		trustAllCerts = new TrustManager[] {
 +		    /*
@@ -149,13 +168,15 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			    java.security.cert.X509Certificate[] certs,
 +			    String authType) {
 +				/* empty */
++				dbg("ALL: an untrusted connect to grab cert.");
 +			}
 +		    }
 +		};
 +
-+		trustOneCert = new TrustManager[] {
++		trustUrlCert = new TrustManager[] {
 +		    /*
-+		     * this one accepts only the retrieved server cert.
++		     * this one accepts only the retrieved server cert
++		     * by SSLSocket by this applet.
 +		     */
 +		    new X509TrustManager() {
 +			public java.security.cert.X509Certificate[]
@@ -170,19 +191,85 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			public void checkServerTrusted(
 +			    java.security.cert.X509Certificate[] certs,
 +			    String authType) throws CertificateException {
-+				if (serverCerts == null) {
++				if (trusturlCerts == null) {
 +					throw new CertificateException(
-+					    "No Server Certs array.");
++					    "No Trust url Certs array.");
 +				}
-+				if (serverCerts.length < 1) {
++				if (trusturlCerts.length < 1) {
 +					throw new CertificateException(
-+					    "No Server Certs.");
++					    "No Trust url Certs.");
 +				}
-+				if (! serverCerts[0].equals(certs[0])) {
++				if (trusturlCerts.length > 1) {
 +					throw new CertificateException(
-+					    "Server Cert Changed.");
++					    "Too many Trust url Certs.");
 +				}
-+				dbg("serverCerts[0] matches certs[0]");
++				if (certs == null) {
++					throw new CertificateException(
++					    "No this-certs array.");
++				}
++				if (certs.length < 1) {
++					throw new CertificateException(
++					    "No this-certs Certs.");
++				}
++				if (certs.length > 1) {
++					throw new CertificateException(
++					    "Too many this-certs.");
++				}
++				if (! trusturlCerts[0].equals(certs[0])) {
++					throw new CertificateException(
++					    "Server Cert Changed != URL.");
++				}
++				dbg("URL: trusturlCerts[0] matches certs[0]");
++			}
++		    }
++		};
++		trustOneCert = new TrustManager[] {
++		    /*
++		     * this one accepts only the retrieved server cert
++		     * by SSLSocket by this applet.
++		     */
++		    new X509TrustManager() {
++			public java.security.cert.X509Certificate[]
++			    getAcceptedIssuers() {
++				return null;
++			}
++			public void checkClientTrusted(
++			    java.security.cert.X509Certificate[] certs,
++			    String authType) throws CertificateException {
++				throw new CertificateException("No Clients");
++			}
++			public void checkServerTrusted(
++			    java.security.cert.X509Certificate[] certs,
++			    String authType) throws CertificateException {
++				if (trustallCerts == null) {
++					throw new CertificateException(
++					    "No Trust All Server Certs array.");
++				}
++				if (trustallCerts.length < 1) {
++					throw new CertificateException(
++					    "No Trust All Server Certs.");
++				}
++				if (trustallCerts.length > 1) {
++					throw new CertificateException(
++					    "Too many Trust All Server Certs.");
++				}
++				if (certs == null) {
++					throw new CertificateException(
++					    "No this-certs array.");
++				}
++				if (certs.length < 1) {
++					throw new CertificateException(
++					    "No this-certs Certs.");
++				}
++				if (certs.length > 1) {
++					throw new CertificateException(
++					    "Too many this-certs.");
++				}
++				if (! trustallCerts[0].equals(certs[0])) {
++					throw new CertificateException(
++					    "Server Cert Changed != TRUSTALL.");
++				}
++				dbg("ONE: trustallCerts[0] matches certs[0]");
 +			}
 +		    }
 +		};
@@ -195,6 +282,18 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		 * 2) to subsequently connect to the server if user agrees.
 +		 */
 +
++		/* trust loc certs: */
++		try {
++			trustloc_ctx = SSLContext.getInstance("SSL");
++			trustloc_ctx.init(null, null, new
++			    java.security.SecureRandom());
++
++		} catch (Exception e) {
++			String msg = "SSL trustloc_ctx FAILED.";
++			dbg(msg);
++			throw new Exception(msg);
++		}
++
 +		/* trust all certs: */
 +		try {
 +			trustall_ctx = SSLContext.getInstance("SSL");
@@ -203,6 +302,18 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +
 +		} catch (Exception e) {
 +			String msg = "SSL trustall_ctx FAILED.";
++			dbg(msg);
++			throw new Exception(msg);
++		}
++
++		/* trust url certs: */
++		try {
++			trusturl_ctx = SSLContext.getInstance("SSL");
++			trusturl_ctx.init(null, trustUrlCert, new
++			    java.security.SecureRandom());
++
++		} catch (Exception e) {
++			String msg = "SSL trusturl_ctx FAILED.";
 +			dbg(msg);
 +			throw new Exception(msg);
 +		}
@@ -220,23 +331,121 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		}
 +	}
 +
++	boolean browser_cert_match() {
++		String msg = "Browser URL accept previously accepted cert";
++
++		if (user_wants_to_see_cert) {
++			return false;
++		}
++
++		if (trustallCerts != null && trusturlCerts != null) {
++		    if (trustallCerts.length == 1 && trusturlCerts.length == 1) {
++			if (trustallCerts[0].equals(trusturlCerts[0])) {
++				System.out.println(msg);
++				return true;
++			}
++		    }
++		}
++		return false;
++	}
++
 +	public Socket connectSock() throws IOException {
 +
-+		/* now connect to host:port */
-+		socket = (SSLSocket) factory.createSocket(host, port);
++		/*
++		 * first try a https connection to detect a proxy, and
++		 * also grab the VNC server cert.
++		 */
++		URL url = new URL("https://" + host + ":" + port +
++		    "/check.https.proxy.connection");
++		try {
++			HttpsURLConnection https = (HttpsURLConnection)
++			    url.openConnection();
++
++			https.setUseCaches(false);
++			https.setRequestMethod("GET");
++			https.setRequestProperty("Pragma", "No-Cache");
++			https.setRequestProperty("Proxy-Connection",
++			    "Keep-Alive");
++			https.setDoInput(true);
++
++			https.connect();
++
++			trusturlCerts = https.getServerCertificates();
++
++			if (https.usingProxy()) {
++				proxy_in_use = true;
++				dbg("HTTPS proxy in use. There may be connection problems.");
++			}
++			Object output = https.getContent();
++			https.disconnect();
++
++		} catch(Exception e) {
++			trusturlCerts = null;
++		}
++
++		if (use_url_cert_for_auth && trusturlCerts != null) {
++			factory = trusturl_ctx.getSocketFactory();
++		} else {
++			factory = trustloc_ctx.getSocketFactory();
++		}
++
++		socket = null;
++		try {
++			socket = (SSLSocket) factory.createSocket(host, port);
++		} catch (Exception esock) {
++			if (proxy_in_use) {
++				proxy_failure = true;
++				dbg("HTTPS proxy in use. Trying to go with it.");
++				try {
++					socket = proxy_socket(factory);
++				} catch (Exception e) {
++					dbg("err proxy_socket: " + e.getMessage());
++				}
++			}
++		}
 +
 +		try {
-+			/*
-+			 * Verified the first time!  How can that be? ;-)
-+			 * They actually went thru the trouble to set it up?
-+			 */
 +			socket.startHandshake();
-+			dbg("Server Connection Verified.");
++			dbg("Server Connection Verified on 1st try.");
 +
-+		} catch (Exception ehand)  {
++			java.security.cert.Certificate[] currentTrustedCerts;
++			BrowserCertsDialog bcd;
++
++			SSLSession sess = socket.getSession();
++			currentTrustedCerts = sess.getPeerCertificates();
++
++			if (currentTrustedCerts == null || currentTrustedCerts.length < 1) {
++				socket.close();
++				socket = null;
++				throw new SSLHandshakeException("no current certs");
++			}
++
++			String serv = "";
++			try {
++				CertInfo ci = new CertInfo(currentTrustedCerts[0]);
++				serv = ci.get_certinfo("CN");
++			} catch (Exception e) {
++				;
++			}
++
++			bcd = new BrowserCertsDialog(serv, host + ":" + port);
++			bcd.queryUser();
++			if (bcd.showCertDialog) {
++				String msg = "user wants to see cert";
++				dbg(msg);
++				user_wants_to_see_cert = true;
++				throw new SSLHandshakeException(msg);
++			} else {
++				user_wants_to_see_cert = false;
++				dbg("bcd: user said yes, accept it");
++			}
++
++		} catch (SSLHandshakeException eh)  {
 +			dbg("Could not automatically verify Server.");
++			dbg("msg: " + eh.getMessage());
 +
 +			socket.close();
++			socket = null;
 +
 +			/*
 +			 * Reconnect, trusting any cert, so we can grab
@@ -244,7 +453,11 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			 * is not used for anything else.
 +			 */
 +			factory = trustall_ctx.getSocketFactory();
-+			socket = (SSLSocket) factory.createSocket(host, port);
++			if (proxy_failure) {
++				socket = proxy_socket(factory);
++			} else {
++				socket = (SSLSocket) factory.createSocket(host, port);
++			}
 +
 +			try {
 +				socket.startHandshake();
@@ -253,32 +466,31 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +				/* grab the cert: */
 +				try {
 +					SSLSession sess = socket.getSession();
-+					serverCerts = sess.getPeerCertificates();
++					trustallCerts = sess.getPeerCertificates();
 +				} catch (Exception e) {
 +					throw new Exception("Could not get " + 
 +					    "Peer Certificate");	
 +				}
 +
-+				/*
-+				 * close socket now, we will reopen after
-+				 * dialog if user agrees to use the cert.
-+				 */
-+				socket.close();
++				if (! browser_cert_match()) {
++					/*
++					 * close socket now, we will reopen after
++					 * dialog if user agrees to use the cert.
++					 */
++					socket.close();
++					socket = null;
 +
-+				/* dialog with user to accept cert or not: */
++					/* dialog with user to accept cert or not: */
 +
-+				TrustDialog td= new TrustDialog(host, port,
-+				    serverCerts);
++					TrustDialog td= new TrustDialog(host, port,
++					    trustallCerts);
 +
-+				if (! td.queryUser()) {
-+					String msg = "User decided against it.";
-+					dbg(msg);
-+					throw new IOException(msg);
++					if (! td.queryUser()) {
++						String msg = "User decided against it.";
++						dbg(msg);
++						throw new IOException(msg);
++					}
 +				}
-+
-+				// idea to save certs for reconnections.
-+				// not working (RfbProto thread terminates).
-+				//viewer.acceptedCerts.addCerts(serverCerts);
 +
 +			} catch (Exception ehand2)  {
 +				dbg("** Could not TrustAll Verify Server.");
@@ -293,7 +505,11 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			 */
 +
 +			factory = trustone_ctx.getSocketFactory();
-+			socket = (SSLSocket) factory.createSocket(host, port);
++			if (proxy_failure) {
++				socket = proxy_socket(factory);
++			} else {
++				socket = (SSLSocket) factory.createSocket(host, port);
++			}
 +
 +			try {
 +				socket.startHandshake();
@@ -315,12 +531,171 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			System.out.println(s);
 +		}
 +	}
++
++	public SSLSocket proxy_socket(SSLSocketFactory factory) {
++		Properties props = null;
++		String proxyHost = null;
++		int proxyPort = 0;
++
++		/* see if we can guess the proxy info from Properties: */
++		try {
++			props = System.getProperties();
++		} catch (Exception e) {
++			dbg("props failed: " + e.getMessage());
++		}
++		if (props != null) {
++			dbg("\n---------------\nAll props:");
++			props.list(System.out);
++			dbg("\n---------------\n\n");
++
++			for (Enumeration e = props.propertyNames(); e.hasMoreElements(); )  {
++				String s = (String) e.nextElement();
++				String v = System.getProperty(s);
++				String l1 = s.toLowerCase();
++				String l2 = v.toLowerCase();
++
++				if (l1.indexOf("proxy") < 0 && l2.indexOf("proxy") < 0) {
++					continue;
++				}
++				if (l2.indexOf("https") < 0) {
++					continue;
++				}
++
++				String[] pieces = v.split("[,;]");
++				for (int i = 0; i < pieces.length; i++) {
++					String p = pieces[i];
++					int j = p.indexOf("https");
++					if (j < 0) {
++						continue;
++					}
++					j = p.indexOf("=", j);
++					if (j < 0) {
++						continue;
++					}
++					p = p.substring(j+1);
++					String [] hp = p.split(":");
++					if (hp.length != 2) {
++						continue;
++					}
++					if (hp[0].length() > 1 && hp[1].length() > 1) {
++						try {
++							Integer I = new Integer(hp[1]);
++							proxyPort = I.intValue();
++						} catch (Exception ex) {
++							continue;
++						}
++						proxyHost = new String(hp[0]);
++						break;
++					}
++				}
++			}
++		}
++		if (proxyHost != null) {
++			dbg("Lucky us! we figured out the Proxy parameters: " + proxyHost + " " + proxyPort);
++		} else {
++			/* ask user to help us: */
++			ProxyDialog pd = new ProxyDialog(proxyHost, proxyPort);
++			pd.queryUser();
++			proxyHost = pd.getHost(); 
++			proxyPort = pd.getPort();
++			dbg("User said host: " + pd.getHost() + " port: " + pd.getPort());
++		}
++
++		proxySock = psocket(proxyHost, proxyPort);
++		if (proxySock == null) {
++			dbg("1 sadly, returning a null socket");
++			return null;
++		}
++		String hp = host + ":" + port;
++
++		String req1 = "CONNECT " + hp + " HTTP/1.1\r\n"
++		    + "Host: " + hp + "\r\n\r\n";
++
++		/* not working for SSL yet: */
++		String req2 = "GET https://" + hp
++		    + "/request.https.proxy.connection HTTP/1.1\r\n"
++		    + "Host: " + hp + "\r\n\r\n";
++
++		dbg("requesting: " + req1);
++
++		try {
++			proxy_os.write(req1.getBytes());
++			String reply = readline(proxy_is);
++
++			dbg("proxy replied: " + reply);
++
++			if (reply.indexOf("HTTP/1.") < 0 && reply.indexOf(" 200") < 0) {
++				proxySock.close();
++				proxySock = psocket(proxyHost, proxyPort);
++				if (proxySock == null) {
++					dbg("2 sadly, returning a null socket");
++					return null;
++				}
++				dbg("requesting: " + req2);
++				proxy_os.write(req2.getBytes());
++
++				reply = readline(proxy_is);
++
++				dbg("proxy replied: " + reply);
++			}
++		} catch(Exception e) {
++			dbg("sock prob: " + e.getMessage());
++		}
++
++		while (true) {
++			String line = readline(proxy_is);
++			dbg("proxy line: " + line);
++			if (line.equals("\r\n") || line.equals("\n")) {
++				break;
++			}
++		}
++		
++		Socket sslsock = null;
++		try {
++			sslsock = factory.createSocket(proxySock, host, port, true);
++		} catch(Exception e) {
++			dbg("sslsock prob: " + e.getMessage());
++			dbg("3 sadly, returning a null socket");
++		}
++
++		return (SSLSocket) sslsock;
++	}
++
++	Socket psocket(String h, int p) {
++		Socket psock = null;
++		try {
++			psock = new Socket(h, p);
++			proxy_is = new DataInputStream(new BufferedInputStream(
++			    psock.getInputStream(), 16384));
++			proxy_os = psock.getOutputStream();
++		} catch(Exception e) {
++			dbg("psocket prob: " + e.getMessage());
++			return null;
++		}
++
++		return psock;
++	}
++
++	String readline(DataInputStream i) {
++		byte[] ba = new byte[1];
++		String s = new String("");
++		ba[0] = 0;
++		try {
++			while (ba[0] != 0xa) {
++				ba[0] = (byte) i.readUnsignedByte();
++				s += new String(ba);
++			}
++		} catch (Exception e) {
++			;
++		}
++		return s;
++	}
 +}
 +
 +class TrustDialog implements ActionListener {
 +	String msg, host, text;
 +	int port;
-+	java.security.cert.Certificate[] serverCerts = null;
++	java.security.cert.Certificate[] trustallCerts = null;
 +	boolean viewing_cert = false;
 +	boolean trust_this_session = false;
 +
@@ -339,38 +714,15 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +	    + " this VNC server";
 +	String ln = "\n---------------------------------------------------\n\n";
 +		
-+	TrustDialog (String h, int p, java.security.cert.Certificate[] certs) {
++	TrustDialog (String h, int p, java.security.cert.Certificate[] s) {
 +		host = h;
 +		port = p;
-+		serverCerts = certs;
++		trustallCerts = s;
 +
 +		msg = "VNC Server " + host + ":" + port + " Not Verified";
 +	}
 +
 +	public boolean queryUser() {
-+
-+// idea to save certs between connections. not working, everything is
-+// cleared after each new connection.
-+//
-+//	public boolean queryUser(VncViewer viewer) {
-+//		int i, j;
-+//		java.security.cert.Certificate cert;
-+//
-+//		for (i=0; i < viewer.acceptedCerts.allCerts.size(); i++) {
-+//			System.out.println("try " + i);
-+//
-+//			cert = (java.security.cert.Certificate)
-+//			    viewer.acceptedCerts.allCerts.elementAt(i);
-+//
-+//			for (j=0; j < serverCerts.length; j++) {
-+//				System.out.println("try " + i + " " + j);
-+//				if (serverCerts[j].equals(cert)) {
-+//					System.out.println("accept previously accepted cert");
-+//					/* matched, no need for dialog */
-+//					return true;
-+//				}
-+//			}
-+//		}
 +
 +		/* create and display the dialog for unverified cert. */
 +
@@ -378,12 +730,18 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +
 +		dialog = new Dialog(frame, true);
 +
++		String infostr = "";
++		if (trustallCerts.length == 1) {
++			CertInfo ci = new CertInfo(trustallCerts[0]);
++			infostr = ci.get_certinfo("all");
++		}
++
 +		text = "\n" 
 ++ "Unable to verify the identity of\n"
 ++ "\n"
 ++ "        " + host + ":" + port + "\n" 
 ++ "\n"
-++ get_certinfo()
+++ infostr
 ++ "\n"
 ++ "as a trusted VNC server.\n"
 ++ "\n"
@@ -473,12 +831,12 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +				int i;
 +				/* show all (likely just one) certs: */
 +				textarea.setText("");
-+				for (i=0; i < serverCerts.length; i++) {
++				for (i=0; i < trustallCerts.length; i++) {
 +					int j = i + 1;
 +					textarea.append("Certificate[" +
 +					    j + "]\n\n");
 +					textarea.append(
-+					    serverCerts[i].toString());
++					    trustallCerts[i].toString());
 +					textarea.append(ln);
 +				}
 +				viewcert.setLabel("View Info");
@@ -508,11 +866,11 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		String all = "";
 +		String fields[] = {"CN", "OU", "O", "L", "C"};
 +		int i;
-+		if (serverCerts.length < 1) {
++		if (trustallCerts.length < 1) {
 +			all = "";
 +			return all;
 +		}
-+		String cert = serverCerts[0].toString();
++		String cert = trustallCerts[0].toString();
 +
 +		/*
 +		 * For now we simply scrape the cert string, there must
@@ -545,6 +903,207 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			}
 +		}
 +		return all;
++	}
++}
++
++class ProxyDialog implements ActionListener {
++	String guessedHost = null;
++	String guessedPort = null;
++	/*
++	 * this is the gui to show the user the cert and info and ask
++	 * them if they want to continue using this cert.
++	 */
++
++	Button ok;
++	Dialog dialog;
++	TextField entry;
++	String reply = "";
++
++	ProxyDialog (String h, int p) {
++		guessedHost = h;
++		try {
++			guessedPort = Integer.toString(p);
++		} catch (Exception e) {
++			guessedPort = "8080";
++		}
++	}
++
++	public void queryUser() {
++
++		/* create and display the dialog for unverified cert. */
++
++		Frame frame = new Frame("Need Proxy host:port");
++
++		dialog = new Dialog(frame, true);
++
++
++		Label label = new Label("Please Enter your https Proxy info as host:port", Label.CENTER);
++		//label.setFont(new Font("Helvetica", Font.BOLD, 16));
++		entry = new TextField(30);
++		ok = new Button("OK");
++		ok.addActionListener(this);
++
++		String guess = "";
++		if (guessedHost != null) {
++			guess = guessedHost + ":" + guessedPort;
++		}
++		entry.setText(guess);
++
++		dialog.setLayout(new BorderLayout());
++		dialog.add("North", label);
++		dialog.add("Center", entry);
++		dialog.add("South", ok);
++		dialog.pack();
++		dialog.resize(dialog.preferredSize());
++
++		dialog.show();	/* block here til OK or Cancel pressed. */
++		return;
++	}
++
++	public String getHost() {
++		int i = reply.indexOf(":");
++		if (i < 0) {
++			return "unknown";
++		}
++		String h = reply.substring(0, i);
++		return h;
++	}
++
++	public int getPort() {
++		int i = reply.indexOf(":");
++		int p = 8080;
++		if (i < 0) {
++			return p;
++		}
++		i++;
++		String ps = reply.substring(i);
++		try {
++			Integer I = new Integer(ps);
++			p = I.intValue();
++		} catch (Exception e) {
++			;
++		}
++		return p;
++	}
++
++	public synchronized void actionPerformed(ActionEvent evt) {
++		System.out.println(evt.getActionCommand());
++		if (evt.getSource() == ok) {
++			reply = entry.getText();
++			dialog.dispose();
++		}
++	}
++}
++
++class BrowserCertsDialog implements ActionListener {
++	Button yes, no;
++	Dialog dialog;
++	String vncServer;
++	String hostport;
++	public boolean showCertDialog = true;
++
++	BrowserCertsDialog(String serv, String hp) {
++		vncServer = serv;
++		hostport = hp;
++	}
++
++	public void queryUser() {
++
++		/* create and display the dialog for unverified cert. */
++
++		Frame frame = new Frame("Use Browser/JVM Certs?");
++
++		dialog = new Dialog(frame, true);
++
++		String m = "\nShould this VNC Viewer applet use your Browser/JVM certs to\n";
++		m += "authenticate the VNC Server:\n";
++		m += "\n        " + hostport + "\n\n        " + vncServer + "\n\n";    
++		m += "(NOTE: this *includes* any certs you have Just Now accepted in a\n";
++		m += "dialog box with your Web Browser or Java Applet Plugin)\n\n";
++
++		TextArea textarea = new TextArea(m, 12, 64,
++		    TextArea.SCROLLBARS_VERTICAL_ONLY);
++		textarea.setEditable(false);
++		yes = new Button("Yes");
++		yes.addActionListener(this);
++		no = new Button("No, Let Me See the Certificate.");
++		no.addActionListener(this);
++
++		dialog.setLayout(new BorderLayout());
++		dialog.add("North", textarea);
++		dialog.add("Center", yes);
++		dialog.add("South", no);
++		dialog.pack();
++		dialog.resize(dialog.preferredSize());
++
++		dialog.show();	/* block here til Yes or No pressed. */
++		return;
++	}
++
++	public synchronized void actionPerformed(ActionEvent evt) {
++		System.out.println(evt.getActionCommand());
++		if (evt.getSource() == yes) {
++			showCertDialog = false;
++			dialog.dispose();
++		} else if (evt.getSource() == no) {
++			showCertDialog = true;
++			dialog.dispose();
++		}
++	}
++}
++
++class CertInfo {
++	String fields[] = {"CN", "OU", "O", "L", "C"};
++	java.security.cert.Certificate cert;
++	String certString = "";
++
++	CertInfo(java.security.cert.Certificate c) {
++		cert = c;
++		certString = cert.toString();
++	}
++	
++	String get_certinfo(String which) {
++		int i;
++		String cs = new String(certString);
++		String all = "";
++
++		/*
++		 * For now we simply scrape the cert string, there must
++		 * be an API for this... perhaps optionValue?
++		 */
++		for (i=0; i < fields.length; i++) {
++			int f, t, t1, t2;
++			String sub, mat = fields[i] + "=";
++			
++			f = cs.indexOf(mat, 0);
++			if (f > 0) {
++				t1 = cs.indexOf(", ", f);
++				t2 = cs.indexOf("\n", f);
++				if (t1 < 0 && t2 < 0) {
++					continue;
++				} else if (t1 < 0) {
++					t = t2;
++				} else if (t2 < 0) {
++					t = t1;
++				} else if (t1 < t2) {
++					t = t1;
++				} else {
++					t = t2;
++				}
++				if (t > f) {
++					sub = cs.substring(f, t);
++					all = all + "        " + sub + "\n";
++					if (which.equals(fields[i])) {
++						return sub;
++					}
++				}
++			}
++		}
++		if (which.equals("all")) {
++			return all;
++		} else {
++			return "";
++		}
 +	}
 +}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java

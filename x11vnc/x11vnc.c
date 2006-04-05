@@ -142,6 +142,7 @@
 #include "sslcmds.h"
 #include "sslhelper.h"
 #include "selection.h"
+#include "pm.h"
 
 /*
  * main routine for the x11vnc program
@@ -468,6 +469,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			check_new_clients();
 			check_xevents();
 			check_autorepeat();
+			check_pm();
 			check_keycode_state();
 			check_connect_inputs();		
 			check_gui_inputs();		
@@ -1161,6 +1163,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " readtimeout: %d\n", rfbMaxClientWait/1000);
 	fprintf(stderr, " take_naps:  %d\n", take_naps);
 	fprintf(stderr, " sb:         %d\n", screen_blank);
+	fprintf(stderr, " fbpm:       %d\n", !watch_fbpm);
 	fprintf(stderr, " xdamage:    %d\n", use_xdamage);
 	fprintf(stderr, "  xd_area:   %d\n", xdamage_max_area);
 	fprintf(stderr, "  xd_mem:    %.3f\n", xdamage_memory);
@@ -1268,7 +1271,7 @@ static void check_loop_mode(int argc, char* argv[]) {
 #endif
 	}
 }
-static void store_homedir_passwd(void) {
+static void store_homedir_passwd(char *file) {
 	char str1[32], str2[32], *p, *h, *f;
 	struct stat sbuf;
 
@@ -1311,27 +1314,32 @@ static void store_homedir_passwd(void) {
 		exit(1);
 	}
 
-	h = getenv("HOME");
-	if (! h) {
-		fprintf(stderr, "** $HOME not set.\n");
-		exit(1);
-	}
-
-	f = (char *) malloc(strlen(h) + strlen("/.vnc/passwd") + 1);
-	sprintf(f, "%s/.vnc", h);
-
-	if (stat(f, &sbuf) != 0) {
-		if (mkdir(f, 0755) != 0) {
-			fprintf(stderr, "** could not create directory %s\n", f);
-			perror("mkdir");
+	if (file != NULL) {
+		f = file;
+	} else {
+		
+		h = getenv("HOME");
+		if (! h) {
+			fprintf(stderr, "** $HOME not set.\n");
 			exit(1);
 		}
-	} else if (! S_ISDIR(sbuf.st_mode)) {
-		fprintf(stderr, "** not a directory %s\n", f);
-		exit(1);
-	}
 
-	sprintf(f, "%s/.vnc/passwd", h);
+		f = (char *) malloc(strlen(h) + strlen("/.vnc/passwd") + 1);
+		sprintf(f, "%s/.vnc", h);
+
+		if (stat(f, &sbuf) != 0) {
+			if (mkdir(f, 0755) != 0) {
+				fprintf(stderr, "** could not create directory %s\n", f);
+				perror("mkdir");
+				exit(1);
+			}
+		} else if (! S_ISDIR(sbuf.st_mode)) {
+			fprintf(stderr, "** not a directory %s\n", f);
+			exit(1);
+		}
+
+		sprintf(f, "%s/.vnc/passwd", h);
+	}
 	fprintf(stderr, "Write password to %s?  [y]/n ", f);
 
 	if (fgets(str2, 32, stdin) == NULL) {
@@ -1597,9 +1605,64 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 			}
+		} else if (!strcmp(arg, "-ssldir")) {
+			CHECK_ARGC
+			ssl_certs_dir = strdup(argv[++i]);
+
 		} else if (!strcmp(arg, "-sslverify")) {
 			CHECK_ARGC
 			ssl_verify = strdup(argv[++i]);
+
+		} else if (!strcmp(arg, "-sslGenCA")) {
+			char *cdir = NULL;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					cdir = strdup(s);
+					i++;
+				}
+			}
+			sslGenCA(cdir);
+			exit(0);
+		} else if (!strcmp(arg, "-sslGenCert")) {
+			char *ty, *nm = NULL;
+			if (i >= argc-1) {
+				fprintf(stderr, "Must be:\n");
+				fprintf(stderr, "          x11vnc -sslGenCert server ...\n");
+				fprintf(stderr, "or        x11vnc -sslGenCert client ...\n");
+				exit(1);
+			}
+			ty = argv[i+1];
+			if (strcmp(ty, "server") && strcmp(ty, "client")) {
+				fprintf(stderr, "Must be:\n");
+				fprintf(stderr, "          x11vnc -sslGenCert server ...\n");
+				fprintf(stderr, "or        x11vnc -sslGenCert client ...\n");
+				exit(1);
+			}
+			if (i < argc-2) {
+				nm = argv[i+2];
+			}
+			sslGenCert(ty, nm);
+			exit(0);
+		} else if (!strcmp(arg, "-sslEncKey")) {
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				sslEncKey(s, 0);
+			}
+			exit(0);
+		} else if (!strcmp(arg, "-sslCertInfo")) {
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				sslEncKey(s, 1);
+			}
+			exit(0);
+		} else if (!strcmp(arg, "-sslDelCert")) {
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				sslEncKey(s, 2);
+			}
+			exit(0);
+
 		} else if (!strcmp(arg, "-stunnel")) {
 			use_stunnel = 1;
 			if (i < argc-1) {
@@ -1633,11 +1696,15 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-usepw")) {
 			usepw = 1;
 		} else if (!strcmp(arg, "-storepasswd")) {
-			if (i+1 >= argc) {
-				store_homedir_passwd();
+			if (argc == i+1) {
+				store_homedir_passwd(NULL);
 				exit(0);
 			}
-			if (i+2 >= argc || rfbEncryptAndStorePasswd(argv[i+1],
+			if (argc == i+2) {
+				store_homedir_passwd(argv[i+1]);
+				exit(0);
+			}
+			if (argc >= i+4 || rfbEncryptAndStorePasswd(argv[i+1],
 			    argv[i+2]) != 0) {
 				fprintf(stderr, "-storepasswd failed\n");
 				exit(1);
@@ -1964,6 +2031,10 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-sb")) {
 			CHECK_ARGC
 			screen_blank = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-nofbpm")) {
+			watch_fbpm = 1;
+		} else if (!strcmp(arg, "-fbpm")) {
+			watch_fbpm = 0;
 		} else if (!strcmp(arg, "-xdamage")) {
 			use_xdamage = 1;
 		} else if (!strcmp(arg, "-noxdamage")) {
@@ -2321,16 +2392,6 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "option -passwdfile is incompatible with:\n");
 		fprintf(stderr, "            -passwd and -viewpasswd\n");
 		exit(1);
-	}
-
-	if (ssl_verify) {
-		struct stat sbuf;
-		if (stat(ssl_verify, &sbuf) != 0) {
-			rfbLog("x11vnc: -sslverify %s does not exist\n",
-			    ssl_verify);
-			rfbLogPerror("stat");
-			exit(1);
-		}
 	}
 
 	/*
@@ -3031,6 +3092,7 @@ int main(int argc, char* argv[]) {
 	}
 #endif
 
+	check_pm();
 
 	if (! quiet) {
 		rfbLog("--------------------------------------------------------\n");

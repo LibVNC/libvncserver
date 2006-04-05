@@ -3173,6 +3173,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    screen_blank, w);
 		screen_blank = w;
 
+	} else if (!strcmp(p, "fbpm")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !watch_fbpm);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning off -nofbpm mode.\n");
+		watch_fbpm = 0;
+	} else if (!strcmp(p, "nofbpm")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, watch_fbpm);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning on -nofbpm mode.\n");
+		watch_fbpm = 1;
+
 	} else if (strstr(p, "fs") == p) {
 		COLON_CHECK("fs:")
 		if (query) {

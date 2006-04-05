@@ -1,3 +1,8 @@
+2006-04-05  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: SSL Java viewer workarounds for firewall
+	  proxies (signed applet as last resort, proxy.vnc).
+	  include ssl_vncviewer stunnel wrapper script.
+
 2006-03-28  Steven Carr <scarr@jsa-usa.com>
 	* SDLvncviewer.c, rfbproto.c, vncviewer.c, main.c, rfbserver.c,
 	  rfb.h, rfbclient.h, rfbproto.h: add new encoding: KeyboardLedState

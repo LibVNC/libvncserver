@@ -59,6 +59,7 @@ AH_TEMPLATE(HAVE_LIBXTRAP, [DEC-XTRAP extension build environment present])
 AH_TEMPLATE(HAVE_RECORD, [RECORD extension build environment present])
 AH_TEMPLATE(HAVE_SOLARIS_XREADSCREEN, [Solaris XReadScreen available])
 AH_TEMPLATE(HAVE_IRIX_XREADDISPLAY, [IRIX XReadDisplay available])
+AH_TEMPLATE(HAVE_FBPM, [FBPM extension build environment present])
 
 AC_ARG_WITH(xkeyboard,
 [  --without-xkeyboard     disable xkeyboard extension support],,)
@@ -74,6 +75,8 @@ AC_ARG_WITH(xtrap,
 [  --without-xtrap         disable xtrap extension support],,)
 AC_ARG_WITH(xrecord,
 [  --without-xrecord       disable xrecord extension support],,)
+AC_ARG_WITH(fbpm,
+[  --without-fbpm          disable fbpm extension support],,)
 
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 	AC_CHECK_LIB(X11, XGetImage, HAVE_X="true",
@@ -94,6 +97,11 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 		AC_CHECK_HEADER(X11/extensions/readdisplay.h,
 			[AC_DEFINE(HAVE_IRIX_XREADDISPLAY)], ,
 			[#include <X11/Xlib.h>])
+
+		AC_CHECK_HEADER(X11/extensions/fbpm.h,
+			[AC_DEFINE(HAVE_FBPM)], ,
+			[#include <X11/Xlib.h>
+#include <X11/Xmd.h>])
 
 		AC_CHECK_LIB(Xtst, XTestGrabControl, 
 			X_PRELIBS="-lXtst $X_PRELIBS"

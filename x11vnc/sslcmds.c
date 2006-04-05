@@ -3,6 +3,8 @@
 #include "x11vnc.h"
 #include "inet.h"
 #include "cleanup.h"
+#include "sslhelper.h"
+#include "ssltools.h"
 
 #if LIBVNCSERVER_HAVE_FORK
 #if LIBVNCSERVER_HAVE_SYS_WAIT_H
@@ -17,6 +19,10 @@ void check_stunnel(void);
 int start_stunnel(int stunnel_port, int x11vnc_port);
 void stop_stunnel(void);
 void setup_stunnel(int rport, int *argc, char **argv);
+char *get_Cert_dir(char *cdir_in, char **tmp_in);
+void sslGenCA(char *cdir);
+void sslGenCert(char *ty, char *nm);
+void sslEncKey(char *path, int info_only);
 
 static pid_t stunnel_pid = 0;
 
@@ -291,5 +297,383 @@ void setup_stunnel(int rport, int *argc, char **argv) {
 	stunnel_fail:
 	rfbLog("failed to start stunnel.\n");
 	clean_up_exit(1);
+}
+
+char *get_Cert_dir(char *cdir_in, char **tmp_in) {
+	char *cdir, *home, *tmp;
+	struct stat sbuf;
+	int i;
+	char *cases1[] = {"/.vnc", "/.vnc/certs", "/.vnc/certs/CA"};
+	char *cases2[] = {"", "/CA", "/tmp"};
+
+	if (cdir_in != NULL) {
+		cdir = cdir_in;
+	} else {
+		cdir = ssl_certs_dir;
+	}
+
+	if (cdir == NULL) {
+		home = get_home_dir();
+		if (! home) {
+			return NULL;
+		}
+		cdir = (char *) malloc(strlen(home) + strlen("/.vnc/certs/CA") + 1);
+		for (i=0; i<3; i++) {
+			sprintf(cdir, "%s%s", home, cases1[i]);
+			if (stat(cdir, &sbuf) != 0) {
+				rfbLog("creating dir: %s\n", cdir);
+				if (mkdir(cdir, 0755) != 0) {
+					rfbLog("could not create directory %s\n", cdir);
+					rfbLogPerror("mkdir");
+					return NULL;
+				}
+			} else if (! S_ISDIR(sbuf.st_mode)) {
+				rfbLog("not a directory: %s\n", cdir);
+				return NULL;
+			}
+		}
+		sprintf(cdir, "%s%s", home, cases1[1]);
+	}
+
+	tmp = (char *) malloc(strlen(cdir) + 10);
+	for (i=0; i<3; i++) {
+		int ret;
+		sprintf(tmp, "%s%s", cdir, cases2[i]);
+		if (stat(tmp, &sbuf) != 0) {
+			rfbLog("creating dir: %s\n", tmp);
+			if (! strcmp(cases2[i], "/tmp")) {
+				ret = mkdir(tmp, 0700);
+			} else {
+				ret = mkdir(tmp, 0755);
+			}
+				
+			if (ret != 0) {
+				rfbLog("could not create directory %s\n", tmp);
+				rfbLogPerror("mkdir");
+				return NULL;
+			}
+		} else if (! S_ISDIR(sbuf.st_mode)) {
+			rfbLog("not a directory: %s\n", tmp);
+			return NULL;
+		}
+	}
+	sprintf(tmp, "%s/tmp", cdir);
+	*tmp_in = tmp;
+	return cdir;
+}
+
+void sslGenCA(char *cdir) {
+	char *openssl = find_openssl_bin();
+	char *tmp, *cmd, *scr, *cdir_use;
+	FILE *out;
+
+	if (! openssl) {
+		exit(1);
+	}
+
+	cdir_use = get_Cert_dir(cdir, &tmp);
+	if (! cdir_use) {
+		exit(1);
+	}
+
+	cmd = (char *) malloc(strlen(tmp) + 100);
+	scr = (char *) malloc(strlen(tmp) + 100);
+
+	sprintf(cmd, "%s/genca.%d.sh", tmp, getpid());
+	out = fopen(cmd, "w");
+	if (! out) {
+		rfbLog("could not open: %s\n", cmd);
+		rfbLogPerror("fopen");
+		exit(1);
+	}
+	fprintf(out, "%s", genCA);
+	fclose(out);
+
+	sprintf(scr, "/bin/sh %s", cmd);
+
+	rfbLog("Using openssl:   %s\n", openssl);
+	rfbLog("Using certs dir: %s\n", cdir_use);
+	fprintf(stderr, "\n");
+
+	set_env("BASE_DIR", cdir_use);
+	set_env("OPENSSL", openssl);
+
+	system(scr);
+	unlink(cmd);
+}
+
+void sslGenCert(char *ty, char *nm) {
+	char *openssl = find_openssl_bin();
+	char *tmp, *cmd, *scr, *cdir_use;
+	FILE *out;
+
+	if (! openssl) {
+		exit(1);
+	}
+
+	cdir_use = get_Cert_dir(NULL, &tmp);
+	if (! cdir_use) {
+		exit(1);
+	}
+
+	cmd = (char *) malloc(strlen(tmp) + 100);
+	scr = (char *) malloc(strlen(tmp) + 100);
+
+	sprintf(cmd, "%s/gencert.%d.sh", tmp, getpid());
+	out = fopen(cmd, "w");
+	if (! out) {
+		rfbLog("could not open: %s\n", cmd);
+		rfbLogPerror("fopen");
+		exit(1);
+	}
+	fprintf(out, "%s", genCert);
+	fclose(out);
+
+	sprintf(scr, "/bin/sh %s", cmd);
+
+	rfbLog("Using openssl:   %s\n", openssl);
+	rfbLog("Using certs dir: %s\n", cdir_use);
+	fprintf(stderr, "\n");
+
+	set_env("BASE_DIR", cdir_use);
+	set_env("OPENSSL", openssl);
+	if (! ty) {
+		set_env("TYPE", "");
+	} else {
+		set_env("TYPE", ty);
+	}
+	if (! nm) {
+		set_env("NAME", "");
+	} else {
+		char *q = strstr(nm, "SAVE-");
+		if (!strcmp(nm, "SAVE")) {
+			set_env("NAME", "");
+		} else if (q == nm) {
+			q += strlen("SAVE-");
+			set_env("NAME", q);
+		} else {
+			set_env("NAME", nm);
+		}
+	}
+
+	system(scr);
+	unlink(cmd);
+}
+
+void sslEncKey(char *path, int mode) {
+	char *openssl = find_openssl_bin();
+	char *scr, *cert = NULL, *tca;
+	char line[1024], tmp[] = "/tmp/x11vnc-tmp.XXXXXX";
+	char *cdir = NULL;
+	int tmp_fd, incert, info_only = 0, delete_only = 0;
+	int listlong = 0;
+	struct stat sbuf;
+	FILE *file;
+	static int depth = 0;
+
+	if (depth > 0) {
+		/* get_saved_pem may call us back. */
+		return;
+	}
+	depth++;
+
+	if (mode == 1) {
+		info_only = 1;
+	} else if (mode == 2) {
+		delete_only = 1;
+	}
+
+	if (! openssl) {
+		exit(1);
+	}
+	cdir = get_Cert_dir(NULL, &tca);
+	if (! cdir) {
+		fprintf(stderr, "could not find Cert dir\n");
+		exit(1);
+	}
+
+	if (!strcasecmp(path, "LL") || !strcasecmp(path, "LISTL")) {
+		listlong = 1;
+		path = "LIST";
+	}
+
+	if (strstr(path, "SAVE") == path) {
+		char *p = get_saved_pem(path, 0);
+		if (p == NULL) {
+			fprintf(stderr, "could not find saved pem matching: %s\n", path);
+			exit(1);
+		}
+		path = p;
+
+	} else if (!strcmp(path, "CA") && cdir) {
+		tca = (char *) malloc(strlen(cdir) + strlen("/CA/cacert.pem") + 1);
+		sprintf(tca, "%s/CA/cacert.pem", cdir);
+		path = tca;
+
+	} else if (info_only && (!strcasecmp(path, "LIST") ||
+	    !strcasecmp(path, "ALL"))) {
+		if (! cdir || strchr(cdir, '\'')) {
+			fprintf(stderr, "bad certdir char: %s\n", cdir ? cdir : "null");
+			exit(1);
+		}
+		tca = (char *) malloc(2*strlen(cdir) + strlen(program_name) + 1000);
+		sprintf(tca, "find '%s' -type f | egrep '\\.(crt|pem|key|req)$' "
+		    "| grep -v CA/newcerts", cdir);
+		if (!strcasecmp(path, "ALL")) {
+			/* ugh.. */
+			strcat(tca, " | grep -v private/cakey.pem | xargs -n1 ");
+			strcat(tca, program_name);
+			strcat(tca, " -ssldir '");
+			strcat(tca, cdir);
+			strcat(tca, "' -sslCertInfo 2>&1 ");
+		} else if (listlong) {
+			strcat(tca, " | xargs ls -l ");
+		}
+		system(tca);
+		return;
+
+	} else if (info_only && (!strcasecmp(path, "HASHON") ||
+	    !strcasecmp(path, "HASHOFF"))) {
+
+		tmp_fd = mkstemp(tmp);
+		if (tmp_fd < 0) {
+			exit(1);
+		}
+
+		write(tmp_fd, genCert, strlen(genCert));
+		close(tmp_fd);
+
+		scr = (char *) malloc(strlen(tmp) + 100);
+		sprintf(scr, "/bin/sh %s", tmp);
+
+		set_env("BASE_DIR", cdir);
+		set_env("OPENSSL", openssl);
+		set_env("TYPE", "server");
+		if (!strcasecmp(path, "HASHON")) {
+			set_env("HASHON", "1");
+		} else {
+			set_env("HASHOFF", "1");
+		}
+		system(scr);
+		unlink(tmp);
+		return;
+	}
+
+	if (stat(path, &sbuf) != 0) {
+		if (strstr(path, "client") || strchr(path, '/') == NULL) {
+			int i;
+			tca = (char *) malloc(strlen(cdir) + strlen("/clients")
+			    + strlen(path) + 100);
+			for (i = 1; i <= 15; i++)  {
+				tca[0] = '\0';
+				if (       i == 1) {
+				    sprintf(tca, "%s/%s", cdir, path); 
+				} else if (i == 2 && mode > 0) {
+				    sprintf(tca, "%s/%s.crt", cdir, path); 
+				} else if (i == 3) {
+				    sprintf(tca, "%s/%s.pem", cdir, path); 
+				} else if (i == 4 && mode > 1) {
+				    sprintf(tca, "%s/%s.req", cdir, path); 
+				} else if (i == 5 && mode > 1) {
+				    sprintf(tca, "%s/%s.key", cdir, path); 
+				} else if (i == 6) {
+				    sprintf(tca, "%s/clients/%s", cdir, path); 
+				} else if (i == 7 && mode > 0) {
+				    sprintf(tca, "%s/clients/%s.crt", cdir, path); 
+				} else if (i == 8) {
+				    sprintf(tca, "%s/clients/%s.pem", cdir, path); 
+				} else if (i == 9 && mode > 1) {
+				    sprintf(tca, "%s/clients/%s.req", cdir, path); 
+				} else if (i == 10 && mode > 1) {
+				    sprintf(tca, "%s/clients/%s.key", cdir, path); 
+				} else if (i == 11) {
+				    sprintf(tca, "%s/server-%s", cdir, path); 
+				} else if (i == 12 && mode > 0) {
+				    sprintf(tca, "%s/server-%s.crt", cdir, path); 
+				} else if (i == 13) {
+				    sprintf(tca, "%s/server-%s.pem", cdir, path); 
+				} else if (i == 14 && mode > 1) {
+				    sprintf(tca, "%s/server-%s.req", cdir, path); 
+				} else if (i == 15 && mode > 1) {
+				    sprintf(tca, "%s/server-%s.key", cdir, path); 
+				}
+				if (tca[0] == '\0') {
+					continue;
+				}
+				if (stat(tca, &sbuf) == 0) {
+					path = tca;
+					break;
+				}
+			}
+		}
+	}
+
+	if (stat(path, &sbuf) != 0) {
+		rfbLog("sslEncKey: %s\n", path);
+		rfbLogPerror("stat");
+		exit(1);
+	}
+
+	if (! info_only) {
+		cert = (char *) malloc(2*sbuf.st_size);
+		file = fopen(path, "r");
+		if (file == NULL) {
+			rfbLog("sslEncKey: %s\n", path);
+			rfbLogPerror("fopen");
+			exit(1);
+		}
+		incert = 0;
+		cert[0] = '\0';
+		while (fgets(line, 1024, file) != NULL) {
+			if (strstr(line, "-----BEGIN CERTIFICATE-----") == line) {
+				incert = 1;
+			}
+			if (incert) {
+				strcat(cert, line);
+			}
+			if (strstr(line, "-----END CERTIFICATE-----") == line) {
+				incert = 0;
+			}
+		}
+		fclose(file);
+	}
+
+	tmp_fd = mkstemp(tmp);
+	if (tmp_fd < 0) {
+		exit(1);
+	}
+
+	write(tmp_fd, genCert, strlen(genCert));
+	close(tmp_fd);
+
+        scr = (char *) malloc(strlen(tmp) + 100);
+	sprintf(scr, "/bin/sh %s", tmp);
+
+	set_env("BASE_DIR", "/no/such/dir");
+	set_env("OPENSSL", openssl);
+	set_env("TYPE", "server");
+	if (info_only) {
+		set_env("INFO_ONLY", path);
+	} else if (delete_only) {
+		set_env("DELETE_ONLY", path);
+	} else {
+		set_env("ENCRYPT_ONLY", path);
+	}
+	system(scr);
+	unlink(tmp);
+
+	if (! mode && cert && cert[0] != '\0') {
+		file = fopen(path, "a");
+		if (file == NULL) {
+			rfbLog("sslEncKey: %s\n", path);
+			rfbLogPerror("fopen");
+			exit(1);
+		}
+		fprintf(file, cert);
+		fclose(file);
+		free(cert);
+	}
+
+	depth--;
 }
 

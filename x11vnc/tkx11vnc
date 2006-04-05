@@ -294,6 +294,7 @@ Permissions
 	=F ssl_pem:
 	stunnel
 	=F stunnel_pem:
+	=F ssldir:
 	=F sslverify:
 	https:
 	=GAL LOFF
@@ -358,6 +359,7 @@ Tuning
 	threads
 	wmdt:
 	rfbwait:
+	nofbpm
 	=GAL LOFF
 "
 }

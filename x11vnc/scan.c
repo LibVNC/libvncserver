@@ -2148,7 +2148,6 @@ static void ping_clients(int tile_cnt) {
 		last_send = now;
 	} else if (now - last_send > 2) {
 		/* Send small heartbeat to client */
-if (0) fprintf(stderr, "ping_clients 2\n");
 		mark_rect_as_modified(0, 0, 1, 1, 1);
 		last_send = now;
 	}
