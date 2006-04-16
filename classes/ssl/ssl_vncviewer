@@ -1,6 +1,8 @@
 #!/bin/sh
 #
-# ssl_vncviewer:  wrapper for vncviewer to use stunnel SSL tunnel.
+# ssl_vncviewer:  wrapper for vncviewer to use an stunnel SSL tunnel.
+#
+# Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
 #
 # You must have stunnel(8) installed on the system and in your
 # PATH (n.b. stunnel is usually in an sbin subdir).
@@ -16,6 +18,7 @@
 # [cert-args] can be:
 #	-verify /path/to/cacert.pem		
 #	-mycert /path/to/mycert.pem		
+#	-proxy  host:port
 #
 # -verify specifies a CA cert PEM file (or a self-signed one) for
 #         authenticating the VNC server.
@@ -23,12 +26,19 @@
 # -mycert specifies this client's cert+key PEM file for the VNC server to
 #	  authenticate this client. 
 #
+# -proxy  try host:port as a Web proxy to use the CONNECT method
+#         to reach the VNC server (e.g. your firewall requires a proxy).
+#         For the "double proxy" case use -proxy host1:port1,host2:port2
+#
+#
+# set VNCVIEWERCMD to whatever vncviewer command you want to use:
+#
+VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
 
-VNCVIEWERCMD="vncviewer"
 PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
 
 help() {
-	head -26 $0 | tail +2
+	head -36 $0 | tail +2
 }
 
 # grab our cmdline options:
@@ -38,6 +48,8 @@ do
 	"-verify")	shift; verify="$1"
                 ;;
 	"-mycert")	shift; mycert="$1"
+                ;;
+	"-proxy")	shift; proxy="$1"
                 ;;
 	"-h"*)	help; exit 0
                 ;;
@@ -59,12 +71,19 @@ host=`echo "$orig" | awk -F: '{print $1}'`
 disp=`echo "$orig" | awk -F: '{print $2}'`
 if [ $disp -lt 200 ]; then
 	port=`expr $disp + 5900`
+else
+	port=$disp
 fi
 
 # try to find an open listening port via netstat(1):
 use=""
+inuse=""
 if uname | grep Linux > /dev/null; then
 	inuse=`netstat -ant | grep LISTEN | awk '{print $4}' | sed 's/^.*://'`
+elif uname | grep SunOS > /dev/null; then
+	inuse=`netstat -an -f inet -P tcp | grep LISTEN | awk '{print $1}' | sed 's/^.*\.//'`
+fi
+if [ "x$inuse" != "x" ]; then
 	try=5920
 	while [ $try -lt 6000 ]
 	do
@@ -95,6 +114,145 @@ if [ "X$mycert" != "X" ]; then
 	cert="cert = $mycert"
 fi
 
+pcode() {
+	tf=$1
+	SSL_VNC_PROXY=$proxy; export SSL_VNC_PROXY
+	SSL_VNC_DEST="$host:$port"; export SSL_VNC_DEST
+	cod='#!/usr/bin/perl
+
+# A hack to glue stunnel to a Web proxy for client connections.
+
+use IO::Socket::INET;
+
+my ($first, $second) = split(/,/, $ENV{SSL_VNC_PROXY});
+my ($proxy_host, $proxy_port) = split(/:/, $first);
+my $connect = $ENV{SSL_VNC_DEST};
+
+print STDERR "\nperl script for web proxing:\n";
+print STDERR "proxy_host:       $proxy_host\n";
+print STDERR "proxy_port:       $proxy_port\n";
+print STDERR "proxy_connect:    $connect\n";
+
+my $sock = IO::Socket::INET->new(
+	PeerAddr => $proxy_host,
+	PeerPort => $proxy_port,
+	Proto => "tcp");
+
+if (! $sock) {
+	unlink($0);
+	die "perl proxy: $!\n";
+}
+
+my $con = "";
+if ($second ne "") {
+	$con = "CONNECT $second HTTP/1.1\r\n";
+	$con   .= "Host: $second\r\n\r\n";
+} else {
+	$con = "CONNECT $connect HTTP/1.1\r\n";
+	$con   .= "Host: $connect\r\n\r\n";
+}
+
+print STDERR "proxy_request1:\n$con";
+print $sock $con;
+
+unlink($0);
+
+my $rep = "";
+while ($rep !~ /\r\n\r\n/) {
+	my $c = getc($sock);
+	print STDERR $c;
+	$rep .= $c;
+}
+if ($rep !~ m,HTTP/.* 200,) {
+	die "proxy error: $rep\n";
+}
+
+if ($second ne "") {
+	$con = "CONNECT $connect HTTP/1.1\r\n";
+	$con   .= "Host: $connect\r\n\r\n";
+	print STDERR "proxy_request2:\n$con";
+
+	print $sock $con;
+
+	$rep = "";
+	while ($rep !~ /\r\n\r\n/) {
+		my $c = getc($sock);
+		print STDERR $c;
+		$rep .= $c;
+	}
+	if ($rep !~ m,HTTP/.* 200,) {
+		die "proxy error: $rep\n";
+	}
+}
+
+if (fork) {
+	print STDERR "parent\[$$]  STDIN -> socket\n\n";
+	xfer(STDIN, $sock);
+} else {
+	print STDERR "child \[$$]  socket -> STDOUT\n\n";
+	xfer($sock, STDOUT);
+}
+exit;
+
+sub xfer {
+	my($in, $out) = @_;
+	$RIN = $WIN = $EIN = "";
+	$ROUT = "";
+	vec($RIN, fileno($in), 1) = 1;
+	vec($WIN, fileno($in), 1) = 1;
+	$EIN = $RIN | $WIN;
+
+	while (1) {
+		my $nf = 0;
+		while (! $nf) {
+			$nf = select($ROUT=$RIN, undef, undef, undef);
+		}
+		my $len = sysread($in, $buf, 8192);
+		if (! defined($len)) {
+			next if $! =~ /^Interrupted/;
+			print STDERR "perl proxy\[$$]: $!\n";
+			last;
+		} elsif ($len == 0) {
+			print STDERR "perl proxy\[$$]: Input is EOF.\n";
+			last;
+		}
+		my $offset = 0;
+		my $quit = 0;
+		while ($len) {
+			my $written = syswrite($out, $buf, $len, $offset);
+			if (! defined $written) {
+				print STDERR "perl proxy\[$$]: Output is EOF. $!\n";
+				$quit = 1;
+				last;
+			}
+			$len -= $written;
+			$offset += $written;
+		}
+		last if $quit;
+	}
+	close($in);
+	close($out);
+}
+'
+	rm -f $tf
+	if [ -f $tf ]; then
+		echo "$tf still exists!"
+		exit 1
+	fi
+	echo "$cod" > $tf
+	chmod 700 $tf
+}
+
+ptmp=""
+if [ "X$proxy" != "X" ]; then
+	ptmp="/tmp/ssl_vncviewer.$$.pl"
+	pcode $ptmp
+	connect="exec = $ptmp"
+else
+	connect="connect = $host:$port"
+fi
+
+
 ##debug = 7
 tmp=/tmp/ssl_vncviewer.$$
 cat > $tmp <<END
@@ -106,12 +264,13 @@ $cert
 
 [vnc_stunnel]
 accept = $use
-connect= $host:$port
+$connect
 END
 
 echo ""
 echo "Using this stunnel configuration:"
-cat $tmp
+echo ""
+cat $tmp | uniq
 echo ""
 sleep 1
 
@@ -140,3 +299,4 @@ else
 fi
 
 kill $pid
+sleep 1

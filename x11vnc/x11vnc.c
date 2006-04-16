@@ -1439,6 +1439,21 @@ int main(int argc, char* argv[]) {
 		exit(1); \
 	}
 
+	/*
+	 * do a quick check for parameters that apply to "utility"
+	 * commands, i.e. ones that do not run the server.
+	 */
+	for (i=1; i < argc; i++) {
+		arg = argv[i];
+		if (strstr(arg, "--") == arg) {
+			arg++;
+		}
+		if (!strcmp(arg, "-ssldir")) {
+			CHECK_ARGC
+			ssl_certs_dir = strdup(argv[++i]);
+		}
+	}
+
 	for (i=1; i < argc; i++) {
 		/* quick-n-dirty --option handling. */
 		arg = argv[i];

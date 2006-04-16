@@ -122,7 +122,9 @@ char *get_saved_pem(char *save, int create) {
 		char *new = NULL;
 		if (create) {
 			new = create_tmp_pem(path, prompt);
-			sslEncKey(new, 0);
+			if (! getenv("X11VNC_SSL_NO_PASSPHRASE") && ! inetd) {
+				sslEncKey(new, 0);
+			}
 		}
 		return new;
 	} else {
@@ -977,12 +979,18 @@ static int is_ssl_readable(int s_in, time_t last_https, char *last_get,
 	int nfd, db = 0;
 	struct timeval tv;
 	fd_set rd;
+
+	if (getenv("ACCEPT_OPENSSL_DEBUG")) {
+		db = atoi(getenv("ACCEPT_OPENSSL_DEBUG"));
+	}
+
 	/*
 	 * we'll do a select() on s_in for reading.  this is not an
 	 * absolute proof that SSL_read is ready (XXX use SSL utility).
 	 */
 	tv.tv_sec  = 2;
 	tv.tv_usec = 0;
+
 
 	if (mode == OPENSSL_INETD) {
 		/*
@@ -1003,7 +1011,7 @@ static int is_ssl_readable(int s_in, time_t last_https, char *last_get,
 			tv.tv_sec  = 4;
 		}
 	}
-if (1) fprintf(stderr, "tv_sec: %d - %s\n", (int) tv.tv_sec, last_get);
+if (db) fprintf(stderr, "tv_sec: %d - %s\n", (int) tv.tv_sec, last_get);
 
 	FD_ZERO(&rd);
 	FD_SET(s_in, &rd);
@@ -1024,7 +1032,7 @@ if (1) fprintf(stderr, "tv_sec: %d - %s\n", (int) tv.tv_sec, last_get);
 static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	int is_http, err, n, n2;
 	char *buf;
-	int db = 1;
+	int db = 0;
 	/*
 	 * sniff the first couple bytes of the stream and try to see
 	 * if it is http or not.  if we read them OK, we must read the
@@ -1032,6 +1040,9 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	 * what has be read is returned in buf_a and n_a.
 	 * *buf_a is BSIZE+1 long and zeroed.
 	 */
+	if (getenv("ACCEPT_OPENSSL_DEBUG")) {
+		db = atoi(getenv("ACCEPT_OPENSSL_DEBUG"));
+	}
 
 	buf = (char *) calloc(sizeof(BSIZE+1), 1);
 	*n_a = 0;
@@ -1076,6 +1087,7 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 }
 
 static int csock_timeout_sock = -1;
+
 static void csock_timeout (int sig) {
 	rfbLog("sig: %d, csock_timeout.\n", sig);
 	if (csock_timeout_sock >= 0) {
@@ -1113,6 +1125,10 @@ int proxy_hack(int vncsock, int listen, int s_in, int s_out, char *cookie,
 
 	rfbLog("SSL: accept_openssl: detected https proxied connection"
 	    " request.\n");
+
+	if (getenv("ACCEPT_OPENSSL_DEBUG")) {
+		db = atoi(getenv("ACCEPT_OPENSSL_DEBUG"));
+	}
 
 	SSL_write(ssl, reply0, strlen(reply0));
 	SSL_shutdown(ssl);
@@ -1191,6 +1207,10 @@ void accept_openssl(int mode) {
 		rcookie[i] = '\0';
 	}
 	first = 0;
+
+	if (getenv("ACCEPT_OPENSSL_DEBUG")) {
+		db = atoi(getenv("ACCEPT_OPENSSL_DEBUG"));
+	}
 
 	/* do INETD, VNC, or HTTPS cases (result is client socket or pipe) */
 	if (mode == OPENSSL_INETD) {
@@ -1314,7 +1334,8 @@ void accept_openssl(int mode) {
 		/* now connect back to parent socket: */
 		vncsock = rfbConnectToTcpAddr("127.0.0.1", cport);
 		if (vncsock < 0) {
-			rfbLog("SSL: ssl_helper: could not connect back to: %d\n", cport);
+			rfbLog("SSL: ssl_helper[%d]: could not connect"
+			    " back to: %d\n", getpid(), cport);
 			close(vncsock);
 			exit(1);
 		}
@@ -1327,6 +1348,7 @@ void accept_openssl(int mode) {
 		} else {
 			s_in = s_out = sock;
 		}
+
 		if (! ssl_init(s_in, s_out)) {
 			close(vncsock);
 			exit(1);
@@ -1342,8 +1364,8 @@ void accept_openssl(int mode) {
 			have_httpd = 1;
 		}
 		if (mode == OPENSSL_HTTPS && ! have_httpd) {
-			rfbLog("SSL: accept_openssl: no httpd socket for "
-			    "-https mode\n");
+			rfbLog("SSL: accept_openssl[%d]: no httpd socket for "
+			    "-https mode\n", getpid());
 			close(vncsock);
 			exit(1);
 		}
@@ -1371,7 +1393,6 @@ void accept_openssl(int mode) {
 			 * Check if there is stuff to read from remote end
 			 * if so it is likely a GET or HEAD.
 			 */
-			if (1) fprintf(stderr, "is_ssl_readable\n");
 			if (! is_ssl_readable(s_in, last_https, last_get,
 			    mode)) {
 				goto write_cookie;
@@ -1384,7 +1405,7 @@ void accept_openssl(int mode) {
 			 * is ever sent.  So often we timeout here.
 			 */
 
-			if (1) fprintf(stderr, "watch_for_http_traffic\n");
+			if (db) fprintf(stderr, "watch_for_http_traffic\n");
 			is_http = watch_for_http_traffic(buf, &n);
 
 			if (is_http < 0 || is_http == 0) {
@@ -1392,27 +1413,47 @@ void accept_openssl(int mode) {
 				 * error or http not detected, fall back
 				 * to normal VNC socket.
 				 */
+				if (db) fprintf(stderr, "is_http err: %d n: %d\n", is_http, n);
 				write(vncsock, cookie, strlen(cookie));
 				if (n > 0) {
 					write(vncsock, buf, n);
 				}
 				goto wrote_cookie;
 			}
-			if (1) fprintf(stderr, "buf: '%s'\n", buf);
+			if (db) fprintf(stderr, "is_http: %d n: %d\n", is_http, n);
+			if (db) fprintf(stderr, "buf: '%s'\n", buf);
 
-			if (strstr(buf, "/request.https.proxy.connection")) {
+			if (strstr(buf, "/request.https.vnc.connection")) {
+				char reply[] = "HTTP/1.0 200 OK\r\n"
+				    "Content-Type: octet-stream\r\n"
+				    "Connection: Keep-Alive\r\n"
+				    "Pragma: no-cache\r\n\r\n";
 				/*
 				 * special case proxy coming thru https
 				 * instead of a direct SSL connection.
 				 */
-				if (! proxy_hack(vncsock, listen, s_in, s_out,
-				    cookie, mode)) {
-					strcpy(tbuf, uniq);
-					strcat(tbuf, cookie);
-					write(vncsock, tbuf, strlen(tbuf));
-					close(vncsock);
+				rfbLog("Handling VNC request via https GET. [%d]\n", getpid());
+				if (strstr(buf, "/reverse.proxy")) {
+					char *buf;
+					int n, ptr;
+					SSL_write(ssl, reply, strlen(reply));
+				
+					buf  = (char *) calloc((8192+1), 1);
+					n = 0;
+					ptr = 0;
+					while (ptr < 8192) {
+						n = SSL_read(ssl, buf + ptr, 1);
+						if (n > 0) {
+							ptr += n;
+						}
+			if (db) fprintf(stderr, "buf2: '%s'\n", buf);
+
+						if (strstr(buf, "\r\n\r\n")) {
+							break;
+						}
+					}
 				}
-				exit(0);
+				goto write_cookie;
 
 			} else if (strstr(buf, "/check.https.proxy.connection")) {
 				char reply[] = "HTTP/1.0 200 OK\r\n"
@@ -1491,7 +1532,8 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 				rfbLog("Could not connect to httpd socket!\n");
 				exit(1);
 			}
-			if (db) fprintf(stderr, "ssl_helper: httpsock: %d %d\n", httpsock, n);
+			if (db) fprintf(stderr, "ssl_helper[%d]: httpsock: %d %d\n",
+			    getpid(), httpsock, n);
 
 			/*
 			 * send what we read to httpd, and then connect
@@ -1651,11 +1693,14 @@ static void ssl_timeout (int sig) {
 static int ssl_init(int s_in, int s_out) {
 	unsigned char *sid = (unsigned char *) "x11vnc SID";
 	char *name;
-	int db = 1, rc, err;
+	int db = 0, rc, err;
 	int ssock = s_in;
 	double start = dnow();
 	int timeout = 20;
 
+	if (getenv("SSL_DEBUG")) {
+		db = atoi(getenv("SSL_DEBUG"));
+	}
 	if (db) fprintf(stderr, "ssl_init: %d/%d\n", s_in, s_out);
 
 	ssl = SSL_new(ctx);
@@ -1749,7 +1794,7 @@ if (db > 1) fprintf(stderr, "d\n");
 		usleep(10 * 1000);
 	}
 
-	rfbLog("SSL: ssl_helper: SSL_accept() succeeded for: %s\n", name);
+	rfbLog("SSL: ssl_helper[%d]: SSL_accept() succeeded for: %s\n", getpid(), name);
 	free(name);
 
 	return 1;
@@ -1816,14 +1861,39 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	int  cptr, sptr, c_rd, c_wr, s_rd, s_wr;
 	fd_set rd, wr;
 	struct timeval tv;
-	int ssock;
+	int ssock, cnt = 0;
+
+	/*
+	 * we want to switch to a longer timeout for long term VNC
+	 * connections (in case the network is not working for short
+	 * periods), but we also want the timeout shorter at the beginning
+	 * in case the client went away.
+	 */
+	time_t start;
+	int tv_https_early = 60;
+	int tv_https_later = 20;
+	int tv_vnc_early = 25;
+	int tv_vnc_later = 300;
+	int tv_cutover = 120;
+	int tv_use;
 
 	if (dbxfer) {
 		raw_xfer(csock, s_in, s_out);
 		return;
 	}
+	if (getenv("SSL_DEBUG")) {
+		db = atoi(getenv("SSL_DEBUG"));
+	}
 
-if (db) fprintf(stderr, "ssl_xfer begin\n");
+	if (db) fprintf(stderr, "ssl_xfer begin\n");
+
+	start = time(0);
+	if (is_https) {
+		tv_use = tv_https_early;
+	} else {
+		tv_use = tv_vnc_early;
+	}
+	
 
 	/*
 	 * csock: clear text socket with libvncserver.    "C"
@@ -1890,6 +1960,7 @@ if (db) fprintf(stderr, "ssl_xfer begin\n");
 			 */
 			break;
 		}
+		cnt++;
 
 		/* set up the fd sets for the two sockets for read & write: */
 
@@ -1927,11 +1998,15 @@ if (db) fprintf(stderr, "ssl_xfer begin\n");
 			}
 		}
 
-		if (is_https) {
-			tv.tv_sec  = 50;
-		} else {
-			tv.tv_sec  = 35;
+		if (tv_cutover && time(0) > start + tv_cutover) {
+			tv_cutover = 0;
+			if (is_https) {
+				tv_use = tv_https_later;
+			} else {
+				tv_use = tv_vnc_later;
+			}
 		}
+		tv.tv_sec  = tv_use;
 		tv.tv_usec = 0;
 
 		/*  do the select, repeat if interrupted */
@@ -1939,7 +2014,7 @@ if (db) fprintf(stderr, "ssl_xfer begin\n");
 			nfd = select(fdmax+1, &rd, &wr, NULL, &tv);
 		} while (nfd < 0 && errno == EINTR);
 
-if (db) fprintf(stderr, "nfd: %d\n", nfd);
+		if (db > 1) fprintf(stderr, "nfd: %d\n", nfd);
 
 		if (nfd < 0) {
 			rfbLog("SSL: ssl_xfer[%d]: select error: %d\n", getpid(), nfd);

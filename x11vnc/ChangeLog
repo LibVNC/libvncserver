@@ -1,3 +1,8 @@
+2006-04-16  Karl Runge <runge@karlrunge.com>
+	* x11vnc: More web proxy work for Java SSL applet and wrapper
+	  script ssl_vncviewer.  Apache SSL gateway support for
+	  incoming x11vnc connections.  Handle "double proxy" case.
+
 2006-04-05  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add FBPM support (-fbpm) for Suns. -rawfb ZERO for
 	  testing.  Basic key+cert management utilities: -sslGenCA,

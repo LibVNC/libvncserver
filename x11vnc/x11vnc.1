@@ -2,7 +2,7 @@
 .TH X11VNC "1" "April 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.1, lastmod: 2006-04-05
+         version: 0.8.1, lastmod: 2006-04-16
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -755,10 +755,8 @@ might want your certificates and keys to be on a local
 filesystem to prevent network snooping (for example
 \fB-ssldir\fR /var/lib/x11vnc-certs).
 .IP
-\fB-ssldir\fR effects the other \fB-ssl*\fR options.  In the case
-of maintenance commands where the VNC server is not run
-(e.g. \fB-sslGenCA),\fR the \fB-ssldir\fR option must precede the
-command. E.g. x11vnc \fB-ssldir\fR ~/mydir \fB-sslCertInfo\fR LIST
+\fB-ssldir\fR affects nearly all of the other \fB-ssl*\fR options,
+e.g. \fB-ssl\fR SAVE, \fB-sslGenCert,\fR etc..
 .PP
 \fB-sslverify\fR \fI[path]\fR
 .IP

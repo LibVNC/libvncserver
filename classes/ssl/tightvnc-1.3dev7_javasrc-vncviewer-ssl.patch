@@ -38,34 +38,43 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/Makefile vnc_javasrc/Makefile
  	@$(ExportJavaClasses)
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto.java
 --- vnc_javasrc.orig/RfbProto.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/RfbProto.java	2006-04-03 11:22:30.000000000 -0400
++++ vnc_javasrc/RfbProto.java	2006-04-16 11:17:37.000000000 -0400
 @@ -199,7 +199,21 @@
      host = h;
      port = p;
  
 -    if (viewer.socketFactory == null) {
 +    if (! viewer.disableSSL) {
-+      System.out.println("new SSLSocketToMe");
-+      SSLSocketToMe ssl;
-+      try {
-+        ssl = new SSLSocketToMe(host, port, v);
-+      } catch (Exception e) {
-+	throw new IOException(e.getMessage());
-+      }
++	System.out.println("new SSLSocketToMe");
++	SSLSocketToMe ssl;
++	try {
++		ssl = new SSLSocketToMe(host, port, v);
++	} catch (Exception e) {
++		throw new IOException(e.getMessage());
++	}
 +
-+      try {
-+      	sock = ssl.connectSock();
-+      } catch (Exception es) {
-+	throw new IOException(es.getMessage());
-+      }
++	try {
++		sock = ssl.connectSock();
++	} catch (Exception es) {
++		throw new IOException(es.getMessage());
++	}
 +    } else if (viewer.socketFactory == null) {
        sock = new Socket(host, port);
      } else {
        try {
+@@ -255,7 +269,7 @@
+ 	|| (b[10] < '0') || (b[10] > '9') || (b[11] != '\n'))
+     {
+       throw new Exception("Host " + host + " port " + port +
+-			  " is not an RFB server");
++			  " is not an RFB server: " + b);
+     }
+ 
+     serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2006-04-04 13:17:39.000000000 -0400
-@@ -0,0 +1,1040 @@
++++ vnc_javasrc/SSLSocketToMe.java	2006-04-16 11:21:30.000000000 -0400
+@@ -0,0 +1,1204 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -111,9 +120,13 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +
 +	/* fallback for Proxy connection */
 +	boolean proxy_in_use = false;
++	boolean proxy_is_https = false;
 +	boolean proxy_failure = false;
 +	public DataInputStream is = null;
 +	public OutputStream os = null;
++
++	String proxy_dialog_host = null;
++	int proxy_dialog_port = 0;
 +
 +	Socket proxySock;
 +	DataInputStream proxy_is;
@@ -148,7 +161,6 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		dbg("SSL startup: " + host + " " + port);
 +
 +		/* create trust managers used if initial handshake fails: */
-+
 +
 +		trustAllCerts = new TrustManager[] {
 +		    /*
@@ -349,15 +361,17 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		return false;
 +	}
 +
-+	public Socket connectSock() throws IOException {
++	public void check_for_proxy() {
++		
++		boolean result = false;
++		String ustr = "https://" + host + ":" + port;
++		ustr += viewer.urlPrefix + "/check.https.proxy.connection";
 +
-+		/*
-+		 * first try a https connection to detect a proxy, and
-+		 * also grab the VNC server cert.
-+		 */
-+		URL url = new URL("https://" + host + ":" + port +
-+		    "/check.https.proxy.connection");
++		trusturlCerts = null;
++		proxy_in_use = false;
++
 +		try {
++			URL url = new URL(ustr);
 +			HttpsURLConnection https = (HttpsURLConnection)
 +			    url.openConnection();
 +
@@ -374,15 +388,59 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +
 +			if (https.usingProxy()) {
 +				proxy_in_use = true;
++				proxy_is_https = true;
 +				dbg("HTTPS proxy in use. There may be connection problems.");
 +			}
 +			Object output = https.getContent();
 +			https.disconnect();
++			result = true;
 +
 +		} catch(Exception e) {
-+			trusturlCerts = null;
++			dbg("HttpsURLConnection: " + e.getMessage());
 +		}
 +
++		if (proxy_in_use) {
++			return;
++		}
++
++		ustr = "http://" + host + ":" + port;
++		ustr += viewer.urlPrefix + "/index.vnc";
++
++		try {
++			URL url = new URL(ustr);
++			HttpURLConnection http = (HttpURLConnection)
++			    url.openConnection();
++
++			http.setUseCaches(false);
++			http.setRequestMethod("GET");
++			http.setRequestProperty("Pragma", "No-Cache");
++			http.setRequestProperty("Proxy-Connection",
++			    "Keep-Alive");
++			http.setDoInput(true);
++
++			http.connect();
++
++			if (http.usingProxy()) {
++				proxy_in_use = true;
++				proxy_is_https = false;
++				dbg("HTTP proxy in use. There may be connection problems.");
++			}
++			Object output = http.getContent();
++			http.disconnect();
++
++		} catch(Exception e) {
++			dbg("HttpURLConnection: " + e.getMessage());
++		}
++	}
++
++	public Socket connectSock() throws IOException {
++
++		/*
++		 * first try a https connection to detect a proxy, and
++		 * also grab the VNC server cert.
++		 */
++		check_for_proxy();
++		
 +		if (use_url_cert_for_auth && trusturlCerts != null) {
 +			factory = trusturl_ctx.getSocketFactory();
 +		} else {
@@ -391,11 +449,23 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +
 +		socket = null;
 +		try {
++			if (proxy_in_use && viewer.forceProxy) {
++				throw new Exception("forcing proxy (forceProxy)");
++			} else if (viewer.CONNECT != null) {
++				throw new Exception("forcing CONNECT");
++			}
++
 +			socket = (SSLSocket) factory.createSocket(host, port);
++
 +		} catch (Exception esock) {
-+			if (proxy_in_use) {
++			dbg("esock: " + esock.getMessage());
++			if (proxy_in_use || viewer.CONNECT != null) {
 +				proxy_failure = true;
-+				dbg("HTTPS proxy in use. Trying to go with it.");
++				if (proxy_in_use) {
++					dbg("HTTPS proxy in use. Trying to go with it.");
++				} else {
++					dbg("viewer.CONNECT reverse proxy in use. Trying to go with it.");
++				}
 +				try {
 +					socket = proxy_socket(factory);
 +				} catch (Exception e) {
@@ -522,6 +592,31 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			}
 +		}
 +
++		if (socket != null && viewer.GET != null) {
++			String str = "GET ";
++			str += viewer.urlPrefix;
++			str += "/request.https.vnc.connection";
++			str += " HTTP/1.0\r\n";
++			str += "Pragma: No-Cache\r\n";
++			str += "\r\n";
++			System.out.println("sending GET: " + str);
++    			OutputStream os = socket.getOutputStream();
++			os.write(str.getBytes());
++			os.flush();
++			if (false) {
++				String rep = "";
++				DataInputStream is = new DataInputStream(
++				    new BufferedInputStream(socket.getInputStream(), 16384));
++				while (true) {
++					rep += readline(is);
++					if (rep.indexOf("\r\n\r\n") >= 0) {
++						break;
++					}
++				}
++				System.out.println("rep: " + rep);
++			}
++		}
++
 +		dbg("SSL returning socket to caller.");
 +		return (Socket) socket;
 +	}
@@ -532,10 +627,24 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		}
 +	}
 +
++	private int gint(String s) {
++		int n = -1;
++		try {
++			Integer I = new Integer(s);
++			n = I.intValue();
++		} catch (Exception ex) {
++			return -1;
++		}
++		return n;
++	}
++
 +	public SSLSocket proxy_socket(SSLSocketFactory factory) {
 +		Properties props = null;
 +		String proxyHost = null;
 +		int proxyPort = 0;
++		String proxyHost_nossl = null;
++		int proxyPort_nossl = 0;
++		String str;
 +
 +		/* see if we can guess the proxy info from Properties: */
 +		try {
@@ -548,16 +657,33 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			props.list(System.out);
 +			dbg("\n---------------\n\n");
 +
-+			for (Enumeration e = props.propertyNames(); e.hasMoreElements(); )  {
++			for (Enumeration e = props.propertyNames(); e.hasMoreElements(); ) {
 +				String s = (String) e.nextElement();
 +				String v = System.getProperty(s);
-+				String l1 = s.toLowerCase();
-+				String l2 = v.toLowerCase();
++				String s2 = s.toLowerCase();
++				String v2 = v.toLowerCase();
 +
-+				if (l1.indexOf("proxy") < 0 && l2.indexOf("proxy") < 0) {
++				if (s2.indexOf("proxy") < 0 && v2.indexOf("proxy") < 0) {
 +					continue;
 +				}
-+				if (l2.indexOf("https") < 0) {
++				if (v2.indexOf("https") < 0) {
++					continue;
++				}
++
++				if (s2.indexOf("proxy.https.host") >= 0) {
++					proxyHost = v2;
++					continue;
++				}
++				if (s2.indexOf("proxy.https.port") >= 0) {
++					proxyPort = gint(v2);
++					continue;
++				}
++				if (s2.indexOf("proxy.http.host") >= 0) {
++					proxyHost_nossl = v2;
++					continue;
++				}
++				if (s2.indexOf("proxy.http.port") >= 0) {
++					proxyPort_nossl = gint(v2);
 +					continue;
 +				}
 +
@@ -578,10 +704,9 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +						continue;
 +					}
 +					if (hp[0].length() > 1 && hp[1].length() > 1) {
-+						try {
-+							Integer I = new Integer(hp[1]);
-+							proxyPort = I.intValue();
-+						} catch (Exception ex) {
++
++						proxyPort = gint(hp[1]);
++						if (proxyPort < 0) {
 +							continue;
 +						}
 +						proxyHost = new String(hp[0]);
@@ -591,65 +716,113 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			}
 +		}
 +		if (proxyHost != null) {
-+			dbg("Lucky us! we figured out the Proxy parameters: " + proxyHost + " " + proxyPort);
-+		} else {
-+			/* ask user to help us: */
-+			ProxyDialog pd = new ProxyDialog(proxyHost, proxyPort);
-+			pd.queryUser();
-+			proxyHost = pd.getHost(); 
-+			proxyPort = pd.getPort();
-+			dbg("User said host: " + pd.getHost() + " port: " + pd.getPort());
-+		}
-+
-+		proxySock = psocket(proxyHost, proxyPort);
-+		if (proxySock == null) {
-+			dbg("1 sadly, returning a null socket");
-+			return null;
-+		}
-+		String hp = host + ":" + port;
-+
-+		String req1 = "CONNECT " + hp + " HTTP/1.1\r\n"
-+		    + "Host: " + hp + "\r\n\r\n";
-+
-+		/* not working for SSL yet: */
-+		String req2 = "GET https://" + hp
-+		    + "/request.https.proxy.connection HTTP/1.1\r\n"
-+		    + "Host: " + hp + "\r\n\r\n";
-+
-+		dbg("requesting: " + req1);
-+
-+		try {
-+			proxy_os.write(req1.getBytes());
-+			String reply = readline(proxy_is);
-+
-+			dbg("proxy replied: " + reply);
-+
-+			if (reply.indexOf("HTTP/1.") < 0 && reply.indexOf(" 200") < 0) {
-+				proxySock.close();
-+				proxySock = psocket(proxyHost, proxyPort);
-+				if (proxySock == null) {
-+					dbg("2 sadly, returning a null socket");
-+					return null;
-+				}
-+				dbg("requesting: " + req2);
-+				proxy_os.write(req2.getBytes());
-+
-+				reply = readline(proxy_is);
-+
-+				dbg("proxy replied: " + reply);
++			if (proxyHost_nossl != null && proxyPort_nossl > 0) {
++				dbg("Using http proxy info instead of https.");
++				proxyHost = proxyHost_nossl;
++				proxyPort = proxyPort_nossl;
 +			}
-+		} catch(Exception e) {
-+			dbg("sock prob: " + e.getMessage());
 +		}
 +
-+		while (true) {
-+			String line = readline(proxy_is);
-+			dbg("proxy line: " + line);
-+			if (line.equals("\r\n") || line.equals("\n")) {
-+				break;
++		if (proxy_in_use) {
++			if (proxy_dialog_host != null && proxy_dialog_port > 0) {
++				proxyHost = proxy_dialog_host;
++				proxyPort = proxy_dialog_port;
++			}
++			if (proxyHost != null) {
++				dbg("Lucky us! we figured out the Proxy parameters: " + proxyHost + " " + proxyPort);
++			} else {
++				/* ask user to help us: */
++				ProxyDialog pd = new ProxyDialog(proxyHost, proxyPort);
++				pd.queryUser();
++				proxyHost = pd.getHost(); 
++				proxyPort = pd.getPort();
++				proxy_dialog_host = new String(proxyHost);
++				proxy_dialog_port = proxyPort;
++				dbg("User said host: " + pd.getHost() + " port: " + pd.getPort());
++			}
++
++			dbg("proxy_in_use psocket:");
++			proxySock = psocket(proxyHost, proxyPort);
++			if (proxySock == null) {
++				dbg("1-a sadly, returning a null socket");
++				return null;
++			}
++			String hp = host + ":" + port;
++
++			String req1 = "CONNECT " + hp + " HTTP/1.1\r\n"
++			    + "Host: " + hp + "\r\n\r\n";
++
++			dbg("requesting1: " + req1);
++
++			try {
++				proxy_os.write(req1.getBytes());
++				String reply = readline(proxy_is);
++
++				dbg("proxy replied1: " + reply.trim());
++
++				if (reply.indexOf("HTTP/1.") < 0 && reply.indexOf(" 200") < 0) {
++					proxySock.close();
++					proxySock = psocket(proxyHost, proxyPort);
++					if (proxySock == null) {
++						dbg("2-a sadly, returning a null socket");
++						return null;
++					}
++				}
++			} catch(Exception e) {
++				dbg("sock prob1: " + e.getMessage());
++			}
++
++			while (true) {
++				String line = readline(proxy_is);
++				dbg("proxy line1: " + line.trim());
++				if (line.equals("\r\n") || line.equals("\n")) {
++					break;
++				}
++			}
++		} else if (viewer.CONNECT != null) {
++			dbg("viewer.CONNECT psocket:");
++			proxySock = psocket(host, port);
++			if (proxySock == null) {
++				dbg("1-b sadly, returning a null socket");
++				return null;
 +			}
 +		}
 +		
++		if (viewer.CONNECT != null) {
++			String hp = viewer.CONNECT;
++			String req2 = "CONNECT " + hp + " HTTP/1.1\r\n"
++			    + "Host: " + hp + "\r\n\r\n";
++
++			dbg("requesting2: " + req2);
++
++			try {
++				proxy_os.write(req2.getBytes());
++				String reply = readline(proxy_is);
++
++				dbg("proxy replied2: " + reply.trim());
++
++				if (reply.indexOf("HTTP/1.") < 0 && reply.indexOf(" 200") < 0) {
++					proxySock.close();
++					proxySock = psocket(proxyHost, proxyPort);
++					if (proxySock == null) {
++						dbg("2-b sadly, returning a null socket");
++						return null;
++					}
++				}
++			} catch(Exception e) {
++				dbg("sock prob2: " + e.getMessage());
++			}
++
++			while (true) {
++				String line = readline(proxy_is);
++				dbg("proxy line2: " + line.trim());
++				if (line.equals("\r\n") || line.equals("\n")) {
++					break;
++				}
++			}
++			
++		}
++
 +		Socket sslsock = null;
 +		try {
 +			sslsock = factory.createSocket(proxySock, host, port, true);
@@ -1108,16 +1281,21 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2006-03-27 22:20:19.000000000 -0500
-@@ -87,6 +87,7 @@
-   int deferScreenUpdates;
++++ vnc_javasrc/VncViewer.java	2006-04-16 11:21:13.000000000 -0400
+@@ -88,6 +88,12 @@
    int deferCursorUpdates;
    int deferUpdateRequests;
-+  boolean disableSSL;
  
++  boolean disableSSL;
++  String GET;
++  String CONNECT;
++  String urlPrefix;
++  boolean forceProxy;
++
    // Reference to this applet for inter-applet communication.
    public static java.applet.Applet refApplet;
-@@ -626,6 +627,12 @@
+ 
+@@ -626,6 +632,39 @@
  
      // SocketFactory.
      socketFactory = readParameter("SocketFactory", false);
@@ -1127,6 +1305,33 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    str = readParameter("DisableSSL", false);
 +    if (str != null && str.equalsIgnoreCase("Yes"))
 +      disableSSL = true;
++
++    // Extra GET, CONNECT string:
++    CONNECT = readParameter("CONNECT", false);
++    if (CONNECT != null) {
++	CONNECT = CONNECT.replaceAll(" ", ":");
++    }
++    GET = readParameter("GET", false);
++    urlPrefix = "";
++    if (GET != null) {
++	GET = GET.replaceAll("%2F", "/");
++	GET = GET.replaceAll("%2f", "/");
++	GET = GET.replaceAll("_2F_", "/");
++	if (! GET.equals("1")) {
++		if (GET.indexOf("/") != 0) {
++			urlPrefix += "/";
++		}
++		urlPrefix += GET;
++	}
++    }
++    urlPrefix = urlPrefix.replaceAll("%2f", "/");
++    System.out.println("urlPrefix: " + urlPrefix);
++
++    forceProxy = false;
++    str = readParameter("forceProxy", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++      forceProxy = true;
++    }
    }
  
    public String readParameter(String name, boolean required) {

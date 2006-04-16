@@ -122,6 +122,11 @@ void clean_up_exit (int ret) {
 	/* remove the shm areas: */
 	clean_shm(0);
 
+	stop_stunnel();
+	if (use_openssl) {
+		ssl_helper_pid(0, 0);	/* killall */
+	}
+
 	if (! dpy) exit(ret);	/* raw_rb hack */
 
 	/* X keyboard cleanups */
@@ -139,11 +144,6 @@ void clean_up_exit (int ret) {
 	if (use_solid_bg) {
 		solid_bg(1);
 	}
-	stop_stunnel();
-	if (use_openssl) {
-		ssl_helper_pid(0, 0);	/* killall */
-	}
-
 	X_LOCK;
 	XTestDiscard_wr(dpy);
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE

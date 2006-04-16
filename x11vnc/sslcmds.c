@@ -51,7 +51,7 @@ void check_stunnel(void) {
 
 int start_stunnel(int stunnel_port, int x11vnc_port) {
 #ifdef SSLCMDS
-	char extra[] = ":/usr/sbin:/usr/local/sbin";
+	char extra[] = ":/usr/sbin:/usr/local/sbin:/dist/sbin";
 	char *path, *p, *exe;
 	char *stunnel_path = NULL;
 	struct stat verify_buf;
@@ -117,6 +117,15 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		rfbLog("\n");
 		rfbLog("starting ssl tunnel: %s  %d -> %d\n", stunnel_path,
 		    stunnel_port, x11vnc_port);
+	}
+
+	if (stunnel_pem && strstr(stunnel_pem, "SAVE") == stunnel_pem) {
+		stunnel_pem = get_saved_pem(stunnel_pem, 1);
+		if (! stunnel_pem) {
+			rfbLog("start_stunnel: could not create or open"
+			    " saved PEM:\n", stunnel_pem);	
+			clean_up_exit(1);
+		}
 	}
 
 	if (ssl_verify) {
@@ -510,30 +519,30 @@ void sslEncKey(char *path, int mode) {
 		sprintf(tca, "%s/CA/cacert.pem", cdir);
 		path = tca;
 
-	} else if (info_only && (!strcasecmp(path, "LIST") ||
+	} else if (info_only && (!strcasecmp(path, "LIST") || !strcasecmp(path, "LS") ||
 	    !strcasecmp(path, "ALL"))) {
 		if (! cdir || strchr(cdir, '\'')) {
 			fprintf(stderr, "bad certdir char: %s\n", cdir ? cdir : "null");
 			exit(1);
 		}
 		tca = (char *) malloc(2*strlen(cdir) + strlen(program_name) + 1000);
-		sprintf(tca, "find '%s' -type f | egrep '\\.(crt|pem|key|req)$' "
+		sprintf(tca, "find '%s' | egrep '/(CA|tmp|clients)$|\\.(crt|pem|key|req)$' "
 		    "| grep -v CA/newcerts", cdir);
 		if (!strcasecmp(path, "ALL")) {
 			/* ugh.. */
-			strcat(tca, " | grep -v private/cakey.pem | xargs -n1 ");
+			strcat(tca, " | egrep -v 'private/cakey.pem|(CA|tmp|clients)$' | xargs -n1 ");
 			strcat(tca, program_name);
 			strcat(tca, " -ssldir '");
 			strcat(tca, cdir);
 			strcat(tca, "' -sslCertInfo 2>&1 ");
 		} else if (listlong) {
-			strcat(tca, " | xargs ls -l ");
+			strcat(tca, " | xargs ls -ld ");
 		}
 		system(tca);
 		return;
 
-	} else if (info_only && (!strcasecmp(path, "HASHON") ||
-	    !strcasecmp(path, "HASHOFF"))) {
+	} else if (info_only && (!strcasecmp(path, "HASHON")
+	    || !strcasecmp(path, "HASHOFF"))) {
 
 		tmp_fd = mkstemp(tmp);
 		if (tmp_fd < 0) {
