@@ -1,3 +1,7 @@
+2006-04-17 Steven Carr <scarr@jsa-usa.com>
+	* Added an example camera application to demonstrate another
+	  way to write a server application.
+
 2006-04-05  Karl Runge <runge@karlrunge.com>
 	* classes/ssl: SSL Java viewer workarounds for firewall
 	  proxies (signed applet as last resort, proxy.vnc).
