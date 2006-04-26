@@ -34,11 +34,23 @@
 # set VNCVIEWERCMD to whatever vncviewer command you want to use:
 #
 VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
+#
+# Same for STUNNEL, e.g. /path/to/stunnel or stunnel4, etc.
+#
 
 PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
 
+if [ "X$STUNNEL" = "X" ]; then
+	type stunnel4 > /dev/null 2>&1
+	if [ $? = 0 ]; then
+		STUNNEL=stunnel4
+	else
+		STUNNEL=stunnel
+	fi
+fi
+
 help() {
-	head -36 $0 | tail +2
+	head -39 $0 | tail +2
 }
 
 # grab our cmdline options:
@@ -274,8 +286,8 @@ cat $tmp | uniq
 echo ""
 sleep 1
 
-echo "running: stunnel $tmp"
-stunnel $tmp < /dev/tty > /dev/tty &
+echo "running: $STUNNEL $tmp"
+$STUNNEL $tmp < /dev/tty > /dev/tty &
 pid=$!
 echo ""
 

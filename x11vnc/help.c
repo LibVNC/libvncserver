@@ -2891,7 +2891,9 @@ void xopen_display_fail_message(char *disp) {
 	fprintf(stderr, "   by the -auth option, e.g.:\n");
 	fprintf(stderr, "       x11vnc -auth /home/someuser/.Xauthority"
 	    " -display :0\n");
-	fprintf(stderr, "   you must have read permission for that file.\n");
+	fprintf(stderr, "       x11vnc -auth /tmp/.gdmzndVlR"
+	    " -display :0\n");
+	fprintf(stderr, "   you must have read permission for the auth file.\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, " - If NO ONE is logged into an X session yet, but"
 	    " there is a greeter login\n");

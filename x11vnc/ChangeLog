@@ -1,3 +1,7 @@
+2006-04-26  Karl Runge <runge@karlrunge.com>
+	* x11vnc: skip exit in check_openssl() if not compiled with
+	  libssl.  set SKIP_HELP (again) in small footprint builds.
+
 2006-04-16  Karl Runge <runge@karlrunge.com>
 	* x11vnc: More web proxy work for Java SSL applet and wrapper
 	  script ssl_vncviewer.  Apache SSL gateway support for

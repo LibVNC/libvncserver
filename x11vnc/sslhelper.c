@@ -34,8 +34,8 @@ static void badnews(void) {
 void openssl_init(void) {badnews();}
 void openssl_port(void) {badnews();}
 void https_port(void) {badnews();}
-void check_openssl(void) {badnews();}
-void check_https(void) {badnews();}
+void check_openssl(void) {if (use_openssl) badnews();}
+void check_https(void) {if (use_openssl) badnews();}
 void ssl_helper_pid(pid_t pid, int sock) {badnews(); sock = pid;}
 void accept_openssl(int mode) {mode = 0; badnews();}
 char *find_openssl_bin(void) {badnews(); return NULL;}

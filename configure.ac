@@ -403,6 +403,10 @@ AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_TYPE_SOCKLEN_T
+if test ! -d ./rfb; then
+	echo "creating subdir ./rfb for rfbint.h"
+	mkdir ./rfb 
+fi
 AC_CREATE_STDINT_H(rfb/rfbint.h)
 AC_CACHE_CHECK([for in_addr_t],
         inaddrt, [

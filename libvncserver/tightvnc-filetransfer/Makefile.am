@@ -1,4 +1,4 @@
-AM_CFLAGS=-g -Wall
+AM_CFLAGS=-g -Wall -I $(top_srcdir)
 
 includedir=$(prefix)/include/rfb
 

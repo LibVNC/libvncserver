@@ -1,3 +1,8 @@
+2006-04-26  Karl Runge <runge@karlrunge.com>
+	* all Makefile.am: use -I $(top_srcdir) instead of -I .. so VPATH
+	  builds will work.
+	* configure.ac: create rfb subdir for rfbint.h under VPATH. 
+
 2006-04-17 Steven Carr <scarr@jsa-usa.com>
 	* Added an example camera application to demonstrate another
 	  way to write a server application.

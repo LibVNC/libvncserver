@@ -1,4 +1,4 @@
-AM_CFLAGS=-I.. -g -Wall
+AM_CFLAGS=-I $(top_srcdir) -g -Wall
 LDADD = ../libvncserver/libvncserver.a ../libvncclient/libvncclient.a @WSOCKLIB@
 
 if HAVE_LIBPTHREAD

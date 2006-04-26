@@ -1,4 +1,4 @@
-AM_CFLAGS=-I.. -g -Wall
+AM_CFLAGS=-I $(top_srcdir) -g -Wall
 LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
 
 if OSX

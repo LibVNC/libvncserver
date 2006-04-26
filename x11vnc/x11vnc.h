@@ -143,7 +143,7 @@
 #undef  NOGUI
 #define NOGUI
 #undef  SKIP_HELP
-#define SKIP_HELP 0
+#define SKIP_HELP 1
 #endif
 
 #if (SMALL_FOOTPRINT > 1)
