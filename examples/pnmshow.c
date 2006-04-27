@@ -2,11 +2,13 @@
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
 
+#ifndef HAVE_HANDLEKEY
 static void HandleKey(rfbBool down,rfbKeySym key,rfbClientPtr cl)
 {
   if(down && (key==XK_Escape || key=='q' || key=='Q'))
     rfbCloseClient(cl);
 }
+#endif
 
 int main(int argc,char** argv)
 {

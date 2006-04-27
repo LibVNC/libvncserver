@@ -1,3 +1,7 @@
+2006-04-27  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* examples/{rotate.c, rotatetemplate.c}: add modified pnmshow
+	  which demonstrates fast rotating and flipping.
+
 2006-04-26  Karl Runge <runge@karlrunge.com>
 	* all Makefile.am: use -I $(top_srcdir) instead of -I .. so VPATH
 	  builds will work.
