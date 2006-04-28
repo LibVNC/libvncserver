@@ -24,6 +24,7 @@ static rfbBool resize(rfbClient* client) {
 	if(okay) {
 		SDL_Surface* sdl=SDL_SetVideoMode(width,height,depth,flags);
 		rfbClientSetClientData(client, SDL_Init, sdl);
+		client->width = sdl->pitch / (depth / 8);
 		client->frameBuffer=sdl->pixels;
 		if(first || depth!=client->format.bitsPerPixel) {
 			first=FALSE;
@@ -41,7 +42,7 @@ static rfbBool resize(rfbClient* client) {
 		rfbClientLog("Could not set resolution %dx%d!\n",
 				client->width,client->height);
 		if(sdl) {
-			client->width=sdl->w;
+			client->width=sdl->pitch / (depth / 8);
 			client->height=sdl->h;
 		} else {
 			client->width=0;
