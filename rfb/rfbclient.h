@@ -201,6 +201,8 @@ typedef struct _rfbClient {
 	int KeyboardLedStateEnabled;
 	int CurrentKeyboardLedState;
 
+	int canHandleNewFBSize;
+
 	/* hooks */
 	HandleKeyboardLedStateProc HandleKeyboardLedState;
 	HandleCursorPosProc HandleCursorPos;

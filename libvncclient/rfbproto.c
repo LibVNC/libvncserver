@@ -138,14 +138,14 @@ static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_
 }
 
 static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
-  int i,j;
+  int j;
 
 #define COPY_RECT(BPP) \
   { \
-    uint##BPP##_t* _buffer=(uint##BPP##_t*)buffer; \
-    for(j=y*client->width;j<(y+h)*client->width;j+=client->width) { \
-      for(i=x;i<x+w;i++,_buffer++) \
-	((uint##BPP##_t*)client->frameBuffer)[j+i]=*_buffer; \
+    int rs = w * BPP / 8, rs2 = client->width * BPP / 8; \
+    for (j = x + y * rs2; j < (y + h) * rs2; j += rs2) { \
+      memcpy(client->frameBuffer + j, buffer, rs); \
+      buffer += rs; \
     } \
   }
 
@@ -592,13 +592,16 @@ SetFormatAndEncodings(rfbClient* client)
       encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingPointerPos);
     }
 
-    /* Keyboard State Encodings */
-    if (se->nEncodings < MAX_ENCODINGS) {
-      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingKeyboardLedState);
-    }
-
-    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingLastRect);
+    if (se->nEncodings < MAX_ENCODINGS)
+      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingLastRect);
   }
+
+  /* Keyboard State Encodings */
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingKeyboardLedState);
+
+  if (se->nEncodings < MAX_ENCODINGS && client->canHandleNewFBSize)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingNewFBSize);
 
   for(e = rfbClientExtensions; e; e = e->next)
     if(e->encodings) {
@@ -624,8 +627,8 @@ SetFormatAndEncodings(rfbClient* client)
 rfbBool
 SendIncrementalFramebufferUpdateRequest(rfbClient* client)
 {
-  return SendFramebufferUpdateRequest(client, 0, 0, client->si.framebufferWidth,
-				      client->si.framebufferHeight, TRUE);
+  return SendFramebufferUpdateRequest(client, 0, 0, client->width,
+				      client->height, TRUE);
 }
 
 
@@ -807,8 +810,17 @@ HandleRFBServerMessage(rfbClient* client)
           continue;
       }
 
-      if ((rect.r.x + rect.r.w > client->si.framebufferWidth) ||
-	  (rect.r.y + rect.r.h > client->si.framebufferHeight))
+      if (rect.encoding == rfbEncodingNewFBSize) {
+	client->width = rect.r.w;
+	client->height = rect.r.h;
+	client->MallocFrameBuffer(client);
+	SendFramebufferUpdateRequest(client, 0, 0, rect.r.w, rect.r.h, FALSE);
+	rfbClientLog("Got new framebuffer size: %dx%d\n", rect.r.w, rect.r.h);
+	continue;
+      }
+
+      if ((rect.r.x + rect.r.w > client->width) ||
+	  (rect.r.y + rect.r.h > client->height))
 	{
 	  rfbClientLog("Rect too large: %dx%d at (%d, %d)\n",
 		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);

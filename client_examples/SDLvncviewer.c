@@ -209,6 +209,7 @@ int main(int argc,char** argv) {
 	/* 16-bit: cl=rfbGetClient(5,3,2); */
 	cl=rfbGetClient(8,3,4);
 	cl->MallocFrameBuffer=resize;
+	cl->canHandleNewFBSize = TRUE;
 	cl->GotFrameBufferUpdate=update;
 	cl->HandleKeyboardLedState=kbd_leds;
 	
