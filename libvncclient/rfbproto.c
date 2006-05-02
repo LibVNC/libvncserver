@@ -143,7 +143,7 @@ static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int 
 #define COPY_RECT(BPP) \
   { \
     int rs = w * BPP / 8, rs2 = client->width * BPP / 8; \
-    for (j = x + y * rs2; j < (y + h) * rs2; j += rs2) { \
+    for (j = ((x * (BPP / 8)) + (y * rs2)); j < (y + h) * rs2; j += rs2) { \
       memcpy(client->frameBuffer + j, buffer, rs); \
       buffer += rs; \
     } \
