@@ -1,3 +1,8 @@
+2006-05-02  Steven Carr <scarr@jsa-usa.com>
+	* Ultra Encoding added.  Tested against UltraVNC V1.01
+	* libvncclient/rfbproto.c  CopyRectangle() BPP!=8 bug fixed.
+	* Incompatible pointer usage warnings eliminated (gcc 4.0.1)
+
 2006-04-27  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* examples/{rotate.c, rotatetemplate.c}: add modified pnmshow
 	  which demonstrates fast rotating and flipping.

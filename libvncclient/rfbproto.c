@@ -46,6 +46,8 @@
 #include <stdarg.h>
 #include <time.h>
 
+#include "minilzo.h"
+
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
  */
@@ -189,6 +191,12 @@ static rfbBool HandleCoRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltra8(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltra16(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltra32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltraZip8(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltraZip16(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltraZip32(rfbClient* client, int rx, int ry, int rw, int rh);
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 static rfbBool HandleZlib8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZlib16(rfbClient* client, int rx, int ry, int rw, int rh);
@@ -498,6 +506,10 @@ SetFormatAndEncodings(rfbClient* client)
       } else if (strncasecmp(encStr,"zrle",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZRLE);
 #endif
+      } else if ((strncasecmp(encStr,"ultra",encStrLen) == 0) || (strncasecmp(encStr,"ultrazip",encStrLen) == 0)) {
+        /* There are 2 encodings used in 'ultra' */
+        encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingUltra);
+        encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingUltraZip);
       } else if (strncasecmp(encStr,"corre",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCoRRE);
       } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
@@ -565,6 +577,8 @@ SetFormatAndEncodings(rfbClient* client)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZlib);
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZRLE);
 #endif
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingUltra);
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingUltraZip);
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCoRRE);
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRRE);
 
@@ -783,8 +797,10 @@ HandleRFBServerMessage(rfbClient* client)
       rect.r.w = rfbClientSwap16IfLE(rect.r.w);
       rect.r.h = rfbClientSwap16IfLE(rect.r.h);
 
+
       if (rect.encoding == rfbEncodingXCursor ||
 	  rect.encoding == rfbEncodingRichCursor) {
+
 	if (!HandleCursorShape(client,
 			       rect.r.x, rect.r.y, rect.r.w, rect.r.h,
 			       rect.encoding)) {
@@ -805,7 +821,7 @@ HandleRFBServerMessage(rfbClient* client)
           client->KeyboardLedStateEnabled = 1;
           if (client->HandleKeyboardLedState!=NULL)
               client->HandleKeyboardLedState(client, rect.r.x, 0);
-          // stash it for the future
+          /* stash it for the future */
           client->CurrentKeyboardLedState = rect.r.x;
           continue;
       }
@@ -819,22 +835,26 @@ HandleRFBServerMessage(rfbClient* client)
 	continue;
       }
 
-      if ((rect.r.x + rect.r.w > client->width) ||
-	  (rect.r.y + rect.r.h > client->height))
-	{
-	  rfbClientLog("Rect too large: %dx%d at (%d, %d)\n",
-		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
-	  return FALSE;
-	}
+      /* rfbEncodingUltraZip is a collection of subrects.   x = # of subrects, and h is always 0 */
+      if (rect.encoding != rfbEncodingUltraZip)
+      {
+        if ((rect.r.x + rect.r.w > client->width) ||
+	    (rect.r.y + rect.r.h > client->height))
+	    {
+	      rfbClientLog("Rect too large: %dx%d at (%d, %d)\n",
+	  	  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
+	      return FALSE;
+            }
 
-      if (rect.r.h * rect.r.w == 0) {
-	rfbClientLog("Zero size rect - ignoring\n");
-	continue;
+        if (rect.r.h * rect.r.w == 0) {
+	  rfbClientLog("Zero size rect - ignoring\n");
+	  continue;
+        }
+
+        /* If RichCursor encoding is used, we should prevent collisions
+	   between framebuffer updates and cursor drawing operations. */
+        client->SoftCursorLockArea(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
       }
-
-      /* If RichCursor encoding is used, we should prevent collisions
-	 between framebuffer updates and cursor drawing operations. */
-      client->SoftCursorLockArea(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 
       switch (rect.encoding) {
 
@@ -851,7 +871,7 @@ HandleRFBServerMessage(rfbClient* client)
 	  if (!ReadFromRFBServer(client, client->buffer,bytesPerLine * linesToRead))
 	    return FALSE;
 
-	  CopyRectangle(client, client->buffer,
+	  CopyRectangle(client, (uint8_t *)client->buffer,
 			   rect.r.x, y, rect.r.w,linesToRead);
 
 	  h -= linesToRead;
@@ -938,6 +958,43 @@ HandleRFBServerMessage(rfbClient* client)
 	  break;
 	}
 	break;
+      }
+
+      case rfbEncodingUltra:
+      {
+        switch (client->format.bitsPerPixel) {
+        case 8:
+          if (!HandleUltra8(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+            return FALSE;
+          break;
+        case 16:
+          if (!HandleUltra16(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+            return FALSE;
+          break;
+        case 32:
+          if (!HandleUltra32(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+            return FALSE;
+          break;
+        }
+        break;
+      }
+      case rfbEncodingUltraZip:
+      {
+        switch (client->format.bitsPerPixel) {
+        case 8:
+          if (!HandleUltraZip8(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+            return FALSE;
+          break;
+        case 16:
+          if (!HandleUltraZip16(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+            return FALSE;
+          break;
+        case 32:
+          if (!HandleUltraZip32(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+            return FALSE;
+          break;
+        }
+        break;
       }
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -1119,6 +1176,7 @@ HandleRFBServerMessage(rfbClient* client)
 #include "rre.c"
 #include "corre.c"
 #include "hextile.c"
+#include "ultra.c"
 #include "zlib.c"
 #include "tight.c"
 #include "zrle.c"
@@ -1127,6 +1185,7 @@ HandleRFBServerMessage(rfbClient* client)
 #include "rre.c"
 #include "corre.c"
 #include "hextile.c"
+#include "ultra.c"
 #include "zlib.c"
 #include "tight.c"
 #include "zrle.c"
@@ -1135,6 +1194,7 @@ HandleRFBServerMessage(rfbClient* client)
 #include "rre.c"
 #include "corre.c"
 #include "hextile.c"
+#include "ultra.c"
 #include "zlib.c"
 #include "tight.c"
 #include "zrle.c"

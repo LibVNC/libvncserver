@@ -19,7 +19,7 @@ include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h ../rfb/rfbint.h \
 	../rfb/rfbproto.h ../rfb/keysym.h ../rfb/rfbregion.h ../rfb/rfbclient.h
 
 noinst_HEADERS=d3des.h ../rfb/default8x16.h zrleoutstream.h \
-	zrlepalettehelper.h zrletypes.h private.h \
+	zrlepalettehelper.h zrletypes.h private.h minilzo.h lzoconf.h \
 	$(TIGHTVNCFILETRANSFERHDRS)
 
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
@@ -36,7 +36,7 @@ endif
 LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	httpd.c cursor.c font.c \
-	draw.c selbox.c d3des.c vncauth.c cargs.c \
+	draw.c selbox.c d3des.c vncauth.c cargs.c minilzo.c ultra.c \
 	$(ZLIBSRCS) $(JPEGSRCS) $(TIGHTVNCFILETRANSFERSRCS)
 
 libvncserver_a_SOURCES=$(LIB_SRCS)

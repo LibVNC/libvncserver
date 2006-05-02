@@ -884,6 +884,13 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                            cl->host);
                 }
                 break;
+            case rfbEncodingUltra:
+                if (cl->preferredEncoding == -1) {
+                    cl->preferredEncoding = enc;
+                    rfbLog("Using Ultra encoding for client %s\n",
+                          cl->host);
+                }
+                break;
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	    case rfbEncodingZlib:
 		if (cl->preferredEncoding == -1) {
@@ -1399,6 +1406,17 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	    nUpdateRegionRects += rectsPerRow*rows;
         }
 	sraRgnReleaseIterator(i);
+    } else if (cl->preferredEncoding == rfbEncodingUltra) {
+        nUpdateRegionRects = 0;
+        
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
+            nUpdateRegionRects += (((h-1) / (ULTRA_MAX_SIZE( w ) / w)) + 1);
+          }
+        sraRgnReleaseIterator(i);
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     } else if (cl->preferredEncoding == rfbEncodingZlib) {
 	nUpdateRegionRects = 0;
@@ -1437,14 +1455,16 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     fu->type = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
 	if(cl->screen->maxRectsPerUpdate>0
+	   /* CoRRE splits the screen into smaller squares */
+	   && cl->preferredEncoding != rfbEncodingCoRRE
+	   /* Ultra encoding splits rectangles up into smaller chunks */
+           && cl->preferredEncoding != rfbEncodingUltra
 #ifdef LIBVNCSERVER_HAVE_LIBZ
+	   /* Zlib encoding splits rectangles up into smaller chunks */
+	   && cl->preferredEncoding != rfbEncodingZlib
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	   /* Tight encoding counts the rectangles differently */
 	   && cl->preferredEncoding != rfbEncodingTight
-	   /* XXX Should rfbEncodingCoRRE be in here? */
-	   && cl->preferredEncoding != rfbEncodingCoRRE
-	   /* Zlib encoding splits rectangles up into smaller chunks */
-	   && cl->preferredEncoding != rfbEncodingZlib
 #endif
 #endif
 	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {
@@ -1509,6 +1529,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         case rfbEncodingHextile:
             if (!rfbSendRectEncodingHextile(cl, x, y, w, h))
 	        goto updateFailed;
+            break;
+        case rfbEncodingUltra:
+            if (!rfbSendRectEncodingUltra(cl, x, y, w, h))
+                goto updateFailed;
             break;
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	case rfbEncodingZlib:

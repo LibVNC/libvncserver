@@ -484,6 +484,12 @@ typedef struct _rfbClientRec {
     int tightQualityLevel;
 #endif
 #endif
+
+    /* Ultra Encoding support */
+    rfbBool compStreamInitedLZO;
+    char *lzoWrkMem;
+
+
     int     lastKeyboardLedState;     /* keep track of last value so we can send *change* events */
     rfbBool enableKeyboardLedState;   /* client supports KeyboardState encoding */
     rfbBool enableLastRectEncoding;   /* client supports LastRect encoding */
@@ -657,6 +663,17 @@ extern rfbBool rfbSendRectEncodingCoRRE(rfbClientPtr cl, int x,int y,int w,int h
 
 extern rfbBool rfbSendRectEncodingHextile(rfbClientPtr cl, int x, int y, int w,
                                        int h);
+
+/* ultra.c */
+
+/* Set maximum ultra rectangle size in pixels.  Always allow at least
+ * two scan lines.
+ */
+#define ULTRA_MAX_RECT_SIZE (128*256)
+#define ULTRA_MAX_SIZE(min) ((( min * 2 ) > ULTRA_MAX_RECT_SIZE ) ? \
+                            ( min * 2 ) : ULTRA_MAX_RECT_SIZE )
+
+extern rfbBool rfbSendRectEncodingUltra(rfbClientPtr cl, int x,int y,int w,int h);
 
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ

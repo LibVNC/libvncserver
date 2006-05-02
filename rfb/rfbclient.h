@@ -148,13 +148,17 @@ typedef struct _rfbClient {
 	   based on the bitsPerPixel, height and width of the rectangle.  We
 	   allocate this buffer one time to be the full size of the buffer. */
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
+	/* Ultra Encoding uses this buffer too */
+	
+	int ultra_buffer_size;
+	char *ultra_buffer;
+
 	int raw_buffer_size;
 	char *raw_buffer;
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 	z_stream decompStream;
 	rfbBool decompStreamInited;
-
 #endif
 
 
