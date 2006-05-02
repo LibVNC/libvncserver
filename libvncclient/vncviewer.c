@@ -118,7 +118,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->serverPort=5900;
   
   client->CurrentKeyboardLedState = 0;
-  client->HandleKeyboardLedState = DummyPoint;
+  client->HandleKeyboardLedState = (HandleKeyboardLedStateProc)DummyPoint;
   
   client->format.bitsPerPixel = bytesPerPixel*8;
   client->format.depth = bitsPerSample*samplesPerPixel;
@@ -175,7 +175,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->MallocFrameBuffer = MallocFrameBuffer;
   client->Bell = Dummy;
   client->CurrentKeyboardLedState = 0;
-  client->HandleKeyboardLedState = DummyPoint;
+  client->HandleKeyboardLedState = (HandleKeyboardLedStateProc)DummyPoint;
 
   return client;
 }
