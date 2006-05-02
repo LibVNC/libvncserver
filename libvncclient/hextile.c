@@ -55,7 +55,7 @@ HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	if (!ReadFromRFBServer(client, client->buffer, w * h * (BPP / 8)))
 	  return FALSE;
 
-	CopyRectangle(client, client->buffer, x, y, w, h);
+	CopyRectangle(client, (uint8_t *)client->buffer, x, y, w, h);
 
 	continue;
       }

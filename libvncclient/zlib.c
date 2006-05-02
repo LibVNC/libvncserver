@@ -142,7 +142,7 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   if ( inflateResult == Z_OK ) {
 
     /* Put the uncompressed contents of the update on the screen. */
-    CopyRectangle(client, client->raw_buffer, rx, ry, rw, rh);
+    CopyRectangle(client, (uint8_t *)client->raw_buffer, rx, ry, rw, rh);
   }
   else {
 
