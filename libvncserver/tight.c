@@ -332,13 +332,13 @@ rfbSendRectEncodingTight(rfbClientPtr cl,
                 if (!SendTightHeader(cl, x_best, y_best, w_best, h_best))
                     return FALSE;
 
-                fbptr = (cl->screen->frameBuffer +
-                         (cl->screen->paddedWidthInBytes * y_best) +
-                         (x_best * (cl->screen->bitsPerPixel / 8)));
+                fbptr = (cl->scaledScreen->frameBuffer +
+                         (cl->scaledScreen->paddedWidthInBytes * y_best) +
+                         (x_best * (cl->scaledScreen->bitsPerPixel / 8)));
 
                 (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
                                    &cl->format, fbptr, tightBeforeBuf,
-                                   cl->screen->paddedWidthInBytes, 1, 1);
+                                   cl->scaledScreen->paddedWidthInBytes, 1, 1);
 
                 if (!SendSolidRect(cl))
                     return FALSE;
@@ -486,7 +486,7 @@ CheckSolidTile##bpp(rfbClientPtr cl, int x, int y, int w, int h,              \
     int dx, dy;                                                               \
                                                                               \
     fbptr = (uint##bpp##_t *)                                                 \
-        &cl->screen->frameBuffer[y * cl->screen->paddedWidthInBytes + x * (bpp/8)]; \
+        &cl->scaledScreen->frameBuffer[y * cl->scaledScreen->paddedWidthInBytes + x * (bpp/8)]; \
                                                                               \
     colorValue = *fbptr;                                                      \
     if (needSameColor && (uint32_t)colorValue != *colorPtr)                   \
@@ -497,7 +497,7 @@ CheckSolidTile##bpp(rfbClientPtr cl, int x, int y, int w, int h,              \
             if (colorValue != fbptr[dx])                                      \
                 return FALSE;                                                 \
         }                                                                     \
-        fbptr = (uint##bpp##_t *)((uint8_t *)fbptr + cl->screen->paddedWidthInBytes); \
+        fbptr = (uint##bpp##_t *)((uint8_t *)fbptr + cl->scaledScreen->paddedWidthInBytes); \
     }                                                                         \
                                                                               \
     *colorPtr = (uint32_t)colorValue;                                         \
@@ -580,12 +580,12 @@ SendSubrect(rfbClientPtr cl,
     if (!SendTightHeader(cl, x, y, w, h))
         return FALSE;
 
-    fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)
-             + (x * (cl->screen->bitsPerPixel / 8)));
+    fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
+             + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
     (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
                        &cl->format, fbptr, tightBeforeBuf,
-                       cl->screen->paddedWidthInBytes, w, h);
+                       cl->scaledScreen->paddedWidthInBytes, w, h);
 
     paletteMaxColors = w * h / tightConf[compressLevel].idxMaxColorsDivisor;
     if ( paletteMaxColors < 2 &&
@@ -1723,7 +1723,7 @@ PrepareRowForJpeg24(rfbClientPtr cl,
     uint32_t pix;
 
     fbptr = (uint32_t *)
-        &cl->screen->frameBuffer[y * cl->screen->paddedWidthInBytes + x * 4];
+        &cl->scaledScreen->frameBuffer[y * cl->scaledScreen->paddedWidthInBytes + x * 4];
 
     while (count--) {
         pix = *fbptr++;
@@ -1742,7 +1742,7 @@ PrepareRowForJpeg##bpp(rfbClientPtr cl, uint8_t *dst, int x, int y, int count) {
     int inRed, inGreen, inBlue;                                             \
                                                                             \
     fbptr = (uint##bpp##_t *)                                               \
-        &cl->screen->frameBuffer[y * cl->screen->paddedWidthInBytes +       \
+        &cl->scaledScreen->frameBuffer[y * cl->scaledScreen->paddedWidthInBytes +       \
                              x * (bpp / 8)];                                \
                                                                             \
     while (count--) {                                                       \

@@ -65,6 +65,7 @@
 #define DEBUGPROTO(x)
 #endif
 
+#include <scale.h>
 
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
@@ -250,6 +251,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     cl->screen = rfbScreen;
     cl->sock = sock;
     cl->viewOnly = FALSE;
+    /* setup pseudo scaling */
+    cl->scaledScreen = rfbScreen;
+    cl->scaledScreen->scaledScreenRefCount++;
 
     rfbResetStats(cl);
 
@@ -445,6 +449,9 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
     if(cl->sock>0)
 	close(cl->sock);
+
+    if (cl->scaledScreen!=NULL)
+        cl->scaledScreen->scaledScreenRefCount--;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbFreeZrleData(cl);
@@ -711,21 +718,31 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
     }
 }
 
+/* The values come in based on the scaled screen, we need to convert them to
+ * values based on the man screen's coordinate system
+ */
 static rfbBool rectSwapIfLEAndClip(uint16_t* x,uint16_t* y,uint16_t* w,uint16_t* h,
-		rfbScreenInfoPtr screen)
+		rfbClientPtr cl)
 {
-	*x=Swap16IfLE(*x);
-	*y=Swap16IfLE(*y);
-	*w=Swap16IfLE(*w);
-	*h=Swap16IfLE(*h);
-	if(*w>screen->width-*x)
-		*w=screen->width-*x;
+	int x1=Swap16IfLE(*x);
+	int y1=Swap16IfLE(*y);
+	int w1=Swap16IfLE(*w);
+	int h1=Swap16IfLE(*h);
+
+	rfbScaledCorrection(cl->scaledScreen, cl->screen, &x1, &y1, &w1, &h1, "rectSwapIfLEAndClip");
+	*x = x1;
+	*y = y1;
+	*w = w1;
+	*h = h1;
+
+	if(*w>cl->screen->width-*x)
+		*w=cl->screen->width-*x;
 	/* possible underflow */
-	if(*w>screen->width-*x)
+	if(*w>cl->screen->width-*x)
 		return FALSE;
-	if(*h>screen->height-*y)
-		*h=screen->height-*y;
-	if(*h>screen->height-*y)
+	if(*h>cl->screen->height-*y)
+		*h=cl->screen->height-*y;
+	if(*h>cl->screen->height-*y)
 		return FALSE;
 
 	return TRUE;
@@ -1062,10 +1079,17 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             return;
         }
 
-	if(!rectSwapIfLEAndClip(&msg.fur.x,&msg.fur.y,&msg.fur.w,&msg.fur.h,
-			cl->screen))
-		return;
 
+        /* The values come in based on the scaled screen, we need to convert them to
+         * values based on the main screen's coordinate system
+         */
+	if(!rectSwapIfLEAndClip(&msg.fur.x,&msg.fur.y,&msg.fur.w,&msg.fur.h,cl))
+	{
+	        rfbLog("Warning, ignoring rfbFramebufferUpdateRequest: %dXx%dY-%dWx%dH\n",msg.fur.x, msg.fur.y, msg.fur.w, msg.fur.h);
+		return;
+        }
+ 
+        
 	tmpRegion =
 	  sraRgnCreateRect(msg.fur.x,
 			   msg.fur.y,
@@ -1142,16 +1166,17 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    if (msg.pe.buttonMask != cl->lastPtrButtons ||
 		    cl->screen->deferPtrUpdateTime == 0) {
 		cl->screen->ptrAddEvent(msg.pe.buttonMask,
-			Swap16IfLE(msg.pe.x), Swap16IfLE(msg.pe.y), cl);
+			ScaleX(cl->scaledScreen, cl->screen, Swap16IfLE(msg.pe.x)), 
+			ScaleY(cl->scaledScreen, cl->screen, Swap16IfLE(msg.pe.y)),
+			cl);
 		cl->lastPtrButtons = msg.pe.buttonMask;
 	    } else {
-		cl->lastPtrX = Swap16IfLE(msg.pe.x);
-		cl->lastPtrY = Swap16IfLE(msg.pe.y);
+		cl->lastPtrX = ScaleX(cl->scaledScreen, cl->screen, Swap16IfLE(msg.pe.x));
+		cl->lastPtrY = ScaleY(cl->scaledScreen, cl->screen, Swap16IfLE(msg.pe.y));
 		cl->lastPtrButtons = msg.pe.buttonMask;
 	    }
       }      
       return;
-
 
 
     case rfbClientCutText:
@@ -1183,6 +1208,23 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
         return;
 
+    case rfbPalmVNCSetScaleFactor:
+      cl->PalmVNC = TRUE;
+    case rfbSetScale:
+
+      if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+          sz_rfbSetScaleMsg - 1)) <= 0) {
+          if (n != 0)
+            rfbLogPerror("rfbProcessClientNormalMessage: read");
+          rfbCloseClient(cl);
+          return;
+      }
+      rfbLog("rfbSetScale(%d)\n", msg.ssc.scale);
+      rfbScalingSetup(cl,cl->screen->width/msg.ssc.scale, cl->screen->height/msg.ssc.scale);
+
+      rfbSendNewScaleSize(cl);
+
+      return;
 
     default:
 	{
@@ -1245,7 +1287,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
       fu->type = rfbFramebufferUpdate;
       fu->nRects = Swap16IfLE(1);
       cl->ublen = sz_rfbFramebufferUpdateMsg;
-      if (!rfbSendNewFBSize(cl, cl->screen->width, cl->screen->height)) {
+      if (!rfbSendNewFBSize(cl, cl->scaledScreen->width, cl->scaledScreen->height)) {
         return FALSE;
       }
       return rfbSendUpdateBuf(cl);
@@ -1401,6 +1443,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
             int y = rect.y1;
             int w = rect.x2 - x;
             int h = rect.y2 - y;
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
 	    int rectsPerRow = (w-1)/cl->correMaxWidth+1;
 	    int rows = (h-1)/cl->correMaxHeight+1;
 	    nUpdateRegionRects += rectsPerRow*rows;
@@ -1414,6 +1459,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
             int y = rect.y1;
             int w = rect.x2 - x;
             int h = rect.y2 - y;
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
             nUpdateRegionRects += (((h-1) / (ULTRA_MAX_SIZE( w ) / w)) + 1);
           }
         sraRgnReleaseIterator(i);
@@ -1426,6 +1474,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
             int y = rect.y1;
             int w = rect.x2 - x;
             int h = rect.y2 - y;
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
 	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
 	}
 	sraRgnReleaseIterator(i);
@@ -1438,6 +1489,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
             int y = rect.y1;
             int w = rect.x2 - x;
             int h = rect.y2 - y;
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
 	    int n = rfbNumCodedRectsTight(cl, x, y, w, h);
 	    if (n == 0) {
 		nUpdateRegionRects = 0xFFFF;
@@ -1508,6 +1562,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         int y = rect.y1;
         int w = rect.x2 - x;
         int h = rect.y2 - y;
+
+        /* We need to count the number of rects in the scaled screen */
+        if (cl->screen!=cl->scaledScreen)
+            rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
 
         cl->rawBytesEquivalent += (sz_rfbFramebufferUpdateRectHeader
                                       + w * (cl->format.bitsPerPixel / 8) * h);
@@ -1598,11 +1656,18 @@ rfbSendCopyRegion(rfbClientPtr cl,
     /* printf("copyrect: "); sraRgnPrint(reg); putchar('\n');fflush(stdout); */
     i = sraRgnGetReverseIterator(reg,dx>0,dy>0);
 
+    /* correct for the scale of the screen */
+    dx = ScaleX(cl->screen, cl->scaledScreen, dx);
+    dy = ScaleX(cl->screen, cl->scaledScreen, dy);
+
     while(sraRgnIteratorNext(i,&rect1)) {
       x = rect1.x1;
       y = rect1.y1;
       w = rect1.x2 - x;
       h = rect1.y2 - y;
+
+      /* correct for scaling (if necessary) */
+      rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "copyrect");
 
       rect.r.x = Swap16IfLE(x);
       rect.r.y = Swap16IfLE(y);
@@ -1644,8 +1709,8 @@ rfbSendRectEncodingRaw(rfbClientPtr cl,
     rfbFramebufferUpdateRectHeader rect;
     int nlines;
     int bytesPerLine = w * (cl->format.bitsPerPixel / 8);
-    char *fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)
-                   + (x * (cl->screen->bitsPerPixel / 8)));
+    char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
+                   + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
     /* Flush the buffer to guarantee correct alignment for translateFn(). */
     if (cl->ublen > 0) {
@@ -1675,7 +1740,7 @@ rfbSendRectEncodingRaw(rfbClientPtr cl,
         (*cl->translateFn)(cl->translateLookupTable,
 			   &(cl->screen->serverFormat),
                            &cl->format, fbptr, &cl->updateBuf[cl->ublen],
-                           cl->screen->paddedWidthInBytes, w, nlines);
+                           cl->scaledScreen->paddedWidthInBytes, w, nlines);
 
         cl->ublen += nlines * bytesPerLine;
         h -= nlines;
@@ -1688,7 +1753,7 @@ rfbSendRectEncodingRaw(rfbClientPtr cl,
         if (!rfbSendUpdateBuf(cl))
             return FALSE;
 
-        fbptr += (cl->screen->paddedWidthInBytes * nlines);
+        fbptr += (cl->scaledScreen->paddedWidthInBytes * nlines);
 
         nlines = (UPDATE_BUF_SIZE - cl->ublen) / bytesPerLine;
         if (nlines == 0) {
@@ -1751,6 +1816,11 @@ rfbSendNewFBSize(rfbClientPtr cl,
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
     }
+
+    if (cl->PalmVNC==TRUE)
+        rfbLog("Sending a rfbEncodingNewFBSize in response to a PalmVNC  style frameuffer resize request (%dx%d)\n", w, h);
+    else
+        rfbLog("Sending a rfbEncodingNewFBSize in response to a UltraVNC style frameuffer resize request (%dx%d)\n", w, h);
 
     rect.encoding = Swap32IfLE(rfbEncodingNewFBSize);
     rect.r.x = 0;

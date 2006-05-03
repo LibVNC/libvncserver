@@ -97,10 +97,10 @@ rfbSendSmallRectEncodingCoRRE(rfbClientPtr cl,
     rfbRREHeader hdr;
     int nSubrects;
     int i;
-    char *fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)
-                   + (x * (cl->screen->bitsPerPixel / 8)));
+    char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
+                   + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
-    int maxRawSize = (cl->screen->width * cl->screen->height
+    int maxRawSize = (cl->scaledScreen->width * cl->scaledScreen->height
                       * (cl->format.bitsPerPixel / 8));
 
     if (rreBeforeBufSize < maxRawSize) {
@@ -121,7 +121,7 @@ rfbSendSmallRectEncodingCoRRE(rfbClientPtr cl,
 
     (*cl->translateFn)(cl->translateLookupTable,&(cl->screen->serverFormat),
                        &cl->format, fbptr, rreBeforeBuf,
-                       cl->screen->paddedWidthInBytes, w, h);
+                       cl->scaledScreen->paddedWidthInBytes, w, h);
 
     switch (cl->format.bitsPerPixel) {
     case 8:

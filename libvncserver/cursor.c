@@ -26,6 +26,8 @@
 #include <rfb/rfbregion.h>
 #include "private.h"
 
+void rfbScaledScreenUpdate(rfbScreenInfoPtr screen, int x1, int y1, int x2, int y2);
+
 /*
  * Send cursor shape either in X-style format or in client pixel format.
  */
@@ -41,6 +43,8 @@ rfbSendCursorShape(rfbClientPtr cl)
     int i, j;
     uint8_t *bitmapData;
     uint8_t bitmapByte;
+
+    /* TODO: scale the cursor data to the correct size */
 
     pCursor = cl->screen->getCursorPtr(cl);
     /*if(!pCursor) return TRUE;*/
@@ -461,6 +465,9 @@ void rfbHideCursor(rfbClientPtr cl)
      memcpy(s->frameBuffer+(y1+j)*rowstride+x1*bpp,
 	    s->underCursorBuffer+j*x2*bpp,
 	    x2*bpp);
+
+   /* Copy to all scaled versions */
+   rfbScaledScreenUpdate(s, x1, y1, x1+x2, y1+y2);
    
    UNLOCK(s->cursorMutex);
 }
@@ -618,6 +625,9 @@ void rfbShowCursor(rfbClientPtr cl)
    	 memcpy(s->frameBuffer+(j+y1)*rowstride+(i+x1)*bpp,
    		c->richSource+(j+j1)*c->width*bpp+(i+i1)*bpp,bpp);
    }
+
+   /* Copy to all scaled versions */
+   rfbScaledScreenUpdate(s, x1, y1, x1+x2, y1+y2);
 
    UNLOCK(s->cursorMutex);
 }

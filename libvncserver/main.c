@@ -48,9 +48,9 @@ static MUTEX(extMutex);
 static int rfbEnableLogging=1;
 
 #ifdef LIBVNCSERVER_WORDS_BIGENDIAN
-char rfbEndianTest = 0;
+char rfbEndianTest = (1==0);
 #else
-char rfbEndianTest = -1;
+char rfbEndianTest = (1==1);
 #endif
 
 /*
@@ -407,6 +407,7 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr screen,sraRegionPtr modRegion)
    rfbReleaseClientIterator(iterator);
 }
 
+void rfbScaledScreenUpdate(rfbScreenInfoPtr screen, int x1, int y1, int x2, int y2);
 void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
 {
    sraRegionPtr region;
@@ -421,7 +422,10 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
    if(y1<0) y1=0;
    if(y2>screen->height) y2=screen->height;
    if(y1==y2) return;
-   
+
+   /* update scaled copies for this rectangle */
+   rfbScaledScreenUpdate(screen,x1,y1,x2,y2);
+
    region = sraRgnCreateRect(x1,y1,x2,y2);
    rfbMarkRegionAsModified(screen,region);
    sraRgnDestroy(region);
@@ -959,6 +963,17 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
   rfbTightCleanup(screen);
 #endif
+
+  /* free all 'scaled' versions of this screen */
+  while (screen->scaledScreenNext!=NULL)
+  {
+      rfbScreenInfoPtr ptr;
+      ptr = screen->scaledScreenNext;
+      screen->scaledScreenNext = ptr->scaledScreenNext;
+      free(ptr->frameBuffer);
+      free(ptr);
+  }
+
 #endif
   free(screen);
 }

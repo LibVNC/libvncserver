@@ -30,13 +30,13 @@
 
 
 #define GET_IMAGE_INTO_BUF(tx,ty,tw,th,buf)                                \
-{  char *fbptr = (cl->screen->frameBuffer                                   \
-		 + (cl->screen->paddedWidthInBytes * ty)                   \
-                 + (tx * (cl->screen->bitsPerPixel / 8)));                 \
+{  char *fbptr = (cl->scaledScreen->frameBuffer                                   \
+		 + (cl->scaledScreen->paddedWidthInBytes * ty)                   \
+                 + (tx * (cl->scaledScreen->bitsPerPixel / 8)));                 \
                                                                            \
   (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,\
                      &cl->format, fbptr, (char*)buf,                       \
-                     cl->screen->paddedWidthInBytes, tw, th); }
+                     cl->scaledScreen->paddedWidthInBytes, tw, th); }
 
 #define EXTRA_ARGS , rfbClientPtr cl
 

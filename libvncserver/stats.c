@@ -28,7 +28,7 @@
 
 static const char* encNames[] = {
     "raw", "copyRect", "RRE", "[encoding 3]", "CoRRE", "hextile",
-    "zlib", "tight", "[encoding 8]", "[encoding 9]", "[encoding 10]",
+    "zlib", "tight", "[encoding 8]", "ultra", "[encoding 10]",
     "[encoding 11]", "[encoding 12]", "[encoding 13]", "[encoding 14]",
     "[encoding 15]",
     "ZRLE", "[encoding 17]", "[encoding 18]", "[encoding 19]", "[encoding 20]"

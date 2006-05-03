@@ -201,6 +201,10 @@ typedef struct _rfbExtensionData {
 
 typedef struct _rfbScreenInfo
 {
+    /* this structure has children that are scaled versions of this screen */
+    struct _rfbScreenInfo *scaledScreenNext;
+    int scaledScreenRefCount;
+
     int width;
     int paddedWidthInBytes;
     int height;
@@ -348,6 +352,12 @@ typedef struct _rfbClientRec {
   
     /* back pointer to the screen */
     rfbScreenInfoPtr screen;
+
+     /* points to a scaled version of the screen buffer in cl->scaledScreenList */
+     rfbScreenInfoPtr scaledScreen;
+     /* how did the client tell us it wanted the screen changed?  Ultra style or palm style? */
+     rfbBool PalmVNC;
+    
   
     /* private data. You should put any application client specific data
      * into a struct and let clientData point to it. Don't forget to

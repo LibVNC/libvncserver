@@ -1,3 +1,7 @@
+2006-05-03  Steven Carr <scarr@jsa-usa.com>
+	* Server Side Scaling is now supported in libvncserver
+	  Both PalmVNC and UltraVNC SetScale messages are supported
+
 2006-05-02  Steven Carr <scarr@jsa-usa.com>
 	* Ultra Encoding added.  Tested against UltraVNC V1.01
 	* libvncclient/rfbproto.c  CopyRectangle() BPP!=8 bug fixed.

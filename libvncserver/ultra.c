@@ -43,8 +43,8 @@ rfbSendOneRectEncodingUltra(rfbClientPtr cl,
     rfbZlibHeader hdr;
     int deflateResult;
     int i;
-    char *fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)
-    	   + (x * (cl->screen->bitsPerPixel / 8)));
+    char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
+    	   + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
     int maxRawSize;
     int maxCompSize;
@@ -78,7 +78,7 @@ rfbSendOneRectEncodingUltra(rfbClientPtr cl,
      */
     (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
 		       &cl->format, fbptr, lzoBeforeBuf,
-		       cl->screen->paddedWidthInBytes, w, h);
+		       cl->scaledScreen->paddedWidthInBytes, w, h);
 
     if ( cl->compStreamInitedLZO == FALSE ) {
         cl->compStreamInitedLZO = TRUE;

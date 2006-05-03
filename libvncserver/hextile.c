@@ -126,12 +126,12 @@ sendHextiles##bpp(rfbClientPtr cl, int rx, int ry, int rw, int rh) {            
                     return FALSE;                                               \
             }                                                                   \
                                                                                 \
-            fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)   \
-                     + (x * (cl->screen->bitsPerPixel / 8)));                   \
+            fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)   \
+                     + (x * (cl->scaledScreen->bitsPerPixel / 8)));                   \
                                                                                 \
             (*cl->translateFn)(cl->translateLookupTable, &(cl->screen->serverFormat),      \
                                &cl->format, fbptr, (char *)clientPixelData,     \
-                               cl->screen->paddedWidthInBytes, w, h);           \
+                               cl->scaledScreen->paddedWidthInBytes, w, h);           \
                                                                                 \
             startUblen = cl->ublen;                                             \
             cl->updateBuf[startUblen] = 0;                                      \
@@ -175,7 +175,7 @@ sendHextiles##bpp(rfbClientPtr cl, int rx, int ry, int rw, int rh) {            
                 (*cl->translateFn)(cl->translateLookupTable,                    \
                                    &(cl->screen->serverFormat), &cl->format, fbptr,        \
                                    (char *)clientPixelData,                     \
-                                   cl->screen->paddedWidthInBytes, w, h);       \
+                                   cl->scaledScreen->paddedWidthInBytes, w, h);       \
                                                                                 \
                 memcpy(&cl->updateBuf[cl->ublen], (char *)clientPixelData,      \
                        w * h * (bpp/8));                                        \
