@@ -401,8 +401,8 @@ typedef struct {
 #define rfbEncodingZlib 6
 #define rfbEncodingTight 7
 #define rfbEncodingZlibHex 8
-#define rfbEncodingUltra 9
 #endif
+#define rfbEncodingUltra 9
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbEncodingZRLE 16
 #endif
@@ -446,9 +446,12 @@ typedef struct {
 #define rfbEncodingRichCursor      0xFFFFFF11
 #define rfbEncodingPointerPos      0xFFFFFF18
 
-#define rfbEncodingLastRect        0xFFFFFF20
-#define rfbEncodingNewFBSize       0xFFFFFF21
-#define rfbEncodingKeyboardLedState 0xFFFFFF22
+#define rfbEncodingLastRect           0xFFFFFF20
+#define rfbEncodingNewFBSize          0xFFFFFF21
+#define rfbEncodingKeyboardLedState   0xFFFFFF22
+#define rfbEncodingSupportedMessages  0xFFFFFF23
+#define rfbEncodingSupportedEncodings 0xFFFFFF24
+#define rfbEncodingServerIdentity     0xFFFFFF25
 
 #define rfbEncodingQualityLevel0   0xFFFFFFE0
 #define rfbEncodingQualityLevel1   0xFFFFFFE1
@@ -513,6 +516,34 @@ typedef struct {
 } rfbFramebufferUpdateRectHeader;
 
 #define sz_rfbFramebufferUpdateRectHeader (sz_rfbRectangle + 4)
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * Supported Messages Encoding.  This encoding does not contain any pixel data.
+ * Instead, it contains 2 sets of bitflags.  These bitflags indicate what messages
+ * are supported by the server.
+ * rect->w contains byte count
+ */
+
+typedef struct {
+  uint8_t client2server[32]; /* maximum of 256 message types (256/8)=32 */
+  uint8_t server2client[32]; /* maximum of 256 message types (256/8)=32 */
+} rfbSupportedMessages;
+
+#define sz_rfbSupportedMessages 64
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * Supported Encodings Encoding.  This encoding does not contain any pixel data.
+ * Instead, it contains a list of (uint32_t) Encodings supported by this server.
+ * rect->w contains byte count
+ * rect->h contains encoding count
+ */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * Server Identity Encoding.  This encoding does not contain any pixel data.
+ * Instead, it contains a text string containing information about the server.
+ * ie: "x11vnc: 0.8.1 lastmod: 2006-04-25 (libvncserver 0.9pre)\0"
+ * rect->w contains byte count
+ */
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1244,7 +1275,7 @@ typedef struct _rfbSetScaleMsg {
  * client buffer.
  */
 typedef struct {
-    uint8_t type;			/* always rfbSetScaleFactor */
+    uint8_t type;			/* always rfbPalmVNCSetScaleFactor */
 
     uint8_t scale;		/* Scale factor (positive non-zero integer) */
     uint16_t pad2;

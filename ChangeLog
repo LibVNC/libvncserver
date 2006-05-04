@@ -1,3 +1,11 @@
+2006-05-04  Steven Carr <scarr@jsa-usa.com>
+	* rfbEncodingSupportedEncodings - What encodings are supported?
+	* rfbEncodingSupportedMessages - What message types are supported?
+	  This way a client can identify if a particular server supports a
+	  specific message types.
+	* rfbEncodingServerIdentity - What is the servers version string?
+	  ie: "x11vnc: 0.8.1 lastmod: 2006-04-25 (LibVNCServer 0.9pre)"
+
 2006-05-03  Steven Carr <scarr@jsa-usa.com>
 	* Server Side Scaling is now supported in libvncserver
 	  Both PalmVNC and UltraVNC SetScale messages are supported

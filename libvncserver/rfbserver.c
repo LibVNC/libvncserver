@@ -64,7 +64,7 @@
 #else
 #define DEBUGPROTO(x)
 #endif
-
+#include <stdarg.h>
 #include <scale.h>
 
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
@@ -353,6 +353,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->useRichCursorEncoding = FALSE;
       cl->enableLastRectEncoding = FALSE;
       cl->enableKeyboardLedState = FALSE;
+      cl->enableSupportedMessages = FALSE;
+      cl->enableSupportedEncodings = FALSE;
+      cl->enableServerIdentity = FALSE;
       cl->lastKeyboardLedState = -1;
       cl->cursorX = rfbScreen->cursorX;
       cl->cursorY = rfbScreen->cursorY;
@@ -782,6 +785,204 @@ rfbSendKeyboardLedState(rfbClientPtr cl)
 }
 
 
+#define rfbSetBit(buffer, position)  (buffer[(position & 255) / 8] |= (1 << (position % 8)))
+
+/*
+ * Send rfbEncodingSupportedMessages.
+ */
+
+rfbBool
+rfbSendSupportedMessages(rfbClientPtr cl)
+{
+    rfbFramebufferUpdateRectHeader rect;
+    rfbSupportedMessages msgs;
+
+    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader
+                  + sz_rfbSupportedMessages > UPDATE_BUF_SIZE) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
+    rect.encoding = Swap32IfLE(rfbEncodingSupportedMessages);
+    rect.r.x = 0;
+    rect.r.y = 0;
+    rect.r.w = Swap16IfLE(sz_rfbFramebufferUpdateRectHeader);
+    rect.r.h = 0;
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+        sz_rfbFramebufferUpdateRectHeader);
+    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    memset((char *)&msgs, 0, sz_rfbSupportedMessages);
+    rfbSetBit(msgs.client2server, rfbSetPixelFormat);
+    rfbSetBit(msgs.client2server, rfbFixColourMapEntries);
+    rfbSetBit(msgs.client2server, rfbSetEncodings);
+    rfbSetBit(msgs.client2server, rfbFramebufferUpdateRequest);
+    rfbSetBit(msgs.client2server, rfbKeyEvent);
+    rfbSetBit(msgs.client2server, rfbPointerEvent);
+    rfbSetBit(msgs.client2server, rfbClientCutText);
+    rfbSetBit(msgs.client2server, rfbFileTransfer);
+    rfbSetBit(msgs.client2server, rfbSetScale);
+    //rfbSetBit(msgs.client2server, rfbSetServerInput);
+    //rfbSetBit(msgs.client2server, rfbSetSW);
+    //rfbSetBit(msgs.client2server, rfbTextChat);
+    //rfbSetBit(msgs.client2server, rfbKeyFrameRequest);
+    rfbSetBit(msgs.client2server, rfbPalmVNCSetScaleFactor);
+
+    rfbSetBit(msgs.server2client, rfbFramebufferUpdate);
+    rfbSetBit(msgs.server2client, rfbSetColourMapEntries);
+    rfbSetBit(msgs.server2client, rfbBell);
+    rfbSetBit(msgs.server2client, rfbServerCutText);
+    rfbSetBit(msgs.server2client, rfbResizeFrameBuffer);
+    //rfbSetBit(msgs.server2client, rfbKeyFrameUpdate);
+    rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&msgs, sz_rfbSupportedMessages);
+    cl->ublen += sz_rfbSupportedMessages;
+
+    if (!rfbSendUpdateBuf(cl))
+        return FALSE;
+
+    return TRUE;
+}
+
+
+
+static void rfbSendSupporteddEncodings_SendEncoding(rfbClientPtr cl, uint32_t enc)
+{
+    uint32_t nSwapped=0;
+    nSwapped = Swap32IfLE(enc);
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&nSwapped, sizeof(nSwapped));
+    cl->ublen+=sizeof(nSwapped);
+}
+
+
+/*
+ * Send rfbEncodingSupportedEncodings.
+ */
+
+rfbBool
+rfbSendSupportedEncodings(rfbClientPtr cl)
+{
+    rfbFramebufferUpdateRectHeader rect;
+    uint16_t nEncodings=0;
+    
+    /* think rfbSetEncodingsMsg */
+
+    /* TODO: dynamic way of doing this */
+    nEncodings=16;
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    nEncodings += 2;
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    nEncodings++;
+#endif
+
+    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader
+                  + (nEncodings*sizeof(uint32_t)) > UPDATE_BUF_SIZE) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
+    rect.encoding = Swap32IfLE(rfbEncodingSupportedEncodings);
+    rect.r.x = 0;
+    rect.r.y = 0;
+    rect.r.w = Swap16IfLE(nEncodings * sizeof(uint32_t));
+    rect.r.h = Swap16IfLE(nEncodings);
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+        sz_rfbFramebufferUpdateRectHeader);
+    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingRaw);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingCopyRect);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingRRE);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingCoRRE);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingHextile);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingZlib);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingTight);
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingZRLE);
+#endif
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingUltra);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingUltraZip);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingXCursor);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingRichCursor);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingPointerPos);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingLastRect);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingNewFBSize);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingKeyboardLedState);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingSupportedMessages);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingSupportedEncodings);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingServerIdentity);
+
+    if (!rfbSendUpdateBuf(cl))
+        return FALSE;
+
+    return TRUE;
+}
+
+
+void
+rfbSetServerVersionIdentity(rfbScreenInfoPtr screen, char *fmt, ...)
+{
+    char buffer[256];
+    va_list ap;
+    
+    va_start(ap, fmt);
+    vsnprintf(buffer, sizeof(buffer)-1, fmt, ap);
+    va_end(ap);
+    
+    if (screen->versionString!=NULL) free(screen->versionString);
+    screen->versionString = strdup(buffer);
+}
+
+/*
+ * Send rfbEncodingServerIdentity.
+ */
+
+rfbBool
+rfbSendServerIdentity(rfbClientPtr cl)
+{
+    rfbFramebufferUpdateRectHeader rect;
+    char buffer[512];
+
+    /* tack on our library version */
+    snprintf(buffer,sizeof(buffer)-1, "%s (%s)", 
+        (cl->screen->versionString==NULL ? "unknown" : cl->screen->versionString),
+        LIBVNCSERVER_PACKAGE_STRING);
+
+    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader
+                  + (strlen(buffer)+1) > UPDATE_BUF_SIZE) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
+    rect.encoding = Swap32IfLE(rfbEncodingServerIdentity);
+    rect.r.x = 0;
+    rect.r.y = 0;
+    rect.r.w = Swap16IfLE(strlen(buffer)+1);
+    rect.r.h = 0;
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+        sz_rfbFramebufferUpdateRectHeader);
+    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    memcpy(&cl->updateBuf[cl->ublen], buffer, strlen(buffer)+1);
+    cl->ublen += strlen(buffer)+1;
+
+    if (!rfbSendUpdateBuf(cl))
+        return FALSE;
+
+    return TRUE;
+}
+
+
+
+
+
 /*
  * rfbProcessClientNormalMessage is called when the client has sent a normal
  * protocol message.
@@ -976,6 +1177,27 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                   rfbLog("Enabling KeyboardLedState protocol extension for client "
                           "%s\n", cl->host);
                   cl->enableKeyboardLedState = TRUE;
+                }
+                break;           
+            case rfbEncodingSupportedMessages:
+                if (!cl->enableSupportedMessages) {
+                  rfbLog("Enabling SupportedMessages protocol extension for client "
+                          "%s\n", cl->host);
+                  cl->enableSupportedMessages = TRUE;
+                }
+                break;           
+            case rfbEncodingSupportedEncodings:
+                if (!cl->enableSupportedEncodings) {
+                  rfbLog("Enabling SupportedEncodings protocol extension for client "
+                          "%s\n", cl->host);
+                  cl->enableSupportedEncodings = TRUE;
+                }
+                break;           
+            case rfbEncodingServerIdentity:
+                if (!cl->enableServerIdentity) {
+                  rfbLog("Enabling ServerIdentity protocol extension for client "
+                          "%s\n", cl->host);
+                  cl->enableServerIdentity = TRUE;
                 }
                 break;           
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -1268,6 +1490,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     rfbBool sendCursorShape = FALSE;
     rfbBool sendCursorPos = FALSE;
     rfbBool sendKeyboardLedState = FALSE;
+    rfbBool sendSupportedMessages = FALSE;
+    rfbBool sendSupportedEncodings = FALSE;
+    rfbBool sendServerIdentity = FALSE;
     rfbBool result = TRUE;
     
 
@@ -1325,6 +1550,40 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         }
     }
 
+    /*
+     * Do we plan to send a rfbEncodingSupportedMessages?
+     */
+    if (cl->enableSupportedMessages)
+    {
+        sendSupportedMessages = TRUE;
+        /* We only send this message ONCE <per setEncodings message received>
+         * (We disable it here)
+         */
+        cl->enableSupportedMessages = FALSE;
+    }
+    /*
+     * Do we plan to send a rfbEncodingSupportedEncodings?
+     */
+    if (cl->enableSupportedEncodings)
+    {
+        sendSupportedEncodings = TRUE;
+        /* We only send this message ONCE <per setEncodings message received>
+         * (We disable it here)
+         */
+        cl->enableSupportedEncodings = FALSE;
+    }
+    /*
+     * Do we plan to send a rfbEncodingServerIdentity?
+     */
+    if (cl->enableServerIdentity)
+    {
+        sendServerIdentity = TRUE;
+        /* We only send this message ONCE <per setEncodings message received>
+         * (We disable it here)
+         */
+        cl->enableServerIdentity = FALSE;
+    }
+
     LOCK(cl->updateMutex);
 
     /*
@@ -1368,7 +1627,8 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
        sraRgnEmpty(updateRegion) &&
        (cl->enableCursorShapeUpdates ||
 	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY)) &&
-       !sendCursorShape && !sendCursorPos && !sendKeyboardLedState) {
+       !sendCursorShape && !sendCursorPos && !sendKeyboardLedState &&
+       !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity) {
       sraRgnDestroy(updateRegion);
       UNLOCK(cl->updateMutex);
       return TRUE;
@@ -1529,7 +1789,8 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	}
 	fu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
 					   nUpdateRegionRects +
-					   !!sendCursorShape + !!sendCursorPos + !!sendKeyboardLedState));
+					   !!sendCursorShape + !!sendCursorPos + !!sendKeyboardLedState +
+					   !!sendSupportedMessages + !!sendSupportedEncodings + !!sendServerIdentity));
     } else {
 	fu->nRects = 0xFFFF;
     }
@@ -1549,6 +1810,19 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
    
    if (sendKeyboardLedState) {
        if (!rfbSendKeyboardLedState(cl))
+           goto updateFailed;
+   }
+
+   if (sendSupportedMessages) {
+       if (!rfbSendSupportedMessages(cl))
+           goto updateFailed;
+   }
+   if (sendSupportedEncodings) {
+       if (!rfbSendSupportedEncodings(cl))
+           goto updateFailed;
+   }
+   if (sendServerIdentity) {
+       if (!rfbSendServerIdentity(cl))
            goto updateFailed;
    }
    

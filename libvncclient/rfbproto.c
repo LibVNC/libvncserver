@@ -532,25 +532,6 @@ SetFormatAndEncodings(rfbClient* client)
       encs[se->nEncodings++] = rfbClientSwap32IfLE(client->appData.qualityLevel +
 					  rfbEncodingQualityLevel0);
     }
-
-
-    if (client->appData.useRemoteCursor) {
-      if (se->nEncodings < MAX_ENCODINGS)
-	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingXCursor);
-      if (se->nEncodings < MAX_ENCODINGS)
-	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRichCursor);
-      if (se->nEncodings < MAX_ENCODINGS)
-	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingPointerPos);
-    }
-
-    /* Let's receive keyboard state encoding if available */
-    if (se->nEncodings < MAX_ENCODINGS) {
-        encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingKeyboardLedState);
-    }
-
-    if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
-      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingLastRect);
-    }
   }
   else {
     if (SameMachine(client->sock)) {
@@ -570,6 +551,7 @@ SetFormatAndEncodings(rfbClient* client)
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingTight);
+    requestLastRectEncoding = TRUE;
 #endif
 #endif
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingHextile);
@@ -599,24 +581,42 @@ SetFormatAndEncodings(rfbClient* client)
       encs[se->nEncodings++] = rfbClientSwap32IfLE(client->appData.qualityLevel +
 					  rfbEncodingQualityLevel0);
     }
+  }
 
-    if (client->appData.useRemoteCursor) {
-      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingXCursor);
-      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRichCursor);
-      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingPointerPos);
-    }
 
+
+  /* Remote Cursor Support (local to viewer) */
+  if (client->appData.useRemoteCursor) {
     if (se->nEncodings < MAX_ENCODINGS)
-      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingLastRect);
+      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingXCursor);
+    if (se->nEncodings < MAX_ENCODINGS)
+      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRichCursor);
+    if (se->nEncodings < MAX_ENCODINGS)
+      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingPointerPos);
   }
 
   /* Keyboard State Encodings */
   if (se->nEncodings < MAX_ENCODINGS)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingKeyboardLedState);
 
+  /* New Frame Buffer Size */
   if (se->nEncodings < MAX_ENCODINGS && client->canHandleNewFBSize)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingNewFBSize);
 
+  /* Last Rect */
+  if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingLastRect);
+
+  /* Server Capabilities */
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingSupportedMessages);
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingSupportedEncodings);
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingServerIdentity);
+
+
+  /* client extensions */
   for(e = rfbClientExtensions; e; e = e->next)
     if(e->encodings) {
       int* enc;
@@ -854,6 +854,65 @@ HandleRFBServerMessage(rfbClient* client)
 	SendFramebufferUpdateRequest(client, 0, 0, rect.r.w, rect.r.h, FALSE);
 	rfbClientLog("Got new framebuffer size: %dx%d\n", rect.r.w, rect.r.h);
 	continue;
+      }
+
+      /* rect.r.w=byte count */
+      if (rect.encoding == rfbEncodingSupportedMessages) {
+          rfbSupportedMessages msgs;
+          int loop;
+          if (!ReadFromRFBServer(client, (char *)&msgs, sz_rfbSupportedMessages))
+              return FALSE;
+
+          /* msgs is two sets of bit flags of supported messages client2server[] and server2client[] */
+          /* currently ignored by this library */
+
+          rfbClientLog("client2server supported messages (bit flags)\n");
+          for (loop=0;loop<32;loop+=8)
+            rfbClientLog("%02X: %04x %04x %04x %04x - %04x %04x %04x %04x\n", loop,
+                msgs.client2server[loop],   msgs.client2server[loop+1],
+                msgs.client2server[loop+2], msgs.client2server[loop+3],
+                msgs.client2server[loop+4], msgs.client2server[loop+5],
+                msgs.client2server[loop+6], msgs.client2server[loop+7]);
+
+          rfbClientLog("server2client supported messages (bit flags)\n");
+          for (loop=0;loop<32;loop+=8)
+            rfbClientLog("%02X: %04x %04x %04x %04x - %04x %04x %04x %04x\n", loop,
+                msgs.server2client[loop],   msgs.server2client[loop+1],
+                msgs.server2client[loop+2], msgs.server2client[loop+3],
+                msgs.server2client[loop+4], msgs.server2client[loop+5],
+                msgs.server2client[loop+6], msgs.server2client[loop+7]);
+          continue;
+      }
+
+      /* rect.r.w=byte count, rect.r.h=# of encodings */
+      if (rect.encoding == rfbEncodingSupportedEncodings) {
+          char *buffer;
+          buffer = malloc(rect.r.w);
+          if (!ReadFromRFBServer(client, buffer, rect.r.w))
+          {
+              free(buffer);
+              return FALSE;
+          }
+
+          /* buffer now contains rect.r.h # of uint32_t encodings that the server supports */
+          /* currently ignored by this library */
+          free(buffer);
+          continue;
+      }
+
+      /* rect.r.w=byte count */
+      if (rect.encoding == rfbEncodingServerIdentity) {
+          char *buffer;
+          buffer = malloc(rect.r.w+1);
+          if (!ReadFromRFBServer(client, buffer, rect.r.w))
+          {
+              free(buffer);
+              return FALSE;
+          }
+          buffer[rect.r.w]=0; /* null terminate, just in case */
+          rfbClientLog("Connected to Server \"%s\"\n", buffer);
+          free(buffer);
+          continue;
       }
 
       /* rfbEncodingUltraZip is a collection of subrects.   x = # of subrects, and h is always 0 */

@@ -323,6 +323,9 @@ typedef struct _rfbScreenInfo
 
     /* handle as many input events as possible (default off) */
     rfbBool handleEventsEagerly;
+
+    /* rfbEncodingServerIdentity */
+    char *versionString;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -501,6 +504,9 @@ typedef struct _rfbClientRec {
 
 
     int     lastKeyboardLedState;     /* keep track of last value so we can send *change* events */
+    rfbBool enableSupportedMessages;  /* client supports SupportedMessages encoding */
+    rfbBool enableSupportedEncodings; /* client supports SupportedEncodings encoding */
+    rfbBool enableServerIdentity;     /* client supports ServerIdentity encoding */
     rfbBool enableKeyboardLedState;   /* client supports KeyboardState encoding */
     rfbBool enableLastRectEncoding;   /* client supports LastRect encoding */
     rfbBool enableCursorShapeUpdates; /* client supports cursor shape updates */
@@ -852,6 +858,7 @@ extern void rfbNewFramebuffer(rfbScreenInfoPtr rfbScreen,char *framebuffer,
  int bytesPerPixel);
 
 extern void rfbScreenCleanup(rfbScreenInfoPtr screenInfo);
+extern void rfbSetServerVersionIdentity(rfbScreenInfoPtr screen, char *fmt, ...);
 
 /* functions to accept/refuse a client that has been put on hold
    by a NewClientHookPtr function. Must not be called in other

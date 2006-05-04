@@ -1966,6 +1966,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		screen->deferUpdateTime = defer_update;
 	}
 
+	rfbSetServerVersionIdentity(screen, "x11vnc: %s", lastmod);
+
 	rfbInitServer(screen);
 
 	if (use_openssl) {
