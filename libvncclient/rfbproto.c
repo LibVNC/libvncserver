@@ -867,11 +867,16 @@ HandleRFBServerMessage(rfbClient* client)
 	      return FALSE;
             }
 
-        if (rect.r.h * rect.r.w == 0) {
-	  rfbClientLog("Zero size rect - ignoring\n");
+        /* UltraVNC with scaling, will send rectangles with a zero W or H
+         *
+        if ((rect.encoding != rfbEncodingTight) && 
+            (rect.r.h * rect.r.w == 0))
+        {
+	  rfbClientLog("Zero size rect - ignoring (encoding=%d (0x%08x) %dx, %dy, %dw, %dh)\n", rect.encoding, rect.encoding, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 	  continue;
         }
-
+        */
+        
         /* If RichCursor encoding is used, we should prevent collisions
 	   between framebuffer updates and cursor drawing operations. */
         client->SoftCursorLockArea(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
