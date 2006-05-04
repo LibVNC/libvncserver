@@ -445,10 +445,10 @@ typedef struct {
 #define rfbEncodingXCursor         0xFFFFFF10
 #define rfbEncodingRichCursor      0xFFFFFF11
 #define rfbEncodingPointerPos      0xFFFFFF18
-#define rfbEncodingKeyboardLedState 0xFFFFFF19
 
 #define rfbEncodingLastRect        0xFFFFFF20
 #define rfbEncodingNewFBSize       0xFFFFFF21
+#define rfbEncodingKeyboardLedState 0xFFFFFF22
 
 #define rfbEncodingQualityLevel0   0xFFFFFFE0
 #define rfbEncodingQualityLevel1   0xFFFFFFE1
