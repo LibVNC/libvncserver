@@ -201,9 +201,23 @@ static rfbBool rfbInitConnection(rfbClient* client)
   client->width=client->si.framebufferWidth;
   client->height=client->si.framebufferHeight;
   client->MallocFrameBuffer(client);
-  if (!SendFramebufferUpdateRequest(client,
-				    0,0,client->width,client->height,FALSE))
-    return FALSE;
+
+  if (client->appData.scaleSetting>1)
+  {
+      if (!SendScaleSetting(client, client->appData.scaleSetting))
+          return FALSE;
+      if (!SendFramebufferUpdateRequest(client,
+                                        0,0,
+                                        client->width/client->appData.scaleSetting,
+                                        client->height/client->appData.scaleSetting,FALSE))
+      return FALSE;
+  }
+  else
+  {
+      if (!SendFramebufferUpdateRequest(client,
+  				        0,0,client->width,client->height,FALSE))
+      return FALSE;
+  }
 
   return TRUE;
 }
@@ -232,6 +246,9 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       } else if (i+1<*argc && strcmp(argv[i], "-quality") == 0) {
 	client->appData.qualityLevel = atoi(argv[i+1]);
 	j+=2;
+      } else if (i+1<*argc && strcmp(argv[i], "-scale") == 0) {
+        client->appData.scaleSetting = atoi(argv[i+1]);
+        j+=2;
       } else {
 	char* colon=strchr(argv[i],':');
 

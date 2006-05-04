@@ -89,6 +89,8 @@ typedef struct {
   int qualityLevel;
   rfbBool enableJPEG;
   rfbBool useRemoteCursor;
+  rfbBool palmVNC;  /* use palmvnc specific SetScale (vs ultravnc) */
+  int scaleSetting; /* 0 means no scale set, else 1/scaleSetting */
 } AppData;
 
 
@@ -239,6 +241,7 @@ extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
 extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
 					 int x, int y, int w, int h,
 					 rfbBool incremental);
+extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
 extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
 extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
 extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);

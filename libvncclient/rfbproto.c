@@ -670,6 +670,27 @@ SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, rfbB
 
 
 /*
+ * SendScaleSetting.
+ */
+rfbBool
+SendScaleSetting(rfbClient* client,int scaleSetting)
+{
+  rfbSetScaleMsg ssm;
+
+  if (client->appData.palmVNC)
+      ssm.type = rfbPalmVNCSetScaleFactor;
+  else
+      ssm.type = rfbSetScale;
+  ssm.scale = scaleSetting;
+  ssm.pad = 0;
+  
+  if (!WriteToRFBServer(client, (char *)&ssm, sz_rfbSetScaleMsg))
+    return FALSE;
+
+  return TRUE;
+}
+
+/*
  * SendPointerEvent.
  */
 
@@ -1132,6 +1153,32 @@ HandleRFBServerMessage(rfbClient* client)
     break;
   }
 
+  case rfbResizeFrameBuffer:
+  {
+    if (!ReadFromRFBServer(client, ((char *)&msg) + 1,
+                           sz_rfbResizeFrameBufferMsg -1))
+      return FALSE;
+    client->width = rfbClientSwap16IfLE(msg.rsfb.framebufferWidth);
+    client->height = rfbClientSwap16IfLE(msg.rsfb.framebufferHeigth);
+    client->MallocFrameBuffer(client);
+    SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
+    rfbClientLog("Got new framebuffer size: %dx%d\n", client->width, client->height);
+    break;
+  }
+
+  case rfbPalmVNCReSizeFrameBuffer:
+  {
+    if (!ReadFromRFBServer(client, ((char *)&msg) + 1,
+                           sz_rfbPalmVNCReSizeFrameBufferMsg -1))
+      return FALSE;
+    client->width = rfbClientSwap16IfLE(msg.prsfb.buffer_w);
+    client->height = rfbClientSwap16IfLE(msg.prsfb.buffer_h);
+    client->MallocFrameBuffer(client);
+    SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
+    rfbClientLog("Got new framebuffer size: %dx%d\n", client->width, client->height);
+    break;
+  }
+
   default:
     {
       rfbBool handled = FALSE;
@@ -1143,8 +1190,8 @@ HandleRFBServerMessage(rfbClient* client)
 
       if(!handled) {
 	char buffer[256];
-	ReadFromRFBServer(client, buffer, 256);
 	rfbClientLog("Unknown message type %d from VNC server\n",msg.type);
+	ReadFromRFBServer(client, buffer, 256);
 	return FALSE;
       }
     }
