@@ -169,6 +169,8 @@ void clear_xdamage_mark_region(sraRegionPtr markregion, int flush) {
 	sraRegionPtr tmpregion;
 	int count = 0;
 
+	RAWFB_RET_VOID
+
 	if (! xdamage_present || ! use_xdamage) {
 		return;
 	}
@@ -182,7 +184,7 @@ void clear_xdamage_mark_region(sraRegionPtr markregion, int flush) {
 
 	X_LOCK;
 	if (flush) {
-		XFlush(dpy);
+		XFlush_wr(dpy);
 	}
 	while (XCheckTypedEvent(dpy, xdamage_base_event_type+XDamageNotify, &ev)) {
 		count++;
@@ -225,6 +227,8 @@ int collect_xdamage(int scancnt, int call) {
 	int dup_x[DUPSZ], dup_y[DUPSZ], dup_w[DUPSZ], dup_h[DUPSZ];
 	double tm, dt;
 
+	RAWFB_RET(0)
+
 	if (scancnt) {} /* unused vars warning: */
 
 	if (! xdamage_present || ! use_xdamage) {
@@ -252,7 +256,7 @@ int collect_xdamage(int scancnt, int call) {
 
 
 	X_LOCK;
-if (0)	XFlush(dpy);
+if (0)	XFlush_wr(dpy);
 if (0)	XEventsQueued(dpy, QueuedAfterFlush);
 	while (XCheckTypedEvent(dpy, xdamage_base_event_type+XDamageNotify, &ev)) {
 		/*
@@ -472,7 +476,7 @@ void initialize_xdamage(void) {
 
 void create_xdamage_if_needed(void) {
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (! xdamage) {
@@ -487,14 +491,14 @@ void create_xdamage_if_needed(void) {
 
 void destroy_xdamage_if_needed(void) {
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (xdamage) {
 		XEvent ev;
 		X_LOCK;
 		XDamageDestroy(dpy, xdamage);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		if (xdamage_base_event_type) {
 			while (XCheckTypedEvent(dpy,
 			    xdamage_base_event_type+XDamageNotify, &ev)) {

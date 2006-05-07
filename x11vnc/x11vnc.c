@@ -524,7 +524,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			 * screen, but do flush the X11 display.
 			 */
 			X_LOCK;
-			XFlush(dpy);
+			XFlush_wr(dpy);
 			X_UNLOCK;
 			dt = 0.0;
 		} else {
@@ -540,7 +540,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			}
 			dtime0(&tm);
 			if (use_snapfb) {
-				int t, tries = 5;
+				int t, tries = 3;
 				copy_snap();
 				for (t =0; t < tries; t++) {
 					tile_diffs = scan_for_updates(0);
@@ -599,7 +599,7 @@ static char *choose_title(char *display) {
 	strncat(title, display, MAXN - strlen(title));
 	if (subwin && valid_window(subwin, NULL, 0)) {
 		char *name;
-		if (XFetchName(dpy, subwin, &name)) {
+		if (dpy && XFetchName(dpy, subwin, &name)) {
 			strncat(title, " ",  MAXN - strlen(title));
 			strncat(title, name, MAXN - strlen(title));
 		}
@@ -1030,6 +1030,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " cmap8to24:  %d\n", cmap8to24);
 	fprintf(stderr, " 8to24_opts: %s\n", cmap8to24_str ? cmap8to24_str
 	    : "null");
+	fprintf(stderr, " 24to32:     %d\n", xform24to32);
 	fprintf(stderr, " visual:     %s\n", visual_str ? visual_str
 	    : "null");
 	fprintf(stderr, " overlay:    %d\n", overlay);
@@ -1521,6 +1522,8 @@ int main(int argc, char* argv[]) {
 				}
 			}
 #endif
+		} else if (!strcmp(arg, "-24to32")) {
+			xform24to32 = 1;
 		} else if (!strcmp(arg, "-visual")) {
 			CHECK_ARGC
 			visual_str = strdup(argv[++i]);
@@ -2111,6 +2114,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-rawfb")) {
 			CHECK_ARGC
 			raw_fb_str = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-freqtab")) {
+			CHECK_ARGC
+			freqtab = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-pipeinput")) {
 			CHECK_ARGC
 			pipeinput_str = strdup(argv[++i]);
@@ -2782,7 +2788,7 @@ int main(int argc, char* argv[]) {
 	if (remote_cmd || query_cmd) {
 		int rc = do_remote_query(remote_cmd, query_cmd, remote_sync,
 		    query_default);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		fflush(stderr);
 		fflush(stdout);
 		usleep(30 * 1000);	/* still needed? */

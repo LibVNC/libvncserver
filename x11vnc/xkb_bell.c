@@ -23,6 +23,8 @@ void initialize_xkb(void) {
 	int ir, reason;
 	int op, ev, er, maj, min;
 	
+	RAWFB_RET_VOID
+
 	if (xkbcompat) {
 		xkb_present = 0;
 	} else if (! XkbQueryExtension(dpy, &op, &ev, &er, &maj, &min)) {
@@ -60,6 +62,8 @@ void initialize_watch_bell(void) {
 		return;
 	}
 
+	RAWFB_RET_VOID
+
 	XkbSelectEvents(dpy, XkbUseCoreKbd, XkbBellNotifyMask, 0);
 
 	if (! watch_bell) {
@@ -88,6 +92,7 @@ void check_bell_event(void) {
 	if (! xkb_base_event_type) {
 		return;
 	}
+	RAWFB_RET_VOID
 
 	/* caller does X_LOCK */
 	if (! XCheckTypedEvent(dpy, xkb_base_event_type, &xev)) {

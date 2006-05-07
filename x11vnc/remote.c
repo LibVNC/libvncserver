@@ -74,7 +74,9 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 		fprintf(stderr, ">>> sending remote command: \"%s\" via"
 		    " X11VNC_REMOTE X property.\n", cmd);
 		set_x11vnc_remote_prop(cmd);
-		XFlush(dpy);
+		if (dpy) {
+			XFlush_wr(dpy);
+		}
 	}
 
 	if (query || wait) {
@@ -724,9 +726,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	if (!strcmp(p, "stop") || !strcmp(p, "quit") ||
 	    !strcmp(p, "exit") || !strcmp(p, "shutdown")) {
 		NOTAPP
-		close_all_clients();
+		if (client_connect_file) {
+			FILE *in = fopen(client_connect_file, "w");
+			if (in) {
+				fprintf(in, "cmd=noop\n");
+				fclose(in);
+			}
+		}
 		rfbLog("remote_cmd: setting shut_down flag\n");
 		shut_down = 1;
+		close_all_clients();
 
 	} else if (!strcmp(p, "ping")) {
 		query = 1;
@@ -1062,6 +1071,34 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: set cmap8to24_str to: %s\n", cmap8to24_str);
 		do_new_fb(0);
+
+	} else if (!strcmp(p, "24to32")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, xform24to32);
+			goto qry;
+		}
+		rfbLog("remote_cmd: turning on -24to32 mode.\n");
+		xform24to32 = 1;
+		do_new_fb(1);
+
+	} else if (!strcmp(p, "no24to32")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !xform24to32);
+			goto qry;
+		}
+		rfbLog("remote_cmd: turning off -24to32 mode.\n");
+		if (set_visual_str_to_something) {
+			if (visual_str) {
+				rfbLog("unsetting: %d %d/%d\n", visual_str,
+				    (int) visual_id, visual_depth);
+				free(visual_str);
+			}
+			visual_str = NULL;
+			visual_id = (VisualID) 0;
+			visual_depth = 0;
+		}
+		xform24to32 = 0;
+		do_new_fb(1);
 
 	} else if (strstr(p, "visual") == p) {
 		COLON_CHECK("visual:")
@@ -1579,7 +1616,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: turning on flipbyteorder mode.\n");
 		flip_byte_order = 1;
 		if (orig != flip_byte_order) {
-			if (! using_shm) {
+			if (! using_shm || xform24to32) {
 				do_new_fb(1);
 			} else {
 				rfbLog("  using shm, not resetting fb\n");
@@ -1594,7 +1631,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: turning off flipbyteorder mode.\n");
 		flip_byte_order = 0;
 		if (orig != flip_byte_order) {
-			if (! using_shm) {
+			if (! using_shm || xform24to32) {
 				do_new_fb(1);
 			} else {
 				rfbLog("  using shm, not resetting fb\n");
@@ -3282,6 +3319,19 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (*raw_fb_str == '\0') {
 			free(raw_fb_str);
 			raw_fb_str = NULL;
+			if (raw_fb_mmap) {
+				munmap(raw_fb_addr, raw_fb_mmap);
+			}
+			if (raw_fb_fd >= 0) {
+				close(raw_fb_fd);
+			}
+			raw_fb_fd = -1;
+			raw_fb = NULL;
+			raw_fb_addr = NULL;
+			raw_fb_offset = 0;
+			raw_fb_shm = 0;
+			raw_fb_mmap = 0;
+			raw_fb_seek = 0;
 			rfbLog("restoring per-rawfb settings...\n");
 			set_raw_fb_params(1);
 		}
@@ -3976,7 +4026,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	} else {
 		if (dpy) {	/* raw_fb hack */
 			set_x11vnc_remote_prop(buf);
-			XFlush(dpy);
+			XFlush_wr(dpy);
 		}
 	}
 #endif

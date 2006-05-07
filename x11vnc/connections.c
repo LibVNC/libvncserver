@@ -13,6 +13,7 @@
 #include "scan.h"
 #include "sslcmds.h"
 #include "sslhelper.h"
+#include "xwrappers.h"
 
 /*
  * routines for handling incoming, outgoing, etc connections
@@ -864,7 +865,7 @@ static unsigned char t2x2_bits[] = {
 
 	KeyCode key_o;
 
-	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
+	RAWFB_RET(0)
 
 	if (! accept) {
 		sprintf(str_y, "OK");
@@ -951,7 +952,7 @@ static unsigned char t2x2_bits[] = {
 	XSetDashes(dpy, gc, 0, dash_list, list_length);
 
 	XMapWindow(dpy, awin);
-	XFlush(dpy);
+	XFlush_wr(dpy);
 
 	if (accept) {
 		snprintf(strh, 100, "x11vnc: accept connection from %s?", addr);
@@ -1107,7 +1108,7 @@ static unsigned char t2x2_bits[] = {
 			XUnmapWindow(dpy, awin);
 			XFreeGC(dpy, gc);
 			XDestroyWindow(dpy, awin);
-			XFlush(dpy);
+			XFlush_wr(dpy);
 			break;
 		}
 	}
@@ -1438,7 +1439,12 @@ static void check_connect_file(char *file) {
 				} else {
 					rfbLog("read connect file: %s\n", str);
 				}
-				client_connect = str;
+				if (!strcmp(str, "cmd=stop") &&
+				    dnow() - x11vnc_start < 3.0) {
+					rfbLog("ignoring stale cmd=stop\n");
+				} else {
+					client_connect = str;
+				}
 			}
 		}
 	}
@@ -1586,11 +1592,13 @@ void reverse_connect(char *str) {
  * for changes.  The vncconnect(1) will set it on our X display.
  */
 void set_vnc_connect_prop(char *str) {
+	RAWFB_RET_VOID
 	XChangeProperty(dpy, rootwin, vnc_connect_prop, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *)str, strlen(str));
 }
 
 void set_x11vnc_remote_prop(char *str) {
+	RAWFB_RET_VOID
 	XChangeProperty(dpy, rootwin, x11vnc_remote_prop, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *)str, strlen(str));
 }
@@ -1609,6 +1617,7 @@ void read_vnc_connect_prop(int nomsg) {
 		/* not active or problem with VNC_CONNECT atom */
 		return;
 	}
+	RAWFB_RET_VOID
 
 	/* read the property value into vnc_connect_str: */
 	do {
@@ -1654,6 +1663,7 @@ void read_x11vnc_remote_prop(int nomsg) {
 		/* not active or problem with X11VNC_REMOTE atom */
 		return;
 	}
+	RAWFB_RET_VOID
 
 	/* read the property value into x11vnc_remote_str: */
 	do {

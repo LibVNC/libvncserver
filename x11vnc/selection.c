@@ -4,6 +4,7 @@
 #include "cleanup.h"
 #include "connections.h"
 #include "unixpw.h"
+#include "xwrappers.h"
 
 /*
  * Selection/Cutbuffer/Clipboard handlers.
@@ -57,7 +58,11 @@ void selection_request(XEvent *ev, char *type) {
 	unsigned int length;
 	unsigned char *data;
 #ifndef XA_LENGTH
-	unsigned long XA_LENGTH = XInternAtom(dpy, "LENGTH", True);
+	unsigned long XA_LENGTH;
+#endif
+	RAWFB_RET_VOID
+#ifndef XA_LENGTH
+	XA_LENGTH = XInternAtom(dpy, "LENGTH", True);
 #endif
 
 	req_event = &(ev->xselectionrequest);
@@ -128,7 +133,7 @@ void selection_request(XEvent *ev, char *type) {
 	XSetErrorHandler(old_handler);
 	trapped_xerror = 0;
 
-	XFlush(dpy);
+	XFlush_wr(dpy);
 }
 
 int check_sel_direction(char *dir, char *label, char *sel, int len) {
@@ -179,6 +184,7 @@ void cutbuffer_send(void) {
 	cutbuffer_str[0] = '\0';
 	slen = 0;
 
+	RAWFB_RET_VOID
 
 	/* read the property value into cutbuffer_str: */
 	do {
@@ -248,6 +254,7 @@ void selection_send(XEvent *ev) {
 	unsigned char* data = NULL;
 	char *selection_str;
 
+	RAWFB_RET_VOID
 	/*
 	 * remember info about our last value of PRIMARY (or CUT_BUFFER0)
 	 * so we can check for any changes below.

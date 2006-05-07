@@ -67,6 +67,8 @@ static int db = 0;
 static int white(void) {
 	static unsigned long black_pix = 0, white_pix = 1, set = 0;
 
+	RAWFB_RET(0xffffff)
+
 	if (depth <= 8 && ! set) {
 		X_LOCK;
 		black_pix = BlackPixel(dpy, scr);

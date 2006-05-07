@@ -11,6 +11,7 @@
 #include "pointer.h"
 #include "cleanup.h"
 #include "unixpw.h"
+#include "screen.h"
 
 /*
  * routines for scanning and reading the X11 display for changes, and
@@ -223,7 +224,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	X_LOCK;
 
-	if (! using_shm) {
+	if (! using_shm || xform24to32 || raw_fb) {
 		/* we only need the XImage created */
 		xim = XCreateImage_wr(dpy, default_visual, depth, ZPixmap,
 		    0, NULL, w, h, raw_fb ? 32 : BitmapPad(dpy), 0);
@@ -258,6 +259,11 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 		*ximg_ptr = xim;
 		return 1;
+	}
+
+	if (! dpy) {
+		X_UNLOCK;
+		return 0;
 	}
 
 	xim = XShmCreateImage_wr(dpy, default_visual, depth, ZPixmap, NULL,
@@ -347,7 +353,20 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 	}
 #endif
 	if (xim != NULL) {
-		XDestroyImage(xim);
+#if 0
+		/*
+		 * This would be needed if you want to crazily switch
+		 * back and forth between rawfb and X.  You will also
+		 * need to supply -noviewonly.  xim->f is public ABI,
+		 * but we choose not to use it.  One could also
+		 * clean up the switch.
+		 */
+		if (xim->f.destroy_image) {
+#else
+		{
+#endif
+			XDestroyImage(xim);
+		}
 		xim = NULL;
 	}
 	X_UNLOCK;
@@ -444,7 +463,7 @@ void initialize_polling_images(void) {
 		}
 	}
 	if (!quiet) {
-		if (using_shm) {
+		if (using_shm && ! xform24to32) {
 			rfbLog("created %d tile_row shm polling images.\n",
 			    tile_shm_count);
 		} else {
@@ -1959,6 +1978,7 @@ int copy_screen(void) {
 	if (! main_fb) {
 		return 0;
 	}
+
 	fbp = main_fb;
 	y = 0;
 
@@ -1986,13 +2006,106 @@ int copy_screen(void) {
 	return 0;
 }
 
-int copy_snap(void) {
+static void snap_all_rawfb(void) {
 	int pixelsize = bpp/8;
+	int n, sz;
+	char *dst;
+	static char *unclipped_dst = NULL;
+	static int unclipped_len = 0;
+
+	dst = snap->data;
+
+	if (xform24to32 && bpp == 32) {
+		pixelsize = 3;
+	}
+	sz = dpy_x * dpy_y * pixelsize;
+
+	if (wdpy_x > dpy_x || wdpy_y > dpy_y) {
+		sz = wdpy_x * wdpy_y * pixelsize;
+		if (sz > unclipped_len || unclipped_dst == NULL) {
+			if (unclipped_dst) {
+				free(unclipped_dst);
+			}
+			unclipped_dst = (char *) malloc(sz+4);
+			unclipped_len = sz;
+		}
+		dst = unclipped_dst;
+	}
+		
+	if (! raw_fb_seek) {
+		memcpy(dst, raw_fb_addr + raw_fb_offset, sz);
+
+	} else {
+		int len = sz, del = 0;
+		off_t off = (off_t) raw_fb_offset;
+
+		lseek(raw_fb_fd, off, SEEK_SET);
+		while (len > 0) {
+			n = read(raw_fb_fd, dst + del, len);
+			if (n > 0) {
+				del += n;
+				len -= n;
+			} else if (n == 0) {
+				break;
+			} else if (errno != EINTR && errno != EAGAIN) {
+				break;
+			}
+		}
+	}
+
+	if (dst == unclipped_dst) {
+		char *src;
+		int h;
+		int x = off_x + coff_x;
+		int y = off_y + coff_y;
+
+		src = unclipped_dst + y * wdpy_x * pixelsize +
+		    x * pixelsize;
+		dst = snap->data;
+
+		for (h = 0; h < dpy_y; h++) {
+			memcpy(dst, src, dpy_x * pixelsize);
+			src += wdpy_x * pixelsize;
+			dst += dpy_x * pixelsize;
+		}
+	}
+}
+
+int copy_snap(void) {
+	int db = 1, pixelsize = bpp/8;
 	char *fbp;
 	int i, y, block_size;
 	double dt;
-	static int first = 1;
+	static int first = 1, snapcnt = 0;
 
+	if (raw_fb_str) {
+		int read_all_at_once = 1;
+		double start = dnow();
+		if (rawfb_reset < 0) {
+			if (getenv("SNAPFB_RAWFB_RESET")) {
+				rawfb_reset = 1;
+			} else {
+				rawfb_reset = 0;
+			}
+		}
+		if (snap_fb == NULL || snap == NULL) {
+			rfbLog("copy_snap: rawfb mode and null snap fb\n"); 
+			clean_up_exit(1);
+		}
+		if (rawfb_reset) {
+			initialize_raw_fb(1);
+		}
+		if (read_all_at_once) {
+			snap_all_rawfb();
+		} else {
+			/* this goes line by line, XXX not working for video */
+			copy_raw_fb(snap, 0, 0, dpy_x, dpy_y);
+		}
+if (db && snapcnt++ < 5) rfbLog("rawfb copy_snap took: %.5f secs\n", dnow() - start);
+
+		return 0;
+	}
+	
 	if (! fs_factor) {
 		return 0;
 	}
@@ -2004,6 +2117,7 @@ int copy_snap(void) {
 	}
 	fbp = snap_fb;
 	y = 0;
+
 
 	dtime0(&dt);
 	X_LOCK;

@@ -240,7 +240,7 @@ static void initialize_xinerama (void) {
 	char *bstr, *tstr;
 	int ev, er, i, n, rcnt;
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	if (! XineramaQueryExtension(dpy, &ev, &er)) {
 		rfbLog("Xinerama: disabling: display does not support it.\n");

@@ -19,7 +19,12 @@
 #include "unixpw.h"
 #include "sslcmds.h"
 #include "sslhelper.h"
+#include "v4l.h"
+#include "linuxfb.h"
 
+void set_greyscale_colormap(void);
+void set_hi240_colormap(void);
+void unset_colormap(void);
 void set_colormap(int reset);
 void set_nofb_params(int restore);
 void set_raw_fb_params(int restore);
@@ -41,12 +46,14 @@ static void nofb_hook(rfbClientPtr cl);
 static void remove_fake_fb(void);
 static void install_fake_fb(int w, int h, int bpp);
 static void initialize_snap_fb(void);
-static XImage *initialize_raw_fb(void);
+XImage *initialize_raw_fb(int);
 static void initialize_clipshift(void);
 static int wait_until_mapped(Window win);
 static void announce(int lport, int ssl, char *iface);
 static void setup_scaling(int *width_in, int *height_in);
 
+int rawfb_reset = -1;
+int rawfb_dev_video = 0;
 
 /*
  * X11 and rfb display/screen related routines
@@ -57,22 +64,96 @@ static void setup_scaling(int *width_in, int *height_in);
  * the clients and dynamically if -flashcmap is specified.
  */
 #define NCOLOR 256
+
+void set_greyscale_colormap(void) {
+	int i;
+	if (! screen) {
+		return;
+	}
+	if (screen->colourMap.data.shorts) {
+		free(screen->colourMap.data.shorts);
+		screen->colourMap.data.shorts = NULL;
+	}
+
+if (0) fprintf(stderr, "set_greyscale_colormap: %s\n", raw_fb_pixfmt);
+	screen->colourMap.count = NCOLOR;
+	screen->serverFormat.trueColour = FALSE;
+	screen->colourMap.is16 = TRUE;
+	screen->colourMap.data.shorts = (unsigned short *)
+		malloc(3*sizeof(unsigned short) * NCOLOR);
+
+	for(i = 0; i < NCOLOR; i++) {
+		unsigned short lvl = i * 256;
+
+		screen->colourMap.data.shorts[i*3+0] = lvl;
+		screen->colourMap.data.shorts[i*3+1] = lvl;
+		screen->colourMap.data.shorts[i*3+2] = lvl;
+	}
+
+	rfbSetClientColourMaps(screen, 0, NCOLOR);
+}
+
+/* this is specific to bttv rf tuner card */
+void set_hi240_colormap(void) {
+	int i;
+	if (! screen) {
+		return;
+	}
+if (0) fprintf(stderr, "set_hi240_colormap: %s\n", raw_fb_pixfmt);
+	if (screen->colourMap.data.shorts) {
+		free(screen->colourMap.data.shorts);
+		screen->colourMap.data.shorts = NULL;
+	}
+
+	screen->colourMap.count = 256;
+	screen->serverFormat.trueColour = FALSE;
+	screen->colourMap.is16 = TRUE;
+	screen->colourMap.data.shorts = (unsigned short *)
+		calloc(3*sizeof(unsigned short) * 256, 1);
+
+	for(i = 0; i < 225; i++) {
+		int r, g, b;
+
+		r = ( (i/5) % 5 ) * 255.0 / 4 + 0.5;
+		g = ( (i/25)    ) * 255.0 / 8 + 0.5;
+		b = ( i % 5     ) * 255.0 / 4 + 0.5;
+
+		screen->colourMap.data.shorts[(i+16)*3+0] = (unsigned short) (r * 256);
+		screen->colourMap.data.shorts[(i+16)*3+1] = (unsigned short) (g * 256);
+		screen->colourMap.data.shorts[(i+16)*3+2] = (unsigned short) (b * 256);
+	}
+
+	rfbSetClientColourMaps(screen, 0, 256);
+}
+void unset_colormap(void) {
+	if (! screen) {
+		return;
+	}
+	if (screen->colourMap.data.shorts) {
+		free(screen->colourMap.data.shorts);
+		screen->colourMap.data.shorts = NULL;
+	}
+	screen->serverFormat.trueColour = TRUE;
+if (0) fprintf(stderr, "unset_colormap: %s\n", raw_fb_pixfmt);
+}
+
 void set_colormap(int reset) {
-	static int first = 1;
+	static int init = 1;
 	static XColor color[NCOLOR], prev[NCOLOR];
 	Colormap cmap;
 	Visual *vis;
 	int i, ncells, diffs = 0;
 
 	if (reset) {
-		first = 1;
+		init = 1;
 		if (screen->colourMap.data.shorts) {
 			free(screen->colourMap.data.shorts);
 			screen->colourMap.data.shorts = NULL;
 		}
 	}
+if (0) fprintf(stderr, "unset_colormap: %d\n", reset);
 
-	if (first) {
+	if (init) {
 		screen->colourMap.count = NCOLOR;
 		screen->serverFormat.trueColour = FALSE;
 		screen->colourMap.is16 = TRUE;
@@ -85,6 +166,8 @@ void set_colormap(int reset) {
 		prev[i].green = color[i].green;
 		prev[i].blue  = color[i].blue;
 	}
+
+	RAWFB_RET_VOID
 
 	X_LOCK;
 
@@ -103,7 +186,7 @@ void set_colormap(int reset) {
 	}
 
 	if (ncells != NCOLOR) {
-		if (first && ! quiet) {
+		if (init && ! quiet) {
 			rfbLog("set_colormap: number of cells is %d "
 			    "instead of %d.\n", ncells, NCOLOR);
 		}
@@ -112,7 +195,7 @@ void set_colormap(int reset) {
 		}
 	}
 
-	if (flash_cmap && ! first) {
+	if (flash_cmap && ! init) {
 		XWindowAttributes attr;
 		Window c;
 		int tries = 0;
@@ -178,7 +261,7 @@ void set_colormap(int reset) {
 		}
 	}
 
-	if (diffs && ! first) {
+	if (diffs && ! init) {
 		if (! all_clients_initialized()) {
 			rfbLog("set_colormap: warning: sending cmap "
 			    "with uninitialized clients.\n");
@@ -190,7 +273,7 @@ void set_colormap(int reset) {
 		}
 	}
 
-	first = 0;
+	init = 0;
 }
 
 static void debug_colormap(XImage *fb) {
@@ -248,10 +331,13 @@ static void debug_colormap(XImage *fb) {
  * visual_id and possibly visual_depth are set.
  */
 static void set_visual(char *str) {
-	int vis, vdepth, defdepth = DefaultDepth(dpy, scr);
+	int vis, vdepth, defdepth;
 	XVisualInfo vinfo;
 	char *p, *vstring = strdup(str);
 
+	RAWFB_RET_VOID
+
+	defdepth = DefaultDepth(dpy, scr);
 	visual_id = (VisualID) 0;
 	visual_depth = 0;
 
@@ -410,7 +496,7 @@ static char *raw_fb_orig_dpy = NULL;
 void set_raw_fb_params(int restore) {
 	static int first = 1;
 	static int vo0, us0, sm0, ws0, wp0, wc0, wb0, na0, tn0;  
-	static int xr0, sb0;
+	static int xr0, sb0, re0;
 	static char *mc0;
 
 	/*
@@ -432,6 +518,7 @@ void set_raw_fb_params(int restore) {
 		sm0 = using_shm;
 		tn0 = take_naps;
 		xr0 = xrandr;
+		re0 = noxrecord;
 		mc0 = multiple_cursors_mode;
 
 		first = 0;
@@ -450,6 +537,7 @@ void set_raw_fb_params(int restore) {
 		using_shm = sm0;
 		take_naps = tn0;
 		xrandr = xr0;
+		noxrecord = re0;
 		multiple_cursors_mode = mc0;
 
 		if (! dpy && raw_fb_orig_dpy) {
@@ -484,55 +572,59 @@ void set_raw_fb_params(int restore) {
 	} else {
 		/* Normal case: */
 		if (! view_only) {
-			if (! quiet) rfbLog("rawfb: setting view_only\n");
+			if (! quiet) rfbLog("  rawfb: setting view_only\n");
 			view_only = 1;
 		}
 		if (watch_selection) {
-			if (! quiet) rfbLog("rawfb: turning off "
+			if (! quiet) rfbLog("  rawfb: turning off "
 			    "watch_selection\n");
 			watch_selection = 0;
 		}
 		if (watch_primary) {
-			if (! quiet) rfbLog("rawfb: turning off "
+			if (! quiet) rfbLog("  rawfb: turning off "
 			    "watch_primary\n");
 			watch_primary = 0;
 		}
 		if (watch_clipboard) {
-			if (! quiet) rfbLog("rawfb: turning off "
+			if (! quiet) rfbLog("  rawfb: turning off "
 			    "watch_clipboard\n");
 			watch_clipboard = 0;
 		}
 		if (watch_bell) {
-			if (! quiet) rfbLog("rawfb: turning off watch_bell\n");
+			if (! quiet) rfbLog("  rawfb: turning off watch_bell\n");
 			watch_bell = 0;
 		}
 		if (no_autorepeat) {
-			if (! quiet) rfbLog("rawfb: turning off "
+			if (! quiet) rfbLog("  rawfb: turning off "
 			    "no_autorepeat\n");
 			no_autorepeat = 0;
 		}
 		if (use_solid_bg) {
-			if (! quiet) rfbLog("rawfb: turning off "
+			if (! quiet) rfbLog("  rawfb: turning off "
 			    "use_solid_bg\n");
 			use_solid_bg = 0;
 		}
 		multiple_cursors_mode = strdup("arrow");
 	}
-	if (use_snapfb) {
-		if (! quiet) rfbLog("rawfb: turning off use_snapfb\n");
+	if (0 && use_snapfb) {
+		if (! quiet) rfbLog("  rawfb: turning off use_snapfb\n");
 		use_snapfb = 0;
 	}
 	if (using_shm) {
-		if (! quiet) rfbLog("rawfb: turning off using_shm\n");
+		if (! quiet) rfbLog("  rawfb: turning off using_shm\n");
 		using_shm = 0;
 	}
 	if (take_naps) {
-		if (! quiet) rfbLog("rawfb: turning off take_naps\n");
+		if (! quiet) rfbLog("  rawfb: turning off take_naps\n");
 		take_naps = 0;
 	}
 	if (xrandr) {
-		if (! quiet) rfbLog("rawfb: turning off xrandr\n");
+		if (! quiet) rfbLog("  rawfb: turning off xrandr\n");
 		xrandr = 0;
+	}
+	if (! noxrecord) {
+		if (! quiet) rfbLog("  rawfb: turning off xrecord\n");
+		noxrecord = 1;
 	}
 }
 
@@ -545,8 +637,10 @@ void set_raw_fb_params(int restore) {
  */
 static void nofb_hook(rfbClientPtr cl) {
 	XImage *fb;
+
 	rfbLog("framebuffer requested in -nofb mode by client %s\n", cl->host);
 	/* ignore xrandr */
+	RAWFB_RET_VOID
 	fb = XGetImage_wr(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
 	main_fb = fb->data;
 	rfb_fb = main_fb;
@@ -669,6 +763,7 @@ void install_padded_fb(char *geom) {
 }
 
 static void initialize_snap_fb(void) {
+	RAWFB_RET_VOID
 	if (snap_fb) {
 		free(snap_fb);
 	}
@@ -677,12 +772,63 @@ static void initialize_snap_fb(void) {
 	snap_fb = snap->data;
 }
 
-static XImage *initialize_raw_fb(void) {
+#define RAWFB_MMAP 1
+#define RAWFB_FILE 2
+#define RAWFB_SHM  3
+
+XImage *initialize_raw_fb(int reset) {
 	char *str, *q;
 	int w, h, b, shmid = 0;
-	unsigned long rm = 0, gm = 0, bm = 0;
+	unsigned long rm = 0, gm = 0, bm = 0, tm;
 	static XImage ximage_struct;	/* n.b.: not (XImage *) */
-	int closedpy = 1, i, m;
+	static XImage ximage_struct_snap;
+	int closedpy = 1, i, m, db = 0;
+
+	static char *last_file = NULL;
+	static int last_mode = 0;
+
+	if (reset && last_mode) {
+		int fd;
+		if (last_mode != RAWFB_MMAP && last_mode != RAWFB_FILE) {
+			return NULL;
+		}
+		if (last_mode == RAWFB_MMAP) {
+			munmap(raw_fb_addr, raw_fb_mmap);
+		}
+		if (raw_fb_fd >= 0) {
+			close(raw_fb_fd);
+		}
+		raw_fb_fd = -1;
+if (db) fprintf(stderr, "initialize_raw_fb reset\n");
+			
+		fd = -1;
+		if (rawfb_dev_video) {
+			fd = open(last_file, O_RDWR);
+		}
+		if (fd < 0) {
+			fd = open(last_file, O_RDONLY);
+		}
+		if (fd < 0) {
+			rfbLogEnable(1);
+			rfbLog("failed to rawfb file: %s\n", last_file);
+			rfbLogPerror("open");
+			clean_up_exit(1);
+		}
+		raw_fb_fd = fd;
+		if (last_mode == RAWFB_MMAP) {
+			raw_fb_addr = mmap(0, raw_fb_mmap, PROT_READ,
+			    MAP_SHARED, fd, 0);
+
+			if (raw_fb_addr == MAP_FAILED || raw_fb_addr == NULL) {
+				rfbLogEnable(1);
+				rfbLog("failed to mmap file: %s\n", last_file);
+				rfbLog("   raw_fb_addr: %p\n", raw_fb_addr);
+				rfbLogPerror("mmap");
+				clean_up_exit(1);
+			}
+		}
+		return NULL;
+	}
 	
 	if (raw_fb_addr || raw_fb_seek) {
 		if (raw_fb_shm) {
@@ -693,13 +839,17 @@ static XImage *initialize_raw_fb(void) {
 			if (raw_fb_fd >= 0) {
 				close(raw_fb_fd);
 			}
+			raw_fb_fd = -1;
 #endif
 		} else if (raw_fb_seek) {
 			if (raw_fb_fd >= 0) {
 				close(raw_fb_fd);
 			}
+			raw_fb_fd = -1;
 		}
 		raw_fb_addr = NULL;
+		raw_fb_mmap = 0;
+		raw_fb_seek = 0;
 	}
 	if (! raw_fb_str) {
 		return NULL;
@@ -750,22 +900,48 @@ static XImage *initialize_raw_fb(void) {
 	} else {
 		str = strdup(raw_fb_str);
 	}
+	if (str[0] == '+') {
+		char *t = strdup(str+1);
+		free(str);
+		str = t;
+		closedpy = 0;
+		if (! window) {
+			window = rootwin;
+		}
+	}
 
-	/*
-	 * uppercase means do not close the display (e.g. for remote control)
-	 */
-	if (strstr(str, "SHM:") == str) {
-		closedpy = 0;
-		str[0] = 's'; str[1] = 'h'; str[2] = 'm';
-	} else if (strstr(str, "MAP:") == str) {
-		closedpy = 0;
-		str[0] = 'm'; str[1] = 'a'; str[2] = 'p';
-	} else if (strstr(str, "MMAP:") == str) {
-		closedpy = 0;
-		str[0] = 'm'; str[1] = 'm'; str[2] = 'a'; str[3] = 'p';
-	} else if (strstr(str, "FILE:") == str) {
-		str[0] = 'f'; str[1] = 'i'; str[2] = 'l'; str[3] = 'e';
-		closedpy = 0;
+	raw_fb_shm = 0;
+	raw_fb_mmap = 0;
+	raw_fb_seek = 0;
+	raw_fb_fd = -1;
+	raw_fb_addr = NULL;
+	raw_fb_offset = 0;
+
+	last_mode = 0;
+	if (last_file) {
+		free(last_file);
+		last_file = NULL;
+	}
+
+	if (strstr(str, "video") == str || strstr(str, "/dev/video") == str) {
+		char *str2 = v4l_guess(str, &raw_fb_fd);
+		if (str2 == NULL) {
+			rfbLog("v4l_guess failed for: %s\n", str);
+			clean_up_exit(1);
+		}
+		str = str2;
+		rfbLog("v4l_guess returned: %s\n", str);
+		rawfb_dev_video = 1;
+	} else if (strstr(str, "dev/video")) {
+		rawfb_dev_video = 1;
+	} else if (strstr(str, "cons") == str || strstr(str, "/dev/fb") == str) {
+		char *str2 = console_guess(str, &raw_fb_fd);
+		if (str2 == NULL) {
+			rfbLog("console_guess failed for: %s\n", str);
+			clean_up_exit(1);
+		}
+		str = str2;
+		rfbLog("console_guess returned: %s\n", str);
 	}
 
 	if (closedpy && !view_only && got_noviewonly) {
@@ -799,7 +975,6 @@ static XImage *initialize_raw_fb(void) {
 	 * -rawfb file:/path/to/file@640x480x32:ff/ff00/ff0000
 	 */
 
-	raw_fb_offset = 0;
 
 	/* +O offset */
 	if ((q = strrchr(str, '+')) != NULL) {
@@ -836,6 +1011,34 @@ static XImage *initialize_raw_fb(void) {
 	}
 	*q = '\0';
 
+	dpy_x = wdpy_x = w;
+	dpy_y = wdpy_y = h;
+	off_x = 0;
+	off_y = 0;
+
+	if (rawfb_dev_video) {
+		if (b == 24) {
+			rfbLog("enabling -24to32 for 24bpp video\n");
+			xform24to32 = 1;
+		} else {
+			if (xform24to32) {
+				rfbLog("disabling -24to32 for 24bpp video\n");
+			}
+			xform24to32 = 0;
+		}
+	}
+
+	if (xform24to32) {
+		if (b != 24) {
+			rfbLog("warning: -24to32 mode and bpp=%d\n", b);
+		}
+		b = 32;
+	}
+	if (strstr(str, "snap:") == str) {
+		use_snapfb = 1;
+		str[0] = 'f'; str[1] = 'i'; str[2] = 'l'; str[3] = 'e';
+	}
+
 	if (strstr(str, "shm:") != str && strstr(str, "mmap:") != str &&
 	    strstr(str, "map:") != str && strstr(str, "file:") != str) {
 		/* hmmm, not following directions, see if map: applies */
@@ -854,17 +1057,6 @@ static XImage *initialize_raw_fb(void) {
 		}
 	}
 
-	dpy_x = wdpy_x = w;
-	dpy_y = wdpy_y = h;
-	off_x = 0;
-	off_y = 0;
-
-	raw_fb_shm = 0;
-	raw_fb_mmap = 0;
-	raw_fb_seek = 0;
-	raw_fb_fd = -1;
-	raw_fb_addr = NULL;
-
 	if (sscanf(str, "shm:%d", &shmid) == 1) {
 		/* shm:N */
 #if LIBVNCSERVER_HAVE_XSHM
@@ -878,6 +1070,7 @@ static XImage *initialize_raw_fb(void) {
 		raw_fb_shm = 1;
 		rfbLog("rawfb: shm: %d W: %d H: %d B: %d addr: %p\n",
 		    shmid, w, h, b, raw_fb_addr);
+		last_mode = RAWFB_SHM;
 #else
 		rfbLogEnable(1);
 		rfbLog("x11vnc was compiled without shm support.\n");
@@ -896,7 +1089,15 @@ static XImage *initialize_raw_fb(void) {
 		q = strchr(str, ':');
 		q++;
 
-		fd = open(q, O_RDONLY);
+		last_file = strdup(q);
+
+		fd = raw_fb_fd;
+		if (fd < 0 && rawfb_dev_video) {
+			fd = open(q, O_RDWR);
+		}
+		if (fd < 0) {
+			fd = open(q, O_RDONLY);
+		}
 		if (fd < 0) {
 			rfbLogEnable(1);
 			rfbLog("failed to open file: %s, %s\n", q, str);
@@ -905,7 +1106,11 @@ static XImage *initialize_raw_fb(void) {
 		}
 		raw_fb_fd = fd;
 
-		size = w*h*b/8 + raw_fb_offset;
+		if (xform24to32) {
+			size = w*h*24/8 + raw_fb_offset;
+		} else {
+			size = w*h*b/8 + raw_fb_offset;
+		}
 		if (fstat(fd, &sbuf) == 0) {
 			if (S_ISREG(sbuf.st_mode)) {
 				if (0) size = sbuf.st_size;
@@ -931,13 +1136,16 @@ static XImage *initialize_raw_fb(void) {
 			rfbLog("rawfb: mmap file: %s\n", q);
 			rfbLog("   w: %d h: %d b: %d addr: %p sz: %d\n", w, h,
 			    b, raw_fb_addr, size);
+			last_mode = RAWFB_MMAP;
 #else
 			rfbLog("mmap(2) not supported on system, using"
 			    " slower lseek(2)\n");
 			raw_fb_seek = size;
+			last_mode = RAWFB_FILE;
 #endif
 		} else {
 			raw_fb_seek = size;
+			last_mode = RAWFB_FILE;
 
 			rfbLog("rawfb: seek file: %s\n", q);
 			rfbLog("   W: %d H: %d B: %d sz: %d\n", w, h, b, size);
@@ -962,6 +1170,24 @@ static XImage *initialize_raw_fb(void) {
 	raw_fb_image->bits_per_pixel = b;
 	raw_fb_image->bytes_per_line = dpy_x*b/8;
 
+	if (use_snapfb && (raw_fb_seek || raw_fb_mmap)) {
+		int b_use = b;
+		if (snap_fb) {
+			free(snap_fb);
+		}
+		if (b_use == 32 && xform24to32) {
+			b_use = 24;
+		}
+		snap_fb = (char *) malloc(dpy_x * dpy_y * b_use/8);
+		snap = &ximage_struct_snap;
+		snap->data = snap_fb;
+		snap->format = ZPixmap;
+		snap->width  = dpy_x;
+		snap->height = dpy_y;
+		snap->bits_per_pixel = b_use;
+		snap->bytes_per_line = dpy_x*b_use/8;
+	}
+
 	if (rm == 0 && gm == 0 && bm == 0) {
 		/* guess masks... */
 		if (b == 24 || b == 32) {
@@ -978,6 +1204,26 @@ static XImage *initialize_raw_fb(void) {
 			bm = 0xc0;
 		}
 	}
+	/* we can fake -flipbyteorder to some degree... */
+	if (flip_byte_order) {
+		if (b == 24 || b == 32) {
+			tm = rm;
+			rm = bm;
+			bm = tm;
+		} else if (b == 16) {
+			unsigned short s1, s2;
+			s1 = (unsigned short) rm;
+			s2 = ((0xff & s1) << 8) | ((0xff00 & s1) >> 8);
+			rm = (unsigned long) s2;
+			s1 = (unsigned short) gm;
+			s2 = ((0xff & s1) << 8) | ((0xff00 & s1) >> 8);
+			gm = (unsigned long) s2;
+			s1 = (unsigned short) bm;
+			s2 = ((0xff & s1) << 8) | ((0xff00 & s1) >> 8);
+			bm = (unsigned long) s2;
+		}
+	}
+
 
 	raw_fb_image->red_mask = rm;
 	raw_fb_image->green_mask = gm;
@@ -1003,15 +1249,30 @@ static XImage *initialize_raw_fb(void) {
 
 	depth = raw_fb_image->depth;
 
+	if (raw_fb_image->depth == 15) {
+		/* unresolved bug with RGB555... */
+		depth++;
+	}
+
 	if (clipshift) {
 		memset(raw_fb, 0xff, dpy_x * dpy_y * b/8);
-	} else if (raw_fb_addr) {
+	} else if (raw_fb_addr && ! xform24to32) {
 		memcpy(raw_fb, raw_fb_addr + raw_fb_offset, dpy_x*dpy_y*b/8);
 	} else {
 		memset(raw_fb, 0xff, dpy_x * dpy_y * b/8);
 	}
 
-	rfbLog("rawfb:  raw_fb %p\n", raw_fb);
+	rfbLog("\n");
+	rfbLog("rawfb:  raw_fb  %p\n", raw_fb);
+	rfbLog("        format  %d\n", raw_fb_image->format);
+	rfbLog("        width   %d\n", raw_fb_image->width);
+	rfbLog("        height  %d\n", raw_fb_image->height);
+	rfbLog("        bpp     %d\n", raw_fb_image->bits_per_pixel);
+	rfbLog("        depth   %d\n", raw_fb_image->depth);
+	rfbLog("        bpl     %d\n", raw_fb_image->bytes_per_line);
+	if (use_snapfb && snap_fb) {
+		rfbLog("        snap_fb %p\n", snap_fb);
+	}
 
 	free(str);
 
@@ -1073,7 +1334,7 @@ static int wait_until_mapped(Window win) {
 			usleep(ms * 1000);
 			continue;
 		}
-		if (! XGetWindowAttributes(dpy, win, &attr)) {
+		if (dpy && ! XGetWindowAttributes(dpy, win, &attr)) {
 			return 0;
 		}
 		if (attr.map_state == IsViewable) {
@@ -1095,7 +1356,7 @@ XImage *initialize_xdisplay_fb(void) {
 	int subwin_bs;
 
 	if (raw_fb_str) {
-		return initialize_raw_fb();
+		return initialize_raw_fb(0);
 	}
 
 	X_LOCK;
@@ -1137,12 +1398,24 @@ XImage *initialize_xdisplay_fb(void) {
 		vis_str = strdup(str);
 	}
 
+	if (xform24to32) {
+		if (DefaultDepth(dpy, scr) == 24) {
+			vis_str = strdup("TrueColor:32");
+			rfbLog("initialize_xdisplay_fb: vis_str set to: %s ",
+			    vis_str);
+			visual_id = (VisualID) 0;
+			visual_depth = 0;
+			set_visual_str_to_something = 1;
+		}
+	}
+
 	if (vis_str != NULL) {
 		set_visual(vis_str);
 		if (vis_str != visual_str) {
 			free(vis_str);
 		}
 	}
+if (0) fprintf(stderr, "vis_str %s\n", vis_str ? vis_str : "notset");
 
 	/* set up parameters for subwin or non-subwin cases: */
 
@@ -1183,6 +1456,8 @@ XImage *initialize_xdisplay_fb(void) {
 
 	/* initialize depth to reasonable value, visual_id may override */
 	depth = DefaultDepth(dpy, scr);
+
+if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_id);
 
 	if (visual_id) {
 		int n;
@@ -1272,7 +1547,7 @@ XImage *initialize_xdisplay_fb(void) {
 		}
 		XMapRaised(dpy, window);
 		XRaiseWindow(dpy, window);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 	}
 	try++;
 
@@ -1533,6 +1808,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	fb_Bpl   = (int) fb->bytes_per_line;
 	fb_depth = (int) fb->depth;
 
+	rfbLog("initialize_screen: fb_depth/fb_bpp/fb_Bpl %d/%d/%d\n", fb_depth,
+	    fb_depth, fb_Bpl);
+
 	main_bytes_per_line = fb->bytes_per_line;
 
 	if (cmap8to24) {
@@ -1675,7 +1953,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		have_masks = 2;
 		/* need to fetch TrueColor visual */
 		X_LOCK;
-		if (XMatchVisualInfo(dpy, scr, 24, TrueColor, &vinfo)) {
+		if (dpy && XMatchVisualInfo(dpy, scr, 24, TrueColor, &vinfo)) {
 			main_red_mask   = vinfo.red_mask;
 			main_green_mask = vinfo.green_mask;
 			main_blue_mask  = vinfo.blue_mask;
@@ -1689,6 +1967,19 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 			main_blue_mask  = 0x00ff0000;
 		}
 		X_UNLOCK;
+	}
+
+	if (raw_fb_str && raw_fb_pixfmt) {
+		char *fmt = strdup(raw_fb_pixfmt);
+		uppercase(fmt);
+		if (strstr(fmt, "GREY")) {
+			set_greyscale_colormap();
+		} else if (strstr(fmt, "HI240")) {
+			set_hi240_colormap();
+		} else {
+			unset_colormap();
+		}
+		free(fmt);
 	}
 
 	if (! have_masks && screen->serverFormat.bitsPerPixel == 8
@@ -1965,8 +2256,6 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	if (! got_deferupdate) {
 		screen->deferUpdateTime = defer_update;
 	}
-
-	rfbSetServerVersionIdentity(screen, "x11vnc: %s", lastmod);
 
 	rfbInitServer(screen);
 

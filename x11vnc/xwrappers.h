@@ -17,6 +17,8 @@ extern int clipshift;
 
 extern int guess_bits_per_color(int bits_per_pixel);
 
+extern int XFlush_wr(Display *disp);
+
 extern Status XShmGetImage_wr(Display *disp, Drawable d, XImage *image, int x, int y,
     unsigned long mask);
 extern XImage *XShmCreateImage_wr(Display* disp, Visual* vis, unsigned int depth,
@@ -38,6 +40,7 @@ extern XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth
     int format, int offset, char *data, unsigned int width,
     unsigned int height, int bitmap_pad, int bytes_per_line);
 extern void copy_image(XImage *dest, int x, int y, unsigned int w, unsigned int h);
+extern void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h);
 extern void init_track_keycode_state(void);
 
 extern void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,

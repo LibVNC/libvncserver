@@ -178,6 +178,7 @@ Screen
 	visual:
 	rawfb:
 	pipeinput:
+	24to32
 	=GAL LOFF
 
 Keyboard

@@ -11,6 +11,8 @@
 #include "cleanup.h"
 #include "allowed_input_t.h"
 #include "unixpw.h"
+#include "v4l.h"
+#include "linuxfb.h"
 
 void get_keystate(int *keystate);
 void clear_modifiers(int init);
@@ -54,6 +56,8 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client);
 void get_keystate(int *keystate) {
 	int i, k;
 	char keys[32];
+
+	RAWFB_RET_VOID
 	
 	/* n.b. caller decides to X_LOCK or not. */
 	XQueryKeymap(dpy, keys);
@@ -84,6 +88,8 @@ void clear_modifiers(int init) {
 	KeySym *keymap;
 	KeySym keysym;
 	KeyCode keycode;
+
+	RAWFB_RET_VOID
 
 	/* n.b. caller decides to X_LOCK or not. */
 	if (first) {
@@ -134,7 +140,7 @@ void clear_modifiers(int init) {
 		}
 		XTestFakeKeyEvent_wr(dpy, keycode, False, CurrentTime);
 	}
-	XFlush(dpy);
+	XFlush_wr(dpy);
 }
 
 static KeySym simple_mods[] = {
@@ -211,6 +217,8 @@ int track_mod_state(rfbKeySym keysym, rfbBool down, rfbBool set) {
  */
 void clear_keys(void) {
 	int k, keystate[256];
+
+	RAWFB_RET_VOID
 	
 	/* n.b. caller decides to X_LOCK or not. */
 	get_keystate(keystate);
@@ -221,7 +229,7 @@ void clear_keys(void) {
 			XTestFakeKeyEvent_wr(dpy, keycode, False, CurrentTime);
 		}
 	}
-	XFlush(dpy);
+	XFlush_wr(dpy);
 }
 		
 /*
@@ -238,6 +246,9 @@ static int save_auto_repeat = -1;
 
 int get_autorepeat_state(void) {
 	XKeyboardState kstate;
+
+	RAWFB_RET(0)
+
 	X_LOCK;
 	XGetKeyboardControl(dpy, &kstate);
 	X_UNLOCK;
@@ -255,7 +266,7 @@ void autorepeat(int restore, int bequiet) {
 	int global_auto_repeat;
 	XKeyboardControl kctrl;
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	if (restore) {
 		if (save_auto_repeat < 0) {
@@ -271,7 +282,7 @@ void autorepeat(int restore, int bequiet) {
 
 		kctrl.auto_repeat_mode = save_auto_repeat;
 		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		X_UNLOCK;
 
 		if (! bequiet && ! quiet) {
@@ -291,7 +302,7 @@ void autorepeat(int restore, int bequiet) {
 		X_LOCK;
 		kctrl.auto_repeat_mode = AutoRepeatModeOff;
 		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		X_UNLOCK;
 
 		if (! bequiet && ! quiet) {
@@ -352,7 +363,7 @@ int add_keysym(KeySym keysym) {
 		first = 0;
 	}
 
-	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
+	RAWFB_RET(0)
 
 	if (keysym == NoSymbol) {
 		return 0;
@@ -419,7 +430,7 @@ int add_keysym(KeySym keysym) {
 			}
 		}
 
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		added_keysyms[kc] = keysym;
 		ret = kc;
 		break;
@@ -434,7 +445,7 @@ static void delete_keycode(KeyCode kc, int bequiet) {
 	KeySym ksym, new[8];
 	char *str;
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
 	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
@@ -454,7 +465,7 @@ static void delete_keycode(KeyCode kc, int bequiet) {
 	}
 
 	XFree(keymap);
-	XFlush(dpy);
+	XFlush_wr(dpy);
 }
 
 static int count_added_keycodes(void) {
@@ -599,7 +610,7 @@ static void add_dead_keysyms(char *str) {
 				inmap = 1;
 			}
 #if LIBVNCSERVER_HAVE_XKEYBOARD
-			if (! inmap && xkb_present) {
+			if (! inmap && xkb_present && dpy) {
 				int kc, grp, lvl;
 				for (kc = 0; kc < 0x100; kc++) {
 				    for (grp = 0; grp < 4; grp++) {
@@ -753,6 +764,8 @@ int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
 	if (!sloppy_keys) {
 		return 0;
 	}
+
+	RAWFB_RET(0)
 	
 	if (!down && !keycode_state[key] && !IsModifierKey(keysym)) {
 		int i, cnt = 0, downkey = -1;
@@ -863,6 +876,7 @@ void switch_to_xkb_if_better(void) {
 		/* already using it */
 		return;
 	}
+	RAWFB_RET_VOID
 
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
 
@@ -1109,6 +1123,8 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
                   the modifier mask.   
  *
  */
+
+	RAWFB_RET_VOID
 
 	/* initialize all the arrays: */
 	for (kc = 0; kc < 0x100; kc++) {
@@ -1413,6 +1429,8 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	static KeySym Ks_last_down = NoSymbol;
 
 	if (client) {} /* unused vars warning: */
+
+	RAWFB_RET_VOID
 
 	X_LOCK;
 
@@ -2144,6 +2162,8 @@ void initialize_modtweak(void) {
 		keycodes[i] = NoSymbol;
 	}
 
+	RAWFB_RET_VOID
+
 	X_LOCK;
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
 
@@ -2230,6 +2250,8 @@ static void tweak_mod(signed char mod, rfbBool down) {
 	Bool dn = (Bool) down;
 	KeyCode altgr = altgr_code;
 
+	RAWFB_RET_VOID
+
 	if (mod < 0) {
 		if (debug_keyboard) {
 			rfbLog("tweak_mod: Skip:  down=%d index=%d\n", down,
@@ -2280,6 +2302,8 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
     rfbClientPtr client) {
 	KeyCode k;
 	int tweak = 0;
+
+	RAWFB_RET_VOID
 
 	if (use_xkb_modtweak) {
 		xkb_tweak_keyboard(down, keysym, client);
@@ -2344,7 +2368,7 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 
 void initialize_keyboard_and_pointer(void) {
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	if (use_modifier_tweak) {
 		initialize_modtweak();
@@ -2417,6 +2441,12 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	char *name;
 	ClientData *cd = (ClientData *) client->clientData;
 
+	if (pipeinput_int == PIPEINPUT_VID) {
+		v4l_key_command(down, keysym, client);
+	}
+	if (pipeinput_int == PIPEINPUT_CONS) {
+		console_key_command(down, keysym, client);
+	}
 	if (pipeinput_fh == NULL) {
 		return;
 	}
@@ -2698,7 +2728,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	skipped_last_down = 0;
 	last_rfb_key_accepted = TRUE;
 
-	if (pipeinput_fh != NULL) {
+	if (pipeinput_fh != NULL || pipeinput_int) {
 		pipe_keyboard(down, keysym, client);
 		if (! pipeinput_tee) {
 			if (! view_only || raw_fb) {	/* raw_fb hack */
@@ -2742,7 +2772,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	got_user_input++;
 	got_keyboard_input++;
 	
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	if (keyremaps) {
 		keyremap_t *remap = keyremaps;
@@ -2810,7 +2840,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		do_button_mask_change(mask, button);	/* down */
 		mask = 0;
 		do_button_mask_change(mask, button);	/* up */
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		X_UNLOCK;
 		return;
 	}
@@ -2818,7 +2848,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	if (use_modifier_tweak) {
 		modifier_tweak_keyboard(down, keysym, client);
 		X_LOCK;
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		X_UNLOCK;
 		return;
 	}
@@ -2842,7 +2872,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 	if ( k != NoSymbol ) {
 		XTestFakeKeyEvent_wr(dpy, k, (Bool) down, CurrentTime);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 	}
 
 	X_UNLOCK;

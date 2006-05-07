@@ -28,7 +28,7 @@ static void handle_xrandr_change(int new_x, int new_y);
 
 
 void initialize_xrandr(void) {
-	if (xrandr_present) {
+	if (xrandr_present && dpy) {
 #if LIBVNCSERVER_HAVE_LIBXRANDR
 		Rotation rot;
 
@@ -110,6 +110,8 @@ static void handle_xrandr_change(int new_x, int new_y) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
 
+	RAWFB_RET_VOID
+
 	/* sanity check xrandr_mode */
 	if (! xrandr_mode) {
 		xrandr_mode = strdup("default");
@@ -148,6 +150,9 @@ static void handle_xrandr_change(int new_x, int new_y) {
 
 int check_xrandr_event(char *msg) {
 	XEvent xev;
+
+	RAWFB_RET(0)
+
 	if (subwin) {
 		return handle_subwin_resize(msg);
 	}

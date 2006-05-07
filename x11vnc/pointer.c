@@ -11,6 +11,8 @@
 #include "connections.h"
 #include "cleanup.h"
 #include "unixpw.h"
+#include "v4l.h"
+#include "linuxfb.h"
 
 int pointer_queued_sent = 0;
 
@@ -25,7 +27,6 @@ static void buttonparse(int from, char **s);
 static void update_x11_pointer_position(int x, int y);
 static void update_x11_pointer_mask(int mask);
 static void pipe_pointer(int mask, int x, int y, rfbClientPtr client);
-
 
 /*
  * pointer event (motion and button click) handling routines.
@@ -116,7 +117,7 @@ static void buttonparse(int from, char **s) {
 					    "keysym: %s\n", t);
 					n--;
 				}
-			} else {
+			} else if (dpy) {
 				/*
 				 * XXX may not work with -modtweak or -xkb
 				 */
@@ -214,9 +215,13 @@ void initialize_pointer_map(char *pointer_remap) {
 	 * from -buttonmap option.
 	 */
 	
-	X_LOCK;
-	num_buttons = XGetPointerMapping(dpy, map, MAX_BUTTONS);
-	X_UNLOCK;
+	if (!raw_fb_str) {
+		X_LOCK;
+		num_buttons = XGetPointerMapping(dpy, map, MAX_BUTTONS);
+		X_UNLOCK;
+	} else {
+		num_buttons = 5;
+	}
 
 	if (num_buttons < 0) {
 		num_buttons = 0;
@@ -284,7 +289,7 @@ void initialize_pointer_map(char *pointer_remap) {
 static void update_x11_pointer_position(int x, int y) {
 	int rc;
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	X_LOCK;
 	if (use_xwarppointer) {
@@ -358,7 +363,7 @@ void do_button_mask_change(int mask, int button) {
 				/* do not send keysym on button up */
 				continue; 
 			}
-			if (debug_pointer) {
+			if (debug_pointer && dpy) {
 				rfbLog("pointer(): sending button %d "
 				    "down as keycode 0x%x (event %d)\n",
 				    i+1, key, k+1);
@@ -387,7 +392,7 @@ static void update_x11_pointer_mask(int mask) {
 
 	last_event = last_input = last_pointer_input = time(0);
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	if (mask != button_mask) {
 		last_pointer_click_time = dnow();
@@ -513,6 +518,12 @@ static void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
 	ClientData *cd = (ClientData *) client->clientData;
 	char hint[MAX_BUTTONS * 20];
 
+	if (pipeinput_int == PIPEINPUT_VID) {
+		v4l_pointer_command(mask, x, y, client);
+	}
+	if (pipeinput_int == PIPEINPUT_CONS) {
+		console_pointer_command(mask, x, y, client);
+	}
 	if (pipeinput_fh == NULL) {
 		return;
 	}
@@ -795,7 +806,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 					    "%.4f\n", dnow() - x11vnc_start);
 				}
 				X_LOCK;
-				XFlush(dpy);	
+				XFlush_wr(dpy);	
 				X_UNLOCK;
 			}
 		    }
@@ -828,13 +839,15 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		sent = 1;
 	}
 
-	if (nofb && sent) {
+	if (! dpy) {
+		;
+	} else if (nofb && sent) {
 		/* 
 		 * nofb is for, e.g. Win2VNC, where fastest pointer
 		 * updates are desired.
 		 */
 		X_LOCK;
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		X_UNLOCK;
 	} else if (buffer_it) {
 		if (debug_pointer) {
@@ -842,7 +855,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			    "%.4f\n", dnow() - x11vnc_start);
 		}
 		X_LOCK;
-		XFlush(dpy);	
+		XFlush_wr(dpy);	
 		X_UNLOCK;
 	}
 }
@@ -898,6 +911,33 @@ void initialize_pipeinput(void) {
 		p++;
 	} else {
 		p = pipeinput_str;
+	}
+if (0) fprintf(stderr, "initialize_pipeinput: %s -- %s\n", pipeinput_str, p);
+
+	if (!strcmp(p, "VID")) {
+		pipeinput_int = PIPEINPUT_VID;
+		return;
+	}
+	if (strstr(p, "CONS") == p) {
+		int tty = 0, n;
+		char dev[32];
+		if (sscanf(p, "CONS%d", &n) == 1) {
+			tty = n;
+		}
+		sprintf(dev, "/dev/tty%d", tty);
+		pipeinput_cons_fd = open(dev, O_WRONLY);
+		if (pipeinput_cons_fd >= 0) {
+			rfbLog("pipeinput: using linux console: %s\n", dev);
+			if (pipeinput_cons_dev) {
+				free(pipeinput_cons_dev);
+			}
+			pipeinput_cons_dev = strdup(dev);
+			pipeinput_int = PIPEINPUT_CONS;
+		} else {
+			rfbLog("pipeinput: could not open: %s\n", dev);
+			rfbLogPerror("open");
+		}
+		return;
 	}
 
 	set_child_info();

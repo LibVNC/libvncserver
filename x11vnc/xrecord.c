@@ -101,7 +101,7 @@ static void xrecord_grabserver(int start) {
 		}
 		XRecordDisableContext(gdpy_ctrl, rc_grab);
 		XRecordFreeContext(gdpy_ctrl, rc_grab);
-		XFlush(gdpy_ctrl);
+		XFlush_wr(gdpy_ctrl);
 		rc_grab = 0;
 		return;
 	}
@@ -135,7 +135,7 @@ static void xrecord_grabserver(int start) {
 		return;
 	}
 	XSetErrorHandler(old_handler);
-	XFlush(gdpy_data);
+	XFlush_wr(gdpy_data);
 #endif
 	if (debug_grabs) {
 		fprintf(stderr, "xrecord_grabserver-done: %.5f\n", dnowx());
@@ -153,6 +153,7 @@ void initialize_xrecord(void) {
 	if (noxrecord) {
 		return;
 	}
+	RAWFB_RET_VOID
 #if LIBVNCSERVER_HAVE_RECORD
 
 	if (rr_CA) XFree(rr_CA);
@@ -1307,7 +1308,7 @@ static void check_xrecord_grabserver(void) {
 	if (unixpw_in_progress) return;
 
 	dtime0(&d);
-	XFlush(gdpy_ctrl);
+	XFlush_wr(gdpy_ctrl);
 	for (i=0; i<max; i++) {
 		last_val = xserver_grabbed;
 		XRecordProcessReplies(gdpy_data);
@@ -1318,7 +1319,7 @@ static void check_xrecord_grabserver(void) {
 		}
 	}
 	if (cnt) {
-		XFlush(gdpy_ctrl);
+		XFlush_wr(gdpy_ctrl);
 	}
  if (debug_grabs && cnt > 0) {
 	d = dtime(&d);
@@ -1332,6 +1333,7 @@ static void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) 
 	int ret1, ret2;
 	int verb = (!bequiet && !quiet);
 
+	RAWFB_RET_VOID
 	if (0 || debug_scroll) {
 		rfbLog("shutdown_record_context(0x%lx, %d, %d)\n", rc,
 		    bequiet, reopen);
@@ -1346,7 +1348,7 @@ static void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) 
 	if (!ret2 && verb) {
 		rfbLog("XRecordFreeContext(0x%lx) failed.\n", rc);	
 	}
-	XFlush(rdpy_ctrl);
+	XFlush_wr(rdpy_ctrl);
 
 	if (reopen == 2 && ret1 && ret2) {
 		reopen = 0;	/* 2 means reopen only on failure  */
@@ -1607,7 +1609,7 @@ if (db > 1) fprintf(stderr, "=== disab-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scr
 				XRecordUnregisterClients(rdpy_ctrl, rc_scroll,
 				    &rcs_scroll, 1);
 				XRecordDisableContext(rdpy_ctrl, rc_scroll);
-				XFlush(rdpy_ctrl);
+				XFlush_wr(rdpy_ctrl);
 				XRecordProcessReplies(rdpy_data);
 
 				if (trapped_record_xerror) {
@@ -1633,7 +1635,7 @@ if (db > 1) fprintf(stderr, "=== disab-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scr
 
 		SCR_UNLOCK;
 		/*
-		 * XXX if we do a XFlush(rdpy_ctrl) here we get:
+		 * XXX if we do a XFlush_wr(rdpy_ctrl) here we get:
 		 *
 
 		X Error of failed request:  XRecordBadContext
@@ -1830,7 +1832,7 @@ if (db > 1) fprintf(stderr, "=-=   reg-scroll 0x%lx 0x%lx\n", rc_scroll, rcs_scr
 		}
 	}
 
-	XFlush(rdpy_ctrl);
+	XFlush_wr(rdpy_ctrl);
 
 if (db) fprintf(stderr, "rc_scroll: 0x%lx\n", rc_scroll);
 	if (trapped_record_xerror) {
@@ -1896,7 +1898,7 @@ if (db) fprintf(stderr, "rc_scroll: 0x%lx\n", rc_scroll);
 
 	/* XXX this may cause more problems than it solves... */
 	if (use_xrecord) {
-		XFlush(rdpy_data);
+		XFlush_wr(rdpy_data);
 	}
 
 	X_UNLOCK;

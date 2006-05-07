@@ -25,7 +25,7 @@ static void check_fbpm(void) {
 	CARD16 level;
 	BOOL enabled;
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	if (! init_fbpm) {
 		if (FBPMCapable(dpy)) {
@@ -83,7 +83,7 @@ static void check_fbpm(void) {
 		if (db) fprintf(stderr, "FBPMInfo failed.\n");
 	}
 #else
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 	if (! init_fbpm) {
 		rfbLog("X FBPM extension not supported.\n");
 		init_fbpm = 1;

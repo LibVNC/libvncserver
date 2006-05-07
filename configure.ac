@@ -60,6 +60,8 @@ AH_TEMPLATE(HAVE_RECORD, [RECORD extension build environment present])
 AH_TEMPLATE(HAVE_SOLARIS_XREADSCREEN, [Solaris XReadScreen available])
 AH_TEMPLATE(HAVE_IRIX_XREADDISPLAY, [IRIX XReadDisplay available])
 AH_TEMPLATE(HAVE_FBPM, [FBPM extension build environment present])
+AH_TEMPLATE(HAVE_LINUX_VIDEODEV_H, [video4linux build environment present])
+AH_TEMPLATE(HAVE_LINUX_FB_H, [linux fb device build environment present])
 
 AC_ARG_WITH(xkeyboard,
 [  --without-xkeyboard     disable xkeyboard extension support],,)
@@ -77,6 +79,10 @@ AC_ARG_WITH(xrecord,
 [  --without-xrecord       disable xrecord extension support],,)
 AC_ARG_WITH(fbpm,
 [  --without-fbpm          disable fbpm extension support],,)
+AC_ARG_WITH(v4l,
+[  --without-v4l           disable video4linux support],,)
+AC_ARG_WITH(fbdev,
+[  --without-fbdev         disable linux fb device support],,)
 
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 	AC_CHECK_LIB(X11, XGetImage, HAVE_X="true",
@@ -223,6 +229,15 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			fi
 		fi
 
+		if test "x$with_v4l" != "xno"; then
+			AC_CHECK_HEADER(linux/videodev.h,
+				[AC_DEFINE(HAVE_LINUX_VIDEODEV_H)],,)
+		fi
+		if test "x$with_fbdev" != "xno"; then
+			AC_CHECK_HEADER(linux/fb.h,
+				[AC_DEFINE(HAVE_LINUX_FB_H)],,)
+		fi
+
 		X_LIBS="$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS"
 	fi
 fi
@@ -237,7 +252,8 @@ Make sure any required X development packages are installed.  If they are
 installed in non-standard locations, one can use the --x-includes=DIR
 and --x-libraries=DIR configure options or set the CPPFLAGS and LDFLAGS
 environment variables to indicate where the X window system header files
-and libraries may be found.
+and libraries may be found.  On 64+32 bit machines you may need to point
+to lib64 or lib32 directories to pick up the correct word size.
 ==========================================================================
 ])
 fi

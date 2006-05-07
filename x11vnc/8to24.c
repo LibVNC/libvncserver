@@ -70,6 +70,8 @@ static void set_root_cmap(void) {
 	static XColor color[NCOLOR];
 	int redo = 0;
 
+	RAWFB_RET_VOID
+
 	if (now > last_set + 10) {
 		redo = 1;
 	}
@@ -133,6 +135,8 @@ static int check_pointer_in_depth24(void) {
 	double now = dnow();
 
 	c = window;
+
+	RAWFB_RET(0)
 
 	if (now > last_keyboard_time + 1.0 && now > last_pointer_time + 1.0) {
 		return 0;
@@ -250,6 +254,8 @@ void check_for_multivis(void) {
 	static double last_query = 0.0;
 	double now = dnow();
 	double delay;
+
+	RAWFB_RET_VOID
 
 	if (now > last_parse + 1.0) {
 		last_parse = now;
@@ -743,6 +749,7 @@ if (db24 > 1) fprintf(stderr, "          ------------ 0x%lx i=%d\n", windows_8bp
 }
 
 static XImage *p_xi(XImage *xi, Visual *visual, int win_depth, int *w) {
+	RAWFB_RET(NULL)
 	if (xi == NULL || *w < dpy_x) {
 		char *d;
 		if (xi) {
@@ -781,6 +788,8 @@ static int poll_line(int x1, int x2, int y1, int n, sraRegionPtr mod) {
 	sraRegionPtr rect;
 	int mx1, mx2, my1, my2;
 	int ns = NSCAN/2;
+
+	RAWFB_RET(1)
 
 	if (win == None) {
 		return 1;
@@ -1269,6 +1278,8 @@ static int get_cmap(int j, Colormap cmap) {
 	int i, ncells;
 	XErrorHandler old_handler = NULL;
 
+	RAWFB_RET(0)
+
 	if (0) {
 		/* not working properly for depth 24... */
 		X_LOCK;
@@ -1401,7 +1412,7 @@ static XImage *cmap_xi(XImage *xi, Window win, int win_depth) {
 	if (xi) {
 		XDestroyImage(xi);
 	}
-	if (! valid_window(win, &attr, 1)) {
+	if (! dpy || ! valid_window(win, &attr, 1)) {
 		return (XImage *) NULL;
 	}
 	if (attr.depth != win_depth) {
@@ -1433,6 +1444,8 @@ static void transform_rect(sraRect rect, Window win, int win_depth, int cm) {
 	XErrorHandler old_handler = NULL;
 
 if (db24 > 1) fprintf(stderr, "transform %4d %4d %4d %4d cm: %d\n", rect.x1, rect.y1, rect.x2, rect.y2, cm);
+
+	RAWFB_RET_VOID
 
 	/* now transform the pixels in this rectangle: */
 	n_off = main_bytes_per_line * rect.y1 + pixelsize * rect.x1;
@@ -1652,6 +1665,8 @@ void bpp8to24(int x1, int y1, int x2, int y2) {
 	static double last_snapshot = 0.0;
 	double now;
 	double dt, d0 = 0.0, t2;
+
+	RAWFB_RET_VOID
 
 	if (! cmap8to24 || ! cmap8to24_fb) {
 		/* hmmm, why were we called? */
@@ -1876,6 +1891,8 @@ if (db24 > 2) {for(i=0; i<256;i++) {fprintf(stderr, " cmap histo[%03d] %d\n", i,
 void mark_8bpp(int mode) {
 	int i, cnt = 0;
 	Window top = None;
+
+	RAWFB_RET_VOID
 
 	if (! cmap8to24 || !cmap8to24_fb) {
 		return;

@@ -96,6 +96,8 @@ int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
 	int rootx, rooty, wx, wy;
 	unsigned int mask;
 
+	RAWFB_RET(0)
+
 	ret = XQueryPointer(dpy, rootwin, &r, &c, &rootx, &rooty, &wx, &wy,
 	    &mask);
 
@@ -2140,6 +2142,9 @@ static int check_xrecord_keys(void) {
 	double set_repeat_in;
 	static double set_repeat = 0.0;
 
+
+	RAWFB_RET(0)
+
 	set_repeat_in = set_repeat;
 	set_repeat = 0.0;
 
@@ -2222,7 +2227,7 @@ if (db) fprintf(stderr, "check_xrecord_keys: BEGIN LOOP: scr_ev_cnt: "
 
 		X_LOCK;
 		flush1 = 1;
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		X_UNLOCK;
 
 		if (set_repeat_in > 0.0) {
@@ -2253,7 +2258,7 @@ if (0 || db) fprintf(stderr, "check_xrecord: more keys: %.3f  0x%x "
     " %.4f  %s  %s\n", spin, last_rfb_keysym, last_rfb_keytime - x11vnc_start,
     last_rfb_down ? "down":"up  ", last_rfb_key_accepted ? "accept":"skip");
 			flush2 = 1;
-			XFlush(dpy);
+			XFlush_wr(dpy);
 		}
 #if LIBVNCSERVER_HAVE_RECORD
 		SCR_LOCK;
@@ -2382,6 +2387,8 @@ static int check_xrecord_mouse(void) {
 	int scroll_wheel = 0;
 	int btn4 = (1<<3);
 	int btn5 = (1<<4);
+
+	RAWFB_RET(0)
 
 	get_out = 1;
 	if (button_mask) {
@@ -2540,7 +2547,7 @@ if (db) fprintf(stderr, "check_xrecord: BUTTON_UP_SCROLL: %.3f\n", spin);
 			if (! already_down || (!scr_cnt && spin>flush1_time)) {
 				flush1 = 1;
 				X_LOCK;
-				XFlush(dpy);
+				XFlush_wr(dpy);
 				X_UNLOCK;
 				dtime0(&last_flush);
 			}
@@ -2624,7 +2631,7 @@ if (db) fprintf(stderr, "check_xrecord: BUTTON-UP-KEEP-GOING:  %.3f/%.3f %d/%d %
 			if (doflush) {
 				flush1 = 1;
 				X_LOCK;
-				XFlush(dpy);
+				XFlush_wr(dpy);
 				X_UNLOCK;
 				dtime0(&last_flush);
 			}
@@ -2679,8 +2686,8 @@ if (db) fprintf(stderr, "  we decide to send ret=3\n");
 
 	if (flush2) {
 		X_LOCK;
-		XFlush(dpy);
-		XFlush(rdpy_ctrl);
+		XFlush_wr(dpy);
+		XFlush_wr(rdpy_ctrl);
 		X_UNLOCK;
 
 		flush2 = 1;
@@ -2707,6 +2714,8 @@ if (db) fprintf(stderr, "FLUSH-2\n");
 int check_xrecord(void) {
 	int watch_keys = 0, watch_mouse = 0, consider_mouse;
 	static int mouse_wants_back_in = 0;
+
+	RAWFB_RET(0)
 
 	if (! use_xrecord) {
 		return 0;
@@ -3291,6 +3300,8 @@ int check_wireframe(void) {
 	int try_it = 0;
 	DB_SET
 
+	RAWFB_RET(0)
+
 	if (unixpw_in_progress) return 0;
 	if (nofb) {
 		return 0;
@@ -3439,7 +3450,7 @@ if (db) fprintf(stderr, "INTERIOR\n");
 	while (1) {
 
 		X_LOCK;
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		X_UNLOCK;
 
 		/* try do induce/waitfor some more user input */
@@ -3504,7 +3515,7 @@ if (db) fprintf(stderr, "  ++pointer event!! [%02d]  dt: %.3f  x: %d  y: %d  mas
 			g = got_pointer_input;
 
 			X_LOCK;
-			XFlush(dpy);
+			XFlush_wr(dpy);
 			X_UNLOCK;
 
 			/* periodically try to let the wm get moving: */
@@ -3849,7 +3860,7 @@ static void check_user_input2(double dt) {
 			X_LOCK;
 			do_flush = 0;
 if (0) fprintf(stderr, "check_user_input2-A: XFlush %.4f\n", tm);
-			XFlush(dpy);
+			XFlush_wr(dpy);
 			X_UNLOCK;
 			if (eaten < max_eat) {
 				continue;
@@ -3864,7 +3875,7 @@ if (0) fprintf(stderr, "check_user_input2-A: XFlush %.4f\n", tm);
 	if (do_flush) {
 		X_LOCK;
 if (0) fprintf(stderr, "check_user_input2-B: XFlush %.4f\n", tm);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		X_UNLOCK;
 	}
 
@@ -3922,7 +3933,7 @@ if (0) fprintf(stderr, "check_user_input2-B: XFlush %.4f\n", tm);
 				}
 				X_LOCK;
 if (0) fprintf(stderr, "check_user_input2-C: XFlush %.4f\n", tm);
-				XFlush(dpy);
+				XFlush_wr(dpy);
 				X_UNLOCK;
 				miss = 0;
 			} else {
@@ -4020,7 +4031,7 @@ static void check_user_input3(double dt, double dtr, int tile_diffs) {
 			got_input = 1;
 			g = got_pointer_input;
 			X_LOCK;
-			XFlush(dpy);
+			XFlush_wr(dpy);
 			X_UNLOCK;
 		} else if (--allowed_misses <= 0) {
 			/* too many misses */
@@ -4172,7 +4183,7 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 		}
 		if (iter) {
 			X_LOCK;
-			XFlush(dpy);
+			XFlush_wr(dpy);
 			X_UNLOCK;
 		}
 		push_frame = 0;
@@ -4256,7 +4267,7 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 			got_input = 1;
 			g = got_pointer_input;
 			X_LOCK;
-			XFlush(dpy);
+			XFlush_wr(dpy);
 			X_UNLOCK;
 
 		} else if (consecutive_misses >= 2) {
@@ -4296,7 +4307,7 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 
 int check_user_input(double dt, double dtr, int tile_diffs, int *cnt) {
 
-	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
+	RAWFB_RET(0)
 
 	if (use_xrecord) {
 		int rc = check_xrecord();
@@ -4328,7 +4339,7 @@ if (debug_scroll && rc > 1) fprintf(stderr, "  CXR: check_user_input ret %d\n", 
 			/* every ui_skip-th drops thru to scan */
 			*cnt++;
 			X_LOCK;
-			XFlush(dpy);
+			XFlush_wr(dpy);
 			X_UNLOCK;
 			return 1;	/* short circuit watch_loop */
 		} else {

@@ -4,6 +4,7 @@
 #include "xinerama.h"
 #include "winattr_t.h"
 #include "cleanup.h"
+#include "xwrappers.h"
 
 winattr_t *stack_list = NULL;
 int stack_list_len = 0;
@@ -32,6 +33,7 @@ Window parent_window(Window win, char **name) {
 	if (name != NULL) {
 		*name = NULL;
 	}
+	RAWFB_RET(None)
 
 	old_handler = XSetErrorHandler(trap_xerror);
 	trapped_xerror = 0;
@@ -68,6 +70,7 @@ int valid_window(Window win, XWindowAttributes *attr_ret, int bequiet) {
 	if (win == None) {
 		return 0;
 	}
+	RAWFB_RET(0)
 
 	old_handler = XSetErrorHandler(trap_xerror);
 	trapped_xerror = 0;
@@ -91,6 +94,8 @@ Bool xtranslate(Window src, Window dst, int src_x, int src_y, int *dst_x,
     int *dst_y, Window *child, int bequiet) {
 	XErrorHandler old_handler;
 	Bool ok = False;
+
+	RAWFB_RET(False)
 
 	trapped_xerror = 0;
 	old_handler = XSetErrorHandler(trap_xerror);
@@ -156,6 +161,8 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 
 	stack_list_num = 0;
 	last_free = now;
+
+	RAWFB_RET_VOID
 
 	X_LOCK;
 	/* no need to trap error since rootwin */
@@ -261,6 +268,7 @@ Window query_pointer(Window start) {
 	Window r, c;	
 	int rx, ry, wx, wy;
 	unsigned int mask;
+	RAWFB_RET(None)
 	if (start == None) {
 		start = rootwin;
 	}
@@ -275,6 +283,8 @@ int pick_windowid(unsigned long *num) {
 	char line[512];
 	int ok = 0, n = 0, msec = 10, secmax = 15;
 	FILE *p;
+
+	RAWFB_RET(0)
 
 	if (use_dpy) {
 		set_env("DISPLAY", use_dpy);
@@ -319,7 +329,7 @@ int pick_windowid(unsigned long *num) {
 				 * note this rfbPE takes about 30ms too:
 				 */
 				rfbPE(-1);
-				XFlush(dpy);
+				XFlush_wr(dpy);
 				continue;
 			}
 		}
@@ -352,6 +362,8 @@ Window descend_pointer(int depth, Window start, char *name_info, int len) {
 	static char *nm_cache = NULL;
 	static int nm_cache_len = 0;
 	static Window prev_start = None;
+
+	RAWFB_RET(None)
 
 	if (! classhint) {
 		classhint = XAllocClassHint();

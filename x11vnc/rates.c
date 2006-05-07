@@ -209,9 +209,7 @@ void initialize_speeds(void) {
 		int n = 0;
 		double dt, timer;
 		dtime0(&timer);
-		if (0 && raw_fb && ! dpy) {		/* raw_fb hack */
-			n = 0;
-		} else if (fullscreen) {
+		if (fullscreen) {
 			copy_image(fullscreen, 0, 0, 0, 0);
 			n = fullscreen->bytes_per_line * fullscreen->height;
 		} else if (scanline) {

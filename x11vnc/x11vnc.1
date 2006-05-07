@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "April 2006" "x11vnc " "User Commands"
+.TH X11VNC "1" "May 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.1, lastmod: 2006-04-25
+         version: 0.8.1, lastmod: 2006-05-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -260,6 +260,21 @@ response.
 .IP
 Debugging for this mode can be enabled by setting
 "dbg=1", "dbg=2", or "dbg=3".
+.PP
+\fB-24to32\fR
+.IP
+Very rare problem: if the framebuffer (X display
+or \fB-rawfb)\fR is 24bpp instead of the usual 32bpp, then
+dynamically transform the pixels to 32bpp.  This will be
+slower, but can be used to work around problems where
+VNC viewers cannot handle 24bpp (e.g. "main: setPF:
+not 8, 16 or 32 bpp?").  See the FAQ for more info.
+.IP
+In the case of \fB-rawfb\fR mode, the pixels are directly
+modified by inserting a 0 byte to pad them out to 32bpp.
+For X displays, a kludge is done that is equivalent to
+"\fB-noshm\fR \fI\fB-visual\fR TrueColor:32\fR".  (If better performance
+is needed for the latter, feel free to ask).
 .PP
 \fB-scale\fR \fIfraction\fR
 .IP
@@ -2579,16 +2594,21 @@ or where window tearing is a problem.
 \fB-rawfb\fR \fIstring\fR
 .IP
 Experimental option, instead of polling X, poll the
-memory object specified in \fIstring\fR.  For shared
-memory segments it is of the form: "shm:N@WxHxB"
-which specifies a shmid N and framebuffer Width, Height,
-and Bits per pixel.  To memory map 
+memory object specified in \fIstring\fR.
+.IP
+For shared memory segments string is of the
+form: "shm:N@WxHxB" which specifies a shmid
+N and framebuffer Width, Height, and Bits
+per pixel.  To memory map 
 .IR mmap (2)
 a file use:
 "map:/path/to/a/file@WxHxB".  If there is trouble
 with mmap, use  "file:/..." for slower 
 .IR lseek (2)
-based reading.  If you do not supply a type "map"
+based
+reading. Use "snap:..." to imply \fB-snapfb\fR mode and the
+"file:" access (this is for devices that only provide
+the fb all at once). If you do not supply a type "map"
 is assumed if the file exists.
 .IP
 If string is "setup:cmd", then the command "cmd"
@@ -2596,6 +2616,14 @@ is run and the first line from it is read and used
 as \fIstring\fR.  This allows initializing the device,
 determining WxHxB, etc. These are often done as root
 so take care.
+.IP
+If the string begins with "video", see the video4linux
+discusion below where the device may be queried for
+(and possibly set) the framebuffer parameters.
+.IP
+If the strings begins with "cons", see the linux
+console discussion below where the framebuffer device
+is opened and keystrokes are inserted into the console.
 .IP
 Optional suffixes are ":R/G/B" and "+O" to specify
 red, green, and blue masks and an offset into the
@@ -2612,6 +2640,12 @@ Examples:
 .IP
 \fB-rawfb\fR file:/tmp/my.pnm@250x200x24+37
 .IP
+\fB-rawfb\fR file:/dev/urandom@128x128x8
+\fB-rawfb\fR snap:/dev/video0@320x240x24 \fB-24to32\fR
+\fB-rawfb\fR video0
+\fB-rawfb\fR video \fB-pipeinput\fR VID
+\fB-rawfb\fR console
+.IP
 (see 
 .IR ipcs (1)
 and 
@@ -2622,16 +2656,163 @@ All user input is discarded by default (but see the
 \fB-pipeinput\fR option).  Most of the X11 (screen, keyboard,
 mouse) options do not make sense and many will cause
 this mode to crash, so please think twice before
-setting/changing them.
+setting or changing them in a running x11vnc.
 .IP
-If you don't want x11vnc to close the X DISPLAY in
-rawfb mode, then capitalize the prefix, SHM:, MAP:,
-FILE:   Keeping the display open enables the default
-remote-control channel, which could be useful.  Also,
-if you also specify \fB-noviewonly,\fR then the mouse and
-keyboard input are STILL sent to the X display, this
-usage should be very rare, i.e. doing something strange
-with /dev/fb0.
+If you DO NOT want x11vnc to close the X DISPLAY in
+rawfb mode, prepend a "+" e.g. +file:/dev/fb0...
+Keeping the display open enables the default
+remote-control channel, which could be useful.
+Alternatively, if you specify \fB-noviewonly,\fR then the
+mouse and keyboard input are STILL sent to the X
+display, this usage should be very rare, i.e. doing
+something strange with /dev/fb0.
+.IP
+If the device is not "seekable" try reading it all
+at once in full snaps via the "snap:" mode (note:
+this is a resource hog).  If you are using file: or
+map: and the device needs to be reopened for *every*
+snapfb snapshot, set the environment variable:
+SNAPFB_RAWFB_RESET=1 as well.
+.IP
+If you want x11vnc to dynamically transform a 24bpp
+rawfb to 32bpp (note that this will be slower) use
+the \fB-24to32\fR option.  This would be useful for, say,
+for a video camera that delivers the pixel data as
+24bpp packed RGB.  This is the default under "video"
+mode if the bpp is 24.
+.IP
+video4linux: on Linux some attempt is made to handle
+video devices (webcams or tv tuners) automatically.
+The idea is the WxHxB will be extracted from the
+device itself.  So if you do not supply "@WxHxB...
+parameters x11vnc will try to determine them.  It first
+tries the v4l API if that support has been compiled in.
+Otherwise it will run the v4l-
+.IR info (1)
+external program
+if it is available.
+.IP
+The simplest examples are "\fB-rawfb\fR \fIvideo\fR" and "-rawfb
+video1" which imply the device file /dev/video and
+/dev/video1, respectively.  You can also supply the
+/dev if you like, e.g. "\fB-rawfb\fR \fI/dev/video0\fR"
+.IP
+Since the video capture device framebuffer usually
+changes continuously (e.g. brightness fluctuations),
+you may want to use the \fB-wait,\fR \fB-slow_fb,\fR or \fB-defer\fR
+options to lower the "framerate" to cut down on
+network VNC traffic.
+.IP
+A more sophisticated video device scheme allows
+initializing the device's settings using:
+.IP
+\fB-rawfb\fR video:<settings>
+.IP
+The prefix could also be, as above, e.g. "video1:" to
+specify the device file.  The v4l API must be available
+for this to work.  Otherwise, you will need to try
+to initialize the device with an external program,
+e.g. xawtv, spcaview, and hope they persist when x11vnc
+re-opens the device.
+.IP
+<settings> is a comma separated list of key=value pairs.
+The device's brightness, color, contrast, and hue can
+be set to percentages, e.g. br=80,co=50,cn=44,hu=60.
+.IP
+The device filename can be set too if needed (if it
+does not start with "video"), e.g. fn=/dev/qcam.
+.IP
+The width, height and bpp of the framebuffer can be
+set via, e.g., w=160,h=120,bpp=16.
+.IP
+Related to the bpp above, the pixel format can be set
+via the fmt=XXX, where XXX can be one of: GREY, HI240,
+RGB555, RGB565, RGB24, and RGB32 (with bpp 8, 8, 16, 16,
+24, and 32 respectively).  See http://www.linuxtv.org
+for more info (V4L api).
+.IP
+For tv/rf tuner cards one can set the tuning mode
+via tun=XXX where XXX can be one of PAL, NTSC, SECAM,
+or AUTO.
+.IP
+One can switch the input channel by the inp=XXX setting,
+where XXX is the name of the input channel (Television,
+Composite1, S-Video, etc).  Use the name that is in the
+information about the device that is printed at startup.
+.IP
+For input channels with tuners (e.g. Television) one
+can change which station is selected by the sta=XXX
+setting.  XXX is the station number.  Currently only
+the ntsc-cable-us (US cable) channels are built into
+x11vnc.  See the \fB-freqtab\fR option below to supply one
+from xawtv. If XXX is greater than 500, then it is
+interpreted as a raw frequency in KHz.
+.IP
+Example:
+.IP
+\fB-rawfb\fR video:br=80,w=320,h=240,fmt=RGB32,tun=NTSC,sta=47
+.IP
+one might need to add inp=Television too for the input
+channel to be TV if the card doesn't come up by default
+in that one.
+.IP
+Note that not all video capture devices will support
+all of the above settings.
+.IP
+See the \fB-pipeinput\fR VID option below for a way to control
+the settings through the VNC Viewer via keystrokes.
+.IP
+As above, if you specify a "@WxHxB..." after the
+<settings> string they are used verbatim: the device
+is not queried for the current values.  Otherwise the
+device will be queried.
+.IP
+Linux console:  If the libvncserver LinuxVNC command is
+on your system use that instead of the following method
+because it will be faster and more accurate for Linux
+text console.
+.IP
+If the rawfb string begins with "cons" the framebuffer
+device /dev/fb0 is opened (this requires the appropriate
+kernel modules) and so is /dev/tty0.  The latter is
+used to inject keystrokes (not all are supported,
+but the basic ones are).  You will need to be root to
+inject keystrokes.  /dev/tty0 refers to the active VT,
+to indicate one explicitly, use "cons2", etc. using
+the VT number.  Note you can change VT remotely using
+the 
+.IR chvt (1)
+command.  Sometimes switching out and back
+corrects the framebuffer.  To skip injecting entirely
+use "consx".
+.IP
+The strings "console", or "/dev/fb0" can be used
+instead of "cons".  The latter can be used to specify
+a different framebuffer device, e.g. /dev/fb1.  If the
+name is something nonstandard, use "cons:/dev/foofb"
+.IP
+If you do not want x11vnc to guess the framebuffer's
+WxHxB and masks automatically, specify them with a
+@WxHxB at the end of the string.
+.IP
+Examples:
+\fB-rawfb\fR cons               (same as \fB-rawfb\fR console)
+\fB-rawfb\fR /dev/fb0           (same)
+\fB-rawfb\fR cons3              (force /dev/tty3)
+\fB-rawfb\fR consx              (no keystrokes)
+\fB-rawfb\fR console:/dev/nonstd
+.PP
+\fB-freqtab\fR \fIfile\fR
+.IP
+For use with "\fB-rawfb\fR \fIvideo\fR" for TV tuner devices to
+specify station frequencies.  Instead of using the built
+in ntsc-cable-us mapping of station number to frequency,
+use the data in file.  For stations that are not
+numeric, e.g. SE20, they are placed above the highest
+numbered station in the order they are found.  Example:
+"\fB-freqtab\fR \fI/usr/X11R6/share/xawtv/europe-west.list\fR"
+You can make your own freqtab by copying the xawtv
+format.
 .PP
 \fB-pipeinput\fR \fIcmd\fR
 .IP
@@ -2651,6 +2832,22 @@ do amusing things (e.g. control non-X devices).
 To facilitate this, if \fB-rawfb\fR is in effect then the
 value is stored in X11VNC_RAWFB_STR for the pipe command
 to use if it wants. Do 'env | grep X11VNC' for more.
+.IP
+If cmd is "VID" and you are using the \fB-rawfb\fR for a
+video capture device, then an internal list of keyboard
+mappings is used to set parameters of the video.
+The mappings are:
+.IP
+"B" and "b" adjust the brightness up and down.
+"H" and "h" adjust the hue.
+"C" and "c" adjust the colour.
+"N" and "n" adjust the contrast.
+"S" and "s" adjust the size of the capture screen.
+"I" and "i" cycle through input channels.
+Up and Down arrows adjust the station (if a tuner)
+F1, F2, ..., F6 will switch the video capture pixel
+format to HI240, RGB565, RGB24, RGB32, RGB555, and
+GREY respectively.  See \fB-rawfb\fR video for details.
 .PP
 \fB-gui\fR \fI[gui-opts]\fR
 .IP
@@ -2828,6 +3025,10 @@ nooverlay_cursor.
 no8to24         disable \fB-8to24\fR mode.
 .IP
 8to24_opts:str  set the \fB-8to24\fR opts to "str".
+.IP
+24to32          enable  \fB-24to32\fR mode (if applicable).
+.IP
+no24to32        disable \fB-24to32\fR mode.
 .IP
 visual:vis      set \fB-visual\fR to "vis"
 .IP
@@ -3294,15 +3495,15 @@ nowaitmapped clip flashcmap noflashcmap shiftcmap
 truecolor notruecolor overlay nooverlay overlay_cursor
 overlay_yescursor nooverlay_nocursor nooverlay_cursor
 nooverlay_yescursor overlay_nocursor 8to24 no8to24
-8to24_opts visual scale scale_cursor viewonly noviewonly
-shared noshared forever noforever once timeout filexfer
-nofilexfer deny lock nodeny unlock connect allowonce
-allow localhost nolocalhost listen lookup nolookup
-accept afteraccept gone shm noshm flipbyteorder
-noflipbyteorder onetile noonetile solid_color
-solid nosolid blackout xinerama noxinerama xtrap
-noxtrap xrandr noxrandr xrandr_mode padgeom quiet q
-noquiet modtweak nomodtweak xkb noxkb skip_keycodes
+8to24_opts 24to32 no24to32 visual scale scale_cursor
+viewonly noviewonly shared noshared forever noforever
+once timeout filexfer nofilexfer deny lock nodeny
+unlock connect allowonce allow localhost nolocalhost
+listen lookup nolookup accept afteraccept gone shm
+noshm flipbyteorder noflipbyteorder onetile noonetile
+solid_color solid nosolid blackout xinerama noxinerama
+xtrap noxtrap xrandr noxrandr xrandr_mode padgeom quiet
+q noquiet modtweak nomodtweak xkb noxkb skip_keycodes
 sloppy_keys nosloppy_keys skip_dups noskip_dups
 add_keysyms noadd_keysyms clear_mods noclear_mods
 clear_keys noclear_keys remap repeat norepeat fb nofb

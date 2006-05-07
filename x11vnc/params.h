@@ -35,4 +35,8 @@
 
 #define MAXN 256
 
+#define PIPEINPUT_NONE	0x0
+#define PIPEINPUT_VID	0x1
+#define PIPEINPUT_CONS	0x2
+
 #endif /* _X11VNC_PARAMS_H */

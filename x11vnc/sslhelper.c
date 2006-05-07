@@ -1028,7 +1028,7 @@ if (db) fprintf(stderr, "tv_sec: %d - %s\n", (int) tv.tv_sec, last_get);
 	return 1;
 }
 
-#define BSIZE 16384
+#define ABSIZE 16384
 static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	int is_http, err, n, n2;
 	char *buf;
@@ -1038,13 +1038,13 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	 * if it is http or not.  if we read them OK, we must read the
 	 * rest of the available data otherwise we may deadlock.
 	 * what has be read is returned in buf_a and n_a.
-	 * *buf_a is BSIZE+1 long and zeroed.
+	 * *buf_a is ABSIZE+1 long and zeroed.
 	 */
 	if (getenv("ACCEPT_OPENSSL_DEBUG")) {
 		db = atoi(getenv("ACCEPT_OPENSSL_DEBUG"));
 	}
 
-	buf = (char *) calloc(sizeof(BSIZE+1), 1);
+	buf = (char *) calloc(sizeof(ABSIZE+1), 1);
 	*n_a = 0;
 
 	n = SSL_read(ssl, buf, 2);
@@ -1075,7 +1075,7 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	 * better read all we can and fwd it along to avoid blocking
 	 * in ssl_xfer().
 	 */
-	n2 = SSL_read(ssl, buf + n, BSIZE - n);
+	n2 = SSL_read(ssl, buf + n, ABSIZE - n);
 	if (n2 >= 0) {
 		n += n2;
 	}
@@ -1376,8 +1376,8 @@ void accept_openssl(int mode) {
 			char *iface = NULL;
 			char *buf, *tbuf;
 
-			buf  = (char *) calloc((BSIZE+1), 1);
-			tbuf = (char *) calloc((2*BSIZE+1), 1);
+			buf  = (char *) calloc((ABSIZE+1), 1);
+			tbuf = (char *) calloc((2*ABSIZE+1), 1);
 
 			if (mode == OPENSSL_HTTPS) {
 				/*
@@ -1857,7 +1857,7 @@ if (db > 1) write(2, buf, n);
 
 static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	int dbxfer = 0, db = 0, check_pending, fdmax, nfd, n, i, err;
-	char cbuf[BSIZE], sbuf[BSIZE];
+	char cbuf[ABSIZE], sbuf[ABSIZE];
 	int  cptr, sptr, c_rd, c_wr, s_rd, s_wr;
 	fd_set rd, wr;
 	struct timeval tv;
@@ -1905,7 +1905,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	 * cbuf[] is data from csock that we have read but not passed on to ssl 
 	 * sbuf[] is data from ssl that we have read but not passed on to csock 
 	 */
-	for (i=0; i<BSIZE; i++) {
+	for (i=0; i<ABSIZE; i++) {
 		cbuf[i] = '\0';
 		sbuf[i] = '\0';
 	}
@@ -1927,7 +1927,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	s_rd = 1;	/* ssl data (remote client)  socket open for reading */
 	s_wr = 1;	/* ssl data (remote client)  socket open for writing */
 
-	cptr = 0;	/* offsets into BSIZE buffers */
+	cptr = 0;	/* offsets into ABSIZE buffers */
 	sptr = 0;
 
 	while (1) {
@@ -1966,7 +1966,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 
 		FD_ZERO(&rd);
 
-		if (c_rd && cptr < BSIZE) {
+		if (c_rd && cptr < ABSIZE) {
 			/* we could read more from C since cbuf is not full */
 			FD_SET(csock, &rd);
 		}
@@ -1976,7 +1976,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 			 * OR ssl is waiting for more BIO to be able to
 			 * read and we have some C data still buffered.
 			 */
-			if (sptr < BSIZE || (cptr > 0 && SSL_want_read(ssl))) {
+			if (sptr < ABSIZE || (cptr > 0 && SSL_want_read(ssl))) {
 				FD_SET(s_in, &rd);
 			}
 		}
@@ -1993,7 +1993,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 			 * OR ssl is waiting for more BIO to be able
 			 * write and we haven't filled up sbuf yet.
 			 */
-			if (cptr > 0 || (sptr < BSIZE && SSL_want_write(ssl))) {
+			if (cptr > 0 || (sptr < ABSIZE && SSL_want_write(ssl))) {
 				FD_SET(s_out, &wr);
 			}
 		}
@@ -2050,7 +2050,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 			} else {
 				/* shift over the data in sbuf by n */
 				memmove(sbuf, sbuf + n, sptr - n);
-				if (sptr == BSIZE) {
+				if (sptr == ABSIZE) {
 					check_pending = 1;
 				}
 				sptr -= n;
@@ -2111,7 +2111,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 
 			/* try to read some data from C into our cbuf */
 
-			n = read(csock, cbuf + cptr, BSIZE - cptr);
+			n = read(csock, cbuf + cptr, ABSIZE - cptr);
 
 			if (n < 0) {
 				if (errno != EINTR) {
@@ -2135,13 +2135,13 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 		}
 
 		if (s_rd) {
-			if ((sptr < BSIZE && FD_ISSET(s_in, &rd)) ||
+			if ((sptr < ABSIZE && FD_ISSET(s_in, &rd)) ||
 			    (SSL_want_write(ssl) && FD_ISSET(s_out, &wr)) ||
 			    (check_pending && SSL_pending(ssl))) {
 
 				/* try to read some data from S into our sbuf */
 
-				n = SSL_read(ssl, sbuf + sptr, BSIZE - sptr);
+				n = SSL_read(ssl, sbuf + sptr, ABSIZE - sptr);
 				err = SSL_get_error(ssl, n);
 
 				if (err == SSL_ERROR_NONE) {

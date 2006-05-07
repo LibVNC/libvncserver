@@ -189,6 +189,7 @@ char gui_code[] = "";
 "	visual:\n"
 "	rawfb:\n"
 "	pipeinput:\n"
+"	24to32\n"
 "	=GAL LOFF\n"
 "\n"
 "Keyboard\n"

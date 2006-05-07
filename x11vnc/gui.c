@@ -70,6 +70,8 @@ int tray_embed(Window iconwin, int remove) {
 	long info[2] = {XEMBED_VERSION, XEMBED_MAPPED};
 	long data = 0;
 
+	RAWFB_RET(0)
+
 	if (remove) {
 		if (!valid_window(iconwin, &attr, 1)) {
 			return 0;
@@ -155,6 +157,8 @@ static int tray_manager_running(Display *d, Window *manager) {
 	char tray_string[100];
 	Atom tray_manager;
 	Window tray_win;
+
+	RAWFB_RET(0)
 
 	if (manager) {
 		*manager = None;

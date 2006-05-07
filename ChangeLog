@@ -1,3 +1,6 @@
+2006-05-06  Karl Runge <runge@karlrunge.com>
+	* configure.ac: add linux/videodev.h and linux/fb.h detection.
+
 2006-05-04  Steven Carr <scarr@jsa-usa.com>
 	* rfbEncodingSupportedEncodings - What encodings are supported?
 	* rfbEncodingSupportedMessages - What message types are supported?

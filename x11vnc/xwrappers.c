@@ -18,6 +18,8 @@ int clipshift = 0;
 
 int guess_bits_per_color(int bits_per_pixel);
 
+int XFlush_wr(Display *disp);
+
 Status XShmGetImage_wr(Display *disp, Drawable d, XImage *image, int x, int y,
     unsigned long mask);
 XImage *XShmCreateImage_wr(Display* disp, Visual* vis, unsigned int depth,
@@ -66,10 +68,8 @@ void disable_grabserver(Display *in_dpy, int change);
 
 Bool XRecordQueryVersion_wr(Display *dpy, int *maj, int *min);
 
-
-static void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h);
+void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h);
 static void upup_downdown_warning(KeyCode key, Bool down);
-
 
 /* 
  * used in rfbGetScreen and rfbNewFramebuffer: and estimate to the number
@@ -94,6 +94,14 @@ int guess_bits_per_color(int bits_per_pixel) {
 		bits_per_color = 8;
 	}
 	return bits_per_color;
+}
+
+int XFlush_wr(Display *disp) {
+	if (disp) {
+		return XFlush(disp);
+	} else {
+		return 1;
+	}
 }
 
 /*
@@ -277,17 +285,161 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 	    width, height, bitmap_pad, bytes_per_line);
 }
 
-static void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
+static void copy_raw_fb_24_to_32(XImage *dest, int x, int y, unsigned int w,
+    unsigned int h) {
+	/*
+	 * kludge to read 1 byte at a time and dynamically transform
+	 * 24bpp -> 32bpp by inserting a extra 0 byte into dst.
+	 */
+	char *src, *dst;
+	unsigned int line;
+	static char *buf = NULL;
+	static int buflen = -1;
+	int bpl = wdpy_x * 3;	/* pixelsize == 3 */
+	int LE, n, stp, len, del, sz = w * 3;
+	int insert_zeroes = 1;
+
+#define INSERT_ZEROES  \
+	len = sz; \
+	del = 0; \
+	stp = 0; \
+	while (len > 0) { \
+		if (insert_zeroes && (del - LE) % 4 == 0) { \
+			*(dst + del) = 0; \
+			del++; \
+		} \
+		*(dst + del) = *(buf + stp); \
+		del++; \
+		len--; \
+		stp++; \
+	}
+
+	if (rfbEndianTest) {
+		LE = 3;	/* little endian */
+	} else {
+		LE = 0; /* big endian */
+	}
+
+	if (sz > buflen || buf == NULL) {
+		if (buf) {
+			free(buf);
+		}
+		buf = (char *) malloc(4*(sz + 1000));
+	}
+
+	if (clipshift && ! use_snapfb) {
+		x += coff_x;
+		y += coff_y;
+	}
+
+	if (use_snapfb && dest != snap) {
+		/* snapfb src */
+		src = snap->data + snap->bytes_per_line*y + 3*x;
+		dst = dest->data;
+		for (line = 0; line < h; line++) {
+			memcpy(buf, src, sz);
+
+			INSERT_ZEROES
+
+			src += snap->bytes_per_line;
+			dst += dest->bytes_per_line;
+		}
+
+	} else if (! raw_fb_seek) {
+		/* mmap */
+		src = raw_fb_addr + raw_fb_offset + bpl*y + 3*x;
+		dst = dest->data;
+
+		if (use_snapfb && dest == snap) {
+			/*
+			 * writing *to* snap_fb: need the x,y offset,
+			 * and also do not do inserts.
+			 */
+			dst += bpl*y + 3*x;
+			insert_zeroes = 0;
+		}
+
+		for (line = 0; line < h; line++) {
+			memcpy(buf, src, sz);
+
+			INSERT_ZEROES
+
+			src += bpl;
+			dst += dest->bytes_per_line;
+		}
+
+	} else {
+		/* lseek */
+		off_t off = (off_t) (raw_fb_offset + bpl*y + 3*x);
+
+		lseek(raw_fb_fd, off, SEEK_SET);
+		dst = dest->data;
+
+		if (use_snapfb && dest == snap) {
+			/*
+			 * writing *to* snap_fb: need the x,y offset,
+			 * and also do not do inserts.
+			 */
+			dst += bpl*y + 3*x;
+			insert_zeroes = 0;
+		}
+
+		for (line = 0; line < h; line++) {
+			len = sz;
+			del = 0;
+			while (len > 0) {
+				n = read(raw_fb_fd, buf + del, len);
+
+				if (n > 0) {
+					del += n;
+					len -= n;
+				} else if (n == 0) {
+					break;
+				} else if (errno != EINTR && errno != EAGAIN) {
+					break;
+				}
+			}
+
+			INSERT_ZEROES
+
+			if (bpl > sz) {
+				off = (off_t) (bpl - sz);
+				lseek(raw_fb_fd, off, SEEK_CUR);
+			}
+			dst += dest->bytes_per_line;
+		}
+	}
+}
+
+void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 	char *src, *dst;
 	unsigned int line;
 	int pixelsize = bpp/8;
 	int bpl = wdpy_x * pixelsize;
 
-	if (clipshift) {
+	if (xform24to32) {
+		copy_raw_fb_24_to_32(dest, x, y, w, h);
+		return;
+	}
+
+	if (clipshift && ! use_snapfb) {
 		x += coff_x;
 		y += coff_y;
 	}
-	if (! raw_fb_seek) {
+
+	if (use_snapfb && dest != snap) {
+		/* snapfb src */
+		src = snap->data + snap->bytes_per_line*y + pixelsize*x;
+		dst = dest->data;
+
+		for (line = 0; line < h; line++) {
+			memcpy(dst, src, w * pixelsize);
+			src += snap->bytes_per_line;
+			dst += dest->bytes_per_line;
+		}
+
+	} else if (! raw_fb_seek) {
+		/* mmap */
 		src = raw_fb_addr + raw_fb_offset + bpl*y + pixelsize*x;
 		dst = dest->data;
 
@@ -296,32 +448,35 @@ static void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int
 			src += bpl;
 			dst += dest->bytes_per_line;
 		}
-	} else{
+
+	} else {
+		/* lseek */
 		int n, len, del, sz = w * pixelsize;
 		off_t off = (off_t) (raw_fb_offset + bpl*y + pixelsize*x);
 
 		lseek(raw_fb_fd, off, SEEK_SET);
 		dst = dest->data;
 
+if (0) fprintf(stderr, "lseek 0 ps: %d  sz: %d off: %d bpl: %d\n", pixelsize, sz, (int) off, bpl);
+
 		for (line = 0; line < h; line++) {
 			len = sz;
 			del = 0;
 			while (len > 0) {
 				n = read(raw_fb_fd, dst + del, len);
+if (0) fprintf(stderr, "len: %d n: %d\n", len, n);
 
 				if (n > 0) {
 					del += n;
 					len -= n;
 				} else if (n == 0) {
 					break;
-				} else {
-					/* overkill... */
-					if (errno != EINTR && errno != EAGAIN) {
-						break;
-					}
+				} else if (errno != EINTR && errno != EAGAIN) {
+					break;
 				}
 			}
 			if (bpl > sz) {
+if (0) fprintf(stderr, "bpl>sz %d %d\n", bpl, sz);
 				off = (off_t) (bpl - sz);
 				lseek(raw_fb_fd, off, SEEK_CUR);
 			}
@@ -332,6 +487,9 @@ static void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int
 
 void copy_image(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 	/* default (w=0, h=0) is the fill the entire XImage */
+	if (dest == NULL) {
+		return;
+	}
 	if (w < 1)  {
 		w = dest->width;
 	}
@@ -339,7 +497,10 @@ void copy_image(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 		h = dest->height;
 	}
 
-	if (use_snapfb && snap_fb && dest != snaprect) {
+	if (raw_fb) {
+		copy_raw_fb(dest, x, y, w, h);
+
+	} else if (use_snapfb && snap_fb && dest != snaprect) {
 		char *src, *dst;
 		unsigned int line;
 		int pixelsize = bpp/8;
@@ -352,10 +513,7 @@ void copy_image(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 			dst += dest->bytes_per_line;
 		}
 
-	} else if (raw_fb) {
-		copy_raw_fb(dest, x, y, w, h);
-
-	} else if (using_shm && (int) w == dest->width &&
+	} else if ((using_shm && ! xform24to32) && (int) w == dest->width &&
 	    (int) h == dest->height) {
 		XShmGetImage_wr(dpy, window, dest, x, y, AllPlanes);
 
@@ -379,6 +537,8 @@ void init_track_keycode_state(void) {
 }
 
 static void upup_downdown_warning(KeyCode key, Bool down) {
+	RAWFB_RET_VOID
+
 	if ((down ? 1:0) == keycode_state[(int) key]) {
 		rfbLog("XTestFakeKeyEvent: keycode=0x%x \"%s\" is *already* "
 		    "%s\n", key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
@@ -394,12 +554,14 @@ static void upup_downdown_warning(KeyCode key, Bool down) {
 void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
     unsigned long delay) {
 
+	RAWFB_RET_VOID
+
 	if (! xtrap_present) {
 		DEBUG_SKIPPED_INPUT(debug_keyboard, "keyboard: no-XTRAP");
 		return;
 	}
 	/* unused vars warning: */
-	if (dpy || key || down || delay) {} 
+	if (key || down || delay) {} 
 
 #if LIBVNCSERVER_HAVE_LIBXTRAP
 	XESimulateXEventRequest(trap_ctx, down ? KeyPress : KeyRelease,
@@ -416,6 +578,9 @@ void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
     unsigned long delay) {
 	static int first = 1;
+
+	RAWFB_RET_VOID
+
 	if (debug_keyboard) {
 		rfbLog("XTestFakeKeyEvent(dpy, keycode=0x%x \"%s\", %s)\n",
 		    key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
@@ -456,12 +621,14 @@ void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 void XTRAP_FakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
     unsigned long delay) {
 
+	RAWFB_RET_VOID
+
 	if (! xtrap_present) {
 		DEBUG_SKIPPED_INPUT(debug_keyboard, "button: no-XTRAP");
 		return;
 	}
 	/* unused vars warning: */
-	if (dpy || button || is_press || delay) {} 
+	if (button || is_press || delay) {} 
 
 #if LIBVNCSERVER_HAVE_LIBXTRAP
 	XESimulateXEventRequest(trap_ctx,
@@ -473,6 +640,8 @@ void XTRAP_FakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
 
 void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
     unsigned long delay) {
+
+	RAWFB_RET_VOID
 
 	if (xtrap_input) {
 		XTRAP_FakeButtonEvent_wr(dpy, button, is_press, delay);
@@ -495,6 +664,8 @@ void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
 void XTRAP_FakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
     unsigned long delay) {
 
+	RAWFB_RET_VOID
+
 	if (! xtrap_present) {
 		DEBUG_SKIPPED_INPUT(debug_keyboard, "motion: no-XTRAP");
 		return;
@@ -511,6 +682,8 @@ void XTRAP_FakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
 
 void XTestFakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
     unsigned long delay) {
+
+	RAWFB_RET_VOID
 
 	if (xtrap_input) {
 		XTRAP_FakeMotionEvent_wr(dpy, screen, x, y, delay);
@@ -530,6 +703,8 @@ Bool XTestCompareCurrentCursorWithWindow_wr(Display* dpy, Window w) {
 	if (! xtest_present) {
 		return False;
 	}
+	RAWFB_RET(False)
+
 #if LIBVNCSERVER_HAVE_XTEST
 	return XTestCompareCurrentCursorWithWindow(dpy, w);
 #else
@@ -541,6 +716,7 @@ Bool XTestCompareCursorWithWindow_wr(Display* dpy, Window w, Cursor cursor) {
 	if (! xtest_present) {
 		return False;
 	}
+	RAWFB_RET(False)
 #if LIBVNCSERVER_HAVE_XTEST
 	return XTestCompareCursorWithWindow(dpy, w, cursor);
 #else
@@ -550,6 +726,7 @@ Bool XTestCompareCursorWithWindow_wr(Display* dpy, Window w, Cursor cursor) {
 
 Bool XTestQueryExtension_wr(Display *dpy, int *ev, int *er, int *maj,
     int *min) {
+	RAWFB_RET(False)
 #if LIBVNCSERVER_HAVE_XTEST
 	return XTestQueryExtension(dpy, ev, er, maj, min);
 #else
@@ -561,18 +738,20 @@ void XTestDiscard_wr(Display *dpy) {
 	if (! xtest_present) {
 		return;
 	}
+	RAWFB_RET_VOID
 #if LIBVNCSERVER_HAVE_XTEST
 	XTestDiscard(dpy);
 #endif
 }
 
 Bool XETrapQueryExtension_wr(Display *dpy, int *ev, int *er, int *op) {
+	RAWFB_RET(False)
 #if LIBVNCSERVER_HAVE_LIBXTRAP
 	return XETrapQueryExtension(dpy, (INT32 *)ev, (INT32 *)er,
 	    (INT32 *)op);
 #else
 	/* unused vars warning: */
-	if (dpy || ev || er || op) {} 
+	if (ev || er || op) {} 
 	return False;
 #endif
 }
@@ -581,6 +760,7 @@ int XTestGrabControl_wr(Display *dpy, Bool impervious) {
 	if (! xtest_present) {
 		return 0;
 	}
+	RAWFB_RET(0)
 #if LIBVNCSERVER_HAVE_XTEST && LIBVNCSERVER_HAVE_XTESTGRABCONTROL
 	XTestGrabControl(dpy, impervious);
 	return 1;
@@ -595,6 +775,7 @@ int XTRAP_GrabControl_wr(Display *dpy, Bool impervious) {
 		if (dpy || impervious) {} 
 		return 0;
 	}
+	RAWFB_RET(0)
 #if LIBVNCSERVER_HAVE_LIBXTRAP
 	  else {
 		ReqFlags requests;
@@ -685,10 +866,11 @@ void disable_grabserver(Display *in_dpy, int change) {
 		rfbLog("* DEADLOCK if your window manager calls XGrabServer !!! *\n");
 		rfbLog("*********************************************************\n");
 	}
-	XFlush(in_dpy);
+	XFlush_wr(in_dpy);
 }
 
 Bool XRecordQueryVersion_wr(Display *dpy, int *maj, int *min) {
+	RAWFB_RET(False)
 #if LIBVNCSERVER_HAVE_RECORD
 	return XRecordQueryVersion(dpy, maj, min);
 #else

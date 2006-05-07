@@ -38,15 +38,18 @@ static void grab_buster_watch(int parent, char *dstr);
 
 void initialize_vnc_connect_prop(void) {
 	vnc_connect_str[0] = '\0';
+	RAWFB_RET_VOID
 	vnc_connect_prop = XInternAtom(dpy, "VNC_CONNECT", False);
 }
 
 void initialize_x11vnc_remote_prop(void) {
 	x11vnc_remote_str[0] = '\0';
+	RAWFB_RET_VOID
 	x11vnc_remote_prop = XInternAtom(dpy, "X11VNC_REMOTE", False);
 }
 
 void initialize_clipboard_atom(void) {
+	RAWFB_RET_VOID
 	clipboard_atom = XInternAtom(dpy, "CLIPBOARD", False);
 	if (clipboard_atom == None) {
 		if (! quiet) rfbLog("could not find atom CLIPBOARD\n");
@@ -69,6 +72,7 @@ static void initialize_xevents(void) {
 	static int did_xdamage = 0;
 	static int did_xrandr = 0;
 
+	RAWFB_RET_VOID
 	if ((watch_selection || vnc_connect) && !did_xselect_input) {
 		/*
 		 * register desired event(s) for notification.
@@ -143,6 +147,7 @@ static void get_prop(char *str, int len, Atom prop) {
 	if (prop == None) {
 		return;
 	}
+	RAWFB_RET_VOID
 
 	slen = 0;
 	
@@ -224,7 +229,7 @@ static void bust_grab(int reset) {
 		fprintf(stderr, "**bust_grab: button%d  %.4f\n",
 		    button, dnowx());
 		XTestFakeButtonEvent_wr(dpy, button, True, CurrentTime);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		usleep(50 * 1000);
 		XTestFakeButtonEvent_wr(dpy, button, False, CurrentTime);
 	} else if (x > 0) {
@@ -234,14 +239,14 @@ static void bust_grab(int reset) {
 		fprintf(stderr, "**bust_grab: x=%d y=%d  %.4f\n", x, y,
 		    dnowx());
 		XTestFakeMotionEvent_wr(dpy, scr, x, y, CurrentTime);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		usleep(50 * 1000);
 
 		/* followed by button press */
 		button = 1;
 		fprintf(stderr, "**bust_grab: button%d\n", button);
 		XTestFakeButtonEvent_wr(dpy, button, True, CurrentTime);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		usleep(50 * 1000);
 		XTestFakeButtonEvent_wr(dpy, button, False, CurrentTime);
 	} else {
@@ -249,11 +254,11 @@ static void bust_grab(int reset) {
 		fprintf(stderr, "**bust_grab: keycode: %d  %.4f\n",
 		    (int) key, dnowx());
 		XTestFakeKeyEvent_wr(dpy, key, True, CurrentTime);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		usleep(50 * 1000);
 		XTestFakeKeyEvent_wr(dpy, key, False, CurrentTime);
 	}
-	XFlush(dpy);
+	XFlush_wr(dpy);
 	last_bust = time(0);
 }
 
@@ -429,6 +434,8 @@ static void grab_buster_watch(int parent, char *dstr) {
 	int ev, er, maj, min;
 	int db = 0;
 
+	RAWFB_RET_VOID
+
 	if (grab_buster > 1) {
 		db = 1;
 	}
@@ -496,6 +503,8 @@ void spawn_grab_buster(void) {
 	int parent = (int) getpid();
 	char *dstr = strdup(DisplayString(dpy));
 
+	RAWFB_RET_VOID
+
 	XCloseDisplay(dpy); 
 	dpy = NULL;
 
@@ -533,6 +542,8 @@ void sync_tod_with_servertime(void) {
 	static int seq = 0;
 	static unsigned long xserver_ticks = 1;
 	int i, db = 0;
+
+	RAWFB_RET_VOID
 
 	if (! ticker_atom) {
 		ticker_atom = XInternAtom(dpy, "X11VNC_TICKER", False);
@@ -586,7 +597,7 @@ void check_keycode_state(void) {
 		return;
 	}
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	if (unixpw_in_progress) return;
 
@@ -689,7 +700,7 @@ void check_xevents(void) {
 	time_t now = time(0);
 	static double last_request = 0.0;
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	if (unixpw_in_progress) return;
 
@@ -1043,7 +1054,7 @@ void check_xevents(void) {
 void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	allowed_input_t input;
 
-	if (raw_fb && ! dpy) return;	/* raw_fb hack */
+	RAWFB_RET_VOID
 
 	if (unixpw_in_progress) return;
 
@@ -1072,7 +1083,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 		own_primary = 1;
 		/* we need to grab the PRIMARY selection */
 		XSetSelectionOwner(dpy, XA_PRIMARY, selwin, CurrentTime);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		if (debug_sel) {
 			rfbLog("Own PRIMARY.\n");
 		}
@@ -1082,7 +1093,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 		own_clipboard = 1;
 		/* we need to grab the CLIPBOARD selection */
 		XSetSelectionOwner(dpy, clipboard_atom, selwin, CurrentTime);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		if (debug_sel) {
 			rfbLog("Own CLIPBOARD.\n");
 		}
@@ -1117,7 +1128,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	/* copy this text to CUT_BUFFER0 as well: */
 	XChangeProperty(dpy, rootwin, XA_CUT_BUFFER0, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *) text, len);
-	XFlush(dpy);
+	XFlush_wr(dpy);
 
 	X_UNLOCK;
 

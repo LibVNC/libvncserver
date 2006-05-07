@@ -2,6 +2,7 @@
 
 #include "x11vnc.h"
 #include "win_utils.h"
+#include "xwrappers.h"
 
 char *guess_desktop(void);
 void solid_bg(int restore);
@@ -45,6 +46,8 @@ static void usr_bin_path(int restore) {
 
 static int dt_cmd(char *cmd) {
 	int rc;
+
+	RAWFB_RET(0)
 
 	if (!cmd || *cmd == '\0') {
 		return 0;
@@ -117,6 +120,8 @@ static void solid_root(char *color) {
 	XColor cdef;
 	Colormap cmap;
 
+	RAWFB_RET_VOID
+
 	if (subwin || window != rootwin) {
 		rfbLog("cannot set subwin to solid color, must be rootwin\n");
 		return;
@@ -159,7 +164,7 @@ static void solid_root(char *color) {
 		XSetWindowBackgroundPixmap(dpy, window, pixmap);
 		XFreePixmap(dpy, pixmap);
 		XClearWindow(dpy, window);
-		XFlush(dpy);
+		XFlush_wr(dpy);
 		
 		/* generate exposures */
 		XMapWindow(dpy, expose);
@@ -228,6 +233,8 @@ static void solid_cde(char *color) {
 	Colormap cmap;
 	int n;
 
+	RAWFB_RET_VOID
+
 	if (subwin || window != rootwin) {
 		rfbLog("cannot set subwin to solid color, must be rootwin\n");
 		return;
@@ -282,7 +289,7 @@ static void solid_cde(char *color) {
 			XSetWindowBackgroundPixmap(dpy, twin, pixmap);
 			XFreePixmap(dpy, pixmap);
 			XClearWindow(dpy, twin);
-			XFlush(dpy);
+			XFlush_wr(dpy);
 		}
 		
 		/* generate exposures */
@@ -481,6 +488,8 @@ static void solid_gnome(char *color) {
 	static char *orig_color = NULL;
 	static char *orig_option = NULL;
 	char *cmd;
+
+	RAWFB_RET_VOID
 	
 	if (! color) {
 		if (! orig_color) {
@@ -555,6 +564,8 @@ static void solid_kde(char *color) {
 	char *cmd, *user = NULL;
 	int len;
 
+	RAWFB_RET_VOID
+
 	user = get_user_name();
 	if (strstr(user, "'") != NULL)  {
 		rfbLog("invalid user: %s\n", user);
@@ -594,6 +605,8 @@ static void solid_kde(char *color) {
 
 char *guess_desktop(void) {
 	Atom prop;
+
+	RAWFB_RET("root")
 
 	if (wmdt_str && *wmdt_str != '\0') {
 		char *s = wmdt_str;
@@ -646,6 +659,8 @@ void solid_bg(int restore) {
 	static int solid_on = 0;
 	static char *prev_str;
 	char *dtname, *color;
+
+	RAWFB_RET_VOID
 
 	if (started_as_root == 1 && users_list) {
 		/* we are still root, don't try. */

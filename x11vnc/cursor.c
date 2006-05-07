@@ -824,6 +824,8 @@ static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 	int nm_info = 1;
 	XErrorHandler old_handler;
 
+	RAWFB_RET_VOID
+
 	X_LOCK;
 
 	if (!strcmp(s, "default") || !strcmp(s, "X") || !strcmp(s, "arrow")) {
@@ -1208,7 +1210,7 @@ static int get_xfixes_cursor(int init) {
 		return -1;
 	}
 
-	if (xfixes_present) {
+	if (xfixes_present && dpy) {
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 		int use, oldest, i;
 		time_t oldtime, now;
@@ -1388,6 +1390,7 @@ void initialize_cursors_mode(void) {
 
 int get_which_cursor(void) {
 	int which = CURS_ARROW;
+	int db = 0;
 
 	if (show_multiple_cursors) {
 		int depth;
@@ -1416,6 +1419,7 @@ int get_which_cursor(void) {
 		}
 
 		if (mode == 3 && xfixes_present && use_xfixes) {
+			if (db) fprintf(stderr, "get_which_cursor call get_xfixes_cursor\n");
 			return get_xfixes_cursor(0);
 		}
 
@@ -1444,7 +1448,7 @@ int get_which_cursor(void) {
 			int which0 = which;
 
 			/* apply crude heuristics to choose a cursor... */
-			if (win) {
+			if (win && dpy) {
 				int ratio = 10, x, y;
 				unsigned int w, h, bw, d;  
 				Window r;
@@ -1495,6 +1499,7 @@ int get_which_cursor(void) {
 			}
 		}
 	}
+	if (db) fprintf(stderr, "get_which_cursor which: %d\n", which);
 	return which;
 }
 
@@ -1768,7 +1773,7 @@ int check_x11_pointer(void) {
 	int x, y;
 	unsigned int mask;
 
-	if (raw_fb && ! dpy) return 0;	/* raw_fb hack */
+	RAWFB_RET(0)
 
 	if (unixpw_in_progress) return 0;
 

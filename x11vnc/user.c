@@ -445,10 +445,13 @@ void lurk_loop(char *str) {
 }
 
 static int guess_user_and_switch(char *str, int fb_mode) {
-	char *dstr, *d = DisplayString(dpy);
+	char *dstr, *d;
 	char *p, *tstr = NULL, *allowed = NULL, *logins, **users = NULL;
 	int dpy1, ret = 0;
 
+	RAWFB_RET(0)
+
+	d = DisplayString(dpy);
 	/* pick out ":N" */
 	dstr = strchr(d, ':');
 	if (! dstr) {
@@ -639,7 +642,7 @@ static int switch_user_env(uid_t uid, char *name, char *home, int fb_mode) {
 	 * OK tricky here, we need to free the shm... otherwise
 	 * we won't be able to delete it as the other user...
 	 */
-	if (fb_mode == 1 && using_shm) {
+	if (fb_mode == 1 && (using_shm && ! xform24to32)) {
 		reset_fb = 1;
 		clean_shm(0);
 		free_tiles();
