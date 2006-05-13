@@ -66,7 +66,10 @@
 #endif
 
 /****************************/
-#include <math.h>
+#define CEIL(x)  ( (double) ((int) (x)) == (x) ? \
+        (double) ((int) (x)) : (double) ((int) (x) + 1) )
+#define FLOOR(x) ( (double) ((int) (x)) )
+
 
 int ScaleX(rfbScreenInfoPtr from, rfbScreenInfoPtr to, int x)
 {
@@ -105,12 +108,12 @@ void rfbScaledCorrection(rfbScreenInfoPtr from, rfbScreenInfoPtr to, int *x, int
 
 
     /*cast from double to int is same as "*x = floor(x1);" */
-    x2 = floor(x1);
-    y2 = floor(y1);
+    x2 = FLOOR(x1);
+    y2 = FLOOR(y1);
 
     /* include into W and H the jitter of scaling X and Y */
-    w2 = ceil(w1 + ( x1 - x2 ));
-    h2 = ceil(h1 + ( y1 - y2 ));
+    w2 = CEIL(w1 + ( x1 - x2 ));
+    h2 = CEIL(h1 + ( y1 - y2 ));
 
     /*
      * rfbLog("%s (%dXx%dY-%dWx%dH  ->  %fXx%fY-%fWx%fH) {%dWx%dH -> %dWx%dH}\n",

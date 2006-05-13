@@ -1,8 +1,8 @@
+AM_CFLAGS=-I $(top_srcdir)
+
 CONSOLE_SRCS=VNConsole.c
 
 noinst_HEADERS=VNConsole.h vga.h
-
-CFLAGS_ADD=-I..
 
 LDADD=../libvncserver/libvncserver.a @WSOCKLIB@
 INCLUDES=-I.

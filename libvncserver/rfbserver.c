@@ -1703,11 +1703,12 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
             int y = rect.y1;
             int w = rect.x2 - x;
             int h = rect.y2 - y;
+	    int rectsPerRow, rows;
             /* We need to count the number of rects in the scaled screen */
             if (cl->screen!=cl->scaledScreen)
                 rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
-	    int rectsPerRow = (w-1)/cl->correMaxWidth+1;
-	    int rows = (h-1)/cl->correMaxHeight+1;
+	    rectsPerRow = (w-1)/cl->correMaxWidth+1;
+	    rows = (h-1)/cl->correMaxHeight+1;
 	    nUpdateRegionRects += rectsPerRow*rows;
         }
 	sraRgnReleaseIterator(i);
@@ -1749,10 +1750,11 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
             int y = rect.y1;
             int w = rect.x2 - x;
             int h = rect.y2 - y;
+            int n;
             /* We need to count the number of rects in the scaled screen */
             if (cl->screen!=cl->scaledScreen)
                 rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
-	    int n = rfbNumCodedRectsTight(cl, x, y, w, h);
+	    n = rfbNumCodedRectsTight(cl, x, y, w, h);
 	    if (n == 0) {
 		nUpdateRegionRects = 0xFFFF;
 		break;
