@@ -25,6 +25,8 @@ rfbUsage(void)
     fprintf(stderr, "-rfbwait time          max time in ms to wait for RFB client\n");
     fprintf(stderr, "-rfbauth passwd-file   use authentication on RFB protocol\n"
                     "                       (use 'storepasswd' to create a password file)\n");
+    fprintf(stderr, "-rfbversion 3.x        Set the version of the RFB we choose to advertise\n");
+    fprintf(stderr, "-permitfiletransfer    permit file transfer support\n");
     fprintf(stderr, "-passwd plain-password use authentication \n"
                     "                       (use plain-password as password, USE AT YOUR RISK)\n");
     fprintf(stderr, "-deferupdate time      time in ms to defer updates "
@@ -90,6 +92,16 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		return FALSE;
 	    }
             rfbScreen->authPasswdData = argv[++i];
+
+            fprintf(stderr, "-permitfiletransfer    permit file transfer support\n");
+        } else if (strcmp(argv[i], "-permitfiletransfer") == 0) {  /* -permitfiletransfer  */
+            rfbScreen->permitFileTransfer = TRUE;
+        } else if (strcmp(argv[i], "-rfbversion") == 0) {  /* -rfbversion 3.6  */
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
+	    sscanf(argv[++i],"%d.%d", &rfbScreen->protocolMajorVersion, &rfbScreen->protocolMinorVersion);
 	} else if (strcmp(argv[i], "-passwd") == 0) {  /* -passwd password */
 	    char **passwds = malloc(sizeof(char**)*2);
 	    if (i + 1 >= *argc) {

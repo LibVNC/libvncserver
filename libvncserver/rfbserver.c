@@ -1589,8 +1589,20 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
                     return rfbSendFileTransferMessage(cl, rfbFileTransferAccess, 0, -1 , 0, ""); /* Deny */
                 }
             }
-            rfbLog("rfbProcessFileTransfer() File Transfer Permission DENIED by default!\n");
-            return rfbSendFileTransferMessage(cl, rfbFileTransferAccess, 0, -1 , 0, ""); /* DEFAULT: DENY (for security) */
+            else
+            {
+                if (cl->screen->permitFileTransfer)
+                {
+                    rfbLog("rfbProcessFileTransfer() File Transfer Permission Granted!\n");
+                    return rfbSendFileTransferMessage(cl, rfbFileTransferAccess, 0, 1 , 0, ""); /* Permit */
+                }
+                else
+                {
+                    rfbLog("rfbProcessFileTransfer() File Transfer Permission DENIED by default!\n");
+                    return rfbSendFileTransferMessage(cl, rfbFileTransferAccess, 0, -1 , 0, ""); /* DEFAULT: DENY (for security) */
+                }
+                
+            }
         }
         break;
 

@@ -836,9 +836,10 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    screen->handleEventsEagerly = FALSE;
 
-   /* Emulate UltraVNC Server by default */
-   screen->protocolMajorVersion = 3;
-   screen->protocolMinorVersion = 6;
+   screen->protocolMajorVersion = rfbProtocolMajorVersion;
+   screen->protocolMinorVersion = rfbProtocolMinorVersion;
+
+   screen->permitFileTransfer = FALSE;
 
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);

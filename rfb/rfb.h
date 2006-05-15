@@ -348,6 +348,9 @@ typedef struct _rfbScreenInfo
     /* What does the server tell the new clients which version it supports */
     int protocolMajorVersion;
     int protocolMinorVersion;
+
+    /* command line authorization of file transfers */
+    rfbBool permitFileTransfer;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 

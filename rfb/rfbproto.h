@@ -218,7 +218,7 @@ typedef struct {
 
 #define rfbProtocolVersionFormat "RFB %03d.%03d\n"
 #define rfbProtocolMajorVersion 3
-#define rfbProtocolMinorVersion 6
+#define rfbProtocolMinorVersion 8
 /* UltraVNC Viewer examines rfbProtocolMinorVersion number (4, and 6)
  * to identify if the server supports File Transfer
  */

@@ -1,4 +1,10 @@
 2006-05-15  Steven Carr <scarr@jsa-usa.com>
+	* Default to RFB 3.8
+	* Add command line options:
+	  -rfbversion X.Y      Sets the version thatthe server reports
+	  -permitfiletransfer  Permits File Transfer (Default is Deny)
+
+2006-05-15  Steven Carr <scarr@jsa-usa.com>
 	* The great UltraVNC Compatibility Commit!
 	  libvncserver now supports the following messages:
 	   SetSingleWindow - Select a single window to be the source of the
