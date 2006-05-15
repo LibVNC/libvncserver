@@ -959,6 +959,8 @@ extern int rfbStatGetEncodingCountRcvd(rfbClientPtr cl, uint32_t type);
 /* Set which version you want to advertise 3.3, 3.6, 3.7 and 3.8 are currently supported*/
 extern void rfbSetProtocolVersion(rfbScreenInfoPtr rfbScreen, int major_, int minor_);
 
+/* send a TextChat message to a client */
+extern rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer);
 
 
 
