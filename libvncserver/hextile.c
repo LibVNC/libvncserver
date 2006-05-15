@@ -44,7 +44,7 @@ rfbSendRectEncodingHextile(rfbClientPtr cl,
                            int h)
 {
     rfbFramebufferUpdateRectHeader rect;
-
+    
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
         if (!rfbSendUpdateBuf(cl))
             return FALSE;
@@ -60,8 +60,9 @@ rfbSendRectEncodingHextile(rfbClientPtr cl,
            sz_rfbFramebufferUpdateRectHeader);
     cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-    cl->rectanglesSent[rfbEncodingHextile]++;
-    cl->bytesSent[rfbEncodingHextile] += sz_rfbFramebufferUpdateRectHeader;
+    rfbStatRecordEncodingSent(cl, rfbEncodingHextile,
+          sz_rfbFramebufferUpdateRectHeader,
+          sz_rfbFramebufferUpdateRectHeader + w * (cl->format.bitsPerPixel / 8) * h);
 
     switch (cl->format.bitsPerPixel) {
     case 8:
@@ -136,6 +137,7 @@ sendHextiles##bpp(rfbClientPtr cl, int rx, int ry, int rw, int rh) {            
             startUblen = cl->ublen;                                             \
             cl->updateBuf[startUblen] = 0;                                      \
             cl->ublen++;                                                        \
+            rfbStatRecordEncodingSentAdd(cl, rfbEncodingHextile, 1);            \
                                                                                 \
             testColours##bpp(clientPixelData, w * h,                            \
                              &mono, &solid, &newBg, &newFg);                    \
@@ -148,7 +150,6 @@ sendHextiles##bpp(rfbClientPtr cl, int rx, int ry, int rw, int rh) {            
             }                                                                   \
                                                                                 \
             if (solid) {                                                        \
-                cl->bytesSent[rfbEncodingHextile] += cl->ublen - startUblen;    \
                 continue;                                                       \
             }                                                                   \
                                                                                 \
@@ -175,15 +176,15 @@ sendHextiles##bpp(rfbClientPtr cl, int rx, int ry, int rw, int rh) {            
                 (*cl->translateFn)(cl->translateLookupTable,                    \
                                    &(cl->screen->serverFormat), &cl->format, fbptr,        \
                                    (char *)clientPixelData,                     \
-                                   cl->scaledScreen->paddedWidthInBytes, w, h);       \
+                                   cl->scaledScreen->paddedWidthInBytes, w, h); \
                                                                                 \
                 memcpy(&cl->updateBuf[cl->ublen], (char *)clientPixelData,      \
                        w * h * (bpp/8));                                        \
                                                                                 \
                 cl->ublen += w * h * (bpp/8);                                   \
+                rfbStatRecordEncodingSentAdd(cl, rfbEncodingHextile,            \
+                             w * h * (bpp/8));                                  \
             }                                                                   \
-                                                                                \
-            cl->bytesSent[rfbEncodingHextile] += cl->ublen - startUblen;        \
         }                                                                       \
     }                                                                           \
                                                                                 \
@@ -210,6 +211,7 @@ subrectEncode##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w, int h,          
                                                                                 \
     nSubrectsUblen = cl->ublen;                                                 \
     cl->ublen++;                                                                \
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingHextile, 1);                    \
                                                                                 \
     for (y=0; y<h; y++) {                                                       \
         line = data+(y*w);                                                      \
@@ -268,6 +270,7 @@ subrectEncode##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w, int h,          
                                                                                 \
                 cl->updateBuf[cl->ublen++] = rfbHextilePackXY(thex,they);       \
                 cl->updateBuf[cl->ublen++] = rfbHextilePackWH(thew,theh);       \
+                rfbStatRecordEncodingSentAdd(cl, rfbEncodingHextile, 1);        \
                                                                                 \
                 /*                                                              \
                  * Now mark the subrect as done.                                \

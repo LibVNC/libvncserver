@@ -377,7 +377,7 @@ static int HandleZRLETile(rfbClient* client,
 #undef HandleZRLETile
 #undef UncompressCPixel
 #undef REALBPP
-#undef UNCOMP
 
 #endif
 
+#undef UNCOMP

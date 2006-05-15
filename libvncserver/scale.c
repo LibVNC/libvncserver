@@ -128,8 +128,8 @@ void rfbScaledCorrection(rfbScreenInfoPtr from, rfbScreenInfoPtr to, int *x, int
     *h = (int)h2;
 
     /* Small changes for a thumbnail may be scaled to zero */
-    if (*w==0) *w++;
-    if (*h==0) *h++;
+    if (*w==0) (*w)++;
+    if (*h==0) (*h)++;
     /* scaling from small to big may overstep the size a bit */
     if (*x+*w > to->width)  *w=to->width - *x;
     if (*y+*h > to->height) *h=to->height - *y;
@@ -212,7 +212,9 @@ void rfbScaledScreenUpdateRect(rfbScreenInfoPtr screen, rfbScreenInfoPtr ptr, in
                  pixel_value += (srcptr2[z] << (8 * z));
                 break;
               }
-              //srcptr2 += bytesPerPixel;
+              /*
+              srcptr2 += bytesPerPixel;
+              */
 
             red += ((pixel_value >> redShift) & redMax);
             green += ((pixel_value >> greenShift) & greenMax);

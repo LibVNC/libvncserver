@@ -218,8 +218,10 @@ typedef struct {
 
 #define rfbProtocolVersionFormat "RFB %03d.%03d\n"
 #define rfbProtocolMajorVersion 3
-#define rfbProtocolMinorVersion 7
-#define rfbProtocolFallbackMinorVersion 3
+#define rfbProtocolMinorVersion 6
+/* UltraVNC Viewer examines rfbProtocolMinorVersion number (4, and 6)
+ * to identify if the server supports File Transfer
+ */
 
 typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 
@@ -397,24 +399,18 @@ typedef struct {
 #define rfbEncodingRRE 2
 #define rfbEncodingCoRRE 4
 #define rfbEncodingHextile 5
-#ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbEncodingZlib 6
 #define rfbEncodingTight 7
 #define rfbEncodingZlibHex 8
-#endif
 #define rfbEncodingUltra 9
-#ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbEncodingZRLE 16
-#endif
 
 /* Cache & XOR-Zlib - rdv@2002 */
 #define rfbEncodingCache                 0xFFFF0000
 #define rfbEncodingCacheEnable           0xFFFF0001
-#ifdef LIBVNCSERVER_HAVE_LIBZ
 #define rfbEncodingXOR_Zlib              0xFFFF0002
 #define rfbEncodingXORMonoColor_Zlib     0xFFFF0003
 #define rfbEncodingXORMultiColor_Zlib    0xFFFF0004
-#endif
 #define rfbEncodingSolidColor            0xFFFF0005
 #define rfbEncodingXOREnable             0xFFFF0006
 #define rfbEncodingCacheZip              0xFFFF0007
@@ -649,11 +645,11 @@ typedef struct {
 #define rfbHextileExtractW(byte) (((byte) >> 4) + 1)
 #define rfbHextileExtractH(byte) (((byte) & 0xf) + 1)
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * zlib - zlib compressed Encoding.  We have an rfbZlibHeader structure
  * giving the number of bytes following.  Finally the data follows is
  * zlib compressed version of the raw pixel data as negotiated.
+ * (NOTE: also used by Ultra Encoding)
  */
 
 typedef struct {
@@ -662,6 +658,7 @@ typedef struct {
 
 #define sz_rfbZlibHeader 4
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * Tight Encoding.
@@ -935,9 +932,10 @@ typedef struct {
 typedef struct _rfbFileTransferMsg {
     uint8_t type;			/* always rfbFileTransfer */
     uint8_t contentType;  /*  See defines below */
-    uint16_t contentParam;/*  Other possible content classification (Dir or File name, etc..) */
-	uint32_t size;		/*  FileSize or packet index or error or other  */
-	/*  uint32_t sizeH;		 Additional 32Bits params to handle big values. Only for V2 (we want backward compatibility between all V1 versions) */
+    uint8_t contentParam;/*  Other possible content classification (Dir or File name, etc..) */
+    uint8_t pad;         /* It appears that UltraVNC *forgot* to Swap16IfLE(contentParam) */
+    uint32_t size;		/*  FileSize or packet index or error or other  */
+/*  uint32_t sizeH;		 Additional 32Bits params to handle big values. Only for V2 (we want backward compatibility between all V1 versions) */
     uint32_t length;
     /* followed by data char text[length] */
 } rfbFileTransferMsg;

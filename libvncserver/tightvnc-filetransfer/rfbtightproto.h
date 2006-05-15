@@ -28,6 +28,12 @@
 #include <rfb/rfb.h>
 #include <limits.h>
 
+/* PATH_MAX is not defined in limits.h on some platforms */
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+
 #define rfbSecTypeTight 16
 
 void rfbTightUsage(void);

@@ -663,8 +663,8 @@ SendTightHeader(rfbClientPtr cl,
            sz_rfbFramebufferUpdateRectHeader);
     cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-    cl->rectanglesSent[rfbEncodingTight]++;
-    cl->bytesSent[rfbEncodingTight] += sz_rfbFramebufferUpdateRectHeader;
+    rfbStatRecordEncodingSent(cl, rfbEncodingTight, sz_rfbFramebufferUpdateRectHeader,
+                              sz_rfbFramebufferUpdateRectHeader + w * (cl->format.bitsPerPixel / 8) * h);
 
     return TRUE;
 }
@@ -693,7 +693,7 @@ SendSolidRect(rfbClientPtr cl)
     memcpy (&cl->updateBuf[cl->ublen], tightBeforeBuf, len);
     cl->ublen += len;
 
-    cl->bytesSent[rfbEncodingTight] += len + 1;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, len+1);
 
     return TRUE;
 }
@@ -736,7 +736,7 @@ SendMonoRect(rfbClientPtr cl,
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteLen);
         cl->ublen += paletteLen;
-        cl->bytesSent[rfbEncodingTight] += 3 + paletteLen;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 3 + paletteLen);
         break;
 
     case 16:
@@ -747,7 +747,7 @@ SendMonoRect(rfbClientPtr cl,
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, 4);
         cl->ublen += 4;
-        cl->bytesSent[rfbEncodingTight] += 7;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 7);
         break;
 
     default:
@@ -755,7 +755,7 @@ SendMonoRect(rfbClientPtr cl,
 
         cl->updateBuf[cl->ublen++] = (char)monoBackground;
         cl->updateBuf[cl->ublen++] = (char)monoForeground;
-        cl->bytesSent[rfbEncodingTight] += 5;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 5);
     }
 
     return CompressData(cl, streamId, dataLen,
@@ -801,7 +801,7 @@ SendIndexedRect(rfbClientPtr cl,
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteNumColors * entryLen);
         cl->ublen += paletteNumColors * entryLen;
-        cl->bytesSent[rfbEncodingTight] += 3 + paletteNumColors * entryLen;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 3 + paletteNumColors * entryLen);
         break;
 
     case 16:
@@ -814,7 +814,7 @@ SendIndexedRect(rfbClientPtr cl,
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteNumColors * 2);
         cl->ublen += paletteNumColors * 2;
-        cl->bytesSent[rfbEncodingTight] += 3 + paletteNumColors * 2;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 3 + paletteNumColors * 2);
         break;
 
     default:
@@ -840,7 +840,7 @@ SendFullColorRect(rfbClientPtr cl,
     }
 
     cl->updateBuf[cl->ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
-    cl->bytesSent[rfbEncodingTight]++;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
 
     if (usePixelFormat24) {
         Pack24(cl, tightBeforeBuf, &cl->format, w * h);
@@ -874,7 +874,7 @@ SendGradientRect(rfbClientPtr cl,
 
     cl->updateBuf[cl->ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     cl->updateBuf[cl->ublen++] = rfbTightFilterGradient;
-    cl->bytesSent[rfbEncodingTight] += 2;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 2);
 
     if (usePixelFormat24) {
         FilterGradient24(cl, tightBeforeBuf, &cl->format, w, h);
@@ -905,7 +905,7 @@ CompressData(rfbClientPtr cl,
     if (dataLen < TIGHT_MIN_TO_COMPRESS) {
         memcpy(&cl->updateBuf[cl->ublen], tightBeforeBuf, dataLen);
         cl->ublen += dataLen;
-        cl->bytesSent[rfbEncodingTight] += dataLen;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, dataLen);
         return TRUE;
     }
 
@@ -955,15 +955,15 @@ static rfbBool SendCompressedData(rfbClientPtr cl,
     int i, portionLen;
 
     cl->updateBuf[cl->ublen++] = compressedLen & 0x7F;
-    cl->bytesSent[rfbEncodingTight]++;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
     if (compressedLen > 0x7F) {
         cl->updateBuf[cl->ublen-1] |= 0x80;
         cl->updateBuf[cl->ublen++] = compressedLen >> 7 & 0x7F;
-        cl->bytesSent[rfbEncodingTight]++;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
         if (compressedLen > 0x3FFF) {
             cl->updateBuf[cl->ublen-1] |= 0x80;
             cl->updateBuf[cl->ublen++] = compressedLen >> 14 & 0xFF;
-            cl->bytesSent[rfbEncodingTight]++;
+            rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
         }
     }
 
@@ -979,7 +979,7 @@ static rfbBool SendCompressedData(rfbClientPtr cl,
         memcpy(&cl->updateBuf[cl->ublen], &tightAfterBuf[i], portionLen);
         cl->ublen += portionLen;
     }
-    cl->bytesSent[rfbEncodingTight] += compressedLen;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, compressedLen);
 
     return TRUE;
 }
@@ -1686,7 +1686,7 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
     }
 
     cl->updateBuf[cl->ublen++] = (char)(rfbTightJpeg << 4);
-    cl->bytesSent[rfbEncodingTight]++;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
 
     return SendCompressedData(cl, jpegDstDataLen);
 }

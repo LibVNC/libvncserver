@@ -239,8 +239,18 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 	tv.tv_usec = usec;
 	nfds = select(rfbScreen->maxFd + 1, &fds, NULL, NULL /* &fds */, &tv);
 	if (nfds == 0) {
+	    /* timed out, check for async events */
+            i = rfbGetClientIterator(rfbScreen);
+            while((cl = rfbClientIteratorNext(i))) {
+                if (cl->onHold)
+                    continue;
+                if (FD_ISSET(cl->sock, &(rfbScreen->allFds)))
+                    rfbSendFileTransferChunk(cl);
+            }
+            rfbReleaseClientIterator(i);
 	    return result;
 	}
+
 	if (nfds < 0) {
 #ifdef WIN32
 	    errno = WSAGetLastError();
@@ -332,11 +342,17 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 
 	i = rfbGetClientIterator(rfbScreen);
 	while((cl = rfbClientIteratorNext(i))) {
+
 	    if (cl->onHold)
 		continue;
-	    if (FD_ISSET(cl->sock, &fds) &&
-		    FD_ISSET(cl->sock, &(rfbScreen->allFds)))
-		rfbProcessClientMessage(cl);
+
+            if (FD_ISSET(cl->sock, &(rfbScreen->allFds)))
+            {
+                if (FD_ISSET(cl->sock, &fds))
+                    rfbProcessClientMessage(cl);
+                else
+                    rfbSendFileTransferChunk(cl);
+            }
 	}
 	rfbReleaseClientIterator(i);
     } while(rfbScreen->handleEventsEagerly);

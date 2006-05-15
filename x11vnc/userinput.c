@@ -4082,7 +4082,7 @@ int fb_update_sent(int *count) {
 
 	i = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(i)) ) {
-		sent += cl->framebufferUpdateMessagesSent;
+		sent += rfbStatGetMessageCountSent(cl, rfbFramebufferUpdate);
 	}
 	rfbReleaseClientIterator(i);
 	if (sent != last_count) {

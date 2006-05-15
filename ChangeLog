@@ -1,3 +1,23 @@
+2006-05-15  Steven Carr <scarr@jsa-usa.com>
+	* The great UltraVNC Compatibility Commit!
+	  libvncserver now supports the following messages:
+	   SetSingleWindow - Select a single window to be the source of the
+	                     framebuffer.
+	   ServerInput     - Disable and blank the servers display
+	   TextChat        - TextChat between the remote/local user
+	                     (Bandwidth friendly VS the Notepad approach)
+	   FileTransfer    - Emulates a Windows Filesystem to the viewer
+	                     (Currently does not support Delta Transfers)
+	                     (Currently does not support Sending Directories)
+	   UltraZip        - Improved UltraZip support
+	* Improved Statistics SubSystem, now supports all encodings
+	* RFB 3.8 support!   Error Messages are a 'Good Thing' (tm)
+	* Default to identify as RFB 3.6 to emulate UltraVNC server
+	  (Server now has the ability to set the RFB version reported)
+	  (permits the viewer to identify the server has FileTransfer ability)
+	* Client Encoding AutoSelection Supported (UltraViewer is speed aware)
+	* libvncclient has improved server detection/capabilities logic!
+
 2006-05-13  Karl Runge <runge@karlrunge.com>
 	* minilzo.c,minilzo.h,lzoconf.h: switch to non-CRLF versions.
 	* libvncclient/Makefile.am: add minilzo.c, minilzo.h, lzoconf.h

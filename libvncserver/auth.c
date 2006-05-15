@@ -317,7 +317,12 @@ rfbAuthProcessClientMessage(rfbClientPtr cl)
         if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
             rfbLogPerror("rfbAuthProcessClientMessage: write");
         }
-        rfbCloseClient(cl);
+	/* support RFB 3.8 clients, they expect a reason *why* it was disconnected */
+        if (cl->protocolMinorVersion > 7) {
+            rfbClientConnFailed(cl, "password check failed!");
+	}
+	else
+            rfbCloseClient(cl);
         return;
     }
 

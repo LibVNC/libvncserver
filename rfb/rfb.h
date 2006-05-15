@@ -136,8 +136,22 @@ typedef rfbBool (*rfbPasswordCheckProcPtr)(struct _rfbClientRec* cl,const char* 
 typedef enum rfbNewClientAction (*rfbNewClientHookPtr)(struct _rfbClientRec* cl);
 typedef void (*rfbDisplayHookPtr)(struct _rfbClientRec* cl);
 /* support the capability to view the caps/num/scroll states of the X server */
-typedef int (*rfbGetKeyboardLedStateHookPtr)(struct _rfbScreenInfo* screen);
-
+typedef int  (*rfbGetKeyboardLedStateHookPtr)(struct _rfbScreenInfo* screen);
+/* If x==1 and y==1 then set the whole display
+ * else find the window underneath x and y and set the framebuffer to the dimensions
+ * of that window
+ */
+typedef void (*rfbSetSingleWindowProcPtr) (struct _rfbClientRec* cl, int x, int y);
+/* Status determines if the X11 server permits input from the local user 
+ * status==0 or 1
+ */
+typedef void (*rfbSetServerInputProcPtr) (struct _rfbClientRec* cl, int status);
+/* Permit the server to allow or deny filetransfers.   This is defaulted to deny
+ * It is called when a client initiates a connection to determine if it is permitted.
+ */
+typedef int  (*rfbFileTransferPermitted) (struct _rfbClientRec* cl);
+/* Handle the textchat messages */
+typedef void (*rfbSetTextChat) (struct _rfbClientRec* cl, int length, char *string);
 
 typedef struct {
   uint32_t count;
@@ -296,7 +310,11 @@ typedef struct _rfbScreenInfo
     rfbSetXCutTextProcPtr setXCutText;
     rfbGetCursorProcPtr getCursorPtr;
     rfbSetTranslateFunctionProcPtr setTranslateFunction;
-  
+    rfbSetSingleWindowProcPtr setSingleWindow;
+    rfbSetServerInputProcPtr  setServerInput;
+    rfbFileTransferPermitted  getFileTransferPermission;
+    rfbSetTextChat            setTextChat;
+    
     /* newClientHook is called just after a new client is created */
     rfbNewClientHookPtr newClientHook;
     /* displayHook is called just before a frame buffer update */
@@ -326,6 +344,10 @@ typedef struct _rfbScreenInfo
 
     /* rfbEncodingServerIdentity */
     char *versionString;
+
+    /* What does the server tell the new clients which version it supports */
+    int protocolMajorVersion;
+    int protocolMinorVersion;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -350,6 +372,27 @@ typedef struct sraRegion* sraRegionPtr;
  */
 
 typedef void (*ClientGoneHookPtr)(struct _rfbClientRec* cl);
+
+typedef struct _rfbFileTransferData {
+  int fd;
+  int compressionEnabled;
+  int fileSize;
+  int numPackets;
+  int receiving;
+  int sending;
+} rfbFileTransferData;
+
+
+typedef struct _rfbStatList {
+    uint32_t type;
+    uint32_t sentCount;
+    uint32_t bytesSent;
+    uint32_t bytesSentIfRaw;
+    uint32_t rcvdCount;
+    uint32_t bytesRcvd;
+    uint32_t bytesRcvdIfRaw;
+    struct _rfbStatList *Next;
+} rfbStatList;
 
 typedef struct _rfbClientRec {
   
@@ -467,20 +510,11 @@ typedef struct _rfbClientRec {
     int ublen;
 
     /* statistics */
-
-    int bytesSent[MAX_ENCODINGS];
-    int rectanglesSent[MAX_ENCODINGS];
-    int lastRectMarkersSent;
-    int lastRectBytesSent;
-    int cursorShapeBytesSent;
-    int cursorShapeUpdatesSent;
-    int cursorPosBytesSent;
-    int cursorPosUpdatesSent;
-    int framebufferUpdateMessagesSent;
+    struct _rfbStatList *statEncList;
+    struct _rfbStatList *statMsgList;
     int rawBytesEquivalent;
-    int keyEventsRcvd;
-    int pointerEventsRcvd;
-
+    int bytesSent;
+        
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     /* zlib encoding -- necessary compression state info per client */
 
@@ -502,6 +536,7 @@ typedef struct _rfbClientRec {
     rfbBool compStreamInitedLZO;
     char *lzoWrkMem;
 
+    rfbFileTransferData fileTransfer;
 
     int     lastKeyboardLedState;     /* keep track of last value so we can send *change* events */
     rfbBool enableSupportedMessages;  /* client supports SupportedMessages encoding */
@@ -584,6 +619,11 @@ extern char rfbEndianTest;
 #define Swap24IfLE(l) (rfbEndianTest ? Swap24(l) : (l))
 #define Swap32IfLE(l) (rfbEndianTest ? Swap32(l) : (l))
 
+/* UltraVNC uses some windows structures unmodified, so the viewer expects LittleEndian Data */
+#define Swap16IfBE(s) (rfbEndianTest ? (s) : Swap16(s))
+#define Swap24IfBE(l) (rfbEndianTest ? (l) : Swap24(l))
+#define Swap32IfBE(l) (rfbEndianTest ? (l) : Swap32(l))
+
 /* sockets.c */
 
 extern int rfbMaxClientWait;
@@ -633,6 +673,13 @@ extern rfbBool rfbSendLastRectMarker(rfbClientPtr cl);
 extern rfbBool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
 extern rfbBool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
 extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
+
+extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
+extern rfbBool rfbSendFileTransferChunk(rfbClientPtr cl);
+extern rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer);
+extern rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, char *buffer);
+extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
+extern rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length);
 
 void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
 
@@ -879,6 +926,38 @@ extern rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo);
 /* TightVNC file transfer extension */
 void rfbRegisterTightVNCFileTransferExtension();
 void rfbUnregisterTightVNCFileTransferExtension(); 
+
+/* Statistics */
+extern char *messageNameServer2Client(uint32_t type, char *buf, int len);
+extern char *messageNameClient2Server(uint32_t type, char *buf, int len);
+extern char *encodingName(uint32_t enc, char *buf, int len);
+
+extern rfbStatList *rfbStatLookupEncoding(rfbClientPtr cl, uint32_t type);
+extern rfbStatList *rfbStatLookupMessage(rfbClientPtr cl, uint32_t type);
+
+/* Each call to rfbStatRecord* adds one to the rect count for that type */
+extern void rfbStatRecordEncodingSent(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
+extern void rfbStatRecordEncodingSentAdd(rfbClientPtr cl, uint32_t type, int byteCount); /* Specifically for tight encoding */
+extern void rfbStatRecordEncodingRcvd(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
+extern void rfbStatRecordMessageSent(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
+extern void rfbStatRecordMessageRcvd(rfbClientPtr cl, uint32_t type, int byteCount, int byteIfRaw);
+extern void rfbResetStats(rfbClientPtr cl);
+extern void rfbPrintStats(rfbClientPtr cl);
+
+extern int rfbStatGetSentBytes(rfbClientPtr cl);
+extern int rfbStatGetSentBytesIfRaw(rfbClientPtr cl);
+extern int rfbStatGetRcvdBytes(rfbClientPtr cl);
+extern int rfbStatGetRcvdBytesIfRaw(rfbClientPtr cl);
+extern int rfbStatGetMessageCountSent(rfbClientPtr cl, uint32_t type);
+extern int rfbStatGetMessageCountRcvd(rfbClientPtr cl, uint32_t type);
+extern int rfbStatGetEncodingCountSent(rfbClientPtr cl, uint32_t type);
+extern int rfbStatGetEncodingCountRcvd(rfbClientPtr cl, uint32_t type);
+
+/* Set which version you want to advertise 3.3, 3.6, 3.7 and 3.8 are currently supported*/
+extern void rfbSetProtocolVersion(rfbScreenInfoPtr rfbScreen, int major_, int minor_);
+
+
+
 
 #endif
 

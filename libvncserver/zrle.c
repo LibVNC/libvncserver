@@ -124,9 +124,8 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
     break;
   }
 
-  cl->rectanglesSent[rfbEncodingZRLE]++;
-  cl->bytesSent[rfbEncodingZRLE] += (sz_rfbFramebufferUpdateRectHeader
-                                        + sz_rfbZRLEHeader + ZRLE_BUFFER_LENGTH(&zos->out));
+  rfbStatRecordEncodingSent(cl, rfbEncodingZRLE, sz_rfbFramebufferUpdateRectHeader + sz_rfbZRLEHeader + ZRLE_BUFFER_LENGTH(&zos->out),
+      + w * (cl->format.bitsPerPixel / 8) * h);
 
   if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbZRLEHeader
       > UPDATE_BUF_SIZE)

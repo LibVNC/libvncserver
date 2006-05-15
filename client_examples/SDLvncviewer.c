@@ -150,6 +150,26 @@ static void kbd_leds(rfbClient* cl, int value, int pad) {
 	fflush(stderr);
 }
 
+/* trivial support for textchat */
+static void text_chat(rfbClient* cl, int value, char *text) {
+	switch(value) {
+	case rfbTextChatOpen:
+		fprintf(stderr,"TextChat: We should open a textchat window!\n");
+		TextChatOpen(cl);
+		break;
+	case rfbTextChatClose:
+		fprintf(stderr,"TextChat: We should close our window!\n");
+		break;
+	case rfbTextChatFinished:
+		fprintf(stderr,"TextChat: We should close our window!\n");
+		break;
+	default:
+		fprintf(stderr,"TextChat: Received \"%s\"\n", text);
+		break;
+	}
+	fflush(stderr);
+}
+
 #ifdef __MINGW32__
 #define LOG_TO_FILE
 #endif
@@ -212,7 +232,7 @@ int main(int argc,char** argv) {
 	cl->canHandleNewFBSize = TRUE;
 	cl->GotFrameBufferUpdate=update;
 	cl->HandleKeyboardLedState=kbd_leds;
-	
+	cl->HandleTextChat=text_chat;
 	if(!rfbInitClient(cl,&argc,argv))
 		return 1;
 

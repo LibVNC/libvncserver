@@ -224,6 +224,99 @@ static rfbBool HandleZRLE32(rfbClient* client, int rx, int ry, int rw, int rh);
 #endif
 
 /*
+ * Server Capability Functions
+ */
+rfbBool
+SupportsClient2Server(rfbClient* client, int messageType)
+{
+    return (client->supportedMessages.client2server[((messageType & 0xFF)/8)] & (1<<(messageType % 8)) ? TRUE : FALSE);
+}
+
+rfbBool
+SupportsServer2Client(rfbClient* client, int messageType)
+{
+    return (client->supportedMessages.server2client[((messageType & 0xFF)/8)] & (1<<(messageType % 8)) ? TRUE : FALSE);
+}
+
+void
+SetClient2Server(rfbClient* client, int messageType)
+{
+  client->supportedMessages.client2server[((messageType & 0xFF)/8)] |= (1<<(messageType % 8));
+}
+
+void
+SetServer2Client(rfbClient* client, int messageType)
+{
+  client->supportedMessages.server2client[((messageType & 0xFF)/8)] |= (1<<(messageType % 8));
+}
+
+void
+ClearClient2Server(rfbClient* client, int messageType)
+{
+  client->supportedMessages.client2server[((messageType & 0xFF)/8)] &= (!(1<<(messageType % 8)));
+}
+
+void
+ClearServer2Client(rfbClient* client, int messageType)
+{
+  client->supportedMessages.server2client[((messageType & 0xFF)/8)] &= (!(1<<(messageType % 8)));
+}
+
+
+void
+DefaultSupportedMessages(rfbClient* client)
+{
+    memset((char *)&client->supportedMessages,0,sizeof(client->supportedMessages));
+
+    /* Default client supported messages (universal RFB 3.3 protocol) */
+    SetClient2Server(client, rfbSetPixelFormat);
+    /* SetClient2Server(client, rfbFixColourMapEntries); Not currently supported */
+    SetClient2Server(client, rfbSetEncodings);
+    SetClient2Server(client, rfbFramebufferUpdateRequest);
+    SetClient2Server(client, rfbKeyEvent);
+    SetClient2Server(client, rfbPointerEvent);
+    SetClient2Server(client, rfbClientCutText);
+    /* technically, we only care what we can *send* to the server
+     * but, we set Server2Client Just in case it ever becomes useful
+     */
+    SetServer2Client(client, rfbFramebufferUpdate);
+    SetServer2Client(client, rfbSetColourMapEntries);
+    SetServer2Client(client, rfbBell);
+    SetServer2Client(client, rfbServerCutText);
+}
+
+void
+DefaultSupportedMessagesUltraVNC(rfbClient* client)
+{
+    DefaultSupportedMessages(client);
+    SetClient2Server(client, rfbFileTransfer);
+    SetClient2Server(client, rfbSetScale);
+    SetClient2Server(client, rfbSetServerInput);
+    SetClient2Server(client, rfbSetSW);
+    SetClient2Server(client, rfbTextChat);
+    SetClient2Server(client, rfbPalmVNCSetScaleFactor);
+    /* technically, we only care what we can *send* to the server */
+    SetServer2Client(client, rfbResizeFrameBuffer);
+    SetServer2Client(client, rfbPalmVNCReSizeFrameBuffer);
+    SetServer2Client(client, rfbFileTransfer);
+    SetServer2Client(client, rfbTextChat);
+}
+
+
+void
+DefaultSupportedMessagesTightVNC(rfbClient* client)
+{
+    DefaultSupportedMessages(client);
+    SetClient2Server(client, rfbFileTransfer);
+    SetClient2Server(client, rfbSetServerInput);
+    SetClient2Server(client, rfbSetSW);
+    /* SetClient2Server(client, rfbTextChat); */
+    /* technically, we only care what we can *send* to the server */
+    SetServer2Client(client, rfbFileTransfer);
+    SetServer2Client(client, rfbTextChat);
+}
+
+/*
  * ConnectToRFBServer.
  */
 
@@ -310,26 +403,87 @@ InitialiseRFBConnection(rfbClient* client)
     return FALSE;
   }
 
-#if rfbProtocolMinorVersion == 7
-  /* work around LibVNCClient not yet speaking RFB 3.7 */
-#undef rfbProtocolMinorVersion
-#define rfbProtocolMinorVersion 3
-#endif
+
+  DefaultSupportedMessages(client);
+  client->major = major;
+  client->minor = minor;
+
+  /* fall back to viewer supported version */
+  if ((major==rfbProtocolMajorVersion) && (minor>rfbProtocolMinorVersion))
+    client->minor = rfbProtocolMinorVersion;
+
+  /* UltraVNC uses minor codes 4 and 6 for the server */
+  if (major==3 && (minor==4 || minor==6)) {
+      rfbClientLog("UltraVNC server detected, enabling UltraVNC specific messages\n",pv);
+      DefaultSupportedMessagesUltraVNC(client);
+  }
+
+  /* TightVNC uses minor codes 5 for the server */
+  if (major==3 && minor==5) {
+      rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n",pv);
+      DefaultSupportedMessagesTightVNC(client);
+  }
+
+  /* we do not support > RFB3.8 */
+  if (major==3 && minor>8)
+    client->minor=8;
 
   rfbClientLog("VNC server supports protocol version %d.%d (viewer %d.%d)\n",
 	  major, minor, rfbProtocolMajorVersion, rfbProtocolMinorVersion);
 
-  major = rfbProtocolMajorVersion;
-  minor = rfbProtocolMinorVersion;
-
-  sprintf(pv,rfbProtocolVersionFormat,major,minor);
+  sprintf(pv,rfbProtocolVersionFormat,client->major,client->minor);
 
   if (!WriteToRFBServer(client, pv, sz_rfbProtocolVersionMsg)) return FALSE;
 
-  if (!ReadFromRFBServer(client, (char *)&authScheme, 4)) return FALSE;
 
-  authScheme = rfbClientSwap32IfLE(authScheme);
+  /* 3.7 and onwards sends a # of security types first */
+  if (client->major==3 && client->minor > 6)
+  {
+    uint8_t count=0;
+    uint8_t loop=0;
+    uint8_t flag=0;
+    uint8_t tAuth=0;
+    
+    if (!ReadFromRFBServer(client, (char *)&count, 1)) return FALSE;
 
+    if (count==0)
+    {
+        rfbClientLog("List of security types is ZERO, expecting an error to follow\n"); 
+
+        /* we have an error following */
+        if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
+        reasonLen = rfbClientSwap32IfLE(reasonLen);
+        reason = malloc(reasonLen);
+        if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
+        rfbClientLog("VNC connection failed: %.*s\n",(int)reasonLen, reason);
+        free(reason);
+        return FALSE;
+    }
+
+    rfbClientLog("We have %d security types to read\n", count);
+    /* now, we have a list of available security types to read ( uint8_t[] ) */
+    for (loop=0;loop<count;loop++)
+    {
+        if (!ReadFromRFBServer(client, (char *)&tAuth, 1)) return FALSE;
+        rfbClientLog("%d) Received security type %d\n", loop, tAuth);
+        if ((flag==0) && ((tAuth==rfbVncAuth) || (tAuth==rfbNoAuth)))
+        {
+            flag++;
+            authScheme=tAuth;
+            rfbClientLog("Selecting security type %d (%d/%d in the list)\n", authScheme, loop, count);
+            /* send back a single byte indicating which security type to use */
+            if (!WriteToRFBServer(client, (char *)&tAuth, 1)) return FALSE;
+        }
+    }
+  }
+  else
+  {
+    if (!ReadFromRFBServer(client, (char *)&authScheme, 4)) return FALSE;
+    authScheme = rfbClientSwap32IfLE(authScheme);
+  }
+  
+  rfbClientLog("Selected Security Scheme %d\n", authScheme);
+  
   switch (authScheme) {
 
   case rfbConnFailed:
@@ -338,9 +492,10 @@ InitialiseRFBConnection(rfbClient* client)
 
     reason = malloc(reasonLen);
 
-    if (!ReadFromRFBServer(client, reason, reasonLen)) return FALSE;
+    if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
 
     rfbClientLog("VNC connection failed: %.*s\n",(int)reasonLen, reason);
+    free(reason);
     return FALSE;
 
   case rfbNoAuth:
@@ -382,6 +537,17 @@ InitialiseRFBConnection(rfbClient* client)
       rfbClientLog("VNC authentication succeeded\n");
       break;
     case rfbVncAuthFailed:
+      if (client->major==3 && client->minor>7)
+      {
+        /* we have an error following */
+        if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
+        reasonLen = rfbClientSwap32IfLE(reasonLen);
+        reason = malloc(reasonLen);
+        if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
+        rfbClientLog("VNC connection failed: %.*s\n",(int)reasonLen, reason);
+        free(reason);
+        return FALSE;
+      }
       rfbClientLog("VNC authentication failed\n");
       return FALSE;
     case rfbVncAuthTooMany:
@@ -427,7 +593,7 @@ InitialiseRFBConnection(rfbClient* client)
   rfbClientLog("Desktop name \"%s\"\n",client->desktopName);
 
   rfbClientLog("Connected to VNC server, using protocol version %d.%d\n",
-	  rfbProtocolMajorVersion, rfbProtocolMinorVersion);
+	  client->major, client->minor);
 
   rfbClientLog("VNC server default format:\n");
   PrintPixelFormat(&client->si.format);
@@ -445,6 +611,7 @@ SetFormatAndEncodings(rfbClient* client)
 {
   rfbSetPixelFormatMsg spf;
   char buf[sz_rfbSetEncodingsMsg + MAX_ENCODINGS * 4];
+
   rfbSetEncodingsMsg *se = (rfbSetEncodingsMsg *)buf;
   uint32_t *encs = (uint32_t *)(&buf[sz_rfbSetEncodingsMsg]);
   int len = 0;
@@ -452,6 +619,8 @@ SetFormatAndEncodings(rfbClient* client)
   rfbBool requestQualityLevel = FALSE;
   rfbBool requestLastRectEncoding = FALSE;
   rfbClientProtocolExtension* e;
+
+  if (!SupportsClient2Server(client, rfbSetPixelFormat)) return TRUE;
 
   spf.type = rfbSetPixelFormat;
   spf.format = client->format;
@@ -461,6 +630,9 @@ SetFormatAndEncodings(rfbClient* client)
 
   if (!WriteToRFBServer(client, (char *)&spf, sz_rfbSetPixelFormatMsg))
     return FALSE;
+
+
+  if (!SupportsClient2Server(client, rfbSetEncodings)) return TRUE;
 
   se->type = rfbSetEncodings;
   se->nEncodings = 0;
@@ -641,7 +813,7 @@ SetFormatAndEncodings(rfbClient* client)
 rfbBool
 SendIncrementalFramebufferUpdateRequest(rfbClient* client)
 {
-  return SendFramebufferUpdateRequest(client, 0, 0, client->width,
+    return SendFramebufferUpdateRequest(client, 0, 0, client->width,
 				      client->height, TRUE);
 }
 
@@ -655,6 +827,8 @@ SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, rfbB
 {
   rfbFramebufferUpdateRequestMsg fur;
 
+  if (!SupportsClient2Server(client, rfbFramebufferUpdateRequest)) return TRUE;
+  
   fur.type = rfbFramebufferUpdateRequest;
   fur.incremental = incremental ? 1 : 0;
   fur.x = rfbClientSwap16IfLE(x);
@@ -677,18 +851,104 @@ SendScaleSetting(rfbClient* client,int scaleSetting)
 {
   rfbSetScaleMsg ssm;
 
-  if (client->appData.palmVNC)
-      ssm.type = rfbPalmVNCSetScaleFactor;
-  else
-      ssm.type = rfbSetScale;
   ssm.scale = scaleSetting;
   ssm.pad = 0;
   
-  if (!WriteToRFBServer(client, (char *)&ssm, sz_rfbSetScaleMsg))
-    return FALSE;
+  /* favor UltraVNC SetScale if both are supported */
+  if (SupportsClient2Server(client, rfbSetScale)) {
+      ssm.type = rfbSetScale;
+      if (!WriteToRFBServer(client, (char *)&ssm, sz_rfbSetScaleMsg))
+          return FALSE;
+  }
+  
+  if (SupportsClient2Server(client, rfbPalmVNCSetScaleFactor)) {
+      ssm.type = rfbPalmVNCSetScaleFactor;
+      if (!WriteToRFBServer(client, (char *)&ssm, sz_rfbSetScaleMsg))
+          return FALSE;
+  }
 
   return TRUE;
 }
+
+/*
+ * TextChatFunctions (UltraVNC)
+ * Extremely bandwidth friendly method of communicating with a user
+ * (Think HelpDesk type applications)
+ */
+
+rfbBool TextChatSend(rfbClient* client, char *text)
+{
+    rfbTextChatMsg chat;
+    int count = strlen(text);
+
+    if (!SupportsClient2Server(client, rfbTextChat)) return TRUE;
+    chat.type = rfbTextChat;
+    chat.pad1 = 0;
+    chat.pad2 = 0;
+    chat.length = (uint32_t)count;
+    chat.length = rfbClientSwap32IfLE(chat.length);
+
+    if (!WriteToRFBServer(client, (char *)&chat, sz_rfbTextChatMsg))
+        return FALSE;
+
+    if (count>0) {
+        if (!WriteToRFBServer(client, text, count))
+            return FALSE;
+    }
+    return TRUE;
+}
+
+rfbBool TextChatOpen(rfbClient* client)
+{
+    rfbTextChatMsg chat;
+
+    if (!SupportsClient2Server(client, rfbTextChat)) return TRUE;
+    chat.type = rfbTextChat;
+    chat.pad1 = 0;
+    chat.pad2 = 0;
+    chat.length = rfbClientSwap32IfLE(rfbTextChatOpen);
+    return  (WriteToRFBServer(client, (char *)&chat, sz_rfbTextChatMsg) ? TRUE : FALSE);
+}
+
+rfbBool TextChatClose(rfbClient* client)
+{
+    rfbTextChatMsg chat;
+    if (!SupportsClient2Server(client, rfbTextChat)) return TRUE;
+    chat.type = rfbTextChat;
+    chat.pad1 = 0;
+    chat.pad2 = 0;
+    chat.length = rfbClientSwap32IfLE(rfbTextChatClose);
+    return  (WriteToRFBServer(client, (char *)&chat, sz_rfbTextChatMsg) ? TRUE : FALSE);
+}
+
+rfbBool TextChatFinish(rfbClient* client)
+{
+    rfbTextChatMsg chat;
+    if (!SupportsClient2Server(client, rfbTextChat)) return TRUE;
+    chat.type = rfbTextChat;
+    chat.pad1 = 0;
+    chat.pad2 = 0;
+    chat.length = rfbClientSwap32IfLE(rfbTextChatFinished);
+    return  (WriteToRFBServer(client, (char *)&chat, sz_rfbTextChatMsg) ? TRUE : FALSE);
+}
+
+/*
+ * UltraVNC Server Input Disable
+ * Apparently, the remote client can *prevent* the local user from interacting with the display
+ * I would think this is extremely helpful when used in a HelpDesk situation
+ */
+rfbBool PermitServerInput(rfbClient* client, int enabled)
+{
+    rfbSetServerInputMsg msg;
+
+    if (!SupportsClient2Server(client, rfbSetServerInput)) return TRUE;
+    /* enabled==1, then server input from local keyboard is disabled */
+    msg.type = rfbSetServerInput;
+    msg.status = (enabled ? 1 : 0);
+    msg.pad = 0;
+    return  (WriteToRFBServer(client, (char *)&msg, sz_rfbSetServerInputMsg) ? TRUE : FALSE);
+}
+
 
 /*
  * SendPointerEvent.
@@ -698,6 +958,8 @@ rfbBool
 SendPointerEvent(rfbClient* client,int x, int y, int buttonMask)
 {
   rfbPointerEventMsg pe;
+
+  if (!SupportsClient2Server(client, rfbPointerEvent)) return TRUE;
 
   pe.type = rfbPointerEvent;
   pe.buttonMask = buttonMask;
@@ -719,6 +981,8 @@ SendKeyEvent(rfbClient* client, uint32_t key, rfbBool down)
 {
   rfbKeyEventMsg ke;
 
+  if (!SupportsClient2Server(client, rfbKeyEvent)) return TRUE;
+
   ke.type = rfbKeyEvent;
   ke.down = down ? 1 : 0;
   ke.key = rfbClientSwap32IfLE(key);
@@ -738,6 +1002,8 @@ SendClientCutText(rfbClient* client, char *str, int len)
   if (client->serverCutText)
     free(client->serverCutText);
   client->serverCutText = NULL;
+
+  if (!SupportsClient2Server(client, rfbClientCutText)) return TRUE;
 
   cct.type = rfbClientCutText;
   cct.length = rfbClientSwap32IfLE(len);
@@ -858,9 +1124,8 @@ HandleRFBServerMessage(rfbClient* client)
 
       /* rect.r.w=byte count */
       if (rect.encoding == rfbEncodingSupportedMessages) {
-          rfbSupportedMessages msgs;
           int loop;
-          if (!ReadFromRFBServer(client, (char *)&msgs, sz_rfbSupportedMessages))
+          if (!ReadFromRFBServer(client, (char *)&client->supportedMessages, sz_rfbSupportedMessages))
               return FALSE;
 
           /* msgs is two sets of bit flags of supported messages client2server[] and server2client[] */
@@ -869,18 +1134,18 @@ HandleRFBServerMessage(rfbClient* client)
           rfbClientLog("client2server supported messages (bit flags)\n");
           for (loop=0;loop<32;loop+=8)
             rfbClientLog("%02X: %04x %04x %04x %04x - %04x %04x %04x %04x\n", loop,
-                msgs.client2server[loop],   msgs.client2server[loop+1],
-                msgs.client2server[loop+2], msgs.client2server[loop+3],
-                msgs.client2server[loop+4], msgs.client2server[loop+5],
-                msgs.client2server[loop+6], msgs.client2server[loop+7]);
+                client->supportedMessages.client2server[loop],   client->supportedMessages.client2server[loop+1],
+                client->supportedMessages.client2server[loop+2], client->supportedMessages.client2server[loop+3],
+                client->supportedMessages.client2server[loop+4], client->supportedMessages.client2server[loop+5],
+                client->supportedMessages.client2server[loop+6], client->supportedMessages.client2server[loop+7]);
 
           rfbClientLog("server2client supported messages (bit flags)\n");
           for (loop=0;loop<32;loop+=8)
             rfbClientLog("%02X: %04x %04x %04x %04x - %04x %04x %04x %04x\n", loop,
-                msgs.server2client[loop],   msgs.server2client[loop+1],
-                msgs.server2client[loop+2], msgs.server2client[loop+3],
-                msgs.server2client[loop+4], msgs.server2client[loop+5],
-                msgs.server2client[loop+6], msgs.server2client[loop+7]);
+                client->supportedMessages.server2client[loop],   client->supportedMessages.server2client[loop+1],
+                client->supportedMessages.server2client[loop+2], client->supportedMessages.server2client[loop+3],
+                client->supportedMessages.server2client[loop+4], client->supportedMessages.server2client[loop+5],
+                client->supportedMessages.server2client[loop+6], client->supportedMessages.server2client[loop+7]);
           continue;
       }
 
@@ -1215,6 +1480,47 @@ HandleRFBServerMessage(rfbClient* client)
     client->newServerCutText = TRUE;
 
     break;
+  }
+
+  case rfbTextChat:
+  {
+      char *buffer=NULL;
+      if (!ReadFromRFBServer(client, ((char *)&msg) + 1,
+                             sz_rfbTextChatMsg- 1))
+        return FALSE;
+      msg.tc.length = rfbClientSwap32IfLE(msg.sct.length);
+      switch(msg.tc.length) {
+      case rfbTextChatOpen:
+          rfbClientLog("Received TextChat Open\n");
+          if (client->HandleTextChat!=NULL)
+              client->HandleTextChat(client, (int)rfbTextChatOpen, NULL);
+          break;
+      case rfbTextChatClose:
+          rfbClientLog("Received TextChat Close\n");
+         if (client->HandleTextChat!=NULL)
+              client->HandleTextChat(client, (int)rfbTextChatClose, NULL);
+          break;
+      case rfbTextChatFinished:
+          rfbClientLog("Received TextChat Finished\n");
+         if (client->HandleTextChat!=NULL)
+              client->HandleTextChat(client, (int)rfbTextChatFinished, NULL);
+          break;
+      default:
+          buffer=malloc(msg.tc.length+1);
+          if (!ReadFromRFBServer(client, buffer, msg.tc.length))
+          {
+              free(buffer);
+              return FALSE;
+          }
+          /* Null Terminate <just in case> */
+          buffer[msg.tc.length]=0;
+          rfbClientLog("Received TextChat \"%s\"\n", buffer);
+          if (client->HandleTextChat!=NULL)
+              client->HandleTextChat(client, (int)msg.tc.length, buffer);
+          free(buffer);
+          break;
+      }
+      break;
   }
 
   case rfbResizeFrameBuffer:

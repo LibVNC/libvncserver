@@ -18,8 +18,6 @@
  *  USA.
  */
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-
 /*
  * ultrazip.c - handle ultrazip encoding.
  *
@@ -210,5 +208,3 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 }
 
 #undef CARDBPP
-
-#endif

@@ -101,9 +101,7 @@ rfbSendOneRectEncodingUltra(rfbClientPtr cl,
     }
 
     /* Update statics */
-    cl->rectanglesSent[rfbEncodingUltra]++;
-    cl->bytesSent[rfbEncodingUltra] += (sz_rfbFramebufferUpdateRectHeader
-					 + sz_rfbZlibHeader + lzoAfterBufLen);
+    rfbStatRecordEncodingSent(cl, rfbEncodingUltra, sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader + lzoAfterBufLen, maxRawSize);
 
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader
 	> UPDATE_BUF_SIZE)

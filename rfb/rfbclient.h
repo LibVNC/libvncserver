@@ -96,6 +96,7 @@ typedef struct {
 
 struct _rfbClient;
 
+typedef void (*HandleTextChatProc)(struct _rfbClient* client, int value, char *text);
 typedef void (*HandleKeyboardLedStateProc)(struct _rfbClient* client, int value, int pad);
 typedef rfbBool (*HandleCursorPosProc)(struct _rfbClient* client, int x, int y);
 typedef void (*SoftCursorLockAreaProc)(struct _rfbClient* client, int x, int y, int w, int h);
@@ -210,6 +211,7 @@ typedef struct _rfbClient {
 	int canHandleNewFBSize;
 
 	/* hooks */
+	HandleTextChatProc         HandleTextChat;
 	HandleKeyboardLedStateProc HandleKeyboardLedState;
 	HandleCursorPosProc HandleCursorPos;
 	SoftCursorLockAreaProc SoftCursorLockArea;
@@ -219,6 +221,19 @@ typedef struct _rfbClient {
 	GetPasswordProc GetPassword;
 	MallocFrameBufferProc MallocFrameBuffer;
 	BellProc Bell;
+
+	/* Which messages are supported by the server
+	 * This is a *guess* for most servers.
+	 * (If we can even detect the type of server)
+	 *
+	 * If the server supports the "rfbEncodingSupportedMessages"
+	 * then this will be updated when the encoding is received to
+	 * accurately reflect the servers capabilities.
+	 */
+	rfbSupportedMessages supportedMessages;
+
+	/* negotiated protocol version */
+	int major, minor;
 } rfbClient;
 
 /* cursor.c */
@@ -246,6 +261,12 @@ extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
 extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
 extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);
 extern rfbBool HandleRFBServerMessage(rfbClient* client);
+
+extern rfbBool TextChatSend(rfbClient* client, char *text);
+extern rfbBool TextChatOpen(rfbClient* client);
+extern rfbBool TextChatClose(rfbClient* client);
+extern rfbBool TextChatFinish(rfbClient* client);
+extern rfbBool PermitServerInput(rfbClient* client, int enabled);
 
 extern void PrintPixelFormat(rfbPixelFormat *format);
 

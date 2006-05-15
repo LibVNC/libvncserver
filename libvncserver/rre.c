@@ -40,7 +40,7 @@ static char *rreBeforeBuf = NULL;
 
 static int rreAfterBufSize = 0;
 static char *rreAfterBuf = NULL;
-static int rreAfterBufLen;
+static int rreAfterBufLen=0;
 
 static int subrectEncode8(uint8_t *data, int w, int h);
 static int subrectEncode16(uint16_t *data, int w, int h);
@@ -112,9 +112,9 @@ rfbSendRectEncodingRRE(rfbClientPtr cl,
         return rfbSendRectEncodingRaw(cl, x, y, w, h);
     }
 
-    cl->rectanglesSent[rfbEncodingRRE]++;
-    cl->bytesSent[rfbEncodingRRE] += (sz_rfbFramebufferUpdateRectHeader
-                                         + sz_rfbRREHeader + rreAfterBufLen);
+    rfbStatRecordEncodingSent(cl, rfbEncodingRRE,
+                              sz_rfbFramebufferUpdateRectHeader + sz_rfbRREHeader + rreAfterBufLen,
+                              sz_rfbFramebufferUpdateRectHeader + w * h * (cl->format.bitsPerPixel / 8));
 
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbRREHeader
         > UPDATE_BUF_SIZE)

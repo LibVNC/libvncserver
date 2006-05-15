@@ -121,6 +121,7 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
 	    zlibAfterBuf = (char *)realloc(zlibAfterBuf, zlibAfterBufSize);
     }
 
+
     /* 
      * Convert pixel data to client format.
      */
@@ -176,9 +177,8 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
      */
 
     /* Update statics */
-    cl->rectanglesSent[rfbEncodingZlib]++;
-    cl->bytesSent[rfbEncodingZlib] += (sz_rfbFramebufferUpdateRectHeader
-					 + sz_rfbZlibHeader + zlibAfterBufLen);
+    rfbStatRecordEncodingSent(cl, rfbEncodingZlib, sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader + zlibAfterBufLen,
+        + w * (cl->format.bitsPerPixel / 8) * h);
 
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader
 	> UPDATE_BUF_SIZE)

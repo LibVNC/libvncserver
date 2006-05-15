@@ -495,22 +495,40 @@ clientInput(void *data)
     pthread_create(&output_thread, NULL, clientOutput, (void *)cl);
 
     while (1) {
-	fd_set fds;
+	fd_set rfds, wfds, efds;
 	struct timeval tv;
 	int n;
 
-	FD_ZERO(&fds);
-	FD_SET(cl->sock, &fds);
+	FD_ZERO(&rfds);
+	FD_SET(cl->sock, &rfds);
+	FD_ZERO(&efds);
+	FD_SET(cl->sock, &efds);
+
+	/* Are we transferring a file in the background? */
+	FD_ZERO(&wfds);
+	if ((cl->fileTransfer.fd!=-1) && (cl->fileTransfer.sending==1))
+	    FD_SET(cl->sock, &wfds);
+
 	tv.tv_sec = 60; /* 1 minute */
 	tv.tv_usec = 0;
-	n = select(cl->sock + 1, &fds, NULL, &fds, &tv);
+	n = select(cl->sock + 1, &rfds, &wfds, &efds, &tv);
 	if (n < 0) {
 	    rfbLogPerror("ReadExact: select");
 	    break;
 	}
 	if (n == 0) /* timeout */
+	{
+            rfbSendFileTransferChunk(cl);
 	    continue;
-        rfbProcessClientMessage(cl);
+        }
+        
+        /* We have some space on the transmit queue, send some data */
+        if (FD_ISSET(cl->sock, &wfds))
+            rfbSendFileTransferChunk(cl);
+
+        if (FD_ISSET(cl->sock, &rfds) || FD_ISSET(cl->sock, &efds))
+            rfbProcessClientMessage(cl);
+
         if (cl->sock == -1) {
             /* Client has disconnected. */
             break;
@@ -817,6 +835,10 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->maxRectsPerUpdate=50;
 
    screen->handleEventsEagerly = FALSE;
+
+   /* Emulate UltraVNC Server by default */
+   screen->protocolMajorVersion = 3;
+   screen->protocolMinorVersion = 6;
 
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);
