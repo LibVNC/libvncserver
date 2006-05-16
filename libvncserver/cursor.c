@@ -164,7 +164,7 @@ rfbSendCursorShape(rfbClientPtr cl)
     }
 
     /* Send everything we have prepared in the cl->updateBuf[]. */
-    rfbStatRecordMessageSent(cl, (cl->useRichCursorEncoding ? rfbEncodingRichCursor : rfbEncodingXCursor), 
+    rfbStatRecordEncodingSent(cl, (cl->useRichCursorEncoding ? rfbEncodingRichCursor : rfbEncodingXCursor), 
         sz_rfbFramebufferUpdateRectHeader + (cl->ublen - saved_ublen), sz_rfbFramebufferUpdateRectHeader + (cl->ublen - saved_ublen));
 
     if (!rfbSendUpdateBuf(cl))
@@ -197,7 +197,7 @@ rfbSendCursorPos(rfbClientPtr cl)
 	 sz_rfbFramebufferUpdateRectHeader);
   cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-  rfbStatRecordMessageSent(cl, rfbEncodingPointerPos, sz_rfbFramebufferUpdateRectHeader, sz_rfbFramebufferUpdateRectHeader);
+  rfbStatRecordEncodingSent(cl, rfbEncodingPointerPos, sz_rfbFramebufferUpdateRectHeader, sz_rfbFramebufferUpdateRectHeader);
 
   if (!rfbSendUpdateBuf(cl))
     return FALSE;
