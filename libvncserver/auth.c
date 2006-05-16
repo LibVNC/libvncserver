@@ -235,7 +235,8 @@ rfbAuthNewClient(rfbClientPtr cl)
  	    securityType = rfbSecTypeVncAuth;
     }
 
-    if (cl->protocolMinorVersion < 7) {
+    if (cl->protocolMajorVersion==3 && cl->protocolMinorVersion < 7)
+    {
 	/* Make sure we use only RFB 3.3 compatible security types. */
 	if (securityType == rfbSecTypeInvalid) {
 	    rfbLog("VNC authentication disabled - RFB 3.3 client rejected\n");
