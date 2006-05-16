@@ -398,7 +398,7 @@ void rfbPrintStats(rfbClientPtr cl)
         if (bytesIfRaw>0.0)
             savings = 100.0 - (((double)bytes / (double)bytesIfRaw) * 100.0);
         if ((bytes>0) || (count>0) || (bytesIfRaw>0))
-            rfbLog(" %-20.20s: %6d | %9.0d/%9.0d (%5.1f%%)\n",
+            rfbLog(" %-20.20s: %6d | %9d/%9d (%5.1f%%)\n",
 	        name, count, bytes, bytesIfRaw, savings);
         totalRects += count;
         totalBytes += bytes;
@@ -416,7 +416,7 @@ void rfbPrintStats(rfbClientPtr cl)
         if (bytesIfRaw>0.0)
             savings = 100.0 - (((double)bytes / (double)bytesIfRaw) * 100.0);
         if ((bytes>0) || (count>0) || (bytesIfRaw>0))
-            rfbLog(" %-20.20s: %6d | %9.0d/%9.0d (%5.1f%%)\n",
+            rfbLog(" %-20.20s: %6d | %9d/%9d (%5.1f%%)\n",
 	        name, count, bytes, bytesIfRaw, savings);
         totalRects += count;
         totalBytes += bytes;
@@ -444,7 +444,7 @@ void rfbPrintStats(rfbClientPtr cl)
         if (bytesIfRaw>0.0)
             savings = 100.0 - (((double)bytes / (double)bytesIfRaw) * 100.0);
         if ((bytes>0) || (count>0) || (bytesIfRaw>0))
-            rfbLog(" %-20.20s: %6d | %9.0d/%9.0d (%5.1f%%)\n",
+            rfbLog(" %-20.20s: %6d | %9d/%9d (%5.1f%%)\n",
 	        name, count, bytes, bytesIfRaw, savings);
         totalRects += count;
         totalBytes += bytes;
@@ -461,7 +461,7 @@ void rfbPrintStats(rfbClientPtr cl)
         if (bytesIfRaw>0.0)
             savings = 100.0 - (((double)bytes / (double)bytesIfRaw) * 100.0);
         if ((bytes>0) || (count>0) || (bytesIfRaw>0))
-            rfbLog(" %-20.20s: %6d | %9.0d/%9.0d (%5.1f%%)\n",
+            rfbLog(" %-20.20s: %6d | %9d/%9d (%5.1f%%)\n",
 	        name, count, bytes, bytesIfRaw, savings);
         totalRects += count;
         totalBytes += bytes;

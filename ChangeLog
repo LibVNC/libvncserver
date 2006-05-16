@@ -1,3 +1,7 @@
+2006-05-16  Steven Carr <scarr@jsa-usa.com>
+	* Statistics output now fits in 80-column output
+	* Corrected Cursor Statistics reporting as messages
+
 2006-05-15  Steven Carr <scarr@jsa-usa.com>
 	* Default to RFB 3.8
 	* Add command line options:
