@@ -421,6 +421,7 @@ typedef struct _rfbClientRec {
     char *host;
 
     /* RFB protocol minor version number */
+    int protocolMajorVersion;
     int protocolMinorVersion;
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD

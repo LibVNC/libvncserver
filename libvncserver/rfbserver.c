@@ -629,6 +629,7 @@ rfbProcessClientProtocolVersion(rfbClientPtr cl)
      * maintaining RFB version compatibility across multiple servers is a pain
      * Should use something like ServerIdentity encoding
      */
+    cl->protocolMajorVersion = major_;
     cl->protocolMinorVersion = minor_;
     
     rfbLog("Protocol version sent %d.%d, using %d.%d\n",
