@@ -56,7 +56,7 @@ char *messageNameServer2Client(uint32_t type, char *buf, int len) {
     case rfbTextChat:                 snprintf(buf, len, "TextChat"); break;
     case rfbPalmVNCReSizeFrameBuffer: snprintf(buf, len, "PalmVNCReSize"); break;
     default:
-        snprintf(buf, len, "server2client(0x%04X)", type);
+        snprintf(buf, len, "svr2cli-0x%08X", 0xFF);
     }
     return buf;
 }
@@ -79,13 +79,16 @@ char *messageNameClient2Server(uint32_t type, char *buf, int len) {
     case rfbKeyFrameRequest:          snprintf(buf, len, "KeyFrameRequest"); break;
     case rfbPalmVNCSetScaleFactor:    snprintf(buf, len, "PalmVNCSetScale"); break;
     default:
-        snprintf(buf, len, "client2server(0x%04X)", type);
+        snprintf(buf, len, "cli2svr-0x%08X", type);
 
 
     }
     return buf;
 }
 
+/* Encoding name must be <=16 characters to fit nicely on the status output in
+ * an 80 column terminal window
+ */
 char *encodingName(uint32_t type, char *buf, int len) {
     if (buf==NULL) return "error";
     
@@ -118,10 +121,11 @@ char *encodingName(uint32_t type, char *buf, int len) {
     case rfbEncodingLastRect:           snprintf(buf, len, "LastRect");    break;
     case rfbEncodingNewFBSize:          snprintf(buf, len, "NewFBSize");   break;
     case rfbEncodingKeyboardLedState:   snprintf(buf, len, "LedState");    break;
-    case rfbEncodingSupportedMessages:  snprintf(buf, len, "SupportedMessages");  break;
-    case rfbEncodingSupportedEncodings: snprintf(buf, len, "SupportedEncodings"); break;
-    case rfbEncodingServerIdentity:     snprintf(buf, len, "ServerIdentity");     break;
+    case rfbEncodingSupportedMessages:  snprintf(buf, len, "SupportedMessage");  break;
+    case rfbEncodingSupportedEncodings: snprintf(buf, len, "SupportedEncoding"); break;
+    case rfbEncodingServerIdentity:     snprintf(buf, len, "ServerIdentify");    break;
 
+    /* The following lookups do not report in stats */
     case rfbEncodingCompressLevel0: snprintf(buf, len, "CompressLevel0");  break;
     case rfbEncodingCompressLevel1: snprintf(buf, len, "CompressLevel1");  break;
     case rfbEncodingCompressLevel2: snprintf(buf, len, "CompressLevel2");  break;
@@ -146,7 +150,7 @@ char *encodingName(uint32_t type, char *buf, int len) {
 
 
     default:
-        snprintf(buf, len, "encoding(0x%04X)", type);
+        snprintf(buf, len, "Enc(0x%08X)", type);
     }
 
     return buf;
@@ -371,89 +375,103 @@ void rfbPrintStats(rfbClientPtr cl)
     rfbStatList *ptr=NULL;
     char encBuf[64];
     double savings=0.0;
-    int    totalRectsSent=0;
-    double totalBytesSent=0.0;
-    double totalBytesIfRawSent=0.0;
-    int    totalRectsRcvd=0;
-    double totalBytesRcvd=0.0;
-    double totalBytesIfRawRcvd=0.0;
+    int    totalRects=0;
+    double totalBytes=0.0;
+    double totalBytesIfRaw=0.0;
 
     char *name=NULL;
     int bytes=0;
+    int bytesIfRaw=0;
     int count=0;
 
     if (cl==NULL) return;
     
-    rfbLog("Statistics: Transmit\n");
+    rfbLog("%-21.21s  %-6.6s   %9.9s/%9.9s (%6.6s)\n", "Statistics", "events", "Transmit","RawEquiv","saved");
     for (ptr = cl->statMsgList; ptr!=NULL; ptr=ptr->Next)
     {
-        name = messageNameServer2Client(ptr->type, encBuf, sizeof(encBuf));
-        count = ptr->sentCount;
-        bytes = ptr->bytesSent;
+        name       = messageNameServer2Client(ptr->type, encBuf, sizeof(encBuf));
+        count      = ptr->sentCount;
+        bytes      = ptr->bytesSent;
+        bytesIfRaw = ptr->bytesSentIfRaw;
+        
         savings = 0.0;
-        if (ptr->bytesSentIfRaw>0.0)
-            savings = 100.0 - (((double)ptr->bytesSent / (double)ptr->bytesSentIfRaw) * 100.0);
-        if ((bytes>0) || (count>0))
-            rfbLog("   %-24.24s: %6d events %9d/%9d bytes (%5.2f%% saved)\n",
-	        name, count, bytes, ptr->bytesSentIfRaw, savings);
-        totalRectsSent += count;
-        totalBytesSent += bytes;
-        totalBytesIfRawSent += ptr->bytesSentIfRaw;
+        if (bytesIfRaw>0.0)
+            savings = 100.0 - (((double)bytes / (double)bytesIfRaw) * 100.0);
+        if ((bytes>0) || (count>0) || (bytesIfRaw>0))
+            rfbLog(" %-20.20s: %6d | %9.0d/%9.0d (%5.1f%%)\n",
+	        name, count, bytes, bytesIfRaw, savings);
+        totalRects += count;
+        totalBytes += bytes;
+        totalBytesIfRaw += bytesIfRaw;
+    }
+
+    for (ptr = cl->statEncList; ptr!=NULL; ptr=ptr->Next)
+    {
+        name       = encodingName(ptr->type, encBuf, sizeof(encBuf));
+        count      = ptr->sentCount;
+        bytes      = ptr->bytesSent;
+        bytesIfRaw = ptr->bytesSentIfRaw;
+        savings    = 0.0;
+
+        if (bytesIfRaw>0.0)
+            savings = 100.0 - (((double)bytes / (double)bytesIfRaw) * 100.0);
+        if ((bytes>0) || (count>0) || (bytesIfRaw>0))
+            rfbLog(" %-20.20s: %6d | %9.0d/%9.0d (%5.1f%%)\n",
+	        name, count, bytes, bytesIfRaw, savings);
+        totalRects += count;
+        totalBytes += bytes;
+        totalBytesIfRaw += bytesIfRaw;
+    }
+    savings=0.0;
+    if (totalBytesIfRaw>0.0)
+        savings = 100.0 - ((totalBytes/totalBytesIfRaw)*100.0);
+    rfbLog(" %-20.20s: %6d | %9.0f/%9.0f (%5.1f%%)\n",
+            "TOTALS", totalRects, totalBytes,totalBytesIfRaw, savings);
+
+    totalRects=0.0;
+    totalBytes=0.0;
+    totalBytesIfRaw=0.0;
+
+    rfbLog("%-21.21s  %-6.6s   %9.9s/%9.9s (%6.6s)\n", "Statistics", "events", "Received","RawEquiv","saved");
+    for (ptr = cl->statMsgList; ptr!=NULL; ptr=ptr->Next)
+    {
+        name       = messageNameClient2Server(ptr->type, encBuf, sizeof(encBuf));
+        count      = ptr->rcvdCount;
+        bytes      = ptr->bytesRcvd;
+        bytesIfRaw = ptr->bytesRcvdIfRaw;
+        savings    = 0.0;
+
+        if (bytesIfRaw>0.0)
+            savings = 100.0 - (((double)bytes / (double)bytesIfRaw) * 100.0);
+        if ((bytes>0) || (count>0) || (bytesIfRaw>0))
+            rfbLog(" %-20.20s: %6d | %9.0d/%9.0d (%5.1f%%)\n",
+	        name, count, bytes, bytesIfRaw, savings);
+        totalRects += count;
+        totalBytes += bytes;
+        totalBytesIfRaw += bytesIfRaw;
     }
     for (ptr = cl->statEncList; ptr!=NULL; ptr=ptr->Next)
     {
-        name = encodingName(ptr->type, encBuf, sizeof(encBuf));
-        count = ptr->sentCount;
-        bytes = ptr->bytesSent;
-        savings = 0.0;
-        if (ptr->bytesSentIfRaw>0.0)
-            savings = 100.0 - (((double)ptr->bytesSent / (double)ptr->bytesSentIfRaw) * 100.0);
-        if ((bytes>0) || (count>0))
-            rfbLog("   %-24.24s: %6d events %9d/%9d bytes (%5.2f%% saved)\n",
-	        name, count, bytes, ptr->bytesSentIfRaw, savings);
-        totalRectsSent += count;
-        totalBytesSent += bytes;
-        totalBytesIfRawSent += ptr->bytesSentIfRaw;
-    }
-    savings = 100.0 - ((totalBytesSent/totalBytesIfRawSent)*100.0);
-    rfbLog("   %-24.24s: %6d events %9.0f/%9.0f bytes (%5.2f%% savings)\n",
-            "TOTALS", totalRectsSent, totalBytesSent, totalBytesIfRawSent, savings);
+        name       = encodingName(ptr->type, encBuf, sizeof(encBuf));
+        count      = ptr->rcvdCount;
+        bytes      = ptr->bytesRcvd;
+        bytesIfRaw = ptr->bytesRcvdIfRaw;
+        savings    = 0.0;
 
-
-    rfbLog("Statistics: Receive\n");
-    for (ptr = cl->statMsgList; ptr!=NULL; ptr=ptr->Next)
-    {
-        name = messageNameClient2Server(ptr->type, encBuf, sizeof(encBuf));
-        count = ptr->rcvdCount;
-        bytes = ptr->bytesRcvd;
-        savings = 0.0;
-        if (ptr->bytesSentIfRaw>0.0)
-            savings = 100.0 - (((double)ptr->bytesRcvd / (double)ptr->bytesRcvdIfRaw) * 100.0);
-        if ((bytes>0) || (count>0))
-	    rfbLog("   %-24.24s: %6d events %9d/%9d bytes (%5.2f%% saved)\n",
-	        name, count, bytes, ptr->bytesRcvdIfRaw, savings);
-        totalRectsRcvd += count;
-        totalBytesRcvd += bytes;
-        totalBytesIfRawRcvd += ptr->bytesRcvdIfRaw;
+        if (bytesIfRaw>0.0)
+            savings = 100.0 - (((double)bytes / (double)bytesIfRaw) * 100.0);
+        if ((bytes>0) || (count>0) || (bytesIfRaw>0))
+            rfbLog(" %-20.20s: %6d | %9.0d/%9.0d (%5.1f%%)\n",
+	        name, count, bytes, bytesIfRaw, savings);
+        totalRects += count;
+        totalBytes += bytes;
+        totalBytesIfRaw += bytesIfRaw;
     }
-    for (ptr = cl->statEncList; ptr!=NULL; ptr=ptr->Next)
-    {
-        name = encodingName(ptr->type, encBuf, sizeof(encBuf));
-        count = ptr->rcvdCount;
-        bytes = ptr->bytesRcvd;
-        savings = 0.0;
-        if (ptr->bytesSentIfRaw>0.0)
-            savings = 100.0 - (((double)ptr->bytesRcvd / (double)ptr->bytesRcvdIfRaw) * 100.0);
-        if ((bytes>0) || (count>0))
-	    rfbLog("   %-24.24s: %6d events %9d/%9d bytes (%5.2f%% saved)\n",
-	        name, count, bytes, ptr->bytesRcvdIfRaw, savings);
-        totalRectsRcvd += count;
-        totalBytesRcvd += bytes;
-        totalBytesIfRawRcvd += ptr->bytesRcvdIfRaw;
-    }
-    savings = 100.0 - ((totalBytesRcvd/totalBytesIfRawRcvd)*100.0);
-    rfbLog("   %-24.24s: %6d events %9.0f/%9.0f bytes (%5.2f%% savings)\n",
-            "TOTALS", totalRectsRcvd, totalBytesRcvd,totalBytesIfRawRcvd, savings);
+    savings=0.0;
+    if (totalBytesIfRaw>0.0)
+        savings = 100.0 - ((totalBytes/totalBytesIfRaw)*100.0);
+    rfbLog(" %-20.20s: %6d | %9.0f/%9.0f (%5.1f%%)\n",
+            "TOTALS", totalRects, totalBytes,totalBytesIfRaw, savings);
       
 } 
 
