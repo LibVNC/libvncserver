@@ -461,6 +461,9 @@ typedef struct {
 #define rfbEncodingQualityLevel9   0xFFFFFFE9
 
 
+
+
+
 /*****************************************************************************
  *
  * Server -> client message definitions
@@ -547,6 +550,21 @@ typedef struct {
  * left-to-right within a scanline with no padding in between.
  */
 
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * KeyboardLedState Encoding.  The X coordinate contains the Locked Modifiers
+ * so that a remote troubleshooter can identify that the users 'Caps Lock' 
+ * is set...   (It helps a *lot* when the users are untrained)
+ */
+#define rfbKeyboardMaskShift        1
+#define rfbKeyboardMaskCapsLock     2
+#define rfbKeyboardMaskControl      4
+#define rfbKeyboardMaskAlt          8
+#define rfbKeyboardMaskMeta        16
+#define rfbKeyboardMaskSuper       32
+#define rfbKeyboardMaskHyper       64
+#define rfbKeyboardMaskNumLock    128
+#define rfbKeyboardMaskScrollLock 256
+#define rfbKeyboardMaskAltGraph   512
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * CopyRect Encoding.  The pixels are specified simply by the x and y position
