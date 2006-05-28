@@ -47,6 +47,19 @@ static int zlibAfterBufSize = 0;
 static char *zlibAfterBuf = NULL;
 static int zlibAfterBufLen;
 
+void rfbZlibCleanup(rfbScreenInfoPtr screen)
+{
+  if (zlibBeforeBufSize) {
+    free(zlibBeforeBuf);
+    zlibBeforeBufSize=0;
+  }
+  if (zlibAfterBufSize) {
+    zlibAfterBufSize=0;
+    free(zlibAfterBuf);
+  }
+}
+
+
 /*
  * rfbSendOneRectEncodingZlib - send a given rectangle using one Zlib
  *                              rectangle encoding.

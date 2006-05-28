@@ -23,7 +23,7 @@ static char *lzoBeforeBuf = NULL;
 
 static int lzoAfterBufSize = 0;
 static char *lzoAfterBuf = NULL;
-static int lzoAfterBufLen;
+static int lzoAfterBufLen = 0;
 
 /*
  * rfbSendOneRectEncodingZlib - send a given rectangle using one Zlib
@@ -31,6 +31,26 @@ static int lzoAfterBufLen;
  */
 
 #define MAX_WRKMEM ((LZO1X_1_MEM_COMPRESS) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t)
+
+void rfbUltraCleanup(rfbScreenInfoPtr screen)
+{
+  if (lzoBeforeBufSize) {
+    free(lzoBeforeBuf);
+    lzoBeforeBufSize=0;
+  }
+  if (lzoAfterBufSize) {
+    free(lzoAfterBuf);
+    lzoAfterBufSize=0;
+  }
+}
+
+void rfbFreeUltraData(rfbClientPtr cl) {
+  if (cl->compStreamInitedLZO) {
+    free(cl->lzoWrkMem);
+    cl->compStreamInitedLZO=FALSE;
+  }
+}
+
 
 static rfbBool
 rfbSendOneRectEncodingUltra(rfbClientPtr cl,
@@ -125,6 +145,7 @@ rfbSendOneRectEncodingUltra(rfbClientPtr cl,
     memcpy(&cl->updateBuf[cl->ublen], (char *)&hdr, sz_rfbZlibHeader);
     cl->ublen += sz_rfbZlibHeader;
 
+    /* We might want to try sending the data directly... */
     for (i = 0; i < lzoAfterBufLen;) {
 
 	int bytesToCopy = UPDATE_BUF_SIZE - cl->ublen;

@@ -48,6 +48,19 @@ static int subrectEncode32(uint32_t *data, int w, int h);
 static uint32_t getBgColour(char *data, int size, int bpp);
 
 
+void rfbRRECleanup(rfbScreenInfoPtr screen)
+{
+  if (rreBeforeBufSize) {
+    free(rreBeforeBuf);
+    rreBeforeBufSize=0;
+  }
+  if (rreAfterBufSize) {
+    free(rreAfterBuf);
+    rreAfterBufSize=0;
+  }
+}
+
+
 /*
  * rfbSendRectEncodingRRE - send a given rectangle using RRE encoding.
  */

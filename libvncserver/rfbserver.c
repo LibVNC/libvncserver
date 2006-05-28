@@ -484,6 +484,8 @@ rfbClientConnectionGone(rfbClientPtr cl)
     rfbFreeZrleData(cl);
 #endif
 
+    rfbFreeUltraData(cl);
+
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     if(cl->screen->backgroundLoop != FALSE) {
       int i;

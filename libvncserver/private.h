@@ -17,11 +17,28 @@ rfbClientPtr rfbClientIteratorHead(rfbClientIteratorPtr i);
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 extern void rfbTightCleanup(rfbScreenInfoPtr screen);
 #endif
-#endif
+
+/* from zlib.c */
+extern void rfbZlibCleanup(rfbScreenInfoPtr screen);
 
 /* from zrle.c */
+void rfbFreeZrleData(rfbClientPtr cl);
 
-extern void rfbFreeZrleData(rfbClientPtr cl);
+#endif
+
+
+/* from ultra.c */
+
+extern void rfbUltraCleanup(rfbScreenInfoPtr screen);
+extern void rfbFreeUltraData(rfbClientPtr cl);
+
+/* from rre.c */
+
+extern void rfbRRECleanup(rfbScreenInfoPtr screen);
+
+/* from corre.c */
+
+extern void rfbCoRRECleanup(rfbScreenInfoPtr screen);
 
 #endif
 

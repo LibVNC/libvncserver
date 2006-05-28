@@ -50,6 +50,17 @@ static uint32_t getBgColour(char *data, int size, int bpp);
 static rfbBool rfbSendSmallRectEncodingCoRRE(rfbClientPtr cl, int x, int y,
                                           int w, int h);
 
+void rfbCoRRECleanup(rfbScreenInfoPtr screen)
+{
+  if (rreBeforeBufSize) {
+    free(rreBeforeBuf);
+    rreBeforeBufSize=0;
+  }
+  if (rreAfterBufSize) {
+    free(rreAfterBuf);
+    rreAfterBufSize=0;
+  }
+}
 
 /*
  * rfbSendRectEncodingCoRRE - send an arbitrary size rectangle using CoRRE
