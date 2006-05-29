@@ -129,6 +129,13 @@ rfbVncAuthSendChallenge(rfbClientPtr cl)
  * Different security types will be added by applications using this library.
  */
 
+static rfbSecurityHandler primaryVncSecurityHandler = {
+    1,
+    rfbVncAuthSendChallenge,
+    NULL
+};
+                        
+
 static void
 rfbSendSecurityTypeList(rfbClientPtr cl, int primaryType)
 {
@@ -141,11 +148,8 @@ rfbSendSecurityTypeList(rfbClientPtr cl, int primaryType)
 
     /* Fill in the list of security types in the client structure. */
     if (primaryType != rfbSecTypeInvalid) {
-	rfbSecurityHandler* handler = calloc(sizeof(rfbSecurityHandler),1);
-	handler->type = primaryType;
-	handler->handler = rfbVncAuthSendChallenge;
-	handler->next = NULL;
-	rfbRegisterSecurityHandler(handler);
+        primaryVncSecurityHandler.type = primaryType;
+        rfbRegisterSecurityHandler(&primaryVncSecurityHandler);
     }
 
     for (handler = securityHandlers;
