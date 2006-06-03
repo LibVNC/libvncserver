@@ -277,19 +277,18 @@ rfbProcessClientSecurityType(rfbClientPtr cl)
 	return;
     }
 
-    if(chosenType == rfbSecTypeNone) {
-       cl->state = RFB_INITIALISATION;
-	return;
-    }
-	
-
     /* Make sure it was present in the list sent by the server. */
-    for (handler = securityHandlers; handler;
-	    handler = handler->next)
+    for (handler = securityHandlers; handler; handler = handler->next) {
 	if (chosenType == handler->type) {
-	    handler->handler(cl);
-	    return;
+		if (chosenType == rfbSecTypeNone) {
+			cl->state = RFB_INITIALISATION;
+			return;
+		} else {
+			handler->handler(cl);
+			return;
+		}
 	}
+    }
 
     rfbLog("rfbProcessClientSecurityType: wrong security type requested\n");
     rfbCloseClient(cl);
