@@ -265,6 +265,7 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 		xi->bitmap_pad = bitmap_pad;
 		xi->bytes_per_line = bytes_per_line ? bytes_per_line : 
 		    xi->width * xi->bits_per_pixel / 8;
+		xi->bitmap_unit = -1;	/* hint to not call XDestroyImage */
 		return xi;
 	}
 

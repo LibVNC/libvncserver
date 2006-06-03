@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8.1 lastmod: 2006-05-06";
+char lastmod[] = "0.8.1 lastmod: 2006-06-03";
 
 /* X display info */
 
@@ -37,7 +37,6 @@ int num_buttons = -1;
 XImage *scanline = NULL;
 XImage *fullscreen = NULL;
 XImage **tile_row = NULL;	/* for all possible row runs */
-XImage *fb0 = NULL;
 XImage *snaprect = NULL;	/* for XShmGetImage (fs_factor) */
 XImage *snap = NULL;		/* the full snap fb */
 XImage *raw_fb_image = NULL;	/* the raw fb */
@@ -58,13 +57,14 @@ char *rfb_fb = NULL;		/* same as main_fb unless transformation */
 char *fake_fb = NULL;		/* used under -padgeom */
 char *snap_fb = NULL;		/* used under -snapfb */
 char *cmap8to24_fb = NULL;	/* used under -8to24 */
-char *raw_fb = NULL;
+char *raw_fb = NULL;		/* when used should be main_fb */
 char *raw_fb_addr = NULL;
 int raw_fb_offset = 0;
 int raw_fb_shm = 0;
 int raw_fb_mmap = 0;
 int raw_fb_seek = 0;
 int raw_fb_fd = -1;
+int raw_fb_back_to_X = 0;	/* kludge for testing rawfb -> X */
 
 int rfb_bytes_per_line;
 int main_bytes_per_line;

@@ -13,7 +13,7 @@ extern void spawn_grab_buster(void);
 extern void sync_tod_with_servertime(void);
 extern void check_keycode_state(void);
 extern void check_autorepeat(void);
-extern void check_xevents(void);
+extern void check_xevents(int reset);
 extern void xcut_receive(char *text, int len, rfbClientPtr cl);
 
 #endif /* _X11VNC_XEVENTS_H */

@@ -108,6 +108,8 @@ char *cmap8to24_str = NULL;
 int launch_gui = 0;		/* -gui */
 
 int use_modifier_tweak = 1;	/* use the shift/altgr modifier tweak */
+int watch_capslock = 0;		/* -capslock */
+int skip_lockkeys = 0;		/* -skip_lockkeys */
 int use_iso_level3 = 0;		/* ISO_Level3_Shift instead of Mode_switch */
 int clear_mods = 0;		/* -clear_mods (1) and -clear_keys (2) */
 int nofb = 0;			/* do not send any fb updates */

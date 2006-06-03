@@ -51,8 +51,6 @@ static void interrupted (int sig);
 void clean_shm(int quick) {
 	int i, cnt = 0;
 
-	if (raw_fb) quick = 1;	/* raw_fb hack */
-
 	/*
 	 * to avoid deadlock, etc, under quick=1 we just delete the shm
 	 * areas and leave the X stuff hanging.

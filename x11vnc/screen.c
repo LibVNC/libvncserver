@@ -29,7 +29,7 @@ void set_colormap(int reset);
 void set_nofb_params(int restore);
 void set_raw_fb_params(int restore);
 void do_new_fb(int reset_mem);
-void free_old_fb(char *old_main, char *old_rfb, char *old_8to24);
+void free_old_fb(char *old_main, char *old_rfb, char *old_8to24, char *old_snap_fb);
 void check_padded_fb(void);
 void install_padded_fb(char *geom);
 XImage *initialize_xdisplay_fb(void);
@@ -545,6 +545,9 @@ void set_raw_fb_params(int restore) {
 			if (dpy) {
 				if (! quiet) rfbLog("reopened DISPLAY: %s\n",
 				    raw_fb_orig_dpy);
+				scr = DefaultScreen(dpy);
+				rootwin = RootWindow(dpy, scr);
+				check_xevents(1);
 			} else {
 				if (! quiet) rfbLog("WARNING: failed to reopen "
 				    "DISPLAY: %s\n", raw_fb_orig_dpy);
@@ -648,23 +651,30 @@ static void nofb_hook(rfbClientPtr cl) {
 	screen->displayHook = NULL;
 }
 
-void free_old_fb(char *old_main, char *old_rfb, char *old_8to24) {
+void free_old_fb(char *old_main, char *old_rfb, char *old_8to24, char *old_snap_fb) {
 	if (old_main) {
 		free(old_main);
 	}
-	if (old_rfb && old_rfb != old_main) {
-		free(old_rfb);
+	if (old_rfb) {
+		if (old_rfb != old_main) {
+			free(old_rfb);
+		}
 	}
-	if (old_8to24 && old_8to24 != old_main && old_8to24 != old_rfb) {
-		free(old_8to24);
+	if (old_8to24) {
+		if (old_8to24 != old_main && old_8to24 != old_rfb) {
+			free(old_8to24);
+		}
+	}
+	if (old_snap_fb) {
+		if (old_snap_fb != old_main && old_snap_fb != old_rfb &&
+		    old_snap_fb != old_8to24) {
+			free(old_snap_fb);
+		}
 	}
 }
 
 void do_new_fb(int reset_mem) {
 	XImage *fb;
-	char *old_main  = main_fb;
-	char *old_rfb   = rfb_fb;
-	char *old_8to24 = cmap8to24_fb;
 
 	/* for threaded we really should lock libvncserver out. */
 	if (use_threads) {
@@ -678,6 +688,16 @@ void do_new_fb(int reset_mem) {
 		free_tiles();
 	}
 
+	free_old_fb(main_fb, rfb_fb, cmap8to24_fb, snap_fb);
+
+	if (raw_fb == main_fb || raw_fb == rfb_fb) {
+		raw_fb = NULL;
+	}
+	main_fb = NULL;
+	rfb_fb = NULL;
+	cmap8to24_fb = NULL;
+	snap_fb = NULL;
+
 	fb = initialize_xdisplay_fb();
 
 	initialize_screen(NULL, NULL, fb);
@@ -688,9 +708,6 @@ void do_new_fb(int reset_mem) {
 		initialize_polling_images();
 	}
 
-	free_old_fb(old_main, old_rfb, old_8to24);
-
-	fb0 = fb;
 }
 
 static void remove_fake_fb(void) {
@@ -921,6 +938,14 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	if (last_file) {
 		free(last_file);
 		last_file = NULL;
+	}
+	if (strstr(str, "Video") == str) {
+		if (pipeinput_str != NULL) {
+			free(pipeinput_str);
+		}
+		pipeinput_str = strdup("VID");
+		initialize_pipeinput();
+		str[0] = 'v';
 	}
 
 	if (strstr(str, "video") == str || strstr(str, "/dev/video") == str) {
@@ -1169,6 +1194,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	raw_fb_image->height = dpy_y;
 	raw_fb_image->bits_per_pixel = b;
 	raw_fb_image->bytes_per_line = dpy_x*b/8;
+	raw_fb_image->bitmap_unit = -1;
 
 	if (use_snapfb && (raw_fb_seek || raw_fb_mmap)) {
 		int b_use = b;
@@ -1186,6 +1212,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		snap->height = dpy_y;
 		snap->bits_per_pixel = b_use;
 		snap->bytes_per_line = dpy_x*b_use/8;
+		snap->bitmap_unit = -1;
 	}
 
 	if (rm == 0 && gm == 0 && bm == 0) {
@@ -2174,9 +2201,11 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	}
 	screen->frameBuffer = rfb_fb;
 	if (!quiet) {
-		fprintf(stderr, " main_fb:     %p\n", main_fb);
 		fprintf(stderr, " rfb_fb:      %p\n", rfb_fb);
+		fprintf(stderr, " main_fb:     %p\n", main_fb);
 		fprintf(stderr, " 8to24_fb:    %p\n", cmap8to24_fb);
+		fprintf(stderr, " snap_fb:     %p\n", snap_fb);
+		fprintf(stderr, " raw_fb:      %p\n", raw_fb);
 		fprintf(stderr, "\n");
 	}
 

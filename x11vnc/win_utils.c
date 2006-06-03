@@ -19,6 +19,7 @@ int get_window_size(Window win, int *x, int *y);
 void snapshot_stack_list(int free_only, double allowed_age);
 void update_stack_list(void);
 Window query_pointer(Window start);
+unsigned int mask_state(void);
 int pick_windowid(unsigned long *num);
 Window descend_pointer(int depth, Window start, char *name_info, int len);
 
@@ -276,6 +277,20 @@ Window query_pointer(Window start) {
 		return c;
 	} else {
 		return None;
+	}
+}
+
+unsigned int mask_state(void) {
+	Window r, c;	
+	int rx, ry, wx, wy;
+	unsigned int mask;
+
+	RAWFB_RET(0)
+
+	if (XQueryPointer(dpy, rootwin, &r, &c, &rx, &ry, &wx, &wy, &mask)) {
+		return mask;
+	} else {
+		return 0;
 	}
 }
 

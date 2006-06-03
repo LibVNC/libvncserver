@@ -17,6 +17,7 @@ extern int get_window_size(Window win, int *x, int *y);
 extern void snapshot_stack_list(int free_only, double allowed_age);
 extern void update_stack_list(void);
 extern Window query_pointer(Window start);
+extern unsigned int mask_state(void);
 extern int pick_windowid(unsigned long *num);
 extern Window descend_pointer(int depth, Window start, char *name_info, int len);
 

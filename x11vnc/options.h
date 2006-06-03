@@ -83,6 +83,8 @@ extern int xform24to32;
 extern int launch_gui;
 
 extern int use_modifier_tweak;
+extern int watch_capslock;
+extern int skip_lockkeys;
 extern int use_iso_level3;
 extern int clear_mods;
 extern int nofb;

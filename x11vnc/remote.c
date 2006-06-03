@@ -1957,6 +1957,38 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		got_noxkb = 1;
 		initialize_modtweak();
 
+	} else if (!strcmp(p, "capslock")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, watch_capslock);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling -capslock mode\n");
+		watch_capslock = 1;
+
+	} else if (!strcmp(p, "nocapslock")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !watch_capslock);
+			goto qry;
+		}
+		rfbLog("remote_cmd: disabling -capslock mode\n");
+		watch_capslock = 0;
+
+	} else if (!strcmp(p, "skip_lockkeys")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, skip_lockkeys);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling -skip_lockkeys mode\n");
+		skip_lockkeys = 1;
+
+	} else if (!strcmp(p, "noskip_lockkeys")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !skip_lockkeys);
+			goto qry;
+		}
+		rfbLog("remote_cmd: disabling -skip_lockkeys mode\n");
+		skip_lockkeys = 0;
+
 	} else if (strstr(p, "skip_keycodes") == p) {
 		COLON_CHECK("skip_keycodes:")
 		if (query) {
@@ -3336,7 +3368,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			set_raw_fb_params(1);
 		}
 		rfbLog("hang on tight, here we go...\n");
+		raw_fb_back_to_X = 1;
 		do_new_fb(1);
+		raw_fb_back_to_X = 0;
 
 	} else if (strstr(p, "progressive") == p) {
 		int f;
@@ -3869,6 +3903,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, no_external_cmds);
 		} else if (!strcmp(p, "passwdfile")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(passwdfile));
+#ifndef REL81
 		} else if (!strcmp(p, "unixpw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, unixpw);
 		} else if (!strcmp(p, "unixpw_nis")) {
@@ -3887,6 +3922,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(stunnel_pem));
 		} else if (!strcmp(p, "https")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, https_port_num);
+#endif
 		} else if (!strcmp(p, "usepw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, usepw);
 		} else if (!strcmp(p, "using_shm")) {

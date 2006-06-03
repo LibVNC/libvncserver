@@ -40,6 +40,11 @@ extern char *crypt(const char*, const char *);
 #define IS_BSD
 #endif
 
+#ifdef REL81
+#undef UNIXPW_SU
+#undef UNIXPW_CRYPT
+#endif
+
 void unixpw_screen(int init);
 void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init);
 void unixpw_accept(char *user);

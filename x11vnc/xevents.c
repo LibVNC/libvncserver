@@ -12,6 +12,7 @@
 #include "gui.h"
 #include "connections.h"
 #include "unixpw.h"
+#include "cleanup.h"
 
 /* XXX CHECK BEFORE RELEASE */
 int grab_buster = 0;
@@ -24,11 +25,11 @@ void spawn_grab_buster(void);
 void sync_tod_with_servertime(void);
 void check_keycode_state(void);
 void check_autorepeat(void);
-void check_xevents(void);
+void check_xevents(int reset);
 void xcut_receive(char *text, int len, rfbClientPtr cl);
 
 
-static void initialize_xevents(void);
+static void initialize_xevents(int reset);
 static void print_xevent_bases(void);
 static void get_prop(char *str, int len, Atom prop);
 static void bust_grab(int reset);
@@ -62,7 +63,7 @@ void initialize_clipboard_atom(void) {
 	}
 }
 
-static void initialize_xevents(void) {
+static void initialize_xevents(int reset) {
 	static int did_xselect_input = 0;
 	static int did_xcreate_simple_window = 0;
 	static int did_vnc_connect_prop = 0;
@@ -73,6 +74,18 @@ static void initialize_xevents(void) {
 	static int did_xrandr = 0;
 
 	RAWFB_RET_VOID
+
+	if (reset) {
+		did_xselect_input = 0;
+		did_xcreate_simple_window = 0;
+		did_vnc_connect_prop = 0;
+		did_x11vnc_remote_prop = 0;
+		did_clipboard_atom = 0;
+		did_xfixes = 0;
+		did_xdamage = 0;
+		did_xrandr = 0;
+	}
+
 	if ((watch_selection || vnc_connect) && !did_xselect_input) {
 		/*
 		 * register desired event(s) for notification.
@@ -688,7 +701,7 @@ void check_autorepeat(void) {
  * This routine is periodically called to check for selection related
  * and other X11 events and respond to them as needed.
  */
-void check_xevents(void) {
+void check_xevents(int reset) {
 	XEvent xev;
 	int tmp, have_clients = 0;
 	static int sent_some_sel = 0;
@@ -699,14 +712,18 @@ void check_xevents(void) {
 	static time_t last_time_sync = 0;
 	time_t now = time(0);
 	static double last_request = 0.0;
+	XErrorHandler old_handler;
 
 	RAWFB_RET_VOID
 
 	if (unixpw_in_progress) return;
 
-	if (now > last_init_check+1) {
+	if (now > last_init_check+1 || reset) {
 		last_init_check = now;
-		initialize_xevents();
+		initialize_xevents(reset);
+		if (reset) {
+			return;
+		}
 	}
 
 	if (screen && screen->clientHead) {
@@ -719,6 +736,7 @@ void check_xevents(void) {
 	 * the client... so instead of sending right away we wait a
 	 * the few seconds.
 	 */
+
 	if (have_clients && watch_selection && !sent_some_sel
 	    && now > last_client + sel_waittime) {
 		if (XGetSelectionOwner(dpy, XA_PRIMARY) == None) {
@@ -741,6 +759,10 @@ void check_xevents(void) {
 	if (now > last_call+1) {
 		/* we only check these once a second or so. */
 		int n = 0;
+
+		trapped_xerror = 0;
+		old_handler = XSetErrorHandler(trap_xerror);
+
 		while (XCheckTypedEvent(dpy, MappingNotify, &xev)) {
 			XRefreshKeyboardMapping((XMappingEvent *) &xev);
 			n++;
@@ -769,6 +791,9 @@ void check_xevents(void) {
 		while (XCheckTypedEvent(dpy, ClientMessage, &xev)) {
 			;
 		}
+
+		XSetErrorHandler(old_handler);
+		trapped_xerror = 0;
 	}
 
 	/* check for CUT_BUFFER0 and VNC_CONNECT changes: */
@@ -908,6 +933,9 @@ void check_xevents(void) {
 
 	if (own_primary || own_clipboard) {
 		/* we own PRIMARY or CLIPBOARD, see if someone requested it: */
+		trapped_xerror = 0;
+		old_handler = XSetErrorHandler(trap_xerror);
+
 		if (XCheckTypedEvent(dpy, SelectionRequest, &xev)) {
 			if (own_primary && xev.type == SelectionRequest &&
 			    xev.xselectionrequest.selection == XA_PRIMARY) {
@@ -944,6 +972,9 @@ void check_xevents(void) {
 				}
 			}
 		}
+
+		XSetErrorHandler(old_handler);
+		trapped_xerror = 0;
 	}
 
 	if (watch_bell || now > last_bell+1) {

@@ -531,8 +531,10 @@ static void add_remap(char *line) {
 		}
 	}
 	if (ksym1 == NoSymbol || ksym2 == NoSymbol) {
-		rfbLog("warning: skipping invalid remap line: %s", line);
-		return;
+		if (strcasecmp(str2, "NoSymbol") && strcasecmp(str2, "None")) {
+			rfbLog("warning: skipping invalid remap line: %s", line);
+			return;
+		}
 	}
 	remap = (keyremap_t *) malloc((size_t) sizeof(keyremap_t));
 	remap->before = ksym1;
@@ -1860,6 +1862,22 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				} else if (ks == XK_ISO_Level3_Shift) {
 					skip = 0;
 				}
+
+				if (watch_capslock && kbstate.locked_mods & LockMask) {
+				    if (keysym >= 'A' && keysym <= 'Z') {
+					if (ks == XK_Shift_L || ks == XK_Shift_R) {
+						if (debug_keyboard > 1) {
+							fprintf(stderr, "    A-Z caplock skip Shift\n");
+						}
+						skip = 1;
+					} else if (ks == XK_Caps_Lock) {
+						if (debug_keyboard > 1) {
+							fprintf(stderr, "    A-Z caplock noskip CapsLock\n");
+						}
+						skip = 0;
+					}
+				    }
+				}
 				/*
 				 * Alt, Meta, Control, Super,
 				 * Hyper, Num, Caps are skipped.
@@ -2328,9 +2346,23 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	ADJUSTMOD(XK_Mode_switch, ALTGR)
 
 	if ( down && keysym >= ' ' && keysym < 0x100 ) {
+		unsigned int state = 0;
 		tweak = 1;
-		tweak_mod(modifiers[keysym], True);
-		k = keycodes[keysym];
+		if (watch_capslock && keysym >= 'A' && keysym <= 'Z') {
+			X_LOCK;
+			state = mask_state();
+			X_UNLOCK;
+		}
+		if (state & LockMask) {
+			/* capslock set for A-Z, so no tweak */
+			X_LOCK;
+			k = XKeysymToKeycode(dpy, (KeySym) keysym);
+			X_UNLOCK;
+			tweak = 0;
+		} else {
+			tweak_mod(modifiers[keysym], True);
+			k = keycodes[keysym];
+		}
 	} else {
 		X_LOCK;
 		k = XKeysymToKeycode(dpy, (KeySym) keysym);
@@ -2615,6 +2647,31 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 				    down, keysym);
 			}
 			return;
+		}
+	}
+
+	if (skip_lockkeys) {
+		/*  we don't handle XK_ISO*_Lock or XK_Kana_Lock ... */
+		if (keysym == XK_Scroll_Lock || keysym == XK_Num_Lock ||
+		    keysym == XK_Caps_Lock || keysym == XK_Shift_Lock) {
+			if (debug_keyboard) {
+				rfbLog("skipping lock key event: %d 0x%x\n",
+				    down, keysym);
+			}
+			return;
+		} else if (keysym >= XK_KP_0 && keysym <= XK_KP_9) {
+			/* ugh this is probably what they meant... assume NumLock. */
+			if (debug_keyboard) {
+				rfbLog("changed KP digit to regular digit: %d 0x%x\n",
+				    down, keysym);
+			}
+			keysym = (keysym - XK_KP_0) + XK_0;
+		} else if (keysym == XK_KP_Decimal) {
+			if (debug_keyboard) {
+				rfbLog("changed XK_KP_Decimal to XK_period: %d 0x%x\n",
+				    down, keysym);
+			}
+			keysym = XK_period; 
 		}
 	}
 

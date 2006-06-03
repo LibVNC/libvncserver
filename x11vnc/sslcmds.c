@@ -14,6 +14,10 @@
 #endif
 #endif
 
+#ifdef REL81
+#undef SSLCMDS
+#endif
+
 
 void check_stunnel(void);
 int start_stunnel(int stunnel_port, int x11vnc_port);
@@ -39,9 +43,13 @@ void check_stunnel(void) {
 
 	if (stunnel_pid > 0) {
 		int status;
+#ifdef SSLCMDS
 		waitpid(stunnel_pid, &status, WNOHANG); 
+#endif
 		if (kill(stunnel_pid, 0) != 0) {
+#ifdef SSLCMDS
 			waitpid(stunnel_pid, &status, WNOHANG); 
+#endif
 			rfbLog("stunnel subprocess %d died.\n", stunnel_pid); 
 			stunnel_pid = 0;
 			clean_up_exit(1);
@@ -74,7 +82,7 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		strcat(path, extra);
 	}
 
-	exe = (char *) malloc(strlen(path) + strlen("stunnel") + 1);
+	exe = (char *) malloc(strlen(path) + 1 + strlen("stunnel") + 1);
 
 	p = strtok(path, ":");
 
@@ -123,7 +131,7 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		stunnel_pem = get_saved_pem(stunnel_pem, 1);
 		if (! stunnel_pem) {
 			rfbLog("start_stunnel: could not create or open"
-			    " saved PEM:\n", stunnel_pem);	
+			    " saved PEM.\n");	
 			clean_up_exit(1);
 		}
 	}
@@ -278,7 +286,7 @@ void setup_stunnel(int rport, int *argc, char **argv) {
 	}
 	if (start_stunnel(rport, xport)) {
 		int tweaked = 0;
-		char tmp[10];
+		char tmp[20];
 		sprintf(tmp, "%d", xport);
 		if (argv) {
 			for (i=0; i< *argc; i++) {
@@ -539,6 +547,7 @@ void sslEncKey(char *path, int mode) {
 			strcat(tca, " | xargs ls -ld ");
 		}
 		system(tca);
+		depth--;
 		return;
 
 	} else if (info_only && (!strcasecmp(path, "HASHON")
@@ -565,6 +574,7 @@ void sslEncKey(char *path, int mode) {
 		}
 		system(scr);
 		unlink(tmp);
+		depth--;
 		return;
 	}
 
@@ -624,7 +634,7 @@ void sslEncKey(char *path, int mode) {
 	}
 
 	if (! info_only) {
-		cert = (char *) malloc(2*sbuf.st_size);
+		cert = (char *) malloc(2*(sbuf.st_size + 100));
 		file = fopen(path, "r");
 		if (file == NULL) {
 			rfbLog("sslEncKey: %s\n", path);
@@ -638,7 +648,9 @@ void sslEncKey(char *path, int mode) {
 				incert = 1;
 			}
 			if (incert) {
-				strcat(cert, line);
+				if (strlen(cert) + strlen(line) < 2*sbuf.st_size) {
+					strcat(cert, line);
+				}
 			}
 			if (strstr(line, "-----END CERTIFICATE-----") == line) {
 				incert = 0;

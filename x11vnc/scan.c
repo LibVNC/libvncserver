@@ -213,6 +213,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 	XImage *xim;
 	static int reported_flip = 0;
+	int db = 0;
 
 	shm->shmid = -1;
 	shm->shmaddr = (char *) -1;
@@ -239,6 +240,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 			}
 			return 0;
 		}
+		if (db) fprintf(stderr, "shm_create simple %d %d\t0x%x %s\n", w, h, xim, name);
 		xim->data = (char *) malloc(xim->bytes_per_line * xim->height);
 		if (xim->data == NULL) {
 			rfbErr("XCreateImage(%s) data malloc failed.\n", name);
@@ -345,27 +347,28 @@ void shm_delete(XShmSegmentInfo *shm) {
 }
 
 void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
+	int db = 0;
 
+	if (db) fprintf(stderr, "shm_clean: called:  0x%x\n", xim);
 	X_LOCK;
 #if LIBVNCSERVER_HAVE_XSHM
-	if (shm != NULL && shm->shmid != -1 && dpy) {	/* raw_fb hack */
+	if (shm != NULL && shm->shmid != -1 && dpy) {
+		if (db) fprintf(stderr, "shm_clean: XShmDetach_wr\n");
 		XShmDetach_wr(dpy, shm);
 	}
 #endif
 	if (xim != NULL) {
-#if 0
-		/*
-		 * This would be needed if you want to crazily switch
-		 * back and forth between rawfb and X.  You will also
-		 * need to supply -noviewonly.  xim->f is public ABI,
-		 * but we choose not to use it.  One could also
-		 * clean up the switch.
-		 */
-		if (xim->f.destroy_image) {
-#else
-		{
-#endif
-			XDestroyImage(xim);
+		if (! raw_fb_back_to_X) {	/* raw_fb hack */
+			if (xim->bitmap_unit != -1) {
+				if (db) fprintf(stderr, "shm_clean: XDestroyImage  0x%x\n", xim);
+				XDestroyImage(xim);
+			} else {
+				if (xim->data) {
+					if (db) fprintf(stderr, "shm_clean: free xim->data  0x%x 0x%x\n", xim, xim->data);
+					free(xim->data);
+					xim->data = NULL;
+				}
+			}
 		}
 		xim = NULL;
 	}

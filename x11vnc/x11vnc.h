@@ -114,6 +114,8 @@
 #define PASSWD_UNLESS_NOPW 0
 #endif
 
+#define REL81
+
 /*
  * Beginning of support for small binary footprint build for embedded
  * systems, PDA's etc.  It currently just cuts out the low-hanging
@@ -234,7 +236,6 @@ extern int h_errno;
 #include <arpa/inet.h>
 #endif
 
-/* XXX autoconf */
 #if LIBVNCSERVER_HAVE_PWD_H
 #include <pwd.h>
 #endif
@@ -334,8 +335,7 @@ extern int num_buttons;
 /* image structures */
 extern XImage *scanline;
 extern XImage *fullscreen;
-extern XImage **tile_row;		/* for all possible row runs */
-extern XImage *fb0;
+extern XImage **tile_row;	/* for all possible row runs */
 extern XImage *snaprect;	/* for XShmGetImage (fs_factor) */
 extern XImage *snap;		/* the full snap fb */
 extern XImage *raw_fb_image;	/* the raw fb */
@@ -373,6 +373,7 @@ extern int raw_fb_shm;
 extern int raw_fb_mmap;
 extern int raw_fb_seek;
 extern int raw_fb_fd;
+extern int raw_fb_back_to_X;
 
 extern int rfb_bytes_per_line;
 extern int main_bytes_per_line;

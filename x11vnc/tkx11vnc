@@ -187,12 +187,14 @@ Keyboard
 	modtweak
 	xkb
 	--
-	=FP remap:
+	capslock
+	skip_lockkeys
 	--
 	skip_keycodes:
-	sloppy_keys
 	skip_dups
+	sloppy_keys
 	--
+	=FP remap:
 	clear_mods
 	clear_keys
 

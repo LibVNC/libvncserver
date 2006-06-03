@@ -10,7 +10,7 @@ extern void set_colormap(int reset);
 extern void set_nofb_params(int restore);
 extern void set_raw_fb_params(int restore);
 extern void do_new_fb(int reset_mem);
-extern void free_old_fb(char *old_main, char *old_rfb, char *old_8to24);
+extern void free_old_fb(char *old_main, char *old_rfb, char *old_8to24, char *old_snap_fb);
 extern void check_padded_fb(void);
 extern void install_padded_fb(char *geom);
 extern XImage *initialize_xdisplay_fb(void);

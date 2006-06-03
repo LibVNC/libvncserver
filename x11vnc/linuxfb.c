@@ -142,7 +142,7 @@ char *console_guess(char *str, int *fd) {
 }
 
 void console_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
-	static int control = 0;
+	static int control = 0, alt = 0;
 	if (debug_keyboard) fprintf(stderr, "console_key_command: %d %s\n", (int) keysym, down ? "down" : "up");
 	if (pipeinput_cons_fd < 0) {
 		return;		
@@ -159,6 +159,16 @@ void console_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		}
 		return;
 	}
+	if (keysym == XK_Alt_L || keysym == XK_Alt_R) {
+		if (! down) {
+			if (alt > 0) {
+				alt--;
+			}
+		} else {
+			alt++;
+		}
+		return;
+	}
 	if (!down) {
 		return;
 	}
@@ -166,6 +176,7 @@ void console_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		keysym = 27;
 	}
 	if (control) {
+		/* shift down to the "control" zone */
 		if (keysym >= 'a' && keysym <= 'z') {
 			keysym -= ('a' - 1);
 		} else if (keysym >= 'A' && keysym <= 'Z') {
@@ -173,10 +184,16 @@ void console_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		} else {
 			keysym = 0xffff;
 		}
+	} else if (alt) {
+		/* shift up to the upper half Latin zone */
+		if (keysym >= '!' && keysym <= '~') {
+			keysym += 128;
+		}
 	}
+	if (debug_keyboard) fprintf(stderr, "keysym now: %d\n", (int) keysym);
 	if (keysym == XK_Tab) {
 		keysym = '\t';
-	} else if (keysym == XK_Return) {
+	} else if (keysym == XK_Return || keysym == XK_KP_Enter) {
 		keysym = '\r';
 	} else if (keysym == XK_BackSpace) {
 		keysym = 8;
@@ -196,6 +213,10 @@ void console_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		keysym = 2;
 	} else if (keysym == XK_Prior || keysym == XK_KP_Prior) {
 		keysym = 2;
+	} else {
+		if (keysym >= XK_KP_Multiply && keysym <= XK_KP_Equal) {
+			keysym -= 0xFF80;
+		}
 	}
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H && defined(TIOCSTI)
 	if (keysym < 0x100) {

@@ -12,11 +12,20 @@
 #define OPENSSL_VNC   2
 #define OPENSSL_HTTPS 3
 
+#define DO_DH 0
+
 #if LIBVNCSERVER_HAVE_FORK
 #if LIBVNCSERVER_HAVE_SYS_WAIT_H && LIBVNCSERVER_HAVE_WAITPID
 #define FORK_OK
 #endif
 #endif
+
+#ifdef REL81
+#undef FORK_OK
+#undef LIBVNCSERVER_HAVE_LIBSSL
+#define LIBVNCSERVER_HAVE_LIBSSL 0
+#endif
+
 
 int openssl_sock = -1;
 int openssl_port_num = 0;
@@ -64,6 +73,7 @@ static SSL *ssl = NULL;
 
 static void init_prng(void);
 static void sslerrexit(void);
+static char *get_input(char *tag, char **in);
 static char *create_tmp_pem(char *path, int prompt);
 static int  ssl_init(int s_in, int s_out);
 static void raw_xfer(int csock, int s_in, int s_out);
@@ -146,9 +156,6 @@ static char *get_input(char *tag, char **in) {
 	str = lblanks(line);
 	if (! strcmp(str, "")) {
 		return *in;
-	} else if (0 && !strcmp(str, "none")) {
-		free(*in);
-		return strdup("");
 	} else {
 		free(*in);
 		return strdup(line);
@@ -200,7 +207,7 @@ static char *create_tmp_pem(char *pathin, int prompt) {
 	FILE *in, *out;
 	char cnf[] = "/tmp/x11vnc-cnf.XXXXXX";
 	char pem[] = "/tmp/x11vnc-pem.XXXXXX";
-	char str[7*1024], line[1024], *exe;
+	char str[8*1024], line[1024], *exe;
 	int cnf_fd, pem_fd, status, show_cert = 1;
 	char *days;
 	char *C, *L, *OU, *O, *CN, *EM;
@@ -431,9 +438,9 @@ static char *create_tmp_pem(char *pathin, int prompt) {
 	if (show_cert) {
 		char cmd[100];
 		if (inetd) {
-			sprintf(cmd, "openssl x509 -text -in %s 1>&2", pem);
+			sprintf(cmd, "openssl x509 -text -in '%s' 1>&2", pem);
 		} else {
-			sprintf(cmd, "openssl x509 -text -in %s", pem);
+			sprintf(cmd, "openssl x509 -text -in '%s'", pem);
 		}
 		fprintf(stderr, "\n");
 		system(cmd);
@@ -600,11 +607,7 @@ void openssl_init(void) {
 	double ds;
 	long mode;
 
-#if DO_DH
-	do_dh = 1;
-#else
-	do_dh = 0;
-#endif
+	do_dh = DO_DH;
 
 	if (! quiet) {
 		rfbLog("\n");
@@ -630,7 +633,7 @@ void openssl_init(void) {
 	}
 
 	ds = dnow();
-	rsa_512 = RSA_generate_key(512,RSA_F4,NULL,NULL);
+	rsa_512 = RSA_generate_key(512, RSA_F4, NULL, NULL);
 	if (rsa_512 == NULL) {
 		rfbLog("openssl_init: RSA_generate_key(512) failed.\n");	
 		sslerrexit();
@@ -639,7 +642,7 @@ void openssl_init(void) {
 	rfbLog("created  512 bit temporary RSA key: %.3fs\n", dnow() - ds);
 
 	ds = dnow();
-	rsa_1024 = RSA_generate_key(1024,RSA_F4,NULL,NULL);
+	rsa_1024 = RSA_generate_key(1024, RSA_F4, NULL, NULL);
 	if (rsa_1024 == NULL) {
 		rfbLog("openssl_init: RSA_generate_key(1024) failed.\n");	
 		sslerrexit();
@@ -717,7 +720,7 @@ void openssl_init(void) {
 		rfbLog("openssl_init: SSL_CTX_use_certificate_chain_file() failed.\n");	
 		sslerrexit();
 	}
-	if(! SSL_CTX_use_RSAPrivateKey_file(ctx, openssl_pem,
+	if (! SSL_CTX_use_RSAPrivateKey_file(ctx, openssl_pem,
 	    SSL_FILETYPE_PEM)) {
 		rfbLog("openssl_init: SSL_CTX_set_tmp_rsa(1024) failed.\n");	
 		sslerrexit();
@@ -739,7 +742,6 @@ void openssl_init(void) {
 				fprintf(stderr, "\n");
 				fclose(in);
 			}
-			
 		}
 		unlink(openssl_pem);
 		free(openssl_pem);
@@ -866,15 +868,15 @@ static void lose_ram(void) {
 	 * without doing exec().  we really should re-exec, but a pain
 	 * to redo all SSL ctx.
 	 */
-	free_old_fb(main_fb, rfb_fb, cmap8to24_fb);
+	free_old_fb(main_fb, rfb_fb, cmap8to24_fb, snap_fb);
+	if (raw_fb == main_fb || raw_fb == rfb_fb) {
+		raw_fb = NULL;
+	}
 	main_fb = NULL;
 	rfb_fb = NULL;
 	cmap8to24_fb = NULL;
+	snap_fb = NULL;
 
-	if (snap_fb) {
-		free(snap_fb);
-		snap_fb = NULL;
-	}
 	free_tiles();
 }
 
@@ -991,7 +993,6 @@ static int is_ssl_readable(int s_in, time_t last_https, char *last_get,
 	tv.tv_sec  = 2;
 	tv.tv_usec = 0;
 
-
 	if (mode == OPENSSL_INETD) {
 		/*
 		 * https via inetd is icky because x11vnc is restarted
@@ -1037,7 +1038,7 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	 * sniff the first couple bytes of the stream and try to see
 	 * if it is http or not.  if we read them OK, we must read the
 	 * rest of the available data otherwise we may deadlock.
-	 * what has be read is returned in buf_a and n_a.
+	 * what has been read is returned in buf_a and n_a.
 	 * *buf_a is ABSIZE+1 long and zeroed.
 	 */
 	if (getenv("ACCEPT_OPENSSL_DEBUG")) {
@@ -1081,6 +1082,7 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	}
 	*n_a = n;
 	if (n > 0) {
+		/* XXX memcpy? */
 		strncpy(buf_a, buf, n);
 	}
 	return is_http;
@@ -1160,18 +1162,16 @@ if (db) fprintf(stderr, "ssl_init FAILED\n");
 
 	{
 		char *buf;
-		int n, ptr;
+		int n = 0, ptr = 0;
 	
 		buf  = (char *) calloc((8192+1), 1);
-		n = 0;
-		ptr = 0;
 		while (ptr < 8192) {
 			n = SSL_read(ssl, buf + ptr, 8192 - ptr);
 			if (n > 0) {
 				ptr += n;
 			}
 if (db) fprintf(stderr, "buf: '%s'\n", buf);
-			if (strstr(buf, "\r\n\r\n") || strstr(buf, "\n\n")) {
+			if (strstr(buf, "\r\n\r\n")) {
 				break;
 			}
 		}
@@ -1708,7 +1708,7 @@ static int ssl_init(int s_in, int s_out) {
 		fprintf(stderr, "SSL_new failed\n");
 		return 0;
 	}
-if (db > 1) fprintf(stderr, "a\n");
+if (db > 1) fprintf(stderr, "ssl_init: 1\n");
 
 	SSL_set_session_id_context(ssl, sid, strlen((char *)sid));
 
@@ -1727,13 +1727,15 @@ if (db > 1) fprintf(stderr, "a\n");
 			return 0;
 		}
 	}
-if (db > 1) fprintf(stderr, "b\n");
+if (db > 1) fprintf(stderr, "ssl_init: 2\n");
 
 	SSL_set_accept_state(ssl);
-if (db > 1) fprintf(stderr, "c\n");
+
+if (db > 1) fprintf(stderr, "ssl_init: 3\n");
 
 	name = get_remote_host(ssock);
-if (db > 1) fprintf(stderr, "d\n");
+
+if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 
 	while (1) {
 		if (db) fprintf(stderr, "calling SSL_accept...\n");
@@ -1751,33 +1753,44 @@ if (db > 1) fprintf(stderr, "d\n");
 		if (err == SSL_ERROR_NONE) {
 			break;
 		} else if (err == SSL_ERROR_WANT_READ) {
+
 			if (db) fprintf(stderr, "got SSL_ERROR_WANT_READ\n");
 			rfbLog("SSL: ssl_helper: SSL_accept() failed for: %s\n",
 			    name);
 			return 0;
 			
 		} else if (err == SSL_ERROR_WANT_WRITE) {
+
 			if (db) fprintf(stderr, "got SSL_ERROR_WANT_WRITE\n");
 			rfbLog("SSL: ssl_helper: SSL_accept() failed for: %s\n",
 			    name);
 			return 0;
+
 		} else if (err == SSL_ERROR_SYSCALL) {
+
 			if (db) fprintf(stderr, "got SSL_ERROR_SYSCALL\n");
 			rfbLog("SSL: ssl_helper: SSL_accept() failed for: %s\n",
 			    name);
 			return 0;
+
 		} else if (err == SSL_ERROR_ZERO_RETURN) {
+
 			if (db) fprintf(stderr, "got SSL_ERROR_ZERO_RETURN\n");
 			rfbLog("SSL: ssl_helper: SSL_accept() failed for: %s\n",
 			    name);
 			return 0;
+
 		} else if (rc < 0) {
+
 			rfbLog("SSL: ssl_helper: SSL_accept() fatal: %d\n", rc);
 			return 0;
+
 		} else if (dnow() > start + 3.0) {
+
 			rfbLog("SSL: ssl_helper: timeout looping SSL_accept() "
 			    "fatal.\n");
 			return 0;
+
 		} else {
 			BIO *bio = SSL_get_rbio(ssl);
 			if (bio == NULL) {
@@ -1819,7 +1832,7 @@ static void raw_xfer(int csock, int s_in, int s_out) {
 				break;
 			} else if (n > 0) {
 				m = write(s_out, buf, n);
-if (db > 1) write(2, buf, n);
+				if (db > 1) write(2, buf, n);
 				if (m != n) {
 		if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d\n", csock, s_out, m, n);
 					break;

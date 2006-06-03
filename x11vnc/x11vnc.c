@@ -239,7 +239,11 @@ static void record_last_fb_update(void) {
 
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
+#if 0
 		rbs += cl->rawBytesEquivalent;
+#else
+		rbs += rfbStatGetSentBytesIfRaw(cl);
+#endif
 	}
 	rfbReleaseClientIterator(iter);
 
@@ -467,7 +471,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			}
 
 			check_new_clients();
-			check_xevents();
+			check_xevents(0);
 			check_autorepeat();
 			check_pm();
 			check_keycode_state();
@@ -1384,6 +1388,7 @@ int main(int argc, char* argv[]) {
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0;
 	int got_httpdir = 0, try_http = 0;
+	XImage *fb0 = NULL;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc = 1; char *argv_vnc[128];
@@ -1592,6 +1597,7 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			passwdfile = strdup(argv[++i]);
 			got_passwdfile = 1;
+#ifndef REL81
 		} else if (strstr(arg, "-unixpw") == arg) {
 			unixpw = 1;
 			if (strstr(arg, "-unixpw_nis")) {
@@ -1709,6 +1715,7 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 			}
+#endif
 		} else if (!strcmp(arg, "-nopw")) {
 			nopw = 1;
 		} else if (!strcmp(arg, "-usepw")) {
@@ -1826,6 +1833,10 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-noxkb")) {
 			use_xkb_modtweak = 0;
 			got_noxkb = 1;
+		} else if (!strcmp(arg, "-capslock")) {
+			watch_capslock = 1;
+		} else if (!strcmp(arg, "-skip_lockkeys")) {
+			skip_lockkeys = 1;
 		} else if (!strcmp(arg, "-xkbcompat")) {
 			xkbcompat = 1;
 		} else if (!strcmp(arg, "-skip_keycodes")) {

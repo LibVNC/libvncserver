@@ -1,3 +1,8 @@
+2006-06-03  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -capslock and -skip_lockkeys options.  map some Alt keys
+	  to Latin under linuxfb.  switch to new stats API.  Handle more
+	  cases carefully when switching fb.
+	
 2006-05-06  Karl Runge <runge@karlrunge.com>
 	* x11vnc: improved support for webcams and tv tuners with
 	  video4linux /dev/video: -rawfb video, -freqtab etc.

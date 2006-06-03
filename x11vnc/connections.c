@@ -644,6 +644,7 @@ void client_gone(rfbClientPtr client) {
 		 * we disconnect after 1 successful connection).
 		 */
 		if ((client->state == RFB_PROTOCOL_VERSION ||
+		     client->state == RFB_SECURITY_TYPE ||
 		     client->state == RFB_AUTHENTICATION) && accepted_client) {
 			rfbLog("connect_once: invalid password or early "
 			   "disconnect.\n");

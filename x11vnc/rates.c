@@ -350,8 +350,16 @@ db = 0;
 		}
 		nclients++;
 
+
+#if 0
+		for (i=0; i<MAX_ENCODINGS; i++) {
+			cbs += cl->bytesSent[i];
+		}
+		rbs = cl->rawBytesEquivalent;
+#else
 		cbs = rfbStatGetSentBytes(cl);
 		rbs = rfbStatGetSentBytesIfRaw(cl);
+#endif
 
 		if (init) {
 
@@ -432,7 +440,13 @@ if (db) fprintf(stderr, "%d client num rects req: %d  mod: %d  cbs: %d  "
 
 if (db) fprintf(stderr, "dt2 calc: num rects req: %d/%d mod: %d/%d  "
     "fbu-sent: %d  dt: %.4f dt2: %.4f  tm: %.4f\n",
-    req0, req1, mod0, mod1, rfbStatGetMessageCountSent(cl, rfbFramebufferUpdate), dt, dt2, tm);
+    req0, req1, mod0, mod1,
+#if 0
+    cl->framebufferUpdateMessagesSent,
+#else
+    rfbStatGetMessageCountSent(cl, rfbFramebufferUpdate),
+#endif
+    dt, dt2, tm);
 			if (req1 != 0 && mod1 == 0) {
 				got_t2 = 1;
 				break;
@@ -499,7 +513,13 @@ if (db) fprintf(stderr, "dt2 calc: num rects req: %d/%d mod: %d/%d  "
 
 if (db) fprintf(stderr, "dt3 calc: num rects req: %d/%d mod: %d/%d  "
     "fbu-sent: %d  dt: %.4f dt3: %.4f  tm: %.4f\n",
-    req0, req1, mod0, mod1, rfbStatGetMessageCountSent(cl, rfbFramebufferUpdate), dt, dt3, tm);
+    req0, req1, mod0, mod1,
+#if 0
+    cl->framebufferUpdateMessagesSent,
+#else
+    rfbStatGetMessageCountSent(cl, rfbFramebufferUpdate),
+#endif
+    dt, dt3, tm);
 
 					if (req1 != 0 && mod1 == 0) {
 						dts[got_t3++] = dt3;
