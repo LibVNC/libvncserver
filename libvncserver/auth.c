@@ -29,6 +29,10 @@
 
 #include <rfb/rfb.h>
 
+/* RFB 3.8 clients are well informed */
+void rfbClientSendString(rfbClientPtr cl, char *reason);
+
+
 /*
  * Handle security types
  */
@@ -207,7 +211,7 @@ rfbSendSecurityTypeList(rfbClientPtr cl, int primaryType)
 	/* The execution should never reach here */
 	char* reason = "No authentication mode is registered!";
 
-	rfbClientConnFailed(cl, reason);
+	rfbClientSendString(cl, reason);
 	return;
     }
 
@@ -352,7 +356,7 @@ rfbAuthProcessClientMessage(rfbClientPtr cl)
         }
 	/* support RFB 3.8 clients, they expect a reason *why* it was disconnected */
         if (cl->protocolMinorVersion > 7) {
-            rfbClientConnFailed(cl, "password check failed!");
+            rfbClientSendString(cl, "password check failed!");
 	}
 	else
             rfbCloseClient(cl);

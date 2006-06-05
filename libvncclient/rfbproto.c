@@ -369,6 +369,47 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
 
 extern void rfbClientEncryptBytes(unsigned char* bytes, char* passwd);
 
+rfbBool
+rfbHandleAuthResult(rfbClient* client)
+{
+    uint32_t authResult=0, reasonLen=0;
+    char *reason=NULL;
+
+    if (!ReadFromRFBServer(client, (char *)&authResult, 4)) return FALSE;
+
+    authResult = rfbClientSwap32IfLE(authResult);
+
+    switch (authResult) {
+    case rfbVncAuthOK:
+      rfbClientLog("VNC authentication succeeded\n");
+      return TRUE;
+      break;
+    case rfbVncAuthFailed:
+      if (client->major==3 && client->minor>7)
+      {
+        /* we have an error following */
+        if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
+        reasonLen = rfbClientSwap32IfLE(reasonLen);
+        reason = malloc(reasonLen+1);
+        if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
+        reason[reasonLen]=0;
+        rfbClientLog("VNC connection failed: %s\n",reason);
+        free(reason);
+        return FALSE;
+      }
+      rfbClientLog("VNC authentication failed\n");
+      return FALSE;
+    case rfbVncAuthTooMany:
+      rfbClientLog("VNC authentication failed - too many tries\n");
+      return FALSE;
+    }
+
+    rfbClientLog("Unknown VNC authentication result: %d\n",
+                 (int)authResult);
+    return FALSE;
+}
+
+
 /*
  * InitialiseRFBConnection.
  */
@@ -378,7 +419,7 @@ InitialiseRFBConnection(rfbClient* client)
 {
   rfbProtocolVersionMsg pv;
   int major,minor;
-  uint32_t authScheme, reasonLen, authResult;
+  uint32_t authScheme, reasonLen;
   char *reason;
   uint8_t challenge[CHALLENGESIZE];
   char *passwd=NULL;
@@ -453,9 +494,10 @@ InitialiseRFBConnection(rfbClient* client)
         /* we have an error following */
         if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
         reasonLen = rfbClientSwap32IfLE(reasonLen);
-        reason = malloc(reasonLen);
+        reason = malloc(reasonLen+1);
         if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
-        rfbClientLog("VNC connection failed: %.*s\n",(int)reasonLen, reason);
+        reason[reasonLen]=0;
+        rfbClientLog("VNC connection failed: %s\n",reason);
         free(reason);
         return FALSE;
     }
@@ -473,6 +515,7 @@ InitialiseRFBConnection(rfbClient* client)
             rfbClientLog("Selecting security type %d (%d/%d in the list)\n", authScheme, loop, count);
             /* send back a single byte indicating which security type to use */
             if (!WriteToRFBServer(client, (char *)&tAuth, 1)) return FALSE;
+            
         }
     }
   }
@@ -490,16 +533,21 @@ InitialiseRFBConnection(rfbClient* client)
     if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
     reasonLen = rfbClientSwap32IfLE(reasonLen);
 
-    reason = malloc(reasonLen);
+    reason = malloc(reasonLen+1);
 
     if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
-
-    rfbClientLog("VNC connection failed: %.*s\n",(int)reasonLen, reason);
+    reason[reasonLen]=0;
+    rfbClientLog("VNC connection failed: %s\n", reason);
     free(reason);
     return FALSE;
 
   case rfbNoAuth:
     rfbClientLog("No authentication needed\n");
+
+    /* 3.8 and upwards sends a Security Result for rfbNoAuth */
+    if (client->major==3 && client->minor > 7)
+        if (!rfbHandleAuthResult(client)) return FALSE;        
+
     break;
 
   case rfbVncAuth:
@@ -528,36 +576,8 @@ InitialiseRFBConnection(rfbClient* client)
       if (!WriteToRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
     }
 
-    if (!ReadFromRFBServer(client, (char *)&authResult, 4)) return FALSE;
-
-    authResult = rfbClientSwap32IfLE(authResult);
-
-    switch (authResult) {
-    case rfbVncAuthOK:
-      rfbClientLog("VNC authentication succeeded\n");
-      break;
-    case rfbVncAuthFailed:
-      if (client->major==3 && client->minor>7)
-      {
-        /* we have an error following */
-        if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
-        reasonLen = rfbClientSwap32IfLE(reasonLen);
-        reason = malloc(reasonLen);
-        if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
-        rfbClientLog("VNC connection failed: %.*s\n",(int)reasonLen, reason);
-        free(reason);
-        return FALSE;
-      }
-      rfbClientLog("VNC authentication failed\n");
-      return FALSE;
-    case rfbVncAuthTooMany:
-      rfbClientLog("VNC authentication failed - too many tries\n");
-      return FALSE;
-    default:
-      rfbClientLog("Unknown VNC authentication result: %d\n",
-	      (int)authResult);
-      return FALSE;
-    }
+    /* Handle the SecurityResult message */
+    if (!rfbHandleAuthResult(client)) return FALSE;
     break;
 
   default:

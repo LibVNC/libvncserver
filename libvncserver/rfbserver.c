@@ -587,7 +587,6 @@ rfbProcessClientProtocolVersion(rfbClientPtr cl)
 {
     rfbProtocolVersionMsg pv;
     int n, major_, minor_;
-    char failureReason[256];
 
     if ((n = rfbReadExact(cl, pv, sz_rfbProtocolVersionMsg)) <= 0) {
         if (n == 0)
@@ -612,14 +611,10 @@ rfbProcessClientProtocolVersion(rfbClientPtr cl)
     rfbLog("Client Protocol Version %d.%d\n", major_, minor_);
 
     if (major_ != rfbProtocolMajorVersion) {
-        /* Major version mismatch - send a ConnFailed message */
-
-        rfbErr("Major version mismatch\n");
-        sprintf(failureReason,
-                "RFB protocol version mismatch - server %d.%d, client %d.%d",
+        rfbErr("RFB protocol version mismatch - server %d.%d, client %d.%d",
                 cl->screen->protocolMajorVersion, cl->screen->protocolMinorVersion,
                 major_,minor_);
-        rfbClientConnFailed(cl, failureReason);
+        rfbCloseClient(cl);
         return;
     }
 
@@ -641,6 +636,25 @@ rfbProcessClientProtocolVersion(rfbClientPtr cl)
 }
 
 
+void
+rfbClientSendString(rfbClientPtr cl, char *reason)
+{
+    char *buf;
+    int len = strlen(reason);
+
+    rfbLog("rfbClientSendString(\"%s\")\n", reason);
+
+    buf = (char *)malloc(4 + len);
+    ((uint32_t *)buf)[0] = Swap32IfLE(len);
+    memcpy(buf + 4, reason, len);
+
+    if (rfbWriteExact(cl, buf, 4 + len) < 0)
+        rfbLogPerror("rfbClientSendString: write");
+    free(buf);
+
+    rfbCloseClient(cl);
+}
+
 /*
  * rfbClientConnFailed is called when a client connection has failed either
  * because it talks the wrong protocol or it has failed authentication.
@@ -653,6 +667,8 @@ rfbClientConnFailed(rfbClientPtr cl,
     char *buf;
     int len = strlen(reason);
 
+    rfbLog("rfbClientConnFailed(\"%s\")\n", reason);
+
     buf = (char *)malloc(8 + len);
     ((uint32_t *)buf)[0] = Swap32IfLE(rfbConnFailed);
     ((uint32_t *)buf)[1] = Swap32IfLE(len);
@@ -661,6 +677,7 @@ rfbClientConnFailed(rfbClientPtr cl,
     if (rfbWriteExact(cl, buf, 8 + len) < 0)
         rfbLogPerror("rfbClientConnFailed: write");
     free(buf);
+
     rfbCloseClient(cl);
 }
 
