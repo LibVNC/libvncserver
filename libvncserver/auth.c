@@ -119,6 +119,28 @@ rfbVncAuthSendChallenge(rfbClientPtr cl)
     cl->state = RFB_AUTHENTICATION;
 }
 
+/*
+ * Send the NO AUTHENTICATION. SCARR
+ */
+
+static void
+rfbVncAuthNone(rfbClientPtr cl)
+{
+    uint32_t authResult;
+
+    if (cl->protocolMajorVersion==3 && cl->protocolMinorVersion > 7) {
+        rfbLog("rfbProcessClientSecurityType: returning securityResult for client rfb versin >= 3.8\n");
+        authResult = Swap32IfLE(rfbVncAuthOK);
+        if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
+            rfbLogPerror("rfbAuthProcessClientMessage: write");
+            rfbCloseClient(cl);
+            return;
+        }
+    }
+    cl->state = RFB_INITIALISATION;
+    return;
+}
+
 
 /*
  * Advertise the supported security types (protocol 3.7). Here before sending 
@@ -129,9 +151,15 @@ rfbVncAuthSendChallenge(rfbClientPtr cl)
  * Different security types will be added by applications using this library.
  */
 
-static rfbSecurityHandler primaryVncSecurityHandler = {
-    1,
+static rfbSecurityHandler VncSecurityHandlerVncAuth = {
+    rfbSecTypeVncAuth,
     rfbVncAuthSendChallenge,
+    NULL
+};
+
+static rfbSecurityHandler VncSecurityHandlerNone = {
+    rfbSecTypeNone,
+    rfbVncAuthNone,
     NULL
 };
                         
@@ -146,10 +174,15 @@ rfbSendSecurityTypeList(rfbClientPtr cl, int primaryType)
 #define MAX_SECURITY_TYPES 255
     uint8_t buffer[MAX_SECURITY_TYPES+1];
 
-    /* Fill in the list of security types in the client structure. */
-    if (primaryType != rfbSecTypeInvalid) {
-        primaryVncSecurityHandler.type = primaryType;
-        rfbRegisterSecurityHandler(&primaryVncSecurityHandler);
+
+    /* Fill in the list of security types in the client structure. (NOTE: Not really in the client structure) */
+    switch (primaryType) {
+    case rfbSecTypeNone:
+        rfbRegisterSecurityHandler(&VncSecurityHandlerNone);
+        break;
+    case rfbSecTypeVncAuth:
+        rfbRegisterSecurityHandler(&VncSecurityHandlerVncAuth);
+        break;
     }
 
     for (handler = securityHandlers;
@@ -265,7 +298,6 @@ rfbProcessClientSecurityType(rfbClientPtr cl)
     int n;
     uint8_t chosenType;
     rfbSecurityHandler* handler;
-    uint32_t authResult;
     
     /* Read the security type. */
     n = rfbReadExact(cl, (char *)&chosenType, 1);
@@ -281,24 +313,13 @@ rfbProcessClientSecurityType(rfbClientPtr cl)
     /* Make sure it was present in the list sent by the server. */
     for (handler = securityHandlers; handler; handler = handler->next) {
 	if (chosenType == handler->type) {
-		if (chosenType == rfbSecTypeNone) {
-                        authResult = Swap32IfLE(rfbVncAuthOK);
-
-                        if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
-                            rfbLogPerror("rfbAuthProcessClientMessage: write");
-                            rfbCloseClient(cl);
-                            return;
-                        }
-			cl->state = RFB_INITIALISATION;
-			return;
-		} else {
-			handler->handler(cl);
-			return;
-		}
+	      rfbLog("rfbProcessClientSecurityType: executing handler for type %d\n", chosenType);
+	      handler->handler(cl);
+	      return;
 	}
     }
 
-    rfbLog("rfbProcessClientSecurityType: wrong security type requested\n");
+    rfbLog("rfbProcessClientSecurityType: wrong security type (%d) requested\n", chosenType);
     rfbCloseClient(cl);
 }
 
