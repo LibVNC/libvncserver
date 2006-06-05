@@ -265,7 +265,8 @@ rfbProcessClientSecurityType(rfbClientPtr cl)
     int n;
     uint8_t chosenType;
     rfbSecurityHandler* handler;
-
+    uint32_t authResult;
+    
     /* Read the security type. */
     n = rfbReadExact(cl, (char *)&chosenType, 1);
     if (n <= 0) {
@@ -281,6 +282,13 @@ rfbProcessClientSecurityType(rfbClientPtr cl)
     for (handler = securityHandlers; handler; handler = handler->next) {
 	if (chosenType == handler->type) {
 		if (chosenType == rfbSecTypeNone) {
+                        authResult = Swap32IfLE(rfbVncAuthOK);
+
+                        if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
+                            rfbLogPerror("rfbAuthProcessClientMessage: write");
+                            rfbCloseClient(cl);
+                            return;
+                        }
 			cl->state = RFB_INITIALISATION;
 			return;
 		} else {
