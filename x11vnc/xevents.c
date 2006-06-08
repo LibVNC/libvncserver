@@ -454,7 +454,7 @@ static void grab_buster_watch(int parent, char *dstr) {
 	}
 
 	/* overwrite original dpy, we let orig connection sit unused. */
-	dpy = XOpenDisplay(dstr);
+	dpy = XOpenDisplay_wr(dstr);
 	if (!dpy) {
 		fprintf(stderr, "grab_buster_watch: could not reopen: %s\n",
 		    dstr);
@@ -518,7 +518,7 @@ void spawn_grab_buster(void) {
 
 	RAWFB_RET_VOID
 
-	XCloseDisplay(dpy); 
+	XCloseDisplay_wr(dpy); 
 	dpy = NULL;
 
 	if ((pid = fork()) > 0) {
@@ -539,7 +539,7 @@ void spawn_grab_buster(void) {
 		exit(0);
 	}
 
-	dpy = XOpenDisplay(dstr);
+	dpy = XOpenDisplay_wr(dstr);
 	if (!dpy) {
 		rfbLog("failed to reopen display %s in spawn_grab_buster\n",
 		    dstr);

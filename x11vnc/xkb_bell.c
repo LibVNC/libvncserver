@@ -40,6 +40,10 @@ void initialize_xkb(void) {
 		return;
 	}
 
+	if (! xauth_raw(1)) {
+		return;
+	}
+
 	if (! XkbOpenDisplay(DisplayString(dpy), &xkb_base_event_type, &ir,
 	    NULL, NULL, &reason) ) {
 		if (! quiet) {
@@ -49,6 +53,7 @@ void initialize_xkb(void) {
 		xkb_base_event_type = 0;
 		xkb_present = 0;
 	}
+	xauth_raw(0);
 }
 
 void initialize_watch_bell(void) {

@@ -114,7 +114,7 @@
 #define PASSWD_UNLESS_NOPW 0
 #endif
 
-#define REL81
+#define noREL81
 
 /*
  * Beginning of support for small binary footprint build for embedded
@@ -320,6 +320,8 @@ extern char lastmod[];
 
 extern Display *dpy;		/* the single display screen we connect to */
 extern int scr;
+extern char *xauth_raw_data;
+extern int xauth_raw_len;
 extern Window window, rootwin;		/* polled window, root window (usu. same) */
 extern Visual *default_visual;		/* the default visual (unless -visual) */
 extern int bpp, depth;

@@ -49,7 +49,7 @@ void unixpw_screen(int init);
 void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init);
 void unixpw_accept(char *user);
 void unixpw_deny(void);
-int su_verify(char *user, char *pass);
+int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size);
 int crypt_verify(char *user, char *pass);
 
 static int white(void);
@@ -62,6 +62,10 @@ int unixpw_in_progress = 0;
 int unixpw_login_viewonly = 0;
 time_t unixpw_last_try_time = 0;
 rfbClientPtr unixpw_client = NULL;
+
+int keep_unixpw = 0;
+char *keep_unixpw_user = NULL;
+char *keep_unixpw_pass = NULL;
 
 static int in_login = 0, in_passwd = 0, tries = 0;
 static int char_row = 0, char_col = 0;
@@ -352,11 +356,11 @@ int crypt_verify(char *user, char *pass) {
 #endif	/* UNIXPW_CRYPT */
 }
 
-int su_verify(char *user, char *pass) {
+int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 #ifndef UNIXPW_SU
 	return 0;
 #else
-	int i, j, status, fd = -1, sfd, tfd;
+	int i, j, status, fd = -1, sfd, tfd, drain_size = 4096, rsize;
 	int slow_pw = 1;
 	char *slave, *bin_true = NULL, *bin_su = NULL;
 	pid_t pid, pidw;
@@ -389,6 +393,7 @@ int su_verify(char *user, char *pass) {
 			return 0;
 		}
 	}
+	/* unixpw */
 	if (no_external_cmds) {
 		rfbLog("su_verify: cannot run external commands.\n");	
 		clean_up_exit(1);
@@ -416,6 +421,10 @@ int su_verify(char *user, char *pass) {
 		bin_true = "/bin/true";
 	} if (stat("/usr/bin/true", &sbuf) == 0) {
 		bin_true = "/usr/bin/true";
+	}
+	if (cmd != NULL && cmd[0] != '\0') {
+		/* this is for ext. cmd su -c "my cmd" */
+		bin_true = cmd;
 	}
 	if (bin_true == NULL) {
 		rfbLogPerror("existence /bin/true");
@@ -617,13 +626,13 @@ if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 if (db) fprintf(stderr, "%s", buf);
 
 		if (db > 3 && n == 1 && buf[0] == ':') {
-			char cmd[32];
+			char cmd0[32];
 			usleep( 100 * 1000 );
 			fprintf(stderr, "\n\n");
-			sprintf(cmd, "ps wu %d", pid);
-			system(cmd);
-			sprintf(cmd, "stty -a < %s", slave);
-			system(cmd);
+			sprintf(cmd0, "ps wu %d", pid);
+			system(cmd0);
+			sprintf(cmd0, "stty -a < %s", slave);
+			system(cmd0);
 			fprintf(stderr, "\n\n");
 		}
 
@@ -675,7 +684,12 @@ if (db) {
 	 * if we don't drain we may block at waitpid.  If we close(fd), the
 	 * make cause child to die by signal.
 	 */
-	for (i = 0; i<4096; i++) {
+	if (rbuf && *rbuf_size > 0) {
+		/* asked to return output of command */
+		drain_size = *rbuf_size;
+		rsize = 0;
+	}
+	for (i = 0; i< drain_size; i++) {
 		int n;	
 		
 		buf[0] = '\0';
@@ -691,6 +705,48 @@ if (db) fprintf(stderr, "%s", buf);
 		if (n <= 0) {
 			break;
 		}
+
+		if (rbuf) {
+			rbuf[i] = buf[0];
+			rsize++;
+		}
+	}
+	if (rbuf) {
+		char *s = rbuf;
+		char *p = strdup(pass);
+		int n, o = 0;
+		
+		n = strlen(p);
+		if (p[n-1] == '\n') {
+			p[n-1] = '\0';
+		}
+		/*
+		 * usually is: Password: mypassword\r\n\r\n<output-of-command>
+		 * and output will have \n -> \r\n
+		 */
+		if (rbuf[0] == ' ') {
+			s++;
+			o++;
+		}
+		if (strstr(s, p) == s) {
+			s += strlen(p);
+			o += strlen(p);
+			for (n = 0; n < 4; n++) {
+				if (s[0] == '\r' || s[0] == '\n') {
+					s++;
+					o++;
+				}
+			}
+		}
+		if (o > 0) {
+			int i = 0;
+			rsize -= o;
+			while (o < drain_size) {
+				rbuf[i++] = rbuf[o++];
+			}
+		}
+		*rbuf_size = rsize;
+		strzero(p);
 	}
 
 if (db) fprintf(stderr, "\n");
@@ -730,14 +786,39 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 	if (unixpw_nis) {
 		if (crypt_verify(user, pass)) {
 			unixpw_accept(user);
+			if (keep_unixpw) {
+				keep_unixpw_user = strdup(user);
+				keep_unixpw_pass = strdup(pass);
+			}
 			return;
 		} else {
 			rfbLog("unixpw_verify: crypt_verify login for %s failed.\n", user);
 			usleep(3000*1000);
 		}
-	} else {
-		if (su_verify(user, pass)) {
+	} else if (0) {
+		char buf[8192];
+		int n = 8000;
+		int res = su_verify(user, pass, "/home/runge/wallycom yegg 33", buf, &n);
+
+		fprintf(stderr, "su_verify ret: n=%d ", n);
+		write(2, buf, n);
+
+		if (res) {
 			unixpw_accept(user);
+			if (keep_unixpw) {
+				keep_unixpw_user = strdup(user);
+				keep_unixpw_pass = strdup(pass);
+			}
+			return;
+		}
+		rfbLog("unixpw_verify: su_verify login for %s failed.\n", user);
+	} else {
+		if (su_verify(user, pass, NULL, NULL, NULL)) {
+			unixpw_accept(user);
+			if (keep_unixpw) {
+				keep_unixpw_user = strdup(user);
+				keep_unixpw_pass = strdup(pass);
+			}
 			return;
 		}
 		rfbLog("unixpw_verify: su_verify login for %s failed.\n", user);
@@ -802,6 +883,14 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 		for (i=0; i<nmax; i++) {
 			user[i] = '\0';
 			pass[i] = '\0';
+		}
+		if (keep_unixpw_user) {
+			free(keep_unixpw_user);
+			keep_unixpw_user = NULL;
+		}
+		if (keep_unixpw_pass) {
+			free(keep_unixpw_pass);
+			keep_unixpw_pass = NULL;
 		}
 		return;
 	}
@@ -1026,6 +1115,41 @@ static void apply_opts (char *user) {
 
 void unixpw_accept(char *user) {
 	apply_opts(user);
+
+	if (started_as_root == 1 && users_list
+	    && strstr(users_list, "unixpw=") == users_list) {
+		if (getuid() && geteuid()) {
+			rfbLog("unixpw_accept: unixpw= but not root\n");
+			started_as_root = 2;
+		} else {
+			char *u = (char *)malloc(strlen(user)+1); 
+
+			u[0] = '\0';
+			if (!strcmp(users_list, "unixpw=")) {
+				sprintf(u, "+%s", user);
+			} else {
+				char *p, *str = strdup(users_list);
+				p = strtok(str + strlen("unixpw="), ",");
+				while (p) {
+					if (!strcmp(p, user)) {
+						sprintf(u, "+%s", user);
+						break;
+					}
+					p = strtok(NULL, ",");
+				}
+				free(str);
+			}
+			
+			if (u[0] == '\0') {
+				rfbLog("unixpw_accept skipping switch to user: %s\n", user);
+			} else if (switch_user(u, 0)) {
+				rfbLog("unixpw_accept switched to user: %s\n", user);
+			} else {
+				rfbLog("unixpw_accept failed to switched to user: %s\n", user);
+			}
+			free(u);
+		}
+	}
 
 	if (unixpw_login_viewonly) {
 		unixpw_client->viewOnly = TRUE;

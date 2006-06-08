@@ -5,6 +5,7 @@
 #include "win_utils.h"
 #include "remote.h"
 #include "cleanup.h"
+#include "xwrappers.h"
 
 #include "tkx11vnc.h"
 
@@ -229,15 +230,15 @@ if (0) fprintf(stderr, "run_gui: %s -- %d %d\n", gui_xdisplay, connect_to_x11vnc
 			} else {
 				old_xauth = strdup("");
 			}
-			dpy = XOpenDisplay(x11vnc_xdisplay); 
+			dpy = XOpenDisplay_wr(x11vnc_xdisplay); 
 			if (! dpy && auth_file) {
 				set_env("XAUTHORITY", auth_file);
-				dpy = XOpenDisplay(x11vnc_xdisplay);
+				dpy = XOpenDisplay_wr(x11vnc_xdisplay);
 			}
 			if (! dpy && ! x11vnc_xdisplay) {
 				/* worstest case */
 				x11vnc_xdisplay = strdup(":0");
-				dpy = XOpenDisplay(x11vnc_xdisplay); 
+				dpy = XOpenDisplay_wr(x11vnc_xdisplay); 
 			}
 			if (! dpy) {
 				rfbLog("gui: could not open x11vnc "
@@ -310,7 +311,7 @@ if (0) fprintf(stderr, "run_gui: %s -- %d %d\n", gui_xdisplay, connect_to_x11vnc
 			set_env("X11VNC_CONNECT_FILE", client_connect_file);
 		}
 		if (dpy)  {
-			XCloseDisplay(dpy);
+			XCloseDisplay_wr(dpy);
 			dpy = NULL;
 		}
 		if (old_xauth) {
@@ -418,6 +419,7 @@ if (0) fprintf(stderr, "run_gui: %s -- %d %d\n", gui_xdisplay, connect_to_x11vnc
 		set_env("X11VNC_ICON_FONT", icon_mode_font);
 	}
 
+	/* gui */
 	if (no_external_cmds) {
 		fprintf(stderr, "cannot run external commands in -nocmds "
 		    "mode:\n");
@@ -576,20 +578,20 @@ void do_gui(char *opts, int sleep) {
 		fprintf(stderr, "starting gui, trying display: %s\n",
 		    gui_xdisplay);
 	}
-	test_dpy = XOpenDisplay(gui_xdisplay);
+	test_dpy = XOpenDisplay_wr(gui_xdisplay);
 	if (! test_dpy && auth_file) {
 		if (getenv("XAUTHORITY") != NULL) {
 			old_xauth = strdup(getenv("XAUTHORITY"));
 		}
 		set_env("XAUTHORITY", auth_file);
-		test_dpy = XOpenDisplay(gui_xdisplay);
+		test_dpy = XOpenDisplay_wr(gui_xdisplay);
 	}
 	if (! test_dpy) {
 		if (! old_xauth && getenv("XAUTHORITY") != NULL) {
 			old_xauth = strdup(getenv("XAUTHORITY"));
 		}
 		set_env("XAUTHORITY", "");
-		test_dpy = XOpenDisplay(gui_xdisplay);
+		test_dpy = XOpenDisplay_wr(gui_xdisplay);
 	}
 	if (! test_dpy) {
 		fprintf(stderr, "error: cannot connect to gui X DISPLAY: %s\n",
@@ -603,7 +605,7 @@ void do_gui(char *opts, int sleep) {
 			tray_manager_ok = 0;
 		}
 	}
-	XCloseDisplay(test_dpy);
+	XCloseDisplay_wr(test_dpy);
 
 	if (start_x11vnc) {
 

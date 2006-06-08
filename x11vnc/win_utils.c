@@ -304,6 +304,7 @@ int pick_windowid(unsigned long *num) {
 	if (use_dpy) {
 		set_env("DISPLAY", use_dpy);
 	}
+	/* id */
 	if (no_external_cmds) {
 		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");

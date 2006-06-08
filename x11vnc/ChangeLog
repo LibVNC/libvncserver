@@ -1,3 +1,8 @@
+2006-06-08  Karl Runge <runge@karlrunge.com>
+	* x11vnc: XOpenDisplay wrapper for raw xauth data, -unixpw 
+	  su_verify() to run any cmd, -users unixpw= mode. -display WAIT:...
+	  modes for delayed X display opening and dynamic choosing.
+
 2006-06-03  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -capslock and -skip_lockkeys options.  map some Alt keys
 	  to Latin under linuxfb.  switch to new stats API.  Handle more

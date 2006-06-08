@@ -1089,6 +1089,7 @@ static char *guess_via_v4l_info(char *dev, int *fd) {
 
 	if (*fd) {}
 
+	/* v4l-info */
 	if (no_external_cmds) {
 		rfbLog("guess_via_v4l_info: cannot run external "
 		    "command: v4l-info\n");

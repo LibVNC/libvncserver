@@ -1,10 +1,13 @@
+2006-06-08  Karl Runge <runge@karlrunge.com>
+	* prepare_x11vnc_dist.sh: to 0.8.2
+
 2006-05-29  Steven Carr <scarr@jsa-usa.com>
 	* Identified and removed some memory leaks associated
 	  with the Encodings RRE, CoRRE, ZLIB, and Ultra.
 	* KeyboardLedState now has portable masks defined.
 	* rfb >= 3.7 Security Type Handler list would grow 1
 	  entry for each new client connection.
- 
+
 2006-05-16  Steven Carr <scarr@jsa-usa.com>
 	* Statistics output now fits in 80-column output
 	* Corrected Cursor Statistics reporting as messages

@@ -316,6 +316,12 @@ Tuning
 	=D-C:0,1,2,3,4 pointer_mode:
 	input_skip:
 	=D nodragging
+	-- D
+	speeds:
+	=D wait:
+	defer:
+	=D nap
+	screen_blank:
 	--
 	=GAL WireFrame::
 	wireframe
@@ -337,12 +343,6 @@ Tuning
 	xd_area:
 	xd_mem:
 	=GAL LOFF
-	-- D
-	speeds:
-	=D wait:
-	defer:
-	=D nap
-	screen_blank:
 	--
 	=GAL SharedMemory::
 	noshm

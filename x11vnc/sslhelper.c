@@ -246,6 +246,7 @@ static char *create_tmp_pem(char *pathin, int prompt) {
 	CN = strdup(line);
 	EM = strdup("x11vnc@server.nowhere");
 
+	/* ssl */
 	if (no_external_cmds) {
 		rfbLog("create_tmp_pem: cannot run external commands.\n");	
 		return NULL;
@@ -818,7 +819,7 @@ void openssl_port(void) {
 		rfbLog("openssl_port: could not reopen port %d\n", port);
 		clean_up_exit(1);
 	}
-	if (db) fprintf(stderr, "listen on port/sock %d/%d\n", port, sock);
+	rfbLog("openssl_port: listen on port/sock %d/%d\n", port, sock);
 	openssl_sock = sock;
 	openssl_port_num = port;
 

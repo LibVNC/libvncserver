@@ -113,6 +113,7 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		return 0;
 	}
 
+	/* stunnel */
 	if (no_external_cmds) {
 		rfbLogEnable(1);
 		rfbLog("start_stunnel: cannot run external commands in -nocmds mode:\n");

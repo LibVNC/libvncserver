@@ -93,7 +93,7 @@ char *allowed_input_str = NULL;
 char *viewonly_passwd = NULL;	/* view only passwd. */
 char **passwd_list = NULL;	/* for -passwdfile */
 int begin_viewonly = -1;
-int inetd = 0;			/* spawned from inetd(1) */
+int inetd = 0;			/* spawned from inetd(8) */
 #ifndef FILEXFER
 #define FILEXFER 1
 #endif

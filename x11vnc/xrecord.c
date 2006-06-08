@@ -118,8 +118,8 @@ static void xrecord_grabserver(int start) {
 	XSync(gdpy_ctrl, True);
 
 	if (! rc_grab || trapped_record_xerror) {
-		XCloseDisplay(gdpy_ctrl);
-		XCloseDisplay(gdpy_data);
+		XCloseDisplay_wr(gdpy_ctrl);
+		XCloseDisplay_wr(gdpy_data);
 		gdpy_ctrl = NULL;
 		gdpy_data = NULL;
 		XSetErrorHandler(old_handler);
@@ -127,8 +127,8 @@ static void xrecord_grabserver(int start) {
 	}
 	rc = XRecordEnableContextAsync(gdpy_data, rc_grab, record_grab, NULL);
 	if (!rc || trapped_record_xerror) {
-		XCloseDisplay(gdpy_ctrl);
-		XCloseDisplay(gdpy_data);
+		XCloseDisplay_wr(gdpy_ctrl);
+		XCloseDisplay_wr(gdpy_data);
 		gdpy_ctrl = NULL;
 		gdpy_data = NULL;
 		XSetErrorHandler(old_handler);
@@ -179,18 +179,18 @@ void initialize_xrecord(void) {
 	X_LOCK;
 	/* open a 2nd control connection to DISPLAY: */
 	if (rdpy_data) {
-		XCloseDisplay(rdpy_data);
+		XCloseDisplay_wr(rdpy_data);
 		rdpy_data = NULL;
 	}
 	if (rdpy_ctrl) {
-		XCloseDisplay(rdpy_ctrl);
+		XCloseDisplay_wr(rdpy_ctrl);
 		rdpy_ctrl = NULL;
 	}
-	rdpy_ctrl = XOpenDisplay(DisplayString(dpy));
+	rdpy_ctrl = XOpenDisplay_wr(DisplayString(dpy));
 	XSync(dpy, True);
 	XSync(rdpy_ctrl, True);
 	/* open datalink connection to DISPLAY: */
-	rdpy_data = XOpenDisplay(DisplayString(dpy));
+	rdpy_data = XOpenDisplay_wr(DisplayString(dpy));
 	if (!rdpy_ctrl || ! rdpy_data) {
 		X_UNLOCK;
 		return;
@@ -206,19 +206,19 @@ void initialize_xrecord(void) {
 	 * in place, why?  Not sure, so we manually watch for grabs...
 	 */
 	if (gdpy_data) {
-		XCloseDisplay(gdpy_data);
+		XCloseDisplay_wr(gdpy_data);
 		gdpy_data = NULL;
 	}
 	if (gdpy_ctrl) {
-		XCloseDisplay(gdpy_ctrl);
+		XCloseDisplay_wr(gdpy_ctrl);
 		gdpy_ctrl = NULL;
 	}
 	xserver_grabbed = 0;
 
-	gdpy_ctrl = XOpenDisplay(DisplayString(dpy));
+	gdpy_ctrl = XOpenDisplay_wr(DisplayString(dpy));
 	XSync(dpy, True);
 	XSync(gdpy_ctrl, True);
-	gdpy_data = XOpenDisplay(DisplayString(dpy));
+	gdpy_data = XOpenDisplay_wr(DisplayString(dpy));
 	if (gdpy_ctrl && gdpy_data) {
 		disable_grabserver(gdpy_ctrl, 0);
 		disable_grabserver(gdpy_data, 0);
@@ -260,19 +260,19 @@ void shutdown_xrecord(void) {
 	}
 		
 	if (rdpy_data) {
-		XCloseDisplay(rdpy_data);
+		XCloseDisplay_wr(rdpy_data);
 		rdpy_data = NULL;
 	}
 	if (rdpy_ctrl) {
-		XCloseDisplay(rdpy_ctrl);
+		XCloseDisplay_wr(rdpy_ctrl);
 		rdpy_ctrl = NULL;
 	}
 	if (gdpy_data) {
-		XCloseDisplay(gdpy_data);
+		XCloseDisplay_wr(gdpy_data);
 		gdpy_data = NULL;
 	}
 	if (gdpy_ctrl) {
-		XCloseDisplay(gdpy_ctrl);
+		XCloseDisplay_wr(gdpy_ctrl);
 		gdpy_ctrl = NULL;
 	}
 	xserver_grabbed = 0;
@@ -1367,16 +1367,16 @@ static void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) 
 		if (debug_scroll) {
 			rfbLog("closing RECORD data connection.\n");
 		}
-		XCloseDisplay(rdpy_data);
+		XCloseDisplay_wr(rdpy_data);
 		rdpy_data = NULL;
 
 		if (debug_scroll) {
 			rfbLog("closing RECORD control connection.\n");
 		}
-		XCloseDisplay(rdpy_ctrl);
+		XCloseDisplay_wr(rdpy_ctrl);
 		rdpy_ctrl = NULL;
 
-		rdpy_ctrl = XOpenDisplay(dpystr);
+		rdpy_ctrl = XOpenDisplay_wr(dpystr);
 
 		if (! rdpy_ctrl) {
 			rfbLog("Failed to reopen RECORD control connection:"
@@ -1390,13 +1390,13 @@ static void shutdown_record_context(XRecordContext rc, int bequiet, int reopen) 
 		disable_grabserver(rdpy_ctrl, 0);
 		XSync(rdpy_ctrl, True);
 
-		rdpy_data = XOpenDisplay(dpystr);
+		rdpy_data = XOpenDisplay_wr(dpystr);
 
 		if (! rdpy_data) {
 			rfbLog("Failed to reopen RECORD data connection:"
 			    "%s\n", dpystr);
 			rfbLog("  disabling RECORD scroll detection.\n");
-			XCloseDisplay(rdpy_ctrl);
+			XCloseDisplay_wr(rdpy_ctrl);
 			rdpy_ctrl = NULL;
 			use_xrecord = 0;
 			return;

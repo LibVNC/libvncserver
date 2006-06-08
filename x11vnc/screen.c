@@ -541,7 +541,7 @@ void set_raw_fb_params(int restore) {
 		multiple_cursors_mode = mc0;
 
 		if (! dpy && raw_fb_orig_dpy) {
-			dpy = XOpenDisplay(raw_fb_orig_dpy);
+			dpy = XOpenDisplay_wr(raw_fb_orig_dpy);
 			if (dpy) {
 				if (! quiet) rfbLog("reopened DISPLAY: %s\n",
 				    raw_fb_orig_dpy);
@@ -881,6 +881,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 
 		set_child_info();
 		q += strlen("setup:");
+		/* rawfb-setup */
 		if (no_external_cmds) {
 			rfbLogEnable(1);
 			rfbLog("cannot run external commands in -nocmds "
@@ -988,7 +989,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		if (dpy) {
 			rfbLog("closing X DISPLAY: %s in rawfb mode.\n",
 			    DisplayString(dpy));
-			XCloseDisplay(dpy);	/* yow! */
+			XCloseDisplay_wr(dpy);	/* yow! */
 		}
 		dpy = NULL;
 	}
@@ -1974,7 +1975,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		have_masks = 0;
 	}
 
-	if (cmap8to24 && depth == 8) {
+	if (cmap8to24 && depth == 8 && dpy) {
 		XVisualInfo vinfo;
 		/* more cooking up... */
 		have_masks = 2;
@@ -2042,6 +2043,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 				rfbLog("Raw fb at addr %p is %dbpp depth=%d "
 				    "true color\n", raw_fb_addr,
 				    fb_bpp, fb_depth);
+			} else if (! dpy) {
+				;
 			} else if (have_masks == 2) {
 				rfbLog("\n");
 				rfbLog("X display %s is %dbpp depth=%d indexed "
@@ -2206,6 +2209,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		fprintf(stderr, " 8to24_fb:    %p\n", cmap8to24_fb);
 		fprintf(stderr, " snap_fb:     %p\n", snap_fb);
 		fprintf(stderr, " raw_fb:      %p\n", raw_fb);
+		fprintf(stderr, " fake_fb:     %p\n", fake_fb);
 		fprintf(stderr, "\n");
 	}
 

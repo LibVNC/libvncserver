@@ -960,7 +960,7 @@ static void quick_pw(char *str) {
 			
 		}
 		fprintf(stdout, "password: ");
-		/* no_external_cmds does not apply */
+		/* test mode: no_external_cmds does not apply */
 		system("stty -echo");
 		if(fgets(tmp, 128, stdin) == NULL) {
 			fprintf(stdout, "\n");
@@ -1003,7 +1003,7 @@ static void quick_pw(char *str) {
 			exit(1);
 		}
 	} else {
-		if (su_verify(p, q+1)) {
+		if (su_verify(p, q+1, NULL, NULL, NULL)) {
 			fprintf(stdout, "Y %s\n", p);
 			exit(0);
 		} else {
@@ -1254,7 +1254,7 @@ static void check_loop_mode(int argc, char* argv[]) {
 				perror("fork");
 				exit(1);
 			} else {
-				/* no_external_cmds does not apply */
+				/* loop mode: no_external_cmds does not apply */
 				execvp(argv[0], argv2); 
 				exit(1);
 			}
@@ -1283,6 +1283,7 @@ static void store_homedir_passwd(char *file) {
 	str1[0] = '\0';
 	str2[0] = '\0';
 
+	/* storepasswd */
 	if (no_external_cmds) {
 		fprintf(stderr, "-nocmds cannot be used with -storepasswd\n");
 		exit(1);
@@ -1388,6 +1389,7 @@ int main(int argc, char* argv[]) {
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0;
 	int got_httpdir = 0, try_http = 0;
+	int waited_for_client = 0;
 	XImage *fb0 = NULL;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
@@ -2728,20 +2730,33 @@ int main(int argc, char* argv[]) {
 	use_xkb_modtweak = 0;
 #endif
 
+#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+	if (filexfer) {
+		rfbRegisterTightVNCFileTransferExtension();
+	} else {
+		rfbUnregisterTightVNCFileTransferExtension();
+	}
+#endif
+
+	initialize_allowed_input();
+
 	if (users_list && strstr(users_list, "lurk=")) {
 		if (use_dpy) {
 			rfbLog("warning: -display does not make sense in "
 			    "\"lurk=\" mode...\n");
 		}
 		lurk_loop(users_list);
+	} else if (use_dpy && strstr(use_dpy, "WAIT:") == use_dpy) {
+		waited_for_client = wait_for_client(&argc_vnc, argv_vnc,
+		    try_http && ! got_httpdir);
 	}
 
 	if (use_dpy) {
-		dpy = XOpenDisplay(use_dpy);
+		dpy = XOpenDisplay_wr(use_dpy);
 	} else if ( (use_dpy = getenv("DISPLAY")) ) {
-		dpy = XOpenDisplay(use_dpy);
+		dpy = XOpenDisplay_wr(use_dpy);
 	} else {
-		dpy = XOpenDisplay("");
+		dpy = XOpenDisplay_wr("");
 	}
 
 	if (! dpy && raw_fb_str) {
@@ -2764,7 +2779,7 @@ int main(int argc, char* argv[]) {
 		}
 		fprintf(stderr, "\n");
 		use_dpy = ":0";
-		dpy = XOpenDisplay(use_dpy);
+		dpy = XOpenDisplay_wr(use_dpy);
 		if (dpy) {
 			rfbLog("*** XOpenDisplay of \":0\" successful.\n");
 		}
@@ -2803,7 +2818,7 @@ int main(int argc, char* argv[]) {
 		fflush(stderr);
 		fflush(stdout);
 		usleep(30 * 1000);	/* still needed? */
-		XCloseDisplay(dpy);
+		XCloseDisplay_wr(dpy);
 		exit(rc);
 	}
 
@@ -3133,13 +3148,6 @@ int main(int argc, char* argv[]) {
 
 	raw_fb_pass_go_and_collect_200_dollars:
 
-#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
-	if (filexfer) {
-		rfbRegisterTightVNCFileTransferExtension();
-	} else {
-		rfbUnregisterTightVNCFileTransferExtension();
-	}
-#endif
 	if (! dt) {
 		static char str[] = "-desktop";
 		argv_vnc[argc_vnc++] = str;
@@ -3162,8 +3170,15 @@ int main(int argc, char* argv[]) {
 
 	initialize_screen(&argc_vnc, argv_vnc, fb0);
 
-	if (try_http && ! got_httpdir && check_httpdir()) {
-		http_connections(1);
+	if (waited_for_client && fake_fb) {
+		free(fake_fb);
+		fake_fb = NULL;
+	}
+
+	if (! waited_for_client) {
+		if (try_http && ! got_httpdir && check_httpdir()) {
+			http_connections(1);
+		}
 	}
 
 	initialize_tiles();
@@ -3180,10 +3195,10 @@ int main(int argc, char* argv[]) {
 
 	initialize_keyboard_and_pointer();
 
-	initialize_allowed_input();
-
 	if (inetd && use_openssl) {
-		accept_openssl(OPENSSL_INETD);
+		if (! waited_for_client) {
+			accept_openssl(OPENSSL_INETD);
+		}
 	}
 	if (! inetd && ! use_openssl) {
 		if (! screen->port || screen->listenSock < 0) {

@@ -68,4 +68,8 @@ extern void disable_grabserver(Display *in_dpy, int change);
 
 extern Bool XRecordQueryVersion_wr(Display *dpy, int *maj, int *min);
 
+extern int xauth_raw(int on);
+extern Display *XOpenDisplay_wr(char *display_name);
+extern int XCloseDisplay_wr(Display *display);
+
 #endif /* _X11VNC_XWRAPPERS_H */

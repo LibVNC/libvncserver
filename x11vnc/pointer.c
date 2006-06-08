@@ -941,6 +941,7 @@ if (0) fprintf(stderr, "initialize_pipeinput: %s -- %s\n", pipeinput_str, p);
 	}
 
 	set_child_info();
+	/* pipeinput */
 	if (no_external_cmds) {
 		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");

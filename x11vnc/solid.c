@@ -53,6 +53,7 @@ static int dt_cmd(char *cmd) {
 		return 0;
 	}
 
+	/* dt */
 	if (no_external_cmds) {
 		rfbLog("cannot run external commands in -nocmds mode:\n");
 		rfbLog("   \"%s\"\n", cmd);

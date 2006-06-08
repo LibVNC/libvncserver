@@ -15,12 +15,14 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8.1 lastmod: 2006-06-03";
+char lastmod[] = "0.8.2 lastmod: 2006-06-08";
 
 /* X display info */
 
 Display *dpy = NULL;		/* the single display screen we connect to */
 int scr = 0;
+char *xauth_raw_data = NULL;
+int xauth_raw_len = 0;
 Window window = None, rootwin = None;	/* polled window, root window (usu. same) */
 Visual *default_visual = NULL;	/* the default visual (unless -visual) */
 int bpp = 0, depth = 0;

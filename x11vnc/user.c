@@ -6,6 +6,8 @@
 #include "scan.h"
 #include "screen.h"
 #include "unixpw.h"
+#include "sslhelper.h"
+#include "xwrappers.h"
 
 void check_switched_user(void);
 void lurk_loop(char *str);
@@ -13,6 +15,7 @@ int switch_user(char *user, int fb_mode);
 int read_passwds(char *passfile);
 void install_passwds(void);
 void check_new_passwds(void);
+int wait_for_client(int *argc, char** argv, int http);
 
 
 static void switch_user_task_dummy(void);
@@ -574,9 +577,9 @@ static int try_user_and_display(uid_t uid, char *dpystr) {
 		}
 
 		fclose(stderr);
-		dpy2 = XOpenDisplay(dpystr);
+		dpy2 = XOpenDisplay_wr(dpystr);
 		if (dpy2) {
-			XCloseDisplay(dpy2);
+			XCloseDisplay_wr(dpy2);
 			exit(0);	/* success */
 		} else {
 			exit(2);	/* fail */
@@ -940,4 +943,234 @@ void check_new_passwds(void) {
 	}
 }
 
+int wait_for_client(int *argc, char** argv, int http) {
+	static XImage ximage_struct;
+	XImage* fb_image;
+	int w = 640, h = 480, b = 32;
+	int w0, h0, i;
+	int chg_raw_fb = 0;
+	char *str, *q, *p;
+	char *cmd = NULL;
+	int db = 0;
+
+	if (! use_dpy || strstr(use_dpy, "WAIT:") != use_dpy) {
+		return 0;
+	}
+
+	rfbLog("into wait_for_client.\n");
+	str = strdup(use_dpy);
+	str += strlen("WAIT:");
+	q = strchr(str, ':');
+
+	/* get any leading geometry: */
+	if (q) *q = '\0';
+	if (sscanf(str, "%dx%d", &w0, &h0) == 2)  {
+		w = w0;
+		h = h0;
+	}
+	if (q) *q = ':';
+
+	q = strchr(str, ':');
+	if (! q) {
+		if (strstr(str, "cmd=") != str) {
+			str = strdup(":0"); 
+		}
+	} else {
+		str = q;
+	}
+	if (db) fprintf(stderr, "str: %s\n", str);
+
+	if (strstr(str, "cmd=") == str) {
+		cmd = str + strlen("cmd=");
+		if (db) fprintf(stderr, "cmd: %s\n", cmd);
+
+		/* WAIT */
+		if (no_external_cmds) {
+			rfbLog("wait_for_client external cmds not allowed:"
+			    " %s\n", use_dpy);
+			clean_up_exit(1);
+		}
+	}
+	
+	if (fake_fb) {
+		free(fake_fb);
+	}
+	fake_fb = (char *) calloc(w*h*b/4, 1);
+
+	fb_image = &ximage_struct;
+	fb_image->data = fake_fb;
+	fb_image->format = ZPixmap;
+	fb_image->width  = w;
+	fb_image->height = h;
+	fb_image->bits_per_pixel = b;
+	fb_image->bytes_per_line = w*b/8;
+	fb_image->bitmap_unit = -1;
+	fb_image->depth = 24;
+	fb_image->red_mask   = 0xff0000;
+	fb_image->green_mask = 0x00ff00;
+	fb_image->blue_mask  = 0x0000ff;
+
+	depth = fb_image->depth;
+
+	dpy_x = wdpy_x = w;
+	dpy_y = wdpy_y = h;
+	off_x = 0;
+	off_y = 0;
+
+	initialize_allowed_input();
+	
+	initialize_screen(argc, argv, fb_image);
+
+	if (http && check_httpdir()) {
+		http_connections(1);
+	}
+
+	if (! raw_fb) {
+		chg_raw_fb = 1;
+		/* kludge to get RAWFB_RET with dpy == NULL guards */
+		raw_fb = "null";
+	}
+
+	if (cmd && unixpw) {
+		keep_unixpw = 1;
+	}
+
+	if (inetd && use_openssl) {
+		accept_openssl(OPENSSL_INETD);
+	}
+
+	while (1) {
+		if (! use_threads) {
+			rfbPE(-1);
+		}
+		if (use_openssl) {
+			check_openssl();
+		}
+		if (! screen || ! screen->clientHead) {
+			usleep(100 * 1000);
+			continue;
+		}
+		rfbLog("wait_for_client: got client\n");
+		break;
+	}
+
+	if (unixpw) {
+		if (! unixpw_in_progress) {
+			rfbLog("unixpw but no unixpw_in_progress\n");
+			clean_up_exit(1);
+		}
+		while (1) {
+			if (! use_threads) {
+				rfbPE(-1);
+			}
+			if (unixpw_in_progress) {
+				usleep(20 * 1000);
+				continue;
+			}
+			rfbLog("wait_for_client: unixpw finished.\n");
+			break;
+		}
+	}
+
+	if (cmd) {
+		char line1[1024];
+		char line2[16384];
+		char *q;
+		int n;
+
+		memset(line1, 0, 1024);
+		memset(line2, 0, 16384);
+
+		if (unixpw) {
+			int res = 0, k, j;
+			char line[18000];
+
+			memset(line, 0, 18000);
+
+			if (keep_unixpw_user && keep_unixpw_pass) {
+				n = 18000;
+				res = su_verify(keep_unixpw_user, keep_unixpw_pass,
+				    cmd, line, &n);
+				strzero(keep_unixpw_user);
+				strzero(keep_unixpw_pass);
+			}
+			keep_unixpw = 0;
+
+			if (! res) {
+				rfbLog("wait_for_client: cmd failed: %s\n", cmd);
+				clean_up_exit(1);
+			}
+			for (k = 0; k < 1024; k++) {
+				line1[k] = line[k];
+				if (line[k] == '\n') {
+					k++;
+					break;
+				}
+			}
+			n -= k;
+			while (j < 16384) {
+				line2[j] = line[k+j];
+				j++;
+			}
+		} else {
+			FILE *p = popen(cmd, "r");
+			if (! p) {
+				rfbLog("wait_for_client: cmd failed: %s\n", cmd);
+				rfbLogPerror("popen");
+				clean_up_exit(1);
+			}
+			if (fgets(line1, 1024, p) == NULL) {
+				rfbLog("wait_for_client: read failed: %s\n", cmd);
+				rfbLogPerror("fgets");
+				clean_up_exit(1);
+			}
+			n = fread(line2, 1, 16384, p);
+			pclose(p);
+		}
+
+		if (strstr(line1, "DISPLAY=") != line1) {
+			rfbLog("wait_for_client: bad reply %s\n", line1);
+			clean_up_exit(1);
+		}
+
+		use_dpy = strdup(line1 + strlen("DISPLAY="));
+		q = use_dpy;
+		while (*q != '\0') {
+			if (*q == '\n' || *q == '\r') *q = '\0';
+			q++;
+		}
+if (db) fprintf(stderr, "use_dpy: %s  n: %d\n", use_dpy, n);
+if (0) write(2, line2, n);
+		if (line2[0] != '\0') {
+			if (strstr(line2, "XAUTHORITY=") == line2) {
+				q = line2;
+				while (*q != '\0') {
+					if (*q == '\n' || *q == '\r') *q = '\0';
+					q++;
+				}
+				if (auth_file) {
+					free(auth_file);
+				}
+				auth_file = strdup(line2 + strlen("XAUTHORITY="));
+
+			} else {
+				xauth_raw_data = (char *)malloc(n);
+				xauth_raw_len = n;
+				memcpy(xauth_raw_data, line2, n);
+if (db) fprintf(stderr, "xauth_raw_len: %d\n", n);
+if (0) {
+	write(2, xauth_raw_data, xauth_raw_len);
+	fprintf(stderr, "\n");
+}
+			}
+		}
+	} else {
+		use_dpy = strdup(str);
+	}
+	if (chg_raw_fb) {
+		raw_fb = NULL;
+	}
+
+	return 1;
+}
 

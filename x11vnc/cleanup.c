@@ -155,7 +155,7 @@ void clean_up_exit (int ret) {
 	}
 #endif
 	/* XXX rdpy_ctrl, etc. cannot close w/o blocking */
-	XCloseDisplay(dpy);
+	XCloseDisplay_wr(dpy);
 	X_UNLOCK;
 
 	fflush(stderr);
@@ -311,6 +311,7 @@ static void crash_shell(void) {
 			crash_shell_help();
 		} else if (*str == 's' && *(str+1) == '\0') {
 			sprintf(cmd, "sh -c '(%s) &'", crash_stack_command1);
+			/* crash */
 			if (no_external_cmds) {
 				fprintf(stderr, "\nno_external_cmds=%d\n",
 				    no_external_cmds);

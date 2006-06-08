@@ -448,6 +448,7 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	sprintf(str, "%d", client_count);
 	set_env("RFB_CLIENT_COUNT", str);
 
+	/* gone, accept, afteraccept */
 	if (no_external_cmds) {
 		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");

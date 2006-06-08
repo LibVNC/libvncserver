@@ -68,6 +68,10 @@ void disable_grabserver(Display *in_dpy, int change);
 
 Bool XRecordQueryVersion_wr(Display *dpy, int *maj, int *min);
 
+int xauth_raw(int on);
+Display *XOpenDisplay_wr(char *display_name);
+int XCloseDisplay_wr(Display *display);
+
 void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h);
 static void upup_downdown_warning(KeyCode key, Bool down);
 
@@ -879,4 +883,74 @@ Bool XRecordQueryVersion_wr(Display *dpy, int *maj, int *min) {
 #endif
 }
 
+int xauth_raw(int on) {
+	char tmp[] = "/tmp/x11vnc-xauth.XXXXXX";
+	int tmp_fd = -1;
+	static char *old_xauthority = NULL;
+	static char *old_tmp = NULL;
+	int db = 0;
+
+	if (on) {
+		if (old_xauthority) {
+			free(old_xauthority);
+			old_xauthority = NULL;
+		}
+		if (old_tmp) {
+			free(old_tmp);
+			old_tmp = NULL;
+		}
+		if (xauth_raw_data) {
+			tmp_fd = mkstemp(tmp);
+			if (tmp_fd < 0) {
+				rfbLog("could not create tmp xauth file: %s\n", tmp);	
+				return 0;
+			}
+			if (db) fprintf(stderr, "tmp: %s\n", tmp);
+			write(tmp_fd, xauth_raw_data, xauth_raw_len);
+			close(tmp_fd);
+			if (getenv("XAUTHORITY")) {
+				old_xauthority = strdup(getenv("XAUTHORITY"));
+			} else {
+				old_xauthority = strdup("");
+			}
+			set_env("XAUTHORITY", tmp);
+			old_tmp = strdup(tmp);
+		}
+		return 1;
+	} else {
+		if (old_xauthority) {
+			set_env("XAUTHORITY", old_xauthority);
+			free(old_xauthority);
+			old_xauthority = NULL;
+		}
+		if (old_tmp) {
+			unlink(old_tmp);
+			free(old_tmp);
+			old_tmp = NULL;
+		}
+		return 1;
+	}
+}
+
+Display *XOpenDisplay_wr(char *display_name) {
+	Display *d;
+	int db = 0;
+
+	if (! xauth_raw(1)) {
+		return NULL;
+	}
+
+	d = XOpenDisplay(display_name);
+	if (db) fprintf(stderr, "XOpenDisplay_wr: %s  0x%x\n", display_name, d);
+
+	xauth_raw(0);
+
+	return d;
+}
+
+int XCloseDisplay_wr(Display *display) {
+	int db = 0;
+	if (db) fprintf(stderr, "XCloseDisplay_wr: 0x%x\n", display);
+	return XCloseDisplay(display);
+}
 

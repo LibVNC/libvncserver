@@ -585,7 +585,7 @@ int remote_control_access_ok(void) {
 		    "XAUTHORITY\n", dpy_str);
 		fprintf(stderr, "   -- (ignore any Xlib: errors that"
 		    " follow) --\n");
-		dpy2 = XOpenDisplay(dpy_str); 
+		dpy2 = XOpenDisplay_wr(dpy_str); 
 		fflush(stderr);
 		fprintf(stderr, "   -- (done checking) --\n\n");
 
@@ -601,7 +601,7 @@ int remote_control_access_ok(void) {
 		if (dpy2) {
 			rfbLog("XAUTHORITY is not required on display.\n");
 			rfbLog("   %s\n", DisplayString(dpy));
-			XCloseDisplay(dpy2);
+			XCloseDisplay_wr(dpy2);
 			dpy2 = NULL;
 			return 0;
 		}
