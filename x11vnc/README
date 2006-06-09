@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Thu Jun  8 18:47:45 EDT 2006
+x11vnc README file                         Date: Thu Jun  8 23:48:35 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -3329,9 +3329,9 @@ service x11vncservice
    x11vnc's (see [392]this example).
 
    The [393]-display WAIT option waits until a VNC viewer is connected
-   before connecting to the X display, and can also be used to run a
+   before attaching to the X display, and can also be used to run a
    command that returns the DISPLAY and XAUTHORITY data. So one could
-   supply "-display WAIT:find_display" where the script find_display
+   supply "-display WAIT:cmd=find_display" where the script find_display
    might look something like:
 #!/bin/sh
 
@@ -3367,7 +3367,7 @@ xauth extract - "$display" 2>/dev/null
 
 exit 0
 
-   A some point a standard script created and will be used by default
+   At some point a standard script like the above will be used by default
    under "-display WAIT:cmd=FINDDISPLAY". The format the script returns
    is the first line is DISPLAY=:disp and any remaining lines are either
    XAUTHORITY=file or raw xauth data (the above example does the latter).
@@ -3396,10 +3396,10 @@ exit 0
 
    Note that [397]SSL is required for this mode because otherwise the
    unix password would be passed in clear text. In general -unixpw is not
-   required for this scheme, but it is convenient because it determines
-   who the user is whose display should be sought. Otherwise the
-   find_display script would have to use some scheme to work all of this
-   out.
+   required for this sort of scheme, but it is convenient because it
+   determines exactly who the user is whose display should be sought.
+   Otherwise the find_display script would have to use some method to
+   work out DISPLAY, XAUTHORITY, etc.
 
 
    Q-52: Can I have x11vnc restart itself after it terminates?
@@ -3436,7 +3436,7 @@ exit 0
    free to customize the default index.vnc file in the classes directory.
 
    As of May/2005 the [400]-http option will try to guess where the Java
-   classes jar file is by looking a expected locations.
+   classes jar file is by looking in expected locations.
 
    Also note that if you wanted to, you could also start the Java viewer
    entirely from the viewer-side by having the jar file there and using

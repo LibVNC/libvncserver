@@ -1,3 +1,6 @@
+2006-06-09  Karl Runge <runge@karlrunge.com>
+	* x11vnc: make -display WAIT + -unixpw work on Solaris.
+
 2006-06-08  Karl Runge <runge@karlrunge.com>
 	* x11vnc: XOpenDisplay wrapper for raw xauth data, -unixpw 
 	  su_verify() to run any cmd, -users unixpw= mode. -display WAIT:...

@@ -1082,15 +1082,15 @@ int wait_for_client(int *argc, char** argv, int http) {
 		memset(line2, 0, 16384);
 
 		if (unixpw) {
-			int res = 0, k, j;
+			int res = 0, k, j, i;
 			char line[18000];
 
 			memset(line, 0, 18000);
 
 			if (keep_unixpw_user && keep_unixpw_pass) {
 				n = 18000;
-				res = su_verify(keep_unixpw_user, keep_unixpw_pass,
-				    cmd, line, &n);
+				res = su_verify(keep_unixpw_user,
+				    keep_unixpw_pass, cmd, line, &n);
 				strzero(keep_unixpw_user);
 				strzero(keep_unixpw_pass);
 			}
@@ -1100,17 +1100,35 @@ int wait_for_client(int *argc, char** argv, int http) {
 				rfbLog("wait_for_client: cmd failed: %s\n", cmd);
 				clean_up_exit(1);
 			}
+
+			/*
+			 * we need to hunt for DISPLAY= since there may be
+			 * a login banner or something at the beginning.
+			 */
+			q = strstr(line, "DISPLAY=");
+			if (! q) {
+				q = line;
+			}
+			n -= (q - line);
+
 			for (k = 0; k < 1024; k++) {
-				line1[k] = line[k];
-				if (line[k] == '\n') {
+				line1[k] = q[k];
+				if (q[k] == '\n') {
 					k++;
 					break;
 				}
 			}
 			n -= k;
-			while (j < 16384) {
-				line2[j] = line[k+j];
-				j++;
+			i = 0;
+			for (j = 0; j < 16384; j++) {
+				if (j < 16384 - 1) {
+					/* xauth data, assume pty added CR */
+					if (q[k+j] == '\r' && q[k+j+1] == '\n') {
+						continue;
+					}
+				}
+				line2[i] = q[k+j];
+				i++;
 			}
 		} else {
 			FILE *p = popen(cmd, "r");

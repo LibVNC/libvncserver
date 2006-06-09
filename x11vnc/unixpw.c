@@ -546,7 +546,13 @@ if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 		/* synchronize with parent: */
 		write(2, "C", 1);
 
-		execlp(bin_su, bin_su, user, "-c", bin_true, (char *) NULL);
+		if (cmd) {
+			execlp(bin_su, bin_su, "-", user, "-c",
+			    bin_true, (char *) NULL);
+		} else {
+			execlp(bin_su, bin_su, user, "-c",
+			    bin_true, (char *) NULL);
+		}
 		exit(1);
 	}
 	/* parent */
