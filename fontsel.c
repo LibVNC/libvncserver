@@ -57,12 +57,12 @@ int main(int argc,char** argv)
     fprintf(stderr,"Couldn't find %s\n",DEFAULTFONT);
     exit(1);
   }
-  
+
   for(j=0;j<0;j++)
     rfbProcessEvents(s,900000);
 
   i = rfbSelectBox(s,font,fontlist,10,20,200,300,0xffdfdf,0x602040,2,showFont);
-  fprintf(stderr,"Selection: %d: %s\n",i,(i>=0)?fontlist[i]:"cancelled");
+  fprintf(stderr,"Selection: %d: %s\n",i,(i>=0)?fontlist[i]:"canceled");
 
   rfbFreeFont(font);
 

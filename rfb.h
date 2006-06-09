@@ -242,7 +242,7 @@ typedef struct _rfbScreenInfo
      */
     void* screenData;
 
-    /* The following two members are used to minimise the amount of unnecessary
+    /* The following two members are used to minimize the amount of unnecessary
        drawing caused by cursor movement.  Whenever any drawing affects the
        part of the screen where the cursor is, the cursor is removed first and
        then the drawing is done (this is what the sprite routines test for).
@@ -794,7 +794,7 @@ void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,Pixel col);
 
 /* this opens a modal select box. list is an array of strings, the end marked
    with a NULL.
-   It returns the index in the list or -1 if cancelled or something else
+   It returns the index in the list or -1 if canceled or something else
    wasn't kosher. */
 typedef void (*SelectionChangedHookPtr)(int _index);
 extern int rfbSelectBox(rfbScreenInfoPtr rfbScreen,

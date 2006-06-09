@@ -1,12 +1,12 @@
 /*
- *  This parses the command line arguments. It was seperated from main.c by 
+ *  This parses the command line arguments. It was separated from main.c by
  *  Justin Dearing <jdeari01@longisland.poly.edu>.
  */
 
 /*
  *  LibVNCServer (C) 2001 Johannes E. Schindelin <Johannes.Schindelin@gmx.de>
  *  Original OSXvnc (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
- *  Original Xvnc (C) 1999 AT&T Laboratories Cambridge.  
+ *  Original Xvnc (C) 1999 AT&T Laboratories Cambridge.
  *  All Rights Reserved.
  *
  *  see GPL (latest version) for full details
@@ -46,13 +46,13 @@ void rfbPurgeArguments(int* argc,int* position,int count,char *argv[])
   (*position)--;
 }
 
-void 
+void
 rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 {
     int i,i1;
 
     if(!argc) return;
-    
+
     for (i = i1 = 1; i < *argc; i++) {
         if (strcmp(argv[i], "-help") == 0) {
 	    rfbUsage();
@@ -107,7 +107,7 @@ void rfbSizeUsage()
     exit(1);
 }
 
-void 
+void
 rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc, char *argv[])
 {
     int i,i1;
