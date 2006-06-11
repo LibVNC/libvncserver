@@ -5,8 +5,8 @@
  */
 
 /*
- *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
- *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
+ *  Copyright 2000, 2001 Const Kaplinsky <const@ce.cctpu.edu.ru> All Rights Reserved.
+ *  Copyright 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
