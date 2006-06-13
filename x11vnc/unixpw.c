@@ -39,6 +39,9 @@ extern char *crypt(const char*, const char *);
 #if defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__NetBSD__)
 #define IS_BSD
 #endif
+#if (defined(__MACH__) && defined(__APPLE__))
+#define IS_BSD
+#endif
 
 #ifdef REL81
 #undef UNIXPW_SU
@@ -49,6 +52,7 @@ void unixpw_screen(int init);
 void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init);
 void unixpw_accept(char *user);
 void unixpw_deny(void);
+void unixpw_msg(char *msg, int delay);
 int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size);
 int crypt_verify(char *user, char *pass);
 
@@ -1195,3 +1199,26 @@ void unixpw_deny(void) {
 	copy_screen();
 }
 
+void unixpw_msg(char *msg, int delay) {
+	int x, y, i;
+
+	char_row += 2;
+	char_col = 0;
+	x = char_x + char_col * char_w;
+	y = char_y + char_row * char_h;
+
+	rfbDrawString(screen, &default8x16Font, x, y, msg, white());
+	if (scaling) {
+		mark_rect_as_modified(0, 0, dpy_x, dpy_y, 1);
+	} else {
+		mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
+	}
+
+	for (i=0; i<5; i++) {
+		rfbPE(-1);
+		usleep(500 * 1000);
+		if (i >= delay) {
+			break;
+		}
+	}
+}

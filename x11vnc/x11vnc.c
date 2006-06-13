@@ -148,13 +148,10 @@
  * main routine for the x11vnc program
  */
 
-
-
 static void check_cursor_changes(void);
 static void record_last_fb_update(void);
 static int choose_delay(double dt);
 static void watch_loop(void);
-static char *choose_title(char *display);
 static int limit_shm(void);
 static void check_rcfile(int argc, char **argv);
 static void immediate_switch_user(int argc, char* argv[]);
@@ -579,36 +576,6 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 		}
 		cnt++;
 	}
-}
-
-/*
- * choose a desktop name
- */
-static char *choose_title(char *display) {
-	static char title[(MAXN+10)];	
-	strcpy(title, "x11vnc");
-
-	if (display == NULL) {
-		display = getenv("DISPLAY");
-	}
-	if (display == NULL) {
-		return title;
-	}
-	title[0] = '\0';
-	if (display[0] == ':') {
-		if (this_host() != NULL) {
-			strncpy(title, this_host(), MAXN - strlen(title));
-		}
-	}
-	strncat(title, display, MAXN - strlen(title));
-	if (subwin && valid_window(subwin, NULL, 0)) {
-		char *name;
-		if (dpy && XFetchName(dpy, subwin, &name)) {
-			strncat(title, " ",  MAXN - strlen(title));
-			strncat(title, name, MAXN - strlen(title));
-		}
-	}
-	return title;
 }
 
 /* 
@@ -1193,6 +1160,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " safer:      %d\n", more_safe);
 	fprintf(stderr, " nocmds:     %d\n", no_external_cmds);
 	fprintf(stderr, " deny_all:   %d\n", deny_all);
+	fprintf(stderr, " pid:        %d\n", getpid());
 	fprintf(stderr, "\n");
 #endif
 	rfbLog("x11vnc version: %s\n", lastmod);
@@ -1371,7 +1339,7 @@ static void store_homedir_passwd(char *file) {
 #define	SHOW_NO_PASSWORD_WARNING \
 	(!got_passwd && !got_rfbauth && (!got_passwdfile || !passwd_list) \
 	    && !query_cmd && !remote_cmd && !unixpw && !got_gui_pw \
-	    && ! ssl_verify)
+	    && ! ssl_verify && !inetd)
 
 int main(int argc, char* argv[]) {
 
@@ -1393,7 +1361,8 @@ int main(int argc, char* argv[]) {
 	XImage *fb0 = NULL;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
-	int argc_vnc = 1; char *argv_vnc[128];
+	int argc_vnc_max = 1024;
+	int argc_vnc = 1; char *argv_vnc[2048];
 
 	/* check for -loop mode: */
 	check_loop_mode(argc, argv);
@@ -1472,6 +1441,13 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-display")) {
 			CHECK_ARGC
 			use_dpy = strdup(argv[++i]);
+			if (strstr(use_dpy, "WAIT")) {
+				extern find_display[];
+				if (strstr(use_dpy, "cmd=FINDDISPLAY-print")) {
+					fprintf(stdout, "%s", find_display);
+					exit(0);
+				}
+			}
 		} else if (!strcmp(arg, "-auth") || !strcmp(arg, "-xauth")) {
 			CHECK_ARGC
 			auth_file = strdup(argv[++i]);
@@ -1568,6 +1544,9 @@ int main(int argc, char* argv[]) {
 			filexfer = 1;
 		} else if (!strcmp(arg, "-http")) {
 			try_http = 1;
+		} else if (!strcmp(arg, "-http_ssl")) {
+			try_http = 1;
+			http_ssl = 1;
 		} else if (!strcmp(arg, "-connect")) {
 			CHECK_ARGC
 			if (strchr(argv[++i], '/')) {
@@ -2239,8 +2218,11 @@ int main(int argc, char* argv[]) {
 				listen_str = strdup(argv[i+1]);
 			}
 			/* otherwise copy it for libvncserver use below. */
-			if (argc_vnc < 100) {
+			if (argc_vnc < argc_vnc_max) {
 				argv_vnc[argc_vnc++] = strdup(arg);
+			} else {
+				rfbLog("too many arguments.\n");
+				exit(1);
 			}
 		}
 	}
@@ -2340,7 +2322,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	if (usepw && ! got_rfbauth && ! got_passwd && ! got_passwdfile) {
+	if (usepw && ! got_rfbauth && ! got_passwd && ! got_passwdfile && !unixpw) {
 		char *f, *h = getenv("HOME");
 		struct stat sbuf;
 		int found = 0, set_rfbauth = 0;
@@ -2523,7 +2505,11 @@ int main(int argc, char* argv[]) {
 				    " -unixpw\n");
 				rfbLog("mode, assuming your SSH encryption"
 				    " is: %s\n", s);
+				rfbLog("Setting -localhost in SSH + -unixpw"
+				    " mode.\n");
 				fprintf(stderr, "\n");
+				allow_list = strdup("127.0.0.1");
+				got_localhost = 1;
 				if (! nopw) {
 					usleep(2000*1000);
 				}
@@ -2536,7 +2522,8 @@ int main(int argc, char* argv[]) {
 					rfbLog("set -ssl in -unixpw mode.\n");
 					use_openssl = 1;
 				} else if (inetd) {
-					rfbLog("could not set -ssl in -inetd + -unixpw mode.\n");
+					rfbLog("could not set -ssl in -inetd"
+					    " + -unixpw mode.\n");
 					exit(1);
 				} else {
 					rfbLog("set -stunnel in -unixpw mode.\n");

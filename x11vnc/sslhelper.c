@@ -32,6 +32,8 @@ int openssl_port_num = 0;
 int https_sock = -1;
 pid_t openssl_last_helper_pid = 0;
 
+void raw_xfer(int csock, int s_in, int s_out);
+
 #if !LIBVNCSERVER_HAVE_LIBSSL
 int openssl_present(void) {return 0;}
 static void badnews(void) {
@@ -76,7 +78,6 @@ static void sslerrexit(void);
 static char *get_input(char *tag, char **in);
 static char *create_tmp_pem(char *path, int prompt);
 static int  ssl_init(int s_in, int s_out);
-static void raw_xfer(int csock, int s_in, int s_out);
 static void ssl_xfer(int csock, int s_in, int s_out, int is_https);
 
 #ifndef FORK_OK
@@ -1057,6 +1058,7 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 			strncpy(buf_a, buf, n);
 			*n_a = n;
 		}
+		if (db) fprintf(stderr, "watch_for_http_traffic ssl err: %d/%d\n", err, n);
 		return -1;
 	}
 
@@ -1071,21 +1073,29 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	} else if (!strncmp("CO", buf, 2)) {
 		is_http = 1;
 	}
-	if (db) fprintf(stderr, "read: '%s'\n", buf);
+	if (db) fprintf(stderr, "watch_for_http_traffic read: '%s' %d\n", buf, n);
 
 	/*
 	 * better read all we can and fwd it along to avoid blocking
 	 * in ssl_xfer().
 	 */
+
 	n2 = SSL_read(ssl, buf + n, ABSIZE - n);
 	if (n2 >= 0) {
 		n += n2;
 	}
 	*n_a = n;
+	if (db) fprintf(stderr, "watch_for_http_traffic readmore: %d\n", n2);
+
 	if (n > 0) {
-		/* XXX memcpy? */
-		strncpy(buf_a, buf, n);
+		memcpy(buf_a, buf, n);
 	}
+	if (db > 1) {
+		fprintf(stderr, "watch_for_http_traffic readmore: ");
+		write(2, buf_a, *n_a);
+		fprintf(stderr, "\n");
+	}
+	if (db) fprintf(stderr, "watch_for_http_traffic return: %d\n", is_http);
 	return is_http;
 }
 
@@ -1814,61 +1824,6 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 	return 1;
 }
 
-static void raw_xfer(int csock, int s_in, int s_out) {
-	char buf[8192];
-	int sz = 8192, n, m, status;
-	pid_t pid = fork();
-	int db = 1;
-
-	/* this is for testing, no SSL just socket redir */
-	if (pid < 0) {
-		exit(1);
-	}
-	if (pid) {
-		if (db) fprintf(stderr, "raw_xfer start: %d -> %d/%d\n", csock, s_in, s_out);
-
-		while (1) {
-			n = read(csock, buf, sz);
-			if (n == 0 || (n < 0 && errno != EINTR) ) {
-				break;
-			} else if (n > 0) {
-				m = write(s_out, buf, n);
-				if (db > 1) write(2, buf, n);
-				if (m != n) {
-		if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d\n", csock, s_out, m, n);
-					break;
-				}
-			
-			}
-		}
-		kill(pid, SIGTERM);
-		waitpid(pid, &status, WNOHANG); 
-		if (db) fprintf(stderr, "raw_xfer done:  %d -> %d\n", csock, s_out);
-
-	} else {
-		if (db) fprintf(stderr, "raw_xfer start: %d <- %d\n", csock, s_in);
-
-		while (1) {
-			n = read(s_in, buf, sz);
-			if (n == 0 || (n < 0 && errno != EINTR) ) {
-				break;
-			} else if (n > 0) {
-				m = write(csock, buf, n);
-if (db > 1) write(2, buf, n);
-				if (m != n) {
-		if (db) fprintf(stderr, "raw_xfer bad write:  %d <- %d | %d/%d\n", csock, s_in, m, n);
-					break;
-				}
-			}
-		}
-		if (db) fprintf(stderr, "raw_xfer done:  %d <- %d\n", csock, s_in);
-
-	}
-	close(csock);
-	close(s_in);
-	close(s_out);
-}
-
 static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	int dbxfer = 0, db = 0, check_pending, fdmax, nfd, n, i, err;
 	char cbuf[ABSIZE], sbuf[ABSIZE];
@@ -2305,4 +2260,80 @@ static void init_prng(void) {
 }
 #endif	/* FORK_OK */
 #endif	/* LIBVNCSERVER_HAVE_LIBSSL */
+
+void raw_xfer(int csock, int s_in, int s_out) {
+	char buf[8192];
+	int sz = 8192, n, m, status;
+#ifdef FORK_OK
+	pid_t pid = fork();
+	int db = 1;
+
+	/* this is for testing, no SSL just socket redir */
+	if (pid < 0) {
+		exit(1);
+	}
+	if (pid) {
+		if (db) fprintf(stderr, "raw_xfer start: %d -> %d/%d\n", csock, s_in, s_out);
+
+		while (1) {
+			n = read(csock, buf, sz);
+			if (n == 0 || (n < 0 && errno != EINTR) ) {
+				break;
+			} else if (n > 0) {
+				int len = n;
+				char *src = buf;
+if (db > 1) write(2, buf, n);
+				while (len > 0) {
+					m = write(s_out, src, len);
+					if (m > 0) {
+						src += m;
+						len -= m;
+						continue;
+					}
+					if (m < 0 && (errno == EINTR || errno == EAGAIN)) {
+						continue;
+					}
+		if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", csock, s_out, m, n, errno);
+					break;
+				}
+			}
+		}
+		kill(pid, SIGTERM);
+		waitpid(pid, &status, WNOHANG); 
+		if (db) fprintf(stderr, "raw_xfer done:  %d -> %d\n", csock, s_out);
+
+	} else {
+		if (db) fprintf(stderr, "raw_xfer start: %d <- %d\n", csock, s_in);
+
+		while (1) {
+			n = read(s_in, buf, sz);
+			if (n == 0 || (n < 0 && errno != EINTR) ) {
+				break;
+			} else if (n > 0) {
+				int len = n;
+				char *src = buf;
+if (db > 1) write(2, buf, n);
+				while (len > 0) {
+					m = write(csock, src, len);
+					if (m > 0) {
+						src += m;
+						len -= m;
+						continue;
+					}
+					if (m < 0 && (errno == EINTR || errno == EAGAIN)) {
+						continue;
+					}
+		if (db) fprintf(stderr, "raw_xfer bad write:  %d <- %d | %d/%d errno=%d\n", csock, s_in, m, n, errno);
+					break;
+				}
+			}
+		}
+		if (db) fprintf(stderr, "raw_xfer done:  %d <- %d\n", csock, s_in);
+
+	}
+	close(csock);
+	close(s_in);
+	close(s_out);
+#endif
+}
 

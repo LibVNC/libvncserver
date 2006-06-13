@@ -874,6 +874,9 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	if (!strcasecmp(raw_fb_str, "NULL") || !strcasecmp(raw_fb_str, "ZERO")) {
 		raw_fb_str = strdup("map:/dev/zero@640x480x32");
 	}
+	if (!strcasecmp(raw_fb_str, "RAND")) {
+		raw_fb_str = strdup("file:/dev/urandom@128x128x16");
+	}
 
 	if ( (q = strstr(raw_fb_str, "setup:")) == raw_fb_str) {
 		FILE *pipe;

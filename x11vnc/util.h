@@ -35,6 +35,7 @@ extern void rfbPE(long usec);
 extern void rfbCFD(long usec);
 extern double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
     int X2, int Y2);
+extern char *choose_title(char *display);
 
 
 #define NONUL(x) ((x) ? (x) : "")

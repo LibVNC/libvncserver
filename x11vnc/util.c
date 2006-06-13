@@ -47,6 +47,8 @@ void rfbCFD(long usec);
 double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
     int X2, int Y2);
 
+char *choose_title(char *display);
+
 
 /*
  * routine to keep 0 <= i < n, should use in more places...
@@ -448,3 +450,32 @@ double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
 	return o;
 }
 
+/*
+ * choose a desktop name
+ */
+char *choose_title(char *display) {
+	static char title[(MAXN+10)];	
+	strcpy(title, "x11vnc");
+
+	if (display == NULL) {
+		display = getenv("DISPLAY");
+	}
+	if (display == NULL) {
+		return title;
+	}
+	title[0] = '\0';
+	if (display[0] == ':') {
+		if (this_host() != NULL) {
+			strncpy(title, this_host(), MAXN - strlen(title));
+		}
+	}
+	strncat(title, display, MAXN - strlen(title));
+	if (subwin && valid_window(subwin, NULL, 0)) {
+		char *name;
+		if (dpy && XFetchName(dpy, subwin, &name)) {
+			strncat(title, " ",  MAXN - strlen(title));
+			strncat(title, name, MAXN - strlen(title));
+		}
+	}
+	return title;
+}

@@ -23,6 +23,7 @@ extern int use_stunnel;
 extern int stunnel_port;
 extern char *stunnel_pem;
 extern int use_openssl;
+extern int http_ssl;
 extern char *openssl_pem;
 extern char *ssl_certs_dir;
 extern int https_port_num;

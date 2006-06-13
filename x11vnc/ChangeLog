@@ -1,3 +1,11 @@
+2006-06-12  Karl Runge <runge@karlrunge.com>
+	* x11vnc: word tune SSL Java viewer; fix multi-certs bug. Add 
+	  -display WAIT:cmd=FINDDISPLAY builtin script and cmd=HTTPONCE
+	  action.  -http_ssl option for ssl subdir only.  Add -rawfb RAND
+	  test case.  improve raw_xfer() for use in inetd https transfer.
+	  fix bug SSH + -unixpw -> -localhost.  fix bug setup cursors
+	  in WAIT mode.  Mac OS X pty tweak.
+
 2006-06-09  Karl Runge <runge@karlrunge.com>
 	* x11vnc: make -display WAIT + -unixpw work on Solaris.
 

@@ -268,7 +268,7 @@ void check_black_fb(void) {
 }
 
 int check_httpdir(void) {
-	if (http_dir) {
+	if (http_dir && http_dir[0] != '\0') {
 		return 1;
 	} else {
 		char *prog = NULL, *httpdir, *q;
@@ -324,7 +324,7 @@ int check_httpdir(void) {
 		len = strlen(prog) + 21 + 1;
 		*q = '\0';
 		httpdir = (char *) malloc(len);
-		if (use_openssl || use_stunnel) {
+		if (use_openssl || use_stunnel || http_ssl) {
 			snprintf(httpdir, len, "%s/../share/x11vnc/classes/ssl", prog);
 		} else {
 			snprintf(httpdir, len, "%s/../share/x11vnc/classes", prog);
@@ -351,7 +351,7 @@ int check_httpdir(void) {
 				"/usr/share/x11vnc/classes/ssl",
 				NULL
 			};
-			if (use_openssl || use_stunnel) {
+			if (use_openssl || use_stunnel || http_ssl) {
 				use = ssllist;
 			} else {
 				use = list;
@@ -392,8 +392,8 @@ void http_connections(int on) {
 			}
 		}
 		screen->httpInitDone = FALSE;
-		screen->httpDir = http_dir;
 		if (check_httpdir()) {
+			screen->httpDir = http_dir;
 			rfbHttpInitSockets(screen);
 		}
 	} else {

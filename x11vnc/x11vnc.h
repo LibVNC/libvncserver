@@ -287,6 +287,7 @@ extern int h_errno;
  __FreeBSD__
  __NetBSD__
  __linux__
+ (defined(__MACH__) && defined(__APPLE__))
  _AIX
  */
 

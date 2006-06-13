@@ -943,6 +943,94 @@ void check_new_passwds(void) {
 	}
 }
 
+static void handle_one_http_request(void) {
+
+	rfbLog("handle_one_http_request: begin.\n");
+	if (screen->httpPort == 0) {
+		int port = find_free_port(5800, 5850);
+		if (port) {
+			screen->httpPort = port;
+		} else {
+			rfbLog("handle_one_http_request: no http port.\n");
+			clean_up_exit(1);
+		}
+	}
+	screen->autoPort = FALSE;
+	screen->port = 0;
+
+	http_connections(1);
+	rfbInitServer(screen);
+
+	if (! inetd) {
+		int conn = 0;
+		while (1) {
+			if (0) fprintf(stderr, "%d %d %d  %d\n", conn, screen->listenSock, screen->httpSock, screen->httpListenSock);
+			usleep(10 * 1000);
+			rfbHttpCheckFds(screen);
+			if (conn) {
+				if (screen->httpSock < 0) {
+					break;
+				}
+			} else {
+				if (screen->httpSock >= 0) {
+					conn = 1;
+				}
+			}
+			if (!screen->httpDir) {
+				break;
+			}
+			if (screen->httpListenSock < 0) {
+				break;
+			}
+		}
+		rfbLog("handle_one_http_request: finished.\n");
+		return;
+	} else {
+#if LIBVNCSERVER_HAVE_FORK
+		pid_t pid;
+		int s_in = screen->inetdSock;
+		if (s_in < 0) {
+			rfbLog("handle_one_http_request: inetdSock not set up.\n");
+			clean_up_exit(1);
+		}
+		pid = fork();
+		if (pid < 0) {
+			rfbLog("handle_one_http_request: could not fork.\n");
+			clean_up_exit(1);
+
+		} else if (pid > 0) {
+			int status;
+			pid_t pidw;
+			while (1) {
+				rfbHttpCheckFds(screen);
+				pidw = waitpid(pid, &status, WNOHANG); 
+				if (pidw == pid && WIFEXITED(status)) {
+					break;
+				} else if (pidw < 0) {
+					break;
+				}
+			}
+			rfbLog("handle_one_http_request: finished.\n");
+			return;
+			
+		} else {
+			int sock = rfbConnectToTcpAddr("127.0.0.1",
+			    screen->httpPort);
+			if (sock < 0) {
+				exit(1);
+			}
+			raw_xfer(sock, s_in, s_in);
+			exit(0);
+		}
+#else
+		rfbLog("handle_one_http_request: fork not supported.\n");
+		clean_up_exit(1);
+#endif
+	}
+}
+
+extern char find_display[];
+
 int wait_for_client(int *argc, char** argv, int http) {
 	static XImage ximage_struct;
 	XImage* fb_image;
@@ -952,50 +1040,69 @@ int wait_for_client(int *argc, char** argv, int http) {
 	char *str, *q, *p;
 	char *cmd = NULL;
 	int db = 0;
+	char tmp[] = "/tmp/x11vnc-find_display.XXXXXX";
+	int tmp_fd = -1, dt = 0;
 
 	if (! use_dpy || strstr(use_dpy, "WAIT:") != use_dpy) {
 		return 0;
 	}
 
-	rfbLog("into wait_for_client.\n");
+	for (i=0; i< *argc; i++) {
+		if (!strcmp(argv[i], "-desktop")) {
+			dt = 1;
+		}
+		if (0) fprintf(stderr, "args %d %s\n", i, argv[i]);
+	}
+
 	str = strdup(use_dpy);
-	str += strlen("WAIT:");
-	q = strchr(str, ':');
+	str += strlen("WAIT");
 
 	/* get any leading geometry: */
-	if (q) *q = '\0';
-	if (sscanf(str, "%dx%d", &w0, &h0) == 2)  {
-		w = w0;
-		h = h0;
-	}
-	if (q) *q = ':';
-
-	q = strchr(str, ':');
-	if (! q) {
-		if (strstr(str, "cmd=") != str) {
-			str = strdup(":0"); 
+	q = strchr(str+1, ':');
+	if (q) {
+		*q = '\0';
+		if (sscanf(str+1, "%dx%d", &w0, &h0) == 2)  {
+			w = w0;
+			h = h0;
+			rfbLog("wait_for_client set: w=%d h=%d\n", w, h);
 		}
-	} else {
+		*q = ':';
 		str = q;
 	}
+
+	/* str currently begins with a ':' */
+	if (strstr(str, ":cmd=") == str) {
+		/* cmd=/path/to/mycommand */
+		str++;
+	} else if (strpbrk(str, "0123456789") == str+1) {
+		/* :0.0 */
+		;
+	} else {
+		/* hostname:0.0 */
+		str++;
+	}
+
 	if (db) fprintf(stderr, "str: %s\n", str);
 
 	if (strstr(str, "cmd=") == str) {
-		cmd = str + strlen("cmd=");
-		if (db) fprintf(stderr, "cmd: %s\n", cmd);
-
-		/* WAIT */
 		if (no_external_cmds) {
 			rfbLog("wait_for_client external cmds not allowed:"
 			    " %s\n", use_dpy);
 			clean_up_exit(1);
 		}
+
+		cmd = str + strlen("cmd=");
+		if (!strcmp(str, "FINDDISPLAY-print")) {
+			fprintf(stdout, "%s", find_display);
+			clean_up_exit(0);
+		}
+		if (db) fprintf(stderr, "cmd: %s\n", cmd);
 	}
 	
 	if (fake_fb) {
 		free(fake_fb);
 	}
-	fake_fb = (char *) calloc(w*h*b/4, 1);
+	fake_fb = (char *) calloc(w*h*b/8, 1);
 
 	fb_image = &ximage_struct;
 	fb_image->data = fake_fb;
@@ -1017,9 +1124,38 @@ int wait_for_client(int *argc, char** argv, int http) {
 	off_x = 0;
 	off_y = 0;
 
+	if (! dt) {
+		char *s;
+		argv[*argc] = strdup("-desktop");
+		(*argc)++;
+
+		if (cmd) {
+			char *q;
+			s = choose_title(":0");
+			q = strstr(s, ":0");
+			if (q) {
+				*q = '\0';
+			}
+		} else {
+			s = choose_title(str);
+		}
+		rfb_desktop_name = strdup(s);
+		argv[*argc] = s;
+		(*argc)++;
+	}
+
 	initialize_allowed_input();
+
+	initialize_cursors_mode();
 	
 	initialize_screen(argc, argv, fb_image);
+
+	initialize_signals();
+
+	if (!strcmp(cmd, "HTTPONCE")) {
+		handle_one_http_request();	
+		clean_up_exit(0);
+	}
 
 	if (http && check_httpdir()) {
 		http_connections(1);
@@ -1081,11 +1217,28 @@ int wait_for_client(int *argc, char** argv, int http) {
 		memset(line1, 0, 1024);
 		memset(line2, 0, 16384);
 
+		if (!strcmp(cmd, "FINDDISPLAY")) {
+			tmp_fd = mkstemp(tmp);
+			if (tmp_fd < 0) {
+				rfbLog("wait_for_client: open failed: %s\n", tmp);
+				rfbLogPerror("mkstemp");
+				clean_up_exit(1);
+			}
+			write(tmp_fd, find_display, strlen(find_display));
+			close(tmp_fd);
+			chmod(tmp, 0644);
+			cmd = (char *) malloc(strlen(tmp) + strlen("/bin/sh ") + 1);
+			sprintf(cmd, "/bin/sh %s", tmp);
+		}
+
+		rfbLog("wait_for_client: running: %s\n", cmd);
+
 		if (unixpw) {
 			int res = 0, k, j, i;
 			char line[18000];
 
 			memset(line, 0, 18000);
+			if (0) unixpw_msg("Looking up DISPLAY", 0);
 
 			if (keep_unixpw_user && keep_unixpw_pass) {
 				n = 18000;
@@ -1096,8 +1249,15 @@ int wait_for_client(int *argc, char** argv, int http) {
 			}
 			keep_unixpw = 0;
 
+			if (tmp_fd >= 0) {
+				unlink(tmp);
+			}
+
+if (db) write(2, line, n); write(2, "\n", 1);
+
 			if (! res) {
 				rfbLog("wait_for_client: cmd failed: %s\n", cmd);
+				unixpw_msg("No DISPLAY found.", 3);
 				clean_up_exit(1);
 			}
 
@@ -1135,19 +1295,31 @@ int wait_for_client(int *argc, char** argv, int http) {
 			if (! p) {
 				rfbLog("wait_for_client: cmd failed: %s\n", cmd);
 				rfbLogPerror("popen");
+				if (tmp_fd >= 0) {
+					unlink(tmp);
+				}
+				unixpw_msg("No DISPLAY found.", 3);
 				clean_up_exit(1);
 			}
 			if (fgets(line1, 1024, p) == NULL) {
 				rfbLog("wait_for_client: read failed: %s\n", cmd);
 				rfbLogPerror("fgets");
+				if (tmp_fd >= 0) {
+					unlink(tmp);
+				}
+				unixpw_msg("No DISPLAY found.", 3);
 				clean_up_exit(1);
 			}
 			n = fread(line2, 1, 16384, p);
 			pclose(p);
+			if (tmp_fd >= 0) {
+				unlink(tmp);
+			}
 		}
 
 		if (strstr(line1, "DISPLAY=") != line1) {
 			rfbLog("wait_for_client: bad reply %s\n", line1);
+			unixpw_msg("No DISPLAY found.", 3);
 			clean_up_exit(1);
 		}
 
@@ -1158,7 +1330,6 @@ int wait_for_client(int *argc, char** argv, int http) {
 			q++;
 		}
 if (db) fprintf(stderr, "use_dpy: %s  n: %d\n", use_dpy, n);
-if (0) write(2, line2, n);
 		if (line2[0] != '\0') {
 			if (strstr(line2, "XAUTHORITY=") == line2) {
 				q = line2;
@@ -1176,11 +1347,12 @@ if (0) write(2, line2, n);
 				xauth_raw_len = n;
 				memcpy(xauth_raw_data, line2, n);
 if (db) fprintf(stderr, "xauth_raw_len: %d\n", n);
-if (0) {
-	write(2, xauth_raw_data, xauth_raw_len);
-	fprintf(stderr, "\n");
-}
 			}
+		}
+		if (unixpw) {
+			char str[32];
+			snprintf(str, 30, "Using DISPLAY %s", use_dpy);
+			unixpw_msg(str, 2);
 		}
 	} else {
 		use_dpy = strdup(str);

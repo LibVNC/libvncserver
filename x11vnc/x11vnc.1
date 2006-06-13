@@ -2,7 +2,7 @@
 .TH X11VNC "1" "June 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.2, lastmod: 2006-06-08
+         version: 0.8.2, lastmod: 2006-06-12
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -380,7 +380,12 @@ Instead of using \fB-httpdir\fR (see below) to specify
 where the Java vncviewer applet is, have x11vnc try
 to *guess* where the directory is by looking relative
 to the program location and in standard locations
-(/usr/local/share/x11vnc/classes, etc).
+(/usr/local/share/x11vnc/classes, etc).  Under \fB-ssl\fR or
+\fB-stunnel\fR the ssl classes subdirectory is sought.
+.PP
+\fB-http_ssl\fR
+.IP
+As \fB-http,\fR but force lookup for ssl classes subdir.
 .PP
 \fB-connect\fR \fIstring\fR
 .IP
@@ -718,9 +723,22 @@ switch to the user as well.  Note: there will be a 2nd
 SSL helper process that will not switch, but it is only
 encoding and decoding the stream at that point.
 .IP
-As a special case, WAIT:cmd=FINDDISPLAY will run a
-script that works on most Unixes to determine a user's
-DISPLAY variable and xauthority data.  this is TBD.
+As a special case, WAIT:cmd=FINDDISPLAY will run
+a script that works on most Unixes to determine a
+user's DISPLAY variable and xauthority data.  To have
+this default script printed to stdout (e.g. for
+customization) run with WAIT:cmd=FINDDISPLAY-print
+.IP
+As another special case, WAIT:cmd=HTTPONCE will allow
+x11vnc to service one http request and then exit.
+This is usually done in \fB-inetd\fR mode to run on, say,
+port 5800 and allow the Java vncviewer to be downloaded
+by client web browsers.  For example:
+.IP
+5815 stream tcp nowait root /usr/sbin/tcpd .../x11vnc \\
+\fB-inetd\fR \fB-q\fR \fB-http_ssl\fR \fB-display\fR WAIT:cmd=HTTPONCE
+.IP
+Is used in the Apache SSL-portal example (see FAQ).
 .IP
 Finally, one can insert a geometry between colons,
 e.g. WAIT:1280x1024:... to set the size of the display
@@ -1274,9 +1292,6 @@ use it with \fB-passwdfile;\fR otherwise, prompt the user
 for a password to create ~/.vnc/passwd and use it with
 the \fB-rfbauth\fR option.  If none of these succeed x11vnc
 exits immediately.
-.IP
-Note: \fB-unixpw\fR currently does not count as a password
-method by this option.
 .PP
 \fB-storepasswd\fR \fIpass\fR \fIfile\fR
 .IP

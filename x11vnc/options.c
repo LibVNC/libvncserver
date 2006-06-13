@@ -23,6 +23,7 @@ int use_stunnel = 0;		/* -stunnel */
 int stunnel_port = 0;
 char *stunnel_pem = NULL;
 int use_openssl = 0;
+int http_ssl = 0;
 char *openssl_pem = NULL;
 char *ssl_certs_dir = NULL;
 int https_port_num = -1;

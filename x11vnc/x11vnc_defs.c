@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8.2 lastmod: 2006-06-08";
+char lastmod[] = "0.8.2 lastmod: 2006-06-12";
 
 /* X display info */
 
@@ -148,6 +148,5 @@ char *program_name = NULL;
 char *program_cmdline = NULL;
 
 struct utsname UT;
-
 
 

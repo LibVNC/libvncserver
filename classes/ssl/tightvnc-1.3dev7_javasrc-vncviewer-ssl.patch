@@ -73,8 +73,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2006-04-16 11:21:30.000000000 -0400
-@@ -0,0 +1,1204 @@
++++ vnc_javasrc/SSLSocketToMe.java	2006-06-12 00:00:28.000000000 -0400
+@@ -0,0 +1,1276 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -212,8 +212,19 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					    "No Trust url Certs.");
 +				}
 +				if (trusturlCerts.length > 1) {
-+					throw new CertificateException(
-+					    "Too many Trust url Certs.");
++					int i;
++					boolean ok = true;
++					for (i = 0; i < trusturlCerts.length - 1; i++)  {
++						if (! trusturlCerts[i].equals(trusturlCerts[i+1])) {
++							ok = false;
++						}
++					}
++					if (! ok) {
++						throw new CertificateException(
++						    "Too many Trust url Certs: "
++						    + trusturlCerts.length
++						);
++					}
 +				}
 +				if (certs == null) {
 +					throw new CertificateException(
@@ -224,8 +235,19 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					    "No this-certs Certs.");
 +				}
 +				if (certs.length > 1) {
-+					throw new CertificateException(
-+					    "Too many this-certs.");
++					int i;
++					boolean ok = true;
++					for (i = 0; i < certs.length - 1; i++)  {
++						if (! certs[i].equals(certs[i+1])) {
++							ok = false;
++						}
++					}
++					if (! ok) {
++						throw new CertificateException(
++						    "Too many this-certs: "
++						    + certs.length
++						);
++					}
 +				}
 +				if (! trusturlCerts[0].equals(certs[0])) {
 +					throw new CertificateException(
@@ -262,8 +284,19 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					    "No Trust All Server Certs.");
 +				}
 +				if (trustallCerts.length > 1) {
-+					throw new CertificateException(
-+					    "Too many Trust All Server Certs.");
++					int i;
++					boolean ok = true;
++					for (i = 0; i < trustallCerts.length - 1; i++)  {
++						if (! trustallCerts[i].equals(trustallCerts[i+1])) {
++							ok = false;
++						}
++					}
++					if (! ok) {
++						throw new CertificateException(
++						    "Too many Trust All Server Certs: "
++						    + trustallCerts.length
++						);
++					}
 +				}
 +				if (certs == null) {
 +					throw new CertificateException(
@@ -274,8 +307,19 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					    "No this-certs Certs.");
 +				}
 +				if (certs.length > 1) {
-+					throw new CertificateException(
-+					    "Too many this-certs.");
++					int i;
++					boolean ok = true;
++					for (i = 0; i < certs.length - 1; i++)  {
++						if (! certs[i].equals(certs[i+1])) {
++							ok = false;
++						}
++					}
++					if (! ok) {
++						throw new CertificateException(
++						    "Too many this-certs: "
++						    + certs.length
++						);
++					}
 +				}
 +				if (! trustallCerts[0].equals(certs[0])) {
 +					throw new CertificateException(
@@ -920,17 +964,26 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 ++ "\n"
 ++ "This may be due to:\n"
 ++ "\n"
+++ " - Your requesting to View the Certificate before accepting.\n"
+++ "\n"
 ++ " - The VNC server using a Self-Signed Certificate.\n"
 ++ "\n"
 ++ " - The VNC server using a Certificate Authority not recognized by your\n"
-++ "   Java applet runtime.\n"
+++ "   Browser or Java Plugin runtime.\n"
+++ "\n"
+++ " - The use of an Apache SSL portal employing CONNECT proxying and the\n"
+++ "   Apache web server has a certificate different from the VNC server's. \n"
 ++ "\n"
 ++ " - A Man-In-The-Middle attack impersonating as the VNC server you wish\n"
-++ "   to connect to.\n"
+++ "   to connect to.  (Wouldn't that be exciting!!)\n"
 ++ "\n"
-++ "By copying the VNC server's Certificate (or using a common Certificate\n"
-++ "Authority certificate) you can configure your Java applet runtime to\n"
-++ "automatically authenticate the Server.\n"
+++ "By safely copying the VNC server's Certificate (or using a common\n"
+++ "Certificate Authority certificate) you can configure your Web Browser or\n"
+++ "Java Plugin to automatically authenticate this Server.\n"
+++ "\n"
+++ "If you do so, then you will only have to click \"Yes\" when this VNC\n"
+++ "Viewer applet asks you whether to trust your Browser/Java Plugin's\n"
+++ "acceptance of the certificate. (except for the Apache portal case above.)\n"
 +;
 +
 +		/* the accept / do-not-accept radio buttons: */
@@ -966,7 +1019,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		label.setFont(new Font("Helvetica", Font.BOLD, 16));
 +
 +		/* textarea in the middle */
-+		textarea = new TextArea(text, 28, 64,
++		textarea = new TextArea(text, 36, 64,
 +		    TextArea.SCROLLBARS_VERTICAL_ONLY);
 +		textarea.setEditable(false);
 +
@@ -1188,13 +1241,32 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +
 +		dialog = new Dialog(frame, true);
 +
-+		String m = "\nShould this VNC Viewer applet use your Browser/JVM certs to\n";
-+		m += "authenticate the VNC Server:\n";
-+		m += "\n        " + hostport + "\n\n        " + vncServer + "\n\n";    
-+		m += "(NOTE: this *includes* any certs you have Just Now accepted in a\n";
-+		m += "dialog box with your Web Browser or Java Applet Plugin)\n\n";
++		String m = "";
++m += "\n";
++m += "This VNC Viewer applet does not have its own keystore to track\n";
++m += "SSL certificates, and so cannot authenticate the certificate\n";
++m += "of the VNC Server:\n";
++m += "\n";
++m += "        " + hostport + "\n\n        " + vncServer + "\n";
++m += "\n";
++m += "on its own.\n";
++m += "\n";
++m += "However, it has noticed that your Web Browser or Java VM Plugin\n";
++m += "has previously accepted the same certificate.  You may have set\n";
++m += "this up permanently or just for this session, or the server\n";
++m += "certificate was signed by a CA cert that your Web Browser or\n";
++m += "Java VM Plugin has.\n";
++m += "\n";
++m += "Should this VNC Viewer applet now connect to the above VNC server?\n";
++m += "\n";
 +
-+		TextArea textarea = new TextArea(m, 12, 64,
++//		String m = "\nShould this VNC Viewer applet use your Browser/JVM certs to\n";
++//		m += "authenticate the VNC Server:\n";
++//		m += "\n        " + hostport + "\n\n        " + vncServer + "\n\n";    
++//		m += "(NOTE: this *includes* any certs you have Just Now accepted in a\n";
++//		m += "dialog box with your Web Browser or Java Applet Plugin)\n\n";
++
++		TextArea textarea = new TextArea(m, 20, 64,
 +		    TextArea.SCROLLBARS_VERTICAL_ONLY);
 +		textarea.setEditable(false);
 +		yes = new Button("Yes");
