@@ -27,13 +27,15 @@ How does it work?
 	The script now can intercept inputs and outputs, and act upon them.
 	In order to write a macro, start
 	
-		recorder.pl host:port my_macro.pl
+		recorder.pl --script my-macro.pl --timing host:port
 	
 	connect with a vncviewer of your choice to <host2>:23, where <host2>
 	is the computer	on which recorder.pl was started (not necessarily the
 	same as the VNC server!). Now your actions are recorded into
 	my_macro.pl, and the images you want to grep for will be saved as
 	my_macro-1.pnm,	my_macro-2.pnm, ...
+
+	In order to finish the script, hit Ctrl twice and say "q".
 
 Why did I do it?
 
