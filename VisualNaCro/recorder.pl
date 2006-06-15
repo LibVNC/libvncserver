@@ -9,16 +9,23 @@ $output="my_script";
 $server="localhost";
 $port=5900;
 $listen_port=5923;
+$timing=0;
 
 if(!GetOptions(
 	"script:s" => \$output,
-	"listen:i" => \$listen_port
+	"listen:i" => \$listen_port,
+	"timing" => \$timing
 ) || $#ARGV!=0) {
 	print STDERR "Usage: $ARGV0 [--script output_name] [--listen listen_port] server[:port]\n";
 	exit 2;
 }
 
 $output=~s/\.pl$//;
+
+if ($timing) {
+	use Time::HiRes qw(time);
+	$starttime=-1;
+}
 
 $server=$ARGV[0];
 
@@ -55,6 +62,9 @@ open OUT, ">$output.pl";
 print OUT "#!/usr/bin/perl\n";
 print OUT "\n";
 print OUT "use nacro;\n";
+if ($timing) {
+	print OUT "use Time::HiRes;"
+}
 print OUT "\n";
 print OUT "\$x_origin=0; \$y_origin=0;\n";
 print OUT "\$vnc=nacro::initvnc(\"$server\",$port,$listen_port);\n";
@@ -63,6 +73,16 @@ $mode="passthru";
 $image_counter=1;
 $magickey=0;
 $x_origin=0; $y_origin=0;
+
+sub writetiming () {
+	if ($timing) {
+		$now=time();
+		if ($starttime>0) {
+			print OUT "nacro::process(\$vnc," . ($now - $starttime) . ");\n";
+		}
+		$starttime=$now;
+	}
+}
 
 while(1) {
 	$result=nacro::waitforinput($vnc,999999);
@@ -77,6 +97,7 @@ while(1) {
 			$keysym=nacro::getkeysym($vnc);
 			$keydown=nacro::getkeydown($vnc);
 			if(nacro::sendkey($vnc,$keysym,$keydown)) {
+				writetiming();
 				print OUT "nacro::sendkey(\$vnc,$keysym,$keydown);\n";
 			}
 			if($keysym==0xffe3 || $keysym==0xffe4) {
@@ -98,6 +119,7 @@ while(1) {
 			$buttons=nacro::getbuttons($vnc);
 			if(nacro::sendmouse($vnc,$x,$y,$buttons)) {
 				$x-=$x_origin; $y-=$y_origin;
+				writetiming();
 				print OUT "nacro::sendmouse(\$vnc,\$x_origin"
 					. ($x>=0?"+":"")."$x,\$y_origin"
 					. ($y>=0?"+":"")."$y,$buttons);\n";
