@@ -56,15 +56,10 @@ if($vnc<0) {
 	exit 1;
 }
 
-# TODO: timing
-
 open OUT, ">$output.pl";
 print OUT "#!/usr/bin/perl\n";
 print OUT "\n";
 print OUT "use nacro;\n";
-if ($timing) {
-	print OUT "use Time::HiRes;"
-}
 print OUT "\n";
 print OUT "\$x_origin=0; \$y_origin=0;\n";
 print OUT "\$vnc=nacro::initvnc(\"$server\",$port,$listen_port);\n";

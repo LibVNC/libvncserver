@@ -1,3 +1,6 @@
+2006-06-15: Johannes Schindelin <Johannes.Schindelin@gmx.de>
+	* added timing: you can record the events with their timestamps now
+
 2005-01-13: Johannes Schindelin <Johannes.Schindelin@gmx.de>
 	* started the project
 

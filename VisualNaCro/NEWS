@@ -1,1 +1,4 @@
-No News yet
+With --timing, you can actually record action scripts which are meaningful...
+Earlier, the events just got garbled, because the GUI could not react as
+fast as the events were churned out.
+
