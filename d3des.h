@@ -15,6 +15,9 @@
 
 /* d3des.h -
  *
+ *
+ * A portable, public domain, version of the Data Encryption Standard.
+ *
  *	Headers and defines for d3des.c
  *	Graven Imagery, 1992.
  *
