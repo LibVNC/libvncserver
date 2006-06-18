@@ -211,7 +211,7 @@ static void check_cursor_changes(void) {
 static void record_last_fb_update(void) {
 	static int rbs0 = -1;
 	static time_t last_call = 0;
-	time_t now = time(0);
+	time_t now = time(NULL);
 	int rbs = -1;
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
@@ -399,7 +399,7 @@ if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnow() - x11vnc_start)
 static void watch_loop(void) {
 	int cnt = 0, tile_diffs = 0, skip_pe = 0;
 	double tm, dtr, dt = 0.0;
-	time_t start = time(0);
+	time_t start = time(NULL);
 
 	if (use_threads) {
 		rfbRunEventLoop(screen, -1, TRUE);
@@ -489,7 +489,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			}
 
 			if (first_conn_timeout < 0) {
-				start = time(0);
+				start = time(NULL);
 				first_conn_timeout = -first_conn_timeout;
 			}
 		}
@@ -497,7 +497,7 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 		if (! screen || ! screen->clientHead) {
 			/* waiting for a client */
 			if (first_conn_timeout) {
-				if (time(0) - start > first_conn_timeout) {
+				if (time(NULL) - start > first_conn_timeout) {
 					rfbLog("No client after %d secs.\n",
 					    first_conn_timeout);
 					shut_down = 1;
@@ -1252,7 +1252,7 @@ static void store_homedir_passwd(char *file) {
 	str2[0] = '\0';
 
 	/* storepasswd */
-	if (no_external_cmds) {
+	if (no_external_cmds || !cmd_ok("storepasswd")) {
 		fprintf(stderr, "-nocmds cannot be used with -storepasswd\n");
 		exit(1);
 	}
@@ -1376,6 +1376,10 @@ int main(int argc, char* argv[]) {
 		immediate_switch_user(argc, argv);
 	}
 
+	for (i=0; i < 2048; i++) {
+		argv_vnc[i] = NULL;
+	}
+
 	argv_vnc[0] = strdup(argv[0]);
 	program_name = strdup(argv[0]);
 	program_pid = (int) getpid();
@@ -1428,6 +1432,30 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-ssldir")) {
 			CHECK_ARGC
 			ssl_certs_dir = strdup(argv[++i]);
+		}
+	}
+
+	/*
+	 * do a quick check for -env parameters
+	 */
+	for (i=1; i < argc; i++) {
+		char *p, *q;
+		arg = argv[i];
+		if (strstr(arg, "--") == arg) {
+			arg++;
+		}
+		if (!strcmp(arg, "-env")) {
+			CHECK_ARGC
+			p = strdup(argv[++i]);
+			q = strchr(p, '=');
+			if (! q) {
+				fprintf(stderr, "no -env '=' found: %s\n", p);
+				exit(1);
+			} else {
+				*q = '\0';
+			}
+			set_env(p, q+1);
+			free(p);
 		}
 	}
 
@@ -1569,6 +1597,10 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-input")) {
 			CHECK_ARGC
 			allowed_input_str = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-grabkbd")) {
+			grab_kbd = 1;
+		} else if (!strcmp(arg, "-grabptr")) {
+			grab_ptr = 1;
 		} else if (!strcmp(arg, "-viewpasswd")) {
 			vpw_loc = i;
 			CHECK_ARGC
@@ -1781,6 +1813,8 @@ int main(int argc, char* argv[]) {
 			i++;	/* done above */
 		} else if (!strcmp(arg, "-norc")) {
 			;	/* done above */
+		} else if (!strcmp(arg, "-env")) {
+			i++;	/* done above */
 		} else if (!strcmp(arg, "-h") || !strcmp(arg, "-help")) {
 			print_help(0);
 		} else if (!strcmp(arg, "-?") || !strcmp(arg, "-opts")) {
@@ -2181,6 +2215,9 @@ int main(int argc, char* argv[]) {
 			more_safe = 1;
 		} else if (!strcmp(arg, "-nocmds")) {
 			no_external_cmds = 1;
+		} else if (!strcmp(arg, "-allowedcmds")) {
+			CHECK_ARGC
+			allowed_external_cmds = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-deny_all")) {
 			deny_all = 1;
 		} else if (!strcmp(arg, "-httpdir")) {
@@ -3157,9 +3194,14 @@ int main(int argc, char* argv[]) {
 
 	initialize_screen(&argc_vnc, argv_vnc, fb0);
 
-	if (waited_for_client && fake_fb) {
-		free(fake_fb);
-		fake_fb = NULL;
+	if (waited_for_client) {
+		if (fake_fb) {
+			free(fake_fb);
+			fake_fb = NULL;
+		}
+		if (use_solid_bg && client_count) {
+			solid_bg(0);
+		}
 	}
 
 	if (! waited_for_client) {

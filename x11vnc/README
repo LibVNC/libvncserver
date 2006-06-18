@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Mon Jun 12 22:23:23 EDT 2006
+x11vnc README file                         Date: Sun Jun 18 19:37:38 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -7192,7 +7192,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-06-12
+x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-06-18
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -7205,19 +7205,20 @@ x11vnc options:
   -inetd                   -nofilexfer              -http                  
   -http_ssl                -connect string          -vncconnect            
   -novncconnect            -allow host1[,host2..]   -localhost             
-  -nolookup                -input string            -viewpasswd string     
-  -passwdfile filename     -unixpw [list]           -unixpw_nis [list]     
-  -display WAIT:...        -ssl [pem]               -ssldir [dir]          
-  -sslverify [path]        -sslGenCA [dir]          -sslGenCert type name  
-  -sslEncKey [pem]         -sslCertInfo [pem]       -sslDelCert [pem]      
-  -stunnel [pem]           -stunnel3  [pem]         -https [port]          
-  -usepw                   -storepasswd pass file   -nopw                  
-  -accept string           -afteraccept string      -gone string           
-  -users list              -noshm                   -flipbyteorder         
-  -onetile                 -solid [color]           -blackout string       
-  -xinerama                -noxinerama              -xtrap                 
-  -xrandr [mode]           -padgeom WxH             -o logfile             
-  -flag file               -rc filename             -norc                  
+  -nolookup                -input string            -grabkbd               
+  -grabptr                 -viewpasswd string       -passwdfile filename   
+  -unixpw [list]           -unixpw_nis [list]       -display WAIT:...      
+  -ssl [pem]               -ssldir [dir]            -sslverify [path]      
+  -sslGenCA [dir]          -sslGenCert type name    -sslEncKey [pem]       
+  -sslCertInfo [pem]       -sslDelCert [pem]        -stunnel [pem]         
+  -stunnel3  [pem]         -https [port]            -usepw                 
+  -storepasswd pass file   -nopw                    -accept string         
+  -afteraccept string      -gone string             -users list            
+  -noshm                   -flipbyteorder           -onetile               
+  -solid [color]           -blackout string         -xinerama              
+  -noxinerama              -xtrap                   -xrandr [mode]         
+  -padgeom WxH             -o logfile               -flag file             
+  -rc filename             -norc                    -env VAR=VALUE         
   -h, -help                -?, -opts                -V, -version           
   -dbg                     -q                       -bg                    
   -modtweak                -nomodtweak              -xkb                   
@@ -7254,7 +7255,8 @@ x11vnc options:
   -remote command          -query variable          -QD variable           
   -sync                    -noremote                -yesremote             
   -unsafe                  -safer                   -privremote            
-  -nocmds                  -deny_all              
+  -nocmds                  -allowedcmds list        -deny_all              
+
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -7288,7 +7290,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-06-12
+x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-06-18
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -7576,6 +7578,7 @@ Options:
                        option, otherwise the stderr goes to the viewer which
                        will cause it to abort.  Specifying both -inetd and -q
                        and no -o will automatically close the stderr.
+
 -nofilexfer            Disable the TightVNC file transfer extension.  (same as
                        -disablefiletransfer).  Note that when the -viewonly
                        option is supplied all file transfers are disabled.
@@ -7583,6 +7586,7 @@ Options:
                        However, if the remote control mechanism is used to
                        change the global or per-client viewonly state the
                        filetransfer permissions will NOT change.
+
 -http                  Instead of using -httpdir (see below) to specify
                        where the Java vncviewer applet is, have x11vnc try
                        to *guess* where the directory is by looking relative
@@ -7658,6 +7662,23 @@ Options:
                        users to move the mouse.  This option is ignored when
                        a global -viewonly is in effect (all input is discarded
                        in that case).
+
+-grabkbd               When VNC viewers are connected, attempt to the grab the
+                       keyboard so someone sitting at the physical display
+                       is not able to enter keystrokes.  This method uses
+                       XGrabKeyboard(3X11) and so it is not secure and does not
+                       rule out the person at the physical display injecting
+                       keystrokes by flooding the server with them, grabbing
+                       the keyboard himself, etc.  Some degree of cooperation
+                       from the person at the display is assumed.
+-grabptr               As -grabkbd, but for the mouse pointer using
+                       XGrabPointer(3X11).  Unfortunately due to the way the X
+                       server works, the mouse can still be moved around by the
+                       user at the physical display, but he will not be able to
+                       change window focus with it.  Also some window managers
+                       that call XGrabServer(3X11) for resizes, etc, will
+                       act on the local user's input.  Again, some degree of
+                       cooperation from the person at the display is assumed.
 
 -viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd
                        (full-access) password must also be supplied.
@@ -7857,7 +7878,25 @@ Options:
                        as the user who just authenticated via the login and
                        password prompt.
 
-                       Thus the combination of -display WAIT:cmd=... and
+                       Also in the case of -unixpw, the user logging in can
+                       place a colon at the end of his username and supply
+                       a few options: scale=, scale_cursor=, solid, id=,
+                       clear_mods, clear_keys, repeat, or speeds= separated
+                       by commas if there is more than one.  After the user
+                       logs in successfully, these options will be applied to
+                       the VNC screen.  For example,
+
+                          login: fred:scale=3/4,repeat
+                          Password: ...
+
+                       for convenience m/n implies scale= e.g. fred:3/4
+                       To disable this set the environment variable
+                       X11VNC_NO_UNIXPW_OPTS=1.  To set any other options,
+                       the user can use the gui (x11vnc -gui connect) or the
+                       remote control method (x11vnc -R opt:val) during his
+                       VNC session.
+
+                       So the combination of -display WAIT:cmd=... and
                        -unixpw allows automatic pairing of an unix
                        authenticated VNC user with his desktop.  This could
                        be very useful on SunRays and also any system where
@@ -7890,7 +7929,7 @@ Options:
                         5815 stream tcp nowait root /usr/sbin/tcpd .../x11vnc \
                           -inetd -q -http_ssl -display WAIT:cmd=HTTPONCE
 
-                       Is used in the Apache SSL-portal example (see FAQ).
+                       It is used in the Apache SSL-portal example (see FAQ).
 
                        Finally, one can insert a geometry between colons,
                        e.g. WAIT:1280x1024:... to set the size of the display
@@ -8671,6 +8710,12 @@ Options:
 
 -rc filename           Use "filename" instead of $HOME/.x11vncrc for rc file.
 -norc                  Do not process any .x11vncrc file for options.
+
+-env VAR=VALUE         Set the environment variable 'VAR' to value 'VALUE'
+                       at x11vnc startup.  This is a convenience utility to
+                       avoid shell script wrappers, etc. to set the env. var.
+                       You may specify as many of these as needed on the
+                       command line.
 
 -h, -help              Print this help text.
 -?, -opts              Only list the x11vnc options.
@@ -9974,6 +10019,10 @@ n
                        nolookup        enable  -nolookup mode.
                        lookup          disable -nolookup mode.
                        input:str       set -input to "str", empty to disable.
+                       grabkbd         enable  -grabkbd mode.
+                       nograbkbd       disable -grabkbd mode.
+                       grabptr         enable  -grabptr mode.
+                       nograbptr       disable -grabptr mode.
                        client_input:str set the K, M, B -input on a per-client
                                        basis.  select which client as for
                                        disconnect, e.g. client_input:host:MB
@@ -10230,13 +10279,14 @@ n
                        scr_skip scr_inc scr_keys scr_term scr_keyrepeat
                        scr_parms scrollcopyrect scr noscrollcopyrect noscr
                        fixscreen noxrecord xrecord reset_record pointer_mode
-                       pm input_skip input client_input speeds wmdt
-                       debug_pointer dp nodebug_pointer nodp debug_keyboard
-                       dk nodebug_keyboard nodk deferupdate defer wait_ui
-                       wait_bog nowait_bog slow_fb wait readtimeout nap nonap
-                       sb screen_blank fbpm nofbpm fs gaps grow fuzz snapfb
-                       nosnapfb rawfb progressive rfbport http nohttp httpport
-                       httpdir enablehttpproxy noenablehttpproxy alwaysshared
+                       pm input_skip input grabkbd nograbkbd grabptr
+                       nograbptr client_input speeds wmdt debug_pointer dp
+                       nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+                       nodk deferupdate defer wait_ui wait_bog nowait_bog
+                       slow_fb wait readtimeout nap nonap sb screen_blank
+                       fbpm nofbpm fs gaps grow fuzz snapfb nosnapfb rawfb
+                       progressive rfbport http nohttp httpport httpdir
+                       enablehttpproxy noenablehttpproxy alwaysshared
                        noalwaysshared nevershared noalwaysshared dontdisconnect
                        nodontdisconnect desktop debug_xevents nodebug_xevents
                        debug_xevents debug_xdamage nodebug_xdamage
@@ -10323,6 +10373,17 @@ n
                        remote-control is disabled it cannot be turned back on.
 -nocmds                No external commands (e.g. system(3), popen(3), exec(3))
                        will be run.
+-allowedcmds list      "list" contains a comma separated list of the only
+                       external commands that can be run.  The full list of
+                       associated options is:
+
+                        stunnel, ssl, unixpw, WAIT, id, accept, afteraccept,
+                        gone, pipeinput, v4l-info, rawfb-setup, dt, gui,
+                        storepasswd, crash.
+
+                       See each option's help to learn the associated external
+                       command.  Note that the -nocmds option takes precedence
+                       and disables all external commands.
 
 -deny_all              For use with -remote nodeny: start out denying all
                        incoming clients until "-remote nodeny" is used to

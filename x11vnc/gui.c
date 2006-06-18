@@ -420,7 +420,7 @@ if (0) fprintf(stderr, "run_gui: %s -- %d %d\n", gui_xdisplay, connect_to_x11vnc
 	}
 
 	/* gui */
-	if (no_external_cmds) {
+	if (no_external_cmds || !cmd_ok("gui")) {
 		fprintf(stderr, "cannot run external commands in -nocmds "
 		    "mode:\n");
 		fprintf(stderr, "   \"%s\"\n", "gui + wish");

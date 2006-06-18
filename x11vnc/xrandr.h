@@ -34,11 +34,11 @@ extern int known_xrandr_mode(char *s);
 			if (subwin) { \
 				static int last = 0; \
 				subwin_trap_count++; \
-				if (time(0) > last_subwin_trap + 60) { \
+				if (time(NULL) > last_subwin_trap + 60) { \
 					rfbLog("trapped GetImage xerror" \
 					    " in SUBWIN mode. [%d]\n", \
 					    subwin_trap_count); \
-					last_subwin_trap = time(0); \
+					last_subwin_trap = time(NULL); \
 					last = subwin_trap_count; \
 				} \
 				if (subwin_trap_count - last > 30) { \

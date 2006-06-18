@@ -75,6 +75,7 @@ int no_external_cmds = 0;	/* -nocmds */
 #else
 int no_external_cmds = 1;	/* cannot be turned back on. */
 #endif
+char *allowed_external_cmds = NULL;
 int started_as_root = 0;
 int host_lookup = 1;
 char *users_list = NULL;	/* -users */

@@ -46,7 +46,7 @@ void check_switched_user(void) {
 	static int did_solid = 0;
 	static int did_dummy = 0;
 	int delay = 15;
-	time_t now = time(0);
+	time_t now = time(NULL);
 
 	if (unixpw_in_progress) return;
 
@@ -675,7 +675,7 @@ static int switch_user_env(uid_t uid, char *name, char *home, int fb_mode) {
 
 static void try_to_switch_users(void) {
 	static time_t last_try = 0;
-	time_t now = time(0);
+	time_t now = time(NULL);
 	char *users, *p;
 
 	if (getuid() && geteuid()) {
@@ -934,7 +934,7 @@ void check_new_passwds(void) {
 	}
 	if (unixpw_in_progress) return;
 
-	now = time(0);
+	now = time(NULL);
 	if (now > last_check + 1) {
 		if (read_passwds(passwdfile)) {
 			install_passwds();
@@ -1029,16 +1029,106 @@ static void handle_one_http_request(void) {
 	}
 }
 
+void user_supplied_opts(char *opts) {
+	char *p, *str;
+	char *allow[] = {
+		"skip-display", "skip-auth", "skip-shared",
+		"scale", "scale_cursor", "solid", "id", "clear_mods",
+		"clear_keys", "repeat", "speeds",
+		NULL
+	};
+
+	if (getenv("X11VNC_NO_UNIXPW_OPTS")) {
+		return;
+	}
+
+	str = strdup(opts);
+
+	p = strtok(str, ",");
+	while (p) {
+		char *q;
+		int i, n, m, ok = 0;
+
+		i = 0;
+		while (allow[i] != NULL) {
+			if (strstr(allow[i], "skip-")) {
+				i++;
+				continue;
+			}
+			if (strstr(p, allow[i]) == p) 	{
+				ok = 1;
+				break;
+			}
+			i++;
+		}
+
+		if (! ok && sscanf(p, "%d/%d", &n, &m) == 2) {
+			if (scale_str) free(scale_str);
+			scale_str = strdup(p);
+		} else if (ok) {
+			if (strstr(p, "display=") == p) {
+				if (use_dpy) free(use_dpy);
+				use_dpy = strdup(p + strlen("display="));
+			} else if (strstr(p, "auth=") == p) {
+				if (auth_file) free(auth_file);
+				auth_file = strdup(p + strlen("auth="));
+			} else if (strstr(p, "scale=") == p) {
+				if (scale_str) free(scale_str);
+				scale_str = strdup(p + strlen("scale="));
+			} else if (strstr(p, "scale_cursor=") == p) {
+				if (scale_cursor_str) free(scale_cursor_str);
+				scale_cursor_str = strdup(p +
+				    strlen("scale_cursor="));
+			} else if (!strcmp(p, "shared")) {
+				shared = 1;
+			} else if (!strcmp(p, "solid")) {
+				use_solid_bg = 1;
+				if (!solid_str) {
+					solid_str = strdup(solid_default);
+				}
+			} else if (strstr(p, "solid=") == p) {
+				use_solid_bg = 1;
+				if (solid_str) free(solid_str);
+				solid_str = strdup(p + strlen("solid="));
+			} else if (strstr(p, "id=") == p) {
+				unsigned long win;
+				q = p + strlen("id=");
+				if (strcmp(q, "pick")) {
+					if (scan_hexdec(q, &win)) {
+						subwin = win;
+					}
+				}
+			} else if (!strcmp(p, "clear_mods")) {
+				clear_mods = 1;
+			} else if (!strcmp(p, "clear_keys")) {
+				clear_mods = 2;
+			} else if (!strcmp(p, "repeat")) {
+				no_autorepeat = 0;
+			} else if (strstr(p, "speeds=") == p) {
+				if (speeds_str) free(speeds_str);
+				speeds_str = strdup(p + strlen("speeds="));
+				q = speeds_str;
+				while (*q != '\0') {
+					if (*q == '-') {
+						*q = ',';
+					}
+					q++;
+				}
+			}
+		}
+		p = strtok(NULL, ",");
+	}
+	free(str);
+}
+
 extern char find_display[];
+static XImage ximage_struct;
 
 int wait_for_client(int *argc, char** argv, int http) {
-	static XImage ximage_struct;
 	XImage* fb_image;
 	int w = 640, h = 480, b = 32;
-	int w0, h0, i;
-	int chg_raw_fb = 0;
-	char *str, *q, *p;
-	char *cmd = NULL;
+	int w0, h0, i, chg_raw_fb = 0;
+	char *str, *q, *p, *cmd = NULL;
 	int db = 0;
 	char tmp[] = "/tmp/x11vnc-find_display.XXXXXX";
 	int tmp_fd = -1, dt = 0;
@@ -1047,11 +1137,11 @@ int wait_for_client(int *argc, char** argv, int http) {
 		return 0;
 	}
 
-	for (i=0; i< *argc; i++) {
+	for (i=0; i < *argc; i++) {
 		if (!strcmp(argv[i], "-desktop")) {
 			dt = 1;
 		}
-		if (0) fprintf(stderr, "args %d %s\n", i, argv[i]);
+		if (1) fprintf(stderr, "args %d %s\n", i, argv[i]);
 	}
 
 	str = strdup(use_dpy);
@@ -1085,7 +1175,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 	if (db) fprintf(stderr, "str: %s\n", str);
 
 	if (strstr(str, "cmd=") == str) {
-		if (no_external_cmds) {
+		if (no_external_cmds || !cmd_ok("WAIT")) {
 			rfbLog("wait_for_client external cmds not allowed:"
 			    " %s\n", use_dpy);
 			clean_up_exit(1);
@@ -1127,7 +1217,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 	if (! dt) {
 		char *s;
 		argv[*argc] = strdup("-desktop");
-		(*argc)++;
+		*argc = (*argc) + 1;
 
 		if (cmd) {
 			char *q;
@@ -1141,30 +1231,33 @@ int wait_for_client(int *argc, char** argv, int http) {
 		}
 		rfb_desktop_name = strdup(s);
 		argv[*argc] = s;
-		(*argc)++;
+		*argc = (*argc) + 1;
 	}
 
 	initialize_allowed_input();
 
+	if (! multiple_cursors_mode) {
+		multiple_cursors_mode = strdup("default");
+	}
 	initialize_cursors_mode();
 	
 	initialize_screen(argc, argv, fb_image);
 
 	initialize_signals();
 
-	if (!strcmp(cmd, "HTTPONCE")) {
+	if (! raw_fb) {
+		chg_raw_fb = 1;
+		/* kludge to get RAWFB_RET with dpy == NULL guards */
+		raw_fb = (char *) 0x1;
+	}
+
+	if (cmd && !strcmp(cmd, "HTTPONCE")) {
 		handle_one_http_request();	
 		clean_up_exit(0);
 	}
 
 	if (http && check_httpdir()) {
 		http_connections(1);
-	}
-
-	if (! raw_fb) {
-		chg_raw_fb = 1;
-		/* kludge to get RAWFB_RET with dpy == NULL guards */
-		raw_fb = "null";
 	}
 
 	if (cmd && unixpw) {
@@ -1176,11 +1269,14 @@ int wait_for_client(int *argc, char** argv, int http) {
 	}
 
 	while (1) {
-		if (! use_threads) {
-			rfbPE(-1);
+		if (shut_down) {
+			clean_up_exit(0);
 		}
 		if (use_openssl) {
 			check_openssl();
+		}
+		if (! use_threads) {
+			rfbPE(-1);
 		}
 		if (! screen || ! screen->clientHead) {
 			usleep(100 * 1000);
@@ -1196,6 +1292,9 @@ int wait_for_client(int *argc, char** argv, int http) {
 			clean_up_exit(1);
 		}
 		while (1) {
+			if (shut_down) {
+				clean_up_exit(0);
+			}
 			if (! use_threads) {
 				rfbPE(-1);
 			}
@@ -1238,7 +1337,6 @@ int wait_for_client(int *argc, char** argv, int http) {
 			char line[18000];
 
 			memset(line, 0, 18000);
-			if (0) unixpw_msg("Looking up DISPLAY", 0);
 
 			if (keep_unixpw_user && keep_unixpw_pass) {
 				n = 18000;
@@ -1329,7 +1427,6 @@ if (db) write(2, line, n); write(2, "\n", 1);
 			if (*q == '\n' || *q == '\r') *q = '\0';
 			q++;
 		}
-if (db) fprintf(stderr, "use_dpy: %s  n: %d\n", use_dpy, n);
 		if (line2[0] != '\0') {
 			if (strstr(line2, "XAUTHORITY=") == line2) {
 				q = line2;
@@ -1359,6 +1456,9 @@ if (db) fprintf(stderr, "xauth_raw_len: %d\n", n);
 	}
 	if (chg_raw_fb) {
 		raw_fb = NULL;
+	}
+	if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
+		user_supplied_opts(keep_unixpw_opts);
 	}
 
 	return 1;

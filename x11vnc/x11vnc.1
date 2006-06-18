@@ -2,7 +2,7 @@
 .TH X11VNC "1" "June 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.2, lastmod: 2006-06-12
+         version: 0.8.2, lastmod: 2006-06-18
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -474,6 +474,32 @@ users to move the mouse.  This option is ignored when
 a global \fB-viewonly\fR is in effect (all input is discarded
 in that case).
 .PP
+\fB-grabkbd\fR
+.IP
+When VNC viewers are connected, attempt to the grab the
+keyboard so someone sitting at the physical display
+is not able to enter keystrokes.  This method uses
+.IR XGrabKeyboard (3X11)
+and so it is not secure and does not
+rule out the person at the physical display injecting
+keystrokes by flooding the server with them, grabbing
+the keyboard himself, etc.  Some degree of cooperation
+from the person at the display is assumed.
+.PP
+\fB-grabptr\fR
+.IP
+As \fB-grabkbd,\fR but for the mouse pointer using
+.IR XGrabPointer (3X11).
+Unfortunately due to the way the X
+server works, the mouse can still be moved around by the
+user at the physical display, but he will not be able to
+change window focus with it.  Also some window managers
+that call 
+.IR XGrabServer (3X11)
+for resizes, etc, will
+act on the local user's input.  Again, some degree of
+cooperation from the person at the display is assumed.
+.PP
 \fB-viewpasswd\fR \fIstring\fR
 .IP
 Supply a 2nd password for view-only logins.  The \fB-passwd\fR
@@ -704,7 +730,25 @@ In the case of \fB-unixpw,\fR then the above command is run
 as the user who just authenticated via the login and
 password prompt.
 .IP
-Thus the combination of \fB-display\fR WAIT:cmd=... and
+Also in the case of \fB-unixpw,\fR the user logging in can
+place a colon at the end of his username and supply
+a few options: scale=, scale_cursor=, solid, id=,
+clear_mods, clear_keys, repeat, or speeds= separated
+by commas if there is more than one.  After the user
+logs in successfully, these options will be applied to
+the VNC screen.  For example,
+.IP
+login: fred:scale=3/4,repeat
+Password: ...
+.IP
+for convenience m/n implies scale= e.g. fred:3/4
+To disable this set the environment variable
+X11VNC_NO_UNIXPW_OPTS=1.  To set any other options,
+the user can use the gui (x11vnc \fB-gui\fR connect) or the
+remote control method (x11vnc \fB-R\fR opt:val) during his
+VNC session.
+.IP
+So the combination of \fB-display\fR WAIT:cmd=... and
 \fB-unixpw\fR allows automatic pairing of an unix
 authenticated VNC user with his desktop.  This could
 be very useful on SunRays and also any system where
@@ -738,7 +782,7 @@ by client web browsers.  For example:
 5815 stream tcp nowait root /usr/sbin/tcpd .../x11vnc \\
 \fB-inetd\fR \fB-q\fR \fB-http_ssl\fR \fB-display\fR WAIT:cmd=HTTPONCE
 .IP
-Is used in the Apache SSL-portal example (see FAQ).
+It is used in the Apache SSL-portal example (see FAQ).
 .IP
 Finally, one can insert a geometry between colons,
 e.g. WAIT:1280x1024:... to set the size of the display
@@ -1628,6 +1672,14 @@ Use \fIfilename\fR instead of $HOME/.x11vncrc for rc file.
 \fB-norc\fR
 .IP
 Do not process any .x11vncrc file for options.
+.PP
+\fB-env\fR \fIVAR=VALUE\fR
+.IP
+Set the environment variable 'VAR' to value 'VALUE'
+at x11vnc startup.  This is a convenience utility to
+avoid shell script wrappers, etc. to set the env. var.
+You may specify as many of these as needed on the
+command line.
 .PP
 \fB-h,\fR \fB-help\fR
 .IP
@@ -3222,6 +3274,14 @@ lookup          disable \fB-nolookup\fR mode.
 .IP
 input:str       set \fB-input\fR to "str", empty to disable.
 .IP
+grabkbd         enable  \fB-grabkbd\fR mode.
+.IP
+nograbkbd       disable \fB-grabkbd\fR mode.
+.IP
+grabptr         enable  \fB-grabptr\fR mode.
+.IP
+nograbptr       disable \fB-grabptr\fR mode.
+.IP
 client_input:str set the K, M, B \fB-input\fR on a per-client
 basis.  select which client as for
 disconnect, e.g. client_input:host:MB
@@ -3653,13 +3713,14 @@ nowf wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
 scr_parms scrollcopyrect scr noscrollcopyrect noscr
 fixscreen noxrecord xrecord reset_record pointer_mode
-pm input_skip input client_input speeds wmdt
-debug_pointer dp nodebug_pointer nodp debug_keyboard
-dk nodebug_keyboard nodk deferupdate defer wait_ui
-wait_bog nowait_bog slow_fb wait readtimeout nap nonap
-sb screen_blank fbpm nofbpm fs gaps grow fuzz snapfb
-nosnapfb rawfb progressive rfbport http nohttp httpport
-httpdir enablehttpproxy noenablehttpproxy alwaysshared
+pm input_skip input grabkbd nograbkbd grabptr
+nograbptr client_input speeds wmdt debug_pointer dp
+nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+nodk deferupdate defer wait_ui wait_bog nowait_bog
+slow_fb wait readtimeout nap nonap sb screen_blank
+fbpm nofbpm fs gaps grow fuzz snapfb nosnapfb rawfb
+progressive rfbport http nohttp httpport httpdir
+enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop debug_xevents nodebug_xevents
 debug_xevents debug_xdamage nodebug_xdamage
@@ -3769,6 +3830,20 @@ No external commands (e.g.
 .IR exec (3)
 )
 will be run.
+.PP
+\fB-allowedcmds\fR \fIlist\fR
+.IP
+\fIlist\fR contains a comma separated list of the only
+external commands that can be run.  The full list of
+associated options is:
+.IP
+stunnel, ssl, unixpw, WAIT, id, accept, afteraccept,
+gone, pipeinput, v4l-info, rawfb-setup, dt, gui,
+storepasswd, crash.
+.IP
+See each option's help to learn the associated external
+command.  Note that the \fB-nocmds\fR option takes precedence
+and disables all external commands.
 .PP
 \fB-deny_all\fR
 .IP

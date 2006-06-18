@@ -18,5 +18,6 @@ extern rfbClientPtr unixpw_client;
 extern int keep_unixpw;
 extern char *keep_unixpw_user;
 extern char *keep_unixpw_pass;
+extern char *keep_unixpw_opts;
 
 #endif /* _X11VNC_UNIXPW_H */

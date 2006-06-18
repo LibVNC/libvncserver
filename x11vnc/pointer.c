@@ -319,7 +319,7 @@ static void update_x11_pointer_position(int x, int y) {
 	rc = set_cursor(x, y, get_which_cursor());
 	cursor_changes += rc;
 
-	last_event = last_input = last_pointer_input = time(0);
+	last_event = last_input = last_pointer_input = time(NULL);
 }
 
 void do_button_mask_change(int mask, int button) {
@@ -390,7 +390,7 @@ void do_button_mask_change(int mask, int button) {
 static void update_x11_pointer_mask(int mask) {
 	int snapped = 0, xr_mouse = 1, i;
 
-	last_event = last_input = last_pointer_input = time(0);
+	last_event = last_input = last_pointer_input = time(NULL);
 
 	RAWFB_RET_VOID
 
@@ -942,7 +942,7 @@ if (0) fprintf(stderr, "initialize_pipeinput: %s -- %s\n", pipeinput_str, p);
 
 	set_child_info();
 	/* pipeinput */
-	if (no_external_cmds) {
+	if (no_external_cmds || !cmd_ok("pipeinput")) {
 		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");
 		rfbLog("   \"%s\"\n", p);

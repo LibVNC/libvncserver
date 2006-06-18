@@ -14,6 +14,7 @@
 #include "sslcmds.h"
 #include "sslhelper.h"
 #include "xwrappers.h"
+#include "xevents.h"
 
 /*
  * routines for handling incoming, outgoing, etc connections
@@ -44,6 +45,7 @@ void check_gui_inputs(void);
 enum rfbNewClientAction new_client(rfbClientPtr client);
 void start_client_info_sock(char *host_port_cookie);
 void send_client_info(char *str);
+void adjust_grabs(int grab, int quiet);
 void check_new_clients(void);
 
 
@@ -328,6 +330,32 @@ void set_child_info(void) {
 	}
 }
 
+int cmd_ok(char *cmd) {
+	char *p, *str;
+	if (no_external_cmds) {
+		return 0;
+	}
+	if (! cmd || cmd[0] == '\0') {
+		return 0;
+	}
+	if (! allowed_external_cmds) {
+		/* default, allow any (overridden by -nocmds) */
+		return 1;
+	}
+
+	str = strdup(allowed_external_cmds);
+	p = strtok(str, ",");
+	while (p) {
+		if (!strcmp(p, cmd)) {
+			free(str);
+			return 1;
+		}
+		p = strtok(NULL, ",");
+	}
+	free(str);
+	return 0;
+}
+
 /*
  * utility to run a user supplied command setting some RFB_ env vars.
  * used by, e.g., accept_client() and client_gone()
@@ -336,7 +364,7 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	char *old_display = NULL;
 	char *addr = client->host;
 	char str[100];
-	int rc;
+	int rc, ok;
 	ClientData *cd = (ClientData *) client->clientData;
 
 	if (addr == NULL || addr[0] == '\0') {
@@ -414,11 +442,11 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	if (cd) {
 		sprintf(str, "%d", (int) cd->login_time);
 	} else {
-		sprintf(str, ">%d", (int) time(0));
+		sprintf(str, ">%d", (int) time(NULL));
 	}
 	set_env("RFB_LOGIN_TIME", str);
 
-	sprintf(str, "%d", (int) time(0));
+	sprintf(str, "%d", (int) time(NULL));
 	set_env("RFB_CURRENT_TIME", str);
 
 	if (!cd || !cd->username || cd->username[0] == '\0') {
@@ -449,7 +477,17 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	set_env("RFB_CLIENT_COUNT", str);
 
 	/* gone, accept, afteraccept */
-	if (no_external_cmds) {
+	ok = 0;
+	if (!strcmp(mode, "accept") && cmd_ok("accept")) {
+		ok = 1;
+	}
+	if (!strcmp(mode, "afteraccept") && cmd_ok("afteraccept")) {
+		ok = 1;
+	}
+	if (!strcmp(mode, "gone") && cmd_ok("gone")) {
+		ok = 1;
+	}
+	if (no_external_cmds || !ok) {
 		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");
 		rfbLog("   \"%s\"\n", cmd);
@@ -1398,7 +1436,7 @@ static void check_connect_file(char *file) {
 	char line[VNC_CONNECT_MAX], host[VNC_CONNECT_MAX];
 	static int first_warn = 1, truncate_ok = 1;
 	static time_t last_time = 0; 
-	time_t now = time(0);
+	time_t now = time(NULL);
 
 	if (last_time == 0) {
 		last_time = now;
@@ -1846,7 +1884,7 @@ void check_gui_inputs(void) {
 enum rfbNewClientAction new_client(rfbClientPtr client) {
 	ClientData *cd; 
 
-	last_event = last_input = time(0);
+	last_event = last_input = time(NULL);
 
 
 	if (inetd) {
@@ -1902,7 +1940,7 @@ if (getenv("NEW_CLIENT")) fprintf(stderr, "new_client: %s %d\n", client->host, c
 
 	cd->input[0] = '-';
 	cd->login_viewonly = -1;
-	cd->login_time = time(0);
+	cd->login_time = time(NULL);
 	cd->ssl_helper_pid = 0;
 
 	if (use_openssl && openssl_last_helper_pid) {
@@ -1933,7 +1971,7 @@ if (0) fprintf(stderr, "SET ssl_helper_pid: %d\n", openssl_last_helper_pid);
 	}
 	client_count++;
 
-	last_keyboard_input = last_pointer_input = time(0);
+	last_keyboard_input = last_pointer_input = time(NULL);
 
 	if (no_autorepeat && client_count == 1 && ! view_only) {
 		/*
@@ -1958,7 +1996,7 @@ if (0) fprintf(stderr, "SET ssl_helper_pid: %d\n", openssl_last_helper_pid);
 	cd->raw_bytes_sent = 0;
 
 	accepted_client = 1;
-	last_client = time(0);
+	last_client = time(NULL);
 
 	if (unixpw) {
 		unixpw_in_progress = 1;
@@ -1968,7 +2006,7 @@ if (0) fprintf(stderr, "SET ssl_helper_pid: %d\n", openssl_last_helper_pid);
 			unixpw_login_viewonly = 1;
 			client->viewOnly = FALSE;
 		}
-		unixpw_last_try_time = time(0);
+		unixpw_last_try_time = time(NULL);
 		unixpw_screen(1);
 		unixpw_keystroke(0, 0, 1);
 	}
@@ -2027,7 +2065,7 @@ void start_client_info_sock(char *host_port_cookie) {
 		if (sock >= 0) {
 			char *lst = list_clients();
 			icon_mode_socks[next] = sock;
-			start_time[next] = time(0);
+			start_time[next] = time(NULL);
 			write(sock, "COOKIE:", strlen("COOKIE:"));
 			write(sock, cookie, strlen(cookie));
 			write(sock, "\n", strlen("\n"));
@@ -2105,6 +2143,40 @@ void send_client_info(char *str) {
 	}
 }
 
+void adjust_grabs(int grab, int quiet) {
+	RAWFB_RET_VOID
+	/* n.b. caller decides to X_LOCK or not. */
+	if (grab) {
+		if (grab_kbd) {
+			if (! quiet) {
+				rfbLog("grabbing keyboard with XGrabKeyboard\n");
+			}
+			XGrabKeyboard(dpy, window, False, GrabModeAsync,
+			    GrabModeAsync, CurrentTime);
+		}
+		if (grab_ptr) {
+			if (! quiet) {
+				rfbLog("grabbing pointer with XGrabPointer\n");
+			}
+			XGrabPointer(dpy, window, False, 0, GrabModeAsync,
+			    GrabModeAsync, None, None, CurrentTime);
+		}
+	} else {
+		if (grab_kbd) {
+			if (! quiet) {
+				rfbLog("ungrabbing keyboard with XUngrabKeyboard\n");
+			}
+			XUngrabKeyboard(dpy, CurrentTime);
+		}
+		if (grab_ptr) {
+			if (! quiet) {
+				rfbLog("ungrabbing pointer with XUngrabPointer\n");
+			}
+			XUngrabPointer(dpy, CurrentTime);
+		}
+	}
+}
+
 void check_new_clients(void) {
 	static int last_count = 0;
 	rfbClientIteratorPtr iter;
@@ -2117,11 +2189,26 @@ void check_new_clients(void) {
 			unixpw_login_viewonly = 1;
 			unixpw_client->viewOnly = FALSE;
 		}
-		if (time(0) > unixpw_last_try_time + 25) {
+		if (time(NULL) > unixpw_last_try_time + 25) {
 			rfbLog("unixpw_deny: timed out waiting for reply.\n");
 			unixpw_deny();
 		}
 		return;
+	}
+
+	if (grab_kbd || grab_ptr) {
+		static double last_force = 0.0;
+		if (client_count != last_count || dnow() > last_force + 0.25) {
+			int q = (client_count == last_count);
+			last_force = dnow();
+			X_LOCK;
+			if (client_count) {
+				adjust_grabs(1, q);
+			} else {
+				adjust_grabs(0, q);
+			}
+			X_UNLOCK;
+		}
 	}
 	
 	if (client_count == last_count) {
@@ -2143,6 +2230,7 @@ void check_new_clients(void) {
 	if (! screen) {
 		return;
 	}
+
 	if (! client_count) {
 		send_client_info("clients:none");
 		return;

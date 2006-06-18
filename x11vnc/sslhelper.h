@@ -13,6 +13,8 @@ extern int openssl_port_num;
 extern int https_sock;
 extern pid_t openssl_last_helper_pid;
 
+extern void raw_xfer(int csock, int s_in, int s_out);
+
 extern int openssl_present(void);
 extern void openssl_init(void);
 extern void openssl_port(void);

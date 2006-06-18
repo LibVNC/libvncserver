@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8.2 lastmod: 2006-06-12";
+char lastmod[] = "0.8.2 lastmod: 2006-06-18";
 
 /* X display info */
 
@@ -68,11 +68,11 @@ int raw_fb_seek = 0;
 int raw_fb_fd = -1;
 int raw_fb_back_to_X = 0;	/* kludge for testing rawfb -> X */
 
-int rfb_bytes_per_line;
-int main_bytes_per_line;
-unsigned long  main_red_mask,  main_green_mask,  main_blue_mask;
-unsigned short main_red_max,   main_green_max,   main_blue_max;
-unsigned short main_red_shift, main_green_shift, main_blue_shift;
+int rfb_bytes_per_line = 0;
+int main_bytes_per_line = 0;
+unsigned long  main_red_mask = 0,  main_green_mask = 0,  main_blue_mask = 0;
+unsigned short main_red_max = 0,   main_green_max = 0,   main_blue_max = 0;
+unsigned short main_red_shift = 0, main_green_shift = 0, main_blue_shift = 0;
 
 /* scaling parameters */
 char *scale_str = NULL;
@@ -123,8 +123,8 @@ int client_count = 0;
 int clients_served = 0;
 
 /* more transient kludge variables: */
-int cursor_x, cursor_y;		/* x and y from the viewer(s) */
-int button_change_x, button_change_y;
+int cursor_x = 0, cursor_y = 0;		/* x and y from the viewer(s) */
+int button_change_x = 0, button_change_y = 0;
 int got_user_input = 0;
 int got_pointer_input = 0;
 int got_pointer_calls = 0;

@@ -51,7 +51,7 @@ char *choose_title(char *display);
 
 
 /*
- * routine to keep 0 <= i < n, should use in more places...
+ * routine to keep 0 <= i < n
  */
 int nfix(int i, int n) {
 	if (i < 0) {
@@ -120,7 +120,7 @@ void uppercase(char *str) {
 
 char *lblanks(char *str) {
 	char *p = str;
-	while (*p) {
+	while (*p != '\0') {
 		if (! isspace(*p)) {
 			break;
 		}
@@ -150,6 +150,9 @@ int scan_hexdec(char *str, unsigned long *num) {
 
 int parse_geom(char *str, int *wp, int *hp, int *xp, int *yp, int W, int H) {
 	int w, h, x, y;
+	if (! str) {
+		return 0;
+	}
 	/* handle +/-x and +/-y */
 	if (sscanf(str, "%dx%d+%d+%d", &w, &h, &x, &y) == 4) {
 		;
@@ -176,10 +179,13 @@ int parse_geom(char *str, int *wp, int *hp, int *xp, int *yp, int W, int H) {
 
 void set_env(char *name, char *value) {
 	char *str;
-	if (!value) {
+	if (! name) {
+		return;
+	}
+	if (! value) {
 		value = "";
 	}
-	str = (char *) malloc(strlen(name)+strlen(value)+2);
+	str = (char *) malloc(strlen(name) + 1 + strlen(value) + 1);
 	sprintf(str, "%s=%s", name, value);
 	putenv(str);
 }
@@ -277,6 +283,7 @@ char *this_host(void) {
 	char host[MAXN];
 #if LIBVNCSERVER_HAVE_GETHOSTNAME
 	if (gethostname(host, MAXN) == 0) {
+		host[MAXN-1] = '\0';
 		return strdup(host);
 	}
 #endif
@@ -286,8 +293,8 @@ char *this_host(void) {
 int match_str_list(char *str, char **list) {
 	int i = 0, matched = 0;
 
-	if (! list) {
-		return matched;
+	if (! str || ! list) {
+		return 0;
 	}
 	while (list[i] != NULL) {
 		if (!strcmp(list[i], "*")) {
@@ -304,9 +311,14 @@ int match_str_list(char *str, char **list) {
 
 char **create_str_list(char *cslist) {
 	int i, n;
-	char *p, *str = strdup(cslist);
+	char *p, *str;
 	char **list = NULL;
+
+	if (! cslist) {
+		return NULL;
+	}
 	
+	str = strdup(cslist);
 	n = 1;
 	p = str;
 	while (*p != '\0') {
@@ -316,7 +328,8 @@ char **create_str_list(char *cslist) {
 		p++;
 	}
 
-	list = (char **) malloc((n+1)*sizeof(char *));
+	/* the extra last one holds NULL */
+	list = (char **) malloc( (n+1)*sizeof(char *) );
 	for(i=0; i < n+1; i++) {
 		list[i] = NULL;
 	}
@@ -427,6 +440,10 @@ double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
 	a = nabs((x2 - x1) * (y2 - y1));
 	A = nabs((X2 - X1) * (Y2 - Y1));
 
+	if (a == 0 || A == 0) {
+		return 0.0;
+	}
+
 	r = sraRgnCreateRect(x1, y1, x2, y2);
 	R = sraRgnCreateRect(X1, Y1, X2, Y2);
 
@@ -455,6 +472,8 @@ double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
  */
 char *choose_title(char *display) {
 	static char title[(MAXN+10)];	
+
+	memset(title, 0, MAXN+10);
 	strcpy(title, "x11vnc");
 
 	if (display == NULL) {
@@ -465,16 +484,20 @@ char *choose_title(char *display) {
 	}
 	title[0] = '\0';
 	if (display[0] == ':') {
-		if (this_host() != NULL) {
-			strncpy(title, this_host(), MAXN - strlen(title));
+		char *th = this_host();
+		if (th != NULL) {
+			strncpy(title, th, MAXN - strlen(title));
 		}
 	}
 	strncat(title, display, MAXN - strlen(title));
-	if (subwin && valid_window(subwin, NULL, 0)) {
-		char *name;
-		if (dpy && XFetchName(dpy, subwin, &name)) {
-			strncat(title, " ",  MAXN - strlen(title));
-			strncat(title, name, MAXN - strlen(title));
+	if (subwin && dpy && valid_window(subwin, NULL, 0)) {
+		char *name = NULL;
+		if (XFetchName(dpy, subwin, &name)) {
+			if (name) {
+				strncat(title, " ",  MAXN - strlen(title));
+				strncat(title, name, MAXN - strlen(title));
+				free(name);
+			}
 		}
 	}
 	return title;

@@ -3,6 +3,7 @@
 #include "x11vnc.h"
 #include "xrecord.h"
 #include "keyboard.h"
+#include "xevents.h"
 
 int xshm_present = 0;
 int xtest_present = 0;
@@ -601,8 +602,15 @@ void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 		last_keyboard_keycode = key;
 	}
 
+	if (grab_kbd) {
+		XUngrabKeyboard(dpy, CurrentTime);
+	}
+
 	if (xtrap_input) {
 		XTRAP_FakeKeyEvent_wr(dpy, key, down, delay);
+		if (grab_kbd) {
+			adjust_grabs(1, 1);
+		}
 		return;
 	}
 
@@ -616,6 +624,9 @@ void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 	}
 #if LIBVNCSERVER_HAVE_XTEST
 	XTestFakeKeyEvent(dpy, key, down, delay);
+	if (grab_kbd) {
+		adjust_grabs(1, 1);
+	}
 	if (debug_keyboard) {
 		upup_downdown_warning(key, down);
 	}
@@ -648,8 +659,15 @@ void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
 
 	RAWFB_RET_VOID
 
+	if (grab_ptr) {
+		XUngrabPointer(dpy, CurrentTime);
+	}
+
 	if (xtrap_input) {
 		XTRAP_FakeButtonEvent_wr(dpy, button, is_press, delay);
+		if (grab_ptr) {
+			adjust_grabs(1, 1);
+		}
 		return;
 	}
 
@@ -664,6 +682,9 @@ void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
 #if LIBVNCSERVER_HAVE_XTEST
     	XTestFakeButtonEvent(dpy, button, is_press, delay);
 #endif
+	if (grab_ptr) {
+		adjust_grabs(1, 1);
+	}
 }
 
 void XTRAP_FakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
@@ -690,8 +711,15 @@ void XTestFakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
 
 	RAWFB_RET_VOID
 
+	if (grab_ptr) {
+		XUngrabPointer(dpy, CurrentTime);
+	}
+
 	if (xtrap_input) {
 		XTRAP_FakeMotionEvent_wr(dpy, screen, x, y, delay);
+		if (grab_ptr) {
+			adjust_grabs(1, 1);
+		}
 		return;
 	}
 
@@ -702,6 +730,9 @@ void XTestFakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
 #if LIBVNCSERVER_HAVE_XTEST
 	XTestFakeMotionEvent(dpy, screen, x, y, delay);
 #endif
+	if (grab_ptr) {
+		adjust_grabs(1, 1);
+	}
 }
 
 Bool XTestCompareCurrentCursorWithWindow_wr(Display* dpy, Window w) {

@@ -321,6 +321,8 @@ char gui_code[] = "";
 "	=0S dontdisconnect\n"
 "	=SQA deny_all\n"
 "	timeout:\n"
+"	grabkbd\n"
+"	grabptr\n"
 "	=GAL LOFF\n"
 "\n"
 "Tuning\n"

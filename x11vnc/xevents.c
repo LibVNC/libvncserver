@@ -16,6 +16,8 @@
 
 /* XXX CHECK BEFORE RELEASE */
 int grab_buster = 0;
+int grab_kbd = 0;
+int grab_ptr = 0;
 int sync_tod_delay = 3;
 
 void initialize_vnc_connect_prop(void);
@@ -187,7 +189,7 @@ static void get_prop(char *str, int len, Atom prop) {
 static void bust_grab(int reset) {
 	static int bust_count = 0;
 	static time_t last_bust = 0;
-	time_t now = time(0);
+	time_t now = time(NULL);
 	KeyCode key;
 	int button, x, y, nb;
 
@@ -272,7 +274,7 @@ static void bust_grab(int reset) {
 		XTestFakeKeyEvent_wr(dpy, key, False, CurrentTime);
 	}
 	XFlush_wr(dpy);
-	last_bust = time(0);
+	last_bust = time(NULL);
 }
 
 typedef struct _grabwatch {
@@ -294,7 +296,7 @@ static int process_watch(char *str, int parent, int db) {
 	unsigned long xtime;
 	static grabwatch_t watches[GRABWATCH];
 	static int first = 1;
-	time_t now = time(0);
+	time_t now = time(NULL);
 	static time_t last_bust = 0;
 	int too_long, problems = 0;
 
@@ -604,7 +606,7 @@ void sync_tod_with_servertime(void) {
 void check_keycode_state(void) {
 	static time_t last_check = 0;
 	int delay = 10, noinput = 3;
-	time_t now = time(0);
+	time_t now = time(NULL);
 
 	if (! client_count) {
 		return;
@@ -629,7 +631,7 @@ void check_keycode_state(void) {
 
 void check_autorepeat(void) {
 	static time_t last_check = 0;
-	time_t now = time(0);
+	time_t now = time(NULL);
 	int autorepeat_is_on, autorepeat_initially_on, idle_timeout = 300;
 	static int idle_reset = 0;
 
@@ -710,7 +712,7 @@ void check_xevents(int reset) {
 	static time_t last_init_check = 0;
 	static time_t last_sync = 0;
 	static time_t last_time_sync = 0;
-	time_t now = time(0);
+	time_t now = time(NULL);
 	static double last_request = 0.0;
 	XErrorHandler old_handler;
 

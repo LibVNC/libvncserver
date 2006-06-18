@@ -51,10 +51,10 @@ static void check_fbpm(void) {
 	if (! client_count) {
 		return;
 	}
-	if (time(0) < last_fbpm + 5) {
+	if (time(NULL) < last_fbpm + 5) {
 		return;
 	}
-	last_fbpm = time(0);
+	last_fbpm = time(NULL);
 
 	if (FBPMInfo(dpy, &level, &enabled)) {
 		if (db) fprintf(stderr, "FBPMInfo level: %d enabled: %d\n", level, enabled);

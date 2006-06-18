@@ -312,7 +312,7 @@ static void crash_shell(void) {
 		} else if (*str == 's' && *(str+1) == '\0') {
 			sprintf(cmd, "sh -c '(%s) &'", crash_stack_command1);
 			/* crash */
-			if (no_external_cmds) {
+			if (no_external_cmds || !cmd_ok("crash")) {
 				fprintf(stderr, "\nno_external_cmds=%d\n",
 				    no_external_cmds);
 				goto crash_prompt;

@@ -65,7 +65,7 @@ static unsigned int root_rgb[NCOLOR];
 
 static void set_root_cmap(void) {
 	static time_t last_set = 0;
-	time_t now = time(0);
+	time_t now = time(NULL);
 	XWindowAttributes attr;
 	static XColor color[NCOLOR];
 	int redo = 0;

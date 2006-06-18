@@ -99,26 +99,26 @@ void initialize_tiles(void) {
 	ntiles = ntiles_x * ntiles_y;
 
 	tile_has_diff = (unsigned char *)
-		malloc((size_t) (ntiles * sizeof(unsigned char)));
+		calloc((size_t) (ntiles * sizeof(unsigned char)), 1);
 	tile_has_xdamage_diff = (unsigned char *)
-		malloc((size_t) (ntiles * sizeof(unsigned char)));
+		calloc((size_t) (ntiles * sizeof(unsigned char)), 1);
 	tile_row_has_xdamage_diff = (unsigned char *)
-		malloc((size_t) (ntiles_y * sizeof(unsigned char)));
+		calloc((size_t) (ntiles_y * sizeof(unsigned char)), 1);
 	tile_tried    = (unsigned char *)
-		malloc((size_t) (ntiles * sizeof(unsigned char)));
+		calloc((size_t) (ntiles * sizeof(unsigned char)), 1);
 	tile_copied   = (unsigned char *)
-		malloc((size_t) (ntiles * sizeof(unsigned char)));
+		calloc((size_t) (ntiles * sizeof(unsigned char)), 1);
 	tile_blackout    = (tile_blackout_t *)
-		malloc((size_t) (ntiles * sizeof(tile_blackout_t)));
-	tile_region = (region_t *) malloc((size_t) (ntiles * sizeof(region_t)));
+		calloc((size_t) (ntiles * sizeof(tile_blackout_t)), 1);
+	tile_region = (region_t *) calloc((size_t) (ntiles * sizeof(region_t)), 1);
 
 	tile_row = (XImage **)
-		malloc((size_t) ((ntiles_x + 1) * sizeof(XImage *)));
+		calloc((size_t) ((ntiles_x + 1) * sizeof(XImage *)), 1);
 	tile_row_shm = (XShmSegmentInfo *)
-		malloc((size_t) ((ntiles_x + 1) * sizeof(XShmSegmentInfo)));
+		calloc((size_t) ((ntiles_x + 1) * sizeof(XShmSegmentInfo)), 1);
 
 	/* there will never be more hints than tiles: */
-	hint_list = (hint_t *) malloc((size_t) (ntiles * sizeof(hint_t)));
+	hint_list = (hint_t *) calloc((size_t) (ntiles * sizeof(hint_t)), 1);
 }
 
 void free_tiles(void) {
@@ -240,7 +240,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 			}
 			return 0;
 		}
-		if (db) fprintf(stderr, "shm_create simple %d %d\t0x%x %s\n", w, h, xim, name);
+		if (db) fprintf(stderr, "shm_create simple %d %d\t%p %s\n", w, h, xim, name);
 		xim->data = (char *) malloc(xim->bytes_per_line * xim->height);
 		if (xim->data == NULL) {
 			rfbErr("XCreateImage(%s) data malloc failed.\n", name);
@@ -349,7 +349,7 @@ void shm_delete(XShmSegmentInfo *shm) {
 void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 	int db = 0;
 
-	if (db) fprintf(stderr, "shm_clean: called:  0x%x\n", xim);
+	if (db) fprintf(stderr, "shm_clean: called:  %p\n", xim);
 	X_LOCK;
 #if LIBVNCSERVER_HAVE_XSHM
 	if (shm != NULL && shm->shmid != -1 && dpy) {
@@ -360,11 +360,11 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 	if (xim != NULL) {
 		if (! raw_fb_back_to_X) {	/* raw_fb hack */
 			if (xim->bitmap_unit != -1) {
-				if (db) fprintf(stderr, "shm_clean: XDestroyImage  0x%x\n", xim);
+				if (db) fprintf(stderr, "shm_clean: XDestroyImage  %p\n", xim);
 				XDestroyImage(xim);
 			} else {
 				if (xim->data) {
-					if (db) fprintf(stderr, "shm_clean: free xim->data  0x%x 0x%x\n", xim, xim->data);
+					if (db) fprintf(stderr, "shm_clean: free xim->data  %p %p\n", xim, xim->data);
 					free(xim->data);
 					xim->data = NULL;
 				}
@@ -1228,7 +1228,7 @@ void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force) {
 		 * damage_delay seconds.
 		 */
 		int debug = 0;
-		if (time(0) > damage_time + damage_delay) {
+		if (time(NULL) > damage_time + damage_delay) {
 			if (! quiet) {
 				rfbLog("damaging turned off.\n");
 			}
@@ -2153,7 +2153,7 @@ if (db && snapcnt++ < 5) rfbLog("rawfb copy_snap took: %.5f secs\n", dnow() - st
  */
 static void nap_set(int tile_cnt) {
 	int nap_in = nap_ok;
-	time_t now = time(0);
+	time_t now = time(NULL);
 
 	if (scan_count == 0) {
 		/* roll up check for all NSCAN scans */
@@ -2219,7 +2219,7 @@ static void nap_check(int tile_cnt) {
 		return;
 	}
 
-	now = time(0);
+	now = time(NULL);
 
 	if (screen_blank > 0) {
 		int dt_ev, dt_fbu, ms = 2000;
@@ -2254,7 +2254,7 @@ static void nap_check(int tile_cnt) {
  */
 static void ping_clients(int tile_cnt) {
 	static time_t last_send = 0;
-	time_t now = time(0);
+	time_t now = time(NULL);
 
 	if (rfbMaxClientWait < 20000) {
 		rfbMaxClientWait = 20000;

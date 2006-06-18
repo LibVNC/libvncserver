@@ -305,7 +305,7 @@ int pick_windowid(unsigned long *num) {
 		set_env("DISPLAY", use_dpy);
 	}
 	/* id */
-	if (no_external_cmds) {
+	if (no_external_cmds || !cmd_ok("id")) {
 		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");
 		rfbLog("   \"%s\"\n", "xwininfo");

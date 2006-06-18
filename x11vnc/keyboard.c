@@ -324,7 +324,7 @@ void autorepeat(int restore, int bequiet) {
 void check_add_keysyms(void) {
 	static time_t last_check = 0;
 	int clear_freq = 300, quiet = 1, count; 
-	time_t now = time(0);
+	time_t now = time(NULL);
 
 	if (unixpw_in_progress) return;
 
@@ -2612,7 +2612,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	KeyCode k;
 	int idx, isbutton = 0;
 	allowed_input_t input;
-	time_t now = time(0);
+	time_t now = time(NULL);
 	double tnow;
 	static int skipped_last_down;
 	static rfbBool last_down;

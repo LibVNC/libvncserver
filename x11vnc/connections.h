@@ -28,6 +28,7 @@ extern void check_gui_inputs(void);
 extern enum rfbNewClientAction new_client(rfbClientPtr client);
 extern void start_client_info_sock(char *host_port_cookie);
 extern void send_client_info(char *str);
+extern void adjust_grabs(int grab, int quiet);
 extern void check_new_clients(void);
 
 #endif /* _X11VNC_CONNECTIONS_H */

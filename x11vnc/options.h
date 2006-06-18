@@ -56,6 +56,7 @@ extern int safe_remote_only;
 extern int priv_remote;
 extern int more_safe;
 extern int no_external_cmds;
+extern char *allowed_external_cmds;
 extern int started_as_root;
 extern int host_lookup;
 extern char *users_list;

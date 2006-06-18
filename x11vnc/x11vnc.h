@@ -366,9 +366,9 @@ extern char *http_dir;
 extern char vnc_desktop_name[];
 extern char *main_fb;			/* our copy of the X11 fb */
 extern char *rfb_fb;			/* same as main_fb unless transformation */
-extern char *fake_fb;		/* used under -padgeom */
-extern char *snap_fb;		/* used under -snapfb */
-extern char *cmap8to24_fb;	/* used under -8to24 */
+extern char *fake_fb;			/* used under -padgeom */
+extern char *snap_fb;			/* used under -snapfb */
+extern char *cmap8to24_fb;		/* used under -8to24 */
 extern char *raw_fb;
 extern char *raw_fb_addr;
 extern int raw_fb_offset;

@@ -310,6 +310,8 @@ Permissions
 	=0S dontdisconnect
 	=SQA deny_all
 	timeout:
+	grabkbd
+	grabptr
 	=GAL LOFF
 
 Tuning

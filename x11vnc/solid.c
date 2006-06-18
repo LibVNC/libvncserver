@@ -54,7 +54,7 @@ static int dt_cmd(char *cmd) {
 	}
 
 	/* dt */
-	if (no_external_cmds) {
+	if (no_external_cmds || !cmd_ok("dt")) {
 		rfbLog("cannot run external commands in -nocmds mode:\n");
 		rfbLog("   \"%s\"\n", cmd);
 		rfbLog("   dt_cmd: returning 1\n");
@@ -522,7 +522,11 @@ static void solid_gnome(char *color) {
 
 	if (! orig_color) {
 		char *q;
-		orig_color = strdup(cmd_output(get_color));
+		if (cmd_ok("dt")) {
+			orig_color = strdup(cmd_output(get_color));
+		} else {
+			orig_color = "";
+		}
 		if (*orig_color == '\0') {
 			orig_color = strdup("#FFFFFF");
 		}
@@ -532,7 +536,11 @@ static void solid_gnome(char *color) {
 	}
 	if (! orig_option) {
 		char *q;
-		orig_option = strdup(cmd_output(get_option));
+		if (cmd_ok("dt")) {
+			orig_option = strdup(cmd_output(get_option));
+		} else {
+			orig_color = "";
+		}
 		if (*orig_option == '\0') {
 			orig_option = strdup("stretched");
 		}

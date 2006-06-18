@@ -296,7 +296,10 @@ int check_httpdir(void) {
 				
 				p = strtok(path, ":");
 				while(p) {
-					free(prog);
+					if (prog) {
+						free(prog);
+						prog = NULL;
+					}
 					len = strlen(p) + 1 + strlen(base) + 1;
 					prog = (char *) malloc(len);
 					snprintf(prog, len, "%s/%s", p, base);
@@ -314,6 +317,7 @@ int check_httpdir(void) {
 		 *                    12345678901234567
 		 * /path/to/bin/../share/x11vnc/classes/ssl
 		 *                    123456789012345678901
+		 *                                        21
 		 */
 		if ((q = strrchr(prog, '/')) == NULL) {
 			rfbLog("check_httpdir: bad program path: %s\n", prog);
@@ -648,13 +652,25 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			/* comma separated batch mode */
 			char *s, *q, *res;
 			char tmp[512];
-			strcpy(buf, "");
+			char **pieces;
+			int k = 0, n = 0;
+
+			pieces = (char **) malloc(strlen(cmd) * sizeof(char *));
 			s = strdup(cmd + strlen("qry="));
 			q = strtok(s, ","); 
+
 			while (q) {
 				strcpy(tmp, "qry=");
 				strncat(tmp, q, 500);
-				res = process_remote_cmd(tmp, 1);
+				pieces[n] = strdup(tmp);
+				n++;
+				q = strtok(NULL, ",");
+			}
+			free(s);
+
+			strcpy(buf, "");
+			for (k=0; k<n; k++) {
+				res = process_remote_cmd(pieces[k], 1);
 				if (res && strlen(buf)+strlen(res)
 				    >= X11VNC_REMOTE_MAX - 1) {
 					rfbLog("overflow in process_remote_cmd:"
@@ -666,12 +682,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 					strcat(buf, res);
 					free(res);
 				}
-				q = strtok(NULL, ",");
-				if (q) {
+				if (k < n - 1) {
 					strcat(buf, ",");
 				}
 			}
-			free(s);
+			for (k=0; k<n; k++) {
+				free(pieces[k]);
+			}
+			free(pieces);
 			goto qry;
 		}
 		p += strlen("qry=");
@@ -781,7 +799,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (sscanf(p, "%d", &delay) == 1)  {
 			rfbLog("damaging client fb's for %d secs "
 			    "(by not marking rects.)\n", delay);
-			damage_time = time(0);
+			damage_time = time(NULL);
 			damage_delay = delay;
 		}
 
@@ -3028,6 +3046,47 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (doit) {
 			initialize_allowed_input();
 		}
+	} else if (!strcmp(p, "grabkbd")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, grab_kbd);
+			goto qry;
+		}
+		grab_kbd = 1;
+		rfbLog("enabled grab_kbd\n");
+	} else if (!strcmp(p, "nograbkbd")) {
+		int orig = grab_kbd;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !grab_kbd);
+			goto qry;
+		}
+		grab_kbd = 0;
+		if (orig && dpy) {
+			X_LOCK;
+			XUngrabKeyboard(dpy, CurrentTime);
+			X_UNLOCK;
+		}
+		rfbLog("disabled grab_kbd\n");
+	} else if (!strcmp(p, "grabptr")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, grab_ptr);
+			goto qry;
+		}
+		grab_ptr = 1;
+		rfbLog("enabled grab_ptr\n");
+	} else if (!strcmp(p, "nograbptr")) {
+		int orig = grab_ptr;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !grab_ptr);
+			goto qry;
+		}
+		grab_ptr = 0;
+		if (orig && dpy) {
+			X_LOCK;
+			XUngrabPointer(dpy, CurrentTime);
+			X_UNLOCK;
+		}
+		rfbLog("disabled grab_ptr\n");
+
 	} else if (strstr(p, "client_input") == p) {
 		NOTAPP
 		COLON_CHECK("client_input:")

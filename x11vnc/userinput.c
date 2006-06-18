@@ -2807,7 +2807,7 @@ static int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy
 	 * it for now by CopyRect-ing the *whole* on-screen 
 	 * rectangle (whether obscured or not!)
 	 */
-	if (time(0) > dt_bad_check + 5) {
+	if (time(NULL) > dt_bad_check + 5) {
 		char *dt = guess_desktop();
 		if (!strcmp(dt, "kde")) {
 			dt_bad = 1;
@@ -2816,7 +2816,7 @@ static int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy
 		} else {
 			dt_bad = 0;
 		}
-		dt_bad_check = time(0);
+		dt_bad_check = time(NULL);
 	}
 
 	if (clipshift) {
@@ -3746,7 +3746,7 @@ if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
 			 * save the stack list, perhaps the user has
 			 * paused with button down.
 			 */
-			last_save_stacklist = time(0);
+			last_save_stacklist = time(NULL);
 		} else {
 			stack_list_num = 0;
 		}
@@ -4126,7 +4126,7 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 			sscanf(p, "%lf,%lf,%lf,%lf", &dt_cut, &Tfac_r, &Tfac_v, &Tfac_n);
 		}
 		first = 0;
-		ssec = time(0);
+		ssec = time(NULL);
 
 		if (dtr) {}	/* unused vars warning: */
 	}

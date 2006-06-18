@@ -1262,7 +1262,7 @@ static int get_xfixes_cursor(int init) {
 			oldest++;
 		}
 		oldtime = curs_times[oldest];
-		now = time(0);
+		now = time(NULL);
 		for (i = CURS_DYN_MIN; i <= CURS_DYN_MAX; i++) {
 			if (screen && screen->cursor == cursors[i]->rfb) {
 				;

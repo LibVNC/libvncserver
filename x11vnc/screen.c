@@ -752,7 +752,7 @@ void check_padded_fb(void) {
 	}
 	if (unixpw_in_progress) return;
 
-	if (time(0) > pad_geometry_time+1 && all_clients_initialized()) {
+	if (time(NULL) > pad_geometry_time+1 && all_clients_initialized()) {
 		remove_fake_fb();
 	}
 }
@@ -776,7 +776,7 @@ void install_padded_fb(char *geom) {
 		return;
 	}
 	install_fake_fb(w, h, bpp);
-	pad_geometry_time = time(0);
+	pad_geometry_time = time(NULL);
 }
 
 static void initialize_snap_fb(void) {
@@ -885,7 +885,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		set_child_info();
 		q += strlen("setup:");
 		/* rawfb-setup */
-		if (no_external_cmds) {
+		if (no_external_cmds || !cmd_ok("rawfb-setup")) {
 			rfbLogEnable(1);
 			rfbLog("cannot run external commands in -nocmds "
 			    "mode:\n");
@@ -1354,12 +1354,12 @@ static void initialize_clipshift(void) {
 
 static int wait_until_mapped(Window win) {
 	int ms = 50, waittime = 30;
-	time_t start = time(0);
+	time_t start = time(NULL);
 	XWindowAttributes attr;
 
 	while (1) {
 		if (! valid_window(win, NULL, 0)) {
-			if (time(0) > start + waittime) {
+			if (time(NULL) > start + waittime) {
 				break;
 			}
 			usleep(ms * 1000);
@@ -1840,7 +1840,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	fb_depth = (int) fb->depth;
 
 	rfbLog("initialize_screen: fb_depth/fb_bpp/fb_Bpl %d/%d/%d\n", fb_depth,
-	    fb_depth, fb_Bpl);
+	    fb_bpp, fb_Bpl);
 
 	main_bytes_per_line = fb->bytes_per_line;
 

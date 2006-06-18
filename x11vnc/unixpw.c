@@ -70,6 +70,7 @@ rfbClientPtr unixpw_client = NULL;
 int keep_unixpw = 0;
 char *keep_unixpw_user = NULL;
 char *keep_unixpw_pass = NULL;
+char *keep_unixpw_opts = NULL;
 
 static int in_login = 0, in_passwd = 0, tries = 0;
 static int char_row = 0, char_col = 0;
@@ -398,7 +399,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 		}
 	}
 	/* unixpw */
-	if (no_external_cmds) {
+	if (no_external_cmds || !cmd_ok("unixpw")) {
 		rfbLog("su_verify: cannot run external commands.\n");	
 		clean_up_exit(1);
 	}
@@ -789,9 +790,17 @@ static void unixpw_verify(char *user, char *pass) {
 	int x, y;
 	char li[] = "Login incorrect";
 	char log[] = "login: ";
+	char *colon = NULL;
 
 if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "********");
 	rfbLog("unixpw_verify: %s\n", user);
+
+	colon = strchr(user, ':');
+	if (colon) {
+		*colon = '\0';
+		rfbLog("unixpw_verify: colon: %s\n", user);
+	}
+
 
 	if (unixpw_nis) {
 		if (crypt_verify(user, pass)) {
@@ -799,40 +808,36 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 			if (keep_unixpw) {
 				keep_unixpw_user = strdup(user);
 				keep_unixpw_pass = strdup(pass);
+				if (colon) {
+					keep_unixpw_opts = strdup(colon+1);
+				} else {
+					keep_unixpw_opts = strdup("");
+				}
 			}
+			if (colon) *colon = ':';
 			return;
 		} else {
 			rfbLog("unixpw_verify: crypt_verify login for %s failed.\n", user);
 			usleep(3000*1000);
 		}
-	} else if (0) {
-		char buf[8192];
-		int n = 8000;
-		int res = su_verify(user, pass, "/home/runge/wallycom yegg 33", buf, &n);
-
-		fprintf(stderr, "su_verify ret: n=%d ", n);
-		write(2, buf, n);
-
-		if (res) {
-			unixpw_accept(user);
-			if (keep_unixpw) {
-				keep_unixpw_user = strdup(user);
-				keep_unixpw_pass = strdup(pass);
-			}
-			return;
-		}
-		rfbLog("unixpw_verify: su_verify login for %s failed.\n", user);
 	} else {
 		if (su_verify(user, pass, NULL, NULL, NULL)) {
 			unixpw_accept(user);
 			if (keep_unixpw) {
 				keep_unixpw_user = strdup(user);
 				keep_unixpw_pass = strdup(pass);
+				if (colon) {
+					keep_unixpw_opts = strdup(colon+1);
+				} else {
+					keep_unixpw_opts = strdup("");
+				}
 			}
+			if (colon) *colon = ':';
 			return;
 		}
 		rfbLog("unixpw_verify: su_verify login for %s failed.\n", user);
 	}
+	if (colon) *colon = ':';
 
 	if (tries < 2) {
 		char_row++;
@@ -856,7 +861,7 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 			mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
 		}
 
-		unixpw_last_try_time = time(0);
+		unixpw_last_try_time = time(NULL);
 		unixpw_keystroke(0, 0, 2);
 		tries++;
 	} else {
@@ -901,6 +906,10 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 		if (keep_unixpw_pass) {
 			free(keep_unixpw_pass);
 			keep_unixpw_pass = NULL;
+		}
+		if (keep_unixpw_opts) {
+			free(keep_unixpw_opts);
+			keep_unixpw_opts = NULL;
 		}
 		return;
 	}
@@ -988,7 +997,12 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 			return;
 		}
 
+#if 0
 		user[u_cnt++] = keystr[0];
+#else
+		user[u_cnt++] = (char) keysym;
+		keystr[0] = (char) keysym;
+#endif
 
 		x = text_x();
 		y = text_y();

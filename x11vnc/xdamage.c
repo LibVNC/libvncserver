@@ -369,7 +369,7 @@ if (0)	XEventsQueued(dpy, QueuedAfterFlush);
 		    "/direct %d/%d/%d/%d\n", call, dt, tm - x11vnc_start, ecount,
 		    dcount, ccount, xdamage_direct_count); 
 	}
-	now = time(0);
+	now = time(NULL);
 	if (! last_rpt) {
 		last_rpt = now;
 	}
