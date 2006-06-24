@@ -12,6 +12,8 @@ extern char *crypt(const char*, const char *);
 #include "scan.h"
 #include "cleanup.h"
 #include "xinerama.h"
+#include "connections.h"
+#include "user.h"
 #include <rfb/default8x16.h>
 
 #if LIBVNCSERVER_HAVE_FORK
@@ -365,7 +367,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 #ifndef UNIXPW_SU
 	return 0;
 #else
-	int i, j, status, fd = -1, sfd, tfd, drain_size = 4096, rsize;
+	int i, j, status, fd = -1, sfd, tfd, drain_size = 4096, rsize = 0;
 	int slow_pw = 1;
 	char *slave, *bin_true = NULL, *bin_su = NULL;
 	pid_t pid, pidw;

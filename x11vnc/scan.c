@@ -240,7 +240,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 			}
 			return 0;
 		}
-		if (db) fprintf(stderr, "shm_create simple %d %d\t%p %s\n", w, h, xim, name);
+		if (db) fprintf(stderr, "shm_create simple %d %d\t%p %s\n", w, h, (void *)xim, name);
 		xim->data = (char *) malloc(xim->bytes_per_line * xim->height);
 		if (xim->data == NULL) {
 			rfbErr("XCreateImage(%s) data malloc failed.\n", name);
@@ -349,7 +349,7 @@ void shm_delete(XShmSegmentInfo *shm) {
 void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 	int db = 0;
 
-	if (db) fprintf(stderr, "shm_clean: called:  %p\n", xim);
+	if (db) fprintf(stderr, "shm_clean: called:  %p\n", (void *)xim);
 	X_LOCK;
 #if LIBVNCSERVER_HAVE_XSHM
 	if (shm != NULL && shm->shmid != -1 && dpy) {
@@ -360,11 +360,11 @@ void shm_clean(XShmSegmentInfo *shm, XImage *xim) {
 	if (xim != NULL) {
 		if (! raw_fb_back_to_X) {	/* raw_fb hack */
 			if (xim->bitmap_unit != -1) {
-				if (db) fprintf(stderr, "shm_clean: XDestroyImage  %p\n", xim);
+				if (db) fprintf(stderr, "shm_clean: XDestroyImage  %p\n", (void *)xim);
 				XDestroyImage(xim);
 			} else {
 				if (xim->data) {
-					if (db) fprintf(stderr, "shm_clean: free xim->data  %p %p\n", xim, xim->data);
+					if (db) fprintf(stderr, "shm_clean: free xim->data  %p %p\n", (void *)xim, (void *)(xim->data));
 					free(xim->data);
 					xim->data = NULL;
 				}

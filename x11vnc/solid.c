@@ -3,6 +3,7 @@
 #include "x11vnc.h"
 #include "win_utils.h"
 #include "xwrappers.h"
+#include "connections.h"
 
 char *guess_desktop(void);
 void solid_bg(int restore);

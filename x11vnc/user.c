@@ -8,6 +8,11 @@
 #include "unixpw.h"
 #include "sslhelper.h"
 #include "xwrappers.h"
+#include "connections.h"
+#include "inet.h"
+#include "keyboard.h"
+#include "cursor.h"
+#include "remote.h"
 
 void check_switched_user(void);
 void lurk_loop(char *str);
@@ -1128,7 +1133,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 	XImage* fb_image;
 	int w = 640, h = 480, b = 32;
 	int w0, h0, i, chg_raw_fb = 0;
-	char *str, *q, *p, *cmd = NULL;
+	char *str, *q, *cmd = NULL;
 	int db = 0;
 	char tmp[] = "/tmp/x11vnc-find_display.XXXXXX";
 	int tmp_fd = -1, dt = 0;

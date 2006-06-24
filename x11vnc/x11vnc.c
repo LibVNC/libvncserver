@@ -143,6 +143,7 @@
 #include "sslhelper.h"
 #include "selection.h"
 #include "pm.h"
+#include "solid.h"
 
 /*
  * main routine for the x11vnc program
@@ -1470,7 +1471,7 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			use_dpy = strdup(argv[++i]);
 			if (strstr(use_dpy, "WAIT")) {
-				extern find_display[];
+				extern char find_display[];
 				if (strstr(use_dpy, "cmd=FINDDISPLAY-print")) {
 					fprintf(stdout, "%s", find_display);
 					exit(0);

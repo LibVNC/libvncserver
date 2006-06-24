@@ -11,6 +11,7 @@
 #include "unixpw.h"
 #include "sslcmds.h"
 #include "sslhelper.h"
+#include "connections.h"
 
 /*
  * Exiting and error handling routines

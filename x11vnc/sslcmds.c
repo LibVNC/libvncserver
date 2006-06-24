@@ -5,6 +5,7 @@
 #include "cleanup.h"
 #include "sslhelper.h"
 #include "ssltools.h"
+#include "connections.h"
 
 #if LIBVNCSERVER_HAVE_FORK
 #if LIBVNCSERVER_HAVE_SYS_WAIT_H
@@ -671,7 +672,8 @@ void sslEncKey(char *path, int mode) {
 				incert = 1;
 			}
 			if (incert) {
-				if (strlen(cert)+strlen(line) < 2*sbuf.st_size) {
+				if (strlen(cert)+strlen(line) <
+				    2 * (size_t) sbuf.st_size) {
 					strcat(cert, line);
 				}
 			}

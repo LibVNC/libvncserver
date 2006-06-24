@@ -5,6 +5,7 @@
 #include "scan.h"
 #include "xinerama.h"
 #include "screen.h"
+#include "connections.h"
 
 #if LIBVNCSERVER_HAVE_LINUX_VIDEODEV_H
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H

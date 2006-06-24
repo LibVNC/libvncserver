@@ -4,6 +4,7 @@
 #include "xrecord.h"
 #include "keyboard.h"
 #include "xevents.h"
+#include "connections.h"
 
 int xshm_present = 0;
 int xtest_present = 0;
@@ -972,7 +973,7 @@ Display *XOpenDisplay_wr(char *display_name) {
 	}
 
 	d = XOpenDisplay(display_name);
-	if (db) fprintf(stderr, "XOpenDisplay_wr: %s  0x%x\n", display_name, d);
+	if (db) fprintf(stderr, "XOpenDisplay_wr: %s  %p\n", display_name, (void *)d);
 
 	xauth_raw(0);
 
@@ -981,7 +982,7 @@ Display *XOpenDisplay_wr(char *display_name) {
 
 int XCloseDisplay_wr(Display *display) {
 	int db = 0;
-	if (db) fprintf(stderr, "XCloseDisplay_wr: 0x%x\n", display);
+	if (db) fprintf(stderr, "XCloseDisplay_wr: %p\n", (void *)display);
 	return XCloseDisplay(display);
 }
 

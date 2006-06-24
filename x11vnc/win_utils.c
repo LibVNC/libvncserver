@@ -5,6 +5,7 @@
 #include "winattr_t.h"
 #include "cleanup.h"
 #include "xwrappers.h"
+#include "connections.h"
 
 winattr_t *stack_list = NULL;
 int stack_list_len = 0;

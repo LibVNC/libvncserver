@@ -2,6 +2,7 @@
 
 #include "x11vnc.h"
 #include "cleanup.h"
+#include "win_utils.h"
 
 struct timeval _mysleep;
 

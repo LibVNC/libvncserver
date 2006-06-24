@@ -34,6 +34,7 @@ void close_all_clients(void);
 void close_clients(char *str);
 void set_client_input(char *str);
 void set_child_info(void);
+int cmd_ok(char *cmd);
 void client_gone(rfbClientPtr client);
 void reverse_connect(char *str);
 void set_vnc_connect_prop(char *str);

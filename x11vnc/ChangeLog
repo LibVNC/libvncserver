@@ -1,3 +1,6 @@
+2006-06-23  Karl Runge <runge@karlrunge.com>
+	* x11vnc: misc cleanup.
+
 2006-06-18  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -grabkbd, -grabptr, -env options.  under -unixpw +
 	  WAIT let user add some options after his username (e.g. runge:3/4)

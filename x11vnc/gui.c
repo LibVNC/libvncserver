@@ -6,6 +6,7 @@
 #include "remote.h"
 #include "cleanup.h"
 #include "xwrappers.h"
+#include "connections.h"
 
 #include "tkx11vnc.h"
 
