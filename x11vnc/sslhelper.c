@@ -1170,7 +1170,11 @@ static void csock_timeout (int sig) {
 static int wait_conn(int sock) {
 	int conn;
 	struct sockaddr_in addr;
+#ifdef __hpux
+	int addrlen = sizeof(addr);
+#else
 	socklen_t addrlen = sizeof(addr);
+#endif
 
 	signal(SIGALRM, csock_timeout);
 	csock_timeout_sock = sock;
@@ -1262,7 +1266,11 @@ void accept_openssl(int mode) {
 	int sock = -1, listen = -1, cport, csock, vsock;	
 	int status, n, i, db = 0;
 	struct sockaddr_in addr;
+#ifdef __hpux
+	int addrlen = sizeof(addr);
+#else
 	socklen_t addrlen = sizeof(addr);
+#endif
 	rfbClientPtr client;
 	pid_t pid;
 	char uniq[] = "__evilrats__";

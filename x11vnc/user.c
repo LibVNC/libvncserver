@@ -244,7 +244,7 @@ static void user2uid(char *user, uid_t *uid, char **name, char **home) {
 
 	q = user;
 	while (*q) {
-		if (! isdigit(*q++)) {
+		if (! isdigit((unsigned char) (*q++))) {
 			numerical = 0;
 			break;
 		}
@@ -810,7 +810,7 @@ int read_passwds(char *passfile) {
 		}
 		p = line;
 		while (*p != '\0') {
-			if (! isspace(*p)) {
+			if (! isspace((unsigned char) (*p))) {
 				blank = 0;
 				break;
 			}

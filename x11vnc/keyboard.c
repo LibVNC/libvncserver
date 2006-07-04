@@ -579,7 +579,7 @@ static void add_dead_keysyms(char *str) {
 	p = str;
 
 	while (*p != '\0') {
-		if (isspace(*p)) {
+		if (isspace((unsigned char) (*p))) {
 			*p = '\0';
 		}
 		p++;

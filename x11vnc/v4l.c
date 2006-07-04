@@ -1471,7 +1471,7 @@ static void init_freqtab(char *file) {
 				if (*q == ']') {
 					break;
 				}
-				if (! isdigit(*q)) {
+				if (! isdigit((unsigned char) (*q))) {
 					if (0) fprintf(stderr, "extra: %s\n", p);
 					extra++;
 					ok = 0;
@@ -1508,7 +1508,7 @@ static void init_freqtab(char *file) {
 				if (*q == ']') {
 					break;
 				}
-				if (! isdigit(*q)) {
+				if (! isdigit((unsigned char) (*q))) {
 					extra++;
 					currn = maxn + extra;
 					ok = 0;

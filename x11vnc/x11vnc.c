@@ -754,7 +754,7 @@ static void check_rcfile(int argc, char **argv) {
 						*(q-1) = ' ';
 						break;
 					}
-					while (isspace(*q)) {
+					while (isspace((unsigned char) (*q))) {
 						*q = '\0';
 						if (q == p) {
 							break;
@@ -770,7 +770,7 @@ static void check_rcfile(int argc, char **argv) {
 				if (*q == '\0') {
 					q--;
 				}
-				while (isspace(*q)) {
+				while (isspace((unsigned char) (*q))) {
 					*q = '\0';
 					if (q == p) {
 						break;
@@ -793,7 +793,7 @@ static void check_rcfile(int argc, char **argv) {
 			q = buf;
 			while (*q) {
 				i++;
-				if (*q == '\n' || isspace(*q)) {
+				if (*q == '\n' || isspace((unsigned char) (*q))) {
 					break;
 				}
 				q++;
@@ -1916,7 +1916,7 @@ int main(int argc, char* argv[]) {
 				if (*s == '-') {
 					s++;
 				}
-				if (isdigit(*s)) {
+				if (isdigit((unsigned char) (*s))) {
 					no_repeat_countdown = atoi(argv[++i]);
 				}
 			}

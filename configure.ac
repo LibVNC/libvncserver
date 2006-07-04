@@ -445,6 +445,13 @@ AC_FUNC_VPRINTF
 AC_FUNC_FORK
 AC_CHECK_LIB(nsl,gethostbyname)
 AC_CHECK_LIB(socket,socket)
+
+uname_s=`(uname -s) 2>/dev/null`
+if test "x$uname_s" = "xHP-UX"; then
+	# need -lsec for getspnam()
+	LDFLAGS="$LDFLAGS -lsec"
+fi
+
 AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr setsid setpgrp getpwuid getpwnam getspnam getuid geteuid setuid setgid seteuid setegid waitpid setutxent grantpt])
 
 # check, if shmget is in cygipc.a

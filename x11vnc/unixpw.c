@@ -358,7 +358,7 @@ int crypt_verify(char *user, char *pass) {
 
 	if (db > 1) fprintf(stderr, "realpw='%s'\n", realpw);
 
-	if (strlen(realpw) < 10) {
+	if (strlen(realpw) < 12) {
 		/* e.g. "x", try getspnam(), sometimes root for inetd, etc */
 #if LIBVNCSERVER_HAVE_GETSPNAM
 		struct spwd *sp = getspnam(user);
@@ -680,11 +680,11 @@ if (db) fprintf(stderr, "%s", buf);
 		}
 
 		if (n == 1) {
-			if (isspace(buf[0])) {
+			if (isspace((unsigned char) buf[0])) {
 				i--;
 				continue;
 			}
-			instr[j++] = tolower(buf[0]);
+			instr[j++] = tolower((unsigned char)buf[0]);
 		}
 		if (n <= 0 || strstr(pstr, instr) != pstr) {
 if (db) {

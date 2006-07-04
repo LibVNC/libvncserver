@@ -19,6 +19,10 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/utsname.h>
+#ifdef __hpux
+/* to avoid select() compiler warning */
+#include <sys/time.h>
+#endif
 #include <time.h>
 #include <errno.h>
 

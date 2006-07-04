@@ -103,7 +103,7 @@ void lowercase(char *str) {
 	}
 	p = str;
 	while (*p != '\0') {
-		*p = tolower(*p);
+		*p = tolower((unsigned char) (*p));
 		p++;
 	}
 }
@@ -115,7 +115,7 @@ void uppercase(char *str) {
 	}
 	p = str;
 	while (*p != '\0') {
-		*p = toupper(*p);
+		*p = toupper((unsigned char) (*p));
 		p++;
 	}
 }
@@ -123,7 +123,7 @@ void uppercase(char *str) {
 char *lblanks(char *str) {
 	char *p = str;
 	while (*p != '\0') {
-		if (! isspace(*p)) {
+		if (! isspace((unsigned char) (*p))) {
 			break;
 		}
 		p++;
