@@ -71,6 +71,7 @@ static void set_db(void);
 static void unixpw_verify(char *user, char *pass);
 
 int unixpw_in_progress = 0;
+int unixpw_denied = 0;
 int unixpw_in_rfbPE = 0;
 int unixpw_login_viewonly = 0;
 time_t unixpw_last_try_time = 0;
@@ -929,6 +930,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 	static char user[100], pass[100];
 	static int  u_cnt = 0, p_cnt = 0, first = 1;
 	char keystr[100];
+	char *str;
 
 	if (first) {
 		set_db();
@@ -938,6 +940,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 	if (init) {
 		in_login = 1;
 		in_passwd = 0;
+		unixpw_denied = 0;
 		if (init == 1) {
 			tries = 0;
 		}
@@ -963,9 +966,22 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 		return;
 	}
 
+	if (unixpw_denied) {
+		rfbLog("unixpw_keystroke: unixpw_denied state: 0x%x\n", (int) keysym);
+		return;
+	}
+	if (keysym <= 0) {
+		rfbLog("unixpw_keystroke: bad keysym1: 0x%x\n", (int) keysym);
+		return;
+	}
 	X_LOCK;
-	sprintf(keystr, "%s", XKeysymToString(keysym));
+	str = XKeysymToString(keysym);
 	X_UNLOCK;
+	if (! str) {
+		rfbLog("unixpw_keystroke: bad keysym2: 0x%x\n", (int) keysym);
+		return;
+	}
+	snprintf(keystr, 100, "%s", str);
 
 	if (db > 2) {
 		fprintf(stderr, "%s / %s  0x%x %s\n", in_login ? "login":"pass ",
@@ -1247,26 +1263,33 @@ void unixpw_deny(void) {
 	int x, y, i;
 	char pd[] = "Permission denied.";
 
-	char_row += 2;
-	char_col = 0;
-	x = char_x + char_col * char_w;
-	y = char_y + char_row * char_h;
+	rfbLog("unixpw_deny: %d, %d\n", unixpw_denied, unixpw_in_progress);
+	if (! unixpw_denied) {
+		unixpw_denied = 1;
 
-	rfbDrawString(screen, &default8x16Font, x, y, pd, white());
-	if (scaling) {
-		mark_rect_as_modified(0, 0, dpy_x, dpy_y, 1);
-	} else {
-		mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
+		char_row += 2;
+		char_col = 0;
+		x = char_x + char_col * char_w;
+		y = char_y + char_row * char_h;
+
+		rfbDrawString(screen, &default8x16Font, x, y, pd, white());
+		if (scaling) {
+			mark_rect_as_modified(0, 0, dpy_x, dpy_y, 1);
+		} else {
+			mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
+		}
+
+		for (i=0; i<5; i++) {
+			rfbPE(-1);
+			usleep(500 * 1000);
+		}
 	}
 
-	for (i=0; i<5; i++) {
+	if (unixpw_client) {
+		rfbCloseClient(unixpw_client);
+		rfbClientConnectionGone(unixpw_client);
 		rfbPE(-1);
-		usleep(500 * 1000);
 	}
-
-	rfbCloseClient(unixpw_client);
-	rfbClientConnectionGone(unixpw_client);
-	rfbPE(-1);
 
 	unixpw_in_progress = 0;
 	unixpw_client = NULL;
