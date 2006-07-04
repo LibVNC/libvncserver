@@ -547,9 +547,9 @@ static void upup_downdown_warning(KeyCode key, Bool down) {
 	RAWFB_RET_VOID
 
 	if ((down ? 1:0) == keycode_state[(int) key]) {
+		char *str = XKeysymToString(XKeycodeToKeysym(dpy, key, 0));
 		rfbLog("XTestFakeKeyEvent: keycode=0x%x \"%s\" is *already* "
-		    "%s\n", key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
-		    down ? "down":"up");
+		    "%s\n", key, str ? str : "null", down ? "down":"up");
 	}
 }
 
@@ -589,9 +589,9 @@ void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 	RAWFB_RET_VOID
 
 	if (debug_keyboard) {
+		char *str = XKeysymToString(XKeycodeToKeysym(dpy, key, 0));
 		rfbLog("XTestFakeKeyEvent(dpy, keycode=0x%x \"%s\", %s)\n",
-		    key, XKeysymToString(XKeycodeToKeysym(dpy, key, 0)),
-		    down ? "down":"up");
+		    key, str ? str : "null", down ? "down":"up");
 	}
 	if (first) { 
 		init_track_keycode_state();

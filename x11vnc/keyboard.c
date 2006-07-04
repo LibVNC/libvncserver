@@ -104,6 +104,7 @@ void clear_modifiers(int init) {
 
 		for (i = minkey; i <= maxkey; i++) {
 		    for (j = 0; j < syms_per_keycode; j++) {
+			char *str;
 			keysym = keymap[ (i - minkey) * syms_per_keycode + j ];
 			if (keysym == NoSymbol || ! ismodkey(keysym)) {
 				continue;
@@ -114,7 +115,9 @@ void clear_modifiers(int init) {
 			}
 			keycodes[kcount] = keycode;
 			keysyms[kcount]  = keysym;
-			keystrs[kcount]  = strdup(XKeysymToString(keysym));
+			str = XKeysymToString(keysym);
+			if (! str) str = "null";
+			keystrs[kcount]  = strdup(str);
 			kcount++;
 		    }
 		}
@@ -920,7 +923,7 @@ void switch_to_xkb_if_better(void) {
 					char *str = XKeysymToString(keysym);
 					fprintf(stderr, "- high keysym mapping"
 					    ": at %3d j=%d "
-					    "'%s'\n", i, j, str ? str:"null");
+					    "'%s'\n", i, j, str ? str : "null");
 				}
 			    }
 			    continue;
@@ -929,7 +932,7 @@ void switch_to_xkb_if_better(void) {
 				if (debug_keyboard > 1) {
 					char *str = XKeysymToString(must);
 					fprintf(stderr, "- at %3d j=%d found "
-					    "'%s'\n", i, j, str ? str:"null");
+					    "'%s'\n", i, j, str ? str : "null");
 				}
 				/* n.b. do not break, see syms_gt_4 above. */
 				gotit = 1;
@@ -1348,14 +1351,16 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 			}
 
 			if (debug_keyboard > 1) {
+				char *str;
 				fprintf(stderr, "  %03d  G%d L%d  mod=%s ",
 				    kc, grp+1, lvl+1, bitprint(ms, 8));
 				fprintf(stderr, "state=%s ",
 				    bitprint(xkbstate[kc][grp][lvl], 8));
 				fprintf(stderr, "ignore=%s ",
 				    bitprint(xkbignore[kc][grp][lvl], 8));
+				str = XKeysymToString(ks);
 				fprintf(stderr, " ks=0x%08lx \"%s\"\n",
-				    ks, XKeysymToString(ks));
+				    ks, str ? str : "null");
 			}
 		}
 	    }
@@ -1480,11 +1485,15 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			state = xkbstate[kc][grp][lvl];
 
 			if (debug_keyboard > 1) {
+				char *s1, *s2;
+				s1 = XKeysymToString(XKeycodeToKeysym(dpy,
+				    kc, 0));
+				if (! s1) s1 = "null";
+				s2 = XKeysymToString(keysym);
+				if (! s2) s2 = "null";
 				fprintf(stderr, "  got match kc=%03d=0x%02x G%d"
 				    " L%d  ks=0x%x \"%s\"  (basesym: \"%s\")\n",
-				    kc, kc, grp+1, lvl+1, keysym,
-				    XKeysymToString(keysym), XKeysymToString(
-				    XKeycodeToKeysym(dpy, kc, 0)));
+				    kc, kc, grp+1, lvl+1, keysym, s2, s1);
 				fprintf(stderr, "    need state: %s\n",
 				    bitprint(state, 8));
 				fprintf(stderr, "    ignorable : %s\n",
@@ -2383,8 +2392,9 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	}
 
 	if (debug_keyboard) {
+		char *str = XKeysymToString(keysym);
 		rfbLog("modifier_tweak_keyboard: KeySym 0x%x \"%s\" -> "
-		    "KeyCode 0x%x%s\n", (int) keysym, XKeysymToString(keysym),
+		    "KeyCode 0x%x%s\n", (int) keysym, str ? str : "null",
 		    (int) k, k ? "" : " *ignored*");
 	}
 	if ( k != NoSymbol ) {
@@ -2501,7 +2511,7 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	X_UNLOCK;
 
 	fprintf(pipeinput_fh, "Keysym %d %d %u %s %s\n", uid, down,
-	    keysym, name, down ? "KeyPress" : "KeyRelease");
+	    keysym, name ? name : "null", down ? "KeyPress" : "KeyRelease");
 
 	fflush(pipeinput_fh);
 	check_pipeinput();
@@ -2851,13 +2861,16 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 				isbutton = remap->isbutton;
 				if (debug_keyboard) {
 					X_LOCK;
+					char *str1, *str2;
+					str1 = XKeysymToString(remap->before);
+					str2 = XKeysymToString(remap->after);
 					rfbLog("keyboard(): remapping keysym: "
 					    "0x%x \"%s\" -> 0x%x \"%s\"\n",
 					    (int) remap->before,
-					    XKeysymToString(remap->before),
+					    str1 ? str1 : "null",
 					    (int) remap->after,
 					    remap->isbutton ? "button" :
-					    XKeysymToString(remap->after));
+					    str2 ? str2 : "null");
 					X_UNLOCK;
 				}
 				break;

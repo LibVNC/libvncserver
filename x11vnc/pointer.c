@@ -121,6 +121,7 @@ static void buttonparse(int from, char **s) {
 				/*
 				 * XXX may not work with -modtweak or -xkb
 				 */
+				char *str;
 				X_LOCK;
 				kcode = XKeysymToKeycode(dpy, ksym);
 
@@ -143,9 +144,10 @@ static void buttonparse(int from, char **s) {
 						modisdown[kcode] = 1;
 					}
 				}
+				str = XKeysymToString(ksym);
 				rfbLog("   event %d: keysym %s (0x%x) -> "
 				    "keycode 0x%x down=%d up=%d\n", n+1,
-				    XKeysymToString(ksym), ksym, kcode,
+				    str ? str : "null", ksym, kcode,
 				    pointer_map[from][n].down,
 				    pointer_map[from][n].up);
 				X_UNLOCK;
@@ -364,13 +366,13 @@ void do_button_mask_change(int mask, int button) {
 				continue; 
 			}
 			if (debug_pointer && dpy) {
+				char *str = XKeysymToString(XKeycodeToKeysym(
+                                    dpy, key, 0));
 				rfbLog("pointer(): sending button %d "
 				    "down as keycode 0x%x (event %d)\n",
 				    i+1, key, k+1);
-				rfbLog("           down=%d up=%d "
-				    "keysym: %s\n", down, up,
-				    XKeysymToString(XKeycodeToKeysym(
-				    dpy, key, 0)));
+				rfbLog("           down=%d up=%d keysym: "
+				    "%s\n", down, up, str ? str : "null");
 			}
 			if (down) {
 				XTestFakeKeyEvent_wr(dpy, key, True,
