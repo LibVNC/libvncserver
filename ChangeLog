@@ -1,3 +1,6 @@
+2006-07-04  Karl Runge <runge@karlrunge.com>
+	* configure.ac: add getspnam.
+
 2006-06-08  Karl Runge <runge@karlrunge.com>
 	* prepare_x11vnc_dist.sh: to 0.8.2
 

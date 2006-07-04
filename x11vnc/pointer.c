@@ -617,7 +617,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		last_x = x;
 		last_y = y;
 	}
-	if (mask >= 0 && unixpw && unixpw_in_progress) {
+	if (unixpw && unixpw_in_progress) {
 		return;
 	}
 

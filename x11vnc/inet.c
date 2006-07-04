@@ -1,6 +1,8 @@
 /* -- inet.c -- */
 
 #include "x11vnc.h"
+#include "unixpw.h"
+#include "sslhelper.h"
 
 /*
  * Simple utility to map host name to dotted IP address.  Ignores aliases.
@@ -21,7 +23,6 @@ int have_ssh_env(void);
 
 static int get_port(int sock, int remote);
 static char *get_host(int sock, int remote);
-
 
 char *host2ip(char *host) {
 	struct hostent *hp;
@@ -291,7 +292,11 @@ char *ident_username(rfbClientPtr client) {
 	if (!strcmp(user, "unknown-user") && cd && cd->unixname[0] != '\0') {
 		user = cd->unixname;
 	}
-	newhost = ip2host(client->host);
+	if (unixpw && openssl_last_ip && strstr("UNIX:", user) != user) {
+		newhost = ip2host(openssl_last_ip);
+	} else {
+		newhost = ip2host(client->host);
+	}
 	len = strlen(user) + 1 + strlen(newhost) + 1;
 	str = (char *) malloc(len);
 	sprintf(str, "%s@%s", user, newhost);

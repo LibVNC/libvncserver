@@ -3,6 +3,7 @@
 #include "x11vnc.h"
 #include "cleanup.h"
 #include "win_utils.h"
+#include "unixpw.h"
 
 struct timeval _mysleep;
 
@@ -407,9 +408,14 @@ double rfac(void) {
  */
 #define USEC_MAX 999999		/* libvncsever assumes < 1 second */
 void rfbPE(long usec) {
+	int uip0 = unixpw_in_progress;
 	if (! screen) {
 		return;
 	}
+ 	if (unixpw && unixpw_in_progress && !unixpw_in_rfbPE) {
+		rfbLog("unixpw_in_rfbPE: skipping rfbPE\n");
+ 		return;
+ 	}
 
 	if (usec > USEC_MAX) {
 		usec = USEC_MAX;
@@ -417,18 +423,38 @@ void rfbPE(long usec) {
 	if (! use_threads) {
 		rfbProcessEvents(screen, usec);
 	}
+
+ 	if (unixpw && unixpw_in_progress && !uip0) {
+		if (!unixpw_in_rfbPE) {
+			rfbLog("rfbPE: got new client in non-rfbPE\n");
+			;	/* this is new unixpw client  */
+		}
+ 	}
 }
 
 void rfbCFD(long usec) {
+	int uip0 = unixpw_in_progress;
 	if (! screen) {
 		return;
 	}
+ 	if (unixpw && unixpw_in_progress && !unixpw_in_rfbPE) {
+		rfbLog("unixpw_in_rfbPE: skipping rfbCFD\n");
+ 		return;
+ 	}
 	if (usec > USEC_MAX) {
 		usec = USEC_MAX;
 	}
+
 	if (! use_threads) {
 		rfbCheckFds(screen, usec);
 	}
+
+ 	if (unixpw && unixpw_in_progress && !uip0) {
+		if (!unixpw_in_rfbPE) {
+			rfbLog("rfbCFD: got new client in non-rfbPE\n");
+			;	/* this is new unixpw client  */
+		}
+ 	}
 }
 
 double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,

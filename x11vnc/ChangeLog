@@ -1,3 +1,9 @@
+2006-07-04  Karl Runge <runge@karlrunge.com>
+	* x11vnc: 2nd -accept popup with WAIT, and UNIX: info for unixpw
+	  login.  Use RFB_CLIENT_ON_HOLD for -unixpw. -unixpw white arrow
+	  -license option.  Use getspnam if getpwnam is short.
+	  abbrevs sc=, cm, ck for user:opts.
+
 2006-06-23  Karl Runge <runge@karlrunge.com>
 	* x11vnc: misc cleanup.
 

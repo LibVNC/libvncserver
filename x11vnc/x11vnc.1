@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "June 2006" "x11vnc " "User Commands"
+.TH X11VNC "1" "July 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.2, lastmod: 2006-06-23
+         version: 0.8.2, lastmod: 2006-07-04
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -37,7 +37,7 @@ In brief:
 .PP
 % vncviewer -encodings 'copyrect tight zrle hextile' localhost:0
 .PP
-Also, use of a VNC password (-rfbauth or \fB-passwdfile)\fR is strongly recommend.
+Also, use of a VNC password (-rfbauth or \fB-passwdfile)\fR is strongly recommended.
 .PP
 For additional info see: http://www.karlrunge.com/x11vnc/
 and  http://www.karlrunge.com/x11vnc/#faq
@@ -231,11 +231,11 @@ speedup may be achieved via the option "nogetimage".
 This enables a scheme were XGetImage() is not used
 to retrieve the 8bpp data.  Instead, it assumes that
 the 8bpp data is in bits 25-32 of the 32bit X pixels.
-There is no reason the X server should put the data
-there for our poll requests, but some do and so the
-extra steps to retrieve it can be skipped.  Tested with
-mga driver with XFree86/Xorg.  For the default depth
-8 case this option is ignored.
+There is no requirement that the X server should put
+the data there for our poll requests, but some do and
+so the extra steps to retrieve it can be skipped.
+Tested with mga driver with XFree86/Xorg.  For the
+default depth 8 case this option is ignored.
 .IP
 To adjust how often XGetImage() is used to poll the
 non-default visual regions for changes, use the option
@@ -373,6 +373,11 @@ Also clients that log in viewonly cannot transfer files.
 However, if the remote control mechanism is used to
 change the global or per-client viewonly state the
 filetransfer permissions will NOT change.
+.IP
+Note, to *enable* UltraVNC filetransfer (currently
+disabled by default, this may change...) and to get it
+to work you probably need to supply these libvncserver
+options: "\fB-rfbversion\fR \fI3.6 \fB-permitfiletransfer\fR"\fR
 .PP
 \fB-http\fR
 .IP
@@ -437,7 +442,7 @@ out with the "#" character in the usual way.
 .PP
 \fB-localhost\fR
 .IP
-Same as "\fB-allow\fR \fI127.0.0.1\fR".
+Basically the same as "\fB-allow\fR \fI127.0.0.1\fR".
 .IP
 Note: if you want to restrict which network interface
 x11vnc listens on, see the \fB-listen\fR option below.
@@ -445,11 +450,11 @@ E.g. "\fB-listen\fR \fIlocalhost\fR" or "\fB-listen\fR \fI192.168.3.21\fR".
 As a special case, the option "\fB-localhost\fR" implies
 "\fB-listen\fR \fIlocalhost\fR".
 .IP
-For non-localhost \fB-listen\fR usage, if you use the remote
-control mechanism (-R) to change the \fB-listen\fR interface
-you may need to manually adjust the \fB-allow\fR list (and
-vice versa) to avoid situations where no connections
-(or too many) are allowed.
+A rare case, but for non-localhost \fB-listen\fR usage, if
+you use the remote control mechanism (-R) to change
+the \fB-listen\fR interface you may need to manually adjust
+the \fB-allow\fR list (and vice versa) to avoid situations
+where no connections (or too many) are allowed.
 .PP
 \fB-nolookup\fR
 .IP
@@ -519,7 +524,7 @@ removed after being read.  Perhaps this is useful in
 limiting the readability of the file.  In general,
 the password file should not be readable by untrusted
 users (BTW: neither should the VNC \fB-rfbauth\fR file:
-it is NOT encrypted).
+it is NOT encrypted, only obscured).
 .IP
 If the filename is prefixed with "read:" it will
 periodically be checked for changes and reread.
@@ -661,7 +666,7 @@ The user names in the comma separated [list] can have
 per-user options after a ":", e.g. "fred:opts"
 where "opts" is a "+" separated list of
 "viewonly", "fullaccess", "input=XXXX", or
-"deny", e.g. "karl,fred:viewonly,boss:input=M".
+"deny", e.g. "karl,wally:viewonly,boss:input=M".
 For "input=" it is the K,M,B,C described under \fB-input.\fR
 .IP
 If a user in the list is "*" that means those
@@ -696,8 +701,10 @@ mode to work (only that
 .IR getpwnam (3)
 return the encrypted
 password is required), but it is unlikely it will work
-for any other modern environment.  All of the \fB-unixpw\fR
-options and contraints apply.
+for any other modern environment unless x11vnc is run
+as root (which, btw, is often done when running x11vnc
+from inetd and xdm/gdm/kdm).  All of the \fB-unixpw\fR options
+and contraints apply.
 .PP
 \fB-display\fR \fIWAIT:...\fR
 .IP
@@ -726,17 +733,17 @@ output is taken as XAUTHORITY data.  It can be either
 of the form XAUTHORITY=<file> or raw xauthority data for
 the display (e.g. "xauth extract - $DISPLAY" output).
 .IP
-In the case of \fB-unixpw,\fR then the above command is run
-as the user who just authenticated via the login and
-password prompt.
+In the case of \fB-unixpw\fR (but not \fB-unixpw_nis),\fR then the
+above command is run as the user who just authenticated
+via the login and password prompt.
 .IP
 Also in the case of \fB-unixpw,\fR the user logging in can
 place a colon at the end of his username and supply
-a few options: scale=, scale_cursor=, solid, id=,
-clear_mods, clear_keys, repeat, or speeds= separated
-by commas if there is more than one.  After the user
-logs in successfully, these options will be applied to
-the VNC screen.  For example,
+a few options: scale=, scale_cursor= (or sc=), solid,
+id=, clear_mods (or cm), clear_keys (or ck), repeat, or
+speeds= separated by commas if there is more than one.
+After the user logs in successfully, these options will
+be applied to the VNC screen.  For example,
 .IP
 login: fred:scale=3/4,repeat
 Password: ...
@@ -760,17 +767,19 @@ A nice way to use WAIT:cmd=... is out of
 .IR inetd (8)
 (it automatically forks a new x11vnc for each user).
 You can have the x11vnc inetd spawned process run as,
-say, root or nobody.  When run as root (for either
-inetd or display manager), you can also supply the
-option "\fB-users\fR \fIunixpw=\fR" to have the x11vnc process
-switch to the user as well.  Note: there will be a 2nd
-SSL helper process that will not switch, but it is only
-encoding and decoding the stream at that point.
+say, root or nobody.  When run as root (for either inetd
+or display manager), you can also supply the option
+"\fB-users\fR \fIunixpw=\fR" to have the x11vnc process switch to
+the user as well.  Note: there will be a 2nd SSL helper
+process that will not switch, but it is only encoding
+and decoding the encrypted stream at that point.
 .IP
-As a special case, WAIT:cmd=FINDDISPLAY will run
-a script that works on most Unixes to determine a
-user's DISPLAY variable and xauthority data.  To have
-this default script printed to stdout (e.g. for
+As a special case, WAIT:cmd=FINDDISPLAY will run a
+script that works on most Unixes to determine a user's
+DISPLAY variable and xauthority data (see 
+.IR who (1)
+).
+To have this default script printed to stdout (e.g. for
 customization) run with WAIT:cmd=FINDDISPLAY-print
 .IP
 As another special case, WAIT:cmd=HTTPONCE will allow
@@ -1399,6 +1408,15 @@ is used.  The popup will time out after 120 seconds,
 use "popup:N" to modify the timeout to N seconds
 (use 0 for no timeout).
 .IP
+In the case of "popup" and when the \fB-unixpw\fR option
+is specified, then a *second* window will be popped
+up after the user successfully logs in via his UNIX
+password.  This time the user will be identified as
+UNIX:username@hostname, the "UNIX:" prefix indicates
+which user the viewer logged as via \fB-unixpw.\fR  The first
+popup is only for whether to allow him to even *try*
+to login via unix password.
+.IP
 If \fIstring\fR is "xmessage" then an 
 .IR xmessage (1)
 invocation is used for the command.  xmessage must be
@@ -1689,6 +1707,11 @@ Print this help text.
 \fB-V,\fR \fB-version\fR
 .IP
 Print program version and last modification date.
+.PP
+\fB-license\fR
+.IP
+Print out license information.  Same as \fB-copying\fR and
+\fB-warranty.\fR
 .PP
 \fB-dbg\fR
 .IP

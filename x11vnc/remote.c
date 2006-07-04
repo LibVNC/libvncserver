@@ -23,6 +23,7 @@
 #include "userinput.h"
 #include "keyboard.h"
 #include "selection.h"
+#include "unixpw.h"
 
 int send_remote_cmd(char *cmd, int query, int wait);
 int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync,
@@ -631,6 +632,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 	if (!query_default && !accept_remote_cmds) {
 		rfbLog("remote commands disabled: %s\n", cmd);
+		return NULL;
+	}
+	if (unixpw_in_progress) {
+		rfbLog("skip remote command: %s unixpw_in_progress.\n", cmd);
 		return NULL;
 	}
 

@@ -1089,7 +1089,10 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 
 	RAWFB_RET_VOID
 
-	if (unixpw_in_progress) return;
+	if (unixpw_in_progress) {
+		rfbLog("xcut_receive: unixpw_in_progress, skipping.\n");
+		return;
+	}
 
 	if (!watch_selection) {
 		return;

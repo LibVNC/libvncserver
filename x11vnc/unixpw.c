@@ -5,6 +5,7 @@
 extern int grantpt(int);
 extern int unlockpt(int);
 extern char *ptsname(int);
+/* XXX remove need for this */
 extern char *crypt(const char*, const char *);
 #endif
 
@@ -14,6 +15,8 @@ extern char *crypt(const char*, const char *);
 #include "xinerama.h"
 #include "connections.h"
 #include "user.h"
+#include "connections.h"
+#include "cursor.h"
 #include <rfb/default8x16.h>
 
 #if LIBVNCSERVER_HAVE_FORK
@@ -25,6 +28,9 @@ extern char *crypt(const char*, const char *);
 #if LIBVNCSERVER_HAVE_PWD_H && LIBVNCSERVER_HAVE_GETPWNAM
 #if LIBVNCSERVER_HAVE_CRYPT || LIBVNCSERVER_HAVE_LIBCRYPT
 #define UNIXPW_CRYPT
+#if LIBVNCSERVER_HAVE_GETSPNAM
+#include <shadow.h>
+#endif
 #endif
 #endif
 
@@ -65,6 +71,7 @@ static void set_db(void);
 static void unixpw_verify(char *user, char *pass);
 
 int unixpw_in_progress = 0;
+int unixpw_in_rfbPE = 0;
 int unixpw_login_viewonly = 0;
 time_t unixpw_last_try_time = 0;
 rfbClientPtr unixpw_client = NULL;
@@ -143,6 +150,8 @@ void unixpw_screen(int init) {
 		char_y = y;
 		char_col = strlen(log);
 		char_row = 0;
+
+		set_warrow_cursor();
 	}
 
 	if (scaling) {
@@ -347,11 +356,32 @@ int crypt_verify(char *user, char *pass) {
 		return 0;
 	}
 
+	if (db > 1) fprintf(stderr, "realpw='%s'\n", realpw);
+
+	if (strlen(realpw) < 10) {
+		/* e.g. "x", try getspnam(), sometimes root for inetd, etc */
+#if LIBVNCSERVER_HAVE_GETSPNAM
+		struct spwd *sp = getspnam(user);
+		if (sp != NULL && sp->sp_pwdp != NULL) {
+			if (db) fprintf(stderr, "using getspnam()\n");
+			realpw = sp->sp_pwdp;
+		} else {
+			if (db) fprintf(stderr, "skipping getspnam()\n");
+		}
+#endif
+	}
+
 	n = strlen(pass);
 	if (pass[n-1] == '\n') {
 		pass[n-1] = '\0';
 	}
+
+	/* XXX remove need for cast */
 	cr = (char *) crypt(pass, realpw);
+	if (db > 1) {
+		fprintf(stderr, "user='%s' pass='%s' realpw='%s' cr='%s'\n",
+		    user, pass, realpw, cr ? cr : "(null)");
+	}
 	if (cr == NULL) {
 		return 0;
 	}
@@ -793,6 +823,7 @@ static void unixpw_verify(char *user, char *pass) {
 	char li[] = "Login incorrect";
 	char log[] = "login: ";
 	char *colon = NULL;
+	ClientData *cd = NULL;
 
 if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "********");
 	rfbLog("unixpw_verify: %s\n", user);
@@ -802,10 +833,23 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 		*colon = '\0';
 		rfbLog("unixpw_verify: colon: %s\n", user);
 	}
-
+	if (unixpw_client) {
+		cd = (ClientData *) unixpw_client->clientData;
+		if (cd) {
+			char *str = (char *)malloc(strlen("UNIX:") +
+			    strlen(user) + 1);
+			sprintf(str, "UNIX:%s", user);	
+			if (cd->username) {
+				free(cd->username);
+			}
+			cd->username = str;
+		}
+	}
 
 	if (unixpw_nis) {
 		if (crypt_verify(user, pass)) {
+			rfbLog("unixpw_verify: crypt_verify login for '%s'"
+			    " succeeded.\n", user);
 			unixpw_accept(user);
 			if (keep_unixpw) {
 				keep_unixpw_user = strdup(user);
@@ -818,12 +862,14 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 			}
 			if (colon) *colon = ':';
 			return;
-		} else {
-			rfbLog("unixpw_verify: crypt_verify login for %s failed.\n", user);
-			usleep(3000*1000);
 		}
+		rfbLog("unixpw_verify: crypt_verify login for '%s' failed.\n",
+		    user);
+		usleep(3000*1000);
 	} else {
 		if (su_verify(user, pass, NULL, NULL, NULL)) {
+			rfbLog("unixpw_verify: su_verify login for '%s'"
+			    " succeeded.\n", user);
 			unixpw_accept(user);
 			if (keep_unixpw) {
 				keep_unixpw_user = strdup(user);
@@ -837,7 +883,8 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 			if (colon) *colon = ':';
 			return;
 		}
-		rfbLog("unixpw_verify: su_verify login for %s failed.\n", user);
+		rfbLog("unixpw_verify: su_verify login for '%s' failed.\n",
+		    user);
 	}
 	if (colon) *colon = ':';
 
@@ -1141,6 +1188,17 @@ static void apply_opts (char *user) {
 
 void unixpw_accept(char *user) {
 	apply_opts(user);
+
+	if (accept_cmd && strstr(accept_cmd, "popup") == accept_cmd) {
+		if (use_dpy && strstr(use_dpy, "WAIT:") == use_dpy &&
+		    dpy == NULL) {
+			/* handled in main() */
+			unixpw_client->onHold = TRUE;
+		} else if (! accept_client(unixpw_client)) {
+			unixpw_deny();
+			return;
+		}
+	}
 
 	if (started_as_root == 1 && users_list
 	    && strstr(users_list, "unixpw=") == users_list) {

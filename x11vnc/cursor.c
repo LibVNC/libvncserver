@@ -30,6 +30,7 @@ int cursor_shape_updates_clients(rfbScreenInfoPtr s);
 int cursor_pos_updates_clients(rfbScreenInfoPtr s);
 void cursor_position(int x, int y);
 void set_no_cursor(void);
+void set_warrow_cursor(void);
 int set_cursor(int x, int y, int which);
 int check_x11_pointer(void);
 
@@ -490,6 +491,7 @@ enum cursor_names {
 	CURS_DOT,
 
 	CURS_ARROW,
+	CURS_WARROW,
 	CURS_ROOT,
 	CURS_WM,
 	CURS_TERM,
@@ -657,6 +659,7 @@ static void setup_cursors(void) {
 		alt_arrow = 1;
 		curs_copy(cursors[CURS_ARROW], &cur_arrow);	n++;
 	}
+	curs_copy(cursors[CURS_WARROW], &cur_arrow2);	n++;
 
 	curs_copy(cursors[CURS_ROOT], &cur_root);	n++;
 	curs_copy(cursors[CURS_WM],   &cur_fleur);	n++;
@@ -1742,6 +1745,10 @@ static void set_rfb_cursor(int which) {
 
 void set_no_cursor(void) {
 	set_rfb_cursor(CURS_EMPTY);
+}
+
+void set_warrow_cursor(void) {
+	set_rfb_cursor(CURS_WARROW);
 }
 
 int set_cursor(int x, int y, int which) {

@@ -1038,8 +1038,8 @@ void user_supplied_opts(char *opts) {
 	char *p, *str;
 	char *allow[] = {
 		"skip-display", "skip-auth", "skip-shared",
-		"scale", "scale_cursor", "solid", "id", "clear_mods",
-		"clear_keys", "repeat", "speeds",
+		"scale", "scale_cursor", "sc", "solid", "id",
+		"clear_mods", "cm", "clear_keys", "ck", "repeat", "speeds",
 		NULL
 	};
 
@@ -1067,7 +1067,8 @@ void user_supplied_opts(char *opts) {
 			i++;
 		}
 
-		if (! ok && sscanf(p, "%d/%d", &n, &m) == 2) {
+		if (! ok && strpbrk(p, "0123456789") == p &&
+		    sscanf(p, "%d/%d", &n, &m) == 2) {
 			if (scale_str) free(scale_str);
 			scale_str = strdup(p);
 		} else if (ok) {
@@ -1077,6 +1078,8 @@ void user_supplied_opts(char *opts) {
 			} else if (strstr(p, "auth=") == p) {
 				if (auth_file) free(auth_file);
 				auth_file = strdup(p + strlen("auth="));
+			} else if (!strcmp(p, "shared")) {
+				shared = 1;
 			} else if (strstr(p, "scale=") == p) {
 				if (scale_str) free(scale_str);
 				scale_str = strdup(p + strlen("scale="));
@@ -1084,8 +1087,9 @@ void user_supplied_opts(char *opts) {
 				if (scale_cursor_str) free(scale_cursor_str);
 				scale_cursor_str = strdup(p +
 				    strlen("scale_cursor="));
-			} else if (!strcmp(p, "shared")) {
-				shared = 1;
+			} else if (strstr(p, "sc=") == p) {
+				if (scale_cursor_str) free(scale_cursor_str);
+				scale_cursor_str = strdup(p + strlen("sc="));
 			} else if (!strcmp(p, "solid")) {
 				use_solid_bg = 1;
 				if (!solid_str) {
@@ -1103,9 +1107,11 @@ void user_supplied_opts(char *opts) {
 						subwin = win;
 					}
 				}
-			} else if (!strcmp(p, "clear_mods")) {
+			} else if (!strcmp(p, "clear_mods") ||
+			    !strcmp(p, "cm")) {
 				clear_mods = 1;
-			} else if (!strcmp(p, "clear_keys")) {
+			} else if (!strcmp(p, "clear_keys") ||
+			    !strcmp(p, "ck")) {
 				clear_mods = 2;
 			} else if (!strcmp(p, "repeat")) {
 				no_autorepeat = 0;
@@ -1296,12 +1302,18 @@ int wait_for_client(int *argc, char** argv, int http) {
 			rfbLog("unixpw but no unixpw_in_progress\n");
 			clean_up_exit(1);
 		}
+		if (unixpw_client && unixpw_client->onHold) {
+			rfbLog("taking unixpw_client off hold.\n");
+			unixpw_client->onHold = FALSE;
+		}
 		while (1) {
 			if (shut_down) {
 				clean_up_exit(0);
 			}
 			if (! use_threads) {
+				unixpw_in_rfbPE = 1;
 				rfbPE(-1);
+				unixpw_in_rfbPE = 0;
 			}
 			if (unixpw_in_progress) {
 				usleep(20 * 1000);

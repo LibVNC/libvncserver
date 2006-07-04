@@ -31,5 +31,6 @@ extern void start_client_info_sock(char *host_port_cookie);
 extern void send_client_info(char *str);
 extern void adjust_grabs(int grab, int quiet);
 extern void check_new_clients(void);
+extern int accept_client(rfbClientPtr client);
 
 #endif /* _X11VNC_CONNECTIONS_H */

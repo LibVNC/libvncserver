@@ -48,6 +48,7 @@ void start_client_info_sock(char *host_port_cookie);
 void send_client_info(char *str);
 void adjust_grabs(int grab, int quiet);
 void check_new_clients(void);
+int accept_client(rfbClientPtr client);
 
 
 static rfbClientPtr *client_match(char *str);
@@ -58,7 +59,6 @@ static void ugly_geom(char *p, int *x, int *y);
 static int ugly_window(char *addr, char *userhost, int X, int Y,
     int timeout, char *mode, int accept);
 static int action_match(char *action, int rc);
-static int accept_client(rfbClientPtr client);
 static void check_connect_file(char *file);
 static void send_client_connect(void);
 
@@ -133,7 +133,11 @@ char *list_clients(void) {
 			char *s = ident_username(cl);
 			if (s) free(s);
 		}
-		strcat(list, cd->username);
+		if (strstr(cd->username, "UNIX:") == cd->username) {
+			strcat(list, cd->username + strlen("UNIX:"));
+		} else {
+			strcat(list, cd->username);
+		}
 		strcat(list, ":");
 		if (cd->unixname[0] == '\0') {
 			strcat(list, "none");
@@ -996,7 +1000,15 @@ static unsigned char t2x2_bits[] = {
 	XFlush_wr(dpy);
 
 	if (accept) {
-		snprintf(strh, 100, "x11vnc: accept connection from %s?", addr);
+		char *ip = addr;
+		char *type = "accept";
+		if (unixpw && strstr(userhost, "UNIX:") != userhost) {
+			type = "unixpw";
+			if (openssl_last_ip) {
+				ip = openssl_last_ip;
+			}
+		}
+		snprintf(strh, 100, "x11vnc: %s connection from %s?", type, ip);
 	} else {
 		snprintf(strh, 100, "x11vnc: client disconnected from %s", addr);
 	}
@@ -1282,7 +1294,7 @@ static void ugly_geom(char *p, int *x, int *y) {
  *	popup:     use internal X widgets for prompting.
  * 
  */
-static int accept_client(rfbClientPtr client) {
+int accept_client(rfbClientPtr client) {
 
 	char xmessage[200], *cmd = NULL;
 	char *addr = client->host;
@@ -1325,6 +1337,14 @@ static int accept_client(rfbClientPtr client) {
 			mode = "key_only";
 		} else {
 			mode = "both";
+		}
+
+		if (dpy == NULL && use_dpy && strstr(use_dpy, "WAIT:") ==
+		    use_dpy) {
+			rfbLog("accept_client: warning allowing client under conditions:\n");
+			rfbLog("  -display WAIT:, dpy == NULL, -accept popup.\n");
+			rfbLog("   There will be another popup.\n");
+			return 1;
 		}
 
 		rfbLog("accept_client: using builtin popup for: %s\n", addr);
@@ -1526,6 +1546,7 @@ static int do_reverse_connect(char *str) {
 		rfbLog("reverse connections disabled in -ssl mode.\n");
 		return 0;
 	}
+	if (unixpw_in_progress) return 0;
 
 	/* copy in to host */
 	host = (char *) malloc(len+1);
@@ -1579,10 +1600,14 @@ static int do_reverse_connect(char *str) {
  * Break up comma separated list of hosts and call do_reverse_connect()
  */
 void reverse_connect(char *str) {
-	char *p, *tmp = strdup(str);
+	char *p, *tmp;
 	int sleep_between_host = 300;
 	int sleep_min = 1500, sleep_max = 4500, n_max = 5;
 	int n, tot, t, dt = 100, cnt = 0;
+
+	if (unixpw_in_progress) return;
+
+	tmp = strdup(str);
 
 	p = strtok(tmp, ", \t\r\n");
 	while (p) {
@@ -1887,7 +1912,6 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	last_event = last_input = time(NULL);
 
-
 	if (inetd) {
 		/* 
 		 * Set this so we exit as soon as connection closes,
@@ -2010,6 +2034,12 @@ if (0) fprintf(stderr, "SET ssl_helper_pid: %d\n", openssl_last_helper_pid);
 		unixpw_last_try_time = time(NULL);
 		unixpw_screen(1);
 		unixpw_keystroke(0, 0, 1);
+		if (!unixpw_in_rfbPE) {
+			rfbLog("new client: %s in non-unixpw_in_rfbPE.\n",
+			     client->host);
+		}
+		/* always put client on hold even if unixpw_in_rfbPE is true */
+		return(RFB_CLIENT_ON_HOLD);
 	}
 
 	return(RFB_CLIENT_ACCEPT);

@@ -407,6 +407,7 @@ static void watch_loop(void) {
 	}
 
 	while (1) {
+		char msg[] = "new client: %s taking unixpw client off hold.\n";
 
 		got_user_input = 0;
 		got_pointer_input = 0;
@@ -418,10 +419,35 @@ static void watch_loop(void) {
 		if (! use_threads) {
 			dtime0(&tm);
 			if (! skip_pe) {
-				measure_send_rates(1);
+				if (unixpw && unixpw_in_progress) {
+					rfbClientPtr cl = unixpw_client;
+					if (cl && cl->onHold) {
+						rfbLog(msg, cl->host);
+						unixpw_client->onHold = FALSE;
+					}
+				} else {
+					measure_send_rates(1);
+				}
+
+				unixpw_in_rfbPE = 1;
+
 				rfbPE(-1);
-				measure_send_rates(0);
-				fb_update_sent(NULL);
+
+				unixpw_in_rfbPE = 0;
+
+				if (unixpw && unixpw_in_progress) {
+					/* rfbPE loop until logged in. */
+					skip_pe = 0;
+					continue;
+				} else {
+					measure_send_rates(0);
+					fb_update_sent(NULL);
+				}
+			} else {
+				if (unixpw && unixpw_in_progress) {
+					skip_pe = 0;
+					continue;
+				}
 			}
 			dtr = dtime(&tm);
 
@@ -432,26 +458,27 @@ static void watch_loop(void) {
 			if (screen && screen->clientHead) {
 				int ret = check_user_input(dt, dtr,
 				    tile_diffs, &cnt);
-				/* true means loop back for more input */
+				/* true: loop back for more input */
 				if (ret == 2) {
 					skip_pe = 1;
 				}
 				if (ret) {
-if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
+					if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 					continue;
 				}
 			}
-
 			/* watch for viewonly input piling up: */
-			if ((got_pointer_calls > got_pointer_input)
-			    || (got_keyboard_calls > got_keyboard_input)) {
+			if ((got_pointer_calls > got_pointer_input) ||
+			    (got_keyboard_calls > got_keyboard_input)) {
 				eat_viewonly_input(10, 3);
 			}
 		} else {
+#if 0
 			if (0 && use_xrecord) {
 				/* XXX not working */
 				check_xrecord();
 			}
+#endif
 			if (wireframe && button_mask) {
 				check_wireframe();
 			}
@@ -461,6 +488,8 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 		if (shut_down) {
 			clean_up_exit(0);
 		}
+
+		if (unixpw_in_progress) continue;
 
 		if (! urgent_update) {
 			if (do_copy_screen) {
@@ -540,6 +569,8 @@ if (debug_scroll) fprintf(stderr, "watch_loop: LOOP-BACK: %d\n", ret);
 			if (use_xdamage && last_dt > xdamage_thrash)  {
 				clear_xdamage_mark_region(NULL, 0);
 			}
+
+			if (unixpw_in_progress) continue;
 			dtime0(&tm);
 			if (use_snapfb) {
 				int t, tries = 3;
@@ -1823,6 +1854,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-V") || !strcmp(arg, "-version")) {
 			fprintf(stdout, "x11vnc: %s\n", lastmod);
 			exit(0);
+		} else if (!strcmp(arg, "-license") ||
+		    !strcmp(arg, "-copying") || !strcmp(arg, "-warranty")) {
+			print_license();
 		} else if (!strcmp(arg, "-dbg")) {
 			crash_debug = 1;
 		} else if (!strcmp(arg, "-nodbg")) {
@@ -2569,6 +2603,12 @@ int main(int argc, char* argv[]) {
 				}
 			}
 		}
+		if (use_threads) {
+			if (! quiet) {
+				rfbLog("disabling -threads under -unixpw\n");
+			}
+			use_threads = 0;
+		}
 	}
 	if (use_stunnel && ! got_localhost) {
 		if (! getenv("STUNNEL_DISABLE_LOCALHOST") &&
@@ -3202,6 +3242,31 @@ int main(int argc, char* argv[]) {
 		}
 		if (use_solid_bg && client_count) {
 			solid_bg(0);
+		}
+		if (accept_cmd && strstr(accept_cmd, "popup") == accept_cmd) {
+			rfbClientIteratorPtr iter;
+			rfbClientPtr cl, cl0 = NULL;
+			int i = 0;
+			iter = rfbGetClientIterator(screen);
+			while( (cl = rfbClientIteratorNext(iter)) ) {
+				i++;	
+				if (i != 1) {
+					rfbLog("WAIT popup: too many clients\n");
+					clean_up_exit(1);
+				}
+				cl0 = cl;
+			}
+			rfbReleaseClientIterator(iter);
+			if (i != 1 || cl0 == NULL) {
+				rfbLog("WAIT popup: no clients.\n");
+				clean_up_exit(1);
+			}
+			if (! accept_client(cl0)) {
+				rfbLog("WAIT popup: denied.\n");
+				clean_up_exit(1);
+			}
+			rfbLog("waited_for_client: popup accepted.\n");
+			cl0->onHold = FALSE;
 		}
 	}
 

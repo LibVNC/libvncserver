@@ -2145,6 +2145,8 @@ static int check_xrecord_keys(void) {
 
 	RAWFB_RET(0)
 
+	if (unixpw_in_progress) return 0;
+
 	set_repeat_in = set_repeat;
 	set_repeat = 0.0;
 
@@ -3303,6 +3305,7 @@ int check_wireframe(void) {
 	RAWFB_RET(0)
 
 	if (unixpw_in_progress) return 0;
+
 	if (nofb) {
 		return 0;
 	}

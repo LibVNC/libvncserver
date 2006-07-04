@@ -1294,6 +1294,8 @@ static int copy_tiles(int tx, int ty, int nt) {
 
 	char *src, *dst, *s_src, *s_dst, *m_src, *m_dst;
 	char *h_src, *h_dst;
+	if (unixpw_in_progress) return 0;
+
 	if (! first_line) {
 		/* allocate arrays first time in. */
 		int n = ntiles_x + 1;
@@ -1626,6 +1628,8 @@ static int copy_all_tiles(void) {
 	int x, y, n, m;
 	int diffs = 0, ct;
 
+	if (unixpw_in_progress) return 0;
+
 	for (y=0; y < ntiles_y; y++) {
 		for (x=0; x < ntiles_x; x++) {
 			n = x + y * ntiles_x;
@@ -1671,6 +1675,8 @@ static int copy_all_tile_runs(void) {
 	int diffs = 0, ct;
 	int in_run = 0, run = 0;
 	int ntave = 0, ntcnt = 0;
+
+	if (unixpw_in_progress) return 0;
 
 	for (y=0; y < ntiles_y; y++) {
 		for (x=0; x < ntiles_x + 1; x++) {
@@ -1742,6 +1748,8 @@ static int copy_tiles_backward_pass(void) {
 	int x, y, n, m;
 	int diffs = 0, ct;
 
+	if (unixpw_in_progress) return 0;
+
 	for (y = ntiles_y - 1; y >= 0; y--) {
 	    for (x = ntiles_x - 1; x >= 0; x--) {
 		n = x + y * ntiles_x;		/* number of this tile */
@@ -1782,6 +1790,8 @@ static int copy_tiles_backward_pass(void) {
 static int copy_tiles_additional_pass(void) {
 	int x, y, n;
 	int diffs = 0, ct;
+
+	if (unixpw_in_progress) return 0;
 
 	for (y=0; y < ntiles_y; y++) {
 		for (x=0; x < ntiles_x; x++) {
@@ -1974,6 +1984,7 @@ int copy_screen(void) {
 	if (! fs_factor) {
 		return 0;
 	}
+
 	if (unixpw_in_progress) return 0;
 
 	block_size = (dpy_x * (dpy_y/fs_factor) * pixelsize);
@@ -2686,6 +2697,9 @@ int scan_for_updates(int count_only) {
 		 */
 		old_copy_tile = 0;
 	}
+
+	if (unixpw_in_progress) return 0;
+
 	if (old_copy_tile) {
 		tile_diffs = copy_all_tiles();
 	} else {
