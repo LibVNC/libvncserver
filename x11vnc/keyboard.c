@@ -2860,8 +2860,8 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 				keysym = remap->after;
 				isbutton = remap->isbutton;
 				if (debug_keyboard) {
-					X_LOCK;
 					char *str1, *str2;
+					X_LOCK;
 					str1 = XKeysymToString(remap->before);
 					str2 = XKeysymToString(remap->after);
 					rfbLog("keyboard(): remapping keysym: "
