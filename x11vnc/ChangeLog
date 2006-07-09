@@ -1,3 +1,8 @@
+2006-07-08  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add uinput support (-pipeinput UINPUT:...) for full
+	  mouse and key input to linux console (e.g. for qt-embedded apps)
+	  add -allinput for handleEventsEagerly.
+
 2006-07-04  Karl Runge <runge@karlrunge.com>
 	* x11vnc: 2nd -accept popup with WAIT, and UNIX: info for unixpw
 	  login.  Use RFB_CLIENT_ON_HOLD for -unixpw. -unixpw white arrow

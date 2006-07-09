@@ -6,6 +6,7 @@
 #include "xinerama.h"
 #include "screen.h"
 #include "connections.h"
+#include "allowed_input_t.h"
 
 #if LIBVNCSERVER_HAVE_LINUX_VIDEODEV_H
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H
@@ -556,12 +557,22 @@ static void v4l_fmt(char *fmt) {
 }
 
 void v4l_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
+	allowed_input_t input;
+
 	if (raw_fb_fd < 0) {
 		return;		
 	}
 	if (! down) {
 		return;
 	}
+	if (view_only) {
+		return;
+	}
+	get_allowed_input(client, &input);
+	if (! input.keystroke) {
+		return;
+	}
+
 	if (keysym == XK_b) {
 		v4l_br(-1);
 	} else if (keysym == XK_B) {
@@ -608,6 +619,7 @@ void v4l_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 
 void v4l_pointer_command(int mask, int x, int y, rfbClientPtr client) {
+	/* do not forget viewonly perms */
 	if (mask || x || y || client) {}
 }
 

@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Tue Jul  4 19:57:31 EDT 2006
+x11vnc README file                         Date: Sat Jul  8 19:22:13 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -7196,7 +7196,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-07-04
+x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-07-08
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -7246,21 +7246,21 @@ x11vnc options:
   -fixscreen string        -debug_scroll            -noxrecord             
   -grab_buster             -nograb_buster           -debug_grabs           
   -debug_sel               -pointer_mode n          -input_skip n          
-  -speeds rd,bw,lat        -wmdt string             -debug_pointer         
-  -debug_keyboard          -defer time              -wait time             
-  -wait_ui factor          -nowait_bog              -slow_fb time          
-  -readtimeout n           -nap                     -nonap                 
-  -sb time                 -nofbpm                  -fbpm                  
-  -noxdamage               -xd_area A               -xd_mem f              
-  -sigpipe string          -threads                 -nothreads             
-  -fs f                    -gaps n                  -grow n                
-  -fuzz n                  -debug_tiles             -snapfb                
-  -rawfb string            -freqtab file            -pipeinput cmd         
-  -gui [gui-opts]          -remote command          -query variable        
-  -QD variable             -sync                    -noremote              
-  -yesremote               -unsafe                  -safer                 
-  -privremote              -nocmds                  -allowedcmds list      
-  -deny_all              
+  -allinput                -speeds rd,bw,lat        -wmdt string           
+  -debug_pointer           -debug_keyboard          -defer time            
+  -wait time               -wait_ui factor          -nowait_bog            
+  -slow_fb time            -readtimeout n           -nap                   
+  -nonap                   -sb time                 -nofbpm                
+  -fbpm                    -noxdamage               -xd_area A             
+  -xd_mem f                -sigpipe string          -threads               
+  -nothreads               -fs f                    -gaps n                
+  -grow n                  -fuzz n                  -debug_tiles           
+  -snapfb                  -rawfb string            -freqtab file          
+  -pipeinput cmd           -gui [gui-opts]          -remote command        
+  -query variable          -QD variable             -sync                  
+  -noremote                -yesremote               -unsafe                
+  -safer                   -privremote              -nocmds                
+  -allowedcmds list        -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -7294,7 +7294,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-07-04
+x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-07-08
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -9457,6 +9457,9 @@ Options:
                        means to act as though there is always user input.
                        Default: 10
 
+-allinput              Have x11vnc read and process all available client input
+                       before proceeding.
+
 -speeds rd,bw,lat      x11vnc tries to estimate some speed parameters that
                        are used to optimize scheduling (e.g. -pointer_mode
                        4, -wireframe, -scrollcopyrect) and other things.
@@ -9613,13 +9616,19 @@ Options:
                        For shared memory segments string is of the
                        form: "shm:N@WxHxB" which specifies a shmid
                        N and framebuffer Width, Height, and Bits
-                       per pixel.  To memory map mmap(2) a file use:
-                       "map:/path/to/a/file@WxHxB".  If there is trouble
-                       with mmap, use  "file:/..." for slower lseek(2) based
-                       reading. Use "snap:..." to imply -snapfb mode and the
-                       "file:" access (this is for devices that only provide
-                       the fb all at once). If you do not supply a type "map"
-                       is assumed if the file exists.
+                       per pixel.
+
+                       For file polling to memory map mmap(2) a file use:
+                       "map:/path/to/a/file@WxHxB", with WxHxB as above.
+                       "mmap:..." is the same. If there is trouble with mmap,
+                       use  "file:/..." for slower lseek(2) based reading.
+                       Use "snap:..." to imply -snapfb mode and the "file:"
+                       access (this is for devices that only provide the fb
+                       all at once).
+
+                       If you do not supply a type "map" is assumed if
+                       the file exists (see the next paragraphs for some
+                       exceptions to this.)
 
                        If string is "setup:cmd", then the command "cmd"
                        is run and the first line from it is read and used
@@ -9627,13 +9636,14 @@ Options:
                        determining WxHxB, etc. These are often done as root
                        so take care.
 
-                       If the string begins with "video", see the video4linux
+                       If the string begins with "video", see the VIDEO4LINUX
                        discusion below where the device may be queried for
                        (and possibly set) the framebuffer parameters.
 
-                       If the strings begins with "cons", see the linux
-                       console discussion below where the framebuffer device
-                       is opened and keystrokes are inserted into the console.
+                       If the string begins with "cons", "/dev/fb", or
+                       "fb", see the LINUX CONSOLE discussion below where
+                       the framebuffer device is opened and keystrokes (and
+                       possibly mouse events) are inserted into the console.
 
                        Optional suffixes are ":R/G/B" and "+O" to specify
                        red, green, and blue masks and an offset into the
@@ -9653,11 +9663,12 @@ Options:
 
                        (see ipcs(1) and fbset(1) for the first two examples)
 
-                       All user input is discarded by default (but see the
-                       -pipeinput option).  Most of the X11 (screen, keyboard,
-                       mouse) options do not make sense and many will cause
-                       this mode to crash, so please think twice before
-                       setting or changing them in a running x11vnc.
+                       In general all user input is discarded by default (see
+                       the -pipeinput option for how to use a helper program
+                       to insert).  Most of the X11 (screen, keyboard, mouse)
+                       options do not make sense and many will cause this
+                       mode to crash, so please think twice before setting or
+                       changing them in a running x11vnc.
 
                        If you DO NOT want x11vnc to close the X DISPLAY in
                        rawfb mode, prepend a "+" e.g. +file:/dev/fb0...
@@ -9676,13 +9687,13 @@ Options:
                        SNAPFB_RAWFB_RESET=1 as well.
 
                        If you want x11vnc to dynamically transform a 24bpp
-                       rawfb to 32bpp (note that this will be slower) use
-                       the -24to32 option.  This would be useful for, say,
-                       for a video camera that delivers the pixel data as
+                       rawfb to 32bpp (note that this will be slower) also
+                       supply the -24to32 option.  This would be useful for,
+                       say, a video camera that delivers the pixel data as
                        24bpp packed RGB.  This is the default under "video"
                        mode if the bpp is 24.
 
-                       video4linux: on Linux some attempt is made to handle
+                       VIDEO4LINUX: on Linux some attempt is made to handle
                        video devices (webcams or TV tuners) automatically.
                        The idea is the WxHxB will be extracted from the
                        device itself.  So if you do not supply "@WxHxB...
@@ -9760,44 +9771,63 @@ Options:
 
                        See the -pipeinput VID option below for a way to control
                        the settings through the VNC Viewer via keystrokes.
+                       As a shortcut, if the string begins "Video.." instead
+                       of "video.." then -pipeinput VID is implied.
 
                        As above, if you specify a "@WxHxB..." after the
                        <settings> string they are used verbatim: the device
                        is not queried for the current values.  Otherwise the
                        device will be queried.
 
-                       Linux console:  If the libvncserver LinuxVNC command is
-                       on your system use that instead of the following method
-                       because it will be faster and more accurate for Linux
-                       text console.
+                       LINUX CONSOLE:  If the libvncserver LinuxVNC program
+                       is on your system you may want to use that instead of
+                       the following method because it will be faster and more
+                       accurate for Linux text console.
 
                        If the rawfb string begins with "cons" the framebuffer
                        device /dev/fb0 is opened (this requires the appropriate
-                       kernel modules) and so is /dev/tty0.  The latter is
-                       used to inject keystrokes (not all are supported,
-                       but the basic ones are).  You will need to be root to
-                       inject keystrokes.  /dev/tty0 refers to the active VT,
-                       to indicate one explicitly, use "cons2", etc. using
-                       the VT number.  Note you can change VT remotely using
-                       the chvt(1) command.  Sometimes switching out and back
-                       corrects the framebuffer.  To skip injecting entirely
-                       use "consx".
+                       kernel modules to be installed) and so is /dev/tty0.
+                       The latter is used to inject keystrokes (not all are
+                       supported, but the basic ones are).  You will need to
+                       be root to inject keystrokes.  /dev/tty0 refers to the
+                       active VT, to indicate one explicitly, use "cons2",
+                       etc. using the VT number.
+
+                       If the Linux version seems to be 2.6 or later and the
+                       "uinput" module appears to be present, then the uinput
+                       method will be used instead of /dev/ttyN.  uinput allows
+                       insertion of BOTH keystrokes and mouse input and so it
+                       preferred when accessing graphical (e.g. QT-embedded)
+                       linux console apps.  See -pipeinput UINPUT below
+                       for more information on this mode (you may want to
+                       also use the -nodragging and -cursor none options).
+                       Use "cons0", etc  or -pipeinput CONS to force the
+                       /dev/ttyN method.
+
+                       Note you can change VT remotely using the chvt(1)
+                       command.  Sometimes switching out and back corrects
+                       the framebuffer state.
+
+                       To skip input injecting entirely use "consx".
 
                        The strings "console", or "/dev/fb0" can be used
                        instead of "cons".  The latter can be used to specify
-                       a different framebuffer device, e.g. /dev/fb1.  If the
-                       name is something nonstandard, use "cons:/dev/foofb"
+                       a different framebuffer device, e.g. /dev/fb1.  As a
+                       shortcut the "/dev/" can be dropped.  If the name is
+                       something nonstandard, use "cons:/dev/foofb"
 
                        If you do not want x11vnc to guess the framebuffer's
-                       WxHxB and masks automatically, specify them with a
+                       WxHxB and masks automatically (sometimes the kernel
+                       given inaccurate information), specify them with a
                        @WxHxB at the end of the string.
 
                        Examples:
                            -rawfb cons               (same as -rawfb console)
                            -rawfb /dev/fb0           (same)
                            -rawfb cons3              (force /dev/tty3)
-                           -rawfb consx              (no keystrokes)
+                           -rawfb consx              (no keystrokes or mouse)
                            -rawfb console:/dev/nonstd
+                           -rawfb cons -pipeinput UINPUT:accel=1.5
 
 -freqtab file          For use with "-rawfb video" for TV tuner devices to
                        specify station frequencies.  Instead of using the built
@@ -9826,6 +9856,8 @@ Options:
                        value is stored in X11VNC_RAWFB_STR for the pipe command
                        to use if it wants. Do 'env | grep X11VNC' for more.
 
+                       Built-in pipeinput modes:
+
                        If cmd is "VID" and you are using the -rawfb for a
                        video capture device, then an internal list of keyboard
                        mappings is used to set parameters of the video.
@@ -9844,7 +9876,57 @@ Options:
 
                        If cmd is "CONS" or "CONSn" where n is a Linux
                        console number, then the linux console keystroke
-                       insertion (see -rawfb cons) is performed.
+                       insertion to /dev/ttyN (see -rawfb cons) is performed.
+
+                       If cmd begins with "UINPUT" then the Linux uinput
+                       module is used to insert both keystroke and mouse events
+                       to the Linux console (see -rawfb above).  This usually
+                       is the /dev/input/uinput device file (you may need to
+                       create it with "mknod /dev/input/uinput c 10 223"
+                       and insert the module with "modprobe uinput".
+
+                       The UINPUT mode currently only does US keyboards (a
+                       scan code option may be added), and not all keysyms
+                       are supported.
+
+                       You may want to use the options -cursor none and
+                       -nodragging in this mode.
+
+                       Additional tuning options may be supplied via:
+                       UINPUT:opt1,opt2,... (a comma separated list). If an
+                       option begins with "/" it is taken as the uinput
+                       device file.
+
+                       Which uinput is injected can be controlled by an option
+                       string made of the characters "K", "M", and "B"
+                       (see the -input option), e.g. "KM" allows keystroke
+                       and motion but not button clicks.
+
+                       A UINPUT option of the form: accel=f, or accel=fx+fy
+                       sets the mouse motion "acceleration".  This is used
+                       to correct raw mouse relative motion into how much the
+                       application cursor moves (x11vnc has no control over
+                       how the application interprets the raw mouse motions).
+                       Typically the acceleration for an X display is 2 (see
+                       xset "m" option).  "f" is a floating point number,
+                       e.g. 2.0.  Use "fx+fy" if you need to supply different
+                       corrections for x and y.
+
+                       Note: the default acceleration is 2.0 since it seems
+                       both X and qt-embedded often use this value.
+
+                       Even with a correct accel setting the mouse position
+                       will get out of sync (probably due to a mouse
+                       "threshold" setting where the acceleration doe not
+                       apply, set xset(1)).  The option reset=N sets the number
+                       of ms (default 500) after which the cursor is attempted
+                       to be reset (by forcing the mouse to (0, 0) via small
+                       increments and then back out to (x, y) in 1 jump), This
+                       correction seems to be needed but can cause jerkiness
+                       or unexpected behavior.  Use reset=0 to disable.
+
+                       Example:
+                           -pipeinput UINPUT:accel=1.0 -cursor none
 
 -gui [gui-opts]        Start up a simple tcl/tk gui based on the the remote
                        control options -remote/-query described below.
@@ -10166,6 +10248,8 @@ n
                        reset_record    reset RECORD extension (if avail.)
                        pointer_mode:n  set -pointer_mode to n. same as "pm"
                        input_skip:n    set -input_skip to n.
+                       allinput        enable  use of -allinput mode.
+                       noallinput      disable use of -allinput mode.
                        speeds:str      set -speeds to str.
                        wmdt:str        set -wmdt to str.
                        debug_pointer   enable  -debug_pointer, same as "dp"
@@ -10195,6 +10279,8 @@ n
                        snapfb          enable  -snapfb mode.
                        nosnapfb        disable -snapfb mode.
                        rawfb:str       set -rawfb mode to "str".
+                       uinput_accel:f  set uinput_accel to f.
+                       uinput_reset:n  set uinput_reset to n ms.
                        progressive:n   set libvncserver -progressive slice
                                        height parameter to n.
                        desktop:str     set -desktop name to str for new clients
@@ -10268,7 +10354,6 @@ n
                        remote command, we hope the name makes it obvious what
                        the returned value corresponds to (hint: the ext_*
                        variables correspond to the presence of X extensions):
-
                        ans= stop quit exit shutdown ping blacken zero
                        refresh reset close disconnect id sid waitmapped
                        nowaitmapped clip flashcmap noflashcmap shiftcmap
@@ -10299,16 +10384,17 @@ n
                        nodragging wireframe_mode wireframe wf nowireframe
                        nowf wirecopyrect wcr nowirecopyrect nowcr scr_area
                        scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-                       scr_parms scrollcopyrect scr noscrollcopyrect noscr
-                       fixscreen noxrecord xrecord reset_record pointer_mode
-                       pm input_skip input grabkbd nograbkbd grabptr
-                       nograbptr client_input speeds wmdt debug_pointer dp
-                       nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-                       nodk deferupdate defer wait_ui wait_bog nowait_bog
-                       slow_fb wait readtimeout nap nonap sb screen_blank
-                       fbpm nofbpm fs gaps grow fuzz snapfb nosnapfb rawfb
-                       progressive rfbport http nohttp httpport httpdir
-                       enablehttpproxy noenablehttpproxy alwaysshared
+                       scr_parms scrollcopyrect scr noscrollcopyrect
+                       noscr fixscreen noxrecord xrecord reset_record
+                       pointer_mode pm input_skip allinput noallinput input
+                       grabkbd nograbkbd grabptr nograbptr client_input
+                       speeds wmdt debug_pointer dp nodebug_pointer nodp
+                       debug_keyboard dk nodebug_keyboard nodk deferupdate
+                       defer wait_ui wait_bog nowait_bog slow_fb wait
+                       readtimeout nap nonap sb screen_blank fbpm nofbpm
+                       fs gaps grow fuzz snapfb nosnapfb rawfb uinput_accel
+                       uinput_reset progressive rfbport http nohttp httpport
+                       httpdir enablehttpproxy noenablehttpproxy alwaysshared
                        noalwaysshared nevershared noalwaysshared dontdisconnect
                        nodontdisconnect desktop debug_xevents nodebug_xevents
                        debug_xevents debug_xdamage nodebug_xdamage
@@ -10333,7 +10419,6 @@ n
                        mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y
                        wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y
                        rfbauth passwd viewpasswd
-
 -QD variable           Just like -query variable, but returns the default
                        value for that parameter (no running x11vnc server
                        is consulted)

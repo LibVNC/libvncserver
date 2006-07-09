@@ -2461,6 +2461,7 @@ void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
 			str = "KMBC";
 		}
 	}
+if (0) fprintf(stderr, "GAI: %s - %s\n", str, cd->input);
 
 	while (*str) {
 		if (*str == 'K') {
@@ -2485,9 +2486,10 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 	if (pipeinput_int == PIPEINPUT_VID) {
 		v4l_key_command(down, keysym, client);
-	}
-	if (pipeinput_int == PIPEINPUT_CONS) {
+	} else if (pipeinput_int == PIPEINPUT_CONS) {
 		console_key_command(down, keysym, client);
+	} else if (pipeinput_int == PIPEINPUT_UINPUT) {
+		uinput_key_command(down, keysym, client);
 	}
 	if (pipeinput_fh == NULL) {
 		return;
@@ -2495,7 +2497,7 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 	if (! view_only) {
 		get_allowed_input(client, &input);
-		if (input.motion || input.button) {
+		if (input.keystroke) {
 			can_input = 1;	/* XXX distinguish later */
 		}
 	}

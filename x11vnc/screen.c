@@ -574,10 +574,12 @@ void set_raw_fb_params(int restore) {
 		}
 	} else {
 		/* Normal case: */
-		if (! view_only) {
+#if 0
+		if (! view_only && ! pipeinput_str) {
 			if (! quiet) rfbLog("  rawfb: setting view_only\n");
 			view_only = 1;
 		}
+#endif
 		if (watch_selection) {
 			if (! quiet) rfbLog("  rawfb: turning off "
 			    "watch_selection\n");
@@ -608,10 +610,6 @@ void set_raw_fb_params(int restore) {
 			use_solid_bg = 0;
 		}
 		multiple_cursors_mode = strdup("arrow");
-	}
-	if (0 && use_snapfb) {
-		if (! quiet) rfbLog("  rawfb: turning off use_snapfb\n");
-		use_snapfb = 0;
 	}
 	if (using_shm) {
 		if (! quiet) rfbLog("  rawfb: turning off using_shm\n");
@@ -963,7 +961,8 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		rawfb_dev_video = 1;
 	} else if (strstr(str, "dev/video")) {
 		rawfb_dev_video = 1;
-	} else if (strstr(str, "cons") == str || strstr(str, "/dev/fb") == str) {
+	} else if (strstr(str, "cons") == str || strstr(str, "fb") == str ||
+	    strstr(str, "/dev/fb") == str) {
 		char *str2 = console_guess(str, &raw_fb_fd);
 		if (str2 == NULL) {
 			rfbLog("console_guess failed for: %s\n", str);

@@ -62,6 +62,8 @@ AH_TEMPLATE(HAVE_IRIX_XREADDISPLAY, [IRIX XReadDisplay available])
 AH_TEMPLATE(HAVE_FBPM, [FBPM extension build environment present])
 AH_TEMPLATE(HAVE_LINUX_VIDEODEV_H, [video4linux build environment present])
 AH_TEMPLATE(HAVE_LINUX_FB_H, [linux fb device build environment present])
+AH_TEMPLATE(HAVE_LINUX_INPUT_H, [linux/input.h present])
+AH_TEMPLATE(HAVE_LINUX_UINPUT_H, [linux uinput device build environment present])
 
 AC_ARG_WITH(xkeyboard,
 [  --without-xkeyboard     disable xkeyboard extension support],,)
@@ -83,6 +85,8 @@ AC_ARG_WITH(v4l,
 [  --without-v4l           disable video4linux support],,)
 AC_ARG_WITH(fbdev,
 [  --without-fbdev         disable linux fb device support],,)
+AC_ARG_WITH(uinput,
+[  --without-uinput        disable linux uinput device support],,)
 
 if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 	AC_CHECK_LIB(X11, XGetImage, HAVE_X="true",
@@ -236,6 +240,14 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 		if test "x$with_fbdev" != "xno"; then
 			AC_CHECK_HEADER(linux/fb.h,
 				[AC_DEFINE(HAVE_LINUX_FB_H)],,)
+		fi
+		if test "x$with_uinput" != "xno"; then
+			AC_CHECK_HEADER(linux/input.h,
+				[AC_DEFINE(HAVE_LINUX_INPUT_H) HAVE_LINUX_INPUT_H="true"],,)
+			if test "x$HAVE_LINUX_INPUT_H" = "xtrue"; then
+				AC_CHECK_HEADER(linux/uinput.h,
+					[AC_DEFINE(HAVE_LINUX_UINPUT_H)],, [#include <linux/input.h>])
+			fi
 		fi
 
 		X_LIBS="$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS"

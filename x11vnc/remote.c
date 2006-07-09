@@ -24,6 +24,7 @@
 #include "keyboard.h"
 #include "selection.h"
 #include "unixpw.h"
+#include "uinput.h"
 
 int send_remote_cmd(char *cmd, int query, int wait);
 int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync,
@@ -3029,6 +3030,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: setting input_skip %d\n", is);
 		ui_skip = is;
 
+	} else if (!strcmp(p, "allinput")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, all_input);
+			goto qry;
+		}
+		all_input = 1;
+		rfbLog("enabled allinput\n");
+	} else if (!strcmp(p, "noallinput")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !all_input);
+			goto qry;
+		}
+		all_input = 0;
+		rfbLog("disabled allinput\n");
+
 	} else if (strstr(p, "input") == p) {
 		int doit = 1;
 		COLON_CHECK("input:")
@@ -3435,6 +3451,28 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		raw_fb_back_to_X = 1;
 		do_new_fb(1);
 		raw_fb_back_to_X = 0;
+
+	} else if (strstr(p, "uinput_accel") == p) {
+		COLON_CHECK("uinput_accel:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(get_uinput_accel()));
+			goto qry;
+		}
+		p += strlen("uinput_accel:");
+		rfbLog("set_uinput_accel: %s\n", p);
+		set_uinput_accel(p);
+
+	} else if (strstr(p, "uinput_reset") == p) {
+		COLON_CHECK("uinput_reset:")
+		p += strlen("uinput_reset:");
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
+			    get_uinput_reset());
+			goto qry;
+		}
+		rfbLog("set_uinput_reset: %s\n", p);
+		set_uinput_reset(atoi(p));
 
 	} else if (strstr(p, "progressive") == p) {
 		int f;

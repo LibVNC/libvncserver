@@ -1,3 +1,6 @@
+2006-07-08  Karl Runge <runge@karlrunge.com>
+	* configure.ac: add <linux/uinput.h> for linux console.
+
 2006-07-04  Karl Runge <runge@karlrunge.com>
 	* configure.ac: add getspnam.
 

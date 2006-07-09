@@ -446,7 +446,24 @@ void rfbCFD(long usec) {
 	}
 
 	if (! use_threads) {
-		rfbCheckFds(screen, usec);
+		if (0 && all_input) {
+			static int cnt = 0;
+			int f = 1;
+			while (rfbCheckFds(screen, usec) > 0) {
+				if (f) {
+					cnt++;
+					f = 0;
+				}
+				fprintf(stderr, "-%d", cnt);
+			}
+		} else {
+			if (all_input) {
+				screen->handleEventsEagerly = TRUE;
+			} else {
+				screen->handleEventsEagerly = FALSE;
+			}
+			rfbCheckFds(screen, usec);
+		}
 	}
 
  	if (unixpw && unixpw_in_progress && !uip0) {

@@ -178,6 +178,8 @@ Screen
 	visual:
 	rawfb:
 	pipeinput:
+	uinput_accel:
+	uinput_reset:
 	24to32
 	=GAL LOFF
 
@@ -317,6 +319,7 @@ Permissions
 Tuning
 	=D-C:0,1,2,3,4 pointer_mode:
 	input_skip:
+	allinput
 	=D nodragging
 	-- D
 	speeds:

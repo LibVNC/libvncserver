@@ -6,6 +6,7 @@
 #include "xinerama.h"
 #include "screen.h"
 #include "pointer.h"
+#include "allowed_input_t.h"
 
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
@@ -21,7 +22,8 @@ void console_pointer_command(int mask, int x, int y, rfbClientPtr client);
 char *console_guess(char *str, int *fd) {
 	char *q, *in = strdup(str);
 	char *atparms = NULL, *file = NULL;
-	int tty = -1;
+	int do_input, have_uinput, tty = -1;
+
 	if (strstr(in, "/dev/fb") == in) {
 		free(in);
 		in = (char *) malloc(strlen("cons:") + strlen(str) + 1);
@@ -67,22 +69,43 @@ char *console_guess(char *str, int *fd) {
 	}
 	rfbLog("console_guess: file is %s\n", file);
 
-	if (!strcmp(in, "cons") || !strcmp(in, "console")) {
+	do_input = 1;
+	if (pipeinput_str) {
+		have_uinput = 0;
+		do_input = 0;
+	} else {
+		have_uinput = check_uinput();
+	}
+
+	if (!strcmp(in, "consx") || !strcmp(in, "consolex")) {
+		do_input = 0;
+	} else if (!strcmp(in, "cons") || !strcmp(in, "console")) {
 		/* current active VT: */
-		tty = 0;
+		if (! have_uinput) {
+			tty = 0;
+		}
 	} else {
 		int n;
 		if (sscanf(in, "cons%d", &n) == 1)  {
 			tty = n;
+			have_uinput = 0;
 		} else if (sscanf(in, "console%d", &n) != 1)  {
 			tty = n;
+			have_uinput = 0;
 		} 
 	}
-	if (tty >=0 && tty < 64) {
-		if (pipeinput_str == NULL) {
+
+	if (do_input) {
+		if (tty >=0 && tty < 64) {
 			pipeinput_str = (char *) malloc(10);
 			sprintf(pipeinput_str, "CONS%d", tty);
-			rfbLog("console_guess: file pipeinput %s\n", pipeinput_str);
+			rfbLog("console_guess: file pipeinput %s\n",
+			    pipeinput_str);
+			initialize_pipeinput();
+		} else if (have_uinput) {
+			pipeinput_str = strdup("UINPUT");
+			rfbLog("console_guess: file pipeinput %s\n",
+			    pipeinput_str);
 			initialize_pipeinput();
 		}
 	}
@@ -143,9 +166,19 @@ char *console_guess(char *str, int *fd) {
 
 void console_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	static int control = 0, alt = 0;
+	allowed_input_t input;
+
 	if (debug_keyboard) fprintf(stderr, "console_key_command: %d %s\n", (int) keysym, down ? "down" : "up");
+
 	if (pipeinput_cons_fd < 0) {
 		return;		
+	}
+	if (view_only) {
+		return;
+	}
+	get_allowed_input(client, &input);
+	if (! input.keystroke) {
+		return;
 	}
 
 	/* From LinuxVNC.c: */
@@ -250,6 +283,7 @@ void console_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 }
 
 void console_pointer_command(int mask, int x, int y, rfbClientPtr client) {
+	/* do not forget viewonly perms */
 	if (mask || x || y || client) {}
 }
 

@@ -2073,6 +2073,10 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			ui_skip = atoi(argv[++i]);
 			if (! ui_skip) ui_skip = 1;
+		} else if (!strcmp(arg, "-allinput")) {
+			all_input = 1;
+		} else if (!strcmp(arg, "-noallinput")) {
+			all_input = 0;
 		} else if (!strcmp(arg, "-speeds")) {
 			CHECK_ARGC
 			speeds_str = strdup(argv[++i]);

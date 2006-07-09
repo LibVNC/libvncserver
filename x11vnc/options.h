@@ -219,6 +219,7 @@ extern int naptile;
 extern int napfac;
 extern int napmax;
 extern int ui_skip;
+extern int all_input;
 
 extern int watch_fbpm;
 
