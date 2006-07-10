@@ -1642,7 +1642,7 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			passwdfile = strdup(argv[++i]);
 			got_passwdfile = 1;
-#ifndef REL81
+#ifndef REL8x
 		} else if (strstr(arg, "-unixpw") == arg) {
 			unixpw = 1;
 			if (strstr(arg, "-unixpw_nis")) {

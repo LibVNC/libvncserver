@@ -118,7 +118,7 @@
 #define PASSWD_UNLESS_NOPW 0
 #endif
 
-#define noREL81
+#define noREL8x
 
 /*
  * Beginning of support for small binary footprint build for embedded

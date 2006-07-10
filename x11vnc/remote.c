@@ -4005,7 +4005,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, no_external_cmds);
 		} else if (!strcmp(p, "passwdfile")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(passwdfile));
-#ifndef REL81
+#ifndef REL8x
 		} else if (!strcmp(p, "unixpw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, unixpw);
 		} else if (!strcmp(p, "unixpw_nis")) {

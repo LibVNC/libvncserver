@@ -51,7 +51,7 @@ extern char *crypt(const char*, const char *);
 #define IS_BSD
 #endif
 
-#ifdef REL81
+#ifdef REL8x
 #undef UNIXPW_SU
 #undef UNIXPW_CRYPT
 #endif

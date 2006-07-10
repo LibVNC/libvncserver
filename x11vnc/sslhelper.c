@@ -20,7 +20,7 @@
 #endif
 #endif
 
-#ifdef REL81
+#ifdef REL8x
 #undef FORK_OK
 #undef LIBVNCSERVER_HAVE_LIBSSL
 #define LIBVNCSERVER_HAVE_LIBSSL 0

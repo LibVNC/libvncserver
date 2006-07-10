@@ -2,7 +2,7 @@
 .TH X11VNC "1" "July 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.2, lastmod: 2006-07-08
+         version: 0.8.2, lastmod: 2006-07-09
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -3026,7 +3026,7 @@ Examples:
 \fB-rawfb\fR cons3              (force /dev/tty3)
 \fB-rawfb\fR consx              (no keystrokes or mouse)
 \fB-rawfb\fR console:/dev/nonstd
-\fB-rawfb\fR cons \fB-pipeinput\fR UINPUT:accel=1.5
+\fB-rawfb\fR cons \fB-pipeinput\fR UINPUT:accel=4.0
 .PP
 \fB-freqtab\fR \fIfile\fR
 .IP
@@ -3108,30 +3108,32 @@ and motion but not button clicks.
 A UINPUT option of the form: accel=f, or accel=fx+fy
 sets the mouse motion "acceleration".  This is used
 to correct raw mouse relative motion into how much the
-application cursor moves (x11vnc has no control over
-how the application interprets the raw mouse motions).
-Typically the acceleration for an X display is 2 (see
-xset "m" option).  "f" is a floating point number,
-e.g. 2.0.  Use "fx+fy" if you need to supply different
-corrections for x and y.
+application cursor moves (x11vnc has no control over,
+or knowledge of how the windowing application interprets
+the raw mouse motions).  Typically the acceleration
+for an X display is 2 (see xset "m" option).  "f"
+is a floating point number, e.g. 3.0.  Use "fx+fy"
+if you need to supply different corrections for x and y.
 .IP
 Note: the default acceleration is 2.0 since it seems
-both X and qt-embedded often use this value.
+both X and qt-embedded often (but not always) use
+this value.
 .IP
 Even with a correct accel setting the mouse position
 will get out of sync (probably due to a mouse
 "threshold" setting where the acceleration doe not
 apply, set 
 .IR xset (1)
-).  The option reset=N sets the number
-of ms (default 500) after which the cursor is attempted
-to be reset (by forcing the mouse to (0, 0) via small
-increments and then back out to (x, y) in 1 jump), This
-correction seems to be needed but can cause jerkiness
-or unexpected behavior.  Use reset=0 to disable.
+).  The option reset=N sets the
+number of ms (default 500) after which the cursor is
+attempted to be reset (by forcing the mouse to (0,
+0) via small increments and then back out to (x, y)
+in 1 jump), This correction seems to be needed but can
+cause jerkiness or unexpected behavior with menus, etc.
+Use reset=0 to disable.
 .IP
 Example:
-\fB-pipeinput\fR UINPUT:accel=1.0 \fB-cursor\fR none
+\fB-pipeinput\fR UINPUT:accel=4.0 \fB-cursor\fR none
 .PP
 \fB-gui\fR \fI[gui-opts]\fR
 .IP

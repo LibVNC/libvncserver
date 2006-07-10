@@ -15,7 +15,7 @@
 #endif
 #endif
 
-#ifdef REL81
+#ifdef REL8x
 #undef SSLCMDS
 #endif
 

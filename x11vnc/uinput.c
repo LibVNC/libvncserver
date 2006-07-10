@@ -32,6 +32,9 @@ void parse_uinput_str(char *str);
 void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client);
 void uinput_key_command(int down, int keysym, rfbClientPtr client);
 
+static void init_key_tracker(void);
+static int mod_is_down(void);
+static int key_is_down(void);
 static void set_uinput_accel_xy(double fx, double fy);
 static void shutdown_uinput(void);
 static void ptr_move(int dx, int dy);
@@ -94,6 +97,45 @@ int check_uinput(void) {
 #endif
 }
 
+static int key_pressed[256];
+static int key_ismod[256];
+
+static void init_key_tracker(void) {
+	int i;
+	for (i = 0; i < 256; i++) {
+		key_pressed[i] = 0;
+		key_ismod[i] = 0;
+	}
+	i = lookup_code(XK_Shift_L);	if (0<=i && i<256) key_ismod[i] = 1;
+	i = lookup_code(XK_Shift_R);	if (0<=i && i<256) key_ismod[i] = 1;
+	i = lookup_code(XK_Control_L);	if (0<=i && i<256) key_ismod[i] = 1;
+	i = lookup_code(XK_Control_R);	if (0<=i && i<256) key_ismod[i] = 1;
+	i = lookup_code(XK_Alt_L);	if (0<=i && i<256) key_ismod[i] = 1;
+	i = lookup_code(XK_Alt_R);	if (0<=i && i<256) key_ismod[i] = 1;
+	i = lookup_code(XK_Meta_L);	if (0<=i && i<256) key_ismod[i] = 1;
+	i = lookup_code(XK_Meta_R);	if (0<=i && i<256) key_ismod[i] = 1;
+}
+
+static int mod_is_down(void) {
+	int i;
+	for (i = 0; i < 256; i++) {
+		if (key_pressed[i] && key_ismod[i]) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int key_is_down(void) {
+	int i;
+	for (i = 0; i < 256; i++) {
+		if (key_pressed[i]) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static void shutdown_uinput(void) {
 #ifdef UINPUT_OK
 	ioctl(fd, UI_DEV_DESTROY);
@@ -112,6 +154,8 @@ int initialize_uinput(void) {
 		close(fd);
 		fd = -1;
 	}
+
+	init_key_tracker();
 	
 	if (uinput_dev) {
 		fd = open(uinput_dev, O_RDWR);
@@ -176,6 +220,7 @@ static double resid_x = 0.0;
 static double resid_y = 0.0;
 
 static double zero_delay = 0.5;
+static double last_button_click = 0.0;
 
 static void set_uinput_accel_xy(double fx, double fy) {
 	fudge_x = 1.0/fx;
@@ -353,6 +398,8 @@ static void button_click(int down, int btn) {
 	ev.value = 0;
 	write(fd, &ev, sizeof(ev));
 
+	last_button_click = dnow();
+
 #endif
 }
 
@@ -361,6 +408,8 @@ void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 	static int last_x = -1, last_y = -1, last_mask = -1;
 	static double last_zero = 0.0;
 	allowed_input_t input;
+	int do_reset;
+	double now;
 	
 	if (db) fprintf(stderr, "uinput_pointer_command: %d %d - %d\n", x, y, mask);
 
@@ -369,13 +418,31 @@ void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 	}
 	get_allowed_input(client, &input);
 
-	if (!bmask && dnow() >= last_zero + zero_delay && input.motion) {
+	now = dnow();
+
+	do_reset = 1;
+	if (mask || bmask) {
+		do_reset = 0;	/* do not do reset if moust button down */
+	} else if (! input.motion) {
+		do_reset = 0;
+	} else if (now < last_zero + zero_delay) {
+		do_reset = 0;
+	}
+	if (do_reset) {
+		if (mod_is_down()) {
+			do_reset = 0;
+		} else if (now < last_button_click + 0.25) {
+			do_reset = 0;
+		}
+	}
+
+	if (do_reset) {
 		static int first = 1;
 
 		if (zero_delay > 0.0 || first) {
 			/* try to push it to 0,0 */
-			int tx = fudge_x * last_x;
-			int ty = fudge_y * last_y;
+			int tx = fudge_x * last_x + 40;
+			int ty = fudge_y * last_y + 40;
 			int bigjump = 1;
 
 			if (bigjump) {
@@ -399,6 +466,7 @@ void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 
 			/* now jump back out */
 			ptr_rel(x, y);
+			if (0) usleep(10*1000);
 
 			last_x = x;
 			last_y = y;
@@ -488,6 +556,10 @@ void uinput_key_command(int down, int keysym, rfbClientPtr client) {
 	ev.code = SYN_REPORT;
 	ev.value = 0;
 	write(fd, &ev, sizeof(ev));
+
+	if (0 <= scancode < 256) {
+		key_pressed[scancode] = down ? 1 : 0;
+	}
 #endif
 }
 
