@@ -19,7 +19,7 @@
  *  USA.
  *
  *
- * This program is based heavily on the following programs:
+ * This program is based on the following programs:
  *
  *       the originial x11vnc.c in libvncserver (Johannes E. Schindelin)
  *	 x0rfbserver, the original native X vnc server (Jens Wagner)

@@ -3463,6 +3463,17 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("set_uinput_accel: %s\n", p);
 		set_uinput_accel(p);
 
+	} else if (strstr(p, "uinput_thresh") == p) {
+		COLON_CHECK("uinput_thresh:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(get_uinput_thresh()));
+			goto qry;
+		}
+		p += strlen("uinput_thresh:");
+		rfbLog("set_uinput_thresh: %s\n", p);
+		set_uinput_thresh(p);
+
 	} else if (strstr(p, "uinput_reset") == p) {
 		COLON_CHECK("uinput_reset:")
 		p += strlen("uinput_reset:");
@@ -3473,6 +3484,17 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("set_uinput_reset: %s\n", p);
 		set_uinput_reset(atoi(p));
+
+	} else if (strstr(p, "uinput_always") == p) {
+		COLON_CHECK("uinput_always:")
+		p += strlen("uinput_always:");
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
+			    get_uinput_always());
+			goto qry;
+		}
+		rfbLog("set_uinput_always: %s\n", p);
+		set_uinput_always(atoi(p));
 
 	} else if (strstr(p, "progressive") == p) {
 		int f;

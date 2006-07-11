@@ -180,6 +180,7 @@ Screen
 	pipeinput:
 	uinput_accel:
 	uinput_reset:
+	uinput_always:
 	24to32
 	=GAL LOFF
 

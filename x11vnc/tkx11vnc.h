@@ -191,6 +191,7 @@ char gui_code[] = "";
 "	pipeinput:\n"
 "	uinput_accel:\n"
 "	uinput_reset:\n"
+"	uinput_always:\n"
 "	24to32\n"
 "	=GAL LOFF\n"
 "\n"

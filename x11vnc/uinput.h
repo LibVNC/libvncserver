@@ -6,9 +6,13 @@
 extern int check_uinput(void);
 extern int initialize_uinput(void);
 extern int set_uinput_accel(char *str);
+extern int set_uinput_thresh(char *str);
 extern void set_uinput_reset(int ms);
+extern void set_uinput_always(int);
 extern char *get_uinput_accel();
+extern char *get_uinput_thresh();
 extern int get_uinput_reset();
+extern int get_uinput_always();
 extern void parse_uinput_str(char *str);
 extern void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client);
 extern void uinput_key_command(int down, int keysym, rfbClientPtr client);

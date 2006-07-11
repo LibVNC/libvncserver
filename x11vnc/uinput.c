@@ -25,8 +25,10 @@
 int check_uinput(void);
 int initialize_uinput(void);
 int set_uinput_accel(char *str);
+int set_uinput_thresh(char *str);
 void set_uinput_reset(int ms);
 char *get_uinput_accel();
+char *get_uinput_thresh();
 int get_uinput_reset();
 void parse_uinput_str(char *str);
 void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client);
@@ -43,7 +45,7 @@ static void button_click(int down, int btn);
 static int lookup_code(int keysym);
 
 static int fd = -1;
-static int db = 1;
+static int db = 0;
 static int bmask = 0;
 
 static char *injectable = NULL;
@@ -155,6 +157,11 @@ int initialize_uinput(void) {
 		fd = -1;
 	}
 
+	if (getenv("X11VNC_UINPUT_DEBUG")) {
+		db = atoi(getenv("X11VNC_UINPUT_DEBUG"));
+		rfbLog("set uinput debug to: %d\n", db);
+	}
+
 	init_key_tracker();
 	
 	if (uinput_dev) {
@@ -213,14 +220,20 @@ int initialize_uinput(void) {
 #endif
 }
 
+/* these defaults are based on qt-embedded 7/2006 */
 static double fudge_x = 0.5;	/* accel=2.0 */
 static double fudge_y = 0.5;
+
+static int thresh = 5;
+static int thresh_or = 1;
 
 static double resid_x = 0.0;
 static double resid_y = 0.0;
 
-static double zero_delay = 0.5;
+static double zero_delay = 0.15;
 static double last_button_click = 0.0;
+
+static int uinput_always = 0;
 
 static void set_uinput_accel_xy(double fx, double fy) {
 	fudge_x = 1.0/fx;
@@ -230,6 +243,7 @@ static void set_uinput_accel_xy(double fx, double fy) {
 }
 
 static char *uinput_accel_str = NULL;
+static char *uinput_thresh_str = NULL;
 
 int set_uinput_accel(char *str) {
 	double fx, fy;
@@ -249,16 +263,40 @@ int set_uinput_accel(char *str) {
 	return 1;
 }
 
+int set_uinput_thresh(char *str) {
+	rfbLog("set_uinput_thresh: str=%s\n", str);
+	if (str[0] == '+') {
+		thresh_or = 0;
+	}
+	thresh = atoi(str);
+	if (uinput_thresh_str) {
+		free(uinput_thresh_str);
+	}
+	uinput_thresh_str = strdup(str);
+	return 1;
+}
+
 void set_uinput_reset(int ms) {
 	zero_delay = (double) ms/1000.;
 	rfbLog("set_uinput_reset: %d\n", ms);
 }
 
+int set_uinput_always(int a) {
+	uinput_always = a;
+}
+
 char *get_uinput_accel(void) {
 	return uinput_accel_str;
 }
+char *get_uinput_thresh(void) {
+	return uinput_thresh_str;
+}
 int get_uinput_reset(void) {
 	return (int) (1000 * zero_delay);
+}
+
+int get_uinput_always(void) {
+	return uinput_always;
 }
 
 void parse_uinput_str(char *in) {
@@ -282,10 +320,16 @@ void parse_uinput_str(char *in) {
 			if (! set_uinput_accel(q)) {
 				clean_up_exit(1);
 			}
+		} else if (strstr(p, "thresh=") == p) {
+			q = p + strlen("thresh=");
+			set_uinput_thresh(q);
 
 		} else if (strstr(p, "reset=") == p) {
 			int n = atoi(p + strlen("reset="));
 			set_uinput_reset(n);
+		} else if (strstr(p, "always=") == p) {
+			int n = atoi(p + strlen("always="));
+			set_uinput_always(n);
 		} else if (strpbrk(p, "KMB") == p) {
 			if (injectable) {
 				free(injectable);
@@ -307,19 +351,18 @@ static void ptr_move(int dx, int dy) {
 	if (injectable && strchr(injectable, 'M') == NULL) {
 		return;
 	}
-if (0) fprintf(stderr, "ptr_move: %d %d\n", dx, dy);
 
 	memset(&ev, 0, sizeof(ev));
 
 	gettimeofday(&ev.time, NULL);
 	ev.type = EV_REL;
-	ev.code = REL_X;
-	ev.value = dx;
+	ev.code = REL_Y;
+	ev.value = dy;
 	write(fd, &ev, sizeof(ev));
 
 	ev.type = EV_REL;
-	ev.code = REL_Y;
-	ev.value = dy;
+	ev.code = REL_X;
+	ev.value = dx;
 	write(fd, &ev, sizeof(ev));
 
 	ev.type = EV_SYN;
@@ -329,36 +372,143 @@ if (0) fprintf(stderr, "ptr_move: %d %d\n", dx, dy);
 #endif
 }
 
-static void ptr_rel(int dx, int dy) {
-	int dxf, dyf;
+static int inside_thresh(int dx, int dy, int thr) {
+	if (thresh_or) {
+		/* this is peeking at qt-embedded qmouse_qws.cpp */
+		if (nabs(dx) <= thresh && nabs(dy) <= thr) {
+			return 1;
+		}
+	} else {
+		/* this is peeking at xfree/xorg xf86Xinput.c */
+		if (nabs(dx) + nabs(dy) < thr) {
+			return 1;
+		}
+	}
+	return 0;
+}
 
-	dxf = (int) (fudge_x * (double) dx);
-	dyf = (int) (fudge_y * (double) dy);
+static void ptr_rel(int dx, int dy) {
+	int dxf, dyf, nx, ny, k;
+	int accel, thresh_high, thresh_mid;
+	double fx, fy;
+	static int try_threshes = -1;
+
+	if (try_threshes < 0) {
+		if (getenv("X11VNC_UINPUT_THRESHOLDS")) {
+			try_threshes = 1;
+		} else {
+			try_threshes = 0;
+		}
+	}
+
+	if (try_threshes) {
+		thresh_high = (int) ( (double) thresh/fudge_x );
+		thresh_mid =  (int) ( (double) (thresh + thresh_high) / 2.0 );
+
+		if (thresh_mid <= thresh) {
+			thresh_mid = thresh + 1;
+		}
+		if (thresh_high <= thresh_mid) {
+			thresh_high = thresh_mid + 1;
+		}
+
+		if (inside_thresh(dx, dy, thresh)) {
+			accel = 0;
+		} else {
+			accel = 1;
+		}
+		nx = nabs(dx);
+		ny = nabs(dy);
+
+	} else {
+		accel = 1;
+		thresh_high = 0;
+		nx = ny = 1;
+	}
+
+	if (accel && nx + ny > 0 ) {
+		if (thresh_high > 0 && inside_thresh(dx, dy, thresh_high)) {
+			double alpha, t;
+			/* XXX */
+			if (1 || inside_thresh(dx, dy, thresh_mid)) {
+				t = thresh; 
+				accel = 2;
+			} else {
+				accel = 3;
+				t = thresh_high;
+			}
+			if (thresh_or) {
+				if (nx > ny) {
+					fx = t;
+					fy =  ((double) ny / (double) nx) * t;
+				} else {
+					fx =  ((double) nx / (double) ny) * t;
+					fy = t;
+				}
+				dxf = (int) fx;
+				dyf = (int) fy;
+				fx = dx;
+				fy = dy;
+				
+			} else {
+				if (t > 1) {
+					/* XXX */
+					t = t - 1.0;
+				}
+				alpha = t/(nx + ny);
+				fx = alpha * dx;
+				fy = alpha * dy;
+				dxf = (int) fx;
+				dyf = (int) fy;
+				fx = dx;
+				fy = dy;
+			}
+		} else {
+			fx = fudge_x * (double) dx;
+			fy = fudge_y * (double) dy;
+			dxf = (int) fx;
+			dyf = (int) fy;
+		}
+	} else {
+		fx = dx;
+		fy = dy;
+		dxf = dx;
+		dyf = dy;
+	}
 
 	if (db > 1) fprintf(stderr, "old dx dy: %d %d\n", dx, dy);
-	if (db > 1) fprintf(stderr, "new dx dy: %d %d\n", dxf, dyf);
+	if (db > 1) fprintf(stderr, "new dx dy: %d %d  accel: %d\n", dxf, dyf, accel);
 
 	ptr_move(dxf, dyf);
 
-	resid_x += fudge_x * (double) dx - dxf;
-	resid_y += fudge_y * (double) dy - dyf;
+	resid_x += fx - dxf;
+	resid_y += fy - dyf;
 
-	if (resid_x < -1.0 || resid_x > 1.0 || resid_y < -1.0 || resid_y > 1.0) {
-		dxf = 0;
-		dyf = 0;
-		if (resid_x > 1.0) {
-			dxf = (int) resid_x;
-		} else if (resid_x < -1.0)  {
-			dxf = -((int) (-resid_x));
+	for (k = 0; k < 4; k++) {
+		if (resid_x <= -1.0 || resid_x >= 1.0 || resid_y <= -1.0 || resid_y >= 1.0) {
+			dxf = 0;
+			dyf = 0;
+			if (resid_x >= 1.0) {
+				dxf = (int) resid_x;
+				dxf = 1;
+			} else if (resid_x <= -1.0)  {
+				dxf = -((int) (-resid_x));
+				dxf = -1;
+			}
+			resid_x -= dxf;
+			if (resid_y >= 1.0) {
+				dyf = (int) resid_y;
+				dyf = 1;
+			} else if (resid_y <= -1.0)  {
+				dyf = -((int) (-resid_y));
+				dyf = -1;
+			}
+			resid_y -= dyf;
+
+			if (db > 1) fprintf(stderr, "*%s resid: dx dy: %d %d  %f %f\n", accel > 1 ? "*" : " ", dxf, dyf, resid_x, resid_y);
+if (0) {usleep(100*1000)};
+			ptr_move(dxf, dyf);
 		}
-		resid_x -= dxf;
-		if (resid_y > 1.0) {
-			dyf = (int) resid_y;
-		} else if (resid_y < -1.0)  {
-			dyf = -((int) (-resid_y));
-		}
-		resid_y -= dyf;
-		ptr_move(dxf, dyf);
 	}
 }
 
@@ -370,7 +520,7 @@ static void button_click(int down, int btn) {
 		return;
 	}
 
-	if (db) fprintf(stderr, "down %d btn %d\n", down, btn);
+	if (db) fprintf(stderr, "button_click: btn %d %s\n", btn, down ? "down" : "up");
 
 	memset(&ev, 0, sizeof(ev));
 	gettimeofday(&ev.time, NULL);
@@ -408,8 +558,18 @@ void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 	static int last_x = -1, last_y = -1, last_mask = -1;
 	static double last_zero = 0.0;
 	allowed_input_t input;
-	int do_reset;
+	int do_reset, reset_lower_right = 1;
 	double now;
+	static int first = 1;
+
+	if (first) {
+		if (getenv("RESET_ALWAYS")) {
+			set_uinput_always(1);
+		} else {
+			set_uinput_always(0);
+		}
+	}
+	first = 0;
 	
 	if (db) fprintf(stderr, "uinput_pointer_command: %d %d - %d\n", x, y, mask);
 
@@ -436,37 +596,92 @@ void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 		}
 	}
 
+	if (uinput_always && !mask && !bmask && input.motion) {
+		do_reset = 1;
+	}
+
 	if (do_reset) {
 		static int first = 1;
 
 		if (zero_delay > 0.0 || first) {
 			/* try to push it to 0,0 */
-			int tx = fudge_x * last_x + 40;
-			int ty = fudge_y * last_y + 40;
-			int bigjump = 1;
+			int tx, ty, bigjump = 1;
+
+			if (reset_lower_right) {
+				tx = fudge_x * (dpy_x - last_x);
+				ty = fudge_y * (dpy_y - last_y);
+			} else {
+				tx = fudge_x * last_x;
+				ty = fudge_y * last_y;
+			}
+
+			tx += 50;
+			ty += 50;
 
 			if (bigjump) {
-				ptr_move(-tx, -ty);
-				ptr_move(-tx, -ty);
+				if (reset_lower_right) {
+					ptr_move(0, +ty);
+					usleep(2*1000);
+					ptr_move(+tx, +ty);
+					ptr_move(+tx, +ty);
+				} else {
+					ptr_move(0, -ty);
+					usleep(2*1000);
+					ptr_move(-tx, -ty);
+					ptr_move(-tx, -ty);
+				}
 			} else {
 				int i, step, n = 20;
 				step = dpy_x / n;
+
 				if (step < 100) step = 100;
+
 				for (i=0; i < n; i++)  {
-					ptr_move(-step, -step);
+					if (reset_lower_right) {
+						ptr_move(+step, +step);
+					} else {
+						ptr_move(-step, -step);
+					}
 				}
 				for (i=0; i < n; i++)  {
-					ptr_move(-1, -1);
+					if (reset_lower_right) {
+						ptr_move(+1, +1);
+					} else {
+						ptr_move(-1, -1);
+					}
 				}
 			}
-			if (db) fprintf(stderr, "uinput_pointer_command: reset\n");
+			if (db) {
+				if (reset_lower_right) {
+					fprintf(stderr, "uinput_pointer_command: reset -> (W,H) (%d,%d)  [%d,%d]\n", x, y, tx, ty);
+				} else {
+					fprintf(stderr, "uinput_pointer_command: reset -> (0,0) (%d,%d)  [%d,%d]\n", x, y, tx, ty);
+				}
+			}
 
 			/* rest a bit for system to absorb the change */
-			usleep(30*1000);
+			if (uinput_always) {
+				static double last_sleep = 0.0;
+				double nw = dnow(), delay = zero_delay;
+				if (delay <= 0.0) delay = 0.1;
+				if (nw > last_sleep + delay) {
+					usleep(10*1000);
+					last_sleep = nw;
+				} else {
+					usleep(1*1000);
+				}
+				
+			} else {
+				usleep(30*1000);
+			}
 
 			/* now jump back out */
-			ptr_rel(x, y);
-			if (0) usleep(10*1000);
+			if (reset_lower_right) {
+				ptr_rel(x - dpy_x, y - dpy_y);
+			} else {
+				ptr_rel(x, y);
+			}
+			if (1) {usleep(10*1000)};
 
 			last_x = x;
 			last_y = y;
@@ -494,12 +709,12 @@ void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 		last_mask = mask;
 	}
 
-#if 0
-fprintf(stderr, "mask:        %s\n", bitprint(mask, 16));
-fprintf(stderr, "bmask:       %s\n", bitprint(bmask, 16));
-fprintf(stderr, "last_mask:   %s\n", bitprint(last_mask, 16));
-fprintf(stderr, "button_mask: %s\n", bitprint(button_mask, 16));
-#endif
+	if (db > 2) {
+		fprintf(stderr, "mask:        %s\n", bitprint(mask, 16));
+		fprintf(stderr, "bmask:       %s\n", bitprint(bmask, 16));
+		fprintf(stderr, "last_mask:   %s\n", bitprint(last_mask, 16));
+		fprintf(stderr, "button_mask: %s\n", bitprint(button_mask, 16));
+	}
 
 	if (mask != last_mask) {
 		int i;
@@ -542,7 +757,7 @@ void uinput_key_command(int down, int keysym, rfbClientPtr client) {
 	if (scancode < 0) {
 		return;
 	}
-	if (db) fprintf(stderr, "uinput_key_command: %d -> %d\n", keysym, scancode);
+	if (db) fprintf(stderr, "uinput_key_command: %d -> %d %s\n", keysym, scancode, down ? "down" : "up");
 
 	memset(&ev, 0, sizeof(ev));
 	gettimeofday(&ev.time, NULL);
@@ -557,7 +772,7 @@ void uinput_key_command(int down, int keysym, rfbClientPtr client) {
 	ev.value = 0;
 	write(fd, &ev, sizeof(ev));
 
-	if (0 <= scancode < 256) {
+	if (0 <= scancode && scancode < 256) {
 		key_pressed[scancode] = down ? 1 : 0;
 	}
 #endif
@@ -767,7 +982,8 @@ while (<>) {
 	}
 }
 
-This only handles us kbd, we would need a kbd database in general...
+This only handles US kbd, we would need a kbd database in general...
+Ugh: parse dumpkeys(1) or -fookeys /usr/share/keymaps/i386/qwerty/dk.kmap.gz
 
 XK_Escape	KEY_ESC
 XK_1		KEY_1

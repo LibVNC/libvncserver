@@ -2631,6 +2631,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	static rfbKeySym last_keysym = NoSymbol;
 	static rfbKeySym max_keyrepeat_last_keysym = NoSymbol;
 	static double max_keyrepeat_last_time = 0.0;
+	static double max_keyrepeat_always = -1.0;
 
 	dtime0(&tnow);
 	got_keyboard_calls++;
@@ -2644,6 +2645,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		    down ? "down":"up", (int) keysym, str ? str : "null",
 		    unixpw_in_progress, tnow - x11vnc_start);
 	}
+
 
 	if (keysym <= 0) {
 		rfbLog("keyboard: skipping 0x0 keysym\n");
@@ -2768,6 +2770,18 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		}
 	}
 
+#ifdef MAX_KEYREPEAT 
+	if (max_keyrepeat_always < 0.0) {
+		if (getenv("MAX_KEYREPEAT")) {
+			max_keyrepeat_always = atof(getenv("MAX_KEYREPEAT"));
+		} else {
+			max_keyrepeat_always = 0.0;
+		}
+	}
+	if (max_keyrepeat_always > 0.0) {
+		max_keyrepeat_time = max_keyrepeat_always;
+	}
+#endif
 	if (!down && skipped_last_down) {
 		int db = debug_scroll;
 		if (keysym == max_keyrepeat_last_keysym) {

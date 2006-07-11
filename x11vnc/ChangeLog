@@ -1,3 +1,6 @@
+2006-07-11  Karl Runge <runge@karlrunge.com>
+	* x11vnc: more tweaks to UINPUT, mostly mouse motion.
+
 2006-07-08  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add uinput support (-pipeinput UINPUT:...) for full
 	  mouse and key input to linux console (e.g. for qt-embedded apps)

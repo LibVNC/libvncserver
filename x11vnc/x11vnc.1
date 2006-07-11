@@ -2,7 +2,7 @@
 .TH X11VNC "1" "July 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.2, lastmod: 2006-07-09
+         version: 0.8.2, lastmod: 2006-07-11
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2991,16 +2991,17 @@ be root to inject keystrokes.  /dev/tty0 refers to the
 active VT, to indicate one explicitly, use "cons2",
 etc. using the VT number.
 .IP
-If the Linux version seems to be 2.6 or later and the
-"uinput" module appears to be present, then the uinput
-method will be used instead of /dev/ttyN.  uinput allows
-insertion of BOTH keystrokes and mouse input and so it
-preferred when accessing graphical (e.g. QT-embedded)
-linux console apps.  See \fB-pipeinput\fR UINPUT below
-for more information on this mode (you may want to
-also use the \fB-nodragging\fR and \fB-cursor\fR none options).
-Use "cons0", etc  or \fB-pipeinput\fR CONS to force the
-/dev/ttyN method.
+If the Linux version seems to be 2.6 or later and
+the "uinput" module appears to be present, then
+the uinput method will be used instead of /dev/ttyN.
+uinput allows insertion of BOTH keystrokes and mouse
+input and so it preferred when accessing graphical
+(e.g. QT-embedded) linux console apps.  See \fB-pipeinput\fR
+UINPUT below for more information on this mode; you
+will have to use \fB-pipeinput\fR if you want to tweak any
+UINPUT parameters.  You may also want to also use the
+\fB-nodragging\fR and \fB-cursor\fR none options.  Use "cons0",
+etc  or \fB-pipeinput\fR CONS to force the /dev/ttyN method.
 .IP
 Note you can change VT remotely using the 
 .IR chvt (1)
@@ -3059,7 +3060,7 @@ To facilitate this, if \fB-rawfb\fR is in effect then the
 value is stored in X11VNC_RAWFB_STR for the pipe command
 to use if it wants. Do 'env | grep X11VNC' for more.
 .IP
-Built-in pipeinput modes:
+Built-in pipeinput modes (no external program required):
 .IP
 If cmd is "VID" and you are using the \fB-rawfb\fR for a
 video capture device, then an internal list of keyboard
@@ -3125,15 +3126,24 @@ will get out of sync (probably due to a mouse
 apply, set 
 .IR xset (1)
 ).  The option reset=N sets the
-number of ms (default 500) after which the cursor is
+number of ms (default 150) after which the cursor is
 attempted to be reset (by forcing the mouse to (0,
 0) via small increments and then back out to (x, y)
 in 1 jump), This correction seems to be needed but can
 cause jerkiness or unexpected behavior with menus, etc.
 Use reset=0 to disable.
 .IP
+If you set the env. var X11VNC_UINPUT_THRESHOLDS then
+the thresh=n mode will be enabled.  It it currently
+not working well.  If |dx| <= thresh and |dy| < thresh
+no acceleration is applied.  Use "thresh=+n" |dx| +
+|dy| <= thresh to be used instead (X11?)
+.IP
 Example:
 \fB-pipeinput\fR UINPUT:accel=4.0 \fB-cursor\fR none
+.IP
+You can also set the env. var X11VNC_UINPUT_DEBUG=1 or
+higher to get debugging output for UINPUT mode.
 .PP
 \fB-gui\fR \fI[gui-opts]\fR
 .IP
@@ -3679,6 +3689,8 @@ uinput_accel:f  set uinput_accel to f.
 .IP
 uinput_reset:n  set uinput_reset to n ms.
 .IP
+uinput_always:n set uinput_always to 1/0.
+.IP
 progressive:n   set libvncserver \fB-progressive\fR slice
 height parameter to n.
 .IP
@@ -3791,13 +3803,6 @@ these cases the value returned is "N/A".  To direct a
 query straight to the X11VNC_REMOTE property or connect
 file use "qry=..." instead of "cmd=..."
 .IP
-Here is the current list of "variables" that can
-be supplied to the \fB-query\fR command. This includes the
-"N/A" ones that return no useful info.  For variables
-names that do not correspond to an x11vnc option or
-remote command, we hope the name makes it obvious what
-the returned value corresponds to (hint: the ext_*
-variables correspond to the presence of X extensions):
 ans= stop quit exit shutdown ping blacken zero
 refresh reset close disconnect id sid waitmapped
 nowaitmapped clip flashcmap noflashcmap shiftcmap
@@ -3828,16 +3833,16 @@ xwarp noxwarppointer noxwarp buttonmap dragging
 nodragging wireframe_mode wireframe wf nowireframe
 nowf wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-scr_parms scrollcopyrect scr noscrollcopyrect
-noscr fixscreen noxrecord xrecord reset_record
-pointer_mode pm input_skip allinput noallinput input
-grabkbd nograbkbd grabptr nograbptr client_input
-speeds wmdt debug_pointer dp nodebug_pointer nodp
-debug_keyboard dk nodebug_keyboard nodk deferupdate
-defer wait_ui wait_bog nowait_bog slow_fb wait
-readtimeout nap nonap sb screen_blank fbpm nofbpm
-fs gaps grow fuzz snapfb nosnapfb rawfb uinput_accel
-uinput_reset progressive rfbport http nohttp httpport
+scr_parms scrollcopyrect scr noscrollcopyrect noscr
+fixscreen noxrecord xrecord reset_record pointer_mode
+pm input_skip allinput noallinput input grabkbd
+nograbkbd grabptr nograbptr client_input speeds wmdt
+debug_pointer dp nodebug_pointer nodp debug_keyboard
+dk nodebug_keyboard nodk deferupdate defer wait_ui
+wait_bog nowait_bog slow_fb wait readtimeout nap
+nonap sb screen_blank fbpm nofbpm fs gaps grow
+fuzz snapfb nosnapfb rawfb uinput_accel uinput_reset
+uinput_always progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop debug_xevents nodebug_xevents
