@@ -521,7 +521,7 @@ static void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
 
 	if (pipeinput_int == PIPEINPUT_VID) {
 		v4l_pointer_command(mask, x, y, client);
-	} else if (pipeinput_int == PIPEINPUT_CONS) {
+	} else if (pipeinput_int == PIPEINPUT_CONSOLE) {
 		console_pointer_command(mask, x, y, client);
 	} else if (pipeinput_int == PIPEINPUT_UINPUT) {
 		uinput_pointer_command(mask, x, y, client);
@@ -924,10 +924,10 @@ if (0) fprintf(stderr, "initialize_pipeinput: %s -- %s\n", pipeinput_str, p);
 	if (!strcmp(p, "VID")) {
 		pipeinput_int = PIPEINPUT_VID;
 		return;
-	} else if (strstr(p, "CONS") == p) {
+	} else if (strstr(p, "CONSOLE") == p) {
 		int tty = 0, n;
 		char dev[32];
-		if (sscanf(p, "CONS%d", &n) == 1) {
+		if (sscanf(p, "CONSOLE%d", &n) == 1) {
 			tty = n;
 		}
 		sprintf(dev, "/dev/tty%d", tty);
@@ -938,7 +938,7 @@ if (0) fprintf(stderr, "initialize_pipeinput: %s -- %s\n", pipeinput_str, p);
 				free(pipeinput_cons_dev);
 			}
 			pipeinput_cons_dev = strdup(dev);
-			pipeinput_int = PIPEINPUT_CONS;
+			pipeinput_int = PIPEINPUT_CONSOLE;
 		} else {
 			rfbLog("pipeinput: could not open: %s\n", dev);
 			rfbLogPerror("open");

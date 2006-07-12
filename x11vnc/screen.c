@@ -961,7 +961,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		rawfb_dev_video = 1;
 	} else if (strstr(str, "dev/video")) {
 		rawfb_dev_video = 1;
-	} else if (strstr(str, "cons") == str || strstr(str, "fb") == str ||
+	} else if (strstr(str, "console") == str || strstr(str, "fb") == str ||
 	    strstr(str, "/dev/fb") == str) {
 		char *str2 = console_guess(str, &raw_fb_fd);
 		if (str2 == NULL) {

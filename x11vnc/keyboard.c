@@ -2486,7 +2486,7 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 	if (pipeinput_int == PIPEINPUT_VID) {
 		v4l_key_command(down, keysym, client);
-	} else if (pipeinput_int == PIPEINPUT_CONS) {
+	} else if (pipeinput_int == PIPEINPUT_CONSOLE) {
 		console_key_command(down, keysym, client);
 	} else if (pipeinput_int == PIPEINPUT_UINPUT) {
 		uinput_key_command(down, keysym, client);

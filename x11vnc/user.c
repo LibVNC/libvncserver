@@ -1152,7 +1152,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 		if (!strcmp(argv[i], "-desktop")) {
 			dt = 1;
 		}
-		if (1) fprintf(stderr, "args %d %s\n", i, argv[i]);
+		if (db) fprintf(stderr, "args %d %s\n", i, argv[i]);
 	}
 
 	str = strdup(use_dpy);

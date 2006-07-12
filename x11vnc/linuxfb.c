@@ -26,15 +26,15 @@ char *console_guess(char *str, int *fd) {
 
 	if (strstr(in, "/dev/fb") == in) {
 		free(in);
-		in = (char *) malloc(strlen("cons:") + strlen(str) + 1);
-		sprintf(in, "cons:%s", str);
+		in = (char *) malloc(strlen("console:") + strlen(str) + 1);
+		sprintf(in, "console:%s", str);
 	} else if (strstr(in, "fb") == in) {
 		free(in);
-		in = (char *) malloc(strlen("cons:/dev/") + strlen(str) + 1);
-		sprintf(in, "cons:/dev/%s", str);
+		in = (char *) malloc(strlen("console:/dev/") + strlen(str) + 1);
+		sprintf(in, "console:/dev/%s", str);
 	}
 
-	if (strstr(in, "cons") != in) {
+	if (strstr(in, "console") != in) {
 		rfbLog("console_guess: unrecognized console/fb format: %s\n", str);
 		free(in);
 		return NULL;
@@ -77,19 +77,16 @@ char *console_guess(char *str, int *fd) {
 		have_uinput = check_uinput();
 	}
 
-	if (!strcmp(in, "consx") || !strcmp(in, "consolex")) {
+	if (!strcmp(in, "consolex")) {
 		do_input = 0;
-	} else if (!strcmp(in, "cons") || !strcmp(in, "console")) {
+	} else if (!strcmp(in, "console")) {
 		/* current active VT: */
 		if (! have_uinput) {
 			tty = 0;
 		}
 	} else {
 		int n;
-		if (sscanf(in, "cons%d", &n) == 1)  {
-			tty = n;
-			have_uinput = 0;
-		} else if (sscanf(in, "console%d", &n) != 1)  {
+		if (sscanf(in, "console%d", &n) != 1)  {
 			tty = n;
 			have_uinput = 0;
 		} 
@@ -98,7 +95,7 @@ char *console_guess(char *str, int *fd) {
 	if (do_input) {
 		if (tty >=0 && tty < 64) {
 			pipeinput_str = (char *) malloc(10);
-			sprintf(pipeinput_str, "CONS%d", tty);
+			sprintf(pipeinput_str, "CONSOLE%d", tty);
 			rfbLog("console_guess: file pipeinput %s\n",
 			    pipeinput_str);
 			initialize_pipeinput();
