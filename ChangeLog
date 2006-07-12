@@ -1,3 +1,6 @@
+2006-07-12  Karl Runge <runge@karlrunge.com>
+	* libvncserver: release for CVE-2006-2450 fix.
+
 2006-07-08  Karl Runge <runge@karlrunge.com>
 	* configure.ac: add <linux/uinput.h> for linux console.
 
