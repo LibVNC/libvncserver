@@ -119,6 +119,7 @@
 #endif
 
 #define noREL8x
+#define REL8x
 
 /*
  * Beginning of support for small binary footprint build for embedded
