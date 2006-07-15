@@ -119,7 +119,6 @@
 #endif
 
 #define noREL8x
-#define REL8x
 
 /*
  * Beginning of support for small binary footprint build for embedded
@@ -130,7 +129,7 @@
  * should be done too (manually for now).
  *
  * If there is interest more of the bloat can be removed...  Currently
- * these shrink the binary from 500K to about 270K.
+ * these shrink the binary from 1100K to about 600K.
  */
 #ifndef SMALL_FOOTPRINT
 #define SMALL_FOOTPRINT 0

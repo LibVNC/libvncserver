@@ -1038,8 +1038,9 @@ void user_supplied_opts(char *opts) {
 	char *p, *str;
 	char *allow[] = {
 		"skip-display", "skip-auth", "skip-shared",
-		"scale", "scale_cursor", "sc", "solid", "id",
-		"clear_mods", "cm", "clear_keys", "ck", "repeat", "speeds",
+		"scale", "scale_cursor", "sc", "solid", "so", "id",
+		"clear_mods", "cm", "clear_keys", "ck", "repeat",
+		"speeds", "sp", "readtimeout", "rd",
 		NULL
 	};
 
@@ -1083,22 +1084,26 @@ void user_supplied_opts(char *opts) {
 			} else if (strstr(p, "scale=") == p) {
 				if (scale_str) free(scale_str);
 				scale_str = strdup(p + strlen("scale="));
-			} else if (strstr(p, "scale_cursor=") == p) {
+			} else if (strstr(p, "scale_cursor=") == p ||
+			    strstr(p, "sc=") == p) {
 				if (scale_cursor_str) free(scale_cursor_str);
-				scale_cursor_str = strdup(p +
-				    strlen("scale_cursor="));
-			} else if (strstr(p, "sc=") == p) {
-				if (scale_cursor_str) free(scale_cursor_str);
-				scale_cursor_str = strdup(p + strlen("sc="));
-			} else if (!strcmp(p, "solid")) {
+				q = strchr(p, '=') + 1;
+				scale_cursor_str = strdup(q);
+			} else if (!strcmp(p, "solid") || !strcmp(p, "so")) {
 				use_solid_bg = 1;
 				if (!solid_str) {
 					solid_str = strdup(solid_default);
 				}
-			} else if (strstr(p, "solid=") == p) {
+			} else if (strstr(p, "solid=") == p ||
+			    strstr(p, "so=") == p) {
 				use_solid_bg = 1;
 				if (solid_str) free(solid_str);
-				solid_str = strdup(p + strlen("solid="));
+				q = strchr(p, '=') + 1;
+				if (!strcmp(q, "R")) {
+					solid_str = strdup("root:");
+				} else {
+					solid_str = strdup(q);
+				}
 			} else if (strstr(p, "id=") == p) {
 				unsigned long win;
 				q = p + strlen("id=");
@@ -1115,9 +1120,11 @@ void user_supplied_opts(char *opts) {
 				clear_mods = 2;
 			} else if (!strcmp(p, "repeat")) {
 				no_autorepeat = 0;
-			} else if (strstr(p, "speeds=") == p) {
+			} else if (strstr(p, "speeds=") == p ||
+			    strstr(p, "sp=") == p) {
 				if (speeds_str) free(speeds_str);
-				speeds_str = strdup(p + strlen("speeds="));
+				q = strchr(p, '=') + 1;
+				speeds_str = strdup(q);
 				q = speeds_str;
 				while (*q != '\0') {
 					if (*q == '-') {
@@ -1125,7 +1132,13 @@ void user_supplied_opts(char *opts) {
 					}
 					q++;
 				}
+			} else if (strstr(p, "readtimeout=") == p ||
+			    strstr(p, "rd=") == p) {
+				q = strchr(p, '=') + 1;
+				rfbMaxClientWait = atoi(q) * 1000;
 			}
+		} else {
+			rfbLog("skipping option: %s\n", p);
 		}
 		p = strtok(NULL, ",");
 	}

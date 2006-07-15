@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Wed Jul 12 08:21:19 EDT 2006
+x11vnc README file                         Date: Sat Jul 15 12:13:51 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -347,12 +347,12 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
    SourceForge.net. I use libvncserver for all of the VNC aspects; I
    couldn't have done without it. The full source code may be found and
    downloaded (either file-release tarball or CVS tree) from the above
-   link. As of Jun 2006, the [52]x11vnc-0.8.1.tar.gz source package is
-   released (recommended download). The [53]x11vnc 0.8.1 release notes.
+   link. As of Jul 2006, the [52]x11vnc-0.8.2.tar.gz source package is
+   released (recommended download). The [53]x11vnc 0.8.2 release notes.
 
    The x11vnc package is the subset of the libvncserver package needed to
    build the x11vnc program. Also, you can get a copy of my latest,
-   bleeding edge [54]x11vnc-0.8.2.tar.gz tarball to build the most up to
+   bleeding edge [54]x11vnc-0.8.3.tar.gz tarball to build the most up to
    date one.
 
    Precompiled Binaries/Packages:  See the [55]FAQ below for information
@@ -383,13 +383,13 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
     Building x11vnc:
 
    If your OS has libjpeg.so and libz.so in standard locations you can
-   build as follows (example given for the 0.8.1 release of x11vnc:
+   build as follows (example given for the 0.8.2 release of x11vnc:
    replace with the version you downloaded):
 (un-tar the x11vnc+libvncserver tarball)
-# gzip -dc x11vnc-0.8.1.tar.gz | tar -xvf -
+# gzip -dc x11vnc-0.8.2.tar.gz | tar -xvf -
 
 (cd to the source directory)
-# cd x11vnc-0.8.1
+# cd x11vnc-0.8.2
 
 (run configure and then run make)
 # ./configure
@@ -583,21 +583,21 @@ make
    I don't have any formal beta-testers for the releases of x11vnc, so
    I'd appreciate any additional testing very much!
 
-   Thanks to those who helped beta test x11vnc 0.8.1 released in Jun
-   2006!
+   Thanks to those who suggested features and helped beta test x11vnc
+   0.8.2 released in Jul 2006!
 
-   Please help test and debug the 0.8.2 version for release sometime in
-   Summer 2006.
+   Please help test and debug the 0.8.3 version for release sometime in
+   Summer/Fall 2006.
 
-   The version 0.8.2 beta tarball is kept here:
-   [70]x11vnc-0.8.2.tar.gz
+   The version 0.8.3 beta tarball is kept here:
+   [70]x11vnc-0.8.3.tar.gz
 
    There are also some Linux, Solaris, and other OS test binaries
    [71]here. Please kick the tires and report bugs, performance
    regressions, undesired behavior, etc. to [72]me.
 
 
-   Here are some features that will appear in the 0.8.2 release:
+   Here are some features that appeared in the 0.8.2 release:
      * Linux console framebuffer keystroke and mouse insertion is now
        supported by the uinput linux device driver. This enables full
        interaction with non-X applications on the Linux console (e.g.
@@ -628,7 +628,7 @@ make
           + [85]-license print license, copying, warranty information.
 
 
-   These features are deferred until the 0.8.3 release:
+   Here are some features that will appear in the 0.8.3 release:
      * The [86]-ssl option provides SSL encryption and authentication
        natively via the [87]www.openssl.org library. One can use from a
        simple self-signed certificate server certificate up to full CA
@@ -5660,9 +5660,9 @@ References
   49. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
   50. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
   51. http://sourceforge.net/projects/libvncserver/
-  52. http://sourceforge.net/project/showfiles.php?group_id=32584&package_id=119006&release_id=422738
-  53. http://sourceforge.net/project/shownotes.php?release_id=422738&group_id=32584
-  54. http://www.karlrunge.com/x11vnc/x11vnc-0.8.2.tar.gz
+  52. http://sourceforge.net/project/showfiles.php?group_id=32584&package_id=119006&release_id=431725
+  53. http://sourceforge.net/project/shownotes.php?release_id=431725&group_id=32584
+  54. http://www.karlrunge.com/x11vnc/x11vnc-0.8.3.tar.gz
   55. http://www.karlrunge.com/x11vnc/index.html#faq-binaries
   56. http://www.tightvnc.com/download.html
   57. http://www.realvnc.com/download-free.html
@@ -5678,7 +5678,7 @@ References
   67. http://www.gzip.org/zlib/
   68. http://www.sunfreeware.com/
   69. http://www.karlrunge.com/x11vnc/index.html#faq-solaris251build
-  70. http://www.karlrunge.com/x11vnc/x11vnc-0.8.2.tar.gz
+  70. http://www.karlrunge.com/x11vnc/x11vnc-0.8.3.tar.gz
   71. http://www.karlrunge.com/x11vnc/bins
   72. mailto:x11vnc-beta@karlrunge.com
   73. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rawfb
@@ -7377,7 +7377,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-07-12
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-07-15
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -7388,56 +7388,60 @@ x11vnc options:
   -viewonly                -shared                  -once                  
   -forever                 -loop                    -timeout n             
   -inetd                   -nofilexfer              -http                  
-  -connect string          -vncconnect              -novncconnect          
-  -allow host1[,host2..]   -localhost               -nolookup              
-  -input string            -grabkbd                 -grabptr               
-  -viewpasswd string       -passwdfile filename     -display WAIT:...      
-  -usepw                   -storepasswd pass file   -nopw                  
-  -accept string           -afteraccept string      -gone string           
-  -users list              -noshm                   -flipbyteorder         
-  -onetile                 -solid [color]           -blackout string       
-  -xinerama                -noxinerama              -xtrap                 
-  -xrandr [mode]           -padgeom WxH             -o logfile             
-  -flag file               -rc filename             -norc                  
-  -env VAR=VALUE           -h, -help                -?, -opts              
-  -V, -version             -license                 -dbg                   
-  -q                       -bg                      -modtweak              
-  -nomodtweak              -xkb                     -noxkb                 
-  -capslock                -skip_lockkeys           -skip_keycodes string  
-  -sloppy_keys             -skip_dups               -noskip_dups           
-  -add_keysyms             -noadd_keysyms           -clear_mods            
-  -clear_keys              -remap string            -norepeat              
-  -repeat                  -nofb                    -nobell                
-  -nosel                   -noprimary               -nosetprimary          
-  -noclipboard             -nosetclipboard          -seldir string         
-  -cursor [mode]           -nocursor                -arrow n               
-  -noxfixes                -alphacut n              -alphafrac fraction    
-  -alpharemove             -noalphablend            -nocursorshape         
-  -cursorpos               -nocursorpos             -xwarppointer          
-  -buttonmap string        -nodragging              -wireframe [str]       
-  -nowireframe             -wirecopyrect mode       -nowirecopyrect        
-  -debug_wireframe         -scrollcopyrect mode     -noscrollcopyrect      
-  -scr_area n              -scr_skip list           -scr_inc list          
-  -scr_keys list           -scr_term list           -scr_keyrepeat lo-hi   
-  -scr_parms string        -fixscreen string        -debug_scroll          
-  -noxrecord               -grab_buster             -nograb_buster         
-  -debug_grabs             -debug_sel               -pointer_mode n        
-  -input_skip n            -allinput                -speeds rd,bw,lat      
-  -wmdt string             -debug_pointer           -debug_keyboard        
-  -defer time              -wait time               -wait_ui factor        
-  -nowait_bog              -slow_fb time            -readtimeout n         
-  -nap                     -nonap                   -sb time               
-  -nofbpm                  -fbpm                    -noxdamage             
-  -xd_area A               -xd_mem f                -sigpipe string        
-  -threads                 -nothreads               -fs f                  
-  -gaps n                  -grow n                  -fuzz n                
-  -debug_tiles             -snapfb                  -rawfb string          
-  -freqtab file            -pipeinput cmd           -gui [gui-opts]        
-  -remote command          -query variable          -QD variable           
-  -sync                    -noremote                -yesremote             
-  -unsafe                  -safer                   -privremote            
-  -nocmds                  -allowedcmds list        -deny_all              
-
+  -http_ssl                -connect string          -vncconnect            
+  -novncconnect            -allow host1[,host2..]   -localhost             
+  -nolookup                -input string            -grabkbd               
+  -grabptr                 -viewpasswd string       -passwdfile filename   
+  -unixpw [list]           -unixpw_nis [list]       -display WAIT:...      
+  -ssl [pem]               -ssldir [dir]            -sslverify [path]      
+  -sslGenCA [dir]          -sslGenCert type name    -sslEncKey [pem]       
+  -sslCertInfo [pem]       -sslDelCert [pem]        -stunnel [pem]         
+  -stunnel3  [pem]         -https [port]            -usepw                 
+  -storepasswd pass file   -nopw                    -accept string         
+  -afteraccept string      -gone string             -users list            
+  -noshm                   -flipbyteorder           -onetile               
+  -solid [color]           -blackout string         -xinerama              
+  -noxinerama              -xtrap                   -xrandr [mode]         
+  -padgeom WxH             -o logfile               -flag file             
+  -rc filename             -norc                    -env VAR=VALUE         
+  -h, -help                -?, -opts                -V, -version           
+  -license                 -dbg                     -q                     
+  -bg                      -modtweak                -nomodtweak            
+  -xkb                     -noxkb                   -capslock              
+  -skip_lockkeys           -skip_keycodes string    -sloppy_keys           
+  -skip_dups               -noskip_dups             -add_keysyms           
+  -noadd_keysyms           -clear_mods              -clear_keys            
+  -remap string            -norepeat                -repeat                
+  -nofb                    -nobell                  -nosel                 
+  -noprimary               -nosetprimary            -noclipboard           
+  -nosetclipboard          -seldir string           -cursor [mode]         
+  -nocursor                -arrow n                 -noxfixes              
+  -alphacut n              -alphafrac fraction      -alpharemove           
+  -noalphablend            -nocursorshape           -cursorpos             
+  -nocursorpos             -xwarppointer            -buttonmap string      
+  -nodragging              -wireframe [str]         -nowireframe           
+  -wirecopyrect mode       -nowirecopyrect          -debug_wireframe       
+  -scrollcopyrect mode     -noscrollcopyrect        -scr_area n            
+  -scr_skip list           -scr_inc list            -scr_keys list         
+  -scr_term list           -scr_keyrepeat lo-hi     -scr_parms string      
+  -fixscreen string        -debug_scroll            -noxrecord             
+  -grab_buster             -nograb_buster           -debug_grabs           
+  -debug_sel               -pointer_mode n          -input_skip n          
+  -allinput                -speeds rd,bw,lat        -wmdt string           
+  -debug_pointer           -debug_keyboard          -defer time            
+  -wait time               -wait_ui factor          -nowait_bog            
+  -slow_fb time            -readtimeout n           -nap                   
+  -nonap                   -sb time                 -nofbpm                
+  -fbpm                    -noxdamage               -xd_area A             
+  -xd_mem f                -sigpipe string          -threads               
+  -nothreads               -fs f                    -gaps n                
+  -grow n                  -fuzz n                  -debug_tiles           
+  -snapfb                  -rawfb string            -freqtab file          
+  -pipeinput cmd           -gui [gui-opts]          -remote command        
+  -query variable          -QD variable             -sync                  
+  -noremote                -yesremote               -unsafe                
+  -safer                   -privremote              -nocmds                
+  -allowedcmds list        -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -7471,7 +7475,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.2 lastmod: 2006-07-12
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-07-15
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -7779,6 +7783,7 @@ Options:
                        to the program location and in standard locations
                        (/usr/local/share/x11vnc/classes, etc).  Under -ssl or
                        -stunnel the ssl classes subdirectory is sought.
+-http_ssl              As -http, but force lookup for ssl classes subdir.
 
 -connect string        For use with "vncviewer -listen" reverse connections.
                        If "string" has the form "host" or "host:port"
@@ -7908,6 +7913,136 @@ Options:
                        and last line be "__BEGIN_VIEWONLY__" to have 2
                        full-access passwords)
 
+-unixpw [list]         Use Unix username and password authentication.  x11vnc
+                       uses the su(1) program to verify the user's password.
+                       [list] is an optional comma separated list of allowed
+                       Unix usernames.  See below for per-user options that
+                       can be applied.
+
+                       A familiar "login:" and "Password:" dialog is
+                       presented to the user on a black screen inside the
+                       vncviewer.  The connection is dropped if the user fails
+                       to supply the correct password in 3 tries or does not
+                       send one before a 25 second timeout.  Existing clients
+                       are view-only during this period.
+
+                       Since the detailed behavior of su(1) can vary from
+                       OS to OS and for local configurations, test the mode
+                       carefully on your systems before using it in production.
+                       Test different combinations of valid/invalid usernames
+                       and valid/invalid passwords to see if it behaves as
+                       expected.  x11vnc will attempt to be conservative and
+                       reject a login if anything abnormal occurs.
+
+                       On FreeBSD and the other BSD's by default it is
+                       impossible for the user running x11vnc to validate
+                       his *own* password via su(1) (evidently commenting out
+                       the pam_self.so entry in /etc/pam.d/su eliminates this
+                       problem).  So the x11vnc login will always *fail* for
+                       this case (even when the correct password is supplied).
+
+                       A possible workaround for this would be to start
+                       x11vnc as root with the "-users +nobody" option to
+                       immediately switch to user nobody.  Another source of
+                       problems are PAM modules that prompt for extra info,
+                       e.g. password aging modules.  These logins will fail
+                       as well even when the correct password is supplied.
+
+                       **IMPORTANT**: to prevent the Unix password being sent
+                       in *clear text* over the network, one of two schemes
+                       will be enforced: 1) the -ssl builtin SSL mode, or 2)
+                       require both -localhost and -stunnel be enabled.
+
+                       Method 1) ensures the traffic is encrypted between
+                       viewer and server.  A PEM file will be required, see the
+                       discussion under -ssl below (under some circumstances
+                       a temporary one can be automatically generated).
+
+                       Method 2) requires the viewer connection to appear
+                       to come from the same machine x11vnc is running on
+                       (e.g. from a ssh -L port redirection).  And that the
+                       -stunnel SSL mode be used for encryption over the
+                       network.(see the description of -stunnel below).
+
+                       Note: as a convenience, if you ssh(1) in and start
+                       x11vnc it will check if the environment variable
+                       SSH_CONNECTION is set and appears reasonable.  If it
+                       does, then the -ssl or -stunnel requirement will be
+                       dropped since it is assumed you are using ssh for the
+                       encrypted tunnelling.  -localhost is still enforced.
+                       Use -ssl or -stunnel to force SSL usage even if
+                       SSH_CONNECTION is set.
+
+                       To override the above restrictions you can set
+                       environment variables before starting x11vnc:
+
+                       Set UNIXPW_DISABLE_SSL=1 to disable requiring either
+                       -ssl or -stunnel.  Evidently you will be using a
+                       different method to encrypt the data between the
+                       vncviewer and x11vnc: perhaps ssh(1) or an IPSEC VPN.
+
+                       Note that use of -localhost with ssh(1) is roughly
+                       the same as requiring a Unix user login (since a Unix
+                       password or the user's public key authentication is
+                       used by sshd on the machine where x11vnc runs and only
+                       local connections from that machine are accepted)
+
+                       Set UNIXPW_DISABLE_LOCALHOST=1 to disable the -localhost
+                       requirement in Method 2).  One should never do this
+                       (i.e. allow the Unix passwords to be sniffed on the
+                       network).
+
+                       Regarding reverse connections (e.g. -R connect:host
+                       and -connect host), when the -localhost constraint is
+                       in effect then reverse connections can only be used
+                       to connect to the same machine x11vnc is running on
+                       (default port 5500).  Please use a ssh or stunnel port
+                       redirection to the viewer machine to tunnel the reverse
+                       connection over an encrypted channel. Note that in -ssl
+                       mode reverse connection are disabled (see below).
+
+                       In -inetd mode the Method 1) will be enforced (not
+                       Method 2).  With -ssl in effect reverse connections
+                       are disabled.  If you override this via env. var, be
+                       sure to also use encryption from the viewer to inetd.
+                       Tip: you can also have your own stunnel spawn x11vnc
+                       in -inetd mode (thereby bypassing inetd).  See the FAQ
+                       for details.
+
+                       The user names in the comma separated [list] can have
+                       per-user options after a ":", e.g. "fred:opts"
+                       where "opts" is a "+" separated list of
+                       "viewonly", "fullaccess", "input=XXXX", or
+                       "deny", e.g. "karl,wally:viewonly,boss:input=M".
+                       For "input=" it is the K,M,B,C described under -input.
+
+                       If a user in the list is "*" that means those
+                       options apply to all users.  It also means all users
+                       are allowed to log in after supplying a valid password.
+                       Use "deny" to explicitly deny some users if you use
+                       "*" to set a global option.
+
+                       There are also some utilities for testing password
+                       if [list] starts with the "%" character.  See the
+                       quick_pw() function in the source for details.
+
+-unixpw_nis [list]     As -unixpw above, however do not use su(1) but rather
+                       use the traditional getpwnam(3) + crypt(3) method to
+                       verify passwords instead.  This requires that the
+                       encrypted passwords be readable.  Passwords stored
+                       in /etc/shadow will be inaccessible unless x11vnc
+                       is run as root.
+
+                       This is called "NIS" mode simply because in most
+                       NIS setups the user encrypted passwords are accessible
+                       (e.g. "ypcat passwd").  NIS is not required for this
+                       mode to work (only that getpwnam(3) return the encrypted
+                       password is required), but it is unlikely it will work
+                       for any other modern environment unless x11vnc is run
+                       as root (which, btw, is often done when running x11vnc
+                       from inetd and xdm/gdm/kdm).  All of the -unixpw options
+                       and contraints apply.
+
 -display_WAIT :...      A special usage mode for the normal -display option.
                        Useful with -unixpw, but can be used independently
                        of it.  If the display string begins with WAIT: then
@@ -7933,6 +8068,49 @@ Options:
                        of the form XAUTHORITY=<file> or raw xauthority data for
                        the display (e.g. "xauth extract - $DISPLAY" output).
 
+                       In the case of -unixpw (but not -unixpw_nis), then the
+                       above command is run as the user who just authenticated
+                       via the login and password prompt.
+
+                       Also in the case of -unixpw, the user logging in
+                       can place a colon at the end of his username and
+                       supply a few options: scale=, scale_cursor= (or sc=),
+                       solid (or so), id=, clear_mods (or cm), clear_keys
+                       (or ck), repeat, speeds= (or sp=), or readtimeout=
+                       (or rd=) separated by commas if there is more than one.
+                       After the user logs in successfully, these options will
+                       be applied to the VNC screen.  For example,
+
+                          login: fred:scale=3/4,sc=1,repeat
+                          Password: ...
+
+                          login: runge:sp=modem,rd=120,solid=root:
+
+                       for convenience m/n implies scale= e.g. fred:3/4
+                       To disable this set the environment variable
+                       X11VNC_NO_UNIXPW_OPTS=1.  To set any other options,
+                       the user can use the gui (x11vnc -gui connect) or the
+                       remote control method (x11vnc -R opt:val) during his
+                       VNC session.
+
+                       So the combination of -display WAIT:cmd=... and
+                       -unixpw allows automatic pairing of an unix
+                       authenticated VNC user with his desktop.  This could
+                       be very useful on SunRays and also any system where
+                       multiple users share a given machine.  The user does
+                       not need to remember special ports or passwords set up
+                       for his desktop and VNC.
+
+                       A nice way to use WAIT:cmd=... is out of inetd(8)
+                       (it automatically forks a new x11vnc for each user).
+                       You can have the x11vnc inetd spawned process run as,
+                       say, root or nobody.  When run as root (for either inetd
+                       or display manager), you can also supply the option
+                       "-users unixpw=" to have the x11vnc process switch to
+                       the user as well.  Note: there will be a 2nd SSL helper
+                       process that will not switch, but it is only encoding
+                       and decoding the encrypted stream at that point.
+
                        As a special case, WAIT:cmd=FINDDISPLAY will run a
                        script that works on most Unixes to determine a user's
                        DISPLAY variable and xauthority data (see who(1)).
@@ -7954,6 +8132,507 @@ Options:
                        e.g. WAIT:1280x1024:... to set the size of the display
                        the VNC client first attaches to since some VNC viewers
                        will not automatically adjust to a new framebuffer size.
+
+-ssl [pem]             Use the openssl library (www.openssl.org) to provide a
+                       built-in encrypted SSL tunnel between VNC viewers and
+                       x11vnc.  This requires libssl support to be compiled
+                       into x11vnc at build time.  If x11vnc is not built
+                       with libssl support it will exit immediately when -ssl
+                       is prescribed.
+
+                       [pem] is optional, use "-ssl /path/to/mycert.pem"
+                       to specify a PEM certificate file to use to identify
+                       and provide a key for this server.  See openssl(1) for
+                       more info about PEMs and the -sslGenCert option below.
+
+                       The connecting VNC viewer SSL tunnel can optionally
+                       authenticate this server if they have the public
+                       key part of the certificate (or a common certificate
+                       authority, CA, is a more sophisicated way to verify
+                       this server's cert, see -sslGenCA below).  This is
+                       used to prevent man-in-the-middle attacks.  Otherwise,
+                       if the VNC viewer accepts this server's key without
+                       verification, at least the traffic is protected
+                       from passive sniffing on the network (but NOT from
+                       man-in-the-middle attacks).
+
+                       If [pem] is not supplied and the openssl(1) utility
+                       command exists in PATH, then a temporary, self-signed
+                       certificate will be generated for this session (this
+                       may take 5-30 seconds on slow machines).  If openssl(1)
+                       cannot be used to generate a temporary certificate
+                       x11vnc exits immediately.
+
+                       If successful in using openssl(1) to generate a
+                       temporary certificate, the public part of it will be
+                       displayed to stderr (e.g. one could copy it to the
+                       client-side to provide authentication of the server to
+                       VNC viewers.)  See following paragraphs for how to save
+                       keys to reuse when x11vnc is restarted.
+
+                       Set the env. var. X11VNC_SHOW_TMP_PEM=1 to have x11vnc
+                       print out the entire certificate, including the PRIVATE
+                       KEY part, to stderr.  One could reuse this cert if saved
+                       in a [pem] file.  Similarly, set X11VNC_KEEP_TMP_PEM=1
+                       to not delete the temporary PEM file: the file name
+                       will be printed to stderr (so one could move it to
+                       a safe place for reuse).  You will be prompted for a
+                       passphrase for the private key.
+
+                       If [pem] is "SAVE" then the certificate will be saved
+                       to the file ~/.vnc/certs/server.pem, or if that file
+                       exists it will be used directly.  Similarly, if [pem]
+                       is "SAVE_PROMPT" the server.pem certificate will be
+                       made based on your answers to its prompts for info such
+                       as OrganizationalName, CommonName, etc.
+
+                       Use "SAVE-<string>" and "SAVE_PROMPT-<string>"
+                       to refer to the file ~/.vnc/certs/server-<string>.pem
+                       instead.  E.g. "SAVE-charlie" will store to the file
+                       ~/.vnc/certs/server-charlie.pem
+
+                       See -ssldir below to use a directory besides the
+                       default ~/.vnc/certs
+
+                       Example: x11vnc -ssl SAVE -display :0 ...
+
+                       Reverse connections are disabled in -ssl mode because
+                       there is no way to ensure that data channel will
+                       be encrypted.  Set X11VNC_SSL_ALLOW_REVERSE=1 to
+                       override this.
+
+                       Your VNC viewer will also need to be able to connect
+                       via SSL.  See the discussion below under -stunnel and
+                       the FAQ (ssl_vncviewer script) for how this might be
+                       achieved.  E.g. on Unix it is easy to write a shell
+                       script that starts up stunnel and then vncviewer.
+                       Also in the x11vnc source a SSL enabled Java VNC Viewer
+                       applet is provided in the classes/ssl directory.
+
+-ssldir [dir]          Use [dir] as an alternate ssl certificate and key
+                       management toplevel directory.  The default is
+                       ~/.vnc/certs
+
+                       This directory is used to store server and other
+                       certificates and keys and also other materials.  E.g. in
+                       the simplest case, "-ssl SAVE" will store the x11vnc
+                       server cert in [dir]/server.pem
+
+                       Use of alternate directories via -ssldir allows you to
+                       manage multiple VNC Certificate Authority (CA) keys.
+                       Another use is if ~/.vnc/cert is on an NFS share you
+                       might want your certificates and keys to be on a local
+                       filesystem to prevent network snooping (for example
+                       -ssldir /var/lib/x11vnc-certs).
+
+                       -ssldir affects nearly all of the other -ssl* options,
+                       e.g. -ssl SAVE, -sslGenCert, etc..
+
+-sslverify [path]      For either of the -ssl or -stunnel modes, use [path]
+                       to provide certificates to authenticate incoming VNC
+                       *Client* connections (normally only the server is
+                       authenticated in SSL.)  This can be used as a method
+                       to replace standard password authentication of clients.
+
+                       If [path] is a directory it contains the client (or CA)
+                       certificates in separate files.  If [path] is a file,
+                       it contains multiple certificates.  See special tokens
+                       below.  These correspond to the "CApath = dir" and
+                       "CAfile = file" stunnel options.  See the stunnel(8)
+                       manpage for details.
+
+                       Examples:
+                              x11vnc -ssl -sslverify ~/my.pem
+                              x11vnc -ssl -sslverify ~/my_pem_dir/
+
+                       Note that if [path] is a directory, it must contain
+                       the certs in separate files named like <HASH>.0, where
+                       the value of <HASH> is found by running the command
+                       "openssl x509 -hash -noout -in file.crt". Evidently
+                       one uses <HASH>.1 if there is a collision...
+
+                       The the key-management utility "-sslCertInfo HASHON"
+                       and "-sslCertInfo HASHOFF" will create/delete these
+                       hashes for you automatically (via symlink) in the HASH
+                       subdirs it manages.  Then you can point -sslverify to
+                       the HASH subdir.
+
+                       Special tokens: in -ssl mode, if [path] is not a file or
+                       a directory, it is taken as a comma separated list of
+                       tokens that are interpreted as follows:
+
+                       If a token is "CA" that means load the CA/cacert.pem
+                       file from the ssl directory.  If a token is "clients"
+                       then all the files clients/*.crt in the ssl directory
+                       are loaded.  Otherwise the file clients/token.crt
+                       is attempted to be loaded.  As a kludge, use a token
+                       like ../server-foo to load a server cert if you find
+                       that necessary.
+
+                       Use -ssldir to use a directory different from the
+                       ~/.vnc/certs default.
+
+                       Note that if the "CA" cert is loaded you do not need
+                       to load any of the certs that have been signed by it.
+                       You will need to load any additional self-signed certs
+                       however.
+
+                       Examples:
+                              x11vnc -ssl -sslverify CA
+                              x11vnc -ssl -sslverify self:fred,self:jim
+                              x11vnc -ssl -sslverify CA,clients
+
+                       Usually "-sslverify CA" is the most effective.
+                       See the -sslGenCA and -sslGenCert options below for
+                       how to set up and manage the CA framework.
+
+
+
+                       NOTE: the following utilities, -sslGenCA, -sslGenCert,
+                       -sslEncKey, and -sslCertInfo are provided for
+                       completeness, but for casual usage they are overkill.
+
+                       They provide VNC Certificate Authority (CA) key creation
+                       and server / client key generation and signing.  So they
+                       provide a basic Public Key management framework for
+                       VNC-ing with x11vnc. (note that they require openssl(1)
+                       be installed on the system)
+
+                       However, the simplest usage mode (where x11vnc
+                       automatically generates its own, self-signed, temporary
+                       key and the VNC viewers always accept it, e.g. accepting
+                       via a dialog box) is probably safe enough for most
+                       scenarios.  CA management is not needed.
+
+                       To protect against Man-In-The-Middle attacks the
+                       simplest mode can be improved by using "-ssl SAVE"
+                       to have x11vnc create a longer term self-signed
+                       certificate, and then (safely) copy the corresponding
+                       public key cert to the desired client machines (care
+                       must be taken the private key part is not stolen;
+                       you will be prompted for a passphrase).
+
+                       So keep in mind no CA key creation or management
+                       (-sslGenCA and -sslGenCert) is needed for either of
+                       the above two common usage modes.
+
+                       One might want to use -sslGenCA and -sslGenCert
+                       if you had a large number of VNC client and server
+                       workstations.  That way the administrator could generate
+                       a single CA key with -sslGenCA and distribute its
+                       certificate part to all of the workstations.
+
+                       Next, he could create signed VNC server keys
+                       (-sslGenCert server ...) for each workstation or user
+                       that then x11vnc would use to authenticate itself to
+                       any VNC client that has the CA cert.
+
+                       Optionally, the admin could also make it so the
+                       VNC clients themselves are authenticated to x11vnc
+                       (-sslGenCert client ...)  For this -sslverify would be
+                       pointed to the CA cert (and/or self-signed certs).
+
+                       x11vnc will be able to use all of these cert and
+                       key files.  On the VNC client side, they will need to
+                       be "imported" somehow.  Web browsers have "Manage
+                       Certificates" actions as does the Java applet plugin
+                       Control Panel.  stunnel can also use these files (see
+                       the ssl_vncviewer example script in the FAQ.)
+
+-sslGenCA [dir]        Generate your own Certificate Authority private key,
+                       certificate, and other files in directory [dir].
+
+                       If [dir] is not supplied, a -ssldir setting is used,
+                       or otherwise ~/.vnc/certs is used.
+
+                       This command also creates directories where server and
+                       client certs and keys will be stored.  The openssl(1)
+                       program must be installed on the system and available
+                       in PATH.
+
+                       After the CA files and directories are created the
+                       command exits; the VNC server is not run.
+
+                       You will be prompted for information to put into the CA
+                       certificate.  The info does not have to be accurate just
+                       as long as clients accept the cert for VNC connections.
+                       You will also need to supply a passphrase of at least
+                       4 characters for the CA private key.
+
+                       Once you have generated the CA you can distribute
+                       its certificate part, [dir]/CA/cacert.pem, to other
+                       workstations where VNC viewers will be run.  One will
+                       need to "import" this certicate in the applications,
+                       e.g. Web browser, Java applet plugin, stunnel, etc.
+                       Next, you can create and sign keys using the CA with
+                       the -sslGenCert option below.
+
+                       Examples:
+                                x11vnc -sslGenCA
+                                x11vnc -sslGenCA  ~/myCAdir
+                                x11vnc -ssldir ~/myCAdir -sslGenCA
+
+                       (the last two lines are equivalent)
+
+-sslGenCert type name  Generate a VNC server or client certificate and private
+                       key pair signed by the CA created previously with
+                       -sslGenCA.  The openssl(1) program must be installed
+                       on the system and available in PATH.
+
+                       After the Certificate is generated the command exits;
+                       the VNC server is not run.
+
+                       The type of key to be generated is the string "type".
+                       It is either "server" (i.e. for use by x11vnc) or
+                       "client" (for a VNC viewer).  Note that typically
+                       only "server" is used: the VNC clients authenticate
+                       themselves by a non-public-key method (e.g. VNC or
+                       unix password).  "type" is required.
+
+                       An arbitrary default name you want to associate with
+                       the key is supplied by the "name" string.  You can
+                       change it at the various prompts when creating the key.
+                       "name" is optional.
+
+                       If name is left blank for clients keys then "nobody"
+                       is used.  If left blank for server keys, then the
+                       primary server key: "server.pem" is created (this
+                       is the saved one referenced by "-ssl SAVE" when the
+                       server is started)
+
+                       If "name" begins with the string "self:" then
+                       a self-signed certificate is created instead of one
+                       signed by your CA key.
+
+                       If "name" begins with the string "req:" then only a
+                       key (.key) and a certificate signing *request* (.req)
+                       are generated.  You can then send the .req file to
+                       an external CA (even a professional one, e.g. Thawte)
+                       and then combine the .key and the received cert into
+                       the .pem file with the same basename.
+
+                       The distinction between "server" and "client" is
+                       simply the choice of output filenames and sub-directory.
+                       This makes it so the -ssl SAVE-name option can easily
+                       pick up the x11vnc PEM file this option generates.
+                       And similarly makes it easy for the -sslverify option
+                       to pick up your client certs.
+
+                       There is nothing special about the filename or directory
+                       location of either the "server" and "client" certs.
+                       You can rename the files or move them to wherever
+                       you like.
+
+                       Precede this option with -ssldir [dir] to use a
+                       directory other than the default ~/.vnc/certs You will
+                       need to run -sslGenCA on that directory first before
+                       doing any -sslGenCert key creation.
+
+                       Note you cannot recreate a cert with exactly the same
+                       distiguished name (DN) as an existing one.  To do so,
+                       you will need to edit the [dir]/CA/index.txt file to
+                       delete the line.
+
+                       Similar to -sslGenCA, you will be prompted to fill
+                       in some information that will be recorded in the
+                       certificate when it is created.  Tip: if you know
+                       the fully-quailified hostname other people will be
+                       connecting to you can use that as the CommonName "CN"
+                       to avoid some applications (e.g. web browsers and java
+                       plugin) complaining it does not match the hostname.
+
+                       You will also need to supply the CA private key
+                       passphrase to unlock the private key created from
+                       -sslGenCA.  This private key is used to sign the server
+                       or client certicate.
+
+                       The "server" certs can be used by x11vnc directly by
+                       pointing to them via the -ssl [pem] option.  The default
+                       file will be ~/.vnc/certs/server.pem.  This one would
+                       be used by simply typing -ssl SAVE.  The pem file
+                       contains both the certificate and the private key.
+                       server.crt file contains the cert only.
+
+                       The "client" cert + private key file will need
+                       to be copied and imported into the VNC viewer
+                       side applications (Web browser, Java plugin,
+                       stunnel, etc.)  Once that is done you can delete the
+                       "client" private key file on this machine since
+                       it is only needed on the VNC viewer side.  The,
+                       e.g. ~/.vnc/certs/clients/<name>.pem contains both
+                       the cert and private key.  The <name>.crt contains the
+                       certificate only.
+
+                       NOTE: It is very important to know one should always
+                       generate new keys with a passphrase.  Otherwise if an
+                       untrusted user steals the key file he could use it to
+                       masquerade as the x11vnc server (or VNC viewer client).
+                       You will be prompted whether to encrypt the key with
+                       a passphrase or not.  It is recommended that you do.
+                       One inconvenience to a passphrase is that it must
+                       be suppled every time x11vnc or the client app is
+                       started up.
+
+                       Examples:
+
+                               x11vnc -sslGenCert server
+                               x11vnc -ssl SAVE -display :0 ...
+
+                       and then on viewer using ssl_vncviewer stunnel wrapper
+                       (see the FAQ):
+                               ssl_vncviewer -verify ./cacert.crt hostname:0
+
+                       (this assumes the cacert.crt cert from -sslGenCA
+                       was safely copied to the VNC viewer machine where
+                       ssl_vncviewer is run)
+
+                       Example using a name:
+
+                               x11vnc -sslGenCert server charlie
+                               x11vnc -ssl SAVE-charlie -display :0 ...
+
+                       Example for a client certificate (rarely used):
+
+                               x11vnc -sslGenCert client roger
+                               scp ~/.vnc/certs/clients/roger.pem somehost:.
+                               rm  ~/.vnc/certs/clients/roger.pem
+
+                       x11vnc is then started with the the option -sslverify
+                       ~/.vnc/certs/clients/roger.crt (or simply -sslverify
+                       roger), and on the viewer user on somehost could do
+                       for example:
+
+                               ssl_vncviewer -mycert ./roger.pem hostname:0
+
+-sslEncKey [pem]       Utility to encrypt an existing PEM file with a
+                       passphrase you supply when prompted.  For that key to be
+                       used (e.g. by x11vnc) the passphrase must be supplied
+                       each time.
+
+                       The "SAVE" notation described under -ssl applies as
+                       well. (precede this option with -ssldir [dir] to refer
+                       a directory besides the default ~/.vnc/certs)
+
+                       The openssl(1) program must be installed on the system
+                       and available in PATH.  After the Key file is encrypted
+                       the command exits; the VNC server is not run.
+
+                       Examples:
+                               x11vnc -sslEncKey /path/to/foo.pem
+                               x11vnc -sslEncKey SAVE
+                               x11vnc -sslEncKey SAVE-charlie
+
+-sslCertInfo [pem]     Prints out information about an existing PEM file.
+                       In addition the public certificate is also printed.
+                       The openssl(1) program must be in PATH. Basically the
+                       command "openssl x509 -text" is run on the pem.
+
+                       The "SAVE" notation described under -ssl applies
+                       as well.
+
+                       Using  "LIST" will give a list of all certs being
+                       managed (in the ~/.vnc/certs dir, use -ssldir to refer
+                       to another dir).  "ALL" will print out the info for
+                       every managed key (this can be very long).  Giving a
+                       client or server cert shortname will also try a lookup
+                       (e.g. -sslCertInfo charlie).  Use "LISTL" or "LL"
+                       for a long (ls -l style) listing.
+
+                       Using "HASHON" will create subdirs [dir]/HASH and
+                       [dir]/HASH with OpenSSL hash filenames (e.g. 0d5fbbf1.0)
+                       symlinks pointing up to the corresponding *.crt file.
+                       ([dir] is ~/.vnc/certs or one given by -ssldir.)
+                       This is a useful way for other OpenSSL applications
+                       (e.g. stunnel) to access all of the certs without
+                       having to concatenate them.  x11vnc will not use them
+                       unless you specifically reference them.  "HASHOFF"
+                       removes these HASH subdirs.
+
+                       The LIST, LISTL, LL, ALL, HASHON, HASHOFF words can
+                       also be lowercase, e.g. "list".
+
+-sslDelCert [pem]      Prompts you to delete all .crt .pem .key .req files
+                       associated with [pem].  "SAVE" and lookups as in
+                       -sslCertInfo apply as well.
+
+
+-stunnel [pem]         Use the stunnel(8) (www.stunnel.org) to provide an
+                       encrypted SSL tunnel between viewers and x11vnc.
+
+                       This external tunnel method was implemented prior to the
+                       integrated -ssl encryption described above.  It still
+                       works well.  This requires stunnel to be installed
+                       on the system and available via PATH (n.b. stunnel is
+                       often installed in sbin directories).  Version 4.x of
+                       stunnel is assumed (but see -stunnel3 below.)
+
+                       [pem] is optional, use "-stunnel /path/to/stunnel.pem"
+                       to specify a PEM certificate file to pass to stunnel.
+                       Whether one is needed or not depends on your stunnel
+                       configuration.  stunnel often generates one at install
+                       time.  See the stunnel documentation for details.
+
+                       stunnel is started up as a child process of x11vnc and
+                       any SSL connections stunnel receives are decrypted and
+                       sent to x11vnc over a local socket.  The strings
+                       "The SSL VNC desktop is ..." and "SSLPORT=..."
+                       are printed out at startup to indicate this.
+
+                       The -localhost option is enforced by default
+                       to avoid people routing around the SSL channel.
+                       Set STUNNEL_DISABLE_LOCALHOST=1 before starting x11vnc
+                       to disable the requirement.
+
+                       Your VNC viewer will also need to be able to connect via
+                       SSL.  Unfortunately not too many do this.  UltraVNC has
+                       an encryption plugin but it does not seem to be SSL.
+
+                       Also, in the x11vnc distribution, a patched TightVNC
+                       Java applet is provided in classes/ssl that does SSL
+                       connections (only).
+
+                       It is also not too difficult to set up an stunnel or
+                       other SSL tunnel on the viewer side.  A simple example
+                       on Unix using stunnel 3.x is:
+
+                         % stunnel -c -d localhost:5901 -r remotehost:5900
+                         % vncviewer localhost:1
+
+                       For Windows, stunnel has been ported to it and there
+                       are probably other such tools available.  See the FAQ
+                       for more examples.
+
+-stunnel3  [pem]       Use version 3.x stunnel command line syntax instead of
+                       version 4.x
+
+-https [port]          Choose a separate HTTPS port (-ssl mode only).
+
+                       In -ssl mode, it turns out you can use the
+                       single VNC port (e.g. 5900) for both VNC and HTTPS
+                       connections. (HTTPS is used to retrieve a SSL-aware
+                       VncViewer.jar applet that is provided with x11vnc).
+                       Since both use SSL the implementation was extended to
+                       detect if HTTP traffic (i.e. GET) is taking place and
+                       handle it accordingly.  The URL would be, e.g.:
+
+                       https://mymachine.org:5900/
+
+                       This is convenient for firewalls, etc, because only one
+                       port needs to be allowed in.  However, this heuristic
+                       adds a few seconds delay to each connection and can be
+                       unreliable (especially if the user takes much time to
+                       ponder the Certificate dialogs in his browser, Java VM,
+                       or VNC Viewer applet.  That's right 3 separate "Are
+                       you sure you want to connect" dialogs!)
+
+                       So use the -https option to provide a separate, more
+                       reliable HTTPS port that x11vnc will listen on.  If
+                       [port] is not provided (or is 0), one is autoselected.
+                       The URL to use is printed out at startup.
+
+                       The SSL Java applet directory is specified via the
+                       -httpdir option.  If not supplied it will try to guess
+                       the directory as though the -http option was supplied.
 
 -usepw                 If no other password method was supplied on the command
                        line, first look for ~/.vnc/passwd and if found use it
