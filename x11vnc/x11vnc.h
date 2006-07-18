@@ -26,18 +26,31 @@
 #include <time.h>
 #include <errno.h>
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-
-#include <X11/keysym.h>
-#include <X11/Xatom.h>
-
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <ctype.h>
 
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
+
+
+/* we can now build under --without-x: */
+#if LIBVNCSERVER_HAVE_X11
+
+#define NO_X11 0
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+
+#include <X11/keysym.h>
+#include <X11/Xatom.h>
+
+#else
+
+#define NO_X11 1
+#include "nox11.h"
+#include <rfb/keysym.h>
+
+#endif
 
 /****************************************************************************/
 
@@ -496,6 +509,8 @@ typedef struct _ClientData {
 	int raw_bytes_sent;
 
 } ClientData;
+
+extern void nox11_exit(int rc);
 
 #include "params.h"
 #include "enums.h"

@@ -6,6 +6,7 @@
 #include "xinerama.h"
 #include "screen.h"
 #include "connections.h"
+#include "keyboard.h"
 #include "allowed_input_t.h"
 
 #if LIBVNCSERVER_HAVE_LINUX_VIDEODEV_H

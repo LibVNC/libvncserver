@@ -1543,27 +1543,27 @@ void accept_openssl(int mode) {
 				 * instead of a direct SSL connection.
 				 */
 				rfbLog("Handling VNC request via https GET. [%d]\n", getpid());
-/* AUDIT */
 
 				if (strstr(buf, "/reverse.proxy")) {
-					char *buf;
+					char *buf2;
 					int n, ptr;
 					SSL_write(ssl, reply, strlen(reply));
 				
-					buf  = (char *) calloc((8192+1), 1);
+					buf2  = (char *) calloc((8192+1), 1);
 					n = 0;
 					ptr = 0;
 					while (ptr < 8192) {
-						n = SSL_read(ssl, buf + ptr, 1);
+						n = SSL_read(ssl, buf2 + ptr, 1);
 						if (n > 0) {
 							ptr += n;
 						}
-			if (db) fprintf(stderr, "buf2: '%s'\n", buf);
+			if (db) fprintf(stderr, "buf2: '%s'\n", buf2);
 
-						if (strstr(buf, "\r\n\r\n")) {
+						if (strstr(buf2, "\r\n\r\n")) {
 							break;
 						}
 					}
+					free(buf2);
 				}
 				goto write_cookie;
 
@@ -1672,6 +1672,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 
 		exit(0);
 	}
+	/* parent here */
 
 	if (mode != OPENSSL_INETD) {
 		close(sock);
@@ -2106,6 +2107,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 
 		/* used to see if SSL_pending() should be checked: */
 		check_pending = 0;
+/* AUDIT */
 
 		if (c_wr && FD_ISSET(csock, &wr)) {
 

@@ -2965,7 +2965,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	overlay_present = 0;
-#ifdef SOLARIS_OVERLAY
+#if defined(SOLARIS_OVERLAY) && !NO_X11
 	if (! XQueryExtension(dpy, "SUN_OVL", &maj, &ev, &er)) {
 		if (! quiet && overlay) {
 			rfbLog("Disabling -overlay: SUN_OVL "
@@ -2975,7 +2975,7 @@ int main(int argc, char* argv[]) {
 		overlay_present = 1;
 	}
 #endif
-#ifdef IRIX_OVERLAY
+#if defined(IRIX_OVERLAY) && !NO_X11
 	if (! XReadDisplayQueryExtension(dpy, &ev, &er)) {
 		if (! quiet && overlay) {
 			rfbLog("Disabling -overlay: IRIX ReadDisplay "

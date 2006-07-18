@@ -13,6 +13,7 @@
 #include "unixpw.h"
 #include "v4l.h"
 #include "linuxfb.h"
+#include "uinput.h"
 
 void get_keystate(int *keystate);
 void clear_modifiers(int init);
@@ -58,6 +59,9 @@ void get_keystate(int *keystate) {
 	char keys[32];
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 	
 	/* n.b. caller decides to X_LOCK or not. */
 	XQueryKeymap(dpy, keys);
@@ -73,6 +77,7 @@ void get_keystate(int *keystate) {
 			c = c >> 1;
 		}
 	}
+#endif	/* NO_X11 */
 }
 
 /*
@@ -90,6 +95,9 @@ void clear_modifiers(int init) {
 	KeyCode keycode;
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	/* n.b. caller decides to X_LOCK or not. */
 	if (first) {
@@ -144,6 +152,7 @@ void clear_modifiers(int init) {
 		XTestFakeKeyEvent_wr(dpy, keycode, False, CurrentTime);
 	}
 	XFlush_wr(dpy);
+#endif	/* NO_X11 */
 }
 
 static KeySym simple_mods[] = {
@@ -251,11 +260,15 @@ int get_autorepeat_state(void) {
 	XKeyboardState kstate;
 
 	RAWFB_RET(0)
+#if NO_X11
+	return 0;
+#else
 
 	X_LOCK;
 	XGetKeyboardControl(dpy, &kstate);
 	X_UNLOCK;
 	return kstate.global_auto_repeat;
+#endif	/* NO_X11 */
 }
 
 int get_initial_autorepeat_state(void) {
@@ -270,6 +283,9 @@ void autorepeat(int restore, int bequiet) {
 	XKeyboardControl kctrl;
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	if (restore) {
 		if (save_auto_repeat < 0) {
@@ -316,6 +332,7 @@ void autorepeat(int restore, int bequiet) {
 			}
 		}
 	}
+#endif	/* NO_X11 */
 }
 
 /*
@@ -367,6 +384,9 @@ int add_keysym(KeySym keysym) {
 	}
 
 	RAWFB_RET(0)
+#if NO_X11
+	return 0;
+#else
 
 	if (keysym == NoSymbol) {
 		return 0;
@@ -440,6 +460,7 @@ int add_keysym(KeySym keysym) {
 	}
 	XFree(keymap);
 	return ret;
+#endif	/* NO_X11 */
 }
 
 static void delete_keycode(KeyCode kc, int bequiet) {
@@ -449,6 +470,9 @@ static void delete_keycode(KeyCode kc, int bequiet) {
 	char *str;
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
 	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
@@ -469,6 +493,7 @@ static void delete_keycode(KeyCode kc, int bequiet) {
 
 	XFree(keymap);
 	XFlush_wr(dpy);
+#endif	/* NO_X11 */
 }
 
 static int count_added_keycodes(void) {
@@ -771,6 +796,9 @@ int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
 	}
 
 	RAWFB_RET(0)
+#if NO_X11
+	return 0;
+#else
 	
 	if (!down && !keycode_state[key] && !IsModifierKey(keysym)) {
 		int i, cnt = 0, downkey = -1;
@@ -817,6 +845,7 @@ int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
 		}
 	}
 	return 0;
+#endif	/* NO_X11 */
 }
 
 #if !LIBVNCSERVER_HAVE_XKEYBOARD || SKIP_XKB
@@ -2190,6 +2219,9 @@ void initialize_modtweak(void) {
 	}
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	X_LOCK;
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
@@ -2267,6 +2299,7 @@ void initialize_modtweak(void) {
 	XFree ((void *) keymap);
 
 	X_UNLOCK;
+#endif	/* NO_X11 */
 }
 
 /*
@@ -2331,6 +2364,9 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	int tweak = 0;
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	if (use_xkb_modtweak) {
 		xkb_tweak_keyboard(down, keysym, client);
@@ -2406,6 +2442,7 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	if ( tweak ) {
 		tweak_mod(modifiers[keysym], False);
 	}
+#endif	/* NO_X11 */
 }
 
 void initialize_keyboard_and_pointer(void) {
@@ -2781,6 +2818,8 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	if (max_keyrepeat_always > 0.0) {
 		max_keyrepeat_time = max_keyrepeat_always;
 	}
+#else
+	if (0) {max_keyrepeat_always=0;}
 #endif
 	if (!down && skipped_last_down) {
 		int db = debug_scroll;

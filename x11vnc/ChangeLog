@@ -1,3 +1,6 @@
+2006-07-17  Karl Runge <runge@karlrunge.com>
+	* x11vnc: enable --without-x builds for -rawfb only (NO_X11)
+
 2006-07-11  Karl Runge <runge@karlrunge.com>
 	* x11vnc: more tweaks to UINPUT, mostly mouse motion.
 

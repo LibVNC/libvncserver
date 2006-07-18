@@ -13,6 +13,7 @@
 #include "unixpw.h"
 #include "v4l.h"
 #include "linuxfb.h"
+#include "uinput.h"
 
 int pointer_queued_sent = 0;
 
@@ -54,6 +55,9 @@ static void buttonparse(int from, char **s) {
 	int to, i;
 	int modisdown[256];
 
+#if NO_X11
+	return;
+#else
 	q = *s;
 
 	for (i=0; i<256; i++) {
@@ -201,6 +205,7 @@ static void buttonparse(int from, char **s) {
 		/* advance the source pointer position */
 		(*s)++;
 	}
+#endif	/* NO_X11 */
 }
 
 /*
@@ -216,6 +221,9 @@ void initialize_pointer_map(char *pointer_remap) {
 	 * from -buttonmap option.
 	 */
 	
+#if NO_X11
+	return;
+#else
 	if (!raw_fb_str) {
 		X_LOCK;
 		num_buttons = XGetPointerMapping(dpy, map, MAX_BUTTONS);
@@ -282,6 +290,7 @@ void initialize_pointer_map(char *pointer_remap) {
 		}
 		free(remap);
 	}
+#endif	/* NO_X11 */
 }
 
 /*
@@ -291,6 +300,9 @@ static void update_x11_pointer_position(int x, int y) {
 	int rc;
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	X_LOCK;
 	if (use_xwarppointer) {
@@ -321,11 +333,15 @@ static void update_x11_pointer_position(int x, int y) {
 	cursor_changes += rc;
 
 	last_event = last_input = last_pointer_input = time(NULL);
+#endif	/* NO_X11 */
 }
 
 void do_button_mask_change(int mask, int button) {
 	int mb, k, i = button-1;
 
+#if NO_X11
+	return;
+#else
 	/*
 	 * this expands to any pointer_map button -> keystrokes
 	 * remappings.  Usually just k=0 and we send one button event.
@@ -383,6 +399,7 @@ void do_button_mask_change(int mask, int button) {
 			}
 		}
 	}
+#endif	/* NO_X11 */
 }
 
 /*
@@ -394,6 +411,9 @@ static void update_x11_pointer_mask(int mask) {
 	last_event = last_input = last_pointer_input = time(NULL);
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	if (mask != button_mask) {
 		last_pointer_click_time = dnow();
@@ -508,6 +528,7 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 	 */
 	button_mask_prev = button_mask;
 	button_mask = mask;
+#endif	/* NO_X11 */
 }
 
 /* for -pipeinput */

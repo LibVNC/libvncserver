@@ -492,6 +492,9 @@ static void reset_rfbport(int old, int new)  {
 int remote_control_access_ok(void) {
 	struct stat sbuf;
 
+#if NO_X11
+	return 0;
+#else
 	if (client_connect_file) {
 		if (stat(client_connect_file, &sbuf) == 0) {
 			if (sbuf.st_mode & S_IWOTH) {
@@ -614,6 +617,7 @@ int remote_control_access_ok(void) {
 
 	}
 	return 1;
+#endif	/* NO_X11 */
 }
 
 static int hack_val = 0;
@@ -3082,9 +3086,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		grab_kbd = 0;
 		if (orig && dpy) {
+#if !NO_X11
 			X_LOCK;
 			XUngrabKeyboard(dpy, CurrentTime);
 			X_UNLOCK;
+#endif
 		}
 		rfbLog("disabled grab_kbd\n");
 	} else if (!strcmp(p, "grabptr")) {
@@ -3102,9 +3108,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		grab_ptr = 0;
 		if (orig && dpy) {
+#if !NO_X11
 			X_LOCK;
 			XUngrabPointer(dpy, CurrentTime);
 			X_UNLOCK;
+#endif
 		}
 		rfbLog("disabled grab_ptr\n");
 

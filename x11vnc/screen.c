@@ -168,6 +168,9 @@ if (0) fprintf(stderr, "unset_colormap: %d\n", reset);
 	}
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	X_LOCK;
 
@@ -274,6 +277,7 @@ if (0) fprintf(stderr, "unset_colormap: %d\n", reset);
 	}
 
 	init = 0;
+#endif	/* NO_X11 */
 }
 
 static void debug_colormap(XImage *fb) {
@@ -336,6 +340,9 @@ static void set_visual(char *str) {
 	char *p, *vstring = strdup(str);
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	defdepth = DefaultDepth(dpy, scr);
 	visual_id = (VisualID) 0;
@@ -406,6 +413,7 @@ static void set_visual(char *str) {
 
 	/* set numerical visual id. */
 	visual_id = vinfo.visualid;
+#endif	/* NO_X11 */
 }
 
 void set_nofb_params(int restore) {
@@ -1356,6 +1364,9 @@ static int wait_until_mapped(Window win) {
 	time_t start = time(NULL);
 	XWindowAttributes attr;
 
+#if NO_X11
+	return 0;
+#else
 	while (1) {
 		if (! valid_window(win, NULL, 0)) {
 			if (time(NULL) > start + waittime) {
@@ -1373,6 +1384,7 @@ static int wait_until_mapped(Window win) {
 		usleep(ms * 1000);
 	}
 	return 0;
+#endif	/* NO_X11 */
 }
 
 /*
@@ -1388,6 +1400,9 @@ XImage *initialize_xdisplay_fb(void) {
 	if (raw_fb_str) {
 		return initialize_raw_fb(0);
 	}
+#if NO_X11
+	return NULL;
+#else
 
 	X_LOCK;
 	if (subwin) {
@@ -1638,6 +1653,7 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 		rfbLog("warning: 24 bpp may have poor performance.\n");
 	}
 	return fb;
+#endif	/* NO_X11 */
 }
 
 void parse_scale_string(char *str, double *factor, int *scaling, int *blend,
@@ -1983,7 +1999,11 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		have_masks = 2;
 		/* need to fetch TrueColor visual */
 		X_LOCK;
-		if (dpy && XMatchVisualInfo(dpy, scr, 24, TrueColor, &vinfo)) {
+		if (dpy
+#if !NO_X11
+		    && XMatchVisualInfo(dpy, scr, 24, TrueColor, &vinfo)
+#endif
+		    ) {
 			main_red_mask   = vinfo.red_mask;
 			main_green_mask = vinfo.green_mask;
 			main_blue_mask  = vinfo.blue_mask;

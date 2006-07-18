@@ -97,6 +97,9 @@ int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
 	unsigned int mask;
 
 	RAWFB_RET(0)
+#if NO_X11
+	return 0;
+#else
 
 	ret = XQueryPointer(dpy, rootwin, &r, &c, &rootx, &rooty, &wx, &wy,
 	    &mask);
@@ -127,6 +130,7 @@ int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
 	}
 
 	return 1;
+#endif	/* NO_X11 */
 }
 
 static int scrollcopyrect_top, scrollcopyrect_bot;
@@ -299,6 +303,7 @@ static void parse_wireframe_str(char *wf) {
 		XColor cdef;
 		Colormap cmap;
 		if (dpy && (bpp == 32 || bpp == 16)) {
+#if !NO_X11
 		 	cmap = DefaultColormap (dpy, scr);
 			if (XParseColor(dpy, cmap, str, &cdef) &&
 			    XAllocColor(dpy, cmap, &cdef)) {
@@ -315,6 +320,7 @@ static void parse_wireframe_str(char *wf) {
 				wireframe_shade = n;
 				ok = 1;
 			}
+#endif
 		}
 		if (ok) {
 			;

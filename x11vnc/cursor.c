@@ -828,6 +828,9 @@ static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 	XErrorHandler old_handler;
 
 	RAWFB_RET_VOID
+#if NO_X11
+	return;
+#else
 
 	X_LOCK;
 
@@ -914,6 +917,7 @@ static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 
 	*depth = descend;
 	*w = wins[descend];
+#endif	/* NO_X11 */
 }
 
 void initialize_xfixes(void) {
@@ -1456,6 +1460,7 @@ int get_which_cursor(void) {
 				unsigned int w, h, bw, d;  
 				Window r;
 
+#if !NO_X11
 				trapped_xerror = 0;
 				X_LOCK;
 				old_handler = XSetErrorHandler(trap_xerror);
@@ -1470,6 +1475,7 @@ int get_which_cursor(void) {
 				XSetErrorHandler(old_handler);
 				X_UNLOCK;
 				trapped_xerror = 0;
+#endif	/* NO_X11 */
 			}
 			if (which == which0) {
 				/* the string "term" mean I-beam. */
@@ -1781,6 +1787,9 @@ int check_x11_pointer(void) {
 	unsigned int mask;
 
 	RAWFB_RET(0)
+#if NO_X11
+	return 0;
+#else
 
 	if (unixpw_in_progress) return 0;
 
@@ -1811,5 +1820,6 @@ int check_x11_pointer(void) {
 
 	/* change the cursor shape if necessary */
 	return set_cursor(x, y, get_which_cursor());
+#endif	/* NO_X11 */
 }
 

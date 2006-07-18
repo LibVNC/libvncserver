@@ -47,6 +47,7 @@ AC_CHECK_HEADER(thenonexistentheader.h, HAVE_THENONEXISTENTHEADER_H="true")
 # Checks for X libraries
 HAVE_X="false"
 AC_PATH_XTRA
+AH_TEMPLATE(HAVE_X11, [X11 build environment present])
 AH_TEMPLATE(HAVE_XSHM, [MIT-SHM extension build environment present])
 AH_TEMPLATE(HAVE_XTEST, [XTEST extension build environment present])
 AH_TEMPLATE(HAVE_XTESTGRABCONTROL, [XTEST extension has XTestGrabControl])
@@ -88,8 +89,10 @@ AC_ARG_WITH(fbdev,
 AC_ARG_WITH(uinput,
 [  --without-uinput        disable linux uinput device support],,)
 
-if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
-	AC_CHECK_LIB(X11, XGetImage, HAVE_X="true",
+if test "x$with_x" = "xno"; then
+	HAVE_X="false"
+elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
+	AC_CHECK_LIB(X11, XGetImage, [AC_DEFINE(HAVE_X11) HAVE_X="true"],
 		HAVE_X="false",
 		$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
@@ -193,70 +196,14 @@ if test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			esac
 		fi
 
-		# currently only x11vnc uses crypt() or libssl:
-		AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
-		AC_ARG_WITH(crypt,
-		[  --without-crypt         disable support for libcrypt],,)
-		if test "x$with_crypt" != "xno"; then
-			AC_CHECK_FUNCS([crypt], HAVE_LIBC_CRYPT="true")
-			if test -z "$HAVE_LIBC_CRYPT"; then
-				AC_CHECK_LIB(crypt, crypt,
-					X_PRELIBS="$X_PRELIBS -lcrypt"
-					[AC_DEFINE(HAVE_LIBCRYPT)], ,)
-			fi
-		fi
-
-		# some OS's need both -lssl and -lcrypto on link line:
-		AH_TEMPLATE(HAVE_LIBCRYPTO, [openssl libcrypto library present])
-		AC_ARG_WITH(crypto,
-		[  --without-crypto        disable support for openssl libcrypto],,)
-
-		AH_TEMPLATE(HAVE_LIBSSL, [openssl libssl library present])
-		AC_ARG_WITH(ssl,
-		[  --without-ssl           disable support for openssl libssl],,)
-
-		if test "x$with_crypto" != "xno" -a "x$with_ssl" != "xno"; then
-			AC_CHECK_LIB(crypto, RAND_file_name,
-				[AC_DEFINE(HAVE_LIBCRYPTO) HAVE_LIBCRYPTO="true"], ,)
-		fi
-
-		if test "x$with_ssl" != "xno"; then
-			if test "x$HAVE_LIBCRYPTO" = "xtrue"; then
-				AC_CHECK_LIB(ssl, SSL_library_init,
-					X_PRELIBS="$X_PRELIBS -lssl -lcrypto"
-					[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,
-					-lcrypto)
-			else
-				AC_CHECK_LIB(ssl, SSL_library_init,
-					X_PRELIBS="$X_PRELIBS -lssl"
-					[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,)
-			fi
-		fi
-
-		if test "x$with_v4l" != "xno"; then
-			AC_CHECK_HEADER(linux/videodev.h,
-				[AC_DEFINE(HAVE_LINUX_VIDEODEV_H)],,)
-		fi
-		if test "x$with_fbdev" != "xno"; then
-			AC_CHECK_HEADER(linux/fb.h,
-				[AC_DEFINE(HAVE_LINUX_FB_H)],,)
-		fi
-		if test "x$with_uinput" != "xno"; then
-			AC_CHECK_HEADER(linux/input.h,
-				[AC_DEFINE(HAVE_LINUX_INPUT_H) HAVE_LINUX_INPUT_H="true"],,)
-			if test "x$HAVE_LINUX_INPUT_H" = "xtrue"; then
-				AC_CHECK_HEADER(linux/uinput.h,
-					[AC_DEFINE(HAVE_LINUX_UINPUT_H)],, [#include <linux/input.h>])
-			fi
-		fi
-
 		X_LIBS="$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS"
 	fi
 fi
+
 AC_SUBST(X_LIBS)
 AM_CONDITIONAL(HAVE_X, test $HAVE_X != "false")
 
-if test "$PACKAGE_NAME" = "x11vnc" -a "x$HAVE_X" = "xfalse"; then
+if test "$PACKAGE_NAME" = "x11vnc" -a "x$HAVE_X" = "xfalse" -a "x$with_x" != "xno"; then
 	AC_MSG_ERROR([
 ==========================================================================
 A working X window system build environment is required to build x11vnc.
@@ -268,6 +215,64 @@ and libraries may be found.  On 64+32 bit machines you may need to point
 to lib64 or lib32 directories to pick up the correct word size.
 ==========================================================================
 ])
+fi
+
+AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
+AC_ARG_WITH(crypt,
+[  --without-crypt         disable support for libcrypt],,)
+if test "x$with_crypt" != "xno"; then
+	AC_CHECK_FUNCS([crypt], HAVE_LIBC_CRYPT="true")
+	if test -z "$HAVE_LIBC_CRYPT"; then
+		AC_CHECK_LIB(crypt, crypt,
+			CRYPT_LIBS="-lcrypt"
+			[AC_DEFINE(HAVE_LIBCRYPT)], ,)
+	fi
+fi
+AC_SUBST(CRYPT_LIBS)
+
+# some OS's need both -lssl and -lcrypto on link line:
+AH_TEMPLATE(HAVE_LIBCRYPTO, [openssl libcrypto library present])
+AC_ARG_WITH(crypto,
+[  --without-crypto        disable support for openssl libcrypto],,)
+
+AH_TEMPLATE(HAVE_LIBSSL, [openssl libssl library present])
+AC_ARG_WITH(ssl,
+[  --without-ssl           disable support for openssl libssl],,)
+
+if test "x$with_crypto" != "xno" -a "x$with_ssl" != "xno"; then
+	AC_CHECK_LIB(crypto, RAND_file_name,
+		[AC_DEFINE(HAVE_LIBCRYPTO) HAVE_LIBCRYPTO="true"], ,)
+fi
+
+if test "x$with_ssl" != "xno"; then
+	if test "x$HAVE_LIBCRYPTO" = "xtrue"; then
+		AC_CHECK_LIB(ssl, SSL_library_init,
+			SSL_LIBS="-lssl -lcrypto"
+			[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,
+			-lcrypto)
+	else
+		AC_CHECK_LIB(ssl, SSL_library_init,
+			SSL_LIBS="-lssl"
+			[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,)
+	fi
+fi
+AC_SUBST(SSL_LIBS)
+
+if test "x$with_v4l" != "xno"; then
+	AC_CHECK_HEADER(linux/videodev.h,
+		[AC_DEFINE(HAVE_LINUX_VIDEODEV_H)],,)
+fi
+if test "x$with_fbdev" != "xno"; then
+	AC_CHECK_HEADER(linux/fb.h,
+		[AC_DEFINE(HAVE_LINUX_FB_H)],,)
+fi
+if test "x$with_uinput" != "xno"; then
+	AC_CHECK_HEADER(linux/input.h,
+		[AC_DEFINE(HAVE_LINUX_INPUT_H) HAVE_LINUX_INPUT_H="true"],,)
+	if test "x$HAVE_LINUX_INPUT_H" = "xtrue"; then
+		AC_CHECK_HEADER(linux/uinput.h,
+			[AC_DEFINE(HAVE_LINUX_UINPUT_H)],, [#include <linux/input.h>])
+	fi
 fi
 
 # Checks for libraries.

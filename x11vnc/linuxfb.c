@@ -7,6 +7,8 @@
 #include "screen.h"
 #include "pointer.h"
 #include "allowed_input_t.h"
+#include "uinput.h"
+#include "keyboard.h"
 
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>

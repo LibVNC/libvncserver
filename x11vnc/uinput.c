@@ -6,6 +6,7 @@
 #include "xinerama.h"
 #include "screen.h"
 #include "pointer.h"
+#include "keyboard.h"
 #include "allowed_input_t.h"
 
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H
@@ -120,6 +121,7 @@ static void init_key_tracker(void) {
 
 static int mod_is_down(void) {
 	int i;
+	if (0) {key_is_down();}
 	for (i = 0; i < 256; i++) {
 		if (key_pressed[i] && key_ismod[i]) {
 			return 1;
@@ -281,7 +283,7 @@ void set_uinput_reset(int ms) {
 	rfbLog("set_uinput_reset: %d\n", ms);
 }
 
-int set_uinput_always(int a) {
+void set_uinput_always(int a) {
 	uinput_always = a;
 }
 
@@ -315,7 +317,6 @@ void parse_uinput_str(char *in) {
 			}
 			uinput_dev = strdup(p);
 		} else if (strstr(p, "accel=") == p) {
-			double fx, fy;
 			q = p + strlen("accel=");
 			if (! set_uinput_accel(q)) {
 				clean_up_exit(1);

@@ -1,3 +1,7 @@
+2006-07-17  Karl Runge <runge@karlrunge.com>
+	* configure.ac: move non-X11 tests out of HAVE_X: set  
+	  SSL_LIBS and CRYPT_LIBS and some header checks.
+
 2006-07-12  Karl Runge <runge@karlrunge.com>
 	* libvncserver: release for CVE-2006-2450 fix.
 
