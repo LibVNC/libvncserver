@@ -1041,6 +1041,7 @@ void user_supplied_opts(char *opts) {
 		"scale", "scale_cursor", "sc", "solid", "so", "id",
 		"clear_mods", "cm", "clear_keys", "ck", "repeat",
 		"speeds", "sp", "readtimeout", "rd",
+		"rotate", "ro",
 		NULL
 	};
 
@@ -1089,6 +1090,11 @@ void user_supplied_opts(char *opts) {
 				if (scale_cursor_str) free(scale_cursor_str);
 				q = strchr(p, '=') + 1;
 				scale_cursor_str = strdup(q);
+			} else if (strstr(p, "rotate=") == p ||
+			    strstr(p, "ro=") == p) {
+				if (rotating_str) free(rotating_str);
+				q = strchr(p, '=') + 1;
+				rotating_str = strdup(q);
 			} else if (!strcmp(p, "solid") || !strcmp(p, "so")) {
 				use_solid_bg = 1;
 				if (!solid_str) {

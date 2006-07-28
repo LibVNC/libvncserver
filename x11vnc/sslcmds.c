@@ -15,7 +15,7 @@
 #endif
 #endif
 
-#ifdef REL8x
+#ifdef NO_SSL_OR_UNIXPW
 #undef SSLCMDS
 #endif
 

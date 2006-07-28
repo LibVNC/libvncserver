@@ -42,4 +42,13 @@
 
 #define MAX_BUTTONS 5
 
+#define ROTATE_NONE		0
+#define ROTATE_X		1
+#define ROTATE_Y		2
+#define ROTATE_XY		3
+#define ROTATE_90		4
+#define ROTATE_90X		5
+#define ROTATE_90Y		6
+#define ROTATE_270		7
+
 #endif /* _X11VNC_PARAMS_H */

@@ -673,7 +673,13 @@ char *guess_desktop(void) {
 	if (prop != None) return "gnome";
 
 	prop = XInternAtom(dpy, "KWIN_RUNNING", True);
-	if (prop != None) return "kde";
+	if (prop != None) {
+		prop = XInternAtom(dpy, "_KDE_RUNNING", True);
+		if (prop != None) {
+			prop = XInternAtom(dpy, "KDE_DESKTOP_WINDOW", True);
+			if (prop != None) return "kde";
+		}
+	}
 
 	prop = XInternAtom(dpy, "_MOTIF_WM_INFO", True);
 	if (prop != None) {

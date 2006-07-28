@@ -1897,6 +1897,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			rfbLog("remote_cmd: XRANDR ext. not present.\n");
 		}
 
+	} else if (strstr(p, "rotate") == p) {
+		COLON_CHECK("rotate:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(rotating_str));
+			goto qry;
+		}
+		p += strlen("rotate:");
+		if (rotating_str) free(rotating_str);
+		rotating_str = strdup(p);
+		rfbLog("remote_cmd: set rotate to \"%s\"\n", rotating_str);
+
+		do_new_fb(0);
+
 	} else if (strstr(p, "padgeom") == p) {
 		COLON_CHECK("padgeom:")
 		if (query) {
@@ -4035,7 +4049,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, no_external_cmds);
 		} else if (!strcmp(p, "passwdfile")) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(passwdfile));
-#ifndef REL8x
+#ifndef NO_SSL_OR_UNIXPW
 		} else if (!strcmp(p, "unixpw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, unixpw);
 		} else if (!strcmp(p, "unixpw_nis")) {

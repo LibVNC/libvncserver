@@ -1,3 +1,7 @@
+2006-07-28  Karl Runge <runge@karlrunge.com>
+	* ssl_vncviewer: remove some bashisms.
+	* x11vnc: -rotate option (e.g. handheld), fix FPE on tru64.
+
 2006-07-17  Karl Runge <runge@karlrunge.com>
 	* x11vnc: enable --without-x builds for -rawfb only (NO_X11)
 

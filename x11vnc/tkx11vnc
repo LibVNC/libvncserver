@@ -166,6 +166,7 @@ Screen
 	=GAL ResizeRotate::
 	= xrandr
 	=-C:resize,newfbsize,exit xrandr_mode:
+	rotate:
 	padgeom:
 	=GAL LOFF
 	=GAL Clipping::

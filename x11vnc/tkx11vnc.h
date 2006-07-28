@@ -177,6 +177,7 @@ char gui_code[] = "";
 "	=GAL ResizeRotate::\n"
 "	= xrandr\n"
 "	=-C:resize,newfbsize,exit xrandr_mode:\n"
+"	rotate:\n"
 "	padgeom:\n"
 "	=GAL LOFF\n"
 "	=GAL Clipping::\n"

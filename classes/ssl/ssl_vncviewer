@@ -30,9 +30,19 @@
 #         to reach the VNC server (e.g. your firewall requires a proxy).
 #         For the "double proxy" case use -proxy host1:port1,host2:port2
 #
+# A couple other args (not related to certs):
+#
+# -alpha  turn on cursor alphablending hack if you are using the
+#         enhanced tightvnc vncviewer.
+#
+# -grab   turn on XGrabServer hack if you are using the enhanced tightvnc
+#         vncviewer (e.g. for fullscreen mode in some windowmanagers like
+#         fvwm that do not otherwise work in fullscreen mode)
+#
 #
 # set VNCVIEWERCMD to whatever vncviewer command you want to use:
 #
+VNCIPCMD=${VNCVIEWERCMD:-vncip}
 VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
 #
 # Same for STUNNEL, e.g. /path/to/stunnel or stunnel4, etc.
@@ -53,6 +63,8 @@ help() {
 	head -39 $0 | tail +2
 }
 
+gotalpha=""
+
 # grab our cmdline options:
 while [ "X$1" != "X" ]
 do
@@ -63,6 +75,10 @@ do
                 ;;
 	"-proxy")	shift; proxy="$1"
                 ;;
+	"-alpha")	gotalpha=1
+                ;;
+	"-grab")	VNCVIEWER_GRAB_SERVER=1; export VNCVIEWER_GRAB_SERVER
+                ;;
 	"-h"*)	help; exit 0
                 ;;
 	*)	break
@@ -71,16 +87,26 @@ do
     shift
 done
 
+if [ "X$gotalpha" != "X1" ]; then
+	NO_ALPHABLEND=1
+	export NO_ALPHABLEND
+fi
+
 orig="$1"
 shift
 
 # play around with host:display port:
-if ! echo "$orig" | grep ':' > /dev/null; then
+if echo "$orig" | grep ':' > /dev/null; then
+	:
+else
 	orig="$orig:0"
 fi
 
 host=`echo "$orig" | awk -F: '{print $1}'`
 disp=`echo "$orig" | awk -F: '{print $2}'`
+if [ "X$host" = "X" ]; then
+	host=localhost
+fi
 if [ $disp -lt 200 ]; then
 	port=`expr $disp + 5900`
 else
@@ -99,7 +125,9 @@ if [ "x$inuse" != "x" ]; then
 	try=5920
 	while [ $try -lt 6000 ]
 	do
-		if ! echo "$inuse" | grep -w $try > /dev/null; then
+		if echo "$inuse" | grep -w $try > /dev/null; then
+			:
+		else
 			use=$try
 			break
 		fi
@@ -305,7 +333,7 @@ fi
 
 if echo "$0" | grep vncip > /dev/null; then
 	# hack for runge's special wrapper script vncip.
-	vncip "$@" localhost:$n
+	$VNCIPCMD "$@" localhost:$n
 else
 	$VNCVIEWERCMD "$@" localhost:$n
 fi

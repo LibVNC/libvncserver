@@ -20,7 +20,7 @@
 #endif
 #endif
 
-#ifdef REL8x
+#ifdef NO_SSL_OR_UNIXPW
 #undef FORK_OK
 #undef LIBVNCSERVER_HAVE_LIBSSL
 #define LIBVNCSERVER_HAVE_LIBSSL 0
@@ -923,14 +923,7 @@ static void lose_ram(void) {
 	 * without doing exec().  we really should re-exec, but a pain
 	 * to redo all SSL ctx.
 	 */
-	free_old_fb(main_fb, rfb_fb, cmap8to24_fb, snap_fb);
-	if (raw_fb == main_fb || raw_fb == rfb_fb) {
-		raw_fb = NULL;
-	}
-	main_fb = NULL;
-	rfb_fb = NULL;
-	cmap8to24_fb = NULL;
-	snap_fb = NULL;
+	free_old_fb();
 
 	free_tiles();
 }
@@ -1406,6 +1399,8 @@ void accept_openssl(int mode) {
 		int f_in  = fileno(stdin);
 		int f_out = fileno(stdout);
 
+		if (db) fprintf(stderr, "helper pid in: %d %d %d %d\n", f_in, f_out, sock, listen);
+
 		/* reset all handlers to default (no interrupted() calls) */
 		unset_signals();
 
@@ -1442,6 +1437,7 @@ void accept_openssl(int mode) {
 			    " back to: %d\n", getpid(), cport);
 			exit(1);
 		}
+		if (db) fprintf(stderr, "vncsock %d\n", vncsock);
 
 		/* try to initialize SSL with the remote client */
 
@@ -2370,10 +2366,9 @@ static void init_prng(void) {
 
 void raw_xfer(int csock, int s_in, int s_out) {
 	char buf[8192];
-	int sz = 8192, n, m, status;
+	int sz = 8192, n, m, status, db = 1;
 #ifdef FORK_OK
 	pid_t pid = fork();
-	int db = 1;
 
 	/* this is for testing, no SSL just socket redir */
 	if (pid < 0) {
@@ -2389,7 +2384,7 @@ void raw_xfer(int csock, int s_in, int s_out) {
 			} else if (n > 0) {
 				int len = n;
 				char *src = buf;
-if (db > 1) write(2, buf, n);
+				if (db > 1) write(2, buf, n);
 				while (len > 0) {
 					m = write(s_out, src, len);
 					if (m > 0) {
@@ -2400,7 +2395,7 @@ if (db > 1) write(2, buf, n);
 					if (m < 0 && (errno == EINTR || errno == EAGAIN)) {
 						continue;
 					}
-		if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", csock, s_out, m, n, errno);
+if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", csock, s_out, m, n, errno);
 					break;
 				}
 			}
@@ -2419,7 +2414,7 @@ if (db > 1) write(2, buf, n);
 			} else if (n > 0) {
 				int len = n;
 				char *src = buf;
-if (db > 1) write(2, buf, n);
+				if (db > 1) write(2, buf, n);
 				while (len > 0) {
 					m = write(csock, src, len);
 					if (m > 0) {
@@ -2441,6 +2436,6 @@ if (db > 1) write(2, buf, n);
 	close(csock);
 	close(s_in);
 	close(s_out);
-#endif
+#endif	/* FORK_OK */
 }
 

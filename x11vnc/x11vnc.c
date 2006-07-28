@@ -1642,7 +1642,7 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			passwdfile = strdup(argv[++i]);
 			got_passwdfile = 1;
-#ifndef REL8x
+#ifndef NO_SSL_OR_UNIXPW
 		} else if (strstr(arg, "-unixpw") == arg) {
 			unixpw = 1;
 			if (strstr(arg, "-unixpw_nis")) {
@@ -1826,6 +1826,9 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 			}
+		} else if (!strcmp(arg, "-rotate")) {
+			CHECK_ARGC
+			rotating_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-padgeom")
 		    || !strcmp(arg, "-padgeometry")) {
 			CHECK_ARGC

@@ -131,7 +131,7 @@
 #define PASSWD_UNLESS_NOPW 0
 #endif
 
-#define noREL8x
+#define xxNO_SSL_OR_UNIXPW
 
 /*
  * Beginning of support for small binary footprint build for embedded
@@ -386,6 +386,7 @@ extern char *rfb_fb;			/* same as main_fb unless transformation */
 extern char *fake_fb;			/* used under -padgeom */
 extern char *snap_fb;			/* used under -snapfb */
 extern char *cmap8to24_fb;		/* used under -8to24 */
+extern char *rot_fb;			/* used under -rotate */
 extern char *raw_fb;
 extern char *raw_fb_addr;
 extern int raw_fb_offset;
@@ -397,6 +398,7 @@ extern int raw_fb_back_to_X;
 
 extern int rfb_bytes_per_line;
 extern int main_bytes_per_line;
+extern int rot_bytes_per_line;
 extern unsigned long  main_red_mask,  main_green_mask,  main_blue_mask;
 extern unsigned short main_red_max,   main_green_max,   main_blue_max;
 extern unsigned short main_red_shift, main_green_shift, main_blue_shift;
@@ -411,6 +413,10 @@ extern int scaling_pad;		/* pad out scaled sizes to fit denominator */
 extern int scaling_interpolate;	/* use interpolation scheme when shrinking */
 extern int scaled_x, scaled_y;		/* dimensions of scaled display */
 extern int scale_numer, scale_denom;	/* n/m */
+extern char *rotating_str;
+extern int rotating;
+extern int rotating_same;
+extern int rotating_cursors;
 
 /* scale cursor */
 extern char *scale_cursor_str;

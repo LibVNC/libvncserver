@@ -82,6 +82,19 @@ static void curs_copy(cursor_info_t *dest, cursor_info_t *src) {
 	dest->sy = src->sy;
 	dest->reverse = src->reverse;
 	dest->rfb = src->rfb;
+
+	if (rotating && rotating_cursors && dest->data != NULL) {
+		int tx, ty;
+		rotate_curs(dest->data, src->data, src->wx, src->wy, 1);
+		rotate_curs(dest->mask, src->mask, src->wx, src->wy, 1);
+		rotate_coords(dest->sx, dest->sy, &tx, &ty, src->wx, src->wy);
+		dest->sx = tx;
+		dest->sy = ty;
+		if (! rotating_same) {
+			dest->wx = src->wy;
+			dest->wy = src->wx;
+		}
+	}
 }
 
 /* empty cursor */
@@ -1315,6 +1328,27 @@ static int get_xfixes_cursor(int init) {
 			}
 			free(cursors[use]->rfb);
 			cursors[use]->rfb = NULL;
+		}
+
+		if (rotating && rotating_cursors) {
+			char *dst;
+			int tx, ty;
+			int w = xfc->width;
+			int h = xfc->height;
+
+			dst = (char *) malloc(w * h * 4);
+			rotate_curs(dst, (char *) xfc->pixels, w, h, 4);
+
+			memcpy(xfc->pixels, dst, w * h * 4);
+			free(dst);
+
+			rotate_coords(xfc->xhot, xfc->yhot, &tx, &ty, w, h);
+			xfc->xhot = tx;
+			xfc->yhot = ty;
+			if (! rotating_same) {
+				xfc->width = h;
+				xfc->height = w;
+			}
 		}
 
 		/* place cursor into our collection */

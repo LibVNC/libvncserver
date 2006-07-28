@@ -646,6 +646,10 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		return;
 	}
 
+	if (rotating) {
+		rotate_coords_inverse(x, y, &x, &y, -1, -1);
+	}
+
 	if (scaling) {
 		/* map from rfb size to X11 size: */
 		x = ((double) x / scaled_x) * dpy_x;

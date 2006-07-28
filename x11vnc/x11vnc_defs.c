@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8.3 lastmod: 2006-07-17";
+char lastmod[] = "0.8.3 lastmod: 2006-07-28";
 
 /* X display info */
 
@@ -59,6 +59,7 @@ char *rfb_fb = NULL;		/* same as main_fb unless transformation */
 char *fake_fb = NULL;		/* used under -padgeom */
 char *snap_fb = NULL;		/* used under -snapfb */
 char *cmap8to24_fb = NULL;	/* used under -8to24 */
+char *rot_fb = NULL;
 char *raw_fb = NULL;		/* when used should be main_fb */
 char *raw_fb_addr = NULL;
 int raw_fb_offset = 0;
@@ -70,6 +71,7 @@ int raw_fb_back_to_X = 0;	/* kludge for testing rawfb -> X */
 
 int rfb_bytes_per_line = 0;
 int main_bytes_per_line = 0;
+int rot_bytes_per_line = 0;
 unsigned long  main_red_mask = 0,  main_green_mask = 0,  main_blue_mask = 0;
 unsigned short main_red_max = 0,   main_green_max = 0,   main_blue_max = 0;
 unsigned short main_red_shift = 0, main_green_shift = 0, main_blue_shift = 0;
@@ -84,6 +86,10 @@ int scaling_pad = 0;		/* pad out scaled sizes to fit denominator */
 int scaling_interpolate = 0;	/* use interpolation scheme when shrinking */
 int scaled_x = 0, scaled_y = 0;	/* dimensions of scaled display */
 int scale_numer = 0, scale_denom = 0;	/* n/m */
+char *rotating_str = NULL;
+int rotating = 0;
+int rotating_same = 0;
+int rotating_cursors = 0;
 
 /* scale cursor */
 char *scale_cursor_str = NULL;

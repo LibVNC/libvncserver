@@ -2,7 +2,7 @@
 .TH X11VNC "1" "July 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-07-17
+         version: 0.8.3, lastmod: 2006-07-28
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -744,8 +744,8 @@ Also in the case of \fB-unixpw,\fR the user logging in
 can place a colon at the end of his username and
 supply a few options: scale=, scale_cursor= (or sc=),
 solid (or so), id=, clear_mods (or cm), clear_keys
-(or ck), repeat, speeds= (or sp=), or readtimeout=
-(or rd=) separated by commas if there is more than one.
+(or ck), repeat, speeds= (or sp=), readtimeout=
+(or rd=), or rotate= (or ro=) separated by commas if there is more than one.
 After the user logs in successfully, these options will
 be applied to the VNC screen.  For example,
 .IP
@@ -1665,6 +1665,39 @@ all viewers that do not support the NewFBSize VNC
 encoding, and then resize the framebuffer.  "exit"
 means disconnect all viewer clients, and then terminate
 x11vnc.
+.PP
+\fB-rotate\fR \fIstring\fR
+.IP
+Rotate and/or flip the framebuffer view exported by VNC.
+This transformation is independent of XRANDR and is
+done in software in main memory and so may be slower.
+This mode could be useful on a handheld with portrait or
+landscape modes that do not correspond to the scanline
+order of the actual framebuffer.  \fIstring\fR can be:
+.IP
+x     flip along x-axis
+y     flip along y-axis
+xy     flip along x- and y-axes
++90     rotate 90 degrees clockwise
+\fB-90\fR     rotate 90 degrees counter-clockwise
++90x     rotate 90 degrees CW, then flip along x
++90y     rotate 90 degrees CW, then flip along y
+.IP
+these give all possible rotations and reflections.
+.IP
+Aliases: same as xy:  yx, +180, \fB-180,\fR 180
+same as \fB-90:\fR +270, 270
+same as +90: 90, (ditto for 90x, 90y)
+.IP
+Like \fB-scale,\fR this transformation is applied at the very
+end of any chain of framebuffer transformations and so
+any options with geometries, e.g. \fB-blackout,\fR \fB-clip,\fR etc.
+are relative to the original X (or \fB-rawfb)\fR framebuffer,
+not the final one sent to VNC viewers.
+.IP
+If you do not want the cursor shape to be rotated
+prefix \fIstring\fR with "nc:", e.g. "nc:+90",
+"nc:xy", etc.
 .PP
 \fB-padgeom\fR \fIWxH\fR
 .IP
@@ -3024,7 +3057,7 @@ nonstandard, use "console:/dev/foofb"
 .IP
 If you do not want x11vnc to guess the framebuffer's
 WxHxB and masks automatically (sometimes the kernel
-given inaccurate information), specify them with a
+gives inaccurate information), specify them with a
 @WxHxB at the end of the string.
 .IP
 Examples:
@@ -3460,6 +3493,8 @@ noxrandr        disable \fB-xrandr\fR mode.
 .IP
 xrandr_mode:mode set the \fB-xrandr\fR mode to "mode".
 .IP
+rotate:mode     set the \fB-rotate\fR mode to "mode".
+.IP
 padgeom:WxH     set \fB-padgeom\fR to WxH (empty to disable)
 If WxH is "force" or "do" the padded
 geometry fb is immediately applied.
@@ -3823,7 +3858,7 @@ unlock connect allowonce allow localhost nolocalhost
 listen lookup nolookup accept afteraccept gone shm
 noshm flipbyteorder noflipbyteorder onetile noonetile
 solid_color solid nosolid blackout xinerama noxinerama
-xtrap noxtrap xrandr noxrandr xrandr_mode padgeom
+xtrap noxtrap xrandr noxrandr xrandr_mode rotate padgeom
 quiet q noquiet modtweak nomodtweak xkb noxkb capslock
 nocapslock skip_lockkeys noskip_lockkeys skip_keycodes
 sloppy_keys nosloppy_keys skip_dups noskip_dups
@@ -3846,9 +3881,9 @@ pm input_skip allinput noallinput input grabkbd
 nograbkbd grabptr nograbptr client_input speeds wmdt
 debug_pointer dp nodebug_pointer nodp debug_keyboard
 dk nodebug_keyboard nodk deferupdate defer wait_ui
-wait_bog nowait_bog slow_fb wait readtimeout nap
-nonap sb screen_blank fbpm nofbpm fs gaps grow
-fuzz snapfb nosnapfb rawfb uinput_accel uinput_reset
+wait_bog nowait_bog slow_fb wait readtimeout nap nonap
+sb screen_blank fbpm nofbpm fs gaps grow fuzz snapfb
+nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
 uinput_always progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
