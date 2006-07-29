@@ -122,7 +122,7 @@ elif uname | grep SunOS > /dev/null; then
 	inuse=`netstat -an -f inet -P tcp | grep LISTEN | awk '{print $1}' | sed 's/^.*\.//'`
 fi
 if [ "x$inuse" != "x" ]; then
-	try=5920
+	try=5930
 	while [ $try -lt 6000 ]
 	do
 		if echo "$inuse" | grep -w $try > /dev/null; then
@@ -137,7 +137,7 @@ fi
 if [ "X$use" = "X" ]; then
 	# otherwise choose a "random" one:
 	use=`date +%S`
-	use=`expr $use + 5920`
+	use=`expr $use + 5930`
 fi
 
 # create the stunnel config file:
