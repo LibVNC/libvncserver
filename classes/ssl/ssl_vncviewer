@@ -299,6 +299,7 @@ cat > $tmp <<END
 foreground = yes
 pid =
 client = yes
+debug = 6
 $verify
 $cert
 
