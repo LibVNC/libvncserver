@@ -1,21 +1,26 @@
 #!/bin/sh
 #
-# ssl_vncviewer:  wrapper for vncviewer to use an stunnel SSL tunnel.
+# ssl_vncviewer:  wrapper for vncviewer to use an stunnel SSL tunnel
+#                 or an SSH tunnel.
 #
 # Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
 #
-# You must have stunnel(8) installed on the system and in your
-# PATH (n.b. stunnel is usually in an sbin subdir).
+# You must have stunnel(8) installed on the system and in your PATH
+# (however, see the -ssh option below, in which case you will need ssh(1)
+# installed)  Note: stunnel is usually installed in an "sbin" subdirectory.
 #
 # You should have "x11vnc -ssl ..." or "x11vnc -stunnel ..." 
-# running as the VNC server. 
+# already running as the VNC server on the remote machine.
+# (or use stunnel on the server side for any other VNC server)
 #
-# usage: ssl_vncviewer [cert-args] host:display <vncviewer-args>
+#
+# Usage: ssl_vncviewer [cert-args] host:display <vncviewer-args>
 #
 # e.g.:  ssl_vncviewer snoopy:0
 #        ssl_vncviewer snoopy:0 -encodings "copyrect tight zrle hextile"
 #
 # [cert-args] can be:
+#
 #	-verify /path/to/cacert.pem		
 #	-mycert /path/to/mycert.pem		
 #	-proxy  host:port
@@ -30,7 +35,39 @@
 #         to reach the VNC server (e.g. your firewall requires a proxy).
 #         For the "double proxy" case use -proxy host1:port1,host2:port2
 #
-# A couple other args (not related to certs):
+#    See http://www.karlrunge.com/x11vnc/#faq-ssl-ca for details on SSL
+#    certificates with VNC.
+#
+# A few other args (not related to SSL and certs):
+#
+# -ssh    Use ssh instead of stunnel SSL.  ssh(1) must be installed and you
+#         must be able to log into the remote machine via ssh.
+#
+#         In this case "host:display" may be of the form "user@host:display"
+#         where "user@host" is used for the ssh login (see ssh(1) manpage).
+#
+#         If -proxy is supplied it can be of the forms: "gwhost" "gwhost:port"
+#         "user@gwhost" or "user@gwhost:port".  "gwhost" is an incoming ssh 
+#         gateway machine (the VNC server is not running there), an ssh -L
+#         redir is used to "host" in "host:display" from "gwhost". Any "user@"
+#         part must be in the -proxy string (not in "host:display").
+#
+#         Under -proxy use "gwhost:port" if connecting to any ssh port
+#         other than the default (22).  (even for the non-gateway case,
+#         -proxy must be used to specify a non-standard ssh port)
+#
+#         Examples:
+#
+#         ssl_vncviewer -ssh bob@bobs-home.net:0
+#         ssl_vncviewer -ssh -sshcmd 'x11vnc -localhost' bob@bobs-home.net:0
+#
+#         ssl_vncviewer -ssh -proxy fred@mygate.com:2022 mymachine:0
+#         ssl_vncviewer -ssh -proxy bob@bobs-home.net:2222 localhost:0
+#
+#
+# -sshcmd cmd   Run "cmd" via ssh instead of the default "sleep 15"
+#               e.g. -sshcmd 'x11vnc -display :0 -localhost -rfbport 5900'
+#
 #
 # -alpha  turn on cursor alphablending hack if you are using the
 #         enhanced tightvnc vncviewer.
@@ -40,13 +77,14 @@
 #         fvwm that do not otherwise work in fullscreen mode)
 #
 #
-# set VNCVIEWERCMD to whatever vncviewer command you want to use:
+# set VNCVIEWERCMD to whatever vncviewer command you want to use.
 #
 VNCIPCMD=${VNCVIEWERCMD:-vncip}
 VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
 #
-# Same for STUNNEL, e.g. /path/to/stunnel or stunnel4, etc.
+# Same for STUNNEL, e.g. set it to /path/to/stunnel or stunnel4, etc.
 #
+
 
 PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
 
@@ -60,10 +98,13 @@ if [ "X$STUNNEL" = "X" ]; then
 fi
 
 help() {
-	head -39 $0 | tail +2
+	tail +2 "$0" | sed -e '/^$/ q'
 }
 
 gotalpha=""
+use_ssh=""
+ssl_sleep=15
+ssh_cmd="sleep $ssl_sleep"
 
 # grab our cmdline options:
 while [ "X$1" != "X" ]
@@ -75,11 +116,17 @@ do
                 ;;
 	"-proxy")	shift; proxy="$1"
                 ;;
+	"-ssh")		use_ssh=1
+                ;;
+	"-sshcmd")	shift; ssh_cmd="$1"
+                ;;
 	"-alpha")	gotalpha=1
                 ;;
 	"-grab")	VNCVIEWER_GRAB_SERVER=1; export VNCVIEWER_GRAB_SERVER
                 ;;
 	"-h"*)	help; exit 0
+                ;;
+	"--h"*)	help; exit 0
                 ;;
 	*)	break
                 ;;
@@ -94,6 +141,13 @@ fi
 
 orig="$1"
 shift
+
+if [ "X$use_ssh" = "X1" ]; then
+	if [ "X$mycert" != "X" -o "X$verify" != "X" ]; then
+		echo "-mycert and -verify cannot be used in -ssh mode" 
+		exit 1
+	fi
+fi
 
 # play around with host:display port:
 if echo "$orig" | grep ':' > /dev/null; then
@@ -117,7 +171,7 @@ fi
 use=""
 inuse=""
 if uname | grep Linux > /dev/null; then
-	inuse=`netstat -ant | grep LISTEN | awk '{print $4}' | sed 's/^.*://'`
+	inuse=`netstat -ant | egrep 'LISTEN|WAIT|ESTABLISH|CLOSE' | awk '{print $4}' | sed 's/^.*://'`
 elif uname | grep SunOS > /dev/null; then
 	inuse=`netstat -an -f inet -P tcp | grep LISTEN | awk '{print $1}' | sed 's/^.*\.//'`
 fi
@@ -140,6 +194,53 @@ if [ "X$use" = "X" ]; then
 	use=`expr $use + 5930`
 fi
 
+if [ $use -ge 5900 ]; then
+	N=`expr $use - 5900`
+else
+	N=$use
+fi
+
+if echo "$0" | grep vncip > /dev/null; then
+	VNCVIEWERCMD="$VNCIPCMD"
+fi
+
+if [ "X$use_ssh" = "X1" ]; then
+	ssh_port="22"
+	ssh_host="$host"
+	vnc_host="localhost"
+	ssh=${SSH:-"ssh -x"}
+	if [ "X$proxy" != "X" ]; then
+		ssh_port=`echo "$proxy" | awk -F: '{print $2}'`
+		if [ "X$ssh_port" = "X" ]; then
+			ssh_port="22"
+		fi
+		ssh_host=`echo "$proxy" | awk -F: '{print $1}'`
+		vnc_host="$host"
+	fi
+	echo ""
+	echo "Running ssh:"
+	echo "$ssh -f -p $ssh_port -L ${use}:${vnc_host}:${port} $ssh_host \"$ssh_cmd\""
+	$ssh -f -p $ssh_port -L ${use}:${vnc_host}:${port} $ssh_host "$ssh_cmd"
+	if [ "$?" != "0" ]; then
+		echo ""
+		echo "ssh to $ssh_host failed."
+		exit 1
+	fi
+	echo ""
+	if [ "X$ssh_cmd" = "Xsleep $ssl_sleep" ] ; then
+		sleep 1
+	else
+		# let any command get started a bit.
+		sleep 5
+	fi
+	echo ""
+	echo "Running viewer:"
+	echo $VNCVIEWERCMD "$@" localhost:$N
+	$VNCVIEWERCMD "$@" localhost:$N
+
+	exit $?
+fi
+
 # create the stunnel config file:
 if [ "X$verify" != "X" ]; then
 	if [ -d $verify ]; then
@@ -152,6 +253,27 @@ verify = 2"
 fi
 if [ "X$mycert" != "X" ]; then
 	cert="cert = $mycert"
+fi
+
+mytmp() {
+	tf=$1
+	rm -rf "$tf" || exit 1
+	if [ -d "$tf" ]; then
+		echo "tmp file $tf still exists as a directory."
+		exit 1
+	elif [ -L "$tf" ]; then
+		echo "tmp file $tf still exists as a symlink."
+		exit 1
+	elif [ -f "$tf" ]; then
+		echo "tmp file $tf still exists."
+		exit 1
+	fi
+	touch "$tf" || exit 1
+	chmod 600 "$tf" || exit 1
+}
+
+if echo "$RANDOM" | grep '[^0-9]' > /dev/null; then
+	RANDOM=`date +%S`
 fi
 
 pcode() {
@@ -274,19 +396,15 @@ sub xfer {
 	close($out);
 }
 '
-	rm -f $tf
-	if [ -f $tf ]; then
-		echo "$tf still exists!"
-		exit 1
-	fi
 	echo "$cod" > $tf
 	chmod 700 $tf
 }
 
 ptmp=""
 if [ "X$proxy" != "X" ]; then
-	ptmp="/tmp/ssl_vncviewer.$$.pl"
-	pcode $ptmp
+	ptmp="/tmp/ssl_vncviewer${RANDOM}.$$.pl"
+	mytmp "$ptmp"
+	pcode "$ptmp"
 	connect="exec = $ptmp"
 else
 	connect="connect = $host:$port"
@@ -294,8 +412,10 @@ fi
 
 
 ##debug = 7
-tmp=/tmp/ssl_vncviewer.$$
-cat > $tmp <<END
+tmp=/tmp/ssl_vncviewer${RANDOM}.$$
+mytmp "$tmp"
+
+cat > "$tmp" <<END
 foreground = yes
 pid =
 client = yes
@@ -311,12 +431,13 @@ END
 echo ""
 echo "Using this stunnel configuration:"
 echo ""
-cat $tmp | uniq
+cat "$tmp" | uniq
 echo ""
 sleep 1
 
-echo "running: $STUNNEL $tmp"
-$STUNNEL $tmp < /dev/tty > /dev/tty &
+echo ""
+echo "Running: $STUNNEL $tmp"
+$STUNNEL "$tmp" < /dev/tty > /dev/tty &
 pid=$!
 echo ""
 
@@ -326,18 +447,12 @@ if [ "X$mycert" != "X" ]; then
 	sleep 4
 fi
 sleep 2
-rm -f $tmp
+rm -f "$tmp"
 
-if [ $use -ge 5900 ]; then
-	n=`expr $use - 5900`
-fi
-
-if echo "$0" | grep vncip > /dev/null; then
-	# hack for runge's special wrapper script vncip.
-	$VNCIPCMD "$@" localhost:$n
-else
-	$VNCVIEWERCMD "$@" localhost:$n
-fi
+echo ""
+echo "Running viewer:"
+echo $VNCVIEWERCMD "$@" localhost:$N
+$VNCVIEWERCMD "$@" localhost:$N
 
 kill $pid
 sleep 1

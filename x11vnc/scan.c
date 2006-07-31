@@ -32,7 +32,9 @@ int copy_snap(void);
 void nap_sleep(int ms, int split);
 void set_offset(void);
 int scan_for_updates(int count_only);
-
+void rotate_curs(char *dst_0, char *src_0, int Dx, int Dy, int Bpp);
+void rotate_coords(int x, int y, int *xo, int *yo, int dxi, int dyi);
+void rotate_coords_inverse(int x, int y, int *xo, int *yo, int dxi, int dyi);
 
 static void set_fs_factor(int max);
 static char *flip_ximage_byte_order(XImage *xim);

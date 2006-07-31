@@ -14,6 +14,7 @@
 #include "v4l.h"
 #include "linuxfb.h"
 #include "uinput.h"
+#include "scan.h"
 
 int pointer_queued_sent = 0;
 
