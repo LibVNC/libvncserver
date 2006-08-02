@@ -1,5 +1,8 @@
+2006-08-02  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add -ssltimeout option; tweak ssl timeouts.
+
 2006-07-28  Karl Runge <runge@karlrunge.com>
-	* ssl_vncviewer: remove some bashisms.
+	* ssl_vncviewer: remove some bashisms, add features.
 	* x11vnc: -rotate option (e.g. handheld), fix FPE on tru64.
 
 2006-07-17  Karl Runge <runge@karlrunge.com>
