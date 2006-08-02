@@ -314,6 +314,7 @@ char gui_code[] = "";
 "	=F stunnel_pem:\n"
 "	=F ssldir:\n"
 "	=F sslverify:\n"
+"	ssltimeout:\n"
 "	https:\n"
 "	=GAL LOFF\n"
 "	=GAL Misc-Perms::\n"

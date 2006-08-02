@@ -29,6 +29,7 @@ char *ssl_certs_dir = NULL;
 int https_port_num = -1;
 char *ssl_verify = NULL;
 int ssl_initialized = 0;
+int ssl_timeout_secs = -1;
 int usepw = USEPW;
 char *blackout_str = NULL;	/* -blackout */
 int blackout_ptr = 0;

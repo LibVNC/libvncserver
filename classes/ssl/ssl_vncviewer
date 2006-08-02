@@ -220,6 +220,7 @@ if [ "X$use_ssh" = "X1" ]; then
 	echo ""
 	echo "Running ssh:"
 	echo "$ssh -f -p $ssh_port -L ${use}:${vnc_host}:${port} $ssh_host \"$ssh_cmd\""
+	echo ""
 	$ssh -f -p $ssh_port -L ${use}:${vnc_host}:${port} $ssh_host "$ssh_cmd"
 	if [ "$?" != "0" ]; then
 		echo ""
@@ -236,6 +237,7 @@ if [ "X$use_ssh" = "X1" ]; then
 	echo ""
 	echo "Running viewer:"
 	echo $VNCVIEWERCMD "$@" localhost:$N
+	echo ""
 	$VNCVIEWERCMD "$@" localhost:$N
 
 	exit $?
@@ -420,11 +422,12 @@ foreground = yes
 pid =
 client = yes
 debug = 6
+$STUNNEL_EXTRA_OPTS
 $verify
 $cert
 
 [vnc_stunnel]
-accept = $use
+accept = localhost:$use
 $connect
 END
 
@@ -436,7 +439,8 @@ echo ""
 sleep 1
 
 echo ""
-echo "Running: $STUNNEL $tmp"
+echo "Running: stunnel"
+echo "$STUNNEL $tmp"
 $STUNNEL "$tmp" < /dev/tty > /dev/tty &
 pid=$!
 echo ""
@@ -452,6 +456,7 @@ rm -f "$tmp"
 echo ""
 echo "Running viewer:"
 echo $VNCVIEWERCMD "$@" localhost:$N
+echo ""
 $VNCVIEWERCMD "$@" localhost:$N
 
 kill $pid

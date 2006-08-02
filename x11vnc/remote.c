@@ -3136,6 +3136,19 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("client_input:");
 		set_client_input(p);
 
+	} else if (strstr(p, "ssltimeout") == p) {
+		int is;
+		COLON_CHECK("ssltimeout:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
+			    ssl_timeout_secs);
+			goto qry;
+		}
+		p += strlen("ssltimeout:");
+		is = atoi(p);
+		rfbLog("remote_cmd: setting ssltimeout: %d\n", is);
+		ssl_timeout_secs = is;
+
 	} else if (strstr(p, "speeds") == p) {
 		COLON_CHECK("speeds:")
 		if (query) {

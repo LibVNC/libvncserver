@@ -1059,6 +1059,10 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	    : "null");
 	fprintf(stderr, " unixpw:     %d\n", unixpw);
 	fprintf(stderr, " unixpw_lst: %s\n", unixpw_list ? unixpw_list:"null");
+	fprintf(stderr, " ssl:        %s\n", openssl_pem ? openssl_pem:"null");
+	fprintf(stderr, " ssldir:     %s\n", ssl_certs_dir ? ssl_certs_dir:"null");
+	fprintf(stderr, " ssltimeout  %d\n", ssl_timeout_secs);
+	fprintf(stderr, " sslverify:  %s\n", ssl_verify ? ssl_verify:"null");
 	fprintf(stderr, " stunnel:    %d\n", use_stunnel);
 	fprintf(stderr, " accept:     %s\n", accept_cmd ? accept_cmd
 	    : "null");
@@ -1674,6 +1678,9 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 			}
+		} else if (!strcmp(arg, "-ssltimeout")) {
+			CHECK_ARGC
+			ssl_timeout_secs = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-ssldir")) {
 			CHECK_ARGC
 			ssl_certs_dir = strdup(argv[++i]);

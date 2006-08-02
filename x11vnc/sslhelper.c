@@ -1932,20 +1932,21 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	int  cptr, sptr, c_rd, c_wr, s_rd, s_wr;
 	fd_set rd, wr;
 	struct timeval tv;
-	int ssock, cnt = 0;
+	int ssock, cnt = 0, ndata = 0;
 
 	/*
 	 * we want to switch to a longer timeout for long term VNC
-	 * connections (in case the network is not working for short
-	 * periods), but we also want the timeout shorter at the beginning
+	 * connections (in case the network is not working for periods of
+	 * time), but we also want the timeout shorter at the beginning
 	 * in case the client went away.
 	 */
 	time_t start;
 	int tv_https_early = 60;
 	int tv_https_later = 20;
 	int tv_vnc_early = 25;
-	int tv_vnc_later = 300;
-	int tv_cutover = 120;
+	int tv_vnc_later = 43200;	/* was 300, stunnel: 43200 */
+	int tv_cutover = 70;
+	int tv_closing = 60;
 	int tv_use;
 
 	if (dbxfer) {
@@ -2002,7 +2003,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	sptr = 0;
 
 	while (1) {
-		int c_to_s, s_to_c;
+		int c_to_s, s_to_c, closing;
 
 		if ( s_wr && (c_rd || cptr > 0) ) {
 			/* 
@@ -2070,6 +2071,8 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 		}
 
 		if (tv_cutover && time(NULL) > start + tv_cutover) {
+			rfbLog("SSL: ssl_xfer[%d]: tv_cutover: %d\n", getpid(),
+			    tv_cutover);
 			tv_cutover = 0;
 			if (is_https) {
 				tv_use = tv_https_later;
@@ -2077,12 +2080,26 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 				tv_use = tv_vnc_later;
 			}
 		}
+		if (ssl_timeout_secs > 0) {
+			tv_use = ssl_timeout_secs;
+		}
+
+		if ( (s_rd && c_rd) || cptr || sptr) {
+			closing = 0;
+		} else {
+			closing = 1;
+			tv_use = tv_closing;
+		}
 		tv.tv_sec  = tv_use;
 		tv.tv_usec = 0;
 
 		/*  do the select, repeat if interrupted */
 		do {
-			nfd = select(fdmax+1, &rd, &wr, NULL, &tv);
+			if (ssl_timeout_secs == 0) {
+				nfd = select(fdmax+1, &rd, &wr, NULL, NULL);
+			} else {
+				nfd = select(fdmax+1, &rd, &wr, NULL, &tv);
+			}
 		} while (nfd < 0 && errno == EINTR);
 
 		if (db > 1) fprintf(stderr, "nfd: %d\n", nfd);
@@ -2095,8 +2112,17 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 		}
 
 		if (nfd == 0) {
-			rfbLog("SSL: ssl_xfer[%d]: connection timedout.\n",
-			    getpid());
+			if (!closing && tv_cutover && ndata > 25000) {
+				static int cn = 0;
+				/* probably ok, early windows iconify */
+				if (cn++ < 2) {
+					rfbLog("SSL: ssl_xfer[%d]: early time"
+					    "out: %d\n", getpid(), ndata);
+				}
+				continue;
+			}
+			rfbLog("SSL: ssl_xfer[%d]: connection timedout. %d\n",
+			    getpid(), ndata);
 			/* connection finished */
 			return;
 		}
@@ -2132,6 +2158,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 					shutdown(csock, SHUT_WR);
 					c_wr = 0;
 				}
+				ndata += n;
 			}
 		}
 
@@ -2154,6 +2181,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 						SSL_shutdown(ssl);
 						s_wr = 0;
 					}
+					ndata += n;
 
 				} else if (err == SSL_ERROR_WANT_WRITE
 					|| err == SSL_ERROR_WANT_READ
@@ -2203,6 +2231,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 				/* good */
 
 				cptr += n;
+				ndata += n;
 			}
 		}
 
@@ -2220,6 +2249,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 					/* good */
 
 					sptr += n;
+					ndata += n;
 
 				} else if (err == SSL_ERROR_WANT_WRITE
 					|| err == SSL_ERROR_WANT_READ

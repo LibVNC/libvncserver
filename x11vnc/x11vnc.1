@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "July 2006" "x11vnc " "User Commands"
+.TH X11VNC "1" "August 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-07-30
+         version: 0.8.3, lastmod: 2006-08-02
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -888,6 +888,15 @@ achieved.  E.g. on Unix it is easy to write a shell
 script that starts up stunnel and then vncviewer.
 Also in the x11vnc source a SSL enabled Java VNC Viewer
 applet is provided in the classes/ssl directory.
+.PP
+\fB-ssltimeout\fR \fIn\fR
+.IP
+Set SSL read timeout to n seconds.  In some situations
+(i.e. an iconified viewer in Windows) the viewer stops
+talking and the connection is dropped after the default
+timeout (25s for about the first minute, 43200s later).
+Set to zero to poll forever.  Set to a negative value
+to use the builtin setting.
 .PP
 \fB-ssldir\fR \fI[dir]\fR
 .IP
@@ -3669,6 +3678,8 @@ allinput        enable  use of \fB-allinput\fR mode.
 .IP
 noallinput      disable use of \fB-allinput\fR mode.
 .IP
+ssltimeout:n    set \fB-ssltimeout\fR to n.
+.IP
 speeds:str      set \fB-speeds\fR to str.
 .IP
 wmdt:str        set \fB-wmdt\fR to str.
@@ -3876,9 +3887,9 @@ nodragging wireframe_mode wireframe wf nowireframe
 nowf wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
 scr_parms scrollcopyrect scr noscrollcopyrect noscr
-fixscreen noxrecord xrecord reset_record pointer_mode
-pm input_skip allinput noallinput input grabkbd
-nograbkbd grabptr nograbptr client_input speeds wmdt
+fixscreen noxrecord xrecord reset_record pointer_mode pm
+input_skip allinput noallinput input grabkbd nograbkbd
+grabptr nograbptr client_input ssltimeout speeds wmdt
 debug_pointer dp nodebug_pointer nodp debug_keyboard
 dk nodebug_keyboard nodk deferupdate defer wait_ui
 wait_bog nowait_bog slow_fb wait readtimeout nap nonap

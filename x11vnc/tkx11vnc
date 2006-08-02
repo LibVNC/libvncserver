@@ -303,6 +303,7 @@ Permissions
 	=F stunnel_pem:
 	=F ssldir:
 	=F sslverify:
+	ssltimeout:
 	https:
 	=GAL LOFF
 	=GAL Misc-Perms::
