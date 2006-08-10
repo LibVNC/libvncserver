@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8.3 lastmod: 2006-08-02";
+char lastmod[] = "0.8.3 lastmod: 2006-08-10";
 
 /* X display info */
 
@@ -27,7 +27,8 @@ Window window = None, rootwin = None;	/* polled window, root window (usu. same) 
 Visual *default_visual = NULL;	/* the default visual (unless -visual) */
 int bpp = 0, depth = 0;
 int indexed_color = 0;
-int dpy_x, dpy_y;		/* size of display */
+int dpy_x = 0, dpy_y = 0;		/* size of display */
+int fb_x = 0, fb_y = 0, fb_b = 0;	/* fb size and bpp guesses at display */
 int off_x, off_y;		/* offsets for -sid */
 int wdpy_x, wdpy_y;		/* for actual sizes in case of -clip */
 int cdpy_x, cdpy_y, coff_x, coff_y;	/* the -clip params */

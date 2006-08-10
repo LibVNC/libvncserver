@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Wed Aug  2 12:13:27 EDT 2006
+x11vnc README file                         Date: Thu Aug 10 17:31:16 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -2708,7 +2708,7 @@ fi
 client = yes
 options = ALL
 [myvncssl]
-accept = 5902
+accept = localhost:5902
 connect = far-away.east:5901
 
    then double click on the stunnel.exe icon to launch it (followed by
@@ -5504,6 +5504,10 @@ ied)
    cannot do both the Linux console framebuffer and VNC at the same time,
    which is often what is desired from VNC.
 
+   Update: We are finding some setups like Qtopia the IPAQ do not allow
+   mouse input via uinput. Please help us debug this problem by trying
+   x11vnc on your device and letting us know what does and does not work.
+
 
    Q-95: Now that non-X11 devices can be exported via VNC using x11vnc,
    can I build it with no dependencies on X11 header files and libraries?
@@ -7478,12 +7482,13 @@ http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html:
 
 Enhanced TightVNC Viewer
 
-   The Enhanced TightVNC Viewer package is an attempt to add some patches
-   to the long neglected Unix Tight VNC Viewer. It also adds a simple GUI
-   for Windows that automatically starts up a STUNNEL SSL tunnel for SSL
-   connections to [1]x11vnc (or any other VNC Server also running STUNNEL
-   at their end), and then launches the Windows Tight VNC Viewer. A
-   wrapper and gui for SSH connections is also provided.
+   The Enhanced TightVNC Viewer package is a project to add some patches
+   to the long neglected Unix TightVNC Viewer. It also adds a GUI for
+   Windows and Unix that automatically starts up a STUNNEL SSL tunnel for
+   SSL connections to [1]x11vnc (or any other VNC Server also running an
+   SSL tunnel, such as STUNNEL, at their end), and then launches the
+   TightVNC Viewer. The program can also be used set up SSH tunnelled
+   connections instead.
 
    Patches were created for the TightVNC 1.3dev7 vnc_unixsrc tree to add
    these features:
@@ -7497,9 +7502,9 @@ Enhanced TightVNC Viewer
 
    The Viewer SSL support is done via a wrapper script
    (bin/ssl_tightvncviewer) that starts up the STUNNEL tunnel first and
-   then starts the Tight VNC viewer pointed at that tunnel. The
-   bin/ssl_vnc_gui program is a simple gui front-end to that script. See
-   [2]this FAQ for more details on SSL tunnelling.
+   then starts the TightVNC viewer pointed at that tunnel. The
+   bin/ssl_vnc_gui program is a GUI front-end to that script. See [2]this
+   FAQ for more details on SSL tunnelling.
 
    The rfbNewFBSize support allows the enhanced TightVNC Unix viewer to
    resize when the server does (e.g. "x11vnc -R scale=3/4" remote control
@@ -7507,21 +7512,22 @@ Enhanced TightVNC Viewer
 
    The cursor alphablending is [3]described here.
 
-   For Windows SSL Viewer support is provided by a simple program
+   For Windows, SSL Viewer support is provided by a GUI
    Windows/ssl_tightvncviewer.exe that prompts for the VNC display and
    then starts up STUNNEL followed by the Stock TightVNC Windows Viewer.
-   When the connection is finished, you may need to manually stop the
-   STUNNEL program by clicking on the icon in the System Tray. If it can
-   track the STUNNEL processes it will ask you if you want to terminate
-   it.
+   The GUI has other useful features. When the connection is finished,
+   you will be asked if you want to terminate the STUNNEL program. For
+   SSH connections from Windows the GUI will use PLINK instead of
+   STUNNEL.
 
    Hopefully these binaries will make it convenient for people to help
    test and use the [4]built-in SSL support in x11vnc. Extra testing of
-   this feature is much appreciated! Thanks.
+   this feature is much appreciated!! Thanks.
 
-   For the heck of it, some wrapper scripts and gui interfaces where also
-   added to automatically set up a SSH tunnel instead of STUNNEL SSL.
-   This works on Unix and Windows (and more smoothly on Unix of course).
+   For the heck of it, the wrapper scripts and GUI interface were also
+   modified to be able to automatically set up an SSH tunnel instead of
+   STUNNEL SSL. This works on Unix and Windows (and more smoothly on Unix
+   of course).
 
    This package can be downloaded here:
     [5]enhanced_tightvnc_viewer-1.0.zip                 All Unix and Windows bi
@@ -7554,9 +7560,10 @@ es. (~3MB)
    or the included binary does not run properly on your system. Let me
    know how that goes.
 
-   IMPORTANT: there may be restrictions for you do download the above
-   because of cryptographic software they contain. Please check out your
-   situation and information at the following and related sites:
+   IMPORTANT: there may be restrictions for you to download, use, or
+   redistribute the above because of cryptographic software they contain.
+   Please check out your situation and information at the following and
+   related sites:
         [10]http://www.tightvnc.com
         [11]http://www.realvnc.com
         [12]http://www.stunnel.org
@@ -7568,7 +7575,8 @@ es. (~3MB)
    cryptographic software (again, if your situation warrants, you will
    need to check). This "no_windows" tarball only contains software (from
    the above URL's and elsewhere) that will use cryptographic software
-   (libraries) already installed on your system.
+   (libraries) already installed on your system. See the section on this
+   in the README below.
 
    Here is the toplevel README from the package:
 
@@ -7655,7 +7663,7 @@ If you need to Build:
 --------------------
 
 If your OS/arch is not included, the script "build.unix" may be able to
-successfully build on for you and desposit the binaries down in ./bin/...
+successfully build on for you and deposit the binaries down in ./bin/...
 using the included source code.
 
 You must run the build.unix script from this directory (that this toplevel
@@ -7677,22 +7685,27 @@ combination and if binaries are present for it automatically use them.
 (if not found try the running the build.unix script).
 
 If you prefer a GUI to prompt for parameters and then start ssl_tightvncviewer
-run this script:
+you can run this instead:
 
         ./bin/ssl_vnc_gui
 
-this is basically the same GUI that is run on Windows.
+this is essentially the same GUI that is run on Windows (the
+ssl_tightvncviewer.exe).
+
+Using the GUI is it impossible to initiate a VNC connection that is not
+encrypted with either SSL or SSH.  Unencrypted VNC connections can only
+be started by manually running the ./bin/tightvncviewer script.
 
 For convenience, you can make symlinks from a directory in your PATH to
-any of the 3 programs above you want to run.  That is all you usually
+any of the 3 programs above you wish to run.  That is all you usually
 need to do for it to pick up all of the binaries, utils, etc. E.g.
 assuming $HOME/bin is in your $PATH:
 
         cd $HOME/bin
         ln -s /path/to/enhanced_tightvnc_viewer/bin/{s,t}* .
 
-(note the "." at the end). That is basically the way to "install" this
-package on Unix.
+(note the "." at the end). The above commands is basically the way to
+"install" this package on Unix.
 
 
 Examples:
@@ -7704,7 +7717,7 @@ Use enhanced TightVNC unix viewer to connect to x11vnc via SSL:
 
         ./bin/tightvncviewer -ssl  far-away.east:0   (same)
 
-        ./bin/ssl_vnc_gui                            (start gui launcher)
+        ./bin/ssl_vnc_gui                            (start GUI launcher)
 
 Use enhanced TightVNC unix viewer without SSL:
 
@@ -7812,7 +7825,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-08-02
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-08-10
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -7911,7 +7924,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-08-02
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-08-10
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -8508,35 +8521,38 @@ Options:
                        above command is run as the user who just authenticated
                        via the login and password prompt.
 
-                       Also in the case of -unixpw, the user logging in
-                       can place a colon at the end of his username and
-                       supply a few options: scale=, scale_cursor= (or sc=),
-                       solid (or so), id=, clear_mods (or cm), clear_keys
-                       (or ck), repeat, speeds= (or sp=), readtimeout=
-                       (or rd=), or rotate= (or ro=) separated by commas if the
-re is more than one.
-                       After the user logs in successfully, these options will
-                       be applied to the VNC screen.  For example,
+                       Also in the case of -unixpw, the user logging in can
+                       place a colon at the end of his username and supply
+                       a few options: scale=, scale_cursor= (or sc=), solid
+                       (or so), id=, clear_mods (or cm), clear_keys (or ck),
+                       repeat, speeds= (or sp=), readtimeout= (or rd=), or
+                       rotate= (or ro=) separated by commas if there is more
+                       than one.  After the user logs in successfully, these
+                       options will be applied to the VNC screen.  For example,
 
                           login: fred:scale=3/4,sc=1,repeat
                           Password: ...
 
-                          login: runge:sp=modem,rd=120,solid=root:
+                          login: runge:sp=modem,rd=120,solid
 
-                       for convenience m/n implies scale= e.g. fred:3/4
-                       To disable this set the environment variable
-                       X11VNC_NO_UNIXPW_OPTS=1.  To set any other options,
-                       the user can use the gui (x11vnc -gui connect) or the
-                       remote control method (x11vnc -R opt:val) during his
-                       VNC session.
+                       for convenience m/n implies scale= e.g. fred:3/4  If you
+                       type and enter your password incorrectly, to retrieve
+                       your long "login:" line press the Up arrow once
+                       (before typing anything else).
 
-                       So the combination of -display WAIT:cmd=... and
-                       -unixpw allows automatic pairing of an unix
-                       authenticated VNC user with his desktop.  This could
-                       be very useful on SunRays and also any system where
-                       multiple users share a given machine.  The user does
-                       not need to remember special ports or passwords set up
-                       for his desktop and VNC.
+                       To disable the option setting set the environment
+                       variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.
+                       To set any other options, the user can use the gui
+                       (x11vnc -gui connect) or the remote control method
+                       (x11vnc -R opt:val) during his VNC session.
+
+                       The combination of -display WAIT:cmd=... and -unixpw
+                       allows automatic pairing of an unix authenticated VNC
+                       user with his desktop.  This could be very useful on
+                       SunRays and also any system where multiple users share
+                       a given machine.  The user does not need to remember
+                       special ports or passwords set up for his desktop
+                       and VNC.
 
                        A nice way to use WAIT:cmd=... is out of inetd(8)
                        (it automatically forks a new x11vnc for each user).
@@ -9067,7 +9083,7 @@ re is more than one.
                        unreliable (especially if the user takes much time to
                        ponder the Certificate dialogs in his browser, Java VM,
                        or VNC Viewer applet.  That's right 3 separate "Are
-                       you sure you want to connect" dialogs!)
+                       you sure you want to connect?" dialogs!)
 
                        So use the -https option to provide a separate, more
                        reliable HTTPS port that x11vnc will listen on.  If
@@ -10590,6 +10606,16 @@ re is more than one.
                        in 1 jump), This correction seems to be needed but can
                        cause jerkiness or unexpected behavior with menus, etc.
                        Use reset=0 to disable.
+
+                       If the uinput device has an absolute pointer (as opposed
+                       to a normal mouse that is a relative pointer) you can
+                       specify the option "abs".  Note that a touchpad
+                       on a laptop is an absolute device t some degree.
+                       This (usually) avoids all the problems with mouse
+                       acceleration.  If x11vnc has trouble deducing the size
+                       of the device, use "abs=WxH".  Furthermore, if the
+                       device is a touchscreen (assumed to have an absolute
+                       pointer) use "touch" or "touch=WxH".
 
                        If you set the env. var X11VNC_UINPUT_THRESHOLDS then
                        the thresh=n mode will be enabled.  It it currently

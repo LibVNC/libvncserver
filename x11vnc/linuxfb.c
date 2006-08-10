@@ -94,20 +94,6 @@ char *console_guess(char *str, int *fd) {
 		} 
 	}
 
-	if (do_input) {
-		if (tty >=0 && tty < 64) {
-			pipeinput_str = (char *) malloc(10);
-			sprintf(pipeinput_str, "CONSOLE%d", tty);
-			rfbLog("console_guess: file pipeinput %s\n",
-			    pipeinput_str);
-			initialize_pipeinput();
-		} else if (have_uinput) {
-			pipeinput_str = strdup("UINPUT");
-			rfbLog("console_guess: file pipeinput %s\n",
-			    pipeinput_str);
-			initialize_pipeinput();
-		}
-	}
 	if (! atparms) {
 #if LIBVNCSERVER_HAVE_LINUX_FB_H
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H
@@ -151,6 +137,30 @@ char *console_guess(char *str, int *fd) {
 		}
 #endif
 #endif
+	}
+
+	if (atparms) {
+		int gw, gh, gb;
+		if (sscanf(atparms, "%dx%dx%d", &gw, &gh, &gb) == 3)  {
+			fb_x = gw;	
+			fb_y = gh;	
+			fb_b = gb;	
+		}
+	}
+
+	if (do_input) {
+		if (tty >=0 && tty < 64) {
+			pipeinput_str = (char *) malloc(10);
+			sprintf(pipeinput_str, "CONSOLE%d", tty);
+			rfbLog("console_guess: file pipeinput %s\n",
+			    pipeinput_str);
+			initialize_pipeinput();
+		} else if (have_uinput) {
+			pipeinput_str = strdup("UINPUT");
+			rfbLog("console_guess: file pipeinput %s\n",
+			    pipeinput_str);
+			initialize_pipeinput();
+		}
 	}
 
 	if (! atparms) {

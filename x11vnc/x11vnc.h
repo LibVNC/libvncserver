@@ -345,6 +345,7 @@ extern Visual *default_visual;		/* the default visual (unless -visual) */
 extern int bpp, depth;
 extern int indexed_color;
 extern int dpy_x, dpy_y;		/* size of display */
+extern int fb_x, fb_y, fb_b;		/* fb size and bpp guesses at display */
 extern int off_x, off_y;		/* offsets for -sid */
 extern int wdpy_x, wdpy_y;		/* for actual sizes in case of -clip */
 extern int cdpy_x, cdpy_y, coff_x, coff_y;	/* the -clip params */

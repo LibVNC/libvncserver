@@ -1,3 +1,6 @@
+2006-08-10  Karl Runge <runge@karlrunge.com>
+	* x11vnc: first pass at touchscreens via uinput.
+
 2006-08-02  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add -ssltimeout option; tweak ssl timeouts.
 

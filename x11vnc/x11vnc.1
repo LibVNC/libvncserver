@@ -2,7 +2,7 @@
 .TH X11VNC "1" "August 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-08-02
+         version: 0.8.3, lastmod: 2006-08-10
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -740,34 +740,38 @@ In the case of \fB-unixpw\fR (but not \fB-unixpw_nis),\fR then the
 above command is run as the user who just authenticated
 via the login and password prompt.
 .IP
-Also in the case of \fB-unixpw,\fR the user logging in
-can place a colon at the end of his username and
-supply a few options: scale=, scale_cursor= (or sc=),
-solid (or so), id=, clear_mods (or cm), clear_keys
-(or ck), repeat, speeds= (or sp=), readtimeout=
-(or rd=), or rotate= (or ro=) separated by commas if there is more than one.
-After the user logs in successfully, these options will
-be applied to the VNC screen.  For example,
+Also in the case of \fB-unixpw,\fR the user logging in can
+place a colon at the end of his username and supply
+a few options: scale=, scale_cursor= (or sc=), solid
+(or so), id=, clear_mods (or cm), clear_keys (or ck),
+repeat, speeds= (or sp=), readtimeout= (or rd=), or
+rotate= (or ro=) separated by commas if there is more
+than one.  After the user logs in successfully, these
+options will be applied to the VNC screen.  For example,
 .IP
 login: fred:scale=3/4,sc=1,repeat
 Password: ...
 .IP
-login: runge:sp=modem,rd=120,solid=root:
+login: runge:sp=modem,rd=120,solid
 .IP
-for convenience m/n implies scale= e.g. fred:3/4
-To disable this set the environment variable
-X11VNC_NO_UNIXPW_OPTS=1.  To set any other options,
-the user can use the gui (x11vnc \fB-gui\fR connect) or the
-remote control method (x11vnc \fB-R\fR opt:val) during his
-VNC session.
+for convenience m/n implies scale= e.g. fred:3/4  If you
+type and enter your password incorrectly, to retrieve
+your long "login:" line press the Up arrow once
+(before typing anything else).
 .IP
-So the combination of \fB-display\fR WAIT:cmd=... and
-\fB-unixpw\fR allows automatic pairing of an unix
-authenticated VNC user with his desktop.  This could
-be very useful on SunRays and also any system where
-multiple users share a given machine.  The user does
-not need to remember special ports or passwords set up
-for his desktop and VNC.
+To disable the option setting set the environment
+variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.
+To set any other options, the user can use the gui
+(x11vnc \fB-gui\fR connect) or the remote control method
+(x11vnc \fB-R\fR opt:val) during his VNC session.
+.IP
+The combination of \fB-display\fR WAIT:cmd=... and \fB-unixpw\fR
+allows automatic pairing of an unix authenticated VNC
+user with his desktop.  This could be very useful on
+SunRays and also any system where multiple users share
+a given machine.  The user does not need to remember
+special ports or passwords set up for his desktop
+and VNC.
 .IP
 A nice way to use WAIT:cmd=... is out of 
 .IR inetd (8)
@@ -1340,7 +1344,7 @@ adds a few seconds delay to each connection and can be
 unreliable (especially if the user takes much time to
 ponder the Certificate dialogs in his browser, Java VM,
 or VNC Viewer applet.  That's right 3 separate "Are
-you sure you want to connect" dialogs!)
+you sure you want to connect?" dialogs!)
 .IP
 So use the \fB-https\fR option to provide a separate, more
 reliable HTTPS port that x11vnc will listen on.  If
@@ -3181,6 +3185,16 @@ attempted to be reset (by forcing the mouse to (0,
 in 1 jump), This correction seems to be needed but can
 cause jerkiness or unexpected behavior with menus, etc.
 Use reset=0 to disable.
+.IP
+If the uinput device has an absolute pointer (as opposed
+to a normal mouse that is a relative pointer) you can
+specify the option "abs".  Note that a touchpad
+on a laptop is an absolute device t some degree.
+This (usually) avoids all the problems with mouse
+acceleration.  If x11vnc has trouble deducing the size
+of the device, use "abs=WxH".  Furthermore, if the
+device is a touchscreen (assumed to have an absolute
+pointer) use "touch" or "touch=WxH".
 .IP
 If you set the env. var X11VNC_UINPUT_THRESHOLDS then
 the thresh=n mode will be enabled.  It it currently

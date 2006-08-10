@@ -3234,13 +3234,17 @@ int main(int argc, char* argv[]) {
 		rfb_desktop_name = strdup(argv_vnc[argc_vnc-1]);
 	}
 	
-	initialize_pipeinput();
-
 	/*
 	 * Create the XImage corresponding to the display framebuffer.
 	 */
 
 	fb0 = initialize_xdisplay_fb();
+
+	/*
+	 * In some cases (UINPUT touchscreens) we need the dpy_x dpy_y
+	 * to initialize pipeinput. So we do it after fb is created.
+	 */
+	initialize_pipeinput();
 
 	/*
 	 * n.b. we do not have to X_LOCK any X11 calls until watch_loop()

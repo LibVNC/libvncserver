@@ -28,9 +28,15 @@ int initialize_uinput(void);
 int set_uinput_accel(char *str);
 int set_uinput_thresh(char *str);
 void set_uinput_reset(int ms);
+void set_uinput_always(int);
+void set_uinput_touchscreen(int);
+void set_uinput_abs(int);
 char *get_uinput_accel();
 char *get_uinput_thresh();
 int get_uinput_reset();
+int get_uinput_always();
+int get_uinput_touchscreen();
+int get_uinput_abs();
 void parse_uinput_str(char *str);
 void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client);
 void uinput_key_command(int down, int keysym, rfbClientPtr client);
@@ -51,6 +57,9 @@ static int bmask = 0;
 
 static char *injectable = NULL;
 static char *uinput_dev = NULL;
+static int uinput_touchscreen = 0;
+static int uinput_abs = 0;
+static int abs_x = 0, abs_y = 0;
 
 static char *devs[] = {
 	"/dev/misc/uinput",
@@ -78,9 +87,12 @@ int check_uinput(void) {
 			if (maj < 2) {
 				return 0;
 			} else if (maj == 2) {
+				/* hmmm IPAQ 2.4.19-rmk6-pxa1-hh37 works... */
+#if 0
 				if (min < 6) {
 					return 0;
 				}
+#endif
 			}
 		}
 	}
@@ -210,6 +222,35 @@ int initialize_uinput(void) {
 	ioctl(fd, UI_SET_KEYBIT, BTN_FORWARD);
 	ioctl(fd, UI_SET_KEYBIT, BTN_BACK);
 
+	if (uinput_touchscreen) {
+		ioctl(fd, UI_SET_KEYBIT, BTN_TOUCH);
+		rfbLog("uinput: touchscreen enabled.\n");
+	}
+	if (uinput_touchscreen || uinput_abs) {
+		int gw = abs_x, gh = abs_y;
+		if (! gw || ! gh) {
+			gw = fb_x; gh = fb_y;
+		}
+		if (! gw || ! gh) {
+			gw = dpy_x; gh = dpy_y;
+		}
+		abs_x = gw;
+		abs_y = gh;
+		ioctl(fd, UI_SET_EVBIT, EV_ABS);
+		ioctl(fd, UI_SET_ABSBIT, ABS_X);
+		ioctl(fd, UI_SET_ABSBIT, ABS_Y);
+		udev.absmin[ABS_X] = 0;
+		udev.absmax[ABS_X] = gw;
+		udev.absfuzz[ABS_X] = 0;
+		udev.absflat[ABS_X] = 0;
+		udev.absmin[ABS_Y] = 0;
+		udev.absmax[ABS_Y] = gh;
+		udev.absfuzz[ABS_Y] = 0;
+		udev.absflat[ABS_Y] = 0;
+		rfbLog("uinput: absolute pointer enabled at %dx%d.\n", abs_x, abs_y);
+		set_uinput_accel_xy(1.0, 1.0);
+	}
+
 	write(fd, &udev, sizeof(udev));
 
 	if (ioctl(fd, UI_DEV_CREATE) != 0) {
@@ -287,6 +328,14 @@ void set_uinput_always(int a) {
 	uinput_always = a;
 }
 
+void set_uinput_touchscreen(int b) {
+	uinput_touchscreen = b;
+}
+
+void set_uinput_abs(int b) {
+	uinput_abs = b;
+}
+
 char *get_uinput_accel(void) {
 	return uinput_accel_str;
 }
@@ -301,6 +350,14 @@ int get_uinput_always(void) {
 	return uinput_always;
 }
 
+int get_uinput_touchscreen(void) {
+	return uinput_touchscreen;
+}
+
+int get_uinput_abs(void) {
+	return uinput_abs;
+}
+
 void parse_uinput_str(char *in) {
 	char *p, *q, *str = strdup(in);
 
@@ -308,6 +365,10 @@ void parse_uinput_str(char *in) {
 		free(injectable);
 		injectable = strdup("KMB");
 	}
+
+	uinput_touchscreen = 0;
+	uinput_abs = 0;
+	abs_x = abs_y = 0;
 
 	p = strtok(str, ",");
 	while (p) {
@@ -336,6 +397,24 @@ void parse_uinput_str(char *in) {
 				free(injectable);
 			}
 			injectable = strdup(p);
+		} else if (strstr(p, "touch") == p) {
+			int gw, gh;
+			q = strchr(p, '=');
+			set_uinput_touchscreen(1);
+			set_uinput_abs(1);
+			if (q && sscanf(q+1, "%dx%d", &gw, &gh) == 2) {
+				abs_x = gw;
+				abs_y = gh;
+			}
+		} else if (strstr(p, "abs") == p) {
+			int gw, gh;
+			q = strchr(p, '=');
+			set_uinput_abs(1);
+			if (q && sscanf(q+1, "%dx%d", &gw, &gh) == 2) {
+				abs_x = gw;
+				abs_y = gh;
+			}
+		
 		} else {
 			rfbLog("invalid UINPUT option: %s\n", p);
 			clean_up_exit(1);
@@ -364,6 +443,36 @@ static void ptr_move(int dx, int dy) {
 	ev.type = EV_REL;
 	ev.code = REL_X;
 	ev.value = dx;
+	write(fd, &ev, sizeof(ev));
+
+	ev.type = EV_SYN;
+	ev.code = SYN_REPORT;
+	ev.value = 0;
+	write(fd, &ev, sizeof(ev));
+#endif
+}
+
+static void ptr_abs(int x, int y) {
+#ifdef UINPUT_OK
+	struct input_event ev;
+
+	if (injectable && strchr(injectable, 'M') == NULL) {
+		return;
+	}
+
+	memset(&ev, 0, sizeof(ev));
+
+	if (db) fprintf(stderr, "ptr_abs(%d, %d)\n", x, y);
+
+	gettimeofday(&ev.time, NULL);
+	ev.type = EV_ABS;
+	ev.code = ABS_Y;
+	ev.value = y;
+	write(fd, &ev, sizeof(ev));
+
+	ev.type = EV_ABS;
+	ev.code = ABS_X;
+	ev.value = x;
 	write(fd, &ev, sizeof(ev));
 
 	ev.type = EV_SYN;
@@ -528,7 +637,10 @@ static void button_click(int down, int btn) {
 	ev.type = EV_KEY;
 	ev.value = down;
 
-	if (btn == 1) {
+	if (uinput_touchscreen) {
+		ev.code = BTN_TOUCH;
+		if (db) fprintf(stderr, "set code to BTN_TOUCH\n");
+	} else if (btn == 1) {
 		ev.code = BTN_LEFT;
 	} else if (btn == 2) {
 		ev.code = BTN_MIDDLE;
@@ -583,7 +695,7 @@ void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 
 	do_reset = 1;
 	if (mask || bmask) {
-		do_reset = 0;	/* do not do reset if moust button down */
+		do_reset = 0;	/* do not do reset if mouse button down */
 	} else if (! input.motion) {
 		do_reset = 0;
 	} else if (now < last_zero + zero_delay) {
@@ -599,6 +711,18 @@ void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 
 	if (uinput_always && !mask && !bmask && input.motion) {
 		do_reset = 1;
+	}
+	if (uinput_abs) {
+#if 0
+		/* this is a bad idea... need to do something else */
+		if (do_reset) {
+			ptr_abs(dpy_x, dpy_y);
+			usleep(10*1000);
+			ptr_abs(x, y);
+			usleep(10*1000);
+		}
+#endif
+		do_reset = 0;
 	}
 
 	if (do_reset) {
@@ -696,7 +820,11 @@ void uinput_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 
 	if (input.motion) {
 		if (x != last_x || y != last_y) {
-			ptr_rel(x - last_x, y - last_y);
+			if (uinput_abs) {
+				ptr_abs(x, y);
+			} else {
+				ptr_rel(x - last_x, y - last_y);
+			}
 			last_x = x;
 			last_y = y;
 		}
