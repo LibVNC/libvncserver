@@ -64,9 +64,19 @@
 #         ssl_vncviewer -ssh -proxy fred@mygate.com:2022 mymachine:0
 #         ssl_vncviewer -ssh -proxy bob@bobs-home.net:2222 localhost:0
 #
-#
 # -sshcmd cmd   Run "cmd" via ssh instead of the default "sleep 15"
 #               e.g. -sshcmd 'x11vnc -display :0 -localhost -rfbport 5900'
+#
+# -sshargs "args"  pass "args" to the ssh process, e.g. -L/-R port redirs.
+#
+# -sshssl Tunnel the SSL connection thru a SSH connection.  The tunnel as
+#         under -ssh is set up and the SSL connection goes thru it.  Use
+#         this if you want to have and end-to-end SSL connection but must
+#         go thru a SSH gateway host (e.g. not the vnc server).  Or use
+#         this if you need to tunnel additional services via -R and -L 
+#         (see -sshargs above).
+#
+#         ssl_vncviewer -sshssl -proxy fred@mygate.com mymachine:0
 #
 #
 # -alpha  turn on cursor alphablending hack if you are using the
@@ -103,8 +113,13 @@ help() {
 
 gotalpha=""
 use_ssh=""
-ssl_sleep=15
-ssh_cmd="sleep $ssl_sleep"
+use_sshssl=""
+ssh_sleep=15
+ssh_cmd="sleep $ssh_sleep"
+if [ "X$SSL_VNCVIEWER_SSH_CMD" != "X" ]; then
+	ssh_cmd="$SSL_VNCVIEWER_SSH_CMD"
+fi
+ssh_args=""
 
 # grab our cmdline options:
 while [ "X$1" != "X" ]
@@ -118,7 +133,12 @@ do
                 ;;
 	"-ssh")		use_ssh=1
                 ;;
+	"-sshssl")	use_ssh=1
+			use_sshssl=1
+                ;;
 	"-sshcmd")	shift; ssh_cmd="$1"
+                ;;
+	"-sshargs")	shift; ssh_args="$1"
                 ;;
 	"-alpha")	gotalpha=1
                 ;;
@@ -142,7 +162,7 @@ fi
 orig="$1"
 shift
 
-if [ "X$use_ssh" = "X1" ]; then
+if [ "X$use_ssh" = "X1" -a "X$use_sshssl" = "X" ]; then
 	if [ "X$mycert" != "X" -o "X$verify" != "X" ]; then
 		echo "-mycert and -verify cannot be used in -ssh mode" 
 		exit 1
@@ -168,31 +188,42 @@ else
 fi
 
 # try to find an open listening port via netstat(1):
-use=""
 inuse=""
 if uname | grep Linux > /dev/null; then
 	inuse=`netstat -ant | egrep 'LISTEN|WAIT|ESTABLISH|CLOSE' | awk '{print $4}' | sed 's/^.*://'`
 elif uname | grep SunOS > /dev/null; then
 	inuse=`netstat -an -f inet -P tcp | grep LISTEN | awk '{print $1}' | sed 's/^.*\.//'`
+# add others...
 fi
-if [ "x$inuse" != "x" ]; then
-	try=5930
+
+date_sec=`date +%S`
+
+findfree() {
+	try0=$1
+	try=$try0
+	use0=""
+
 	while [ $try -lt 6000 ]
 	do
+		if [ "X$inuse" = "X" ]; then
+			break
+		fi
 		if echo "$inuse" | grep -w $try > /dev/null; then
 			:
 		else
-			use=$try
+			use0=$try
 			break
 		fi
 		try=`expr $try + 1`
 	done
-fi
-if [ "X$use" = "X" ]; then
-	# otherwise choose a "random" one:
-	use=`date +%S`
-	use=`expr $use + 5930`
-fi
+	if [ "X$use0" = "X" ]; then
+		use0=`expr $date_sec + $try0`
+	fi
+
+	echo $use0
+}
+
+use=`findfree 5930`
 
 if [ $use -ge 5900 ]; then
 	N=`expr $use - 5900`
@@ -219,28 +250,56 @@ if [ "X$use_ssh" = "X1" ]; then
 	fi
 	echo ""
 	echo "Running ssh:"
-	echo "$ssh -f -p $ssh_port -L ${use}:${vnc_host}:${port} $ssh_host \"$ssh_cmd\""
-	echo ""
-	$ssh -f -p $ssh_port -L ${use}:${vnc_host}:${port} $ssh_host "$ssh_cmd"
+	sz=`echo "$ssh_cmd" | wc -c`
+	if [ "$sz" -gt 200 ]; then
+		info="..."
+	else
+		info="$ssh_cmd"
+	fi
+	if [ "X$SSL_VNCVIEWER_SSH_ONLY" != "X" ]; then
+		echo "$ssh -p $ssh_port -t -C $ssh_args $ssh_host \"$info\""
+		echo ""
+		$ssh -p $ssh_port -t -C $ssh_args $ssh_host "$ssh_cmd"
+		exit $?
+	elif [ "X$SSL_VNCVIEWER_NO_F" != "X" ]; then
+		echo "$ssh -p $ssh_port -C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host \"$info\""
+		echo ""
+		$ssh -p $ssh_port -C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host "$ssh_cmd"
+	else
+		echo "$ssh -f -p $ssh_port -C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host \"$info\""
+		echo ""
+		$ssh -f -p $ssh_port -C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host "$ssh_cmd"
+	fi
 	if [ "$?" != "0" ]; then
 		echo ""
 		echo "ssh to $ssh_host failed."
 		exit 1
 	fi
 	echo ""
-	if [ "X$ssh_cmd" = "Xsleep $ssl_sleep" ] ; then
+	if [ "X$ssh_cmd" = "Xsleep $ssh_sleep" ] ; then
 		sleep 1
 	else
 		# let any command get started a bit.
 		sleep 5
 	fi
 	echo ""
-	echo "Running viewer:"
-	echo $VNCVIEWERCMD "$@" localhost:$N
-	echo ""
-	$VNCVIEWERCMD "$@" localhost:$N
+	if [ "X$use_sshssl" = "X" ]; then
+		echo "Running viewer:"
+		echo $VNCVIEWERCMD "$@" localhost:$N
+		echo ""
+		$VNCVIEWERCMD "$@" localhost:$N
 
-	exit $?
+		exit $?
+	else
+		use2=`findfree 5960`
+		host0=$host
+		port0=$port
+		host=localhost
+		port=$use
+		use=$use2
+		N=`expr $use - 5900`
+		proxy=""
+	fi
 fi
 
 # create the stunnel config file:
