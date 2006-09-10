@@ -1423,7 +1423,7 @@ void initialize_cursors_mode(void) {
 		}
 	} else {
 		if (screen) {
-			screen->cursor = NULL;	/* dangerous? */
+			screen->cursor = NULL;
 			set_cursor_was_changed(screen);
 		}
 	}

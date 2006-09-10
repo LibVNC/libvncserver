@@ -1066,6 +1066,11 @@ void print_help(int mode) {
 "\n"
 "                               ssl_vncviewer -mycert ./roger.pem hostname:0\n"
 "\n"
+"                       If you set the env. var REQ_ARGS='...' it will be\n"
+"                       passed to openssl req(1).  A common use would be\n"
+"                       REQ_ARGS='-days 730' to bump up the expiration date\n"
+"                       (2 years in this case).\n"
+"\n"
 "-sslEncKey [pem]       Utility to encrypt an existing PEM file with a\n"
 "                       passphrase you supply when prompted.  For that key to be\n"
 "                       used (e.g. by x11vnc) the passphrase must be supplied\n"
@@ -3463,7 +3468,7 @@ void xopen_display_fail_message(char *disp) {
 	    " will of course change,\n");
 	fprintf(stderr, "   and the directory the cookie file resides in may"
 	    " also be system dependent.\n");
-	fprintf(stderr, "   Sometimes the command \"ps wwaux | grep auth\""
+	fprintf(stderr, "   Sometimes the command \"ps wwwaux | grep auth\""
 	    " can reveal the file location.\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "See also: http://www.karlrunge.com/x11vnc/#faq\n");

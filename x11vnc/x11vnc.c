@@ -2825,9 +2825,17 @@ int main(int argc, char* argv[]) {
 			    "\"lurk=\" mode...\n");
 		}
 		lurk_loop(users_list);
+
 	} else if (use_dpy && strstr(use_dpy, "WAIT:") == use_dpy) {
+		char *mcm = multiple_cursors_mode;
+
 		waited_for_client = wait_for_client(&argc_vnc, argv_vnc,
 		    try_http && ! got_httpdir);
+
+		if (!mcm && multiple_cursors_mode) {
+			free(multiple_cursors_mode);
+			multiple_cursors_mode = NULL;
+		}
 	}
 
 	if (use_dpy) {

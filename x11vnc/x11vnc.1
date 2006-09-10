@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "August 2006" "x11vnc " "User Commands"
+.TH X11VNC "1" "September 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-08-10
+         version: 0.8.3, lastmod: 2006-09-10
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1207,6 +1207,13 @@ roger), and on the viewer user on somehost could do
 for example:
 .IP
 ssl_vncviewer \fB-mycert\fR ./roger.pem hostname:0
+.IP
+If you set the env. var REQ_ARGS='...' it will be
+passed to openssl 
+.IR req (1).
+A common use would be
+REQ_ARGS='-days 730' to bump up the expiration date
+(2 years in this case).
 .PP
 \fB-sslEncKey\fR \fI[pem]\fR
 .IP

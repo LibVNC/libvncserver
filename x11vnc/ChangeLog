@@ -1,3 +1,7 @@
+2006-09-10  Karl Runge <runge@karlrunge.com>
+	* x11vnc: minor changes: REQ_ARGS for -sslGenCert, EV_SYN
+	  SYN_REPORT check restore cursor most under -display WAIT.
+
 2006-08-10  Karl Runge <runge@karlrunge.com>
 	* x11vnc: first pass at touchscreens via uinput.
 
