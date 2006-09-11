@@ -104,6 +104,7 @@ typedef void (*SoftCursorUnlockScreenProc)(struct _rfbClient* client);
 typedef void (*GotFrameBufferUpdateProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef char* (*GetPasswordProc)(struct _rfbClient* client);
 typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
+typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int textlen);
 typedef void (*BellProc)(struct _rfbClient* client);
 
 typedef struct _rfbClient {
@@ -136,8 +137,6 @@ typedef struct _rfbClient {
 	char *desktopName;
 	rfbPixelFormat format;
 	rfbServerInitMsg si;
-	char *serverCutText;
-	rfbBool newServerCutText;
 
 	/* sockets.c */
 #define RFB_BUF_SIZE 8192
@@ -220,6 +219,7 @@ typedef struct _rfbClient {
 	/* the pointer returned by GetPassword will be freed after use! */
 	GetPasswordProc GetPassword;
 	MallocFrameBufferProc MallocFrameBuffer;
+	GotXCutTextProc GotXCutText;
 	BellProc Bell;
 
 	/* Which messages are supported by the server

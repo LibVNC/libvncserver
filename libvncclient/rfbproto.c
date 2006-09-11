@@ -1019,10 +1019,6 @@ SendClientCutText(rfbClient* client, char *str, int len)
 {
   rfbClientCutTextMsg cct;
 
-  if (client->serverCutText)
-    free(client->serverCutText);
-  client->serverCutText = NULL;
-
   if (!SupportsClient2Server(client, rfbClientCutText)) return TRUE;
 
   cct.type = rfbClientCutText;
@@ -1481,23 +1477,25 @@ HandleRFBServerMessage(rfbClient* client)
 
   case rfbServerCutText:
   {
+    char *buffer;
+
     if (!ReadFromRFBServer(client, ((char *)&msg) + 1,
 			   sz_rfbServerCutTextMsg - 1))
       return FALSE;
 
     msg.sct.length = rfbClientSwap32IfLE(msg.sct.length);
 
-    if (client->serverCutText)
-      free(client->serverCutText);
+    buffer = malloc(msg.sct.length+1);
 
-    client->serverCutText = malloc(msg.sct.length+1);
-
-    if (!ReadFromRFBServer(client, client->serverCutText, msg.sct.length))
+    if (!ReadFromRFBServer(client, buffer, msg.sct.length))
       return FALSE;
 
-    client->serverCutText[msg.sct.length] = 0;
+    buffer[msg.sct.length] = 0;
 
-    client->newServerCutText = TRUE;
+    if (client->GotXCutText)
+      client->GotXCutText(client, buffer, msg.sct.length);
+
+    free(buffer);
 
     break;
   }
