@@ -169,7 +169,7 @@ while(1) {
 						#0, 0, 1, 10);
 				if ($res == 0) {
 					nacro::alert($vnc, "Error displaying "
-							. $pnm);
+							. $pnm, 10);
 				}
 			} else {
 				nacro::alert($vnc,"Unknown key",10);
