@@ -11,7 +11,7 @@ if [ -f "`dirname "$0"`/libvncserver-config.in" ]; then
   dir="`dirname "$0"`"
   prefix="`cd "$dir"; pwd`"
   includedir="$prefix"
-  libdir="$prefix"/libvncserver
+  libdir="$prefix/libvncserver $prefix/libvncclient"
 fi
 
 usage="\
@@ -55,12 +55,13 @@ while test $# -gt 0; do
       echo "$includes"
       ;;
     --libs)
-      if [ "`uname`" = "SunOS" ]; then
-        libdirs="-L$libdir -R$libdir"
-      else
-        libdirs="-L$libdir"
-      fi
-      echo "$libdirs" -lvncserver @LIBS@ @WSOCKLIB@
+      for dir in $libdir; do
+        echo -n "-L$dir "
+        if [ "`uname`" = "SunOS" ]; then
+          echo -n "-R$dir "
+        fi
+      done
+      echo -lvncserver -lvncclient @LIBS@ @WSOCKLIB@
       ;;
     --link)
       echo @CC@
