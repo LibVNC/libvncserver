@@ -109,4 +109,9 @@ bool_t savepnm(resource_t res,const char* filename,coordinate_t x1, coordinate_t
 
 result_t alert(resource_t res,const char* message,timeout_t timeout);
 
+/* display a rectangular rubber band between (x0, y0) and the current
+   mouse pointer, as long as a button us pressed. */
+
+result_t rubberband(resource_t res, coordinate_t x0, coordinate_t y0);
+
 #endif
