@@ -575,6 +575,78 @@ const char *gettext_client(resource_t res)
 	return r->text_client;
 }
 
+static void copy_line(rfbScreenInfo *dest, char *backup,
+		int x0, int y0, int x1, int y1, int color_offset)
+{
+	uint8_t *d = (uint8_t *)dest->frameBuffer, *s = (uint8_t *)backup;
+	int i;
+	int steps0 = x1 > x0 ? x1 - x0 : x0 - x1;
+	int steps1 = y1 > y0 ? y1 - y0 : y0 - y1;
+
+	if (steps1 > steps0)
+		steps0 = steps1;
+	else if (steps0 == 0)
+		steps0 = 1;
+
+	for (i = 0; i <= steps0; i++) {
+		int j, index = 4 * (x0 + i * (x1 - x0) / steps0
+				+ dest->width * (y0 + i * (y1 - y0) / steps0));
+		for (j = 0; j < 4; j++)
+			d[index + j] = s[index + j] + color_offset;
+	}
+
+	rfbMarkRectAsModified(dest, x0 - 5, y0 - 5, x1 + 1, y1 + 2);
+}
+
+result_t rubberband(resource_t resource, coordinate_t x0, coordinate_t y0)
+{
+	private_resource_t* res=get_resource(resource);
+	char* fake_frame_buffer;
+	char* backup;
+	int w, h, x, y;
+	
+	if(res == NULL || res->server==NULL)
+		return -1;
+
+	x = res->x;
+	y = res->y;
+	w = res->server->width;
+	h = res->server->height;
+	fake_frame_buffer = malloc(w * 4 * h);
+	if(!fake_frame_buffer)
+		return 0;
+	memcpy(fake_frame_buffer, res->server->frameBuffer, w * 4 * h);
+	
+	backup = res->server->frameBuffer;
+	res->server->frameBuffer = fake_frame_buffer;
+
+	while (res->buttons) {
+		result_t r = waitforinput(resource, 1000000L);
+		if (x == res->x && y == res->y)
+				continue;
+		copy_line(res->server, backup, x0, y0, x, y0, 0);
+		copy_line(res->server, backup, x0, y0, x0, y, 0);
+		copy_line(res->server, backup, x, y0, x, y, 0);
+		copy_line(res->server, backup, x0, y, x, y, 0);
+		x = res->x;
+		y = res->y;
+		copy_line(res->server, backup, x0, y0, x, y0, 0x80);
+		copy_line(res->server, backup, x0, y0, x0, y, 0x80);
+		copy_line(res->server, backup, x, y0, x, y, 0x80);
+		copy_line(res->server, backup, x0, y, x, y, 0x80);
+	}
+
+	copy_line(res->server, backup, x0, y0, x, y0, 0);
+	copy_line(res->server, backup, x0, y0, x0, y, 0);
+	copy_line(res->server, backup, x, y0, x, y, 0);
+	copy_line(res->server, backup, x0, y, x, y, 0);
+
+	res->server->frameBuffer=backup;
+	free(fake_frame_buffer);
+
+	return RESULT_MOUSE;
+}
+
 const char *gettext_server(resource_t res)
 {
 	private_resource_t* r=get_resource(res);

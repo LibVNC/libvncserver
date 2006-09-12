@@ -117,7 +117,6 @@ while(1) {
 				if($magickey>3 && !$keydown) {
 					$magickey=0;
 					$mode="menu";
-					$dragging=0;
 					nacro::alert($vnc,"VisualNaCro: press 'q' to quit\nor mark reference rectangle by dragging",10);
 				}
 			} else {
@@ -169,13 +168,13 @@ while(1) {
 			$x=nacro::getx($vnc);
 			$y=nacro::gety($vnc);
 			$buttons=nacro::getbuttons($vnc);
-			if(!$dragging && (($buttons&1)==1)) {
-			print STDERR "start draggin: $x $y\n";
+			if(($buttons&1)==1) {
+				print STDERR "start draggin: $x $y\n";
 				$start_x=$x;
 				$start_y=$y;
-				$dragging=1;
-			} elsif($dragging && (($buttons&1)==0)) {
-			print STDERR "stop draggin: $x $y\n";
+				nacro::rubberband($vnc, $x, $y);
+				$x=nacro::getx($vnc);
+				$y=nacro::gety($vnc);
 				if($start_x==$x && $start_y==$y) {
 					print OUT "\$x_origin=0; \$y_origin=0;\n";
 				} else {
