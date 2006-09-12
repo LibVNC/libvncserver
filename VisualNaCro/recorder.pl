@@ -10,21 +10,30 @@ $server="localhost";
 $port=5900;
 $listen_port=5923;
 $timing=0;
+$symbolic=0;
 
 if(!GetOptions(
 	"script:s" => \$output,
 	"listen:i" => \$listen_port,
-	"timing" => \$timing
+	"timing" => \$timing,
+	"symbolic" => \$symbolic,
 ) || $#ARGV!=0) {
-	print STDERR "Usage: $ARGV0 [--script output_name] [--listen listen_port] server[:port]\n";
+	print STDERR "Usage: $ARGV0 [--script output_name] [--listen listen_port] [--timing] [--symbolic] server[:port]\n";
 	exit 2;
 }
 
 $output=~s/\.pl$//;
 
 if ($timing) {
-	use Time::HiRes qw(time);
+	eval 'use Time::HiRes';
+	$timing=0 if $@;
 	$starttime=-1;
+}
+
+if ($symbolic) {
+	eval 'use X11::Keysyms qw(%Keysyms)';
+	$symbolic=0 if $@;
+	%sym_name = reverse %Keysyms;
 }
 
 $server=$ARGV[0];
@@ -59,6 +68,9 @@ if($vnc<0) {
 open OUT, ">$output.pl";
 print OUT "#!/usr/bin/perl\n";
 print OUT "\n";
+if ($symbolic) {
+	print OUT "use X11::Keysyms qw(\%sym);\n";
+}
 print OUT "use nacro;\n";
 print OUT "\n";
 print OUT "\$x_origin=0; \$y_origin=0;\n";
@@ -71,7 +83,7 @@ $x_origin=0; $y_origin=0;
 
 sub writetiming () {
 	if ($timing) {
-		$now=time();
+		$now=Time::HiRes::time();
 		if ($starttime>0) {
 			print OUT "nacro::process(\$vnc," . ($now - $starttime) . ");\n";
 		}
@@ -93,7 +105,11 @@ while(1) {
 			$keydown=nacro::getkeydown($vnc);
 			if(nacro::sendkey($vnc,$keysym,$keydown)) {
 				writetiming();
-				print OUT "nacro::sendkey(\$vnc,$keysym,$keydown);\n";
+				if ($symbolic and exists $sym_name{$keysym}) {
+					print OUT 'nacro::sendkey($vnc,$sym{'.$sym_name{$keysym}."},$keydown);\n";
+				} else {
+					print OUT "nacro::sendkey(\$vnc,$keysym,$keydown);\n";
+				}
 			}
 			if($keysym==0xffe3 || $keysym==0xffe4) {
 				# Control pressed
@@ -118,6 +134,22 @@ while(1) {
 				print OUT "nacro::sendmouse(\$vnc,\$x_origin"
 					. ($x>=0?"+":"")."$x,\$y_origin"
 					. ($y>=0?"+":"")."$y,$buttons);\n";
+			}
+		}
+		if ($result & $nacro::RESULT_TEXT_CLIENT) {
+			my $text = nacro::gettext_client($vnc);
+			if (nacro::sendtext($vnc,$text)) {
+				writetiming();
+				print OUT "nacro::sendtext(\$vnc, q(\Q$text\E));\n";
+				print "got text from client: $text\n";
+			}
+		}
+		if ($result & $nacro::RESULT_TEXT_SERVER) {
+			my $text = nacro::gettext_server($vnc);
+			if (nacro::sendtext_to_server($vnc,$text)) {
+				writetiming();
+				print OUT "nacro::sendtext_to_server(\$vnc, q(\Q$text\E));\n";
+				print "got text from server: $text\n";
 			}
 		}
 	} else {

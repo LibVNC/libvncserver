@@ -2,3 +2,7 @@ With --timing, you can actually record action scripts which are meaningful...
 Earlier, the events just got garbled, because the GUI could not react as
 fast as the events were churned out.
 
+Clipboard is supported (thanks to Uwe).
+
+Keys are recorded by their symbols with the --symbolic switch, provided you
+have the X11::Keysyms module.

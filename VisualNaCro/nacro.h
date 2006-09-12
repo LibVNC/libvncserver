@@ -32,10 +32,11 @@ typedef int result_t;
 %constant int RESULT_TIMEOUT=1;
 %constant int RESULT_KEY=2;
 %constant int RESULT_MOUSE=4;
-%constant int RESULT_TEXT=8
-%constant int RESULT_SCREEN=16;
-%constant int RESULT_FOUNDIMAGE=32;
-%constant int RESULT_SHUTDOWN=64;
+%constant int RESULT_TEXT_CLIENT=8;
+%constant int RESULT_TEXT_CLIENT=16;
+%constant int RESULT_SCREEN=32;
+%constant int RESULT_FOUNDIMAGE=64;
+%constant int RESULT_SHUTDOWN=128;
 */
 
 %}
@@ -52,10 +53,11 @@ typedef int result_t;
 #define RESULT_TIMEOUT 1
 #define  RESULT_KEY 2
 #define  RESULT_MOUSE 4
-#define  RESULT_TEXT 8
-#define  RESULT_SCREEN 16
-#define  RESULT_FOUNDIMAGE 32
-#define  RESULT_SHUTDOWN 64
+#define  RESULT_TEXT_CLIENT 8
+#define  RESULT_TEXT_SERVER 16
+#define  RESULT_SCREEN 32
+#define  RESULT_FOUNDIMAGE 64
+#define  RESULT_SHUTDOWN 128
 
 /* init/shutdown */
 
@@ -86,13 +88,15 @@ coordinate_t getx(resource_t res);
 coordinate_t gety(resource_t res);
 buttons_t getbuttons(resource_t res);
 
-const char *gettext(resource_t res);
+const char *gettext_client(resource_t res);
+const char *gettext_server(resource_t res);
 
 /* send events to the server */
 
 bool_t sendkey(resource_t res,keysym_t keysym,bool_t keydown);
 bool_t sendmouse(resource_t res,coordinate_t x,coordinate_t y,buttons_t buttons);
 bool_t sendtext(resource_t res, const char *string);
+bool_t sendtext_to_server(resource_t res, const char *string);
 
 /* for visual grepping */
 

@@ -23,7 +23,8 @@ typedef struct private_resource_t {
 	int x,y;
 	int buttons;
 
-	char* text;
+	char* text_client;
+	char* text_server;
 
 	image_t* grep_image;
 	int x_origin,y_origin;
@@ -94,24 +95,20 @@ static void got_text(char* str,int len,rfbClientRec* cl)
 {
 	private_resource_t* res=(private_resource_t*)cl->screen->screenData;
 
-	SendClientCutText(res->client, str, len);
-
-	if (res->text)
-		free(res->text);
-	res->text=strdup(str);
-	res->result|=RESULT_TEXT;
+	if (res->text_client)
+		free(res->text_client);
+	res->text_client=strdup(str);
+	res->result|=RESULT_TEXT_CLIENT;
 }
 
 static void got_text_from_server(rfbClient* cl, const char *str, int textlen)
 {
 	private_resource_t* res=(private_resource_t*)cl->clientData;
 
-	rfbSendServerCutText(res->server, (char *)str, textlen);
-
-	if (res->text)
-		free(res->text);
-	res->text=strdup(str);
-	res->result|=RESULT_TEXT;
+	if (res->text_server)
+		free(res->text_server);
+	res->text_server=strdup(str);
+	res->result|=RESULT_TEXT_SERVER;
 }
 
 static rfbBool malloc_frame_buffer(rfbClient* cl)
@@ -203,7 +200,8 @@ resource_t initvnc(const char* server,int server_port,int listen_port)
 	/* remember for later */
 	res->listen_port=listen_port;
 
-	res->text = NULL;
+	res->text_client = NULL;
+	res->text_server = NULL;
 
 	res->client=rfbGetClient(8,3,4);
 	res->client->clientData=(void*)res;
@@ -571,10 +569,16 @@ buttons_t getbuttons(resource_t res)
 	return r->buttons;
 }
 
-const char *gettext(resource_t res)
+const char *gettext_client(resource_t res)
 {
 	private_resource_t* r=get_resource(res);
-	return r->text;
+	return r->text_client;
+}
+
+const char *gettext_server(resource_t res)
+{
+	private_resource_t* r=get_resource(res);
+	return r->text_server;
 }
 
 /* send events to the server */
@@ -601,6 +605,15 @@ bool_t sendtext(resource_t res, const char *string)
 	if(r==NULL)
 		return 0;
 	return SendClientCutText(r->client, (char *)string, (int)strlen(string));
+}
+
+bool_t sendtext_to_server(resource_t res, const char *string)
+{
+	private_resource_t* r=get_resource(res);
+	if(r==NULL)
+		return 0;
+	rfbSendServerCutText(r->server, (char *)string, (int)strlen(string));
+	return 1;
 }
 
 /* for visual grepping */
