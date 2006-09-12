@@ -62,7 +62,7 @@ then
 	*-*-aix*) LDSHARED="\$(srcdir)/ld_so_aix \$(CC)";;
 	*-*-cygwin* | *-*-mingw*)
             if test "$GCC" = yes; then
-                LDSHARED="$CC -shared"
+                LDSHARED="dllwrap --driver-name gcc --dlltool dlltool --export-all-symbols --as as --dllname \$(LIBPREFIX)\$(TARGET)\$(SO)"
             else
                 if test "cl" = $CC ;  then
                     # Microsoft Visual C++ (MSVC)

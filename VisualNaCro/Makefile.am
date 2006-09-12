@@ -4,7 +4,7 @@ OBJS=nacro.o
 ISRCS=nacro_wrap.c
 IOBJS=nacro_wrap.o
 TARGET=nacro
-LIBS= @LIBVNCSERVERLIBS@ -lvncclient
+LIBS= -lvncclient @LIBVNCSERVERLIBS@
 
 nacro_CFLAGS= @LIBVNCSERVERCFLAGS@
 
