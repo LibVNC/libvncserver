@@ -112,12 +112,14 @@ while(1) {
 				}
 			}
 			if($keysym==0xffe3 || $keysym==0xffe4) {
-				# Control pressed
-				$magickey++;
-				if($magickey>3 && !$keydown) {
-					$magickey=0;
-					$mode="menu";
-					nacro::alert($vnc,"VisualNaCro: press 'q' to quit\nor mark reference rectangle by dragging",10);
+				if (!$keydown) {
+					# Control pressed
+					$magickey++;
+					if ($magickey > 1) {
+						$magickey = 0;
+						$mode = "menu";
+						nacro::alert($vnc,"VisualNaCro: press 'q' to quit,\n'd' to display current reference image,\nor mark reference rectangle by dragging",10);
+					}
 				}
 			} else {
 				$magickey=0;
@@ -160,8 +162,18 @@ while(1) {
 				close OUT;
 				nacro::closevnc($vnc);
 				exit 0;
+			} elsif ($keysym == ord('d')) {
+				$pnm=$output.($image_counter - 1).".pnm";
+				$res = nacro::displaypnm($vnc, $pnm,
+						$x_origin, $y_origin, 1, 10);
+						#0, 0, 1, 10);
+				if ($res == 0) {
+					nacro::alert($vnc, "Error displaying "
+							. $pnm);
+				}
+			} else {
+				nacro::alert($vnc,"Unknown key",10);
 			}
-			nacro::alert($vnc,"Unknown key",10);
 			$mode="passthru";
 		}
 		if($result&$nacro::RESULT_MOUSE) {

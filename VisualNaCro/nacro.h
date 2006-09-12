@@ -105,6 +105,8 @@ coordinate_t getyorigin(resource_t res);
 
 bool_t savepnm(resource_t res,const char* filename,coordinate_t x1, coordinate_t y1, coordinate_t x2, coordinate_t y2);
 
+result_t displaypnm(resource_t res, const char *filename, coordinate_t x, coordinate_t y, bool_t border, timeout_t timeout);
+
 /* this displays an overlay which is shown for a certain time */
 
 result_t alert(resource_t res,const char* message,timeout_t timeout);

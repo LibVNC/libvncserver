@@ -330,6 +330,83 @@ static void free_image(image_t* image)
 	free(image);
 }
 
+static void copy_line(rfbScreenInfo *dest, char *backup,
+		int x0, int y0, int x1, int y1, int color_offset)
+{
+	uint8_t *d = (uint8_t *)dest->frameBuffer, *s = (uint8_t *)backup;
+	int i;
+	int steps0 = x1 > x0 ? x1 - x0 : x0 - x1;
+	int steps1 = y1 > y0 ? y1 - y0 : y0 - y1;
+
+	if (steps1 > steps0)
+		steps0 = steps1;
+	else if (steps0 == 0)
+		steps0 = 1;
+
+	for (i = 0; i <= steps0; i++) {
+		int j, index = 4 * (x0 + i * (x1 - x0) / steps0
+				+ dest->width * (y0 + i * (y1 - y0) / steps0));
+		for (j = 0; j < 4; j++)
+			d[index + j] = s[index + j] + color_offset;
+	}
+
+	rfbMarkRectAsModified(dest, x0 - 5, y0 - 5, x1 + 1, y1 + 2);
+}
+
+result_t displaypnm(resource_t resource, const char *filename,
+		coordinate_t x, coordinate_t y, bool_t border,
+		timeout_t timeout_in_seconds)
+{
+	private_resource_t* res = get_resource(resource);
+	image_t *image;
+	char* fake_frame_buffer;
+	char* backup;
+	int w, h, i, j, w2, h2;
+	result_t result;
+
+	if (res == NULL || res->server == NULL ||
+			(image = loadpnm(filename)) == NULL)
+		return 0;
+	
+	w = res->server->width;
+	h = res->server->height;
+	fake_frame_buffer = malloc(w * 4 * h);
+	if(!fake_frame_buffer)
+		return 0;
+	memcpy(fake_frame_buffer, res->server->frameBuffer, w * 4 * h);
+	
+	backup = res->server->frameBuffer;
+	res->server->frameBuffer = fake_frame_buffer;
+
+	w2 = image->width;
+	if (x + w2 > w)
+		w2 = w - x;
+	h2 = image->height;
+	if (y + h2 > h)
+		h2 = h - y;
+	for (j = 0; j < h2; j++)
+		memcpy(fake_frame_buffer + 4 * (x + (y + j) * w),
+			image->buffer + j * 4 * image->width, 4 * w2);
+	free(image);
+	if (border) {
+		copy_line(res->server, backup, x, y, x + w2, y, 0x80);
+		copy_line(res->server, backup, x, y, x, y + h2, 0x80);
+		copy_line(res->server, backup, x + w2, y, x + w2, y + h2, 0x80);
+		copy_line(res->server, backup, x, y + h2, x + w2, y + h2, 0x80);
+	}
+	rfbMarkRectAsModified(res->server,
+			x - 1, y - 1, x + w2 + 1, y + h2 + 1);
+
+	result = waitforinput(resource, timeout_in_seconds);
+
+	res->server->frameBuffer=backup;
+	free(fake_frame_buffer);
+	rfbMarkRectAsModified(res->server,
+			x - 1, y - 1, x + w2 + 1, y + h2 + 1);
+
+	return result;
+}
+
 /* process() and friends */
 
 /* this function returns only if res->result in return_mask */
@@ -573,29 +650,6 @@ const char *gettext_client(resource_t res)
 {
 	private_resource_t* r=get_resource(res);
 	return r->text_client;
-}
-
-static void copy_line(rfbScreenInfo *dest, char *backup,
-		int x0, int y0, int x1, int y1, int color_offset)
-{
-	uint8_t *d = (uint8_t *)dest->frameBuffer, *s = (uint8_t *)backup;
-	int i;
-	int steps0 = x1 > x0 ? x1 - x0 : x0 - x1;
-	int steps1 = y1 > y0 ? y1 - y0 : y0 - y1;
-
-	if (steps1 > steps0)
-		steps0 = steps1;
-	else if (steps0 == 0)
-		steps0 = 1;
-
-	for (i = 0; i <= steps0; i++) {
-		int j, index = 4 * (x0 + i * (x1 - x0) / steps0
-				+ dest->width * (y0 + i * (y1 - y0) / steps0));
-		for (j = 0; j < 4; j++)
-			d[index + j] = s[index + j] + color_offset;
-	}
-
-	rfbMarkRectAsModified(dest, x0 - 5, y0 - 5, x1 + 1, y1 + 2);
 }
 
 result_t rubberband(resource_t resource, coordinate_t x0, coordinate_t y0)
