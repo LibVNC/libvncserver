@@ -1,3 +1,4 @@
+#include <rfb/keysym.h>
 #include "VNConsole.h"
 #include "vga.h"
 #include <fcntl.h>

@@ -1,4 +1,5 @@
 #include <stdarg.h>
+#include <rfb/keysym.h>
 #include "VNConsole.h"
 
 #define DEBUG(x)

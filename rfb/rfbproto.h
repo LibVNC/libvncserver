@@ -59,7 +59,6 @@
 #include <rfb/rfbconfig.h>
 #include <rfb/rfbint.h>
 #endif
-#include <rfb/keysym.h>
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
