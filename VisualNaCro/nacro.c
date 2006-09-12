@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <string.h>
 #include <rfb/rfb.h>
 #include <rfb/rfbclient.h>
 
@@ -21,6 +22,8 @@ typedef struct private_resource_t {
 
 	int x,y;
 	int buttons;
+
+	char* text;
 
 	image_t* grep_image;
 	int x_origin,y_origin;
@@ -87,6 +90,30 @@ static void got_mouse(int buttons,int x,int y,rfbClientRec* cl)
 	res->result|=RESULT_MOUSE;
 }
 
+static void got_text(char* str,int len,rfbClientRec* cl)
+{
+	private_resource_t* res=(private_resource_t*)cl->screen->screenData;
+
+	SendClientCutText(res->client, str, len);
+
+	if (res->text)
+		free(res->text);
+	res->text=strdup(str);
+	res->result|=RESULT_TEXT;
+}
+
+static void got_text_from_server(rfbClient* cl, const char *str, int textlen)
+{
+	private_resource_t* res=(private_resource_t*)cl->clientData;
+
+	rfbSendServerCutText(res->server, (char *)str, textlen);
+
+	if (res->text)
+		free(res->text);
+	res->text=strdup(str);
+	res->result|=RESULT_TEXT;
+}
+
 static rfbBool malloc_frame_buffer(rfbClient* cl)
 {
 	private_resource_t* res=(private_resource_t*)cl->clientData;
@@ -102,6 +129,7 @@ static rfbBool malloc_frame_buffer(rfbClient* cl)
 		res->server->frameBuffer=res->client->frameBuffer;
 		res->server->kbdAddEvent=got_key;
 		res->server->ptrAddEvent=got_mouse;
+		res->server->setXCutText=got_text;
 		rfbInitServer(res->server);
 	} else {
 		/* TODO: realloc if necessary */
@@ -174,11 +202,14 @@ resource_t initvnc(const char* server,int server_port,int listen_port)
 
 	/* remember for later */
 	res->listen_port=listen_port;
-	
+
+	res->text = NULL;
+
 	res->client=rfbGetClient(8,3,4);
-	res->client->clientData=res;
+	res->client->clientData=(void*)res;
 	res->client->GotFrameBufferUpdate=got_frame_buffer;
 	res->client->MallocFrameBuffer=malloc_frame_buffer;
+	res->client->GotXCutText=got_text_from_server;
 	res->client->serverHost=strdup(server);
 	res->client->serverPort=server_port;
 	res->client->appData.encodingsString="raw";
@@ -484,7 +515,7 @@ result_t alert(resource_t resource,const char* message,timeout_t timeout)
 	int x,y,w,h;
 	result_t result;
 	
-	if(res->server==0)
+	if(res == NULL || res->server==NULL)
 		return -1;
 
 	w=res->server->width;
@@ -540,12 +571,18 @@ buttons_t getbuttons(resource_t res)
 	return r->buttons;
 }
 
+const char *gettext(resource_t res)
+{
+	private_resource_t* r=get_resource(res);
+	return r->text;
+}
+
 /* send events to the server */
 
 bool_t sendkey(resource_t res,keysym_t keysym,bool_t keydown)
 {
 	private_resource_t* r=get_resource(res);
-	if(r==0)
+	if(r==NULL)
 		return 0;
 	return SendKeyEvent(r->client,keysym,keydown);
 }
@@ -553,9 +590,17 @@ bool_t sendkey(resource_t res,keysym_t keysym,bool_t keydown)
 bool_t sendmouse(resource_t res,coordinate_t x,coordinate_t y,buttons_t buttons)
 {
 	private_resource_t* r=get_resource(res);
-	if(r==0)
+	if(r==NULL)
 		return 0;
 	return SendPointerEvent(r->client,x,y,buttons);
+}
+
+bool_t sendtext(resource_t res, const char *string)
+{
+	private_resource_t* r=get_resource(res);
+	if(r==NULL)
+		return 0;
+	return SendClientCutText(r->client, (char *)string, (int)strlen(string));
 }
 
 /* for visual grepping */

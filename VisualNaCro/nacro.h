@@ -32,9 +32,10 @@ typedef int result_t;
 %constant int RESULT_TIMEOUT=1;
 %constant int RESULT_KEY=2;
 %constant int RESULT_MOUSE=4;
-%constant int RESULT_SCREEN=8;
-%constant int RESULT_FOUNDIMAGE=16;
-%constant int RESULT_SHUTDOWN=32;
+%constant int RESULT_TEXT=8
+%constant int RESULT_SCREEN=16;
+%constant int RESULT_FOUNDIMAGE=32;
+%constant int RESULT_SHUTDOWN=64;
 */
 
 %}
@@ -51,9 +52,10 @@ typedef int result_t;
 #define RESULT_TIMEOUT 1
 #define  RESULT_KEY 2
 #define  RESULT_MOUSE 4
-#define  RESULT_SCREEN 8
-#define  RESULT_FOUNDIMAGE 16
-#define  RESULT_SHUTDOWN 32
+#define  RESULT_TEXT 8
+#define  RESULT_SCREEN 16
+#define  RESULT_FOUNDIMAGE 32
+#define  RESULT_SHUTDOWN 64
 
 /* init/shutdown */
 
@@ -84,10 +86,13 @@ coordinate_t getx(resource_t res);
 coordinate_t gety(resource_t res);
 buttons_t getbuttons(resource_t res);
 
+const char *gettext(resource_t res);
+
 /* send events to the server */
 
 bool_t sendkey(resource_t res,keysym_t keysym,bool_t keydown);
 bool_t sendmouse(resource_t res,coordinate_t x,coordinate_t y,buttons_t buttons);
+bool_t sendtext(resource_t res, const char *string);
 
 /* for visual grepping */
 
