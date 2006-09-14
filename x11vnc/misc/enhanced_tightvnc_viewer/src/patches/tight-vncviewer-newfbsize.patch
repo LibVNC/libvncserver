@@ -1,0 +1,285 @@
+--- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
++++ vnc_unixsrc/vncviewer/desktop.c	2006-07-27 11:30:01.000000000 -0400
+@@ -50,6 +50,30 @@
+   },
+ };
+ 
++void create_image() {
++  image = NULL;
++
++#ifdef MITSHM
++  if (appData.useShm) {
++    image = CreateShmImage();
++    if (!image)
++      appData.useShm = False;
++  }
++#endif
++
++  if (!image) {
++    image = XCreateImage(dpy, vis, visdepth, ZPixmap, 0, NULL,
++			 si.framebufferWidth, si.framebufferHeight,
++			 BitmapPad(dpy), 0);
++
++    image->data = malloc(image->bytes_per_line * image->height);
++    if (!image->data) {
++      fprintf(stderr,"malloc failed\n");
++      exit(1);
++    }
++  }
++}
++
+ 
+ /*
+  * DesktopInitBeforeRealization creates the "desktop" widget and the viewport
+@@ -82,30 +106,9 @@
+   for (i = 0; i < 256; i++)
+     modifierPressed[i] = False;
+ 
+-  image = NULL;
+-
+-#ifdef MITSHM
+-  if (appData.useShm) {
+-    image = CreateShmImage();
+-    if (!image)
+-      appData.useShm = False;
+-  }
+-#endif
+-
+-  if (!image) {
+-    image = XCreateImage(dpy, vis, visdepth, ZPixmap, 0, NULL,
+-			 si.framebufferWidth, si.framebufferHeight,
+-			 BitmapPad(dpy), 0);
+-
+-    image->data = malloc(image->bytes_per_line * image->height);
+-    if (!image->data) {
+-      fprintf(stderr,"malloc failed\n");
+-      exit(1);
+-    }
+-  }
++  create_image();
+ }
+ 
+-
+ /*
+  * DesktopInitAfterRealization does things which require the X windows to
+  * exist.  It creates some GCs and sets the dot cursor.
+@@ -460,3 +463,69 @@
+     break;
+   }
+ }
++
++static void reset_image(void) {
++	if (UsingShm()) {
++		ShmCleanup();
++	} else {
++		if (image && image->data) {
++			free(image->data);
++			XDestroyImage(image);
++			image = NULL;
++		}
++	}
++	create_image();
++	XFlush(dpy);
++}
++
++void ReDoDesktop(void) {
++	int w, h, x, y, dw, dh;
++
++	if (appData.fullScreen) {
++		if (image && image->data) {
++			int len;
++			int h = image->height;
++			int w = image->width;
++			len = image->bytes_per_line * image->height;
++			/* black out window first: */
++			memset(image->data, 0, len);
++  			XPutImage(dpy, XtWindow(desktop), gc, image, 0, 0, 0, 0, w, h);
++			XFlush(dpy);
++		}
++		XtResizeWidget(desktop, si.framebufferWidth, si.framebufferHeight, 0);
++		XSync(dpy, False);
++		usleep(100*1000);
++		FullScreenOn();
++		XSync(dpy, False);
++		usleep(100*1000);
++		reset_image();
++		return;
++	}
++
++	dw = appData.wmDecorationWidth;
++	dh = appData.wmDecorationHeight;
++
++	w = si.framebufferWidth;
++	h = si.framebufferHeight;
++
++	if (w + dw >= dpyWidth) {
++		w = dpyWidth - dw;
++	}
++	if (h + dh >= dpyHeight) {
++		h = dpyHeight - dh;
++	}
++
++	XtVaSetValues(toplevel, XtNmaxWidth, w, XtNmaxHeight, h, NULL);
++
++	XtVaSetValues(desktop, XtNwidth, si.framebufferWidth,
++	    XtNheight, si.framebufferHeight, NULL);
++
++	x = (dpyWidth  - w - dw)/2;
++	y = (dpyHeight - h - dh)/2;
++
++	XtResizeWidget(desktop, si.framebufferWidth, si.framebufferHeight, 0);
++
++	XtConfigureWidget(toplevel, x + dw, y + dh, w, h, 0);
++
++	reset_image();
++}
+--- vnc_unixsrc.orig/vncviewer/fullscreen.c	2003-10-09 05:23:49.000000000 -0400
++++ vnc_unixsrc/vncviewer/fullscreen.c	2006-07-27 14:36:06.000000000 -0400
+@@ -85,10 +85,13 @@
+   Dimension oldViewportWidth, oldViewportHeight, clipWidth, clipHeight;
+   Position viewportX, viewportY;
+ 
++  Bool fsAlready = appData.fullScreen, toobig = False;
++
+   appData.fullScreen = True;
+ 
+   if (si.framebufferWidth > dpyWidth || si.framebufferHeight > dpyHeight) {
+ 
++    toobig = True;
+     XtVaSetValues(viewport, XtNforceBars, True, NULL);
+     XtVaGetValues(viewport, XtNwidth, &oldViewportWidth,
+ 		  XtNheight, &oldViewportHeight, NULL);
+@@ -129,6 +132,7 @@
+      reparenting our window to the root.  The window manager will get a
+      ReparentNotify and hopefully clean up its frame window. */
+ 
++if (! fsAlready) {
+   XtVaSetValues(toplevel, XtNoverrideRedirect, True, NULL);
+ 
+   XReparentWindow(dpy, XtWindow(toplevel), DefaultRootWindow(dpy), 0, 0);
+@@ -164,10 +168,22 @@
+ 
+   XtManageChild(viewport);
+ 
+-  /* Now we can set "toplevel" to its proper size. */
++} else {
++	XSync(dpy, False);
++}
+ 
++  /* Now we can set "toplevel" to its proper size. */
+   XtResizeWidget(toplevel, toplevelWidth, toplevelHeight, 0);
+ 
++if (fsAlready) {
++  XtResizeWidget(viewport, viewportWidth, viewportHeight, 0);
++  if (! toobig) {
++	XtVaSetValues(viewport, XtNforceBars, False, NULL);
++  }
++  XMoveWindow(dpy, XtWindow(viewport), viewportX, viewportY);
++  XSync(dpy, False);
++}
++
+   /* Set the popup to overrideRedirect too */
+ 
+   XtVaSetValues(popup, XtNoverrideRedirect, True, NULL);
+--- vnc_unixsrc.orig/vncviewer/rfbproto.c	2004-03-11 13:14:39.000000000 -0500
++++ vnc_unixsrc/vncviewer/rfbproto.c	2006-07-25 21:51:20.000000000 -0400
+@@ -177,6 +177,9 @@
+ 	  sig_rfbEncodingPointerPos, "Pointer position update");
+   CapsAdd(encodingCaps, rfbEncodingLastRect, rfbTightVncVendor,
+ 	  sig_rfbEncodingLastRect, "LastRect protocol extension");
++
++  CapsAdd(encodingCaps, rfbEncodingNewFBSize, rfbTightVncVendor,
++	  sig_rfbEncodingNewFBSize, "New FB size protocol extension");
+ }
+ 
+ 
+@@ -729,6 +732,7 @@
+   Bool requestCompressLevel = False;
+   Bool requestQualityLevel = False;
+   Bool requestLastRectEncoding = False;
++  Bool requestNewFBSizeEncoding = True;
+ 
+   spf.type = rfbSetPixelFormat;
+   spf.format = myFormat;
+@@ -806,6 +810,10 @@
+     if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
+       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
+     }
++
++    if (se->nEncodings < MAX_ENCODINGS && requestNewFBSizeEncoding) {
++      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingNewFBSize);
++    }
+   }
+   else {
+     if (SameMachine(rfbsock)) {
+@@ -849,6 +857,7 @@
+     }
+ 
+     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
++    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingNewFBSize);
+   }
+ 
+   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
+@@ -1038,6 +1047,16 @@
+ 	}
+ 	continue;
+       }
++      if (rect.encoding == rfbEncodingNewFBSize) {
++	  fprintf(stderr,"New Size: %dx%d at (%d, %d)\n",
++		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
++	si.framebufferWidth = rect.r.w;
++	si.framebufferHeight = rect.r.h;
++        fprintf(stderr, "si: %d %d\n", si.framebufferWidth, si.framebufferHeight);
++	ReDoDesktop();
++
++	continue;
++      }
+ 
+       if ((rect.r.x + rect.r.w > si.framebufferWidth) ||
+ 	  (rect.r.y + rect.r.h > si.framebufferHeight))
+--- vnc_unixsrc.orig/vncviewer/shm.c	2000-06-11 08:00:53.000000000 -0400
++++ vnc_unixsrc/vncviewer/shm.c	2006-07-26 23:30:42.000000000 -0400
+@@ -41,6 +41,10 @@
+   }
+ }
+ 
++Bool UsingShm() {
++	return needShmCleanup;
++}
++
+ static int
+ ShmCreationXErrorHandler(Display *dpy, XErrorEvent *error)
+ {
+--- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.h	2006-07-26 23:31:25.000000000 -0400
+@@ -162,6 +162,8 @@
+ extern void CopyDataToScreen(char *buf, int x, int y, int width, int height);
+ extern void SynchroniseScreen();
+ 
++extern void ReDoDesktop();
++
+ /* dialogs.c */
+ 
+ extern void ServerDialogDone(Widget w, XEvent *event, String *params,
+@@ -243,6 +245,7 @@
+ 
+ extern XImage *CreateShmImage();
+ extern void ShmCleanup();
++extern Bool UsingShm();
+ 
+ /* sockets.c */
+ 
+--- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.c	2006-07-27 19:00:25.000000000 -0400
+@@ -57,6 +57,11 @@
+     }
+   }
+ 
++  if (argc > 1 && strstr(argv[1], "-h") == argv[1]) {
++  	usage();
++	return 0;
++  }
++
+   /* Call the main Xt initialisation function.  It parses command-line options,
+      generating appropriate resource specs, and makes a connection to the X
+      display. */

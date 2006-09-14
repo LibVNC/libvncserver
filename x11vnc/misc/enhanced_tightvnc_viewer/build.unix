@@ -1,0 +1,244 @@
+#!/bin/sh
+
+# Add useful directories to PATH:
+#
+PATH=$PATH:/usr/bin:/bin:/usr/local/bin:/usr/X11R6/bin:/usr/bin/X11:/usr/openwin/bin:/opt/SUNWspro/bin:/usr/sfw/bin:/usr/ccs/bin
+export PATH
+
+# Check location:
+#
+thisdir=`dirname "$0"`
+if [ ! -d ./bin -o ! -d src/patches ]; then
+	echo "You must run this script from: $thisdir"
+	exit 1
+fi
+
+# Try to find osname.arch
+#
+name=$UNAME
+if [ "X$name" = "X" ]; then
+	name=`uname -sm | sed -e 's/ /./'`
+fi
+if [ "X$name" = "X" ]; then
+	echo "cannot determine platform: os.arch, e.g. Linux.i686"
+	echo "set \$UNAME manually and retry."
+	exit 1
+fi
+
+# Work out main destination:
+#
+dest=./bin/$name
+if [ -d $dest ]; then
+	printf "$dest exists.  overwrite it? [y]/n "
+	read x
+	if [ "X$x" = "Xn" ]; then
+		exit
+	fi
+	rm -rf $dest
+fi
+mkdir -p $dest || exit 1
+
+# Create a tmp dir for this build:
+#
+tmp=./src/tmp/$name.$$
+if [ "X$TMPDIR" != "X" ]; then
+	tmp="$TMPDIR/$tmp"
+fi
+mkdir -p $tmp || exit 1
+
+# Try to find some static archives of various libraries:
+#
+libs="$tmp/libs"
+mkdir -p $libs || exit 1
+#for liba in libz.a libjpeg.a libssl.a libcrypto.a
+for liba in libz.a libjpeg.a
+do
+	for dir in /usr/lib /lib /usr/local/lib /usr/pkg/lib /usr/sfw/lib /usr/openwin/lib
+	do
+		if [ "$name" = "Linux.x86_64" -o "$name" = "Linux.ppc64" ] ; then
+			dir64=`echo "$dir" | sed -e 's,lib,lib64,'`
+		fi
+		try="$dir/$liba"
+		if [ -f $try ]; then
+			cp -p "$try" $libs
+		fi
+	done
+done
+echo "Found these static archive libraries, will try to use them..."
+ls -ld $libs
+ls -l $libs
+echo
+
+have_gcc=""
+if type gcc > /dev/null; then
+	have_gcc=1
+fi
+have_cc=""
+if type cc > /dev/null; then
+	have_cc=1
+fi
+
+if [ "X$have_cc" = "X" ]; then
+	if [ "X$have_gcc" = "X1" ]; then
+		cat > $tmp/cc <<END
+#!/bin/sh
+gcc "\$@"
+END
+		chmod 755 $tmp/cc
+		PATH=$PATH:`pwd`/$tmp
+		type cc
+		type gcc
+	fi
+fi
+
+if [ `uname` = "SunOS" ]; then
+	LDFLAGS_OS="$LDFLAGS_OS -L/usr/sfw/lib -R/usr/sfw/lib"
+	CPPFLAGS_OS="$CPPFLAGS_OS -I /usr/sfw/include"
+elif uname | grep -i bsd > /dev/null; then
+	LDFLAGS_OS="$LDFLAGS_OS -L/usr/local/lib -L/usr/pkg/lib"
+	CPPFLAGS_OS="$CPPFLAGS_OS -I /usr/local/include -I /usr/pkg/include"
+fi
+
+# Do tightvnc viewer:
+#
+tight_src=`ls -td ./src/vnc_unixsrc* | head -1`
+if [ ! -d $tight_src ]; then
+	echo "could not locate tight vnc viewer source"
+	exit 1
+fi
+
+cp -pR "$tight_src" "$tmp/vnc_unixsrc" || exit 1
+
+echo "applying tight vnc patches:"
+start=`pwd`
+cd $tmp;
+failed=0
+for patch in ../../patches/tight*
+do
+	if [ ! -f "$patch" ]; then
+		continue
+	fi
+	patch -p0 < $patch
+	if [ $? != 0 ]; then
+		failed=`expr $failed + 1`
+	fi
+done
+cd "$start"
+if [ $failed != 0 ]; then
+	ball=src/zips/vnc_unixsrc_vncviewer.patched.tar
+	echo "patches failed, trying to use backup tarball:"
+	ls -l $ball
+	sleep 2
+	cat $ball | (cd $tmp; tar -xvf -)
+fi
+echo
+
+
+cd $tmp/vnc_unixsrc
+xmkmf
+make Makefiles
+mv vncviewer/Makefile vncviewer/Makefile.orig
+sed -e "s,EXTRA_LDOPTIONS =,EXTRA_LDOPTIONS = -L$start/$libs $LDFLAGS_OS," \
+    -e "s,CCOPTIONS =,CCOPTIONS = $CPPFLAGS_OS," \
+	vncviewer/Makefile.orig > vncviewer/Makefile
+
+if [ `uname` = "SunOS" ]; then
+	for d in vncviewer libvncauth vncconnect vncpasswd
+	do
+		mv $d/Makefile $d/Makefile.orig
+		sed -e "s,CCOPTIONS =.*\$,CCOPTIONS = $CPPFLAGS_OS," \
+			$d/Makefile.orig > $d/Makefile
+	done
+fi
+
+make depend
+echo $PATH
+make all
+ls -l vncviewer/vncviewer
+cd "$start"
+src=$tmp/vnc_unixsrc/vncviewer/vncviewer
+sync
+sleep 2
+sync
+strip $src
+sync
+sleep 2
+sync
+wc  $src
+sum $src
+sleep 2
+echo cp -p $src $dest/vncviewer
+cp -p $src $dest/vncviewer || exit 1
+sleep 1
+cp -p $src $dest/vncviewer || exit 1
+ls -l $src $dest/vncviewer
+$dest/vncviewer -h
+ldd $dest/vncviewer
+echo ""
+
+# Do stunnel:
+#
+stunnel_src=`ls -td ./src/stunnel* | head -1`
+if [ ! -d $stunnel_src ]; then
+	echo "could not locate stunnel source"
+	exit 1
+fi
+
+cp -pR "$stunnel_src" "$tmp/stunnel" || exit 1
+
+echo "applying stunnel patches:"
+start=`pwd`
+cd $tmp;
+failed=0
+for patch in ../../patches/stunnel*
+do
+	if [ ! -f "$patch" ]; then
+		continue
+	fi
+	patch -p0 < $patch
+	if [ $? != 0 ]; then
+		failed=`expr $failed + 1`
+	fi
+done
+cd "$start"
+if [ $failed != 0 ]; then
+	ball=src/zips/stunnel.patched.tar
+	echo "patches failed, trying to use backup tarball:"
+	ls -l $ball
+	sleep 2
+	cat $ball | (cd $tmp; tar -xvf -)
+fi
+echo
+
+
+cd $tmp/stunnel
+if [ `uname` = "SunOS" ]; then
+	cp configure configure.orig
+	sed -e "s,/var/ssl,/var/ssl /usr/sfw," configure.orig > configure
+fi
+env LDFLAGS="-L$start/$libs $LDFLAGS_OS" CPPFLAGS="$CPPFLAGS_OS" ./configure --disable-libwrap
+make
+ls -l src/stunnel
+cd "$start"
+src=$tmp/stunnel/src/stunnel
+sync
+sleep 2
+sync
+strip $src
+sync
+sleep 2
+sync
+wc  $src
+sum $src
+sleep 2
+echo cp -p $src $dest/stunnel
+cp -p $src $dest/stunnel || exit 1
+sleep 1
+cp -p $src $dest/stunnel || exit 1
+ls -l $src $dest/stunnel
+$dest/stunnel -help
+ldd $dest/stunnel
+echo ""
+
+$dest/vncviewer -h
+ldd $dest/vncviewer

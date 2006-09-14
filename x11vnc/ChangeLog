@@ -1,3 +1,9 @@
+2006-09-13  Karl Runge <runge@karlrunge.com>
+	* x11vnc: document 'ssh -t' improved keyboard response.  add
+	  extra rfbPE() around keystrokes. 
+	  misc/enhanced_tightvnc_viewer: incorporate scripts, documentation,
+	  etc. for the enhanced tightvnc viewer package.
+
 2006-09-10  Karl Runge <runge@karlrunge.com>
 	* x11vnc: minor changes: REQ_ARGS for -sslGenCert, EV_SYN
 	  SYN_REPORT check restore cursor most under -display WAIT.

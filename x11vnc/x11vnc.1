@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-09-10
+         version: 0.8.3, lastmod: 2006-09-13
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -32,8 +32,8 @@ these protections.  See the FAQ for details how to tunnel the VNC connection
 through an encrypted channel such as 
 .IR ssh (1).
 In brief:
-.PP
-% ssh -L 5900:localhost:5900 far-host 'x11vnc -localhost -display :0'
+.IP
+ssh \fB-t\fR \fB-L\fR 5900:localhost:5900 far-host 'x11vnc \fB-localhost\fR \fB-display\fR :0'
 .PP
 % vncviewer -encodings 'copyrect tight zrle hextile' localhost:0
 .PP
@@ -130,17 +130,17 @@ even if it looks like 8bpp TrueColor (rare problem).
 .PP
 \fB-visual\fR \fIn\fR
 .IP
-Experimental option: probably does not do what you
-think.  It simply *forces* the visual used for the
-framebuffer; this may be a bad thing... (e.g. messes
-up colors or cause a crash). It is useful for testing
-and for some workarounds.  n may be a decimal number,
-or 0x hex.  Run 
+This option probably does not do what you think.
+It simply *forces* the visual used for the framebuffer;
+this may be a bad thing... (e.g. messes up colors or
+cause a crash). It is useful for testing and for some
+workarounds.  n may be a decimal number, or 0x hex.
+Run 
 .IR xdpyinfo (1)
-for the values.  One may
-also use "TrueColor", etc. see <X11/X.h> for a list.
-If the string ends in ":m" then for better or for
-worse the visual depth is forced to be m.
+for the values.  One may also use
+"TrueColor", etc. see <X11/X.h> for a list.  If the
+string ends in ":m" then for better or for worse the
+visual depth is forced to be m.
 .PP
 \fB-overlay\fR
 .IP
@@ -1788,7 +1788,7 @@ Go into the background after screen setup.  Messages to
 stderr are lost unless \fB-o\fR logfile is used.  Something
 like this could be useful in a script:
 .IP
-port=`ssh $host "x11vnc -display :0 -bg" | grep PORT`
+port=`ssh -t $host "x11vnc -display :0 -bg" | grep PORT`
 .IP
 port=`echo "$port" | sed -e 's/PORT=//'`
 .IP
@@ -2852,8 +2852,8 @@ or where window tearing is a problem.
 .PP
 \fB-rawfb\fR \fIstring\fR
 .IP
-Experimental option, instead of polling X, poll the
-memory object specified in \fIstring\fR.
+Instead of polling X, poll the memory object specified
+in \fIstring\fR.
 .IP
 For shared memory segments string is of the
 form: "shm:N@WxHxB" which specifies a shmid
@@ -3102,16 +3102,16 @@ format.
 .PP
 \fB-pipeinput\fR \fIcmd\fR
 .IP
-Another experimental option: it lets you supply an
-external command in \fIcmd\fR that x11vnc will pipe
-all of the user input events to in a simple format.
-In \fB-pipeinput\fR mode by default x11vnc will not process
-any of the user input events.  If you prefix \fIcmd\fR
-with "tee:" it will both send them to the pipe
-command and process them.  For a description of the
-format run "\fB-pipeinput\fR \fItee:/bin/cat\fR".  Another prefix
-is "reopen" which means to reopen pipe if it exits.
-Separate multiple prefixes with commas.
+This option lets you supply an external command in
+\fIcmd\fR that x11vnc will pipe all of the user input
+events to in a simple format.  In \fB-pipeinput\fR mode by
+default x11vnc will not process any of the user input
+events.  If you prefix \fIcmd\fR with "tee:" it will
+both send them to the pipe command and process them.
+For a description of the format run "-pipeinput
+tee:/bin/cat".  Another prefix is "reopen" which
+means to reopen pipe if it exits.  Separate multiple
+prefixes with commas.
 .IP
 In combination with \fB-rawfb\fR one might be able to
 do amusing things (e.g. control non-X devices).

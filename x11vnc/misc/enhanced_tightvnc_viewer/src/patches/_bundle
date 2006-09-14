@@ -1,0 +1,33 @@
+#!/bin/sh
+
+rm -rf ./src/tmp/* || exit 1
+vers=1.0.3
+
+cd .. || exit 1
+
+if [ -f enhanced_tightvnc_viewer-$vers.zip ]; then
+	mv enhanced_tightvnc_viewer-$vers.zip enhanced_tightvnc_viewer-$vers.zip~
+fi
+rm -f enhanced_tightvnc_viewer_all-$vers.zip
+rm -f enhanced_tightvnc_viewer-$vers.zip
+zip -9 -r enhanced_tightvnc_viewer_all-$vers.zip enhanced_tightvnc_viewer
+zip -9 -r enhanced_tightvnc_viewer-$vers.zip enhanced_tightvnc_viewer -x '*.zip' '*.tar.gz'
+tar cvf - --exclude='*.zip' --exclude='*.tar.gz' enhanced_tightvnc_viewer | gzip -9 >  enhanced_tightvnc_viewer-$vers.tar.gz
+tar cvf - --exclude='*.zip' --exclude='*.tar.gz' --exclude='*.dll' --exclude='*.exe' --exclude enhanced_tightvnc_viewer/Windows/util enhanced_tightvnc_viewer | gzip -9 >  enhanced_tightvnc_viewer_no_windows-$vers.tar.gz
+
+ls -l enhanced_tightvnc_viewer*-$vers.*
+
+###########################################
+
+rm -rf enhanced_tightvnc_viewer_windows_only-${vers}*
+
+cp -pR enhanced_tightvnc_viewer enhanced_tightvnc_viewer_windows_only-$vers
+rm -rf enhanced_tightvnc_viewer_windows_only-$vers/{src,bin,man}/*
+rm -rf enhanced_tightvnc_viewer_windows_only-$vers/bin/.linkin
+cp -p enhanced_tightvnc_viewer/bin/util/ssl_tightvncviewer.tcl  enhanced_tightvnc_viewer_windows_only-$vers/Windows/util
+
+rm -f enhanced_tightvnc_viewer_windows_only-$vers.zip
+zip -9 -r enhanced_tightvnc_viewer_windows_only-$vers.zip enhanced_tightvnc_viewer_windows_only-$vers
+
+ls -l enhanced_tightvnc_viewer_windows_only-$vers.zip
+rm -rf enhanced_tightvnc_viewer_windows_only-${vers}

@@ -431,7 +431,21 @@ static void watch_loop(void) {
 
 				unixpw_in_rfbPE = 1;
 
-				rfbPE(-1);
+				/*
+				 * do a few more since a key press may
+				 * have induced a small change we want to
+				 * see quickly (just 1 rfbPE will likely
+				 * only process the subsequent "up" event)
+				 */
+				if (tm < last_keyboard_time + 0.16) {
+					rfbPE(0);
+					rfbPE(0);
+					rfbPE(-1);
+					rfbPE(0);
+					rfbPE(0);
+				} else {
+					rfbPE(-1);
+				}
 
 				unixpw_in_rfbPE = 0;
 

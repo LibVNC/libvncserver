@@ -450,6 +450,8 @@ extern double last_copyrect_fix;
 extern double servertime_diff;
 extern double x11vnc_start;
 
+extern int hack_val;
+
 /* last client to move pointer */
 extern rfbClientPtr last_pointer_client;
 

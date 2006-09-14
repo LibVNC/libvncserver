@@ -1,0 +1,6 @@
+#!/bin/sh
+
+make clean
+rm -f *.o
+cd ../..
+tar -cvf ../../zips/vnc_unixsrc_vncviewer.patched.tar vnc_unixsrc/vncviewer

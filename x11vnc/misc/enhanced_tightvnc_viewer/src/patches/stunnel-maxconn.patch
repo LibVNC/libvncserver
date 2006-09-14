@@ -1,0 +1,124 @@
+diff -Naur stunnel.orig/src/client.c stunnel/src/client.c
+--- stunnel.orig/src/client.c	2005-10-24 14:00:56.000000000 -0400
++++ stunnel/src/client.c	2006-07-31 21:51:37.000000000 -0400
+@@ -126,6 +126,10 @@
+     s_log(LOG_DEBUG, "%s finished (%d left)", c->opt->servname,
+         --num_clients);
+     leave_critical_section(CRIT_CLIENTS);
++    if (num_clients <= 0 && options.maxconn > 0 && num_conn >= options.maxconn) {
++            s_log(LOG_NOTICE, "client() finished: exceeded maxconn");
++	    exit(0);
++    }
+ #endif
+     free(c);
+ #ifdef DEBUG_STACK_SIZE
+diff -Naur stunnel.orig/src/network.c stunnel/src/network.c
+--- stunnel.orig/src/network.c	2005-10-30 16:35:42.000000000 -0500
++++ stunnel/src/network.c	2006-07-31 21:53:49.000000000 -0400
+@@ -329,6 +329,10 @@
+         /* no logging is possible in a signal handler */
+ #ifdef USE_FORK
+         num_clients--; /* one client less */
++        if (num_clients <= 0 && options.maxconn > 0 && num_conn >= options.maxconn) {
++                s_log(LOG_NOTICE, "sigchld_handler() finished: exceeded maxconn");
++                exit(0);
++        }
+ #endif /* USE_FORK */
+     }
+ #else /* __sgi */
+@@ -375,6 +379,10 @@
+     if((pid=wait(&status))>0) {
+         num_clients--; /* one client less */
+ #endif
++        if (num_clients <= 0 && options.maxconn > 0 && num_conn >= options.maxconn) {
++                s_log(LOG_NOTICE, "client_status() finished: exceeded maxconn");
++                exit(0);
++        }
+ #ifdef WIFSIGNALED
+         if(WIFSIGNALED(status)) {
+             s_log(LOG_DEBUG, "Process %d terminated on signal %d (%d left)",
+diff -Naur stunnel.orig/src/options.c stunnel/src/options.c
+--- stunnel.orig/src/options.c	2005-10-20 03:12:07.000000000 -0400
++++ stunnel/src/options.c	2006-07-31 22:49:57.000000000 -0400
+@@ -665,6 +665,24 @@
+         break;
+     }
+ 
++    /* maxconn */
++    switch(cmd) {
++    case CMD_INIT:
++        options.maxconn=0;
++        break;
++    case CMD_EXEC:
++        if(strcasecmp(opt, "maxconn"))
++            break;
++        options.maxconn=atoi(arg);
++            return NULL; /* OK */
++    case CMD_DEFAULT:
++        log_raw("%-15s = 0", "maxconn");
++        break;
++    case CMD_HELP:
++        log_raw("%-15s = maximum number of accepted connections", "maxconn");
++        break;
++    }
++
+     if(cmd==CMD_EXEC)
+         return option_not_found;
+     return NULL; /* OK */
+diff -Naur stunnel.orig/src/prototypes.h stunnel/src/prototypes.h
+--- stunnel.orig/src/prototypes.h	2005-10-27 05:41:28.000000000 -0400
++++ stunnel/src/prototypes.h	2006-07-31 22:49:36.000000000 -0400
+@@ -44,6 +44,7 @@
+ /**************************************** Prototypes for stunnel.c */
+ 
+ extern int num_clients;
++extern int num_conn;
+ 
+ void main_initialize(char *, char *);
+ void main_execute(void);
+@@ -113,6 +114,7 @@
+     long session_timeout;
+     int verify_level;
+     int verify_use_only_my;
++    int maxconn;
+     long ssl_options;
+ 
+         /* some global data for stunnel.c */
+diff -Naur stunnel.orig/src/stunnel.c stunnel/src/stunnel.c
+--- stunnel.orig/src/stunnel.c	2005-11-02 15:18:42.000000000 -0500
++++ stunnel/src/stunnel.c	2006-07-31 21:40:04.000000000 -0400
+@@ -53,6 +53,7 @@
+ #endif
+ 
+ int num_clients=0; /* Current number of clients */
++int num_conn=0;    /* Total number of connections */
+ 
+     /* Functions */
+ 
+@@ -138,6 +139,7 @@
+     }
+ 
+     num_clients=0;
++    num_conn=0;
+ 
+     /* bind local ports */
+     for(opt=local_options.next; opt; opt=opt->next) {
+@@ -222,6 +224,18 @@
+                 return; /* error */
+         }
+     }
++    num_conn++;
++fprintf(stderr, "num_conn: %d\n", num_conn);
++    if (options.maxconn > 0 && num_conn > options.maxconn) {
++        s_log(LOG_WARNING, "Connection rejected: exceeded maxconn (%d>%d)",
++            num_conn, options.maxconn);
++        closesocket(s);
++	if (num_clients == 0) {
++            s_log(LOG_WARNING, "Finished via maxconn.");
++            exit(0);
++	}
++        return;
++    }
+     s_ntop(from_address, &addr);
+     s_log(LOG_DEBUG, "%s accepted FD=%d from %s",
+         opt->servname, s, from_address);

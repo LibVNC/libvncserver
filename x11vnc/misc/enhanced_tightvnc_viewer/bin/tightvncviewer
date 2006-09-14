@@ -1,0 +1,129 @@
+#!/bin/sh
+#
+# Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
+#
+# tightvncviewer:
+#
+#    A wrapper that calls the enhanced TightVNC viewer. 
+#
+# The enhanced TightVNC viewer features are:
+#
+#	- SSL support for connections using the co-bundled stunnel program.
+#	- rfbNewFBSize VNC support (screen resizing)
+#	- cursor alphablending with x11vnc at 32bpp
+#	- xgrabserver support for fullscreen mode (for old window mgrs)
+#
+#
+# Your platform (e.g. Linux.i686) is autodetected and enhanced
+# vncviewer and stunnel binaries for it are used (see the ./bin directory).
+#
+# See the build.unix script if your platform is not in this package if
+# you want to build one.
+#
+# See the build.unix script if your platform is not in this package if you want to build one.
+# You can also set the env. var. UNAME=os.arch to any "os.arch" you want
+# to override the autodetetion.
+#
+# Usage:
+#
+#     tightvncviewer [tightvncviewer-args] hostname:N 
+# or
+#     tightvncviewer -ssl hostname:N [tightvncviewer-args]
+#
+# "hostname:N" is the host and VNC display to connect to, e.g. snoopy:0
+#
+# If the first argument is "-ssl" then ssl_tightvncviewer is called 
+# instead.  See that script for details.
+#
+# See the TightVNC viewer documentation for on its cmdline arguments.
+#
+# For convenience, here is the current (7/2006) TightVNC viewer -help output:
+#
+#       TightVNC viewer version 1.3dev5
+#       
+#       Usage: vncviewer [<OPTIONS>] [<HOST>][:<DISPLAY#>]
+#              vncviewer [<OPTIONS>] [<HOST>][::<PORT#>]
+#              vncviewer [<OPTIONS>] -listen [<DISPLAY#>]
+#              vncviewer -help
+#       
+#       <OPTIONS> are standard Xt options, or:
+#               -via <GATEWAY>
+#               -shared (set by default)
+#               -noshared
+#               -viewonly
+#               -fullscreen
+#               -noraiseonbeep
+#               -passwd <PASSWD-FILENAME> (standard VNC authentication)
+#               -user <USERNAME> (Unix login authentication)
+#               -encodings <ENCODING-LIST> (e.g. "tight copyrect")
+#               -bgr233
+#               -owncmap
+#               -truecolour
+#               -depth <DEPTH>
+#               -compresslevel <COMPRESS-VALUE> (0..9: 0-fast, 9-best)
+#               -quality <JPEG-QUALITY-VALUE> (0..9: 0-low, 9-high)
+#               -nojpeg
+#               -nocursorshape
+#               -x11cursor
+#               -autopass
+#       
+#       Option names may be abbreviated, e.g. -bgr instead of -bgr233.
+#       See the manual page for more information.
+#  
+
+if [ "X$1" = "X-h" -o "X$1" = "X-help" -o "X$1" = "X--help" ]; then
+	head -69 "$0" | grep -v bin/sh
+	exit
+fi
+
+# Include /usr/bin... to be sure to get regular utilities:
+#
+PATH=$PATH:/usr/bin:/bin
+export PATH
+
+# Set this for ssl_vncviewer to pick up:
+#
+VNCVIEWERCMD="vncviewer"
+export VNCVIEWERCMD
+
+# work out os.arch platform string and check for binaries:
+#
+name=$UNAME
+if [ "X$name" = "X" ]; then
+	name=`uname -sm | sed -e 's/ /./'`
+fi
+
+if [ -L "$0" ]; then
+	d=`dirname "\`ls -l "$0" | sed -e 's/^.* -> //'\`"`
+	if echo "$d" | grep '^/' > /dev/null; then
+		dir="$d"
+	else
+		dir="`dirname "$0"`/$d"
+	fi
+else
+	dir=`dirname "$0"`
+fi
+if [ ! -d "$dir/$name" ]; then
+	echo "cannot find platform dir: $dir/$name for your OS:" 
+	uname -sm
+	echo "you can set the \$UNAME env. var. to override the setting."
+	exit 1
+fi
+
+# Put our os.arch and other utils dirs at head of PATH to be sure to
+# pick them up:
+#
+PATH="$dir:$dir/$name:$dir/util:$PATH"
+
+if [ "X$1" = "X-ssl" ]; then
+	shift	
+	ssl_tightvncviewer "$@"
+	exit $?
+fi
+
+STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
+export STUNNEL_EXTRA_OPTS
+
+# Force the use of tight encoding for localhost redir connection:
+#
+vncviewer -encodings 'copyrect tight zrle zlib hextile' "$@"

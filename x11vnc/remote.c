@@ -620,8 +620,6 @@ int remote_control_access_ok(void) {
 #endif	/* NO_X11 */
 }
 
-static int hack_val = 0;
-
 /*
  * Huge, ugly switch to handle all remote commands and queries
  * -remote/-R and -query/-Q.

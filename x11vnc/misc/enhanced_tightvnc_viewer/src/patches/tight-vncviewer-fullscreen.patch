@@ -1,0 +1,42 @@
+--- vnc_unixsrc.orig/vncviewer/fullscreen.c	2003-10-09 05:23:49.000000000 -0400
++++ vnc_unixsrc/vncviewer/fullscreen.c	2004-12-26 21:21:44.000000000 -0500
+@@ -173,9 +173,15 @@
+   XtVaSetValues(popup, XtNoverrideRedirect, True, NULL);
+ 
+   /* Try to get the input focus. */
+-
++ 
++#if 0
+   XSetInputFocus(dpy, DefaultRootWindow(dpy), RevertToPointerRoot,
+ 		 CurrentTime);
++#else
++  XSetInputFocus(dpy, PointerRoot, RevertToPointerRoot,
++                 CurrentTime);
++#endif
++
+ 
+   /* Optionally, grab the keyboard. */
+ 
+@@ -184,6 +190,10 @@
+ 		     GrabModeAsync, CurrentTime) != GrabSuccess) {
+     fprintf(stderr, "XtGrabKeyboard() failed.\n");
+   }
++if (getenv("VNCVIEWER_GRAB_SERVER") != NULL) { /* runge bot of FullScreenOn */
++        fprintf(stderr, "calling XGrabServer(dpy)\n");
++        XGrabServer(dpy);       
++}
+ }
+ 
+ 
+@@ -210,6 +220,11 @@
+ 
+   appData.fullScreen = False;
+ 
++if (getenv("VNCVIEWER_GRAB_SERVER") != NULL) { /* runge top of FullScreenOff */
++        fprintf(stderr, "calling XUngrabServer(dpy)\n");
++        XUngrabServer(dpy);     
++}
++
+   if (appData.grabKeyboard)
+     XtUngrabKeyboard(desktop, CurrentTime);
+ 

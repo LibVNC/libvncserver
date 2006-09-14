@@ -1,0 +1,7 @@
+
+In this directory we have source zip/tgz files in zip/, the patches
+we created in patches/, a temporary build dir (used by build.unix)
+in tmp/, and unpacked sources in vnc_unixsrc/ and stunnel-4.14/ (used
+by the build.unix script).
+
+See the README in the directory one level up for more information.
