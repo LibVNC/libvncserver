@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Fri Sep 15 11:12:28 EDT 2006
+x11vnc README file                         Date: Fri Sep 15 12:06:02 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -10518,7 +10518,10 @@ Options:
                        However, for convenience you can use it to ignore other
                        signals, e.g. "-sigpipe ignore:HUP,INT,TERM" in case
                        that would be useful for some sort of application.
-                       You can also put "exit:.." in there.
+                       You can also put "exit:.." in the list to have x11vnc
+                       cleanup on the listed signals. "-sig" is an alias
+                       for this option if you don't like the 'pipe'. Example:
+                       -sig ignore:INT,TERM,exit:USR1
 
 -threads               Whether or not to use the threaded libvncserver
 -nothreads             algorithm [rfbRunEventLoop] if libpthread is available

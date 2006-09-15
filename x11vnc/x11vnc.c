@@ -2160,7 +2160,7 @@ int main(int argc, char* argv[]) {
 			if (f >= 0.0) {
 				xdamage_memory = f;
 			}
-		} else if (!strcmp(arg, "-sigpipe")) {
+		} else if (!strcmp(arg, "-sigpipe") || !strcmp(arg, "-sig")) {
 			CHECK_ARGC
 			if (known_sigpipe_mode(argv[++i])) {
 				sigpipe = strdup(argv[i]);

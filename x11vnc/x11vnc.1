@@ -2819,7 +2819,10 @@ is doing the correct thing now for quite some time.
 However, for convenience you can use it to ignore other
 signals, e.g. "\fB-sigpipe\fR \fIignore:HUP,INT,TERM\fR" in case
 that would be useful for some sort of application.
-You can also put "exit:.." in there.
+You can also put "exit:.." in the list to have x11vnc
+cleanup on the listed signals. "\fB-sig\fR" is an alias
+for this option if you don't like the 'pipe'. Example:
+\fB-sig\fR ignore:INT,TERM,exit:USR1
 .PP
 \fB-threads,\fR \fB-nothreads\fR
 .IP
