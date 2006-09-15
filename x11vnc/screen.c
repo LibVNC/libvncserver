@@ -880,7 +880,8 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	if (! raw_fb_str) {
 		return NULL;
 	}
-	if (!strcasecmp(raw_fb_str, "NULL") || !strcasecmp(raw_fb_str, "ZERO")) {
+	if (!strcasecmp(raw_fb_str, "NULL") || !strcasecmp(raw_fb_str, "ZERO")
+	    || !strcasecmp(raw_fb_str, "NONE")) {
 		raw_fb_str = strdup("map:/dev/zero@640x480x32");
 	}
 	if (!strcasecmp(raw_fb_str, "RAND")) {

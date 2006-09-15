@@ -584,6 +584,11 @@ if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 
 		try_to_be_nobody();
 #if LIBVNCSERVER_HAVE_GETUID
+		if (0 && db > 1) {
+			/* does not work, writes to pty... */
+			fprintf(stderr, "getuid=%d geteuid=%d\n",
+			    getuid(), geteuid());
+		}
 		if (getuid() == 0 || geteuid() == 0) {
 			exit(1);
 		}
@@ -594,6 +599,11 @@ if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 		set_env("LC_ALL", "C");
 		set_env("LANG", "C");
 		set_env("SHELL", "/bin/sh");
+		if (!cmd && getenv("DISPLAY")) {
+			/* this will cause timeout problems with pam_xauth */
+			char *s = getenv("DISPLAY");
+			if (s) *(s-2) = '_';
+		}
 
 		/* synchronize with parent: */
 		write(2, "C", 1);

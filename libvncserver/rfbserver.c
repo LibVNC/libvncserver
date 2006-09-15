@@ -2971,9 +2971,9 @@ rfbSendNewFBSize(rfbClientPtr cl,
     }
 
     if (cl->PalmVNC==TRUE)
-        rfbLog("Sending a rfbEncodingNewFBSize in response to a PalmVNC  style frameuffer resize request (%dx%d)\n", w, h);
+        rfbLog("Sending rfbEncodingNewFBSize in response to a PalmVNC style framebuffer resize (%dx%d)\n", w, h);
     else
-        rfbLog("Sending a rfbEncodingNewFBSize in response to a UltraVNC style frameuffer resize request (%dx%d)\n", w, h);
+        rfbLog("Sending rfbEncodingNewFBSize for resize to (%dx%d)\n", w, h);
 
     rect.encoding = Swap32IfLE(rfbEncodingNewFBSize);
     rect.r.x = 0;

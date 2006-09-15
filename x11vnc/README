@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Wed Sep 13 21:30:41 EDT 2006
+x11vnc README file                         Date: Fri Sep 15 11:12:28 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -8061,7 +8061,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-13
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-15
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -8160,7 +8160,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-13
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-15
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -8713,20 +8713,31 @@ Options:
 
 -unixpw_nis [list]     As -unixpw above, however do not use su(1) but rather
                        use the traditional getpwnam(3) + crypt(3) method to
-                       verify passwords instead.  This requires that the
-                       encrypted passwords be readable.  Passwords stored
-                       in /etc/shadow will be inaccessible unless x11vnc
-                       is run as root.
+                       verify passwords. All of the above -unixpw options and
+                       contraints apply.
+
+                       This mode requires that the encrypted passwords be
+                       readable.  Encrypted passwords stored in /etc/shadow
+                       will be inaccessible unless x11vnc is run as root.
 
                        This is called "NIS" mode simply because in most
-                       NIS setups the user encrypted passwords are accessible
-                       (e.g. "ypcat passwd").  NIS is not required for this
-                       mode to work (only that getpwnam(3) return the encrypted
-                       password is required), but it is unlikely it will work
-                       for any other modern environment unless x11vnc is run
-                       as root (which, btw, is often done when running x11vnc
-                       from inetd and xdm/gdm/kdm).  All of the -unixpw options
-                       and contraints apply.
+                       NIS setups user encrypted passwords are accessible
+                       (e.g. "ypcat passwd") by an ordinary user and so that
+                       user can authenticate ANY user.
+
+                       NIS is not required for this mode to work (only that
+                       getpwnam(3) return the encrypted password is required),
+                       but it is unlikely it will work for any most modern
+                       environments unless x11vnc is run as root to be able
+                       to access /etc/shadow (note running as root is often
+                       done when running x11vnc from inetd and xdm/gdm/kdm).
+
+                       Looked at another way, if you do not want to use the
+                       su(1) method provided by -unixpw, you can run x11vnc
+                       as root and use -unixpw_nis.  Any users with passwords
+                       in /etc/shadow can then be authenticated.  You may want
+                       to use -users unixpw= to switch the process user after
+                       the user logs in.
 
 -display_WAIT :...      A special usage mode for the normal -display option.
                        Useful with -unixpw, but can be used independently
@@ -10500,8 +10511,15 @@ Options:
                        "ignore" or "exit".  For "ignore" libvncserver
                        will handle the abrupt loss of a client and continue,
                        for "exit" x11vnc will cleanup and exit at the 1st
-                       broken connection.  Default: "ignore".  This option
-                       is obsolete.
+                       broken connection.
+
+                       This option is not really needed since libvncserver
+                       is doing the correct thing now for quite some time.
+                       However, for convenience you can use it to ignore other
+                       signals, e.g. "-sigpipe ignore:HUP,INT,TERM" in case
+                       that would be useful for some sort of application.
+                       You can also put "exit:.." in there.
+
 -threads               Whether or not to use the threaded libvncserver
 -nothreads             algorithm [rfbRunEventLoop] if libpthread is available
                        Default: -nothreads

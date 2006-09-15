@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-09-13
+         version: 0.8.3, lastmod: 2006-09-15
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -692,22 +692,33 @@ use the traditional
 + 
 .IR crypt (3)
 method to
-verify passwords instead.  This requires that the
-encrypted passwords be readable.  Passwords stored
-in /etc/shadow will be inaccessible unless x11vnc
-is run as root.
+verify passwords. All of the above \fB-unixpw\fR options and
+contraints apply.
+.IP
+This mode requires that the encrypted passwords be
+readable.  Encrypted passwords stored in /etc/shadow
+will be inaccessible unless x11vnc is run as root.
 .IP
 This is called "NIS" mode simply because in most
-NIS setups the user encrypted passwords are accessible
-(e.g. "ypcat passwd").  NIS is not required for this
-mode to work (only that 
+NIS setups user encrypted passwords are accessible
+(e.g. "ypcat passwd") by an ordinary user and so that
+user can authenticate ANY user.
+.IP
+NIS is not required for this mode to work (only that
 .IR getpwnam (3)
-return the encrypted
-password is required), but it is unlikely it will work
-for any other modern environment unless x11vnc is run
-as root (which, btw, is often done when running x11vnc
-from inetd and xdm/gdm/kdm).  All of the \fB-unixpw\fR options
-and contraints apply.
+return the encrypted password is required),
+but it is unlikely it will work for any most modern
+environments unless x11vnc is run as root to be able
+to access /etc/shadow (note running as root is often
+done when running x11vnc from inetd and xdm/gdm/kdm).
+.IP
+Looked at another way, if you do not want to use the
+.IR su (1)
+method provided by \fB-unixpw,\fR you can run x11vnc
+as root and use \fB-unixpw_nis.\fR  Any users with passwords
+in /etc/shadow can then be authenticated.  You may want
+to use \fB-users\fR unixpw= to switch the process user after
+the user logs in.
 .PP
 \fB-display\fR \fIWAIT:...\fR
 .IP
@@ -2801,8 +2812,14 @@ Broken pipe (SIGPIPE) handling.  \fIstring\fR can be
 "ignore" or "exit".  For "ignore" libvncserver
 will handle the abrupt loss of a client and continue,
 for "exit" x11vnc will cleanup and exit at the 1st
-broken connection.  Default: "ignore".  This option
-is obsolete.
+broken connection.
+.IP
+This option is not really needed since libvncserver
+is doing the correct thing now for quite some time.
+However, for convenience you can use it to ignore other
+signals, e.g. "\fB-sigpipe\fR \fIignore:HUP,INT,TERM\fR" in case
+that would be useful for some sort of application.
+You can also put "exit:.." in there.
 .PP
 \fB-threads,\fR \fB-nothreads\fR
 .IP
