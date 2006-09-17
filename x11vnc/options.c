@@ -150,6 +150,7 @@ int noxrecord = 0;
 
 char *client_connect = NULL;	/* strings for -connect option */
 char *client_connect_file = NULL;
+int connect_or_exit = 0;
 int vnc_connect = 1;		/* -vncconnect option */
 
 int show_cursor = 1;		/* show cursor shapes */
@@ -326,6 +327,7 @@ int debug_pointer = 0;
 int debug_keyboard = 0;
 
 int quiet = 0;
+int verbose = 0;
 
 /* threaded vs. non-threaded (default) */
 #if LIBVNCSERVER_HAVE_LIBPTHREAD && defined(X11VNC_THREADED)
@@ -336,6 +338,7 @@ int use_threads = 0;
 
 /* info about command line opts */
 int got_rfbport = 0;
+int got_rfbport_val = -1;
 int got_alwaysshared = 0;
 int got_nevershared = 0;
 int got_cursorpos = 0;

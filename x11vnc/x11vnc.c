@@ -1625,12 +1625,16 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-http_ssl")) {
 			try_http = 1;
 			http_ssl = 1;
-		} else if (!strcmp(arg, "-connect")) {
+		} else if (!strcmp(arg, "-connect") ||
+		    !strcmp(arg, "-connect_or_exit")) {
 			CHECK_ARGC
 			if (strchr(argv[++i], '/')) {
 				client_connect_file = strdup(argv[i]);
 			} else {
 				client_connect = strdup(argv[i]);
+			}
+			if (!strcmp(arg, "-connect_or_exit")) {
+				connect_or_exit = 1;
 			}
 		} else if (!strcmp(arg, "-vncconnect")) {
 			vnc_connect = 1;
@@ -1887,6 +1891,8 @@ int main(int argc, char* argv[]) {
 			crash_debug = 0;
 		} else if (!strcmp(arg, "-q") || !strcmp(arg, "-quiet")) {
 			quiet = 1;
+		} else if (!strcmp(arg, "-v") || !strcmp(arg, "-verbose")) {
+			verbose = 1;
 		} else if (!strcmp(arg, "-bg") || !strcmp(arg, "-background")) {
 #if LIBVNCSERVER_HAVE_SETSID
 			bg = 1;
@@ -2306,7 +2312,8 @@ int main(int argc, char* argv[]) {
 				got_deferupdate = 1;
 			}
 			if (!strcmp(arg, "-rfbport") && i < argc-1) {
-				got_rfbport = atoi(argv[i+1]);
+				got_rfbport = 1;
+				got_rfbport_val = atoi(argv[i+1]);
 			}
 			if (!strcmp(arg, "-alwaysshared ")) {
 				got_alwaysshared = 1;
@@ -2710,7 +2717,6 @@ int main(int argc, char* argv[]) {
 		if (use_stunnel) {
 			exit(1);
 		}
-		/* others? */
 	}
 
 	if (flip_byte_order && using_shm && ! quiet) {
@@ -2790,7 +2796,9 @@ int main(int argc, char* argv[]) {
 	initialize_crash_handler();
 
 	if (! quiet) {
-		print_settings(try_http, bg, gui_str);
+		if (verbose) {
+			print_settings(try_http, bg, gui_str);
+		}
 	} else {
 		rfbLogEnable(0);
 	}
@@ -2907,7 +2915,7 @@ int main(int argc, char* argv[]) {
 	scr = DefaultScreen(dpy);
 	rootwin = RootWindow(dpy, scr);
 
-	if (! quiet) {
+	if (! quiet && ! raw_fb_str) {
 		rfbLog("\n");
 		rfbLog("------------------ USEFUL INFORMATION ------------------\n");
 	}
@@ -2938,7 +2946,7 @@ int main(int argc, char* argv[]) {
 
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 	if (! XFixesQueryExtension(dpy, &xfixes_base_event_type, &er)) {
-		if (! quiet) {
+		if (! quiet && ! raw_fb_str) {
 			rfbLog("Disabling XFIXES mode: display does not "
 			    "support it.\n");
 		}
@@ -2954,7 +2962,7 @@ int main(int argc, char* argv[]) {
 
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (! XDamageQueryExtension(dpy, &xdamage_base_event_type, &er)) {
-		if (! quiet) {
+		if (! quiet && ! raw_fb_str) {
 			rfbLog("Disabling X DAMAGE mode: display does not "
 			    "support it.\n");
 		}
@@ -2967,14 +2975,14 @@ int main(int argc, char* argv[]) {
 	if (! xdamage_present) {
 		use_xdamage = 0;
 	}
-	if (! quiet && xdamage_present && use_xdamage) {
+	if (! quiet && xdamage_present && use_xdamage && ! raw_fb_str) {
 		rfbLog("X DAMAGE available on display, using it for"
 		    " polling hints.\n");
 		rfbLog("  To disable this behavior use: "
 		    "'-noxdamage'\n");
 	}
 
-	if (! quiet && wireframe) {
+	if (! quiet && wireframe && ! raw_fb_str) {
 		rfbLog("Wireframing: -wireframe mode is in effect for window "
 		    "moves.\n");
 		rfbLog("  If this yields undesired behavior (poor response, "
@@ -2999,7 +3007,7 @@ int main(int argc, char* argv[]) {
 	overlay_present = 0;
 #if defined(SOLARIS_OVERLAY) && !NO_X11
 	if (! XQueryExtension(dpy, "SUN_OVL", &maj, &ev, &er)) {
-		if (! quiet && overlay) {
+		if (! quiet && overlay && ! raw_fb_str) {
 			rfbLog("Disabling -overlay: SUN_OVL "
 			    "extension not available.\n");
 		}
@@ -3009,7 +3017,7 @@ int main(int argc, char* argv[]) {
 #endif
 #if defined(IRIX_OVERLAY) && !NO_X11
 	if (! XReadDisplayQueryExtension(dpy, &ev, &er)) {
-		if (! quiet && overlay) {
+		if (! quiet && overlay && ! raw_fb_str) {
 			rfbLog("Disabling -overlay: IRIX ReadDisplay "
 			    "extension not available.\n");
 		}
@@ -3032,7 +3040,7 @@ int main(int argc, char* argv[]) {
 			free(multiple_cursors_mode);
 			multiple_cursors_mode = strdup("most");
 
-			if (! quiet) {
+			if (! quiet && ! raw_fb_str) {
 				rfbLog("XFIXES available on display, resetting"
 				    " cursor mode\n");
 				rfbLog("  to: '-cursor most'.\n");
@@ -3044,7 +3052,7 @@ int main(int argc, char* argv[]) {
 		if(!strcmp(multiple_cursors_mode, "most")) {
 			if (xfixes_present && use_xfixes &&
 			    overlay_cursor == 1) {
-				if (! quiet) {
+				if (! quiet && ! raw_fb_str) {
 					rfbLog("using XFIXES for cursor "
 					    "drawing.\n");
 				}
@@ -3055,7 +3063,7 @@ int main(int argc, char* argv[]) {
 
 	if (overlay) {
 		using_shm = 0;
-		if (flash_cmap && ! quiet) {
+		if (flash_cmap && ! quiet && ! raw_fb_str) {
 			rfbLog("warning: -flashcmap may be "
 			    "incompatible with -overlay\n");
 		}
@@ -3082,7 +3090,7 @@ int main(int argc, char* argv[]) {
 
 	/* check for XTEST */
 	if (! XTestQueryExtension_wr(dpy, &ev, &er, &maj, &min)) {
-		if (! quiet) {
+		if (! quiet && ! raw_fb_str) {
 			rfbLog("WARNING: XTEST extension not available "
 			    "(either missing from\n");
 			rfbLog("  display or client library libXtst "
@@ -3149,7 +3157,7 @@ int main(int argc, char* argv[]) {
 #if !LIBVNCSERVER_HAVE_RECORD
 	tmpi = 0;
 #endif
-	if (! quiet && tmpi) {
+	if (! quiet && tmpi && ! raw_fb_str) {
 		rfbLog("Scroll Detection: -scrollcopyrect mode is in effect "
 		    "to\n");
 		rfbLog("  use RECORD extension to try to detect scrolling "
@@ -3183,12 +3191,12 @@ int main(int argc, char* argv[]) {
 	if (! XShmQueryExtension_wr(dpy)) {
 		xshm_present = 0;
 		if (! using_shm) {
-			if (! quiet) {
+			if (! quiet && ! raw_fb_str) {
 				rfbLog("info: display does not support"
 				    " XShm.\n");
 			}
 		} else {
-		    if (! quiet) {
+		    if (! quiet && ! raw_fb_str) {
 			rfbLog("warning: XShm extension is not available.\n");
 			rfbLog("For best performance the X Display should be"
 			    " local. (i.e.\n");
@@ -3212,7 +3220,7 @@ int main(int argc, char* argv[]) {
 	initialize_xkb();
 	initialize_watch_bell();
 	if (!xkb_present && use_xkb_modtweak) {
-		if (! quiet) {
+		if (! quiet && ! raw_fb_str) {
 			rfbLog("warning: disabling xkb modtweak."
 			    " XKEYBOARD ext. not present.\n");
 		}
@@ -3228,7 +3236,7 @@ int main(int argc, char* argv[]) {
 
 #if LIBVNCSERVER_HAVE_LIBXRANDR
 	if (! XRRQueryExtension(dpy, &xrandr_base_event_type, &er)) {
-		if (xrandr && ! quiet) {
+		if (xrandr && ! quiet && ! raw_fb_str) {
 			rfbLog("Disabling -xrandr mode: display does not"
 			    " support X RANDR.\n");
 		}
@@ -3242,7 +3250,7 @@ int main(int argc, char* argv[]) {
 
 	check_pm();
 
-	if (! quiet) {
+	if (! quiet && ! raw_fb_str) {
 		rfbLog("--------------------------------------------------------\n");
 		rfbLog("\n");
 	}
@@ -3337,9 +3345,13 @@ int main(int argc, char* argv[]) {
 	}
 	if (! inetd && ! use_openssl) {
 		if (! screen->port || screen->listenSock < 0) {
-			rfbLogEnable(1);
-			rfbLog("Error: could not obtain listening port.\n");
-			clean_up_exit(1);
+			if (got_rfbport && got_rfbport_val == 0) {
+				;
+			} else {
+				rfbLogEnable(1);
+				rfbLog("Error: could not obtain listening port.\n");
+				clean_up_exit(1);
+			}
 		}
 	}
 	if (! quiet) {

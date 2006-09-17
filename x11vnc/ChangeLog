@@ -1,3 +1,9 @@
+2006-09-17  Karl Runge <runge@karlrunge.com>
+	* x11vnc: move some info printout to -v, -verbose mode.  Add 
+	  -connect_or_exit option.  Have -rfbport 0 lead to no TCP
+	  listening.  Eliminate double certificates in .pem files.
+	  Always print SSL certificate to the screen to aid pasting.
+
 2006-09-15  Karl Runge <runge@karlrunge.com>
 	* x11vnc: allow user set signals to ignore, clear DISPLAY in 
 	  -unixpw su_verify. -rawfb none same as null. 

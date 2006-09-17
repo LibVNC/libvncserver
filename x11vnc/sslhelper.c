@@ -146,9 +146,35 @@ char *get_saved_pem(char *save, int create) {
 			}
 		}
 		return new;
-	} else {
-		return strdup(path);
 	}
+
+	if (! quiet) {
+		char line[1024];
+		int on = 0;
+		FILE *in = fopen(path, "r");
+		if (in != NULL) {
+			rfbLog("\n");
+			rfbLog("Using SSL Certificate:\n");
+			fprintf(stderr, "\n");
+			while (fgets(line, 1024, in) != NULL) {
+				if (strstr(line, "BEGIN CERTIFICATE")) {
+					on = 1;
+				}
+				if (on) {
+					fprintf(stderr, "%s", line);
+				}
+				if (strstr(line, "END CERTIFICATE")) {
+					on = 0;
+				}
+				if (strstr(line, "PRIVATE KEY")) {
+					on = 0;
+				}
+			}
+			fprintf(stderr, "\n");
+			fclose(in);
+		}
+	}
+	return strdup(path);
 }
 
 static char *get_input(char *tag, char **in) {
@@ -441,14 +467,17 @@ static char *create_tmp_pem(char *pathin, int prompt) {
 			return NULL;
 		}
 		while (fgets(line, 1024, in) != NULL) {
-			if (strstr(line, "-----BEGIN CERTIFICATE-----")) {
+			if (strstr(line, "BEGIN CERTIFICATE")) {
 				on = 1;
 			}
 			fprintf(out, "%s", line);
 			if (on) {
 				fprintf(crt, "%s", line);
 			}
-			if (strstr(line, "-----END CERTIFICATE-----")) {
+			if (strstr(line, "END CERTIFICATE")) {
+				on = 0;
+			}
+			if (strstr(line, "PRIVATE KEY")) {
 				on = 0;
 			}
 		}

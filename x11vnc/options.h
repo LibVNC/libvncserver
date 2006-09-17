@@ -125,6 +125,7 @@ extern int noxrecord;
 
 extern char *client_connect;
 extern char *client_connect_file;
+extern int connect_or_exit;
 extern int vnc_connect;
 
 extern int show_cursor;
@@ -247,10 +248,12 @@ extern int debug_pointer;
 extern int debug_keyboard;
 
 extern int quiet;
+extern int verbose;
 
 extern int use_threads;
 
 extern int got_rfbport;
+extern int got_rfbport_val;
 extern int got_alwaysshared;
 extern int got_nevershared;
 extern int got_cursorpos;

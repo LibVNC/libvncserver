@@ -1587,6 +1587,9 @@ static int do_reverse_connect(char *str) {
 	free(host);
 
 	if (cl == NULL) {
+		if (quiet && connect_or_exit) {
+			rfbLogEnable(1);
+		}
 		rfbLog("reverse_connect: %s failed\n", str);
 		return 0;
 	} else {
@@ -1609,6 +1612,7 @@ void reverse_connect(char *str) {
 	int sleep_between_host = 300;
 	int sleep_min = 1500, sleep_max = 4500, n_max = 5;
 	int n, tot, t, dt = 100, cnt = 0;
+	int nclients0 = client_count;
 
 	if (unixpw_in_progress) return;
 
@@ -1634,6 +1638,11 @@ void reverse_connect(char *str) {
 	free(tmp);
 
 	if (cnt == 0) {
+		if (connect_or_exit) {
+			rfbLogEnable(1);
+			rfbLog("exiting under -connect_or_exit\n");
+			clean_up_exit(0);
+		}
 		return;
 	}
 
@@ -1653,8 +1662,22 @@ void reverse_connect(char *str) {
 	t = 0;
 	while (t < tot) {
 		rfbPE(-1);
+		rfbPE(-1);
 		usleep(dt * 1000);
 		t += dt;
+	}
+	if (connect_or_exit) {
+		if (client_count <= nclients0)  {
+			for (t = 0; t < 10; t++) {
+				rfbPE(-1);
+				usleep(100 * 1000);
+			}
+		}
+		if (client_count <= nclients0)  {
+			rfbLogEnable(1);
+			rfbLog("exiting under -connect_or_exit\n");
+			clean_up_exit(0);
+		}
 	}
 }
 

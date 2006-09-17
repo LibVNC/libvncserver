@@ -554,7 +554,9 @@ static void setup_cursors(void) {
 	int i, j, n = 0;
 	static int first = 1;
 
-	rfbLog("setting up %d cursors...\n", CURS_MAX);
+	if (verbose) {
+		rfbLog("setting up %d cursors...\n", CURS_MAX);
+	}
 
 	if (first) {
 		for (i=0; i<CURS_MAX; i++) {
@@ -814,7 +816,9 @@ static void setup_cursors(void) {
 	if (screen) {
 		UNLOCK(screen->cursorMutex);
 	}
-	rfbLog("  done.\n");
+	if (verbose) {
+		rfbLog("  done.\n");
+	}
 	rfbLog("\n");
 }
 

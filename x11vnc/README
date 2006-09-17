@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Fri Sep 15 12:06:02 EDT 2006
+x11vnc README file                         Date: Sun Sep 17 13:31:31 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -4001,9 +4001,14 @@ ied)
    [494]scrollcopyrect FAQ below) provide schemes to sweep this problem
    under the rug for window moves or resizes and for some (but not all)
    window scrolls. These are the preferred way of avoiding the "lurching"
-   problem, contact me if they are not working. (Note on SuSE the RECORD
-   X extension used by scrollcopyrect is not enabled by default, turn it
-   on in xorg.conf)
+   problem, contact me if they are not working. Note on SuSE and some
+   other distros the RECORD X extension used by scrollcopyrect is not
+   enabled by default, turn it on in xorg.conf:
+Section "Module"
+        ...
+        Load  "record"
+        ...
+EndSection
 
 
    Q-65: Why not do something like wireframe animations to avoid the
@@ -4131,7 +4136,12 @@ ied)
    protocol between the X client with the focus window and the X server.
    This extension is usually present on most X servers (but SuSE disables
    it for some reason). On XFree86/Xorg it can be enabled via Load
-   "record" in the Module section of the config file if it isn't already.
+   "record" in the Module section of the config file if it isn't already:
+Section "Module"
+        ...
+        Load  "record"
+        ...
+EndSection
 
    Currently the RECORD extension is used as little as possible so as to
    not slow down regular use. Only simple heuristics are applied to
@@ -8061,7 +8071,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-15
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-17
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -8072,61 +8082,62 @@ x11vnc options:
   -viewonly                -shared                  -once                  
   -forever                 -loop                    -timeout n             
   -inetd                   -nofilexfer              -http                  
-  -http_ssl                -connect string          -vncconnect            
-  -novncconnect            -allow host1[,host2..]   -localhost             
-  -nolookup                -input string            -grabkbd               
-  -grabptr                 -viewpasswd string       -passwdfile filename   
-  -unixpw [list]           -unixpw_nis [list]       -display WAIT:...      
-  -ssl [pem]               -ssltimeout n            -ssldir [dir]          
-  -sslverify [path]        -sslGenCA [dir]          -sslGenCert type name  
-  -sslEncKey [pem]         -sslCertInfo [pem]       -sslDelCert [pem]      
-  -stunnel [pem]           -stunnel3  [pem]         -https [port]          
-  -usepw                   -storepasswd pass file   -nopw                  
-  -accept string           -afteraccept string      -gone string           
-  -users list              -noshm                   -flipbyteorder         
-  -onetile                 -solid [color]           -blackout string       
-  -xinerama                -noxinerama              -xtrap                 
-  -xrandr [mode]           -rotate string           -padgeom WxH           
-  -o logfile               -flag file               -rc filename           
-  -norc                    -env VAR=VALUE           -h, -help              
-  -?, -opts                -V, -version             -license               
-  -dbg                     -q                       -bg                    
-  -modtweak                -nomodtweak              -xkb                   
-  -noxkb                   -capslock                -skip_lockkeys         
-  -skip_keycodes string    -sloppy_keys             -skip_dups             
-  -noskip_dups             -add_keysyms             -noadd_keysyms         
-  -clear_mods              -clear_keys              -remap string          
-  -norepeat                -repeat                  -nofb                  
-  -nobell                  -nosel                   -noprimary             
-  -nosetprimary            -noclipboard             -nosetclipboard        
-  -seldir string           -cursor [mode]           -nocursor              
-  -arrow n                 -noxfixes                -alphacut n            
-  -alphafrac fraction      -alpharemove             -noalphablend          
-  -nocursorshape           -cursorpos               -nocursorpos           
-  -xwarppointer            -buttonmap string        -nodragging            
-  -wireframe [str]         -nowireframe             -wirecopyrect mode     
-  -nowirecopyrect          -debug_wireframe         -scrollcopyrect mode   
-  -noscrollcopyrect        -scr_area n              -scr_skip list         
-  -scr_inc list            -scr_keys list           -scr_term list         
-  -scr_keyrepeat lo-hi     -scr_parms string        -fixscreen string      
-  -debug_scroll            -noxrecord               -grab_buster           
-  -nograb_buster           -debug_grabs             -debug_sel             
-  -pointer_mode n          -input_skip n            -allinput              
-  -speeds rd,bw,lat        -wmdt string             -debug_pointer         
-  -debug_keyboard          -defer time              -wait time             
-  -wait_ui factor          -nowait_bog              -slow_fb time          
-  -readtimeout n           -nap                     -nonap                 
-  -sb time                 -nofbpm                  -fbpm                  
-  -noxdamage               -xd_area A               -xd_mem f              
-  -sigpipe string          -threads                 -nothreads             
-  -fs f                    -gaps n                  -grow n                
-  -fuzz n                  -debug_tiles             -snapfb                
-  -rawfb string            -freqtab file            -pipeinput cmd         
-  -gui [gui-opts]          -remote command          -query variable        
-  -QD variable             -sync                    -noremote              
-  -yesremote               -unsafe                  -safer                 
-  -privremote              -nocmds                  -allowedcmds list      
-  -deny_all              
+  -http_ssl                -connect string          -connect_or_exit str   
+  -vncconnect              -novncconnect            -allow host1[,host2..] 
+  -localhost               -nolookup                -input string          
+  -grabkbd                 -grabptr                 -viewpasswd string     
+  -passwdfile filename     -unixpw [list]           -unixpw_nis [list]     
+  -display WAIT:...        -ssl [pem]               -ssltimeout n          
+  -ssldir [dir]            -sslverify [path]        -sslGenCA [dir]        
+  -sslGenCert type name    -sslEncKey [pem]         -sslCertInfo [pem]     
+  -sslDelCert [pem]        -stunnel [pem]           -stunnel3  [pem]       
+  -https [port]            -usepw                   -storepasswd pass file 
+  -nopw                    -accept string           -afteraccept string    
+  -gone string             -users list              -noshm                 
+  -flipbyteorder           -onetile                 -solid [color]         
+  -blackout string         -xinerama                -noxinerama            
+  -xtrap                   -xrandr [mode]           -rotate string         
+  -padgeom WxH             -o logfile               -flag file             
+  -rc filename             -norc                    -env VAR=VALUE         
+  -h, -help                -?, -opts                -V, -version           
+  -license                 -dbg                     -q, -quiet             
+  -v, -verbose             -bg                      -modtweak              
+  -nomodtweak              -xkb                     -noxkb                 
+  -capslock                -skip_lockkeys           -skip_keycodes string  
+  -sloppy_keys             -skip_dups               -noskip_dups           
+  -add_keysyms             -noadd_keysyms           -clear_mods            
+  -clear_keys              -remap string            -norepeat              
+  -repeat                  -nofb                    -nobell                
+  -nosel                   -noprimary               -nosetprimary          
+  -noclipboard             -nosetclipboard          -seldir string         
+  -cursor [mode]           -nocursor                -arrow n               
+  -noxfixes                -alphacut n              -alphafrac fraction    
+  -alpharemove             -noalphablend            -nocursorshape         
+  -cursorpos               -nocursorpos             -xwarppointer          
+  -buttonmap string        -nodragging              -wireframe [str]       
+  -nowireframe             -wirecopyrect mode       -nowirecopyrect        
+  -debug_wireframe         -scrollcopyrect mode     -noscrollcopyrect      
+  -scr_area n              -scr_skip list           -scr_inc list          
+  -scr_keys list           -scr_term list           -scr_keyrepeat lo-hi   
+  -scr_parms string        -fixscreen string        -debug_scroll          
+  -noxrecord               -grab_buster             -nograb_buster         
+  -debug_grabs             -debug_sel               -pointer_mode n        
+  -input_skip n            -allinput                -speeds rd,bw,lat      
+  -wmdt string             -debug_pointer           -debug_keyboard        
+  -defer time              -wait time               -wait_ui factor        
+  -nowait_bog              -slow_fb time            -readtimeout n         
+  -nap                     -nonap                   -sb time               
+  -nofbpm                  -fbpm                    -noxdamage             
+  -xd_area A               -xd_mem f                -sigpipe string        
+  -threads                 -nothreads               -fs f                  
+  -gaps n                  -grow n                  -fuzz n                
+  -debug_tiles             -snapfb                  -rawfb string          
+  -freqtab file            -pipeinput cmd           -gui [gui-opts]        
+  -remote command          -query variable          -QD variable           
+  -sync                    -noremote                -yesremote             
+  -unsafe                  -safer                   -privremote            
+  -nocmds                  -allowedcmds list        -deny_all              
+
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -8160,7 +8171,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-15
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-17
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -8485,8 +8496,14 @@ Options:
                        If "string" contains "/" it is instead interpreted
                        as a file to periodically check for new hosts.
                        The first line is read and then the file is truncated.
-                       Be careful for this usage mode if x11vnc is running as
-                       root (e.g. via gdm(1), etc).
+                       Be careful about the location of this file if x11vnc
+                       is running as root (e.g. via gdm(1), etc).
+
+-connect_or_exit str   As with -connect, except if none of the reverse
+                       connections succeed, then x11vnc shutdowns immediately.
+
+                       If you do not want x11vnc to listen on ANY interface
+                       use -rfbport 0
 
 -vncconnect            Monitor the VNC_CONNECT X property set by the standard
 -novncconnect          VNC program vncconnect(1).  When the property is
@@ -8518,6 +8535,11 @@ Options:
                        the -listen interface you may need to manually adjust
                        the -allow list (and vice versa) to avoid situations
                        where no connections (or too many) are allowed.
+
+                       If you do not want x11vnc to listen on ANY interface
+                       (evidently you are using -connect or -connect_or_exit,
+                       or plan to use remote control: -R connect:host), use
+                       -rfbport 0
 
 -nolookup              Do not use gethostbyname() or gethostbyaddr() to look up
                        host names or IP numbers.  Use this if name resolution
@@ -9676,8 +9698,10 @@ Options:
 -dbg                   Instead of exiting after cleaning up, run a simple
                        "debug crash shell" when fatal errors are trapped.
 
--q                     Be quiet by printing less informational output to
-                       stderr.  Same as -quiet.
+-q, -quiet             Be quiet by printing less informational output to
+                       stderr.
+-v, -verbose           Print out more information to stderr.
+
 -bg                    Go into the background after screen setup.  Messages to
                        stderr are lost unless -o logfile is used.  Something
                        like this could be useful in a script:

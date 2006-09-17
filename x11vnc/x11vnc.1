@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-09-15
+         version: 0.8.3, lastmod: 2006-09-17
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -409,10 +409,18 @@ your environment before starting x11vnc.
 If \fIstring\fR contains "/" it is instead interpreted
 as a file to periodically check for new hosts.
 The first line is read and then the file is truncated.
-Be careful for this usage mode if x11vnc is running as
-root (e.g. via 
+Be careful about the location of this file if x11vnc
+is running as root (e.g. via 
 .IR gdm (1)
 , etc).
+.PP
+\fB-connect_or_exit\fR \fIstr\fR
+.IP
+As with \fB-connect,\fR except if none of the reverse
+connections succeed, then x11vnc shutdowns immediately.
+.IP
+If you do not want x11vnc to listen on ANY interface
+use \fB-rfbport\fR 0
 .PP
 \fB-vncconnect,\fR \fB-novncconnect\fR
 .IP
@@ -455,6 +463,11 @@ you use the remote control mechanism (-R) to change
 the \fB-listen\fR interface you may need to manually adjust
 the \fB-allow\fR list (and vice versa) to avoid situations
 where no connections (or too many) are allowed.
+.IP
+If you do not want x11vnc to listen on ANY interface
+(evidently you are using \fB-connect\fR or \fB-connect_or_exit,\fR
+or plan to use remote control: \fB-R\fR connect:host), use
+\fB-rfbport\fR 0
 .PP
 \fB-nolookup\fR
 .IP
@@ -1788,10 +1801,14 @@ Print out license information.  Same as \fB-copying\fR and
 Instead of exiting after cleaning up, run a simple
 "debug crash shell" when fatal errors are trapped.
 .PP
-\fB-q\fR
+\fB-q,\fR \fB-quiet\fR
 .IP
 Be quiet by printing less informational output to
-stderr.  Same as \fB-quiet.\fR
+stderr.
+.PP
+\fB-v,\fR \fB-verbose\fR
+.IP
+Print out more information to stderr.
 .PP
 \fB-bg\fR
 .IP
