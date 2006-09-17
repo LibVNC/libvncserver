@@ -30,7 +30,7 @@ proc apply_bg {w} {
 }
 
 proc scroll_text {fr {w 80} {h 35}} {
-	global help_font is_windows
+	global help_font is_windows scroll_text_focus
 
 	catch {destroy $fr}
 	
@@ -45,7 +45,9 @@ proc scroll_text {fr {w 80} {h 35}} {
 	pack $fr.y -side right -fill y
 	pack $fr.t -side top -fill both -expand 1
 
-	focus $fr.t
+	if {$scroll_text_focus} {
+		focus $fr.t
+	}
 }
 
 proc scroll_text_dismiss {fr {w 80} {h 35}} {
@@ -135,6 +137,13 @@ proc help {} {
     where it will print out its automatically generated certificate to
     the screen and that can be safely copied to the viewer side.
 
+    You can also use the "Create Certificate" feature of this program
+    under "Certs ...".  Just click on it and follow the instructions in
+    the dialog.  Then copy the cert file to the VNC Server and specify the
+    other one in the "Certs ..." dialog.  Alternatively you can use the
+    "Import Certificate" action to paste in a certificate or read one in
+    from a file.
+
 
     To set other Options, e.g. to use SSH instead of STUNNEL SSL,
     click on the "Options ..." button and read the Help there.
@@ -156,7 +165,7 @@ proc help {} {
      2) If you use "user@hostname cmd=SHELL" then you get an SSH shell only:
         no VNC viewer will be launched.  On Windows "user@hostname cmd=PUTTY"
         will try to use putty.exe (better terminal emulation than plink.exe)
-        A shortcut for this is Ctrl-S.
+        A shortcut for this is Ctrl-S as long as user@hostname is present.
 }
 
 	.h.f.t insert end $msg
@@ -178,9 +187,21 @@ proc help_certs {} {
     Only with SSL Certificate verification can Man In the Middle attacks be
     prevented. Otherwise, only passive snooping attacks are prevented with SSL.
 
+    The SSL Certificate files described below can have been created externally
+    (e.g. by x11vnc), you can import it via "Import Certificate" if you like.
+    OR you can click on "Create Certificate ..." to use this program to generate a
+    Certificate + Private Key pair.  In that case you will need to distribute one
+    of the generated files to the VNC Server.
+
+
+    Your Certificate + Key:
+
     You can specify your own SSL certificate (PEM) file in "MyCert" in which case it
     is used to authenticate you (the viewer) to the remote VNC Server.  If this fails
     the remote VNC Server will drop the connection.
+
+
+    Server Certificates:
     
     Server certs can be specified in one of two ways:
     
@@ -189,7 +210,6 @@ proc help_certs {} {
     
         - A directory of certificate (PEM) files stored in
           the special OpenSSL hash fashion.
-    
     
     The former is set via "ServerCert" in this gui.
     The latter is set via "CertsDir" in this gui.
@@ -201,6 +221,11 @@ proc help_certs {} {
     If the remote VNC Server fails to authenticate itself with respect to the specified
     certificate(s), then the VNC Viewer (your side) will drop the connection.
 
+
+    Select which file or directory by clicking on the appropriate "Browse..."  button.
+    Once selected, if you click the Right Mouse button on the "Browse..."  button then
+    information about the certificate will be displayed.
+
     If "Use SSH instead" has been selected then SSL certs are disabled.
 
     See the x11vnc and STUNNEL documentation for how to create and use PEM
@@ -209,6 +234,18 @@ proc help_certs {} {
         http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-ext
         http://www.karlrunge.com/x11vnc/ssl.html
         http://www.stunnel.org
+
+    A common way to create and use a VNC Server certificate is:
+
+        x11vnc -ssl SAVE ...
+
+    and then copy the Server certificate to the local (viewer-side) machine.
+    x11vnc prints out the the screen the Server certificate it generates.
+    You can set "ServerCert" to it directly or use the "Import Certificate"
+    action to save it to a file.
+
+    x11vnc also has command line utilities to create server, client, and CA
+    (Certificate Authority) certificates.  See the above URLs.
 }
 
 	.ch.f.t insert end $msg
@@ -261,7 +298,7 @@ set msg {
             Trick: If you use "cmd=SHELL" then you get an SSH shell only:
             no VNC viewer will be launched.  On Windows "cmd=PUTTY" will
             try to use putty.exe (better terminal emulation than plink.exe)
-            Ctrl-S is a shortcut for this.
+            A shortcut for this is Ctrl-S as long as user@hostname is present.
 
   Use SSH and SSL: Tunnel the SSL connection through a SSH tunnel.  Use this
             if you want end-to-end SSL and must use a SSH gateway (e.g. to
@@ -1029,7 +1066,16 @@ proc launch_windows_ssh {hp file n} {
 	catch {destroy .o}
 	catch {destroy .oa}
 
-	do_port_knock $ssh_host
+	if { ![do_port_knock $ssh_host]} {
+		catch {file delete $file}
+		if {$file_cmd != ""} {
+			catch {file delete $file_cmd}
+		}
+		if {$file_pre != ""} {
+			catch {file delete $file_pre}
+		}
+		return 0
+	}
 
 	if {$is_win9x} {
 		wm withdraw .
@@ -1314,7 +1360,9 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 			set c "$c -sshargs '$smb_redir_0'"
 		}
 
-		do_port_knock $pk_hp
+		if {! [do_port_knock $pk_hp]} {
+			return
+		}
 		set did_port_knock 1
 
 		if {$use_smbmnt} {
@@ -1457,7 +1505,9 @@ proc launch_unix {hp} {
 				set pk_hp $hp
 			}
 			if {! $did_port_knock} {
-				do_port_knock $pk_hp
+				if {! [do_port_knock $pk_hp]} {
+					return
+				}
 				set did_port_knock 1
 			}
 
@@ -1562,7 +1612,10 @@ proc launch_unix {hp} {
 		set pk_hp $hp
 	}
 	if {! $did_port_knock} {
-		do_port_knock $pk_hp
+		if {! [do_port_knock $pk_hp]} {
+			wm deiconify .
+			return
+		}
 		set did_port_knock 1
 	}
 
@@ -1846,6 +1899,8 @@ proc launch {{hp ""}} {
 		after 1000
 	}
 
+	set fail 0
+
 	set fh [open $file "w"]
 
 	puts $fh "client = yes"
@@ -1859,7 +1914,7 @@ proc launch {{hp ""}} {
 		if {! [file exists $mycert]} {
 			mesg "MyCert does not exist: $mycert"
 			bell
-			return
+			set fail 1
 		}
 		puts $fh "cert = $mycert"
 	}
@@ -1867,7 +1922,7 @@ proc launch {{hp ""}} {
 		if {! [file exists $svcert]} {
 			mesg "ServerCert does not exist: $svcert"
 			bell
-			return
+			set fail 1
 		}
 		puts $fh "CAfile = $svcert"
 		puts $fh "verify = 2"
@@ -1875,7 +1930,7 @@ proc launch {{hp ""}} {
 		if {! [file exists $crtdir]} {
 			mesg "CertsDir does not exist: $crtdir"
 			bell
-			return
+			set fail 1
 		}
 		puts $fh "CApath = $crtdir"
 		puts $fh "verify = 2"
@@ -1896,6 +1951,18 @@ proc launch {{hp ""}} {
 	puts $fh ""
 	close $fh
 
+	if {! $did_port_knock} {
+		if {! [do_port_knock $host]} {
+			set fail 1
+		}
+		set did_port_knock 1
+	}
+
+	if {$fail} {
+		catch {file delete $file}
+		return
+	}
+
 	mesg "Starting STUNNEL on port $port2 ..."
 	after 600
 
@@ -1915,11 +1982,6 @@ proc launch {{hp ""}} {
 		catch {destroy .o}
 		catch {destroy .oa}
 		wm withdraw .
-	}
-
-	if {! $did_port_knock} {
-		do_port_knock $host
-		set did_port_knock 1
 	}
 
 	do_viewer_windows $n
@@ -1975,7 +2037,13 @@ proc get_idir {str} {
 		}
 	}
 	if {$idir == ""} {
-		set idir [pwd]
+		global is_windows
+		if {$is_windows} {
+			set idir [get_profiles_dir]
+		}
+		if {$idir == ""} {
+			set idir [pwd]
+		}
 	}
 	return $idir
 }
@@ -1983,25 +2051,70 @@ proc get_idir {str} {
 proc set_mycert {} {
 	global mycert
 	set idir [get_idir $mycert]
+	set t ""
 	if {$idir != ""} {
-		set mycert [tk_getOpenFile -initialdir $idir]
+		set t [tk_getOpenFile -initialdir $idir]
 	} else {
-		set mycert [tk_getOpenFile]
+		set t [tk_getOpenFile]
+	}
+	if {$t != ""} {
+		set mycert $t
 	}
 	catch {wm deiconify .c}
 	update
 }
 
+
+proc show_cert {crt} {
+	if {$crt == ""} {
+		bell
+		return
+	}
+	if {! [file exists $crt]} {
+		bell
+		return
+	}
+	set info ""
+	catch {set info [get_x509_info $crt]}
+	if {$info == ""} {
+		bell
+		return
+	}
+
+	set w .show_certificate
+	catch {destroy $w}
+	toplevel $w
+	scroll_text $w.f
+	button $w.b -text Dismiss -command "destroy $w"
+	bind $w <Escape> "destroy $w"
+	$w.f.t insert end $info
+
+	pack $w.b -side bottom -fill x
+	pack $w.f -side top -fill both -expand 1
+	center_win $w
+	catch {raise $w}
+}
+proc show_mycert {} {
+	global mycert
+	show_cert $mycert
+}
+proc show_svcert {} {
+	global svcert
+	show_cert $svcert
+}
+
 proc set_svcert {} {
 	global svcert crtdir
 	set idir [get_idir $svcert]
+	set t ""
 	if {$idir != ""} {
-		set svcert [tk_getOpenFile -initialdir $idir]
+		set t [tk_getOpenFile -initialdir $idir]
 	} else {
-		set svcert [tk_getOpenFile]
+		set t [tk_getOpenFile]
 	}
-	if {$svcert != ""} {
+	if {$t != ""} {
 		set crtdir ""
+		set svcert $t
 	}
 	catch {wm deiconify .c}
 	update
@@ -2010,17 +2123,767 @@ proc set_svcert {} {
 proc set_crtdir {} {
 	global svcert crtdir
 	set idir [get_idir $crtdir]
+	set t ""
 	if {$idir != ""} {
-		set crtdir [tk_chooseDirectory -initialdir $idir]
+		set t [tk_chooseDirectory -initialdir $idir]
 	} else {
-		set crtdir [tk_chooseDirectory]
+		set t [tk_chooseDirectory]
 	}
-	if {$crtdir != ""} {
+	if {$t != ""} {
 		set svcert ""
+		set crtdir $t
 	}
 	catch {wm deiconify .c}
 	update
 }
+
+proc set_createcert_file {} {
+	global ccert
+	if {[info exists ccert(FILE)]} {
+		set idir [get_idir $ccert(FILE)]
+	}
+	if {$idir != ""} {
+		set t [tk_getSaveFile -defaultextension ".pem" -initialdir $idir]
+	} else {
+		set t [tk_getSaveFile -defaultextension ".pem"]
+	}
+	if {$t != ""} {
+		set ccert(FILE) $t
+	}
+	catch {raise .ccrt}
+	update
+}
+
+proc check_pp {} {
+	global ccert
+	if {$ccert(ENC)} {
+		catch {.ccrt.pf.e configure -state normal}
+		catch {focus .ccrt.pf.e}
+		catch {.ccrt.pf.e icursor end}
+	} else {
+		catch {.ccrt.pf.e configure -state disabled}
+	}
+}
+
+proc get_openssl {} {
+	global is_windows
+	if {$is_windows} {
+		set ossl "util/openssl"
+	} else {
+		set ossl "openssl"
+	}
+}
+
+proc get_x509_info {crt} {
+	set ossl [get_openssl]
+	set info ""
+	#puts "$ossl x509 -text -in \"$crt\""
+	set ph [open "| $ossl x509 -text -in \"$crt\"" "r"]
+	while {[gets $ph line] > -1} {
+		#puts "line: $line"
+		append info "$line\n"
+	}
+	close $ph
+	return $info
+}
+
+proc do_oss_create {} {
+	global is_windows is_win9x
+
+	set cfg {
+[ req ]
+default_bits            = 2048
+encrypt_key             = yes
+distinguished_name      = req_distinguished_name
+
+[ req_distinguished_name ]
+countryName                     = Country Name (2 letter code)
+countryName_default             = %CO
+countryName_min                 = 2
+countryName_max                 = 2
+
+stateOrProvinceName             = State or Province Name (full name)
+stateOrProvinceName_default     = %ST
+
+localityName                    = Locality Name (eg, city)
+localityName_default            = %LOC
+
+0.organizationName              = Organization Name (eg, company)
+0.organizationName_default      = %ON
+
+organizationalUnitName          = Organizational Unit Name (eg, section)
+organizationalUnitName_default  = %OUN
+
+commonName                      = Common Name (eg, YOUR name)
+commonName_default              = %CN
+commonName_max                  = 64
+
+emailAddress                    = Email Address
+emailAddress_default            = %EM
+emailAddress_max                = 64
+}
+
+	global ccert
+
+	if {$ccert(FILE) == ""} {
+		catch {destroy .c}
+		mesg "No output cert file supplied"
+		bell
+		return
+	}
+	if {! [regexp {\.pem$} $ccert(FILE)]} {
+		append ccert(FILE) ".pem"
+	}
+	set pem $ccert(FILE)
+	regsub {\.pem$} $ccert(FILE) ".crt" crt
+
+	if {$ccert(ENC)} {
+		if {[string length $ccert(PASS)] < 4} {
+			catch {destroy .c}
+			mesg "Passphrase must be at least 4 characters long."
+			bell
+			return
+		}
+	}
+	if {[string length $ccert(CO)] != 2} {
+		catch {destroy .c}
+		mesg "Country Name must be at exactly 2 characters long."
+		bell
+		return
+	}
+	if {[string length $ccert(CN)] > 64} {
+		catch {destroy .c}
+		mesg "Common Name must be less than 65 characters long."
+		bell
+		return
+	}
+	if {[string length $ccert(EM)] > 64} {
+		catch {destroy .c}
+		mesg "Email Address must be less than 65 characters long."
+		bell
+		return
+	}
+		
+	foreach t {EM CN OUN ON LOC ST CO} {
+
+		set val $ccert($t)
+		if {$val == ""} {
+			set val "none"
+		}
+		regsub "%$t" $cfg "$val" cfg
+	}
+
+	global is_windows
+
+	if {$is_windows} {
+		set tmp "cert.cfg"
+	} else {
+		set tmp "/tmp/cert.cfg."
+		append tmp [clock clicks -milliseconds]
+		catch {file delete $tmp}
+		if {[file exists $tmp]} {
+			catch {destroy .c}
+			mesg "file still exists: $tmp"
+			bell
+			return
+		}
+		catch {set fh [open $tmp "w"]}
+		catch {exec chmod 600 $tmp}
+		if {! [file exists $tmp]} {
+			catch {destroy .c}
+			mesg "cannot create: $tmp"
+			bell
+			return
+		}
+	}
+	set fh ""
+	catch {set fh [open $tmp "w"]}
+	if {$fh == ""} {
+		catch {destroy .c}
+		mesg "cannot create: $tmp"
+		bell
+		catch {file delete $tmp}
+		return
+	}
+
+	puts $fh $cfg
+	close $fh
+
+	set ossl [get_openssl]
+
+	set cmd "$ossl req -config $tmp -nodes -new -newkey rsa:2048 -x509 -batch"
+	if {$ccert(DAYS) != ""} {
+		set cmd "$cmd -days $ccert(DAYS)"
+	}
+	set cmd "$cmd -keyout {$pem} -out {$crt}"
+
+	if {$is_windows} {
+		set emess ""
+		if {$is_win9x} {
+			catch {file delete $pem}
+			catch {file delete $crt}
+			eval exec $cmd &
+			catch {raise .}
+			set sl 0
+			set max 100
+			#if {$ccert(ENC)} {
+			#	set max 100
+			#}
+			set maxms [expr $max * 1000]
+			while {$sl < $maxms} {
+				set s2 [expr $sl / 1000]
+				mesg "running openssl ... $s2/$max"
+				if {[file exists $pem] && [file exists $crt]} {
+					after 2000
+					break
+				}
+				after 500
+				set sl [expr $sl + 500]
+			}
+			mesg ""
+		} else {
+			set rc [catch {eval exec $cmd} emess]
+			if {$rc != 0} {
+				tk_messageBox -type ok -icon error -message $emess -title "OpenSSL req command failed"
+				return
+			}
+		}
+	} else {
+		set geometry [xterm_center_geometry]
+		eval exec xterm -geometry $geometry -title Running_OpenSSL -e $cmd
+	}
+	catch {file delete $tmp}
+
+	set bad ""
+	if {! [file exists $pem]} {
+		set bad "$pem "
+	}
+	if {! [file exists $crt]} {
+		set bad "$crt"
+	}
+	if {$bad != ""} {
+		tk_messageBox -type ok -icon error -message "Not created: $bad" -title "OpenSSL could not create cert"
+		catch {raise .c}
+		return
+	}
+
+	if {$ccert(ENC) && $ccert(PASS) != ""} {
+		set cmd "$ossl rsa -in \"$pem\" -des3 -out \"$pem\" -passout stdin"
+		set ph ""
+		set emess ""
+		set rc [catch {set ph [open "| $cmd" "w"]} emess]
+		if {$rc != 0 || $ph == ""} {
+			tk_messageBox -type ok -icon error -message $emess -title "Count not encrypt private key"
+			catch {file delete $pem}
+			catch {file delete $crt}
+			return
+		}
+		puts $ph $ccert(PASS)
+		set emess ""
+		set rc [catch {close $ph} emess]
+		#puts $emess
+		#puts $rc
+	}
+
+	set in  [open $crt "r"]
+	set out [open $pem "a"]
+	while {[gets $in line] > -1} {
+		puts $out $line
+	}
+	close $in
+	close $out
+
+	catch {raise .c}
+	set p .
+	if [winfo exists .c] {
+		set p .c
+	}
+	set reply [tk_messageBox -parent $p -type yesno -title "View Cert" -message "View Certificate and Info?"]
+	catch {raise .c}
+	if {$reply == "yes"} {
+		set w .view_cert
+		catch {destroy $w}
+		toplevel $w
+		scroll_text $w.f
+		set cert ""
+		set fh ""
+		catch {set fh [open $crt "r"]}
+		if {$fh != ""} {
+			while {[gets $fh line] > -1} {
+				append cert "$line\n"
+			}
+			catch {close $fh}
+		}
+
+		global yegg
+		set yegg ""
+		button $w.b -text Dismiss -command "destroy $w; set yegg 1"
+		pack $w.b -side bottom -fill x
+		bind $w <Escape> "destroy $w; set yegg 1"
+		
+		$w.f.t insert end "\n"
+		$w.f.t insert end "$crt:\n"
+		$w.f.t insert end "\n"
+		$w.f.t insert end $cert
+		$w.f.t insert end "\n"
+
+		set info [get_x509_info $crt]
+		$w.f.t insert end $info
+
+		pack $w.f -side top -fill both -expand 1
+		center_win $w
+		catch {raise $w}
+		vwait yegg
+		catch {raise .c}
+	}
+
+	set p .
+	if [winfo exists .c] {
+		set p .c
+	}
+	set reply [tk_messageBox -parent $p -type yesno -title "View Private Key" -message "View Private Key?"]
+	catch {raise .c}
+	if {$reply == "yes"} {
+		set w .view_key
+		catch {destroy $w}
+		toplevel $w
+		scroll_text $w.f
+		set key ""
+		set fh [open $pem "r"]
+		while {[gets $fh line] > -1} {
+			append key "$line\n"
+		}
+		close $fh
+
+		global yegg
+		set yegg ""
+		button $w.b -text Dismiss -command "destroy $w; set yegg 1"
+		pack $w.b -side bottom -fill x
+		bind $w <Escape> "destroy $w; set yegg 1"
+		
+		$w.f.t insert end "\n"
+		$w.f.t insert end "$pem:\n"
+		$w.f.t insert end "\n"
+		$w.f.t insert end $key
+		$w.f.t insert end "\n"
+
+		pack $w.f -side top -fill both -expand 1
+		center_win $w
+		catch {raise $w}
+		vwait yegg
+		catch {raise .c}
+	}
+}
+	
+proc create_cert {} {
+
+	catch {destroy .ccrt}
+	toplevel .ccrt
+	wm title .ccrt "Create SSL Certificate"
+
+	scroll_text .ccrt.f 80 30
+
+	set msg {
+    This dialog helps you to create a simple self-signed SSL certificate.  
+
+    On Unix the openssl(1) program must be installed and in $PATH.
+    On Windows, a copy of the openssl program is provided for convenience.
+
+    The resulting certificate files can be used for either:
+
+       1) authenticating yourself (VNC Viewer) to a VNC Server
+    or 2) your verifying the identity of a remote VNC Server.
+
+    In either case you will need to safely copy one of the generated
+    certificate files to the remote VNC Server and have the VNC Server use
+    it.  Or you could send it to the system administrator of the VNC Server.
+
+    We assume below that the filename selected in the "Save to file" entry
+    is "vnccert.pem".  That file will be generated and so will "vnccert.crt".
+    "vnccert.pem" contains both the Private Key and the Public Certificate.
+    "vnccert.crt" only contains the Public Certificate.
+
+    For case 1) you would copy "vnccert.crt" to the VNC Server side and 
+    instruct the server to use it.  For x11vnc it would be for example:
+
+        x11vnc -sslverify /path/to/vnccert.crt -ssl SAVE ...
+
+    (it is also possible to handle many client certs at once in a directory,
+    see the -sslverify documentation).  Then you would use "vnccert.pem"
+    as the MyCert entry in the Set SSL Certificates dialog.
+
+    For case 2) you would copy "vnccert.pem" to the VNC Server side and 
+    instruct the server to use it.  For x11vnc it would be for example:
+
+        x11vnc -ssl /path/to/vnccert.pem
+
+    Then you would use "vnccert.crt" as the as the ServerCert entry in the
+    "Set SSL Certificates" dialog.
+
+
+    Creating the Certificate:
+    
+    Choose a output filename (ending in .pem) in the "Save to file" entry.
+
+    Then fill in the identification information (Country, State or Province,
+    etc).
+
+    The click on "Create" to generate the certificate files.
+
+    Encrypting the Private Key:  It is a very good idea to encrypt the
+    Private Key that goes in the "vnccert.pem".  The downside is that
+    whenever that key is used (e.g. starting up x11vnc using it) then
+    the passphrase will need to be created.  If you do not encrypt it and
+    somebody steals a copy of the "vnccert.pem" file then they can pretend
+    to be you.
+
+    After you have created the certificate files, you must copy and import
+    either "vnccert.pem" or "vnccert.pem" to the remote VNC Server and
+    also select the other file in the "Set SSL Certificates" dialog.
+    See the description above.
+
+    For more information see:
+
+           http://www.karlrunge.com/x11vnc/ssl.html
+           http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-int
+
+    The first one describes how to use x11vnc to create Certificate
+    Authority (CA) certificates in addition to self-signed ones.
+
+
+    Tip: if you choose the "Common Name" to be the internet hostname
+    (e.g. gateway.mydomain.com) that connections will be made to or
+    from that will avoid many dialogs when connecting mentioning that
+    the hostname does not match the Common Name.
+}
+	.ccrt.f.t insert end $msg
+
+	global ccert ccert_init tcert
+
+
+	if {! [info exists ccert_init]} {
+		set ccert_init 1
+		set ccert(CO) "US"
+		set ccert(ST) "Massachusetts"
+		set ccert(LOC) "Boston"
+		set ccert(ON) "My Company"
+		set ccert(OUN) "Product Development"
+		set ccert(CN) "www.nowhere.none"
+		set ccert(EM) "admin@nowhere.none"
+		set ccert(DAYS) "365"
+		set ccert(FILE) ""
+	}
+
+	set ccert(ENC) 0
+	set ccert(PASS) ""
+		
+	set tcert(CO) "Country Name (2 letter code):"
+	set tcert(ST) "State or Province Name (full name):"
+	set tcert(LOC) "Locality Name (eg, city):"
+	set tcert(ON) "Organization Name (eg, company):"
+	set tcert(OUN) "Organizational Unit Name (eg, section):"
+	set tcert(CN) "Common Name (eg, YOUR name):"
+	set tcert(EM) "Email Address:"
+	set tcert(DAYS) "Days until expiration:"
+
+	if {$ccert(FILE) == ""} {
+		global is_windows
+		if {$is_windows} {
+			set pdir [get_profiles_dir]
+			set ccert(FILE) "$pdir/vnccert.pem"
+		} else {
+			set idir [get_idir ""]
+			set ccert(FILE) "$idir/vnccert.pem"
+		}
+	}
+
+	button .ccrt.cancel -text "Cancel" -command {destroy .ccrt; catch {raise .c}}
+	bind .ccrt <Escape> {destroy .ccrt; catch {raise .c}}
+
+	button .ccrt.create -text "Generate Cert" -command {destroy .ccrt; catch {raise .c}; do_oss_create}
+
+	pack .ccrt.cancel .ccrt.create -side bottom -fill x
+
+	set ew 40
+
+	set w .ccrt.pf
+	frame $w
+	checkbutton $w.check -anchor w -variable ccert(ENC) -text \
+		"Encrypt Key with Passphrase" -command {check_pp}
+
+	entry $w.e -width $ew -textvariable ccert(PASS) -state disabled \
+		-show *
+
+	pack $w.e -side right
+	pack $w.check -side left -expand 1 -fill x
+	pack $w -side bottom -fill x
+
+	set w .ccrt.fl
+	frame $w
+	label $w.l -anchor w -text "Save to file:"
+
+	entry $w.e -width $ew -textvariable ccert(FILE)
+	button $w.b -text "Browse..." -command {set_createcert_file; catch {raise .ccrt}}
+
+	pack $w.e -side right
+	pack $w.b -side right
+	pack $w.l -side left -expand 1 -fill x
+	pack $w -side bottom -fill x
+
+	set i 0
+	foreach t {DAYS EM CN OUN ON LOC ST CO} {
+		set w .ccrt.f$i
+		frame $w
+		label $w.l -anchor w -text "$tcert($t)"
+		entry $w.e -width $ew -textvariable ccert($t)
+		pack $w.e  -side right
+		pack $w.l  -side left -expand 1 -fill x
+		pack $w -side bottom -fill x
+		incr i
+	}
+
+	pack .ccrt.f -side top -fill both -expand 1
+
+	center_win .ccrt
+}
+
+proc import_check_mode {w} {
+	global import_mode
+	if {$import_mode == "paste"} {
+		$w.mf.b configure -state disabled
+		$w.mf.e configure -state disabled
+		$w.plab configure -state normal
+		$w.paste.t configure -state normal
+	} else {
+		$w.mf.b configure -state normal
+		$w.mf.e configure -state normal
+		$w.plab configure -state disabled
+		$w.paste.t configure -state disabled
+	}
+}
+	
+proc import_browse {} {
+	global import_file
+
+	set idir ""
+	if {$import_file != ""} {
+		set idir [get_idir $import_file]
+	}
+	if {$idir != ""} {
+		set t [tk_getOpenFile -initialdir $idir]
+	} else {
+		set t [tk_getOpenFile]
+	}
+	if {$t != ""} {
+		set import_file $t
+	}
+	catch {raise .icrt}
+	update
+}
+
+proc import_save_browse {} {
+	global import_save_file
+
+	set idir ""
+	if {$import_save_file != ""} {
+		set idir [get_idir $import_save_file]
+	}
+	if {$idir == ""} {
+		global is_windows
+		if {$is_windows} {
+			set idir [get_profiles_dir]
+		} else {
+			set idir [get_idir ""]
+		}
+	}
+	if {$idir != ""} {
+		set t [tk_getSaveFile -defaultextension ".crt" -initialdir $idir]
+	} else {
+		set t [tk_getSaveFile -defaultextension ".crt"]
+	}
+	if {$t != ""} {
+		set import_save_file $t
+	}
+	catch {raise .icrt}
+	update
+}
+
+proc do_save {} {
+	global import_mode import_file import_save_file
+	
+	if {$import_save_file == ""} {
+		tk_messageBox -parent .icrt -type ok -icon error \
+			-message "No Save File supplied" -title "Save File"
+		return
+	}
+
+	set str ""
+	if {$import_mode == "paste"} {
+		set str [.icrt.paste.t get 1.0 end]
+	} else {
+		if {! [file exists $import_file]} {
+			tk_messageBox -parent .icrt -type ok -icon error \
+				-message "Input file \"$import_file\" does not exist." -title "Import File"
+			return
+		}
+		set fh ""
+		set emess ""
+		set rc [catch {set fh [open $import_file "r"]} emess]
+		if {$rc != 0 || $fh == ""} {
+			tk_messageBox -parent .icrt -type ok -icon error \
+				-message $emess -title "Import File: $import_file"
+			return
+		}
+		while {[gets $fh line] > -1} {
+			append str "$line\n"
+		}
+		close $fh
+	}
+
+	if {! [regexp {BEGIN CERTIFICATE} $str]} {
+		tk_messageBox -parent .icrt -type ok -icon error \
+			-message "Import Text does not contain \"BEGIN CERTIFICATE\"" -title "Imported Text"
+		return
+	}
+	if {! [regexp {END CERTIFICATE} $str]} {
+		tk_messageBox -parent .icrt -type ok -icon error \
+			-message "Import Text does not contain \"END CERTIFICATE\"" -title "Imported Text"
+		return
+	}
+
+	set fh ""
+	set emess ""
+	set rc [catch {set fh [open $import_save_file "w"]} emess]
+	if {$rc != 0 || $fh == ""} {
+		tk_messageBox -parent .icrt -type ok -icon error \
+			-message $emess -title "Save File: $import_save_file"
+		return
+	}
+	puts -nonewline $fh $str
+	close $fh
+	catch {destroy .icrt}
+	catch {raise .c}
+	tk_messageBox -parent .c -type ok -icon info \
+		-message "Saved to file: $import_save_file" -title "Save File: $import_save_file"
+}
+
+proc import_cert {} {
+
+	catch {destroy .icrt}
+	toplevel .icrt
+	wm title .icrt "Import SSL Certificate"
+
+	global scroll_text_focus
+	set scroll_text_focus 0
+	scroll_text .icrt.f 90 16
+	set scroll_text_focus 1
+
+	set msg {
+    This dialog lets you import a SSL Certificate by either pasting one in or by
+    loading from another file.  Choose which input mode you want to use by the toggle
+    "Paste / Read from File".
+
+    There are two types of files we use 1) Certificate only, and 2) Private Key
+    and Certificate.
+
+    Type 1) would be used to verify the identity of a remote VNC Server, whereas
+    type 2) would be used to authenticate ourselves to the remote VNC Server.
+
+    A type 1) by convention ends with file suffix ".crt" and looks like:
+
+-----BEGIN CERTIFICATE-----
+MIID2jCCAsKgAwIBAgIJALKypfV8BItCMA0GCSqGSIb3DQEBBAUAMIGgMQswCQYD
+...
+TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
+-----END CERTIFICATE-----
+
+    where "..." means similarly looking lines.
+
+    A type 2) by convention ends with file suffix ".pem" and looks like:
+
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA4sApd7WaPKQRWnFe9T04D4pglQB0Ti0/dCVHxg8WEVQ8OdcW
+...
+9kBmNotUiTpvRM+e7E/zRemhvY9qraFooqMWzi9JrgYfeLfSvvFfGw==
+-----END RSA PRIVATE KEY-----
+-----BEGIN CERTIFICATE-----
+MIID2jCCAsKgAwIBAgIJALKypfV8BItCMA0GCSqGSIb3DQEBBAUAMIGgMQswCQYD
+...
+TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
+-----END CERTIFICATE-----
+
+    You do not need to use the ".crt" or ".pem" convention if you do not want to.
+
+    First, either paste in the text or set the "Read from File" filename.
+
+    Next, set the "Save to File" name to the file where the imported certificate
+    will be saved.
+
+    Then, click on "Save" to save the imported Certificate.
+
+    After you have imported the Certificate (or Key + Certificate), select it to
+    use for a connection via the "MyCert" or "ServerCert" dialog.
+}
+	.icrt.f.t insert end $msg
+
+	global icert import_mode
+
+	set import_mode "paste"
+
+	set w .icrt.mf
+	frame $w
+
+	radiobutton $w.p -pady 1 -anchor w -variable import_mode -value paste \
+		-text "Paste" -command "import_check_mode .icrt"
+
+	radiobutton $w.f -pady 1 -anchor w -variable import_mode -value file \
+		-text "Read from File:" -command "import_check_mode .icrt"
+
+	global import_file
+	set import_file ""
+	entry $w.e -width 40 -textvariable import_file
+
+	button $w.b -pady 1 -anchor w -text "Browse..." -command import_browse
+	pack $w.b -side right
+	pack $w.p $w.f -side left
+	pack $w.e -side left -expand 1 -fill x
+
+	$w.b configure -state disabled
+	$w.e configure -state disabled
+
+	label .icrt.plab -anchor w -text "Paste Certificate here:" 
+	scroll_text .icrt.paste 90 25
+
+	button .icrt.cancel -text "Cancel" -command {destroy .icrt; catch {raise .c}}
+	bind .icrt <Escape> {destroy .icrt; catch {raise .c}}
+
+	button .icrt.save -text "Save" -command {do_save}
+
+	set w .icrt.sf
+	frame $w
+
+	label $w.l -text "Save to File:" -anchor w
+	global import_save_file
+	set import_save_file ""
+	entry $w.e -width 40 -textvariable import_save_file
+	button $w.b -pady 1 -anchor w -text "Browse..." -command import_save_browse
+
+	pack $w.b -side right
+	pack $w.l -side left
+	pack $w.e -side left -expand 1 -fill x
+
+	pack .icrt.cancel .icrt.save .icrt.sf .icrt.mf -side bottom -fill x
+	pack .icrt.paste .icrt.plab -side bottom -fill x
+
+	pack .icrt.f -side top -fill both -expand 1
+
+	.icrt.paste.t insert end ""
+
+	focus .icrt.paste.t
+
+	center_win .icrt
+}
+
 
 proc getcerts {} {
 	global mycert svcert crtdir
@@ -2041,6 +2904,11 @@ proc getcerts {} {
 	button .c.mycert.b -text "Browse..." -command {set_mycert; catch {raise .c}}
 	button .c.svcert.b -text "Browse..." -command {set_svcert; catch {raise .c}}
 	button .c.crtdir.b -text "Browse..." -command {set_crtdir; catch {raise .c}}
+	bind .c.mycert.b <B3-ButtonRelease>   "show_mycert"
+	bind .c.svcert.b <B3-ButtonRelease>   "show_svcert"
+
+	button .c.create -text "Create Certificate ..." -command {create_cert}
+	button .c.import -text "Import Certificate ..." -command {import_cert}
 
 	frame .c.b
 	button .c.b.done -text "Done" -command {catch {destroy .c}}
@@ -2060,7 +2928,7 @@ proc getcerts {} {
 		}	
 	}
 
-	pack .c.mycert .c.svcert .c.crtdir .c.b -side top -fill x
+	pack .c.mycert .c.svcert .c.crtdir .c.create .c.import .c.b -side top -fill x
 	center_win .c
 	wm resizable .c 1 0
 
@@ -2980,8 +3848,8 @@ proc cups_dialog {} {
     This method requires working CUPS software setups on both the remote
     and local sides of the connection.
 
-    (See Method #1 below for perhaps the easiest way to get applications
-    to print through the tunnel; it requires admin privileges however).
+    (See Method #1 below for perhaps the easiest way to get applications to
+    print through the tunnel; it requires printing admin privileges however).
 
     You choose an actual remote CUPS port below under "Use Remote CUPS
     Port:" (6631 is just our default and used in the examples below).
@@ -3029,7 +3897,8 @@ proc cups_dialog {} {
 
     Method #2: Restarting individual applications with the IPP_PORT
     set will enable redirected printing for them, e.g.:
-    "env IPP_PORT=6631 firefox"
+
+       env IPP_PORT=6631 firefox
 
     Windows/SMB Printers:  Under "Local SMB Print Server" you can set
     a port redirection for a Windows (non-CUPS) SMB printer.  E.g. port
@@ -3069,28 +3938,28 @@ proc cups_dialog {} {
 	}
 
 	frame .cups.serv
-	label .cups.serv.l -text "Local CUPS Server:      "
+	label .cups.serv.l -anchor w -text "Local CUPS Server:      "
 	entry .cups.serv.e -width 40 -textvariable cups_local_server
-	pack .cups.serv.l -side left
-	pack .cups.serv.e -side left -expand 1 -fill x
+	pack .cups.serv.e -side right
+	pack .cups.serv.l -side left -expand 1 -fill x
 
 	frame .cups.port
-	label .cups.port.l -text "Use Remote CUPS Port:"
+	label .cups.port.l -anchor w -text "Use Remote CUPS Port:"
 	entry .cups.port.e -width 40 -textvariable cups_remote_port
-	pack .cups.port.l -side left
-	pack .cups.port.e -side left -expand 1 -fill x
+	pack .cups.port.e -side right
+	pack .cups.port.l -side left -expand 1 -fill x
 
 	frame .cups.smbs
-	label .cups.smbs.l -text "Local SMB Print Server:      "
+	label .cups.smbs.l -anchor w -text "Local SMB Print Server:      "
 	entry .cups.smbs.e -width 40 -textvariable cups_local_smb_server
-	pack .cups.smbs.l -side left
-	pack .cups.smbs.e -side left -expand 1 -fill x
+	pack .cups.smbs.e -side right
+	pack .cups.smbs.l -side left -expand 1 -fill x
 
 	frame .cups.smbp
-	label .cups.smbp.l -text "Use Remote SMB Print Port:"
+	label .cups.smbp.l -anchor w -text "Use Remote SMB Print Port:"
 	entry .cups.smbp.e -width 40 -textvariable cups_remote_smb_port
-	pack .cups.smbp.l -side left
-	pack .cups.smbp.e -side left -expand 1 -fill x
+	pack .cups.smbp.e -side right
+	pack .cups.smbp.l -side left -expand 1 -fill x
 
 	checkbutton .cups.cupsrc -anchor w -variable cups_manage_rcfile -text \
 		"Manage ServerName in the remote \$HOME/.cups/client.conf file for me"
@@ -3118,14 +3987,15 @@ proc sound_dialog {} {
 	scroll_text .snd.f 80 30
 
 	set msg {
-    Sound daemon tunnelling requires SSH be used to set up the service
-    port redirection.  This will be either of the "Use SSH instead" or "Use
-    SSH and SSL" modes under "Options".  Pure SSL tunnelling will not work.
+    Sound tunnelling to a sound daemon requires SSH be used to set up the
+    service port redirection.  This will be either of the "Use SSH instead"
+    or "Use SSH and SSL" modes under "Options".  Pure SSL tunnelling will
+    not work.
 
     This method requires working Sound daemon (e.g. ESD or ARTSD) software
     setups on both the remote and local sides of the connection.
 
-    Often this means you want to run your ENTIRE remote desktop with all
+    Often this means you want to run your ENTIRE remote desktop with ALL
     applications instructed to use the sound daemon's network port.  E.g.
 
         esddsp -s localhost:16001  startkde
@@ -3163,14 +4033,13 @@ proc sound_dialog {} {
     So you may need to supply TWO SSH PASSWORDS, unless you are using
     something like ssh-agent(1), the Putty PW setting, etc.
 
-    You will also need to supply the remote and local sound ports for the
-    SSH redirs (even though in principle the could be guessed from the
-    daemon commands...)  For esd the default port is 16001, but you can
-    choose another one if you prefer.
+    You will also need to supply the remote and local sound ports for
+    the SSH redirs.  For esd the default port is 16001, but you can choose
+    another one if you prefer.
 
     For "Local Sound Port" you can also supply "host:port" instead of just
     a numerical port to specify non-localhost connections, e.g. to another
-    machine.
+    nearby machine.
 
     For more info see: http://www.karlrunge.com/x11vnc/#faq-sound
 }
@@ -3196,28 +4065,28 @@ proc sound_dialog {} {
 
 
 	frame .snd.remote
-	label .snd.remote.l -text "Remote Sound daemon cmd: "
-	entry .snd.remote.e -width 40 -textvariable sound_daemon_remote_cmd
-	pack .snd.remote.l -side left
-	pack .snd.remote.e -side left -expand 1 -fill x
+	label .snd.remote.l -anchor w -text "Remote Sound daemon cmd: "
+	entry .snd.remote.e -width 45 -textvariable sound_daemon_remote_cmd
+	pack .snd.remote.e -side right
+	pack .snd.remote.l -side left -expand 1 -fill x
 
 	frame .snd.local
-	label .snd.local.l -text "Local Sound daemon cmd:     "
-	entry .snd.local.e -width 40 -textvariable sound_daemon_local_cmd
-	pack .snd.local.l -side left
-	pack .snd.local.e -side left -expand 1 -fill x
+	label .snd.local.l -anchor w -text "Local Sound daemon cmd:     "
+	entry .snd.local.e -width 45 -textvariable sound_daemon_local_cmd
+	pack .snd.local.e -side right
+	pack .snd.local.l -side left -expand 1 -fill x
 
 	frame .snd.rport
-	label .snd.rport.l -text "Remote Sound Port: "
-	entry .snd.rport.e -width 40 -textvariable sound_daemon_remote_port
-	pack .snd.rport.l -side left
-	pack .snd.rport.e -side left -expand 1 -fill x
+	label .snd.rport.l -anchor w -text "Remote Sound Port: "
+	entry .snd.rport.e -width 45 -textvariable sound_daemon_remote_port
+	pack .snd.rport.e -side right
+	pack .snd.rport.l -side left -expand 1 -fill x
 
 	frame .snd.lport
-	label .snd.lport.l -text "Local Sound Port:     "
-	entry .snd.lport.e -width 40 -textvariable sound_daemon_local_port
-	pack .snd.lport.l -side left
-	pack .snd.lport.e -side left -expand 1 -fill x
+	label .snd.lport.l -anchor w -text "Local Sound Port:     "
+	entry .snd.lport.e -width 45 -textvariable sound_daemon_local_port
+	pack .snd.lport.e -side right
+	pack .snd.lport.l -side left -expand 1 -fill x
 
 
 	checkbutton .snd.sdk -anchor w -variable sound_daemon_kill -text \
@@ -3879,10 +4748,11 @@ proc smb_dialog {} {
     side of the connection (VNC server) and existing Samba or Windows file
     server(s) on the local side (VNC viewer).
 
-    The smbmount(8) program MUST be installed on the remote side.
-    This evidently limits the mounting to Linux systems.  Let us know
-    of similar utilities on other Unixes.  Mounting onto remote Windows
-    machines is currently not supported (our SSH mode only works to Unix).
+    The smbmount(8) program MUST be installed on the remote side. This
+    evidently limits the mounting to Linux systems.  Let us know of similar
+    utilities on other Unixes.  Mounting onto remote Windows machines is
+    currently not supported (our SSH mode with services setup only works
+    to Unix).
 
     Depending on how smbmount is configured you may be able to run it
     as a regular user, or it may require running under su(1) or sudo(8)
@@ -3902,7 +4772,7 @@ proc smb_dialog {} {
     %WIN
 
     To indicate the Windows/Samba shares to mount enter them one per line
-    in either one of the forms:
+    in one of the forms:
 
       //machine1/share   ~/Desktop/my-mount1
       //machine2/fubar   /var/tmp/my-foobar2  192.168.100.53:3456
@@ -3928,7 +4798,8 @@ proc smb_dialog {} {
     server:port combination).  A fixed one is preferred: choose a free
     remote port.
 
-    The standard SMB ports are 445 and 139.  139 is used by this application.
+    The standard SMB service ports (local side) are 445 and 139.  139 is
+    used by this application.
 
     Sometimes "localhost" will not work on Windows machines for a share
     hostname, and you will have to specify a different network interface
@@ -4022,7 +4893,7 @@ proc help_advanced_opts {} {
 
          SMB mount tunnelling: redirect localhost:1139 (say) on the VNC
          server and through that mount SMB file shares from your local
-         server.  The remote machine must be Linux.
+         server.  The remote machine must be Linux with smbmount installed.
 
          Change vncviewer: specify a non-bundled VNC Viewer (e.g.
          UltraVNC or RealVNC) to run instead of the bundled TightVNC Viewer.
@@ -4071,7 +4942,7 @@ proc change_vncviewer_dialog {} {
     Note that due to incompatibilities with respect to command line options
     there may be issues, especially if many command line options are supplied.
     You can specify your own command line options below if you like (and try to
-    avoid setting any others in this GUI).
+    avoid setting any others in this GUI under "Options").
 
     If the path to the program name has any spaces it in, please surround it with
     double quotes, e.g. "C:\Program Files\My Vnc Viewer\VNCVIEWER.EXE"
@@ -4269,10 +5140,10 @@ proc do_port_knock {hp} {
 	global is_windows
 
 	if {! $use_port_knocking} {
-		return
+		return 1
 	}
 	if {$port_knocking_list == ""} {
-		return
+		return 1
 	}
 
 	set default_delay 0
@@ -4285,7 +5156,7 @@ proc do_port_knock {hp} {
 	if {$host0 == ""} {
 		bell
 		mesg "No host: $hp"
-		return
+		return 0
 	}
 	if [regexp {PAD=([^\n]+)} $port_knocking_list mv padfile] {
 		set tlist [read_from_pad $padfile] 
@@ -4294,7 +5165,7 @@ proc do_port_knock {hp} {
 			tk_messageBox -type ok -icon error \
 				-message "Failed to read entry from $padfile" \
 				-title "Error: Padfile $padfile"
-			return
+			return 0
 		}
 		regsub -all {PAD=([^\n]+)} $port_knocking_list $tlist list
 	} else {
@@ -4362,10 +5233,10 @@ proc do_port_knock {hp} {
 		set udp 0
 		if [regexp -nocase {/udp} $line] {
 			set udp 1
-			regsub -all -nocase {/udp} $line "" line
+			regsub -all -nocase {/udp} $line " " line
 			set line [string trim $line]
 		}
-		regsub -all -nocase {/tcp} $line "" line
+		regsub -all -nocase {/tcp} $line " " line
 		set line [string trim $line]
 
 		set delay 0
@@ -4388,8 +5259,23 @@ proc do_port_knock {hp} {
 
 		if {$port == ""} {
 			bell
-			mesg "No port: $line0"
-			continue
+			mesg "No port found: \"$line0\""
+			return 0
+		}
+		if {! [regexp {^[0-9][0-9]*$} $port]} {
+			bell
+			mesg "Invalid port: \"$port\""
+			return 0
+		}
+		if {[regexp {[ \t]} $host]} {
+			bell
+			mesg "Invalid host: \"$host\""
+			return 0
+		}
+		if {! [regexp {^[-A-z0-9_.][-A-z0-9_.]*$} $host]} {
+			bell
+			mesg "Invalid host: \"$host\""
+			return 0
 		}
 
 		set nc ""
@@ -4485,6 +5371,7 @@ proc do_port_knock {hp} {
 	if {$is_windows} {
 		catch {file delete "nc_in.txt"}
 	}
+	return 1
 }
 
 proc port_knocking_dialog {} {
@@ -4528,49 +5415,65 @@ proc port_knocking_dialog {} {
     for a VNC tunnel, then specify something like "user@hostname cmd=SHELL"
     (or "user@hostname cmd=PUTTY" on Windows) in the VNC Server entry box
     on the main panel.  This will do everything short of starting the viewer.
-    A shortcut for this is Ctrl-S.
+    A shortcut for this is Ctrl-S as long as user@hostname is present.
     
-    In the text area below put in the pattern of "knocks" needed for this
-    connection.  You can separate the knocks by commas or put them one per line.
-    Whitespace is trimmed.
+
+    Specifying the Knocks:
+
+    In the text area below "Supply port knocking pattern" you put in the pattern
+    of "knocks" needed for this connection.  You can separate the knocks by
+    commas or put them one per line.
 
     Each "knock" is of this form:
 
            [host:]port[/udp] [delay]
 
     In the simplest form just a numerical port, e.g. 5433, is supplied.
+    Items inside [...] are optional and described below.
 
     The packet is sent to the same host that the VNC (or SSH) connection will
     be made to.  If you want it to go to a different host or IP use the [host:]
     prefix.  It can be either a hostname or numerical IP.
 
-    TCP is assumed by default.
+    A TCP packet is sent by default.
 
     If you need to send a UDP packet, the netcat (aka "nc") program must be
     installed on Unix (tcl/tk does not support udp connections).  Indicate this
-    with "/udp" following the port number (you can also use "/tcp", but since
-    it is the default it is not necessary).  For convenience a Windows netcat
-    binary is supplied.
+    with "/udp" following the port number (you can also use "/tcp", but since it
+    is the default it is not necessary).  See the example below.  For convenience
+    a Windows netcat binary is supplied.
 
-    Because an external program must be launched for each packet udp knocking will
-    be somewhat slower and less reliable.  ICMP (ping) is currently not supported.
+    The last field, [delay], is an optional number of milliseconds to delay
+    before continuing on to the next knock.
 
-    The last field is the number of milliseconds to delay before continuing.
 
     Examples:
 
-           5433,12321,1661
+           5433, 12321, 1661
 
-           fw.example.com:5433, 12321/udp 3000,1661 2000
+           fw.example.com:5433, 12321/udp 3000, 1661 2000
 
            fw.example.com:5433
            12321/udp 3000
            1661 2000
 
+    Note how the first two examples separate their knocks via commas ",".
+    The 3rd example is equivalent to the 2nd and splits them up by new lines.
 
-    Alternate actions:  If the string in the text field contains anywhere the
-    strings "CMD=", "CMDX=", or "SEND=", then splitting on commas is not done:
-    it is only split on lines.
+    Note for each knock any second number (e.g. the "2000" in "1661 2000") is
+    a DELAY in milliseconds, not a port number.  If you had a comma separating
+    them: "1661, 2000" that would mean two separate knocks: one to port 1661
+    followed by one to 2000 (with basically no delay between them).
+
+    In examples 2 and 3, "fw.example.com" represents some machine other than
+    the VNC/SSH host.  By default, the VNC/SSH host is the one the packet is
+    sent to.
+
+
+    Advanced port knock actions:
+
+    If the string in the text field contains anywhere the strings "CMD=", "CMDX=",
+    or "SEND=", then splitting on commas is not done: it is only split on lines.
 
     Then, if a line begins CMD=... the string after the = is run as an
     external command.  The command could be anything you want, e.g. it could
@@ -4602,8 +5505,8 @@ proc port_knocking_dialog {} {
 
    Examples:
 
-      CMD=port_knock_client -pass wombat33
-      CMDX=port_knock_client -pass wombat33 -host %HOST -src %NAT
+      CMD=port_knock_client -password wombat33
+      CMDX=port_knock_client -password wombat33 -host %HOST -src %NAT
 
       fw.example.com:5433/udp SEND=ASDLFKSJDF
 
@@ -4615,7 +5518,7 @@ proc port_knocking_dialog {} {
       CMD=... items or at the very end of the knocks to wait).
 
       If a knock entry matches "delay N" the default delay is set to
-      N milliseconds.
+      N milliseconds (it is 0 initially).
 
    One Time Pads:
 
@@ -4973,6 +5876,8 @@ if {[regexp -nocase {Windows.9} $tcl_platform(os)]} {
 
 set putty_pw ""
 
+global scroll_text_focus
+set scroll_text_focus 1
 
 wm title . "SSL VNC Viewer"
 wm resizable . 1 0
