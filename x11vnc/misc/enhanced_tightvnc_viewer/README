@@ -64,6 +64,8 @@ The enhanced TightVNC viewer features are:
 	- xgrabserver support for fullscreen mode, for old window
 	  managers (-grab option, Unix only).
 
+	- Create or Import SSL Certificates and Private Keys.
+
 	- Automatic Service tunnelling via SSH for CUPS and SMB Printing,
 	  ESD/ARTSD Audio, and SMB (Windows/Samba) filesystem mounting.
 
@@ -72,9 +74,14 @@ The enhanced TightVNC viewer features are:
           a hook is also provided to run any port knocking client before a
           connecting.
 
+	- You can also use your own VNC Viewer, e.g. UltraVNC or RealVNC,
+	  with the front-end if you like.
+
+	- Sets up any additional SSH port redirections that you want.
+
 
 Your package should have included binaries for many OS's: Linux, Solaris,
-FreeBSD, etc.  See the subdirectories of
+FreeBSD, etc.  Unpack your archive and see the subdirectories of
 
 	./bin
 
@@ -100,7 +107,8 @@ README is in) and like this:
 The programs:
 ------------
 
-The wrapper scripts: 
+Unpack your archive, and you will see "bin", "Windows", "src" directories
+and other files.  The wrapper scripts: 
 
 	./bin/ssl_tightvncviewer
 	./bin/tightvncviewer
@@ -133,13 +141,16 @@ assuming $HOME/bin is in your $PATH:
 "install" this package on Unix.
 
 
-On Windows run:
+On Windows unpack your archive and run:
 
 	Windows/ssl_tightvncviewer.exe
 
 
 Examples:
 --------
+
+The following assume you are in the toplevel directory of the
+archive you unpacked.
 
 Use enhanced TightVNC unix viewer to connect to x11vnc via SSL:
 
@@ -213,12 +224,16 @@ See also:
 Windows:
 -------
 
+	Unpack the zip archive somewhere.
+
 	A wrapper to create a STUNNEL tunnel and then launch the
 	Windows TightVNC viewer is provided in:
 
 		Windows/ssl_tightvncviewer.exe
 
-	Just launch it and fill in the remote VNC display.
+	Just launch it (Start ... Run) and fill in the remote VNC
+	display then click "Connect".  You can make a shortcut if
+	you prefer.
 
 	Click the Help buttons for more info.  There is also a
 	Windows/README.txt file.
@@ -226,3 +241,4 @@ Windows:
 	On Windows you may need to terminate the STUNNEL process
 	from the System Tray if the tool cannot terminate it
 	by itself.  Just right-click on the STUNNEL icon.
+

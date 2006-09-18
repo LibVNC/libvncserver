@@ -841,9 +841,32 @@ proc contag {} {
 	set str "-$str-$concount"
 }
 
+proc make_plink {} {
+	catch {destroy .plink}
+	toplevel .plink
+	#wm geometry .plink +700+500
+	wm geometry .plink -40-40
+	wm title .plink "plink SSH status?"
+	set wd 37
+	label .plink.l1 -anchor w -text "Login via plink/ssh to the remote server" -width $wd
+	label .plink.l2 -anchor w -text "(supply username and password as needed)." -width $wd
+	label .plink.l3 -anchor w -text "" -width $wd
+	label .plink.l4 -anchor w -text "After ssh is set up, AND if the connection" -width $wd
+	label .plink.l5 -anchor w -text "success is not autodetected, please click" -width $wd
+	label .plink.l6 -anchor w -text "one of these buttons:" -width $wd
+	global plink_status
+	button .plink.fail -text "Failed" -command {destroy .plink; set plink_status no}
+	button .plink.ok   -text "Success" -command {destroy .plink; set plink_status yes}
+	pack .plink.l1 .plink.l2 .plink.l3 .plink.l4 .plink.l5 .plink.l6 .plink.fail .plink.ok -side top -fill x
+
+	#wm deiconify .plink
+	update
+}
+
 proc launch_windows_ssh {hp file n} {
 	global is_win9x 
 	global use_sshssl use_ssh putty_pw
+	global port_knocking_list
 
 	set hpnew  [get_ssh_hp $hp]
 	set proxy  [get_ssh_proxy $hp]
@@ -865,7 +888,10 @@ proc launch_windows_ssh {hp file n} {
 		}
 	}
 
-	if {$vnc_disp < 200} {
+	set vnc_port 5900
+	if {![regexp {^[0-9][0-9]*$} $vnc_disp]} {
+		;
+	} elseif {$vnc_disp < 200} {
 		set vnc_port [expr $vnc_disp + 5900]
 	} else {
 		set vnc_port $vnc_disp
@@ -900,6 +926,9 @@ proc launch_windows_ssh {hp file n} {
 	if {$is_win9x} {
 		set pwd [pwd]
 		regsub -all {/} $pwd "\\" pwd
+	}
+	if {! [regexp {^[0-9][0-9]*$} $n]} {
+		set n 0
 	}
 
 	set use [expr $n + 5900]
@@ -1042,6 +1071,9 @@ proc launch_windows_ssh {hp file n} {
 			set plink_str "putty.exe -ssh -C -P $ssh_port $extra_redirs -t $pw $ssh_host" 
 		    } else {
 			set plink_str "start \"putty $ssh_host\" putty.exe -ssh -C -P $ssh_port $extra_redirs -t $pw $ssh_host" 
+			if [regexp {FINISH} $port_knocking_list] {
+				regsub {start} $plink_str "start /wait" plink_str
+			}
 		    }
 		} else {
 			set plink_str "plink.exe -ssh -C -P $ssh_port $extra_redirs -t $pw $ssh_host" 
@@ -1066,7 +1098,7 @@ proc launch_windows_ssh {hp file n} {
 	catch {destroy .o}
 	catch {destroy .oa}
 
-	if { ![do_port_knock $ssh_host]} {
+	if { ![do_port_knock $ssh_host start]} {
 		catch {file delete $file}
 		if {$file_cmd != ""} {
 			catch {file delete $file_cmd}
@@ -1092,7 +1124,6 @@ proc launch_windows_ssh {hp file n} {
 		}
 
 		if {$file_pre != ""} {
-			exec $com /c $file_pre &
 			set sl 0
 			if {$use_smbmnt}  {
 				global smb_su_mode
@@ -1111,17 +1142,30 @@ proc launch_windows_ssh {hp file n} {
 			set sl [expr $sl + 5]
 			set st [clock seconds]
 			set dt 0
-			global entered_gui_top
+			global entered_gui_top button_gui_top
 			set entered_gui_top 0
+			set button_gui_top 0
+
+			catch {wm geometry . "-40-40"}
+			catch {wm withdraw .; update; wm deiconify .; raise .; update}
+			mesg "Click on *This* Label when done with 1st SSH 0/$sl"
+			after 600
+
+			exec $com /c $file_pre &
+
+			catch {lower .; update; raise .; update}
 
 			while {$dt < $sl} {
 				after 100
 				set dt [clock seconds]
 				set dt [expr $dt - $st]
-				mesg "Click or Enter when done with 1st SSH $dt/$sl"
+				mesg "Click on *This* Label when done with 1st SSH $dt/$sl"
 				update
 				update idletasks
-				if {$entered_gui_top != 0 && $dt >= 3} {
+				if {$dt <= 1} {
+					set button_gui_top 0
+				}
+				if {$button_gui_top != 0 && $dt >= 3} {
 					mesg "Running 2nd SSH now ..."
 					after 1000
 					break
@@ -1130,34 +1174,31 @@ proc launch_windows_ssh {hp file n} {
 			mesg "Running 2nd SSH ..."
 		}
 
+		if {! $do_shell} {
+			make_plink
+		}
 		wm withdraw .
 		update
-		exec $com /c $file &
+		if {$do_shell && [regexp {FINISH} $port_knocking_list]} {
+			catch {exec $com /c $file}
+		} else {
+			exec $com /c $file &
+		}
 		after 1000
 	}
 
 	if {$do_shell} {
 		wm deiconify .
+		update
+		if {[regexp {FINISH} $port_knocking_list]} {
+			do_port_knock $ssh_host finish
+		}
 		return 1
 	}
-
-	catch {destroy .plink}
-	toplevel .plink
-	wm title .plink "plink SSH status?"
-	set wd 37
-	label .plink.l1 -anchor w -text "Login via plink/ssh to the remote server" -width $wd
-	label .plink.l2 -anchor w -text "(supply username and password as needed)." -width $wd
-	label .plink.l3 -anchor w -text "" -width $wd
-	label .plink.l4 -anchor w -text "After ssh is set up, AND if the connection" -width $wd
-	label .plink.l5 -anchor w -text "success is not autodetected, please click" -width $wd
-	label .plink.l6 -anchor w -text "one of these buttons:" -width $wd
+	if {$is_win9x} {
+		make_plink
+	}
 	global plink_status
-	button .plink.fail -text "Failed" -command {destroy .plink; set plink_status no}
-	button .plink.ok   -text "Success" -command {destroy .plink; set plink_status yes}
-	pack .plink.l1 .plink.l2 .plink.l3 .plink.l4 .plink.l5 .plink.l6 .plink.fail .plink.ok -side top -fill x
-
-	wm geometry .plink +700+500
-	wm deiconify .plink
 	set plink_status ""
 	set waited 0
 	set cnt 0
@@ -1176,14 +1217,13 @@ proc launch_windows_ssh {hp file n} {
 		}
 
 		if {$waited == 0} {
-			wm deiconify .plink
+			#wm deiconify .plink
 		}
 		set waited [expr "$waited + 500"]
 
 		incr cnt
 		if {$cnt >= 12} {
 			set cnt 0
-			#catch {wm deiconify .plink}
 		}
 	}
 	if {$plink_status == ""} {
@@ -1212,6 +1252,10 @@ proc launch_windows_ssh {hp file n} {
 		do_viewer_windows $n
 		wm deiconify .
 		mesg "Disconnected from $hp"
+	}
+	update
+	if [regexp {FINISH} $port_knocking_list] {
+		do_port_knock $ssh_host finish
 	}
 
 	if {$file != ""} {
@@ -1360,7 +1404,7 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 			set c "$c -sshargs '$smb_redir_0'"
 		}
 
-		if {! [do_port_knock $pk_hp]} {
+		if {! [do_port_knock $pk_hp start]} {
 			return
 		}
 		set did_port_knock 1
@@ -1410,6 +1454,7 @@ proc launch_unix {hp} {
 	global smb_redir_0 smb_mounts
 	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
+	global port_knocking_list
 
 	set cmd ""
 
@@ -1505,14 +1550,24 @@ proc launch_unix {hp} {
 				set pk_hp $hp
 			}
 			if {! $did_port_knock} {
-				if {! [do_port_knock $pk_hp]} {
+				if {! [do_port_knock $pk_hp start]} {
 					return
 				}
 				set did_port_knock 1
 			}
 
-			exec xterm -geometry $geometry -title "SHELL to $hp" \
-			    -e sh -c "$cmd" &
+			if {[regexp {FINISH} $port_knocking_list]} {
+				wm withdraw .
+				update
+				exec xterm -geometry $geometry \
+				    -title "SHELL to $hp" -e sh -c "$cmd"
+				wm deiconify .
+				update
+				do_port_knock $pk_hp finish
+			} else {
+				exec xterm -geometry $geometry \
+				    -title "SHELL to $hp" -e sh -c "$cmd" &
+			}
 			set env(SSL_VNCVIEWER_SSH_CMD) ""
 			set env(SSL_VNCVIEWER_SSH_ONLY) ""
 			set env(SSL_VNCVIEWER_USE_C) ""
@@ -1598,7 +1653,6 @@ proc launch_unix {hp} {
 
 	catch {destroy .o}
 	catch {destroy .oa}
-	wm withdraw .
 	update
 
 	if {$sound_daemon_local_start && $sound_daemon_local_cmd != ""} {
@@ -1612,12 +1666,15 @@ proc launch_unix {hp} {
 		set pk_hp $hp
 	}
 	if {! $did_port_knock} {
-		if {! [do_port_knock $pk_hp]} {
+		if {! [do_port_knock $pk_hp start]} {
 			wm deiconify .
+			update
 			return
 		}
 		set did_port_knock 1
 	}
+	wm withdraw .
+	update
 
 	set geometry [xterm_center_geometry]
 	set xrm1 "*.srinterCommand:true"
@@ -1647,6 +1704,9 @@ proc launch_unix {hp} {
 	}
 	wm deiconify .
 	mesg "Disconnected from $hp"
+	if {[regexp {FINISH} $port_knocking_list]} {
+		do_port_knock $pk_hp finish
+	}
 }
 
 proc kill_stunnel {pids} {
@@ -1886,12 +1946,22 @@ proc launch {{hp ""}} {
 		set list [split $hp ":"] 
 		set host [lindex $list 0]
 		set disp [lindex $list 1]
+		set disp [string trim $disp]
+		regsub { .*$} $disp "" disp
+		if {$disp == ""} {
+			set disp 0
+		}
 		set port [expr "$disp + 5900"]
 	}
 
 	set list [split $hp ":"] 
 	set host [lindex $list 0]
 	set disp [lindex $list 1]
+	set disp [string trim $disp]
+	regsub { .*$} $disp "" disp
+	if {$disp == "" || ! [regexp {^[0-9][0-9]*$} $disp]} {
+		set disp 0
+	}
 	set port [expr "$disp + 5900"]
 
 	if {$debug} {
@@ -1936,6 +2006,12 @@ proc launch {{hp ""}} {
 		puts $fh "verify = 2"
 	}
 
+	if {$n == ""} {
+		set n 10
+	}
+	if {$n2 == ""} {
+		set n2 11
+	}
 	puts $fh "\[vnc$n\]"
 	set port2 [expr "$n + 5900"] 
 	puts $fh "accept = localhost:$port2"
@@ -1952,7 +2028,7 @@ proc launch {{hp ""}} {
 	close $fh
 
 	if {! $did_port_knock} {
-		if {! [do_port_knock $host]} {
+		if {! [do_port_knock $host start]} {
 			set fail 1
 		}
 		set did_port_knock 1
@@ -1997,6 +2073,11 @@ proc launch {{hp ""}} {
 	}
 	mesg "Disconnected from $hp."
 
+	global port_knocking_list
+	if [regexp {FINISH} $port_knocking_list] {
+		do_port_knock $host finish
+	}
+
 	if {[llength $pids_new] > 0} {
 		set plist [join $pids_new ", "]
 		global terminate_pids
@@ -2018,7 +2099,8 @@ proc launch {{hp ""}} {
 	}
 }
 
-proc get_idir {str} {
+proc get_idir_certs {str} {
+	global is_windows env
 	set idir ""
 	if {$str != ""} {
 		if [file isdirectory $str] {
@@ -2028,16 +2110,23 @@ proc get_idir {str} {
 		}
 	}
 	if {$idir == ""} {
-		global env
-		if [info exists env(HOME)] {
-			set t "$env(HOME)/.vnc/certs"	
+		if {$is_windows} {
+			set t [file dirname [pwd]]
+			set t "$t/certs"
 			if [file isdirectory $t] {
 				set idir $t
 			}
 		}
+		if {$idir == ""} {
+			if [info exists env(HOME)] {
+				set t "$env(HOME)/.vnc/certs"	
+				if [file isdirectory $t] {
+					set idir $t
+				}
+			}
+		}
 	}
 	if {$idir == ""} {
-		global is_windows
 		if {$is_windows} {
 			set idir [get_profiles_dir]
 		}
@@ -2050,7 +2139,7 @@ proc get_idir {str} {
 
 proc set_mycert {} {
 	global mycert
-	set idir [get_idir $mycert]
+	set idir [get_idir_certs $mycert]
 	set t ""
 	if {$idir != ""} {
 		set t [tk_getOpenFile -initialdir $idir]
@@ -2105,7 +2194,7 @@ proc show_svcert {} {
 
 proc set_svcert {} {
 	global svcert crtdir
-	set idir [get_idir $svcert]
+	set idir [get_idir_certs $svcert]
 	set t ""
 	if {$idir != ""} {
 		set t [tk_getOpenFile -initialdir $idir]
@@ -2122,7 +2211,7 @@ proc set_svcert {} {
 
 proc set_crtdir {} {
 	global svcert crtdir
-	set idir [get_idir $crtdir]
+	set idir [get_idir_certs $crtdir]
 	set t ""
 	if {$idir != ""} {
 		set t [tk_chooseDirectory -initialdir $idir]
@@ -2140,7 +2229,7 @@ proc set_crtdir {} {
 proc set_createcert_file {} {
 	global ccert
 	if {[info exists ccert(FILE)]} {
-		set idir [get_idir $ccert(FILE)]
+		set idir [get_idir_certs $ccert(FILE)]
 	}
 	if {$idir != ""} {
 		set t [tk_getSaveFile -defaultextension ".pem" -initialdir $idir]
@@ -2591,14 +2680,8 @@ proc create_cert {} {
 	set tcert(DAYS) "Days until expiration:"
 
 	if {$ccert(FILE) == ""} {
-		global is_windows
-		if {$is_windows} {
-			set pdir [get_profiles_dir]
-			set ccert(FILE) "$pdir/vnccert.pem"
-		} else {
-			set idir [get_idir ""]
-			set ccert(FILE) "$idir/vnccert.pem"
-		}
+		set idir [get_idir_certs ""]
+		set ccert(FILE) "$idir/vnccert.pem"
 	}
 
 	button .ccrt.cancel -text "Cancel" -command {destroy .ccrt; catch {raise .c}}
@@ -2671,7 +2754,7 @@ proc import_browse {} {
 
 	set idir ""
 	if {$import_file != ""} {
-		set idir [get_idir $import_file]
+		set idir [get_idir_certs $import_file]
 	}
 	if {$idir != ""} {
 		set t [tk_getOpenFile -initialdir $idir]
@@ -2690,15 +2773,10 @@ proc import_save_browse {} {
 
 	set idir ""
 	if {$import_save_file != ""} {
-		set idir [get_idir $import_save_file]
+		set idir [get_idir_certs $import_save_file]
 	}
 	if {$idir == ""} {
-		global is_windows
-		if {$is_windows} {
-			set idir [get_profiles_dir]
-		} else {
-			set idir [get_idir ""]
-		}
+		set idir [get_idir_certs ""]
 	}
 	if {$idir != ""} {
 		set t [tk_getSaveFile -defaultextension ".crt" -initialdir $idir]
@@ -3132,6 +3210,7 @@ proc save_profile {} {
 	set host $h
 	regsub {[ 	].*$} $p "" p
 	regsub {^.*:} $p "" p
+	regsub { .*$} $p "" p
 	if {$p == ""} {
 		set p 0
 	}
@@ -3737,6 +3816,9 @@ set cmd(6) {
 	fi
 
 
+	echo
+	#FINMSG
+	echo
 	echo "--vnc-helper-exiting--"
 	echo
 	rm -f $0
@@ -3781,9 +3863,8 @@ set cmd(6) {
 		}
 	}
 	
-	global use_smbmnt smb_su_mode
+	global use_smbmnt smb_su_mode smb_mounts 
 	if {$use_smbmnt} {
-		global smb_mounts 
 		if {$smb_mounts != ""} {
 			set smbm $smb_mounts
 			regsub -all {%USER} $smbm "__USER__" smbm
@@ -3827,6 +3908,24 @@ set cmd(6) {
 		}
 	}
 	
+	if {$mode == "pre"} {
+		set dopre 0
+		if {$use_smbmnt && $smb_mounts != ""} {
+			set dopre 1
+		}
+		if {$use_sound && $sound_daemon_kill} {
+			set dopre 1
+		}
+		if {$dopre} {
+			global is_windows
+			if {$is_windows} {
+				regsub {#FINMSG} $cmdall {echo "Now Go Click on the Label to Start the 2nd SSH"} cmdall
+			} else {
+				regsub {#FINMSG} $cmdall {echo "Finished with the 1st SSH tasks, the 2nd SSH should start shortly..."} cmdall
+			}
+		}
+	}
+
 	if {"$orig" == "$cmdall"} {
 		return ""
 	} else {
@@ -5147,7 +5246,7 @@ proc read_from_pad {file} {
 	return $match
 }
 
-proc do_port_knock {hp} {
+proc do_port_knock {hp mode} {
 	global use_port_knocking port_knocking_list
 	global is_windows
 
@@ -5156,6 +5255,19 @@ proc do_port_knock {hp} {
 	}
 	if {$port_knocking_list == ""} {
 		return 1
+	}
+	set list $port_knocking_list
+
+	if {$mode == "finish"} {
+		if {! [regexp {FINISH} $list]} {
+			return 1
+		} else {
+			regsub {^.*FINISH} $list "" list
+		}
+	} elseif {$mode == "start"} {
+		if {[regexp {FINISH} $list]} {
+			regsub {FINISH.*$} $list "" list
+		}
 	}
 
 	set default_delay 0
@@ -5167,10 +5279,13 @@ proc do_port_knock {hp} {
 
 	if {$host0 == ""} {
 		bell
-		mesg "No host: $hp"
+		mesg "PortKnock: No host: $hp"
 		return 0
 	}
-	if [regexp {PAD=([^\n]+)} $port_knocking_list mv padfile] {
+
+	set m ""
+	
+	if [regexp {PAD=([^\n]+)} $list mv padfile] {
 		set tlist [read_from_pad $padfile] 
 		set tlist [string trim $tlist]
 		if {$tlist == "" || $tlist == "FAIL"} {
@@ -5179,9 +5294,7 @@ proc do_port_knock {hp} {
 				-title "Error: Padfile $padfile"
 			return 0
 		}
-		regsub -all {PAD=([^\n]+)} $port_knocking_list $tlist list
-	} else {
-		set list $port_knocking_list
+		regsub -all {PAD=([^\n]+)} $list $tlist list
 	}
 
 	set spl ",\n\r"
@@ -5203,25 +5316,30 @@ proc do_port_knock {hp} {
 		if [regexp {^#} $line] {
 			continue
 		}
+
 		if [regexp {^sleep[ \t][ \t]*([0-9][0-9]*)} $line mv sl] {
-			mesg "sleep: $sl"
+			set m "PortKnock: sleep $sl"
+			mesg $m
 			after $sl
 			continue
 		}
 		if [regexp {^delay[ \t][ \t]*([0-9][0-9]*)} $line mv sl] {
-			mesg "delay: $sl"
+			set m "PortKnock: delay=$sl"
+			mesg $m
 			set default_delay $sl
 			continue
 		}
 
 		if [regexp {^CMD=(.*)} $line mv cmd] {
-			mesg "CMD: $cmd"
+			set m "PortKnock: CMD: $cmd"
+			mesg $m
 			eval exec $cmd
 			continue
 		}
 		if [regexp {^CMDX=(.*)} $line mv cmd] {
 			set cmd [pk_expand $cmd $host0]
-			mesg "CMDX: $cmd"
+			set m "PortKnock: CMDX: $cmd"
+			mesg $m
 			eval exec $cmd
 			continue
 		}
@@ -5271,22 +5389,26 @@ proc do_port_knock {hp} {
 
 		if {$port == ""} {
 			bell
-			mesg "No port found: \"$line0\""
+			set m "PortKnock: No port found: \"$line0\""
+			mesg $m
 			return 0
 		}
 		if {! [regexp {^[0-9][0-9]*$} $port]} {
 			bell
-			mesg "Invalid port: \"$port\""
+			set m "PortKnock: Invalid port: \"$port\""
+			mesg $m
 			return 0
 		}
 		if {[regexp {[ \t]} $host]} {
 			bell
-			mesg "Invalid host: \"$host\""
+			set m "PortKnock: Invalid host: \"$host\""
+			mesg $m
 			return 0
 		}
 		if {! [regexp {^[-A-z0-9_.][-A-z0-9_.]*$} $host]} {
 			bell
-			mesg "Invalid host: \"$host\""
+			set m "PortKnock: Invalid host: \"$host\""
+			mesg $m
 			return 0
 		}
 
@@ -5295,7 +5417,8 @@ proc do_port_knock {hp} {
 			set nc [find_netcat]
 			if {$nc == ""} {
 				bell
-				mesg "UDP: netcat(1) not found"
+				set m "PortKnock: UDP: netcat(1) not found"
+				mesg $m
 				after 1000
 				continue
 			}
@@ -5313,7 +5436,8 @@ proc do_port_knock {hp} {
 			puts -nonewline $fh "$snd"
 			close $fh
 
-			mesg "SEND: $host $port"
+			set m "PortKnock: SEND: $host $port"
+			mesg $m
 			if {$is_windows} {
 				if {$udp} {
 					catch {exec $nc -d -u -w 1 "$host" "$port" < $pfile &}
@@ -5330,7 +5454,8 @@ proc do_port_knock {hp} {
 			catch {after 50; file delete $pfile}
 			
 		} elseif {$udp} {
-			mesg "UDP: $host $port"
+			set m "PortKnock: UDP: $host $port"
+			mesg $m
 			if {! $is_windows} {
 				catch {exec echo a | $nc -u -w 1 "$host" "$port" &}
 			} else {
@@ -5340,7 +5465,8 @@ proc do_port_knock {hp} {
 				catch {exec $nc -d -u -w 1 "$host" "$port" < "nc_in.txt" &}
 			}
 		} else {
-			mesg "TCP: $host $port"
+			set m "PortKnock: TCP: $host $port"
+			mesg $m
 			set s ""
 			set emess ""
 			set rc [catch {set s [socket -async $host $port]} emess]
@@ -5383,6 +5509,10 @@ proc do_port_knock {hp} {
 	if {$is_windows} {
 		catch {file delete "nc_in.txt"}
 	}
+	if {$m != ""} {
+		set m "$m,"
+	}
+	mesg "PortKnock: done"
 	return 1
 }
 
@@ -5480,6 +5610,14 @@ proc port_knocking_dialog {} {
     In examples 2 and 3, "fw.example.com" represents some machine other than
     the VNC/SSH host.  By default, the VNC/SSH host is the one the packet is
     sent to.
+
+    If one of the items is the string "FINISH", then the part before it is
+    used prior to connecting and the part after is used once the connection
+    is finished.  This can be used, say, to close the firewall port.  Example:
+
+           5433, 12321, FINISH, 7659, 2314
+
+    (or one can split them up via lines as above.)
 
 
     Advanced port knock actions:
@@ -5940,10 +6078,11 @@ bind . <Control-q> "destroy .; exit"
 bind . <Shift-Escape> "destroy .; exit"
 bind . <Control-s> "launch_shell_only"
 
-global entered_gui_top
+global entered_gui_top button_gui_top
 set entered_gui_top 0
+set button_gui_top 0
 bind . <Enter> {set entered_gui_top 1}
+bind .l <ButtonPress> {set button_gui_top 1}
+bind .f.l <ButtonPress> {set button_gui_top 1}
 
-
-#smb_help_me_decide
 update
