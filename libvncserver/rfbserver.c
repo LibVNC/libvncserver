@@ -1292,8 +1292,9 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
 	tv.tv_usec = 0;
 	n = select(cl->sock + 1, NULL, &wfds, NULL, &tv);
 
-	if (n<1)
+	if (n<0) {
             rfbLog("rfbSendFileTransferChunk() select failed: %s\n", strerror(errno));
+	}
         /* We have space on the transmit queue */
 	if (n > 0)
 	{

@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sun Sep 17 13:31:31 EDT 2006
+x11vnc README file                         Date: Sun Sep 17 19:51:07 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -44,11 +44,12 @@ x11vnc: a VNC server for real X displays
    or questions.
 
    An x11vnc side-project provides an [17]Enhanced TightVNC Viewer
-   package with automatic SSL and/or SSH tunnelling support, NewFBSize
-   support on Unix, and cursor alphablending. Please help test out some
-   recently added features: automatic service tunnelling via SSH for CUPS
-   and SMB Printing, ESD/ARTSD Audio, and SMB (Windows/Samba) filesystem
-   mounting; and Port Knocking.
+   package with automatic SSL and/or SSH tunnelling support, SSL
+   Certificate creation, NewFBSize support on Unix, and cursor
+   alphablending. Please help test out some recently added features:
+   automatic service tunnelling via SSH for CUPS and SMB Printing,
+   ESD/ARTSD Audio, and SMB (Windows/Samba) filesystem mounting; and Port
+   Knocking.
 
     Background:
 
@@ -7708,6 +7709,7 @@ Enhanced TightVNC Viewer
        only)
      * xgrabserver support for fullscreen mode, for old window managers
        (-grab option, Unix only).
+     * Create or Import SSL Certificates and Private Keys.
      * Automatic Service tunnelling via SSH for CUPS and SMB Printing,
        ESD/ARTSD Audio, and SMB (Windows/Samba) filesystem mounting.
      * Port Knocking for "closed port" SSH/SSL connections. In addition

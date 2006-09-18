@@ -394,6 +394,47 @@ if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnow() - x11vnc_start)
 	return msec;
 }
 
+void check_filexfer(void) {
+	static time_t last_check = 0;
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int transferring = 0; 
+	
+	if (time(NULL) <= last_check) {
+		return;
+	}
+
+#if 0
+	if (getenv("NOFT")) {
+		return;
+	}
+#endif
+
+	iter = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		if (cl->fileTransfer.receiving) {
+			transferring = 1;
+			break;
+		}
+		if (cl->fileTransfer.sending) {
+			transferring = 1;
+			break;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+
+	if (transferring) {
+		double start = dnow();
+		while (dnow() < start + 0.5) {
+			rfbCFD(5000);
+			rfbCFD(1000);
+			rfbCFD(0);
+		}
+	} else {
+		last_check = time(NULL);
+	}
+}
+
 /*
  * main x11vnc loop: polls, checks for events, iterate libvncserver, etc.
  */
@@ -515,6 +556,7 @@ static void watch_loop(void) {
 			check_xevents(0);
 			check_autorepeat();
 			check_pm();
+			check_filexfer();
 			check_keycode_state();
 			check_connect_inputs();		
 			check_gui_inputs();		
