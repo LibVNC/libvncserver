@@ -2168,7 +2168,7 @@ proc check_pp {} {
 proc get_openssl {} {
 	global is_windows
 	if {$is_windows} {
-		set ossl "util/openssl"
+		set ossl "openssl.exe"
 	} else {
 		set ossl "openssl"
 	}
@@ -2177,10 +2177,9 @@ proc get_openssl {} {
 proc get_x509_info {crt} {
 	set ossl [get_openssl]
 	set info ""
-	#puts "$ossl x509 -text -in \"$crt\""
+	update
 	set ph [open "| $ossl x509 -text -in \"$crt\"" "r"]
 	while {[gets $ph line] > -1} {
-		#puts "line: $line"
 		append info "$line\n"
 	}
 	close $ph
@@ -2322,6 +2321,7 @@ emailAddress_max                = 64
 		if {$is_win9x} {
 			catch {file delete $pem}
 			catch {file delete $crt}
+			update
 			eval exec $cmd &
 			catch {raise .}
 			set sl 0
@@ -2342,14 +2342,16 @@ emailAddress_max                = 64
 			}
 			mesg ""
 		} else {
+			update
 			set rc [catch {eval exec $cmd} emess]
-			if {$rc != 0} {
+			if {$rc != 0 && [regexp -nocase {error:} $emess]} {
 				tk_messageBox -type ok -icon error -message $emess -title "OpenSSL req command failed"
 				return
 			}
 		}
 	} else {
 		set geometry [xterm_center_geometry]
+		update
 		eval exec xterm -geometry $geometry -title Running_OpenSSL -e $cmd
 	}
 	catch {file delete $tmp}
@@ -2371,6 +2373,7 @@ emailAddress_max                = 64
 		set cmd "$ossl rsa -in \"$pem\" -des3 -out \"$pem\" -passout stdin"
 		set ph ""
 		set emess ""
+		update
 		set rc [catch {set ph [open "| $cmd" "w"]} emess]
 		if {$rc != 0 || $ph == ""} {
 			tk_messageBox -type ok -icon error -message $emess -title "Count not encrypt private key"
@@ -2498,10 +2501,11 @@ proc create_cert {} {
     certificate files to the remote VNC Server and have the VNC Server use
     it.  Or you could send it to the system administrator of the VNC Server.
 
-    We assume below that the filename selected in the "Save to file" entry
-    is "vnccert.pem".  That file will be generated and so will "vnccert.crt".
-    "vnccert.pem" contains both the Private Key and the Public Certificate.
-    "vnccert.crt" only contains the Public Certificate.
+    For the purpose of description, assume that the filename selected in the
+    "Save to file" entry is "vnccert.pem".  That file will be generated
+    by this process and so will the "vnccert.crt" file.  "vnccert.pem"
+    contains both the Private Key and the Public Certificate.  "vnccert.crt"
+    only contains the Public Certificate.
 
     For case 1) you would copy "vnccert.crt" to the VNC Server side and 
     instruct the server to use it.  For x11vnc it would be for example:
@@ -3964,13 +3968,14 @@ proc cups_dialog {} {
 	checkbutton .cups.cupsrc -anchor w -variable cups_manage_rcfile -text \
 		"Manage ServerName in the remote \$HOME/.cups/client.conf file for me"
 
+	button .cups.cancel -text "Cancel" -command {destroy .cups; set use_cups 0}
+	bind .cups <Escape> {destroy .cups; set use_cups 0}
 	button .cups.done -text "Done" -command {destroy .cups; if {$use_cups} {set_ssh}}
-	bind .cups <Escape> {destroy .cups; if {$use_cups} {set_ssh}}
 
 	button .cups.guess -text "Help me decide ..." -command {}
 	.cups.guess configure -state disabled
 
-	pack .cups.done .cups.guess .cups.cupsrc .cups.smbp .cups.smbs .cups.port .cups.serv -side bottom -fill x
+	pack .cups.done .cups.cancel .cups.guess .cups.cupsrc .cups.smbp .cups.smbs .cups.port .cups.serv -side bottom -fill x
 	pack .cups.f -side top -fill both -expand 1
 
 	center_win .cups
@@ -4112,10 +4117,11 @@ proc sound_dialog {} {
 		.snd.sdkl configure -state disabled
 	}
 
+	button .snd.cancel -text "Cancel" -command {destroy .snd; set use_sound 0}
+	bind .snd <Escape> {destroy .snd; set use_sound 0}
 	button .snd.done -text "Done" -command {destroy .snd; if {$use_sound} {set_ssh}}
-	bind .snd <Escape> {destroy .snd; if {$use_sound} {set_ssh}}
 
-	pack .snd.done .snd.guess .snd.sdkl .snd.sdsl .snd.sdr .snd.sdk .snd.lport .snd.rport \
+	pack .snd.done .snd.cancel .snd.guess .snd.sdkl .snd.sdsl .snd.sdr .snd.sdk .snd.lport .snd.rport \
 		.snd.local .snd.remote -side bottom -fill x
 	pack .snd.f -side bottom -fill both -expand 1
 
@@ -4591,6 +4597,7 @@ You can do this by either logging into the remote machine to find the info or as
 	global smb_wiz_done
 	set smb_wiz_done 0
 
+	button .smbwiz.cancel -text "Cancel" -command {set smb_wiz_done 1}
 	button .smbwiz.done -text "Done" -command {set smb_wiz_done 1}
 	pack .smbwiz.done -side bottom -fill x 
 	pack .smbwiz.f -side top -fill both -expand 1
@@ -4661,6 +4668,8 @@ You can do this by either logging into the remote machine to find the info or as
 
 	if {! $smbmount_exists || $smbmount_sumode == "dontknow"} {
 		tk_messageBox -type ok -icon warning -message "Sorry we couldn't help out!\n'smbmount' info on the remote system is required for SMB mounting" -title "SMB mounting -- aborting"
+		global use_smbmnt
+		set use_smbmnt 0
 		catch {raise .oa}
 		return
 	}
@@ -4851,10 +4860,11 @@ proc smb_dialog {} {
 	button .smb.guess -text "Help me decide ..." -command {destroy .smb; smb_help_me_decide}
 	#.smb.guess configure -state disabled
 
+	button .smb.cancel -text "Cancel" -command {set use_smbmnt 0; destroy .smb}
+	bind .smb <Escape> {set use_smbmnt 0; destroy .smb}
 	button .smb.done -text "Done" -command {if {$use_smbmnt} {set_ssh; set smb_mount_list [.smb.mnts get 1.0 end]}; destroy .smb}
-	bind .smb <Escape> {if {$use_smbmnt} {set_ssh; set smb_mount_list [.smb.mnts get 1.0 end]}; destroy .smb}
 
-	pack .smb.done .smb.guess .smb.mnts .smb.info .smb.r -side bottom -fill x
+	pack .smb.done .smb.cancel .smb.guess .smb.mnts .smb.info .smb.r -side bottom -fill x
 	pack .smb.f -side top -fill both -expand 1
 
 	center_win .smb
@@ -4964,10 +4974,11 @@ proc change_vncviewer_dialog {} {
 	pack .chviewer.path.b -side left
 	pack .chviewer.path.r -side left
 
+	button .chviewer.cancel -text "Cancel" -command {destroy .chviewer; set change_vncviewer 0}
+	bind .chviewer <Escape> {destroy .chviewer; set change_vncviewer 0}
 	button .chviewer.done -text "Done" -command {destroy .chviewer; catch {raise .oa}}
-	bind .chviewer <Escape> {destroy .chviewer; catch {raise .oa}}
 
-	pack .chviewer.t .chviewer.path .chviewer.done -side top -fill x
+	pack .chviewer.t .chviewer.path .chviewer.cancel .chviewer.done -side top -fill x
 
 	center_win .chviewer
 	wm resizable .chviewer 1 0
@@ -5030,10 +5041,11 @@ proc port_redir_dialog {} {
 	pack .redirs.path.l -side left
 	pack .redirs.path.e -side left -expand 1 -fill x
 
+	button .redirs.cancel -text "Cancel" -command {set additional_port_redirs 0; destroy .redirs}
+	bind .redirs <Escape> {set additional_port_redirs 0; destroy .redirs}
 	button .redirs.done -text "Done" -command {destroy .redirs}
-	bind .redirs <Escape> {destroy .redirs}
 
-	pack .redirs.t .redirs.path .redirs.done -side top -fill x
+	pack .redirs.t .redirs.path .redirs.cancel .redirs.done -side top -fill x
 
 	center_win .redirs
 	wm resizable .redirs 1 0
@@ -5549,10 +5561,11 @@ proc port_knocking_dialog {} {
 	.pk.rule insert end $port_knocking_list
 	#apply_bg .pk.rule
 
+	button .pk.cancel -text "Cancel" -command {set use_port_knocking 0; destroy .pk}
+	bind .pk <Escape> {set use_port_knocking 0; destroy .pk}
 	button .pk.done -text "Done" -command {if {$use_port_knocking} {set port_knocking_list [.pk.rule get 1.0 end]}; destroy .pk}
-	bind .pk <Escape> {if {$use_port_knocking} {set port_knocking_list [.pk.rule get 1.0 end]}; destroy .pk}
 
-	pack .pk.done .pk.rule .pk.info -side bottom -fill x
+	pack .pk.done .pk.cancel .pk.rule .pk.info -side bottom -fill x
 	pack .pk.f -side top -fill both -expand 1
 
 	center_win .pk
