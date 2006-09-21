@@ -569,7 +569,7 @@ static void watch_loop(void) {
 			check_xdamage_state();
 			check_xrecord_reset(0);
 			check_add_keysyms();
-			check_new_passwds();
+			check_new_passwds(0);
 			if (started_as_root) {
 				check_switched_user();
 			}
@@ -1049,7 +1049,15 @@ static void quick_pw(char *str) {
 	}
 	*q = '\0';
 	if (db) fprintf(stderr, "'%s' '%s'\n", p, q+1);
-	if (unixpw_nis) {
+	if (unixpw_cmd) {
+		if (cmd_verify(p, q+1)) {
+			fprintf(stdout, "Y %s\n", p);
+			exit(0);
+		} else {
+			fprintf(stdout, "N %s\n", p);
+			exit(1);
+		}
+	} else if (unixpw_nis) {
 		if (crypt_verify(p, q+1)) {
 			fprintf(stdout, "Y %s\n", p);
 			exit(0);
@@ -1707,6 +1715,16 @@ int main(int argc, char* argv[]) {
 			passwdfile = strdup(argv[++i]);
 			got_passwdfile = 1;
 #ifndef NO_SSL_OR_UNIXPW
+		} else if (!strcmp(arg, "-unixpw_cmd")
+		    || !strcmp(arg, "-unixpw_cmd_unsafe")) {
+			CHECK_ARGC
+			unixpw_cmd = strdup(argv[++i]);
+			unixpw = 1;
+			if (strstr(arg, "_unsafe")) {
+				/* hidden option for testing. */
+				set_env("UNIXPW_DISABLE_SSL", "1");
+				set_env("UNIXPW_DISABLE_LOCALHOST", "1");
+			}
 		} else if (strstr(arg, "-unixpw") == arg) {
 			unixpw = 1;
 			if (strstr(arg, "-unixpw_nis")) {
@@ -1741,6 +1759,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-ssltimeout")) {
 			CHECK_ARGC
 			ssl_timeout_secs = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-sslnofail")) {
+			ssl_no_fail = 1;
 		} else if (!strcmp(arg, "-ssldir")) {
 			CHECK_ARGC
 			ssl_certs_dir = strdup(argv[++i]);
@@ -2367,7 +2387,14 @@ int main(int argc, char* argv[]) {
 				listen_str = strdup(argv[i+1]);
 			}
 			/* otherwise copy it for libvncserver use below. */
-			if (argc_vnc < argc_vnc_max) {
+			if (!strcmp(arg, "-ultrafilexfer") ||
+			    !strcmp(arg, "-ultravncfilexfer")) {
+				if (argc_vnc + 2 < argc_vnc_max) {
+					argv_vnc[argc_vnc++] = strdup("-rfbversion");
+					argv_vnc[argc_vnc++] = strdup("3.6");
+					argv_vnc[argc_vnc++] = strdup("-permitfiletransfer");
+				}
+			} else if (argc_vnc < argc_vnc_max) {
 				argv_vnc[argc_vnc++] = strdup(arg);
 			} else {
 				rfbLog("too many arguments.\n");
@@ -2573,12 +2600,24 @@ int main(int argc, char* argv[]) {
 		}
 	} else if (passwdfile) {
 		/* read passwd(s) from file */
-		if (read_passwds(passwdfile)) {
+		if (strstr(passwdfile, "cmd:") == passwdfile ||
+		    strstr(passwdfile, "custom:") == passwdfile) {
+			char tstr[100], *q;
+			sprintf(tstr, "%f", dnow());
+			if ((q = strrchr(tstr, '.')) == NULL) {
+				q = tstr;
+			} else {
+				q++;
+			}
+			/* never used under cmd:, used to force auth */
+			argv_vnc[argc_vnc++] = strdup("-passwd");
+			argv_vnc[argc_vnc++] = strdup(q);
+		} else if (read_passwds(passwdfile)) {
 			argv_vnc[argc_vnc++] = strdup("-passwd");
 			argv_vnc[argc_vnc++] = strdup(passwd_list[0]);
-			got_passwd = 1;
-			pw_loc = 100;	/* just for pw_loc check below */
 		}
+		got_passwd = 1;
+		pw_loc = 100;	/* just for pw_loc check below */
 	}
 	if (vpw_loc > 0) {
 		int i;

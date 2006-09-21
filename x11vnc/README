@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sun Sep 17 19:51:07 EDT 2006
+x11vnc README file                         Date: Wed Sep 20 20:05:35 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -5627,10 +5627,9 @@ EndSection
    -permitfiletransfer"
    options (UltraVNC incorrectly uses the RFB protocol version to
    determine if its features are available, so x11vnc has to pretend to
-   be version 3.6).
-
-   If you find any bugs or performance issues with the file transfer,
-   please report them to the [621]LibVNCServer team.
+   be version 3.6). As of Sep/2006 "-ultrafilexfer" is an alias for these
+   two options. Note that running as RFB version 3.6 may confuse other
+   VNC Viewers.
 
 
    Q-101: Can I (temporarily) mount my local (viewer-side) Windows/Samba
@@ -5639,7 +5638,7 @@ EndSection
    You will have to use an external network redirection for this.
    Filesystem mounting is not part of the VNC protocol.
 
-   We show a simple [622]Samba example here.
+   We show a simple [621]Samba example here.
 
    First you will need a tunnel to redirect the SMB requests from the
    remote machine to the one you sitting at. We use an ssh tunnel:
@@ -5676,7 +5675,7 @@ d,ip=127.0.0.1,port=1139
   far-away> smbumount /home/fred/smb-haystack-pub
 
    At some point we hope to fold some automation for SMB ssh redir setup
-   into the [623]Enhanced TightVNC Viewer package we provide (as of Sep
+   into the [622]Enhanced TightVNC Viewer package we provide (as of Sep
    2006 it is there for testing).
 
 
@@ -5686,7 +5685,7 @@ d,ip=127.0.0.1,port=1139
    You will have to use an external network redirection for this.
    Printing is not part of the VNC protocol.
 
-   We show a simple Unix to Unix [624]CUPS example here. Non-CUPS port
+   We show a simple Unix to Unix [623]CUPS example here. Non-CUPS port
    redirections (e.g. LPD) should also be possible, but may be a bit more
    tricky. If you are viewing on Windows SMB and don't have a local cups
    server it may be trickier still (see below).
@@ -5758,7 +5757,7 @@ d,ip=127.0.0.1,port=1139
    "localhost".
 
    At some point we hope to fold some automation for CUPS ssh redir setup
-   into the [625]Enhanced TightVNC Viewer package we provide (as of Sep
+   into the [624]Enhanced TightVNC Viewer package we provide (as of Sep
    2006 it is there for testing).
 
 
@@ -5769,8 +5768,8 @@ d,ip=127.0.0.1,port=1139
    Audio is not part of the VNC protocol.
 
    We show a simple Unix to Unix esd example here (artsd should be
-   possible too, and perhaps even one or both of these have been ported
-   to Windows so you can redirect the sound there).
+   possible too, we have also verified the esd Windows port works for the
+   method described below).
 
    First you will need a tunnel to redirect the audio from the remote
    machine to the one you sitting at. We use an ssh tunnel:
@@ -5791,7 +5790,8 @@ way.east 'x11vnc -localhost -display :0'
   sitting-here> esd -promiscuous -port 16001 -tcp -bind 127.0.0.1
 
    See the esd(1) man page for the meaning of the options (the above are
-   not very secure).
+   not very secure). (This method also works with the EsounD windows port
+   esd.exe)
 
    To test this sound tunnel, we use the esdplay program to play a simple
    .wav file:
@@ -5858,8 +5858,8 @@ or:
        the applications will fail to run because LD_PRELOAD will point to
        libraries of the wrong wordsize.
      * At some point we hope to fold some automation for esd or artsd ssh
-       redir setup into the [626]Enhanced TightVNC Viewer package we
-       provide (as of Sep 2006 it is there for testing).
+       redir setup into the [625]Enhanced TightVNC Viewer package we
+       provide (as of Sep/2006 it is there for testing).
 
 
    Q-104: Why don't I hear the "Beeps" in my X session (e.g. when typing
@@ -5870,9 +5870,9 @@ or:
    in Solaris, see Xserver(1) for how to turn it on via +kb), and so you
    won't hear them if the extension is not present.
 
-   If you don't want to hear the beeps use the [627]-nobell option. If
+   If you don't want to hear the beeps use the [626]-nobell option. If
    you want to hear the audio from the remote applications, consider
-   trying a [628]redirector such as esd.
+   trying a [627]redirector such as esd.
 
 
 
@@ -6509,14 +6509,13 @@ References
  618. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-seldir
  619. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-input
  620. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nofilexfer
- 621. http://sourceforge.net/projects/libvncserver
- 622. http://www.samba.org/
- 623. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
- 624. http://www.cups.org/
+ 621. http://www.samba.org/
+ 622. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
+ 623. http://www.cups.org/
+ 624. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
  625. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
- 626. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
- 627. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nobell
- 628. http://www.karlrunge.com/x11vnc/index.html#faq-sound
+ 626. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nobell
+ 627. http://www.karlrunge.com/x11vnc/index.html#faq-sound
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/chainingssh.html:
@@ -7692,12 +7691,13 @@ http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html:
 Enhanced TightVNC Viewer
 
    The Enhanced TightVNC Viewer package is a project to add some patches
-   to the long neglected Unix TightVNC Viewer. It also adds a GUI for
-   Windows and Unix that automatically starts up a STUNNEL SSL tunnel for
-   SSL connections to [1]x11vnc (or any other VNC Server also running an
-   SSL tunnel, such as STUNNEL, at their end), and then launches the
-   TightVNC Viewer. The front-end program can also be used to set up SSH
-   tunnelled connections instead.
+   to the long neglected Unix TightVNC Viewer.
+
+   It also adds a front-end GUI for Windows and Unix that automatically
+   starts up a STUNNEL SSL tunnel for SSL connections to [1]x11vnc (or
+   any other VNC Server also running an SSL tunnel, such as STUNNEL, at
+   their end), and then launches the TightVNC Viewer. The front-end
+   program can also be used to set up SSH tunnelled connections instead.
 
    Patches were created for the TightVNC 1.3dev7 vnc_unixsrc tree (and
    various wrappers written) to add these features:
@@ -7716,7 +7716,7 @@ Enhanced TightVNC Viewer
        to a simple fixed port sequence and one-time-pad implementation, a
        hook is also provided to run any port knocking client before
        connecting.
-     * You can also use your own, e.g. UltraVNC or RealVNC, VNC Viewer
+     * You can also use your own VNC Viewer, e.g. UltraVNC or RealVNC,
        with the front-end if you like.
      * Sets up any additional SSH port redirections that you want.
 
@@ -7764,15 +7764,15 @@ Enhanced TightVNC Viewer
    (and there should be kinks to work out).
 
    This package can be downloaded here:
-    [8]enhanced_tightvnc_viewer-1.0.3.zip                 All Unix and Windows
+    [8]enhanced_tightvnc_viewer-1.0.4.zip                 All Unix and Windows
 binaries and source.  (~6MB)
-    [9]enhanced_tightvnc_viewer-1.0.3.tar.gz              All Unix and Windows
+    [9]enhanced_tightvnc_viewer-1.0.4.tar.gz              All Unix and Windows
 binaries and source.  (~6MB)
-    [10]enhanced_tightvnc_viewer_all-1.0.3.zip             All Unix and Windows
+    [10]enhanced_tightvnc_viewer_all-1.0.4.zip             All Unix and Windows
  binaries and source and full archives in zip dir. (~9MB)
-    [11]enhanced_tightvnc_viewer_windows_only-1.0.3.zip    Only the Windows bin
+    [11]enhanced_tightvnc_viewer_windows_only-1.0.4.zip    Only the Windows bin
 aries. (~4MB)
-    [12]enhanced_tightvnc_viewer_no_windows-1.0.3.tar.gz   No Windows binaries.
+    [12]enhanced_tightvnc_viewer_no_windows-1.0.4.tar.gz   No Windows binaries.
  (~2MB)
 
    Sorry for the inconvenience of lumping all the Unix binaries and
@@ -7805,7 +7805,7 @@ aries. (~4MB)
         [17]http://www.chiark.greenend.org.uk/~sgtatham/putty/
 
    It is my belief (but I cannot be absolutely sure) that the bundle
-   enhanced_tightvnc_viewer_no_windows-1.0.3.tar.gz contains no
+   enhanced_tightvnc_viewer_no_windows-1.0.4.tar.gz contains no
    cryptographic software (again, if your situation warrants, you will
    need to check). This "no_windows" tarball only contains software (from
    the above URL's and elsewhere) that will use cryptographic software
@@ -7879,17 +7879,24 @@ The enhanced TightVNC viewer features are:
         - xgrabserver support for fullscreen mode, for old window
           managers (-grab option, Unix only).
 
+        - Create or Import SSL Certificates and Private Keys.
+
         - Automatic Service tunnelling via SSH for CUPS and SMB Printing,
           ESD/ARTSD Audio, and SMB (Windows/Samba) filesystem mounting.
 
         - Port Knocking for "closed port" SSH/SSL connections.  In addition
-          to a simple fixed port sequence implementation and one-time-pad,
+          to a simple fixed port sequence and one-time-pad implementation,
           a hook is also provided to run any port knocking client before a
           connecting.
 
+        - You can also use your own VNC Viewer, e.g. UltraVNC or RealVNC,
+          with the front-end if you like.
+
+        - Sets up any additional SSH port redirections that you want.
+
 
 Your package should have included binaries for many OS's: Linux, Solaris,
-FreeBSD, etc.  See the subdirectories of
+FreeBSD, etc.  Unpack your archive and see the subdirectories of
 
         ./bin
 
@@ -7915,7 +7922,8 @@ README is in) and like this:
 The programs:
 ------------
 
-The wrapper scripts:
+Unpack your archive, and you will see "bin", "Windows", "src" directories
+and other files.  The wrapper scripts:
 
         ./bin/ssl_tightvncviewer
         ./bin/tightvncviewer
@@ -7948,13 +7956,16 @@ assuming $HOME/bin is in your $PATH:
 "install" this package on Unix.
 
 
-On Windows run:
+On Windows unpack your archive and run:
 
         Windows/ssl_tightvncviewer.exe
 
 
 Examples:
 --------
+
+The following assume you are in the toplevel directory of the
+archive you unpacked.
 
 Use enhanced TightVNC unix viewer to connect to x11vnc via SSL:
 
@@ -8028,12 +8039,16 @@ See also:
 Windows:
 -------
 
+        Unpack the zip archive somewhere.
+
         A wrapper to create a STUNNEL tunnel and then launch the
         Windows TightVNC viewer is provided in:
 
                 Windows/ssl_tightvncviewer.exe
 
-        Just launch it and fill in the remote VNC display.
+        Just launch it (Start ... Run) and fill in the remote VNC
+        display then click "Connect".  You can make a shortcut if
+        you prefer.
 
         Click the Help buttons for more info.  There is also a
         Windows/README.txt file.
@@ -8051,11 +8066,11 @@ References
    5. http://www.karlrunge.com/x11vnc/index.html#faq-smb-shares
    6. http://www.karlrunge.com/x11vnc/index.html#faq-cups
    7. http://www.karlrunge.com/x11vnc/index.html#faq-sound
-   8. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer-1.0.3.zip
-   9. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer-1.0.3.tar.gz
-  10. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer_all-1.0.3.zip
-  11. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer_windows_only-1.0.3.zip
-  12. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer_no_windows-1.0.3.tar.gz
+   8. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.4.zip
+   9. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.4.tar.gz
+  10. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_all-1.0.4.zip
+  11. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_windows_only-1.0.4.zip
+  12. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_no_windows-1.0.4.tar.gz
   13. http://www.tightvnc.com/
   14. http://www.realvnc.com/
   15. http://www.stunnel.org/
@@ -8073,7 +8088,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-17
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-20
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -8083,13 +8098,14 @@ x11vnc options:
   -24to32                  -scale fraction          -scale_cursor frac     
   -viewonly                -shared                  -once                  
   -forever                 -loop                    -timeout n             
-  -inetd                   -nofilexfer              -http                  
-  -http_ssl                -connect string          -connect_or_exit str   
-  -vncconnect              -novncconnect            -allow host1[,host2..] 
-  -localhost               -nolookup                -input string          
-  -grabkbd                 -grabptr                 -viewpasswd string     
-  -passwdfile filename     -unixpw [list]           -unixpw_nis [list]     
-  -display WAIT:...        -ssl [pem]               -ssltimeout n          
+  -inetd                   -nofilexfer              -ultrafilexfer         
+  -http                    -http_ssl                -connect string        
+  -connect_or_exit str     -vncconnect              -novncconnect          
+  -allow host1[,host2..]   -localhost               -nolookup              
+  -input string            -grabkbd                 -grabptr               
+  -viewpasswd string       -passwdfile filename     -unixpw [list]         
+  -unixpw_nis [list]       -unixpw_cmd str          -display WAIT:...      
+  -ssl [pem]               -ssltimeout n            -sslnofail             
   -ssldir [dir]            -sslverify [path]        -sslGenCA [dir]        
   -sslGenCert type name    -sslEncKey [pem]         -sslCertInfo [pem]     
   -sslDelCert [pem]        -stunnel [pem]           -stunnel3  [pem]       
@@ -8173,7 +8189,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-17
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-20
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -8470,10 +8486,11 @@ Options:
                        change the global or per-client viewonly state the
                        filetransfer permissions will NOT change.
 
-                       Note, to *enable* UltraVNC filetransfer (currently
+-ultrafilexfer         Note, to *enable* UltraVNC filetransfer (currently
                        disabled by default, this may change...) and to get it
                        to work you probably need to supply these libvncserver
                        options: "-rfbversion 3.6 -permitfiletransfer"
+                       "-ultrafilexfer" is an alias for this combination.
 
 -http                  Instead of using -httpdir (see below) to specify
                        where the Java vncviewer applet is, have x11vnc try
@@ -8587,20 +8604,59 @@ Options:
 -passwdfile filename   Specify the libvncserver password via the first line
                        of the file "filename" (instead of via -passwd on
                        the command line where others might see it via ps(1)).
-                       See below for how to supply multiple passwords.
+
+                       See the descriptions below for how to supply multiple
+                       passwords, view-only passwords, to specify external
+                       programs for the authentication, and other features.
 
                        If the filename is prefixed with "rm:" it will be
                        removed after being read.  Perhaps this is useful in
-                       limiting the readability of the file.  In general,
-                       the password file should not be readable by untrusted
-                       users (BTW: neither should the VNC -rfbauth file:
-                       it is NOT encrypted, only obscured).
+                       limiting the readability of the file.  In general, the
+                       password file should not be readable by untrusted users
+                       (BTW: neither should the VNC -rfbauth file: it is NOT
+                       encrypted, only obscured with a fixed key).
 
                        If the filename is prefixed with "read:" it will
-                       periodically be checked for changes and reread.
+                       periodically be checked for changes and reread.  It it
+                       guaranteed to be reread just when a new client connects
+                       so that the latest passwords will be used.
 
-                       Note that only the first 8 characters of a password
-                       are used.
+                       If "filename" is prefixed with "cmd:" then the
+                       string after the ":" is run as an external command:
+                       the output of the command will be interpreted as if it
+                       were read from a password file (see below).  If the
+                       command does not exit with 0, then x11vnc terminates
+                       immediately.  To specify more than 1000 passwords this
+                       way set X11VNC_MAX_PASSWDS before starting x11vnc.
+                       The environment variables are set as in -accept.
+
+                       Note that due to the VNC protocol only the first 8
+                       characters of a password are used (DES key).
+
+                       If "filename" is prefixed with "custom:" then a
+                       custom password checker is supplied as an external
+                       command following the ":". The command will be run
+                       when a client authenticates.  If the command exits with
+                       0 the client is accepted, otherwise it is rejected.
+                       The environment variables are set as in -accept.
+
+                       The standard input to the custom command will be a
+                       decimal digit "len" followed by a newline. "len"
+                       specifies the challenge size and is usually 16 (the
+                       VNC spec).  Then follows len bytes which is the random
+                       challenge string that was sent to the client. This is
+                       then followed by len more bytes holding the client's
+                       response (i.e. the challenge string encrypted via DES
+                       with the user password in the standard situation).
+
+                       The "custom:" scheme can be useful to implement
+                       dynamic passwords or to implement methods where longer
+                       passwords and/or different encryption algorithms
+                       are used.  The latter will require customizing the VNC
+                       client as well.  One could create an MD5SUM based scheme
+                       for example.
+
+                       File format for -passwdfile:
 
                        If multiple non-blank lines exist in the file they are
                        all taken as valid passwords.  Blank lines are ignored.
@@ -8762,6 +8818,17 @@ Options:
                        in /etc/shadow can then be authenticated.  You may want
                        to use -users unixpw= to switch the process user after
                        the user logs in.
+
+-unixpw_cmd str        As -unixpw above, however do not use su(1) but rather
+                       run the externally supplied command "str".  The first
+                       line of its stdin will the username and the second line
+                       the received password.  If the command exits with status
+                       0 (success) the VNC client will be accepted.  It will be
+                       rejected for any other return status.  Dynamic passwords
+                       and non-unix passwords can be implemented this way by
+                       providing your own custom helper program.  Note that
+                       under unixpw mode the remote viewer is given 3 tries
+                       to enter the correct password.
 
 -display_WAIT :...      A special usage mode for the normal -display option.
                        Useful with -unixpw, but can be used independently
@@ -8939,6 +9006,11 @@ Options:
                        timeout (25s for about the first minute, 43200s later).
                        Set to zero to poll forever.  Set to a negative value
                        to use the builtin setting.
+
+-sslnofail             Exit at the first SSL connection failure. Useful when
+                       scripting SSL connections (e.g. x11vnc is started via
+                       ssh) and you do not want x11vnc waiting around for more
+                       connections, tying up ports, etc.
 
 -ssldir [dir]          Use [dir] as an alternate ssl certificate and key
                        management toplevel directory.  The default is
@@ -11473,7 +11545,7 @@ n
 
                         stunnel, ssl, unixpw, WAIT, id, accept, afteraccept,
                         gone, pipeinput, v4l-info, rawfb-setup, dt, gui,
-                        storepasswd, crash.
+                        storepasswd, passwdfile, custom_passwd, crash.
 
                        See each option's help to learn the associated external
                        command.  Note that the -nocmds option takes precedence

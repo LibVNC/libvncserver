@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-09-17
+         version: 0.8.3, lastmod: 2006-09-20
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -373,11 +373,14 @@ Also clients that log in viewonly cannot transfer files.
 However, if the remote control mechanism is used to
 change the global or per-client viewonly state the
 filetransfer permissions will NOT change.
+.PP
+\fB-ultrafilexfer\fR
 .IP
 Note, to *enable* UltraVNC filetransfer (currently
 disabled by default, this may change...) and to get it
 to work you probably need to supply these libvncserver
 options: "\fB-rfbversion\fR \fI3.6 \fB-permitfiletransfer\fR"\fR
+"\fB-ultrafilexfer\fR" is an alias for this combination.
 .PP
 \fB-http\fR
 .IP
@@ -533,20 +536,59 @@ of the file \fIfilename\fR (instead of via \fB-passwd\fR on
 the command line where others might see it via 
 .IR ps (1)
 ).
-See below for how to supply multiple passwords.
+.IP
+See the descriptions below for how to supply multiple
+passwords, view-only passwords, to specify external
+programs for the authentication, and other features.
 .IP
 If the filename is prefixed with "rm:" it will be
 removed after being read.  Perhaps this is useful in
-limiting the readability of the file.  In general,
-the password file should not be readable by untrusted
-users (BTW: neither should the VNC \fB-rfbauth\fR file:
-it is NOT encrypted, only obscured).
+limiting the readability of the file.  In general, the
+password file should not be readable by untrusted users
+(BTW: neither should the VNC \fB-rfbauth\fR file: it is NOT
+encrypted, only obscured with a fixed key).
 .IP
 If the filename is prefixed with "read:" it will
-periodically be checked for changes and reread.
+periodically be checked for changes and reread.  It it
+guaranteed to be reread just when a new client connects
+so that the latest passwords will be used.
 .IP
-Note that only the first 8 characters of a password
-are used.
+If \fIfilename\fR is prefixed with "cmd:" then the
+string after the ":" is run as an external command:
+the output of the command will be interpreted as if it
+were read from a password file (see below).  If the
+command does not exit with 0, then x11vnc terminates
+immediately.  To specify more than 1000 passwords this
+way set X11VNC_MAX_PASSWDS before starting x11vnc.
+The environment variables are set as in \fB-accept.\fR
+.IP
+Note that due to the VNC protocol only the first 8
+characters of a password are used (DES key).
+.IP
+If \fIfilename\fR is prefixed with "custom:" then a
+custom password checker is supplied as an external
+command following the ":". The command will be run
+when a client authenticates.  If the command exits with
+0 the client is accepted, otherwise it is rejected.
+The environment variables are set as in \fB-accept.\fR
+.IP
+The standard input to the custom command will be a
+decimal digit "len" followed by a newline. "len"
+specifies the challenge size and is usually 16 (the
+VNC spec).  Then follows len bytes which is the random
+challenge string that was sent to the client. This is
+then followed by len more bytes holding the client's
+response (i.e. the challenge string encrypted via DES
+with the user password in the standard situation).
+.IP
+The "custom:" scheme can be useful to implement
+dynamic passwords or to implement methods where longer
+passwords and/or different encryption algorithms
+are used.  The latter will require customizing the VNC
+client as well.  One could create an MD5SUM based scheme
+for example.
+.IP
+File format for \fB-passwdfile:\fR
 .IP
 If multiple non-blank lines exist in the file they are
 all taken as valid passwords.  Blank lines are ignored.
@@ -732,6 +774,21 @@ as root and use \fB-unixpw_nis.\fR  Any users with passwords
 in /etc/shadow can then be authenticated.  You may want
 to use \fB-users\fR unixpw= to switch the process user after
 the user logs in.
+.PP
+\fB-unixpw_cmd\fR \fIstr\fR
+.IP
+As \fB-unixpw\fR above, however do not use 
+.IR su (1)
+but rather
+run the externally supplied command \fIstr\fR.  The first
+line of its stdin will the username and the second line
+the received password.  If the command exits with status
+0 (success) the VNC client will be accepted.  It will be
+rejected for any other return status.  Dynamic passwords
+and non-unix passwords can be implemented this way by
+providing your own custom helper program.  Note that
+under unixpw mode the remote viewer is given 3 tries
+to enter the correct password.
 .PP
 \fB-display\fR \fIWAIT:...\fR
 .IP
@@ -925,6 +982,13 @@ talking and the connection is dropped after the default
 timeout (25s for about the first minute, 43200s later).
 Set to zero to poll forever.  Set to a negative value
 to use the builtin setting.
+.PP
+\fB-sslnofail\fR
+.IP
+Exit at the first SSL connection failure. Useful when
+scripting SSL connections (e.g. x11vnc is started via
+ssh) and you do not want x11vnc waiting around for more
+connections, tying up ports, etc.
 .PP
 \fB-ssldir\fR \fI[dir]\fR
 .IP
@@ -4073,7 +4137,7 @@ associated options is:
 .IP
 stunnel, ssl, unixpw, WAIT, id, accept, afteraccept,
 gone, pipeinput, v4l-info, rawfb-setup, dt, gui,
-storepasswd, crash.
+storepasswd, passwdfile, custom_passwd, crash.
 .IP
 See each option's help to learn the associated external
 command.  Note that the \fB-nocmds\fR option takes precedence

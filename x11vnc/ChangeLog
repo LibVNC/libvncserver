@@ -1,3 +1,7 @@
+2006-09-20  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -unixpw_cmd, -passwfile cmd:/custom:, -sslnofail,
+	  -ultrafilexfer
+
 2006-09-17  Karl Runge <runge@karlrunge.com>
 	* x11vnc: move some info printout to -v, -verbose mode.  Add 
 	  -connect_or_exit option.  Have -rfbport 0 lead to no TCP

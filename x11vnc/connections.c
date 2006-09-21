@@ -10,6 +10,7 @@
 #include "rates.h"
 #include "screen.h"
 #include "unixpw.h"
+#include "user.h"
 #include "scan.h"
 #include "sslcmds.h"
 #include "sslhelper.h"
@@ -49,10 +50,10 @@ void send_client_info(char *str);
 void adjust_grabs(int grab, int quiet);
 void check_new_clients(void);
 int accept_client(rfbClientPtr client);
-
+int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
+    int len, FILE *output);
 
 static rfbClientPtr *client_match(char *str);
-static int run_user_command(char *cmd, rfbClientPtr client, char *mode);
 static void free_client_data(rfbClientPtr client);
 static int check_access(char *addr);
 static void ugly_geom(char *p, int *x, int *y);
@@ -365,12 +366,16 @@ int cmd_ok(char *cmd) {
  * utility to run a user supplied command setting some RFB_ env vars.
  * used by, e.g., accept_client() and client_gone()
  */
-static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
+int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
+   int len, FILE *output) {
 	char *old_display = NULL;
 	char *addr = client->host;
 	char str[100];
 	int rc, ok;
-	ClientData *cd = (ClientData *) client->clientData;
+	ClientData *cd = NULL;
+	if (client != NULL) {
+		cd = (ClientData *) client->clientData;
+	}
 
 	if (addr == NULL || addr[0] == '\0') {
 		addr = "unknown-host";
@@ -492,6 +497,15 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	if (!strcmp(mode, "gone") && cmd_ok("gone")) {
 		ok = 1;
 	}
+	if (!strcmp(mode, "cmd_verify") && cmd_ok("unixpw")) {
+		ok = 1;
+	}
+	if (!strcmp(mode, "read_passwds") && cmd_ok("passwdfile")) {
+		ok = 1;
+	}
+	if (!strcmp(mode, "custom_passwd") && cmd_ok("custom_passwd")) {
+		ok = 1;
+	}
 	if (no_external_cmds || !ok) {
 		rfbLogEnable(1);
 		rfbLog("cannot run external commands in -nocmds mode:\n");
@@ -501,6 +515,32 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	}
 	rfbLog("running command:\n");
 	rfbLog("  %s\n", cmd);
+
+	if (output != NULL) {
+		FILE *ph = popen(cmd, "r");
+		char line[1024];
+		if (ph == NULL) {
+			rfbLog("popen(%s) failed", cmd);
+			rfbLogPerror("popen");
+			clean_up_exit(1);
+		}
+		while (fgets(line, 1024, ph) != NULL) {
+			if (0) fprintf(stderr, "line: %s", line);
+			fprintf(output, "%s", line);
+		}
+		rc = pclose(ph);
+		goto got_rc;
+	} else if (input != NULL) {
+		FILE *ph = popen(cmd, "w");
+		if (ph == NULL) {
+			rfbLog("popen(%s) failed", cmd);
+			rfbLogPerror("popen");
+			clean_up_exit(1);
+		}
+		write(fileno(ph), input, len);
+		rc = pclose(ph);
+		goto got_rc;
+	}
 
 #if LIBVNCSERVER_HAVE_FORK
 	{
@@ -549,6 +589,7 @@ static int run_user_command(char *cmd, rfbClientPtr client, char *mode) {
 	/* this will still have port 5900 open */
 	rc = system(cmd);
 #endif
+	got_rc:
 
 	if (rc >= 256) {
 		rc = rc/256;
@@ -671,7 +712,7 @@ void client_gone(rfbClientPtr client) {
 			free(userhost);
 		} else {
 			rfbLog("client_gone: using cmd: %s\n", client->host);
-			run_user_command(gone_cmd, client, "gone");
+			run_user_command(gone_cmd, client, "gone", NULL,0,NULL);
 		}
 	}
 
@@ -1412,7 +1453,7 @@ int accept_client(rfbClientPtr client) {
 		int rc;
 
 		rfbLog("accept_client: using cmd for: %s\n", addr);
-		rc = run_user_command(cmd, client, "accept");
+		rc = run_user_command(cmd, client, "accept", NULL, 0, NULL);
 
 		if (action) {
 			int result;
@@ -1952,6 +1993,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	last_event = last_input = time(NULL);
 
+	latest_client = client;
+
 	if (inetd) {
 		/* 
 		 * Set this so we exit as soon as connection closes,
@@ -2023,6 +2066,22 @@ if (0) fprintf(stderr, "SET ssl_helper_pid: %d\n", openssl_last_helper_pid);
 		free_client_data(client);
 
 		return(RFB_CLIENT_REFUSE);
+	}
+
+	if (passwdfile) {
+		if (strstr(passwdfile, "read:") == passwdfile ||
+		    strstr(passwdfile, "cmd:") == passwdfile) {
+			if (read_passwds(passwdfile)) {
+				install_passwds();
+			} else {
+				rfbLog("problem reading: %s\n", passwdfile);
+				clean_up_exit(1);
+			}
+		} else if (strstr(passwdfile, "custom:") == passwdfile) {
+			if (screen) {
+				screen->passwordCheck = custom_passwd_check;
+			}
+		}
 	}
 
 	cd->uid = clients_served;
@@ -2340,7 +2399,7 @@ void check_new_clients(void) {
 			}
 			if (run_after_accept) {
 				run_user_command(afteraccept_cmd, cl,
-				    "afteraccept");
+				    "afteraccept", NULL, 0, NULL);
 			}
 		}
 	}

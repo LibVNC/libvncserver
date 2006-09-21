@@ -63,6 +63,7 @@ void unixpw_deny(void);
 void unixpw_msg(char *msg, int delay);
 int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size);
 int crypt_verify(char *user, char *pass);
+int cmd_verify(char *user, char *pass);
 
 static int white(void);
 static int text_x(void);
@@ -406,6 +407,51 @@ int crypt_verify(char *user, char *pass) {
 		return 0;
 	}
 #endif	/* UNIXPW_CRYPT */
+}
+
+int cmd_verify(char *user, char *pass) {
+	int i, len, rc;
+	char *str;
+
+	if (! user || ! pass) {
+		return 0;
+	}
+	if (! unixpw_cmd || *unixpw_cmd == '\0') {
+		return 0;
+	}
+	if (unixpw_client) {
+		ClientData *cd = (ClientData *) unixpw_client->clientData;
+		if (cd) {
+			cd->username = strdup(user);
+		}
+	}
+
+	len = strlen(user) + 1 + strlen(pass) + 1 + 1;
+	str = (char *) malloc(len);
+	if (! str) {
+		return 0;
+	}
+	str[0] = '\0';
+	strcat(str, user);
+	strcat(str, "\n");
+	strcat(str, pass);
+	if (!strchr(pass, '\n')) {
+		strcat(str, "\n");
+	}
+
+	rc = run_user_command(unixpw_cmd, unixpw_client, "cmd_verify",
+	    str, strlen(str), NULL);
+
+	for (i=0; i < len; i++) {
+		str[i] = '\0';
+	}
+	free(str);
+
+	if (rc == 0) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
@@ -849,6 +895,7 @@ static void unixpw_verify(char *user, char *pass) {
 	char log[] = "login: ";
 	char *colon = NULL;
 	ClientData *cd = NULL;
+	int ok;
 
 if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "********");
 	rfbLog("unixpw_verify: %s\n", user);
@@ -871,45 +918,55 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 		}
 	}
 
-	if (unixpw_nis) {
+	ok = 0;
+	if (unixpw_cmd) {
+		if (cmd_verify(user, pass)) {
+			rfbLog("unixpw_verify: cmd_verify login for '%s'"
+			    " succeeded.\n", user);
+			ok = 1;
+		} else {
+			rfbLog("unixpw_verify: crypt_verify login for '%s'"
+			    " failed.\n", user);
+			usleep(3000*1000);
+			ok = 0;
+		}
+	} else if (unixpw_nis) {
 		if (crypt_verify(user, pass)) {
 			rfbLog("unixpw_verify: crypt_verify login for '%s'"
 			    " succeeded.\n", user);
-			unixpw_accept(user);
-			if (keep_unixpw) {
-				keep_unixpw_user = strdup(user);
-				keep_unixpw_pass = strdup(pass);
-				if (colon) {
-					keep_unixpw_opts = strdup(colon+1);
-				} else {
-					keep_unixpw_opts = strdup("");
-				}
-			}
-			if (colon) *colon = ':';
-			return;
+			ok = 1;
+		} else {
+			rfbLog("unixpw_verify: crypt_verify login for '%s'"
+			    " failed.\n", user);
+			usleep(3000*1000);
+			ok = 0;
 		}
-		rfbLog("unixpw_verify: crypt_verify login for '%s' failed.\n",
-		    user);
-		usleep(3000*1000);
 	} else {
 		if (su_verify(user, pass, NULL, NULL, NULL)) {
 			rfbLog("unixpw_verify: su_verify login for '%s'"
 			    " succeeded.\n", user);
-			unixpw_accept(user);
-			if (keep_unixpw) {
-				keep_unixpw_user = strdup(user);
-				keep_unixpw_pass = strdup(pass);
-				if (colon) {
-					keep_unixpw_opts = strdup(colon+1);
-				} else {
-					keep_unixpw_opts = strdup("");
-				}
-			}
-			if (colon) *colon = ':';
-			return;
+			ok = 1;
+		} else {
+			rfbLog("unixpw_verify: su_verify login for '%s'"
+			    " failed.\n", user);
+			/* use su(1)'s sleep */
+			ok = 0;
 		}
-		rfbLog("unixpw_verify: su_verify login for '%s' failed.\n",
-		    user);
+	}
+
+	if (ok) {
+		unixpw_accept(user);
+		if (keep_unixpw) {
+			keep_unixpw_user = strdup(user);
+			keep_unixpw_pass = strdup(pass);
+			if (colon) {
+				keep_unixpw_opts = strdup(colon+1);
+			} else {
+				keep_unixpw_opts = strdup("");
+			}
+		}
+		if (colon) *colon = ':';
+		return;
 	}
 	if (colon) *colon = ':';
 

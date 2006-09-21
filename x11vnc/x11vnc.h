@@ -454,6 +454,7 @@ extern int hack_val;
 
 /* last client to move pointer */
 extern rfbClientPtr last_pointer_client;
+extern rfbClientPtr latest_client;
 
 extern int client_count;
 extern int clients_served;

@@ -1326,6 +1326,9 @@ void accept_openssl(int mode) {
 		if (sock < 0)  {
 			rfbLog("SSL: accept_openssl: accept connection failed\n");
 			rfbLogPerror("accept");
+			if (ssl_no_fail) {
+				clean_up_exit(1);
+			}
 			return;
 		}
 		listen = openssl_sock;
@@ -1335,6 +1338,9 @@ void accept_openssl(int mode) {
 		if (sock < 0)  {
 			rfbLog("SSL: accept_openssl: accept connection failed\n");
 			rfbLogPerror("accept");
+			if (ssl_no_fail) {
+				clean_up_exit(1);
+			}
 			return;
 		}
 		listen = https_sock;
@@ -1357,7 +1363,7 @@ void accept_openssl(int mode) {
 	if (! cport) {
 		rfbLog("SSL: accept_openssl: could not find open port.\n");
 		close(sock);
-		if (mode == OPENSSL_INETD) {
+		if (mode == OPENSSL_INETD || ssl_no_fail) {
 			clean_up_exit(1);
 		}
 		return;
@@ -1370,7 +1376,7 @@ void accept_openssl(int mode) {
 		rfbLog("SSL: accept_openssl: could not listen on port %d.\n",
 		    cport);
 		close(sock);
-		if (mode == OPENSSL_INETD) {
+		if (mode == OPENSSL_INETD || ssl_no_fail) {
 			clean_up_exit(1);
 		}
 		return;
@@ -1416,7 +1422,7 @@ void accept_openssl(int mode) {
 		rfbLogPerror("fork");
 		close(sock);
 		close(csock);
-		if (mode == OPENSSL_INETD) {
+		if (mode == OPENSSL_INETD || ssl_no_fail) {
 			clean_up_exit(1);
 		}
 		return;
@@ -1721,7 +1727,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 
 		kill(pid, SIGTERM);
 		waitpid(pid, &status, WNOHANG); 
-		if (mode == OPENSSL_INETD) {
+		if (mode == OPENSSL_INETD || ssl_no_fail) {
 			clean_up_exit(1);
 		}
 		return;
@@ -1787,7 +1793,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 		}
 		kill(pid, SIGTERM);
 		waitpid(pid, &status, WNOHANG); 
-		if (mode == OPENSSL_INETD) {
+		if (mode == OPENSSL_INETD || ssl_no_fail) {
 			clean_up_exit(1);
 		}
 		return;
@@ -1820,7 +1826,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 
 		kill(pid, SIGTERM);
 		waitpid(pid, &status, WNOHANG); 
-		if (mode == OPENSSL_INETD) {
+		if (mode == OPENSSL_INETD || ssl_no_fail) {
 			clean_up_exit(1);
 		}
 		return;
