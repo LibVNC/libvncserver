@@ -122,7 +122,7 @@ proc help {} {
 
     If you want to use a SSL Certificate (PEM) file to authenticate yourself
     to the VNC server ("MyCert") or to verify the identity of the VNC Server
-    ("ServerCert" or "CertsDir") import the certificate file by clicking
+    ("ServerCert" or "CertsDir") select the certificate file by clicking
     the "Certs ..." button before connecting.
 
     Certificate verification is needed to prevent Man In the Middle attacks.
@@ -169,7 +169,6 @@ proc help {} {
 }
 
 	.h.f.t insert end $msg
-	#raise .h
 }
 
 proc help_certs {} {
@@ -240,7 +239,7 @@ proc help_certs {} {
         x11vnc -ssl SAVE ...
 
     and then copy the Server certificate to the local (viewer-side) machine.
-    x11vnc prints out the the screen the Server certificate it generates.
+    x11vnc prints out to the screen the Server certificate it generates.
     You can set "ServerCert" to it directly or use the "Import Certificate"
     action to save it to a file.
 
@@ -249,7 +248,6 @@ proc help_certs {} {
 }
 
 	.ch.f.t insert end $msg
-	#raise .ch
 }
 
 proc help_opts {} {
@@ -308,8 +306,8 @@ set msg {
 
   Putty PW:  On Windows only: use the supplied password for plink SSH logins.
              Unlike the other options the value is not saved when 'Save
-             Profile' is used.  This feature useful when options under
-             "Advanced" are set that require 2 SSH's: you just have
+             Profile' is performed.  This feature useful when options under
+             "Advanced" are set that require TWO SSH's: you just have
              to type the password once in this entry box.  The bundled
              pagent.exe and puttygen.exe programs can also be used to avoid
              repeatedly entering passwords (note this requires setting up
@@ -342,17 +340,29 @@ set msg {
 
   Compress Level/Quality:  Set TightVNC encoding parameters.
 
-
   Save and Load:   You can Save the current settings by clicking on Save
                    Profile (.vnc file) and you can also read in a saved one
-                   with Load Profile.
+                   with Load Profile.  Use the Browse... button to select
+                   the filename via the GUI.
+
+  Include:         Profile template(s) to load before loading a profile
+                   (see Load Profile above).  For example if you Save
+                   a profile called "globals" that has some settings
+                   you use often, then just supply "Include: globals"
+                   to have them applied.
+
+                   You may supply a comma or space separated list of
+                   templates to include.  They can be full path names or
+                   basenames relative to the profiles directory.  You do
+                   not need to supply the .vnc suffix.  The non-default
+                   settings in them will be applied first, and then any
+                   values then in the loaded Profile will override them.
 
   Clear Options:   Set all options to their defaults (i.e. unset).
 
   Advanced:        Bring up the Advanced options dialog.
 }
 	.oh.f.t insert end $msg
-	#raise .oh
 }
 
 proc win_nokill_msg {} {
@@ -383,7 +393,6 @@ proc win_nokill_msg {} {
     for error messages and other information.
 }
 	.w.t insert end $msg
-	#raise .w
 }
 
 proc win_kill_msg {pids} {
@@ -425,7 +434,6 @@ proc win_kill_msg {pids} {
     make the Tray notice STUNNEL is gone...
 }
 	.w.t insert end $msg
-	#raise .w
 }
 
 proc win9x_plink_msg {file} {
@@ -462,7 +470,7 @@ proc win9x_plink_msg {file} {
     type COMMAND in the entry box and hit Return or click OK.
 
     To select the above command, highlight it with the mouse and then press
-    Ctrl-C.  Then go over the the COMMAND.COM window and click on the
+    Ctrl-C.  Then go over to the COMMAND.COM window and click on the
     Clipboard paste button.  Once pasted in, press Return to run the script.
     
     This will start up a PLINK.EXE ssh login to the remote computer,
@@ -516,6 +524,8 @@ proc get_ssh_proxy {str} {
 }
 
 proc set_defaults {} {
+	global defs
+
 	global mycert svcert crtdir
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
@@ -529,59 +539,67 @@ proc set_defaults {} {
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
+	global include_list
 
-	set use_ssh 0
-	set use_sshssl 0
+	set defs(use_ssh) 0
+	set defs(use_sshssl) 0
+
+	set defs(use_viewonly) 0
+	set defs(use_fullscreen) 0
+	set defs(use_raise_on_beep) 0
+	set defs(use_bgr233) 0
+	set defs(use_alpha) 0
+	set defs(use_grab) 0
+	set defs(use_nojpeg) 0
+	set defs(use_compresslevel) "default"
+	set defs(use_quality) "default"
+	set defs(compresslevel_text) "Compress Level: default"
+	set defs(quality_text) "Quality: default"
+
+	set defs(mycert) ""
+	set defs(svcert) ""
+	set defs(crtdir) ""
+
+	set defs(use_cups) 0
+	set defs(use_sound) 0
+	set defs(use_smbmnt) 0
+
+	set defs(change_vncviewer) 0 
+	set defs(change_vncviewer_path) "" 
+	set defs(cups_manage_rcfile) 0 
+	set defs(vncviewer_realvnc4) 0
+
+	set defs(additional_port_redirs) 0
+	set defs(additional_port_redirs_list) ""
+
+	set defs(cups_local_server) ""
+	set defs(cups_remote_port) ""
+	set defs(cups_local_smb_server) ""
+	set defs(cups_remote_smb_port) ""
+
+	set defs(smb_su_mode) "su"
+	set defs(smb_mount_list) ""
+
+	set defs(sound_daemon_remote_cmd) ""
+	set defs(sound_daemon_remote_port) ""
+	set defs(sound_daemon_kill) 0
+	set defs(sound_daemon_restart) 0
+
+	set defs(sound_daemon_local_cmd) ""
+	set defs(sound_daemon_local_port) ""
+	set defs(sound_daemon_local_start) 0
+	set defs(sound_daemon_local_kill) 0
+
+	set defs(use_port_knocking) 0
+	set defs(port_knocking_list) ""
+
+	set defs(include_list) ""
+
+	foreach var [array names defs] {
+		set $var $defs($var)	
+	}
+
 	putty_pw_entry check
-
-	set use_viewonly 0
-	set use_fullscreen 0
-	set use_raise_on_beep 0
-	set use_bgr233 0
-	set use_alpha 0
-	set use_grab 0
-	set use_nojpeg 0
-	set use_compresslevel "default"
-	set use_quality "default"
-	set compresslevel_text "Compress Level: $use_compresslevel"
-	set quality_text "Quality: $use_quality"
-
-	set mycert ""
-	set svcert ""
-	set crtdir ""
-
-	set use_cups 0
-	set use_sound 0
-	set use_smbmnt 0
-
-	set change_vncviewer 0 
-	set change_vncviewer_path "" 
-	set cups_manage_rcfile 0 
-	set vncviewer_realvnc4 0
-
-	set additional_port_redirs 0
-	set additional_port_redirs_list ""
-
-	set cups_local_server ""
-	set cups_remote_port ""
-	set cups_local_smb_server ""
-	set cups_remote_smb_port ""
-
-	set smb_su_mode "su"
-	set smb_mount_list ""
-
-	set sound_daemon_remote_cmd ""
-	set sound_daemon_remote_port ""
-	set sound_daemon_kill 0
-	set sound_daemon_restart 0
-
-	set sound_daemon_local_cmd ""
-	set sound_daemon_local_port ""
-	set sound_daemon_local_start 0
-	set sound_daemon_local_kill 0
-
-	set use_port_knocking 0
-	set port_knocking_list ""
 }
 
 proc do_viewer_windows {n} {
@@ -732,7 +750,7 @@ proc guess_nat_ip {} {
 }
 
 proc guess_ip {} {
-	global env is_windows
+	global is_windows
 	if {! $is_windows} {
 		set out ""
 		set out [get_hostname]
@@ -791,7 +809,7 @@ proc windows_start_sound_daemon {file} {
 }
 
 proc windows_stop_sound_daemon {} {
-	global env is_win9x
+	global is_win9x
 	global use_sound sound_daemon_local_cmd sound_daemon_local_start
 
 	set cmd [string trim $sound_daemon_local_cmd]
@@ -859,12 +877,11 @@ proc make_plink {} {
 	button .plink.ok   -text "Success" -command {destroy .plink; set plink_status yes}
 	pack .plink.l1 .plink.l2 .plink.l3 .plink.l4 .plink.l5 .plink.l6 .plink.fail .plink.ok -side top -fill x
 
-	#wm deiconify .plink
 	update
 }
 
 proc launch_windows_ssh {hp file n} {
-	global is_win9x 
+	global is_win9x env
 	global use_sshssl use_ssh putty_pw
 	global port_knocking_list
 
@@ -896,7 +913,6 @@ proc launch_windows_ssh {hp file n} {
 	} else {
 		set vnc_port $vnc_disp
 	}
-
 
 	set ssh_port 22
 	set ssh_host $hpnew
@@ -1117,7 +1133,6 @@ proc launch_windows_ssh {hp file n} {
 		set win9x_plink_msg_done 0
 		vwait win9x_plink_msg_done
 	} else {
-		global env
 		set com "cmd.exe"
 		if [info exists env(COMSPEC)] {
 			set com $env(COMSPEC)
@@ -1276,13 +1291,7 @@ proc launch_windows_ssh {hp file n} {
 }
 
 proc check_ssh_needed {} {
-	global use_cups use_sound use_smbmnt
-	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
-	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
-	global cups_local_server cups_remote_port cups_manage_rcfile
-	global cups_local_smb_server cups_remote_smb_port
-	global smb_su_mode smb_mount_list
-	global use_ssh use_sshssl
+	globalize
 	
 	if {$use_ssh || $use_sshssl} {
 		return
@@ -1445,16 +1454,9 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 }
 
 proc launch_unix {hp} {
-	global mycert svcert crtdir env
-	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
-	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
-	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
-	global additional_port_redirs additional_port_redirs_list
-	global use_cups use_sound use_smbmnt
-	global smb_redir_0 smb_mounts
-	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
-	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
-	global port_knocking_list
+	global smb_redir_0 smb_mounts env
+
+	globalize
 
 	set cmd ""
 
@@ -1476,6 +1478,14 @@ proc launch_unix {hp} {
 			set cmd "ssl_vncviewer -ssh"
 		} else {
 			set cmd "ssl_vncviewer -sshssl"
+			if {$mycert != ""} {
+				set cmd "$cmd -mycert '$mycert'"
+			}
+			if {$svcert != ""} {
+				set cmd "$cmd -verify '$svcert'"
+			} elseif {$crtdir != ""} {
+				set cmd "$cmd -verify '$crtdir'"
+			}
 		}
 		set hpnew  [get_ssh_hp $hp]
 		set proxy  [get_ssh_proxy $hp]
@@ -1645,7 +1655,6 @@ proc launch_unix {hp} {
 	}
 
 	if {$change_vncviewer && $change_vncviewer_path != ""} {
-		global env
 		set env(VNCVIEWERCMD) $change_vncviewer_path
 	} else {
 		set env(VNCVIEWERCMD) ""
@@ -1687,7 +1696,8 @@ proc launch_unix {hp} {
 	}
 	exec xterm -geometry $geometry -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" \
 	    -title "SSL VNC Viewer $hp" \
-	    -e sh -c "set -xv; $cmd; set +xv; echo; echo Done. You Can X-out or Ctrl-C this Terminal whenever you like.; echo; echo sleep 15; echo; sleep 15"
+	    -e sh -c "set -xv; $cmd; set +xv; echo; echo Done. You Can X-out or Ctrl-C this Terminal if you like.; echo; echo sleep 15; echo; sleep 15"
+
 	set env(SSL_VNCVIEWER_SSH_CMD) ""
 	set env(SSL_VNCVIEWER_USE_C) ""
 
@@ -1710,7 +1720,7 @@ proc launch_unix {hp} {
 }
 
 proc kill_stunnel {pids} {
-	global is_win9x env
+	global is_win9x
 
 	set count 0
 	foreach pid $pids {
@@ -1730,7 +1740,7 @@ proc kill_stunnel {pids} {
 }
 
 proc get_task_list {} {
-	global env is_win9x
+	global is_win9x
 	
 	set output1 ""
 	set output2 ""
@@ -1748,7 +1758,6 @@ proc get_task_list {} {
 }
 
 proc note_stunnel_pids {when} {
-	global env
 	global is_win9x pids_before pids_after pids_new
 
 	if {$when == "before"} {
@@ -1811,7 +1820,7 @@ proc launch_shell_only {} {
 }
 
 proc launch {{hp ""}} {
-	global vncdisplay env tcl_platform is_windows
+	global vncdisplay tcl_platform is_windows
 	global mycert svcert crtdir
 	global pids_before pids_after pids_new
 	global use_ssh use_sshssl
@@ -1881,7 +1890,6 @@ proc launch {{hp ""}} {
 		set suffix "bat"
 	}
 
-	# we avoid parsing netstat output on Windows (but I guess we do now elsewhere):
 	set file ""
 	set n ""
 	set file2 ""
@@ -2183,10 +2191,12 @@ proc show_cert {crt} {
 	center_win $w
 	catch {raise $w}
 }
+
 proc show_mycert {} {
 	global mycert
 	show_cert $mycert
 }
+
 proc show_svcert {} {
 	global svcert
 	show_cert $svcert
@@ -2857,7 +2867,7 @@ proc import_cert {} {
 
 	global scroll_text_focus
 	set scroll_text_focus 0
-	scroll_text .icrt.f 90 16
+	scroll_text .icrt.f 90 20
 	set scroll_text_focus 1
 
 	set msg {
@@ -2875,22 +2885,20 @@ proc import_cert {} {
 
 -----BEGIN CERTIFICATE-----
 MIID2jCCAsKgAwIBAgIJALKypfV8BItCMA0GCSqGSIb3DQEBBAUAMIGgMQswCQYD
-...
+(more lines) ...
 TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 -----END CERTIFICATE-----
-
-    where "..." means similarly looking lines.
 
     A type 2) by convention ends with file suffix ".pem" and looks like:
 
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA4sApd7WaPKQRWnFe9T04D4pglQB0Ti0/dCVHxg8WEVQ8OdcW
-...
+(more lines) ...
 9kBmNotUiTpvRM+e7E/zRemhvY9qraFooqMWzi9JrgYfeLfSvvFfGw==
 -----END RSA PRIVATE KEY-----
 -----BEGIN CERTIFICATE-----
 MIID2jCCAsKgAwIBAgIJALKypfV8BItCMA0GCSqGSIb3DQEBBAUAMIGgMQswCQYD
-...
+(more lines) ...
 TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 -----END CERTIFICATE-----
 
@@ -2934,7 +2942,7 @@ TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 	$w.e configure -state disabled
 
 	label .icrt.plab -anchor w -text "Paste Certificate here:" 
-	scroll_text .icrt.paste 90 25
+	scroll_text .icrt.paste 90 22
 
 	button .icrt.cancel -text "Cancel" -command {destroy .icrt; catch {raise .c}}
 	bind .icrt <Escape> {destroy .icrt; catch {raise .c}}
@@ -3050,23 +3058,78 @@ proc get_profiles_dir {} {
 	}
 	return $dir
 }
+
+proc globalize {} {
+	global defs
+	foreach var [array names defs] {
+		uplevel global $var
+	}
+}
 	
+proc load_include {include dir} {
+	global include_vars defs
+
+	if [info exists include_vars] {
+		unset include_vars
+	}
+	
+	foreach inc [split $include ", "] {
+		set f [string trim $inc]
+#puts "f=$f";
+		if {$f == ""} {
+			continue
+		}
+		set try ""
+		if {[regexp {/} $f] || [regexp {\\} $f]} {
+			set try $f;
+		} else {
+			set try "$dir/$f"
+		}
+		if {! [file exists $try]} {
+			set try "$dir/$f.vnc"
+		}
+#puts "try: $try"
+		if [file exists $try] {
+			set fh ""
+			catch {set fh [open $try "r"]}
+			if {$fh == ""} {
+				continue
+			}
+			while {[gets $fh line] > -1} {
+				append inc_str "$line\n"
+				if [regexp {^([^=]*)=(.*)$} $line m var val] {
+					if {! [info exists defs($var)]} {
+						continue
+					}
+					if {$var == "include_list"} {
+						continue
+					}
+					set pct 0
+					if {$var == "smb_mount_list"} {
+						set pct 1
+					}
+					if {$var == "port_knocking_list"} {
+						set pct 1
+					}
+					if {$pct} {
+						regsub -all {%%%} $val "\n" val
+					}
+					if {$val != $defs($var)} {
+#puts "include_vars $var $val"
+						set include_vars($var) $val
+					}
+				}
+			}
+			catch {close $fh}
+		}
+	}
+}
+
 proc load_profile {} {
-	global env
-	global mycert svcert crtdir vncdisplay
-	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
-	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
-	global compresslevel_text quality_text
-	global use_smbmnt use_sound
-	global use_cups cups_local_server cups_remote_port cups_manage_rcfile
-	global cups_local_smb_server cups_remote_smb_port
-	global smb_su_mode smb_mount_list
-	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
-	global additional_port_redirs additional_port_redirs_list
-	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
-	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
-	global use_port_knocking port_knocking_list
 	global profdone
+	global vncdisplay
+
+	globalize
 
 	set dir [get_profiles_dir]
 
@@ -3081,107 +3144,70 @@ proc load_profile {} {
 		set profdone 1
 		return
 	}
-
-	set_defaults
-
+	set str ""
+	set include ""
 	while {[gets $fh line] > -1} {
-		if [regexp {^disp=(.*)$} $line m val] {
-			set vncdisplay $val 
-		} elseif [regexp {^ssh=(.*)$} $line m val] {
-			set use_ssh $val 
-		} elseif [regexp {^sshssl=(.*)$} $line m val] {
-			set use_sshssl $val 
-		} elseif [regexp {^viewonly=(.*)$} $line m val] {
-			set use_viewonly $val 
-		} elseif [regexp {^fullscreen=(.*)$} $line m val] {
-			set use_fullscreen $val 
-		} elseif [regexp {^belldeiconify=(.*)$} $line m val] {
-			set use_raise_on_beep $val 
-		} elseif [regexp {^8bit=(.*)$} $line m val] {
-			set use_bgr233 $val 
-		} elseif [regexp {^alpha=(.*)$} $line m val] {
-			set use_alpha $val 
-		} elseif [regexp {^grab=(.*)$} $line m val] {
-			set use_grab $val 
-		} elseif [regexp {^nojpeg=(.*)$} $line m val] {
-			set use_nojpeg $val 
-		} elseif [regexp {^compresslevel=(.*)$} $line m val] {
-			set use_compresslevel $val 
-			set compresslevel_text "Compress Level: $val"
-		} elseif [regexp {^quality=(.*)$} $line m val] {
-			set use_quality $val 
-			set quality_text "Quality: $val"
-		} elseif [regexp {^mycert=(.*)$} $line m val] {
-			set mycert $val 
-		} elseif [regexp {^svcert=(.*)$} $line m val] {
-			set svcert $val 
-		} elseif [regexp {^crtdir=(.*)$} $line m val] {
-			set crtdir $val 
-		} elseif [regexp {^use_smbmnt=(.*)$} $line m val] {
-			set use_smbmnt $val 
-		} elseif [regexp {^use_sound=(.*)$} $line m val] {
-			set use_sound $val 
-		} elseif [regexp {^use_cups=(.*)$} $line m val] {
-			set use_cups $val 
-		} elseif [regexp {^cups_local_server=(.*)$} $line m val] {
-			set cups_local_server $val 
-		} elseif [regexp {^cups_remote_port=(.*)$} $line m val] {
-			set cups_remote_port $val 
-		} elseif [regexp {^cups_local_smb_server=(.*)$} $line m val] {
-			set cups_local_smb_server $val 
-		} elseif [regexp {^cups_remote_smb_port=(.*)$} $line m val] {
-			set cups_remote_smb_port $val 
-		} elseif [regexp {^cups_manage_rcfile=(.*)$} $line m val] {
-			set cups_manage_rcfile $val 
-		} elseif [regexp {^smb_mount_list=(.*)$} $line m val] {
-			regsub -all {%%%} $val "\n" val
-			set smb_mount_list $val 
-		} elseif [regexp {^smb_su_mode=(.*)$} $line m val] {
-			set smb_su_mode $val 
-		} elseif [regexp {^port_knocking_list=(.*)$} $line m val] {
-			regsub -all {%%%} $val "\n" val
-			set port_knocking_list $val 
-		} elseif [regexp {^use_port_knocking=(.*)$} $line m val] {
-			set use_port_knocking $val 
-		} elseif [regexp {^sound_daemon_remote_cmd=(.*)$} $line m val] {
-			set sound_daemon_remote_cmd $val 
-		} elseif [regexp {^sound_daemon_remote_port=(.*)$} $line m val] {
-			set sound_daemon_remote_port $val 
-		} elseif [regexp {^sound_daemon_kill=(.*)$} $line m val] {
-			set sound_daemon_kill $val 
-		} elseif [regexp {^sound_daemon_restart=(.*)$} $line m val] {
-			set sound_daemon_restart $val 
-		} elseif [regexp {^sound_daemon_local_cmd=(.*)$} $line m val] {
-			set sound_daemon_local_cmd $val 
-		} elseif [regexp {^sound_daemon_local_port=(.*)$} $line m val] {
-			set sound_daemon_local_port $val 
-		} elseif [regexp {^sound_daemon_local_start=(.*)$} $line m val] {
-			set sound_daemon_local_start $val 
-		} elseif [regexp {^sound_daemon_local_kill=(.*)$} $line m val] {
-			set sound_daemon_local_kill $val 
-		} elseif [regexp {^change_vncviewer=(.*)$} $line m val] {
-			set change_vncviewer $val 
-		} elseif [regexp {^change_vncviewer_path=(.*)$} $line m val] {
-			set change_vncviewer_path $val 
-		} elseif [regexp {^vncviewer_realvnc4=(.*)$} $line m val] {
-			set vncviewer_realvnc4 $val 
-		} elseif [regexp {^additional_port_redirs=(.*)$} $line m val] {
-			set additional_port_redirs $val 
-		} elseif [regexp {^additional_port_redirs_list=(.*)$} $line m val] {
-			set additional_port_redirs_list $val 
+		append str "$line\n"
+		if [regexp {^include_list=(.*)$} $line m val] {
+			set include $val
 		}
 	}
 	close $fh
+
+	if {$include != ""} {
+		load_include $include $dir
+	}
+
+	set_defaults
+
+	global include_vars
+	if [info exists include_vars] {
+		foreach var [array names include_vars] {
+			set $var $include_vars($var)
+		}
+	}
+
+	global defs
+	foreach line [split $str "\n"] {
+		set line [string trim $line]
+		if [regexp {^#} $line] {
+			continue
+		}
+		if [regexp {^([^=]*)=(.*)$} $line m var val] {
+			if {$var == "disp"} {
+				set vncdisplay $val
+				continue
+			}
+			if [info exists defs($var)] {
+				set pct 0
+				if {$var == "smb_mount_list"} {
+					set pct 1
+				}
+				if {$var == "port_knocking_list"} {
+					set pct 1
+				}
+				if {$pct} {
+					regsub -all {%%%} $val "\n" val
+				}
+				set $var $val
+			}
+		}
+	}
+
+	set compresslevel_text "Compress Level: $use_compresslevel"
+	set quality_text "Quality: $use_quality"
+
 	set profdone 1
 	putty_pw_entry check
 }
 
 proc save_profile {} {
-	global env is_windows
-	global mycert svcert crtdir vncdisplay
-	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
-	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
+	global is_windows
+	global vncdisplay
 	global profdone
+	global include_vars defs
+
+	globalize
 	
 	set dir [get_profiles_dir]
 
@@ -3251,64 +3277,38 @@ proc save_profile {} {
 	puts $fh "proxyport=$proxyport"
 	puts $fh "disp=$vncdisplay"
 	puts $fh "\n\[options\]"
-	puts $fh "ssh=$use_ssh"
-	puts $fh "sshssl=$use_sshssl"
-	puts $fh "viewonly=$use_viewonly"
-	puts $fh "fullscreen=$use_fullscreen"
-	puts $fh "belldeiconify=$use_raise_on_beep"
-	puts $fh "8bit=$use_bgr233"
-	puts $fh "alpha=$use_alpha"
-	puts $fh "grab=$use_grab"
-	puts $fh "nojpeg=$use_nojpeg"
-	puts $fh "compresslevel=$use_compresslevel"
-	puts $fh "quality=$use_quality"
-	puts $fh "mycert=$mycert"
-	puts $fh "svcert=$svcert"
-	puts $fh "crtdir=$crtdir"
 
-	global use_smbmnt use_sound
-	puts $fh "use_smbmnt=$use_smbmnt"
-	puts $fh "use_sound=$use_sound"
+	if {$include_list != ""} {
+		load_include $include_list [get_profiles_dir]
+	}
 
-	global use_cups cups_local_server cups_remote_port cups_manage_rcfile
-	global cups_local_smb_server cups_remote_smb_port
-	puts $fh "use_cups=$use_cups"
-	puts $fh "cups_local_server=$cups_local_server"
-	puts $fh "cups_remote_port=$cups_remote_port"
-	puts $fh "cups_local_smb_server=$cups_local_smb_server"
-	puts $fh "cups_remote_smb_port=$cups_remote_smb_port"
-	puts $fh "cups_manage_rcfile=$cups_manage_rcfile"
-
-	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
-	global additional_port_redirs additional_port_redirs_list
-	puts $fh "change_vncviewer=$change_vncviewer"
-	puts $fh "change_vncviewer_path=$change_vncviewer_path"
-	puts $fh "vncviewer_realvnc4=$vncviewer_realvnc4"
-	puts $fh "additional_port_redirs=$additional_port_redirs"
-	puts $fh "additional_port_redirs_list=$additional_port_redirs_list"
-
-	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
-	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
-	puts $fh "sound_daemon_remote_cmd=$sound_daemon_remote_cmd"
-	puts $fh "sound_daemon_remote_port=$sound_daemon_remote_port"
-	puts $fh "sound_daemon_kill=$sound_daemon_kill"
-	puts $fh "sound_daemon_restart=$sound_daemon_restart"
-	puts $fh "sound_daemon_local_cmd=$sound_daemon_local_cmd"
-	puts $fh "sound_daemon_local_port=$sound_daemon_local_port"
-	puts $fh "sound_daemon_local_kill=$sound_daemon_local_kill"
-	puts $fh "sound_daemon_local_start=$sound_daemon_local_start"
-
-	global smb_su_mode smb_mount_list
-	set list $smb_mount_list
-	regsub -all "\n" $list "%%%" list
-	puts $fh "smb_su_mode=$smb_su_mode"
-	puts $fh "smb_mount_list=$list"
-
-	global use_port_knocking port_knocking_list
-	set list $port_knocking_list
-	regsub -all "\n" $list "%%%" list
-	puts $fh "use_port_knocking=$use_port_knocking"
-	puts $fh "port_knocking_list=$list"
+	foreach var [lsort [array names defs]] {
+		eval set val \$$var
+		set pre ""
+		if {$val == $defs($var)} {
+			set pre "#"
+		}
+		set pct 0
+		if {$var == "smb_mount_list"} {
+			set pct 1
+		}
+		if {$var == "port_knocking_list"} {
+			set pct 1
+		}
+		if {$include_list != "" && [info exists include_vars($var)]} {
+			if {$val == $include_vars($var)} {
+				if {$pct} {
+					regsub -all "\n" $val "%%%" val
+				}
+				puts $fh "#from include: $var=$val"
+				continue
+			}
+		}
+		if {$pct} {
+			regsub -all "\n" $val "%%%" val
+		}
+		puts $fh "$pre$var=$val"
+	}
 
 	close $fh
 	set profdone 1
@@ -3539,6 +3539,9 @@ set cmd(1) {
 			fi
 			i=`expr $i + 1`
 		done
+		echo MY_PID=$$
+		tty
+		echo
 	}
 
 	wait_til_ssh_gone() {
@@ -3821,6 +3824,7 @@ set cmd(6) {
 	echo
 	echo "--vnc-helper-exiting--"
 	echo
+	#cat $0
 	rm -f $0
 	exit 0
 };
@@ -4003,6 +4007,11 @@ proc cups_dialog {} {
 
        env IPP_PORT=6631 firefox
 
+    If you can only get Method #2 to work, an extreme application would
+    be to run the whole desktop, e.g. env IPP_PORT=6631 gnome-session, but
+    then you would need some sort of TCP redirector (ssh -L comes to mind),
+    to direct it to 631 when not connected remotely.
+
     Windows/SMB Printers:  Under "Local SMB Print Server" you can set
     a port redirection for a Windows (non-CUPS) SMB printer.  E.g. port
     6632 -> localhost:139.  If localhost:139 does not work, try IP:139,
@@ -4011,12 +4020,13 @@ proc cups_dialog {} {
 
        smbspool smb://localhost:6632/lp job user title 1 "" myfile.ps
 
-    You could put this in a script, "myprinter".  It appears on the the URI,
-    the number of copies ("1" above) and the file itself are important.
+    You could put this in a script, "myprinter".  It appears for the URI,
+    only the number of copies ("1" above) and the file itself are important.
     (XXX this might only work for Samba printers...)
 
-    If you have root permission you can configure CUPS to know about this
-    printer via lpadmin(8), etc.  You basically give it the smb:// URI.
+    If you have root or print admin permission you can configure CUPS to
+    know about this printer via lpadmin(8), etc.  You basically give it
+    the smb://... URI.
 
     For more info see: http://www.karlrunge.com/x11vnc/#faq-cups
 }
@@ -4606,7 +4616,6 @@ proc make_share_widgets {w} {
 	}
 	if {$i == 0} {
 		global is_win9x
-		#.smbwiz.f.t insert end "\nNo SMB Share Hosts were found!\n"
 		$share_label configure -text {Share Name: No SMB Share Hosts were found!}
 		if {$is_win9x} {
 			.smbwiz.f.t insert end "\n(this feature does not work on Win9x you have have to enter them manually: //HOST/share /var/tmp/mymnt)\n"
@@ -4954,10 +4963,7 @@ proc smb_dialog {} {
 	eval text .smb.mnts -width 80 -height 5 $help_font
 	.smb.mnts insert end $smb_mount_list
 
-	#apply_bg .smb.mnts
-
 	button .smb.guess -text "Help me decide ..." -command {destroy .smb; smb_help_me_decide}
-	#.smb.guess configure -state disabled
 
 	button .smb.cancel -text "Cancel" -command {set use_smbmnt 0; destroy .smb}
 	bind .smb <Escape> {set use_smbmnt 0; destroy .smb}
@@ -4980,13 +4986,14 @@ proc help_advanced_opts {} {
 	wm title .ah "Advanced Opts Help"
 
 	set msg {
-    These Advanced settings are experimental options that may require extra
-    software installed on the VNC server-side (the remote server machine)
-    and/or on the VNC client-side (where this gui is running).
+    These Advanced options that may require extra software installed on
+    the VNC server-side (the remote server machine) and/or on the VNC
+    client-side (where this gui is running).
 
     The Service redirection options, CUPS, ESD/ARTSD, and SMB will require
-    that you use SSH for tunneling so that the -R port redirection will
-    be enabled for each service.  I.e. "Use SSH instead" or "Use SSH and SSL"
+    that you use SSH for tunneling so that they can use the -R port
+    redirection will be enabled for each service.  I.e. "Use SSH instead"
+    or "Use SSH and SSL" mode.
 
     These options may also require additional configuration to get them
     to work properly.  Please submit bug reports if it appears it should
@@ -5013,16 +5020,17 @@ proc help_advanced_opts {} {
 
          Port Knocking: for "closed port" services, first "knock" on the
          firewall ports in a certain way to open the door for SSH or SSL.
+         The port can also be closed when the encrypted VNC connection
+         finishes.
 	
     About the CheckButtons:
 
-         Ahem, Well...., a klunky UI: you have to toggle the CheckButton
-         to pull up the Dialog box a 2nd, etc. time... your settings will
-         still be there.
+         Ahem, Well...., yes quite a klunky UI: you have to toggle the
+         CheckButton to pull up the Dialog box a 2nd, etc. time... don't
+         worry your settings will still be there!
 }
 
 	.ah.f.t insert end $msg
-	#raise .ah
 }
 
 proc set_viewer_path {} {
@@ -5153,7 +5161,7 @@ proc port_redir_dialog {} {
 }
 
 proc find_netcat {} {
-	global env is_windows
+	global is_windows
 
 	set nc ""
 
@@ -5270,7 +5278,7 @@ proc do_port_knock {hp mode} {
 		}
 	}
 
-	set default_delay 0
+	set default_delay 150
 
 	set host [string trim $hp]
 	regsub {^.*@} $host "" host
@@ -5361,12 +5369,12 @@ proc do_port_knock {hp mode} {
 		}
 
 		set udp 0
-		if [regexp -nocase {/udp} $line] {
+		if [regexp -nocase {[/:]udp} $line] {
 			set udp 1
-			regsub -all -nocase {/udp} $line " " line
+			regsub -all -nocase {[/:]udp} $line " " line
 			set line [string trim $line]
 		}
-		regsub -all -nocase {/tcp} $line " " line
+		regsub -all -nocase {[/:]tcp} $line " " line
 		set line [string trim $line]
 
 		set delay 0
@@ -5581,9 +5589,10 @@ proc port_knocking_dialog {} {
 
     If you need to send a UDP packet, the netcat (aka "nc") program must be
     installed on Unix (tcl/tk does not support udp connections).  Indicate this
-    with "/udp" following the port number (you can also use "/tcp", but since it
-    is the default it is not necessary).  See the example below.  For convenience
-    a Windows netcat binary is supplied.
+    with "/udp" following the port number (you can also use "/tcp", but since
+    it is the default it is not necessary).  (You can also use ":udp" to match
+    the knockd syntax).  See the example below.  For convenience a Windows netcat
+    binary is supplied.
 
     The last field, [delay], is an optional number of milliseconds to delay
     before continuing on to the next knock.
@@ -5668,7 +5677,7 @@ proc port_knocking_dialog {} {
       CMD=... items or at the very end of the knocks to wait).
 
       If a knock entry matches "delay N" the default delay is set to
-      N milliseconds (it is 0 initially).
+      N milliseconds (it is 150 initially).
 
    One Time Pads:
 
@@ -5697,7 +5706,6 @@ proc port_knocking_dialog {} {
 
 	eval text .pk.rule -width 80 -height 5 $help_font
 	.pk.rule insert end $port_knocking_list
-	#apply_bg .pk.rule
 
 	button .pk.cancel -text "Cancel" -command {set use_port_knocking 0; destroy .pk}
 	bind .pk <Escape> {set use_port_knocking 0; destroy .pk}
@@ -5711,7 +5719,6 @@ proc port_knocking_dialog {} {
 
 
 proc set_advanced_options {} {
-	global env
 	global use_cups use_sound use_smbmnt
 	global change_vncviewer
 	global use_port_knocking port_knocking_list
@@ -5988,12 +5995,20 @@ proc set_options {} {
 		pack .o.sa -side top -fill x 
 	}
 
+	global include_list
+	frame .o.inc
+	label .o.inc.l -text "Include:"
+	entry .o.inc.e -width 10 -textvariable include_list
+	pack .o.inc.l -side left
+	pack .o.inc.e -side right -expand 1 -fill x
+
 	button .o.s_prof -text "Save Profile ..." -command {save_profile; raise .o}
 	button .o.l_prof -text " Load Profile ..." -command {load_profile; raise .o}
 	button .o.advanced -text "Advanced ..." -command set_advanced_options
 	button .o.clear -text "Clear Options" -command set_defaults
 	pack .o.s_prof -side top -fill x 
 	pack .o.l_prof -side top -fill x 
+	pack .o.inc -side top -fill x
 	pack .o.clear -side top -fill x 
 	pack .o.advanced -side top -fill x 
 
@@ -6011,6 +6026,7 @@ proc set_options {} {
 	focus .o
 }
 
+global env
 set is_windows 0
 set help_font "-font fixed"
 if { [regexp -nocase {Windows} $tcl_platform(os)]} {
@@ -6061,7 +6077,6 @@ if {![info exists env(SSL_VNC_GUI_CHILD)] || $env(SSL_VNC_GUI_CHILD) == ""} {
 	center_win .
 }
 focus .f.e
-#raise .
 
 global system_button_face
 set system_button_face ""
@@ -6069,7 +6084,6 @@ foreach item [.b.help configure -bg] {
 	set system_button_face $item
 }
 
-global env
 if {[info exists env(SSL_VNC_GUI_CMD)]} {
 	set env(SSL_VNC_GUI_CHILD) 1
 	bind . <Control-n> "exec $env(SSL_VNC_GUI_CMD) &"

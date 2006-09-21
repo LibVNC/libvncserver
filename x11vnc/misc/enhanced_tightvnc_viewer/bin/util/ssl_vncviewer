@@ -95,7 +95,6 @@ VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
 # Same for STUNNEL, e.g. set it to /path/to/stunnel or stunnel4, etc.
 #
 
-
 PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
 
 if [ "X$STUNNEL" = "X" ]; then
