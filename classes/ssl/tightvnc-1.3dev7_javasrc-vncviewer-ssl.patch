@@ -73,8 +73,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2006-06-12 00:00:28.000000000 -0400
-@@ -0,0 +1,1276 @@
++++ vnc_javasrc/SSLSocketToMe.java	2006-09-23 18:35:25.000000000 -0400
+@@ -0,0 +1,1301 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -408,8 +408,14 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +	public void check_for_proxy() {
 +		
 +		boolean result = false;
-+		String ustr = "https://" + host + ":" + port;
++		String ustr = "https://" + host + ":";
++		if (viewer.httpsPort != null) {
++			ustr += viewer.httpsPort;
++		} else {
++			ustr += port;	// hmmm
++		}
 +		ustr += viewer.urlPrefix + "/check.https.proxy.connection";
++		dbg("ustr is: " + ustr);
 +
 +		trusturlCerts = null;
 +		proxy_in_use = false;
@@ -429,6 +435,11 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			https.connect();
 +
 +			trusturlCerts = https.getServerCertificates();
++			if (trusturlCerts == null) {
++				dbg("set trusturlCerts to null...");
++			} else {
++				dbg("set trusturlCerts to non-null");
++			}
 +
 +			if (https.usingProxy()) {
 +				proxy_in_use = true;
@@ -485,9 +496,14 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		 */
 +		check_for_proxy();
 +		
-+		if (use_url_cert_for_auth && trusturlCerts != null) {
++		if (viewer.trustAllVncCerts) {
++			dbg("viewer.trustAllVncCerts-0 using trustall_ctx");
++			factory = trustall_ctx.getSocketFactory();
++		} else if (use_url_cert_for_auth && trusturlCerts != null) {
++			dbg("using trusturl_ctx");
 +			factory = trusturl_ctx.getSocketFactory();
 +		} else {
++			dbg("using trustloc_ctx");
 +			factory = trustloc_ctx.getSocketFactory();
 +		}
 +
@@ -528,7 +544,9 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			SSLSession sess = socket.getSession();
 +			currentTrustedCerts = sess.getPeerCertificates();
 +
-+			if (currentTrustedCerts == null || currentTrustedCerts.length < 1) {
++			if (viewer.trustAllVncCerts) {
++				dbg("viewer.trustAllVncCerts-1");
++			} else if (currentTrustedCerts == null || currentTrustedCerts.length < 1) {
 +				socket.close();
 +				socket = null;
 +				throw new SSLHandshakeException("no current certs");
@@ -542,16 +560,21 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +				;
 +			}
 +
-+			bcd = new BrowserCertsDialog(serv, host + ":" + port);
-+			bcd.queryUser();
-+			if (bcd.showCertDialog) {
-+				String msg = "user wants to see cert";
-+				dbg(msg);
-+				user_wants_to_see_cert = true;
-+				throw new SSLHandshakeException(msg);
-+			} else {
++			if (viewer.trustAllVncCerts) {
++				dbg("viewer.trustAllVncCerts-2");
 +				user_wants_to_see_cert = false;
-+				dbg("bcd: user said yes, accept it");
++			} else {
++				bcd = new BrowserCertsDialog(serv, host + ":" + port);
++				bcd.queryUser();
++				if (bcd.showCertDialog) {
++					String msg = "user wants to see cert";
++					dbg(msg);
++					user_wants_to_see_cert = true;
++					throw new SSLHandshakeException(msg);
++				} else {
++					user_wants_to_see_cert = false;
++					dbg("bcd: user said yes, accept it");
++				}
 +			}
 +
 +		} catch (SSLHandshakeException eh)  {
@@ -586,7 +609,9 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					    "Peer Certificate");	
 +				}
 +
-+				if (! browser_cert_match()) {
++				if (viewer.trustAllVncCerts) {
++					dbg("viewer.trustAllVncCerts-3");
++				} else if (! browser_cert_match()) {
 +					/*
 +					 * close socket now, we will reopen after
 +					 * dialog if user agrees to use the cert.
@@ -636,7 +661,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			}
 +		}
 +
-+		if (socket != null && viewer.GET != null) {
++		if (socket != null && viewer.GET) {
 +			String str = "GET ";
 +			str += viewer.urlPrefix;
 +			str += "/request.https.vnc.connection";
@@ -1353,21 +1378,23 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2006-04-16 11:21:13.000000000 -0400
-@@ -88,6 +88,12 @@
++++ vnc_javasrc/VncViewer.java	2006-09-23 18:36:42.000000000 -0400
+@@ -88,6 +88,14 @@
    int deferCursorUpdates;
    int deferUpdateRequests;
  
 +  boolean disableSSL;
-+  String GET;
++  boolean GET;
 +  String CONNECT;
 +  String urlPrefix;
++  String httpsPort;
 +  boolean forceProxy;
++  boolean trustAllVncCerts;
 +
    // Reference to this applet for inter-applet communication.
    public static java.applet.Applet refApplet;
  
-@@ -626,6 +632,39 @@
+@@ -626,6 +634,51 @@
  
      // SocketFactory.
      socketFactory = readParameter("SocketFactory", false);
@@ -1378,31 +1405,43 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    if (str != null && str.equalsIgnoreCase("Yes"))
 +      disableSSL = true;
 +
++    httpsPort = readParameter("httpsPort", false);
++
 +    // Extra GET, CONNECT string:
 +    CONNECT = readParameter("CONNECT", false);
 +    if (CONNECT != null) {
 +	CONNECT = CONNECT.replaceAll(" ", ":");
 +    }
-+    GET = readParameter("GET", false);
-+    urlPrefix = "";
-+    if (GET != null) {
-+	GET = GET.replaceAll("%2F", "/");
-+	GET = GET.replaceAll("%2f", "/");
-+	GET = GET.replaceAll("_2F_", "/");
-+	if (! GET.equals("1")) {
-+		if (GET.indexOf("/") != 0) {
-+			urlPrefix += "/";
-+		}
-+		urlPrefix += GET;
++
++    GET = false;
++    str = readParameter("GET", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++      GET = true;
++    }
++    if (str != null && str.equalsIgnoreCase("1")) {
++      GET = true;
++    }
++
++    urlPrefix = readParameter("urlPrefix", false);
++    if (urlPrefix != null) {
++	urlPrefix = urlPrefix.replaceAll("%2F", "/");
++	urlPrefix = urlPrefix.replaceAll("%2f", "/");
++	urlPrefix = urlPrefix.replaceAll("_2F_", "/");
++	if (urlPrefix.indexOf("/") != 0) {
++		urlPrefix = "/" + urlPrefix;
 +	}
 +    }
-+    urlPrefix = urlPrefix.replaceAll("%2f", "/");
 +    System.out.println("urlPrefix: " + urlPrefix);
 +
 +    forceProxy = false;
 +    str = readParameter("forceProxy", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +      forceProxy = true;
++    }
++    trustAllVncCerts = false;
++    str = readParameter("trustAllVncCerts", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++      trustAllVncCerts = true;
 +    }
    }
  

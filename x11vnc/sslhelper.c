@@ -1574,6 +1574,7 @@ void accept_openssl(int mode) {
 				 * instead of a direct SSL connection.
 				 */
 				rfbLog("Handling VNC request via https GET. [%d]\n", getpid());
+				rfbLog("-- %s\n", buf);
 
 				if (strstr(buf, "/reverse.proxy")) {
 					char *buf2;
@@ -1603,6 +1604,9 @@ void accept_openssl(int mode) {
 				    "Connection: close\r\n"
 				    "Content-Type: octet-stream\r\n"
 				    "Pragma: no-cache\r\n\r\n";
+
+				rfbLog("Handling Check HTTPS request via https GET. [%d]\n", getpid());
+				rfbLog("-- %s\n", buf);
 
 				SSL_write(ssl, reply, strlen(reply));
 				SSL_shutdown(ssl);

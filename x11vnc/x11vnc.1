@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-09-20
+         version: 0.8.3, lastmod: 2006-09-23
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -617,8 +617,10 @@ uses the
 .IR su (1)
 program to verify the user's password.
 [list] is an optional comma separated list of allowed
-Unix usernames.  See below for per-user options that
-can be applied.
+Unix usernames.  If the [list] string begins with the
+character "!" then the entire list is taken as an
+exclude list.  See below for per-user options that can
+be applied.
 .IP
 A familiar "login:" and "Password:" dialog is
 presented to the user on a black screen inside the
@@ -727,11 +729,14 @@ where "opts" is a "+" separated list of
 "deny", e.g. "karl,wally:viewonly,boss:input=M".
 For "input=" it is the K,M,B,C described under \fB-input.\fR
 .IP
-If a user in the list is "*" that means those
+If an item in the list is "*" that means those
 options apply to all users.  It also means all users
 are allowed to log in after supplying a valid password.
 Use "deny" to explicitly deny some users if you use
-"*" to set a global option.
+"*" to set a global option.  If [list] begins with
+the "!" character then "*" is ignored for checking
+if the user is allowed, but the any value of options
+associated with it does apply as normal.
 .IP
 There are also some utilities for testing password
 if [list] starts with the "%" character.  See the
@@ -784,11 +789,15 @@ run the externally supplied command \fIstr\fR.  The first
 line of its stdin will the username and the second line
 the received password.  If the command exits with status
 0 (success) the VNC client will be accepted.  It will be
-rejected for any other return status.  Dynamic passwords
-and non-unix passwords can be implemented this way by
-providing your own custom helper program.  Note that
-under unixpw mode the remote viewer is given 3 tries
-to enter the correct password.
+rejected for any other return status.
+.IP
+Dynamic passwords and non-unix passwords can be
+implemented this way by providing your own custom helper
+program.  Note that under unixpw mode the remote viewer
+is given 3 tries to enter the correct password.
+.IP
+If a list of allowed users is needed use \fB-unixpw\fR [list]
+in addition to this option.
 .PP
 \fB-display\fR \fIWAIT:...\fR
 .IP
@@ -3182,7 +3191,7 @@ gives inaccurate information), specify them with a
 @WxHxB at the end of the string.
 .IP
 Examples:
-\fB-rawfb\fR console            (same as \fB-rawfb\fR console)
+\fB-rawfb\fR console
 \fB-rawfb\fR /dev/fb0           (same)
 \fB-rawfb\fR console3           (force /dev/tty3)
 \fB-rawfb\fR consolex           (no keystrokes or mouse)

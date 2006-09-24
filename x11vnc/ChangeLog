@@ -1,3 +1,8 @@
+2006-09-23  Karl Runge <runge@karlrunge.com>
+	* Java viewer: improvements to connection response, faster
+	  connections.
+	* x11vnc: some cleanup for -unixpw login process.
+
 2006-09-20  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -unixpw_cmd, -passwfile cmd:/custom:, -sslnofail,
 	  -ultrafilexfer

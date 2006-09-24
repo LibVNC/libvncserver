@@ -1048,7 +1048,7 @@ static unsigned char t2x2_bits[] = {
 		char *ip = addr;
 		char *type = "accept";
 		if (unixpw && strstr(userhost, "UNIX:") != userhost) {
-			type = "unixpw";
+			type = "UNIXPW";
 			if (openssl_last_ip) {
 				ip = openssl_last_ip;
 			}
@@ -2007,7 +2007,6 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	}
 
 	clients_served++;
-if (getenv("NEW_CLIENT")) fprintf(stderr, "new_client: %s %d\n", client->host, clients_served);
 
 	if (use_openssl || use_stunnel) {
 		if (! ssl_initialized) {
@@ -2016,7 +2015,7 @@ if (getenv("NEW_CLIENT")) fprintf(stderr, "new_client: %s %d\n", client->host, c
 			return(RFB_CLIENT_REFUSE);
 		}
 	}
-	if (unixpw && unixpw_in_progress) {
+	if (unixpw_in_progress) {
 		rfbLog("denying additional client: %s during -unixpw login.\n",
 		     client->host);
 		return(RFB_CLIENT_REFUSE);
@@ -2052,7 +2051,6 @@ if (getenv("NEW_CLIENT")) fprintf(stderr, "new_client: %s %d\n", client->host, c
 	cd->ssl_helper_pid = 0;
 
 	if (use_openssl && openssl_last_helper_pid) {
-if (0) fprintf(stderr, "SET ssl_helper_pid: %d\n", openssl_last_helper_pid);
 		cd->ssl_helper_pid = openssl_last_helper_pid;
 		openssl_last_helper_pid = 0;
 	}
@@ -2085,7 +2083,6 @@ if (0) fprintf(stderr, "SET ssl_helper_pid: %d\n", openssl_last_helper_pid);
 	}
 
 	cd->uid = clients_served;
-
 
 	client->clientGoneHook = client_gone;
 
@@ -2131,8 +2128,10 @@ if (0) fprintf(stderr, "SET ssl_helper_pid: %d\n", openssl_last_helper_pid);
 			client->viewOnly = FALSE;
 		}
 		unixpw_last_try_time = time(NULL);
+
 		unixpw_screen(1);
 		unixpw_keystroke(0, 0, 1);
+
 		if (!unixpw_in_rfbPE) {
 			rfbLog("new client: %s in non-unixpw_in_rfbPE.\n",
 			     client->host);

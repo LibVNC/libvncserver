@@ -2680,20 +2680,19 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	if (debug_keyboard) {
 		char *str;
 		X_LOCK;
-		str = XKeysymToString(keysym);
+		str = XKeysymToString((KeySym) keysym);
 		X_UNLOCK;
 		rfbLog("# keyboard(%s, 0x%x \"%s\") uip=%d  %.4f\n",
 		    down ? "down":"up", (int) keysym, str ? str : "null",
 		    unixpw_in_progress, tnow - x11vnc_start);
 	}
 
-
 	if (keysym <= 0) {
 		rfbLog("keyboard: skipping 0x0 keysym\n");
 		return;
 	}
 	
-	if (unixpw && unixpw_in_progress) {
+	if (unixpw_in_progress) {
 		if (unixpw_denied) {
 			rfbLog("keyboard: ignoring keystroke 0x%x in "
 			    "unixpw_denied=1 state\n", (int) keysym);
@@ -2703,7 +2702,9 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			rfbLog("keyboard: skipping other client in unixpw\n");
 			return;
 		}
+
 		unixpw_keystroke(down, keysym, 0);
+
 		return;
 	}
 

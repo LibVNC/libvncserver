@@ -460,7 +460,7 @@ static void watch_loop(void) {
 		if (! use_threads) {
 			dtime0(&tm);
 			if (! skip_pe) {
-				if (unixpw && unixpw_in_progress) {
+				if (unixpw_in_progress) {
 					rfbClientPtr cl = unixpw_client;
 					if (cl && cl->onHold) {
 						rfbLog(msg, cl->host);
@@ -490,17 +490,19 @@ static void watch_loop(void) {
 
 				unixpw_in_rfbPE = 0;
 
-				if (unixpw && unixpw_in_progress) {
+				if (unixpw_in_progress) {
 					/* rfbPE loop until logged in. */
 					skip_pe = 0;
+					check_new_clients();
 					continue;
 				} else {
 					measure_send_rates(0);
 					fb_update_sent(NULL);
 				}
 			} else {
-				if (unixpw && unixpw_in_progress) {
+				if (unixpw_in_progress) {
 					skip_pe = 0;
+					check_new_clients();
 					continue;
 				}
 			}
@@ -528,12 +530,6 @@ static void watch_loop(void) {
 				eat_viewonly_input(10, 3);
 			}
 		} else {
-#if 0
-			if (0 && use_xrecord) {
-				/* XXX not working */
-				check_xrecord();
-			}
-#endif
 			if (wireframe && button_mask) {
 				check_wireframe();
 			}
@@ -544,7 +540,10 @@ static void watch_loop(void) {
 			clean_up_exit(0);
 		}
 
-		if (unixpw_in_progress) continue;
+		if (unixpw_in_progress) {
+			check_new_clients();
+			continue;
+		}
 
 		if (! urgent_update) {
 			if (do_copy_screen) {
