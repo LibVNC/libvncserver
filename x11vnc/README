@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat Sep 23 19:30:26 EDT 2006
+x11vnc README file                         Date: Sat Oct  7 10:35:03 EDT 2006
 
 The following information is taken from these URLs:
 
@@ -35,11 +35,11 @@ x11vnc: a VNC server for real X displays
    impossible to build on Solaris and had poor performance. The primary
    x0rfbserver build problems centered around esoteric C++ toolkits.
    x11vnc is written in plain C and uses only standard libraries and so
-   should work on nearly all Unixes. I also added a some enhancements to
+   should work on nearly all Unixes. I also added some enhancements to
    improve the interactive response, add many esoteric features, etc.
 
-   This page and the [14]FAQ contain a lot of information [15][*] and
-   solutions to many problems and interesting applications, but
+   This page and the [14]FAQ contain a lot of information [15][*],
+   solutions to many problems, and interesting applications, but
    nevertheless please feel free to [16]contact me if you have problems
    or questions.
 
@@ -3892,6 +3892,9 @@ ied)
      * Turn off Anti-aliased fonts on your system, web browser, terminal
        windows, etc. AA fonts do not compress as well as traditional
        fonts (sometimes 10X less).
+     * On Firefox/Mozilla (and anything else) turn off "Smooth Scroll"
+       animations. In Firefox put in the URL "about:config" and set
+       general.smoothScroll to false.
      * On XFree86 turn on the Shadow Framebuffer to speed up reading.
        (Option "ShadowFB" "true" in the Device section of
        /etc/X11/XF86Config) This disables 2D acceleration on the physical
@@ -7358,13 +7361,17 @@ http://www.karlrunge.com/x11vnc/ssl-portal.html:
    -t -L 5900:myworkstation:5900 user@gateway) to set up the encrypted
    channel that VNC is then tunneled through. Next he starts up the VNC
    viewer on the machine where he is sitting directed to the local tunnel
-   port.
+   port (e.g. localhost:0).
 
-   The SSH scheme is nice because it is a common and well tested login
-   technique for users connecting to machines inside their company or
-   home firewall. It is a bit awkward, however, because SSH needs to be
-   installed on the Viewer machine and the user usually has to rig up his
-   own port redirection plumbing.
+   The SSH scheme is nice because it is a widely used and well tested
+   login technique for users connecting to machines inside their company
+   or home firewall. For VNC access it is a bit awkward, however, because
+   SSH needs to be installed on the Viewer machine and the user usually
+   has to rig up his own port redirection plumbing. Also, some users have
+   restrictive work environments where SSH and similar applications are
+   prohibited (i.e. only outgoing connections to standard WWW ports are
+   allowed, perhaps mediated by a proxy server) and have used the method
+   described below for remote access.
 
    With the SSL support in x11vnc and the SSL enabled Java VNC viewer
    applet, a convenient and secure alternative exists that uses the
@@ -7372,17 +7379,19 @@ http://www.karlrunge.com/x11vnc/ssl-portal.html:
    connection is already running apache as a web server (either SSL or
    non-SSL) and we add to it the ability to act as a gateway for SSL VNC
    connections. The only thing needed on the Viewer side is a Java
-   enabled Web Browser. The stunnel VNC viewer wrapper script provided
+   enabled Web Browser: the user enters a URL that starts the VNC
+   connection process. The stunnel VNC viewer wrapper script provided
    (ssl_vncviewer) can also take advantage of the method described here.
-   The apache solution may be overkill for you (e.g. home system) see
-   [1]below for some simpler setups.
 
-   There are numerous ways to do this. We present the simplest one here.
-   Important: these schemes allow incoming connections from anywhere on
-   the Internet to specific ports on machines inside the firewall. Care
-   must be taken to implement and test thoroughly. If one is paranoid one
-   can (and should) add extra layers of protection. (e.g. extra
-   passwords, packet filtering, SSL certificate verification, etc).
+   This apache solution may be overkill for you (e.g. home system) see
+   [1]below for some simpler setups that avoid using SSH.
+
+   There are numerous ways to achieve this with Apache. We present the
+   simplest one here. Important: these schemes allow incoming connections
+   from anywhere on the Internet to fixed ports on machines inside the
+   firewall. Care must be taken to implement and test thoroughly. If one
+   is paranoid one can (and should) add extra layers of protection. (e.g.
+   extra passwords, packet filtering, SSL certificate verification, etc).
 
    The scheme described here sets up apache on the firewall/gateway as a
    regular Web proxy into the intranet and allows connections to a fixed
@@ -7398,9 +7407,10 @@ http://www.karlrunge.com/x11vnc/ssl-portal.html:
    We choose 563 because it is the rarely used SNEWS port that is usually
    allowed by Web proxies for the CONNECT method. The idea is the user
    may be coming out of another firewall using a proxy (not the one we
-   describe here, that is, the case when two proxies are involved; the
-   "double proxy" problem) and using port 563 simplifies things because
-   CONNECT's to it are usually allowed by default.
+   describe here, that is, the case when two proxies are involved, e.g.
+   one at work and another, Apache at home redirecting into our firewall;
+   the "double proxy" problem) and using port 563 simplifies things
+   because CONNECT's to it are usually allowed by default.
 
    We also assume all of the x11vnc servers on the internal machines are
    all listening on port 5915 ("-rfbport 5915") instead of the default
@@ -7470,10 +7480,11 @@ t:563/
    into the browser:
    http://www.gateway.east:563/vnc/mach2
 
-   to connect to internal workstation mach2, etc. There will be a number
-   of SSL certificate, etc, dialogs he will have to respond to in
-   addition to any passwords he is required to provide (this depends on
-   how you set up user authentication for x11vnc).
+   to connect to internal workstation mach2, etc. (Important: do not put
+   a trailing "/" on the URL, since that will defeat the RewriteRules.)
+   There will be a number of SSL certificate, etc, dialogs he will have
+   to respond to in addition to any passwords he is required to provide
+   (this depends on how you set up user authentication for x11vnc).
 
    If a second Web proxy is involved (i.e. the user's browser is inside
    another firewall that requires proxying) then use this URL:
@@ -7499,7 +7510,8 @@ t:563/
 
    Next, the "ProxyRequests On" and "AllowCONNECT 5915" enable the web
    server to forward proxy requests to port 5915 (and only this port)
-   INSIDE the firewall. Test this carefully.
+   INSIDE the firewall. Research the implications of this thoroughly and
+   test it carefully.
 
    The "ProxyPass /vnc/mach1/ ..." lines forward the initial page (e.g.
    index.vnc) and Java applet JAR file (e.g. VncViewer.jar) requests to
@@ -7534,18 +7546,33 @@ t:563/
    Web browser's acceptance of the certificate.
 
    Unfortunately the applet currently is not able to save its own list of
-   Certificates (e.g. the user says trust this certificate always). As an
-   applet it cannot open local files, etc. Sadly, the applet cannot even
-   remember certificates in the same browser session because it is
-   completely reinitialized for each connection.
+   Certificates (e.g. the user says trust this VNC certificate 'always').
+   This is because an applet it cannot open local files, etc. Sadly, the
+   applet cannot even remember certificates in the same browser session
+   because it is completely reinitialized for each connection.
+
+
+   Problems:
+
+   One user reported that the ProxyRemoteMatch did not work for his
+   Apache setup and had to use something like this:
+<ProxyMatch ^(?!(http://mach1|mach1:))>
+  Order deny,allow
+  Deny from all
+</ProxyMatch>
+
+   in the global config section.
 
 
    Some Ideas for adding extra authentication, etc. for the paranoid:
      * VNC passwords: [6]-rfbauth, [7]-passwdfile, or [8]-usepw. Even
-       adding a company-wide VNC password helps block unwanted access.
+       adding a simple company-wide VNC password helps block unwanted
+       access.
      * Unix passwords: [9]-unixpw
      * SSL Client certificates: [10]-sslverify
      * Apache AuthUserFile directive: .htaccess, etc.
+     * Use Port-knocking on your firewall as described in: [11]Enhanced
+       TightVNC Viewer.
      * Add proxy password authentication (requires Viewer changes?)
      * Run a separate instance of Apache that provides this VNC service
        so it can be brought up and down independently of the normal web
@@ -7555,14 +7582,14 @@ t:563/
 
    Using non-Java viewers with this scheme:
 
-   The [11]ssl_vncviewer stunnel wrapper script for VNC viewers has the
+   The [12]ssl_vncviewer stunnel wrapper script for VNC viewers has the
    -proxy option that can take advantage of this method. For the case of
    the "double proxy" situation (see below) supply both separated by a
    comma.
    ssl_vncviewer -proxy www.gateway.east:563 mach1:15
    ssl_vncviewer -proxy proxy1.foobar.com:8080,www.gateway.east:563 mach1:15
 
-   For the [12]Enhanced TightVNC Viewer GUI (it uses ssl_vncviewer on
+   For the [13]Enhanced TightVNC Viewer GUI (it uses ssl_vncviewer on
    Unix) enter these into the 'VNC Server' entry box:
    mach1:15  www.gateway.east:563
    mach1:15  proxy1.foobar.com:8080,www.gateway.east:563
@@ -7573,20 +7600,21 @@ t:563/
 
    Downloading the Java applet via HTTPS:
 
-   To have the Java applet downloaded to the user's Web Browswer via an
+   To have the Java applet downloaded to the user's Web Browser via an
    encrypted (and evidently safer) SSL connection the Apache webserver
-   should be configured for SSL via [13]mod_ssl (this is probably not
+   should be configured for SSL via [14]mod_ssl (this is probably not
    absolutely necessary; show us how you did it).
 
-   It is actually possible to use the x11vnc [14]Key Management utility
-   "[15]-sslGenCert" to generate your Apache/SSL .crt and .key files. (In
+   It is actually possible to use the x11vnc [15]Key Management utility
+   "[16]-sslGenCert" to generate your Apache/SSL .crt and .key files. (In
    brief, run something like "x11vnc -sslGenCert server self:apache" then
    copy the resulting self:apache.crt file to conf/ssl.crt/server.crt and
    extract the private key part from self:apache.pem and paste it into
    conf/ssl.key/server.key). Setting the env var REQ_ARGS='-days 730'
    will bump up the expiration date (2 years in this case). Or you can
    use the standard methods described in the Apache mod_ssl
-   documentation.
+   documentation. Then restart Apache, usually something like "apachectl
+   startssl".
 
    In addition to the above sections in httpd.conf one should add the
    following to ssl.conf:
@@ -7612,6 +7640,7 @@ RT=563&forceProxy=yes [R,NE]
    ProxyPass /vnc/mach2/       http://mach2:5815/
    ProxyPass /vnc/mach3/       http://mach3:5815/
    ProxyPass /vnc/mach4/       http://mach4:5815/
+   # single port VNC+HTTPS:
    ProxyPass /vncs/mach1/      https://mach1:5915/
    ProxyPass /vncs/mach2/      https://mach2:5915/
    ProxyPass /vncs/mach3/      https://mach3:5915/
@@ -7625,7 +7654,8 @@ RT=563&forceProxy=yes [R,NE]
    or
    https://www.gateway.east/vnc/proxy/mach2
 
-   for the "double proxy" case.
+   for the "double proxy" case. (Important: do not put a trailing "/" on
+   the URL, since that will defeat the RewriteRules.)
 
    Note that inside the firewall the Java applet download traffic is not
    encrypted (only over the Internet is SSL used) for these cases:
@@ -7637,19 +7667,22 @@ RT=563&forceProxy=yes [R,NE]
 
    the Java applet download is encrypted via SSL for both legs. Note that
    the two legs are two separate SSL sessions. So the data is decrypted
-   inside an apache process and reencrypted for the 2nd SSL session
-   inside the same apache process (a very small gap one might overlook).
+   inside an apache process and reencrypted by the apache process for the
+   2nd SSL session inside the same apache process (a very small gap one
+   might overlook).
 
    In all of the above cases the VNC traffic from Viewer to x11vnc is
    encrypted end-to-end in a single SSL session, even for the "double
-   proxy" case. This is the important part to have encrypted.
+   proxy" case because the CONNECT method is used (there are actually two
+   CONNECT's for the "double proxy" case). This part (the VNC traffic) is
+   the important part to have encrypted.
 
    Note that the Certificate dialogs the user has in his web browser will
    be for the Apache Certificate, while for the Java applet it will be
    the x11vnc certificate.
 
    Note also that you can have Apache serve up the Jar file VncViewer.jar
-   instead of each x11vnc if you want to.
+   and/or index.vnc/proxy.vnc instead of each x11vnc if you want to.
 
 
    INETD automation:
@@ -7701,7 +7734,7 @@ RT=563&forceProxy=yes [R,NE]
        -inetd -oa /var/log/x11vnc-15.log -http_ssl -display WAIT:cmd=HTTPONCE
 
    where the long inetd.conf line has been split. Note how the
-   [16]-http_ssl tries to automatically find the .../classes/ssl
+   [17]-http_ssl tries to automatically find the .../classes/ssl
    subdirectory.
 
    Also note the use of "-ssl SAVE" above. This way a saved server.pem is
@@ -7826,7 +7859,7 @@ Certs=yes [R,NE]
    the first time you connect carefully check the Certificate and then
    tell your Browser and Java Virtual Machine to trust the certificate
    'Always'. Then if you later get an unexpected dialog, you know
-   something is wrong. Nearly always it is just an changed or expired
+   something is wrong. Nearly always it is just a changed or expired
    certificate, but better safe than sorry...
 
 References
@@ -7841,12 +7874,13 @@ References
    8. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-usepw
    9. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
   10. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
-  11. http://www.karlrunge.com/x11vnc/index.html#ssl_vncviewer
-  12. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
-  13. http://httpd.apache.org/docs/2.0/mod/mod_ssl.html
-  14. http://www.karlrunge.com/x11vnc/ssl.html
-  15. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCert
-  16. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-http_ssl
+  11. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
+  12. http://www.karlrunge.com/x11vnc/index.html#ssl_vncviewer
+  13. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
+  14. http://httpd.apache.org/docs/2.0/mod/mod_ssl.html
+  15. http://www.karlrunge.com/x11vnc/ssl.html
+  16. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCert
+  17. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-http_ssl
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html:
@@ -7856,17 +7890,22 @@ http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html:
 
 Enhanced TightVNC Viewer
 
-   The Enhanced TightVNC Viewer package is a project to add some patches
-   to the long neglected Unix TightVNC Viewer.
+   The Enhanced TightVNC Viewer package started as a project to add some
+   patches to the long neglected Unix TightVNC Viewer.
 
-   It also adds a front-end GUI for Windows and Unix that automatically
-   starts up a STUNNEL SSL tunnel for SSL connections to [1]x11vnc (or
-   any other VNC Server also running an SSL tunnel, such as STUNNEL, at
-   their end), and then launches the TightVNC Viewer. The front-end
-   program can also be used to set up SSH tunnelled connections instead.
+   It now also adds a front-end GUI for Windows and Unix that
+   automatically starts up a STUNNEL SSL tunnel for SSL connections to
+   [1]x11vnc (or any other VNC Server also running an SSL tunnel, such as
+   STUNNEL, at their end), and then launches the TightVNC Viewer. The
+   front-end program can also be used to set up SSH tunnelled connections
+   instead. And many additional features (see below for a list).
+
+   It is a self-contained package, you could carry it around on, say, a
+   USB memory stick for secure VNC viewing from almost any machine, Unix
+   or Windows.
 
    Patches were created for the TightVNC 1.3dev7 vnc_unixsrc tree (and
-   various wrappers written) to add these features:
+   various wrappers and a tcl/tk GUI written) to add these features:
      * SSL support for connections using the co-bundled stunnel program.
      * Automatic SSH connections from the GUI (system ssh is used on
        Unix; co-bundled plink is used on Windows)
@@ -7930,15 +7969,15 @@ Enhanced TightVNC Viewer
    (and there should be kinks to work out).
 
    This package can be downloaded here:
-    [8]enhanced_tightvnc_viewer-1.0.4.zip                 All Unix and Windows
-binaries and source.  (~6MB)
-    [9]enhanced_tightvnc_viewer-1.0.4.tar.gz              All Unix and Windows
-binaries and source.  (~6MB)
-    [10]enhanced_tightvnc_viewer_all-1.0.4.zip             All Unix and Windows
- binaries and source and full archives in zip dir. (~9MB)
-    [11]enhanced_tightvnc_viewer_windows_only-1.0.4.zip    Only the Windows bin
-aries. (~4MB)
-    [12]enhanced_tightvnc_viewer_no_windows-1.0.4.tar.gz   No Windows binaries.
+    [8]enhanced_tightvnc_viewer-1.0.5.zip                 All Unix and Windows
+binaries and source.  (~8MB)
+    [9]enhanced_tightvnc_viewer-1.0.5.tar.gz              All Unix and Windows
+binaries and source.  (~8MB)
+    [10]enhanced_tightvnc_viewer_all-1.0.5.zip             All Unix and Windows
+ binaries and source and full archives in zip dir. (~11MB)
+    [11]enhanced_tightvnc_viewer_windows_only-1.0.5.zip    Only the Windows bin
+aries. (~6MB)
+    [12]enhanced_tightvnc_viewer_no_windows-1.0.5.tar.gz   No Windows binaries.
  (~2MB)
 
    Sorry for the inconvenience of lumping all the Unix binaries and
@@ -7971,7 +8010,7 @@ aries. (~4MB)
         [17]http://www.chiark.greenend.org.uk/~sgtatham/putty/
 
    It is my belief (but I cannot be absolutely sure) that the bundle
-   enhanced_tightvnc_viewer_no_windows-1.0.4.tar.gz contains no
+   enhanced_tightvnc_viewer_no_windows-1.0.5.tar.gz contains no
    cryptographic software (again, if your situation warrants, you will
    need to check). This "no_windows" tarball only contains software (from
    the above URL's and elsewhere) that will use cryptographic software
@@ -8027,6 +8066,9 @@ Also, a Windows SSL wrapper for the co-bundled TightVNC binary and other
 utilities are provided.  (Launch ssl_tightvncviewer.exe in the
 Windows subdirectory).
 
+It is a self-contained package, you could carry it around on, say,
+a USB memory stick for secure VNC viewing from almost any machine,
+Unix or Windows.
 
 Features:
 --------
@@ -8076,7 +8118,7 @@ If you need to Build:
 --------------------
 
 If your OS/arch is not included, the script "build.unix" may be able to
-successfully build on for you and deposit the binaries down in ./bin/...
+successfully build one for you and deposit the binaries down in ./bin/...
 using the included source code.
 
 You must run the build.unix script from this directory (that this toplevel
@@ -8232,11 +8274,11 @@ References
    5. http://www.karlrunge.com/x11vnc/index.html#faq-smb-shares
    6. http://www.karlrunge.com/x11vnc/index.html#faq-cups
    7. http://www.karlrunge.com/x11vnc/index.html#faq-sound
-   8. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.4.zip
-   9. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.4.tar.gz
-  10. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_all-1.0.4.zip
-  11. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_windows_only-1.0.4.zip
-  12. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_no_windows-1.0.4.tar.gz
+   8. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.5.zip
+   9. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.5.tar.gz
+  10. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_all-1.0.5.zip
+  11. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_windows_only-1.0.5.zip
+  12. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_no_windows-1.0.5.tar.gz
   13. http://www.tightvnc.com/
   14. http://www.realvnc.com/
   15. http://www.stunnel.org/
@@ -8254,7 +8296,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-23
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-10-07
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -8355,7 +8397,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-09-23
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-10-07
 
 (type "x11vnc -opts" to just list the options.)
 

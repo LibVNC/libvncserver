@@ -17,6 +17,7 @@ by others.  See these sites and related ones for more information:
         http://www.tightvnc.com
         http://www.realvnc.com
         http://www.stunnel.org
+        http://stunnel.mirt.net
         http://www.openssl.org
         http://www.chiark.greenend.org.uk/~sgtatham/putty/
 
@@ -46,6 +47,9 @@ Also, a Windows SSL wrapper for the co-bundled TightVNC binary and other
 utilities are provided.  (Launch ssl_tightvncviewer.exe in the
 Windows subdirectory).
 
+It is a self-contained package, you could carry it around on, say,
+a USB memory stick for secure VNC viewing from almost any machine,
+Unix or Windows.
 
 Features:
 --------
@@ -215,6 +219,7 @@ See also:
 	x11vnc -h | more
 
 	http://www.stunnel.org
+	http://stunnel.mirt.net
 	http://www.openssl.org
 	http://www.tightvnc.com
         http://www.realvnc.com

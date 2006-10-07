@@ -33,7 +33,10 @@
 #
 # -proxy  try host:port as a Web proxy to use the CONNECT method
 #         to reach the VNC server (e.g. your firewall requires a proxy).
+#
 #         For the "double proxy" case use -proxy host1:port1,host2:port2
+#         (the first CONNECT is done through host1:port1 to host2:port2
+#         and then a 2nd CONNECT to the destination VNC server.)
 #
 #    See http://www.karlrunge.com/x11vnc/#faq-ssl-ca for details on SSL
 #    certificates with VNC.
@@ -56,6 +59,14 @@
 #         other than the default (22).  (even for the non-gateway case,
 #         -proxy must be used to specify a non-standard ssh port)
 #
+#         A "double ssh" can be specified via a -proxy string with the two
+#         hosts separated by a comma:
+#
+#             [user1@]host1[:port1],[user2@]host2[:port2]
+#
+#         in which case a ssh to host1 and thru it via a -L redir a 2nd
+#         ssh is established to host2.  
+#
 #         Examples:
 #
 #         ssl_vncviewer -ssh bob@bobs-home.net:0
@@ -63,6 +74,8 @@
 #
 #         ssl_vncviewer -ssh -proxy fred@mygate.com:2022 mymachine:0
 #         ssl_vncviewer -ssh -proxy bob@bobs-home.net:2222 localhost:0
+#
+#         ssl_vncviewer -ssh -proxy fred@gw-host,fred@peecee localhost:0
 #
 # -sshcmd cmd   Run "cmd" via ssh instead of the default "sleep 15"
 #               e.g. -sshcmd 'x11vnc -display :0 -localhost -rfbport 5900'
@@ -94,7 +107,6 @@ VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
 #
 # Same for STUNNEL, e.g. set it to /path/to/stunnel or stunnel4, etc.
 #
-
 
 PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
 
@@ -240,6 +252,38 @@ if [ "X$use_ssh" = "X1" ]; then
 	ssh_host="$host"
 	vnc_host="localhost"
 	ssh=${SSH:-"ssh -x"}
+	if echo "$proxy" | grep "," > /dev/null; then
+		proxy1=`echo "$proxy" | awk -F, '{print $1}'`
+		proxy2=`echo "$proxy" | awk -F, '{print $2}'`
+		# user1@gw1.com:port1,user2@ws2:port2
+		ssh_host1=`echo "$proxy1" | awk -F: '{print $1}'`
+		ssh_port1=`echo "$proxy1" | awk -F: '{print $2}'`
+		if [ "X$ssh_port1" = "X" ]; then
+			ssh_port1="22"
+		fi
+		ssh_host2=`echo "$proxy2" | awk -F: '{print $1}'`
+		ssh_user2=`echo "$ssh_host2" | awk -F@ '{print $1}'`
+		ssh_host2=`echo "$ssh_host2" | awk -F@ '{print $2}'`
+		if [ "X$ssh_host2" = "X" ]; then
+			ssh_host2=$ssh_user2
+			ssh_user2=""
+		else
+			ssh_user2="${ssh_user2}@"
+		fi
+		ssh_port2=`echo "$proxy2" | awk -F: '{print $2}'`
+		if [ "X$ssh_port2" = "X" ]; then
+			ssh_port2="22"
+		fi
+		proxport=`findfree 3500`
+		echo
+		echo "Running 1st ssh proxy:"
+		echo "$ssh -f -p $ssh_port1 -t -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
+		      $ssh -f -p $ssh_port1 -t -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
+		ssh_args="$ssh_args -o NoHostAuthenticationForLocalhost=yes"
+		sleep 1
+		stty sane
+		proxy="${ssh_user2}localhost:$proxport"
+	fi
 	if [ "X$proxy" != "X" ]; then
 		ssh_port=`echo "$proxy" | awk -F: '{print $2}'`
 		if [ "X$ssh_port" = "X" ]; then

@@ -108,11 +108,16 @@ proc help {} {
 
     Proxies: If an intermediate proxy is needed to make the SSL connection
     (e.g. web gateway out of a firewall), supply both hosts separated
-    by spaces (with the proxy 2nd):
+    by spaces (with the proxy second):
 
            host:number   gwhost:port 
 
-    E.g.:  far-way.east:0   mygateway.com:8080
+    E.g.:  far-away.east:0   mygateway.com:8080
+
+    If the "double proxy" case is required (e.g. coming out of a web
+    proxied firewall environment), separate them via a comma, e.g.:
+
+           far-away:0   local-proxy:8080,mygateway.com:443
 
     See the ssl_vncviewer description and x11vnc FAQ for info on proxies:
 
@@ -164,8 +169,15 @@ proc help {} {
 
      2) If you use "user@hostname cmd=SHELL" then you get an SSH shell only:
         no VNC viewer will be launched.  On Windows "user@hostname cmd=PUTTY"
-        will try to use putty.exe (better terminal emulation than plink.exe)
-        A shortcut for this is Ctrl-S as long as user@hostname is present.
+        will try to use putty.exe (better terminal emulation than
+        plink.exe).  A shortcut for this is Ctrl-S as long as user@hostname
+        is present in the entry box.
+
+     3) If you use "user@hostname cmd=KNOCK" then only the port-knocking 
+        is performed.  A shortcut for this is Ctrl-P as long as hostname
+        is present in the entry box.  If it matches cmd=KNOCKF, i.e. an
+        extra "F", then the port-knocking "FINISH" sequence is sent, if any.
+        A shortcut for this Shift-Ctrl-P as long as hostname is present.
 }
 
 	.h.f.t insert end $msg
@@ -265,18 +277,18 @@ set msg {
             tunnel.  You must be able to log in via ssh to the remote host.
 
             On Unix the cmdline ssh(1) program will be run in an xterm
-            for authentication, etc. On Windows the cmdline plink.exe
-            program will be launched in a Windows Console window.
+            for passphrase authentication, etc. On Windows the cmdline
+            plink.exe program will be launched in a Windows Console window.
 
-            You can set the "VNC Server" to "user@host:disp" to indicate
-            ssh should log in as "user" on "host".  On Windows you must
+            You can set the "VNC Server" to "user@host:disp" to indicate ssh
+            should log in as "user" on "host".  NOTE: On Windows you MUST
             always supply the "user@" part (due to a plink deficiency). E.g.:
 
                   fred@far-away.east:0
 
-            If a gateway machine must be used (e.g. to enter a firewall;
-            the VNC Server is not running on it), put something like this
-            in the "VNC Server" entry box:
+            If an intermediate gateway machine must be used (e.g. to enter
+            a firewall; the VNC Server is not running on it), put something
+            like this in the "VNC Server" entry box:
 
                   workstation:0   user@gateway-host:port
   
@@ -285,6 +297,16 @@ set msg {
             ":port" is optional, use it if the gateway-host SSH port is
             not the default value 22.
 
+            One can also do a "double ssh", i.e. a first SSH to the
+            gateway login machine then a 2nd ssh to the destination machine
+            (presumably it is running the vnc server).  Unlike the above
+            example, the "last leg" (gateway-host -> workstation) is also
+            encrypted by SSH this way.  Do this by splitting the gateway
+            in two with a comma, the part before it is the first SSH:
+
+                  :0   user@gateway-host:port,user@workstation:port
+
+
             At the very end of the entry box, you can also append a
             cmd=... string to indicate that command should be run via ssh
             on the remote machine instead of the default "sleep 15".  E.g.:
@@ -292,6 +314,7 @@ set msg {
                   user@host:0   cmd=x11vnc -nopw -display :0
 
             (if a gateway is also needed, put it just before the cmd=...)
+
 
             Trick: If you use "cmd=SHELL" then you get an SSH shell only:
             no VNC viewer will be launched.  On Windows "cmd=PUTTY" will
@@ -345,18 +368,14 @@ set msg {
                    with Load Profile.  Use the Browse... button to select
                    the filename via the GUI.
 
-  Include:         Profile template(s) to load before loading a profile
-                   (see Load Profile above).  For example if you Save
-                   a profile called "globals" that has some settings
-                   you use often, then just supply "Include: globals"
-                   to have them applied.
-
-                   You may supply a comma or space separated list of
-                   templates to include.  They can be full path names or
-                   basenames relative to the profiles directory.  You do
-                   not need to supply the .vnc suffix.  The non-default
-                   settings in them will be applied first, and then any
-                   values then in the loaded Profile will override them.
+                   Note: On Windows since the TightVNC Viewer will save
+                   its own settings in the registry, some unexpected
+                   behavior is possible because the viewer is nearly
+                   always directed to the VNC host "localhost:30".  E.g. if
+                   you specify "View Only" in this gui once but not next
+                   time the Windows VNC Viewer may remember the setting.
+                   Unfortunately there is not a /noreg option for the Viewer.
+                   
 
   Clear Options:   Set all options to their defaults (i.e. unset).
 
@@ -880,6 +899,24 @@ proc make_plink {} {
 	update
 }
 
+proc ssh_split {str} {
+	if {! [regexp {:} $str]} {
+		append str ":22"
+	}
+	regsub {:.*$} $str "" ssh_host
+	regsub {^.*:} $str "" ssh_port
+	if {$ssh_port == ""} {
+		set ssh_port 22
+	}
+	if [regexp {@} $ssh_host] {
+		regsub {@.*$} $ssh_host "" ssh_user
+		regsub {^.*@} $ssh_host "" ssh_host
+	} else {
+		set ssh_user ""
+	}
+	return [list $ssh_user $ssh_host $ssh_port]
+}
+
 proc launch_windows_ssh {hp file n} {
 	global is_win9x env
 	global use_sshssl use_ssh putty_pw
@@ -918,16 +955,65 @@ proc launch_windows_ssh {hp file n} {
 	set ssh_host $hpnew
 	regsub {:.*$} $ssh_host "" ssh_host
 
+	set double_ssh ""
+	set p_port ""
 	if {$proxy != ""} {
-		set ssh_host $proxy
+		if [regexp {,} $proxy] {
+			if {$is_win9x} {
+				mesg "Double proxy does not work on Win9x"
+				bell
+				return 0
+			}
+			# user1@gateway:port1,user2@workstation:port2
+			set proxy1 ""
+			set proxy2 ""
+			set s [split $proxy ","]
+			set proxy1 [lindex $s 0]
+			set proxy2 [lindex $s 1]
+
+			set p_port [expr 3000 + 1000 * rand()]	
+			set p_port [expr round($p_port)]
+
+			set s [ssh_split $proxy1]
+			set ssh_user1 [lindex $s 0]
+			set ssh_host1 [lindex $s 1]
+			set ssh_port1 [lindex $s 2]
+
+			set s [ssh_split $proxy2]
+			set ssh_user2 [lindex $s 0]
+			set ssh_host2 [lindex $s 1]
+			set ssh_port2 [lindex $s 2]
+
+			set u1 ""
+			if {$ssh_user1 != ""} {
+				set u1 "${ssh_user1}@"
+			}
+			set u2 ""
+			if {$ssh_user2 != ""} {
+				set u2 "${ssh_user2}@"
+			}
+		
+			set double_ssh "-L $p_port:$ssh_host2:$ssh_port2 -P $ssh_port1 $u1$ssh_host1"
+			set proxy_use "${u2}localhost:$p_port"
+
+		} else {
+			# user1@gateway:port1
+			set proxy_use $proxy
+		}
+
+		set ssh_host $proxy_use
 		regsub {:.*$} $ssh_host "" ssh_host
-		set ssh_port $proxy
+		set ssh_port $proxy_use
 		regsub {^.*:} $ssh_port "" ssh_port
 		if {$ssh_port == ""} {
 			set ssh_port 22
 		}
+
 		set vnc_host $hpnew
 		regsub {:.*$} $vnc_host "" vnc_host
+		if {$vnc_host == ""} {
+			set vnc_host "localhost"
+		}
 	}
 
 	if {![regexp {^[^ 	][^ 	]*@} $ssh_host]} {
@@ -973,6 +1059,8 @@ proc launch_windows_ssh {hp file n} {
 	}
 
 	set tag [contag]
+
+	set file_double ""
 
 	set file_pre ""
 	set file_pre_cmd ""
@@ -1077,6 +1165,10 @@ proc launch_windows_ssh {hp file n} {
 		append extra_redirs [get_additional_redir]
 	}
 
+	if {$vnc_host == ""} {
+		set vnc_host "localhost"
+	}
+
 	set plink_str "plink.exe -ssh -P $ssh_port $verb -L $use:$vnc_host:$vnc_port $extra_redirs -t" 
 	if {$extra_redirs != ""} {
 		regsub {exe} $plink_str "exe -C" plink_str
@@ -1123,6 +1215,41 @@ proc launch_windows_ssh {hp file n} {
 			catch {file delete $file_pre}
 		}
 		return 0
+	}
+
+	if {$double_ssh != ""} {
+		set plink_str_double_ssh "plink.exe -ssh -t $pw $double_ssh \"echo sleep 60 ...; sleep 60; echo done.\"" 
+
+		regsub {\.bat} $file "dob.bat" file_double
+		set fhdouble [open $file_double "w"]
+		puts $fhdouble $plink_str_double_ssh
+		puts $fhdouble "del $file_double"
+		close $fhdouble
+
+		set com "cmd.exe"
+		if [info exists env(COMSPEC)] {
+			set com $env(COMSPEC)
+		}
+
+		exec $com /c $file_double &
+
+		set waited 0
+		set gotit 0
+		while {$waited < 30000} {
+			after 500
+			update
+			set ns [get_netstat]
+			set re ":$p_port"
+			append re {[ 	][ 	]*[0:.][0:.]*[ 	][ 	]*LISTEN}
+			if [regexp $re $ns] {
+				set gotit 1
+				break
+			}
+			set waited [expr "$waited + 500"]
+		}
+		if {! $gotit} {
+			after 5000
+		}
 	}
 
 	if {$is_win9x} {
@@ -1281,6 +1408,9 @@ proc launch_windows_ssh {hp file n} {
 	}
 	if {$file_pre_cmd != ""} {
 		catch {file delete $file_pre_cmd}	
+	}
+	if {$file_double != ""} {
+		catch {file delete $file_double}	
 	}
 
 	global sound_daemon_local_kill
@@ -1450,6 +1580,35 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 		} else {
 			after 2000
 		}
+	}
+}
+
+proc port_knock_only {hp {mode KNOCK}} {
+	if {$hp == ""} {
+		global vncdisplay
+		set hp $vncdisplay
+		if {$hp == ""} {
+			mesg "No host port found"
+			bell
+			return
+		}
+	}
+	set hpnew  [get_ssh_hp $hp]
+	set proxy  [get_ssh_proxy $hp]
+	set sshcmd [get_ssh_cmd $hp]
+	set hp $hpnew
+
+	set pk_hp ""
+	if {$proxy != ""} {
+		set pk_hp $proxy
+	}
+	if {$pk_hp == ""} {
+		set pk_hp $hp
+	}
+	if {$mode == "KNOCK"} {
+		do_port_knock $pk_hp start
+	} elseif {$mode == "FINISH"} {
+		do_port_knock $pk_hp finish
 	}
 }
 
@@ -1823,6 +1982,7 @@ proc launch {{hp ""}} {
 	global vncdisplay tcl_platform is_windows
 	global mycert svcert crtdir
 	global pids_before pids_after pids_new
+	global env
 	global use_ssh use_sshssl
 
 	set debug 0
@@ -1843,6 +2003,16 @@ proc launch {{hp ""}} {
 
 	mesg "Using: $hp"
 	after 600
+
+	set sc [get_ssh_cmd $hp]
+	if {[regexp {^KNOCK} $sc]} {
+		if [regexp {^KNOCKF} $sc] {
+			port_knock_only $hp "FINISH"
+		} else {
+			port_knock_only $hp "KNOCK"
+		}
+		return
+	}
 
 	if {$debug} {
 		mesg "\"$tcl_platform(os)\" | \"$tcl_platform(osVersion)\""
@@ -1896,6 +2066,11 @@ proc launch {{hp ""}} {
 	set n2 ""
 	set now [clock seconds]
 
+	set proxy [get_ssh_proxy $hp]
+	if {$use_sshssl} {
+		set proxy ""
+	}
+
 	for {set i 30} {$i < 90} {incr i}  {
 		set try "$prefix-$i.$suffix"
 		if {[file exists $try]}  {
@@ -1907,7 +2082,7 @@ proc launch {{hp ""}} {
 			}
 		}
 		if {! [file exists $try]}  {
-			if {$use_sshssl} {
+			if {$use_sshssl || $proxy != ""} {
 				if {$file != ""} {
 					set file2 $try
 					set n2 $i
@@ -1916,7 +2091,7 @@ proc launch {{hp ""}} {
 			}
 			set file $try
 			set n $i
-			if {! $use_sshssl} {
+			if {! $use_sshssl && $proxy == ""} {
 				break
 			}
 		}
@@ -1947,23 +2122,13 @@ proc launch {{hp ""}} {
 		return
 	}
 
-	if [regexp {[ 	]} $hp] {
-		# proxy or cmd case (should not happen? yet?) 
-		regsub {[ 	].*$} $hp "" hp2
-	} else {
-		set list [split $hp ":"] 
-		set host [lindex $list 0]
-		set disp [lindex $list 1]
-		set disp [string trim $disp]
-		regsub { .*$} $disp "" disp
-		if {$disp == ""} {
-			set disp 0
-		}
-		set port [expr "$disp + 5900"]
+	set list [split $hp ":"] 
+
+	set host [lindex $list 0]
+	if {$host == ""} {
+		set host "localhost"
 	}
 
-	set list [split $hp ":"] 
-	set host [lindex $list 0]
 	set disp [lindex $list 1]
 	set disp [string trim $disp]
 	regsub { .*$} $disp "" disp
@@ -1971,6 +2136,12 @@ proc launch {{hp ""}} {
 		set disp 0
 	}
 	set port [expr "$disp + 5900"]
+
+	if {$proxy != ""} {
+		set env(SSL_VNC_PROXY) $proxy
+		set env(SSL_VNC_LISTEN) [expr "$n2 + 5900"]
+		set env(SSL_VNC_DEST) "$host:$port"
+	}
 
 	if {$debug} {
 		mesg "file: $file"
@@ -2024,7 +2195,7 @@ proc launch {{hp ""}} {
 	set port2 [expr "$n + 5900"] 
 	puts $fh "accept = localhost:$port2"
 
-	if {$use_sshssl} {
+	if {$use_sshssl || $proxy != ""} {
 		set port [expr "$n2 + 5900"]
 		puts $fh "connect = localhost:$port"
 	} else {
@@ -2045,6 +2216,16 @@ proc launch {{hp ""}} {
 	if {$fail} {
 		catch {file delete $file}
 		return
+	}
+
+	set proxy_pid ""
+	if {$proxy != ""} {
+		mesg "Starting TCP helper on port $port ..."
+		after 600
+		set proxy_pid [exec "connect_br.exe" &]
+		unset -nocomplain env(SSL_VNC_PROXY)
+		unset -nocomplain env(SSL_VNC_LISTEN)
+		unset -nocomplain env(SSL_VNC_DEST)
 	}
 
 	mesg "Starting STUNNEL on port $port2 ..."
@@ -2158,6 +2339,7 @@ proc set_mycert {} {
 		set mycert $t
 	}
 	catch {wm deiconify .c}
+	v_mycert
 	update
 }
 
@@ -2192,6 +2374,26 @@ proc show_cert {crt} {
 	catch {raise $w}
 }
 
+proc v_svcert {} {
+	global svcert
+	if {$svcert == "" || ! [file exists $svcert]} {
+		catch {.c.svcert.i configure -state disabled}
+	} else {
+		catch {.c.svcert.i configure -state normal}
+	}
+	return 1
+}
+
+proc v_mycert {} {
+	global mycert
+	if {$mycert == "" || ! [file exists $mycert]} {
+		catch {.c.mycert.i configure -state disabled}
+	} else {
+		catch {.c.mycert.i configure -state normal}
+	}
+	return 1
+}
+
 proc show_mycert {} {
 	global mycert
 	show_cert $mycert
@@ -2216,6 +2418,7 @@ proc set_svcert {} {
 		set svcert $t
 	}
 	catch {wm deiconify .c}
+	v_svcert
 	update
 }
 
@@ -2452,6 +2655,8 @@ emailAddress_max                = 64
 		set geometry [xterm_center_geometry]
 		update
 		eval exec xterm -geometry $geometry -title Running_OpenSSL -e $cmd
+		catch {file attributes $pem -permissions go-rw}
+		catch {file attributes $crt -permissions go-w}
 	}
 	catch {file delete $tmp}
 
@@ -2851,6 +3056,13 @@ proc do_save {} {
 			-message $emess -title "Save File: $import_save_file"
 		return
 	}
+	global is_windows
+	if {! $is_windows} {
+		catch {file attributes $import_save_file -permissions go-w}
+		if {[regexp {PRIVATE} $str] || [regexp {\.pem$} $import_save_file]} {
+			catch {file attributes $import_save_file -permissions go-rw}
+		}
+	}
 	puts -nonewline $fh $str
 	close $fh
 	catch {destroy .icrt}
@@ -2988,12 +3200,22 @@ proc getcerts {} {
 	label .c.svcert.l -anchor w -width 12 -text "ServerCert:"
 	label .c.crtdir.l -anchor w -width 12 -text "CertsDir:"
 	
-	entry .c.mycert.e -width 32 -textvariable mycert
-	entry .c.svcert.e -width 32 -textvariable svcert
+	entry .c.mycert.e -width 32 -textvariable mycert -vcmd v_mycert
+	entry .c.svcert.e -width 32 -textvariable svcert -vcmd v_svcert
+	bind .c.mycert.e <Enter> {.c.mycert.e validate}
+	bind .c.mycert.e <Leave> {.c.mycert.e validate}
+	bind .c.svcert.e <Enter> {.c.svcert.e validate}
+	bind .c.svcert.e <Leave> {.c.svcert.e validate}
 	entry .c.crtdir.e -width 32 -textvariable crtdir
 	button .c.mycert.b -text "Browse..." -command {set_mycert; catch {raise .c}}
 	button .c.svcert.b -text "Browse..." -command {set_svcert; catch {raise .c}}
 	button .c.crtdir.b -text "Browse..." -command {set_crtdir; catch {raise .c}}
+	button .c.mycert.i -text "Info" -command {show_mycert}
+	button .c.svcert.i -text "Info" -command {show_svcert}
+	button .c.crtdir.i -text "Info" -command {}
+	.c.mycert.i configure -state disabled
+	.c.svcert.i configure -state disabled
+	.c.crtdir.i configure -state disabled
 	bind .c.mycert.b <B3-ButtonRelease>   "show_mycert"
 	bind .c.svcert.b <B3-ButtonRelease>   "show_svcert"
 
@@ -3010,6 +3232,7 @@ proc getcerts {} {
 		pack .c.$w.l -side left
 		pack .c.$w.e -side left -expand 1 -fill x
 		pack .c.$w.b -side left
+		pack .c.$w.i -side left
 		bind .c.$w.e <Return> ".c.$w.b invoke"
 		if {$use_ssh} {
 			.c.$w.l configure -state disabled	
@@ -3722,19 +3945,21 @@ set cmd(5) {
 		if [ "$rc" = 0 ]; then
 			if [ "X$have_perl_done" = "X1" -o 1 = 1 ] ; then
 				echo
-				echo "Your SMB shares will be be unmounted when the VNC connection"
-				echo "closes.  If that fails follow these instructions:"
+				echo "Your SMB shares will be unmounted when the VNC connection closes,"
+				echo "*As Long As* No Applications have any of the share files opened or are"
+				echo "cd-ed into any of the share directories."
+				echo
+				echo "Try to make sure nothing is accessing the SMB shares before disconnecting"
+				echo "the VNC session.  If you fail to do that follow these instructions:"
 			fi
 			echo
-			echo "To unmount your SMB shares make sure no applications are still using"
-			echo "any of the files and no shells are still cd-ed into the share area,"
-			echo "then type:"
+			echo "To unmount your SMB shares make sure no applications are still using any of"
+			echo "the files and no shells are still cd-ed into the share area, then type:"
 			echo 
 			echo "   rm -f $smb_script"
 			echo 
-			echo "(to avoid a 2nd ssh, try to do this before terminating the VNC Viewer)"
-			echo
-			echo "In the worst case run: smbumount /path/to/mount/point for each mount."
+			echo "In the worst case run: smbumount /path/to/mount/point for each mount as root"
+			echo "Even with the remote redirection gone the kernel should umount after a timeout."
 		else
 			echo 
 			if [ "$DO_SMB_SU" = "1" ]; then
@@ -3819,7 +4044,6 @@ set cmd(6) {
 	fi
 
 
-	echo
 	#FINMSG
 	echo
 	echo "--vnc-helper-exiting--"
@@ -4927,7 +5151,7 @@ proc smb_dialog {} {
 
     VERY IMPORTANT: Before terminating the VNC Connection, make sure no
     applications are using any of the SMB shares (or shells are cd-ed
-    into the share).  This way the shares will be automatically umounted.
+    into the share).  This way the shares will be automatically unmounted.
     Otherwise you will need to log in again, stop processes from using
     the share, become root and umount the shares manually ("smbumount
     /path/to/share", etc.)
@@ -5022,7 +5246,18 @@ proc help_advanced_opts {} {
          firewall ports in a certain way to open the door for SSH or SSL.
          The port can also be closed when the encrypted VNC connection
          finishes.
-	
+
+         Include:  Profile template(s) to load before loading a profile
+         (see Load Profile under "Options").  For example if you Save a
+         profile called "globals" that has some settings you use often,
+         then just supply "Include: globals" to have them applied.
+         You may supply a comma or space separated list of templates
+         to include.  They can be full path names or basenames relative
+         to the profiles directory.  You do not need to supply the .vnc
+         suffix.  The non-default settings in them will be applied first,
+         and then any values in the loaded Profile will override them.
+
+
     About the CheckButtons:
 
          Ahem, Well...., yes quite a klunky UI: you have to toggle the
@@ -5268,6 +5503,7 @@ proc do_port_knock {hp mode} {
 
 	if {$mode == "finish"} {
 		if {! [regexp {FINISH} $list]} {
+			mesg "PortKnock(finish): done"
 			return 1
 		} else {
 			regsub {^.*FINISH} $list "" list
@@ -5407,6 +5643,7 @@ proc do_port_knock {hp mode} {
 			mesg $m
 			return 0
 		}
+		regsub {,.*$} $host "" host
 		if {[regexp {[ \t]} $host]} {
 			bell
 			set m "PortKnock: Invalid host: \"$host\""
@@ -5520,7 +5757,11 @@ proc do_port_knock {hp mode} {
 	if {$m != ""} {
 		set m "$m,"
 	}
-	mesg "PortKnock: done"
+	if {$mode == "finish"} {
+		mesg "PortKnock(finish): done"
+	} else {
+		mesg "PortKnock: done"
+	}
 	return 1
 }
 
@@ -5699,6 +5940,16 @@ proc port_knocking_dialog {} {
            delay 1000
            PAD=C:\My Pads\work-pad1.txt
            sleep 4000
+
+
+   Port knock only:
+
+      If, in the 'VNC Server' entry box, you use "user@hostname cmd=KNOCK"
+      then only the port-knocking is performed.  A shortcut for this is
+      Ctrl-P as long as hostname is present in the entry box.  If it
+      matches cmd=KNOCKF, i.e. an extra "F", then the port-knocking
+      "FINISH" sequence is sent, if any.  A shortcut for this Shift-Ctrl-P
+      as long as hostname is present.
 }
 	.pk.f.t insert end $msg
 
@@ -5759,6 +6010,15 @@ proc set_advanced_options {} {
 	checkbutton .oa.b$i -anchor w -variable use_port_knocking -text \
 		"Port Knocking" \
 		-command {if {$use_port_knocking} {port_knocking_dialog}}
+	incr i
+
+	global include_list
+	frame .oa.b$i
+	label .oa.b$i.l -text "Include:"
+	entry .oa.b$i.e -width 10 -textvariable include_list
+	pack .oa.b$i.l -side left
+	pack .oa.b$i.e -side right -expand 1 -fill x
+
 	incr i
 
 	for {set j 1} {$j < $i} {incr j} {
@@ -5995,20 +6255,13 @@ proc set_options {} {
 		pack .o.sa -side top -fill x 
 	}
 
-	global include_list
-	frame .o.inc
-	label .o.inc.l -text "Include:"
-	entry .o.inc.e -width 10 -textvariable include_list
-	pack .o.inc.l -side left
-	pack .o.inc.e -side right -expand 1 -fill x
-
 	button .o.s_prof -text "Save Profile ..." -command {save_profile; raise .o}
 	button .o.l_prof -text " Load Profile ..." -command {load_profile; raise .o}
 	button .o.advanced -text "Advanced ..." -command set_advanced_options
 	button .o.clear -text "Clear Options" -command set_defaults
 	pack .o.s_prof -side top -fill x 
 	pack .o.l_prof -side top -fill x 
-	pack .o.inc -side top -fill x
+	#pack .o.inc -side top -fill x
 	pack .o.clear -side top -fill x 
 	pack .o.advanced -side top -fill x 
 
@@ -6091,6 +6344,8 @@ if {[info exists env(SSL_VNC_GUI_CMD)]} {
 bind . <Control-q> "destroy .; exit"
 bind . <Shift-Escape> "destroy .; exit"
 bind . <Control-s> "launch_shell_only"
+bind . <Control-p> {port_knock_only "" "KNOCK"}
+bind . <Control-P> {port_knock_only "" "FINISH"}
 
 global entered_gui_top button_gui_top
 set entered_gui_top 0
