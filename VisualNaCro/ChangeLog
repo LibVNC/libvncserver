@@ -1,6 +1,7 @@
 2006-10-10: Johannes Schindelin <Johannes.Schindelin@gmx.de>
 	* implement --compact and --compact-dragging to shut up the
 	  script about mouse movements or drags.
+	* add 'i', 'c' and 'r' menu keys.
 
 2006-09-12: Johannes Schindelin <Johannes.Schindelin@gmx.de>
 	* the reference rectangle is selected with a rubber band,

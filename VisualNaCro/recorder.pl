@@ -108,6 +108,29 @@ sub handle_mouse {
 	}
 }
 
+sub toggle_text {
+	my $text = shift;
+	if ($text eq "Timing") {
+		return $text . " is " . ($timing ? "on" : "off");
+	} elsif ($text eq "Key presses") {
+		return $text . " are recorded " . ($symbolic ? "symbolically"
+			: "numerically");
+	} elsif ($text eq "Mouse moves") {
+		return $text . " are recorded " . ($compact ? "compacted"
+			: "verbosely");
+	} elsif ($text eq "Mouse drags") {
+		return $text . " are recorded " . ($compact ? "compacted"
+			: "verbosely");
+	}
+	return $text . ": <unknown>";
+}
+
+$menu_message = "VisualNaCro: press 'q' to quit,\n"
+	. "'i' to display current settings,\n"
+	. "'c', 'r' to toggle compact mouse movements or drags,\n"
+	. "'d' to display current reference image,\n"
+	. "or mark reference rectangle by dragging";
+
 while(1) {
 	$result=nacro::waitforinput($vnc,999999);
 	if($result==0) {
@@ -135,7 +158,8 @@ while(1) {
 					if ($magickey > 1) {
 						$magickey = 0;
 						$mode = "menu";
-						nacro::alert($vnc,"VisualNaCro: press 'q' to quit,\n'd' to display current reference image,\nor mark reference rectangle by dragging",10);
+						nacro::alert($vnc,
+							$menu_message, 10);
 					}
 				}
 			} else {
@@ -193,6 +217,24 @@ while(1) {
 					nacro::alert($vnc, "Error displaying "
 							. $pnm, 10);
 				}
+			} elsif ($keysym == ord('i')) {
+				nacro::alert($vnc, "Current settings:\n"
+					. "\n"
+					. "Script: $output\n"
+					. "Server: $server\n"
+					. "Listening on port: $port\n"
+					. toggle_text("Timing") . "\n"
+					. toggle_text("Key presses") . "\n"
+					. toggle_text("Mouse moves") . "\n"
+					. toggle_text("Mouse drags"), 10);
+			} elsif ($keysym == ord('c')) {
+				$compact = !$compact;
+				nacro::alert($vnc,
+						toggle_text("Mouse moves"), 10);
+			} elsif ($keysym == ord('r')) {
+				$compact_dragging = !$compact_dragging;
+				nacro::alert($vnc,
+						toggle_text("Mouse drags"), 10);
 			} else {
 				nacro::alert($vnc,"Unknown key",10);
 			}
