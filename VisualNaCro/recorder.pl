@@ -3,22 +3,24 @@
 use Getopt::Long;
 use nacro;
 
-# TODO: take options
-
 $output="my_script";
 $server="localhost";
 $port=5900;
 $listen_port=5923;
 $timing=0;
 $symbolic=0;
+$compact=0;
+$compact_dragging=0;
 
 if(!GetOptions(
 	"script:s" => \$output,
 	"listen:i" => \$listen_port,
 	"timing" => \$timing,
 	"symbolic" => \$symbolic,
+	"compact" => \$compact,
+	"compact-dragging" => \$compact_dragging,
 ) || $#ARGV!=0) {
-	print STDERR "Usage: $ARGV0 [--script output_name] [--listen listen_port] [--timing] [--symbolic] server[:port]\n";
+	print STDERR "Usage: $ARGV0 [--script output_name] [--listen listen_port] [--timing]\n\t[--symbolic] [--compact] [--compact-dragging] server[:port]\n";
 	exit 2;
 }
 
@@ -91,6 +93,21 @@ sub writetiming () {
 	}
 }
 
+$last_button = -1;
+
+sub handle_mouse {
+	my $x = shift;
+	my $y = shift;
+	my $buttons = shift;
+	if(nacro::sendmouse($vnc,$x,$y,$buttons)) {
+		$x-=$x_origin; $y-=$y_origin;
+		writetiming();
+		print OUT "nacro::sendmouse(\$vnc,\$x_origin"
+			. ($x>=0?"+":"")."$x,\$y_origin"
+			. ($y>=0?"+":"")."$y,$buttons);\n";
+	}
+}
+
 while(1) {
 	$result=nacro::waitforinput($vnc,999999);
 	if($result==0) {
@@ -129,13 +146,18 @@ while(1) {
 			$x=nacro::getx($vnc);
 			$y=nacro::gety($vnc);
 			$buttons=nacro::getbuttons($vnc);
-			if(nacro::sendmouse($vnc,$x,$y,$buttons)) {
-				$x-=$x_origin; $y-=$y_origin;
-				writetiming();
-				print OUT "nacro::sendmouse(\$vnc,\$x_origin"
-					. ($x>=0?"+":"")."$x,\$y_origin"
-					. ($y>=0?"+":"")."$y,$buttons);\n";
+			if ($buttons != $last_buttons) {
+				if (!$buttons && $compact_dragging) {
+					handle_mouse($x, $y, $last_buttons);
+				}
+				$last_buttons = $buttons;
+			} else {
+				if (($buttons && $compact_dragging) ||
+						(!$buttons && $compact)) {
+					next;
+				}
 			}
+			handle_mouse($x, $y, $buttons);
 		}
 		if ($result & $nacro::RESULT_TEXT_CLIENT) {
 			my $text = nacro::gettext_client($vnc);
@@ -188,6 +210,7 @@ while(1) {
 				$x=nacro::getx($vnc);
 				$y=nacro::gety($vnc);
 				if($start_x==$x && $start_y==$y) {
+					# reset
 					print OUT "\$x_origin=0; \$y_origin=0;\n";
 				} else {
 					if($start_x>$x) {
