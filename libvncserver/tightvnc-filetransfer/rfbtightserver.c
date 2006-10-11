@@ -237,7 +237,7 @@ rfbSendInteractionCaps(rfbClientPtr cl)
     rfbCapabilityInfo smsg_list[N_SMSG_CAPS];
     rfbCapabilityInfo cmsg_list[N_CMSG_CAPS];
     rfbCapabilityInfo enc_list[N_ENC_CAPS];
-    int i;
+    int i, n_enc_caps = N_ENC_CAPS;
 
     /* Fill in the header structure sent prior to capability lists. */
     intr_caps.nServerMessageTypes = Swap16IfLE(N_SMSG_CAPS);
@@ -286,6 +286,8 @@ rfbSendInteractionCaps(rfbClientPtr cl)
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     SetCapInfo(&enc_list[i++],  rfbEncodingZlib,           rfbTridiaVncVendor);
     SetCapInfo(&enc_list[i++],  rfbEncodingTight,          rfbTightVncVendor);
+#else
+    n_enc_caps -= 2;
 #endif
     SetCapInfo(&enc_list[i++],  rfbEncodingCompressLevel0, rfbTightVncVendor);
     SetCapInfo(&enc_list[i++],  rfbEncodingQualityLevel0,  rfbTightVncVendor);
@@ -293,7 +295,7 @@ rfbSendInteractionCaps(rfbClientPtr cl)
     SetCapInfo(&enc_list[i++],  rfbEncodingRichCursor,     rfbTightVncVendor);
     SetCapInfo(&enc_list[i++],  rfbEncodingPointerPos,     rfbTightVncVendor);
     SetCapInfo(&enc_list[i++],  rfbEncodingLastRect,       rfbTightVncVendor);
-    if (i != N_ENC_CAPS) {
+    if (i != n_enc_caps) {
 	rfbLog("rfbSendInteractionCaps: assertion failed, i != N_ENC_CAPS\n");
 	rfbCloseClient(cl);
 	return;
