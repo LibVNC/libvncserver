@@ -94,6 +94,7 @@ const char *gettext_server(resource_t res);
 /* send events to the server */
 
 bool_t sendkey(resource_t res,keysym_t keysym,bool_t keydown);
+bool_t sendascii(resource_t res,const char *string);
 bool_t sendmouse(resource_t res,coordinate_t x,coordinate_t y,buttons_t buttons);
 bool_t sendtext(resource_t res, const char *string);
 bool_t sendtext_to_server(resource_t res, const char *string);

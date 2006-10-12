@@ -717,6 +717,47 @@ bool_t sendkey(resource_t res,keysym_t keysym,bool_t keydown)
 	return SendKeyEvent(r->client,keysym,keydown);
 }
 
+bool_t sendascii(resource_t res,const char *string)
+{
+	timeout_t delay = 0.1;
+	private_resource_t* r=get_resource(res);
+	int i;
+	if(r==NULL)
+		return 0;
+	while (*string) {
+		int keysym = *string;
+		int need_shift = 0;
+
+		if (keysym >= 8 && keysym < ' ')
+			keysym += 0xff00;
+		else if (keysym >= 'A' && keysym <= 'Z')
+			need_shift = 1;
+		else if (keysym > '~') {
+			fprintf(stderr, "String contains non-ASCII "
+					"character 0x%02x\n", *string);
+			return FALSE;
+		}
+
+		if (need_shift) {
+			if (!SendKeyEvent(r->client,0xffe1,1))
+				return FALSE;
+			waitforinput(r,delay);
+		}
+		for (i = 1; i >= 0; i--) {
+			if (!SendKeyEvent(r->client,keysym,i))
+				return FALSE;
+			waitforinput(r,delay);
+		}
+		if (need_shift) {
+			if (!SendKeyEvent(r->client,0xffe1,0))
+				return FALSE;
+			waitforinput(r,delay);
+		}
+		string++;
+	}
+	return TRUE;
+}
+
 bool_t sendmouse(resource_t res,coordinate_t x,coordinate_t y,buttons_t buttons)
 {
 	private_resource_t* r=get_resource(res);
