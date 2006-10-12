@@ -78,6 +78,7 @@
  * -DPASSWD_REQUIRED=1        exit unless a password is supplied.
  * -DPASSWD_UNLESS_NOPW=1     exit unless a password is supplied and no -nopw.
  *
+ * -DCURSOR_DRAG=1  to have -cursor_drag as the default.
  * -DWIREFRAME=0  to have -nowireframe as the default.
  * -DWIREFRAME_COPYRECT=0  to have -nowirecopyrect as the default.
  * -DWIREFRAME_PARMS=...   set default -wirecopyrect parameters.

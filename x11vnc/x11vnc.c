@@ -2048,6 +2048,10 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-nocursor")) { 
 			multiple_cursors_mode = strdup("none");
 			show_cursor = 0;
+		} else if (!strcmp(arg, "-cursor_drag")) { 
+			cursor_drag_changes = 1;
+		} else if (!strcmp(arg, "-nocursor_drag")) { 
+			cursor_drag_changes = 0;
 		} else if (!strcmp(arg, "-arrow")) {
 			CHECK_ARGC
 			alt_arrow = atoi(argv[++i]);

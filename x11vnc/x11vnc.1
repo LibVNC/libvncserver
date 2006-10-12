@@ -2,7 +2,7 @@
 .TH X11VNC "1" "October 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-10-07
+         version: 0.8.3, lastmod: 2006-10-11
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2196,6 +2196,12 @@ unless the display has overlay visuals or XFIXES
 extensions available.  On Solaris and IRIX if XFIXES
 is not available, \fB-overlay\fR mode will be attempted.
 .PP
+\fB-cursor_drag\fR
+.IP
+Show cursor shape changes even when the mouse is being
+dragged with a mouse button down.  This is useful if you
+want to be able to see Drag-and-Drop cursor icons, etc.
+.PP
 \fB-arrow\fR \fIn\fR
 .IP
 Choose an alternate "arrow" cursor from a set of
@@ -3729,6 +3735,10 @@ show_cursor     enable  showing a cursor.
 noshow_cursor   disable showing a cursor. (same as
 "nocursor")
 .IP
+cursor_drag     enable  cursor changes during drag.
+.IP
+nocursor_drag   disable cursor changes during drag.
+.IP
 arrow:n         set \fB-arrow\fR to alternate n.
 .IP
 xfixes          enable  xfixes cursor shape mode.
@@ -4000,16 +4010,17 @@ unlock connect allowonce allow localhost nolocalhost
 listen lookup nolookup accept afteraccept gone shm
 noshm flipbyteorder noflipbyteorder onetile noonetile
 solid_color solid nosolid blackout xinerama noxinerama
-xtrap noxtrap xrandr noxrandr xrandr_mode rotate padgeom
-quiet q noquiet modtweak nomodtweak xkb noxkb capslock
-nocapslock skip_lockkeys noskip_lockkeys skip_keycodes
-sloppy_keys nosloppy_keys skip_dups noskip_dups
-add_keysyms noadd_keysyms clear_mods noclear_mods
-clear_keys noclear_keys remap repeat norepeat fb nofb
-bell nobell sel nosel primary noprimary setprimary
-nosetprimary clipboard noclipboard setclipboard
-nosetclipboard seldir cursorshape nocursorshape
-cursorpos nocursorpos cursor show_cursor noshow_cursor
+xtrap noxtrap xrandr noxrandr xrandr_mode rotate
+padgeom quiet q noquiet modtweak nomodtweak xkb noxkb
+capslock nocapslock skip_lockkeys noskip_lockkeys
+skip_keycodes sloppy_keys nosloppy_keys skip_dups
+noskip_dups add_keysyms noadd_keysyms clear_mods
+noclear_mods clear_keys noclear_keys remap repeat
+norepeat fb nofb bell nobell sel nosel primary
+noprimary setprimary nosetprimary clipboard noclipboard
+setclipboard nosetclipboard seldir cursorshape
+nocursorshape cursorpos nocursorpos cursor_drag
+nocursor_drag cursor show_cursor noshow_cursor
 nocursor arrow xfixes noxfixes xdamage noxdamage
 xd_area xd_mem alphacut alphafrac alpharemove
 noalpharemove alphablend noalphablend xwarppointer

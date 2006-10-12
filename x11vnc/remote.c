@@ -2400,6 +2400,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: turning off cursorpos mode.\n");
 		cursor_pos_updates = 0;
 
+	} else if (!strcmp(p, "cursor_drag")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, cursor_drag_changes);
+			goto qry;
+		}
+		cursor_drag_changes = 1;
+		rfbLog("remote_cmd: setting cursor_drag_changes: %d.\n", cursor_drag_changes);
+	} else if (!strcmp(p, "nocursor_drag")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !cursor_drag_changes);
+			goto qry;
+		}
+		cursor_drag_changes = 0;
+		rfbLog("remote_cmd: setting cursor_drag_changes: %d.\n", cursor_drag_changes);
+
 	} else if (strstr(p, "cursor") == p) {
 		COLON_CHECK("cursor:")
 		if (query) {

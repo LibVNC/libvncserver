@@ -1,3 +1,6 @@
+2006-10-11  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -cursor_drag for DnD, etc.
+
 2006-09-23  Karl Runge <runge@karlrunge.com>
 	* Java viewer: improvements to connection response, faster
 	  connections.

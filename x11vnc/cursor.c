@@ -1447,7 +1447,9 @@ int get_which_cursor(void) {
 
 		if (drag_in_progress || button_mask) {
 			/* XXX not exactly what we want for menus */
-			return -1;
+			if (! cursor_drag_changes) {
+				return -1;
+			}
 		}
 
 		if (!strcmp(multiple_cursors_mode, "arrow")) {

@@ -158,6 +158,10 @@ int vnc_connect = 1;		/* -vncconnect option */
 int show_cursor = 1;		/* show cursor shapes */
 int show_multiple_cursors = 0;	/* show X when on root background, etc */
 char *multiple_cursors_mode = NULL;
+#ifndef CURSOR_DRAG
+#define CURSOR_DRAG 0
+#endif
+int cursor_drag_changes = CURSOR_DRAG;
 int cursor_pos_updates = 1;	/* cursor position updates -cursorpos */
 int cursor_shape_updates = 1;	/* cursor shape updates -nocursorshape */
 int use_xwarppointer = 0;	/* use XWarpPointer instead of XTestFake... */

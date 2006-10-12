@@ -133,6 +133,7 @@ extern int vnc_connect;
 extern int show_cursor;
 extern int show_multiple_cursors;
 extern char *multiple_cursors_mode;
+extern int cursor_drag_changes;
 extern int cursor_pos_updates;
 extern int cursor_shape_updates;
 extern int use_xwarppointer;
