@@ -1,3 +1,6 @@
+2006-10-29  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Add tip about how to reenable RECORD extension.
+
 2006-10-11  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -cursor_drag for DnD, etc.
 

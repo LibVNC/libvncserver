@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Wed Oct 11 20:12:26 EDT 2006
+x11vnc README file                         Date: Sun Oct 29 19:01:09 EST 2006
 
 The following information is taken from these URLs:
 
@@ -7976,15 +7976,15 @@ Enhanced TightVNC Viewer
    (and there should be kinks to work out).
 
    This package can be downloaded here:
-    [8]enhanced_tightvnc_viewer-1.0.5.zip                 All Unix and Windows
+    [8]enhanced_tightvnc_viewer-1.0.6.zip                 All Unix and Windows
 binaries and source.  (~8MB)
-    [9]enhanced_tightvnc_viewer-1.0.5.tar.gz              All Unix and Windows
+    [9]enhanced_tightvnc_viewer-1.0.6.tar.gz              All Unix and Windows
 binaries and source.  (~8MB)
-    [10]enhanced_tightvnc_viewer_all-1.0.5.zip             All Unix and Windows
+    [10]enhanced_tightvnc_viewer_all-1.0.6.zip             All Unix and Windows
  binaries and source and full archives in zip dir. (~11MB)
-    [11]enhanced_tightvnc_viewer_windows_only-1.0.5.zip    Only the Windows bin
+    [11]enhanced_tightvnc_viewer_windows_only-1.0.6.zip    Only the Windows bin
 aries. (~6MB)
-    [12]enhanced_tightvnc_viewer_no_windows-1.0.5.tar.gz   No Windows binaries.
+    [12]enhanced_tightvnc_viewer_no_windows-1.0.6.tar.gz   No Windows binaries.
  (~2MB)
 
    Sorry for the inconvenience of lumping all the Unix binaries and
@@ -8017,7 +8017,7 @@ aries. (~6MB)
         [17]http://www.chiark.greenend.org.uk/~sgtatham/putty/
 
    It is my belief (but I cannot be absolutely sure) that the bundle
-   enhanced_tightvnc_viewer_no_windows-1.0.5.tar.gz contains no
+   enhanced_tightvnc_viewer_no_windows-1.0.6.tar.gz contains no
    cryptographic software (again, if your situation warrants, you will
    need to check). This "no_windows" tarball only contains software (from
    the above URL's and elsewhere) that will use cryptographic software
@@ -8281,11 +8281,11 @@ References
    5. http://www.karlrunge.com/x11vnc/index.html#faq-smb-shares
    6. http://www.karlrunge.com/x11vnc/index.html#faq-cups
    7. http://www.karlrunge.com/x11vnc/index.html#faq-sound
-   8. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.5.zip
-   9. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.5.tar.gz
-  10. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_all-1.0.5.zip
-  11. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_windows_only-1.0.5.zip
-  12. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_no_windows-1.0.5.tar.gz
+   8. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.6.zip
+   9. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer-1.0.6.tar.gz
+  10. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_all-1.0.6.zip
+  11. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_windows_only-1.0.6.zip
+  12. http://www.karlrunge.com/x11vnc/etv/enhanced_tightvnc_viewer_no_windows-1.0.6.tar.gz
   13. http://www.tightvnc.com/
   14. http://www.realvnc.com/
   15. http://www.stunnel.org/
@@ -8303,7 +8303,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-10-11
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-10-29
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -8404,7 +8404,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-10-11
+x11vnc: allow VNC connections to real X11 displays. 0.8.3 lastmod: 2006-10-29
 
 (type "x11vnc -opts" to just list the options.)
 

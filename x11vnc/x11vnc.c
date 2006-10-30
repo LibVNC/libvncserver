@@ -3219,6 +3219,20 @@ int main(int argc, char* argv[]) {
 	/* check for RECORD */
 	if (! XRecordQueryVersion_wr(dpy, &maj, &min)) {
 		xrecord_present = 0;
+		if (! quiet) {
+			rfbLog("The RECORD X extension was not found on the display.\n");
+			rfbLog("If your system has disabled it by default, you can\n");
+			rfbLog("enable it to get a nice x11vnc performance speedup\n");
+			rfbLog("for scrolling by putting this into the \"Module\" section\n");
+			rfbLog("of /etc/X11/xorg.conf or /etc/X11/XF86Config:\n");
+			rfbLog("\n");
+			rfbLog("  Section \"Module\"\n");
+			rfbLog("  ...\n");
+			rfbLog("      Load    \"record\"\n");
+			rfbLog("  ...\n");
+			rfbLog("  EndSection\n");
+			rfbLog("\n");
+		}
 	} else {
 		xrecord_present = 1;
 	}
