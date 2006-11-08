@@ -32,7 +32,10 @@
 #
 # "hostname:N" is the host and VNC display to connect to, e.g. snoopy:0
 #
-# If the first argument is "-ssl" then ssl_tightvncviewer is called 
+# If the *very first* argument is "-cotvnc" then it is assumed you are on
+# Darwin and want to run the Chicken of the VNC viewer via our wrapper.
+#
+# If the next argument is "-ssl" then ssl_tightvncviewer is called 
 # instead.  See that script for details.
 #
 # See the TightVNC viewer documentation for on its cmdline arguments.
@@ -72,7 +75,7 @@
 #  
 
 if [ "X$1" = "X-h" -o "X$1" = "X-help" -o "X$1" = "X--help" ]; then
-	head -69 "$0" | grep -v bin/sh
+	head -76 "$0" | grep -v bin/sh
 	exit
 fi
 
@@ -83,26 +86,44 @@ export PATH
 
 # Set this for ssl_vncviewer to pick up:
 #
-VNCVIEWERCMD="vncviewer"
-export VNCVIEWERCMD
+use_ours=0
+if [ "X$1" = "X-cotvnc" ]; then
+	shift
+	DARWIN_COTVNC=1
+	export DARWIN_COTVNC
+fi
+if [ "X$VNCVIEWERCMD" = "X" ]; then
+	VNCVIEWERCMD="vncviewer"
+	export VNCVIEWERCMD
+	if [ "X$DARWIN_COTVNC" = "X" ]; then
+		use_ours=1
+	fi
+fi
 
 # work out os.arch platform string and check for binaries:
 #
 name=$UNAME
 if [ "X$name" = "X" ]; then
-	name=`uname -sm | sed -e 's/ /./'`
+	name=`uname -sm | sed -e 's/ /./g'`
 fi
 
-if [ -L "$0" ]; then
-	d=`dirname "\`ls -l "$0" | sed -e 's/^.* -> //'\`"`
-	if echo "$d" | grep '^/' > /dev/null; then
-		dir="$d"
+f="$0"
+for t in 1 2 3 4 5
+do
+	if [ -L "$f" ]; then
+		f0="$f"
+		f=`ls -l "$f" | sed -e 's/^.* -> //'`
+		if echo "$f" | grep '^/' > /dev/null; then
+			:
+		else
+			f="`dirname "$f0"`/$f"
+		fi
 	else
-		dir="`dirname "$0"`/$d"
+		break
 	fi
-else
-	dir=`dirname "$0"`
-fi
+done
+dir=`dirname "$f"`
+
 if [ ! -d "$dir/$name" ]; then
 	echo "cannot find platform dir: $dir/$name for your OS:" 
 	uname -sm
@@ -114,6 +135,15 @@ fi
 # pick them up:
 #
 PATH="$dir:$dir/$name:$dir/util:$PATH"
+if echo "$dir" | grep '^/' > /dev/null; then
+	:
+else
+	dir=`pwd`/$dir
+	PATH="$dir:$dir/$name:$dir/util:$PATH"
+fi
+
+STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
+export STUNNEL_EXTRA_OPTS
 
 if [ "X$1" = "X-ssl" ]; then
 	shift	
@@ -121,9 +151,13 @@ if [ "X$1" = "X-ssl" ]; then
 	exit $?
 fi
 
-STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
-export STUNNEL_EXTRA_OPTS
-
 # Force the use of tight encoding for localhost redir connection:
 #
-vncviewer -encodings 'copyrect tight zrle zlib hextile' "$@"
+# If ours (and not doing cotvnc), force the use of tight encoding for
+# the connection:
+#
+if [ $use_ours = 1 ]; then
+	"$VNCVIEWERCMD" -encodings 'copyrect tight zrle zlib hextile' "$@"
+else
+	"$VNCVIEWERCMD" "$@"
+fi

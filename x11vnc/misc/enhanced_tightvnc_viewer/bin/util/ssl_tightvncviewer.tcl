@@ -74,7 +74,7 @@ proc help {} {
 	wm title .h "SSL TightVNC Viewer Help"
 
 	set msg {
-    Enter the VNC host and display in the 'VNC Server' entry box.
+    Enter the VNC host and display in the 'VNC Host:Display' entry box.
     
     It is of the form "host:number", where "host" is the hostname of the
     machine running the VNC Server and "number" is the VNC display number;
@@ -153,6 +153,8 @@ proc help {} {
     To set other Options, e.g. to use SSH instead of STUNNEL SSL,
     click on the "Options ..." button and read the Help there.
 
+    To load in a saved Options profile, click on the "Load" button.
+
     See these links for more information:
 
            http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-ext
@@ -160,7 +162,7 @@ proc help {} {
            http://www.tightvnc.com
 
 
-    Tips:
+    Tips and Tricks:
 
      1) On Unix to get a 2nd GUI (e.g. for a 2nd connection) press Ctrl-N
         on the GUI.  If only the xterm window is visible you can press
@@ -178,6 +180,13 @@ proc help {} {
         is present in the entry box.  If it matches cmd=KNOCKF, i.e. an
         extra "F", then the port-knocking "FINISH" sequence is sent, if any.
         A shortcut for this Shift-Ctrl-P as long as hostname is present.
+
+     4) Pressing the "Load" button or pressing Ctrl-L or Clicking the Right
+        mouse button on the main GUI will invoke the Load Profile dialog.
+
+     5) If you want to do a Direct VNC connection, with *NO* SSL or SSH
+        encryption, use the "vnc://" prefix, e.g. vnc://far-away.east:0
+
 }
 
 	.h.f.t insert end $msg
@@ -280,15 +289,15 @@ set msg {
             for passphrase authentication, etc. On Windows the cmdline
             plink.exe program will be launched in a Windows Console window.
 
-            You can set the "VNC Server" to "user@host:disp" to indicate ssh
-            should log in as "user" on "host".  NOTE: On Windows you MUST
+            You can set the "VNC Host:Display" to "user@host:disp" to indicate
+            ssh should log in as "user" on "host".  NOTE: On Windows you MUST
             always supply the "user@" part (due to a plink deficiency). E.g.:
 
                   fred@far-away.east:0
 
             If an intermediate gateway machine must be used (e.g. to enter
             a firewall; the VNC Server is not running on it), put something
-            like this in the "VNC Server" entry box:
+            like this in the "VNC Host:Display" entry box:
 
                   workstation:0   user@gateway-host:port
   
@@ -367,6 +376,9 @@ set msg {
                    Profile (.vnc file) and you can also read in a saved one
                    with Load Profile.  Use the Browse... button to select
                    the filename via the GUI.
+
+                   Pressing Ctrl-L or Clicking the Right mouse button on
+                   the main GUI will invoke the Load Profile dialog.
 
                    Note: On Windows since the TightVNC Viewer will save
                    its own settings in the registry, some unexpected
@@ -1470,6 +1482,127 @@ proc set_smb_mounts {} {
 	}
 }
 
+proc darwin_terminal_cmd {{title ""} {cmd ""} {bg 0}} {
+	global darwin_terminal
+
+	set tries ""
+	lappend tries "/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal"
+
+	if {! [info exists darwin_terminal]} {
+		foreach try $tries {
+			if [file exists $try] {
+				if [file executable $try] {
+					set darwin_terminal $try
+					break
+				}
+			}
+		}
+		if {! [info exists darwin_terminal]} {
+			set fh ""
+			catch {set fh [open "| find /Applications -type f -name Terminal" "r"]}
+			if {$fh != ""} {
+				while {[gets $fh line] > -1} {
+					if {! [file exists $line]} {
+						continue
+					}
+					if {[file isdirectory $line]} {
+						continue
+					}
+					if {! [regexp {/Terminal$} $line]} {
+						continue
+					}
+					if {! [file executable $line]} {
+						continue
+					}
+					set darwin_terminal $line
+					break
+				}
+				close $fh
+			}
+		}
+	}
+	if {! [info exists darwin_terminal]} {
+		tk_messageBox -type ok -icon error -message "Cannot find Darwin Terminal program." -title "Cannot find Terminal program"
+		return
+	}
+
+	global darwin_terminal_cnt
+	set tmp /tmp/darwin_terminal_cmd.[pid]
+	if {! [info exists darwin_terminal_cnt]} {
+		set darwin_terminal_cnt 0
+	}
+	incr darwin_terminal_cnt
+	append tmp ".$darwin_terminal_cnt"
+	
+	set fh ""
+	catch {set fh [open $tmp w 0755]}
+	if {$fh == ""} {
+		tk_messageBox -type ok -icon error -message "Cannot open temporary file: $tmp" -title "Cannot open file"
+		return
+	}
+	global env
+	puts $fh "#!/bin/sh"
+	puts $fh "PATH=$env(PATH)"
+	puts $fh "export PATH"
+	puts $fh "tmp=$tmp"
+	puts $fh "sleep 1"
+	puts $fh {if [ "X$DDDBG" != "X" ]; then ps www; fi}
+	puts $fh {termpid=`ps www | grep -w Terminal | grep $tmp | grep -v grep | awk '{print $1}' | sort -n | tail -1`}
+	puts $fh {echo try-1: termpid=$termpid mypid=$$}
+	puts $fh {if [ "X$termpid" = "X" ]; then}
+	puts $fh {	termpid=`ps www | grep -w Terminal | grep -v grep | awk '{print $1}' | sort -n | tail -1`}
+	puts $fh {	echo try-2: termpid=$termpid mypid=$$}
+	puts $fh {fi}
+	puts $fh {if [ "X$termpid" = "X" ]; then}
+	puts $fh {	termpid=$$}
+	puts $fh {	echo termpid-find-fail: termpid=$termpid mypid=$$}
+	puts $fh {fi}
+	puts $fh {trap "rm -f $tmp; kill -TERM $termpid; kill -TERM $mypid; kill -KILL $mypid; exit 0" 0 2 15}
+	puts $fh "$cmd"
+	puts $fh "sleep 1"
+	puts $fh {rm -f $tmp}
+	puts $fh {kill -TERM $termpid}
+	puts $fh {kill -TERM $mypid}
+	puts $fh {kill -KILL $mypid}
+	puts $fh "exit 0"
+	close $fh
+	if {$bg} {
+		catch {exec $darwin_terminal $tmp &}
+	} else {
+		catch {exec $darwin_terminal $tmp}
+	}
+}
+
+proc unix_terminal_cmd {{geometry "+100+100"} {title "xterm-command"} {cmd "echo test"} {bg 0} {xrm1 ""} {xrm2 ""} {xrm3 ""}} {
+	global uname
+	if {$uname == "Darwin"} {
+		global env
+		set doX  0;
+		if [info exists env(DISPLAY)] {
+			if {[in_path "xterm"] != ""} {
+				set doX 1
+			}
+		}
+		if {! $doX} {
+			darwin_terminal_cmd $title $cmd $bg
+			return
+		}
+	}
+	if {$bg} {
+		if {$xrm1 == ""} {
+			exec xterm -geometry "$geometry" -title "$title" -e sh -c "$cmd" &
+		} else {
+			exec xterm -geometry "$geometry" -title "$title" -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" -e sh -c "$cmd" &
+		}
+	} else {
+		if {$xrm1 == ""} {
+			exec xterm -geometry "$geometry" -title "$title" -e sh -c "$cmd"
+		} else {
+			exec xterm -geometry "$geometry" -title "$title" -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" -e sh -c "$cmd"
+		}
+	}
+}
+
 proc xterm_center_geometry {} {
 	set sh [winfo screenheight .]
 	set sw [winfo screenwidth .]
@@ -1568,9 +1701,11 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 			}
 		}
 
-		exec xterm -geometry "80x25+100+100" \
-		    -title "$title" \
-		    -e sh -c "set -xv; $c" &
+#		exec xterm -geometry "80x25+100+100" \
+#		    -title "$title" \
+#		    -e sh -c "set -xv; $c" &
+
+		unix_terminal_cmd "80x25+100+100" "$title" "set -xv; $c" 1
 
 		set env(SSL_VNCVIEWER_SSH_CMD) ""
 		set env(SSL_VNCVIEWER_SSH_ONLY) ""
@@ -1612,6 +1747,37 @@ proc port_knock_only {hp {mode KNOCK}} {
 	}
 }
 
+proc direct_connect_msg {} {
+	set msg ""
+	globalize
+	if {$use_sshssl} {
+		append msg "  - SSH + SSL tunnelling\n"
+	} elseif {$use_ssh} {
+		append msg "  - SSH tunnelling\n"
+	} else {
+		append msg "  - SSL tunnelling\n"
+	}
+	if {$use_smbmnt} {
+		append msg "  - SMB Mount Port Redirection\n"
+	}
+	if {$use_sound} {
+		append msg "  - ESD Sound Port Redirection\n"
+	}
+	if {$use_cups} {
+		append msg "  - CUPS Port Redirection\n"
+	}
+	if {$additional_port_redirs} {
+		append msg "  - Additional Port Redirections\n"
+	}
+	if {$mycert != "" || $svcert != "" || $crtdir != ""} {
+		append msg "  - SSL certificate authentication\n"
+	}
+	if {$msg != ""} {
+		set msg "Direct connect via vnc://hostname\nThe following options will be disabled:\n\n$msg"
+		tk_messageBox -type ok -icon info -message $msg
+	}
+}
+
 proc launch_unix {hp} {
 	global smb_redir_0 smb_mounts env
 
@@ -1632,8 +1798,16 @@ proc launch_unix {hp} {
 	set did_port_knock 0
 	set pk_hp ""
 
+	set skip_ssh 0
+	if [regexp {vnc://} $hp] {
+		set skip_ssh 1
+		direct_connect_msg
+	}
+
 	if {$use_ssh || $use_sshssl} {
-		if {$use_ssh} {
+		if {$skip_ssh} {
+			set cmd "ssl_vncviewer"
+		} elseif {$use_ssh} {
 			set cmd "ssl_vncviewer -ssh"
 		} else {
 			set cmd "ssl_vncviewer -sshssl"
@@ -1666,7 +1840,7 @@ proc launch_unix {hp} {
 			set do_pre 1
 		}
 		global skip_pre
-		if {$skip_pre} {
+		if {$skip_pre || $skip_ssh} {
 			set do_pre 0
 			set skip_pre 0
 		}
@@ -1679,6 +1853,9 @@ proc launch_unix {hp} {
 
 
 		set setup_cmds [ugly_setup_scripts post $tag] 
+		if {$skip_ssh} {
+			set setup_cmds ""
+		}
 
 		if {$sshcmd == "SHELL"} {
 			set env(SSL_VNCVIEWER_SSH_CMD) {$SHELL}
@@ -1703,6 +1880,9 @@ proc launch_unix {hp} {
 		}
 
 		set sshargs [string trim $sshargs]
+		if {$skip_ssh} {
+			set sshargs ""
+		}
 		if {$sshargs != ""} {
 			set cmd "$cmd -sshargs '$sshargs'"
 			set env(SSL_VNCVIEWER_USE_C) 1
@@ -1728,14 +1908,16 @@ proc launch_unix {hp} {
 			if {[regexp {FINISH} $port_knocking_list]} {
 				wm withdraw .
 				update
-				exec xterm -geometry $geometry \
-				    -title "SHELL to $hp" -e sh -c "$cmd"
+#				exec xterm -geometry $geometry \
+#				    -title "SHELL to $hp" -e sh -c "$cmd"
+				unix_terminal_cmd $geometry "SHELL to $hp" "$cmd"
 				wm deiconify .
 				update
 				do_port_knock $pk_hp finish
 			} else {
-				exec xterm -geometry $geometry \
-				    -title "SHELL to $hp" -e sh -c "$cmd" &
+#				exec xterm -geometry $geometry \
+#				    -title "SHELL to $hp" -e sh -c "$cmd" &
+				unix_terminal_cmd $geometry "SHELL to $hp" "$cmd" 1
 			}
 			set env(SSL_VNCVIEWER_SSH_CMD) ""
 			set env(SSL_VNCVIEWER_SSH_ONLY) ""
@@ -1767,13 +1949,26 @@ proc launch_unix {hp} {
 		set cmd "$cmd -grab"
 	}
 
+	global darwin_cotvnc
+	if {$darwin_cotvnc} {
+		set env(DARWIN_COTVNC) 1
+	}
+
 	set cmd "$cmd $hp"
 
 	if {$use_viewonly} {
-		set cmd "$cmd -viewonly"
+		if {$darwin_cotvnc} {
+			set cmd "$cmd --ViewOnly"
+		} else {
+			set cmd "$cmd -viewonly"
+		}
 	}
 	if {$use_fullscreen} {
-		set cmd "$cmd -fullscreen"
+		if {$darwin_cotvnc} {
+			set cmd "$cmd --FullScreen"
+		} else {
+			set cmd "$cmd -fullscreen"
+		}
 	}
 	if {$use_bgr233} {
 		if {$vncviewer_realvnc4} {
@@ -1783,12 +1978,16 @@ proc launch_unix {hp} {
 		}
 	}
 	if {$use_nojpeg} {
-		if {! $vncviewer_realvnc4} {
+		if {$darwin_cotvnc} {
+			;
+		} elseif {! $vncviewer_realvnc4} {
 			set cmd "$cmd -nojpeg"
 		}
 	}
 	if {! $use_raise_on_beep} {
-		if {! $vncviewer_realvnc4} {
+		if {$darwin_cotvnc} {
+			;
+		} elseif {! $vncviewer_realvnc4} {
 			set cmd "$cmd -noraiseonbeep"
 		}
 	}
@@ -1800,13 +1999,17 @@ proc launch_unix {hp} {
 		}
 	}
 	if {$use_quality != "" && $use_quality != "default"} {
-		if {! $vncviewer_realvnc4} {
+		if {$darwin_cotvnc} {
+			;
+		} elseif {! $vncviewer_realvnc4} {
 			set cmd "$cmd -quality '$use_quality'"
 		}
 	}
 	if {$use_ssh || $use_sshssl} {
 		# realvnc4 -preferredencoding zrle
-		if {$vncviewer_realvnc4} {
+		if {$darwin_cotvnc} {
+			;
+		} elseif {$vncviewer_realvnc4} {
 			set cmd "$cmd -preferredencoding zrle"
 		} else {
 			set cmd "$cmd -encodings 'copyrect tight zrle zlib hextile'"
@@ -1853,9 +2056,16 @@ proc launch_unix {hp} {
 		set xrm2 "XTerm*VT100*translations:#override Shift<Btn3Down>:print()\\nCtrl<Key>N:print()"
 		set xrm3 "*mainMenu*print*Label:  New SSL_VNC_GUI"
 	}
-	exec xterm -geometry $geometry -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" \
-	    -title "SSL VNC Viewer $hp" \
-	    -e sh -c "set -xv; $cmd; set +xv; echo; echo Done. You Can X-out or Ctrl-C this Terminal if you like.; echo; echo sleep 15; echo; sleep 15"
+#	exec xterm -geometry $geometry -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" \
+#	    -title "SSL VNC Viewer $hp" \
+#	    -e sh -c "set -xv; $cmd; set +xv; echo; echo Done. You Can X-out or Ctrl-C this Terminal if you like.; echo; echo sleep 15; echo; sleep 15"
+	set m "Done. You Can X-out or Ctrl-C this Terminal if you like."
+	global uname
+	if {$uname == "Darwin"} {
+		regsub {X-out or } $m "" m
+	}
+	unix_terminal_cmd $geometry "SSL VNC Viewer $hp" \
+	"set -xv; $cmd; set +xv; echo; echo $m; echo; echo sleep 15; echo; sleep 15" 0 $xrm1 $xrm2 $xrm3
 
 	set env(SSL_VNCVIEWER_SSH_CMD) ""
 	set env(SSL_VNCVIEWER_USE_C) ""
@@ -1993,6 +2203,7 @@ proc launch {{hp ""}} {
 	if {[regexp {^[ 	]*$} $hp]} {
 		mesg "No host:disp supplied."
 		bell
+		catch {raise .}
 		return
 	}
 	if {! [regexp ":" $hp]} {
@@ -2616,7 +2827,11 @@ emailAddress_max                = 64
 	if {$ccert(DAYS) != ""} {
 		set cmd "$cmd -days $ccert(DAYS)"
 	}
-	set cmd "$cmd -keyout {$pem} -out {$crt}"
+	if {$is_windows} {
+		set cmd "$cmd -keyout {$pem} -out {$crt}"
+	} else {
+		set cmd "$cmd -keyout \"$pem\" -out \"$crt\""
+	}
 
 	if {$is_windows} {
 		set emess ""
@@ -2654,7 +2869,8 @@ emailAddress_max                = 64
 	} else {
 		set geometry [xterm_center_geometry]
 		update
-		eval exec xterm -geometry $geometry -title Running_OpenSSL -e $cmd
+#		exec xterm -geometry $geometry -title "Running OpenSSL" -e sh -c "$cmd"
+		unix_terminal_cmd $geometry "Running OpenSSL" "$cmd"
 		catch {file attributes $pem -permissions go-rw}
 		catch {file attributes $crt -permissions go-w}
 	}
@@ -2788,7 +3004,12 @@ proc create_cert {} {
 	toplevel .ccrt
 	wm title .ccrt "Create SSL Certificate"
 
-	scroll_text .ccrt.f 80 30
+	global uname
+	if {$uname == "Darwin"} {
+		scroll_text .ccrt.f 80 20
+	} else {
+		scroll_text .ccrt.f 80 30
+	}
 
 	set msg {
     This dialog helps you to create a simple self-signed SSL certificate.  
@@ -3079,7 +3300,12 @@ proc import_cert {} {
 
 	global scroll_text_focus
 	set scroll_text_focus 0
-	scroll_text .icrt.f 90 20
+	global uname
+	if {$uname == "Darwin"} {
+		scroll_text .icrt.f 90 16
+	} else {
+		scroll_text .icrt.f 90 20
+	}
 	set scroll_text_focus 1
 
 	set msg {
@@ -3154,7 +3380,11 @@ TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 	$w.e configure -state disabled
 
 	label .icrt.plab -anchor w -text "Paste Certificate here:" 
-	scroll_text .icrt.paste 90 22
+	if {$uname == "Darwin"} {
+		scroll_text .icrt.paste 90 11
+	} else {
+		scroll_text .icrt.paste 90 22
+	}
 
 	button .icrt.cancel -text "Cancel" -command {destroy .icrt; catch {raise .c}}
 	bind .icrt <Escape> {destroy .icrt; catch {raise .c}}
@@ -3425,7 +3655,7 @@ proc load_profile {} {
 }
 
 proc save_profile {} {
-	global is_windows
+	global is_windows uname
 	global vncdisplay
 	global profdone
 	global include_vars defs
@@ -3437,8 +3667,9 @@ proc save_profile {} {
 	set disp [string trim $vncdisplay]
 	if {$disp != ""} {
 		regsub {[ 	].*$} $disp "" disp
+		regsub -all {/} $disp "" disp
 	}
-	if {$is_windows} {
+	if {$is_windows || $uname == "Darwin"} {
 		regsub -all {:} $disp "_" disp
 	}
 
@@ -3872,8 +4103,8 @@ set cmd(3) {
 				mkdir -p $dest
 			fi
 			echo "echo SMBMOUNT:" >> $smb_script
-			echo "echo smbmount $smfs $dest -o uid=$USER,ip=127.0.0.1,port=$port" >> $smb_script
-			echo "smbmount \"$smfs\" \"$dest\" -o uid=$USER,ip=127.0.0.1,port=$port" >> $smb_script
+			echo "echo smbmount $smfs $dest -o uid=$USER,ip=127.0.0.1,ttl=20000,port=$port" >> $smb_script
+			echo "smbmount \"$smfs\" \"$dest\" -o uid=$USER,ip=127.0.0.1,ttl=20000,port=$port" >> $smb_script
 			echo "echo; df \"$dest\"; echo" >> $smb_script
 			dests="$dests $dest"
 		done
@@ -4169,7 +4400,13 @@ proc cups_dialog {} {
 	global cups_local_server cups_remote_port cups_manage_rcfile
 	global cups_local_smb_server cups_remote_smb_port
 
-	scroll_text .cups.f
+	global uname
+	if {$uname == "Darwin"} {
+		scroll_text .cups.f 80 25
+	} else {
+		scroll_text .cups.f
+	}
+		
 
 	set msg {
     CUPS Printing requires SSH be used to set up the Print service port
@@ -4322,7 +4559,12 @@ proc sound_dialog {} {
 	toplevel .snd
 	wm title .snd "ESD/ARTSD Sound Tunnelling"
 
-	scroll_text .snd.f 80 30
+	global uname
+	if {$uname == "Darwin"} {
+		scroll_text .snd.f 80 20
+	} else {
+		scroll_text .snd.f 80 30
+	}
 
 	set msg {
     Sound tunnelling to a sound daemon requires SSH be used to set up the
@@ -5077,7 +5319,12 @@ proc smb_dialog {} {
 
 	global help_font
 
-	scroll_text .smb.f
+	global uname
+	if {$uname == "Darwin"} {
+		scroll_text .smb.f 80 25
+	} else {
+		scroll_text .smb.f
+	}
 
 	set msg {
     Windows/Samba Filesystem mounting requires SSH be used to set up the SMB
@@ -5162,7 +5409,7 @@ proc smb_dialog {} {
 	set msg2 {
     To speed up moving to the next step, iconify the first SSH console
     when you are done entering passwords, etc. and then click on the
-    main panel 'VNC Server' label.
+    main panel 'VNC Host:Display' label.
 }
 
 	global is_windows
@@ -5335,8 +5582,12 @@ proc port_redir_dialog {} {
 	toplevel .redirs
 	wm title .redirs "Additional Port Redirections"
 
-	global help_font
-	eval text .redirs.t -width 80 -height 35 $help_font
+	global help_font uname
+	if {$uname == "Darwin"} {
+		eval text .redirs.t -width 80 -height 35 $help_font
+	} else {
+		eval text .redirs.t -width 80 -height 35 $help_font
+	}
 	apply_bg .redirs.t
 
 	set msg {
@@ -5517,6 +5768,7 @@ proc do_port_knock {hp mode} {
 	set default_delay 150
 
 	set host [string trim $hp]
+	regsub {^vnc://} $host "" host
 	regsub {^.*@} $host "" host
 	regsub {:.*$} $host "" host
 	set host0 [string trim $host]
@@ -5773,7 +6025,12 @@ proc port_knocking_dialog {} {
 
 	global help_font
 
-	scroll_text .pk.f 85
+	global uname
+	if {$uname == "Darwin"} {
+		scroll_text .pk.f 85 25
+	} else {
+		scroll_text .pk.f 85
+	}
 
 	set msg {
     Port Knocking is where a network connection to a service is not provided
@@ -5804,7 +6061,7 @@ proc port_knocking_dialog {} {
 
     Tip: if you just want to use the Port Knocking for an SSH shell and not
     for a VNC tunnel, then specify something like "user@hostname cmd=SHELL"
-    (or "user@hostname cmd=PUTTY" on Windows) in the VNC Server entry box
+    (or "user@hostname cmd=PUTTY" on Windows) in the VNC Host:Display entry box
     on the main panel.  This will do everything short of starting the viewer.
     A shortcut for this is Ctrl-S as long as user@hostname is present.
     
@@ -5944,7 +6201,7 @@ proc port_knocking_dialog {} {
 
    Port knock only:
 
-      If, in the 'VNC Server' entry box, you use "user@hostname cmd=KNOCK"
+      If, in the 'VNC Host:Display' entry, you use "user@hostname cmd=KNOCK"
       then only the port-knocking is performed.  A shortcut for this is
       Ctrl-P as long as hostname is present in the entry box.  If it
       matches cmd=KNOCKF, i.e. an extra "F", then the port-knocking
@@ -6025,6 +6282,9 @@ proc set_advanced_options {} {
 		pack .oa.b$j -side top -fill x
 	}
 
+	button .oa.connect -text "Connect" -command launch
+	pack .oa.connect -side top -fill x 
+
 	frame .oa.b
 	button .oa.b.done -text "Done" -command {destroy .oa}
 	bind .oa <Escape> {destroy .oa}
@@ -6059,10 +6319,10 @@ proc ssh_agent_restart {} {
 	set got_ssh_agent2 0
 	set got_ssh_add2 0
 
-	if [in_path "ssh-agent"]  {set got_ssh_agent 1}
-	if [in_path "ssh-agent2"] {set got_ssh_agent2 1}
-	if [in_path "ssh-add"]    {set got_ssh_add 1}
-	if [in_path "ssh-add2"]   {set got_ssh_add2 1}
+	if {[in_path "ssh-agent"]  != ""} {set got_ssh_agent 1}
+	if {[in_path "ssh-agent2"] != ""} {set got_ssh_agent2 1}
+	if {[in_path "ssh-add"]    != ""} {set got_ssh_add 1}
+	if {[in_path "ssh-add2"]   != ""} {set got_ssh_add2 1}
 
 	set ssh_agent ""
 	set ssh_add ""
@@ -6121,7 +6381,8 @@ proc ssh_agent_restart {} {
 	catch {wm withdraw .o}
 	catch {wm withdraw .oa}
 
-	exec xterm -geometry +200+200 -title "Restarting with ssh-agent/ssh-add" -e sh $tmp &
+#	exec xterm -geometry +200+200 -title "Restarting with ssh-agent/ssh-add" -e sh $tmp &
+	unix_terminal_cmd "+200+200" "Restarting with ssh-agent/ssh-add" "sh $tmp" 1
 	after 10000
 	destroy .
 	exit
@@ -6150,7 +6411,7 @@ proc set_options {} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
 	global compresslevel_text quality_text
-	global env is_windows 
+	global env is_windows darwin_cotvnc
 
 	catch {destroy .o}
 	toplevel .o
@@ -6179,28 +6440,34 @@ proc set_options {} {
 
 	checkbutton .o.b$i -anchor w -variable use_raise_on_beep -text \
 		"Raise On Beep"
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_bgr233 -text \
 		"Use 8bit color (-bgr233)"
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_alpha -text \
 		"Cursor alphablending (32bpp required)"
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	set ia $i
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_grab -text \
 		"Use XGrabServer"
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	set ix $i
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_nojpeg -text \
 		"Do not use JPEG (-nojpeg)"
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i
 
 	menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable compresslevel_text
 	set compresslevel_text "Compress Level: $use_compresslevel"
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 
 	menu .o.b$i.m -tearoff 0
 	for {set j -1} {$j < 10} {incr j} {
@@ -6218,6 +6485,7 @@ proc set_options {} {
 
 	menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable quality_text
 	set quality_text "Quality: $use_quality"
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 
 	menu .o.b$i.m -tearoff 0
 	for {set j -1} {$j < 10} {incr j} {
@@ -6258,12 +6526,14 @@ proc set_options {} {
 	button .o.s_prof -text "Save Profile ..." -command {save_profile; raise .o}
 	button .o.l_prof -text " Load Profile ..." -command {load_profile; raise .o}
 	button .o.advanced -text "Advanced ..." -command set_advanced_options
+	button .o.connect -text "Connect" -command launch
 	button .o.clear -text "Clear Options" -command set_defaults
 	pack .o.s_prof -side top -fill x 
 	pack .o.l_prof -side top -fill x 
 	#pack .o.inc -side top -fill x
 	pack .o.clear -side top -fill x 
 	pack .o.advanced -side top -fill x 
+	pack .o.connect -side top -fill x 
 
 	frame .o.b
 	button .o.b.done -text "Done" -command {destroy .o}
@@ -6294,6 +6564,24 @@ if {[regexp -nocase {Windows.9} $tcl_platform(os)]} {
 	set is_win9x 0
 }
 
+set uname ""
+if {! $is_windows} {
+	catch {set uname [exec uname]}
+}
+
+set darwin_cotvnc 0
+if {$uname == "Darwin"} {
+	if {! [info exists env(DISPLAY)]} {
+		set darwin_cotvnc 1
+	}
+	if [info exists env(HOME)] {
+		set t "$env(HOME)/.vnc"
+		if {! [file exists $t]} {
+			catch {file mkdir $t}
+		}
+	}
+}
+
 set putty_pw ""
 
 global scroll_text_focus
@@ -6308,28 +6596,56 @@ set skip_pre 0
 set vncdisplay ""
 
 label .l -text "SSL TightVNC Viewer" -relief ridge
-frame .f
-label .f.l -text "VNC Server:" -relief ridge
-entry .f.e -width 40 -textvariable vncdisplay
-pack .f.l -side left 
-pack .f.e -side left -expand 1 -fill x
-bind .f.e <Return> launch
+
+set wl 21
+set we 40
+frame .f0
+#label .f0.l -width $wl -anchor w -text "VNC Host:Display" -relief ridge
+label .f0.l -anchor w -text "VNC Host:Display" -relief ridge
+entry .f0.e -width $we -textvariable vncdisplay
+pack .f0.l -side left 
+pack .f0.e -side left -expand 1 -fill x
+bind .f0.e <Return> launch
+
+frame .f1
+label .f1.l -width $wl -anchor w -text "Proxy/Gateway:" -relief ridge
+entry .f1.e -width $we -textvariable vncdisplay
+pack .f1.l -side left 
+pack .f1.e -side left -expand 1 -fill x
+
+frame .f2
+label .f2.l -width $wl -anchor w -text "Remote SSH Command:" -relief ridge
+entry .f2.e -width $we -textvariable vncdisplay
+pack .f2.l -side left 
+pack .f2.e -side left -expand 1 -fill x
+.f2.l configure -state disabled
+.f2.e configure -state disabled
+
+frame .f3
+# -command
+checkbutton .f3.ssl -anchor w -variable use_ssl -text "Use SSL"
+checkbutton .f3.ssh -anchor w -variable use_ssh -text "Use SSH"
+checkbutton .f3.sshssl -anchor w -variable use_sshssl -text "Use SSH and SSL"
+set use_ssl 1
+pack .f3.ssl .f3.ssh .f3.sshssl -side left -fill x
 
 frame .b
 button .b.help  -text "Help" -command help
 button .b.certs -text "Certs ..." -command getcerts
 button .b.opts  -text "Options ..." -command set_options
+button .b.load  -text "Load" -command {load_profile}
 button .b.conn  -text "Connect" -command launch
 button .b.exit  -text "Exit" -command {destroy .; exit}
 
 
-pack .b.certs .b.opts .b.conn .b.help .b.exit -side left -expand 1 -fill x
+pack .b.certs .b.opts .b.load .b.conn .b.help .b.exit -side left -expand 1 -fill x
 
-pack .l .f .b -side top -fill x
+#pack .l .f0 .f1 .f2 .f3 .b -side top -fill x
+pack .l .f0 .b -side top -fill x
 if {![info exists env(SSL_VNC_GUI_CHILD)] || $env(SSL_VNC_GUI_CHILD) == ""} {
 	center_win .
 }
-focus .f.e
+focus .f0.e
 
 global system_button_face
 set system_button_face ""
@@ -6346,12 +6662,14 @@ bind . <Shift-Escape> "destroy .; exit"
 bind . <Control-s> "launch_shell_only"
 bind . <Control-p> {port_knock_only "" "KNOCK"}
 bind . <Control-P> {port_knock_only "" "FINISH"}
+bind . <Control-l> {load_profile}
+bind . <B3-ButtonRelease> {load_profile}
 
 global entered_gui_top button_gui_top
 set entered_gui_top 0
 set button_gui_top 0
 bind . <Enter> {set entered_gui_top 1}
 bind .l <ButtonPress> {set button_gui_top 1}
-bind .f.l <ButtonPress> {set button_gui_top 1}
+bind .f0.l <ButtonPress> {set button_gui_top 1}
 
 update

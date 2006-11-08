@@ -1,7 +1,7 @@
 #!/bin/sh
 
 rm -rf ./src/tmp/* || exit 1
-vers=1.0.5
+vers=1.0.7
 
 cd .. || exit 1
 
@@ -24,6 +24,8 @@ rm -rf enhanced_tightvnc_viewer_windows_only-${vers}*
 cp -pR enhanced_tightvnc_viewer enhanced_tightvnc_viewer_windows_only-$vers
 rm -rf enhanced_tightvnc_viewer_windows_only-$vers/{src,bin,man}/*
 rm -rf enhanced_tightvnc_viewer_windows_only-$vers/bin/.linkin
+rm -rf enhanced_tightvnc_viewer_windows_only-$vers/MacOSX
+rm -rf enhanced_tightvnc_viewer_windows_only-$vers/Unix
 cp -p enhanced_tightvnc_viewer/bin/util/ssl_tightvncviewer.tcl  enhanced_tightvnc_viewer_windows_only-$vers/Windows/util
 
 rm -f enhanced_tightvnc_viewer_windows_only-$vers.zip

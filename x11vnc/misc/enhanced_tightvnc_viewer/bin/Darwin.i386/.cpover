@@ -1,0 +1,6 @@
+#!/bin/sh
+
+cp -p ../Darwin.Power.Macintosh/vncviewer.sh .
+cp -p vncviewer.sh vncviewer
+pwd
+ls -l vncviewer.sh vncviewer

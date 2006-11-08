@@ -1,0 +1,7 @@
+#!/bin/sh
+
+cp -p vncviewer.sh vncviewer
+pwd
+ls -l vncviewer.sh vncviewer
+
+(cd ../Darwin.i386; .cpover)

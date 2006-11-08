@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# Notes: to customize locations, e.g. for libjpeg, set LDFLAGS_OS and/or CPPFLAGS_OS
+#
+# e.g. on Darwin we did:
+#
+# env LDFLAGS_OS="-L/Volumes/someplace/common/lib/" CPPFLAGS_OS="-I /Volumes/someplace/common/include" ./build.unix
+#
+
+
 # Add useful directories to PATH:
 #
 PATH=$PATH:/usr/bin:/bin:/usr/local/bin:/usr/X11R6/bin:/usr/bin/X11:/usr/openwin/bin:/opt/SUNWspro/bin:/usr/sfw/bin:/usr/ccs/bin
@@ -17,12 +25,17 @@ fi
 #
 name=$UNAME
 if [ "X$name" = "X" ]; then
-	name=`uname -sm | sed -e 's/ /./'`
+	name=`uname -sm | sed -e 's/ /./g'`
 fi
 if [ "X$name" = "X" ]; then
 	echo "cannot determine platform: os.arch, e.g. Linux.i686"
 	echo "set \$UNAME manually and retry."
 	exit 1
+fi
+
+LDD="ldd"
+if [ `uname` = "Darwin" ]; then
+	LDD="otool -L"
 fi
 
 # Work out main destination:
@@ -167,13 +180,17 @@ sync
 wc  $src
 sum $src
 sleep 2
-echo cp -p $src $dest/vncviewer
-cp -p $src $dest/vncviewer || exit 1
+
+suff=""
+if [ `uname` = "Darwin" ]; then
+	suff=".x11"
+fi
+echo cp -p $src $dest/vncviewer$suff
 sleep 1
-cp -p $src $dest/vncviewer || exit 1
-ls -l $src $dest/vncviewer
-$dest/vncviewer -h
-ldd $dest/vncviewer
+cp -p $src $dest/vncviewer$suff || exit 1
+ls -l $src $dest/vncviewer$suff
+$dest/vncviewer$suff -h
+$LDD $dest/vncviewer$suff
 echo ""
 
 # Do stunnel:
@@ -237,8 +254,8 @@ sleep 1
 cp -p $src $dest/stunnel || exit 1
 ls -l $src $dest/stunnel
 $dest/stunnel -help
-ldd $dest/stunnel
+$LDD $dest/stunnel
 echo ""
 
-$dest/vncviewer -h
-ldd $dest/vncviewer
+$dest/vncviewer$suff -h
+$LDD $dest/vncviewer$suff

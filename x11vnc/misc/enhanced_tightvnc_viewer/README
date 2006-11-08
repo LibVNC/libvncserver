@@ -20,6 +20,7 @@ by others.  See these sites and related ones for more information:
         http://stunnel.mirt.net
         http://www.openssl.org
         http://www.chiark.greenend.org.uk/~sgtatham/putty/
+	http://sourceforge.net/projects/cotvnc/
 
 Note: Some of the Windows binaries included contain cryptographic software
 that you may not be allowed to download, use, or redistribute.  Please
@@ -107,6 +108,9 @@ README is in) and like this:
 
 	./build.unix
 
+To use custom locations for libraries see the LDFLAGS_OS and CPPFLAGS_OS
+description at the top of the build.unix script.
+
 
 The programs:
 ------------
@@ -129,9 +133,10 @@ you can run this instead:
 this is essentially the same GUI that is run on Windows (the
 ssl_tightvncviewer.exe).
 
-Using the GUI is it impossible to initiate a VNC connection that is not
-encrypted with either SSL or SSH.  Unencrypted VNC connections can only
-be started by manually running the ./bin/tightvncviewer script.
+Using the GUI is it not possible (well not easy) to initiate
+a VNC connection that is not encrypted with either SSL or SSH.
+Unencrypted VNC connections can only be started by manually running the
+./bin/tightvncviewer script.
 
 For convenience, you can make symlinks from a directory in your PATH to
 any of the 3 programs above you wish to run.  That is all you usually
@@ -144,6 +149,10 @@ assuming $HOME/bin is in your $PATH:
 (note the "." at the end). The above commands is basically the way to
 "install" this package on Unix.
 
+Also symlinks to the GUI launcher script are provided in:
+
+	MacOSX/ssl_vnc_gui.sh
+	Unix/ssl_vnc_gui
 
 On Windows unpack your archive and run:
 
@@ -224,6 +233,7 @@ See also:
 	http://www.tightvnc.com
         http://www.realvnc.com
         http://www.chiark.greenend.org.uk/~sgtatham/putty/
+	http://sourceforge.net/projects/cotvnc/
 
 
 Windows:
