@@ -126,6 +126,7 @@ help() {
 gotalpha=""
 use_ssh=""
 use_sshssl=""
+direct_connect=""
 ssh_sleep=15
 ssh_cmd="sleep $ssh_sleep"
 if [ "X$SSL_VNCVIEWER_SSH_CMD" != "X" ]; then
@@ -179,6 +180,15 @@ if [ "X$use_ssh" = "X1" -a "X$use_sshssl" = "X" ]; then
 		echo "-mycert and -verify cannot be used in -ssh mode" 
 		exit 1
 	fi
+fi
+
+if echo "$orig" | grep '^vnc://' > /dev/null; then
+	orig=`echo "$orig" | sed -e 's,vnc://,,'`
+	verify=""
+	mycert=""
+	use_ssh=""
+	use_sshssl=""
+	direct_connect=1
 fi
 
 # play around with host:display port:
@@ -277,8 +287,8 @@ if [ "X$use_ssh" = "X1" ]; then
 		proxport=`findfree 3500`
 		echo
 		echo "Running 1st ssh proxy:"
-		echo "$ssh -f -p $ssh_port1 -t -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
-		      $ssh -f -p $ssh_port1 -t -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
+		echo "$ssh -f -x -p $ssh_port1 -t -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
+		      $ssh -f -x -p $ssh_port1 -t -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
 		ssh_args="$ssh_args -o NoHostAuthenticationForLocalhost=yes"
 		sleep 1
 		stty sane
@@ -307,18 +317,18 @@ if [ "X$use_ssh" = "X1" ]; then
 	fi
 	# the -t option actually speeds up typing response via VNC!!
 	if [ "X$SSL_VNCVIEWER_SSH_ONLY" != "X" ]; then
-		echo "$ssh -p $ssh_port -t $C $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x -p $ssh_port -t $C $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -p $ssh_port -t $C $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x -p $ssh_port -t $C $ssh_args $ssh_host "$ssh_cmd"
 		exit $?
 	elif [ "X$SSL_VNCVIEWER_NO_F" != "X" ]; then
-		echo "$ssh -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host "$ssh_cmd"
 	else
-		echo "$ssh -f -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x -f -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -f -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x -f -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host "$ssh_cmd"
 	fi
 	if [ "$?" != "0" ]; then
 		echo ""
@@ -337,9 +347,9 @@ if [ "X$use_ssh" = "X1" ]; then
 	stty sane
 	if [ "X$use_sshssl" = "X" ]; then
 		echo "Running viewer:"
-		echo $VNCVIEWERCMD "$@" localhost:$N
+		echo "$VNCVIEWERCMD" "$@" localhost:$N
 		echo ""
-		$VNCVIEWERCMD "$@" localhost:$N
+		"$VNCVIEWERCMD" "$@" localhost:$N
 
 		exit $?
 	else
@@ -408,6 +418,23 @@ print STDERR "proxy_host:       $proxy_host\n";
 print STDERR "proxy_port:       $proxy_port\n";
 print STDERR "proxy_connect:    $connect\n";
 
+my $listen_handle = "";
+if ($ENV{SSL_VNC_LISTEN} != "") {
+	my $listen_sock = IO::Socket::INET->new(
+		Listen    => 2,
+		LocalAddr => "localhost",
+		LocalPort => $ENV{SSL_VNC_LISTEN},
+		Proto     => "tcp");
+	if (! $listen_sock) {
+		die "perl proxy: $!\n";
+	}
+	my $ip;
+	($listen_handle, $ip) = $listen_sock->accept();
+	if (! $listen_handle) {
+		die "perl proxy: $!\n";
+	}
+}
+
 my $sock = IO::Socket::INET->new(
 	PeerAddr => $proxy_host,
 	PeerPort => $proxy_port,
@@ -462,10 +489,18 @@ if ($second ne "") {
 
 if (fork) {
 	print STDERR "parent\[$$]  STDIN -> socket\n\n";
-	xfer(STDIN, $sock);
+	if ($listen_handle) {
+		xfer($listen_handle, $sock);
+	} else {
+		xfer(STDIN, $sock);
+	}
 } else {
 	print STDERR "child \[$$]  socket -> STDOUT\n\n";
-	xfer($sock, STDOUT);
+	if ($listen_handle) {
+		xfer($sock, $listen_handle);
+	} else {
+		xfer($sock, STDOUT);
+	}
 }
 exit;
 
@@ -523,6 +558,35 @@ else
 	connect="connect = $host:$port"
 fi
 
+if [ "X$direct_connect" != "X" ]; then
+	echo ""
+	echo "Running viewer for direct connection:"
+	echo ""
+	echo "** NOTE: THERE WILL BE NO SSL OR SSH ENCRYPTION **"
+	echo ""
+	if type printf > /dev/null 2>&1; then
+		printf  "Are you sure you want to continue? [y]/n "
+	else
+		echo -n "Are you sure you want to continue? [y]/n "
+	fi
+	read x
+	if [ "X$x" = "Xn" ]; then
+		exit 1
+	fi
+	echo ""
+	if [ "X$ptmp" != "X" ]; then
+		SSL_VNC_LISTEN=$use
+		export SSL_VNC_LISTEN
+		$ptmp &
+		sleep 2
+		host="localhost"
+		disp="$N"
+	fi
+	echo "$VNCVIEWERCMD" "$@" $host:$disp
+	echo ""
+	"$VNCVIEWERCMD" "$@" $host:$disp
+	exit $?
+fi
 
 ##debug = 7
 tmp=/tmp/ssl_vncviewer${RANDOM}.$$
@@ -566,9 +630,9 @@ rm -f "$tmp"
 
 echo ""
 echo "Running viewer:"
-echo $VNCVIEWERCMD "$@" localhost:$N
+echo "$VNCVIEWERCMD" "$@" localhost:$N
 echo ""
-$VNCVIEWERCMD "$@" localhost:$N
+"$VNCVIEWERCMD" "$@" localhost:$N
 
 kill $pid
 sleep 1

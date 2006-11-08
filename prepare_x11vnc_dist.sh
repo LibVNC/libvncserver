@@ -44,9 +44,31 @@ into a versatile and performant while still easy to use program.\
 x11vnc was put together and is (actively ;-) maintained by\
 Karl Runge <runge@karlrunge.com>\
 \
-%prep\
-/' \
-> x11vnc.spec.in
+/i' \
+> x11vnc.spec.in.tmp
+
+perl -e '
+    $s = 0;
+    while (<>) {
+	if ($s) {
+		if (/^\s*$/) {
+			$s = 0;
+		}
+	} else {
+		if (/^%files\s*$/ || /^%files devel/) {
+			$s = 1;
+		}
+	}
+	next if $s;
+	if (/^%files x11vnc/) {
+		print "\%files\n";
+		print "\%doc README x11vnc/ChangeLog\n";
+		next;
+	}
+	print;
+    }' < x11vnc.spec.in.tmp > x11vnc.spec.in
+
+rm -f x11vnc.spec.in.tmp
 
 mv libvncserver/Makefile.am libvncserver/Makefile.am.LibVNCServer
 

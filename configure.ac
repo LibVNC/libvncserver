@@ -65,6 +65,7 @@ AH_TEMPLATE(HAVE_LINUX_VIDEODEV_H, [video4linux build environment present])
 AH_TEMPLATE(HAVE_LINUX_FB_H, [linux fb device build environment present])
 AH_TEMPLATE(HAVE_LINUX_INPUT_H, [linux/input.h present])
 AH_TEMPLATE(HAVE_LINUX_UINPUT_H, [linux uinput device build environment present])
+AH_TEMPLATE(HAVE_MACOSX_NATIVE_DISPLAY, [build MacOS X native display support])
 
 AC_ARG_WITH(xkeyboard,
 [  --without-xkeyboard     disable xkeyboard extension support],,)
@@ -88,6 +89,8 @@ AC_ARG_WITH(fbdev,
 [  --without-fbdev         disable linux fb device support],,)
 AC_ARG_WITH(uinput,
 [  --without-uinput        disable linux uinput device support],,)
+AC_ARG_WITH(macosx-native,
+[  --without-macosx-native disable MacOS X native display support],,)
 
 if test "x$with_x" = "xno"; then
 	HAVE_X="false"
@@ -275,7 +278,21 @@ if test "x$with_uinput" != "xno"; then
 	fi
 fi
 
+if test "x$with_macosx_native" != "xno"; then
+	AC_DEFINE(HAVE_MACOSX_NATIVE_DISPLAY)
+fi
+
 # Checks for libraries.
+
+uname_s=`(uname -s) 2>/dev/null`
+ld_minus_R="yes"
+if test "x$uname_s" = "xHP-UX"; then
+	ld_minus_R="no"
+elif test "x$uname_s" = "xOSF1"; then
+	ld_minus_R="no"
+elif test "x$uname_s" = "xDarwin"; then
+	ld_minus_R="no"
+fi
 
 AC_ARG_WITH(jpeg,
 [  --without-jpeg          disable support for jpeg]
@@ -294,10 +311,7 @@ if test "x$with_jpeg" != "xno"; then
 		saved_LDFLAGS="$LDFLAGS"
 		CPPFLAGS="$CPPFLAGS -I$with_jpeg/include"
 		LDFLAGS="$LDFLAGS -L$with_jpeg/lib"
-		uname_s=`(uname -s) 2>/dev/null`
-		if test "x$uname_s" = "xHP-UX"; then
-			:
-		elif test "x$uname_s" = "xOSF1"; then
+		if test "x$ld_minus_R" = "xno"; then
 			:
 		elif test "x$GCC" = "xyes"; then
 			# this is not complete... in general a rat's nest.
@@ -344,10 +358,7 @@ if test "x$with_zlib" != "xno" -a "x$with_libz" != "xno"; then
 		saved_LDFLAGS="$LDFLAGS"
 		CPPFLAGS="$CPPFLAGS -I$with_zlib/include"
 		LDFLAGS="$LDFLAGS -L$with_zlib/lib"
-		uname_s=`(uname -s) 2>/dev/null`
-		if test "x$uname_s" = "xHP-UX"; then
-			:
-		elif test "x$uname_s" = "xOSF1"; then
+		if test "x$ld_minus_R" = "xno"; then
 			:
 		elif test "x$GCC" = "xyes"; then
 			LDFLAGS="$LDFLAGS -Xlinker -R$with_zlib/lib"
