@@ -530,6 +530,7 @@ static void watch_loop(void) {
 				eat_viewonly_input(10, 3);
 			}
 		} else {
+			/* -threads here. */
 			if (wireframe && button_mask) {
 				check_wireframe();
 			}
@@ -1440,6 +1441,8 @@ static void store_homedir_passwd(char *file) {
 	    && !query_cmd && !remote_cmd && !unixpw && !got_gui_pw \
 	    && ! ssl_verify && !inetd)
 
+extern int dragum(void);
+
 int main(int argc, char* argv[]) {
 
 	int i, len, tmpi;
@@ -1462,6 +1465,9 @@ int main(int argc, char* argv[]) {
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc_max = 1024;
 	int argc_vnc = 1; char *argv_vnc[2048];
+
+//dragum();
+
 
 	/* check for -loop mode: */
 	check_loop_mode(argc, argv);
@@ -2280,6 +2286,12 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-pipeinput")) {
 			CHECK_ARGC
 			pipeinput_str = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-macnodim")) {
+			macosx_nodimming = 1;
+		} else if (!strcmp(arg, "-macnosleep")) {
+			macosx_nosleep = 1;
+		} else if (!strcmp(arg, "-macnosaver")) {
+			macosx_noscreensaver = 1;
 		} else if (!strcmp(arg, "-gui")) {
 			launch_gui = 1;
 			if (i < argc-1) {
@@ -2434,8 +2446,23 @@ int main(int argc, char* argv[]) {
 	if (launch_gui) {
 		int sleep = 0;
 		if (SHOW_NO_PASSWORD_WARNING && !nopw) {
-			sleep = 2;
+			sleep = 1;
 		}
+#ifdef MACOSX
+		if (! use_dpy && getenv("DISPLAY") == NULL) {
+			/* we need this for gui since no X properties */
+			if (! client_connect_file && ! client_connect) {
+				int fd;
+				char tmp[] = "/tmp/x11vnc-macosx-channel.XXXXXX";
+				fd = mkstemp(tmp);
+				if (fd >= 0) {
+					close(fd);
+					client_connect_file = strdup(tmp);
+					rfbLog("MacOS X: set -connect file to %s\n", client_connect_file);
+				}
+			}
+		}
+#endif
 		do_gui(gui_str, sleep);
 	}
 	if (logfile) {
@@ -2952,6 +2979,12 @@ int main(int argc, char* argv[]) {
 		dpy = XOpenDisplay_wr("");
 	}
 
+#ifdef MACOSX
+	if (! dpy && ! raw_fb_str) {
+		raw_fb_str = strdup("console");
+	}
+#endif
+
 	if (! dpy && raw_fb_str) {
 		rfbLog("continuing without X display in -rawfb mode, "
 		    "hold on tight..\n");
@@ -3354,6 +3387,19 @@ int main(int argc, char* argv[]) {
 	}
 
 	raw_fb_pass_go_and_collect_200_dollars:
+
+#ifdef MACOSX
+	if (! dpy) {
+		if (! multiple_cursors_mode) {
+			multiple_cursors_mode = strdup("most");
+		}
+		initialize_cursors_mode();
+		if (use_xdamage) {
+			xdamage_present = 1;
+			initialize_xdamage();
+		}
+	}
+#endif
 
 	if (! dt) {
 		static char str[] = "-desktop";

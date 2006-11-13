@@ -1,3 +1,6 @@
+2006-11-13  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Native Mac OS X support.
+
 2006-11-07  Karl Runge <runge@karlrunge.com>
 	* ssl_vncviewer: vnc:// direct connect, add -x to ssh,
 	  SSL_VNC_LISTEN variable for direct proxy.

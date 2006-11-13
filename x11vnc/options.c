@@ -129,6 +129,10 @@ int pipeinput_int = 0;
 int pipeinput_cons_fd = -1;
 char *pipeinput_cons_dev = NULL;
 
+int macosx_nodimming = 0;
+int macosx_nosleep = 0;
+int macosx_noscreensaver = 0;
+
 unsigned long subwin = 0x0;	/* -id, -sid */
 int subwin_wait_mapped = 0;
 

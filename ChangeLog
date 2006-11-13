@@ -1,3 +1,7 @@
+2006-11-13  Karl Runge <runge@karlrunge.com>
+	* configure.ac: x11vnc warnings for no XTEST or SSL.
+	* prepare_x11vnc_dist.sh: to 0.8.4
+
 2006-11-07  Karl Runge <runge@karlrunge.com>
 	* configure.ac: clean up -R linker case, add --without-macosx-native
 	* prepare_x11vnc_dist.sh: have "make rpm" work properly for

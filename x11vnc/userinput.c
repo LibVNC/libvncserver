@@ -96,12 +96,19 @@ int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
 	int rootx, rooty, wx, wy;
 	unsigned int mask;
 
+#ifdef MACOSX
+	if (! dpy) {
+		return macosx_get_wm_frame_pos(px, py, x, y, w, h, frame, win);
+	}
+#endif
+
 	RAWFB_RET(0)
 #if NO_X11
 	return 0;
 #else
 
-	ret = XQueryPointer(dpy, rootwin, &r, &c, &rootx, &rooty, &wx, &wy,
+
+	ret = XQueryPointer_wr(dpy, rootwin, &r, &c, &rootx, &rooty, &wx, &wy,
 	    &mask);
 
 	*frame = c;
@@ -2876,6 +2883,7 @@ static int try_copyrect(Window frame, int x, int y, int w, int h, int dx, int dy
 		x -= off_x;
 		y -= off_y;
 	}
+if (db2) fprintf(stderr, "try_copyrect: 0x%lx  bad: %d stack_list_num: %d\n", frame, dt_bad, stack_list_num);
 
 	if (dt_bad && wireframe_in_progress) {
 		sraRegionPtr rect;
@@ -2941,6 +2949,7 @@ if (db2) fprintf(stderr, "moved_win: %4d %3d, %4d %3d  0x%lx ---\n",
 			}
 
 			swin = stack_list[k].win;
+if (db2) fprintf(stderr, "sw: %d/%lx\n", k, swin);
 			if (swin == frame) {
  if (db2) {
  saw_me = 1; fprintf(stderr, "  ----------\n");
@@ -2953,11 +2962,16 @@ fprintf(stderr, "bo: %d/%lx\n", k, swin);
 #endif
 
 			/* skip some unwanted cases: */
+#ifdef MACOSX
+			if (0) {
+				;
+#else
 			if (swin == None) {
 				continue;
 			}
 			if (swin < 10) {
 				;	/* blackouts */
+#endif
 			} else if (! stack_list[k].fetched ||
 			    stack_list[k].time > tm + 2.0) {
 				if (!valid_window(swin, &attr, 1)) {
@@ -3349,7 +3363,9 @@ int check_wireframe(void) {
 	int try_it = 0;
 	DB_SET
 
+#ifndef MACOSX
 	RAWFB_RET(0)
+#endif
 
 	if (unixpw_in_progress) return 0;
 
@@ -3359,12 +3375,14 @@ int check_wireframe(void) {
 	if (subwin) {
 		return 0;	/* don't even bother for -id case */
 	}
+if (db > 1 && button_mask) fprintf(stderr, "check_wireframe: bm: %d  gpi: %d\n", button_mask, got_pointer_input);
 	if (! button_mask) {
 		return 0;	/* no button pressed down */
 	}
 	if (!use_threads && !got_pointer_input) {
 		return 0;	/* need ptr input, e.g. button down, motion */
 	}
+if (db > 1) fprintf(stderr, "check_wireframe: %d\n", db);
 
 if (db) fprintf(stderr, "\n*** button down!!  x: %d  y: %d\n", cursor_x, cursor_y);
 
@@ -3375,12 +3393,12 @@ if (db) fprintf(stderr, "\n*** button down!!  x: %d  y: %d\n", cursor_x, cursor_
 	 */
 	X_LOCK;
 	if (! get_wm_frame_pos(&px, &py, &x, &y, &w, &h, &frame, NULL)) {
-if (db) fprintf(stderr, "NO get_wm_frame_pos: 0x%lx\n", frame);
+if (db) fprintf(stderr, "NO get_wm_frame_pos-1: 0x%lx\n", frame);
 		X_UNLOCK;
 		return 0;
 	}
 	X_UNLOCK;
-if (db) fprintf(stderr, "a: %d  wf: %.3f  A: %d\n", w*h, wireframe_frac, (dpy_x*dpy_y));
+if (db) fprintf(stderr, "a: %d  wf: %.3f  A: %d  frm: 0x%lx\n", w*h, wireframe_frac, (dpy_x*dpy_y), frame);
 
 	/*
 	 * apply the percentage size criterion (allow opaque moves for
@@ -3390,7 +3408,7 @@ if (db) fprintf(stderr, "a: %d  wf: %.3f  A: %d\n", w*h, wireframe_frac, (dpy_x*
 if (db) fprintf(stderr, "small window %.3f\n", ((double) w*h)/(dpy_x * dpy_y));
 		return 0;
 	}
-if (db) fprintf(stderr, "  frame: x: %d  y: %d  w: %d  h: %d  px: %d  py: %d  fr: 0x%lx\n", x, y, w, h, px, py, orig_frame);	
+if (db) fprintf(stderr, "  frame: x: %d  y: %d  w: %d  h: %d  px: %d  py: %d  fr: 0x%lx\n", x, y, w, h, px, py, frame);	
 
 	/*
 	 * see if the pointer is within range of the assumed wm frame
@@ -3590,7 +3608,7 @@ if (db) fprintf(stderr, "  ++pointer event!! [%02d]  dt: %.3f  x: %d  y: %d  mas
 			if (! get_wm_frame_pos(&px, &py, &x, &y, &w, &h,
 			    &frame, NULL)) {
 				frame = 0x0;
-if (db) fprintf(stderr, "NO get_wm_frame_pos: 0x%lx\n", frame);
+if (db) fprintf(stderr, "NO get_wm_frame_pos-2: 0x%lx\n", frame);
 			}
 
 			if (frame != orig_frame) {
@@ -3754,7 +3772,7 @@ if (db || db2) fprintf(stderr, "NO button_mask\n");
 		sent_copyrect = try_copyrect(frame, x, y, w, h, dx, dy,
 		    &obscured, NULL, 0.15);
 
-if (db) fprintf(stderr, "send_copyrect: %d\n", sent_copyrect);
+if (db) fprintf(stderr, "sent_copyrect: %d - obs: %d  frame: 0x%lx\n", sent_copyrect, obscured, frame);
 		if (sent_copyrect) {
 			/* try to push the changes to viewers: */
 			if (! obscured) {
@@ -4361,7 +4379,9 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 
 int check_user_input(double dt, double dtr, int tile_diffs, int *cnt) {
 
+#ifndef MACOSX
 	RAWFB_RET(0)
+#endif
 
 	if (use_xrecord) {
 		int rc = check_xrecord();

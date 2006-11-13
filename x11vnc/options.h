@@ -104,6 +104,10 @@ extern int pipeinput_int;
 extern int pipeinput_cons_fd;
 extern char *pipeinput_cons_dev;
 
+extern int macosx_nodimming;
+extern int macosx_nosleep;
+extern int macosx_noscreensaver;
+
 extern unsigned long subwin;
 extern int subwin_wait_mapped;
 

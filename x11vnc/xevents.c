@@ -190,13 +190,13 @@ static void get_prop(char *str, int len, Atom prop) {
 			dlen = nitems * (format/8);
 			if (slen + dlen > len) {
 				/* too big */
-				XFree(data);
+				XFree_wr(data);
 				break;
 			}
 			memcpy(str+slen, data, dlen);
 			slen += dlen;
 			str[slen] = '\0';
-			XFree(data);
+			XFree_wr(data);
 		}
 	} while (bytes_after > 0);
 #endif	/* NO_X11 */

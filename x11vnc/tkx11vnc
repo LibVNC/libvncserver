@@ -3607,9 +3607,12 @@ proc toggle_simple_gui {} {
 proc little_qs {m} {
 	global bfont ffont beginner_mode
 	global helpremote helptext helplabel
-	global tk_version
+	global tk_version osname
 
 	if {$tk_version < 8.0} {
+		return
+	}
+	if {$osname == "Darwin"} {
 		return
 	}
 
@@ -3856,6 +3859,7 @@ proc make_menu_items {} {
 	}
 
 	# Now make the little "(?)" help buttons
+	global osname
 	foreach case [array names menu_m] {
 		if {$case == "Help"} {
 			continue;
@@ -5224,7 +5228,12 @@ proc make_widgets {top} {
 				}
 				incr ul
 			}
-			menubutton $menub -text "$case" -underline $ul \
+			global osname
+			set tstr "$case"
+			if {$osname == "Darwin"} {
+				#set tstr " $case   "
+			}
+			menubutton $menub -text "$tstr" -underline $ul \
 				-anchor w -menu $menu -background $fbg \
 				-font $bfont
 			pack $menub -side top -fill x
@@ -5296,30 +5305,42 @@ proc make_widgets {top} {
 	bind $ef_entry <KeyPress-Return> {set entry_set 1}
 	bind $ef_entry <KeyPress-Escape> {set entry_set 0}
 
+	set ok_s "OK"
+	set cancel_s "Cancel"
+	set help_s "Help"
+	set browse_s "Browse..."
+	global osname
+	if {$osname == "Darwin"} {
+		set ok_s " OK   "
+		set cancel_s " Cancel   "
+		set help_s " Help   "
+		set browse_s " Browse...   "
+	}
+
 	# Entry OK button
 	set bpx "1m"
 	set bpy "1"
 	set hlt "0"
 	set ef_ok "$ef.ok"
-	button $ef_ok -text OK -pady $bpy -padx $bpx -command {set entry_set 1} \
+	button $ef_ok -text $ok_s -pady $bpy -padx $bpx -command {set entry_set 1} \
 		-highlightthickness $hlt \
 		-font $bfont
 
 	# Entry Skip button
 	set ef_skip "$ef.skip"
-	button $ef_skip -text Cancel -pady $bpy -padx $bpx -command {set entry_set 0} \
+	button $ef_skip -text $cancel_s -pady $bpy -padx $bpx -command {set entry_set 0} \
 		-highlightthickness $hlt \
 		-font $bfont
 
 	# Entry Help button
 	set ef_help "$ef.help"
-	button $ef_help -text Help -pady $bpy -padx $bpx -command \
+	button $ef_help -text $help_s -pady $bpy -padx $bpx -command \
 		{menu_help $entry_dialog_item} -font $bfont \
 		-highlightthickness $hlt
 
 	# Entry Browse button
 	set ef_browse "$ef.browse"
-	button $ef_browse -text "Browse..." -pady $bpy -padx $bpx -font $bfont \
+	button $ef_browse -text $browse_s -pady $bpy -padx $bpx -font $bfont \
 		-highlightthickness $hlt \
 		-command {entry_insert [tk_getOpenFile]} 
 
@@ -6452,6 +6473,10 @@ set osname [exec uname]
 if {[regexp -nocase {IRIX} $osname]} {
 	# IRIX "fixed" font is huge and doublespaced... 
 	set ffont $snfont
+}
+if {[regexp -nocase {Darwin} $osname]} {
+	set ffont {Monaco 10}
+	set bfont {system}
 }
 
 #puts [exec env]

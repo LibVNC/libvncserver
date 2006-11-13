@@ -579,7 +579,7 @@ int remote_control_access_ok(void) {
 					rfbLog("  unknown-%d\n", i+1);
 				}
 			}
-			XFree(xha);
+			XFree_wr(xha);
 			return 0;
 		}
 
@@ -3888,6 +3888,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		crash_debug = 0;
 		rfbLog("set crash_debug to: %d\n", crash_debug);
 
+	} else if (!strcmp(p, "macnosaver")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, macosx_noscreensaver); goto qry;
+		}
+		rfbLog("remote_cmd: turn on macnosaver.\n");
+		macosx_noscreensaver = 1;
+	} else if (!strcmp(p, "macsaver")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !macosx_noscreensaver); goto qry;
+		}
+		rfbLog("remote_cmd: turn off macnosaver.\n");
+		macosx_noscreensaver = 0;
+
+
 	} else if (strstr(p, "hack") == p) { /* skip-cmd-list */
 		COLON_CHECK("hack:")
 		if (query) {
@@ -3993,7 +4007,6 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			rfbLog("remote_cmd: will try to unembed 0x%x out"
 			    " of the system tray.\n", id);
 		}
-
 
 	} else if (query) {
 		/* read-only variables that can only be queried: */

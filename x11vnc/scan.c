@@ -12,6 +12,7 @@
 #include "cleanup.h"
 #include "unixpw.h"
 #include "screen.h"
+#include "macosx.h"
 
 /*
  * routines for scanning and reading the X11 display for changes, and
@@ -2943,7 +2944,15 @@ int scan_for_updates(int count_only) {
 		}
 		if (use_xdamage) {
 			/* first pass collecting DAMAGE events: */
-			collect_xdamage(scan_count, 0);
+#ifdef MACOSX
+			if (! dpy) {
+				macosx_event_loop();
+				collect_macosx_damage(-1, -1, -1, -1, 0);
+			} else 
+#endif
+			{
+				collect_xdamage(scan_count, 0);
+			}
 		}
 	}
 
@@ -2967,7 +2976,14 @@ int scan_for_updates(int count_only) {
 	 * the unchanged tiles are read in again).
 	 */
 	if (use_xdamage) {
-		collect_xdamage(scan_count, 1);
+#ifdef MACOSX
+		if (! dpy) {
+			;
+		} else 
+#endif
+		{
+			collect_xdamage(scan_count, 1);
+		}
 	}
 	if (count_only) {
 		scan_in_progress = 0;

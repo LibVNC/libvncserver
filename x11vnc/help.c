@@ -2848,6 +2848,10 @@ void print_help(int mode) {
 "                       You can also set the env. var X11VNC_UINPUT_DEBUG=1 or\n"
 "                       higher to get debugging output for UINPUT mode.\n"
 "\n"
+"-macnodim              For the native Mac OS X server, disable dimming. \n"
+"-macnosleep            For the native Mac OS X server, disable display sleep.\n"
+"-macnosaver            For the native Mac OS X server, disable screensaver.\n"
+"\n"
 "-gui [gui-opts]        Start up a simple tcl/tk gui based on the the remote\n"
 "                       control options -remote/-query described below.\n"
 "                       Requires the \"wish\" program to be installed on the\n"
@@ -3216,6 +3220,8 @@ void print_help(int mode) {
 "                                       height parameter to n.\n"
 "                       desktop:str     set -desktop name to str for new clients.\n"
 "                       rfbport:n       set -rfbport to n.\n"
+"                       macnosaver      enable  -macnosaver mode.\n"
+"                       macsaver        disable -macnosaver mode.\n"
 /* access */
 "                       httpport:n      set -httpport to n.\n"
 "                       httpdir:dir     set -httpdir to dir (and enable http).\n"
@@ -3327,7 +3333,7 @@ void print_help(int mode) {
 "                       debug_wireframe debug_scroll nodebug_scroll debug_scroll\n"
 "                       debug_tiles dbt nodebug_tiles nodbt debug_tiles\n"
 "                       debug_grabs nodebug_grabs debug_sel nodebug_sel dbg\n"
-"                       nodbg noremote\n"
+"                       nodbg macnosaver macsaver noremote\n"
 "\n"
 "                       aro=  noop display vncdisplay desktopname guess_desktop\n"
 "                       http_url auth xauth users rootshift clipshift\n"
@@ -3665,7 +3671,7 @@ void nopassword_warning_msg(int gotloc) {
 	fprintf(stderr, "%s", str1);
 	fflush(stderr);
 #if !PASSWD_REQUIRED
-	usleep(2500 * 1000);
+	usleep(1000 * 1000);
 #endif
 	if (!quiet) {
 		fprintf(stderr, "%s", str2);

@@ -126,7 +126,7 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 
 		AC_CHECK_LIB(Xtst, XTestFakeKeyEvent, 
 			X_PRELIBS="-lXtst $X_PRELIBS"
-			[AC_DEFINE(HAVE_XTEST)], ,
+			[AC_DEFINE(HAVE_XTEST) HAVE_XTEST="true"], ,
 			$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
 		if test "x$with_xrecord" != "xno"; then
@@ -216,6 +216,24 @@ and --x-libraries=DIR configure options or set the CPPFLAGS and LDFLAGS
 environment variables to indicate where the X window system header files
 and libraries may be found.  On 64+32 bit machines you may need to point
 to lib64 or lib32 directories to pick up the correct word size.
+
+If you want to build x11vnc without X support (e.g. for -rawfb use only
+or for native Mac OS X), specify the --without-x configure option.
+==========================================================================
+])
+fi
+
+if test "$PACKAGE_NAME" = "x11vnc" -a "x$HAVE_X" = "xtrue" -a "x$HAVE_XTEST" != "xtrue"; then
+	AC_MSG_WARN([
+==========================================================================
+A working build environment for the XTEST extension was not found (libXtst).
+An x11vnc built this way will be only barely usable.  You will be able to
+move the mouse but not click or type.  There can also be deadlocks if an
+application grabs the X server.
+
+It is recommended that you install the necessary development packages
+for XTEST (perhaps it is named something like libxtst-dev) and run
+configure again.
 ==========================================================================
 ])
 fi
@@ -260,6 +278,19 @@ if test "x$with_ssl" != "xno"; then
 	fi
 fi
 AC_SUBST(SSL_LIBS)
+
+if test "$PACKAGE_NAME" = "x11vnc"; then
+	if test "x$HAVE_LIBSSL" != "xtrue"; then
+		AC_MSG_WARN([
+==========================================================================
+The openssl encryption library libssl.so was not found.  An x11vnc built
+this way will not support SSL encryption.  To enable SSL install the
+necessary development packages (perhaps it is named something like
+libssl-dev) and run configure again.
+==========================================================================
+])
+	fi
+fi
 
 if test "x$with_v4l" != "xno"; then
 	AC_CHECK_HEADER(linux/videodev.h,

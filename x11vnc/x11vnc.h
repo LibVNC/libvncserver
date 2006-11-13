@@ -47,7 +47,9 @@
 #else
 
 #define NO_X11 1
+#ifndef SKIP_NO_X11
 #include "nox11.h"
+#endif
 #include <rfb/keysym.h>
 
 #endif
@@ -308,6 +310,10 @@ extern int h_errno;
  (defined(__MACH__) && defined(__APPLE__))
  _AIX
  */
+#if (defined(__MACH__) && defined(__APPLE__))
+#define MACOSX
+#endif
+
 
 #ifdef IRIX_OVERLAY
 #include <X11/extensions/readdisplay.h>

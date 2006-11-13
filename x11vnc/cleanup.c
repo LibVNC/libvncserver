@@ -126,6 +126,18 @@ void clean_up_exit (int ret) {
 		ssl_helper_pid(0, 0);	/* killall */
 	}
 
+#ifdef MACOSX
+	if (client_connect_file) {
+		if (strstr(client_connect_file, "/tmp/x11vnc-macosx-channel.")
+		    == client_connect_file) {
+			unlink(client_connect_file);
+		}
+	}
+	if (! dpy) {
+		macosxCG_fini();
+	}
+#endif
+
 	if (! dpy) exit(ret);	/* raw_rb hack */
 
 	/* X keyboard cleanups */

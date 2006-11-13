@@ -2,7 +2,7 @@
 .TH X11VNC "1" "November 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.3, lastmod: 2006-11-06
+         version: 0.8.4, lastmod: 2006-11-13
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -3331,6 +3331,18 @@ Example:
 You can also set the env. var X11VNC_UINPUT_DEBUG=1 or
 higher to get debugging output for UINPUT mode.
 .PP
+\fB-macnodim\fR
+.IP
+For the native Mac OS X server, disable dimming.
+.PP
+\fB-macnosleep\fR
+.IP
+For the native Mac OS X server, disable display sleep.
+.PP
+\fB-macnosaver\fR
+.IP
+For the native Mac OS X server, disable screensaver.
+.PP
 \fB-gui\fR \fI[gui-opts]\fR
 .IP
 Start up a simple tcl/tk gui based on the the remote
@@ -3892,6 +3904,10 @@ desktop:str     set \fB-desktop\fR name to str for new clients.
 .IP
 rfbport:n       set \fB-rfbport\fR to n.
 .IP
+macnosaver      enable  \fB-macnosaver\fR mode.
+.IP
+macsaver        disable \fB-macnosaver\fR mode.
+.IP
 httpport:n      set \fB-httpport\fR to n.
 .IP
 httpdir:dir     set \fB-httpdir\fR to dir (and enable http).
@@ -4046,7 +4062,7 @@ debug_xdamage debug_wireframe nodebug_wireframe
 debug_wireframe debug_scroll nodebug_scroll debug_scroll
 debug_tiles dbt nodebug_tiles nodbt debug_tiles
 debug_grabs nodebug_grabs debug_sel nodebug_sel dbg
-nodbg noremote
+nodbg macnosaver macsaver noremote
 .IP
 aro=  noop display vncdisplay desktopname guess_desktop
 http_url auth xauth users rootshift clipshift

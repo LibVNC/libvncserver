@@ -75,6 +75,12 @@ int xauth_raw(int on);
 Display *XOpenDisplay_wr(char *display_name);
 int XCloseDisplay_wr(Display *display);
 
+Bool XQueryPointer_wr(Display *display, Window w, Window *root_return,
+    Window *child_return, int *root_x_return, int *root_y_return,
+    int *win_x_return, int *win_y_return, unsigned int *mask_return);
+
+int XFree_wr(void *data);
+
 void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h);
 static void upup_downdown_warning(KeyCode key, Bool down);
 
@@ -1057,6 +1063,59 @@ int XCloseDisplay_wr(Display *display) {
 #endif	/* NO_X11 */
 }
 
+Bool XQueryPointer_wr(Display *display, Window w, Window *root_return,
+    Window *child_return, int *root_x_return, int *root_y_return,
+    int *win_x_return, int *win_y_return, unsigned int *mask_return) {
+
+#if NO_X11
+	return False;
+#else
+	if (! display) {
+		return False;
+	}
+	return XQueryPointer(display, w, root_return, child_return,
+	    root_x_return, root_y_return, win_x_return, win_y_return,
+	    mask_return);
+#endif	/* NO_X11 */
+}
+ 
+
+Status XQueryTree_wr(Display *display, Window w, Window *root_return,
+    Window *parent_return, Window **children_return,
+    unsigned int *nchildren_return) {
+
+#ifdef MACOSX
+	if (! display) {
+		return macosx_xquerytree(w, root_return, parent_return,
+		    children_return, nchildren_return);
+	}
+#endif
+#if NO_X11
+	return (Status) 0;
+#else
+	if (! display) {
+		return (Status) 0;
+	}
+	return XQueryTree(display, w, root_return, parent_return,
+	    children_return, nchildren_return);
+#endif	/* NO_X11 */
+    	
+}
+
+int XFree_wr(void *data) {
+	if (data == NULL) {
+		return 1;
+	}
+	if (! dpy) {
+		return 1;
+	}
+#if NO_X11
+	return 1;
+#else
+	return XFree(data);
+#endif
+}
+
 void nox11_exit(int rc) {
 #if NO_X11
 	rfbLog("This x11vnc was not built with X11 support.\n");
@@ -1065,6 +1124,7 @@ void nox11_exit(int rc) {
 	if (0) {rc = 0;}
 #endif
 }
+
 
 #if NO_X11
 #include "nox11_funcs.h"
