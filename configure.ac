@@ -84,6 +84,8 @@ AC_ARG_WITH(xrecord,
 [  --without-xrecord       disable xrecord extension support],,)
 AC_ARG_WITH(fbpm,
 [  --without-fbpm          disable fbpm extension support],,)
+AC_ARG_WITH(dpms,
+[  --without-dpms          disable dpms extension support],,)
 AC_ARG_WITH(v4l,
 [  --without-v4l           disable video4linux support],,)
 AC_ARG_WITH(fbdev,
@@ -115,14 +117,18 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			[AC_DEFINE(HAVE_IRIX_XREADDISPLAY)], ,
 			[#include <X11/Xlib.h>])
 
-		AC_CHECK_HEADER(X11/extensions/fbpm.h,
-			[AC_DEFINE(HAVE_FBPM)], ,
-			[#include <X11/Xlib.h>
+		if test "x$with_fbpm" != "xno"; then
+			AC_CHECK_HEADER(X11/extensions/fbpm.h,
+				[AC_DEFINE(HAVE_FBPM)], ,
+				[#include <X11/Xlib.h>
 #include <X11/Xmd.h>])
+		fi
 
-		AC_CHECK_HEADER(X11/extensions/dpms.h,
-			[AC_DEFINE(HAVE_DPMS)], ,
-			[#include <X11/Xlib.h>])
+		if test "x$with_dpms" != "xno"; then
+			AC_CHECK_HEADER(X11/extensions/dpms.h,
+				[AC_DEFINE(HAVE_DPMS)], ,
+				[#include <X11/Xlib.h>])
+		fi
 
 		AC_CHECK_LIB(Xtst, XTestGrabControl, 
 			X_PRELIBS="-lXtst $X_PRELIBS"
