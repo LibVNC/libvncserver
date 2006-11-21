@@ -133,7 +133,7 @@ void clean_up_exit (int ret) {
 			unlink(client_connect_file);
 		}
 	}
-	if (! dpy) {
+	if (macosx_console) {
 		macosxCG_fini();
 	}
 #endif

@@ -2870,7 +2870,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	last_rfb_key_accepted = TRUE;
 
 	if (pipeinput_fh != NULL || pipeinput_int) {
-		pipe_keyboard(down, keysym, client);
+		pipe_keyboard(down, keysym, client);	/* MACOSX here. */
 		if (! pipeinput_tee) {
 			if (! view_only || raw_fb) {	/* raw_fb hack */
 				last_keyboard_client = client;

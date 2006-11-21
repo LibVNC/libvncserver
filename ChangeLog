@@ -1,3 +1,6 @@
+2006-11-21  Karl Runge <runge@karlrunge.com>
+	* configure.ac: add DPMS detection.
+
 2006-11-13  Karl Runge <runge@karlrunge.com>
 	* configure.ac: x11vnc warnings for no XTEST or SSL.
 	* prepare_x11vnc_dist.sh: to 0.8.4

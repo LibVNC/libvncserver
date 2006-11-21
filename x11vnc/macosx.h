@@ -13,6 +13,8 @@ extern int macosx_get_cursor_pos(int *, int *);
 extern int macosx_valid_window(Window, XWindowAttributes*);
 extern Status macosx_xquerytree(Window w, Window *root_return, Window *parent_return,
     Window **children_return, unsigned int *nchildren_return);
+extern void macosx_send_sel(char *, int);
+extern void macosx_set_sel(char *, int);
 
 
 

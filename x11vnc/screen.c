@@ -867,7 +867,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	}
 
 #ifdef MACOSX
-	if (raw_fb_addr != NULL && raw_fb_addr == macosx_get_fb_addr()) {
+	if (raw_fb_addr != NULL && macosx_console && raw_fb_addr == macosx_get_fb_addr()) {
 		raw_fb_addr = NULL;
 	}
 #endif
@@ -963,6 +963,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	raw_fb_fd = -1;
 	raw_fb_addr = NULL;
 	raw_fb_offset = 0;
+	raw_fb_bytes_per_line = 0;
 
 	last_mode = 0;
 	if (last_file) {
@@ -1059,6 +1060,12 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		rfbLog("invalid rawfb str: %s\n", str);
 		clean_up_exit(1);
 	}
+
+	if (strrchr(q, '-')) {
+		char *q2 = strrchr(q, '-');
+		raw_fb_bytes_per_line = atoi(q2+1);
+		*q2 = '\0';
+	}
 	/* @WxHxB */
 	if (sscanf(q, "@%dx%dx%d", &w, &h, &b) != 3) {
 		rfbLogEnable(1);
@@ -1145,11 +1152,13 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		q = strchr(str, ':');
 		q++;
 
+		macosx_console = 0;
 		if (strstr(q, "macosx:") == q) {
 			/* mmap:macosx:/dev/null@... */
 			q += strlen("macosx:");			
 			do_macosx = 1;
 			do_mmap = 0;
+			macosx_console = 1;
 		}
 
 		last_file = strdup(q);
@@ -1233,20 +1242,29 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 
 	initialize_clipshift();
 
-	raw_fb = (char *) malloc(dpy_x * dpy_y * b/8);
+	if (raw_fb_bytes_per_line == 0) {
+		raw_fb_bytes_per_line = dpy_x*b/8;
+
+		/*
+		 * Put cases here were we can determine that
+		 * raw_bytes_per_line != dpy_x*b/8
+		 */
+#ifdef MACOSX
+		if (do_macosx) {
+			raw_fb_bytes_per_line = macosxCG_CGDisplayBytesPerRow();
+		}
+#endif
+	}
+
+	raw_fb_image->bytes_per_line = dpy_x * b/8;
+	raw_fb = (char *) malloc(dpy_y * dpy_x * b/8);
 	raw_fb_image->data = raw_fb;
 	raw_fb_image->format = ZPixmap;
 	raw_fb_image->width  = dpy_x;
 	raw_fb_image->height = dpy_y;
 	raw_fb_image->bits_per_pixel = b;
-	raw_fb_image->bytes_per_line = dpy_x*b/8;
 	raw_fb_image->bitmap_unit = -1;
 
-#ifdef MACOSX
-	if (do_macosx) {
-		raw_fb_image->bytes_per_line = macosxCG_CGDisplayBytesPerRow();
-	}
-#endif
 
 	if (use_snapfb && (raw_fb_seek || raw_fb_mmap)) {
 		int b_use = b;
@@ -1254,16 +1272,25 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 			free(snap_fb);
 		}
 		if (b_use == 32 && xform24to32) {
+			/*
+			 * The actual framebuffer (e.g. mapped addr) and
+			 * snap fb must be the same bpp.  E.g. both 24bpp.
+			 * Reading FROM snap to utility image will be
+			 * transformed 24->32 in copy_raw_fb_24_to_32.
+			 *
+			 * addr -> snap -> (scanline, fullscreen, ...)
+			 */
 			b_use = 24;
+			raw_fb_bytes_per_line = dpy_x * b_use/8;
 		}
-		snap_fb = (char *) malloc(dpy_x * dpy_y * b_use/8);
+		snap_fb = (char *) malloc(dpy_y * dpy_x * b_use/8);
 		snap = &ximage_struct_snap;
 		snap->data = snap_fb;
 		snap->format = ZPixmap;
 		snap->width  = dpy_x;
 		snap->height = dpy_y;
 		snap->bits_per_pixel = b_use;
-		snap->bytes_per_line = dpy_x*b_use/8;
+		snap->bytes_per_line = dpy_x * b_use/8;
 		snap->bitmap_unit = -1;
 	}
 
@@ -1334,11 +1361,11 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	}
 
 	if (clipshift) {
-		memset(raw_fb, 0xff, dpy_x * dpy_y * b/8);
+		memset(raw_fb, 0xff, dpy_y * raw_fb_image->bytes_per_line);
 	} else if (raw_fb_addr && ! xform24to32) {
-		memcpy(raw_fb, raw_fb_addr + raw_fb_offset, dpy_x*dpy_y*b/8);
+		memcpy(raw_fb, raw_fb_addr + raw_fb_offset, dpy_y * raw_fb_image->bytes_per_line);
 	} else {
-		memset(raw_fb, 0xff, dpy_x * dpy_y * b/8);
+		memset(raw_fb, 0xff, dpy_y * raw_fb_image->bytes_per_line);
 	}
 
 	if (verbose) {
@@ -2275,6 +2302,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 			rfb_bytes_per_line);
 		fprintf(stderr, " rot_fb_bytes_per_line: %d\n",
 			rot_bytes_per_line);
+		fprintf(stderr, " raw_fb_bytes_per_line: %d\n",
+			raw_fb_bytes_per_line);
 		switch(fb->format) {
 		case XYBitmap:
 			fprintf(stderr, " format:     XYBitmap\n"); break;

@@ -1246,7 +1246,7 @@ static int get_exact_cursor(int init) {
 	}
 
 #ifdef MACOSX
-	if (! dpy) {
+	if (macosx_console) {
 		return macosx_get_cursor();
 	}
 #endif
@@ -1325,6 +1325,11 @@ fprintf(stderr, "sc: %d  %d/%d %d - %d %d\n", serial, w, h, cbpp, xhot, yhot);
 			 * got a hit with an existing cursor,
 			 * use that one.
 			 */
+#ifdef MACOSX
+			if (now > curs_times[i] + 1) {
+				continue;
+			}
+#endif
 			last_cursor = curs_index[i];
 			curs_times[i] = now;
 			last_index = i;
@@ -1481,11 +1486,7 @@ int get_which_cursor(void) {
 		}
 
 		if (mode == 3) {
-			int try_macosx = 0;
-#ifdef MACOSX
-			if (! dpy) try_macosx = 1;
-#endif
-			if ((xfixes_present && use_xfixes) || try_macosx) {
+			if ((xfixes_present && use_xfixes) || macosx_console) {
 				if (db) fprintf(stderr, "get_which_cursor call get_exact_cursor\n");
 				return get_exact_cursor(0);
 			}
@@ -1846,24 +1847,23 @@ int check_x11_pointer(void) {
 	int root_x, root_y, win_x, win_y;
 	int x, y;
 	unsigned int mask;
-	int macosx_rawfb_ret = 0;
 
 	if (unixpw_in_progress) return 0;
 
+
 #ifdef MACOSX
-	if (macosx_rawfb_ret) {
-		RAWFB_RET(0)
-	}
-	if (dpy) {
-		;
-	} else {
+	if (macosx_console) {
 		ret = macosx_get_cursor_pos(&root_x, &root_y);
+	} else {
+		RAWFB_RET(0)
 	}
 #else
 	RAWFB_RET(0)
-#if NO_X11
+
+#   if NO_X11
 	return 0;
-#endif
+#   endif
+
 #endif
 
 
@@ -1876,6 +1876,7 @@ int check_x11_pointer(void) {
 	}
 #endif	/* NO_X11 */
 
+if (0) fprintf(stderr, "check_x11_pointer %d %d\n", root_x, root_y);
 	if (! ret) {
 		return 0;
 	}

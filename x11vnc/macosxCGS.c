@@ -15,6 +15,7 @@
 extern CGDirectDisplayID displayID;
 
 void macosxCGS_get_all_windows(void);
+void macosxGCS_set_pasteboard(char *str, int len);
 
 typedef CGError       CGSError;
 typedef long          CGSWindowCount;
@@ -79,12 +80,13 @@ void macosxCGS_get_all_windows(void) {
 	if (first) {
 		first = 0;
 		CGS_levelmax = 0;
-		CGS_levels[CGS_levelmax++] = (int) kCGDraggingWindowLevel;	/* 500 */
-		if (0) CGS_levels[CGS_levelmax++] = (int) kCGHelpWindowLevel;		/* 102 */
-		if (0) CGS_levels[CGS_levelmax++] = (int) kCGPopUpMenuWindowLevel;	/* 101 */
-		CGS_levels[CGS_levelmax++] = (int) kCGMainMenuWindowLevelKey;	/*  24 */
-		CGS_levels[CGS_levelmax++] = (int) kCGFloatingWindowLevel;	/*   3 */
-		CGS_levels[CGS_levelmax++] = (int) kCGNormalWindowLevel;	/*   0 */
+		CGS_levels[CGS_levelmax++] = (int) kCGDraggingWindowLevel;	/* 500 ? */
+		if (0) CGS_levels[CGS_levelmax++] = (int) kCGHelpWindowLevel;		/* 102 ? */
+		if (0) CGS_levels[CGS_levelmax++] = (int) kCGPopUpMenuWindowLevel;	/* 101 pulldown menu */
+		CGS_levels[CGS_levelmax++] = (int) kCGMainMenuWindowLevelKey;	/*  24 ? */
+		CGS_levels[CGS_levelmax++] = (int) kCGModalPanelWindowLevel;	/*   8 open dialog box */
+		CGS_levels[CGS_levelmax++] = (int) kCGFloatingWindowLevel;	/*   3 ? */
+		CGS_levels[CGS_levelmax++] = (int) kCGNormalWindowLevel;	/*   0 regular window */
 	}
 
 	if (cid == NULL) {
@@ -151,6 +153,80 @@ if (db) fprintf(stderr, "i=%03d ID: %06d  x: %03d  y: %03d  w: %03d h: %03d leve
 		macwinmax++;
 	}
 }
+
+#if 1
+NSLock *pblock = nil;
+NSString *pbstr = nil;
+NSString *cuttext = nil;
+
+int pbcnt = -1;
+NSStringEncoding pbenc = NSWindowsCP1252StringEncoding;
+
+void macosxGCS_initpb(void) {
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+	pblock = [[NSLock alloc] init];
+	if (![NSPasteboard generalPasteboard]) {
+		fprintf(stderr, "macosxGCS_initpb: pasteboard inaccessible.\n");
+		pbcnt = 0;
+		pbstr = [[NSString alloc] initWithString:@"\e<PASTEBOARD INACCESSIBLE>\e"]; 
+	}
+	[pool release];
+}
+
+void macosxGCS_set_pasteboard(char *str, int len) {
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+	if (pbcnt != 0) {
+		[pblock lock];
+		[cuttext release];
+		cuttext = [[NSString alloc] initWithData:[NSData dataWithBytes:str length:len] encoding: pbenc];
+		if ([[NSPasteboard generalPasteboard] declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil]) {
+			NS_DURING
+				[[NSPasteboard generalPasteboard] setString:cuttext forType:NSStringPboardType];
+			NS_HANDLER
+				fprintf(stderr, "macosxGCS_set_pasteboard: problem writing to pasteboard\n");
+			NS_ENDHANDLER
+		} else {
+			fprintf(stderr, "macosxGCS_set_pasteboard: problem writing to pasteboard\n");
+		}
+		[cuttext release];
+		cuttext = nil;
+		[pblock unlock];
+	}
+	[pool release];
+}
+
+extern void macosx_send_sel(char *, int);
+
+void macosxGCS_poll_pb(void) {
+
+	static double dlast = 0.0;
+	double now = dnow();
+
+	if (now < dlast + 0.2) {
+		return;
+	}
+	dlast = now;
+
+	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+	[pblock lock];
+	if (pbcnt != [[NSPasteboard generalPasteboard] changeCount]) {
+		pbcnt = [[NSPasteboard generalPasteboard] changeCount];
+		[pbstr release];
+		pbstr = nil;
+		if ([[NSPasteboard generalPasteboard] availableTypeFromArray:[NSArray arrayWithObject:NSStringPboardType]]) {
+			pbstr = [[[NSPasteboard generalPasteboard] stringForType:NSStringPboardType] copy];
+			if (pbstr) {
+				NSData *str = [pbstr dataUsingEncoding:pbenc allowLossyConversion:YES];
+				if ([str length]) {
+					macosx_send_sel((char *) [str bytes], [str length]);
+				}
+			}
+		}
+	}
+	[pblock unlock];
+	[pool release];
+}
+#endif
 
 #endif	/* __APPLE__ */
 

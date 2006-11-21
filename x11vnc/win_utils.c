@@ -18,6 +18,8 @@ Bool xtranslate(Window src, Window dst, int src_x, int src_y, int *dst_x,
     int *dst_y, Window *child, int bequiet);
 int get_window_size(Window win, int *x, int *y);
 void snapshot_stack_list(int free_only, double allowed_age);
+int get_boff(void);
+int get_bwin(void);
 void update_stack_list(void);
 Window query_pointer(Window start);
 unsigned int mask_state(void);
@@ -78,11 +80,12 @@ int valid_window(Window win, XWindowAttributes *attr_ret, int bequiet) {
 		return 0;
 	}
 #ifdef MACOSX
-	if (! dpy) {
+	if (macosx_console) {
 		return macosx_valid_window(win, attr_ret);
 	}
 #endif
 	RAWFB_RET(0)
+
 #if NO_X11
 	nox11_exit(1);
 	return 0;
@@ -184,9 +187,14 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 	stack_list_num = 0;
 	last_free = now;
 
-#ifndef MACOSX
+#ifdef MACOSX
+	if (! macosx_console) {
+		RAWFB_RET_VOID
+	}
+#else
 	RAWFB_RET_VOID
 #endif
+
 #if NO_X11 && !defined(MACOSX)
 	return;
 #else
@@ -220,13 +228,7 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 		j++;
 	}
 	for (i=0; i<blackouts; i++) {
-#ifdef MACOSX
-		if (! dpy) {
-			num = num - blackouts;
-			break;
-		}
-#endif
-		stack_list[j].win = 0x1;
+		stack_list[j].win = get_boff() + 1;
 		stack_list[j].fetched = 1;
 		stack_list[j].valid = 1;
 		stack_list[j].x = blackr[i].x1;
@@ -255,10 +257,23 @@ if (0) fprintf(stderr, "blackr: %d %dx%d+%d+%d\n", i,
 #endif	/* NO_X11 */
 }
 
+int get_boff(void) {
+	if (macosx_console) {
+		return 0x1000000;
+	} else {
+		return 0;		
+	}
+}
+
+int get_bwin(void) {
+	return 10;		
+}
+
 void update_stack_list(void) {
 	int k;
 	double now;
 	XWindowAttributes attr;
+	int boff, bwin;
 
 	if (! stack_list) {
 		return;
@@ -268,11 +283,14 @@ void update_stack_list(void) {
 	}
 
 	dtime0(&now);
+
+	boff = get_boff();
+	bwin = get_bwin();
 	
 	X_LOCK;
 	for (k=0; k < stack_list_num; k++) {
 		Window win = stack_list[k].win;
-		if (win != None && win < 10) {
+		if (win != None && boff <= win && win < boff + bwin) {
 			;	/* special, blackout */
 		} else if (!valid_window(win, &attr, 1)) {
 			stack_list[k].valid = 0;
@@ -302,6 +320,13 @@ Window query_pointer(Window start) {
 	Window r, c;	
 	int rx, ry, wx, wy;
 	unsigned int mask;
+
+#ifdef MACOSX
+	if (macosx_console) {
+		macosx_get_cursor_pos(&rx, &rx);
+	}
+#endif
+
 	RAWFB_RET(None)
 #if NO_X11
 	return None;

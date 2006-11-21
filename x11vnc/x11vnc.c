@@ -452,6 +452,7 @@ static void watch_loop(void) {
 
 		got_user_input = 0;
 		got_pointer_input = 0;
+		got_local_pointer_input = 0;
 		got_pointer_calls = 0;
 		got_keyboard_input = 0;
 		got_keyboard_calls = 0;
@@ -558,14 +559,14 @@ static void watch_loop(void) {
 			check_pm();
 			check_filexfer();
 			check_keycode_state();
-			check_connect_inputs();		
-			check_gui_inputs();		
-			check_stunnel();		
-			check_openssl();		
-			check_https();		
+			check_connect_inputs();
+			check_gui_inputs();
+			check_stunnel();
+			check_openssl();
+			check_https();
 			record_last_fb_update();
-			check_padded_fb();		
-			check_fixscreen();		
+			check_padded_fb();
+			check_fixscreen();
 			check_xdamage_state();
 			check_xrecord_reset(0);
 			check_add_keysyms();
@@ -602,6 +603,9 @@ static void watch_loop(void) {
 			if (cursor_pos_updates) {
 				check_x11_pointer();
 			}
+#ifdef MACOSX
+			else check_x11_pointer();
+#endif
 			continue;
 		}
 
@@ -1236,6 +1240,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " take_naps:  %d\n", take_naps);
 	fprintf(stderr, " sb:         %d\n", screen_blank);
 	fprintf(stderr, " fbpm:       %d\n", !watch_fbpm);
+	fprintf(stderr, " dpms:       %d\n", !watch_dpms);
 	fprintf(stderr, " xdamage:    %d\n", use_xdamage);
 	fprintf(stderr, "  xd_area:   %d\n", xdamage_max_area);
 	fprintf(stderr, "  xd_mem:    %.3f\n", xdamage_memory);
@@ -1263,7 +1268,6 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " pid:        %d\n", getpid());
 	fprintf(stderr, "\n");
 #endif
-	rfbLog("x11vnc version: %s\n", lastmod);
 }
 
 
@@ -2101,6 +2105,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-nowireframe")
 		    || !strcmp(arg, "-nowf")) {
 			wireframe = 0;
+		} else if (!strcmp(arg, "-nowireframelocal")
+		    || !strcmp(arg, "-nowfl")) {
+			wireframe_local = 0;
 		} else if (!strcmp(arg, "-wirecopyrect")
 		    || !strcmp(arg, "-wcr")) {
 			CHECK_ARGC
@@ -2219,6 +2226,10 @@ int main(int argc, char* argv[]) {
 			watch_fbpm = 1;
 		} else if (!strcmp(arg, "-fbpm")) {
 			watch_fbpm = 0;
+		} else if (!strcmp(arg, "-nodpms")) {
+			watch_dpms = 1;
+		} else if (!strcmp(arg, "-dpms")) {
+			watch_dpms = 0;
 		} else if (!strcmp(arg, "-xdamage")) {
 			use_xdamage = 1;
 		} else if (!strcmp(arg, "-noxdamage")) {
@@ -2292,6 +2303,15 @@ int main(int argc, char* argv[]) {
 			macosx_nosleep = 1;
 		} else if (!strcmp(arg, "-macnosaver")) {
 			macosx_noscreensaver = 1;
+		} else if (!strcmp(arg, "-macnowait")) {
+			macosx_wait_for_switch = 0;
+		} else if (!strcmp(arg, "-macwheel")) {
+			CHECK_ARGC
+			macosx_mouse_wheel_speed = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-macnoswap")) {
+			macosx_swap23 = 0;
+		} else if (!strcmp(arg, "-macnoresize")) {
+			macosx_resize = 0;
 		} else if (!strcmp(arg, "-gui")) {
 			launch_gui = 1;
 			if (i < argc-1) {
@@ -2910,6 +2930,7 @@ int main(int argc, char* argv[]) {
 		if (verbose) {
 			print_settings(try_http, bg, gui_str);
 		}
+		rfbLog("x11vnc version: %s\n", lastmod);
 	} else {
 		rfbLogEnable(0);
 	}
@@ -3390,13 +3411,16 @@ int main(int argc, char* argv[]) {
 
 #ifdef MACOSX
 	if (! dpy) {
-		if (! multiple_cursors_mode) {
-			multiple_cursors_mode = strdup("most");
-		}
-		initialize_cursors_mode();
-		if (use_xdamage) {
-			xdamage_present = 1;
-			initialize_xdamage();
+		/* XXX this needs improvement (esp. for remote control) */
+		if (! raw_fb_str || strstr(raw_fb_str, "console") == raw_fb_str) {
+			if (! multiple_cursors_mode) {
+				multiple_cursors_mode = strdup("most");
+			}
+			initialize_cursors_mode();
+			if (use_xdamage) {
+				xdamage_present = 1;
+				initialize_xdamage();
+			}
 		}
 	}
 #endif
@@ -3459,6 +3483,9 @@ int main(int argc, char* argv[]) {
 			}
 			rfbLog("waited_for_client: popup accepted.\n");
 			cl0->onHold = FALSE;
+		}
+		if (macosx_console) {
+			refresh_screen(1);
 		}
 	}
 

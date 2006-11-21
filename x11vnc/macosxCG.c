@@ -44,6 +44,7 @@ static void macosxCG_callback(CGRectCount n, const CGRect *rects, void *dum) {
 }
 
 int dragum(void) {
+#if 0
         int x =200, y = 150, dy = 10, i;
         CGPoint loc;
 
@@ -58,6 +59,7 @@ int dragum(void) {
         }
         CGPostMouseEvent(loc, TRUE, 1, FALSE);
         usleep(4*1000*1000);
+#endif
 	return 0;
 }
 
@@ -85,6 +87,7 @@ void macosxCG_refresh_callback_off(void) {
 }
 
 extern int macosx_noscreensaver;
+extern void macosxGCS_initpb(void);
 
 void macosxCG_init(void) {
 	if (displayID == NULL) {
@@ -106,6 +109,7 @@ void macosxCG_init(void) {
 		if (macosx_noscreensaver) {
 			macosxCGP_screensaver_timer_on();
 		}
+		macosxGCS_initpb();
 	}
 }
 
@@ -117,22 +121,63 @@ void macosxCG_fini(void) {
 	macosxCG_refresh_callback_off();
 }
 
-extern int dpy_x, dpy_y;
-extern int client_count;
+extern int dpy_x, dpy_y, bpp, wdpy_x, wdpy_y;
+extern int client_count, nofb;
 extern void do_new_fb(int);
+extern int macosx_wait_for_switch, macosx_resize;
 
 void macosxCG_event_loop(void) {
 	OSStatus rc;
+	int nbpp;
+
+	macosxGCS_poll_pb();
+	if (nofb) {
+		return;
+	}
+
 	rc = RunCurrentEventLoop(kEventDurationSecond/30);
+
 	if (client_count) {
 		macosxCG_refresh_callback_on();
 	} else {
 		macosxCG_refresh_callback_off();
 	}
-	if (dpy_x != (int) CGDisplayPixelsWide(displayID)) {
-		if (dpy_y != (int) CGDisplayPixelsHigh(displayID)) {
+
+	nbpp = macosxCG_CGDisplayBitsPerPixel();
+
+		
+	if (nbpp > 0 && nbpp != bpp) {
+		if (macosx_resize) {
 			do_new_fb(1);
 		}
+	} else if (wdpy_x != (int) CGDisplayPixelsWide(displayID)) {
+	    if (wdpy_y != (int) CGDisplayPixelsHigh(displayID)) {
+		if (macosx_wait_for_switch) {
+			int cnt = 0;
+			while (1) {
+				if(CGDisplayPixelsWide(displayID) > 0) {
+					if(CGDisplayPixelsHigh(displayID) > 0) {
+						usleep(500*1000);
+						break;
+					}
+				}
+				if ((cnt++ % 120) == 0) {
+					fprintf(stderr, "waiting for user to "
+					    "switch back..\n");
+				}
+				sleep(1);
+			}
+			if (wdpy_x == (int) CGDisplayPixelsWide(displayID)) {
+				if (wdpy_y == (int) CGDisplayPixelsHigh(displayID)) {
+					fprintf(stderr, "we're back...\n");
+					return;
+				}
+			}
+		}
+		if (macosx_resize) {
+			do_new_fb(1);
+		}
+	    }
 	}
 }
 
@@ -171,6 +216,16 @@ extern CGError CGSGetCurrentCursorLocation(CGSConnectionRef, CGPoint*);
 extern int CGSCurrentCursorSeed(void);
 extern int CGSHardwareCursorActive(); 
 
+static unsigned int last_local_button_mask = 0;
+static unsigned int last_local_mod_mask = 0;
+static int last_local_x = 0;
+static int last_local_y = 0;
+
+extern unsigned int display_button_mask;
+extern unsigned int display_mod_mask;
+extern int got_local_pointer_input;
+extern time_t last_local_input;
+
 static CGPoint current_cursor_pos(void) {
 	CGPoint pos;
 	pos.x = 0;
@@ -183,6 +238,25 @@ static CGPoint current_cursor_pos(void) {
 	if (CGSGetCurrentCursorLocation(conn, &pos) != kCGErrorSuccess) {
 		fprintf(stderr, "CGSGetCurrentCursorLocation error\n");
 	}
+
+	display_button_mask = GetCurrentButtonState();
+#if 0
+/* not used yet */
+	display_mod_mask = GetCurrentKeyModifiers();
+#endif
+
+	if (last_local_button_mask != display_button_mask) {
+		got_local_pointer_input++;
+		last_local_input = time(NULL);
+	} else if (pos.x != last_local_x || pos.y != last_local_y) {
+		got_local_pointer_input++;
+		last_local_input = time(NULL);
+	}
+	last_local_button_mask = display_button_mask;
+	last_local_mod_mask = display_mod_mask;
+	last_local_x = pos.x;
+	last_local_y = pos.y;
+
 	return pos;
 }
 
@@ -199,29 +273,36 @@ extern int store_cursor(int serial, unsigned long *data, int w, int h, int cbpp,
 int macosxCG_get_cursor(void) {
 	int last_idx = (int) get_cursor_serial(1);
 	int which = 1;
-	static CGPoint pos, lastpos;
-	static foo = 0;
 	CGError err;
 	int datasize, masksize, row_bytes, cdepth, comps, bpcomp;
 	CGRect rect;
 	CGPoint hot;
 	unsigned char *data;
 	int res, cursor_seed;
+	static int last_cursor_seed = -1;
+	static time_t last_fetch = 0;
+	time_t now = time(NULL);
 
 	if (last_idx) {
 		which = last_idx;
 	}
 
-	pos = current_cursor_pos();
-	if (cursor_seed == CGSCurrentCursorSeed()) {
-		return which;
-	}
 	if (! conn) {
 		if (CGSNewConnection(NULL, &conn) != kCGErrorSuccess) {
 			fprintf(stderr, "CGSNewConnection error\n");
 			return which;
 		}
 	}
+
+	cursor_seed = CGSCurrentCursorSeed();
+	if (last_idx && cursor_seed == last_cursor_seed) {
+		if (now < last_fetch + 2) {
+			return which;
+		}
+	}
+	last_cursor_seed = cursor_seed;
+	last_fetch = now;
+
 	if (CGSGetGlobalCursorDataSize(conn, &datasize) != kCGErrorSuccess) {
 		fprintf(stderr, "CGSGetGlobalCursorDataSize error\n");
 		return which;
@@ -239,7 +320,6 @@ int macosxCG_get_cursor(void) {
 	if (cdepth == 24) {
 		cdepth = 32;
 	}
-	cursor_seed = CGSCurrentCursorSeed();
 
 	which = store_cursor(cursor_seed, (unsigned long*) data,
 	    (int) rect.size.width, (int) rect.size.height, cdepth, (int) hot.x, (int) hot.y);
@@ -248,20 +328,24 @@ int macosxCG_get_cursor(void) {
 	return(which);
 }
 
+extern int macosx_mouse_wheel_speed;
+extern int macosx_swap23;
+extern int off_x, coff_x, off_y, coff_y;
+
 void macosxCG_pointer_inject(int mask, int x, int y) {
-	int swap23 = 1, rc;
+	int swap23 = macosx_swap23, rc;
 	int s1 = 0, s2 = 1, s3 = 2, s4 = 3, s5 = 4;
 	CGPoint loc;
-	int wheel_distance = 10;
+	int wheel_distance = macosx_mouse_wheel_speed;
 	static int cnt = 0;
-
-	loc.x = x;
-	loc.y = y;
 
 	if (swap23) {
 		s2 = 2;
 		s3 = 1;
 	}
+
+	loc.x = x + off_x + coff_x;
+	loc.y = y + off_y + coff_y;
 
 	if ((cnt++ % 10) == 0) {
 		macosxCGP_undim();

@@ -4,6 +4,7 @@
 /* -- macosxCGS.h -- */
 
 extern void macosxCGS_get_all_windows(void);
+extern void macosxGCS_set_pasteboard(char *str, int len);
 
 
 #endif /* _X11VNC_MACOSXCGS_H */

@@ -97,12 +97,13 @@ int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
 	unsigned int mask;
 
 #ifdef MACOSX
-	if (! dpy) {
+	if (macosx_console) {
 		return macosx_get_wm_frame_pos(px, py, x, y, w, h, frame, win);
 	}
 #endif
 
 	RAWFB_RET(0)
+
 #if NO_X11
 	return 0;
 #else
@@ -2918,6 +2919,7 @@ if (db2) fprintf(stderr, "try_copyrect: 0x%lx  bad: %d stack_list_num: %d\n", fr
 		sraRect rect;
 		int saw_me = 0;
 		int orig_x, orig_y;
+		int boff, bwin;
 		XWindowAttributes attr;
 
 		orig_x = x - dx;
@@ -2934,6 +2936,9 @@ if (db2) fprintf(stderr, "moved_win: %4d %3d, %4d %3d  0x%lx ---\n",
 		moved_win = sraRgnCreateRect(tx1, ty1, tx2, ty2);
 
 		dtime0(&tm);
+
+		boff = get_boff();
+		bwin = get_bwin();
 
 		X_LOCK;
 
@@ -2962,16 +2967,13 @@ fprintf(stderr, "bo: %d/%lx\n", k, swin);
 #endif
 
 			/* skip some unwanted cases: */
-#ifdef MACOSX
-			if (0) {
-				;
-#else
+#ifndef MACOSX
 			if (swin == None) {
 				continue;
 			}
-			if (swin < 10) {
-				;	/* blackouts */
 #endif
+			if (boff <= swin && swin < boff + bwin) {
+				;	/* blackouts */
 			} else if (! stack_list[k].fetched ||
 			    stack_list[k].time > tm + 2.0) {
 				if (!valid_window(swin, &attr, 1)) {
@@ -3346,7 +3348,7 @@ int check_wireframe(void) {
 	int orig_px, orig_py, orig_x, orig_y, orig_w, orig_h;
 	int px, py, x, y, w, h;
 	int box_x, box_y, box_w, box_h;
-	int orig_cursor_x, orig_cursor_y, g;
+	int orig_cursor_x, orig_cursor_y, g, gd;
 	int already_down = 0, win_gone = 0, win_unmapped = 0;
 	double spin = 0.0, tm, last_ptr = 0.0, last_draw;
 	int frame_changed = 0, drew_box = 0, got_2nd_pointer = 0;
@@ -3354,6 +3356,7 @@ int check_wireframe(void) {
 	static double first_dt_ave = 0.0;
 	static int first_dt_cnt = 0;
 	static time_t last_save_stacklist = 0;
+	int bdown0, bdown, gotui, cnt = 0;
 	
 	/* heuristics: */
 	double first_event_spin   = wireframe_t1;
@@ -3363,11 +3366,17 @@ int check_wireframe(void) {
 	int try_it = 0;
 	DB_SET
 
-#ifndef MACOSX
+	if (unixpw_in_progress) return 0;
+
+#ifdef MACOSX
+	if (macosx_console) {
+		;
+	} else {
+		RAWFB_RET(0)
+	}
+#else
 	RAWFB_RET(0)
 #endif
-
-	if (unixpw_in_progress) return 0;
 
 	if (nofb) {
 		return 0;
@@ -3375,13 +3384,29 @@ int check_wireframe(void) {
 	if (subwin) {
 		return 0;	/* don't even bother for -id case */
 	}
+
 if (db > 1 && button_mask) fprintf(stderr, "check_wireframe: bm: %d  gpi: %d\n", button_mask, got_pointer_input);
-	if (! button_mask) {
+
+	bdown0 = 0;
+	if (button_mask) {
+		bdown0 = 1;
+	} else if (wireframe_local && display_button_mask) {
+		bdown0 = 2;
+	}
+	if (! bdown0) {
 		return 0;	/* no button pressed down */
 	}
-	if (!use_threads && !got_pointer_input) {
+
+	gotui = 0;
+	if (got_pointer_input) {
+		gotui = 1;
+	} else if (wireframe_local && display_button_mask) {
+		gotui = 2;
+	}
+	if (!use_threads && !gotui) {
 		return 0;	/* need ptr input, e.g. button down, motion */
 	}
+
 if (db > 1) fprintf(stderr, "check_wireframe: %d\n", db);
 
 if (db) fprintf(stderr, "\n*** button down!!  x: %d  y: %d\n", cursor_x, cursor_y);
@@ -3514,6 +3539,7 @@ if (db) fprintf(stderr, "INTERIOR\n");
 	}
 
 	g = got_pointer_input;
+	gd = got_local_pointer_input;
 
 	while (1) {
 
@@ -3529,7 +3555,28 @@ if (db) fprintf(stderr, "INTERIOR\n");
 		} else {
 			rfbCFD(1000);
 		}
+		if (bdown0 == 2) {
+			int freq = 1;
+			/*
+			 * This is to just update display_button_mask
+			 * which will also update got_local_pointer_input.
+			 */
+			int px, py, x, y, w, h;
+			Window frame;
+			check_x11_pointer();
+#if 0
+#ifdef MACOSX
+			if (macosx_console) {
+				macosx_get_cursor_pos(&x, &y);
+			}
+			else
+#endif
+			get_wm_frame_pos(&px, &py, &x, &y, &w, &h, &frame, NULL);
+#endif
+		}
 
+
+		cnt++;
 		spin += dtime(&tm);
 
 if (0) fprintf(stderr, "wf-spin: %.3f\n", spin);
@@ -3575,12 +3622,15 @@ if (db || db2) fprintf(stderr, " SPIN-OUT-NO2ND_PTR: %.3f\n", spin);
 				break;
 			}
 		}
-
 		/* see if some pointer input occurred: */
-		if (got_pointer_input > g) {
-if (db) fprintf(stderr, "  ++pointer event!! [%02d]  dt: %.3f  x: %d  y: %d  mask: %d\n", got_2nd_pointer+1, spin, cursor_x, cursor_y, button_mask);	
+		if (got_pointer_input > g ||
+		    (wireframe_local && (got_local_pointer_input > gd))) {
+
+if (db) fprintf(stderr, "  ++pointer event!! [%02d]  dt: %.3f  x: %d  y: %d  mask: %d\n",
+    got_2nd_pointer+1, spin, cursor_x, cursor_y, button_mask);	
 
 			g = got_pointer_input;
+			gd = got_local_pointer_input;
 
 			X_LOCK;
 			XFlush_wr(dpy);
@@ -3716,7 +3766,13 @@ if (db) fprintf(stderr, "FRAME MOVE  1st-dt: %.3f\n", first_dt_ave/n);
 		 * we check here to get a better location and size of
 		 * the final window.
 		 */
-		if (! button_mask) {
+		bdown = 0;
+		if (button_mask) {
+			bdown = 1;
+		} else if (wireframe_local && display_button_mask) {
+			bdown = 2;
+		}
+		if (! bdown) {
 if (db || db2) fprintf(stderr, "NO button_mask\n");
 			break_reason = 6;
 			break;	
@@ -4379,7 +4435,11 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 
 int check_user_input(double dt, double dtr, int tile_diffs, int *cnt) {
 
-#ifndef MACOSX
+#ifdef MACOSX
+	if (! macosx_console) {
+		RAWFB_RET(0)
+	}
+#else
 	RAWFB_RET(0)
 #endif
 

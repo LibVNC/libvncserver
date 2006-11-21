@@ -163,8 +163,8 @@ void add_region_xdamage(sraRegionPtr new_region) {
 	}
 
 	reg = xdamage_regions[prev_tick];  
-	if (reg != NULL) {
-if (debug_xdamage > 1) fprintf(stderr, "add_region_xdamage: prev_tick: %d reg %p\n", prev_tick, (void *)reg);
+	if (reg != NULL && new_region != NULL) {
+if (debug_xdamage > 1) fprintf(stderr, "add_region_xdamage: prev_tick: %d reg %p  new_region %p\n", prev_tick, (void *)reg, (void *)new_region);
 		sraRgnOr(reg, new_region);
 	}
 }
@@ -232,6 +232,9 @@ if (call && debug_xdamage > 1) fprintf(stderr, "collect_macosx_damage: %d %d %d 
 	if (! use_xdamage) {
 		return 0;
 	}
+	if (! xdamage_regions) {
+		return 0;
+	}
 
 	dtime0(&tm);
 
@@ -241,9 +244,14 @@ if (call && debug_xdamage > 1) fprintf(stderr, "collect_macosx_damage: %d %d %d 
 		xdamage_ticker = (xdamage_ticker+1) % nreg;
 		xdamage_direct_count = 0;
 		reg = xdamage_regions[xdamage_ticker];  
-		sraRgnMakeEmpty(reg);
+		if (reg != NULL) {
+			sraRgnMakeEmpty(reg);
+		}
 	} else {
 		reg = xdamage_regions[xdamage_ticker];  
+	}
+	if (reg == NULL) {
+		return 0;
 	}
 
 	if (x_in < 0) {
@@ -288,8 +296,8 @@ if (call && debug_xdamage > 1) fprintf(stderr, "collect_macosx_damage: %d %d %d 
 	}
 	if (debug_xdamage > 2) {
 		fprintf(stderr, "xdamage: -> event %dx%d+%d+%d area:"
-		    " %d  dups: %d  %s\n", w, h, x, y, w*h, dcount,
-		    (w*h > xdamage_max_area) ? "TOO_BIG" : "");
+		    " %d  dups: %d  %s reg: %p\n", w, h, x, y, w*h, dcount,
+		    (w*h > xdamage_max_area) ? "TOO_BIG" : "", (void *)reg);
 	}
 
 	record_desired_xdamage_rect(x, y, w, h);
@@ -365,6 +373,9 @@ int collect_xdamage(int scancnt, int call) {
 	if (! xdamage_base_event_type) {
 		return 0;
 	}
+	if (! xdamage_regions) {
+		return 0;
+	}
 
 	dtime0(&tm);
 
@@ -374,9 +385,14 @@ int collect_xdamage(int scancnt, int call) {
 		xdamage_ticker = (xdamage_ticker+1) % nreg;
 		xdamage_direct_count = 0;
 		reg = xdamage_regions[xdamage_ticker];  
-		sraRgnMakeEmpty(reg);
+		if (reg != NULL) {
+			sraRgnMakeEmpty(reg);
+		}
 	} else {
 		reg = xdamage_regions[xdamage_ticker];  
+	}
+	if (reg == NULL) {
+		return 0;
 	}
 
 
@@ -549,6 +565,9 @@ int xdamage_hint_skip(int y) {
 		/* go back thru the history starting at most recent */
 		n = (xdamage_ticker + nreg - i) % nreg;
 		reg = xdamage_regions[n];  
+		if (reg == NULL) {
+			continue;
+		}
 		if (sraRgnEmpty(reg)) {
 			/* checking for emptiness is very fast */
 			continue;

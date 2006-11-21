@@ -2,7 +2,7 @@
 .TH X11VNC "1" "November 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.4, lastmod: 2006-11-13
+         version: 0.8.4, lastmod: 2006-11-21
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -977,7 +977,7 @@ override this.
 .IP
 Your VNC viewer will also need to be able to connect
 via SSL.  See the discussion below under \fB-stunnel\fR and
-the FAQ (ssl_vncviewer script) for how this might be
+the FAQ (ss_vncviewer script) for how this might be
 achieved.  E.g. on Unix it is easy to write a shell
 script that starts up stunnel and then vncviewer.
 Also in the x11vnc source a SSL enabled Java VNC Viewer
@@ -1131,7 +1131,7 @@ key files.  On the VNC client side, they will need to
 be "imported" somehow.  Web browsers have "Manage
 Certificates" actions as does the Java applet plugin
 Control Panel.  stunnel can also use these files (see
-the ssl_vncviewer example script in the FAQ.)
+the ss_vncviewer example script in the FAQ.)
 .PP
 \fB-sslGenCA\fR \fI[dir]\fR
 .IP
@@ -1279,13 +1279,13 @@ Examples:
 x11vnc \fB-sslGenCert\fR server
 x11vnc \fB-ssl\fR SAVE \fB-display\fR :0 ...
 .IP
-and then on viewer using ssl_vncviewer stunnel wrapper
+and then on viewer using ss_vncviewer stunnel wrapper
 (see the FAQ):
-ssl_vncviewer \fB-verify\fR ./cacert.crt hostname:0
+ss_vncviewer \fB-verify\fR ./cacert.crt hostname:0
 .IP
 (this assumes the cacert.crt cert from \fB-sslGenCA\fR
 was safely copied to the VNC viewer machine where
-ssl_vncviewer is run)
+ss_vncviewer is run)
 .IP
 Example using a name:
 .IP
@@ -1303,7 +1303,7 @@ x11vnc is then started with the the option \fB-sslverify\fR
 roger), and on the viewer user on somehost could do
 for example:
 .IP
-ssl_vncviewer \fB-mycert\fR ./roger.pem hostname:0
+ss_vncviewer \fB-mycert\fR ./roger.pem hostname:0
 .IP
 If you set the env. var REQ_ARGS='...' it will be
 passed to openssl 
@@ -2368,6 +2368,14 @@ between sending wireframe "animations".  If a slow
 link is detected, these values may be automatically
 changed to something better for a slow link.
 .PP
+\fB-nowireframelocal\fR
+.IP
+By default, mouse motion and button presses of a
+user sitting at the LOCAL display are monitored for
+wireframing opportunities (so that the changes will be
+sent efficiently to the VNC clients).  Use this option
+to disable this behavior.
+.PP
 \fB-wirecopyrect\fR \fImode,\fR \fB-nowirecopyrect\fR
 .IP
 Since the \fB-wireframe\fR mechanism evidently tracks moving
@@ -2864,6 +2872,31 @@ manpage
 for details.  \fB-nofbpm\fR is basically the same as running
 "xset fbpm force on" periodically.  Default: \fB-fbpm\fR
 .PP
+\fB-nodpms,\fR \fB-dpms\fR
+.IP
+If the system supports the DPMS (Display Power Management
+Signaling) extension, then prevent the monitor from
+going into a reduced power state when VNC clients
+are connected.
+.IP
+DPMS reduced power monitor states are a good thing
+and you normally want the power down to take place
+(usually x11vnc has no problem exporting the display in
+this state).  You probably only want to use "\fB-nodpms\fR"
+to work around problems with Screen Savers kicking
+on in DPMS low power states.  There is known problem
+with kdesktop_lock on KDE where the screen saver keeps
+kicking in every time user input stops for a second
+or two.  Specifying "\fB-nodpms\fR" works around it.
+.IP
+"\fB-nodpms\fR" means prevent DPMS low power states whenever
+VNC clients are connected, while "\fB-dpms\fR" means to not
+monitor the DPMS state at all.  See the 
+.IR xset (1)
+manpage
+for details.  \fB-nodpms\fR is basically the same as running
+"xset dpms force on" periodically.  Default: \fB-dpms\fR
+.PP
 \fB-noxdamage\fR
 .IP
 Do not use the X DAMAGE extension to detect framebuffer
@@ -3011,6 +3044,11 @@ Optional suffixes are ":R/G/B" and "+O" to specify
 red, green, and blue masks and an offset into the
 memory object.  If the masks are not provided x11vnc
 guesses them based on the bpp.
+.IP
+Another optional suffix is the Bytes Per Line which in
+some cases is not WxHxB/4.  Specify it as WxHxB-BPL
+e.g. 800x600x16-2048.  This could be a normal width
+1024 at 16bpp fb, but only width 800 shows up.
 .IP
 Examples:
 .IP
@@ -3342,6 +3380,27 @@ For the native Mac OS X server, disable display sleep.
 \fB-macnosaver\fR
 .IP
 For the native Mac OS X server, disable screensaver.
+.PP
+\fB-macnowait\fR
+.IP
+For the native Mac OS X server, do not wait for the
+user to switch back to his display.
+.PP
+\fB-macwheel\fR \fIn\fR
+.IP
+For the native Mac OS X server, set the mouse wheel
+speed to n (default 5).
+.PP
+\fB-macnoswap\fR
+.IP
+For the native Mac OS X server, do not swap mouse
+buttons 2 and 3.
+.PP
+\fB-macnoresize\fR
+.IP
+For the native Mac OS X server, do not resize or reset
+the framebuffer even if it is detected that the screen
+resolution or depth has changed.
 .PP
 \fB-gui\fR \fI[gui-opts]\fR
 .IP
@@ -3795,6 +3854,10 @@ wireframe:str   enable  \fB-wireframe\fR mode string.
 .IP
 wireframe_mode:str enable  \fB-wireframe\fR mode string.
 .IP
+wireframelocal  enable  wireframelocal. same as "wfl"
+.IP
+nowireframe     disable wireframelocal. same as "nowfl"
+.IP
 wirecopyrect:str set \fB-wirecopyrect\fR string. same as "wcr:"
 .IP
 scrollcopyrect:str set \fB-scrollcopyrect\fR string. same "scr"
@@ -3868,6 +3931,10 @@ sb:n            set \fB-sb\fR to n s, same as screen_blank:n
 fbpm            disable \fB-nofbpm\fR mode.
 .IP
 nofbpm          enable  \fB-nofbpm\fR mode.
+.IP
+dpms            disable \fB-nodpms\fR mode.
+.IP
+nodpms          enable  \fB-nodpms\fR mode.
 .IP
 xdamage         enable  xdamage polling hints.
 .IP
@@ -4026,35 +4093,36 @@ unlock connect allowonce allow localhost nolocalhost
 listen lookup nolookup accept afteraccept gone shm
 noshm flipbyteorder noflipbyteorder onetile noonetile
 solid_color solid nosolid blackout xinerama noxinerama
-xtrap noxtrap xrandr noxrandr xrandr_mode rotate
-padgeom quiet q noquiet modtweak nomodtweak xkb noxkb
-capslock nocapslock skip_lockkeys noskip_lockkeys
-skip_keycodes sloppy_keys nosloppy_keys skip_dups
-noskip_dups add_keysyms noadd_keysyms clear_mods
-noclear_mods clear_keys noclear_keys remap repeat
-norepeat fb nofb bell nobell sel nosel primary
-noprimary setprimary nosetprimary clipboard noclipboard
-setclipboard nosetclipboard seldir cursorshape
-nocursorshape cursorpos nocursorpos cursor_drag
-nocursor_drag cursor show_cursor noshow_cursor
-nocursor arrow xfixes noxfixes xdamage noxdamage
-xd_area xd_mem alphacut alphafrac alpharemove
-noalpharemove alphablend noalphablend xwarppointer
-xwarp noxwarppointer noxwarp buttonmap dragging
-nodragging wireframe_mode wireframe wf nowireframe
-nowf wirecopyrect wcr nowirecopyrect nowcr scr_area
+xtrap noxtrap xrandr noxrandr xrandr_mode rotate padgeom
+quiet q noquiet modtweak nomodtweak xkb noxkb capslock
+nocapslock skip_lockkeys noskip_lockkeys skip_keycodes
+sloppy_keys nosloppy_keys skip_dups noskip_dups
+add_keysyms noadd_keysyms clear_mods noclear_mods
+clear_keys noclear_keys remap repeat norepeat fb nofb
+bell nobell sel nosel primary noprimary setprimary
+nosetprimary clipboard noclipboard setclipboard
+nosetclipboard seldir cursorshape nocursorshape
+cursorpos nocursorpos cursor_drag nocursor_drag cursor
+show_cursor noshow_cursor nocursor arrow xfixes noxfixes
+xdamage noxdamage xd_area xd_mem alphacut alphafrac
+alpharemove noalpharemove alphablend noalphablend
+xwarppointer xwarp noxwarppointer noxwarp buttonmap
+dragging nodragging wireframe_mode wireframe wf
+nowireframe nowf wireframelocal wfl nowireframelocal
+nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
 scr_parms scrollcopyrect scr noscrollcopyrect noscr
-fixscreen noxrecord xrecord reset_record pointer_mode pm
-input_skip allinput noallinput input grabkbd nograbkbd
-grabptr nograbptr client_input ssltimeout speeds wmdt
-debug_pointer dp nodebug_pointer nodp debug_keyboard
-dk nodebug_keyboard nodk deferupdate defer wait_ui
-wait_bog nowait_bog slow_fb wait readtimeout nap nonap
-sb screen_blank fbpm nofbpm fs gaps grow fuzz snapfb
-nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
-uinput_always progressive rfbport http nohttp httpport
-httpdir enablehttpproxy noenablehttpproxy alwaysshared
+fixscreen noxrecord xrecord reset_record pointer_mode
+pm input_skip allinput noallinput input grabkbd
+nograbkbd grabptr nograbptr client_input ssltimeout
+speeds wmdt debug_pointer dp nodebug_pointer nodp
+debug_keyboard dk nodebug_keyboard nodk deferupdate
+defer wait_ui wait_bog nowait_bog slow_fb wait
+readtimeout nap nonap sb screen_blank fbpm nofbpm
+dpms nodpms fs gaps grow fuzz snapfb nosnapfb rawfb
+uinput_accel uinput_thresh uinput_reset uinput_always
+progressive rfbport http nohttp httpport httpdir
+enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop debug_xevents nodebug_xevents
 debug_xevents debug_xdamage nodebug_xdamage

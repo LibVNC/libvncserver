@@ -29,6 +29,8 @@ void macosx_pointer_command(int mask, int x, int y, rfbClientPtr client);
 char *macosx_get_fb_addr(void);
 int macosx_get_cursor(void);
 int macosx_get_cursor_pos(int *, int *);
+void macosx_send_sel(char *, int);
+void macosx_set_sel(char *, int);
 int macosx_valid_window(Window, XWindowAttributes*);
 
 Status macosx_xquerytree(Window w, Window *root_return, Window *parent_return,
@@ -56,6 +58,12 @@ int macosx_get_cursor(void) {
 }
 int macosx_get_cursor_pos(int *x, int *y) {
 	return 0;
+}
+void macosx_send_sel(char * str, int len) {
+	return;
+}
+void macosx_set_sel(char * str, int len) {
+	return;
 }
 int macosx_valid_window(Window w, XWindowAttributes* a) {
 	return 0;
@@ -163,6 +171,7 @@ char *macosx_console_guess(char *str, int *fd) {
 
 void macosx_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 	allowed_input_t input;
+	static int last_mask = 0;
 	int rc;
 
 	if (0) fprintf(stderr, "macosx_pointer_command: %d %d - %d\n", x, y, mask);
@@ -191,8 +200,17 @@ void macosx_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 
 	macosxCG_pointer_inject(mask, x, y);
 
+	if (cursor_x != x || cursor_y != y) {
+		last_pointer_motion_time = dnow();
+	}
+
 	cursor_x = x;
 	cursor_y = y;
+
+	if (last_mask != mask) {
+		last_pointer_click_time = dnow();
+	}
+	last_mask = mask;
 
 	/* record the x, y position for the rfb screen as well. */
 	cursor_position(x, y);
@@ -226,9 +244,55 @@ void macosx_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 }
 
+extern void macosxGCS_poll_pb(void);
+
 int macosx_get_cursor_pos(int *x, int *y) {
 	macosxCG_get_cursor_pos(x, y);
+	if (nofb) {
+		/* good time to poll the pasteboard */
+		macosxGCS_poll_pb();
+	}
 	return 1;
+}
+
+static char *cuttext = NULL;
+static int cutlen = 0;
+
+void macosx_send_sel(char *str, int len) {
+	if (screen && all_clients_initialized()) {
+		if (cuttext) {
+			int n = cutlen;
+			if (len < n) {
+				n = len;
+			}
+			if (!memcmp(str, cuttext, (size_t) n)) {
+				/* the same text we set pasteboard to ... */
+				return;
+			}
+		}
+		if (debug_sel) {
+			rfbLog("macosx_send_sel: %d\n", len);
+		}
+		rfbSendServerCutText(screen, str, len);
+	}
+}
+
+void macosx_set_sel(char *str, int len) {
+	if (screen && all_clients_initialized()) {
+		if (cutlen <= len) {
+			if (cuttext) {
+				free(cuttext);
+			}
+			cutlen = 2*(len+1);
+			cuttext = (char *) calloc(cutlen, 1);
+		}
+		memcpy(cuttext, str, (size_t) len);
+		cuttext[len] = '\0';
+		if (debug_sel) {
+			rfbLog("macosx_set_sel: %d\n", len);
+		}
+		macosxGCS_set_pasteboard(str, len);
+	}
 }
 
 int macosx_get_cursor(void) {
@@ -346,23 +410,13 @@ Status macosx_xquerytree(Window w, Window *root_return, Window *parent_return,
 	*root_return = (Window) 0;
 	*parent_return = (Window) 0;
 
-#if 0
-fprintf(stderr, "macosx_xquerytree in.\n");
-#endif
-
 	macosxCGS_get_all_windows();
 
-#if 0
-fprintf(stderr, "macosx_xquerytree got windows.\n");
-#endif
-
 	n = 0;
-	for (k = 0; k < CGS_levelmax; k++) {
+	for (k = CGS_levelmax - 1; k >= 0; k--) {
 		for (i = macwinmax - 1; i >= 0; i--) {
 			if (macwins[i].level == CGS_levels[k]) {
-#if 0
-fprintf(stderr, "k=%d i=%d n=%d\n", k, i, n);
-#endif
+if (0) fprintf(stderr, "k=%d i=%d n=%d\n", k, i, n);
 				cret[n++] = (Window) macwins[i].win;
 			}
 		}

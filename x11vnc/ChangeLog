@@ -1,3 +1,9 @@
+2006-11-21  Karl Runge <runge@karlrunge.com>
+	* x11vnc: macosx: problem with padded framebuffer rows, wait for
+	  user to switch back, CutText xfer support, ignore a few more
+	  types of toplevels.  Add local user wireframing.  -dpms/-nodpms
+	  option to work around kdesktop_lock problem.
+
 2006-11-13  Karl Runge <runge@karlrunge.com>
 	* x11vnc: Native Mac OS X support.
 

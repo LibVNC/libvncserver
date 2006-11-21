@@ -664,7 +664,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	}
 
 	if ((pipeinput_fh != NULL || pipeinput_int) && mask >= 0) {
-		pipe_pointer(mask, x, y, client);
+		pipe_pointer(mask, x, y, client);	/* MACOSX here. */
 		if (! pipeinput_tee) {
 			if (! view_only || raw_fb) {	/* raw_fb hack */
 				got_user_input++;

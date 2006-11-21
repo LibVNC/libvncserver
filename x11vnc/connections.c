@@ -748,7 +748,7 @@ void client_gone(rfbClientPtr client) {
 		clean_up_exit(0);
 	}
 #ifdef MACOSX
-	if (! dpy && client_count == 0) {
+	if (macosx_console && client_count == 0) {
 		macosxCG_refresh_callback_off();
 	}
 #endif
@@ -2108,7 +2108,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		autorepeat(0, 0);
 	}
 #ifdef MACOSX
-	if (! dpy && client_count == 1) {
+	if (macosx_console && client_count == 1) {
 		macosxCG_refresh_callback_on();
 	}
 #endif

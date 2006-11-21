@@ -2774,6 +2774,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: enabling -nowireframe mode.\n");
 		wireframe = 0;
 
+	} else if (!strcmp(p, "wireframelocal") || !strcmp(p, "wfl")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, wireframe_local);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling -wireframelocal mode.\n");
+		wireframe_local = 1;
+	} else if (!strcmp(p, "nowireframelocal") || !strcmp(p, "nowfl")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !wireframe_local);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enabling -nowireframelocal mode.\n");
+		wireframe_local = 0;
+
 	} else if (strstr(p, "wirecopyrect") == p) {
 		COLON_CHECK("wirecopyrect:")
 		if (query) {
@@ -3384,6 +3399,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: turning on -nofbpm mode.\n");
 		watch_fbpm = 1;
+
+	} else if (!strcmp(p, "dpms")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !watch_dpms);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning off -nodpms mode.\n");
+		watch_dpms = 0;
+	} else if (!strcmp(p, "nodpms")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, watch_dpms);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning on -nodpms mode.\n");
+		watch_dpms = 1;
 
 	} else if (strstr(p, "fs") == p) {
 		COLON_CHECK("fs:")

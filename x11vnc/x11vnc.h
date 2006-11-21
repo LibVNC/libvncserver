@@ -360,6 +360,9 @@ extern int button_mask;		/* button state and info */
 extern int button_mask_prev;
 extern int num_buttons;
 
+extern unsigned int display_button_mask;
+extern unsigned int display_mod_mask;
+
 /* image structures */
 extern XImage *scanline;
 extern XImage *fullscreen;
@@ -411,6 +414,8 @@ extern unsigned long  main_red_mask,  main_green_mask,  main_blue_mask;
 extern unsigned short main_red_max,   main_green_max,   main_blue_max;
 extern unsigned short main_red_shift, main_green_shift, main_blue_shift;
 
+extern int raw_fb_bytes_per_line;	/* of actual raw region we poll, not our raw_fb */
+
 /* scaling parameters */
 extern char *scale_str;
 extern double scale_fac;
@@ -446,6 +451,7 @@ extern unsigned char *tile_has_xdamage_diff, *tile_row_has_xdamage_diff;
 /* times of recent events */
 extern time_t last_event, last_input, last_client;
 extern time_t last_keyboard_input, last_pointer_input; 
+extern time_t last_local_input;
 extern time_t last_fb_bytes_sent;
 extern double last_keyboard_time;
 extern double last_pointer_time;
@@ -471,6 +477,7 @@ extern int cursor_x, cursor_y;		/* x and y from the viewer(s) */
 extern int button_change_x, button_change_y;
 extern int got_user_input;
 extern int got_pointer_input;
+extern int got_local_pointer_input;
 extern int got_pointer_calls;
 extern int got_keyboard_input;
 extern int got_keyboard_calls;
