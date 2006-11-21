@@ -4,7 +4,7 @@
 #
 # e.g. on Darwin we did:
 #
-# env LDFLAGS_OS="-L/Volumes/someplace/common/lib/" CPPFLAGS_OS="-I /Volumes/someplace/common/include" ./build.unix
+# env LDFLAGS_OS="-L/Volumes/someplace/common/lib" CPPFLAGS_OS="-I /Volumes/someplace/common/include" ./build.unix
 #
 
 
@@ -16,9 +16,33 @@ export PATH
 # Check location:
 #
 thisdir=`dirname "$0"`
-if [ ! -d ./bin -o ! -d src/patches ]; then
+if [ ! -d ./bin -o ! -d src/patches -o ! -f ./build.unix ]; then
+	echo ""
 	echo "You must run this script from: $thisdir"
-	exit 1
+	echo ""
+	echo "Maybe:"
+	echo ""
+	echo "  cd $thisdir"
+	echo "  ./build.unix"
+	if [ "X$BUILD_UNIX" != "X" ]; then
+		sleep 2
+		exit 1
+	fi
+	echo ""
+	sleep 1
+	printf "Do you want me to run those for you?  y/[n] "
+	read x
+	if [ "X$x" = "Xy" ]; then
+		BUILD_UNIX=1
+		export BUILD_UNIX
+		cd "$thisdir" || exit 1
+		echo "pwd:"
+		pwd
+		sleep 1
+		./build.unix
+	fi
+	
+	exit $?
 fi
 
 # Try to find osname.arch
@@ -112,6 +136,12 @@ elif uname | grep -i bsd > /dev/null; then
 	CPPFLAGS_OS="$CPPFLAGS_OS -I /usr/local/include -I /usr/pkg/include"
 fi
 
+cnt=`ls ./src/patches/*.patch | wc -c`
+if [ $cnt -lt 1 ]; then
+	echo "Could not find any patches in ./src/patches.  Is your tarball missing them?"
+	exit 1
+fi
+
 # Do tightvnc viewer:
 #
 tight_src=`ls -td ./src/vnc_unixsrc* | head -1`
@@ -126,18 +156,25 @@ echo "applying tight vnc patches:"
 start=`pwd`
 cd $tmp;
 failed=0
+count=0
 for patch in ../../patches/tight*
 do
 	if [ ! -f "$patch" ]; then
 		continue
 	fi
-	patch -p0 < $patch
+	echo PATCHING WITH: "$patch" 
+	ls -l "$patch"
+	sleep 1
+	patch -p0 < "$patch"
 	if [ $? != 0 ]; then
 		failed=`expr $failed + 1`
+	else
+		count=`expr $count + 1`
 	fi
 done
+sleep 1
 cd "$start"
-if [ $failed != 0 ]; then
+if [ $failed != 0 -o $count = 0 ]; then
 	ball=src/zips/vnc_unixsrc_vncviewer.patched.tar
 	echo "patches failed, trying to use backup tarball:"
 	ls -l $ball
@@ -207,18 +244,25 @@ echo "applying stunnel patches:"
 start=`pwd`
 cd $tmp;
 failed=0
+count=0
 for patch in ../../patches/stunnel*
 do
 	if [ ! -f "$patch" ]; then
 		continue
 	fi
+	echo PATCHING WITH: "$patch" 
+	ls -l "$patch"
+	sleep 1
 	patch -p0 < $patch
 	if [ $? != 0 ]; then
 		failed=`expr $failed + 1`
+	else
+		count=`expr $count + 1`
 	fi
 done
+sleep 1
 cd "$start"
-if [ $failed != 0 ]; then
+if [ $failed != 0 -o $count = 0 ]; then
 	ball=src/zips/stunnel.patched.tar
 	echo "patches failed, trying to use backup tarball:"
 	ls -l $ball

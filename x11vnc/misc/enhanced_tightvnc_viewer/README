@@ -1,18 +1,18 @@
-                  Enhanced TightVNC Viewer package
+       Enhanced TightVNC Viewer (ssvnc: SSL/SSH VNC viewer)
 
-Copyright (c) Karl J. Runge <runge@karlrunge.com>
+Copyright (c) 2006 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
-These packages provide 1) An enhanced TightVNC Viewer on Unix, 2) Binaries
-for many Operating Systems (including Windows) for your convenience,
-3) Wrapper scripts and etc. for gluing them all together.
+These bundles provide 1) An enhanced TightVNC Viewer on Unix, 2) Binaries
+for many Operating Systems (including Windows and Mac OS X) for your
+convenience, 3) Wrapper scripts and a GUI for gluing them all together.
 
 One can straight-forwardly download all of the components and get them
-to work together by oneself: this package is mostly for your convenience
+to work together by oneself: this bundle is mostly for your convenience
 to combine and wrap together the freely available software.
 
-Bundled software co-shipped in this package is copyright and licensed
-by others.  See these sites and related ones for more information:
+Bundled software co-shipped is copyright and licensed by others.
+See these sites and related ones for more information:
 
         http://www.tightvnc.com
         http://www.realvnc.com
@@ -24,31 +24,33 @@ by others.  See these sites and related ones for more information:
 
 Note: Some of the Windows binaries included contain cryptographic software
 that you may not be allowed to download, use, or redistribute.  Please
-check your situation first before downloading any of these packages.
+check your situation first before downloading any of these bundles.
 See the survey http://rechten.uvt.nl/koops/cryptolaw/index.htm for useful
 information.  The Unix programs do not contain cryptographic software, but
 rather will make use of cryptographic libraries that are installed on your
 Unix system.  Depending on your circumstances you may still need to check.
 
-All work by Karl J. Runge in this package is Copyright (c) Karl J. Runge
+All work by Karl J. Runge in this project is Copyright (c) 2006 Karl J. Runge
 and is licensed under the GPL as described in the file COPYING in this
 directory.
 
-All the files and information in this package are provided "AS IS"
+All the files and information in this project are provided "AS IS"
 without any warranty of any kind.  Use them at your own risk.
 
 
 =============================================================================
 
-This package contains a convenient collection of enhanced TightVNC viewers
-and stunnel binaries for different flavors of Unix and wrapper scripts,
-etc to glue them together.  SSL and SSH encryption tunnelling is provided.
+This bundle contains a convenient collection of enhanced TightVNC
+viewers and stunnel binaries for different flavors of Unix and wrapper
+scripts and a GUI front-end to glue them together.  Automatic SSL and
+SSH encryption tunnelling is provided.
 
-Also, a Windows SSL wrapper for the co-bundled TightVNC binary and other
-utilities are provided.  (Launch ssl_tightvncviewer.exe in the
-Windows subdirectory).
+A Windows SSL wrapper for the bundled TightVNC binary and other utilities
+are provided.  (Launch ssvnc.exe in the Windows subdirectory).
 
-It is a self-contained package, you could carry it around on, say,
+The short name of the project is "ssvnc" for SSL/SSH VNC Viewer.
+
+It is a self-contained bundle, you could carry it around on, say,
 a USB memory stick for secure VNC viewing from almost any machine,
 Unix or Windows.
 
@@ -57,17 +59,10 @@ Features:
 
 The enhanced TightVNC viewer features are:
 
-	- SSL support for connections using the co-bundled stunnel program.
+	- SSL support for connections using the bundled stunnel program.
 
 	- Automatic SSH connections from the GUI (ssh must already be
-	  installed on Unix; co-bundled plink is used on Windows)
-
-	- rfbNewFBSize VNC support on Unix (screen resizing)
-
-	- cursor alphablending with x11vnc at 32bpp (-alpha option, Unix only)
-
-	- xgrabserver support for fullscreen mode, for old window
-	  managers (-grab option, Unix only).
+	  installed on Unix; bundled plink is used on Windows)
 
 	- Create or Import SSL Certificates and Private Keys.
 
@@ -80,31 +75,154 @@ The enhanced TightVNC viewer features are:
           connecting.
 
 	- You can also use your own VNC Viewer, e.g. UltraVNC or RealVNC,
-	  with the front-end if you like.
+	  with the front-end GUI or scripts if you like.
 
-	- Sets up any additional SSH port redirections that you want.
+	- Sets up any additional SSH port redirections that you desire.
+
+	- Support for native MacOS X usage with bundled Chicken of the
+	  VNC viewer.
 
 
-Your package should have included binaries for many OS's: Linux, Solaris,
-FreeBSD, etc.  Unpack your archive and see the subdirectories of
+	(these 3 features only apply to the bundled Unix tightvnc viewer)
+
+	- rfbNewFBSize VNC support on Unix (screen resizing, Unix only)
+
+	- cursor alphablending with x11vnc at 32bpp (-alpha option, Unix only)
+
+	- xgrabserver support for fullscreen mode, for old window
+	  managers (-grab option, Unix only).
+
+
+The list of software bundled in the archive files:
+
+        TightVNC Viewer           (windows, unix, macosx)
+        Chicken of the VNC Viewer (macosx)
+        Stunnel                   (windows, unix, macosx)
+        Putty/Plink/Pageant       (windows)
+        OpenSSL                   (windows)
+        esound                    (windows)
+
+These are all self-contained in the bundle directory: they will not be
+installed on your system.  Just un-zip or un-tar the file you downloaded
+and run it straight from its directory.
+
+
+Quick Start:
+-----------
+
+Unix and Mac OS X:
+
+    Inside a Terminal do something like the following.
+
+    Unpack the archive:
+
+        % gzip -dc ssvnc-1.0.8.tar.gz | tar xvf -
+
+    Run the GUI:
+
+        % ./ssvnc/Unix/ssvnc               (for Unix)
+
+        % ./ssvnc/MacOSX/ssvnc             (for Mac OS X)
+
+    actually both of the above are equivalent, and the same as running
+
+        % ./ssvnc/bin/ssvnc
+
+
+    The smaller file "ssvnc_no_windows-1.0.8.tar.gz"
+    could have been used as well.
+
+
+Windows:
+
+    Unzip, using WinZip or a similar utility, the zip file:
+
+        ssvnc-1.0.8.zip
+
+    Run the GUI, e.g.:
+
+	Start -> Run -> Browse
+
+    and then navigate to
+
+        .../ssvnc/Windows/ssvnc.exe
+
+    select Open, and then OK to launch it.
+
+    The smaller file "ssvnc_windows_only-1.0.8.zip"
+    could have been used as well.
+
+    You can make a Windows shortcut to this program if you want to.
+
+    See the Windows/README.txt for more info.
+    
+
+Bundle Info:
+------------
+
+The bundle files unpack a directory/folder named: ssvnc
+
+It contains these programs to launch the GUI:
+
+        Windows/ssvnc.exe        for Windows
+        MacOSX/ssvnc             for Mac OS X
+        Unix/ssvnc               for Unix
+
+(the Mac OS X and Unix launchers are simply links to the bin directory).
+
+
+Your bundle file should have included binaries for many OS's: Linux,
+Solaris, FreeBSD, etc.  Unpack your archive and see the subdirectories of
 
 	./bin
 
-for the ones that were shipped in this package, e.g. ./bin/Linux.i686
+for the ones that were shipped in this project, e.g. ./bin/Linux.i686
 Run "uname -sm" to see your OS+arch combination. (See the
-./bin/tightvncviewer -h output for how to override platform autodection
+./bin/ssvnc_cmd -h output for how to override platform autodection
 via the UNAME env. var).
 
+
+External Dependencies:
+----------------------
+
+On Windows everything is included.  Let us know if you find otherwise.
+
+On Unix depending on what you do you need these programs installed:
+	
+	- basic unix utilities (sh, ls, cat, awk, sed, etc..)
+	- tcl/tk (wish interpreter)
+	- xterm
+	- perl
+	- ssh
+	- openssl
+
+    Lesser used ones: netcat, esd/artsd, smbclient, smbmount, cups
+	
+On Mac OS X depending on what you do you need these programs installed:
+	
+	- basic unix utilities (sh, ls, cat, awk, sed, etc..)
+	- tcl/tk (wish interpreter)
+	- Terminal
+	- perl
+	- ssh
+	- openssl
+
+    Lesser used ones: netcat, smbclient, cups
+
+
+Most Mac OS X and Unix OS come with the main components installed. 
+	
 
 If you need to Build:
 --------------------
 
-If your OS/arch is not included, the script "build.unix" may be able to
+If your OS/arch is not included or the provided binary has the wrong
+library dependencies, etc. the script "build.unix" may be able to
 successfully build on for you and deposit the binaries down in ./bin/...
 using the included source code.
 
-You must run the build.unix script from this directory (that this toplevel
-README is in) and like this:
+You MUST run the build.unix script from this directory (that this toplevel
+README is in, i.e "ssvnc") and like this:
 
 	./build.unix
 
@@ -116,27 +234,21 @@ The programs:
 ------------
 
 Unpack your archive, and you will see "bin", "Windows", "src" directories
-and other files.  The wrapper scripts: 
+and other files.  The command line wrapper scripts: 
 
-	./bin/ssl_tightvncviewer
+	./bin/ssvnc_cmd
 	./bin/tightvncviewer
 
-are the main programs you will run and will try to autodetect your OS+arch
+are the main programs that are run and will try to autodetect your OS+arch
 combination and if binaries are present for it automatically use them.
 (if not found try the running the build.unix script).
 
-If you prefer a GUI to prompt for parameters and then start ssl_tightvncviewer
+If you prefer a GUI to prompt for parameters and then start ssvnc_cmd
 you can run this instead:
 
-	./bin/ssl_vnc_gui
+	./bin/ssvnc       
 
-this is essentially the same GUI that is run on Windows (the
-ssl_tightvncviewer.exe).
-
-Using the GUI is it not possible (well not easy) to initiate
-a VNC connection that is not encrypted with either SSL or SSH.
-Unencrypted VNC connections can only be started by manually running the
-./bin/tightvncviewer script.
+this is the same GUI that is run on Windows (the ssvnc.exe).
 
 For convenience, you can make symlinks from a directory in your PATH to
 any of the 3 programs above you wish to run.  That is all you usually
@@ -144,19 +256,19 @@ need to do for it to pick up all of the binaries, utils, etc. E.g.
 assuming $HOME/bin is in your $PATH:
 
 	cd $HOME/bin
-	ln -s /path/to/enhanced_tightvnc_viewer/bin/{s,t}* .
+	ln -s /path/to/ssvnc/bin/{s,t}* .
 
 (note the "." at the end). The above commands is basically the way to
-"install" this package on Unix.
+"install" this on Unix.
 
 Also symlinks to the GUI launcher script are provided in:
 
-	MacOSX/ssl_vnc_gui.sh
-	Unix/ssl_vnc_gui
+	MacOSX/ssvnc
+	Unix/ssvnc
 
 On Windows unpack your archive and run:
 
-	Windows/ssl_tightvncviewer.exe
+	Windows/ssvnc.exe
 
 
 Examples:
@@ -167,11 +279,11 @@ archive you unpacked.
 
 Use enhanced TightVNC unix viewer to connect to x11vnc via SSL:
 
-	./bin/ssl_tightvncviewer   far-away.east:0
+	./bin/ssvnc_cmd   far-away.east:0
 
 	./bin/tightvncviewer -ssl  far-away.east:0   (same)
 
-	./bin/ssl_vnc_gui                            (start GUI launcher)
+	./bin/ssvnc                                  (start GUI launcher)
 
 Use enhanced TightVNC unix viewer without SSL:
 
@@ -180,7 +292,7 @@ Use enhanced TightVNC unix viewer without SSL:
 Use SSL to connect to a x11vnc server, and also verify the server's
 identity using the SSL Certificate in the file ./x11vnc.pem:
 
-	./bin/ssl_tightvncviewer -alpha -verify ./x11vnc.pem far-away.east:0
+	./bin/ssvnc_cmd -alpha -verify ./x11vnc.pem far-away.east:0
 
 (also turns on the viewer-side cursor alphablending hack). 
 
@@ -188,8 +300,8 @@ identity using the SSL Certificate in the file ./x11vnc.pem:
 Brief description of the subdirectories:
 ---------------------------------------
 
-	./bin/util		some utility scripts, e.g. ssl_vncviewer
-				and ssl_tightvncviewer.tcl
+	./bin/util		some utility scripts, e.g. ss_vncviewer
+				and ssvnc.tcl
 
 	./src			source code and patches.
 	./src/zips		zip files of source code and binaries.
@@ -205,11 +317,24 @@ Brief description of the subdirectories:
 	./man			man pages for TightVNC viewer and stunnel.
 
 	./Windows		Stock TightVNC viewer and Stunnel, Openssl
-				etc Windows binaries. ssl_tightvncviewer.exe
-				is the program to run.
+				etc Windows binaries. ssvnc.exe is the
+				program to run.
 
-Since they are large, depending on which package you use not all of the
-above may be present in your package.
+	./MacOSX		contains an unpacked Chicken of the VNC
+				viewer and a symlink to ssvnc.
+
+	./Unix			contains a symlink to ssvnc.
+
+Depending on which bundle you use not all of the above may be present.
+The smallest bundles with binaries are:
+
+	ssvnc_windows_only-1.x.y.zip   Windows
+	ssvnc_no_windows-1.x.y.tar.gz  Unix and MacOSX
+
+however, the tiny scripts only one (only 60KB) will run properly on Unix
+as long as you install external vncviewer and stunnel packages:
+
+	ssvnc_unix_minimal-1.x.y.tar.gz
 
 
 Help and Info:
@@ -217,9 +342,8 @@ Help and Info:
 
 For more help on other options and usage patterns run these:
 
-	./bin/ssl_tightvncviewer -h
-	./bin/tightvncviewer -h
-	./bin/util/ssl_vncviewer -h
+	./bin/ssvnc_cmd -h
+	./bin/util/ss_vncviewer -h
 
 See also:
 
@@ -234,26 +358,3 @@ See also:
         http://www.realvnc.com
         http://www.chiark.greenend.org.uk/~sgtatham/putty/
 	http://sourceforge.net/projects/cotvnc/
-
-
-Windows:
--------
-
-	Unpack the zip archive somewhere.
-
-	A wrapper to create a STUNNEL tunnel and then launch the
-	Windows TightVNC viewer is provided in:
-
-		Windows/ssl_tightvncviewer.exe
-
-	Just launch it (Start ... Run) and fill in the remote VNC
-	display then click "Connect".  You can make a shortcut if
-	you prefer.
-
-	Click the Help buttons for more info.  There is also a
-	Windows/README.txt file.
-
-	On Windows you may need to terminate the STUNNEL process
-	from the System Tray if the tool cannot terminate it
-	by itself.  Just right-click on the STUNNEL icon.
-

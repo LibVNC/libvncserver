@@ -8,7 +8,7 @@ www.tightvnc.com windows
   standalone viewer binary:  209149 Jul 25 15:10 tightvnc-1.3dev7_x86_viewer.zip
 
 To save space they may not be included in the package you downloaded.
-The should be included in the "enhanced_tightvnc_viewer_all-<version>.zip" file.
+The should be included in the "ssvnc_all-<version>.zip" file.
 Go to the websites indicated above or contact me if you cannot find them.
 
 The stunnel.patched.tar vnc_unixsrc_vncviewer.patched.tar

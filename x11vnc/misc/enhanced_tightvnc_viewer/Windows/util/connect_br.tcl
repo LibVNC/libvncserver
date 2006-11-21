@@ -9,25 +9,25 @@ set server_fh ""
 
 set debug 0
 if {$debug} {
-	if {! [info exists env(SSL_VNC_DEST)]} {
-		set env(SSL_VNC_DEST) "haystack:2037"
+	if {! [info exists env(SSVNC_DEST)]} {
+		set env(SSVNC_DEST) "haystack:2037"
 	}
-	if {! [info exists env(SSL_VNC_PROXY)]} {
-		set env(SSL_VNC_PROXY) "haystack:2037"
+	if {! [info exists env(SSVNC_PROXY)]} {
+		set env(SSVNC_PROXY) "haystack:2037"
 	}
-	if {! [info exists env(SSL_VNC_LISTEN)]} {
-		set env(SSL_VNC_LISTEN) "6789"
+	if {! [info exists env(SSVNC_LISTEN)]} {
+		set env(SSVNC_LISTEN) "6789"
 	}
 }
 
-set dest $env(SSL_VNC_DEST)
+set dest $env(SSVNC_DEST)
 
-if [regexp {,} $env(SSL_VNC_PROXY)] {
-	set s [split $env(SSL_VNC_PROXY) ","]
+if [regexp {,} $env(SSVNC_PROXY)] {
+	set s [split $env(SSVNC_PROXY) ","]
 	set proxy1 [lindex $s 0]
 	set proxy2 [lindex $s 1]
 } else {
-	set proxy1 $env(SSL_VNC_PROXY)
+	set proxy1 $env(SSVNC_PROXY)
 }
 
 set s [split $proxy1 ":"]
@@ -40,7 +40,7 @@ if {$proxy2 != ""} {
 	set proxy2_port [lindex $s 1]
 }
 
-set lport $env(SSL_VNC_LISTEN)
+set lport $env(SSVNC_LISTEN)
 
 set got_connection 0
 set lsock [socket -myaddr 127.0.0.1 -server handle_connection $lport]

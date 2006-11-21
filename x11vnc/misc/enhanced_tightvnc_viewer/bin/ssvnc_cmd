@@ -2,9 +2,9 @@
 #
 # Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
 #
-# ssl_tightvncviewer:
+# ssvnc_cmd:
 #
-#    A wrapper that calls ssl_vncviewer to use the enhanced TightVNC viewer. 
+#    A wrapper that calls ss_vncviewer to use the enhanced TightVNC viewer. 
 #
 # The enhanced TightVNC viewer features are:
 #
@@ -23,11 +23,11 @@
 #
 # Usage:
 #
-#     ssl_tightvncviewer [ssl_vncviewer-args] hostname:N [tightvncviewer-args]
+#     ssvnc_cmd [ss_vncviewer-args] hostname:N [tightvncviewer-args]
 #
 # "hostname:N" is the host and VNC display to connect to, e.g. snoopy:0
 #
-# See the script util/ssl_vncviewer for details about its arguments:
+# See the script util/ss_vncviewer for details about its arguments:
 #
 #	-verify pemfile
 #	-mycert pemfile
@@ -86,18 +86,25 @@ fi
 PATH=$PATH:/usr/bin:/bin
 export PATH
 
-# Set this for ssl_vncviewer to pick up:
+# Set this for ss_vncviewer to pick up:
 #
-use_ours=0
 if [ "X$1" = "X-cotvnc" ]; then
 	shift
 	DARWIN_COTVNC=1
 	export DARWIN_COTVNC
+elif [ "X$DARWIN_COTVNC" = "X" -a "X$DISPLAY" = "X" ]; then
+	uname=`uname`
+	if [ "X$uname" = "XDarwin" ]; then
+		DARWIN_COTVNC=1
+		export DARWIN_COTVNC
+	fi
 fi
+
+use_ours=0
 if [ "X$VNCVIEWERCMD" = "X" ]; then
 	VNCVIEWERCMD="vncviewer"
 	export VNCVIEWERCMD
-	if [ "X$DARWIN_COTVNC" = "X" ]; then
+	if [ "X$DARWIN_COTVNC" != "X" ]; then
 		use_ours=1
 	fi
 fi
@@ -110,7 +117,7 @@ if [ "X$name" = "X" ]; then
 fi
 
 f="$0"
-for t in 1 2 3 4 5
+for t in 1 2 3 4 5 6
 do
 	if [ -L "$f" ]; then
 		f0="$f"
@@ -125,12 +132,55 @@ do
 	fi
 done
 dir=`dirname "$f"`
+PATH="$dir:$PATH"
 
-if [ ! -d "$dir/$name" ]; then
-	echo "cannot find platform dir: $dir/$name for your OS:" 
-	uname -sm
-	echo "you can set the \$UNAME env. var. to override the setting."
-	exit 1
+nearby=0
+if [ -x "$dir/vncviewer" -a -x "$dir/stunnel" ]; then
+	nearby=1
+fi
+if [ ! -d "$dir/$name" -a $nearby = 0 ]; then
+	echo
+	echo "Cannot find platform dir for your OS `uname -sm`:"
+	echo
+	echo "    $dir/$name" 
+	echo
+	PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin
+
+	quit=0
+	if type vncviewer >/dev/null 2>/dev/null; then
+		:
+	else
+		echo "vncviewer not found in PATH." 
+		quit=1
+	fi
+	if type stunnel >/dev/null 2>/dev/null; then
+		:
+	else
+		echo "stunnel not found in PATH."
+		quit=1
+	fi
+	echo
+	if [ "X$quit" = "X1" ]; then
+		echo "You can set the \$UNAME env. var. to override the OS setting."
+		echo "Or, if available, run the ./build.unix script to build it."
+		echo "Or install external \"vncviewer\" and \"stunnel\" packages."
+		exit 1
+	fi
+	echo "Using externel \"vncviewer\" and \"stunnel\" found in PATH."
+
+	if [ "X$DARWIN_COTVNC" = "X" -a "X$VNCVIEWERCMD" = "Xvncviewer" ]; then
+		hstr=`"$VNCVIEWERCMD" -h 2>&1 | head -5`
+		if echo "$hstr" | grep '^TightVNC.*version 1\.[23]' > /dev/null; then
+			# we need to avoid raw encoding
+			use_ours=1
+		fi
+	fi
+else
+	STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
+	export STUNNEL_EXTRA_OPTS
+	SSVNC_VIEWER_INTERNAL=1
+	export SSVNC_VIEWER_INTERNAL
+	use_ours=1
 fi
 
 # Put our os.arch and other utils dirs at head of PATH to be sure to
@@ -144,15 +194,26 @@ else
 	PATH="$dir:$dir/$name:$dir/util:$PATH"
 fi
 
-STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
-export STUNNEL_EXTRA_OPTS
+base=`basename "$0"`
+if [ "X$1" = "X-ssl" ]; then
+	shift	
+	base="ssvnc_cmd"
+fi
 
 # If ours (and not cotvnc), force the use of tight encoding for localhost
 # redir connection:
 #
 #
 if [ $use_ours = 1 ]; then
-	ssl_vncviewer "$@" -encodings 'copyrect tight zrle zlib hextile'
+	if [ "X$base" = "Xtightvncviewer" ]; then
+		"$VNCVIEWERCMD" -encodings 'copyrect tight zrle zlib hextile' "$@"
+	else
+		ss_vncviewer "$@" -encodings 'copyrect tight zrle zlib hextile'
+	fi
 else
-	ssl_vncviewer "$@"
+	if [ "X$base" = "Xtightvncviewer" ]; then
+		"$VNCVIEWERCMD" "$@"
+	else
+		ss_vncviewer "$@"
+	fi
 fi

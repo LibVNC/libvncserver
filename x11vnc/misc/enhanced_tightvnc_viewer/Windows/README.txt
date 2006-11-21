@@ -6,16 +6,16 @@ is launched to used this SSL tunnel.
 An example server would be "x11vnc -ssl", or any VNC server with a
 2nd STUNNEL program running on the server side.
 
-Just click on the program "ssl_tightvncviewer.exe", and then enter
-the remote VNC Server and click "Connect".  Click on "Help" for more
+Just click on the program "ssvnc.exe", and then enter the remote
+VNC Server and click "Connect".  Click on "Help" for more information
 information.  You can also set some simple options under "Options ..."
 
 Note that on Windows when the TightVNC viewer disconnects you may need to
 terminate the STUNNEL program manually.  To do this: Click on the STUNNEL
 icon (dark green) on the System Tray and then click "Exit".  Before that,
-however, you will be prompted if you want ssl_tightvncviewer.exe to try
-to terminate STUNNEL for you. (Note that even if STUNNEL termination is
-successful, the Tray Icon may not go away until the mouse hovers over it!)
+however, you will be prompted if you want ssvnc.exe to try to terminate
+STUNNEL for you. (Note that even if STUNNEL termination is successful,
+the Tray Icon may not go away until the mouse hovers over it!)
 
 With this STUNNEL and TightVNC Viewer wrapper you can also enable using
 SSL Certificates with STUNNEL, and so the connection is not only encrypted

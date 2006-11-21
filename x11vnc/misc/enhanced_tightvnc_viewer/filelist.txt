@@ -162,10 +162,10 @@
 2261967  196 -rwxr-xr-x   1 runge    runge      193076 Jul 31 22:59 ./bin/Linux.i686/vncviewer
 2261999   80 -rwxr-xr-x   1 runge    runge       77148 Jul 31 23:00 ./bin/Linux.i686/stunnel
 5538622    4 drwxr-xr-x   2 runge    runge        4096 Sep 12 21:24 ./bin/util
-5538759   12 -rwxr-xr-x   1 runge    runge       12148 Sep 12 21:24 ./bin/util/ssl_vncviewer
-5538760  136 -rwxr-xr-x   1 runge    runge      132853 Sep 12 21:17 ./bin/util/ssl_tightvncviewer.tcl
+5538759   12 -rwxr-xr-x   1 runge    runge       12148 Sep 12 21:24 ./bin/util/ss_vncviewer
+5538760  136 -rwxr-xr-x   1 runge    runge      132853 Sep 12 21:17 ./bin/util/ssvnc.tcl
 5538641    4 -rw-r--r--   1 runge    runge         981 Aug  4 09:27 ./bin/util/stunnel-server.conf
-2851794    4 -rwxr-xr-x   1 runge    runge        3581 Jul 31 23:00 ./bin/ssl_tightvncviewer
+2851794    4 -rwxr-xr-x   1 runge    runge        3581 Jul 31 23:00 ./bin/ssvnc_cmd
 2851592    4 -rwxr-xr-x   1 runge    runge        3752 Jul 31 23:01 ./bin/tightvncviewer
 2425590    4 drwxr-xr-x   2 runge    runge        4096 Jul 31 23:30 ./bin/Linux.alpha
 2425595  100 -rwxr-xr-x   1 runge    runge       97504 Jul 31 23:30 ./bin/Linux.alpha/stunnel
@@ -188,7 +188,7 @@
 3064794    4 drwxr-xr-x   2 runge    runge        4096 Jul 31 23:47 ./bin/SunOS.sun4u
 3064795  108 -rwxr-xr-x   1 runge    runge      106260 Jul 31 23:45 ./bin/SunOS.sun4u/vncviewer
 3064796   76 -rwxr-xr-x   1 runge    runge       71748 Jul 31 23:47 ./bin/SunOS.sun4u/stunnel
-2851711    4 -rwxr-xr-x   1 runge    runge        1310 Aug 29 16:29 ./bin/ssl_vnc_gui
+2851711    4 -rwxr-xr-x   1 runge    runge        1310 Aug 29 16:29 ./bin/ssvnc
 2851793    4 -rwxr-xr-x   1 runge    runge         640 Jul 31 17:22 ./bin/.linkin
 3293942    4 drwxr-xr-x   2 runge    runge        4096 Aug  1 22:14 ./bin/profiles
 3277791    8 -rwxr-xr-x   1 runge    runge        4814 Jul 30 17:54 ./build.unix
@@ -199,7 +199,7 @@
 5063556   16 -rw-r--r--   1 runge    runge       14478 Jul 27 16:32 ./man/man1/vncviewer.1
 5063557   24 -rw-r--r--   1 runge    runge       23885 Jul 27 16:33 ./man/man1/stunnel.1
 5538624    4 drwxr-xr-x   4 runge    runge        4096 Sep  6 16:30 ./Windows
-5538633 2312 -rw-r--r--   1 runge    runge     2361922 Sep 12 22:27 ./Windows/ssl_tightvncviewer.exe
+5538633 2312 -rw-r--r--   1 runge    runge     2361922 Sep 12 22:27 ./Windows/ssvnc.exe
 5538576    4 -rw-r--r--   1 runge    runge        2149 Aug  2 09:42 ./Windows/README.txt
 3293943    4 drwxr-xr-x   2 runge    runge        4096 Aug  1 22:14 ./Windows/profiles
 4621136    4 drwxr-xr-x   5 runge    runge        4096 Sep  6 16:30 ./Windows/util

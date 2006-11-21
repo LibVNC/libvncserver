@@ -5,8 +5,8 @@ exec wish "$0" "$@"
 #
 # Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
 #
-# ssl_tightvncviewer.tcl: gui wrapper to the , etc. programs in this
-# ssl_tightvncviewerpackage. Also sets up service port forwarding.
+# ssvnc.tcl: gui wrapper to the programs in this
+# package. Also sets up service port forwarding.
 #
 
 set buck_zero $argv0
@@ -71,9 +71,11 @@ proc help {} {
 	scroll_text_dismiss .h.f
 
 	center_win .h
-	wm title .h "SSL TightVNC Viewer Help"
+	wm title .h "SSL/SSH VNC Viewer Help"
 
 	set msg {
+ Hosts:
+
     Enter the VNC host and display in the 'VNC Host:Display' entry box.
     
     It is of the form "host:number", where "host" is the hostname of the
@@ -88,27 +90,34 @@ proc help {} {
     Then click on "Connect".  When you do so the STUNNEL program will be
     started locally to provide you with an outgoing SSL tunnel.
 
-    Once the STUNNEL is running, the TightVNC Viewer will be automatically
-    started directed to the local SSL tunnel which, in turn, encrypts and
-    redirects the connection to the remote VNC server.
+    Once the STUNNEL is running, the TightVNC Viewer (Or Chicken-of-the-VNC
+    on Mac OS X) will be automatically started directed to the local SSL
+    tunnel which, in turn, encrypts and redirects the connection to the
+    remote VNC server.
 
     The remote VNC server must support an initial SSL handshake before
     using the VNC protocol (i.e. VNC is tunnelled through the SSL channel
     after it is established).  "x11vnc -ssl ..."  does this, and any VNC
     server can be made to do this by using, e.g., STUNNEL on the remote side.
 
-    Click on "Options ..." if you want to use an *SSH* tunnel instead of
-    SSL (then the VNC Server does not need to speak SSL or use STUNNEL).
-
-
     Note that on Windows when the Viewer connection is finished you may
     need to terminate STUNNEL manually from the System Tray (right click
     on dark green icon) and selecting "Exit".
 
 
-    Proxies: If an intermediate proxy is needed to make the SSL connection
-    (e.g. web gateway out of a firewall), supply both hosts separated
-    by spaces (with the proxy second):
+ SSH:
+
+    Click on "Use SSH" or go to "Options ..." if you want to use an *SSH*
+    tunnel instead of SSL (then the VNC Server does not need to speak SSL or
+    use STUNNEL).  "Use SSH and SSL" is similar: see the Help under Options.
+
+
+ Proxies:
+
+    If an intermediate proxy is needed to make the SSL connection
+    (e.g. web gateway out of a firewall) enter it in the "Proxy/Gateway"
+    entry box, or Alternatively supply both hosts separated by spaces
+    (with the proxy second) in the VNC Host:Display box:
 
            host:number   gwhost:port 
 
@@ -119,18 +128,41 @@ proc help {} {
 
            far-away:0   local-proxy:8080,mygateway.com:443
 
-    See the ssl_vncviewer description and x11vnc FAQ for info on proxies:
+    (either as above, or putting the 2nd string in the "Proxy/Gateway"
+    entry box).
 
-           http://www.karlrunge.com/x11vnc/#ssl_vncviewer
+    See the ss_vncviewer description and x11vnc FAQ for info on proxies:
+
+           http://www.karlrunge.com/x11vnc/#ss_vncviewer
            http://www.karlrunge.com/x11vnc/#faq-ssl-java-viewer-proxy
 
+
+ Remote SSH Command:
+
+    In SSH or SSH and SSL mode you can also specify a remote command to run
+    on the remote ssh host in the "Remote SSH Command" entry.  The default
+    is just to sleep a bit (sleep 30) to make sure the port tunnels are
+    active.  Alternatively you could have the remote command start the
+    VNC server, e.g.  x11vnc -nopw -display :0 -rfbport 5900 -localhost
+
+    You can also specify the remote SSH command by putting a string like
+    
+         cmd=x11vnc -nopw -display :0 -rfbport 5900 -localhost
+
+    (use any command you wish to run) at the END of the VNC Host:Display
+    entry.  In general, you can cram it all in the VNC Host:Display if
+    you like:   host:disp  proxy:port  cmd=...  (this is the way it is
+    stored internally).
+
+
+ SSL Certificates:
 
     If you want to use a SSL Certificate (PEM) file to authenticate yourself
     to the VNC server ("MyCert") or to verify the identity of the VNC Server
     ("ServerCert" or "CertsDir") select the certificate file by clicking
     the "Certs ..." button before connecting.
 
-    Certificate verification is needed to prevent Man In the Middle attacks.
+    Certificate verification is needed to prevent Man-In-The-Middle attacks.
     See the x11vnc documentation: 
 
            http://www.karlrunge.com/x11vnc/ssl.html
@@ -150,10 +182,18 @@ proc help {} {
     from a file.
 
 
-    To set other Options, e.g. to use SSH instead of STUNNEL SSL,
-    click on the "Options ..." button and read the Help there.
+ More Options:
+
+    To set other Options, e.g. to use SSH instead of STUNNEL SSL, or
+    View-Only usage, click on the "Options ..." button and read the Help
+    there.
 
     To load in a saved Options profile, click on the "Load" button.
+    This is the same as the "Load Profile" button under "Options"
+    See "Save Profile" under "Options" to save a profile.
+
+
+ More Info:
 
     See these links for more information:
 
@@ -162,24 +202,26 @@ proc help {} {
            http://www.tightvnc.com
 
 
-    Tips and Tricks:
+ Tips and Tricks:
 
      1) On Unix to get a 2nd GUI (e.g. for a 2nd connection) press Ctrl-N
         on the GUI.  If only the xterm window is visible you can press
-        Ctrl-N or try Ctrl-LeftButton -> New SSL_VNC_GUI.  On Windows you
+        Ctrl-N or try Ctrl-LeftButton -> New SSVNC_GUI.  On Windows you
         will have to manually Start a new one: Start -> Run ..., etc.
 
      2) If you use "user@hostname cmd=SHELL" then you get an SSH shell only:
         no VNC viewer will be launched.  On Windows "user@hostname cmd=PUTTY"
         will try to use putty.exe (better terminal emulation than
         plink.exe).  A shortcut for this is Ctrl-S as long as user@hostname
-        is present in the entry box.
+        is present in the entry box.  You can also put the string in the
+        "Remote SSH Command" entry.
 
      3) If you use "user@hostname cmd=KNOCK" then only the port-knocking 
         is performed.  A shortcut for this is Ctrl-P as long as hostname
         is present in the entry box.  If it matches cmd=KNOCKF, i.e. an
         extra "F", then the port-knocking "FINISH" sequence is sent, if any.
         A shortcut for this Shift-Ctrl-P as long as hostname is present.
+        You can also put the string in the "Remote SSH Command" entry.
 
      4) Pressing the "Load" button or pressing Ctrl-L or Clicking the Right
         mouse button on the main GUI will invoke the Load Profile dialog.
@@ -204,7 +246,9 @@ proc help_certs {} {
 	wm title .ch "SSL Certificates Help"
 
 	set msg {
-    Only with SSL Certificate verification can Man In the Middle attacks be
+ Description:
+
+    Only with SSL Certificate verification can Man-In-The-Middle attacks be
     prevented. Otherwise, only passive snooping attacks are prevented with SSL.
 
     The SSL Certificate files described below can have been created externally
@@ -214,14 +258,14 @@ proc help_certs {} {
     of the generated files to the VNC Server.
 
 
-    Your Certificate + Key:
+ Your Certificate + Key:
 
     You can specify your own SSL certificate (PEM) file in "MyCert" in which case it
     is used to authenticate you (the viewer) to the remote VNC Server.  If this fails
     the remote VNC Server will drop the connection.
 
 
-    Server Certificates:
+ Server Certificates:
     
     Server certs can be specified in one of two ways:
     
@@ -246,7 +290,10 @@ proc help_certs {} {
     Once selected, if you click the Right Mouse button on the "Browse..."  button then
     information about the certificate will be displayed.
 
-    If "Use SSH instead" has been selected then SSL certs are disabled.
+
+ Notes:
+
+    If "Use SSH" has been selected then SSL certs are disabled.
 
     See the x11vnc and STUNNEL documentation for how to create and use PEM
     certificate files:
@@ -279,15 +326,19 @@ proc help_opts {} {
 
 	center_win .oh
 
-	wm title .oh "SSL Viewer Options Help"
+	wm title .oh "SSL/SSH Viewer Options Help"
 
 set msg {
+  Use SSL:  The default, use SSL via STUNNEL (this requires SSL aware VNC
+            server, e.g. x11vnc -ssl SAVE ...)
+
   Use SSH:  Instead of using STUNNEL SSL, use ssh(1) for the encrypted
             tunnel.  You must be able to log in via ssh to the remote host.
 
-            On Unix the cmdline ssh(1) program will be run in an xterm
-            for passphrase authentication, etc. On Windows the cmdline
-            plink.exe program will be launched in a Windows Console window.
+            On Unix the cmdline ssh(1) program (it must already be installed)
+            will be run in an xterm for passphrase authentication, etc. On
+            Windows the cmdline plink.exe program will be launched in
+            a Windows Console window.
 
             You can set the "VNC Host:Display" to "user@host:disp" to indicate
             ssh should log in as "user" on "host".  NOTE: On Windows you MUST
@@ -296,8 +347,9 @@ set msg {
                   fred@far-away.east:0
 
             If an intermediate gateway machine must be used (e.g. to enter
-            a firewall; the VNC Server is not running on it), put something
-            like this in the "VNC Host:Display" entry box:
+            a firewall; the VNC Server is not running on it), put it in the
+            Proxy/Gateway entry or you can put something like this in the
+            "VNC Host:Display" entry box:
 
                   workstation:0   user@gateway-host:port
   
@@ -315,30 +367,34 @@ set msg {
 
                   :0   user@gateway-host:port,user@workstation:port
 
+            (or in the Proxy/Gateway entry).
 
-            At the very end of the entry box, you can also append a
-            cmd=... string to indicate that command should be run via ssh
-            on the remote machine instead of the default "sleep 15".  E.g.:
+            In the "Remote SSH Command" entry you can to indicate that a
+            remote command to be run.  The default is "sleep 15".  Also, at
+            the very end of the entry box, you can append a cmd=... string
+            to to achieve the same thing.  E.g.
 
                   user@host:0   cmd=x11vnc -nopw -display :0
 
-            (if a gateway is also needed, put it just before the cmd=...)
+            (if a gateway is also needed, put it just before the cmd=...
+            e.g.  host:0  user@gateway-host:port cmd=x11vnc -nopw )
 
 
             Trick: If you use "cmd=SHELL" then you get an SSH shell only:
             no VNC viewer will be launched.  On Windows "cmd=PUTTY" will
             try to use putty.exe (better terminal emulation than plink.exe)
-            A shortcut for this is Ctrl-S as long as user@hostname is present.
+            A shortcut for this is Ctrl-S as long as user@hostname is present
+            in the "VNC Host:Display" box.
 
   Use SSH and SSL: Tunnel the SSL connection through a SSH tunnel.  Use this
             if you want end-to-end SSL and must use a SSH gateway (e.g. to
             enter a firewall) or if additional SSH port redirs are required
-            (CUPS, Sound, SMB tunnelling: See Advanced options).
+            (CUPS, Sound, SMB tunnelling: See Advanced Options).
 
 
   Putty PW:  On Windows only: use the supplied password for plink SSH logins.
              Unlike the other options the value is not saved when 'Save
-             Profile' is performed.  This feature useful when options under
+             Profile' is performed.  This feature is useful when options under
              "Advanced" are set that require TWO SSH's: you just have
              to type the password once in this entry box.  The bundled
              pagent.exe and puttygen.exe programs can also be used to avoid
@@ -381,7 +437,7 @@ set msg {
                    the main GUI will invoke the Load Profile dialog.
 
                    Note: On Windows since the TightVNC Viewer will save
-                   its own settings in the registry, some unexpected
+                   its own settings in the Registry, some unexpected
                    behavior is possible because the viewer is nearly
                    always directed to the VNC host "localhost:30".  E.g. if
                    you specify "View Only" in this gui once but not next
@@ -391,7 +447,7 @@ set msg {
 
   Clear Options:   Set all options to their defaults (i.e. unset).
 
-  Advanced:        Bring up the Advanced options dialog.
+  Advanced:        Bring up the Advanced Options dialog.
 }
 	.oh.f.t insert end $msg
 }
@@ -410,10 +466,10 @@ proc win_nokill_msg {} {
 	center_win .w
 	wm resizable .w 1 0
 
-	wm title .w "SSL Viewer: Warning"
+	wm title .w "SSL/SSH Viewer: Warning"
 
 	set msg {
-    The TightVNC Viewer has exited.
+    The VNC Viewer has exited.
     
     You will need to terminate STUNNEL manually.
     
@@ -442,10 +498,10 @@ proc win_kill_msg {pids} {
 	center_win .w
 	wm resizable .w 1 0
 
-	wm title .w "SSL Viewer: Warning"
+	wm title .w "SSL/SSH Viewer: Warning"
 
 	set msg {
-    The TightVNC Viewer has exited.
+    The VNC Viewer has exited.
     
     We can terminate the following still running STUNNEL process(es):
     
@@ -482,7 +538,7 @@ proc win9x_plink_msg {file} {
 	center_win .pl
 	wm resizable .pl 1 0
 
-	wm title .pl "SSL Viewer: Win9x Warning"
+	wm title .pl "SSL/SSH Viewer: Win9x Warning"
 
 	set msg {
     Due to limitations on Window 9x you will have to manually start up
@@ -526,6 +582,7 @@ proc mesg {str} {
 }
 
 proc get_ssh_hp {str} {
+	regsub {cmd=.*$} $str "" str
 	set str [string trim $str]
 	regsub {[ 	].*$} $str "" str
 	return $str
@@ -545,7 +602,7 @@ proc get_ssh_cmd {str} {
 
 proc get_ssh_proxy {str} {
 	set str [string trim $str]
-	regsub {cmd=(.*$)} $str "" str
+	regsub {cmd=.*$} $str "" str
 	set str [string trim $str]
 	if { ![regexp {[ 	]} $str]} {
 		return ""
@@ -558,7 +615,7 @@ proc set_defaults {} {
 	global defs
 
 	global mycert svcert crtdir
-	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
+	global use_alpha use_grab use_ssl use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
 	global compresslevel_text quality_text
 	global use_cups use_sound use_smbmnt
@@ -571,9 +628,6 @@ proc set_defaults {} {
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
 	global include_list
-
-	set defs(use_ssh) 0
-	set defs(use_sshssl) 0
 
 	set defs(use_viewonly) 0
 	set defs(use_fullscreen) 0
@@ -626,11 +680,15 @@ proc set_defaults {} {
 
 	set defs(include_list) ""
 
+	set defs(use_ssl) 1
+	set defs(use_ssh) 0
+	set defs(use_sshssl) 0
+
 	foreach var [array names defs] {
 		set $var $defs($var)	
 	}
 
-	putty_pw_entry check
+	ssl_ssh_adjust ssl
 }
 
 proc do_viewer_windows {n} {
@@ -1438,34 +1496,55 @@ proc check_ssh_needed {} {
 	if {$use_ssh || $use_sshssl} {
 		return
 	}
-	set must 0
+	set must_cups 0
+	set must_snd 0
+	set must_smb 0
+	set must_addl 0
 	if {$use_cups} {
-		if {$cups_local_server != ""} {set must 1}
-		if {$cups_remote_port != ""} {set must 1}
-		if {$cups_local_smb_server != ""} {set must 1}
-		if {$cups_remote_smb_port != ""} {set must 1}
-		if {$cups_manage_rcfile != ""} {set must 1}
+		if {$cups_local_server != ""} {set must_cups 1}
+		if {$cups_remote_port != ""} {set must_cups 1}
+		if {$cups_local_smb_server != ""} {set must_cups 1}
+		if {$cups_remote_smb_port != ""} {set must_cups 1}
+		if {$cups_manage_rcfile != ""} {set must_cups 1}
 	}
 	if {$use_sound} {
-		if {$sound_daemon_remote_cmd != ""} {set must 1}
-		if {$sound_daemon_remote_port != ""} {set must 1}
-		if {$sound_daemon_kill} {set must 1}
-		if {$sound_daemon_restart} {set must 1}
-		if {$sound_daemon_local_cmd != ""} {set must 1}
-		if {$sound_daemon_local_port != ""} {set must 1}
-		if {$sound_daemon_local_kill} {set must 1}
-		if {$sound_daemon_local_start} {set must 1}
+		if {$sound_daemon_remote_cmd != ""} {set must_snd 1}
+		if {$sound_daemon_remote_port != ""} {set must_snd 1}
+		if {$sound_daemon_kill} {set must_snd 1}
+		if {$sound_daemon_restart} {set must_snd 1}
+		if {$sound_daemon_local_cmd != ""} {set must_snd 1}
+		if {$sound_daemon_local_port != ""} {set must_snd 1}
+		if {$sound_daemon_local_kill} {set must_snd 1}
+		if {$sound_daemon_local_start} {set must_snd 1}
 	}
 	if {$use_smbmnt} {
-		if {[regexp {//} $smb_mount_list]} {set must 1}
+		if {[regexp {//} $smb_mount_list]} {set must_smb 1}
 	}
-	if {$must} {
-		set use_sshssl 1
-		putty_pw_entry check
-		mesg "Enabling \"Use SSH and SSL\" mode for port redir"
-		update
+	if {$additional_port_redirs} {
+		set must_addl 1
+	}
+	if {$must_cups || $must_snd || $must_smb || $must_addl} {
+#		set use_sshssl 1
+#		ssl_ssh_adjust sshssl
+#		mesg "Enabling \"Use SSH and SSL\" mode for port redir"
+		mesg "Cannot do Port redirs in non-SSH mode (SSL)"
+		set msg ""
+		if {$must_smb} {
+			append msg "  - SMB Mount Port Redirection\n"
+		}
+		if {$must_snd} {
+			append msg "  - ESD Sound Port Redirection\n"
+		}
+		if {$must_cups} {
+			append msg "  - CUPS Port Redirection\n"
+		}
+		if {$must_addl} {
+			append msg "  - Additional Port Redirections\n"
+		}
+                set msg "\"Use SSL\" mode selected (no SSH)\nThe following options will be disabled:\n\n$msg"
 		bell
-		after 4000
+		update
+                tk_messageBox -type ok -icon info -message $msg
 	}
 }
 
@@ -1590,15 +1669,15 @@ proc unix_terminal_cmd {{geometry "+100+100"} {title "xterm-command"} {cmd "echo
 	}
 	if {$bg} {
 		if {$xrm1 == ""} {
-			exec xterm -geometry "$geometry" -title "$title" -e sh -c "$cmd" &
+			exec xterm -geometry "$geometry" -title "$title" -e sh -c "$cmd" 2>@stdout &
 		} else {
-			exec xterm -geometry "$geometry" -title "$title" -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" -e sh -c "$cmd" &
+			exec xterm -geometry "$geometry" -title "$title" -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" -e sh -c "$cmd" 2>@stdout &
 		}
 	} else {
 		if {$xrm1 == ""} {
-			exec xterm -geometry "$geometry" -title "$title" -e sh -c "$cmd"
+			exec xterm -geometry "$geometry" -title "$title" -e sh -c "$cmd" 2>@stdout
 		} else {
-			exec xterm -geometry "$geometry" -title "$title" -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" -e sh -c "$cmd"
+			exec xterm -geometry "$geometry" -title "$title" -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" -e sh -c "$cmd" 2>@stdout
 		}
 	}
 }
@@ -1659,7 +1738,7 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 	global did_port_knock
 	
 	set setup_cmds [ugly_setup_scripts pre $tag] 
-	set c "ssl_vncviewer -ssh"
+	set c "ss_vncviewer -ssh"
 
 	if {$proxy == ""} {
 		set pxy $hp
@@ -1670,8 +1749,8 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 	}
 
 	if {$setup_cmds != ""} {
-		set env(SSL_VNCVIEWER_SSH_CMD) "$setup_cmds sleep 10"
-		set env(SSL_VNCVIEWER_SSH_ONLY) 1
+		set env(SS_VNCVIEWER_SSH_CMD) "$setup_cmds sleep 10"
+		set env(SS_VNCVIEWER_SSH_ONLY) 1
 		if {$smb_redir_0 != ""} {
 			set c "$c -sshargs '$smb_redir_0'"
 		}
@@ -1682,9 +1761,9 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 		set did_port_knock 1
 
 		if {$use_smbmnt} {
-			set title "SSL VNC Viewer $hp -- SMB MOUNTS"
+			set title "SSL/SSH VNC Viewer $hp -- SMB MOUNTS"
 		} else {
-			set title "SSL VNC Viewer $hp -- Pre Commands"
+			set title "SSL/SSH VNC Viewer $hp -- Pre Commands"
 		}
 
 		set tee ""
@@ -1701,14 +1780,10 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 			}
 		}
 
-#		exec xterm -geometry "80x25+100+100" \
-#		    -title "$title" \
-#		    -e sh -c "set -xv; $c" &
-
 		unix_terminal_cmd "80x25+100+100" "$title" "set -xv; $c" 1
 
-		set env(SSL_VNCVIEWER_SSH_CMD) ""
-		set env(SSL_VNCVIEWER_SSH_ONLY) ""
+		set env(SS_VNCVIEWER_SSH_CMD) ""
+		set env(SS_VNCVIEWER_SSH_ONLY) ""
 
 		if {$use_smbmnt} {
 			smbmnt_wait $tee
@@ -1717,11 +1792,72 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 		}
 	}
 }
+proc init_vncdisplay {} {
+	global vncdisplay vncproxy remote_ssh_cmd
+	set vncdisplay [string trim $vncdisplay] 
+
+	if {$vncdisplay == ""} {
+		set vncproxy ""
+		set remote_ssh_cmd ""
+		return
+	}
+
+	set hpnew  [get_ssh_hp $vncdisplay]
+	set proxy  [get_ssh_proxy $vncdisplay]
+	set sshcmd [get_ssh_cmd $vncdisplay]
+
+	set vncdisplay $hpnew
+	set vncproxy $proxy
+	set remote_ssh_cmd $sshcmd
+
+	if {$sshcmd != ""} {
+		global use_ssl use_ssh use_sshssl
+		set use_ssl 0
+		if {! $use_ssh && ! $use_sshssl} {
+			set use_ssh 1
+		}
+	}
+	# ssl_ssh_adjust will be called.
+}
+
+proc get_vncdisplay {} {
+	global vncdisplay vncproxy remote_ssh_cmd
+	set vncdisplay [string trim $vncdisplay]
+
+	set t $vncdisplay
+	regsub {[ \t]*cmd=.*$} $t "" t
+	set t [string trim $t]
+	
+	set str ""
+	if [regexp {[ \t]} $t] {
+		set str $t
+	} else {
+		if {$vncproxy != "" && $t == ""} {
+			set str "--nohost-- $vncproxy"
+		} else {
+			set str "$t $vncproxy"
+		}
+	}
+	if [regexp {cmd=.*$} $vncdisplay match] {
+		if {$str == ""} {
+			set str "--nohost--"
+		}
+		set str "$str $match"
+	} else {
+		if {$remote_ssh_cmd != ""} {
+			if {$str == ""} {
+				set str "--nohost--"
+			}
+			set str "$str cmd=$remote_ssh_cmd"
+		}
+	}
+	set str [string trim $str]
+	return $str
+}
 
 proc port_knock_only {hp {mode KNOCK}} {
 	if {$hp == ""} {
-		global vncdisplay
-		set hp $vncdisplay
+		set hp [get_vncdisplay]
 		if {$hp == ""} {
 			mesg "No host port found"
 			bell
@@ -1785,11 +1921,6 @@ proc launch_unix {hp} {
 
 	set cmd ""
 
-	if [regexp {cmd=} $hp] {
-		if {! $use_ssh && ! $use_sshssl} {
-			set use_ssh 1
-		}
-	}
 	check_ssh_needed
 
 	set_smb_mounts
@@ -1806,11 +1937,11 @@ proc launch_unix {hp} {
 
 	if {$use_ssh || $use_sshssl} {
 		if {$skip_ssh} {
-			set cmd "ssl_vncviewer"
+			set cmd "ss_vncviewer"
 		} elseif {$use_ssh} {
-			set cmd "ssl_vncviewer -ssh"
+			set cmd "ss_vncviewer -ssh"
 		} else {
-			set cmd "ssl_vncviewer -sshssl"
+			set cmd "ss_vncviewer -sshssl"
 			if {$mycert != ""} {
 				set cmd "$cmd -mycert '$mycert'"
 			}
@@ -1858,10 +1989,10 @@ proc launch_unix {hp} {
 		}
 
 		if {$sshcmd == "SHELL"} {
-			set env(SSL_VNCVIEWER_SSH_CMD) {$SHELL}
-			set env(SSL_VNCVIEWER_SSH_ONLY) 1
+			set env(SS_VNCVIEWER_SSH_CMD) {$SHELL}
+			set env(SS_VNCVIEWER_SSH_ONLY) 1
 		} elseif {$setup_cmds != ""} {
-			set env(SSL_VNCVIEWER_SSH_CMD) "$setup_cmds$sshcmd"
+			set env(SS_VNCVIEWER_SSH_CMD) "$setup_cmds$sshcmd"
 		} else {
 			if {$sshcmd != ""} {
 				set cmd "$cmd -sshcmd '$sshcmd'"
@@ -1885,10 +2016,10 @@ proc launch_unix {hp} {
 		}
 		if {$sshargs != ""} {
 			set cmd "$cmd -sshargs '$sshargs'"
-			set env(SSL_VNCVIEWER_USE_C) 1
+			set env(SS_VNCVIEWER_USE_C) 1
 		}
 		if {$sshcmd == "SHELL"} {
-			set env(SSL_VNCVIEWER_SSH_ONLY) 1
+			set env(SS_VNCVIEWER_SSH_ONLY) 1
 			if {$proxy == ""} {
 				set hpt $hpnew
 				regsub {:[0-9]*$} $hpt "" hpt
@@ -1908,24 +2039,20 @@ proc launch_unix {hp} {
 			if {[regexp {FINISH} $port_knocking_list]} {
 				wm withdraw .
 				update
-#				exec xterm -geometry $geometry \
-#				    -title "SHELL to $hp" -e sh -c "$cmd"
 				unix_terminal_cmd $geometry "SHELL to $hp" "$cmd"
 				wm deiconify .
 				update
 				do_port_knock $pk_hp finish
 			} else {
-#				exec xterm -geometry $geometry \
-#				    -title "SHELL to $hp" -e sh -c "$cmd" &
 				unix_terminal_cmd $geometry "SHELL to $hp" "$cmd" 1
 			}
-			set env(SSL_VNCVIEWER_SSH_CMD) ""
-			set env(SSL_VNCVIEWER_SSH_ONLY) ""
-			set env(SSL_VNCVIEWER_USE_C) ""
+			set env(SS_VNCVIEWER_SSH_CMD) ""
+			set env(SS_VNCVIEWER_SSH_ONLY) ""
+			set env(SS_VNCVIEWER_USE_C) ""
 			return
 		}
 	} else {
-		set cmd "ssl_tightvncviewer"
+		set cmd "ssvnc_cmd"
 		set hpnew  [get_ssh_hp $hp]
 		set proxy  [get_ssh_proxy $hp]
 		if {$mycert != ""} {
@@ -1940,6 +2067,18 @@ proc launch_unix {hp} {
 			set cmd "$cmd -proxy '$proxy'"
 		}
 		set hp $hpnew
+		if [regexp {^.*@} $hp match] {
+			catch {raise .; update}
+			mesg "Trimming \"$match\" from hostname"
+			after 1000
+			regsub {^.*@} $hp "" hp
+		}
+		if [regexp {@} $proxy] {
+			bell
+			catch {raise .; update}
+			mesg "WARNING: SSL proxy contains \"@\" sign"
+			after 2000
+		}
 	}
 
 	if {$use_alpha} {
@@ -1956,6 +2095,29 @@ proc launch_unix {hp} {
 
 	set cmd "$cmd $hp"
 
+	if {$change_vncviewer && $change_vncviewer_path != ""} {
+		set env(VNCVIEWERCMD) $change_vncviewer_path
+	} else {
+		set env(VNCVIEWERCMD) ""
+	}
+
+	set realvnc4 $vncviewer_realvnc4
+	set realvnc3 0
+	set flavor ""
+	if {! $darwin_cotvnc} {
+		catch {set flavor [exec ss_vncviewer -viewerflavor 2>/dev/null]}
+	}
+	if [regexp {realvnc4} $flavor] {
+		set realvnc4 1
+	}
+	if [regexp {tightvnc} $flavor] {
+		set realvnc4 0
+	}
+	if [regexp {realvnc3} $flavor] {
+		set realvnc4 0
+		set realvnc3 1
+	}
+
 	if {$use_viewonly} {
 		if {$darwin_cotvnc} {
 			set cmd "$cmd --ViewOnly"
@@ -1971,7 +2133,7 @@ proc launch_unix {hp} {
 		}
 	}
 	if {$use_bgr233} {
-		if {$vncviewer_realvnc4} {
+		if {$realvnc4} {
 			set cmd "$cmd -lowcolourlevel 1"
 		} else {
 			set cmd "$cmd -bgr233"
@@ -1980,19 +2142,21 @@ proc launch_unix {hp} {
 	if {$use_nojpeg} {
 		if {$darwin_cotvnc} {
 			;
-		} elseif {! $vncviewer_realvnc4} {
+		} elseif {! $realvnc4 && ! $realvnc3} {
 			set cmd "$cmd -nojpeg"
 		}
 	}
 	if {! $use_raise_on_beep} {
 		if {$darwin_cotvnc} {
 			;
-		} elseif {! $vncviewer_realvnc4} {
+		} elseif {! $realvnc4 && ! $realvnc3} {
 			set cmd "$cmd -noraiseonbeep"
 		}
 	}
 	if {$use_compresslevel != "" && $use_compresslevel != "default"} {
-		if {$vncviewer_realvnc4} {
+		if {$realvnc3} {
+			;
+		} elseif {$realvnc4} {
 			set cmd "$cmd -zliblevel '$use_compresslevel'"
 		} else {
 			set cmd "$cmd -compresslevel '$use_compresslevel'"
@@ -2001,7 +2165,7 @@ proc launch_unix {hp} {
 	if {$use_quality != "" && $use_quality != "default"} {
 		if {$darwin_cotvnc} {
 			;
-		} elseif {! $vncviewer_realvnc4} {
+		} elseif {! $realvnc4 && ! $realvnc3} {
 			set cmd "$cmd -quality '$use_quality'"
 		}
 	}
@@ -2009,17 +2173,11 @@ proc launch_unix {hp} {
 		# realvnc4 -preferredencoding zrle
 		if {$darwin_cotvnc} {
 			;
-		} elseif {$vncviewer_realvnc4} {
+		} elseif {$realvnc4} {
 			set cmd "$cmd -preferredencoding zrle"
 		} else {
 			set cmd "$cmd -encodings 'copyrect tight zrle zlib hextile'"
 		}
-	}
-
-	if {$change_vncviewer && $change_vncviewer_path != ""} {
-		set env(VNCVIEWERCMD) $change_vncviewer_path
-	} else {
-		set env(VNCVIEWERCMD) ""
 	}
 
 	catch {destroy .o}
@@ -2051,24 +2209,21 @@ proc launch_unix {hp} {
 	set xrm1 "*.srinterCommand:true"
 	set xrm2 $xrm1
 	set xrm3 $xrm1
-	if {[info exists env(SSL_VNC_GUI_CMD)]} {
-		set xrm1 "*.printerCommand:env XTERM_PRINT=1 $env(SSL_VNC_GUI_CMD)"
+	if {[info exists env(SSVNC_GUI_CMD)]} {
+		set xrm1 "*.printerCommand:env XTERM_PRINT=1 $env(SSVNC_GUI_CMD)"
 		set xrm2 "XTerm*VT100*translations:#override Shift<Btn3Down>:print()\\nCtrl<Key>N:print()"
-		set xrm3 "*mainMenu*print*Label:  New SSL_VNC_GUI"
+		set xrm3 "*mainMenu*print*Label:  New SSVNC_GUI"
 	}
-#	exec xterm -geometry $geometry -xrm "$xrm1" -xrm "$xrm2" -xrm "$xrm3" \
-#	    -title "SSL VNC Viewer $hp" \
-#	    -e sh -c "set -xv; $cmd; set +xv; echo; echo Done. You Can X-out or Ctrl-C this Terminal if you like.; echo; echo sleep 15; echo; sleep 15"
 	set m "Done. You Can X-out or Ctrl-C this Terminal if you like."
 	global uname
 	if {$uname == "Darwin"} {
 		regsub {X-out or } $m "" m
 	}
-	unix_terminal_cmd $geometry "SSL VNC Viewer $hp" \
+	unix_terminal_cmd $geometry "SSL/SSH VNC Viewer $hp" \
 	"set -xv; $cmd; set +xv; echo; echo $m; echo; echo sleep 15; echo; sleep 15" 0 $xrm1 $xrm2 $xrm3
 
-	set env(SSL_VNCVIEWER_SSH_CMD) ""
-	set env(SSL_VNCVIEWER_USE_C) ""
+	set env(SS_VNCVIEWER_SSH_CMD) ""
+	set env(SS_VNCVIEWER_USE_C) ""
 
 	if {$sound_daemon_local_kill && $sound_daemon_local_cmd != ""} {
 		set daemon [string trim $sound_daemon_local_cmd]
@@ -2173,11 +2328,11 @@ proc del_launch_windows_ssh_files {} {
 }
 
 proc launch_shell_only {} {
-	global vncdisplay is_windows
+	global is_windows
 	global skip_pre
 
-	set hp $vncdisplay
-	regsub {cmd=.*$} $vncdisplay "" hp
+	set hp [get_vncdisplay]
+	regsub {cmd=.*$} $hp "" hp
 	set hp [string trim $hp]
 	if {$is_windows} {
 		append hp " cmd=PUTTY"
@@ -2189,7 +2344,7 @@ proc launch_shell_only {} {
 }
 
 proc launch {{hp ""}} {
-	global vncdisplay tcl_platform is_windows
+	global tcl_platform is_windows
 	global mycert svcert crtdir
 	global pids_before pids_after pids_new
 	global env
@@ -2197,10 +2352,18 @@ proc launch {{hp ""}} {
 
 	set debug 0
 	if {$hp == ""} {
-		set hp [string trim $vncdisplay]
+		set hp [get_vncdisplay]
 	}
 
-	if {[regexp {^[ 	]*$} $hp]} {
+	regsub {[ 	]*cmd=.*$} $hp "" tt
+
+	if {[regexp {^[ 	]*$} $tt]} {
+		mesg "No host:disp supplied."
+		bell
+		catch {raise .}
+		return
+	}
+	if {[regexp -- {--nohost--} $tt]} {
 		mesg "No host:disp supplied."
 		bell
 		catch {raise .}
@@ -2234,11 +2397,6 @@ proc launch {{hp ""}} {
 		return
 	}
 
-	if [regexp {cmd=} $hp] {
-		if {! $use_ssh && ! $use_sshssl} {
-			set use_ssh 1
-		}
-	}
 	check_ssh_needed
 
 	if {! $use_ssh} {
@@ -2340,6 +2498,13 @@ proc launch {{hp ""}} {
 		set host "localhost"
 	}
 
+	if [regexp {^.*@} $host match] {
+		catch {raise .; update}
+		mesg "Trimming \"$match\" from hostname"
+		after 1000
+		regsub {^.*@} $host "" host
+	}
+
 	set disp [lindex $list 1]
 	set disp [string trim $disp]
 	regsub { .*$} $disp "" disp
@@ -2349,9 +2514,15 @@ proc launch {{hp ""}} {
 	set port [expr "$disp + 5900"]
 
 	if {$proxy != ""} {
-		set env(SSL_VNC_PROXY) $proxy
-		set env(SSL_VNC_LISTEN) [expr "$n2 + 5900"]
-		set env(SSL_VNC_DEST) "$host:$port"
+		if [regexp {@} $proxy] {
+			bell
+			catch {raise .; update}
+			mesg "WARNING: SSL proxy contains \"@\" sign"
+			after 2000
+		}
+		set env(SSVNC_PROXY) $proxy
+		set env(SSVNC_LISTEN) [expr "$n2 + 5900"]
+		set env(SSVNC_DEST) "$host:$port"
 	}
 
 	if {$debug} {
@@ -2434,9 +2605,9 @@ proc launch {{hp ""}} {
 		mesg "Starting TCP helper on port $port ..."
 		after 600
 		set proxy_pid [exec "connect_br.exe" &]
-		unset -nocomplain env(SSL_VNC_PROXY)
-		unset -nocomplain env(SSL_VNC_LISTEN)
-		unset -nocomplain env(SSL_VNC_DEST)
+		unset -nocomplain env(SSVNC_PROXY)
+		unset -nocomplain env(SSVNC_LISTEN)
+		unset -nocomplain env(SSVNC_DEST)
 	}
 
 	mesg "Starting STUNNEL on port $port2 ..."
@@ -2508,13 +2679,36 @@ proc get_idir_certs {str} {
 		} else {
 			set idir [file dirname $str]
 		}
+		if {$is_windows} {
+			regsub -all {\\} $idir "/" idir
+			regsub -all {//*} $idir "/" idir
+		}
 	}
 	if {$idir == ""} {
 		if {$is_windows} {
-			set t [file dirname [pwd]]
-			set t "$t/certs"
-			if [file isdirectory $t] {
-				set idir $t
+			if [info exists env(HOME)] {
+				set t "$env(HOME)/ss_vnc"	
+				regsub -all {\\} $t "/" t
+				regsub -all {//*} $t "/" t
+				if {! [file isdirectory $t]} {
+					catch {file mkdir $t}
+				}
+				set t "$env(HOME)/ss_vnc/certs"	
+				regsub -all {\\} $t "/" t
+				regsub -all {//*} $t "/" t
+				if {! [file isdirectory $t]} {
+					catch {file mkdir $t}
+				}
+				if [file isdirectory $t] {
+					set idir $t
+				}
+			}
+			if {$idir == ""} {
+				set t [file dirname [pwd]]
+				set t "$t/certs"
+				if [file isdirectory $t] {
+					set idir $t
+				}
 			}
 		}
 		if {$idir == ""} {
@@ -2869,7 +3063,6 @@ emailAddress_max                = 64
 	} else {
 		set geometry [xterm_center_geometry]
 		update
-#		exec xterm -geometry $geometry -title "Running OpenSSL" -e sh -c "$cmd"
 		unix_terminal_cmd $geometry "Running OpenSSL" "$cmd"
 		catch {file attributes $pem -permissions go-rw}
 		catch {file attributes $crt -permissions go-w}
@@ -3483,10 +3676,27 @@ proc get_profiles_dir {} {
 	
 	set dir ""
 	if {$is_windows} {
-		set t [file dirname [pwd]]
-		set t "$t/profiles"
-		if [file isdirectory $t] {
-			set dir $t
+		if [info exists env(HOME)] {
+			set t "$env(HOME)/ss_vnc"
+			regsub -all {\\} $t "/" t
+			regsub -all {//*} $t "/" t
+			if {! [file isdirectory $t]} {
+				catch {file mkdir $t}
+			}
+			if [file isdirectory $t] {
+				set dir $t
+				set s "$t/profiles"
+				if {! [file exists $s]} {
+					catch {file mkdir $s}
+				}
+			}
+		}
+		if {$dir == ""} {
+			set t [file dirname [pwd]]
+			set t "$t/profiles"
+			if [file isdirectory $t] {
+				set dir $t
+			}
 		}
 	} elseif [info exists env(HOME)] {
 		set t "$env(HOME)/.vnc"
@@ -3501,8 +3711,8 @@ proc get_profiles_dir {} {
 	
 	if {$dir != ""} {
 		
-	} elseif [info exists env(SSL_VNC_BASEDIR)] {
-		set dir $env(SSL_VNC_BASEDIR)
+	} elseif [info exists env(SSVNC_BASEDIR)] {
+		set dir $env(SSVNC_BASEDIR)
 	} else {
 		set dir [pwd]
 	}
@@ -3620,6 +3830,11 @@ proc load_profile {} {
 		}
 	}
 
+	global use_ssl use_ssh use_sshssl
+	set use_ssl 0
+	set use_ssh 0
+	set use_sshssl 0
+
 	global defs
 	foreach line [split $str "\n"] {
 		set line [string trim $line]
@@ -3647,6 +3862,24 @@ proc load_profile {} {
 		}
 	}
 
+	init_vncdisplay
+	if {! $use_ssl && ! $use_ssh && ! $use_sshssl} {
+		set use_ssl 1
+	}
+	if {$use_ssl} {
+		set use_ssh 0
+		set use_sshssl 0
+	} elseif {$use_ssh && $use_sshssl} {
+		set use_ssh 0
+	}
+	if {$use_ssl} {
+		ssl_ssh_adjust ssl
+	} elseif {$use_ssh} {
+		ssl_ssh_adjust ssh
+	} elseif {$use_sshssl} {
+		ssl_ssh_adjust sshssl
+	}
+
 	set compresslevel_text "Compress Level: $use_compresslevel"
 	set quality_text "Quality: $use_quality"
 
@@ -3656,7 +3889,6 @@ proc load_profile {} {
 
 proc save_profile {} {
 	global is_windows uname
-	global vncdisplay
 	global profdone
 	global include_vars defs
 
@@ -3664,7 +3896,9 @@ proc save_profile {} {
 	
 	set dir [get_profiles_dir]
 
-	set disp [string trim $vncdisplay]
+	set vncdisp [get_vncdisplay]
+
+	set disp [string trim $vncdisp]
 	if {$disp != ""} {
 		regsub {[ 	].*$} $disp "" disp
 		regsub -all {/} $disp "" disp
@@ -3684,7 +3918,7 @@ proc save_profile {} {
 		set profdone 1
 		return
 	}
-	set h [string trim $vncdisplay]
+	set h [string trim $vncdisp]
 	set p $h
 	regsub {:.*$} $h "" h
 	set host $h
@@ -3700,7 +3934,7 @@ proc save_profile {} {
 		set port $p
 	}
 
-	set h [string trim $vncdisplay]
+	set h [string trim $vncdisp]
 	regsub {cmd=.*$} $h "" h
 	set h [string trim $h]
 	if {! [regexp {[ 	]} $h]} {
@@ -3729,7 +3963,7 @@ proc save_profile {} {
 	puts $fh "port=$port"
 	puts $fh "proxyhost=$proxy"
 	puts $fh "proxyport=$proxyport"
-	puts $fh "disp=$vncdisplay"
+	puts $fh "disp=$vncdisp"
 	puts $fh "\n\[options\]"
 
 	if {$include_list != ""} {
@@ -3769,11 +4003,10 @@ proc save_profile {} {
 }
 
 proc set_ssh {} {
-	global use_ssh use_sshssl
-	if {! $use_ssh && ! $use_sshssl} {
-		set use_ssh 1
+	global use_ssl
+	if {$use_ssl} {
+		ssl_ssh_adjust ssh
 	}
-	putty_pw_entry check
 }
 
 proc expand_IP {redir} {
@@ -4410,8 +4643,8 @@ proc cups_dialog {} {
 
 	set msg {
     CUPS Printing requires SSH be used to set up the Print service port
-    redirection.  This will be either of the "Use SSH instead" or "Use
-    SSH and SSL" modes under "Options".  Pure SSL tunnelling will not work.
+    redirection.  This will be either of the "Use SSH" or "Use SSH and
+    SSL" modes under "Options".  Pure SSL tunnelling will not work.
 
     This method requires working CUPS software setups on both the remote
     and local sides of the connection.
@@ -4567,10 +4800,10 @@ proc sound_dialog {} {
 	}
 
 	set msg {
-    Sound tunnelling to a sound daemon requires SSH be used to set up the
-    service port redirection.  This will be either of the "Use SSH instead"
-    or "Use SSH and SSL" modes under "Options".  Pure SSL tunnelling will
-    not work.
+    Sound tunnelling to a sound daemon requires SSH be used to set up
+    the service port redirection.  This will be either of the "Use SSH"
+    or "Use SSH and SSL" modes under "Options".  Pure SSL tunnelling
+    will not work.
 
     This method requires working Sound daemon (e.g. ESD or ARTSD) software
     setups on both the remote and local sides of the connection.
@@ -5327,10 +5560,10 @@ proc smb_dialog {} {
 	}
 
 	set msg {
-    Windows/Samba Filesystem mounting requires SSH be used to set up the SMB
-    service port redirection.  This will be either of the "Use SSH instead"
-    or "Use SSH and SSL" modes under "Options".  Pure SSL tunnelling will
-    not work.
+    Windows/Samba Filesystem mounting requires SSH be used to set up the
+    SMB service port redirection.  This will be either of the "Use SSH"
+    or "Use SSH and SSL" modes under "Options".  Pure SSL tunnelling
+    will not work.
 
     This method requires a working Samba software setup on the remote
     side of the connection (VNC server) and existing Samba or Windows file
@@ -5454,16 +5687,16 @@ proc help_advanced_opts {} {
 
 	center_win .ah
 
-	wm title .ah "Advanced Opts Help"
+	wm title .ah "Advanced Options Help"
 
 	set msg {
-    These Advanced options that may require extra software installed on
+    These Advanced Options that may require extra software installed on
     the VNC server-side (the remote server machine) and/or on the VNC
     client-side (where this gui is running).
 
-    The Service redirection options, CUPS, ESD/ARTSD, and SMB will require
-    that you use SSH for tunneling so that they can use the -R port
-    redirection will be enabled for each service.  I.e. "Use SSH instead"
+    The Service redirection options, CUPS, ESD/ARTSD, and SMB will
+    require that you use SSH for tunneling so that they can use the -R
+    port redirection will be enabled for each service.  I.e. "Use SSH"
     or "Use SSH and SSL" mode.
 
     These options may also require additional configuration to get them
@@ -6033,6 +6266,8 @@ proc port_knocking_dialog {} {
 	}
 
 	set msg {
+ Description:
+
     Port Knocking is where a network connection to a service is not provided
     to just any client, but rather only to those that immediately prior to
     connecting send a more or less secret pattern of connections to other
@@ -6059,14 +6294,17 @@ proc port_knocking_dialog {} {
     For more information http://www.portknocking.org/ and
     http://www.linuxjournal.com/article/6811
 
-    Tip: if you just want to use the Port Knocking for an SSH shell and not
+
+ Tip:
+
+    If you just want to use the Port Knocking for an SSH shell and not
     for a VNC tunnel, then specify something like "user@hostname cmd=SHELL"
     (or "user@hostname cmd=PUTTY" on Windows) in the VNC Host:Display entry box
     on the main panel.  This will do everything short of starting the viewer.
     A shortcut for this is Ctrl-S as long as user@hostname is present.
     
 
-    Specifying the Knocks:
+ Specifying the Knocks:
 
     In the text area below "Supply port knocking pattern" you put in the pattern
     of "knocks" needed for this connection.  You can separate the knocks by
@@ -6096,7 +6334,7 @@ proc port_knocking_dialog {} {
     before continuing on to the next knock.
 
 
-    Examples:
+ Examples:
 
            5433, 12321, 1661
 
@@ -6127,7 +6365,7 @@ proc port_knocking_dialog {} {
     (or one can split them up via lines as above.)
 
 
-    Advanced port knock actions:
+ Advanced port knock actions:
 
     If the string in the text field contains anywhere the strings "CMD=", "CMDX=",
     or "SEND=", then splitting on commas is not done: it is only split on lines.
@@ -6160,14 +6398,16 @@ proc port_knocking_dialog {} {
    SEND string, use %NEWLINE.  Sending binary data is not yet supported;
    use CMD= with your own program.
 
-   Examples:
+
+ Advanced Examples:
 
       CMD=port_knock_client -password wombat33
       CMDX=port_knock_client -password wombat33 -host %HOST -src %NAT
 
       fw.example.com:5433/udp SEND=ASDLFKSJDF
 
-   More tricks:
+
+ More tricks:
 
       To temporarily "comment out" a knock, insert a leading "#" character.
 
@@ -6177,7 +6417,8 @@ proc port_knocking_dialog {} {
       If a knock entry matches "delay N" the default delay is set to
       N milliseconds (it is 150 initially).
 
-   One Time Pads:
+
+ One Time Pads:
 
       If the text contains a (presumably single) line of the form:
 
@@ -6199,7 +6440,7 @@ proc port_knocking_dialog {} {
            sleep 4000
 
 
-   Port knock only:
+ Port knock only:
 
       If, in the 'VNC Host:Display' entry, you use "user@hostname cmd=KNOCK"
       then only the port-knocking is performed.  A shortcut for this is
@@ -6234,7 +6475,7 @@ proc set_advanced_options {} {
 	catch {destroy .o}
 	catch {destroy .oa}
 	toplevel .oa
-	wm title .oa "Advanced options"
+	wm title .oa "Advanced Options"
 
 	set i 1
 
@@ -6282,15 +6523,17 @@ proc set_advanced_options {} {
 		pack .oa.b$j -side top -fill x
 	}
 
-	button .oa.connect -text "Connect" -command launch
-	pack .oa.connect -side top -fill x 
+#	button .oa.connect -text "Connect" -command launch
+#	pack .oa.connect -side top -fill x 
 
 	frame .oa.b
 	button .oa.b.done -text "Done" -command {destroy .oa}
 	bind .oa <Escape> {destroy .oa}
 	button .oa.b.help -text "Help" -command help_advanced_opts
 
-	pack .oa.b.help .oa.b.done -fill x -expand 1 -side left
+	button .oa.b.connect -text "Connect" -command launch
+
+	pack .oa.b.help .oa.b.connect .oa.b.done -fill x -expand 1 -side left
 
 	pack .oa.b -side top -fill x 
 
@@ -6362,14 +6605,14 @@ proc ssh_agent_restart {} {
 	puts $fh "#!/bin/sh"
 	puts $fh "eval `$ssh_agent -s`"
 	puts $fh "$ssh_add"
-	puts $fh "SSL_VNC_GUI_CHILD=\"\"" 
-	puts $fh "export SSL_VNC_GUI_CHILD" 
+	puts $fh "SSVNC_GUI_CHILD=\"\"" 
+	puts $fh "export SSVNC_GUI_CHILD" 
 
 	global buck_zero
 	set cmd $buck_zero
 	
-	if [info exists env(SSL_VNC_GUI_CMD)] {
-		set cmd $env(SSL_VNC_GUI_CMD) 
+	if [info exists env(SSVNC_GUI_CMD)] {
+		set cmd $env(SSVNC_GUI_CMD) 
 	}
 	#puts $fh "$cmd </dev/null 1>/dev/null 2>/dev/null &"
 	puts $fh "nohup $cmd &"
@@ -6381,7 +6624,6 @@ proc ssh_agent_restart {} {
 	catch {wm withdraw .o}
 	catch {wm withdraw .oa}
 
-#	exec xterm -geometry +200+200 -title "Restarting with ssh-agent/ssh-add" -e sh $tmp &
 	unix_terminal_cmd "+200+200" "Restarting with ssh-agent/ssh-add" "sh $tmp" 1
 	after 10000
 	destroy .
@@ -6407,6 +6649,48 @@ proc putty_pw_entry {mode} {
 	}
 }
 
+proc ssl_ssh_adjust {which} {
+	global use_ssl use_ssh use_sshssl sshssl_sw	
+	global remote_ssh_cmd_list
+
+	if {$which == "ssl"} {
+		set use_ssl 1
+		set use_ssh 0
+		set use_sshssl 0
+		set sshssl_sw "ssl"
+	} elseif {$which == "ssh"} {
+		set use_ssl 0
+		set use_ssh 1
+		set use_sshssl 0
+		set sshssl_sw "ssh"
+	} elseif {$which == "sshssl"} {
+		set use_ssl 0
+		set use_ssh 0
+		set use_sshssl 1
+		set sshssl_sw "sshssl"
+	}
+
+	if [info exists remote_ssh_cmd_list] {
+		if {$use_ssh || $use_sshssl} {
+			foreach w $remote_ssh_cmd_list {
+				$w configure -state normal
+			}
+		}
+		if {$use_ssl} {
+			foreach w $remote_ssh_cmd_list {
+				$w configure -state disabled
+			}
+		}
+	}
+
+	if {! $use_ssl && ! $use_ssh && ! $use_sshssl} {
+		set use_ssl 1
+		set sshssl_sw "ssl"
+	}
+	
+	putty_pw_entry check
+}
+
 proc set_options {} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
@@ -6415,18 +6699,20 @@ proc set_options {} {
 
 	catch {destroy .o}
 	toplevel .o
-	wm title .o "Set SSL VNC Viewer options"
+	wm title .o "SSL/SSH VNC Options"
 
 	set i 1
 
-	checkbutton .o.b$i -anchor w -variable use_ssh -text \
-		"Use SSH instead" \
-		-command {if {$use_ssh} {set use_sshssl 0}; putty_pw_entry check}
+	radiobutton .o.b$i -anchor w -variable sshssl_sw -value ssl -text \
+		"Use SSL" -command {ssl_ssh_adjust ssl}
 	incr i
 
-	checkbutton .o.b$i -anchor w -variable use_sshssl -text \
-		"Use SSH and SSL" \
-		-command {if {$use_sshssl} {set use_ssh 0}; putty_pw_entry check}
+	radiobutton .o.b$i -anchor w -variable sshssl_sw -value ssh -text \
+		"Use SSH" -command {ssl_ssh_adjust ssh}
+	incr i
+
+	radiobutton .o.b$i -anchor w -variable sshssl_sw -value sshssl -text \
+		"Use SSH and SSL" -command {ssl_ssh_adjust sshssl}
 	set iss $i
 	incr i
 
@@ -6526,21 +6812,21 @@ proc set_options {} {
 	button .o.s_prof -text "Save Profile ..." -command {save_profile; raise .o}
 	button .o.l_prof -text " Load Profile ..." -command {load_profile; raise .o}
 	button .o.advanced -text "Advanced ..." -command set_advanced_options
-	button .o.connect -text "Connect" -command launch
+#	button .o.connect -text "Connect" -command launch
 	button .o.clear -text "Clear Options" -command set_defaults
+#	pack .o.connect -side top -fill x 
+	pack .o.clear -side top -fill x 
 	pack .o.s_prof -side top -fill x 
 	pack .o.l_prof -side top -fill x 
-	#pack .o.inc -side top -fill x
-	pack .o.clear -side top -fill x 
 	pack .o.advanced -side top -fill x 
-	pack .o.connect -side top -fill x 
 
 	frame .o.b
 	button .o.b.done -text "Done" -command {destroy .o}
 	bind .o <Escape> {destroy .o}
 	button .o.b.help -text "Help" -command help_opts
+	button .o.b.connect -text "Connect" -command launch
 
-	pack .o.b.help .o.b.done -fill x -expand 1 -side left
+	pack .o.b.help .o.b.connect .o.b.done -fill x -expand 1 -side left
 
 	pack .o.b -side top -fill x 
 
@@ -6580,6 +6866,7 @@ if {$uname == "Darwin"} {
 			catch {file mkdir $t}
 		}
 	}
+	set help_font "-font {Monaco 10}"
 }
 
 set putty_pw ""
@@ -6587,21 +6874,28 @@ set putty_pw ""
 global scroll_text_focus
 set scroll_text_focus 1
 
-wm title . "SSL VNC Viewer"
+set multientry 1
+
+wm title . "SSL/SSH VNC Viewer"
 wm resizable . 1 0
 
 set_defaults
 set skip_pre 0
 
 set vncdisplay ""
+set vncproxy ""
+set remote_ssh_cmd ""
 
-label .l -text "SSL TightVNC Viewer" -relief ridge
+label .l -text "SSL/SSH VNC Viewer" -relief ridge
 
 set wl 21
 set we 40
 frame .f0
-#label .f0.l -width $wl -anchor w -text "VNC Host:Display" -relief ridge
-label .f0.l -anchor w -text "VNC Host:Display" -relief ridge
+if {$multientry} {
+	label .f0.l -width $wl -anchor w -text "VNC Host:Display" -relief ridge
+} else {
+	label .f0.l -anchor w -text "VNC Host:Display" -relief ridge
+}
 entry .f0.e -width $we -textvariable vncdisplay
 pack .f0.l -side left 
 pack .f0.e -side left -expand 1 -fill x
@@ -6609,25 +6903,27 @@ bind .f0.e <Return> launch
 
 frame .f1
 label .f1.l -width $wl -anchor w -text "Proxy/Gateway:" -relief ridge
-entry .f1.e -width $we -textvariable vncdisplay
+entry .f1.e -width $we -textvariable vncproxy
 pack .f1.l -side left 
 pack .f1.e -side left -expand 1 -fill x
 
 frame .f2
 label .f2.l -width $wl -anchor w -text "Remote SSH Command:" -relief ridge
-entry .f2.e -width $we -textvariable vncdisplay
+entry .f2.e -width $we -textvariable remote_ssh_cmd
 pack .f2.l -side left 
 pack .f2.e -side left -expand 1 -fill x
 .f2.l configure -state disabled
 .f2.e configure -state disabled
 
+set remote_ssh_cmd_list {.f2.e .f2.l} 
+
 frame .f3
-# -command
-checkbutton .f3.ssl -anchor w -variable use_ssl -text "Use SSL"
-checkbutton .f3.ssh -anchor w -variable use_ssh -text "Use SSH"
-checkbutton .f3.sshssl -anchor w -variable use_sshssl -text "Use SSH and SSL"
-set use_ssl 1
+radiobutton .f3.ssl -anchor w    -variable sshssl_sw -value ssl    -command {ssl_ssh_adjust ssl}    -text "Use SSL"
+radiobutton .f3.ssh -anchor w    -variable sshssl_sw -value ssh    -command {ssl_ssh_adjust ssh}    -text "Use SSH"
+radiobutton .f3.sshssl -anchor w -variable sshssl_sw -value sshssl -command {ssl_ssh_adjust sshssl} -text "Use SSH and SSL"
 pack .f3.ssl .f3.ssh .f3.sshssl -side left -fill x
+
+ssl_ssh_adjust ssl
 
 frame .b
 button .b.help  -text "Help" -command help
@@ -6640,9 +6936,12 @@ button .b.exit  -text "Exit" -command {destroy .; exit}
 
 pack .b.certs .b.opts .b.load .b.conn .b.help .b.exit -side left -expand 1 -fill x
 
-#pack .l .f0 .f1 .f2 .f3 .b -side top -fill x
-pack .l .f0 .b -side top -fill x
-if {![info exists env(SSL_VNC_GUI_CHILD)] || $env(SSL_VNC_GUI_CHILD) == ""} {
+if {$multientry} {
+	pack .l .f0 .f1 .f2 .f3 .b -side top -fill x
+} else {
+	pack .l .f0 .b -side top -fill x
+}
+if {![info exists env(SSVNC_GUI_CHILD)] || $env(SSVNC_GUI_CHILD) == ""} {
 	center_win .
 }
 focus .f0.e
@@ -6653,9 +6952,9 @@ foreach item [.b.help configure -bg] {
 	set system_button_face $item
 }
 
-if {[info exists env(SSL_VNC_GUI_CMD)]} {
-	set env(SSL_VNC_GUI_CHILD) 1
-	bind . <Control-n> "exec $env(SSL_VNC_GUI_CMD) &"
+if {[info exists env(SSVNC_GUI_CMD)]} {
+	set env(SSVNC_GUI_CHILD) 1
+	bind . <Control-n> "exec $env(SSVNC_GUI_CMD) &"
 }
 bind . <Control-q> "destroy .; exit"
 bind . <Shift-Escape> "destroy .; exit"
