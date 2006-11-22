@@ -118,16 +118,15 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			[#include <X11/Xlib.h>])
 
 		if test "x$with_fbpm" != "xno"; then
-			AC_CHECK_HEADER(X11/extensions/fbpm.h,
+			AC_CHECK_LIB(Xext, FBPMForceLevel, 
 				[AC_DEFINE(HAVE_FBPM)], ,
-				[#include <X11/Xlib.h>
-#include <X11/Xmd.h>])
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 		fi
 
 		if test "x$with_dpms" != "xno"; then
-			AC_CHECK_HEADER(X11/extensions/dpms.h,
+			AC_CHECK_LIB(Xext, DPMSForceLevel, 
 				[AC_DEFINE(HAVE_DPMS)], ,
-				[#include <X11/Xlib.h>])
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 		fi
 
 		AC_CHECK_LIB(Xtst, XTestGrabControl, 
