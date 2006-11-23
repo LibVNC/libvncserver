@@ -54,7 +54,7 @@ even when no such file exists.
 ---------------------------------------------------------------
 Extras:
 
-ssl_vncviewer (not Java):
+ss_vncviewer (not Java):
 
         Wrapper script for native VNC viewer to connect to x11vnc in
         SSL mode.  Script launches stunnel(8) and then connects to it
