@@ -1,7 +1,7 @@
 #!/bin/sh
 #
-# ssl_vncviewer:  wrapper for vncviewer to use an stunnel SSL tunnel
-#                 or an SSH tunnel.
+# ss_vncviewer:  wrapper for vncviewer to use an stunnel SSL tunnel
+#                or an SSH tunnel.
 #
 # Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
 #
@@ -14,10 +14,10 @@
 # (or use stunnel on the server side for any other VNC server)
 #
 #
-# Usage: ssl_vncviewer [cert-args] host:display <vncviewer-args>
+# Usage: ss_vncviewer [cert-args] host:display <vncviewer-args>
 #
-# e.g.:  ssl_vncviewer snoopy:0
-#        ssl_vncviewer snoopy:0 -encodings "copyrect tight zrle hextile"
+# e.g.:  ss_vncviewer snoopy:0
+#        ss_vncviewer snoopy:0 -encodings "copyrect tight zrle hextile"
 #
 # [cert-args] can be:
 #
@@ -69,13 +69,13 @@
 #
 #         Examples:
 #
-#         ssl_vncviewer -ssh bob@bobs-home.net:0
-#         ssl_vncviewer -ssh -sshcmd 'x11vnc -localhost' bob@bobs-home.net:0
+#         ss_vncviewer -ssh bob@bobs-home.net:0
+#         ss_vncviewer -ssh -sshcmd 'x11vnc -localhost' bob@bobs-home.net:0
 #
-#         ssl_vncviewer -ssh -proxy fred@mygate.com:2022 mymachine:0
-#         ssl_vncviewer -ssh -proxy bob@bobs-home.net:2222 localhost:0
+#         ss_vncviewer -ssh -proxy fred@mygate.com:2022 mymachine:0
+#         ss_vncviewer -ssh -proxy bob@bobs-home.net:2222 localhost:0
 #
-#         ssl_vncviewer -ssh -proxy fred@gw-host,fred@peecee localhost:0
+#         ss_vncviewer -ssh -proxy fred@gw-host,fred@peecee localhost:0
 #
 # -sshcmd cmd   Run "cmd" via ssh instead of the default "sleep 15"
 #               e.g. -sshcmd 'x11vnc -display :0 -localhost -rfbport 5900'
@@ -89,7 +89,7 @@
 #         this if you need to tunnel additional services via -R and -L 
 #         (see -sshargs above).
 #
-#         ssl_vncviewer -sshssl -proxy fred@mygate.com mymachine:0
+#         ss_vncviewer -sshssl -proxy fred@mygate.com mymachine:0
 #
 #
 # -alpha  turn on cursor alphablending hack if you are using the
@@ -129,10 +129,28 @@ use_sshssl=""
 direct_connect=""
 ssh_sleep=15
 ssh_cmd="sleep $ssh_sleep"
-if [ "X$SSL_VNCVIEWER_SSH_CMD" != "X" ]; then
-	ssh_cmd="$SSL_VNCVIEWER_SSH_CMD"
+if [ "X$SS_VNCVIEWER_SSH_CMD" != "X" ]; then
+	ssh_cmd="$SS_VNCVIEWER_SSH_CMD"
 fi
 ssh_args=""
+
+if [ "X$1" = "X-viewerflavor" ]; then
+	if echo "$VNCVIEWERCMD" | grep -i chicken.of > /dev/null; then
+		echo "cotvnc"
+		exit 0
+	fi
+	str=`"$VNCVIEWERCMD" -h 2>&1 | head -5`
+	if echo "$str" | grep -i 'TightVNC.viewer' > /dev/null; then
+		echo "tightvnc"
+	elif echo "$str" | grep -i 'RealVNC.Ltd' > /dev/null; then
+		echo "realvnc4"
+	elif echo "$str" | grep -i 'VNC viewer version 3' > /dev/null; then
+		echo "realvnc3"
+	else
+		echo "unknown"
+	fi
+	exit 0
+fi
 
 # grab our cmdline options:
 while [ "X$1" != "X" ]
@@ -312,16 +330,16 @@ if [ "X$use_ssh" = "X1" ]; then
 	fi
 
 	C=""
-	if [ "X$SSL_VNCVIEWER_USE_C" != "X" ]; then
+	if [ "X$SS_VNCVIEWER_USE_C" != "X" ]; then
 		C="-C"
 	fi
 	# the -t option actually speeds up typing response via VNC!!
-	if [ "X$SSL_VNCVIEWER_SSH_ONLY" != "X" ]; then
+	if [ "X$SS_VNCVIEWER_SSH_ONLY" != "X" ]; then
 		echo "$ssh -x -p $ssh_port -t $C $ssh_args $ssh_host \"$info\""
 		echo ""
 		$ssh -x -p $ssh_port -t $C $ssh_args $ssh_host "$ssh_cmd"
 		exit $?
-	elif [ "X$SSL_VNCVIEWER_NO_F" != "X" ]; then
+	elif [ "X$SS_VNCVIEWER_NO_F" != "X" ]; then
 		echo "$ssh -x -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host \"$info\""
 		echo ""
 		$ssh -x -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host "$ssh_cmd"
@@ -401,17 +419,17 @@ fi
 
 pcode() {
 	tf=$1
-	SSL_VNC_PROXY=$proxy; export SSL_VNC_PROXY
-	SSL_VNC_DEST="$host:$port"; export SSL_VNC_DEST
+	SSVNC_PROXY=$proxy; export SSVNC_PROXY
+	SSVNC_DEST="$host:$port"; export SSVNC_DEST
 	cod='#!/usr/bin/perl
 
 # A hack to glue stunnel to a Web proxy for client connections.
 
 use IO::Socket::INET;
 
-my ($first, $second) = split(/,/, $ENV{SSL_VNC_PROXY});
+my ($first, $second) = split(/,/, $ENV{SSVNC_PROXY});
 my ($proxy_host, $proxy_port) = split(/:/, $first);
-my $connect = $ENV{SSL_VNC_DEST};
+my $connect = $ENV{SSVNC_DEST};
 
 print STDERR "\nperl script for web proxing:\n";
 print STDERR "proxy_host:       $proxy_host\n";
@@ -419,11 +437,11 @@ print STDERR "proxy_port:       $proxy_port\n";
 print STDERR "proxy_connect:    $connect\n";
 
 my $listen_handle = "";
-if ($ENV{SSL_VNC_LISTEN} != "") {
+if ($ENV{SSVNC_LISTEN} != "") {
 	my $listen_sock = IO::Socket::INET->new(
 		Listen    => 2,
 		LocalAddr => "localhost",
-		LocalPort => $ENV{SSL_VNC_LISTEN},
+		LocalPort => $ENV{SSVNC_LISTEN},
 		Proto     => "tcp");
 	if (! $listen_sock) {
 		die "perl proxy: $!\n";
@@ -550,7 +568,7 @@ sub xfer {
 
 ptmp=""
 if [ "X$proxy" != "X" ]; then
-	ptmp="/tmp/ssl_vncviewer${RANDOM}.$$.pl"
+	ptmp="/tmp/ss_vncviewer${RANDOM}.$$.pl"
 	mytmp "$ptmp"
 	pcode "$ptmp"
 	connect="exec = $ptmp"
@@ -575,8 +593,8 @@ if [ "X$direct_connect" != "X" ]; then
 	fi
 	echo ""
 	if [ "X$ptmp" != "X" ]; then
-		SSL_VNC_LISTEN=$use
-		export SSL_VNC_LISTEN
+		SSVNC_LISTEN=$use
+		export SSVNC_LISTEN
 		$ptmp &
 		sleep 2
 		host="localhost"
@@ -589,7 +607,7 @@ if [ "X$direct_connect" != "X" ]; then
 fi
 
 ##debug = 7
-tmp=/tmp/ssl_vncviewer${RANDOM}.$$
+tmp=/tmp/ss_vncviewer${RANDOM}.$$
 mytmp "$tmp"
 
 cat > "$tmp" <<END
