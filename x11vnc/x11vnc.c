@@ -1946,6 +1946,12 @@ int main(int argc, char* argv[]) {
 			;	/* done above */
 		} else if (!strcmp(arg, "-env")) {
 			i++;	/* done above */
+		} else if (!strcmp(arg, "-prog")) {
+			CHECK_ARGC
+			if (program_name) {
+				free(program_name);
+			}
+			program_name = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-h") || !strcmp(arg, "-help")) {
 			print_help(0);
 		} else if (!strcmp(arg, "-?") || !strcmp(arg, "-opts")) {

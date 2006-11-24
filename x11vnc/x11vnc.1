@@ -2,7 +2,7 @@
 .TH X11VNC "1" "November 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.4, lastmod: 2006-11-21
+         version: 0.8.4, lastmod: 2006-11-23
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -549,7 +549,7 @@ password file should not be readable by untrusted users
 encrypted, only obscured with a fixed key).
 .IP
 If the filename is prefixed with "read:" it will
-periodically be checked for changes and reread.  It it
+periodically be checked for changes and reread.  It is
 guaranteed to be reread just when a new client connects
 so that the latest passwords will be used.
 .IP
@@ -780,12 +780,12 @@ in /etc/shadow can then be authenticated.  You may want
 to use \fB-users\fR unixpw= to switch the process user after
 the user logs in.
 .PP
-\fB-unixpw_cmd\fR \fIstr\fR
+\fB-unixpw_cmd\fR \fIcmd\fR
 .IP
 As \fB-unixpw\fR above, however do not use 
 .IR su (1)
 but rather
-run the externally supplied command \fIstr\fR.  The first
+run the externally supplied command \fIcmd\fR.  The first
 line of its stdin will the username and the second line
 the received password.  If the command exits with status
 0 (success) the VNC client will be accepted.  It will be
@@ -888,9 +888,11 @@ This is usually done in \fB-inetd\fR mode to run on, say,
 port 5800 and allow the Java vncviewer to be downloaded
 by client web browsers.  For example:
 .IP
-5815 stream tcp nowait root /usr/sbin/tcpd .../x11vnc \\
-\fB-inetd\fR \fB-q\fR \fB-http_ssl\fR \fB-display\fR WAIT:cmd=HTTPONCE
+5815 stream tcp nowait root /usr/sbin/tcpd /.../x11vnc \\
+\fB-inetd\fR \fB-q\fR \fB-http_ssl\fR \fB-prog\fR /.../x11vnc \\
+\fB-display\fR WAIT:cmd=HTTPONCE
 .IP
+Where /.../x11vnc is the full path to x11vnc.
 It is used in the Apache SSL-portal example (see FAQ).
 .IP
 Finally, one can insert a geometry between colons,
@@ -1854,6 +1856,11 @@ at x11vnc startup.  This is a convenience utility to
 avoid shell script wrappers, etc. to set the env. var.
 You may specify as many of these as needed on the
 command line.
+.PP
+\fB-prog\fR \fI/path/to/x11vnc\fR
+.IP
+Set the full path to the x11vnc program for cases when
+it cannot be determined from argv[0] (e.g. tcpd/inetd)
 .PP
 \fB-h,\fR \fB-help\fR
 .IP
@@ -3358,7 +3365,7 @@ device is a touchscreen (assumed to have an absolute
 pointer) use "touch" or "touch=WxH".
 .IP
 If you set the env. var X11VNC_UINPUT_THRESHOLDS then
-the thresh=n mode will be enabled.  It it currently
+the thresh=n mode will be enabled.  It is currently
 not working well.  If |dx| <= thresh and |dy| < thresh
 no acceleration is applied.  Use "thresh=+n" |dx| +
 |dy| < thresh to be used instead (X11?)

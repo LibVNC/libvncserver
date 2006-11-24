@@ -277,7 +277,7 @@ int check_httpdir(void) {
 		struct stat sbuf;
 		int len;
 
-		rfbLog("check_httpdir: trying to guess httpdir...\n");
+		rfbLog("check_httpdir: trying to guess httpdir... %s\n", program_name);
 		if (program_name[0] == '/') {
 			prog = strdup(program_name);
 		} else {

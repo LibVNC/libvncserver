@@ -1,3 +1,9 @@
+2006-11-23  Karl Runge <runge@karlrunge.com>
+	* prepare_x11vnc_dist.sh: make ss_vncviewer installed 755.
+	* x11vnc: for HTTPONCE open new http port in -inetd mode.
+	  -prog option to indicate full path to program (not know
+	  when in -inetd and tcpd)
+
 2006-11-21  Karl Runge <runge@karlrunge.com>
 	* x11vnc: macosx: problem with padded framebuffer rows, wait for
 	  user to switch back, CutText xfer support, ignore a few more

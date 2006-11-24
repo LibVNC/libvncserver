@@ -1020,8 +1020,8 @@ rfbBool custom_passwd_check(rfbClientPtr cl, const char *response, int len) {
 static void handle_one_http_request(void) {
 
 	rfbLog("handle_one_http_request: begin.\n");
-	if (screen->httpPort == 0) {
-		int port = find_free_port(5800, 5850);
+	if (inetd || screen->httpPort == 0) {
+		int port = find_free_port(5800, 5860);
 		if (port) {
 			screen->httpPort = port;
 		} else {
