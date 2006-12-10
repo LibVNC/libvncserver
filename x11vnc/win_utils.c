@@ -378,6 +378,7 @@ int pick_windowid(unsigned long *num) {
 		rfbLog("   exiting.\n");
 		clean_up_exit(1);
 	}
+	close_exec_fds();
 	p = popen("xwininfo", "r");
 
 	if (! p) {

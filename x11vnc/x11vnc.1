@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "November 2006" "x11vnc " "User Commands"
+.TH X11VNC "1" "December 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.4, lastmod: 2006-11-23
+         version: 0.8.4, lastmod: 2006-12-09
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -814,17 +814,29 @@ in yet).
 .IP
 If the string is, e.g. WAIT:0.0 or WAIT:1, i.e. "WAIT"
 in front of a normal X display, then that indicated
-display is used.  A more interesting case is like this:
+display is used.
+.IP
+One can also insert a geometry between colons, e.g.
+WAIT:1280x1024:... to set the size of the display the
+VNC client first attaches to since some VNC viewers
+will not automatically adjust to a new framebuffer size.
+.IP
+A more interesting case is like this:
 .IP
 WAIT:cmd=/usr/local/bin/find_display
 .IP
 in which case the command after "cmd=" is run to
 dynamically work out the DISPLAY and optionally the
 XAUTHORITY data.  The first line of the command output
-must be of the form DISPLAY=<xdisplay>.  Any remaining
-output is taken as XAUTHORITY data.  It can be either
-of the form XAUTHORITY=<file> or raw xauthority data for
-the display (e.g. "xauth extract - $DISPLAY" output).
+must be of the form DISPLAY=<xdisplay>.  On Linux
+if the virtual terminal is known append ",VT=n" to
+this string and the 
+.IR chvt (1)
+program will also be run.
+Any remaining output is taken as XAUTHORITY data.
+It can be either of the form XAUTHORITY=<file> or raw
+xauthority data for the display (e.g. "xauth extract -
+$DISPLAY" output).
 .IP
 In the case of \fB-unixpw\fR (but not \fB-unixpw_nis),\fR then the
 above command is run as the user who just authenticated
@@ -879,6 +891,7 @@ script that works on most Unixes to determine a user's
 DISPLAY variable and xauthority data (see 
 .IR who (1)
 ).
+.IP
 To have this default script printed to stdout (e.g. for
 customization) run with WAIT:cmd=FINDDISPLAY-print
 .IP
@@ -895,10 +908,51 @@ by client web browsers.  For example:
 Where /.../x11vnc is the full path to x11vnc.
 It is used in the Apache SSL-portal example (see FAQ).
 .IP
-Finally, one can insert a geometry between colons,
-e.g. WAIT:1280x1024:... to set the size of the display
-the VNC client first attaches to since some VNC viewers
-will not automatically adjust to a new framebuffer size.
+An experimental option is WAIT:cmd=FINDCREATEDISPLAY
+that is like FINDDISPLAY in that is uses the same method
+to find an existing display.  However, if it does not
+find one it will try to *start* up an X server session
+for the user.  This is the only time x11vnc tries to
+start up an X server.
+.IP
+By default FINDCREATEDISPLAY will try Xdummy and
+then Xvfb.  The Xdummy wrapper is part of the x11vnc
+source code (x11vnc/misc/Xdummy)  It should be available
+in PATH and have run "Xdummy \fB-install"\fR once to create
+the shared library.  Xdummy requires root permission
+and only works on Linux.  Xvfb is available on most
+platforms.
+.IP
+When x11vnc exits (i.e. user disconnects) the X server
+session stays running in the background.  Presumably the
+FINDDISPLAY will find it next time.  The user must exit
+the X session in the usual way for it to terminate.
+.IP
+So this is a somewhat odd mode for x11vnc in that it
+will start up and poll virtual X servers.  This can
+be used from, say, 
+.IR inetd (8)
+to provide a means of
+definitely getting a desktop (either real or virtual)
+on the machine.  E.g. a desktop service:
+.IP
+5915 stream tcp nowait root /usr/sbin/tcpd /.../x11vnc
+\fB-inetd\fR \fB-q\fR \fB-http\fR \fB-ssl\fR SAVE \fB-unixpw\fR \fB-users\fR unixpw=\\
+\fB-passwd\fR secret \fB-prog\fR /.../x11vnc \\
+\fB-display\fR WAIT:cmd=FINDCREATEDISPLAY
+.IP
+Where /.../x11vnc is the full path to x11vnc.
+.IP
+Use WAIT:cmd=FINDCREATEDISPLAY-print to print out the
+script used.  You can specify the preferred order via
+e.g., WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb,X  and/or
+leave out ones you do not want.  The the extra case "X"
+means try to start up a real, hardware X server using
+.IR xinit (1).
+If there is already an X server running the
+X case may only work on Linux (see 
+.IR startx (1)
+).
 .PP
 \fB-ssl\fR \fI[pem]\fR
 .IP
@@ -2992,41 +3046,46 @@ Print debugging output for tiles, fb updates, etc.
 .PP
 \fB-snapfb\fR
 .IP
-Instead of polling the X display framebuffer (fb) for
-changes, periodically copy all of X display fb into main
-memory and examine that copy for changes.  Under some
-circumstances this will improve interactive response,
-or at least make things look smoother, but in others
-(most!) it will make the response worse.  If the video
-h/w fb is such that reading small tiles is very slow
-this mode could help.  To keep the "framerate" up
-the screen size x bpp cannot be too large.  Note that
+Instead of polling the X display framebuffer (fb)
+for changes, periodically copy all of X display fb
+into main memory and examine that copy for changes.
+(This setting also applies for non-X \fB-rawfb\fR modes).
+Under some circumstances this will improve interactive
+response, or at least make things look smoother, but in
+others (most!) it will make the response worse.  If the
+video h/w fb is such that reading small tiles is very
+slow this mode could help.  To keep the "framerate"
+up the screen size x bpp cannot be too large.  Note that
 this mode is very wasteful of memory I/O resources
 (it makes full screen copies even if nothing changes).
 It may be of use in video capture-like applications,
-or where window tearing is a problem.
+webcams, or where window tearing is a problem.
 .PP
 \fB-rawfb\fR \fIstring\fR
 .IP
 Instead of polling X, poll the memory object specified
 in \fIstring\fR.
 .IP
-For shared memory segments string is of the
-form: "shm:N@WxHxB" which specifies a shmid
-N and framebuffer Width, Height, and Bits
-per pixel.
-.IP
 For file polling to memory map 
 .IR mmap (2)
 a file use:
-"map:/path/to/a/file@WxHxB", with WxHxB as above.
-"mmap:..." is the same. If there is trouble with mmap,
-use  "file:/..." for slower 
+"map:/path/to/a/file@WxHxB", with framebuffer Width,
+Height, and Bits per pixel.  "mmap:..." is the
+same.
+.IP
+If there is trouble with mmap, use  "file:/..."
+for slower 
 .IR lseek (2)
-based reading.
-Use "snap:..." to imply \fB-snapfb\fR mode and the "file:"
-access (this is for devices that only provide the fb
-all at once).
+based reading.  Use "snap:..."
+to imply \fB-snapfb\fR mode and the "file:" access (this
+is for devices that only provide the fb all at once).
+.IP
+For shared memory segments string is of the form:
+"shm:N@WxHxB" which specifies a shmid N and with
+WxHxB as above.  See 
+.IR shmat (1)
+and 
+.IR ipcs (1)
 .IP
 If you do not supply a type "map" is assumed if
 the file exists (see the next paragraphs for some
@@ -3053,7 +3112,7 @@ memory object.  If the masks are not provided x11vnc
 guesses them based on the bpp.
 .IP
 Another optional suffix is the Bytes Per Line which in
-some cases is not WxHxB/4.  Specify it as WxHxB-BPL
+some cases is not WxB/4.  Specify it as WxHxB-BPL
 e.g. 800x600x16-2048.  This could be a normal width
 1024 at 16bpp fb, but only width 800 shows up.
 .IP
@@ -3095,11 +3154,11 @@ mouse and keyboard input are STILL sent to the X
 display, this usage should be very rare, i.e. doing
 something strange with /dev/fb0.
 .IP
-If the device is not "seekable" try reading it all
-at once in full snaps via the "snap:" mode (note:
-this is a resource hog).  If you are using file: or
-map: and the device needs to be reopened for *every*
-snapfb snapshot, set the environment variable:
+If the device is not "seekable" (e.g. webcam) try
+reading it all at once in full snaps via the "snap:"
+mode (note: this is a resource hog).  If you are using
+file: or map: and the device needs to be reopened for
+*every* snapfb snapshot, set the environment variable:
 SNAPFB_RAWFB_RESET=1 as well.
 .IP
 If you want x11vnc to dynamically transform a 24bpp

@@ -35,6 +35,7 @@ char *xerror_string(XErrorEvent *error);
 void initialize_crash_handler(void);
 void initialize_signals(void);
 void unset_signals(void);
+void close_exec_fds(void);
 int known_sigpipe_mode(char *s);
 
 
@@ -542,6 +543,18 @@ void unset_signals(void) {
 	signal(SIGPIPE, SIG_DFL);
 }
 
+void close_exec_fds(void) {
+	int fd;
+#ifdef FD_CLOEXEC
+	for (fd = 3; fd < 64; fd++) {
+		int flags = fcntl(fd, F_GETFD);
+		if (flags != -1) {
+			flags |= FD_CLOEXEC;
+			fcntl(fd, F_SETFD, flags);
+		}
+	}
+#endif
+}
 
 int known_sigpipe_mode(char *s) {
 /*

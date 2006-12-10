@@ -1378,7 +1378,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2006-09-23 18:36:42.000000000 -0400
++++ vnc_javasrc/VncViewer.java	2006-12-01 02:31:26.000000000 -0500
 @@ -88,6 +88,14 @@
    int deferCursorUpdates;
    int deferUpdateRequests;
@@ -1394,7 +1394,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
    // Reference to this applet for inter-applet communication.
    public static java.applet.Applet refApplet;
  
-@@ -626,6 +634,51 @@
+@@ -626,6 +634,53 @@
  
      // SocketFactory.
      socketFactory = readParameter("SocketFactory", false);
@@ -1430,8 +1430,10 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +	if (urlPrefix.indexOf("/") != 0) {
 +		urlPrefix = "/" + urlPrefix;
 +	}
++    } else {
++    	urlPrefix = "";
 +    }
-+    System.out.println("urlPrefix: " + urlPrefix);
++    System.out.println("urlPrefix: '" + urlPrefix + "'");
 +
 +    forceProxy = false;
 +    str = readParameter("forceProxy", false);

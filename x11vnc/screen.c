@@ -40,6 +40,7 @@ int parse_rotate_string(char *str, int *mode);
 int scale_round(int len, double fac);
 void initialize_screen(int *argc, char **argv, XImage *fb);
 void set_vnc_desktop_name(void);
+void announce(int lport, int ssl, char *iface);
 
 
 static void debug_colormap(XImage *fb);
@@ -51,7 +52,6 @@ static void initialize_snap_fb(void);
 XImage *initialize_raw_fb(int);
 static void initialize_clipshift(void);
 static int wait_until_mapped(Window win);
-static void announce(int lport, int ssl, char *iface);
 static void setup_scaling(int *width_in, int *height_in);
 
 int rawfb_reset = -1;
@@ -920,6 +920,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 			clean_up_exit(1);
 		}
 		rfbLog("running command to setup rawfb: %s\n", q);
+		close_exec_fds();
 		pipe = popen(q, "r");
 		if (! pipe) {
 			rfbLogEnable(1);
@@ -2497,7 +2498,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	install_passwds();
 }
 
-static void announce(int lport, int ssl, char *iface) {
+void announce(int lport, int ssl, char *iface) {
 	
 	char *host = this_host();
 	char *tvdt;

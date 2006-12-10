@@ -997,6 +997,7 @@ if (0) fprintf(stderr, "initialize_pipeinput: %s -- %s\n", pipeinput_str, p);
 		clean_up_exit(1);
 	}
 	rfbLog("pipeinput: starting: \"%s\"...\n", p);
+	close_exec_fds();
 	pipeinput_fh = popen(p, "w");
 
 	if (! pipeinput_fh) {

@@ -1,3 +1,9 @@
+2006-12-09  Karl Runge <runge@karlrunge.com>
+	* java SSL viewer: guard against empty urlPrefix
+	* x11vnc: FINDCREATEDISPLAY support to create X session if
+	  one cannot be found.  close fds utility.  Print VNC Viewer
+	  is.. for find display mode.  chvt(1) utility.
+
 2006-11-23  Karl Runge <runge@karlrunge.com>
 	* prepare_x11vnc_dist.sh: make ss_vncviewer installed 755.
 	* x11vnc: for HTTPONCE open new http port in -inetd mode.

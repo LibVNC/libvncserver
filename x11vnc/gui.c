@@ -456,6 +456,7 @@ if (0) fprintf(stderr, "run_gui: %s -- %d %d\n", gui_xdisplay, connect_to_x11vnc
 				strcat(cmd, icon_mode_embed_id);
 			}
 		}
+		close_exec_fds();
 		pipe = popen(cmd, "w");
 		if (! pipe) {
 			fprintf(stderr, "could not run: %s\n", cmd);

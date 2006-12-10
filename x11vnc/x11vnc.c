@@ -1580,8 +1580,13 @@ int main(int argc, char* argv[]) {
 			use_dpy = strdup(argv[++i]);
 			if (strstr(use_dpy, "WAIT")) {
 				extern char find_display[];
+				extern char create_display[];
 				if (strstr(use_dpy, "cmd=FINDDISPLAY-print")) {
 					fprintf(stdout, "%s", find_display);
+					exit(0);
+				}
+				if (strstr(use_dpy, "cmd=FINDCREATEDISPLAY-print")) {
+					fprintf(stdout, "%s", create_display);
 					exit(0);
 				}
 			}

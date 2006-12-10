@@ -517,6 +517,8 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 	rfbLog("running command:\n");
 	rfbLog("  %s\n", cmd);
 
+	close_exec_fds();
+
 	if (output != NULL) {
 		FILE *ph = popen(cmd, "r");
 		char line[1024];
@@ -587,7 +589,6 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 		}
 	}
 #else
-	/* this will still have port 5900 open */
 	rc = system(cmd);
 #endif
 	got_rc:
