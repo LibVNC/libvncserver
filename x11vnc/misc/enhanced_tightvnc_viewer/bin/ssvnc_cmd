@@ -168,19 +168,19 @@ if [ ! -d "$dir/$name" -a $nearby = 0 ]; then
 	fi
 	echo "Using externel \"vncviewer\" and \"stunnel\" found in PATH."
 
-	if [ "X$DARWIN_COTVNC" = "X" -a "X$VNCVIEWERCMD" = "Xvncviewer" ]; then
-		hstr=`"$VNCVIEWERCMD" -h 2>&1 | head -5`
-		if echo "$hstr" | grep '^TightVNC.*version 1\.[23]' > /dev/null; then
-			# we need to avoid raw encoding
-			use_ours=1
-		fi
-	fi
 else
 	STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
 	export STUNNEL_EXTRA_OPTS
 	SSVNC_VIEWER_INTERNAL=1
 	export SSVNC_VIEWER_INTERNAL
-	use_ours=1
+fi
+
+if [ "X$DARWIN_COTVNC" = "X" -a "X$VNCVIEWERCMD" = "Xvncviewer" ]; then
+	hstr=`"$VNCVIEWERCMD" -h 2>&1 | head -5`
+	if echo "$hstr" | grep '^TightVNC.*version 1\.[23]' > /dev/null; then
+		# we need to avoid raw encoding
+		use_ours=1
+	fi
 fi
 
 # Put our os.arch and other utils dirs at head of PATH to be sure to

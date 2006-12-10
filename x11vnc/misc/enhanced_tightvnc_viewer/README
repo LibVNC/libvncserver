@@ -64,6 +64,8 @@ The enhanced TightVNC viewer features are:
 	- Automatic SSH connections from the GUI (ssh must already be
 	  installed on Unix; bundled plink is used on Windows)
 
+	- Ability to Save and Load VNC profiles for different hosts.
+
 	- Create or Import SSL Certificates and Private Keys.
 
 	- Automatic Service tunnelling via SSH for CUPS and SMB Printing,
@@ -123,11 +125,6 @@ Unix and Mac OS X:
         % ./ssvnc/Unix/ssvnc               (for Unix)
 
         % ./ssvnc/MacOSX/ssvnc             (for Mac OS X)
-
-    actually both of the above are equivalent, and the same as running
-
-        % ./ssvnc/bin/ssvnc
-
 
     The smaller file "ssvnc_no_windows-1.0.8.tar.gz"
     could have been used as well.
