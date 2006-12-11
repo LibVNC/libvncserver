@@ -92,7 +92,9 @@ extern void macosxGCS_initpb(void);
 void macosxCG_init(void) {
 	if (displayID == NULL) {
 		fprintf(stderr, "macosxCG_init: initializing display.\n");
-		//dragum();
+#if 0
+		dragum();
+#endif
 
 		displayID = kCGDirectMainDisplay;
 		(void) GetMainDevice();
@@ -469,7 +471,7 @@ static int USKeyCodes[] = {
     XK_question,          44,      /* ? */
     XK_backslash,         42,      /* \ */
     XK_bar,               42,      /* | */
-    // OS X Sends this (END OF MEDIUM) for Shift-Tab (with US Keyboard)
+    /* OS X Sends this (END OF MEDIUM) for Shift-Tab (with US Keyboard) */
     0x0019,               48,      /* Tab */
     XK_space,             49,      /* Space */
 };

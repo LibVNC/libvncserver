@@ -1470,8 +1470,6 @@ int main(int argc, char* argv[]) {
 	int argc_vnc_max = 1024;
 	int argc_vnc = 1; char *argv_vnc[2048];
 
-//dragum();
-
 
 	/* check for -loop mode: */
 	check_loop_mode(argc, argv);

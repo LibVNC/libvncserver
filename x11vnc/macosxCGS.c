@@ -38,9 +38,9 @@ extern CGWindowLevel CGSGetWindowLevel (CGSConnectionID cid,
     CGSWindowID wid, CGSWindowLevel *level);
 
 typedef enum _CGSWindowOrderingMode {
-    kCGSOrderAbove                =  1, // Window is ordered above target.
-    kCGSOrderBelow                = -1, // Window is ordered below target.
-    kCGSOrderOut                  =  0  // Window is removed from the on-screen window list.
+    kCGSOrderAbove                =  1, /* Window is ordered above target. */
+    kCGSOrderBelow                = -1, /* Window is ordered below target. */
+    kCGSOrderOut                  =  0  /* Window is removed from the on-screen window list. */
 } CGSWindowOrderingMode;
 
 extern OSStatus CGSOrderWindow(const CGSConnectionID cid,
