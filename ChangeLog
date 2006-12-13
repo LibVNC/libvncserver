@@ -1,3 +1,7 @@
+2006-12-13  Karl Runge <runge@karlrunge.com>
+	* remove stray "-permitfiletransfer  permit file transfer support"
+	  print out.
+
 2006-11-21  Karl Runge <runge@karlrunge.com>
 	* configure.ac: add DPMS detection.
 
