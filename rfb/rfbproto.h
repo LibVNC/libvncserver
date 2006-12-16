@@ -443,10 +443,6 @@ typedef struct {
 
 #define rfbEncodingLastRect           0xFFFFFF20
 #define rfbEncodingNewFBSize          0xFFFFFF21
-#define rfbEncodingKeyboardLedState   0xFFFFFF22
-#define rfbEncodingSupportedMessages  0xFFFFFF23
-#define rfbEncodingSupportedEncodings 0xFFFFFF24
-#define rfbEncodingServerIdentity     0xFFFFFF25
 
 #define rfbEncodingQualityLevel0   0xFFFFFFE0
 #define rfbEncodingQualityLevel1   0xFFFFFFE1
@@ -460,7 +456,11 @@ typedef struct {
 #define rfbEncodingQualityLevel9   0xFFFFFFE9
 
 
-
+/* LibVNCServer additions.   We claim 0xFFFE0000 - 0xFFFE00FF */
+#define rfbEncodingKeyboardLedState   0xFFFE0000
+#define rfbEncodingSupportedMessages  0xFFFE0001
+#define rfbEncodingSupportedEncodings 0xFFFE0002
+#define rfbEncodingServerIdentity     0xFFFE0003
 
 
 /*****************************************************************************
