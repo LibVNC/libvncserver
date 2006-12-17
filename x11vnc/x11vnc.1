@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.4, lastmod: 2006-12-14
+         version: 0.8.4, lastmod: 2006-12-17
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2375,6 +2375,32 @@ Do not update the display during mouse dragging events
 slow setups, but you lose all visual feedback for drags,
 text selection, and some menu traversals.  It overrides
 any \fB-pointer_mode\fR setting.
+.PP
+\fB-ncache\fR \fIn\fR
+.IP
+Client-side caching scheme.  Framebuffer memory \fIn\fR
+(an integer) times that of the full display is allocated
+below the actual framebuffer to cache screen contents
+for rapid retrieval.  So a W x H frambuffer is expanded
+to a W x (n+1)*H one.  Use 0 to disable.  Default: XXX.
+.IP
+This is an experimental option, currently implemented
+in an awkward way in that in the VNC Viewer you can
+see the cache contents if you scroll down, etc.  So you
+will have to set things up so you can't see that region.
+If this method is successful, the changes required for
+clients to do this less awkwardly will be investigated.
+.IP
+Note that this mode consumes a lot of memory, both
+on the x11vnc server side and on the VNC Viewer side.
+If n=2 then the amount of RAM used is roughly tripled
+for both x11vnc and the VNC Viewer.  As a rule of
+thumb, note that 1280x1024 at depth 24 is about 5MB of
+pixel data.
+.IP
+Because of the way window backingstore and saveunders
+are implemented, n must be even.  It will be incremented
+by 1 if it is not.
 .PP
 \fB-wireframe\fR \fI[str],\fR \fB-nowireframe\fR
 .IP

@@ -2816,6 +2816,31 @@ static int scan_display(int ystart, int rescan) {
 
 		/* grab the horizontal scanline from the display: */
 		X_LOCK;
+
+#ifndef NO_NCACHE
+#if !NO_X11
+if (ncache > 0 && dpy) {
+	/* XXX watch for problems. */
+	XEvent ev;
+	int gotone = 0;
+	if (XCheckTypedEvent(dpy, MapNotify, &ev)) {
+		gotone = 1;
+	} else if (XCheckTypedEvent(dpy, UnmapNotify, &ev)) {
+		gotone = 2;
+	} else if (XCheckTypedEvent(dpy, CreateNotify, &ev)) {
+		gotone = 3;
+	}
+	if (gotone) {
+		XPutBackEvent(dpy, &ev);
+		X_UNLOCK;
+fprintf(stderr, "*** SCAN_DISPLAY CHECK_NCACHE/%d *** %d\n", gotone, y);
+		check_ncache(0);
+		X_LOCK;
+	}
+}
+#endif
+#endif
+
 		XRANDR_SET_TRAP_RET(-1, "scan_display-set");
 		copy_image(scanline, 0, y, 0, 0);
 		XRANDR_CHK_TRAP_RET(-1, "scan_display-chk");

@@ -107,7 +107,8 @@ static void initialize_xevents(int reset) {
 		 * XXX: does this cause a flood of other stuff?
 		 */
 		X_LOCK;
-		XSelectInput(dpy, rootwin, PropertyChangeMask);
+		xselectinput_rootwin |= PropertyChangeMask;
+		XSelectInput(dpy, rootwin, xselectinput_rootwin);
 		X_UNLOCK;
 		did_xselect_input = 1;
 	}

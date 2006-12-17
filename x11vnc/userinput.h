@@ -35,5 +35,6 @@ extern int check_xrecord(void);
 extern int check_wireframe(void);
 extern int fb_update_sent(int *count);
 extern int check_user_input(double dt, double dtr, int tile_diffs, int *cnt);
+extern void do_copyregion(sraRegionPtr region, int dx, int dy);
 
 #endif /* _X11VNC_USERINPUT_H */

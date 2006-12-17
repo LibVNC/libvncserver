@@ -554,6 +554,7 @@ static void watch_loop(void) {
 			}
 
 			check_new_clients();
+			check_ncache();
 			check_xevents(0);
 			check_autorepeat();
 			check_pm();
@@ -611,8 +612,9 @@ static void watch_loop(void) {
 
 		if (button_mask && (!show_dragging || pointer_mode == 0)) {
 			/*
-			 * if any button is pressed do not update rfb
-			 * screen, but do flush the X11 display.
+			 * if any button is pressed in this mode do
+			 * not update rfb screen, but do flush the
+			 * X11 display.
 			 */
 			X_LOCK;
 			XFlush_wr(dpy);
@@ -1200,6 +1202,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " buttonmap:  %s\n", pointer_remap
 	    ? pointer_remap : "null");
 	fprintf(stderr, " dragging:   %d\n", show_dragging);
+	fprintf(stderr, " ncache:     %d\n", ncache);
 	fprintf(stderr, " wireframe:  %s\n", wireframe_str ?
 	    wireframe_str : WIREFRAME_PARMS);
 	fprintf(stderr, " wirecopy:   %s\n", wireframe_copyrect ?
@@ -2105,6 +2108,14 @@ int main(int argc, char* argv[]) {
 			pointer_remap = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-nodragging")) {
 			show_dragging = 0;
+#ifndef NO_NCACHE
+		} else if (!strcmp(arg, "-ncache")) {
+			CHECK_ARGC
+			ncache = atoi(argv[++i]);
+			if (ncache % 2 != 0) {
+				ncache++;
+			}
+#endif
 		} else if (!strcmp(arg, "-wireframe")
 		    || !strcmp(arg, "-wf")) {
 			wireframe = 1;

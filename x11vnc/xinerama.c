@@ -382,11 +382,17 @@ void push_sleep(int n) {
  * try to forcefully push a black screen to all connected clients
  */
 void push_black_screen(int n) {
+	int Lx = dpy_x, Ly = dpy_y;
 	if (!screen) {
 		return;
 	}
-	zero_fb(0, 0, dpy_x, dpy_y);
-	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
+#ifndef NO_NCACHE
+	if (ncache > 0) {
+		Ly = dpy_y * (1+ncache);
+	}
+#endif
+	zero_fb(0, 0, Lx, Ly);
+	mark_rect_as_modified(0, 0, Lx, Ly, 0);
 	push_sleep(n);
 }
 
@@ -406,13 +412,19 @@ void refresh_screen(int push) {
  */
 void zero_fb(int x1, int y1, int x2, int y2) {
 	int pixelsize = bpp/8;
-	int line, fill = 0;
+	int line, fill = 0, yfac = 1;
 	char *dst;
+
+#ifndef NO_NCACHE
+	if (ncache > 0) {
+		yfac = 1+ncache;
+	}
+#endif
 	
 	if (x1 < 0 || x2 <= x1 || x2 > dpy_x) {
 		return;
 	}
-	if (y1 < 0 || y2 <= y1 || y2 > dpy_y) {
+	if (y1 < 0 || y2 <= y1 || y2 > yfac * dpy_y) {
 		return;
 	}
 	if (! main_fb) {

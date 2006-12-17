@@ -134,7 +134,9 @@
 #define PASSWD_UNLESS_NOPW 0
 #endif
 
+/* these are for delaying features: */
 #define xxNO_SSL_OR_UNIXPW
+#define xxNO_NCACHE
 
 /*
  * Beginning of support for small binary footprint build for embedded
@@ -359,6 +361,8 @@ extern int cdpy_x, cdpy_y, coff_x, coff_y;	/* the -clip params */
 extern int button_mask;		/* button state and info */
 extern int button_mask_prev;
 extern int num_buttons;
+
+extern long xselectinput_rootwin;
 
 extern unsigned int display_button_mask;
 extern unsigned int display_mod_mask;

@@ -3,6 +3,7 @@
 
 /* -- unixpw.h -- */
 
+extern int white_pixel(void);
 extern void unixpw_screen(int init);
 extern void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init);
 extern void unixpw_accept(char *user);

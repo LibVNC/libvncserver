@@ -25,6 +25,7 @@
 #include "selection.h"
 #include "unixpw.h"
 #include "uinput.h"
+#include "userinput.h"
 
 int send_remote_cmd(char *cmd, int query, int wait);
 int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync,
@@ -334,6 +335,13 @@ int check_httpdir(void) {
 			snprintf(httpdir, len, "%s/../share/x11vnc/classes/ssl", prog);
 		} else {
 			snprintf(httpdir, len, "%s/../share/x11vnc/classes", prog);
+		}
+		if (stat(httpdir, &sbuf) != 0) {
+			if (use_openssl || use_stunnel || http_ssl) {
+				snprintf(httpdir, len, "%s/../classes/ssl", prog);
+			} else {
+				snprintf(httpdir, len, "%s/../classes", prog);
+			}
 		}
 		free(prog);
 
@@ -749,7 +757,35 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 /*
  * Maybe add: passwdfile logfile bg rfbauth passwd...
  */
-	if (!strcmp(p, "stop") || !strcmp(p, "quit") ||
+	if (strstr(p, "CR:") == p) {	/* skip-cmd-list */
+		/* CR:WxH+X+Y,dx,dy */
+		int w, h, x, y, dx, dy;
+		NOTAPP
+		if (sscanf(p+3, "%dx%d+%d+%d,%d,%d", &w, &h, &x, &y, &dx, &dy) == 6) {
+			sraRegionPtr r;
+			rfbLog("rfbDoCopyRect(screen, %d, %d, %d, %d, %d, %d)\n", x, y, x+w, y+h, dx, dy);
+			r = sraRgnCreateRect(x, y, x+w, y+h);
+			do_copyregion(r, dx, dy);
+			fb_push();
+			sraRgnDestroy(r);
+			rfbLog("did\n");
+		} else {
+			rfbLog("remote_cmd: bad CR string: %s\n", p);
+		}
+	} else if (strstr(p, "ncache") == p) {	/* skip-cmd-list */
+		COLON_CHECK("ncache:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, ncache);
+			goto qry;
+		}
+		p += strlen("ncache:");
+		ncache = atoi(p);
+		if (ncache % 2 != 0) {
+			ncache++;
+		}
+		rfbLog("remote_cmd: set -ncache %d\n", ncache);
+
+	} else if (!strcmp(p, "stop") || !strcmp(p, "quit") ||
 	    !strcmp(p, "exit") || !strcmp(p, "shutdown")) {
 		NOTAPP
 		if (client_connect_file) {

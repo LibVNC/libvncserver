@@ -155,6 +155,9 @@ extern char *wireframe_copyrect;
 extern char *wireframe_copyrect_default;
 extern int wireframe_in_progress;
 
+extern int ncache;
+extern int ncache0;
+
 extern char *scroll_copyrect_str;
 extern char *scroll_copyrect;
 extern char *scroll_copyrect_default;

@@ -193,6 +193,9 @@ char *wireframe_copyrect_default = "never";
 int wireframe_in_progress = 0;
 int wireframe_local = 1;
 
+int ncache = 0;
+int ncache0 = 0;
+
 /* T+B+L+R,tkey+presist_key,tmouse+persist_mouse */
 char *scroll_copyrect_str = NULL;
 #ifndef SCROLL_COPYRECT

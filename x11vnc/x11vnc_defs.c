@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8.4 lastmod: 2006-12-14";
+char lastmod[] = "0.8.4 lastmod: 2006-12-17";
 
 /* X display info */
 
@@ -35,6 +35,8 @@ int cdpy_x, cdpy_y, coff_x, coff_y;	/* the -clip params */
 int button_mask = 0;		/* button state and info */
 int button_mask_prev = 0;
 int num_buttons = -1;
+
+long xselectinput_rootwin = 0;
 
 unsigned int display_button_mask = 0;
 unsigned int display_mod_mask = 0;

@@ -56,6 +56,7 @@ extern char *crypt(const char*, const char *);
 #undef UNIXPW_CRYPT
 #endif
 
+int white_pixel(void);
 void unixpw_screen(int init);
 void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init);
 void unixpw_accept(char *user);
@@ -65,7 +66,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size);
 int crypt_verify(char *user, char *pass);
 int cmd_verify(char *user, char *pass);
 
-static int white(void);
+
 static int text_x(void);
 static int text_y(void);
 static void set_db(void);
@@ -89,7 +90,7 @@ static int char_x = 0, char_y = 0, char_w = 8, char_h = 16;
 
 static int db = 0;
 
-static int white(void) {
+int white_pixel(void) {
 	static unsigned long black_pix = 0, white_pix = 1, set = 0;
 
 	RAWFB_RET(0xffffff)
@@ -162,7 +163,7 @@ void unixpw_screen(int init) {
 			pscreen = screen;
 		}
 
-		rfbDrawString(pscreen, &default8x16Font, x, y, log, white());
+		rfbDrawString(pscreen, &default8x16Font, x, y, log, white_pixel());
 
 		char_x = x;
 		char_y = y;
@@ -1075,13 +1076,13 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 
 		x = text_x();
 		y = text_y();
-		rfbDrawString(pscreen, &default8x16Font, x, y, li, white());
+		rfbDrawString(pscreen, &default8x16Font, x, y, li, white_pixel());
 
 		char_row += 2;
 
 		x = text_x();
 		y = text_y();
-		rfbDrawString(pscreen, &default8x16Font, x, y, log, white());
+		rfbDrawString(pscreen, &default8x16Font, x, y, log, white_pixel());
 
 		char_col = strlen(log);
 
@@ -1245,7 +1246,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 			x = text_x();
 			y = text_y();
 			rfbDrawString(pscreen, &default8x16Font, x, y, pw,
-			    white());
+			    white_pixel());
 
 			char_col = strlen(pw);
 			if (scaling) {
@@ -1279,7 +1280,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 				x = text_x();
 				y = text_y();
 				rfbDrawString(pscreen, &default8x16Font, x, y,
-				    str, white());
+				    str, white_pixel());
 				mark_rect_as_modified(x, y-char_h, x+char_w,
 				    y, scaling);
 				char_col++;
@@ -1323,7 +1324,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 
 if (db && db <= 2) fprintf(stderr, "u_cnt: %d %d/%d ks: 0x%x  '%s'\n", u_cnt, x, y, keysym, keystr);
 
-		rfbDrawString(pscreen, &default8x16Font, x, y, keystr, white());
+		rfbDrawString(pscreen, &default8x16Font, x, y, keystr, white_pixel());
 
 		mark_rect_as_modified(x, y-char_h, x+char_w, y, scaling);
 		char_col++;
@@ -1555,7 +1556,7 @@ void unixpw_deny(void) {
 		x = char_x + char_col * char_w;
 		y = char_y + char_row * char_h;
 
-		rfbDrawString(pscreen, &default8x16Font, x, y, pd, white());
+		rfbDrawString(pscreen, &default8x16Font, x, y, pd, white_pixel());
 		if (scaling) {
 			mark_rect_as_modified(0, 0, scaled_x, scaled_y, 1);
 		} else {
@@ -1587,7 +1588,7 @@ void unixpw_msg(char *msg, int delay) {
 	x = char_x + char_col * char_w;
 	y = char_y + char_row * char_h;
 
-	rfbDrawString(pscreen, &default8x16Font, x, y, msg, white());
+	rfbDrawString(pscreen, &default8x16Font, x, y, msg, white_pixel());
 	if (scaling) {
 		mark_rect_as_modified(0, 0, scaled_x, scaled_y, 1);
 	} else {

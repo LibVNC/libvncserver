@@ -2033,6 +2033,23 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		}
 	}
 
+#ifndef NO_NCACHE
+	if (ncache > 0) {
+		char *new_fb;
+		int sz = fb->height * fb->bytes_per_line;
+
+		new_fb = (char *) calloc((size_t) (sz * (1+ncache)), 1);
+		if (fb->data) {
+			memcpy(new_fb, fb->data, sz);
+			free(fb->data);
+		}
+		fb->data = new_fb;
+		fb->height *= (1+ncache);
+		height *= (1+ncache);
+		ncache0 = ncache;
+	}
+#endif
+
 	if (cmap8to24 && depth == 8) {
 		rfb_bytes_per_line *= 4;
 		rot_bytes_per_line *= 4;
