@@ -2097,6 +2097,9 @@ int main(int argc, char* argv[]) {
 			cursor_pos_updates = 0;
 		} else if (!strcmp(arg, "-xwarppointer")) {
 			use_xwarppointer = 1;
+		} else if (!strcmp(arg, "-noxwarppointer")) {
+			use_xwarppointer = 0;
+			got_noxwarppointer = 1;
 		} else if (!strcmp(arg, "-buttonmap")) {
 			CHECK_ARGC
 			pointer_remap = strdup(argv[++i]);

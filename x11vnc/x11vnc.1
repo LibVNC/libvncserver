@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.4, lastmod: 2006-12-11
+         version: 0.8.4, lastmod: 2006-12-14
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1794,9 +1794,10 @@ not a rectangle this option will try to guess the
 areas to black out (if your system has libXinerama).
 default: \fB-xinerama\fR
 .IP
-In general, we have noticed on XINERAMA displays you
-may need to use the "\fB-xwarppointer\fR" option if the mouse
-pointer misbehaves.
+In general, we have noticed on XINERAMA displays you may
+need to use the "\fB-xwarppointer\fR" option if the mouse
+pointer misbehaves and it is enabled by default. Use
+"\fB-noxwarppointer\fR" if you do not want this.
 .PP
 \fB-xtrap\fR
 .IP
@@ -2325,7 +2326,7 @@ back to all vnc clients that support the TightVNC
 CursorPosUpdates extension.  Other clients will be able
 to see the pointer motions. Default: \fB-cursorpos\fR
 .PP
-\fB-xwarppointer\fR
+\fB-xwarppointer,\fR \fB-noxwarppointer\fR
 .IP
 Move the pointer with 
 .IR XWarpPointer (3X)
@@ -2333,7 +2334,10 @@ instead of
 the XTEST extension.  Use this as a workaround
 if the pointer motion behaves incorrectly, e.g.
 on touchscreens or other non-standard setups.
-Also sometimes needed on XINERAMA displays.
+.IP
+It is also sometimes needed on XINERAMA displays and is
+enabled by default if XINERAMA is found to be active.
+To prevent this, use \fB-noxwarppointer.\fR
 .PP
 \fB-buttonmap\fR \fIstring\fR
 .IP

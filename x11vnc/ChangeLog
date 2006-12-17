@@ -1,3 +1,6 @@
+2006-12-17  Karl Runge <runge@karlrunge.com>
+	* x11vnc: make -xwarppointer the default if xinerama is active.
+
 2006-12-09  Karl Runge <runge@karlrunge.com>
 	* java SSL viewer: guard against empty urlPrefix
 	* x11vnc: FINDCREATEDISPLAY support to create X session if

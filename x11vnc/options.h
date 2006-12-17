@@ -266,6 +266,7 @@ extern int verbose;
 
 extern int use_threads;
 
+extern int got_noxwarppointer;
 extern int got_rfbport;
 extern int got_rfbport_val;
 extern int got_alwaysshared;

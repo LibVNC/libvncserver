@@ -260,6 +260,15 @@ static void initialize_xinerama (void) {
 		return;
 	} 
 	xinerama_present = 1;
+	rfbLog("\n");
+	rfbLog("Xinerama is present and active (e.g. multi-head).\n");
+
+	if (! use_xwarppointer && ! got_noxwarppointer) {
+		rfbLog("Xinerama: enabling -xwarppointer mode to try to correct\n");
+		rfbLog("Xinerama: mouse pointer motion. XTEST+XINERAMA bug.\n");
+		rfbLog("Xinerama: Use -noxwarppointer to force XTEST.\n");
+		use_xwarppointer = 1;
+	}
 
 	/* n.b. change to XineramaGetData() someday */
 	xineramas = XineramaQueryScreens(dpy, &n);
@@ -271,6 +280,7 @@ static void initialize_xinerama (void) {
 		if (verbose) {
 			rfbLog("Xinerama: no blackouts needed (only one"
 			    " sub-screen)\n");
+			rfbLog("\n");
 		}
 		XFree_wr(xineramas);
 		return;		/* must be OK w/o change */
@@ -298,6 +308,7 @@ static void initialize_xinerama (void) {
 	if (sraRgnEmpty(black_region)) {
 		rfbLog("Xinerama: no blackouts needed (screen fills"
 		    " rectangle)\n");
+		rfbLog("\n");
 		sraRgnDestroy(black_region);
 		return;
 	}
@@ -332,6 +343,7 @@ static void initialize_xinerama (void) {
 	}
 	sraRgnReleaseIterator(iter);
 	initialize_blackouts(bstr);
+	rfbLog("\n");
 
 	free(bstr);
 	free(tstr);

@@ -355,6 +355,7 @@ int use_threads = 0;
 #endif
 
 /* info about command line opts */
+int got_noxwarppointer = 0;
 int got_rfbport = 0;
 int got_rfbport_val = -1;
 int got_alwaysshared = 0;
