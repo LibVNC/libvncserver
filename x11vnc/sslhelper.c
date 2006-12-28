@@ -1510,7 +1510,7 @@ void accept_openssl(int mode) {
 		}
 
 		if (have_httpd) {
-			int n, is_http;
+			int n = 0, is_http;
 			int hport = screen->httpPort; 
 			char *iface = NULL;
 			char *buf, *tbuf;

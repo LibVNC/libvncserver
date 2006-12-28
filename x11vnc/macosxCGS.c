@@ -132,11 +132,13 @@ int macosxCGS_find_index(int w) {
 	return -1;
 }
 
+extern void usleep(unsigned long usec);
+
 int macosxCGS_follow_animation_win(int win, int idx, int grow) {
 	double t = dnow();
 	int diffs = 0;
 	int x, y, w, h;
-	int xp, yp, wp, hp;
+	int xp = -1, yp = -1, wp = -1, hp = -1;
 	CGSRect rect;
 	CGSError err; 
 
@@ -217,13 +219,13 @@ static int check_offscreen(int win) {
 
 extern int macosx_ncache_macmenu;
 
+
 void macosxCGS_get_all_windows(void) {
 	static double last = 0.0;
 	static int totcnt = 0;
 	double dt = 0.0, now = dnow();
-	int i, db = 0, whist_prv, maxwin = 0, whist_skip = 0;
+	int i, db = 0, whist_prv = 0, maxwin = 0, whist_skip = 0;
 	CGSWindowCount cap = (CGSWindowCount) MAXWINDAT;
-	CGSWindowCount cnt = 0;
 	CGSError err; 
 
 	CGS_levelmax = 0;
@@ -267,7 +269,7 @@ void macosxCGS_get_all_windows(void) {
 
 	err = CGSGetWindowList(cid, NULL, cap, _wins_all, &_wins_all_cnt);
 
-if (db) fprintf(stderr, "cnt: %d err: %d\n", _wins_all_cnt, err);
+if (db) fprintf(stderr, "cnt: %d err: %d\n", (int) _wins_all_cnt, err);
 
 	if (err != 0) {
 		return;
@@ -330,7 +332,7 @@ if (0 || db) fprintf(stderr, "i=%03d ID: %06d  x: %03d  y: %03d  w: %03d h: %03d
 
 	err = CGSGetOnScreenWindowList(cid, NULL, cap, _wins_mapped, &_wins_mapped_cnt);
 
-if (db) fprintf(stderr, "cnt: %d err: %d\n", _wins_mapped_cnt, err);
+if (db) fprintf(stderr, "cnt: %d err: %d\n", (int) _wins_mapped_cnt, err);
 
 	if (err != 0) {
 		return;
@@ -394,9 +396,9 @@ if (db) fprintf(stderr, "cnt: %d err: %d\n", _wins_mapped_cnt, err);
 				;
 			} else if ( !(prev & is_mapped) && (curr & is_mapped)) {
 				/* MapNotify */
-				fprintf(stderr, "MapNotify:   %d/%d  %d               %.4f %d tot=%d\n", prev, curr, win, dnowx(), totcnt); 
+				fprintf(stderr, "MapNotify:   %d/%d  %d               %.4f tot=%d\n", prev, curr, win, dnowx(), totcnt); 
 				macosx_add_mapnotify(win, macwins[i].level, 1);
-				//macosxCGS_follow_animation_win(win, i, 1);
+				if (0) macosxCGS_follow_animation_win(win, i, 1);
 
 			} else if ( !(curr & is_mapped) && (prev & is_mapped)) {
 				/* UnmapNotify */
@@ -532,6 +534,7 @@ void macosxGCS_poll_pb(void) {
 	}
 	dlast = now;
 
+   {
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	[pblock lock];
 	if (pbcnt != [[NSPasteboard generalPasteboard] changeCount]) {
@@ -550,6 +553,7 @@ void macosxGCS_poll_pb(void) {
 	}
 	[pblock unlock];
 	[pool release];
+   }
 }
 #endif
 

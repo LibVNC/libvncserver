@@ -16,6 +16,7 @@
 #include "sslhelper.h"
 #include "xwrappers.h"
 #include "xevents.h"
+#include "macosx.h"
 #include "macosxCG.h"
 #include "userinput.h"
 

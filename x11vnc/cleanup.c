@@ -12,6 +12,8 @@
 #include "sslcmds.h"
 #include "sslhelper.h"
 #include "connections.h"
+#include "macosx.h"
+#include "macosxCG.h"
 
 /*
  * Exiting and error handling routines

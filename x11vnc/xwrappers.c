@@ -6,6 +6,7 @@
 #include "xevents.h"
 #include "connections.h"
 #include "cleanup.h"
+#include "macosx.h"
 
 int xshm_present = 0;
 int xtest_present = 0;

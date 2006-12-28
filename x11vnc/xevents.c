@@ -1145,7 +1145,8 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 
 #ifdef MACOSX
 	if (macosx_console) {
-		return macosx_set_sel(text, len);
+		macosx_set_sel(text, len);
+		return;
 	}
 #endif
 

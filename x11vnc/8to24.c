@@ -1475,6 +1475,9 @@ if (db24 > 1) fprintf(stderr, "transform %4d %4d %4d %4d cm: %d\n", rect.x1, rec
 	return;
 #else
 
+	attr.width = 0;
+	attr.height = 0;
+
 	/* now transform the pixels in this rectangle: */
 	n_off = main_bytes_per_line * rect.y1 + pixelsize * rect.x1;
 

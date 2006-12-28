@@ -547,6 +547,8 @@ static void hint_updates(void) {
 	int x, y, i, n, ty, th, tx, tw;
 	int hint_count = 0, in_run = 0;
 
+	hint.x = hint.y = hint.w = hint.h = 0;
+
 	for (y=0; y < ntiles_y; y++) {
 		for (x=0; x < ntiles_x; x++) {
 			n = x + y * ntiles_x;
@@ -3069,7 +3071,6 @@ int scan_for_updates(int count_only) {
 	/* scan with the initial y to the jitter value from scanlines: */
 	scan_in_progress = 1;
 	tile_count = scan_display(scanlines[scan_count], 0);
-//if (tile_count) fprintf(stderr, "XX tile_countA: %d\n", tile_count);
 	SCAN_FATAL(tile_count);
 
 	/*
@@ -3132,14 +3133,12 @@ int scan_for_updates(int count_only) {
 			cp = (NSCAN - scan_count) % NSCAN;
 
 			tile_count = scan_display(scanlines[cp], 1);
-//fprintf(stderr, "XX tile_countB: %d\n", tile_count);
 			SCAN_FATAL(tile_count);
 
 			if (tile_count >= (1 + frac2) * tile_count_old) {
 				/* on a roll... do a 3rd scan */
 				cp = (NSCAN - scan_count + 7) % NSCAN;
 				tile_count = scan_display(scanlines[cp], 1);
-//fprintf(stderr, "XX tile_countC: %d\n", tile_count);
 				SCAN_FATAL(tile_count);
 			}
 		}

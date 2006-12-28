@@ -1696,7 +1696,6 @@ if (db) fprintf(stderr, "  DFC(%d,%d-%d,%d)", tx1, ty1, tx2, ty2);
 				if (fast_push) {
 					fb_push();
 				}
-//fb_push();
 				do_fb_push++;
 PUSH_TEST(0);
 			}
@@ -4079,9 +4078,9 @@ fprintf(stderr, "FAW orig_frame unmapped.\n");
 	if (unmapped) {
 		;
 	} else if (orig_frame && macosxCGS_follow_animation_win(orig_frame, -1, 0)) {
-		fprintf(stderr, "FAW orig_frame %d\n", orig_frame);
+		fprintf(stderr, "FAW orig_frame %d\n", (int) orig_frame);
 	} else if (0 && frame && macosxCGS_follow_animation_win(frame, -1, 0)) {
-		fprintf(stderr, "FAW frame      %d\n", frame);
+		fprintf(stderr, "FAW frame      %d\n", (int) frame);
 	}
 	for (j=0; j<m; j++) {
 		macosxCGS_get_all_windows();
@@ -6573,7 +6572,7 @@ fprintf(stderr, "backingstore save:       0x%x  %3d \n", (unsigned int) win, idx
 	if (! valid_wr(idx, win, &attr)) {
 fprintf(stderr, "bs_save:    not a valid X window: 0x%x\n", (unsigned int) win);
 /* XXX Y */
-//		DELETE(idx);
+/*		DELETE(idx); */
 		X_UNLOCK;
 		cache_list[idx].valid = 0;
 		return 0;
@@ -6660,7 +6659,7 @@ fprintf(stderr, "save-unders save:        0x%x  %3d \n", (unsigned int) win, idx
 	if (! valid_wr(idx, win, &attr)) {
 fprintf(stderr, "su_save:    not a valid X window: 0x%x\n", (unsigned int) win);
 /* XXX Y */
-//		DELETE(idx);
+/*		DELETE(idx); */
 		X_UNLOCK;
 		cache_list[idx].valid = 0;
 		return 0;

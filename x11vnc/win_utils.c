@@ -6,6 +6,7 @@
 #include "cleanup.h"
 #include "xwrappers.h"
 #include "connections.h"
+#include "macosx.h"
 
 winattr_t *stack_list = NULL;
 int stack_list_len = 0;

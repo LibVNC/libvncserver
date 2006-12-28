@@ -6,6 +6,7 @@
 #include "screen.h"
 #include "scan.h"
 #include "unixpw.h"
+#include "macosx.h"
 
 int xfixes_present = 0;
 int use_xfixes = 1;
@@ -1460,10 +1461,10 @@ int get_which_cursor(void) {
 	int db = 0;
 
 	if (show_multiple_cursors) {
-		int depth;
+		int depth = 0;
 		static win_str_info_t winfo;
 		static int first = 1, depth_cutoff = -1;
-		Window win;
+		Window win = None;
 		XErrorHandler old_handler;
 		int mode = 0;
 

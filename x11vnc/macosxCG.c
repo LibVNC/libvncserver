@@ -15,6 +15,7 @@ void macosxCG_dummy(void) {}
 #include <Carbon/Carbon.h>
 
 void macosxCG_init(void);
+void macosxCG_fini(void);
 void macosxCG_event_loop(void);
 char *macosxCG_get_fb_addr(void);
 
@@ -38,7 +39,8 @@ extern int collect_macosx_damage(int x_in, int y_in, int w_in, int h_in, int cal
 static void macosxCG_callback(CGRectCount n, const CGRect *rects, void *dum) {
 	int i, db = 0;
 	if (db) fprintf(stderr, "macosx_callback: n=%d\n", (int) n);
-	for (i=0; i < n; i++) {
+	if (!dum) {}
+	for (i=0; i < (int) n; i++) {
 		if (db > 1) fprintf(stderr, "               : %g %g - %g %g\n", rects[i].origin.x, rects[i].origin.y, rects[i].size.width, rects[i].size.height);
 		collect_macosx_damage( (int) rects[i].origin.x, (int) rects[i].origin.y,
 		    (int) rects[i].size.width, (int) rects[i].size.height, 1);
@@ -90,6 +92,11 @@ void macosxCG_refresh_callback_off(void) {
 
 extern int macosx_noscreensaver;
 extern void macosxGCS_initpb(void);
+extern int macosxCGP_init_dimming(void);
+extern int macosxCGP_undim(void);
+extern int macosxCGP_dim_shutdown(void);
+extern void macosxCGP_screensaver_timer_off(void);
+extern void macosxCGP_screensaver_timer_on(void);
 
 void macosxCG_init(void) {
 	if (displayID == NULL) {
@@ -129,6 +136,10 @@ extern int dpy_x, dpy_y, bpp, wdpy_x, wdpy_y;
 extern int client_count, nofb;
 extern void do_new_fb(int);
 extern int macosx_wait_for_switch, macosx_resize;
+
+extern void macosxGCS_poll_pb(void);
+extern void usleep(unsigned long usec);
+extern unsigned int sleep(unsigned int seconds);
 
 void macosxCG_event_loop(void) {
 	OSStatus rc;
@@ -278,11 +289,11 @@ int macosxCG_get_cursor(void) {
 	int last_idx = (int) get_cursor_serial(1);
 	int which = 1;
 	CGError err;
-	int datasize, masksize, row_bytes, cdepth, comps, bpcomp;
+	int datasize, row_bytes, cdepth, comps, bpcomp;
 	CGRect rect;
 	CGPoint hot;
 	unsigned char *data;
-	int res, cursor_seed;
+	int cursor_seed;
 	static int last_cursor_seed = -1;
 	static time_t last_fetch = 0;
 	time_t now = time(NULL);
@@ -337,7 +348,7 @@ extern int macosx_swap23;
 extern int off_x, coff_x, off_y, coff_y;
 
 void macosxCG_pointer_inject(int mask, int x, int y) {
-	int swap23 = macosx_swap23, rc;
+	int swap23 = macosx_swap23;
 	int s1 = 0, s2 = 1, s3 = 2, s4 = 3, s5 = 4;
 	CGPoint loc;
 	int wheel_distance = macosx_mouse_wheel_speed;
@@ -561,23 +572,25 @@ void macosxCG_init_key_table(void) {
 		keyTable[i] = 0xFFFF;
 		keyTableMods[i] = 0;
 	}
-	for (i=0; i< (sizeof(USKeyCodes) / sizeof(int)); i += 2) {
+	for (i=0; i< (int) (sizeof(USKeyCodes) / sizeof(int)); i += 2) {
 		int j = USKeyCodes[i];
 		keyTable[(unsigned short) j] = (CGKeyCode) USKeyCodes[i+1];
 	}
-	for (i=0; i< (sizeof(SpecialKeyCodes) / sizeof(int)); i += 2) {
+	for (i=0; i< (int) (sizeof(SpecialKeyCodes) / sizeof(int)); i += 2) {
 		int j = SpecialKeyCodes[i];
 		keyTable[(unsigned short) j] = (CGKeyCode) SpecialKeyCodes[i+1];
 	}
 }
 
-void macosxCG_key_inject(int down, unsigned int keysym) {
-	static int control = 0, alt = 0;
-	int pressModsForKeys = FALSE;
+extern void init_key_table(void);
 
+void macosxCG_key_inject(int down, unsigned int keysym) {
 	CGKeyCode keyCode = keyTable[(unsigned short)keysym];
 	CGCharCode keyChar = 0;
+#if 0
+	int pressModsForKeys = FALSE;
 	UInt32 modsForKey = keyTableMods[keysym] << 8;
+#endif
 
 	init_key_table();
 

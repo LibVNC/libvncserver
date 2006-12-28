@@ -19,6 +19,7 @@
 #include "allowed_input_t.h"
 #include "keyboard.h"
 #include "cursor.h"
+#include "connections.h"
 #include "macosxCG.h"
 #include "macosxCGP.h"
 #include "macosxCGS.h"
@@ -35,6 +36,8 @@ int macosx_valid_window(Window, XWindowAttributes*);
 
 Status macosx_xquerytree(Window w, Window *root_return, Window *parent_return,
     Window **children_return, unsigned int *nchildren_return);
+int macosx_get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
+    Window *frame, Window *win);
 
 void macosx_add_mapnotify(Window win, int level, int map);
 void macosx_add_create(Window win, int level);
@@ -287,7 +290,6 @@ void init_key_table(void) {
 }
 
 void macosx_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
-	static int control = 0, alt = 0;
 	allowed_input_t input;
 	if (debug_keyboard) fprintf(stderr, "macosx_key_command: %d %s\n", (int) keysym, down ? "down" : "up");
 
@@ -301,7 +303,6 @@ void macosx_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 	init_key_table();
 	macosxCG_key_inject((int) down, (unsigned int) keysym);
-
 }
 
 extern void macosxGCS_poll_pb(void);
@@ -600,11 +601,11 @@ extern int CGS_levels[];
 Status macosx_xquerytree(Window w, Window *root_return, Window *parent_return,
     Window **children_return, unsigned int *nchildren_return) {
 
-	int i, n, k, swap;
-	int win1, win2;
+	int i, n, k;
 
 	*root_return = (Window) 0;
 	*parent_return = (Window) 0;
+	if (!w) {}
 
 	macosxCGS_get_all_windows();
 
@@ -685,16 +686,12 @@ int macosx_check_clipped(int win, int *list, int n) {
 		if (sraRgnAnd(r2, r1)) {
 			ret = 1;
 			sraRgnDestroy(r2);
-//fprintf(stderr, "macosx_check_clipped: %4d %4d -- CLIP\n", win, list[k]);
 			break;
 		}
-//fprintf(stderr, "macosx_check_clipped: %4d %4d -- -no-\n", win, list[k]);
 		sraRgnDestroy(r2);
 	}
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r1);
-
-//fprintf(stderr, "macosx_check_clipped: %4d      -- CLIP: %s\n", win, ret ? "yes" : "no");
 
 	return ret;
 }

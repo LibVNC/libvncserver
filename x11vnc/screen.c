@@ -22,6 +22,7 @@
 #include "v4l.h"
 #include "linuxfb.h"
 #include "macosx.h"
+#include "macosxCG.h"
 
 void set_greyscale_colormap(void);
 void set_hi240_colormap(void);
