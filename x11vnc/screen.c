@@ -701,6 +701,7 @@ void free_old_fb(void) {
 
 void do_new_fb(int reset_mem) {
 	XImage *fb;
+	int i;
 
 	/* for threaded we really should lock libvncserver out. */
 	if (use_threads) {
@@ -725,7 +726,6 @@ void do_new_fb(int reset_mem) {
 		initialize_blackouts_and_xinerama();
 		initialize_polling_images();
 	}
-
 }
 
 static void remove_fake_fb(void) {
@@ -2035,18 +2035,25 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 #ifndef NO_NCACHE
 	if (ncache > 0) {
-		char *new_fb;
-		int sz = fb->height * fb->bytes_per_line;
+#ifdef MACOSX
+		if (! raw_fb_str || macosx_console) {
+#else
+		if (! raw_fb_str) {
+#endif
+			
+			char *new_fb;
+			int sz = fb->height * fb->bytes_per_line;
 
-		new_fb = (char *) calloc((size_t) (sz * (1+ncache)), 1);
-		if (fb->data) {
-			memcpy(new_fb, fb->data, sz);
-			free(fb->data);
+			new_fb = (char *) calloc((size_t) (sz * (1+ncache)), 1);
+			if (fb->data) {
+				memcpy(new_fb, fb->data, sz);
+				free(fb->data);
+			}
+			fb->data = new_fb;
+			fb->height *= (1+ncache);
+			height *= (1+ncache);
+			ncache0 = ncache;
 		}
-		fb->data = new_fb;
-		fb->height *= (1+ncache);
-		height *= (1+ncache);
-		ncache0 = ncache;
 	}
 #endif
 

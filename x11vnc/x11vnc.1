@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2006" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.4, lastmod: 2006-12-17
+         version: 0.8.4, lastmod: 2006-12-28
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2391,16 +2391,52 @@ will have to set things up so you can't see that region.
 If this method is successful, the changes required for
 clients to do this less awkwardly will be investigated.
 .IP
-Note that this mode consumes a lot of memory, both
-on the x11vnc server side and on the VNC Viewer side.
-If n=2 then the amount of RAM used is roughly tripled
-for both x11vnc and the VNC Viewer.  As a rule of
-thumb, note that 1280x1024 at depth 24 is about 5MB of
-pixel data.
+Note that this mode consumes a huge amount of memory,
+both on the x11vnc server side and on the VNC Viewer
+side.  If n=2 then the amount of RAM used is roughly
+tripled for both x11vnc and the VNC Viewer.  As a rule
+of thumb, note that 1280x1024 at depth 24 is about 5MB
+of pixel data.
+.IP
+For reasonable response when cycling through 4 to 6
+large (e.g. web browser) windows a value n of 6 to 12
+is recommended. (that's right: ~10X more memory...)
 .IP
 Because of the way window backingstore and saveunders
 are implemented, n must be even.  It will be incremented
 by 1 if it is not.
+.IP
+This mode also works for native MacOS X, but may not
+be as effective as the X version.  This is due to a
+number of things, one is the drop-shadow compositing
+that leaves extra areas that need to be repaired (see
+\fB-ncache_pad).\fR  Another is the window iconification
+animations need to be avoided (see \fB-macicontime).\fR
+It appears the that the 'Scale' animation mode gives
+better results than the 'Genie' one.  Also, window event
+detection not as accurate as the X version.
+.PP
+\fB-ncache_cr\fR
+.IP
+In \fB-nache\fR mode, try do to copyrect opaque window
+moves/drags instead of wireframes (this can induce
+painting errors).  The wireframe will still be used when
+moving a window whose save-unders has not yet been set
+or has been invalidated.
+.IP
+Some VNC Viewers provide better response than others
+with this option.  On Unix, realvnc viewer gives
+smoother drags than tightvnc viewer.  Response may also
+be choppy if the server side machine is too slow.
+.PP
+\fB-ncache_pad\fR \fIn\fR
+.IP
+In \fB-nache\fR mode, pad each window with n pixels for the
+caching rectangles.  This can be used to try to improve
+the situation with dropshadows or other compositing
+(e.g. MacOS X window manager), although it could make
+things worse.  The default is 0 on Unix and 24 on
+MacOS X.
 .PP
 \fB-wireframe\fR \fI[str],\fR \fB-nowireframe\fR
 .IP
@@ -3498,6 +3534,19 @@ For the native Mac OS X server, do not resize or reset
 the framebuffer even if it is detected that the screen
 resolution or depth has changed.
 .PP
+\fB-maciconanim\fR \fIn\fR
+.IP
+For the native Mac OS X server, set n to the number
+of milliseconds that the window iconify/deiconify
+animation takes.  In \fB-ncache\fR mode this value will be
+used to skip the animation if possible. (default 400)
+.PP
+\fB-macmenu\fR
+.IP
+For the native Mac OS X server, in \fB-ncache\fR client-side
+caching mode, try to cache pull down menus (not perfect
+because they have animated fades, etc.)
+.PP
 \fB-gui\fR \fI[gui-opts]\fR
 .IP
 Start up a simple tcl/tk gui based on the the remote
@@ -3942,6 +3991,16 @@ dragging        disable \fB-nodragging\fR mode.
 .IP
 nodragging      enable  \fB-nodragging\fR mode.
 .IP
+ncache          reenable \fB-ncache\fR mode.
+.IP
+noncache        disable  \fB-ncache\fR mode.
+.IP
+ncache_size:n   set \fB-ncache\fR size to n.
+.IP
+ncache_cr       enable  \fB-ncache_cr\fR mode.
+.IP
+noncache_cr     disable \fB-ncache_cr\fR mode.
+.IP
 wireframe       enable  \fB-wireframe\fR mode. same as "wf"
 .IP
 nowireframe     disable \fB-wireframe\fR mode. same as "nowf"
@@ -4070,6 +4129,26 @@ rfbport:n       set \fB-rfbport\fR to n.
 macnosaver      enable  \fB-macnosaver\fR mode.
 .IP
 macsaver        disable \fB-macnosaver\fR mode.
+.IP
+macnowait       enable  \fB-macnowait\fR  mode.
+.IP
+macwait         disable \fB-macnowait\fR  mode.
+.IP
+macwheel:n      set \fB-macwheel\fR to n.
+.IP
+macnoswap       enable  \fB-macnoswap\fR mouse button mode.
+.IP
+macswap         disable \fB-macnoswap\fR mouse button mode.
+.IP
+macnoresize     enable  \fB-macnoresize\fR mode.
+.IP
+macresize       disable \fB-macnoresize\fR mode.
+.IP
+maciconanim:n   set \fB-maciconanim\fR to n.
+.IP
+macmenu         enable  \fB-macmenu\fR  mode.
+.IP
+macnomenu       disable \fB-macnmenu\fR mode.
 .IP
 httpport:n      set \fB-httpport\fR to n.
 .IP
@@ -4203,7 +4282,8 @@ show_cursor noshow_cursor nocursor arrow xfixes noxfixes
 xdamage noxdamage xd_area xd_mem alphacut alphafrac
 alpharemove noalpharemove alphablend noalphablend
 xwarppointer xwarp noxwarppointer noxwarp buttonmap
-dragging nodragging wireframe_mode wireframe wf
+dragging nodragging ncache_cr noncache_cr ncache
+noncache ncache_size wireframe_mode wireframe wf
 nowireframe nowf wireframelocal wfl nowireframelocal
 nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
@@ -4226,7 +4306,10 @@ debug_xdamage debug_wireframe nodebug_wireframe
 debug_wireframe debug_scroll nodebug_scroll debug_scroll
 debug_tiles dbt nodebug_tiles nodbt debug_tiles
 debug_grabs nodebug_grabs debug_sel nodebug_sel dbg
-nodbg macnosaver macsaver noremote
+nodbg macnosaver macsaver nomacnosaver macnowait macwait
+nomacnowait macwheel macnoswap macswap nomacnoswap
+macnoresize macresize nomacnoresize maciconanim macmenu
+macnomenu nomacmenu noremote
 .IP
 aro=  noop display vncdisplay desktopname guess_desktop
 http_url auth xauth users rootshift clipshift

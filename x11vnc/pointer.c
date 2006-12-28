@@ -816,7 +816,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			}
 			if (debug_pointer) {
 				rfbLog("pointer(): sending event %d %.4f\n",
-				    i+1, dnow() - x11vnc_start);
+				    i+1, dnowx());
 			}
 			if (ev[i][1] >= 0) {
 				update_x11_pointer_position(ev[i][1], ev[i][2]);
@@ -836,7 +836,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			if (mask < 0) {
 				if (debug_pointer) {
 					rfbLog("pointer(): calling XFlush "
-					    "%.4f\n", dnow() - x11vnc_start);
+					    "%.4f\n", dnowx());
 				}
 				X_LOCK;
 				XFlush_wr(dpy);	
@@ -853,7 +853,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	if (mask < 0) {		/* -1 just means flush the event queue */
 		if (debug_pointer) {
 			rfbLog("pointer(): flush only.  %.4f\n",
-			    dnow() - x11vnc_start);
+			    dnowx());
 		}
 		return;
 	}
@@ -885,7 +885,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	} else if (buffer_it) {
 		if (debug_pointer) {
 			rfbLog("pointer(): calling XFlush+"
-			    "%.4f\n", dnow() - x11vnc_start);
+			    "%.4f\n", dnowx());
 		}
 		X_LOCK;
 		XFlush_wr(dpy);	

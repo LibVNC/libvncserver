@@ -1705,6 +1705,24 @@ int cursor_shape_updates_clients(rfbScreenInfoPtr s) {
 	return count;
 }
 
+int cursor_noshape_updates_clients(rfbScreenInfoPtr s) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int count = 0;
+
+	if (! s) {
+		return 0;
+	}
+	iter = rfbGetClientIterator(s);
+	while( (cl = rfbClientIteratorNext(iter)) ) {
+		if (!cl->enableCursorShapeUpdates) {
+			count++;
+		}
+	}
+	rfbReleaseClientIterator(iter);
+	return count;
+}
+
 int cursor_pos_updates_clients(rfbScreenInfoPtr s) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;

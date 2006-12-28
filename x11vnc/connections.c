@@ -1033,7 +1033,7 @@ static unsigned char t2x2_bits[] = {
 	XSetStandardProperties(dpy, awin, sprop, "x11vnc query", ico, NULL,
 	    0, &hints);
 
-	XSelectInput(dpy, awin, evmask);
+	XSelectInput_wr(dpy, awin, evmask);
 
 	if (! font_info && (font_info = XLoadQueryFont(dpy, "fixed")) == NULL) {
 		rfbLogEnable(1);
@@ -1209,7 +1209,7 @@ static unsigned char t2x2_bits[] = {
 		}
 		if (out != -1) {
 			ret = out;
-			XSelectInput(dpy, awin, 0);
+			XSelectInput_wr(dpy, awin, 0);
 			XUnmapWindow(dpy, awin);
 			XFree_wr(gc);
 			XDestroyWindow(dpy, awin);
@@ -1554,7 +1554,7 @@ static void check_connect_file(char *file) {
 					rfbLog("read connect file: %s\n", str);
 				}
 				if (!strcmp(str, "cmd=stop") &&
-				    dnow() - x11vnc_start < 3.0) {
+				    dnowx() < 3.0) {
 					rfbLog("ignoring stale cmd=stop\n");
 				} else {
 					client_connect = str;
@@ -2130,6 +2130,10 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	accepted_client = 1;
 	last_client = time(NULL);
+
+	if (ncache) {
+		check_ncache(1, 0);
+	}
 
 	if (unixpw) {
 		unixpw_in_progress = 1;

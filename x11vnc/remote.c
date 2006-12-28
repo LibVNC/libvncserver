@@ -765,26 +765,13 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			sraRegionPtr r;
 			rfbLog("rfbDoCopyRect(screen, %d, %d, %d, %d, %d, %d)\n", x, y, x+w, y+h, dx, dy);
 			r = sraRgnCreateRect(x, y, x+w, y+h);
-			do_copyregion(r, dx, dy);
+			do_copyregion(r, dx, dy, 0);
 			fb_push();
 			sraRgnDestroy(r);
 			rfbLog("did\n");
 		} else {
 			rfbLog("remote_cmd: bad CR string: %s\n", p);
 		}
-	} else if (strstr(p, "ncache") == p) {	/* skip-cmd-list */
-		COLON_CHECK("ncache:")
-		if (query) {
-			snprintf(buf, bufn, "ans=%s%s%d", p, co, ncache);
-			goto qry;
-		}
-		p += strlen("ncache:");
-		ncache = atoi(p);
-		if (ncache % 2 != 0) {
-			ncache++;
-		}
-		rfbLog("remote_cmd: set -ncache %d\n", ncache);
-
 	} else if (!strcmp(p, "stop") || !strcmp(p, "quit") ||
 	    !strcmp(p, "exit") || !strcmp(p, "shutdown")) {
 		NOTAPP
@@ -2746,6 +2733,54 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: enabling mouse nodragging mode.\n");
 		show_dragging = 0;
 
+	} else if (!strcmp(p, "ncache_cr")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, ncache_copyrect);
+			goto qry;
+		}
+		ncache_copyrect = 1;
+		rfbLog("remote_cmd: set -ncache_cr %d\n", ncache_copyrect);
+	} else if (!strcmp(p, "noncache_cr")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !ncache_copyrect);
+			goto qry;
+		}
+		ncache_copyrect = 0;
+		rfbLog("remote_cmd: disabled -ncache_cr %d\n", ncache_copyrect);
+
+	} else if (!strcmp(p, "ncache")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !!ncache);
+			goto qry;
+		}
+		ncache = ncache0;
+		rfbLog("remote_cmd: set ncache %d\n", ncache);
+	} else if (!strcmp(p, "noncache")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !ncache);
+			goto qry;
+		}
+		ncache = 0;
+		rfbLog("remote_cmd: disabled ncache %d\n", ncache);
+	} else if (strstr(p, "ncache_size") == p) {
+		int orig = ncache, n;
+		COLON_CHECK("ncache_size:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, ncache);
+			goto qry;
+		}
+		p += strlen("ncache_size:");
+		n = atoi(p);
+
+		if (n >= 0 && n != ncache) {
+			rfbLog("remote_cmd: setting ncache %d to: %d\n", orig, ncache);
+			ncache = n;
+			do_new_fb(1);
+			if (client_count) {
+				check_ncache(1,0);
+			}
+		}
+
 	} else if (strstr(p, "wireframe_mode") == p) {
 		COLON_CHECK("wireframe_mode:")
 		if (query) {
@@ -3960,13 +3995,84 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: turn on macnosaver.\n");
 		macosx_noscreensaver = 1;
-	} else if (!strcmp(p, "macsaver")) {
+	} else if (!strcmp(p, "macsaver") || !strcmp(p, "nomacnosaver")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !macosx_noscreensaver); goto qry;
 		}
 		rfbLog("remote_cmd: turn off macnosaver.\n");
 		macosx_noscreensaver = 0;
 
+	} else if (!strcmp(p, "macnowait")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !macosx_wait_for_switch); goto qry;
+		}
+		rfbLog("remote_cmd: disable macosx_wait_for_switch.\n");
+		macosx_wait_for_switch = 0;
+	} else if (!strcmp(p, "macwait") || !strcmp(p, "nomacnowait")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, macosx_wait_for_switch); goto qry;
+		}
+		rfbLog("remote_cmd: enable macosx_wait_for_switch.\n");
+		macosx_wait_for_switch = 1;
+
+	} else if (strstr(p, "macwheel") == p) {
+		COLON_CHECK("macwheel:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, macosx_mouse_wheel_speed);
+			goto qry;
+		}
+		p += strlen("macwheel:");
+		macosx_mouse_wheel_speed = atoi(p);
+		rfbLog("set macosx_mouse_wheel_speed to: %d\n", macosx_mouse_wheel_speed);
+
+	} else if (!strcmp(p, "macnoswap")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !macosx_swap23); goto qry;
+		}
+		rfbLog("remote_cmd: disable macosx_swap23.\n");
+		macosx_swap23 = 0;
+	} else if (!strcmp(p, "macswap") || !strcmp(p, "nomacnoswap")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, macosx_swap23); goto qry;
+		}
+		rfbLog("remote_cmd: enable macosx_swap23.\n");
+		macosx_swap23 = 1;
+
+	} else if (!strcmp(p, "macnoresize")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !macosx_resize); goto qry;
+		}
+		rfbLog("remote_cmd: disable macosx_resize.\n");
+		macosx_resize = 0;
+	} else if (!strcmp(p, "macresize") || !strcmp(p, "nomacnoresize")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, macosx_resize); goto qry;
+		}
+		rfbLog("remote_cmd: enable macosx_resize.\n");
+		macosx_resize = 1;
+
+	} else if (strstr(p, "maciconanim") == p) {
+		COLON_CHECK("maciconanim:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, macosx_icon_anim_time);
+			goto qry;
+		}
+		p += strlen("maciconanim:");
+		macosx_icon_anim_time = atoi(p);
+		rfbLog("set macosx_icon_anim_time to: %d\n", macosx_icon_anim_time);
+
+	} else if (!strcmp(p, "macmenu")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, macosx_ncache_macmenu); goto qry;
+		}
+		rfbLog("remote_cmd: enable macosx_ncache_macmenu.\n");
+		macosx_ncache_macmenu = 1;
+	} else if (!strcmp(p, "macnomenu") || !strcmp(p, "nomacmenu")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !macosx_ncache_macmenu); goto qry;
+		}
+		rfbLog("remote_cmd: disable macosx_ncache_macmenu.\n");
+		macosx_ncache_macmenu = 0;
 
 	} else if (strstr(p, "hack") == p) { /* skip-cmd-list */
 		COLON_CHECK("hack:")

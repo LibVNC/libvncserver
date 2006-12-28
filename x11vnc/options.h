@@ -112,6 +112,7 @@ extern int macosx_mouse_wheel_speed;
 extern int macosx_console;
 extern int macosx_swap23;
 extern int macosx_resize;
+extern int macosx_icon_anim_time;
 
 extern unsigned long subwin;
 extern int subwin_wait_mapped;
@@ -157,6 +158,9 @@ extern int wireframe_in_progress;
 
 extern int ncache;
 extern int ncache0;
+extern int ncache_copyrect;
+extern int ncache_pad;
+extern int macosx_ncache_macmenu;
 
 extern char *scroll_copyrect_str;
 extern char *scroll_copyrect;

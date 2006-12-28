@@ -19,7 +19,13 @@ typedef struct winattr {
 	double su_time;
 	int bs_x, bs_y, bs_w, bs_h;
 	int su_x, su_y, su_w, su_h;
-	int selectinput;
+	Window above;
+	short vis_state;
+	short selectinput;
+	short map_cnt;
+	short unmap_cnt;
+	short vis_cnt;
+	short create_cnt;
 } winattr_t;
 
 #endif /* _X11VNC_WINATTR_T_H */

@@ -80,6 +80,7 @@ Bool XQueryPointer_wr(Display *display, Window w, Window *root_return,
     int *win_x_return, int *win_y_return, unsigned int *mask_return);
 
 int XFree_wr(void *data);
+int XSelectInput_wr(Display *display, Window w, long event_mask);
 
 void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h);
 static void upup_downdown_warning(KeyCode key, Bool down);
@@ -671,7 +672,7 @@ void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 	}
 	if (debug_keyboard) {
 		rfbLog("calling XTestFakeKeyEvent(%d, %d)  %.4f\n",
-		    key, down, dnow() - x11vnc_start);	
+		    key, down, dnowx());	
 	}
 #if LIBVNCSERVER_HAVE_XTEST
 	XTestFakeKeyEvent(dpy, key, down, delay);
@@ -740,7 +741,7 @@ void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
 	}
 	if (debug_pointer) {
 		rfbLog("calling XTestFakeButtonEvent(%d, %d)  %.4f\n",
-		    button, is_press, dnow() - x11vnc_start);	
+		    button, is_press, dnowx());	
 	}
 #if LIBVNCSERVER_HAVE_XTEST
     	XTestFakeButtonEvent(dpy, button, is_press, delay);
@@ -799,7 +800,7 @@ void XTestFakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
 
 	if (debug_pointer) {
 		rfbLog("calling XTestFakeMotionEvent(%d, %d)  %.4f\n",
-		    x, y, dnow() - x11vnc_start);	
+		    x, y, dnowx());	
 	}
 #if LIBVNCSERVER_HAVE_XTEST
 	XTestFakeMotionEvent(dpy, screen, x, y, delay);
@@ -1081,16 +1082,26 @@ Bool XQueryPointer_wr(Display *display, Window w, Window *root_return,
     Window *child_return, int *root_x_return, int *root_y_return,
     int *win_x_return, int *win_y_return, unsigned int *mask_return) {
 	Bool rc;
+	XErrorHandler old_handler;
 
 #if NO_X11
 	return False;
 #else
+
 	if (! display) {
 		return False;
 	}
+	old_handler = XSetErrorHandler(trap_xerror);
+	trapped_xerror = 0;
+
 	rc = XQueryPointer(display, w, root_return, child_return,
 	    root_x_return, root_y_return, win_x_return, win_y_return,
 	    mask_return);
+
+	XSetErrorHandler(old_handler);
+	if (trapped_xerror) {
+		rc = 0;
+	}
 	if (rc) {
 		display_button_mask = (*mask_return) & Bmask;
 		display_mod_mask    = (*mask_return) & Mmask;
@@ -1143,6 +1154,26 @@ int XFree_wr(void *data) {
 	return 1;
 #else
 	return XFree(data);
+#endif
+}
+
+int XSelectInput_wr(Display *display, Window w, long event_mask) {
+#if NO_X11
+	return 0;
+#else
+	int rc;
+	XErrorHandler old_handler;
+	if (display == NULL || w == None) {
+		return 0;
+	}
+	old_handler = XSetErrorHandler(trap_xerror);
+	trapped_xerror = 0;
+	rc = XSelectInput(display, w, event_mask);
+	XSetErrorHandler(old_handler);
+	if (trapped_xerror) {
+		rc = 0;
+	}
+	return rc;
 #endif
 }
 

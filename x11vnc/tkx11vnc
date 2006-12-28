@@ -240,6 +240,15 @@ Misc
 	xrecord
 	=RQA reset_record
 	=GAL LOFF
+	=GAL MacOSX::
+	macnosaver
+	macnowait
+	macwheel:
+	macnoswap
+	macnoresize
+	maciconanim:
+	macmenu
+	=GAL LOFF
 	--
 	nofb
 	=D nobell
@@ -370,7 +379,12 @@ Tuning
 	threads
 	wmdt:
 	rfbwait:
+	nodpms
 	nofbpm
+	--
+	ncache
+	ncache_size:
+	ncache_cr
 	=GAL LOFF
 "
 }

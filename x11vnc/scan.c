@@ -26,7 +26,7 @@ void initialize_polling_images(void);
 void scale_rect(double factor, int blend, int interpolate, int Bpp,
     char *src_fb, int src_bytes_per_line, char *dst_fb, int dst_bytes_per_line,
     int Nx, int Ny, int nx, int ny, int X1, int Y1, int X2, int Y2, int mark);
-void scale_and_mark_rect(int X1, int Y1, int X2, int Y2);
+void scale_and_mark_rect(int X1, int Y1, int X2, int Y2, int mark);
 void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force);
 int copy_screen(void);
 int copy_snap(void);
@@ -1253,7 +1253,7 @@ some aliases:
 	-90:	+270, 270
  */
 
-void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
+void scale_and_mark_rect(int X1, int Y1, int X2, int Y2, int mark) {
 	char *dst_fb, *src_fb = main_fb;
 	int dst_bpl, Bpp = bpp/8, fac = 1;
 
@@ -1290,7 +1290,7 @@ void scale_and_mark_rect(int X1, int Y1, int X2, int Y2) {
 
 	scale_rect(scale_fac, scaling_blend, scaling_interpolate, fac * Bpp,
 	    src_fb, fac * main_bytes_per_line, dst_fb, dst_bpl, dpy_x, dpy_y,
-	    scaled_x, scaled_y, X1, Y1, X2, Y2, 1);
+	    scaled_x, scaled_y, X1, Y1, X2, Y2, mark);
 }
 
 void rotate_coords(int x, int y, int *xo, int *yo, int dxi, int dyi) {
@@ -1307,6 +1307,8 @@ void rotate_coords(int x, int y, int *xo, int *yo, int dxi, int dyi) {
 		Dx = dpy_x;
 		Dy = dpy_y;
 	}
+
+	/* ncache?? */
 
 	if (rotating == ROTATE_NONE) {
 		*xo = xi;
@@ -1625,7 +1627,7 @@ void mark_rect_as_modified(int x1, int y1, int x2, int y2, int force) {
 	}
 
 	if (scaling) {
-		scale_and_mark_rect(x1, y1, x2, y2);
+		scale_and_mark_rect(x1, y1, x2, y2, 1);
 	} else {
 		mark_wrapper(x1, y1, x2, y2);
 	}
@@ -2537,6 +2539,48 @@ if (db && snapcnt++ < 5) rfbLog("rawfb copy_snap took: %.5f secs\n", dnow() - st
 }
 
 
+/* 
+ * debugging: print out a picture of the tiles.
+ */
+static void print_tiles(void) {
+	/* hack for viewing tile diffs on the screen. */
+	static char *prev = NULL;
+	int n, x, y, ms = 1500;
+
+	ms = 1;
+
+	if (! prev) {
+		prev = (char *) malloc((size_t) ntiles);
+		for (n=0; n < ntiles; n++) {
+			prev[n] = 0;
+		}
+	}
+	fprintf(stderr, "   ");
+	for (x=0; x < ntiles_x; x++) {
+		fprintf(stderr, "%1d", x % 10);
+	}
+	fprintf(stderr, "\n");
+	n = 0;
+	for (y=0; y < ntiles_y; y++) {
+		fprintf(stderr, "%2d ", y);
+		for (x=0; x < ntiles_x; x++) {
+			if (tile_has_diff[n]) {
+				fprintf(stderr, "X");
+			} else if (prev[n]) {
+				fprintf(stderr, "o");
+			} else {
+				fprintf(stderr, ".");
+			}
+			n++;
+		}
+		fprintf(stderr, "\n");
+	}
+	for (n=0; n < ntiles; n++) {
+		prev[n] = tile_has_diff[n];
+	}
+	usleep(ms * 1000);
+}
+
 /*
  * Utilities for managing the "naps" to cut down on amount of polling.
  */
@@ -2818,27 +2862,42 @@ static int scan_display(int ystart, int rescan) {
 		X_LOCK;
 
 #ifndef NO_NCACHE
-#if !NO_X11
-if (ncache > 0 && dpy) {
-	/* XXX watch for problems. */
+/* XXX Y test */
+if (ncache > 0) {
 	XEvent ev;
 	int gotone = 0;
-	if (XCheckTypedEvent(dpy, MapNotify, &ev)) {
-		gotone = 1;
-	} else if (XCheckTypedEvent(dpy, UnmapNotify, &ev)) {
-		gotone = 2;
-	} else if (XCheckTypedEvent(dpy, CreateNotify, &ev)) {
-		gotone = 3;
+	if (macosx_console) {
+		if (macosx_checkevent(NULL)) {
+			gotone = 1;
+		}
+	} else {
+#if !NO_X11
+		if (XCheckTypedEvent(dpy, MapNotify, &ev)) {
+			gotone = 1;
+		} else if (XCheckTypedEvent(dpy, UnmapNotify, &ev)) {
+			gotone = 2;
+		} else if (XCheckTypedEvent(dpy, CreateNotify, &ev)) {
+			gotone = 3;
+		}
+		if (gotone) {
+			XPutBackEvent(dpy, &ev);
+		}
+#endif
 	}
 	if (gotone) {
-		XPutBackEvent(dpy, &ev);
+		static int nomsg = 1;
+		if (nomsg) {
+			if (dnowx() > 20) {
+				nomsg = 0;
+			}
+		} else {
+fprintf(stderr, "*** SCAN_DISPLAY CHECK_NCACHE/%d *** %d rescan=%d\n", gotone, y, rescan);
+		}
 		X_UNLOCK;
-fprintf(stderr, "*** SCAN_DISPLAY CHECK_NCACHE/%d *** %d\n", gotone, y);
-		check_ncache(0);
+		check_ncache(0, 1);
 		X_LOCK;
 	}
 }
-#endif
 #endif
 
 		XRANDR_SET_TRAP_RET(-1, "scan_display-set");
@@ -2936,6 +2995,7 @@ int scan_for_updates(int count_only) {
 	double frac2 = 0.35;  /* or 3rd */
 	double frac3 = 0.02;  /* do scan_display() again after copy_tiles() */
 	static double last_poll = 0.0;
+	double dtmp;
 
 	if (unixpw_in_progress) return 0;
  
@@ -3007,6 +3067,7 @@ int scan_for_updates(int count_only) {
 	/* scan with the initial y to the jitter value from scanlines: */
 	scan_in_progress = 1;
 	tile_count = scan_display(scanlines[scan_count], 0);
+//if (tile_count) fprintf(stderr, "XX tile_countA: %d\n", tile_count);
 	SCAN_FATAL(tile_count);
 
 	/*
@@ -3069,12 +3130,14 @@ int scan_for_updates(int count_only) {
 			cp = (NSCAN - scan_count) % NSCAN;
 
 			tile_count = scan_display(scanlines[cp], 1);
+//fprintf(stderr, "XX tile_countB: %d\n", tile_count);
 			SCAN_FATAL(tile_count);
 
 			if (tile_count >= (1 + frac2) * tile_count_old) {
 				/* on a roll... do a 3rd scan */
 				cp = (NSCAN - scan_count + 7) % NSCAN;
 				tile_count = scan_display(scanlines[cp], 1);
+//fprintf(stderr, "XX tile_countC: %d\n", tile_count);
 				SCAN_FATAL(tile_count);
 			}
 		}
@@ -3127,6 +3190,9 @@ int scan_for_updates(int count_only) {
 	}
 
 	if (unixpw_in_progress) return 0;
+/* XXX Y */
+if (0 && tile_count > 20) print_tiles();
+//dtmp = dnow();
 
 	if (old_copy_tile) {
 		tile_diffs = copy_all_tiles();
@@ -3134,6 +3200,7 @@ int scan_for_updates(int count_only) {
 		tile_diffs = copy_all_tile_runs();
 	}
 	SCAN_FATAL(tile_diffs);
+//if (tile_count) fprintf(stderr, "XX copytile: %.4f  tile_count: %d\n", dnow() - dtmp, tile_count);
 
 	/*
 	 * This backward pass for upward and left tiles complements what

@@ -16,6 +16,13 @@ extern Status macosx_xquerytree(Window w, Window *root_return, Window *parent_re
 extern void macosx_send_sel(char *, int);
 extern void macosx_set_sel(char *, int);
 
+extern void macosx_add_mapnotify(Window win, int level, int map);
+extern void macosx_add_create(Window win, int level);
+extern void macosx_add_destroy(Window win, int level);
+extern void macosx_add_visnotify(Window win, int level, int obscured);
+extern int macosx_checkevent(XEvent *ev);
+
+extern Window macosx_click_frame;
 
 
 #endif /* _X11VNC_MACOSX_H */

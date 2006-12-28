@@ -137,6 +137,7 @@ int macosx_mouse_wheel_speed = 5;
 int macosx_console = 0;
 int macosx_swap23 = 1;
 int macosx_resize = 1;
+int macosx_icon_anim_time = 450;
 
 unsigned long subwin = 0x0;	/* -id, -sid */
 int subwin_wait_mapped = 0;
@@ -195,6 +196,13 @@ int wireframe_local = 1;
 
 int ncache = 0;
 int ncache0 = 0;
+int ncache_copyrect = 0;
+int macosx_ncache_macmenu = 0;
+#ifdef MACOSX
+int ncache_pad = 24;
+#else
+int ncache_pad = 0;
+#endif
 
 /* T+B+L+R,tkey+presist_key,tmouse+persist_mouse */
 char *scroll_copyrect_str = NULL;

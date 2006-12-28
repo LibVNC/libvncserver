@@ -108,7 +108,7 @@ static void initialize_xevents(int reset) {
 		 */
 		X_LOCK;
 		xselectinput_rootwin |= PropertyChangeMask;
-		XSelectInput(dpy, rootwin, xselectinput_rootwin);
+		XSelectInput_wr(dpy, rootwin, xselectinput_rootwin);
 		X_UNLOCK;
 		did_xselect_input = 1;
 	}

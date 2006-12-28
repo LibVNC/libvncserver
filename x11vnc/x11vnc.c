@@ -329,7 +329,7 @@ static int choose_delay(double dt) {
 	}
 	dts[ndt-1] = dt;
 
-if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnow() - x11vnc_start);
+if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnowx());
 	if (bogdown) {
 		if (use_xdamage) {
 			/* DAMAGE can queue ~1000 rectangles for a scroll */
@@ -554,7 +554,7 @@ static void watch_loop(void) {
 			}
 
 			check_new_clients();
-			check_ncache();
+			check_ncache(0, 0);
 			check_xevents(0);
 			check_autorepeat();
 			check_pm();
@@ -2115,6 +2115,11 @@ int main(int argc, char* argv[]) {
 			if (ncache % 2 != 0) {
 				ncache++;
 			}
+		} else if (!strcmp(arg, "-ncache_cr")) {
+			ncache_copyrect = 1;
+		} else if (!strcmp(arg, "-ncache_pad")) {
+			CHECK_ARGC
+			ncache_pad = atoi(argv[++i]);
 #endif
 		} else if (!strcmp(arg, "-wireframe")
 		    || !strcmp(arg, "-wf")) {
@@ -2335,6 +2340,11 @@ int main(int argc, char* argv[]) {
 			macosx_swap23 = 0;
 		} else if (!strcmp(arg, "-macnoresize")) {
 			macosx_resize = 0;
+		} else if (!strcmp(arg, "-maciconanim")) {
+			CHECK_ARGC
+			macosx_icon_anim_time = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-macmenu")) {
+			macosx_ncache_macmenu = 1;
 		} else if (!strcmp(arg, "-gui")) {
 			launch_gui = 1;
 			if (i < argc-1) {
@@ -3094,8 +3104,7 @@ int main(int argc, char* argv[]) {
 
 	if (priv_remote) {
 		if (! remote_control_access_ok()) {
-			rfbLog("** Disabling remote commands in -privremote "
-			    "mode.\n");
+			rfbLog("** Disabling remote commands in -privremote mode.\n");
 			accept_remote_cmds = 0;
 		}
 	}
@@ -3108,8 +3117,7 @@ int main(int argc, char* argv[]) {
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 	if (! XFixesQueryExtension(dpy, &xfixes_base_event_type, &er)) {
 		if (! quiet && ! raw_fb_str) {
-			rfbLog("Disabling XFIXES mode: display does not "
-			    "support it.\n");
+			rfbLog("Disabling XFIXES mode: display does not support it.\n");
 		}
 		xfixes_base_event_type = 0;
 		xfixes_present = 0;
@@ -3124,8 +3132,7 @@ int main(int argc, char* argv[]) {
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (! XDamageQueryExtension(dpy, &xdamage_base_event_type, &er)) {
 		if (! quiet && ! raw_fb_str) {
-			rfbLog("Disabling X DAMAGE mode: display does not "
-			    "support it.\n");
+			rfbLog("Disabling X DAMAGE mode: display does not support it.\n");
 		}
 		xdamage_base_event_type = 0;
 		xdamage_present = 0;
@@ -3137,31 +3144,24 @@ int main(int argc, char* argv[]) {
 		use_xdamage = 0;
 	}
 	if (! quiet && xdamage_present && use_xdamage && ! raw_fb_str) {
-		rfbLog("X DAMAGE available on display, using it for"
-		    " polling hints.\n");
-		rfbLog("  To disable this behavior use: "
-		    "'-noxdamage'\n");
+		rfbLog("X DAMAGE available on display, using it for polling hints.\n");
+		rfbLog("  To disable this behavior use: '-noxdamage'\n");
 	}
 
 	if (! quiet && wireframe && ! raw_fb_str) {
-		rfbLog("Wireframing: -wireframe mode is in effect for window "
-		    "moves.\n");
-		rfbLog("  If this yields undesired behavior (poor response, "
-		    "painting\n");
+		rfbLog("\n");
+		rfbLog("Wireframing: -wireframe mode is in effect for window moves.\n");
+		rfbLog("  If this yields undesired behavior (poor response, painting\n");
 		rfbLog("  errors, etc) it may be disabled:\n");
 		rfbLog("   - use '-nowf' to disable wireframing completely.\n");
-		rfbLog("   - use '-nowcr' to disable the Copy Rectangle after "
-		    "the\n");
+		rfbLog("   - use '-nowcr' to disable the Copy Rectangle after the\n");
 		rfbLog("     moved window is released in the new position.\n");
 		rfbLog("  Also see the -help entry for tuning parameters.\n");
-		rfbLog("  You can press 3 Alt_L's (Left \"Alt\" key) in a row"
-		    " to \n");
-		rfbLog("  repaint the screen, also see the -fixscreen option"
-		    " for\n");
+		rfbLog("  You can press 3 Alt_L's (Left \"Alt\" key) in a row to \n");
+		rfbLog("  repaint the screen, also see the -fixscreen option for\n");
 		rfbLog("  periodic repaints.\n");
 		if (scale_str && !strstr(scale_str, "nocr")) {
-			rfbLog("  Note: '-scale' is on and this can cause "
-			    "more problems.\n");
+			rfbLog("  Note: '-scale' is on and this can cause more problems.\n");
 		}
 	}
 
@@ -3169,8 +3169,7 @@ int main(int argc, char* argv[]) {
 #if defined(SOLARIS_OVERLAY) && !NO_X11
 	if (! XQueryExtension(dpy, "SUN_OVL", &maj, &ev, &er)) {
 		if (! quiet && overlay && ! raw_fb_str) {
-			rfbLog("Disabling -overlay: SUN_OVL "
-			    "extension not available.\n");
+			rfbLog("Disabling -overlay: SUN_OVL extension not available.\n");
 		}
 	} else {
 		overlay_present = 1;
@@ -3179,8 +3178,7 @@ int main(int argc, char* argv[]) {
 #if defined(IRIX_OVERLAY) && !NO_X11
 	if (! XReadDisplayQueryExtension(dpy, &ev, &er)) {
 		if (! quiet && overlay && ! raw_fb_str) {
-			rfbLog("Disabling -overlay: IRIX ReadDisplay "
-			    "extension not available.\n");
+			rfbLog("Disabling -overlay: IRIX ReadDisplay extension not available.\n");
 		}
 	} else {
 		overlay_present = 1;
@@ -3202,11 +3200,9 @@ int main(int argc, char* argv[]) {
 			multiple_cursors_mode = strdup("most");
 
 			if (! quiet && ! raw_fb_str) {
-				rfbLog("XFIXES available on display, resetting"
-				    " cursor mode\n");
+				rfbLog("XFIXES available on display, resetting cursor mode\n");
 				rfbLog("  to: '-cursor most'.\n");
-				rfbLog("  to disable this behavior use: "
-				    "'-cursor arrow'\n");
+				rfbLog("  to disable this behavior use: '-cursor arrow'\n");
 				rfbLog("  or '-noxfixes'.\n");
 			}
 		}
@@ -3214,8 +3210,7 @@ int main(int argc, char* argv[]) {
 			if (xfixes_present && use_xfixes &&
 			    overlay_cursor == 1) {
 				if (! quiet && ! raw_fb_str) {
-					rfbLog("using XFIXES for cursor "
-					    "drawing.\n");
+					rfbLog("using XFIXES for cursor drawing.\n");
 				}
 				overlay_cursor = 0;
 			}
@@ -3225,8 +3220,7 @@ int main(int argc, char* argv[]) {
 	if (overlay) {
 		using_shm = 0;
 		if (flash_cmap && ! quiet && ! raw_fb_str) {
-			rfbLog("warning: -flashcmap may be "
-			    "incompatible with -overlay\n");
+			rfbLog("warning: -flashcmap may be incompatible with -overlay\n");
 		}
 		if (show_cursor && overlay_cursor) {
 			char *s = multiple_cursors_mode;
@@ -3252,19 +3246,14 @@ int main(int argc, char* argv[]) {
 	/* check for XTEST */
 	if (! XTestQueryExtension_wr(dpy, &ev, &er, &maj, &min)) {
 		if (! quiet && ! raw_fb_str) {
-			rfbLog("WARNING: XTEST extension not available "
-			    "(either missing from\n");
-			rfbLog("  display or client library libXtst "
-			    "missing at build time).\n");
-			rfbLog("  MOST user input (pointer and keyboard) "
-			    "will be DISCARDED.\n");
-			rfbLog("  If display does have XTEST, be sure to "
-			    "build x11vnc with\n");
-			rfbLog("  a working libXtst build environment "
-			    "(e.g. libxtst-dev,\n");
+			rfbLog("\n");
+			rfbLog("WARNING: XTEST extension not available (either missing from\n");
+			rfbLog("  display or client library libXtst missing at build time).\n");
+			rfbLog("  MOST user input (pointer and keyboard) will be DISCARDED.\n");
+			rfbLog("  If display does have XTEST, be sure to build x11vnc with\n");
+			rfbLog("  a working libXtst build environment (e.g. libxtst-dev,\n");
 			rfbLog("  or other packages).\n");
-			rfbLog("No XTEST extension, switching to "
-			    "-xwarppointer mode for\n");
+			rfbLog("No XTEST extension, switching to -xwarppointer mode for\n");
 			rfbLog("  pointer motion input.\n");
 		}
 		xtest_present = 0;
@@ -3297,6 +3286,7 @@ int main(int argc, char* argv[]) {
 	if (! XRecordQueryVersion_wr(dpy, &maj, &min)) {
 		xrecord_present = 0;
 		if (! quiet) {
+			rfbLog("\n");
 			rfbLog("The RECORD X extension was not found on the display.\n");
 			rfbLog("If your system has disabled it by default, you can\n");
 			rfbLog("enable it to get a nice x11vnc performance speedup\n");
@@ -3333,23 +3323,39 @@ int main(int argc, char* argv[]) {
 	tmpi = 0;
 #endif
 	if (! quiet && tmpi && ! raw_fb_str) {
-		rfbLog("Scroll Detection: -scrollcopyrect mode is in effect "
-		    "to\n");
-		rfbLog("  use RECORD extension to try to detect scrolling "
-		    "windows\n");
+		rfbLog("\n");
+		rfbLog("Scroll Detection: -scrollcopyrect mode is in effect to\n");
+		rfbLog("  use RECORD extension to try to detect scrolling windows\n");
 		rfbLog("  (induced by either user keystroke or mouse input).\n");
-		rfbLog("  If this yields undesired behavior (poor response, "
-		    "painting\n");
+		rfbLog("  If this yields undesired behavior (poor response, painting\n");
 		rfbLog("  errors, etc) it may be disabled via: '-noscr'\n");
 		rfbLog("  Also see the -help entry for tuning parameters.\n");
-		rfbLog("  You can press 3 Alt_L's (Left \"Alt\" key) in a row"
-		    " to \n");
-		rfbLog("  repaint the screen, also see the -fixscreen option"
-		    " for\n");
+		rfbLog("  You can press 3 Alt_L's (Left \"Alt\" key) in a row to \n");
+		rfbLog("  repaint the screen, also see the -fixscreen option for\n");
 		rfbLog("  periodic repaints.\n");
 		if (scale_str && !strstr(scale_str, "nocr")) {
-			rfbLog("  Note: '-scale' is on and this can cause "
-			    "more problems.\n");
+			rfbLog("  Note: '-scale' is on and this can cause more problems.\n");
+		}
+	}
+
+	if (! quiet && ncache && ! raw_fb_str) {
+		rfbLog("\n");
+		rfbLog("Client Side Caching: -ncache mode is in effect to provide\n");
+		rfbLog("  some client-side pixel data caching.  This speeds up\n");
+		rfbLog("  iconifying/deiconifying windows, moving and raising\n");
+		rfbLog("  windows, and reposting menus.  In the simple CopyRect\n");
+		rfbLog("  encoding scheme used (no compression) a huge amount\n");
+		rfbLog("  of extra memory (20-80MB) is used on both the server and\n");
+		rfbLog("  client sides.  This mode works with any VNC viewer,\n");
+		rfbLog("  however in most you can actually see the cached pixel\n");
+		rfbLog("  data by scrolling down, so you need to re-adjust its size.\n");
+		rfbLog("  If this mode yields undesired behavior (poor response,\n");
+		rfbLog("  painting errors, etc) it may be disabled via: '-ncache 0'\n");
+		rfbLog("  You can press 3 Alt_L's (Left \"Alt\" key) in a row to \n");
+		rfbLog("  repaint the screen, also see the -fixscreen option for\n");
+		rfbLog("  periodic repaints.\n");
+		if (scale_str) {
+			rfbLog("  Note: '-scale' is on and this can cause more problems.\n");
 		}
 	}
 
@@ -3367,16 +3373,14 @@ int main(int argc, char* argv[]) {
 		xshm_present = 0;
 		if (! using_shm) {
 			if (! quiet && ! raw_fb_str) {
-				rfbLog("info: display does not support"
-				    " XShm.\n");
+				rfbLog("info: display does not support XShm.\n");
 			}
 		} else {
 		    if (! quiet && ! raw_fb_str) {
+			rfbLog("\n");
 			rfbLog("warning: XShm extension is not available.\n");
-			rfbLog("For best performance the X Display should be"
-			    " local. (i.e.\n");
-			rfbLog("the x11vnc and X server processes should be"
-			    " running on\n");
+			rfbLog("For best performance the X Display should be local. (i.e.\n");
+			rfbLog("the x11vnc and X server processes should be running on\n");
 			rfbLog("the same machine.)\n");
 #if LIBVNCSERVER_HAVE_XSHM
 			rfbLog("Restart with -noshm to override this.\n");
@@ -3396,8 +3400,7 @@ int main(int argc, char* argv[]) {
 	initialize_watch_bell();
 	if (!xkb_present && use_xkb_modtweak) {
 		if (! quiet && ! raw_fb_str) {
-			rfbLog("warning: disabling xkb modtweak."
-			    " XKEYBOARD ext. not present.\n");
+			rfbLog("warning: disabling xkb modtweak. XKEYBOARD ext. not present.\n");
 		}
 		use_xkb_modtweak = 0;
 	}
@@ -3412,8 +3415,7 @@ int main(int argc, char* argv[]) {
 #if LIBVNCSERVER_HAVE_LIBXRANDR
 	if (! XRRQueryExtension(dpy, &xrandr_base_event_type, &er)) {
 		if (xrandr && ! quiet && ! raw_fb_str) {
-			rfbLog("Disabling -xrandr mode: display does not"
-			    " support X RANDR.\n");
+			rfbLog("Disabling -xrandr mode: display does not support X RANDR.\n");
 		}
 		xrandr_base_event_type = 0;
 		xrandr = 0;

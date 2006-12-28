@@ -647,7 +647,7 @@ if (db > 1) fprintf(stderr, "record_CA-%d\n", k++);
 	dt = (dnow() - servertime_diff) - st;
 	fprintf(stderr, "record_CA-%d *FOUND_SCROLL: src: 0x%lx dx: %d dy: %d "
 	"x: %d y: %d w: %d h: %d st: %.4f %.4f  %.4f\n", k++, src, dx, dy,
-	src_x, src_y, w, h, st, dt, dnow() - x11vnc_start);
+	src_x, src_y, w, h, st, dt, dnowx());
  }
 
 	i = scr_ev_cnt;
@@ -1144,7 +1144,7 @@ if (db > 1) fprintf(stderr, "record_CW-%d\n", k++);
 	dt = (dnow() - servertime_diff) - st;
 	fprintf(stderr, "record_CW-%d *FOUND_SCROLL: win: 0x%lx dx: %d dy: %d "
 	"x: %d y: %d w: %d h: %d  st: %.4f  dt: %.4f  %.4f\n", k++, win,
-	dx, dy, src_x, src_y, w, h, st, dt, dnow() - x11vnc_start);
+	dx, dy, src_x, src_y, w, h, st, dt, dnowx());
  }
 
 	i = scr_ev_cnt;
@@ -1271,7 +1271,7 @@ static void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
 	req = (xReq *) rec_data->data;
 
 	if (req->reqType == X_GrabServer) {
-		double now = dnow() - x11vnc_start;
+		double now = dnowx();
 		xserver_grabbed++;
 		if (db) rfbLog("X server Grabbed:    %d %.5f\n", xserver_grabbed, now);
 		if (xserver_grabbed > 1) {
@@ -1282,7 +1282,7 @@ static void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
 			xserver_grabbed = 1;
 		}
 	} else if (req->reqType == X_UngrabServer) {
-		double now = dnow() - x11vnc_start;
+		double now = dnowx();
 		xserver_grabbed--;
 		if (xserver_grabbed < 0) {
 			xserver_grabbed = 0;

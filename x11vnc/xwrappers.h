@@ -77,6 +77,7 @@ extern Bool XQueryPointer_wr(Display *display, Window w, Window *root_return,
     int *win_x_return, int *win_y_return, unsigned int *mask_return);
 
 extern int XFree_wr(void *data);
+extern int XSelectInput_wr(Display *display, Window w, long event_mask);
 
 
 #endif /* _X11VNC_XWRAPPERS_H */

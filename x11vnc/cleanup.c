@@ -359,6 +359,7 @@ crash_prompt:
 static void interrupted (int sig) {
 	exit_sig = sig;
 	if (exit_flag) {
+		fprintf(stderr, "extra[%d] signal: %d\n", exit_flag, sig);
 		exit_flag++;
 		if (use_threads) {
 			usleep2(250 * 1000);
@@ -370,6 +371,7 @@ static void interrupted (int sig) {
 	exit_flag++;
 	if (sig == 0) {
 		fprintf(stderr, "caught X11 error:\n");
+		if (crash_debug) { crash_shell(); }
 	} else if (sig == -1) {
 		fprintf(stderr, "caught XIO error:\n");
 	} else {
@@ -378,6 +380,10 @@ static void interrupted (int sig) {
 	if (sig == SIGINT) {
 		shut_down = 1;
 		return;
+	}
+
+	if (crash_debug) {
+		crash_shell();
 	}
 
 	X_UNLOCK;
