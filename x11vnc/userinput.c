@@ -5460,7 +5460,7 @@ fprintf(stderr, "check_wireframe: 1\n");
 #if defined(NO_NCACHE) || (NO_X11 && !defined(MACOSX))
 int check_ncache(int a, int b) {
 	if (!a || !b) {}
-	return;
+	return 0;
 }
 int lookup_win_index(Window win) {
 	if (!win) {}

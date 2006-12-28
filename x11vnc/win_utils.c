@@ -205,6 +205,10 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 #endif
 
 #if NO_X11 && !defined(MACOSX)
+	num = rc = i = j = 0;
+	ui = 0;
+	r = w = None;
+	list = NULL;
 	return;
 #else
 
@@ -341,7 +345,7 @@ Window query_pointer(Window start) {
 
 	RAWFB_RET(None)
 #if NO_X11
-	if (!start) {}
+	if (!start) { rx = ry = 0; }
 	return None;
 #else
 	if (start == None) {
