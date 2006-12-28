@@ -51,6 +51,11 @@ static char clipboard_str[PROP_MAX+1];
  * n.b.: our caller already has the X_LOCK.
  */
 void selection_request(XEvent *ev, char *type) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!ev || !type) {}
+	return;
+#else
 	XSelectionEvent notify_event;
 	XSelectionRequestEvent *req_event;
 	XErrorHandler old_handler;
@@ -61,9 +66,7 @@ void selection_request(XEvent *ev, char *type) {
 	unsigned long XA_LENGTH;
 #endif
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
+
 #ifndef XA_LENGTH
 	XA_LENGTH = XInternAtom(dpy, "LENGTH", True);
 #endif
@@ -180,6 +183,10 @@ int check_sel_direction(char *dir, char *label, char *sel, int len) {
  * n.b.: our caller already has the X_LOCK.
  */
 void cutbuffer_send(void) {
+#if NO_X11
+	RAWFB_RET_VOID
+	return;
+#else
 	Atom type;
 	int format, slen, dlen, len;
 	unsigned long nitems = 0, bytes_after = 0;
@@ -189,9 +196,6 @@ void cutbuffer_send(void) {
 	slen = 0;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	/* read the property value into cutbuffer_str: */
 	do {
@@ -254,6 +258,11 @@ void cutbuffer_send(void) {
  */
 #define CHKSZ 32
 void selection_send(XEvent *ev) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!ev) {}
+	return;
+#else
 	Atom type;
 	int format, slen, dlen, oldlen, newlen, toobig = 0, len;
 	static int err = 0, sent_one = 0;
@@ -263,9 +272,6 @@ void selection_send(XEvent *ev) {
 	char *selection_str;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 	/*
 	 * remember info about our last value of PRIMARY (or CUT_BUFFER0)
 	 * so we can check for any changes below.

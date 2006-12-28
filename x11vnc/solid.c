@@ -114,6 +114,11 @@ static char *cmd_output(char *cmd) {
 }
 
 static void solid_root(char *color) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!color) {}
+	return;
+#else
 	Window expose;
 	static XImage *image = NULL;
 	Pixmap pixmap;
@@ -126,9 +131,6 @@ static void solid_root(char *color) {
 	Colormap cmap;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (subwin || window != rootwin) {
 		rfbLog("cannot set subwin to solid color, must be rootwin\n");
@@ -226,6 +228,11 @@ static void solid_root(char *color) {
 }
 
 static void solid_cde(char *color) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!color) {}
+	return;
+#else
 	int wsmax = 16;
 	static XImage *image[16];
 	static Window ws_wins[16];
@@ -243,9 +250,6 @@ static void solid_cde(char *color) {
 	int n;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (subwin || window != rootwin) {
 		rfbLog("cannot set subwin to solid color, must be rootwin\n");
@@ -490,6 +494,11 @@ static void solid_cde(char *color) {
 }
 
 static void solid_gnome(char *color) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!color) {}
+	return;
+#else
 	char get_color[] = "gconftool-2 --get "
 	    "/desktop/gnome/background/primary_color";
 	char set_color[] = "gconftool-2 --set "
@@ -503,9 +512,6 @@ static void solid_gnome(char *color) {
 	char *cmd;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 	
 	if (! color) {
 		if (! orig_color) {
@@ -580,6 +586,11 @@ static void solid_gnome(char *color) {
 }
 
 static void solid_kde(char *color) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!color) {}
+	return;
+#else
 	char set_color[] =
 	    "dcop --user '%s' kdesktop KBackgroundIface setColor '%s' 1";
 	char bg_off[] =
@@ -590,9 +601,6 @@ static void solid_kde(char *color) {
 	int len;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	user = get_user_name();
 	if (strstr(user, "'") != NULL)  {
@@ -633,12 +641,13 @@ static void solid_kde(char *color) {
 }
 
 char *guess_desktop(void) {
+#if NO_X11
+	RAWFB_RET("root")
+	return "root";
+#else
 	Atom prop;
 
 	RAWFB_RET("root")
-#if NO_X11
-	return "root";
-#else
 
 	if (wmdt_str && *wmdt_str != '\0') {
 		char *s = wmdt_str;

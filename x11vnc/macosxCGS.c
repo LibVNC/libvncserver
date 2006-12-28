@@ -53,6 +53,8 @@ extern OSStatus CGSOrderWindow(const CGSConnectionID cid,
 
 static CGSConnectionID cid = NULL;
 
+extern void macosx_log(char *);
+
 int macwinmax = 0; 
 typedef struct windat {
 	int win;
@@ -493,7 +495,7 @@ void macosxGCS_initpb(void) {
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	pblock = [[NSLock alloc] init];
 	if (![NSPasteboard generalPasteboard]) {
-		fprintf(stderr, "macosxGCS_initpb: pasteboard inaccessible.\n");
+		macosx_log("macosxGCS_initpb: pasteboard inaccessible.\n");
 		pbcnt = 0;
 		pbstr = [[NSString alloc] initWithString:@"\e<PASTEBOARD INACCESSIBLE>\e"]; 
 	}

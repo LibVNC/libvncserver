@@ -104,7 +104,7 @@ use_ours=0
 if [ "X$VNCVIEWERCMD" = "X" ]; then
 	VNCVIEWERCMD="vncviewer"
 	export VNCVIEWERCMD
-	if [ "X$DARWIN_COTVNC" != "X" ]; then
+	if [ "X$DARWIN_COTVNC" = "X" ]; then
 		use_ours=1
 	fi
 fi

@@ -53,13 +53,14 @@ static prtremap_t pointer_map[MAX_BUTTONS+1][MAX_BUTTON_EVENTS];
  * For parsing the -buttonmap sections, e.g. "4" or ":Up+Up+Up:"
  */
 static void buttonparse(int from, char **s) {
+#if NO_X11
+	if (!from || !s) {}
+	return;
+#else
 	char *q;
 	int to, i;
 	int modisdown[256];
 
-#if NO_X11
-	return;
-#else
 	q = *s;
 
 	for (i=0; i<256; i++) {
@@ -214,6 +215,10 @@ static void buttonparse(int from, char **s) {
  * process the -buttonmap string
  */
 void initialize_pointer_map(char *pointer_remap) {
+#if NO_X11
+	if (!pointer_remap) {}
+	return;
+#else
 	unsigned char map[MAX_BUTTONS];
 	int i, k;
 	/*
@@ -223,9 +228,6 @@ void initialize_pointer_map(char *pointer_remap) {
 	 * from -buttonmap option.
 	 */
 	
-#if NO_X11
-	return;
-#else
 	if (!raw_fb_str) {
 		X_LOCK;
 		num_buttons = XGetPointerMapping(dpy, map, MAX_BUTTONS);
@@ -299,12 +301,14 @@ void initialize_pointer_map(char *pointer_remap) {
  * Send a pointer position event to the X server.
  */
 static void update_x11_pointer_position(int x, int y) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!x || !y) {}
+	return;
+#else
 	int rc;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	X_LOCK;
 	if (use_xwarppointer) {
@@ -339,11 +343,12 @@ static void update_x11_pointer_position(int x, int y) {
 }
 
 void do_button_mask_change(int mask, int button) {
-	int mb, k, i = button-1;
-
 #if NO_X11
+	if (!mask || !button) {}
 	return;
 #else
+	int mb, k, i = button-1;
+
 	/*
 	 * this expands to any pointer_map button -> keystrokes
 	 * remappings.  Usually just k=0 and we send one button event.
@@ -408,14 +413,16 @@ void do_button_mask_change(int mask, int button) {
  * Send a pointer button event to the X server.
  */
 static void update_x11_pointer_mask(int mask) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!mask) {}
+	return;
+#else
 	int snapped = 0, xr_mouse = 1, i;
 
 	last_event = last_input = last_pointer_input = time(NULL);
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (mask != button_mask) {
 		last_pointer_click_time = dnow();

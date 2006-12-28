@@ -498,11 +498,11 @@ static void reset_rfbport(int old, int new)  {
  * libXau yet.
  */
 int remote_control_access_ok(void) {
-	struct stat sbuf;
-
 #if NO_X11
 	return 0;
 #else
+	struct stat sbuf;
+
 	if (client_connect_file) {
 		if (stat(client_connect_file, &sbuf) == 0) {
 			if (sbuf.st_mode & S_IWOTH) {

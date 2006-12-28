@@ -98,11 +98,13 @@ int lookup_win_index(Window);
  */
 int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
     Window *frame, Window *win) {
+#if !NO_X11
 	Window r, c;
 	XWindowAttributes attr;
 	Bool ret;
 	int rootx, rooty, wx, wy;
 	unsigned int mask;
+#endif
 
 #ifdef MACOSX
 	if (macosx_console) {
@@ -113,6 +115,7 @@ int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
 	RAWFB_RET(0)
 
 #if NO_X11
+	if (!px || !py || !x || !y || !w || !h || !frame || !win) {}
 	return 0;
 #else
 
@@ -336,6 +339,10 @@ static void parse_wireframe_str(char *wf) {
 				wireframe_shade = n;
 				ok = 1;
 			}
+#else
+			r = g = b = 0;
+			cmap = 0;
+			cdef.pixel = 0;
 #endif
 		}
 		if (ok) {
@@ -7061,6 +7068,7 @@ void xselectinput(Window w, unsigned long evmask, int sync) {
 #if NO_X11
 	trapped_xerror = 0;
 	trapped_xioerror = 0;
+	if (!evmask) {}
 #else
 	XErrorHandler   old_handler1;
 	XIOErrorHandler old_handler2;
@@ -7108,6 +7116,7 @@ Bool xcheckmaskevent(Display *d, long mask, XEvent *ev) {
 	RAWFB_RET(False);
 
 #if NO_X11
+	if (!d || !mask) {}
 	return False;
 #else
 	return XCheckMaskEvent(d, mask, ev);

@@ -837,6 +837,11 @@ void setup_cursors_and_push(void) {
  *
  */
 static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!depth || !w || !winfo) {}
+	return;
+#else
 	Window r, c;
 	int i, rx, ry, wx, wy;
 	unsigned int mask;
@@ -848,9 +853,6 @@ static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 	XErrorHandler old_handler;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	X_LOCK;
 
@@ -1540,6 +1542,8 @@ int get_which_cursor(void) {
 				XSetErrorHandler(old_handler);
 				X_UNLOCK;
 				trapped_xerror = 0;
+#else
+				if (!r || !d || !bw || !h || !w || !y || !x || !ratio || !old_handler) {}
 #endif	/* NO_X11 */
 			}
 			if (which == which0) {
@@ -1895,6 +1899,8 @@ int check_x11_pointer(void) {
 		    &win_x, &win_y, &mask);
 		X_UNLOCK;
 	}
+#else
+	if (!mask || !win_y || !win_x || !child_w || !root_w) {}
 #endif	/* NO_X11 */
 
 if (0) fprintf(stderr, "check_x11_pointer %d %d\n", root_x, root_y);

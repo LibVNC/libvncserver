@@ -84,7 +84,7 @@ int trap_record_xerror(Display *d, XErrorEvent *error) {
 
 static void xrecord_grabserver(int start) {
 	XErrorHandler old_handler = NULL;
-	int rc;
+	int rc = 0;
 
 	if (debug_grabs) {
 		fprintf(stderr, "xrecord_grabserver%d/%d %.5f\n",
@@ -136,6 +136,8 @@ static void xrecord_grabserver(int start) {
 	}
 	XSetErrorHandler(old_handler);
 	XFlush_wr(gdpy_data);
+#else
+	if (!rc || !old_handler) {}
 #endif
 	if (debug_grabs) {
 		fprintf(stderr, "xrecord_grabserver-done: %.5f\n", dnowx());
@@ -1299,9 +1301,9 @@ static void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
 #endif
 
 static void check_xrecord_grabserver(void) {
+#if LIBVNCSERVER_HAVE_RECORD
 	int last_val, cnt = 0, i, max = 10;
 	double d;
-#if LIBVNCSERVER_HAVE_RECORD
 	if (!gdpy_ctrl || !gdpy_data) {
 		return;
 	}
@@ -1415,7 +1417,7 @@ void check_xrecord_reset(int force) {
 	static double last_reset = 0.0;
 	int reset_time  = 60, require_idle  = 10;
 	int reset_time2 = 600, require_idle2 = 40;
-	double now;
+	double now = 0.0;
 	XErrorHandler old_handler = NULL;
 
 	if (gdpy_ctrl) {
@@ -1486,6 +1488,8 @@ void check_xrecord_reset(int force) {
 	X_UNLOCK;
 
 	last_reset = now;
+#else
+	if (!old_handler || now == 0.0 || !last_reset || !force) {}
 #endif
 }
 
@@ -1500,15 +1504,18 @@ void check_xrecord_reset(int force) {
 	}
 
 void xrecord_watch(int start, int setby) {
+#if LIBVNCSERVER_HAVE_RECORD
 	Window focus, wm, c, clast;
 	static double create_time = 0.0;
-	double now;
-	static double last_error = 0.0;
-	int rc, db = debug_scroll;
+	int rc;
 	int do_shutdown = 0;
 	int reopen_dpys = 1;
 	XErrorHandler old_handler = NULL;
 	static Window last_win = None, last_result = None;
+#endif
+	int db = debug_scroll;
+	double now;
+	static double last_error = 0.0;
 
 if (0) db = 1;
 

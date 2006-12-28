@@ -207,6 +207,8 @@ int check_xrandr_event(char *msg) {
 		    " caller...\n");
 		return do_change;
 	}
+#else
+	xev.type = 0;
 #endif
 	return 0;
 }

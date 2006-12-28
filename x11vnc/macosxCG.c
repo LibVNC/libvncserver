@@ -34,6 +34,7 @@ void macosxCG_key_inject(int down, unsigned int keysym);
 
 CGDirectDisplayID displayID = NULL;
 
+extern void macosx_log(char *);
 extern int collect_macosx_damage(int x_in, int y_in, int w_in, int h_in, int call);
 
 static void macosxCG_callback(CGRectCount n, const CGRect *rects, void *dum) {
@@ -76,7 +77,7 @@ void macosxCG_refresh_callback_on(void) {
 	}
 
 	if (! callback_set) {
-		if (1) fprintf(stderr, "macosxCG_callback: register\n");
+		if (1) macosx_log("macosxCG_callback: register\n");
 		CGRegisterScreenRefreshCallback(macosxCG_callback, NULL);
 	}
 	callback_set = 1;
@@ -84,7 +85,7 @@ void macosxCG_refresh_callback_on(void) {
 
 void macosxCG_refresh_callback_off(void) {
 	if (callback_set) {
-		if (1) fprintf(stderr, "macosxCG_callback: unregister\n");
+		if (1) macosx_log("macosxCG_callback: unregister\n");
 		CGUnregisterScreenRefreshCallback(macosxCG_callback, NULL);
 	}
 	callback_set = 0;
@@ -100,7 +101,7 @@ extern void macosxCGP_screensaver_timer_on(void);
 
 void macosxCG_init(void) {
 	if (displayID == NULL) {
-		fprintf(stderr, "macosxCG_init: initializing display.\n");
+		macosx_log("macosxCG_init: initializing display.\n");
 #if 0
 		dragum();
 #endif
@@ -140,6 +141,7 @@ extern int macosx_wait_for_switch, macosx_resize;
 extern void macosxGCS_poll_pb(void);
 extern void usleep(unsigned long usec);
 extern unsigned int sleep(unsigned int seconds);
+extern void clean_up_exit (int ret);
 
 void macosxCG_event_loop(void) {
 	OSStatus rc;
@@ -177,14 +179,14 @@ void macosxCG_event_loop(void) {
 					}
 				}
 				if ((cnt++ % 120) == 0) {
-					fprintf(stderr, "waiting for user to "
+					macosx_log("waiting for user to "
 					    "switch back..\n");
 				}
 				sleep(1);
 			}
 			if (wdpy_x == (int) CGDisplayPixelsWide(displayID)) {
 				if (wdpy_y == (int) CGDisplayPixelsHigh(displayID)) {
-					fprintf(stderr, "we're back...\n");
+					macosx_log("we're back...\n");
 					return;
 				}
 			}
@@ -247,11 +249,14 @@ static CGPoint current_cursor_pos(void) {
 	pos.y = 0;
 	if (! conn) {
 		if (CGSNewConnection(NULL, &conn) != kCGErrorSuccess) {
-			fprintf(stderr, "CGSNewConnection error\n");
+			macosx_log("CGSNewConnection error.\n");
+			if (!dpy_x || !dpy_y || !wdpy_x || !wdpy_y) {
+				clean_up_exit(1);
+			}
 		}
 	}
 	if (CGSGetCurrentCursorLocation(conn, &pos) != kCGErrorSuccess) {
-		fprintf(stderr, "CGSGetCurrentCursorLocation error\n");
+		macosx_log("CGSGetCurrentCursorLocation error\n");
 	}
 
 	display_button_mask = GetCurrentButtonState();
@@ -304,7 +309,10 @@ int macosxCG_get_cursor(void) {
 
 	if (! conn) {
 		if (CGSNewConnection(NULL, &conn) != kCGErrorSuccess) {
-			fprintf(stderr, "CGSNewConnection error\n");
+			macosx_log("CGSNewConnection error.\n");
+			if (!dpy_x || !dpy_y || !wdpy_x || !wdpy_y) {
+				clean_up_exit(1);
+			}
 			return which;
 		}
 	}
@@ -319,7 +327,7 @@ int macosxCG_get_cursor(void) {
 	last_fetch = now;
 
 	if (CGSGetGlobalCursorDataSize(conn, &datasize) != kCGErrorSuccess) {
-		fprintf(stderr, "CGSGetGlobalCursorDataSize error\n");
+		macosx_log("CGSGetGlobalCursorDataSize error\n");
 		return which;
 	}
 
@@ -328,7 +336,7 @@ int macosxCG_get_cursor(void) {
 	err = CGSGetGlobalCursorData(conn, data, &datasize, &row_bytes,
 	    &rect, &hot, &cdepth, &comps, &bpcomp);
 	if (err != kCGErrorSuccess) {
-		fprintf(stderr, "CGSGetGlobalCursorData error\n");
+		macosx_log("CGSGetGlobalCursorData error\n");
 		return which;
 	}
 

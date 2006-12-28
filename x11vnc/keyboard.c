@@ -56,13 +56,15 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client);
  * Routine to retreive current state keyboard.  1 means down, 0 up.
  */
 void get_keystate(int *keystate) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!keystate) {}
+	return;
+#else
 	int i, k;
 	char keys[32];
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 	
 	/* n.b. caller decides to X_LOCK or not. */
 	XQueryKeymap(dpy, keys);
@@ -85,6 +87,11 @@ void get_keystate(int *keystate) {
  * Try to KeyRelease any non-Lock modifiers that are down.
  */
 void clear_modifiers(int init) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!init) {}
+	return;
+#else
 	static KeyCode keycodes[256];
 	static KeySym  keysyms[256];
 	static char *keystrs[256];
@@ -96,9 +103,6 @@ void clear_modifiers(int init) {
 	KeyCode keycode;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	/* n.b. caller decides to X_LOCK or not. */
 	if (first) {
@@ -258,12 +262,13 @@ void clear_keys(void) {
 static int save_auto_repeat = -1;
 
 int get_autorepeat_state(void) {
+#if NO_X11
+	RAWFB_RET(0)
+	return 0;
+#else
 	XKeyboardState kstate;
 
 	RAWFB_RET(0)
-#if NO_X11
-	return 0;
-#else
 
 	X_LOCK;
 	XGetKeyboardControl(dpy, &kstate);
@@ -280,13 +285,15 @@ int get_initial_autorepeat_state(void) {
 }
 
 void autorepeat(int restore, int bequiet) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!restore || !bequiet) {}
+	return;
+#else
 	int global_auto_repeat;
 	XKeyboardControl kctrl;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (restore) {
 		if (save_auto_repeat < 0) {
@@ -372,9 +379,21 @@ static int alltime_len = 1024;
 static int alltime_num = 0;
 
 int add_keysym(KeySym keysym) {
-	int minkey, maxkey, syms_per_keycode;
-	int kc, n, ret = 0;
 	static int first = 1;
+	int n;
+#if NO_X11
+	if (first) {
+		for (n=0; n < 0x100; n++) {
+			added_keysyms[n] = NoSymbol;
+		}
+		first = 0;
+	}
+	RAWFB_RET(0)
+	if (!keysym) {}
+	return 0;
+#else
+	int minkey, maxkey, syms_per_keycode;
+	int kc, ret = 0;
 	KeySym *keymap;
 
 	if (first) {
@@ -385,9 +404,6 @@ int add_keysym(KeySym keysym) {
 	}
 
 	RAWFB_RET(0)
-#if NO_X11
-	return 0;
-#else
 
 	if (keysym == NoSymbol) {
 		return 0;
@@ -465,15 +481,17 @@ int add_keysym(KeySym keysym) {
 }
 
 static void delete_keycode(KeyCode kc, int bequiet) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!kc || !bequiet) {}
+	return;
+#else
 	int minkey, maxkey, syms_per_keycode, i;
 	KeySym *keymap;
 	KeySym ksym, new[8];
 	char *str;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
 	keymap = XGetKeyboardMapping(dpy, minkey, (maxkey - minkey + 1),
@@ -659,6 +677,8 @@ static void add_dead_keysyms(char *str) {
 				    }
 				}
 			}
+#else
+			if ((ksym2 = 0)) {}
 #endif
 			if (! inmap) {
 				add_remap(p);
@@ -798,6 +818,7 @@ int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
 
 	RAWFB_RET(0)
 #if NO_X11
+	if (!key || !down || !keysym || !new) {}
 	return 0;
 #else
 	
@@ -855,6 +876,7 @@ int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new) {
 static void initialize_xkb_modtweak(void) {}
 static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
     rfbClientPtr client) {
+	if (!client || !down || !keysym) {} /* unused vars warning: */
 }
 void switch_to_xkb_if_better(void) {}
 
@@ -1465,7 +1487,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	static int Kc_last_down = -1;
 	static KeySym Ks_last_down = NoSymbol;
 
-	if (client) {} /* unused vars warning: */
+	if (!client || !down || !keysym) {} /* unused vars warning: */
 
 	RAWFB_RET_VOID
 
@@ -2207,6 +2229,10 @@ rfbLog("allowed_input_view_only: %s\n", allowed_input_view_only);
 }
 
 void initialize_modtweak(void) {
+#if NO_X11
+	RAWFB_RET_VOID
+	return;
+#else
 	KeySym keysym, *keymap;
 	int i, j, minkey, maxkey, syms_per_keycode;
 
@@ -2220,9 +2246,6 @@ void initialize_modtweak(void) {
 	}
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	X_LOCK;
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
@@ -2361,13 +2384,15 @@ static void tweak_mod(signed char mod, rfbBool down) {
  */
 static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
     rfbClientPtr client) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!down || !keysym || !client) {}
+	return;
+#else
 	KeyCode k;
 	int tweak = 0;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (use_xkb_modtweak) {
 		xkb_tweak_keyboard(down, keysym, client);

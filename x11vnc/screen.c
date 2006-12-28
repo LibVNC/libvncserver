@@ -141,6 +141,10 @@ if (0) fprintf(stderr, "unset_colormap: %s\n", raw_fb_pixfmt);
 }
 
 void set_colormap(int reset) {
+#if NO_X11
+	if (!reset) {}
+	return;
+#else
 	static int init = 1;
 	static XColor color[NCOLOR], prev[NCOLOR];
 	Colormap cmap;
@@ -171,9 +175,6 @@ if (0) fprintf(stderr, "unset_colormap: %d\n", reset);
 	}
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	X_LOCK;
 
@@ -338,14 +339,16 @@ static void debug_colormap(XImage *fb) {
  * visual_id and possibly visual_depth are set.
  */
 static void set_visual(char *str) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!str) {}
+	return;
+#else
 	int vis, vdepth, defdepth;
 	XVisualInfo vinfo;
 	char *p, *vstring = strdup(str);
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	defdepth = DefaultDepth(dpy, scr);
 	visual_id = (VisualID) 0;
@@ -1432,13 +1435,14 @@ static void initialize_clipshift(void) {
 }
 
 static int wait_until_mapped(Window win) {
+#if NO_X11
+	if (!win) {}
+	return 0;
+#else
 	int ms = 50, waittime = 30;
 	time_t start = time(NULL);
 	XWindowAttributes attr;
 
-#if NO_X11
-	return 0;
-#else
 	while (1) {
 		if (! valid_window(win, NULL, 0)) {
 			if (time(NULL) > start + waittime) {
@@ -1463,6 +1467,9 @@ static int wait_until_mapped(Window win) {
  * initialize a fb for the X display
  */
 XImage *initialize_xdisplay_fb(void) {
+#if NO_X11
+	return NULL;
+#else
 	XImage *fb;
 	char *vis_str = visual_str;
 	int try = 0, subwin_tries = 3;
@@ -1472,9 +1479,6 @@ XImage *initialize_xdisplay_fb(void) {
 	if (raw_fb_str) {
 		return initialize_raw_fb(0);
 	}
-#if NO_X11
-	return NULL;
-#else
 
 	X_LOCK;
 	if (subwin) {
@@ -2165,6 +2169,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	if (cmap8to24 && depth == 8 && dpy) {
 		XVisualInfo vinfo;
+		vinfo.red_mask = 0;
+		vinfo.green_mask = 0;
+		vinfo.blue_mask = 0;
 		/* more cooking up... */
 		have_masks = 2;
 		/* need to fetch TrueColor visual */

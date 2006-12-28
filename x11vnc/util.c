@@ -557,6 +557,8 @@ char *choose_title(char *display) {
 				free(name);
 			}
 		}
+#else
+		if (!name) {}
 #endif	/* NO_X11 */
 	}
 	return title;

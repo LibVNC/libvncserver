@@ -43,12 +43,13 @@ char *get_gui_code(void) {
 }
 
 static Window tweak_tk_window_id(Window win) {
+#if NO_X11
+	if (!win) {}
+	return None;
+#else
 	char *name = NULL;
 	Window parent, new;
 
-#if NO_X11
-	return None;
-#else
 	/* hack for tk, does not report outermost window */
 	new = win;
 	parent = parent_window(win, &name);
@@ -67,6 +68,11 @@ static Window tweak_tk_window_id(Window win) {
 }
 
 int tray_embed(Window iconwin, int remove) {
+#if NO_X11
+	RAWFB_RET(0)
+	if (!iconwin || !remove) {}
+	return 0;
+#else
 	XEvent ev;
 	XErrorHandler old_handler;
 	Window manager;
@@ -77,9 +83,6 @@ int tray_embed(Window iconwin, int remove) {
 	long data = 0;
 
 	RAWFB_RET(0)
-#if NO_X11
-	return 0;
-#else
 
 	if (remove) {
 		if (!valid_window(iconwin, &attr, 1)) {
@@ -164,14 +167,16 @@ int tray_embed(Window iconwin, int remove) {
 }
 
 static int tray_manager_running(Display *d, Window *manager) {
+#if NO_X11
+	RAWFB_RET(0)
+	if (!d || !manager) {}
+	return 0;
+#else
 	char tray_string[100];
 	Atom tray_manager;
 	Window tray_win;
 
 	RAWFB_RET(0)
-#if NO_X11
-	return 0;
-#else
 
 	if (manager) {
 		*manager = None;

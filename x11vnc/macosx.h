@@ -3,6 +3,7 @@
 
 /* -- macosx.h -- */
 
+extern void macosx_log(char *);
 extern char *macosx_console_guess(char *str, int *fd);
 extern char *macosx_get_fb_addr(void);
 extern void macosx_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client);

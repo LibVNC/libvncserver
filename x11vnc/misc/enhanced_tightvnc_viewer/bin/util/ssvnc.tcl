@@ -64,6 +64,16 @@ proc scroll_text_dismiss {fr {w 80} {h 35}} {
 	pack $fr -side top -fill both -expand 1
 }
 
+proc jiggle_text {w} {
+	global uname
+	if {$uname == "Darwin"} {
+		$w yview scroll 1 pages
+		update idletasks
+		$w yview scroll -1 pages
+		update idletasks
+	}
+}
+
 proc help {} {
 	catch {destroy .h}
 	toplevel .h
@@ -104,6 +114,15 @@ proc help {} {
     need to terminate STUNNEL manually from the System Tray (right click
     on dark green icon) and selecting "Exit".
 
+ VNC Password:
+
+    On Unix or MacOSX if there is a VNC password for the server you
+    can enter it in the "VNC Password:" entry box.  This is required on
+    MacOSX when Chicken of the VNC (the default) is used.  On Unix if
+    you choose not to enter the password you will be prompted for it in
+    the terminal running TightVNC viewer.  On Windows TightVNC viewer
+    should prompt you.  When you Save a VNC profile, the password is
+    not saved (you need to enter it each time).
 
  SSH:
 
@@ -232,6 +251,7 @@ proc help {} {
 }
 
 	.h.f.t insert end $msg
+	jiggle_text .h.f.t
 }
 
 proc help_certs {} {
@@ -316,6 +336,7 @@ proc help_certs {} {
 }
 
 	.ch.f.t insert end $msg
+	jiggle_text .ch.f.t
 }
 
 proc help_opts {} {
@@ -450,6 +471,7 @@ set msg {
   Advanced:        Bring up the Advanced Options dialog.
 }
 	.oh.f.t insert end $msg
+	jiggle_text .oh.f.t
 }
 
 proc win_nokill_msg {} {
@@ -687,6 +709,9 @@ proc set_defaults {} {
 	foreach var [array names defs] {
 		set $var $defs($var)	
 	}
+
+	global vncauth_passwd
+	set vncauth_passwd ""
 
 	ssl_ssh_adjust ssl
 }
@@ -1633,6 +1658,10 @@ proc darwin_terminal_cmd {{title ""} {cmd ""} {bg 0}} {
 	puts $fh {	echo try-2: termpid=$termpid mypid=$$}
 	puts $fh {fi}
 	puts $fh {if [ "X$termpid" = "X" ]; then}
+	puts $fh {	termpid=`ps wwwwaux | grep -w Terminal | grep $tmp | grep -v grep | awk '{print $2}' | sort -n | tail -1`}
+	puts $fh {	echo try-3: termpid=$termpid mypid=$$}
+	puts $fh {fi}
+	puts $fh {if [ "X$termpid" = "X" ]; then}
 	puts $fh {	termpid=$$}
 	puts $fh {	echo termpid-find-fail: termpid=$termpid mypid=$$}
 	puts $fh {fi}
@@ -1916,6 +1945,7 @@ proc direct_connect_msg {} {
 
 proc launch_unix {hp} {
 	global smb_redir_0 smb_mounts env
+	global vncauth_passwd
 
 	globalize
 
@@ -2118,6 +2148,19 @@ proc launch_unix {hp} {
 		set realvnc3 1
 	}
 
+	set passwdfile ""
+	if {$vncauth_passwd != ""} {
+		set passwdfile "$env(HOME)/.vncauth_tmp.[pid]"
+		catch {exec vncstorepw $vncauth_passwd $passwdfile}
+		catch {exec chmod 600 $passwdfile}
+		catch {exec sh -c "sleep 15; rm $passwdfile" &}
+		if {$darwin_cotvnc} {
+			set cmd "$cmd --PasswordFile $passwdfile"
+		} else {
+			set cmd "$cmd -passwd $passwdfile"
+		}
+	}
+
 	if {$use_viewonly} {
 		if {$darwin_cotvnc} {
 			set cmd "$cmd --ViewOnly"
@@ -2235,6 +2278,9 @@ proc launch_unix {hp} {
 			catch {exec sh -c "killall $daemon"  >/dev/null 2>/dev/null </dev/null &}
 			catch {exec sh -c "pkill -x $daemon" >/dev/null 2>/dev/null </dev/null &}
 		}
+	}
+	if {$passwdfile != ""} {
+		catch {file delete $passwdfile}
 	}
 	wm deiconify .
 	mesg "Disconnected from $hp"
@@ -5746,6 +5792,7 @@ proc help_advanced_opts {} {
 }
 
 	.ah.f.t insert end $msg
+	jiggle_text .ah.f.t
 }
 
 proc set_viewer_path {} {
@@ -6885,6 +6932,7 @@ set skip_pre 0
 set vncdisplay ""
 set vncproxy ""
 set remote_ssh_cmd ""
+set vncauth_passwd ""
 
 label .l -text "SSL/SSH VNC Viewer" -relief ridge
 
@@ -6902,26 +6950,32 @@ pack .f0.e -side left -expand 1 -fill x
 bind .f0.e <Return> launch
 
 frame .f1
-label .f1.l -width $wl -anchor w -text "Proxy/Gateway:" -relief ridge
-entry .f1.e -width $we -textvariable vncproxy
+label .f1.l -width $wl -anchor w -text "VNC Password:" -relief ridge
+entry .f1.e -width $we -textvariable vncauth_passwd -show *
 pack .f1.l -side left 
 pack .f1.e -side left -expand 1 -fill x
 
 frame .f2
-label .f2.l -width $wl -anchor w -text "Remote SSH Command:" -relief ridge
-entry .f2.e -width $we -textvariable remote_ssh_cmd
+label .f2.l -width $wl -anchor w -text "Proxy/Gateway:" -relief ridge
+entry .f2.e -width $we -textvariable vncproxy
 pack .f2.l -side left 
 pack .f2.e -side left -expand 1 -fill x
-.f2.l configure -state disabled
-.f2.e configure -state disabled
-
-set remote_ssh_cmd_list {.f2.e .f2.l} 
 
 frame .f3
-radiobutton .f3.ssl -anchor w    -variable sshssl_sw -value ssl    -command {ssl_ssh_adjust ssl}    -text "Use SSL"
-radiobutton .f3.ssh -anchor w    -variable sshssl_sw -value ssh    -command {ssl_ssh_adjust ssh}    -text "Use SSH"
-radiobutton .f3.sshssl -anchor w -variable sshssl_sw -value sshssl -command {ssl_ssh_adjust sshssl} -text "Use SSH and SSL"
-pack .f3.ssl .f3.ssh .f3.sshssl -side left -fill x
+label .f3.l -width $wl -anchor w -text "Remote SSH Command:" -relief ridge
+entry .f3.e -width $we -textvariable remote_ssh_cmd
+pack .f3.l -side left 
+pack .f3.e -side left -expand 1 -fill x
+.f3.l configure -state disabled
+.f3.e configure -state disabled
+
+set remote_ssh_cmd_list {.f3.e .f3.l} 
+
+frame .f4
+radiobutton .f4.ssl -anchor w    -variable sshssl_sw -value ssl    -command {ssl_ssh_adjust ssl}    -text "Use SSL"
+radiobutton .f4.ssh -anchor w    -variable sshssl_sw -value ssh    -command {ssl_ssh_adjust ssh}    -text "Use SSH"
+radiobutton .f4.sshssl -anchor w -variable sshssl_sw -value sshssl -command {ssl_ssh_adjust sshssl} -text "Use SSH and SSL"
+pack .f4.ssl .f4.ssh .f4.sshssl -side left -fill x
 
 ssl_ssh_adjust ssl
 
@@ -6937,7 +6991,11 @@ button .b.exit  -text "Exit" -command {destroy .; exit}
 pack .b.certs .b.opts .b.load .b.conn .b.help .b.exit -side left -expand 1 -fill x
 
 if {$multientry} {
-	pack .l .f0 .f1 .f2 .f3 .b -side top -fill x
+	if {! $is_windows} {
+		pack .l .f0 .f1 .f2 .f3 .f4 .b -side top -fill x
+	} else {
+		pack .l .f0     .f2 .f3 .f4 .b -side top -fill x
+	}
 } else {
 	pack .l .f0 .b -side top -fill x
 }

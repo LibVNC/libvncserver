@@ -347,6 +347,8 @@ void shm_delete(XShmSegmentInfo *shm) {
 	if (shm != NULL && shm->shmid != -1) {
 		shmctl(shm->shmid, IPC_RMID, 0);
 	}
+#else
+	if (!shm) {}
 #endif
 }
 
@@ -2866,7 +2868,6 @@ static int scan_display(int ystart, int rescan) {
 #ifndef NO_NCACHE
 /* XXX Y test */
 if (ncache > 0) {
-	XEvent ev;
 	int gotone = 0;
 	if (macosx_console) {
 		if (macosx_checkevent(NULL)) {
@@ -2874,6 +2875,7 @@ if (ncache > 0) {
 		}
 	} else {
 #if !NO_X11
+		XEvent ev;
 		if (raw_fb_str) {
 			;
 		} else if (XCheckTypedEvent(dpy, MapNotify, &ev)) {

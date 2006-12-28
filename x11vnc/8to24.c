@@ -65,6 +65,9 @@ static Colormap root_cmap = 0;
 static unsigned int root_rgb[NCOLOR];
 
 static void set_root_cmap(void) {
+#if NO_X11
+	return;
+#else
 	static time_t last_set = 0;
 	time_t now = time(NULL);
 	XWindowAttributes attr;
@@ -72,9 +75,6 @@ static void set_root_cmap(void) {
 	int redo = 0;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (now > last_set + 10) {
 		redo = 1;
@@ -244,6 +244,9 @@ int MV_hit;
 double MV_start;
 
 void check_for_multivis(void) {
+#if NO_X11
+	return;
+#else
 	XWindowAttributes attr;
 	int doall = 0;
 	int k, i, cnt, diff;
@@ -261,9 +264,6 @@ void check_for_multivis(void) {
 	double delay;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (now > last_parse + 1.0) {
 		last_parse = now;
@@ -758,10 +758,11 @@ if (db24 > 1) fprintf(stderr, "          ------------ 0x%lx i=%d\n", windows_8bp
 }
 
 static XImage *p_xi(XImage *xi, Visual *visual, int win_depth, int *w) {
-	RAWFB_RET(NULL)
 #if NO_X11
+	if (!xi || !visual || !win_depth || !w) {}
 	return NULL;
 #else
+	RAWFB_RET(NULL)
 	if (xi == NULL || *w < dpy_x) {
 		char *d;
 		if (xi) {
@@ -781,6 +782,10 @@ static XImage *p_xi(XImage *xi, Visual *visual, int win_depth, int *w) {
 }
 
 static int poll_line(int x1, int x2, int y1, int n, sraRegionPtr mod) {
+#if NO_X11
+	if (!x1 || !x2 || !y1 || !n || !mod) {}
+	return 1;
+#else
 	int fac, n_off, w, xo, yo;
 	char *poll_fb, *dst, *src;
 	int w2, xl, xh, stride = 32;
@@ -804,9 +809,6 @@ static int poll_line(int x1, int x2, int y1, int n, sraRegionPtr mod) {
 
 	RAWFB_RET(1)
 
-#if NO_X11
-	return 1;
-#else
 	if (win == None) {
 		return 1;
 	}
@@ -1292,13 +1294,14 @@ static int cmap_failed[CMAPMAX];
 int histo[256];
 
 static int get_cmap(int j, Colormap cmap) {
+#if NO_X11
+	if (!j || !cmap) {}
+	return 0;
+#else
 	int i, ncells;
 	XErrorHandler old_handler = NULL;
 
 	RAWFB_RET(0)
-#if NO_X11
-	return 0;
-#else
 
 	if (0) {
 		/* not working properly for depth 24... */
@@ -1427,12 +1430,13 @@ if (db24 > 1) fprintf(stderr, "ncmaps: %d\n", ncmaps);
 }
 
 static XImage *cmap_xi(XImage *xi, Window win, int win_depth) {
+#if NO_X11
+	if (!xi || !win || !win_depth) {}
+	return NULL;
+#else
 	XWindowAttributes attr;
 	char *d;
 
-#if NO_X11
-	return NULL;
-#else
 	if (xi) {
 		XDestroyImage(xi);
 	}
@@ -1455,6 +1459,10 @@ static XImage *cmap_xi(XImage *xi, Window win, int win_depth) {
 
 
 static void transform_rect(sraRect rect, Window win, int win_depth, int cm) {
+#if NO_X11
+	if (!rect.x1 || !win || !win_depth || !cm) {}
+	return;
+#else
 
 	char *src, *dst, *poll;
 	unsigned int *ui;
@@ -1471,9 +1479,6 @@ static void transform_rect(sraRect rect, Window win, int win_depth, int cm) {
 if (db24 > 1) fprintf(stderr, "transform %4d %4d %4d %4d cm: %d\n", rect.x1, rect.y1, rect.x2, rect.y2, cm);
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	attr.width = 0;
 	attr.height = 0;

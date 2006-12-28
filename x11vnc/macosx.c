@@ -24,6 +24,7 @@
 #include "macosxCGP.h"
 #include "macosxCGS.h"
 
+void macosx_log(char *);
 char *macosx_console_guess(char *str, int *fd);
 void macosx_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client);
 void macosx_pointer_command(int mask, int x, int y, rfbClientPtr client);
@@ -44,6 +45,10 @@ void macosx_add_create(Window win, int level);
 void macosx_add_destroy(Window win, int level);
 void macosx_add_visnotify(Window win, int level, int obscured);
 int macosx_checkevent(XEvent *ev);
+
+void macosx_log(char *str) {
+	rfbLog(str);
+}
 
 #if (! DOMAC)
 

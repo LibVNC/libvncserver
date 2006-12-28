@@ -75,6 +75,11 @@ void initialize_clipboard_atom(void) {
 }
 
 static void initialize_xevents(int reset) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!reset) {}
+	return;
+#else
 	static int did_xselect_input = 0;
 	static int did_xcreate_simple_window = 0;
 	static int did_vnc_connect_prop = 0;
@@ -85,9 +90,6 @@ static void initialize_xevents(int reset) {
 	static int did_xrandr = 0;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (reset) {
 		did_xselect_input = 0;
@@ -165,10 +167,13 @@ static void print_xevent_bases(void) {
 }
 
 static void get_prop(char *str, int len, Atom prop) {
+	int i;
+#if !NO_X11
 	Atom type;
-	int format, slen, dlen, i;
+	int format, slen, dlen;
 	unsigned long nitems = 0, bytes_after = 0;
 	unsigned char* data = NULL;
+#endif
 
 	for (i=0; i<len; i++) {
 		str[i] = '\0';
@@ -205,6 +210,10 @@ static void get_prop(char *str, int len, Atom prop) {
 }
 
 static void bust_grab(int reset) {
+#if NO_X11
+	if (!reset) {}
+	return;
+#else
 	static int bust_count = 0;
 	static time_t last_bust = 0;
 	time_t now = time(NULL);
@@ -218,9 +227,6 @@ static void bust_grab(int reset) {
 		bust_count = 0;
 		return;
 	}
-#if NO_X11
-	return;
-#else
 
 	x = 0;
 	y = 0;
@@ -465,6 +471,11 @@ static int process_watch(char *str, int parent, int db) {
 }
 
 static void grab_buster_watch(int parent, char *dstr) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!parent || !dstr) {}
+	return;
+#else
 	Atom ticker_atom = None;
 	int sleep = sync_tod_delay * 921 * 1000;
 	char propval[200];
@@ -472,9 +483,6 @@ static void grab_buster_watch(int parent, char *dstr) {
 	int db = 0;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (grab_buster > 1) {
 		db = 1;
@@ -577,6 +585,10 @@ void spawn_grab_buster(void) {
 }
 
 void sync_tod_with_servertime(void) {
+#if NO_X11
+	RAWFB_RET_VOID
+	return;
+#else
 	static Atom ticker_atom = None;
 	XEvent xev;
 	char diff[128];
@@ -585,9 +597,6 @@ void sync_tod_with_servertime(void) {
 	int i, db = 0;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (! ticker_atom) {
 		ticker_atom = XInternAtom(dpy, "X11VNC_TICKER", False);
@@ -733,6 +742,11 @@ void check_autorepeat(void) {
  * and other X11 events and respond to them as needed.
  */
 void check_xevents(int reset) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!reset) {}
+	return;
+#else
 	XEvent xev;
 	int tmp, have_clients = 0;
 	static int sent_some_sel = 0;
@@ -748,9 +762,6 @@ void check_xevents(int reset) {
 	if (unixpw_in_progress) return;
 
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	if (now > last_init_check+1 || reset) {
 		last_init_check = now;

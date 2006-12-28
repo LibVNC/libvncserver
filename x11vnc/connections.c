@@ -908,6 +908,12 @@ static int check_access(char *addr) {
  */
 static int ugly_window(char *addr, char *userhost, int X, int Y,
     int timeout, char *mode, int accept) {
+#if NO_X11
+	if (!addr || !userhost || !X || !Y || !timeout || !mode || !accept) {}
+	RAWFB_RET(0)
+	nox11_exit(1);
+	return 0;
+#else
 
 #define t2x2_width 16
 #define t2x2_height 16
@@ -961,10 +967,6 @@ static unsigned char t2x2_bits[] = {
 	KeyCode key_o;
 
 	RAWFB_RET(0)
-#if NO_X11
-	nox11_exit(1);
-	return 0;
-#else
 
 	if (! accept) {
 		sprintf(str_y, "OK");
@@ -1740,6 +1742,8 @@ void set_vnc_connect_prop(char *str) {
 #if !NO_X11
 	XChangeProperty(dpy, rootwin, vnc_connect_prop, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *)str, strlen(str));
+#else
+	if (!str) {}
 #endif	/* NO_X11 */
 }
 
@@ -1748,10 +1752,17 @@ void set_x11vnc_remote_prop(char *str) {
 #if !NO_X11
 	XChangeProperty(dpy, rootwin, x11vnc_remote_prop, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *)str, strlen(str));
+#else
+	if (!str) {}
 #endif	/* NO_X11 */
 }
 
 void read_vnc_connect_prop(int nomsg) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!nomsg) {}
+	return;
+#else
 	Atom type;
 	int format, slen, dlen;
 	unsigned long nitems = 0, bytes_after = 0;
@@ -1766,9 +1777,6 @@ void read_vnc_connect_prop(int nomsg) {
 		return;
 	}
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	/* read the property value into vnc_connect_str: */
 	do {
@@ -1802,6 +1810,11 @@ void read_vnc_connect_prop(int nomsg) {
 }
 
 void read_x11vnc_remote_prop(int nomsg) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!nomsg) {}
+	return;
+#else
 	Atom type;
 	int format, slen, dlen;
 	unsigned long nitems = 0, bytes_after = 0;
@@ -1816,9 +1829,6 @@ void read_x11vnc_remote_prop(int nomsg) {
 		return;
 	}
 	RAWFB_RET_VOID
-#if NO_X11
-	return;
-#else
 
 	/* read the property value into x11vnc_remote_str: */
 	do {
@@ -2293,6 +2303,7 @@ void send_client_info(char *str) {
 void adjust_grabs(int grab, int quiet) {
 	RAWFB_RET_VOID
 #if NO_X11
+	if (!grab || !quiet) {}
 	return;
 #else
 	/* n.b. caller decides to X_LOCK or not. */
