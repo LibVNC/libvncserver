@@ -1227,6 +1227,8 @@ unsigned long get_cursor_serial(int mode) {
 		return last_cursor;
 	} else if (mode == 1) {
 		return (unsigned long) last_index;
+	} else {
+		return (unsigned long) last_index;
 	}
 }
 
@@ -1320,7 +1322,7 @@ fprintf(stderr, "sc: %d  %d/%d %d - %d %d\n", serial, w, h, cbpp, xhot, yhot);
 			oldest = i;
 			oldtime = curs_times[i];
 		}
-		if (serial == curs_index[i]) {
+		if (serial == (int) curs_index[i]) {
 			/*
 			 * got a hit with an existing cursor,
 			 * use that one.

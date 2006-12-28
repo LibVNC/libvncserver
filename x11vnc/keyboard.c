@@ -14,6 +14,7 @@
 #include "v4l.h"
 #include "linuxfb.h"
 #include "uinput.h"
+#include "macosx.h"
 
 void get_keystate(int *keystate);
 void clear_modifiers(int init);

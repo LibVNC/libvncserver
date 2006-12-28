@@ -37,4 +37,7 @@ extern int fb_update_sent(int *count);
 extern int check_user_input(double dt, double dtr, int tile_diffs, int *cnt);
 extern void do_copyregion(sraRegionPtr region, int dx, int dy, int mode);
 
+extern int check_ncache(int reset, int mode);
+extern int find_rect(int idx, int x, int y, int w, int h);
+
 #endif /* _X11VNC_USERINPUT_H */

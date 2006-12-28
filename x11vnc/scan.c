@@ -13,6 +13,7 @@
 #include "unixpw.h"
 #include "screen.h"
 #include "macosx.h"
+#include "userinput.h"
 
 /*
  * routines for scanning and reading the X11 display for changes, and
@@ -2351,7 +2352,6 @@ static void blackout_regions(void) {
  * are other issues...  use -fs 1.0 to disable.
  */
 int copy_screen(void) {
-	int pixelsize = bpp/8;
 	char *fbp;
 	int i, y, block_size;
 
@@ -2462,7 +2462,7 @@ static void snap_all_rawfb(void) {
 }
 
 int copy_snap(void) {
-	int db = 1, pixelsize = bpp/8;
+	int db = 1;
 	char *fbp;
 	int i, y, block_size;
 	double dt;
@@ -2872,7 +2872,9 @@ if (ncache > 0) {
 		}
 	} else {
 #if !NO_X11
-		if (XCheckTypedEvent(dpy, MapNotify, &ev)) {
+		if (raw_fb_str) {
+			;
+		} else if (XCheckTypedEvent(dpy, MapNotify, &ev)) {
 			gotone = 1;
 		} else if (XCheckTypedEvent(dpy, UnmapNotify, &ev)) {
 			gotone = 2;
@@ -2995,7 +2997,7 @@ int scan_for_updates(int count_only) {
 	double frac2 = 0.35;  /* or 3rd */
 	double frac3 = 0.02;  /* do scan_display() again after copy_tiles() */
 	static double last_poll = 0.0;
-	double dtmp;
+	double dtmp = 0.0;
 
 	if (unixpw_in_progress) return 0;
  
@@ -3190,9 +3192,14 @@ int scan_for_updates(int count_only) {
 	}
 
 	if (unixpw_in_progress) return 0;
+
 /* XXX Y */
 if (0 && tile_count > 20) print_tiles();
-//dtmp = dnow();
+#if 0
+dtmp = dnow();
+#else
+dtmp = 0.0;
+#endif
 
 	if (old_copy_tile) {
 		tile_diffs = copy_all_tiles();
@@ -3200,7 +3207,10 @@ if (0 && tile_count > 20) print_tiles();
 		tile_diffs = copy_all_tile_runs();
 	}
 	SCAN_FATAL(tile_diffs);
-//if (tile_count) fprintf(stderr, "XX copytile: %.4f  tile_count: %d\n", dnow() - dtmp, tile_count);
+
+#if 0
+if (tile_count) fprintf(stderr, "XX copytile: %.4f  tile_count: %d\n", dnow() - dtmp, tile_count);
+#endif
 
 	/*
 	 * This backward pass for upward and left tiles complements what

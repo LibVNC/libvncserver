@@ -4,6 +4,7 @@
 #include "win_utils.h"
 #include "xwrappers.h"
 #include "connections.h"
+#include "cleanup.h"
 
 char *guess_desktop(void);
 void solid_bg(int restore);

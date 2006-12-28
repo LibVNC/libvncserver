@@ -980,7 +980,7 @@ void check_new_passwds(int force) {
 }
 
 rfbBool custom_passwd_check(rfbClientPtr cl, const char *response, int len) {
-	char *input, *q, *cmd;
+	char *input, *cmd;
 	char num[16];
 	int j, i, n, rc;
 

@@ -17,6 +17,7 @@
 #include "xwrappers.h"
 #include "xevents.h"
 #include "macosxCG.h"
+#include "userinput.h"
 
 /*
  * routines for handling incoming, outgoing, etc connections

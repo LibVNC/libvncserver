@@ -79,6 +79,10 @@ Bool XQueryPointer_wr(Display *display, Window w, Window *root_return,
     Window *child_return, int *root_x_return, int *root_y_return,
     int *win_x_return, int *win_y_return, unsigned int *mask_return);
 
+Status XQueryTree_wr(Display *display, Window w, Window *root_return,
+    Window *parent_return, Window **children_return,
+    unsigned int *nchildren_return);
+
 int XFree_wr(void *data);
 int XSelectInput_wr(Display *display, Window w, long event_mask);
 

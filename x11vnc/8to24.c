@@ -4,6 +4,7 @@
 #include "scan.h"
 #include "util.h"
 #include "win_utils.h"
+#include "xwrappers.h"
 
 int multivis_count = 0;
 int multivis_24count = 0;

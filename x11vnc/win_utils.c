@@ -290,7 +290,7 @@ void update_stack_list(void) {
 	X_LOCK;
 	for (k=0; k < stack_list_num; k++) {
 		Window win = stack_list[k].win;
-		if (win != None && boff <= win && win < boff + bwin) {
+		if (win != None && boff <= (int) win && (int) win < boff + bwin) {
 			;	/* special, blackout */
 		} else if (!valid_window(win, &attr, 1)) {
 			stack_list[k].valid = 0;

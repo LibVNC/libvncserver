@@ -267,7 +267,9 @@ if (0) fprintf(stderr, "run_gui: %s -- %d %d\n", gui_xdisplay, connect_to_x11vnc
 			initialize_x11vnc_remote_prop();
 		}
 
+#ifdef MACOSX
 		macjump:
+#endif
 		
 		signal(SIGUSR1, sigusr1);
 		got_sigusr1 = 0;
@@ -630,7 +632,9 @@ void do_gui(char *opts, int sleep) {
 	}
 	XCloseDisplay_wr(test_dpy);
 
+#ifdef MACOSX
 	startit:
+#endif
 
 	if (start_x11vnc) {
 

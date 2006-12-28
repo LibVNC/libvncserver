@@ -6,6 +6,8 @@
  * will not work!!
  */
 
+void macosxCG_dummy(void) {}
+
 #if (defined(__MACH__) && defined(__APPLE__))
 
 #include <ApplicationServices/ApplicationServices.h>

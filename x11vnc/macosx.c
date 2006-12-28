@@ -48,12 +48,15 @@ void macosx_event_loop(void) {
 	return;
 }
 char *macosx_console_guess(char *str, int *fd) {
+	if (!str || !fd) {}
 	return NULL;
 }
 void macosx_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
+	if (!down || !keysym || !client) {}
 	return;
 }
 void macosx_pointer_command(int mask, int x, int y, rfbClientPtr client) {
+	if (!mask || !x || !y || !client) {}
 	return;
 }
 char *macosx_get_fb_addr(void) {
@@ -63,35 +66,45 @@ int macosx_get_cursor(void) {
 	return 0;
 }
 int macosx_get_cursor_pos(int *x, int *y) {
+	if (!x || !y) {}
 	return 0;
 }
 void macosx_send_sel(char * str, int len) {
+	if (!str || !len) {}
 	return;
 }
 void macosx_set_sel(char * str, int len) {
+	if (!str || !len) {}
 	return;
 }
 int macosx_valid_window(Window w, XWindowAttributes* a) {
+	if (!w || !a) {}
 	return 0;
 }
 Status macosx_xquerytree(Window w, Window *root_return, Window *parent_return,
     Window **children_return, unsigned int *nchildren_return) {
+	if (!w || !root_return || !parent_return || !children_return || !nchildren_return) {}
 	return (Status) 0;
 }
 void macosx_add_mapnotify(Window win, int level, int map) {
+	if (!win || !level || !map) {}
 	return;
 }
 void macosx_add_create(Window win, int level) {
+	if (!win || !level) {}
 	return;
 }
 void macosx_add_destroy(Window win, int level) {
+	if (!win || !level) {}
 	return;
 }
 void macosx_add_visnotify(Window win, int level, int obscured) {
+	if (!win || !level || !obscured) {}
 	return;
 }
 
 int macosx_checkevent(XEvent *ev) {
+	if (!ev) {}
 	return 0;
 }
 

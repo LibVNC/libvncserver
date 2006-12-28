@@ -701,7 +701,6 @@ void free_old_fb(void) {
 
 void do_new_fb(int reset_mem) {
 	XImage *fb;
-	int i;
 
 	/* for threaded we really should lock libvncserver out. */
 	if (use_threads) {
