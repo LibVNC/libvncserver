@@ -85,11 +85,13 @@ int valid_window(Window win, XWindowAttributes *attr_ret, int bequiet) {
 	if (win == None) {
 		return 0;
 	}
+
 #ifdef MACOSX
 	if (macosx_console) {
 		return macosx_valid_window(win, attr_ret);
 	}
 #endif
+
 	RAWFB_RET(0)
 
 #if NO_X11
@@ -205,7 +207,7 @@ void snapshot_stack_list(int free_only, double allowed_age) {
 #endif
 
 #if NO_X11 && !defined(MACOSX)
-	num = rc = i = j = 0;
+	num = rc = i = j = 0;	/* compiler warnings */
 	ui = 0;
 	r = w = None;
 	list = NULL;
@@ -332,7 +334,7 @@ if (0) fprintf(stderr, "update_stack_list[%d]: %.4f  %.4f\n", stack_list_num, no
 Window query_pointer(Window start) {
 	int rx, ry;
 #if !NO_X11
-	Window r, c;	
+	Window r, c;	/* compiler warnings */
 	int wx, wy;
 	unsigned int mask;
 #endif
@@ -344,6 +346,7 @@ Window query_pointer(Window start) {
 #endif
 
 	RAWFB_RET(None)
+
 #if NO_X11
 	if (!start) { rx = ry = 0; }
 	return None;

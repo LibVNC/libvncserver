@@ -414,12 +414,13 @@ void do_button_mask_change(int mask, int button) {
  */
 static void update_x11_pointer_mask(int mask) {
 #if NO_X11
+	last_event = last_input = last_pointer_input = time(NULL);
+
 	RAWFB_RET_VOID
 	if (!mask) {}
 	return;
 #else
 	int snapped = 0, xr_mouse = 1, i;
-
 	last_event = last_input = last_pointer_input = time(NULL);
 
 	RAWFB_RET_VOID

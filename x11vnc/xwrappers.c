@@ -318,7 +318,8 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 
 #if NO_X11
 	nox11_exit(1);
-	if (!disp || !visual || !depth || !format || !offset || !data || !width || !height || !width || !bitmap_pad || !bytes_per_line) {}
+	if (!disp || !visual || !depth || !format || !offset || !data || !width
+	    || !height || !width || !bitmap_pad || !bytes_per_line) {}
 	return NULL;
 #else
 	if (overlay) {
@@ -632,16 +633,16 @@ void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 	/* unused vars warning: */
 	if (key || down || delay) {} 
 
-#if LIBVNCSERVER_HAVE_LIBXTRAP
+# if LIBVNCSERVER_HAVE_LIBXTRAP
 	XESimulateXEventRequest(trap_ctx, down ? KeyPress : KeyRelease,
 	    key, 0, 0, 0);
 	if (debug_keyboard) {
 		upup_downdown_warning(key, down);
 	}
 	keycode_state[(int) key] = down ? 1 : 0;
-#else
+# else
 	DEBUG_SKIPPED_INPUT(debug_keyboard, "keyboard: no-XTRAP-build");
-#endif
+# endif
 
 #endif	/* NO_X11 */
 }
@@ -1112,7 +1113,8 @@ Bool XQueryPointer_wr(Display *display, Window w, Window *root_return,
     Window *child_return, int *root_x_return, int *root_y_return,
     int *win_x_return, int *win_y_return, unsigned int *mask_return) {
 #if NO_X11
-	if (!display || !w || !root_return || !child_return || !root_x_return || !root_y_return || !win_x_return || !win_y_return || !mask_return) {}
+	if (!display || !w || !root_return || !child_return || !root_x_return
+	    || !root_y_return || !win_x_return || !win_y_return || !mask_return) {}
 	return False;
 #else
 	Bool rc;
@@ -1163,7 +1165,8 @@ Status XQueryTree_wr(Display *display, Window w, Window *root_return,
 	}
 #endif
 #if NO_X11
-	if (!display || !w || !root_return || !parent_return || !children_return || !nchildren_return) {}
+	if (!display || !w || !root_return || !parent_return
+	    || !children_return || !nchildren_return) {}
 	return (Status) 0;
 #else
 	if (! display) {

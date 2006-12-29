@@ -1875,7 +1875,6 @@ int check_x11_pointer(void) {
 
 	if (unixpw_in_progress) return 0;
 
-
 #ifdef MACOSX
 	if (macosx_console) {
 		ret = macosx_get_cursor_pos(&root_x, &root_y);
@@ -1883,6 +1882,7 @@ int check_x11_pointer(void) {
 		RAWFB_RET(0)
 	}
 #else
+
 	RAWFB_RET(0)
 
 #   if NO_X11

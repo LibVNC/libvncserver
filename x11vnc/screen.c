@@ -425,6 +425,7 @@ static void set_visual(char *str) {
 void set_nofb_params(int restore) {
 	static int first = 1;
 	static int save[100];
+	static char *scroll = NULL;
 	int i = 0;
 
 	if (first) {
@@ -444,6 +445,9 @@ void set_nofb_params(int restore) {
 		save[i++] = show_cursor;
 		save[i++] = cursor_shape_updates;
 		save[i++] = cursor_pos_updates;
+		save[i++] = ncache;
+
+		scroll = scroll_copyrect;
 	}
 	if (restore) {
 		i = 0;
@@ -462,6 +466,9 @@ void set_nofb_params(int restore) {
 		show_cursor           = save[i++];
 		cursor_shape_updates  = save[i++];
 		cursor_pos_updates    = save[i++];
+		ncache                = save[i++];
+
+		scroll_copyrect = scroll;
 
 		if (cursor_shape_updates) {
 			restore_cursor_shape_updates(screen);
@@ -496,9 +503,13 @@ void set_nofb_params(int restore) {
 		cursor_pos_updates = 0;
 	}
 
+	ncache = 0;
+
+	scroll_copyrect = "never";
+
 	if (! quiet) {
 		rfbLog("disabling: xfixes, xdamage, solid, overlay, shm,\n");
-		rfbLog("  wireframe, scrollcopyrect,\n");
+		rfbLog("  wireframe, scrollcopyrect, ncache,\n");
 		rfbLog("  noonetile, nap, cursor, %scursorshape\n",
 		    got_cursorpos ? "" : "cursorpos, " );
 		rfbLog("  in -nofb mode.\n");
@@ -654,16 +665,22 @@ void set_raw_fb_params(int restore) {
  */
 static void nofb_hook(rfbClientPtr cl) {
 	XImage *fb;
+	XImage raw;
 
 	rfbLog("framebuffer requested in -nofb mode by client %s\n", cl->host);
 	/* ignore xrandr */
 
 	if (raw_fb && ! dpy) {
-		XImage raw;
 		fb = &raw;
 		fb->data = (char *)malloc(32);
 	} else {
-		fb = XGetImage_wr(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
+		int use_real_ximage = 0;
+		if (use_real_ximage) {
+			fb = XGetImage_wr(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
+		} else {
+			fb = &raw;
+			fb->data = (char *) calloc(dpy_x*dpy_y*bpp/8, 1);
+		}
 	}
 	main_fb = fb->data;
 	rfb_fb = main_fb;
@@ -1468,6 +1485,9 @@ static int wait_until_mapped(Window win) {
  */
 XImage *initialize_xdisplay_fb(void) {
 #if NO_X11
+	if (raw_fb_str) {
+		return initialize_raw_fb(0);
+	}
 	return NULL;
 #else
 	XImage *fb;
@@ -2038,7 +2058,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	}
 
 #ifndef NO_NCACHE
-	if (ncache > 0) {
+	if (ncache > 0 && !nofb) {
 #ifdef MACOSX
 		if (! raw_fb_str || macosx_console) {
 #else
@@ -2552,18 +2572,18 @@ void announce(int lport, int ssl, char *iface) {
 			if (lport >= 5900) {
 				snprintf(vnc_desktop_name, sz, "%s:%d",
 				    host, lport - 5900);
-				fprintf(stderr, "%s %s\n", tvdt,
+				fprintf(stderr, "\n%s %s\n", tvdt,
 				    vnc_desktop_name);
 			} else {
 				snprintf(vnc_desktop_name, sz, "%s:%d",
 				    host, lport);
-				fprintf(stderr, "%s %s\n", tvdt,
+				fprintf(stderr, "\n%s %s\n", tvdt,
 				    vnc_desktop_name);
 			}
 		} else if (lport >= 5900) {
 			snprintf(vnc_desktop_name, sz, "%s:%d",
 			    host, lport - 5900);
-			fprintf(stderr, "%s %s\n", tvdt, vnc_desktop_name);
+			fprintf(stderr, "\n%s %s\n", tvdt, vnc_desktop_name);
 			if (lport >= 6000) {
 				rfbLog("possible aliases:  %s:%d, "
 				    "%s::%d\n", host, lport,
@@ -2572,7 +2592,7 @@ void announce(int lport, int ssl, char *iface) {
 		} else {
 			snprintf(vnc_desktop_name, sz, "%s:%d",
 			    host, lport);
-			fprintf(stderr, "%s %s\n", tvdt, vnc_desktop_name);
+			fprintf(stderr, "\n%s %s\n", tvdt, vnc_desktop_name);
 			rfbLog("possible alias:    %s::%d\n",
 			    host, lport);
 		}

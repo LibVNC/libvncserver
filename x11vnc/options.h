@@ -161,6 +161,7 @@ extern int ncache0;
 extern int ncache_copyrect;
 extern int ncache_pad;
 extern int macosx_ncache_macmenu;
+extern int ncache_beta_tester;
 
 extern char *scroll_copyrect_str;
 extern char *scroll_copyrect;

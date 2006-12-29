@@ -181,7 +181,9 @@ static void get_prop(char *str, int len, Atom prop) {
 	if (prop == None) {
 		return;
 	}
+
 	RAWFB_RET_VOID
+
 #if NO_X11
 	return;
 #else

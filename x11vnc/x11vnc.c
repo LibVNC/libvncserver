@@ -1443,6 +1443,50 @@ static void store_homedir_passwd(char *file) {
 	exit(0);
 }
 
+void ncache_beta_tester_message(void) {
+
+char msg[] = 
+"\n"
+"***************************************************************************\n"
+"\n"
+"Hello!  Exciting News!!\n"
+"\n"
+"You have been selected at random to beta test the x11vnc '-ncache' VNC\n"
+"client-side pixel caching feature!\n"
+"\n"
+"This scheme stores pixel data offscreen on the VNC viewer side for faster\n"
+"retrieval.  It should work with any VNC viewer.\n"
+"\n"
+"This method requires much testing and so we hope you will try it out and\n"
+"perhaps even report back your observations.  However, if you do not want\n"
+"to test or use the feature, run x11vnc like this:\n"
+"\n"
+"    x11vnc -ncache 0 ...\n"
+"\n"
+"The feature needs additional testing because we want to have x11vnc\n"
+"performance enhancements on by default.  Otherwise, only a relative few\n"
+"would notice and use the -ncache option (e.g. the wireframe and scroll\n"
+"detection features are on by default).  A couple things to note:\n"
+"\n"
+"    1) It uses a large amount of RAM (on both viewer and server)\n"
+"\n"
+"    2) You can actually see the cached pixel data if you scroll down\n"
+"       to it in your viewer; adjust your viewer's size to hide it.\n"
+"\n"
+"More info: http://www.karlrunge.com/x11vnc/#faq-client-caching\n"
+;
+
+	if (raw_fb_str && !macosx_console) {
+		return;
+	}
+	if (nofb) {
+		return;
+	}
+	
+	fprintf(stderr, "%s", msg);
+
+}
+
 #define	SHOW_NO_PASSWORD_WARNING \
 	(!got_passwd && !got_rfbauth && (!got_passwdfile || !passwd_list) \
 	    && !query_cmd && !remote_cmd && !unixpw && !got_gui_pw \
@@ -2920,6 +2964,11 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	if (ncache < 0) {
+		ncache_beta_tester = 1;
+		ncache = -ncache;
+	}
+
 	if (raw_fb_str) {
 		set_raw_fb_params(0);
 	}
@@ -3349,6 +3398,7 @@ int main(int argc, char* argv[]) {
 		rfbLog("  client sides.  This mode works with any VNC viewer,\n");
 		rfbLog("  however in most you can actually see the cached pixel\n");
 		rfbLog("  data by scrolling down, so you need to re-adjust its size.\n");
+		rfbLog("  See http://www.karlrunge.com/x11vnc/#faq-client-caching.\n");
 		rfbLog("  If this mode yields undesired behavior (poor response,\n");
 		rfbLog("  painting errors, etc) it may be disabled via: '-ncache 0'\n");
 		rfbLog("  You can press 3 Alt_L's (Left \"Alt\" key) in a row to \n");
@@ -3561,6 +3611,10 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	set_vnc_desktop_name();
+
+	if (ncache_beta_tester) {
+		ncache_beta_tester_message();
+	}
 
 #if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SETSID
 	if (bg) {

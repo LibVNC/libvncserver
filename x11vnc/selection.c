@@ -62,14 +62,14 @@ void selection_request(XEvent *ev, char *type) {
 	char *str;
 	unsigned int length;
 	unsigned char *data;
-#ifndef XA_LENGTH
+# ifndef XA_LENGTH
 	unsigned long XA_LENGTH;
-#endif
+# endif
 	RAWFB_RET_VOID
 
-#ifndef XA_LENGTH
+# ifndef XA_LENGTH
 	XA_LENGTH = XInternAtom(dpy, "LENGTH", True);
-#endif
+# endif
 
 	req_event = &(ev->xselectionrequest);
 	notify_event.type 	= SelectionNotify;
@@ -257,6 +257,7 @@ void cutbuffer_send(void) {
  * Also: XFIXES has XFixesSelectSelectionInput().
  */
 #define CHKSZ 32
+
 void selection_send(XEvent *ev) {
 #if NO_X11
 	RAWFB_RET_VOID

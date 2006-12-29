@@ -66,6 +66,7 @@ static unsigned int root_rgb[NCOLOR];
 
 static void set_root_cmap(void) {
 #if NO_X11
+	RAWFB_RET_VOID
 	return;
 #else
 	static time_t last_set = 0;
@@ -245,6 +246,7 @@ double MV_start;
 
 void check_for_multivis(void) {
 #if NO_X11
+	RAWFB_RET_VOID
 	return;
 #else
 	XWindowAttributes attr;
@@ -758,11 +760,12 @@ if (db24 > 1) fprintf(stderr, "          ------------ 0x%lx i=%d\n", windows_8bp
 }
 
 static XImage *p_xi(XImage *xi, Visual *visual, int win_depth, int *w) {
+	RAWFB_RET(NULL)
+
 #if NO_X11
 	if (!xi || !visual || !win_depth || !w) {}
 	return NULL;
 #else
-	RAWFB_RET(NULL)
 	if (xi == NULL || *w < dpy_x) {
 		char *d;
 		if (xi) {
@@ -783,6 +786,7 @@ static XImage *p_xi(XImage *xi, Visual *visual, int win_depth, int *w) {
 
 static int poll_line(int x1, int x2, int y1, int n, sraRegionPtr mod) {
 #if NO_X11
+	RAWFB_RET(1)
 	if (!x1 || !x2 || !y1 || !n || !mod) {}
 	return 1;
 #else
@@ -1295,6 +1299,7 @@ int histo[256];
 
 static int get_cmap(int j, Colormap cmap) {
 #if NO_X11
+	RAWFB_RET(0)
 	if (!j || !cmap) {}
 	return 0;
 #else
@@ -1460,6 +1465,7 @@ static XImage *cmap_xi(XImage *xi, Window win, int win_depth) {
 
 static void transform_rect(sraRect rect, Window win, int win_depth, int cm) {
 #if NO_X11
+	RAWFB_RET_VOID
 	if (!rect.x1 || !win || !win_depth || !cm) {}
 	return;
 #else

@@ -194,10 +194,14 @@ char *wireframe_copyrect_default = "never";
 int wireframe_in_progress = 0;
 int wireframe_local = 1;
 
-int ncache = 0;
+#ifndef NCACHE
+#define NCACHE -10
+#endif
+int ncache = NCACHE;
 int ncache0 = 0;
 int ncache_copyrect = 0;
 int macosx_ncache_macmenu = 0;
+int ncache_beta_tester = 0;
 #ifdef MACOSX
 int ncache_pad = 24;
 #else

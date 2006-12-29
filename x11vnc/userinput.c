@@ -3546,28 +3546,28 @@ static Window NPP_nwin = None;
 
 void clear_win_events(void) {
 #if !NO_X11
-		if (dpy && NPP_nwin != None) {
-			XEvent ev;
-			XErrorHandler old_handler;
-			old_handler = XSetErrorHandler(trap_xerror);
+	if (dpy && NPP_nwin != None) {
+		XEvent ev;
+		XErrorHandler old_handler;
+		old_handler = XSetErrorHandler(trap_xerror);
+		trapped_xerror = 0;
+		while (XCheckTypedWindowEvent(dpy, NPP_nwin, ConfigureNotify, &ev)) {
+			fprintf(stderr, ".");
+			if (trapped_xerror) {
+				break;
+			}
 			trapped_xerror = 0;
-			while (XCheckTypedWindowEvent(dpy, NPP_nwin, ConfigureNotify, &ev)) {
-				fprintf(stderr, ".");
-				if (trapped_xerror) {
-					break;
-				}
-				trapped_xerror = 0;
-			}
-			while (XCheckTypedWindowEvent(dpy, NPP_nwin, VisibilityNotify, &ev)) {
-				fprintf(stderr, "+");
-				if (trapped_xerror) {
-					break;
-				}
-				trapped_xerror = 0;
-			}
-			XSetErrorHandler(old_handler);
-			fprintf(stderr, " 0x%x\n", (unsigned int) NPP_nwin);
 		}
+		while (XCheckTypedWindowEvent(dpy, NPP_nwin, VisibilityNotify, &ev)) {
+			fprintf(stderr, "+");
+			if (trapped_xerror) {
+				break;
+			}
+			trapped_xerror = 0;
+		}
+		XSetErrorHandler(old_handler);
+		fprintf(stderr, " 0x%x\n", (unsigned int) NPP_nwin);
+	}
 #endif
 }
 
@@ -5515,7 +5515,12 @@ void snapshot_cache_list(int free_only, double allowed_age) {
 	RAWFB_RET_VOID
 #endif
 
+
 #if NO_X11 && !defined(MACOSX)
+	num = rc = i = 0;	/* compiler warnings */
+	ui = 0;
+	r = w = None;
+	list = NULL;
 	return;
 #else
 
@@ -6357,6 +6362,15 @@ fprintf(stderr, "free_rect: bad index: %d\n", idx);
 		fac1 = 0.18;
 		fac2 = 0.35;
 	}
+	if (macosx_console && !macosx_ncache_macmenu) {
+		if (cram) {
+			fac1 *= 1.5;	
+			fac2 *= 1.5;	
+		} else {
+			fac1 *= 2.5;	
+			fac2 *= 2.5;	
+		}
+	}
 	if (w * h > fac1 * (dpy_x * dpy_y)) {
 		big1 = 1;
 	}
@@ -6559,7 +6573,7 @@ int valid_wr(int idx, Window win, XWindowAttributes *attr) {
 	return valid_window(win, attr, 1);
 }
 
-int bs_save(int idx, int *nbatch) {
+int bs_save(int idx, int *nbatch, int verb) {
 	Window win = cache_list[idx].win;
 	XWindowAttributes attr;
 	int x1, y1, w1, h1;
@@ -6573,7 +6587,7 @@ int bs_save(int idx, int *nbatch) {
 	w1 = cache_list[idx].width;
 	h1 = cache_list[idx].height;
 
-fprintf(stderr, "backingstore save:       0x%x  %3d \n", (unsigned int) win, idx);
+if (verb) fprintf(stderr, "backingstore save:       0x%x  %3d \n", (unsigned int) win, idx);
 	
 	X_LOCK;
 	if (! valid_wr(idx, win, &attr)) {
@@ -6630,12 +6644,12 @@ fprintf(stderr, "BS_save: FAIL FOR: %d\n", idx);
 	sraRgnOffset(r, dx, dy);
 
 	dtA =  dnowx();
-fprintf(stderr, "BS_save: %.4f      %d dx=%d dy=%d\n", dtA, idx, dx, dy);
+if (verb) fprintf(stderr, "BS_save: %.4f      %d dx=%d dy=%d\n", dtA, idx, dx, dy);
 	if (w2 > 0 && h2 > 0) {
 		cache_cr(r, dx, dy, save_delay0, save_delay1, nbatch);
 	}
 	dtB =  dnowx();
-fprintf(stderr, "BS_save: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f\n", dtB, dtB-dtA, idx, w1, h1, x1, y1, w2, h2, x2, y2, cache_list[idx].bs_time - x11vnc_start, dnowx());
+if (verb) fprintf(stderr, "BS_save: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f\n", dtB, dtB-dtA, idx, w1, h1, x1, y1, w2, h2, x2, y2, cache_list[idx].bs_time - x11vnc_start, dnowx());
 
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r);
@@ -6646,7 +6660,7 @@ fprintf(stderr, "BS_save: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f
 	return 1;
 }
 
-int su_save(int idx, int *nbatch) {
+int su_save(int idx, int *nbatch, int verb) {
 	Window win = cache_list[idx].win;
 	XWindowAttributes attr;
 	int x1, y1, w1, h1;
@@ -6655,7 +6669,7 @@ int su_save(int idx, int *nbatch) {
 	int dx, dy, rc = 1;
 	sraRegionPtr r, r0;
 	
-fprintf(stderr, "save-unders save:        0x%x  %3d \n", (unsigned int) win, idx);
+if (verb) fprintf(stderr, "save-unders save:        0x%x  %3d \n", (unsigned int) win, idx);
 
 	x1 = cache_list[idx].x;
 	y1 = cache_list[idx].y;
@@ -6716,12 +6730,12 @@ fprintf(stderr, "SU_save: FAIL FOR: %d\n", idx);
 	sraRgnOffset(r, dx, dy);
 
 	dtA =  dnowx();
-fprintf(stderr, "SU_save: %.4f      %d dx=%d dy=%d\n", dtA, idx, dx, dy);
+if (verb) fprintf(stderr, "SU_save: %.4f      %d dx=%d dy=%d\n", dtA, idx, dx, dy);
 	if (w2 > 0 && h2 > 0) {
 		cache_cr(r, dx, dy, save_delay0, save_delay1, nbatch);
 	}
 	dtB =  dnowx();
-fprintf(stderr, "SU_save: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f\n", dtB, dtB-dtA, idx, w1, h1, x1, y1, w2, h2, x2, y2, cache_list[idx].su_time - x11vnc_start, dnowx());
+if (verb) fprintf(stderr, "SU_save: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f\n", dtB, dtB-dtA, idx, w1, h1, x1, y1, w2, h2, x2, y2, cache_list[idx].su_time - x11vnc_start, dnowx());
 
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r);
@@ -6732,7 +6746,7 @@ fprintf(stderr, "SU_save: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f
 	return 1;
 }
 
-int bs_restore(int idx, int *nbatch, int nopad) {
+int bs_restore(int idx, int *nbatch, int nopad, int verb) {
 	Window win = cache_list[idx].win;
 	XWindowAttributes attr;
 	int x1, y1, w1, h1;
@@ -6741,7 +6755,7 @@ int bs_restore(int idx, int *nbatch, int nopad) {
 	int dx, dy;
 	sraRegionPtr r, r0;
 
-fprintf(stderr, "backingstore restore:    0x%x  %3d \n", (unsigned int) win, idx);
+if (verb) fprintf(stderr, "backingstore restore:    0x%x  %3d \n", (unsigned int) win, idx);
 
 	x1 = cache_list[idx].x;
 	y1 = cache_list[idx].y;
@@ -6807,12 +6821,12 @@ fprintf(stderr, "BS_restore: not a valid X window: 0x%x\n", (unsigned int) win);
 	sraRgnAnd(r, r0);
 
 	dtA =  dnowx();
-fprintf(stderr, "BS_rest: %.4f      %d dx=%d dy=%d\n", dtA, idx, dx, dy);
+if (verb) fprintf(stderr, "BS_rest: %.4f      %d dx=%d dy=%d\n", dtA, idx, dx, dy);
 	if (w2 > 0 && h2 > 0) {
 		cache_cr(r, dx, dy, restore_delay0, restore_delay1, nbatch);
 	}
 	dtB =  dnowx();
-fprintf(stderr, "BS_rest: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f\n", dtB, dtB-dtA, idx, w1, h1, x1, y1, w2, h2, x2, y2, cache_list[idx].bs_time - x11vnc_start, dnowx());
+if (verb) fprintf(stderr, "BS_rest: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f\n", dtB, dtB-dtA, idx, w1, h1, x1, y1, w2, h2, x2, y2, cache_list[idx].bs_time - x11vnc_start, dnowx());
 
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r);
@@ -6822,7 +6836,7 @@ fprintf(stderr, "BS_rest: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f
 	return 1;
 }
 
-int su_restore(int idx, int *nbatch, int nopad) {
+int su_restore(int idx, int *nbatch, int nopad, int verb) {
 	Window win = cache_list[idx].win;
 	XWindowAttributes attr;
 	int x1, y1, w1, h1;
@@ -6832,7 +6846,7 @@ int su_restore(int idx, int *nbatch, int nopad) {
 	sraRegionPtr r, r0;
 	int invalid = 0;
 
-fprintf(stderr, "save-unders  restore:    0x%x  %3d \n", (unsigned int) win, idx);
+if (verb) fprintf(stderr, "save-unders  restore:    0x%x  %3d \n", (unsigned int) win, idx);
 	
 	x1 = cache_list[idx].x;
 	y1 = cache_list[idx].y;
@@ -6903,12 +6917,12 @@ fprintf(stderr, "SU_rest: su_x/bs_x/su_time: %d %d %.3f\n", x, cache_list[idx].b
 	sraRgnAnd(r, r0);
 
 	dtA =  dnowx();
-fprintf(stderr, "SU_rest: %.4f      %d dx=%d dy=%d\n", dtA, idx, dx, dy);
+if (verb) fprintf(stderr, "SU_rest: %.4f      %d dx=%d dy=%d\n", dtA, idx, dx, dy);
 	if (w2 > 0 && h2 > 0) {
 		cache_cr(r, dx, dy, restore_delay0, restore_delay1, nbatch);
 	}
 	dtB =  dnowx();
-fprintf(stderr, "SU_rest: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f\n", dtB, dtB-dtA, idx, w1, h1, x1, y1, w2, h2, x2, y2, cache_list[idx].su_time - x11vnc_start, dnowx());
+if (verb) fprintf(stderr, "SU_rest: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d  %.2f %.2f\n", dtB, dtB-dtA, idx, w1, h1, x1, y1, w2, h2, x2, y2, cache_list[idx].su_time - x11vnc_start, dnowx());
 
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r);
@@ -7042,7 +7056,7 @@ Window sched_bs[NSCHED];
 double sched_tm[NSCHED];
 double last_sched_bs = 0.0;
 
-#define SCHED(w) \
+#define SCHED(w, v) \
 { \
 	int k, save = -1, empty = 1; \
 	for (k=0; k < NSCHED; k++) { \
@@ -7059,7 +7073,7 @@ double last_sched_bs = 0.0;
 		sched_bs[save] = w; \
 		if (empty) { \
 			sched_tm[save] = dnow(); \
-			fprintf(stderr, "SCHED: %d %f\n", save, dnowx()); \
+			if (v) fprintf(stderr, "SCHED: %d %f\n", save, dnowx()); \
 		} \
 	} \
 }
@@ -7174,7 +7188,7 @@ int check_ncache(int reset, int mode) {
 	if (ncache0) {
 		if (reset) {
 			;
-		} else if (! client_count || !ncache) {
+		} else if (! client_count || !ncache || nofb) {
 			static double last_purge = 0.0;
 			double delay = client_count ? 0.5 : 2.0;
 			if (now > last_purge + delay) {
@@ -7207,6 +7221,9 @@ if (c) fprintf(stderr, "check_ncache purged %d events\n", c);
 		return -1;
 	}
 	if (subwin) {
+		return -1;
+	}
+	if (nofb) {
 		return -1;
 	}
 
@@ -7352,7 +7369,7 @@ fprintf(stderr, "Created window never mapped: freeing(%d) 0x%x\n", k, (unsigned 
 			int idx = lookup_win_index(topmapped);
 			if (idx >= 0) {
 				if (! macosx_console) {
-					bs_save(idx, NULL);
+					bs_save(idx, NULL, 1);
 				}
 			}
 		}
@@ -7387,8 +7404,8 @@ fprintf(stderr, "Created window never mapped: freeing(%d) 0x%x\n", k, (unsigned 
 					} else if (aw * ah < 64 * 64) {
 						;
 					} else {
-fprintf(stderr, "*NEW BS_save: 0x%x %d %d %d\n", (unsigned int) win, aw, ah, cache_list[idx].map_state); 
-						bs_save(idx, bat);
+fprintf(stderr, "*SNAP BS_save: 0x%x %d %d %d\n", (unsigned int) win, aw, ah, cache_list[idx].map_state); 
+						bs_save(idx, bat, 0);
 					}
 				}
 			}
@@ -7409,7 +7426,7 @@ fprintf(stderr, "*NEW BS_save: 0x%x %d %d %d\n", (unsigned int) win, aw, ah, cac
 					if (cache_list[i].vis_state == VisibilityUnobscured) {
 						if (cache_list[i].valid) {
 							if (cache_list[i].win != None) {
-								SCHED(cache_list[i].win) 
+								SCHED(cache_list[i].win, 0) 
 							}
 						}
 					}
@@ -7554,10 +7571,10 @@ fprintf(stderr, "\n"); rfbLog("IN  check_ncache() %d events.\n", n);
 					if (create_tot <= 6 && create_cnt++ < 3) {
 						if (w*h > 64 * 64) {
 							X_UNLOCK;
-							su_save(idx, nbatch);
+							su_save(idx, nbatch, 1);
 							X_LOCK;
 							if (cache_list[idx].valid) {
-								SCHED(win2) 
+								SCHED(win2, 1) 
 							}
 							create_cnt++;
 						}
@@ -7655,7 +7672,7 @@ fprintf(stderr, "----%02d: VisibilityNotify 0x%x  %3d  state: %s U/P %d/%d\n", i
 					}
 					if (ok) {
 						X_UNLOCK;
-						bs_restore(idx, nbatch, 1);
+						bs_restore(idx, nbatch, 1, 1);
 						X_LOCK;
 						cache_list[idx].time = dnow();
 						cache_list[idx].vis_cnt++;
@@ -7665,7 +7682,7 @@ fprintf(stderr, "----%02d: VisibilityNotify 0x%x  %3d  state: %s U/P %d/%d\n", i
 						Ev_rects[nrects].x2 = cache_list[idx].width;
 						Ev_rects[nrects].y2 = cache_list[idx].height;
 						nrects++;
-						SCHED(win) 
+						SCHED(win, 1) 
 					}
 				}
 				cache_list[idx].vis_state = state;
@@ -7680,14 +7697,14 @@ fprintf(stderr, "----%02d: MapNotify        0x%x  %3d\n", i, (unsigned int) win,
 
 				if (cache_list[idx].map_state == IsUnmapped || macosx_console) {
 					X_UNLOCK;
-					su_save(idx, nbatch);
-					bs_restore(idx, nbatch, 0);
+					su_save(idx, nbatch, 1);
+					bs_restore(idx, nbatch, 0, 1);
 					if (macosx_console) {
 #ifdef MACOSX
 						macosxCGS_follow_animation_win(win, -1, 1);
 						if (valid_window(win, &attr, 1)) {
 							STORE(idx, win, attr);
-							SCHED(win);
+							SCHED(win, 1);
 						}
 						/* XXX Y */
 						if (cache_list[idx].vis_state == -1)  {
@@ -7723,8 +7740,8 @@ fprintf(stderr, "----%02d: UnmapNotify      0x%x  %3d\n", i, (unsigned int) win,
 
 				if (cache_list[idx].map_state == IsViewable || macosx_console) {
 					X_UNLOCK;
-					bs_save(idx, nbatch);
-					su_restore(idx, nbatch, 0);
+					bs_save(idx, nbatch, 1);
+					su_restore(idx, nbatch, 0, 1);
 					X_LOCK;
 					pixels += cache_list[idx].width * cache_list[idx].height;
 					cache_list[idx].time = dnow();

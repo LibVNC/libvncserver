@@ -548,8 +548,8 @@ char *choose_title(char *display) {
 	}
 	strncat(title, display, MAXN - strlen(title));
 	if (subwin && dpy && valid_window(subwin, NULL, 0)) {
-		char *name = NULL;
 #if !NO_X11
+		char *name = NULL;
 		if (XFetchName(dpy, subwin, &name)) {
 			if (name) {
 				strncat(title, " ",  MAXN - strlen(title));
@@ -557,8 +557,6 @@ char *choose_title(char *display) {
 				free(name);
 			}
 		}
-#else
-		if (!name) {}
 #endif	/* NO_X11 */
 	}
 	return title;
