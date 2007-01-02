@@ -829,7 +829,7 @@ char find_display[] =
 char create_display[] = 
 "#!/bin/sh\n"
 "\n"
-"CREATE_DISPLAY_OUTPUT=/tmp/cdo.txt\n"
+"#CREATE_DISPLAY_OUTPUT=/tmp/cdo.txt\n"
 "if [ \"X$CREATE_DISPLAY_EXEC\" = \"X\" ]; then\n"
 "	CREATE_DISPLAY_EXEC=1\n"
 "	export CREATE_DISPLAY_EXEC\n"

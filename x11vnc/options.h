@@ -159,9 +159,18 @@ extern int wireframe_in_progress;
 extern int ncache;
 extern int ncache0;
 extern int ncache_copyrect;
+extern int ncache_wf_raises;
+extern int ncache_dt_change;
 extern int ncache_pad;
 extern int macosx_ncache_macmenu;
 extern int ncache_beta_tester;
+
+extern Atom atom_NET_ACTIVE_WINDOW;
+extern Atom atom_NET_CURRENT_DESKTOP;
+extern Atom atom_NET_CLIENT_LIST_STACKING;
+extern double got_NET_ACTIVE_WINDOW;
+extern double got_NET_CURRENT_DESKTOP;
+extern double got_NET_CLIENT_LIST_STACKING;
 
 extern char *scroll_copyrect_str;
 extern char *scroll_copyrect;

@@ -197,16 +197,26 @@ int wireframe_local = 1;
 #ifndef NCACHE
 #define NCACHE -10
 #endif
-int ncache = NCACHE;
-int ncache0 = 0;
-int ncache_copyrect = 0;
-int macosx_ncache_macmenu = 0;
-int ncache_beta_tester = 0;
 #ifdef MACOSX
+int ncache = 0;
 int ncache_pad = 24;
 #else
+int ncache = NCACHE;
 int ncache_pad = 0;
 #endif
+int ncache0 = 0;
+int ncache_copyrect = 0;
+int ncache_wf_raises = 1;
+int ncache_dt_change = 1;
+int macosx_ncache_macmenu = 0;
+int ncache_beta_tester = 0;
+
+Atom atom_NET_ACTIVE_WINDOW = None;
+Atom atom_NET_CURRENT_DESKTOP = None;
+Atom atom_NET_CLIENT_LIST_STACKING = None;
+double got_NET_ACTIVE_WINDOW = 0.0;
+double got_NET_CURRENT_DESKTOP = 0.0;
+double got_NET_CLIENT_LIST_STACKING = 0.0;
 
 /* T+B+L+R,tkey+presist_key,tmouse+persist_mouse */
 char *scroll_copyrect_str = NULL;

@@ -1451,7 +1451,7 @@ char msg[] =
 "\n"
 "Hello!  Exciting News!!\n"
 "\n"
-"You have been selected at random to beta test the x11vnc '-ncache' VNC\n"
+"You have been selected at random to beta-test the x11vnc '-ncache' VNC\n"
 "client-side pixel caching feature!\n"
 "\n"
 "This scheme stores pixel data offscreen on the VNC viewer side for faster\n"
@@ -1468,12 +1468,13 @@ char msg[] =
 "would notice and use the -ncache option (e.g. the wireframe and scroll\n"
 "detection features are on by default).  A couple things to note:\n"
 "\n"
-"    1) It uses a large amount of RAM (on both viewer and server)\n"
+"    1) It uses a large amount of RAM (on both viewer and server sides)\n"
 "\n"
 "    2) You can actually see the cached pixel data if you scroll down\n"
 "       to it in your viewer; adjust your viewer's size to hide it.\n"
 "\n"
 "More info: http://www.karlrunge.com/x11vnc/#faq-client-caching\n"
+"waiting for connections:\n"
 ;
 
 	if (raw_fb_str && !macosx_console) {
@@ -2161,6 +2162,10 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-ncache_cr")) {
 			ncache_copyrect = 1;
+		} else if (!strcmp(arg, "-ncache_no_moveraise")) {
+			ncache_wf_raises = 1;
+		} else if (!strcmp(arg, "-ncache_no_dtchange")) {
+			ncache_dt_change = 0;
 		} else if (!strcmp(arg, "-ncache_pad")) {
 			CHECK_ARGC
 			ncache_pad = atoi(argv[++i]);
@@ -3249,6 +3254,7 @@ int main(int argc, char* argv[]) {
 			multiple_cursors_mode = strdup("most");
 
 			if (! quiet && ! raw_fb_str) {
+				rfbLog("\n");
 				rfbLog("XFIXES available on display, resetting cursor mode\n");
 				rfbLog("  to: '-cursor most'.\n");
 				rfbLog("  to disable this behavior use: '-cursor arrow'\n");
@@ -3390,13 +3396,13 @@ int main(int argc, char* argv[]) {
 	if (! quiet && ncache && ! raw_fb_str) {
 		rfbLog("\n");
 		rfbLog("Client Side Caching: -ncache mode is in effect to provide\n");
-		rfbLog("  some client-side pixel data caching.  This speeds up\n");
+		rfbLog("  client-side pixel data caching.  This speeds up\n");
 		rfbLog("  iconifying/deiconifying windows, moving and raising\n");
 		rfbLog("  windows, and reposting menus.  In the simple CopyRect\n");
 		rfbLog("  encoding scheme used (no compression) a huge amount\n");
 		rfbLog("  of extra memory (20-80MB) is used on both the server and\n");
-		rfbLog("  client sides.  This mode works with any VNC viewer,\n");
-		rfbLog("  however in most you can actually see the cached pixel\n");
+		rfbLog("  client sides.  This mode works with any VNC viewer.\n");
+		rfbLog("  However, in most you can actually see the cached pixel\n");
 		rfbLog("  data by scrolling down, so you need to re-adjust its size.\n");
 		rfbLog("  See http://www.karlrunge.com/x11vnc/#faq-client-caching.\n");
 		rfbLog("  If this mode yields undesired behavior (poor response,\n");

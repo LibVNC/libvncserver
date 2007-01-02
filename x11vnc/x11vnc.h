@@ -464,8 +464,12 @@ extern double last_pointer_motion_time;
 extern double last_key_to_button_remap_time;
 extern double last_copyrect;
 extern double last_copyrect_fix;
+extern double last_wireframe;
 extern double servertime_diff;
 extern double x11vnc_start;
+
+extern double last_get_wm_frame_time;
+extern Window last_get_wm_frame;
 
 extern int hack_val;
 

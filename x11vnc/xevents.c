@@ -19,7 +19,7 @@
 int grab_buster = 0;
 int grab_kbd = 0;
 int grab_ptr = 0;
-int sync_tod_delay = 3;
+int sync_tod_delay = 20;
 
 void initialize_vnc_connect_prop(void);
 void initialize_x11vnc_remote_prop(void);
@@ -28,6 +28,7 @@ void spawn_grab_buster(void);
 void sync_tod_with_servertime(void);
 void check_keycode_state(void);
 void check_autorepeat(void);
+void set_prop_atom(Atom atom);
 void check_xevents(int reset);
 void xcut_receive(char *text, int len, rfbClientPtr cl);
 
@@ -600,6 +601,16 @@ void sync_tod_with_servertime(void) {
 
 	RAWFB_RET_VOID
 
+	if (atom_NET_ACTIVE_WINDOW == None) {
+		atom_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+	}
+	if (atom_NET_CURRENT_DESKTOP == None) {
+		atom_NET_CURRENT_DESKTOP = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
+	}
+	if (atom_NET_CLIENT_LIST_STACKING == None) {
+		atom_NET_CLIENT_LIST_STACKING = XInternAtom(dpy, "_NET_CLIENT_LIST_STACKING", False);
+	}
+
 	if (! ticker_atom) {
 		ticker_atom = XInternAtom(dpy, "X11VNC_TICKER", False);
 	}
@@ -609,7 +620,7 @@ void sync_tod_with_servertime(void) {
 
 	XSync(dpy, False);
 	while (XCheckTypedEvent(dpy, PropertyNotify, &xev)) {
-		;
+		set_prop_atom(xev.xproperty.atom);
 	}
 
 	snprintf(diff, 128, "%d/%08d/%lu/%.6f", (int) getpid(), seq++,
@@ -737,6 +748,13 @@ void check_autorepeat(void) {
 			autorepeat(0, 0);
 		}
 	}
+}
+
+void set_prop_atom(Atom atom) {
+	if (atom == None) return;
+	if (atom == atom_NET_ACTIVE_WINDOW) got_NET_ACTIVE_WINDOW = dnow();
+	if (atom == atom_NET_CURRENT_DESKTOP) got_NET_CURRENT_DESKTOP = dnow();
+	if (atom == atom_NET_CLIENT_LIST_STACKING) got_NET_CLIENT_LIST_STACKING = dnow();
 }
 
 /*
@@ -871,7 +889,10 @@ void check_xevents(int reset) {
 				 * Go retrieve X11VNC_REMOTE string.
 				 */
 				read_x11vnc_remote_prop(0);
+
+
 			}
+			set_prop_atom(xev.xproperty.atom);
 		}
 	}
 

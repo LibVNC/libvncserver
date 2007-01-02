@@ -1235,6 +1235,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 	char *create_cmd = NULL;
 	char *users_list_save = NULL;
 	int created_disp = 0;
+	int ncache_save;
 
 	if (! use_dpy || strstr(use_dpy, "WAIT:") != use_dpy) {
 		return 0;
@@ -1340,6 +1341,9 @@ int wait_for_client(int *argc, char** argv, int http) {
 		argv[*argc] = s;
 		*argc = (*argc) + 1;
 	}
+
+	ncache_save = ncache;
+	ncache = 0;
 
 	initialize_allowed_input();
 
@@ -1744,6 +1748,8 @@ if (db) fprintf(stderr, "xauth_raw_len: %d\n", n);
 	if (create_cmd) {
 		free(create_cmd);
 	}
+
+	ncache = ncache_save;
 
 	return 1;
 }

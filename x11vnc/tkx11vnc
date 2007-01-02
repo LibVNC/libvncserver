@@ -360,6 +360,13 @@ Tuning
 	xd_area:
 	xd_mem:
 	=GAL LOFF
+	=GAL Ncache::
+	ncache
+	ncache_size:
+	ncache_cr
+	ncache_no_moveraise
+	ncache_no_dtchange
+	=GAL LOFF
 	--
 	=GAL SharedMemory::
 	noshm
@@ -381,10 +388,6 @@ Tuning
 	rfbwait:
 	nodpms
 	nofbpm
-	--
-	ncache
-	ncache_size:
-	ncache_cr
 	=GAL LOFF
 "
 }
@@ -1054,6 +1057,17 @@ changed regions.  Nevertheless, x11vnc uses the DAMAGE information very
 effectively as hints to improve its performance.
 
 The items in the sub-menu allow tweaking x11vnc's DAMAGE algorithm.
+"
+
+	set helptext(Ncache:) "
+A simple client-side (viewer) caching scheme is enabled with the
+\"-ncache n\" option.  It simply uses \"n\" framebuffer sized areas
+below the actual display for caching window pixel data.  
+
+Drawbacks are it uses a lot of RAM (roughly n times more), and the
+pixels cache area is visible in the viewers.
+
+The items in the sub-menu allow tweaking x11vnc's -ncache algorithm.
 "
 
 	set helptext(SharedMemory:) "

@@ -2748,6 +2748,36 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		ncache_copyrect = 0;
 		rfbLog("remote_cmd: disabled -ncache_cr %d\n", ncache_copyrect);
 
+	} else if (!strcmp(p, "ncache_no_moveraise")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !ncache_wf_raises);
+			goto qry;
+		}
+		ncache_wf_raises = 0;
+		rfbLog("remote_cmd: set -ncache_no_moveraise\n");
+	} else if (!strcmp(p, "noncache_no_moveraise")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, ncache_wf_raises);
+			goto qry;
+		}
+		ncache_wf_raises = 1;
+		rfbLog("remote_cmd: disabled -ncache_no_moveraise\n");
+
+	} else if (!strcmp(p, "ncache_no_dtchange")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !ncache_dt_change);
+			goto qry;
+		}
+		ncache_dt_change = 0;
+		rfbLog("remote_cmd: set -ncache_no_dt_change\n");
+	} else if (!strcmp(p, "noncache_no_dtchange")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, ncache_dt_change);
+			goto qry;
+		}
+		ncache_dt_change = 1;
+		rfbLog("remote_cmd: disabled -ncache_no_dt_change\n");
+
 	} else if (!strcmp(p, "ncache")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !!ncache);

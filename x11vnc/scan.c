@@ -2897,7 +2897,7 @@ if (ncache > 0) {
 				nomsg = 0;
 			}
 		} else {
-fprintf(stderr, "*** SCAN_DISPLAY CHECK_NCACHE/%d *** %d rescan=%d\n", gotone, y, rescan);
+fprintf(stderr, "\n*** SCAN_DISPLAY CHECK_NCACHE/%d *** %d rescan=%d\n", gotone, y, rescan);
 		}
 		X_UNLOCK;
 		check_ncache(0, 1);

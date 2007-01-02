@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Fri Dec 29 01:37:39 EST 2006
+x11vnc README file                         Date: Mon Jan  1 21:04:46 EST 2007
 
 The following information is taken from these URLs:
 
@@ -9262,7 +9262,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2006-12-29
+x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-01
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -9308,34 +9308,34 @@ x11vnc options:
   -noalphablend            -nocursorshape           -cursorpos             
   -nocursorpos             -xwarppointer            -noxwarppointer        
   -buttonmap string        -nodragging              -ncache n              
-  -ncache_cr               -ncache_pad n            -wireframe [str]       
-  -nowireframe             -nowireframelocal        -wirecopyrect mode     
-  -nowirecopyrect          -debug_wireframe         -scrollcopyrect mode   
-  -noscrollcopyrect        -scr_area n              -scr_skip list         
-  -scr_inc list            -scr_keys list           -scr_term list         
-  -scr_keyrepeat lo-hi     -scr_parms string        -fixscreen string      
-  -debug_scroll            -noxrecord               -grab_buster           
-  -nograb_buster           -debug_grabs             -debug_sel             
-  -pointer_mode n          -input_skip n            -allinput              
-  -speeds rd,bw,lat        -wmdt string             -debug_pointer         
-  -debug_keyboard          -defer time              -wait time             
-  -wait_ui factor          -nowait_bog              -slow_fb time          
-  -readtimeout n           -nap                     -nonap                 
-  -sb time                 -nofbpm                  -fbpm                  
-  -nodpms                  -dpms                    -noxdamage             
-  -xd_area A               -xd_mem f                -sigpipe string        
-  -threads                 -nothreads               -fs f                  
-  -gaps n                  -grow n                  -fuzz n                
-  -debug_tiles             -snapfb                  -rawfb string          
-  -freqtab file            -pipeinput cmd           -macnodim              
-  -macnosleep              -macnosaver              -macnowait             
-  -macwheel n              -macnoswap               -macnoresize           
-  -maciconanim n           -macmenu                 -gui [gui-opts]        
-  -remote command          -query variable          -QD variable           
-  -sync                    -noremote                -yesremote             
-  -unsafe                  -safer                   -privremote            
-  -nocmds                  -allowedcmds list        -deny_all              
-
+  -ncache_cr               -ncache_no_moveraise     -ncache_no_dtchange    
+  -ncache_pad n            -wireframe [str]         -nowireframe           
+  -nowireframelocal        -wirecopyrect mode       -nowirecopyrect        
+  -debug_wireframe         -scrollcopyrect mode     -noscrollcopyrect      
+  -scr_area n              -scr_skip list           -scr_inc list          
+  -scr_keys list           -scr_term list           -scr_keyrepeat lo-hi   
+  -scr_parms string        -fixscreen string        -debug_scroll          
+  -noxrecord               -grab_buster             -nograb_buster         
+  -debug_grabs             -debug_sel               -pointer_mode n        
+  -input_skip n            -allinput                -speeds rd,bw,lat      
+  -wmdt string             -debug_pointer           -debug_keyboard        
+  -defer time              -wait time               -wait_ui factor        
+  -nowait_bog              -slow_fb time            -readtimeout n         
+  -nap                     -nonap                   -sb time               
+  -nofbpm                  -fbpm                    -nodpms                
+  -dpms                    -noxdamage               -xd_area A             
+  -xd_mem f                -sigpipe string          -threads               
+  -nothreads               -fs f                    -gaps n                
+  -grow n                  -fuzz n                  -debug_tiles           
+  -snapfb                  -rawfb string            -freqtab file          
+  -pipeinput cmd           -macnodim                -macnosleep            
+  -macnosaver              -macnowait               -macwheel n            
+  -macnoswap               -macnoresize             -maciconanim n         
+  -macmenu                 -gui [gui-opts]          -remote command        
+  -query variable          -QD variable             -sync                  
+  -noremote                -yesremote               -unsafe                
+  -safer                   -privremote              -nocmds                
+  -allowedcmds list        -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -9369,7 +9369,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2006-12-29
+x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-01
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -11388,7 +11388,7 @@ Options:
                        better results than the 'Genie' one.  Also, window event
                        detection not as accurate as the X version.
 
--ncache_cr             In -nache mode, try do to copyrect opaque window
+-ncache_cr             In -ncache mode, try to do copyrect opaque window
                        moves/drags instead of wireframes (this can induce
                        painting errors).  The wireframe will still be used when
                        moving a window whose save-unders has not yet been set
@@ -11399,7 +11399,18 @@ Options:
                        smoother drags than tightvnc viewer.  Response may also
                        be choppy if the server side machine is too slow.
 
--ncache_pad n          In -nache mode, pad each window with n pixels for the
+-ncache_no_moveraise   In -ncache mode, do not assume that moving a window
+                       will cause the window manager to raise it to the top
+                       of the stack.  The default is to assume it does, and
+                       so at the beginning of any wireframe, etc, window moves
+                       the window will be pushed to top in the VNC viewer.
+
+-ncache_no_dtchange    In -ncache mode, do not try to guess when the desktop
+                       (viewport) changes to another one (i.e. another
+                       workarea).  The default is to try to guess and when
+                       detected try to make the transistion more smoothly.
+
+-ncache_pad n          In -ncache mode, pad each window with n pixels for the
                        caching rectangles.  This can be used to try to improve
                        the situation with dropshadows or other compositing
                        (e.g. MacOS X window manager), although it could make
@@ -12656,6 +12667,8 @@ n
                        ncache_size:n   set -ncache size to n.
                        ncache_cr       enable  -ncache_cr mode.
                        noncache_cr     disable -ncache_cr mode.
+                       ncache_no_moveraise   enable  no_moveraise mode.
+                       noncache_no_moveraise disable no_moveraise mode.
                        wireframe       enable  -wireframe mode. same as "wf"
                        nowireframe     disable -wireframe mode. same as "nowf"
                        wireframe:str   enable  -wireframe mode string.
@@ -12817,12 +12830,13 @@ n
                        bell nobell sel nosel primary noprimary setprimary
                        nosetprimary clipboard noclipboard setclipboard
                        nosetclipboard seldir cursorshape nocursorshape
-                       cursorpos nocursorpos cursor_drag nocursor_drag cursor
-                       show_cursor noshow_cursor nocursor arrow xfixes noxfixes
-                       xdamage noxdamage xd_area xd_mem alphacut alphafrac
-                       alpharemove noalpharemove alphablend noalphablend
-                       xwarppointer xwarp noxwarppointer noxwarp buttonmap
-                       dragging nodragging ncache_cr noncache_cr ncache
+                       cursorpos nocursorpos cursor_drag nocursor_drag
+                       cursor show_cursor noshow_cursor nocursor arrow
+                       xfixes noxfixes xdamage noxdamage xd_area xd_mem
+                       alphacut alphafrac alpharemove noalpharemove alphablend
+                       noalphablend xwarppointer xwarp noxwarppointer noxwarp
+                       buttonmap dragging nodragging ncache_cr noncache_cr
+                       ncache_no_moveraise noncache_no_moveraise ncache
                        noncache ncache_size wireframe_mode wireframe wf
                        nowireframe nowf wireframelocal wfl nowireframelocal
                        nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
