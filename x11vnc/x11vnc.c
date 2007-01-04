@@ -1,7 +1,7 @@
 /*
  * x11vnc: a VNC server for X displays.
  *
- * Copyright (c) 2002-2006 Karl J. Runge <runge@karlrunge.com>
+ * Copyright (c) 2002-2007 Karl J. Runge <runge@karlrunge.com>
  * All rights reserved.
  *
  *  This is free software; you can redistribute it and/or modify

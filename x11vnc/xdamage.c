@@ -544,6 +544,8 @@ int xdamage_hint_skip(int y) {
 	static sraRegionPtr scanline = NULL;
 	sraRegionPtr reg, tmpl;
 	int ret, i, n, nreg;
+	static int ncache_no_skip = 0;
+	static double last_ncache_no_skip = 0.0;
 
 	if (! xdamage_present || ! use_xdamage) {
 		return 0;	/* cannot skip */
@@ -557,9 +559,26 @@ int xdamage_hint_skip(int y) {
 		scanline = sraRgnCreate();
 	}
 
+	nreg = (xdamage_memory * NSCAN) + 1;
+
+	if (ncache > 0) {
+		if (ncache_no_skip == 0) {
+			if (dnow() > last_ncache_no_skip + 4.0) {
+				ncache_no_skip = 1;
+				last_ncache_no_skip = dnow();
+				return 0;
+			}
+		} else {
+			if (++ncache_no_skip >= 2*nreg) {
+				ncache_no_skip = 0;
+			} else {
+				return 0;
+			}
+		}
+	}
+
 	tmpl = sraRgnCreateRect(0, y, dpy_x, y+1);
 
-	nreg = (xdamage_memory * NSCAN) + 1;
 	ret = 1;
 	for (i=0; i<nreg; i++) {
 		/* go back thru the history starting at most recent */

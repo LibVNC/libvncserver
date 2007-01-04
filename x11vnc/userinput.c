@@ -1970,6 +1970,7 @@ void batch_copyregion(sraRegionPtr* region, int *dx, int *dy, int ncr, double de
 	rfbClientIteratorPtr i;
 	rfbClientPtr cl;
 	int k, direct, mode, nrects = 0, bad = 0;
+	double start = dnow();
 
 /* XXX Y */
 
@@ -2039,13 +2040,15 @@ void batch_copyregion(sraRegionPtr* region, int *dx, int *dy, int ncr, double de
 	}
 	rfbReleaseClientIterator(i);
 
-fprintf(stderr, "batch_copyregion: nrects: %d nregions: %d\n", nrects, ncr);
+fprintf(stderr, "batch_copyregion: nrects: %d nregions: %d  dt=%.4f\n", nrects, ncr, dnow() - start);
 
 }
 
 void batch_push(int nreg, double delay) {
 	int k;
 	batch_copyregion(batch_reg, batch_dxs, batch_dys, nreg, delay);
+	/* XXX Y */
+	fb_push();
 	for (k=0; k < nreg; k++) {
 		sraRgnDestroy(batch_reg[k]);
 	}
@@ -4157,6 +4160,8 @@ void snap_old(void);
 int check_copyrect_raise(int idx, Window orig_frame, int try_batch) {
 	char *no = "none";
 	int doraise = 1;
+	int valid;
+	XWindowAttributes attr;
 
 	if (! ncache_wf_raises) {
 		doraise = 0;
@@ -4177,7 +4182,8 @@ fprintf(stderr, "--YES, wf_raise\n");
 		if (try_batch) {
 			nb = &nr;
 		}
-		bs_restore(idx, nb, 0, 1, 1, 1);
+		valid = 1;
+		bs_restore(idx, nb, &attr, 0, 1, &valid, 1);
 		try_to_fix_su(orig_frame, idx, 0x1, nb, NULL);	
 		if (nb && nr) {
 			batch_push(nr, -1.0);
@@ -5906,6 +5912,7 @@ int lookup_old_stack_index(int ic) {
 }
 
 #define STORE(k, w, attr) \
+	if (0) fprintf(stderr, "STORE(%d) = 0x%x\n", k, w); \
 	cache_list[k].win = w;  \
 	cache_list[k].fetched = 1;  \
 	cache_list[k].valid = 1;  \
@@ -5917,6 +5924,7 @@ int lookup_old_stack_index(int ic) {
 	cache_list[k].time = dnow();
 
 #define CLEAR(k) \
+	if (0) fprintf(stderr, "CLEAR(%d)\n", k); \
 	cache_list[k].bs_x = -1;  \
 	cache_list[k].bs_y = -1;  \
 	cache_list[k].bs_w = -1;  \
@@ -5930,6 +5938,7 @@ int lookup_old_stack_index(int ic) {
 	cache_list[k].su_time = 0.0;
 
 #define DELETE(k) \
+	if (0) fprintf(stderr, "DELETE(%d) = 0x%x\n", k, cache_list[k].win); \
 	cache_list[k].win = None;  \
 	cache_list[k].fetched = 0;  \
 	cache_list[k].valid = 0; \
@@ -6878,9 +6887,8 @@ void clip_region(sraRegionPtr r, Window win) {
 	}
 }
 
-int bs_save(int idx, int *nbatch, int clip, int only_if_tracking, int verb) {
+int bs_save(int idx, int *nbatch, XWindowAttributes *attr, int clip, int only_if_tracking, int *valid, int verb) {
 	Window win = cache_list[idx].win;
-	XWindowAttributes attr;
 	int x1, y1, w1, h1;
 	int x2, y2, w2, h2;
 	int x, y, w, h;
@@ -6892,27 +6900,33 @@ int bs_save(int idx, int *nbatch, int clip, int only_if_tracking, int verb) {
 	w1 = cache_list[idx].width;
 	h1 = cache_list[idx].height;
 
-	if (only_if_tracking && cache_list[idx].bs_x < 0) {
-		return;
-	}
-
 if (verb) fprintf(stderr, "backingstore save:       0x%x  %3d clip=%d\n", (unsigned int) win, idx, clip);
 	
 	X_LOCK;
-	if (! valid_wr(idx, win, &attr)) {
+	if (*valid) {
+		attr->x = x1;
+		attr->y = y1;
+		attr->width = w1;
+		attr->height = h1;
+	} else if (! valid_wr(idx, win, attr)) {
 fprintf(stderr, "bs_save:    not a valid X window: 0x%x\n", (unsigned int) win);
-/* XXX Y */
-/*		DELETE(idx); */
 		X_UNLOCK;
+		*valid = 0;
 		cache_list[idx].valid = 0;
 		return 0;
+	} else {
+		*valid = 1;
 	}
 	X_UNLOCK;
 
-	x2 = attr.x;
-	y2 = attr.y;
-	w2 = attr.width;
-	h2 = attr.height;
+	if (only_if_tracking && cache_list[idx].bs_x < 0) {
+		return 0;
+	}
+
+	x2 = attr->x;
+	y2 = attr->y;
+	w2 = attr->width;
+	h2 = attr->height;
 
 	if (cache_list[idx].bs_x < 0) {
 		rc = find_rect(idx, x2, y2, w2, h2);
@@ -6927,7 +6941,9 @@ fprintf(stderr, "bs_save:    not a valid X window: 0x%x\n", (unsigned int) win);
 	h = cache_list[idx].bs_h;
 
 	if (x < 0 || ! rc) {
-		STORE(idx, win, attr);
+//		if (!novalidate) {
+//			STORE(idx, win, attr);
+//		}
 fprintf(stderr, "BS_save: FAIL FOR: %d\n", idx);
 		return 0;
 	}
@@ -6968,15 +6984,16 @@ if (verb) fprintf(stderr, "BS_save: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d 
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r);
 
-	STORE(idx, win, attr);
+//	if (!novalidate) {
+//		STORE(idx, win, attr);
+//	}
 	cache_list[idx].bs_time = dnow();
 	
 	return 1;
 }
 
-int su_save(int idx, int *nbatch, int clip, int verb) {
+int su_save(int idx, int *nbatch, XWindowAttributes *attr, int clip, int *valid, int verb) {
 	Window win = cache_list[idx].win;
-	XWindowAttributes attr;
 	int x1, y1, w1, h1;
 	int x2, y2, w2, h2;
 	int x, y, w, h;
@@ -6991,20 +7008,26 @@ if (verb) fprintf(stderr, "save-unders save:        0x%x  %3d \n", (unsigned int
 	h1 = cache_list[idx].height;
 	
 	X_LOCK;
-	if (! valid_wr(idx, win, &attr)) {
+	if (*valid) {
+		attr->x = x1;
+		attr->y = y1;
+		attr->width = w1;
+		attr->height = h1;
+	} else if (! valid_wr(idx, win, attr)) {
 fprintf(stderr, "su_save:    not a valid X window: 0x%x\n", (unsigned int) win);
-/* XXX Y */
-/*		DELETE(idx); */
 		X_UNLOCK;
+		*valid = 0;
 		cache_list[idx].valid = 0;
 		return 0;
+	} else {
+		*valid = 1;
 	}
 	X_UNLOCK;
 
-	x2 = attr.x;
-	y2 = attr.y;
-	w2 = attr.width;
-	h2 = attr.height;
+	x2 = attr->x;
+	y2 = attr->y;
+	w2 = attr->width;
+	h2 = attr->height;
 
 	if (cache_list[idx].bs_x < 0) {
 		rc = find_rect(idx, x2, y2, w2, h2);
@@ -7018,7 +7041,9 @@ fprintf(stderr, "su_save:    not a valid X window: 0x%x\n", (unsigned int) win);
 	h = cache_list[idx].su_h;
 
 	if (x < 0 || ! rc) {
-		STORE(idx, win, attr);
+//		if (!novalidate) {
+//			STORE(idx, win, attr);
+//		}
 fprintf(stderr, "SU_save: FAIL FOR: %d\n", idx);
 		return 0;
 	}
@@ -7059,15 +7084,16 @@ if (verb) fprintf(stderr, "SU_save: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d 
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r);
 
-	STORE(idx, win, attr);
+//	if (!novalidate) {
+//		STORE(idx, win, attr);
+//	}
 	cache_list[idx].su_time = dnow();
 	
 	return 1;
 }
 
-int bs_restore(int idx, int *nbatch, int clip, int nopad, int novalidate, int verb) {
+int bs_restore(int idx, int *nbatch, XWindowAttributes *attr, int clip, int nopad, int *valid, int verb) {
 	Window win = cache_list[idx].win;
-	XWindowAttributes attr;
 	int x1, y1, w1, h1;
 	int x2, y2, w2, h2;
 	int x, y, w, h;
@@ -7082,23 +7108,25 @@ if (verb) fprintf(stderr, "backingstore restore:    0x%x  %3d \n", (unsigned int
 	h1 = cache_list[idx].height;
 	
 	X_LOCK;
-	if (novalidate) {
-		attr.x = x1;
-		attr.y = y1;
-		attr.width = w1;
-		attr.height = h1;
-	} else if (! valid_wr(idx, win, &attr)) {
+	if (*valid) {
+		attr->x = x1;
+		attr->y = y1;
+		attr->width = w1;
+		attr->height = h1;
+	} else if (! valid_wr(idx, win, attr)) {
 fprintf(stderr, "BS_restore: not a valid X window: 0x%x\n", (unsigned int) win);
-		DELETE(idx);
+		*valid = 0;
 		X_UNLOCK;
 		return 0;
+	} else {
+		*valid = 1;
 	}
 	X_UNLOCK;
 
-	x2 = attr.x;
-	y2 = attr.y;
-	w2 = attr.width;
-	h2 = attr.height;
+	x2 = attr->x;
+	y2 = attr->y;
+	w2 = attr->width;
+	h2 = attr->height;
 
 	x = cache_list[idx].bs_x;
 	y = cache_list[idx].bs_y;
@@ -7106,9 +7134,9 @@ fprintf(stderr, "BS_restore: not a valid X window: 0x%x\n", (unsigned int) win);
 	h = cache_list[idx].bs_h;
 
 	if (x < 0 || cache_list[idx].bs_time == 0.0) {
-		if (!novalidate) {
-			STORE(idx, win, attr);
-		}
+//		if (!novalidate) {
+//			STORE(idx, win, attr);
+//		}
 		return 0;
 	}
 
@@ -7162,22 +7190,20 @@ if (verb) fprintf(stderr, "BS_rest: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d 
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r);
 
-	if (!novalidate) {
-		STORE(idx, win, attr);
-	}
+//	if (!novalidate) {
+//		STORE(idx, win, attr);
+//	}
 	
 	return 1;
 }
 
-int su_restore(int idx, int *nbatch, int clip, int nopad, int verb) {
+int su_restore(int idx, int *nbatch, XWindowAttributes *attr, int clip, int nopad, int *valid, int verb) {
 	Window win = cache_list[idx].win;
-	XWindowAttributes attr;
 	int x1, y1, w1, h1;
 	int x2, y2, w2, h2;
 	int x, y, w, h;
 	int dx, dy;
 	sraRegionPtr r, r0;
-	int invalid = 0;
 
 if (verb) fprintf(stderr, "save-unders  restore:    0x%x  %3d \n", (unsigned int) win, idx);
 	
@@ -7187,18 +7213,24 @@ if (verb) fprintf(stderr, "save-unders  restore:    0x%x  %3d \n", (unsigned int
 	h1 = cache_list[idx].height;
 	
 	X_LOCK;
-	if (! valid_wr(idx, win, &attr)) {
+	if (*valid) {
+		attr->x = x1;
+		attr->y = y1;
+		attr->width = w1;
+		attr->height = h1;
+	} else if (! valid_wr(idx, win, attr)) {
 fprintf(stderr, "SU_restore: not a valid X window: 0x%x\n", (unsigned int) win);
-		invalid = 1;
+		*valid = 0;
 		x2 = x1;
 		y2 = y1;
 		w2 = w1;
 		h2 = h1;
 	} else {
-		x2 = attr.x;
-		y2 = attr.y;
-		w2 = attr.width;
-		h2 = attr.height;
+		x2 = attr->x;
+		y2 = attr->y;
+		w2 = attr->width;
+		h2 = attr->height;
+		*valid = 1;
 	}
 	X_UNLOCK;
 
@@ -7209,9 +7241,9 @@ fprintf(stderr, "SU_restore: not a valid X window: 0x%x\n", (unsigned int) win);
 
 	if (x < 0 || cache_list[idx].bs_x < 0 || cache_list[idx].su_time == 0.0) {
 fprintf(stderr, "SU_rest: su_x/bs_x/su_time: %d %d %.3f\n", x, cache_list[idx].bs_x, cache_list[idx].su_time);
-		if (invalid) {
-			DELETE(idx);
-		}
+//		if (invalid) {
+//			DELETE(idx);
+//		}
 		return 0;
 	}
 
@@ -7265,11 +7297,11 @@ if (verb) fprintf(stderr, "SU_rest: %.4f %.2f %d done.  %dx%d+%d+%d %dx%d+%d+%d 
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r);
 
-	if (invalid) {
-		DELETE(idx);
-	} else {
-		STORE(idx, win, attr);
-	}
+//	if (invalid) {
+//		DELETE(idx);
+//	} else if (!novalidate) {
+//		STORE(idx, win, attr);
+//	}
 	return 1;
 }
 
@@ -7357,10 +7389,10 @@ void block_stats(void) {
 				double t2 = cache_list[k].bs_time;
 				if (t1 > 0.0) {t1 = dnow() - t1;} else {t1 = -1.0;}
 				if (t2 > 0.0) {t2 = dnow() - t2;} else {t2 = -1.0;}
-				fprintf(stderr, "     [%02d] %04d 0x%08x bs: %04dx%04d+%04d+%05d vw: %04dx%04d+%04d+%04d cl: %04dx%04d+%04d+%04d map=%d su=%9.3f bs=%9.3f\n",
+				fprintf(stderr, "     [%02d] %04d 0x%08x bs: %04dx%04d+%04d+%05d vw: %04dx%04d+%04d+%04d cl: %04dx%04d+%04d+%04d map=%d su=%9.3f bs=%9.3f cnt=%d/%d\n",
 				    n, k, (unsigned int) win, w, h, x, y, attr.width, attr.height, attr.x, attr.y,
 				    cache_list[k].width, cache_list[k].height, cache_list[k].x, cache_list[k].y,
-				    attr.map_state == IsViewable, t1, t2); 
+				    attr.map_state == IsViewable, t1, t2, cache_list[k].create_cnt, cache_list[k].map_cnt); 
 			}
 		}
 		frac = area /(dpy_x * dpy_y);
@@ -7638,13 +7670,13 @@ int try_to_fix_su(Window win, int idx, Window above, int *nbatch, char *mode) {
 	int unmapped = 0;
 	int moved = 0;
 
-fprintf(stderr, "TRY_TO_FIX_SU(%d)  0x%x  0x%x unmapped=%d\n", idx, win, above, unmapped);
 
 	if (mode && !strcmp(mode, "unmapped")) {
 		unmapped = 1;
 	} else if (mode && !strcmp(mode, "moved")) {
 		moved = 1;
 	}
+fprintf(stderr, "TRY_TO_FIX_SU(%d)  0x%x  0x%x unmapped=%d\n", idx, win, above, unmapped);
 
 	if (idx < 0) {
 		return 0;
@@ -7851,25 +7883,176 @@ sraRegionPtr idx_create_rgn(sraRegionPtr r0, int idx) {
 	return rtmp;
 }
 
+#define EVLISTMAX 256
+#define EV_RESET	0
+#define EV_CREATE	1
+#define EV_DESTROY	2
+#define EV_UNMAP	3 
+#define EV_MAP		4 
+#define EV_REPARENT	5 
+#define EV_CONFIGURE	6 
+#define EV_VISIBILITY_UNOBS	7 
+#define EV_VISIBILITY_OBS	8 
+#define EV_PROPERTY	9 
+Window _ev_list[EVLISTMAX];
+int _ev_case[EVLISTMAX];
+int _ev_list_cnt;
+
+int n_CN = 0, n_RN = 0, n_DN = 0, n_ON = 0, n_MN = 0, n_UN = 0;
+int n_VN = 0, n_VN_p = 0, n_VN_u = 0, n_ST = 0, n_PN = 0;
+
+int ev_store(Window win, int type) {
+	if (type == EV_RESET)  {
+		n_CN = 0; n_RN = 0; n_DN = 0; n_ON = 0; n_MN = 0; n_UN = 0;
+		n_VN = 0; n_VN_p = 0; n_VN_u = 0; n_ST = 0; n_PN = 0;
+		_ev_list_cnt = 0;
+		return 1;
+	}
+	if (_ev_list_cnt >= EVLISTMAX) {
+		return 0;
+	}
+	_ev_list[_ev_list_cnt] = win;
+	_ev_case[_ev_list_cnt++] = type;
+}
+
+int ev_lookup(Window win, int type) {
+	int i;
+	for(i=0; i < _ev_list_cnt; i++) {
+		if (_ev_list[i] == win && _ev_case[i] == type) 	{
+			return 1;
+		}
+	}
+	return 0;
+}
+
+unsigned long all_ev = SubstructureNotifyMask|StructureNotifyMask|VisibilityChangeMask;
+unsigned long win_ev = StructureNotifyMask|VisibilityChangeMask;
+
+void read_events(int *n_in) {
+	int n = *n_in;
+	Window win, win2;
+	XEvent ev;
+	
+	while (xcheckmaskevent(dpy, all_ev, &Ev[n])) {
+		int type = Ev[n].type; 
+		Window w = None;
+		win = Ev[n].xany.window;
+		Ev_done[n] = 0;
+		Ev_area[n] = 0;
+		Ev_win[n] = win;
+		Ev_map[n] = None;
+		Ev_unmap[n] = None;
+		Ev_order[n] = n;
+
+		ev = Ev[n];
+
+if (type == DestroyNotify)  w = Ev[n].xcreatewindow.window;
+if (type == CreateNotify)   w = Ev[n].xdestroywindow.window;
+if (type == ReparentNotify) w = Ev[n].xreparent.window;
+if (type == UnmapNotify)    w = Ev[n].xunmap.window;
+if (type == MapNotify)      w = Ev[n].xmap.window;
+if (type == Expose)         w = Ev[n].xexpose.window;
+if (type == ConfigureNotify) w = Ev[n].xconfigure.window;
+if (n == *n_in) fprintf(stderr, "\n");
+fprintf(stderr, "----- %d inputev 0x%08x w: 0x%08x %s\n", n, win, w, Etype(type));
+
+		if (win == rootwin) {
+			if (type == CreateNotify) {
+				win2 = ev.xcreatewindow.window;
+				ev_store(win2, EV_CREATE);
+				n++;
+				n_CN++;
+			} else if (type == ReparentNotify) {
+				if (ev.xreparent.parent != rootwin) {
+					win2 = ev.xreparent.window;
+					if (win2 != rootwin) {
+						ev_store(win2, EV_REPARENT);
+					}
+				}
+				n++;
+				n_RN++;
+			} else if (type == PropertyNotify) {
+				set_prop_atom(Ev[n].xproperty.atom);
+				n++;
+				n_PN++;
+			} else if (type == MapNotify) {
+				win2 = ev.xmap.window;
+				ev_store(win2, EV_MAP);
+				n++;
+				n_CN++;
+			} else {
+				/* skip rest */
+#if 0
+				Window w = None;
+if (type == DestroyNotify) w = Ev[n].xdestroywindow.window;
+if (type == UnmapNotify)   w = Ev[n].xunmap.window;
+if (type == MapNotify)     w = Ev[n].xmap.window;
+if (type == Expose)        w = Ev[n].xexpose.window;
+if (type == ConfigureNotify) w = Ev[n].xconfigure.window;
+if (type != ConfigureNotify) fprintf(stderr, "root: skip %s  for 0x%x\n", Etype(type), (unsigned int) w);
+#endif
+
+			}
+		} else {
+			if (type == ReparentNotify) {
+				ev_store(win, EV_REPARENT);
+				n++;
+				n_RN++;
+			} else if (type == DestroyNotify) {
+				ev_store(win, EV_DESTROY);
+				n++;
+				n_DN++;
+			} else if (type == ConfigureNotify) {
+				ev_store(win, EV_CONFIGURE);
+				n++;
+				n_ON++;
+			} else if (type == VisibilityNotify) {
+				if (Ev[n].xvisibility.state == VisibilityUnobscured) {
+					ev_store(win, EV_VISIBILITY_UNOBS);
+					n_VN_u++;
+				} else {
+					ev_store(win, EV_VISIBILITY_OBS);
+					n_VN_p++;
+				}
+				n++;
+				n_VN++;
+			} else if (type == MapNotify) {
+				ev_store(win, EV_MAP);
+				Ev_map[n] = win;
+				n++;
+				n_MN++;
+			} else if (type == UnmapNotify) {
+				ev_store(win, EV_UNMAP);
+				Ev_unmap[n] = win;
+				n++;
+				n_UN++;
+			} else {
+				/* skip rest */
+fprintf(stderr, "----- skip %s\n", Etype(type));
+			}
+		}
+		if (n >= EVMAX) {
+			break;
+		}
+	}
+	*n_in = n;
+}
+
 int check_ncache(int reset, int mode) {
 	static double last_root = 0.0;
 	static int first = 1;
 	static int last_client_count = -1;
 	int i, k, n; 
-	int n_CN = 0, n_RN = 0, n_DN = 0, n_ON = 0, n_MN = 0, n_UN = 0;
-	int n_VN = 0, n_VN_p = 0, n_VN_u = 0, n_ST = 0, n_PN = 0;
 	int did_sched = 0;
 
 	double now, refresh = 60.0;
 	Window win, win2;
 	XWindowAttributes attr;
-	unsigned long all_ev = SubstructureNotifyMask|StructureNotifyMask|VisibilityChangeMask;
-	unsigned long win_ev = StructureNotifyMask|VisibilityChangeMask;
-
+	int valid;
 	int try_batch = 1; /* XXX Y */
 	int use_batch = 0;
 	int nreg = 0, *nbatch;
-	int create_cnt, create_tot;
+	int create_cnt;
 	int pixels = 0, ttot;
 	int desktop_change = 0, n1, n2;
 	static int saw_desktop_change = 0;
@@ -7880,10 +8063,12 @@ int check_ncache(int reset, int mode) {
 	sraRegionPtr missed_bs_restore_rgn;
 
 	int nrects = 0;
+	int nsave, nxsel;
+	int did_vis_snap = 0;
 
 	int skipwins_n = 0;
-	int skipwins_max = 16;
-	Window skipwins[16];
+	int skipwins_max = 256;
+	Window skipwins[256];
 
 	if (unixpw_in_progress) return -1;
 
@@ -7995,7 +8180,7 @@ if (c) fprintf(stderr, "check_ncache purged %d events\n", c);
 			    "This is the Pixel buffer cache region. Your VNC Viewer is not hiding it from you.",
 			    white_pixel());
 			rfbDrawString(screen, &default8x16Font, dx, ds + Dy+2*dy,
-			    "Try resizing your VNC Viewer so you don't see it !!",
+			    "Try resizing your VNC Viewer so you don't see it!! Pay no attention to the man behind the curtain...",
 			    white_pixel());
 			rfbDrawString(screen, &default8x16Font, dx, ds + Dy+3*dy,
 			    "To disable run the server with:  x11vnc -ncache 0 ...",
@@ -8045,13 +8230,13 @@ fprintf(stderr, "\n**** checking cache_list[%d]\n\n", cache_list_num);
 		block_stats();
 
 		for(k=0; k<cache_list_num; k++) {
-			int valid = 0;
+			valid = 0;
 			win = cache_list[k].win; 
 			X_LOCK;
 			if (win == None) {
 				;
 			} else if (cache_list[k].selectinput && cache_list[k].time > now - refresh) {
-				;
+				valid = 1;
 			} else if (valid_window(win, &attr, 1)) {
 				STORE(k, win, attr);
 				if (! cache_list[k].selectinput) {
@@ -8069,7 +8254,7 @@ fprintf(stderr, "DELETE(%d) %dx%d+%d+%d\n", k, cache_list[k].width, cache_list[k
 			X_UNLOCK;
 /* XXX Y */
 			if (valid) {
-				if (cache_list[k].create_cnt && attr.map_state != IsViewable && cache_list[k].map_cnt == 0) {
+				if (cache_list[k].create_cnt && cache_list[k].map_state != IsViewable && cache_list[k].map_cnt == 0) {
 					if (cache_list[k].bs_x >= 0) {
 fprintf(stderr, "Created window never mapped: freeing(%d) 0x%x\n", k, (unsigned int) win);
 						free_rect(k);
@@ -8129,9 +8314,17 @@ fprintf(stderr, "Created window never mapped: freeing(%d) 0x%x\n", k, (unsigned 
 					} else if (aw * ah < 64 * 64) {
 						;
 					} else {
-//fprintf(stderr, "*SNAP BS_save: 0x%x %d %d %d\n", (unsigned int) win, aw, ah, cache_list[idx].map_state); 
-						bs_save(idx, bat, 1, 0, 0);
+fprintf(stderr, "*SNAP BS_save: 0x%x %d %d %d\n", (unsigned int) win, aw, ah, cache_list[idx].map_state); 
+						valid = 0;
+						bs_save(idx, bat, &attr, 1, 0, &valid, 0);
+						if (valid) {
+							STORE(idx, win, attr);
+						} else {
+							DELETE(idx);
+						}
 					}
+				} else {
+fprintf(stderr, "*SCHED LOOKUP FAIL: i=%d 0x%x\n", i, win);
 				}
 			}
 			sched_bs[i] = None;
@@ -8139,12 +8332,21 @@ fprintf(stderr, "Created window never mapped: freeing(%d) 0x%x\n", k, (unsigned 
 		did_sched = 1;
 
 		if (now > last_sched_vis + 3.0 && now > last_wireframe + 2.0) {
+			static double last_vis = 0.0;
+			int vis_now[32], top_now[32];
+			static int vis_prev[32];
+			int diff, nv = 32, vis_now_n = 0;
+			Window win;
+
+			did_vis_snap = 1;
 			for (i=0; i < cache_list_num; i++) {
-				Window win = cache_list[i].win;
 				int ok = 0;
 				int top_only = 1;
 				int aw = cache_list[i].width; 
 				int ah = cache_list[i].height; 
+				int map_prev = cache_list[i].map_state;
+
+				win = cache_list[i].win;
 
 				if (saw_desktop_change) {
 					top_only = 0;
@@ -8163,6 +8365,10 @@ fprintf(stderr, "Created window never mapped: freeing(%d) 0x%x\n", k, (unsigned 
 				if (cache_list[i].map_state != IsViewable) {
 					continue;
 				}
+				if (map_prev != IsViewable) {
+					/* we hope to catch it below in the normal event processing */
+					continue;
+				}
 				if (aw * ah < 64 * 64) {
 					continue;
 				}
@@ -8176,8 +8382,33 @@ fprintf(stderr, "Created window never mapped: freeing(%d) 0x%x\n", k, (unsigned 
 					ok = 1;
 				}
 				if (ok) {
-					bs_save(i, bat, !top_only, 0, 0);
+					if (vis_now_n < nv) {
+						vis_now[vis_now_n] = i;
+						top_now[vis_now_n++] = top_only;
+					}
 				}
+			}
+			diff = 0;
+			for (k = 0; k < vis_now_n; k++) {
+				if (vis_now[k] != vis_prev[k]) {
+					diff = 1;
+				}
+			}
+			if (diff || now > last_vis + 45.0) {
+				for (k = 0; k < vis_now_n; k++) {
+					i = vis_now[k];
+					win = cache_list[i].win;
+					valid = 0;
+fprintf(stderr, "*VIS  BS_save: 0x%x %d %d %d\n", win, cache_list[i].width, cache_list[i].height, cache_list[i].map_state); 
+					bs_save(i, bat, &attr, !top_now[k], 0, &valid, 0);
+					if (valid) {
+						STORE(i, win, attr);
+					} else {
+						DELETE(i);
+					}
+					vis_prev[k] = vis_now[k];
+				}
+				last_vis = dnow();
 			}
 			last_sched_vis = dnow();
 			saw_desktop_change = 0;
@@ -8191,78 +8422,74 @@ fprintf(stderr, "Created window never mapped: freeing(%d) 0x%x\n", k, (unsigned 
 
 	n = 0;
 	ttot = 0;
-	create_tot = 0;
+
+	ev_store(None, EV_RESET);
+
 
 	X_LOCK;
-	while (xcheckmaskevent(dpy, all_ev, &Ev[n])) {
-		int type = Ev[n].type; 
-		win = Ev[n].xany.window;
-		Ev_done[n] = 0;
-		Ev_area[n] = 0;
-		Ev_win[n] = win;
-		Ev_map[n] = None;
-		Ev_unmap[n] = None;
-		Ev_order[n] = n;
+	for (k = 1; k <= 3; k++) {
 
-//fprintf(stderr, "----- %d/%d inputev 0x%x %s\n", n, ttot++, win, Etype(type));
+		nsave = n;
 
-		if (win == rootwin) {
-			if (type == CreateNotify) {
-				create_tot++;
-				n++;
-				n_CN++;
-			} else if (type == ReparentNotify) {
-				n++;
-				n_RN++;
-			} else if (type == PropertyNotify) {
-				set_prop_atom(Ev[n].xproperty.atom);
-				n++;
-				n_PN++;
-			} else {
-				/* skip rest */
-#if 0
-				Window w = None;
-if (type == DestroyNotify) w = Ev[n].xdestroywindow.window;
-if (type == UnmapNotify)   w = Ev[n].xunmap.window;
-if (type == MapNotify)     w = Ev[n].xmap.window;
-if (type == Expose)        w = Ev[n].xexpose.window;
-if (type == ConfigureNotify) w = Ev[n].xconfigure.window;
-if (type != ConfigureNotify) fprintf(stderr, "root: skip %s  for 0x%x\n", Etype(type), (unsigned int) w);
-#endif
+		if (k > 1) fprintf(stderr, "read_events-%d\n", k);
+		read_events(&n);
 
-			}
-		} else {
-			if (type == ReparentNotify) {
-				n++;
-				n_RN++;
-			} else if (type == DestroyNotify) {
-				n++;
-				n_DN++;
-			} else if (type == ConfigureNotify) {
-				n++;
-				n_ON++;
-			} else if (type == VisibilityNotify) {
-				if (Ev[n].xvisibility.state == VisibilityUnobscured) {
-					n_VN_u++;
+		nxsel = 0;
+			
+		/* handle creates and reparenting: */
+		for (n1 = nsave; n1 < n; n1++) {
+			Window win2;
+			int idx;
+			XEvent ev = Ev[n1];
+			win = Ev_win[n1];
+			if (ev.type == CreateNotify) {
+				win2 = ev.xcreatewindow.window;
+				if (ev_lookup(win2, EV_REPARENT) || ev_lookup(win2, EV_DESTROY)) {
+					if (skipwins_n < skipwins_max) {
+fprintf(stderr, "SKIPWINS: CreateNotify: 0x%x %d\n", win2, n1);
+						skipwins[skipwins_n++] = win2;
+					}
 				} else {
-					n_VN_p++;
+					idx = lookup_win_index(win);
+					if (idx < 0) {
+						idx = lookup_free_index();
+						if (idx < 0) {
+							continue;
+						}
+						CLEAR(idx);
+					}
+fprintf(stderr, "PRELOOP:  CreateNotify: 0x%x %d valid_window\n", win2, n1);
+					if (valid_window(win2, &attr, 1)) {
+						STORE(idx, win2, attr);
+						CLEAR(idx);
+						cache_list[idx].selectinput = 1;
+						cache_list[idx].create_cnt = 1;
+fprintf(stderr, "PRELOOP:  CreateNotify: 0x%x %d xselectinput\n", win2, n1);
+						xselectinput(win2, win_ev, 1);
+						nxsel++;
+					} else {
+						DELETE(idx);
+					}
+					nxsel++;
 				}
-				n++;
-				n_VN++;
-			} else if (type == MapNotify) {
-				Ev_map[n] = win;
-				n++;
-				n_MN++;
-			} else if (type == UnmapNotify) {
-				Ev_unmap[n] = win;
-				n++;
-				n_UN++;
-			} else {
-				/* skip rest */
-fprintf(stderr, "----- skip %s\n", Etype(type));
+			} else if (ev.type == ReparentNotify) {
+				if (ev.xreparent.parent != rootwin) {
+					win2 = ev.xreparent.window;
+					if (win2 != rootwin) {
+						idx = lookup_win_index(win2);
+fprintf(stderr, "PRELOOP:  RepartNotify: 0x%x %d idx=%d\n", win2, n1, idx);
+						if (idx >= 0) {
+							DELETE(idx);
+						}
+						if (! ev_lookup(win2, EV_CREATE)) {
+							xselectinput(win2, 0, 1);
+							nxsel++;
+						}
+					}
+				}
 			}
 		}
-		if (n >= EVMAX) {
+		if (nxsel == 0) {
 			break;
 		}
 	}
@@ -8281,7 +8508,8 @@ fprintf(stderr, "----- skip %s\n", Etype(type));
 	if (n == 0) {
 		return 0;
 	}
-fprintf(stderr, "\n"); rfbLog("IN  check_ncache() %d events.\n", n);
+fprintf(stderr, "\n"); rfbLog("IN  check_ncache() %d events.  %.4f\n", n, now - x11vnc_start);
+if (did_vis_snap) fprintf(stderr, "VIS snapshot all %.4f\n", dnowx());
 
 	if (try_batch) {
 		use_batch = 1;
@@ -8310,6 +8538,7 @@ fprintf(stderr, "\n"); rfbLog("IN  check_ncache() %d events.\n", n);
 		for (n2 = 0; n2 < n; n2++) {
 			if (Ev_unmap[n2] == twin) {
 				if (skipwins_n < skipwins_max) {
+fprintf(stderr, "SKIPWINS: Ev_unmap/map: 0x%x %d\n", twin, n2);
 					skipwins[skipwins_n++] = twin;
 					break;
 				}
@@ -8435,6 +8664,10 @@ fprintf(stderr, "\n"); rfbLog("IN  check_ncache() %d events.\n", n);
 	missed_bs_restore_rgn = sraRgnCreate();
 	r0 = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
 
+for (k = 0; k < skipwins_n; k++) {
+	fprintf(stderr, "skipwins[%d] 0x%x\n", k, skipwins[k]);
+}
+
 	X_LOCK;
 	for (i=0; i < n; i++) {
 		XEvent ev;
@@ -8448,57 +8681,50 @@ fprintf(stderr, "\n"); rfbLog("IN  check_ncache() %d events.\n", n);
 		type = ev.type;
 		Ev_done[ik] = 1;
 
+		win2 = win;
+		if (win == rootwin) {
+			if (type == CreateNotify) {
+				win2 = ev.xcreatewindow.window;
+			} else if (type == ReparentNotify) {
+				win2 = ev.xreparent.window;
+			}
+		}
 		for (ns = 0; ns < skipwins_n; ns++) {
-			if (win == skipwins[ns]) {
+			if (win2 == skipwins[ns]) {
 				skip = 1;
 				break;
 			}
 		}
 		if (skip) {
-fprintf(stderr, "skip%02d: ** SpecialSkip   0x%x type: %s\n", ik, (unsigned int) win, Etype(type));
+fprintf(stderr, "skip%02d: ** SpecialSkip   0x%x/0x%x type: %s\n", ik, (unsigned int) win, (unsigned int) win2, Etype(type));
 			continue;
 		}
 		
 		if (win == rootwin) {
 			if (type == CreateNotify) {
 				int x=0, y=0, w=0, h=0;
-				int valid = 0;
+				valid = 0;
 				win2 = ev.xcreatewindow.window;
 				idx = lookup_win_index(win2);
 				if (idx < 0) {
-					idx = lookup_free_index();
-					if (idx < 0) {
-						continue;
-					}
-					CLEAR(idx);
+					continue;
 				}
-				if (valid_window(win2, &attr, 1)) {
-					STORE(idx, win2, attr);
-					CLEAR(idx);
-					x=attr.x;
-					y=attr.y;
-					w=attr.width;
-					h=attr.height;
-					if (create_tot <= 6 && create_cnt++ < 3) {
-						if (w*h > 64 * 64) {
-							X_UNLOCK;
-							su_save(idx, nbatch, 0, 1);
-							X_LOCK;
-							if (cache_list[idx].valid) {
-								if (! desktop_change) {
-									SCHED(win2, 1) 
-								}
-							}
-							create_cnt++;
-						}
-					}
-					if (cache_list[idx].valid) {
-						xselectinput(win2, win_ev, 1);
-						cache_list[idx].selectinput = 1;
-						cache_list[idx].create_cnt = 1;
+				if (cache_list[idx].valid) {
+					valid = 1;
+					x=cache_list[idx].x;
+					y=cache_list[idx].y;
+					w=cache_list[idx].width;
+					h=cache_list[idx].height;
+					if (w*h > 64 * 64 && ev_lookup(win2, EV_MAP)) {
+						X_UNLOCK;
 						valid = 1;
-					} else {
-						DELETE(idx);
+						su_save(idx, nbatch, &attr, 0, &valid, 1);
+						STORE(idx, win2, attr);
+						X_LOCK;
+						if (! desktop_change) {
+							SCHED(win2, 1) 
+						}
+						create_cnt++;
 					}
 				}
 fprintf(stderr, "root%02d: ** CreateNotify  0x%x  %3d  -- %dx%d+%d+%d valid=%d\n", ik, (unsigned int) win2, idx, w, h, x, y, valid);
@@ -8506,14 +8732,8 @@ fprintf(stderr, "root%02d: ** CreateNotify  0x%x  %3d  -- %dx%d+%d+%d valid=%d\n
 			} else if (type == ReparentNotify) {
 				if (ev.xreparent.parent != rootwin) {
 					win2 = ev.xreparent.window;
-					if (win2 != rootwin) {
-						idx = lookup_win_index(win2);
+					idx = lookup_win_index(win2);
 fprintf(stderr, "root%02d: ReparentNotifyRM 0x%x  %3d\n", ik, (unsigned int) win2, idx);
-						if (idx >= 0) {
-							DELETE(idx);
-						}
-						xselectinput(win2, 0, 1);
-					}
 				}
 			} else {
 fprintf(stderr, "root%02d: ** IgnoringRoot  0x%x type: %s\n", ik, (unsigned int) win, Etype(type));
@@ -8542,6 +8762,7 @@ fprintf(stderr, "----%02d: ConfigureNotify  0x%x  %3d  -- above: 0x%x -> 0x%x  %
 				y_new = ev.xconfigure.y; 
 				w_new = ev.xconfigure.width; 
 				h_new = ev.xconfigure.height; 
+
 				x_old = cache_list[idx].x;
 				y_old = cache_list[idx].y;
 				w_old = cache_list[idx].width;
@@ -8557,6 +8778,7 @@ fprintf(stderr, "          INVALIDATE su: 0x%x xy: %d/%d  %d/%d \n", (unsigned i
 					cache_list[idx].bs_time = 0.0;
 fprintf(stderr, "          INVALIDATE bs: 0x%x wh: %d/%d  %d/%d \n", (unsigned int) win, w_old, h_old, w_new, h_new);
 				}
+
 				stack_change = 0;
 				if (cache_list[idx].above != ev.xconfigure.above) {
 					stack_change = 1;
@@ -8581,6 +8803,7 @@ fprintf(stderr, "          INVALIDATE bs: 0x%x wh: %d/%d  %d/%d \n", (unsigned i
 				cache_list[idx].y = y_new;
 				cache_list[idx].width = w_new;
 				cache_list[idx].height = h_new;
+
 				cache_list[idx].above = ev.xconfigure.above;
 				cache_list[idx].time = dnow();
 
@@ -8598,28 +8821,35 @@ fprintf(stderr, "----%02d: VisibilityNotify 0x%x  %3d  state: %s U/P %d/%d\n", i
 					;	/* XXXX not working well yet with UnmapNotify ... */
 				} else if (state == VisibilityUnobscured) {
 					int i2, ok = 1;
-					for (i2=0; i2 < n; i2++)  {
-						if (Ev_map[i2] == win) {
-							ok = 0;
-							break;
-						}
-					}
 					if (ncache <= 2) {
+						ok = 0;
+					} else if (ev_lookup(win, EV_MAP)) {
+						ok = 0;
+					} else if (ev_lookup(win, EV_UNMAP)) {
+						ok = 0;
+					} else if (ev_lookup(win, EV_DESTROY)) {
 						ok = 0;
 					}
 					if (ok) {
 						X_UNLOCK;
-						bs_restore(idx, nbatch, 0, 1, 0, 1);
+						valid = 0;
+						bs_restore(idx, nbatch, &attr, 0, 1, &valid, 1);
 						X_LOCK;
-						cache_list[idx].time = dnow();
-						cache_list[idx].vis_cnt++;
-						Ev_map[ik] = win;
-						Ev_rects[nrects].x1 = cache_list[idx].x;
-						Ev_rects[nrects].y1 = cache_list[idx].y;
-						Ev_rects[nrects].x2 = cache_list[idx].width;
-						Ev_rects[nrects].y2 = cache_list[idx].height;
-						nrects++;
-						SCHED(win, 1) 
+						if (valid) {
+							STORE(idx, win, attr);
+
+							cache_list[idx].time = dnow();
+							cache_list[idx].vis_cnt++;
+							Ev_map[ik] = win;
+							Ev_rects[nrects].x1 = cache_list[idx].x;
+							Ev_rects[nrects].y1 = cache_list[idx].y;
+							Ev_rects[nrects].x2 = cache_list[idx].width;
+							Ev_rects[nrects].y2 = cache_list[idx].height;
+							nrects++;
+							SCHED(win, 1) 
+						} else {
+							DELETE(idx);
+						}
 					}
 				}
 				cache_list[idx].vis_state = state;
@@ -8632,7 +8862,8 @@ fprintf(stderr, "----%02d: MapNotify        0x%x  %3d\n", ik, (unsigned int) win
 					continue;
 				}
 
-				if (cache_list[idx].map_state == IsUnmapped || desktop_change || macosx_console) {
+//				if (cache_list[idx].map_state == IsUnmapped || desktop_change || macosx_console)
+				if (1) {
 					X_UNLOCK;
 					if (desktop_change) {
 						/* XXX Y */
@@ -8655,16 +8886,28 @@ fprintf(stderr, "----%02d: MapNotify        0x%x  %3d\n", ik, (unsigned int) win
 							sraRgnDestroy(r);
 						} 
 						if (save) {
-							su_save(idx, nbatch, 1, 1);
+							valid = 0;
+							su_save(idx, nbatch, &attr, 1, &valid, 1);
+							if (valid) {
+								STORE(idx, win, attr);
+							}
 						}
 					} else {
-						su_save(idx, nbatch, 0, 1);
+						valid = 0;
+						su_save(idx, nbatch, &attr, 0, &valid, 1);
+						if (valid) {
+							STORE(idx, win, attr);
+						}
 					}
-					if (bs_restore(idx, nbatch, 0, 0, 0, 1)) { /* XXX clip? */
+					valid = 0;
+					if (bs_restore(idx, nbatch, &attr, 0, 0, &valid, 1)) { /* XXX clip? */
 						;
 					} else {
 						idx_add_rgn(missed_bs_restore_rgn, r0, idx);
 						missed_bs_restore++;
+					}
+					if (valid) {
+						STORE(idx, win, attr);
 					}
 
 					if (macosx_console) {
@@ -8690,6 +8933,10 @@ fprintf(stderr, "----%02d: MapNotify        0x%x  %3d\n", ik, (unsigned int) win
 					Ev_rects[nrects].x2 = cache_list[idx].width;
 					Ev_rects[nrects].y2 = cache_list[idx].height;
 					nrects++;
+
+					if (! valid) {
+						DELETE(idx);
+					}
 				}
 				cache_list[idx].map_state = IsViewable;
 
@@ -8706,7 +8953,8 @@ fprintf(stderr, "----%02d: UnmapNotify      0x%x  %3d\n", ik, (unsigned int) win
 					}
 				}
 
-				if (cache_list[idx].map_state == IsViewable || desktop_change || macosx_console) {
+//				if (cache_list[idx].map_state == IsViewable || desktop_change || macosx_console)
+				if (1) {
 					X_UNLOCK;
 					if (desktop_change) {
 						int save = 1;
@@ -8728,13 +8976,21 @@ fprintf(stderr, "----%02d: UnmapNotify      0x%x  %3d\n", ik, (unsigned int) win
 							sraRgnDestroy(r);
 						} 
 						if (save) {
-							bs_save(idx, nbatch, 1, 0, 1);
+							valid = 0;
+							bs_save(idx, nbatch, &attr, 1, 0, &valid, 1);
 						}
 					} else {
-						bs_save(idx, nbatch, 1, 0, 1);
+						valid = 0;
+						bs_save(idx, nbatch, &attr, 1, 0, &valid, 1);
 					}
-					if (su_restore(idx, nbatch, 1, 0, 1)) {
+					valid = 0;
+					if (su_restore(idx, nbatch, &attr, 1, 0, &valid, 1)) {
 						try_to_fix_su(win, idx, None, nbatch, "unmapped");	
+						if (valid) {
+							STORE(idx, win, attr);
+						} else {
+							DELETE(idx);
+						}
 					} else {
 						idx_add_rgn(missed_su_restore_rgn, r0, idx);
 						missed_su_restore++;
@@ -8759,10 +9015,6 @@ fprintf(stderr, "----%02d: UnmapNotify      0x%x  %3d\n", ik, (unsigned int) win
 					if (win2 != rootwin) {
 						idx = lookup_win_index(win2);
 fprintf(stderr, "----%02d: ReparentNotifyRM 0x%x  %3d\n", ik, (unsigned int) win2, idx);
-						if (idx >= 0) {
-							DELETE(idx);
-						}
-						xselectinput(win2, 0, 1);
 					}
 				}
 
@@ -8799,7 +9051,7 @@ fprintf(stderr, "igno%02d: ** Ignoring      0x%x type: %s\n", ik, (unsigned int)
 	sraRgnDestroy(missed_su_restore_rgn);
 	sraRgnDestroy(missed_bs_restore_rgn);
 
-rfbLog("OUT check_ncache(): %.6f events: %d  pixels: %d\n", dnow() - now, n, pixels);
+rfbLog("OUT check_ncache(): %.4f %.6f events: %d  pixels: %d\n", dnowx(), dnow() - now, n, pixels);
 	return pixels;
 }
 #endif
