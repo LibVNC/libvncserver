@@ -195,7 +195,7 @@ int wireframe_in_progress = 0;
 int wireframe_local = 1;
 
 #ifndef NCACHE
-#define NCACHE -10
+#define NCACHE -12
 #endif
 #ifdef MACOSX
 int ncache = 0;

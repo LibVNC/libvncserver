@@ -470,6 +470,10 @@ extern double x11vnc_start;
 
 extern double last_get_wm_frame_time;
 extern Window last_get_wm_frame;
+extern double last_bs_restore;
+extern double last_su_restore;
+extern double last_bs_save;
+extern double last_su_save;
 
 extern int hack_val;
 

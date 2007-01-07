@@ -563,13 +563,22 @@ int xdamage_hint_skip(int y) {
 
 	if (ncache > 0) {
 		if (ncache_no_skip == 0) {
-			if (dnow() > last_ncache_no_skip + 4.0) {
+			double now = dnow();
+			if (now > last_ncache_no_skip + 8.0) {
 				ncache_no_skip = 1;
+			} else if (now < last_bs_restore + 0.5) {
+				ncache_no_skip = 1;
+			} else if (now < last_su_restore + 0.5) {
+				ncache_no_skip = 1;
+			} else if (now < last_copyrect + 0.5) {
+				ncache_no_skip = 1;
+			}
+			if (ncache_no_skip) {
 				last_ncache_no_skip = dnow();
 				return 0;
 			}
 		} else {
-			if (++ncache_no_skip >= 2*nreg) {
+			if (ncache_no_skip++ >= 1*nreg + 4) {
 				ncache_no_skip = 0;
 			} else {
 				return 0;

@@ -17,6 +17,8 @@ typedef struct winattr {
 	double time; 
 	double bs_time;
 	double su_time;
+	double vis_obs_time;
+	double vis_unobs_time;
 	int bs_x, bs_y, bs_w, bs_h;
 	int su_x, su_y, su_w, su_h;
 	Window above;
