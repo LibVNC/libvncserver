@@ -195,7 +195,11 @@ int wireframe_in_progress = 0;
 int wireframe_local = 1;
 
 #ifndef NCACHE
+#ifdef NO_NCACHE
+#define NCACHE 0 
+#else
 #define NCACHE -12
+#endif
 #endif
 #ifdef MACOSX
 int ncache = 0;
@@ -204,6 +208,7 @@ int ncache_pad = 24;
 int ncache = NCACHE;
 int ncache_pad = 0;
 #endif
+int ncache_xrootpmap = 1;
 int ncache0 = 0;
 int ncache_copyrect = 0;
 int ncache_wf_raises = 1;

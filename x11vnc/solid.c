@@ -13,7 +13,7 @@ void solid_bg(int restore);
 static void usr_bin_path(int restore);
 static int dt_cmd(char *cmd);
 static char *cmd_output(char *cmd);
-static void solid_root(char *color);
+XImage *solid_root(char *color);
 static void solid_cde(char *color);
 static void solid_gnome(char *color);
 static void solid_kde(char *color);
@@ -113,11 +113,11 @@ static char *cmd_output(char *cmd) {
 	return(output);
 }
 
-static void solid_root(char *color) {
+XImage *solid_root(char *color) {
 #if NO_X11
 	RAWFB_RET_VOID
 	if (!color) {}
-	return;
+	return NULL;
 #else
 	Window expose;
 	static XImage *image = NULL;
@@ -130,11 +130,11 @@ static void solid_root(char *color) {
 	XColor cdef;
 	Colormap cmap;
 
-	RAWFB_RET_VOID
+	RAWFB_RET(NULL)
 
 	if (subwin || window != rootwin) {
 		rfbLog("cannot set subwin to solid color, must be rootwin\n");
-		return;
+		return NULL;
 	}
 
 	/* create the "clear" window just for generating exposures */
@@ -155,7 +155,7 @@ static void solid_root(char *color) {
 			/* whoops */
 			XDestroyWindow(dpy, expose);
 			rfbLog("no root snapshot available.\n");
-			return;
+			return NULL;
 		}
 
 		
@@ -180,7 +180,7 @@ static void solid_root(char *color) {
 		XMapWindow(dpy, expose);
 		XSync(dpy, False);
 		XDestroyWindow(dpy, expose);
-		return;
+		return NULL;
 	}
 
 	if (! image) {
@@ -205,6 +205,13 @@ static void solid_root(char *color) {
 		    ZPixmap);
 		XSync(dpy, False);
 		XDestroyWindow(dpy, iwin);
+		rfbLog("done.\n");
+	}
+	if (color == (char *) 0x1) {
+		/* caller will XDestroyImage it: */
+		XImage *xi = image;
+		image = NULL;
+		return xi;
 	}
 
 	/* use black for low colors or failure */
@@ -225,6 +232,7 @@ static void solid_root(char *color) {
 	XSync(dpy, False);
 	XDestroyWindow(dpy, expose);
 #endif	/* NO_X11 */
+	return NULL;
 }
 
 static void solid_cde(char *color) {

@@ -1463,6 +1463,8 @@ char msg[] =
 "\n"
 "    x11vnc -ncache 0 ...\n"
 "\n"
+"Your current setting is: -ncache %d\n"
+"\n"
 "The feature needs additional testing because we want to have x11vnc\n"
 "performance enhancements on by default.  Otherwise, only a relative few\n"
 "would notice and use the -ncache option (e.g. the wireframe and scroll\n"
@@ -1483,8 +1485,11 @@ char msg[] =
 	if (nofb) {
 		return;
 	}
+#ifdef NO_NCACHE
+	return;
+#endif
 	
-	fprintf(stderr, "%s", msg);
+	fprintf(stderr, msg, ncache);
 
 }
 

@@ -2,7 +2,7 @@
 .TH X11VNC "1" "January 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.4, lastmod: 2007-01-07
+         version: 0.8.4, lastmod: 2007-01-08
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2428,6 +2428,10 @@ Some VNC Viewers provide better response than others
 with this option.  On Unix, realvnc viewer gives
 smoother drags than tightvnc viewer.  Response may also
 be choppy if the server side machine is too slow.
+.IP
+Sometimes on very slow modem connections, this actually
+gives an improvement because no pixel data at all
+(not even the box animation) is sent during the drag.
 .PP
 \fB-ncache_no_moveraise\fR
 .IP

@@ -546,6 +546,7 @@ int xdamage_hint_skip(int y) {
 	int ret, i, n, nreg;
 	static int ncache_no_skip = 0;
 	static double last_ncache_no_skip = 0.0;
+	static double last_ncache_no_skip_long = 0.0, ncache_fac = 0.25;
 
 	if (! xdamage_present || ! use_xdamage) {
 		return 0;	/* cannot skip */
@@ -561,6 +562,7 @@ int xdamage_hint_skip(int y) {
 
 	nreg = (xdamage_memory * NSCAN) + 1;
 
+#ifndef NO_NCACHE
 	if (ncache > 0) {
 		if (ncache_no_skip == 0) {
 			double now = dnow();
@@ -575,16 +577,23 @@ int xdamage_hint_skip(int y) {
 			}
 			if (ncache_no_skip) {
 				last_ncache_no_skip = dnow();
+				if (now > last_ncache_no_skip_long + 60.0) {
+					ncache_fac = 2.0;
+					last_ncache_no_skip_long = now;
+				} else {
+					ncache_fac = 0.25;
+				}
 				return 0;
 			}
 		} else {
-			if (ncache_no_skip++ >= 1*nreg + 4) {
+			if (ncache_no_skip++ >= ncache_fac*nreg + 4) {
 				ncache_no_skip = 0;
 			} else {
 				return 0;
 			}
 		}
 	}
+#endif
 
 	tmpl = sraRgnCreateRect(0, y, dpy_x, y+1);
 

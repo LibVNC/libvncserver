@@ -2733,6 +2733,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: enabling mouse nodragging mode.\n");
 		show_dragging = 0;
 
+#ifndef NO_NCACHE
 	} else if (!strcmp(p, "ncache_cr")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, ncache_copyrect);
@@ -2810,6 +2811,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				check_ncache(1,0);
 			}
 		}
+#endif
 
 	} else if (strstr(p, "wireframe_mode") == p) {
 		COLON_CHECK("wireframe_mode:")

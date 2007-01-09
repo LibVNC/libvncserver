@@ -2059,23 +2059,28 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 #ifndef NO_NCACHE
 	if (ncache > 0 && !nofb) {
-#ifdef MACOSX
+# ifdef MACOSX
 		if (! raw_fb_str || macosx_console) {
-#else
+# else
 		if (! raw_fb_str) {
-#endif
+# endif
 			
 			char *new_fb;
 			int sz = fb->height * fb->bytes_per_line;
+			int ns = 1+ncache;
 
-			new_fb = (char *) calloc((size_t) (sz * (1+ncache)), 1);
+			if (ncache_xrootpmap) {
+				ns++;
+			}
+
+			new_fb = (char *) calloc((size_t) (sz * ns), 1);
 			if (fb->data) {
 				memcpy(new_fb, fb->data, sz);
 				free(fb->data);
 			}
 			fb->data = new_fb;
-			fb->height *= (1+ncache);
-			height *= (1+ncache);
+			fb->height *= (ns);
+			height *= (ns);
 			ncache0 = ncache;
 		}
 	}

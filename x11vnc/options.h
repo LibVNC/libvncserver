@@ -162,6 +162,7 @@ extern int ncache_copyrect;
 extern int ncache_wf_raises;
 extern int ncache_dt_change;
 extern int ncache_pad;
+extern int ncache_xrootpmap;
 extern int macosx_ncache_macmenu;
 extern int ncache_beta_tester;
 
