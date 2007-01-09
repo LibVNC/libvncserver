@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Mon Jan  8 23:02:20 EST 2007
+x11vnc README file                         Date: Tue Jan  9 09:38:28 EST 2007
 
 The following information is taken from these URLs:
 
@@ -667,13 +667,13 @@ make
        by default when XINERAMA is active.
      * [93]Viewer-side pixmap caching. This one might not make it into
        0.8.4 but will benefit from much testing, thanks. A large area of
-       pixels (at least twice as big as the framebuffer itself; the
+       pixels (at least 2-3 times as big as the framebuffer itself; the
        bigger the better...) is placed below the framebuffer to act as a
        buffer/cache area for pixel data. The VNC CopyRect encoding is
        used to move it around (so any viewer should work). Until we start
        modifying viewers you will be able to see the cache area if you
        scroll down (this makes it easier to debug!). Test it with
-       something like "-ncache 10".
+       something like "-ncache 12".
 
    If you have a Mac please try out the native Mac OS X support (build
    with "./configure --without-x", or download a binary mentioned above),
@@ -9349,7 +9349,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-08
+x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-09
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -9456,7 +9456,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-08
+x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-09
 
 (type "x11vnc -opts" to just list the options.)
 
