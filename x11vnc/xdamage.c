@@ -542,6 +542,8 @@ if (0)	XEventsQueued(dpy, QueuedAfterFlush);
 
 int xdamage_hint_skip(int y) {
 	static sraRegionPtr scanline = NULL;
+	static sraRegionPtr tmpl_y = NULL;
+	int fast_tmpl = 1;
 	sraRegionPtr reg, tmpl;
 	int ret, i, n, nreg;
 	static int ncache_no_skip = 0;
@@ -559,13 +561,16 @@ int xdamage_hint_skip(int y) {
 		/* keep it around to avoid malloc etc, recreate */
 		scanline = sraRgnCreate();
 	}
+	if (! tmpl_y) {
+		tmpl_y = sraRgnCreateRect(0, 0, dpy_x, 1);
+	}
 
 	nreg = (xdamage_memory * NSCAN) + 1;
 
 #ifndef NO_NCACHE
 	if (ncache > 0) {
 		if (ncache_no_skip == 0) {
-			double now = dnow();
+			double now = g_now;
 			if (now > last_ncache_no_skip + 8.0) {
 				ncache_no_skip = 1;
 			} else if (now < last_bs_restore + 0.5) {
@@ -595,7 +600,12 @@ int xdamage_hint_skip(int y) {
 	}
 #endif
 
-	tmpl = sraRgnCreateRect(0, y, dpy_x, y+1);
+	if (fast_tmpl) {
+		sraRgnOffset(tmpl_y, 0, y);
+		tmpl = tmpl_y;
+	} else {
+		tmpl = sraRgnCreateRect(0, y, dpy_x, y+1);
+	}
 
 	ret = 1;
 	for (i=0; i<nreg; i++) {
@@ -616,7 +626,11 @@ int xdamage_hint_skip(int y) {
 			break;
 		}
 	}
-	sraRgnDestroy(tmpl);
+	if (fast_tmpl) {
+		sraRgnOffset(tmpl_y, 0, -y);
+	} else {
+		sraRgnDestroy(tmpl);
+	}
 if (0) fprintf(stderr, "xdamage_hint_skip: %d -> %d\n", y, ret);
 
 	return ret;

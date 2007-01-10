@@ -39,5 +39,7 @@ extern void do_copyregion(sraRegionPtr region, int dx, int dy, int mode);
 
 extern int check_ncache(int reset, int mode);
 extern int find_rect(int idx, int x, int y, int w, int h);
+extern int lookup_win_index(Window);
+extern void set_ncache_xrootpmap(void);
 
 #endif /* _X11VNC_USERINPUT_H */

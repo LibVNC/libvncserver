@@ -2846,10 +2846,14 @@ static int scan_display(int ystart, int rescan) {
 
 	y = ystart;
 
+	g_now = dnow();
+
 	if (! main_fb) {
 		rfbLog("scan_display: no main_fb!\n");
 		return 0;
 	}
+
+	X_LOCK;
 
 	while (y < dpy_y) {
 
@@ -2863,7 +2867,6 @@ static int scan_display(int ystart, int rescan) {
 		}
 
 		/* grab the horizontal scanline from the display: */
-		X_LOCK;
 
 #ifndef NO_NCACHE
 /* XXX Y test */
@@ -2878,12 +2881,18 @@ if (ncache > 0) {
 		XEvent ev;
 		if (raw_fb_str) {
 			;
+		} else if (XEventsQueued(dpy, QueuedAlready) == 0) {
+			;	/* XXX Y resp */
 		} else if (XCheckTypedEvent(dpy, MapNotify, &ev)) {
 			gotone = 1;
 		} else if (XCheckTypedEvent(dpy, UnmapNotify, &ev)) {
 			gotone = 2;
 		} else if (XCheckTypedEvent(dpy, CreateNotify, &ev)) {
 			gotone = 3;
+		} else if (XCheckTypedEvent(dpy, ConfigureNotify, &ev)) {
+			gotone = 4;
+		} else if (XCheckTypedEvent(dpy, VisibilityNotify, &ev)) {
+			gotone = 5;
 		}
 		if (gotone) {
 			XPutBackEvent(dpy, &ev);
@@ -2909,7 +2918,6 @@ fprintf(stderr, "\n*** SCAN_DISPLAY CHECK_NCACHE/%d *** %d rescan=%d\n", gotone,
 		XRANDR_SET_TRAP_RET(-1, "scan_display-set");
 		copy_image(scanline, 0, y, 0, 0);
 		XRANDR_CHK_TRAP_RET(-1, "scan_display-chk");
-		X_UNLOCK;
 
 		/* for better memory i/o try the whole line at once */
 		src = scanline->data;
@@ -2979,6 +2987,9 @@ fprintf(stderr, "\n*** SCAN_DISPLAY CHECK_NCACHE/%d *** %d rescan=%d\n", gotone,
 		}
 		y += NSCAN;
 	}
+
+	X_UNLOCK;
+
 	return tile_count;
 }
 

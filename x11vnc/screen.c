@@ -746,6 +746,9 @@ void do_new_fb(int reset_mem) {
 		initialize_blackouts_and_xinerama();
 		initialize_polling_images();
 	}
+	if (ncache) {
+		check_ncache(1, 0);
+	}
 }
 
 static void remove_fake_fb(void) {

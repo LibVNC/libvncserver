@@ -55,6 +55,8 @@ catch {rename send {}}
 #	0 means to skip the item.
 #	-- means add a separator
 #
+#       The =GAL ... =GAL LOFF stuff is to provide submenus.
+#
 
 global env started time_count
 set started ""
@@ -366,6 +368,8 @@ Tuning
 	ncache_cr
 	ncache_no_moveraise
 	ncache_no_dtchange
+	ncache_no_rootpixmap
+	=A ncache_reset_rootpixmap
 	=GAL LOFF
 	--
 	=GAL SharedMemory::

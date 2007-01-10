@@ -418,6 +418,9 @@ void zero_fb(int x1, int y1, int x2, int y2) {
 #ifndef NO_NCACHE
 	if (ncache > 0) {
 		yfac = 1+ncache;
+		if (ncache_xrootpmap) {
+			yfac++;
+		}
 	}
 #endif
 	

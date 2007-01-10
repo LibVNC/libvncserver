@@ -2171,6 +2171,8 @@ int main(int argc, char* argv[]) {
 			ncache_wf_raises = 1;
 		} else if (!strcmp(arg, "-ncache_no_dtchange")) {
 			ncache_dt_change = 0;
+		} else if (!strcmp(arg, "-ncache_no_rootpixmap")) {
+			ncache_xrootpmap = 0;
 		} else if (!strcmp(arg, "-ncache_pad")) {
 			CHECK_ARGC
 			ncache_pad = atoi(argv[++i]);

@@ -602,13 +602,16 @@ void sync_tod_with_servertime(void) {
 	RAWFB_RET_VOID
 
 	if (atom_NET_ACTIVE_WINDOW == None) {
-		atom_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+		atom_NET_ACTIVE_WINDOW = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", True);
 	}
 	if (atom_NET_CURRENT_DESKTOP == None) {
-		atom_NET_CURRENT_DESKTOP = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", False);
+		atom_NET_CURRENT_DESKTOP = XInternAtom(dpy, "_NET_CURRENT_DESKTOP", True);
 	}
 	if (atom_NET_CLIENT_LIST_STACKING == None) {
-		atom_NET_CLIENT_LIST_STACKING = XInternAtom(dpy, "_NET_CLIENT_LIST_STACKING", False);
+		atom_NET_CLIENT_LIST_STACKING = XInternAtom(dpy, "_NET_CLIENT_LIST_STACKING", True);
+	}
+	if (atom_XROOTPMAP_ID == None) {
+		atom_XROOTPMAP_ID = XInternAtom(dpy, "_XROOTPMAP_ID", True);
 	}
 
 	if (! ticker_atom) {
@@ -755,6 +758,7 @@ void set_prop_atom(Atom atom) {
 	if (atom == atom_NET_ACTIVE_WINDOW) got_NET_ACTIVE_WINDOW = dnow();
 	if (atom == atom_NET_CURRENT_DESKTOP) got_NET_CURRENT_DESKTOP = dnow();
 	if (atom == atom_NET_CLIENT_LIST_STACKING) got_NET_CLIENT_LIST_STACKING = dnow();
+	if (atom == atom_XROOTPMAP_ID) got_XROOTPMAP_ID = dnow();
 }
 
 /*

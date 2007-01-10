@@ -169,9 +169,11 @@ extern int ncache_beta_tester;
 extern Atom atom_NET_ACTIVE_WINDOW;
 extern Atom atom_NET_CURRENT_DESKTOP;
 extern Atom atom_NET_CLIENT_LIST_STACKING;
+extern Atom atom_XROOTPMAP_ID;
 extern double got_NET_ACTIVE_WINDOW;
 extern double got_NET_CURRENT_DESKTOP;
 extern double got_NET_CLIENT_LIST_STACKING;
+extern double got_XROOTPMAP_ID;
 
 extern char *scroll_copyrect_str;
 extern char *scroll_copyrect;

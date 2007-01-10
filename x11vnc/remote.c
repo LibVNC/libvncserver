@@ -2779,6 +2779,40 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		ncache_dt_change = 1;
 		rfbLog("remote_cmd: disabled -ncache_no_dt_change\n");
 
+	} else if (!strcmp(p, "ncache_no_rootpixmap")) {
+		int orig = ncache_xrootpmap;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !ncache_xrootpmap);
+			goto qry;
+		}
+		ncache_xrootpmap = 0;
+		rfbLog("remote_cmd: set -ncache_no_rootpixmap\n");
+		if (orig != ncache_xrootpmap) {
+			do_new_fb(1);
+		}
+
+	} else if (!strcmp(p, "noncache_no_rootpixmap")) {
+		int orig = ncache_xrootpmap;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, ncache_xrootpmap);
+			goto qry;
+		}
+		ncache_xrootpmap = 1;
+		rfbLog("remote_cmd: disabled -ncache_no_rootpixmap\n");
+		if (orig != ncache_xrootpmap) {
+			do_new_fb(1);
+		}
+
+	} else if (!strcmp(p, "ncache_reset_rootpixmap")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !ncache_xrootpmap);
+			goto qry;
+		}
+		if (ncache_xrootpmap) {
+			rfbLog("remote_cmd: resetting root pixmap.\n");
+			set_ncache_xrootpmap();
+		}
+
 	} else if (!strcmp(p, "ncache")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !!ncache);

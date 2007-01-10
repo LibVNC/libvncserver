@@ -2,7 +2,7 @@
 .TH X11VNC "1" "January 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.4, lastmod: 2007-01-09
+         version: 0.8.4, lastmod: 2007-01-10
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2448,6 +2448,12 @@ In \fB-ncache\fR mode, do not try to guess when the desktop
 workarea).  The default is to try to guess and when
 detected try to make the transistion more smoothly.
 .PP
+\fB-ncache_no_rootpixmap\fR
+.IP
+In \fB-ncache\fR mode, do not try to snapshot the desktop
+background to use in guessing or reconstructing window
+save-unders..
+.PP
 \fB-ncache_pad\fR \fIn\fR
 .IP
 In \fB-ncache\fR mode, pad each window with n pixels for the
@@ -4020,9 +4026,19 @@ ncache_cr       enable  \fB-ncache_cr\fR mode.
 .IP
 noncache_cr     disable \fB-ncache_cr\fR mode.
 .IP
-ncache_no_moveraise   enable  no_moveraise mode.
+ncache_no_moveraise     enable  no_moveraise mode.
 .IP
-noncache_no_moveraise disable no_moveraise mode.
+noncache_no_moveraise   disable no_moveraise mode.
+.IP
+ncache_no_dtchange      enable  ncache_no_dtchange mode.
+.IP
+noncache_no_dtchange    disable ncache_no_dtchange mode.
+.IP
+ncache_no_rootpixmap    enable  ncache_no_rootpixmap.
+.IP
+noncache_no_rootpixmap  disable ncache_no_rootpixmap.
+.IP
+ncache_reset_rootpixmap recheck the root pixmap
 .IP
 wireframe       enable  \fB-wireframe\fR mode. same as "wf"
 .IP
@@ -4300,29 +4316,31 @@ clear_keys noclear_keys remap repeat norepeat fb nofb
 bell nobell sel nosel primary noprimary setprimary
 nosetprimary clipboard noclipboard setclipboard
 nosetclipboard seldir cursorshape nocursorshape
-cursorpos nocursorpos cursor_drag nocursor_drag
-cursor show_cursor noshow_cursor nocursor arrow
-xfixes noxfixes xdamage noxdamage xd_area xd_mem
-alphacut alphafrac alpharemove noalpharemove alphablend
-noalphablend xwarppointer xwarp noxwarppointer noxwarp
-buttonmap dragging nodragging ncache_cr noncache_cr
-ncache_no_moveraise noncache_no_moveraise ncache
-noncache ncache_size wireframe_mode wireframe wf
-nowireframe nowf wireframelocal wfl nowireframelocal
-nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
-scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-scr_parms scrollcopyrect scr noscrollcopyrect noscr
-fixscreen noxrecord xrecord reset_record pointer_mode
-pm input_skip allinput noallinput input grabkbd
-nograbkbd grabptr nograbptr client_input ssltimeout
-speeds wmdt debug_pointer dp nodebug_pointer nodp
-debug_keyboard dk nodebug_keyboard nodk deferupdate
-defer wait_ui wait_bog nowait_bog slow_fb wait
-readtimeout nap nonap sb screen_blank fbpm nofbpm
-dpms nodpms fs gaps grow fuzz snapfb nosnapfb rawfb
-uinput_accel uinput_thresh uinput_reset uinput_always
-progressive rfbport http nohttp httpport httpdir
-enablehttpproxy noenablehttpproxy alwaysshared
+cursorpos nocursorpos cursor_drag nocursor_drag cursor
+show_cursor noshow_cursor nocursor arrow xfixes
+noxfixes xdamage noxdamage xd_area xd_mem alphacut
+alphafrac alpharemove noalpharemove alphablend
+noalphablend xwarppointer xwarp noxwarppointer
+noxwarp buttonmap dragging nodragging ncache_cr
+noncache_cr ncache_no_moveraise noncache_no_moveraise
+ncache_no_dtchange noncache_no_dtchange
+ncache_no_rootpixmap noncache_no_rootpixmap
+ncache_reset_rootpixmap ncache noncache ncache_size
+wireframe_mode wireframe wf nowireframe nowf
+wireframelocal wfl nowireframelocal nowfl wirecopyrect
+wcr nowirecopyrect nowcr scr_area scr_skip scr_inc
+scr_keys scr_term scr_keyrepeat scr_parms scrollcopyrect
+scr noscrollcopyrect noscr fixscreen noxrecord xrecord
+reset_record pointer_mode pm input_skip allinput
+noallinput input grabkbd nograbkbd grabptr nograbptr
+client_input ssltimeout speeds wmdt debug_pointer dp
+nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+nodk deferupdate defer wait_ui wait_bog nowait_bog
+slow_fb wait readtimeout nap nonap sb screen_blank
+fbpm nofbpm dpms nodpms fs gaps grow fuzz snapfb
+nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
+uinput_always progressive rfbport http nohttp httpport
+httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
 nodontdisconnect desktop debug_xevents nodebug_xevents
 debug_xevents debug_xdamage nodebug_xdamage

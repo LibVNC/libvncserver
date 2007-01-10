@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8.4 lastmod: 2007-01-09";
+char lastmod[] = "0.8.4 lastmod: 2007-01-10";
 
 /* X display info */
 
@@ -131,6 +131,7 @@ double last_copyrect_fix = 0.0;
 double last_wireframe = 0.0;
 double servertime_diff = 0.0;
 double x11vnc_start = 0.0;
+double g_now = 0.0;
 
 double last_get_wm_frame_time = 0.0;
 Window last_get_wm_frame = None;

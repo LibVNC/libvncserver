@@ -66,6 +66,8 @@ int bs_restore(int idx, int *nbatch, sraRegionPtr rmask, XWindowAttributes *attr
 int try_to_fix_su(Window win, int idx, Window above, int *nbatch, char *mode);
 int try_to_fix_resize_su(Window orig_frame, int orig_x, int orig_y, int orig_w, int orig_h,
     int x, int y, int w, int h, int try_batch);
+int lookup_win_index(Window);
+void set_ncache_xrootpmap(void);
 
 static void get_client_regions(int *req, int *mod, int *cpy, int *num) ;
 static void parse_scroll_copyrect_str(char *scr);
@@ -93,7 +95,6 @@ static void check_user_input3(double dt, double dtr, int tile_diffs);
 static void check_user_input4(double dt, double dtr, int tile_diffs);
 
 winattr_t *cache_list;
-int lookup_win_index(Window);
 
 /*
  * For -wireframe: find the direct child of rootwin that has the
@@ -1977,8 +1978,6 @@ void batch_copyregion(sraRegionPtr* region, int *dx, int *dy, int ncr, double de
 	int k, direct, mode, nrects = 0, bad = 0;
 	double start = dnow();
 
-/* XXX Y */
-
 	for (k=0; k < ncr; k++) {
 		sraRectangleIterator *iter;
 		sraRect rect;
@@ -2012,13 +2011,28 @@ void batch_copyregion(sraRegionPtr* region, int *dx, int *dy, int ncr, double de
 	}
 	fb_push_wait(delay, FB_COPY|FB_MOD);
 
+#if 0
+	i = rfbGetClientIterator(screen);
+	while( (cl = rfbClientIteratorNext(i)) ) {
+		if (cl->ublen != 0) {
+			fprintf(stderr, "batch_copyregion: *** BAD ublen != 0: %d\n", cl->ublen);
+			bad++;
+		}
+	}
+	rfbReleaseClientIterator(i);
+
+	if (bad) {
+		return;
+	}
+#endif
+
 	i = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(i)) ) {
 		rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
 		fu->nRects = Swap16IfLE((uint16_t)(nrects));
 		fu->type = rfbFramebufferUpdate;
 
-		if (cl->ublen != 0) fprintf(stderr, "batch_copyregion: *** ublen != 0: %d\n", cl->ublen);
+		if (cl->ublen != 0) fprintf(stderr, "batch_copyregion: *** BAD ublen != 0: %d\n", cl->ublen);
 
 		cl->ublen = sz_rfbFramebufferUpdateMsg;
 	}
@@ -2091,9 +2105,6 @@ void fb_push(void) {
 	rfbClientIteratorPtr i;
 	rfbClientPtr cl;
 	
-/* XXX Y */
-db = 0;
-
 if (db)	get_client_regions(&req0, &mod0, &cpy0, &ncli);
 
 	i = rfbGetClientIterator(screen);
@@ -5605,6 +5616,9 @@ int try_to_fix_resize_su(Window orig_frame, int orig_x, int orig_y, int orig_w, 
 	if (!orig_frame || !orig_x || !orig_y || !orig_w || !orig_h || !x || !y || !w || !h || !try_batch) {}
 	return 0;
 }
+void set_ncache_xrootpmap(void) {
+	return;
+}
 #else
 /* maybe ncache.c it if works */
 
@@ -6673,7 +6687,7 @@ fprintf(stderr, "free_rect: bad index: %d\n", idx);
 	if (w * h > fac2 * (dpy_x * dpy_y)) {
 		big2 = 1;
 	}
-/* XXX Y */
+
 	if (nobigs < 0) {
 		if (getenv("NOBIGS")) {
 			nobigs = 1;
@@ -7965,12 +7979,38 @@ sraRegionPtr idx_create_rgn(sraRegionPtr r0, int idx) {
 	return rtmp;
 }
 
+void scale_mark_xrootpmap(void) {
+	char *dst_fb, *src_fb = main_fb;
+	int dst_bpl, Bpp = bpp/8, fac = 1;
+	int yn = (ncache+1) * dpy_y;
+	int yfac = (ncache+2);
+	int mark = 1;
+
+	if (!scaling || !rfb_fb || rfb_fb == main_fb) {
+		mark_rect_as_modified(0, yn, dpy_x, yn + dpy_y, 0);
+		return;
+	}
+
+	if (cmap8to24 && cmap8to24_fb) {
+		src_fb = cmap8to24_fb;
+		if (scaling && depth == 8) {
+			fac = 4;
+		}
+	}
+	dst_fb = rfb_fb;
+	dst_bpl = rfb_bytes_per_line;
+
+	scale_rect(scale_fac, scaling_blend, scaling_interpolate, fac * Bpp,
+	    src_fb, fac * main_bytes_per_line, dst_fb, dst_bpl, dpy_x, yfac * dpy_y,
+	    scaled_x, yfac * scaled_y, 0, yn, dpy_x, yn + dpy_y, mark);
+}
 
 void set_ncache_xrootpmap(void) {
 	Atom pmap, type;
 	int format;
 	unsigned long length, after;
 	XImage *image = NULL;
+	XErrorHandler old_handler;
 
 	RAWFB_RET_VOID
 #if !NO_X11
@@ -7978,6 +8018,8 @@ void set_ncache_xrootpmap(void) {
 		return;
 	}
 	X_LOCK;
+	old_handler = XSetErrorHandler(trap_xerror);
+	trapped_xerror = 0;
 	pmap = XInternAtom(dpy, "_XROOTPMAP_ID", True);
 	if (pmap != None) {
 		Pixmap pixmap;
@@ -7992,6 +8034,12 @@ void set_ncache_xrootpmap(void) {
 				image = XGetImage(dpy, pixmap, 0, 0, dpy_x, dpy_y, AllPlanes, ZPixmap);
 			}
 		}
+		if (!quiet) {
+			rfbLog("set_ncache_xrootpmap: loading background pixmap: 0x%lx\n", pixmap);
+		}
+	} else {
+		rfbLog("set_ncache_xrootpmap: trying root background\n");
+		
 	}
 	if (image == NULL) {
 		image = solid_root((char *) 0x1);
@@ -8011,10 +8059,12 @@ void set_ncache_xrootpmap(void) {
 			dst += main_bytes_per_line;
 		}
 		XDestroyImage(image);
+		scale_mark_xrootpmap();
 	} else {
 		int yn = (ncache+1) * dpy_y;
 		zero_fb(0, yn, dpy_x, yn + dpy_y);
 	}
+	XSetErrorHandler(old_handler);
 	X_UNLOCK;
 #endif
 }
@@ -8229,7 +8279,7 @@ fprintf(stderr, "----- skip %s\n", Etype(type));
 	*n_in = n;
 }
 
-int try_to_synthesize_su(int force, int *nbatch) {
+int try_to_synthesize_su(int force, int urgent, int *nbatch) {
 	int i, idx, idx2, n = 0; 	
 	sraRegionPtr r0, r1, r2;
 	Window win = None;
@@ -8246,12 +8296,30 @@ int try_to_synthesize_su(int force, int *nbatch) {
 	X_LOCK;
 	for (i = old_stack_n - 1; i >= 0; i--) {
 		win = old_stack[i];
-		if (!valid_window(win, &attr, 1)) {
-			continue;
-		}
-		idx = lookup_win_index(win);
-		if (idx >= 0) {
-			STORE(idx, win, attr);
+		if (urgent) {	/* XXX Y resp */
+			if (!valid_window(win, &attr, 1)) {
+				continue;
+			}
+			idx = lookup_win_index(win);
+			if (idx >= 0) {
+				STORE(idx, win, attr);
+			}
+		} else {
+			idx = lookup_win_index(win);
+			if (idx >= 0) {
+				attr.map_state = cache_list[idx].map_state;
+				attr.x = cache_list[idx].x;
+				attr.y = cache_list[idx].y;
+				attr.width = cache_list[idx].width;
+				attr.height = cache_list[idx].height;
+			} else {
+				attr.map_state = IsUnmapped;
+				attr.x = 0;
+				attr.y = 0;
+				attr.width = 0;
+				attr.height = 0;
+			}
+			
 		}
 		if (attr.map_state != IsViewable) {
 			continue;
@@ -8384,6 +8452,7 @@ static int saw_desktop_change = 0;
 
 void check_sched(int try_batch, int *did_sched) {
 	static double last_root = 0.0;
+	static double last_pixmap = 0.0;
 	double refresh = 60.0;
 	int i, k, valid;
 	Window win;
@@ -8504,9 +8573,11 @@ fprintf(stderr, "*SCHED LOOKUP FAIL: i=%d 0x%lx\n", i, win);
 		} else if (now > last_sched_vis + 3.0 && now > last_wireframe + 2.0) {
 			static double last_vis = 0.0;
 			int vis_now[32], top_now[32];
-			static int vis_prev[32];
+			static int vis_prev[32], freq = 0;
 			int diff, nv = 32, vis_now_n = 0;
 			Window win;
+
+			freq++;
 
 			for (i=0; i < cache_list_num; i++) {
 				int ok = 0;
@@ -8524,10 +8595,13 @@ fprintf(stderr, "*SCHED LOOKUP FAIL: i=%d 0x%lx\n", i, win);
 				if (win == None) {
 					continue;
 				}
-				if (!valid_window(win, &attr, 1)) {
-					continue;
+				/* XXX Y resp */
+				if (saw_desktop_change || freq % 5 == 0) {
+					if (!valid_window(win, &attr, 1)) {
+						continue;
+					}
+					STORE(i, win, attr);
 				}
-				STORE(i, win, attr);
 				if (!cache_list[i].valid) {
 					continue;
 				}
@@ -8596,13 +8670,26 @@ fprintf(stderr, "*VIS  BS_save: 0x%lx %d %d %d\n", win, cache_list[i].width, cac
 				saw_desktop_change = 0;
 			}
 			/* XXX Y */
-			try_to_synthesize_su(0, bat);
+			try_to_synthesize_su(0, 0, bat);
 		}
 
 		if (nr) {
 			batch_push(nr, -1.0);
 		}
 		last_sched_bs = dnow();
+	}
+#if !NO_X11
+	if (atom_XROOTPMAP_ID == None && now > last_pixmap + 5.0) {
+		atom_XROOTPMAP_ID = XInternAtom(dpy, "_XROOTPMAP_ID", True);
+		last_pixmap = now;
+	}
+#endif
+	if (got_XROOTPMAP_ID > 0.0) {
+fprintf(stderr, "got_XROOTPMAP_ID\n");
+		if (ncache_xrootpmap) {
+			set_ncache_xrootpmap();
+		}
+		got_XROOTPMAP_ID = 0.0;
 	}
 }
 
@@ -8636,6 +8723,11 @@ int check_ncache(int reset, int mode) {
 	int skipwins_n = 0;
 	int skipwins_max = 256;
 	Window skipwins[256];
+
+	static char *dt_guess = NULL;
+	static double dt_last = 0.0;
+	int dt_gnome = 0, gnome_animation = 0;
+	int dt_kde = 0;
 
 	if (unixpw_in_progress) return -1;
 
@@ -8703,7 +8795,6 @@ if (c) fprintf(stderr, "check_ncache purged %d events\n", c);
 		rfbLog("check_ncache: resetting cache\n");
 		for (i=0; i < cache_list_num; i++) {
 			free_rect(i);
-			CLEAR(i);
 		}
 		for (n = 1; n <= ncache; n++) {
 			if (rect_reg[n] != NULL) {
@@ -8806,6 +8897,19 @@ if (hack_val == 2) {
 
 	n = 0;
 	ttot = 0;
+
+	if (dt_guess == NULL || now > dt_last + 30) {
+		if (dt_guess) {
+			free(dt_guess);
+		}
+		dt_guess = strdup(guess_desktop());
+		dt_last = now;
+	}
+	if (dt_guess && !strcmp(dt_guess, "gnome")) {
+		dt_gnome = 1;
+	} else if (dt_guess && !strcmp(dt_guess, "kde")) {
+		dt_kde = 1;
+	}
 
 	ev_store(None, EV_RESET);
 
@@ -9191,10 +9295,28 @@ fprintf(stderr, "          CONF_IGNORE: Too many stacking changes: 0x%lx\n", win
 						
 					}
 					if (ok) {
+						if (ev_lookup(ev.xconfigure.above, EV_UNMAP)) {
+							fprintf(stderr, "        skip try_to_fix_su for GNOME deiconify #1\n");
+							if (dt_gnome) {
+								gnome_animation = 1;
+							}
+							ok = 0;
+						}
+					}
+					if (ok && dt_gnome) {
+						if (valid_window(ev.xconfigure.above, &attr, 1)) {
+							if (attr.map_state != IsViewable) {
+								fprintf(stderr, "        skip try_to_fix_su for GNOME deiconify #2\n");
+								gnome_animation = 1;
+								ok = 0;
+							}
+						}
+					}
+					if (ok) {
 						int rc = try_to_fix_su(win, idx, ev.xconfigure.above, nbatch, NULL);	
 						if (rc == 0 && su_fix_cnt == 0 && n_MN == 0 && n_UN == 0) {
 							X_UNLOCK;
-							try_to_synthesize_su(1, nbatch);
+							try_to_synthesize_su(1, 1, nbatch);
 							X_LOCK;
 						}
 						n_ST++;
@@ -9232,6 +9354,37 @@ fprintf(stderr, "----%02d: VisibilityNotify 0x%lx  %3d  state: %s U/P %d/%d\n", 
 						ok = 0;
 					} else if (ev_lookup(win, EV_DESTROY)) {
 						ok = 0;
+					} else if (gnome_animation) {
+						ok = 0;
+					} else {
+						/* this is for gnome iconify */
+						int i2;
+						for (i2=i+1; i2 < n; i2++) {
+							int idx2, ik2 = Ev_order[i2];
+							sraRegionPtr ro1, ro2;
+							Window win2 = Ev_unmap[ik2];
+
+							if (win2 == None) {
+								continue;
+							}
+							idx2 = lookup_win_index(win2);
+							if (idx2 < 0) {
+								continue;
+							}
+
+							ro1 = idx_create_rgn(r0, idx);
+							ro2 = idx_create_rgn(r0, idx2);
+
+							if (sraRgnAnd(ro1, ro2)) {
+								fprintf(stderr, "        skip VisibilityUnobscured for GNOME iconify.\n");
+								ok = 0;
+							}
+							sraRgnDestroy(ro1);
+							sraRgnDestroy(ro2);
+							if (! ok) {
+								break;
+							}
+						}
 					}
 					if (ok) {
 						int x2, y2, w2, h2;

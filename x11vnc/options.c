@@ -208,7 +208,10 @@ int ncache_pad = 24;
 int ncache = NCACHE;
 int ncache_pad = 0;
 #endif
-int ncache_xrootpmap = 1;
+#ifndef NCACHE_XROOTPMAP
+#define NCACHE_XROOTPMAP 1
+#endif
+int ncache_xrootpmap = NCACHE_XROOTPMAP;
 int ncache0 = 0;
 int ncache_copyrect = 0;
 int ncache_wf_raises = 1;
@@ -219,9 +222,11 @@ int ncache_beta_tester = 0;
 Atom atom_NET_ACTIVE_WINDOW = None;
 Atom atom_NET_CURRENT_DESKTOP = None;
 Atom atom_NET_CLIENT_LIST_STACKING = None;
+Atom atom_XROOTPMAP_ID = None;
 double got_NET_ACTIVE_WINDOW = 0.0;
 double got_NET_CURRENT_DESKTOP = 0.0;
 double got_NET_CLIENT_LIST_STACKING = 0.0;
+double got_XROOTPMAP_ID = 0.0;
 
 /* T+B+L+R,tkey+presist_key,tmouse+persist_mouse */
 char *scroll_copyrect_str = NULL;

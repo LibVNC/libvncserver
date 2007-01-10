@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Tue Jan  9 09:38:28 EST 2007
+x11vnc README file                         Date: Wed Jan 10 12:06:50 EST 2007
 
 The following information is taken from these URLs:
 
@@ -1145,7 +1145,8 @@ make
    [201]Q-62: How can I make x11vnc use MORE system resources? 
 
    [202]Q-63: I use x11vnc over a slow link with high latency (e.g.
-   dialup modem), is there anything I can do to speed things up? 
+   dialup modem or broadband), is there anything I can do to speed things
+   up? 
 
    [203]Q-64: Does x11vnc support the X DAMAGE Xserver extension to find
    modified regions of the screen quickly and efficiently? 
@@ -4070,7 +4071,7 @@ ied)
 
 
    Q-63: I use x11vnc over a slow link with high latency (e.g. dialup
-   modem), is there anything I can do to speed things up?
+   modem or broadband), is there anything I can do to speed things up?
 
    Some things you might want to experiment with (many of which will help
    performance on faster links as well):
@@ -9349,7 +9350,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-09
+x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-10
 
 x11vnc options:
   -display disp            -auth file               -id windowid           
@@ -9396,33 +9397,34 @@ x11vnc options:
   -nocursorpos             -xwarppointer            -noxwarppointer        
   -buttonmap string        -nodragging              -ncache n              
   -ncache_cr               -ncache_no_moveraise     -ncache_no_dtchange    
-  -ncache_pad n            -wireframe [str]         -nowireframe           
-  -nowireframelocal        -wirecopyrect mode       -nowirecopyrect        
-  -debug_wireframe         -scrollcopyrect mode     -noscrollcopyrect      
-  -scr_area n              -scr_skip list           -scr_inc list          
-  -scr_keys list           -scr_term list           -scr_keyrepeat lo-hi   
-  -scr_parms string        -fixscreen string        -debug_scroll          
-  -noxrecord               -grab_buster             -nograb_buster         
-  -debug_grabs             -debug_sel               -pointer_mode n        
-  -input_skip n            -allinput                -speeds rd,bw,lat      
-  -wmdt string             -debug_pointer           -debug_keyboard        
-  -defer time              -wait time               -wait_ui factor        
-  -nowait_bog              -slow_fb time            -readtimeout n         
-  -nap                     -nonap                   -sb time               
-  -nofbpm                  -fbpm                    -nodpms                
-  -dpms                    -noxdamage               -xd_area A             
-  -xd_mem f                -sigpipe string          -threads               
-  -nothreads               -fs f                    -gaps n                
-  -grow n                  -fuzz n                  -debug_tiles           
-  -snapfb                  -rawfb string            -freqtab file          
-  -pipeinput cmd           -macnodim                -macnosleep            
-  -macnosaver              -macnowait               -macwheel n            
-  -macnoswap               -macnoresize             -maciconanim n         
-  -macmenu                 -gui [gui-opts]          -remote command        
-  -query variable          -QD variable             -sync                  
-  -noremote                -yesremote               -unsafe                
-  -safer                   -privremote              -nocmds                
-  -allowedcmds list        -deny_all              
+  -ncache_no_rootpixmap    -ncache_pad n            -wireframe [str]       
+  -nowireframe             -nowireframelocal        -wirecopyrect mode     
+  -nowirecopyrect          -debug_wireframe         -scrollcopyrect mode   
+  -noscrollcopyrect        -scr_area n              -scr_skip list         
+  -scr_inc list            -scr_keys list           -scr_term list         
+  -scr_keyrepeat lo-hi     -scr_parms string        -fixscreen string      
+  -debug_scroll            -noxrecord               -grab_buster           
+  -nograb_buster           -debug_grabs             -debug_sel             
+  -pointer_mode n          -input_skip n            -allinput              
+  -speeds rd,bw,lat        -wmdt string             -debug_pointer         
+  -debug_keyboard          -defer time              -wait time             
+  -wait_ui factor          -nowait_bog              -slow_fb time          
+  -readtimeout n           -nap                     -nonap                 
+  -sb time                 -nofbpm                  -fbpm                  
+  -nodpms                  -dpms                    -noxdamage             
+  -xd_area A               -xd_mem f                -sigpipe string        
+  -threads                 -nothreads               -fs f                  
+  -gaps n                  -grow n                  -fuzz n                
+  -debug_tiles             -snapfb                  -rawfb string          
+  -freqtab file            -pipeinput cmd           -macnodim              
+  -macnosleep              -macnosaver              -macnowait             
+  -macwheel n              -macnoswap               -macnoresize           
+  -maciconanim n           -macmenu                 -gui [gui-opts]        
+  -remote command          -query variable          -QD variable           
+  -sync                    -noremote                -yesremote             
+  -unsafe                  -safer                   -privremote            
+  -nocmds                  -allowedcmds list        -deny_all              
+
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -9456,7 +9458,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-09
+x11vnc: allow VNC connections to real X11 displays. 0.8.4 lastmod: 2007-01-10
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -11501,6 +11503,10 @@ Options:
                        workarea).  The default is to try to guess and when
                        detected try to make the transistion more smoothly.
 
+-ncache_no_rootpixmap  In -ncache mode, do not try to snapshot the desktop
+                       background to use in guessing or reconstructing window
+                       save-unders..
+
 -ncache_pad n          In -ncache mode, pad each window with n pixels for the
                        caching rectangles.  This can be used to try to improve
                        the situation with dropshadows or other compositing
@@ -12758,8 +12764,13 @@ n
                        ncache_size:n   set -ncache size to n.
                        ncache_cr       enable  -ncache_cr mode.
                        noncache_cr     disable -ncache_cr mode.
-                       ncache_no_moveraise   enable  no_moveraise mode.
-                       noncache_no_moveraise disable no_moveraise mode.
+                       ncache_no_moveraise     enable  no_moveraise mode.
+                       noncache_no_moveraise   disable no_moveraise mode.
+                       ncache_no_dtchange      enable  ncache_no_dtchange mode.
+                       noncache_no_dtchange    disable ncache_no_dtchange mode.
+                       ncache_no_rootpixmap    enable  ncache_no_rootpixmap.
+                       noncache_no_rootpixmap  disable ncache_no_rootpixmap.
+                       ncache_reset_rootpixmap recheck the root pixmap
                        wireframe       enable  -wireframe mode. same as "wf"
                        nowireframe     disable -wireframe mode. same as "nowf"
                        wireframe:str   enable  -wireframe mode string.
@@ -12921,29 +12932,31 @@ n
                        bell nobell sel nosel primary noprimary setprimary
                        nosetprimary clipboard noclipboard setclipboard
                        nosetclipboard seldir cursorshape nocursorshape
-                       cursorpos nocursorpos cursor_drag nocursor_drag
-                       cursor show_cursor noshow_cursor nocursor arrow
-                       xfixes noxfixes xdamage noxdamage xd_area xd_mem
-                       alphacut alphafrac alpharemove noalpharemove alphablend
-                       noalphablend xwarppointer xwarp noxwarppointer noxwarp
-                       buttonmap dragging nodragging ncache_cr noncache_cr
-                       ncache_no_moveraise noncache_no_moveraise ncache
-                       noncache ncache_size wireframe_mode wireframe wf
-                       nowireframe nowf wireframelocal wfl nowireframelocal
-                       nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
-                       scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-                       scr_parms scrollcopyrect scr noscrollcopyrect noscr
-                       fixscreen noxrecord xrecord reset_record pointer_mode
-                       pm input_skip allinput noallinput input grabkbd
-                       nograbkbd grabptr nograbptr client_input ssltimeout
-                       speeds wmdt debug_pointer dp nodebug_pointer nodp
-                       debug_keyboard dk nodebug_keyboard nodk deferupdate
-                       defer wait_ui wait_bog nowait_bog slow_fb wait
-                       readtimeout nap nonap sb screen_blank fbpm nofbpm
-                       dpms nodpms fs gaps grow fuzz snapfb nosnapfb rawfb
-                       uinput_accel uinput_thresh uinput_reset uinput_always
-                       progressive rfbport http nohttp httpport httpdir
-                       enablehttpproxy noenablehttpproxy alwaysshared
+                       cursorpos nocursorpos cursor_drag nocursor_drag cursor
+                       show_cursor noshow_cursor nocursor arrow xfixes
+                       noxfixes xdamage noxdamage xd_area xd_mem alphacut
+                       alphafrac alpharemove noalpharemove alphablend
+                       noalphablend xwarppointer xwarp noxwarppointer
+                       noxwarp buttonmap dragging nodragging ncache_cr
+                       noncache_cr ncache_no_moveraise noncache_no_moveraise
+                       ncache_no_dtchange noncache_no_dtchange
+                       ncache_no_rootpixmap noncache_no_rootpixmap
+                       ncache_reset_rootpixmap ncache noncache ncache_size
+                       wireframe_mode wireframe wf nowireframe nowf
+                       wireframelocal wfl nowireframelocal nowfl wirecopyrect
+                       wcr nowirecopyrect nowcr scr_area scr_skip scr_inc
+                       scr_keys scr_term scr_keyrepeat scr_parms scrollcopyrect
+                       scr noscrollcopyrect noscr fixscreen noxrecord xrecord
+                       reset_record pointer_mode pm input_skip allinput
+                       noallinput input grabkbd nograbkbd grabptr nograbptr
+                       client_input ssltimeout speeds wmdt debug_pointer dp
+                       nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+                       nodk deferupdate defer wait_ui wait_bog nowait_bog
+                       slow_fb wait readtimeout nap nonap sb screen_blank
+                       fbpm nofbpm dpms nodpms fs gaps grow fuzz snapfb
+                       nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
+                       uinput_always progressive rfbport http nohttp httpport
+                       httpdir enablehttpproxy noenablehttpproxy alwaysshared
                        noalwaysshared nevershared noalwaysshared dontdisconnect
                        nodontdisconnect desktop debug_xevents nodebug_xevents
                        debug_xevents debug_xdamage nodebug_xdamage
