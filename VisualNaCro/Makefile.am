@@ -37,6 +37,7 @@ PERL5_CCFLAGS = @PERL5CCFLAGS@
 # ----------------------------------------------------------------
 
 $(ISRCS): $(INTERFACE)
+	@test -n "$(SWIG)" || (echo "Need SWIG" && exit 1)
 	$(SWIG) -perl5 $(SWIGOPT) $(INTERFACE)
 
 $(OBJS): $(SRCS) $(INTERFACE)
