@@ -155,8 +155,6 @@ XImage *solid_root(char *color) {
 	XSetWindowAttributes swa;
 	Visual visual;
 	static unsigned long mask, pixel = 0;
-	XColor cdef;
-	Colormap cmap;
 
 	RAWFB_RET(NULL)
 

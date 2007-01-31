@@ -14,6 +14,7 @@
 #include "unixpw.h"
 #include "cleanup.h"
 #include "macosx.h"
+#include "screen.h"
 
 /* XXX CHECK BEFORE RELEASE */
 int grab_buster = 0;

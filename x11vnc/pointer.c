@@ -16,6 +16,7 @@
 #include "uinput.h"
 #include "scan.h"
 #include "macosx.h"
+#include "screen.h"
 
 int pointer_queued_sent = 0;
 

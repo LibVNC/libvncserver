@@ -15,6 +15,7 @@
 #include "linuxfb.h"
 #include "uinput.h"
 #include "macosx.h"
+#include "screen.h"
 
 void get_keystate(int *keystate);
 void clear_modifiers(int init);

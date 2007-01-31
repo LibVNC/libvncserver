@@ -558,9 +558,11 @@ int xdamage_hint_skip(int y) {
 	int fast_tmpl = 1;
 	sraRegionPtr reg, tmpl;
 	int ret, i, n, nreg;
+#ifndef NO_NCACHE
 	static int ncache_no_skip = 0;
 	static double last_ncache_no_skip = 0.0;
 	static double last_ncache_no_skip_long = 0.0, ncache_fac = 0.25;
+#endif
 
 	if (! xdamage_present || ! use_xdamage) {
 		return 0;	/* cannot skip */

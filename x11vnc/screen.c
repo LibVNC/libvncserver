@@ -847,6 +847,7 @@ static void initialize_snap_fb(void) {
 rfbClient* client = NULL;
 
 void vnc_reflect_bell(rfbClient *cl) {
+	if (cl) {}
 	if (sound_bell) {
 		if (unixpw_in_progress) {
 			return;
@@ -863,6 +864,7 @@ void vnc_reflect_bell(rfbClient *cl) {
 }
 
 void vnc_reflect_recv_cuttext(rfbClient *cl, const char *str, int len) {
+	if (cl) {}
 	if (unixpw_in_progress) {
 		return;
 	}
@@ -877,6 +879,7 @@ void vnc_reflect_recv_cuttext(rfbClient *cl, const char *str, int len) {
 }
 
 void vnc_reflect_got_update(rfbClient *cl, int x, int y, int w, int h) {
+	if (cl) {}
 	if (use_xdamage) {
 		static int first = 1;
 		if (first) {
@@ -890,12 +893,12 @@ void vnc_reflect_got_update(rfbClient *cl, int x, int y, int w, int h) {
 void vnc_reflect_got_cursorshape(rfbClient *cl, int xhot, int yhot, int width, int height, int bytesPerPixel) {
 	static int serial = 1;
 	int i, j;
-	char *bitmap, *rich, *alpha;
 	char *pixels = NULL;
-	unsigned long r, g, b, a;
-	unsigned int ui;
+	unsigned long r, g, b;
+	unsigned int ui = 0;
 	unsigned long red_mask, green_mask, blue_mask;
 
+	if (cl) {}
 	if (unixpw_in_progress) {
 		return;
 	}
@@ -959,6 +962,7 @@ void vnc_reflect_got_copyrect(rfbClient *cl, int src_x, int src_y, int w, int h,
 	sraRegionPtr reg;
 	int dx, dy, rc = -1;
 	static int last_dx = 0, last_dy = 0;
+	if (cl) {}
 	if (unixpw_in_progress) {
 		return;
 	}
@@ -1051,11 +1055,11 @@ char *vnc_reflect_guess(char *str, char **raw_fb_addr) {
 		red_mask   = (client->format.redMax   << client->format.redShift);
 		green_mask = (client->format.greenMax << client->format.greenShift);
 		blue_mask  = (client->format.blueMax  << client->format.blueShift);
-		sprintf(str2, "map:/dev/null@%dx%dx%d:0x%x/0x%x/0x%x",
+		sprintf(str2, "map:/dev/null@%dx%dx%d:0x%lx/0x%lx/0x%lx",
 		    client->width, client->height, client->format.bitsPerPixel,
 		    red_mask, green_mask, blue_mask);
 	}
-	*raw_fb_addr = client->frameBuffer;
+	*raw_fb_addr = (char *) client->frameBuffer;
 	free(str0);
 
 	if (first) {
@@ -1071,7 +1075,6 @@ char *vnc_reflect_guess(char *str, char **raw_fb_addr) {
 }
 
 rfbBool vnc_reflect_send_pointer(int x, int y, int mask) {
-	rfbBool ret;
 	int rc;
 	if (mask >= 0) {
 		got_user_input++;
@@ -1106,7 +1109,6 @@ rfbBool vnc_reflect_send_cuttext(char *str, int len) {
 
 void vnc_reflect_process_client(void) {
 	int num;
-	rfbBool save;
 	if (client == NULL) {
 		return;
 	}
