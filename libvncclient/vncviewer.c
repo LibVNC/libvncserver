@@ -87,7 +87,7 @@ static rfbBool MallocFrameBuffer(rfbClient* client) {
 static void initAppData(AppData* data) {
 	data->shareDesktop=TRUE;
 	data->viewOnly=FALSE;
-	data->encodingsString="tight zrle ultra hextile zlib corre rre raw";
+	data->encodingsString="tight zrle ultra copyrect hextile zlib corre rre raw";
 	data->useBGR233=FALSE;
 	data->nColours=0;
 	data->forceOwnCmap=FALSE;

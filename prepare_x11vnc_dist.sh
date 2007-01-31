@@ -9,7 +9,7 @@ mv configure.ac configure.ac.LibVNCServer
 cat configure.ac.LibVNCServer | \
 egrep -v 'AC_CONFIG_COMMANDS.*libvncserver-config' | \
 sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
-    -e "s/\(contrib\|examples\|vncterm\|libvncclient\|test\|client_examples\)\/Makefile//g" \
+    -e "s/\(contrib\|examples\|vncterm\|test\|client_examples\)\/Makefile//g" \
     -e "s/LibVNCServer.spec/x11vnc.spec/g" \
     -e "s/^.*libvncserver-config//g" \
 > configure.ac
@@ -18,8 +18,8 @@ mv Makefile.am Makefile.am.LibVNCServer
 
 echo "EXTRA_DIST=tightvnc-1.3dev5-vncviewer-alpha-cursor.patch README.LibVNCServer" > Makefile.am
 cat Makefile.am.LibVNCServer | \
-sed -e "s/^SUBDIRS.*$/SUBDIRS=libvncserver x11vnc classes/" \
-    -e "s/^DIST_SUBDIRS.*$/DIST_SUBDIRS=libvncserver x11vnc classes/" \
+sed -e "s/^SUBDIRS.*$/SUBDIRS=libvncserver libvncclient x11vnc classes/" \
+    -e "s/^DIST_SUBDIRS.*$/DIST_SUBDIRS=libvncserver libvncclient x11vnc classes/" \
     -e "/all: make_config_executable/,\$d" \
     -e "/^.*bin_SCRIPTS.*$/d" \
     -e "s/include_/noinst_/" \
@@ -76,6 +76,12 @@ cat libvncserver/Makefile.am.LibVNCServer | \
 sed -e "s/\(include\|LIB\|lib\)_/noinst_/g" \
 > libvncserver/Makefile.am
 
+mv libvncclient/Makefile.am libvncclient/Makefile.am.LibVNCServer
+
+cat libvncclient/Makefile.am.LibVNCServer | \
+sed -e "s/\(include\|LIB\|lib\)_/noinst_/g" \
+> libvncclient/Makefile.am
+
 cp classes/Makefile.am classes/Makefile.am.LibVNCServer
 echo 'pkgdatadir = $(datadir)/@PACKAGE@/classes' >> classes/Makefile.am
 echo 'pkgdata_DATA=VncViewer.jar index.vnc' >> classes/Makefile.am
@@ -96,7 +102,7 @@ sed -e "s/^\(_PKG.*\)\$PACKAGE\(.*\)$/\1LibVNCServer\2/" \
 > acinclude.m4
 
 make x11vnc-${VERSION}.tar.gz
-for f in configure.ac Makefile.am libvncserver/Makefile.am classes/Makefile.am classes/ssl/Makefile.am acinclude.m4 README; do
+for f in configure.ac Makefile.am libvncserver/Makefile.am libvncclient/Makefile.am classes/Makefile.am classes/ssl/Makefile.am acinclude.m4 README; do
 	mv -f $f.LibVNCServer $f
 done
 

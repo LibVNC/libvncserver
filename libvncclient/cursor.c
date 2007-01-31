@@ -167,6 +167,10 @@ rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int h
     }
   }
 
+  if (client->GotCursorShape != NULL) {
+     client->GotCursorShape(client, xhot, yhot, width, height, bytesPerPixel);
+  }
+
   free(buf);
 
   return TRUE;

@@ -107,6 +107,9 @@ typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int textlen);
 typedef void (*BellProc)(struct _rfbClient* client);
 
+typedef void (*GotCursorShapeProc)(struct _rfbClient* client, int xhot, int yhot, int width, int height, int bytesPerPixel);
+typedef void (*GotCopyRectProc)(struct _rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y);
+
 typedef struct _rfbClient {
 	uint8_t* frameBuffer;
 	int width, height;
@@ -221,6 +224,9 @@ typedef struct _rfbClient {
 	MallocFrameBufferProc MallocFrameBuffer;
 	GotXCutTextProc GotXCutText;
 	BellProc Bell;
+
+	GotCursorShapeProc GotCursorShape;
+	GotCopyRectProc GotCopyRect;
 
 	/* Which messages are supported by the server
 	 * This is a *guess* for most servers.
