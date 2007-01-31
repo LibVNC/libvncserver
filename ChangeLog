@@ -1,3 +1,9 @@
+2007-01-31  Karl Runge <runge@karlrunge.com>
+	* libvncclient: add GotCursorShape() and GotCopyRect() hooks.
+	  fix copyrect code in rfbproto.c, add copyrect to default list.
+	* Makefile.am and prepare_x11vnc_dist.sh: add x11vnc dependence
+	  on libvncclient.
+
 2006-12-13  Karl Runge <runge@karlrunge.com>
 	* remove stray "-permitfiletransfer  permit file transfer support"
 	  print out.
