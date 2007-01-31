@@ -2235,6 +2235,7 @@ void initialize_modtweak(void) {
 #else
 	KeySym keysym, *keymap;
 	int i, j, minkey, maxkey, syms_per_keycode;
+	int use_lowest_index = 0;
 
 	if (use_xkb_modtweak) {
 		initialize_xkb_modtweak();
@@ -2246,6 +2247,10 @@ void initialize_modtweak(void) {
 	}
 
 	RAWFB_RET_VOID
+
+	if (getenv("MODTWEAK_LOWEST")) {
+		use_lowest_index = 1;
+	}
 
 	X_LOCK;
 	XDisplayKeycodes(dpy, &minkey, &maxkey);
@@ -2306,6 +2311,9 @@ void initialize_modtweak(void) {
 			keysym = keymap[ (i - minkey) * syms_per_keycode + j ];
 			if ( keysym >= ' ' && keysym < 0x100
 			    && i == XKeysymToKeycode(dpy, keysym) ) {
+				if (use_lowest_index && keycodes[keysym] != NoSymbol) {
+					continue;
+				}
 				keycodes[keysym] = i;
 				modifiers[keysym] = j;
 			}
@@ -2555,6 +2563,8 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		uinput_key_command(down, keysym, client);
 	} else if (pipeinput_int == PIPEINPUT_MACOSX) {
 		macosx_key_command(down, keysym, client);
+	} else if (pipeinput_int == PIPEINPUT_VNC) {
+		vnc_reflect_send_key((uint32_t) keysym, down);
 	}
 	if (pipeinput_fh == NULL) {
 		return;

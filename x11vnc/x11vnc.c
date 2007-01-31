@@ -582,6 +582,14 @@ static void watch_loop(void) {
 			}
 		}
 
+		if (rawfb_vnc_reflect) {
+			static time_t lastone = 0;
+			if (time(NULL) > lastone + 10) {
+				lastone = time(NULL);
+				vnc_reflect_process_client();
+			}
+		}
+
 		if (! screen || ! screen->clientHead) {
 			/* waiting for a client */
 			if (first_conn_timeout) {
@@ -633,6 +641,10 @@ static void watch_loop(void) {
 			}
 
 			if (unixpw_in_progress) continue;
+
+			if (rawfb_vnc_reflect) {
+				vnc_reflect_process_client();
+			}
 			dtime0(&tm);
 			if (use_snapfb) {
 				int t, tries = 3;
@@ -1072,7 +1084,7 @@ static void quick_pw(char *str) {
 			exit(1);
 		}
 	} else {
-		if (su_verify(p, q+1, NULL, NULL, NULL)) {
+		if (su_verify(p, q+1, NULL, NULL, NULL, 1)) {
 			fprintf(stdout, "Y %s\n", p);
 			exit(0);
 		} else {
@@ -1461,7 +1473,7 @@ char msg[] =
 "perhaps even report back your observations.  However, if you do not want\n"
 "to test or use the feature, run x11vnc like this:\n"
 "\n"
-"    x11vnc -ncache 0 ...\n"
+"    x11vnc -noncache ...\n"
 "\n"
 "Your current setting is: -ncache %d\n"
 "\n"
@@ -1517,6 +1529,7 @@ int main(int argc, char* argv[]) {
 	int got_rfbwait = 0;
 	int got_httpdir = 0, try_http = 0;
 	int waited_for_client = 0;
+	int orig_use_xdamage = use_xdamage;
 	XImage *fb0 = NULL;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
@@ -1644,6 +1657,13 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-auth") || !strcmp(arg, "-xauth")) {
 			CHECK_ARGC
 			auth_file = strdup(argv[++i]);
+		} else if (!strcmp(arg, "-N")) {
+			display_N = 1;
+		} else if (!strcmp(arg, "-reflect")) {
+			CHECK_ARGC
+			raw_fb_str = (char *) malloc(4 + strlen(argv[i]) + 1);
+			sprintf(raw_fb_str, "vnc:%s", argv[++i]);
+			shared = 1;
 		} else if (!strcmp(arg, "-id") || !strcmp(arg, "-sid")) {
 			CHECK_ARGC
 			if (!strcmp(arg, "-sid")) {
@@ -1716,6 +1736,8 @@ int main(int argc, char* argv[]) {
 			got_noviewonly = 1;
 		} else if (!strcmp(arg, "-shared")) {
 			shared = 1;
+		} else if (!strcmp(arg, "-noshared")) {
+			shared = 0;
 		} else if (!strcmp(arg, "-once")) {
 			connect_once = 1;
 			got_connect_once = 1;
@@ -2159,21 +2181,27 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-nodragging")) {
 			show_dragging = 0;
 #ifndef NO_NCACHE
-		} else if (!strcmp(arg, "-ncache")) {
+		} else if (!strcmp(arg, "-ncache") || !strcmp(arg, "-nc")) {
 			CHECK_ARGC
 			ncache = atoi(argv[++i]);
 			if (ncache % 2 != 0) {
 				ncache++;
 			}
-		} else if (!strcmp(arg, "-ncache_cr")) {
+		} else if (!strcmp(arg, "-noncache") || !strcmp(arg, "-nonc")) {
+			ncache = 0;
+		} else if (!strcmp(arg, "-ncache_cr") || !strcmp(arg, "-nc_cr")) {
 			ncache_copyrect = 1;
-		} else if (!strcmp(arg, "-ncache_no_moveraise")) {
+		} else if (!strcmp(arg, "-ncache_no_moveraise") || !strcmp(arg, "-nc_no_moveraise")) {
 			ncache_wf_raises = 1;
-		} else if (!strcmp(arg, "-ncache_no_dtchange")) {
+		} else if (!strcmp(arg, "-ncache_no_dtchange") || !strcmp(arg, "-nc_no_dtchange")) {
 			ncache_dt_change = 0;
-		} else if (!strcmp(arg, "-ncache_no_rootpixmap")) {
+		} else if (!strcmp(arg, "-ncache_no_rootpixmap") || !strcmp(arg, "-nc_no_rootpixmap")) {
 			ncache_xrootpmap = 0;
-		} else if (!strcmp(arg, "-ncache_pad")) {
+		} else if (!strcmp(arg, "-ncache_keep_anims") || !strcmp(arg, "-nc_keep_anims")) {
+			ncache_keep_anims = 1;
+		} else if (!strcmp(arg, "-ncache_old_wm") || !strcmp(arg, "-nc_old_wm")) {
+			ncache_old_wm = 1;
+		} else if (!strcmp(arg, "-ncache_pad") || !strcmp(arg, "-nc_pad")) {
 			CHECK_ARGC
 			ncache_pad = atoi(argv[++i]);
 #endif
@@ -2281,6 +2309,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-debug_keyboard")
 		    || !strcmp(arg, "-dk")) {
 			debug_keyboard++;
+		} else if (!strcmp(arg, "-debug_xdamage")) {
+			debug_xdamage++;
 		} else if (!strcmp(arg, "-defer")) {
 			CHECK_ARGC
 			defer_update = atoi(argv[++i]);
@@ -2375,6 +2405,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-rawfb")) {
 			CHECK_ARGC
 			raw_fb_str = strdup(argv[++i]);
+			if (strstr(raw_fb_str, "vnc:") == raw_fb_str) {
+				shared = 1;
+			}
 		} else if (!strcmp(arg, "-freqtab")) {
 			CHECK_ARGC
 			freqtab = strdup(argv[++i]);
@@ -2527,6 +2560,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	orig_use_xdamage = use_xdamage;
 
 	if (getenv("X11VNC_LOOP_MODE")) {
 		if (bg) {
@@ -3067,6 +3101,34 @@ int main(int argc, char* argv[]) {
 
 	initialize_allowed_input();
 
+	if (display_N && !got_rfbport) {
+		char *ud = use_dpy;
+		if (ud == NULL) {
+			ud = getenv("DISPLAY");
+		}
+		if (ud && strstr(ud, "cmd=") == NULL) {
+			char *p;
+			ud = strdup(ud);
+			p = strrchr(ud, ':');
+			if (p) {
+				int N;	
+				char *q = strchr(p, '.');
+				if (q) {
+					*q = '\0';
+				}
+				N = atoi(p+1);	
+				if (argc_vnc+1 < argc_vnc_max) {
+					char Nstr[16];
+					sprintf(Nstr, "%d", (5900 + N) % 65536); 
+					argv_vnc[argc_vnc++] = strdup("-rfbport");
+					argv_vnc[argc_vnc++] = strdup(Nstr);
+					got_rfbport = 1;
+				}
+			}
+			free(ud);
+		}
+	}
+
 	if (users_list && strstr(users_list, "lurk=")) {
 		if (use_dpy) {
 			rfbLog("warning: -display does not make sense in "
@@ -3093,6 +3155,7 @@ int main(int argc, char* argv[]) {
 	} else {
 		dpy = XOpenDisplay_wr("");
 	}
+
 
 #ifdef MACOSX
 	if (! dpy && ! raw_fb_str) {
@@ -3497,21 +3560,29 @@ int main(int argc, char* argv[]) {
 
 	raw_fb_pass_go_and_collect_200_dollars:
 
-#ifdef MACOSX
-	if (! dpy) {
+	if (! dpy || raw_fb_str) {
+		int doit = 0;
 		/* XXX this needs improvement (esp. for remote control) */
 		if (! raw_fb_str || strstr(raw_fb_str, "console") == raw_fb_str) {
+#ifdef MACOSX
+			doit = 1;
+#endif
+		}
+		if (raw_fb_str && strstr(raw_fb_str, "vnc") == raw_fb_str) {
+			doit = 1;
+		}
+		if (doit) {
 			if (! multiple_cursors_mode) {
 				multiple_cursors_mode = strdup("most");
 			}
 			initialize_cursors_mode();
+			use_xdamage = orig_use_xdamage;
 			if (use_xdamage) {
 				xdamage_present = 1;
 				initialize_xdamage();
 			}
 		}
 	}
-#endif
 
 	if (! dt) {
 		static char str[] = "-desktop";

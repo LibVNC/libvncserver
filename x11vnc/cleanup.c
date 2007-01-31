@@ -158,6 +158,9 @@ void clean_up_exit (int ret) {
 	if (use_solid_bg) {
 		solid_bg(1);
 	}
+	if (ncache || ncache0) {
+		kde_no_animate(1);
+	}
 	X_LOCK;
 	XTestDiscard_wr(dpy);
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
@@ -414,6 +417,9 @@ static void interrupted (int sig) {
 	}
 	if (use_solid_bg) {
 		solid_bg(1);
+	}
+	if (ncache || ncache0) {
+		kde_no_animate(1);
 	}
 	stop_stunnel();
 

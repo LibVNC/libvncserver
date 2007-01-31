@@ -517,8 +517,9 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 		clean_up_exit(1);
 	}
 	rfbLog("running command:\n");
-	rfbLog("  %s\n", cmd);
-
+	if (!quiet) {
+		fprintf(stderr, "\n  %s\n\n", cmd);
+	}
 	close_exec_fds();
 
 	if (output != NULL) {
@@ -667,6 +668,9 @@ void client_gone(rfbClientPtr client) {
 	}
 	if (use_solid_bg && client_count == 0) {
 		solid_bg(1);
+	}
+	if ((ncache || ncache0) && client_count == 0) {
+		kde_no_animate(1);
 	}
 	if (client->clientData) {
 		cd = (ClientData *) client->clientData;

@@ -1,5 +1,5 @@
 AM_CFLAGS = -I $(top_srcdir)
-LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
+LDADD = ../libvncserver/libvncserver.a ../libvncclient/libvncclient.a @WSOCKLIB@
 
 if OSX
 x11vnc_LDFLAGS = -framework ApplicationServices -framework Carbon -framework IOKit -framework Cocoa

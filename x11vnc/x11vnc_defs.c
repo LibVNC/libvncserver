@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.8.4 lastmod: 2007-01-10";
+char lastmod[] = "0.8.4 lastmod: 2007-01-31";
 
 /* X display info */
 
@@ -110,14 +110,14 @@ int scale_cursor_numer = 0, scale_cursor_denom = 0;
 /* size of the basic tile unit that is polled for changes: */
 int tile_x = 32;
 int tile_y = 32;
-int ntiles, ntiles_x, ntiles_y;
+int ntiles, ntiles_x = 0, ntiles_y = 0;
 
 /* arrays that indicate changed or checked tiles. */
 unsigned char *tile_has_diff = NULL, *tile_tried = NULL, *tile_copied = NULL;
 unsigned char *tile_has_xdamage_diff = NULL, *tile_row_has_xdamage_diff = NULL;
 
 /* times of recent events */
-time_t last_event, last_input = 0, last_client = 0;
+time_t last_event = 0, last_input = 0, last_client = 0;
 time_t last_local_input = 0;
 time_t last_keyboard_input = 0, last_pointer_input = 0; 
 time_t last_fb_bytes_sent = 0;

@@ -8,6 +8,7 @@
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 Damage xdamage = 0;
 #endif
+
 #ifndef XDAMAGE
 #define XDAMAGE 1
 #endif
@@ -30,7 +31,7 @@ int XD_skip = 0, XD_tot = 0, XD_des = 0;	/* for stats */
 
 void add_region_xdamage(sraRegionPtr new_region);
 void clear_xdamage_mark_region(sraRegionPtr markregion, int flush);
-int collect_macosx_damage(int x_in, int y_in, int w_in, int h_in, int call);
+int collect_non_X_xdamage(int x_in, int y_in, int w_in, int h_in, int call);
 int collect_xdamage(int scancnt, int call);
 int xdamage_hint_skip(int y);
 void initialize_xdamage(void);
@@ -118,6 +119,11 @@ static void record_desired_xdamage_rect(int x, int y, int w, int h) {
 		xdamage_direct_count++;
 		X_LOCK;
 	} else {
+
+		if (ntiles_x == 0 || ntiles_y == 0) {
+			/* too early. */
+			return;
+		}
 		nt_x1 = nfix(  (x)/tile_x, ntiles_x);
 		nt_x2 = nfix((x+w)/tile_x, ntiles_x);
 		nt_y1 = nfix(  (y)/tile_y, ntiles_y);
@@ -217,7 +223,7 @@ void clear_xdamage_mark_region(sraRegionPtr markregion, int flush) {
 #endif
 }
 
-int collect_macosx_damage(int x_in, int y_in, int w_in, int h_in, int call) {
+int collect_non_X_xdamage(int x_in, int y_in, int w_in, int h_in, int call) {
 	sraRegionPtr tmpregion;
 	sraRegionPtr reg;
 	static int rect_count = 0;
@@ -227,7 +233,7 @@ int collect_macosx_damage(int x_in, int y_in, int w_in, int h_in, int call) {
 	double tm, dt;
 	int x, y, w, h, x2, y2;
 
-if (call && debug_xdamage > 1) fprintf(stderr, "collect_macosx_damage: %d %d %d %d - %d / %d\n", x_in, y_in, w_in, h_in, call, use_xdamage);
+if (call && debug_xdamage > 1) fprintf(stderr, "collect_non_X_xdamage: %d %d %d %d - %d / %d\n", x_in, y_in, w_in, h_in, call, use_xdamage);
 
 	if (! use_xdamage) {
 		return 0;
@@ -248,6 +254,9 @@ if (call && debug_xdamage > 1) fprintf(stderr, "collect_macosx_damage: %d %d %d 
 			sraRgnMakeEmpty(reg);
 		}
 	} else {
+		if (xdamage_ticker < 0) {
+			xdamage_ticker = 0;
+		}
 		reg = xdamage_regions[xdamage_ticker];  
 	}
 	if (reg == NULL) {
@@ -315,7 +324,7 @@ if (call && debug_xdamage > 1) fprintf(stderr, "collect_macosx_damage: %d %d %d 
 	dt = dtime(&tm);
 	if ((debug_tiles > 1 && ecount) || (debug_tiles && ecount > 200)
 	    || debug_xdamage > 1) {
-		fprintf(stderr, "collect_macosx_damage(%d): %.4f t: %.4f ev/dup/accept"
+		fprintf(stderr, "collect_non_X_xdamage(%d): %.4f t: %.4f ev/dup/accept"
 		    "/direct %d/%d/%d/%d\n", call, dt, tm - x11vnc_start, ecount,
 		    dcount, ccount, xdamage_direct_count); 
 	}
@@ -389,6 +398,9 @@ int collect_xdamage(int scancnt, int call) {
 			sraRgnMakeEmpty(reg);
 		}
 	} else {
+		if (xdamage_ticker < 0) {
+			xdamage_ticker = 0;
+		}
 		reg = xdamage_regions[xdamage_ticker];  
 	}
 	if (reg == NULL) {

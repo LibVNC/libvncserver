@@ -287,6 +287,8 @@ char *this_host(void) {
 	if (gethostname(host, MAXN) == 0) {
 		host[MAXN-1] = '\0';
 		return strdup(host);
+	} else if (UT.nodename) {
+		return strdup(UT.nodename);
 	}
 #endif
 	return NULL;

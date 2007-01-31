@@ -558,6 +558,8 @@ static void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
 		uinput_pointer_command(mask, x, y, client);
 	} else if (pipeinput_int == PIPEINPUT_MACOSX) {
 		macosx_pointer_command(mask, x, y, client);
+	} else if (pipeinput_int == PIPEINPUT_VNC) {
+		vnc_reflect_send_pointer(x, y, mask);
 	}
 	if (pipeinput_fh == NULL) {
 		return;
@@ -679,6 +681,8 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				got_user_input++;
 				got_pointer_input++;
 				last_pointer_client = client;
+				last_pointer_time = dnow();
+				last_event = last_input = last_pointer_input = time(NULL);
 			}
 			if (input.motion) {
 				/* raw_fb hack track button state */
@@ -993,6 +997,9 @@ if (0) fprintf(stderr, "initialize_pipeinput: %s -- %s\n", pipeinput_str, p);
 		return;
 	} else if (strstr(p, "MACOSX") == p) {
 		pipeinput_int = PIPEINPUT_MACOSX;
+		return;
+	} else if (strstr(p, "VNC") == p) {
+		pipeinput_int = PIPEINPUT_VNC;
 		return;
 	}
 

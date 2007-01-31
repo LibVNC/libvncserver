@@ -9,6 +9,7 @@
 extern int debug;
 
 extern char *use_dpy;
+extern int display_N;
 extern char *auth_file;
 extern char *visual_str;
 extern int set_visual_str_to_something;
@@ -163,6 +164,8 @@ extern int ncache_wf_raises;
 extern int ncache_dt_change;
 extern int ncache_pad;
 extern int ncache_xrootpmap;
+extern int ncache_keep_anims;
+extern int ncache_old_wm;
 extern int macosx_ncache_macmenu;
 extern int ncache_beta_tester;
 

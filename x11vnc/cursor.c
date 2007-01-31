@@ -1113,7 +1113,6 @@ static rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 			a = 0xff000000 & (*(pixels+i));
 			a = a >> 24;	/* alpha channel */
 
-
 			if (a < (unsigned int) thresh) {
 				bitmap[i] = ' ';
 			} else {
@@ -1256,6 +1255,13 @@ static int get_exact_cursor(int init) {
 	}
 #endif
 
+	if (rawfb_vnc_reflect) {
+		int last_idx = (int) get_cursor_serial(1);
+		if (last_idx) {
+			which = last_idx;
+		}
+		return which;
+	}
 	if (xfixes_present && dpy) {
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 		int last_idx = (int) get_cursor_serial(1);
@@ -1490,6 +1496,9 @@ int get_which_cursor(void) {
 			mode = 3;
 		}
 
+		if (rawfb_vnc_reflect && mode > -1) {
+			return get_exact_cursor(0);
+		}
 		if (mode == 3) {
 			if ((xfixes_present && use_xfixes) || macosx_console) {
 				if (db) fprintf(stderr, "get_which_cursor call get_exact_cursor\n");

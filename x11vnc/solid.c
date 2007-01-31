@@ -67,7 +67,10 @@ static int dt_cmd(char *cmd) {
 		set_env("DISPLAY", DisplayString(dpy));
 	}
 
-	rfbLog("running command:\n  %s\n", cmd);
+	rfbLog("running command:\n");
+	if (!quiet) {
+		fprintf(stderr, "\n  %s\n\n", cmd);
+	}
 	usr_bin_path(0);
 	close_exec_fds();
 	rc = system(cmd);
@@ -96,7 +99,10 @@ static char *cmd_output(char *cmd) {
 		return "";
 	}
 
-	rfbLog("running pipe:\n  %s\n", cmd);
+	rfbLog("running pipe:\n");
+	if (!quiet) {
+		fprintf(stderr, "\n  %s\n\n", cmd);
+	}
 	usr_bin_path(0);
 	close_exec_fds();
 	p = popen(cmd, "r");
@@ -113,6 +119,28 @@ static char *cmd_output(char *cmd) {
 	return(output);
 }
 
+static char *last_color = NULL;
+
+unsigned long get_pixel(char *color) {
+#if NO_X11
+	return 0;
+#else
+	XColor cdef;
+	Colormap cmap;
+	unsigned long pixel = BlackPixel(dpy, scr);
+	if (depth > 8 || strcmp(color, solid_default)) {
+		cmap = DefaultColormap (dpy, scr);
+		if (XParseColor(dpy, cmap, color, &cdef) &&
+		    XAllocColor(dpy, cmap, &cdef)) {
+			pixel = cdef.pixel;
+		} else {
+			rfbLog("error parsing/allocing color: %s\n", color);
+		}
+	}
+	return pixel;
+#endif
+}
+
 XImage *solid_root(char *color) {
 #if NO_X11
 	RAWFB_RET_VOID
@@ -126,7 +154,7 @@ XImage *solid_root(char *color) {
 	GC gc;
 	XSetWindowAttributes swa;
 	Visual visual;
-	unsigned long mask, pixel;
+	static unsigned long mask, pixel = 0;
 	XColor cdef;
 	Colormap cmap;
 
@@ -148,8 +176,6 @@ XImage *solid_root(char *color) {
 	    InputOutput, &visual, mask, &swa);
 
 	if (! color) {
-		/* restore the root window from the XImage snapshot */
-		pixmap = XCreatePixmap(dpy, window, wdpy_x, wdpy_y, depth);
 
 		if (! image) {
 			/* whoops */
@@ -158,6 +184,8 @@ XImage *solid_root(char *color) {
 			return NULL;
 		}
 
+		/* restore the root window from the XImage snapshot */
+		pixmap = XCreatePixmap(dpy, window, wdpy_x, wdpy_y, depth);
 		
 		/* draw the image to a pixmap: */
 		gcv.function = GXcopy;
@@ -215,16 +243,7 @@ XImage *solid_root(char *color) {
 	}
 
 	/* use black for low colors or failure */
-	pixel = BlackPixel(dpy, scr);
-	if (depth > 8 || strcmp(color, solid_default)) {
-		cmap = DefaultColormap (dpy, scr);
-		if (XParseColor(dpy, cmap, color, &cdef) &&
-		    XAllocColor(dpy, cmap, &cdef)) {
-			pixel = cdef.pixel;
-		} else {
-			rfbLog("error parsing/allocing color: %s\n", color);
-		}
-	}
+	pixel = get_pixel(color);
 
 	rfbLog("setting solid background...\n");
 	XSetWindowBackground(dpy, window, pixel);
@@ -593,6 +612,100 @@ static void solid_gnome(char *color) {
 #endif	/* NO_X11 */
 }
 
+static char *dcop_session(void) {
+#if NO_X11
+	RAWFB_RET("");
+	return "";
+#else
+	char list_sessions[] = "dcop --user '%s' --list-sessions";
+	int len;
+	char *cmd, *host, *user = NULL;
+	char *out, *p, *ds, *dsn = NULL, *sess = NULL, *sess2 = NULL;
+
+	RAWFB_RET("");
+
+	if (getenv("SESSION_MANAGER")) {
+		return "";
+	}
+
+	user = get_user_name();
+	if (strstr(user, "'") != NULL)  {
+		rfbLog("invalid user: %s\n", user);
+		free(user);
+		return "";
+	}
+
+	len = strlen(list_sessions) + strlen(user) + 1;
+	cmd = (char *) malloc(len);
+	sprintf(cmd, list_sessions, user);
+
+	out = strdup(cmd_output(cmd));
+	free(cmd);
+	free(user);
+
+	ds = DisplayString(dpy);
+	if (!ds || !strcmp(ds, "")) {
+		ds = getenv("DISPLAY");
+	}
+	if (!ds) {
+		ds = ":0";
+	}
+	ds = strdup(ds);
+	dsn = strchr(ds, ':');
+	if (dsn) {
+		*dsn = '_';
+	} else {
+		free(ds);
+		ds = strdup("_0");
+		dsn = ds;
+	}
+
+	host = this_host();
+
+	p = strtok(out, "\n");
+	while (p) {
+		char *q = strstr(p, ".DCOP");
+		if (q == NULL) {
+			;
+		} else if (host) {
+			if (strstr(q, host)) {
+				if(strstr(p, dsn)) {
+					sess = strdup(q);
+					break;
+				} else {
+					if (sess2) {
+						free(sess2);
+					} 
+					sess2 = strdup(q);
+				}
+			}
+		} else {
+			if(strstr(p, dsn)) {
+				sess = strdup(q);
+				break;
+			}
+		}
+		p = strtok(NULL, "\n");
+	}
+	free(ds);
+	free(out);
+	if (!sess && sess2) {
+		sess = sess2;
+	}
+	if (!sess || strchr(sess, '\'')) {
+		if (sess) free(sess);
+		sess = strdup("--all-sessions");
+	} else {
+		len = strlen("--session ") + 2 + strlen(sess) + 1;
+		cmd = (char *) malloc(len);
+		sprintf(cmd, "--session '%s'", sess);
+		free(sess);
+		sess = cmd;
+	}
+	return sess;
+#endif
+}
+
 static void solid_kde(char *color) {
 #if NO_X11
 	RAWFB_RET_VOID
@@ -600,12 +713,12 @@ static void solid_kde(char *color) {
 	return;
 #else
 	char set_color[] =
-	    "dcop --user '%s' kdesktop KBackgroundIface setColor '%s' 1";
+	    "dcop --user '%s' %s kdesktop KBackgroundIface setColor '%s' 1";
 	char bg_off[] =
-	    "dcop --user '%s' kdesktop KBackgroundIface setBackgroundEnabled 0";
+	    "dcop --user '%s' %s kdesktop KBackgroundIface setBackgroundEnabled 0";
 	char bg_on[] =
-	    "dcop --user '%s' kdesktop KBackgroundIface setBackgroundEnabled 1";
-	char *cmd, *user = NULL;
+	    "dcop --user '%s' %s kdesktop KBackgroundIface setBackgroundEnabled 1";
+	char *cmd, *user = NULL, *sess;
 	int len;
 
 	RAWFB_RET_VOID
@@ -617,13 +730,19 @@ static void solid_kde(char *color) {
 		return;
 	}
 
+	set_env("DISPLAY", DisplayString(dpy));
+
 	if (! color) {
-		len = strlen(bg_on) + strlen(user) + 1;
+		sess = dcop_session();
+		len = strlen(bg_on) + strlen(user) + strlen(sess) + 1;
 		cmd = (char *) malloc(len);
-		sprintf(cmd, bg_on, user);
+		sprintf(cmd, bg_on, user, sess);
+
 		dt_cmd(cmd);
+
 		free(cmd);
 		free(user);
+		free(sess);
 
 		return;
 	}
@@ -633,19 +752,132 @@ static void solid_kde(char *color) {
 		return;
 	}
 
-	len = strlen(set_color) + strlen(user) + strlen(color) + 1;
+	sess = dcop_session();
+
+	len = strlen(set_color) + strlen(user) + strlen(sess) + strlen(color) + 1;
 	cmd = (char *) malloc(len);
-	sprintf(cmd, set_color, user, color);
+	sprintf(cmd, set_color, user, sess, color);
 	dt_cmd(cmd);
 	free(cmd);
 
-	len = strlen(bg_off) + strlen(user) + 1;
+	len = strlen(bg_off) + strlen(user) + strlen(sess) + 1;
 	cmd = (char *) malloc(len);
-	sprintf(cmd, bg_off, user);
+	sprintf(cmd, bg_off, user, sess);
 	dt_cmd(cmd);
 	free(cmd);
 	free(user);
 #endif	/* NO_X11 */
+}
+
+void kde_no_animate(int restore) {
+#if NO_X11
+	if (!restore) {}
+	RAWFB_RET_VOID
+	return;
+#else
+	char query_setting[] =
+	    "kreadconfig  --file kwinrc --group Windows --key AnimateMinimize";
+	char kwinrc_off[] =
+	    "kwriteconfig --file kwinrc --group Windows --key AnimateMinimize --type bool false";
+	char kwinrc_on[] =
+	    "kwriteconfig --file kwinrc --group Windows --key AnimateMinimize --type bool true";
+	char kwin_reconfigure[] =
+	    "dcop --user '%s' %s kwin KWinInterface reconfigure";
+	char *cmd, *cmd2, *out, *user = NULL, *sess;
+	int len;
+	static int anim_state = 1;
+
+	RAWFB_RET_VOID
+
+	if (ncache_keep_anims) {
+		return;
+	}
+
+	if (restore) {
+		if (anim_state == 1) {
+			return;
+		}
+
+		user = get_user_name();
+		if (strstr(user, "'") != NULL)  {
+			rfbLog("invalid user: %s\n", user);
+			free(user);
+			return;
+		}
+
+		sess = dcop_session();
+
+		len = strlen(kwin_reconfigure) + strlen(user) + strlen(sess) + 1;
+		cmd = (char *) malloc(len);
+		sprintf(cmd, kwin_reconfigure, user, sess);
+		rfbLog("\n");
+		rfbLog("Restoring KDE kwinrc settings.\n");
+		rfbLog("\n");
+		dt_cmd(cmd);
+		free(cmd);
+		free(user);
+		free(sess);
+		anim_state = 1;
+		return;
+	} else {
+		if (anim_state == 0) {
+			return;
+		}
+		anim_state = 0;
+	}
+
+	user = get_user_name();
+	if (strstr(user, "'") != NULL)  {
+		rfbLog("invalid user: %s\n", user);
+		free(user);
+		return;
+	}
+	out = cmd_output(query_setting);
+
+
+	if (!out || strstr(out, "false")) {
+		rfbLog("\n");
+		rfbLog("********************************************************\n");
+		rfbLog("KDE kwinrc AnimateMinimize is false. Good.\n");
+		rfbLog("********************************************************\n");
+		rfbLog("\n");
+		free(user);
+		return;
+	}
+
+	rfbLog("\n");
+	rfbLog("********************************************************\n");
+	rfbLog("To improve the -ncache client-side caching performance\n");
+	rfbLog("temporarily setting KDE kwinrc AnimateMinimize to false.\n");
+	rfbLog("It will be reset for the next session or when VNC client\n");
+	rfbLog("disconnects.  Or you can use the Control Center GUI to\n");
+	rfbLog("change it now (toggle its setting a few times):\n");
+	rfbLog("   Desktop -> Window Behavior -> Moving\n");
+	rfbLog("********************************************************\n");
+	rfbLog("\n");
+
+	set_env("DISPLAY", DisplayString(dpy));
+
+	sess = dcop_session();
+	len = strlen(kwin_reconfigure) + strlen(user) + strlen(sess) + 1;
+	cmd = (char *) malloc(len);
+	sprintf(cmd, kwin_reconfigure, user, sess);
+
+	len = 1 + strlen(kwinrc_off) + 2 + strlen(cmd) + 2 + strlen("sleep 5") + 2 + strlen(kwinrc_on) + 3 + 1;
+	cmd2 = (char *) malloc(len);
+
+	sprintf(cmd2, "(%s; %s; sleep 5; %s) &", kwinrc_off, cmd, kwinrc_on);
+
+	dt_cmd(cmd2);
+	free(cmd);
+	free(cmd2);
+	free(user);
+	free(sess);
+#endif	/* NO_X11 */
+}
+
+void gnome_no_animate(void) {
+	;
 }
 
 char *guess_desktop(void) {
@@ -710,6 +942,42 @@ char *guess_desktop(void) {
 #endif	/* NO_X11 */
 }
 
+XImage *solid_image(char *color) {
+#if NO_X11
+	RAWFB_RET(NULL)
+	return NULL;
+#else
+	XImage *image = NULL;
+	unsigned long pixel = 0;
+	int x, y;
+
+	RAWFB_RET(NULL)
+
+	if (!color) {
+		color = last_color;
+	}
+
+	if (!color) {
+		return NULL;
+	}
+
+	image = XGetImage(dpy, rootwin, 0, 0, wdpy_x, wdpy_y, AllPlanes,
+	    ZPixmap);
+
+	if (!image) {
+		return NULL;
+	}
+	pixel = get_pixel(color);
+
+	for (y=0; y<wdpy_y; y++) {
+		for (x=0; x<wdpy_x; x++) {
+			XPutPixel(image, x, y, pixel);
+		}
+	}
+	return image;
+#endif	/* NO_X11 */
+}
+
 void solid_bg(int restore) {
 	static int desktop = -1;
 	static int solid_on = 0;
@@ -770,6 +1038,11 @@ void solid_bg(int restore) {
 			color = solid_default;
 		}
 	}
+	if (last_color) {
+		free(last_color);
+	}
+	last_color = strdup(color);
+
 	if (!strcmp(dtname, "gnome")) {
 		desktop = 1;
 		solid_gnome(color);

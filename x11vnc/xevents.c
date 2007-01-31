@@ -1152,6 +1152,7 @@ void check_xevents(int reset) {
 #endif	/* NO_X11 */
 }
 
+extern int rawfb_vnc_reflect;
 /*
  * hook called when a VNC client sends us some "XCut" text (rfbClientCutText).
  */
@@ -1187,6 +1188,11 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 		return;
 	}
 #endif
+
+	if (rawfb_vnc_reflect) {
+		vnc_reflect_send_cuttext(text, len);
+		return;
+	}
 
 	RAWFB_RET_VOID
 

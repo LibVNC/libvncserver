@@ -1,5 +1,5 @@
 --- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
-+++ vnc_unixsrc/vncviewer/desktop.c	2006-07-27 11:30:01.000000000 -0400
++++ vnc_unixsrc/vncviewer/desktop.c	2007-01-13 13:59:51.000000000 -0500
 @@ -50,6 +50,30 @@
    },
  };
@@ -63,7 +63,7 @@
  /*
   * DesktopInitAfterRealization does things which require the X windows to
   * exist.  It creates some GCs and sets the dot cursor.
-@@ -460,3 +463,69 @@
+@@ -460,3 +463,70 @@
      break;
    }
  }
@@ -74,7 +74,8 @@
 +	} else {
 +		if (image && image->data) {
 +			free(image->data);
-+			XDestroyImage(image);
++			/* see manpage XDestroyImage may also free data, so we skip and have a tiny leak instead */
++			if (0) XDestroyImage(image);
 +			image = NULL;
 +		}
 +	}

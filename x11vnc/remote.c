@@ -2790,7 +2790,6 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (orig != ncache_xrootpmap) {
 			do_new_fb(1);
 		}
-
 	} else if (!strcmp(p, "noncache_no_rootpixmap")) {
 		int orig = ncache_xrootpmap;
 		if (query) {
@@ -2812,6 +2811,38 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			rfbLog("remote_cmd: resetting root pixmap.\n");
 			set_ncache_xrootpmap();
 		}
+
+	} else if (!strcmp(p, "ncache_keep_anims")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, ncache_keep_anims);
+			goto qry;
+		}
+		kde_no_animate(0);
+		ncache_keep_anims = 1;
+		rfbLog("remote_cmd: set -ncache_keep_anims\n");
+	} else if (!strcmp(p, "noncache_keep_anims")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !ncache_keep_anims);
+			goto qry;
+		}
+		ncache_keep_anims = 0;
+		kde_no_animate(1);
+		rfbLog("remote_cmd: disabled -ncache_keep_anims\n");
+
+	} else if (!strcmp(p, "ncache_old_wm")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, ncache_old_wm);
+			goto qry;
+		}
+		ncache_old_wm = 1;
+		rfbLog("remote_cmd: set -ncache_old_wm\n");
+	} else if (!strcmp(p, "noncache_old_wm")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !ncache_old_wm);
+			goto qry;
+		}
+		ncache_old_wm = 0;
+		rfbLog("remote_cmd: disabled -ncache_old_wm\n");
 
 	} else if (!strcmp(p, "ncache")) {
 		if (query) {

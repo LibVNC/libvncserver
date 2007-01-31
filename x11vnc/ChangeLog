@@ -1,3 +1,13 @@
+2007-01-31  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -reflect reflector/repeater mode with libvncclient.
+	  -ncache tweaks: no kde animations and wm improvements,
+	  fixes to FINDDISPLAY and FINDCREATEDISPLAY login modes,
+	  MODTWEAK_LOWEST envvar for HP-UX keyboard workaround.
+	  -N option for display and rfbport matching.
+
+2007-01-12  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -N option, more -ncache improvements, kde/gnome.
+
 2007-01-03  Karl Runge <runge@karlrunge.com>
 	* x11vnc: more -ncache improvements.
 

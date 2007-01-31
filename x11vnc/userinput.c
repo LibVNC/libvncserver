@@ -275,6 +275,7 @@ void parse_fixscreen(void) {
 
 /*
 WIREFRAME_PARMS "0xff,2,0,30+6+6+6,Alt,0.05+0.3+2.0,8"
+                 0xff,2,0,32+8+8+8,all,0.15+0.30+5.0+0.125
 shade,linewidth,percent,T+B+L+R,mods,t1+t2+t3+t4
  */
 #define LW_MAX 8
@@ -874,11 +875,12 @@ static void draw_box(int x, int y, int w, int h, int restore) {
 		save[i]->saved = 0;
 	}
 
+if (0) fprintf(stderr, "  DrawBox: %04dx%04d+%04d+%04d B=%d rest=%d lw=%d %.4f\n", w, h, x, y, 2*(w+h)*(2-restore)*pixelsize*lw, restore, lw, dnowx());
+
 	if (restore) {
 		return;
 	}
 
-if (0) fprintf(stderr, "  DrawBox: %dx%d+%d+%d\n", w, h, x, y);
 
 	/*
 	 * work out shade/color for the wireframe line, could be a color
@@ -1824,12 +1826,12 @@ void do_copyregion(sraRegionPtr region, int dx, int dy, int mode)  {
 	if (rfb_fb == main_fb && ! rotating && mode == DCR_Normal) {
 		/* normal case, no -scale or -8to24 */
 		get_client_regions(&req, &mod, &cpy, &ncli);
-if (debug_scroll > 1) fprintf(stderr, ">>>-rfbDoCopyRect req: %d mod: %d cpy: %d\n", req, mod, cpy); 
+if (0 || debug_scroll > 1) fprintf(stderr, ">>>-rfbDoCopyRect req: %d mod: %d cpy: %d\n", req, mod, cpy); 
 
 		rfbDoCopyRegion(screen, region, dx, dy);
 
 		get_client_regions(&req, &mod, &cpy, &ncli);
-if (debug_scroll > 1) fprintf(stderr, "<<<-rfbDoCopyRect req: %d mod: %d cpy: %d\n", req, mod, cpy); 
+if (0 || debug_scroll > 1) fprintf(stderr, "<<<-rfbDoCopyRect req: %d mod: %d cpy: %d\n", req, mod, cpy); 
 
 		return;
 	}
@@ -1976,7 +1978,7 @@ void batch_copyregion(sraRegionPtr* region, int *dx, int *dy, int ncr, double de
 	rfbClientIteratorPtr i;
 	rfbClientPtr cl;
 	int k, direct, mode, nrects = 0, bad = 0;
-	double start = dnow();
+	double t1, t2, start = dnow();
 
 	for (k=0; k < ncr; k++) {
 		sraRectangleIterator *iter;
@@ -2010,6 +2012,8 @@ void batch_copyregion(sraRegionPtr* region, int *dx, int *dy, int ncr, double de
 		delay = 0.1;
 	}
 	fb_push_wait(delay, FB_COPY|FB_MOD);
+
+	t1 = dnow();
 
 #if 0
 	i = rfbGetClientIterator(screen);
@@ -2048,6 +2052,9 @@ void batch_copyregion(sraRegionPtr* region, int *dx, int *dy, int ncr, double de
 	for (k=0; k < ncr; k++) {
 		do_copyregion(region[k], dx[k], dy[k], mode);
 	}
+
+	t2 = dnow();
+
 	i = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(i)) ) {
 		if (!direct)  {
@@ -2061,7 +2068,8 @@ void batch_copyregion(sraRegionPtr* region, int *dx, int *dy, int ncr, double de
 
 	last_copyrect = dnow();
 
-fprintf(stderr, "batch_copyregion: nrects: %d nregions: %d  dt=%.4f  %.4f\n", nrects, ncr, dnow() - start, dnowx());
+if (0) fprintf(stderr, "batch_copyregion: nrects: %d nregions: %d  tot=%.4f t10=%.4f t21=%.4f t32=%.4f  %.4f\n",
+    nrects, ncr, last_copyrect - start, t1 - start, t2 - t1, last_copyrect - t2, dnowx());
 
 }
 
@@ -4123,7 +4131,7 @@ void check_macosx_iconify(Window orig_frame, Window frame, int flush) {
 		idx = lookup_win_index(orig_frame);
 		if (idx >= 0) {
 			if (cache_list[idx].map_state == IsUnmapped) {
-fprintf(stderr, "FAW orig_frame unmapped.\n");
+if (0) fprintf(stderr, "FAW orig_frame unmapped.\n");
 				unmapped = 1;
 				m = 3;
 			}
@@ -4133,17 +4141,17 @@ fprintf(stderr, "FAW orig_frame unmapped.\n");
 	if (unmapped) {
 		;
 	} else if (orig_frame && macosxCGS_follow_animation_win(orig_frame, -1, 0)) {
-		fprintf(stderr, "FAW orig_frame %d\n", (int) orig_frame);
+		if (0) fprintf(stderr, "FAW orig_frame %d\n", (int) orig_frame);
 	} else if (0 && frame && macosxCGS_follow_animation_win(frame, -1, 0)) {
-		fprintf(stderr, "FAW frame      %d\n", (int) frame);
+		if (0) fprintf(stderr, "FAW frame      %d\n", (int) frame);
 	}
 	for (j=0; j<m; j++) {
 		macosxCGS_get_all_windows();
 		if (macosx_checkevent(NULL)) {
 			ok = 1;
-			fprintf(stderr, "Check Event    1\n");
+			if (0) fprintf(stderr, "Check Event    1\n");
 		} else {
-			fprintf(stderr, "Check Event    0\n");
+			if (0) fprintf(stderr, "Check Event    0\n");
 		}
 		if (ok) {
 			break;
@@ -4400,6 +4408,10 @@ if (db) fprintf(stderr, "INTERIOR\n");
 			frame_changed_spin *= 2.0;
 			max_spin *= 2.0;
 			min_draw *= 1.5;
+			if (link == LR_DIALUP) {
+				max_spin *= 1.2;
+				min_draw *= 1.7;
+			}
 			if (! didmsg) {
 				rfbLog("increased wireframe timeouts for "
 				    "slow network connection.\n");
@@ -4706,7 +4718,7 @@ if (db) fprintf(stderr, "FRAME MOVE  1st-dt: %.3f\n", first_dt_ave/n);
 				} else {
 					if (drew_box && cnt > last_draw_cnt) 	{
 						doit = 1;
-fprintf(stderr, "*** NO GPI DRAW_BOX\n");
+if (0) fprintf(stderr, "*** NO GPI DRAW_BOX\n");
 					}
 				}
 		
@@ -5513,6 +5525,16 @@ static void check_user_input4(double dt, double dtr, int tile_diffs) {
 
 int check_user_input(double dt, double dtr, int tile_diffs, int *cnt) {
 
+	if (rawfb_vnc_reflect) {
+		if (got_user_input) {
+			if (0) vnc_reflect_process_client();
+		}
+		if (got_user_input && *cnt % ui_skip != 0) {
+			/* every n-th drops thru to scan */
+			*cnt = *cnt + 1;
+			return 1;	/* short circuit watch_loop */
+		}
+	}
 #ifdef MACOSX
 	if (! macosx_console) {
 		RAWFB_RET(0)
@@ -5549,7 +5571,7 @@ if (debug_scroll && rc > 1) fprintf(stderr, "  CXR: check_user_input ret %d\n", 
 	if (pointer_mode == 1) {
 		if ((got_user_input || ui_skip < 0) && *cnt % ui_skip != 0) {
 			/* every ui_skip-th drops thru to scan */
-			*cnt++;
+			*cnt = *cnt + 1;
 			X_LOCK;
 			XFlush_wr(dpy);
 			X_UNLOCK;
@@ -5565,7 +5587,7 @@ if (debug_scroll && rc > 1) fprintf(stderr, "  CXR: check_user_input ret %d\n", 
 			 * *keyboard* input.
 			 */
 			if (*cnt % ui_skip != 0) {
-				*cnt++;
+				*cnt = *cnt + 1; 
 				return 1;
 			}
 		}
@@ -5913,7 +5935,7 @@ void snap_old(void) {
 	int i;
 	old_stack_n = STACKMAX;
 	quick_snap(old_stack, &old_stack_n);
-fprintf(stderr, "snap_old: %d  %.4f\n", old_stack_n, dnowx());
+if (0) fprintf(stderr, "snap_old: %d  %.4f\n", old_stack_n, dnowx());
 #if 0
 	for (i= old_stack_n - 1; i >= 0; i--) {
 		int idx = lookup_win_index(old_stack[i]);
@@ -6069,7 +6091,7 @@ int free_rect(int idx) {
 	int x, y, w, h;
 
 	if (idx < 0 || idx >= cache_list_num) {
-fprintf(stderr, "free_rect: bad index: %d\n", idx);
+if (0) fprintf(stderr, "free_rect: bad index: %d\n", idx);
 		clean_up_exit(1);
 	}
 
@@ -7071,6 +7093,13 @@ fprintf(stderr, "BS_save: FAIL FOR: %d\n", idx);
 		clip_region(r, win);
 	}
 
+	if (sraRgnEmpty(r)) {
+if (verb) fprintf(stderr, "BS_save: Region Empty: %d\n", idx);
+		sraRgnDestroy(r0);
+		sraRgnDestroy(r);
+		return 0;
+	}
+
 	dx = x - x2; 
 	dy = y - y2; 
 
@@ -7164,6 +7193,14 @@ fprintf(stderr, "SU_save: FAIL FOR: %d\n", idx);
 	if (clip) {
 		clip_region(r, win);
 	}
+
+	if (sraRgnEmpty(r)) {
+if (verb) fprintf(stderr, "SU_save: Region Empty: %d\n", idx);
+		sraRgnDestroy(r0);
+		sraRgnDestroy(r);
+		return 0;
+	}
+
 
 	dx = x - x2; 
 	dy = y - y2; 
@@ -7608,6 +7645,7 @@ int Ev_order[EVMAX];
 int Ev_area[EVMAX];
 int Ev_tmp[EVMAX];
 int Ev_tmp2[EVMAX];
+Window Ev_tmpwin[EVMAX];
 Window Ev_win[EVMAX];
 Window Ev_map[EVMAX];
 Window Ev_unmap[EVMAX];
@@ -7811,12 +7849,12 @@ fprintf(stderr, "TRY_TO_FIX_SU(%d)  0x%lx  0x%lx was_unmapped=%d map_state=%s\n"
 	for (i = old_stack_n - 1; i >= 0; i--) {
 		win2 = old_stack[i];
 		if (win2 == above) {
-fprintf(stderr, "0x%lx turn on:  0x%lx  i=%d\n", win, win2, i);
+if (0) fprintf(stderr, "0x%lx turn on:  0x%lx  i=%d\n", win, win2, i);
 			on = 1;
 			found_above = 1;
 		}
 		if (win2 == win) {
-fprintf(stderr, "0x%lx turn off: 0x%lx  i=%d\n", win, win2, i);
+if (0) fprintf(stderr, "0x%lx turn off: 0x%lx  i=%d\n", win, win2, i);
 			found = 1;
 			on = 0;
 			break;
@@ -8021,7 +8059,10 @@ void set_ncache_xrootpmap(void) {
 	old_handler = XSetErrorHandler(trap_xerror);
 	trapped_xerror = 0;
 	pmap = XInternAtom(dpy, "_XROOTPMAP_ID", True);
-	if (pmap != None) {
+
+	if (use_solid_bg) {
+		image = solid_image(NULL);
+	} else if (pmap != None) {
 		Pixmap pixmap;
 		unsigned char *d_pmap;
 
@@ -8083,17 +8124,23 @@ void set_ncache_xrootpmap(void) {
 #define EV_VISIBILITY_UNOBS	10
 #define EV_VISIBILITY_OBS	11
 #define EV_PROPERTY		12
+#define EV_OLD_WM_MAP		13
+#define EV_OLD_WM_UNMAP		14
+#define EV_OLD_WM_OFF		15
+#define EV_OLD_WM_NOTMAPPED	16
 Window _ev_list[EVLISTMAX];
 int _ev_case[EVLISTMAX];
 int _ev_list_cnt;
 
 int n_CN = 0, n_RN = 0, n_DN = 0, n_ON = 0, n_MN = 0, n_UN = 0;
 int n_VN = 0, n_VN_p = 0, n_VN_u = 0, n_ST = 0, n_PN = 0, n_DC = 0;
+int n_ON_sz = 0, n_ON_po = 0, n_ON_st = 0;
 
 int ev_store(Window win, int type) {
 	if (type == EV_RESET)  {
 		n_CN = 0; n_RN = 0; n_DN = 0; n_ON = 0; n_MN = 0; n_UN = 0;
 		n_VN = 0; n_VN_p = 0; n_VN_u = 0; n_ST = 0; n_PN = 0; n_DC = 0;
+		n_ON_sz = 0; n_ON_po = 0; n_ON_st = 0;
 		_ev_list_cnt = 0;
 		return 1;
 	}
@@ -8238,12 +8285,15 @@ if (type != ConfigureNotify) fprintf(stderr, "root: skip %s  for 0x%lx\n", Etype
 				ev_store(win, EV_CONFIGURE);
 				if (cfg_size) {
 					ev_store(win, EV_CONFIGURE_SIZE);
+					n_ON_sz++;
 				}
 				if (cfg_pos) {
 					ev_store(win, EV_CONFIGURE_POS);
+					n_ON_po++;
 				}
 				if (cfg_stack) {
 					ev_store(win, EV_CONFIGURE_STACK);
+					n_ON_st++;
 				}
 				n++;
 				n_ON++;
@@ -8447,6 +8497,9 @@ fprintf(stderr, "  try_to_synth_su: 0x%lx %d  idx=%d cnt=%d\n", win, i, idx, cnt
 	CLEAN_OUT
 	return 1;
 }
+
+static double last_vis_unobs_time = 0.0;
+static double last_vis_obs_time = 0.0;
 
 static int saw_desktop_change = 0;
 
@@ -8655,7 +8708,7 @@ fprintf(stderr, "*VIS  BS_save: 0x%lx %d %d %d\n", win, cache_list[i].width, cac
 					if (now < cache_list[i].vis_unobs_time + 0.75 && now < cache_list[i].vis_obs_time + 0.75) {
 						continue;
 					}
-					bs_save(i, bat, &attr, !top_now[k], 0, &valid, 0);
+					bs_save(i, bat, &attr, !top_now[k], 0, &valid, 1);
 					if (valid) {
 						STORE(i, win, attr);
 					} else {
@@ -8709,6 +8762,7 @@ int check_ncache(int reset, int mode) {
 	int su_fix_cnt;
 	int pixels = 0, ttot;
 	int desktop_change = 0, n1, n2;
+	int desktop_change_old_wm = 0;
 	int missed_su_restore = 0;
 	int missed_bs_restore = 0;
 	sraRegionPtr r0, r;
@@ -8790,6 +8844,15 @@ if (c) fprintf(stderr, "check_ncache purged %d events\n", c);
 	if (nofb) {
 		return -1;
 	}
+	if (now < last_client + 4) {
+		return -1;
+	}
+	if (! all_clients_initialized()) {
+		/* play it safe */
+		return -1;
+	}
+
+
 
 	if (reset) {
 		rfbLog("check_ncache: resetting cache\n");
@@ -8846,19 +8909,22 @@ if (c) fprintf(stderr, "check_ncache purged %d events\n", c);
 			    "This is the Pixel buffer cache region. Your VNC Viewer is not hiding it from you.",
 			    white_pixel());
 			rfbDrawString(screen, &default8x16Font, dx, ds + Dy+2*dy,
-			    "Try resizing your VNC Viewer so you don't see it!! Pay no attention to the man behind the curtain...",
+			    "Try resizing your VNC Viewer so you don't see it!!",
 			    white_pixel());
 			rfbDrawString(screen, &default8x16Font, dx, ds + Dy+3*dy,
-			    "To disable run the server with:  x11vnc -ncache 0 ...",
+			    "Pay no attention to the man behind the curtain...",
 			    white_pixel());
 			rfbDrawString(screen, &default8x16Font, dx, ds + Dy+4*dy,
-			    "If there are painting errors you can press 3 Alt_L's (Left \"Alt\" key) in a row to repaint the screen.",
+			    "To disable caching run the server with:  x11vnc -noncache ...",
 			    white_pixel());
 			rfbDrawString(screen, &default8x16Font, dx, ds + Dy+5*dy,
+			    "If there are painting errors press 3 Alt_L's (Left \"Alt\" key) in a row to repaint the screen.",
+			    white_pixel());
+			rfbDrawString(screen, &default8x16Font, dx, ds + Dy+6*dy,
 			    "More info:  http://www.karlrunge.com/x11vnc/#faq-client-caching",
 			    white_pixel());
 
-			ds += 9 * dy;
+			ds += 11 * dy;
 		}
 
 		snapshot_cache_list(0, 100.0);
@@ -8868,14 +8934,15 @@ if (c) fprintf(stderr, "check_ncache purged %d events\n", c);
 		for (n = 1; n <= ncache; n++) {
 			rect_reg[n] = NULL;
 		}
+
+		if (ncache_xrootpmap) {
+			set_ncache_xrootpmap();
+		}
+
 		snap_old();
 	}
 
 	check_zero_rects();
-
-	if (now < last_client + 4) {
-		return -1;
-	}
 
 if (hack_val == 2) {
 	block_stats();
@@ -8910,19 +8977,61 @@ if (hack_val == 2) {
 	} else if (dt_guess && !strcmp(dt_guess, "kde")) {
 		dt_kde = 1;
 	}
+	if (dt_kde) {
+		kde_no_animate(0);
+	}
 
 	ev_store(None, EV_RESET);
 
 	X_LOCK;
 	for (k = 1; k <= 3; k++) {
+		int j, retry = 0;
 
 		nsave = n;
 
 		if (k > 1) fprintf(stderr, "read_events-%d\n", k);
 		read_events(&n);
 
-		nxsel = 0;
+#if 0
+		if (dt_gnome && (n_MN || n_UN)) {
+			retry = 1;
+		} else if (ncache_old_wm && n_ON_po >= 2) {
+			retry = 1;
+		} else if (n > nsave) {
+			/* XXX Y */
+			retry = 1;
+		}
+
+		if (retry) {
+			int n0 = n;
+			usleep(25 * 1000);
+			XFlush_wr(dpy);
+			read_events(&n);
+			fprintf(stderr, "read_events retry: %d -> %d\n", n0, n);
+		}
+#endif
+
+		if (n > nsave) {
+			int n0 = n;
+
+			for (j=0; j<4; j++) {
+				if (j < 2) {
+					usleep(30 * 1000);
+				} else {
+					usleep(10 * 1000);
+				}
+				XFlush_wr(dpy);
+				read_events(&n);
+				fprintf(stderr, "read_events retry: %d -> %d\n", n0, n);
+				if (n == n0) {
+					break;
+				}
+				n0 = n;
+			}
+		}
 			
+		nxsel = 0;
+
 		/* handle creates and reparenting: */
 		for (n1 = nsave; n1 < n; n1++) {
 			Window win2;
@@ -9041,10 +9150,87 @@ fprintf(stderr, "SKIPWINS: Ev_unmap/map: 0x%lx %d\n", twin, n2);
 				n_DC++;
 			}
 		} else {
-			if (n_MN + n_UN >= 4) {
+			if (n_MN + n_UN >= 3) {
 				desktop_change = 1;
 				n_DC++;
 			}
+		}
+	}
+	if (ncache_old_wm) {
+		int old_maps = 0; 
+		int old_unmaps = 0; 
+		int shifts = 0;
+		for (i=0; i < n; i++) {
+			XEvent ev;
+			int ns, skip = 0, type, idx = -1, state, valid;
+			int ik = Ev_order[i];
+			int x_new, y_new, w_new, h_new;
+			int x_old, y_old, w_old, h_old;
+			int old_wm = 0;
+
+			if (Ev_done[ik]) continue;
+			win = Ev_win[ik];
+
+			ev = Ev[ik];
+			type = ev.type;
+			if (type != ConfigureNotify) {
+				continue;
+			}
+			if (ev_lookup(win, EV_MAP)) {
+				continue;
+			} else if (ev_lookup(win, EV_UNMAP)) {
+				continue;
+			} else if (ev_lookup(win, EV_DESTROY)) {
+				continue;
+			}
+
+			idx = lookup_win_index(win);
+			if (idx < 0) {
+				continue;
+			}
+			x_new = ev.xconfigure.x; 
+			y_new = ev.xconfigure.y; 
+			w_new = ev.xconfigure.width; 
+			h_new = ev.xconfigure.height; 
+
+			x_old = cache_list[idx].x;
+			y_old = cache_list[idx].y;
+			w_old = cache_list[idx].width;
+			h_old = cache_list[idx].height;
+
+			if (w_new == w_old && h_new == h_old) {
+				if (nabs(x_new - x_old) >= dpy_x || nabs(y_new - y_old) >= dpy_y) {
+					sraRegionPtr r_old, r_new, r0;
+					r0 = sraRgnCreateRect(0, 0, dpy_x, dpy_y);
+					r_old = sraRgnCreateRect(x_old, y_old, x_old+w_old, y_old+h_old);
+					sraRgnAnd(r_old, r0);
+					r_new = sraRgnCreateRect(x_new, y_new, x_new+w_new, y_new+h_new);
+					sraRgnAnd(r_new, r0);
+					if (cache_list[idx].map_state != IsViewable) {
+						ev_store(win, EV_OLD_WM_NOTMAPPED);
+					} else if (sraRgnEmpty(r_old) && !sraRgnEmpty(r_new)) {
+						old_wm = 1;
+						ev_store(win, EV_OLD_WM_MAP);
+						Ev_map[i] = win;
+					} else if (!sraRgnEmpty(r_old) && sraRgnEmpty(r_new)) {
+						ev_store(win, EV_OLD_WM_UNMAP);
+						old_wm = -1;
+						Ev_unmap[i] = win;
+					} else {
+						ev_store(win, EV_OLD_WM_OFF);
+					}
+					sraRgnDestroy(r_old);
+					sraRgnDestroy(r_new);
+					sraRgnDestroy(r0);
+					shifts++;
+fprintf(stderr, "old_wm[%d]  +%04d+%04d  +%04d+%04d  old_wm: %d\n", i, x_old, y_old, x_new, y_new, old_wm);
+				}
+			}
+		}
+		if (shifts >= 3) {
+fprintf(stderr, "DESKTOP_CHANGE_OLD_WM: %d\n", shifts);
+			desktop_change = 1;
+			desktop_change_old_wm = 1;
 		}
 	}
 
@@ -9060,7 +9246,100 @@ fprintf(stderr, "SKIPWINS: Ev_unmap/map: 0x%lx %d\n", twin, n2);
 		} \
 	}
 
-	/* XXX Y not working well */
+	if (desktop_change) {
+		Window twin;
+		int ok, s, k, add, cnt, ns;
+
+		cnt = 0;
+		add = 0;
+		for (i=0; i < n; i++) {
+			twin = Ev_unmap[i];
+			SKIPUMS
+			if (ok) {
+fprintf(stderr, "U Ev_tmp[%d] = %d\n", cnt, i);
+				Ev_tmp[cnt++] = i;
+			}
+		}
+		for (i=0; i < n; i++) {
+			twin = Ev_map[i];
+			SKIPUMS
+			if (ok) {
+fprintf(stderr, "M Ev_tmp[%d] = %d\n", cnt, i);
+				Ev_tmp[cnt++] = i;
+			}
+		}
+		for (k = 0; k < cnt; k++) {
+			Ev_tmp2[k] = -1;
+		}
+		/* unmap from top to bottom */
+		for (s = old_stack_n - 1; s >= 0; s--) {
+			twin = old_stack[s];	
+			if (twin == None || twin == rootwin) {
+				continue;
+			}
+			for (k = 0; k < cnt; k++) {
+				i = Ev_tmp[k];
+				if (twin == Ev_unmap[i]) {
+fprintf(stderr, "U Ev_tmp2[%d] = %d\n", add, i);
+					Ev_tmp2[add++] = i;
+					break;
+				}
+			}
+		}
+		/* map from bottom to top */
+		for (s = 0; s < old_stack_n; s++) {
+			twin = old_stack[s];	
+			if (twin == None || twin == rootwin) {
+				continue;
+			}
+			for (k = 0; k < cnt; k++) {
+				i = Ev_tmp[k];
+				if (twin == Ev_map[i]) {
+fprintf(stderr, "M Ev_tmp2[%d] = %d\n", add, i);
+					Ev_tmp2[add++] = i;
+					break;
+				}
+			}
+		}
+		k = 0;
+		for (i=0; i < n; i++) {
+			Window wu, wm;
+			int j;
+			int oku = 0, okm = 0;
+			wu = Ev_unmap[i];
+			wm = Ev_map[i];
+			ok = 0;
+			if (wu != None && wu != rootwin) oku = 1;
+			if (wm != None && wm != rootwin) okm = 1;
+			if (!oku && !okm) {
+				continue;
+			}
+			if (oku) {
+				twin = wu;
+				SKIPUMS
+				if (!ok) {
+					oku = 0;
+				}
+			}
+			if (okm) {
+				twin = wm;
+				SKIPUMS
+				if (!ok) {
+					okm = 0;
+				}
+			}
+			if (!oku && !okm) {
+				continue;
+			}
+			j = Ev_tmp2[k++];
+			if (j >= 0) {
+fprintf(stderr, "UM Ev_order[%d] = %d oku=%d okm=%d\n", i, j, oku, okm);
+				Ev_order[i] = j;
+			}
+		}
+	}
+
+#if 0
 	if (desktop_change) {
 		Window twin;
 		int ok, s, k, add, cnt, ns;
@@ -9137,6 +9416,64 @@ fprintf(stderr, "SKIPWINS: Ev_unmap/map: 0x%lx %d\n", twin, n2);
 			}
 		}
 	}
+#endif
+
+	if (!desktop_change && (n_VN_p && !n_UN && (n_MN || n_ON_st))) {
+		if (now < last_vis_unobs_time + 0.75 || now < last_vis_obs_time + 0.75) {
+			;
+		} else if (n_MN <= 2 && n_ON_st <= 1) {
+			for (i=0; i < n; i++) {
+				XEvent ev;
+				int ns, skip = 0, type, idx = -1, state, valid;
+				int ik = Ev_order[i];
+
+				if (Ev_done[ik]) continue;
+				win = Ev_win[ik];
+
+				ev = Ev[ik];
+				type = ev.type;
+				if (type != VisibilityNotify) {
+					continue;
+				}
+
+				state = ev.xvisibility.state;
+				if (state == VisibilityUnobscured) {
+					continue;
+				}
+				if (ev_lookup(win, EV_MAP)) {
+					continue;
+				} else if (ev_lookup(win, EV_UNMAP)) {
+					continue;
+				} else if (ev_lookup(win, EV_DESTROY)) {
+					continue;
+				}
+				idx = lookup_win_index(win);
+
+				if (idx < 0) {
+					continue;
+				}
+				if (cache_list[idx].vis_state == VisibilityFullyObscured) {
+					continue;
+				}
+				if (now < cache_list[idx].vis_unobs_time + 3.00 || now < cache_list[idx].vis_obs_time + 3.00) {
+					continue;
+				}
+
+fprintf(stderr, "----%02d: VisibilityNotify 0x%lx  %3d  (*PRELOOP*) state: %s U/P %d/%d\n", ik, win, idx, VState(state), n_VN_u, n_VN_p);
+				valid = 0;
+				bs_save(idx, nbatch, &attr, 1, 0, &valid, 1);
+				if (valid) {
+					STORE(idx, win, attr);
+				} else {
+					DELETE(idx);
+				}
+
+				cache_list[idx].vis_state = state;
+				cache_list[idx].vis_obs_time = last_vis_obs_time = dnow();
+				Ev_done[ik] = 1;
+			}
+		}
+	}
 	if (desktop_change) {
 		if (ncache_dt_change) {
 			fprintf(stderr, "GUESSED DESKTOP CHANGE.\n");
@@ -9146,6 +9483,7 @@ fprintf(stderr, "SKIPWINS: Ev_unmap/map: 0x%lx %d\n", twin, n2);
 			desktop_change = 0;
 		}
 	}
+
 
 	create_cnt = 0;
 	missed_su_restore = 0;
@@ -9234,7 +9572,7 @@ fprintf(stderr, "root%02d: ** IgnoringRoot  0x%lx type: %s\n", ik, win, Etype(ty
 			if (type == ConfigureNotify) {
 				int x_new, y_new, w_new, h_new;
 				int x_old, y_old, w_old, h_old;
-				int stack_change;
+				int stack_change, old_wm = 0;
 				Window oabove = None;
 
 				idx = lookup_win_index(win);
@@ -9260,19 +9598,60 @@ fprintf(stderr, "----%02d: ConfigureNotify  0x%lx  %3d  -- above: 0x%lx -> 0x%lx
 				w_old = cache_list[idx].width;
 				h_old = cache_list[idx].height;
 
-				if (x_old != x_new || y_old != y_new) {
-					/* invalidate su */
-					cache_list[idx].su_time = 0.0;
-fprintf(stderr, "          INVALIDATE su: 0x%lx xy: +%d+%d  +%d+%d \n", win, x_old, y_old, x_new, y_new);
+				if (desktop_change_old_wm) {
+					if (ev_lookup(win, EV_OLD_WM_MAP)) {
+						if (Ev_map[ik] == win) {
+							old_wm = 1;
+						} else {
+							old_wm = 2;
+						}
+					} else if (ev_lookup(win, EV_OLD_WM_UNMAP)) {
+						if (Ev_unmap[ik] == win) {
+							old_wm = -1;
+						} else {
+							old_wm = 2;
+						}
+					} else if (ev_lookup(win, EV_OLD_WM_OFF)) {
+						old_wm = 2;
+					} else if (ev_lookup(win, EV_OLD_WM_NOTMAPPED)) {
+						old_wm = 3;
+					}
 				}
-				if (w_old != w_new || h_old != h_new) {
-					/* invalidate bs */
-					cache_list[idx].bs_time = 0.0;
+
+				if (!old_wm)  {
+					if (x_old != x_new || y_old != y_new) {
+						/* invalidate su */
+						cache_list[idx].su_time = 0.0;
+fprintf(stderr, "          INVALIDATE su: 0x%lx xy: +%d+%d  +%d+%d \n", win, x_old, y_old, x_new, y_new);
+					}
+					if (w_old != w_new || h_old != h_new) {
+						/* invalidate bs */
+						cache_list[idx].bs_time = 0.0;
 fprintf(stderr, "          INVALIDATE bs: 0x%lx wh:  %dx%d   %dx%d \n", win, w_old, h_old, w_new, h_new);
+					}
+				} else {
+					int valid;
+					X_UNLOCK;
+					if (old_wm == 1) {
+						/* XXX Y */
+fprintf(stderr, "          OLD_WM_MAP:    0x%lx wh:  %dx%d+%d+%d   %dx%d+%d+%d \n", win, w_old, h_old, x_old, y_old, w_new, h_new, x_new, y_new);
+						valid = 0;
+						bs_restore(idx, nbatch, NULL, &attr, 0, 0, &valid, 1);
+
+					} else if (old_wm == -1) {
+fprintf(stderr, "          OLD_WM_UNMAP:  0x%lx wh:  %dx%d+%d+%d   %dx%d+%d+%d \n", win, w_old, h_old, x_old, y_old, w_new, h_new, x_new, y_new);
+						valid = 1;
+						su_restore(idx, nbatch, NULL, &attr, 1, 0, &valid, 1);
+					} else {
+fprintf(stderr, "          OLD_WM_OFF::   0x%lx wh:  %dx%d+%d+%d   %dx%d+%d+%d  old_wm=%d\n", win, w_old, h_old, x_old, y_old, w_new, h_new, x_new, y_new, old_wm);
+					}
+					X_LOCK;
 				}
 
 				stack_change = 0;
-				if (cache_list[idx].above != ev.xconfigure.above) {
+				if (old_wm) {
+					;
+				} else if (cache_list[idx].above != ev.xconfigure.above) {
 					stack_change = 1;
 				} else if (x_new == x_old && y_new == y_old && w_new == w_old && h_new == h_old) {
 					stack_change = 1;
@@ -9430,9 +9809,9 @@ fprintf(stderr, "----%02d: VisibilityNotify 0x%lx  %3d  state: %s U/P %d/%d\n", 
 					}
 				}
 				if (state == VisibilityUnobscured) {
-					cache_list[idx].vis_unobs_time = dnow();
+					cache_list[idx].vis_unobs_time = last_vis_unobs_time = dnow();
 				} else if (cache_list[idx].vis_state == VisibilityUnobscured) {
-					cache_list[idx].vis_obs_time = dnow();
+					cache_list[idx].vis_obs_time = last_vis_obs_time = dnow();
 				}
 				cache_list[idx].vis_state = state;
 

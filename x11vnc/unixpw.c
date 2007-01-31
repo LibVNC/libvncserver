@@ -62,7 +62,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init);
 void unixpw_accept(char *user);
 void unixpw_deny(void);
 void unixpw_msg(char *msg, int delay);
-int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size);
+int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int nodisp);
 int crypt_verify(char *user, char *pass);
 int cmd_verify(char *user, char *pass);
 
@@ -552,7 +552,7 @@ int cmd_verify(char *user, char *pass) {
 	}
 }
 
-int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
+int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int nodisp) {
 #ifndef UNIXPW_SU
 	return 0;
 #else
@@ -624,6 +624,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 		return 0;
 	}
 
+	if (db) fprintf(stderr, "cmd is: %s\n", cmd);
 	if (db) fprintf(stderr, "slave is: %s fd=%d\n", slave, fd);
 
 	if (fd < 0) {
@@ -729,10 +730,19 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 		set_env("LC_ALL", "C");
 		set_env("LANG", "C");
 		set_env("SHELL", "/bin/sh");
-		if (!cmd && getenv("DISPLAY")) {
+		if (nodisp) {
 			/* this will cause timeout problems with pam_xauth */
-			char *s = getenv("DISPLAY");
-			if (s) *(s-2) = '_';	/* quite... */
+			int k;
+			for (k=0; k<3; k++) {
+				if (getenv("DISPLAY")) {
+					char *s = getenv("DISPLAY");
+					if (s) *(s-2) = '_';	/* quite... */
+				}
+				if (getenv("XAUTHORITY")) {
+					char *s = getenv("XAUTHORITY");
+					if (s) *(s-2) = '_';	/* quite... */
+				}
+			}
 		}
 
 		/* synchronize with parent: */
@@ -874,6 +884,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 		return 0;
 	}
 
+	if (db > 2) fprintf(stderr, "\nsending passwd: %s\n", pass);
 	usleep(100 * 1000);
 	if (slow_pw) {
 		unsigned int k;
@@ -899,6 +910,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 		drain_size = *rbuf_size;
 		rsize = 0;
 	}
+	if (db) fprintf(stderr, "\ndraining:\n");
 	for (i = 0; i< drain_size; i++) {
 		int n;	
 		
@@ -907,12 +919,13 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 
 		n = read(fd, cbuf, 1);
 		if (n < 0 && errno == EINTR) {
+			if (db) fprintf(stderr, "\nEINTR n=%d i=%d --", n, i);
 			i--;
 			if (i < 0) i = 0;
 			continue;
 		}
 
-		if (db) fprintf(stderr, "%s", cbuf);
+		if (db) fprintf(stderr, "\nn=%d i=%d errno=%d %.6f  '%s'", n, i, errno, dnowx(), cbuf);
 
 		if (n <= 0) {
 			break;
@@ -921,6 +934,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 			rbuf[rsize++] = cbuf[0];
 		}
 	}
+	if (db && rbuf) fprintf(stderr, "\nrbuf: '%s'\n", rbuf);
 
 	if (rbuf && *rbuf_size > 0) {
 		char *s = rbuf;
@@ -961,7 +975,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size) {
 		free(p);
 	}
 
-	if (db) fprintf(stderr, "\n");
+	if (db) fprintf(stderr, "\n--\n");
 
 	alarm(0);
 	signal(SIGALRM, SIG_DFL);
@@ -1042,7 +1056,7 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 			ok = 0;
 		}
 	} else {
-		if (su_verify(user, pass, NULL, NULL, NULL)) {
+		if (su_verify(user, pass, NULL, NULL, NULL, 1)) {
 			rfbLog("unixpw_verify: su_verify login for '%s'"
 			    " succeeded.\n", user);
 			ok = 1;

@@ -243,7 +243,7 @@ void macosx_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 		last_pointer_time = time(NULL);
 	}
 	if (last_mask != mask) {
-		fprintf(stderr, "about to inject mask change %d -> %d: %.4f\n", last_mask, mask, dnowx());
+		if (0) fprintf(stderr, "about to inject mask change %d -> %d: %.4f\n", last_mask, mask, dnowx());
 		if (mask) {
 			int px, py, x, y, w, h;
 			macosx_click_frame = None;
@@ -267,7 +267,7 @@ void macosx_pointer_command(int mask, int x, int y, rfbClientPtr client) {
 		if (ncache > 0) {
 			/* XXX Y */
 			int i;
-fprintf(stderr, "about to get all windows:           %.4f\n", dnowx());
+if (0) fprintf(stderr, "about to get all windows:           %.4f\n", dnowx());
 			for (i=0; i < 2; i++) {
 				macosxCGS_get_all_windows();
 				fprintf(stderr, "!");
@@ -275,7 +275,7 @@ fprintf(stderr, "about to get all windows:           %.4f\n", dnowx());
 					break;
 				}
 			}
-fprintf(stderr, "\ndone:                               %.4f\n", dnowx());
+if (0) fprintf(stderr, "\ndone:                               %.4f\n", dnowx());
 		}
 	}
 	last_mask = mask;

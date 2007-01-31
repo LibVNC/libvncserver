@@ -35,7 +35,7 @@ void macosxCG_key_inject(int down, unsigned int keysym);
 CGDirectDisplayID displayID = NULL;
 
 extern void macosx_log(char *);
-extern int collect_macosx_damage(int x_in, int y_in, int w_in, int h_in, int call);
+extern int collect_non_X_xdamage(int x_in, int y_in, int w_in, int h_in, int call);
 
 static void macosxCG_callback(CGRectCount n, const CGRect *rects, void *dum) {
 	int i, db = 0;
@@ -43,7 +43,7 @@ static void macosxCG_callback(CGRectCount n, const CGRect *rects, void *dum) {
 	if (!dum) {}
 	for (i=0; i < (int) n; i++) {
 		if (db > 1) fprintf(stderr, "               : %g %g - %g %g\n", rects[i].origin.x, rects[i].origin.y, rects[i].size.width, rects[i].size.height);
-		collect_macosx_damage( (int) rects[i].origin.x, (int) rects[i].origin.y,
+		collect_non_X_xdamage( (int) rects[i].origin.x, (int) rects[i].origin.y,
 		    (int) rects[i].size.width, (int) rects[i].size.height, 1);
 	}
 }

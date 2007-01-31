@@ -3065,11 +3065,15 @@ int scan_for_updates(int count_only) {
 			/* first pass collecting DAMAGE events: */
 #ifdef MACOSX
 			if (macosx_console) {
-				collect_macosx_damage(-1, -1, -1, -1, 0);
+				collect_non_X_xdamage(-1, -1, -1, -1, 0);
 			} else 
 #endif
 			{
-				collect_xdamage(scan_count, 0);
+				if (rawfb_vnc_reflect) {
+					collect_non_X_xdamage(-1, -1, -1, -1, 0);
+				} else {
+					collect_xdamage(scan_count, 0);
+				}
 			}
 		}
 	}
@@ -3100,7 +3104,11 @@ int scan_for_updates(int count_only) {
 		} else 
 #endif
 		{
-			collect_xdamage(scan_count, 1);
+			if (rawfb_vnc_reflect) {
+				;
+			} else {
+				collect_xdamage(scan_count, 1);
+			}
 		}
 	}
 	if (count_only) {

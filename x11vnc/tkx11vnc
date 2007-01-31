@@ -135,6 +135,7 @@ Clients
 Displays
 	=D display:
 	=F auth:
+	=S reflect:
 	=D desktop:
 	=D rfbport:
 	=0 gui:
@@ -369,6 +370,7 @@ Tuning
 	ncache_no_moveraise
 	ncache_no_dtchange
 	ncache_no_rootpixmap
+	ncache_keep_anims
 	=A ncache_reset_rootpixmap
 	=GAL LOFF
 	--

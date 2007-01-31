@@ -177,7 +177,7 @@ int macosxCGS_follow_animation_win(int win, int idx, int grow) {
 			macwins[idx].height = h;
 		}
 	
-		fprintf(stderr, " chase: %03dx%03d+%03d+%03d  %d\n", w, h, x, y, win);
+		if (0) fprintf(stderr, " chase: %03dx%03d+%03d+%03d  %d\n", w, h, x, y, win);
 		if (x == xp && y == yp && w == wp && h == hp)  {
 			reps++;
 			if (reps >= 2) {
@@ -398,20 +398,20 @@ if (db) fprintf(stderr, "cnt: %d err: %d\n", (int) _wins_mapped_cnt, err);
 				;
 			} else if ( !(prev & is_mapped) && (curr & is_mapped)) {
 				/* MapNotify */
-				fprintf(stderr, "MapNotify:   %d/%d  %d               %.4f tot=%d\n", prev, curr, win, dnowx(), totcnt); 
+				if (0) fprintf(stderr, "MapNotify:   %d/%d  %d               %.4f tot=%d\n", prev, curr, win, dnowx(), totcnt); 
 				macosx_add_mapnotify(win, macwins[i].level, 1);
 				if (0) macosxCGS_follow_animation_win(win, i, 1);
 
 			} else if ( !(curr & is_mapped) && (prev & is_mapped)) {
 				/* UnmapNotify */
-				fprintf(stderr, "UnmapNotify: %d/%d  %d               %.4f A tot=%d\n", prev, curr, win, dnowx(), totcnt); 
+				if (0) fprintf(stderr, "UnmapNotify: %d/%d  %d               %.4f A tot=%d\n", prev, curr, win, dnowx(), totcnt); 
 				macosx_add_mapnotify(win, macwins[i].level, 0);
 			} else if ( !(prev & is_exist) && (curr & is_exist)) {
 				/* CreateNotify */
-				fprintf(stderr, "CreateNotify:%d/%d  %d               %.4f whist: %d/%d 0x%x tot=%d\n", prev, curr, win, dnowx(), whist_prv, whist_idx, win, totcnt); 
+				if (0) fprintf(stderr, "CreateNotify:%d/%d  %d               %.4f whist: %d/%d 0x%x tot=%d\n", prev, curr, win, dnowx(), whist_prv, whist_idx, win, totcnt); 
 				macosx_add_create(win, macwins[i].level);
 				if (curr & is_mapped) {
-					fprintf(stderr, "MapNotify:   %d/%d  %d               %.4f tot=%d\n", prev, curr, win, dnowx(), totcnt); 
+					if (0) fprintf(stderr, "MapNotify:   %d/%d  %d               %.4f tot=%d\n", prev, curr, win, dnowx(), totcnt); 
 					macosx_add_mapnotify(win, macwins[i].level, 1);
 				}
 			}
@@ -425,24 +425,24 @@ if (db) fprintf(stderr, "cnt: %d err: %d\n", (int) _wins_mapped_cnt, err);
 				if (1) {
 					;
 				} else if (curr & is_clipped) {
-					fprintf(stderr, "VisibNotify: %d/%d  %d               OBS tot=%d\n", prev, curr, win, totcnt); 
+					if (0) fprintf(stderr, "VisibNotify: %d/%d  %d               OBS tot=%d\n", prev, curr, win, totcnt); 
 					nv_win[nv] = win;
 					nv_lvl[nv] = macwins[i].level;
 					nv_vis[nv++] = 1;
 				} else {
-					fprintf(stderr, "VisibNotify: %d/%d  %d               UNOBS tot=%d\n", prev, curr, win, totcnt); 
+					if (0) fprintf(stderr, "VisibNotify: %d/%d  %d               UNOBS tot=%d\n", prev, curr, win, totcnt); 
 					nv_win[nv] = win;
 					nv_lvl[nv] = macwins[i].level;
 					nv_vis[nv++] = 0;
 				}
 			} else {
 				if        ( !(prev & is_clipped) &&  (curr & is_clipped) ) {
-					fprintf(stderr, "VisibNotify: %d/%d  %d               OBS tot=%d\n", prev, curr, win, totcnt); 
+					if (0) fprintf(stderr, "VisibNotify: %d/%d  %d               OBS tot=%d\n", prev, curr, win, totcnt); 
 					nv_win[nv] = win;
 					nv_lvl[nv] = macwins[i].level;
 					nv_vis[nv++] = 1;
 				} else if (  (prev & is_clipped) && !(curr & is_clipped) ) {
-					fprintf(stderr, "VisibNotify: %d/%d  %d               UNOBS tot=%d\n", prev, curr, win, totcnt); 
+					if (0) fprintf(stderr, "VisibNotify: %d/%d  %d               UNOBS tot=%d\n", prev, curr, win, totcnt); 
 					nv_win[nv] = win;
 					nv_lvl[nv] = macwins[i].level;
 					nv_vis[nv++] = 0;
@@ -466,11 +466,11 @@ if (db) fprintf(stderr, "cnt: %d err: %d\n", (int) _wins_mapped_cnt, err);
 			prev = whist[whist_prv][win];
 			if (!(curr & is_exist) && (prev & is_exist)) {
 				if (prev & is_mapped) {
-					fprintf(stderr, "UnmapNotify: %d/%d  %d               %.4f B tot=%d\n", prev, curr, win, dnowx(), totcnt); 
+					if (0) fprintf(stderr, "UnmapNotify: %d/%d  %d               %.4f B tot=%d\n", prev, curr, win, dnowx(), totcnt); 
 					macosx_add_mapnotify(win, lvl, 0);
 				}
 				/* DestroyNotify */
-				fprintf(stderr, "DestroNotify:%d/%d  %d               %.4f tot=%d\n", prev, curr, win, dnowx(), totcnt); 
+				if (0) fprintf(stderr, "DestroNotify:%d/%d  %d               %.4f tot=%d\n", prev, curr, win, dnowx(), totcnt); 
 				macosx_add_destroy(win, lvl);
 			}
 		}

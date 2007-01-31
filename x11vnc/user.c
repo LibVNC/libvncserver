@@ -1241,6 +1241,10 @@ int wait_for_client(int *argc, char** argv, int http) {
 		return 0;
 	}
 
+	if (getenv("WAIT_FOR_CLIENT_DB")) {
+		db = 1;
+	}
+
 	for (i=0; i < *argc; i++) {
 		if (!strcmp(argv[i], "-desktop")) {
 			dt = 1;
@@ -1435,6 +1439,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 		char line2[16384];
 		char *q;
 		int n;
+		int nodisp = 0;
 
 		memset(line1, 0, 1024);
 		memset(line2, 0, 16384);
@@ -1447,9 +1452,10 @@ int wait_for_client(int *argc, char** argv, int http) {
 				rfbLogPerror("mkstemp");
 				clean_up_exit(1);
 			}
+			chmod(tmp, 0644);
 			write(tmp_fd, find_display, strlen(find_display));
 			close(tmp_fd);
-			chmod(tmp, 0644);
+			nodisp = 1;
 
 			if (strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 				char *opts = strchr(cmd, '-');
@@ -1487,10 +1493,10 @@ if (db) fprintf(stderr, "create_cmd: %s\n", create_cmd);
 			if (keep_unixpw_user && keep_unixpw_pass) {
 				n = 18000;
 				res = su_verify(keep_unixpw_user,
-				    keep_unixpw_pass, cmd, line, &n);
+				    keep_unixpw_pass, cmd, line, &n, nodisp);
 			}
 
-if (db) write(2, line, n); write(2, "\n", 1);
+if (db) {fprintf(stderr, "line: "); write(2, line, n); write(2, "\n", 1); fprintf(stderr, "res=%d n=%d\n", res, n);}
 
 			if (! res && create_cmd) {
 				FILE *mt = fopen(tmp, "w");
@@ -1506,7 +1512,7 @@ if (db) write(2, line, n); write(2, "\n", 1);
 					/* if not root, run as the other user... */
 					n = 18000;
 					res = su_verify(keep_unixpw_user,
-					    keep_unixpw_pass, create_cmd, line, &n);
+					    keep_unixpw_pass, create_cmd, line, &n, nodisp);
 /*if (1) fprintf(stderr, "line: '%s'\n", line); */
 
 				} else {
@@ -1576,8 +1582,8 @@ if (db) fprintf(stderr, "line1: '%s'\n", line1);
 				line2[i] = q[k+j];
 				i++;
 			}
-write(2, line, 100);
-fprintf(stderr, "\n");
+if (db) write(2, line, 100);
+if (db) fprintf(stderr, "\n");
 		} else {
 			FILE *p;
 			int rc;
@@ -1641,6 +1647,7 @@ fprintf(stderr, "\n");
 			}
 		}
 
+if (db) fprintf(stderr, "line1=%s\n", line1);
 
 		if (strstr(line1, "DISPLAY=") != line1) {
 			rfbLog("wait_for_client: bad reply '%s'\n", line1);
@@ -1648,11 +1655,47 @@ fprintf(stderr, "\n");
 			clean_up_exit(1);
 		}
 
+
 		if (strstr(line1, ",VT=")) {
 			int vt;
 			char *t = strstr(line1, ",VT=");
 			vt = atoi(t + strlen(",VT="));
 			*t = '\0';
+			if (7 <= vt && vt <= 128) {
+				char chvt[100];
+				sprintf(chvt, "chvt %d >/dev/null 2>/dev/null &", vt);
+				rfbLog("running: %s\n", chvt);
+				system(chvt);
+				sleep(2);
+			}
+		} else if (strstr(line1, ",XPID=")) {
+			int i, pvt, vt = -1;
+			char *t = strstr(line1, ",XPID=");
+			pvt = atoi(t + strlen(",XPID="));
+			*t = '\0';
+			if (pvt > 0) {
+				for (i=3; i <= 10; i++) {
+					int k;
+					char proc[100];
+					char buf[100];
+					sprintf(proc, "/proc/%d/fd/%d", pvt, i);
+if (db) fprintf(stderr, "%d -- %s\n", i, proc);
+					for (k=0; k < 100; k++) {
+						buf[k] = '\0';
+					}
+		
+					if (readlink(proc, buf, 100) != -1) {
+						buf[100-1] = '\0';
+if (db) fprintf(stderr, "%d -- %s -- %s\n", i, proc, buf);
+						if (strstr(buf, "/dev/tty") == buf) {
+							vt = atoi(buf + strlen("/dev/tty"));
+							if (vt > 0) {
+								break;
+							}
+						}
+					}
+				}
+			}
 			if (7 <= vt && vt <= 128) {
 				char chvt[100];
 				sprintf(chvt, "chvt %d >/dev/null 2>/dev/null &", vt);

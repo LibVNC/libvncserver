@@ -9,6 +9,7 @@
 int debug = 0;
 
 char *use_dpy = NULL;		/* -display */
+int display_N = 0;
 char *auth_file = NULL;		/* -auth/-xauth */
 char *visual_str = NULL;	/* -visual */
 int set_visual_str_to_something = 0;
@@ -216,6 +217,8 @@ int ncache0 = 0;
 int ncache_copyrect = 0;
 int ncache_wf_raises = 1;
 int ncache_dt_change = 1;
+int ncache_keep_anims = 0;
+int ncache_old_wm = 0;
 int macosx_ncache_macmenu = 0;
 int ncache_beta_tester = 0;
 
