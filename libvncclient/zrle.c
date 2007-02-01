@@ -56,6 +56,7 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 	int remaining;
 	int inflateResult;
 	int toRead;
+	int min_buffer_size = rw * rh * (REALBPP / 8) * 2;
 
 	/* First make sure we have a large enough raw buffer to hold the
 	 * decompressed data.  In practice, with a fixed REALBPP, fixed frame
@@ -63,7 +64,7 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 	 * buffer, this buffer allocation should only happen once, on the
 	 * first update.
 	 */
-	if ( client->raw_buffer_size < (( rw * rh ) * ( REALBPP / 8 ))) {
+	if ( client->raw_buffer_size < min_buffer_size) {
 
 		if ( client->raw_buffer != NULL ) {
 
@@ -71,7 +72,7 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 
 		}
 
-		client->raw_buffer_size = (( rw * rh ) * ( REALBPP / 8 ));
+		client->raw_buffer_size = min_buffer_size;
 		client->raw_buffer = (char*) malloc( client->raw_buffer_size );
 
 	}
