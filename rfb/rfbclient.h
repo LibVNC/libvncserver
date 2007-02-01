@@ -124,6 +124,10 @@ typedef struct _rfbClient {
 	rfbBool listenSpecified;
 	int listenPort, flashPort;
 
+	struct {
+		int x, y, w, h;
+	} updateRect;
+
 	/* Note that the CoRRE encoding uses this buffer and assumes it is big enough
 	   to hold 255 * 255 * 32 bits -> 260100 bytes.  640*480 = 307200 bytes.
 	   Hextile also assumes it is big enough to hold 16 * 16 * 32 bits.

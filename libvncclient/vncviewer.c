@@ -119,7 +119,10 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   
   client->CurrentKeyboardLedState = 0;
   client->HandleKeyboardLedState = (HandleKeyboardLedStateProc)DummyPoint;
-  
+
+  /* default: use complete frame buffer */ 
+  client->updateRect.x = -1;
+ 
   client->format.bitsPerPixel = bytesPerPixel*8;
   client->format.depth = bitsPerSample*samplesPerPixel;
   client->appData.requestedDepth=client->format.depth;
@@ -202,20 +205,30 @@ static rfbBool rfbInitConnection(rfbClient* client)
   client->height=client->si.framebufferHeight;
   client->MallocFrameBuffer(client);
 
+  if (client->updateRect.x < 0) {
+    client->updateRect.x = client->updateRect.y = 0;
+    client->updateRect.w = client->width;
+    client->updateRect.h = client->height;
+  }
+
   if (client->appData.scaleSetting>1)
   {
       if (!SendScaleSetting(client, client->appData.scaleSetting))
           return FALSE;
       if (!SendFramebufferUpdateRequest(client,
-                                        0,0,
-                                        client->width/client->appData.scaleSetting,
-                                        client->height/client->appData.scaleSetting,FALSE))
-      return FALSE;
+			      client->updateRect.x / client->appData.scaleSetting,
+			      client->updateRect.y / client->appData.scaleSetting,
+			      client->updateRect.w / client->appData.scaleSetting,
+			      client->updateRect.h / client->appData.scaleSetting,
+			      FALSE))
+	      return FALSE;
   }
   else
   {
       if (!SendFramebufferUpdateRequest(client,
-  				        0,0,client->width,client->height,FALSE))
+			      client->updateRect.x, client->updateRect.y,
+			      client->updateRect.w, client->updateRect.h,
+			      FALSE))
       return FALSE;
   }
 

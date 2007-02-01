@@ -854,8 +854,9 @@ SetFormatAndEncodings(rfbClient* client)
 rfbBool
 SendIncrementalFramebufferUpdateRequest(rfbClient* client)
 {
-    return SendFramebufferUpdateRequest(client, 0, 0, client->width,
-				      client->height, TRUE);
+	return SendFramebufferUpdateRequest(client,
+			client->updateRect.x, client->updateRect.y,
+			client->updateRect.w, client->updateRect.h, TRUE);
 }
 
 
