@@ -21,6 +21,17 @@ fi
 PATH=$PATH:/usr/bin:/bin:/usr/bin/X11:/usr/X11R6/bin:/usr/openwin/bin:/usr/sfw/bin:/usr/local/bin
 export PATH
 
+if [ "X$FULLNAME" = "XKarl J. Runge" ]; then
+	VNCVIEWER_POPUP_FIX=1
+	export VNCVIEWER_POPUP_FIX
+
+	if uname -smr | grep 'Linux 2\.4.*i686' > /dev/null; then
+		UNAME="Linux.i686.older"
+		export UNAME
+	fi
+	PATH=`echo "$PATH" | sed -e 's,runge/bin/override,-------------,'`
+fi
+
 if [ "X$WISH" = "X" ]; then
 	WISH=wish
 	for try in wish wish8.3 wish8.4 wish8.5

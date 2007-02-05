@@ -157,7 +157,11 @@ start=`pwd`
 cd $tmp;
 failed=0
 count=0
-for patch in ../../patches/tight*
+patches="../../patches/tight-vncviewer-full.patch"
+if [ ! -f "$patches" ]; then
+	patches=`ls ../../patches/tight* | grep -v 'tight-vncviewer-full.patch'`
+fi
+for patch in $patches
 do
 	if [ ! -f "$patch" ]; then
 		continue

@@ -12,6 +12,7 @@ exec wish "$0" "$@"
 set buck_zero $argv0
 
 proc center_win {w} {
+	update
 	set W [winfo screenwidth  $w]
 	set W [expr $W + 1]
 	wm geometry $w +$W+0
@@ -19,7 +20,14 @@ proc center_win {w} {
 	set x [expr [winfo screenwidth  $w]/2 - [winfo width  $w]/2]
 	set y [expr [winfo screenheight $w]/2 - [winfo height $w]/2]
 	wm geometry $w +$x+$y
+	wm deiconify $w
 	update
+}
+
+proc toplev {w} {
+	catch {destroy $w}
+	toplevel $w
+	catch {wm withdraw $w}
 }
 
 proc apply_bg {w} {
@@ -75,8 +83,7 @@ proc jiggle_text {w} {
 }
 
 proc help {} {
-	catch {destroy .h}
-	toplevel .h
+	toplev .h
 
 	scroll_text_dismiss .h.f
 
@@ -255,8 +262,7 @@ proc help {} {
 }
 
 proc help_certs {} {
-	catch {destroy .ch}
-	toplevel .ch
+	toplev .ch
 
 	scroll_text_dismiss .ch.f 90 33
 
@@ -340,8 +346,7 @@ proc help_certs {} {
 }
 
 proc help_opts {} {
-	catch {destroy .oh}
-	toplevel .oh
+	toplev .oh
 
 	scroll_text_dismiss .oh.f
 
@@ -476,8 +481,7 @@ set msg {
 
 proc win_nokill_msg {} {
 	global help_font is_windows system_button_face
-	catch {destroy .w}
-	toplevel .w
+	toplev .w
 
 	eval text .w.t -width 60 -height 11 $help_font
 	button .w.d -text "Dismiss" -command {destroy .w}
@@ -507,8 +511,7 @@ proc win_nokill_msg {} {
 proc win_kill_msg {pids} {
 	global terminate_pids
 	global help_font
-	catch {destroy .w}
-	toplevel .w
+	toplev .w
 
 	eval text .w.t -width 72 -height 19 $help_font
 	button .w.d -text "Dismiss" -command {destroy .w; set terminate_pids no}
@@ -546,9 +549,8 @@ proc win_kill_msg {pids} {
 }
 
 proc win9x_plink_msg {file} {
-	catch {destroy .pl}
 	global help_font win9x_plink_msg_done
-	toplevel .pl
+	toplev .pl
 
 	eval text .pl.t -width 90 -height 26 $help_font
 	button .pl.d -text "OK" -command {destroy .pl; set win9x_plink_msg_done 1}
@@ -783,6 +785,7 @@ proc do_viewer_windows {n} {
 	set emess ""
 	set rc [catch {eval exec $cmd} emess]
 	if {$rc != 0} {
+		raise .
 		tk_messageBox -type ok -icon error -message $emess -title "Error: $cmd"
 	}
 }
@@ -974,8 +977,7 @@ proc contag {} {
 }
 
 proc make_plink {} {
-	catch {destroy .plink}
-	toplevel .plink
+	toplev .plink
 	#wm geometry .plink +700+500
 	wm geometry .plink -40-40
 	wm title .plink "plink SSH status?"
@@ -1569,6 +1571,7 @@ proc check_ssh_needed {} {
                 set msg "\"Use SSL\" mode selected (no SSH)\nThe following options will be disabled:\n\n$msg"
 		bell
 		update
+		raise .
                 tk_messageBox -type ok -icon info -message $msg
 	}
 }
@@ -1626,6 +1629,7 @@ proc darwin_terminal_cmd {{title ""} {cmd ""} {bg 0}} {
 		}
 	}
 	if {! [info exists darwin_terminal]} {
+		raise .
 		tk_messageBox -type ok -icon error -message "Cannot find Darwin Terminal program." -title "Cannot find Terminal program"
 		return
 	}
@@ -1641,6 +1645,7 @@ proc darwin_terminal_cmd {{title ""} {cmd ""} {bg 0}} {
 	set fh ""
 	catch {set fh [open $tmp w 0755]}
 	if {$fh == ""} {
+		raise .
 		tk_messageBox -type ok -icon error -message "Cannot open temporary file: $tmp" -title "Cannot open file"
 		return
 	}
@@ -1939,6 +1944,7 @@ proc direct_connect_msg {} {
 	}
 	if {$msg != ""} {
 		set msg "Direct connect via vnc://hostname\nThe following options will be disabled:\n\n$msg"
+		raise .
 		tk_messageBox -type ok -icon info -message $msg
 	}
 }
@@ -2128,7 +2134,11 @@ proc launch_unix {hp} {
 	if {$change_vncviewer && $change_vncviewer_path != ""} {
 		set env(VNCVIEWERCMD) $change_vncviewer_path
 	} else {
-		set env(VNCVIEWERCMD) ""
+		if [info exists env(VNCVIEWERCMD_OVERRIDE)] {
+			set env(VNCVIEWERCMD) $env(VNCVIEWERCMD_OVERRIDE)
+		} else {
+			set env(VNCVIEWERCMD) ""
+		}
 	}
 
 	set realvnc4 $vncviewer_realvnc4
@@ -2777,14 +2787,14 @@ proc get_idir_certs {str} {
 	return $idir
 }
 
-proc set_mycert {} {
+proc set_mycert {{parent "."}} {
 	global mycert
 	set idir [get_idir_certs $mycert]
 	set t ""
 	if {$idir != ""} {
-		set t [tk_getOpenFile -initialdir $idir]
+		set t [tk_getOpenFile -parent $parent -initialdir $idir]
 	} else {
-		set t [tk_getOpenFile]
+		set t [tk_getOpenFile -parent $parent]
 	}
 	if {$t != ""} {
 		set mycert $t
@@ -2812,8 +2822,7 @@ proc show_cert {crt} {
 	}
 
 	set w .show_certificate
-	catch {destroy $w}
-	toplevel $w
+	toplev $w
 	scroll_text $w.f
 	button $w.b -text Dismiss -command "destroy $w"
 	bind $w <Escape> "destroy $w"
@@ -2855,14 +2864,14 @@ proc show_svcert {} {
 	show_cert $svcert
 }
 
-proc set_svcert {} {
+proc set_svcert {{parent "."}} {
 	global svcert crtdir
 	set idir [get_idir_certs $svcert]
 	set t ""
 	if {$idir != ""} {
-		set t [tk_getOpenFile -initialdir $idir]
+		set t [tk_getOpenFile -parent $parent -initialdir $idir]
 	} else {
-		set t [tk_getOpenFile]
+		set t [tk_getOpenFile -parent $parent]
 	}
 	if {$t != ""} {
 		set crtdir ""
@@ -2873,14 +2882,14 @@ proc set_svcert {} {
 	update
 }
 
-proc set_crtdir {} {
+proc set_crtdir {{parent "."}} {
 	global svcert crtdir
 	set idir [get_idir_certs $crtdir]
 	set t ""
 	if {$idir != ""} {
-		set t [tk_chooseDirectory -initialdir $idir]
+		set t [tk_chooseDirectory -parent $parent -initialdir $idir]
 	} else {
-		set t [tk_chooseDirectory]
+		set t [tk_chooseDirectory -parent $parent]
 	}
 	if {$t != ""} {
 		set svcert ""
@@ -2896,9 +2905,9 @@ proc set_createcert_file {} {
 		set idir [get_idir_certs $ccert(FILE)]
 	}
 	if {$idir != ""} {
-		set t [tk_getSaveFile -defaultextension ".pem" -initialdir $idir]
+		set t [tk_getSaveFile -parent .ccrt -defaultextension ".pem" -initialdir $idir]
 	} else {
-		set t [tk_getSaveFile -defaultextension ".pem"]
+		set t [tk_getSaveFile -parent .ccrt -defaultextension ".pem"]
 	}
 	if {$t != ""} {
 		set ccert(FILE) $t
@@ -3102,6 +3111,7 @@ emailAddress_max                = 64
 			update
 			set rc [catch {eval exec $cmd} emess]
 			if {$rc != 0 && [regexp -nocase {error:} $emess]} {
+				raise .
 				tk_messageBox -type ok -icon error -message $emess -title "OpenSSL req command failed"
 				return
 			}
@@ -3123,6 +3133,7 @@ emailAddress_max                = 64
 		set bad "$crt"
 	}
 	if {$bad != ""} {
+		raise .
 		tk_messageBox -type ok -icon error -message "Not created: $bad" -title "OpenSSL could not create cert"
 		catch {raise .c}
 		return
@@ -3135,6 +3146,7 @@ emailAddress_max                = 64
 		update
 		set rc [catch {set ph [open "| $cmd" "w"]} emess]
 		if {$rc != 0 || $ph == ""} {
+			raise .
 			tk_messageBox -type ok -icon error -message $emess -title "Count not encrypt private key"
 			catch {file delete $pem}
 			catch {file delete $crt}
@@ -3160,12 +3172,12 @@ emailAddress_max                = 64
 	if [winfo exists .c] {
 		set p .c
 	}
+	
 	set reply [tk_messageBox -parent $p -type yesno -title "View Cert" -message "View Certificate and Info?"]
 	catch {raise .c}
 	if {$reply == "yes"} {
 		set w .view_cert
-		catch {destroy $w}
-		toplevel $w
+		toplev $w
 		scroll_text $w.f
 		set cert ""
 		set fh ""
@@ -3207,8 +3219,7 @@ emailAddress_max                = 64
 	catch {raise .c}
 	if {$reply == "yes"} {
 		set w .view_key
-		catch {destroy $w}
-		toplevel $w
+		toplev $w
 		scroll_text $w.f
 		set key ""
 		set fh [open $pem "r"]
@@ -3239,8 +3250,7 @@ emailAddress_max                = 64
 	
 proc create_cert {} {
 
-	catch {destroy .ccrt}
-	toplevel .ccrt
+	toplev .ccrt
 	wm title .ccrt "Create SSL Certificate"
 
 	global uname
@@ -3432,9 +3442,9 @@ proc import_browse {} {
 		set idir [get_idir_certs $import_file]
 	}
 	if {$idir != ""} {
-		set t [tk_getOpenFile -initialdir $idir]
+		set t [tk_getOpenFile -parent .icrt -initialdir $idir]
 	} else {
-		set t [tk_getOpenFile]
+		set t [tk_getOpenFile -parent .icrt]
 	}
 	if {$t != ""} {
 		set import_file $t
@@ -3454,9 +3464,9 @@ proc import_save_browse {} {
 		set idir [get_idir_certs ""]
 	}
 	if {$idir != ""} {
-		set t [tk_getSaveFile -defaultextension ".crt" -initialdir $idir]
+		set t [tk_getSaveFile -parent .icrt -defaultextension ".crt" -initialdir $idir]
 	} else {
-		set t [tk_getSaveFile -defaultextension ".crt"]
+		set t [tk_getSaveFile -parent .icrt -defaultextension ".crt"]
 	}
 	if {$t != ""} {
 		set import_save_file $t
@@ -3533,8 +3543,7 @@ proc do_save {} {
 
 proc import_cert {} {
 
-	catch {destroy .icrt}
-	toplevel .icrt
+	toplev .icrt
 	wm title .icrt "Import SSL Certificate"
 
 	global scroll_text_focus
@@ -3659,8 +3668,7 @@ TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 proc getcerts {} {
 	global mycert svcert crtdir
 	global use_ssh use_sshssl
-	catch {destroy .c}
-	toplevel .c
+	toplev .c
 	wm title .c "Set SSL Certificates"
 	frame .c.mycert
 	frame .c.svcert
@@ -3676,9 +3684,9 @@ proc getcerts {} {
 	bind .c.svcert.e <Enter> {.c.svcert.e validate}
 	bind .c.svcert.e <Leave> {.c.svcert.e validate}
 	entry .c.crtdir.e -width 32 -textvariable crtdir
-	button .c.mycert.b -text "Browse..." -command {set_mycert; catch {raise .c}}
-	button .c.svcert.b -text "Browse..." -command {set_svcert; catch {raise .c}}
-	button .c.crtdir.b -text "Browse..." -command {set_crtdir; catch {raise .c}}
+	button .c.mycert.b -text "Browse..." -command {set_mycert .c; catch {raise .c}}
+	button .c.svcert.b -text "Browse..." -command {set_svcert .c; catch {raise .c}}
+	button .c.crtdir.b -text "Browse..." -command {set_crtdir .c; catch {raise .c}}
 	button .c.mycert.i -text "Info" -command {show_mycert}
 	button .c.svcert.i -text "Info" -command {show_svcert}
 	button .c.crtdir.i -text "Info" -command {}
@@ -3834,7 +3842,7 @@ proc load_include {include dir} {
 	}
 }
 
-proc load_profile {} {
+proc load_profile {{parent "."}} {
 	global profdone
 	global vncdisplay
 
@@ -3842,7 +3850,7 @@ proc load_profile {} {
 
 	set dir [get_profiles_dir]
 
-	set file [tk_getOpenFile -defaultextension ".vnc" \
+	set file [tk_getOpenFile -parent $parent -defaultextension ".vnc" \
 		-initialdir $dir -title "Load VNC Profile"]
 	if {$file == ""} {
 		set profdone 1
@@ -3933,7 +3941,7 @@ proc load_profile {} {
 	putty_pw_entry check
 }
 
-proc save_profile {} {
+proc save_profile {{parent "."}} {
 	global is_windows uname
 	global profdone
 	global include_vars defs
@@ -3953,7 +3961,7 @@ proc save_profile {} {
 		regsub -all {:} $disp "_" disp
 	}
 
-	set file [tk_getSaveFile -defaultextension ".vnc" \
+	set file [tk_getSaveFile -parent $parent -defaultextension ".vnc" \
 		-initialdir $dir -initialfile "$disp" -title "Save VNC Profile"]
 	if {$file == ""} {
 		set profdone 1
@@ -4673,8 +4681,7 @@ set cmd(6) {
 
 proc cups_dialog {} {
 
-	catch {destroy .cups}
-	toplevel .cups
+	toplev .cups
 	wm title .cups "CUPS Tunnelling"
 	global cups_local_server cups_remote_port cups_manage_rcfile
 	global cups_local_smb_server cups_remote_smb_port
@@ -4834,8 +4841,7 @@ proc sound_dialog {} {
 
 	global is_windows
 
-	catch {destroy .snd}
-	toplevel .snd
+	toplev .snd
 	wm title .snd "ESD/ARTSD Sound Tunnelling"
 
 	global uname
@@ -5378,8 +5384,7 @@ proc smb_help_me_decide {} {
 	global smb_selected_cb smb_selected_en
 	global smb_host_list
 
-	catch {destroy .smbwiz}
-	toplevel .smbwiz
+	toplev .smbwiz
 	set title "SMB Filesystem Tunnelling -- Help Me Decide"
 	wm title .smbwiz $title
 	set id "  "
@@ -5520,7 +5525,7 @@ You can do this by either logging into the remote machine to find the info or as
 	catch {destroy .smbwiz}
 
 	if {! $smbmount_exists || $smbmount_sumode == "dontknow"} {
-		tk_messageBox -type ok -icon warning -message "Sorry we couldn't help out!\n'smbmount' info on the remote system is required for SMB mounting" -title "SMB mounting -- aborting"
+		tk_messageBox -type ok -parent .oa -icon warning -message "Sorry we couldn't help out!\n'smbmount' info on the remote system is required for SMB mounting" -title "SMB mounting -- aborting"
 		global use_smbmnt
 		set use_smbmnt 0
 		catch {raise .oa}
@@ -5590,8 +5595,7 @@ proc apply_mount_point_prefix {w} {
 }
 
 proc smb_dialog {} {
-	catch {destroy .smb}
-	toplevel .smb
+	toplev .smb
 	wm title .smb "SMB Filesystem Tunnelling"
 	global smb_su_mode smb_mount_list
 	global use_smbmnt
@@ -5726,8 +5730,7 @@ proc smb_dialog {} {
 }
 
 proc help_advanced_opts {} {
-	catch {destroy .ah}
-	toplevel .ah
+	toplev .ah
 
 	scroll_text_dismiss .ah.f
 
@@ -5797,7 +5800,7 @@ proc help_advanced_opts {} {
 
 proc set_viewer_path {} {
 	global change_vncviewer_path
-	set change_vncviewer_path [tk_getOpenFile]
+	set change_vncviewer_path [tk_getOpenFile -parent .chviewer]
 	catch {raise .chviewer}
 	update
 }
@@ -5805,8 +5808,7 @@ proc set_viewer_path {} {
 proc change_vncviewer_dialog {} {
 	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
 	
-	catch {destroy .chviewer}
-	toplevel .chviewer
+	toplev .chviewer
 	wm title .chviewer "Change VNC Viewer"
 
 	global help_font
@@ -5858,8 +5860,7 @@ proc change_vncviewer_dialog {} {
 proc port_redir_dialog {} {
 	global additional_port_redirs additional_port_redirs_list
 	
-	catch {destroy .redirs}
-	toplevel .redirs
+	toplev .redirs
 	wm title .redirs "Additional Port Redirections"
 
 	global help_font uname
@@ -6065,6 +6066,7 @@ proc do_port_knock {hp mode} {
 		set tlist [read_from_pad $padfile] 
 		set tlist [string trim $tlist]
 		if {$tlist == "" || $tlist == "FAIL"} {
+			raise .
 			tk_messageBox -type ok -icon error \
 				-message "Failed to read entry from $padfile" \
 				-title "Error: Padfile $padfile"
@@ -6248,6 +6250,7 @@ proc do_port_knock {hp mode} {
 			set emess ""
 			set rc [catch {set s [socket -async $host $port]} emess]
 			if {$rc != 0} {
+				raise .
 				tk_messageBox -type ok -icon error -message $emess -title "Error: socket -async $host $port"
 			}
 			set socks($i) $s
@@ -6298,8 +6301,7 @@ proc do_port_knock {hp mode} {
 }
 
 proc port_knocking_dialog {} {
-	catch {destroy .pk}
-	toplevel .pk
+	toplev .pk
 	wm title .pk "Port Knocking"
 	global use_port_knocking port_knocking_list
 
@@ -6520,8 +6522,7 @@ proc set_advanced_options {} {
 	global use_port_knocking port_knocking_list
 
 	catch {destroy .o}
-	catch {destroy .oa}
-	toplevel .oa
+	toplev .oa
 	wm title .oa "Advanced Options"
 
 	set i 1
@@ -6744,8 +6745,7 @@ proc set_options {} {
 	global compresslevel_text quality_text
 	global env is_windows darwin_cotvnc
 
-	catch {destroy .o}
-	toplevel .o
+	toplev .o
 	wm title .o "SSL/SSH VNC Options"
 
 	set i 1
@@ -6856,8 +6856,8 @@ proc set_options {} {
 		pack .o.sa -side top -fill x 
 	}
 
-	button .o.s_prof -text "Save Profile ..." -command {save_profile; raise .o}
-	button .o.l_prof -text " Load Profile ..." -command {load_profile; raise .o}
+	button .o.s_prof -text "Save Profile ..." -command {save_profile .o; raise .o}
+	button .o.l_prof -text " Load Profile ..." -command {load_profile .o; raise .o}
 	button .o.advanced -text "Advanced ..." -command set_advanced_options
 #	button .o.connect -text "Connect" -command launch
 	button .o.clear -text "Clear Options" -command set_defaults
@@ -6923,6 +6923,7 @@ set scroll_text_focus 1
 
 set multientry 1
 
+wm withdraw .
 wm title . "SSL/SSH VNC Viewer"
 wm resizable . 1 0
 
@@ -7003,6 +7004,7 @@ if {![info exists env(SSVNC_GUI_CHILD)] || $env(SSVNC_GUI_CHILD) == ""} {
 	center_win .
 }
 focus .f0.e
+wm deiconify .
 
 global system_button_face
 set system_button_face ""

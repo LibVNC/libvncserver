@@ -1,0 +1,3312 @@
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncviewer/Vncviewer
+--- vnc_unixsrc.orig/vncviewer/Vncviewer	2003-02-07 05:30:57.000000000 -0500
++++ vnc_unixsrc/vncviewer/Vncviewer	2007-02-04 18:25:33.000000000 -0500
+@@ -5,7 +5,7 @@
+ 
+ !
+ ! The title of the main window.  "%s" will be replaced by the desktop name.
+-! 
++!
+ 
+ Vncviewer.title: TightVNC: %s
+ 
+@@ -50,6 +50,7 @@
+ 
+ *desktop.baseTranslations:\
+   <Key>F8: ShowPopup()\n\
++  <Key>F9: ToggleFullScreen()\n\
+   <ButtonPress>: SendRFBEvent()\n\
+   <ButtonRelease>: SendRFBEvent()\n\
+   <Motion>: SendRFBEvent()\n\
+@@ -79,7 +80,7 @@
+ 
+ *popup.title: TightVNC popup
+ *popup*background: grey
+-*popup*font: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*
++*popup*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
+ *popup.buttonForm.Command.borderWidth: 0
+ *popup.buttonForm.Toggle.borderWidth: 0
+ 
+@@ -96,7 +97,7 @@
+ ! Popup buttons
+ !
+ 
+-*popupButtonCount: 8
++*popupButtonCount: 22
+ 
+ *popup*button1.label: Dismiss popup
+ *popup*button1.translations: #override\n\
+@@ -136,3 +137,86 @@
+ *popup*button8.label: Send F8
+ *popup*button8.translations: #override\n\
+   <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F8) HidePopup()
++
++*popup*button9.label: Send F9
++*popup*button9.translations: #override\n\
++  <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F9) HidePopup()
++
++*popup*button10.label: ViewOnly
++*popup*button10.type: toggle
++*popup*button10.translations: #override\n\
++  <Visible>: SetViewOnlyState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() ToggleViewOnly() HidePopup()
++
++*popup*button11.label: Cursor Shape
++*popup*button11.type: toggle
++*popup*button11.translations: #override\n\
++  <Visible>: SetCursorShapeState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() ToggleCursorShape() HidePopup()
++
++*popup*button12.label: X11 Cursor
++*popup*button12.type: toggle
++*popup*button12.translations: #override\n\
++  <Visible>: SetX11CursorState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() ToggleX11Cursor() HidePopup()
++
++*popup*button13.label: Cursor Alphablend
++*popup*button13.type: toggle
++*popup*button13.translations: #override\n\
++  <Visible>: SetCursorAlphaState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() ToggleCursorAlpha() HidePopup()
++
++*popup*button14.label: Toggle Tight/ZRLE
++*popup*button14.type: toggle
++*popup*button14.translations: #override\n\
++  <Visible>: SetZRLEState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() ToggleTightZRLE() HidePopup()
++
++*popup*button15.label: Disable JPEG
++*popup*button15.type: toggle
++*popup*button15.translations: #override\n\
++  <Visible>: SetNOJPEGState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() ToggleJPEG() HidePopup()
++
++*popup*button16.label: Prefer raw for localhost
++*popup*button16.type: toggle
++*popup*button16.translations: #override\n\
++  <Visible>: SetRawLocalState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() ToggleRawLocal() HidePopup()
++
++*popup*button17.label: Full Color
++*popup*button17.type: toggle
++*popup*button17.translations: #override\n\
++  <Visible>: SetFullColorState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() ToggleFullColor() HidePopup()
++
++*popup*button18.label: 16 bit color (BGR565)
++*popup*button18.type: toggle
++*popup*button18.translations: #override\n\
++  <Visible>: Set16bppState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() Toggle16bpp() HidePopup()
++
++*popup*button19.label: 8   bit color (BGR233)
++*popup*button19.type: toggle
++*popup*button19.translations: #override\n\
++  <Visible>: Set8bppState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() Toggle8bpp() HidePopup()
++
++*popup*button20.label: -     256 colors
++*popup*button20.type: toggle
++*popup*button20.translations: #override\n\
++  <Visible>: Set256ColorsState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() Toggle256Colors() HidePopup()
++
++*popup*button21.label: -       64 colors
++*popup*button21.type: toggle
++*popup*button21.translations: #override\n\
++  <Visible>: Set64ColorsState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() Toggle64Colors() HidePopup()
++
++*popup*button22.label: -         8 colors
++*popup*button22.type: toggle
++*popup*button22.translations: #override\n\
++  <Visible>: Set8ColorsState()\n\
++  <Btn1Down>,<Btn1Up>: toggle() Toggle8Colors() HidePopup()
++
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/vncviewer/argsresources.c
+--- vnc_unixsrc.orig/vncviewer/argsresources.c	2007-02-04 17:10:31.000000000 -0500
++++ vnc_unixsrc/vncviewer/argsresources.c	2007-02-04 18:25:53.000000000 -0500
+@@ -45,8 +45,18 @@
+   "*viewport.useRight: True",
+   "*viewport*Scrollbar*thumb: None",
+ 
++#if 0
++  "vncviewer*.desktop.translations:  #override Shift <Key>F8: ToggleFullScreen()",
++  "vncviewer*.desktop.translations:  #override <Key>F9: ToggleFullScreen()",
++#endif
++  "*viewport.horizontal.height: %SBW",
++  "*viewport.vertical.width: %SBW",
++  "vncviewer*viewport.horizontal.height: %SBW",
++  "vncviewer*viewport.vertical.width: %SBW",
++
+   "*desktop.baseTranslations:\
+-     <Key>F8: ShowPopup()\\n\
++     <Key>F8:  ShowPopup()\\n\
++     <Key>F9:  ToggleFullScreen()\\n\
+      <ButtonPress>: SendRFBEvent()\\n\
+      <ButtonRelease>: SendRFBEvent()\\n\
+      <Motion>: SendRFBEvent()\\n\
+@@ -66,7 +76,8 @@
+ 
+   "*popup.title: TightVNC popup",
+   "*popup*background: grey",
+-  "*popup*font: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*",
++  "*popup*font_old: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*",
++  "*popup*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*",
+   "*popup.buttonForm.Command.borderWidth: 0",
+   "*popup.buttonForm.Toggle.borderWidth: 0",
+ 
+@@ -74,7 +85,7 @@
+   "*popup.buttonForm.translations: #override\\n\
+      <KeyPress>: SendRFBEvent() HidePopup()",
+ 
+-  "*popupButtonCount: 8",
++  "*popupButtonCount: 22",
+ 
+   "*popup*button1.label: Dismiss popup",
+   "*popup*button1.translations: #override\\n\
+@@ -115,6 +126,96 @@
+   "*popup*button8.translations: #override\\n\
+      <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F8) HidePopup()",
+ 
++  "*popup*button9.label: Send F9",
++  "*popup*button9.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F9) HidePopup()",
++
++  "*popup*button10.label: ViewOnly",
++  "*popup*button10.type: toggle",
++  "*popup*button10.translations: #override\\n\
++     <Visible>: SetViewOnlyState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleViewOnly() HidePopup()",
++
++  "*popup*button11.label: Cursor Shape",
++  "*popup*button11.type: toggle",
++  "*popup*button11.translations: #override\\n\
++     <Visible>: SetCursorShapeState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleCursorShape() HidePopup()",
++
++  "*popup*button12.label: X11 Cursor",
++  "*popup*button12.type: toggle",
++  "*popup*button12.translations: #override\\n\
++     <Visible>: SetX11CursorState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleX11Cursor() HidePopup()",
++
++  "*popup*button13.label: Cursor Alphablend",
++  "*popup*button13.type: toggle",
++  "*popup*button13.translations: #override\\n\
++     <Visible>: SetCursorAlphaState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleCursorAlpha() HidePopup()",
++
++  "*popup*button14.label: Toggle Tight/ZRLE",
++  "*popup*button14.type: toggle",
++  "*popup*button14.translations: #override\\n\
++     <Visible>: SetZRLEState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleTightZRLE() HidePopup()",
++
++#if 0
++  "*popup*button14.label: -     ZRLE/ZWYRLE",
++  "*popup*button14.type: toggle",
++  "*popup*button14.translations: #override\\n\
++     <Visible>: SetZRLEState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleTightZRLE() HidePopup()",
++#endif
++
++  "*popup*button15.label: Disable JPEG",
++  "*popup*button15.type: toggle",
++  "*popup*button15.translations: #override\\n\
++     <Visible>: SetNOJPEGState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleJPEG() HidePopup()",
++
++  "*popup*button16.label: Prefer raw for localhost",
++  "*popup*button16.type: toggle",
++  "*popup*button16.translations: #override\\n\
++     <Visible>: SetRawLocalState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleRawLocal() HidePopup()",
++
++  "*popup*button17.label: Full Color",
++  "*popup*button17.type: toggle",
++  "*popup*button17.translations: #override\\n\
++     <Visible>: SetFullColorState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleFullColor() HidePopup()",
++
++  "*popup*button18.label: 16 bit color (BGR565)",
++  "*popup*button18.type: toggle",
++  "*popup*button18.translations: #override\\n\
++     <Visible>: Set16bppState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() Toggle16bpp() HidePopup()",
++
++  "*popup*button19.label: 8   bit color (BGR233)",
++  "*popup*button19.type: toggle",
++  "*popup*button19.translations: #override\\n\
++     <Visible>: Set8bppState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() Toggle8bpp() HidePopup()",
++
++  "*popup*button20.label: -     256 colors",
++  "*popup*button20.type: toggle",
++  "*popup*button20.translations: #override\\n\
++     <Visible>: Set256ColorsState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() Toggle256Colors() HidePopup()",
++
++  "*popup*button21.label: -       64 colors",
++  "*popup*button21.type: toggle",
++  "*popup*button21.translations: #override\\n\
++     <Visible>: Set64ColorsState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() Toggle64Colors() HidePopup()",
++
++  "*popup*button22.label: -         8 colors",
++  "*popup*button22.type: toggle",
++  "*popup*button22.translations: #override\\n\
++     <Visible>: Set8ColorsState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() Toggle8Colors() HidePopup()",
++
+   NULL
+ };
+ 
+@@ -135,6 +236,7 @@
+  */
+ 
+ AppData appData;
++AppData appDataNew;
+ 
+ static XtResource appDataResourceList[] = {
+   {"shareDesktop", "ShareDesktop", XtRBool, sizeof(Bool),
+@@ -161,8 +263,17 @@
+   {"encodings", "Encodings", XtRString, sizeof(String),
+    XtOffsetOf(AppData, encodingsString), XtRImmediate, (XtPointer) 0},
+ 
+-  {"useBGR233", "UseBGR233", XtRBool, sizeof(Bool),
+-   XtOffsetOf(AppData, useBGR233), XtRImmediate, (XtPointer) False},
++  {"useBGR233", "UseBGR233", XtRInt, sizeof(int),
++   XtOffsetOf(AppData, useBGR233), XtRImmediate, (XtPointer) 0},
++
++  {"useBGR565", "UseBGR565", XtRBool, sizeof(Bool),
++   XtOffsetOf(AppData, useBGR565), XtRImmediate, (XtPointer) False},
++
++  {"yCrop", "yCrop", XtRInt, sizeof(int),
++   XtOffsetOf(AppData, yCrop), XtRImmediate, (XtPointer) 0},
++
++  {"sbWidth", "sbWidth", XtRInt, sizeof(int),
++   XtOffsetOf(AppData, sbWidth), XtRImmediate, (XtPointer) 2},
+ 
+   {"nColours", "NColours", XtRInt, sizeof(int),
+    XtOffsetOf(AppData, nColours), XtRImmediate, (XtPointer) 256},
+@@ -218,14 +329,29 @@
+   {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
+    XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
+ 
++  {"useCursorAlpha", "UseCursorAlpha", XtRBool, sizeof(Bool),
++   XtOffsetOf(AppData, useCursorAlpha), XtRImmediate, (XtPointer) False},
++
++  {"useRawLocal", "UseRawLocal", XtRBool, sizeof(Bool),
++   XtOffsetOf(AppData, useRawLocal), XtRImmediate, (XtPointer) False},
++
+   {"useX11Cursor", "UseX11Cursor", XtRBool, sizeof(Bool),
+    XtOffsetOf(AppData, useX11Cursor), XtRImmediate, (XtPointer) False},
+ 
+   {"grabKeyboard", "GrabKeyboard", XtRBool, sizeof(Bool),
+-   XtOffsetOf(AppData, grabKeyboard), XtRImmediate, (XtPointer) False},
++   XtOffsetOf(AppData, grabKeyboard), XtRImmediate, (XtPointer) True},
+ 
+   {"autoPass", "AutoPass", XtRBool, sizeof(Bool),
+-   XtOffsetOf(AppData, autoPass), XtRImmediate, (XtPointer) False}
++   XtOffsetOf(AppData, autoPass), XtRImmediate, (XtPointer) False},
++
++  {"grabAll", "GrabAll", XtRBool, sizeof(Bool),
++   XtOffsetOf(AppData, grabAll), XtRImmediate, (XtPointer) False},
++
++  {"overrideRedir", "OverrideRedir", XtRBool, sizeof(Bool),
++   XtOffsetOf(AppData, overrideRedir), XtRImmediate, (XtPointer) True},
++
++  {"popupFix", "PopupFix", XtRBool, sizeof(Bool),
++   XtOffsetOf(AppData, popupFix), XtRImmediate, (XtPointer) False}
+ };
+ 
+ 
+@@ -243,7 +369,18 @@
+   {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
+   {"-user",          "*userLogin",          XrmoptionSepArg, 0},
+   {"-encodings",     "*encodings",          XrmoptionSepArg, 0},
+-  {"-bgr233",        "*useBGR233",          XrmoptionNoArg,  "True"},
++  {"-bgr233",        "*useBGR233",          XrmoptionNoArg,  "256"},
++  {"-use64",         "*useBGR233",          XrmoptionNoArg,   "64"},
++  {"-bgr222",        "*useBGR233",          XrmoptionNoArg,   "64"},
++  {"-use8",          "*useBGR233",          XrmoptionNoArg,    "8"},
++  {"-bgr111",        "*useBGR233",          XrmoptionNoArg,    "8"},
++  {"-16bpp",         "*useBGR565",          XrmoptionNoArg,  "True"},
++  {"-bgr565",        "*useBGR565",          XrmoptionNoArg,  "True"},
++  {"-sbwidth",       "*sbwidth",            XrmoptionSepArg, 0},
++  {"-ycrop",         "*yCrop",              XrmoptionSepArg, 0},
++  {"-sbwidth",       "*sbwidth",            XrmoptionSepArg, 0},
++  {"-rawlocal",      "*useRawLocal",        XrmoptionNoArg,  "True"},
++  {"-alpha",         "*useCursorAlpha",     XrmoptionNoArg,  "True"},
+   {"-owncmap",       "*forceOwnCmap",       XrmoptionNoArg,  "True"},
+   {"-truecolor",     "*forceTrueColour",    XrmoptionNoArg,  "True"},
+   {"-truecolour",    "*forceTrueColour",    XrmoptionNoArg,  "True"},
+@@ -253,7 +390,14 @@
+   {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
+   {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
+   {"-x11cursor",     "*useX11Cursor",       XrmoptionNoArg,  "True"},
+-  {"-autopass",      "*autoPass",           XrmoptionNoArg,  "True"}
++  {"-autopass",      "*autoPass",           XrmoptionNoArg,  "True"},
++  {"-graball",       "*grabAll",            XrmoptionNoArg,  "True"},
++  {"-grabkbd",       "*grabKeyboard",       XrmoptionNoArg,  "True"},
++  {"-nograbkbd",     "*grabKeyboard",       XrmoptionNoArg,  "False"},
++  {"-grabkeyboard",  "*grabKeyboard",       XrmoptionNoArg,  "True"},
++  {"-nograbkeyboard","*grabKeyboard",       XrmoptionNoArg,  "False"},
++  {"-nooverride",    "*overrideRedir",      XrmoptionNoArg,  "False"},
++  {"-popupfix",      "*popupFix",           XrmoptionNoArg,  "True"}
+ 
+ };
+ 
+@@ -277,6 +421,32 @@
+     {"Pause", Pause},
+     {"RunCommand", RunCommand},
+     {"Quit", Quit},
++    {"Toggle8bpp", Toggle8bpp},
++    {"Toggle16bpp", Toggle16bpp},
++    {"ToggleFullColor", ToggleFullColor},
++    {"Toggle256Colors", Toggle256Colors},
++    {"Toggle64Colors", Toggle64Colors},
++    {"Toggle8Colors", Toggle8Colors},
++    {"ToggleTightZRLE", ToggleTightZRLE},
++    {"ToggleViewOnly", ToggleViewOnly},
++    {"ToggleJPEG", ToggleJPEG},
++    {"ToggleCursorShape", ToggleCursorShape},
++    {"ToggleCursorAlpha", ToggleCursorAlpha},
++    {"ToggleX11Cursor", ToggleX11Cursor},
++    {"ToggleRawLocal", ToggleRawLocal},
++    {"Set8bppState", Set8bppState},
++    {"Set16bppState", Set16bppState},
++    {"SetFullColorState", SetFullColorState},
++    {"Set256ColorsState", Set256ColorsState},
++    {"Set64ColorsState", Set64ColorsState},
++    {"Set8ColorsState", Set8ColorsState},
++    {"SetZRLEState", SetZRLEState},
++    {"SetNOJPEGState", SetNOJPEGState},
++    {"SetViewOnlyState", SetViewOnlyState},
++    {"SetCursorShapeState", SetCursorShapeState},
++    {"SetCursorAlphaState", SetCursorAlphaState},
++    {"SetX11CursorState", SetX11CursorState},
++    {"SetRawLocalState", SetRawLocalState},
+ };
+ 
+ 
+@@ -332,7 +502,56 @@
+ 	  "        -autopass\n"
+ 	  "\n"
+ 	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
+-	  "See the manual page for more information."
++	  "See the manual page for more information.\n"
++	  "\n"
++	  "Enhanced TightVNC viewer options:\n"
++	  "\n"
++	  "   URL http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html\n"
++	  "\n"
++	  "   Note: ZRLE encoding is now supported.\n"
++	  "\n"
++	  "   Note: F9 is shortcut to Toggle FullScreen mode.\n"
++	  "\n"
++	  "        -use64      In -bgr233 mode, use 64 colors instead of 256.\n"
++	  "        -bgr222     Same as -use64.\n"
++	  "\n"
++	  "        -use8       In -bgr233 mode, use 8 colors instead of 256.\n"
++	  "        -bgr111     Same as -use8.\n"
++	  "\n"
++	  "        -16bpp      If the vnc viewer X display is depth 24 at 32bpp\n"
++	  "                    request a 16bpp format from the VNC server to cut\n"
++	  "                    network traffic by up to 2X, then tranlate the\n"
++	  "                    pixels to 32bpp locally.\n"
++	  "        -bgr565     Same as -16bpp.\n"
++	  "\n"
++	  "        -alpha      Use alphablending transparency for local cursors\n"
++	  "                    requires: x11vnc server, both client and server\n"
++          "                    must be 32bpp and same endianness.\n"
++	  "\n"
++	  "        -ycrop n    Only show the top n rows of the framebuffer.  For\n"
++	  "                    use with x11vnc -ncache client caching option\n"
++	  "                    to help \"hide\" the pixel cache region.\n"
++	  "                    Use a negative value (e.g. -1) for autodetection.\n"
++	  "                    Autodetection will always take place if the remote\n"
++	  "                    fb height is more than 2 times the width.\n"
++	  "        -sbwidth n  Scrollbar width, default is very narrow: 2 pixels,\n"
++	  "                    it is narrow to avoid distraction in -ycrop mode.\n"
++	  "\n"
++	  "        -rawlocal   Prefer raw encoding for localhost, default is\n"
++	  "                    no, i.e. assumes you have a SSH tunnel instead.\n"
++	  "\n"
++	  "        -graball    Grab the entire X server when in fullscreen mode,\n"
++	  "                    needed by some old window managers like fvwm2.\n"
++	  "        -popupfix   Warp the popup back to the pointer position,\n"
++	  "                    needed by some old window managers like fvwm2.\n"
++	  "\n"
++	  "        -grabkbd    Grab the X keyboard when in fullscreen mode,\n"
++	  "                    needed by some window managers. Same as -grabkeyboard.\n"
++	  "                    -grabkbd is the default, use -nograbkbd to disable.\n"
++#if 0
++	  "        -nooverride Do not apply OverrideRedirect in fullscreen mode.\n"
++#endif
++	  "\n"
+ 	  "\n", programName, programName, programName, programName);
+   exit(1);
+ }
+@@ -357,6 +576,17 @@
+   XtGetApplicationResources(toplevel, &appData, appDataResourceList,
+ 			    XtNumber(appDataResourceList), 0, 0);
+ 
++	if (getenv("VNCVIEWER_ALPHABLEND")) {
++		appData.useCursorAlpha = True;
++	}
++	if (getenv("VNCVIEWER_POPUP_FIX")) {
++		appData.popupFix = True;
++	}
++	if (getenv("VNCVIEWER_GRAB_SERVER")) {
++		appData.grabAll = True;
++	}
++
++
+   /* Add our actions to the actions table so they can be used in widget
+      resource specs */
+ 
+@@ -376,6 +606,10 @@
+     return;
+   }
+ 
++	if (appData.useBGR233 && appData.useBGR565) {
++		appData.useBGR233 = 0;
++	}
++
+   if (argc == 1) {
+     vncServerName = DoServerDialog();
+     appData.passwordDialog = True;
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewer/colour.c
+--- vnc_unixsrc.orig/vncviewer/colour.c	2002-04-30 09:07:31.000000000 -0400
++++ vnc_unixsrc/vncviewer/colour.c	2007-02-03 19:56:11.000000000 -0500
+@@ -31,6 +31,9 @@
+ #define BGR233_SIZE 256
+ unsigned long BGR233ToPixel[BGR233_SIZE];
+ 
++#define BGR565_SIZE 65536
++unsigned long BGR565ToPixel[BGR565_SIZE];
++
+ Colormap cmap;
+ Visual *vis;
+ unsigned int visdepth, visbpp;
+@@ -45,6 +48,8 @@
+ static void AllocateExactBGR233Colours();
+ static Bool AllocateBGR233Colour(int r, int g, int b);
+ 
++static void SetupBGR565Map();
++
+ 
+ /*
+  * SetVisualAndCmap() deals with the wonderful world of X "visuals" (which are
+@@ -97,6 +102,30 @@
+   visbpp = GetBPPForDepth(visdepth);
+   cmap = DefaultColormap(dpy,DefaultScreen(dpy));
+ 
++  if (appData.useBGR565) {
++  	if (visdepth < 24 || visbpp < 24 || vis->class != TrueColor) {
++  		fprintf(stderr, "disabling -16bpp BGR565 on non-depth 24 machine\n"); 
++		appData.useBGR565 = False;
++  	} else {
++		myFormat.bitsPerPixel = 16;
++		myFormat.depth = 16;
++		myFormat.trueColour = 1;
++		myFormat.bigEndian = 0;
++		myFormat.redMax   = 31;
++		myFormat.greenMax = 63;
++		myFormat.blueMax  = 31;
++		myFormat.redShift   = 11;
++		myFormat.greenShift = 5;
++		myFormat.blueShift  = 0;
++
++		fprintf(stderr, "Using default colormap and translating from BGR565 (65536 colors).  Pixel format:\n");
++		PrintPixelFormat(&myFormat);
++
++		SetupBGR565Map();
++		return;
++  	}
++  }
++
+   if (!appData.useBGR233 && (vis->class == TrueColor)) {
+ 
+     myFormat.bitsPerPixel = visbpp;
+@@ -116,21 +145,42 @@
+     return;
+   }
+ 
+-  appData.useBGR233 = True;
++  if (appData.useBGR233 == 0) {
++	appData.useBGR233 = 256;
++  }
+ 
+   myFormat.bitsPerPixel = 8;
+   myFormat.depth = 8;
+   myFormat.trueColour = 1;
+   myFormat.bigEndian = 0;
+-  myFormat.redMax = 7;
++  myFormat.redMax   = 7;
+   myFormat.greenMax = 7;
+-  myFormat.blueMax = 3;
+-  myFormat.redShift = 0;
++  myFormat.blueMax  = 3;
++  myFormat.redShift   = 0;
+   myFormat.greenShift = 3;
+-  myFormat.blueShift = 6;
++  myFormat.blueShift  = 6;
++
++	if (appData.useBGR233 == 64) {
++		/* BGR222 */
++		myFormat.redMax   = 3;
++		myFormat.greenMax = 3;
++		myFormat.blueMax  = 3;
++		myFormat.redShift   = 0;
++		myFormat.greenShift = 2;
++		myFormat.blueShift  = 4;
++	}
++	if (appData.useBGR233 == 8) {
++		/* BGR111 */
++		myFormat.redMax   = 2;
++		myFormat.greenMax = 2;
++		myFormat.blueMax  = 2;
++		myFormat.redShift   = 0;
++		myFormat.greenShift = 1;
++		myFormat.blueShift  = 2;
++	}
+ 
+   fprintf(stderr,
+-       "Using default colormap and translating from BGR233.  Pixel format:\n");
++       "Using default colormap and translating from BGR233 (%d colors).  Pixel format:\n", appData.useBGR233);
+   PrintPixelFormat(&myFormat);
+ 
+   SetupBGR233Map();
+@@ -394,16 +444,29 @@
+     for (r = 0; r < 8; r++) {
+       for (g = 0; g < 8; g++) {
+ 	for (b = 0; b < 4; b++) {
+-	  if (BGR233ToPixel[(b<<6) | (g<<3) | r] == INVALID_PIXEL) {
++		int bs = 6, gs = 3, rs = 0;
++		int bm = 3, gm = 7, rm = 7;
++		if (appData.useBGR233 == 64) {
++			bs = 4; gs = 2; rs = 0;
++			bm = 3; gm = 3; rm = 3;
++		}
++		if (appData.useBGR233 == 8) {
++			bs = 2; gs = 1; rs = 0;
++			bm = 1; gm = 1; rm = 1;
++		}
++		if ((b > bm || g > gm || r > rm)) {
++			continue;
++		}
++	  if (BGR233ToPixel[(b<<bs) | (g<<gs) | (r<<rs)] == INVALID_PIXEL) {
+ 
+ 	    unsigned long minDistance = ULONG_MAX;
+ 
+ 	    for (i = 0; i < cmapSize; i++) {
+ 	      if (exactBGR233[i] || shared[i]) {
+ 		unsigned long distance
+-		  = (abs(cmapEntry[i].red - r * 65535 / 7)
+-		     + abs(cmapEntry[i].green - g * 65535 / 7)
+-		     + abs(cmapEntry[i].blue - b * 65535 / 3));
++		  = (  abs(cmapEntry[i].red   - r * 65535 / rm)
++		     + abs(cmapEntry[i].green - g * 65535 / gm)
++		     + abs(cmapEntry[i].blue  - b * 65535 / bm));
+ 
+ 		if (distance < minDistance) {
+ 		  minDistance = distance;
+@@ -412,7 +475,7 @@
+ 	      }
+ 	    }
+ 
+-	    BGR233ToPixel[(b<<6) | (g<<3) | r] = nearestPixel;
++	    BGR233ToPixel[(b<<bs) | (g<<gs) | (r<<rs)] = nearestPixel;
+ 	    if (shared[nearestPixel] && !usedAsNearest[nearestPixel])
+ 	      nSharedUsed++;
+ 	    usedAsNearest[nearestPixel] = True;
+@@ -433,6 +496,38 @@
+   }
+ }
+ 
++static void
++SetupBGR565Map()
++{
++  int r, g, b;
++  int r2, g2, b2;
++  long i, idx;
++  int cnt = 0;
++  unsigned long pixel = 0;
++
++    for (r = 0; r < 32; r++) {
++      for (g = 0; g < 64; g++) {
++	for (b = 0; b < 32; b++) {
++		int bs = 0, gs = 5, rs = 11;
++		int bm = 31, gm = 63, rm = 31;
++		if ((b > bm || g > gm || r > rm)) {
++			continue;
++		}
++		r2 = (255 * r) / rm;
++		g2 = (255 * g) / gm;
++		b2 = (255 * b) / bm;
++
++		pixel = (r2 << 16) | (g2 << 8) | (b2 << 0);
++		idx = (b<<bs) | (g<<gs) | (r<<rs);
++		if (0) fprintf(stderr, "cnt: %5d idx: %5d pixel: 0x%08x\n", cnt, idx, pixel);
++		BGR565ToPixel[idx] = pixel;
++		cnt++;
++	}
++      }
++    }
++}
++
++
+ 
+ /*
+  * AllocateExactBGR233Colours() attempts to allocate each of the colours in the
+@@ -484,8 +579,13 @@
+     ri = rn;
+     for (gi = 0; gi < gn; gi++) {
+       for (bi = 0; bi < bn; bi++) {
+-	if (!AllocateBGR233Colour(rv[ri], gv[gi], bv[bi]))
+-	  return;
++	if (appData.useBGR233 == 64 && (bv[bi] > 3 || gv[gi] > 3 || rv[ri] > 3)) {
++		nBGR233ColoursAllocated++;
++	} else if (appData.useBGR233 == 8 && (bv[bi] > 1 || gv[gi] > 1 || rv[ri] > 1)) {
++		nBGR233ColoursAllocated++;
++	} else if (!AllocateBGR233Colour(rv[ri], gv[gi], bv[bi])) {
++		return;
++	}
+       }
+     }
+     rn++;
+@@ -496,8 +596,13 @@
+     gi = gn;
+     for (ri = 0; ri < rn; ri++) {
+       for (bi = 0; bi < bn; bi++) {
+-	if (!AllocateBGR233Colour(rv[ri], gv[gi], bv[bi]))
+-	  return;
++	if (appData.useBGR233 == 64 && (bv[bi] > 3 || gv[gi] > 3 || rv[ri] > 3)) {
++		nBGR233ColoursAllocated++;
++	} else if (appData.useBGR233 == 8 && (bv[bi] > 1 || gv[gi] > 1 || rv[ri] > 1)) {
++		nBGR233ColoursAllocated++;
++	} else if (!AllocateBGR233Colour(rv[ri], gv[gi], bv[bi])) {
++	  	return;
++	}
+       }
+     }
+     gn++;
+@@ -507,8 +612,13 @@
+       bi = bn;
+       for (ri = 0; ri < rn; ri++) {
+ 	for (gi = 0; gi < gn; gi++) {
+-	  if (!AllocateBGR233Colour(rv[ri], gv[gi], bv[bi]))
+-	    return;
++	  if (appData.useBGR233 == 64 && (bv[bi] > 3 || gv[gi] > 3 || rv[ri] > 3)) {
++		nBGR233ColoursAllocated++;
++	  } else if (appData.useBGR233 == 8 && (bv[bi] > 1 || gv[gi] > 1 || rv[ri] > 1)) {
++		nBGR233ColoursAllocated++;
++	  } else if (!AllocateBGR233Colour(rv[ri], gv[gi], bv[bi])) {
++	    	return;
++	  }
+ 	}
+       }
+       bn++;
+@@ -529,18 +639,29 @@
+ AllocateBGR233Colour(int r, int g, int b)
+ {
+   XColor c;
++	int bs = 6, gs = 3, rs = 0;
++	int bm = 3, gm = 7, rm = 7;
+ 
+   if (nBGR233ColoursAllocated >= appData.nColours)
+     return False;
+ 
+-  c.red = r * 65535 / 7;
+-  c.green = g * 65535 / 7;
+-  c.blue = b * 65535 / 3;
++	if (appData.useBGR233 == 64) {
++		bs = 4; gs = 2, rs = 0;
++		bm = 3; gm = 3; rm = 3;
++	}
++	if (appData.useBGR233 == 8) {
++		bs = 2; gs = 1, rs = 0;
++		bm = 1; gm = 1; rm = 1;
++	}
++
++  c.red =   r * 65535 / rm;
++  c.green = g * 65535 / gm;
++  c.blue =  b * 65535 / bm;
+ 
+   if (!XAllocColor(dpy, cmap, &c))
+     return False;
+ 
+-  BGR233ToPixel[(b<<6) | (g<<3) | r] = c.pixel;
++  BGR233ToPixel[(b<<bs) | (g<<gs) | r] = c.pixel;
+ 
+   nBGR233ColoursAllocated++;
+ 
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/corre.c vnc_unixsrc/vncviewer/corre.c
+--- vnc_unixsrc.orig/vncviewer/corre.c	2000-06-11 08:00:53.000000000 -0400
++++ vnc_unixsrc/vncviewer/corre.c	2007-02-03 20:48:52.000000000 -0500
+@@ -50,8 +50,12 @@
+ #if (BPP == 8)
+     gcv.foreground = (appData.useBGR233 ? BGR233ToPixel[pix] : pix);
+ #else
++#if (BPP == 16)
++    gcv.foreground = (appData.useBGR565 ? BGR565ToPixel[pix] : pix);
++#else
+     gcv.foreground = pix;
+ #endif
++#endif
+ 
+     XChangeGC(dpy, gc, GCForeground, &gcv);
+     XFillRectangle(dpy, desktopWin, gc, rx, ry, rw, rh);
+@@ -72,8 +76,12 @@
+ #if (BPP == 8)
+ 	gcv.foreground = (appData.useBGR233 ? BGR233ToPixel[pix] : pix);
+ #else
++#if (BPP == 16)
++	gcv.foreground = (appData.useBGR565 ? BGR565ToPixel[pix] : pix);
++#else
+ 	gcv.foreground = pix;
+ #endif
++#endif
+ 
+ 	XChangeGC(dpy, gc, GCForeground, &gcv);
+ 	XFillRectangle(dpy, desktopWin, gc, rx + x, ry + y, w, h);
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewer/cursor.c
+--- vnc_unixsrc.orig/vncviewer/cursor.c	2003-01-15 04:46:52.000000000 -0500
++++ vnc_unixsrc/vncviewer/cursor.c	2007-02-03 18:09:18.000000000 -0500
+@@ -39,7 +39,7 @@
+ 
+ static Bool prevSoftCursorSet = False;
+ static Pixmap rcSavedArea;
+-static CARD8 *rcSource, *rcMask;
++static CARD8 *rcSource = NULL, *rcMask;
+ static int rcHotX, rcHotY, rcWidth, rcHeight;
+ static int rcCursorX = 0, rcCursorY = 0;
+ static int rcLockX, rcLockY, rcLockWidth, rcLockHeight;
+@@ -48,8 +48,8 @@
+ static Bool SoftCursorInLockedArea(void);
+ static void SoftCursorCopyArea(int oper);
+ static void SoftCursorDraw(void);
+-static void FreeSoftCursor(void);
+-static void FreeX11Cursor();
++void FreeSoftCursor(void);
++void FreeX11Cursor();
+ 
+ /* Copied from Xvnc/lib/font/util/utilbitmap.c */
+ static unsigned char _reverse_byte[0x100] = {
+@@ -103,6 +103,7 @@
+   Pixmap source, mask;
+   Cursor cursor;
+   int i;
++if (0) fprintf(stderr, "In HandleXCursor\n");
+ 
+   bytesPerRow = (width + 7) / 8;
+   bytesData = bytesPerRow * height;
+@@ -149,6 +150,7 @@
+   XFreePixmap(dpy, mask);
+   free(buf);
+ 
++if (0) fprintf(stderr, "HandleXCursor calls XDefineCursor: 0x%x\n", cursor);
+   XDefineCursor(dpy, desktopWin, cursor);
+   FreeX11Cursor();
+   prevXCursor = cursor;
+@@ -175,6 +177,7 @@
+   char *buf;
+   CARD8 *ptr;
+   int x, y, b;
++if (0) fprintf(stderr, "In HandleCursorShape\n");
+ 
+   bytesPerPixel = myFormat.bitsPerPixel / 8;
+   bytesPerRow = (width + 7) / 8;
+@@ -195,12 +198,14 @@
+   buf = malloc(bytesMaskData);
+   if (buf == NULL) {
+     free(rcSource);
++    rcSource = NULL;
+     return False;
+   }
+ 
+   /* Read and decode cursor pixel data, depending on the encoding type. */
+ 
+   if (enc == rfbEncodingXCursor) {
++if (0) fprintf(stderr, "HandleCursorShape: rfbEncodingXCursor\n");
+     if (appData.useX11Cursor) {
+       HandleXCursor(xhot, yhot, width, height);
+       return True;
+@@ -209,6 +214,7 @@
+     /* Read and convert background and foreground colors. */
+     if (!ReadFromRFBServer((char *)&rgb, sz_rfbXCursorColors)) {
+       free(rcSource);
++      rcSource = NULL;
+       free(buf);
+       return False;
+     }
+@@ -218,6 +224,7 @@
+     /* Read 1bpp pixel data into a temporary buffer. */
+     if (!ReadFromRFBServer(buf, bytesMaskData)) {
+       free(rcSource);
++      rcSource = NULL;
+       free(buf);
+       return False;
+     }
+@@ -254,9 +261,11 @@
+     }
+ 
+   } else {			/* enc == rfbEncodingRichCursor */
++if (0) fprintf(stderr, "HandleCursorShape: rfbEncodingRichCursor\n");
+ 
+     if (!ReadFromRFBServer((char *)rcSource, width * height * bytesPerPixel)) {
+       free(rcSource);
++      rcSource = NULL;
+       free(buf);
+       return False;
+     }
+@@ -267,6 +276,7 @@
+ 
+   if (!ReadFromRFBServer(buf, bytesMaskData)) {
+     free(rcSource);
++    rcSource = NULL;
+     free(buf);
+     return False;
+   }
+@@ -274,6 +284,7 @@
+   rcMask = malloc(width * height);
+   if (rcMask == NULL) {
+     free(rcSource);
++    rcSource = NULL;
+     free(buf);
+     return False;
+   }
+@@ -301,6 +312,7 @@
+   rcWidth = width;
+   rcHeight = height;
+ 
++if (0) fprintf(stderr, "HandleCursorShape: SoftCursorCopyArea\n");
+   SoftCursorCopyArea(OPER_SAVE);
+   SoftCursorDraw();
+ 
+@@ -472,6 +484,139 @@
+   int offset, bytesPerPixel;
+   char *pos;
+ 
++#define alphahack
++#ifdef alphahack
++  /* hack to have cursor transparency at 32bpp <runge@karlrunge.com> */
++  int alphablend = 0;
++
++  if (!rcSource) {
++  	return;
++  }
++
++  if (appData.useCursorAlpha) {
++  	alphablend = 1;
++  }
++
++  bytesPerPixel = myFormat.bitsPerPixel / 8;
++
++  if (alphablend && bytesPerPixel == 4) {
++	unsigned long pixel, put, *upos, *upix;
++	int got_alpha = 0, rsX, rsY, rsW, rsH;
++	static XImage *image = NULL;
++	static int iwidth = 128;
++
++	if (! image) {
++		/* watch out for tiny fb (rare) */
++		if (iwidth > si.framebufferWidth) {
++			iwidth = si.framebufferWidth;
++		}
++		if (iwidth > si.framebufferHeight) {
++			iwidth = si.framebufferHeight;
++		}
++
++		/* initialize an XImage with a chunk of desktopWin */
++		image = XGetImage(dpy, desktopWin, 0, 0, iwidth, iwidth,
++		    AllPlanes, ZPixmap);
++	}
++
++	/* first check if there is any non-zero alpha channel data at all: */
++	for (y = 0; y < rcHeight; y++) {
++		for (x = 0; x < rcWidth; x++) {
++			int alpha;
++
++			offset = y * rcWidth + x;
++			pos = (char *)&rcSource[offset * bytesPerPixel];
++
++			upos = (unsigned long *) pos;
++			alpha = (*upos & 0xff000000) >> 24;
++			if (alpha) {
++				got_alpha = 1;
++				break;
++			}
++		}
++		if (got_alpha) {
++			break;
++		}
++	}
++
++	if (!got_alpha) {
++		/* no alpha channel data, fallback to the old way */
++		goto oldway;
++	}
++
++	/* load the saved fb patch in to image (faster way?) */
++	XGetSubImage(dpy, rcSavedArea, 0, 0, rcWidth, rcHeight,
++	    AllPlanes, ZPixmap, image, 0, 0);
++	upix = (unsigned long *)image->data;
++
++	/* if the richcursor is clipped, the fb patch will be smaller */
++	rsW = rcWidth;
++	rsX = 0;	/* used to denote a shift from the left side */
++	x = rcCursorX - rcHotX;
++	if (x < 0) {
++		rsW += x;
++		rsX = -x;
++	} else if (x + rsW > si.framebufferWidth) {
++		rsW = si.framebufferWidth - x;
++	}
++	rsH = rcHeight;
++	rsY = 0;	/* used to denote a shift from the top side */
++	y = rcCursorY - rcHotY;
++	if (y < 0) {
++		rsH += y;
++		rsY = -y;
++	} else if (y + rsH > si.framebufferHeight) {
++		rsH = si.framebufferHeight - y;
++	}
++
++	/*
++	 * now loop over the cursor data, blend in the fb values,
++	 * and then overwrite the fb (CopyDataToScreen())
++	 */
++	for (y = 0; y < rcHeight; y++) {
++		y0 = rcCursorY - rcHotY + y;
++		if (y0 < 0 || y0 >= si.framebufferHeight) {
++			continue;	/* clipped */
++		}
++		for (x = 0; x < rcWidth; x++) {
++			int alpha, color_curs, color_fb, i;
++
++			x0 = rcCursorX - rcHotX + x;
++			if (x0 < 0 || x0 >= si.framebufferWidth) {
++				continue;	/* clipped */
++			}
++
++			offset = y * rcWidth + x;
++			pos = (char *)&rcSource[offset * bytesPerPixel];
++
++			/* extract secret alpha byte from rich cursor: */
++			upos = (unsigned long *) pos;
++			alpha = (*upos & 0xff000000) >> 24;	/* XXX MSB? */
++
++			/* extract the pixel from the fb: */
++			pixel = *(upix + (y-rsY)*iwidth + (x-rsX));
++
++			put = 0;
++			/* for simplicity, blend all 4 bytes */
++			for (i = 0; i < 4; i++) {
++				int sh = i*8;
++				color_curs = ((0xff << sh) & *upos) >> sh;
++				color_fb   = ((0xff << sh) & pixel) >> sh;
++
++				/* XXX assumes pre-multipled color_curs */
++				color_fb = color_curs
++				    + ((0xff - alpha) * color_fb)/0xff;
++				put |= color_fb << sh;
++			}
++			/* place in the fb: */
++	    		CopyDataToScreen((char *)&put, x0, y0, 1, 1);
++		}
++	}
++	return;
++  }
++oldway:
++#endif
++
+   bytesPerPixel = myFormat.bitsPerPixel / 8;
+ 
+   /* FIXME: Speed optimization is possible. */
+@@ -492,19 +637,20 @@
+   }
+ }
+ 
+-static void FreeSoftCursor(void)
++void FreeSoftCursor(void)
+ {
+   if (prevSoftCursorSet) {
+     SoftCursorCopyArea(OPER_RESTORE);
+     XFreePixmap(dpy, rcSavedArea);
+     free(rcSource);
++    rcSource = NULL;
+     free(rcMask);
+     prevSoftCursorSet = False;
+   }
+ }
+ 
+ 
+-static void FreeX11Cursor()
++void FreeX11Cursor()
+ {
+   if (prevXCursorSet) {
+     XFreeCursor(dpy, prevXCursor);
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncviewer/desktop.c
+--- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
++++ vnc_unixsrc/vncviewer/desktop.c	2007-02-04 18:34:32.000000000 -0500
+@@ -31,7 +31,7 @@
+ GC gc;
+ GC srcGC, dstGC; /* used for debugging copyrect */
+ Window desktopWin;
+-Cursor dotCursor;
++Cursor dotCursor = None;
+ Widget form, viewport, desktop;
+ 
+ static Bool modifierPressed[256];
+@@ -43,6 +43,8 @@
+ static void HandleBasicDesktopEvent(Widget w, XtPointer ptr, XEvent *ev,
+ 				    Boolean *cont);
+ 
++static void CopyBGR565ToScreen(CARD16 *buf, int x, int y, int width,int height);
++
+ static XtResource desktopBackingStoreResources[] = {
+   {
+     XtNbackingStore, XtCBackingStore, XtRBackingStore, sizeof(int), 0,
+@@ -50,6 +52,60 @@
+   },
+ };
+ 
++void create_image() {
++  image = NULL;
++
++#ifdef MITSHM
++  if (appData.useShm) {
++    image = CreateShmImage();
++    if (!image)
++      appData.useShm = False;
++  }
++#endif
++
++  if (!image) {
++    image = XCreateImage(dpy, vis, visdepth, ZPixmap, 0, NULL,
++			 si.framebufferWidth, si.framebufferHeight,
++			 BitmapPad(dpy), 0);
++
++    image->data = malloc(image->bytes_per_line * image->height);
++    if (!image->data) {
++      fprintf(stderr,"malloc failed\n");
++      exit(1);
++    }
++  }
++}
++
++int old_width = 0;
++int old_height = 0;
++
++int guessCrop(void) {
++	int w = si.framebufferWidth;
++
++	if (w == 320) {
++		return 240;
++	} else if (w == 400) {
++		return 300;
++	} else if (w == 640) {
++		return 480;
++	} else if (w == 800) {
++		return 600;
++	} else if (w == 1024) {
++		return 768;
++	} else if (w == 1152) {
++		return 864;
++	} else if (w == 1280) {
++		return 1024;
++	} else if (w == 1600) {
++		return 1200;
++	} else if (w == 1920) {
++		return 1200;
++	} else {
++		int h = (3 * w) / 4;
++		return h;
++	}
++}
++
+ 
+ /*
+  * DesktopInitBeforeRealization creates the "desktop" widget and the viewport
+@@ -79,32 +135,102 @@
+   XtAddEventHandler(desktop, LeaveWindowMask|ExposureMask,
+ 		    True, HandleBasicDesktopEvent, NULL);
+ 
++
++	if (! appData.yCrop) {
++		int w = si.framebufferWidth;
++		int h = si.framebufferHeight;
++		if (h > 2 * w) {
++			fprintf(stderr, "Tall display (%dx%d) suspect 'x11vnc -ncache' mode,\n", w, h);
++			fprintf(stderr, "  setting auto -ycrop detection.\n", w, h);
++			appData.yCrop = -1;
++		}
++	}
++	if (appData.yCrop) {
++		if (appData.yCrop < 0) {
++			appData.yCrop = guessCrop();
++			fprintf(stderr, "Set -ycrop to: %d\n", appData.yCrop);
++		}
++		XtVaSetValues(toplevel, XtNmaxHeight, appData.yCrop, NULL);
++		XtVaSetValues(form,     XtNmaxHeight, appData.yCrop, NULL);
++		XtVaSetValues(viewport, XtNforceBars, False, NULL);
++	}
++	old_width  = si.framebufferWidth;
++	old_height = si.framebufferHeight;
++
+   for (i = 0; i < 256; i++)
+     modifierPressed[i] = False;
+ 
+-  image = NULL;
++  create_image();
++}
+ 
+-#ifdef MITSHM
+-  if (appData.useShm) {
+-    image = CreateShmImage();
+-    if (!image)
+-      appData.useShm = False;
+-  }
+-#endif
++static Widget scrollbar_y = NULL;
+ 
+-  if (!image) {
+-    image = XCreateImage(dpy, vis, visdepth, ZPixmap, 0, NULL,
+-			 si.framebufferWidth, si.framebufferHeight,
+-			 BitmapPad(dpy), 0);
++static int xsst = 2;
++#include <X11/Xaw/Scrollbar.h>
+ 
+-    image->data = malloc(image->bytes_per_line * image->height);
+-    if (!image->data) {
+-      fprintf(stderr,"malloc failed\n");
+-      exit(1);
+-    }
+-  }
++static XtCallbackProc Scrolled(Widget w, XtPointer closure, XtPointer call_data) {
++	Position x, y;
++	XtVaGetValues(desktop, XtNx, &x, XtNy, &y, NULL);
++	if (0) fprintf(stderr, "scrolled by %d pixels x=%d y=%d\n", (int) call_data, x, y);
++	if (xsst == 2) {
++		x = 0;
++		y = 0;
++		XtVaSetValues(desktop, XtNx, x, XtNy, y, NULL);
++	} else if (xsst) {
++		XawScrollbarSetThumb(w, 0.0, 0.0);
++	} else {
++		float t = 0.0;
++		XtVaSetValues(w, XtNtopOfThumb, &t, NULL);
++	}
+ }
++static XtCallbackProc Jumped(Widget w, XtPointer closure, XtPointer call_data) {
++	float top = *((float *) call_data);
++	Position x, y;
++	XtVaGetValues(desktop, XtNx, &x, XtNy, &y, NULL);
++	if (0) fprintf(stderr, "thumb value: %.4f x=%d y=%d\n", top, x, y);
++	if (top > 0.01) {
++		if (xsst == 2) {
++			x = 0;
++			y = 0;
++			XtVaSetValues(desktop, XtNx, x, XtNy, y, NULL);
++		} else if (xsst) {
++			XawScrollbarSetThumb(w, 0.0, 0.0);
++		} else {
++			float t = 0.0, s = 1.0;
++			XtVaSetValues(w, XtNtopOfThumb, *(XtArgVal*)&t, XtNshown, *(XtArgVal*)&s, NULL);
++		}
++	}
++}
++
++
++void check_things() {
++	Widget w;
++	static time_t last = 0;
++	static int installed_callback = 0;
++	
++	if (time(NULL) <= last + 1) {
++		return;
++	}
++
++	dpyWidth  = WidthOfScreen(DefaultScreenOfDisplay(dpy));
++	dpyHeight = HeightOfScreen(DefaultScreenOfDisplay(dpy));
+ 
++	if (!installed_callback) {
++		if (appData.yCrop > 0) {
++#if 0
++			w = XtNameToWidget(viewport, "vertical");
++			if (w != NULL) {
++				fprintf(stderr, "got scrollbar\n");
++				XtAddCallback(w, XtNjumpProc, Jumped, NULL);
++				XtAddCallback(w, XtNscrollProc, Scrolled, NULL);
++				scrollbar_y = w;
++				installed_callback = 1;
++			}
++#endif
++		}
++	}
++	last = time(NULL);
++}
+ 
+ /*
+  * DesktopInitAfterRealization does things which require the X windows to
+@@ -144,6 +270,24 @@
+   XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
+ }
+ 
++extern void FreeX11Cursor(void);
++extern void FreeSoftCursor(void);
++
++void
++DesktopCursorOff()
++{
++	XSetWindowAttributes attr;
++	unsigned long valuemask;
++
++	if (dotCursor == None) {
++		dotCursor = CreateDotCursor();
++	}
++	XDefineCursor(dpy, desktopWin, dotCursor);
++	FreeX11Cursor();
++	FreeSoftCursor();
++}
++
++
+ 
+ /*
+  * HandleBasicDesktopEvent - deal with expose and leave events.
+@@ -185,6 +329,8 @@
+     }
+     break;
+   }
++
++	check_things();
+ }
+ 
+ 
+@@ -330,7 +476,7 @@
+  */
+ 
+ static Cursor
+-CreateDotCursor()
++CreateDotCursorOrig()
+ {
+   Cursor cursor;
+   Pixmap src, msk;
+@@ -352,6 +498,29 @@
+ }
+ 
+ 
++static Cursor
++CreateDotCursor()
++{
++  Cursor cursor;
++  Pixmap src, msk;
++  static char srcBits[] = { 0, 14, 0 };
++  static char mskBits[] = { 14,31,14 };
++  XColor fg, bg;
++
++  src = XCreateBitmapFromData(dpy, DefaultRootWindow(dpy), srcBits, 3, 3);
++  msk = XCreateBitmapFromData(dpy, DefaultRootWindow(dpy), mskBits, 3, 3);
++  XAllocNamedColor(dpy, DefaultColormap(dpy,DefaultScreen(dpy)), "black",
++		   &fg, &fg);
++  XAllocNamedColor(dpy, DefaultColormap(dpy,DefaultScreen(dpy)), "white",
++		   &bg, &bg);
++  cursor = XCreatePixmapCursor(dpy, src, msk, &fg, &bg, 1, 1);
++  XFreePixmap(dpy, src);
++  XFreePixmap(dpy, msk);
++
++  return cursor;
++}
++
++
+ /*
+  * CopyDataToScreen.
+  */
+@@ -367,7 +536,11 @@
+     usleep(appData.rawDelay * 1000);
+   }
+ 
+-  if (!appData.useBGR233) {
++  if (appData.useBGR233) {
++    CopyBGR233ToScreen((CARD8 *)buf, x, y, width, height);
++  } else if (appData.useBGR565) {
++    CopyBGR565ToScreen((CARD16 *)buf, x, y, width, height);
++  } else {
+     int h;
+     int widthInBytes = width * myFormat.bitsPerPixel / 8;
+     int scrWidthInBytes = si.framebufferWidth * myFormat.bitsPerPixel / 8;
+@@ -380,8 +553,6 @@
+       buf += widthInBytes;
+       scr += scrWidthInBytes;
+     }
+-  } else {
+-    CopyBGR233ToScreen((CARD8 *)buf, x, y, width, height);
+   }
+ 
+ #ifdef MITSHM
+@@ -460,3 +631,111 @@
+     break;
+   }
+ }
++
++static void
++CopyBGR565ToScreen(CARD16 *buf, int x, int y, int width, int height)
++{
++  int p, q;
++  CARD32 *scr32 = ((CARD32 *)image->data) + y * si.framebufferWidth + x;
++
++ /*  case 32: */
++    for (q = 0; q < height; q++) {
++      for (p = 0; p < width; p++) {
++	*(scr32++) = BGR565ToPixel[*(buf++)];
++      }
++      scr32 += si.framebufferWidth - width;
++    }
++}
++
++static void reset_image(void) {
++	if (UsingShm()) {
++		ShmCleanup();
++	} else {
++		if (image && image->data) {
++			free(image->data);
++			/* see manpage XDestroyImage may also free data, so we skip and have a tiny leak instead */
++			if (0) XDestroyImage(image);
++			image = NULL;
++		}
++	}
++	create_image();
++	XFlush(dpy);
++}
++
++void ReDoDesktop(void) {
++	int w, h, x, y, dw, dh;
++
++	if (appData.yCrop) {
++		if (appData.yCrop < 0 || old_width <= 0) {
++			appData.yCrop = guessCrop();
++			fprintf(stderr, "Set -ycrop to: %d\n", appData.yCrop);
++		} else {
++			int w1 = si.framebufferWidth;
++			int w0 = old_width;
++			appData.yCrop = (w1 * appData.yCrop) / old_width;
++			if (appData.yCrop <= 100)  {
++				appData.yCrop = guessCrop();
++				fprintf(stderr, "Set small -ycrop to: %d\n", appData.yCrop);
++			}
++		}
++		fprintf(stderr, "Using -ycrop: %d\n", appData.yCrop);
++	}
++	old_width  = si.framebufferWidth;
++	old_height = si.framebufferHeight;
++
++	if (appData.fullScreen) {
++		if (image && image->data) {
++			int len;
++			int h = image->height;
++			int w = image->width;
++			len = image->bytes_per_line * image->height;
++			/* black out window first: */
++			memset(image->data, 0, len);
++  			XPutImage(dpy, XtWindow(desktop), gc, image, 0, 0, 0, 0, w, h);
++			XFlush(dpy);
++		}
++		XtResizeWidget(desktop, si.framebufferWidth, si.framebufferHeight, 0);
++		XSync(dpy, False);
++		usleep(100*1000);
++		FullScreenOn();
++		XSync(dpy, False);
++		usleep(100*1000);
++		reset_image();
++		return;
++	}
++
++	dw = appData.wmDecorationWidth;
++	dh = appData.wmDecorationHeight;
++
++	w = si.framebufferWidth;
++	h = si.framebufferHeight;
++	if (appData.yCrop > 0) {
++		h = appData.yCrop;
++	}
++
++	if (w + dw >= dpyWidth) {
++		w = dpyWidth - dw;
++	}
++	if (h + dh >= dpyHeight) {
++		h = dpyHeight - dh;
++	}
++
++	XtVaSetValues(toplevel, XtNmaxWidth, w, XtNmaxHeight, h, NULL);
++
++	XtVaSetValues(desktop, XtNwidth, si.framebufferWidth,
++	    XtNheight, si.framebufferHeight, NULL);
++
++	x = (dpyWidth  - w - dw)/2;
++	y = (dpyHeight - h - dh)/2;
++
++	XtResizeWidget(desktop, si.framebufferWidth, si.framebufferHeight, 0);
++
++	if (appData.yCrop > 0) {
++		XtVaSetValues(toplevel, XtNmaxHeight, appData.yCrop, NULL);
++		XtVaSetValues(form,     XtNmaxHeight, appData.yCrop, NULL);
++	}
++
++	XtConfigureWidget(toplevel, x + dw, y + dh, w, h, 0);
++
++	reset_image();
++}
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/fullscreen.c vnc_unixsrc/vncviewer/fullscreen.c
+--- vnc_unixsrc.orig/vncviewer/fullscreen.c	2003-10-09 05:23:49.000000000 -0400
++++ vnc_unixsrc/vncviewer/fullscreen.c	2007-02-04 14:15:42.000000000 -0500
+@@ -85,10 +85,14 @@
+   Dimension oldViewportWidth, oldViewportHeight, clipWidth, clipHeight;
+   Position viewportX, viewportY;
+ 
++  Bool fsAlready = appData.fullScreen, toobig = False;
++
+   appData.fullScreen = True;
+ 
+   if (si.framebufferWidth > dpyWidth || si.framebufferHeight > dpyHeight) {
++    int eff_height = si.framebufferHeight;
+ 
++    toobig = True;
+     XtVaSetValues(viewport, XtNforceBars, True, NULL);
+     XtVaGetValues(viewport, XtNwidth, &oldViewportWidth,
+ 		  XtNheight, &oldViewportHeight, NULL);
+@@ -105,16 +109,23 @@
+       toplevelWidth = dpyWidth;
+     }
+ 
+-    if (si.framebufferHeight > dpyHeight) {
++    if (appData.yCrop > 0) {
++	eff_height = appData.yCrop;
++    }
++
++    if (eff_height > dpyHeight) {
+       viewportHeight = toplevelHeight = dpyHeight + scrollbarHeight;
+     } else {
+-      viewportHeight = si.framebufferHeight + scrollbarHeight;
++      viewportHeight = eff_height + scrollbarHeight;
+       toplevelHeight = dpyHeight;
+     }
+ 
+   } else {
+     viewportWidth = si.framebufferWidth;
+     viewportHeight = si.framebufferHeight;
++	if (appData.yCrop > 0) {
++		viewportHeight = appData.yCrop;
++	}
+     toplevelWidth = dpyWidth;
+     toplevelHeight = dpyHeight;
+   }
+@@ -129,7 +140,12 @@
+      reparenting our window to the root.  The window manager will get a
+      ReparentNotify and hopefully clean up its frame window. */
+ 
++if (! fsAlready) {
++  XUnmapWindow(dpy, XtWindow(toplevel));
+   XtVaSetValues(toplevel, XtNoverrideRedirect, True, NULL);
++  XtVaSetValues(viewport, XtNoverrideRedirect, True, NULL);
++  XtVaSetValues(desktop,  XtNoverrideRedirect, True, NULL);
++  XtVaSetValues(popup,    XtNoverrideRedirect, True, NULL);
+ 
+   XReparentWindow(dpy, XtWindow(toplevel), DefaultRootWindow(dpy), 0, 0);
+ 
+@@ -139,6 +155,8 @@
+      with XReparentWindow. The last XSync seems to prevent losing
+      focus, but I don't know why. */
+   XSync(dpy, False);
++XMapWindow(dpy, XtWindow(toplevel));
++XRaiseWindow(dpy, XtWindow(toplevel));
+   XMoveWindow(dpy, XtWindow(toplevel), 0, 0);
+   XSync(dpy, False);
+ 
+@@ -164,25 +182,67 @@
+ 
+   XtManageChild(viewport);
+ 
+-  /* Now we can set "toplevel" to its proper size. */
++} else {
++	XSync(dpy, False);
++}
+ 
++  /* Now we can set "toplevel" to its proper size. */
+   XtResizeWidget(toplevel, toplevelWidth, toplevelHeight, 0);
+ 
+-  /* Set the popup to overrideRedirect too */
++if (fsAlready) {
++  XtResizeWidget(viewport, viewportWidth, viewportHeight, 0);
++  if (! toobig) {
++	XtVaSetValues(viewport, XtNforceBars, False, NULL);
++  }
++  XMoveWindow(dpy, XtWindow(viewport), viewportX, viewportY);
++  XSync(dpy, False);
++}
+ 
+-  XtVaSetValues(popup, XtNoverrideRedirect, True, NULL);
++  /* Set the popup to overrideRedirect too */
+ 
+   /* Try to get the input focus. */
+ 
++#if 0
+   XSetInputFocus(dpy, DefaultRootWindow(dpy), RevertToPointerRoot,
+ 		 CurrentTime);
++#else
++  XSetInputFocus(dpy, PointerRoot, RevertToPointerRoot,
++                 CurrentTime);
++#endif
++
+ 
+   /* Optionally, grab the keyboard. */
+ 
+-  if (appData.grabKeyboard &&
+-      XtGrabKeyboard(desktop, True, GrabModeAsync,
+-		     GrabModeAsync, CurrentTime) != GrabSuccess) {
+-    fprintf(stderr, "XtGrabKeyboard() failed.\n");
++#define FORCE_UP \
++	XSync(dpy, False); \
++	XUnmapWindow(dpy, XtWindow(toplevel)); \
++	XSync(dpy, False); \
++	XMapWindow(dpy, XtWindow(toplevel)); \
++	XRaiseWindow(dpy, XtWindow(toplevel)); \
++	XSync(dpy, False);
++
++  if (appData.grabKeyboard && XtGrabKeyboard(desktop, True, GrabModeAsync, GrabModeAsync, CurrentTime) != GrabSuccess) {
++	fprintf(stderr, "XtGrabKeyboard() failed.\n");
++	XSync(dpy, False);
++	usleep(200 * 1000);
++	FORCE_UP
++
++  	if (XtGrabKeyboard(desktop, True, GrabModeAsync, GrabModeAsync, CurrentTime) != GrabSuccess) {
++		fprintf(stderr, "XtGrabKeyboard() failed again.\n");
++		usleep(200 * 1000);
++		XSync(dpy, True);
++  		if (XtGrabKeyboard(desktop, True, GrabModeAsync, GrabModeAsync, CurrentTime) != GrabSuccess) {
++			fprintf(stderr, "XtGrabKeyboard() failed 3rd time.\n");
++		} else {
++			fprintf(stderr, "XtGrabKeyboard() OK 3rd try.\n");
++		}
++	} else {
++		fprintf(stderr, "XtGrabKeyboard() OK 2nd try.\n");
++	}
++	XRaiseWindow(dpy, XtWindow(toplevel));
++  } else if (appData.grabAll) { /* runge bot of FullScreenOn */
++        fprintf(stderr, "calling XGrabServer(dpy)\n");
++        XGrabServer(dpy);       
+   }
+ }
+ 
+@@ -210,8 +270,14 @@
+ 
+   appData.fullScreen = False;
+ 
+-  if (appData.grabKeyboard)
+-    XtUngrabKeyboard(desktop, CurrentTime);
++
++  if (appData.grabAll) { /* runge top of FullScreenOff */
++        fprintf(stderr, "calling XUngrabServer(dpy)\n");
++        XUngrabServer(dpy);     
++  }
++  if (appData.grabKeyboard) {
++	XtUngrabKeyboard(desktop, CurrentTime);
++  }
+ 
+   XtUnmapWidget(toplevel);
+ 
+@@ -238,6 +304,9 @@
+   XtManageChild(viewport);
+ 
+   XtVaSetValues(toplevel, XtNoverrideRedirect, False, NULL);
++  XtVaSetValues(viewport, XtNoverrideRedirect, False, NULL);
++  XtVaSetValues(desktop,  XtNoverrideRedirect, False, NULL);
++  XtVaSetValues(popup,    XtNoverrideRedirect, False, NULL);
+ 
+   if ((toplevelWidth + appData.wmDecorationWidth) >= dpyWidth)
+     toplevelWidth = dpyWidth - appData.wmDecorationWidth;
+@@ -345,7 +414,9 @@
+   }
+ 
+   if (scrollDown) {
+-    if (desktopY < si.framebufferHeight - dpyHeight) {
++    if (appData.yCrop > 0 && desktopY + dpyHeight >= appData.yCrop) {
++	;
++    } else if (desktopY < si.framebufferHeight - dpyHeight) {
+       desktopY += appData.bumpScrollPixels;
+       if (desktopY > si.framebufferHeight - dpyHeight)
+ 	desktopY = si.framebufferHeight - dpyHeight;
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/hextile.c vnc_unixsrc/vncviewer/hextile.c
+--- vnc_unixsrc.orig/vncviewer/hextile.c	2000-06-11 08:00:53.000000000 -0400
++++ vnc_unixsrc/vncviewer/hextile.c	2007-02-03 20:41:19.000000000 -0500
+@@ -66,11 +66,18 @@
+ 	  return False;
+ 
+ #if (BPP == 8)
+-      if (appData.useBGR233)
++      if (appData.useBGR233) {
+ 	gcv.foreground = BGR233ToPixel[bg];
+-      else
++      } else
+ #endif
++#if (BPP == 16)
++      if (appData.useBGR565) {
++	gcv.foreground = BGR565ToPixel[bg];
++      } else
++#endif
++      {
+ 	gcv.foreground = bg;
++      }
+ 
+       XChangeGC(dpy, gc, GCForeground, &gcv);
+       XFillRectangle(dpy, desktopWin, gc, x, y, w, h);
+@@ -101,11 +108,18 @@
+ 	  sh = rfbHextileExtractH(*ptr);
+ 	  ptr++;
+ #if (BPP == 8)
+-	  if (appData.useBGR233)
++	  if (appData.useBGR233) {
+ 	    gcv.foreground = BGR233ToPixel[fg];
+-	  else
++	  } else
++#endif
++#if (BPP == 16)
++	  if (appData.useBGR565) {
++	    gcv.foreground = BGR565ToPixel[fg];
++	  } else
+ #endif
++	  {
+ 	    gcv.foreground = fg;
++	  }
+ 
+ 	  XChangeGC(dpy, gc, GCForeground, &gcv);
+ 	  XFillRectangle(dpy, desktopWin, gc, x+sx, y+sy, sw, sh);
+@@ -116,11 +130,18 @@
+ 	  return False;
+ 
+ #if (BPP == 8)
+-	if (appData.useBGR233)
++	if (appData.useBGR233) {
+ 	  gcv.foreground = BGR233ToPixel[fg];
+-	else
++	} else
+ #endif
++#if (BPP == 16)
++        if (appData.useBGR565) {
++          gcv.foreground = BGR565ToPixel[fg];
++	} else
++#endif
++	{
+ 	  gcv.foreground = fg;
++	}
+ 
+ 	XChangeGC(dpy, gc, GCForeground, &gcv);
+ 
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer/popup.c
+--- vnc_unixsrc.orig/vncviewer/popup.c	2000-06-11 08:00:53.000000000 -0400
++++ vnc_unixsrc/vncviewer/popup.c	2007-02-04 11:14:45.000000000 -0500
+@@ -32,8 +32,33 @@
+ void
+ ShowPopup(Widget w, XEvent *event, String *params, Cardinal *num_params)
+ {
+-  XtMoveWidget(popup, event->xbutton.x_root, event->xbutton.y_root);
+-  XtPopup(popup, XtGrabNone);
++  if (appData.popupFix) {
++	Window rr, cr; 
++	unsigned int m;
++  	int x0 = 500, y0 = 500;
++	int xr, yr, wxr, wyr;
++	Dimension ph;
++	if (XQueryPointer(dpy, DefaultRootWindow(dpy), &rr, &cr, &xr, &yr, &wxr, &wyr, &m)) {
++		x0 = xr;
++		y0 = yr;
++	}
++  	XtPopup(popup, XtGrabNone);
++	XtVaGetValues(popup, XtNheight, &ph, NULL);
++	if (0) fprintf(stderr, "%d %d %d\n", y0, (int) ph, dpyHeight);
++	if (y0 + (int) ph > dpyHeight) {
++		y0 = dpyHeight - (int) ph;
++		if (y0 < 0) {
++			y0 = 0;
++		}
++	}
++	XtMoveWidget(popup, x0, y0);
++  } else {
++	XtMoveWidget(popup, event->xbutton.x_root, event->xbutton.y_root);
++  	XtPopup(popup, XtGrabNone);
++  }
++  if (appData.grabAll) {
++  	XRaiseWindow(dpy, XtWindow(popup));
++  }
+   XSetWMProtocols(dpy, XtWindow(popup), &wmDeleteWindow, 1);
+ }
+ 
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
+--- vnc_unixsrc.orig/vncviewer/rfbproto.c	2004-03-11 13:14:39.000000000 -0500
++++ vnc_unixsrc/vncviewer/rfbproto.c	2007-02-04 18:31:34.000000000 -0500
+@@ -57,6 +57,23 @@
+ static Bool HandleTight16(int rx, int ry, int rw, int rh);
+ static Bool HandleTight32(int rx, int ry, int rw, int rh);
+ 
++/* runge add zrle */
++static Bool HandleZRLE8(int rx, int ry, int rw, int rh);
++static Bool HandleZRLE16(int rx, int ry, int rw, int rh);
++static Bool HandleZRLE24(int rx, int ry, int rw, int rh);
++static Bool HandleZRLE24Up(int rx, int ry, int rw, int rh);
++static Bool HandleZRLE24Down(int rx, int ry, int rw, int rh);
++static Bool HandleZRLE32(int rx, int ry, int rw, int rh);
++
++typedef struct {
++    unsigned long length;
++} rfbZRLEHeader;
++
++#define sz_rfbZRLEHeader 4
++
++#define rfbZRLETileWidth 64
++#define rfbZRLETileHeight 64
++
+ static void ReadConnFailedReason(void);
+ static long ReadCompactLen (void);
+ 
+@@ -68,6 +85,9 @@
+                               int compressedLen);
+ 
+ 
++int sent_FBU = 0;
++int skip_XtUpdate = 0;
++
+ int rfbsock;
+ char *desktopName;
+ rfbPixelFormat myFormat;
+@@ -177,6 +197,9 @@
+ 	  sig_rfbEncodingPointerPos, "Pointer position update");
+   CapsAdd(encodingCaps, rfbEncodingLastRect, rfbTightVncVendor,
+ 	  sig_rfbEncodingLastRect, "LastRect protocol extension");
++
++  CapsAdd(encodingCaps, rfbEncodingNewFBSize, rfbTightVncVendor,
++	  sig_rfbEncodingNewFBSize, "New FB size protocol extension");
+ }
+ 
+ 
+@@ -729,6 +752,23 @@
+   Bool requestCompressLevel = False;
+   Bool requestQualityLevel = False;
+   Bool requestLastRectEncoding = False;
++  Bool requestNewFBSizeEncoding = True;
++
++  fprintf(stderr, "SetFormatAndEncodings: sent_FBU state: %2d\n", sent_FBU);
++#if 0
++  if (sent_FBU == 1 || sent_FBU == 2) {
++	int i;
++	skip_XtUpdate = 1;
++	for (i=0; i<10; i++) {
++		Bool result = HandleRFBServerMessage();
++  		fprintf(stderr, "--------: %2d\n", sent_FBU);
++		if (sent_FBU == 0) {
++			break;
++		}
++	}
++	skip_XtUpdate = 0;
++  }
++#endif
+ 
+   spf.type = rfbSetPixelFormat;
+   spf.format = myFormat;
+@@ -736,6 +776,7 @@
+   spf.format.greenMax = Swap16IfLE(spf.format.greenMax);
+   spf.format.blueMax = Swap16IfLE(spf.format.blueMax);
+ 
++
+   if (!WriteExact(rfbsock, (char *)&spf, sz_rfbSetPixelFormatMsg))
+     return False;
+ 
+@@ -754,6 +795,12 @@
+ 	encStrLen = strlen(encStr);
+       }
+ 
++if (getenv("DEBUG_SETFORMAT")) {
++	fprintf(stderr, "encs: ");
++	write(2, encStr, encStrLen);
++	fprintf(stderr, "\n");
++}
++
+       if (strncasecmp(encStr,"raw",encStrLen) == 0) {
+ 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
+       } else if (strncasecmp(encStr,"copyrect",encStrLen) == 0) {
+@@ -775,6 +822,8 @@
+ 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
+       } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
+ 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
++      } else if (strncasecmp(encStr,"zrle",encStrLen) == 0) {
++	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZRLE);
+       } else {
+ 	fprintf(stderr,"Unknown encoding '%.*s'\n",encStrLen,encStr);
+       }
+@@ -797,7 +846,7 @@
+     if (appData.useRemoteCursor) {
+       if (se->nEncodings < MAX_ENCODINGS)
+ 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
+-      if (se->nEncodings < MAX_ENCODINGS)
++      if (se->nEncodings < MAX_ENCODINGS && !appData.useX11Cursor)
+ 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
+       if (se->nEncodings < MAX_ENCODINGS)
+ 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
+@@ -806,10 +855,14 @@
+     if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
+       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
+     }
++
++    if (se->nEncodings < MAX_ENCODINGS && requestNewFBSizeEncoding) {
++      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingNewFBSize);
++    }
+   }
+   else {
+     if (SameMachine(rfbsock)) {
+-      if (!tunnelSpecified) {
++      if (!tunnelSpecified && appData.useRawLocal) {
+ 	fprintf(stderr,"Same machine: preferring raw encoding\n");
+ 	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
+       } else {
+@@ -819,6 +872,7 @@
+ 
+     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
+     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
++    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZRLE);
+     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
+     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
+     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
+@@ -844,11 +898,14 @@
+ 
+     if (appData.useRemoteCursor) {
+       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
+-      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
++      if (!appData.useX11Cursor) {
++      	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
++      }
+       encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
+     }
+ 
+     encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
++    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingNewFBSize);
+   }
+ 
+   len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
+@@ -889,6 +946,12 @@
+   fur.w = Swap16IfLE(w);
+   fur.h = Swap16IfLE(h);
+ 
++	if (incremental) {
++		sent_FBU = 1;
++	} else {
++		sent_FBU = 2;
++	}
++
+   if (!WriteExact(rfbsock, (char *)&fur, sz_rfbFramebufferUpdateRequestMsg))
+     return False;
+ 
+@@ -955,6 +1018,10 @@
+ }
+ 
+ 
++extern int do_format_change;
++extern int do_cursor_change;
++extern void cutover_format_change(void);
++
+ /*
+  * HandleRFBServerMessage.
+  */
+@@ -1004,6 +1071,9 @@
+     int i;
+     int usecs;
+ 
++	int skip_incFBU = 0;
++	sent_FBU = -1;
++
+     if (!ReadFromRFBServer(((char *)&msg.fu) + 1,
+ 			   sz_rfbFramebufferUpdateMsg - 1))
+       return False;
+@@ -1038,6 +1108,16 @@
+ 	}
+ 	continue;
+       }
++      if (rect.encoding == rfbEncodingNewFBSize) {
++	  fprintf(stderr,"New Size: %dx%d at (%d, %d)\n",
++		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
++	si.framebufferWidth = rect.r.w;
++	si.framebufferHeight = rect.r.h;
++        fprintf(stderr, "si: %d %d\n", si.framebufferWidth, si.framebufferHeight);
++	ReDoDesktop();
++
++	continue;
++      }
+ 
+       if ((rect.r.x + rect.r.w > si.framebufferWidth) ||
+ 	  (rect.r.y + rect.r.h > si.framebufferHeight))
+@@ -1208,6 +1288,42 @@
+ 	break;
+       }
+ 
++/* runge adds zrle: */
++      case rfbEncodingZRLE:
++      {
++        switch (myFormat.bitsPerPixel) {
++        case 8:
++          if (!HandleZRLE8(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
++            return False;
++          break;
++        case 16:
++          if (!HandleZRLE16(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
++            return False;
++          break;
++        case 32:
++        {
++          unsigned int maxColor=(myFormat.redMax<<myFormat.redShift)|
++                (myFormat.greenMax<<myFormat.greenShift)|
++                (myFormat.blueMax<<myFormat.blueShift);
++          if ((myFormat.bigEndian && (maxColor&0xff)==0) ||
++              (!myFormat.bigEndian && (maxColor&0xff000000)==0)) {
++            if (!HandleZRLE24(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
++              return False;
++          } else if (!myFormat.bigEndian && (maxColor&0xff)==0) {
++            if (!HandleZRLE24Up(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
++              return False;
++          } else if (myFormat.bigEndian && (maxColor&0xff000000)==0) {
++            if (!HandleZRLE24Down(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
++              return False;
++          } else if (!HandleZRLE32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
++            return False;
++          break;
++        }
++        }
++        break;
++     }
++
++
+       default:
+ 	fprintf(stderr,"Unknown rect encoding %d\n",
+ 		(int)rect.encoding);
+@@ -1217,6 +1333,28 @@
+       /* Now we may discard "soft cursor locks". */
+       SoftCursorUnlockScreen();
+     }
++	sent_FBU = 0;
++	/*
++	 * we need to be careful since Xt events are processed
++	 * usually in the middle of FBU.  So we do any scheduled ones now
++	 * which is pretty safe but not absolutely safe.
++         */
++	if (do_format_change) {
++		cutover_format_change();
++		do_format_change = 0;
++		SetVisualAndCmap();
++		SetFormatAndEncodings();
++		if (do_cursor_change) {
++			if (do_cursor_change == 1) {
++				DesktopCursorOff();
++			}
++			do_cursor_change = 0;
++		} else {
++			SendFramebufferUpdateRequest(0, 0, si.framebufferWidth,
++			    si.framebufferHeight, False);
++			skip_incFBU = 1;
++		}
++	}
+ 
+ #ifdef MITSHM
+     /* if using shared memory PutImage, make sure that the X server has
+@@ -1228,8 +1366,12 @@
+       XSync(dpy, False);
+ #endif
+ 
+-    if (!SendIncrementalFramebufferUpdateRequest())
+-      return False;
++
++	if (skip_XtUpdate || skip_incFBU) {
++		;
++	} else if (!SendIncrementalFramebufferUpdateRequest()) {
++		return False;
++	}
+ 
+     break;
+   }
+@@ -1296,12 +1438,19 @@
+ #define CONCAT2(a,b) a##b
+ #define CONCAT2E(a,b) CONCAT2(a,b)
+ 
++#define CONCAT3(a,b,c) a##b##c
++#define CONCAT3E(a,b,c) CONCAT3(a,b,c)
++
++static unsigned char* frameBuffer = NULL;
++static int frameBufferLen = 0;
++
+ #define BPP 8
+ #include "rre.c"
+ #include "corre.c"
+ #include "hextile.c"
+ #include "zlib.c"
+ #include "tight.c"
++#include "zrle.c"
+ #undef BPP
+ #define BPP 16
+ #include "rre.c"
+@@ -1309,6 +1458,7 @@
+ #include "hextile.c"
+ #include "zlib.c"
+ #include "tight.c"
++#include "zrle.c"
+ #undef BPP
+ #define BPP 32
+ #include "rre.c"
+@@ -1316,6 +1466,15 @@
+ #include "hextile.c"
+ #include "zlib.c"
+ #include "tight.c"
++#include "zrle.c"
++#define REALBPP 24
++#include "zrle.c"
++#define REALBPP 24
++#define UNCOMP 8
++#include "zrle.c"
++#define REALBPP 24
++#define UNCOMP -8
++#include "zrle.c"
+ #undef BPP
+ 
+ /*
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rre.c vnc_unixsrc/vncviewer/rre.c
+--- vnc_unixsrc.orig/vncviewer/rre.c	2000-06-11 08:00:53.000000000 -0400
++++ vnc_unixsrc/vncviewer/rre.c	2007-02-03 20:45:57.000000000 -0500
+@@ -49,8 +49,12 @@
+ #if (BPP == 8)
+   gcv.foreground = (appData.useBGR233 ? BGR233ToPixel[pix] : pix);
+ #else
++#if (BPP == 16)
++  gcv.foreground = (appData.useBGR565 ? BGR565ToPixel[pix] : pix);
++#else
+   gcv.foreground = pix;
+ #endif
++#endif
+ 
+   XChangeGC(dpy, gc, GCForeground, &gcv);
+   XFillRectangle(dpy, desktopWin, gc, rx, ry, rw, rh);
+@@ -70,8 +74,12 @@
+ #if (BPP == 8)
+     gcv.foreground = (appData.useBGR233 ? BGR233ToPixel[pix] : pix);
+ #else
++#if (BPP == 16)
++    gcv.foreground = (appData.useBGR565 ? BGR565ToPixel[pix] : pix);
++#else
+     gcv.foreground = pix;
+ #endif
++#endif
+ 
+     XChangeGC(dpy, gc, GCForeground, &gcv);
+     XFillRectangle(dpy, desktopWin, gc, rx + subrect.x, ry + subrect.y,
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/shm.c vnc_unixsrc/vncviewer/shm.c
+--- vnc_unixsrc.orig/vncviewer/shm.c	2000-06-11 08:00:53.000000000 -0400
++++ vnc_unixsrc/vncviewer/shm.c	2006-07-26 23:30:42.000000000 -0400
+@@ -41,6 +41,10 @@
+   }
+ }
+ 
++Bool UsingShm() {
++	return needShmCleanup;
++}
++
+ static int
+ ShmCreationXErrorHandler(Display *dpy, XErrorEvent *error)
+ {
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncviewer/sockets.c
+--- vnc_unixsrc.orig/vncviewer/sockets.c	2001-01-14 22:54:18.000000000 -0500
++++ vnc_unixsrc/vncviewer/sockets.c	2007-02-03 22:47:29.000000000 -0500
+@@ -63,9 +63,14 @@
+   XtRemoveInput(*id);
+ }
+ 
++extern int skip_XtUpdate;
++
+ static void
+ ProcessXtEvents()
+ {
++	if (skip_XtUpdate) {
++		return;
++	}
+   rfbsockReady = False;
+   XtAppAddInput(appContext, rfbsock, (XtPointer)XtInputReadMask,
+ 		rfbsockReadyCallback, NULL);
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/tight.c vnc_unixsrc/vncviewer/tight.c
+--- vnc_unixsrc.orig/vncviewer/tight.c	2002-04-30 09:07:31.000000000 -0400
++++ vnc_unixsrc/vncviewer/tight.c	2007-02-03 20:52:34.000000000 -0500
+@@ -132,8 +132,13 @@
+     gcv.foreground = (appData.useBGR233) ?
+       BGR233ToPixel[fill_colour] : fill_colour;
+ #else
++#if (BPP == 16)
++    gcv.foreground = (appData.useBGR565) ?
++      BGR565ToPixel[fill_colour] : fill_colour;
++#else
+     gcv.foreground = fill_colour;
+ #endif
++#endif
+ 
+     XChangeGC(dpy, gc, GCForeground, &gcv);
+     XFillRectangle(dpy, desktopWin, gc, rx, ry, rw, rh);
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncviewer/vncviewer.c
+--- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.c	2007-02-04 00:05:10.000000000 -0500
+@@ -22,6 +22,7 @@
+  */
+ 
+ #include "vncviewer.h"
++#include <X11/Xaw/Toggle.h>
+ 
+ char *programName;
+ XtAppContext appContext;
+@@ -29,6 +30,32 @@
+ 
+ Widget toplevel;
+ 
++static void set_sbwidth(int sbw) {
++	char *q, *p, t[5];
++	int i, k, N = 4;
++
++	if (sbw < 1) {
++		sbw = 2;
++	} else if (sbw > 100) {
++		sbw = 100;
++	}
++
++	sprintf(t, "%4d", sbw);
++	k = 0;
++	while (fallback_resources[k] != NULL) {
++		q = strstr(fallback_resources[k], "%SBW");
++		if (q) {
++			p = strdup(fallback_resources[k]);
++			q = strstr(p, "%SBW");
++			for (i=0; i < N; i++) {
++				*(q+i) = t[i];
++			}
++			fallback_resources[k] = p;
++		}
++		k++;
++	}
++}
++
+ int
+ main(int argc, char **argv)
+ {
+@@ -57,10 +84,24 @@
+     }
+   }
+ 
++  if (argc > 1 && strstr(argv[1], "-h") == argv[1]) {
++  	usage();
++	return 0;
++  }
++
+   /* Call the main Xt initialisation function.  It parses command-line options,
+      generating appropriate resource specs, and makes a connection to the X
+      display. */
+ 
++  {	int i, sbw = 2;
++	for (i = 1; i < argc - 1; i++) {
++		if (!strcmp(argv[i], "-sbwidth")) {
++			sbw = atoi(argv[i+1]);
++		}
++	}
++	set_sbwidth(sbw);
++  }
++
+   toplevel = XtVaAppInitialize(&appContext, "Vncviewer",
+ 			       cmdLineOptions, numCmdLineOptions,
+ 			       &argc, argv, fallback_resources,
+@@ -123,11 +164,443 @@
+      automatically be processed whenever the VNC connection is idle. */
+ 
+   while (1) {
+-    if (!HandleRFBServerMessage())
+-      break;
++	if (!HandleRFBServerMessage()) {
++		break;
++	}
+   }
+ 
+   Cleanup();
+ 
+   return 0;
+ }
++
++/*
++ * Toggle8bpp
++ */
++
++static int last_ncolors = 0;
++static int save_useBGR233 = 0;
++static Bool save_useBGR565 = False;
++
++static Widget b8    = NULL;
++static Widget b16   = NULL;
++static Widget bfull = NULL;
++
++int do_format_change = 0;
++int do_cursor_change = 0;
++static void schedule_format_change(void) {
++	do_format_change = 1;
++	do_cursor_change = 0;
++}
++static void init_format_change(void) {
++	appDataNew.useBGR233       = appData.useBGR233;
++	appDataNew.useBGR565       = appData.useBGR565;
++	appDataNew.enableJPEG      = appData.enableJPEG;
++	appDataNew.encodingsString = appData.encodingsString;
++	appDataNew.useRemoteCursor = appData.useRemoteCursor;
++	appDataNew.useX11Cursor    = appData.useX11Cursor;
++	appDataNew.useRawLocal     = appData.useRawLocal;
++}
++void cutover_format_change(void) {
++	appData.useBGR233       = appDataNew.useBGR233;
++	appData.useBGR565       = appDataNew.useBGR565;
++	appData.enableJPEG      = appDataNew.enableJPEG;
++	appData.encodingsString = appDataNew.encodingsString;
++	appData.useRemoteCursor = appDataNew.useRemoteCursor;
++	appData.useX11Cursor    = appDataNew.useX11Cursor;
++	appData.useRawLocal     = appDataNew.useRawLocal;
++}
++
++void
++Toggle8bpp(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	fprintf(stderr, "Toggle8bpp: %d\n", appData.useBGR233);
++	b8 = w;
++	init_format_change();
++	if (appData.useBGR233) {
++		last_ncolors = appData.useBGR233;
++		appDataNew.useBGR233 = 0;
++		appDataNew.useBGR565 = save_useBGR565;
++		fprintf(stderr, "8bpp: off\n");
++	} else {
++		if (!last_ncolors) last_ncolors = 256;
++		appDataNew.useBGR233 = last_ncolors;
++		save_useBGR565 = appData.useBGR565;
++		appDataNew.useBGR565 = False;
++		fprintf(stderr, "8bpp: on (%d colors)\n", appDataNew.useBGR233);
++	}
++	schedule_format_change();
++}
++
++
++void
++Toggle16bpp(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	fprintf(stderr, "Toggle16bpp: %d\n", appData.useBGR565);
++	b16 = w;
++	init_format_change();
++	if (appData.useBGR565) {
++		appDataNew.useBGR565 = False;
++		appDataNew.useBGR233 = save_useBGR233;
++		fprintf(stderr, "16bpp: off\n");
++	} else {
++		appDataNew.useBGR565 = True;
++		save_useBGR233 = appData.useBGR233;
++		appDataNew.useBGR233 = 0;
++		fprintf(stderr, "16bpp: on\n");
++	}
++	schedule_format_change();
++}
++
++void
++ToggleFullColor(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	fprintf(stderr, "ToggleFullColor\n");
++	bfull = w;
++	init_format_change();
++	if (appData.useBGR565 || appData.useBGR233) {
++		save_useBGR565 = appData.useBGR565;
++		appDataNew.useBGR565 = False;
++		save_useBGR233 = appData.useBGR233;
++		appDataNew.useBGR233 = 0;
++		fprintf(stderr, "FullColor: on\n");
++	} else {
++		if (save_useBGR565) {
++			appDataNew.useBGR565 = True;
++			appDataNew.useBGR233 = 0;
++			fprintf(stderr, "FullColor off -> 16bpp.\n");
++		} else {
++			appDataNew.useBGR565 = False;
++			if (!save_useBGR233) save_useBGR233 = 256;
++			appDataNew.useBGR233 = save_useBGR233;
++			fprintf(stderr, "FullColor off -> 8bpp.\n");
++		}
++	}
++	schedule_format_change();
++}
++
++/*
++ * ToggleNColors
++ */
++
++static Widget w256 = NULL;
++static Widget w64  = NULL;
++static Widget w8   = NULL;
++
++void
++Toggle256Colors(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	w256 = w;
++	if (appData.useBGR233 != 256) {
++		fprintf(stderr, "256 colors: on\n");
++		init_format_change();
++		last_ncolors = appDataNew.useBGR233 = 256;
++		save_useBGR565 = appData.useBGR565;
++		appDataNew.useBGR565 = False;
++		schedule_format_change();
++	}
++}
++
++void
++Toggle64Colors(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	w64 = w;
++	if (appData.useBGR233 != 64) {
++		fprintf(stderr, "64 colors: on\n");
++		init_format_change();
++		last_ncolors = appDataNew.useBGR233 = 64;
++		save_useBGR565 = appData.useBGR565;
++		appDataNew.useBGR565 = False;
++		schedule_format_change();
++	}
++}
++
++void
++Toggle8Colors(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	w8 = w;
++	if (appData.useBGR233 != 8) {
++		fprintf(stderr, "8 colors: on\n");
++		init_format_change();
++		last_ncolors = appDataNew.useBGR233 = 8;
++		save_useBGR565 = appData.useBGR565;
++		appDataNew.useBGR565 = False;
++		schedule_format_change();
++	}
++}
++
++/*
++ * ToggleJPEG
++ */
++
++void
++ToggleJPEG(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	init_format_change();
++	if (appData.enableJPEG) {
++		appDataNew.enableJPEG = False;
++		fprintf(stderr, "JPEG: off\n");
++	} else {
++		appDataNew.enableJPEG = True;
++		fprintf(stderr, "JPEG: on\n");
++	}
++	schedule_format_change();
++}
++
++/*
++ * ToggleTightZRLE
++ */
++
++static Bool usingZRLE = False;
++
++void
++ToggleTightZRLE(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	char prefTight[] = "copyrect tight zrle zlib hextile corre rre raw";
++	char prefZRLE[]  = "copyrect zrle tight zlib hextile corre rre raw";
++	init_format_change();
++	if (! appData.encodingsString) {
++		appDataNew.encodingsString = strdup(prefZRLE);
++		usingZRLE = True;
++		fprintf(stderr, "prefer: ZRLE\n");
++	} else {
++		char *p, *q;
++		p = strstr(appData.encodingsString, "tight");
++		q = strstr(appData.encodingsString, "zrle");
++		if (! p) {
++			appDataNew.encodingsString = strdup(prefZRLE);
++			usingZRLE = True;
++			fprintf(stderr, "prefer: ZRLE\n");
++		} else if (! q) {
++			appDataNew.encodingsString = strdup(prefTight);
++			usingZRLE = False;
++			fprintf(stderr, "prefer: Tight\n");
++		} else {
++			if (p < q) {
++				appDataNew.encodingsString = strdup(prefZRLE);
++				usingZRLE = True;
++				fprintf(stderr, "prefer: ZRLE\n");
++			} else {
++				appDataNew.encodingsString = strdup(prefTight);
++				usingZRLE = False;
++				fprintf(stderr, "prefer: Tight\n");
++			}
++		}
++	}
++	schedule_format_change();
++}
++
++/*
++ * ToggleViewOnly
++ */
++
++void
++ToggleViewOnly(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (appData.viewOnly) {
++		appData.viewOnly = False;
++		fprintf(stderr, "viewonly: off\n");
++	} else {
++		appData.viewOnly = True;
++		fprintf(stderr, "viewonly: on\n");
++	}
++}
++
++void
++ToggleCursorShape(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	init_format_change();
++	if (appData.useRemoteCursor) {
++		appDataNew.useRemoteCursor = False;
++		fprintf(stderr, "useRemoteCursor: off\n");
++	} else {
++		appDataNew.useRemoteCursor = True;
++		fprintf(stderr, "useRemoteCursor: on\n");
++	}
++	schedule_format_change();
++	if (!appDataNew.useRemoteCursor) {
++		do_cursor_change = 1;
++	} else {
++		do_cursor_change = -1;
++	}
++}
++
++void
++ToggleCursorAlpha(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (appData.useCursorAlpha) {
++		appData.useCursorAlpha = False;
++		fprintf(stderr, "useCursorAlpha: off\n");
++	} else {
++		appData.useCursorAlpha = True;
++		fprintf(stderr, "useCursorAlpha: on\n");
++	}
++}
++
++void
++ToggleX11Cursor(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	init_format_change();
++	if (appData.useX11Cursor) {
++		appDataNew.useX11Cursor = False;
++		fprintf(stderr, "useX11Cursor: off\n");
++	} else {
++		appDataNew.useX11Cursor = True;
++		fprintf(stderr, "useX11Cursor: on\n");
++	}
++	schedule_format_change();
++	do_cursor_change = 1;
++}
++
++void
++ToggleRawLocal(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	init_format_change();
++	if (appData.useRawLocal) {
++		appDataNew.useRawLocal = False;
++		fprintf(stderr, "useRawLocal: off\n");
++	} else {
++		appDataNew.useRawLocal = True;
++		fprintf(stderr, "useRawLocal: on\n");
++	}
++	schedule_format_change();
++}
++
++void
++SetViewOnlyState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++  if (appData.viewOnly)
++    XtVaSetValues(w, XtNstate, True, NULL);
++  else
++    XtVaSetValues(w, XtNstate, False, NULL);
++}
++
++void
++SetNOJPEGState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++  if (appData.enableJPEG)
++    XtVaSetValues(w, XtNstate, False, NULL);
++  else
++    XtVaSetValues(w, XtNstate, True, NULL);
++}
++
++void
++Set8bppState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (appData.useBGR233) {
++		XtVaSetValues(w, XtNstate, True, NULL);
++		if (b16   != NULL) XtVaSetValues(b16,   XtNstate, False, NULL);
++		if (bfull != NULL) XtVaSetValues(bfull, XtNstate, False, NULL);
++	} else {
++		XtVaSetValues(w, XtNstate, False, NULL);
++	}
++}
++
++void
++Set16bppState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (appData.useBGR565) {
++		XtVaSetValues(w, XtNstate, True, NULL);
++		if (b8    != NULL) XtVaSetValues(b8,    XtNstate, False, NULL);
++		if (bfull != NULL) XtVaSetValues(bfull, XtNstate, False, NULL);
++	} else {
++		XtVaSetValues(w, XtNstate, False, NULL);
++	}
++}
++
++void
++SetFullColorState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (appData.useBGR565 || appData.useBGR233) {
++		XtVaSetValues(w, XtNstate, False, NULL);
++	} else {
++		XtVaSetValues(w, XtNstate, True, NULL);
++		if (b8  != NULL) XtVaSetValues(b8,  XtNstate, False, NULL);
++		if (b16 != NULL) XtVaSetValues(b16, XtNstate, False, NULL);
++	}
++}
++
++void
++Set256ColorsState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (appData.useBGR233 == 256) {
++		XtVaSetValues(w, XtNstate, True, NULL);
++		if (w64  != NULL) XtVaSetValues(w64 , XtNstate, False, NULL);
++		if (w8   != NULL) XtVaSetValues(w8  , XtNstate, False, NULL);
++	} else {
++		XtVaSetValues(w, XtNstate, False, NULL);
++	}
++}
++
++void
++Set64ColorsState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (appData.useBGR233 == 64) {
++		XtVaSetValues(w, XtNstate, True, NULL);
++		if (w256 != NULL) XtVaSetValues(w256, XtNstate, False, NULL);
++		if (w8   != NULL) XtVaSetValues(w8  , XtNstate, False, NULL);
++	} else {
++		XtVaSetValues(w, XtNstate, False, NULL);
++	}
++}
++
++void
++Set8ColorsState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (appData.useBGR233 == 8) {
++		XtVaSetValues(w, XtNstate, True, NULL);
++		if (w256 != NULL) XtVaSetValues(w256, XtNstate, False, NULL);
++		if (w64  != NULL) XtVaSetValues(w64 , XtNstate, False, NULL);
++	} else {
++		XtVaSetValues(w, XtNstate, False, NULL);
++	}
++}
++
++void
++SetZRLEState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++  if (usingZRLE)
++    XtVaSetValues(w, XtNstate, True, NULL);
++  else
++    XtVaSetValues(w, XtNstate, False, NULL);
++}
++
++void
++SetCursorShapeState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++  if (appData.useRemoteCursor)
++    XtVaSetValues(w, XtNstate, True, NULL);
++  else
++    XtVaSetValues(w, XtNstate, False, NULL);
++}
++
++void
++SetCursorAlphaState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++  if (appData.useCursorAlpha)
++    XtVaSetValues(w, XtNstate, True, NULL);
++  else
++    XtVaSetValues(w, XtNstate, False, NULL);
++}
++
++void
++SetX11CursorState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++  if (appData.useX11Cursor)
++    XtVaSetValues(w, XtNstate, True, NULL);
++  else
++    XtVaSetValues(w, XtNstate, False, NULL);
++}
++
++void
++SetRawLocalState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++  if (appData.useRawLocal)
++    XtVaSetValues(w, XtNstate, True, NULL);
++  else
++    XtVaSetValues(w, XtNstate, False, NULL);
++}
++
++
++
++
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncviewer/vncviewer.h
+--- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.h	2007-02-04 12:39:56.000000000 -0500
+@@ -76,12 +76,17 @@
+ 
+   String encodingsString;
+ 
+-  Bool useBGR233;
++  int useBGR233;
+   int nColours;
+   Bool useSharedColours;
+   Bool forceOwnCmap;
+   Bool forceTrueColour;
+   int requestedDepth;
++  Bool useBGR565;
++
++  Bool grabAll;
++  Bool overrideRedir;
++  Bool popupFix;
+ 
+   Bool useShm;
+ 
+@@ -96,6 +101,11 @@
+   int rawDelay;
+   int copyRectDelay;
+ 
++  int yCrop;
++  int sbWidth;
++  Bool useCursorAlpha;
++  Bool useRawLocal;
++
+   Bool debug;
+ 
+   int popupButtonCount;
+@@ -113,6 +123,7 @@
+ } AppData;
+ 
+ extern AppData appData;
++extern AppData appDataNew;
+ 
+ extern char *fallback_resources[];
+ extern char vncServerHost[];
+@@ -130,6 +141,7 @@
+ /* colour.c */
+ 
+ extern unsigned long BGR233ToPixel[];
++extern unsigned long BGR565ToPixel[];
+ 
+ extern Colormap cmap;
+ extern Visual *vis;
+@@ -162,6 +174,9 @@
+ extern void CopyDataToScreen(char *buf, int x, int y, int width, int height);
+ extern void SynchroniseScreen();
+ 
++extern void ReDoDesktop();
++extern void DesktopCursorOff();
++
+ /* dialogs.c */
+ 
+ extern void ServerDialogDone(Widget w, XEvent *event, String *params,
+@@ -243,6 +258,7 @@
+ 
+ extern XImage *CreateShmImage();
+ extern void ShmCleanup();
++extern Bool UsingShm();
+ 
+ /* sockets.c */
+ 
+@@ -271,3 +287,31 @@
+ extern XtAppContext appContext;
+ extern Display* dpy;
+ extern Widget toplevel;
++
++extern void Toggle8bpp(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void Toggle16bpp(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleFullColor(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void Toggle256Colors(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void Toggle64Colors(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void Toggle8Colors(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleTightZRLE(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleViewOnly(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleJPEG(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleCursorShape(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleCursorAlpha(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleX11Cursor(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleRawLocal(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++
++extern void SetViewOnlyState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetNOJPEGState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void Set8bppState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void Set16bppState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetFullColorState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void Set256ColorsState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void Set64ColorsState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void Set8ColorsState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetZRLEState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetCursorShapeState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetCursorAlphaState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetX11CursorState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetRawLocalState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vncviewer/vncviewer.man
+--- vnc_unixsrc.orig/vncviewer/vncviewer.man	2004-03-11 13:14:40.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.man	2007-02-04 15:09:49.000000000 -0500
+@@ -168,6 +168,72 @@
+ \fB\-autopass\fR
+ Read a plain-text password from stdin. This option affects only the
+ standard VNC authentication.
++
++.SH Enhanced TightVNC Viewer OPTIONS
++.TP
++Enhanced TightVNC Viewer web page is located at:
++.TP
++http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
++.TP
++Note: ZRLE encoding is now supported.
++.TP
++Note: F9 is shortcut to Toggle FullScreen mode.
++.TP
++\fB\-use64\fR
++In \fB\-bgr233\fR mode, use 64 colors instead of 256.
++.TP
++\fB\-bgr222\fR
++Same as \fB\-use64\fR.
++.TP
++\fB\-use8\fR
++In \fB\-bgr233\fR mode, use 8 colors instead of 256.
++.TP
++\fB\-bgr111\fR
++Same as \fB\-use8\fR.
++.TP
++\fB\-16bpp\fR
++If the vnc viewer X display is depth 24 at 32bpp
++request a 16bpp format from the VNC server to cut
++network traffic by up to 2X, then tranlate the
++pixels to 32bpp locally.
++.TP
++\fB\-bgr565\fR
++Same as \fB\-16bpp\fR.
++.TP
++\fB\-alpha\fR
++Use alphablending transparency for local cursors
++requires: x11vnc server, both client and server
++must be 32bpp and same endianness.
++.TP
++\fB\-ycrop\fR n
++Only show the top n rows of the framebuffer.  For
++use with x11vnc \fB\-ncache\fR client caching option
++to help "hide" the pixel cache region.
++Use a negative value (e.g. \fB\-1\fR) for autodetection.
++Autodetection will always take place if the remote
++fb height is more than 2 times the width.
++.TP
++\fB\-sbwidth\fR n
++Scrollbar width, default is very narrow: 2 pixels,
++it is narrow to avoid distraction in \fB\-ycrop\fR mode.
++.TP
++\fB\-rawlocal\fR
++Prefer raw encoding for localhost, default is
++no, i.e. assumes you have a SSH tunnel instead.
++.TP
++\fB\-graball\fR
++Grab the entire X server when in fullscreen mode,
++needed by some old window managers like fvwm2.
++.TP
++\fB\-popupfix\fR
++Warp the popup back to the pointer position,
++needed by some old window managers like fvwm2.
++.TP
++\fB\-grabkbd\fR
++Grab the X keyboard when in fullscreen mode,
++needed by some window managers. Same as \fB\-grabkeyboard\fR.
++\fB\-grabkbd\fR is the default, use \fB\-nograbkbd\fR to disable.
++
+ .SH ENCODINGS
+ The server supplies information in whatever format is desired by the
+ client, in order to make the client as easy as possible to implement. 
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/zrle.c
+--- vnc_unixsrc.orig/vncviewer/zrle.c	2007-02-04 18:59:50.000000000 -0500
++++ vnc_unixsrc/vncviewer/zrle.c	2007-02-03 20:57:56.000000000 -0500
+@@ -0,0 +1,449 @@
++/*
++ *  Copyright (C) 2005 Johannes E. Schindelin.  All Rights Reserved.
++ *
++ *  This is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This software is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this software; if not, write to the Free Software
++ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
++ *  USA.
++ */
++
++/*
++ * zrle.c - handle zrle encoding.
++ *
++ * This file shouldn't be compiled directly.  It is included multiple times by
++ * rfbproto.c, each time with a different definition of the macro BPP.  For
++ * each value of BPP, this file defines a function which handles an zrle
++ * encoded rectangle with BPP bits per pixel.
++ */
++
++#ifndef REALBPP
++#define REALBPP BPP
++#endif
++
++#if !defined(UNCOMP) || UNCOMP==0
++#define HandleZRLE CONCAT2E(HandleZRLE,REALBPP)
++#define HandleZRLETile CONCAT2E(HandleZRLETile,REALBPP)
++#elif UNCOMP>0
++#define HandleZRLE CONCAT3E(HandleZRLE,REALBPP,Down)
++#define HandleZRLETile CONCAT3E(HandleZRLETile,REALBPP,Down)
++#else
++#define HandleZRLE CONCAT3E(HandleZRLE,REALBPP,Up)
++#define HandleZRLETile CONCAT3E(HandleZRLETile,REALBPP,Up)
++#endif
++#undef CARDBPP
++#undef CARDREALBPP
++#define CARDBPP CONCAT2E(CARD, BPP)
++#define CARDREALBPP CONCAT2E(CARD,REALBPP)
++
++#define FillRectangle(x, y, w, h, color)  \
++	{ \
++		XGCValues gcv; \
++		gcv.foreground = color; \
++		XChangeGC(dpy, gc, GCForeground, &gcv); \
++		XFillRectangle(dpy, desktopWin, gc, x, y, w, h); \
++	}
++
++static int HandleZRLETile(
++	unsigned char* buffer,size_t buffer_length,
++	int x,int y,int w,int h);
++
++static Bool
++HandleZRLE (int rx, int ry, int rw, int rh)
++{
++	rfbZRLEHeader header;
++	int remaining;
++	int inflateResult;
++	int toRead;
++	int min_buffer_size = rw * rh * (REALBPP / 8) * 2;
++
++	/* First make sure we have a large enough raw buffer to hold the
++	 * decompressed data.  In practice, with a fixed REALBPP, fixed frame
++	 * buffer size and the first update containing the entire frame
++	 * buffer, this buffer allocation should only happen once, on the
++	 * first update.
++	 */
++	if ( raw_buffer_size < min_buffer_size) {
++
++		if ( raw_buffer != NULL ) {
++
++			free( raw_buffer );
++
++		}
++
++		raw_buffer_size = min_buffer_size;
++		raw_buffer = (char*) malloc( raw_buffer_size );
++
++	}
++
++	if (!ReadFromRFBServer((char *)&header, sz_rfbZRLEHeader))
++		return False;
++
++	remaining = Swap32IfLE(header.length);
++
++	/* Need to initialize the decompressor state. */
++	decompStream.next_in   = ( Bytef * )buffer;
++	decompStream.avail_in  = 0;
++	decompStream.next_out  = ( Bytef * )raw_buffer;
++	decompStream.avail_out = raw_buffer_size;
++	decompStream.data_type = Z_BINARY;
++
++	/* Initialize the decompression stream structures on the first invocation. */
++	if ( decompStreamInited == False ) {
++
++		inflateResult = inflateInit( &decompStream );
++
++		if ( inflateResult != Z_OK ) {
++			fprintf(stderr, 
++					"inflateInit returned error: %d, msg: %s\n",
++					inflateResult,
++					decompStream.msg);
++			return False;
++		}
++
++		decompStreamInited = True;
++
++	}
++
++	inflateResult = Z_OK;
++
++	/* Process buffer full of data until no more to process, or
++	 * some type of inflater error, or Z_STREAM_END.
++	 */
++	while (( remaining > 0 ) &&
++			( inflateResult == Z_OK )) {
++
++		if ( remaining > BUFFER_SIZE ) {
++			toRead = BUFFER_SIZE;
++		}
++		else {
++			toRead = remaining;
++		}
++
++		/* Fill the buffer, obtaining data from the server. */
++		if (!ReadFromRFBServer(buffer,toRead))
++			return False;
++
++		decompStream.next_in  = ( Bytef * )buffer;
++		decompStream.avail_in = toRead;
++
++		/* Need to uncompress buffer full. */
++		inflateResult = inflate( &decompStream, Z_SYNC_FLUSH );
++
++		/* We never supply a dictionary for compression. */
++		if ( inflateResult == Z_NEED_DICT ) {
++			fprintf(stderr, "zlib inflate needs a dictionary!\n");
++			return False;
++		}
++		if ( inflateResult < 0 ) {
++			fprintf(stderr, 
++					"zlib inflate returned error: %d, msg: %s\n",
++					inflateResult,
++					decompStream.msg);
++			return False;
++		}
++
++		/* Result buffer allocated to be at least large enough.  We should
++		 * never run out of space!
++		 */
++		if (( decompStream.avail_in > 0 ) &&
++				( decompStream.avail_out <= 0 )) {
++			fprintf(stderr, "zlib inflate ran out of space!\n");
++			return False;
++		}
++
++		remaining -= toRead;
++
++	} /* while ( remaining > 0 ) */
++
++	if ( inflateResult == Z_OK ) {
++		void* buf=raw_buffer;
++		int i,j;
++
++		remaining = raw_buffer_size-decompStream.avail_out;
++
++		for(j=0; j<rh; j+=rfbZRLETileHeight)
++			for(i=0; i<rw; i+=rfbZRLETileWidth) {
++				int subWidth=(i+rfbZRLETileWidth>rw)?rw-i:rfbZRLETileWidth;
++				int subHeight=(j+rfbZRLETileHeight>rh)?rh-j:rfbZRLETileHeight;
++				int result=HandleZRLETile(buf,remaining,rx+i,ry+j,subWidth,subHeight);
++
++				if(result<0) {
++					fprintf(stderr, "ZRLE decoding failed (%d)\n",result);
++return True;
++					return False;
++				}
++
++				buf+=result;
++				remaining-=result;
++			}
++	}
++	else {
++
++		fprintf(stderr, 
++				"zlib inflate returned error: %d, msg: %s\n",
++				inflateResult,
++				decompStream.msg);
++		return False;
++
++	}
++
++	return True;
++}
++
++#if REALBPP!=BPP && defined(UNCOMP) && UNCOMP!=0
++#if UNCOMP>0
++#define UncompressCPixel(pointer) ((*(CARDBPP*)pointer)>>UNCOMP)
++#else
++#define UncompressCPixel(pointer) ((*(CARDBPP*)pointer)<<(-(UNCOMP)))
++#endif
++#else
++#define UncompressCPixel(pointer) (*(CARDBPP*)pointer)
++#endif
++
++static int HandleZRLETile(
++		unsigned char* buffer,size_t buffer_length,
++		int x,int y,int w,int h) {
++	unsigned char* buffer_copy = buffer;
++	unsigned char* buffer_end = buffer+buffer_length;
++	unsigned char type;
++
++	if(buffer_length<1)
++		return -2;
++
++	if (frameBufferLen < w * h * REALBPP/8) {
++		if(frameBuffer) {
++			free(frameBuffer);
++		}
++		frameBufferLen = w * h * REALBPP/8 * 2;
++		frameBuffer = (unsigned char *) malloc(frameBufferLen);
++	}
++
++	type = *buffer;
++	buffer++;
++	switch(type) {
++		case 0: /* raw */
++		{
++#if REALBPP!=BPP
++			int m0 = 0, i,j;
++
++			if(1+w*h*REALBPP/8>buffer_length) {
++				fprintf(stderr, "expected %d bytes, got only %d (%dx%d)\n",1+w*h*REALBPP/8,buffer_length,w,h);
++				return -3;
++			}
++
++			for(j=y*si.framebufferWidth; j<(y+h)*si.framebufferWidth; j+=si.framebufferWidth) {
++				for(i=x; i<x+w; i++,buffer+=REALBPP/8) {
++#  if 0
++					((CARDBPP*)frameBuffer)[j+i] = UncompressCPixel(buffer);
++					/* alt */
++					CARDBPP color = UncompressCPixel(buffer);
++					CopyDataToScreen((char *)&color, i, j/si.framebufferWidth, 1, 1);
++#  else
++					((CARDBPP*)frameBuffer)[m0++] = UncompressCPixel(buffer);
++#  endif
++				}
++			}
++			CopyDataToScreen((char *)frameBuffer, x, y, w, h);
++if (0) fprintf(stderr, "cha1: %dx%d+%d+%d\n", w, h, x, y);
++
++#else
++#  if 0
++			CopyRectangle(buffer, x, y, w, h);
++#  else
++			CopyDataToScreen((char *)buffer, x, y, w, h);
++#  endif
++			buffer+=w*h*REALBPP/8;
++#endif
++			break;
++		}
++		case 1: /* solid */
++		{
++			CARDBPP color = UncompressCPixel(buffer);
++
++			if(1+REALBPP/8>buffer_length)
++				return -4;
++				
++			if ((BPP == 8 && appData.useBGR233) || (BPP == 16 && appData.useBGR565)) {
++				int m0;
++				for (m0=0; m0 < w*h; m0++) {
++					((CARDBPP*)frameBuffer)[m0] = color;
++				}
++				CopyDataToScreen((char *)frameBuffer, x, y, w, h);
++			} else {
++				FillRectangle(x, y, w, h, color);
++			}
++if (0) fprintf(stderr, "cha2: %dx%d+%d+%d\n", w, h, x, y);
++
++			buffer+=REALBPP/8;
++
++			break;
++		}
++		case 2 ... 127: /* packed Palette */
++		{
++			CARDBPP palette[16];
++			int m0, i,j,shift,
++				bpp=(type>4?(type>16?8:4):(type>2?2:1)),
++				mask=(1<<bpp)-1,
++				divider=(8/bpp);
++
++			if(1+type*REALBPP/8+((w+divider-1)/divider)*h>buffer_length)
++				return -5;
++
++			/* read palette */
++			for(i=0; i<type; i++,buffer+=REALBPP/8)
++				palette[i] = UncompressCPixel(buffer);
++
++			m0 = 0;
++			/* read palettized pixels */
++			for(j=y*si.framebufferWidth; j<(y+h)*si.framebufferWidth; j+=si.framebufferWidth) {
++				for(i=x,shift=8-bpp; i<x+w; i++) {
++#  if 0
++					((CARDBPP*)frameBuffer)[j+i] = palette[((*buffer)>>shift)&mask];
++					/* alt */
++					CARDBPP color = palette[((*buffer)>>shift)&mask];
++					CopyDataToScreen((char *)&color, i, j/si.framebufferWidth, 1, 1);
++#  else
++					((CARDBPP*)frameBuffer)[m0++] = palette[((*buffer)>>shift)&mask];
++#  endif
++					shift-=bpp;
++					if(shift<0) {
++						shift=8-bpp;
++						buffer++;
++					}
++				}
++				if(shift<8-bpp)
++					buffer++;
++			}
++			CopyDataToScreen((char *)frameBuffer, x, y, w, h);
++if (0) fprintf(stderr, "cha3: %dx%d+%d+%d\n", w, h, x, y);
++
++			break;
++		}
++		/* case 17 ... 127: not used, but valid */
++		case 128: /* plain RLE */
++		{
++			int m0=0, i=0,j=0;
++			while(j<h) {
++				int color,length;
++				/* read color */
++				if(buffer+REALBPP/8+1>buffer_end)
++					return -7;
++				color = UncompressCPixel(buffer);
++				buffer+=REALBPP/8;
++				/* read run length */
++				length=1;
++				while(*buffer==0xff) {
++					if(buffer+1>=buffer_end)
++						return -8;
++					length+=*buffer;
++					buffer++;
++				}
++				length+=*buffer;
++				buffer++;
++				while(j<h && length>0) {
++#  if 0
++					((CARDBPP*)frameBuffer)[(y+j)*si.framebufferWidth+x+i] = color;
++					/* alt */
++					CopyDataToScreen((char *)&color, x+i, y+j, 1, 1);
++#  else
++					((CARDBPP*)frameBuffer)[m0++] = color;
++#  endif
++					length--;
++					i++;
++					if(i>=w) {
++						i=0;
++						j++;
++					}
++				}
++				if(length>0)
++					fprintf(stderr, "Warning: possible ZRLE corruption\n");
++			}
++			CopyDataToScreen((char *)frameBuffer, x, y, w, h);
++if (0) fprintf(stderr, "cha4: %dx%d+%d+%d\n", w, h, x, y);
++
++			break;
++		}
++		case 129: /* unused */
++		{
++			return -8;
++		}
++		case 130 ... 255: /* palette RLE */
++		{
++			CARDBPP palette[128];
++			int m0 = 0, i,j;
++
++			if(2+(type-128)*REALBPP/8>buffer_length)
++				return -9;
++
++			/* read palette */
++			for(i=0; i<type-128; i++,buffer+=REALBPP/8)
++				palette[i] = UncompressCPixel(buffer);
++			/* read palettized pixels */
++			i=j=0;
++			while(j<h) {
++				int color,length;
++				/* read color */
++				if(buffer>=buffer_end)
++					return -10;
++				color = palette[(*buffer)&0x7f];
++				length=1;
++				if(*buffer&0x80) {
++					if(buffer+1>=buffer_end)
++						return -11;
++					buffer++;
++					/* read run length */
++					while(*buffer==0xff) {
++						if(buffer+1>=buffer_end)
++							return -8;
++						length+=*buffer;
++						buffer++;
++					}
++					length+=*buffer;
++				}
++				buffer++;
++				while(j<h && length>0) {
++#  if 0
++					((CARDBPP*)frameBuffer)[(y+j)*si.framebufferWidth+x+i] = color;
++					/* alt */
++					CopyDataToScreen((char *)&color, x+i, y+j, 1, 1);
++#  else
++					((CARDBPP*)frameBuffer)[m0++] = color;
++#  endif
++					length--;
++					i++;
++					if(i>=w) {
++						i=0;
++						j++;
++					}
++				}
++				if(length>0)
++					fprintf(stderr, "Warning: possible ZRLE corruption\n");
++			}
++			CopyDataToScreen((char *)frameBuffer, x, y, w, h);
++if (0) fprintf(stderr, "cha5: %dx%d+%d+%d\n", w, h, x, y);
++
++			break;
++		}
++	}
++
++	return buffer-buffer_copy;	
++}
++
++#undef CARDBPP
++#undef CARDREALBPP
++#undef HandleZRLE
++#undef HandleZRLETile
++#undef UncompressCPixel
++#undef REALBPP
++
++#undef UNCOMP
+diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
+--- vnc_unixsrc.orig/include/rfbproto.h	2004-05-27 03:02:02.000000000 -0400
++++ vnc_unixsrc/include/rfbproto.h	2007-02-01 18:30:17.000000000 -0500
+@@ -435,6 +435,8 @@
+ #define rfbEncodingTight     7
+ #define rfbEncodingZlibHex   8
+ 
++#define rfbEncodingZRLE 16
++
+ /* signatures for basic encoding types */
+ #define sig_rfbEncodingRaw       "RAW_____"
+ #define sig_rfbEncodingCopyRect  "COPYRECT"

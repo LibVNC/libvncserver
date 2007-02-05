@@ -1,7 +1,7 @@
 #!/bin/sh
 
 rm -rf ./src/tmp/* || exit 1
-vers=1.0.9
+vers=1.0.11
 
 cd .. || exit 1
 

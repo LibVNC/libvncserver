@@ -185,7 +185,10 @@ do
     shift
 done
 
-if [ "X$gotalpha" != "X1" ]; then
+if [ "X$gotalpha" = "X1" ]; then
+	VNCVIEWER_ALPHABLEND=1
+	export VNCVIEWER_ALPHABLEND
+else
 	NO_ALPHABLEND=1
 	export NO_ALPHABLEND
 fi
