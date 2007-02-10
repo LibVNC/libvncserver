@@ -76,6 +76,8 @@ int unixpw_in_progress = 0;
 int unixpw_denied = 0;
 int unixpw_in_rfbPE = 0;
 int unixpw_login_viewonly = 0;
+int unixpw_tightvnc_xfer_save = 0;
+rfbBool unixpw_file_xfer_save = FALSE;
 time_t unixpw_last_try_time = 0;
 rfbClientPtr unixpw_client = NULL;
 
@@ -1550,6 +1552,12 @@ void unixpw_accept(char *user) {
 		unixpw_client->viewOnly = TRUE;
 	}
 	unixpw_in_progress = 0;
+	screen->permitFileTransfer = unixpw_file_xfer_save;
+	if ((filexfer = unixpw_tightvnc_xfer_save)) {
+#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+                rfbRegisterTightVNCFileTransferExtension();
+#endif
+	}
 	unixpw_client = NULL;
 	mark_rect_as_modified(0, 0, dpy_x, dpy_y, 0);
 	if (macosx_console) {
@@ -1590,6 +1598,12 @@ void unixpw_deny(void) {
 	}
 
 	unixpw_in_progress = 0;
+	screen->permitFileTransfer = unixpw_file_xfer_save;
+	if ((filexfer = unixpw_tightvnc_xfer_save)) {
+#ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+                rfbRegisterTightVNCFileTransferExtension();
+#endif
+	}
 	unixpw_client = NULL;
 	copy_screen();
 }

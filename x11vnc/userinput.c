@@ -8796,7 +8796,7 @@ int check_ncache(int reset, int mode) {
 	RAWFB_RET(-1)
 #endif
 
-	if (! screen) {
+	if (! screen || ! dpy) {
 		return -1;
 	}
 
@@ -8805,6 +8805,10 @@ int check_ncache(int reset, int mode) {
 #ifdef NO_NCACHE
 	ncache = 0;
 #endif
+
+	if (reset && (first || cache_list_len == 0)) {
+		return -1;
+	}
 
 	if (ncache0) {
 		if (reset) {
@@ -8858,7 +8862,7 @@ if (c) fprintf(stderr, "check_ncache purged %d events\n", c);
 
 
 	if (reset) {
-		rfbLog("check_ncache: resetting cache\n");
+		rfbLog("check_ncache: resetting cache: %d/%d %d %d\n", cache_list_num, cache_list_len, ncache, first);
 		for (i=0; i < cache_list_num; i++) {
 			free_rect(i);
 		}

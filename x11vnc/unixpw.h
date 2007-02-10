@@ -17,6 +17,8 @@ extern int unixpw_in_progress;
 extern int unixpw_denied;
 extern int unixpw_in_rfbPE;
 extern int unixpw_login_viewonly;
+extern int unixpw_tightvnc_xfer_save;
+extern rfbBool unixpw_file_xfer_save;
 extern time_t unixpw_last_try_time;
 extern rfbClientPtr unixpw_client;
 extern int keep_unixpw;

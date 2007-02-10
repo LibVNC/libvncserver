@@ -25,10 +25,10 @@ void do_button_mask_change(int mask, int button);
 void pointer(int mask, int x, int y, rfbClientPtr client);
 void initialize_pipeinput(void);
 int check_pipeinput(void);
+void update_x11_pointer_position(int x, int y);
 
 
 static void buttonparse(int from, char **s);
-static void update_x11_pointer_position(int x, int y);
 static void update_x11_pointer_mask(int mask);
 static void pipe_pointer(int mask, int x, int y, rfbClientPtr client);
 
@@ -301,7 +301,7 @@ void initialize_pointer_map(char *pointer_remap) {
 /*
  * Send a pointer position event to the X server.
  */
-static void update_x11_pointer_position(int x, int y) {
+void update_x11_pointer_position(int x, int y) {
 #if NO_X11
 	RAWFB_RET_VOID
 	if (!x || !y) {}

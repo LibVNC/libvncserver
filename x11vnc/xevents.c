@@ -15,6 +15,7 @@
 #include "cleanup.h"
 #include "macosx.h"
 #include "screen.h"
+#include "pm.h"
 
 /* XXX CHECK BEFORE RELEASE */
 int grab_buster = 0;
@@ -33,6 +34,12 @@ void set_prop_atom(Atom atom);
 void check_xevents(int reset);
 void xcut_receive(char *text, int len, rfbClientPtr cl);
 
+void kbd_release_all_keys(rfbClientPtr cl);
+void set_single_window(rfbClientPtr cl, int x, int y);
+void set_server_input(rfbClientPtr cl, int s);
+void set_text_chat(rfbClientPtr cl, int l, char *t);
+int get_keyboard_led_state_hook(rfbScreenInfoPtr s);
+int get_file_transfer_permitted(rfbClientPtr cl);
 
 static void initialize_xevents(int reset);
 static void print_xevent_bases(void);
@@ -1259,6 +1266,127 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 
 	set_cutbuffer = 1;
 #endif	/* NO_X11 */
+}
+
+void kbd_release_all_keys(rfbClientPtr cl) {
+	if (unixpw_in_progress) {
+		rfbLog("kbd_release_all_keys: unixpw_in_progress, skipping.\n");
+		return;
+	}
+	if (cl->viewOnly) {
+		return;
+	}
+
+	RAWFB_RET_VOID
+
+#if NO_X11
+	return;
+#else
+	clear_keys();
+	clear_modifiers(0);
+#endif
+}
+
+void set_single_window(rfbClientPtr cl, int x, int y) {
+	int ok = 0;
+	if (unixpw_in_progress) {
+		rfbLog("set_single_window: unixpw_in_progress, skipping.\n");
+		return;
+	}
+	if (cl->viewOnly) {
+		return;
+	}
+
+	RAWFB_RET_VOID
+
+#if NO_X11
+	return;
+#else
+	if (x==1 && y==1) {
+		if (subwin) {
+			subwin = 0x0;
+			ok = 1;
+		}
+	} else {
+		Window r, c;
+		int rootx, rooty, wx, wy;
+		unsigned int mask;
+
+		update_x11_pointer_position(x, y);
+		XSync(dpy, False);
+
+		if (XQueryPointer_wr(dpy, rootwin, &r, &c, &rootx, &rooty,
+		    &wx, &wy, &mask)) {
+			if (c != None) {
+				subwin = c;
+				ok = 1;
+			}
+		}
+	}
+
+	if (ok) {
+		check_black_fb();
+		do_new_fb(1);	
+	}
+#endif
+
+}
+void set_server_input(rfbClientPtr cl, int grab) {
+	if (unixpw_in_progress) {
+		rfbLog("set_server_input: unixpw_in_progress, skipping.\n");
+		return;
+	}
+	if (cl->viewOnly) {
+		return;
+	}
+
+	RAWFB_RET_VOID
+
+#if NO_X11
+	return;
+#else
+	if (grab) {
+		process_remote_cmd("cmd=grabkbd", 0);
+		process_remote_cmd("cmd=grabptr", 0);
+
+		set_dpms_mode("off");
+
+	} else {
+		process_remote_cmd("cmd=nograbkbd", 0);
+		process_remote_cmd("cmd=nograbptr", 0);
+	}
+#endif
+}
+void set_text_chat(rfbClientPtr cl, int len, char *txt) {
+	char buf[100];
+	rfbLog("set_text_chat: len=0x%x txt='", len);
+	if (0 < len && len < 10000) write(2, txt, len);
+	fprintf(stderr, "'\n");
+	if (unixpw_in_progress) {
+		rfbLog("set_text_chat: unixpw_in_progress, skipping.\n");
+		return;
+	}
+	if (0 && len == rfbTextChatOpen) {
+		if (rfbSendTextChatMessage(cl, rfbTextChatOpen, "")) {
+			rfbLog("rfbSendTextChatMessage: true\n");
+		} else {
+			rfbLog("rfbSendTextChatMessage: false\n");
+		}
+	}
+}
+int get_keyboard_led_state_hook(rfbScreenInfoPtr s) {
+	if (unixpw_in_progress) {
+		rfbLog("get_keyboard_led_state_hook: unixpw_in_progress, skipping.\n");
+		return 0;
+	}
+	return 0;
+}
+int get_file_transfer_permitted(rfbClientPtr cl) {
+	if (unixpw_in_progress) {
+		rfbLog("get_file_transfer_permitted: unixpw_in_progress, skipping.\n");
+		return FALSE;
+	}
+	return screen->permitFileTransfer;
 }
 
 

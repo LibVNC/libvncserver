@@ -2831,18 +2831,23 @@ void set_offset(void) {
 	X_UNLOCK;
 }
 
+static int xd_samples = 0, xd_misses = 0, xd_do_check = 0;
+
 /*
  * Loop over 1-pixel tall horizontal scanlines looking for changes.  
  * Record the changes in tile_has_diff[].  Scanlines in the loop are
  * equally spaced along y by NSCAN pixels, but have a slightly random
  * starting offset ystart ( < NSCAN ) from scanlines[].
  */
+
 static int scan_display(int ystart, int rescan) {
 	char *src, *dst;
 	int pixelsize = bpp/8;
 	int x, y, w, n;
 	int tile_count = 0;
 	int nodiffs = 0, diff_hint;
+	int xd_check, xd_freq = 1;
+	static int xd_tck = 0;
 
 	y = ystart;
 
@@ -2859,10 +2864,24 @@ static int scan_display(int ystart, int rescan) {
 
 		if (use_xdamage) {
 			XD_tot++;
+			xd_check = 0;
 			if (xdamage_hint_skip(y)) {
-				XD_skip++;
-				y += NSCAN;
-				continue;
+				if (xd_do_check && dpy && use_xdamage == 1) {
+					xd_tck = (xd_tck++) % xd_freq;
+					if (xd_tck == 0) {
+						xd_check = 1;
+						xd_samples++;
+					}
+				}
+				if (!xd_check) {
+					XD_skip++;
+					y += NSCAN;
+					continue;
+				}
+			} else {
+				if (xd_do_check && 0) {
+					fprintf(stderr, "ns y=%d\n", y);
+				}
 			}
 		}
 
@@ -2930,6 +2949,9 @@ fprintf(stderr, "\n*** SCAN_DISPLAY CHECK_NCACHE/%d *** %d rescan=%d\n", gotone,
 				y += NSCAN;
 				continue;
 			}
+		}
+		if (xd_check) {
+			xd_misses++;
 		}
 
 		x = 0;
@@ -3129,6 +3151,33 @@ int scan_for_updates(int count_only) {
 					tile_has_xdamage_diff[i] = 2;
 					tile_count++;
 				}
+			}
+		}
+	}
+	if (dpy && use_xdamage == 1) {
+		static time_t last_xd_check = 0;
+		if (time(NULL) > last_xd_check + 2) {
+			int cp = (scan_count + 3) % NSCAN;
+			xd_do_check = 1;
+			tile_count = scan_display(scanlines[cp], 0);
+			xd_do_check = 0;
+			SCAN_FATAL(tile_count);
+			last_xd_check = time(NULL);
+			if (xd_samples > 200) {
+				static bad = 0;
+				if (xd_misses > (5 * xd_samples) / 100) {
+					rfbLog("XDAMAGE is not working well... misses: %d/%d\n", xd_misses, xd_samples);
+					rfbLog("Maybe a OpenGL app like Beryl is the problem? Use -noxdamage\n");
+					rfbLog("To disable this check and warning specify -xdamage twice.\n");
+					if (++bad >= 10) {
+						rfbLog("XDAMAGE appears broken (OpenGL app?), turning it off.\n");
+						use_xdamage = 0;
+						initialize_xdamage();
+						destroy_xdamage_if_needed();
+					}
+				}
+				xd_samples = 0;
+				xd_misses = 0;
 			}
 		}
 	}

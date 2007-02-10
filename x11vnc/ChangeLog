@@ -1,3 +1,11 @@
+2007-02-10  Karl Runge <runge@karlrunge.com>
+	* x11vnc: watch things like textchat, etc. more carefully 
+	  in unixpw state.  Monitor broken XDAMAGE reports when
+	  OpenGL apps like beryl are running.  Implement simple
+	  kbdReleaseAllKeys, setSingleWindow, setServerInput actions
+	  (ultravnc extentions).  Try to send XDM the username in
+	  FINDCREATEDISPLAY, also try .dmrc before .xsession.
+
 2007-01-31  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -reflect reflector/repeater mode with libvncclient.
 	  -ncache tweaks: no kde animations and wm improvements,

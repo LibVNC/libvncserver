@@ -3,6 +3,7 @@
 #include "cleanup.h"
 
 void check_pm(void);
+void set_dpms_mode(char *mode);
 static void check_fbpm(void);
 static void check_dpms(void);
 
@@ -101,6 +102,57 @@ static void check_fbpm(void) {
 		}
 		init_fbpm = 1;
 	}
+#endif
+}
+
+void set_dpms_mode(char *mode) {
+#if NO_X11
+	return;
+#else
+	RAWFB_RET_VOID
+#if LIBVNCSERVER_HAVE_DPMS
+	if (dpy && DPMSCapable(dpy)) {
+		CARD16 level;
+		CARD16 want;
+		BOOL enabled;
+		if (!strcmp(mode, "off")) {
+			want = DPMSModeOff;
+		} else if (!strcmp(mode, "on")) {
+			want = DPMSModeOn;
+		} else if (!strcmp(mode, "standby")) {
+			want = DPMSModeStandby;
+		} else if (!strcmp(mode, "suspend")) {
+			want = DPMSModeSuspend;
+		} else {
+			return;
+		}
+		if (DPMSInfo(dpy, &level, &enabled)) {
+			char *from;
+			fprintf(stderr, "DPMSInfo level: %d enabled: %d\n", level, enabled);
+			if (enabled && level != want) {
+				XErrorHandler old_handler = XSetErrorHandler(trap_xerror);
+				trapped_xerror = 0;
+
+				if (level == DPMSModeStandby) {
+					from = "DPMSModeStandby";
+				} else if (level == DPMSModeSuspend) {
+					from = "DPMSModeSuspend";
+				} else if (level == DPMSModeOff) {
+					from = "DPMSModeOff";
+				} else if (level == DPMSModeOn) {
+					from = "DPMSModeOn";
+				}
+
+				rfbLog("switching DPMS state from %s to %s\n", from, mode);
+				
+				DPMSForceLevel(dpy, want);
+			
+				XSetErrorHandler(old_handler);
+				trapped_xerror = 0;
+			}
+		}
+	}
+#endif
 #endif
 }
 

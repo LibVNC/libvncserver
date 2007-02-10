@@ -2834,6 +2834,11 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->setXCutText = xcut_receive;
 	screen->setTranslateFunction = set_xlate_wrapper;
 
+	screen->kbdReleaseAllKeys = kbd_release_all_keys; 
+	screen->setSingleWindow = set_single_window; 
+	screen->setServerInput = set_server_input; 
+	screen->setTextChat = set_text_chat; 
+
 	/* called from inetd, we need to treat stdio as our socket */
 	if (inetd && use_openssl) {
 		/* accept_openssl() called later */

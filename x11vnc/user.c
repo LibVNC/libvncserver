@@ -22,6 +22,7 @@ void install_passwds(void);
 void check_new_passwds(int force);
 int wait_for_client(int *argc, char** argv, int http);
 rfbBool custom_passwd_check(rfbClientPtr cl, const char *response, int len);
+char *xdmcp_insert = NULL;
 
 static void switch_user_task_dummy(void);
 static void switch_user_task_solid_bg(void);
@@ -1255,6 +1256,8 @@ int wait_for_client(int *argc, char** argv, int http) {
 	str = strdup(use_dpy);
 	str += strlen("WAIT");
 
+	xdmcp_insert = NULL;
+
 	/* get any leading geometry: */
 	q = strchr(str+1, ':');
 	if (q) {
@@ -1434,12 +1437,15 @@ int wait_for_client(int *argc, char** argv, int http) {
 		}
 	}
 
+if (0) db = 1;
+
 	if (cmd) {
 		char line1[1024];
 		char line2[16384];
 		char *q;
 		int n;
 		int nodisp = 0;
+		int saw_xdmcp = 0;
 
 		memset(line1, 0, 1024);
 		memset(line2, 0, 16384);
@@ -1462,6 +1468,9 @@ int wait_for_client(int *argc, char** argv, int http) {
 				char st[] = "";
 				if (opts) {
 					opts++;
+					if (strstr(opts, "xdmcp")) {
+						saw_xdmcp = 1;
+					}
 				} else {
 					opts = st;
 				}
@@ -1513,7 +1522,7 @@ if (db) {fprintf(stderr, "line: "); write(2, line, n); write(2, "\n", 1); fprint
 					n = 18000;
 					res = su_verify(keep_unixpw_user,
 					    keep_unixpw_pass, create_cmd, line, &n, nodisp);
-/*if (1) fprintf(stderr, "line: '%s'\n", line); */
+if (db) fprintf(stderr, "line: '%s'\n", line);
 
 				} else {
 					FILE *p;
@@ -1539,6 +1548,9 @@ if (db) fprintf(stderr, "line1: '%s'\n", line1);
 							res = 1;
 						}
 					}
+				}
+				if (res && saw_xdmcp) {
+					xdmcp_insert = strdup(keep_unixpw_user);
 				}
 			}
 
@@ -1727,7 +1739,9 @@ if (db) fprintf(stderr, "%d -- %s -- %s\n", i, proc, buf);
 				xauth_raw_data = (char *)malloc(n);
 				xauth_raw_len = n;
 				memcpy(xauth_raw_data, line2, n);
-if (db) fprintf(stderr, "xauth_raw_len: %d\n", n);
+if (db) {fprintf(stderr, "xauth_raw_len: %d\n", n);
+write(2, xauth_raw_data, n);
+fprintf(stderr, "\n");}
 			}
 		}
 

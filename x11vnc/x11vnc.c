@@ -2345,7 +2345,7 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-dpms")) {
 			watch_dpms = 0;
 		} else if (!strcmp(arg, "-xdamage")) {
-			use_xdamage = 1;
+			use_xdamage++;
 		} else if (!strcmp(arg, "-noxdamage")) {
 			use_xdamage = 0;
 		} else if (!strcmp(arg, "-xd_area")) {
@@ -3156,7 +3156,6 @@ int main(int argc, char* argv[]) {
 		dpy = XOpenDisplay_wr("");
 	}
 
-
 #ifdef MACOSX
 	if (! dpy && ! raw_fb_str) {
 		raw_fb_str = strdup("console");
@@ -3206,6 +3205,7 @@ int main(int argc, char* argv[]) {
 	} else {
 		if (! quiet) rfbLog("Using default X display.\n");
 	}
+
 
 	scr = DefaultScreen(dpy);
 	rootwin = RootWindow(dpy, scr);
@@ -3646,6 +3646,68 @@ int main(int argc, char* argv[]) {
 		if (macosx_console) {
 			refresh_screen(1);
 		}
+		if (dpy && xdmcp_insert != NULL) {
+#if !NO_X11
+			char c;
+			int n = strlen(xdmcp_insert);
+			KeyCode k, k2;
+			KeySym sym;
+			int i, ok = 1;
+			for (i = 0; i < n; i++) {
+				c = xdmcp_insert[i];
+				sym = (KeySym) c;
+				if (sym < ' ' || sym > 0x7f) {
+					ok = 0;
+					break;
+				}
+				k = XKeysymToKeycode(dpy, sym);
+				if (k == NoSymbol) {
+					ok = 0;
+					break;
+				}
+			}
+			if (ok) {
+				XFlush_wr(dpy);
+				usleep(2*1000*1000);
+				if (!quiet) {
+					rfbLog("sending XDM '%s'\n", xdmcp_insert);
+				}
+				for (i = 0; i < n; i++) {
+					c = xdmcp_insert[i];
+					sym = (KeySym) c;
+					k = XKeysymToKeycode(dpy, sym);
+					if (isupper(c)) {
+						k2 = XKeysymToKeycode(dpy, XK_Shift_L);
+						XTestFakeKeyEvent_wr(dpy, k2, True, CurrentTime);
+						XFlush_wr(dpy);
+						usleep(100*1000);
+					}
+					if (0) fprintf(stderr, "C/k %c/%x\n", c, k);
+					XTestFakeKeyEvent_wr(dpy, k, True, CurrentTime);
+					XFlush_wr(dpy);
+					usleep(100*1000);
+					XTestFakeKeyEvent_wr(dpy, k, False, CurrentTime);
+					XFlush_wr(dpy);
+					usleep(100*1000);
+					if (isupper(c)) {
+						k2 = XKeysymToKeycode(dpy, XK_Shift_L);
+						XTestFakeKeyEvent_wr(dpy, k2, False, CurrentTime);
+						XFlush_wr(dpy);
+						usleep(100*1000);
+					}
+				}
+				k2 = XKeysymToKeycode(dpy, XK_Tab);
+				XTestFakeKeyEvent_wr(dpy, k2, True, CurrentTime);
+				XFlush_wr(dpy);
+				usleep(100*1000);
+				XTestFakeKeyEvent_wr(dpy, k2, False, CurrentTime);
+				XFlush_wr(dpy);
+				usleep(100*1000);
+			}
+			free(xdmcp_insert);
+#endif
+	}
+
 	}
 
 	if (! waited_for_client) {
