@@ -1302,12 +1302,16 @@ static void check_loop_mode(int argc, char* argv[]) {
 				loop_max = atoi(q+1);
 				*q = '\0';
 			}
+			if (strstr(p, "-loopbg") == p) {
+				set_env("X11VNC_LOOP_MODE_BG", "1");
+				loop_sleep = 500;
+			}
 			
 			q = strpbrk(p, "0123456789");
 			if (q) {
 				loop_sleep = atoi(q);
 				if (loop_sleep <= 0) {
-					loop_sleep = 10;
+					loop_sleep = 20;
 				}
 			}
 		}
@@ -1528,7 +1532,6 @@ int main(int argc, char* argv[]) {
 	int dt = 0, bg = 0;
 	int got_rfbwait = 0;
 	int got_httpdir = 0, try_http = 0;
-	int waited_for_client = 0;
 	int orig_use_xdamage = use_xdamage;
 	XImage *fb0 = NULL;
 
@@ -1745,6 +1748,14 @@ int main(int argc, char* argv[]) {
 			connect_once = 0;
 		} else if (strstr(arg, "-loop") == arg) {
 			;	/* handled above */
+#if LIBVNCSERVER_HAVE_SETSID
+			bg = 1;
+			opts_bg = bg;
+#else
+			fprintf(stderr, "warning: -bg mode not supported.\n");
+#endif
+		} else if (strstr(arg, "-loop") == arg) {
+			;	/* handled above */
 		} else if (!strcmp(arg, "-timeout")) {
 			CHECK_ARGC
 			first_conn_timeout = atoi(argv[++i]);
@@ -1792,6 +1803,10 @@ int main(int argc, char* argv[]) {
 			grab_kbd = 1;
 		} else if (!strcmp(arg, "-grabptr")) {
 			grab_ptr = 1;
+		} else if (!strcmp(arg, "-grabalways")) {
+			grab_kbd = 1;
+			grab_ptr = 1;
+			grab_always = 1;
 		} else if (!strcmp(arg, "-viewpasswd")) {
 			vpw_loc = i;
 			CHECK_ARGC
@@ -1801,6 +1816,18 @@ int main(int argc, char* argv[]) {
 			CHECK_ARGC
 			passwdfile = strdup(argv[++i]);
 			got_passwdfile = 1;
+		} else if (!strcmp(arg, "-svc") || !strcmp(arg, "-service")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb");
+			unixpw = 1;
+			users_list = strdup("unixpw=");
+			use_openssl = 1;
+			openssl_pem = strdup("SAVE");
+		} else if (!strcmp(arg, "-xdmsvc") || !strcmp(arg, "-xdm_service")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp");
+			unixpw = 1;
+			users_list = strdup("unixpw=");
+			use_openssl = 1;
+			openssl_pem = strdup("SAVE");
 #ifndef NO_SSL_OR_UNIXPW
 		} else if (!strcmp(arg, "-unixpw_cmd")
 		    || !strcmp(arg, "-unixpw_cmd_unsafe")) {
@@ -1834,6 +1861,9 @@ int main(int argc, char* argv[]) {
 				set_env("UNIXPW_DISABLE_SSL", "1");
 				set_env("UNIXPW_DISABLE_LOCALHOST", "1");
 			}
+		} else if (!strcmp(arg, "-nossl")) {
+			use_openssl = 0;
+			openssl_pem = NULL;
 		} else if (!strcmp(arg, "-ssl")) {
 			use_openssl = 1;
 			if (i < argc-1) {
@@ -2344,6 +2374,12 @@ int main(int argc, char* argv[]) {
 			watch_dpms = 1;
 		} else if (!strcmp(arg, "-dpms")) {
 			watch_dpms = 0;
+		} else if (!strcmp(arg, "-forcedpms")) {
+			force_dpms = 1;
+		} else if (!strcmp(arg, "-clientdpms")) {
+			client_dpms = 1;
+		} else if (!strcmp(arg, "-noserverdpms")) {
+			no_ultra_dpms = 1;
 		} else if (!strcmp(arg, "-xdamage")) {
 			use_xdamage++;
 		} else if (!strcmp(arg, "-noxdamage")) {
@@ -2563,7 +2599,7 @@ int main(int argc, char* argv[]) {
 	orig_use_xdamage = use_xdamage;
 
 	if (getenv("X11VNC_LOOP_MODE")) {
-		if (bg) {
+		if (bg && !getenv("X11VNC_LOOP_MODE_BG")) {
 			if (! quiet) {
 				fprintf(stderr, "disabling -bg in -loop "
 				    "mode\n");
@@ -3210,6 +3246,13 @@ int main(int argc, char* argv[]) {
 	scr = DefaultScreen(dpy);
 	rootwin = RootWindow(dpy, scr);
 
+	if (grab_always) {
+		Window save = window;
+		window = rootwin;
+		adjust_grabs(1, 0);
+		window = save;
+	}
+
 	if (! quiet && ! raw_fb_str) {
 		rfbLog("\n");
 		rfbLog("------------------ USEFUL INFORMATION ------------------\n");
@@ -3764,6 +3807,26 @@ int main(int argc, char* argv[]) {
 
 #if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SETSID
 	if (bg) {
+		if (getenv("X11VNC_LOOP_MODE_BG")) {
+			if (screen && screen->listenSock >= 0) {
+				close(screen->listenSock);
+				FD_CLR(screen->listenSock,&screen->allFds);
+				screen->listenSock = -1;
+			}
+			if (screen && screen->httpListenSock >= 0) {
+				close(screen->httpListenSock);
+				FD_CLR(screen->httpListenSock,&screen->allFds);
+				screen->httpListenSock = -1;
+			}
+			if (openssl_sock >= 0) {
+				close(openssl_sock);
+				openssl_sock = -1;
+			}
+			if (https_sock >= 0) {
+				close(https_sock);
+				https_sock = -1;
+			}
+		}
 		/* fork into the background now */
 		int p, n;
 		if ((p = fork()) > 0)  {

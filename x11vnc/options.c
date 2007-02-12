@@ -356,6 +356,9 @@ int watch_fbpm = 0;
 #endif
 
 int watch_dpms = 0;	/* -dpms */
+int force_dpms = 0;
+int client_dpms = 0;
+int no_ultra_dpms = 0;
 
 int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
 int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */

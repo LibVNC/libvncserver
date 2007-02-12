@@ -21,6 +21,7 @@
 int grab_buster = 0;
 int grab_kbd = 0;
 int grab_ptr = 0;
+int grab_always = 0;
 int sync_tod_delay = 20;
 
 void initialize_vnc_connect_prop(void);
@@ -871,6 +872,7 @@ void check_xevents(int reset) {
 
 		XSetErrorHandler(old_handler);
 		trapped_xerror = 0;
+		last_call = now;
 	}
 
 	/* check for CUT_BUFFER0 and VNC_CONNECT changes: */
@@ -1156,7 +1158,6 @@ void check_xevents(int reset) {
 	}
 	X_UNLOCK;
 
-	last_call = now;
 #endif	/* NO_X11 */
 }
 
@@ -1346,14 +1347,22 @@ void set_server_input(rfbClientPtr cl, int grab) {
 	return;
 #else
 	if (grab) {
+		if (!no_ultra_dpms) {
+			set_dpms_mode("enable");
+			set_dpms_mode("off");
+			force_dpms = 1;
+		}
+
 		process_remote_cmd("cmd=grabkbd", 0);
 		process_remote_cmd("cmd=grabptr", 0);
-
-		set_dpms_mode("off");
 
 	} else {
 		process_remote_cmd("cmd=nograbkbd", 0);
 		process_remote_cmd("cmd=nograbptr", 0);
+
+		if (!no_ultra_dpms) {
+			force_dpms = 0;
+		}
 	}
 #endif
 }

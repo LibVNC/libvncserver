@@ -261,6 +261,9 @@ extern int all_input;
 
 extern int watch_fbpm;
 extern int watch_dpms;
+extern int force_dpms;
+extern int client_dpms;
+extern int no_ultra_dpms;
 
 extern int watch_selection;
 extern int watch_primary;

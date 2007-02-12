@@ -3287,6 +3287,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		grab_kbd = 1;
+		if (grab_always) {
+			adjust_grabs(1, 0);
+		}
 		rfbLog("enabled grab_kbd\n");
 	} else if (!strcmp(p, "nograbkbd")) {
 		int orig = grab_kbd;
@@ -3303,12 +3306,16 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 #endif
 		}
 		rfbLog("disabled grab_kbd\n");
+
 	} else if (!strcmp(p, "grabptr")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, grab_ptr);
 			goto qry;
 		}
 		grab_ptr = 1;
+		if (grab_always) {
+			adjust_grabs(1, 0);
+		}
 		rfbLog("enabled grab_ptr\n");
 	} else if (!strcmp(p, "nograbptr")) {
 		int orig = grab_ptr;
@@ -3325,6 +3332,36 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 #endif
 		}
 		rfbLog("disabled grab_ptr\n");
+
+	} else if (!strcmp(p, "grabalways")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, grab_always);
+			goto qry;
+		}
+		grab_ptr = 1;
+		grab_kbd = 1;
+		grab_always = 1;
+		adjust_grabs(1, 0);
+		rfbLog("enabled grab_always\n");
+	} else if (!strcmp(p, "nograbalways")) {
+		int orig = grab_always;
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !grab_always);
+			goto qry;
+		}
+		grab_ptr = 0;
+		grab_kbd = 0;
+		grab_always = 0;
+		if (orig && dpy) {
+#if !NO_X11
+			X_LOCK;
+			XUngrabKeyboard(dpy, CurrentTime);
+			XUngrabPointer(dpy, CurrentTime);
+			X_UNLOCK;
+#endif
+		}
+		adjust_grabs(0, 0);
+		rfbLog("disabled grab_always\n");
 
 	} else if (strstr(p, "client_input") == p) {
 		NOTAPP
@@ -3582,6 +3619,51 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: turning on -nodpms mode.\n");
 		watch_dpms = 1;
+
+	} else if (!strcmp(p, "clientdpms")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, client_dpms);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning on -clientdpms mode.\n");
+		client_dpms = 1;
+	} else if (!strcmp(p, "noclientdpms")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !client_dpms);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning off -clientdpms mode.\n");
+		client_dpms = 0;
+
+	} else if (!strcmp(p, "forcedpms")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, force_dpms);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning on -forcedpms mode.\n");
+		force_dpms = 1;
+	} else if (!strcmp(p, "noforcedpms")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !force_dpms);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning off -forcedpms mode.\n");
+		force_dpms = 0;
+
+	} else if (!strcmp(p, "noserverdpms")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, no_ultra_dpms);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning on -noserverdpms mode.\n");
+		no_ultra_dpms = 1;
+	} else if (!strcmp(p, "serverdpms")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !no_ultra_dpms);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning off -noserverdpms mode.\n");
+		no_ultra_dpms = 0;
 
 	} else if (strstr(p, "fs") == p) {
 		COLON_CHECK("fs:")

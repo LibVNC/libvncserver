@@ -482,6 +482,9 @@ extern int hack_val;
 extern rfbClientPtr last_pointer_client;
 extern rfbClientPtr latest_client;
 
+extern int waited_for_client;
+extern int findcreatedisplay;
+
 extern int client_count;
 extern int clients_served;
 

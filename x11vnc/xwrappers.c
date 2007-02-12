@@ -1042,7 +1042,7 @@ int xauth_raw(int on) {
 				rfbLog("could not create tmp xauth file: %s\n", tmp);	
 				return 0;
 			}
-			if (db) fprintf(stderr, "tmp: %s\n", tmp);
+			if (db) fprintf(stderr, "XAUTHORITY tmp: %s\n", tmp);
 			write(tmp_fd, xauth_raw_data, xauth_raw_len);
 			close(tmp_fd);
 			if (getenv("XAUTHORITY")) {

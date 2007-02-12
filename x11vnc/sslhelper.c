@@ -1458,6 +1458,24 @@ void accept_openssl(int mode) {
 			}
 			close(i);
 		}
+		if (screen->listenSock >= 0) {
+			close(screen->listenSock);
+			FD_CLR(screen->listenSock,&screen->allFds);
+			screen->listenSock = -1;
+		}
+		if (screen->httpListenSock >= 0) {
+			close(screen->httpListenSock);
+			FD_CLR(screen->httpListenSock,&screen->allFds);
+			screen->httpListenSock = -1;
+		}
+		if (openssl_sock >= 0) {
+			close(openssl_sock);
+			openssl_sock = -1;
+		}
+		if (https_sock >= 0) {
+			close(https_sock);
+			https_sock = -1;
+		}
 
 		/*
 		 * sadly, we are a long lived child and so the large

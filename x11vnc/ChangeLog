@@ -1,3 +1,9 @@
+2007-02-11  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add -grabalways, -forcedpms, -clientdpms, and 
+	  -noserverdpms (ultravnc viewer) for improvements in
+	  the still approximate server locking.  Add -loopbg
+	  and -svc, -xdmsvc aliases. Bug fix create_display.
+
 2007-02-10  Karl Runge <runge@karlrunge.com>
 	* x11vnc: watch things like textchat, etc. more carefully 
 	  in unixpw state.  Monitor broken XDAMAGE reports when

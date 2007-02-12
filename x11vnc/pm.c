@@ -123,16 +123,22 @@ void set_dpms_mode(char *mode) {
 			want = DPMSModeStandby;
 		} else if (!strcmp(mode, "suspend")) {
 			want = DPMSModeSuspend;
+		} else if (!strcmp(mode, "enable")) {
+			DPMSEnable(dpy);
+			return;
+		} else if (!strcmp(mode, "disable")) {
+			DPMSDisable(dpy);
+			return;
 		} else {
 			return;
 		}
 		if (DPMSInfo(dpy, &level, &enabled)) {
 			char *from;
-			fprintf(stderr, "DPMSInfo level: %d enabled: %d\n", level, enabled);
 			if (enabled && level != want) {
 				XErrorHandler old_handler = XSetErrorHandler(trap_xerror);
 				trapped_xerror = 0;
 
+				rfbLog("DPMSInfo level: %d enabled: %d\n", level, enabled);
 				if (level == DPMSModeStandby) {
 					from = "DPMSModeStandby";
 				} else if (level == DPMSModeSuspend) {
@@ -188,6 +194,14 @@ static void check_dpms(void) {
 		init_dpms = 1;
 	}
 
+	if (force_dpms || (client_dpms && client_count)) {
+		static int last_enable = 0;
+		if (time(NULL) > last_enable) {
+			set_dpms_mode("enable");
+			last_enable = time(NULL);
+		}
+		set_dpms_mode("off");
+	}
 	if (! watch_dpms) {
 		return;
 	}

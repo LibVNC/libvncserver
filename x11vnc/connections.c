@@ -2377,7 +2377,9 @@ void check_new_clients(void) {
 		return;
 	}
 
-	if (grab_kbd || grab_ptr) {
+	if (grab_always) {
+		;
+	} else if (grab_kbd || grab_ptr) {
 		static double last_force = 0.0;
 		if (client_count != last_count || dnow() > last_force + 0.25) {
 			int q = (client_count == last_count);

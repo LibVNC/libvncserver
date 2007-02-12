@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.5, lastmod: 2007-02-10
+         version: 0.8.5, lastmod: 2007-02-11
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -360,13 +360,30 @@ as soon as the first client(s) disconnect. Same as \fB-many\fR
 \fB-loop\fR
 .IP
 Create an outer loop restarting the x11vnc process
-whenever it terminates.  \fB-bg\fR and \fB-inetd\fR are ignored in
-this mode.  Useful for continuing even if the X server
-terminates and restarts (you will need permission to
-reconnect of course).   Use, e.g., \fB-loop100\fR to sleep
-100 millisecs between restarts, etc.  Default is 2000ms
-(i.e. 2 secs)  Use, e.g. \fB-loop300,5\fR to sleep 300 ms
-and only loop 5 times.
+whenever it terminates.  \fB-bg\fR and \fB-inetd\fR are ignored
+in this mode (however see \fB-loopbg\fR below).
+.IP
+Useful for continuing even if the X server terminates
+and restarts (at that moment the process will need
+permission to reconnect to the new X server of course).
+.IP
+Use, e.g., \fB-loop100\fR to sleep 100 millisecs between
+restarts, etc.  Default is 2000ms (i.e. 2 secs) Use,
+e.g. \fB-loop300,5\fR to sleep 300 ms and only loop 5 times.
+.IP
+If \fB-loopbg\fR (plus any numbers) is specified instead,
+the "\fB-bg\fR" option is implied and the mode approximates
+.IR inetd (8)
+usage to some degree.  In this case when
+it goes into the background any listening sockets
+(i.e. ports 5900, 5800) are closed, so the next one
+in the loop can use them.  This mode will only be of
+use if a VNC client (the only client for that process)
+is already connected before the process goes into the
+background, for example, usage of \fB-display\fR WAIT:..,
+\fB-svc,\fR and \fB-connect\fR can make use of this "poor man's"
+inetd mode.  The default wait time is 500ms in this
+mode.  This usage could use useful:  \fB-svc\fR \fB-loopbg\fR
 .PP
 \fB-timeout\fR \fIn\fR
 .IP
@@ -543,6 +560,13 @@ that call
 for resizes, etc, will
 act on the local user's input.  Again, some degree of
 cooperation from the person at the display is assumed.
+.PP
+\fB-grabalways\fR
+.IP
+Apply both \fB-grabkbd\fR and \fB-grabptr\fR even when no VNC
+viewers are connected.  If you only want one of them,
+use the \fB-R\fR remote control to turn the other back on,
+e.g. \fB-R\fR nograbptr.
 .PP
 \fB-viewpasswd\fR \fIstring\fR
 .IP
@@ -819,6 +843,18 @@ is given 3 tries to enter the correct password.
 If a list of allowed users is needed use \fB-unixpw\fR [list]
 in addition to this option.
 .PP
+\fB-svc\fR
+.IP
+Terminal services mode.  Also "\fB-service\fR", implies
+\fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb \fB-unixpw\fR
+\fB-users\fR unixpw= \fB-ssl\fR SAVE
+.PP
+\fB-xdmsvc\fR
+.IP
+Terminal services mode.  Also "\fB-xdm_service\fR", implies
+\fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp \fB-unixpw\fR
+\fB-users\fR unixpw= \fB-ssl\fR SAVE
+.PP
 \fB-display\fR \fIWAIT:...\fR
 .IP
 A special usage mode for the normal \fB-display\fR option.
@@ -928,7 +964,7 @@ by client web browsers.  For example:
 Where /.../x11vnc is the full path to x11vnc.
 It is used in the Apache SSL-portal example (see FAQ).
 .IP
-An experimental option is WAIT:cmd=FINDCREATEDISPLAY
+An interesting option is WAIT:cmd=FINDCREATEDISPLAY
 that is like FINDDISPLAY in that is uses the same method
 to find an existing display.  However, if it does not
 find one it will try to *start* up an X server session
@@ -943,11 +979,12 @@ the shared library.  Xdummy requires root permission
 and only works on Linux.  Xvfb is available on most
 platforms and does not require root.
 .IP
-When x11vnc exits (i.e. user disconnects) the X server
-session stays running in the background.  Presumably
-the FINDDISPLAY will find it next time.  The user must
-exit the X session in the usual way for it to terminate
-(or kill the X server process if all else fails).
+When x11vnc exits (i.e. user disconnects) the X
+server session stays running in the background.
+The FINDDISPLAY will find it directly next time.
+The user must exit the X session in the usual way for
+it to terminate (or kill the X server process if all
+else fails).
 .IP
 So this is a somewhat odd mode for x11vnc in that it
 will start up and poll virtual X servers!  This can
@@ -991,6 +1028,15 @@ display manager.  This seems to be:
 for gdm in gdm.conf:   Enable=true in section [xdmcp]
 for kdm in kdmrc:      Enable=true in section [Xdmcp]
 for xdm in xdm-config: DisplayManager.requestPort: 177
+.IP
+See the shorthand options above "\fB-svc\fR" and "\fB-xdmsvc\fR"
+that specify the above options for some useful cases.
+.PP
+\fB-nossl\fR
+.IP
+Disable the \fB-ssl\fR option (see below). Since \fB-ssl\fR is off
+by default \fB-nossl\fR would only be used on the commandline
+to unset any *earlier* \fB-ssl\fR option (or \fB-svc...)\fR
 .PP
 \fB-ssl\fR \fI[pem]\fR
 .IP
@@ -3117,6 +3163,38 @@ manpage
 for details.  \fB-nodpms\fR is basically the same as running
 "xset dpms force on" periodically.  Default: \fB-dpms\fR
 .PP
+\fB-forcedpms\fR
+.IP
+If the system supports the DPMS (Display Power
+Management Signaling) extension, then try to keep the
+monitor in a powered off state.  This is to prevent
+nosey people at the physical display from viewing
+what is on the screen.  Be sure lock the screen before
+disconnecting.
+.IP
+This method is far from bullet proof, e.g. suppose
+someone attaches a non-DPMS monitor, or loads the
+machine so that there is a gap of time before x11vnc
+restores the powered off state?  On many machines if
+he floods it with keyboard and mouse input he can see
+flashes of what is on the screen before the DPMS off
+state is reestablished.  For this to work securely
+there would need to be support in the X server to do
+this exactly rather than approximately with DPMS.
+.PP
+\fB-clientdpms\fR
+.IP
+As \fB-forcedpms\fR but only when VNC clients are connected.
+.PP
+\fB-noserverdpms\fR
+.IP
+The UltraVNC ServerInput extension is supported.
+This allows the VNC viewer to click a button that will
+cause the server (x11vnc) to try to disable keyboard
+and mouse input at the physical display and put the
+monitor in dpms powered off state.  Use this option to
+skip powering off the monitor.
+.PP
 \fB-noxdamage\fR
 .IP
 Do not use the X DAMAGE extension to detect framebuffer
@@ -3940,6 +4018,10 @@ grabptr         enable  \fB-grabptr\fR mode.
 .IP
 nograbptr       disable \fB-grabptr\fR mode.
 .IP
+grabalways      enable  \fB-grabalways\fR mode.
+.IP
+nograbalways    disable \fB-grabalways\fR mode.
+.IP
 client_input:str set the K, M, B \fB-input\fR on a per-client
 basis.  select which client as for
 disconnect, e.g. client_input:host:MB
@@ -4245,6 +4327,18 @@ dpms            disable \fB-nodpms\fR mode.
 .IP
 nodpms          enable  \fB-nodpms\fR mode.
 .IP
+forcedpms       enable  \fB-forcedpms\fR mode.
+.IP
+noforcedpms     disable \fB-forcedpms\fR mode.
+.IP
+clientdpms      enable  \fB-clientdpms\fR mode.
+.IP
+noclientdpms    disable \fB-clientdpms\fR mode.
+.IP
+noserverdpms    enable  \fB-noserverdpms\fR mode.
+.IP
+serverdpms      disable \fB-noserverdpms\fR mode.
+.IP
 xdamage         enable  xdamage polling hints.
 .IP
 noxdamage       disable xdamage polling hints.
@@ -4422,38 +4516,40 @@ unlock connect allowonce allow localhost nolocalhost
 listen lookup nolookup accept afteraccept gone shm
 noshm flipbyteorder noflipbyteorder onetile noonetile
 solid_color solid nosolid blackout xinerama noxinerama
-xtrap noxtrap xrandr noxrandr xrandr_mode rotate
-padgeom quiet q noquiet modtweak nomodtweak xkb noxkb
-capslock nocapslock skip_lockkeys noskip_lockkeys
-skip_keycodes sloppy_keys nosloppy_keys skip_dups
-noskip_dups add_keysyms noadd_keysyms clear_mods
-noclear_mods clear_keys noclear_keys remap repeat
-norepeat fb nofb bell nobell sel nosel primary
-noprimary setprimary nosetprimary clipboard noclipboard
-setclipboard nosetclipboard seldir cursorshape
-nocursorshape cursorpos nocursorpos cursor_drag
-nocursor_drag cursor show_cursor noshow_cursor
-nocursor arrow xfixes noxfixes xdamage noxdamage
-xd_area xd_mem alphacut alphafrac alpharemove
-noalpharemove alphablend noalphablend xwarppointer
-xwarp noxwarppointer noxwarp buttonmap dragging
-nodragging ncache_cr noncache_cr ncache_no_moveraise
-noncache_no_moveraise ncache_no_dtchange
-noncache_no_dtchange ncache_no_rootpixmap
-noncache_no_rootpixmap ncache_reset_rootpixmap
-ncache_keep_anims noncache_keep_anims ncache noncache
-ncache_size wireframe_mode wireframe wf nowireframe nowf
-wireframelocal wfl nowireframelocal nowfl wirecopyrect
-wcr nowirecopyrect nowcr scr_area scr_skip scr_inc
-scr_keys scr_term scr_keyrepeat scr_parms scrollcopyrect
-scr noscrollcopyrect noscr fixscreen noxrecord xrecord
-reset_record pointer_mode pm input_skip allinput
-noallinput input grabkbd nograbkbd grabptr nograbptr
-client_input ssltimeout speeds wmdt debug_pointer dp
-nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-nodk deferupdate defer wait_ui wait_bog nowait_bog
-slow_fb wait readtimeout nap nonap sb screen_blank
-fbpm nofbpm dpms nodpms fs gaps grow fuzz snapfb
+xtrap noxtrap xrandr noxrandr xrandr_mode rotate padgeom
+quiet q noquiet modtweak nomodtweak xkb noxkb capslock
+nocapslock skip_lockkeys noskip_lockkeys skip_keycodes
+sloppy_keys nosloppy_keys skip_dups noskip_dups
+add_keysyms noadd_keysyms clear_mods noclear_mods
+clear_keys noclear_keys remap repeat norepeat fb nofb
+bell nobell sel nosel primary noprimary setprimary
+nosetprimary clipboard noclipboard setclipboard
+nosetclipboard seldir cursorshape nocursorshape
+cursorpos nocursorpos cursor_drag nocursor_drag cursor
+show_cursor noshow_cursor nocursor arrow xfixes
+noxfixes xdamage noxdamage xd_area xd_mem alphacut
+alphafrac alpharemove noalpharemove alphablend
+noalphablend xwarppointer xwarp noxwarppointer
+noxwarp buttonmap dragging nodragging ncache_cr
+noncache_cr ncache_no_moveraise noncache_no_moveraise
+ncache_no_dtchange noncache_no_dtchange
+ncache_no_rootpixmap noncache_no_rootpixmap
+ncache_reset_rootpixmap ncache_keep_anims
+noncache_keep_anims ncache_old_wm noncache_old_wm
+ncache noncache ncache_size wireframe_mode wireframe wf
+nowireframe nowf wireframelocal wfl nowireframelocal
+nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
+scr_skip scr_inc scr_keys scr_term scr_keyrepeat
+scr_parms scrollcopyrect scr noscrollcopyrect noscr
+fixscreen noxrecord xrecord reset_record pointer_mode pm
+input_skip allinput noallinput input grabkbd nograbkbd
+grabptr nograbptr grabalways nograbalways client_input
+ssltimeout speeds wmdt debug_pointer dp nodebug_pointer
+nodp debug_keyboard dk nodebug_keyboard nodk deferupdate
+defer wait_ui wait_bog nowait_bog slow_fb wait
+readtimeout nap nonap sb screen_blank fbpm nofbpm dpms
+nodpms clientdpms noclientdpms forcedpms noforcedpms
+noserverdpms serverdpms fs gaps grow fuzz snapfb
 nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
 uinput_always progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared

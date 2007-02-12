@@ -213,6 +213,7 @@ Pointer
 	=D nocursorshape
 	--
 	noxfixes
+	cursor_drag
 	=GAL AlphaBlending::
 	noalphablend
 	alphacut:
@@ -257,6 +258,8 @@ Misc
 	=D nobell
 	nolookup
 	bg
+	=S loop
+	=S loopbg
 	=-C:ignore,exit sigpipe:
 	=0 inetd
 
@@ -329,6 +332,10 @@ Permissions
 	timeout:
 	grabkbd
 	grabptr
+	grabalways
+	forcedpms
+	clientdpms
+	noserverdpms
 	=GAL LOFF
 
 Tuning

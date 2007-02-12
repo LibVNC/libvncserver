@@ -558,7 +558,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 #ifndef UNIXPW_SU
 	return 0;
 #else
-	int i, j, status, fd = -1, sfd, tfd, drain_size = 4096, rsize = 0;
+	int i, j, status, fd = -1, sfd, tfd, drain_size = 65536, rsize = 0;
 	int slow_pw = 1;
 	char *slave, *bin_true = NULL, *bin_su = NULL;
 	pid_t pid, pidw;
@@ -1542,7 +1542,7 @@ void unixpw_accept(char *user) {
 			} else if (switch_user(u, 0)) {
 				rfbLog("unixpw_accept switched to user: %s\n", user);
 			} else {
-				rfbLog("unixpw_accept failed to switched to user: %s\n", user);
+				rfbLog("unixpw_accept failed to switch to user: %s\n", user);
 			}
 			free(u);
 		}

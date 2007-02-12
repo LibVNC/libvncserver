@@ -1404,6 +1404,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 		break;
 	}
 
+
 	if (unixpw) {
 		if (! unixpw_in_progress) {
 			rfbLog("unixpw but no unixpw_in_progress\n");
@@ -1517,12 +1518,15 @@ if (db) {fprintf(stderr, "line: "); write(2, line, n); write(2, "\n", 1); fprint
 				fprintf(mt, "%s", create_display);
 				fclose(mt);
 
+				findcreatedisplay = 1;
+
 				if (getuid() != 0) {
 					/* if not root, run as the other user... */
 					n = 18000;
+					close_exec_fds();
 					res = su_verify(keep_unixpw_user,
 					    keep_unixpw_pass, create_cmd, line, &n, nodisp);
-if (db) fprintf(stderr, "line: '%s'\n", line);
+if (db) fprintf(stderr, "c-res=%d n=%d line: '%s'\n", res, n, line);
 
 				} else {
 					FILE *p;
@@ -1632,6 +1636,8 @@ if (db) fprintf(stderr, "\n");
 				}
 				fprintf(mt, "%s", create_display);
 				fclose(mt);
+
+				findcreatedisplay = 1;
 
 				rfbLog("wait_for_client: FINDCREATEDISPLAY cmd: %s\n", create_cmd);
 
@@ -1772,7 +1778,7 @@ fprintf(stderr, "\n");}
 			} else if (switch_user(u, 0)) {
 				rfbLog("unixpw_accept switched to user: %s\n", user);
 			} else {
-				rfbLog("unixpw_accept failed to switched to user: %s\n", user);
+				rfbLog("unixpw_accept failed to switch to user: %s\n", user);
 			}
 			free(u);
 		}
