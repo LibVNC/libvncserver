@@ -134,6 +134,7 @@ char gui_code[] = "";
 "	afteraccept:\n"
 "	gone:\n"
 "	vncconnect\n"
+"	avahi\n"
 "	-- D\n"
 "	filexfer\n"
 "	=GAL Java-applet::\n"

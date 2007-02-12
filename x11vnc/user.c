@@ -1382,6 +1382,28 @@ int wait_for_client(int *argc, char** argv, int http) {
 		keep_unixpw = 1;
 	}
 
+	if (!inetd) {
+		if (!use_openssl) {
+			announce(screen->port, use_openssl, NULL);
+			fprintf(stdout, "PORT=%d\n", screen->port);
+		} else {
+			fprintf(stdout, "PORT=%d\n", screen->port);
+			if (stunnel_port) {
+				fprintf(stdout, "SSLPORT=%d\n", stunnel_port);
+			} else if (use_openssl) {
+				fprintf(stdout, "SSLPORT=%d\n", screen->port);
+			}
+		}
+		fflush(stdout);
+	} else if (!use_openssl && avahi) {
+		char *name = rfb_desktop_name;
+		if (!name) {
+			name = use_dpy;
+		}
+		avahi_initialise();
+		avahi_advertise(name, this_host(), screen->port);
+	}
+
 	if (inetd && use_openssl) {
 		accept_openssl(OPENSSL_INETD);
 	}

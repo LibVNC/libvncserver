@@ -26,6 +26,7 @@
 #include "unixpw.h"
 #include "uinput.h"
 #include "userinput.h"
+#include "avahi.h"
 
 int send_remote_cmd(char *cmd, int query, int wait);
 int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync,
@@ -1308,6 +1309,29 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: allowing new connections.\n");
 		deny_all = 0;
+
+	} else if (!strcmp(p, "avahi") || !strcmp(p, "mdns")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, avahi);
+			goto qry;
+		}
+		rfbLog("remote_cmd: enable -avahi mDNS mode.\n");
+		if (!avahi) {
+			avahi = 1;
+			avahi_initialise();
+			avahi_advertise(vnc_desktop_name, this_host(),
+			    screen->port);
+		}
+	} else if (!strcmp(p, "noavahi") || !strcmp(p, "nomdns")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !avahi);
+			goto qry;
+		}
+		rfbLog("remote_cmd: disable -avahi mDNS mode.\n");
+		if (avahi) {
+			avahi = 0;
+			avahi_reset();
+		}
 
 	} else if (strstr(p, "connect") == p) {
 		NOTAPP

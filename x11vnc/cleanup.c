@@ -14,6 +14,7 @@
 #include "connections.h"
 #include "macosx.h"
 #include "macosxCG.h"
+#include "avahi.h"
 
 /*
  * Exiting and error handling routines
@@ -127,6 +128,10 @@ void clean_up_exit (int ret) {
 	stop_stunnel();
 	if (use_openssl) {
 		ssl_helper_pid(0, 0);	/* killall */
+	}
+
+	if (avahi) {
+		avahi_cleanup();
 	}
 
 #ifdef MACOSX

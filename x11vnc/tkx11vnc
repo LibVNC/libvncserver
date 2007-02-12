@@ -123,6 +123,7 @@ Clients
 	afteraccept:
 	gone:
 	vncconnect
+	avahi
 	-- D
 	filexfer
 	=GAL Java-applet::

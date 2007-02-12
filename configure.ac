@@ -335,6 +335,33 @@ elif test "x$uname_s" = "xDarwin"; then
 	ld_minus_R="no"
 fi
 
+AH_TEMPLATE(HAVE_AVAHI, [Avahi/mDNS client build environment present])
+AC_ARG_WITH(avahi,
+[  --without-avahi         disable support for Avahi/mDNS]
+[  --with-avahi=DIR        use avahi include/library files in DIR],,)
+if test "x$with_avahi" != "xno"; then
+	printf "checking for avahi... "
+	if test ! -z "$with_avahi" -a "x$with_avahi" != "xyes"; then
+		AVAHI_CFLAGS="-I$with_avahi/include"
+		AVAHI_LIBS="-L$with_avahi/lib -lavahi-common -lavahi-client"
+		echo "using $with_avahi"
+		with_avahi=yes
+	elif pkg-config --atleast-version=0.6.4 avahi-client >/dev/null 2>&1; then
+		AVAHI_CFLAGS=`pkg-config --cflags avahi-client`
+		AVAHI_LIBS=`pkg-config --libs avahi-client`
+		with_avahi=yes
+		echo yes
+	else
+		with_avahi=no
+		echo no
+	fi
+fi
+if test "x$with_avahi" = "xyes"; then
+	AC_DEFINE(HAVE_AVAHI)
+	AC_SUBST(AVAHI_CFLAGS)
+	AC_SUBST(AVAHI_LIBS)
+fi
+
 AC_ARG_WITH(jpeg,
 [  --without-jpeg          disable support for jpeg]
 [  --with-jpeg=DIR         use jpeg include/library files in DIR],,)

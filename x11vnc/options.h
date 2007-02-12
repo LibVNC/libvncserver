@@ -88,6 +88,8 @@ extern char *cmap8to24_str;
 extern int xform24to32;
 extern int launch_gui;
 
+extern int avahi;
+
 extern int use_modifier_tweak;
 extern int watch_capslock;
 extern int skip_lockkeys;

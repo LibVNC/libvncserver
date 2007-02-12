@@ -576,4 +576,3 @@ Window descend_pointer(int depth, Window start, char *name_info, int len) {
 #endif	/* NO_X11 */
 }
 
-

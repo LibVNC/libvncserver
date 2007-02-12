@@ -113,6 +113,11 @@ int xform24to32 = 0;		/* -24to32 */
 char *cmap8to24_str = NULL;
 int launch_gui = 0;		/* -gui */
 
+#ifndef AVAHI
+#define AVAHI 0
+#endif
+int avahi = AVAHI;		/* -avahi, -mdns */
+
 int use_modifier_tweak = 1;	/* use the shift/altgr modifier tweak */
 int watch_capslock = 0;		/* -capslock */
 int skip_lockkeys = 0;		/* -skip_lockkeys */

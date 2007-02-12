@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.5, lastmod: 2007-02-11
+         version: 0.8.5, lastmod: 2007-02-12
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -60,8 +60,12 @@ becomes a space character).
 X11 server display to connect to, usually :0.  The X
 server process must be running on same machine and
 support MIT-SHM.  Equivalent to setting the DISPLAY
-environment variable to \fIdisp\fR.  See the description
-below of the "\fB-display\fR \fIWAIT:...\fR" extensions.
+environment variable to \fIdisp\fR.
+.IP
+See the description below of the "\fB-display\fR \fIWAIT:...\fR"
+extensions, where alias "\fB-find\fR" will find the user's
+display automatically, and "\fB-create\fR" will create a
+Xvfb session if no session is found.
 .PP
 \fB-auth\fR \fIfile\fR
 .IP
@@ -431,6 +435,18 @@ to the program location and in standard locations
 \fB-http_ssl\fR
 .IP
 As \fB-http,\fR but force lookup for ssl classes subdir.
+.PP
+\fB-avahi\fR
+.IP
+Use the Avahi/mDNS ZeroConf protocol to advertize
+this VNC server to the local network. (Related terms:
+Rendezvous, Bonjour).  Depending on your setup, you
+may need to start avahi-daemon and open udp port 5353
+in your firewall.
+.PP
+\fB-mdns\fR
+.IP
+Same as \fB-avahi.\fR
 .PP
 \fB-connect\fR \fIstring\fR
 .IP
@@ -843,15 +859,27 @@ is given 3 tries to enter the correct password.
 If a list of allowed users is needed use \fB-unixpw\fR [list]
 in addition to this option.
 .PP
+\fB-find\fR
+.IP
+Find the user's display using FINDDISPLAY. It is an
+alias for "\fB-display\fR \fIWAIT:cmd=FINDDISPLAY\fR".
+.PP
+\fB-create\fR
+.IP
+First try to find the user's display using FINDDISPLAY,
+if that doesn't work create an X session via the
+FINDCREATEDISPLAY method. This is an alias for
+"\fB-display\fR \fIWAIT:cmd=FINDCREATEDISPLAY-Xvfb\fR".
+.PP
 \fB-svc\fR
 .IP
-Terminal services mode.  Also "\fB-service\fR", implies
+Terminal services mode. Also "\fB-service\fR". Alias for
 \fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb \fB-unixpw\fR
 \fB-users\fR unixpw= \fB-ssl\fR SAVE
 .PP
 \fB-xdmsvc\fR
 .IP
-Terminal services mode.  Also "\fB-xdm_service\fR", implies
+Terminal services mode. Also "\fB-xdm_service\fR". Alias for
 \fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp \fB-unixpw\fR
 \fB-users\fR unixpw= \fB-ssl\fR SAVE
 .PP
@@ -3976,6 +4004,14 @@ deny            deny any new connections, same as "lock"
 .IP
 nodeny          allow new connections, same as "unlock"
 .IP
+avahi           enable  avahi service advertizing.
+.IP
+noavahi         disable avahi service advertizing.
+.IP
+mdns            enable  avahi service advertizing.
+.IP
+nomdns          disable avahi service advertizing.
+.IP
 connect:host    do reverse connection to host, "host"
 may be a comma separated list of hosts
 or host:ports.  See \fB-connect.\fR  Passwords
@@ -4511,24 +4547,24 @@ overlay_yescursor nooverlay_nocursor nooverlay_cursor
 nooverlay_yescursor overlay_nocursor 8to24 no8to24
 8to24_opts 24to32 no24to32 visual scale scale_cursor
 viewonly noviewonly shared noshared forever noforever
-once timeout filexfer nofilexfer deny lock nodeny
-unlock connect allowonce allow localhost nolocalhost
-listen lookup nolookup accept afteraccept gone shm
-noshm flipbyteorder noflipbyteorder onetile noonetile
-solid_color solid nosolid blackout xinerama noxinerama
-xtrap noxtrap xrandr noxrandr xrandr_mode rotate padgeom
-quiet q noquiet modtweak nomodtweak xkb noxkb capslock
-nocapslock skip_lockkeys noskip_lockkeys skip_keycodes
-sloppy_keys nosloppy_keys skip_dups noskip_dups
-add_keysyms noadd_keysyms clear_mods noclear_mods
-clear_keys noclear_keys remap repeat norepeat fb nofb
-bell nobell sel nosel primary noprimary setprimary
-nosetprimary clipboard noclipboard setclipboard
-nosetclipboard seldir cursorshape nocursorshape
-cursorpos nocursorpos cursor_drag nocursor_drag cursor
-show_cursor noshow_cursor nocursor arrow xfixes
-noxfixes xdamage noxdamage xd_area xd_mem alphacut
-alphafrac alpharemove noalpharemove alphablend
+once timeout filexfer nofilexfer deny lock nodeny unlock
+avahi mdns noavahi nomdns connect allowonce allow
+localhost nolocalhost listen lookup nolookup accept
+afteraccept gone shm noshm flipbyteorder noflipbyteorder
+onetile noonetile solid_color solid nosolid blackout
+xinerama noxinerama xtrap noxtrap xrandr noxrandr
+xrandr_mode rotate padgeom quiet q noquiet modtweak
+nomodtweak xkb noxkb capslock nocapslock skip_lockkeys
+noskip_lockkeys skip_keycodes sloppy_keys nosloppy_keys
+skip_dups noskip_dups add_keysyms noadd_keysyms
+clear_mods noclear_mods clear_keys noclear_keys remap
+repeat norepeat fb nofb bell nobell sel nosel primary
+noprimary setprimary nosetprimary clipboard noclipboard
+setclipboard nosetclipboard seldir cursorshape
+nocursorshape cursorpos nocursorpos cursor_drag
+nocursor_drag cursor show_cursor noshow_cursor nocursor
+arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem
+alphacut alphafrac alpharemove noalpharemove alphablend
 noalphablend xwarppointer xwarp noxwarppointer
 noxwarp buttonmap dragging nodragging ncache_cr
 noncache_cr ncache_no_moveraise noncache_no_moveraise

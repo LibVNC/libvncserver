@@ -23,6 +23,7 @@
 #include "linuxfb.h"
 #include "macosx.h"
 #include "macosxCG.h"
+#include "avahi.h"
 
 #include <rfb/rfbclient.h>
 
@@ -2888,6 +2889,13 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	install_passwds();
 }
 
+#define DO_AVAHI \
+	if (avahi) { \
+		avahi_initialise(); \
+		avahi_advertise(vnc_desktop_name, host, lport); \
+		usleep(1000*1000); \
+	}
+
 void announce(int lport, int ssl, char *iface) {
 	
 	char *host = this_host();
@@ -2911,17 +2919,20 @@ void announce(int lport, int ssl, char *iface) {
 			if (lport >= 5900) {
 				snprintf(vnc_desktop_name, sz, "%s:%d",
 				    host, lport - 5900);
+				DO_AVAHI
 				fprintf(stderr, "\n%s %s\n", tvdt,
 				    vnc_desktop_name);
 			} else {
 				snprintf(vnc_desktop_name, sz, "%s:%d",
 				    host, lport);
+				DO_AVAHI
 				fprintf(stderr, "\n%s %s\n", tvdt,
 				    vnc_desktop_name);
 			}
 		} else if (lport >= 5900) {
 			snprintf(vnc_desktop_name, sz, "%s:%d",
 			    host, lport - 5900);
+			DO_AVAHI
 			fprintf(stderr, "\n%s %s\n", tvdt, vnc_desktop_name);
 			if (lport >= 6000) {
 				rfbLog("possible aliases:  %s:%d, "
@@ -2931,6 +2942,7 @@ void announce(int lport, int ssl, char *iface) {
 		} else {
 			snprintf(vnc_desktop_name, sz, "%s:%d",
 			    host, lport);
+			DO_AVAHI
 			fprintf(stderr, "\n%s %s\n", tvdt, vnc_desktop_name);
 			rfbLog("possible alias:    %s::%d\n",
 			    host, lport);

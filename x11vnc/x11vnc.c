@@ -1657,6 +1657,10 @@ int main(int argc, char* argv[]) {
 					exit(0);
 				}
 			}
+		} else if (!strcmp(arg, "-find")) {
+			use_dpy = strdup("WAIT:cmd=FINDDISPLAY");
+		} else if (!strcmp(arg, "-create")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb");
 		} else if (!strcmp(arg, "-auth") || !strcmp(arg, "-xauth")) {
 			CHECK_ARGC
 			auth_file = strdup(argv[++i]);
@@ -1773,6 +1777,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-http_ssl")) {
 			try_http = 1;
 			http_ssl = 1;
+		} else if (!strcmp(arg, "-avahi") || !strcmp(arg, "-mdns")) {
+			avahi = 1;
 		} else if (!strcmp(arg, "-connect") ||
 		    !strcmp(arg, "-connect_or_exit")) {
 			CHECK_ARGC
