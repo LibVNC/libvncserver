@@ -300,7 +300,7 @@ void set_client_input(char *str) {
 	}
 	*p = '\0';
 	p++;
-	val = short_kmbc(p);
+	val = short_kmbcf(p);
 	
 	cl_list = client_match(str);
 

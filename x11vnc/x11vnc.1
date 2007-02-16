@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.5, lastmod: 2007-02-15
+         version: 0.8.5, lastmod: 2007-02-16
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -426,7 +426,7 @@ options: "\fB-rfbversion\fR \fI3.6 \fB-permitfiletransfer\fR"\fR
 Note that sadly you cannot do both \fB-tightfilexfer\fR and
 \fB-ultrafilexfer\fR at the same time because the latter
 requires setting the version to 3.6 and tightvnc will
-not do filetransfer at that version number.
+not do filetransfer when it sees that version number.
 .PP
 \fB-http\fR
 .IP
@@ -541,13 +541,14 @@ lookups time out, etc.
 .IP
 Fine tuning of allowed user input.  If \fIstring\fR does
 not contain a comma "," the tuning applies only to
-normal clients.  Otherwise the part before "," is for
-normal clients and the part after for view-only clients.
-"K" is for Keystroke input, "M" for Mouse-motion
-input, "B" for Button-click input, and "C" is for
-Clipboard input.  Their presence in the string enables
+normal clients.  Otherwise the part before "," is
+for normal clients and the part after for view-only
+clients.  "K" is for Keystroke input, "M" for
+Mouse-motion input, "B" for Button-click input, "C"
+is for Clipboard input, and "F" is for File transfer
+(ultravnc only).  Their presence in the string enables
 that type of input.  E.g. "\fB-input\fR \fIM\fR" means normal
-users can only move the mouse and  "\fB-input\fR \fIKMBC,M\fR"
+users can only move the mouse and  "\fB-input\fR \fIKMBCF,M\fR"
 lets normal users do anything and enables view-only
 users to move the mouse.  This option is ignored when
 a global \fB-viewonly\fR is in effect (all input is discarded
@@ -935,10 +936,11 @@ Also in the case of \fB-unixpw,\fR the user logging in can
 place a colon at the end of his username and supply
 a few options: scale=, scale_cursor= (or sc=), solid
 (or so), id=, clear_mods (or cm), clear_keys (or ck),
-repeat, speeds= (or sp=), readtimeout= (or rd=), or
-rotate= (or ro=) separated by commas if there is more
-than one.  After the user logs in successfully, these
-options will be applied to the VNC screen.  For example,
+repeat, speeds= (or sp=), readtimeout= (or rd=),
+rotate= (or ro=), or noncache (or nc) separated by
+commas if there is more than one.  After the user logs
+in successfully, these options will be applied to the
+VNC screen.  For example,
 .IP
 login: fred:scale=3/4,sc=1,repeat
 Password: ...
@@ -4009,9 +4011,15 @@ timeout:n       reset \fB-timeout\fR to n, if there are
 currently no clients, exit unless one
 connects in the next n secs.
 .IP
-tightfilexfer        enable  filetransfer for new clients.
+tightfilexfer   enable  filetransfer for NEW clients.
 .IP
-notightfilexfer      disable filetransfer for new clients.
+notightfilexfer disable filetransfer for NEW clients.
+.IP
+ultrafilexfer   enable  filetransfer for clients.
+.IP
+noultrafilexfer disable filetransfer for clients.
+.IP
+rfbversion:n.m  set \fB-rfbversion\fR for new clients.
 .IP
 http            enable  http client connections.
 .IP
@@ -4568,7 +4576,8 @@ overlay_yescursor nooverlay_nocursor nooverlay_cursor
 nooverlay_yescursor overlay_nocursor 8to24 no8to24
 8to24_opts 24to32 no24to32 visual scale scale_cursor
 viewonly noviewonly shared noshared forever noforever
-once timeout filexfer nofilexfer deny lock nodeny unlock
+once timeout tightfilexfer notightfilexfer ultrafilexfer
+noultrafilexfer rfbversion deny lock nodeny unlock
 avahi mdns noavahi nomdns connect allowonce allow
 localhost nolocalhost listen lookup nolookup accept
 afteraccept gone shm noshm flipbyteorder noflipbyteorder
@@ -4597,16 +4606,17 @@ ncache noncache ncache_size wireframe_mode wireframe wf
 nowireframe nowf wireframelocal wfl nowireframelocal
 nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-scr_parms scrollcopyrect scr noscrollcopyrect noscr
-fixscreen noxrecord xrecord reset_record pointer_mode pm
-input_skip allinput noallinput input grabkbd nograbkbd
-grabptr nograbptr grabalways nograbalways client_input
-ssltimeout speeds wmdt debug_pointer dp nodebug_pointer
-nodp debug_keyboard dk nodebug_keyboard nodk deferupdate
-defer wait_ui wait_bog nowait_bog slow_fb wait
-readtimeout nap nonap sb screen_blank fbpm nofbpm dpms
-nodpms clientdpms noclientdpms forcedpms noforcedpms
-noserverdpms serverdpms fs gaps grow fuzz snapfb
+scr_parms scrollcopyrect scr noscrollcopyrect
+noscr fixscreen noxrecord xrecord reset_record
+pointer_mode pm input_skip allinput noallinput input
+grabkbd nograbkbd grabptr nograbptr grabalways
+nograbalways client_input ssltimeout speeds wmdt
+debug_pointer dp nodebug_pointer nodp debug_keyboard
+dk nodebug_keyboard nodk deferupdate defer wait_ui
+wait_bog nowait_bog slow_fb wait readtimeout nap nonap
+sb screen_blank fbpm nofbpm dpms nodpms clientdpms
+noclientdpms forcedpms noforcedpms noserverdpms
+serverdpms noultraext ultraext fs gaps grow fuzz snapfb
 nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
 uinput_always progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared

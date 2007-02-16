@@ -30,7 +30,7 @@ void delete_added_keycodes(int bequiet);
 void initialize_remap(char *infile);
 int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new);
 void switch_to_xkb_if_better(void);
-char *short_kmbc(char *str);
+char *short_kmbcf(char *str);
 void initialize_allowed_input(void);
 void initialize_modtweak(void);
 void initialize_keyboard_and_pointer(void);
@@ -2121,8 +2121,8 @@ if (sym >> 8 == 0) { \
 }
 #endif
 
-char *short_kmbc(char *str) {
-	int i, saw_k = 0, saw_m = 0, saw_b = 0, saw_c = 0, n = 10;
+char *short_kmbcf(char *str) {
+	int i, saw_k = 0, saw_m = 0, saw_b = 0, saw_c = 0, saw_f = 0, n = 10;
 	char *p, tmp[10];
 	
 	for (i=0; i<n; i++) {
@@ -2144,6 +2144,9 @@ char *short_kmbc(char *str) {
 		} else if ((*p == 'C' || *p == 'c') && !saw_c) {
 			tmp[i++] = 'C';
 			saw_c = 1;
+		} else if ((*p == 'F' || *p == 'f') && !saw_f) {
+			tmp[i++] = 'F';
+			saw_f = 1;
 		}
 		p++;
 	}
@@ -2163,7 +2166,7 @@ void initialize_allowed_input(void) {
 	}
 
 	if (! allowed_input_str) {
-		allowed_input_normal = strdup("KMBC");
+		allowed_input_normal = strdup("KMBCF");
 		allowed_input_view_only = strdup("");
 	} else {
 		char *p, *str = strdup(allowed_input_str);
@@ -2180,11 +2183,11 @@ void initialize_allowed_input(void) {
 	}
 
 	/* shorten them */
-	str = short_kmbc(allowed_input_normal);
+	str = short_kmbcf(allowed_input_normal);
 	free(allowed_input_normal);
 	allowed_input_normal = str;
 
-	str = short_kmbc(allowed_input_view_only);
+	str = short_kmbcf(allowed_input_view_only);
 	free(allowed_input_view_only);
 	allowed_input_view_only = str;
 
@@ -2507,6 +2510,7 @@ void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
 	input->motion    = 0;
 	input->button    = 0;
 	input->clipboard = 0;
+	input->files     = 0;
 
 	if (! client) {
 		return;
@@ -2530,7 +2534,7 @@ void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
 		if (allowed_input_normal) {
 			str = allowed_input_normal;
 		} else {
-			str = "KMBC";
+			str = "KMBCF";
 		}
 	}
 if (0) fprintf(stderr, "GAI: %s - %s\n", str, cd->input);
@@ -2544,6 +2548,8 @@ if (0) fprintf(stderr, "GAI: %s - %s\n", str, cd->input);
 			input->button = 1;
 		} else if (*str == 'C') {
 			input->clipboard = 1;
+		} else if (*str == 'F') {
+			input->files = 1;
 		}
 		str++;
 	}

@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Thu Feb 15 21:21:56 EST 2007
+x11vnc README file                         Date: Fri Feb 16 13:40:55 EST 2007
 
 The following information is taken from these URLs:
 
@@ -6574,17 +6574,36 @@ ateway and not a broadcaster?)
    As of Oct/2005 and May/2006 x11vnc enables, respectively, the TightVNC
    and UltraVNC file transfer implementations that were added to
    libvncserver. This currently works with TightVNC and UltraVNC viewers
-   (and Windows viewers only support filetransfer it appears).
+   (and Windows viewers only support filetransfer it appears... but they
+   do work to some degree under Wine on Linux).
 
-   TightVNC file transfer is on by default, if you want to disable it use
-   the [756]-nofilexfer option. UltraVNC file transfer is currently off
-   by default, to enable it use something like "-rfbversion 3.6
-   -permitfiletransfer"
+   TightVNC file transfer is off by default, if you want to enable it use
+   the [756]-nofilexfer option.
+
+   UltraVNC file transfer is off by default, to enable it use something
+   like "-rfbversion 3.6 -permitfiletransfer"
    options (UltraVNC incorrectly uses the RFB protocol version to
    determine if its features are available, so x11vnc has to pretend to
    be version 3.6). As of Sep/2006 "-ultrafilexfer" is an alias for these
    two options. Note that running as RFB version 3.6 may confuse other
    VNC Viewers.
+
+   Sadly you cannot do both -tightfilexfer and -ultrafilexfer at the same
+   time because the latter requires setting the version to 3.6 and
+   tightvnc will not do filetransfer when it sees that version number.
+
+   Also, because of the way the LibVNCServer TightVNC file transfer is
+   implemented, you cannot do Tightvnc file transfer in -unixpw mode.
+   UltraVNC file transfer does work, however.
+
+   The UltraVNC and TightVNC settings can be toggled on and off inside
+   the gui or by -R remote control. However for TightVNC the changed
+   setting only applies for NEW clients, current clients retain their
+   TightVNC file transfer ability. For UltraVNC it works better, however
+   if an UltraVNC client has initiated a file transfer dialog it will
+   remain in effect until the dialog is closed. If you want to switch
+   between UltraVNC and TightVNC file transfer in the gui or by remote
+   control you will probably be foiled by the "-rfbversion 3.6" issue.
 
 
    Q-110: Which UltraVNC extensions are supported?
@@ -10008,7 +10027,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.5 lastmod: 2007-02-15
+x11vnc: allow VNC connections to real X11 displays. 0.8.5 lastmod: 2007-02-16
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -10121,7 +10140,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.5 lastmod: 2007-02-15
+x11vnc: allow VNC connections to real X11 displays. 0.8.5 lastmod: 2007-02-16
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -10466,7 +10485,7 @@ Options:
                        Note that sadly you cannot do both -tightfilexfer and
                        -ultrafilexfer at the same time because the latter
                        requires setting the version to 3.6 and tightvnc will
-                       not do filetransfer at that version number.
+                       not do filetransfer when it sees that version number.
 
 -http                  Instead of using -httpdir (see below) to specify
                        where the Java vncviewer applet is, have x11vnc try
@@ -10550,13 +10569,14 @@ Options:
 
 -input string          Fine tuning of allowed user input.  If "string" does
                        not contain a comma "," the tuning applies only to
-                       normal clients.  Otherwise the part before "," is for
-                       normal clients and the part after for view-only clients.
-                       "K" is for Keystroke input, "M" for Mouse-motion
-                       input, "B" for Button-click input, and "C" is for
-                       Clipboard input.  Their presence in the string enables
+                       normal clients.  Otherwise the part before "," is
+                       for normal clients and the part after for view-only
+                       clients.  "K" is for Keystroke input, "M" for
+                       Mouse-motion input, "B" for Button-click input, "C"
+                       is for Clipboard input, and "F" is for File transfer
+                       (ultravnc only).  Their presence in the string enables
                        that type of input.  E.g. "-input M" means normal
-                       users can only move the mouse and  "-input KMBC,M"
+                       users can only move the mouse and  "-input KMBCF,M"
                        lets normal users do anything and enables view-only
                        users to move the mouse.  This option is ignored when
                        a global -viewonly is in effect (all input is discarded
@@ -10886,10 +10906,11 @@ Options:
                        place a colon at the end of his username and supply
                        a few options: scale=, scale_cursor= (or sc=), solid
                        (or so), id=, clear_mods (or cm), clear_keys (or ck),
-                       repeat, speeds= (or sp=), readtimeout= (or rd=), or
-                       rotate= (or ro=) separated by commas if there is more
-                       than one.  After the user logs in successfully, these
-                       options will be applied to the VNC screen.  For example,
+                       repeat, speeds= (or sp=), readtimeout= (or rd=),
+                       rotate= (or ro=), or noncache (or nc) separated by
+                       commas if there is more than one.  After the user logs
+                       in successfully, these options will be applied to the
+                       VNC screen.  For example,
 
                           login: fred:scale=3/4,sc=1,repeat
                           Password: ...
@@ -13487,10 +13508,11 @@ n
                        timeout:n       reset -timeout to n, if there are
                                        currently no clients, exit unless one
                                        connects in the next n secs.
-                       tightfilexfer        enable  filetransfer for new client
-s.
-                       notightfilexfer      disable filetransfer for new client
-s.
+                       tightfilexfer   enable  filetransfer for NEW clients.
+                       notightfilexfer disable filetransfer for NEW clients.
+                       ultrafilexfer   enable  filetransfer for clients.
+                       noultrafilexfer disable filetransfer for clients.
+                       rfbversion:n.m  set -rfbversion for new clients.
                        http            enable  http client connections.
                        nohttp          disable http client connections.
                        deny            deny any new connections, same as "lock"
@@ -13800,7 +13822,8 @@ s.
                        nooverlay_yescursor overlay_nocursor 8to24 no8to24
                        8to24_opts 24to32 no24to32 visual scale scale_cursor
                        viewonly noviewonly shared noshared forever noforever
-                       once timeout filexfer nofilexfer deny lock nodeny unlock
+                       once timeout tightfilexfer notightfilexfer ultrafilexfer
+                       noultrafilexfer rfbversion deny lock nodeny unlock
                        avahi mdns noavahi nomdns connect allowonce allow
                        localhost nolocalhost listen lookup nolookup accept
                        afteraccept gone shm noshm flipbyteorder noflipbyteorder
@@ -13829,16 +13852,17 @@ s.
                        nowireframe nowf wireframelocal wfl nowireframelocal
                        nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
                        scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-                       scr_parms scrollcopyrect scr noscrollcopyrect noscr
-                       fixscreen noxrecord xrecord reset_record pointer_mode pm
-                       input_skip allinput noallinput input grabkbd nograbkbd
-                       grabptr nograbptr grabalways nograbalways client_input
-                       ssltimeout speeds wmdt debug_pointer dp nodebug_pointer
-                       nodp debug_keyboard dk nodebug_keyboard nodk deferupdate
-                       defer wait_ui wait_bog nowait_bog slow_fb wait
-                       readtimeout nap nonap sb screen_blank fbpm nofbpm dpms
-                       nodpms clientdpms noclientdpms forcedpms noforcedpms
-                       noserverdpms serverdpms fs gaps grow fuzz snapfb
+                       scr_parms scrollcopyrect scr noscrollcopyrect
+                       noscr fixscreen noxrecord xrecord reset_record
+                       pointer_mode pm input_skip allinput noallinput input
+                       grabkbd nograbkbd grabptr nograbptr grabalways
+                       nograbalways client_input ssltimeout speeds wmdt
+                       debug_pointer dp nodebug_pointer nodp debug_keyboard
+                       dk nodebug_keyboard nodk deferupdate defer wait_ui
+                       wait_bog nowait_bog slow_fb wait readtimeout nap nonap
+                       sb screen_blank fbpm nofbpm dpms nodpms clientdpms
+                       noclientdpms forcedpms noforcedpms noserverdpms
+                       serverdpms noultraext ultraext fs gaps grow fuzz snapfb
                        nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
                        uinput_always progressive rfbport http nohttp httpport
                        httpdir enablehttpproxy noenablehttpproxy alwaysshared

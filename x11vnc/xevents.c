@@ -1401,8 +1401,20 @@ int get_keyboard_led_state_hook(rfbScreenInfoPtr s) {
 	return 0;
 }
 int get_file_transfer_permitted(rfbClientPtr cl) {
+	allowed_input_t input;
 	if (unixpw_in_progress) {
 		rfbLog("get_file_transfer_permitted: unixpw_in_progress, skipping.\n");
+		return FALSE;
+	}
+if (0) fprintf(stderr, "get_file_transfer_permitted called\n");
+	if (view_only) {
+		return FALSE;
+	}
+	if (cl->viewOnly) {
+		return FALSE;
+	}
+	get_allowed_input(cl, &input);
+	if (!input.files) {
 		return FALSE;
 	}
 	return screen->permitFileTransfer;

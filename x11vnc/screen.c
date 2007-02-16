@@ -2840,6 +2840,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	screen->setSingleWindow = set_single_window; 
 	screen->setServerInput = set_server_input; 
 	screen->setTextChat = set_text_chat; 
+	screen->getFileTransferPermission = get_file_transfer_permitted; 
 
 	/* called from inetd, we need to treat stdio as our socket */
 	if (inetd && use_openssl) {

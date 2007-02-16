@@ -1113,6 +1113,7 @@ void user_supplied_opts(char *opts) {
 		"speeds", "sp", "readtimeout", "rd",
 		"rotate", "ro",
 		"geometry", "geom", "ge",
+		"noncache", "nc",
 		NULL
 	};
 
@@ -1195,6 +1196,10 @@ void user_supplied_opts(char *opts) {
 			} else if (!strcmp(p, "clear_keys") ||
 			    !strcmp(p, "ck")) {
 				clear_mods = 2;
+			} else if (!strcmp(p, "noncache") ||
+			    !strcmp(p, "nc")) {
+				ncache = 0;
+				ncache0 = 0;
 			} else if (!strcmp(p, "repeat")) {
 				no_autorepeat = 0;
 			} else if (strstr(p, "speeds=") == p ||
@@ -1873,6 +1878,9 @@ fprintf(stderr, "\n");}
 	if (chg_raw_fb) {
 		raw_fb = NULL;
 	}
+
+	ncache = ncache_save;
+
 	if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
 		user_supplied_opts(keep_unixpw_opts);
 	}
@@ -1880,7 +1888,6 @@ fprintf(stderr, "\n");}
 		free(create_cmd);
 	}
 
-	ncache = ncache_save;
 
 	return 1;
 }

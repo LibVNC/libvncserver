@@ -1272,7 +1272,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
 		if (! tightfilexfer) {
-			rfbLog("remote_cmd: enabling -tightfilexfer for new clients.\n");
+			rfbLog("remote_cmd: enabling -tightfilexfer for *NEW* clients.\n");
 			tightfilexfer = 1;
 			rfbRegisterTightVNCFileTransferExtension();
 		}
@@ -1287,13 +1287,51 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
 		if (tightfilexfer) {
-			rfbLog("remote_cmd: disabling -tightfilexfer for new clients.\n");
+			rfbLog("remote_cmd: disabling -tightfilexfer for *NEW* clients.\n");
 			tightfilexfer = 0;
 			rfbUnregisterTightVNCFileTransferExtension();
 		}
 #else
 		rfbLog("remote_cmd: -tightfilexfer not supported in this binary.\n");
 #endif
+
+	} else if (!strcmp(p, "ultrafilexfer")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, screen->permitFileTransfer == TRUE);
+			goto qry;
+		}
+		if (! screen->permitFileTransfer) {
+			rfbLog("remote_cmd: enabling -ultrafilexfer for clients.\n");
+			screen->permitFileTransfer = TRUE;
+		}
+
+	} else if (!strcmp(p, "noultrafilexfer")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, screen->permitFileTransfer == FALSE);
+			goto qry;
+		}
+		if (screen->permitFileTransfer) {
+			rfbLog("remote_cmd: disabling -ultrafilexfer for clients.\n");
+			screen->permitFileTransfer = FALSE;
+		}
+
+	} else if (strstr(p, "rfbversion") == p) {
+		int maj, min;
+		COLON_CHECK("rfbversion:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d.%d", p, screen->protocolMajorVersion, screen->protocolMinorVersion);
+			goto qry;
+		}
+		p += strlen("rfbversion:");
+
+		if (sscanf(p, "%d.%d", &maj, &min) == 2) {
+			screen->protocolMajorVersion = maj;
+			screen->protocolMinorVersion = min;
+			rfbLog("remote_cmd: set rfbversion to: %d.%d\n", maj, min);
+		} else {
+			rfbLog("remote_cmd: invalid rfbversion: %s\n", p);
+		}
+		
 
 	} else if (!strcmp(p, "deny") || !strcmp(p, "lock")) {
 		if (query) {

@@ -17,7 +17,7 @@ extern void delete_added_keycodes(int bequiet);
 extern void initialize_remap(char *infile);
 extern int sloppy_key_check(int key, rfbBool down, rfbKeySym keysym, int *new);
 extern void switch_to_xkb_if_better(void);
-extern char *short_kmbc(char *str);
+extern char *short_kmbcf(char *str);
 extern void initialize_allowed_input(void);
 extern void initialize_modtweak(void);
 extern void initialize_keyboard_and_pointer(void);
