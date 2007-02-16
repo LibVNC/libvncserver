@@ -78,7 +78,7 @@ extern char *viewonly_passwd;
 extern char **passwd_list;
 extern int begin_viewonly;
 extern int inetd;
-extern int filexfer; 
+extern int tightfilexfer; 
 extern int first_conn_timeout;
 extern int flash_cmap;
 extern int shift_cmap;
@@ -266,6 +266,7 @@ extern int watch_dpms;
 extern int force_dpms;
 extern int client_dpms;
 extern int no_ultra_dpms;
+extern int no_ultra_ext;
 
 extern int watch_selection;
 extern int watch_primary;

@@ -1553,7 +1553,7 @@ void unixpw_accept(char *user) {
 	}
 	unixpw_in_progress = 0;
 	screen->permitFileTransfer = unixpw_file_xfer_save;
-	if ((filexfer = unixpw_tightvnc_xfer_save)) {
+	if ((tightfilexfer = unixpw_tightvnc_xfer_save)) {
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
                 rfbRegisterTightVNCFileTransferExtension();
 #endif
@@ -1599,7 +1599,7 @@ void unixpw_deny(void) {
 
 	unixpw_in_progress = 0;
 	screen->permitFileTransfer = unixpw_file_xfer_save;
-	if ((filexfer = unixpw_tightvnc_xfer_save)) {
+	if ((tightfilexfer = unixpw_tightvnc_xfer_save)) {
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
                 rfbRegisterTightVNCFileTransferExtension();
 #endif

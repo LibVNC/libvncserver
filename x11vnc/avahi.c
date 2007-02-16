@@ -34,11 +34,35 @@ static AvahiEntryGroup *_group = NULL;
 
 static int db = 0;
 
+typedef struct {
+	const char *name;
+	const char *host;
+	uint16_t port;
+} avahi_service_t;
+
+typedef struct {
+	char *name;
+	char *host;
+	uint16_t port;
+} avahi_reg_t;
+
+#define NREG 16
+static avahi_reg_t registered[NREG];
+
 void avahi_initialise(void) {
 	int ret;
+	static int first = 1;
 
 	if (getenv("AVAHI_DEBUG")) {
 		db = 1;
+	}
+	if (first) {
+		int i;
+		for (i=0; i<NREG; i++) {
+			registered[i].name = NULL;
+			registered[i].host = NULL;
+		}
+		first = 0;
 	}
 
 if (db) fprintf(stderr, "in  avahi_initialise\n");
@@ -73,12 +97,6 @@ if (db) fprintf(stderr, "    avahi_initialise: poll not null\n");
 	}
 if (db) fprintf(stderr, "out avahi_initialise\n");
 }
-
-typedef struct {
-	const char *name;
-	const char *host;
-	uint16_t port;
-} avahi_service_t;
 
 static void _avahi_create_services(const char *name, const char *host,
     const uint16_t port);
@@ -159,7 +177,8 @@ if (db) fprintf(stderr, "out _avahi_create_services\n");
 }
 
 void avahi_advertise(const char *name, const char *host, const uint16_t port) {
-if (db) fprintf(stderr, "in  avahi_advertise\n");
+	int i;
+if (db) fprintf(stderr, "in  avahi_advertise: %s %s %d\n", name, host, port);
 	if (!_client) {
 if (db) fprintf(stderr, "    avahi_advertise client null\n");
 		return;
@@ -167,6 +186,31 @@ if (db) fprintf(stderr, "    avahi_advertise client null\n");
 	if (_poll == NULL) {
 		rfbLog("Avahi poll not initialized.\n");
 		return;
+	}
+	/* well, we just track it ourselves... */
+	for (i=0; i<NREG; i++) {
+		if (!registered[i].name) {
+			continue;
+		}
+		if (strcmp(registered[i].name, name)) {
+			continue;
+		}
+		if (strcmp(registered[i].host, host)) {
+			continue;
+		}
+		if (registered[i].port != port) {
+			continue;
+		}
+if (db) fprintf(stderr, "    avahi_advertise already did this one\n");
+		return;
+	}
+	for (i=0; i<NREG; i++) {
+		if (!registered[i].name) {
+			registered[i].name = strdup(name);
+			registered[i].host = strdup(host);
+			registered[i].port = port;
+			break;
+		}
 	}
 
 	avahi_threaded_poll_lock(_poll);
@@ -176,7 +220,18 @@ if (db) fprintf(stderr, "out avahi_advertise\n");
 }
 
 void avahi_reset(void) {
+	int i;
 if (db) fprintf(stderr, "in  avahi_reset\n");
+	for (i=0; i<NREG; i++) {
+		if (registered[i].name) {
+			free(registered[i].name);
+			registered[i].name = NULL;
+		}
+		if (registered[i].host) {
+			free(registered[i].host);
+			registered[i].host = NULL;
+		}
+	}
 	if (!_client || !_group) {
 if (db) fprintf(stderr, "    avahi_reset client/group null\n");
 		return;

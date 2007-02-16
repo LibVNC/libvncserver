@@ -2477,6 +2477,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		rfbLog("\n");
 		rfbLog("removed: -hints, -nohints\n");
 		rfbLog("removed: -cursorposall\n");
+		rfbLog("removed: -nofilexfer, now the default.\n");
 		rfbLog("\n");
 		rfbLog("renamed: -old_copytile, use -onetile\n");
 		rfbLog("renamed: -mouse,   use -cursor\n");

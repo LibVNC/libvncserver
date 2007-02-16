@@ -71,7 +71,7 @@
  * -DREMOTE_DEFAULT=0  to disable remote-control on by default (-yesremote).
  * -DREMOTE_CONTROL=0  to disable remote-control mechanism completely.
  * -DEXTERNAL_COMMANDS=0  to disable the running of all external commands.
- * -DFILEXFER=0  disable filexfer.
+ * -DTIGHTFILEXFER=0  disable tightfilexfer.
  *
  * -DHARDWIRE_PASSWD=...      hardwired passwords, quoting necessary.
  * -DHARDWIRE_VIEWPASSWD=...

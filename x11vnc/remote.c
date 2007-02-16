@@ -1265,34 +1265,34 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		first_conn_timeout = to;
 		rfbLog("remote_cmd: set -timeout to %d\n", -to);
 
-	} else if (!strcmp(p, "filexfer")) {
+	} else if (!strcmp(p, "tightfilexfer")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p, filexfer);
+			snprintf(buf, bufn, "ans=%s:%d", p, tightfilexfer);
 			goto qry;
 		}
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
-		if (! filexfer) {
-			rfbLog("remote_cmd: enabling -filexfer for new clients.\n");
-			filexfer = 1;
+		if (! tightfilexfer) {
+			rfbLog("remote_cmd: enabling -tightfilexfer for new clients.\n");
+			tightfilexfer = 1;
 			rfbRegisterTightVNCFileTransferExtension();
 		}
 #else
-		rfbLog("remote_cmd: -filexfer not supported in this binary.\n");
+		rfbLog("remote_cmd: -tightfilexfer not supported in this binary.\n");
 #endif
 
-	} else if (!strcmp(p, "nofilexfer")) {
+	} else if (!strcmp(p, "notightfilexfer")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p, !filexfer);
+			snprintf(buf, bufn, "ans=%s:%d", p, !tightfilexfer);
 			goto qry;
 		}
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
-		if (filexfer) {
-			rfbLog("remote_cmd: disabling -filexfer for new clients.\n");
-			filexfer = 0;
+		if (tightfilexfer) {
+			rfbLog("remote_cmd: disabling -tightfilexfer for new clients.\n");
+			tightfilexfer = 0;
 			rfbUnregisterTightVNCFileTransferExtension();
 		}
 #else
-		rfbLog("remote_cmd: -filexfer not supported in this binary.\n");
+		rfbLog("remote_cmd: -tightfilexfer not supported in this binary.\n");
 #endif
 
 	} else if (!strcmp(p, "deny") || !strcmp(p, "lock")) {
@@ -3688,6 +3688,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: turning off -noserverdpms mode.\n");
 		no_ultra_dpms = 0;
+
+	} else if (!strcmp(p, "noultraext")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, no_ultra_ext);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning on -noultraext mode.\n");
+		no_ultra_ext = 1;
+	} else if (!strcmp(p, "ultraext")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !no_ultra_ext);
+			    goto qry;
+		}
+		rfbLog("remote_cmd: turning off -noultraext mode.\n");
+		no_ultra_ext = 0;
 
 	} else if (strstr(p, "fs") == p) {
 		COLON_CHECK("fs:")

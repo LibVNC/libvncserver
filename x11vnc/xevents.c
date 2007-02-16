@@ -1290,6 +1290,9 @@ void kbd_release_all_keys(rfbClientPtr cl) {
 
 void set_single_window(rfbClientPtr cl, int x, int y) {
 	int ok = 0;
+	if (no_ultra_ext) {
+		return;
+	}
 	if (unixpw_in_progress) {
 		rfbLog("set_single_window: unixpw_in_progress, skipping.\n");
 		return;
@@ -1333,6 +1336,9 @@ void set_single_window(rfbClientPtr cl, int x, int y) {
 
 }
 void set_server_input(rfbClientPtr cl, int grab) {
+	if (no_ultra_ext) {
+		return;
+	}
 	if (unixpw_in_progress) {
 		rfbLog("set_server_input: unixpw_in_progress, skipping.\n");
 		return;
@@ -1368,6 +1374,10 @@ void set_server_input(rfbClientPtr cl, int grab) {
 }
 void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 	char buf[100];
+
+	if (no_ultra_ext) {
+		return;
+	}
 	rfbLog("set_text_chat: len=0x%x txt='", len);
 	if (0 < len && len < 10000) write(2, txt, len);
 	fprintf(stderr, "'\n");

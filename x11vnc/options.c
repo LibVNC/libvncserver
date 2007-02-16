@@ -100,10 +100,10 @@ char *viewonly_passwd = NULL;	/* view only passwd. */
 char **passwd_list = NULL;	/* for -passwdfile */
 int begin_viewonly = -1;
 int inetd = 0;			/* spawned from inetd(8) */
-#ifndef FILEXFER
-#define FILEXFER 1
+#ifndef TIGHTFILEXFER
+#define TIGHTFILEXFER 0
 #endif
-int filexfer = FILEXFER; 
+int tightfilexfer = TIGHTFILEXFER; 
 int first_conn_timeout = 0;	/* -timeout */
 int flash_cmap = 0;		/* follow installed colormaps */
 int shift_cmap = 0;		/* ncells < 256 and needs shift of pixel values */
@@ -364,6 +364,7 @@ int watch_dpms = 0;	/* -dpms */
 int force_dpms = 0;
 int client_dpms = 0;
 int no_ultra_dpms = 0;
+int no_ultra_ext = 0;
 
 int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
 int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */

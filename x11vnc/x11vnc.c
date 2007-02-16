@@ -1126,7 +1126,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " conn_once:  %d\n", connect_once);
 	fprintf(stderr, " timeout:    %d\n", first_conn_timeout);
 	fprintf(stderr, " inetd:      %d\n", inetd);
-	fprintf(stderr, " filexfer:   %d\n", filexfer);
+	fprintf(stderr, " tightfilexfer:   %d\n", tightfilexfer);
 	fprintf(stderr, " http:       %d\n", try_http);
 	fprintf(stderr, " connect:    %s\n", client_connect
 	    ? client_connect : "null");
@@ -1768,10 +1768,10 @@ int main(int argc, char* argv[]) {
 			users_list = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-inetd")) {
 			inetd = 1;
-		} else if (!strcmp(arg, "-nofilexfer")) {
-			filexfer = 0;
-		} else if (!strcmp(arg, "-filexfer")) {
-			filexfer = 1;
+		} else if (!strcmp(arg, "-notightfilexfer")) {
+			tightfilexfer = 0;
+		} else if (!strcmp(arg, "-tightfilexfer")) {
+			tightfilexfer = 1;
 		} else if (!strcmp(arg, "-http")) {
 			try_http = 1;
 		} else if (!strcmp(arg, "-http_ssl")) {
@@ -2386,6 +2386,8 @@ int main(int argc, char* argv[]) {
 			client_dpms = 1;
 		} else if (!strcmp(arg, "-noserverdpms")) {
 			no_ultra_dpms = 1;
+		} else if (!strcmp(arg, "-noultraext")) {
+			no_ultra_ext = 1;
 		} else if (!strcmp(arg, "-xdamage")) {
 			use_xdamage++;
 		} else if (!strcmp(arg, "-noxdamage")) {
@@ -2586,8 +2588,7 @@ int main(int argc, char* argv[]) {
 				listen_str = strdup(argv[i+1]);
 			}
 			/* otherwise copy it for libvncserver use below. */
-			if (!strcmp(arg, "-ultrafilexfer") ||
-			    !strcmp(arg, "-ultravncfilexfer")) {
+			if (!strcmp(arg, "-ultrafilexfer")) {
 				if (argc_vnc + 2 < argc_vnc_max) {
 					argv_vnc[argc_vnc++] = strdup("-rfbversion");
 					argv_vnc[argc_vnc++] = strdup("3.6");
@@ -2998,12 +2999,12 @@ int main(int argc, char* argv[]) {
 		overlay = 0;
 	}
 
-	if (filexfer && view_only) {
+	if (tightfilexfer && view_only) {
 		if (! quiet) {
-			rfbLog("setting -nofilexfer in -viewonly mode.\n");
+			rfbLog("setting -notightfilexfer in -viewonly mode.\n");
 		}
 		/* how to undo via -R? */
-		filexfer = 0;
+		tightfilexfer = 0;
 	}
 
 	if (inetd) {
@@ -3134,7 +3135,7 @@ int main(int argc, char* argv[]) {
 #endif
 
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
-	if (filexfer) {
+	if (tightfilexfer) {
 		rfbRegisterTightVNCFileTransferExtension();
 	} else {
 		rfbUnregisterTightVNCFileTransferExtension();

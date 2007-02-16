@@ -1112,6 +1112,7 @@ void user_supplied_opts(char *opts) {
 		"clear_mods", "cm", "clear_keys", "ck", "repeat",
 		"speeds", "sp", "readtimeout", "rd",
 		"rotate", "ro",
+		"geometry", "geom", "ge",
 		NULL
 	};
 
@@ -1489,6 +1490,7 @@ if (0) db = 1;
 			if (strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 				char *opts = strchr(cmd, '-');
 				char st[] = "";
+				char geom[32];
 				if (opts) {
 					opts++;
 					if (strstr(opts, "xdmcp")) {
@@ -1497,12 +1499,56 @@ if (0) db = 1;
 				} else {
 					opts = st;
 				}
+				sprintf(geom, "NONE");
+#if 0
+if (!keep_unixpw_opts) {
+	fprintf(stderr, "no keep_unixpw_opts\n");
+} else {
+	fprintf(stderr, "keep_unixpw_opts: %s\n", keep_unixpw_opts);
+}
+#endif
+				if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
+					char *q, *p, *t = strdup(keep_unixpw_opts);
+					q = strstr(t, "ge=");
+					if (! q) q = strstr(t, "geom=");
+					if (! q) q = strstr(t, "geometry=");
+					if (q) {
+						int ok = 1;
+						q = strstr(q, "=");
+						q++;
+						p = strstr(q, ",");
+						if (p) *p = '\0';
+						p = q;
+						while (*p) {
+							if (*p == 'x') {
+								;
+							} else if (isdigit((int) *p)) {
+								;
+							} else {
+								ok = 0;
+								break;
+							}
+							p++;
+						}
+						if (ok && strlen(q) < 32) {
+							sprintf(geom, q);
+							if (!quiet) {
+								rfbLog("set create display geom: %s\n", geom);
+							}
+						}
+					}
+					free(t);
+				}
+				set_env("FD_GEOM", geom);
 				if (unixpw && keep_unixpw_user) {
 					create_cmd = (char *) malloc(strlen(tmp)
 					    + strlen("env USER='' /bin/sh ")
-					    + strlen(keep_unixpw_user) + 1 + strlen(opts) + 1);
-					sprintf(create_cmd, "env USER='%s' /bin/sh %s %s",
-					    keep_unixpw_user, tmp, opts);
+					    + strlen("env FD_GEOM='' /bin/sh ")
+					    + strlen(keep_unixpw_user) + 1
+					    + strlen(geom) + 1
+					    + strlen(opts) + 1);
+					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' /bin/sh %s %s",
+					    keep_unixpw_user, geom, tmp, opts);
 				} else {
 					create_cmd = (char *) malloc(strlen(tmp)
 					    + strlen("/bin/sh ") + 1 + strlen(opts) + 1);

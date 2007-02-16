@@ -337,6 +337,7 @@ Permissions
 	forcedpms
 	clientdpms
 	noserverdpms
+	noultraext
 	=GAL LOFF
 
 Tuning

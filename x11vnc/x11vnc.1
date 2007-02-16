@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.5, lastmod: 2007-02-12
+         version: 0.8.5, lastmod: 2007-02-15
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -405,15 +405,15 @@ option, otherwise the stderr goes to the viewer which
 will cause it to abort.  Specifying both \fB-inetd\fR and \fB-q\fR
 and no \fB-o\fR will automatically close the stderr.
 .PP
-\fB-nofilexfer\fR
+\fB-tightfilexfer\fR
 .IP
-Disable the TightVNC file transfer extension.  (same as
-\fB-disablefiletransfer).\fR  Note that when the \fB-viewonly\fR
-option is supplied all file transfers are disabled.
-Also clients that log in viewonly cannot transfer files.
-However, if the remote control mechanism is used to
-change the global or per-client viewonly state the
-filetransfer permissions will NOT change.
+Enable the TightVNC file transfer extension. Note that
+that when the \fB-viewonly\fR option is supplied all file
+transfers are disabled.  Also clients that log in
+viewonly cannot transfer files.  However, if the remote
+control mechanism is used to change the global or
+per-client viewonly state the filetransfer permissions
+will NOT change.
 .PP
 \fB-ultrafilexfer\fR
 .IP
@@ -422,6 +422,11 @@ disabled by default, this may change...) and to get it
 to work you probably need to supply these libvncserver
 options: "\fB-rfbversion\fR \fI3.6 \fB-permitfiletransfer\fR"\fR
 "\fB-ultrafilexfer\fR" is an alias for this combination.
+.IP
+Note that sadly you cannot do both \fB-tightfilexfer\fR and
+\fB-ultrafilexfer\fR at the same time because the latter
+requires setting the version to 3.6 and tightvnc will
+not do filetransfer at that version number.
 .PP
 \fB-http\fR
 .IP
@@ -945,6 +950,12 @@ type and enter your password incorrectly, to retrieve
 your long "login:" line press the Up arrow once
 (before typing anything else).
 .IP
+Another option is "geom=WxH" or "geom=WxHxD"
+(or ge=). This only has an effect in FINDCREATEDISPLAY
+mode when a virtual X server such as Xvfb is going to
+be created.  It sets the width and height of the new
+display, and optionally the color depth as well.
+.IP
 To disable the option setting set the environment
 variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.
 To set any other options, the user can use the gui
@@ -1022,7 +1033,7 @@ to provide a means of
 definitely getting a desktop (either real or virtual)
 on the machine.  E.g. a desktop service:
 .IP
-5915 stream tcp nowait root /usr/sbin/tcpd /.../x11vnc
+5900 stream tcp nowait root /usr/sbin/tcpd /.../x11vnc
 \fB-inetd\fR \fB-q\fR \fB-http\fR \fB-ssl\fR SAVE \fB-unixpw\fR \fB-users\fR unixpw=\\
 \fB-passwd\fR secret \fB-prog\fR /.../x11vnc \\
 \fB-display\fR WAIT:cmd=FINDCREATEDISPLAY
@@ -3223,6 +3234,12 @@ and mouse input at the physical display and put the
 monitor in dpms powered off state.  Use this option to
 skip powering off the monitor.
 .PP
+\fB-noultraext\fR
+.IP
+Disable the following UltraVNC extensions: SingleWindow
+and ServerInput.  The others managed by libvncserver
+(textchat, 1/n scaling, rfbEncodingUltra) are not.
+.PP
 \fB-noxdamage\fR
 .IP
 Do not use the X DAMAGE extension to detect framebuffer
@@ -3992,9 +4009,9 @@ timeout:n       reset \fB-timeout\fR to n, if there are
 currently no clients, exit unless one
 connects in the next n secs.
 .IP
-filexfer        enable  filetransfer for new clients.
+tightfilexfer        enable  filetransfer for new clients.
 .IP
-nofilexfer      disable filetransfer for new clients.
+notightfilexfer      disable filetransfer for new clients.
 .IP
 http            enable  http client connections.
 .IP
@@ -4374,6 +4391,10 @@ noclientdpms    disable \fB-clientdpms\fR mode.
 noserverdpms    enable  \fB-noserverdpms\fR mode.
 .IP
 serverdpms      disable \fB-noserverdpms\fR mode.
+.IP
+noultraext      enable  \fB-noultraext\fR mode.
+.IP
+ultraext        disable \fB-noultraext\fR mode.
 .IP
 xdamage         enable  xdamage polling hints.
 .IP

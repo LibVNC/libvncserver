@@ -348,6 +348,7 @@ char gui_code[] = "";
 "	forcedpms\n"
 "	clientdpms\n"
 "	noserverdpms\n"
+"	noultraext\n"
 "	=GAL LOFF\n"
 "\n"
 "Tuning\n"
