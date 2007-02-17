@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Fri Feb 16 13:40:55 EST 2007
+x11vnc README file                         Date: Fri Feb 16 20:41:26 EST 2007
 
 The following information is taken from these URLs:
 
@@ -10903,7 +10903,7 @@ Options:
                        via the login and password prompt.
 
                        Also in the case of -unixpw, the user logging in can
-                       place a colon at the end of his username and supply
+                       place a colon at the end of her username and supply
                        a few options: scale=, scale_cursor= (or sc=), solid
                        (or so), id=, clear_mods (or cm), clear_keys (or ck),
                        repeat, speeds= (or sp=), readtimeout= (or rd=),

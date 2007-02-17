@@ -786,7 +786,7 @@ void print_help(int mode) {
 "                       via the login and password prompt.\n"
 "\n"
 "                       Also in the case of -unixpw, the user logging in can\n"
-"                       place a colon at the end of his username and supply\n"
+"                       place a colon at the end of her username and supply\n"
 "                       a few options: scale=, scale_cursor= (or sc=), solid\n"
 "                       (or so), id=, clear_mods (or cm), clear_keys (or ck),\n"
 "                       repeat, speeds= (or sp=), readtimeout= (or rd=),\n"
