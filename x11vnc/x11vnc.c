@@ -950,7 +950,18 @@ static void check_rcfile(int argc, char **argv) {
 }
 
 static void immediate_switch_user(int argc, char* argv[]) {
-	int i;
+	int i, bequiet = 0;
+	for (i=1; i < argc; i++) {
+		if (strcmp(argv[i], "-inetd")) {
+			bequiet = 1;
+		}
+		if (strcmp(argv[i], "-quiet")) {
+			bequiet = 1;
+		}
+		if (strcmp(argv[i], "-q")) {
+			bequiet = 1;
+		}
+	}
 	for (i=1; i < argc; i++) {
 		char *u;
 
@@ -976,7 +987,9 @@ static void immediate_switch_user(int argc, char* argv[]) {
 			fprintf(stderr, "Could not switch to user: %s\n", u+1);
 			exit(1);
 		} else {
-			fprintf(stderr, "Switched to user: %s\n", u+1);
+			if (!bequiet) {
+				fprintf(stderr, "Switched to user: %s\n", u+1);
+			}
 			started_as_root = 2;
 		}
 		free(u);
