@@ -38,6 +38,9 @@
 #         (the first CONNECT is done through host1:port1 to host2:port2
 #         and then a 2nd CONNECT to the destination VNC server.)
 #
+# -showcert  Only fetch the certificate using the 'openssl s_client'
+#            command (openssl(1) must in installed).
+#
 #    See http://www.karlrunge.com/x11vnc/#faq-ssl-ca for details on SSL
 #    certificates with VNC.
 #
@@ -133,13 +136,18 @@ if [ "X$SS_VNCVIEWER_SSH_CMD" != "X" ]; then
 	ssh_cmd="$SS_VNCVIEWER_SSH_CMD"
 fi
 ssh_args=""
+showcert=""
 
 if [ "X$1" = "X-viewerflavor" ]; then
 	if echo "$VNCVIEWERCMD" | grep -i chicken.of > /dev/null; then
 		echo "cotvnc"
 		exit 0
 	fi
-	str=`"$VNCVIEWERCMD" -h 2>&1 | head -5`
+	if echo "$VNCVIEWERCMD" | grep -i ultra > /dev/null; then
+		echo "ultravnc"
+		exit 0
+	fi
+	str=`$VNCVIEWERCMD -h 2>&1 | head -5`
 	if echo "$str" | grep -i 'TightVNC.viewer' > /dev/null; then
 		echo "tightvnc"
 	elif echo "$str" | grep -i 'RealVNC.Ltd' > /dev/null; then
@@ -172,6 +180,8 @@ do
 	"-sshargs")	shift; ssh_args="$1"
                 ;;
 	"-alpha")	gotalpha=1
+                ;;
+	"-showcert")	showcert=1
                 ;;
 	"-grab")	VNCVIEWER_GRAB_SERVER=1; export VNCVIEWER_GRAB_SERVER
                 ;;
@@ -370,7 +380,7 @@ if [ "X$use_ssh" = "X1" ]; then
 		echo "Running viewer:"
 		echo "$VNCVIEWERCMD" "$@" localhost:$N
 		echo ""
-		"$VNCVIEWERCMD" "$@" localhost:$N
+		$VNCVIEWERCMD "$@" localhost:$N
 
 		exit $?
 	else
@@ -574,9 +584,37 @@ if [ "X$proxy" != "X" ]; then
 	ptmp="/tmp/ss_vncviewer${RANDOM}.$$.pl"
 	mytmp "$ptmp"
 	pcode "$ptmp"
-	connect="exec = $ptmp"
+	if [ "X$showcert" != "X1" -a "X$direct_connect" = "X" ]; then
+		if uname | grep Darwin >/dev/null; then
+			nd=`expr $use + 333`
+			SSVNC_LISTEN=$nd
+			export SSVNC_LISTEN
+			$ptmp 2>/dev/null &
+			sleep 3
+			host="localhost"
+			port="$nd"
+			connect="connect = localhost:$nd"
+		else
+			connect="exec = $ptmp"
+		fi
+	else
+		connect="exec = $ptmp"
+	fi
 else
 	connect="connect = $host:$port"
+fi
+
+if [ "X$showcert" = "X1" ]; then
+	if [ "X$proxy" != "X" ]; then
+		SSVNC_LISTEN=$use
+		export SSVNC_LISTEN
+		$ptmp 2>/dev/null &
+		sleep 3
+		host="localhost"
+		port="$use"
+	fi
+	openssl s_client -connect $host:$port 2>&1 < /dev/null
+	exit $?
 fi
 
 if [ "X$direct_connect" != "X" ]; then
@@ -605,7 +643,7 @@ if [ "X$direct_connect" != "X" ]; then
 	fi
 	echo "$VNCVIEWERCMD" "$@" $host:$disp
 	echo ""
-	"$VNCVIEWERCMD" "$@" $host:$disp
+	$VNCVIEWERCMD "$@" $host:$disp
 	exit $?
 fi
 
@@ -653,7 +691,7 @@ echo ""
 echo "Running viewer:"
 echo "$VNCVIEWERCMD" "$@" localhost:$N
 echo ""
-"$VNCVIEWERCMD" "$@" localhost:$N
+$VNCVIEWERCMD "$@" localhost:$N
 
 kill $pid
 sleep 1

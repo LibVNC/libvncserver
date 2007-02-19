@@ -117,6 +117,14 @@ proc help {} {
     after it is established).  "x11vnc -ssl ..."  does this, and any VNC
     server can be made to do this by using, e.g., STUNNEL on the remote side.
 
+    *IMPORTANT*: If you do not take the steps to verify the VNC Server's
+    SSL Certificate, you are vulnerable to a Man-In-The-Middle attack.
+    (Only passive sniffing attacks are prevented). You can use the "Fetch
+    Cert" button to retrieve the Cert and then after you check it is OK
+    (say, via comparing the MD5 or other info)  you can save it and use
+    it to verify connections.  See the Certs... Help for information on
+    how to do this.
+
     Note that on Windows when the Viewer connection is finished you may
     need to terminate STUNNEL manually from the System Tray (right click
     on dark green icon) and selecting "Exit".
@@ -205,7 +213,7 @@ proc help {} {
     the dialog.  Then copy the cert file to the VNC Server and specify the
     other one in the "Certs ..." dialog.  Alternatively you can use the
     "Import Certificate" action to paste in a certificate or read one in
-    from a file.
+    from a file or use the "Fetch Cert" button on the main panel.
 
 
  More Options:
@@ -274,14 +282,23 @@ proc help_certs {} {
 	set msg {
  Description:
 
-    Only with SSL Certificate verification can Man-In-The-Middle attacks be
-    prevented. Otherwise, only passive snooping attacks are prevented with SSL.
+    *IMPORTANT*: Only with SSL Certificate verification can Man-In-The-Middle
+    attacks be prevented. Otherwise, only passive snooping attacks are prevented
+    with SSL.
 
     The SSL Certificate files described below can have been created externally
     (e.g. by x11vnc), you can import it via "Import Certificate" if you like.
     OR you can click on "Create Certificate ..." to use this program to generate a
     Certificate + Private Key pair.  In that case you will need to distribute one
     of the generated files to the VNC Server.
+
+    You can also retrieve the remote VNC Server's Cert via the "Fetch Cert" button
+    on the main panel.  After you check that it is the correct Cert (e.g. by
+    comparing MD5 hash or other info), you can save it.  It will be set as the
+    "ServerCert" to verify against for the connection.  To make this verification
+    check permanent, you will need to save the profile via Options -> Save Profile.
+
+    Note: due to a deficiency in openssl "Fetch Cert" is very slow on Windows.
 
 
  Your Certificate + Key:
@@ -313,8 +330,8 @@ proc help_certs {} {
 
 
     Select which file or directory by clicking on the appropriate "Browse..."  button.
-    Once selected, if you click the Right Mouse button on the "Browse..."  button then
-    information about the certificate will be displayed.
+    Once selected, if you click Info or the Right Mouse button on "Browse..."
+    then information about the certificate will be displayed.
 
 
  Notes:
@@ -335,7 +352,7 @@ proc help_certs {} {
     and then copy the Server certificate to the local (viewer-side) machine.
     x11vnc prints out to the screen the Server certificate it generates.
     You can set "ServerCert" to it directly or use the "Import Certificate"
-    action to save it to a file.
+    action to save it to a file.  Or use the "Fetch Cert" method.
 
     x11vnc also has command line utilities to create server, client, and CA
     (Certificate Authority) certificates.  See the above URLs.
@@ -651,6 +668,7 @@ proc set_defaults {} {
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
+	global ycrop_string
 	global include_list
 
 	set defs(use_viewonly) 0
@@ -700,6 +718,7 @@ proc set_defaults {} {
 	set defs(sound_daemon_local_kill) 0
 
 	set defs(use_port_knocking) 0
+	set defs(ycrop_string) ""
 	set defs(port_knocking_list) ""
 
 	set defs(include_list) ""
@@ -1949,6 +1968,271 @@ proc direct_connect_msg {} {
 	}
 }
 
+proc fetch_cert {} {
+	global vncdisplay is_windows
+	set hp [get_vncdisplay]
+
+	regsub {[ 	]*cmd=.*$} $hp "" tt
+	if {[regexp {^[ 	]*$} $tt]} {
+		mesg "No host:disp supplied."
+		bell
+		catch {raise .}
+		return
+	}
+	if {[regexp -- {--nohost--} $tt]} {
+		mesg "No host:disp supplied."
+		bell
+		catch {raise .}
+		return
+	}
+	if {! [regexp ":" $hp]} {
+		if {! [regexp {cmd=} $hp]} {
+			append hp ":0"
+		}
+	}
+	set hpnew  [get_ssh_hp $hp]
+	set proxy  [get_ssh_proxy $hp]
+
+	mesg "Fetching $hpnew Cert..."
+	global cert_text
+	set cert_text ""
+	.f4.getcert configure -state disabled
+	update
+	if {$is_windows} {
+		set cert_text [fetch_cert_windows $hp]
+	} else {
+		catch {set cert_text [fetch_cert_unix $hp]}
+	}
+	.f4.getcert configure -state normal
+	mesg "Fetched $hpnew Cert"
+
+	set n 50
+	set ok 1
+	if {$cert_text == ""} {
+		set cert_text "An Error occurred in fetching SSL Certificate from $hp"
+		set ok 0
+		set n 4
+	} elseif {! [regexp {BEGIN CERTIFICATE} $cert_text]} {
+		set cert_text "An Error occurred in fetching $hp\n\n$cert_text"
+		set ok 0
+	} else {
+		set text "" 
+		set on 0
+		foreach line [split $cert_text "\n"] {
+			if [regexp -- {-----BEGIN CERTIFICATE-----} $line] {
+				set on 1
+			}
+			if {! $on} {
+				continue;
+			}
+			append text "$line\n"
+			if [regexp -- {-----END CERTIFICATE-----} $line] {
+				set on 0
+			}
+		}
+		global is_windows
+		set tmp "/tmp/cert.hsh.[pid]"
+		if {$is_windows} {
+			set tmp cert.hsh
+		}
+		set fh ""
+		catch {set fh [open $tmp "w"]}
+		if {$fh != ""} {
+			puts $fh $text
+			close $fh
+			set info ""
+			catch {set info [get_x509_info $tmp]}
+			catch {file delete $tmp}
+			if [regexp -nocase {MD5 Finger[^\n]*} $info mvar] {
+				set cert_text "$mvar\n\n$cert_text"
+			}
+			if [regexp -nocase {SHA. Finger[^\n]*} $info mvar] {
+				set cert_text "$mvar\n\n$cert_text"
+			}
+		}
+		set cert_text "SSL Certificate from $hp\n\n$cert_text"
+	}
+	
+	toplev .fetch
+
+	scroll_text_dismiss .fetch.f 90 $n
+
+	if {$ok} {
+		button .fetch.save -text Save -command "destroy .fetch; save_cert $hpnew"
+		pack .fetch.save -side bottom -fill x
+	}
+
+	center_win .fetch
+	wm title .fetch "$hp Certificate"
+
+	.fetch.f.t insert end $cert_text
+	jiggle_text .fetch.f.t
+}
+
+proc fetch_cert_unix {hp} {
+	set hpnew  [get_ssh_hp $hp]
+	set proxy  [get_ssh_proxy $hp]
+	if {$proxy != ""} {
+		return [exec ss_vncviewer -proxy $proxy -showcert $hpnew 2>/dev/null]
+	} else {
+		return [exec ss_vncviewer -showcert $hpnew]
+	}
+}
+
+proc fetch_cert_windows {hp} {
+	set hpnew  [get_ssh_hp $hp]
+	set proxy  [get_ssh_proxy $hp]
+
+	set list [split $hpnew ":"] 
+
+	set host [lindex $list 0]
+	if {$host == ""} {
+		set host "localhost"
+	}
+
+	if [regexp {^.*@} $host match] {
+		mesg "Trimming \"$match\" from hostname"
+		regsub {^.*@} $host "" host
+	}
+
+	set disp [lindex $list 1]
+	set disp [string trim $disp]
+	regsub { .*$} $disp "" disp
+
+	if {$disp == "" || ! [regexp {^[0-9][0-9]*$} $disp]} {
+		set disp 0
+	}
+	set port [expr "$disp + 5900"]
+
+	if {$proxy != ""} {
+		global env
+
+		set port2 5991
+		set env(SSVNC_PROXY) $proxy
+		set env(SSVNC_LISTEN) $port2
+		set env(SSVNC_DEST) "$host:$port"
+
+		set host localhost
+		set port $port2
+		mesg "Starting TCP helper on port $port2 ..."
+		after 600
+		set proxy_pid [exec "connect_br.exe" &]
+		unset -nocomplain env(SSVNC_PROXY)
+		unset -nocomplain env(SSVNC_LISTEN)
+		unset -nocomplain env(SSVNC_DEST)
+	}
+
+	set ossl [get_openssl]
+	update
+	set tin tmpin.txt
+	set tou tmpout.txt
+	set fh ""
+	catch {set fh [open $tin "w"]}
+	if {$fh != ""} {
+		puts $fh "Q"
+		puts $fh "GET /WOMBAT HTTP/1.1\r\nHost: wombat.com\r\n\r\n\r\n"
+		close $fh
+	}
+	if {1} {
+		set ph ""
+		set ph [open "| $ossl s_client -connect $host:$port < $tin 2>NUL" "r"]
+#		set ph [open "| $ossl s_client -connect $host:$port" "r"]
+		set text ""
+		if {$ph != ""} {
+			set pids [pid $ph]
+			set got 0
+			while {[gets $ph line] > -1} {
+				append text "$line\n"
+#mesg "line: $line"; after 10
+				if [regexp {END CERT} $line] {
+					set got 1
+				}
+				if {$got && [regexp {^ *Verify return code} $line]} {
+					break
+				}
+				if [regexp {^RFB } $line] {
+					break
+				}
+				if [regexp {^DONE} $line] {
+					break
+				}
+			}
+			foreach pid $pids {
+				global is_win9x
+				if {$pid == ""} {
+					;
+				} elseif {$is_win9x} {
+					catch {exec w98/kill.exe /f $pid}
+				} else {
+					catch {exec tskill.exe $pid}
+				}
+			}
+			catch {close $ph}
+			catch {file delete $tin $tou}
+			return $text
+		}
+	} else {
+		set pids ""
+if {1} {
+		set ph2 [open "| $ossl s_client -connect $host:$port > $tou 2>NUL" "w"]
+		set pids [pid $ph2]
+		after 500
+		for {set i 0} {$i < 128} {incr i} {
+			puts $ph2 "Q"
+		}
+		catch {close $ph2}
+	
+} else {
+		set pids [exec $ossl s_client -connect $host:$port < $tin >& $tou &]
+}
+		for {set i 0} {$i < 10} {incr i} {
+			after 500
+			set got 0
+			set ph ""
+			catch {set ph [open $tou "r"]}
+#mesg "open: $tou"
+			if {$ph != ""} {
+				while {[gets $ph line] > -1} {
+#mesg "line: $line"; after 10
+					if [regexp {END CERT} $line] {
+						set got 1
+						break
+					}
+				}
+				close $ph
+			}
+#mesg "clse: $tou"
+			if {$got} {
+				break
+#mesg "GOT"; after 200
+			}
+		}
+		global is_win9x
+		foreach pid $pids {
+#mesg "kill -- $pid"
+			if {$pid == ""} {
+				;
+			} elseif {$is_win9x} {
+				catch {exec w98/kill.exe /f $pid}
+			} else {
+				catch {exec tskill.exe $pid}
+			}
+		}
+		after 500
+		set ph ""
+		catch {set ph [open $tou "r"]}
+	}
+	set text ""
+	if {$ph != ""} {
+		while {[gets $ph line] > -1} {
+			append text "$line\n"
+		}
+		close $ph
+	}
+	catch {file delete $tin $tou}
+	return $text
+}
+
 proc launch_unix {hp} {
 	global smb_redir_0 smb_mounts env
 	global vncauth_passwd
@@ -2131,8 +2415,36 @@ proc launch_unix {hp} {
 
 	set cmd "$cmd $hp"
 
+	set do_vncspacewrapper 0
 	if {$change_vncviewer && $change_vncviewer_path != ""} {
-		set env(VNCVIEWERCMD) $change_vncviewer_path
+		set path [string trim $change_vncviewer_path]
+		if [regexp {^["'].} $path]  {	# "
+			set tmp "/tmp/vncspacewrapper."
+			set do_vncspacewrapper 1
+			append tmp [clock clicks -milliseconds]
+			catch {file delete $tmp}
+			if {[file exists $tmp]} {
+				catch {destroy .c}
+				mesg "file still exists: $tmp"
+				bell
+				return
+			}
+			catch {set fh [open $tmp "w"]}
+			catch {exec chmod 700 $tmp}
+			if {! [file exists $tmp]} {
+				catch {destroy .c}
+				mesg "cannot create: $tmp"
+				bell
+				return
+			}
+			puts $fh "#!/bin/sh"
+			puts $fh "echo $tmp; set -xv"
+			puts $fh "$path \"\$@\""
+			puts $fh "sleep 1; rm -f $tmp"
+			close $fh
+			set path $tmp
+		}
+		set env(VNCVIEWERCMD) $path
 	} else {
 		if [info exists env(VNCVIEWERCMD_OVERRIDE)] {
 			set env(VNCVIEWERCMD) $env(VNCVIEWERCMD_OVERRIDE)
@@ -2145,7 +2457,19 @@ proc launch_unix {hp} {
 	set realvnc3 0
 	set flavor ""
 	if {! $darwin_cotvnc} {
-		catch {set flavor [exec ss_vncviewer -viewerflavor 2>/dev/null]}
+		set done 0
+		if {$do_vncspacewrapper} {
+			if [regexp -nocase {ultra} $change_vncviewer_path] {
+				set done 1
+				set flavor "ultravnc"
+			} elseif [regexp -nocase {chicken.of} $change_vncviewer_path] {
+				set done 1
+				set flavor "cotvnc"
+			}
+		}
+		if {! $done} {
+			catch {set flavor [exec ss_vncviewer -viewerflavor 2>/dev/null]}
+		}
 	}
 	if [regexp {realvnc4} $flavor] {
 		set realvnc4 1
@@ -2174,6 +2498,8 @@ proc launch_unix {hp} {
 	if {$use_viewonly} {
 		if {$darwin_cotvnc} {
 			set cmd "$cmd --ViewOnly"
+		} elseif {$flavor == "ultravnc"} {
+			set cmd "$cmd /viewonly"
 		} else {
 			set cmd "$cmd -viewonly"
 		}
@@ -2181,6 +2507,8 @@ proc launch_unix {hp} {
 	if {$use_fullscreen} {
 		if {$darwin_cotvnc} {
 			set cmd "$cmd --FullScreen"
+		} elseif {$flavor == "ultravnc"} {
+			set cmd "$cmd /fullscreen"
 		} else {
 			set cmd "$cmd -fullscreen"
 		}
@@ -2188,12 +2516,16 @@ proc launch_unix {hp} {
 	if {$use_bgr233} {
 		if {$realvnc4} {
 			set cmd "$cmd -lowcolourlevel 1"
+		} elseif {$flavor == "ultravnc"} {
+			set cmd "$cmd /8bit"
 		} else {
 			set cmd "$cmd -bgr233"
 		}
 	}
 	if {$use_nojpeg} {
 		if {$darwin_cotvnc} {
+			;
+		} elseif {$flavor == "ultravnc"} {
 			;
 		} elseif {! $realvnc4 && ! $realvnc3} {
 			set cmd "$cmd -nojpeg"
@@ -2202,12 +2534,16 @@ proc launch_unix {hp} {
 	if {! $use_raise_on_beep} {
 		if {$darwin_cotvnc} {
 			;
+		} elseif {$flavor == "ultravnc"} {
+			;
 		} elseif {! $realvnc4 && ! $realvnc3} {
 			set cmd "$cmd -noraiseonbeep"
 		}
 	}
 	if {$use_compresslevel != "" && $use_compresslevel != "default"} {
 		if {$realvnc3} {
+			;
+		} elseif {$flavor == "ultravnc"} {
 			;
 		} elseif {$realvnc4} {
 			set cmd "$cmd -zliblevel '$use_compresslevel'"
@@ -2218,6 +2554,8 @@ proc launch_unix {hp} {
 	if {$use_quality != "" && $use_quality != "default"} {
 		if {$darwin_cotvnc} {
 			;
+		} elseif {$flavor == "ultravnc"} {
+			;
 		} elseif {! $realvnc4 && ! $realvnc3} {
 			set cmd "$cmd -quality '$use_quality'"
 		}
@@ -2226,6 +2564,8 @@ proc launch_unix {hp} {
 		# realvnc4 -preferredencoding zrle
 		if {$darwin_cotvnc} {
 			;
+		} elseif {$flavor == "ultravnc"} {
+			;
 		} elseif {$realvnc4} {
 			set cmd "$cmd -preferredencoding zrle"
 		} else {
@@ -2233,11 +2573,27 @@ proc launch_unix {hp} {
 		}
 	}
 
+	global ycrop_string
+	catch {unset env(VNCVIEWER_SBWIDTH)}
+	catch {unset env(VNCVIEWER_YCROP)}
+	if {[info exists ycrop_string] && $ycrop_string != ""}  {
+		set t $ycrop_string
+		if [regexp {,sb=([0-9][0-9]*)} $t m mv1]  {
+			set env(VNCVIEWER_SBWIDTH) $mv1
+		}
+		regsub {,sb=([0-9][0-9]*)} $t "" t
+		if {$t != ""} {
+			set env(VNCVIEWER_YCROP) $t
+		}
+		#catch {puts "VNCVIEWER_SBWIDTH $env(VNCVIEWER_SBWIDTH)"}
+		#catch {puts "VNCVIEWER_YCROP   $env(VNCVIEWER_YCROP)"}
+	}
+
 	catch {destroy .o}
 	catch {destroy .oa}
 	update
 
-	if {$sound_daemon_local_start && $sound_daemon_local_cmd != ""} {
+	if {$use_sound && $sound_daemon_local_start && $sound_daemon_local_cmd != ""} {
 		mesg "running: $sound_daemon_local_cmd"
 		exec sh -c "$sound_daemon_local_cmd" >& /dev/null </dev/null &
 		update
@@ -2267,18 +2623,18 @@ proc launch_unix {hp} {
 		set xrm2 "XTerm*VT100*translations:#override Shift<Btn3Down>:print()\\nCtrl<Key>N:print()"
 		set xrm3 "*mainMenu*print*Label:  New SSVNC_GUI"
 	}
-	set m "Done. You Can X-out or Ctrl-C this Terminal if you like."
+	set m "Done. You Can X-out or Ctrl-C this Terminal if you like.  Ctrl-\\\\ to pause."
 	global uname
 	if {$uname == "Darwin"} {
 		regsub {X-out or } $m "" m
 	}
 	unix_terminal_cmd $geometry "SSL/SSH VNC Viewer $hp" \
-	"set -xv; $cmd; set +xv; echo; echo $m; echo; echo sleep 15; echo; sleep 15" 0 $xrm1 $xrm2 $xrm3
+	"set -xv; $cmd; set +xv; ulimit -c 0; trap 'printf \"Paused. Press Enter to exit:\"; read x' QUIT; echo; echo $m; echo; echo sleep 5; echo; sleep 6" 0 $xrm1 $xrm2 $xrm3
 
 	set env(SS_VNCVIEWER_SSH_CMD) ""
 	set env(SS_VNCVIEWER_USE_C) ""
 
-	if {$sound_daemon_local_kill && $sound_daemon_local_cmd != ""} {
+	if {$use_sound && $sound_daemon_local_kill && $sound_daemon_local_cmd != ""} {
 		set daemon [string trim $sound_daemon_local_cmd]
 		regsub {^gw[ \t]*} $daemon "" daemon
 		regsub {[ \t].*$} $daemon "" daemon
@@ -2940,7 +3296,7 @@ proc get_x509_info {crt} {
 	set ossl [get_openssl]
 	set info ""
 	update
-	set ph [open "| $ossl x509 -text -in \"$crt\"" "r"]
+	set ph [open "| $ossl x509 -text -fingerprint -in \"$crt\"" "r"]
 	while {[gets $ph line] > -1} {
 		append info "$line\n"
 	}
@@ -3288,7 +3644,7 @@ proc create_cert {} {
 
     (it is also possible to handle many client certs at once in a directory,
     see the -sslverify documentation).  Then you would use "vnccert.pem"
-    as the MyCert entry in the Set SSL Certificates dialog.
+    as the MyCert entry in the SSL Certificates dialog.
 
     For case 2) you would copy "vnccert.pem" to the VNC Server side and 
     instruct the server to use it.  For x11vnc it would be for example:
@@ -3296,7 +3652,7 @@ proc create_cert {} {
         x11vnc -ssl /path/to/vnccert.pem
 
     Then you would use "vnccert.crt" as the as the ServerCert entry in the
-    "Set SSL Certificates" dialog.
+    "SSL Certificates" dialog.
 
 
     Creating the Certificate:
@@ -3317,7 +3673,7 @@ proc create_cert {} {
 
     After you have created the certificate files, you must copy and import
     either "vnccert.pem" or "vnccert.pem" to the remote VNC Server and
-    also select the other file in the "Set SSL Certificates" dialog.
+    also select the other file in the "SSL Certificates" dialog.
     See the description above.
 
     For more information see:
@@ -3453,7 +3809,7 @@ proc import_browse {} {
 	update
 }
 
-proc import_save_browse {} {
+proc import_save_browse {{par ".icrt"}} {
 	global import_save_file
 
 	set idir ""
@@ -3464,14 +3820,14 @@ proc import_save_browse {} {
 		set idir [get_idir_certs ""]
 	}
 	if {$idir != ""} {
-		set t [tk_getSaveFile -parent .icrt -defaultextension ".crt" -initialdir $idir]
+		set t [tk_getSaveFile -parent $par -defaultextension ".crt" -initialdir $idir]
 	} else {
-		set t [tk_getSaveFile -parent .icrt -defaultextension ".crt"]
+		set t [tk_getSaveFile -parent $par -defaultextension ".crt"]
 	}
 	if {$t != ""} {
 		set import_save_file $t
 	}
-	catch {raise .icrt}
+	catch {raise $par}
 	update
 }
 
@@ -3485,7 +3841,10 @@ proc do_save {} {
 	}
 
 	set str ""
-	if {$import_mode == "paste"} {
+	if {$import_mode == "save_cert_text"} {
+		global save_cert_text
+		set str $save_cert_text
+	} elseif {$import_mode == "paste"} {
 		set str [.icrt.paste.t get 1.0 end]
 	} else {
 		if {! [file exists $import_file]} {
@@ -3536,8 +3895,17 @@ proc do_save {} {
 	puts -nonewline $fh $str
 	close $fh
 	catch {destroy .icrt}
+	set p .c
+	if {![winfo exists .c]} {
+		getcerts
+		update	
+	}
+	if {![winfo exists .c]} {
+		set p .
+	}
 	catch {raise .c}
-	tk_messageBox -parent .c -type ok -icon info \
+	catch {destroy .scrt}
+	tk_messageBox -parent $p -type ok -icon info \
 		-message "Saved to file: $import_save_file" -title "Save File: $import_save_file"
 }
 
@@ -3664,12 +4032,104 @@ TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 	center_win .icrt
 }
 
+proc save_cert {hp} {
+
+	toplev .scrt
+	wm title .scrt "Import SSL Certificate"
+
+	global scroll_text_focus
+	set scroll_text_focus 0
+	global uname
+	scroll_text .scrt.f 90 14
+	set scroll_text_focus 1
+
+	set msg {
+    This dialog lets you import a SSL Certificate retrieved from a VNC server.
+
+    Set the "Save to File" name to the file where the imported certificate
+    will be saved.
+
+    Then, click on "Save" to save the imported Certificate.
+
+    After you have imported the Certificate it will be automatically selected 
+    as the "ServerCert" for this host: %HOST
+
+    To make the ServerCert setting to the imported cert file permanent, 
+    select Options -> Save Profile to save it in a profile.
+}
+
+	regsub {%HOST} $msg "$hp" msg
+	.scrt.f.t insert end $msg
+
+	set w .scrt.mf
+	frame $w
+
+	global import_file
+	set import_file ""
+	entry $w.e -width 40 -textvariable import_file
+
+	scroll_text .scrt.paste 90 26
+
+	button .scrt.cancel -text "Cancel" -command {destroy .scrt; catch {raise .c}}
+	bind .scrt <Escape> {destroy .scrt; catch {raise .c}}
+
+	global import_save_file
+	button .scrt.save -text "Save" -command {do_save; set svcert $import_save_file}
+
+	set w .scrt.sf
+	frame $w
+
+	label $w.l -text "Save to File:" -anchor w
+	set import_save_file "server:$hp.crt"
+	global is_windows
+	if {$is_windows} {
+		regsub -all {:} $import_save_file "_" import_save_file
+	}
+	set import_save_file [get_idir_certs ""]/$import_save_file
+	entry $w.e -width 40 -textvariable import_save_file
+	button $w.b -pady 1 -anchor w -text "Browse..." -command {import_save_browse .scrt}
+
+	pack $w.b -side right
+	pack $w.l -side left
+	pack $w.e -side left -expand 1 -fill x
+
+	pack .scrt.cancel .scrt.save .scrt.sf .scrt.mf -side bottom -fill x
+	pack .scrt.paste -side bottom -fill x
+
+	pack .scrt.f -side top -fill both -expand 1
+
+	global cert_text
+	set text "" 
+	set on 0
+	foreach line [split $cert_text "\n"] {
+		if [regexp -- {-----BEGIN CERTIFICATE-----} $line] {
+			set on 1
+		}
+		if {! $on} {
+			continue;
+		}
+		append text "$line\n"
+		if [regexp -- {-----END CERTIFICATE-----} $line] {
+			set on 0
+		}
+	}
+	global save_cert_text
+	set save_cert_text $text
+	.scrt.paste.t insert end "$text"
+	global import_mode
+	set import_mode "save_cert_text"
+
+	focus .scrt.paste.t
+
+	center_win .scrt
+}
+
 
 proc getcerts {} {
 	global mycert svcert crtdir
 	global use_ssh use_sshssl
 	toplev .c
-	wm title .c "Set SSL Certificates"
+	wm title .c "SSL Certificates"
 	frame .c.mycert
 	frame .c.svcert
 	frame .c.crtdir
@@ -3690,6 +4150,8 @@ proc getcerts {} {
 	button .c.mycert.i -text "Info" -command {show_mycert}
 	button .c.svcert.i -text "Info" -command {show_svcert}
 	button .c.crtdir.i -text "Info" -command {}
+	bind .c.mycert.b <Enter> "v_mycert"
+	bind .c.svcert.b <Enter> "v_svcert"
 	.c.mycert.i configure -state disabled
 	.c.svcert.i configure -state disabled
 	.c.crtdir.i configure -state disabled
@@ -3716,6 +4178,13 @@ proc getcerts {} {
 			.c.$w.e configure -state disabled	
 			.c.$w.b configure -state disabled	
 		}	
+	}
+
+	if {$mycert != ""} {
+		v_mycert
+	}
+	if {$svcert != ""} {
+		v_svcert
 	}
 
 	pack .c.mycert .c.svcert .c.crtdir .c.create .c.import .c.b -side top -fill x
@@ -5776,6 +6245,15 @@ proc help_advanced_opts {} {
          The port can also be closed when the encrypted VNC connection
          finishes.
 
+	 Y Crop: this is for x11vnc's -ncache client side caching scheme
+	 with our Unix TightVNC viewer.  Sets the Y value to "crop" the
+	 viewer size at (below the cut is the pixel cache region you do
+	 not want to see).  If the screen is tall (H > 2*W) ycropping
+	 will be autodetected, or you can set to -1 to force autodection.
+	 Otherwise, set it to the desired Y value.  You can also set
+	 the scrollbar width (very thin by default) by appending ",sb=N"
+	 (or use ",sb=N" by itself to just set the scrollbar width).
+
          Include:  Profile template(s) to load before loading a profile
          (see Load Profile under "Options").  For example if you Save a
          profile called "globals" that has some settings you use often,
@@ -5812,7 +6290,7 @@ proc change_vncviewer_dialog {} {
 	wm title .chviewer "Change VNC Viewer"
 
 	global help_font
-	eval text .chviewer.t -width 90 -height 16 $help_font
+	eval text .chviewer.t -width 90 -height 24 $help_font
 	apply_bg .chviewer.t
 
 	set msg {
@@ -5826,10 +6304,17 @@ proc change_vncviewer_dialog {} {
     avoid setting any others in this GUI under "Options").
 
     If the path to the program name has any spaces it in, please surround it with
-    double quotes, e.g. "C:\Program Files\My Vnc Viewer\VNCVIEWER.EXE"
+    double quotes, e.g.
+
+        "C:\Program Files\My Vnc Viewer\VNCVIEWER.EXE"
+
+    Make sure the very first character is a quote.  You should quote the command
+    even if it is only the command line arguments that need extra protection:
+
+        "wine" -- "/home/fred/Program Flies/UltraVNC-1.0.2.exe" /64colors
 
     Since the command line options differ between them greatly, if you know it
-    is of the RealVNC 4.x flavor, indicate so on the check box.
+    is of the RealVNC 4.x flavor, indicate on the check box. Otherwise we guess.
 }
 	.chviewer.t insert end $msg
 
@@ -6558,6 +7043,15 @@ proc set_advanced_options {} {
 		-command {if {$use_port_knocking} {port_knocking_dialog}}
 	incr i
 
+	global ycrop_string
+	frame .oa.b$i
+	label .oa.b$i.l -text "Y Crop: "
+	entry .oa.b$i.e -width 10 -textvariable ycrop_string
+	pack .oa.b$i.l -side left
+	pack .oa.b$i.e -side right -expand 1 -fill x
+
+	incr i
+
 	global include_list
 	frame .oa.b$i
 	label .oa.b$i.l -text "Include:"
@@ -6706,16 +7200,19 @@ proc ssl_ssh_adjust {which} {
 		set use_ssh 0
 		set use_sshssl 0
 		set sshssl_sw "ssl"
+		catch {.f4.getcert configure -state normal}
 	} elseif {$which == "ssh"} {
 		set use_ssl 0
 		set use_ssh 1
 		set use_sshssl 0
 		set sshssl_sw "ssh"
+		catch {.f4.getcert configure -state disabled}
 	} elseif {$which == "sshssl"} {
 		set use_ssl 0
 		set use_ssh 0
 		set use_sshssl 1
 		set sshssl_sw "sshssl"
+		catch {.f4.getcert configure -state disabled}
 	}
 
 	if [info exists remote_ssh_cmd_list] {
@@ -6955,6 +7452,7 @@ label .f1.l -width $wl -anchor w -text "VNC Password:" -relief ridge
 entry .f1.e -width $we -textvariable vncauth_passwd -show *
 pack .f1.l -side left 
 pack .f1.e -side left -expand 1 -fill x
+bind .f1.e <Return> launch
 
 frame .f2
 label .f2.l -width $wl -anchor w -text "Proxy/Gateway:" -relief ridge
@@ -6976,7 +7474,9 @@ frame .f4
 radiobutton .f4.ssl -anchor w    -variable sshssl_sw -value ssl    -command {ssl_ssh_adjust ssl}    -text "Use SSL"
 radiobutton .f4.ssh -anchor w    -variable sshssl_sw -value ssh    -command {ssl_ssh_adjust ssh}    -text "Use SSH"
 radiobutton .f4.sshssl -anchor w -variable sshssl_sw -value sshssl -command {ssl_ssh_adjust sshssl} -text "Use SSH and SSL"
+button .f4.getcert -command {fetch_cert} -text "Fetch Cert"
 pack .f4.ssl .f4.ssh .f4.sshssl -side left -fill x
+pack .f4.getcert -side right -fill x
 
 ssl_ssh_adjust ssl
 

@@ -25,10 +25,10 @@ if [ "X$FULLNAME" = "XKarl J. Runge" ]; then
 	VNCVIEWER_POPUP_FIX=1
 	export VNCVIEWER_POPUP_FIX
 
-	if uname -smr | grep 'Linux 2\.4.*i686' > /dev/null; then
-		UNAME="Linux.i686.older"
-		export UNAME
-	fi
+	#if uname -smr | grep 'Linux 2\.4.*i686' > /dev/null; then
+	#	UNAME="Linux.i686.older"
+	#	export UNAME
+	#fi
 	PATH=`echo "$PATH" | sed -e 's,runge/bin/override,-------------,'`
 fi
 
@@ -108,8 +108,9 @@ if [ ! -d "$dir/$name" -a $nearby = 0 ]; then
 	fi
 	echo "Using externel \"vncviewer\" and \"stunnel\" found in PATH."
 else
+	STUNNEL=stunnel
 	STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
-	export STUNNEL_EXTRA_OPTS
+	export STUNNEL STUNNEL_EXTRA_OPTS
 	SSVNC_VIEWER_INTERNAL=1
 	export SSVNC_VIEWER_INTERNAL
 fi

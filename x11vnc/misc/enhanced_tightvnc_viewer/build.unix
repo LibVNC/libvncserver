@@ -166,6 +166,10 @@ do
 	if [ ! -f "$patch" ]; then
 		continue
 	fi
+	if [ "X$PATCH_FAIL" != "X" ]; then
+		failed=1	
+		break
+	fi
 	echo PATCHING WITH: "$patch" 
 	ls -l "$patch"
 	sleep 1
@@ -253,6 +257,10 @@ for patch in ../../patches/stunnel*
 do
 	if [ ! -f "$patch" ]; then
 		continue
+	fi
+	if [ "X$PATCH_FAIL" != "X" ]; then
+		failed=1	
+		break
 	fi
 	echo PATCHING WITH: "$patch" 
 	ls -l "$patch"

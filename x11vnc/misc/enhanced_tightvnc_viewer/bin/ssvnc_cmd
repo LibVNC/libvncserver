@@ -169,14 +169,15 @@ if [ ! -d "$dir/$name" -a $nearby = 0 ]; then
 	echo "Using externel \"vncviewer\" and \"stunnel\" found in PATH."
 
 else
+	STUNNEL=stunnel
 	STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
-	export STUNNEL_EXTRA_OPTS
+	export STUNNEL STUNNEL_EXTRA_OPTS
 	SSVNC_VIEWER_INTERNAL=1
 	export SSVNC_VIEWER_INTERNAL
 fi
 
 if [ "X$DARWIN_COTVNC" = "X" -a "X$VNCVIEWERCMD" = "Xvncviewer" ]; then
-	hstr=`"$VNCVIEWERCMD" -h 2>&1 | head -5`
+	hstr=`$VNCVIEWERCMD -h 2>&1 | head -5`
 	if echo "$hstr" | grep '^TightVNC.*version 1\.[23]' > /dev/null; then
 		# we need to avoid raw encoding
 		use_ours=1
@@ -206,13 +207,13 @@ fi
 #
 if [ $use_ours = 1 ]; then
 	if [ "X$base" = "Xtightvncviewer" ]; then
-		"$VNCVIEWERCMD" -encodings 'copyrect tight zrle zlib hextile' "$@"
+		$VNCVIEWERCMD -encodings 'copyrect tight zrle zlib hextile' "$@"
 	else
 		ss_vncviewer "$@" -encodings 'copyrect tight zrle zlib hextile'
 	fi
 else
 	if [ "X$base" = "Xtightvncviewer" ]; then
-		"$VNCVIEWERCMD" "$@"
+		$VNCVIEWERCMD "$@"
 	else
 		ss_vncviewer "$@"
 	fi
