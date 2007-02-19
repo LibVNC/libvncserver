@@ -1374,25 +1374,41 @@ void set_server_input(rfbClientPtr cl, int grab) {
 }
 void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 	char buf[100];
+	int dochat = 1;
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl2;
 
-	if (no_ultra_ext) {
+	if (no_ultra_ext || ! dochat) {
 		return;
 	}
+#if 0
+	rfbLog("set_text_chat: len=%d\n", len);
 	rfbLog("set_text_chat: len=0x%x txt='", len);
 	if (0 < len && len < 10000) write(2, txt, len);
 	fprintf(stderr, "'\n");
+#endif
 	if (unixpw_in_progress) {
 		rfbLog("set_text_chat: unixpw_in_progress, skipping.\n");
 		return;
 	}
-	if (0 && len == rfbTextChatOpen) {
-		if (rfbSendTextChatMessage(cl, rfbTextChatOpen, "")) {
-			rfbLog("rfbSendTextChatMessage: true\n");
-		} else {
-			rfbLog("rfbSendTextChatMessage: false\n");
+	iter = rfbGetClientIterator(screen);
+	while( (cl2 = rfbClientIteratorNext(iter)) ) {
+		if (cl2 == cl) {
+			continue;
+		}
+		if (len == rfbTextChatOpen) {
+			rfbSendTextChatMessage(cl2, rfbTextChatOpen, "");
+		} else if (len == rfbTextChatClose) {
+			rfbSendTextChatMessage(cl2, rfbTextChatClose, "");
+		} else if (len == rfbTextChatFinished) {
+			rfbSendTextChatMessage(cl2, rfbTextChatFinished, "");
+		} else if (len <= rfbTextMaxSize) {
+			rfbSendTextChatMessage(cl2, len, txt);
 		}
 	}
+	rfbReleaseClientIterator(iter);
 }
+
 int get_keyboard_led_state_hook(rfbScreenInfoPtr s) {
 	if (unixpw_in_progress) {
 		rfbLog("get_keyboard_led_state_hook: unixpw_in_progress, skipping.\n");

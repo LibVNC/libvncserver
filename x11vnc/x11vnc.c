@@ -3814,6 +3814,7 @@ int main(int argc, char* argv[]) {
 
 #if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SETSID
 	if (bg) {
+		int p, n;
 		if (getenv("X11VNC_LOOP_MODE_BG")) {
 			if (screen && screen->listenSock >= 0) {
 				close(screen->listenSock);
@@ -3835,7 +3836,6 @@ int main(int argc, char* argv[]) {
 			}
 		}
 		/* fork into the background now */
-		int p, n;
 		if ((p = fork()) > 0)  {
 			exit(0);
 		} else if (p == -1) {
