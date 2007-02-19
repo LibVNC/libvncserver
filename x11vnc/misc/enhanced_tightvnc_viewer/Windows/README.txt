@@ -1,7 +1,7 @@
 
 This is a Windows utility to automatically start up STUNNEL to redirect
 SSL VNC connections to a remote host.  Then TightVNC Viewer (included)
-is launched to used this SSL tunnel.
+is launched to use this SSL tunnel.
 
 An example server would be "x11vnc -ssl", or any VNC server with a
 2nd STUNNEL program running on the server side.

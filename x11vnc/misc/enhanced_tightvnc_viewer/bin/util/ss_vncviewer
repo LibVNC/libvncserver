@@ -220,6 +220,8 @@ if echo "$orig" | grep '^vnc://' > /dev/null; then
 	use_ssh=""
 	use_sshssl=""
 	direct_connect=1
+elif echo "$orig" | grep '^vncs://' > /dev/null; then
+	orig=`echo "$orig" | sed -e 's,vncs://,,'`
 fi
 
 # play around with host:display port:

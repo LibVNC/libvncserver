@@ -1,3 +1,5 @@
 #!/bin/sh
 
 cp -p /dist/src/apps/VNC/tight_vnc_1.3dev5/tight-vncviewer*patch .
+cp -p /dist/src/apps/VNC/tight_vnc_1.3dev5/vnc_unixsrc_vncviewer.patched.tar ../zips/
+

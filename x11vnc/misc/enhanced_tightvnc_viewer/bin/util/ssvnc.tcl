@@ -496,6 +496,62 @@ set msg {
 	jiggle_text .oh.f.t
 }
 
+proc help_fetch_cert {} {
+	toplev .fh
+
+	scroll_text_dismiss .fh.f 85 37
+
+	center_win .fh
+	wm resizable .fh 1 0
+
+	wm title .fh "Fetch Certificates Help"
+
+	set msg {
+  The above SSL Certificate has been retrieved from the VNC Server via the
+  "Fetch Cert" action.
+  
+  It has merely been downloaded via the SSL Protocol: IT HAS NOT BEEN VERIFIED
+  IN ANY WAY.
+  
+  So, in principle, it could be a fake certificate being inserted by a bad
+  person attempting to perform a Man-In-The-Middle attack on your SSL connection.
+  
+  If, however, by some external means you can verify the authenticity of
+  this SSL Certificate you can use it for your VNC SSL connection to the
+  VNC server you wish to connect to.  It will provide an authenticated and
+  encrypted connection.
+  
+  You can verify the SSL Certificate by comparing the MD5 or SHA1 hash
+  value via a method/channel you know is safe (i.e. not also under control
+  of a Man-In-The-Middle attacker).  You could also check the text between
+  the -----BEGIN CERTIFICATE----- and -----END CERTIFICATE----- tags, etc.
+  
+  Once you are sure it is correct, you can press the Save button to save the
+  certificate to a file on the local machine for use when you connect via
+  VNC tunneled through SSL.  If you save it, then that file will be set as
+  the Certificate to verify the VNC server against.  You can see this in
+  the dialog started via the "Certs..." button on the main panel.
+  
+  NOTE: If you want to make PERMANENT the association of the saved SSL
+  certificate file with the VNC server host, you MUST save the setting as
+  a profile for loading later. To Save a Profile, click on Options -> Save
+  Profile ..., and choose a name for the profile and then click on Save.
+  
+  To reload the profile at a later time, click on the "Load" button on
+  the main panel and then select the name and click "Open".  If you want
+  to be sure the certificate is still associated with the loaded in host,
+  click on "Certs..." button and make sure the "ServerCert" points to the
+  desired SSL filename.
+
+  See the Certs... Help for more information.  A sophisticated method
+  can be set up using a Certificate Authority key to verify never before
+  seen certificates (i.e. like your web browser does).
+}
+
+	.fh.f.t insert end $msg
+	jiggle_text .fh.f.t
+}
+
 proc win_nokill_msg {} {
 	global help_font is_windows system_button_face
 	toplev .w
@@ -2006,7 +2062,7 @@ proc fetch_cert {} {
 	.f4.getcert configure -state normal
 	mesg "Fetched $hpnew Cert"
 
-	set n 50
+	set n 47
 	set ok 1
 	if {$cert_text == ""} {
 		set cert_text "An Error occurred in fetching SSL Certificate from $hp"
@@ -2059,7 +2115,8 @@ proc fetch_cert {} {
 
 	if {$ok} {
 		button .fetch.save -text Save -command "destroy .fetch; save_cert $hpnew"
-		pack .fetch.save -side bottom -fill x
+		button .fetch.help -text Help -command "help_fetch_cert"
+		pack .fetch.help .fetch.save -side bottom -fill x
 	}
 
 	center_win .fetch
@@ -4040,11 +4097,14 @@ proc save_cert {hp} {
 	global scroll_text_focus
 	set scroll_text_focus 0
 	global uname
-	scroll_text .scrt.f 90 14
+	scroll_text .scrt.f 90 17
 	set scroll_text_focus 1
 
 	set msg {
     This dialog lets you import a SSL Certificate retrieved from a VNC server.
+
+    Be sure to have verified its authenticity via an external means (checking
+    the MD5 hash value, etc)
 
     Set the "Save to File" name to the file where the imported certificate
     will be saved.
@@ -4054,7 +4114,7 @@ proc save_cert {hp} {
     After you have imported the Certificate it will be automatically selected 
     as the "ServerCert" for this host: %HOST
 
-    To make the ServerCert setting to the imported cert file permanent, 
+    To make the ServerCert setting to the imported cert file PERMANENT, 
     select Options -> Save Profile to save it in a profile.
 }
 
