@@ -1114,6 +1114,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/corre.c vnc_unixsrc/vncviewer
  }
 +
 +#undef FillRectangle
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cp_it vnc_unixsrc/vncviewer/cp_it
+--- vnc_unixsrc.orig/vncviewer/cp_it	1969-12-31 19:00:00.000000000 -0500
++++ vnc_unixsrc/vncviewer/cp_it	2007-03-01 22:46:20.000000000 -0500
+@@ -0,0 +1,8 @@
++#!/bin/sh
++
++dest=/dist/bin/vncviewerz-1.3dev5-resize
++suc "cp -p $dest $dest.back; mv $dest $dest.unlink; mv $dest.back $dest; rm $dest.unlink"
++cat ./vncviewer > $dest
++touch -r ./vncviewer $dest 
++cp -p ./vncviewer /dist/src/apps/VNC/etc/libvncserver_cvs/expts/etv/ssvnc/bin/Linux.i686/vncviewer
++ls -l ./vncviewer $dest /dist/src/apps/VNC/etc/libvncserver_cvs/expts/etv/ssvnc/bin/Linux.i686/vncviewer
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewer/cursor.c
 --- vnc_unixsrc.orig/vncviewer/cursor.c	2003-01-15 04:46:52.000000000 -0500
 +++ vnc_unixsrc/vncviewer/cursor.c	2007-02-08 18:46:24.000000000 -0500
@@ -1445,7 +1457,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 -
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncviewer/desktop.c
 --- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
-+++ vnc_unixsrc/vncviewer/desktop.c	2007-02-19 15:27:49.000000000 -0500
++++ vnc_unixsrc/vncviewer/desktop.c	2007-03-01 21:05:47.000000000 -0500
 @@ -28,21 +28,28 @@
  #include <X11/extensions/XShm.h>
  #endif
@@ -1972,9 +1984,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  void
  SendRFBEvent(Widget w, XEvent *ev, String *params, Cardinal *num_params)
  {
-@@ -215,6 +490,13 @@
- 
-   if (appData.viewOnly) return;
+@@ -213,6 +488,13 @@
+       return;
+   }
  
 +	if (selectingSingleWindow && ev->type == ButtonPress) {
 +		selectingSingleWindow = False;
@@ -1983,9 +1995,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		return;
 +	}
 +
+   if (appData.viewOnly) return;
+ 
    if (*num_params != 0) {
-     if (strncasecmp(params[0],"key",3) == 0) {
-       if (*num_params != 2) {
 @@ -332,23 +614,112 @@
  static Cursor
  CreateDotCursor()
@@ -2775,7 +2787,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
 --- vnc_unixsrc.orig/vncviewer/rfbproto.c	2004-03-11 13:14:39.000000000 -0500
-+++ vnc_unixsrc/vncviewer/rfbproto.c	2007-02-18 18:46:53.000000000 -0500
++++ vnc_unixsrc/vncviewer/rfbproto.c	2007-03-01 21:08:08.000000000 -0500
 @@ -57,6 +57,25 @@
  static Bool HandleTight16(int rx, int ry, int rw, int rh);
  static Bool HandleTight32(int rx, int ry, int rw, int rh);
@@ -3199,8 +3211,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			return rfbSecTypeTight;
 +		}
 +	}
- 
--  free(secTypes);
++
 +	/* Find first supported security type */
 +	for (j = 0; j < (int)nSecTypes; j++) {
 +		for (i = 0; i < nKnownSecTypes; i++) {
@@ -3217,7 +3228,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			break;
 +		}
 +	}
-+
+ 
+-  free(secTypes);
 +	free(secTypes);
  
 -  if (secType == rfbSecTypeInvalid)
@@ -3837,6 +3849,15 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  {
 -  rfbPointerEventMsg pe;
 +	rfbPointerEventMsg pe;
++
++	pe.type = rfbPointerEvent;
++	pe.buttonMask = buttonMask;
++	if (x < 0) x = 0;
++	if (y < 0) y = 0;
++
++	if (!appData.useX11Cursor) {
++		SoftCursorMove(x, y);
++	}
  
 -  pe.type = rfbPointerEvent;
 -  pe.buttonMask = buttonMask;
@@ -3849,15 +3870,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -  pe.x = Swap16IfLE(x);
 -  pe.y = Swap16IfLE(y);
 -  return WriteExact(rfbsock, (char *)&pe, sz_rfbPointerEventMsg);
-+	pe.type = rfbPointerEvent;
-+	pe.buttonMask = buttonMask;
-+	if (x < 0) x = 0;
-+	if (y < 0) y = 0;
-+
-+	if (!appData.useX11Cursor) {
-+		SoftCursorMove(x, y);
-+	}
-+
 +	pe.x = Swap16IfLE(x);
 +	pe.y = Swap16IfLE(y);
 +	return WriteExact(rfbsock, (char *)&pe, sz_rfbPointerEventMsg);
@@ -3882,17 +3894,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -942,281 +1045,551 @@
+@@ -942,281 +1045,555 @@
  Bool
  SendClientCutText(char *str, int len)
  {
 -  rfbClientCutTextMsg cct;
 +	rfbClientCutTextMsg cct;
-+
-+	if (serverCutText) {
-+		free(serverCutText);
-+	}
-+	serverCutText = NULL;
  
 -  if (serverCutText)
 -    free(serverCutText);
@@ -3902,53 +3909,79 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -  cct.length = Swap32IfLE(len);
 -  return  (WriteExact(rfbsock, (char *)&cct, sz_rfbClientCutTextMsg) &&
 -	   WriteExact(rfbsock, str, len));
-+	cct.type = rfbClientCutText;
-+	cct.length = Swap32IfLE(len);
-+	return  (WriteExact(rfbsock, (char *)&cct, sz_rfbClientCutTextMsg) &&
-+	    WriteExact(rfbsock, str, len));
- }
+-}
++	if (serverCutText) {
++		free(serverCutText);
++	}
++	serverCutText = NULL;
  
-+Bool
-+SendServerScale(int nfac)
-+{
-+	rfbSetScaleMsg ssc;
-+	if (nfac < 0 || nfac > 100) {
++	if (appData.viewOnly) {
 +		return True;
 +	}
  
 -/*
 - * HandleRFBServerMessage.
 - */
-+	ssc.type = rfbSetScale;
-+	ssc.scale = nfac;
-+	return WriteExact(rfbsock, (char *)&ssc, sz_rfbSetScaleMsg);
++	cct.type = rfbClientCutText;
++	cct.length = Swap32IfLE(len);
++	return  (WriteExact(rfbsock, (char *)&cct, sz_rfbClientCutTextMsg) &&
++	    WriteExact(rfbsock, str, len));
 +}
  
  Bool
 -HandleRFBServerMessage()
-+SendServerInput(Bool enabled)
++SendServerScale(int nfac)
  {
 -  rfbServerToClientMsg msg;
-+	rfbSetServerInputMsg sim;
- 
+-
 -  if (!ReadFromRFBServer((char *)&msg, 1))
 -    return False;
-+	sim.type = rfbSetServerInput;
-+	sim.status = enabled;
-+	return WriteExact(rfbsock, (char *)&sim, sz_rfbSetServerInputMsg);
-+}
++	rfbSetScaleMsg ssc;
++	if (nfac < 0 || nfac > 100) {
++		return True;
++	}
  
 -  switch (msg.type) {
-+Bool
-+SendSingleWindow(int x, int y)
-+{
-+	rfbSetSWMsg sw;
++	ssc.type = rfbSetScale;
++	ssc.scale = nfac;
++	return WriteExact(rfbsock, (char *)&ssc, sz_rfbSetScaleMsg);
++}
  
 -  case rfbSetColourMapEntries:
 -  {
 -    int i;
 -    CARD16 rgb[3];
 -    XColor xc;
++Bool
++SendServerInput(Bool enabled)
++{
++	rfbSetServerInputMsg sim;
+ 
+-    if (!ReadFromRFBServer(((char *)&msg) + 1,
+-			   sz_rfbSetColourMapEntriesMsg - 1))
+-      return False;
++	sim.type = rfbSetServerInput;
++	sim.status = enabled;
++	return WriteExact(rfbsock, (char *)&sim, sz_rfbSetServerInputMsg);
++}
+ 
+-    msg.scme.firstColour = Swap16IfLE(msg.scme.firstColour);
+-    msg.scme.nColours = Swap16IfLE(msg.scme.nColours);
++Bool
++SendSingleWindow(int x, int y)
++{
++	rfbSetSWMsg sw;
+ 
+-    for (i = 0; i < msg.scme.nColours; i++) {
+-      if (!ReadFromRFBServer((char *)rgb, 6))
+-	return False;
+-      xc.pixel = msg.scme.firstColour + i;
+-      xc.red = Swap16IfLE(rgb[0]);
+-      xc.green = Swap16IfLE(rgb[1]);
+-      xc.blue = Swap16IfLE(rgb[2]);
+-      xc.flags = DoRed|DoGreen|DoBlue;
+-      XStoreColor(dpy, cmap, &xc);
+-    }
 +	if (x == -1 && y == -1)  {
 +		sw.type = rfbSetSW;
 +		sw.x = Swap16IfLE(1);
@@ -3962,9 +3995,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	return WriteExact(rfbsock, (char *)&sw, sz_rfbSetSWMsg);
 +}
  
--    if (!ReadFromRFBServer(((char *)&msg) + 1,
--			   sz_rfbSetColourMapEntriesMsg - 1))
--      return False;
+-    break;
+-  }
 +Bool
 +SendTextChat(char *str)
 +{
@@ -3981,23 +4013,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	return WriteExact(rfbsock, str, strlen(str));
 +}
  
--    msg.scme.firstColour = Swap16IfLE(msg.scme.firstColour);
--    msg.scme.nColours = Swap16IfLE(msg.scme.nColours);
+-  case rfbFramebufferUpdate:
+-  {
+-    rfbFramebufferUpdateRectHeader rect;
+-    int linesToRead;
+-    int bytesPerLine;
+-    int i;
+-    int usecs;
 +extern void raiseme(void);
  
--    for (i = 0; i < msg.scme.nColours; i++) {
--      if (!ReadFromRFBServer((char *)rgb, 6))
--	return False;
--      xc.pixel = msg.scme.firstColour + i;
--      xc.red = Swap16IfLE(rgb[0]);
--      xc.green = Swap16IfLE(rgb[1]);
--      xc.blue = Swap16IfLE(rgb[2]);
--      xc.flags = DoRed|DoGreen|DoBlue;
--      XStoreColor(dpy, cmap, &xc);
--    }
--
--    break;
--  }
+-    if (!ReadFromRFBServer(((char *)&msg.fu) + 1,
+-			   sz_rfbFramebufferUpdateMsg - 1))
+-      return False;
 +Bool
 +SendTextChatOpen(void)
 +{
@@ -4010,13 +4037,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	return WriteExact(rfbsock, (char *)&chat, sz_rfbTextChatMsg);
 +}
  
--  case rfbFramebufferUpdate:
--  {
--    rfbFramebufferUpdateRectHeader rect;
--    int linesToRead;
--    int bytesPerLine;
--    int i;
--    int usecs;
+-    msg.fu.nRects = Swap16IfLE(msg.fu.nRects);
 +Bool
 +SendTextChatClose(void)
 +{
@@ -4028,9 +4049,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	return WriteExact(rfbsock, (char *)&chat, sz_rfbTextChatMsg);
 +}
  
--    if (!ReadFromRFBServer(((char *)&msg.fu) + 1,
--			   sz_rfbFramebufferUpdateMsg - 1))
--      return False;
+-    for (i = 0; i < msg.fu.nRects; i++) {
+-      if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader))
+-	return False;
 +Bool
 +SendTextChatFinished(void)
 +{
@@ -4065,24 +4086,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +        return(dt);
 +}
  
--    msg.fu.nRects = Swap16IfLE(msg.fu.nRects);
+-      rect.encoding = Swap32IfLE(rect.encoding);
+-      if (rect.encoding == rfbEncodingLastRect)
+-	break;
 +/* common dtime() activities: */
 +double dtime0(double *t_old) {
 +        *t_old = 0.0;
 +        return dtime(t_old);
 +}
- 
--    for (i = 0; i < msg.fu.nRects; i++) {
--      if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader))
--	return False;
-+double dnow(void) {
-+        double t;
-+        return dtime0(&t);
-+}
- 
--      rect.encoding = Swap32IfLE(rect.encoding);
--      if (rect.encoding == rfbEncodingLastRect)
--	break;
  
 -      rect.r.x = Swap16IfLE(rect.r.x);
 -      rect.r.y = Swap16IfLE(rect.r.y);
@@ -4097,14 +4108,31 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -	}
 -	continue;
 -      }
-+/*
-+ * HandleRFBServerMessage.
-+ */
++double dnow(void) {
++        double t;
++        return dtime0(&t);
++}
  
 -      if (rect.encoding == rfbEncodingPointerPos) {
 -	if (!HandleCursorPos(rect.r.x, rect.r.y)) {
 -	  return False;
 -	}
+-	continue;
+-      }
+ 
+-      if ((rect.r.x + rect.r.w > si.framebufferWidth) ||
+-	  (rect.r.y + rect.r.h > si.framebufferHeight))
+-	{
+-	  fprintf(stderr,"Rect too large: %dx%d at (%d, %d)\n",
+-		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
+-	  return False;
+-	}
++/*
++ * HandleRFBServerMessage.
++ */
+ 
+-      if (rect.r.h * rect.r.w == 0) {
+-	fprintf(stderr,"Zero size rect - ignoring\n");
 -	continue;
 -      }
 +Bool
@@ -4113,28 +4141,16 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	int db = 0;
 +	rfbServerToClientMsg msg;
  
--      if ((rect.r.x + rect.r.w > si.framebufferWidth) ||
--	  (rect.r.y + rect.r.h > si.framebufferHeight))
--	{
--	  fprintf(stderr,"Rect too large: %dx%d at (%d, %d)\n",
--		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
--	  return False;
-+	if (!ReadFromRFBServer((char *)&msg, 1)) {
-+		return False;
- 	}
- 
--      if (rect.r.h * rect.r.w == 0) {
--	fprintf(stderr,"Zero size rect - ignoring\n");
--	continue;
--      }
--
 -      /* If RichCursor encoding is used, we should prevent collisions
 -	 between framebuffer updates and cursor drawing operations. */
 -      SoftCursorLockArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h);
-+    switch (msg.type) {
++	if (!ReadFromRFBServer((char *)&msg, 1)) {
++		return False;
++	}
  
 -      switch (rect.encoding) {
--
++    switch (msg.type) {
+ 
 -      case rfbEncodingRaw:
 +    case rfbSetColourMapEntries:
 +    {
@@ -4668,7 +4684,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  #ifdef MITSHM
      /* if using shared memory PutImage, make sure that the X server has
-@@ -1224,59 +1597,138 @@
+@@ -1224,59 +1601,138 @@
         mainly to avoid copyrect using invalid screen contents - not sure
         if we'd need it otherwise. */
  
@@ -4728,32 +4744,34 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -			   sz_rfbServerCutTextMsg - 1))
 -      return False;
 +	msg.sct.length = Swap32IfLE(msg.sct.length);
-+
+ 
+-    msg.sct.length = Swap32IfLE(msg.sct.length);
 +	if (serverCutText) {
 +		free(serverCutText);
 +	}
  
--    msg.sct.length = Swap32IfLE(msg.sct.length);
-+	serverCutText = malloc(msg.sct.length+1);
- 
 -    if (serverCutText)
 -      free(serverCutText);
++	serverCutText = malloc(msg.sct.length+1);
+ 
+-    serverCutText = malloc(msg.sct.length+1);
 +	if (!ReadFromRFBServer(serverCutText, msg.sct.length)) {
 +		return False;
 +	}
  
--    serverCutText = malloc(msg.sct.length+1);
-+	serverCutText[msg.sct.length] = 0;
- 
 -    if (!ReadFromRFBServer(serverCutText, msg.sct.length))
 -      return False;
-+	newServerCutText = True;
++	serverCutText[msg.sct.length] = 0;
  
 -    serverCutText[msg.sct.length] = 0;
++	newServerCutText = True;
+ 
+-    newServerCutText = True;
 +	break;
 +    }
  
--    newServerCutText = True;
+-    break;
+-  }
 +    case rfbTextChat:
 +    {
 +	char *buffer = NULL;
@@ -4790,7 +4808,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	break;
 +    }
  
--    break;
+-  default:
+-    fprintf(stderr,"Unknown message type %d from VNC server\n",msg.type);
+-    return False;
 -  }
 +    case rfbRestartConnection:
 +    {
@@ -4823,14 +4843,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	DesktopCursorOff();
 +	SendFramebufferUpdateRequest(0, 0, si.framebufferWidth, si.framebufferHeight, False);
  
--  default:
--    fprintf(stderr,"Unknown message type %d from VNC server\n",msg.type);
--    return False;
--  }
+-  return True;
 +	break;
 +    }
- 
--  return True;
++
 +    default:
 +	fprintf(stderr,"Unknown message type %d from VNC server\n",msg.type);
 +	return False;
@@ -4840,7 +4856,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -1296,12 +1748,19 @@
+@@ -1296,12 +1752,19 @@
  #define CONCAT2(a,b) a##b
  #define CONCAT2E(a,b) CONCAT2(a,b)
  
@@ -4860,7 +4876,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  #define BPP 16
  #include "rre.c"
-@@ -1309,6 +1768,7 @@
+@@ -1309,6 +1772,7 @@
  #include "hextile.c"
  #include "zlib.c"
  #include "tight.c"
@@ -4868,7 +4884,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  #define BPP 32
  #include "rre.c"
-@@ -1316,6 +1776,15 @@
+@@ -1316,6 +1780,15 @@
  #include "hextile.c"
  #include "zlib.c"
  #include "tight.c"
@@ -4884,7 +4900,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  
  /*
-@@ -1463,3 +1932,115 @@
+@@ -1463,3 +1936,115 @@
    cinfo->src = &jpegSrcManager;
  }
  
@@ -5315,6 +5331,507 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/tight.c vnc_unixsrc/vncviewer
      return True;
    }
  
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vncviewer/vncviewer._man
+--- vnc_unixsrc.orig/vncviewer/vncviewer._man	1969-12-31 19:00:00.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer._man	2007-02-18 18:25:14.000000000 -0500
+@@ -0,0 +1,497 @@
++'\" t
++.\" ** The above line should force tbl to be a preprocessor **
++.\" Man page for X vncviewer
++.\"
++.\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
++.\" Copyright (C) 2000,2001 Red Hat, Inc.
++.\" Copyright (C) 2001-2003 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
++.\"
++.\" You may distribute under the terms of the GNU General Public
++.\" License as specified in the file LICENCE.TXT that comes with the
++.\" TightVNC distribution.
++.\"
++.TH vncviewer 1 "January 2003" "" "TightVNC"
++.SH NAME
++vncviewer \- an X viewer client for VNC
++.SH SYNOPSIS
++.B vncviewer
++.RI [\| options \|]
++.RI [\| host \|][\| :display \|]
++.br
++.B vncviewer
++.RI [\| options \|]
++.RI [\| host \|][\| ::port \|]
++.br
++.B vncviewer
++.RI [\| options \|]
++.IR \-listen
++.RI [\| display \|]
++.br
++.B vncviewer
++.IR \-help
++.br
++.SH DESCRIPTION
++.B vncviewer
++is an Xt\-based client application for the VNC (Virtual Network
++Computing) system. It can connect to any VNC\-compatible server such
++as \fBXvnc\fR or WinVNC, allowing you to control desktop environment
++of a different machine.
++
++You can use F8 to display a pop\-up utility menu. Press F8 twice to
++pass single F8 to the remote side.
++.SH OPTIONS
++.TP
++\fB\-help\fR
++Prints a short usage notice to stderr.
++.TP
++\fB\-listen\fR
++Make the viewer listen on port 5500+\fIdisplay\fR for reverse
++connections from a server. WinVNC supports reverse connections using
++the "Add New Client" menu option, or the \-connect command line
++option. \fBXvnc\fR requires the use of the helper program
++\fBvncconnect\fR.
++.TP
++\fB\-via\fR \fIgateway\fR
++Automatically create encrypted TCP tunnel to the \fIgateway\fR machine
++before connection, connect to the \fIhost\fR through that tunnel
++(TightVNC\-specific). By default, this option invokes SSH local port
++forwarding, assuming that SSH client binary can be accessed as
++/usr/bin/ssh. Note that when using the \fB\-via\fR option, the host
++machine name should be specified as known to the gateway machine, e.g. 
++"localhost" denotes the \fIgateway\fR, not the machine where vncviewer
++was launched. See the ENVIRONMENT section below for the information on
++configuring the \fB\-via\fR option.
++.TP
++\fB\-shared\fR
++When connecting, specify that a shared connection is requested. In
++TightVNC, this is the default mode, allowing you to share the desktop
++with other clients already using it.
++.TP
++\fB\-noshared\fR
++When connecting, specify that the session may not be shared. This
++would either disconnect other connected clients or refuse your
++connection, depending on the server configuration.
++.TP
++\fB\-viewonly\fR
++Disable transfer of mouse and keyboard events from the client to the
++server.
++.TP
++\fB\-fullscreen\fR
++Start in full\-screen mode. Please be aware that operating in
++full\-screen mode may confuse X window managers. Typically, such
++conflicts cause incorrect handling of input focus or make the viewer
++window disappear mysteriously. See the grabKeyboard setting in the
++RESOURCES section below for a method to solve input focus problem.
++.TP
++\fB\-noraiseonbeep\fR
++By default, the viewer shows and raises its window on remote beep
++(bell) event. This option disables such behaviour
++(TightVNC\-specific).
++.TP
++\fB\-user\fR \fIusername\fR
++User name for Unix login authentication. Default is to use current
++Unix user name. If this option was given, the viewer will prefer Unix
++login authentication over the standard VNC authentication.
++.TP
++\fB\-passwd\fR \fIpasswd\-file\fR
++File from which to get the password (as generated by the
++\fBvncpasswd\fR(1) program). This option affects only the standard VNC
++authentication.
++.TP
++\fB\-encodings\fR \fIencoding\-list\fR
++TightVNC supports several different compression methods to encode
++screen updates; this option specifies a set of them to use in order of
++preference. Encodings are specified separated with spaces, and must
++thus be enclosed in quotes if more than one is specified. Available
++encodings, in default order for a remote connection, are "copyrect
++tight hextile zlib corre rre raw". For a local connection (to the same
++machine), the default order to try is "raw copyrect tight hextile zlib
++corre rre". Raw encoding is always assumed as a last option if no
++other encoding can be used for some reason. For more information on
++encodings, see the section ENCODINGS below.
++.TP
++\fB\-bgr233\fR
++Always use the BGR233 format to encode pixel data. This reduces
++network traffic, but colors may be represented inaccurately. The
++bgr233 format is an 8\-bit "true color" format, with 2 bits blue, 3
++bits green, and 3 bits red.
++.TP
++\fB\-owncmap\fR
++Try to use a PseudoColor visual and a private colormap. This allows
++the VNC server to control the colormap.
++.TP
++\fB\-truecolour\fR, \fB\-truecolor\fR
++Try to use a TrueColor visual.
++.TP
++\fB\-depth\fR \fIdepth\fR
++On an X server which supports multiple TrueColor visuals of different
++depths, attempt to use the specified one (in bits per pixel); if
++successful, this depth will be requested from the VNC server.
++.TP
++\fB\-compresslevel \fIlevel\fR
++Use specified compression \fIlevel\fR (0..9) for "tight" and "zlib"
++encodings (TightVNC\-specific). Level 1 uses minimum of CPU time and
++achieves weak compression ratios, while level 9 offers best
++compression but is slow in terms of CPU time consumption on the server
++side. Use high levels with very slow network connections, and low
++levels when working over high\-speed LANs. It's not recommended to use
++compression level 0, reasonable choices start from the level 1.
++.TP
++\fB\-quality \fIlevel\fR
++Use the specified JPEG quality \fIlevel\fR (0..9) for the "tight"
++encoding (TightVNC\-specific). Quality level 0 denotes bad image
++quality but very impressive compression ratios, while level 9 offers
++very good image quality at lower compression ratios. Note that the
++"tight" encoder uses JPEG to encode only those screen areas that look
++suitable for lossy compression, so quality level 0 does not always
++mean unacceptable image quality.
++.TP
++\fB\-nojpeg\fR
++Disable lossy JPEG compression in Tight encoding (TightVNC\-specific). 
++Disabling JPEG compression is not a good idea in typical cases, as
++that makes the Tight encoder less efficient. You might want to use
++this option if it's absolutely necessary to achieve perfect image
++quality (see also the \fB\-quality\fR option).
++.TP
++\fB\-nocursorshape\fR
++Disable cursor shape updates, protocol extensions used to handle
++remote cursor movements locally on the client side
++(TightVNC\-specific). Using cursor shape updates decreases delays with
++remote cursor movements, and can improve bandwidth usage dramatically. 
++.TP
++\fB\-x11cursor\fR
++Use a real X11 cursor with X-style cursor shape updates, instead of
++drawing the remote cursor on the framebuffer. This option also
++disables the dot cursor, and disables cursor position updates in
++non-fullscreen mode.
++.TP
++\fB\-autopass\fR
++Read a plain-text password from stdin. This option affects only the
++standard VNC authentication.
++
++.SH Enhanced TightVNC Viewer OPTIONS
++.TP
++Enhanced TightVNC Viewer web page is located at:
++.TP
++http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
++.TP
++Note: ZRLE encoding is now supported.
++.TP
++Note: F9 is shortcut to Toggle FullScreen mode.
++.TP
++\fB\-use64\fR
++In \fB\-bgr233\fR mode, use 64 colors instead of 256.
++.TP
++\fB\-bgr222\fR
++Same as \fB\-use64\fR.
++.TP
++\fB\-use8\fR
++In \fB\-bgr233\fR mode, use 8 colors instead of 256.
++.TP
++\fB\-bgr111\fR
++Same as \fB\-use8\fR.
++.TP
++\fB\-16bpp\fR
++If the vnc viewer X display is depth 24 at 32bpp
++request a 16bpp format from the VNC server to cut
++network traffic by up to 2X, then tranlate the
++pixels to 32bpp locally.
++.TP
++\fB\-bgr565\fR
++Same as \fB\-16bpp\fR.
++.TP
++\fB\-alpha\fR
++Use alphablending transparency for local cursors
++requires: x11vnc server, both client and server
++must be 32bpp and same endianness.
++.TP
++\fB\-ycrop\fR n
++Only show the top n rows of the framebuffer.  For
++use with x11vnc \fB\-ncache\fR client caching option
++to help "hide" the pixel cache region.
++Use a negative value (e.g. \fB\-1\fR) for autodetection.
++Autodetection will always take place if the remote
++fb height is more than 2 times the width.
++.TP
++\fB\-sbwidth\fR n
++Scrollbar width, default is very narrow: 2 pixels,
++it is narrow to avoid distraction in \fB\-ycrop\fR mode.
++.TP
++\fB\-rawlocal\fR
++Prefer raw encoding for localhost, default is
++no, i.e. assumes you have a SSH tunnel instead.
++.TP
++\fB\-graball\fR
++Grab the entire X server when in fullscreen mode,
++needed by some old window managers like fvwm2.
++.TP
++\fB\-popupfix\fR
++Warp the popup back to the pointer position,
++needed by some old window managers like fvwm2.
++.TP
++\fB\-grabkbd\fR
++Grab the X keyboard when in fullscreen mode,
++needed by some window managers. Same as \fB\-grabkeyboard\fR.
++\fB\-grabkbd\fR is the default, use \fB\-nograbkbd\fR to disable.
++.TP
++\fB\-bs/-nobs\fR
++Whether or not to use X server Backingstore for the
++main viewer window.  The default is to not, mainly
++because most Linux, etc, systems X servers disable
++*all* Backingstore by default.  To re-enable it put
++
++Option "Backingstore"
++
++in the Device section of /etc/X11/xorg.conf.
++In -bs mode with no X server backingstore, whenever an
++area of the screen is re-exposed it must go out to the
++VNC server to retrieve the pixels. This is too slow.
++
++In -nobs mode, memory is allocated by the viewer to
++provide its own backing of the main viewer window. This
++actually makes some activities faster (changes in large
++regions) but can appear to "flash" too much.
++.TP
++\fB\-noshm\fR
++Disable use of MIT shared memory extension (not recommended)
++.TP
++\fB New Popup actions:\fR
++
++ Cursor Shape:            ~ -nocursorshape
++ X11 Cursor:              ~ -x11cursor
++ Cursor Alphablend:       ~ -alpha
++ Disable JPEG:            ~ -nojpeg
++ Prefer raw for localhost ~ -rawlocal
++ Full Color                 as many colors as local screen allows.
++ Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
++ 16 bit color (BGR565)    ~ -bgr565
++ 8  bit color (BGR233)    ~ -bgr233
++ 256 colors               ~ -bgr233 default # of colors.
++  64 colors               ~ -bgr222 / -use64
++   8 colors               ~ -bgr111 / -use8
++
++ 
++ Disable Remote Input       Ultravnc ext.  Try to prevent input and
++                            viewing of monitor at physical display.
++ Single Window              Ultravnc ext.  Grab and a single window.
++                            (click on the window you want).
++ Set 1/n Server Scale       Ultravnc ext.  Scale desktop by 1/n.
++                            prompt is from the terminal.
++ Text Chat                  Ultravnc ext.  Do Text Chat, currently
++                            input via the terminal (no window).
++ 
++ Note: the Ultravnc extensions only apply to servers that support
++       them.  x11vnc/libvncserver supports some of them.
++
++.SH ENCODINGS
++The server supplies information in whatever format is desired by the
++client, in order to make the client as easy as possible to implement. 
++If the client represents itself as able to use multiple formats, the
++server will choose one.
++
++.I Pixel format
++refers to the representation of an individual pixel. The most common
++formats are 24 and 16 bit "true\-color" values, and 8\-bit "color map"
++representations, where an arbitrary map converts the color number to
++RGB values.
++
++.I Encoding
++refers to how a rectangle of pixels are sent (all pixel information in
++VNC is sent as rectangles). All rectangles come with a header giving
++the location and size of the rectangle and an encoding type used by
++the data which follows. These types are listed below.
++.TP
++.B Raw
++The raw encoding simply sends width*height pixel values. All clients
++are required to support this encoding type. Raw is also the fastest
++when the server and viewer are on the same machine, as the connection
++speed is essentially infinite and raw encoding minimizes processing
++time.
++.TP
++.B CopyRect
++The Copy Rectangle encoding is efficient when something is being
++moved; the only data sent is the location of a rectangle from which
++data should be copied to the current location. Copyrect could also be
++used to efficiently transmit a repeated pattern.
++.TP
++.B RRE
++The Rise\-and\-Run\-length\-Encoding is basically a 2D version of
++run\-length encoding (RLE). In this encoding, a sequence of identical
++pixels are compressed to a single value and repeat count. In VNC, this
++is implemented with a background color, and then specifications of an
++arbitrary number of subrectangles and color for each. This is an
++efficient encoding for large blocks of constant color.
++.TP
++.B CoRRE
++This is a minor variation on RRE, using a maximum of 255x255 pixel
++rectangles. This allows for single\-byte values to be used, reducing
++packet size. This is in general more efficient, because the savings
++from sending 1\-byte values generally outweighs the losses from the
++(relatively rare) cases where very large regions are painted the same
++color.
++.TP
++.B Hextile
++Here, rectangles are split up in to 16x16 tiles, which are sent in a
++predetermined order. The data within the tiles is sent either raw or
++as a variant on RRE. Hextile encoding is usually the best choice for
++using in high\-speed network environments (e.g. Ethernet local\-area
++networks).
++.TP
++.B Zlib
++Zlib is a very simple encoding that uses zlib library to compress raw
++pixel data. This encoding achieves good compression, but consumes a
++lot of CPU time. Support for this encoding is provided for
++compatibility with VNC servers that might not understand Tight
++encoding which is more efficient than Zlib in nearly all real\-life
++situations.
++.TP
++.B Tight
++Like Zlib encoding, Tight encoding uses zlib library to compress the
++pixel data, but it pre\-processes data to maximize compression ratios,
++and to minimize CPU usage on compression. Also, JPEG compression may
++be used to encode color\-rich screen areas (see the description of
++\-quality and \-nojpeg options above). Tight encoding is usually the
++best choice for low\-bandwidth network environments (e.g. slow modem
++connections).
++.SH RESOURCES
++X resources that \fBvncviewer\fR knows about, aside from the
++normal Xt resources, are as follows:
++.TP
++.B shareDesktop
++Equivalent of \fB\-shared\fR/\fB\-noshared\fR options. Default true.
++.TP
++.B viewOnly
++Equivalent of \fB\-viewonly\fR option. Default false.
++.TP
++.B fullScreen
++Equivalent of \fB\-fullscreen\fR option. Default false.
++.TP
++.B grabKeyboard
++Grab keyboard in full-screen mode. This can help to solve problems
++with losing keyboard focus. Default false.
++.TP
++.B raiseOnBeep
++Equivalent of \fB\-noraiseonbeep\fR option, when set to false. Default
++true.
++.TP
++.B passwordFile
++Equivalent of \fB\-passwd\fR option.
++.TP
++.B userLogin
++Equivalent of \fB\-user\fR option.
++.TP
++.B passwordDialog
++Whether to use a dialog box to get the password (true) or get it from
++the tty (false). Irrelevant if \fBpasswordFile\fR is set. Default
++false.
++.TP
++.B encodings
++Equivalent of \fB\-encodings\fR option.
++.TP
++.B compressLevel
++Equivalent of \fB\-compresslevel\fR option (TightVNC\-specific).
++.TP
++.B qualityLevel
++Equivalent of \fB\-quality\fR option (TightVNC\-specific).
++.TP
++.B enableJPEG
++Equivalent of \fB\-nojpeg\fR option, when set to false. Default true.
++.TP
++.B useRemoteCursor
++Equivalent of \fB\-nocursorshape\fR option, when set to false
++(TightVNC\-specific). Default true.
++.TP
++.B useBGR233
++Equivalent of \fB\-bgr233\fR option. Default false.
++.TP
++.B nColours
++When using BGR233, try to allocate this many "exact" colors from the
++BGR233 color cube. When using a shared colormap, setting this resource
++lower leaves more colors for other X clients. Irrelevant when using
++truecolor. Default is 256 (i.e. all of them).
++.TP
++.B useSharedColours
++If the number of "exact" BGR233 colors successfully allocated is less
++than 256 then the rest are filled in using the "nearest" colors
++available. This resource says whether to only use the "exact" BGR233
++colors for this purpose, or whether to use other clients' "shared"
++colors as well. Default true (i.e. use other clients' colors).
++.TP
++.B forceOwnCmap
++Equivalent of \fB\-owncmap\fR option. Default false.
++.TP
++.B forceTrueColour
++Equivalent of \fB\-truecolour\fR option. Default false.
++.TP
++.B requestedDepth
++Equivalent of \fB\-depth\fR option.
++.TP
++.B useSharedMemory
++Use MIT shared memory extension if on the same machine as the X
++server. Default true.
++.TP
++.B wmDecorationWidth, wmDecorationHeight
++The total width and height taken up by window manager decorations.
++This is used to calculate the maximum size of the VNC viewer window. 
++Default is width 4, height 24.
++.TP
++.B bumpScrollTime, bumpScrollPixels
++When in full screen mode and the VNC desktop is bigger than the X
++display, scrolling happens whenever the mouse hits the edge of the
++screen. The maximum speed of scrolling is bumpScrollPixels pixels
++every bumpScrollTime milliseconds. The actual speed of scrolling will
++be slower than this, of course, depending on how fast your machine is. 
++Default 20 pixels every 25 milliseconds.
++.TP
++.B popupButtonCount
++The number of buttons in the popup window. See the README file for
++more information on how to customize the buttons.
++.TP
++.B debug
++For debugging. Default false.
++.TP
++.B rawDelay, copyRectDelay
++For debugging, see the README file for details. Default 0 (off).
++.SH ENVIRONMENT
++When started with the \fB\-via\fR option, vncviewer reads the
++\fBVNC_VIA_CMD\fR environment variable, expands patterns beginning
++with the "%" character, and executes result as a command assuming that
++it would create TCP tunnel that should be used for VNC connection. If
++not set, this environment variable defaults to "/usr/bin/ssh -f -L
++%L:%H:%R %G sleep 20".
++
++The following patterns are recognized in the \fBVNC_VIA_CMD\fR (note
++that all the patterns %G, %H, %L and %R must be present in the command
++template):
++.TP
++.B %%
++A literal "%";
++.TP
++.B %G
++gateway host name;
++.TP
++.B %H
++remote VNC host name, as known to the gateway;
++.TP
++.B %L
++local TCP port number;
++.TP
++.B %R
++remote TCP port number.
++.SH SEE ALSO
++\fBvncserver\fR(1), \fBXvnc\fR(1), \fBvncpasswd\fR(1),
++\fBvncconnect\fR(1), \fBssh\fR(1)
++.SH AUTHORS
++Original VNC was developed in AT&T Laboratories Cambridge. TightVNC
++additions was implemented by Constantin Kaplinsky. Many other people
++participated in development, testing and support.
++
++\fBMan page authors:\fR
++.br
++Marcus Brinkmann <Marcus.Brinkmann@ruhr-uni-bochum.de>,
++.br
++Terran Melconian <terran@consistent.org>,
++.br
++Tim Waugh <twaugh@redhat.com>,
++.br
++Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncviewer/vncviewer.c
 --- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
 +++ vnc_unixsrc/vncviewer/vncviewer.c	2007-02-18 18:45:43.000000000 -0500
