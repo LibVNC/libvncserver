@@ -611,26 +611,27 @@ static void solid_gnome(char *color) {
 }
 
 static char *dcop_session(void) {
+	char *empty = strdup("");
 #if NO_X11
-	RAWFB_RET("");
-	return "";
+	RAWFB_RET(empty);
+	return empty;
 #else
 	char list_sessions[] = "dcop --user '%s' --list-sessions";
 	int len;
 	char *cmd, *host, *user = NULL;
 	char *out, *p, *ds, *dsn = NULL, *sess = NULL, *sess2 = NULL;
 
-	RAWFB_RET("");
+	RAWFB_RET(empty);
 
 	if (getenv("SESSION_MANAGER")) {
-		return "";
+		return empty;
 	}
 
 	user = get_user_name();
 	if (strstr(user, "'") != NULL)  {
 		rfbLog("invalid user: %s\n", user);
 		free(user);
-		return "";
+		return empty;
 	}
 
 	len = strlen(list_sessions) + strlen(user) + 1;

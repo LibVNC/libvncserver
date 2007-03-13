@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "February 2007" "x11vnc " "User Commands"
+.TH X11VNC "1" "March 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.5, lastmod: 2007-02-19
+         version: 0.8.5, lastmod: 2007-03-13
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -125,11 +125,14 @@ the window.
 \fB-clip\fR \fIWxH+X+Y\fR
 .IP
 Only show the sub-region of the full display that
-corresponds to the rectangle with size WxH and offset
-+X+Y.  The VNC display has size WxH (i.e. smaller than
-the full display).  This also works for \fB-id/-sid\fR mode
-where the offset is relative to the upper left corner
-of the selected window.
+corresponds to the rectangle geometry with size WxH and
+offset +X+Y.  The VNC display has size WxH (i.e. smaller
+than the full display).  This also works for \fB-id/-sid\fR
+mode where the offset is relative to the upper left
+corner of the selected window.  An example use of this
+option would be to split a large (e.g. Xinerama) display
+into two parts to be accessed via separate viewers by
+running a separate x11vnc on each part.
 .PP
 \fB-flashcmap\fR
 .IP
@@ -417,9 +420,8 @@ will NOT change.
 .PP
 \fB-ultrafilexfer\fR
 .IP
-Note, to *enable* UltraVNC filetransfer (currently
-disabled by default, this may change...) and to get it
-to work you probably need to supply these libvncserver
+Note: to enable UltraVNC filetransfer and to get it to
+work you probably need to supply these libvncserver
 options: "\fB-rfbversion\fR \fI3.6 \fB-permitfiletransfer\fR"\fR
 "\fB-ultrafilexfer\fR" is an alias for this combination.
 .IP

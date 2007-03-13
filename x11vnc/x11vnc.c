@@ -75,7 +75,7 @@
  * extensions exists that allow drawing the mouse into the framebuffer)
  * 
  * The current *position* of the remote X mouse pointer is shown with
- * the -cursor option.  Further, if -cursorX or -X is used, a trick
+ * the -cursor option.  Further, if -cursor X is used, a trick
  * is done to at least show the root window cursor vs non-root cursor.
  * (perhaps some heuristic can be done to further distinguish cases...,
  * currently "-cursor some" is a first hack at this)
@@ -3266,6 +3266,23 @@ int main(int argc, char* argv[]) {
 	scr = DefaultScreen(dpy);
 	rootwin = RootWindow(dpy, scr);
 
+	if (ncache_beta_tester) {
+		int h = DisplayHeight(dpy, scr);
+		int w = DisplayWidth(dpy, scr);
+		int mem = (w * h * 4) / (1000 * 1000), MEM = 96;
+		if (mem < 1) mem = 1;
+
+		/* limit poor, unsuspecting beta tester's viewer to 96 MB */
+		if ( (ncache+2) * mem > MEM ) {
+			int n = (MEM/mem) - 2;
+			if (n < 0) n = 0;
+			n = 2 * (n / 2);
+			if (n < ncache) {
+				ncache = n;
+			}
+		}
+	}
+
 	if (grab_always) {
 		Window save = window;
 		window = rootwin;
@@ -3533,7 +3550,7 @@ int main(int argc, char* argv[]) {
 		rfbLog("  iconifying/deiconifying windows, moving and raising\n");
 		rfbLog("  windows, and reposting menus.  In the simple CopyRect\n");
 		rfbLog("  encoding scheme used (no compression) a huge amount\n");
-		rfbLog("  of extra memory (20-80MB) is used on both the server and\n");
+		rfbLog("  of extra memory (20-100MB) is used on both the server and\n");
 		rfbLog("  client sides.  This mode works with any VNC viewer.\n");
 		rfbLog("  However, in most you can actually see the cached pixel\n");
 		rfbLog("  data by scrolling down, so you need to re-adjust its size.\n");

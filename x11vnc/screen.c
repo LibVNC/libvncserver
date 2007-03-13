@@ -845,7 +845,7 @@ static void initialize_snap_fb(void) {
 	snap_fb = snap->data;
 }
 
-rfbClient* client = NULL;
+static rfbClient* client = NULL;
 
 void vnc_reflect_bell(rfbClient *cl) {
 	if (cl) {}

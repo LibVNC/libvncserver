@@ -2846,7 +2846,7 @@ static int scan_display(int ystart, int rescan) {
 	int x, y, w, n;
 	int tile_count = 0;
 	int nodiffs = 0, diff_hint;
-	int xd_check, xd_freq = 1;
+	int xd_check = 0, xd_freq = 1;
 	static int xd_tck = 0;
 
 	y = ystart;
