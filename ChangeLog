@@ -1,3 +1,6 @@
+2007-03-17  Charles Coffing  <cconffing@novell.com>
+	* libvncserver: fix a locking issue
+
 2007-02-01  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* libvncclient: add updateRect member to rfbClient, to allow
 	  requesting smaller updates than whole-screen.

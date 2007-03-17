@@ -500,9 +500,9 @@ rfbClientConnectionGone(rfbClientPtr cl)
       do {
 	LOCK(cl->refCountMutex);
 	i=cl->refCount;
-	UNLOCK(cl->refCountMutex);
 	if(i>0)
 	  WAIT(cl->deleteCond,cl->refCountMutex);
+	UNLOCK(cl->refCountMutex);
       } while(i>0);
     }
 #endif
