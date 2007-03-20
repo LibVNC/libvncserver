@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Tue Mar 13 06:20:11 EDT 2007
+x11vnc README file                         Date: Mon Mar 19 22:29:18 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -41,7 +41,7 @@ x11vnc: a VNC server for real X displays
    x0rfbserver build problems centered around esoteric C++ toolkits.
    x11vnc is written in plain C and needs only standard libraries and so
    should work on nearly all Unixes. I also added some enhancements to
-   improve the interactive response, many esoteric features, etc.
+   improve the interactive response, add many features, etc.
 
    This page and the [19]FAQ contain a lot of information [20][*],
    solutions to many problems, and interesting applications, but
@@ -1491,6 +1491,15 @@ make
    or xclock tests work, x11vnc also will not work (all of these X
    clients must be allowed to connect to the X server to function
    properly).
+
+   Firewalls: Speaking of permissions, it should go without saying that
+   the host-level firewall will need to be configured to allow
+   connections in on a port. E.g. 5900 (default VNC port) or 22 (default
+   SSH port for tunnelling VNC). Most systems these days have firewalls
+   turned on by default, so you will actively have to do something to
+   poke a hole in the firewall at the desired port number. See your
+   system administration tool for Firewall settings (Yast, Firestarter,
+   etc.).
 
 
    Q-2: I can't get x11vnc and/or libvncserver to compile.
@@ -3104,7 +3113,8 @@ connect = 5900
 
    Update Jul/2006: we now provide an [466]Enhanced TightVNC Viewer
    (ssvnc) package that starts up STUNNEL automatically along with some
-   other features. All binaries are provided in the package.
+   other features. All binaries (stunnel, vncviewer, and some utilities)
+   are provided in the package. It works on Unix, Mac OS X, and Windows.
 
 
    Q-46: Does x11vnc have built-in SSL tunneling?
@@ -3281,15 +3291,43 @@ connect = 5900
    "_2F_" (a deficiency in libvncserver prevents using the more natural
    "%2F".)
 
+   You apply multiple applet parameters in the regular way, e.g.:
+  https://far-away.east:5900/?GET=1&urlPrefix=mysubdir&...
+
+
+   Router/Firewall port redirs:  If you are doing port redirection at
+   your router to an internal machine running x11vnc AND the internet
+   facing port is different from the internal machine's VNC port, you
+   will need to apply the PORT applet parameter to indicate to the applet
+   the Internet facing port number (otherwise by default the internal
+   machine's port, say 5900, is sent and that of course is rejected at
+   the firewall/router). For example:
+  https://far-away.east:443/?GET=1&PORT=443
+
+   (actually, in this case the first ":443" isn't needed because that is
+   the default port for https; it would be needed for any other port). So
+   in this example the user configures his router to redirect connections
+   to port 443 on his Internet side to, say, port 5900 on the internal
+   machine running x11vnc.
+
+   To configure your router to do port redirection, see its instructions.
+   Typically, from the inside you point a web browser to a special URL
+   (e.g. http://192.168.1.1) and you get a web interface to configure it.
+   Look for something like "Port Redirection" or "Port Forwarding",
+   probably under "Advanced" or something like that. If you have a Linux
+   or Unix system acting as your firewall/router, see its firewall
+   configuration.
+
+
    If you do serve the SSL enabled Java viewer via https be prepared for
    quite a number of "are you sure you trust this site?" dialogs:
      * First from the Web browser that cannot verify the self-signed
        certificate when it downloads index.vnc.
-     * From the Web browser noting that the common name on the
+     * From the Web browser again noting that the common name on the
        certificate does not match the hostname of the remote machine.
      * Next from the Java VM that cannot verify the self-signed
        certificate when it downloads VncViewer.jar.
-     * And also from the Java VM noting that the common name on the
+     * And also from the Java VM again noting that the common name on the
        certificate does not match the hostname of the remote machine.
      * Finally from the Java VncViewer applet itself saying it cannot
        verify the certificate! (or a popup asking you if you want to see
@@ -3300,8 +3338,12 @@ connect = 5900
    connection is VNC instead of the HTTPS it actually is (but since you
    have paused too long at the dialog the GET request comes too late).
    Often hitting Reload and going through the dialogs more quickly will
-   let you connect. Use the [483]-https option if you want a dedicated
-   port for HTTPS connections instead of sharing the VNC port.
+   let you connect. The Java VM dialogs are the most important ones to
+   NOT linger at. If you see in the x11vnc output a request for
+   VncViewer.class instead of VncViewer.jar it is too late... you may
+   need to restart the Web browser to get it to try for the jar again.
+   You can use the [483]-https option if you want a dedicated port for
+   HTTPS connections instead of sharing the VNC port.
 
    To see example x11vnc output for a successful https://host:5900/
    connection with the Java Applet see [484]This Page.
@@ -3356,7 +3398,8 @@ connect = 5900
 
    Update Jul/2006: we now provide an [489]Enhanced TightVNC Viewer
    (ssvnc) package that starts up STUNNEL automatically along with some
-   other features. All binaries are provided in the package.
+   other features. All binaries (stunnel, vncviewer, and some utilities)
+   are provided in the package. It works on Unix, Mac OS X, and Windows.
 
 
    Q-48: How do I use VNC Viewers with built-in SSL tunneling when going
@@ -3420,7 +3463,7 @@ connect = 5900
 
    this is cleaner because it avoids editing the file, but requires more
    parameters in the URL. To use the GET [491]trick discussed above, do:
-  https://yourmachine.com/proxy.vnc?PORT=443&GET=1
+  https://yourmachine.com/proxy.vnc?GET=1&PORT=443
 
 
    Q-49: Can Apache web server act as a gateway for users to connect via
@@ -3484,6 +3527,14 @@ x11vnc -logfile $HOME/.x11vnc.log -rfbauth $HOME/.vnc/passwd -forever -bg
    a different directory or have a different basename. One user
    recommends the description under 'Running Scripts Automatically' at
    [498]this link.
+
+   Firewalls: note all methods will require the host-level firewall will
+   need to be configured to allow connections in on a port. E.g. 5900
+   (default VNC port) or 22 (default SSH port for tunnelling VNC). Most
+   systems these days have firewalls turned on by default, so you will
+   actively have to do something to poke a hole in the firewall at the
+   desired port number. See your system administration tool for Firewall
+   settings (Yast, Firestarter, etc.).
 
 
    Q-52: How can I use x11vnc to connect to an X login screen like xdm,
@@ -9551,20 +9602,22 @@ http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html:
 
 Enhanced TightVNC Viewer   (ssvnc: SSL/SSH VNC viewer)
 
+   [1](To Downloads)  [2](To Quick Start)
+
    The Enhanced TightVNC Viewer package started as a project to add some
    patches to the long neglected Unix TightVNC Viewer. However, now the
    front-end GUI and wrapper scripts features dwarf the Unix TightVNC
    Viewer patches (see the lists below).
 
    It adds a GUI for Windows, Mac OS X, and Unix that automatically
-   starts up a STUNNEL SSL tunnel for SSL or SSH connections to
-   [1]x11vnc, and then launches the TightVNC Viewer to use that tunnel.
-   It also enables SSL encrypted VNC connections to any other VNC Server
-   running an SSL tunnel, such as STUNNEL, at their end. It can be used
-   to perform SSH connections to any other VNC Server as well. The tool
+   starts up STUNNEL SSL tunnel for SSL or SSH connections to [3]x11vnc,
+   and then launches the TightVNC Viewer to use the tunnel. It also
+   enables SSL encrypted VNC connections to any other VNC Server running
+   an SSL tunnel, such as STUNNEL, at their end. It can be used to
+   perform SSH tunnelled connections to any VNC Server as well. The tool
    has many additional features (see below for a list).
 
-   The short name for this project is ssvnc for SSL/SSH VNC Viewer.
+   The short name for this project is "ssvnc" for SSL/SSH VNC Viewer.
 
    It is a self-contained bundle, you could carry it around on, say, a
    USB memory stick for secure VNC viewing from almost any machine, Unix,
@@ -9589,16 +9642,17 @@ Enhanced TightVNC Viewer   (ssvnc: SSL/SSH VNC viewer)
      * Support for native MacOS X usage with bundled Chicken of the VNC
        viewer.
 
-   Unix TightVNC Viewer improvements (these only apply to our Unix viewer
-   binaries):
+   Unix TightVNC Viewer improvements (these only apply to the Unix VNC
+   viewer):
      * rfbNewFBSize VNC support (dynamic screen resizing)
      * ZRLE VNC encoding support (RealVNC's encoding)
      * Extremely low color modes: 64 and 8 colors in 8bpp
        (-use64/-bgr222, -use8/-bgr111)
      * Medium color mode: 16bpp mode on a 32bpp Viewer display
        (-16bpp/-bgr565)
-     * Cursor [2]alphablending with x11vnc at 32bpp (-alpha option)
-     * For use with x11vnc's [3]client-side caching -ncache method use
+     * Cursor [4]alphablending with x11vnc at 32bpp (-alpha option)
+     * Maintains its own BackingStore if the X server does not
+     * For use with x11vnc's [5]client-side caching -ncache method use
        the cropping option -ycrop n. This will "hide" the large pixel
        buffer cache below the actual display. Set to the actual height or
        use -1 for autodetection (also, tall screens, H > 2*W, are
@@ -9606,8 +9660,8 @@ Enhanced TightVNC Viewer   (ssvnc: SSL/SSH VNC viewer)
      * Scrollbar width setting: -sbwidth n, the default is very thin, 2
        pixels, for less distracting -ycrop usage.
      * The default for localhost:0 connections is not raw encoding since
-       same-machine connections are very rare. Default assumes you are
-       using SSH tunnel. Use -rawlocal to revert.
+       same-machine connections are pretty rare. Default assumes you are
+       using a SSL or SSH tunnel. Use -rawlocal to revert.
      * XGrabServer support for fullscreen mode, for old window managers
        (-grab/-graball option).
      * Fix for Popup menu positioning for old window managers (-popupfix
@@ -9615,8 +9669,12 @@ Enhanced TightVNC Viewer   (ssvnc: SSL/SSH VNC viewer)
      * Improvements to the Popup menu, all of these can now be changed
        dynamically via the menu: ViewOnly, CursorShape updates, X11
        Cursor, Cursor Alphablending, Toggle Tight/ZRLE, Toggle JPEG,
-       FullColor/16bpp/8bpp (256/64/8 colors) without having to restart
-       the viewer.
+       Toggle Greyscale, FullColor/16bpp/8bpp (256/64/8 colors) without
+       having to restart the viewer.
+     * Support for UltraVNC extensions: Single Window, Disable
+       Server-side Input, 1/n Server side scaling, Text Chat (shell
+       terminal UI). Both UltraVNC and x11vnc servers support these
+       extensions.
 
    The list of software bundled in the archive files:
      * TightVNC Viewer  (windows, unix, macosx)
@@ -9640,7 +9698,7 @@ Unix and Mac OS X:
 
     Unpack the archive:
 
-        % gzip -dc ssvnc-1.0.12.tar.gz | tar xvf -
+        % gzip -dc ssvnc-1.0.13.tar.gz | tar xvf -
 
     Run the GUI:
 
@@ -9648,7 +9706,7 @@ Unix and Mac OS X:
 
         % ./ssvnc/MacOSX/ssvnc       (for Mac OS X)
 
-    The smaller file "ssvnc_no_windows-1.0.12.tar.gz" could have been
+    The smaller file "ssvnc_no_windows-1.0.13.tar.gz" could have been
     used as well.
 
     On MacOSX there is also a SSVNC.app directory icon you can click on
@@ -9659,7 +9717,7 @@ Windows:
 
     Unzip, using WinZip or a similar utility, the zip file:
 
-        ssvnc-1.0.12.zip
+        ssvnc-1.0.13.zip
 
     Run the GUI, e.g.:
 
@@ -9671,12 +9729,28 @@ Windows:
 
     select Open, and then OK to launch it.
 
-    The smaller file "ssvnc_windows_only-1.0.12.zip" could have been used
+    The smaller file "ssvnc_windows_only-1.0.13.zip" could have been used
     as well.
 
     You can make a Windows shortcut to this program if you want to.
 
     See the Windows/README.txt for more info.
+
+   Important Note for Windows Vista: One user reports that on Windows
+   Vista if you move or extract the "ssvnc" folder down to the "Program
+   Files" folder you will be prompted to do this as the Administrator.
+   But then when you start up ssvnc, as a regular user, it cannot create
+   files in that folder and so it fails to run properly. We recommend to
+   not copy or extract the "ssvnc" folder into "Program Files". Rather,
+   extract it to somewhere you have write permission (e.g. C:\ or your
+   User dir) and create a Shortcut to ssvnc.exe on the desktop.
+
+   If you must put a launcher file down in "Program Files", perhaps an
+   "ssvnc.bat" that looks like this:
+C:
+cd \ssvnc\Windows
+ssvnc.exe
+
      _________________________________________________________________
 
    The bundle unpacks a directory/folder named: ssvnc. It contains these
@@ -9691,7 +9765,7 @@ Windows:
    The Viewer SSL support is done via a wrapper script (bin/ssvnc_cmd
    that calls bin/util/ss_vncviewer) that starts up the STUNNEL tunnel
    first and then starts the TightVNC viewer pointed at that tunnel. The
-   bin/ssvnc program is a GUI front-end to that script. See [4]this FAQ
+   bin/ssvnc program is a GUI front-end to that script. See [6]this FAQ
    for more details on SSL tunnelling.
 
 
@@ -9701,16 +9775,17 @@ Windows:
    resize when the server does (e.g. "x11vnc -R scale=3/4" remote control
    command).
 
-   The cursor alphablending is [5]described here.
+   The cursor alphablending is [7]described here.
 
    The RealVNC ZRLE encoding is supported, in addition to some low colors
    modes (16bpp and 8bpp at 256, 64, and even 8 colors, for use on very
-   slow connections).
+   slow connections). Greyscales are also enabled for the low color
+   modes.
 
    The Popup menu (F8) is enhanced with the ability to change many things
    on the fly. F9 is added as a shortcut to toggle FullScreen mode.
 
-   Client Side Caching: The x11vnc [6]client-side caching is handled
+   Client Side Caching: The x11vnc [8]client-side caching is handled
    nicely by this viewer. The very large pixel cache below the actual
    display in this caching method is distracting. Our Unix VNC viewer
    will automatically try to autodetect the actual display height if the
@@ -9723,14 +9798,14 @@ Windows:
    scrollbars are set to be very thin (2 pixels) to be less distracting.
    Use the -sbwidth n to make them wider.
 
-   Probably nobody is interested in the [7]grabserver patch for old
+   Probably nobody is interested in the [9]grabserver patch for old
    window managers when the viewer is in fullscreen mode... This and some
    other unfixed bugs have been fixed in our patches (fullscreen toggle
    works with KDE, -x11cursor has been fixed, and the dot cursor has been
    made smaller).
 
    From the -help output:
-Enhanced TightVNC viewer options:
+Enhanced TightVNC viewer (SSVNC) options:
 
    URL http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
 
@@ -9750,6 +9825,8 @@ Enhanced TightVNC viewer options:
                     pixels to 32bpp locally.
         -bgr565     Same as -16bpp.
 
+        -grey       Use a grey scale for the 16- and 8-bpp modes.
+
         -alpha      Use alphablending transparency for local cursors
                     requires: x11vnc server, both client and server
                     must be 32bpp and same endianness.
@@ -9760,8 +9837,10 @@ Enhanced TightVNC viewer options:
                     Use a negative value (e.g. -1) for autodetection.
                     Autodetection will always take place if the remote
                     fb height is more than 2 times the width.
-        -sbwidth n  Scrollbar width, default is very narrow: 2 pixels,
-                    it is narrow to avoid distraction in -ycrop mode.
+
+        -sbwidth n  Scrollbar width for x11vnc -ncache mode (-ycrop),
+                    default is very narrow: 2 pixels, it is narrow to
+                    avoid distraction in -ycrop mode.
 
         -rawlocal   Prefer raw encoding for localhost, default is
                     no, i.e. assumes you have a SSH tunnel instead.
@@ -9774,6 +9853,53 @@ Enhanced TightVNC viewer options:
         -grabkbd    Grab the X keyboard when in fullscreen mode,
                     needed by some window managers. Same as -grabkeyboard.
                     -grabkbd is the default, use -nograbkbd to disable.
+
+        -bs, -nobs  Whether or not to use X server Backingstore for the
+                    main viewer window.  The default is to not, mainly
+                    because most Linux, etc, systems X servers disable
+                    *all* Backingstore by default.  To re-enable it put
+
+                        Option "Backingstore"
+
+                    in the Device section of /etc/X11/xorg.conf.
+                    In -bs mode with no X server backingstore, whenever an
+                    area of the screen is re-exposed it must go out to the
+                    VNC server to retrieve the pixels. This is too slow.
+
+                    In -nobs mode, memory is allocated by the viewer to
+                    provide its own backing of the main viewer window. This
+                    actually makes some activities faster (changes in large
+                    regions) but can appear to "flash" too much.
+
+        -noshm      Disable use of MIT shared memory extension (not recommended
+)
+
+   New Popup actions:
+
+        Cursor Shape:            ~ -nocursorshape
+        X11 Cursor:              ~ -x11cursor
+        Cursor Alphablend:       ~ -alpha
+        Disable JPEG:            ~ -nojpeg
+        Prefer raw for localhost ~ -rawlocal
+        Full Color                 as many colors as local screen allows.
+        Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
+        16 bit color (BGR565)    ~ -16bpp / -bgr565
+        8  bit color (BGR233)    ~ -bgr233
+        256 colors               ~ -bgr233 default # of colors.
+         64 colors               ~ -bgr222 / -use64
+          8 colors               ~ -bgr111 / -use8
+
+        Disable Remote Input       Ultravnc ext. Try to prevent input and
+                                   viewing of monitor at physical display.
+        Single Window              Ultravnc ext. Grab and view a single window.
+                                   (click on the window you want).
+        Set 1/n Server Scale       Ultravnc ext. Scale desktop by 1/n.
+                                   prompt is from the terminal.
+        Text Chat                  Ultravnc ext. Do Text Chat, currently
+                                   input via the terminal (no window).
+
+        Note: the Ultravnc extensions only apply to servers that support
+              them.  x11vnc/libvncserver supports some of them.
 
    Nearly all of these can be changed dynamically in the Popup menu.
 
@@ -9793,7 +9919,7 @@ Enhanced TightVNC viewer options:
      _________________________________________________________________
 
    Hopefully this tool will make it convenient for people to help test
-   and use the [8]built-in SSL support in x11vnc. Extra testing of this
+   and use the [10]built-in SSL support in x11vnc. Extra testing of this
    feature is much appreciated!! Thanks.
 
    Please Help Test the newly added features:
@@ -9806,9 +9932,9 @@ Enhanced TightVNC viewer options:
    Server machine, and to mount your local Windows or Samba shares on the
    remote VNC Server machine. Basically these new features try to
    automate the tricks described here:
-    [9]http://www.karlrunge.com/x11vnc/#faq-smb-shares
-    [10]http://www.karlrunge.com/x11vnc/#faq-cups
-    [11]http://www.karlrunge.com/x11vnc/#faq-sound
+    [11]http://www.karlrunge.com/x11vnc/#faq-smb-shares
+    [12]http://www.karlrunge.com/x11vnc/#faq-cups
+    [13]http://www.karlrunge.com/x11vnc/#faq-sound
 
    (and there may be kinks to work out).
      _________________________________________________________________
@@ -9816,30 +9942,30 @@ Enhanced TightVNC viewer options:
    Downloading: This project can be downloaded here, choose the archive
    file bundle that best suits you (e.g. no source code, windows only,
    unix only, zip, tar etc):
-  [12]ssvnc_windows_only-1.0.12.zip      Windows Binaries Only.  No source incl
+  [14]ssvnc_windows_only-1.0.13.zip      Windows Binaries Only.  No source incl
 uded (~6MB)
-  [13]ssvnc_no_windows-1.0.12.tar.gz     Unix and Mac OS X Only. No Windows bin
+  [15]ssvnc_no_windows-1.0.13.tar.gz     Unix and Mac OS X Only. No Windows bin
 aries.  Source included. (~3.5MB)
-  [14]ssvnc_unix_only-1.0.12.tar.gz      Unix Binaries Only.     No source incl
+  [16]ssvnc_unix_only-1.0.13.tar.gz      Unix Binaries Only.     No source incl
 uded. (~1MB)
-  [15]ssvnc_unix_minimal-1.0.12.tar.gz   Unix Minimal.  You must supply your ow
+  [17]ssvnc_unix_minimal-1.0.13.tar.gz   Unix Minimal.  You must supply your ow
 n vncviewer and stunnel. (~0.1MB)
 
-  [16]ssvnc-1.0.12.tar.gz                All Unix, Mac OS X, and Windows binari
+  [18]ssvnc-1.0.13.tar.gz                All Unix, Mac OS X, and Windows binari
 es and source TGZ. (~10MB)
-  [17]ssvnc-1.0.12.zip                   All Unix, Mac OS X, and Windows binari
+  [19]ssvnc-1.0.13.zip                   All Unix, Mac OS X, and Windows binari
 es and source ZIP. (~10MB)
-  [18]ssvnc_all-1.0.12.zip               All Unix, Mac OS X, and Windows binari
+  [20]ssvnc_all-1.0.13.zip               All Unix, Mac OS X, and Windows binari
 es and source AND full archives in the zip dir. (~12MB)
 
-   You can try for an older one by replacing, e.g. ".12" by ".11", etc.
+   You can try for an older one by replacing, e.g. ".13" by ".11", etc.
 
    Sorry for the inconvenience of lumping all the Unix binaries and
    source together in one archive. To save space you can delete the src
    subdirectory if you like.
 
    A self-extracting and running file for the "ssvnc_unix_minimal"
-   package is here: [19]ssvnc. Save it as filename "ssvnc", type "chmod
+   package is here: [21]ssvnc. Save it as filename "ssvnc", type "chmod
    755 ./ssvnc", and then launch the GUI via typing "./ssvnc". Note that
    this "ssvnc_unix_minimal" mode requires you install the "stunnel" and
    "vncviewer" programs externally (for example, install your distros'
@@ -9858,6 +9984,9 @@ es and source AND full archives in the zip dir. (~12MB)
     Darwin.Power.Macintosh
     Darwin.i386
 
+   (some of these are out of date because I no longer have access to
+   machines running those OS's).
+
    Note: some of the above binaries depend on libssl.so.0.9.7, whereas
    some recent distros only provide libssl.so.0.9.8 by default (for
    compatibility reasons they should install both by default but not all
@@ -9875,20 +10004,13 @@ es and source AND full archives in the zip dir. (~12MB)
    redistribute the above because of cryptographic software they contain
    or for other reasons. Please check out your situation and information
    at the following and related sites:
-        [20]http://www.stunnel.org
-        [21]http://stunnel.mirt.net
-        [22]http://www.openssl.org
-        [23]http://www.chiark.greenend.org.uk/~sgtatham/putty/
-        [24]http://www.tightvnc.com
-        [25]http://www.realvnc.com
-        [26]http://sourceforge.net/projects/cotvnc/
-
-   It is my belief (but I cannot be absolutely sure) that the bundle
-   ssvnc_no_windows-1.0.12.tar.gz contains no cryptographic software
-   (again, if your situation warrants, you will need to check). This
-   "no_windows" tarball only contains software (from the above URL's and
-   elsewhere) that will use cryptographic software (libraries) already
-   installed on your system. See the section on this in the README below.
+        [22]http://www.stunnel.org
+        [23]http://stunnel.mirt.net
+        [24]http://www.openssl.org
+        [25]http://www.chiark.greenend.org.uk/~sgtatham/putty/
+        [26]http://www.tightvnc.com
+        [27]http://www.realvnc.com
+        [28]http://sourceforge.net/projects/cotvnc/
      _________________________________________________________________
 
    Here is the toplevel README from the bundle:
@@ -9916,17 +10038,15 @@ See these sites and related ones for more information:
         http://www.chiark.greenend.org.uk/~sgtatham/putty/
         http://sourceforge.net/projects/cotvnc/
 
-Note: Some of the Windows binaries included contain cryptographic software
-that you may not be allowed to download, use, or redistribute.  Please
-check your situation first before downloading any of these bundles.
-See the survey http://rechten.uvt.nl/koops/cryptolaw/index.htm for useful
-information.  The Unix programs do not contain cryptographic software, but
-rather will make use of cryptographic libraries that are installed on your
-Unix system.  Depending on your circumstances you may still need to check.
+Note: Some of the binaries included contain cryptographic software that
+you may not be allowed to download, use, or redistribute.  Please check
+your situation first before downloading any of these bundles.  See the
+survey http://rechten.uvt.nl/koops/cryptolaw/index.htm for useful
+information.
 
-All work by Karl J. Runge in this project is Copyright (c) 2006 Karl J. Runge
-and is licensed under the GPL as described in the file COPYING in this
-directory.
+All work done by Karl J. Runge in this project is
+Copyright (c) 2006-2007 Karl J. Runge and is licensed under the GPL as
+described in the file COPYING in this directory.
 
 All the files and information in this project are provided "AS IS"
 without any warranty of any kind.  Use them at your own risk.
@@ -9946,7 +10066,7 @@ The short name of the project is "ssvnc" for SSL/SSH VNC Viewer.
 
 It is a self-contained bundle, you could carry it around on, say,
 a USB memory stick for secure VNC viewing from almost any machine,
-Unix or Windows.
+Unix, Mac, or Windows.
 
 Features:
 --------
@@ -9992,6 +10112,8 @@ The enhanced TightVNC viewer features are:
           (-16bpp/-bgr565)
 
         - Cursor alphablending with x11vnc at 32bpp (-alpha option)
+
+        - Maintains its own BackingStore if the X server does not
 
         - x11vnc's client-side caching -ncache method cropping option
           (-ycrop n). This will "hide" the large pixel buffer cache
@@ -10043,7 +10165,7 @@ Unix and Mac OS X:
 
     Unpack the archive:
 
-        % gzip -dc ssvnc-1.0.12.tar.gz | tar xvf -
+        % gzip -dc ssvnc-1.0.13.tar.gz | tar xvf -
 
     Run the GUI:
 
@@ -10053,16 +10175,18 @@ Unix and Mac OS X:
 
     On MacOSX you could also click on the SSVNC app in the Finder.
 
-    The smaller file "ssvnc_no_windows-1.0.12.tar.gz"
+    The smaller file "ssvnc_no_windows-1.0.13.tar.gz"
     could have been used as well.
 
+    On MacOSX there is also a SSVNC.app directory icon you can click on
+    in Finder to start the application.
 
 
 Windows:
 
     Unzip, using WinZip or a similar utility, the zip file:
 
-        ssvnc-1.0.12.zip
+        ssvnc-1.0.13.zip
 
     Run the GUI, e.g.:
 
@@ -10074,12 +10198,30 @@ Windows:
 
     select Open, and then OK to launch it.
 
-    The smaller file "ssvnc_windows_only-1.0.12.zip"
+    The smaller file "ssvnc_windows_only-1.0.13.zip"
     could have been used as well.
 
     You can make a Windows shortcut to this program if you want to.
 
     See the Windows/README.txt for more info.
+
+
+
+Important Note for Windows Vista: One user reports that on Windows Vista
+if you move or extract the "ssvnc" folder down to the "Program Files"
+folder you will be prompted to do this as the Administrator. But then
+when you start up ssvnc, as a regular user, it cannot create files in
+that folder and so it fails to run properly. We recommend to not copy
+or extract the "ssvnc" folder into "Program Files". Rather, extract
+it to somewhere you have write permission (e.g. C:\ or your User dir)
+and create a Shortcut to ssvnc.exe on the desktop.
+
+If you must put a launcher file down in "Program Files", perhaps an
+"ssvnc.bat" that looks like this:
+
+C:
+cd \ssvnc\Windows
+ssvnc.exe
 
 
 Bundle Info:
@@ -10153,6 +10295,8 @@ README is in, i.e "ssvnc") and like this:
 
 To use custom locations for libraries see the LDFLAGS_OS and CPPFLAGS_OS
 description at the top of the build.unix script.
+
+Feel free to ask us if you need help running ./build.unix
 
 
 The programs:
@@ -10286,32 +10430,34 @@ See also:
 
 References
 
-   1. http://www.karlrunge.com/x11vnc/index.html
-   2. http://www.karlrunge.com/x11vnc/index.html#faq-xfixes-alpha-hacks
-   3. http://www.karlrunge.com/x11vnc/index.html#faq-client-caching
-   4. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-ext
-   5. http://www.karlrunge.com/x11vnc/index.html#faq-xfixes-alpha-hacks
-   6. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#faq-client-caching
-   7. http://www.karlrunge.com/x11vnc/index.html#faq-scrollbars
-   8. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
-   9. http://www.karlrunge.com/x11vnc/index.html#faq-smb-shares
-  10. http://www.karlrunge.com/x11vnc/index.html#faq-cups
-  11. http://www.karlrunge.com/x11vnc/index.html#faq-sound
-  12. http://www.karlrunge.com/x11vnc/etv/ssvnc_windows_only-1.0.12.zip
-  13. http://www.karlrunge.com/x11vnc/etv/ssvnc_no_windows-1.0.12.tar.gz
-  14. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_only-1.0.12.tar.gz
-  15. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_minimal-1.0.12.tar.gz
-  16. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.12.tar.gz
-  17. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.12.zip
-  18. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.12.zip
-  19. http://www.karlrunge.com/x11vnc/etv/ssvnc
-  20. http://www.stunnel.org/
-  21. http://stunnel.mirt.net/
-  22. http://www.openssl.org/
-  23. http://www.chiark.greenend.org.uk/~sgtatham/putty/
-  24. http://www.tightvnc.com/
-  25. http://www.realvnc.com/
-  26. http://sourceforge.net/projects/cotvnc/
+   1. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#download
+   2. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#quickstart
+   3. http://www.karlrunge.com/x11vnc/index.html
+   4. http://www.karlrunge.com/x11vnc/index.html#faq-xfixes-alpha-hacks
+   5. http://www.karlrunge.com/x11vnc/index.html#faq-client-caching
+   6. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-ext
+   7. http://www.karlrunge.com/x11vnc/index.html#faq-xfixes-alpha-hacks
+   8. http://www.karlrunge.com/x11vnc/index.html#faq-client-caching
+   9. http://www.karlrunge.com/x11vnc/index.html#faq-scrollbars
+  10. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
+  11. http://www.karlrunge.com/x11vnc/index.html#faq-smb-shares
+  12. http://www.karlrunge.com/x11vnc/index.html#faq-cups
+  13. http://www.karlrunge.com/x11vnc/index.html#faq-sound
+  14. http://www.karlrunge.com/x11vnc/etv/ssvnc_windows_only-1.0.13.zip
+  15. http://www.karlrunge.com/x11vnc/etv/ssvnc_no_windows-1.0.13.tar.gz
+  16. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_only-1.0.13.tar.gz
+  17. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_minimal-1.0.13.tar.gz
+  18. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.13.tar.gz
+  19. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.13.zip
+  20. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.13.zip
+  21. http://www.karlrunge.com/x11vnc/etv/ssvnc
+  22. http://www.stunnel.org/
+  23. http://stunnel.mirt.net/
+  24. http://www.openssl.org/
+  25. http://www.chiark.greenend.org.uk/~sgtatham/putty/
+  26. http://www.tightvnc.com/
+  27. http://www.realvnc.com/
+  28. http://sourceforge.net/projects/cotvnc/
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/x11vnc_opts.html:
@@ -10324,7 +10470,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.5 lastmod: 2007-03-13
+x11vnc: allow VNC connections to real X11 displays. 0.8.5 lastmod: 2007-03-19
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -10348,62 +10494,62 @@ x11vnc options:
   -sslnofail               -ssldir [dir]            -sslverify [path]      
   -sslGenCA [dir]          -sslGenCert type name    -sslEncKey [pem]       
   -sslCertInfo [pem]       -sslDelCert [pem]        -stunnel [pem]         
-  -stunnel3  [pem]         -https [port]            -usepw                 
-  -storepasswd pass file   -nopw                    -accept string         
-  -afteraccept string      -gone string             -users list            
-  -noshm                   -flipbyteorder           -onetile               
-  -solid [color]           -blackout string         -xinerama              
-  -noxinerama              -xtrap                   -xrandr [mode]         
-  -rotate string           -padgeom WxH             -o logfile             
-  -flag file               -rc filename             -norc                  
-  -env VAR=VALUE           -prog /path/to/x11vnc    -h, -help              
-  -?, -opts                -V, -version             -license               
-  -dbg                     -q, -quiet               -v, -verbose           
-  -bg                      -modtweak                -nomodtweak            
-  -xkb                     -noxkb                   -capslock              
-  -skip_lockkeys           -skip_keycodes string    -sloppy_keys           
-  -skip_dups               -noskip_dups             -add_keysyms           
-  -noadd_keysyms           -clear_mods              -clear_keys            
-  -remap string            -norepeat                -repeat                
-  -nofb                    -nobell                  -nosel                 
-  -noprimary               -nosetprimary            -noclipboard           
-  -nosetclipboard          -seldir string           -cursor [mode]         
-  -nocursor                -cursor_drag             -arrow n               
-  -noxfixes                -alphacut n              -alphafrac fraction    
-  -alpharemove             -noalphablend            -nocursorshape         
-  -cursorpos               -nocursorpos             -xwarppointer          
-  -noxwarppointer          -buttonmap string        -nodragging            
-  -ncache n                -ncache_cr               -ncache_no_moveraise   
-  -ncache_no_dtchange      -ncache_no_rootpixmap    -ncache_keep_anims     
-  -ncache_old_wm           -ncache_pad n            -wireframe [str]       
-  -nowireframe             -nowireframelocal        -wirecopyrect mode     
-  -nowirecopyrect          -debug_wireframe         -scrollcopyrect mode   
-  -noscrollcopyrect        -scr_area n              -scr_skip list         
-  -scr_inc list            -scr_keys list           -scr_term list         
-  -scr_keyrepeat lo-hi     -scr_parms string        -fixscreen string      
-  -debug_scroll            -noxrecord               -grab_buster           
-  -nograb_buster           -debug_grabs             -debug_sel             
-  -pointer_mode n          -input_skip n            -allinput              
-  -speeds rd,bw,lat        -wmdt string             -debug_pointer         
-  -debug_keyboard          -defer time              -wait time             
-  -wait_ui factor          -nowait_bog              -slow_fb time          
-  -readtimeout n           -nap                     -nonap                 
-  -sb time                 -nofbpm                  -fbpm                  
-  -nodpms                  -dpms                    -forcedpms             
-  -clientdpms              -noserverdpms            -noultraext            
-  -noxdamage               -xd_area A               -xd_mem f              
-  -sigpipe string          -threads                 -nothreads             
-  -fs f                    -gaps n                  -grow n                
-  -fuzz n                  -debug_tiles             -snapfb                
-  -rawfb string            -freqtab file            -pipeinput cmd         
-  -macnodim                -macnosleep              -macnosaver            
-  -macnowait               -macwheel n              -macnoswap             
-  -macnoresize             -maciconanim n           -macmenu               
-  -gui [gui-opts]          -remote command          -query variable        
-  -QD variable             -sync                    -noremote              
-  -yesremote               -unsafe                  -safer                 
-  -privremote              -nocmds                  -allowedcmds list      
-  -deny_all              
+  -stunnel3  [pem]         -https [port]            -httpsredir [port]     
+  -usepw                   -storepasswd pass file   -nopw                  
+  -accept string           -afteraccept string      -gone string           
+  -users list              -noshm                   -flipbyteorder         
+  -onetile                 -solid [color]           -blackout string       
+  -xinerama                -noxinerama              -xtrap                 
+  -xrandr [mode]           -rotate string           -padgeom WxH           
+  -o logfile               -flag file               -rc filename           
+  -norc                    -env VAR=VALUE           -prog /path/to/x11vnc  
+  -h, -help                -?, -opts                -V, -version           
+  -license                 -dbg                     -q, -quiet             
+  -v, -verbose             -bg                      -modtweak              
+  -nomodtweak              -xkb                     -noxkb                 
+  -capslock                -skip_lockkeys           -skip_keycodes string  
+  -sloppy_keys             -skip_dups               -noskip_dups           
+  -add_keysyms             -noadd_keysyms           -clear_mods            
+  -clear_keys              -remap string            -norepeat              
+  -repeat                  -nofb                    -nobell                
+  -nosel                   -noprimary               -nosetprimary          
+  -noclipboard             -nosetclipboard          -seldir string         
+  -cursor [mode]           -nocursor                -cursor_drag           
+  -arrow n                 -noxfixes                -alphacut n            
+  -alphafrac fraction      -alpharemove             -noalphablend          
+  -nocursorshape           -cursorpos               -nocursorpos           
+  -xwarppointer            -noxwarppointer          -buttonmap string      
+  -nodragging              -ncache n                -ncache_cr             
+  -ncache_no_moveraise     -ncache_no_dtchange      -ncache_no_rootpixmap  
+  -ncache_keep_anims       -ncache_old_wm           -ncache_pad n          
+  -wireframe [str]         -nowireframe             -nowireframelocal      
+  -wirecopyrect mode       -nowirecopyrect          -debug_wireframe       
+  -scrollcopyrect mode     -noscrollcopyrect        -scr_area n            
+  -scr_skip list           -scr_inc list            -scr_keys list         
+  -scr_term list           -scr_keyrepeat lo-hi     -scr_parms string      
+  -fixscreen string        -debug_scroll            -noxrecord             
+  -grab_buster             -nograb_buster           -debug_grabs           
+  -debug_sel               -pointer_mode n          -input_skip n          
+  -allinput                -speeds rd,bw,lat        -wmdt string           
+  -debug_pointer           -debug_keyboard          -defer time            
+  -wait time               -wait_ui factor          -nowait_bog            
+  -slow_fb time            -readtimeout n           -nap                   
+  -nonap                   -sb time                 -nofbpm                
+  -fbpm                    -nodpms                  -dpms                  
+  -forcedpms               -clientdpms              -noserverdpms          
+  -noultraext              -noxdamage               -xd_area A             
+  -xd_mem f                -sigpipe string          -threads               
+  -nothreads               -fs f                    -gaps n                
+  -grow n                  -fuzz n                  -debug_tiles           
+  -snapfb                  -rawfb string            -freqtab file          
+  -pipeinput cmd           -macnodim                -macnosleep            
+  -macnosaver              -macnowait               -macwheel n            
+  -macnoswap               -macnoresize             -maciconanim n         
+  -macmenu                 -gui [gui-opts]          -remote command        
+  -query variable          -QD variable             -sync                  
+  -noremote                -yesremote               -unsafe                
+  -safer                   -privremote              -nocmds                
+  -allowedcmds list        -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -10437,7 +10583,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.8.5 lastmod: 2007-03-13
+x11vnc: allow VNC connections to real X11 displays. 0.8.5 lastmod: 2007-03-19
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -11853,6 +11999,26 @@ Options:
                        The SSL Java applet directory is specified via the
                        -httpdir option.  If not supplied it will try to guess
                        the directory as though the -http option was supplied.
+
+-httpsredir [port]     In -ssl mode with the Java applet retrieved via HTTPS:
+                       when the HTML file containing applet parameters
+                       ('index.vnc' or 'proxy.vnc') is sent do not set the
+                       applet PORT parameter to the actual VNC port but set it
+                       to "port" instead.  If "port" is not supplied, then
+                       the port number is guessed from the Host: HTTP header.
+
+                       This is useful when an incoming TCP connection
+                       redirection is performed by a router/gateway/firewall
+                       from one port to an internal machine where x11vnc is
+                       listening on a different port. The Java applet needs to
+                       connect to the firewall/router port, not the VNC port
+                       on the internal workstation. For example, one could
+                       redir from mygateway.com:443 to workstation:5900.
+
+                       This spares the user from having to type in
+                       https://mygateway.com/?PORT=443 into their web browser
+                       (note 443 is the default https port; other ports must
+                       be explicity indicated: https://mygateway.com:8000/...)
 
 -usepw                 If no other password method was supplied on the command
                        line, first look for ~/.vnc/passwd and if found use it
@@ -14181,17 +14347,17 @@ n
                        http_url auth xauth users rootshift clipshift
                        scale_str scaled_x scaled_y scale_numer scale_denom
                        scale_fac scaling_blend scaling_nomult4 scaling_pad
-                       scaling_interpolate inetd privremote unsafe safer nocmds
-                       passwdfile unixpw unixpw_nis unixpw_list ssl ssl_pem
-                       sslverify stunnel stunnel_pem https usepw using_shm
-                       logfile o flag rc norc h help V version lastmod bg
-                       sigpipe threads readrate netrate netlatency pipeinput
-                       clients client_count pid ext_xtest ext_xtrap ext_xrecord
-                       ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes
-                       ext_xdamage ext_xrandr rootwin num_buttons button_mask
-                       mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y
-                       wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y
-                       rfbauth passwd viewpasswd
+                       scaling_interpolate inetd privremote unsafe safer
+                       nocmds passwdfile unixpw unixpw_nis unixpw_list ssl
+                       ssl_pem sslverify stunnel stunnel_pem https httpsredir
+                       usepw using_shm logfile o flag rc norc h help V version
+                       lastmod bg sigpipe threads readrate netrate netlatency
+                       pipeinput clients client_count pid ext_xtest ext_xtrap
+                       ext_xrecord ext_xkb ext_xshm ext_xinerama ext_overlay
+                       ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
+                       button_mask mouse_x mouse_y bpp depth indexed_color
+                       dpy_x dpy_y wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y
+                       coff_x coff_y rfbauth passwd viewpasswd
 
 
 -QD variable           Just like -query variable, but returns the default

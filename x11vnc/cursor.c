@@ -1209,6 +1209,16 @@ static rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
 	c->cleanupRichSource = FALSE;
 	c->richSource = (unsigned char *) rich;
 
+	/* zeroes mean interpolate the rich cursor somehow and use B+W */
+	c->foreRed   = 0;
+	c->foreGreen = 0;
+	c->foreBlue  = 0;
+	c->backRed   = 0;
+	c->backGreen = 0;
+	c->backBlue  = 0;
+
+	c->source = NULL;
+
 	if (alpha_blend && !indexed_color) {
 		c->alphaSource = (unsigned char *) alpha;
 		c->alphaPreMultiplied = TRUE;

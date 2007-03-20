@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.5, lastmod: 2007-03-13
+         version: 0.8.5, lastmod: 2007-03-19
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1641,6 +1641,28 @@ The URL to use is printed out at startup.
 The SSL Java applet directory is specified via the
 \fB-httpdir\fR option.  If not supplied it will try to guess
 the directory as though the \fB-http\fR option was supplied.
+.PP
+\fB-httpsredir\fR \fI[port]\fR
+.IP
+In \fB-ssl\fR mode with the Java applet retrieved via HTTPS:
+when the HTML file containing applet parameters
+('index.vnc' or 'proxy.vnc') is sent do not set the
+applet PORT parameter to the actual VNC port but set it
+to "port" instead.  If "port" is not supplied, then
+the port number is guessed from the Host: HTTP header.
+.IP
+This is useful when an incoming TCP connection
+redirection is performed by a router/gateway/firewall
+from one port to an internal machine where x11vnc is
+listening on a different port. The Java applet needs to
+connect to the firewall/router port, not the VNC port
+on the internal workstation. For example, one could
+redir from mygateway.com:443 to workstation:5900.
+.IP
+This spares the user from having to type in
+https://mygateway.com/?PORT=443 into their web browser
+(note 443 is the default https port; other ports must
+be explicity indicated: https://mygateway.com:8000/...)
 .PP
 \fB-usepw\fR
 .IP
@@ -4638,17 +4660,17 @@ aro=  noop display vncdisplay desktopname guess_desktop
 http_url auth xauth users rootshift clipshift
 scale_str scaled_x scaled_y scale_numer scale_denom
 scale_fac scaling_blend scaling_nomult4 scaling_pad
-scaling_interpolate inetd privremote unsafe safer nocmds
-passwdfile unixpw unixpw_nis unixpw_list ssl ssl_pem
-sslverify stunnel stunnel_pem https usepw using_shm
-logfile o flag rc norc h help V version lastmod bg
-sigpipe threads readrate netrate netlatency pipeinput
-clients client_count pid ext_xtest ext_xtrap ext_xrecord
-ext_xkb ext_xshm ext_xinerama ext_overlay ext_xfixes
-ext_xdamage ext_xrandr rootwin num_buttons button_mask
-mouse_x mouse_y bpp depth indexed_color dpy_x dpy_y
-wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y
-rfbauth passwd viewpasswd
+scaling_interpolate inetd privremote unsafe safer
+nocmds passwdfile unixpw unixpw_nis unixpw_list ssl
+ssl_pem sslverify stunnel stunnel_pem https httpsredir
+usepw using_shm logfile o flag rc norc h help V version
+lastmod bg sigpipe threads readrate netrate netlatency
+pipeinput clients client_count pid ext_xtest ext_xtrap
+ext_xrecord ext_xkb ext_xshm ext_xinerama ext_overlay
+ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
+button_mask mouse_x mouse_y bpp depth indexed_color
+dpy_x dpy_y wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y
+coff_x coff_y rfbauth passwd viewpasswd
 .PP
 \fB-QD\fR \fIvariable\fR
 .IP

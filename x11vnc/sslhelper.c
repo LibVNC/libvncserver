@@ -1090,6 +1090,9 @@ static int is_ssl_readable(int s_in, time_t last_https, char *last_get,
 			tv.tv_sec  = 4;
 		}
 	}
+	if (getenv("X11VNC_HTTPS_VS_VNC_TIMEOUT")) {
+		tv.tv_sec  = atoi(getenv("X11VNC_HTTPS_VS_VNC_TIMEOUT"));
+	}
 if (db) fprintf(stderr, "tv_sec: %d - %s\n", (int) tv.tv_sec, last_get);
 
 	FD_ZERO(&rd);
@@ -1296,7 +1299,7 @@ void accept_openssl(int mode) {
 #endif
 	rfbClientPtr client;
 	pid_t pid;
-	char uniq[] = "__evilrats__";
+	char uniq[] = "_evilrats_";
 	char cookie[128], rcookie[128], *name = NULL;
 	static time_t last_https = 0;
 	static char last_get[128];
@@ -1627,6 +1630,27 @@ void accept_openssl(int mode) {
 			/* send the failure tag: */
 			strcpy(tbuf, uniq);
 
+			if (https_port_redir < 0) {
+				char *q = strstr(buf, "Host:");
+				int fport = 443;
+				char num[16];
+				if (q && strstr(q, "\n")) {
+				    q += strlen("Host:") + 1;
+				    while (*q != '\n') {
+					int p;
+					if (*q == ':' && sscanf(q, ":%d", &p) == 1) {
+						if (p > 0 && p < 65536) {
+							fport = p;
+							break;
+						}
+					}
+					q++;
+				    }
+				}
+				sprintf(num, "HP=%d,", fport);
+				strcat(tbuf, num);
+			}
+
 			if (strstr(buf, "HTTP/") != NULL)  {
 				char *q, *str;
 				/*
@@ -1758,7 +1782,44 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 			}
 			ssl_helper_pid(pid, -2);
 
-			if (mode == OPENSSL_INETD) {
+			if (https_port_redir) {
+				double start;
+				int origport = screen->port;
+				int useport = screen->port;
+				/* to expand $PORT correctly in index.vnc */
+				if (https_port_redir < 0) {
+					char *q = strstr(rcookie, "HP=");
+					if (q) {
+						int p;
+						if (sscanf(q, "HP=%d,", &p) == 1) {
+							useport = p;
+						}
+					}
+				} else {
+					useport = https_port_redir;
+				}
+				screen->port = useport;
+				if (origport != useport) {
+					rfbLog("SSL: -httpsredir guess port: %d\n", screen->port);
+				}
+
+				start = dnow();
+				while (dnow() < start + 10.0) {
+					rfbPE(10000);
+					usleep(10000);
+					waitpid(pid, &status, WNOHANG); 
+					if (kill(pid, 0) != 0) {
+						rfbPE(10000);
+						rfbPE(10000);
+						break;
+					}
+				}
+				screen->port = origport;
+				rfbLog("SSL: guessing child https finished.\n");
+				if (mode == OPENSSL_INETD) {
+					clean_up_exit(1);
+				}
+			} else if (mode == OPENSSL_INETD) {
 				double start;
 				/* to expand $PORT correctly in index.vnc */
 				if (screen->port == 0) {

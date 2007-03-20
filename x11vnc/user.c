@@ -1198,8 +1198,17 @@ void user_supplied_opts(char *opts) {
 				clear_mods = 2;
 			} else if (!strcmp(p, "noncache") ||
 			    !strcmp(p, "nc")) {
-				ncache = 0;
+				ncache  = 0;
 				ncache0 = 0;
+			} else if (strstr(p, "nc=") == p) {
+				int n2 = atoi(p + strlen("nc="));
+				if (nabs(n2) < nabs(ncache)) {
+					if (ncache < 0) {
+						ncache = -nabs(n2);
+					} else {
+						ncache = nabs(n2);
+					}
+				}
 			} else if (!strcmp(p, "repeat")) {
 				no_autorepeat = 0;
 			} else if (strstr(p, "speeds=") == p ||

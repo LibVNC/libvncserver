@@ -4535,6 +4535,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(stunnel_pem));
 		} else if (!strcmp(p, "https")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, https_port_num);
+		} else if (!strcmp(p, "httpsredir")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, https_port_redir);
 #endif
 		} else if (!strcmp(p, "usepw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, usepw);

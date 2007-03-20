@@ -1983,6 +1983,15 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 			}
+		} else if (!strcmp(arg, "-httpsredir")) {
+			https_port_redir = -1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					https_port_redir = atoi(s);
+					i++;
+				}
+			}
 #endif
 		} else if (!strcmp(arg, "-nopw")) {
 			nopw = 1;
@@ -3069,6 +3078,10 @@ int main(int argc, char* argv[]) {
 	if (ncache < 0) {
 		ncache_beta_tester = 1;
 		ncache = -ncache;
+		if (try_http || got_httpdir) {
+			/* JVM usually not set to handle all the memory */
+			ncache = 0;
+		}
 	}
 
 	if (raw_fb_str) {
