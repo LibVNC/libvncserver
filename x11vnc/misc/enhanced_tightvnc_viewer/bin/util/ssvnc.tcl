@@ -883,6 +883,7 @@ proc get_ipconfig {} {
 	append file [pid]
 	append file ".txt"
 
+	# VF
 	catch {[exec winipcfg /Batch $file]}
 
 	if [file exists $file] {
@@ -984,6 +985,7 @@ proc windows_start_sound_daemon {file} {
 	global env
 	global use_sound sound_daemon_local_cmd sound_daemon_local_start
 
+	# VF
 	regsub {\.bat} $file "snd.bat" file2
 	set fh2 [open $file2 "w"]
 
@@ -1240,11 +1242,13 @@ proc launch_windows_ssh {hp file n} {
 		set setup_cmds [ugly_setup_scripts pre $tag] 
 		
 		if {$setup_cmds != ""} {
+			# VF
 			regsub {\.bat} $file "pre.cmd" file_pre_cmd
 			set fh [open $file_pre_cmd "w"]
 			puts $fh "$setup_cmds sleep 10; "
 			close $fh
 
+			# VF
 			regsub {\.bat} $file "pre.bat" file_pre
 			set fh [open $file_pre "w"]
 			set plink_str "plink.exe -ssh -C -P $ssh_port -m $file_pre_cmd $verb -t" 
@@ -1290,6 +1294,7 @@ proc launch_windows_ssh {hp file n} {
 
 	set file_cmd ""
 	if {$setup_cmds != ""} {
+		# VF
 		regsub {\.bat} $file ".cmd" file_cmd
 		set fh_cmd [open $file_cmd "w"]
 
@@ -1315,6 +1320,7 @@ proc launch_windows_ssh {hp file n} {
 		windows_start_sound_daemon $file
 	}
 
+	# VF
 	set fh [open $file "w"]
 	if {$is_win9x} {
 		puts $fh "cd $pwd"
@@ -1392,6 +1398,7 @@ proc launch_windows_ssh {hp file n} {
 	if {$double_ssh != ""} {
 		set plink_str_double_ssh "plink.exe -ssh -t $pw $double_ssh \"echo sleep 60 ...; sleep 60; echo done.\"" 
 
+		# VF
 		regsub {\.bat} $file "dob.bat" file_double
 		set fhdouble [open $file_double "w"]
 		puts $fhdouble $plink_str_double_ssh
@@ -2089,6 +2096,7 @@ proc fetch_cert {} {
 		global is_windows
 		set tmp "/tmp/cert.hsh.[pid]"
 		if {$is_windows} {
+			# VF
 			set tmp cert.hsh
 		}
 		set fh ""
@@ -2181,6 +2189,7 @@ proc fetch_cert_windows {hp} {
 
 	set ossl [get_openssl]
 	update
+	# VF
 	set tin tmpin.txt
 	set tou tmpout.txt
 	set fh ""
@@ -2891,10 +2900,11 @@ proc launch {{hp ""}} {
 		}
 	}
 
+	# VF
 	set prefix "stunnel-vnc"
 	set suffix "conf"
 	if {$use_ssh || $use_sshssl} {
-		set prefix "plink-vnc"
+		set prefix "plink_vnc"
 		set suffix "bat"
 	}
 
@@ -3450,6 +3460,7 @@ emailAddress_max                = 64
 	global is_windows
 
 	if {$is_windows} {
+		# VF
 		set tmp "cert.cfg"
 	} else {
 		set tmp "/tmp/cert.cfg."
@@ -7439,6 +7450,34 @@ proc set_options {} {
 	focus .o
 }
 
+proc check_writable {} {
+	set test test[pid].txt
+	catch {set f [open $test "w"]; puts $f "test"; close $f}
+
+	###catch {file delete -force $test}	# testing.
+
+	if ![file exists $test] {
+		global env
+		if [info exists env(HOME)] {
+			set dir "$env(HOME)/ss_vnc/cache"	
+			catch {file mkdir $dir}
+			if ![file exists $dir] {
+				return
+			}
+			foreach f [glob -type f * */* */*/*] {
+				set dest "$dir/$f"
+				set dirn [file dirname $dest]
+				catch {file mkdir $dirn}
+				catch {file copy -force -- $f $dest}
+			}
+			cd $dir
+			###catch {set f [open $test "w"]; puts $f "test"; close $f}
+		}
+	} else {
+		catch {file delete -force $test}
+	}
+}
+
 global env
 set is_windows 0
 set help_font "-font fixed"
@@ -7452,6 +7491,10 @@ if {[regexp -nocase {Windows.9} $tcl_platform(os)]} {
 	set is_win9x 1
 } else {
 	set is_win9x 0
+}
+
+if {$is_windows} {
+	check_writable
 }
 
 set uname ""

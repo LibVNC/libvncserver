@@ -22,17 +22,15 @@ See these sites and related ones for more information:
         http://www.chiark.greenend.org.uk/~sgtatham/putty/
 	http://sourceforge.net/projects/cotvnc/
 
-Note: Some of the Windows binaries included contain cryptographic software
-that you may not be allowed to download, use, or redistribute.  Please
-check your situation first before downloading any of these bundles.
-See the survey http://rechten.uvt.nl/koops/cryptolaw/index.htm for useful
-information.  The Unix programs do not contain cryptographic software, but
-rather will make use of cryptographic libraries that are installed on your
-Unix system.  Depending on your circumstances you may still need to check.
+Note: Some of the binaries included contain cryptographic software that
+you may not be allowed to download, use, or redistribute.  Please check
+your situation first before downloading any of these bundles.  See the
+survey http://rechten.uvt.nl/koops/cryptolaw/index.htm for useful
+information.
 
-All work by Karl J. Runge in this project is Copyright (c) 2006 Karl J. Runge
-and is licensed under the GPL as described in the file COPYING in this
-directory.
+All work done by Karl J. Runge in this project is
+Copyright (c) 2006-2007 Karl J. Runge and is licensed under the GPL as
+described in the file COPYING in this directory.
 
 All the files and information in this project are provided "AS IS"
 without any warranty of any kind.  Use them at your own risk.
@@ -52,7 +50,7 @@ The short name of the project is "ssvnc" for SSL/SSH VNC Viewer.
 
 It is a self-contained bundle, you could carry it around on, say,
 a USB memory stick for secure VNC viewing from almost any machine,
-Unix or Windows.
+Unix, Mac, or Windows.
 
 Features:
 --------
@@ -98,6 +96,8 @@ The enhanced TightVNC viewer features are:
 	  (-16bpp/-bgr565)
 
 	- Cursor alphablending with x11vnc at 32bpp (-alpha option)
+
+	- Maintains its own BackingStore if the X server does not
 
 	- x11vnc's client-side caching -ncache method cropping option
 	  (-ycrop n). This will "hide" the large pixel buffer cache
@@ -188,7 +188,25 @@ Windows:
     You can make a Windows shortcut to this program if you want to.
 
     See the Windows/README.txt for more info.
+
     
+
+Important Note for Windows Vista: One user reports that on Windows Vista
+if you move or extract the "ssvnc" folder down to the "Program Files"
+folder you will be prompted to do this as the Administrator. But then
+when you start up ssvnc, as a regular user, it cannot create files in
+that folder and so it fails to run properly. We recommend to not copy
+or extract the "ssvnc" folder into "Program Files". Rather, extract
+it to somewhere you have write permission (e.g. C:\ or your User dir)
+and create a Shortcut to ssvnc.exe on the desktop.
+
+If you must put a launcher file down in "Program Files", perhaps an
+"ssvnc.bat" that looks like this:
+
+C:
+cd \ssvnc\Windows
+ssvnc.exe
+
 
 Bundle Info:
 ------------
@@ -261,6 +279,8 @@ README is in, i.e "ssvnc") and like this:
 
 To use custom locations for libraries see the LDFLAGS_OS and CPPFLAGS_OS
 description at the top of the build.unix script.
+
+Feel free to ask us if you need help running ./build.unix
 
 
 The programs:

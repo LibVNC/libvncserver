@@ -49,3 +49,21 @@ Misc:
 
 	Also, the kill.exe and tlist.exe programs in the w98 directory
 	came from diagnostic tools ftp site of Microsoft's.
+
+
+
+Important Note for Windows Vista: One user reports that on Windows Vista
+if you move or extract the "ssvnc" folder down to the "Program Files"
+folder you will be prompted to do this as the Administrator. But then
+when you start up ssvnc, as a regular user, it cannot create files in
+that folder and so it fails to run properly. We recommend to not copy
+or extract the "ssvnc" folder into "Program Files". Rather, extract
+it to somewhere you have write permission (e.g. C:\ or your User dir)
+and create a Shortcut to ssvnc.exe on the desktop.
+
+If you must put a launcher file down in "Program Files", perhaps an
+"ssvnc.bat" that looks like this:
+C:
+cd \ssvnc\Windows
+ssvnc.exe
+

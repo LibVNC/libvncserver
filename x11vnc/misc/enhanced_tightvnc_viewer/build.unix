@@ -87,13 +87,16 @@ mkdir -p $tmp || exit 1
 #
 libs="$tmp/libs"
 mkdir -p $libs || exit 1
-#for liba in libz.a libjpeg.a libssl.a libcrypto.a
-for liba in libz.a libjpeg.a
+for liba in libz.a libjpeg.a libssl.a libcrypto.a
+#for liba in libz.a libjpeg.a
 do
 	for dir in /usr/lib /lib /usr/local/lib /usr/pkg/lib /usr/sfw/lib /usr/openwin/lib
 	do
 		if [ "$name" = "Linux.x86_64" -o "$name" = "Linux.ppc64" ] ; then
 			dir64=`echo "$dir" | sed -e 's,lib,lib64,'`
+			if [ -d $dir64 ]; then
+				dir=$dir64
+			fi
 		fi
 		try="$dir/$liba"
 		if [ -f $try ]; then
@@ -126,6 +129,10 @@ END
 		type cc
 		type gcc
 	fi
+fi
+
+if [ -d /var/tmp/LIBS ]; then
+	LDFLAGS_OS="$LDFLAGS_OS -L/var/tmp/LIBS"
 fi
 
 if [ `uname` = "SunOS" ]; then

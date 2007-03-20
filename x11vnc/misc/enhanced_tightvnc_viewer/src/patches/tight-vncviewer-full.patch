@@ -1128,7 +1128,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cp_it vnc_unixsrc/vncviewer/c
 +ls -l ./vncviewer $dest /dist/src/apps/VNC/etc/libvncserver_cvs/expts/etv/ssvnc/bin/Linux.i686/vncviewer
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewer/cursor.c
 --- vnc_unixsrc.orig/vncviewer/cursor.c	2003-01-15 04:46:52.000000000 -0500
-+++ vnc_unixsrc/vncviewer/cursor.c	2007-02-08 18:46:24.000000000 -0500
++++ vnc_unixsrc/vncviewer/cursor.c	2007-03-17 22:48:34.000000000 -0400
 @@ -39,7 +39,7 @@
  
  static Bool prevSoftCursorSet = False;
@@ -1197,7 +1197,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
      free(buf);
      return False;
    }
-@@ -429,41 +435,51 @@
+@@ -429,41 +435,63 @@
  	  rcLockY + rcLockHeight > rcCursorY - rcHotY);
  }
  
@@ -1252,6 +1252,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 +	if (oper == OPER_SAVE) {
 +		/* Save screen area in memory. */
 +//fprintf(stderr, "OPER_SAVE\n");
++#if 0
  #ifdef MITSHM
 -    if (appData.useShm)
 -      XSync(dpy, False);
@@ -1267,17 +1268,28 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 +		{
 +			XSync(dpy, False);
 +		}
-+		XCopyArea(dpy, desktopWin, rcSavedArea, gc, x, y, w, h, 0, 0);
++#endif
++		if (appData.useBackingstore) {
++			XSync(dpy, False);
++			XCopyArea(dpy, desktopWin, rcSavedArea, gc, x, y, w, h, 0, 0);
++		} else {
++			XPutImage(dpy, rcSavedArea, gc, image, x, y, 0, 0, w, h);
++		}
 +	} else {
 +//fprintf(stderr, "OPER_RESTORE\n");
 +		/* Restore screen area. */
-+		XCopyArea(dpy, rcSavedArea, desktopWin, gc, 0, 0, w, h, x, y);
-+		XGetSubImage(dpy, rcSavedArea, 0, 0, w, h, AllPlanes, ZPixmap, image, x, y);
++		if (appData.useBackingstore) {
++			XCopyArea(dpy, rcSavedArea, desktopWin, gc, 0, 0, w, h, x, y);
++			XGetSubImage(dpy, rcSavedArea, 0, 0, w, h, AllPlanes, ZPixmap, image, x, y);
++		} else {
++			XCopyArea(dpy, rcSavedArea, desktopWin, gc, 0, 0, w, h, x, y);
++			XGetSubImage(dpy, rcSavedArea, 0, 0, w, h, AllPlanes, ZPixmap, image, x, y);
++		}
 +	}
  }
  
  static void SoftCursorDraw(void)
-@@ -472,6 +488,139 @@
+@@ -472,6 +500,139 @@
    int offset, bytesPerPixel;
    char *pos;
  
@@ -1299,10 +1311,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 +  if (alphablend && bytesPerPixel == 4) {
 +	unsigned long pixel, put, *upos, *upix;
 +	int got_alpha = 0, rsX, rsY, rsW, rsH;
-+	static XImage *image = NULL;
++	static XImage *alpha_image = NULL;
 +	static int iwidth = 128;
 +
-+	if (! image) {
++	if (! alpha_image) {
 +		/* watch out for tiny fb (rare) */
 +		if (iwidth > si.framebufferWidth) {
 +			iwidth = si.framebufferWidth;
@@ -1312,7 +1324,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 +		}
 +
 +		/* initialize an XImage with a chunk of desktopWin */
-+		image = XGetImage(dpy, desktopWin, 0, 0, iwidth, iwidth,
++		alpha_image = XGetImage(dpy, desktopWin, 0, 0, iwidth, iwidth,
 +		    AllPlanes, ZPixmap);
 +	}
 +
@@ -1343,8 +1355,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 +
 +	/* load the saved fb patch in to image (faster way?) */
 +	XGetSubImage(dpy, rcSavedArea, 0, 0, rcWidth, rcHeight,
-+	    AllPlanes, ZPixmap, image, 0, 0);
-+	upix = (unsigned long *)image->data;
++	    AllPlanes, ZPixmap, alpha_image, 0, 0);
++	upix = (unsigned long *)alpha_image->data;
 +
 +	/* if the richcursor is clipped, the fb patch will be smaller */
 +	rsW = rcWidth;
@@ -1417,8 +1429,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
    bytesPerPixel = myFormat.bitsPerPixel / 8;
  
    /* FIXME: Speed optimization is possible. */
-@@ -492,23 +641,23 @@
+@@ -490,25 +651,26 @@
+       }
+     }
    }
++	XSync(dpy, False);
  }
  
 -static void FreeSoftCursor(void)
@@ -1457,7 +1472,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 -
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncviewer/desktop.c
 --- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
-+++ vnc_unixsrc/vncviewer/desktop.c	2007-03-01 21:05:47.000000000 -0500
++++ vnc_unixsrc/vncviewer/desktop.c	2007-03-17 23:31:56.000000000 -0400
 @@ -28,21 +28,28 @@
  #include <X11/extensions/XShm.h>
  #endif
@@ -1771,7 +1786,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  /*
   * DesktopInitAfterRealization does things which require the X windows to
   * exist.  It creates some GCs and sets the dot cursor.
-@@ -114,34 +306,100 @@
+@@ -114,34 +306,108 @@
  void
  DesktopInitAfterRealization()
  {
@@ -1820,6 +1835,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	    NULL, 0);
 +
 +	if (appData.useBackingstore) {
++		Screen *s = DefaultScreenOfDisplay(dpy);
++		if (DoesBackingStore(s) != Always) {
++			fprintf(stderr, "X server does not do backingstore, disabling it.\n");
++			appData.useBackingstore = False;
++		}
++	}
++
++	if (appData.useBackingstore) {
 +		XtVaGetApplicationResources(desktop, (XtPointer)&attr.backing_store,
 +		    desktopBackingStoreResources, 1, NULL);
 +		valuemask |= CWBackingStore;
@@ -1834,8 +1857,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		valuemask |= CWCursor;
 +	}
 +	bogoCursor = XCreateFontCursor(dpy, XC_bogosity);
- 
--  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
++
 +	XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
 +	if (XGetWindowAttributes(dpy, desktopWin, &gattr)) {
 +		fprintf(stderr, "desktopWin backingstore: %d save_under: %d\n", gattr.backing_store, gattr.save_under);
@@ -1851,7 +1873,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +{
 +	XSetWindowAttributes attr;
 +	unsigned long valuemask;
-+
+ 
+-  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
 +	if (dotCursor == None) {
 +		dotCursor = CreateDotCursor();
 +	}
@@ -1899,7 +1922,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -152,39 +410,53 @@
+@@ -152,39 +418,53 @@
  static void
  HandleBasicDesktopEvent(Widget w, XtPointer ptr, XEvent *ev, Boolean *cont)
  {
@@ -1974,7 +1997,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -201,6 +473,9 @@
+@@ -201,6 +481,9 @@
   * button2 down, 3 for both, etc).
   */
  
@@ -1984,7 +2007,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  void
  SendRFBEvent(Widget w, XEvent *ev, String *params, Cardinal *num_params)
  {
-@@ -213,6 +488,13 @@
+@@ -213,6 +496,13 @@
        return;
    }
  
@@ -1998,7 +2021,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
    if (appData.viewOnly) return;
  
    if (*num_params != 0) {
-@@ -332,23 +614,112 @@
+@@ -332,23 +622,112 @@
  static Cursor
  CreateDotCursor()
  {
@@ -2127,7 +2150,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -359,38 +730,35 @@
+@@ -359,38 +738,35 @@
  void
  CopyDataToScreen(char *buf, int x, int y, int width, int height)
  {
@@ -2193,7 +2216,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -401,62 +769,175 @@
+@@ -401,62 +777,175 @@
  static void
  CopyBGR233ToScreen(CARD8 *buf, int x, int y, int width, int height)
  {
