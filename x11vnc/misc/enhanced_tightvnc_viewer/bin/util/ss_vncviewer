@@ -3,7 +3,7 @@
 # ss_vncviewer:  wrapper for vncviewer to use an stunnel SSL tunnel
 #                or an SSH tunnel.
 #
-# Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2006-2007 by Karl J. Runge <runge@karlrunge.com>
 #
 # You must have stunnel(8) installed on the system and in your PATH
 # (however, see the -ssh option below, in which case you will need ssh(1)
@@ -94,6 +94,7 @@
 #
 #         ss_vncviewer -sshssl -proxy fred@mygate.com mymachine:0
 #
+# -listen (or -reverse) set up a reverse connection.
 #
 # -alpha  turn on cursor alphablending hack if you are using the
 #         enhanced tightvnc vncviewer.
@@ -110,6 +111,8 @@ VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
 #
 # Same for STUNNEL, e.g. set it to /path/to/stunnel or stunnel4, etc.
 #
+
+#set -xv 
 
 PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
 
@@ -131,12 +134,16 @@ use_ssh=""
 use_sshssl=""
 direct_connect=""
 ssh_sleep=15
-ssh_cmd="sleep $ssh_sleep"
+if echo "$*" | grep '.*-listen' > /dev/null; then
+	ssh_sleep=1800
+fi
+ssh_cmd=""
 if [ "X$SS_VNCVIEWER_SSH_CMD" != "X" ]; then
 	ssh_cmd="$SS_VNCVIEWER_SSH_CMD"
 fi
 ssh_args=""
 showcert=""
+reverse=""
 
 if [ "X$1" = "X-viewerflavor" ]; then
 	if echo "$VNCVIEWERCMD" | grep -i chicken.of > /dev/null; then
@@ -183,6 +190,10 @@ do
                 ;;
 	"-showcert")	showcert=1
                 ;;
+	"-listen")	reverse=1
+                ;;
+	"-reverse")	reverse=1
+                ;;
 	"-grab")	VNCVIEWER_GRAB_SERVER=1; export VNCVIEWER_GRAB_SERVER
                 ;;
 	"-h"*)	help; exit 0
@@ -201,6 +212,29 @@ if [ "X$gotalpha" = "X1" ]; then
 else
 	NO_ALPHABLEND=1
 	export NO_ALPHABLEND
+fi
+if [ "X$reverse" != "X" ]; then
+	ssh_sleep=1800
+	if [ "X$use_ssh" = "X1" ]; then
+		VNCVIEWER_LISTEN_LOCALHOST=1
+		export VNCVIEWER_LISTEN_LOCALHOST
+	fi
+	if [ "X$proxy" != "X" ]; then
+		if [ "X$use_ssh" = "X" -a "X$use_sshssl" = "X" ]; then
+			echo ""
+			echo "*Warning*: SSL -listen and a Web proxy does not make sense."
+			sleep 3
+		elif echo "$proxy" | grep "," > /dev/null; then
+			:
+		else
+			echo ""
+			echo "*Warning*: -listen and a single proxy/gateway does not make sense."
+			sleep 3
+		fi
+	fi
+fi
+if [ "X$ssh_cmd" = "X" ]; then
+	ssh_cmd="sleep $ssh_sleep"
 fi
 
 orig="$1"
@@ -228,7 +262,9 @@ fi
 if echo "$orig" | grep ':' > /dev/null; then
 	:
 else
-	orig="$orig:0"
+	if [ "X$reverse" = "X" ]; then
+		orig="$orig:0"
+	fi
 fi
 
 host=`echo "$orig" | awk -F: '{print $1}'`
@@ -236,8 +272,14 @@ disp=`echo "$orig" | awk -F: '{print $2}'`
 if [ "X$host" = "X" ]; then
 	host=localhost
 fi
-if [ $disp -lt 200 ]; then
-	port=`expr $disp + 5900`
+if [ $disp -lt 0 ]; then
+	port=`expr 0 - $disp`
+elif [ $disp -lt 200 ]; then
+	if [ "X$reverse" = "X" ]; then
+		port=`expr $disp + 5900`
+	else
+		port=`expr $disp + 5500`
+	fi
 else
 	port=$disp
 fi
@@ -278,12 +320,47 @@ findfree() {
 	echo $use0
 }
 
-use=`findfree 5930`
+final() {
+	echo ""
+	if [ "X$SS_VNCVIEWER_RM" != "X" ]; then
+		rm -f $SS_VNCVIEWER_RM 2>/dev/null
+	fi
+	if [ "X$tcert" != "X" ]; then
+		rm -f $tcert
+	fi
+	if [ "X$pssh" != "X" ]; then
+		echo "Terminating background ssh process"
+		echo kill -TERM "$pssh"
+		kill -TERM "$pssh" 2>/dev/null
+		sleep 1
+		kill -KILL "$pssh" 2>/dev/null
+		pssh=""
+	fi
+	if [ "X$stunnel_pid" != "X" ]; then
+		echo "Terminating background stunnel process"
+		echo kill -TERM "$stunnel_pid"
+		kill -TERM "$stunnel_pid" 2>/dev/null
+		sleep 1
+		kill -KILL "$stunnel_pid" 2>/dev/null
+		stunnel_pid=""
+	fi
+}
 
-if [ $use -ge 5900 ]; then
-	N=`expr $use - 5900`
+if [ "X$reverse" = "X" ]; then
+	use=`findfree 5930`
+	if [ $use -ge 5900 ]; then
+		N=`expr $use - 5900`
+	else
+		N=$use
+	fi
 else
-	N=$use
+	p2=`expr $port + 30`
+	use=`findfree $p2`
+	if [ $use -ge 5500 ]; then
+		N=`expr $use - 5500`
+	else
+		N=$use
+	fi
 fi
 
 if echo "$0" | grep vncip > /dev/null; then
@@ -295,6 +372,7 @@ if [ "X$use_ssh" = "X1" ]; then
 	ssh_host="$host"
 	vnc_host="localhost"
 	ssh=${SSH:-"ssh -x"}
+
 	if echo "$proxy" | grep "," > /dev/null; then
 		proxy1=`echo "$proxy" | awk -F, '{print $1}'`
 		proxy2=`echo "$proxy" | awk -F, '{print $2}'`
@@ -327,6 +405,7 @@ if [ "X$use_ssh" = "X1" ]; then
 		stty sane
 		proxy="${ssh_user2}localhost:$proxport"
 	fi
+
 	if [ "X$proxy" != "X" ]; then
 		ssh_port=`echo "$proxy" | awk -F: '{print $2}'`
 		if [ "X$ssh_port" = "X" ]; then
@@ -348,6 +427,12 @@ if [ "X$use_ssh" = "X1" ]; then
 	if [ "X$SS_VNCVIEWER_USE_C" != "X" ]; then
 		C="-C"
 	fi
+	if [ "X$reverse" = "X" ]; then
+		ssh_redir="-L ${use}:${vnc_host}:${port}"
+	else
+		ssh_redir="-R ${port}:${vnc_host}:${use}"
+	fi
+	pmark=`sh -c 'echo $$'`
 	# the -t option actually speeds up typing response via VNC!!
 	if [ "X$SS_VNCVIEWER_SSH_ONLY" != "X" ]; then
 		echo "$ssh -x -p $ssh_port -t $C $ssh_args $ssh_host \"$info\""
@@ -355,20 +440,32 @@ if [ "X$use_ssh" = "X1" ]; then
 		$ssh -x -p $ssh_port -t $C $ssh_args $ssh_host "$ssh_cmd"
 		exit $?
 	elif [ "X$SS_VNCVIEWER_NO_F" != "X" ]; then
-		echo "$ssh -x -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x -p $ssh_port -t $C $ssh_redir $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -x -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x -p $ssh_port -t $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
 	else
-		echo "$ssh -x -f -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x -f -p $ssh_port -t $C $ssh_redir $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -x -f -p $ssh_port -t $C -L ${use}:${vnc_host}:${port} $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x -f -p $ssh_port -t $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
 	fi
 	if [ "$?" != "0" ]; then
 		echo ""
 		echo "ssh to $ssh_host failed."
 		exit 1
 	fi
-	echo ""
+	stty sane
+
+	c=0
+	pssh=""
+	while [ $c -lt 30 ]
+	do
+		p=`expr $pmark + $c`
+		if ps -p "$p" 2>&1 | grep "$ssh" > /dev/null; then
+			pssh=$p
+			break
+		fi
+		c=`expr $c + 1`
+	done
 	if [ "X$ssh_cmd" = "Xsleep $ssh_sleep" ] ; then
 		sleep 1
 	else
@@ -378,11 +475,23 @@ if [ "X$use_ssh" = "X1" ]; then
 	echo ""
 	#reset
 	stty sane
+	#echo "pssh=\"$pssh\""
 	if [ "X$use_sshssl" = "X" ]; then
 		echo "Running viewer:"
-		echo "$VNCVIEWERCMD" "$@" localhost:$N
-		echo ""
-		$VNCVIEWERCMD "$@" localhost:$N
+
+		trap "final" 0 2 15
+		if [ "X$reverse" = "X" ]; then
+			echo "$VNCVIEWERCMD" "$@" localhost:$N
+			echo ""
+			$VNCVIEWERCMD "$@" localhost:$N
+		else
+			echo ""
+			echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
+			echo ""
+			echo "$VNCVIEWERCMD" "$@" -listen $N
+			echo ""
+			$VNCVIEWERCMD "$@" -listen $N
+		fi
 
 		exit $?
 	else
@@ -639,21 +748,37 @@ if [ "X$direct_connect" != "X" ]; then
 		SSVNC_LISTEN=$use
 		export SSVNC_LISTEN
 		$ptmp &
-		sleep 2
+		if [ "X$reverse" = "X" ]; then
+			sleep 2
+		fi
 		host="localhost"
 		disp="$N"
 	fi
-	echo "$VNCVIEWERCMD" "$@" $host:$disp
-	echo ""
-	$VNCVIEWERCMD "$@" $host:$disp
+	if [ "X$reverse" = "X" ]; then
+		echo "$VNCVIEWERCMD" "$@" $host:$disp
+		trap "final" 0 2 15
+		echo ""
+		$VNCVIEWERCMD "$@" $host:$disp
+	else
+		echo ""
+		echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
+		echo ""
+		echo "$VNCVIEWERCMD" "$@" -listen $N
+		trap "final" 0 2 15
+		echo ""
+		$VNCVIEWERCMD "$@" -listen $N
+	fi
 	exit $?
 fi
 
 ##debug = 7
+## debug = 6
 tmp=/tmp/ss_vncviewer${RANDOM}.$$
 mytmp "$tmp"
 
-cat > "$tmp" <<END
+if [ "X$reverse" = "X" ]; then
+
+	cat > "$tmp" <<END
 foreground = yes
 pid =
 client = yes
@@ -665,7 +790,92 @@ $cert
 [vnc_stunnel]
 accept = localhost:$use
 $connect
+
 END
+else
+
+	p2=`expr 5500 + $N`
+	connect="connect = localhost:$p2"
+	if [ "X$cert" = "X" ]; then
+		tcert="/tmp/tcert.$$"
+		cat > $tcert <<END
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAvkfXxb0wcxgrjV2ziFikjII+ze8iKcTBt47L0GM/c21efelN
++zZpJUUXLu4zz8Ryq8Q+sQgfNy7uTOpN9bUUaOk1TnD7gaDQnQWiNHmqbW2kL+DS
+OKngJVPo9dETAS8hf7+D1e1DBZxjTc1a4RQqWJixwpYj99ixWzu8VC2m/xXsjvOs
+jp4+DLBB490nbkwvstmhmiWm1CmI5O5xOkgioVNQqHvQMdVKOSz9PpbjvZiRX1Uo
+qoMrk+2NOqwP90TB35yPASXb9zXKpO7DLhkube+yYGf+yk46aD707L07Eb7cosFP
+S84vNZ9gX7rQ0UOwm5rYA/oZTBskgaqhtIzkLwIDAQABAoIBAD4ot/sXt5kRn0Ca
+CIkU9AQWlC+v28grR2EQW9JiaZrqcoDNUzUqbCTJsi4ZkIFh2lf0TsqELbZYNW6Y
+6AjJM7al4E0UqYSKJTv2WCuuRxdiRs2BMwthqyBmjeanev7bB6V0ybt7u3Y8xU/o
+MrTuYnr4vrEjXPKdLirwk7AoDbKsRXHSIiHEIBOq1+dUQ32t36ukdnnza4wKDLZc
+PKHiCdCk/wOGhuDlxD6RspqUAlRnJ8/aEhrgWxadFXw1hRhRsf/v1shtB0T3DmTe
+Jchjwyiw9mryb9JZAcKxW+fUc4EVvj6VdQGqYInQJY5Yxm5JAlVQUJicuuJEvn6A
+rj5osQECgYEA552CaHpUiFlB4HGkjaH00kL+f0+gRF4PANCPk6X3UPDVYzKnzmuu
+yDvIdEETGFWBwoztUrOOKqVvPEQ+kBa2+DWWYaERZLtg2cI5byfDJxQ3ldzilS3J
+1S3WgCojqcsG/hlxoQJ1dZFanUy/QhUZ0B+wlC+Zp1Q8AyuGQvhHp68CgYEA0lBI
+eqq2GGCdJuNHMPFbi8Q0BnX55LW5C1hWjhuYiEkb3hOaIJuJrqvayBlhcQa2cGqp
+uP34e9UCfoeLgmoCQ0b4KpL2NGov/mL4i8bMgog4hcoYuIi3qxN18vVR14VKEh4U
+RLk0igAYPU+IK2QByaQlBo9OSaKkcfm7U1/pK4ECgYAxr6VpGk0GDvfF2Tsusv6d
+GIgV8ZP09qSLTTJvvxvF/lQYeqZq7sjI5aJD5i3de4JhpO/IXQJzfZfWOuGc8XKA
+3qYK/Y2IqXXGYRcHFGWV/Y1LFd55mCADHlk0l1WdOBOg8P5iRu/Br9PbiLpCx9oI
+vrOXpnp03eod1/luZmqguwKBgQCWFRSj9Q7ddpSvG6HCG3ro0qsNsUMTI1tZ7UBX
+SPogx4tLf1GN03D9ZUZLZVFUByZKMtPLX/Hi7K9K/A9ikaPrvsl6GEX6QYzeTGJx
+3Pw0amFrmDzr8ySewNR6/PXahxPEuhJcuI31rPufRRI3ZLah3rFNbRbBFX+klkJH
+zTnoAQKBgDbUK/aQFGduSy7WUT7LlM3UlGxJ2sA90TQh4JRQwzur0ACN5GdYZkqM
+YBts4sBJVwwJoxD9OpbvKu3uKCt41BSj0/KyoBzjT44S2io2tj1syujtlVUsyyBy
+/ca0A7WBB8lD1D7QMIhYUm2O9kYtSCLlUTHt5leqGaRG38DqlX36
+-----END RSA PRIVATE KEY-----
+-----BEGIN CERTIFICATE-----
+MIIDzDCCArQCCQDSzxzxqhyqLzANBgkqhkiG9w0BAQQFADCBpzELMAkGA1UEBhMC
+VVMxFjAUBgNVBAgTDU1hc3NhY2h1c2V0dHMxDzANBgNVBAcTBkJvc3RvbjETMBEG
+A1UEChMKTXkgQ29tcGFueTEcMBoGA1UECxMTUHJvZHVjdCBEZXZlbG9wbWVudDEZ
+MBcGA1UEAxMQd3d3Lm5vd2hlcmUubm9uZTEhMB8GCSqGSIb3DQEJARYSYWRtaW5A
+bm93aGVyZS5ub25lMB4XDTA3MDMyMzE4MDc0NVoXDTI2MDUyMjE4MDc0NVowgacx
+CzAJBgNVBAYTAlVTMRYwFAYDVQQIEw1NYXNzYWNodXNldHRzMQ8wDQYDVQQHEwZC
+b3N0b24xEzARBgNVBAoTCk15IENvbXBhbnkxHDAaBgNVBAsTE1Byb2R1Y3QgRGV2
+ZWxvcG1lbnQxGTAXBgNVBAMTEHd3dy5ub3doZXJlLm5vbmUxITAfBgkqhkiG9w0B
+CQEWEmFkbWluQG5vd2hlcmUubm9uZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC
+AQoCggEBAL5H18W9MHMYK41ds4hYpIyCPs3vIinEwbeOy9BjP3NtXn3pTfs2aSVF
+Fy7uM8/EcqvEPrEIHzcu7kzqTfW1FGjpNU5w+4Gg0J0FojR5qm1tpC/g0jip4CVT
+6PXREwEvIX+/g9XtQwWcY03NWuEUKliYscKWI/fYsVs7vFQtpv8V7I7zrI6ePgyw
+QePdJ25ML7LZoZolptQpiOTucTpIIqFTUKh70DHVSjks/T6W472YkV9VKKqDK5Pt
+jTqsD/dEwd+cjwEl2/c1yqTuwy4ZLm3vsmBn/spOOmg+9Oy9OxG+3KLBT0vOLzWf
+YF+60NFDsJua2AP6GUwbJIGqobSM5C8CAwEAATANBgkqhkiG9w0BAQQFAAOCAQEA
+vGomHEp6TVU83X2EBUgnbOhzKJ9u3fOI/Uf5L7p//Vxqow7OR1cguzh/YEzmXOIL
+ilMVnzX9nj/bvcLAuqEP7MR1A8f4+E807p/L/Sf49BiCcwQq5I966sGKYXjkve+T
+2GTBNwMSq+5kLSf6QY8VZI+qnrAudEQMeJByQhTZZ0dH8Njeq8EGl9KUio+VWaiW
+CQK6xJuAvAHqa06OjLmwu1fYD4GLGSrOIiRVkSXV8qLIUmzxdJaIRznkFWsrCEKR
+wAH966SAOvd2s6yOHMvyDRIL7WHxfESB6rDHsdIW/yny1fBePjv473KrxyXtbz7I
+dMw1yW09l+eEo4A7GzwOdw==
+-----END CERTIFICATE-----
+END
+		chmod 600 $tcert
+		cert="cert = $tcert"
+	fi
+
+	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
+
+	hloc=""
+	if [ "X$use_ssh" = "X1" ]; then
+		hloc="localhost:"
+	fi
+	cat > "$tmp" <<END
+foreground = yes
+pid =
+client = no
+debug = 6
+$STUNNEL_EXTRA_OPTS
+$verify
+$cert
+
+[vnc_stunnel]
+accept = $hloc$port
+$connect
+
+END
+
+fi
 
 echo ""
 echo "Using this stunnel configuration:"
@@ -675,25 +885,39 @@ echo ""
 sleep 1
 
 echo ""
-echo "Running: stunnel"
+echo "Running stunnel:"
 echo "$STUNNEL $tmp"
 $STUNNEL "$tmp" < /dev/tty > /dev/tty &
-pid=$!
+stunnel_pid=$!
 echo ""
 
 # pause here to let the user supply a possible passphrase for the
 # mycert key:
 if [ "X$mycert" != "X" ]; then
-	sleep 4
+	sleep 2
+	echo ""
+	echo "(pausing for possible certificate passphrase dialog)"
+	echo ""
+	sleep 2
 fi
 sleep 2
 rm -f "$tmp"
 
 echo ""
 echo "Running viewer:"
-echo "$VNCVIEWERCMD" "$@" localhost:$N
-echo ""
-$VNCVIEWERCMD "$@" localhost:$N
+if [ "X$reverse" = "X" ]; then
+	echo "$VNCVIEWERCMD" "$@" localhost:$N
+	trap "final" 0 2 15
+	echo ""
+	$VNCVIEWERCMD "$@" localhost:$N
+else
+	echo ""
+	echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
+	echo ""
+	echo "$VNCVIEWERCMD" "$@" -listen $N
+	trap "final" 0 2 15
+	echo ""
+	$VNCVIEWERCMD "$@" -listen $N
+fi
 
-kill $pid
 sleep 1

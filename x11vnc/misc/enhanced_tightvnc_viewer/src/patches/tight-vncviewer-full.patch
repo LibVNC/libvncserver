@@ -214,7 +214,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
 +
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/vncviewer/argsresources.c
 --- vnc_unixsrc.orig/vncviewer/argsresources.c	2007-02-04 17:10:31.000000000 -0500
-+++ vnc_unixsrc/vncviewer/argsresources.c	2007-02-18 20:41:40.000000000 -0500
++++ vnc_unixsrc/vncviewer/argsresources.c	2007-03-20 10:10:59.000000000 -0400
 @@ -31,7 +31,7 @@
  
  char *fallback_resources[] = {
@@ -609,7 +609,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "\n"
 +	  "Enhanced TightVNC viewer (SSVNC) options:\n"
 +	  "\n"
-+	  "   URL http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html\n"
++	  "   URL http://www.karlrunge.com/x11vnc/ssvnc.html\n"
 +	  "\n"
 +	  "   Note: ZRLE encoding is now supported.\n"
 +	  "\n"
@@ -748,8 +748,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
      appData.passwordDialog = True;
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewer/colour.c
 --- vnc_unixsrc.orig/vncviewer/colour.c	2002-04-30 09:07:31.000000000 -0400
-+++ vnc_unixsrc/vncviewer/colour.c	2007-02-17 23:57:21.000000000 -0500
-@@ -31,6 +31,9 @@
++++ vnc_unixsrc/vncviewer/colour.c	2007-03-22 21:36:12.000000000 -0400
+@@ -31,9 +31,12 @@
  #define BGR233_SIZE 256
  unsigned long BGR233ToPixel[BGR233_SIZE];
  
@@ -758,7 +758,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
 +
  Colormap cmap;
  Visual *vis;
- unsigned int visdepth, visbpp;
+-unsigned int visdepth, visbpp;
++unsigned int visdepth, visbpp, isLSB;
+ Bool allocColorFailed = False;
+ 
+ static int nBGR233ColoursAllocated;
 @@ -45,6 +48,8 @@
  static void AllocateExactBGR233Colours();
  static Bool AllocateBGR233Colour(int r, int g, int b);
@@ -768,10 +772,24 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
  
  /*
   * SetVisualAndCmap() deals with the wonderful world of X "visuals" (which are
-@@ -97,6 +102,30 @@
+@@ -97,6 +102,44 @@
    visbpp = GetBPPForDepth(visdepth);
    cmap = DefaultColormap(dpy,DefaultScreen(dpy));
  
++  if (ImageByteOrder(dpy) == LSBFirst) {
++  	isLSB = 1;
++  } else {
++  	isLSB = 0;
++  }
++  if (visbpp == 24) {
++  	if (!appData.useBGR233) {
++  		fprintf(stderr, "Warning: for 24bpp enabling -bgr565 -- Don't use FullColor!\n"); 
++  		appData.useBGR565 = True;
++  	} else {
++  		fprintf(stderr, "Warning: for 24bpp using -bgr233 -- Don't use FullColor!\n"); 
++  	}
++  }
++
 +  if (appData.useBGR565) {
 +  	if (visdepth < 24 || visbpp < 24 || vis->class != TrueColor) {
 +  		fprintf(stderr, "disabling -16bpp BGR565 on non-depth 24 machine\n"); 
@@ -799,7 +817,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
    if (!appData.useBGR233 && (vis->class == TrueColor)) {
  
      myFormat.bitsPerPixel = visbpp;
-@@ -116,21 +145,42 @@
+@@ -116,21 +159,42 @@
      return;
    }
  
@@ -848,7 +866,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
    PrintPixelFormat(&myFormat);
  
    SetupBGR233Map();
-@@ -394,16 +444,43 @@
+@@ -282,8 +346,12 @@
+   XFree(format);
+ 
+   if (bpp != 1 && bpp != 8 && bpp != 16 && bpp != 32) {
+-    fprintf(stderr,"Can't cope with %d bits-per-pixel.  Sorry.\n", bpp);
+-    exit(1);
++	if (bpp == 24) {
++		fprintf(stderr,"Warning: 24 bits-per-pixel may have problems...\n");
++	} else {
++		fprintf(stderr,"Can't cope with %d bits-per-pixel.  Sorry.\n", bpp);
++		exit(1);
++	}
+   }
+ 
+   return bpp;
+@@ -394,16 +462,43 @@
      for (r = 0; r < 8; r++) {
        for (g = 0; g < 8; g++) {
  	for (b = 0; b < 4; b++) {
@@ -897,7 +930,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
  
  		if (distance < minDistance) {
  		  minDistance = distance;
-@@ -412,7 +489,7 @@
+@@ -412,7 +507,7 @@
  	      }
  	    }
  
@@ -906,7 +939,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
  	    if (shared[nearestPixel] && !usedAsNearest[nearestPixel])
  	      nSharedUsed++;
  	    usedAsNearest[nearestPixel] = True;
-@@ -433,6 +510,53 @@
+@@ -433,6 +528,53 @@
    }
  }
  
@@ -960,7 +993,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
  
  /*
   * AllocateExactBGR233Colours() attempts to allocate each of the colours in the
-@@ -484,8 +608,13 @@
+@@ -484,8 +626,13 @@
      ri = rn;
      for (gi = 0; gi < gn; gi++) {
        for (bi = 0; bi < bn; bi++) {
@@ -976,7 +1009,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
        }
      }
      rn++;
-@@ -496,8 +625,13 @@
+@@ -496,8 +643,13 @@
      gi = gn;
      for (ri = 0; ri < rn; ri++) {
        for (bi = 0; bi < bn; bi++) {
@@ -992,7 +1025,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
        }
      }
      gn++;
-@@ -507,8 +641,13 @@
+@@ -507,8 +659,13 @@
        bi = bn;
        for (ri = 0; ri < rn; ri++) {
  	for (gi = 0; gi < gn; gi++) {
@@ -1008,7 +1041,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
  	}
        }
        bn++;
-@@ -529,18 +668,36 @@
+@@ -529,18 +686,36 @@
  AllocateBGR233Colour(int r, int g, int b)
  {
    XColor c;
@@ -1116,16 +1149,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/corre.c vnc_unixsrc/vncviewer
 +#undef FillRectangle
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cp_it vnc_unixsrc/vncviewer/cp_it
 --- vnc_unixsrc.orig/vncviewer/cp_it	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/cp_it	2007-03-01 22:46:20.000000000 -0500
-@@ -0,0 +1,8 @@
++++ vnc_unixsrc/vncviewer/cp_it	2007-03-24 10:05:16.000000000 -0400
+@@ -0,0 +1,14 @@
 +#!/bin/sh
 +
 +dest=/dist/bin/vncviewerz-1.3dev5-resize
 +suc "cp -p $dest $dest.back; mv $dest $dest.unlink; mv $dest.back $dest; rm $dest.unlink"
++strip ./vncviewer
 +cat ./vncviewer > $dest
 +touch -r ./vncviewer $dest 
-+cp -p ./vncviewer /dist/src/apps/VNC/etc/libvncserver_cvs/expts/etv/ssvnc/bin/Linux.i686/vncviewer
-+ls -l ./vncviewer $dest /dist/src/apps/VNC/etc/libvncserver_cvs/expts/etv/ssvnc/bin/Linux.i686/vncviewer
++yy=/dist/src/apps/VNC/etc/libvncserver_cvs/expts/etv/ssvnc/bin/Linux.i686/vncviewer
++mv $yy $yy.unlink
++cp -p ./vncviewer $yy
++cp -p ./vncviewer $HOME/etv_col/Linux.i686
++chmod 755 $yy
++rm -f $yy.unlink
++ls -l ./vncviewer $dest $yy $HOME/etv_col/Linux.i686/vncviewer
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewer/cursor.c
 --- vnc_unixsrc.orig/vncviewer/cursor.c	2003-01-15 04:46:52.000000000 -0500
 +++ vnc_unixsrc/vncviewer/cursor.c	2007-03-17 22:48:34.000000000 -0400
@@ -1472,7 +1511,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 -
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncviewer/desktop.c
 --- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
-+++ vnc_unixsrc/vncviewer/desktop.c	2007-03-17 23:31:56.000000000 -0400
++++ vnc_unixsrc/vncviewer/desktop.c	2007-03-24 10:18:42.000000000 -0400
 @@ -28,21 +28,28 @@
  #include <X11/extensions/XShm.h>
  #endif
@@ -1591,28 +1630,31 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  
  /*
   * DesktopInitBeforeRealization creates the "desktop" widget and the viewport
-@@ -59,53 +146,158 @@
+@@ -59,52 +146,157 @@
  void
  DesktopInitBeforeRealization()
  {
 -  int i;
-+	int i;
- 
+-
 -  form = XtVaCreateManagedWidget("form", formWidgetClass, toplevel,
 -				 XtNborderWidth, 0,
 -				 XtNdefaultDistance, 0, NULL);
-+	form = XtVaCreateManagedWidget("form", formWidgetClass, toplevel,
-+	    XtNborderWidth, 0, XtNdefaultDistance, 0, NULL);
++	int i;
  
 -  viewport = XtVaCreateManagedWidget("viewport", viewportWidgetClass, form,
 -				     XtNborderWidth, 0,
 -				     NULL);
-+	viewport = XtVaCreateManagedWidget("viewport", viewportWidgetClass, form,
-+	    XtNborderWidth, 0, NULL);
++	form = XtVaCreateManagedWidget("form", formWidgetClass, toplevel,
++	    XtNborderWidth, 0, XtNdefaultDistance, 0, NULL);
  
 -  desktop = XtVaCreateManagedWidget("desktop", coreWidgetClass, viewport,
 -				    XtNborderWidth, 0,
 -				    NULL);
++	viewport = XtVaCreateManagedWidget("viewport", viewportWidgetClass, form,
++	    XtNborderWidth, 0, NULL);
+ 
+-  XtVaSetValues(desktop, XtNwidth, si.framebufferWidth,
+-		XtNheight, si.framebufferHeight, NULL);
 +	desktop = XtVaCreateManagedWidget("desktop", coreWidgetClass, viewport,
 +	    XtNborderWidth, 0, NULL);
 +
@@ -1642,24 +1684,19 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	old_width  = si.framebufferWidth;
 +	old_height = si.framebufferHeight;
  
--  XtVaSetValues(desktop, XtNwidth, si.framebufferWidth,
--		XtNheight, si.framebufferHeight, NULL);
+-  XtAddEventHandler(desktop, LeaveWindowMask|ExposureMask,
+-		    True, HandleBasicDesktopEvent, NULL);
 +	for (i = 0; i < 256; i++) {
 +		modifierPressed[i] = False;
 +	}
  
--  XtAddEventHandler(desktop, LeaveWindowMask|ExposureMask,
--		    True, HandleBasicDesktopEvent, NULL);
+-  for (i = 0; i < 256; i++)
+-    modifierPressed[i] = False;
 +	create_image();
 +}
  
--  for (i = 0; i < 256; i++)
--    modifierPressed[i] = False;
-+static Widget scrollbar_y = NULL;
- 
 -  image = NULL;
-+static int xsst = 2;
-+#include <X11/Xaw/Scrollbar.h>
++static Widget scrollbar_y = NULL;
  
 -#ifdef MITSHM
 -  if (appData.useShm) {
@@ -1668,7 +1705,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 -      appData.useShm = False;
 -  }
 -#endif
--
++static int xsst = 2;
++#include <X11/Xaw/Scrollbar.h>
+ 
 -  if (!image) {
 -    image = XCreateImage(dpy, vis, visdepth, ZPixmap, 0, NULL,
 -			 si.framebufferWidth, si.framebufferHeight,
@@ -1694,7 +1733,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		float t = 0.0;
 +		XtVaSetValues(w, XtNtopOfThumb, &t, NULL);
 +	}
-+}
+ }
 +static XtCallbackProc Jumped(Widget w, XtPointer closure, XtPointer call_data) {
 +	float top = *((float *) call_data);
 +	Position x, y;
@@ -1712,9 +1751,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			XtVaSetValues(w, XtNtopOfThumb, *(XtArgVal*)&t, XtNshown, *(XtArgVal*)&s, NULL);
 +		}
 +	}
- }
- 
- 
++}
++
++
 +extern double dnow(void);
 +
 +void check_things() {
@@ -1779,14 +1818,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +
 +	dpyWidth  = WidthOfScreen(DefaultScreenOfDisplay(dpy));
 +	dpyHeight = HeightOfScreen(DefaultScreenOfDisplay(dpy));
-+
+ 
 +	last = dnow();
 +}
-+
+ 
  /*
   * DesktopInitAfterRealization does things which require the X windows to
-  * exist.  It creates some GCs and sets the dot cursor.
-@@ -114,34 +306,108 @@
+@@ -114,34 +306,110 @@
  void
  DesktopInitAfterRealization()
  {
@@ -1850,7 +1888,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		attr.background_pixel = BlackPixel(dpy, DefaultScreen(dpy));
 +		valuemask |= CWBackPixel;
 +	}
-+
+ 
+-  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
 +	if (!appData.useX11Cursor) {
 +		dotCursor = CreateDotCursor();
 +		attr.cursor = dotCursor;    
@@ -1860,7 +1899,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +
 +	XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
 +	if (XGetWindowAttributes(dpy, desktopWin, &gattr)) {
++#if 0
 +		fprintf(stderr, "desktopWin backingstore: %d save_under: %d\n", gattr.backing_store, gattr.save_under);
++#endif
 +	}
 +	fprintf(stderr, "\n");
 +}
@@ -1873,8 +1914,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +{
 +	XSetWindowAttributes attr;
 +	unsigned long valuemask;
- 
--  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
++
 +	if (dotCursor == None) {
 +		dotCursor = CreateDotCursor();
 +	}
@@ -1922,7 +1962,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -152,39 +418,53 @@
+@@ -152,39 +420,53 @@
  static void
  HandleBasicDesktopEvent(Widget w, XtPointer ptr, XEvent *ev, Boolean *cont)
  {
@@ -1997,7 +2037,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -201,6 +481,9 @@
+@@ -201,6 +483,9 @@
   * button2 down, 3 for both, etc).
   */
  
@@ -2007,7 +2047,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  void
  SendRFBEvent(Widget w, XEvent *ev, String *params, Cardinal *num_params)
  {
-@@ -213,6 +496,13 @@
+@@ -213,6 +498,13 @@
        return;
    }
  
@@ -2021,7 +2061,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
    if (appData.viewOnly) return;
  
    if (*num_params != 0) {
-@@ -332,23 +622,112 @@
+@@ -332,23 +624,123 @@
  static Cursor
  CreateDotCursor()
  {
@@ -2088,6 +2128,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	unsigned short *usp;
 +	unsigned int   *uip;
 +	char *scr;
++	int b0, b1, b2;
 +
 +//fprintf(stderr, "FillImage bpp=%d %04dx%04d+%04d+%04d -- 0x%x\n", bpp, width, height, x, y, fill);
 +
@@ -2102,11 +2143,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	usp = (unsigned short*) buf;
 +	uip = (unsigned int*) buf;
 +
++	if (isLSB) {
++		b0 = 0; b1 = 1; b2 = 2;
++	} else {
++		b0 = 2; b1 = 1; b2 = 0;
++	}
+ 
+-  return cursor;
 +	for (h = 0; h < width; h++) {
 +		if (bpp == 8) {
 +			*(ucp+h) = (unsigned char)  fill;
 +		} else if (bpp == 16) {
 +			*(usp+h) = (unsigned short) fill;
++		} else if (bpp == 24) {
++			*(ucp + 3*h + b0) = (unsigned char) ((fill & 0x0000ff) >> 0);
++			*(ucp + 3*h + b1) = (unsigned char) ((fill & 0x00ff00) >> 8);
++			*(ucp + 3*h + b2) = (unsigned char) ((fill & 0xff0000) >> 16);
 +		} else if (bpp == 32) {
 +			*(uip+h) = (unsigned int)   fill;
 +		}
@@ -2121,8 +2173,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	put_image(x, y, x, y, width, height);
 +	maybe_sync(width, height);
 +}
- 
--  return cursor;
++
 +void copy_rect(int x, int y, int width, int height, int src_x, int src_y) {
 +	char *src, *dst;
 +	int i;
@@ -2150,7 +2201,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -359,38 +738,35 @@
+@@ -359,38 +751,35 @@
  void
  CopyDataToScreen(char *buf, int x, int y, int width, int height)
  {
@@ -2216,7 +2267,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -401,62 +777,175 @@
+@@ -401,62 +790,226 @@
  static void
  CopyBGR233ToScreen(CARD8 *buf, int x, int y, int width, int height)
  {
@@ -2235,9 +2286,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	int fbwb = si.framebufferWidth / 8;
 +	CARD8 *scr1 = ((CARD8 *)image->data) + y * fbwb + x / 8;
 +	CARD8 *scrt;
-+	CARD8 *scr8 = ((CARD8 *)image->data) + y * si.framebufferWidth + x;
++	CARD8  *scr8  = ( (CARD8 *)image->data) + y * si.framebufferWidth + x;
 +	CARD16 *scr16 = ((CARD16 *)image->data) + y * si.framebufferWidth + x;
 +	CARD32 *scr32 = ((CARD32 *)image->data) + y * si.framebufferWidth + x;
++	int b0, b1, b2;
  
 -  switch (visbpp) {
 +	switch (visbpp) {
@@ -2290,6 +2342,25 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		}
 +		break;
 +
++	case 24:
++		if (isLSB) {
++			b0 = 0; b1 = 1; b2 = 2;
++		} else {
++			b0 = 2; b1 = 1; b2 = 0;
++		}
++		scr8  = ((CARD8 *)image->data) + (y * si.framebufferWidth + x) * 3;
++		for (q = 0; q < height; q++) {
++			for (p = 0; p < width; p++) {
++				CARD32 v = BGR233ToPixel[*(buf++)];
++				*(scr8 + b0) = (unsigned char) ((v & 0x0000ff) >> 0);
++				*(scr8 + b1) = (unsigned char) ((v & 0x00ff00) >> 8);
++				*(scr8 + b2) = (unsigned char) ((v & 0xff0000) >> 16);
++				scr8 += 3;
++			}
++			scr8 += (si.framebufferWidth - width) * 3;
++		}
++		break;
++
 +	case 32:
 +		for (q = 0; q < height; q++) {
 +			for (p = 0; p < width; p++) {
@@ -2314,10 +2385,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 -    }
 -    break;
 +static void
-+CopyBGR565ToScreen(CARD16 *buf, int x, int y, int width, int height)
++BGR565_24bpp(CARD16 *buf, int x, int y, int width, int height)
 +{
 +	int p, q;
-+	CARD32 *scr32 = ((CARD32 *)image->data) + y * si.framebufferWidth + x;
++	int b0, b1, b2;
++	unsigned char *scr= (unsigned char *)image->data + (y * si.framebufferWidth + x) * 3;
++
++	if (isLSB) {
++		b0 = 0; b1 = 1; b2 = 2;
++	} else {
++		b0 = 2; b1 = 1; b2 = 0;
++	}
  
 -  case 16:
 -    for (q = 0; q < height; q++) {
@@ -2327,12 +2405,16 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 -      scr16 += si.framebufferWidth - width;
 -    }
 -    break;
-+	/*  case 32: */
++	/*  case 24: */
 +	for (q = 0; q < height; q++) {
 +		for (p = 0; p < width; p++) {
-+			*(scr32++) = BGR565ToPixel[*(buf++)];
++			CARD32 v = BGR565ToPixel[*(buf++)];
++			*(scr + b0) = (unsigned char) ((v & 0x0000ff) >> 0);
++			*(scr + b1) = (unsigned char) ((v & 0x00ff00) >> 8);
++			*(scr + b2) = (unsigned char) ((v & 0xff0000) >> 16);
++			scr += 3;
 +		}
-+		scr32 += si.framebufferWidth - width;
++		scr += (si.framebufferWidth - width) * 3;
 +	}
 +}
  
@@ -2345,6 +2427,26 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 -    }
 -    break;
 -  }
++static void
++CopyBGR565ToScreen(CARD16 *buf, int x, int y, int width, int height)
++{
++	int p, q;
++	CARD32 *scr32 = ((CARD32 *)image->data) + y * si.framebufferWidth + x;
++
++	if (visbpp == 24) {
++		BGR565_24bpp(buf, x, y, width, height);
++		return;
++	}
++
++	/*  case 32: */
++	for (q = 0; q < height; q++) {
++		for (p = 0; p < width; p++) {
++			*(scr32++) = BGR565ToPixel[*(buf++)];
++		}
++		scr32 += si.framebufferWidth - width;
++	}
++}
++
 +static void reset_image(void) {
 +	if (UsingShm()) {
 +		ShmCleanup();
@@ -2746,6 +2848,62 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/hextile.c vnc_unixsrc/vncview
  }
 +
 +#undef FillRectangle
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewer/listen.c
+--- vnc_unixsrc.orig/vncviewer/listen.c	2001-01-16 03:07:57.000000000 -0500
++++ vnc_unixsrc/vncviewer/listen.c	2007-03-23 22:30:46.000000000 -0400
+@@ -111,13 +111,14 @@
+   getFlashFont(d);
+ 
+   listenSocket = ListenAtTcpPort(listenPort);
+-  flashSocket = ListenAtTcpPort(flashPort);
++//flashSocket = ListenAtTcpPort(flashPort);
++  flashSocket = 1234;
+ 
+   if ((listenSocket < 0) || (flashSocket < 0)) exit(1);
+ 
+-  fprintf(stderr,"%s -listen: Listening on port %d (flash port %d)\n",
+-	  programName,listenPort,flashPort);
+-  fprintf(stderr,"%s -listen: Command line errors are not reported until "
++  fprintf(stderr,"%s -listen: Listening on port %d\n",
++	  programName,listenPort);
++  fprintf(stderr,"%s -listen: Cmdline errors are not reported until "
+ 	  "a connection comes in.\n", programName);
+ 
+   while (True) {
+@@ -132,12 +133,13 @@
+ 
+     FD_ZERO(&fds); 
+ 
+-    FD_SET(flashSocket, &fds);
++//  FD_SET(flashSocket, &fds);
+     FD_SET(listenSocket, &fds);
+     FD_SET(ConnectionNumber(d), &fds);
+ 
+     select(FD_SETSIZE, &fds, NULL, NULL, NULL);
+ 
++#if 0
+     if (FD_ISSET(flashSocket, &fds)) {
+ 
+       sock = AcceptTcpConnection(flashSocket);
+@@ -151,6 +153,7 @@
+       }
+       close(sock);
+     }
++#endif
+ 
+     if (FD_ISSET(listenSocket, &fds)) {
+       rfbsock = AcceptTcpConnection(listenSocket);
+@@ -182,6 +185,10 @@
+ 	  exit(1);
+ 	}
+ 	getFlashFont(d);
++	fprintf(stderr,"\n\n%s -listen: Listening on port %d\n",
++	    programName,listenPort);
++	fprintf(stderr,"%s -listen: Cmdline errors are not reported until "
++	    "a connection comes in.\n\n", programName);
+ 	break;
+       }
+     }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer/popup.c
 --- vnc_unixsrc.orig/vncviewer/popup.c	2000-06-11 08:00:53.000000000 -0400
 +++ vnc_unixsrc/vncviewer/popup.c	2007-02-04 11:14:45.000000000 -0500
@@ -2810,7 +2968,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
 --- vnc_unixsrc.orig/vncviewer/rfbproto.c	2004-03-11 13:14:39.000000000 -0500
-+++ vnc_unixsrc/vncviewer/rfbproto.c	2007-03-01 21:08:08.000000000 -0500
++++ vnc_unixsrc/vncviewer/rfbproto.c	2007-03-23 22:17:11.000000000 -0400
 @@ -57,6 +57,25 @@
  static Bool HandleTight16(int rx, int ry, int rw, int rh);
  static Bool HandleTight32(int rx, int ry, int rw, int rh);
@@ -4923,6 +5081,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  
  /*
+@@ -1358,9 +1831,9 @@
+ 	    "  %s significant bit in each byte is leftmost on the screen.\n",
+ 	    (format->bigEndian ? "Most" : "Least"));
+   } else {
+-    fprintf(stderr,"  %d bits per pixel.\n",format->bitsPerPixel);
++    fprintf(stderr,"  %d bits per pixel.  ",format->bitsPerPixel);
+     if (format->bitsPerPixel != 8) {
+-      fprintf(stderr,"  %s significant byte first in each pixel.\n",
++      fprintf(stderr,"%s significant byte first in each pixel.\n",
+ 	      (format->bigEndian ? "Most" : "Least"));
+     }
+     if (format->trueColour) {
 @@ -1463,3 +1936,115 @@
    cinfo->src = &jpegSrcManager;
  }
@@ -5107,7 +5277,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rre.c vnc_unixsrc/vncviewer/r
 +#undef FillRectangle
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/shm.c vnc_unixsrc/vncviewer/shm.c
 --- vnc_unixsrc.orig/vncviewer/shm.c	2000-06-11 08:00:53.000000000 -0400
-+++ vnc_unixsrc/vncviewer/shm.c	2007-02-08 23:36:56.000000000 -0500
++++ vnc_unixsrc/vncviewer/shm.c	2007-03-23 22:20:35.000000000 -0400
 @@ -33,68 +33,80 @@
  void
  ShmCleanup()
@@ -5236,7 +5406,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/shm.c vnc_unixsrc/vncviewer/s
 +	needShmCleanup = True;
  
 -  fprintf(stderr,"Using shared memory PutImage\n");
-+	fprintf(stderr,"Using shared memory PutImage ycrop=%d\n", do_ycrop);
++	fprintf(stderr,"Using shared memory (PutImage ycrop=%d)\n", do_ycrop);
  
 -  return image;
 +	return image;
@@ -5258,7 +5428,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/smake vnc_unixsrc/vncviewer/s
 +fi
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncviewer/sockets.c
 --- vnc_unixsrc.orig/vncviewer/sockets.c	2001-01-14 22:54:18.000000000 -0500
-+++ vnc_unixsrc/vncviewer/sockets.c	2007-02-18 20:31:30.000000000 -0500
++++ vnc_unixsrc/vncviewer/sockets.c	2007-03-23 21:23:15.000000000 -0400
 @@ -63,15 +63,59 @@
    XtRemoveInput(*id);
  }
@@ -5325,6 +5495,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
  }
  
  Bool
+@@ -283,6 +327,10 @@
+   addr.sin_port = htons(port);
+   addr.sin_addr.s_addr = INADDR_ANY;
+ 
++	if (getenv("VNCVIEWER_LISTEN_LOCALHOST")) {
++		addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
++	}
++
+   sock = socket(AF_INET, SOCK_STREAM, 0);
+   if (sock < 0) {
+     fprintf(stderr,programName);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/tight.c vnc_unixsrc/vncviewer/tight.c
 --- vnc_unixsrc.orig/vncviewer/tight.c	2002-04-30 09:07:31.000000000 -0400
 +++ vnc_unixsrc/vncviewer/tight.c	2007-02-17 22:08:20.000000000 -0500
@@ -5356,7 +5537,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/tight.c vnc_unixsrc/vncviewer
  
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vncviewer/vncviewer._man
 --- vnc_unixsrc.orig/vncviewer/vncviewer._man	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer._man	2007-02-18 18:25:14.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer._man	2007-03-20 10:11:33.000000000 -0400
 @@ -0,0 +1,497 @@
 +'\" t
 +.\" ** The above line should force tbl to be a preprocessor **
@@ -5533,7 +5714,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +.TP
 +Enhanced TightVNC Viewer web page is located at:
 +.TP
-+http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
++http://www.karlrunge.com/x11vnc/ssvnc.html
 +.TP
 +Note: ZRLE encoding is now supported.
 +.TP
@@ -6673,7 +6854,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncviewer/vncviewer.h
 --- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.h	2007-02-18 14:18:58.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.h	2007-03-22 20:54:06.000000000 -0400
 @@ -68,51 +68,69 @@
  /* argsresources.c */
  
@@ -6785,7 +6966,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern char *fallback_resources[];
  extern char vncServerHost[];
-@@ -130,6 +148,7 @@
+@@ -130,10 +148,11 @@
  /* colour.c */
  
  extern unsigned long BGR233ToPixel[];
@@ -6793,6 +6974,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern Colormap cmap;
  extern Visual *vis;
+-extern unsigned int visdepth, visbpp;
++extern unsigned int visdepth, visbpp, isLSB;
+ 
+ extern void SetVisualAndCmap();
+ 
 @@ -160,8 +179,14 @@
  extern void SendRFBEvent(Widget w, XEvent *event, String *params,
  			 Cardinal *num_params);
@@ -6880,7 +7066,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void SetTextChatState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vncviewer/vncviewer.man
 --- vnc_unixsrc.orig/vncviewer/vncviewer.man	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.man	2007-02-18 18:25:14.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.man	2007-03-20 10:11:33.000000000 -0400
 @@ -168,6 +168,121 @@
  \fB\-autopass\fR
  Read a plain-text password from stdin. This option affects only the
@@ -6890,7 +7076,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +.TP
 +Enhanced TightVNC Viewer web page is located at:
 +.TP
-+http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html
++http://www.karlrunge.com/x11vnc/ssvnc.html
 +.TP
 +Note: ZRLE encoding is now supported.
 +.TP

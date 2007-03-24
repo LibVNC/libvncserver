@@ -112,6 +112,16 @@ proc help {} {
     tunnel which, in turn, encrypts and redirects the connection to the
     remote VNC server.
 
+    If you are using a port less than the default VNC port 5900 (usually
+    the VNC display = port - 5900), use the full port number itself, e.g.:
+
+           24.67.132.27:443
+
+    Note, however, if the number n after the colon is less than 200, then
+    a port number 5900 + n is assumed; i.e. n is the VNC display number.
+    If you must use a TCP port less than 200, specify a negative value,
+    e.g.:  24.67.132.27:-80
+
     The remote VNC server must support an initial SSL handshake before
     using the VNC protocol (i.e. VNC is tunnelled through the SSL channel
     after it is established).  "x11vnc -ssl ..."  does this, and any VNC
@@ -263,6 +273,11 @@ proc help {} {
      5) If you want to do a Direct VNC connection, with *NO* SSL or SSH
         encryption, use the "vnc://" prefix, e.g. vnc://far-away.east:0
 
+     6) Reverse VNC connections are possible as well.  Go to Options and
+        select "Reverse VNC connection".  In the 'VNC Host:Display' entry
+        box put in the number (e.g. "0" or ":0") that corresponds to the
+        Listening display (0 -> port 5500).  See the Options Help for more
+        info.
 }
 
 	.h.f.t insert end $msg
@@ -434,6 +449,48 @@ set msg {
             enter a firewall) or if additional SSH port redirs are required
             (CUPS, Sound, SMB tunnelling: See Advanced Options).
 
+  Reverse VNC connection: reverse (listening) VNC connections are possible.
+
+            For SSL connections in the 'VNC Host:Display' entry box put in
+            the number (e.g. "0" or ":0") that corresponds to the Listening
+            display (0 -> port 5500).  For example x11vnc can then be used:
+            "x11vnc ... -ssl SAVE -connect hostname:port".
+
+            Then a VNC server should establish a reverse connection to
+            that port on this machine (e.g. -connect this-machine:5500)
+
+            For reverse connections in SSH or SSH + SSL modes it is a
+            little trickier.  The SSH tunnel (with -R redirect) must be
+            established and remain up waiting for reverse connections.
+            The default time is "sleep 1800", i.e. 30 mins.  You can put
+            a longer or shorter sleep in "Remote SSH Command" (perhaps
+            after your command runs:  cmd; sleep 3600).
+
+            For SSH reverse connections put "hostname:n" in
+            'VNC Host:Display' or "user@hostname:n".  The "n" will be the
+            listening display on the *REMOTE* side.  So to have the remote
+            x11vnc connect use: "x11vnc ... -connect localhost:n" or
+            "x11vnc -R connect:localhost:n" (-ssl will be needed for SSH+SSL
+            mode).  If the -R port cannot be opened because it is in use
+            by another program you will have to kill everything and start
+            over using a different port.
+
+            In reverse connections mode be careful to protect the listening
+            vncviewer from direct connections (neither SSL nor SSH)
+            connecting directly to its listening port thereby bypassing
+            the tunnel.  This can be done by a host-level firewall that only
+            lets in, say, port 5500.  Or for SSH reverse connections allows
+            no 5500+n ports in.  For SSH reverse connections the Unix viewers
+            supplied in the SSVNC package will only listen on localhost.
+
+            Note that for SSL connections use of "Proxy/Gateway" does not
+            make sense: the remote side cannot initiate its reverse connection
+            via the Proxy.
+
+            Note that for SSH or SSH+SSL connections use of "Proxy/Gateway"
+            does not make sense (the ssh cannot do a -R on a remote host:port),
+            unless it is a double proxy where the 2nd host is the machine with
+            the VNC server.
 
   Putty PW:  On Windows only: use the supplied password for plink SSH logins.
              Unlike the other options the value is not saved when 'Save
@@ -724,10 +781,11 @@ proc set_defaults {} {
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
-	global ycrop_string
+	global ycrop_string use_listen
 	global include_list
 
 	set defs(use_viewonly) 0
+	set defs(use_listen) 0
 	set defs(use_fullscreen) 0
 	set defs(use_raise_on_beep) 0
 	set defs(use_bgr233) 0
@@ -797,6 +855,7 @@ proc do_viewer_windows {n} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
 	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
+	global use_listen
 
 	set cmd "vncviewer"
 	if {$change_vncviewer && $change_vncviewer_path != ""} {
@@ -854,7 +913,68 @@ proc do_viewer_windows {n} {
 			append cmd " /quality $use_quality"
 		}
 	}
-	append cmd " localhost:$n"
+	if {$use_listen} {
+		if {$vncviewer_realvnc4} {
+			append cmd " listen=1"
+		} else {
+			append cmd " /listen"
+		}
+		set nn $n
+		if {$nn < 100} {
+			set nn [expr "$nn + 5500"] 
+		}
+		append cmd " $nn"
+		global did_listening_message
+		if {$did_listening_message < 3} {
+			incr did_listening_message
+			global listening_name
+
+			set msg "
+   About to start the Listening VNC Viewer.
+
+   VNC Viewer command to be run:
+
+       $cmd
+
+   The VNC server should then Reverse connect to:
+
+       $listening_name
+
+   To stop the Viewer: right click on the VNC Icon in the taskbar
+   and select 'Close listening daemon' (or similar).
+
+   You will then return to this GUI.
+
+"
+			global use_ssh use_sshssl
+			if {$use_ssh || $use_sshssl} {
+				set msg "${msg}   NOTE: You will probably also need to kill the SSH in the\n   terminal via Ctrl-C" 
+			}
+
+			global help_font is_windows system_button_face
+			toplev .wll
+			global wll_done
+
+			set wll_done 0
+
+			eval text .wll.t -width 60 -height 18 $help_font
+			button .wll.d -text "OK" -command {destroy .wll; set wll_done 1}
+			pack .wll.t .wll.d -side top -fill x
+
+			apply_bg .wll.t
+
+			center_win .wll
+			wm resizable .wll 1 0
+
+			wm title .wll "SSL/SSH Viewer: Listening VNC Info"
+
+			.wll.t insert end $msg
+
+			vwait wll_done
+		}
+	} else {
+		append cmd " localhost:$n"
+	}
 	
 	mesg $cmd
 	set emess ""
@@ -1095,6 +1215,7 @@ proc launch_windows_ssh {hp file n} {
 	global is_win9x env
 	global use_sshssl use_ssh putty_pw
 	global port_knocking_list
+	global use_listen listening_name
 
 	set hpnew  [get_ssh_hp $hp]
 	set proxy  [get_ssh_proxy $hp]
@@ -1104,7 +1225,7 @@ proc launch_windows_ssh {hp file n} {
 	set vnc_disp $hpnew
 	regsub {^.*:} $vnc_disp "" vnc_disp
 
-	if {![regexp {^[0-9][0-9]*$} $vnc_disp]} {
+	if {![regexp {^-?[0-9][0-9]*$} $vnc_disp]} {
 		if {[regexp {cmd=SHELL} $hp]} {
 			;
 		} elseif {[regexp {cmd=PUTTY} $hp]} {
@@ -1116,11 +1237,21 @@ proc launch_windows_ssh {hp file n} {
 		}
 	}
 
-	set vnc_port 5900
-	if {![regexp {^[0-9][0-9]*$} $vnc_disp]} {
+	if {$use_listen} {
+		set vnc_port 5500
+	} else {
+		set vnc_port 5900
+	}
+	if {[regexp {^-[0-9][0-9]*$} $vnc_disp]} {
+		set vnc_port [expr "- $vnc_disp"]
+	} elseif {![regexp {^[0-9][0-9]*$} $vnc_disp]} {
 		;
 	} elseif {$vnc_disp < 200} {
-		set vnc_port [expr $vnc_disp + 5900]
+		if {$use_listen} {
+			set vnc_port [expr $vnc_disp + 5500]
+		} else {
+			set vnc_port [expr $vnc_disp + 5900]
+		}
 	} else {
 		set vnc_port $vnc_disp
 	}
@@ -1207,7 +1338,11 @@ proc launch_windows_ssh {hp file n} {
 		set n 0
 	}
 
-	set use [expr $n + 5900]
+	if {$use_listen} {
+		set use [expr $n + 5500]
+	} else {
+		set use [expr $n + 5900]
+	}
 
 	set_smb_mounts
 	
@@ -1279,6 +1414,9 @@ proc launch_windows_ssh {hp file n} {
 	} else {
 		set sleep 20
 	}
+	if {$use_listen} {
+		set sleep 1800
+	}
 
 	set setup_cmds [ugly_setup_scripts post $tag] 
 
@@ -1347,7 +1485,13 @@ proc launch_windows_ssh {hp file n} {
 		set vnc_host "localhost"
 	}
 
-	set plink_str "plink.exe -ssh -P $ssh_port $verb -L $use:$vnc_host:$vnc_port $extra_redirs -t" 
+	set redir "-L $use:$vnc_host:$vnc_port"
+	if {$use_listen} {
+		set redir "-R $vnc_port:$vnc_host:$use"
+		set listening_name "localhost:$vnc_port  (on remote SSH side)"
+	}
+
+	set plink_str "plink.exe -ssh -P $ssh_port $verb $redir $extra_redirs -t" 
 	if {$extra_redirs != ""} {
 		regsub {exe} $plink_str "exe -C" plink_str
 	}
@@ -1417,6 +1561,10 @@ proc launch_windows_ssh {hp file n} {
 		while {$waited < 30000} {
 			after 500
 			update
+			if {$use_listen} {
+				set gotit 1
+				break;
+			}
 			set ns [get_netstat]
 			set re ":$p_port"
 			append re {[ 	][ 	]*[0:.][0:.]*[ 	][ 	]*LISTEN}
@@ -1526,6 +1674,10 @@ proc launch_windows_ssh {hp file n} {
 	while {$waited < 30000} {
 		after 500
 		update
+		if {$use_listen} {
+			set plink_status yes
+			break;
+		}
 		set ns [get_netstat]
 		set re ":$use"
 		append re {[ 	][ 	]*[0:.][0:.]*[ 	][ 	]*LISTEN}
@@ -2164,10 +2316,18 @@ proc fetch_cert_windows {hp} {
 	set disp [string trim $disp]
 	regsub { .*$} $disp "" disp
 
-	if {$disp == "" || ! [regexp {^[0-9][0-9]*$} $disp]} {
+	if {[regexp {^-[0-9][0-9]*$} $disp]} {
+		;
+	} elseif {$disp == "" || ! [regexp {^[0-9][0-9]*$} $disp]} {
 		set disp 0
 	}
-	set port [expr "$disp + 5900"]
+	if {$disp < 0} {
+		set port [expr "- $disp"]
+	} elseif {$disp < 200} {
+		set port [expr "$disp + 5900"]
+	} else {
+		set port $disp
+	}
 
 	if {$proxy != ""} {
 		global env
@@ -2337,6 +2497,9 @@ proc launch_unix {hp} {
 				set cmd "$cmd -verify '$crtdir'"
 			}
 		}
+		if {$use_listen} {
+			set cmd "$cmd -listen"
+		}
 		set hpnew  [get_ssh_hp $hp]
 		set proxy  [get_ssh_proxy $hp]
 		set sshcmd [get_ssh_cmd $hp]
@@ -2473,6 +2636,9 @@ proc launch_unix {hp} {
 	if {$use_grab} {
 		set cmd "$cmd -grab"
 	}
+	if {$use_listen} {
+		set cmd "$cmd -listen"
+	}
 
 	global darwin_cotvnc
 	if {$darwin_cotvnc} {
@@ -2550,10 +2716,16 @@ proc launch_unix {hp} {
 
 	set passwdfile ""
 	if {$vncauth_passwd != ""} {
+		global use_listen
 		set passwdfile "$env(HOME)/.vncauth_tmp.[pid]"
 		catch {exec vncstorepw $vncauth_passwd $passwdfile}
 		catch {exec chmod 600 $passwdfile}
-		catch {exec sh -c "sleep 15; rm $passwdfile" &}
+		if {$use_listen} {
+			global env
+			set env(SS_VNCVIEWER_RM) $passwdfile
+		} else {
+			catch {exec sh -c "sleep 15; rm $passwdfile" &}
+		}
 		if {$darwin_cotvnc} {
 			set cmd "$cmd --PasswordFile $passwdfile"
 		} else {
@@ -2826,7 +2998,7 @@ proc launch {{hp ""}} {
 	global mycert svcert crtdir
 	global pids_before pids_after pids_new
 	global env
-	global use_ssh use_sshssl
+	global use_ssh use_sshssl use_listen
 
 	set debug 0
 	if {$hp == ""} {
@@ -2874,6 +3046,7 @@ proc launch {{hp ""}} {
 		launch_unix $hp
 		return
 	}
+	##############################################################
 
 	check_ssh_needed
 
@@ -2956,6 +3129,9 @@ proc launch {{hp ""}} {
 
 	set did_port_knock 0
 
+	global listening_name
+	set listening_name ""
+
 	if {$use_sshssl} {
 		set rc [launch_windows_ssh $hp $file2 $n2]
 		if {$rc == 0} {
@@ -2987,10 +3163,23 @@ proc launch {{hp ""}} {
 	set disp [lindex $list 1]
 	set disp [string trim $disp]
 	regsub { .*$} $disp "" disp
-	if {$disp == "" || ! [regexp {^[0-9][0-9]*$} $disp]} {
+	if {[regexp {^-[0-9][0-9]*$} $disp]} {
+		;
+	} elseif {$disp == "" || ! [regexp {^[0-9][0-9]*$} $disp]} {
 		set disp 0
 	}
-	set port [expr "$disp + 5900"]
+
+	if {$disp < 0} {
+		set port [expr "- $disp"]
+	} elseif {$disp < 200} {
+		if {$use_listen} {
+			set port [expr "$disp + 5500"]
+		} else {
+			set port [expr "$disp + 5900"]
+		}
+	} else {
+		set port $disp
+	}
 
 	if {$proxy != ""} {
 		if [regexp {@} $proxy] {
@@ -3013,7 +3202,11 @@ proc launch {{hp ""}} {
 
 	set fh [open $file "w"]
 
-	puts $fh "client = yes"
+	if {$use_listen} {
+		puts $fh "client = no"
+	} else {
+		puts $fh "client = yes"
+	}
 	puts $fh "options = ALL"
 	puts $fh "taskbar = yes"
 	puts $fh "RNDbytes = 2048"
@@ -3027,6 +3220,12 @@ proc launch {{hp ""}} {
 			set fail 1
 		}
 		puts $fh "cert = $mycert"
+	} elseif {$use_listen} {
+		set dummy "dummy.pem"
+		set dh [open $dummy "w"]
+		puts $dh [dummy_cert]
+		close $dh
+		puts $fh "cert = $dummy"
 	}
 	if {$svcert != ""} {
 		if {! [file exists $svcert]} {
@@ -3053,14 +3252,32 @@ proc launch {{hp ""}} {
 		set n2 11
 	}
 	puts $fh "\[vnc$n\]"
-	set port2 [expr "$n + 5900"] 
-	puts $fh "accept = localhost:$port2"
+	set port2 ""
+	if {! $use_listen} {
+		set port2 [expr "$n + 5900"] 
+		puts $fh "accept = localhost:$port2"
 
-	if {$use_sshssl || $proxy != ""} {
-		set port [expr "$n2 + 5900"]
-		puts $fh "connect = localhost:$port"
+		if {$use_sshssl || $proxy != ""} {
+			set port [expr "$n2 + 5900"]
+			puts $fh "connect = localhost:$port"
+		} else {
+			puts $fh "connect = $host:$port"
+		}
 	} else {
-		puts $fh "connect = $host:$port"
+		set port2 [expr "$n + 5500"] 
+		set hloc ""
+		if {$use_ssh} {
+			set hloc "localhost:"
+			set listening_name "localhost:$port  (on remote SSH side)"
+		} else {
+			set hn [get_hostname]
+			if {$hn == ""} {
+				set hn "this-computer"
+			}
+			set listening_name "$hn:$port  (or IP:$port, etc.)"
+		}
+		puts $fh "accept = $hloc$port"
+		puts $fh "connect = localhost:$port2"
 	}
 
 	puts $fh "delay = no"
@@ -4479,6 +4696,63 @@ proc load_profile {{parent "."}} {
 
 	set profdone 1
 	putty_pw_entry check
+	listen_adjust
+}
+
+proc dummy_cert {} {
+	set str {
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAvkfXxb0wcxgrjV2ziFikjII+ze8iKcTBt47L0GM/c21efelN
++zZpJUUXLu4zz8Ryq8Q+sQgfNy7uTOpN9bUUaOk1TnD7gaDQnQWiNHmqbW2kL+DS
+OKngJVPo9dETAS8hf7+D1e1DBZxjTc1a4RQqWJixwpYj99ixWzu8VC2m/xXsjvOs
+jp4+DLBB490nbkwvstmhmiWm1CmI5O5xOkgioVNQqHvQMdVKOSz9PpbjvZiRX1Uo
+qoMrk+2NOqwP90TB35yPASXb9zXKpO7DLhkube+yYGf+yk46aD707L07Eb7cosFP
+S84vNZ9gX7rQ0UOwm5rYA/oZTBskgaqhtIzkLwIDAQABAoIBAD4ot/sXt5kRn0Ca
+CIkU9AQWlC+v28grR2EQW9JiaZrqcoDNUzUqbCTJsi4ZkIFh2lf0TsqELbZYNW6Y
+6AjJM7al4E0UqYSKJTv2WCuuRxdiRs2BMwthqyBmjeanev7bB6V0ybt7u3Y8xU/o
+MrTuYnr4vrEjXPKdLirwk7AoDbKsRXHSIiHEIBOq1+dUQ32t36ukdnnza4wKDLZc
+PKHiCdCk/wOGhuDlxD6RspqUAlRnJ8/aEhrgWxadFXw1hRhRsf/v1shtB0T3DmTe
+Jchjwyiw9mryb9JZAcKxW+fUc4EVvj6VdQGqYInQJY5Yxm5JAlVQUJicuuJEvn6A
+rj5osQECgYEA552CaHpUiFlB4HGkjaH00kL+f0+gRF4PANCPk6X3UPDVYzKnzmuu
+yDvIdEETGFWBwoztUrOOKqVvPEQ+kBa2+DWWYaERZLtg2cI5byfDJxQ3ldzilS3J
+1S3WgCojqcsG/hlxoQJ1dZFanUy/QhUZ0B+wlC+Zp1Q8AyuGQvhHp68CgYEA0lBI
+eqq2GGCdJuNHMPFbi8Q0BnX55LW5C1hWjhuYiEkb3hOaIJuJrqvayBlhcQa2cGqp
+uP34e9UCfoeLgmoCQ0b4KpL2NGov/mL4i8bMgog4hcoYuIi3qxN18vVR14VKEh4U
+RLk0igAYPU+IK2QByaQlBo9OSaKkcfm7U1/pK4ECgYAxr6VpGk0GDvfF2Tsusv6d
+GIgV8ZP09qSLTTJvvxvF/lQYeqZq7sjI5aJD5i3de4JhpO/IXQJzfZfWOuGc8XKA
+3qYK/Y2IqXXGYRcHFGWV/Y1LFd55mCADHlk0l1WdOBOg8P5iRu/Br9PbiLpCx9oI
+vrOXpnp03eod1/luZmqguwKBgQCWFRSj9Q7ddpSvG6HCG3ro0qsNsUMTI1tZ7UBX
+SPogx4tLf1GN03D9ZUZLZVFUByZKMtPLX/Hi7K9K/A9ikaPrvsl6GEX6QYzeTGJx
+3Pw0amFrmDzr8ySewNR6/PXahxPEuhJcuI31rPufRRI3ZLah3rFNbRbBFX+klkJH
+zTnoAQKBgDbUK/aQFGduSy7WUT7LlM3UlGxJ2sA90TQh4JRQwzur0ACN5GdYZkqM
+YBts4sBJVwwJoxD9OpbvKu3uKCt41BSj0/KyoBzjT44S2io2tj1syujtlVUsyyBy
+/ca0A7WBB8lD1D7QMIhYUm2O9kYtSCLlUTHt5leqGaRG38DqlX36
+-----END RSA PRIVATE KEY-----
+-----BEGIN CERTIFICATE-----
+MIIDzDCCArQCCQDSzxzxqhyqLzANBgkqhkiG9w0BAQQFADCBpzELMAkGA1UEBhMC
+VVMxFjAUBgNVBAgTDU1hc3NhY2h1c2V0dHMxDzANBgNVBAcTBkJvc3RvbjETMBEG
+A1UEChMKTXkgQ29tcGFueTEcMBoGA1UECxMTUHJvZHVjdCBEZXZlbG9wbWVudDEZ
+MBcGA1UEAxMQd3d3Lm5vd2hlcmUubm9uZTEhMB8GCSqGSIb3DQEJARYSYWRtaW5A
+bm93aGVyZS5ub25lMB4XDTA3MDMyMzE4MDc0NVoXDTI2MDUyMjE4MDc0NVowgacx
+CzAJBgNVBAYTAlVTMRYwFAYDVQQIEw1NYXNzYWNodXNldHRzMQ8wDQYDVQQHEwZC
+b3N0b24xEzARBgNVBAoTCk15IENvbXBhbnkxHDAaBgNVBAsTE1Byb2R1Y3QgRGV2
+ZWxvcG1lbnQxGTAXBgNVBAMTEHd3dy5ub3doZXJlLm5vbmUxITAfBgkqhkiG9w0B
+CQEWEmFkbWluQG5vd2hlcmUubm9uZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC
+AQoCggEBAL5H18W9MHMYK41ds4hYpIyCPs3vIinEwbeOy9BjP3NtXn3pTfs2aSVF
+Fy7uM8/EcqvEPrEIHzcu7kzqTfW1FGjpNU5w+4Gg0J0FojR5qm1tpC/g0jip4CVT
+6PXREwEvIX+/g9XtQwWcY03NWuEUKliYscKWI/fYsVs7vFQtpv8V7I7zrI6ePgyw
+QePdJ25ML7LZoZolptQpiOTucTpIIqFTUKh70DHVSjks/T6W472YkV9VKKqDK5Pt
+jTqsD/dEwd+cjwEl2/c1yqTuwy4ZLm3vsmBn/spOOmg+9Oy9OxG+3KLBT0vOLzWf
+YF+60NFDsJua2AP6GUwbJIGqobSM5C8CAwEAATANBgkqhkiG9w0BAQQFAAOCAQEA
+vGomHEp6TVU83X2EBUgnbOhzKJ9u3fOI/Uf5L7p//Vxqow7OR1cguzh/YEzmXOIL
+ilMVnzX9nj/bvcLAuqEP7MR1A8f4+E807p/L/Sf49BiCcwQq5I966sGKYXjkve+T
+2GTBNwMSq+5kLSf6QY8VZI+qnrAudEQMeJByQhTZZ0dH8Njeq8EGl9KUio+VWaiW
+CQK6xJuAvAHqa06OjLmwu1fYD4GLGSrOIiRVkSXV8qLIUmzxdJaIRznkFWsrCEKR
+wAH966SAOvd2s6yOHMvyDRIL7WHxfESB6rDHsdIW/yny1fBePjv473KrxyXtbz7I
+dMw1yW09l+eEo4A7GzwOdw==
+-----END CERTIFICATE-----
+}
+	return $str
 }
 
 proc save_profile {{parent "."}} {
@@ -4522,7 +4796,9 @@ proc save_profile {{parent "."}} {
 	if {$p == ""} {
 		set p 0
 	}
-	if {$p < 200} {
+	if {$p < 0} {
+		set port $p
+	} elseif {$p < 200} {
 		set port [expr $p + 5900]
 	} else {
 		set port $p
@@ -7144,7 +7420,12 @@ proc set_advanced_options {} {
 	bind .oa <Escape> {destroy .oa}
 	button .oa.b.help -text "Help" -command help_advanced_opts
 
-	button .oa.b.connect -text "Connect" -command launch
+	global use_listen
+	if {$use_listen} {
+		button .oa.b.connect -text "Listen" -command launch
+	} else {
+		button .oa.b.connect -text "Connect" -command launch
+	}
 
 	pack .oa.b.help .oa.b.connect .oa.b.done -fill x -expand 1 -side left
 
@@ -7307,11 +7588,23 @@ proc ssl_ssh_adjust {which} {
 	putty_pw_entry check
 }
 
+proc listen_adjust {} {
+	global use_listen revs_button
+	if {$use_listen} {
+		catch {.b.conn configure -text "Listen"}
+		catch {.o.b.connect configure -text "Listen"}
+	} else {
+		catch {.b.conn configure -text "Connect"}
+		catch {.o.b.connect configure -text "Connect"}
+	}
+}
+
 proc set_options {} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
 	global compresslevel_text quality_text
 	global env is_windows darwin_cotvnc
+	global use_listen
 
 	toplev .o
 	wm title .o "SSL/SSH VNC Options"
@@ -7329,6 +7622,11 @@ proc set_options {} {
 	radiobutton .o.b$i -anchor w -variable sshssl_sw -value sshssl -text \
 		"Use SSH and SSL" -command {ssl_ssh_adjust sshssl}
 	set iss $i
+	incr i
+
+	checkbutton .o.b$i -anchor w -variable use_listen -text \
+		"Reverse VNC Connection (-listen)" -command {listen_adjust}
+	#if {$is_windows} {.o.b$i configure -state disabled}
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_viewonly -text \
@@ -7439,7 +7737,12 @@ proc set_options {} {
 	button .o.b.done -text "Done" -command {destroy .o}
 	bind .o <Escape> {destroy .o}
 	button .o.b.help -text "Help" -command help_opts
-	button .o.b.connect -text "Connect" -command launch
+	global use_listen
+	if {$use_listen} {
+		button .o.b.connect -text "Listen" -command launch
+	} else {
+		button .o.b.connect -text "Connect" -command launch
+	}
 
 	pack .o.b.help .o.b.connect .o.b.done -fill x -expand 1 -side left
 
@@ -7535,6 +7838,9 @@ set vncproxy ""
 set remote_ssh_cmd ""
 set vncauth_passwd ""
 
+global did_listening_message
+set did_listening_message 0
+
 label .l -text "SSL/SSH VNC Viewer" -relief ridge
 
 set wl 21
@@ -7587,7 +7893,7 @@ frame .b
 button .b.help  -text "Help" -command help
 button .b.certs -text "Certs ..." -command getcerts
 button .b.opts  -text "Options ..." -command set_options
-button .b.load  -text "Load" -command {load_profile}
+button .b.load  -text "Load ..." -command {load_profile}
 button .b.conn  -text "Connect" -command launch
 button .b.exit  -text "Exit" -command {destroy .; exit}
 
