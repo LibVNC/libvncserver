@@ -73,8 +73,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2006-09-23 18:35:25.000000000 -0400
-@@ -0,0 +1,1301 @@
++++ vnc_javasrc/SSLSocketToMe.java	2007-02-21 23:27:10.000000000 -0500
+@@ -0,0 +1,1366 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -100,8 +100,13 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +import java.net.*;
 +import java.io.*;
 +import javax.net.ssl.*;
-+import java.security.cert.*;
 +import java.util.*;
++
++import java.security.*;
++import java.security.cert.*;
++import java.security.spec.*;
++import java.security.cert.Certificate;
++import java.security.cert.CertificateFactory;
 +
 +import java.awt.*;
 +import java.awt.event.*;
@@ -148,6 +153,25 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +	/* cert(s) we retrieve from VNC server */
 +	java.security.cert.Certificate[] trustallCerts = null;
 +	java.security.cert.Certificate[] trusturlCerts = null;
++
++	byte[] hex2bytes(String s) {
++		byte[] bytes = new byte[s.length()/2];
++		for (int i=0; i<s.length()/2; i++) {
++			int j = 2*i;
++			try {
++				int val = Integer.parseInt(s.substring(j, j+2), 16);
++				if (val > 127) {
++					val -= 256;
++				}
++				Integer I = new Integer(val);
++				bytes[i] = Byte.decode(I.toString()).byteValue();
++				
++			} catch (Exception e) {
++				;
++			}
++		}
++		return bytes;
++	}
 +
 +	SSLSocketToMe(String h, int p, VncViewer v) throws Exception {
 +		host = h;
@@ -338,10 +362,48 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		 * 2) to subsequently connect to the server if user agrees.
 +		 */
 +
++		KeyManager[] mykey = null;
++
++		if (viewer.oneTimeKey != null && viewer.oneTimeKey.indexOf(",") > 0) {
++			int idx = viewer.oneTimeKey.indexOf(",");
++
++			String onetimekey = viewer.oneTimeKey.substring(0, idx);
++			byte[] key = hex2bytes(onetimekey);
++			String onetimecert = viewer.oneTimeKey.substring(idx+1);
++			byte[] cert = hex2bytes(onetimecert);
++
++			KeyFactory kf = KeyFactory.getInstance("RSA");
++			PKCS8EncodedKeySpec keysp = new PKCS8EncodedKeySpec ( key );
++			PrivateKey ff = kf.generatePrivate (keysp);
++			dbg("ff " + ff);
++			String cert_str = new String(cert);
++
++			CertificateFactory cf = CertificateFactory.getInstance("X.509");
++			Collection c = cf.generateCertificates(new ByteArrayInputStream(cert));
++			Certificate[] certs = new Certificate[c.toArray().length];
++			if (c.size() == 1) {
++				Certificate tmpcert = cf.generateCertificate(new ByteArrayInputStream(cert));
++				dbg("tmpcert" + tmpcert);
++				certs[0] = tmpcert;
++			} else {
++				certs = (Certificate[]) c.toArray();
++			}
++
++			KeyStore ks = KeyStore.getInstance("JKS");
++			ks.load(null, null);
++			ks.setKeyEntry("onetimekey", ff, "".toCharArray(), certs);
++			String da = KeyManagerFactory.getDefaultAlgorithm();
++			KeyManagerFactory kmf = KeyManagerFactory.getInstance(da);
++			kmf.init(ks, "".toCharArray());
++
++			mykey = kmf.getKeyManagers();
++		}
++
++
 +		/* trust loc certs: */
 +		try {
 +			trustloc_ctx = SSLContext.getInstance("SSL");
-+			trustloc_ctx.init(null, null, new
++			trustloc_ctx.init(mykey, null, new
 +			    java.security.SecureRandom());
 +
 +		} catch (Exception e) {
@@ -353,7 +415,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		/* trust all certs: */
 +		try {
 +			trustall_ctx = SSLContext.getInstance("SSL");
-+			trustall_ctx.init(null, trustAllCerts, new
++			trustall_ctx.init(mykey, trustAllCerts, new
 +			    java.security.SecureRandom());
 +
 +		} catch (Exception e) {
@@ -365,7 +427,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		/* trust url certs: */
 +		try {
 +			trusturl_ctx = SSLContext.getInstance("SSL");
-+			trusturl_ctx.init(null, trustUrlCert, new
++			trusturl_ctx.init(mykey, trustUrlCert, new
 +			    java.security.SecureRandom());
 +
 +		} catch (Exception e) {
@@ -377,7 +439,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		/* trust the one cert from server: */
 +		try {
 +			trustone_ctx = SSLContext.getInstance("SSL");
-+			trustone_ctx.init(null, trustOneCert, new
++			trustone_ctx.init(mykey, trustOneCert, new
 +			    java.security.SecureRandom());
 +
 +		} catch (Exception e) {
@@ -562,6 +624,9 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +
 +			if (viewer.trustAllVncCerts) {
 +				dbg("viewer.trustAllVncCerts-2");
++				user_wants_to_see_cert = false;
++			} else if (viewer.trustUrlVncCert) {
++				dbg("viewer.trustUrlVncCert-1");
 +				user_wants_to_see_cert = false;
 +			} else {
 +				bcd = new BrowserCertsDialog(serv, host + ":" + port);
@@ -1378,8 +1443,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2006-12-01 02:31:26.000000000 -0500
-@@ -88,6 +88,14 @@
++++ vnc_javasrc/VncViewer.java	2007-02-21 23:24:37.000000000 -0500
+@@ -88,6 +88,16 @@
    int deferCursorUpdates;
    int deferUpdateRequests;
  
@@ -1388,13 +1453,15 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +  String CONNECT;
 +  String urlPrefix;
 +  String httpsPort;
++  String oneTimeKey;
 +  boolean forceProxy;
 +  boolean trustAllVncCerts;
++  boolean trustUrlVncCert;
 +
    // Reference to this applet for inter-applet communication.
    public static java.applet.Applet refApplet;
  
-@@ -626,6 +634,53 @@
+@@ -626,6 +636,63 @@
  
      // SocketFactory.
      socketFactory = readParameter("SocketFactory", false);
@@ -1435,6 +1502,11 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    }
 +    System.out.println("urlPrefix: '" + urlPrefix + "'");
 +
++    oneTimeKey = readParameter("oneTimeKey", false);
++    if (oneTimeKey != null) {
++    	System.out.println("oneTimeKey: is set");
++    }
++
 +    forceProxy = false;
 +    str = readParameter("forceProxy", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
@@ -1444,6 +1516,11 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    str = readParameter("trustAllVncCerts", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +      trustAllVncCerts = true;
++    }
++    trustUrlVncCert = false;
++    str = readParameter("trustUrlVncCert", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++      trustUrlVncCert = true;
 +    }
    }
  
