@@ -11,6 +11,7 @@
 #define OPENSSL_INETD 1
 #define OPENSSL_VNC   2
 #define OPENSSL_HTTPS 3
+#define OPENSSL_REVERSE 4
 
 #define DO_DH 0
 
@@ -43,13 +44,13 @@ static void badnews(void) {
 	rfbLog("** not compiled with libssl OpenSSL support **\n");
 	clean_up_exit(1);
 }
-void openssl_init(void) {badnews();}
+void openssl_init(int isclient) {badnews();}
 void openssl_port(void) {badnews();}
 void https_port(void) {badnews();}
 void check_openssl(void) {if (use_openssl) badnews();}
 void check_https(void) {if (use_openssl) badnews();}
 void ssl_helper_pid(pid_t pid, int sock) {badnews(); sock = pid;}
-void accept_openssl(int mode) {mode = 0; badnews();}
+void accept_openssl(int mode, int presock) {mode = 0; presock = 0; badnews();}
 char *find_openssl_bin(void) {badnews(); return NULL;}
 char *get_saved_pem(char *string, int create) {badnews(); return NULL;}
 #else
@@ -59,12 +60,12 @@ char *get_saved_pem(char *string, int create) {badnews(); return NULL;}
 #include <openssl/rand.h>
 
 int openssl_present(void);
-void openssl_init(void);
+void openssl_init(int isclient);
 void openssl_port(void);
 void check_openssl(void);
 void check_https(void);
 void ssl_helper_pid(pid_t pid, int sock);
-void accept_openssl(int mode);
+void accept_openssl(int mode, int presock);
 char *find_openssl_bin(void);
 char *get_saved_pem(char *string, int create);
 
@@ -82,7 +83,7 @@ static int  ssl_init(int s_in, int s_out);
 static void ssl_xfer(int csock, int s_in, int s_out, int is_https);
 
 #ifndef FORK_OK
-void openssl_init(void) {
+void openssl_init(int isclient) {
 	rfbLog("openssl_init: fork is not supported. cannot create"
 	    " ssl helper process.\n");
 	clean_up_exit(1);
@@ -678,31 +679,50 @@ static char *get_ssl_verify_file(char *str_in) {
 	return tfile;
 }
 
-void openssl_init(void) {
+static int ssl_client_mode = 0;
+
+void openssl_init(int isclient) {
 	int db = 0, tmp_pem = 0, do_dh;
 	FILE *in;
 	double ds;
 	long mode;
+	static int first = 1;
 
 	do_dh = DO_DH;
 
 	if (! quiet) {
 		rfbLog("\n");
-		rfbLog("Initializing SSL.\n");
+		rfbLog("Initializing SSL (%s connect mode).\n", isclient ? "client":"server");
 	}
-	if (db) fprintf(stderr, "\nSSL_load_error_strings()\n");
+	if (first) {
+		if (db) fprintf(stderr, "\nSSL_load_error_strings()\n");
 
-	SSL_load_error_strings();
+		SSL_load_error_strings();
 
-	if (db) fprintf(stderr, "SSL_library_init()\n");
+		if (db) fprintf(stderr, "SSL_library_init()\n");
 
-	SSL_library_init();
+		SSL_library_init();
 
-	if (db) fprintf(stderr, "init_prng()\n");
+		if (db) fprintf(stderr, "init_prng()\n");
 
-	init_prng();
+		init_prng();
 
-	ctx = SSL_CTX_new( SSLv23_server_method() );
+		first = 0;
+	}
+
+	if (isclient) {
+		ssl_client_mode = 1;
+	} else {
+		ssl_client_mode = 0;
+	}
+
+	if (ssl_client_mode) {
+		if (db) fprintf(stderr, "SSLv23_client_method()\n");
+		ctx = SSL_CTX_new( SSLv23_client_method() );
+	} else {
+		if (db) fprintf(stderr, "SSLv23_server_method()\n");
+		ctx = SSL_CTX_new( SSLv23_server_method() );
+	}
 
 	if (ctx == NULL) {
 		rfbLog("openssl_init: SSL_CTX_new failed.\n");	
@@ -1288,7 +1308,7 @@ if (db) fprintf(stderr, "buf: '%s'\n", buf);
 	return 1;
 }
 
-void accept_openssl(int mode) {
+void accept_openssl(int mode, int presock) {
 	int sock = -1, listen = -1, cport, csock, vsock;	
 	int status, n, i, db = 0;
 	struct sockaddr_in addr;
@@ -1336,6 +1356,17 @@ void accept_openssl(int mode) {
 			return;
 		}
 		listen = openssl_sock;
+
+	} else if (mode == OPENSSL_REVERSE) {
+		sock = presock;
+		if (sock < 0)  {
+			rfbLog("SSL: accept_openssl: connection failed\n");
+			if (ssl_no_fail) {
+				clean_up_exit(1);
+			}
+			return;
+		}
+		listen = -1;
 
 	} else if (mode == OPENSSL_HTTPS) {
 		sock = accept(https_sock, (struct sockaddr *)&addr, &addrlen);
@@ -1940,7 +1971,11 @@ if (db > 1) fprintf(stderr, "ssl_init: 1\n");
 	}
 if (db > 1) fprintf(stderr, "ssl_init: 2\n");
 
-	SSL_set_accept_state(ssl);
+	if (ssl_client_mode) {
+		SSL_set_connect_state(ssl);
+	} else {
+		SSL_set_accept_state(ssl);
+	}
 
 if (db > 1) fprintf(stderr, "ssl_init: 3\n");
 
@@ -1954,7 +1989,11 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 		signal(SIGALRM, ssl_timeout);
 		alarm(timeout);
 
-		rc = SSL_accept(ssl);
+		if (ssl_client_mode) {
+			rc = SSL_connect(ssl);
+		} else {
+			rc = SSL_accept(ssl);
+		}
 		err = SSL_get_error(ssl, rc);
 
 		alarm(0);
@@ -2425,7 +2464,7 @@ void check_openssl(void) {
 	}
 	
 	rfbLog("SSL: accept_openssl(OPENSSL_VNC)\n");
-	accept_openssl(OPENSSL_VNC);
+	accept_openssl(OPENSSL_VNC, -1);
 }
 
 void check_https(void) {
@@ -2457,7 +2496,7 @@ void check_https(void) {
 		return;
 	}
 	rfbLog("SSL: accept_openssl(OPENSSL_HTTPS)\n");
-	accept_openssl(OPENSSL_HTTPS);
+	accept_openssl(OPENSSL_HTTPS, -1);
 }
 
 #define MSZ 4096

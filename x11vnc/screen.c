@@ -2430,7 +2430,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	/* n.b. samplesPerPixel (set = 1 here) seems to be unused. */
 	if (create_screen) {
 		if (use_openssl) {
-			openssl_init();
+			openssl_init(0);
 		} else if (use_stunnel) {
 			setup_stunnel(0, argc, argv);
 		}

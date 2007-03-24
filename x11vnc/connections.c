@@ -1593,6 +1593,9 @@ static void check_connect_file(char *file) {
 /*
  * Do a reverse connect for a single "host" or "host:port"
  */
+
+extern int ssl_client_mode;
+
 static int do_reverse_connect(char *str) {
 	rfbClientPtr cl;
 	char *host, *p;
@@ -1609,10 +1612,6 @@ static int do_reverse_connect(char *str) {
 		rfbLog("reverse_connect: screen not setup yet.\n");
 		return 0;
 	}
-	if (use_openssl && !getenv("X11VNC_SSL_ALLOW_REVERSE")) {
-		rfbLog("reverse connections disabled in -ssl mode.\n");
-		return 0;
-	}
 	if (unixpw_in_progress) return 0;
 
 	/* copy in to host */
@@ -1627,9 +1626,55 @@ static int do_reverse_connect(char *str) {
 	/* extract port, if any */
 	if ((p = strchr(host, ':')) != NULL) {
 		rport = atoi(p+1);
+		if (rport < 0) {
+			rport = -rport;
+		} else if (rport < 20) {
+			rport = 5500 + rport;
+		}
 		*p = '\0';
 	}
 
+#if 0
+	if (use_openssl && !getenv("X11VNC_SSL_ALLOW_REVERSE")) {
+		rfbLog("reverse connections disabled in -ssl mode.\n");
+		return 0;
+	}
+#endif
+
+	if (use_openssl) {
+		int vncsock = rfbConnectToTcpAddr(host, rport);
+		if (vncsock < 0) {
+			rfbLog("reverse_connect: failed to connect to: %s\n", str);
+			return 0;
+		}
+#define OPENSSL_REVERSE 4
+		openssl_init(1);
+		accept_openssl(OPENSSL_REVERSE, vncsock);
+		openssl_init(0);
+		return 1;
+	}
+
+	if (unixpw) {
+		int is_localhost = 0, user_disabled = 0;
+
+		if(!strcmp(host, "localhost") || !strcmp(host, "127.0.0.1")) {
+			is_localhost = 1;
+		}
+		if (getenv("UNIXPW_DISABLE_LOCALHOST")) {
+			user_disabled = 1;
+		}
+
+		if (! is_localhost) {
+			if (user_disabled ) {
+				rfbLog("reverse_connect: warning disabling localhost constraint in -unixpw\n");
+			} else {
+				rfbLog("reverse_connect: error not localhost in -unixpw\n");
+				return 0;
+			}
+		}
+	}
+
+#if 0
 	if (inetd && unixpw) {
 		if(strcmp(host, "localhost") && strcmp(host, "127.0.0.1")) {
 			if (! getenv("UNIXPW_DISABLE_LOCALHOST")) {
@@ -1644,6 +1689,7 @@ static int do_reverse_connect(char *str) {
 			return 0;
 		}
 	}
+#endif
 
 	cl = rfbReverseConnection(screen, host, rport);
 	free(host);

@@ -131,6 +131,8 @@ Clients
 	=D http
 	httpdir:
 	httpport:
+	https:
+	httpsredir:
 	enablehttpproxy
 	=GAL LOFF
 
@@ -322,7 +324,6 @@ Permissions
 	=F ssldir:
 	=F sslverify:
 	ssltimeout:
-	https:
 	=GAL LOFF
 	=GAL Misc-Perms::
 	safer

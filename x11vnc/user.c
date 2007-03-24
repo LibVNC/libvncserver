@@ -1420,7 +1420,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 	}
 
 	if (inetd && use_openssl) {
-		accept_openssl(OPENSSL_INETD);
+		accept_openssl(OPENSSL_INETD, -1);
 	}
 
 	while (1) {

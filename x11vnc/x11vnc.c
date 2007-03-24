@@ -1776,6 +1776,13 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-timeout")) {
 			CHECK_ARGC
 			first_conn_timeout = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-sleepin")) {
+			int n;
+			CHECK_ARGC
+			n = atoi(argv[++i]);
+			if (n > 0) {
+				usleep(1000*1000*n);
+			}
 		} else if (!strcmp(arg, "-users")) {
 			CHECK_ARGC
 			users_list = strdup(argv[++i]);
@@ -3825,7 +3832,7 @@ int main(int argc, char* argv[]) {
 
 	if (inetd && use_openssl) {
 		if (! waited_for_client) {
-			accept_openssl(OPENSSL_INETD);
+			accept_openssl(OPENSSL_INETD, -1);
 		}
 	}
 	if (! inetd && ! use_openssl) {
@@ -3851,7 +3858,7 @@ int main(int argc, char* argv[]) {
 	}
 	set_vnc_desktop_name();
 
-	if (ncache_beta_tester) {
+	if (ncache_beta_tester && ncache != 0) {
 		ncache_beta_tester_message();
 	}
 

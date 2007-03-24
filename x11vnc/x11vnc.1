@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.5, lastmod: 2007-03-19
+         version: 0.8.5, lastmod: 2007-03-24
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -397,6 +397,11 @@ mode.  This usage could use useful:  \fB-svc\fR \fB-loopbg\fR
 Exit unless a client connects within the first n seconds
 after startup.
 .PP
+\fB-sleepin\fR \fIn\fR
+.IP
+At startup sleep n seconds before proceeding (e.g. to
+allow redirs and listening clients to start up)
+.PP
 \fB-inetd\fR
 .IP
 Launched by 
@@ -766,7 +771,7 @@ is roughly
 the same as requiring a Unix user login (since a Unix
 password or the user's public key authentication is
 used by sshd on the machine where x11vnc runs and only
-local connections from that machine are accepted)
+local connections from that machine are accepted).
 .IP
 Set UNIXPW_DISABLE_LOCALHOST=1 to disable the \fB-localhost\fR
 requirement in Method 2).  One should never do this
@@ -779,8 +784,7 @@ in effect then reverse connections can only be used
 to connect to the same machine x11vnc is running on
 (default port 5500).  Please use a ssh or stunnel port
 redirection to the viewer machine to tunnel the reverse
-connection over an encrypted channel. Note that in \fB-ssl\fR
-mode reverse connection are disabled (see below).
+connection over an encrypted channel.
 .IP
 In \fB-inetd\fR mode the Method 1) will be enforced (not
 Method 2).  With \fB-ssl\fR in effect reverse connections
@@ -1152,11 +1156,6 @@ See \fB-ssldir\fR below to use a directory besides the
 default ~/.vnc/certs
 .IP
 Example: x11vnc \fB-ssl\fR SAVE \fB-display\fR :0 ...
-.IP
-Reverse connections are disabled in \fB-ssl\fR mode because
-there is no way to ensure that data channel will
-be encrypted.  Set X11VNC_SSL_ALLOW_REVERSE=1 to
-override this.
 .IP
 Your VNC viewer will also need to be able to connect
 via SSL.  See the discussion below under \fB-stunnel\fR and

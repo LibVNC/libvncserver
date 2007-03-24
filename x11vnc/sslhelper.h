@@ -4,9 +4,10 @@
 /* -- sslhelper.h -- */
 
 
-#define OPENSSL_INETD 1
-#define OPENSSL_VNC   2
-#define OPENSSL_HTTPS 3
+#define OPENSSL_INETD   1
+#define OPENSSL_VNC     2
+#define OPENSSL_HTTPS   3
+#define OPENSSL_REVERSE 4
 
 extern int openssl_sock;
 extern int openssl_port_num;
@@ -17,13 +18,13 @@ extern char *openssl_last_ip;
 extern void raw_xfer(int csock, int s_in, int s_out);
 
 extern int openssl_present(void);
-extern void openssl_init(void);
+extern void openssl_init(int);
 extern void openssl_port(void);
 extern void https_port(void);
 extern void check_openssl(void);
 extern void check_https(void);
 extern void ssl_helper_pid(pid_t pid, int sock);
-extern void accept_openssl(int mode);
+extern void accept_openssl(int mode, int presock);
 extern char *find_openssl_bin(void);
 extern char *get_saved_pem(char *string, int create);
 

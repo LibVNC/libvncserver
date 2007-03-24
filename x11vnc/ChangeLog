@@ -1,3 +1,6 @@
+2007-03-24  Karl Runge <runge@karlrunge.com>
+	* x11vnc: reverse SSL connections.  -sleepin option.
+
 2007-03-20  Karl Runge <runge@karlrunge.com>
 	* x11vnc: Add -httpsredir option for router port redirs.
 	  set Xcursor bg/fg color values to zero.  Env var to
