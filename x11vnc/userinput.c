@@ -21,6 +21,7 @@
 #include "macosxCGS.h"
 #include "cursor.h"
 #include "screen.h"
+#include "connections.h"
 
 /*
  * user input handling heuristics
@@ -3153,11 +3154,7 @@ static int try_copyrect(Window orig_frame, Window frame, int x, int y, int w, in
 	}
 if (db2) fprintf(stderr, "try_copyrect: 0x%lx/0x%lx  bad: %d stack_list_num: %d\n", orig_frame, frame, dt_bad, stack_list_num);
 
-#if 0
-/* XXX Y */
-//dt_bad = 0;
-#endif
-
+/* XXX Y dt_bad = 0 */
 	if (dt_bad && wireframe_in_progress) {
 		sraRegionPtr rect;
 		/* send the whole thing... */
@@ -5835,7 +5832,7 @@ int lookup_win_index(Window win) {
 			int k2 = recidx[k];
 			if (cache_list[k2].win == win) {
 				idx = k2;
-if (0) fprintf(stderr, "recentA(shortcut): %d  0x%x\n", idx, win);
+if (0) fprintf(stderr, "recentA(shortcut): %d  0x%lx\n", idx, win);
 				s1++;
 				break;
 			}
@@ -5849,7 +5846,7 @@ if (0) fprintf(stderr, "recentA(shortcut): %d  0x%x\n", idx, win);
 			}
 			if (cache_list[k].win == win) {
 				idx = k;
-if (0) fprintf(stderr, "recentB(normal): %d  0x%x\n", idx, win);
+if (0) fprintf(stderr, "recentB(normal): %d  0x%lx\n", idx, win);
 				s2++;
 				break;
 			}
@@ -6968,7 +6965,7 @@ int clipped(int idx) {
 		r2 = sraRgnCreateRect(xc, yc, xc+wc, yc+hc);
 		sraRgnAnd(r2, r0);
 		if (sraRgnAnd(r2, r1)) {
-if (0) fprintf(stderr, "clip[0x%x]: 0x%x, %d/%d\n", win, cache_list[idx2].win, ic, idx2);
+if (0) fprintf(stderr, "clip[0x%lx]: 0x%lx, %d/%d\n", win, cache_list[idx2].win, ic, idx2);
 			clip = 1;
 		}
 		sraRgnDestroy(r2);
@@ -6978,7 +6975,7 @@ if (0) fprintf(stderr, "clip[0x%x]: 0x%x, %d/%d\n", win, cache_list[idx2].win, i
 	}
 	sraRgnDestroy(r0);
 	sraRgnDestroy(r1);
-if (0) fprintf(stderr, "clip[0x%x]: %s\n", win, clip ? "clipped" : "no-clipped");
+if (0) fprintf(stderr, "clip[0x%lx]: %s\n", win, clip ? "clipped" : "no-clipped");
 	return clip;
 }
 
@@ -6988,7 +6985,7 @@ void clip_region(sraRegionPtr r, Window win) {
 	for (ic = old_stack_n - 1; ic >= 0; ic--) {
 		int xc, yc, wc, hc;
 
-if (0) fprintf(stderr, "----[0x%x]: 0x%x, %d  %d\n", win, old_stack[ic], ic, old_stack_mapped[ic]);
+if (0) fprintf(stderr, "----[0x%lx]: 0x%lx, %d  %d\n", win, old_stack[ic], ic, old_stack_mapped[ic]);
 		if (old_stack[ic] == win) {
 			break;
 		}
@@ -7012,7 +7009,7 @@ if (0) fprintf(stderr, "----[0x%x]: 0x%x, %d  %d\n", win, old_stack[ic], ic, old
 		r1 = sraRgnCreateRect(xc, yc, xc+wc, yc+hc);
 		if (sraRgnAnd(r1, r)) {
 			sraRgnSubtract(r, r1);
-if (0) fprintf(stderr, "clip[0x%x]: 0x%x, %d/%d\n", win, cache_list[idx2].win, ic, idx2);
+if (0) fprintf(stderr, "clip[0x%lx]: 0x%lx, %d/%d\n", win, cache_list[idx2].win, ic, idx2);
 		}
 		sraRgnDestroy(r1);
 	}
@@ -8066,7 +8063,7 @@ void set_ncache_xrootpmap(void) {
 	if (use_solid_bg) {
 		image = solid_image(NULL);
 	} else if (pmap != None) {
-		Pixmap pixmap;
+		Pixmap pixmap = None;
 		unsigned char *d_pmap;
 
 		XGetWindowProperty(dpy, rootwin, pmap, 0L, 1L, False,
@@ -8792,13 +8789,15 @@ int check_ncache(int reset, int mode) {
 	if (! macosx_console) {
 		RAWFB_RET(-1)
 	}
+	if (! screen) {
+		return -1;
+	}
 #else
 	RAWFB_RET(-1)
-#endif
-
 	if (! screen || ! dpy) {
 		return -1;
 	}
+#endif
 
 	now = dnow();
 

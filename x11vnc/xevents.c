@@ -16,6 +16,8 @@
 #include "macosx.h"
 #include "screen.h"
 #include "pm.h"
+#include "pointer.h"
+#include "remote.h"
 
 /* XXX CHECK BEFORE RELEASE */
 int grab_buster = 0;
@@ -1373,7 +1375,6 @@ void set_server_input(rfbClientPtr cl, int grab) {
 #endif
 }
 void set_text_chat(rfbClientPtr cl, int len, char *txt) {
-	char buf[100];
 	int dochat = 1;
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl2;
@@ -1393,14 +1394,15 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 	}
 	iter = rfbGetClientIterator(screen);
 	while( (cl2 = rfbClientIteratorNext(iter)) ) {
+		unsigned int ulen = (unsigned int) len;
 		if (cl2 == cl) {
 			continue;
 		}
-		if (len == rfbTextChatOpen) {
+		if (ulen == rfbTextChatOpen) {
 			rfbSendTextChatMessage(cl2, rfbTextChatOpen, "");
-		} else if (len == rfbTextChatClose) {
+		} else if (ulen == rfbTextChatClose) {
 			rfbSendTextChatMessage(cl2, rfbTextChatClose, "");
-		} else if (len == rfbTextChatFinished) {
+		} else if (ulen == rfbTextChatFinished) {
 			rfbSendTextChatMessage(cl2, rfbTextChatFinished, "");
 		} else if (len <= rfbTextMaxSize) {
 			rfbSendTextChatMessage(cl2, len, txt);
@@ -1410,6 +1412,7 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 }
 
 int get_keyboard_led_state_hook(rfbScreenInfoPtr s) {
+	if (s) {}
 	if (unixpw_in_progress) {
 		rfbLog("get_keyboard_led_state_hook: unixpw_in_progress, skipping.\n");
 		return 0;

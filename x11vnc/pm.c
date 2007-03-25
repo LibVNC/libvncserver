@@ -133,7 +133,7 @@ void set_dpms_mode(char *mode) {
 			return;
 		}
 		if (DPMSInfo(dpy, &level, &enabled)) {
-			char *from;
+			char *from = "unk";
 			if (enabled && level != want) {
 				XErrorHandler old_handler = XSetErrorHandler(trap_xerror);
 				trapped_xerror = 0;

@@ -13,6 +13,7 @@
 #include "keyboard.h"
 #include "cursor.h"
 #include "remote.h"
+#include "avahi.h"
 
 void check_switched_user(void);
 void lurk_loop(char *str);
@@ -1796,7 +1797,7 @@ if (db) fprintf(stderr, "%d -- %s -- %s\n", i, proc, buf);
 					}
 				}
 			}
-			if (7 <= vt && vt <= 128) {
+			if (7 <= vt && vt <= 12) {
 				char chvt[100];
 				sprintf(chvt, "chvt %d >/dev/null 2>/dev/null &", vt);
 				rfbLog("running: %s\n", chvt);

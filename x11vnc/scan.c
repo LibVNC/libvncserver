@@ -2867,7 +2867,8 @@ static int scan_display(int ystart, int rescan) {
 			xd_check = 0;
 			if (xdamage_hint_skip(y)) {
 				if (xd_do_check && dpy && use_xdamage == 1) {
-					xd_tck = (xd_tck++) % xd_freq;
+					xd_tck++;
+					xd_tck = xd_tck % xd_freq;
 					if (xd_tck == 0) {
 						xd_check = 1;
 						xd_samples++;
@@ -3164,7 +3165,7 @@ int scan_for_updates(int count_only) {
 			SCAN_FATAL(tile_count);
 			last_xd_check = time(NULL);
 			if (xd_samples > 200) {
-				static bad = 0;
+				static int bad = 0;
 				if (xd_misses > (5 * xd_samples) / 100) {
 					rfbLog("XDAMAGE is not working well... misses: %d/%d\n", xd_misses, xd_samples);
 					rfbLog("Maybe a OpenGL app like Beryl is the problem? Use -noxdamage\n");
