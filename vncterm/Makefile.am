@@ -4,7 +4,7 @@ CONSOLE_SRCS=VNConsole.c
 
 noinst_HEADERS=VNConsole.h vga.h
 
-LDADD=../libvncserver/libvncserver.a @WSOCKLIB@
+LDADD=../libvncserver/libvncserver.la @WSOCKLIB@
 INCLUDES=-I.
 
 if LINUX

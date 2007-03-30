@@ -39,9 +39,9 @@ LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
 	draw.c selbox.c d3des.c vncauth.c cargs.c minilzo.c ultra.c scale.c \
 	$(ZLIBSRCS) $(JPEGSRCS) $(TIGHTVNCFILETRANSFERSRCS)
 
-libvncserver_a_SOURCES=$(LIB_SRCS)
+libvncserver_la_SOURCES=$(LIB_SRCS)
 
-lib_LIBRARIES=libvncserver.a
+lib_LTLIBRARIES=libvncserver.la
 
 if HAVE_RPM
 $(PACKAGE)-$(VERSION).tar.gz: dist

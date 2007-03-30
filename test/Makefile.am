@@ -1,5 +1,5 @@
 AM_CFLAGS=-I $(top_srcdir) -g -Wall
-LDADD = ../libvncserver/libvncserver.a ../libvncclient/libvncclient.a @WSOCKLIB@
+LDADD = ../libvncserver/libvncserver.la ../libvncclient/libvncclient.la @WSOCKLIB@
 
 if HAVE_LIBPTHREAD
 BACKGROUND_TEST=blooptest

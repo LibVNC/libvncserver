@@ -1,3 +1,6 @@
+2007-03-31  Guillaume Rousse <Guillaume.Rousse@inria.fr>
+	* configure.ac, **/Makefile.am: build shared libraries
+
 2007-03-20  Karl Runge <runge@karlrunge.com>
 	* libvncserver/httpd.c: Add "Connection: close" to HTTP replies.
 

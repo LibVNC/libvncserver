@@ -12,7 +12,7 @@ else
 	CCLD="$CC"
 fi
 AC_PROG_MAKE_SET
-AC_PROG_RANLIB
+AC_PROG_LIBTOOL
 AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
                   [$PATH:/usr/ccs/bin])
 

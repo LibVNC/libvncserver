@@ -1,5 +1,5 @@
 AM_CFLAGS = -I $(top_srcdir)
-LDADD = ../libvncserver/libvncserver.a @WSOCKLIB@
+LDADD = ../libvncserver/libvncserver.la @WSOCKLIB@
 
 noinst_PROGRAMS=zippy
 

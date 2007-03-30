@@ -1,5 +1,5 @@
 AM_CFLAGS=-I $(top_srcdir) -g -Wall
-LDADD = ../libvncclient/libvncclient.a @WSOCKLIB@
+LDADD = ../libvncclient/libvncclient.la @WSOCKLIB@
 
 if WITH_FFMPEG
 FFMPEG_HOME=@with_ffmpeg@
