@@ -12,6 +12,7 @@ sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
     -e "s/\(contrib\|examples\|vncterm\|test\|client_examples\)\/Makefile//g" \
     -e "s/LibVNCServer.spec/x11vnc.spec/g" \
     -e "s/^.*libvncserver-config//g" \
+    -e "s/AC_PROG_LIBTOOL/AC_PROG_RANLIB/" \
 > configure.ac
 
 mv Makefile.am Makefile.am.LibVNCServer
@@ -74,13 +75,28 @@ mv libvncserver/Makefile.am libvncserver/Makefile.am.LibVNCServer
 
 cat libvncserver/Makefile.am.LibVNCServer | \
 sed -e "s/\(include\|LIB\|lib\)_/noinst_/g" \
+    -e "s/_la_/_a_/" \
+    -e "s/\.la/.a/" \
+    -e "s/_LTLIBRARIES/_LIBRARIES/" \
 > libvncserver/Makefile.am
 
 mv libvncclient/Makefile.am libvncclient/Makefile.am.LibVNCServer
 
 cat libvncclient/Makefile.am.LibVNCServer | \
 sed -e "s/\(include\|LIB\|lib\)_/noinst_/g" \
+    -e "s/_la_/_a_/" \
+    -e "s/\.la/.a/" \
+    -e "s/_LTLIBRARIES/_LIBRARIES/" \
 > libvncclient/Makefile.am
+
+mv x11vnc/Makefile.am x11vnc/Makefile.am.LibVNCServer
+
+cat x11vnc/Makefile.am.LibVNCServer | \
+sed -e "s/_la_/_a_/" \
+    -e "s/\.la/.a/g" \
+    -e "s/_LTLIBRARIES/_LIBRARIES/" \
+> x11vnc/Makefile.am
+
 
 cp classes/Makefile.am classes/Makefile.am.LibVNCServer
 echo 'pkgdatadir = $(datadir)/@PACKAGE@/classes' >> classes/Makefile.am
@@ -102,7 +118,7 @@ sed -e "s/^\(_PKG.*\)\$PACKAGE\(.*\)$/\1LibVNCServer\2/" \
 > acinclude.m4
 
 make x11vnc-${VERSION}.tar.gz
-for f in configure.ac Makefile.am libvncserver/Makefile.am libvncclient/Makefile.am classes/Makefile.am classes/ssl/Makefile.am acinclude.m4 README; do
+for f in configure.ac Makefile.am x11vnc/Makefile.am libvncserver/Makefile.am libvncclient/Makefile.am classes/Makefile.am classes/ssl/Makefile.am acinclude.m4 README; do
 	mv -f $f.LibVNCServer $f
 done
 
