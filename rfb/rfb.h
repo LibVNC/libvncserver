@@ -965,8 +965,10 @@ extern rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *bu
 
 
 
-#endif
 
 #if(defined __cplusplus)
 }
 #endif
+
+#endif
+

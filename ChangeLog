@@ -1,3 +1,7 @@
+2007-04-05  Alessandro Praduroux <pradu@pradu.it>
+	* rfb/rfb.h: do not misplace guards, which makes it possible to
+	  double include rfb.h from C++.
+
 2007-03-31  Guillaume Rousse <Guillaume.Rousse@inria.fr>
 	* configure.ac, **/Makefile.am: build shared libraries
 
