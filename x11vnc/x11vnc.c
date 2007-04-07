@@ -1505,6 +1505,7 @@ char msg[] =
 "       to it in your viewer; adjust your viewer's size to hide it.\n"
 "\n"
 "More info: http://www.karlrunge.com/x11vnc/#faq-client-caching\n"
+"\n"
 "waiting for connections:\n"
 ;
 

@@ -12,6 +12,7 @@
 #if LIBVNCSERVER_HAVE_LINUX_VIDEODEV_H
 #if LIBVNCSERVER_HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
+#define CONFIG_VIDEO_V4L1_COMPAT
 #include <linux/videodev.h>
 #define V4L_OK
 #endif

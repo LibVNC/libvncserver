@@ -55,6 +55,13 @@ char *find_openssl_bin(void) {badnews(); return NULL;}
 char *get_saved_pem(char *string, int create) {badnews(); return NULL;}
 #else
 
+/*
+ * This is because on older systems both zlib.h and ssl.h define
+ * 'free_func' nothing we do below (currently) induces an external
+ * dependency on 'free_func'.
+ */
+#define free_func my_jolly_little_free_func
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>

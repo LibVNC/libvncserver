@@ -1653,6 +1653,14 @@ static int do_reverse_connect(char *str) {
 		openssl_init(0);
 		return 1;
 	}
+	if (use_stunnel) {
+		if(strcmp(host, "localhost") && strcmp(host, "127.0.0.1")) {
+			if (!getenv("STUNNEL_DISABLE_LOCALHOST")) {
+				rfbLog("reverse_connect: error host not localhost in -stunnel mode.\n");
+				return 0;
+			}
+		}
+	}
 
 	if (unixpw) {
 		int is_localhost = 0, user_disabled = 0;
@@ -1673,23 +1681,6 @@ static int do_reverse_connect(char *str) {
 			}
 		}
 	}
-
-#if 0
-	if (inetd && unixpw) {
-		if(strcmp(host, "localhost") && strcmp(host, "127.0.0.1")) {
-			if (! getenv("UNIXPW_DISABLE_LOCALHOST")) {
-				rfbLog("reverse_connect: in -inetd only localhost\n");
-				rfbLog("connections allowed under -unixpw\n");
-				return 0;
-			}
-		}
-		if (! getenv("UNIXPW_DISABLE_SSL") && ! have_ssh_env()) {
-			rfbLog("reverse_connect: in -inetd stunnel/ssh\n");
-			rfbLog("required under -unixpw\n");
-			return 0;
-		}
-	}
-#endif
 
 	cl = rfbReverseConnection(screen, host, rport);
 	free(host);

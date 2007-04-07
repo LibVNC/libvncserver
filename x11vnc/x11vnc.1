@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "March 2007" "x11vnc " "User Commands"
+.TH X11VNC "1" "April 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.5, lastmod: 2007-03-24
+         version: 0.8.5, lastmod: 2007-04-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1011,6 +1011,10 @@ by client web browsers.  For example:
 Where /.../x11vnc is the full path to x11vnc.
 It is used in the Apache SSL-portal example (see FAQ).
 .IP
+In this mode you can set X11VNC_SKIP_DISPLAY to a comma
+separated list of displays (e.g. ":0,:1") to ignore
+in the finding process.
+.IP
 An interesting option is WAIT:cmd=FINDCREATEDISPLAY
 that is like FINDDISPLAY in that is uses the same method
 to find an existing display.  However, if it does not
@@ -1062,6 +1066,11 @@ X server running the X case may only work on Linux
 (see 
 .IR startx (1)
 ).
+.IP
+You can set the environment variable FD_GEOM (or
+X11VNC_CREATE_GEOM) to WxH or WxHxD to set the width
+and height and optionally the color depth of the
+created display.
 .IP
 If you want the FINDCREATEDISPLAY session to contact an
 XDMCP login manager (xdm/gdm/kdm) on the same machine,
