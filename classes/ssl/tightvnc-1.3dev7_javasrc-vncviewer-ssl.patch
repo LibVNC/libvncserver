@@ -73,8 +73,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2007-02-21 23:27:10.000000000 -0500
-@@ -0,0 +1,1366 @@
++++ vnc_javasrc/SSLSocketToMe.java	2007-03-31 23:33:21.000000000 -0400
+@@ -0,0 +1,1371 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -470,6 +470,13 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +	public void check_for_proxy() {
 +		
 +		boolean result = false;
++
++		trusturlCerts = null;
++		proxy_in_use = false;
++		if (viewer.ignoreProxy) {
++			return;
++		}
++
 +		String ustr = "https://" + host + ":";
 +		if (viewer.httpsPort != null) {
 +			ustr += viewer.httpsPort;
@@ -479,8 +486,6 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		ustr += viewer.urlPrefix + "/check.https.proxy.connection";
 +		dbg("ustr is: " + ustr);
 +
-+		trusturlCerts = null;
-+		proxy_in_use = false;
 +
 +		try {
 +			URL url = new URL(ustr);
@@ -1443,8 +1448,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2007-02-21 23:24:37.000000000 -0500
-@@ -88,6 +88,16 @@
++++ vnc_javasrc/VncViewer.java	2007-03-31 23:35:26.000000000 -0400
+@@ -88,6 +88,17 @@
    int deferCursorUpdates;
    int deferUpdateRequests;
  
@@ -1455,13 +1460,14 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +  String httpsPort;
 +  String oneTimeKey;
 +  boolean forceProxy;
++  boolean ignoreProxy;
 +  boolean trustAllVncCerts;
 +  boolean trustUrlVncCert;
 +
    // Reference to this applet for inter-applet communication.
    public static java.applet.Applet refApplet;
  
-@@ -626,6 +636,63 @@
+@@ -626,6 +637,68 @@
  
      // SocketFactory.
      socketFactory = readParameter("SocketFactory", false);
@@ -1510,17 +1516,22 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    forceProxy = false;
 +    str = readParameter("forceProxy", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
-+      forceProxy = true;
++	forceProxy = true;
++    }
++    ignoreProxy = false;
++    str = readParameter("ignoreProxy", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	ignoreProxy = true;
 +    }
 +    trustAllVncCerts = false;
 +    str = readParameter("trustAllVncCerts", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
-+      trustAllVncCerts = true;
++	trustAllVncCerts = true;
 +    }
 +    trustUrlVncCert = false;
 +    str = readParameter("trustUrlVncCert", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
-+      trustUrlVncCert = true;
++	trustUrlVncCert = true;
 +    }
    }
  
