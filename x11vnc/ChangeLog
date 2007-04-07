@@ -1,3 +1,7 @@
+2007-04-07  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add gnome, kde, etc. FINDCREATEDISPLAY tags.
+	  In check_ncache periodically check for changed desktop. 
+
 2007-03-24  Karl Runge <runge@karlrunge.com>
 	* x11vnc: reverse SSL connections.  -sleepin option.
 

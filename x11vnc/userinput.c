@@ -8062,6 +8062,9 @@ void set_ncache_xrootpmap(void) {
 
 	if (use_solid_bg) {
 		image = solid_image(NULL);
+		if (!quiet) {
+			rfbLog("set_ncache_xrootpmap: solid_image\n");
+		}
 	} else if (pmap != None) {
 		Pixmap pixmap = None;
 		unsigned char *d_pmap;
@@ -8079,8 +8082,9 @@ void set_ncache_xrootpmap(void) {
 			rfbLog("set_ncache_xrootpmap: loading background pixmap: 0x%lx\n", pixmap);
 		}
 	} else {
-		rfbLog("set_ncache_xrootpmap: trying root background\n");
-		
+		if (!quiet) {
+			rfbLog("set_ncache_xrootpmap: trying root background\n");
+		}
 	}
 	if (image == NULL) {
 		image = solid_root((char *) 0x1);
@@ -8971,12 +8975,19 @@ if (hack_val == 2) {
 	n = 0;
 	ttot = 0;
 
-	if (dt_guess == NULL || now > dt_last + 30) {
-		if (dt_guess) {
-			free(dt_guess);
-		}
+	if (dt_guess == NULL || now > dt_last + 60) {
+		static char *dt_prev = NULL;
+		dt_prev = dt_guess;
 		dt_guess = strdup(guess_desktop());
+		if (ncache_xrootpmap && dt_prev && dt_guess) {
+			if (strcmp(dt_prev, dt_guess)) {
+				set_ncache_xrootpmap();
+			}
+		}
 		dt_last = now;
+		if (dt_prev) {
+			free(dt_prev);
+		}
 	}
 	if (dt_guess && !strcmp(dt_guess, "gnome")) {
 		dt_gnome = 1;

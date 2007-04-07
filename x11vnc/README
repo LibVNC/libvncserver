@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Fri Apr  6 15:54:32 EDT 2007
+x11vnc README file                         Date: Fri Apr  6 23:19:54 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -11415,7 +11415,10 @@ Options:
                        (or ge=). This only has an effect in FINDCREATEDISPLAY
                        mode when a virtual X server such as Xvfb is going to
                        be created.  It sets the width and height of the new
-                       display, and optionally the color depth as well.
+                       display, and optionally the color depth as well. You
+                       can also supply "kde", "gnome", "fvwm", "twm",
+                       or "failsafe" to have the created display use that
+                       mode for the user session.
 
                        To disable the option setting set the environment
                        variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.

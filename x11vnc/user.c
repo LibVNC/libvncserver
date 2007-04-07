@@ -1505,7 +1505,7 @@ if (0) db = 1;
 			if (strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 				char *opts = strchr(cmd, '-');
 				char st[] = "";
-				char geom[32];
+				char geom[32], xsess[32];
 				if (opts) {
 					opts++;
 					if (strstr(opts, "xdmcp")) {
@@ -1515,6 +1515,7 @@ if (0) db = 1;
 					opts = st;
 				}
 				sprintf(geom, "NONE");
+				xsess[0] = '\0';
 #if 0
 if (!keep_unixpw_opts) {
 	fprintf(stderr, "no keep_unixpw_opts\n");
@@ -1524,6 +1525,17 @@ if (!keep_unixpw_opts) {
 #endif
 				if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
 					char *q, *p, *t = strdup(keep_unixpw_opts);
+					if (strstr(t, "gnome")) {
+						sprintf(xsess, "gnome");
+					} else if (strstr(t, "kde")) {
+						sprintf(xsess, "kde");
+					} else if (strstr(t, "twm")) {
+						sprintf(xsess, "twm");
+					} else if (strstr(t, "fvwm")) {
+						sprintf(xsess, "fvwm");
+					} else if (strstr(t, "failsafe")) {
+						sprintf(xsess, "failsafe");
+					}
 					q = strstr(t, "ge=");
 					if (! q) q = strstr(t, "geom=");
 					if (! q) q = strstr(t, "geometry=");
@@ -1555,15 +1567,18 @@ if (!keep_unixpw_opts) {
 					free(t);
 				}
 				set_env("FD_GEOM", geom);
+				set_env("FD_SESS", xsess);
 				if (unixpw && keep_unixpw_user) {
 					create_cmd = (char *) malloc(strlen(tmp)
-					    + strlen("env USER='' /bin/sh ")
+					    + strlen("env USER='' ")
+					    + strlen("env FD_SESS='' ")
 					    + strlen("env FD_GEOM='' /bin/sh ")
 					    + strlen(keep_unixpw_user) + 1
 					    + strlen(geom) + 1
+					    + strlen(xsess) + 1
 					    + strlen(opts) + 1);
-					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' /bin/sh %s %s",
-					    keep_unixpw_user, geom, tmp, opts);
+					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' /bin/sh %s %s",
+					    keep_unixpw_user, geom, xsess, tmp, opts);
 				} else {
 					create_cmd = (char *) malloc(strlen(tmp)
 					    + strlen("/bin/sh ") + 1 + strlen(opts) + 1);
