@@ -9841,7 +9841,9 @@ fprintf(stderr, "----%02d: MapNotify        0x%lx  %3d\n", ik, win, idx);
 				}
 
 #if 0
-//				if (cache_list[idx].map_state == IsUnmapped || desktop_change || macosx_console)
+/*
+				if (cache_list[idx].map_state == IsUnmapped || desktop_change || macosx_console)
+ */
 #endif
 				if (1) {
 					X_UNLOCK;
@@ -9941,7 +9943,9 @@ fprintf(stderr, "----%02d: UnmapNotify      0x%lx  %3d\n", ik, win, idx);
 				}
 
 #if 0
+/*
 //				if (cache_list[idx].map_state == IsViewable || desktop_change || macosx_console)
+ */
 #endif
 				if (1) {
 					X_UNLOCK;

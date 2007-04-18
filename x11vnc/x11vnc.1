@@ -2,7 +2,7 @@
 .TH X11VNC "1" "April 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.8.5, lastmod: 2007-04-06
+         version: 0.9, lastmod: 2007-04-18
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2543,115 +2543,6 @@ Do not update the display during mouse dragging events
 slow setups, but you lose all visual feedback for drags,
 text selection, and some menu traversals.  It overrides
 any \fB-pointer_mode\fR setting.
-.PP
-\fB-ncache\fR \fIn\fR
-.IP
-Client-side caching scheme.  Framebuffer memory \fIn\fR
-(an integer) times that of the full display is allocated
-below the actual framebuffer to cache screen contents
-for rapid retrieval.  So a W x H frambuffer is expanded
-to a W x (n+1)*H one.  Use 0 to disable.  Default: XXX.
-.IP
-For this and the other \fB-ncache*\fR options below you can
-abbreviate "\fB-ncache\fR" with "\fB-nc\fR".  Also, "\fB-nonc\fR"
-is the same as "\fB-ncache\fR \fI0\fR"
-.IP
-This is an experimental option, currently implemented
-in an awkward way in that in the VNC Viewer you can
-see the cache contents if you scroll down, etc.  So you
-will have to set things up so you can't see that region.
-If this method is successful, the changes required for
-clients to do this less awkwardly will be investigated.
-.IP
-Note that this mode consumes a huge amount of memory,
-both on the x11vnc server side and on the VNC Viewer
-side.  If n=2 then the amount of RAM used is roughly
-tripled for both x11vnc and the VNC Viewer.  As a rule
-of thumb, note that 1280x1024 at depth 24 is about 5MB
-of pixel data.
-.IP
-For reasonable response when cycling through 4 to 6
-large (e.g. web browser) windows a value n of 6 to 12
-is recommended. (that's right: ~10X more memory...)
-.IP
-Because of the way window backingstore and saveunders
-are implemented, n must be even.  It will be incremented
-by 1 if it is not.
-.IP
-This mode also works for native MacOS X, but may not
-be as effective as the X version.  This is due to a
-number of things, one is the drop-shadow compositing
-that leaves extra areas that need to be repaired (see
-\fB-ncache_pad).\fR  Another is the window iconification
-animations need to be avoided (see \fB-macicontime).\fR
-It appears the that the 'Scale' animation mode gives
-better results than the 'Genie' one.  Also, window event
-detection not as accurate as the X version.
-.PP
-\fB-ncache_cr\fR
-.IP
-In \fB-ncache\fR mode, try to do copyrect opaque window
-moves/drags instead of wireframes (this can induce
-painting errors).  The wireframe will still be used when
-moving a window whose save-unders has not yet been set
-or has been invalidated.
-.IP
-Some VNC Viewers provide better response than others
-with this option.  On Unix, realvnc viewer gives
-smoother drags than tightvnc viewer.  Response may also
-be choppy if the server side machine is too slow.
-.IP
-Sometimes on very slow modem connections, this actually
-gives an improvement because no pixel data at all
-(not even the box animation) is sent during the drag.
-.PP
-\fB-ncache_no_moveraise\fR
-.IP
-In \fB-ncache\fR mode, do not assume that moving a window
-will cause the window manager to raise it to the top
-of the stack.  The default is to assume it does, and
-so at the beginning of any wireframe, etc, window moves
-the window will be pushed to top in the VNC viewer.
-.PP
-\fB-ncache_no_dtchange\fR
-.IP
-In \fB-ncache\fR mode, do not try to guess when the desktop
-(viewport) changes to another one (i.e. another
-workarea).  The default is to try to guess and when
-detected try to make the transistion more smoothly.
-.PP
-\fB-ncache_no_rootpixmap\fR
-.IP
-In \fB-ncache\fR mode, do not try to snapshot the desktop
-background to use in guessing or reconstructing window
-save-unders.
-.PP
-\fB-ncache_keep_anims\fR
-.IP
-In \fB-ncache\fR mode, do not try to disable window
-manager animations and other effects (that usually
-degrade ncache performance or cause painting errors).
-The default is to try to disable them on KDE (but not
-GNOME) when VNC clients are connected.
-.IP
-For other window managers or desktops that provide
-animations, effects, compositing, translucency,
-etc. that interfere with the \fB-ncache\fR method you will
-have to disable them manually.
-.PP
-\fB-ncache_old_wm\fR
-.IP
-In \fB-ncache\fR mode, enable some heuristics for old style
-window managers such as fvwm and twm.
-.PP
-\fB-ncache_pad\fR \fIn\fR
-.IP
-In \fB-ncache\fR mode, pad each window with n pixels for the
-caching rectangles.  This can be used to try to improve
-the situation with dropshadows or other compositing
-(e.g. MacOS X window manager), although it could make
-things worse.  The default is 0 on Unix and 24 on
-MacOS X.
 .PP
 \fB-wireframe\fR \fI[str],\fR \fB-nowireframe\fR
 .IP
