@@ -1,6 +1,6 @@
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncviewer/Vncviewer
 --- vnc_unixsrc.orig/vncviewer/Vncviewer	2003-02-07 05:30:57.000000000 -0500
-+++ vnc_unixsrc/vncviewer/Vncviewer	2007-02-18 19:52:59.000000000 -0500
++++ vnc_unixsrc/vncviewer/Vncviewer	2007-04-05 23:13:59.000000000 -0400
 @@ -5,9 +5,9 @@
  
  !
@@ -33,12 +33,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
  *popup.buttonForm.Command.borderWidth: 0
  *popup.buttonForm.Toggle.borderWidth: 0
  
-@@ -96,43 +97,154 @@
+@@ -96,43 +97,160 @@
  ! Popup buttons
  !
  
 -*popupButtonCount: 8
-+*popupButtonCount: 27
++*popupButtonCount: 28
  
  *popup*button1.label: Dismiss popup
 -*popup*button1.translations: #override\n\
@@ -112,109 +112,115 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
 +     <Visible>: SetViewOnlyState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleViewOnly() HidePopup()
 +
-+*popup*button11.label: Cursor Shape
++*popup*button11.label: Disable Bell
 +*popup*button11.type: toggle
 +*popup*button11.translations: #override\\n\
++     <Visible>: SetBellState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleBell() HidePopup()
++
++*popup*button12.label: Cursor Shape
++*popup*button12.type: toggle
++*popup*button12.translations: #override\\n\
 +     <Visible>: SetCursorShapeState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleCursorShape() HidePopup()
 +
-+*popup*button12.label: X11 Cursor
-+*popup*button12.type: toggle
-+*popup*button12.translations: #override\\n\
++*popup*button13.label: X11 Cursor
++*popup*button13.type: toggle
++*popup*button13.translations: #override\\n\
 +     <Visible>: SetX11CursorState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleX11Cursor() HidePopup()
 +
-+*popup*button13.label: Cursor Alphablend
-+*popup*button13.type: toggle
-+*popup*button13.translations: #override\\n\
++*popup*button14.label: Cursor Alphablend
++*popup*button14.type: toggle
++*popup*button14.translations: #override\\n\
 +     <Visible>: SetCursorAlphaState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleCursorAlpha() HidePopup()
 +
-+*popup*button14.label: Toggle Tight/ZRLE
-+*popup*button14.type: toggle
-+*popup*button14.translations: #override\\n\
++*popup*button15.label: Toggle Tight/ZRLE
++*popup*button15.type: toggle
++*popup*button15.translations: #override\\n\
 +     <Visible>: SetZRLEState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTightZRLE() HidePopup()
 +
-+*popup*button15.label: Disable JPEG
-+*popup*button15.type: toggle
-+*popup*button15.translations: #override\\n\
++*popup*button16.label: Disable JPEG
++*popup*button16.type: toggle
++*popup*button16.translations: #override\\n\
 +     <Visible>: SetNOJPEGState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleJPEG() HidePopup()
 +
-+*popup*button16.label: Prefer raw for localhost
-+*popup*button16.type: toggle
-+*popup*button16.translations: #override\\n\
++*popup*button17.label: Prefer raw for localhost
++*popup*button17.type: toggle
++*popup*button17.translations: #override\\n\
 +     <Visible>: SetRawLocalState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleRawLocal() HidePopup()
 +
-+*popup*button17.label: Full Color
-+*popup*button17.type: toggle
-+*popup*button17.translations: #override\\n\
++*popup*button18.label: Full Color
++*popup*button18.type: toggle
++*popup*button18.translations: #override\\n\
 +     <Visible>: SetFullColorState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFullColor() HidePopup()
 +
-+*popup*button18.label: Grey Scale (16 & 8-bpp)
-+*popup*button18.type: toggle
-+*popup*button18.translations: #override\\n\
++*popup*button19.label: Grey Scale (16 & 8-bpp)
++*popup*button19.type: toggle
++*popup*button19.translations: #override\\n\
 +     <Visible>: SetGreyScaleState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleGreyScale() HidePopup()
 +
-+*popup*button19.label: 16 bit color (BGR565)
-+*popup*button19.type: toggle
-+*popup*button19.translations: #override\\n\
++*popup*button20.label: 16 bit color (BGR565)
++*popup*button20.type: toggle
++*popup*button20.translations: #override\\n\
 +     <Visible>: Set16bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle16bpp() HidePopup()
 +
-+*popup*button20.label: 8   bit color (BGR233)
-+*popup*button20.type: toggle
-+*popup*button20.translations: #override\\n\
++*popup*button21.label: 8   bit color (BGR233)
++*popup*button21.type: toggle
++*popup*button21.translations: #override\\n\
 +     <Visible>: Set8bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8bpp() HidePopup()
 +
-+*popup*button21.label: -     256 colors
-+*popup*button21.type: toggle
-+*popup*button21.translations: #override\\n\
++*popup*button22.label: -     256 colors
++*popup*button22.type: toggle
++*popup*button22.translations: #override\\n\
 +     <Visible>: Set256ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle256Colors() HidePopup()
 +
-+*popup*button22.label: -       64 colors
-+*popup*button22.type: toggle
-+*popup*button22.translations: #override\\n\
++*popup*button23.label: -       64 colors
++*popup*button23.type: toggle
++*popup*button23.translations: #override\\n\
 +     <Visible>: Set64ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle64Colors() HidePopup()
 +
-+*popup*button23.label: -         8 colors
-+*popup*button23.type: toggle
-+*popup*button23.translations: #override\\n\
++*popup*button24.label: -         8 colors
++*popup*button24.type: toggle
++*popup*button24.translations: #override\\n\
 +     <Visible>: Set8ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8Colors() HidePopup()
 +
-+*popup*button24.label: Disable Remote Input
-+*popup*button24.type: toggle
-+*popup*button24.translations: #override\\n\
++*popup*button25.label: Disable Remote Input
++*popup*button25.type: toggle
++*popup*button25.translations: #override\\n\
 +     <Visible>: SetServerInputState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleServerInput() HidePopup()
 +
-+*popup*button25.label: Single Window
-+*popup*button25.type: toggle
-+*popup*button25.translations: #override\\n\
++*popup*button26.label: Single Window
++*popup*button26.type: toggle
++*popup*button26.translations: #override\\n\
 +     <Visible>: SetSingleWindowState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleSingleWindow() HidePopup()
 +
-+*popup*button26.label: Set 1/n Server Scale
-+*popup*button26.translations: #override\\n\
++*popup*button27.label: Set 1/n Server Scale
++*popup*button27.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: DoServerScale() HidePopup()
 +
-+*popup*button27.label: Text Chat
-+*popup*button27.type: toggle
-+*popup*button27.translations: #override\\n\
++*popup*button28.label: Text Chat
++*popup*button28.type: toggle
++*popup*button28.translations: #override\\n\
 +     <Visible>: SetTextChatState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTextChat() HidePopup()
 +
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/vncviewer/argsresources.c
 --- vnc_unixsrc.orig/vncviewer/argsresources.c	2007-02-04 17:10:31.000000000 -0500
-+++ vnc_unixsrc/vncviewer/argsresources.c	2007-03-20 10:10:59.000000000 -0400
++++ vnc_unixsrc/vncviewer/argsresources.c	2007-04-05 23:14:45.000000000 -0400
 @@ -31,7 +31,7 @@
  
  char *fallback_resources[] = {
@@ -258,7 +264,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
       <KeyPress>: SendRFBEvent() HidePopup()",
  
 -  "*popupButtonCount: 8",
-+  "*popupButtonCount: 27",
++  "*popupButtonCount: 28",
  
    "*popup*button1.label: Dismiss popup",
    "*popup*button1.translations: #override\\n\
@@ -271,7 +277,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    "*popup*button3.type: toggle",
    "*popup*button3.translations: #override\\n\
       <Visible>: SetFullScreenState()\\n\
-@@ -115,9 +122,127 @@
+@@ -115,9 +122,133 @@
    "*popup*button8.translations: #override\\n\
       <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F8) HidePopup()",
  
@@ -285,103 +291,109 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +     <Visible>: SetViewOnlyState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleViewOnly() HidePopup()",
 +
-+  "*popup*button11.label: Cursor Shape",
++  "*popup*button11.label: Disable Bell",
 +  "*popup*button11.type: toggle",
 +  "*popup*button11.translations: #override\\n\
++     <Visible>: SetBellState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleBell() HidePopup()",
++
++  "*popup*button12.label: Cursor Shape",
++  "*popup*button12.type: toggle",
++  "*popup*button12.translations: #override\\n\
 +     <Visible>: SetCursorShapeState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleCursorShape() HidePopup()",
 +
-+  "*popup*button12.label: X11 Cursor",
-+  "*popup*button12.type: toggle",
-+  "*popup*button12.translations: #override\\n\
++  "*popup*button13.label: X11 Cursor",
++  "*popup*button13.type: toggle",
++  "*popup*button13.translations: #override\\n\
 +     <Visible>: SetX11CursorState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleX11Cursor() HidePopup()",
 +
-+  "*popup*button13.label: Cursor Alphablend",
-+  "*popup*button13.type: toggle",
-+  "*popup*button13.translations: #override\\n\
++  "*popup*button14.label: Cursor Alphablend",
++  "*popup*button14.type: toggle",
++  "*popup*button14.translations: #override\\n\
 +     <Visible>: SetCursorAlphaState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleCursorAlpha() HidePopup()",
 +
-+  "*popup*button14.label: Toggle Tight/ZRLE",
-+  "*popup*button14.type: toggle",
-+  "*popup*button14.translations: #override\\n\
++  "*popup*button15.label: Toggle Tight/ZRLE",
++  "*popup*button15.type: toggle",
++  "*popup*button15.translations: #override\\n\
 +     <Visible>: SetZRLEState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTightZRLE() HidePopup()",
 +
-+  "*popup*button15.label: Disable JPEG",
-+  "*popup*button15.type: toggle",
-+  "*popup*button15.translations: #override\\n\
++  "*popup*button16.label: Disable JPEG",
++  "*popup*button16.type: toggle",
++  "*popup*button16.translations: #override\\n\
 +     <Visible>: SetNOJPEGState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleJPEG() HidePopup()",
 +
-+  "*popup*button16.label: Prefer raw for localhost",
-+  "*popup*button16.type: toggle",
-+  "*popup*button16.translations: #override\\n\
++  "*popup*button17.label: Prefer raw for localhost",
++  "*popup*button17.type: toggle",
++  "*popup*button17.translations: #override\\n\
 +     <Visible>: SetRawLocalState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleRawLocal() HidePopup()",
 +
-+  "*popup*button17.label: Full Color",
-+  "*popup*button17.type: toggle",
-+  "*popup*button17.translations: #override\\n\
++  "*popup*button18.label: Full Color",
++  "*popup*button18.type: toggle",
++  "*popup*button18.translations: #override\\n\
 +     <Visible>: SetFullColorState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFullColor() HidePopup()",
 +
-+  "*popup*button18.label: Grey Scale (16 & 8-bpp)",
-+  "*popup*button18.type: toggle",
-+  "*popup*button18.translations: #override\\n\
++  "*popup*button19.label: Grey Scale (16 & 8-bpp)",
++  "*popup*button19.type: toggle",
++  "*popup*button19.translations: #override\\n\
 +     <Visible>: SetGreyScaleState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleGreyScale() HidePopup()",
 +
-+  "*popup*button19.label: 16 bit color (BGR565)",
-+  "*popup*button19.type: toggle",
-+  "*popup*button19.translations: #override\\n\
++  "*popup*button20.label: 16 bit color (BGR565)",
++  "*popup*button20.type: toggle",
++  "*popup*button20.translations: #override\\n\
 +     <Visible>: Set16bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle16bpp() HidePopup()",
 +
-+  "*popup*button20.label: 8   bit color (BGR233)",
-+  "*popup*button20.type: toggle",
-+  "*popup*button20.translations: #override\\n\
++  "*popup*button21.label: 8   bit color (BGR233)",
++  "*popup*button21.type: toggle",
++  "*popup*button21.translations: #override\\n\
 +     <Visible>: Set8bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8bpp() HidePopup()",
 +
-+  "*popup*button21.label: -     256 colors",
-+  "*popup*button21.type: toggle",
-+  "*popup*button21.translations: #override\\n\
++  "*popup*button22.label: -     256 colors",
++  "*popup*button22.type: toggle",
++  "*popup*button22.translations: #override\\n\
 +     <Visible>: Set256ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle256Colors() HidePopup()",
 +
-+  "*popup*button22.label: -       64 colors",
-+  "*popup*button22.type: toggle",
-+  "*popup*button22.translations: #override\\n\
++  "*popup*button23.label: -       64 colors",
++  "*popup*button23.type: toggle",
++  "*popup*button23.translations: #override\\n\
 +     <Visible>: Set64ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle64Colors() HidePopup()",
 +
-+  "*popup*button23.label: -         8 colors",
-+  "*popup*button23.type: toggle",
-+  "*popup*button23.translations: #override\\n\
++  "*popup*button24.label: -         8 colors",
++  "*popup*button24.type: toggle",
++  "*popup*button24.translations: #override\\n\
 +     <Visible>: Set8ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8Colors() HidePopup()",
 +
-+  "*popup*button24.label: Disable Remote Input",
-+  "*popup*button24.type: toggle",
-+  "*popup*button24.translations: #override\\n\
++  "*popup*button25.label: Disable Remote Input",
++  "*popup*button25.type: toggle",
++  "*popup*button25.translations: #override\\n\
 +     <Visible>: SetServerInputState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleServerInput() HidePopup()",
 +
-+  "*popup*button25.label: Single Window",
-+  "*popup*button25.type: toggle",
-+  "*popup*button25.translations: #override\\n\
++  "*popup*button26.label: Single Window",
++  "*popup*button26.type: toggle",
++  "*popup*button26.translations: #override\\n\
 +     <Visible>: SetSingleWindowState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleSingleWindow() HidePopup()",
 +
-+  "*popup*button26.label: Set 1/n Server Scale",
-+  "*popup*button26.translations: #override\\n\
++  "*popup*button27.label: Set 1/n Server Scale",
++  "*popup*button27.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: DoServerScale() HidePopup()",
 +
-+  "*popup*button27.label: Text Chat",
-+  "*popup*button27.type: toggle",
-+  "*popup*button27.translations: #override\\n\
++  "*popup*button28.label: Text Chat",
++  "*popup*button28.type: toggle",
++  "*popup*button28.translations: #override\\n\
 +     <Visible>: SetTextChatState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTextChat() HidePopup()",
 +
@@ -399,7 +411,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  /*
   * vncServerHost and vncServerPort are set either from the command line or
-@@ -135,6 +260,7 @@
+@@ -135,6 +266,7 @@
   */
  
  AppData appData;
@@ -407,7 +419,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  static XtResource appDataResourceList[] = {
    {"shareDesktop", "ShareDesktop", XtRBool, sizeof(Bool),
-@@ -161,8 +287,20 @@
+@@ -161,8 +293,20 @@
    {"encodings", "Encodings", XtRString, sizeof(String),
     XtOffsetOf(AppData, encodingsString), XtRImmediate, (XtPointer) 0},
  
@@ -430,7 +442,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"nColours", "NColours", XtRInt, sizeof(int),
     XtOffsetOf(AppData, nColours), XtRImmediate, (XtPointer) 256},
-@@ -179,7 +317,7 @@
+@@ -179,7 +323,7 @@
    {"requestedDepth", "RequestedDepth", XtRInt, sizeof(int),
     XtOffsetOf(AppData, requestedDepth), XtRImmediate, (XtPointer) 0},
  
@@ -439,7 +451,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
     XtOffsetOf(AppData, useShm), XtRImmediate, (XtPointer) True},
  
    {"wmDecorationWidth", "WmDecorationWidth", XtRInt, sizeof(int),
-@@ -206,8 +344,13 @@
+@@ -206,8 +350,13 @@
    {"bumpScrollPixels", "BumpScrollPixels", XtRInt, sizeof(int),
     XtOffsetOf(AppData, bumpScrollPixels), XtRImmediate, (XtPointer) 20},
  
@@ -453,7 +465,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"qualityLevel", "QualityLevel", XtRInt, sizeof(int),
     XtOffsetOf(AppData, qualityLevel), XtRImmediate, (XtPointer) 6},
-@@ -218,14 +361,49 @@
+@@ -218,14 +367,52 @@
    {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
  
@@ -466,6 +478,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"useX11Cursor", "UseX11Cursor", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, useX11Cursor), XtRImmediate, (XtPointer) False},
  
++  {"useBell", "UseBell", XtRBool, sizeof(Bool),
++   XtOffsetOf(AppData, useBell), XtRImmediate, (XtPointer) True},
++
    {"grabKeyboard", "GrabKeyboard", XtRBool, sizeof(Bool),
 -   XtOffsetOf(AppData, grabKeyboard), XtRImmediate, (XtPointer) False},
 +   XtOffsetOf(AppData, grabKeyboard), XtRImmediate, (XtPointer) True},
@@ -505,7 +520,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -243,7 +421,20 @@
+@@ -243,7 +430,20 @@
    {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
    {"-user",          "*userLogin",          XrmoptionSepArg, 0},
    {"-encodings",     "*encodings",          XrmoptionSepArg, 0},
@@ -527,11 +542,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"-owncmap",       "*forceOwnCmap",       XrmoptionNoArg,  "True"},
    {"-truecolor",     "*forceTrueColour",    XrmoptionNoArg,  "True"},
    {"-truecolour",    "*forceTrueColour",    XrmoptionNoArg,  "True"},
-@@ -253,7 +444,17 @@
+@@ -253,7 +453,18 @@
    {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
    {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
    {"-x11cursor",     "*useX11Cursor",       XrmoptionNoArg,  "True"},
 -  {"-autopass",      "*autoPass",           XrmoptionNoArg,  "True"}
++  {"-nobell",        "*useBell",            XrmoptionNoArg,  "False"},
 +  {"-autopass",      "*autoPass",           XrmoptionNoArg,  "True"},
 +  {"-graball",       "*grabAll",            XrmoptionNoArg,  "True"},
 +  {"-grabkbd",       "*grabKeyboard",       XrmoptionNoArg,  "True"},
@@ -546,7 +562,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  };
  
-@@ -277,6 +478,41 @@
+@@ -277,6 +488,43 @@
      {"Pause", Pause},
      {"RunCommand", RunCommand},
      {"Quit", Quit},
@@ -563,6 +579,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +    {"ToggleCursorShape", ToggleCursorShape},
 +    {"ToggleCursorAlpha", ToggleCursorAlpha},
 +    {"ToggleX11Cursor", ToggleX11Cursor},
++    {"ToggleBell", ToggleBell},
 +    {"ToggleRawLocal", ToggleRawLocal},
 +    {"ToggleServerInput", ToggleServerInput},
 +    {"ToggleSingleWindow", ToggleSingleWindow},
@@ -581,6 +598,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +    {"SetCursorShapeState", SetCursorShapeState},
 +    {"SetCursorAlphaState", SetCursorAlphaState},
 +    {"SetX11CursorState", SetX11CursorState},
++    {"SetBellState", SetBellState},
 +    {"SetRawLocalState", SetRawLocalState},
 +    {"SetServerInputState", SetServerInputState},
 +    {"SetSingleWindowState", SetSingleWindowState},
@@ -588,7 +606,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -302,8 +538,8 @@
+@@ -302,8 +550,8 @@
  void
  usage(void)
  {
@@ -599,7 +617,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  	  "\n"
  	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
  	  "       %s [<OPTIONS>] [<HOST>][::<PORT#>]\n"
-@@ -332,10 +568,110 @@
+@@ -332,10 +580,112 @@
  	  "        -autopass\n"
  	  "\n"
  	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
@@ -643,6 +661,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "        -sbwidth n  Scrollbar width for x11vnc -ncache mode (-ycrop),\n"
 +          "                    default is very narrow: 2 pixels, it is narrow to\n"
 +          "                    avoid distraction in -ycrop mode.\n"
++	  "\n"
++	  "        -nobell     Disable bell.\n"
 +	  "\n"
 +	  "        -rawlocal   Prefer raw encoding for localhost, default is\n"
 +	  "                    no, i.e. assumes you have a SSH tunnel instead.\n"
@@ -711,7 +731,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  
  /*
-@@ -357,6 +693,23 @@
+@@ -357,6 +707,23 @@
    XtGetApplicationResources(toplevel, &appData, appDataResourceList,
  			    XtNumber(appDataResourceList), 0, 0);
  
@@ -735,7 +755,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    /* Add our actions to the actions table so they can be used in widget
       resource specs */
  
-@@ -376,6 +729,10 @@
+@@ -376,6 +743,10 @@
      return;
    }
  
@@ -2968,7 +2988,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
 --- vnc_unixsrc.orig/vncviewer/rfbproto.c	2004-03-11 13:14:39.000000000 -0500
-+++ vnc_unixsrc/vncviewer/rfbproto.c	2007-03-23 22:17:11.000000000 -0400
++++ vnc_unixsrc/vncviewer/rfbproto.c	2007-04-06 19:38:37.000000000 -0400
 @@ -57,6 +57,25 @@
  static Bool HandleTight16(int rx, int ry, int rw, int rh);
  static Bool HandleTight32(int rx, int ry, int rw, int rh);
@@ -4865,7 +4885,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  #ifdef MITSHM
      /* if using shared memory PutImage, make sure that the X server has
-@@ -1224,59 +1601,138 @@
+@@ -1224,59 +1601,140 @@
         mainly to avoid copyrect using invalid screen contents - not sure
         if we'd need it otherwise. */
  
@@ -4896,18 +4916,20 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
    {
 -    Window toplevelWin;
 +	Window toplevelWin;
++
++	if (appData.useBell) {
++		XBell(dpy, 0);
++	}
  
 -    XBell(dpy, 0);
-+	XBell(dpy, 0);
- 
--    if (appData.raiseOnBeep) {
--      toplevelWin = XtWindow(toplevel);
--      XMapRaised(dpy, toplevelWin);
 +	if (appData.raiseOnBeep) {
 +		toplevelWin = XtWindow(toplevel);
 +		XMapRaised(dpy, toplevelWin);
 +	}
-+
+ 
+-    if (appData.raiseOnBeep) {
+-      toplevelWin = XtWindow(toplevel);
+-      XMapRaised(dpy, toplevelWin);
 +	break;
      }
  
@@ -5037,7 +5059,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -1296,12 +1752,19 @@
+@@ -1296,12 +1754,19 @@
  #define CONCAT2(a,b) a##b
  #define CONCAT2E(a,b) CONCAT2(a,b)
  
@@ -5057,7 +5079,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  #define BPP 16
  #include "rre.c"
-@@ -1309,6 +1772,7 @@
+@@ -1309,6 +1774,7 @@
  #include "hextile.c"
  #include "zlib.c"
  #include "tight.c"
@@ -5065,7 +5087,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  #define BPP 32
  #include "rre.c"
-@@ -1316,6 +1780,15 @@
+@@ -1316,6 +1782,15 @@
  #include "hextile.c"
  #include "zlib.c"
  #include "tight.c"
@@ -5081,7 +5103,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  
  /*
-@@ -1358,9 +1831,9 @@
+@@ -1358,9 +1833,9 @@
  	    "  %s significant bit in each byte is leftmost on the screen.\n",
  	    (format->bigEndian ? "Most" : "Least"));
    } else {
@@ -5093,7 +5115,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	      (format->bigEndian ? "Most" : "Least"));
      }
      if (format->trueColour) {
-@@ -1463,3 +1936,115 @@
+@@ -1463,3 +1938,115 @@
    cinfo->src = &jpegSrcManager;
  }
  
@@ -6038,7 +6060,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncviewer/vncviewer.c
 --- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.c	2007-02-18 18:45:43.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.c	2007-04-10 14:14:58.000000000 -0400
 @@ -22,6 +22,7 @@
   */
  
@@ -6097,7 +6119,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  
    /* The -listen option is used to make us a daemon process which listens for
       incoming connections from servers, rather than actively connecting to a
-@@ -45,89 +82,718 @@
+@@ -45,89 +82,743 @@
       listenForIncomingConnections() returns, setting the listenSpecified
       flag. */
  
@@ -6157,7 +6179,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		}
 +	}
 +	save_sbw = appData.sbWidth;
-+	set_sbwidth(6);
++	if (save_sbw > 0) {
++		set_sbwidth(save_sbw);
++	} else {
++		set_sbwidth(6);
++	}
 +
 +	toplevel = XtVaAppInitialize(&appContext, "Vncviewer", cmdLineOptions,
 +	    numCmdLineOptions, &argc, argv, fallback_resources,
@@ -6553,6 +6579,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +}
 +
 +void
++ToggleBell(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (appData.useBell) {
++		appData.useBell = False;
++		fprintf(stderr, "useBell: off\n");
++	} else {
++		appData.useBell = True;
++		fprintf(stderr, "useBell: on\n");
++	}
++}
++
++void
 +ToggleRawLocal(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
 +	init_format_change();
@@ -6640,8 +6678,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		}
 +	}
 +}
- 
--  return 0;
++
 +void
 +DoServerScale(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -6753,7 +6790,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	} else {
 +		XtVaSetValues(w, XtNstate, False, NULL);
 +	}
- }
++}
 +
 +void
 +Set8ColorsState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
@@ -6814,6 +6851,15 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +}
 +
 +void
++SetBellState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++  if (appData.useBell)
++    XtVaSetValues(w, XtNstate, False, NULL);
++  else
++    XtVaSetValues(w, XtNstate, True, NULL);
++}
++
++void
 +SetRawLocalState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
 +  if (appData.useRawLocal)
@@ -6830,7 +6876,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +  else
 +    XtVaSetValues(w, XtNstate, False, NULL);
 +}
-+
+ 
+-  return 0;
 +void
 +SetSingleWindowState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -6847,15 +6894,15 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +    XtVaSetValues(w, XtNstate, True, NULL);
 +  else
 +    XtVaSetValues(w, XtNstate, False, NULL);
-+}
+ }
 +
 +
 +
 +
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncviewer/vncviewer.h
 --- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.h	2007-03-22 20:54:06.000000000 -0400
-@@ -68,51 +68,69 @@
++++ vnc_unixsrc/vncviewer/vncviewer.h	2007-04-05 23:09:03.000000000 -0400
+@@ -68,51 +68,70 @@
  /* argsresources.c */
  
  typedef struct {
@@ -6952,6 +6999,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +	Bool enableJPEG;
 +	Bool useRemoteCursor;
 +	Bool useX11Cursor;
++	Bool useBell;
 +	Bool autoPass;
 +
 +	Bool serverInput;
@@ -6966,7 +7014,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern char *fallback_resources[];
  extern char vncServerHost[];
-@@ -130,10 +148,11 @@
+@@ -130,10 +149,11 @@
  /* colour.c */
  
  extern unsigned long BGR233ToPixel[];
@@ -6979,7 +7027,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern void SetVisualAndCmap();
  
-@@ -160,8 +179,14 @@
+@@ -160,8 +180,14 @@
  extern void SendRFBEvent(Widget w, XEvent *event, String *params,
  			 Cardinal *num_params);
  extern void CopyDataToScreen(char *buf, int x, int y, int width, int height);
@@ -6994,7 +7042,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  /* dialogs.c */
  
  extern void ServerDialogDone(Widget w, XEvent *event, String *params,
-@@ -229,6 +254,15 @@
+@@ -229,6 +255,15 @@
  extern Bool SendClientCutText(char *str, int len);
  extern Bool HandleRFBServerMessage();
  
@@ -7010,7 +7058,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern void PrintPixelFormat(rfbPixelFormat *format);
  
  /* selection.c */
-@@ -241,8 +275,9 @@
+@@ -241,8 +276,9 @@
  
  /* shm.c */
  
@@ -7021,7 +7069,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  /* sockets.c */
  
-@@ -271,3 +306,42 @@
+@@ -271,3 +307,44 @@
  extern XtAppContext appContext;
  extern Display* dpy;
  extern Widget toplevel;
@@ -7041,6 +7089,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void ToggleCursorShape(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleCursorAlpha(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleX11Cursor(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleBell(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleRawLocal(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleServerInput(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleSingleWindow(Widget w, XEvent *ev, String *params, Cardinal *num_params);
@@ -7060,6 +7109,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void SetCursorShapeState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetCursorAlphaState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetX11CursorState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetBellState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetRawLocalState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetServerInputState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetSingleWindowState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
