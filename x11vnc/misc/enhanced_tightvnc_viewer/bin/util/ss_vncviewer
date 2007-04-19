@@ -112,7 +112,9 @@ VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
 # Same for STUNNEL, e.g. set it to /path/to/stunnel or stunnel4, etc.
 #
 
-#set -xv 
+if [ "X$SS_DEBUG" != "X" ]; then
+	set -xv 
+fi
 
 PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
 
@@ -146,6 +148,10 @@ showcert=""
 reverse=""
 
 if [ "X$1" = "X-viewerflavor" ]; then
+	if echo "$VNCVIEWERCMD" | egrep -i '^(xmessage|sleep )' > /dev/null; then
+		echo "unknown"
+		exit 0
+	fi
 	if echo "$VNCVIEWERCMD" | grep -i chicken.of > /dev/null; then
 		echo "cotvnc"
 		exit 0
@@ -165,6 +171,12 @@ if [ "X$1" = "X-viewerflavor" ]; then
 		echo "unknown"
 	fi
 	exit 0
+fi
+
+if [ "X$SS_VNCVIEWER_NO_MAXCONN" != "X" ]; then
+	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
+elif echo "$VNCVIEWERCMD" | egrep -i '^(xmessage|sleep )' > /dev/null; then
+	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
 fi
 
 # grab our cmdline options:
@@ -215,10 +227,6 @@ else
 fi
 if [ "X$reverse" != "X" ]; then
 	ssh_sleep=1800
-	if [ "X$use_ssh" = "X1" ]; then
-		VNCVIEWER_LISTEN_LOCALHOST=1
-		export VNCVIEWER_LISTEN_LOCALHOST
-	fi
 	if [ "X$proxy" != "X" ]; then
 		if [ "X$use_ssh" = "X" -a "X$use_sshssl" = "X" ]; then
 			echo ""
@@ -256,6 +264,15 @@ if echo "$orig" | grep '^vnc://' > /dev/null; then
 	direct_connect=1
 elif echo "$orig" | grep '^vncs://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vncs://,,'`
+elif echo "$orig" | grep '^vncssl://' > /dev/null; then
+	orig=`echo "$orig" | sed -e 's,vncssl://,,'`
+elif echo "$orig" | grep '^vncssh://' > /dev/null; then
+	orig=`echo "$orig" | sed -e 's,vncssh://,,'`
+	use_ssh=1
+fi
+if [ "X$reverse" != "X" -a "X$direct_connect" = "X" ]; then
+	VNCVIEWER_LISTEN_LOCALHOST=1
+	export VNCVIEWER_LISTEN_LOCALHOST
 fi
 
 # play around with host:display port:
@@ -264,6 +281,8 @@ if echo "$orig" | grep ':' > /dev/null; then
 else
 	if [ "X$reverse" = "X" ]; then
 		orig="$orig:0"
+	elif [ "X$orig" = "X" ]; then
+		orig=":0"
 	fi
 fi
 
@@ -295,10 +314,31 @@ fi
 
 date_sec=`date +%S`
 
+if echo "$VNCVIEWERCMD" | grep '^sleep[ 	][ 	]*[0-9][0-9]*' > /dev/null; then
+	if [ "X$SS_VNCVIEWER_LISTEN_PORT" = "X" ]; then
+		p=`echo "$VNCVIEWERCMD" | awk '{print $3}'`
+		if [ "X$p" != "X" ]; then
+			SS_VNCVIEWER_LISTEN_PORT=$p
+		fi
+	fi
+	p2=`echo "$VNCVIEWERCMD" | awk '{print $2}'`
+	VNCVIEWERCMD="eval sleep $p2; echo Local "
+elif echo "$VNCVIEWERCMD" | grep '^xmessage[ 	][ 	]*[0-9][0-9]*' > /dev/null; then
+	if [ "X$SS_VNCVIEWER_LISTEN_PORT" = "X" ]; then
+		p=`echo "$VNCVIEWERCMD" | awk '{print $2}'`
+		SS_VNCVIEWER_LISTEN_PORT=$p
+	fi
+fi
+
 findfree() {
 	try0=$1
 	try=$try0
 	use0=""
+
+	if [ "X$SS_VNCVIEWER_LISTEN_PORT" != "X" ]; then
+		echo "$SS_VNCVIEWER_LISTEN_PORT"
+		return	
+	fi
 
 	while [ $try -lt 6000 ]
 	do
@@ -763,10 +803,10 @@ if [ "X$direct_connect" != "X" ]; then
 		echo ""
 		echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
 		echo ""
-		echo "$VNCVIEWERCMD" "$@" -listen $N
+		echo "$VNCVIEWERCMD" "$@" -listen $disp
 		trap "final" 0 2 15
 		echo ""
-		$VNCVIEWERCMD "$@" -listen $N
+		$VNCVIEWERCMD "$@" -listen $disp
 	fi
 	exit $?
 fi

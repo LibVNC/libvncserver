@@ -3,7 +3,7 @@
 exec wish "$0" "$@"
 
 #
-# Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2006-2007 by Karl J. Runge <runge@karlrunge.com>
 #
 # ssvnc.tcl: gui wrapper to the programs in this
 # package. Also sets up service port forwarding.
@@ -270,14 +270,30 @@ proc help {} {
      4) Pressing the "Load" button or pressing Ctrl-L or Clicking the Right
         mouse button on the main GUI will invoke the Load Profile dialog.
 
-     5) If you want to do a Direct VNC connection, with *NO* SSL or SSH
-        encryption, use the "vnc://" prefix, e.g. vnc://far-away.east:0
+     5) If you want to do a Direct VNC connection, WITH *NO* SSL OR SSH
+        ENCRYPTION, use the "vnc://" prefix, e.g. vnc://far-away.east:0
+        This also works for reverse connections (see below).
+
+        Sorry we do not make this easy to figure out how to do (e.g. a
+        button on the main panel), but the goal of SSVNC is secure 
+        connections!
 
      6) Reverse VNC connections are possible as well.  Go to Options and
         select "Reverse VNC connection".  In the 'VNC Host:Display' entry
         box put in the number (e.g. "0" or ":0") that corresponds to the
         Listening display (0 -> port 5500).  See the Options Help for more
         info.
+
+     7) On Unix to have SSVNC act as a general STUNNEL redirector (i.e. no
+        VNC), put the the desired host:port in VNC Host:Display (use a
+        negative port value if it is to be less than 200), then go to
+        Options -> Advanced -> Change VNC Viewer.  Change the "viewer"
+        command to be "xmessage OK" or "xmessage <port>" (or sleep) where
+        port is the desired local listening port.  Then click Connect.
+        If you didn't set the local port look for it in the terminal output.
+
+        On Windows set it to "NOTEPAD" or similar; you can't control
+        the port though.  It is usually 5930.
 }
 
 	.h.f.t insert end $msg
@@ -476,12 +492,14 @@ set msg {
             over using a different port.
 
             In reverse connections mode be careful to protect the listening
-            vncviewer from direct connections (neither SSL nor SSH)
+            VNC Viewer from direct connections (neither SSL nor SSH)
             connecting directly to its listening port thereby bypassing
-            the tunnel.  This can be done by a host-level firewall that only
-            lets in, say, port 5500.  Or for SSH reverse connections allows
-            no 5500+n ports in.  For SSH reverse connections the Unix viewers
-            supplied in the SSVNC package will only listen on localhost.
+            the tunnel.  This can be done by a host-level firewall that
+            only lets in, say, port 5500 (the default one ":0" for stunnel
+            to listen on).  Or for SSH reverse connections allow NO 5500+n
+            ports in.  For reverse connections, the Unix enhanced tightvnc
+            viewers supplied in the SSVNC package will only listen on
+            localhost so these precautions are not needed.
 
             Note that for SSL connections use of "Proxy/Gateway" does not
             make sense: the remote side cannot initiate its reverse connection
@@ -556,7 +574,7 @@ set msg {
 proc help_fetch_cert {} {
 	toplev .fh
 
-	scroll_text_dismiss .fh.f 85 37
+	scroll_text_dismiss .fh.f 85 35
 
 	center_win .fh
 	wm resizable .fh 1 0
@@ -849,6 +867,7 @@ proc set_defaults {} {
 	set vncauth_passwd ""
 
 	ssl_ssh_adjust ssl
+	listen_adjust
 }
 
 proc do_viewer_windows {n} {
@@ -929,6 +948,11 @@ proc do_viewer_windows {n} {
 			incr did_listening_message
 			global listening_name
 
+			set ln $listening_name
+			if {$ln == ""} {
+				set ln "this-computer:$n"
+			}
+
 			set msg "
    About to start the Listening VNC Viewer.
 
@@ -938,13 +962,14 @@ proc do_viewer_windows {n} {
 
    The VNC server should then Reverse connect to:
 
-       $listening_name
+       $ln
 
-   To stop the Viewer: right click on the VNC Icon in the taskbar
+   To stop the Viewer: right click on the VNC Icon in the tray
    and select 'Close listening daemon' (or similar).
 
    You will then return to this GUI.
 
+   Click OK now to start the Listening VNC Viewer.
 "
 			global use_ssh use_sshssl
 			if {$use_ssh || $use_sshssl} {
@@ -957,7 +982,7 @@ proc do_viewer_windows {n} {
 
 			set wll_done 0
 
-			eval text .wll.t -width 60 -height 18 $help_font
+			eval text .wll.t -width 60 -height 19 $help_font
 			button .wll.d -text "OK" -command {destroy .wll; set wll_done 1}
 			pack .wll.t .wll.d -side top -fill x
 
@@ -973,7 +998,11 @@ proc do_viewer_windows {n} {
 			vwait wll_done
 		}
 	} else {
-		append cmd " localhost:$n"
+		if [regexp {^[0-9][0-9]*$} $n] {
+			append cmd " localhost:$n"
+		} else {
+			append cmd " $n"
+		}
 	}
 	
 	mesg $cmd
@@ -2178,6 +2207,10 @@ proc direct_connect_msg {} {
 	}
 	if {$msg != ""} {
 		set msg "Direct connect via vnc://hostname\nThe following options will be disabled:\n\n$msg"
+		global is_windows
+		if {0 && $is_windows} {
+			set msg "Direct connect mode: vnc://host:disp is not supported on Windows."
+		}
 		raise .
 		tk_messageBox -type ok -icon info -message $msg
 	}
@@ -2297,6 +2330,9 @@ proc fetch_cert_unix {hp} {
 }
 
 proc fetch_cert_windows {hp} {
+
+	regsub {^vnc.*://} $hp "" hp
+
 	set hpnew  [get_ssh_hp $hp]
 	set proxy  [get_ssh_proxy $hp]
 
@@ -3048,6 +3084,22 @@ proc launch {{hp ""}} {
 	}
 	##############################################################
 
+	if [regexp {vnc://} $hp] {
+		direct_connect_msg
+		regsub {vnc://} $hp "" hp
+		direct_connect_windows $hp
+		return
+	} elseif [regexp {vncs://} $hp] {
+		set use_ssl 1
+		regsub {vncs://} $hp "" hp
+	} elseif [regexp {vncssl://} $hp] {
+		set use_ssl 1
+		regsub {vncssl://} $hp "" hp
+	} elseif [regexp {vncssh://} $hp] {
+		set use_ssh 1
+		regsub {vncssh://} $hp "" hp
+	}
+
 	check_ssh_needed
 
 	if {! $use_ssh} {
@@ -3364,6 +3416,120 @@ proc launch {{hp ""}} {
 	if {! $is_win9x && $use_sound && $sound_daemon_local_kill && $sound_daemon_local_cmd != ""} {
 		windows_stop_sound_daemon
 	}
+}
+
+proc direct_connect_windows {{hp ""}} {
+	global tcl_platform is_windows
+	global env use_listen
+
+	set proxy [get_ssh_proxy $hp]
+
+	set did_port_knock 0
+
+	global listening_name
+	set listening_name ""
+
+	set list [split $hp ":"] 
+
+	set host [lindex $list 0]
+	if {$host == ""} {
+		set host "localhost"
+	}
+
+	if [regexp {^.*@} $host match] {
+		catch {raise .; update}
+		mesg "Trimming \"$match\" from hostname"
+		after 1000
+		regsub {^.*@} $host "" host
+	}
+
+	set disp [lindex $list 1]
+	set disp [string trim $disp]
+	regsub { .*$} $disp "" disp
+	if {[regexp {^-[0-9][0-9]*$} $disp]} {
+		;
+	} elseif {$disp == "" || ! [regexp {^[0-9][0-9]*$} $disp]} {
+		set disp 0
+	}
+
+	if {$disp < 0} {
+		set port [expr "- $disp"]
+	} elseif {$disp < 200} {
+		if {$use_listen} {
+			set port [expr "$disp + 5500"]
+		} else {
+			set port [expr "$disp + 5900"]
+		}
+	} else {
+		set port $disp
+	}
+
+	if {$proxy != ""} {
+		if [regexp {@} $proxy] {
+			bell
+			catch {raise .; update}
+			mesg "WARNING: SSL proxy contains \"@\" sign"
+			after 2000
+		}
+		set n2 45
+
+		set env(SSVNC_PROXY) $proxy
+		set env(SSVNC_LISTEN) [expr "$n2 + 5900"]
+		set env(SSVNC_DEST) "$host:$port"
+
+		set port [expr $n2 + 5900]
+		set host "localhost"
+	}
+
+	set fail 0
+	if {! $did_port_knock} {
+		if {! [do_port_knock $host start]} {
+			set fail 1
+		}
+		set did_port_knock 1
+	}
+
+	if {$fail} {
+		return
+	}
+
+	set proxy_pid ""
+	if {$proxy != ""} {
+		mesg "Starting TCP helper on port $port ..."
+		after 600
+		set proxy_pid [exec "connect_br.exe" &]
+		unset -nocomplain env(SSVNC_PROXY)
+		unset -nocomplain env(SSVNC_LISTEN)
+		unset -nocomplain env(SSVNC_DEST)
+	}
+
+	catch {destroy .o}
+	catch {destroy .oa}
+	wm withdraw .
+
+	if {$use_listen} {
+		set n $port
+		if {$n >= 5500} {
+			set n [expr $n - 5500]
+		}
+		do_viewer_windows "$n"
+	} else {
+		if {$port >= 5900} {
+			set port [expr $port - 5900]
+		}
+		do_viewer_windows "$host:$port"
+	}
+
+	wm deiconify .
+
+	mesg "Disconnected from $hp."
+
+	global port_knocking_list
+	if [regexp {FINISH} $port_knocking_list] {
+		do_port_knock $host finish
+	}
+
+	mesg "Disconnected from $hp."
 }
 
 proc get_idir_certs {str} {
@@ -4599,7 +4765,7 @@ proc load_include {include dir} {
 	}
 }
 
-proc load_profile {{parent "."}} {
+proc load_profile {{parent "."} {infile ""}} {
 	global profdone
 	global vncdisplay
 
@@ -4607,8 +4773,12 @@ proc load_profile {{parent "."}} {
 
 	set dir [get_profiles_dir]
 
-	set file [tk_getOpenFile -parent $parent -defaultextension ".vnc" \
-		-initialdir $dir -title "Load VNC Profile"]
+	if {$infile != ""} {
+		set file $infile
+	} else {
+		set file [tk_getOpenFile -parent $parent -defaultextension \
+			".vnc" -initialdir $dir -title "Load VNC Profile"]
+	}
 	if {$file == ""} {
 		set profdone 1
 		return
@@ -6637,7 +6807,7 @@ proc change_vncviewer_dialog {} {
 	wm title .chviewer "Change VNC Viewer"
 
 	global help_font
-	eval text .chviewer.t -width 90 -height 24 $help_font
+	eval text .chviewer.t -width 90 -height 29 $help_font
 	apply_bg .chviewer.t
 
 	set msg {
@@ -6662,6 +6832,12 @@ proc change_vncviewer_dialog {} {
 
     Since the command line options differ between them greatly, if you know it
     is of the RealVNC 4.x flavor, indicate on the check box. Otherwise we guess.
+
+    To have SSVNC act as a general STUNNEL redirector (no VNC) set the viewer to
+    be "xmessage OK" or "xmessage <port>" or "sleep n" or "sleep n <port>" (or
+    "NOTEPAD" on Windows).  The default listen port is 5930.  The destination is
+    set in "VNC Host:Display" (for a remote port less then 200 use the negative
+    of the port value).
 }
 	.chviewer.t insert end $msg
 
@@ -7625,8 +7801,9 @@ proc set_options {} {
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_listen -text \
-		"Reverse VNC Connection (-listen)" -command {listen_adjust}
+		"Reverse VNC Connection (-listen)" -command {listen_adjust; if {$vncdisplay == ""} {set vncdisplay ":0"}}
 	#if {$is_windows} {.o.b$i configure -state disabled}
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_viewonly -text \
@@ -7868,6 +8045,7 @@ label .f2.l -width $wl -anchor w -text "Proxy/Gateway:" -relief ridge
 entry .f2.e -width $we -textvariable vncproxy
 pack .f2.l -side left 
 pack .f2.e -side left -expand 1 -fill x
+bind .f2.e <Return> launch
 
 frame .f3
 label .f3.l -width $wl -anchor w -text "Remote SSH Command:" -relief ridge
@@ -7876,6 +8054,7 @@ pack .f3.l -side left
 pack .f3.e -side left -expand 1 -fill x
 .f3.l configure -state disabled
 .f3.e configure -state disabled
+bind .f3.e <Return> launch
 
 set remote_ssh_cmd_list {.f3.e .f3.l} 
 
@@ -7941,3 +8120,31 @@ bind .l <ButtonPress> {set button_gui_top 1}
 bind .f0.l <ButtonPress> {set button_gui_top 1}
 
 update
+
+if {$argc > 0} {
+	set item [lindex $argv 0]
+	if {$item != ""} {
+		if [file exists $item] {
+			load_profile . $item
+		} else {
+			set ok 0
+			set dir [get_profiles_dir]
+			set try "$dir/$item"
+			foreach try [list $dir/$item $dir/$item.vnc] {
+				if [file exists $try] {
+					load_profile . $try
+					set ok 1
+					break;
+				}
+			}
+			if {! $ok && [regexp {:} $item]} {
+				global vncdisplay
+				set vncdisplay $item
+				update 
+				after 750
+				launch
+			}
+		}
+	}
+}
+
