@@ -136,7 +136,7 @@
 
 /* these are for delaying features: */
 #define xxNO_SSL_OR_UNIXPW
-#define NO_NCACHE
+#define xxNO_NCACHE
 
 /*
  * Beginning of support for small binary footprint build for embedded
