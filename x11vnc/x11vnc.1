@@ -2,7 +2,7 @@
 .TH X11VNC "1" "April 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.1, lastmod: 2007-04-18
+         version: 0.9.1, lastmod: 2007-04-27
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1016,7 +1016,8 @@ It is used in the Apache SSL-portal example (see FAQ).
 .IP
 In this mode you can set X11VNC_SKIP_DISPLAY to a comma
 separated list of displays (e.g. ":0,:1") to ignore
-in the finding process.
+in the finding process.  This can also be set by the
+user via "nd=" using "-" instead of ","
 .IP
 An interesting option is WAIT:cmd=FINDCREATEDISPLAY
 that is like FINDDISPLAY in that is uses the same method
@@ -1054,6 +1055,10 @@ on the machine.  E.g. a desktop service:
 \fB-display\fR WAIT:cmd=FINDCREATEDISPLAY
 .IP
 Where /.../x11vnc is the full path to x11vnc.
+.IP
+If for some reason you do not want x11vnc to ever
+try to find an existing display set the env. var
+X11VNC_FINDDISPLAY_ALWAYS_FAILS=1 (also \fB-env\fR ...)
 .IP
 Use WAIT:cmd=FINDCREATEDISPLAY-print to print out the
 script used.  You can specify the preferred order via
@@ -1866,6 +1871,28 @@ user as though "\fB-users\fR \fI+username\fR" had been supplied.
 If you want to limit which users this will be done for,
 provide them as a comma separated list after "unixpw="
 .IP
+Similarly, in \fB-ssl\fR mode, if "\fB-users\fR \fIsslpeer=\fR" is
+supplied then after an SSL client authenticates with his
+cert (the \fB-sslverify\fR option is required for this) x11vnc
+will extract a UNIX username from the "emailAddress"
+field (username@hostname.com) of the "Subject" in the
+x509 SSL cert and then try to switch to that user as
+though "\fB-users\fR \fI+username\fR" had been supplied.  If you
+want to limit which users this will be done for, provide
+them as a comma separated list after "sslpeer=".
+Set the env. var X11VNC_SSLPEER_CN to use the Common
+Name (normally a hostname) instead of the Email field.
+NOTE: the x11vnc administrator must take great care
+that any client certs he adds to \fB-sslverify\fR have the
+correct UNIX username in the "emailAddress" field
+of the cert.  Otherwise a user may be able to log in
+as another.  The following command can be of use in
+checking: "openssl x509 \fB-text\fR \fB-in\fR file.crt", see the
+"Subject:" line.  Also, along with the normal RFB_*
+env. vars. (see \fB-accept)\fR passed to external cmd=
+commands, RFB_SSL_CLIENT_CERT will be set to the
+client's x509 certificate string.
+.IP
 To immediately switch to a user *before* connections
 to the X display are made or any files opened use the
 "=" character: "\fB-users\fR \fI=bob\fR".  That user needs to
@@ -2551,6 +2578,8 @@ Client-side caching scheme.  Framebuffer memory \fIn\fR
 below the actual framebuffer to cache screen contents
 for rapid retrieval.  So a W x H frambuffer is expanded
 to a W x (n+1)*H one.  Use 0 to disable.  Default: XXX.
+.IP
+The \fIn\fR is actually optional, the default is 10.
 .IP
 For this and the other \fB-ncache*\fR options below you can
 abbreviate "\fB-ncache\fR" with "\fB-nc\fR".  Also, "\fB-nonc\fR"

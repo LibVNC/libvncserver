@@ -413,6 +413,11 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 	} else {
 		set_env("RFB_STATE", "UNKNOWN");
 	}
+	if (certret_str) {
+		set_env("RFB_SSL_CLIENT_CERT", certret_str);
+	} else {
+		set_env("RFB_SSL_CLIENT_CERT", "");
+	}
 
 	/* set RFB_CLIENT_PORT to peer port for command to use */
 	if (cd && cd->client_port > 0) {
@@ -491,6 +496,9 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 
 	/* gone, accept, afteraccept */
 	ok = 0;
+	if (!strcmp(mode, "env")) {
+		return 1;
+	}
 	if (!strcmp(mode, "accept") && cmd_ok("accept")) {
 		ok = 1;
 	}

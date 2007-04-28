@@ -1295,7 +1295,7 @@ char create_display[] =
 "\n"
 "have_root=\"\"\n"
 "id0=`id`\n"
-"if id | grep -w root > /dev/null; then\n"
+"if id | sed -e 's/ gid.*$//' | grep -w root > /dev/null; then\n"
 "	have_root=\"1\"\n"
 "fi\n"
 "\n"

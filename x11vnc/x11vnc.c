@@ -2248,8 +2248,17 @@ int main(int argc, char* argv[]) {
 			show_dragging = 0;
 #ifndef NO_NCACHE
 		} else if (!strcmp(arg, "-ncache") || !strcmp(arg, "-nc")) {
-			CHECK_ARGC
-			ncache = atoi(argv[++i]);
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					ncache = atoi(s);
+					i++;
+				} else {
+					ncache = ncache_default;
+				}
+			} else {
+				ncache = ncache_default;
+			}
 			if (ncache % 2 != 0) {
 				ncache++;
 			}

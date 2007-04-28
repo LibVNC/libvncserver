@@ -162,6 +162,7 @@ extern int wireframe_in_progress;
 
 extern int ncache;
 extern int ncache0;
+extern int ncache_default;
 extern int ncache_copyrect;
 extern int ncache_wf_raises;
 extern int ncache_dt_change;

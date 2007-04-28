@@ -2760,7 +2760,7 @@ proc launch_unix {hp} {
 			global env
 			set env(SS_VNCVIEWER_RM) $passwdfile
 		} else {
-			catch {exec sh -c "sleep 15; rm $passwdfile" &}
+			catch {exec sh -c "sleep 15; rm $passwdfile 2>/dev/null" &}
 		}
 		if {$darwin_cotvnc} {
 			set cmd "$cmd --PasswordFile $passwdfile"

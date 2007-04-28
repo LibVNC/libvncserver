@@ -220,6 +220,7 @@ int ncache_pad = 0;
 #endif
 int ncache_xrootpmap = NCACHE_XROOTPMAP;
 int ncache0 = 0;
+int ncache_default = 10;
 int ncache_copyrect = 0;
 int ncache_wf_raises = 1;
 int ncache_dt_change = 1;

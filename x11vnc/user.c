@@ -29,11 +29,11 @@ static void switch_user_task_dummy(void);
 static void switch_user_task_solid_bg(void);
 static char *get_login_list(int with_display);
 static char **user_list(char *user_str);
-static void user2uid(char *user, uid_t *uid, char **name, char **home);
+static void user2uid(char *user, uid_t *uid, gid_t *gid, char **name, char **home);
 static int lurk(char **users);
 static int guess_user_and_switch(char *str, int fb_mode);
-static int try_user_and_display(uid_t uid, char *dpystr);
-static int switch_user_env(uid_t uid, char *name, char *home, int fb_mode);
+static int try_user_and_display(uid_t uid, gid_t gid, char *dpystr);
+static int switch_user_env(uid_t uid, gid_t gid, char *name, char *home, int fb_mode);
 static void try_to_switch_users(void);
 
 
@@ -236,7 +236,7 @@ static char **user_list(char *user_str) {
 	return list;
 }
 
-static void user2uid(char *user, uid_t *uid, char **name, char **home) {
+static void user2uid(char *user, uid_t *uid, gid_t *gid, char **name, char **home) {
 	int numerical = 1;
 	char *q;
 
@@ -271,6 +271,7 @@ static void user2uid(char *user, uid_t *uid, char **name, char **home) {
 		}
 		if (pw) {
 			*uid  = pw->pw_uid;
+			*gid  = pw->pw_gid;
 			*name = pw->pw_name;	/* n.b. use immediately */
 			*home = pw->pw_dir;
 		}
@@ -281,6 +282,7 @@ static void user2uid(char *user, uid_t *uid, char **name, char **home) {
 
 static int lurk(char **users) {
 	uid_t uid;
+	gid_t gid;
 	int success = 0, dmin = -1, dmax = -1;
 	char *p, *logins, **u;
 
@@ -390,10 +392,10 @@ static int lurk(char **users) {
 			}
 		}
 
-		user2uid(user, &uid, &name, &home);
+		user2uid(user, &uid, &gid, &name, &home);
 		free(t);
 
-		if (! uid) {
+		if (! uid || ! gid) {
 			ok = 0;
 		}
 
@@ -406,8 +408,8 @@ static int lurk(char **users) {
 			if (dn >= 0) {
 				sprintf(dpystr, ":%d", dn);
 			}
-			if (try_user_and_display(uid, dpystr)) {
-				if (switch_user_env(uid, name, home, 0)) {
+			if (try_user_and_display(uid, gid, dpystr)) {
+				if (switch_user_env(uid, gid, name, home, 0)) {
 					rfbLog("lurk: now user: %s @ %s\n",
 					    name, dpystr);
 					started_as_root = 2;
@@ -539,7 +541,7 @@ static int guess_user_and_switch(char *str, int fb_mode) {
 	return ret;
 }
 
-static int try_user_and_display(uid_t uid, char *dpystr) {
+static int try_user_and_display(uid_t uid, gid_t gid, char *dpystr) {
 	/* NO strtoks */
 #if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SYS_WAIT_H && LIBVNCSERVER_HAVE_PWD_H
 	pid_t pid, pidw;
@@ -578,7 +580,7 @@ static int try_user_and_display(uid_t uid, char *dpystr) {
 		signal(SIGQUIT, SIG_DFL);
 		signal(SIGTERM, SIG_DFL);
 
-		rc = switch_user_env(uid, name, home, 0); 
+		rc = switch_user_env(uid, gid, name, home, 0); 
 		if (! rc) {
 			exit(1);
 		}
@@ -606,6 +608,7 @@ int switch_user(char *user, int fb_mode) {
 	/* NO strtoks */
 	int doit = 0;
 	uid_t uid = 0;
+	gid_t gid = 0;
 	char *name, *home;
 
 	if (*user == '+') {
@@ -617,20 +620,23 @@ int switch_user(char *user, int fb_mode) {
 		return guess_user_and_switch(user, fb_mode);
 	}
 
-	user2uid(user, &uid, &name, &home);
+	user2uid(user, &uid, &gid, &name, &home);
 
 	if (uid == (uid_t) -1 || uid == 0) {
+		return 0;
+	}
+	if (gid == 0) {
 		return 0;
 	}
 
 	if (! doit && dpy) {
 		/* see if this display works: */
 		char *dstr = DisplayString(dpy);
-		doit = try_user_and_display(uid, dstr);
+		doit = try_user_and_display(uid, gid, dstr);
 	}
 
 	if (doit) {
-		int rc = switch_user_env(uid, name, home, fb_mode);
+		int rc = switch_user_env(uid, gid, name, home, fb_mode);
 		if (rc) {
 			started_as_root = 2;
 		}
@@ -640,7 +646,7 @@ int switch_user(char *user, int fb_mode) {
 	}
 }
 
-static int switch_user_env(uid_t uid, char *name, char *home, int fb_mode) {
+static int switch_user_env(uid_t uid, gid_t gid, char *name, char *home, int fb_mode) {
 	/* NO strtoks */
 	char *xauth;
 	int reset_fb = 0;
@@ -656,6 +662,13 @@ static int switch_user_env(uid_t uid, char *name, char *home, int fb_mode) {
 		reset_fb = 1;
 		clean_shm(0);
 		free_tiles();
+	}
+	if (setgid(gid) != 0) {
+		if (reset_fb) {
+			/* 2 means we did clean_shm and free_tiles */
+			do_new_fb(2);
+		}
+		return 0;
 	}
 	if (setuid(uid) != 0) {
 		if (reset_fb) {
@@ -1115,6 +1128,7 @@ void user_supplied_opts(char *opts) {
 		"rotate", "ro",
 		"geometry", "geom", "ge",
 		"noncache", "nc",
+		"nodisplay", "nd",
 		NULL
 	};
 
@@ -1485,12 +1499,89 @@ if (0) db = 1;
 		int n;
 		int nodisp = 0;
 		int saw_xdmcp = 0;
+		char *usslpeer = NULL;
 
 		memset(line1, 0, 1024);
 		memset(line2, 0, 16384);
 
+		if (users_list && strstr(users_list, "sslpeer=") == users_list) {
+			int ok = 0;
+			char *u = NULL, *upeer = NULL;
+
+			if (certret_str) {
+				char *q, *p, *str = strdup(certret_str);
+				q = strstr(str, "Subject: ");
+				if (! q) return 0;
+				p = strstr(q, "\n");
+				if (p) *p = '\0';
+				q = strstr(q, "CN=");
+				if (! q) return 0;
+				if (! getenv("X11VNC_SSLPEER_CN")) {
+					p = q;
+					q = strstr(q, "/emailAddress=");
+					if (! q) q = strstr(p, "/Email=");
+					if (! q) return 0;
+				}
+				q = strstr(q, "=");
+				if (! q) return 0;
+				q++;
+				p = strstr(q, " ");
+				if (p) *p = '\0';
+				p = strstr(q, "@");
+				if (p) *p = '\0';
+				p = strstr(q, "/");
+				if (p) *p = '\0';
+				upeer = strdup(q);
+				if (strcmp(upeer, "")) {
+					p = upeer;
+					while (*p != '\0') {
+						char c = *p;
+						if (!isalnum((int) c)) {
+							*p = '\0';
+							break;
+						}
+						p++;
+					}
+					if (strcmp(upeer, "")) {
+						ok = 1;
+					}
+				}
+			}
+			if (! ok || !upeer) {
+				return 0;
+			}
+			rfbLog("sslpeer unix username extracted from x509 cert: %s\n", upeer);
+			u = (char *) malloc(strlen(upeer+2));
+			u[0] = '\0';
+			if (!strcmp(users_list, "sslpeer=")) {
+				sprintf(u, "+%s", upeer);
+			} else {
+				char *p, *str = strdup(users_list);
+				p = strtok(str + strlen("sslpeer="), ",");
+				while (p) {
+					if (!strcmp(p, upeer)) {
+						sprintf(u, "+%s", upeer);
+						break;
+					}
+					p = strtok(NULL, ",");
+				}
+				free(str);
+			}
+			if (u[0] == '\0') {
+				rfbLog("sslpeer cannot determine user: %s\n", upeer);
+				free(u);
+				return 0;
+			}
+			free(u);
+			usslpeer = upeer;
+		}
+
+		/* only sets environment variables: */
+		run_user_command("", latest_client, "env", NULL, 0, NULL);
+
 		if (!strcmp(cmd, "FINDDISPLAY") ||
 		    strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
+			char *nd = "";
 			tmp_fd = mkstemp(tmp);
 			if (tmp_fd < 0) {
 				rfbLog("wait_for_client: open failed: %s\n", tmp);
@@ -1498,7 +1589,12 @@ if (0) db = 1;
 				clean_up_exit(1);
 			}
 			chmod(tmp, 0644);
-			write(tmp_fd, find_display, strlen(find_display));
+			if (getenv("X11VNC_FINDDISPLAY_ALWAYS_FAILS")) {
+				char *s = "#!/bin/sh\necho _FAIL_\nexit 1\n";
+				write(tmp_fd, s, strlen(s));
+			} else {
+				write(tmp_fd, find_display, strlen(find_display));
+			}
 			close(tmp_fd);
 			nodisp = 1;
 
@@ -1536,6 +1632,7 @@ if (!keep_unixpw_opts) {
 					} else if (strstr(t, "failsafe")) {
 						sprintf(xsess, "failsafe");
 					}
+
 					q = strstr(t, "ge=");
 					if (! q) q = strstr(t, "geom=");
 					if (! q) q = strstr(t, "geometry=");
@@ -1566,28 +1663,60 @@ if (!keep_unixpw_opts) {
 					}
 					free(t);
 				}
+
 				set_env("FD_GEOM", geom);
 				set_env("FD_SESS", xsess);
-				if (unixpw && keep_unixpw_user) {
-					create_cmd = (char *) malloc(strlen(tmp)
+
+				if (usslpeer || (unixpw && keep_unixpw_user)) {
+					char *uu = usslpeer;
+					if (!uu) {
+						uu = keep_unixpw_user;
+					}
+					create_cmd = (char *) malloc(strlen(tmp)+1
 					    + strlen("env USER='' ")
-					    + strlen("env FD_SESS='' ")
-					    + strlen("env FD_GEOM='' /bin/sh ")
-					    + strlen(keep_unixpw_user) + 1
+					    + strlen("FD_GEOM='' ")
+					    + strlen("FD_SESS='' /bin/sh ")
+					    + strlen(uu) + 1
 					    + strlen(geom) + 1
 					    + strlen(xsess) + 1
 					    + strlen(opts) + 1);
 					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' /bin/sh %s %s",
-					    keep_unixpw_user, geom, xsess, tmp, opts);
+					    uu, geom, xsess, tmp, opts);
 				} else {
 					create_cmd = (char *) malloc(strlen(tmp)
 					    + strlen("/bin/sh ") + 1 + strlen(opts) + 1);
 					sprintf(create_cmd, "/bin/sh %s %s", tmp, opts);
 				}
+
 if (db) fprintf(stderr, "create_cmd: %s\n", create_cmd);
 			}
-			cmd = (char *) malloc(strlen(tmp) + strlen("/bin/sh ") + 1);
-			sprintf(cmd, "/bin/sh %s", tmp);
+			if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
+				char *q, *t = keep_unixpw_opts;
+				q = strstr(t, "nd=");
+				if (! q) q = strstr(t, "nodisplay=");
+				if (q) {
+					char *t2;
+					q = strchr(q, '=') + 1;
+					t = strdup(q);
+					q = t;
+					t2 = strchr(t, ',');
+					if (t2) *t2 = '\0';
+					while (*t != '\0') {
+						if (*t == '-') {
+							*t = ',';
+						}
+						t++;
+					}
+					if (!strchr(q, '\'')) {
+						if (! quiet) rfbLog("set X11VNC_SKIP_DISPLAY: %s\n", q);
+						nd = q;
+					}
+				}
+			}
+
+			cmd = (char *) malloc(strlen("env X11VNC_SKIP_DISPLAY='' ")
+			    + strlen(nd) + strlen(tmp) + strlen("/bin/sh ") + 1);
+			sprintf(cmd, "env X11VNC_SKIP_DISPLAY='%s' /bin/sh %s", nd, tmp);
 		}
 
 		rfbLog("wait_for_client: running: %s\n", cmd);
@@ -1605,6 +1734,9 @@ if (db) fprintf(stderr, "create_cmd: %s\n", create_cmd);
 			}
 
 if (db) {fprintf(stderr, "line: "); write(2, line, n); write(2, "\n", 1); fprintf(stderr, "res=%d n=%d\n", res, n);}
+			if (! res) {
+				rfbLog("wait_for_client: find display cmd failed\n");
+			}
 
 			if (! res && create_cmd) {
 				FILE *mt = fopen(tmp, "w");
@@ -1702,7 +1834,22 @@ if (db) fprintf(stderr, "\n");
 			FILE *p;
 			int rc;
 			close_exec_fds();
-			p = popen(cmd, "r");
+
+			if (usslpeer) {
+				char *c;
+				if (getuid() == 0) {
+					c = (char *) malloc(strlen("su - '' -c \"")
+					    + strlen(usslpeer) + strlen(cmd) + 1 + 1);
+					sprintf(c, "su - '%s' -c \"%s\"", usslpeer, cmd);
+				} else {
+					c = strdup(cmd);
+				}
+				p = popen(c, "r");
+				free(c);
+				
+			} else {
+				p = popen(cmd, "r");
+			}
 			if (! p) {
 				rfbLog("wait_for_client: cmd failed: %s\n", cmd);
 				rfbLogPerror("popen");
@@ -1721,6 +1868,10 @@ if (db) fprintf(stderr, "\n");
 			}
 			n = fread(line2, 1, 16384, p);
 			rc = pclose(p);
+
+			if (rc != 0) {
+				rfbLog("wait_for_client: find display cmd failed\n");
+			}
 
 			if (create_cmd && rc != 0) {
 				FILE *mt = fopen(tmp, "w");
@@ -1767,7 +1918,9 @@ if (db) fprintf(stderr, "line1=%s\n", line1);
 
 		if (strstr(line1, "DISPLAY=") != line1) {
 			rfbLog("wait_for_client: bad reply '%s'\n", line1);
-			unixpw_msg("No DISPLAY found.", 3);
+			if (unixpw) {
+				unixpw_msg("No DISPLAY found.", 3);
+			}
 			clean_up_exit(1);
 		}
 
@@ -1849,7 +2002,17 @@ fprintf(stderr, "\n");}
 			}
 		}
 
-		if (users_list_save && keep_unixpw_user) {
+		if (usslpeer) {
+			char *u = (char *) malloc(strlen(usslpeer+2));
+			sprintf(u, "+%s", usslpeer);
+			if (switch_user(u, 0)) {
+				rfbLog("sslpeer switched to user: %s\n", usslpeer);
+			} else {
+				rfbLog("sslpeer failed to switch to user: %s\n", usslpeer);
+			}
+			free(u);
+			
+		} else if (users_list_save && keep_unixpw_user) {
 			char *user = keep_unixpw_user;
 			char *u = (char *)malloc(strlen(user)+1); 
 

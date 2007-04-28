@@ -25,16 +25,12 @@ if [ "X$FULLNAME" = "XKarl J. Runge" ]; then
 	VNCVIEWER_POPUP_FIX=1
 	export VNCVIEWER_POPUP_FIX
 
-	#if uname -smr | grep 'Linux 2\.4.*i686' > /dev/null; then
-	#	UNAME="Linux.i686.older"
-	#	export UNAME
-	#fi
 	PATH=`echo "$PATH" | sed -e 's,runge/bin/override,-------------,'`
 fi
 
 if [ "X$WISH" = "X" ]; then
 	WISH=wish
-	for try in wish wish8.3 wish8.4 wish8.5
+	for try in wish wish8.3 wish8.4 wish8.5 wish8.6
 	do
 		if type $try > /dev/null; then
 			WISH=$try
@@ -53,7 +49,7 @@ export SSVNC_LAUNCH
 #
 name=$UNAME
 if [ "X$name" = "X" ]; then
-	name=`uname -sm | sed -e 's/ /./g'`
+	name=`uname -sm | sed -e 's/ /./g' -e 's/Linux\.i.86/Linux.i686/'`
 fi
 
 f="$0"

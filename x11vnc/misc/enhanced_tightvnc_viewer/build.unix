@@ -49,7 +49,7 @@ fi
 #
 name=$UNAME
 if [ "X$name" = "X" ]; then
-	name=`uname -sm | sed -e 's/ /./g'`
+	name=`uname -sm | sed -e 's/ /./g' -e 's/Linux\.i.86/Linux.i686/'`
 fi
 if [ "X$name" = "X" ]; then
 	echo "cannot determine platform: os.arch, e.g. Linux.i686"
@@ -71,7 +71,8 @@ if [ -d $dest ]; then
 	if [ "X$x" = "Xn" ]; then
 		exit
 	fi
-	rm -rf $dest
+	rm -f $dest/*stunnel*
+	rm -f $dest/*vncviewer*
 fi
 mkdir -p $dest || exit 1
 

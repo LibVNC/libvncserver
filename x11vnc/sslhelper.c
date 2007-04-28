@@ -1315,6 +1315,11 @@ if (db) fprintf(stderr, "buf: '%s'\n", buf);
 	return 1;
 }
 
+static char *certret = NULL;
+static int certret_fd = -1;
+static mode_t omode;
+char *certret_str = NULL;
+
 void accept_openssl(int mode, int presock) {
 	int sock = -1, listen = -1, cport, csock, vsock;	
 	int status, n, i, db = 0;
@@ -1454,6 +1459,23 @@ void accept_openssl(int mode, int presock) {
 		}
 		free(name);
 		name = NULL;
+	}
+
+	if (certret) {
+		free(certret);
+	}
+	if (certret_str) {
+		free(certret_str);
+		certret_str = NULL;
+	}
+	certret = strdup("/tmp/x11vnc-certret.XXXXXX");
+	omode = umask(077);
+	certret_fd = mkstemp(certret);
+	umask(omode);
+	if (certret_fd < 0) {
+		free(certret);
+		certret = NULL;
+		certret_fd = -1;
 	}
 
 	/* now fork the child to handle the SSL: */
@@ -1785,6 +1807,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 	signal(SIGALRM, SIG_DFL);
 	close(csock);
 
+
 	if (vsock < 0) {
 		rfbLog("SSL: accept_openssl: connection from ssl_helper failed.\n");
 		rfbLogPerror("accept");
@@ -1794,11 +1817,42 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 		if (mode == OPENSSL_INETD || ssl_no_fail) {
 			clean_up_exit(1);
 		}
+		if (certret_fd >= 0) {
+			close(certret_fd);
+			certret_fd = -1;
+		}
+		if (certret) {
+			unlink(certret);
+		}
 		return;
 	}
 	if (db) fprintf(stderr, "accept_openssl: vsock: %d\n", vsock);
 
 	n = read(vsock, rcookie, strlen(cookie));
+
+	if (certret) {
+		struct stat sbuf;
+		sbuf.st_size = 0;
+		if (certret_fd >= 0 && stat(certret, &sbuf) == 0 && sbuf.st_size > 0) {
+			certret_str = (char *) malloc(sbuf.st_size+1);
+			read(certret_fd, certret_str, sbuf.st_size);
+			close(certret_fd);
+			certret_fd = -1;
+		}
+		if (certret_fd >= 0) {
+			close(certret_fd);
+			certret_fd = -1;
+		}
+		unlink(certret);
+		if (certret_str && strstr(certret_str, "NOCERT") == certret_str) {
+			free(certret_str);
+			certret_str = NULL;
+		}
+		if (0 && certret_str) {
+			fprintf(stderr, "certret_str[%d]:\n%s\n", sbuf.st_size, certret_str);
+		}
+	}
+
 	if (n != (int) strlen(cookie) || strncmp(cookie, rcookie, n)) {
 		rfbLog("SSL: accept_openssl: cookie from ssl_helper failed. %d\n", n);
 		if (errno != 0) {
@@ -2065,6 +2119,30 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 	}
 
 	rfbLog("SSL: ssl_helper[%d]: SSL_accept() succeeded for: %s\n", getpid(), name);
+
+	if (SSL_get_verify_result(ssl) == X509_V_OK) {
+		X509 *x;
+		FILE *cr = NULL;
+		if (certret != NULL) {
+			cr = fopen(certret, "w");
+		}
+		
+		x = SSL_get_peer_certificate(ssl);	
+		if (x == NULL) {
+			rfbLog("SSL: ssl_helper[%d]: accepted client %s x509 peer cert is null\n", getpid(), name);
+			if (cr != NULL) {
+				fprintf(cr, "NOCERT\n");
+				fclose(cr);
+			}
+		} else {
+			rfbLog("SSL: ssl_helper[%d]: accepted client %s x509 cert is:\n", getpid(), name);
+			X509_print_ex_fp(stderr, x, 0, XN_FLAG_MULTILINE);
+			if (cr != NULL) {
+				X509_print_ex_fp(cr, x, 0, XN_FLAG_MULTILINE);
+				fclose(cr);
+			}
+		}
+	}
 	free(name);
 
 	return 1;

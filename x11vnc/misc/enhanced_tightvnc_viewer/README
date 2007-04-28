@@ -234,9 +234,9 @@ Solaris, FreeBSD, etc.  Unpack your archive and see the subdirectories of
 	./bin
 
 for the ones that were shipped in this project, e.g. ./bin/Linux.i686
-Run "uname -sm" to see your OS+arch combination. (See the
-./bin/ssvnc_cmd -h output for how to override platform autodection
-via the UNAME env. var).
+Run "uname -sm" to see your OS+arch combination (n.b. all Linux x86 are
+mapped to Linux.i686).   (See the ./bin/ssvnc_cmd -h output for how to
+override platform autodection via the UNAME env. var).
 
 
 External Dependencies:
