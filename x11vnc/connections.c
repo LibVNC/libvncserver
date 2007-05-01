@@ -595,6 +595,14 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 			for (fd=3; fd<256; fd++) {
 				close(fd);
 			}
+/* XXX test more */
+			if (!strcmp(mode, "gone")) {
+#if LIBVNCSERVER_HAVE_SETSID
+				setsid();
+#else
+				setpgrp();
+#endif
+			}
 			execlp("/bin/sh", "/bin/sh", "-c", cmd, (char *) NULL);
 			exit(1);
 		}

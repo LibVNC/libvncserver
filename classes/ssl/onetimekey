@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# usage: onetimekey path/to/mycert.pem
+#
+# Takes an openssl cert+key pem file and turns into a long string
+# for the x11vnc SSL VNC Java Viewer.
+#
+# The Java applet URL parameter can be  oneTimeKey=<str> where str is
+# the output of this program, or can be oneTimeKey=PROMPT in which
+# case the applet will ask you to paste in the string.
+#
+# The problem trying to be solved here is it is difficult to get
+# the Java applet to have or use a keystore with the key saved
+# in it.  Also, as the name implies, an HTTPS server can create
+# a one time key to send to the applet (the user has already
+# logged in via password to the HTTPS server).
+
+in=$1
+der=/tmp/1time$$.der
+touch $der
+chmod 600 $der
+
+openssl pkcs8 -topk8 -nocrypt -in "$in" -out "$der" -outform der
+
+pbinhex=/tmp/pbinhex.$$
+cat > $pbinhex <<END
+#!/usr/bin/perl
+
+\$str = '';
+while (1) {
+        \$c = getc(STDIN);
+        last if \$c eq '';
+        \$str .= sprintf("%02x", unpack("C", \$c));
+}
+
+print "\$str\n";
+END
+
+chmod 700 $pbinhex 
+
+str1=`$pbinhex < "$der"`
+rm -f "$der"
+
+n=`grep -n 'BEGIN CERTIFICATE' $in | awk -F: '{print $1}' | head -1`
+str2=`tail +$n $in | $pbinhex`
+echo "$str1,$str2"
+rm -f $pbinhex

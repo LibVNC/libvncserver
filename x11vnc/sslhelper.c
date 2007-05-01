@@ -1809,7 +1809,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 
 
 	if (vsock < 0) {
-		rfbLog("SSL: accept_openssl: connection from ssl_helper failed.\n");
+		rfbLog("SSL: accept_openssl: connection from ssl_helper FAILED.\n");
 		rfbLogPerror("accept");
 
 		kill(pid, SIGTERM);
@@ -1829,6 +1829,9 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 	if (db) fprintf(stderr, "accept_openssl: vsock: %d\n", vsock);
 
 	n = read(vsock, rcookie, strlen(cookie));
+	if (n < 0 && errno != 0) {
+		rfbLogPerror("read");
+	}
 
 	if (certret) {
 		struct stat sbuf;
@@ -1854,10 +1857,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 	}
 
 	if (n != (int) strlen(cookie) || strncmp(cookie, rcookie, n)) {
-		rfbLog("SSL: accept_openssl: cookie from ssl_helper failed. %d\n", n);
-		if (errno != 0) {
-			rfbLogPerror("read");
-		}
+		rfbLog("SSL: accept_openssl: cookie from ssl_helper FAILED. %d\n", n);
 		if (db) fprintf(stderr, "'%s'\n'%s'\n", cookie, rcookie);
 		close(vsock);
 
@@ -2093,7 +2093,7 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 
 		} else if (rc < 0) {
 
-			rfbLog("SSL: ssl_helper: SSL_accept() fatal: %d\n", rc);
+			rfbLog("SSL: ssl_helper: SSL_accept() *FATAL: %d\n", rc);
 			return 0;
 
 		} else if (dnow() > start + 3.0) {

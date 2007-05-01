@@ -1612,6 +1612,7 @@ if (0) db = 1;
 				}
 				sprintf(geom, "NONE");
 				xsess[0] = '\0';
+				geom[0] = '\0';
 #if 0
 if (!keep_unixpw_opts) {
 	fprintf(stderr, "no keep_unixpw_opts\n");
@@ -1663,6 +1664,12 @@ if (!keep_unixpw_opts) {
 					}
 					free(t);
 				}
+				if (geom[0] == '\0' && getenv("FD_GEOM")) {
+					snprintf(geom,  30, "%s", getenv("FD_GEOM"));
+				}
+				if (xsess[0] == '\0' && getenv("FD_SESS")) {
+					snprintf(xsess, 30, "%s", getenv("FD_SESS"));
+				}
 
 				set_env("FD_GEOM", geom);
 				set_env("FD_SESS", xsess);
@@ -1689,6 +1696,9 @@ if (!keep_unixpw_opts) {
 				}
 
 if (db) fprintf(stderr, "create_cmd: %s\n", create_cmd);
+			}
+			if (getenv("X11VNC_SKIP_DISPLAY")) {
+				nd = strdup(getenv("X11VNC_SKIP_DISPLAY"));
 			}
 			if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
 				char *q, *t = keep_unixpw_opts;

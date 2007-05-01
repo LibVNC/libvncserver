@@ -1069,7 +1069,7 @@ void print_help(int mode) {
 "                       manpage for details.\n"
 "\n"
 "                       Examples:\n"
-"                              x11vnc -ssl -sslverify ~/my.pem\n"
+"                              x11vnc -ssl -sslverify ~/my.crt\n"
 "                              x11vnc -ssl -sslverify ~/my_pem_dir/\n"
 "\n"
 "                       Note that if [path] is a directory, it must contain\n"

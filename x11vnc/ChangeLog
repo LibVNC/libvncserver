@@ -1,3 +1,8 @@
+2007-05-01  Karl Runge <runge@karlrunge.com>
+	* ssl: update to java viewer and utility scripts (add onetimekey).
+	* x11vnc: setsid() for -gone mode. setpgrp for -create script and
+	  add -cc 4 to avoid DirectColor.
+
 2007-04-28  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -users sslpeer= option. RFB_SSL_CLIENT_CERT var.
 	  X11VNC_FINDDISPLAY_ALWAYS_FAILS var. -ncache default 10.
