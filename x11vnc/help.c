@@ -941,6 +941,9 @@ void print_help(int mode) {
 "                       See the shorthand options above \"-svc\" and \"-xdmsvc\"\n"
 "                       that specify the above options for some useful cases.\n"
 "\n"
+"                       If you set the env. var WAITBG=1 x11vnc will go into\n"
+"                       the background once listening in wait mode.\n"
+"\n"
 #ifndef NO_SSL_OR_UNIXPW
 "-nossl                 Disable the -ssl option (see below). Since -ssl is off\n"
 "                       by default -nossl would only be used on the commandline\n"

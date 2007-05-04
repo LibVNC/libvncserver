@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "April 2007" "x11vnc " "User Commands"
+.TH X11VNC "1" "May 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.1, lastmod: 2007-04-30
+         version: 0.9.1, lastmod: 2007-05-03
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1095,6 +1095,9 @@ for xdm in xdm-config: DisplayManager.requestPort: 177
 .IP
 See the shorthand options above "\fB-svc\fR" and "\fB-xdmsvc\fR"
 that specify the above options for some useful cases.
+.IP
+If you set the env. var WAITBG=1 x11vnc will go into
+the background once listening in wait mode.
 .PP
 \fB-nossl\fR
 .IP
@@ -4909,7 +4912,7 @@ set ftp root
 .IR HOME
 .PP
 The following are set for the auxiliary commands
-run by \fB-accept\fR and \fB-gone\fR:
+run by \fB-accept\fR, \fB-gone\fR and other cases:
 .PP
 .IR RFB_CLIENT_IP ,
 .IR RFB_CLIENT_PORT ,
@@ -4919,6 +4922,12 @@ run by \fB-accept\fR and \fB-gone\fR:
 .IR RFB_CLIENT_ID ,
 .IR RFB_CLIENT_COUNT ,
 .IR RFB_MODE
+.IR RFB_STATE
+.IR RFB_LOGIN_VIEWONLY
+.IR RFB_LOGIN_TIME
+.IR RFB_CURRENT_TIME
+.IR RFB_USERNAME
+.IR RFB_SSL_CLIENT_CERT
 .SH "SEE ALSO"
 .IR vncviewer (1),
 .IR vncpasswd (1),

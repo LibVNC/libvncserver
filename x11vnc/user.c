@@ -1434,6 +1434,38 @@ int wait_for_client(int *argc, char** argv, int http) {
 		avahi_advertise(name, this_host(), screen->port);
 	}
 
+	if (getenv("WAITBG")) {
+#if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SETSID
+		int p, n;
+		if ((p = fork()) > 0)  {
+			exit(0);
+		} else if (p == -1) {
+			rfbLogEnable(1);
+			fprintf(stderr, "could not fork\n");
+			perror("fork");
+			clean_up_exit(1);
+		}
+		if (setsid() == -1) {
+			rfbLogEnable(1);
+			fprintf(stderr, "setsid failed\n");
+			perror("setsid");
+			clean_up_exit(1);
+		}
+		/* adjust our stdio */
+		n = open("/dev/null", O_RDONLY);
+		dup2(n, 0);
+		dup2(n, 1);
+		if (! logfile) {
+			dup2(n, 2);
+		}
+		if (n > 2) {
+			close(n);
+		}
+#else
+		clean_up_exit(1);
+#endif
+	}
+
 	if (inetd && use_openssl) {
 		accept_openssl(OPENSSL_INETD, -1);
 	}
@@ -1630,6 +1662,8 @@ if (!keep_unixpw_opts) {
 						sprintf(xsess, "twm");
 					} else if (strstr(t, "fvwm")) {
 						sprintf(xsess, "fvwm");
+					} else if (strstr(t, "mwm")) {
+						sprintf(xsess, "mwm");
 					} else if (strstr(t, "failsafe")) {
 						sprintf(xsess, "failsafe");
 					}
