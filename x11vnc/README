@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat May  5 10:47:52 EDT 2007
+x11vnc README file                         Date: Sat May  5 14:09:28 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -6827,6 +6827,12 @@ ateway and not a broadcaster?)
    implemented, you cannot do Tightvnc file transfer in -unixpw mode.
    UltraVNC file transfer does work, however.
 
+   IMPORTANT: please understand if -ultrafilexfer or -tightfilexfer is
+   specified and you run x11vnc as root for, say, inetd or display
+   manager (gdm, kdm, ...) access and you do not have it switch users via
+   the [778]-users option, then VNC Viewers that connect are able to do
+   filetransfer reads and writes as *root*.
+
    The UltraVNC and TightVNC settings can be toggled on and off inside
    the gui or by -R remote control. However for TightVNC the changed
    setting only applies for NEW clients, current clients retain their
@@ -6843,7 +6849,7 @@ ateway and not a broadcaster?)
    these extensions you will need to supply this option to x11vnc:
    -rfbversion 3.6
 
-   Or use [778]-ultrafilexfer which is an alias for the above option and
+   Or use [779]-ultrafilexfer which is an alias for the above option and
    "-permitfiletransfer". UltraVNC evidently treats any other RFB version
    number as non-UltraVNC.
 
@@ -6855,21 +6861,21 @@ ateway and not a broadcaster?)
      * 1/n Server Scaling
      * rfbEncodingUltra compression encoding
 
-   To disable SingleWindow and ServerInput use [779]-noultraext (the
+   To disable SingleWindow and ServerInput use [780]-noultraext (the
    others are managed by LibVNCServer). See this option too:
-   [780]-noserverdpms.
+   [781]-noserverdpms.
 
 
    Q-112: Can x11vnc emulate UltraVNC's Single Click helpdesk mode? I.e.
    something very simple for a naive user to initiate a reverse vnc
    connection from their desktop to a helpdesk operator's VNC Viewer.
 
-   Yes, UltraVNC's [781]Single Click (SC) mode can be emulated reasonably
+   Yes, UltraVNC's [782]Single Click (SC) mode can be emulated reasonably
    well on Unix.
 
    We use the term "helpdesk" below, but it could be any sort of remote
    assistance you want to set up, e.g. something for unix-using friends
-   or family to use. This includes [782]Mac OS X.
+   or family to use. This includes [783]Mac OS X.
 
    Assume you create a helpdesk directory "hd" on your website:
    http://www.mysite.com/hd
@@ -6972,9 +6978,9 @@ fi
 
 
    SSL Encrypted Helpdesk Connections:  Currently x11vnc does not support
-   reverse connections in SSL [783]-ssl mode. This may change in a future
+   reverse connections in SSL [784]-ssl mode. This may change in a future
    release, until then you would need to cook up something with
-   [784]STUNNEL.
+   [785]STUNNEL.
 
    Update: as of Apr/2007 x11vnc supports reverse connections in SSL.
    Recipe below will be updated (TBD), basically you just add "-ssl SAVE"
@@ -7130,7 +7136,7 @@ rypto.a -lwrap
    You will have to use an external network redirection for this.
    Filesystem mounting is not part of the VNC protocol.
 
-   We show a simple [785]Samba example here.
+   We show a simple [786]Samba example here.
 
    First you will need a tunnel to redirect the SMB requests from the
    remote machine to the one you sitting at. We use an ssh tunnel:
@@ -7167,7 +7173,7 @@ d,ip=127.0.0.1,port=1139
   far-away> smbumount /home/fred/smb-haystack-pub
 
    At some point we hope to fold some automation for SMB ssh redir setup
-   into the [786]Enhanced TightVNC Viewer (SSVNC) package we provide (as
+   into the [787]Enhanced TightVNC Viewer (SSVNC) package we provide (as
    of Sep 2006 it is there for testing).
 
 
@@ -7177,7 +7183,7 @@ d,ip=127.0.0.1,port=1139
    You will have to use an external network redirection for this.
    Printing is not part of the VNC protocol.
 
-   We show a simple Unix to Unix [787]CUPS example here. Non-CUPS port
+   We show a simple Unix to Unix [788]CUPS example here. Non-CUPS port
    redirections (e.g. LPD) should also be possible, but may be a bit more
    tricky. If you are viewing on Windows SMB and don't have a local cups
    server it may be trickier still (see below).
@@ -7249,7 +7255,7 @@ d,ip=127.0.0.1,port=1139
    "localhost".
 
    At some point we hope to fold some automation for CUPS ssh redir setup
-   into the [788]Enhanced TightVNC Viewer (SSVNC) package we provide (as
+   into the [789]Enhanced TightVNC Viewer (SSVNC) package we provide (as
    of Sep 2006 it is there for testing).
 
 
@@ -7350,7 +7356,7 @@ or:
        the applications will fail to run because LD_PRELOAD will point to
        libraries of the wrong wordsize.
      * At some point we hope to fold some automation for esd or artsd ssh
-       redir setup into the [789]Enhanced TightVNC Viewer (SSVNC) package
+       redir setup into the [790]Enhanced TightVNC Viewer (SSVNC) package
        we provide (as of Sep/2006 it is there for testing).
 
 
@@ -7362,9 +7368,9 @@ or:
    in Solaris, see Xserver(1) for how to turn it on via +kb), and so you
    won't hear them if the extension is not present.
 
-   If you don't want to hear the beeps use the [790]-nobell option. If
+   If you don't want to hear the beeps use the [791]-nobell option. If
    you want to hear the audio from the remote applications, consider
-   trying a [791]redirector such as esd.
+   trying a [792]redirector such as esd.
 
 
 
@@ -8158,20 +8164,21 @@ References
  775. http://www.unixuser.org/~euske/vnc2swf/
  776. http://wolphination.com/linux/2006/06/30/how-to-record-videos-of-your-desktop/
  777. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nofilexfer
- 778. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ultrafilexfer
- 779. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noultraext
- 780. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noserverdpms
- 781. http://www.uvnc.com/addons/singleclick.html
- 782. http://www.karlrunge.com/x11vnc/index.html#faq-macosx
- 783. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
- 784. http://stunnel.mirt.net/
- 785. http://www.samba.org/
- 786. http://www.karlrunge.com/x11vnc/ssvnc.html
- 787. http://www.cups.org/
- 788. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 778. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-users
+ 779. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ultrafilexfer
+ 780. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noultraext
+ 781. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noserverdpms
+ 782. http://www.uvnc.com/addons/singleclick.html
+ 783. http://www.karlrunge.com/x11vnc/index.html#faq-macosx
+ 784. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 785. http://stunnel.mirt.net/
+ 786. http://www.samba.org/
+ 787. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 788. http://www.cups.org/
  789. http://www.karlrunge.com/x11vnc/ssvnc.html
- 790. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nobell
- 791. http://www.karlrunge.com/x11vnc/index.html#faq-sound
+ 790. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 791. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nobell
+ 792. http://www.karlrunge.com/x11vnc/index.html#faq-sound
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/chainingssh.html:
@@ -11203,10 +11210,26 @@ Options:
                        per-client viewonly state the filetransfer permissions
                        will NOT change.
 
+                       IMPORTANT: please understand if -tightfilexfer is
+                       specified and you run x11vnc as root for, say, inetd
+                       or display manager (gdm, kdm, ...) access and you do
+                       not have it switch users via the -users option, then
+                       VNC Viewers that connect are able to do filetransfer
+                       reads and writes as *root*.
+
+                       Also, tightfilexfer is disabled in -unixpw mode.
+
 -ultrafilexfer         Note: to enable UltraVNC filetransfer and to get it to
                        work you probably need to supply these libvncserver
                        options: "-rfbversion 3.6 -permitfiletransfer"
                        "-ultrafilexfer" is an alias for this combination.
+
+                       IMPORTANT: please understand if -ultrafilexfer is
+                       specified and you run x11vnc as root for, say, inetd
+                       or display manager (gdm, kdm, ...) access and you do
+                       not have it switch users via the -users option, then
+                       VNC Viewers that connect are able to do filetransfer
+                       reads and writes as *root*.
 
                        Note that sadly you cannot do both -tightfilexfer and
                        -ultrafilexfer at the same time because the latter
@@ -12467,7 +12490,7 @@ Options:
                        character. E.g. "-users +bob" or "-users +nobody".
 
                        The latter (i.e. switching immediately to user
-                       "nobody") is probably the only use of this option
+                       "nobody") is the only obvious use of the -users option
                        that increases security.
 
                        Use the following notation to associate a group with

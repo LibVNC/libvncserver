@@ -422,6 +422,15 @@ viewonly cannot transfer files.  However, if the remote
 control mechanism is used to change the global or
 per-client viewonly state the filetransfer permissions
 will NOT change.
+.IP
+IMPORTANT: please understand if \fB-tightfilexfer\fR is
+specified and you run x11vnc as root for, say, inetd
+or display manager (gdm, kdm, ...) access and you do
+not have it switch users via the \fB-users\fR option, then
+VNC Viewers that connect are able to do filetransfer
+reads and writes as *root*.
+.IP
+Also, tightfilexfer is disabled in \fB-unixpw\fR mode.
 .PP
 \fB-ultrafilexfer\fR
 .IP
@@ -429,6 +438,13 @@ Note: to enable UltraVNC filetransfer and to get it to
 work you probably need to supply these libvncserver
 options: "\fB-rfbversion\fR \fI3.6 \fB-permitfiletransfer\fR"\fR
 "\fB-ultrafilexfer\fR" is an alias for this combination.
+.IP
+IMPORTANT: please understand if \fB-ultrafilexfer\fR is
+specified and you run x11vnc as root for, say, inetd
+or display manager (gdm, kdm, ...) access and you do
+not have it switch users via the \fB-users\fR option, then
+VNC Viewers that connect are able to do filetransfer
+reads and writes as *root*.
 .IP
 Note that sadly you cannot do both \fB-tightfilexfer\fR and
 \fB-ultrafilexfer\fR at the same time because the latter
@@ -1866,7 +1882,7 @@ can be reopened prefix the username with the "+"
 character. E.g. "\fB-users\fR \fI+bob\fR" or "\fB-users\fR \fI+nobody\fR".
 .IP
 The latter (i.e. switching immediately to user
-"nobody") is probably the only use of this option
+"nobody") is the only obvious use of the \fB-users\fR option
 that increases security.
 .IP
 Use the following notation to associate a group with

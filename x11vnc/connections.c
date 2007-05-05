@@ -676,6 +676,7 @@ void client_gone(rfbClientPtr client) {
 			screen->permitFileTransfer = unixpw_file_xfer_save;
 			if ((tightfilexfer = unixpw_tightvnc_xfer_save)) {
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+				rfbLog("rfbRegisterTightVNCFileTransferExtension: 3\n");
 				rfbRegisterTightVNCFileTransferExtension();
 #endif
 			}
@@ -2220,6 +2221,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		unixpw_tightvnc_xfer_save = tightfilexfer;
 		tightfilexfer = 0;
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+		rfbLog("rfbUnregisterTightVNCFileTransferExtension: 1\n");
 		rfbUnregisterTightVNCFileTransferExtension();
 #endif
 

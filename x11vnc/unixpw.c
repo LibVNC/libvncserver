@@ -1554,8 +1554,9 @@ void unixpw_accept(char *user) {
 	unixpw_in_progress = 0;
 	screen->permitFileTransfer = unixpw_file_xfer_save;
 	if ((tightfilexfer = unixpw_tightvnc_xfer_save)) {
-		/* this doesn't work the current client is never registered */
+		/* this doesn't work: the current client is never registered! */
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+		rfbLog("rfbRegisterTightVNCFileTransferExtension: 1\n");
                 rfbRegisterTightVNCFileTransferExtension();
 #endif
 	}
@@ -1602,6 +1603,7 @@ void unixpw_deny(void) {
 	screen->permitFileTransfer = unixpw_file_xfer_save;
 	if ((tightfilexfer = unixpw_tightvnc_xfer_save)) {
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+		rfbLog("rfbRegisterTightVNCFileTransferExtension: 2\n");
                 rfbRegisterTightVNCFileTransferExtension();
 #endif
 	}

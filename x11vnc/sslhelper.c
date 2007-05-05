@@ -1852,7 +1852,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 			certret_str = NULL;
 		}
 		if (0 && certret_str) {
-			fprintf(stderr, "certret_str[%d]:\n%s\n", sbuf.st_size, certret_str);
+			fprintf(stderr, "certret_str[%d]:\n%s\n", (int) sbuf.st_size, certret_str);
 		}
 	}
 

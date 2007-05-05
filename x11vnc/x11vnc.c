@@ -3227,8 +3227,10 @@ int main(int argc, char* argv[]) {
 
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
 	if (tightfilexfer) {
+		rfbLog("rfbRegisterTightVNCFileTransferExtension: 6\n");
 		rfbRegisterTightVNCFileTransferExtension();
 	} else {
+		rfbLog("rfbUnregisterTightVNCFileTransferExtension: 3\n");
 		rfbUnregisterTightVNCFileTransferExtension();
 	}
 #endif

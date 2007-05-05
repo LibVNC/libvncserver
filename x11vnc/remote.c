@@ -1274,6 +1274,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (! tightfilexfer) {
 			rfbLog("remote_cmd: enabling -tightfilexfer for *NEW* clients.\n");
 			tightfilexfer = 1;
+			rfbLog("rfbRegisterTightVNCFileTransferExtension: 4\n");
 			rfbRegisterTightVNCFileTransferExtension();
 		}
 #else
@@ -1289,6 +1290,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (tightfilexfer) {
 			rfbLog("remote_cmd: disabling -tightfilexfer for *NEW* clients.\n");
 			tightfilexfer = 0;
+			rfbLog("rfbUnregisterTightVNCFileTransferExtension: 2\n");
 			rfbUnregisterTightVNCFileTransferExtension();
 		}
 #else
