@@ -548,7 +548,7 @@ if test "x$uname_s" = "xHP-UX"; then
 	LDFLAGS="$LDFLAGS -lsec"
 fi
 
-AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr setsid setpgrp getpwuid getpwnam getspnam getuid geteuid setuid setgid seteuid setegid waitpid setutxent grantpt])
+AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr setsid setpgrp getpwuid getpwnam getspnam getuid geteuid setuid setgid seteuid setegid initgroups waitpid setutxent grantpt])
 
 # check, if shmget is in cygipc.a
 AC_CHECK_LIB(cygipc,shmget)

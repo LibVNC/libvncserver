@@ -84,6 +84,7 @@ char *allowed_external_cmds = NULL;
 int started_as_root = 0;
 int host_lookup = 1;
 char *users_list = NULL;	/* -users */
+char **user2group = NULL;
 char *allow_list = NULL;	/* for -allow and -localhost */
 char *listen_str = NULL;
 char *allow_once = NULL;	/* one time -allow */

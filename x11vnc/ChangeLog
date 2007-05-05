@@ -1,3 +1,6 @@
+2007-05-05  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add groups handling for -users mode.
+
 2007-05-01  Karl Runge <runge@karlrunge.com>
 	* ssl: update to java viewer and utility scripts (add onetimekey).
 	* x11vnc: setsid() for -gone mode. setpgrp for -create script and

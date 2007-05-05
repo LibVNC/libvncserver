@@ -2,7 +2,7 @@
 .TH X11VNC "1" "May 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.1, lastmod: 2007-05-03
+         version: 0.9.1, lastmod: 2007-05-05
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1842,9 +1842,10 @@ must be run as the user owning the desktop session.
 Since this option switches userid it also affects the
 userid used to run the processes for the \fB-accept\fR and
 \fB-gone\fR options.  It also affects the ability to read
-files for options such as \fB-connect,\fR \fB-allow,\fR and \fB-remap.\fR
-Note that the \fB-connect\fR file is also sometimes written
-to.
+files for options such as \fB-connect,\fR \fB-allow,\fR and \fB-remap\fR
+and also the ultra and tight filetransfer feature if
+enabled.  Note that the \fB-connect\fR file is also sometimes
+written to.
 .IP
 So be careful with this option since in some situations
 its use can decrease security.
@@ -1853,9 +1854,10 @@ In general the switch to a user will only take place
 if the display can still be successfully opened as that
 user (this is primarily to try to guess the actual owner
 of the session). Example: "\fB-users\fR \fIfred,wilma,betty\fR".
-Note that a malicious user "barney" by quickly using
-"xhost +" when logging in may possibly get the x11vnc
-process to switch to user "fred".  What happens next?
+Note that a malicious local user "barney" by
+quickly using "xhost +" when logging in may possibly
+get the x11vnc process to switch to user "fred".
+What happens next?
 .IP
 Under display managers it may be a long time before
 the switch succeeds (i.e. a user logs in).  To instead
@@ -1867,29 +1869,49 @@ The latter (i.e. switching immediately to user
 "nobody") is probably the only use of this option
 that increases security.
 .IP
+Use the following notation to associate a group with
+a user: user1.group1,user2.group2,...  Note that
+.IR initgroups (2)
+will still be called first to try to
+switch to ALL of a user's groups (primary and additional
+groups).  Only if that fails or it is not available
+then the single group specified as above (or the user's
+primary group if not specified) is switched to with
+.IR setgid (2).
+Use \fB-env\fR X11VNC_SINGLE_GROUP=1 to prevent
+trying 
+.IR initgroups (2)
+and only switch to the single
+group.  This sort of setting is only really needed to
+make the ultra or tight filetransfer permissions work
+properly. This format applies to any comma separated list
+of users, even the special "=" modes described below.
+.IP
 In \fB-unixpw\fR mode, if "\fB-users\fR \fIunixpw=\fR" is supplied
 then after a user authenticates himself via the
 \fB-unixpw\fR mechanism, x11vnc will try to switch to that
 user as though "\fB-users\fR \fI+username\fR" had been supplied.
 If you want to limit which users this will be done for,
 provide them as a comma separated list after "unixpw="
+Groups can also be specified as described above.
 .IP
 Similarly, in \fB-ssl\fR mode, if "\fB-users\fR \fIsslpeer=\fR" is
 supplied then after an SSL client authenticates with his
 cert (the \fB-sslverify\fR option is required for this) x11vnc
 will extract a UNIX username from the "emailAddress"
-field (username@hostname.com) of the "Subject" in the
+field (username@hostname.com) of the "Subject" of the
 x509 SSL cert and then try to switch to that user as
 though "\fB-users\fR \fI+username\fR" had been supplied.  If you
 want to limit which users this will be done for, provide
 them as a comma separated list after "sslpeer=".
 Set the env. var X11VNC_SSLPEER_CN to use the Common
 Name (normally a hostname) instead of the Email field.
-NOTE: the x11vnc administrator must take great care
-that any client certs he adds to \fB-sslverify\fR have the
-correct UNIX username in the "emailAddress" field
-of the cert.  Otherwise a user may be able to log in
-as another.  The following command can be of use in
+.IP
+NOTE: for sslpeer= mode the x11vnc administrator must
+take care that any client certs he adds to \fB-sslverify\fR
+have the intended UNIX username in the "emailAddress"
+field of the cert.  Otherwise a user may be able to
+log in as another.  This command can be of use in
 checking: "openssl x509 \fB-text\fR \fB-in\fR file.crt", see the
 "Subject:" line.  Also, along with the normal RFB_*
 env. vars. (see \fB-accept)\fR passed to external cmd=

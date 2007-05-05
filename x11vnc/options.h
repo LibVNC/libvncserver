@@ -65,6 +65,7 @@ extern char *allowed_external_cmds;
 extern int started_as_root;
 extern int host_lookup;
 extern char *users_list;
+extern char **user2group;
 extern char *allow_list;
 extern char *listen_str;
 extern char *allow_once;

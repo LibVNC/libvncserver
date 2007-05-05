@@ -237,7 +237,7 @@ static char **user_list(char *user_str) {
 }
 
 static void user2uid(char *user, uid_t *uid, gid_t *gid, char **name, char **home) {
-	int numerical = 1;
+	int numerical = 1, gotgroup = 0;
 	char *q;
 
 	*uid = (uid_t) -1;
@@ -249,6 +249,46 @@ static void user2uid(char *user, uid_t *uid, gid_t *gid, char **name, char **hom
 		if (! isdigit((unsigned char) (*q++))) {
 			numerical = 0;
 			break;
+		}
+	}
+
+	if (user2group != NULL) {
+		static int *did = NULL;
+		int i;
+
+		if (did == NULL) {
+			int n = 0;
+			i = 0;
+			while (user2group[i] != NULL) {
+				n++;
+				i++;
+			}
+			did = (int *) malloc((n+1) * sizeof(int)); 
+			i = 0;
+			for (i=0; i<n; i++) {
+				did[i] = 0;
+			}
+		}
+		i = 0;
+		while (user2group[i] != NULL) {
+			if (strstr(user2group[i], user) == user2group[i]) {
+				char *w = user2group[i] + strlen(user);
+				if (*w == '.') {
+					struct group* gr = getgrnam(++w);
+					if (! gr) {
+						rfbLog("Invalid group: %s\n", w);
+						clean_up_exit(1);
+					}
+					*gid = gr->gr_gid;
+					if (! did[i]) {
+						rfbLog("user2uid: using group %s (%d) for %s\n",
+						    w, (int) *gid, user);
+						did[i] = 1;
+					}
+					gotgroup = 1;
+				}
+			}
+			i++;
 		}
 	}
 
@@ -271,7 +311,9 @@ static void user2uid(char *user, uid_t *uid, gid_t *gid, char **name, char **hom
 		}
 		if (pw) {
 			*uid  = pw->pw_uid;
-			*gid  = pw->pw_gid;
+			if (! gotgroup) {
+				*gid  = pw->pw_gid;
+			}
 			*name = pw->pw_name;	/* n.b. use immediately */
 			*home = pw->pw_dir;
 		}
@@ -650,6 +692,7 @@ static int switch_user_env(uid_t uid, gid_t gid, char *name, char *home, int fb_
 	/* NO strtoks */
 	char *xauth;
 	int reset_fb = 0;
+	int grp_ok = 0;
 
 #if !LIBVNCSERVER_HAVE_SETUID
 	return 0;
@@ -663,13 +706,31 @@ static int switch_user_env(uid_t uid, gid_t gid, char *name, char *home, int fb_
 		clean_shm(0);
 		free_tiles();
 	}
-	if (setgid(gid) != 0) {
+#if LIBVNCSERVER_HAVE_INITGROUPS
+#if LIBVNCSERVER_HAVE_PWD_H
+	if (getpwuid(uid) != NULL && getenv("X11VNC_SINGLE_GROUP") == NULL) {
+		struct passwd *p = getpwuid(uid);
+		if (initgroups(p->pw_name, gid) == 0)  {
+			grp_ok = 1;
+		} else {
+			rfbLogPerror("initgroups");
+		}
+	}
+#endif
+#endif
+	if (! grp_ok) {
+		if (setgid(gid) == 0) {
+			grp_ok = 1;
+		}
+	}
+	if (! grp_ok) {
 		if (reset_fb) {
 			/* 2 means we did clean_shm and free_tiles */
 			do_new_fb(2);
 		}
 		return 0;
 	}
+
 	if (setuid(uid) != 0) {
 		if (reset_fb) {
 			/* 2 means we did clean_shm and free_tiles */

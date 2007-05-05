@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Thu May  3 23:21:57 EDT 2007
+x11vnc README file                         Date: Sat May  5 10:47:52 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -10747,7 +10747,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-03
+x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-05
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -10861,7 +10861,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-03
+x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-05
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -12443,9 +12443,10 @@ Options:
                        Since this option switches userid it also affects the
                        userid used to run the processes for the -accept and
                        -gone options.  It also affects the ability to read
-                       files for options such as -connect, -allow, and -remap.
-                       Note that the -connect file is also sometimes written
-                       to.
+                       files for options such as -connect, -allow, and -remap
+                       and also the ultra and tight filetransfer feature if
+                       enabled.  Note that the -connect file is also sometimes
+                       written to.
 
                        So be careful with this option since in some situations
                        its use can decrease security.
@@ -12454,9 +12455,10 @@ Options:
                        if the display can still be successfully opened as that
                        user (this is primarily to try to guess the actual owner
                        of the session). Example: "-users fred,wilma,betty".
-                       Note that a malicious user "barney" by quickly using
-                       "xhost +" when logging in may possibly get the x11vnc
-                       process to switch to user "fred".  What happens next?
+                       Note that a malicious local user "barney" by
+                       quickly using "xhost +" when logging in may possibly
+                       get the x11vnc process to switch to user "fred".
+                       What happens next?
 
                        Under display managers it may be a long time before
                        the switch succeeds (i.e. a user logs in).  To instead
@@ -12468,29 +12470,46 @@ Options:
                        "nobody") is probably the only use of this option
                        that increases security.
 
+                       Use the following notation to associate a group with
+                       a user: user1.group1,user2.group2,...  Note that
+                       initgroups(2) will still be called first to try to
+                       switch to ALL of a user's groups (primary and additional
+                       groups).  Only if that fails or it is not available
+                       then the single group specified as above (or the user's
+                       primary group if not specified) is switched to with
+                       setgid(2).  Use -env X11VNC_SINGLE_GROUP=1 to prevent
+                       trying initgroups(2) and only switch to the single
+                       group.  This sort of setting is only really needed to
+                       make the ultra or tight filetransfer permissions work
+                       properly. This format applies to any comma separated lis
+t
+                       of users, even the special "=" modes described below.
+
                        In -unixpw mode, if "-users unixpw=" is supplied
                        then after a user authenticates himself via the
                        -unixpw mechanism, x11vnc will try to switch to that
                        user as though "-users +username" had been supplied.
                        If you want to limit which users this will be done for,
                        provide them as a comma separated list after "unixpw="
+                       Groups can also be specified as described above.
 
                        Similarly, in -ssl mode, if "-users sslpeer=" is
                        supplied then after an SSL client authenticates with his
                        cert (the -sslverify option is required for this) x11vnc
                        will extract a UNIX username from the "emailAddress"
-                       field (username@hostname.com) of the "Subject" in the
+                       field (username@hostname.com) of the "Subject" of the
                        x509 SSL cert and then try to switch to that user as
                        though "-users +username" had been supplied.  If you
                        want to limit which users this will be done for, provide
                        them as a comma separated list after "sslpeer=".
                        Set the env. var X11VNC_SSLPEER_CN to use the Common
                        Name (normally a hostname) instead of the Email field.
-                       NOTE: the x11vnc administrator must take great care
-                       that any client certs he adds to -sslverify have the
-                       correct UNIX username in the "emailAddress" field
-                       of the cert.  Otherwise a user may be able to log in
-                       as another.  The following command can be of use in
+
+                       NOTE: for sslpeer= mode the x11vnc administrator must
+                       take care that any client certs he adds to -sslverify
+                       have the intended UNIX username in the "emailAddress"
+                       field of the cert.  Otherwise a user may be able to
+                       log in as another.  This command can be of use in
                        checking: "openssl x509 -text -in file.crt", see the
                        "Subject:" line.  Also, along with the normal RFB_*
                        env. vars. (see -accept) passed to external cmd=

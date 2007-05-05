@@ -260,6 +260,7 @@ extern int h_errno;
 
 #if LIBVNCSERVER_HAVE_PWD_H
 #include <pwd.h>
+#include <grp.h>
 #endif
 #if LIBVNCSERVER_HAVE_SYS_WAIT_H
 #include <sys/wait.h>

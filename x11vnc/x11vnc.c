@@ -963,7 +963,7 @@ static void immediate_switch_user(int argc, char* argv[]) {
 		}
 	}
 	for (i=1; i < argc; i++) {
-		char *u;
+		char *u, *q;
 
 		if (strcmp(argv[i], "-users")) {
 			continue;
@@ -979,6 +979,13 @@ static void immediate_switch_user(int argc, char* argv[]) {
 		/* wants an immediate switch: =bob */
 		u = strdup(argv[i+1]);
 		*u = '+';
+		q = strchr(u, '.');
+		if (q) {
+			user2group = (char **) malloc(2*sizeof(char *));
+			user2group[0] = strdup(u+1);
+			user2group[1] = NULL;
+			*q = '\0';
+		}
 		if (strstr(u, "+guess") == u) {
 			fprintf(stderr, "invalid user: %s\n", u+1);
 			exit(1);
@@ -2932,6 +2939,47 @@ int main(int argc, char* argv[]) {
 		accept_remote_cmds = 0;
 		safe_remote_only = 1;
 		launch_gui = 0;
+	}
+
+	if (users_list && strchr(users_list, '.')) {
+		char *p, *q, *tmp = (char *) malloc(strlen(users_list)+1);
+		char *str = strdup(users_list);
+		int i, n, db = 1;
+
+		tmp[0] = '\0';
+
+		n = strlen(users_list) + 1;
+		user2group = (char **) malloc(n * sizeof(char *));
+		for (i=0; i<n; i++) {
+			user2group[i] = NULL;
+		}
+
+		i = 0;
+		p = strtok(str, ",");
+		if (db) fprintf(stderr, "users_list: %s\n", users_list);
+		while (p) {
+			if (tmp[0] != '\0') {
+				strcat(tmp, ",");
+			}
+			q = strchr(p, '.');
+			if (q) {
+				char *s = strchr(p, '=');
+				if (! s) {
+					s = p;
+				} else {
+					s++;
+				}
+				if (s[0] == '+') s++;
+				user2group[i++] = strdup(s);
+				if (db) fprintf(stderr, "u2g: %s\n", s);
+				*q = '\0';
+			}
+			strcat(tmp, p);
+			p = strtok(NULL, ",");
+		}
+		free(str);
+		users_list = tmp;
+		if (db) fprintf(stderr, "users_list: %s\n", users_list);
 	}
 
 	if (unixpw) {
