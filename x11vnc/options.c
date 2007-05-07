@@ -338,11 +338,11 @@ int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
  * waitms is the msec to wait between screen polls.  Not too old h/w shows
  * poll times of 10-35ms, so maybe this value cuts the idle load by 2 or so.
  */
-int waitms = 30;
+int waitms = 20;
 double wait_ui = 2.0;
 double slow_fb = 0.0;
 int wait_bog = 1;
-int defer_update = 30;	/* deferUpdateTime ms to wait before sends. */
+int defer_update = 20;	/* deferUpdateTime ms to wait before sends. */
 int got_defer = 0;
 int got_deferupdate = 0;
 

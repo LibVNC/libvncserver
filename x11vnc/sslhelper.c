@@ -1863,7 +1863,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 
 		if (strstr(rcookie, uniq) == rcookie) {
 			int i;
-			rfbLog("SSL: but https for helper process succeeded.\n");
+			rfbLog("SSL: BUT WAIT! HTTPS for helper process succeeded. Good.\n");
 			if (mode != OPENSSL_HTTPS) {
 				last_https = time(NULL);
 				for (i=0; i<128; i++) {
@@ -2066,52 +2066,52 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 		} else if (err == SSL_ERROR_WANT_READ) {
 
 			if (db) fprintf(stderr, "got SSL_ERROR_WANT_READ\n");
-			rfbLog("SSL: ssl_helper: SSL_accept() failed for: %s\n",
-			    name);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s\n",
+			    getpid(), name);
 			return 0;
 			
 		} else if (err == SSL_ERROR_WANT_WRITE) {
 
 			if (db) fprintf(stderr, "got SSL_ERROR_WANT_WRITE\n");
-			rfbLog("SSL: ssl_helper: SSL_accept() failed for: %s\n",
-			    name);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s\n",
+			    getpid(), name);
 			return 0;
 
 		} else if (err == SSL_ERROR_SYSCALL) {
 
 			if (db) fprintf(stderr, "got SSL_ERROR_SYSCALL\n");
-			rfbLog("SSL: ssl_helper: SSL_accept() failed for: %s\n",
-			    name);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s\n",
+			    getpid(), name);
 			return 0;
 
 		} else if (err == SSL_ERROR_ZERO_RETURN) {
 
 			if (db) fprintf(stderr, "got SSL_ERROR_ZERO_RETURN\n");
-			rfbLog("SSL: ssl_helper: SSL_accept() failed for: %s\n",
-			    name);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s\n",
+			    getpid(), name);
 			return 0;
 
 		} else if (rc < 0) {
 
-			rfbLog("SSL: ssl_helper: SSL_accept() *FATAL: %d\n", rc);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() *FATAL: %d\n", getpid(), rc);
 			return 0;
 
 		} else if (dnow() > start + 3.0) {
 
-			rfbLog("SSL: ssl_helper: timeout looping SSL_accept() "
-			    "fatal.\n");
+			rfbLog("SSL: ssl_helper[%d]: timeout looping SSL_accept() "
+			    "fatal.\n", getpid());
 			return 0;
 
 		} else {
 			BIO *bio = SSL_get_rbio(ssl);
 			if (bio == NULL) {
-				rfbLog("SSL: ssl_helper: ssl BIO is null. "
-				    "fatal.\n");
+				rfbLog("SSL: ssl_helper[%d]: ssl BIO is null. "
+				    "fatal.\n", getpid());
 				return 0;
 			}
 			if (BIO_eof(bio)) {
-				rfbLog("SSL: ssl_helper: ssl BIO is EOF. "
-				    "fatal.\n");
+				rfbLog("SSL: ssl_helper[%d]: ssl BIO is EOF. "
+				    "fatal.\n", getpid());
 				return 0;
 			}
 		}

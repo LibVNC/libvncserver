@@ -2,7 +2,7 @@
 .TH X11VNC "1" "May 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.1, lastmod: 2007-05-05
+         version: 0.9.1, lastmod: 2007-05-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -3213,12 +3213,12 @@ times for more output.
 \fB-defer\fR \fItime\fR
 .IP
 Time in ms to wait for updates before sending to client
-(deferUpdateTime)  Default: 30
+(deferUpdateTime)  Default: 20
 .PP
 \fB-wait\fR \fItime\fR
 .IP
 Time in ms to pause between screen polls.  Used to cut
-down on load.  Default: 30
+down on load.  Default: 20
 .PP
 \fB-wait_ui\fR \fIfactor\fR
 .IP

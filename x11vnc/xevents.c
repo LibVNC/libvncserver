@@ -1296,7 +1296,8 @@ void set_single_window(rfbClientPtr cl, int x, int y) {
 		return;
 	}
 	if (unixpw_in_progress) {
-		rfbLog("set_single_window: unixpw_in_progress, skipping.\n");
+		rfbLog("set_single_window: unixpw_in_progress, dropping client.\n");
+		rfbCloseClient(cl);
 		return;
 	}
 	if (cl->viewOnly) {
@@ -1342,7 +1343,8 @@ void set_server_input(rfbClientPtr cl, int grab) {
 		return;
 	}
 	if (unixpw_in_progress) {
-		rfbLog("set_server_input: unixpw_in_progress, skipping.\n");
+		rfbLog("set_server_input: unixpw_in_progress, dropping client.\n");
+		rfbCloseClient(cl);
 		return;
 	}
 	if (cl->viewOnly) {
@@ -1389,7 +1391,8 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 	fprintf(stderr, "'\n");
 #endif
 	if (unixpw_in_progress) {
-		rfbLog("set_text_chat: unixpw_in_progress, skipping.\n");
+		rfbLog("set_text_chat: unixpw_in_progress, dropping client.\n");
+		rfbCloseClient(cl);
 		return;
 	}
 	iter = rfbGetClientIterator(screen);

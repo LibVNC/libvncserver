@@ -1,3 +1,8 @@
+2007-05-06  Karl Runge <runge@karlrunge.com>
+	* x11vnc: lower -wait and -defer to 20ms.  Change some SSL
+	  debug output.  Drop client doing ultravnc stuff in -unixpw
+	  during login phase.
+
 2007-05-05  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add groups handling for -users mode.
 

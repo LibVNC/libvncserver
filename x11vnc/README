@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat May  5 14:09:28 EDT 2007
+x11vnc README file                         Date: Sun May  6 21:13:00 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -2172,7 +2172,7 @@ TrueColor defdepth 24
    Q-19: I am on a high color system (depth >= 24) but I seem to have
    colormap problems. They either flash or everything is very dark.
 
-   This can happen if the defaul Visual (use xdpyinfo to list them) is
+   This can happen if the default Visual (use xdpyinfo to list them) is
    DirectColor instead of TrueColor. These are both usually used in high
    color modes, but whereas TrueColor uses static ramps for the Red,
    Green, and Blue components, DirectColor has arbitrary colormaps for
@@ -3371,6 +3371,82 @@ connect = 5900
 
    You apply multiple applet parameters in the regular way, e.g.:
   https://far-away.east:5900/?GET=1&urlPrefix=mysubdir&...
+
+
+   Tips on Getting it Working the First Time:  It can be a little tricky
+   getting the SSL VNC Java Viewer working with x11vnc. Here are some
+   tips to getting working the first time (afterwards you can
+   incrementally customize).
+     * First try it on the LAN: Do NOT try to have it work the first time
+       going through firewalls, Web proxies, home router port
+       redirections, or Apache portal. Just try a direct connection over
+       your LAN first (if you only have 1 machine and no LAN, just do a
+       direct connection to the same machine: localhost).
+     * First try HTTP to download the Java Applet: x11vnc can serve both
+       the Java Applet and VNC out of the same port (both tunneled
+       through SSL, see below). But it can lead to timing and other
+       problems. So first try HTTP instead of HTTPS to download the
+       Applet jar file (VncViewer.jar). That is to say try
+       http://hostname:5800 in your web browser first before trying
+       https://hostname:5900. x11vnc will print out the ports and URLs it
+       is using, so use the HTTP one it prints out.
+     * Always Restart the Browser: If you are having problems and have to
+       repeatedly retry things Always restart the browser (i.e.
+       completely exit it and then start a new browser process) each
+       time. Otherwise as you are changing things the browser may
+       "remember" failed applet downloads, etc. and just add to the
+       confusion. If you see it trying to download VncViewer.class
+       (instead of VncViewer.jar) you know it is really confused and
+       needs to be restarted.
+     * Step Lively: If you get Browser or Java VM or VNC Viewer applet
+       dialog boxes saying things like "Do you want to trust this
+       certificate" or "The hostname does not match the one on the
+       certificate", etc. just go through them as quickly as possible.
+       x11vnc cannot wait forever for each SSL connection, and so if you
+       daudle too long inspecting the certs, etc it can lead to problems.
+       Get it working first before taking your time to read the details
+       in the dialogs, etc.
+     * No inetd, Please: Even if you intend to deploy via inetd or xinetd
+       eventually, get that working later (and remember you need to do
+       something like "-ssl SAVE" to prevent x11vnc from creating a new
+       temporary SSL certificate for every new socket connection).
+     * Nothing Fancy: Do not try fancy stuff like -svc, -create, -unixpw,
+       "-users unixpw=", "-users sslpeer=", -sslverify, etc. Just get the
+       simplest connection working first and then incrementally add what
+       you need.
+
+   So the recommended test command lines are:
+   x11vnc -ssl SAVE -http
+   x11vnc -ssl SAVE -httpdir /path/to/x11vnc/classes/ssl
+
+   Use the latter is if x11vnc cannot automatically find the classes/ssl
+   directory (this what the -http option instructs it to do.) Then point
+   your browser to the HTTP (not HTTPS) URL it prints out.
+
+   Following the above guidelines, did it work? If so, Congratulations!!
+   you created an SSL encrypted connection between the SSL Java applet
+   running in your web browser and x11vnc. The fact that you used HTTP
+   instead of HTTPS to download the applet is not the end of the world
+   (some users do it this way), the main thing is that the VNC traffic is
+   encrypted with SSL. If you are having trouble even with the above
+   baseline test case feel free to contact me (please send the Full
+   x11vnc output, not just part of it, and the complete x11vnc command
+   line, and the URL(s) entered in the browser, and anything else you can
+   think of.)
+
+   Next, you can add features one by one testing each time. I suggest
+   first turning on the HTTPS applet download (https://hostname:5900) if
+   that is what you intend to use. That one gives the most trouble
+   because of the ambiguity of passing two different protocols (HTTP and
+   VNC) through the same SSL service port. Next turn on inetd if you
+   intend to use that (this can be tricky too, be sure to use -o logfile
+   and inspect it carefully if there are problems). If you are going to
+   use non-standard ports (e.g. "-rfbport 443" as root), work on that
+   next. Then enable the firewall, router port redirection channel (you
+   will somehow need to be outside to do that, maybe test that through
+   another VNC session). Then enable "fancy stuff" like "-svc" or
+   "-unixpw", etc, etc. Be sure to add a password either "-rfbauth" or
+   "-unixpw" or both.
 
 
    Router/Firewall port redirs:  If you are doing port redirection at
@@ -6825,7 +6901,9 @@ ateway and not a broadcaster?)
 
    Also, because of the way the LibVNCServer TightVNC file transfer is
    implemented, you cannot do Tightvnc file transfer in -unixpw mode.
-   UltraVNC file transfer does work, however.
+   However, UltraVNC file transfer does work in -unixpw (but if a client
+   tries it do a filetransfer during the login process it will be
+   disconnected).
 
    IMPORTANT: please understand if -ultrafilexfer or -tightfilexfer is
    specified and you run x11vnc as root for, say, inetd or display
@@ -8230,6 +8308,7 @@ http://www.karlrunge.com/x11vnc/miscbuild.html:
    Misc. Build problems:   We collect here rare build problems some users
    have reported and the corresponding workarounds. See also the [1]FAQ's
    on building.
+     _________________________________________________________________
 
    One user had a problem where the build script below was failing
    because his work environment had the ENV variable set to a script that
@@ -8237,6 +8316,7 @@ http://www.karlrunge.com/x11vnc/miscbuild.html:
    you do not have any ENV or BASH_ENV in your environment doing things
    like that. Typing "unset ENV", etc. before configuring and building
    should clear it.
+     _________________________________________________________________
 
    One user had his bash shell compiled with --enable-xpg-echo-default
    that causes some strange behavior with things like echo "\\1 ..." the
@@ -8250,9 +8330,21 @@ http://www.karlrunge.com/x11vnc/miscbuild.html:
 
    i.e. avoid using the bash with the misbehavior. A bug has been filed
    against autoconf to guard against this.
+     _________________________________________________________________
 
    AIX: one user had to add the "X11.adt" package to AIX to get build
    header files like XShm.h, etc.
+     _________________________________________________________________
+
+   Ubuntu Feisty Fawn 7.04: In May/2007 one user said he needed to add
+   these packages to compile x11vnc on that Linux distro and version:
+  apt-get install build-essential make bin86 libjpeg62-dev libssl-dev libxtst-d
+ev
+
+   Note that Ubuntu is based on Debian, so perhaps this is the list
+   needed on Debian (testing?) as well. To build in Avahi (mDNS service
+   advertising) support it would appear that libavahi-client-dev is
+   needed as well.
 
 References
 
@@ -9891,8 +9983,10 @@ Enhanced TightVNC Viewer   (SSVNC: SSL/SSH VNC viewer)
    The short name for this project is "ssvnc" for SSL/SSH VNC Viewer.
 
    It is a self-contained bundle, you could carry it around on, say, a
-   USB memory stick for secure VNC viewing from almost any machine, Unix,
-   Mac OS X, and Windows.
+   USB memory stick / flash drive for secure VNC viewing from almost any
+   machine, Unix, Mac OS X, and Windows (and if you create a directory
+   named "Home" in the toplevel ssvnc directory on the drive your VNC
+   profiles and certs will be kept there as well).
 
    Wrappers and a tcl/tk GUI were written and patches were created for
    the TightVNC 1.3dev7 vnc_unixsrc tree to add these features:
@@ -9960,7 +10054,7 @@ Enhanced TightVNC Viewer   (SSVNC: SSL/SSH VNC viewer)
    installed on your system. Just un-zip or un-tar the file you
    downloaded and run it straight from its directory.
 
-   Here is the quick start info from the README for how to do that:
+   Here is the Quick Start info from the README for how to do that:
 Quick Start:
 -----------
 
@@ -9970,7 +10064,7 @@ Unix and Mac OS X:
 
     Unpack the archive:
 
-        % gzip -dc ssvnc-1.0.15.tar.gz | tar xvf -
+        % gzip -dc ssvnc-1.0.16.tar.gz | tar xvf -
 
     Run the GUI:
 
@@ -9978,7 +10072,7 @@ Unix and Mac OS X:
 
         % ./ssvnc/MacOSX/ssvnc       (for Mac OS X)
 
-    The smaller file "ssvnc_no_windows-1.0.15.tar.gz" could have been
+    The smaller file "ssvnc_no_windows-1.0.16.tar.gz" could have been
     used as well.
 
     On MacOSX there is also a SSVNC.app directory icon you can click on
@@ -9989,7 +10083,7 @@ Windows:
 
     Unzip, using WinZip or a similar utility, the zip file:
 
-        ssvnc-1.0.15.zip
+        ssvnc-1.0.16.zip
 
     Run the GUI, e.g.:
 
@@ -10001,7 +10095,7 @@ Windows:
 
     select Open, and then OK to launch it.
 
-    The smaller file "ssvnc_windows_only-1.0.15.zip" could have been used
+    The smaller file "ssvnc_windows_only-1.0.16.zip" could have been used
     as well.
 
     You can make a Windows shortcut to this program if you want to.
@@ -10036,6 +10130,18 @@ ssvnc.exe
 
    (the Mac OS X and Unix launchers are simply links to the bin
    directory). See the README for more information.
+
+   Memory Stick Usage: If you create a directory named "Home" in that
+   toplevel ssvnc directory then that will be used as the base for
+   storing VNC profiles and certificates. Also, for convenience, if you
+   first run the command with "." as an argument (e.g. "ssvnc .") it will
+   automatically create the "Home" directory for you. This is handy if
+   you want to place SSVNC on a USB flash drive that you carry around for
+   mobile use and you want the profiles you create to stay with the drive
+   (otherwise you'd have to browse to the drive directory each time you
+   load or save). WARNING: if you use ssvnc from an "Internet Cafe", i.e.
+   an untrusted computer, an intruder may be capturing keystrokes etc.
+
 
    The Viewer SSL support is done via a wrapper script (bin/ssvnc_cmd
    that calls bin/util/ss_vncviewer) that starts up the STUNNEL tunnel
@@ -10181,6 +10287,7 @@ Enhanced TightVNC viewer (SSVNC) options:
 
    [viewer_menu.gif] [unixviewer.gif]
 
+     _________________________________________________________________
 
    Windows:
 
@@ -10220,23 +10327,23 @@ Enhanced TightVNC viewer (SSVNC) options:
    Downloading: This project can be downloaded here, choose the archive
    file bundle that best suits you (e.g. no source code, windows only,
    unix only, zip, tar etc):
-  [14]ssvnc_windows_only-1.0.15.zip      Windows Binaries Only.  No source incl
+  [14]ssvnc_windows_only-1.0.16.zip      Windows Binaries Only.  No source incl
 uded (~6MB)
-  [15]ssvnc_no_windows-1.0.15.tar.gz     Unix and Mac OS X Only. No Windows bin
+  [15]ssvnc_no_windows-1.0.16.tar.gz     Unix and Mac OS X Only. No Windows bin
 aries.  Source included. (~6MB)
-  [16]ssvnc_unix_only-1.0.15.tar.gz      Unix Binaries Only.     No source incl
+  [16]ssvnc_unix_only-1.0.16.tar.gz      Unix Binaries Only.     No source incl
 uded. (~3.5MB)
-  [17]ssvnc_unix_minimal-1.0.15.tar.gz   Unix Minimal.  You must supply your ow
+  [17]ssvnc_unix_minimal-1.0.16.tar.gz   Unix Minimal.  You must supply your ow
 n vncviewer and stunnel. (~0.1MB)
 
-  [18]ssvnc-1.0.15.tar.gz                All Unix, Mac OS X, and Windows binari
+  [18]ssvnc-1.0.16.tar.gz                All Unix, Mac OS X, and Windows binari
 es and source TGZ. (~11MB)
-  [19]ssvnc-1.0.15.zip                   All Unix, Mac OS X, and Windows binari
+  [19]ssvnc-1.0.16.zip                   All Unix, Mac OS X, and Windows binari
 es and source ZIP. (~11MB)
-  [20]ssvnc_all-1.0.15.zip               All Unix, Mac OS X, and Windows binari
+  [20]ssvnc_all-1.0.16.zip               All Unix, Mac OS X, and Windows binari
 es and source AND full archives in the zip dir. (~15MB)
 
-   You can try for an older one by replacing, e.g. ".15" by ".11", etc.
+   You can try for an older one by replacing, e.g. ".16" by ".11", etc.
 
    Sorry for the inconvenience of lumping all the Unix binaries and
    source together in one archive. To save space you can delete the src
@@ -10449,7 +10556,7 @@ Unix and Mac OS X:
 
     Unpack the archive:
 
-        % gzip -dc ssvnc-1.0.15.tar.gz | tar xvf -
+        % gzip -dc ssvnc-1.0.16.tar.gz | tar xvf -
 
     Run the GUI:
 
@@ -10459,7 +10566,7 @@ Unix and Mac OS X:
 
     On MacOSX you could also click on the SSVNC app in the Finder.
 
-    The smaller file "ssvnc_no_windows-1.0.15.tar.gz"
+    The smaller file "ssvnc_no_windows-1.0.16.tar.gz"
     could have been used as well.
 
     On MacOSX there is also a SSVNC.app directory icon you can click on
@@ -10470,7 +10577,7 @@ Windows:
 
     Unzip, using WinZip or a similar utility, the zip file:
 
-        ssvnc-1.0.15.zip
+        ssvnc-1.0.16.zip
 
     Run the GUI, e.g.:
 
@@ -10482,7 +10589,7 @@ Windows:
 
     select Open, and then OK to launch it.
 
-    The smaller file "ssvnc_windows_only-1.0.15.zip"
+    The smaller file "ssvnc_windows_only-1.0.16.zip"
     could have been used as well.
 
     You can make a Windows shortcut to this program if you want to.
@@ -10528,9 +10635,25 @@ Solaris, FreeBSD, etc.  Unpack your archive and see the subdirectories of
         ./bin
 
 for the ones that were shipped in this project, e.g. ./bin/Linux.i686
-Run "uname -sm" to see your OS+arch combination. (See the
-./bin/ssvnc_cmd -h output for how to override platform autodection
-via the UNAME env. var).
+Run "uname -sm" to see your OS+arch combination (n.b. all Linux x86 are
+mapped to Linux.i686).   (See the ./bin/ssvnc_cmd -h output for how to
+override platform autodection via the UNAME env. var).
+
+
+Memory Stick Usage:
+-------------------
+
+If you create a directory named "Home" in that toplevel ssvnc directory
+then that will be used as the base for storing VNC profiles and
+certificates.  Also, for convenience, if you first run the command with
+"." as an argument (e.g. "ssvnc .") it will automatically create that
+"Home" directory for you.  This is handy if you want to place SSVNC
+on a USB flash drive that you carry around for mobile use and you want
+the profiles you create to stay with the drive (otherwise you'd have to
+browse to the drive directory each time you load or save).
+
+WARNING: if you use ssvnc from an "Internet Cafe", i.e.  an untrusted
+computer, an intruder may be capturing keystrokes etc.
 
 
 External Dependencies:
@@ -10727,13 +10850,13 @@ References
   11. http://www.karlrunge.com/x11vnc/index.html#faq-smb-shares
   12. http://www.karlrunge.com/x11vnc/index.html#faq-cups
   13. http://www.karlrunge.com/x11vnc/index.html#faq-sound
-  14. http://www.karlrunge.com/x11vnc/etv/ssvnc_windows_only-1.0.15.zip
-  15. http://www.karlrunge.com/x11vnc/etv/ssvnc_no_windows-1.0.15.tar.gz
-  16. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_only-1.0.15.tar.gz
-  17. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_minimal-1.0.15.tar.gz
-  18. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.15.tar.gz
-  19. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.15.zip
-  20. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.15.zip
+  14. http://www.karlrunge.com/x11vnc/etv/ssvnc_windows_only-1.0.16.zip
+  15. http://www.karlrunge.com/x11vnc/etv/ssvnc_no_windows-1.0.16.tar.gz
+  16. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_only-1.0.16.tar.gz
+  17. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_minimal-1.0.16.tar.gz
+  18. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.16.tar.gz
+  19. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.16.zip
+  20. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.16.zip
   21. http://www.karlrunge.com/x11vnc/etv/ssvnc
   22. http://www.stunnel.org/
   23. http://stunnel.mirt.net/
@@ -10754,7 +10877,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-05
+x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-06
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -10868,7 +10991,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-05
+x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-06
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -13585,9 +13708,9 @@ t
                        times for more output.
 
 -defer time            Time in ms to wait for updates before sending to client
-                       (deferUpdateTime)  Default: 30
+                       (deferUpdateTime)  Default: 20
 -wait time             Time in ms to pause between screen polls.  Used to cut
-                       down on load.  Default: 30
+                       down on load.  Default: 20
 -wait_ui factor        Factor by which to cut the -wait time if there
                        has been recent user input (pointer or keyboard).
                        Improves response, but increases the load whenever you
