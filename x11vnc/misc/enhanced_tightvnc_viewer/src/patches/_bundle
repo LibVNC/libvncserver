@@ -1,9 +1,11 @@
 #!/bin/sh
 
 rm -rf ./src/tmp/* || exit 1
-vers=1.0.15
+vers=1.0.16
 
 cd .. || exit 1
+
+cp -p ssvnc/bin/ssvnc_cmd ssvnc/bin/tightvncviewer
 
 ###########################################
 dest=./t.unix_only

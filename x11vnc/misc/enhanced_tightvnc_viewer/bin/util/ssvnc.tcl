@@ -276,7 +276,8 @@ proc help {} {
 
         Sorry we do not make this easy to figure out how to do (e.g. a
         button on the main panel), but the goal of SSVNC is secure 
-        connections!
+        connections!  Set the env var SSVNC_NO_ENC_WARN=1 (or use Vnc://)
+        to skip the warning prompts.
 
      6) Reverse VNC connections are possible as well.  Go to Options and
         select "Reverse VNC connection".  In the 'VNC Host:Display' entry
@@ -294,6 +295,30 @@ proc help {} {
 
         On Windows set it to "NOTEPAD" or similar; you can't control
         the port though.  It is usually 5930.
+
+     8) On Unix if you are going to an older SSH server (e.g. Solaris 10),
+        you will probably need to set the env. var. SS_VNCVIEWER_NO_T=1
+        to disable the ssh "-t" option being used (that can prevent the
+        command from being run).
+
+     9) In the VNC Host:Display entry you can also use these "URL-like"
+        prefixes:  vncs://host:0, vncssl://host:0, and vnc+ssl://host:0
+        (for SSL) and vncssh://host:0 and vnc+ssh://host:0 for SSH. There
+        is no need to toggle the SSL/SSH else.  These also work from the
+        command line, e.g.:  ssvnc vnc+ssh://mymachine:10
+
+    10) Mobile USB memory stick / flash drive usage:  You can unpack ssvnc
+        to a flash drive for impromptu usage (e.g. from a friends computer)
+        If you create a directory "Home" in the toplevel ssvnc directory,
+        then that will be the default location for your VNC profiles and
+        certs.  So they follow the drive this way.  If you run like this:
+        "ssvnc ." or "ssvnc.exe ." the "Home" directory will be created for
+        you.  WARNING: if you use ssvnc from an "Internet Cafe", i.e. an
+        untrusted computer, an intruder may be capturing keystrokes, etc.
+
+	You can also set the SSVNC_HOME env. var. to point to any
+	directory you want. It can be set after starting ssvnc by putting
+	HOME=/path/to/dir in the Host:Display box and clicking "Connect".
 }
 
 	.h.f.t insert end $msg
@@ -2065,7 +2090,7 @@ proc do_unix_pre {tag proxy hp pk_hp}  {
 
 		set tee ""
 		if {$use_smbmnt} {
-			set tee $env(HOME) 
+			set tee $env(SSVNC_HOME) 
 			append tee "/.tee-etv$tag"
 			set fh ""
 			catch {set fh [open $tee "w"]}
@@ -2182,6 +2207,7 @@ proc port_knock_only {hp {mode KNOCK}} {
 
 proc direct_connect_msg {} {
 	set msg ""
+	global env
 	globalize
 	if {$use_sshssl} {
 		append msg "  - SSH + SSL tunnelling\n"
@@ -2189,6 +2215,9 @@ proc direct_connect_msg {} {
 		append msg "  - SSH tunnelling\n"
 	} else {
 		append msg "  - SSL tunnelling\n"
+	}
+	if [info exists env(SSVNC_NO_ENC_WARN)] {
+		set msg ""
 	}
 	if {$use_smbmnt} {
 		append msg "  - SMB Mount Port Redirection\n"
@@ -2512,6 +2541,7 @@ proc launch_unix {hp} {
 	set pk_hp ""
 
 	set skip_ssh 0
+		
 	if [regexp {vnc://} $hp] {
 		set skip_ssh 1
 		direct_connect_msg
@@ -2753,7 +2783,7 @@ proc launch_unix {hp} {
 	set passwdfile ""
 	if {$vncauth_passwd != ""} {
 		global use_listen
-		set passwdfile "$env(HOME)/.vncauth_tmp.[pid]"
+		set passwdfile "$env(SSVNC_HOME)/.vncauth_tmp.[pid]"
 		catch {exec vncstorepw $vncauth_passwd $passwdfile}
 		catch {exec chmod 600 $passwdfile}
 		if {$use_listen} {
@@ -3041,6 +3071,14 @@ proc launch {{hp ""}} {
 		set hp [get_vncdisplay]
 	}
 
+	if {[regexp {^HOME=} $hp] || [regexp {^SSVNC_HOME=} $hp]} {
+		set t $hp
+		regsub {^.*HOME=} $t "" t
+		set env(SSVNC_HOME) $t
+		mesg "set SSVNC_HOME to $t"
+		return 0
+	}
+
 	regsub {[ 	]*cmd=.*$} $hp "" tt
 
 	if {[regexp {^[ 	]*$} $tt]} {
@@ -3078,12 +3116,17 @@ proc launch {{hp ""}} {
 		mesg "\"$tcl_platform(os)\" | \"$tcl_platform(osVersion)\""
 		after 1000
 	}
+
+	if [regexp {V[Nn][Cc]://} $hp] {
+		set env(SSVNC_NO_ENC_WARN) 1
+		regsub {V[Nn][Cc]://} $hp "vnc://" hp
+	}
+
 	if {! $is_windows} {
 		launch_unix $hp
 		return
 	}
 	##############################################################
-
 	if [regexp {vnc://} $hp] {
 		direct_connect_msg
 		regsub {vnc://} $hp "" hp
@@ -3095,9 +3138,15 @@ proc launch {{hp ""}} {
 	} elseif [regexp {vncssl://} $hp] {
 		set use_ssl 1
 		regsub {vncssl://} $hp "" hp
+	} elseif [regexp {vnc\+ssl://} $hp] {
+		set use_ssl 1
+		regsub {vnc\+ssl://} $hp "" hp
 	} elseif [regexp {vncssh://} $hp] {
 		set use_ssh 1
 		regsub {vncssh://} $hp "" hp
+	} elseif [regexp {vnc\+ssh://} $hp] {
+		set use_ssh 1
+		regsub {vnc\+ssh://} $hp "" hp
 	}
 
 	check_ssh_needed
@@ -3548,14 +3597,14 @@ proc get_idir_certs {str} {
 	}
 	if {$idir == ""} {
 		if {$is_windows} {
-			if [info exists env(HOME)] {
-				set t "$env(HOME)/ss_vnc"	
+			if [info exists env(SSVNC_HOME)] {
+				set t "$env(SSVNC_HOME)/ss_vnc"	
 				regsub -all {\\} $t "/" t
 				regsub -all {//*} $t "/" t
 				if {! [file isdirectory $t]} {
 					catch {file mkdir $t}
 				}
-				set t "$env(HOME)/ss_vnc/certs"	
+				set t "$env(SSVNC_HOME)/ss_vnc/certs"	
 				regsub -all {\\} $t "/" t
 				regsub -all {//*} $t "/" t
 				if {! [file isdirectory $t]} {
@@ -3574,8 +3623,8 @@ proc get_idir_certs {str} {
 			}
 		}
 		if {$idir == ""} {
-			if [info exists env(HOME)] {
-				set t "$env(HOME)/.vnc/certs"	
+			if [info exists env(SSVNC_HOME)] {
+				set t "$env(SSVNC_HOME)/.vnc/certs"	
 				if [file isdirectory $t] {
 					set idir $t
 				}
@@ -4653,8 +4702,8 @@ proc get_profiles_dir {} {
 	
 	set dir ""
 	if {$is_windows} {
-		if [info exists env(HOME)] {
-			set t "$env(HOME)/ss_vnc"
+		if [info exists env(SSVNC_HOME)] {
+			set t "$env(SSVNC_HOME)/ss_vnc"
 			regsub -all {\\} $t "/" t
 			regsub -all {//*} $t "/" t
 			if {! [file isdirectory $t]} {
@@ -4675,8 +4724,8 @@ proc get_profiles_dir {} {
 				set dir $t
 			}
 		}
-	} elseif [info exists env(HOME)] {
-		set t "$env(HOME)/.vnc"
+	} elseif [info exists env(SSVNC_HOME)] {
+		set t "$env(SSVNC_HOME)/.vnc"
 		if [file isdirectory $t] {
 			set dir $t
 			set s "$t/profiles"
@@ -7215,7 +7264,7 @@ proc do_port_knock {hp mode} {
 			global env
 			set pfile "payload$pi.txt" 
 			if {! $is_windows} {
-				set pfile "$env(HOME)/.$pfile"
+				set pfile "$env(SSVNC_HOME)/.$pfile"
 			}
 			set pfiles($pi) $pfile
 			incr pi
@@ -7663,7 +7712,7 @@ proc ssh_agent_restart {} {
 		mesg "could not find ssh-add in PATH"
 		return
 	}
-	set tmp $env(HOME)/.vnc-sa[pid]
+	set tmp $env(SSVNC_HOME)/.vnc-sa[pid]
 	set fh ""
 	catch {set fh [open $tmp "w"]}
 	if {$fh == ""} {
@@ -7938,8 +7987,8 @@ proc check_writable {} {
 
 	if ![file exists $test] {
 		global env
-		if [info exists env(HOME)] {
-			set dir "$env(HOME)/ss_vnc/cache"	
+		if [info exists env(SSVNC_HOME)] {
+			set dir "$env(SSVNC_HOME)/ss_vnc/cache"	
 			catch {file mkdir $dir}
 			if ![file exists $dir] {
 				return
@@ -7973,6 +8022,75 @@ if {[regexp -nocase {Windows.9} $tcl_platform(os)]} {
 	set is_win9x 0
 }
 
+# set SSVNC_HOME to HOME in case we modify it for mobile use:
+if [info exists env(HOME)] {
+	if {! [info exists env(SSVNC_HOME)]} {
+		set env(SSVNC_HOME) $env(HOME)
+	}
+}
+
+# For mobile use, e.g. from a USB flash drive, we look for a "home" or "Home"
+# directory relative to this script where the profiles and certs will be kept
+# by default.
+if [file exists $buck_zero] {
+	#puts "$buck_zero"
+	set up [file dirname $buck_zero]
+
+	if {$up == "."} {
+		# this is actually bad news on windows because we cd'd to util.
+		set up ".."
+	} else {
+		set up [file dirname $up]
+	}
+	set dirs [list $up]
+
+	if {! $is_windows && $up != ".."} {
+		# get rid of bin
+		set up [file dirname $up]
+		lappend dirs $up
+	}
+
+	if {$argc > 0} {
+		set i [lindex $argv 0]
+		if {$i == "."} {
+			if {![file isdirectory "$up/home"] && ![file isdirectory "$up/Home"]} {
+				catch {file mkdir "$up/Home"}
+			}
+		}
+	}
+
+	set gotone 0
+
+	foreach d $dirs {
+		set try "$d/home"
+		#puts "$try"
+		if [file isdirectory $try] {
+			set env(SSVNC_HOME) $try
+			set gotone 1
+			break
+		}
+		set try "$d/Home"
+		#puts "$try"
+		if [file isdirectory $try] {
+			set env(SSVNC_HOME) $try
+			set gotone 1
+			break
+		}
+	}
+	if {$gotone} {
+		set b ""
+		if {$is_windows} {
+			set b "$env(SSVNC_HOME)/ss_vnc"
+		} else {
+			set b "$env(SSVNC_HOME)/.vnc"
+		}
+		catch {file mkdir $b}
+		catch {file mkdir "$b/certs"}
+		catch {file mkdir "$b/profiles"}
+	}
+	#puts "HOME: $env(SSVNC_HOME)"
+}
+
 if {$is_windows} {
 	check_writable
 }
@@ -7987,8 +8105,8 @@ if {$uname == "Darwin"} {
 	if {! [info exists env(DISPLAY)]} {
 		set darwin_cotvnc 1
 	}
-	if [info exists env(HOME)] {
-		set t "$env(HOME)/.vnc"
+	if [info exists env(SSVNC_HOME)] {
+		set t "$env(SSVNC_HOME)/.vnc"
 		if {! [file exists $t]} {
 			catch {file mkdir $t}
 		}
@@ -8123,6 +8241,12 @@ update
 
 if {$argc > 0} {
 	set item [lindex $argv 0]
+	if {$item == "."} {
+		set item ""
+		if {$argc > 1} {
+			set item [lindex $argv 1]
+		}
+	}
 	if {$item != ""} {
 		if [file exists $item] {
 			load_profile . $item
@@ -8148,3 +8272,4 @@ if {$argc > 0} {
 	}
 }
 
+#mesg "$buck_zero"

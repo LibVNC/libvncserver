@@ -1,4 +1,4 @@
-       Enhanced TightVNC Viewer (ssvnc: SSL/SSH VNC viewer)
+       Enhanced TightVNC Viewer (SSVNC: SSL/SSH VNC viewer)
 
 Copyright (c) 2006-2007 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
@@ -237,6 +237,22 @@ for the ones that were shipped in this project, e.g. ./bin/Linux.i686
 Run "uname -sm" to see your OS+arch combination (n.b. all Linux x86 are
 mapped to Linux.i686).   (See the ./bin/ssvnc_cmd -h output for how to
 override platform autodection via the UNAME env. var).
+
+
+Memory Stick Usage:
+-------------------
+
+If you create a directory named "Home" in that toplevel ssvnc directory
+then that will be used as the base for storing VNC profiles and
+certificates.  Also, for convenience, if you first run the command with
+"." as an argument (e.g. "ssvnc .") it will automatically create that
+"Home" directory for you.  This is handy if you want to place SSVNC
+on a USB flash drive that you carry around for mobile use and you want
+the profiles you create to stay with the drive (otherwise you'd have to
+browse to the drive directory each time you load or save).
+
+WARNING: if you use ssvnc from an "Internet Cafe", i.e.  an untrusted
+computer, an intruder may be capturing keystrokes etc.
 
 
 External Dependencies:

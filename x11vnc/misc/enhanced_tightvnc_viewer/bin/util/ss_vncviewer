@@ -218,6 +218,11 @@ do
     shift
 done
 
+targ="-t"
+if [ "X$SS_VNCVIEWER_NO_T" != "X" ]; then
+	targ=""
+fi
+
 if [ "X$gotalpha" = "X1" ]; then
 	VNCVIEWER_ALPHABLEND=1
 	export VNCVIEWER_ALPHABLEND
@@ -255,6 +260,12 @@ if [ "X$use_ssh" = "X1" -a "X$use_sshssl" = "X" ]; then
 	fi
 fi
 
+if echo "$orig" | grep '^V[Nn][Cc]://' > /dev/null; then
+	SSVNC_NO_ENC_WARN=1
+	export SSVNC_NO_ENC_WARN
+	orig=`echo "$orig" | sed -e 's/^...:/vnc:/'`
+fi
+
 if echo "$orig" | grep '^vnc://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vnc://,,'`
 	verify=""
@@ -266,8 +277,13 @@ elif echo "$orig" | grep '^vncs://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vncs://,,'`
 elif echo "$orig" | grep '^vncssl://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vncssl://,,'`
+elif echo "$orig" | grep '^vnc+ssl://' > /dev/null; then
+	orig=`echo "$orig" | sed -e 's,vnc.ssl://,,'`
 elif echo "$orig" | grep '^vncssh://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vncssh://,,'`
+	use_ssh=1
+elif echo "$orig" | grep '^vnc+ssh://' > /dev/null; then
+	orig=`echo "$orig" | sed -e 's,vnc.ssh://,,'`
 	use_ssh=1
 fi
 if [ "X$reverse" != "X" -a "X$direct_connect" = "X" ]; then
@@ -438,8 +454,8 @@ if [ "X$use_ssh" = "X1" ]; then
 		proxport=`findfree 3500`
 		echo
 		echo "Running 1st ssh proxy:"
-		echo "$ssh -f -x -p $ssh_port1 -t -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
-		      $ssh -f -x -p $ssh_port1 -t -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
+		echo "$ssh -f -x -p $ssh_port1 $targ -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
+		      $ssh -f -x -p $ssh_port1 $targ -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
 		ssh_args="$ssh_args -o NoHostAuthenticationForLocalhost=yes"
 		sleep 1
 		stty sane
@@ -475,18 +491,18 @@ if [ "X$use_ssh" = "X1" ]; then
 	pmark=`sh -c 'echo $$'`
 	# the -t option actually speeds up typing response via VNC!!
 	if [ "X$SS_VNCVIEWER_SSH_ONLY" != "X" ]; then
-		echo "$ssh -x -p $ssh_port -t $C $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x -p $ssh_port $targ $C $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -x -p $ssh_port -t $C $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x -p $ssh_port $targ $C $ssh_args $ssh_host "$ssh_cmd"
 		exit $?
 	elif [ "X$SS_VNCVIEWER_NO_F" != "X" ]; then
-		echo "$ssh -x -p $ssh_port -t $C $ssh_redir $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -x -p $ssh_port -t $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
 	else
-		echo "$ssh -x -f -p $ssh_port -t $C $ssh_redir $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -x -f -p $ssh_port -t $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
 	fi
 	if [ "$?" != "0" ]; then
 		echo ""
@@ -774,12 +790,15 @@ if [ "X$direct_connect" != "X" ]; then
 	echo ""
 	echo "** NOTE: THERE WILL BE NO SSL OR SSH ENCRYPTION **"
 	echo ""
-	if type printf > /dev/null 2>&1; then
+	if [ "X$SSVNC_NO_ENC_WARN" != "X" ]; then
+		sleep 1
+	elif type printf > /dev/null 2>&1; then
 		printf  "Are you sure you want to continue? [y]/n "
+		read x
 	else
 		echo -n "Are you sure you want to continue? [y]/n "
+		read x
 	fi
-	read x
 	if [ "X$x" = "Xn" ]; then
 		exit 1
 	fi
