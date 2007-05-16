@@ -1322,6 +1322,7 @@ char *certret_str = NULL;
 
 void accept_openssl(int mode, int presock) {
 	int sock = -1, listen = -1, cport, csock, vsock;	
+	int peerport = 0;
 	int status, n, i, db = 0;
 	struct sockaddr_in addr;
 #ifdef __hpux
@@ -1441,8 +1442,10 @@ void accept_openssl(int mode, int presock) {
 
 	if (mode != OPENSSL_INETD) {
 		name = get_remote_host(sock);
+		peerport = get_remote_port(sock);
 	} else {
 		openssl_last_ip = get_remote_host(fileno(stdin));
+		peerport = get_remote_port(fileno(stdin));
 		if (openssl_last_ip) {
 			name = strdup(openssl_last_ip);
 		} else {
@@ -1452,10 +1455,10 @@ void accept_openssl(int mode, int presock) {
 	if (name) {
 		if (mode == OPENSSL_INETD) {
 			rfbLog("SSL: (inetd) spawning helper process "
-			    "to handle: %s\n", name);
+			    "to handle: %s:%d\n", name, peerport);
 		} else {
 			rfbLog("SSL: spawning helper process to handle: "
-			    "%s\n", name);
+			    "%s:%d\n", name, peerport);
 		}
 		free(name);
 		name = NULL;
@@ -1996,6 +1999,7 @@ static void ssl_timeout (int sig) {
 static int ssl_init(int s_in, int s_out) {
 	unsigned char *sid = (unsigned char *) "x11vnc SID";
 	char *name;
+	int peerport = 0;
 	int db = 0, rc, err;
 	int ssock = s_in;
 	double start = dnow();
@@ -2041,6 +2045,7 @@ if (db > 1) fprintf(stderr, "ssl_init: 2\n");
 if (db > 1) fprintf(stderr, "ssl_init: 3\n");
 
 	name = get_remote_host(ssock);
+	peerport = get_remote_port(ssock);
 
 if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 
@@ -2066,29 +2071,29 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 		} else if (err == SSL_ERROR_WANT_READ) {
 
 			if (db) fprintf(stderr, "got SSL_ERROR_WANT_READ\n");
-			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s\n",
-			    getpid(), name);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s:%d\n",
+			    getpid(), name, peerport);
 			return 0;
 			
 		} else if (err == SSL_ERROR_WANT_WRITE) {
 
 			if (db) fprintf(stderr, "got SSL_ERROR_WANT_WRITE\n");
-			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s\n",
-			    getpid(), name);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s:%d\n",
+			    getpid(), name, peerport);
 			return 0;
 
 		} else if (err == SSL_ERROR_SYSCALL) {
 
 			if (db) fprintf(stderr, "got SSL_ERROR_SYSCALL\n");
-			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s\n",
-			    getpid(), name);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s:%d\n",
+			    getpid(), name, peerport);
 			return 0;
 
 		} else if (err == SSL_ERROR_ZERO_RETURN) {
 
 			if (db) fprintf(stderr, "got SSL_ERROR_ZERO_RETURN\n");
-			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s\n",
-			    getpid(), name);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s:%d\n",
+			    getpid(), name, peerport);
 			return 0;
 
 		} else if (rc < 0) {
@@ -2118,7 +2123,7 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 		usleep(10 * 1000);
 	}
 
-	rfbLog("SSL: ssl_helper[%d]: SSL_accept() succeeded for: %s\n", getpid(), name);
+	rfbLog("SSL: ssl_helper[%d]: SSL_accept() succeeded for: %s:%d\n", getpid(), name, peerport);
 
 	if (SSL_get_verify_result(ssl) == X509_V_OK) {
 		X509 *x;

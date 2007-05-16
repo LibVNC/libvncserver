@@ -77,13 +77,19 @@ The enhanced TightVNC viewer features are:
 	- You can also use your own VNC Viewer, e.g. UltraVNC or RealVNC,
 	  with the front-end GUI or scripts if you like.
 
-	- Sets up any additional SSH port redirections that you desire.
+	- Sets up any additional SSH port redirections that you want.
 
 	- Support for native MacOS X usage with bundled Chicken of the
 	  VNC viewer.
 
+	- Reverse (viewer listening) VNC connections via SSL and SSH.
 
-	(these features only apply to the bundled Unix tightvnc viewer)
+	- Dynamic VNC Server Port determination and redirection (using
+	  ssh's builtin SOCKS proxy, -D) for servers like x11vnc that
+	  print out PORT= at startup.
+
+
+	(the following features only apply to the bundled Unix tightvnc viewer)
 
 	- rfbNewFBSize VNC support (screen resizing)
 

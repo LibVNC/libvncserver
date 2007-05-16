@@ -3230,7 +3230,7 @@ int main(int argc, char* argv[]) {
 		rfbLog("rfbRegisterTightVNCFileTransferExtension: 6\n");
 		rfbRegisterTightVNCFileTransferExtension();
 	} else {
-		rfbLog("rfbUnregisterTightVNCFileTransferExtension: 3\n");
+		if (0) rfbLog("rfbUnregisterTightVNCFileTransferExtension: 3\n");
 		rfbUnregisterTightVNCFileTransferExtension();
 	}
 #endif
