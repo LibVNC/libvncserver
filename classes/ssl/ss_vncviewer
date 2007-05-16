@@ -260,6 +260,12 @@ if [ "X$use_ssh" = "X1" -a "X$use_sshssl" = "X" ]; then
 	fi
 fi
 
+if echo "$orig" | grep '^V[Nn][Cc]://' > /dev/null; then
+	SSVNC_NO_ENC_WARN=1
+	export SSVNC_NO_ENC_WARN
+	orig=`echo "$orig" | sed -e 's/^...:/vnc:/'`
+fi
+
 if echo "$orig" | grep '^vnc://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vnc://,,'`
 	verify=""
@@ -271,8 +277,13 @@ elif echo "$orig" | grep '^vncs://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vncs://,,'`
 elif echo "$orig" | grep '^vncssl://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vncssl://,,'`
+elif echo "$orig" | grep '^vnc+ssl://' > /dev/null; then
+	orig=`echo "$orig" | sed -e 's,vnc.ssl://,,'`
 elif echo "$orig" | grep '^vncssh://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vncssh://,,'`
+	use_ssh=1
+elif echo "$orig" | grep '^vnc+ssh://' > /dev/null; then
+	orig=`echo "$orig" | sed -e 's,vnc.ssh://,,'`
 	use_ssh=1
 fi
 if [ "X$reverse" != "X" -a "X$direct_connect" = "X" ]; then
@@ -314,6 +325,8 @@ if uname | grep Linux > /dev/null; then
 	inuse=`netstat -ant | egrep 'LISTEN|WAIT|ESTABLISH|CLOSE' | awk '{print $4}' | sed 's/^.*://'`
 elif uname | grep SunOS > /dev/null; then
 	inuse=`netstat -an -f inet -P tcp | grep LISTEN | awk '{print $1}' | sed 's/^.*\.//'`
+elif uname | grep -i bsd > /dev/null; then
+	inuse=`netstat -ant -f inet | grep LISTEN | awk '{print $4}' | sed 's/^.*\.//'`
 # add others...
 fi
 
@@ -412,6 +425,31 @@ if echo "$0" | grep vncip > /dev/null; then
 	VNCVIEWERCMD="$VNCIPCMD"
 fi
 
+rchk() {
+	if [ "X$BASH_VERSION" = "X" ]; then
+		RANDOM=`date +%S``sh -c 'echo $$'``ps -elf 2>&1 | sum 2>&1 | awk '{print $1}'`
+	fi
+}
+rchk
+
+mytmp() {
+	tf=$1
+	rm -rf "$tf" || exit 1
+	if [ -d "$tf" ]; then
+		echo "tmp file $tf still exists as a directory."
+		exit 1
+	elif [ -L "$tf" ]; then
+		echo "tmp file $tf still exists as a symlink."
+		exit 1
+	elif [ -f "$tf" ]; then
+		echo "tmp file $tf still exists."
+		exit 1
+	fi
+	touch "$tf" || exit 1
+	chmod 600 "$tf" || exit 1
+	rchk
+}
+
 if [ "X$use_ssh" = "X1" ]; then
 	ssh_port="22"
 	ssh_host="$host"
@@ -472,28 +510,88 @@ if [ "X$use_ssh" = "X1" ]; then
 	if [ "X$SS_VNCVIEWER_USE_C" != "X" ]; then
 		C="-C"
 	fi
-	if [ "X$reverse" = "X" ]; then
+
+	getport=""
+	if echo "$ssh_cmd" | egrep "^(PORT=|P=)" > /dev/null; then
+		getport=1
+		PORT=""
+		ssh_cmd=`echo "$ssh_cmd" | sed -e 's/^PORT=[ 	]*//' -e 's/^P=//'`
+		SSVNC_NO_ENC_WARN=1
+		if [ "X$use_sshssl" = "X" ]; then
+			direct_connect=1
+		fi
+	fi
+	if [ "X$getport" != "X" ]; then
+		ssh_redir="-D ${use}"
+	elif [ "X$reverse" = "X" ]; then
 		ssh_redir="-L ${use}:${vnc_host}:${port}"
 	else
 		ssh_redir="-R ${port}:${vnc_host}:${use}"
 	fi
 	pmark=`sh -c 'echo $$'`
+
 	# the -t option actually speeds up typing response via VNC!!
+
 	if [ "X$SS_VNCVIEWER_SSH_ONLY" != "X" ]; then
 		echo "$ssh -x -p $ssh_port $targ $C $ssh_args $ssh_host \"$info\""
 		echo ""
 		$ssh -x -p $ssh_port $targ $C $ssh_args $ssh_host "$ssh_cmd"
 		exit $?
+
 	elif [ "X$SS_VNCVIEWER_NO_F" != "X" ]; then
 		echo "$ssh -x -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
 		echo ""
 		$ssh -x -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+		rc=$?
+
+	elif [ "X$getport" != "X" ]; then
+		echo "$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+		echo ""
+
+		tport=/tmp/tport${RANDOM}.$$
+		mytmp $tport
+		$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd" > $tport 
+		rc=$?
+
+		stty sane
+		i=0
+		while [ $i -lt 10 ]; do
+			sleep 1
+			PORT=`grep "^PORT=" $tport | head -1 | sed -e 's/PORT=//' -e 's/\r//g'`
+			if echo "$PORT" | grep '^[0-9][0-9]*$' > /dev/null; then
+				break
+			fi
+			vnss=`sed -e 's/\r//g' $tport | egrep -i '^(New.* desktop is|A VNC server is already running).*:[0-9[0-9]*$' | head -1 | awk '{print $NF}'`
+			if [ "X$vnss" != "X" ]; then
+				PORT=`echo "$vnss" | awk -F: '{print $2}'`
+				if echo "$PORT" | grep '^[0-9][0-9]*$' > /dev/null; then
+					if [ $PORT -lt 100 ]; then
+						PORT=`expr $PORT + 5900`
+					fi
+				fi
+				if echo "$PORT" | grep '^[0-9][0-9]*$' > /dev/null; then
+					break
+				fi
+			fi
+			i=`expr $i + 1`
+		done
+
+		echo "PORT=$PORT" 1>&2
+		PPROXY_SOCKS=1
+		export PPROXY_SOCKS
+		host="localhost"
+		port="$PORT"
+		proxy="localhost:$use"
+		rm -f $tport
+
 	else
 		echo "$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
 		echo ""
 		$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+		rc=$?
 	fi
-	if [ "$?" != "0" ]; then
+
+	if [ "$rc" != "0" ]; then
 		echo ""
 		echo "ssh to $ssh_host failed."
 		exit 1
@@ -511,7 +609,9 @@ if [ "X$use_ssh" = "X1" ]; then
 		fi
 		c=`expr $c + 1`
 	done
-	if [ "X$ssh_cmd" = "Xsleep $ssh_sleep" ] ; then
+	if [ "X$getport" != "X" ]; then
+		:
+	elif [ "X$ssh_cmd" = "Xsleep $ssh_sleep" ] ; then
 		sleep 1
 	else
 		# let any command get started a bit.
@@ -521,7 +621,7 @@ if [ "X$use_ssh" = "X1" ]; then
 	#reset
 	stty sane
 	#echo "pssh=\"$pssh\""
-	if [ "X$use_sshssl" = "X" ]; then
+	if [ "X$use_sshssl" = "X" -a "X$getport" = "X" ]; then
 		echo "Running viewer:"
 
 		trap "final" 0 2 15
@@ -547,7 +647,12 @@ if [ "X$use_ssh" = "X1" ]; then
 		port=$use
 		use=$use2
 		N=`expr $use - 5900`
-		proxy=""
+		if [ "X$getport" != "X" ]; then
+			host="$host0"
+			port="$port0"
+		else
+			proxy=""
+		fi
 	fi
 fi
 
@@ -565,53 +670,33 @@ if [ "X$mycert" != "X" ]; then
 	cert="cert = $mycert"
 fi
 
-mytmp() {
-	tf=$1
-	rm -rf "$tf" || exit 1
-	if [ -d "$tf" ]; then
-		echo "tmp file $tf still exists as a directory."
-		exit 1
-	elif [ -L "$tf" ]; then
-		echo "tmp file $tf still exists as a symlink."
-		exit 1
-	elif [ -f "$tf" ]; then
-		echo "tmp file $tf still exists."
-		exit 1
-	fi
-	touch "$tf" || exit 1
-	chmod 600 "$tf" || exit 1
-}
-
-if echo "$RANDOM" | grep '[^0-9]' > /dev/null; then
-	RANDOM=`date +%S`
-fi
-
 pcode() {
 	tf=$1
-	SSVNC_PROXY=$proxy; export SSVNC_PROXY
-	SSVNC_DEST="$host:$port"; export SSVNC_DEST
+	PPROXY_PROXY=$proxy; export PPROXY_PROXY
+	PPROXY_DEST="$host:$port"; export PPROXY_DEST
 	cod='#!/usr/bin/perl
 
-# A hack to glue stunnel to a Web proxy for client connections.
+# A hack to glue stunnel to a Web proxy or SOCKS for client connections.
 
 use IO::Socket::INET;
 
-my ($first, $second) = split(/,/, $ENV{SSVNC_PROXY});
+my ($first, $second) = split(/,/, $ENV{PPROXY_PROXY});
 my ($proxy_host, $proxy_port) = split(/:/, $first);
-my $connect = $ENV{SSVNC_DEST};
+my $connect = $ENV{PPROXY_DEST};
 
-print STDERR "\nperl script for web proxing:\n";
+print STDERR "\nPPROXY v0.0: a tool for Web proxies and SOCKS connections.\n";
 print STDERR "proxy_host:       $proxy_host\n";
 print STDERR "proxy_port:       $proxy_port\n";
 print STDERR "proxy_connect:    $connect\n";
 
 my $listen_handle = "";
-if ($ENV{SSVNC_LISTEN} != "") {
+if ($ENV{PPROXY_LISTEN} != "") {
 	my $listen_sock = IO::Socket::INET->new(
 		Listen    => 2,
 		LocalAddr => "localhost",
-		LocalPort => $ENV{SSVNC_LISTEN},
-		Proto     => "tcp");
+		LocalPort => $ENV{PPROXY_LISTEN},
+		Proto     => "tcp"
+	);
 	if (! $listen_sock) {
 		die "perl proxy: $!\n";
 	}
@@ -625,7 +710,8 @@ if ($ENV{SSVNC_LISTEN} != "") {
 my $sock = IO::Socket::INET->new(
 	PeerAddr => $proxy_host,
 	PeerPort => $proxy_port,
-	Proto => "tcp");
+	Proto => "tcp"
+);
 
 if (! $sock) {
 	unlink($0);
@@ -633,24 +719,77 @@ if (! $sock) {
 }
 
 my $con = "";
-if ($second ne "") {
+my $con0 = "";
+if ($ENV{PPROXY_SOCKS} ne "") {
+	$second = "";
+	my ($h, $p) = split(/:/, $connect);
+	$con .= pack("C", 0x04);
+	$con .= pack("C", 0x01);
+	$con .= pack("n", $p);
+
+	my $SOCKS_4a = 0;
+	if ($h eq "localhost" || $h eq "127.0.0.1") {
+		$con .= pack("C", 127);
+		$con .= pack("C", 0);
+		$con .= pack("C", 0);
+		$con .= pack("C", 1);
+	} elsif ($h =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
+		$con .= pack("C", $1);
+		$con .= pack("C", $2);
+		$con .= pack("C", $3);
+		$con .= pack("C", $4);
+	} else {
+		$con .= pack("C", 0);
+		$con .= pack("C", 0);
+		$con .= pack("C", 0);
+		$con .= pack("C", 3);
+		$SOCKS_4a = 1;
+	}
+
+	$con .= "nobody";
+	$con .= pack("C", 0);
+
+	if ($SOCKS_4a) {
+		$con .= $h;
+		$con .= pack("C", 0);
+	}
+	$con0 = "SOCKS4 via $proxy_host:$proxy_port to $h:$p\n\n";
+
+} elsif ($second ne "") {
 	$con = "CONNECT $second HTTP/1.1\r\n";
 	$con   .= "Host: $second\r\n\r\n";
+	$con0 = $con;
 } else {
 	$con = "CONNECT $connect HTTP/1.1\r\n";
 	$con   .= "Host: $connect\r\n\r\n";
+	$con0 = $con;
 }
 
-print STDERR "proxy_request1:\n$con";
+print STDERR "proxy_request1:\n$con0";
 print $sock $con;
 
 unlink($0);
 
 my $rep = "";
-while ($rep !~ /\r\n\r\n/) {
-	my $c = getc($sock);
-	print STDERR $c;
-	$rep .= $c;
+if ($ENV{PPROXY_SOCKS} ne "") {
+	$rep = "HTTP/1.0 200";
+	for (my $i = 0; $i < 8; $i++) {
+		my $c;
+		sysread($sock, $c, 1);
+		my $s = unpack("C", $c);
+		if ($i == 0) {
+			$rep = "" if $s != 0x0;
+		} elsif ($i == 1) {
+			$rep = "" if $s != 0x5a;
+		}
+	}
+} else {
+	while ($rep !~ /\r\n\r\n/) {
+		my $c;
+		sysread($sock, $c, 1);
+		print STDERR $c;
+		$rep .= $c;
+	}
 }
 if ($rep !~ m,HTTP/.* 200,) {
 	die "proxy error: $rep\n";
@@ -665,7 +804,8 @@ if ($second ne "") {
 
 	$rep = "";
 	while ($rep !~ /\r\n\r\n/) {
-		my $c = getc($sock);
+		my $c;
+		sysread($sock, $c, 1);
 		print STDERR $c;
 		$rep .= $c;
 	}
@@ -743,8 +883,8 @@ if [ "X$proxy" != "X" ]; then
 	if [ "X$showcert" != "X1" -a "X$direct_connect" = "X" ]; then
 		if uname | grep Darwin >/dev/null; then
 			nd=`expr $use + 333`
-			SSVNC_LISTEN=$nd
-			export SSVNC_LISTEN
+			PPROXY_LISTEN=$nd
+			export PPROXY_LISTEN
 			$ptmp 2>/dev/null &
 			sleep 3
 			host="localhost"
@@ -762,8 +902,8 @@ fi
 
 if [ "X$showcert" = "X1" ]; then
 	if [ "X$proxy" != "X" ]; then
-		SSVNC_LISTEN=$use
-		export SSVNC_LISTEN
+		PPROXY_LISTEN=$use
+		export PPROXY_LISTEN
 		$ptmp 2>/dev/null &
 		sleep 3
 		host="localhost"
@@ -774,24 +914,29 @@ if [ "X$showcert" = "X1" ]; then
 fi
 
 if [ "X$direct_connect" != "X" ]; then
-	echo ""
-	echo "Running viewer for direct connection:"
-	echo ""
-	echo "** NOTE: THERE WILL BE NO SSL OR SSH ENCRYPTION **"
-	echo ""
-	if type printf > /dev/null 2>&1; then
+	if [ "X$getport" = "X" ]; then
+		echo ""
+		echo "Running viewer for direct connection:"
+		echo ""
+		echo "** NOTE: THERE WILL BE NO SSL OR SSH ENCRYPTION **"
+		echo ""
+	fi
+	if [ "X$SSVNC_NO_ENC_WARN" != "X" ]; then
+		sleep 1
+	elif type printf > /dev/null 2>&1; then
 		printf  "Are you sure you want to continue? [y]/n "
+		read x
 	else
 		echo -n "Are you sure you want to continue? [y]/n "
+		read x
 	fi
-	read x
 	if [ "X$x" = "Xn" ]; then
 		exit 1
 	fi
 	echo ""
 	if [ "X$ptmp" != "X" ]; then
-		SSVNC_LISTEN=$use
-		export SSVNC_LISTEN
+		PPROXY_LISTEN=$use
+		export PPROXY_LISTEN
 		$ptmp &
 		if [ "X$reverse" = "X" ]; then
 			sleep 2
@@ -816,8 +961,6 @@ if [ "X$direct_connect" != "X" ]; then
 	exit $?
 fi
 
-##debug = 7
-## debug = 6
 tmp=/tmp/ss_vncviewer${RANDOM}.$$
 mytmp "$tmp"
 

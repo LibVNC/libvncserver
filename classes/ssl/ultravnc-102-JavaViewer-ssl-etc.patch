@@ -1,79 +1,697 @@
-diff -x VncCanvas.java -Naur vnc_javasrc.orig/Makefile vnc_javasrc/Makefile
---- vnc_javasrc.orig/Makefile	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/Makefile	2006-03-26 17:29:25.000000000 -0500
-@@ -15,25 +15,29 @@
- 	  DesCipher.class CapabilityInfo.class CapsContainer.class \
- 	  RecordingFrame.class SessionRecorder.class AuthUnixLoginPanel.class \
- 	  SocketFactory.class HTTPConnectSocketFactory.class \
--	  HTTPConnectSocket.class ReloginPanel.class
-+	  HTTPConnectSocket.class ReloginPanel.class \
-+	  SSLSocketToMe.class
-+
-+SSL_CLASSES = SSLSocketToMe*.class TrustDialog.class
- 
- SOURCES = VncViewer.java RfbProto.java AuthPanel.java VncCanvas.java \
- 	  OptionsFrame.java ClipboardFrame.java ButtonPanel.java \
- 	  DesCipher.java CapabilityInfo.java CapsContainer.java \
- 	  RecordingFrame.java SessionRecorder.java AuthUnixLoginPanel.java \
- 	  SocketFactory.java HTTPConnectSocketFactory.java \
--	  HTTPConnectSocket.java ReloginPanel.java
-+	  HTTPConnectSocket.java ReloginPanel.java \
-+	  SSLSocketToMe.java
- 
- all: $(CLASSES) $(ARCHIVE)
- 
- $(CLASSES): $(SOURCES)
--	$(JC) -target 1.1 -O $(SOURCES)
-+	$(JC) -target 1.4 -O $(SOURCES)
- 
- $(ARCHIVE): $(CLASSES) $(MANIFEST)
--	$(JAR) cfm $(ARCHIVE) $(MANIFEST) $(CLASSES)
-+	$(JAR) cfm $(ARCHIVE) $(MANIFEST) $(CLASSES) $(SSL_CLASSES)
- 
- install: $(CLASSES) $(ARCHIVE)
--	$(CP) $(CLASSES) $(ARCHIVE) $(PAGES) $(INSTALL_DIR)
-+	$(CP) $(CLASSES) $(SSL_CLASSES) $(ARCHIVE) $(PAGES) $(INSTALL_DIR)
- 
- export:: $(CLASSES) $(ARCHIVE) $(PAGES)
- 	@$(ExportJavaClasses)
-diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto.java
---- vnc_javasrc.orig/RfbProto.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/RfbProto.java	2006-04-16 11:17:37.000000000 -0400
-@@ -199,7 +199,21 @@
-     host = h;
-     port = p;
- 
--    if (viewer.socketFactory == null) {
-+    if (! viewer.disableSSL) {
-+	System.out.println("new SSLSocketToMe");
-+	SSLSocketToMe ssl;
-+	try {
-+		ssl = new SSLSocketToMe(host, port, v);
-+	} catch (Exception e) {
-+		throw new IOException(e.getMessage());
-+	}
-+
-+	try {
-+		sock = ssl.connectSock();
-+	} catch (Exception es) {
-+		throw new IOException(es.getMessage());
-+	}
-+    } else if (viewer.socketFactory == null) {
-       sock = new Socket(host, port);
-     } else {
-       try {
-@@ -255,7 +269,7 @@
- 	|| (b[10] < '0') || (b[10] > '9') || (b[11] != '\n'))
-     {
-       throw new Exception("Host " + host + " port " + port +
--			  " is not an RFB server");
-+			  " is not an RFB server: " + b);
+diff -Naur JavaViewer.orig/ButtonPanel.java JavaViewer/ButtonPanel.java
+--- JavaViewer.orig/ButtonPanel.java	2004-12-12 20:51:02.000000000 -0500
++++ JavaViewer/ButtonPanel.java	2007-05-16 15:50:54.000000000 -0400
+@@ -163,9 +163,12 @@
      }
+     else if (evt.getSource() == ftpButton)
+     {
++// begin runge/x11vnc
++		viewer.ftp.setSavedLocations();
++// end runge/x11vnc
+ 		viewer.ftp.setVisible(!viewer.ftp.isVisible());
+ 		viewer.rfb.readServerDriveList();
+-	
++
+     }
+   }
+ }
+diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
+--- JavaViewer.orig/FTPFrame.java	2005-03-15 23:53:14.000000000 -0500
++++ JavaViewer/FTPFrame.java	2007-05-16 16:05:15.000000000 -0400
+@@ -26,6 +26,10 @@
+ import java.util.Vector;
+ import javax.swing.*;
  
-     serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
-diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
---- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2007-04-29 20:40:35.000000000 -0400
++// begin runge/x11vnc
++import java.util.Arrays;
++// end runge/x11vnc
++
+ 
+ /*
+  * Created on Feb 25, 2004
+@@ -80,6 +84,17 @@
+ 	private File localSelection = null;		// Holds the currently selected local file  
+ 	private String remoteSelection = null;	// Holds the currently selected remote file
+ 	public String selectedTable = null;
++
++// begin runge/x11vnc
++	private javax.swing.JButton viewButton = null;
++	public File saveLocalDirectory = null;
++	public long saveLocalDirectoryTime = 0;
++	public int saveLocalDirectoryCount = 0;
++	public String saveRemoteDirectory = null;
++	public long saveRemoteDirectoryTime = 0;
++	public int saveRemoteDirectoryCount = 0;
++	private boolean localCurrentIsDir = true;
++// end   runge/x11vnc
+ 	
+ //	 sf@2004 - Separate directories and files for better lisibility
+ 	private ArrayList DirsList;
+@@ -125,11 +140,59 @@
+ 	 
+ 	 void refreshRemoteLocation()
+ 	 {
++
+ 		remoteList.clear();
+ 		remoteFileTable.setListData(remoteList);	
++System.out.println("refreshRemoteLocation '" + remoteLocation.getText() + "'");	// runge/x11vnc
+ 		viewer.rfb.readServerDirectory(remoteLocation.getText());
+ 	 }
+ 	 
++// begin runge/x11vnc
++	 public void setSavedLocations() {
++		saveLocalDirectory = currentLocalDirectory;
++		saveLocalDirectoryTime = System.currentTimeMillis();
++		saveLocalDirectoryCount = 0;
++
++		if (remoteLocation != null) {
++			saveRemoteDirectory = remoteLocation.getText();
++System.out.println("RemoteSave '" + saveRemoteDirectory + "'");
++		}
++		saveRemoteDirectoryTime = System.currentTimeMillis();
++		saveRemoteDirectoryCount = 0;
++	 }
++
++	private File saveLocalHack(File dir) {
++		saveLocalDirectoryCount++;
++System.out.println("L " + saveLocalDirectoryCount + " dt: " + (System.currentTimeMillis() - saveLocalDirectoryTime) + " - " + saveLocalDirectory);
++		if (System.currentTimeMillis() > saveLocalDirectoryTime + 2000 || saveLocalDirectoryCount > 2) {
++			saveLocalDirectory = null;
++		}
++		if (saveLocalDirectory != null) {
++			currentLocalDirectory = saveLocalDirectory;
++			localLocation.setText(saveLocalDirectory.toString());
++			return saveLocalDirectory;
++		} else {
++			return dir;
++		}
++	}
++
++	private String saveRemoteHack(String indrive) {
++		saveRemoteDirectoryCount++;
++System.out.println("R " + saveRemoteDirectoryCount + " - " + saveRemoteDirectory);
++		if (saveRemoteDirectory != null && saveRemoteDirectoryCount > 1) {
++			saveRemoteDirectory = null;
++		}
++		if (saveRemoteDirectory != null) {
++			if (! saveRemoteDirectory.equals("")) {
++System.out.println("saveRemoteHack setText + refreshRemoteLocation '" + saveRemoteDirectory + "'");
++				return saveRemoteDirectory;
++			}
++		}
++		return indrive;
++	}
++// end runge/x11vnc
++
++
+ 	/*
+ 	 * Prints the list of drives on the remote directory and returns a String[].  
+ 	 * str takes as string like A:fC:lD:lE:lF:lG:cH:c
+@@ -185,6 +248,7 @@
+ 		stopButton.setVisible(true);
+ 		stopButton.setEnabled(true);
+ 		receiveButton.setEnabled(false);
++		viewButton.setEnabled(false);	// runge/x11vnc
+ 		remoteTopButton.setEnabled(false);
+ 		sendButton.setEnabled(false);
+ 		remoteFileTable.setEnabled(false);
+@@ -207,6 +271,7 @@
+ 		stopButton.setVisible(false);
+ 		stopButton.setEnabled(false);
+ 		receiveButton.setEnabled(true);
++		viewButton.setEnabled(true);	// runge/x11vnc
+ 		remoteTopButton.setEnabled(true);
+ 		sendButton.setEnabled(true);
+ 		remoteFileTable.setEnabled(true);
+@@ -405,6 +470,7 @@
+ 			buttonPanel = new javax.swing.JPanel();
+ 			buttonPanel.setLayout(null);
+ 			buttonPanel.add(getReceiveButton(), null);
++			buttonPanel.add(getViewButton(), null);	// runge/x11vnc
+ 			buttonPanel.add(getNewFolderButton(), null);
+ 			buttonPanel.add(getCloseButton(), null);
+ 			buttonPanel.add(getDeleteButton(), null);
+@@ -422,7 +488,7 @@
+ 	private javax.swing.JButton getSendButton() {
+ 		if (sendButton == null) {
+ 			sendButton = new javax.swing.JButton();
+-			sendButton.setBounds(20, 30, 97, 25);
++			sendButton.setBounds(15, 30, 107, 25);	// runge/x11vnc
+ 			sendButton.setText("Send >>");
+ 			sendButton.setName("sendButton");
+ 			sendButton.addActionListener(this);
+@@ -438,7 +504,7 @@
+ 	private javax.swing.JButton getReceiveButton() {
+ 		if (receiveButton == null) {
+ 			receiveButton = new javax.swing.JButton();
+-			receiveButton.setBounds(20, 60, 97, 25);
++			receiveButton.setBounds(15, 60, 107, 25);	// runge/x11vnc
+ 			receiveButton.setText("<< Receive");
+ 			receiveButton.setName("receiveButton");
+ 			receiveButton.addActionListener(this);
+@@ -453,7 +519,7 @@
+ 	private javax.swing.JButton getDeleteButton() {
+ 		if (deleteButton == null) {
+ 			deleteButton = new javax.swing.JButton();
+-			deleteButton.setBounds(20, 110, 97, 25);
++			deleteButton.setBounds(15, 110, 107, 25);	// runge/x11vnc
+ 			deleteButton.setText("Delete File");
+ 			deleteButton.setName("deleteButton");
+ 			deleteButton.addActionListener(this);
+@@ -468,7 +534,7 @@
+ 	private javax.swing.JButton getNewFolderButton() {
+ 		if (newFolderButton == null) {
+ 			newFolderButton = new javax.swing.JButton();
+-			newFolderButton.setBounds(20, 140, 97, 25);
++			newFolderButton.setBounds(15, 140, 107, 25);	// runge/x11vnc
+ 			newFolderButton.setText("New Folder");
+ 			newFolderButton.setName("newFolderButton");
+ 			newFolderButton.addActionListener(this);
+@@ -476,6 +542,24 @@
+ 		return newFolderButton;
+ 	}
+ 	
++// begin runge/x11vnc
++	/**
++	 * This method initializes viewButton
++	 * 
++	 * @return javax.swing.JButton
++	 */
++	private javax.swing.JButton getViewButton() {
++		if (viewButton == null) {
++			viewButton = new javax.swing.JButton();
++			viewButton.setBounds(15, 170, 107, 25);
++			viewButton.setText("View File");
++			viewButton.setName("viewButton");
++			viewButton.addActionListener(this);
++		}
++		return viewButton;
++	}
++// end   runge/x11vnc
++
+ 	/**
+ 	 * This method initializes stopButton
+ 	 * 
+@@ -486,7 +570,7 @@
+ 		if (stopButton == null)
+ 		{
+ 			stopButton = new javax.swing.JButton();
+-			stopButton.setBounds(20, 200, 97, 25);
++			stopButton.setBounds(15, 200, 107, 25);	// runge/x11vnc
+ 			stopButton.setText("Stop");
+ 			stopButton.setName("stopButton");
+ 			stopButton.addActionListener(this);
+@@ -503,7 +587,7 @@
+ 	private javax.swing.JButton getCloseButton() {
+ 		if (closeButton == null) {
+ 			closeButton = new javax.swing.JButton();
+-			closeButton.setBounds(20, 325, 97, 25);
++			closeButton.setBounds(15, 325, 107, 25);	// runge/x11vnc
+ 			closeButton.setText("Close");
+ 			closeButton.setName("closeButton");
+ 			closeButton.addActionListener(this);
+@@ -829,12 +913,19 @@
+ 		{
+ 			doReceive();
+ 		}
++// begin runge/x11vnc
++		else if (evt.getSource() == viewButton)
++		{
++			doView();
++		}
++// end   runge/x11vnc
+ 		else if (evt.getSource() == localDrivesComboBox)
+ 		{
+ 			changeLocalDrive();
+ 		}
+ 		else if (evt.getSource() == remoteDrivesComboBox)
+ 		{ 
++System.out.println("remoteDrivesComboBox");	// runge/x11vnc
+ 			changeRemoteDrive();
+ 			remoteList.clear();
+ 			remoteFileTable.setListData(remoteList);
+@@ -845,6 +936,7 @@
+ 		}
+ 		else if (evt.getSource() == remoteTopButton)
+ 		{
++System.out.println("remoteTopButton");	// runge/x11vnc
+ 		  	changeRemoteDrive();
+ 		}
+ 		else if(evt.getSource() == deleteButton)
+@@ -979,6 +1071,56 @@
+ 		viewer.rfb.requestRemoteFile(remoteFileName,localDestinationPath);
+ 	}
+ 
++// begin runge/x11vnc
++	private void doView()
++	{
++		System.out.println("View Button Pressed");
++
++		if (selectedTable == null) {
++			return;
++		}
++		if (selectedTable.equals("remote")) {
++			viewRemote();
++		} else if (selectedTable.equals("local")) {
++			viewLocal();
++		}
++	}
++
++	private File doReceiveTmp()
++	{
++
++		if (remoteFileTable == null) {
++			return null;
++		}
++		String sFileName = ((String) this.remoteFileTable.getSelectedValue());
++		if (sFileName == null) {
++			return null;
++		}
++		
++		// sf@2004 - Directory can't be transfered
++		if (sFileName.substring(0, 2).equals(" [") && sFileName.substring((sFileName.length() - 1), sFileName.length()).equals("]"))
++		{
++			return null;
++		}
++		
++		File tmp = null;
++		try {
++			tmp = File.createTempFile("ULTRAFTP", ".txt");
++		} catch (Exception e) {
++			return null;
++		}
++		
++		//updateHistory("Downloaded " + localSelection.toString());
++		String remoteFileName = this.remoteLocation.getText();
++		remoteFileName+= ((String) this.remoteFileTable.getSelectedValue()).substring(1);
++		
++		String localDestinationPath = tmp.getAbsolutePath();
++		viewer.rfb.requestRemoteFile(remoteFileName,localDestinationPath);
++		System.out.println("ReceiveTmp: " + localDestinationPath);
++		return tmp;
++	}
++// end   runge/x11vnc
++
+ 	private void doSend()
+ 	{
+ 		System.out.println("Send Button Pressed");
+@@ -1035,8 +1177,11 @@
+ 	
+ 		if (!updateDriveList) {
+ 			String drive =	remoteDrivesComboBox.getSelectedItem().toString().substring(0,1)+ ":\\";
++System.out.println("changeRemoteDrive-A " + drive);	// runge/x11vnc
++			drive = saveRemoteHack(drive);
+ 			viewer.rfb.readServerDirectory(drive);
+ 			remoteLocation.setText(drive);
++System.out.println("changeRemoteDrive-B " + drive);	// runge/x11vnc
+ 		}
+ 		remoteList.clear();
+ 		remoteFileTable.setListData(remoteList);
+@@ -1048,6 +1193,7 @@
+ 	private void changeLocalDrive()
+ 	{
+ 		File currentDrive = new File(localDrivesComboBox.getSelectedItem().toString());
++System.out.println("changeLocalDrive " + currentDrive.toString());	// runge/x11vnc
+ 		if(currentDrive.canRead())
+ 		{
+ 			localSelection = null;
+@@ -1060,6 +1206,7 @@
+ 			localStatus.setText("WARNING: Drive " + localDrivesComboBox.getSelectedItem().toString());
+ 			connectionStatus.setText(" > WARNING - Local Drive unavailable (possibly restricted access or media not present)");
+ 		}
++
+ 	}
+ 	/**
+ 	 * Determines which FileTable was double-clicked and updates the table
+@@ -1101,7 +1248,7 @@
+ 		String name = (remoteFileTable.getSelectedValue().toString()).substring(1);
+ 		if( !name.substring(0, 2).equals(" ["))	
+ 			remoteSelection = remoteLocation.getText() + name.substring(0, name.length());
+-		
++
+ 	}
+ 
+ 	/*
+@@ -1115,10 +1262,38 @@
+ 		localFileTable.setBackground(new Color(255, 255, 255));
+ 		File currentSelection = new File(currentLocalDirectory, getTrimmedSelection());
+ 		
+-		if(currentSelection.isFile()) 
++// begin runge/x11vnc
++		// localSelection = currentSelection.getAbsoluteFile();
++		if(currentSelection.isFile()) {
+ 			localSelection = currentSelection.getAbsoluteFile();
++			localCurrentIsDir = false;
++		} else {
++			localCurrentIsDir = true;
++		}
++// end   runge/x11vnc
+ 
+ 	}
++
++// begin runge/x11vnc
++	private void viewRemote() {
++		File tmp = doReceiveTmp();
++		if (tmp == null) {
++			return;
++		}
++		TextViewer tv = new TextViewer("Remote: " + remoteSelection, tmp, true);
++	}
++	private void viewLocal() {
++		if (localSelection == null) {
++			return;
++		}
++		if (localCurrentIsDir) {
++			return;
++		}
++		File loc = new File(localSelection.toString());
++		TextViewer tv = new TextViewer("Local: " + localSelection.toString(), loc, false);
++	}
++// end runge/x11vnc
++
+ 	/**
+ 	 * Updates the Remote File Table based on selection.  Called from mouseClicked handler
+ 	 */
+@@ -1149,6 +1324,7 @@
+ 			remoteSelection = remoteLocation.getText() + name.substring(0, name.length());
+ 			drive = remoteLocation.getText();
+ 			// ??
++			viewRemote();	// runge/x11vnc
+ 		}
+ 		else
+ 		{ 
+@@ -1163,6 +1339,7 @@
+ 		}	
+ 		//remoteLocation.setText(drive);	
+ 	}
++
+ 	/**
+ 	 * Updates the Local File Table based on selection. Called from MouseClicked handler
+ 	 */
+@@ -1188,6 +1365,7 @@
+ 		else if (currentSelection.isFile())
+ 		{
+ 			localSelection = currentSelection.getAbsoluteFile();
++			viewLocal();	// runge/x11vnc
+ 		}
+ 		else if (currentSelection.isDirectory())
+ 		{
+@@ -1247,9 +1425,20 @@
+ 	 */
+ 	public void changeLocalDirectory(File dir)
+ 	{
++			dir = saveLocalHack(dir);	// runge/x11vnc
++
+ 			currentLocalDirectory = dir;	// Updates Global
+ 			File allFiles[] = dir.listFiles();	// Reads files
+ 			String[] contents = dir.list();
++// begin runge/x11vnc
++System.out.println("changeLocalDirectory: " + dir.toString());
++			if (contents != null) {
++				java.util.Arrays.sort(contents, String.CASE_INSENSITIVE_ORDER);
++				for (int i = 0; i < contents.length; i++) {
++					allFiles[i] = new File(dir, contents[i]);
++				}
++			}
++// end runge/x11vnc
+ 
+ 			localList.clear();
+ 			localList.addElement(" [..]");
+@@ -1296,3 +1485,135 @@
+ 	}
+ 
+ } //  @jve:visual-info  decl-index=0 visual-constraint="10,10"
++
++// begin runge/x11vnc
++class TextViewer extends JFrame implements ActionListener {
++
++	JTextArea textArea = new JTextArea(35, 80);
++	File file = null;
++	JButton refreshButton;
++	JButton dismissButton;
++	Timer tim = null;
++	int rcnt = 0;
++	int tms = 250;
++	boolean delete_it = false;
++
++	public TextViewer(String s, File f, boolean d) {
++
++		delete_it = d;
++		file = f;
++
++		JScrollPane scrollPane = new JScrollPane(textArea,
++		    JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
++		    JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
++
++		textArea.setEditable(false);
++		textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
++
++
++		refreshButton = new JButton();
++		refreshButton.setText("Reload");
++		refreshButton.setName("refreshButton");
++		refreshButton.addActionListener(this);
++
++		dismissButton = new JButton();
++		dismissButton.setText("Dismiss");
++		dismissButton.setName("dismissButton");
++		dismissButton.addActionListener(this);
++
++		JPanel buttons = new JPanel();
++		buttons.setLayout(new BorderLayout());
++		buttons.add(refreshButton, BorderLayout.WEST);
++		buttons.add(dismissButton, BorderLayout.EAST);
++
++		JPanel content = new JPanel();
++		content.setLayout(new BorderLayout());
++		content.add(scrollPane, BorderLayout.CENTER);
++		content.add(buttons, BorderLayout.SOUTH);
++
++		ActionListener tsk = new ActionListener() {
++			public void actionPerformed(ActionEvent evt) {
++				// System.out.println("tsk");
++				refresh();
++			}
++		};
++		tim = new Timer(tms, tsk);
++		tim.start();
++
++		this.setContentPane(content);
++		this.setTitle("TextViewer - " + s);
++		this.pack();
++		this.setVisible(true);
++	}
++
++	private void refresh() {
++
++		rcnt++;
++		if (rcnt * tms > 3000 && tim != null) {
++			tim.stop();
++			tim = null;
++		}
++		BufferedReader input = null;
++		StringBuffer contents = new StringBuffer();
++		try {
++			if (input == null) {
++				input = new BufferedReader(new FileReader(file));
++			}
++			String line = null;
++			int i = 0;
++			while (( line = input.readLine()) != null) {
++				if (i == 0) {
++					// System.out.println("read");
++				}
++				i++;
++				contents.append(line);
++				contents.append(System.getProperty("line.separator"));
++			}
++		} catch (Exception e) {
++			;
++		} finally {
++			try {
++				if (input != null) {
++					input.close();
++					input = null;
++				}
++			} catch (Exception e) {
++				;
++			}
++		}
++
++		textArea.setText(contents.toString());
++		textArea.setCaretPosition(0);
++	}
++
++	public void actionPerformed(ActionEvent evt) {
++
++		if (evt.getSource() == refreshButton) {
++			refresh();
++		}
++		if (evt.getSource() == dismissButton) {
++			cleanse();
++			this.dispose();
++		}
++	}
++
++	private void cleanse() {
++		if (delete_it && file != null) {
++			try {
++				file.delete();
++				file = null;
++			} catch (Exception e) {
++				;
++			}
++		}
++	}
++
++	protected void finalize() throws Throwable {
++		try {
++			cleanse();
++		} finally {
++			super.finalize();
++		}
++	}
++}
++// end runge/x11vnc
+diff -Naur JavaViewer.orig/OptionsFrame.java JavaViewer/OptionsFrame.java
+--- JavaViewer.orig/OptionsFrame.java	2005-11-21 18:50:16.000000000 -0500
++++ JavaViewer/OptionsFrame.java	2007-05-13 22:18:30.000000000 -0400
+@@ -144,7 +144,10 @@
+     choices[jpegQualityIndex].select("6");
+     choices[cursorUpdatesIndex].select("Enable");
+     choices[useCopyRectIndex].select("Yes");
+-    choices[eightBitColorsIndex].select("64");
++// begin runge/x11vnc
++//    choices[eightBitColorsIndex].select("64");
++    choices[eightBitColorsIndex].select("Full");
++// end runge/x11vnc
+     choices[mouseButtonIndex].select("Normal");
+     choices[viewOnlyIndex].select("No");
+     choices[shareDesktopIndex].select("Yes");
+diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
+--- JavaViewer.orig/RfbProto.java	2006-05-24 15:14:40.000000000 -0400
++++ JavaViewer/RfbProto.java	2007-05-16 15:57:07.000000000 -0400
+@@ -199,6 +199,10 @@
+ 	// playback.
+ 	int numUpdatesInSession;
+ 
++// begin runge/x11vnc
++	int readServerDriveListCnt = -1;
++	long readServerDriveListTime = 0;
++// end   runge/x11vnc
+ 	//
+ 	// Constructor. Make TCP connection to RFB server.
+ 	//
+@@ -207,7 +211,27 @@
+ 		viewer = v;
+ 		host = h;
+ 		port = p;
+-		sock = new Socket(host, port);
++// begin runge/x11vnc
++//		sock = new Socket(host, port);
++    if (! viewer.disableSSL) {
++       System.out.println("new SSLSocketToMe");
++       SSLSocketToMe ssl;
++       try {
++               ssl = new SSLSocketToMe(host, port, v);
++       } catch (Exception e) {
++               throw new IOException(e.getMessage());
++       }
++
++       try {
++               sock = ssl.connectSock();
++       } catch (Exception es) {
++               throw new IOException(es.getMessage());
++       }
++    } else {
++       sock = new Socket(host, port);
++    }
++// end runge/x11vnc
++
+ 		is =
+ 			new DataInputStream(
+ 				new BufferedInputStream(sock.getInputStream(), 16384));
+@@ -1263,11 +1287,47 @@
+ 			|| dwFileAttributes == 369623040)
+ 		{
+ 			fileName = " [" + fileName + "]";
+-			remoteDirsList.add(fileName); // sf@2004
++// begin runge/x11vnc
++//			remoteDirsList.add(fileName); // sf@2004
++			int i = -1;
++			String t1 = fileName.toLowerCase();
++			for (int j = 0; j < remoteDirsList.size(); j++) {
++				String t = (String) remoteDirsList.get(j);
++				String t2 = t.toLowerCase();
++				if (t1.compareTo(t2) < 0) {
++					i = j;
++					break;
++				}
++			}
++			if (i >= 0) {
++				remoteDirsList.add(i, fileName);
++			} else {
++				remoteDirsList.add(fileName);
++			}
++// end runge/x11vnc
+ 		}
+ 		else
+ 		{
+-			remoteFilesList.add(" " + fileName); // sf@2004
++// begin runge/x11vnc
++//			remoteFilesList.add(" " + fileName); // sf@2004
++	
++			fileName = " " + fileName;
++			int i = -1;
++			String t1 = fileName.toLowerCase();
++			for (int j = 0; j < remoteFilesList.size(); j++) {
++				String t = (String) remoteFilesList.get(j);
++				String t2 = t.toLowerCase();
++				if (t1.compareTo(t2) < 0) {
++					i = j;
++					break;
++				}
++			}
++			if (i >= 0) {
++				remoteFilesList.add(i, fileName);
++			} else {
++				remoteFilesList.add(fileName);
++			}
++// end runge/x11vnc
+ 		}
+ 	
+ 		// a.add(fileName);
+@@ -1289,6 +1349,16 @@
+ 		remoteDirsList.clear();
+ 		remoteFilesList.clear();
+ 		
++// begin runge/x11vnc
++		// Hack for double listing at startup... probably libvncserver bug..
++		readServerDriveListCnt++;
++		if (readServerDriveListCnt == 2) {
++			if (System.currentTimeMillis() - readServerDriveListTime < 1500)  {
++System.out.println("readServerDriveListCnt skip " + readServerDriveListCnt);
++				return;
++			}
++		}
++// end runge/x11vnc
+ 		viewer.ftp.printDirectory(a);
+ 	}
+ 
+@@ -1312,6 +1382,10 @@
+ 												0,
+ 												0,
+ 												null);
++// begin runge/x11vnc
++			readServerDriveListCnt = 0;
++			readServerDriveListTime = System.currentTimeMillis();
++// end   runge/x11vnc
+ 		}
+ 		catch (IOException e)
+ 		{
+diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
+--- JavaViewer.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
++++ JavaViewer/SSLSocketToMe.java	2007-04-29 20:40:35.000000000 -0400
 @@ -0,0 +1,1421 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
@@ -1496,32 +2114,143 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		}
 +	}
 +}
-diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
---- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2007-03-31 23:35:26.000000000 -0400
-@@ -88,6 +88,17 @@
-   int deferCursorUpdates;
-   int deferUpdateRequests;
+diff -Naur JavaViewer.orig/VncCanvas.java JavaViewer/VncCanvas.java
+--- JavaViewer.orig/VncCanvas.java	2005-11-21 18:50:18.000000000 -0500
++++ JavaViewer/VncCanvas.java	2007-05-16 15:57:36.000000000 -0400
+@@ -27,6 +27,9 @@
+ import java.lang.*;
+ import java.util.zip.*;
  
-+  boolean disableSSL;
-+  boolean GET;
-+  String CONNECT;
-+  String urlPrefix;
-+  String httpsPort;
-+  String oneTimeKey;
-+  boolean forceProxy;
-+  boolean ignoreProxy;
-+  boolean trustAllVncCerts;
-+  boolean trustUrlVncCert;
++// begin runge/x11vnc
++import java.util.Collections;
++// end runge/x11vnc
+ 
+ //
+ // VncCanvas is a subclass of Canvas which draws a VNC desktop on it.
+@@ -85,6 +88,22 @@
+ 		
+ 		cm24 = new DirectColorModel(24, 0xFF0000, 0x00FF00, 0x0000FF);
+ 
++// begin runge/x11vnc
++// kludge to not show any Java cursor in the canvas since we are
++// showing the soft cursor (should be a user setting...)
++Cursor dot = Toolkit.getDefaultToolkit().createCustomCursor(
++    Toolkit.getDefaultToolkit().createImage(new byte[4]), new Point(0,0),
++    "dot");
++this.setCursor(dot);
 +
-   // Reference to this applet for inter-applet communication.
-   public static java.applet.Applet refApplet;
- 
-@@ -626,6 +637,68 @@
- 
-     // SocketFactory.
-     socketFactory = readParameter("SocketFactory", false);
++// while we are at it... get rid of the keyboard traversals that
++// make it so we can't type a Tab character:
++this.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS,
++    Collections.EMPTY_SET);
++this.setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS,
++    Collections.EMPTY_SET);
++// end runge/x11vnc
 +
+ 		colors = new Color[256];
+ 		// sf@2005 - Now Default
+ 		for (int i = 0; i < 256; i++)
+@@ -237,6 +256,9 @@
+ 		}
+ 		else 
+ 		{
++// begin runge/x11vnc
++			viewer.options.oldEightBitColors = viewer.options.eightBitColors;
++// end runge/x11vnc
+ 			rfb.writeSetPixelFormat(
+ 				32,
+ 				24,
+@@ -1532,9 +1554,14 @@
+ 							else
+ 							{
+ 								result =
+-									0xFF000000 | (pixBuf[i * 4 + 1] & 0xFF)
+-										<< 16 | (pixBuf[i * 4 + 2] & 0xFF)
+-										<< 8 | (pixBuf[i * 4 + 3] & 0xFF);
++// begin runge/x11vnc
++//									0xFF000000 | (pixBuf[i * 4 + 1] & 0xFF)
++//										<< 16 | (pixBuf[i * 4 + 2] & 0xFF)
++//										<< 8 | (pixBuf[i * 4 + 3] & 0xFF);
++									0xFF000000 | (pixBuf[i * 4 + 2] & 0xFF)
++										<< 16 | (pixBuf[i * 4 + 1] & 0xFF)
++										<< 8 | (pixBuf[i * 4 + 0] & 0xFF);
++// end runge/x11vnc
+ 							}
+ 						} else {
+ 							result = 0; // Transparent pixel
+@@ -1565,9 +1592,14 @@
+ 						else
+ 						{
+ 							result =
+-								0xFF000000 | (pixBuf[i * 4 + 1] & 0xFF)
+-									<< 16 | (pixBuf[i * 4 + 2] & 0xFF)
+-									<< 8 | (pixBuf[i * 4 + 3] & 0xFF);
++// begin runge/x11vnc
++//								0xFF000000 | (pixBuf[i * 4 + 1] & 0xFF)
++//									<< 16 | (pixBuf[i * 4 + 2] & 0xFF)
++//									<< 8 | (pixBuf[i * 4 + 3] & 0xFF);
++								0xFF000000 | (pixBuf[i * 4 + 2] & 0xFF)
++									<< 16 | (pixBuf[i * 4 + 1] & 0xFF)
++									<< 8 | (pixBuf[i * 4 + 0] & 0xFF);
++// end runge/x11vnc
+ 						}
+ 					} else {
+ 						result = 0; // Transparent pixel
+diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
+--- JavaViewer.orig/VncViewer.java	2006-05-24 15:14:40.000000000 -0400
++++ JavaViewer/VncViewer.java	2007-05-15 15:09:10.000000000 -0400
+@@ -115,6 +115,22 @@
+   int i;
+   // mslogon support 2 end
+ 
++// begin runge/x11vnc
++boolean disableSSL;
++boolean GET;
++String CONNECT;
++String urlPrefix;
++String httpsPort;
++String oneTimeKey;
++boolean forceProxy;
++boolean ignoreProxy;
++boolean trustAllVncCerts;
++boolean trustUrlVncCert;
++
++boolean ignoreMSLogonCheck;
++// end runge/x11vnc
++
++
+   //
+   // init()
+   //
+@@ -336,7 +352,12 @@
+     //
+ 
+     
+-    prologueDetectAuthProtocol() ;
++// begin runge/x11vnc
++//  prologueDetectAuthProtocol() ;
++    if (ignoreMSLogonCheck == false) {
++        prologueDetectAuthProtocol() ;
++    }
++// end runge/x11vnc
+ 
+     authenticator = new AuthPanel(mslogon);
+     
+@@ -435,7 +456,7 @@
+ 
+     rfb.readVersionMsg();
+ 
+-    System.out.println("RFB server supports protocol version " +
++    System.out.println("RFB server supports protocol version: " +
+ 		       rfb.serverMajor + "." + rfb.serverMinor);
+ 
+     rfb.writeVersionMsg();
+@@ -804,6 +825,75 @@
+     deferScreenUpdates = readIntParameter("Defer screen updates", 20);
+     deferCursorUpdates = readIntParameter("Defer cursor updates", 10);
+     deferUpdateRequests = readIntParameter("Defer update requests", 50);
++
++// begin runge/x11vnc
 +    // SSL
 +    disableSSL = false;
 +    str = readParameter("DisableSSL", false);
@@ -1583,6 +2312,12 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +	trustUrlVncCert = true;
 +    }
++    ignoreMSLogonCheck = false;
++    str = readParameter("ignoreMSLogonCheck", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	ignoreMSLogonCheck = true;
++    }
++// end runge/x11vnc
    }
  
    public String readParameter(String name, boolean required) {

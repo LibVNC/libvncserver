@@ -69,4 +69,18 @@ Running Java SSL VncViewer from the command line:
 	java -cp ./VncViewer.jar VncViewer HOST <thehost> PORT <theport>
 
 	substitute <thehost> and <theport> with the actual values.
+	You can add any other parameters, e.g.: ignoreProxy yes
 
+---------------------------------------------------------------
+UltraVNC:
+
+The UltraVNC java viewer has also been patched to support SSL.  Various
+bugs in the UltraVNC java viewer were also fixed.  This viewer can be
+useful because is support UltraVNC filetransfer, and so it works on
+Unix, etc.
+
+UltraViewerSSL.jar
+SignedUltraViewerSSL.jar
+ultra.vnc
+ultraproxy.vnc
+ultravnc-102-JavaViewer-ssl-etc.patch
