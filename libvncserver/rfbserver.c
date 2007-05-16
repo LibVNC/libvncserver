@@ -609,7 +609,7 @@ rfbProcessClientProtocolVersion(rfbClientPtr cl)
     if (sscanf(pv,rfbProtocolVersionFormat,&major_,&minor_) != 2) {
         char name[1024]; 
 	if(sscanf(pv,"RFB %03d.%03d %1023s\n",&major_,&minor_,name) != 3) {
-	    rfbErr("rfbProcessClientProtocolVersion: not a valid RFB client\n");
+	    rfbErr("rfbProcessClientProtocolVersion: not a valid RFB client: %s\n", pv);
 	    rfbCloseClient(cl);
 	    return;
 	}
@@ -1083,6 +1083,14 @@ rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer)
     return TRUE;
 }
 
+#define FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN(msg, cl, ret) \
+	if ((cl->screen->getFileTransferPermission != NULL \
+	    && cl->screen->getFileTransferPermission(cl) != TRUE) \
+	    || cl->screen->permitFileTransfer != TRUE) { \
+		rfbLog("%sUltra File Transfer is disabled, dropping client: %s\n", msg, cl->host); \
+		rfbCloseClient(cl); \
+		return ret; \
+	}
 
 rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, char *buffer)
 {
@@ -1094,6 +1102,7 @@ rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t
     ft.size         = Swap32IfLE(size);
     ft.length       = Swap32IfLE(length);
     
+    FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN("", cl, FALSE);
     /*
     rfbLog("rfbSendFileTransferMessage( %dtype, %dparam, %dsize, %dlen, %p)\n", contentType, contentParam, size, length, buffer);
     */
@@ -1154,6 +1163,9 @@ rfbBool rfbFilenameTranslate2UNIX(rfbClientPtr cl, char *path, char *unixPath)
 {
     int x;
     char *home=NULL;
+
+    FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN("", cl, FALSE);
+
     /* C: */
     if (path[0]=='C' && path[1]==':')
       strcpy(unixPath, &path[2]);
@@ -1177,6 +1189,9 @@ rfbBool rfbFilenameTranslate2UNIX(rfbClientPtr cl, char *path, char *unixPath)
 rfbBool rfbFilenameTranslate2DOS(rfbClientPtr cl, char *unixPath, char *path)
 {
     int x;
+
+    FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN("", cl, FALSE);
+
     sprintf(path,"C:%s", unixPath);
     for (x=2;x<strlen(path);x++)
         if (path[x]=='/') path[x]='\\';
@@ -1193,12 +1208,13 @@ rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer)
     DIR *dirp=NULL;
     struct dirent *direntp=NULL;
 
+    FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN("", cl, FALSE);
+
     /* Client thinks we are Winblows */
     rfbFilenameTranslate2UNIX(cl, buffer, path);
 
-//    /*
     rfbLog("rfbProcessFileTransfer() rfbDirContentRequest: rfbRDirContent: \"%s\"->\"%s\"\n",buffer, path);
-//    */
+
     dirp=opendir(path);
     if (dirp==NULL)
         return rfbSendFileTransferMessage(cl, rfbDirPacket, rfbADirectory, 0, 0, NULL);
@@ -1252,6 +1268,8 @@ char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length)
 {
     char *buffer=NULL;
     int   n=0;
+
+    FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN("", cl, NULL);
     /*
     rfbLog("rfbProcessFileTransferReadBuffer(%dlen)\n", length);
     */
@@ -1288,6 +1306,16 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
     unsigned long nMaxCompSize = sizeof(compBuf);
     int nRetC = 0;
 #endif
+
+    /*
+     * Don't close the client if we get into this one because 
+     * it is called from many places to service file transfers.
+     */
+    if ((cl->screen->getFileTransferPermission != NULL
+        && cl->screen->getFileTransferPermission(cl) != TRUE)
+        || cl->screen->permitFileTransfer != TRUE) {
+		return TRUE;
+    }
 
     /* If not sending, or no file open...   Return as if we sent something! */
     if ((cl->fileTransfer.fd!=-1) && (cl->fileTransfer.sending==1))
@@ -1372,6 +1400,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
     unsigned long nRawBytes = sz_rfbBlockSize;
     int nRet = 0;
 #endif
+
+    FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN("", cl, FALSE);
         
     /*
     rfbLog("rfbProcessFileTransfer(%dtype, %dparam, %dsize, %dlen)\n", contentType, contentParam, size, length);
