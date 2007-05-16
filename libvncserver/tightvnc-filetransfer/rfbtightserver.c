@@ -59,6 +59,7 @@ static void
 rfbVncAuthSendChallenge(rfbClientPtr cl)
 {
 	
+    rfbLog("tightvnc-filetransfer/rfbVncAuthSendChallenge\n");
     /* 4 byte header is alreay sent. Which is rfbSecTypeVncAuth (same as rfbVncAuth). Just send the challenge. */
     rfbRandomBytes(cl->authChallenge);
     if (rfbWriteExact(cl, (char *)cl->authChallenge, CHALLENGESIZE) < 0) {
@@ -83,6 +84,8 @@ rfbProcessClientAuthType(rfbClientPtr cl)
     uint32_t auth_type;
     int n, i;
     rfbTightClientPtr rtcp = rfbGetTightClientData(cl);
+
+    rfbLog("tightvnc-filetransfer/rfbProcessClientAuthType\n");
 
     if(rtcp == NULL)
 	return;
@@ -155,6 +158,8 @@ rfbSendAuthCaps(rfbClientPtr cl)
     int count = 0;
     rfbTightClientPtr rtcp = rfbGetTightClientData(cl);
 
+    rfbLog("tightvnc-filetransfer/rfbSendAuthCaps\n");
+
     if(rtcp == NULL)
 	return;
 
@@ -198,6 +203,8 @@ rfbSendTunnelingCaps(rfbClientPtr cl)
 {
     rfbTunnelingCapsMsg caps;
     uint32_t nTypes = 0;		/* we don't support tunneling yet */
+
+    rfbLog("tightvnc-filetransfer/rfbSendTunnelingCaps\n");
 
     caps.nTunnelTypes = Swap32IfLE(nTypes);
     if (rfbWriteExact(cl, (char *)&caps, sz_rfbTunnelingCapsMsg) < 0) {
@@ -244,6 +251,8 @@ rfbSendInteractionCaps(rfbClientPtr cl)
     intr_caps.nClientMessageTypes = Swap16IfLE(N_CMSG_CAPS);
     intr_caps.nEncodingTypes = Swap16IfLE(N_ENC_CAPS);
     intr_caps.pad = 0;
+
+    rfbLog("tightvnc-filetransfer/rfbSendInteractionCaps\n");
 
     /* Supported server->client message types. */
     /* For file transfer support: */
@@ -337,7 +346,7 @@ handleMessage(rfbClientPtr cl,
 {
 	rfbTightClientPtr data;
 
-	rfbLog("%s message received\n", messageName);
+	rfbLog("tightvnc-filetransfer: %s message received\n", messageName);
 
 	if((IsFileTransferEnabled() == FALSE) || ( cl->viewOnly == TRUE)) {
 		rfbCloseClient(cl);
@@ -425,6 +434,8 @@ rfbTightUsage(void) {
 int
 rfbTightProcessArg(int argc, char *argv[]) {
 
+    rfbLog("tightvnc-filetransfer/rfbTightProcessArg\n");
+
     InitFileTransfer();
 
     if(argc<1)
@@ -452,6 +463,8 @@ rfbTightProcessArg(int argc, char *argv[]) {
   */
 void
 rfbHandleSecTypeTight(rfbClientPtr cl) {
+
+    rfbLog("tightvnc-filetransfer/rfbHandleSecTypeTight\n");
 
     rfbTightClientPtr rtcp = (rfbTightClientPtr) malloc(sizeof(rfbTightClientRec));
 

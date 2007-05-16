@@ -70,6 +70,8 @@ InitFileTransfer()
 
 	if(fileTransferInitted)
 		return;
+
+	rfbLog("tightvnc-filetransfer/InitFileTransfer\n");
 	
 	memset(ftproot, 0, sizeof(ftproot));
 	
@@ -97,6 +99,8 @@ SetFtpRoot(char* path)
 {
 	struct stat stat_buf;
 	DIR* dir = NULL;
+
+	rfbLog("tightvnc-filetransfer/SetFtpRoot\n");
 	
 	if((path == NULL) || (strlen(path) == 0) || (strlen(path) > (PATH_MAX - 1))) {
 		rfbLog("File [%s]: Method [%s]: parameter passed is improper, ftproot"
