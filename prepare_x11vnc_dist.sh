@@ -106,7 +106,7 @@ cp classes/ssl/Makefile.am classes/ssl/Makefile.am.LibVNCServer
 sed -e 's/EXTRA_DIST=/EXTRA_DIST=tightvnc-1.3dev7_javasrc-vncviewer-ssl.patch tightvnc-1.3dev7_javasrc-vncviewer-cursor-colors+no-tab-traversal.patch /' \
 	classes/ssl/Makefile.am.LibVNCServer > classes/ssl/Makefile.am
 echo 'pkgdatadir = $(datadir)/@PACKAGE@/classes/ssl' >> classes/ssl/Makefile.am
-echo 'pkgdata_DATA=VncViewer.jar index.vnc SignedVncViewer.jar proxy.vnc README' >> classes/ssl/Makefile.am
+echo 'pkgdata_DATA=VncViewer.jar index.vnc SignedVncViewer.jar proxy.vnc README UltraViewerSSL.jar SignedUltraViewerSSL.jar ultra.vnc ultrasigned.vnc' >> classes/ssl/Makefile.am
 echo 'pkgdata_SCRIPTS=ss_vncviewer' >> classes/ssl/Makefile.am
 
 chmod 755 classes/ssl/ss_vncviewer
