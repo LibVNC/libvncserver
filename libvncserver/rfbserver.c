@@ -1310,10 +1310,11 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
     /*
      * Don't close the client if we get into this one because 
      * it is called from many places to service file transfers.
+     * Note that permitFileTransfer is checked first.
      */
-    if ((cl->screen->getFileTransferPermission != NULL
-        && cl->screen->getFileTransferPermission(cl) != TRUE)
-        || cl->screen->permitFileTransfer != TRUE) {
+    if (cl->screen->permitFileTransfer != TRUE ||
+       (cl->screen->getFileTransferPermission != NULL
+        && cl->screen->getFileTransferPermission(cl) != TRUE)) { 
 		return TRUE;
     }
 
