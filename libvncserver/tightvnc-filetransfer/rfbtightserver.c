@@ -464,9 +464,9 @@ rfbTightProcessArg(int argc, char *argv[]) {
 void
 rfbHandleSecTypeTight(rfbClientPtr cl) {
 
-    rfbLog("tightvnc-filetransfer/rfbHandleSecTypeTight\n");
-
     rfbTightClientPtr rtcp = (rfbTightClientPtr) malloc(sizeof(rfbTightClientRec));
+
+    rfbLog("tightvnc-filetransfer/rfbHandleSecTypeTight\n");
 
     if(rtcp == NULL) {
         /* Error condition close socket */
