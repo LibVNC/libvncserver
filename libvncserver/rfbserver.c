@@ -1092,6 +1092,8 @@ rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer)
 		return ret; \
 	}
 
+int DB = 1;
+
 rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, char *buffer)
 {
     rfbFileTransferMsg ft;
@@ -1213,7 +1215,7 @@ rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer)
     /* Client thinks we are Winblows */
     rfbFilenameTranslate2UNIX(cl, buffer, path);
 
-    rfbLog("rfbProcessFileTransfer() rfbDirContentRequest: rfbRDirContent: \"%s\"->\"%s\"\n",buffer, path);
+    if (DB) rfbLog("rfbProcessFileTransfer() rfbDirContentRequest: rfbRDirContent: \"%s\"->\"%s\"\n",buffer, path);
 
     dirp=opendir(path);
     if (dirp==NULL)
@@ -1482,8 +1484,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         cl->fileTransfer.fd=open(filename1, O_RDONLY, 0744);
 
         /*
-        rfbLog("rfbProcessFileTransfer() rfbFileTransferRequest(\"%s\"->\"%s\") Open: %s\n", buffer, filename1, (cl->fileTransfer.fd==-1?"Failed":"Success"));
         */
+        if (DB) rfbLog("rfbProcessFileTransfer() rfbFileTransferRequest(\"%s\"->\"%s\") Open: %s fd=%d\n", buffer, filename1, (cl->fileTransfer.fd==-1?"Failed":"Success"), cl->fileTransfer.fd);
         
         if (cl->fileTransfer.fd!=-1) {
             if (fstat(cl->fileTransfer.fd, &statbuf)!=0) {
@@ -1502,6 +1504,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
               strcat(buffer,",");
               strcat(buffer, timespec);
               length = strlen(buffer);
+              if (DB) rfbLog("rfbProcessFileTransfer() buffer is now: \"%s\"\n", buffer);
             }
         }
 
@@ -1595,8 +1598,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         /* TODO: Delta Transfer */
 
         cl->fileTransfer.fd=open(filename1, O_CREAT|O_WRONLY|O_TRUNC, 0744);
+        if (DB) rfbLog("rfbProcessFileTransfer() rfbFileTransferOffer(\"%s\"->\"%s\") %s %s fd=%d\n", buffer, filename1, (cl->fileTransfer.fd==-1?"Failed":"Success"), (cl->fileTransfer.fd==-1?strerror(errno):""), cl->fileTransfer.fd);
         /*
-        rfbLog("rfbProcessFileTransfer() rfbFileTransferOffer(\"%s\"->\"%s\") %s %s\n", buffer, filename1, (cl->fileTransfer.fd==-1?"Failed":"Success"), (cl->fileTransfer.fd==-1?strerror(errno):""));
         */
         
         /* File Size in bytes, 0xFFFFFFFF (-1) means error */
@@ -1644,8 +1647,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         break;
 
     case rfbEndOfFile:
+        if (DB) rfbLog("rfbProcessFileTransfer() rfbEndOfFile\n");
         /*
-        rfbLog("rfbProcessFileTransfer() rfbEndOfFile\n");
         */
         if (cl->fileTransfer.fd!=-1)
             close(cl->fileTransfer.fd);
@@ -1655,8 +1658,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         break;
 
     case rfbAbortFileTransfer:
+        if (DB) rfbLog("rfbProcessFileTransfer() rfbAbortFileTransfer\n");
         /*
-        rfbLog("rfbProcessFileTransfer() rfbAbortFileTransfer\n");
         */
         if (cl->fileTransfer.fd!=-1)
         {
@@ -1717,8 +1720,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         case rfbCDirCreate:  /* Client requests the creation of a directory */
             rfbFilenameTranslate2UNIX(cl, buffer, filename1);
             retval = mkdir(filename1, 0755);
+            if (DB) rfbLog("rfbProcessFileTransfer() rfbCommand: rfbCDirCreate(\"%s\"->\"%s\") %s\n", buffer, filename1, (retval==-1?"Failed":"Success"));
             /*
-            rfbLog("rfbProcessFileTransfer() rfbCommand: rfbCDirCreate(\"%s\"->\"%s\") %s\n", buffer, filename1, (retval==-1?"Failed":"Success"));
             */
             retval = rfbSendFileTransferMessage(cl, rfbCommandReturn, rfbADirCreate, retval, length, buffer);
             if (buffer!=NULL) free(buffer);
@@ -1745,8 +1748,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
                 rfbFilenameTranslate2UNIX(cl, buffer, filename1);
                 rfbFilenameTranslate2UNIX(cl, p+1,    filename2);
                 retval = rename(filename1,filename2);
+                if (DB) rfbLog("rfbProcessFileTransfer() rfbCommand: rfbCFileRename(\"%s\"->\"%s\" -->> \"%s\"->\"%s\") %s\n", buffer, filename1, p+1, filename2, (retval==-1?"Failed":"Success"));
                 /*
-                rfbLog("rfbProcessFileTransfer() rfbCommand: rfbCFileRename(\"%s\"->\"%s\" -->> \"%s\"->\"%s\") %s\n", buffer, filename1, p+1, filename2, (retval==-1?"Failed":"Success"));
                 */
                 /* Restore the buffer so the reply is good */
                 *p = '*';

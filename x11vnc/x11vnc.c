@@ -157,7 +157,7 @@ static int limit_shm(void);
 static void check_rcfile(int argc, char **argv);
 static void immediate_switch_user(int argc, char* argv[]);
 static void print_settings(int try_http, int bg, char *gui_str);
-static void check_loop_mode(int argc, char* argv[]);
+static void check_loop_mode(int argc, char* argv[], int force);
 
 
 static void check_cursor_changes(void) {
@@ -782,7 +782,7 @@ static void check_rcfile(int argc, char **argv) {
 	argv2[argc2++] = strdup(argv[0]);
 
 	if (! norc) {
-		char line[4096], parm[100], tmp[101];
+		char line[4096], parm[400], tmp[401];
 		char *buf, *tbuf;
 		struct stat sbuf;
 		int sz;
@@ -873,7 +873,7 @@ static void check_rcfile(int argc, char **argv) {
 				q++;
 			}
 
-			if (i >= 100) {
+			if (i >= 400) {
 				fprintf(stderr, "invalid rcfile line: %s/%s\n",
 				    p, buf);
 				exit(1);
@@ -884,10 +884,17 @@ static void check_rcfile(int argc, char **argv) {
 				exit(1);
 			}
 			if (parm[0] == '-') {
-				strncpy(tmp, parm, 100); 
+				strncpy(tmp, parm, 400); 
 			} else {
 				tmp[0] = '-';
-				strncpy(tmp+1, parm, 100); 
+				strncpy(tmp+1, parm, 400); 
+			}
+
+			if (strstr(tmp, "-loop") == tmp) {
+				if (! getenv("X11VNC_LOOP_MODE")) {
+					check_loop_mode(argc, argv, 1);
+					exit(0);
+				}
 			}
 
 			argv2[argc2++] = strdup(tmp);
@@ -1306,10 +1313,13 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 }
 
 
-static void check_loop_mode(int argc, char* argv[]) {
+static void check_loop_mode(int argc, char* argv[], int force) {
 	int i;
 	int loop_mode = 0, loop_sleep = 2000, loop_max = 0;
 
+	if (force) {
+		loop_mode = 1;
+	}
 	for (i=1; i < argc; i++) {
 		char *p = argv[i];
 		if (strstr(p, "--") == p) {
@@ -1562,7 +1572,7 @@ int main(int argc, char* argv[]) {
 
 
 	/* check for -loop mode: */
-	check_loop_mode(argc, argv);
+	check_loop_mode(argc, argv, 0);
 
 	dtime0(&x11vnc_start);
 
@@ -1771,14 +1781,6 @@ int main(int argc, char* argv[]) {
 			got_connect_once = 1;
 		} else if (!strcmp(arg, "-many") || !strcmp(arg, "-forever")) {
 			connect_once = 0;
-		} else if (strstr(arg, "-loop") == arg) {
-			;	/* handled above */
-#if LIBVNCSERVER_HAVE_SETSID
-			bg = 1;
-			opts_bg = bg;
-#else
-			fprintf(stderr, "warning: -bg mode not supported.\n");
-#endif
 		} else if (strstr(arg, "-loop") == arg) {
 			;	/* handled above */
 		} else if (!strcmp(arg, "-timeout")) {
