@@ -1493,7 +1493,7 @@ void ncache_beta_tester_message(void) {
 
 char msg[] = 
 "\n"
-"***************************************************************************\n"
+"******************************************************************************\n"
 "\n"
 "Hello!  Exciting News!!\n"
 "\n"
@@ -1526,6 +1526,20 @@ char msg[] =
 "waiting for connections:\n"
 ;
 
+char msg2[] = 
+"\n"
+"******************************************************************************\n"
+"Have you tried the x11vnc '-ncache' VNC client-side pixel caching feature yet?\n"
+"\n"
+"The scheme stores pixel data offscreen on the VNC viewer side for faster\n"
+"retrieval.  It should work with any VNC viewer.  Try it by running:\n"
+"\n"
+"    x11vnc -ncache 10 ...\n"
+"\n"
+"more info: http://www.karlrunge.com/x11vnc/#faq-client-caching\n"
+"\n"
+;
+
 	if (raw_fb_str && !macosx_console) {
 		return;
 	}
@@ -1535,9 +1549,13 @@ char msg[] =
 #ifdef NO_NCACHE
 	return;
 #endif
-	
-	fprintf(stderr, msg, ncache);
 
+	if (ncache == 0) {
+		fprintf(stderr, msg2);
+		ncache0 = ncache = 0;
+	} else {
+		fprintf(stderr, msg, ncache);
+	}
 }
 
 #define	SHOW_NO_PASSWORD_WARNING \
@@ -1565,6 +1583,7 @@ int main(int argc, char* argv[]) {
 	int got_httpdir = 0, try_http = 0;
 	int orig_use_xdamage = use_xdamage;
 	XImage *fb0 = NULL;
+	int ncache_msg = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc_max = 1024;
@@ -3144,10 +3163,15 @@ int main(int argc, char* argv[]) {
 
 	if (ncache < 0) {
 		ncache_beta_tester = 1;
+		ncache_msg = 1;
+		if (ncache == -1) {
+			ncache = 0;
+		}
 		ncache = -ncache;
 		if (try_http || got_httpdir) {
 			/* JVM usually not set to handle all the memory */
 			ncache = 0;
+			ncache_msg = 0;
 		}
 	}
 
@@ -3920,7 +3944,7 @@ int main(int argc, char* argv[]) {
 	}
 	set_vnc_desktop_name();
 
-	if (ncache_beta_tester && ncache != 0) {
+	if (ncache_beta_tester && (ncache != 0 || ncache_msg)) {
 		ncache_beta_tester_message();
 	}
 

@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Fri May 18 22:13:05 EDT 2007
+x11vnc README file                         Date: Mon May 21 17:57:42 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -10172,7 +10172,8 @@ ssvnc.exe
    mobile use and you want the profiles you create to stay with the drive
    (otherwise you'd have to browse to the drive directory each time you
    load or save). WARNING: if you use ssvnc from an "Internet Cafe", i.e.
-   an untrusted computer, an intruder may be capturing keystrokes etc.
+   an untrusted computer, someone may have set it up to be capturing your
+   keystrokes, etc.
 
    Dynamic VNC Server Port determination: If you are running SSVNC on
    Unix and are using SSH to start the remote VNC server and the VNC
@@ -10934,7 +10935,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-18
+x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-21
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -11048,7 +11049,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-18
+x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-21
 
 (type "x11vnc -opts" to just list the options.)
 

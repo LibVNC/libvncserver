@@ -4076,10 +4076,11 @@ void xopen_display_fail_message(char *disp) {
 	fprintf(stderr, "\n");
 	fprintf(stderr, " * An X server (the one you wish to view) must"
 	    " be running before x11vnc is\n");
-	fprintf(stderr, "   started: x11vnc does not start the X server.\n");
+	fprintf(stderr, "   started: x11vnc does not start the X server.  (however, see the\n");
+	fprintf(stderr, "   recent -create option if that is what you really want).\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, " * You must use -display <disp>, -OR- set and"
-	    " export your DISPLAY\n");
+	    " export your $DISPLAY\n");
 	fprintf(stderr, "   environment variable to refer to the display of"
 	    " the desired X server.\n");
 	fprintf(stderr, " - Usually the display is simply \":0\" (in fact"

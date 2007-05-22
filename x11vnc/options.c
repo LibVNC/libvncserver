@@ -206,9 +206,11 @@ int wireframe_local = 1;
 #ifdef NO_NCACHE
 #define NCACHE 0 
 #else
-#define NCACHE -12
+#define xxNCACHE -12
+#define NCACHE -1
 #endif
 #endif
+
 #ifdef MACOSX
 int ncache = 0;
 int ncache_pad = 24;
@@ -216,6 +218,7 @@ int ncache_pad = 24;
 int ncache = NCACHE;
 int ncache_pad = 0;
 #endif
+
 #ifndef NCACHE_XROOTPMAP
 #define NCACHE_XROOTPMAP 1
 #endif
