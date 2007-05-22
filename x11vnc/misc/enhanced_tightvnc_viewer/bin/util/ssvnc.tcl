@@ -1040,7 +1040,7 @@ proc do_viewer_windows {n} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
 	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
-	global use_listen
+	global use_listen env
 
 	set cmd "vncviewer"
 	if {$change_vncviewer && $change_vncviewer_path != ""} {
@@ -1169,6 +1169,13 @@ proc do_viewer_windows {n} {
 		} else {
 			append cmd " $n"
 		}
+	}
+
+	if [info exists env(SSVNC_EXTRA_SLEEP)] {
+		set t $env(SSVNC_EXTRA_SLEEP)
+		mesg "sleeping an extra $t seconds..."
+		set t [expr "$t * 1000"]
+		after $t
 	}
 	
 	mesg $cmd

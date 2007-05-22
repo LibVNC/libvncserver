@@ -553,6 +553,10 @@ if [ "X$use_ssh" = "X1" ]; then
 		$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd" > $tport 
 		rc=$?
 
+		if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
+			sleep $SSVNC_EXTRA_SLEEP
+		fi
+
 		stty sane
 		i=0
 		while [ $i -lt 10 ]; do
@@ -618,6 +622,9 @@ if [ "X$use_ssh" = "X1" ]; then
 		sleep 5
 	fi
 	echo ""
+	if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
+		sleep $SSVNC_EXTRA_SLEEP
+	fi
 	#reset
 	stty sane
 	#echo "pssh=\"$pssh\""
@@ -944,6 +951,9 @@ if [ "X$direct_connect" != "X" ]; then
 		host="localhost"
 		disp="$N"
 	fi
+	if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
+		sleep $SSVNC_EXTRA_SLEEP
+	fi
 	if [ "X$reverse" = "X" ]; then
 		echo "$VNCVIEWERCMD" "$@" $host:$disp
 		trap "final" 0 2 15
@@ -1092,6 +1102,9 @@ sleep 2
 rm -f "$tmp"
 
 echo ""
+if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
+	sleep $SSVNC_EXTRA_SLEEP
+fi
 echo "Running viewer:"
 if [ "X$reverse" = "X" ]; then
 	echo "$VNCVIEWERCMD" "$@" localhost:$N
