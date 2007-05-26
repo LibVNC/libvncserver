@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Mon May 21 17:57:42 EDT 2007
+x11vnc README file                         Date: Sat May 26 19:09:57 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -398,12 +398,12 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
    SourceForge.net. I use libvncserver for all of the VNC aspects; I
    couldn't have done without it. The full source code may be found and
    downloaded (either file-release tarball or CVS tree) from the above
-   link. As of Apr 2007, the [70]x11vnc-0.9.tar.gz source package is
-   released (recommended download). The [71]x11vnc 0.9 release notes.
+   link. As of May 2007, the [70]x11vnc-0.9.1.tar.gz source package is
+   released (recommended download). The [71]x11vnc 0.9.1 release notes.
 
    The x11vnc package is the subset of the libvncserver package needed to
    build the x11vnc program. Also, you can get a copy of my latest,
-   bleeding edge [72]x11vnc-0.9.1.tar.gz tarball to build the most up to
+   bleeding edge [72]x11vnc-0.9.2.tar.gz tarball to build the most up to
    date one.
 
    Precompiled Binaries/Packages:  See the [73]FAQ below for information
@@ -436,13 +436,13 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
     Building x11vnc:
 
    If your OS has libjpeg.so and libz.so in standard locations you can
-   build as follows (example given for the 0.9 release of x11vnc: replace
-   with the version you downloaded):
+   build as follows (example given for the 0.9.1 release of x11vnc:
+   replace with the version you downloaded):
 (un-tar the x11vnc+libvncserver tarball)
-# gzip -dc x11vnc-0.9.tar.gz | tar -xvf -
+# gzip -dc x11vnc-0.9.1.tar.gz | tar -xvf -
 
 (cd to the source directory)
-# cd x11vnc-0.9
+# cd x11vnc-0.9.1
 
 (run configure and then run make)
 # ./configure
@@ -658,14 +658,14 @@ make
    I don't have any formal beta-testers for the releases of x11vnc, so
    I'd appreciate any additional testing very much.
 
-   Thanks to those who suggested features and helped beta test x11vnc 0.9
-   released in Apr 2007!
+   Thanks to those who suggested features and helped beta test x11vnc
+   0.9.1 released in May 2007!
 
-   Please help test and debug the 0.9.1 version for release sometime in
+   Please help test and debug the 0.9.2 version for release sometime in
    Summer 2007.
 
-   The version 0.9.1 beta tarball is kept here:
-   [91]x11vnc-0.9.1.tar.gz
+   The version 0.9.2 beta tarball is kept here:
+   [91]x11vnc-0.9.2.tar.gz
 
    There are also some Linux, Solaris, Mac OS X, and other OS test
    binaries [92]here. Please kick the tires and report bugs, performance
@@ -680,7 +680,7 @@ make
    [97]Enhanced TightVNC Viewer (SSVNC) page.
 
 
-   Here are some features that will appear in the 0.9.1 release:
+   Here are some features that will appear in the 0.9.2 release:
      * [98]Viewer-side pixmap caching. This one will benefit from much
        testing. A large area of pixels (at least 2-3 times as big as the
        framebuffer itself; the bigger the better... default is 12X) is
@@ -692,6 +692,9 @@ make
        "-ncache 12". The unix Enhanced TightVNC Viewer [99]ssvnc has a
        nice [100]-ycrop option to help hide the pixel cache area from
        view.
+
+
+   Here are some features that appeared in the 0.9.1 release:
      * The [101]UltraVNC Java viewer has been enhanced to support SSL (as
        the TightVNC viewer had been previously). The UltraVNC Java
        supports ultravnc filetransfer, and so can be used as a VNC viewer
@@ -6675,7 +6678,7 @@ EndSection
 
    Building:  If you don't have the X11 build and runtime packages
    installed you will need to build it like this:
-   (cd to the x11vnc-0.9, etc, source directory)
+   (cd to the e.g. x11vnc-0.9, source directory)
    ./configure --without-x
    make
 
@@ -7551,9 +7554,9 @@ References
   67. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
   68. http://www.karlrunge.com/x11vnc/ssvnc.html
   69. http://sourceforge.net/projects/libvncserver/
-  70. http://sourceforge.net/project/showfiles.php?group_id=32584&package_id=119006&release_id=502277
-  71. http://sourceforge.net/project/shownotes.php?group_id=32584&release_id=502277
-  72. http://www.karlrunge.com/x11vnc/x11vnc-0.9.1.tar.gz
+  70. http://sourceforge.net/project/showfiles.php?group_id=32584&package_id=119006&release_id=510888
+  71. http://sourceforge.net/project/shownotes.php?release_id=510888&group_id=32584
+  72. http://www.karlrunge.com/x11vnc/x11vnc-0.9.2.tar.gz
   73. http://www.karlrunge.com/x11vnc/index.html#faq-binaries
   74. http://www.tightvnc.com/download.html
   75. http://www.realvnc.com/download-free.html
@@ -7572,7 +7575,7 @@ References
   88. http://www.karlrunge.com/x11vnc/index.html#faq-solaris251build
   89. http://www.karlrunge.com/x11vnc/index.html#faq-macosx
   90. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
-  91. http://www.karlrunge.com/x11vnc/x11vnc-0.9.1.tar.gz
+  91. http://www.karlrunge.com/x11vnc/x11vnc-0.9.2.tar.gz
   92. http://www.karlrunge.com/x11vnc/bins
   93. mailto:xvml-beta@karlrunge.com
   94. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
@@ -10031,6 +10034,8 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
      * [5]Dynamic VNC Server Port determination and redirection (using
        ssh's builtin SOCKS proxy, -D) for servers like x11vnc that print
        out PORT= at startup.
+     * Unix Username and Password entry for use with "x11vnc -unixpw"
+       type login dialogs.
 
    [6]Unix TightVNC Viewer improvements (these only apply to the Unix VNC
    viewer):
@@ -10056,15 +10061,16 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
        (-grab/-graball option).
      * Fix for Popup menu positioning for old window managers (-popupfix
        option).
+     * Option "-unixpw ..." for use with "x11vnc -unixpw" type login
+       dialogs.
      * Improvements to the Popup menu, all of these can now be changed
        dynamically via the menu: ViewOnly, Toggle Bell, CursorShape
        updates, X11 Cursor, Cursor Alphablending, Toggle Tight/ZRLE,
        Toggle JPEG, FullColor/16bpp/8bpp (256/64/8 colors), Greyscale for
        low color modes.
-     * Support for UltraVNC extensions: Single Window, Disable
-       Server-side Input, 1/n Server side scaling, Text Chat (shell
-       terminal UI). Both UltraVNC and x11vnc servers support these
-       extensions.
+     * Support for UltraVNC extensions: 1/n Server side scaling, Text
+       Chat, Single Window, Disable Server-side Input. Both UltraVNC and
+       x11vnc servers support these extensions.
 
    The list of software bundled in the archive files:
      * TightVNC Viewer  (windows, unix, macosx)
@@ -10305,13 +10311,43 @@ Enhanced TightVNC viewer (SSVNC) options:
         -noshm      Disable use of MIT shared memory extension (not recommended
 )
 
+        -termchat   Do the UltraVNC chat in the terminal vncviewer is in
+                    instead of in an independent window.
+
+        -unixpw str Useful for logging into x11vnc in -unixpw mode. "str" is a
+                    string that allows many ways to enter the Unix Username
+                    and Unix Password.  These characters: username, newline,
+                    password, newline are sent to the VNC server after any VNC
+                    authentication has taken place.  Under x11vnc they are
+                    used for the -unixpw login.  Other VNC servers could do
+                    something similar.
+
+                    You can also indicate "str" via the environment
+                    variable SSVNC_UNIXPW.
+
+                    Note that the Escape key is actually sent first to tell
+                    x11vnc to not echo the Unix Username back to the VNC
+                    viewer. Set SSVNC_UNIXPW_NOESC=1 to override this.
+
+                    If str is ".", then you are prompted at the command line
+                    for the username and password in the normal way.  If str is
+                    "-" the stdin is read via getpass(3) for username@password.
+                    Otherwise if str is a file, it is opened and the first line
+                    read is taken as the Unix username and the 2nd as the
+                    password. If str prefixed by "rm:" the file is removed
+                    after reading. Otherwise, if str has a "@" character,
+                    it is taken as username@password. Otherwise, the program
+                    exits with an error. Got all that?
+
+
    New Popup actions:
 
+        ViewOnly:                ~ -viewonly
+        Disable Bell:            ~ -nobell
         Cursor Shape:            ~ -nocursorshape
         X11 Cursor:              ~ -x11cursor
         Cursor Alphablend:       ~ -alpha
         Disable JPEG:            ~ -nojpeg
-        Prefer raw for localhost ~ -rawlocal
         Full Color                 as many colors as local screen allows.
         Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
         16 bit color (BGR565)    ~ -16bpp / -bgr565
@@ -10320,14 +10356,15 @@ Enhanced TightVNC viewer (SSVNC) options:
          64 colors               ~ -bgr222 / -use64
           8 colors               ~ -bgr111 / -use8
 
+        UltraVNC Extensions:
         Disable Remote Input       Ultravnc ext. Try to prevent input and
                                    viewing of monitor at physical display.
         Single Window              Ultravnc ext. Grab and view a single window.
                                    (click on the window you want).
         Set 1/n Server Scale       Ultravnc ext. Scale desktop by 1/n.
                                    prompt is from the terminal.
-        Text Chat                  Ultravnc ext. Do Text Chat, currently
-                                   input via the terminal (no window).
+        Text Chat                  Ultravnc ext. Do Text Chat.
+
 
         Note: the Ultravnc extensions only apply to servers that support
               them.  x11vnc/libvncserver supports some of them.
@@ -10394,12 +10431,18 @@ es and source AND full archives in the zip dir. (~15MB)
 
    You can try for an older one by replacing, e.g. ".16" by ".11", etc.
 
-   Sorry for the inconvenience of lumping all the Unix binaries and
-   source together in one archive. To save space you can delete the src
-   subdirectory if you like.
+   Here are the corresponding "development" bundles:
+  [24]ssvnc_windows_only-1.0.17.zip
+  [25]ssvnc_no_windows-1.0.17.tar.gz
+  [26]ssvnc_unix_only-1.0.17.tar.gz
+  [27]ssvnc_unix_minimal-1.0.17.tar.gz
+
+  [28]ssvnc-1.0.17.tar.gz
+  [29]ssvnc-1.0.17.zip
+  [30]ssvnc_all-1.0.17.zip
 
    A self-extracting and running file for the "ssvnc_unix_minimal"
-   package is here: [24]ssvnc. Save it as filename "ssvnc", type "chmod
+   package is here: [31]ssvnc. Save it as filename "ssvnc", type "chmod
    755 ./ssvnc", and then launch the GUI via typing "./ssvnc". Note that
    this "ssvnc_unix_minimal" mode requires you install the "stunnel" and
    "vncviewer" programs externally (for example, install your distros'
@@ -10438,13 +10481,13 @@ es and source AND full archives in the zip dir. (~15MB)
    redistribute the above because of cryptographic software they contain
    or for other reasons. Please check out your situation and information
    at the following and related sites:
-        [25]http://www.stunnel.org
-        [26]http://stunnel.mirt.net
-        [27]http://www.openssl.org
-        [28]http://www.chiark.greenend.org.uk/~sgtatham/putty/
-        [29]http://www.tightvnc.com
-        [30]http://www.realvnc.com
-        [31]http://sourceforge.net/projects/cotvnc/
+        [32]http://www.stunnel.org
+        [33]http://stunnel.mirt.net
+        [34]http://www.openssl.org
+        [35]http://www.chiark.greenend.org.uk/~sgtatham/putty/
+        [36]http://www.tightvnc.com
+        [37]http://www.realvnc.com
+        [38]http://sourceforge.net/projects/cotvnc/
      _________________________________________________________________
 
    Here is the toplevel README from the bundle:
@@ -10915,14 +10958,21 @@ References
   21. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.16.tar.gz
   22. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.16.zip
   23. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.16.zip
-  24. http://www.karlrunge.com/x11vnc/etv/ssvnc
-  25. http://www.stunnel.org/
-  26. http://stunnel.mirt.net/
-  27. http://www.openssl.org/
-  28. http://www.chiark.greenend.org.uk/~sgtatham/putty/
-  29. http://www.tightvnc.com/
-  30. http://www.realvnc.com/
-  31. http://sourceforge.net/projects/cotvnc/
+  24. http://www.karlrunge.com/x11vnc/etv/ssvnc_windows_only-1.0.17.zip
+  25. http://www.karlrunge.com/x11vnc/etv/ssvnc_no_windows-1.0.17.tar.gz
+  26. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_only-1.0.17.tar.gz
+  27. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_minimal-1.0.17.tar.gz
+  28. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.17.tar.gz
+  29. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.17.zip
+  30. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.17.zip
+  31. http://www.karlrunge.com/x11vnc/etv/ssvnc
+  32. http://www.stunnel.org/
+  33. http://stunnel.mirt.net/
+  34. http://www.openssl.org/
+  35. http://www.chiark.greenend.org.uk/~sgtatham/putty/
+  36. http://www.tightvnc.com/
+  37. http://www.realvnc.com/
+  38. http://sourceforge.net/projects/cotvnc/
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/x11vnc_opts.html:
@@ -10935,7 +10985,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-21
+x11vnc: allow VNC connections to real X11 displays. 0.9.2 lastmod: 2007-05-26
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -11049,7 +11099,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.1 lastmod: 2007-05-21
+x11vnc: allow VNC connections to real X11 displays. 0.9.2 lastmod: 2007-05-26
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -11631,27 +11681,32 @@ Options:
                        send one before a 25 second timeout.  Existing clients
                        are view-only during this period.
 
+                       If the first character received is "Escape" then the
+                       unix username will not be displayed after "login:"
+                       as it is typed.  This could be of use for VNC viewers
+                       that automatically type the username and password.
+
                        Since the detailed behavior of su(1) can vary from
                        OS to OS and for local configurations, test the mode
-                       carefully on your systems before using it in production.
-                       Test different combinations of valid/invalid usernames
-                       and valid/invalid passwords to see if it behaves as
-                       expected.  x11vnc will attempt to be conservative and
+                       carefully.  x11vnc will attempt to be conservative and
                        reject a login if anything abnormal occurs.
 
-                       On FreeBSD and the other BSD's by default it is
-                       impossible for the user running x11vnc to validate
-                       his *own* password via su(1) (evidently commenting out
+                       One case to note: FreeBSD and the other BSD's by
+                       default it is impossible for the user running x11vnc to
+                       validate his *own* password via su(1) (commenting out
                        the pam_self.so entry in /etc/pam.d/su eliminates this
-                       problem).  So the x11vnc login will always *fail* for
+                       behavior).  So the x11vnc login will always *FAIL* for
                        this case (even when the correct password is supplied).
 
-                       A possible workaround for this would be to start
-                       x11vnc as root with the "-users +nobody" option to
-                       immediately switch to user nobody.  Another source of
-                       problems are PAM modules that prompt for extra info,
-                       e.g. password aging modules.  These logins will fail
-                       as well even when the correct password is supplied.
+                       A possible workaround for this on *BSD would be to
+                       start x11vnc as root with the "-users +nobody" option
+                       to immediately switch to user nobody where the su'ing
+                       will proceed normally.
+
+                       Another source of potential problems are PAM modules
+                       that prompt for extra info, e.g. password aging modules.
+                       These logins will fail as well even when the correct
+                       password is supplied.
 
                        **IMPORTANT**: to prevent the Unix password being sent
                        in *clear text* over the network, one of two schemes
@@ -12719,6 +12774,9 @@ t
                        env. vars. (see -accept) passed to external cmd=
                        commands, RFB_SSL_CLIENT_CERT will be set to the
                        client's x509 certificate string.
+
+                       The sslpeer= mode can aid finding X sessions via the
+                       FINDDISPLAY and FINDCREATEDISPLAY mechanisms.
 
                        To immediately switch to a user *before* connections
                        to the X display are made or any files opened use the

@@ -1126,6 +1126,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 	int x, y, i, rc, nmax = 100;
 	static char user_r[100], user[100], pass[100];
 	static int  u_cnt = 0, p_cnt = 0, first = 1;
+	static int echo = 1;
 	char keystr[100];
 	char *str;
 
@@ -1143,6 +1144,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 		in_login = 1;
 		in_passwd = 0;
 		unixpw_denied = 0;
+		echo = 1;
 		if (init == 1) {
 			tries = 0;
 		}
@@ -1207,6 +1209,11 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 			return;
 		}
 	} else if (! down) {
+		return;
+	}
+	if (in_login && keysym == XK_Escape && u_cnt == 0) {
+		echo = 0;	
+		rfbLog("unixpw_keystroke: echo off.\n");
 		return;
 	}
 
@@ -1295,8 +1302,10 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 
 				x = text_x();
 				y = text_y();
-				rfbDrawString(pscreen, &default8x16Font, x, y,
-				    str, white_pixel());
+				if (echo) {
+					rfbDrawString(pscreen, &default8x16Font, x, y,
+					    str, white_pixel());
+				}
 				mark_rect_as_modified(x, y-char_h, x+char_w,
 				    y, scaling);
 				char_col++;
@@ -1340,7 +1349,9 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 
 if (db && db <= 2) fprintf(stderr, "u_cnt: %d %d/%d ks: 0x%x  '%s'\n", u_cnt, x, y, keysym, keystr);
 
-		rfbDrawString(pscreen, &default8x16Font, x, y, keystr, white_pixel());
+		if (echo ) {
+			rfbDrawString(pscreen, &default8x16Font, x, y, keystr, white_pixel());
+		}
 
 		mark_rect_as_modified(x, y-char_h, x+char_w, y, scaling);
 		char_col++;

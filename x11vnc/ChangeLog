@@ -1,3 +1,7 @@
+2007-05-26  Karl Runge <runge@karlrunge.com>
+	* x11vnc: set to version 0.9.2, back to NCACHE -12 for testing.
+	  in -unixpw, initial Escape means no echo username (see ssvnc).
+
 2007-05-21  Karl Runge <runge@karlrunge.com>
 	* x11vnc: set things up (NCACHE = -1) to not have -ncache
 	  on by default; just give a blurb about it.

@@ -2,7 +2,7 @@
 .TH X11VNC "1" "May 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.1, lastmod: 2007-05-21
+         version: 0.9.2, lastmod: 2007-05-26
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -718,31 +718,36 @@ to supply the correct password in 3 tries or does not
 send one before a 25 second timeout.  Existing clients
 are view-only during this period.
 .IP
+If the first character received is "Escape" then the
+unix username will not be displayed after "login:"
+as it is typed.  This could be of use for VNC viewers
+that automatically type the username and password.
+.IP
 Since the detailed behavior of 
 .IR su (1)
 can vary from
 OS to OS and for local configurations, test the mode
-carefully on your systems before using it in production.
-Test different combinations of valid/invalid usernames
-and valid/invalid passwords to see if it behaves as
-expected.  x11vnc will attempt to be conservative and
+carefully.  x11vnc will attempt to be conservative and
 reject a login if anything abnormal occurs.
 .IP
-On FreeBSD and the other BSD's by default it is
-impossible for the user running x11vnc to validate
-his *own* password via 
+One case to note: FreeBSD and the other BSD's by
+default it is impossible for the user running x11vnc to
+validate his *own* password via 
 .IR su (1)
-(evidently commenting out
+(commenting out
 the pam_self.so entry in /etc/pam.d/su eliminates this
-problem).  So the x11vnc login will always *fail* for
+behavior).  So the x11vnc login will always *FAIL* for
 this case (even when the correct password is supplied).
 .IP
-A possible workaround for this would be to start
-x11vnc as root with the "\fB-users\fR \fI+nobody\fR" option to
-immediately switch to user nobody.  Another source of
-problems are PAM modules that prompt for extra info,
-e.g. password aging modules.  These logins will fail
-as well even when the correct password is supplied.
+A possible workaround for this on *BSD would be to
+start x11vnc as root with the "\fB-users\fR \fI+nobody\fR" option
+to immediately switch to user nobody where the su'ing
+will proceed normally.
+.IP
+Another source of potential problems are PAM modules
+that prompt for extra info, e.g. password aging modules.
+These logins will fail as well even when the correct
+password is supplied.
 .IP
 **IMPORTANT**: to prevent the Unix password being sent
 in *clear text* over the network, one of two schemes
@@ -1933,6 +1938,9 @@ checking: "openssl x509 \fB-text\fR \fB-in\fR file.crt", see the
 env. vars. (see \fB-accept)\fR passed to external cmd=
 commands, RFB_SSL_CLIENT_CERT will be set to the
 client's x509 certificate string.
+.IP
+The sslpeer= mode can aid finding X sessions via the
+FINDDISPLAY and FINDCREATEDISPLAY mechanisms.
 .IP
 To immediately switch to a user *before* connections
 to the X display are made or any files opened use the
