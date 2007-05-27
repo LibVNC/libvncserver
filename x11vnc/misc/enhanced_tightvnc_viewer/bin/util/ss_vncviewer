@@ -995,7 +995,7 @@ else
 	p2=`expr 5500 + $N`
 	connect="connect = localhost:$p2"
 	if [ "X$cert" = "X" ]; then
-		tcert="/tmp/tcert.$$"
+		tcert="/tmp/tcert${RANDOM}.$$"
 		cat > $tcert <<END
 -----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAvkfXxb0wcxgrjV2ziFikjII+ze8iKcTBt47L0GM/c21efelN

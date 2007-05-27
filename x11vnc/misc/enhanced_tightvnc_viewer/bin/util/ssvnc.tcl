@@ -8,6 +8,7 @@ exec wish "$0" "$@"
 # ssvnc.tcl: gui wrapper to the programs in this
 # package. Also sets up service port forwarding.
 #
+set version 1.0.17
 
 set buck_zero $argv0
 
@@ -422,6 +423,9 @@ proc help {} {
         new X sessions if called repeatedly.
 }
 
+	global version
+	set msg "                         SSVNC version: $version\n$msg"
+
 	.h.f.t insert end $msg
 	jiggle_text .h.f.t
 }
@@ -626,7 +630,38 @@ set msg {
             enter a firewall) or if additional SSH port redirs are required
             (CUPS, Sound, SMB tunnelling: See Advanced Options).
 
-  Reverse VNC connection: reverse (listening) VNC connections are possible.
+  Unix Username & Password:  This is only available on Unix and when using
+            the SSVNC enhanced TightVNC viewer (it has been modified to
+            do Unix logins).  It supports a login dialog with servers
+            doing something like x11vnc's "-unixpw" mode.  After any
+            regular VNC authentication takes place (VNC Password), then
+            it sends the Unix Username, a Return, the Unix Password and
+            a final Return.  This saves you from typing them into the
+            "login:" and "Password:" prompts in the viewer window.
+
+            Note that the x11vnc -unixpw login mode is external to the
+            VNC protocol, so you need to be sure the VNC server is in
+            this mode and will be waiting for the dialog.  Otherwise the
+            username and password will be typed directly into the desktop
+            application that happens to have the focus!
+
+            When you select this option "Unix Username:" and "Unix
+            Password:" entry boxes appear on the main panel where you can
+            type them in.  x11vnc has settings that can be specified after
+            a ":" in the Unix username; they may be used here as well.
+            (For example: username:3/4,nc for a smaller screen and -nocache)
+
+            If the Unix Username is not set when you click Connect, then
+            any SSH username@host is used.  Otherwise the environment
+            variable $USER or $LOGNAME and finally whoami(1) is used.
+
+            Also Note that the Unix Password is never saved in a VNC
+            profile (so you have to type it each time).  Also, the remote
+            x11vnc server is instructed to not echo the Username string
+            by sending an initial Escape.  Set the SSVNC_UNIXPW_NOESC=1
+            environment variable to override this.
+
+  Reverse VNC Connection: reverse (listening) VNC connections are possible.
 
             For SSL connections in the 'VNC Host:Display' entry box put in
             the number (e.g. "0" or ":0") that corresponds to the Listening
@@ -746,8 +781,8 @@ proc help_fetch_cert {} {
   The above SSL Certificate has been retrieved from the VNC Server via the
   "Fetch Cert" action.
   
-  It has merely been downloaded via the SSL Protocol: IT HAS NOT BEEN VERIFIED
-  IN ANY WAY.
+  It has merely been downloaded via the SSL Protocol: **IT HAS NOT BEEN VERIFIED
+  IN ANY WAY**
   
   So, in principle, it could be a fake certificate being inserted by a bad
   person attempting to perform a Man-In-The-Middle attack on your SSL connection.
@@ -965,11 +1000,13 @@ proc set_defaults {} {
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
-	global ycrop_string use_listen
+	global ycrop_string use_listen use_unixpw unixpw_username
 	global include_list
 
 	set defs(use_viewonly) 0
 	set defs(use_listen) 0
+	set defs(use_unixpw) 0
+	set defs(unixpw_username) ""
 	set defs(use_fullscreen) 0
 	set defs(use_raise_on_beep) 0
 	set defs(use_bgr233) 0
@@ -1029,11 +1066,13 @@ proc set_defaults {} {
 		set $var $defs($var)	
 	}
 
-	global vncauth_passwd
+	global vncauth_passwd unixpw_passwd
 	set vncauth_passwd ""
+	set unixpw_passwd ""
 
 	ssl_ssh_adjust ssl
 	listen_adjust
+	unixpw_adjust
 }
 
 proc do_viewer_windows {n} {
@@ -2068,7 +2107,7 @@ proc darwin_terminal_cmd {{title ""} {cmd ""} {bg 0}} {
 	}
 
 	global darwin_terminal_cnt
-	set tmp /tmp/darwin_terminal_cmd.[pid]
+	set tmp /tmp/darwin_terminal_cmd.[tpid]
 	if {! [info exists darwin_terminal_cnt]} {
 		set darwin_terminal_cnt 0
 	}
@@ -2442,18 +2481,18 @@ proc fetch_cert {save} {
 		set on 0
 		foreach line [split $cert_text "\n"] {
 			if [regexp -- {-----BEGIN CERTIFICATE-----} $line] {
-				set on 1
+				incr on
 			}
-			if {! $on} {
+			if {$on != 1} {
 				continue;
 			}
 			append text "$line\n"
 			if [regexp -- {-----END CERTIFICATE-----} $line] {
-				set on 0
+				set on 2
 			}
 		}
 		global is_windows
-		set tmp "/tmp/cert.hsh.[pid]"
+		set tmp "/tmp/cert.hsh.[tpid]"
 		if {$is_windows} {
 			# VF
 			set tmp cert.hsh
@@ -2472,8 +2511,9 @@ proc fetch_cert {save} {
 			if [regexp -nocase {SHA. Finger[^\n]*} $info mvar] {
 				set cert_text "$mvar\n\n$cert_text"
 			}
+			set cert_text "$cert_text\n\n----------------------------------\nOutput of x509 -text -fingerprint:\n\n$info"
 		}
-		set cert_text "SSL Certificate from $hp\n\n$cert_text"
+		set cert_text "==== SSL Certificate from $hp ====\n\n$cert_text"
 	}
 
 	if {! $save} {
@@ -2693,7 +2733,7 @@ proc check_accepted_certs {} {
 		if {$i > 4} {
 			break
 		}
-		if [regexp {^SSL Certificate from (.*)} $line mv str] {
+		if [regexp {^==== SSL Certificate from (.*) ====} $line mv str] {
 			set from [string trim $str]
 		}
 		if [regexp -nocase {Fingerprint=(.*)} $line mv str] {
@@ -2943,9 +2983,113 @@ proc check_accepted_certs {} {
 	return 0
 }
 
+proc tpid {} {
+	global is_windows
+	set p ""
+
+	if {!$is_windows} {
+		catch {set p [exec sh -c {echo $$}]}
+	}
+	if {$p == ""} {
+		set p [pid];
+	}
+	append p [clock clicks]
+	return $p
+}
+
+proc fini_unixpw {} {
+	global named_pipe_fh unixpw_tmp
+	
+	if {$named_pipe_fh != ""} {
+		catch {close $named_pipe_fh}
+	}
+	if {$unixpw_tmp  != ""} {
+		catch {file delete $unixpw_tmp}
+	}
+}
+
+proc init_unixpw {hp} {
+	global use_unixpw unixpw_username unixpw_passwd
+	global named_pipe_fh unixpw_tmp env
+	
+	set named_pipe_fh ""
+	set unixpw_tmp ""
+
+	if {$use_unixpw} {
+		set name $unixpw_username
+		set env(SSVNC_UNIXPW) ""
+		if {$name == ""} {
+			regsub {^.*://} $hp "" hp
+			set hptmp [get_ssh_hp $hp]
+			if [regexp {^(.*)@} $hptmp mv m1] {
+				set name $m1
+			}
+		}
+		if {$name == ""} {
+			if [info exists env(USER)] {
+				set name $env(USER)
+			}
+		}
+		if {$name == ""} {
+			if [info exists env(LOGNAME)] {
+				set name $env(LOGNAME)
+			}
+		}
+		if {$name == ""} {
+			set name [exec whoami]
+		}
+		if {$name == ""} {
+			set name "unknown"
+		}
+
+		set tmp "/tmp/unix.[tpid]"
+		catch {file delete $tmp}
+		if {[file exists $tmp]} {
+			mesg "file still exists: $tmp"
+			bell
+			return
+		}
+
+		catch {exec mknod $tmp p}
+		set fh ""
+		if {! [file exists $tmp]} {
+			catch {set fh [open $tmp "w"]}
+		} else {
+			catch {set fh [open $tmp "r+"]}
+			set named_pipe_fh $fh
+		}
+		catch {exec chmod 600 $tmp}
+		if {! [file exists $tmp]} {
+			mesg "cannot create: $tmp"
+			if {$named_pipe_fh != ""} {catch close $named_pipe_fh}
+			bell
+			return
+		}
+		#puts [exec ls -l $tmp]
+		set unixpw_tmp $tmp
+		puts $fh $name
+		puts $fh $unixpw_passwd
+		if {$named_pipe_fh != ""} {
+			flush $fh
+		} else {
+			close $fh
+		}
+		exec sh -c "sleep 60; /bin/rm -f $tmp" &
+		if {$unixpw_passwd == ""} {
+			set env(SSVNC_UNIXPW) "."
+		} else {
+			set env(SSVNC_UNIXPW) "rm:$tmp"
+		}
+	} else {
+		if [info exists env(SSVNC_UNIXPW)] {
+			set env(SSVNC_UNIXPW) ""
+		}
+	}
+}
+
 proc launch_unix {hp} {
 	global smb_redir_0 smb_mounts env
-	global vncauth_passwd
+	global vncauth_passwd use_unixpw unixpw_username unixpw_passwd
 
 	globalize
 
@@ -2971,7 +3115,7 @@ proc launch_unix {hp} {
 
 	set skip_ssh 0
 	set do_direct 0
-		
+
 	if [regexp {vnc://} $hp] {
 		set skip_ssh 1
 		set do_direct 1
@@ -3166,9 +3310,8 @@ proc launch_unix {hp} {
 	if {$change_vncviewer && $change_vncviewer_path != ""} {
 		set path [string trim $change_vncviewer_path]
 		if [regexp {^["'].} $path]  {	# "
-			set tmp "/tmp/vncspacewrapper."
+			set tmp "/tmp/vncspacewrapper.[tpid]"
 			set do_vncspacewrapper 1
-			append tmp [clock clicks -milliseconds]
 			catch {file delete $tmp}
 			if {[file exists $tmp]} {
 				catch {destroy .c}
@@ -3232,7 +3375,7 @@ proc launch_unix {hp} {
 	set passwdfile ""
 	if {$vncauth_passwd != ""} {
 		global use_listen
-		set passwdfile "$env(SSVNC_HOME)/.vncauth_tmp.[pid]"
+		set passwdfile "$env(SSVNC_HOME)/.vncauth_tmp.[tpid]"
 		catch {exec vncstorepw $vncauth_passwd $passwdfile}
 		catch {exec chmod 600 $passwdfile}
 		if {$use_listen} {
@@ -3364,6 +3507,9 @@ proc launch_unix {hp} {
 		}
 		set did_port_knock 1
 	}
+
+	init_unixpw $hp
+
 	wm withdraw .
 	update
 
@@ -3406,6 +3552,8 @@ proc launch_unix {hp} {
 	if {[regexp {FINISH} $port_knocking_list]} {
 		do_port_knock $pk_hp finish
 	}
+
+	fini_unixpw
 }
 
 proc kill_stunnel {pids} {
@@ -5154,14 +5302,14 @@ proc save_cert {hp} {
 	set on 0
 	foreach line [split $cert_text "\n"] {
 		if [regexp -- {-----BEGIN CERTIFICATE-----} $line] {
-			set on 1
+			incr on
 		}
-		if {! $on} {
+		if {$on != 1} {
 			continue;
 		}
 		append text "$line\n"
 		if [regexp -- {-----END CERTIFICATE-----} $line] {
-			set on 0
+			set on 2
 		}
 	}
 	global save_cert_text
@@ -5459,6 +5607,7 @@ proc load_profile {{parent "."} {infile ""}} {
 	set profdone 1
 	putty_pw_entry check
 	listen_adjust
+	unixpw_adjust
 }
 
 proc sync_use_ssl_ssh {} {
@@ -8273,7 +8422,7 @@ proc ssh_agent_restart {} {
 		mesg "could not find ssh-add in PATH"
 		return
 	}
-	set tmp $env(SSVNC_HOME)/.vnc-sa[pid]
+	set tmp $env(SSVNC_HOME)/.vnc-sa[tpid]
 	set fh ""
 	catch {set fh [open $tmp "w"]}
 	if {$fh == ""} {
@@ -8388,6 +8537,18 @@ proc listen_adjust {} {
 	}
 }
 
+proc unixpw_adjust {} {
+	global is_windows use_unixpw darwin_cotvnc
+	if {$is_windows || $darwin_cotvnc} {
+		return;
+	}
+	if {$use_unixpw} {
+		pack configure .fu -after .f1 -fill x
+	} else {
+		pack forget .fu
+	}
+}
+
 proc set_options {} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
@@ -8411,6 +8572,12 @@ proc set_options {} {
 	radiobutton .o.b$i -anchor w -variable sshssl_sw -value sshssl -text \
 		"Use SSH + SSL" -command {ssl_ssh_adjust sshssl}
 	set iss $i
+	incr i
+
+	checkbutton .o.b$i -anchor w -variable use_unixpw -text \
+		"Unix Username & Password" -command {unixpw_adjust}
+	if {$is_windows} {.o.b$i configure -state disabled}
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_listen -text \
@@ -8727,6 +8894,9 @@ set did_listening_message 0
 global accepted_cert_dialog_in_progress
 set accepted_cert_dialog_in_progress 0
 
+global fetch_cert_filename
+set fetch_cert_filename ""
+
 label .l -text "SSL/SSH VNC Viewer" -relief ridge
 
 set wl 21
@@ -8738,32 +8908,42 @@ if {$multientry} {
 	label .f0.l -anchor w -text "VNC Host:Display" -relief ridge
 }
 entry .f0.e -width $we -textvariable vncdisplay
-pack .f0.l -side left 
-pack .f0.e -side left -expand 1 -fill x
-bind .f0.e <Return> launch
+pack  .f0.l -side left 
+pack  .f0.e -side left -expand 1 -fill x
+bind  .f0.e <Return> launch
 
 frame .f1
 label .f1.l -width $wl -anchor w -text "VNC Password:" -relief ridge
 entry .f1.e -width $we -textvariable vncauth_passwd -show *
-pack .f1.l -side left 
-pack .f1.e -side left -expand 1 -fill x
-bind .f1.e <Return> launch
+pack  .f1.l -side left 
+pack  .f1.e -side left -expand 1 -fill x
+bind  .f1.e <Return> launch
+
+frame .fu
+label .fu.l -width $wl -anchor w -text "Unix Username:" -relief ridge
+entry .fu.e -width 14 -textvariable unixpw_username
+label .fu.m -anchor w -text "Unix Password:" -relief ridge
+entry .fu.f -textvariable unixpw_passwd -show *
+pack  .fu.l -side left 
+pack  .fu.e .fu.m -side left
+pack  .fu.f -side left -expand 1 -fill x
+bind  .fu.f <Return> launch
 
 frame .f2
 label .f2.l -width $wl -anchor w -text "Proxy/Gateway:" -relief ridge
 entry .f2.e -width $we -textvariable vncproxy
-pack .f2.l -side left 
-pack .f2.e -side left -expand 1 -fill x
-bind .f2.e <Return> launch
+pack  .f2.l -side left 
+pack  .f2.e -side left -expand 1 -fill x
+bind  .f2.e <Return> launch
 
 frame .f3
 label .f3.l -width $wl -anchor w -text "Remote SSH Command:" -relief ridge
 entry .f3.e -width $we -textvariable remote_ssh_cmd
-pack .f3.l -side left 
-pack .f3.e -side left -expand 1 -fill x
+pack  .f3.l -side left 
+pack  .f3.e -side left -expand 1 -fill x
 .f3.l configure -state disabled
 .f3.e configure -state disabled
-bind .f3.e <Return> launch
+bind  .f3.e <Return> launch
 
 set remote_ssh_cmd_list {.f3.e .f3.l} 
 
