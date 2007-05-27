@@ -55,13 +55,15 @@ while test $# -gt 0; do
       echo "$includes"
       ;;
     --libs)
+      libs=""
       for dir in $libdir; do
-        echo -n "-L$dir "
+        libs="$libs -L$dir"
         if [ "`uname`" = "SunOS" ]; then
-          echo -n "-R$dir "
+          # why only Solaris??
+          libs="$libs -R$dir"
         fi
       done
-      echo -lvncserver -lvncclient @LIBS@ @WSOCKLIB@
+      echo "$libs" -lvncserver -lvncclient @LIBS@ @WSOCKLIB@
       ;;
     --link)
       echo @CC@
