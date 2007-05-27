@@ -48,6 +48,28 @@ AC_CHECK_HEADER(thenonexistentheader.h, HAVE_THENONEXISTENTHEADER_H="true")
 HAVE_X="false"
 AC_PATH_XTRA
 AH_TEMPLATE(HAVE_X11, [X11 build environment present])
+
+# See if we are to build x11vnc:
+AM_CONDITIONAL(HAVE_SYSTEM_LIBVNCSERVER, test ! -z $with_system_libvncserver)
+AH_TEMPLATE(HAVE_SYSTEM_LIBVNCSERVER, [Use the system libvncserver build environment for x11vnc.])
+AC_ARG_WITH(system-libvncserver,
+[  --with-system-libvncserver     use installed libvncserver for x11vnc]
+[  --with-system-libvncserver=DIR use libvncserver installed in DIR for x11vnc],,)
+AC_ARG_WITH(x11vnc,
+[  --with-x11vnc           configure for building the x11vnc subdir (if present)]
+[                          you will need to cd to x11vnc and run 'make' etc.],,)
+
+if test ! -z "$with_x11vnc" -a "$with_x11vnc" = "yes"; then
+	build_x11vnc="yes"
+elif test "$PACKAGE_NAME" = "x11vnc"; then
+	build_x11vnc="yes"
+else
+	build_x11vnc="no"
+fi
+	
+# x11vnc only:
+if test "$build_x11vnc" = "yes"; then
+
 AH_TEMPLATE(HAVE_XSHM, [MIT-SHM extension build environment present])
 AH_TEMPLATE(HAVE_XTEST, [XTEST extension build environment present])
 AH_TEMPLATE(HAVE_XTESTGRABCONTROL, [XTEST extension has XTestGrabControl])
@@ -95,6 +117,9 @@ AC_ARG_WITH(uinput,
 AC_ARG_WITH(macosx-native,
 [  --without-macosx-native disable MacOS X native display support],,)
 
+fi
+# end x11vnc only.
+
 if test "x$with_x" = "xno"; then
 	HAVE_X="false"
 elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
@@ -102,7 +127,8 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 		HAVE_X="false",
 		$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
-	if test $HAVE_X = "true"; then
+	# x11vnc only:
+	if test $HAVE_X = "true" -a "$build_x11vnc" = "yes"; then
 		X_PRELIBS="$X_PRELIBS -lXext"
 
 		AC_CHECK_LIB(Xext, XShmGetImage, 
@@ -211,12 +237,39 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 
 		X_LIBS="$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS"
 	fi
+	# end x11vnc only.
 fi
 
 AC_SUBST(X_LIBS)
 AM_CONDITIONAL(HAVE_X, test $HAVE_X != "false")
 
-if test "$PACKAGE_NAME" = "x11vnc" -a "x$HAVE_X" = "xfalse" -a "x$with_x" != "xno"; then
+if test "x$with_system_libvncserver" = "xyes"; then
+	printf "checking for system libvncserver... "
+	if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xyes"; then
+		SYSTEM_LIBVNCSERVER_CFLAGS="-I$with_system_libvncserver/include"
+		SYSTEM_LIBVNCSERVER_LIBS="-L$with_system_libvncserver/lib -lvncserver -lvncclient"
+		echo "using $with_system_libvncserver"
+		with_system_libvncserver=yes
+	elif libvncserver-config --version >/dev/null 2>&1; then
+		SYSTEM_LIBVNCSERVER_CFLAGS=`libvncserver-config --cflags`
+		SYSTEM_LIBVNCSERVER_LIBS=`libvncserver-config --libs`
+		with_system_libvncserver=yes
+		echo yes
+	else
+		with_system_libvncserver=no
+		echo no
+	fi
+fi
+if test "x$with_system_libvncserver" = "xyes"; then
+	AC_DEFINE(HAVE_SYSTEM_LIBVNCSERVER)
+	AC_SUBST(SYSTEM_LIBVNCSERVER_CFLAGS)
+	AC_SUBST(SYSTEM_LIBVNCSERVER_LIBS)
+fi
+
+# x11vnc only:
+if test "$build_x11vnc" = "yes"; then
+
+if test "x$HAVE_X" = "xfalse" -a "x$with_x" != "xno"; then
 	AC_MSG_ERROR([
 ==========================================================================
 A working X window system build environment is required to build x11vnc.
@@ -233,7 +286,7 @@ or for native Mac OS X), specify the --without-x configure option.
 ])
 fi
 
-if test "$PACKAGE_NAME" = "x11vnc" -a "x$HAVE_X" = "xtrue" -a "x$HAVE_XTEST" != "xtrue"; then
+if test "x$HAVE_X" = "xtrue" -a "x$HAVE_XTEST" != "xtrue"; then
 	AC_MSG_WARN([
 ==========================================================================
 A working build environment for the XTEST extension was not found (libXtst).
@@ -289,7 +342,6 @@ if test "x$with_ssl" != "xno"; then
 fi
 AC_SUBST(SSL_LIBS)
 
-if test "$PACKAGE_NAME" = "x11vnc"; then
 	if test "x$HAVE_LIBSSL" != "xtrue"; then
 		AC_MSG_WARN([
 ==========================================================================
@@ -300,7 +352,6 @@ libssl-dev) and run configure again.
 ==========================================================================
 ])
 	fi
-fi
 
 if test "x$with_v4l" != "xno"; then
 	AC_CHECK_HEADER(linux/videodev.h,
@@ -321,18 +372,6 @@ fi
 
 if test "x$with_macosx_native" != "xno"; then
 	AC_DEFINE(HAVE_MACOSX_NATIVE_DISPLAY)
-fi
-
-# Checks for libraries.
-
-uname_s=`(uname -s) 2>/dev/null`
-ld_minus_R="yes"
-if test "x$uname_s" = "xHP-UX"; then
-	ld_minus_R="no"
-elif test "x$uname_s" = "xOSF1"; then
-	ld_minus_R="no"
-elif test "x$uname_s" = "xDarwin"; then
-	ld_minus_R="no"
 fi
 
 AH_TEMPLATE(HAVE_AVAHI, [Avahi/mDNS client build environment present])
@@ -361,6 +400,22 @@ if test "x$with_avahi" = "xyes"; then
 	AC_SUBST(AVAHI_CFLAGS)
 	AC_SUBST(AVAHI_LIBS)
 fi
+
+fi
+# end x11vnc only.
+
+# Checks for libraries.
+
+uname_s=`(uname -s) 2>/dev/null`
+ld_minus_R="yes"
+if test "x$uname_s" = "xHP-UX"; then
+	ld_minus_R="no"
+elif test "x$uname_s" = "xOSF1"; then
+	ld_minus_R="no"
+elif test "x$uname_s" = "xDarwin"; then
+	ld_minus_R="no"
+fi
+
 
 AC_ARG_WITH(jpeg,
 [  --without-jpeg          disable support for jpeg]
@@ -399,7 +454,7 @@ if test "x$with_jpeg" != "xno"; then
 			LDFLAGS="$saved_LDFLAGS"
 		fi
 	fi
-	if test "$PACKAGE_NAME" = "x11vnc"; then
+	if test "$build" = "yes"; then
 		if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
 			AC_MSG_WARN([
 ==========================================================================
@@ -444,7 +499,7 @@ if test "x$with_zlib" != "xno" -a "x$with_libz" != "xno"; then
 			LDFLAGS="$saved_LDFLAGS"
 		fi
 	fi
-	if test "$PACKAGE_NAME" = "x11vnc"; then
+	if test "$build_x11vnc" = "yes"; then
 		if test "x$HAVE_ZLIB_H" != "xtrue"; then
 			AC_MSG_WARN([
 ==========================================================================
@@ -505,7 +560,12 @@ AC_SUBST(WSOCKLIB)
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h pwd.h sys/wait.h utmpx.h termios.h sys/ioctl.h sys/stropts.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h])
+
+# x11vnc only:
+if test "$build_x11vnc" = "yes"; then
+	AC_CHECK_HEADERS([pwd.h sys/wait.h utmpx.h termios.h sys/ioctl.h sys/stropts.h])
+fi
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -548,7 +608,11 @@ if test "x$uname_s" = "xHP-UX"; then
 	LDFLAGS="$LDFLAGS -lsec"
 fi
 
-AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr setsid setpgrp getpwuid getpwnam getspnam getuid geteuid setuid setgid seteuid setegid initgroups waitpid setutxent grantpt])
+AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr])
+# x11vnc only:
+if test "$build_x11vnc" = "yes"; then
+	AC_CHECK_FUNCS([setsid setpgrp getpwuid getpwnam getspnam getuid geteuid setuid setgid seteuid setegid initgroups waitpid setutxent grantpt])
+fi
 
 # check, if shmget is in cygipc.a
 AC_CHECK_LIB(cygipc,shmget)
@@ -582,19 +646,22 @@ AM_CONDITIONAL(HAVE_RPM, test "$RPMSOURCEDIR" != "NOT-FOUND")
 AC_SUBST(RPMSOURCEDIR)
 
 AC_CONFIG_FILES([Makefile
-                 libvncserver/Makefile
-                 contrib/Makefile
-                 x11vnc/Makefile
-                 x11vnc/misc/Makefile
-                 examples/Makefile
-		 vncterm/Makefile
-		 classes/Makefile
-		 classes/ssl/Makefile
-		 libvncclient/Makefile
-		 client_examples/Makefile
-		 test/Makefile
-		 LibVNCServer.spec
-		 libvncserver-config])
+	libvncserver/Makefile
+	contrib/Makefile
+	examples/Makefile
+	vncterm/Makefile
+	classes/Makefile
+	classes/ssl/Makefile
+	libvncclient/Makefile
+	client_examples/Makefile
+	test/Makefile
+	libvncserver-config
+	LibVNCServer.spec])
+# x11vnc only:
+if test "$build_x11vnc" = "yes"; then
+	AC_CONFIG_FILES([x11vnc/Makefile x11vnc/misc/Makefile])
+fi
+
 AC_CONFIG_COMMANDS([chmod-libvncserver-config],[chmod a+x libvncserver-config])
 AC_OUTPUT
 chmod a+x ./libvncserver-config

@@ -1,3 +1,8 @@
+2007-05-26  Karl Runge <runge@karlrunge.com>
+	* configure.ac, Makefile.am, x11vnc/Makefile.am: change 
+	  configure to make more of a split between libvncserver and
+	  x11vnc packages. LibVNCServer pkg does not include x11vnc.
+
 2007-04-06  Brad Hards <bradh@users.sourceforge.net>
 	* rfb/rfbclient.h: use 'extern "C"' to make it convenient to
 	  include from C++.

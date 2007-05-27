@@ -7,11 +7,11 @@ cd "$(dirname "$0")"
 mv configure.ac configure.ac.LibVNCServer
 
 cat configure.ac.LibVNCServer | \
-egrep -v 'AC_CONFIG_COMMANDS.*libvncserver-config' | \
+egrep -v '(AC_CONFIG_COMMANDS|chmod).*libvncserver-config' | \
+egrep -v '^[ 	]*libvncserver-config$' | \
 sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
     -e "s/\(contrib\|examples\|vncterm\|test\|client_examples\)\/Makefile//g" \
     -e "s/LibVNCServer.spec/x11vnc.spec/g" \
-    -e "s/^.*libvncserver-config//g" \
     -e "s/AC_PROG_LIBTOOL/AC_PROG_RANLIB/" \
 > configure.ac
 
