@@ -50,7 +50,6 @@ AC_PATH_XTRA
 AH_TEMPLATE(HAVE_X11, [X11 build environment present])
 
 # See if we are to build x11vnc:
-AM_CONDITIONAL(HAVE_SYSTEM_LIBVNCSERVER, test ! -z $with_system_libvncserver)
 AH_TEMPLATE(HAVE_SYSTEM_LIBVNCSERVER, [Use the system libvncserver build environment for x11vnc.])
 AC_ARG_WITH(system-libvncserver,
 [  --with-system-libvncserver     use installed libvncserver for x11vnc]
@@ -243,29 +242,6 @@ fi
 AC_SUBST(X_LIBS)
 AM_CONDITIONAL(HAVE_X, test $HAVE_X != "false")
 
-if test "x$with_system_libvncserver" = "xyes"; then
-	printf "checking for system libvncserver... "
-	if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xyes"; then
-		SYSTEM_LIBVNCSERVER_CFLAGS="-I$with_system_libvncserver/include"
-		SYSTEM_LIBVNCSERVER_LIBS="-L$with_system_libvncserver/lib -lvncserver -lvncclient"
-		echo "using $with_system_libvncserver"
-		with_system_libvncserver=yes
-	elif libvncserver-config --version >/dev/null 2>&1; then
-		SYSTEM_LIBVNCSERVER_CFLAGS=`libvncserver-config --cflags`
-		SYSTEM_LIBVNCSERVER_LIBS=`libvncserver-config --libs`
-		with_system_libvncserver=yes
-		echo yes
-	else
-		with_system_libvncserver=no
-		echo no
-	fi
-fi
-if test "x$with_system_libvncserver" = "xyes"; then
-	AC_DEFINE(HAVE_SYSTEM_LIBVNCSERVER)
-	AC_SUBST(SYSTEM_LIBVNCSERVER_CFLAGS)
-	AC_SUBST(SYSTEM_LIBVNCSERVER_LIBS)
-fi
-
 # x11vnc only:
 if test "$build_x11vnc" = "yes"; then
 
@@ -415,6 +391,48 @@ elif test "x$uname_s" = "xOSF1"; then
 elif test "x$uname_s" = "xDarwin"; then
 	ld_minus_R="no"
 fi
+
+if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xno"; then
+	printf "checking for system libvncserver... "
+	if test "x$with_system_libvncserver" != "xyes"; then
+		rflag=""
+		if test "x$ld_minus_R" = "xno"; then
+			:
+		elif test "x$GCC" = "xyes"; then
+			rflag="-Xlinker -R$with_system_libvncserver/lib"
+		else
+			rflag="-R$with_system_libvncserver/lib"
+		fi
+		SYSTEM_LIBVNCSERVER_CFLAGS="-I$with_system_libvncserver/include"
+		SYSTEM_LIBVNCSERVER_LIBS="-L$with_system_libvncserver/lib $rflag -lvncserver -lvncclient"
+		echo "using $with_system_libvncserver"
+		with_system_libvncserver=yes
+	elif libvncserver-config --version >/dev/null 2>&1; then
+		rflag=""
+		rprefix=`libvncserver-config --prefix`
+		if test "x$ld_minus_R" = "xno"; then
+			:
+		elif test "x$GCC" = "xyes"; then
+			rflag=" -Xlinker -R$rprefix/lib "
+		else
+			rflag=" -R$rprefix/lib "
+		fi
+		SYSTEM_LIBVNCSERVER_CFLAGS=`libvncserver-config --cflags`
+		SYSTEM_LIBVNCSERVER_LIBS="$rflag"`libvncserver-config --libs`
+		with_system_libvncserver=yes
+		echo yes
+	else
+		with_system_libvncserver=no
+		echo no
+	fi
+fi
+
+if test "x$with_system_libvncserver" = "xyes"; then
+	AC_DEFINE(HAVE_SYSTEM_LIBVNCSERVER)
+	AC_SUBST(SYSTEM_LIBVNCSERVER_CFLAGS)
+	AC_SUBST(SYSTEM_LIBVNCSERVER_LIBS)
+fi
+AM_CONDITIONAL(HAVE_SYSTEM_LIBVNCSERVER, test "x$with_system_libvncserver" = "xyes")
 
 
 AC_ARG_WITH(jpeg,
