@@ -675,8 +675,20 @@ AC_CONFIG_FILES([Makefile
 	test/Makefile
 	libvncserver-config
 	LibVNCServer.spec])
+#
 # x11vnc only:
+#
 if test "$build_x11vnc" = "yes"; then
+	#
+	# NOTE: if you are using the LibVNCServer-X.Y.Z.tar.gz source
+	# tarball and nevertheless want to run autoconf (i.e. aclocal,
+	# autoheader, automake, autoconf) AGAIN (perhaps you have a
+	# special target system, e.g. embedded) then you will need to
+	# comment out the following 'AC_CONFIG_FILES' line to avoid
+	# automake error messages like:
+	#
+	# configure.ac:690: required file `x11vnc/Makefile.in' not found
+	#
 	AC_CONFIG_FILES([x11vnc/Makefile x11vnc/misc/Makefile])
 fi
 

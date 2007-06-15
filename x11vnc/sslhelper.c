@@ -34,6 +34,11 @@ int https_sock = -1;
 pid_t openssl_last_helper_pid = 0;
 char *openssl_last_ip = NULL;
 
+static char *certret = NULL;
+static int certret_fd = -1;
+static mode_t omode;
+char *certret_str = NULL;
+
 void raw_xfer(int csock, int s_in, int s_out);
 
 #if !LIBVNCSERVER_HAVE_LIBSSL
@@ -1314,11 +1319,6 @@ if (db) fprintf(stderr, "buf: '%s'\n", buf);
 
 	return 1;
 }
-
-static char *certret = NULL;
-static int certret_fd = -1;
-static mode_t omode;
-char *certret_str = NULL;
 
 void accept_openssl(int mode, int presock) {
 	int sock = -1, listen = -1, cport, csock, vsock;	

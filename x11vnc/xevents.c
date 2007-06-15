@@ -1376,6 +1376,7 @@ void set_server_input(rfbClientPtr cl, int grab) {
 	}
 #endif
 }
+
 void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 	int dochat = 1;
 	rfbClientIteratorPtr iter;
@@ -1384,6 +1385,7 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 	if (no_ultra_ext || ! dochat) {
 		return;
 	}
+
 #if 0
 	rfbLog("set_text_chat: len=%d\n", len);
 	rfbLog("set_text_chat: len=0x%x txt='", len);
@@ -1395,6 +1397,9 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 		rfbCloseClient(cl);
 		return;
 	}
+
+	saw_ultra_chat = 1;
+
 	iter = rfbGetClientIterator(screen);
 	while( (cl2 = rfbClientIteratorNext(iter)) ) {
 		unsigned int ulen = (unsigned int) len;
@@ -1439,6 +1444,9 @@ if (0) fprintf(stderr, "get_file_transfer_permitted called\n");
 	get_allowed_input(cl, &input);
 	if (!input.files) {
 		return FALSE;
+	}
+	if (screen->permitFileTransfer) {
+		saw_ultra_file = 1;
 	}
 	return screen->permitFileTransfer;
 }

@@ -8,7 +8,7 @@ exec wish "$0" "$@"
 # ssvnc.tcl: gui wrapper to the programs in this
 # package. Also sets up service port forwarding.
 #
-set version 1.0.17
+set version 1.0.18
 
 set buck_zero $argv0
 
@@ -187,32 +187,67 @@ proc help {} {
     the Help under Options for more info.
 
 
- Proxies:
+ Proxies/Gateways:
 
     If an intermediate proxy is needed to make the SSL connection
     (e.g. web gateway out of a firewall) enter it in the "Proxy/Gateway"
-    entry box, or Alternatively supply both hosts separated by spaces
-    (with the proxy second) in the VNC Host:Display box:
+    entry box:
 
-           host:number   gwhost:port 
+           VNC Host-Display:   host:number
+           Proxy/Gateway:      gw-host:port
+    e.g.:
+           VNC Host-Display:   far-away.east:0
+           Proxy/Gateway:      mygateway.com:8080
 
-    E.g.:  far-away.east:0   mygateway.com:8080
+    Or Alternatively one can supply both hosts separated by
+    spaces (with the proxy second) in the VNC Host:Display box:
+
+           VNC Host-Display:   far-away.east:0    mygateway.com:8080
+
+    This looks a little strange, but it actually how SSVNC stores the
+    host info internally.
+
 
     If the "double proxy" case is required (e.g. coming out of a web
-    proxied firewall environment), separate them via a comma, e.g.:
+    proxied firewall environment and then into a 2nd proxy to ultimately
+    reach the VNC server), separate them via a comma, e.g.:
 
-           far-away:0   local-proxy:8080,mygateway.com:443
+           VNC Host-Display:   far-away:0
+           Proxy/Gateway:      local-proxy:8080,mygateway.com:443
 
-    (either as above, or putting the 2nd string in the "Proxy/Gateway"
-    entry box).
+    (either as above, or alternatively putting both strings in Host:Display)
 
     See the ss_vncviewer description and x11vnc FAQ for info on proxies:
 
            http://www.karlrunge.com/x11vnc/#ss_vncviewer
            http://www.karlrunge.com/x11vnc/#faq-ssl-java-viewer-proxy
 
-    Proxies also apply to SSH mode, it is a usually a gateway machine to
-    log into via SSH that is not the workstation running the VNC server.
+ SSH Proxies/Gateways:
+
+    Proxy/Gateway also applies to SSH mode, it is a usually a gateway
+    machine to log into via SSH that is not the workstation running the
+    VNC server.
+
+    For example if a company had a central login server: "ssh.company.com"
+    (accessible from the internet) and the internal workstation name was
+    "joes-pc", one could put in for the
+
+           VNC Host:Display:   joes-pc:0
+           Proxy/Gateway:      ssh.company.com
+
+    It is OK if the hostname "joes-pc" only resolves inside the firewall.
+
+    The 2nd leg, from ssh.company.com -> joes-pc is done by a ssh -L
+    redir and is not encrypted (but viewer -> ssh.company.com is encrypted). 
+
+    To SSH encrypt both legs, try the "double gateway" using the above
+    "comma" notation:
+
+           VNC Host:Display:   :0
+           Proxy/Gateway:      ssh.company.com,joes-pc
+
+    this requires an SSH server running on joes-pc.  Use username@host
+    (e.g. joe@joes-pc  jsmith@ssh.company.com if the user name differs).
 
 
  Remote SSH Command:
@@ -421,10 +456,16 @@ proc help {} {
         the latter is preferred because when you reconnect with it will
         find the already running one.  The former one will keep creating
         new X sessions if called repeatedly.
+
+    12) You can change the X DISPLAY variable by typing DISPLAY=... into
+        VNC Host:Display and hitting Return or clicking Connect. Same for
+        HOME=.  Setting SLEEP=n increases the amount of time waited before
+        starting the viewer.  On Mac, you can set DYLD_LIBRARY_PATH=... too.
+        It should propagate down the the viewer.
 }
 
 	global version
-	set msg "                         SSVNC version: $version\n$msg"
+	set msg "                             SSVNC version: $version\n$msg"
 
 	.h.f.t insert end $msg
 	jiggle_text .h.f.t
@@ -443,54 +484,78 @@ proc help_certs {} {
 	set msg {
  Description:
 
-    *IMPORTANT*: Only with SSL Certificate verification (either manually or via
-    Certificate Authority) can Man-In-The-Middle attacks be prevented.  Otherwise,
-    only passive network sniffing attacks are prevented.
+    *IMPORTANT*: Only with SSL Certificate verification (either manually or via a
+    Certificate Authority certificate) can Man-In-The-Middle attacks be prevented.
+    Otherwise, only passive network sniffing attacks are prevented.
 
-    The SSL Certificate files described below can have been created externally
-    (e.g. by x11vnc), you can import it via "Import Certificate" if you like.
-    OR you can click on "Create Certificate ..." to use this program to generate a
-    Certificate + Private Key pair.  In that case you will need to distribute one
-    of the generated files to the VNC Server.
+    The SSL Certificate files described below may have been created externally
+    (e.g. by x11vnc or openssl): you can import them via "Import Certificate".
+    OR you can click on "Create Certificate ..." to use THIS program to generate
+    a Certificate + Private Key pair for you (in this case you will need to
+    distribute one of the generated files to the VNC Server).
 
-    You can also retrieve the remote VNC Server's Cert via the "Fetch Cert" button
-    on the main panel.  After you check that it is the correct Cert (e.g. by
-    comparing MD5 hash or other info), you can save it.  It will be set as the
-    "ServerCert" to verify against for the connection.  To make this verification
-    check permanent, you will need to save the profile via Options -> Save Profile.
+    Then you associate the Saved cert with the VNC server, see the panel entry
+    box description below, and then Connect.  You will usually want to Save this
+    association in a VNC Server profile for the next time you connect.
 
-    If "Verify All Certs" is checked, you are forced to do this check, and so the
-    first time you connect to a new server you may need to follow a few dialogs to
-    inspect and save the server certificate.  In this case certificates are saved
-    in the 'Accepted Certs' directory.  When "Verify All Certs" is checked all
-    hosts or profiles with "CertsDir" set to "ACCEPTED_CERTS" (and no "ServerCert"
-    setting) will be check against the accepted certificates.
+ Fetch Cert:
 
-    Note that "Verify All Certs" is on by default so that users who do not
+    You can also retrieve and view the VNC Server's Cert via the "Fetch Cert"
+    button on the main panel.  After you check that it is the correct Cert (e.g. by
+    comparing MD5 hash or other info), you can save it.  The file it was saved
+    as will be set as the "ServerCert" to verify against for the next connection.
+    To make this verification check permanent, you will need to save the profile
+    via Options -> Save Profile.
+
+ Verify All Certs:
+
+    If "Verify All Certs" is checked on the main panel, you are always forced
+    to check unrecognized server certs, and so the first time you connect to
+    a new server you may need to follow a few dialogs to inspect and save the
+    server certificate.
+
+    Under "Verify All Certs", new certificates are saved in the 'Accepted Certs'
+    directory.  When the checkbox is set all host profiles with "CertsDir" set to
+    "ACCEPTED_CERTS" (and an empty "ServerCert" setting) will be checked against
+    the pool of accepted certificates in the 'Accepted Certs' directory.
+
+    Note that we have "Verify All Certs" on by default so that users who do not
     understand the SSL Man-In-The-Middle problem will not be left completely
-    vulnerable to it (everyone still must make the effort to verify new certificates
-    by an external method to be completely safe)
+    vulnerable to it.  Everyone still must make the effort to verify new
+    certificates by an external method to be completely safe.
 
     To have "Verify All Certs" toggled off at startup, use "ssvnc -nv" or set
     SSVNC_NO_VERIFY_ALL=1 before starting.  If you do not even want to see the
     button, use "ssvnc -nvb" or SSVNC_NO_VERIFY_ALL_BUTTON=1.
 
-    Note: due to a deficiency in openssl "Fetch Cert" may be slow on Windows.  Also:
-    "Fetch Cert" and "Verify All Certs" do not currently work in "SSH + SSL" mode.
+    Note: "Fetch Cert" and "Verify All Certs" do not currently work in "SSH +
+    SSL" mode.  In this case to have server authentication "ServerCert" must be
+    set explicitly to a file (or "CertDir" to a directory).
 
-    One can make SSL VNC server authentication "automatic" as it is in Web
-    Browsers going to HTTPS sites, by using a Certificate Authority (CA) cert
-    (e.g. a professional one like Verisign or Thawte, or one your company or
-    organization creates).  This is described in detail here:
-    http://www.karlrunge.com/x11vnc/ssl.html You simply use the CA cert in the
-    entries described below.
+ CA:
+
+    One can make SSL VNC server authentication more "automatic" as it is in
+    Web Browsers going to HTTPS sites, by using a Certificate Authority (CA)
+    cert (e.g. a professional one like Verisign or Thawte, or one your company
+    or organization creates) for the "ServerCert".  This is described in detail
+    here: http://www.karlrunge.com/x11vnc/ssl.html
+
+    CA's are not often used, but if the number of VNC Servers scales up it can
+    be very convenient because the viewers (i.e. SSVNC) only need the CA cert,
+    not all of the Server certs.
+
+
+ Now what goes into the panel's entry boxes is described.
 
 
  Your Certificate + Key:
 
-    You can specify your own SSL certificate (PEM) file in "MyCert" in which case it
-    is used to authenticate you (the viewer) to the remote VNC Server.  If this fails
+    You can specify YOUR own SSL certificate (PEM) file in "MyCert" in which case it
+    is used to authenticate YOU (the viewer) to the remote VNC Server.  If this fails
     the remote VNC Server will drop the connection.
+
+    So the Server could use this method to authenticate Viewers instead of the
+    more common practice of using a VNC password or x11vnc's -unixpw mode.
 
 
  Server Certificates:
@@ -508,6 +573,7 @@ proc help_certs {} {
     
     The former corresponds to the "CAfile" STUNNEL parameter.
     The latter corresponds to the "CApath" STUNNEL parameter.
+
     See stunnel(8) or www.stunnel.org for more information.
     
     If the remote VNC Server fails to authenticate itself with respect to the specified
@@ -517,17 +583,19 @@ proc help_certs {} {
     Once selected, if you click Info or the Right Mouse button on "Browse..."
     then information about the certificate will be displayed.
 
-    If "CertsDir" is set to the token "ACCEPTED_CERTS" (and "ServerCert" is
-    unset) then the certificates accumulated in the special 'Accepted Certs'
-    directory will be used.  "ACCEPTED_CERTS" is the default for every server
-    ("Verify All Certs").  Note that if you ever need to clean this directory,
-    each cert is saved in two files, for example:
+    If, as is the default, "CertsDir" is set to the token "ACCEPTED_CERTS" (and
+    "ServerCert" is unset) then the certificates accumulated in the special
+    'Accepted Certs' directory will be used.  "ACCEPTED_CERTS" is the default for
+    every server ("Verify All Certs").  Note that if you ever need to clean this
+    directory, each cert is saved in two files, for example:
 
           bf-d0-d6-9c-68-5a-fe-24-c6-60-ba-b4-14-e6-66-14=hostname-0.crt
     and
           9eb7c8be.0
 
     This is because of the way OpenSSL must use hash-based filenames in Cert dirs. 
+    The file will have a "full filename:" line indicating the fingerprint and
+    hostname associated with it.  Be sure to remove both files.
 
 
  Notes:
@@ -546,9 +614,10 @@ proc help_certs {} {
         x11vnc -ssl SAVE ...
 
     and then copy the Server certificate to the local (viewer-side) machine.
-    x11vnc prints out to the screen the Server certificate it generates.
-    You can set "ServerCert" to it directly or use the "Import Certificate"
-    action to save it to a file.  Or use the "Fetch Cert" method.
+    x11vnc prints out to the screen the Server certificate it generates.  You can
+    set "ServerCert" to it directly or use the "Import Certificate" action to
+    save it to a file.  Or use the "Fetch Cert" method to retrieve it (be sure
+    to verify the MD5 fingerprint, etc).
 
     x11vnc also has command line utilities to create server, client, and CA
     (Certificate Authority) certificates.  See the above URLs.
@@ -2770,7 +2839,7 @@ proc check_accepted_certs {} {
 
 	if [file exists $crt] {
 		mesg "OK: Certificate found in ACCEPTED_CERTS"
-		after 550
+		after 750
 		return 1
 	}
 
@@ -2864,6 +2933,7 @@ proc check_accepted_certs {} {
     VNC server that you trust (e.g. by checking the fingerprint with that
     sent to you by the server administrator).
 
+
     Should this certificate be saved in the accepted certs directory and
     then used to SSL authenticate VNC servers?
 
@@ -2871,7 +2941,7 @@ proc check_accepted_certs {} {
     to inspect the certificate before deciding to save it or not.
 
     Choose 'Ignore Cert for One Connection' to connect one time to the
-    server and not require any certificate verification.
+    server and not require ANY certificate verification.
 "
 
 	if {$oth == 0} {
@@ -2947,40 +3017,51 @@ proc check_accepted_certs {} {
 	set fetch_cert_filename $crt
 
 	fetch_dialog $cert_text $hp $hp 1 47 
+	after 100
 
 	catch {tkwait window .fetch}
 	after 200
 	catch {tkwait window .scrt}
-
-	set fetch_cert_filename ""
-
-	if [file exists $crt] {
-		set ossl [get_openssl]
-		set hash [exec $ossl x509 -hash -noout -in $crt]
-		set hash [string trim $hash]
-		if [regexp {^([0-9a-f][0-9a-f]*)} $hash mv h] {
-			set hashfile "$adir/$h.0"
-			if [file exists $hashfile] {
-				set hashfile "$adir/$h.1"
-			}
-			set fh [open $crt "a"]
-			if {$fh != ""} {
-				puts $fh ""
-				puts $fh "SSVNC info:"
-				puts $fh "Host-Display: $hp"
-				puts $fh "$fingerline"
-				puts $fh "hash filename: $h.0"
-				puts $fh "full filename: $fingerprint=$from.crt"
-				close $fh
-			}
-			catch {file copy -force $crt $hashfile}
-			if [file exists $hashfile] {
-				return 1
-			}
-		}
+	after 200
+	if [winfo exists .scrt] {
+		catch {tkwait window .scrt}
 	}
 
-	return 0
+	set fetch_cert_filename ""
+	set accepted_cert_dialog_in_progress 0
+
+	save_hash $crt $adir $hp $fingerline $from $fingerprint
+
+	return 1
+}
+
+proc save_hash {crt adir hp fingerline from fingerprint} {
+	if ![file exists $crt] {
+		return
+	}
+	set ossl [get_openssl]
+	set hash [exec $ossl x509 -hash -noout -in $crt]
+	set hash [string trim $hash]
+	if [regexp {^([0-9a-f][0-9a-f]*)} $hash mv h] {
+		set hashfile "$adir/$h.0"
+		if [file exists $hashfile] {
+			set hashfile "$adir/$h.1"
+		}
+		set fh [open $crt "a"]
+		if {$fh != ""} {
+			puts $fh ""
+			puts $fh "SSVNC info:"
+			puts $fh "Host-Display: $hp"
+			puts $fh "$fingerline"
+			puts $fh "hash filename: $h.0"
+			puts $fh "full filename: $fingerprint=$from.crt"
+			close $fh
+		}
+		catch {file copy -force $crt $hashfile}
+		if [file exists $hashfile] {
+			return 1
+		}
+	}
 }
 
 proc tpid {} {
@@ -3680,11 +3761,49 @@ proc launch {{hp ""}} {
 		set hp [get_vncdisplay]
 	}
 
-	if {[regexp {^HOME=} $hp] || [regexp {^SSVNC_HOME=} $hp]} {
-		set t $hp
+	set hpt [string trim $hp]
+	regsub {[ 	].*$} $hpt "" hpt
+	
+
+	if {[regexp {^HOME=} $hpt] || [regexp {^SSVNC_HOME=} $hpt]} {
+		set t $hpt
 		regsub {^.*HOME=} $t "" t
+		set t [string trim $t]
 		set env(SSVNC_HOME) $t
 		mesg "set SSVNC_HOME to $t"
+		return 0
+	}
+	if {[regexp {^DISPLAY=} $hpt] || [regexp {^SSVNC_DISPLAY=} $hpt]} {
+		set t $hpt
+		regsub {^.*DISPLAY=} $t "" t
+		set t [string trim $t]
+		set env(DISPLAY) $t
+		mesg "set DISPLAY to $t"
+		global uname darwin_cotvnc
+		if {$uname == "Darwin"} {
+			if {$t != ""} {
+				set darwin_cotvnc 0
+			} else {
+				set darwin_cotvnc 1
+			}
+		}
+		return 0
+	}
+	if {[regexp {^DYLD_LIBRARY_PATH=} $hpt] || [regexp {^SSVNC_DYLD_LIBRARY_PATH=} $hpt]} {
+		set t $hpt
+		regsub {^.*DYLD_LIBRARY_PATH=} $t "" t
+		set t [string trim $t]
+		set env(DYLD_LIBRARY_PATH) $t
+		set env(SSVNC_DYLD_LIBRARY_PATH) $t
+		mesg "set DYLD_LIBRARY_PATH to $t"
+		return 0
+	}
+	if {[regexp {^SLEEP=} $hpt] || [regexp {^SSVNC_EXTRA_SLEEP=} $hpt]} {
+		set t $hpt
+		regsub {^.*SLEEP=} $t "" t
+		set t [string trim $t]
+		set env(SSVNC_EXTRA_SLEEP) $t
+		mesg "set SSVNC_EXTRA_SLEEP to $t"
 		return 0
 	}
 
@@ -4944,7 +5063,7 @@ proc import_check_mode {w} {
 	}
 }
 	
-proc import_browse {} {
+proc import_browse {par} {
 	global import_file
 
 	set idir ""
@@ -4952,14 +5071,14 @@ proc import_browse {} {
 		set idir [get_idir_certs $import_file]
 	}
 	if {$idir != ""} {
-		set t [tk_getOpenFile -parent .icrt -initialdir $idir]
+		set t [tk_getOpenFile -parent $par -initialdir $idir]
 	} else {
-		set t [tk_getOpenFile -parent .icrt]
+		set t [tk_getOpenFile -parent $par]
 	}
 	if {$t != ""} {
 		set import_file $t
 	}
-	catch {raise .icrt}
+	catch {raise $par}
 	update
 }
 
@@ -4985,11 +5104,12 @@ proc import_save_browse {{par ".icrt"}} {
 	update
 }
 
-proc do_save {} {
+proc do_save {par} {
 	global import_mode import_file import_save_file
+	global also_save_to_accepted_certs
 	
-	if {$import_save_file == ""} {
-		tk_messageBox -parent .icrt -type ok -icon error \
+	if {$import_save_file == "" && ! $also_save_to_accepted_certs} {
+		tk_messageBox -parent $par -type ok -icon error \
 			-message "No Save File supplied" -title "Save File"
 		return
 	}
@@ -4999,10 +5119,10 @@ proc do_save {} {
 		global save_cert_text
 		set str $save_cert_text
 	} elseif {$import_mode == "paste"} {
-		set str [.icrt.paste.t get 1.0 end]
+		set str [$par.paste.t get 1.0 end]
 	} else {
 		if {! [file exists $import_file]} {
-			tk_messageBox -parent .icrt -type ok -icon error \
+			tk_messageBox -parent $par -type ok -icon error \
 				-message "Input file \"$import_file\" does not exist." -title "Import File"
 			return
 		}
@@ -5010,7 +5130,7 @@ proc do_save {} {
 		set emess ""
 		set rc [catch {set fh [open $import_file "r"]} emess]
 		if {$rc != 0 || $fh == ""} {
-			tk_messageBox -parent .icrt -type ok -icon error \
+			tk_messageBox -parent $par -type ok -icon error \
 				-message $emess -title "Import File: $import_file"
 			return
 		}
@@ -5021,25 +5141,34 @@ proc do_save {} {
 	}
 
 	if {! [regexp {BEGIN CERTIFICATE} $str]} {
-		tk_messageBox -parent .icrt -type ok -icon error \
+		tk_messageBox -parent $par -type ok -icon error \
 			-message "Import Text does not contain \"BEGIN CERTIFICATE\"" -title "Imported Text"
 		return
 	}
 	if {! [regexp {END CERTIFICATE} $str]} {
-		tk_messageBox -parent .icrt -type ok -icon error \
+		tk_messageBox -parent $par -type ok -icon error \
 			-message "Import Text does not contain \"END CERTIFICATE\"" -title "Imported Text"
 		return
 	}
 
+	global is_windows
 	set fh ""
 	set emess ""
+	set deltmp ""
+	if {$import_save_file == ""} {
+		if {! $is_windows} {
+			set deltmp /tmp/itmp.[tpid]
+		} else {
+			set deltmp itmp.[tpid]
+		}
+		set import_save_file $deltmp
+	}
 	set rc [catch {set fh [open $import_save_file "w"]} emess]
 	if {$rc != 0 || $fh == ""} {
-		tk_messageBox -parent .icrt -type ok -icon error \
+		tk_messageBox -parent $par -type ok -icon error \
 			-message $emess -title "Save File: $import_save_file"
 		return
 	}
-	global is_windows
 	if {! $is_windows} {
 		catch {file attributes $import_save_file -permissions go-w}
 		if {[regexp {PRIVATE} $str] || [regexp {\.pem$} $import_save_file]} {
@@ -5048,13 +5177,59 @@ proc do_save {} {
 	}
 	puts -nonewline $fh $str
 	close $fh
-	catch {destroy .icrt}
+
+	if {$also_save_to_accepted_certs} {
+		set ossl [get_openssl]
+		set fp_txt ""
+		set fp_txt [exec $ossl x509 -fingerprint -noout -in $import_save_file]
+
+		set adir [get_idir_certs ""]
+		set adir "$adir/accepted"
+		catch {file mkdir $adir}
+
+		set fingerprint ""
+		set fingerline ""
+
+		set i 0
+		foreach line [split $fp_txt "\n"] {
+			incr i
+			if {$i > 4} {
+				break
+			}
+			if [regexp -nocase {Fingerprint=(.*)} $line mv str] {
+				set fingerline $line
+				set fingerprint [string trim $str]
+			}
+		}
+
+		set fingerprint [string tolower $fingerprint]
+		regsub -all {:} $fingerprint "-" fingerprint
+		regsub -all {[\\/=]} $fingerprint "_" fingerprint
+
+		global vncdisplay
+		set from [get_ssh_hp $vncdisplay]
+		set hp $from
+
+		set from [string tolower $from]
+		regsub -all {^[+a-z]*://} $from "" from
+		regsub -all {:} $from "-" from
+		regsub -all {[\\/=]} $from "_" from
+
+		set crt "$adir/$fingerprint=$from.crt"
+		catch {file copy -force $import_save_file $crt}
+
+		save_hash $crt $adir $hp $fingerline $from $fingerprint
+	}
+
+	catch {destroy $par}
 	set p .c
 	if {![winfo exists .c]} {
 		global accepted_cert_dialog_in_progress
 		if {! $accepted_cert_dialog_in_progress} {
-			getcerts
-			update	
+			if {$deltmp == ""} {
+				getcerts
+				update	
+			}
 		}
 	}
 	if {![winfo exists .c]} {
@@ -5062,6 +5237,11 @@ proc do_save {} {
 	}
 	catch {raise .c}
 	catch {destroy .scrt}
+	if {$deltmp != ""} {
+		catch {file delete $deltmp}
+		set import_save_file ""
+		return;
+	}
 	tk_messageBox -parent $p -type ok -icon info \
 		-message "Saved to file: $import_save_file" -title "Save File: $import_save_file"
 }
@@ -5144,7 +5324,7 @@ TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 	set import_file ""
 	entry $w.e -width 40 -textvariable import_file
 
-	button $w.b -pady 1 -anchor w -text "Browse..." -command import_browse
+	button $w.b -pady 1 -anchor w -text "Browse..." -command {import_browse .icrt}
 	pack $w.b -side right
 	pack $w.p $w.f -side left
 	pack $w.e -side left -expand 1 -fill x
@@ -5162,7 +5342,7 @@ TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 	button .icrt.cancel -text "Cancel" -command {destroy .icrt; catch {raise .c}}
 	bind .icrt <Escape> {destroy .icrt; catch {raise .c}}
 
-	button .icrt.save -text "Save" -command {do_save}
+	button .icrt.save -text "Save" -command {do_save .icrt}
 
 	set w .icrt.sf
 	frame $w
@@ -5197,15 +5377,16 @@ proc save_cert {hp} {
 	global scroll_text_focus
 	set scroll_text_focus 0
 	global uname
-	scroll_text .scrt.f 90 17
-	set scroll_text_focus 1
 
 	global accepted_cert_dialog_in_progress
 	if {$accepted_cert_dialog_in_progress} {
 		set mode "accepted"
+		scroll_text .scrt.f 90 15
 	} else {
 		set mode "normal"
+		scroll_text .scrt.f 90 20
 	}
+	set scroll_text_focus 1
 
 	set msg1 {
     This dialog lets you import a SSL Certificate retrieved from a VNC server.
@@ -5213,16 +5394,19 @@ proc save_cert {hp} {
     Be sure to have verified its authenticity via an external means (checking
     the MD5 hash value sent to you by the administrator, etc)
 
-    Set the "Save to File" name to the file where the imported certificate
-    will be saved.
+    Set "Save to File" to the filename where the imported cert will be saved.
+
+    If you also want the Certificate to be saved to the pool of certs in the
+    'Accepted Certs' directory, select the checkbox.  By default all Servers are
+    verified against the certificates in this pool.
 
     Then, click on "Save" to save the imported Certificate.
 
-    After you have imported the Certificate it will be automatically selected 
-    as the "ServerCert" for this host: %HOST
+    After you have imported the Certificate it will be automatically selected as
+    the "ServerCert" for the next connection to this host: %HOST
 
-    To make the ServerCert setting to the imported cert file PERMANENT, 
-    select Options -> Save Profile to save it in a profile.
+    To make the ServerCert setting to the imported cert file PERMANENT, select
+    Options -> Save Profile to save it in the profile for this host.
 }
 
 	set msg2 {
@@ -5238,7 +5422,7 @@ proc save_cert {hp} {
 
     It, and the others certs in that directory, will be used to authenticate
     any VNC Server that has "ACCEPTED_CERTS" as the "CertsDir" value in the
-    "Certs..." dialog.
+    "Certs..." dialog.  This is the default checking policy.
 }
 
 	set msg ""
@@ -5258,16 +5442,16 @@ proc save_cert {hp} {
 	set import_file ""
 	entry $w.e -width 40 -textvariable import_file
 
-	scroll_text .scrt.paste 90 26
+	scroll_text .scrt.paste 90 23
 
 	button .scrt.cancel -text "Cancel" -command {destroy .scrt; catch {raise .c}}
 	bind .scrt <Escape> {destroy .scrt; catch {raise .c}}
 
 	global import_save_file
 	if {$mode == "normal"} {
-		button .scrt.save -text "Save" -command {do_save; set svcert $import_save_file}
+		button .scrt.save -text "Save" -command {do_save .scrt; set svcert $import_save_file}
 	} else {
-		button .scrt.save -text "Save" -command {do_save}
+		button .scrt.save -text "Save" -command {do_save .scrt}
 	}
 
 	set w .scrt.sf
@@ -5292,7 +5476,16 @@ proc save_cert {hp} {
 	pack $w.l -side left
 	pack $w.e -side left -expand 1 -fill x
 
-	pack .scrt.cancel .scrt.save .scrt.sf .scrt.mf -side bottom -fill x
+	global also_save_to_accepted_certs
+	set also_save_to_accepted_certs 0
+	checkbutton .scrt.ac -anchor w -variable also_save_to_accepted_certs -text \
+	    "Also Save to the 'Accepted Certs' directory" -relief raised
+
+	if {$mode == "normal"} {
+		pack .scrt.cancel .scrt.save .scrt.sf .scrt.ac .scrt.mf -side bottom -fill x
+	} else {
+		pack .scrt.cancel .scrt.save .scrt.sf          .scrt.mf -side bottom -fill x
+	}
 	pack .scrt.paste -side bottom -fill x
 
 	pack .scrt.f -side top -fill both -expand 1
@@ -8544,6 +8737,7 @@ proc unixpw_adjust {} {
 	}
 	if {$use_unixpw} {
 		pack configure .fu -after .f1 -fill x
+		catch {focus .fu.e}
 	} else {
 		pack forget .fu
 	}
@@ -8575,7 +8769,7 @@ proc set_options {} {
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_unixpw -text \
-		"Unix Username & Password" -command {unixpw_adjust}
+		"Unix Username & Password" -command {unixpw_adjust; catch {destroy .o}}
 	if {$is_windows} {.o.b$i configure -state disabled}
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i

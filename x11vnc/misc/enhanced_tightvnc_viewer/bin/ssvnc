@@ -126,6 +126,11 @@ fi
 SSVNC_BASEDIR="$dir"
 export SSVNC_BASEDIR
 
+if [ -f "$dir/util/ultraftp.jar" ]; then
+	SSVNC_ULTRA_FTP_JAR="$dir/util/ultraftp.jar"
+	export SSVNC_ULTRA_FTP_JAR
+fi
+
 if [ "X$WISH" = "Xwish" ]; then
 	exec ssvnc.tcl "$@"
 else

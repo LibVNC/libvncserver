@@ -86,6 +86,13 @@ fi
 PATH=$PATH:/usr/bin:/bin
 export PATH
 
+if [ "X$FULLNAME" = "XKarl J. Runge" ]; then
+	VNCVIEWER_POPUP_FIX=1
+	export VNCVIEWER_POPUP_FIX
+
+	PATH=`echo "$PATH" | sed -e 's,runge/bin/override,-------------,'`
+fi
+
 # Set this for ss_vncviewer to pick up:
 #
 if [ "X$1" = "X-cotvnc" ]; then
@@ -193,6 +200,11 @@ if echo "$dir" | grep '^/' > /dev/null; then
 else
 	dir=`pwd`/$dir
 	PATH="$dir:$dir/$name:$dir/util:$PATH"
+fi
+
+if [ -f "$dir/util/ultraftp.jar" ]; then
+	SSVNC_ULTRA_FTP_JAR="$dir/util/ultraftp.jar"
+	export SSVNC_ULTRA_FTP_JAR
 fi
 
 base=`basename "$0"`

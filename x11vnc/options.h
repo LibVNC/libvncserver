@@ -270,6 +270,8 @@ extern int force_dpms;
 extern int client_dpms;
 extern int no_ultra_dpms;
 extern int no_ultra_ext;
+extern int saw_ultra_chat;
+extern int saw_ultra_file;
 
 extern int watch_selection;
 extern int watch_primary;

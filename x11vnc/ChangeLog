@@ -1,3 +1,10 @@
+2007-06-14  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add detectors if ultravnc chat or file xfer took place,
+	  if so ping clients more frequently.  Fix compile bug if libssl
+	  not available.
+	* ssvnc: add ultravnc ftp jar feature. Add certificate management
+	  "Verify All Certs".
+
 2007-05-26  Karl Runge <runge@karlrunge.com>
 	* x11vnc: set to version 0.9.2, back to NCACHE -12 for testing.
 	  in -unixpw, initial Escape means no echo username (see ssvnc).

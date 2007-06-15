@@ -20,6 +20,7 @@ $USER's $DESKTOP desktop ($DISPLAY)
 <param name=PORT value=$PORT>
 <param name="Open New Window" value=yes>
 <param name="ignoreMSLogonCheck" value=yes>
+<param name="delayAuthPanel" value=yes>
 $PARAMS
 </APPLET>
 <BR>

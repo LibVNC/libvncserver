@@ -5,6 +5,15 @@
 
 dir=`dirname "$0"`
 
+if [ "X$SSVNC_DYLD_LIBRARY_PATH" != "X" ]; then
+	if [ "X$DYLD_LIBRARY_PATH" = "X" ] ; then
+		DYLD_LIBRARY_PATH=$SSVNC_DYLD_LIBRARY_PATH
+	else
+		DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$SSVNC_DYLD_LIBRARY_PATH
+	fi
+	export DYLD_LIBRARY_PATH
+fi
+
 if [ "X$DISPLAY" != "X" ]; then
 	"$dir/vncviewer.x11" "$@"
 else

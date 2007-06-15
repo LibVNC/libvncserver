@@ -2704,8 +2704,13 @@ static void ping_clients(int tile_cnt) {
 		rfbLog("reset rfbMaxClientWait to %d msec.\n",
 		    rfbMaxClientWait);
 	}
-	if (tile_cnt) {
+	if (tile_cnt > 0) {
 		last_send = now;
+	} else if (tile_cnt < 0) {
+		if (now >= last_send - tile_cnt) {
+			mark_rect_as_modified(0, 0, 1, 1, 1);
+			last_send = now;
+		}
 	} else if (now - last_send > 2) {
 		/* Send small heartbeat to client */
 		mark_rect_as_modified(0, 0, 1, 1, 1);
@@ -3344,6 +3349,8 @@ if (tile_count) fprintf(stderr, "XX copytile: %.4f  tile_count: %d\n", dnow() - 
 	/* Work around threaded rfbProcessClientMessage() calls timeouts */
 	if (use_threads) {
 		ping_clients(tile_diffs);
+	} else if (saw_ultra_chat || saw_ultra_file) {
+		ping_clients(-1);
 	} else if (use_openssl && !tile_diffs) {
 		ping_clients(0);
 	}
