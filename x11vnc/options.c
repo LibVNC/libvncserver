@@ -206,8 +206,8 @@ int wireframe_local = 1;
 #ifdef NO_NCACHE
 #define NCACHE 0 
 #else
-#define NCACHE -12
-#define xxNCACHE -1
+#define xxNCACHE -12
+#define NCACHE -1
 #endif
 #endif
 

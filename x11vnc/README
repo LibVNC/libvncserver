@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Thu Jun 14 22:46:36 EDT 2007
+x11vnc README file                         Date: Sat Jun 16 17:10:23 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -709,7 +709,7 @@ make
        on Unix that supports ultravnc filetransfer. It is in the
        classes/ssl/UltraViewerSSL.jar file (that is pointed to by
        ultra.vnc). The signed applet SignedUltraViewerSSL.jar version
-       (pointed to by ultrasigned.vnc will be needed to access the local
+       (pointed to by ultrasigned.vnc) will be needed to access the local
        drive if you are using it for file transfer via a Web browser.
        Some other bugs in the UltraVNC Java viewer were fixed and a few
        improvements to the UI made.
@@ -1460,7 +1460,7 @@ make
    [299]Q-116: Why don't I hear the "Beeps" in my X session (e.g. when
    typing tput bel in an xterm)? 
 
-   [300]Q-117: Can x11vnc work with IPv6? 
+   [300]Q-117: Does x11vnc work with IPv6? 
 
    [301]Q-118: Thanks for your program and for your help! Can I make a
    donation? 
@@ -3725,7 +3725,7 @@ x11vnc -logfile $HOME/.x11vnc.log -rfbauth $HOME/.vnc/passwd -forever -bg
    GNOME gdm, KDE kdm, or CDE dtlogin? (i.e. nobody is logged into an X
    session yet).
 
-   One time only.   If the X login screen is running and you just want to
+   One time only:   If the X login screen is running and you just want to
    connect to it once (i.e. a one-shot):
 
    It is usually possible to do this by just adjusting the XAUTHORITY
@@ -3762,7 +3762,7 @@ x11vnc -logfile $HOME/.x11vnc.log -rfbauth $HOME/.vnc/passwd -forever -bg
    [518]the example at the end of this FAQ). Then restart dtlogin, e.g.:
    /etc/init.d/dtlogin stop; /etc/init.d/dtlogin start or reboot.
 
-   Continuously.   Have x11vnc reattach each time the X server is
+   Continuously:   Have x11vnc reattach each time the X server is
    restarted (i.e. after each logout):
 
    To make x11vnc always attached to the X server including the login
@@ -7481,7 +7481,7 @@ or:
    trying a [798]redirector such as esd.
 
 
-   Q-117: Can x11vnc work with IPv6?
+   Q-117: Does x11vnc work with IPv6?
 
    Currently the only way to do this is via [799]inetd. You configure
    x11vnc to be run from inetd or xinetd and instruct it to listen on an
@@ -10476,8 +10476,8 @@ es and source AND full archives in the zip dir. (~15MB)
   [30]ssvnc-1.0.18.zip
   [31]ssvnc_all-1.0.18.zip
 
-   Please help test the UltraVNC file transfer support in the native Unix
-   VNC viewer.
+   Please help test the UltraVNC File Transfer support in the native Unix
+   VNC viewer!
 
    A self-extracting and running file for the "ssvnc_unix_minimal"
    package is here: [32]ssvnc. Save it as filename "ssvnc", type "chmod
@@ -11030,7 +11030,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.2 lastmod: 2007-06-14
+x11vnc: allow VNC connections to real X11 displays. 0.9.2 lastmod: 2007-06-16
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -11144,7 +11144,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.2 lastmod: 2007-06-14
+x11vnc: allow VNC connections to real X11 displays. 0.9.2 lastmod: 2007-06-16
 
 (type "x11vnc -opts" to just list the options.)
 
