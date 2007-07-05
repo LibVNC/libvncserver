@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "June 2007" "x11vnc " "User Commands"
+.TH X11VNC "1" "July 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.2, lastmod: 2007-06-16
+         version: 0.9.3, lastmod: 2007-07-03
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2731,6 +2731,10 @@ the situation with dropshadows or other compositing
 things worse.  The default is 0 on Unix and 24 on
 MacOS X.
 .PP
+\fB-debug_ncache\fR
+.IP
+Turn on debugging and profiling output under \fB-ncache.\fR
+.PP
 \fB-wireframe\fR \fI[str],\fR \fB-nowireframe\fR
 .IP
 Try to detect window moves or resizes when a mouse
@@ -4627,6 +4631,10 @@ debug_sel       enable  \fB-debug_sel\fR
 .IP
 nodebug_sel     disable \fB-debug_sel\fR
 .IP
+debug_ncache    enable  \fB-debug_ncache\fR
+.IP
+nodebug_ncache  disable \fB-debug_ncache\fR
+.IP
 dbg             enable  \fB-dbg\fR crash shell
 .IP
 nodbg           disable \fB-dbg\fR crash shell
@@ -4700,24 +4708,25 @@ xrandr_mode rotate padgeom quiet q noquiet modtweak
 nomodtweak xkb noxkb capslock nocapslock skip_lockkeys
 noskip_lockkeys skip_keycodes sloppy_keys nosloppy_keys
 skip_dups noskip_dups add_keysyms noadd_keysyms
-clear_mods noclear_mods clear_keys noclear_keys remap
-repeat norepeat fb nofb bell nobell sel nosel primary
-noprimary setprimary nosetprimary clipboard noclipboard
-setclipboard nosetclipboard seldir cursorshape
-nocursorshape cursorpos nocursorpos cursor_drag
-nocursor_drag cursor show_cursor noshow_cursor nocursor
-arrow xfixes noxfixes xdamage noxdamage xd_area xd_mem
-alphacut alphafrac alpharemove noalpharemove alphablend
-noalphablend xwarppointer xwarp noxwarppointer
-noxwarp buttonmap dragging nodragging ncache_cr
-noncache_cr ncache_no_moveraise noncache_no_moveraise
-ncache_no_dtchange noncache_no_dtchange
-ncache_no_rootpixmap noncache_no_rootpixmap
-ncache_reset_rootpixmap ncache_keep_anims
-noncache_keep_anims ncache_old_wm noncache_old_wm
-ncache noncache ncache_size wireframe_mode wireframe wf
-nowireframe nowf wireframelocal wfl nowireframelocal
-nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
+clear_mods noclear_mods clear_keys noclear_keys
+remap repeat norepeat fb nofb bell nobell sel nosel
+primary noprimary setprimary nosetprimary clipboard
+noclipboard setclipboard nosetclipboard seldir
+cursorshape nocursorshape cursorpos nocursorpos
+cursor_drag nocursor_drag cursor show_cursor
+noshow_cursor nocursor arrow xfixes noxfixes xdamage
+noxdamage xd_area xd_mem alphacut alphafrac alpharemove
+noalpharemove alphablend noalphablend xwarppointer
+xwarp noxwarppointer noxwarp buttonmap dragging
+nodragging ncache_cr noncache_cr ncache_no_moveraise
+noncache_no_moveraise ncache_no_dtchange
+noncache_no_dtchange ncache_no_rootpixmap
+noncache_no_rootpixmap ncache_reset_rootpixmap
+ncache_keep_anims noncache_keep_anims ncache_old_wm
+noncache_old_wm ncache noncache ncache_size debug_ncache
+nodebug_ncache wireframe_mode wireframe wf nowireframe
+nowf wireframelocal wfl nowireframelocal nowfl
+wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
 scr_parms scrollcopyrect scr noscrollcopyrect
 noscr fixscreen noxrecord xrecord reset_record

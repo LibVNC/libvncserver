@@ -173,6 +173,7 @@ extern int ncache_keep_anims;
 extern int ncache_old_wm;
 extern int macosx_ncache_macmenu;
 extern int ncache_beta_tester;
+extern int ncdb;
 
 extern Atom atom_NET_ACTIVE_WINDOW;
 extern Atom atom_NET_CURRENT_DESKTOP;

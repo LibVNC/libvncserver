@@ -1,3 +1,6 @@
+2007-07-04  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -debug_ncache, fix big fonts in tkx11vnc.
+
 2007-06-14  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add detectors if ultravnc chat or file xfer took place,
 	  if so ping clients more frequently.  Fix compile bug if libssl

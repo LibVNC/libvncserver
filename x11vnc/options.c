@@ -206,8 +206,8 @@ int wireframe_local = 1;
 #ifdef NO_NCACHE
 #define NCACHE 0 
 #else
-#define xxNCACHE -12
-#define NCACHE -1
+#define NCACHE -12
+#define xxNCACHE -1
 #endif
 #endif
 
@@ -232,6 +232,7 @@ int ncache_keep_anims = 0;
 int ncache_old_wm = 0;
 int macosx_ncache_macmenu = 0;
 int ncache_beta_tester = 0;
+int ncdb = 0;
 
 Atom atom_NET_ACTIVE_WINDOW = None;
 Atom atom_NET_CURRENT_DESKTOP = None;

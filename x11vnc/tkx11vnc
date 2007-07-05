@@ -286,6 +286,7 @@ Debugging
 	debug_tiles
 	debug_grabs
 	debug_sel
+	debug_ncache
 	dbg
 	=GAL LOFF
 
@@ -383,7 +384,7 @@ Tuning
 	ncache_no_dtchange
 	ncache_no_rootpixmap
 	ncache_keep_anims
-	=A ncache_reset_rootpixmap
+	=RA ncache_reset_rootpixmap
 	=GAL LOFF
 	--
 	=GAL SharedMemory::
@@ -6321,6 +6322,17 @@ set bfont "-adobe-helvetica-bold-r-*-*-*-120-*-*-*-*-*-*"
 set sfont "-adobe-helvetica-bold-r-*-*-*-100-*-*-*-*-*-*"
 set snfont "-adobe-helvetica-medium-r-*-*-*-100-*-*-*-*-*-*"
 set ffont "fixed"
+
+set ls ""
+catch {set ls [font metrics $bfont -linespace]}
+if {$ls != ""} {
+    if {$ls > 14} {
+	# some recent setups have BIG rendering for the above fonts:
+	set bfont "-adobe-helvetica-bold-r-*-*-*-90-*-*-*-*-*-*"
+	set sfont "-adobe-helvetica-bold-r-*-*-*-75-*-*-*-*-*-*"
+	set snfont "-adobe-helvetica-medium-r-*-*-*-75-*-*-*-*-*-*"
+    }
+}
 set help_indent 24;
 set reply_xdisplay ""
 set all_settings "None so far."

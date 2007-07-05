@@ -2940,6 +2940,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				check_ncache(1,0);
 			}
 		}
+	} else if (!strcmp(p, "debug_ncache")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, ncdb);
+			goto qry;
+		}
+		ncdb = 1;
+		rfbLog("remote_cmd: enabled debug_ncache\n");
+	} else if (!strcmp(p, "nodebug_ncache")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !ncdb);
+			goto qry;
+		}
+		ncdb = 0;
+		rfbLog("remote_cmd: disabled debug_ncache\n");
 #endif
 
 	} else if (strstr(p, "wireframe_mode") == p) {

@@ -2307,6 +2307,8 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-ncache_pad") || !strcmp(arg, "-nc_pad")) {
 			CHECK_ARGC
 			ncache_pad = atoi(argv[++i]);
+		} else if (!strcmp(arg, "-debug_ncache")) {
+			ncdb++;
 #endif
 		} else if (!strcmp(arg, "-wireframe")
 		    || !strcmp(arg, "-wf")) {
@@ -3669,6 +3671,9 @@ int main(int argc, char* argv[]) {
 		if (scale_str) {
 			rfbLog("  Note: '-scale' is on and this can cause more problems.\n");
 		}
+	}
+	if (ncache && getenv("NCACHE_DEBUG")) {
+		ncdb = 1;
 	}
 
 	/* check for OS with small shm limits */
