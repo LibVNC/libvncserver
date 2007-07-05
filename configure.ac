@@ -248,13 +248,14 @@ if test "$build_x11vnc" = "yes"; then
 if test "x$HAVE_X" = "xfalse" -a "x$with_x" != "xno"; then
 	AC_MSG_ERROR([
 ==========================================================================
-A working X window system build environment is required to build x11vnc.
-Make sure any required X development packages are installed.  If they are
-installed in non-standard locations, one can use the --x-includes=DIR
-and --x-libraries=DIR configure options or set the CPPFLAGS and LDFLAGS
-environment variables to indicate where the X window system header files
-and libraries may be found.  On 64+32 bit machines you may need to point
-to lib64 or lib32 directories to pick up the correct word size.
+*** A working X window system build environment is required to build ***
+x11vnc.  Make sure any required X development packages are installed.
+If they are installed in non-standard locations, one can use the
+--x-includes=DIR and --x-libraries=DIR configure options or set the
+CPPFLAGS and LDFLAGS environment variables to indicate where the X
+window system header files and libraries may be found.  On 64+32 bit
+machines you may need to point to lib64 or lib32 directories to pick up
+the correct word size.
 
 If you want to build x11vnc without X support (e.g. for -rawfb use only
 or for native Mac OS X), specify the --without-x configure option.
@@ -265,10 +266,10 @@ fi
 if test "x$HAVE_X" = "xtrue" -a "x$HAVE_XTEST" != "xtrue"; then
 	AC_MSG_WARN([
 ==========================================================================
-A working build environment for the XTEST extension was not found (libXtst).
-An x11vnc built this way will be only barely usable.  You will be able to
-move the mouse but not click or type.  There can also be deadlocks if an
-application grabs the X server.
+*** A working build environment for the XTEST extension was not found ***
+(libXtst).  An x11vnc built this way will be only barely usable.
+You will be able to move the mouse but not click or type.  There can
+also be deadlocks if an application grabs the X server.
 
 It is recommended that you install the necessary development packages
 for XTEST (perhaps it is named something like libxtst-dev) and run
@@ -321,10 +322,10 @@ AC_SUBST(SSL_LIBS)
 	if test "x$HAVE_LIBSSL" != "xtrue"; then
 		AC_MSG_WARN([
 ==========================================================================
-The openssl encryption library libssl.so was not found.  An x11vnc built
-this way will not support SSL encryption.  To enable SSL install the
-necessary development packages (perhaps it is named something like
-libssl-dev) and run configure again.
+*** The openssl encryption library libssl.so was not found. ***
+An x11vnc built this way will not support SSL encryption.  To enable
+SSL install the necessary development packages (perhaps it is named
+something like libssl-dev) and run configure again.
 ==========================================================================
 ])
 	fi
@@ -394,6 +395,7 @@ fi
 
 if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xno"; then
 	printf "checking for system libvncserver... "
+	vneed="0.9.1"
 	if test "x$with_system_libvncserver" != "xyes"; then
 		rflag=""
 		if test "x$ld_minus_R" = "xno"; then
@@ -403,11 +405,35 @@ if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xno
 		else
 			rflag="-R$with_system_libvncserver/lib"
 		fi
-		SYSTEM_LIBVNCSERVER_CFLAGS="-I$with_system_libvncserver/include"
-		SYSTEM_LIBVNCSERVER_LIBS="-L$with_system_libvncserver/lib $rflag -lvncserver -lvncclient"
-		echo "using $with_system_libvncserver"
-		with_system_libvncserver=yes
-	elif libvncserver-config --version >/dev/null 2>&1; then
+		cmd="$with_system_libvncserver/bin/libvncserver-config"
+		if $cmd --version 1>/dev/null 2>&1; then
+			cvers=`$cmd --version 2>/dev/null`
+			cscore=`echo "$cvers" | tr '.' ' ' | awk '{print 10000 * $1 + 100 * $2 + $3}'`
+			nscore=`echo "$vneed" | tr '.' ' ' | awk '{print 10000 * $1 + 100 * $2 + $3}'`
+
+			if test $cscore -lt $nscore; then
+				echo "no"
+				with_system_libvncserver=no
+				AC_MSG_WARN([
+==========================================================================
+*** Need libvncserver version $vneed, have version $cvers ***
+You are building with a system installed libvncserver and it is not
+new enough.  NOTE: The libvncserver included in the x11vnc source tree
+will be used instead.
+==========================================================================
+])
+			else
+				SYSTEM_LIBVNCSERVER_CFLAGS="-I$with_system_libvncserver/include"
+				SYSTEM_LIBVNCSERVER_LIBS="-L$with_system_libvncserver/lib $rflag -lvncserver -lvncclient"
+				echo "using $with_system_libvncserver"
+				with_system_libvncserver=yes
+			fi
+		else
+			echo " *** cannot run $cmd *** " 1>&2
+			with_system_libvncserver=no
+			echo no
+		fi
+	elif libvncserver-config --version 1>/dev/null 2>&1; then
 		rflag=""
 		rprefix=`libvncserver-config --prefix`
 		if test "x$ld_minus_R" = "xno"; then
@@ -417,10 +443,26 @@ if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xno
 		else
 			rflag=" -R$rprefix/lib "
 		fi
-		SYSTEM_LIBVNCSERVER_CFLAGS=`libvncserver-config --cflags`
-		SYSTEM_LIBVNCSERVER_LIBS="$rflag"`libvncserver-config --libs`
-		with_system_libvncserver=yes
-		echo yes
+		cvers=`libvncserver-config --version 2>/dev/null`
+		cscore=`echo "$cvers" | tr '.' ' ' | awk '{print 10000 * $1 + 100 * $2 + $3}'`
+		nscore=`echo "$vneed" | tr '.' ' ' | awk '{print 10000 * $1 + 100 * $2 + $3}'`
+
+		if test $cscore -lt $nscore; then
+			echo "no"
+				AC_MSG_WARN([
+==========================================================================
+*** Need libvncserver version $vneed, have version $cvers ***
+You are building with a system installed libvncserver and it is not
+new enough.  NOTE: The libvncserver included in the x11vnc source tree
+will be used instead.
+==========================================================================
+])
+		else
+			SYSTEM_LIBVNCSERVER_CFLAGS=`libvncserver-config --cflags`
+			SYSTEM_LIBVNCSERVER_LIBS="$rflag"`libvncserver-config --libs`
+			with_system_libvncserver=yes
+			echo yes
+		fi
 	else
 		with_system_libvncserver=no
 		echo no
@@ -476,11 +518,12 @@ if test "x$with_jpeg" != "xno"; then
 		if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
 			AC_MSG_WARN([
 ==========================================================================
-The libjpeg compression library was not found: this may lead to reduced
-performance, especially over slow links.  If libjpeg is in a non-standard
-location use --with-jpeg=DIR to indicate the header file is in
-DIR/include/jpeglib.h and the library in DIR/lib/libjpeg.a.  A copy of
-libjpeg may be obtained from: ftp://ftp.uu.net/graphics/jpeg/
+*** The libjpeg compression library was not found. ***
+This may lead to reduced performance, especially over slow links.
+If libjpeg is in a non-standard location use --with-jpeg=DIR to
+indicate the header file is in DIR/include/jpeglib.h and the library
+in DIR/lib/libjpeg.a.  A copy of libjpeg may be obtained from:
+ftp://ftp.uu.net/graphics/jpeg/
 ==========================================================================
 ])
 		fi
@@ -521,11 +564,11 @@ if test "x$with_zlib" != "xno" -a "x$with_libz" != "xno"; then
 		if test "x$HAVE_ZLIB_H" != "xtrue"; then
 			AC_MSG_WARN([
 ==========================================================================
-The libz compression library was not found: this may lead to reduced
-performance, especially over slow links.  If libz is in a non-standard
-location use --with-zlib=DIR to indicate the header file is in
-DIR/include/zlib.h and the library in DIR/lib/libz.a.  A copy of
-libz may be obtained from: http://www.gzip.org/zlib/
+*** The libz compression library was not found. ***
+This may lead to reduced performance, especially over slow links.
+If libz is in a non-standard location use --with-zlib=DIR to indicate the
+header file is in DIR/include/zlib.h and the library in DIR/lib/libz.a.
+A copy of libz may be obtained from: http://www.gzip.org/zlib/
 ==========================================================================
 ])
 		fi
