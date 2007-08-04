@@ -250,6 +250,7 @@ extern int flip_byte_order;
 extern int waitms;
 extern double wait_ui;
 extern double slow_fb;
+extern double xrefresh;
 extern int wait_bog;
 extern int defer_update;
 extern int got_defer;

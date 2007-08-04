@@ -620,6 +620,7 @@ static char *dcop_session(void) {
 	int len;
 	char *cmd, *host, *user = NULL;
 	char *out, *p, *ds, *dsn = NULL, *sess = NULL, *sess2 = NULL;
+	int db = 0;
 
 	RAWFB_RET(empty);
 
@@ -650,6 +651,9 @@ static char *dcop_session(void) {
 		ds = ":0";
 	}
 	ds = strdup(ds);
+	p = strrchr(ds, '.');
+	if (p) *p = '\0';
+
 	dsn = strchr(ds, ':');
 	if (dsn) {
 		*dsn = '_';
@@ -658,17 +662,31 @@ static char *dcop_session(void) {
 		ds = strdup("_0");
 		dsn = ds;
 	}
+	if (db) fprintf(stderr, "ds:  %s\n", ds);
+	if (db) fprintf(stderr, "dsn: %s\n", dsn);
 
 	host = this_host();
+	if (host) {
+		char *h2 = (char *) malloc(strlen(host) + 2 + 1);
+		sprintf(h2, "_%s_", host);
+		free(host);
+		host = h2;
+	} else {
+		host = strdup("");
+	}
+	if (db) fprintf(stderr, "host: %s\n", host);
 
 	p = strtok(out, "\n");
 	while (p) {
+		if (db) fprintf(stderr, "p:  %s\n", p);
 		char *q = strstr(p, ".DCOP");
 		if (q == NULL) {
 			;
 		} else if (host) {
 			if (strstr(q, host)) {
-				if(strstr(p, dsn)) {
+				char *r = strstr(p, dsn);
+				int n = strlen(dsn);
+				if(r && !isalnum((int) *(r+n))) {
 					sess = strdup(q);
 					break;
 				} else {
@@ -679,7 +697,9 @@ static char *dcop_session(void) {
 				}
 			}
 		} else {
-			if(strstr(p, dsn)) {
+			char *r = strstr(p, dsn);
+			int n = strlen(dsn);
+			if(r && !isalnum((int) *(r+n))) {
 				sess = strdup(q);
 				break;
 			}
@@ -688,6 +708,7 @@ static char *dcop_session(void) {
 	}
 	free(ds);
 	free(out);
+	free(host);
 	if (!sess && sess2) {
 		sess = sess2;
 	}

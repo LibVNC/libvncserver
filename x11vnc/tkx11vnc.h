@@ -411,6 +411,8 @@ char gui_code[] = "";
 "	fuzz:\n"
 "	wait_ui:\n"
 "	nowait_bog\n"
+"	slow_fb:\n"
+"	xrefresh:\n"
 "	readtimeout:\n"
 "	snapfb\n"
 "	threads\n"

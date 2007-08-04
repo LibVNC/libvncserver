@@ -345,6 +345,7 @@ int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
 int waitms = 20;
 double wait_ui = 2.0;
 double slow_fb = 0.0;
+double xrefresh = 0.0;
 int wait_bog = 1;
 int defer_update = 20;	/* deferUpdateTime ms to wait before sends. */
 int got_defer = 0;

@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Tue Jul  3 14:37:44 EDT 2007
+x11vnc README file                         Date: Fri Aug  3 17:26:56 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -43,10 +43,12 @@ x11vnc: a VNC server for real X displays
    should work on nearly all Unixes. I also added some enhancements to
    improve the interactive response, add many features, etc.
 
-   This page and the [19]FAQ contain a lot of information [20][*],
-   solutions to many problems, and interesting applications, but
+   This page including the [19]FAQ contains much information [20][*];
+   solutions to many problems; and interesting applications, but
    nevertheless please feel free to [21]contact me if you have problems
-   or questions.
+   or questions. Please do check the FAQ; I realize this page is massive,
+   but you can often use your browser's find-in-page action to find the
+   discussion of your problem or question.
 
    Please help [22]beta test the new performance speedup feature using
    [23]viewer-side pixel caching. Let me know how it goes; thanks.
@@ -4383,30 +4385,37 @@ xprop -root -f VNC_CONNECT 8s -set VNC_CONNECT "$1"
 
    You can, but you would not be doing this for performance reasons (for
    virtual X sessions via VNC, Xvnc should give the fastest response).
-   You may want to do this because Xvnc does not support an X server
-   extension you desire, or you want to take advantage of one of x11vnc's
-   unending number of options and features.
+   You may want to do this because Xvnc is buggy and crashes, does not
+   support an X server extension you desire, or you want to take
+   advantage of one of x11vnc's unending number of options and features.
 
    One way to acheive this is to have a Xvfb(1) virtual framebuffer X
    server running in the background and have x11vnc attached to it.
-   Another method, faster and more accurate is to use the "dummy" Device
-   Driver in XFree86/Xorg (see below). One could view this desktop both
-   remotely and also [567]locally using vncviewer. Make sure vncviewer's
-   "-encodings raw" is in effect for local viewing (compression seems to
-   slow things down locally). For local viewing you set up a "bare"
-   window manager that just starts up vncviewer and nothing else
-   ([568]See below).
+   Another method, faster and more accurate, is to use the "dummy" Device
+   Driver in XFree86/Xorg (see below).
+
+   In either case, one can view this desktop both remotely and also
+   [567]locally using vncviewer. Make sure vncviewer's "-encodings raw"
+   is in effect for local viewing (compression seems to slow things down
+   locally). For local viewing you set up a "bare" window manager that
+   just starts up vncviewer and nothing else ([568]See how below).
 
    Here is one way to start up Xvfb:
   xinit -- /usr/X11R6/bin/Xvfb :1 -cc 4 -screen 0 1024x768x16
 
    This starts up a 16bpp virtual display. To export it via VNC use
-   "x11vnc -display :1 ...". The "-cc 4" option is to force Xvfb to use a
-   TrueColor visual instead of DirectColor.
+  x11vnc -display :1 ...
+
+   Then have the remote vncviewer attach to x11vnc's VNC display (e.g. :0
+   which is port 5900).
+
+   The "-cc 4" Xvfb option is to force it to use a TrueColor visual
+   instead of DirectColor (this works around a recent bug in the Xorg
+   Xvfb server).
 
    One good thing about Xvfb is that the virtual framebuffer exists in
    main memory (rather than in the video hardware), and so x11vnc can
-   "screen scrape" it efficiently (more than, say, 100X faster than
+   "screen scrape" it very efficiently (more than, say, 100X faster than
    normal video hardware).
 
    Update Nov/2006: See the [569]FINDCREATEDISPLAY discussion of the
@@ -4419,7 +4428,7 @@ xprop -root -f VNC_CONNECT 8s -set VNC_CONNECT "$1"
    [572]-create, [573]-svc, and [574]-xdmsvc aliases can also come in
    handy here.
 
-   There are some annoyances WRT Xvfb though. The default keyboard
+   There are some annoyances WRT Xvfb however. The default keyboard
    mapping seems to be very poor. One should run x11vnc with
    [575]-add_keysyms option to have keysyms added automatically. Also, to
    add the Shift_R and Control_R modifiers something like this is needed:
@@ -4434,17 +4443,17 @@ xmodmap -e "keycode any = Meta_L"
 xmodmap -e "add Mod1 = Alt_L Alt_R Meta_L"
 
    (note: these are applied automatically in the [576]FINDCREATEDISPLAY
-   mode). Perhaps the Xvfb options -xkbdb or -xkbmap could be used to get
-   a better default keyboard mapping.
+   mode of x11vnc). Perhaps the Xvfb options -xkbdb or -xkbmap could be
+   used to get a better default keyboard mapping...
 
-   A user points out a faster and more accurate method is to use the
-   "dummy" Device Driver of XFree86/Xorg instead of Xvfb. He uses this to
-   create a persistent and resizable desktop accessible from anywhere. In
-   the Device Section of the config file set Driver "dummy". You may also
-   need to set VideoRam NNN to be large enough to hold the framebuffer.
-   The framebuffer is kept in main memory like Xvfb except that the
-   server code is closely correlated with the real XFree86/Xorg Xserver
-   unlike Xvfb.
+   Dummy Driver:  A user points out a faster and more accurate method is
+   to use the "dummy" Device Driver of XFree86/Xorg instead of Xvfb. He
+   uses this to create a persistent and resizable desktop accessible from
+   anywhere. In the Device Section of the config file set Driver "dummy".
+   You may also need to set VideoRam NNN to be large enough to hold the
+   framebuffer. The framebuffer is kept in main memory like Xvfb except
+   that the server code is closely correlated with the real XFree86/Xorg
+   Xserver unlike Xvfb.
 
    The main drawback to this method (besides requiring extra
    configuration and possibly root permission) is that it also does the
@@ -4471,9 +4480,10 @@ startx -- /path/to/Xdummy :1
    other virtual X sessions, say Xnest or even Xvnc itself (useful for
    testing x11vnc).
 
-   Local access: To access your virtual X display locally (i.e. while
-   sitting at the same machine it is running on) one can perhaps have
-   something like this in their $HOME/.xinitrc
+   Local access: You use a VNC viewer to access the display remotely; to
+   access your virtual X display locally (i.e. while sitting at the same
+   machine it is running on) one can perhaps have something like this in
+   their $HOME/.xinitrc
 #!/bin/sh
 x11vnc -display :5 -rfbport 5905 -bg
 vncviewer -geometry +0+0 -encodings raw -passwd $HOME/.vnc/passwd localhost:5
@@ -11046,7 +11056,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-07-03
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-03
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -11110,23 +11120,23 @@ x11vnc options:
   -speeds rd,bw,lat        -wmdt string             -debug_pointer         
   -debug_keyboard          -defer time              -wait time             
   -wait_ui factor          -nowait_bog              -slow_fb time          
-  -readtimeout n           -nap                     -nonap                 
-  -sb time                 -nofbpm                  -fbpm                  
-  -nodpms                  -dpms                    -forcedpms             
-  -clientdpms              -noserverdpms            -noultraext            
-  -noxdamage               -xd_area A               -xd_mem f              
-  -sigpipe string          -threads                 -nothreads             
-  -fs f                    -gaps n                  -grow n                
-  -fuzz n                  -debug_tiles             -snapfb                
-  -rawfb string            -freqtab file            -pipeinput cmd         
-  -macnodim                -macnosleep              -macnosaver            
-  -macnowait               -macwheel n              -macnoswap             
-  -macnoresize             -maciconanim n           -macmenu               
-  -gui [gui-opts]          -remote command          -query variable        
-  -QD variable             -sync                    -noremote              
-  -yesremote               -unsafe                  -safer                 
-  -privremote              -nocmds                  -allowedcmds list      
-  -deny_all              
+  -xrefresh time           -readtimeout n           -nap                   
+  -nonap                   -sb time                 -nofbpm                
+  -fbpm                    -nodpms                  -dpms                  
+  -forcedpms               -clientdpms              -noserverdpms          
+  -noultraext              -noxdamage               -xd_area A             
+  -xd_mem f                -sigpipe string          -threads               
+  -nothreads               -fs f                    -gaps n                
+  -grow n                  -fuzz n                  -debug_tiles           
+  -snapfb                  -rawfb string            -freqtab file          
+  -pipeinput cmd           -macnodim                -macnosleep            
+  -macnosaver              -macnowait               -macwheel n            
+  -macnoswap               -macnoresize             -maciconanim n         
+  -macmenu                 -gui [gui-opts]          -remote command        
+  -query variable          -QD variable             -sync                  
+  -noremote                -yesremote               -unsafe                
+  -safer                   -privremote              -nocmds                
+  -allowedcmds list        -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -11160,7 +11170,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-07-03
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-03
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -13905,6 +13915,12 @@ t
                        For special purpose usage where a low frame rate is
                        acceptable and desirable, but you want the user input
                        processed at the normal rate so you cannot use -wait.
+-xrefresh time         Floating point time in seconds to indicate how often to
+                       do the equivalent of xrefresh(1) to force all windows
+                       (in the viewable area if -id, -sid, or -clip is used)
+                       to repaint themselves.  Use this only if applications
+                       misbehave by not repainting themselves properly.
+                       See also -noxdamage.
 -readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On
                        slow links that take a long time to paint the first
                        screen libvncserver may hit the timeout and drop the
@@ -14833,6 +14849,7 @@ n
                        wait_bog        disable -nowait_bog mode.
                        nowait_bog      enable  -nowait_bog mode.
                        slow_fb:f       set -slow_fb to f seconds.
+                       xrefresh:f      set -xrefresh to f seconds.
                        readtimeout:n   set read timeout to n seconds.
                        nap             enable  -nap mode.
                        nonap           disable -nap mode.
@@ -14982,15 +14999,15 @@ n
                        nowf wireframelocal wfl nowireframelocal nowfl
                        wirecopyrect wcr nowirecopyrect nowcr scr_area
                        scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-                       scr_parms scrollcopyrect scr noscrollcopyrect
-                       noscr fixscreen noxrecord xrecord reset_record
-                       pointer_mode pm input_skip allinput noallinput input
-                       grabkbd nograbkbd grabptr nograbptr grabalways
-                       nograbalways client_input ssltimeout speeds wmdt
-                       debug_pointer dp nodebug_pointer nodp debug_keyboard
-                       dk nodebug_keyboard nodk deferupdate defer wait_ui
-                       wait_bog nowait_bog slow_fb wait readtimeout nap nonap
-                       sb screen_blank fbpm nofbpm dpms nodpms clientdpms
+                       scr_parms scrollcopyrect scr noscrollcopyrect noscr
+                       fixscreen noxrecord xrecord reset_record pointer_mode
+                       pm input_skip allinput noallinput input grabkbd
+                       nograbkbd grabptr nograbptr grabalways nograbalways
+                       client_input ssltimeout speeds wmdt debug_pointer dp
+                       nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+                       nodk deferupdate defer wait_ui wait_bog nowait_bog
+                       slow_fb xrefresh wait readtimeout nap nonap sb
+                       screen_blank fbpm nofbpm dpms nodpms clientdpms
                        noclientdpms forcedpms noforcedpms noserverdpms
                        serverdpms noultraext ultraext fs gaps grow fuzz snapfb
                        nosnapfb rawfb uinput_accel uinput_thresh uinput_reset

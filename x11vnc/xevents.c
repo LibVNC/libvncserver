@@ -792,6 +792,7 @@ void check_xevents(int reset) {
 	static time_t last_time_sync = 0;
 	time_t now = time(NULL);
 	static double last_request = 0.0;
+	static double last_xrefresh = 0.0;
 	XErrorHandler old_handler;
 
 	if (unixpw_in_progress) return;
@@ -834,6 +835,31 @@ void check_xevents(int reset) {
 			last_X_ping = now;
 			XGetSelectionOwner(dpy, XA_PRIMARY);
 		}
+	}
+
+	if (have_clients && xrefresh > 0.0 && dnow() > last_xrefresh + xrefresh) {
+		XSetWindowAttributes swa;
+		Visual visual;
+		Window xrf;
+		unsigned long mask;
+
+		swa.override_redirect = True;
+		swa.backing_store = NotUseful;
+		swa.save_under = False;
+		swa.background_pixmap = None;
+		visual.visualid = CopyFromParent;
+		mask = (CWOverrideRedirect|CWBackingStore|CWSaveUnder|CWBackPixmap);
+
+		xrf = XCreateWindow(dpy, window, coff_x, coff_y, dpy_x, dpy_y, 0, CopyFromParent,
+		    InputOutput, &visual, mask, &swa);
+		if (xrf != None) {
+			if (0) fprintf(stderr, "XCreateWindow(%d, %d, %d, %d) 0x%lx\n", coff_x, coff_y, dpy_x, dpy_y, xrf);
+			XMapWindow(dpy, xrf);
+			XFlush_wr(dpy);
+			XDestroyWindow(dpy, xrf);
+			XFlush_wr(dpy);
+		}
+		last_xrefresh = dnow();
 	}
 
 	if (now > last_call+1) {

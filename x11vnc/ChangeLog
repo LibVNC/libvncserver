@@ -1,3 +1,8 @@
+2007-08-03  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add -xrefresh option, fix KDE .DCOPserver parse bug,
+	  make sure UNIXPW_DISABLE_LOCALHOST/-unixpw_unsafe ignore
+	  any SSH tunnel that would imply -localhost.
+
 2007-07-04  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -debug_ncache, fix big fonts in tkx11vnc.
 

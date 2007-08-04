@@ -1278,6 +1278,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " wait_ui:    %.2f\n", wait_ui);
 	fprintf(stderr, " nowait_bog: %d\n", !wait_bog);
 	fprintf(stderr, " slow_fb:    %.2f\n", slow_fb);
+	fprintf(stderr, " xrefresh:   %.2f\n", xrefresh);
 	fprintf(stderr, " readtimeout: %d\n", rfbMaxClientWait/1000);
 	fprintf(stderr, " take_naps:  %d\n", take_naps);
 	fprintf(stderr, " sb:         %d\n", screen_blank);
@@ -2431,6 +2432,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-slow_fb")) {
 			CHECK_ARGC
 			slow_fb = atof(argv[++i]);
+		} else if (!strcmp(arg, "-xrefresh")) {
+			CHECK_ARGC
+			xrefresh = atof(argv[++i]);
 		} else if (!strcmp(arg, "-readtimeout")) {
 			CHECK_ARGC
 			rfbMaxClientWait = atoi(argv[++i]) * 1000;
@@ -3010,7 +3014,11 @@ int main(int argc, char* argv[]) {
 			use_stunnel = 0;
 		}
 		if (! use_stunnel && ! use_openssl) {
-			if (have_ssh_env()) {
+			if (getenv("UNIXPW_DISABLE_LOCALHOST")) {
+				rfbLog("Skipping -ssl/-stunnel requirement"
+				    " due to\n");
+				rfbLog("UNIXPW_DISABLE_LOCALHOST setting.\n");
+			} else if (have_ssh_env()) {
 				char *s = getenv("SSH_CONNECTION");
 				if (! s) s = getenv("SSH_CLIENT");
 				if (! s) s = "SSH_CONNECTION";
@@ -3027,10 +3035,6 @@ int main(int argc, char* argv[]) {
 				if (! nopw) {
 					usleep(2000*1000);
 				}
-			} else if (getenv("UNIXPW_DISABLE_SSL")) {
-				rfbLog("Skipping -ssl/-stunnel requirement"
-				    " due to\n");
-				rfbLog("UNIXPW_DISABLE_SSL setting.\n");
 			} else {
 				if (openssl_present()) {
 					rfbLog("set -ssl in -unixpw mode.\n");
@@ -3172,6 +3176,10 @@ int main(int argc, char* argv[]) {
 		ncache = -ncache;
 		if (try_http || got_httpdir) {
 			/* JVM usually not set to handle all the memory */
+			ncache = 0;
+			ncache_msg = 0;
+		}
+		if (subwin) {
 			ncache = 0;
 			ncache_msg = 0;
 		}

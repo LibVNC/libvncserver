@@ -3598,6 +3598,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		    slow_fb, w);
 		slow_fb = w;
 
+	} else if (strstr(p, "xrefresh") == p) {
+		double w;
+		COLON_CHECK("xrefresh:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%.2f", p, co, xrefresh);
+			goto qry;
+		}
+		p += strlen("xrefresh:");
+		w = atof(p);
+		if (w <= 0) w = 0.0;
+		rfbLog("remote_cmd: setting xrefresh delay %.2f -> %.2f\n",
+		    xrefresh, w);
+		xrefresh = w;
+
 	} else if (strstr(p, "wait") == p) {
 		int w;
 		COLON_CHECK("wait:")

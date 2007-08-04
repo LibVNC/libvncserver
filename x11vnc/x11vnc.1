@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "July 2007" "x11vnc " "User Commands"
+.TH X11VNC "1" "August 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.3, lastmod: 2007-07-03
+         version: 0.9.3, lastmod: 2007-08-03
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -3257,6 +3257,17 @@ For special purpose usage where a low frame rate is
 acceptable and desirable, but you want the user input
 processed at the normal rate so you cannot use \fB-wait.\fR
 .PP
+\fB-xrefresh\fR \fItime\fR
+.IP
+Floating point time in seconds to indicate how often to
+do the equivalent of 
+.IR xrefresh (1)
+to force all windows
+(in the viewable area if \fB-id,\fR \fB-sid,\fR or \fB-clip\fR is used)
+to repaint themselves.  Use this only if applications
+misbehave by not repainting themselves properly.
+See also \fB-noxdamage.\fR
+.PP
 \fB-readtimeout\fR \fIn\fR
 .IP
 Set libvncserver rfbMaxClientWait to n seconds. On
@@ -4489,6 +4500,8 @@ nowait_bog      enable  \fB-nowait_bog\fR mode.
 .IP
 slow_fb:f       set \fB-slow_fb\fR to f seconds.
 .IP
+xrefresh:f      set \fB-xrefresh\fR to f seconds.
+.IP
 readtimeout:n   set read timeout to n seconds.
 .IP
 nap             enable  \fB-nap\fR mode.
@@ -4728,15 +4741,15 @@ nodebug_ncache wireframe_mode wireframe wf nowireframe
 nowf wireframelocal wfl nowireframelocal nowfl
 wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-scr_parms scrollcopyrect scr noscrollcopyrect
-noscr fixscreen noxrecord xrecord reset_record
-pointer_mode pm input_skip allinput noallinput input
-grabkbd nograbkbd grabptr nograbptr grabalways
-nograbalways client_input ssltimeout speeds wmdt
-debug_pointer dp nodebug_pointer nodp debug_keyboard
-dk nodebug_keyboard nodk deferupdate defer wait_ui
-wait_bog nowait_bog slow_fb wait readtimeout nap nonap
-sb screen_blank fbpm nofbpm dpms nodpms clientdpms
+scr_parms scrollcopyrect scr noscrollcopyrect noscr
+fixscreen noxrecord xrecord reset_record pointer_mode
+pm input_skip allinput noallinput input grabkbd
+nograbkbd grabptr nograbptr grabalways nograbalways
+client_input ssltimeout speeds wmdt debug_pointer dp
+nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+nodk deferupdate defer wait_ui wait_bog nowait_bog
+slow_fb xrefresh wait readtimeout nap nonap sb
+screen_blank fbpm nofbpm dpms nodpms clientdpms
 noclientdpms forcedpms noforcedpms noserverdpms
 serverdpms noultraext ultraext fs gaps grow fuzz snapfb
 nosnapfb rawfb uinput_accel uinput_thresh uinput_reset

@@ -400,6 +400,8 @@ Tuning
 	fuzz:
 	wait_ui:
 	nowait_bog
+	slow_fb:
+	xrefresh:
 	readtimeout:
 	snapfb
 	threads
