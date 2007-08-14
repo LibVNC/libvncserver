@@ -1,3 +1,7 @@
+2007-08-10  Timo Ketola <timo@riihineva.no-ip.org>
+	* libvncclient/rfbproto.c: add missing else (so that GotRect
+	  handling overrides the default operation).
+
 2007-06-14  Karl Runge <runge@karlrunge.com>
 	* configure.ac: add a note on what you must do if you want to
 	  re-run autoconf from the LibVNCServer-X.Y.Z.tar.gz tarball.

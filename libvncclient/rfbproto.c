@@ -1287,8 +1287,8 @@ HandleRFBServerMessage(rfbClient* client)
         if (client->GotCopyRect != NULL) {
           client->GotCopyRect(client, cr.srcX, cr.srcY, rect.r.w, rect.r.h,
               rect.r.x, rect.r.y);
-        }
-	CopyRectangleFromRectangle(client,
+        } else
+		CopyRectangleFromRectangle(client,
 				   cr.srcX, cr.srcY, rect.r.w, rect.r.h,
 				   rect.r.x, rect.r.y);
 
