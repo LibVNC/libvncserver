@@ -2,7 +2,7 @@
 .TH X11VNC "1" "August 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.3, lastmod: 2007-08-03
+         version: 0.9.3, lastmod: 2007-08-15
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -480,8 +480,12 @@ Same as \fB-avahi.\fR
 .IP
 For use with "vncviewer -listen" reverse connections.
 If \fIstring\fR has the form "host" or "host:port"
-the connection is made once at startup.  Use commas
-for a list of host's and host:port's.
+the connection is made once at startup.
+.IP
+Use commas for a list of host's and host:port's.
+E.g. \fB-connect\fR host1,host2 or host1:0,host2:5678.
+Note that to reverse connect to multiple hosts at the
+same time you will likely need to also supply: \fB-shared\fR
 .IP
 Note that unlike most vnc servers, x11vnc will require a
 password for reverse as well as for forward connections.

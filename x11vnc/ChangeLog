@@ -1,3 +1,9 @@
+2007-08-15  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add reverse -connect support to -display WAIT:
+	  i.e. -find, -create, -svc, ... mode.  Document need for
+	  -shared under -connect host1,host2,...  Fix bug in -display
+	  WAIT: mode if vnc client tries to only retrieve SSL cert.
+
 2007-08-03  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add -xrefresh option, fix KDE .DCOPserver parse bug,
 	  make sure UNIXPW_DISABLE_LOCALHOST/-unixpw_unsafe ignore

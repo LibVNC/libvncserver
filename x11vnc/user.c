@@ -1328,6 +1328,8 @@ int wait_for_client(int *argc, char** argv, int http) {
 	char *users_list_save = NULL;
 	int created_disp = 0;
 	int ncache_save;
+	int did_client_connect = 0;
+	int loop = 0;
 
 	if (! use_dpy || strstr(use_dpy, "WAIT:") != use_dpy) {
 		return 0;
@@ -1527,20 +1529,113 @@ int wait_for_client(int *argc, char** argv, int http) {
 #endif
 	}
 
+
 	if (inetd && use_openssl) {
 		accept_openssl(OPENSSL_INETD, -1);
 	}
 
+	if (client_connect != NULL) {
+		char *remainder = NULL;
+		if (inetd) {
+			rfbLog("wait_for_client: -connect disallowed in inetd mode: %s\n",
+			    client_connect);
+		} else if (screen && screen->clientHead) {
+			rfbLog("wait_for_client: -connect disallowed: client exists: %s\n",
+			    client_connect);
+		} else if (strchr(client_connect, '=')) {
+			rfbLog("wait_for_client: invalid -connect string: %s\n",
+			    client_connect);
+		} else {
+			char *q = strchr(client_connect, ',');
+			if (q) {
+				rfbLog("wait_for_client: only using first"
+				    " connect host in: %s\n", client_connect);
+				remainder = strdup(q+1);
+				*q = '\0';
+			}
+			rfbLog("wait_for_client: reverse_connect(%s)\n",
+			    client_connect);
+			reverse_connect(client_connect);
+			did_client_connect = 1;
+		}
+		free(client_connect);
+		if (remainder != NULL) {
+			/* reset to host2,host3,... */
+			client_connect = remainder;
+		} else {
+			client_connect = NULL;
+		}
+	}
+
 	while (1) {
+		loop++;
 		if (shut_down) {
 			clean_up_exit(0);
 		}
-		if (use_openssl) {
+		if (loop < 2) {
+			if (did_client_connect) {
+				goto screen_check;
+			}
+			if (inetd) {
+				goto screen_check;
+			}
+			if (screen && screen->clientHead) {
+				goto screen_check;
+			}
+		}
+		if (use_openssl && !inetd) {
+			check_openssl();
+			/*
+			 * This is to handle an initial verify cert from viewer,
+			 * they disconnect right after fetching the cert.
+			 */
+			if (! use_threads) rfbPE(-1);
+			if (screen && screen->clientHead) {
+				int i;
+				if (unixpw) {
+					if (! unixpw_in_progress) {
+						rfbLog("unixpw but no unixpw_in_progress\n");
+						clean_up_exit(1);
+					}
+					if (unixpw_client && unixpw_client->onHold) {
+						rfbLog("taking unixpw_client off hold\n");
+						unixpw_client->onHold = FALSE;
+					}
+				}
+				for (i=0; i<10; i++) {
+					if (shut_down) {
+						clean_up_exit(0);
+					}
+					usleep(20 * 1000);
+					if (0) rfbLog("wait_for_client: %d\n", i);
+
+					if (! use_threads) {
+						if (unixpw) {
+							unixpw_in_rfbPE = 1;
+						}
+						rfbPE(-1);
+						if (unixpw) {
+							unixpw_in_rfbPE = 0;
+						}
+					}
+
+					if (unixpw && !unixpw_in_progress) {
+						/* XXX too soon. */
+						goto screen_check;
+					}
+					if (!screen->clientHead) {
+						break;
+					}
+				}
+			}
+		} else if (use_openssl) {
 			check_openssl();
 		}
+
 		if (! use_threads) {
 			rfbPE(-1);
 		}
+		screen_check:
 		if (! screen || ! screen->clientHead) {
 			usleep(100 * 1000);
 			continue;
