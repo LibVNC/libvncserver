@@ -678,8 +678,8 @@ static char *dcop_session(void) {
 
 	p = strtok(out, "\n");
 	while (p) {
-		if (db) fprintf(stderr, "p:  %s\n", p);
 		char *q = strstr(p, ".DCOP");
+		if (db) fprintf(stderr, "p:  %s\n", p);
 		if (q == NULL) {
 			;
 		} else if (host) {

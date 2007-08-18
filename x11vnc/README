@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Wed Aug 15 15:33:58 EDT 2007
+x11vnc README file                         Date: Fri Aug 17 23:09:12 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -1778,16 +1778,19 @@ typedef unsigned int in_addr_t;
 
    There are precompiled x11vnc binaries built by other groups that are
    available at the following locations:
-    Debian:         (.deb)  [315]http://packages.debian.org/x11vnc
+    Slackware:      (.tgz)  [315]http://www.linuxpackages.net/
 
-   Slackware: (.tgz) [316]http://www.linuxpackages.net/ Redhat/Fedora:
-   (.rpm) [317]http://dag.wieers.com/packages/x11vnc/
-   [318]http://dries.ulyssis.org/rpm/packages/x11vnc SuSE: (.rpm)
+   Redhat/Fedora: (.rpm) [316]http://dag.wieers.com/packages/x11vnc/
+   [317]http://dries.ulyssis.org/rpm/packages/x11vnc Debian: (.deb)
+   [318]http://packages.debian.org/x11vnc (N.B: old and unmaintained;
+   better to compile from source) SuSE: (.rpm)
    [319]http://linux01.gwdg.de/~pbleser/ Solaris: (pkg)
-   [320]http://www.sunfreeware.com/ FreeBSD: (.tbz)
-   [321]http://www.freebsd.org/ [322]http://www.freshports.org/net/x11vnc
-   OpenBSD: (.tgz) [323]http://www.openbsd.org/ NetBSD: (src)
-   [324]http://pkgsrc.se/x11/x11vnc Nokia 770 (.deb)
+   [320]http://www.sunfreeware.com/ (N.B: very old; better to compile
+   from source) FreeBSD: (.tbz) [321]http://www.freebsd.org/
+   [322]http://www.freshports.org/net/x11vnc OpenBSD: (.tgz)
+   [323]http://www.openbsd.org/ (N.B: very old and unmaintained; better
+   to compile from source) NetBSD: (src) [324]http://pkgsrc.se/x11/x11vnc
+   Nokia 770 (.deb)
    [325]http://mike.saunby.googlepages.com/x11vncfornokia7702 Sharp
    Zaurus [326]http://www.pdaxrom.org/ and [327]http://www.focv.com/
 
@@ -7849,10 +7852,10 @@ References
  312. http://www.karlrunge.com/x11vnc/x11vnc_sunos4.html
  313. http://www.karlrunge.com/x11vnc/index.html#building
  314. http://www.karlrunge.com/x11vnc/index.html#faq-build
- 315. http://packages.debian.org/x11vnc
- 316. http://www.linuxpackages.net/search_view.php?by=name&name=x11vnc
- 317. http://dag.wieers.com/packages/x11vnc/
- 318. http://dries.ulyssis.org/rpm/packages/x11vnc/info.html
+ 315. http://www.linuxpackages.net/search_view.php?by=name&name=x11vnc
+ 316. http://dag.wieers.com/packages/x11vnc/
+ 317. http://dries.ulyssis.org/rpm/packages/x11vnc/info.html
+ 318. http://packages.debian.org/x11vnc
  319. http://linux01.gwdg.de/~pbleser/rpm-navigation.php?cat=Network/x11vnc/
  320. http://www.sunfreeware.com/
  321. http://www.freebsd.org/cgi/ports.cgi?query=x11vnc&stype=all
@@ -11072,7 +11075,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-15
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-17
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -11186,7 +11189,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-15
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-17
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -11997,14 +12000,15 @@ Options:
                        your long "login:" line press the Up arrow once
                        (before typing anything else).
 
-                       Another option is "geom=WxH" or "geom=WxHxD"
-                       (or ge=). This only has an effect in FINDCREATEDISPLAY
-                       mode when a virtual X server such as Xvfb is going to
-                       be created.  It sets the width and height of the new
-                       display, and optionally the color depth as well. You
-                       can also supply "kde", "gnome", "fvwm", "twm",
-                       or "failsafe" to have the created display use that
-                       mode for the user session.
+                       Another option is "geom=WxH" or "geom=WxHxD" (or
+                       ge=). This only has an effect in FINDCREATEDISPLAY
+                       mode when a virtual X server such as Xvfb is going
+                       to be created.  It sets the width and height of
+                       the new display, and optionally the color depth as
+                       well. You can also supply "gnome", "kde", "twm",
+                       "fvwm", "mwm", "dtwm", "wmaker", "Xsession",
+                       or "failsafe" (same as "xterm") to have the created
+                       display use that mode for the user session.
 
                        To disable the option setting set the environment
                        variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.
@@ -12100,14 +12104,18 @@ Options:
                        e.g., WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb,X  and/or
                        leave out ones you do not want.  The the extra case
                        "X" means try to start up a real, hardware X server
-                       using xinit(1) or startx(1).  If there is already an
-                       X server running the X case may only work on Linux
-                       (see startx(1)).
+                       using xinit(1) or startx(1).  "Xvnc" also works.  If
+                       there is already an X server running the X case may
+                       only work on Linux (see startx(1)).
 
                        You can set the environment variable FD_GEOM (or
                        X11VNC_CREATE_GEOM) to WxH or WxHxD to set the width
                        and height and optionally the color depth of the
-                       created display.
+                       created display.  You can also set FD_SESS to be the
+                       session (short name of the windowmanager: kde, gnome,
+                       twm, failsafe), and FD_OPTS as extra options to pass
+                       to the created X server. You can also set FD_PROG to
+                       be the full path to the session/windowmanager program.
 
                        If you want the FINDCREATEDISPLAY session to contact an
                        XDMCP login manager (xdm/gdm/kdm) on the same machine,

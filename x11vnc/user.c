@@ -1789,7 +1789,7 @@ if (0) db = 1;
 			if (strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 				char *opts = strchr(cmd, '-');
 				char st[] = "";
-				char geom[32], xsess[32];
+				char geom[128], xsess[128], fdopts[128], fdprog[128];
 				if (opts) {
 					opts++;
 					if (strstr(opts, "xdmcp")) {
@@ -1801,6 +1801,8 @@ if (0) db = 1;
 				sprintf(geom, "NONE");
 				xsess[0] = '\0';
 				geom[0] = '\0';
+				fdopts[0] = '\0';
+				fdprog[0] = '\0';
 #if 0
 if (!keep_unixpw_opts) {
 	fprintf(stderr, "no keep_unixpw_opts\n");
@@ -1820,6 +1822,16 @@ if (!keep_unixpw_opts) {
 						sprintf(xsess, "fvwm");
 					} else if (strstr(t, "mwm")) {
 						sprintf(xsess, "mwm");
+					} else if (strstr(t, "cde")) {
+						sprintf(xsess, "cde");
+					} else if (strstr(t, "dtwm")) {
+						sprintf(xsess, "dtwm");
+					} else if (strstr(t, "xterm")) {
+						sprintf(xsess, "xterm");
+					} else if (strstr(t, "wmaker")) {
+						sprintf(xsess, "wmaker");
+					} else if (strstr(t, "Xsession")) {
+						sprintf(xsess, "Xsession");
 					} else if (strstr(t, "failsafe")) {
 						sprintf(xsess, "failsafe");
 					}
@@ -1855,14 +1867,22 @@ if (!keep_unixpw_opts) {
 					free(t);
 				}
 				if (geom[0] == '\0' && getenv("FD_GEOM")) {
-					snprintf(geom,  30, "%s", getenv("FD_GEOM"));
+					snprintf(geom,  120, "%s", getenv("FD_GEOM"));
 				}
 				if (xsess[0] == '\0' && getenv("FD_SESS")) {
-					snprintf(xsess, 30, "%s", getenv("FD_SESS"));
+					snprintf(xsess, 120, "%s", getenv("FD_SESS"));
+				}
+				if (fdopts[0] == '\0' && getenv("FD_OPTS")) {
+					snprintf(fdopts, 120, "%s", getenv("FD_OPTS"));
+				}
+				if (fdprog[0] == '\0' && getenv("FD_PROG")) {
+					snprintf(fdprog, 120, "%s", getenv("FD_PROG"));
 				}
 
 				set_env("FD_GEOM", geom);
 				set_env("FD_SESS", xsess);
+				set_env("FD_OPTS", fdopts);
+				set_env("FD_PROG", fdprog);
 
 				if (usslpeer || (unixpw && keep_unixpw_user)) {
 					char *uu = usslpeer;
@@ -1872,13 +1892,17 @@ if (!keep_unixpw_opts) {
 					create_cmd = (char *) malloc(strlen(tmp)+1
 					    + strlen("env USER='' ")
 					    + strlen("FD_GEOM='' ")
+					    + strlen("FD_OPTS='' ")
+					    + strlen("FD_PROG='' ")
 					    + strlen("FD_SESS='' /bin/sh ")
 					    + strlen(uu) + 1
 					    + strlen(geom) + 1
 					    + strlen(xsess) + 1
+					    + strlen(fdopts) + 1
+					    + strlen(fdprog) + 1
 					    + strlen(opts) + 1);
-					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' /bin/sh %s %s",
-					    uu, geom, xsess, tmp, opts);
+					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' FD_OPTS='%s' FD_PROG='%s' /bin/sh %s %s",
+					    uu, geom, xsess, fdopts, fdprog, tmp, opts);
 				} else {
 					create_cmd = (char *) malloc(strlen(tmp)
 					    + strlen("/bin/sh ") + 1 + strlen(opts) + 1);

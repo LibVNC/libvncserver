@@ -1,3 +1,7 @@
+2007-08-18  Karl Runge <runge@karlrunge.com>
+	* x11vnc: improve FINDCREATEDISPLAY (-create) script.  Document
+	  FD_GEOM, FD_SESS, FD_OPTS, FD_PROG env vars, add Xvnc support. 
+
 2007-08-15  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add reverse -connect support to -display WAIT:
 	  i.e. -find, -create, -svc, ... mode.  Document need for

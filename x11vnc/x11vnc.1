@@ -2,7 +2,7 @@
 .TH X11VNC "1" "August 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.3, lastmod: 2007-08-15
+         version: 0.9.3, lastmod: 2007-08-17
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -983,14 +983,15 @@ type and enter your password incorrectly, to retrieve
 your long "login:" line press the Up arrow once
 (before typing anything else).
 .IP
-Another option is "geom=WxH" or "geom=WxHxD"
-(or ge=). This only has an effect in FINDCREATEDISPLAY
-mode when a virtual X server such as Xvfb is going to
-be created.  It sets the width and height of the new
-display, and optionally the color depth as well. You
-can also supply "kde", "gnome", "fvwm", "twm",
-or "failsafe" to have the created display use that
-mode for the user session.
+Another option is "geom=WxH" or "geom=WxHxD" (or
+ge=). This only has an effect in FINDCREATEDISPLAY
+mode when a virtual X server such as Xvfb is going
+to be created.  It sets the width and height of
+the new display, and optionally the color depth as
+well. You can also supply "gnome", "kde", "twm",
+"fvwm", "mwm", "dtwm", "wmaker", "Xsession",
+or "failsafe" (same as "xterm") to have the created
+display use that mode for the user session.
 .IP
 To disable the option setting set the environment
 variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.
@@ -1094,16 +1095,20 @@ using
 .IR xinit (1)
 or 
 .IR startx (1).
-If there is already an
-X server running the X case may only work on Linux
-(see 
+"Xvnc" also works.  If
+there is already an X server running the X case may
+only work on Linux (see 
 .IR startx (1)
 ).
 .IP
 You can set the environment variable FD_GEOM (or
 X11VNC_CREATE_GEOM) to WxH or WxHxD to set the width
 and height and optionally the color depth of the
-created display.
+created display.  You can also set FD_SESS to be the
+session (short name of the windowmanager: kde, gnome,
+twm, failsafe), and FD_OPTS as extra options to pass
+to the created X server. You can also set FD_PROG to
+be the full path to the session/windowmanager program.
 .IP
 If you want the FINDCREATEDISPLAY session to contact an
 XDMCP login manager (xdm/gdm/kdm) on the same machine,
