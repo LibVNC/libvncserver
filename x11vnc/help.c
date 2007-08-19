@@ -1943,7 +1943,7 @@ void print_help(int mode) {
 "                       They apply only when there is ambiguity as to which\n"
 "                       key to choose (i.e the mapping is not one-to-one).\n"
 "                       NOKEYHINTS=1: for up ascii keystrokes do not use score\n"
-"                       hints saved when the keep was press down.  NOANYDOWN=1:\n"
+"                       hints saved when the key was pressed down. NOANYDOWN=1:\n"
 "                       for up keystrokes do not resort to searching through\n"
 "                       keys that are currently pressed down.  KEYSDOWN=N:\n"
 "                       remember the last N keys press down for tie-breaking\n"

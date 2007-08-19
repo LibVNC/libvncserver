@@ -1466,7 +1466,7 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 	}
 }
 
-static int score_hint[0x100][0x100];
+static short **score_hint = NULL;
 /*
  * Called on user keyboard input.  Try to solve the reverse mapping
  * problem: KeySym (from VNC client) => KeyCode(s) to press to generate
@@ -1516,9 +1516,16 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 		} else {
 			klast = 3;
 		}
-		for (i=0; i<0x100; i++) {
-			for (j=0; j<0x100; j++) {
-				score_hint[i][j] = -1;
+		if (khints && score_hint == NULL) {
+			score_hint = (short **) malloc(0x100 * sizeof(short *));
+			for (i=0; i<0x100; i++) {
+				score_hint[i] = (short *) malloc(0x100 * sizeof(short));
+			}
+			
+			for (i=0; i<0x100; i++) {
+				for (j=0; j<0x100; j++) {
+					score_hint[i][j] = -1;
+				}
 			}
 		}
 	}
@@ -1714,7 +1721,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 					    kc_f[l], myscore);
 				}
 				if (khints && keysym < 0x100 && kc_f[l] < 0x100) {
-					score_hint[(int) keysym][kc_f[l]] = score[l];
+					score_hint[(int) keysym][kc_f[l]] = (short) score[l];
 				}
 			}
 			for (l=0; l < found; l++) {
@@ -1738,7 +1745,8 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			if (khints && keysym < 0x100) {
 				/* low keysyms, ascii, only */
 				int ks = (int) keysym;
-				int ok = 1, sbest = -1, lbest, l;
+				int ok = 1, lbest, l;
+				short sbest = -1;
 				for (l=0; l < found; l++) {
 					if (kc_f[l] < 0x100) {
 						int key = (int) kc_f[l];
@@ -1812,7 +1820,6 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				 * physical display (but is updated
 				 * periodically to clean out stale info).
 				 */
-				/* we could probably break ties based on lowest XKeycodeToKeysym index */
 				for (l=0; l < found; l++) {
 					int key = (int) kc_f[l];
 					int j, jmatch = -1;
@@ -1820,6 +1827,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 					if (keycode_state[key]) {
 						continue;
 					}
+					/* break ties based on lowest XKeycodeToKeysym index */
 					for (j=0; j<8; j++) {
 						KeySym ks = XKeycodeToKeysym(dpy, kc_f[l], j);
 						if (ks != NoSymbol && ks == keysym) {
