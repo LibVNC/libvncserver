@@ -1466,6 +1466,7 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 	}
 }
 
+static int score_hint[0x100][0x100];
 /*
  * Called on user keyboard input.  Try to solve the reverse mapping
  * problem: KeySym (from VNC client) => KeyCode(s) to press to generate
@@ -1485,14 +1486,42 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	XkbStateRec kbstate;
 	int got_kbstate = 0;
 	int Kc_f, Grp_f = 0, Lvl_f = 0;
-	static int Kc_last_down = -1;
-	static KeySym Ks_last_down = NoSymbol;
+#	define KLAST 10
+	static int Kc_last_down[KLAST];
+	static KeySym Ks_last_down[KLAST];
+	static int klast = 0, khints = 1, anydown = 1;
 
 	if (!client || !down || !keysym) {} /* unused vars warning: */
 
 	RAWFB_RET_VOID
 
 	X_LOCK;
+
+	if (klast == 0) {
+		int i, j;
+		for (i=0; i<KLAST; i++) {
+			Kc_last_down[i] = -1;
+			Ks_last_down[i] = NoSymbol;
+		}
+		if (getenv("NOKEYHINTS")) {
+			khints = 0;
+		}
+		if (getenv("NOANYDOWN")) {
+			anydown = 0;
+		}
+		if (getenv("KEYSDOWN")) {
+			klast = atoi(getenv("KEYSDOWN"));
+			if (klast < 1) klast = 1;
+			if (klast > KLAST) klast = KLAST;
+		} else {
+			klast = 3;
+		}
+		for (i=0; i<0x100; i++) {
+			for (j=0; j<0x100; j++) {
+				score_hint[i][j] = -1;
+			}
+		}
+	}
 
 	if (debug_keyboard) {
 		char *str = XKeysymToString(keysym);
@@ -1636,6 +1665,12 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				XkbGetState(dpy, XkbUseCoreKbd, &kbstate);
 				got_kbstate = 1;
 			}
+			if (khints && keysym < 0x100) {
+				int ks = (int) keysym, j;
+				for (j=0; j< 0x100; j++) {
+					score_hint[ks][j] = -1;
+				}
+			}
 			for (l=0; l < found; l++) {
 				int myscore = 0, b = 0x1, i;
 				int curr, curr_state = kbstate.mods;
@@ -1678,6 +1713,9 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 					    "keycode %03d: %4d\n",
 					    kc_f[l], myscore);
 				}
+				if (khints && keysym < 0x100 && kc_f[l] < 0x100) {
+					score_hint[(int) keysym][kc_f[l]] = score[l];
+				}
 			}
 			for (l=0; l < found; l++) {
 				int myscore = score[l];
@@ -1693,39 +1731,125 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			
 		} else {
 			/* up */
+			int i, Kc_loc = -1;
 			Kc_f = -1;
-			if (keysym == Ks_last_down) {
-				int l;
+
+			/* first try the scores we remembered when the key went down: */
+			if (khints && keysym < 0x100) {
+				/* low keysyms, ascii, only */
+				int ks = (int) keysym;
+				int ok = 1, sbest = -1, lbest, l;
 				for (l=0; l < found; l++) {
-					if (Kc_last_down == kc_f[l]) {
-						Kc_f = Kc_last_down;
+					if (kc_f[l] < 0x100) {
+						int key = (int) kc_f[l];
+						if (! keycode_state[key]) {
+							continue;
+						}
+						if (score_hint[ks][key] < 0) {
+							ok = 0;
+							break;
+						}
+						if (sbest < 0 || score_hint[ks][key] < sbest) {
+							sbest = score_hint[ks][key];
+							lbest = l;
+						}
+					} else {
+						ok = 0;
 						break;
 					}
 				}
+				if (ok && sbest != -1) {
+					Kc_f = kc_f[lbest];
+				}
+				if (debug_keyboard && Kc_f != -1) {
+					fprintf(stderr, "    UP: found via score_hint, s/l=%d/%d\n",
+					    sbest, lbest);
+				}
 			}
+
+			/* next look at our list of recently pressed down keys */
 			if (Kc_f == -1) {
+				for (i=klast-1; i>=0; i--) {
+					/*
+					 * some people type really fast and leave
+					 * lots of keys down before releasing
+					 * them.  this gives problem on weird
+					 * qwerty+dvorak keymappings where each
+					 * alpha character is on TWO keys.
+					 */
+					if (keysym == Ks_last_down[i]) {
+						int l;
+						for (l=0; l < found; l++) {
+							if (Kc_last_down[i] == kc_f[l]) {
+								int key = (int) kc_f[l];
+								if (keycode_state[key]) {
+									Kc_f = Kc_last_down[i];
+									Kc_loc = i;
+									break;
+								}
+							}
+						}
+					}
+					if (Kc_f != -1) {
+						break;
+					}
+				}
+				if (debug_keyboard && Kc_f != -1) {
+					fprintf(stderr, "    UP: found via klast, i=%d\n", Kc_loc);
+				}
+			}
+
+			/* next just check for any one that is down */
+			if (Kc_f == -1 && anydown) {
 				int l;
+				int best = -1, lbest;
 				/*
 				 * If it is already down, that is
 				 * a great hint.  Use it.
 				 *
-				 * note: keycode_state in internal and
+				 * note: keycode_state is internal and
 				 * ignores someone pressing keys on the
 				 * physical display (but is updated
 				 * periodically to clean out stale info).
 				 */
+				/* we could probably break ties based on lowest XKeycodeToKeysym index */
 				for (l=0; l < found; l++) {
 					int key = (int) kc_f[l];
+					int j, jmatch = -1;
+
 					if (keycode_state[key]) {
-						Kc_f = kc_f[l];
-						break;
+						continue;
 					}
+					for (j=0; j<8; j++) {
+						KeySym ks = XKeycodeToKeysym(dpy, kc_f[l], j);
+						if (ks != NoSymbol && ks == keysym) {
+							jmatch = j;
+							break;
+						}
+					}
+					if (jmatch == -1) {
+						continue;
+					}
+					if (best == -1 || jmatch < best) {
+						best = jmatch;
+						lbest = l;
+					}
+				}
+				if (best != -1) {
+					Kc_f = kc_f[lbest];
+				}
+				if (debug_keyboard && Kc_f != -1) {
+					fprintf(stderr, "    UP: found via downlist, l=%d\n", lbest);
 				}
 			}
 
+			/* last, use the first one found */
 			if (Kc_f == -1) {
 				/* hope for the best... XXX check mods */
 				Kc_f = kc_f[0];
+				if (debug_keyboard && Kc_f != -1) {
+					fprintf(stderr, "    UP: set to first one, kc_f[0]!!\n");
+				}
 			}
 		}
 	} else {
@@ -1747,7 +1871,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			fprintf(stderr, " \"%s\"", str ? str : "null");
 		}
 		fprintf(stderr, ", picked this one: %03d  (last down: %03d)\n",
-		    Kc_f, Kc_last_down);
+		    Kc_f, Kc_last_down[0]);
 	}
 
 	if (sloppy_keys) {
@@ -1769,8 +1893,12 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 		Bool dn;
 
 		/* remember these to aid the subsequent up case: */
-		Ks_last_down = keysym;
-		Kc_last_down = Kc_f;
+		for (i=KLAST-1; i >= 1; i--) {
+			Ks_last_down[i] = Ks_last_down[i-1];
+			Kc_last_down[i] = Kc_last_down[i-1];
+		}
+		Ks_last_down[0] = keysym;
+		Kc_last_down[0] = Kc_f;
 
 		if (! got_kbstate) {
 			/* get the current modifier state if we haven't yet */

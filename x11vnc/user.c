@@ -1789,7 +1789,7 @@ if (0) db = 1;
 			if (strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 				char *opts = strchr(cmd, '-');
 				char st[] = "";
-				char geom[128], xsess[128], fdopts[128], fdprog[128];
+				char geom[128], xsess[128], fdopts[128], fdprog[128], fdxsrv[128];
 				if (opts) {
 					opts++;
 					if (strstr(opts, "xdmcp")) {
@@ -1803,6 +1803,7 @@ if (0) db = 1;
 				geom[0] = '\0';
 				fdopts[0] = '\0';
 				fdprog[0] = '\0';
+				fdxsrv[0] = '\0';
 #if 0
 if (!keep_unixpw_opts) {
 	fprintf(stderr, "no keep_unixpw_opts\n");
@@ -1878,11 +1879,15 @@ if (!keep_unixpw_opts) {
 				if (fdprog[0] == '\0' && getenv("FD_PROG")) {
 					snprintf(fdprog, 120, "%s", getenv("FD_PROG"));
 				}
+				if (fdxsrv[0] == '\0' && getenv("FD_XSRV")) {
+					snprintf(fdxsrv, 120, "%s", getenv("FD_XSRV"));
+				}
 
 				set_env("FD_GEOM", geom);
 				set_env("FD_SESS", xsess);
 				set_env("FD_OPTS", fdopts);
 				set_env("FD_PROG", fdprog);
+				set_env("FD_XSRV", fdxsrv);
 
 				if (usslpeer || (unixpw && keep_unixpw_user)) {
 					char *uu = usslpeer;
@@ -1894,15 +1899,17 @@ if (!keep_unixpw_opts) {
 					    + strlen("FD_GEOM='' ")
 					    + strlen("FD_OPTS='' ")
 					    + strlen("FD_PROG='' ")
+					    + strlen("FD_XSRV='' ")
 					    + strlen("FD_SESS='' /bin/sh ")
 					    + strlen(uu) + 1
 					    + strlen(geom) + 1
 					    + strlen(xsess) + 1
 					    + strlen(fdopts) + 1
 					    + strlen(fdprog) + 1
+					    + strlen(fdxsrv) + 1
 					    + strlen(opts) + 1);
-					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' FD_OPTS='%s' FD_PROG='%s' /bin/sh %s %s",
-					    uu, geom, xsess, fdopts, fdprog, tmp, opts);
+					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' FD_OPTS='%s' FD_PROG='%s' FD_XSRV='%s' /bin/sh %s %s",
+					    uu, geom, xsess, fdopts, fdprog, fdxsrv, tmp, opts);
 				} else {
 					create_cmd = (char *) malloc(strlen(tmp)
 					    + strlen("/bin/sh ") + 1 + strlen(opts) + 1);

@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Fri Aug 17 23:09:12 EDT 2007
+x11vnc README file                         Date: Sun Aug 19 14:30:12 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -11075,7 +11075,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-17
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-19
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -11189,7 +11189,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-17
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-08-19
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -12065,7 +12065,7 @@ Options:
                        to find an existing display.  However, if it does not
                        find one it will try to *start* up an X server session
                        for the user.  This is the only time x11vnc tries to
-                       start up an X server.
+                       actually start up an X server.
 
                        By default FINDCREATEDISPLAY will try Xdummy and
                        then Xvfb.  The Xdummy wrapper is part of the x11vnc
@@ -12100,22 +12100,30 @@ Options:
                        X11VNC_FINDDISPLAY_ALWAYS_FAILS=1 (also -env ...)
 
                        Use WAIT:cmd=FINDCREATEDISPLAY-print to print out the
-                       script used.  You can specify the preferred order via
-                       e.g., WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb,X  and/or
-                       leave out ones you do not want.  The the extra case
-                       "X" means try to start up a real, hardware X server
-                       using xinit(1) or startx(1).  "Xvnc" also works.  If
-                       there is already an X server running the X case may
-                       only work on Linux (see startx(1)).
+                       script used.
+
+                       You can specify the preferred X server order via e.g.,
+                       WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb,X  and/or leave
+                       out ones you do not want.  The the case "X" means try
+                       to start up a real, hardware X server using xinit(1)
+                       or startx(1).  If there is already an X server running
+                       the X case may only work on Linux (see startx(1)).
+
+                       "Xvnc" will start up a VNC X server (real-
+                       or tight-vnc, e.g. use if Xvfb is not available).
+                       "Xsrv" will start up the server program in the
+                       variable "FD_XSRV" if it is non-empty. You can make
+                       this be a wrapper script if you like (it must handle :N,
+                       -geometry, and -depth and other X server options).
 
                        You can set the environment variable FD_GEOM (or
-                       X11VNC_CREATE_GEOM) to WxH or WxHxD to set the width
-                       and height and optionally the color depth of the
-                       created display.  You can also set FD_SESS to be the
-                       session (short name of the windowmanager: kde, gnome,
-                       twm, failsafe), and FD_OPTS as extra options to pass
-                       to the created X server. You can also set FD_PROG to
-                       be the full path to the session/windowmanager program.
+                       X11VNC_CREATE_GEOM) to WxH or WxHxD to set the width and
+                       height and optionally the color depth of the created
+                       display.  You can also set FD_SESS to be the session
+                       (short name of the windowmanager: kde, gnome, twm,
+                       failsafe, etc.). FD_OPTS as extra options to pass to
+                       the X server. You can also set FD_PROG to be the full
+                       path to the session/windowmanager program.
 
                        If you want the FINDCREATEDISPLAY session to contact an
                        XDMCP login manager (xdm/gdm/kdm) on the same machine,
@@ -13088,6 +13096,16 @@ t
                        e.g. !, @, [, are only accessible via -xkb mode and if
                        so then automatically enable the mode.  To disable this
                        automatic detection use -noxkb.
+
+                       When -xkb mode is active you can set these env. vars.
+                       They apply only when there is ambiguity as to which
+                       key to choose (i.e the mapping is not one-to-one).
+                       NOKEYHINTS=1: for up ascii keystrokes do not use score
+                       hints saved when the keep was press down.  NOANYDOWN=1:
+                       for up keystrokes do not resort to searching through
+                       keys that are currently pressed down.  KEYSDOWN=N:
+                       remember the last N keys press down for tie-breaking
+                       when an up keystroke comes in.
 
 -capslock              When in -modtweak (the default) or -xkb mode,
                        if a keysym in the range A-Z comes in check the X
