@@ -1815,8 +1815,8 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  
 diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 --- JavaViewer.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ JavaViewer/SSLSocketToMe.java	2007-04-29 20:40:35.000000000 -0400
-@@ -0,0 +1,1421 @@
++++ JavaViewer/SSLSocketToMe.java	2007-09-04 23:13:00.000000000 -0400
+@@ -0,0 +1,1452 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -2329,7 +2329,15 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +				throw new Exception("forcing CONNECT");
 +			}
 +
-+			socket = (SSLSocket) factory.createSocket(host, port);
++			int timeout = 10;
++			if (timeout > 0) {
++				socket = (SSLSocket) factory.createSocket();
++				InetSocketAddress inetaddr = new InetSocketAddress(host, port);
++				dbg("Using timeout of " + timeout + " secs to: " + host + ":" + port);
++				socket.connect(inetaddr, timeout * 1000);
++			} else {
++				socket = (SSLSocket) factory.createSocket(host, port);
++			}
 +
 +		} catch (Exception esock) {
 +			dbg("esock: " + esock.getMessage());
@@ -2382,7 +2390,9 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +				user_wants_to_see_cert = false;
 +			} else {
 +				bcd = new BrowserCertsDialog(serv, host + ":" + port);
++				dbg("bcd START");
 +				bcd.queryUser();
++				dbg("bcd DONE");
 +				if (bcd.showCertDialog) {
 +					String msg = "user wants to see cert";
 +					dbg(msg);
@@ -2487,8 +2497,22 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +			str += "\r\n";
 +			System.out.println("sending GET: " + str);
 +    			OutputStream os = socket.getOutputStream();
-+			os.write(str.getBytes());
-+			os.flush();
++			String type = "os";
++			if (type == "os") {
++				os.write(str.getBytes());
++				os.flush();
++				System.out.println("used OutputStream");
++			} else if (type == "bs") {
++				BufferedOutputStream bs = new BufferedOutputStream(os);
++				bs.write(str.getBytes());
++				bs.flush();
++				System.out.println("used BufferedOutputStream");
++			} else if (type == "ds") {
++				DataOutputStream ds = new DataOutputStream(os);
++				ds.write(str.getBytes());
++				ds.flush();
++				System.out.println("used DataOutputStream");
++			}
 +			if (false) {
 +				String rep = "";
 +				DataInputStream is = new DataInputStream(
@@ -2920,13 +2944,15 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +			} else {
 +				trust_this_session = false;
 +			}
-+			dialog.dispose();
++			//dialog.dispose();
++			dialog.hide();
 +
 +		} else if (evt.getSource() == cancel) {
 +			/* Cancel button clicked */
 +			trust_this_session = false;
 +
-+			dialog.dispose();
++			//dialog.dispose();
++			dialog.hide();
 +		}
 +	}
 +
@@ -3058,7 +3084,8 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +		System.out.println(evt.getActionCommand());
 +		if (evt.getSource() == ok) {
 +			reply = entry.getText();
-+			dialog.dispose();
++			//dialog.dispose();
++			dialog.hide();
 +		}
 +	}
 +}
@@ -3103,7 +3130,8 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +		System.out.println(evt.getActionCommand());
 +		if (evt.getSource() == ok) {
 +			reply = entry.getText();
-+			dialog.dispose();
++			//dialog.dispose();
++			dialog.hide();
 +		}
 +	}
 +}
@@ -3168,7 +3196,9 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +		dialog.pack();
 +		dialog.resize(dialog.preferredSize());
 +
++		System.out.println("calling show()");
 +		dialog.show();	/* block here til Yes or No pressed. */
++		System.out.println("done    show()");
 +		return;
 +	}
 +
@@ -3176,11 +3206,12 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +		System.out.println(evt.getActionCommand());
 +		if (evt.getSource() == yes) {
 +			showCertDialog = false;
-+			dialog.dispose();
 +		} else if (evt.getSource() == no) {
 +			showCertDialog = true;
-+			dialog.dispose();
 +		}
++		//dialog.dispose();
++		dialog.hide();
++		System.out.println("done actionPerformed()");
 +	}
 +}
 +
@@ -3363,7 +3394,7 @@ diff -Naur JavaViewer.orig/VncCanvas.java JavaViewer/VncCanvas.java
  						result = 0; // Transparent pixel
 diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 --- JavaViewer.orig/VncViewer.java	2006-05-24 15:14:40.000000000 -0400
-+++ JavaViewer/VncViewer.java	2007-05-31 16:13:10.000000000 -0400
++++ JavaViewer/VncViewer.java	2007-09-03 23:31:31.000000000 -0400
 @@ -80,7 +80,7 @@
    GridBagLayout gridbag;
    ButtonPanel buttonPanel;
@@ -3373,6 +3404,15 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
    OptionsFrame options;
    ClipboardFrame clipboard;
    RecordingFrame rec;
+@@ -96,7 +96,7 @@
+ 
+   // Variables read from parameter values.
+   String host;
+-  int port;
++  int port, vncserverport;
+   String passwordParam;
+   String encPasswordParam;
+   boolean showControls;
 @@ -115,6 +115,28 @@
    int i;
    // mslogon support 2 end
@@ -3597,7 +3637,35 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfb.writeClientInit();
  
      rfb.readServerInit();
-@@ -804,6 +914,90 @@
+@@ -775,8 +885,25 @@
+       }
+     }
+ 
+-    String str = readParameter("PORT", true);
+-    port = Integer.parseInt(str);
++    port = 0;
++    String str = readParameter("PORT", false);
++    if (str != null) {
++	port = Integer.parseInt(str);
++    }
++    // When there is a proxy VNCSERVERPORT may be inaccessible (inside firewall).
++    vncserverport = 0;
++    str = readParameter("VNCSERVERPORT", false);
++    if (str != null) {
++	vncserverport = Integer.parseInt(str);
++    }
++    if (port == 0 && vncserverport == 0) {
++	fatalError("Neither PORT nor VNCSERVERPORT parameters specified");
++    }
++    if (port == 0) {
++	// Nevertheless, fall back to vncserverport if we have to.
++	System.out.println("using vncserverport: '" + vncserverport + "' for PORT.");
++	port = vncserverport;
++    }
+ 
+     if (inAnApplet) {
+       str = readParameter("Open New Window", false);
+@@ -804,6 +931,90 @@
      deferScreenUpdates = readIntParameter("Defer screen updates", 20);
      deferCursorUpdates = readIntParameter("Defer cursor updates", 10);
      deferUpdateRequests = readIntParameter("Defer update requests", 50);

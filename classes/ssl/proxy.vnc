@@ -52,7 +52,7 @@ SignedVncViewer.jar is just a signed version of VncViewer.jar
 
 The URL to use for this file:  https://host:port/proxy.vnc
 
-Note LIBVNCSERVERPORT, we assume $PARAMS will have the correct PORT setting
+Note VNCSERVERPORT, we assume $PARAMS will have the correct PORT setting
 (e.g. 563), not the one libvncserver puts in....
 
 -->
@@ -64,7 +64,7 @@ $USER's $DESKTOP desktop ($DISPLAY)
 </TITLE>
 <APPLET CODE=VncViewer.class ARCHIVE=SignedVncViewer.jar
         WIDTH=$APPLETWIDTH HEIGHT=$APPLETHEIGHT>
-<param name=LIBVNCSERVERPORT value=$PORT>
+<param name=VNCSERVERPORT value=$PORT>
 <param name="Open New Window" value=yes>
 $PARAMS
 </APPLET>

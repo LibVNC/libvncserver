@@ -1,3 +1,7 @@
+2007-09-04  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: improve timeouts, port fallback, and connection
+	  time of the SSL Java viewers.
+
 2007-08-10  Timo Ketola <timo@riihineva.no-ip.org>
 	* libvncclient/rfbproto.c: add missing else (so that GotRect
 	  handling overrides the default operation).

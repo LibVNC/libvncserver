@@ -500,7 +500,7 @@ if [ "X$use_ssh" = "X1" ]; then
 	echo ""
 	echo "Running ssh:"
 	sz=`echo "$ssh_cmd" | wc -c`
-	if [ "$sz" -gt 200 ]; then
+	if [ "$sz" -gt 300 ]; then
 		info="..."
 	else
 		info="$ssh_cmd"
@@ -691,10 +691,11 @@ my ($first, $second) = split(/,/, $ENV{PPROXY_PROXY});
 my ($proxy_host, $proxy_port) = split(/:/, $first);
 my $connect = $ENV{PPROXY_DEST};
 
-print STDERR "\nPPROXY v0.0: a tool for Web proxies and SOCKS connections.\n";
+print STDERR "\nPPROXY v0.1: a tool for Web proxies and SOCKS connections.\n";
 print STDERR "proxy_host:       $proxy_host\n";
 print STDERR "proxy_port:       $proxy_port\n";
 print STDERR "proxy_connect:    $connect\n";
+print STDERR "\n";
 
 my $listen_handle = "";
 if ($ENV{PPROXY_LISTEN} != "") {

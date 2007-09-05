@@ -1,0 +1,28 @@
+<!-- 
+     index.vnc - default HTML page for TightVNC Java viewer applet, to be
+     used with Xvnc. On any file ending in .vnc, the HTTP server embedded in
+     Xvnc will substitute the following variables when preceded by a dollar:
+     USER, DESKTOP, DISPLAY, APPLETWIDTH, APPLETHEIGHT, WIDTH, HEIGHT, PORT,
+     PARAMS. Use two dollar signs ($$) to get a dollar sign in the generated
+     HTML page.
+
+     NOTE: the $PARAMS variable is not supported by the standard VNC, so
+     make sure you have TightVNC on the server side, if you're using this
+     variable.
+-->
+
+<HTML>
+<TITLE>
+$USER's $DESKTOP desktop ($DISPLAY)
+</TITLE>
+<APPLET CODE=VncViewer.class ARCHIVE=SignedUltraViewerSSL.jar
+        WIDTH=$APPLETWIDTH HEIGHT=$APPLETHEIGHT>
+<param name="Open New Window" value=yes>
+<param name="ignoreMSLogonCheck" value=yes>
+<param name="delayAuthPanel" value=yes>
+<param name=VNCSERVERPORT value=$PORT>
+$PARAMS
+</APPLET>
+<BR>
+<A href="http://www.ultravnc.com/">UltraVNC site</A>
+</HTML>
