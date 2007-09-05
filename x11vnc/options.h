@@ -10,6 +10,7 @@ extern int debug;
 
 extern char *use_dpy;
 extern int display_N;
+extern int auto_port;
 extern char *auth_file;
 extern char *visual_str;
 extern int set_visual_str_to_something;
@@ -132,6 +133,7 @@ extern int debug_sel;
 extern int xtrap_input;
 extern int xinerama;
 extern int xrandr;
+extern int xrandr_maybe;
 extern char *xrandr_mode;
 extern char *pad_geometry;
 extern time_t pad_geometry_time;

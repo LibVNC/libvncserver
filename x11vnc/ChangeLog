@@ -1,3 +1,11 @@
+2007-09-04  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Add -autoport and -finddpy utils. -xdummy creation.
+	  tweak xkb tiebreaking again.  Shut off -ncache in dev mode.
+	  watch for xrandr events even if no -xrandr.  Tips for types
+	  of URLs for java viewers.  Add check_redir_services() to
+	  create_display and tsdo() redir helper utility (-tsd).
+	  Improvements to Xdummy.
+
 2007-08-19  Karl Runge <runge@karlrunge.com>
 	* x11vnc: better -xkb tie-breaking for up keystrokes.  Add 
 	  Xsrv/FD_XSRV custom server to FINDCREATEDISPLAY list.

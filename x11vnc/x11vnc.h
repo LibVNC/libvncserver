@@ -485,6 +485,7 @@ extern rfbClientPtr latest_client;
 
 extern int waited_for_client;
 extern int findcreatedisplay;
+extern char *terminal_services_daemon;
 
 extern int client_count;
 extern int clients_served;

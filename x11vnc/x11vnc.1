@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "August 2007" "x11vnc " "User Commands"
+.TH X11VNC "1" "September 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.3, lastmod: 2007-08-19
+         version: 0.9.3, lastmod: 2007-09-04
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -83,6 +83,12 @@ If the X display is :N, try to set the VNC display
 to also be :N  This just sets the \fB-rfbport\fR option
 to 5900+N.  The program will exit immediately if that
 port is not available.
+.PP
+\fB-autoport\fR \fIn\fR
+.IP
+Automatically probe for a free VNC port starting at n.
+The default is to start probing at 5900.  Use this to
+stay away from other VNC servers near 5900.
 .PP
 \fB-reflect\fR \fIhost:N\fR
 .IP
@@ -898,8 +904,9 @@ in addition to this option.
 .PP
 \fB-find\fR
 .IP
-Find the user's display using FINDDISPLAY. It is an
-alias for "\fB-display\fR \fIWAIT:cmd=FINDDISPLAY\fR".
+Find the user's display using FINDDISPLAY. It is
+an alias for "\fB-display\fR \fIWAIT:cmd=FINDDISPLAY\fR".
+Use \fB-finddpy\fR to run the FINDDISPLAY program and exit.
 .PP
 \fB-create\fR
 .IP
@@ -908,11 +915,21 @@ if that doesn't work create an X session via the
 FINDCREATEDISPLAY method. This is an alias for
 "\fB-display\fR \fIWAIT:cmd=FINDCREATEDISPLAY-Xvfb\fR".
 .PP
+\fB-xdummy\fR
+.IP
+As \fB-create\fR except Xdummy instead of Xvfb.  Implies
+FD_XDUMMY_NOROOT=1.
+.PP
 \fB-svc\fR
 .IP
 Terminal services mode. Also "\fB-service\fR". Alias for
 \fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb \fB-unixpw\fR
 \fB-users\fR unixpw= \fB-ssl\fR SAVE
+.PP
+\fB-svc_xdummy\fR
+.IP
+As \fB-svc\fR except Xdummy instead of Xvfb.  Implies
+FD_XDUMMY_NOROOT=1.
 .PP
 \fB-xdmsvc\fR
 .IP
@@ -1052,13 +1069,16 @@ find one it will try to *start* up an X server session
 for the user.  This is the only time x11vnc tries to
 actually start up an X server.
 .IP
-By default FINDCREATEDISPLAY will try Xdummy and
-then Xvfb.  The Xdummy wrapper is part of the x11vnc
-source code (x11vnc/misc/Xdummy)  It should be available
-in PATH and have run "Xdummy \fB-install"\fR once to create
-the shared library.  Xdummy requires root permission
-and only works on Linux.  Xvfb is available on most
-platforms and does not require root.
+By default FINDCREATEDISPLAY will try Xdummy and then
+Xvfb.  The Xdummy wrapper is part of the x11vnc source
+code (x11vnc/misc/Xdummy)  It should be available in
+PATH and have run "Xdummy \fB-install"\fR once to create
+the shared library.  Xdummy requires root permission and
+only works on Linux.  (Note: specify FD_XDUMMY_NOROOT=1
+to skip a check for the root id; evidently your 
+.IR sudo (1)
+will take care of everything).  Xvfb is available on
+most platforms and does not require root.
 .IP
 When x11vnc exits (i.e. user disconnects) the X
 server session stays running in the background.
@@ -1116,6 +1136,13 @@ display.  You can also set FD_SESS to be the session
 failsafe, etc.). FD_OPTS as extra options to pass to
 the X server. You can also set FD_PROG to be the full
 path to the session/windowmanager program.
+.IP
+More FD tricks:  FD_CUPS=port or FD_CUPS=host:port
+will set the cups printing environment.  Similarly
+for FD_ESD=port or FD_ESD=host:port for esddsp sound
+redirection.  FD_XDUMMY_NOROOT means the Xdummy server
+does not need to be started as root (e.g. it will sudo
+automatically)
 .IP
 If you want the FINDCREATEDISPLAY session to contact an
 XDMCP login manager (xdm/gdm/kdm) on the same machine,
@@ -1700,9 +1727,9 @@ the directory as though the \fB-http\fR option was supplied.
 .PP
 \fB-httpsredir\fR \fI[port]\fR
 .IP
-In \fB-ssl\fR mode with the Java applet retrieved via HTTPS:
+In \fB-ssl\fR mode with the Java applet retrieved via HTTPS,
 when the HTML file containing applet parameters
-('index.vnc' or 'proxy.vnc') is sent do not set the
+('index.vnc' or 'proxy.vnc') is sent do NOT set the
 applet PORT parameter to the actual VNC port but set it
 to "port" instead.  If "port" is not supplied, then
 the port number is guessed from the Host: HTTP header.
@@ -1716,9 +1743,12 @@ on the internal workstation. For example, one could
 redir from mygateway.com:443 to workstation:5900.
 .IP
 This spares the user from having to type in
-https://mygateway.com/?PORT=443 into their web browser
-(note 443 is the default https port; other ports must
-be explicity indicated: https://mygateway.com:8000/...)
+https://mygateway.com/?PORT=443 into their web
+browser. Note taht port 443 is the default https port;
+other ports must be explicity indicated, for example:
+https://mygateway.com:8000/?PORT=8000.  To avoid having
+to include the PORT= in the browser URL, simply supply
+"\fB-httpsredir\fR" to x11vnc.
 .PP
 \fB-usepw\fR
 .IP
@@ -2083,6 +2113,12 @@ knows how to react to screen size changes.  Otherwise,
 libvncserver tries to do so something reasonable for
 viewers that cannot do this (portions of the screen
 may be clipped, unused, etc).
+.IP
+Note: the default now is to check for XRANDR events, but
+do not trap every X call that may fail due to resize.
+If a resize event is received, the full \fB-xrandr\fR mode
+is enabled.  To disable even checking for events supply:
+\fB-noxrandr.\fR
 .IP
 "mode" defaults to "resize", which means create a
 new, resized, framebuffer and hope all viewers can cope
@@ -4446,7 +4482,7 @@ ncache_no_rootpixmap    enable  ncache_no_rootpixmap.
 .IP
 noncache_no_rootpixmap  disable ncache_no_rootpixmap.
 .IP
-ncache_reset_rootpixmap recheck the root pixmap
+ncache_reset_rootpixmap recheck the root pixmap, ncrp
 .IP
 ncache_keep_anims       enable  ncache_keep_anims.
 .IP

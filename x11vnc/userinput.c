@@ -1954,7 +1954,7 @@ if (0) fprintf(stderr, "sa.. %d %d %d %d %d %d\n", sx1, sy1, sx2, sy2, sdx, sdy)
 			sy1 = sy2;
 			sy2 = t;
 		}
-if (1) fprintf(stderr, "sb.. %d %d %d %d %d %d\n", sx1, sy1, sx2, sy2, sdx, sdy);
+if (0) fprintf(stderr, "sb.. %d %d %d %d %d %d\n", sx1, sy1, sx2, sy2, sdx, sdy);
 
 		if (mode == DCR_Direct) {
 			rfbClientIteratorPtr i;
@@ -3619,7 +3619,7 @@ void clear_win_events(Window win, int vis) {
 /* XXX Y */
 		if (vis) {
 			while (XCheckTypedWindowEvent(dpy, win, VisibilityNotify, &ev)) {
-				fprintf(stderr, "+");
+				if (ncdb) fprintf(stderr, "+");
 				if (trapped_xerror) {
 					break;
 				}
@@ -7692,7 +7692,7 @@ int try_to_fix_resize_su(Window orig_frame, int orig_x, int orig_y, int orig_w, 
 	
 	if (orig_w >= w && orig_h >= h) {
 
-fprintf(stderr, "Shrinking resize %d  %dx%d+%d+%d -> %dx%d+%d+%d\n", idx, orig_w, orig_h, orig_x, orig_y, w, h, x, y);
+if (0) fprintf(stderr, "Shrinking resize %d  %dx%d+%d+%d -> %dx%d+%d+%d\n", idx, orig_w, orig_h, orig_x, orig_y, w, h, x, y);
 		r3 = sraRgnCreateRgn(r1);
 		sraRgnSubtract(r3, r2);
 
@@ -7739,7 +7739,7 @@ fprintf(stderr, "Shrinking resize %d  %dx%d+%d+%d -> %dx%d+%d+%d\n", idx, orig_w
 		/* XXX Y */
 		if (0) cache_list[idx].su_time = dnow();
 	} else {
-fprintf(stderr, "Growing resize %d  %dx%d+%d+%d -> %dx%d+%d+%d\n", idx, orig_w, orig_h, orig_x, orig_y, w, h, x, y);
+if (0) fprintf(stderr, "Growing resize %d  %dx%d+%d+%d -> %dx%d+%d+%d\n", idx, orig_w, orig_h, orig_x, orig_y, w, h, x, y);
 
 		sx1 = cache_list[idx].su_x;
 		sy1 = cache_list[idx].su_y;

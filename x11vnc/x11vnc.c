@@ -394,6 +394,574 @@ if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnowx());
 	return msec;
 }
 
+static int tsdo_timeout_flag;
+
+static void tsdo_timeout (int sig) {
+	tsdo_timeout_flag = 1;
+}
+
+#define TASKMAX 32
+static pid_t ts_tasks[TASKMAX];
+static int ts_taskn = -1;
+
+int tsdo(int port, int lsock, int *conn) {
+	int csock, rsock, i, db = 1;
+	pid_t pid;
+	struct sockaddr_in addr;
+#ifdef __hpux
+	int addrlen = sizeof(addr);
+#else
+	socklen_t addrlen = sizeof(addr);
+#endif
+
+	if (*conn < 0) {
+		signal(SIGALRM, tsdo_timeout);
+		tsdo_timeout_flag = 0;
+
+		alarm(10);
+		csock = accept(lsock, (struct sockaddr *)&addr, &addrlen);
+		alarm(0);
+
+		if (db) rfbLog("tsdo: accept: lsock: %d, csock: %d, port: %d\n", lsock, csock, port);
+
+		if (tsdo_timeout_flag > 0 || csock < 0) {
+			close(csock);
+			*conn = -1;
+			return 1;
+		}
+		*conn = csock;
+	} else {
+		csock = *conn;
+		if (db) rfbLog("tsdo: using exiting csock: %d, port: %d\n", csock, port);
+	}
+
+	rsock = rfbConnectToTcpAddr("127.0.0.1", port);
+	if (rsock < 0) {
+		if (db) rfbLog("tsdo: rfbConnectToTcpAddr(port=%d) failed.\n", port);
+		return 2;
+	}
+
+	pid = fork();
+	if (pid < 0) {
+		close(rsock);
+		return 3;
+	}
+	if (pid > 0) {
+		ts_taskn = (ts_taskn+1) % TASKMAX;
+		ts_tasks[ts_taskn] = pid;
+		close(csock);
+		*conn = -1;
+		close(rsock);
+		return 0;
+	}
+	if (pid == 0) {
+		for (i=0; i<255; i++) {
+			if (i != csock && i != rsock && i != 2) {
+				close(i);
+			}
+		}
+#if LIBVNCSERVER_HAVE_SETSID
+		if (setsid() == -1) {
+			perror("setsid");
+			exit(1);
+		}
+#else
+		if (setpgrp() == -1) {
+			perror("setpgrp");
+			exit(1);
+		}
+#endif	/* SETSID */
+		raw_xfer(rsock, csock, csock);
+		exit(0);
+	}
+}
+
+void set_redir_properties(void);
+
+#define TSMAX 32
+#define TSSTK 16
+void terminal_services(char *list) {
+	int i, j, n = 0, db = 1;
+	char *p, *q, *r, *str = strdup(list);
+#if !NO_X11
+	char *tag[TSMAX];
+	int listen[TSMAX], redir[TSMAX][TSSTK], socks[TSMAX], tstk[TSSTK];
+	Atom at, atom[TSMAX];
+	fd_set rd;
+	Window rwin;
+	XErrorHandler   old_handler1;
+	XIOErrorHandler old_handler2;
+	char num[32];
+	time_t last_clean = time(NULL);
+
+	if (! dpy) {
+		return;
+	}
+	rwin = RootWindow(dpy, DefaultScreen(dpy));
+
+	at = XInternAtom(dpy, "TS_REDIR_LIST", False);
+	if (at != None) {
+		XChangeProperty(dpy, rwin, at, XA_STRING, 8,
+		    PropModeReplace, (unsigned char *)list, strlen(list));
+		XSync(dpy, False);
+	}
+	for (i=0; i<TASKMAX; i++) {
+		ts_tasks[i] = 0;
+	}
+	for (i=0; i<TSMAX; i++) {
+		for (j=0; j<TSSTK; j++) {
+			redir[i][j] = 0;
+		}
+	}
+
+	p = strtok(str, ",");
+	while (p) {
+		int m1, m2;
+		if (db) fprintf(stderr, "item: %s\n", p);
+		q = strrchr(p, ':');
+		if (!q) {
+			p = strtok(NULL, ",");
+			continue;
+		}
+		r = strchr(p, ':');
+		if (!r || r == q) {
+			p = strtok(NULL, ",");
+			continue;
+		}
+
+		m1 = atoi(q+1);
+		*q = '\0';
+		m2 = atoi(r+1);
+		*r = '\0';
+
+		if (m1 <= 0 || m2 <= 0 || m1 >= 0xffff || m2 >= 0xffff) {
+			p = strtok(NULL, ",");
+			continue;
+		}
+
+		redir[n][0] = m1;
+		listen[n] = m2;
+		tag[n] = strdup(p);
+
+		if (db) fprintf(stderr, "     %d %d %s\n", redir[n][0], listen[n], tag[n]);
+
+		*r = ':';
+		*q = ':';
+
+		n++;
+		if (n >= TSMAX) {
+			break;
+		}
+		p = strtok(NULL, ",");
+	}
+	free(str);
+
+	if (n==0) {
+		return;
+	}
+
+	at = XInternAtom(dpy, "TS_REDIR_PID", False);
+	if (at != None) {
+		sprintf(num, "%d", getpid());
+		XChangeProperty(dpy, rwin, at, XA_STRING, 8,
+		    PropModeReplace, (unsigned char *)num, strlen(num));
+		XSync(dpy, False);
+	}
+
+	for (i=0; i<n; i++) {
+		atom[i] = XInternAtom(dpy, tag[i], False);
+		if (db) fprintf(stderr, "tag: %s atom: %d\n", tag[i], atom[i]);
+		if (atom[i] == None) {
+			continue;
+		}
+		sprintf(num, "%d", redir[i][0]);
+		if (db) fprintf(stderr, "     listen: %d  redir: %s\n", listen[i], num);
+		XChangeProperty(dpy, rwin, atom[i], XA_STRING, 8,
+		    PropModeReplace, (unsigned char *)num, strlen(num));
+		XSync(dpy, False);
+
+		socks[i] = rfbListenOnTCPPort(listen[i], htonl(INADDR_LOOPBACK));
+	}
+
+	if (getenv("TSD_RESTART")) {
+		if (!strcmp(getenv("TSD_RESTART"), "1")) {
+			set_redir_properties();
+		}
+	}
+
+	while (1) {
+		struct timeval tv;
+		int nfd;
+		int fmax = -1;
+
+		tv.tv_sec  = 3;
+		tv.tv_usec = 0;
+
+		FD_ZERO(&rd);
+		for (i=0; i<n; i++) {
+			if (socks[i] >= 0) {
+				FD_SET(socks[i], &rd);
+				if (socks[i] > fmax) {
+					fmax = socks[i];
+				}
+			}
+		}
+
+		nfd = select(fmax+1, &rd, NULL, NULL, &tv);
+
+		if (db && 0) fprintf(stderr, "nfd=%d\n", nfd);
+		if (nfd < 0 && errno == EINTR) {
+			XSync(dpy, True);
+			continue;
+		}
+		if (nfd > 0) {
+			for(i=0; i<n; i++) {
+				int k = 0;
+				for (j = 0; j < TSSTK; j++) {
+					tstk[j] = 0;
+				}
+				for (j = 0; j < TSSTK; j++) {
+					if (redir[i][j] != 0) {
+						tstk[k++] = redir[i][j];
+					}
+				}
+				for (j = 0; j < TSSTK; j++) {
+					redir[i][j] = tstk[j];
+if (tstk[j] != 0) fprintf(stderr, "B redir[%d][%d] = %d  %s\n", i, j, tstk[j], tag[i]);
+				}
+			}
+			for(i=0; i<n; i++) {
+				int s = socks[i];
+				if (s < 0) {
+					continue;
+				}
+				if (FD_ISSET(s, &rd)) {
+					int p0, p, found = -1, jzero = -1;
+					int conn = -1;
+
+					get_prop(num, 32, atom[i]);
+					p0 = atoi(num);
+
+					for (j = TSSTK-1; j >= 0; j--) {
+						if (redir[i][j] == 0) {
+							jzero = j;
+							continue;
+						}
+						if (p0 > 0 && p0 < 0xffff) {
+							if (redir[i][j] == p0) {
+								found = j;
+								break;
+							}
+						}
+					}
+					if (jzero < 0) {
+						jzero = TSSTK-1;
+					}
+					if (found < 0) {
+						if (p0 > 0 && p0 < 0xffff) {
+							redir[i][jzero] = p0;
+						}
+					}
+					for (j = TSSTK-1; j >= 0; j--) {
+						int rc;
+						p = redir[i][j];
+						if (p <= 0 || p >= 0xffff) {
+							redir[i][j] = 0;
+							continue;
+						}
+						rc = tsdo(p, s, &conn);
+						if (rc == 0) {
+							/* AOK */
+							if (db) fprintf(stderr, "tsdo[%d] OK: %d\n", i, p);
+							if (p != p0) {
+								sprintf(num, "%d", p);
+								XChangeProperty(dpy, rwin, atom[i], XA_STRING, 8,
+								    PropModeReplace, (unsigned char *)num, strlen(num));
+								XSync(dpy, False);
+							}
+							break;
+						} else if (rc == 1) {
+							/* accept failed */
+							if (db) fprintf(stderr, "tsdo[%d] accept failed: %d\n", i, p);
+							break;
+						} else if (rc == 2) {
+							/* connect failed */
+							if (db) fprintf(stderr, "tsdo[%d] connect failed: %d\n", i, p);
+							redir[i][j] = 0;
+							continue;
+						} else if (rc == 3) {
+							/* fork failed */
+							usleep(250*1000);
+							break;
+						}
+					}
+					for (j = 0; j < TSSTK; j++) {
+						if (redir[i][j] != 0) fprintf(stderr, "A redir[%d][%d] = %d  %s\n", i, j, redir[i][j], tag[i]);
+					}
+				}
+			}
+		}
+		for (i=0; i<TASKMAX; i++) {
+			pid_t p = ts_tasks[i];
+			if (p > 0) {
+				int status;
+				pid_t p2 = waitpid(p, &status, WNOHANG); 
+				if (p2 == p) {
+					ts_tasks[i] = 0;
+				}
+			}
+		}
+		/* this is to drop events and exit when X server is gone. */
+		old_handler1 = XSetErrorHandler(trap_xerror);
+		old_handler2 = XSetIOErrorHandler(trap_xioerror);
+		trapped_xerror = 0;
+		trapped_xioerror = 0;
+
+		XSync(dpy, True);
+
+		sprintf(num, "%d", (int) time(NULL));
+		at = XInternAtom(dpy, "TS_REDIR", False);
+		if (at != None) {
+			XChangeProperty(dpy, rwin, at, XA_STRING, 8,
+			    PropModeReplace, (unsigned char *)num, strlen(num));
+			XSync(dpy, False);
+		}
+		if (time(NULL) > last_clean + 20 * 60) {
+			int i, j;
+			for(i=0; i<n; i++) {
+				int first = 1;
+				for (j = TSSTK-1; j >= 0; j--) {
+					int s, p = redir[i][j];
+					if (p <= 0 || p >= 0xffff) {
+						redir[i][j] = 0;
+						continue;
+					}
+					s = rfbConnectToTcpAddr("127.0.0.1", p);
+					if (s < 0) {
+						redir[i][j] = 0;
+						if (db) fprintf(stderr, "tsdo[%d][%d] clean: connect failed: %d\n", i, j, p);
+					} else {
+						close(s);
+						if (first) {
+							sprintf(num, "%d", p);
+							XChangeProperty(dpy, rwin, atom[i], XA_STRING, 8,
+							    PropModeReplace, (unsigned char *)num, strlen(num));
+							XSync(dpy, False);
+						}
+						first = 0;
+					}
+					usleep(500*1000);
+				}
+			}
+			last_clean = time(NULL);
+		}
+		if (trapped_xerror || trapped_xioerror) {
+			if (db) fprintf(stderr, "Xerror: %d/%d\n", trapped_xerror, trapped_xioerror);
+			exit(0);
+		}
+		XSetErrorHandler(old_handler1);
+		XSetIOErrorHandler(old_handler2);
+	}
+#endif
+}
+
+char *ts_services[][2] = {
+	{"FD_CUPS", "TS_CUPS_REDIR"},
+	{"FD_SMB",  "TS_SMB_REDIR"},
+	{"FD_ESD",  "TS_ESD_REDIR"},
+	{"FD_NAS",  "TS_NAS_REDIR"},
+	{NULL, NULL}
+};
+
+void do_tsd(void) {
+#if !NO_X11
+	Atom a;
+	char prop[513];
+	pid_t pid;
+	char *cmd;
+	int n, sz = 0;
+	char *disp = DisplayString(dpy);
+
+	prop[0] = '\0';
+	a = XInternAtom(dpy, "TS_REDIR_LIST", False);
+	if (a != None) {
+		get_prop(prop, 512, a);
+	}
+
+	if (prop[0] == '\0') {
+		return;
+	}
+
+	if (! program_name) {
+		program_name = "x11vnc";
+	}
+	sz += strlen(program_name) + 1;
+	sz += strlen("-display") + 1;
+	sz += strlen(disp) + 1;
+	sz += strlen("-tsd") + 1;
+	sz += 1 + strlen(prop) + 1 + 1;
+	sz += strlen("-env TSD_RESTART=1") + 1;
+	sz += strlen("</dev/null 1>/dev/null 2>&1") + 1;
+	sz += strlen(" &") + 1;
+
+	cmd = (char *) malloc(sz);
+
+	if (getenv("XAUTHORITY")) {
+		char *xauth = getenv("XAUTHORITY");
+		if (!strcmp(xauth, "") || access(xauth, R_OK) != 0) {
+			*(xauth-2) = '_';	/* yow */
+		}
+	}
+	sprintf(cmd, "%s -display %s -tsd '%s' -env TSD_RESTART=1 </dev/null 1>/dev/null 2>&1 &", program_name, disp, prop); 
+	rfbLog("running: %s\n", cmd);
+
+#if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SETSID
+	/* fork into the background now */
+	if ((pid = fork()) > 0)  {
+		pid_t pidw;
+		int status;
+		double s = dnow();
+
+		while (dnow() < s + 1.5) {
+			pidw = waitpid(pid, &status, WNOHANG);
+			if (pidw == pid) {
+				break;
+			}
+			usleep(100*1000);
+		}
+		return;
+
+	} else if (pid == -1) {
+		system(cmd);
+	} else {
+		setsid();
+		/* adjust our stdio */
+		n = open("/dev/null", O_RDONLY);
+		dup2(n, 0);
+		dup2(n, 1);
+		dup2(n, 2);
+		if (n > 2) {
+			close(n);
+		}
+		system(cmd);
+		exit(0);
+	}
+#else
+	system(cmd);
+#endif
+
+#endif
+}
+
+void set_redir_properties(void) {
+#if !NO_X11
+	char *e, *f, *t;
+	Atom a;
+	char num[32];
+	int i, p;
+
+	if (! dpy) {
+		return;
+	}
+
+	i = 0;
+	while (ts_services[i][0] != NULL) {
+		f = ts_services[i][0]; 
+		t = ts_services[i][1]; 
+		e = getenv(f);
+		if (!e || strstr(e, "DAEMON-") != e) {
+			i++;
+			continue;
+		}
+		p = atoi(e + strlen("DAEMON-"));
+		if (p <= 0) {
+			i++;
+			continue;
+		}
+		sprintf(num, "%d", p);
+		a = XInternAtom(dpy, t, False);
+		if (a != None) {
+			Window rwin = RootWindow(dpy, DefaultScreen(dpy));
+fprintf(stderr, "Set: %s %s %s -> %s\n", f, t, e, num);
+			XChangeProperty(dpy, rwin, a, XA_STRING, 8,
+			    PropModeReplace, (unsigned char *) num, strlen(num));
+			XSync(dpy, False);
+		}
+		i++;
+	}
+#endif
+}
+
+void check_redir_services(void) {
+#if !NO_X11
+	Atom a;
+	char prop[513];
+	time_t tsd_last;
+	int i, restart = 0;
+	pid_t pid = 0;
+
+	if (! dpy) {
+		return;
+	}
+
+	a = XInternAtom(dpy, "TS_REDIR_PID", False);
+	if (a != None) {
+		prop[0] = '\0';
+		get_prop(prop, 512, a);
+		if (prop[0] != '\0') {
+			pid = (pid_t) atoi(prop);
+		}
+	}
+
+	if (getenv("FD_TAG")) {
+		a = XInternAtom(dpy, "FD_TAG", False);
+		if (a != None) {
+			Window rwin = RootWindow(dpy, DefaultScreen(dpy));
+			char *tag = getenv("FD_TAG");
+			XChangeProperty(dpy, rwin, a, XA_STRING, 8,
+			    PropModeReplace, (unsigned char *)tag, strlen(tag));
+			XSync(dpy, False);
+		}
+	}
+
+	prop[0] = '\0';
+	a = XInternAtom(dpy, "TS_REDIR", False);
+	if (a != None) {
+		get_prop(prop, 512, a);
+	}
+	if (prop[0] == '\0') {
+		rfbLog("TS_REDIR is empty, restarting...\n");
+		restart = 1;
+	} else {
+		tsd_last = (time_t) atoi(prop);
+		if (time(NULL) > tsd_last + 30) {
+			rfbLog("TS_REDIR seems dead for: %d sec, restarting...\n",
+			    time(NULL) - tsd_last);
+			restart = 1;
+		} else if (pid > 0 && time(NULL) > tsd_last + 6) {
+			if (kill(pid, 0) != 0) {
+				rfbLog("TS_REDIR seems dead via kill(%d, 0), restarting...\n",
+				    pid);
+				restart = 1;
+			}
+		}
+	}
+	if (restart) {
+
+		if (pid > 1) {
+			rfbLog("killing TS_REDIR_PID: %d\n", pid);
+			kill(pid, SIGTERM);
+			usleep(500*1000);
+			kill(pid, SIGKILL);
+		}
+		do_tsd();
+		return;
+	}
+
+	set_redir_properties();
+#endif
+}
+
 void check_filexfer(void) {
 	static time_t last_check = 0;
 	rfbClientIteratorPtr iter;
@@ -646,6 +1214,27 @@ static void watch_loop(void) {
 				vnc_reflect_process_client();
 			}
 			dtime0(&tm);
+
+#if !NO_X11
+			if (xrandr_present && !xrandr && xrandr_maybe) {
+				int delay = 180;
+				/*  there may be xrandr right after xsession start */
+				if (tm < x11vnc_start + delay || tm < last_client + delay) {
+					int tw = 20;
+					if (auth_file != NULL) {
+						tw = 120;
+					}
+					X_LOCK;
+					if (tm < x11vnc_start + tw || tm < last_client + tw) {
+						XSync(dpy, False);
+					} else {
+						XFlush_wr(dpy);
+					}
+					X_UNLOCK;
+				}
+				check_xrandr_event("before-scan");
+			}
+#endif
 			if (use_snapfb) {
 				int t, tries = 3;
 				copy_snap();
@@ -1562,7 +2151,7 @@ char msg2[] =
 #define	SHOW_NO_PASSWORD_WARNING \
 	(!got_passwd && !got_rfbauth && (!got_passwdfile || !passwd_list) \
 	    && !query_cmd && !remote_cmd && !unixpw && !got_gui_pw \
-	    && ! ssl_verify && !inetd)
+	    && ! ssl_verify && !inetd && !terminal_services_daemon)
 
 extern int dragum(void);
 
@@ -1710,18 +2299,36 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-find")) {
 			use_dpy = strdup("WAIT:cmd=FINDDISPLAY");
+		} else if (!strcmp(arg, "-finddpy")) {
+			int ic = 0;
+			use_dpy = strdup("WAIT:cmd=FINDDISPLAY-run");
+			if (argc > i+1) {
+				set_env("X11VNC_USER", argv[i+1]);
+				fprintf(stdout, "X11VNC_USER=%s\n", getenv("X11VNC_USER"));
+			}
+			wait_for_client(&ic, NULL, 0);
+			exit(0);
 		} else if (!strcmp(arg, "-create")) {
 			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb");
+		} else if (!strcmp(arg, "-xdummy")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xdummy");
+			set_env("FD_XDUMMY_NOROOT", "1");
 		} else if (!strcmp(arg, "-auth") || !strcmp(arg, "-xauth")) {
 			CHECK_ARGC
 			auth_file = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-N")) {
 			display_N = 1;
+		} else if (!strcmp(arg, "-autoport")) {
+			CHECK_ARGC
+			auto_port = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-reflect")) {
 			CHECK_ARGC
 			raw_fb_str = (char *) malloc(4 + strlen(argv[i]) + 1);
 			sprintf(raw_fb_str, "vnc:%s", argv[++i]);
 			shared = 1;
+		} else if (!strcmp(arg, "-tsd")) {
+			CHECK_ARGC
+			terminal_services_daemon = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-id") || !strcmp(arg, "-sid")) {
 			CHECK_ARGC
 			if (!strcmp(arg, "-sid")) {
@@ -1878,6 +2485,13 @@ int main(int argc, char* argv[]) {
 			users_list = strdup("unixpw=");
 			use_openssl = 1;
 			openssl_pem = strdup("SAVE");
+		} else if (!strcmp(arg, "-svc_xdummy")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xdummy");
+			unixpw = 1;
+			users_list = strdup("unixpw=");
+			use_openssl = 1;
+			openssl_pem = strdup("SAVE");
+			set_env("FD_XDUMMY_NOROOT", "1");
 		} else if (!strcmp(arg, "-xdmsvc") || !strcmp(arg, "-xdm_service")) {
 			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp");
 			unixpw = 1;
@@ -2095,6 +2709,9 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 			}
+		} else if (!strcmp(arg, "-noxrandr")) {
+			xrandr = 0;
+			xrandr_maybe = 0;
 		} else if (!strcmp(arg, "-rotate")) {
 			CHECK_ARGC
 			rotating_str = strdup(argv[++i]);
@@ -3328,6 +3945,11 @@ int main(int argc, char* argv[]) {
 		dpy = XOpenDisplay_wr("");
 	}
 
+	if (terminal_services_daemon != NULL) {
+		terminal_services(terminal_services_daemon);
+		exit(0);
+	}
+
 #ifdef MACOSX
 	if (! dpy && ! raw_fb_str) {
 		raw_fb_str = strdup("console");
@@ -3744,6 +4366,7 @@ int main(int argc, char* argv[]) {
 		}
 		xrandr_base_event_type = 0;
 		xrandr = 0;
+		xrandr_maybe = 0;
 		xrandr_present = 0;
 	} else {
 		xrandr_present = 1;
@@ -3905,7 +4528,8 @@ int main(int argc, char* argv[]) {
 			}
 			free(xdmcp_insert);
 #endif
-	}
+		}
+		check_redir_services();
 
 	}
 

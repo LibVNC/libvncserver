@@ -1937,6 +1937,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !xrandr); goto qry;
 		}
 		xrandr = 0;
+		xrandr_maybe = 0;
 		if (xrandr_present) {
 			rfbLog("remote_cmd: disable xrandr mode.\n");
 			if (orig != xrandr) {
@@ -1956,6 +1957,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("xrandr_mode:");
 		if (!strcmp("none", p)) {
 			xrandr = 0;
+			xrandr_maybe = 0;
 		} else {
 			if (known_xrandr_mode(p)) {
 				if (xrandr_mode) free(xrandr_mode);
@@ -2866,7 +2868,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			do_new_fb(1);
 		}
 
-	} else if (!strcmp(p, "ncache_reset_rootpixmap")) {
+	} else if (!strcmp(p, "ncache_reset_rootpixmap") || !strcmp(p, "ncrp")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !ncache_xrootpmap);
 			goto qry;

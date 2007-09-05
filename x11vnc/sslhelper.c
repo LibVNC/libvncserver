@@ -1875,6 +1875,14 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 				strncpy(last_get, rcookie, 100);
 				if (db) fprintf(stderr, "last_get: '%s'\n", last_get);
 			}
+			if (rcookie && strstr(rcookie, "VncViewer.class")) {
+				rfbLog("\n");
+				rfbLog("***********************************************************\n");
+				rfbLog("SSL: WARNING CLIENT ASKED FOR NONEXISTENT 'VncViewer.class'\n");
+				rfbLog("SSL: USER NEEDS TO **RESTART** HIS WEB BROWSER.\n");
+				rfbLog("***********************************************************\n");
+				rfbLog("\n");
+			}
 			ssl_helper_pid(pid, -2);
 
 			if (https_port_redir) {
@@ -2625,6 +2633,7 @@ void raw_xfer(int csock, int s_in, int s_out) {
 	char buf[8192];
 	int sz = 8192, n, m, status, db = 1;
 #ifdef FORK_OK
+	pid_t par = getpid();
 	pid_t pid = fork();
 
 	/* this is for testing, no SSL just socket redir */
@@ -2657,6 +2666,7 @@ if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", cso
 				}
 			}
 		}
+		usleep(250*1000);
 		kill(pid, SIGTERM);
 		waitpid(pid, &status, WNOHANG); 
 		if (db) fprintf(stderr, "raw_xfer done:  %d -> %d\n", csock, s_out);
@@ -2687,8 +2697,10 @@ if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", cso
 				}
 			}
 		}
+		usleep(250*1000);
+		kill(par, SIGTERM);
+		waitpid(par, &status, WNOHANG); 
 		if (db) fprintf(stderr, "raw_xfer done:  %d <- %d\n", csock, s_in);
-
 	}
 	close(csock);
 	close(s_in);

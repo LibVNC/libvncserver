@@ -43,10 +43,10 @@ void set_server_input(rfbClientPtr cl, int s);
 void set_text_chat(rfbClientPtr cl, int l, char *t);
 int get_keyboard_led_state_hook(rfbScreenInfoPtr s);
 int get_file_transfer_permitted(rfbClientPtr cl);
+void get_prop(char *str, int len, Atom prop);
 
 static void initialize_xevents(int reset);
 static void print_xevent_bases(void);
-static void get_prop(char *str, int len, Atom prop);
 static void bust_grab(int reset);
 static int process_watch(char *str, int parent, int db);
 static void grab_buster_watch(int parent, char *dstr);
@@ -135,7 +135,7 @@ static void initialize_xevents(int reset) {
 		did_xcreate_simple_window = 1;
 	}
 
-	if (xrandr && !did_xrandr) {
+	if ((xrandr || xrandr_maybe) && !did_xrandr) {
 		initialize_xrandr();
 		did_xrandr = 1;
 	}
@@ -178,7 +178,7 @@ static void print_xevent_bases(void) {
 	fprintf(stderr, "  SelClear=%d, Expose=%d\n", SelectionClear, Expose);
 }
 
-static void get_prop(char *str, int len, Atom prop) {
+void get_prop(char *str, int len, Atom prop) {
 	int i;
 #if !NO_X11
 	Atom type;
@@ -949,7 +949,7 @@ void check_xevents(int reset) {
 	}
 
 #if LIBVNCSERVER_HAVE_LIBXRANDR
-	if (xrandr) {
+	if (xrandr || xrandr_maybe) {
 		check_xrandr_event("check_xevents");
 	}
 #endif

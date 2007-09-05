@@ -530,7 +530,7 @@ static char *raw_fb_orig_dpy = NULL;
 void set_raw_fb_params(int restore) {
 	static int first = 1;
 	static int vo0, us0, sm0, ws0, wp0, wc0, wb0, na0, tn0;  
-	static int xr0, sb0, re0;
+	static int xr0, xrm0, sb0, re0;
 	static char *mc0;
 
 	/*
@@ -552,6 +552,7 @@ void set_raw_fb_params(int restore) {
 		sm0 = using_shm;
 		tn0 = take_naps;
 		xr0 = xrandr;
+		xrm0 = xrandr_maybe;
 		re0 = noxrecord;
 		mc0 = multiple_cursors_mode;
 
@@ -571,6 +572,7 @@ void set_raw_fb_params(int restore) {
 		using_shm = sm0;
 		take_naps = tn0;
 		xrandr = xr0;
+		xrandr_maybe = xrm0;
 		noxrecord = re0;
 		multiple_cursors_mode = mc0;
 
@@ -664,6 +666,10 @@ void set_raw_fb_params(int restore) {
 	if (xrandr) {
 		if (verbose) rfbLog("  rawfb: turning off xrandr\n");
 		xrandr = 0;
+	}
+	if (xrandr_maybe) {
+		if (verbose) rfbLog("  rawfb: turning off xrandr_maybe\n");
+		xrandr_maybe = 0;
 	}
 	if (! noxrecord) {
 		if (verbose) rfbLog("  rawfb: turning off xrecord\n");
@@ -2860,6 +2866,10 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		screen->inetdSock = fd;
 		screen->port = 0;
 
+	} else if (auto_port > 0) {
+		int lport = find_free_port(auto_port, auto_port+200);
+		screen->autoPort = FALSE;
+		screen->port = lport;
 	} else if (! got_rfbport) {
 		screen->autoPort = TRUE;
 	} else if (got_rfbport && got_rfbport_val == 0) {
@@ -2984,6 +2994,23 @@ void set_vnc_desktop_name(void) {
 	if (screen->port) {
 
 		if (! quiet) {
+			if (screen->httpListenSock > -1 && screen->httpPort) {
+				rfbLog("\n");
+				rfbLog("The URLs printed out below ('Java ... viewer URL') can\n");
+				rfbLog("be used for Java enabled Web browser connections.\n");
+				if (use_openssl || stunnel_port) {
+					rfbLog("Here are some additional possibilities:\n");
+					rfbLog("\n");
+					rfbLog("https://host:port/proxy.vnc (MUST be used if Web Proxy used)\n");
+					rfbLog("\n");
+					rfbLog("https://host:port/ultra.vnc (Use UltraVNC Java Viewer)\n");
+					rfbLog("https://host:port/ultraproxy.vnc (Web Proxy with UltraVNC)\n");
+					rfbLog("https://host:port/ultrasigned.vnc (Signed UltraVNC Filexfer)\n");
+					rfbLog("\n");
+					rfbLog("Where you replace \"host:port\" with that printed below, or\n");
+					rfbLog("whatever is needed to reach the host e.g. Internet IP number\n");
+				}
+			}
 			rfbLog("\n");
 		}
 

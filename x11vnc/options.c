@@ -10,6 +10,7 @@ int debug = 0;
 
 char *use_dpy = NULL;		/* -display */
 int display_N = 0;
+int auto_port = 0;
 char *auth_file = NULL;		/* -auth/-xauth */
 char *visual_str = NULL;	/* -visual */
 int set_visual_str_to_something = 0;
@@ -160,6 +161,7 @@ int debug_sel = 0;
 int xtrap_input = 0;		/* -xtrap for user input insertion */
 int xinerama = XINERAMA;	/* -xinerama */
 int xrandr = 0;			/* -xrandr */
+int xrandr_maybe = 1;		/* check for events, but don't trap all calls */
 char *xrandr_mode = NULL;
 char *pad_geometry = NULL;
 time_t pad_geometry_time = 0;
@@ -206,8 +208,8 @@ int wireframe_local = 1;
 #ifdef NO_NCACHE
 #define NCACHE 0 
 #else
-#define NCACHE -12
-#define xxNCACHE -1
+#define xxNCACHE -12
+#define NCACHE -1
 #endif
 #endif
 

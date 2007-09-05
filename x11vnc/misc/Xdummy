@@ -22,7 +22,7 @@ export PATH
 program=`basename "$0"`
 
 help () {
-	cat << END
+	${PAGER:-more} << END
 
 $program: a hack to run a stock XFree86(1) or Xorg(1) server with the
 "dummy" video driver such that it AVOIDS the Linux VT switching, keyboard
@@ -87,6 +87,43 @@ gdm/kdm example:
 
 	TBD.
 
+Root permission and x11vnc:
+
+	This program needs to be run as root.  One could run x11vnc as
+	root with -unixpw (it switches to the user that logs in) and
+	that may be OK, some other ideas:
+
+	- add this to sudo via visudo:
+
+		ALL ALL = NOPASSWD: /usr/local/bin/Xdummy
+
+	- use this little suid wrapper:
+/* 
+ * xdummy.c
+ *
+   cc -o ./xdummy xdummy.c
+   sudo cp ./xdummy /usr/local/bin/xdummy
+   sudo chown root:root /usr/local/bin/xdummy
+   sudo chmod u+s /usr/local/bin/xdummy
+ *
+ */
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <stdio.h>
+
+int main (int argc, char *argv[]) {
+	extern char **environ;
+	char str[100];
+	sprintf(str, "XDUMMY_UID=%d", (int) getuid());
+	putenv(str);
+	setuid(0);  
+	setgid(0);
+	execv("/usr/local/bin/Xdummy", argv); 
+	exit(1);
+	return 1;
+}
+
 
 Options:
 
@@ -123,6 +160,9 @@ Options:
 			shared object, tweaked config files, etc.
 
 	-nonroot	Try to run in non-root mode (XXX NOT yet working).
+
+	-nosudo		Do not try to use sudo(1) when re-running as root,
+			use su(1) instead.
 
 	-xserver path	Specify the path to the Xserver to use.  Default
 			is to try "Xorg" first and then "XFree86".  If
@@ -192,17 +232,35 @@ END
 warn() {
 	echo "$*" 1>&2
 }
+#set -xv
+
+if [ "X$XDUMMY_UID" = "X" ]; then
+	XDUMMY_UID=`id -u`
+	export XDUMMY_UID
+fi
+if [ "X$XDUMMY_UID" = "X0" ]; then
+	if [ "X$SUDO_UID" != "X" ]; then
+		XDUMMY_UID=$SUDO_UID
+		export XDUMMY_UID
+	fi
+fi
 
 #warn "id: `id -u`"
 # See if it needs to be run as root:
 if [ "X$XDUMMY_SU_EXEC" = "X" -a "X`id -u`" != "X0"  ]; then
 	dosu=1
+	nosudo=""
 	XDUMMY_SU_EXEC=1
 	export XDUMMY_SU_EXEC
 	for arg in $*
 	do
+		#echo "arg=$arg"
 		if [ "X$arg" = "X-nonroot" ]; then
 			dosu=""
+		elif [ "X$arg" = "X-noroot" ]; then
+			dosu=""
+		elif [ "X$arg" = "X-nosudo" ]; then
+			nosudo="1"
 		elif [ "X$arg" = "X-help" ]; then
 			dosu=""
 		elif [ "X$arg" = "X-h" ]; then
@@ -221,8 +279,26 @@ if [ "X$XDUMMY_SU_EXEC" = "X" -a "X`id -u`" != "X0"  ]; then
 	done
 	if [ $dosu ]; then
 		warn "$program: currently needs to be run as root to work."
-		warn "$program: supply the root password to restart as root:"
-		exec su -c "$0 $*"
+		if type sudo > /dev/null 2>&1; then
+			:
+		else
+			nosudo=1
+		fi
+		if [ "X$nosudo" = "X" ]; then
+			warn "$program: supply the sudo password to restart as root:"
+			if [ "X$XDUMMY_UID" != "X" ]; then
+				exec sudo $0 -uid $XDUMMY_UID "$@"
+			else
+				exec sudo $0 "$@"
+			fi
+		else
+			warn "$program: supply the root password to restart as root:"
+			if [ "X$XDUMMY_UID" != "X" ]; then
+				exec su -c "$0 -uid $XDUMMY_UID $*"
+			else
+				exec su -c "$0 $*"
+			fi
+		fi
 		exit
 	fi
 fi
@@ -241,7 +317,14 @@ do
                 ;;
 	"-nonroot") root=""
                 ;;
+	"-noroot") root=""
+                ;;
+	"-nosudo") nosudo=1
+                ;;
 	"-xserver") xserver="$2"; shift
+                ;;
+	"-uid") XDUMMY_UID="$2"; shift
+		export XDUMMY_UID
                 ;;
 	"-geom"*) geom="$2"; shift
                 ;;
@@ -285,10 +368,17 @@ if [ "X$user" = "X" ]; then
 	user=`whoami 2>/dev/null`
 fi
 if [ "X$user" = "X" ]; then
-	user=`basename $HOME`
+	user=`basename "$HOME"`
 fi
 if [ "X$user" = "X" -o "X$user" = "X." ]; then
 	user="u$$"
+fi
+
+if [ "X$debug" = "X1" ]; then
+	echo ""
+	echo "/usr/bin/env:"
+	env
+	echo ""
 fi
 
 # Function to compile the LD_PRELOAD shared object:
@@ -409,6 +499,8 @@ if [ "X$xserver" = "X" ]; then
 		xserver="XFree86"
 	elif -x /usr/X11R6/bin/Xorg; then
 		xserver="/usr/X11R6/bin/Xorg"
+	elif -x /usr/bin/Xorg; then
+		xserver="/usr/bin/Xorg"
 	elif -x /usr/X11R6/bin/XFree86; then
 		xserver="/usr/X11R6/bin/XFree86"
 	fi
@@ -425,14 +517,21 @@ if [ -e "$xserver_path" -a "X$root" = "X" -a "X$runit" != "X" ]; then
 	if [ ! -r $xserver_path -o -u $xserver_path ]; then
 		# XXX not quite correct with rm -rf $XDUMMY_TMPDIR ...
 		base=`basename "$xserver_path"`
-		new="$tdir/$base.$user"
+		#new="$tdir/$base.$user"
+		new="/tmp/$base.$user"
 		if [ ! -e $new ]; then
-			warn "need to copy $xserver_path to $new as root:"
+			warn "NEED TO COPY UNREADABLE $xserver_path to $new as root:"
+			warn ""
 			ls -l $xserver_path 1>&2
-			warn "please supply root passwd to 'su -c'"
+			warn ""
+			warn "This only needs to be done once."
+			warn "Please supply root passwd to 'su -c'"
 			touch $new || exit 1
 			chmod 700 $new || exit 1
 			su -c "cat $xserver_path > $new"
+			ls -l $new
+			warn "Please restart."
+			exit 0
 		elif [ ! -O $new ]; then
 			warn "file \"$new\" not owned by us!"
 			ls -l $new
@@ -830,6 +929,13 @@ static char str2[1024];
 static char devs[256][1024];
 static int debug = -1;
 static int root = -1;
+static int changed_uid = 0;
+static int saw_fonts = 0;
+
+#if 0
+typedef long time_t;
+#endif
+static time_t start = 0; 
 
 void check_debug(void) {
 	if (debug < 0) {
@@ -850,8 +956,29 @@ void check_root(void) {
 		}
 	}
 }
+
+void check_uid(void) {
+	if (start == 0) {
+		start = time(NULL);
+		if (debug) fprintf(stderr, "START: %d\n", start);
+		return;
+	} else if (changed_uid == 0) {
+		if (saw_fonts || time(NULL) > start + 20) {
+			if (getenv("XDUMMY_UID")) {
+				int uid = atoi(getenv("XDUMMY_UID"));
+				if (debug) fprintf(stderr, "SETREUID: %d\n", uid);
+				if (uid >= 0) {
+					setreuid(uid, -1);
+				}
+			}
+			changed_uid = 1;
+		}
+	}
+}
+
 #define CHECKIT if (debug < 0) check_debug(); \
-		if (root  < 0) check_root();
+		if (root  < 0) check_root(); \
+		check_uid();
 
 static void set_tmpdir(void) {
 	char *s;
@@ -904,7 +1031,7 @@ int open(const char *pathname, int flags, unsigned short mode) {
 		} else if (strstr(pathname, "/dev") == pathname) {
 			store_dev = strdup(pathname);
 			pathname = tmpdir_path(pathname);
-			if (debug) fprintf(stderr, "OPEN: -> %s\n", pathname, mode);
+			if (debug) fprintf(stderr, "OPEN: -> %s\n", pathname);
 			fd = real_open(pathname, O_WRONLY|O_CREAT, 0777);
 			close(fd);
 		}
@@ -941,6 +1068,16 @@ FILE *fopen(const char *pathname, const char *mode) {
 	static FILE* (*real_fopen)(const char *, const char *) = NULL;
 	char *str;
 
+	if (! saw_fonts) {
+		if (strstr(pathname, "/fonts/")) {
+			if (strstr(pathname, "fonts.dir")) {
+				saw_fonts = 1;
+			} else if (strstr(pathname, "fonts.alias")) {
+				saw_fonts = 1;
+			}
+		}
+	}
+
 	CHECKIT
 	if (! real_fopen) {
 		real_fopen = (FILE* (*)(const char *, const char *))
@@ -955,7 +1092,7 @@ FILE *fopen(const char *pathname, const char *mode) {
 	str = (char *) pathname;
 	if (strstr(pathname, "/var/log") == pathname) {
 		str = tmpdir_path(pathname);
-		if (debug) fprintf(stderr, "FOPEN: -> %s\n", str, mode);
+		if (debug) fprintf(stderr, "FOPEN: -> %s\n", str);
 	}
 
 }
@@ -1049,6 +1186,38 @@ int close(int fd) {
 		}
 	}
 	return(real_close(fd));
+}
+
+struct stat {
+	int foo;
+};
+
+int stat(const char *path, struct stat *buf) {
+	static int (*real_stat)(const char *, struct stat *) = NULL;
+
+	CHECKIT
+	if (! real_stat) {
+		real_stat = (int (*)(const char *, struct stat *))
+			dlsym(RTLD_NEXT, "stat");
+	}
+
+	if (debug) fprintf(stderr, "STAT: %s\n", path);
+
+	return(real_stat(path, buf));
+}
+
+int stat64(const char *path, struct stat *buf) {
+	static int (*real_stat64)(const char *, struct stat *) = NULL;
+
+	CHECKIT
+	if (! real_stat64) {
+		real_stat64 = (int (*)(const char *, struct stat *))
+			dlsym(RTLD_NEXT, "stat64");
+	}
+
+	if (debug) fprintf(stderr, "STAT64: %s\n", path);
+
+	return(real_stat64(path, buf));
 }
 
 /*
@@ -1202,6 +1371,25 @@ gid_t getegid32(void) {
 	if (debug) fprintf(stderr, "GETEGID32: 0\n");
 	return 0;
 }
+
+#if 0
+int xf86PathIsSafe(char *path) {
+	fprintf(stderr, "xf86pathIsSafe: %s\n", path);
+	return 1;
+}
+#endif
+
+#if 0
+int strcmp(const char *s1, const char *s2) {
+	static int (*real_strcmp)(const char *, const char *) = NULL;
+	CHECKIT
+	if (! real_strcmp) {
+		real_strcmp = (int (*)(const char *, const char *)) dlsym(RTLD_NEXT, "strcmp");
+	}
+	if (debug) fprintf(stderr, "STRCMP: '%s' '%s'\n", s1, s2);
+	return(real_strcmp(s1, s2));
+}
+#endif
 
 #code_end
 }

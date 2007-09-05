@@ -1490,6 +1490,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 	static int Kc_last_down[KLAST];
 	static KeySym Ks_last_down[KLAST];
 	static int klast = 0, khints = 1, anydown = 1;
+	static int cnt = 0;
 
 	if (!client || !down || !keysym) {} /* unused vars warning: */
 
@@ -1526,6 +1527,15 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				for (j=0; j<0x100; j++) {
 					score_hint[i][j] = -1;
 				}
+			}
+		}
+	}
+	cnt++;
+	if (cnt % 100 && khints && score_hint != NULL) {
+		int i, j;
+		for (i=0; i<0x100; i++) {
+			for (j=0; j<0x100; j++) {
+				score_hint[i][j] = -1;
 			}
 		}
 	}
@@ -1807,7 +1817,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				}
 			}
 
-			/* next just check for any one that is down */
+			/* next just check for "best" one that is down */
 			if (Kc_f == -1 && anydown) {
 				int l;
 				int best = -1, lbest;
@@ -1824,7 +1834,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 					int key = (int) kc_f[l];
 					int j, jmatch = -1;
 
-					if (keycode_state[key]) {
+					if (! keycode_state[key]) {
 						continue;
 					}
 					/* break ties based on lowest XKeycodeToKeysym index */
@@ -1851,12 +1861,27 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 				}
 			}
 
+			/* next, use the first one found that is down */
+			if (Kc_f == -1) {
+				int l;
+				for (l=0; l < found; l++) {
+					int key = (int) kc_f[l];
+					if (keycode_state[key]) {
+						Kc_f = kc_f[l];
+						break;
+					}
+				}
+				if (debug_keyboard && Kc_f != -1) {
+					fprintf(stderr, "    UP: set to first one down, kc_f[%d]!!\n", l);
+				}
+			}
+
 			/* last, use the first one found */
 			if (Kc_f == -1) {
 				/* hope for the best... XXX check mods */
 				Kc_f = kc_f[0];
 				if (debug_keyboard && Kc_f != -1) {
-					fprintf(stderr, "    UP: set to first one, kc_f[0]!!\n");
+					fprintf(stderr, "    UP: set to first one at all, kc_f[0]!!\n");
 				}
 			}
 		}

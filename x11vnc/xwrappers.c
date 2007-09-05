@@ -1055,8 +1055,15 @@ int xauth_raw(int on) {
 		}
 		return 1;
 	} else {
-		if (old_xauthority) {
+		if (old_xauthority && strcmp(old_xauthority, "")) {
 			set_env("XAUTHORITY", old_xauthority);
+		} else {
+			char *xauth = getenv("XAUTHORITY");
+			if (xauth) {
+				*(xauth-2) = '_';	/* yow */
+			}
+		}
+		if (old_xauthority) {
 			free(old_xauthority);
 			old_xauthority = NULL;
 		}

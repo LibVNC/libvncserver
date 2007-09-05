@@ -883,10 +883,10 @@ void kde_no_animate(int restore) {
 	cmd = (char *) malloc(len);
 	sprintf(cmd, kwin_reconfigure, user, sess);
 
-	len = 1 + strlen(kwinrc_off) + 2 + strlen(cmd) + 2 + strlen("sleep 5") + 2 + strlen(kwinrc_on) + 3 + 1;
+	len = 1 + strlen("sleep 10") + 2 + strlen(kwinrc_off) + 2 + strlen(cmd) + 2 + strlen("sleep 5") + 2 + strlen(kwinrc_on) + 3 + 1;
 	cmd2 = (char *) malloc(len);
 
-	sprintf(cmd2, "(%s; %s; sleep 5; %s) &", kwinrc_off, cmd, kwinrc_on);
+	sprintf(cmd2, "(sleep 10; %s; %s; sleep 5; %s) &", kwinrc_off, cmd, kwinrc_on);
 
 	dt_cmd(cmd2);
 	free(cmd);

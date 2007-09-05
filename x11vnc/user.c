@@ -1386,9 +1386,22 @@ int wait_for_client(int *argc, char** argv, int http) {
 		}
 
 		cmd = str + strlen("cmd=");
-		if (!strcmp(str, "FINDDISPLAY-print")) {
+		if (!strcmp(cmd, "FINDDISPLAY-print")) {
 			fprintf(stdout, "%s", find_display);
 			clean_up_exit(0);
+		}
+		if (!strcmp(cmd, "FINDDISPLAY-run")) {
+			char tmp[] = "/tmp/fd.XXXXXX";
+			char com[100];
+			int fd = mkstemp(tmp);
+			if (fd >= 0) {
+				write(fd, find_display, strlen(find_display));
+				close(fd);
+				sprintf(com, "/bin/sh %s -n; rm -f %s", tmp, tmp);
+				system(com);
+			}
+			unlink(tmp);
+			exit(0);
 		}
 		if (!strcmp(str, "FINDCREATEDISPLAY-print")) {
 			fprintf(stdout, "%s", create_display);
@@ -1767,6 +1780,12 @@ if (0) db = 1;
 		/* only sets environment variables: */
 		run_user_command("", latest_client, "env", NULL, 0, NULL);
 
+		if (program_name) {
+			set_env("X11VNC_PROG", program_name);
+		} else {
+			set_env("X11VNC_PROG", "x11vnc");
+		}
+
 		if (!strcmp(cmd, "FINDDISPLAY") ||
 		    strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 			char *nd = "";
@@ -1789,7 +1808,9 @@ if (0) db = 1;
 			if (strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 				char *opts = strchr(cmd, '-');
 				char st[] = "";
-				char geom[128], xsess[128], fdopts[128], fdprog[128], fdxsrv[128];
+				char fdgeom[128], fdsess[128], fdopts[128], fdprog[128];
+				char fdxsrv[128], fdxdum[128], fdcups[128], fdesd[128];
+				char fdnas[128], fdsmb[128], fdtag[128];
 				if (opts) {
 					opts++;
 					if (strstr(opts, "xdmcp")) {
@@ -1798,43 +1819,43 @@ if (0) db = 1;
 				} else {
 					opts = st;
 				}
-				sprintf(geom, "NONE");
-				xsess[0] = '\0';
-				geom[0] = '\0';
+				sprintf(fdgeom, "NONE");
+				fdsess[0] = '\0';
+				fdgeom[0] = '\0';
 				fdopts[0] = '\0';
 				fdprog[0] = '\0';
 				fdxsrv[0] = '\0';
-#if 0
-if (!keep_unixpw_opts) {
-	fprintf(stderr, "no keep_unixpw_opts\n");
-} else {
-	fprintf(stderr, "keep_unixpw_opts: %s\n", keep_unixpw_opts);
-}
-#endif
+				fdxdum[0] = '\0';
+				fdcups[0] = '\0';
+				fdesd[0]  = '\0';
+				fdnas[0]  = '\0';
+				fdsmb[0]  = '\0';
+				fdtag[0]  = '\0';
+
 				if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
 					char *q, *p, *t = strdup(keep_unixpw_opts);
 					if (strstr(t, "gnome")) {
-						sprintf(xsess, "gnome");
+						sprintf(fdsess, "gnome");
 					} else if (strstr(t, "kde")) {
-						sprintf(xsess, "kde");
+						sprintf(fdsess, "kde");
 					} else if (strstr(t, "twm")) {
-						sprintf(xsess, "twm");
+						sprintf(fdsess, "twm");
 					} else if (strstr(t, "fvwm")) {
-						sprintf(xsess, "fvwm");
+						sprintf(fdsess, "fvwm");
 					} else if (strstr(t, "mwm")) {
-						sprintf(xsess, "mwm");
+						sprintf(fdsess, "mwm");
 					} else if (strstr(t, "cde")) {
-						sprintf(xsess, "cde");
+						sprintf(fdsess, "cde");
 					} else if (strstr(t, "dtwm")) {
-						sprintf(xsess, "dtwm");
+						sprintf(fdsess, "dtwm");
 					} else if (strstr(t, "xterm")) {
-						sprintf(xsess, "xterm");
+						sprintf(fdsess, "xterm");
 					} else if (strstr(t, "wmaker")) {
-						sprintf(xsess, "wmaker");
+						sprintf(fdsess, "wmaker");
 					} else if (strstr(t, "Xsession")) {
-						sprintf(xsess, "Xsession");
+						sprintf(fdsess, "Xsession");
 					} else if (strstr(t, "failsafe")) {
-						sprintf(xsess, "failsafe");
+						sprintf(fdsess, "failsafe");
 					}
 
 					q = strstr(t, "ge=");
@@ -1859,19 +1880,33 @@ if (!keep_unixpw_opts) {
 							p++;
 						}
 						if (ok && strlen(q) < 32) {
-							sprintf(geom, q);
+							sprintf(fdgeom, q);
 							if (!quiet) {
-								rfbLog("set create display geom: %s\n", geom);
+								rfbLog("set create display geom: %s\n", fdgeom);
 							}
+						}
+					}
+					q = strstr(t, "cups=");
+					if (q) {
+						int p;
+						if (sscanf(q, "cups=%d", &p) == 1) {
+							sprintf(fdcups, "%d", p);
+						}
+					}
+					q = strstr(t, "esd=");
+					if (q) {
+						int p;
+						if (sscanf(q, "esd=%d", &p) == 1) {
+							sprintf(fdesd, "%d", p);
 						}
 					}
 					free(t);
 				}
-				if (geom[0] == '\0' && getenv("FD_GEOM")) {
-					snprintf(geom,  120, "%s", getenv("FD_GEOM"));
+				if (fdgeom[0] == '\0' && getenv("FD_GEOM")) {
+					snprintf(fdgeom,  120, "%s", getenv("FD_GEOM"));
 				}
-				if (xsess[0] == '\0' && getenv("FD_SESS")) {
-					snprintf(xsess, 120, "%s", getenv("FD_SESS"));
+				if (fdsess[0] == '\0' && getenv("FD_SESS")) {
+					snprintf(fdsess, 120, "%s", getenv("FD_SESS"));
 				}
 				if (fdopts[0] == '\0' && getenv("FD_OPTS")) {
 					snprintf(fdopts, 120, "%s", getenv("FD_OPTS"));
@@ -1882,12 +1917,36 @@ if (!keep_unixpw_opts) {
 				if (fdxsrv[0] == '\0' && getenv("FD_XSRV")) {
 					snprintf(fdxsrv, 120, "%s", getenv("FD_XSRV"));
 				}
+				if (fdcups[0] == '\0' && getenv("FD_CUPS")) {
+					snprintf(fdcups, 120, "%s", getenv("FD_CUPS"));
+				}
+				if (fdesd[0] == '\0' && getenv("FD_ESD")) {
+					snprintf(fdesd, 120, "%s", getenv("FD_ESD"));
+				}
+				if (fdnas[0] == '\0' && getenv("FD_NAS")) {
+					snprintf(fdnas, 120, "%s", getenv("FD_NAS"));
+				}
+				if (fdsmb[0] == '\0' && getenv("FD_SMB")) {
+					snprintf(fdsmb, 120, "%s", getenv("FD_SMB"));
+				}
+				if (fdtag[0] == '\0' && getenv("FD_TAG")) {
+					snprintf(fdtag, 120, "%s", getenv("FD_TAG"));
+				}
+				if (fdxdum[0] == '\0' && getenv("FD_XDUMMY_NOROOT")) {
+					snprintf(fdxdum, 120, "%s", getenv("FD_XDUMMY_NOROOT"));
+				}
 
-				set_env("FD_GEOM", geom);
-				set_env("FD_SESS", xsess);
+				set_env("FD_GEOM", fdgeom);
 				set_env("FD_OPTS", fdopts);
 				set_env("FD_PROG", fdprog);
 				set_env("FD_XSRV", fdxsrv);
+				set_env("FD_CUPS", fdcups);
+				set_env("FD_ESD",  fdesd);
+				set_env("FD_NAS",  fdnas);
+				set_env("FD_SMB",  fdsmb);
+				set_env("FD_TAG",  fdtag);
+				set_env("FD_XDUMMY_NOROOT", fdxdum);
+				set_env("FD_SESS", fdsess);
 
 				if (usslpeer || (unixpw && keep_unixpw_user)) {
 					char *uu = usslpeer;
@@ -1900,16 +1959,32 @@ if (!keep_unixpw_opts) {
 					    + strlen("FD_OPTS='' ")
 					    + strlen("FD_PROG='' ")
 					    + strlen("FD_XSRV='' ")
+					    + strlen("FD_CUPS='' ")
+					    + strlen("FD_ESD='' ")
+					    + strlen("FD_NAS='' ")
+					    + strlen("FD_SMB='' ")
+					    + strlen("FD_TAG='' ")
+					    + strlen("FD_XDUMMY_NOROOT='' ")
 					    + strlen("FD_SESS='' /bin/sh ")
 					    + strlen(uu) + 1
-					    + strlen(geom) + 1
-					    + strlen(xsess) + 1
+					    + strlen(fdgeom) + 1
 					    + strlen(fdopts) + 1
 					    + strlen(fdprog) + 1
 					    + strlen(fdxsrv) + 1
+					    + strlen(fdcups) + 1
+					    + strlen(fdesd) + 1
+					    + strlen(fdnas) + 1
+					    + strlen(fdsmb) + 1
+					    + strlen(fdtag) + 1
+					    + strlen(fdxdum) + 1
+					    + strlen(fdsess) + 1
 					    + strlen(opts) + 1);
-					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' FD_OPTS='%s' FD_PROG='%s' FD_XSRV='%s' /bin/sh %s %s",
-					    uu, geom, xsess, fdopts, fdprog, fdxsrv, tmp, opts);
+					sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' "
+					    "FD_OPTS='%s' FD_PROG='%s' FD_XSRV='%s' FD_CUPS='%s' "
+					    "FD_ESD='%s' FD_NAS='%s' FD_SMB='%s' FD_TAG='%s' "
+					    "FD_XDUMMY_NOROOT='%s' /bin/sh %s %s",
+					    uu, fdgeom, fdsess, fdopts, fdprog, fdxsrv,
+					    fdcups, fdesd, fdnas, fdsmb, fdtag, fdxdum, tmp, opts);
 				} else {
 					create_cmd = (char *) malloc(strlen(tmp)
 					    + strlen("/bin/sh ") + 1 + strlen(opts) + 1);
@@ -2161,7 +2236,7 @@ if (db) fprintf(stderr, "line1=%s\n", line1);
 			char *t = strstr(line1, ",VT=");
 			vt = atoi(t + strlen(",VT="));
 			*t = '\0';
-			if (7 <= vt && vt <= 128) {
+			if (7 <= vt && vt <= 15) {
 				char chvt[100];
 				sprintf(chvt, "chvt %d >/dev/null 2>/dev/null &", vt);
 				rfbLog("running: %s\n", chvt);
