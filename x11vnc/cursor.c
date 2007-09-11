@@ -1790,6 +1790,13 @@ void cursor_position(int x, int y) {
 		y = nfix(y, scaled_y);
 	}
 
+	if (clipshift) {
+		if (x < 0) x = 0;
+		if (y < 0) y = 0;
+		if (x >= dpy_x) x = dpy_x-1;
+		if (y >= dpy_y) y = dpy_y-1;
+	}
+
 	if (x == screen->cursorX && y == screen->cursorY) {
 		return;
 	}
@@ -1939,6 +1946,18 @@ if (0) fprintf(stderr, "check_x11_pointer %d %d\n", root_x, root_y);
 	/* offset subtracted since XQueryPointer relative to rootwin */
 	x = root_x - off_x - coff_x;
 	y = root_y - off_y - coff_y;
+
+	if (clipshift) {
+		static int cnt = 0;
+		if (x < 0 || y < 0 || x >= dpy_x || y >= dpy_y)  {
+			if (cnt++ % 4 != 0) {
+				if (debug_pointer) {
+					rfbLog("Skipping cursor_position() outside our clipshift\n");
+				}
+				return 0;
+			}
+		}
+	}
 
 	/* record the cursor position in the rfb screen */
 	cursor_position(x, y);

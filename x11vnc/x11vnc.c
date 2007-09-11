@@ -2299,12 +2299,15 @@ int main(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(arg, "-find")) {
 			use_dpy = strdup("WAIT:cmd=FINDDISPLAY");
-		} else if (!strcmp(arg, "-finddpy")) {
+		} else if (!strcmp(arg, "-finddpy") || strstr(arg, "-listdpy") == arg) {
 			int ic = 0;
 			use_dpy = strdup("WAIT:cmd=FINDDISPLAY-run");
 			if (argc > i+1) {
 				set_env("X11VNC_USER", argv[i+1]);
 				fprintf(stdout, "X11VNC_USER=%s\n", getenv("X11VNC_USER"));
+			}
+			if (strstr(arg, "-listdpy") == arg) {
+				set_env("FIND_DISPLAY_ALL", "1");
 			}
 			wait_for_client(&ic, NULL, 0);
 			exit(0);
@@ -2312,7 +2315,18 @@ int main(int argc, char* argv[]) {
 			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb");
 		} else if (!strcmp(arg, "-xdummy")) {
 			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xdummy");
-			set_env("FD_XDUMMY_NOROOT", "1");
+		} else if (!strcmp(arg, "-xvnc")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvnc");
+		} else if (!strcmp(arg, "-xvnc_redirect")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvnc.redirect");
+		} else if (!strcmp(arg, "-redirect")) {
+			char *q, *t, *t0 = "WAIT:cmd=FINDDISPLAY-vnc_redirect";
+			CHECK_ARGC
+			t = (char *) malloc(strlen(t0) + strlen(argv[++i]) + 2);
+			q = strrchr(argv[i], ':');
+			if (q) *q = ' ';
+			sprintf(t, "%s=%s", t0, argv[i]);
+			use_dpy = t;
 		} else if (!strcmp(arg, "-auth") || !strcmp(arg, "-xauth")) {
 			CHECK_ARGC
 			auth_file = strdup(argv[++i]);
@@ -2492,6 +2506,12 @@ int main(int argc, char* argv[]) {
 			use_openssl = 1;
 			openssl_pem = strdup("SAVE");
 			set_env("FD_XDUMMY_NOROOT", "1");
+		} else if (!strcmp(arg, "-svc_xvnc")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvnc");
+			unixpw = 1;
+			users_list = strdup("unixpw=");
+			use_openssl = 1;
+			openssl_pem = strdup("SAVE");
 		} else if (!strcmp(arg, "-xdmsvc") || !strcmp(arg, "-xdm_service")) {
 			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp");
 			unixpw = 1;
@@ -3295,6 +3315,10 @@ int main(int argc, char* argv[]) {
 
 	orig_use_xdamage = use_xdamage;
 
+	if (!auto_port && getenv("AUTO_PORT")) {
+		auto_port = atoi(getenv("AUTO_PORT"));
+	}
+
 	if (getenv("X11VNC_LOOP_MODE")) {
 		if (bg && !getenv("X11VNC_LOOP_MODE_BG")) {
 			if (! quiet) {
@@ -3856,6 +3880,7 @@ int main(int argc, char* argv[]) {
 	/* open the X display: */
 	if (auth_file) {
 		set_env("XAUTHORITY", auth_file);
+fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	}
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 	/*

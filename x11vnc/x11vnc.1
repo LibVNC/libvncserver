@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.3, lastmod: 2007-09-04
+         version: 0.9.3, lastmod: 2007-09-10
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -904,21 +904,45 @@ in addition to this option.
 .PP
 \fB-find\fR
 .IP
-Find the user's display using FINDDISPLAY. It is
-an alias for "\fB-display\fR \fIWAIT:cmd=FINDDISPLAY\fR".
-Use \fB-finddpy\fR to run the FINDDISPLAY program and exit.
+Find the user's display using FINDDISPLAY. This is an
+alias for "\fB-display\fR \fIWAIT:cmd=FINDDISPLAY\fR".
+.IP
+For this and the next few options see \fB-display\fR WAIT:...
+below for all of the details.
+.PP
+\fB-finddpy\fR
+.IP
+Run the FINDDISPLAY program, print out the found
+display (if any) and exit.  Output is like: DISPLAY=:0.0
+DISPLAY=:0.0,XPID=12345 or DISPLAY=:0.0,VT=7.  XPID is
+the process ID of the found X server.  VT is the Linux
+virtual terminal of the X server.
+.PP
+\fB-listdpy\fR
+.IP
+Have the FINDDISPLAY program list all of your displays
+(i.e. all the X displays on the local machine that you
+have access rights to).
 .PP
 \fB-create\fR
 .IP
 First try to find the user's display using FINDDISPLAY,
-if that doesn't work create an X session via the
-FINDCREATEDISPLAY method. This is an alias for
+if that doesn't succeed create an X session via the
+FINDCREATEDISPLAY method.  This is an alias for
 "\fB-display\fR \fIWAIT:cmd=FINDCREATEDISPLAY-Xvfb\fR".
 .PP
 \fB-xdummy\fR
 .IP
-As \fB-create\fR except Xdummy instead of Xvfb.  Implies
+As in \fB-create,\fR except Xdummy instead of Xvfb.  Implies
 FD_XDUMMY_NOROOT=1.
+.PP
+\fB-xvnc\fR
+.IP
+As in \fB-create,\fR except Xvnc instead of Xvfb.
+.PP
+\fB-xvnc_redirect\fR
+.IP
+As in \fB-create,\fR except Xvnc.redirect instead of Xvfb.
 .PP
 \fB-svc\fR
 .IP
@@ -931,11 +955,36 @@ Terminal services mode. Also "\fB-service\fR". Alias for
 As \fB-svc\fR except Xdummy instead of Xvfb.  Implies
 FD_XDUMMY_NOROOT=1.
 .PP
+\fB-svc_xvnc\fR
+.IP
+As \fB-svc\fR except Xvnc instead of Xvfb.
+.PP
 \fB-xdmsvc\fR
 .IP
 Terminal services mode. Also "\fB-xdm_service\fR". Alias for
 \fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp \fB-unixpw\fR
 \fB-users\fR unixpw= \fB-ssl\fR SAVE
+.PP
+\fB-redirect\fR \fIport\fR
+.IP
+As in FINDCREATEDISPLAY-Xvnc.redirect mode except
+redirect immediately (i.e. without X session finding
+or creation) to a VNC server listening on port. You
+can also supply host:port to redirect to a different
+machine.
+.IP
+If 0 <= port < 200 it is taken as a VNC display (5900 is
+added to get the actual port), if port < 0 then \fB-port\fR
+is used.
+.IP
+Probably the only reason to use the \fB-redirect\fR option is
+in conjunction with SSL support, e.g. \fB-ssl,\fR \fB-ssl\fR SAVE.
+This provides an easy way to add SSL encryption to a VNC
+server that does not support SSL (e.g. Xvnc or vnc.so)
+In fact, the protocol does not even need to be VNC,
+and so "\fB-ssl\fR \fISAVE \fB-redirect\fR host:port\fR" can act as a
+replacement for 
+.IR stunnel (1).
 .PP
 \fB-display\fR \fIWAIT:...\fR
 .IP
@@ -1000,15 +1049,16 @@ type and enter your password incorrectly, to retrieve
 your long "login:" line press the Up arrow once
 (before typing anything else).
 .IP
-Another option is "geom=WxH" or "geom=WxHxD" (or
-ge=). This only has an effect in FINDCREATEDISPLAY
-mode when a virtual X server such as Xvfb is going
-to be created.  It sets the width and height of
-the new display, and optionally the color depth as
-well. You can also supply "gnome", "kde", "twm",
-"fvwm", "mwm", "dtwm", "wmaker", "Xsession",
-or "failsafe" (same as "xterm") to have the created
-display use that mode for the user session.
+Another option is "geom=WxH" or "geom=WxHxD"
+(or ge=). This only has an effect in FINDCREATEDISPLAY
+mode when a virtual X server such as Xvfb is going to
+be created.  It sets the width and height of the new
+display, and optionally the color depth as well. You
+can also supply "gnome", "kde", "twm", "fvwm",
+"mwm", "dtwm", "wmaker", "enlightenment",
+"Xsession", or "failsafe" (same as "xterm")
+to have the created display use that mode for the
+user session.
 .IP
 To disable the option setting set the environment
 variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.
@@ -1042,7 +1092,9 @@ DISPLAY variable and xauthority data (see
 ).
 .IP
 To have this default script printed to stdout (e.g. for
-customization) run with WAIT:cmd=FINDDISPLAY-print
+customization) run with WAIT:cmd=FINDDISPLAY-print To
+have the script run to print what display it would find
+use "\fB-finddpy\fR" or WAIT:cmd=FINDDISPLAY-run
 .IP
 As another special case, WAIT:cmd=HTTPONCE will allow
 x11vnc to service one http request and then exit.
@@ -1162,6 +1214,25 @@ that specify the above options for some useful cases.
 .IP
 If you set the env. var WAITBG=1 x11vnc will go into
 the background once listening in wait mode.
+.IP
+Another special mode is FINDCREATEDISPLAY-Xvnc.redirect,
+(or FINDDISPLAY-Xvnc.redirect).  In this case it will
+start up Xvnc as above if needed, but instead of
+polling it in its normal way, it simply does a socket
+redirection of the connected VNC viewer to the Xvnc.
+.IP
+So in Xvnc.redirect x11vnc does no VNC but merely
+transfers the data back and forth.  This should be
+faster then x11vnc's polling method, but not as fast
+as connecting directly to the Xvnc with the VNC Viewer.
+The idea here is to take advantage of x11vnc's display
+finding/creating scheme, SSL, and perhaps a few others.
+Most of x11vnc's options do not apply in this mode.
+.IP
+Xvnc.redirect should also work for the vnc.so X server
+module for the h/w display however it will work only
+for finding the display and the user must already be
+logged into the X console.
 .PP
 \fB-nossl\fR
 .IP

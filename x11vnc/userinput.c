@@ -4385,6 +4385,19 @@ if (db) fprintf(stderr, "  frame: x: %d  y: %d  w: %d  h: %d  px: %d  py: %d  fr
 	if (! try_it && wireframe_mod_state()) {
 		try_it = 1;
 	}
+	if (try_it && clipshift) {
+		sraRegionPtr r1, r2;
+		int xc = off_x + coff_x;
+		int yc = off_y + coff_y;
+		r1 = sraRgnCreateRect(x, y, x+w, y+h);
+		r2 = sraRgnCreateRect(xc, yc, xc+dpy_x, yc+dpy_y);
+		if (!sraRgnAnd(r1, r2)) {
+if (db) fprintf(stderr, "OUTSIDE CLIPSHIFT\n");
+			try_it = 0;
+		}
+		sraRgnDestroy(r1);
+		sraRgnDestroy(r2);
+	}
 	if (! try_it) {
 if (db) fprintf(stderr, "INTERIOR\n");
 #ifdef MACOSX

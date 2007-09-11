@@ -189,10 +189,16 @@ void initialize_xrecord(void) {
 		rdpy_ctrl = NULL;
 	}
 	rdpy_ctrl = XOpenDisplay_wr(DisplayString(dpy));
+	if (!rdpy_ctrl) {
+		fprintf(stderr, "rdpy_ctrl open failed: %s / %s / %s / %s\n", getenv("DISPLAY"), DisplayString(dpy), getenv("XAUTHORITY"), getenv("XAUTHORIT_"));
+	}
 	XSync(dpy, True);
 	XSync(rdpy_ctrl, True);
 	/* open datalink connection to DISPLAY: */
 	rdpy_data = XOpenDisplay_wr(DisplayString(dpy));
+	if (!rdpy_data) {
+		fprintf(stderr, "rdpy_data open failed\n");
+	}
 	if (!rdpy_ctrl || ! rdpy_data) {
 		X_UNLOCK;
 		return;
@@ -218,9 +224,15 @@ void initialize_xrecord(void) {
 	xserver_grabbed = 0;
 
 	gdpy_ctrl = XOpenDisplay_wr(DisplayString(dpy));
+	if (!gdpy_ctrl) {
+		fprintf(stderr, "gdpy_ctrl open failed\n");
+	}
 	XSync(dpy, True);
 	XSync(gdpy_ctrl, True);
 	gdpy_data = XOpenDisplay_wr(DisplayString(dpy));
+	if (!gdpy_data) {
+		fprintf(stderr, "gdpy_data open failed\n");
+	}
 	if (gdpy_ctrl && gdpy_data) {
 		disable_grabserver(gdpy_ctrl, 0);
 		disable_grabserver(gdpy_data, 0);

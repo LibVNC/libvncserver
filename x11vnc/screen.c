@@ -24,6 +24,7 @@
 #include "macosx.h"
 #include "macosxCG.h"
 #include "avahi.h"
+#include "solid.h"
 
 #include <rfb/rfbclient.h>
 
@@ -1141,6 +1142,7 @@ XImage *initialize_raw_fb(int reset) {
 	int closedpy = 1, i, m, db = 0;
 	int do_macosx = 0;
 	int do_reflect = 0;
+	char *unlink_me = NULL;
 
 	static char *last_file = NULL;
 	static int last_mode = 0;
@@ -1218,13 +1220,74 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	if (! raw_fb_str) {
 		return NULL;
 	}
+
+	/* testing aliases */
 	if (!strcasecmp(raw_fb_str, "NULL") || !strcasecmp(raw_fb_str, "ZERO")
 	    || !strcasecmp(raw_fb_str, "NONE")) {
 		raw_fb_str = strdup("map:/dev/zero@640x480x32");
+	} else if (!strcasecmp(raw_fb_str, "NULLBIG") || !strcasecmp(raw_fb_str, "NONEBIG")) {
+		raw_fb_str = strdup("map:/dev/zero@1024x768x32");
 	}
 	if (!strcasecmp(raw_fb_str, "RAND")) {
 		raw_fb_str = strdup("file:/dev/urandom@128x128x16");
+	} else if (!strcasecmp(raw_fb_str, "RANDBIG")) {
+		raw_fb_str = strdup("file:/dev/urandom@640x480x16");
+	} else if (!strcasecmp(raw_fb_str, "RANDHUGE")) {
+		raw_fb_str = strdup("file:/dev/urandom@1024x768x16");
 	}
+	if (strstr(raw_fb_str, "solid=") == raw_fb_str) {
+		char *n = raw_fb_str + strlen("solid=");
+		char tmp[] = "/tmp/solid.XXXXXX";
+		char str[100];
+		unsigned int vals[1024], val;
+		int x, y, fd, w = 1024, h = 768;
+		if (strstr(n, "0x")) {
+			if (sscanf(n, "0x%lx", &val) != 1) {
+				val = 0;
+			}
+		}
+		if (val == 0) {
+			val = get_pixel(n);
+		}
+		if (val == 0) {
+			val = 0xFF00FF;
+		}
+		fd = mkstemp(tmp);
+		for (y = 0; y < h; y++) {
+			for (x = 0; x < w; x++) {
+				vals[x] = val;
+			}
+			write(fd, (char *)vals, 4 * w);
+		}
+		close(fd);
+		fd = open(tmp, O_WRONLY);
+		unlink_me = strdup(tmp);
+		sprintf(str, "map:%s@%dx%dx32", tmp, w, h);
+		raw_fb_str = strdup(str);
+	} else if (strstr(raw_fb_str, "swirl") == raw_fb_str) {
+		char tmp[] = "/tmp/solid.XXXXXX";
+		char str[100];
+		unsigned int val[1024];
+		unsigned int c1, c2, c3, c4;
+		int x, y, fd, w = 1024, h = 768;
+		fd = mkstemp(tmp);
+		for (y = 0; y < h; y++) {
+			for (x = 0; x < w; x++) {
+				c1 = 0;
+				c2 = ((x+y)*128)/(w+h);
+				c3 = (x*128)/w;
+				c4 = (y*256)/h;
+				val[x] = (c1 << 24) | (c2 << 16) | (c3 << 8) | (c4 << 0);
+			}
+			write(fd, (char *)val, 4 * w);
+		}
+		close(fd);
+		fd = open(tmp, O_WRONLY);
+		unlink_me = strdup(tmp);
+		sprintf(str, "map:%s@%dx%dx32", tmp, w, h);
+		raw_fb_str = strdup(str);
+	}
+
 
 	if ( (q = strstr(raw_fb_str, "setup:")) == raw_fb_str) {
 		FILE *pipe;
@@ -1576,6 +1639,10 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		rfbLogEnable(1);
 		rfbLog("invalid rawfb str: %s\n", str);
 		clean_up_exit(1);
+	}
+
+	if (unlink_me) {
+		unlink(unlink_me);
 	}
 
 	if (! raw_fb_image) {
@@ -2866,7 +2933,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		screen->inetdSock = fd;
 		screen->port = 0;
 
-	} else if (auto_port > 0) {
+	} else if (! got_rfbport && auto_port > 0) {
 		int lport = find_free_port(auto_port, auto_port+200);
 		screen->autoPort = FALSE;
 		screen->port = lport;

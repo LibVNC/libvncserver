@@ -92,6 +92,8 @@ extern int xform24to32;
 extern int launch_gui;
 
 extern int avahi;
+extern int vnc_redirect;
+extern int vnc_redirect_sock;
 
 extern int use_modifier_tweak;
 extern int watch_capslock;

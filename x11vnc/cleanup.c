@@ -89,7 +89,7 @@ void clean_shm(int quick) {
 			break;
 		}
 	}
-	if (!quiet) {
+	if (!quiet && cnt > 0) {
 		rfbLog("deleted %d tile_row polling images.\n", cnt);
 	}
 }

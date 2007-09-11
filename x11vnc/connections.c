@@ -372,12 +372,13 @@ int cmd_ok(char *cmd) {
 int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
    int len, FILE *output) {
 	char *old_display = NULL;
-	char *addr = client->host;
+	char *addr = NULL;
 	char str[100];
 	int rc, ok;
 	ClientData *cd = NULL;
 	if (client != NULL) {
 		cd = (ClientData *) client->clientData;
+		addr = client->host;
 	}
 
 	if (addr == NULL || addr[0] == '\0') {
@@ -400,7 +401,9 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 	sprintf(str, "%d", (int) getpid());
 	set_env("RFB_X11VNC_PID", str);
 
-	if (client->state == RFB_PROTOCOL_VERSION) {
+	if (client == NULL) {
+		;
+	} else if (client->state == RFB_PROTOCOL_VERSION) {
 		set_env("RFB_STATE", "PROTOCOL_VERSION");
 	} else if (client->state == RFB_SECURITY_TYPE) {
 		set_env("RFB_STATE", "SECURITY_TYPE");
@@ -422,7 +425,7 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 	/* set RFB_CLIENT_PORT to peer port for command to use */
 	if (cd && cd->client_port > 0) {
 		sprintf(str, "%d", cd->client_port);
-	} else {
+	} else if (client) {
 		sprintf(str, "%d", get_remote_port(client->sock));
 	}
 	set_env("RFB_CLIENT_PORT", str);
@@ -437,7 +440,7 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 	 */
 	if (cd && cd->server_ip) {
 		set_env("RFB_SERVER_IP", cd->server_ip);
-	} else {
+	} else if (client) {
 		char *sip = get_local_host(client->sock);
 		set_env("RFB_SERVER_IP", sip);
 		if (sip) free(sip);
@@ -445,7 +448,7 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 
 	if (cd && cd->server_port > 0) {
 		sprintf(str, "%d", cd->server_port);
-	} else {
+	} else if (client) {
 		sprintf(str, "%d", get_local_port(client->sock));
 	}
 	set_env("RFB_SERVER_PORT", str);

@@ -1312,6 +1312,11 @@ void user_supplied_opts(char *opts) {
 	free(str);
 }
 
+static void vnc_redirect_timeout (int sig) {
+	write(2, "timeout: no clients connected.\n", 31);
+	exit(0);
+}
+
 extern char find_display[];
 extern char create_display[];
 static XImage ximage_struct;
@@ -1330,6 +1335,13 @@ int wait_for_client(int *argc, char** argv, int http) {
 	int ncache_save;
 	int did_client_connect = 0;
 	int loop = 0;
+	time_t start;
+	char *vnc_redirect_host = "localhost";
+	int vnc_redirect_port = -1;
+	int vnc_redirect_cnt = 0;
+	char vnc_redirect_test[10];
+
+	vnc_redirect = 0;
 
 	if (! use_dpy || strstr(use_dpy, "WAIT:") != use_dpy) {
 		return 0;
@@ -1344,6 +1356,9 @@ int wait_for_client(int *argc, char** argv, int http) {
 			dt = 1;
 		}
 		if (db) fprintf(stderr, "args %d %s\n", i, argv[i]);
+	}
+	if (!quiet && !strstr(use_dpy, "FINDDISPLAY-run")) {
+		rfbLog("wait_for_client: %s\n", use_dpy);
 	}
 
 	str = strdup(use_dpy);
@@ -1408,6 +1423,34 @@ int wait_for_client(int *argc, char** argv, int http) {
 			clean_up_exit(0);
 		}
 		if (db) fprintf(stderr, "cmd: %s\n", cmd);
+		if (strstr(str, "FINDCREATEDISPLAY") || strstr(str, "FINDDISPLAY")) {
+			if (strstr(str, "Xvnc.redirect") || strstr(str, "X.redirect")) {
+				vnc_redirect = 1;
+			}
+		}
+		if (strstr(cmd, "FINDDISPLAY-vnc_redirect") == cmd) {
+			int p;
+			char h[256];
+			if (strlen(cmd) >= 256) {
+				rfbLog("wait_for_client string too long: %s\n", str);
+				clean_up_exit(1);
+			}
+			h[0] = '\0';
+			if (sscanf(cmd, "FINDDISPLAY-vnc_redirect=%d", &p) == 1) {
+				;
+			} else if (sscanf(cmd, "FINDDISPLAY-vnc_redirect=%s %d", h, &p) == 2) {
+				;
+			} else {
+				rfbLog("wait_for_client bad string: %s\n", cmd);
+				clean_up_exit(1);
+			}
+			vnc_redirect_port = p;
+			if (strcmp(h, "")) {
+				vnc_redirect_host = strdup(h);
+			}
+			vnc_redirect = 2;
+			rfbLog("wait_for_client: vnc_redirect: %s:%d\n", vnc_redirect_host, vnc_redirect_port);
+		}
 	}
 	
 	if (fake_fb) {
@@ -1542,6 +1585,86 @@ int wait_for_client(int *argc, char** argv, int http) {
 #endif
 	}
 
+	if (vnc_redirect) {
+		if (unixpw) {
+			rfbLog("wait_for_client: -unixpw and Xvnc.redirect not allowed\n");
+			clean_up_exit(1);
+		}
+		if (client_connect) {
+			rfbLog("wait_for_client: -connect and Xvnc.redirect not allowed\n");
+			clean_up_exit(1);
+		}
+		if (inetd) {
+			if (use_openssl) {
+				accept_openssl(OPENSSL_INETD, -1);
+			}
+		} else {
+			int gotone = 0;
+			if (first_conn_timeout) {
+				if (first_conn_timeout < 0) {
+					first_conn_timeout = -first_conn_timeout;
+				}
+				signal(SIGALRM, vnc_redirect_timeout);
+				alarm(first_conn_timeout);
+			}
+			if (use_openssl) {
+				accept_openssl(OPENSSL_VNC, -1);
+			} else {
+				struct sockaddr_in addr;
+#ifdef __hpux
+				int addrlen = sizeof(addr);
+#else
+				socklen_t addrlen = sizeof(addr);
+#endif
+				if (screen->listenSock < 0) {
+					rfbLog("wait_for_client: Xvnc.redirect not listening... sock=%d port=%d\n", screen->listenSock, screen->port);
+					clean_up_exit(1);
+				}
+				vnc_redirect_sock = accept(screen->listenSock, (struct sockaddr *)&addr, &addrlen);
+			}
+			if (first_conn_timeout) {
+				alarm(0);
+			}
+		}
+		if (vnc_redirect_sock < 0) {
+			rfbLog("wait_for_client: vnc_redirect failed.\n");
+			clean_up_exit(1);
+		}
+		if (!inetd && use_openssl) {
+			/* check for Fetch Cert closing */
+			fd_set rfds;
+			struct timeval tv;
+			int nfds;
+
+			usleep(300*1000);
+
+			FD_ZERO(&rfds);
+			FD_SET(vnc_redirect_sock, &rfds);
+
+			tv.tv_sec = 0;
+			tv.tv_usec = 200000;
+			nfds = select(vnc_redirect_sock+1, &rfds, NULL, NULL, &tv);
+
+			rfbLog("wait_for_client: vnc_redirect nfds: %d\n", nfds);
+			if (nfds > 0) {
+				int n;
+				n = read(vnc_redirect_sock, vnc_redirect_test, 1);
+				if (n <= 0) {
+					close(vnc_redirect_sock);
+					vnc_redirect_sock = -1;
+					rfbLog("wait_for_client: waiting for 2nd connection (Fetch Cert?)\n");
+					accept_openssl(OPENSSL_VNC, -1);
+					if (vnc_redirect_sock < 0) {
+						rfbLog("wait_for_client: vnc_redirect failed.\n");
+						clean_up_exit(1);
+					}
+				} else {
+					vnc_redirect_cnt = n;
+				}
+			}
+		}
+		goto vnc_redirect_place;
+	}
 
 	if (inetd && use_openssl) {
 		accept_openssl(OPENSSL_INETD, -1);
@@ -1580,8 +1703,17 @@ int wait_for_client(int *argc, char** argv, int http) {
 		}
 	}
 
+	if (first_conn_timeout < 0) {
+		first_conn_timeout = -first_conn_timeout;
+	}
+	start = time(NULL);
+
 	while (1) {
 		loop++;
+		if (first_conn_timeout && time(NULL) > start + first_conn_timeout) {
+			rfbLog("no client connect after %d seconds.\n", first_conn_timeout);
+			shut_down = 1;
+		}
 		if (shut_down) {
 			clean_up_exit(0);
 		}
@@ -1693,7 +1825,11 @@ int wait_for_client(int *argc, char** argv, int http) {
 
 if (0) db = 1;
 
-	if (cmd) {
+	vnc_redirect_place:
+
+	if (vnc_redirect == 2) {
+		;
+	} else if (cmd) {
 		char line1[1024];
 		char line2[16384];
 		char *q;
@@ -1852,6 +1988,8 @@ if (0) db = 1;
 						sprintf(fdsess, "xterm");
 					} else if (strstr(t, "wmaker")) {
 						sprintf(fdsess, "wmaker");
+					} else if (strstr(t, "enlightenment")) {
+						sprintf(fdsess, "enlightenment");
 					} else if (strstr(t, "Xsession")) {
 						sprintf(fdsess, "Xsession");
 					} else if (strstr(t, "failsafe")) {
@@ -2382,6 +2520,64 @@ fprintf(stderr, "\n");}
 		free(create_cmd);
 	}
 
+	if (vnc_redirect) {
+		char *q = strchr(use_dpy, ':');
+		int vdpy = -1, sock = -1;
+		int s_in, s_out, i;
+		if (vnc_redirect == 2) {
+			char num[32];	
+			sprintf(num, ":%d", vnc_redirect_port);
+			q = num;
+		}
+		if (!q) {
+			rfbLog("wait_for_client: can't find number in X display: %s\n", use_dpy);
+			clean_up_exit(1);
+		}
+		if (sscanf(q+1, "%d", &vdpy) != 1) {
+			rfbLog("wait_for_client: can't find number in X display: %s\n", q);
+			clean_up_exit(1);
+		}
+		if (vdpy == -1 && vnc_redirect != 2) {
+			rfbLog("wait_for_client: can't find number in X display: %s\n", q);
+			clean_up_exit(1);
+		}
+		if (vnc_redirect == 2) {
+			if (vdpy < 0) {
+				vdpy = -vdpy;
+			} else if (vdpy < 200) {
+				vdpy += 5900;
+			}
+		} else {
+			vdpy += 5900;
+		}
+		if (created_disp) {
+			usleep(1000*1000);
+		}
+		for (i=0; i < 20; i++) {
+			sock = rfbConnectToTcpAddr(vnc_redirect_host, vdpy);
+			if (sock >= 0) {
+				break;
+			}
+			rfbLog("wait_for_client: ...\n");
+			usleep(500*1000);
+		}
+		if (sock < 0) {
+			rfbLog("wait_for_client: could not connect to a VNC Server at %s:%d\n", vnc_redirect_host, vdpy);
+			clean_up_exit(1);
+		}
+		if (inetd) {
+			s_in  = fileno(stdin);
+			s_out = fileno(stdout);
+		} else {
+			s_in = s_out = vnc_redirect_sock;
+		}
+		if (vnc_redirect_cnt > 0) {
+			write(vnc_redirect_sock, vnc_redirect_test, vnc_redirect_cnt);
+		}
+		rfbLog("wait_for_client: switching control to VNC Server at %s:%d\n", vnc_redirect_host, vdpy);
+		raw_xfer(sock, s_in, s_out);
+		clean_up_exit(0);
+	}
 
 	return 1;
 }

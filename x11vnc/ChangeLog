@@ -1,10 +1,17 @@
+2007-09-11  Karl Runge <runge@karlrunge.com>
+	* x11vnc: fix wireframe crash under -clip.  Add -redirect for
+	  VNC redir.  -rawfb nullbig, randbig, solid, swirl, etc.
+	  FD_XDM mode to find_display.	-listdpy.  Add enlightenment.
+	  Xvnc.redirect FINDDISPLAY-vnc_redirect. -xvnc, -xvnc_redirect,
+	  -svc_xvnc. AUTO_PORT.
+
 2007-09-04  Karl Runge <runge@karlrunge.com>
 	* x11vnc: Add -autoport and -finddpy utils. -xdummy creation.
 	  tweak xkb tiebreaking again.  Shut off -ncache in dev mode.
 	  watch for xrandr events even if no -xrandr.  Tips for types
 	  of URLs for java viewers.  Add check_redir_services() to
 	  create_display and tsdo() redir helper utility (-tsd).
-	  Improvements to Xdummy.
+	  Improvements to Xdummy.  Prevent dcop XAUTHORITY=''
 
 2007-08-19  Karl Runge <runge@karlrunge.com>
 	* x11vnc: better -xkb tie-breaking for up keystrokes.  Add 

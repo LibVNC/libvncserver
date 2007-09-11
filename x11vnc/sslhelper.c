@@ -933,7 +933,9 @@ void openssl_port(void) {
 		clean_up_exit(1);
 	}
 	rfbLog("openssl_port: listen on port/sock %d/%d\n", port, sock);
-	announce(port, 1, NULL);
+	if (!quiet) {
+		announce(port, 1, NULL);
+	}
 	openssl_sock = sock;
 	openssl_port_num = port;
 
@@ -1971,6 +1973,12 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 	openssl_last_helper_pid = pid;
 	ssl_helper_pid(pid, vsock);
 
+	if (vnc_redirect) {
+		vnc_redirect_sock = vsock;
+		openssl_last_helper_pid = 0;
+		return;
+	}
+
 	client = rfbNewClient(screen, vsock);
 	openssl_last_helper_pid = 0;
 
@@ -2630,11 +2638,17 @@ static void init_prng(void) {
 #endif	/* LIBVNCSERVER_HAVE_LIBSSL */
 
 void raw_xfer(int csock, int s_in, int s_out) {
-	char buf[8192];
+	char buf0[8192];
 	int sz = 8192, n, m, status, db = 1;
+	char *buf;
 #ifdef FORK_OK
 	pid_t par = getpid();
 	pid_t pid = fork();
+
+	buf = buf0;
+	if (vnc_redirect) {
+		/* change buf size some direction. */
+	}
 
 	/* this is for testing, no SSL just socket redir */
 	if (pid < 0) {
