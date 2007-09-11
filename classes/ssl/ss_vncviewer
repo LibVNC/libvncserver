@@ -128,7 +128,7 @@ if [ "X$STUNNEL" = "X" ]; then
 fi
 
 help() {
-	tail +2 "$0" | sed -e '/^$/ q'
+	tail -n +2 "$0" | sed -e '/^$/ q'
 }
 
 gotalpha=""
@@ -160,7 +160,7 @@ if [ "X$1" = "X-viewerflavor" ]; then
 		echo "ultravnc"
 		exit 0
 	fi
-	str=`$VNCVIEWERCMD -h 2>&1 | head -5`
+	str=`$VNCVIEWERCMD -h 2>&1 | head -n 5`
 	if echo "$str" | grep -i 'TightVNC.viewer' > /dev/null; then
 		echo "tightvnc"
 	elif echo "$str" | grep -i 'RealVNC.Ltd' > /dev/null; then
@@ -291,6 +291,18 @@ if [ "X$reverse" != "X" -a "X$direct_connect" = "X" ]; then
 	export VNCVIEWER_LISTEN_LOCALHOST
 fi
 
+rsh=""
+if echo "$orig" | grep '^rsh://' > /dev/null; then
+	use_ssh=1
+	rsh=1
+	orig=`echo "$orig" | sed -e 's,rsh://,,'`
+elif echo "$orig" | grep '^rsh:' > /dev/null; then
+	use_ssh=1
+	rsh=1
+	orig=`echo "$orig" | sed -e 's,rsh:,,'`
+fi
+
+
 # play around with host:display port:
 if echo "$orig" | grep ':' > /dev/null; then
 	:
@@ -402,6 +414,9 @@ final() {
 		kill -KILL "$stunnel_pid" 2>/dev/null
 		stunnel_pid=""
 	fi
+	if [ "X$tail_pid" != "X" ]; then
+		kill -TERM $tail_pid
+	fi
 }
 
 if [ "X$reverse" = "X" ]; then
@@ -450,6 +465,32 @@ mytmp() {
 	rchk
 }
 
+rsh_setup() {
+	if echo "$ssh_host" | grep '@' > /dev/null; then
+		ul=`echo "$ssh_host" | awk -F@ '{print $1}'`
+		ul="-l $ul"
+		ssh_host=`echo "$ssh_host" | awk -F@ '{print $2}'`
+	else
+		ul=""
+	fi
+	ssh_cmd=`echo "$ssh_cmd" | sed -e 's/ -localhost/ /g'`
+}
+
+rsh_viewer() {
+	trap "final" 0 2 15
+	if [ "X$PORT" = "X" ]; then
+		exit 1
+	elif [ $PORT -ge 5900 ]; then
+		vdpy=`expr $PORT - 5900`
+	else
+		vdpy=":$PORT"
+	fi
+	stty sane
+	echo "$VNCVIEWERCMD" "$@" $ssh_host:$vdpy
+	echo ""
+	$VNCVIEWERCMD "$@" $ssh_host:$vdpy
+}
+
 if [ "X$use_ssh" = "X1" ]; then
 	ssh_port="22"
 	ssh_host="$host"
@@ -462,8 +503,8 @@ if [ "X$use_ssh" = "X1" ]; then
 		# user1@gw1.com:port1,user2@ws2:port2
 		ssh_host1=`echo "$proxy1" | awk -F: '{print $1}'`
 		ssh_port1=`echo "$proxy1" | awk -F: '{print $2}'`
-		if [ "X$ssh_port1" = "X" ]; then
-			ssh_port1="22"
+		if [ "X$ssh_port1" != "X" ]; then
+			ssh_port1="-p 22"
 		fi
 		ssh_host2=`echo "$proxy2" | awk -F: '{print $1}'`
 		ssh_user2=`echo "$ssh_host2" | awk -F@ '{print $1}'`
@@ -481,8 +522,8 @@ if [ "X$use_ssh" = "X1" ]; then
 		proxport=`findfree 3500`
 		echo
 		echo "Running 1st ssh proxy:"
-		echo "$ssh -f -x -p $ssh_port1 $targ -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
-		      $ssh -f -x -p $ssh_port1 $targ -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
+		echo "$ssh -f -x $ssh_port1 $targ -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
+		      $ssh -f -x $ssh_port1 $targ -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
 		ssh_args="$ssh_args -o NoHostAuthenticationForLocalhost=yes"
 		sleep 1
 		stty sane
@@ -512,8 +553,13 @@ if [ "X$use_ssh" = "X1" ]; then
 	fi
 
 	getport=""
+	teeport=""
 	if echo "$ssh_cmd" | egrep "^(PORT=|P=)" > /dev/null; then
 		getport=1
+		if echo "$ssh_cmd" | egrep "^P=" > /dev/null; then
+			teeport=1
+		fi
+
 		PORT=""
 		ssh_cmd=`echo "$ssh_cmd" | sed -e 's/^PORT=[ 	]*//' -e 's/^P=//'`
 		SSVNC_NO_ENC_WARN=1
@@ -531,27 +577,54 @@ if [ "X$use_ssh" = "X1" ]; then
 	pmark=`sh -c 'echo $$'`
 
 	# the -t option actually speeds up typing response via VNC!!
+	if [ "X$ssh_port" = "X22" ]; then
+		ssh_port=""
+	else
+		ssh_port="-p $ssh_port"
+	fi
 
 	if [ "X$SS_VNCVIEWER_SSH_ONLY" != "X" ]; then
-		echo "$ssh -x -p $ssh_port $targ $C $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x $ssh_port $targ $C $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -x -p $ssh_port $targ $C $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x $ssh_port $targ $C $ssh_args $ssh_host "$ssh_cmd"
 		exit $?
 
 	elif [ "X$SS_VNCVIEWER_NO_F" != "X" ]; then
-		echo "$ssh -x -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
 		echo ""
-		$ssh -x -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
 		rc=$?
 
 	elif [ "X$getport" != "X" ]; then
-		echo "$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
-		echo ""
-
 		tport=/tmp/tport${RANDOM}.$$
 		mytmp $tport
-		$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd" > $tport 
-		rc=$?
+
+		if [ "X$rsh" != "X1" ]; then
+			if echo "$ssh_cmd" | grep -w sudo > /dev/null; then
+				echo ""
+				echo "Initial ssh with 'sudo id' to prime sudo so hopefully the next one"
+				echo "will require no password..."
+				echo ""
+				targ="-t"
+				$ssh -x $ssh_port $targ $ssh_args $ssh_host "sudo id; tty"
+				echo ""
+			fi
+			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+			echo ""
+			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd" > $tport 
+			if [ "X$teeport" = "X1" ]; then
+				tail -f $tport 1>&2 &
+				tail_pid=$!
+			fi
+			rc=$?
+		else
+			rsh_setup
+			echo "rsh $ul $ssh_host \"$ssh_cmd\""
+			echo ""
+			rsh $ul $ssh_host "$ssh_cmd" > $tport &
+			sleep 1
+			rc=0
+		fi
 
 		if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
 			sleep $SSVNC_EXTRA_SLEEP
@@ -561,11 +634,11 @@ if [ "X$use_ssh" = "X1" ]; then
 		i=0
 		while [ $i -lt 10 ]; do
 			sleep 1
-			PORT=`grep "^PORT=" $tport | head -1 | sed -e 's/PORT=//' -e 's/\r//g'`
+			PORT=`grep "^PORT=" $tport | head -n 1 | sed -e 's/PORT=//' -e 's/\r//g'`
 			if echo "$PORT" | grep '^[0-9][0-9]*$' > /dev/null; then
 				break
 			fi
-			vnss=`sed -e 's/\r//g' $tport | egrep -i '^(New.* desktop is|A VNC server is already running).*:[0-9[0-9]*$' | head -1 | awk '{print $NF}'`
+			vnss=`sed -e 's/\r//g' $tport | egrep -i '^(New.* desktop is|A VNC server is already running).*:[0-9[0-9]*$' | head -n 1 | awk '{print $NF}'`
 			if [ "X$vnss" != "X" ]; then
 				PORT=`echo "$vnss" | awk -F: '{print $2}'`
 				if echo "$PORT" | grep '^[0-9][0-9]*$' > /dev/null; then
@@ -581,18 +654,33 @@ if [ "X$use_ssh" = "X1" ]; then
 		done
 
 		echo "PORT=$PORT" 1>&2
+		rm -f $tport
+		if [ "X$rsh" = "X1" ]; then
+			rsh_viewer "$@"
+			exit $?
+		fi
 		PPROXY_SOCKS=1
 		export PPROXY_SOCKS
 		host="localhost"
 		port="$PORT"
 		proxy="localhost:$use"
-		rm -f $tport
 
 	else
-		echo "$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
-		echo ""
-		$ssh -x -f -p $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
-		rc=$?
+		if [ "X$rsh" != "X1" ]; then
+			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+			echo ""
+			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+			rc=$?
+		else
+			rsh_setup
+			echo "rsh $ul $ssh_host \"$ssh_cmd\""
+			echo ""
+			rsh $ul $ssh_host "$ssh_cmd" &
+			sleep 1
+			PORT=$port
+			rsh_viewer "$@"
+			exit $?
+		fi
 	fi
 
 	if [ "$rc" != "0" ]; then
@@ -691,10 +779,11 @@ my ($first, $second) = split(/,/, $ENV{PPROXY_PROXY});
 my ($proxy_host, $proxy_port) = split(/:/, $first);
 my $connect = $ENV{PPROXY_DEST};
 
-print STDERR "\nPPROXY v0.1: a tool for Web proxies and SOCKS connections.\n";
+print STDERR "PPROXY v0.1: a tool for Web proxies and SOCKS connections.\n";
 print STDERR "proxy_host:       $proxy_host\n";
 print STDERR "proxy_port:       $proxy_port\n";
 print STDERR "proxy_connect:    $connect\n";
+print STDERR "pproxy_listen:    $ENV{PPROXY_LISTEN}\n";
 print STDERR "\n";
 
 my $listen_handle = "";
@@ -706,12 +795,12 @@ if ($ENV{PPROXY_LISTEN} != "") {
 		Proto     => "tcp"
 	);
 	if (! $listen_sock) {
-		die "perl proxy: $!\n";
+		die "pproxy: $!\n";
 	}
 	my $ip;
 	($listen_handle, $ip) = $listen_sock->accept();
 	if (! $listen_handle) {
-		die "perl proxy: $!\n";
+		die "pproxy: $!\n";
 	}
 }
 
@@ -723,7 +812,7 @@ my $sock = IO::Socket::INET->new(
 
 if (! $sock) {
 	unlink($0);
-	die "perl proxy: $!\n";
+	die "pproxy: $!\n";
 }
 
 my $con = "";
@@ -773,7 +862,7 @@ if ($ENV{PPROXY_SOCKS} ne "") {
 	$con0 = $con;
 }
 
-print STDERR "proxy_request1:\n$con0";
+print STDERR "proxy_request1: $con0";
 print $sock $con;
 
 unlink($0);
@@ -806,7 +895,7 @@ if ($rep !~ m,HTTP/.* 200,) {
 if ($second ne "") {
 	$con = "CONNECT $connect HTTP/1.1\r\n";
 	$con   .= "Host: $connect\r\n\r\n";
-	print STDERR "proxy_request2:\n$con";
+	print STDERR "proxy_request2: $con";
 
 	print $sock $con;
 
@@ -823,14 +912,14 @@ if ($second ne "") {
 }
 
 if (fork) {
-	print STDERR "parent\[$$]  STDIN -> socket\n\n";
+	print STDERR "pproxy parent\[$$]  STDIN -> socket\n";
 	if ($listen_handle) {
 		xfer($listen_handle, $sock);
 	} else {
 		xfer(STDIN, $sock);
 	}
 } else {
-	print STDERR "child \[$$]  socket -> STDOUT\n\n";
+	print STDERR "pproxy child \[$$]  socket -> STDOUT\n";
 	if ($listen_handle) {
 		xfer($sock, $listen_handle);
 	} else {
@@ -855,10 +944,10 @@ sub xfer {
 		my $len = sysread($in, $buf, 8192);
 		if (! defined($len)) {
 			next if $! =~ /^Interrupted/;
-			print STDERR "perl proxy\[$$]: $!\n";
+			print STDERR "pproxy\[$$]: $!\n";
 			last;
 		} elsif ($len == 0) {
-			print STDERR "perl proxy\[$$]: Input is EOF.\n";
+			print STDERR "pproxy\[$$]: Input is EOF.\n";
 			last;
 		}
 		my $offset = 0;
@@ -866,7 +955,7 @@ sub xfer {
 		while ($len) {
 			my $written = syswrite($out, $buf, $len, $offset);
 			if (! defined $written) {
-				print STDERR "perl proxy\[$$]: Output is EOF. $!\n";
+				print STDERR "pproxy\[$$]: Output is EOF. $!\n";
 				$quit = 1;
 				last;
 			}
