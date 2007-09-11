@@ -8,7 +8,7 @@ exec wish "$0" "$@"
 # ssvnc.tcl: gui wrapper to the programs in this
 # package. Also sets up service port forwarding.
 #
-set version 1.0.18
+set version 1.0.19
 
 set buck_zero $argv0
 
@@ -91,7 +91,197 @@ proc jiggle_text {w} {
 	}
 }
 
+proc ts_help {} {
+	toplev .h
+
+	scroll_text_dismiss .h.f
+
+	center_win .h
+	wm title .h "Terminal Services VNC Viewer Help"
+
+	set msg {
+ Terminal Services:
+
+    The Terminal Services VNC Viewer uses SSH to establish an encrypted
+    and authenticated connection to the remote server.
+
+    On the remote server x11vnc is run in terminal services mode to find
+    or create your desktop session.  x11vnc is used for both the session
+    management and the VNC transport.
+
+    You MUST be able to log in via SSH to the remote terminal server.
+    Ask your administrator to set this up for you if it isn't already.
+
+    This mode is started by the commands 'tsvnc' or 'ssvnc -ts' or
+    toggling by pressing Ctrl-t.  "SSVNC Mode" under Options -> Advanced
+    will also return to the full SSVNC.
+
+    Or in your ~/.ssvncrc (or ~/ssvnc_rc on Windows) put "mode=tsvnc"
+    to have the tool always start up in that mode.
+
+    To constrain the UI, run with -tso or SSVNC_TS_ALWAYS set to prevent
+    leaving the Terminal Services mode.
+
+
+ Hosts and Displays:
+
+    Enter the remote VNC Terminal Services hostname in the
+    'VNC Terminal Server' entry.
+
+    Examples:
+
+           24.67.132.27
+           far-away.east
+           fred@someplace.no
+    
+    Then click on "Connect".
+
+    Once the SSH is running (you may need to type a password
+    in the terminal window that pops up), the TightVNC Viewer (Or
+    Chicken-of-the-VNC on Mac OS X) will be automatically started directed
+    to the local port of the SSH tunnel which, in turn, encrypts and
+    redirects the connection to the remote VNC server.
+
+    x11vnc is run remotely to find or create your terminal services
+    desktop session.
+
+    Enter "user@hostname.com" in 'VNC Terminal Server' if the remote
+    username is different from the yours on this machine.  On Windows
+    you *MUST* supply the remote username.  This entry is passed to SSH;
+    it could also be an SSH alias you have created (in ~/.ssh/config).
+
+
+ Proxies/Gateways:
+
+    Proxy/Gateway is usually a gateway machine to log into via SSH
+    that is not the machine running the VNC terminal services.
+
+    For example if a company had a central login server: "ssh.company.com"
+    (accessible from the internet) and the internal server name was
+    "ts-server", one could put in for the
+
+           VNC Terminal Server:   ts-server
+           Proxy/Gateway:         ssh.company.com
+
+    It is OK if the hostname "ts-server" only resolves inside the firewall.
+
+    The 2nd host, ts-server in this example, MUST also be running an
+    SSH server and you must be able to log into it.
+
+    Use username@host (e.g. joe@ts-server or jsmith@ssh.company.com)
+    if the user name differs between machines.
+
+    To use a non-standard ssh port (i.e. a port other than 22) you need to
+    use the Proxies/Gateways as well.  Something like this for port 2222:
+
+           VNC Host:Display:   localhost
+           Proxy/Gateway:      jsmith@ssh.company.com:2222
+
+    The username@ is not needed if it is the same as on this machine. The
+    above will also work going to a different internal machine,
+    e.g. "ts-server", as in the first example.
+
+
+ Options:
+
+    Click on Options to get to dialog boxes to:
+
+           - Desktop Type        (kde, gnome, failsafe, twm...) 
+           - Desktop Size        (Geometry WxH and pixel depth) 
+           - X Server Type       (Xvfb, Xdummy, Xvnc) 
+           - Enable Printing     (CUPS and/or SMB/Windows)
+           - Enable Sound        (TBD, ESD partially working)
+           - File Transfer       (Ultra or TightVNC filexfer)
+           - View Only           (View only client)
+           - Change VNC Viewer   (Realvnc, ultra, etc...)
+           - Delete Profile...   (Delete a saved profile)
+
+           - Advanced Options:
+
+           - VNC Shared          (optional traditional VNC sharing)
+           - Multiple Sessions   (more than 1 session per server)
+           - X Login             (Connect to Login/Greeter Display)
+           - Other VNC Server    (redirect to 3rd party VNC Server)
+           - Use unixpw          (optional x11vnc login mode)
+           - Client 8bit Color   (VNC Viewer requests low color mode)
+           - Client-Side Caching (experimental x11vnc speedup)
+           - X11VNC Options      (set any extra x11vnc options)
+           - SSVNC Mode          (Return to full SSVNC mode)
+
+
+ Profiles:
+
+    Use "Save" to save a profile (i.e. a host:display and its specific
+    settings) with a name.  The "TS-" prefix will be suggested to help
+    you distinguish between Terminal Services and regular profiles.
+
+    To load in a saved Options profile, click on the "Load" button,
+    and choose which one you want.
+
+    To list your profiles from the command line use:
+
+         tsvnc -profiles    (or -list)
+
+    To launch profile1 directly from the command-line, or to a server
+    use things like: 
+
+         tsvnc profile1
+         tsvnc hostname
+         tsvnc user@hostname
+
+
+ Requirements:
+
+    When running this application on Unix/MacOSX the ssh(1) program must
+    be installed locally.  On Windows a plink/putty binary is included.
+
+    On the remote VNC Terminal Services host, x11vnc must be installed
+    (0.9.3 or higher), and at least one virtual X server: Xvfb, Xdummy,
+    or Xvnc must be available.  Xvfb is the most often used one.  All of
+    these programs must be available in $PATH on the remote server when
+    logged in via SSH.
+
+    The VNC terminal services administrator can make "x11vnc" be a wrapper
+    script that sets everything up correctly and then runs the real x11vnc. 
+
+
+ Real X servers:
+
+    As a BONUS, if on the remote host, say a workstation, you have a
+    regular X session running on the physical hardware that you are
+    ALREADY logged into you can access to that display as well (x11vnc
+    will find it).
+
+    So this tool can be used as a simple way to launch x11vnc to find
+    your real X display on your workstation and connect to it.
+
+    The Printing and Sound redirection won't work for this mode however.
+    You will need to use the full SSVNC application to attempt that.
+
+    If you (mistakenly) have not logged into an X session on the real
+    X server on the workstation, a VIRTUAL (Xvfb, etc.) server will be
+    created for you (that may or may not be what you want).
+
+ More Info:
+
+    See these links for more information:
+
+        http://www.karlrunge.com/x11vnc/#tunnelling
+}
+
+	global version
+	set msg "                             SSVNC version: $version\n$msg"
+
+	.h.f.t insert end $msg
+	jiggle_text .h.f.t
+}
+
 proc help {} {
+	global ts_only
+	if {$ts_only} {
+		ts_help
+		return
+	}
 	toplev .h
 
 	scroll_text_dismiss .h.f
@@ -116,10 +306,15 @@ proc help {} {
     Then click on "Connect".  When you do so the STUNNEL program will be
     started locally to provide you with an outgoing SSL tunnel.
 
-    Once the STUNNEL is running, the TightVNC Viewer (Or Chicken-of-the-VNC
-    on Mac OS X) will be automatically started directed to the local SSL
-    tunnel which, in turn, encrypts and redirects the connection to the
-    remote VNC server.
+    Once the STUNNEL is running, the TightVNC Viewer (Or Chicken of the
+    VNC on Mac OS X) will be automatically started directed to the local
+    port of the SSL tunnel which, in turn, encrypts and redirects the
+    connection to the remote VNC server.
+
+    The remote VNC server must support an initial SSL handshake before
+    using the VNC protocol (i.e. VNC is tunnelled through the SSL channel
+    after it is established).  "x11vnc -ssl ..."  does this, and any VNC
+    server can be made to do this by using, e.g., STUNNEL on the remote side.
 
     SSH tunnels are described below.
 
@@ -128,15 +323,10 @@ proc help {} {
 
            24.67.132.27:443
 
-    Note, however, if the number n after the colon is less than 200, then
-    a port number 5900 + n is assumed; i.e. n is the VNC display number.
+    Note, however, if the number n after the colon is < 200, then a
+    port number 5900 + n is assumed; i.e. n is the VNC display number.
     If you must use a TCP port less than 200, specify a negative value,
     e.g.:  24.67.132.27:-80
-
-    The remote VNC server must support an initial SSL handshake before
-    using the VNC protocol (i.e. VNC is tunnelled through the SSL channel
-    after it is established).  "x11vnc -ssl ..."  does this, and any VNC
-    server can be made to do this by using, e.g., STUNNEL on the remote side.
 
 
     *IMPORTANT*: If you do not take the steps to verify the VNC Server's
@@ -171,8 +361,8 @@ proc help {} {
     be prompted for it in the terminal window running TightVNC viewer.
     On Windows TightVNC viewer should prompt you.
 
-    NOTE: when you Save a VNC profile (Options ... -> Save Profile),
-    the password is not saved (you need to enter it each time).
+    NOTE: when you Save a VNC profile, the password is not saved (you
+    need to enter it each time).
 
  SSH:
 
@@ -185,6 +375,9 @@ proc help {} {
     Use something like "username@hostname.com:0" if the remote username
     is different.  "SSH + SSL" is similar but its use is more rare. See
     the Help under Options for more info.
+
+    See Tip 13) below for how to make this application be SSH only with
+    the -ssh command line option.
 
 
  Proxies/Gateways:
@@ -216,6 +409,7 @@ proc help {} {
            Proxy/Gateway:      local-proxy:8080,mygateway.com:443
 
     (either as above, or alternatively putting both strings in Host:Display)
+    So it goes: viewer -> local-proxy -> mygateway.com -> far-away (VNC)
 
     See the ss_vncviewer description and x11vnc FAQ for info on proxies:
 
@@ -243,29 +437,31 @@ proc help {} {
     To SSH encrypt both legs, try the "double gateway" using the above
     "comma" notation:
 
-           VNC Host:Display:   :0
+           VNC Host:Display:   localhost:0
            Proxy/Gateway:      ssh.company.com,joes-pc
 
     this requires an SSH server running on joes-pc.  Use username@host
-    (e.g. joe@joes-pc  jsmith@ssh.company.com if the user name differs).
+    (e.g. joe@joes-pc  jsmith@ssh.company.com) if the user name differs.
 
+    To use a non-standard ssh port (i.e. a port other than 22) you need to
+    use the Proxies/Gateways as well.  Something like this for port 2222:
+
+           VNC Host:Display:   localhost:0
+           Proxy/Gateway:      joe@ssh.company.com:2222
+
+    The username@ is not needed if it is the same as on the client.
+    (Also, localhost:0 is actually the same as :0).  This will also work
+    going to a different internal machine, e.g. "joes-pc:0", as in the
+    first example.
 
  Remote SSH Command:
 
-    In SSH or SSH + SSL mode you can also specify a remote command to run
-    on the remote ssh host in the "Remote SSH Command" entry.  The default
-    is just to sleep a bit (e.g. sleep 30) to make sure the port tunnels are
-    active.  Alternatively you could have the remote command start the
-    VNC server, e.g.  x11vnc -nopw -display :0 -rfbport 5900 -localhost
-
-    You can also specify the remote SSH command by putting a string like
-    
-         cmd=x11vnc -nopw -display :0 -rfbport 5900 -localhost
-
-    (use any command you wish to run) at the END of the VNC Host:Display
-    entry.  In general, you can cram it all in the VNC Host:Display if
-    you like:   host:disp  proxy:port  cmd=...  (this is the way it is
-    stored internally).
+    In SSH or SSH + SSL mode you can also specify a remote command
+    to run on the remote ssh host in the "Remote SSH Command" entry.
+    The default is just to sleep a bit (e.g. sleep 30) to make sure
+    the port tunnels are established.  Alternatively you could have the
+    remote command start the VNC server, e.g.  x11vnc -nopw -display :0
+    -rfbport 5900 -localhost
 
     When starting the VNC server this way, note that sometimes you
     will need to correlate the VNC Display number with the "-rfbport"
@@ -328,13 +524,14 @@ proc help {} {
 
  Profiles:
 
-    Use "Save Profile" under "Options ..." to save a profile (i.e. a
-    host:display and its specific settings) with a name.
+    Use "Save" to save a profile (i.e. a host:display and its specific
+    settings) with a name.
 
     To load in a saved Options profile, click on the "Load" button.
-    This is the same as the "Load Profile" button under "Options"
 
-    To list your profiles use: "ssvnc -profiles"
+    To list your profiles from the command line use: 
+
+        ssvnc -profiles    (or -list)
 
     You can launch ssvnc and have it immediately connect to the server
     by invoking it something like this:
@@ -378,7 +575,7 @@ proc help {} {
         You can also put the string in the "Remote SSH Command" entry.
 
      4) Pressing the "Load" button or pressing Ctrl-L or Clicking the Right
-        mouse button on the main GUI will invoke the Load Profile dialog.
+        mouse button on the main GUI will invoke the Load dialog.
 
      5) If you want to do a Direct VNC connection, WITH *NO* SSL OR SSH
         ENCRYPTION, use the "vnc://" prefix, e.g. vnc://far-away.east:0
@@ -417,14 +614,17 @@ proc help {} {
         is no need to toggle the SSL/SSH setting.  These also work from
         the command line, e.g.:  ssvnc vnc+ssh://mymachine:10
 
-    10) Mobile USB memory stick / flash drive usage:  You can unpack ssvnc
-        to a flash drive for impromptu usage (e.g. from a friends computer)
-        If you create a directory "Home" in the toplevel ssvnc directory,
-        then that will be the default location for your VNC profiles and
-        certs.  So they follow the drive this way.  If you run like this:
-        "ssvnc ." or "ssvnc.exe ." the "Home" directory will be created for
-        you.  WARNING: if you use ssvnc from an "Internet Cafe", i.e. an
-        untrusted computer, an intruder may be capturing keystrokes, etc.
+    10) Mobile USB memory stick / flash drive usage:  You can unpack
+        ssvnc to a flash drive for impromptu usage (e.g. from a friends
+        computer) If you create a directory "Home" in the toplevel ssvnc
+        directory, then that will be the default location for your VNC
+        profiles and certs.  So they follow the drive this way.  If you
+        run like this: "ssvnc ." or "ssvnc.exe ." the "Home" directory
+        will be created for you.
+
+        WARNING: if you use ssvnc from an "Internet Cafe", i.e. an
+        untrusted computer, an unscrupulous person may be capturing
+        keystrokes, etc.
 
 	You can also set the SSVNC_HOME env. var. to point to any
 	directory you want. It can be set after starting ssvnc by putting
@@ -457,11 +657,62 @@ proc help {} {
         find the already running one.  The former one will keep creating
         new X sessions if called repeatedly.
 
+        On Windows if PORT= is supplied SOCKS proxying is not used, but
+        rather a high, random value of the VNC port is chosen (e.g. 8453)
+        and assumed to be free, and is passed to x11vnc's -rfbport option.
+        This only works with x11vnc (not vncserver).
+
     12) You can change the X DISPLAY variable by typing DISPLAY=... into
         VNC Host:Display and hitting Return or clicking Connect. Same for
         HOME=.  Setting SLEEP=n increases the amount of time waited before
         starting the viewer.  On Mac, you can set DYLD_LIBRARY_PATH=... too.
         It should propagate down the the viewer.
+
+    13) If you want this application to be SSH only, then supply the
+        command line option "-ssh" or set the env. var SSVNC_SSH_ONLY=1.
+        Then no GUI elements specific to SSL will appear (the
+        documentation will refer to the SSL mode, however).  You cannot
+        Load an SSL profile when in this mode.  To convert a running
+        app to ssh-only select "Mode: SSH-Only" in Options.
+
+        The wrapper scripts "sshvnc" and "sshvnc.bat" will start it up
+        automatically this way.
+
+        Or in your ~/.ssvncrc (or ~/ssvnc_rc on Windows) put "mode=sshvnc"
+        to have the tool always start up in that mode.
+
+    14) For an even simpler "Terminal Services" mode use "tsvnc" or
+        "tsvnc.bat" (or "-ts" option).  This mode automatically launches
+        x11vnc on the remote side to find or create your Desktop session
+        (usually the Xvfb X server).
+
+        From a full ssvnc you can press Ctrl-h to go into ssh-only mode
+        and Ctrl-t to toggle between "tsvnc" and "ssvnc" modes.  The
+        Options Mode menu also let you switch.
+
+        Or in your ~/.ssvncrc (or ~/ssvnc_rc on Windows) put "mode=tsvnc"
+        to have the tool always start up in that mode.
+
+    15) You can put global options in your ~/.ssvncrc file (ssvnc_rc on
+        Windows). Currently they are:
+
+	Put "mode=tsvnc" or "mode=sshvnc" in the ~/.ssvncrc file to have
+	the application start up in the given mode.
+
+        desktop_type=wmaker  (e.g.) to switch the default Desktop Type.
+
+        desktop_size=1280x1024  (e.g.) to switch the default Desktop Size.
+
+        desktop_depth=24  (e.g.) to switch the default Desktop Color Depth.
+
+        xserver_type=Xdummy  (e.g.) to switch the default X Server Type.
+
+        (The above 4 settings apply only to the Terminal Services Mode.)
+
+    16) On Unix you can make the "Open File" and "Save File" dialogs
+        bigger by setting the env. var. SSVNC_BIGGER_DIALOG=1 or
+        supplying the -bigger option.  If you set it to a Width x Height,
+        e.g. SSVNC_BIGGER_DIALOG=500x200, that size will be used.
 }
 
 	global version
@@ -470,6 +721,15 @@ proc help {} {
 	.h.f.t insert end $msg
 	jiggle_text .h.f.t
 }
+
+#    You can also specify the remote SSH command by putting a string like
+#    
+#         cmd=x11vnc -nopw -display :0 -rfbport 5900 -localhost
+#
+#    (use any command you wish to run) at the END of the VNC Host:Display
+#    entry.  In general, you can cram it all in the VNC Host:Display if
+#    you like:   host:disp  proxy:port  cmd=...  (this is the way it is
+#    stored internally).
 
 proc help_certs {} {
 	toplev .ch
@@ -505,7 +765,7 @@ proc help_certs {} {
     comparing MD5 hash or other info), you can save it.  The file it was saved
     as will be set as the "ServerCert" to verify against for the next connection.
     To make this verification check permanent, you will need to save the profile
-    via Options -> Save Profile.
+    via 'Save'.
 
  Verify All Certs:
 
@@ -627,6 +887,255 @@ proc help_certs {} {
 	jiggle_text .ch.f.t
 }
 
+proc help_ts_opts {} {
+	toplev .oh
+
+	scroll_text_dismiss .oh.f
+
+	center_win .oh
+
+	wm title .oh "Terminal Services VNC Options Help"
+
+set msg {
+ Options:  Click on a checkbox to enable a feature and bring up its Dialog.
+ Deselecting a checkbox will disable the feature (but settings from the
+ Dialog are remembered).  Click on it again to re-enable.
+
+
+ Desktop Type:
+
+    The default type of remote Desktop type is the "kde" (The K Desktop
+    Environment) You can choose a different type: gnome, failsafe,
+    twm, etc.
+
+    This setting will ONLY be used if the desktop needs to be created.
+    If an existing session of yours is found it will be used instead
+    (log out of that session if you want to create a new Desktop type
+    or see the Multiple Sessions option under Advanced).
+
+ Desktop Size:
+
+    The default size of remote Desktop type is the "1024x768" with a
+    Color depth of 16 bits per pixel (BPP).  Choose one of the standard
+    WxH values or enter a custom one (TBD).
+
+    This setting will ONLY be used if the desktop needs to be created.
+    If an existing session of yours is found it will be used instead
+    (log out of that session if you want to create a new Desktop size
+    or see the Multiple Sessions option under Advanced).
+
+    Some X servers, Xdummy or a real X server, will allow dynamic screen
+    size changing after the session has started via a GUI configuration
+    tool (or xrandr(1) from the command line).
+
+ X Server Type:
+
+    The default type of remote X session is the "Xvfb" (X virtual frame
+    buffer) X server.  It is available on most systems.  To choose a
+    different type, select "Xdummy", "Xvnc", "Xvnc.redirect".
+
+    Xdummy is part of the x11vnc project and is a virtual X server with
+    some nice features, but it Linux only and requires root permission
+    to run.  One user put 'ALL ALL = NOPASSWD: /usr/local/bin/Xdummy*'
+    in his sudo(1) configuration (via visudo).
+
+    For Xvnc that server is started up, and x11vnc polls it in its
+    normal way.  Use Xvnc.redirect if you want x11vnc to find and/or
+    create the Xvnc session, but after that merely transfer packets back
+    and forth between VNC viewer and Xvnc (I.e. x11vnc does no polling
+    or VNC protocol).
+
+
+ Enable Printing:
+
+    This sets up a SSH port redirection for you from your remote session
+    to your local print server.  The CUPS mechanism is used.  The local
+    print server can also be SMB/Windows (not fully functional yet).
+
+ Enable Sound:
+
+    Not completely implemented yet.  A partially working ESD method
+    is provided.  It may change over to http://nas.sourceforge.net in
+    the future.  As with printing, it uses a SSH port redirection to a
+    server running locally.
+
+ File Transfer:
+
+    x11vnc supports both the UltraVNC and TightVNC file transfer
+    extensions.  On Windows both viewers support their file transfer
+    protocol.  On Unix only the SSVNC VNC Viewer has filexfer support;
+    it supports the UltraVNC flavor via a Java helper program.
+
+    Choose the one you want based on VNC viewer you will use.
+    The defaults for the SSVNC viewer package are TightVNC on Windows
+    and UltraVNC on Unix.
+
+ View Only:
+
+    Start the VNC Viewer in View-Only mode (it may be switched to full
+    access later in the session).
+
+ Change VNC Viewer:
+
+    If you do not like the VNC Viewer bundled in the package, you can
+    indicate another one here.
+
+
+ Advanced Options:
+
+ VNC Shared:
+
+    Normal use of this program, 'tsvnc', *ALREADY* allows simultaneous
+    shared access of the remote desktop:   You simply log in as many
+    times from as many different locations with 'tsvnc' as you like.
+
+    Select this option for the traditional VNC server shared mode of
+    operation using a single x11vnc server.  SSH access is still required.
+
+ Multiple Sessions:
+
+    To enable one user to have more than one Terminal Services Desktop
+    X session on a single machine, this option lets you create Tags for
+    multiple ones (e.g. KDE_BIG, TWM_800x600)
+
+ X Login:
+
+    If you have root (sudo(1)) permission on the remote machine,
+    you can have x11vnc try to connect to X displays that have nobody
+    logged in yet.  This is most likely the login greeter running on
+    the Physical console.  sudo(1) is used to run x11vnc with FD_XDM=1.
+
+    An initial ssh running 'sudo id' is performed to try to 'prime'
+    sudo so the 2nd one that starts x11vnc does not need a password.
+
+    Note that if someone is already logged into the console of the XDM
+    display you will see their X session.
+
+ Other VNC Server:
+
+    The x11vnc program running on the remote machine can be instructed to
+    immediately redirect to some other (3rd party, e.g. Xvnc or vnc.so)
+    VNC server.
+
+ Use unixpw:
+
+    This enables the x11vnc unixpw mode.  A Login: and Password: dialog
+    will be presented in the VNC Viewer for the user to provide any Unix
+    username and password whose session he wants to connect to.
+
+    This mode is useful if a shared terminal services user (e.g. 'tsuser')
+    is used for the SSH login part (say via the SSH authorized_keys
+    mechanism and all users share the same private SSH key for 'tsuser').
+
+    In normal usage the per-user SSH login should be the simplest and
+    sufficient, in which case the unixpw option should NOT be selected.
+
+ Client 8bit Color:
+
+    Have the VNC Viewer request low color mode (8 bits per pixel) for
+    slow links.  This may be disabled or further tuned (e.g. 64 color
+    mode) in the viewer during the session.
+
+ Client-Side Caching:
+
+    x11vnc has an experiment Client-Side caching scheme "-ncache n"
+    that can give nice speedups.  But there are some drawbacks
+    because the the cache-region is visible and uses much RAM.
+    http://www.karlrunge.com/x11vnc/#faq-client-caching
+
+ X11VNC Options:
+
+    If you are familiar with x11vnc, you can specify any of its features
+    that you would like enabled.
+
+ SSVNC Mode:
+
+    Clicking on this button will return you to the full SSVNC Mode.
+
+
+ ~/.ssvncrc file:
+
+    You can put global options in your ~/.ssvncrc file (ssvnc_rc on
+    Windows). Currently they are:
+
+    Put "mode=tsvnc" or "mode=sshvnc" in the ~/.ssvncrc file to have
+    the application start up in the given mode.
+
+    desktop_type=wmaker  (e.g.) to switch the default Desktop Type.
+
+    desktop_size=1280x1024  (e.g.) to switch the default Desktop Size.
+
+    desktop_depth=24  (e.g.) to switch the default Desktop Color Depth.
+
+    xserver_type=Xdummy  (e.g.) to switch the default X Server Type.
+
+    (The above 4 settings apply only to the Terminal Services Mode.)
+}
+	.oh.f.t insert end $msg
+	jiggle_text .oh.f.t
+}
+
+proc help_fetch_cert {} {
+	toplev .fh
+
+	scroll_text_dismiss .fh.f 85 35
+
+	center_win .fh
+	wm resizable .fh 1 0
+
+	wm title .fh "Fetch Certificates Help"
+
+	set msg {
+  The above SSL Certificate has been retrieved from the VNC Server via the
+  "Fetch Cert" action.
+  
+  It has merely been downloaded via the SSL Protocol: **IT HAS NOT BEEN VERIFIED
+  IN ANY WAY**
+  
+  So, in principle, it could be a fake certificate being inserted by a bad
+  person attempting to perform a Man-In-The-Middle attack on your SSL connection.
+  
+  If, however, by some external means you can verify the authenticity of
+  this SSL Certificate you can use it for your VNC SSL connection to the
+  VNC server you wish to connect to.  It will provide an authenticated and
+  encrypted connection.
+  
+  You can verify the SSL Certificate by comparing the MD5 or SHA1 hash
+  value via a method/channel you know is safe (i.e. not also under control
+  of a Man-In-The-Middle attacker).  You could also check the text between
+  the -----BEGIN CERTIFICATE----- and -----END CERTIFICATE----- tags, etc.
+  
+  Once you are sure it is correct, you can press the Save button to save the
+  certificate to a file on the local machine for use when you connect via
+  VNC tunneled through SSL.  If you save it, then that file will be set as
+  the Certificate to verify the VNC server against.  You can see this in
+  the dialog started via the "Certs..." button on the main panel.
+  
+  NOTE: If you want to make PERMANENT the association of the saved SSL
+  certificate file with the VNC server host, you MUST save the setting as
+  a profile for loading later. To Save a Profile, click on Options -> Save
+  Profile ..., and choose a name for the profile and then click on Save.
+
+  If "Verify All Certs" is checked, then you are forced to check all
+  new certs.  In this case the certs are saved in the 'Accepted Certs'
+  directory against which all servers will be checked unless "ServerCert"
+  or "CertsDir" has been set to something else.
+
+  To reload the profile at a later time, click on the "Load" button on
+  the main panel and then select the name and click "Open".  If you want
+  to be sure the certificate is still associated with the loaded in host,
+  click on "Certs..." button and make sure the "ServerCert" points to the
+  desired SSL filename.
+
+  See the Certs... Help for more information.  A sophisticated method
+  can be set up using a Certificate Authority key to verify never before
+  seen certificates (i.e. like your web browser does).
+}
+
+	.fh.f.t insert end $msg
+	jiggle_text .fh.f.t
+}
+
 proc help_opts {} {
 	toplev .oh
 
@@ -644,64 +1153,119 @@ set msg {
             tunnel.  You must be able to log in via ssh to the remote host.
 
             On Unix the cmdline ssh(1) program (it must already be installed)
-            will be run in an xterm for passphrase authentication, etc. On
-            Windows the cmdline plink.exe program will be launched in
-            a Windows Console window.
+            will be run in an xterm for passphrase authentication, prompts
+            about RSA keys, etc.  On Windows the cmdline plink.exe program
+            will be launched in a Windows Console window. (Apologies for
+            the klunkiness..)
 
-            You can set the "VNC Host:Display" to "user@host:disp" to indicate
-            ssh should log in as "user" on "host".  NOTE: On Windows you MUST
-            always supply the "user@" part (due to a plink deficiency). E.g.:
+            You can set the "VNC Host:Display" to "user@host:disp" to
+            indicate ssh should log in as "user" on "host".  NOTE: On
+            Windows you *MUST* always supply the "user@" part (due to a
+            plink deficiency). E.g.:
 
-                  fred@far-away.east:0
+                fred@far-away.east:0
 
-            If an intermediate gateway machine must be used (e.g. to enter
-            a firewall; the VNC Server is not running on it), put it in the
-            Proxy/Gateway entry or you can put something like this in the
-            "VNC Host:Display" entry box:
 
-                  workstation:0   user@gateway-host:port
+            Gateway:  If an intermediate gateway machine must be used
+            (e.g. to enter a firewall; the VNC Server is not running on it),
+            put it in the Proxy/Gateway entry, e.g.:
+
+                VNC Host:Display:    workstation:0
+                Proxy/Gateway:       user@gateway-host:port
   
             ssh is used to login to user@gateway-host and then a -L port
             redirection is set up to go to workstation:0 from gateway-host.
             ":port" is optional, use it if the gateway-host SSH port is
             not the default value 22.
 
-            One can also do a "double ssh", i.e. a first SSH to the
-            gateway login machine then a 2nd ssh to the destination machine
-            (presumably it is running the vnc server).  Unlike the above
-            example, the "last leg" (gateway-host -> workstation) is also
-            encrypted by SSH this way.  Do this by splitting the gateway
-            in two with a comma, the part before it is the first SSH:
+            Chaining 2 ssh's:  One can also do a "double ssh", i.e. a
+            first SSH to the gateway login machine then a 2nd ssh to the
+            destination machine (presumably it is running the vnc server).
 
-                  :0   user@gateway-host:port,user@workstation:port
+            Unlike the above example, the "last leg" (gateway-host ->
+            workstation) is also encrypted by SSH this way.  Do this by
+            splitting the gateway in two with a comma, the part before it
+            is the first SSH:
 
-            (or in the Proxy/Gateway entry).
-
-            In the "Remote SSH Command" entry you can to indicate that a
-            remote command to be run.  The default is "sleep 15".  Also, at
-            the very end of the entry box, you can append a cmd=... string
-            to to achieve the same thing.  E.g.
-
-                  user@host:0   cmd=x11vnc -nopw -display :0
-
-            (if a gateway is also needed, put it just before the cmd=...
-            e.g.  host:0  user@gateway-host:port cmd=x11vnc -nopw )
+                VNC Host:Display: localhost:0
+                Proxy/Gateway:    user@gateway-host:port,user@workstation:port
 
 
-            Trick: If you use "cmd=SHELL" then you get an SSH shell only:
+            Remote Command:  In the "Remote SSH Command" entry you can to
+            indicate that a remote command to be run.  The default is
+            "sleep 15".  For example, to run x11vnc for your X :0 display:
+
+                x11vnc -nopw -display :0
+
+
+            Trick:  If you use "cmd=SHELL" then you get an SSH shell only:
             no VNC viewer will be launched.  On Windows "cmd=PUTTY" will
             try to use putty.exe (better terminal emulation than plink.exe)
             A shortcut for this is Ctrl-S as long as user@hostname is present
             in the "VNC Host:Display" box.
 
-  Use SSH + SSL: Tunnel the SSL connection through a SSH tunnel.  Use this
+
+  Use SSH + SSL:
+
+            Tunnel the SSL connection through a SSH tunnel.  Use this
             if you want end-to-end SSL and must use a SSH gateway (e.g. to
             enter a firewall) or if additional SSH port redirs are required
-            (CUPS, Sound, SMB tunnelling: See Advanced Options).
+            (CUPS, Sound, SMB tunnelling: See Advanced Options).  Rarely used
+            mode, but included in case the need arises.
 
-  Unix Username & Password:  This is only available on Unix and when using
-            the SSVNC enhanced TightVNC viewer (it has been modified to
-            do Unix logins).  It supports a login dialog with servers
+
+  Automatically Find X Session:
+
+            When using SSH mode to connect, you can select this option.  It
+            simply sets the Remote SSH Command to:
+
+                 PORT= x11vnc -find -localhost
+
+            This requires that x11vnc is installed on the remote computer
+            and is available in $PATH for the ssh login.  The command
+            "x11vnc -find -localhost" command is run on the remote
+            machine.
+
+            The -find option causes x11vnc to try to find an existing X
+            session owned by the user (i.e. who you ssh in as).  If it
+            does it attaches to it; otherwise the x11vnc VNC server exits
+            immediately followed by your VNC Viewer.
+
+            The PORT= option just means to let x11vnc pick its own VNC
+            port and then connect to whatever it picked.
+
+            The idea for this mode is you simply type 'username@workstation'
+            in the VNC Host:Display box, Select 'Options -> Automatically
+            Find X Session', and then click Connect.  The tsvnc mode
+            is similar.
+
+  Automatically Find X Login/Greeter:
+
+            This mode is similar to "Automatically Find X Session" except
+            that it will attach to a X Login/Greeter screen that no one
+            has logged into yet.  It requires root privileges via sudo(1)
+            on the remote machine.
+
+            As with "Automatically Find X Session" it works only with SSH
+            mode and requires x11vnc be installed on the remote computer.
+
+            It simply sets the Remote SSH Command to:
+
+                 PORT= sudo x11vnc -find -localhost -env FD_XDM=1
+
+            An initial ssh running 'sudo id' is performed to try to
+            'prime' sudo so the 2nd one that runs x11vnc does not need
+            a password.  This may not always succeed...
+
+            See the 'X Login' description in 'Terminal Services' Mode
+            Help for more info.
+
+
+  Unix Username & Password:
+
+            This is only available on Unix and when using the SSVNC
+            enhanced TightVNC viewer (it has been modified to do
+            Unix logins).  It supports a login dialog with servers
             doing something like x11vnc's "-unixpw" mode.  After any
             regular VNC authentication takes place (VNC Password), then
             it sends the Unix Username, a Return, the Unix Password and
@@ -730,7 +1294,9 @@ set msg {
             by sending an initial Escape.  Set the SSVNC_UNIXPW_NOESC=1
             environment variable to override this.
 
-  Reverse VNC Connection: reverse (listening) VNC connections are possible.
+  Reverse VNC Connection:
+
+            Reverse (listening) VNC connections are possible.
 
             For SSL connections in the 'VNC Host:Display' entry box put in
             the number (e.g. "0" or ":0") that corresponds to the Listening
@@ -739,6 +1305,11 @@ set msg {
 
             Then a VNC server should establish a reverse connection to
             that port on this machine (e.g. -connect this-machine:5500)
+
+            SSL certificates will be verified, however you won't be
+            prompted about unrecognized ones; rather, you must set
+            up the correct Server certificate (e.g. by importing).
+            prior to any connections.
 
             For reverse connections in SSH or SSH + SSL modes it is a
             little trickier.  The SSH tunnel (with -R redirect) must be
@@ -775,23 +1346,6 @@ set msg {
             unless it is a double proxy where the 2nd host is the machine with
             the VNC server.
 
-  Putty PW:  On Windows only: use the supplied password for plink SSH logins.
-             Unlike the other options the value is not saved when 'Save
-             Profile' is performed.  This feature is useful when options under
-             "Advanced" are set that require TWO SSH's: you just have
-             to type the password once in this entry box.  The bundled
-             pagent.exe and puttygen.exe programs can also be used to avoid
-             repeatedly entering passwords (note this requires setting up
-             and distributing SSH keys).  Start up pagent.exe or puttygen.exe
-             and read the instructions there.
-                
-  ssh-agent: On Unix only: restart the GUI in the presence of ssh-agent(1)
-             (e.g. in case you forgot to start your agent before starting
-             this GUI).  An xterm will be used to enter passphrases, etc.
-             This can avoid repeatedly entering passphrases for the
-             SSH logins (note this requires setting up and distributing
-             SSH keys).
-
 
   View Only:               Have VNC Viewer ignore mouse and keyboard input.
   
@@ -801,36 +1355,53 @@ set msg {
   
   Use 8bit color:          Request a very low-color pixel format.
   
-  Cursor Alphablending:    Use the x11vnc alpha hack for translucent cursors
-                           (requires Unix, 32bpp and same endianness)
-  
-  Use XGrabServer:         On Unix only, use the XGrabServer workaround for
-                           old window managers.
-
   Do not use JPEG:         Do not use the jpeg aspect of the tight encoding.
 
   Compress Level/Quality:  Set TightVNC encoding parameters.
 
-  Save and Load:   You can Save the current settings by clicking on Save
-                   Profile (.vnc file) and you can also read in a saved one
-                   with Load Profile.  Use the Browse... button to select
-                   the filename via the GUI.
+  Putty PW:  On Windows only: use the supplied password for plink SSH
+             logins.  Unlike the other options the value is not saved
+             when 'Save' is performed.  This feature is useful when
+             options under "Advanced" are set that require TWO SSH's:
+             you just have to type the password once in this entry box.
+             The bundled pagent.exe and puttygen.exe programs can also
+             be used to avoid repeatedly entering passwords (note this
+             requires setting up and distributing SSH keys).  Start up
+             pagent.exe or puttygen.exe and read the instructions there.
 
-                   Pressing Ctrl-L or Clicking the Right mouse button on
-                   the main GUI will invoke the Load Profile dialog.
+  Mode:      To change the GUI Mode, select between the full SSVNC
+             (i.e. SSL and SSH), SSHVNC (i.e. SSH-Only), and Terminal
+             Services mode (TSVNC; uses x11vnc)
 
-                   Note: On Windows since the TightVNC Viewer will save
-                   its own settings in the Registry, some unexpected
-                   behavior is possible because the viewer is nearly
-                   always directed to the VNC host "localhost:30".  E.g. if
-                   you specify "View Only" in this gui once but not next
-                   time the Windows VNC Viewer may remember the setting.
-                   Unfortunately there is not a /noreg option for the Viewer.
-                   
+             Note: You can put "mode=tsvnc" or "mode=sshvnc" in your
+             ~/.ssvncrc file (ssvnc_rc on Windows) to have the application
+             start up in the given mode.
 
+  Buttons:
+                
   Clear Options:   Set all options to their defaults (i.e. unset).
 
+  Delete Profile:  Delete a saved profile.
+
   Advanced:        Bring up the Advanced Options dialog.
+
+  Save and Load:
+
+             You can Save the current settings by clicking on Save
+             (.vnc file) and you can also read in a saved one with Load
+             Profile.  Use the Browse... button to select the filename
+             via the GUI.
+
+             Pressing Ctrl-L or Clicking the Right mouse button on the
+             main GUI will invoke the Load dialog.
+
+             Note: On Windows since the TightVNC Viewer will save its own
+             settings in the Registry, some unexpected behavior is possible
+             because the viewer is nearly always directed to the VNC host
+             "localhost:30".  E.g. if you specify "View Only" in this gui
+             once but not next time the Windows VNC Viewer may remember
+             the setting.  Unfortunately there is not a /noreg option for
+             the Viewer.
 }
 	.oh.f.t insert end $msg
 	jiggle_text .oh.f.t
@@ -1032,6 +1603,10 @@ proc get_ssh_hp {str} {
 
 proc get_ssh_cmd {str} {
 	set str [string trim $str]
+	global ts_only
+	if {$ts_only} {
+		return [ts_x11vnc_cmd]	
+	}
 	if [regexp {cmd=(.*$)} $str m cmd] {
 		set cmd [string trim $cmd]
 		regsub -nocase {^%x11vncr$} $cmd "x11vnc -nopw -display none -rawfb rand" cmd
@@ -1053,6 +1628,143 @@ proc get_ssh_proxy {str} {
 	return $str
 }
 
+proc ts_x11vnc_cmd {} {
+	global is_windows
+	global ts_xserver_type choose_xserver ts_desktop_type choose_desktop ts_unixpw ts_vncshared
+	global ts_desktop_size ts_desktop_depth choose_desktop_geom
+	global choose_filexfer ts_filexfer
+	global ts_x11vnc_opts  ts_x11vnc_path ts_x11vnc_autoport choose_x11vnc_opts
+	global ts_othervnc choose_othervnc ts_xlogin
+
+	set cmd ""
+	if {$choose_x11vnc_opts && $ts_x11vnc_path != ""} {
+		set cmd $ts_x11vnc_path
+	} else {
+		set cmd "x11vnc"
+	}
+	if {! $is_windows} {
+		set cmd "PORT= $cmd"
+	} else {
+		set cmd "PORT= $cmd"
+	}
+
+	set type $ts_xserver_type;
+	if {! $choose_xserver} {
+		set type ""
+	}
+	if {$choose_othervnc && $ts_othervnc == "find"} {
+		set type "Xvnc.redirect"
+	}
+
+	if {$choose_othervnc && $ts_othervnc != "find"} {
+		set cmd "$cmd -redirect $ts_othervnc"
+	} elseif {$type == ""} {
+		global ts_xserver_type_def
+		if {$ts_xserver_type_def != ""} {
+			set cmd "$cmd -display WAIT:cmd=FINDCREATEDISPLAY-$ts_xserver_type_def";
+		} else {
+			set cmd "$cmd -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb";
+		}
+	} elseif {$type == "Xvfb"} {
+		set cmd "$cmd -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb";
+	} elseif {$type == "Xdummy"} {
+		set cmd "$cmd -display WAIT:cmd=FINDCREATEDISPLAY-Xdummy";
+	} elseif {$type == "Xvnc"} {
+		set cmd "$cmd -display WAIT:cmd=FINDCREATEDISPLAY-Xvnc";
+	} elseif {$type == "Xvnc.redirect"} {
+		set cmd "$cmd -display WAIT:cmd=FINDCREATEDISPLAY-Xvnc.redirect";
+	}
+
+	# TBD: Cups + sound
+
+	set cmd "$cmd -localhost";
+	set cmd "$cmd -nopw";
+	global ts_ncache choose_ncache
+	if {$choose_ncache && [regexp {^[0-9][0-9]*$} $ts_ncache]} {
+		set cmd "$cmd -ncache $ts_ncache";
+	} else {
+		#set cmd "$cmd -nonc";
+	}
+	set cmd "$cmd -timeout 120";
+	global ts_multisession choose_multisession
+	regsub -all {[^A-z0-9_-]} $ts_multisession "" ts_multisession
+	if {$choose_multisession && $ts_multisession != ""} {
+		set cmd "$cmd -env FD_TAG='$ts_multisession'";
+	}
+	if {$choose_filexfer && $ts_filexfer != ""} {
+		if {$ts_filexfer == "tight"} {
+			set cmd "$cmd -tightfilexfer";
+		} else {
+			set cmd "$cmd -ultrafilexfer";
+		}
+	}
+	if {$ts_unixpw} {
+		set cmd "$cmd -unixpw";
+	}
+	if {$ts_vncshared} {
+		set cmd "$cmd -shared";
+	}
+	set u "unknown"
+	global env
+	if {[info exists env(USER)]} {
+		regsub -all {[^A-z]} $env(USER) "_" u
+	}
+	set cmd "$cmd -o \$HOME/.tsvnc.log.$u";	# XXX perms
+
+	set sess "kde"
+	global ts_desktop_type_def
+	if {$ts_desktop_type_def != ""} {
+		set sess $ts_desktop_type_def
+	}
+	if {$choose_desktop && $ts_desktop_type != ""} {
+		set sess $ts_desktop_type
+	}
+	set cmd "$cmd -env FD_SESS=$sess";
+
+	if {$choose_desktop_geom} {
+		set geom 1024x768
+		set dep 16
+		global ts_desktop_size_def ts_desktop_depth_def
+		if {$ts_desktop_size_def != ""} {
+			set geom $ts_desktop_size_def
+		}
+		if {$ts_desktop_depth_def != ""} {
+			set dep $ts_desktop_depth_def
+		}
+		if {$ts_desktop_size != ""} {
+			if [regexp {^[0-9][0-9]*x[0-9][0-9]*$} $ts_desktop_size] {
+				set geom $ts_desktop_size
+			}
+			if {$ts_desktop_depth != ""} {
+				set geom "${geom}x$ts_desktop_depth"
+			} else {
+				set geom "${geom}x$dep"
+			}
+		} else {
+			set geom "${geom}x$dep"
+		}
+		set cmd "$cmd -env FD_GEOM=$geom";
+	}
+	if {$is_windows} {
+		;
+	} elseif {$choose_x11vnc_opts && $ts_x11vnc_autoport != "" && [regexp {^[0-9][0-9]*$} $ts_x11vnc_autoport]} {
+		set cmd "$cmd -autoport $ts_x11vnc_autoport";
+	} else {
+		set cmd "$cmd -env AUTO_PORT=5950";
+	}
+	if {$choose_x11vnc_opts && $ts_x11vnc_opts != ""} {
+		set cmd "$cmd $ts_x11vnc_opts";
+	}
+	if {$ts_xlogin} {
+		regsub {PORT=} $cmd "PORT= sudo" cmd
+		regsub { -o [^ ][^ ]*} $cmd "" cmd
+		
+		set cmd "$cmd -env FD_XDM=1";
+	}
+
+	return $cmd
+}
+
 proc set_defaults {} {
 	global defs
 
@@ -1061,21 +1773,29 @@ proc set_defaults {} {
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
 	global compresslevel_text quality_text
 	global use_cups use_sound use_smbmnt
-	global cups_local_server cups_remote_port cups_manage_rcfile
+	global cups_local_server cups_remote_port cups_manage_rcfile cups_x11vnc
 	global cups_local_smb_server cups_remote_smb_port
 	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
+	global choose_xserver ts_xserver_type choose_desktop ts_desktop_type ts_unixpw ts_vncshared
+	global choose_filexfer ts_filexfer
+	global ts_x11vnc_opts choose_x11vnc_opts ts_x11vnc_path ts_x11vnc_autoport ts_xlogin
+	global ts_othervnc choose_othervnc
+	global choose_ncache ts_ncache choose_multisession ts_multisession
+	global ts_mode ts_desktop_size ts_desktop_depth choose_desktop_geom
 	global additional_port_redirs additional_port_redirs_list
 	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
-	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_local_start 
+	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_x11vnc sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
-	global ycrop_string use_listen use_unixpw unixpw_username
+	global ycrop_string use_listen use_unixpw use_x11vnc_find unixpw_username
 	global include_list
+
 
 	set defs(use_viewonly) 0
 	set defs(use_listen) 0
 	set defs(use_unixpw) 0
 	set defs(unixpw_username) ""
+	set defs(use_x11vnc_find) 0
 	set defs(use_fullscreen) 0
 	set defs(use_raise_on_beep) 0
 	set defs(use_bgr233) 0
@@ -1095,9 +1815,34 @@ proc set_defaults {} {
 	set defs(use_sound) 0
 	set defs(use_smbmnt) 0
 
+	set defs(choose_xserver) 0 
+	set defs(ts_xserver_type) "" 
+	set defs(choose_desktop) 0 
+	set defs(ts_desktop_type) "" 
+	set defs(ts_desktop_size) "" 
+	set defs(ts_desktop_depth) "" 
+	set defs(choose_desktop_geom) 0
+	set defs(ts_unixpw) 0 
+	set defs(ts_vncshared) 0 
+	set defs(ts_ncache) 8
+	set defs(choose_ncache) 0
+	set defs(ts_multisession) "" 
+	set defs(choose_multisession) 0
+	set defs(ts_filexfer) "" 
+	set defs(choose_filexfer) 0
+	set defs(choose_x11vnc_opts) 0
+	set defs(ts_x11vnc_opts) "" 
+	set defs(ts_x11vnc_path) "" 
+	set defs(ts_x11vnc_autoport) "" 
+	set defs(ts_othervnc) "" 
+	set defs(choose_othervnc) 0
+	set defs(ts_xlogin) 0
+	set defs(ts_mode) 0
+
 	set defs(change_vncviewer) 0 
 	set defs(change_vncviewer_path) "" 
 	set defs(cups_manage_rcfile) 0 
+	set defs(cups_x11vnc) 0 
 	set defs(vncviewer_realvnc4) 0
 
 	set defs(additional_port_redirs) 0
@@ -1120,6 +1865,7 @@ proc set_defaults {} {
 	set defs(sound_daemon_local_port) ""
 	set defs(sound_daemon_local_start) 0
 	set defs(sound_daemon_local_kill) 0
+	set defs(sound_daemon_x11vnc) 0
 
 	set defs(use_port_knocking) 0
 	set defs(ycrop_string) ""
@@ -1127,9 +1873,16 @@ proc set_defaults {} {
 
 	set defs(include_list) ""
 
-	set defs(use_ssl) 1
-	set defs(use_ssh) 0
-	set defs(use_sshssl) 0
+	global ssh_only ts_only
+	if {$ssh_only || $ts_only} {
+		set defs(use_ssl) 0
+		set defs(use_ssh) 1
+		set defs(use_sshssl) 0
+	} else {
+		set defs(use_ssl) 1
+		set defs(use_ssh) 0
+		set defs(use_sshssl) 0
+	}
 
 	foreach var [array names defs] {
 		set $var $defs($var)	
@@ -1139,9 +1892,16 @@ proc set_defaults {} {
 	set vncauth_passwd ""
 	set unixpw_passwd ""
 
-	ssl_ssh_adjust ssl
+	if {$ssh_only || $ts_only} {
+		ssl_ssh_adjust ssh
+	} else {
+		ssl_ssh_adjust ssl
+	}
 	listen_adjust
 	unixpw_adjust
+
+	global last_load
+	set last_load ""
 }
 
 proc do_viewer_windows {n} {
@@ -1526,6 +2286,7 @@ proc launch_windows_ssh {hp file n} {
 	global use_sshssl use_ssh putty_pw
 	global port_knocking_list
 	global use_listen listening_name
+	global ts_only
 
 	set hpnew  [get_ssh_hp $hp]
 	set proxy  [get_ssh_proxy $hp]
@@ -1535,7 +2296,9 @@ proc launch_windows_ssh {hp file n} {
 	set vnc_disp $hpnew
 	regsub {^.*:} $vnc_disp "" vnc_disp
 
-	if {![regexp {^-?[0-9][0-9]*$} $vnc_disp]} {
+	if {$ts_only} {
+		;
+	} elseif {![regexp {^-?[0-9][0-9]*$} $vnc_disp]} {
 		if {[regexp {cmd=SHELL} $hp]} {
 			;
 		} elseif {[regexp {cmd=PUTTY} $hp]} {
@@ -1552,7 +2315,13 @@ proc launch_windows_ssh {hp file n} {
 	} else {
 		set vnc_port 5900
 	}
-	if {[regexp {^-[0-9][0-9]*$} $vnc_disp]} {
+
+	if {$ts_only || [regexp {^PORT= .*x11vnc} $sshcmd] || [regexp {^P= .*x11vnc} $sshcmd]} {
+		regsub {^PORT=[ 	]*} $sshcmd "" sshcmd
+		regsub {^P=[ 	]*} $sshcmd "" sshcmd
+		set vnc_port [expr "8100 + int(4000 * rand())"]
+		set sshcmd "$sshcmd -rfbport $vnc_port"
+	} elseif {[regexp {^-[0-9][0-9]*$} $vnc_disp]} {
 		set vnc_port [expr "- $vnc_disp"]
 	} elseif {![regexp {^[0-9][0-9]*$} $vnc_disp]} {
 		;
@@ -1740,6 +2509,41 @@ proc launch_windows_ssh {hp file n} {
 		set do_shell 1
 	}
 
+	if {$sshcmd != "SHELL" && [regexp -nocase {x11vnc} $sshcmd]} {
+		global use_cups cups_x11vnc cups_remote_port
+		global cups_remote_smb_port
+		global use_sound sound_daemon_x11vnc sound_daemon_remote_port 
+		global ts_only
+		if {$ts_only} {
+			set cups_x11vnc 1
+			set sound_daemon_x11vnc 1
+		}
+		if {$use_cups && $cups_x11vnc && $cups_remote_port != ""} {
+			set crp $cups_remote_port
+			if {$ts_only} {
+				set cups_remote_port [rand_port]
+				set crp "DAEMON-$cups_remote_port"
+			}
+			set sshcmd "$sshcmd -env FD_CUPS=$crp"
+		}
+		if {$use_cups && $cups_x11vnc && $cups_remote_smb_port != ""} {
+			set csp $cups_remote_smb_port
+			if {$ts_only} {
+				set cups_remote_smb_port [rand_port]
+				set csp "DAEMON-$cups_remote_smb_port"
+			}
+			set sshcmd "$sshcmd -env FD_SMB=$csp"
+		}
+		if {$use_sound && $sound_daemon_x11vnc && $sound_daemon_remote_port != ""} {
+			set srp $sound_daemon_remote_port
+			if {$ts_only} {
+				set sound_daemon_remote_port [rand_port]
+				set srp "DAEMON-$sound_daemon_remote_port"
+			}
+			set sshcmd "$sshcmd -env FD_ESD=$srp"
+		}
+	}
+
 	set file_cmd ""
 	if {$setup_cmds != ""} {
 		# VF
@@ -1804,6 +2608,10 @@ proc launch_windows_ssh {hp file n} {
 	set plink_str "plink.exe -ssh -P $ssh_port $verb $redir $extra_redirs -t" 
 	if {$extra_redirs != ""} {
 		regsub {exe} $plink_str "exe -C" plink_str
+	} else {
+		# hmm we used to have it off... why?
+		# ssh typing response?
+		regsub {exe} $plink_str "exe -C" plink_str
 	}
 	if {$do_shell} {
 		if {$sshcmd == "PUTTY"} {
@@ -1827,6 +2635,13 @@ proc launch_windows_ssh {hp file n} {
 
 	if {$pw != ""} {
 		puts $fh "echo off"
+	}
+	if {$ts_only && [regexp {sudo } $sshcmd]} {
+		puts $fh "echo \" \""
+		puts $fh "echo \"Doing Initial SSH with sudo id to prime sudo...\""
+		puts $fh "echo \" \""
+		puts $fh "plink.exe -ssh -t $ssh_host \"sudo id; tty\""
+		puts $fh "echo \" \""
 	}
 	puts $fh $plink_str
 	if {$file_cmd != ""} {
@@ -2385,7 +3200,8 @@ proc init_vncdisplay {} {
 	set vncproxy $proxy
 	set remote_ssh_cmd $sshcmd
 
-	if {$sshcmd != ""} {
+	global ssh_only ts_only
+	if {$sshcmd != "" || $ssh_only || $ts_only} {
 		global use_ssl use_ssh use_sshssl
 		set use_ssl 0
 		if {! $use_ssh && ! $use_sshssl} {
@@ -2598,7 +3414,7 @@ proc fetch_dialog {cert_text hp hpnew ok n} {
 	scroll_text_dismiss .fetch.f 90 $n
 
 	if {$ok} {
-		button .fetch.save -text Save -command "destroy .fetch; save_cert $hpnew"
+		button .fetch.save -text Save -command "destroy .fetch; save_cert {$hpnew}"
 		button .fetch.help -text Help -command "help_fetch_cert"
 		pack .fetch.help .fetch.save -side bottom -fill x
 	}
@@ -2782,11 +3598,14 @@ if {1} {
 
 proc check_accepted_certs {} {
 	global cert_text always_verify_ssl
-	global skip_verify_accepted_certs
+	global skip_verify_accepted_certs use_listen
 
 	if {! $always_verify_ssl} {
 		set skip_verify_accepted_certs 1
 		return 1
+	}
+	if {$use_listen} {
+		return 1;
 	}
 
 	set cert_text [fetch_cert 0]
@@ -3171,6 +3990,7 @@ proc init_unixpw {hp} {
 proc launch_unix {hp} {
 	global smb_redir_0 smb_mounts env
 	global vncauth_passwd use_unixpw unixpw_username unixpw_passwd
+	global ssh_only ts_only
 
 	globalize
 
@@ -3183,6 +4003,11 @@ proc launch_unix {hp} {
 	} elseif {[regexp {^vncs://} $hp] || [regexp {^vncssl://} $hp] || [regexp {^vnc\+ssl://} $hp]} {
 		set use_ssl 1
 		set use_ssh 0
+		sync_use_ssl_ssh
+	}
+	if {[regexp {^rsh:/?/?} $hp]} {
+		set use_ssl 0
+		set use_ssh 1
 		sync_use_ssl_ssh
 	}
 
@@ -3227,6 +4052,16 @@ proc launch_unix {hp} {
 		set hpnew  [get_ssh_hp $hp]
 		set proxy  [get_ssh_proxy $hp]
 		set sshcmd [get_ssh_cmd $hp]
+
+		if {$ts_only && $proxy != "" && ![regexp {,} $proxy]} {
+			regsub {:[0-9]*$} $hpnew "" h2
+			set proxy "$proxy,$h2"
+			regsub {^[^:]*} $hpnew "localhost" hpnew
+		}
+#puts hp=$hp
+#puts hpn=$hpnew
+#puts pxy=$proxy
+#puts cmd=$sshcmd
 		set hp $hpnew
 
 		if {$proxy != ""} {
@@ -3260,6 +4095,40 @@ proc launch_unix {hp} {
 		if {$skip_ssh} {
 			set setup_cmds ""
 		}
+		if {$sshcmd != "SHELL" && [regexp -nocase {x11vnc} $sshcmd]} {
+			global use_cups cups_x11vnc cups_remote_port
+			global cups_remote_smb_port
+			global use_sound sound_daemon_x11vnc sound_daemon_remote_port 
+			global ts_only
+			if {$ts_only} {
+				set cups_x11vnc 1
+				set sound_daemon_x11vnc 1
+			}
+			if {$use_cups && $cups_x11vnc && $cups_remote_port != ""} {
+				set crp $cups_remote_port
+				if {$ts_only} {
+					set cups_remote_port [rand_port]
+					set crp "DAEMON-$cups_remote_port"
+				}
+				set sshcmd "$sshcmd -env FD_CUPS=$crp"
+			}
+			if {$use_cups && $cups_x11vnc && $cups_remote_smb_port != ""} {
+				set csp $cups_remote_smb_port
+				if {$ts_only} {
+					set cups_remote_smb_port [rand_port]
+					set csp "DAEMON-$cups_remote_smb_port"
+				}
+				set sshcmd "$sshcmd -env FD_SMB=$csp"
+			}
+			if {$use_sound && $sound_daemon_x11vnc && $sound_daemon_remote_port != ""} {
+				set srp $sound_daemon_remote_port
+				if {$ts_only} {
+					set sound_daemon_remote_port [rand_port]
+					set srp "DAEMON-$sound_daemon_remote_port"
+				}
+				set sshcmd "$sshcmd -env FD_ESD=$srp"
+			}
+		}
 
 		if {$sshcmd == "SHELL"} {
 			set env(SS_VNCVIEWER_SSH_CMD) {$SHELL}
@@ -3289,6 +4158,10 @@ proc launch_unix {hp} {
 		}
 		if {$sshargs != ""} {
 			set cmd "$cmd -sshargs '$sshargs'"
+			set env(SS_VNCVIEWER_USE_C) 1
+		} else {
+			# hmm we used to have it off... why?
+			# ssh typing response?
 			set env(SS_VNCVIEWER_USE_C) 1
 		}
 		if {$sshcmd == "SHELL"} {
@@ -3572,7 +4445,11 @@ proc launch_unix {hp} {
 
 	if {$use_sound && $sound_daemon_local_start && $sound_daemon_local_cmd != ""} {
 		mesg "running: $sound_daemon_local_cmd"
-		exec sh -c "$sound_daemon_local_cmd" >& /dev/null </dev/null &
+		global sound_daemon_local_pid
+		set sound_daemon_local_pid ""
+		#exec sh -c "$sound_daemon_local_cmd " >& /dev/null </dev/null &
+		set sound_daemon_local_pid [exec sh -c "echo \$\$; exec $sound_daemon_local_cmd </dev/null 1>/dev/null 2>/dev/null &"]
+#puts "A $sound_daemon_local_pid"
 		update
 		after 500
 	}
@@ -3608,19 +4485,31 @@ proc launch_unix {hp} {
 	if {$uname == "Darwin"} {
 		regsub {X-out or } $m "" m
 	}
+	set te "set -xv; "
+	if {$ts_only} {
+		set te ""
+	}
 	unix_terminal_cmd $geometry "SSL/SSH VNC Viewer $hp" \
-	"set -xv; $cmd; set +xv; ulimit -c 0; trap 'printf \"Paused. Press Enter to exit:\"; read x' QUIT; echo; echo $m; echo; echo sleep 5; echo; sleep 6" 0 $xrm1 $xrm2 $xrm3
+	"$te$cmd; set +xv; ulimit -c 0; trap 'printf \"Paused. Press Enter to exit:\"; read x' QUIT; echo; echo $m; echo; echo sleep 5; echo; sleep 6" 0 $xrm1 $xrm2 $xrm3
 
 	set env(SS_VNCVIEWER_SSH_CMD) ""
 	set env(SS_VNCVIEWER_USE_C) ""
 
 	if {$use_sound && $sound_daemon_local_kill && $sound_daemon_local_cmd != ""} {
+		# XXX need to kill just one...
 		set daemon [string trim $sound_daemon_local_cmd]
 		regsub {^gw[ \t]*} $daemon "" daemon
 		regsub {[ \t].*$} $daemon "" daemon
 		regsub {^.*/} $daemon "" daemon
 		mesg "killing sound daemon: $daemon"
-		if {$daemon != ""} {
+		global sound_daemon_local_pid
+		if {$sound_daemon_local_pid != ""} {
+#puts pid=$sound_daemon_local_pid
+			catch {exec sh -c "kill $sound_daemon_local_pid"  >/dev/null 2>/dev/null </dev/null &}
+			incr sound_daemon_local_pid
+			catch {exec sh -c "kill $sound_daemon_local_pid"  >/dev/null 2>/dev/null </dev/null &}
+			set sound_daemon_local_pid ""
+		} elseif {$daemon != ""} {
 			catch {exec sh -c "killall $daemon"  >/dev/null 2>/dev/null </dev/null &}
 			catch {exec sh -c "pkill -x $daemon" >/dev/null 2>/dev/null </dev/null &}
 		}
@@ -3749,6 +4638,111 @@ proc launch_shell_only {} {
 	set use_sshssl $use_sshssl_save
 }
 
+proc to_sshonly {} {
+	global ssh_only ts_only env
+	if {$ssh_only && !$ts_only} {
+		return
+	}
+	if {[info exists env(SSVNC_TS_ALWAYS)]} {
+		return
+	}
+	set ssh_only 1
+	set ts_only 0
+	
+	set t "SSH VNC Viewer"
+	wm title . $t
+	catch {pack forget .f4}
+	catch {pack forget .b.certs}
+	catch {.l configure -text $t}
+
+	global vncdisplay vncauth_passwd unixpw_username vncproxy remote_ssh_cmd
+	set vncdisplay ""
+	set vncauth_passwd ""
+	set unixpw_username ""
+	set vncproxy ""
+	set remote_ssh_cmd ""
+
+	set_defaults
+}
+
+proc toggle_tsonly {} {
+	global ts_only env
+	if {$ts_only} {
+		if {![info exists env(SSVNC_TS_ALWAYS)]} {
+			to_ssvnc
+		}
+	} else {
+		to_tsonly
+	}
+}
+
+proc toggle_sshonly {} {
+	global ssh_only env
+	if {$ssh_only} {
+		to_ssvnc
+	} else {
+		to_sshonly
+	}
+}
+
+proc to_tsonly {} {
+	global ts_only
+	if {$ts_only} {
+		return
+	}
+	set ts_only 1
+	set ssh_only 1
+	
+	set t "Terminal Services VNC Viewer"
+	wm title . $t
+	catch {pack forget .f4}
+	catch {pack forget .f3}
+	catch {pack forget .f1}
+	catch {pack forget .b.certs}
+	catch {.l configure -text $t}
+	catch {.f0.l configure -text "VNC Terminal Server:"}
+
+	global vncdisplay vncauth_passwd unixpw_username vncproxy remote_ssh_cmd
+	set vncdisplay ""
+	set vncauth_passwd ""
+	set unixpw_username ""
+	set vncproxy ""
+	set remote_ssh_cmd ""
+
+	set_defaults
+}
+
+proc to_ssvnc {} {
+	global ts_only ssh_only env
+
+	if {!$ts_only && !$ssh_only} {
+		return;
+	}
+	if {[info exists env(SSVNC_TS_ALWAYS)]} {
+		return
+	}
+	set ts_only 0
+	set ssh_only 0
+	
+	set t "SSL/SSH VNC Viewer"
+	wm title . $t
+	catch {pack configure .f1 -after .f0 -side top -fill x}
+	catch {pack configure .f3 -after .f2 -side top -fill x}
+	catch {pack configure .f4 -after .f3 -side top -fill x}
+	catch {pack configure .b.certs -before .b.opts -side left -expand 1 -fill x}
+	catch {.l configure -text $t}
+	catch {.f0.l configure -text "VNC Host:Display"}
+
+	global vncdisplay vncauth_passwd unixpw_username vncproxy remote_ssh_cmd
+	set vncdisplay ""
+	set vncauth_passwd ""
+	set unixpw_username ""
+	set vncproxy ""
+	set remote_ssh_cmd ""
+
+	set_defaults
+}
+
 proc launch {{hp ""}} {
 	global tcl_platform is_windows
 	global mycert svcert crtdir
@@ -3806,6 +4800,25 @@ proc launch {{hp ""}} {
 		mesg "set SSVNC_EXTRA_SLEEP to $t"
 		return 0
 	}
+	if {[regexp -nocase {^SSH.?ONLY} $hpt]} {
+		global ssh_only
+		if {$ssh_only} {
+			return 0;
+		}
+		to_sshonly
+
+		return 0
+	}
+	if {[regexp -nocase {^TS.?ONLY} $hpt]} {
+		global ts_only
+		if {$ts_only} {
+			return 0;
+		}
+		to_tsonly
+
+		return 0
+	}
+
 
 	regsub {[ 	]*cmd=.*$} $hp "" tt
 
@@ -4414,6 +5427,7 @@ proc set_mycert {{parent "."}} {
 	global mycert
 	set idir [get_idir_certs $mycert]
 	set t ""
+	unix_dialog_resize $parent
 	if {$idir != ""} {
 		set t [tk_getOpenFile -parent $parent -initialdir $idir]
 	} else {
@@ -4491,6 +5505,7 @@ proc set_svcert {{parent "."}} {
 	global svcert crtdir
 	set idir [get_idir_certs $svcert]
 	set t ""
+	unix_dialog_resize $parent
 	if {$idir != ""} {
 		set t [tk_getOpenFile -parent $parent -initialdir $idir]
 	} else {
@@ -4514,6 +5529,7 @@ proc set_crtdir {{parent "."}} {
 		set idir [get_idir_certs $crtdir]
 	}
 	set t ""
+	unix_dialog_resize $parent
 	if {$idir != ""} {
 		set t [tk_chooseDirectory -parent $parent -initialdir $idir]
 	} else {
@@ -4532,6 +5548,7 @@ proc set_createcert_file {} {
 	if {[info exists ccert(FILE)]} {
 		set idir [get_idir_certs $ccert(FILE)]
 	}
+	unix_dialog_resize .ccrt 
 	if {$idir != ""} {
 		set t [tk_getSaveFile -parent .ccrt -defaultextension ".pem" -initialdir $idir]
 	} else {
@@ -5000,6 +6017,7 @@ proc create_cert {} {
 
 	button .ccrt.cancel -text "Cancel" -command {destroy .ccrt; catch {raise .c}}
 	bind .ccrt <Escape> {destroy .ccrt; catch {raise .c}}
+	wm protocol .ccrt WM_DELETE_WINDOW {destroy .ccrt; catch {raise .c}}
 
 	button .ccrt.create -text "Generate Cert" -command {destroy .ccrt; catch {raise .c}; do_oss_create}
 
@@ -5070,6 +6088,7 @@ proc import_browse {par} {
 	if {$import_file != ""} {
 		set idir [get_idir_certs $import_file]
 	}
+	unix_dialog_resize $par
 	if {$idir != ""} {
 		set t [tk_getOpenFile -parent $par -initialdir $idir]
 	} else {
@@ -5092,6 +6111,7 @@ proc import_save_browse {{par ".icrt"}} {
 	if {$idir == ""} {
 		set idir [get_idir_certs ""]
 	}
+	unix_dialog_resize $par
 	if {$idir != ""} {
 		set t [tk_getSaveFile -parent $par -defaultextension ".crt" -initialdir $idir]
 	} else {
@@ -5341,6 +6361,7 @@ TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 
 	button .icrt.cancel -text "Cancel" -command {destroy .icrt; catch {raise .c}}
 	bind .icrt <Escape> {destroy .icrt; catch {raise .c}}
+	wm protocol .icrt WM_DELETE_WINDOW {destroy .icrt; catch {raise .c}}
 
 	button .icrt.save -text "Save" -command {do_save .icrt}
 
@@ -5406,7 +6427,7 @@ proc save_cert {hp} {
     the "ServerCert" for the next connection to this host: %HOST
 
     To make the ServerCert setting to the imported cert file PERMANENT, select
-    Options -> Save Profile to save it in the profile for this host.
+    'Save' to save it in the profile for this host.
 }
 
 	set msg2 {
@@ -5446,6 +6467,7 @@ proc save_cert {hp} {
 
 	button .scrt.cancel -text "Cancel" -command {destroy .scrt; catch {raise .c}}
 	bind .scrt <Escape> {destroy .scrt; catch {raise .c}}
+	wm protocol .scrt WM_DELETE_WINDOW {destroy .scrt; catch {raise .c}}
 
 	global import_save_file
 	if {$mode == "normal"} {
@@ -5704,6 +6726,69 @@ proc load_include {include dir} {
 	}
 }
 
+proc unix_dialog_resize {{w .}} {
+	global env is_windows uname unix_dialog_size
+	set ok 0
+	set width 600
+	set height 300
+	if {[info exists env(SSVNC_BIGGER_DIALOG)]} {
+		set ok 1
+		if {[regexp {([0-9][0-9]*)x([0-9][0-9]*)} $env(SSVNC_BIGGER_DIALOG) m wi he]} {
+			set width $wi;
+			set height $he;
+		}
+	} elseif {[info exists env(USER)] && $env(USER) == "runge"} {
+		set ok 1
+	}
+	if {$ok} {
+		# this is a personal hack because tk_getOpenFile size is not configurable.
+		if {!$is_windows && $uname != "Darwin"} {
+			if {$w == "."} {
+				set w2 .__tk_filedialog
+			} else {
+				set w2 $w.__tk_filedialog
+			}
+			set w3 $w2.icons.canvas
+			global udr_w4
+			set udr_w4 $w2.f2.cancel
+			if {! [info exists unix_dialog_size($w)]} {
+				after 50 {global udr_w4; catch {$udr_w4 invoke}}
+				tk_getOpenFile -parent $w -initialdir /
+				set unix_dialog_size($w) 1
+			}
+			if [winfo exists $w3] {
+				catch {$w3 configure -width $width}
+				catch {$w3 configure -height $height}
+			}
+		}
+	}
+}
+
+proc delete_profile {{parent "."}} {
+
+	globalize
+
+	set dir [get_profiles_dir]
+
+	unix_dialog_resize $parent
+	set file [tk_getOpenFile -parent $parent -initialdir $dir -title "DELETE VNC Profile"]
+
+	if {$file == ""} {
+		return
+	}
+
+	set tail [file tail $file]
+
+	set ans [tk_messageBox -type okcancel -title "Delete $tail" -message "Really Delete $file?" -icon warning]
+
+	if {$ans == "ok"} {
+		catch {file delete $file}
+		mesg "Deleted $tail"
+	} else {
+		mesg "Delete Skipped."
+	}
+}
+
 proc load_profile {{parent "."} {infile ""}} {
 	global profdone
 	global vncdisplay
@@ -5715,9 +6800,11 @@ proc load_profile {{parent "."} {infile ""}} {
 	if {$infile != ""} {
 		set file $infile
 	} else {
+		unix_dialog_resize
 		set file [tk_getOpenFile -parent $parent -defaultextension \
 			".vnc" -initialdir $dir -title "Load VNC Profile"]
 	}
+
 	if {$file == ""} {
 		set profdone 1
 		return
@@ -5727,20 +6814,79 @@ proc load_profile {{parent "."} {infile ""}} {
 		set profdone 1
 		return
 	}
+
+	set goto_mode "";
 	set str ""
 	set include ""
+	set sw 1
 	while {[gets $fh line] > -1} {
 		append str "$line\n"
 		if [regexp {^include_list=(.*)$} $line m val] {
 			set include $val
 		}
+		global ssh_only ts_only
+		if {$ssh_only || $ts_only} {
+			if [regexp {use_ssh=0} $line] {
+				if {$sw} {
+					mesg "Switching to SSVNC mode."
+					set goto_mode "ssvnc"
+					update
+					after 500
+				} else {
+					bell
+					mesg "Cannot Load an SSL profile in SSH-ONLY mode."
+					set profdone 1
+					close $fh
+					return
+				}
+			}
+		}
+		if {! $ts_only} {
+			if [regexp {ts_mode=1} $line] {
+				if {$sw} {
+					mesg "Switching to Terminal Services mode."
+					set goto_mode "tsonly"
+					update
+					after 500
+				} else {
+					bell
+					mesg "Cannot Load a Terminal Svcs profile SSVNC mode."
+					set profdone 1
+					close $fh
+					return
+				}
+			}
+		} else {
+			if [regexp {ts_mode=0} $line] {
+				if {$sw} {
+					mesg "Switching to SSVNC mode."
+					set goto_mode "ssvnc"
+					update
+					after 500
+				} else {
+					bell
+					mesg "Cannot Load a Terminal Svcs profile SSVNC mode."
+					set profdone 1
+					close $fh
+					return
+				}
+			}
+		}
 	}
 	close $fh
+
 
 	if {$include != ""} {
 		load_include $include $dir
 	}
 
+	if {$goto_mode == "tsonly"} {
+		to_tsonly
+	} elseif {$goto_mode == "ssvnc"} {
+		to_ssvnc
+	} elseif {$goto_mode == "sshvnc"} {
+		to_sshvnc
+	}
 	set_defaults
 
 	global include_vars
@@ -5749,6 +6895,7 @@ proc load_profile {{parent "."} {infile ""}} {
 			set $var $include_vars($var)
 		}
 	}
+
 
 	global use_ssl use_ssh use_sshssl
 	set use_ssl 0
@@ -5801,6 +6948,12 @@ proc load_profile {{parent "."} {infile ""}} {
 	putty_pw_entry check
 	listen_adjust
 	unixpw_adjust
+
+	global last_load
+	set last_load [file tail $file]
+##	regsub {\.vnc$} $last_load "" last_load
+
+	mesg "Loaded [file tail $file]"
 }
 
 proc sync_use_ssl_ssh {} {
@@ -5874,6 +7027,8 @@ proc save_profile {{parent "."}} {
 	global is_windows uname
 	global profdone
 	global include_vars defs
+	global ts_only
+	global last_load
 
 	globalize
 	
@@ -5882,27 +7037,47 @@ proc save_profile {{parent "."}} {
 	set vncdisp [get_vncdisplay]
 
 
-	set disp [string trim $vncdisp]
-	if {$disp != ""} {
-		regsub {[ 	].*$} $disp "" disp
-		regsub -all {/} $disp "" disp
+	set dispf [string trim $vncdisp]
+	if {$dispf != ""} {
+		regsub {[ 	].*$} $dispf "" dispf
+		regsub -all {/} $dispf "" dispf
 	} else {
-		mesg "No VNC Host:Disp supplied."
+		global ts_only
+		if {$ts_only} {
+			mesg "No VNC Terminal Server supplied."
+		} else {
+			mesg "No VNC Host:Disp supplied."
+		}
 		bell
 		return
 	}
 	if {$is_windows || $uname == "Darwin"} {
-		regsub -all {:} $disp "-" disp
+		regsub -all {:} $dispf "-" dispf
 	} else {
-		regsub -all {:} $disp "-" disp
+		regsub -all {:} $dispf "-" dispf
+	}
+	if {$ts_only && ![regexp {^TS-} $dispf]} {
+		set dispf "TS-$dispf"
+	}
+	if {![regexp {\.vnc$} $dispf]} {
+		set dispf "$dispf.vnc"
 	}
 
+	set guess $dispf
+	if {$last_load != ""} {
+		set guess $last_load
+	}
+
+	unix_dialog_resize
 	set file [tk_getSaveFile -parent $parent -defaultextension ".vnc" \
-		-initialdir $dir -initialfile "$disp" -title "Save VNC Profile"]
+		-initialdir $dir -initialfile "$guess" -title "Save VNC Profile"]
 	if {$file == ""} {
 		set profdone 1
 		return
 	}
+	#if {$file == $last_load && ![regexp {\.vnc$} $file]} {
+	#	set file "$file.vnc"
+	#}
 	set fh [open $file "w"]
 	if {! [info exists fh]} {
 		set profdone 1
@@ -5962,6 +7137,12 @@ proc save_profile {{parent "."}} {
 		load_include $include_list [get_profiles_dir]
 	}
 
+	global ts_only
+	if {$ts_only} {
+		set ts_mode 1
+	} else {
+		set ts_mode 0
+	}
 	foreach var [lsort [array names defs]] {
 		eval set val \$$var
 		set pre ""
@@ -6019,9 +7200,25 @@ proc expand_IP {redir} {
 	return $redir
 }
 
+proc rand_port {} {
+	global rand_port_list
+
+	set p ""
+	for {set i 0} {$i < 20} {incr i} {
+		set p [expr 25000 + 35000 * rand()]	
+		set p [expr round($p)]
+		if {![info exists rand_port_list($p)]} {
+			break
+		}
+	}
+	set rand_port_list($p) 1
+	return $p
+}
+
 proc get_cups_redir {} {
 	global cups_local_server cups_remote_port
 	global cups_local_smb_server cups_remote_smb_port
+
 	set redir "$cups_remote_port:$cups_local_server"
 	regsub -all {['" 	]} $redir {} redir; #"
 	set redir " -R $redir"
@@ -6036,7 +7233,11 @@ proc get_cups_redir {} {
 
 proc get_additional_redir {} {
 	global additional_port_redirs additional_port_redirs_list
+	global ts_only choose_x11vnc_opts
 	if {! $additional_port_redirs || $additional_port_redirs_list == ""} {
+		return ""
+	}
+	if {$ts_only && !$choose_x11vnc_opts} {
 		return ""
 	}
 	set redir [string trim $additional_port_redirs_list]
@@ -6048,6 +7249,8 @@ proc get_additional_redir {} {
 
 proc get_sound_redir {} {
 	global sound_daemon_remote_port sound_daemon_local_port
+	global sound_daemon_x11vnc
+
 	set loc $sound_daemon_local_port
 	if {! [regexp {:} $loc]} {
 		set loc "localhost:$loc"
@@ -6539,7 +7742,7 @@ set cmd(6) {
 
 	set orig $cmdall
 
-	global use_cups cups_local_server cups_remote_port cups_manage_rcfile
+	global use_cups cups_local_server cups_remote_port cups_manage_rcfile cups_x11vnc
 	if {$use_cups && $cups_manage_rcfile} {
 		if {$mode == "post"} {
 			regsub {DO_CUPS=0} $cmdall {DO_CUPS=1} cmdall
@@ -6617,12 +7820,543 @@ set cmd(6) {
 	}
 }
 
+proc ts_unixpw_dialog {} {
+
+	toplev .uxpw
+	wm title .uxpw "Use unixpw"
+
+	scroll_text .uxpw.f 80 14
+
+	global ts_unixpw
+
+	set msg {
+    This enables the x11vnc unixpw mode.  A Login: and Password: dialog
+    will be presented in the VNC Viewer for the user to provide any Unix
+    username and password whose session he wants to connect to.  So this
+    may require typing in the password a 2nd time after the one for SSH.
+
+    This mode is useful if a shared terminal services user (e.g. 'tsuser')
+    is used for the SSH login part (say via the SSH authorized_keys
+    mechanism and all users share the same private SSH key for 'tsuser').
+
+    Note, However that the default usage of a per-user SSH login should
+    be the simplest and also sufficient for most situations, in which
+    case this "Use unixpw" option should NOT be selected.
+}
+	.uxpw.f.t insert end $msg
+
+	button .uxpw.cancel -text "Cancel" -command {destroy .uxpw; set ts_unixpw 0}
+	bind .uxpw <Escape> {destroy .uxpw; set ts_unixpw 0}
+	wm protocol .uxpw WM_DELETE_WINDOW {destroy .uxpw; set ts_unixpw 0}
+
+	button .uxpw.done -text "Done" -command {destroy .uxpw; set ts_unixpw 1}
+
+	pack .uxpw.done .uxpw.cancel -side bottom -fill x
+	pack .uxpw.f -side top -fill both -expand 1
+
+	center_win .uxpw
+}
+
+proc ts_vncshared_dialog {} {
+
+	toplev .vncs
+	wm title .vncs "VNC Shared"
+
+	scroll_text .vncs.f 80 23
+
+	global ts_vncshared
+
+	set msg {
+    Normal use of this program, 'tsvnc', *ALREADY* allows simultaneous
+    shared access of the remote desktop:   You simply log in as many
+    times from as many different locations with 'tsvnc' as you like.
+
+    However, doing it that way starts up a new x11vnc for each connection.
+    In some circumstances you may want a single x11vnc running but allow
+    multiple VNC viewers to access it simultaneously.
+
+    This option (VNC Shared) enables that rarer usage case by passing
+    '-shared' to the remote x11vnc command.
+
+    With this option enabled, the new shared connections must
+    still connect to the Terminal Server via SSH for encryption and
+    authentication.  They must also do the normal SSH port redirection
+    to access the x11vnc port (usually 5900, but look for the PORT=
+    output for the actual value).
+
+    They could use SSVNC for that, or do it manually in terminal
+    windows, more information:
+
+       http://www.karlrunge.com/x11vnc/#tunnelling
+}
+	.vncs.f.t insert end $msg
+
+	button .vncs.cancel -text "Cancel" -command {destroy .vncs; set ts_vncshared 0}
+	bind .vncs <Escape> {destroy .vncs; set ts_vncshared 0}
+	wm protocol .vncs WM_DELETE_WINDOW {destroy .vncs; set ts_vncshared 0}
+	button .vncs.done -text "Done" -command {destroy .vncs; set ts_vncshared 1}
+
+	pack .vncs.done .vncs.cancel -side bottom -fill x
+	pack .vncs.f -side top -fill both -expand 1
+
+	center_win .vncs
+}
+
+proc ts_multi_dialog {} {
+
+	toplev .mult
+	wm title .mult "Multiple Sessions"
+
+	scroll_text .mult.f 80 21
+
+	global ts_multisession choose_multisession
+
+	set msg {
+    Normally in Terminal Services mode (tsvnc) your user account (the
+    one you SSH in as) can only have a single Terminal Services X session
+    running at a time on one server machine.  
+
+    This is simply because x11vnc chooses the first Desktop (X session)
+    of yours that it can find.  It will never create a 2nd X session
+    because it keeps finding the 1st one.
+
+    To have Multiple Sessions for one username on a single machine,
+    choose a unique Session "Tag", that will be associated with the X
+    session and x11vnc will only choose the one that has this Tag. 
+
+    For this to work ALL of your sessions on the server machine must
+    have a different tag (that is, if you have an existing session with
+    no tag, x11vnc might find a tagged one first instead of it).
+
+    The tag must be made of only letters, numbers, dash, or underscore.
+
+    Examples:  KDE_SMALL,  gnome-2,  test1
+}
+	.mult.f.t insert end $msg
+
+	frame .mult.c
+	label .mult.c.l -anchor w -text "Tag:"
+	entry .mult.c.e -width 20 -textvariable ts_multisession
+	pack .mult.c.l -side left
+	pack .mult.c.e -side left -expand 1 -fill x
+
+	button .mult.cancel -text "Cancel" -command {destroy .mult; set choose_multisession 0}
+	bind .mult <Escape> {destroy .mult; set choose_multisession 0}
+	wm protocol .mult WM_DELETE_WINDOW {destroy .mult; set choose_multisession 0}
+
+	bind .mult.c.e <Return> {destroy .mult; set choose_multisession 1}
+	button .mult.done -text "Done" -command {destroy .mult; set choose_multisession 1}
+
+	pack .mult.done .mult.cancel .mult.c -side bottom -fill x
+	pack .mult.f -side top -fill both -expand 1
+
+	center_win .mult
+	focus .mult.c.e 
+}
+
+proc ts_xlogin_dialog {} {
+
+	toplev .xlog
+	wm title .xlog "X Login"
+
+	scroll_text .xlog.f 80 33
+
+	global ts_xlogin
+
+	set msg {
+    If you have root (sudo(1)) permission on the remote machine, you
+    can have x11vnc try to connect to a X display(s) that has No One
+    Logged In Yet.  This is most likely the login greeter running on
+    the Physical console.  sudo(1) is used to run x11vnc with FD_XDM=1.
+
+    This is different from tsvnc's regular Terminal Services mode where
+    usually a virtual (RAM only, e.g. Xvfb) X server used.  With this option
+    it is the physical graphics hardware that will be connected to.
+
+    Note that if your user is ALREADY logged into the physical display,
+    you don't need to use this X Login option because x11vnc should find
+    it in its normal find-display procedure and not need sudo(1).
+
+    An initial ssh running 'sudo id' is performed to try to 'prime' 
+    sudo so the 2nd one that runs x11vnc does not need a password.
+    This may not always succeed...
+
+    Note that if someone is already logged into the display console
+    via XDM (GDM, KDM etc.) you will see and control their X session.
+
+    Otherwise, you will get the Greeter X login screen where you can
+    log in via username and password.  Your SSVNC 'Terminal Services'
+    Desktop Type, Size, Printing etc. settings will be ignored in this
+    case of course because XDM, GDM, or KDM is creating your X session,
+    not x11vnc.
+
+    Note that the GDM display manager has a setting KillInitClients in
+    gdm.conf that will kill x11vnc right after you log in, and so you
+    would have to repeat the whole process ('Connect' button) to attach to
+    your session. See http://www.karlrunge.com/x11vnc/#faq-display-manager
+    for more info.
+}
+	.xlog.f.t insert end $msg
+
+	button .xlog.cancel -text "Cancel" -command {destroy .xlog; set ts_xlogin 0}
+	bind .xlog <Escape> {destroy .xlog; set ts_xlogin 0}
+	wm protocol .xlog WM_DELETE_WINDOW {destroy .xlog; set ts_xlogin 0}
+
+	button .xlog.done -text "Done" -command {destroy .xlog; set ts_xlogin 1}
+
+	pack .xlog.done .xlog.cancel -side bottom -fill x
+	pack .xlog.f -side top -fill both -expand 1
+
+	center_win .xlog
+}
+
+
+proc ts_othervnc_dialog {} {
+
+	toplev .ovnc
+	wm title .ovnc "Other VNC Server"
+
+	scroll_text .ovnc.f 80 21
+
+	global ts_othervnc choose_othervnc
+
+	set msg {
+    The x11vnc program running on the remote machine can be instructed to
+    immediately redirect to some other (3rd party, e.g. Xvnc or vnc.so)
+    VNC server.
+
+    It should be a little faster to have x11vnc forward the VNC protocol
+    rather than having it poll the corresponding X server for changes
+    in the way it normally does and translate to VNC.
+
+    This mode also enables a simple way to add SSL or find X display
+    support to a 3rd party VNC Server lacking these features.
+
+    In the entry box put the other vnc display, e.g. "localhost:0" or
+    "somehost:5".
+
+    The string "find" in the entry will have x11vnc try to find an X
+    display in its normal way, and then redirect to the corresponding VNC
+    server port.  This assumes if the X display is, say, :2 (i.e. port
+    6002) then the VNC display is also :2 (i.e. port 5902).  This mode is
+    the same as an "X Server Type" of "Xvnc.redirect" (and overrides it).
+}
+	.ovnc.f.t insert end $msg
+
+	frame .ovnc.c
+	label .ovnc.c.l -anchor w -text "Other VNC Server:"
+	entry .ovnc.c.e -width 20 -textvariable ts_othervnc
+	pack .ovnc.c.l -side left
+	pack .ovnc.c.e -side left -expand 1 -fill x
+
+	button .ovnc.cancel -text "Cancel" -command {destroy .ovnc; set choose_othervnc 0}
+	bind .ovnc <Escape> {destroy .ovnc; set choose_othervnc 0}
+	wm protocol .ovnc WM_DELETE_WINDOW {destroy .ovnc; set choose_othervnc 0}
+	button .ovnc.done -text "Done" -command {destroy .ovnc; set choose_othervnc 1}
+	bind .ovnc.c.e <Return> {destroy .ovnc; set choose_othervnc 1}
+
+	if {$ts_othervnc == ""} {
+		set ts_othervnc "find"
+	}
+
+	pack .ovnc.done .ovnc.cancel .ovnc.c -side bottom -fill x
+	pack .ovnc.f -side top -fill both -expand 1
+
+	center_win .ovnc
+	focus .ovnc.c.e 
+}
+
+proc ts_ncache_dialog {} {
+
+	toplev .nche
+	wm title .nche "Client-Side Caching"
+
+	scroll_text .nche.f 80 22
+
+	global ts_ncache choose_ncache
+
+	set msg {
+    This enables the *experimental* x11vnc client-side caching mode.
+    It often gives nice speedups, but can sometimes lead to painting
+    errors or window "flashing". (you can repaint the screen by tapping
+    the Left Alt key 3 times in a row)
+
+    It is a very simple but hoggy method: uncompressed image pixmaps are
+    stored in the viewer in a large (20-100MB) display region beneath
+    the actual display screen.  You may need also to adjust your VNC Viewer
+    to not show this region (the SSVNC Unix viewer does it automatically).
+
+    The scheme uses a lot of RAM, but at least it has the advantage that
+    it works with every VNC Viewer.  Otherwise the VNC protocol would
+    need to be modified, changing both the server and the viewer.
+
+    Set the x11vnc "-ncache" parameter to an even integer between 2
+    and 20.  This is the increase in area factor over the normal screen
+    for the caching region.  So 10 means use 10 times the RAM to store
+    pixmaps.  The default is 8.
+
+    More info: http://www.karlrunge.com/x11vnc/#faq-client-caching
+}
+	.nche.f.t insert end $msg
+
+	frame .nche.c
+	label .nche.c.l -anchor w -text "ncache:"
+	radiobutton .nche.c.r2  -text "2"  -variable ts_ncache -value "2"
+	radiobutton .nche.c.r4  -text "4"  -variable ts_ncache -value "4"
+	radiobutton .nche.c.r6  -text "6"  -variable ts_ncache -value "6"
+	radiobutton .nche.c.r8  -text "8"  -variable ts_ncache -value "8"
+	radiobutton .nche.c.r10 -text "10" -variable ts_ncache -value "10"
+	radiobutton .nche.c.r12 -text "12" -variable ts_ncache -value "12"
+	radiobutton .nche.c.r14 -text "14" -variable ts_ncache -value "14"
+	radiobutton .nche.c.r16 -text "16" -variable ts_ncache -value "16"
+	radiobutton .nche.c.r18 -text "18" -variable ts_ncache -value "18"
+	radiobutton .nche.c.r20 -text "20" -variable ts_ncache -value "20"
+	pack .nche.c.l -side left
+	pack .nche.c.r2 .nche.c.r4 .nche.c.r6 .nche.c.r8 .nche.c.r10 \
+		.nche.c.r12 .nche.c.r14 .nche.c.r16 .nche.c.r18  .nche.c.r20 -side left
+	button .nche.cancel -text "Cancel" -command {destroy .nche; set choose_ncache 0}
+	bind .nche <Escape> {destroy .nche; set choose_ncache 0}
+	wm protocol .nche WM_DELETE_WINDOW {destroy .nche; set choose_ncache 0}
+	button .nche.done -text "Done" -command {destroy .nche; set choose_ncache 1}
+
+	pack .nche.done .nche.cancel .nche.c -side bottom -fill x
+	pack .nche.f -side top -fill both -expand 1
+
+	center_win .nche
+}
+
+proc ts_x11vnc_opts_dialog {} {
+
+	toplev .x11v
+	wm title .x11v "x11vnc Options"
+
+	scroll_text .x11v.f 80 23
+
+	global ts_x11vnc_opts ts_x11vnc_path ts_x11vnc_autoport choose_x11vnc_opts
+	global additional_port_redirs_list
+
+	set msg {
+    If you are an expert with x11vnc's endless options and tweaking
+    parameters feel free to specify any you want here in "Options".
+
+    Also, if you need to specify the path to the x11vnc program on the
+    remote side because it will not be in $PATH, put it in the "Full
+    Path" entry.
+
+    Port Redirs are additional SSH "-L port:host:port" or "-R port:host:port"
+    (forward or reverse, resp.) port redirections you want.  In SSVNC mode,
+    see the detailed description under: Options -> Advanced -> Port Redirs.
+
+    Some potentially useful options:
+
+	-solid		-scale		-scale_cursor
+	-passwd		-rfbauth	-http
+	-xrandr		-rotate		-noxdamage
+	-xkb		-skip_lockkeys	-nomodtweak
+	-repeat		-cursor		-wmdt
+	-nowireframe	-ncache_cr	-speeds
+
+    More info: http://www.karlrunge.com/x11vnc/#faq-cmdline-opts
+}
+#    In Auto Port put a starting port for x11vnc to try autoprobing
+#    instead of the default 5900.  It starts at the value you supply and
+#    works upward until a free one is found. (x11vnc 0.9.3 or later).
+
+	.x11v.f.t insert end $msg
+
+	frame .x11v.c
+	label .x11v.c.l -width 10 -anchor w -text "Options:"
+	entry .x11v.c.e -textvariable ts_x11vnc_opts
+	pack .x11v.c.l -side left
+	pack .x11v.c.e -side left -expand 1 -fill x
+
+	frame .x11v.c2
+	label .x11v.c2.l -width 10 -anchor w -text "Full Path:"
+	entry .x11v.c2.e -textvariable ts_x11vnc_path
+	pack .x11v.c2.l -side left
+	pack .x11v.c2.e -side left -expand 1 -fill x
+
+#	frame .x11v.c3
+#	label .x11v.c3.l -width 10 -anchor w -text "Auto Port:"
+#	entry .x11v.c3.e -textvariable ts_x11vnc_autoport
+#	pack .x11v.c3.l -side left
+#	pack .x11v.c3.e -side left -expand 1 -fill x
+
+	frame .x11v.c4
+	label .x11v.c4.l -width 10 -anchor w -text "Port Redirs:"
+	entry .x11v.c4.e -textvariable additional_port_redirs_list
+	pack .x11v.c4.l -side left
+	pack .x11v.c4.e -side left -expand 1 -fill x
+
+	button .x11v.cancel -text "Cancel" -command {destroy .x11v; set choose_x11vnc_opts 0}
+	bind .x11v <Escape> {destroy .x11v; set choose_x11vnc_opts 0}
+	wm protocol .x11v WM_DELETE_WINDOW {destroy .x11v; set choose_x11vnc_opts 0}
+	button .x11v.done -text "Done" -command {destroy .x11v; set choose_x11vnc_opts 1;
+			if {$additional_port_redirs_list != ""} {set additional_port_redirs 1} else {set additional_port_redirs 0}}
+
+#	pack .x11v.done .x11v.cancel .x11v.c4 .x11v.c3 .x11v.c2 .x11v.c -side bottom -fill x
+	pack .x11v.done .x11v.cancel .x11v.c4 .x11v.c2 .x11v.c -side bottom -fill x
+	pack .x11v.f -side top -fill both -expand 1
+
+	center_win .x11v
+	focus .x11v.c.e 
+}
+
+
+proc ts_filexfer_dialog {} {
+
+	toplev .xfer
+	wm title .xfer "File Transfer"
+	global choose_filexfer ts_filexfer
+
+	scroll_text .xfer.f 70 13
+
+	set msg {
+    x11vnc supports both the UltraVNC and TightVNC file transfer
+    extensions.  On Windows both viewers support their file transfer
+    protocol.  On Unix only the SSVNC VNC Viewer can do filexfer; it
+    supports the UltraVNC flavor via a Java helper program (and so
+    java(1) is required on the viewer-side).
+
+    Choose the one you want based on VNC viewer you will use.
+    The defaults for the SSVNC viewer package are TightVNC on
+    Windows and UltraVNC on Unix.
+
+    For more info see: http://www.karlrunge.com/x11vnc/#faq-filexfer
+}
+	.xfer.f.t insert end $msg
+
+	global is_windows
+	if {$ts_filexfer == ""} {
+		if {$is_windows} {
+			set ts_filexfer "tight"
+		} else {
+			set ts_filexfer "ultra"
+		}
+	}
+
+	frame .xfer.c
+	radiobutton .xfer.c.tight  -text "TightVNC"  -variable ts_filexfer -value "tight" -relief ridge
+	radiobutton .xfer.c.ultra  -text "UltraVNC"  -variable ts_filexfer -value "ultra" -relief ridge
+
+	pack .xfer.c.ultra .xfer.c.tight -side left -fill x -expand 1
+
+	button .xfer.cancel -text "Cancel" -command {destroy .xfer; set choose_filexfer 0}
+	bind .xfer <Escape> {destroy .xfer; set choose_filexfer 0}
+	wm protocol .xfer WM_DELETE_WINDOW {destroy .xfer; set choose_filexfer 0}
+	button .xfer.done -text "Done" -command {destroy .xfer; set choose_filexfer 1}
+
+	pack .xfer.done .xfer.cancel -side bottom -fill x
+	pack .xfer.c -side bottom -fill x -expand 1
+	pack .xfer.f -side top -fill both -expand 1
+
+	center_win .xfer
+}
+
+proc ts_cups_dialog {} {
+
+	toplev .cups
+	wm title .cups "CUPS and SMB Printing"
+	global cups_local_server cups_remote_port cups_manage_rcfile cups_x11vnc
+	global cups_local_smb_server cups_remote_smb_port
+
+	scroll_text .cups.f 80 29
+		
+
+	set msg {
+    This method requires working a CUPS Desktop setup on the remote side
+    of the connection and working CUPS (or possibly Windows SMB or IPP)
+    printing on the local side of the connection.
+
+    Enter the VNC Viewer side (i.e. where you are sitting) CUPS server
+    under "Local CUPS Server".  Use "localhost:631" if there is one
+    on your viewer machine (cupsd), or, say, "my-print-srv:631" for a
+    nearby CUPS print server.  631 is the default CUPS port.
+
+    The remote Desktop session will have the variables CUPS_SERVER and
+    IPP_PORT set so all printing applications will be redirected to your
+    local CUPS server.  Your locally available printers should appear
+    in the remote print dialogs.
+
+    Windows/SMB Printers:  Under "Local SMB Print Server" you can
+    set a port redirection for a Windows (non-CUPS) SMB printer.
+    If localhost:139 does not work, try "IP:139", or use the known
+    value of the IP address manually.  139 is the default SMB port;
+    445 is also a possibility.
+
+    On the remote side, in the Desktop session the variables $SMB_SERVER,
+    $SMB_HOST, and $SMB_PORT will be set for you to use.
+
+    Unfortunately, printing to Windows is only partially functional
+    due to the general lack PostScript support on Windows.  We hope to
+    improve this in the future.
+
+    If you have print admin permission on the remote machine you can
+    configure CUPS to know about your Windows printer via lpadmin(8) or
+    a GUI tool.  You give it the URI: smb://localhost:port/printername.
+    port will be found in the $SMB_PORT.  You also identify the printer
+    type.  NOTE: You will leave "Local CUPS Server" blank in this case.
+    The smbspool(1) command should also work as well, at least for
+    PostScript printers.
+
+    For more info see: http://www.karlrunge.com/x11vnc/#faq-cups
+}
+	.cups.f.t insert end $msg
+
+	if {$cups_local_server == ""} {
+		set cups_local_server "localhost:631"
+	}
+	if {$cups_remote_port == ""} {
+		set cups_remote_port [expr "6731 + int(1000 * rand())"]
+	}
+	if {$cups_local_smb_server == ""} {
+		global is_windows
+		if {$is_windows} {
+			set cups_local_smb_server "IP:139"
+		} else {
+			set cups_local_smb_server "localhost:139"
+		}
+	}
+	if {$cups_remote_smb_port == ""} {
+		set cups_remote_smb_port [expr "7731 + int(1000 * rand())"]
+	}
+
+	frame .cups.serv
+	label .cups.serv.l -anchor w -text "Local CUPS Server:      "
+	entry .cups.serv.e -width 40 -textvariable cups_local_server
+	pack .cups.serv.e -side right
+	pack .cups.serv.l -side left -expand 1 -fill x
+
+	frame .cups.smbs
+	label .cups.smbs.l -anchor w -text "Local SMB Print Server:      "
+	entry .cups.smbs.e -width 40 -textvariable cups_local_smb_server
+	pack .cups.smbs.e -side right
+	pack .cups.smbs.l -side left -expand 1 -fill x
+
+	button .cups.cancel -text "Cancel" -command {destroy .cups; set use_cups 0}
+	bind .cups <Escape> {destroy .cups; set use_cups 0}
+	wm protocol .cups WM_DELETE_WINDOW {destroy .cups; set use_cups 0}
+	button .cups.done -text "Done" -command {destroy .cups; if {$use_cups} {set_ssh}}
+
+	pack .cups.done .cups.cancel .cups.smbs .cups.serv -side bottom -fill x
+	pack .cups.f -side top -fill both -expand 1
+
+	center_win .cups
+	focus .cups.serv.e
+}
+
+
 proc cups_dialog {} {
 
 	toplev .cups
 	wm title .cups "CUPS Tunnelling"
-	global cups_local_server cups_remote_port cups_manage_rcfile
+	global cups_local_server cups_remote_port cups_manage_rcfile cups_x11vnc
 	global cups_local_smb_server cups_remote_smb_port
+	global ts_only
+	if {$ts_only} {
+		ts_cups_dialog
+		return
+	}
 
 	global uname
 	if {$uname == "Darwin"} {
@@ -6644,7 +8378,7 @@ proc cups_dialog {} {
     print through the tunnel; it requires printing admin privileges however).
 
     You choose an actual remote CUPS port below under "Use Remote CUPS
-    Port:" (6631 is just our default and used in the examples below).
+    Port:", 6631 is just our default and used in the examples below.
     Note that the normal default CUPS server port is 631.
 
     The port you choose must be unused on the VNC server machine (n.b. no
@@ -6680,6 +8414,14 @@ proc cups_dialog {} {
 
     Select "Manage ServerName in the $HOME/.cups/client.conf file for me" to
     attempt to do this editing of the CUPS config file for you automatically.
+
+    Select "Pass -env FD_CUPS=<Port> to x11vnc command line" if you are
+    starting x11vnc as the Remote SSH Command, and x11vnc is running in
+    -create mode (i.e. FINDCREATEDISPLAY).  That way, when your X session
+    is created IPP_PORT will be set correctly for the entire session.
+
+    You probably would never select both of the above two options at
+    the same time, since they conflict with eachother to some degree.
 
     Method #1: If you have admin permission on the VNC Server machine you
     can likely "Add a Printer" via a GUI dialog, wizard, lpadmin(8), etc.
@@ -6762,22 +8504,110 @@ proc cups_dialog {} {
 	checkbutton .cups.cupsrc -anchor w -variable cups_manage_rcfile -text \
 		"Manage ServerName in the remote \$HOME/.cups/client.conf file for me"
 
+	checkbutton .cups.x11vnc -anchor w -variable cups_x11vnc -text \
+		"Pass -env FD_CUPS=<Port> to x11vnc command line."
+
 	button .cups.cancel -text "Cancel" -command {destroy .cups; set use_cups 0}
 	bind .cups <Escape> {destroy .cups; set use_cups 0}
+	wm protocol .cups WM_DELETE_WINDOW {destroy .cups; set use_cups 0}
 	button .cups.done -text "Done" -command {destroy .cups; if {$use_cups} {set_ssh}}
 
 	button .cups.guess -text "Help me decide ..." -command {}
 	.cups.guess configure -state disabled
 
-	pack .cups.done .cups.cancel .cups.guess .cups.cupsrc .cups.smbp .cups.smbs .cups.port .cups.serv -side bottom -fill x
+	pack .cups.done .cups.cancel .cups.guess .cups.x11vnc .cups.cupsrc .cups.smbp .cups.smbs .cups.port .cups.serv -side bottom -fill x
 	pack .cups.f -side top -fill both -expand 1
 
 	center_win .cups
+	focus .cups.serv.e
+}
+
+proc ts_sound_dialog {} {
+
+	global is_windows
+	global ts_only
+
+	toplev .snd
+	wm title .snd "Sound Tunnelling"
+
+	scroll_text .snd.f 80 21
+
+	set msg {
+    Your remote Desktop will be started in an Enlightenment Sound Daemon
+    (ESD) environment (esddsp(1), which must be installed on the remote
+    machine), and a local ESD sound daemon (esd(1)) will be started to
+    play the sounds for you to hear.
+
+    In the entry box below you can choose the port that the local esd
+    will use to listen on.  The default ESD port is 16001.  You will
+    need to choose different values if you will have more than one esd
+    running locally.
+
+    The command run (with port replaced by your choice) will be:
+
+      %RCMD
+
+    Note: Unfortunately not all applications work with ESD.
+          And esd's LD_PRELOAD is broken on 64+32bit Linux (x86_64).
+          And so this mode is not working well currently... 
+ 
+    For more info see: http://www.karlrunge.com/x11vnc/#faq-sound
+}
+
+
+	global sound_daemon_remote_port sound_daemon_local_port sound_daemon_local_cmd
+	global sound_daemon_local_start sound_daemon_local_kill
+
+	set sound_daemon_local_start 1
+	set sound_daemon_local_kill 1
+
+	if {$sound_daemon_remote_port == ""} {
+		set sound_daemon_remote_port 16010
+	}
+	if {$sound_daemon_local_port == ""} {
+		set sound_daemon_local_port 16010
+	}
+
+	if {$sound_daemon_local_cmd == ""} {
+		global is_windows
+		if {$is_windows} {
+			set sound_daemon_local_cmd {esound\esd -promiscuous -as 5 -port %PORT -tcp -bind 127.0.0.1}
+		} else {
+			set sound_daemon_local_cmd {esd -promiscuous -as 5 -port %PORT -tcp -bind 127.0.0.1}
+		}
+	}
+	regsub {%PORT} $sound_daemon_local_cmd $sound_daemon_local_port sound_daemon_local_cmd
+
+	regsub {%RCMD} $msg $sound_daemon_local_cmd msg
+	.snd.f.t insert end $msg
+
+	frame .snd.lport
+	label .snd.lport.l -anchor w -text "Local Sound Port:     "
+	entry .snd.lport.e -width 45 -textvariable sound_daemon_local_port
+	pack .snd.lport.e -side right
+	pack .snd.lport.l -side left -expand 1 -fill x
+
+	button .snd.cancel -text "Cancel" -command {destroy .snd; set use_sound 0}
+	bind .snd <Escape> {destroy .snd; set use_sound 0}
+	wm protocol .snd WM_DELETE_WINDOW {destroy .snd; set use_sound 0}
+	button .snd.done -text "Done" -command {destroy .snd; if {$use_sound} {set_ssh}}
+	bind .snd.lport.e <Return> {destroy .snd; if {$use_sound} {set_ssh}}
+
+	pack .snd.done .snd.cancel .snd.lport -side bottom -fill x
+	pack .snd.f -side bottom -fill both -expand 1
+
+	center_win .snd
+	focus .snd.lport.e
 }
 
 proc sound_dialog {} {
 
 	global is_windows
+	global ts_only
+	if {$ts_only} {
+		ts_sound_dialog;
+		return
+	}
 
 	toplev .snd
 	wm title .snd "ESD/ARTSD Sound Tunnelling"
@@ -6809,6 +8639,13 @@ proc sound_dialog {} {
     do this you still can direct *individual* sound applications through
     the tunnel, for example "esddsp -s localhost:16001 soundapp", where
     "soundapp" is some application that makes noise (say xmms or mpg123).
+
+    Select "Pass -env FD_ESD=<Port> to x11vnc command line."  if you are
+    starting x11vnc as the Remote SSH Command, and x11vnc is running in
+    -create mode (i.e. FINDCREATEDISPLAY).  That way, your X session is
+    started via "esddsp -s ... <session>"  and the ESD variables will be
+    set correctly for the entire session.  (This mode make most sense for
+    a virtual, e.g. Xvfb or Xdummy session, not one a physical display).
 
     Also, usually the remote Sound daemon must be killed BEFORE the SSH port
     redir is established (because it is listening on the port we want to use
@@ -6904,6 +8741,9 @@ proc sound_dialog {} {
 	checkbutton .snd.sdkl -anchor w -variable sound_daemon_local_kill -text \
 		"Local Sound daemon: Kill at end."
 
+	checkbutton .snd.x11vnc -anchor w -variable sound_daemon_x11vnc -text \
+		"Pass -env FD_ESD=<Port> to x11vnc command line."
+
 	button .snd.guess -text "Help me decide ..." -command {}
 	.snd.guess configure -state disabled
 
@@ -6917,13 +8757,15 @@ proc sound_dialog {} {
 
 	button .snd.cancel -text "Cancel" -command {destroy .snd; set use_sound 0}
 	bind .snd <Escape> {destroy .snd; set use_sound 0}
+	wm protocol .snd WM_DELETE_WINDOW {destroy .snd; set use_sound 0}
 	button .snd.done -text "Done" -command {destroy .snd; if {$use_sound} {set_ssh}}
 
-	pack .snd.done .snd.cancel .snd.guess .snd.sdkl .snd.sdsl .snd.sdr .snd.sdk .snd.lport .snd.rport \
+	pack .snd.done .snd.cancel .snd.guess .snd.x11vnc .snd.sdkl .snd.sdsl .snd.sdr .snd.sdk .snd.lport .snd.rport \
 		.snd.local .snd.remote -side bottom -fill x
 	pack .snd.f -side bottom -fill both -expand 1
 
 	center_win .snd
+	focus .snd.remote.e
 }
 
 # Share ideas.
@@ -7659,6 +9501,7 @@ proc smb_dialog {} {
 
 	button .smb.cancel -text "Cancel" -command {set use_smbmnt 0; destroy .smb}
 	bind .smb <Escape> {set use_smbmnt 0; destroy .smb}
+	wm protocol .smb WM_DELETE_WINDOW {set use_smbmnt 0; destroy .smb}
 	button .smb.done -text "Done" -command {if {$use_smbmnt} {set_ssh; set smb_mount_list [.smb.mnts get 1.0 end]}; destroy .smb}
 
 	pack .smb.done .smb.cancel .smb.guess .smb.mnts .smb.info .smb.r -side bottom -fill x
@@ -7714,24 +9557,36 @@ proc help_advanced_opts {} {
          The port can also be closed when the encrypted VNC connection
          finishes.
 
-	 Y Crop: this is for x11vnc's -ncache client side caching scheme
-	 with our Unix TightVNC viewer.  Sets the Y value to "crop" the
-	 viewer size at (below the cut is the pixel cache region you do
-	 not want to see).  If the screen is tall (H > 2*W) ycropping
-	 will be autodetected, or you can set to -1 to force autodection.
-	 Otherwise, set it to the desired Y value.  You can also set
-	 the scrollbar width (very thin by default) by appending ",sb=N"
-	 (or use ",sb=N" by itself to just set the scrollbar width).
+         Cursor Alphablending:  Use the x11vnc alpha hack for translucent
+         cursors (requires Unix, 32bpp and same endianness)
+
+         Use XGrabServer:  On Unix only, use the XGrabServer workaround
+         for old window managers.
+
+         Y Crop: this is for x11vnc's -ncache client side caching scheme
+         with our Unix TightVNC viewer.  Sets the Y value to "crop" the
+         viewer size at (below the cut is the pixel cache region you do
+         not want to see).  If the screen is tall (H > 2*W) ycropping
+         will be autodetected, or you can set to -1 to force autodection.
+         Otherwise, set it to the desired Y value.  You can also set
+         the scrollbar width (very thin by default) by appending ",sb=N"
+         (or use ",sb=N" by itself to just set the scrollbar width).
 
          Include:  Profile template(s) to load before loading a profile
-         (see Load Profile under "Options").  For example if you Save a
-         profile called "globals" that has some settings you use often,
-         then just supply "Include: globals" to have them applied.
-         You may supply a comma or space separated list of templates
-         to include.  They can be full path names or basenames relative
-         to the profiles directory.  You do not need to supply the .vnc
-         suffix.  The non-default settings in them will be applied first,
-         and then any values in the loaded Profile will override them.
+         (Load button).  For example if you Save a profile called "globals"
+         that has some settings you use often, then just supply "Include:
+         globals" to have them applied.  You may supply a comma or space
+         separated list of templates to include.  They can be full path
+         names or basenames relative to the profiles directory.  You do
+         not need to supply the .vnc suffix.  The non-default settings
+         in them will be applied first, and then any values in the loaded
+         Profile will override them.
+
+         ssh-agent: On Unix only: restart the GUI in the presence of
+         ssh-agent(1) (e.g. in case you forgot to start your agent before
+         starting this GUI).  An xterm will be used to enter passphrases,
+         etc.  This can avoid repeatedly entering passphrases for the SSH
+         logins (note this requires setting up and distributing SSH keys).
 
 
     About the CheckButtons:
@@ -7747,6 +9602,7 @@ proc help_advanced_opts {} {
 
 proc set_viewer_path {} {
 	global change_vncviewer_path
+	unix_dialog_resize .chviewer
 	set change_vncviewer_path [tk_getOpenFile -parent .chviewer]
 	catch {raise .chviewer}
 	update
@@ -7754,12 +9610,17 @@ proc set_viewer_path {} {
 
 proc change_vncviewer_dialog {} {
 	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
+	global ts_only
 	
 	toplev .chviewer
 	wm title .chviewer "Change VNC Viewer"
 
 	global help_font
-	eval text .chviewer.t -width 90 -height 29 $help_font
+	if {$ts_only} {
+		eval text .chviewer.t -width 90 -height 18 $help_font
+	} else {
+		eval text .chviewer.t -width 90 -height 29 $help_font
+	}
 	apply_bg .chviewer.t
 
 	set msg {
@@ -7791,6 +9652,11 @@ proc change_vncviewer_dialog {} {
     set in "VNC Host:Display" (for a remote port less then 200 use the negative
     of the port value).
 }
+
+	if {$ts_only} {
+		regsub {Note that due(.|\n)*If the} $msg "If the" msg
+		regsub {To have SSVNC act(.|\n)*} $msg "" msg
+	}
 	.chviewer.t insert end $msg
 
 	frame .chviewer.path
@@ -7807,7 +9673,9 @@ proc change_vncviewer_dialog {} {
 
 	button .chviewer.cancel -text "Cancel" -command {destroy .chviewer; set change_vncviewer 0}
 	bind .chviewer <Escape> {destroy .chviewer; set change_vncviewer 0}
+	wm protocol .chviewer WM_DELETE_WINDOW {destroy .chviewer; set change_vncviewer 0}
 	button .chviewer.done -text "Done" -command {destroy .chviewer; catch {raise .oa}}
+	bind .chviewer.path.e <Return> {destroy .chviewer; catch {raise .oa}}
 
 	pack .chviewer.t .chviewer.path .chviewer.cancel .chviewer.done -side top -fill x
 
@@ -7877,6 +9745,7 @@ proc port_redir_dialog {} {
 
 	button .redirs.cancel -text "Cancel" -command {set additional_port_redirs 0; destroy .redirs}
 	bind .redirs <Escape> {set additional_port_redirs 0; destroy .redirs}
+	wm protocol .redirs WM_DELETE_WINDOW {set additional_port_redirs 0; destroy .redirs}
 	button .redirs.done -text "Done" -command {destroy .redirs}
 
 	pack .redirs.t .redirs.path .redirs.cancel .redirs.done -side top -fill x
@@ -8467,6 +10336,7 @@ proc port_knocking_dialog {} {
 
 	button .pk.cancel -text "Cancel" -command {set use_port_knocking 0; destroy .pk}
 	bind .pk <Escape> {set use_port_knocking 0; destroy .pk}
+	wm protocol .pk WM_DELETE_WINDOW {set use_port_knocking 0; destroy .pk}
 	button .pk.done -text "Done" -command {if {$use_port_knocking} {set port_knocking_list [.pk.rule get 1.0 end]}; destroy .pk}
 
 	pack .pk.done .pk.cancel .pk.rule .pk.info -side bottom -fill x
@@ -8475,11 +10345,313 @@ proc port_knocking_dialog {} {
 	center_win .pk
 }
 
+proc choose_desktop_dialog {} {
+	toplev .sd
+	wm title .sd "Desktop Type"
+	global ts_desktop_type choose_desktop
+
+	global ts_desktop_type_def
+	set def "kde"
+	if {$ts_desktop_type_def != ""} {
+		set def $ts_desktop_type_def
+	}
+
+	if {$ts_desktop_type == ""} {
+		set ts_desktop_type $def
+	}
+
+	label .sd.l1 -anchor w -text "Select the type of remote Desktop"
+	label .sd.l2 -anchor w -text "for your session (default: $def)"
+
+	radiobutton .sd.b1 -anchor w -variable ts_desktop_type -value kde      -text kde
+	radiobutton .sd.b2 -anchor w -variable ts_desktop_type -value gnome    -text gnome
+	radiobutton .sd.b3 -anchor w -variable ts_desktop_type -value Xsession -text cde
+	radiobutton .sd.b4 -anchor w -variable ts_desktop_type -value mwm      -text mwm
+	radiobutton .sd.b5 -anchor w -variable ts_desktop_type -value wmaker   -text wmaker
+	radiobutton .sd.b6 -anchor w -variable ts_desktop_type -value enlightenment   -text enlightenment
+	radiobutton .sd.b7 -anchor w -variable ts_desktop_type -value twm      -text twm
+	radiobutton .sd.b8 -anchor w -variable ts_desktop_type -value failsafe -text failsafe
+
+	button .sd.cancel -text "Cancel" -command {destroy .sd; set choose_desktop 0; set ts_desktop_type ""}
+	bind .sd <Escape> {destroy .sd; set choose_desktop 0; set ts_desktop_type ""}
+	wm protocol .sd WM_DELETE_WINDOW {destroy .sd; set choose_desktop 0; set ts_desktop_type ""}
+	button .sd.done -text "Done" -command {destroy .sd}
+
+	pack .sd.l1 .sd.l2 .sd.b1 .sd.b2 .sd.b3 .sd.b4 .sd.b5 .sd.b6 .sd.b7 .sd.b8 .sd.cancel .sd.done -side top -fill x
+
+	center_win .sd
+}
+
+proc choose_size_dialog {} {
+	toplev .sz
+	wm title .sz "Desktop Size"
+	global ts_desktop_size ts_desktop_depth choose_desktop_geom
+
+	set def1 "1024x768"
+	set def2 "16"
+
+	global ts_desktop_size_def ts_desktop_depth_def
+	if {$ts_desktop_size_def != ""} {
+		set def1 $ts_desktop_size_def
+	}
+	if {$ts_desktop_depth_def != ""} {
+		set def2 $ts_desktop_depth_def
+	}
+
+	if {$ts_desktop_size == ""} {
+		set ts_desktop_size $def1
+	}
+	if {$ts_desktop_depth == ""} {
+		set ts_desktop_depth $def2
+	}
+
+	label .sz.l1 -anchor w -text "Select the Size and Color depth"
+	label .sz.l2 -anchor w -text "for your Desktop session."
+	label .sz.l3 -anchor w -text "Default: $def1 and $def2 bits/pixel."
+
+	label .sz.g0 -anchor w -text "Width x Height:" -relief groove
+
+	radiobutton .sz.g1 -anchor w -variable ts_desktop_size -value "640x480"   -text "    640x480"
+	radiobutton .sz.g2 -anchor w -variable ts_desktop_size -value "800x600"   -text "    800x600"
+	radiobutton .sz.g3 -anchor w -variable ts_desktop_size -value "1024x768"  -text "  1024x768"
+	radiobutton .sz.g4 -anchor w -variable ts_desktop_size -value "1280x1024" -text "1280x1024"
+	radiobutton .sz.g5 -anchor w -variable ts_desktop_size -value "1400x1050" -text "1400x1050"
+	radiobutton .sz.g6 -anchor w -variable ts_desktop_size -value "1600x1200" -text "1600x1200"
+	radiobutton .sz.g7 -anchor w -variable ts_desktop_size -value "1920x1200" -text "1920x1200"
+
+	frame .sz.c
+	label .sz.c.l -anchor w -text "Custom:"
+	entry .sz.c.e -width 10 -textvariable ts_desktop_size
+	pack .sz.c.l -side left
+	pack .sz.c.e -side left -expand 1 -fill x
+	bind .sz.c.e <Return> {destroy .sz}
+
+	label .sz.d0 -anchor w -text "Color Depth:" -relief groove
+
+	radiobutton .sz.d1 -anchor w -variable ts_desktop_depth -value "8" -text  "  8 bits/pixel"
+	radiobutton .sz.d2 -anchor w -variable ts_desktop_depth -value "16" -text "16 bits/pixel"
+	radiobutton .sz.d3 -anchor w -variable ts_desktop_depth -value "24" -text "24 bits/pixel"
+
+	button .sz.cancel -text "Cancel" -command {destroy .sz; set choose_desktop_geom 0; set ts_desktop_size ""; set ts_desktop_depth ""}
+	bind .sz <Escape> {destroy .sz; set choose_desktop_geom 0; set ts_desktop_size ""; set ts_desktop_depth ""}
+	wm protocol .sz WM_DELETE_WINDOW {destroy .sz; set choose_desktop_geom 0; set ts_desktop_size ""; set ts_desktop_depth ""}
+	button .sz.done -text "Done" -command {destroy .sz}
+
+	pack .sz.l1 .sz.l2 .sz.l3 \
+		.sz.g0 .sz.g1 .sz.g2 .sz.g3 .sz.g4 .sz.g5 .sz.g6 .sz.g7 \
+		.sz.c \
+		.sz.d0 .sz.d1 .sz.d2 .sz.d3 \
+		.sz.cancel .sz.done -side top -fill x
+
+	center_win .sz
+	focus .sz.c.e
+}
+
+proc choose_xserver_dialog {} {
+	toplev .st
+	wm title .st "X Server Type"
+	global ts_xserver_type choose_xserver
+
+	set def "Xvfb"
+	global ts_xserver_type_def
+	if {$ts_xserver_type_def != ""} {
+		set def $ts_xserver_type_def
+	}
+
+	if {$ts_xserver_type == ""} {
+		set ts_xserver_type $def
+	}
+
+	label .st.l1 -anchor w -text "Select the type of remote X server"
+	label .st.l2 -anchor w -text "for your session (default: $def)"
+
+	radiobutton .st.b1 -anchor w -variable ts_xserver_type -value Xvfb -text "Xvfb"
+
+	radiobutton .st.b2 -anchor w -variable ts_xserver_type -value Xdummy -text "Xdummy"
+
+	radiobutton .st.b3 -anchor w -variable ts_xserver_type -value Xvnc -text "Xvnc"
+
+	radiobutton .st.b4 -anchor w -variable ts_xserver_type -value Xvnc.redirect -text "Xvnc.redirect"
+
+	button .st.cancel -text "Cancel" -command {destroy .st; set choose_xserver 0; set ts_xserver_type ""}
+	bind .st <Escape> {destroy .st; set choose_xserver 0; set ts_xserver_type ""}
+	wm protocol .st WM_DELETE_WINDOW {destroy .st; set choose_xserver 0; set ts_xserver_type ""}
+	button .st.done -text "Done" -command {destroy .st}
+
+	pack .st.l1 .st.l2 .st.b1 .st.b2 .st.b3 .st.b4 .st.cancel .st.done -side top -fill x
+
+	center_win .st
+}
+
+proc set_ts_options {} {
+	global use_cups use_sound use_smbmnt
+	global change_vncviewer choose_xserver
+	global ts_only
+	if {! $ts_only} {
+		return
+	}
+	catch {destroy .o}
+	toplev .ot
+	wm title .ot "Options"
+
+	set i 1
+
+	checkbutton .ot.b$i -anchor w -variable choose_desktop -text \
+		"Desktop Type" \
+		-command {if {$choose_desktop} {choose_desktop_dialog}}
+	incr i
+
+	checkbutton .ot.b$i -anchor w -variable choose_desktop_geom -text \
+		"Desktop Size" \
+		-command {if {$choose_desktop_geom} {choose_size_dialog}}
+	incr i
+
+	checkbutton .ot.b$i -anchor w -variable choose_xserver -text \
+		"X Server Type" \
+		-command {if {$choose_xserver} {choose_xserver_dialog}}
+	incr i
+
+	checkbutton .ot.b$i -anchor w -variable use_cups -text \
+		"Enable Printing" \
+		-command {if {$use_cups} {cups_dialog}}
+	incr i
+
+	checkbutton .ot.b$i -anchor w -variable use_sound -text \
+		"Enable Sound" \
+		-command {if {$use_sound} {sound_dialog}}
+	incr i
+
+#	checkbutton .ot.b$i -anchor w -variable use_smbmnt -text \
+#		"Enable SMB mount tunnelling" \
+#		-command {if {$use_smbmnt} {smb_dialog}}
+#	incr i
+
+	checkbutton .ot.b$i -anchor w -variable choose_filexfer -text \
+		"File Transfer" \
+		-command {if {$choose_filexfer} {ts_filexfer_dialog}}
+	incr i
+
+	checkbutton .ot.b$i -anchor w -variable use_viewonly -text \
+		"View Only"
+	incr i
+
+	checkbutton .ot.b$i -anchor w -variable change_vncviewer -text \
+		"Change VNC Viewer" \
+		-command {if {$change_vncviewer} {change_vncviewer_dialog}}
+	incr i
+
+	button .ot.b$i -anchor w -text "   Delete Profile..." \
+		-command {destroy .ot; delete_profile}
+	incr i
+
+	button .ot.b$i -anchor w -text "   Advanced ..." -command {set_ts_adv_options}
+	incr i
+
+	for {set j 1} {$j < $i} {incr j} {
+		pack .ot.b$j -side top -fill x
+	}
+
+	frame .ot.b
+	button .ot.b.done -text "Done" -command {destroy .ot}
+	button .ot.b.help -text "Help" -command help_ts_opts
+	pack .ot.b.help .ot.b.done -fill x -expand 1 -side left
+
+	bind .ot <Escape> {destroy .ot}
+	wm protocol .ot WM_DELETE_WINDOW {destroy .ot}
+
+	pack .ot.b -side top -fill x 
+
+	center_win .ot
+	wm resizable .ot 1 0
+	focus .ot
+}
+
+proc set_ts_adv_options {} {
+	global ts_only ts_unixpw ts_vncshared
+	global ts_ncache ts_multisession
+	global choose_othervnc darwin_cotvnc
+
+	if {! $ts_only} {
+		return
+	}
+	catch {destroy .ot}
+	toplev .ot2
+	wm title .ot2 "Advanced"
+
+	set i 1
+
+	checkbutton .ot2.b$i -anchor w -variable ts_vncshared -text \
+		"VNC Shared" \
+		-command {if {$ts_vncshared} {ts_vncshared_dialog}}
+	incr i
+
+	checkbutton .ot2.b$i -anchor w -variable choose_multisession -text \
+		"Multiple Sessions" \
+		-command {if {$choose_multisession} {ts_multi_dialog}}
+	incr i
+
+	checkbutton .ot2.b$i -anchor w -variable ts_xlogin -text \
+		"X Login" \
+		-command {if {$ts_xlogin} {ts_xlogin_dialog}}
+	incr i
+
+	checkbutton .ot2.b$i -anchor w -variable choose_othervnc -text \
+		"Other VNC Server" \
+		-command {if {$choose_othervnc} {ts_othervnc_dialog}}
+	incr i
+
+	checkbutton .ot2.b$i -anchor w -variable ts_unixpw -text \
+		"Use unixpw" \
+		-command {if {$ts_unixpw} {ts_unixpw_dialog}}
+	incr i
+
+	checkbutton .ot2.b$i -anchor w -variable use_bgr233 -text \
+		"Client 8bit Color"
+	if {$darwin_cotvnc} {.ot2.b$i configure -state disabled}
+	incr i
+
+	checkbutton .ot2.b$i -anchor w -variable choose_ncache -text \
+		"Client-Side Caching" \
+		-command {if {$choose_ncache} {ts_ncache_dialog}}
+	incr i
+
+	checkbutton .ot2.b$i -anchor w -variable choose_x11vnc_opts -text \
+		"X11VNC Options" \
+		-command {if {$choose_x11vnc_opts} {ts_x11vnc_opts_dialog}}
+	incr i
+
+	global env
+	if {![info exists env(SSVNC_TS_ALWAYS)]} {
+		button .ot2.b$i -anchor w -text "   SSVNC Mode" \
+			-command {destroy .ot2; to_ssvnc}
+		incr i
+	}
+
+	for {set j 1} {$j < $i} {incr j} {
+		pack .ot2.b$j -side top -fill x
+	}
+
+	frame .ot2.b
+	button .ot2.b.done -text "Done" -command {destroy .ot2}
+	button .ot2.b.help -text "Help" -command help_ts_opts
+	pack .ot2.b.help .ot2.b.done -fill x -expand 1 -side left
+
+	bind .ot2 <Escape> {destroy .ot2}
+	wm protocol .ot2 WM_DELETE_WINDOW {destroy .ot2}
+
+	pack .ot2.b -side top -fill x 
+
+	center_win .ot2
+	wm resizable .ot2 1 0
+	focus .ot2
+}
+
 
 proc set_advanced_options {} {
 	global use_cups use_sound use_smbmnt
 	global change_vncviewer
 	global use_port_knocking port_knocking_list
+	global is_windows darwin_cotvnc
 
 	catch {destroy .o}
 	toplev .oa
@@ -8518,6 +10690,20 @@ proc set_advanced_options {} {
 		-command {if {$use_port_knocking} {port_knocking_dialog}}
 	incr i
 
+	checkbutton .oa.b$i -anchor w -variable use_grab -text \
+		"Use XGrabServer"
+	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	set ix $i
+	incr i
+
+	checkbutton .oa.b$i -anchor w -variable use_alpha -text \
+		"Cursor alphablending (32bpp required)"
+	if {$darwin_cotvnc} {.oa.b$i configure -state disabled}
+	set ia $i
+	incr i
+
+
+
 	global ycrop_string
 	frame .oa.b$i
 	label .oa.b$i.l -text "Y Crop: "
@@ -8536,16 +10722,25 @@ proc set_advanced_options {} {
 
 	incr i
 
+	if {$is_windows} {
+		.oa.b$ix configure -state disabled
+		.oa.b$ia configure -state disabled
+	}
+
 	for {set j 1} {$j < $i} {incr j} {
 		pack .oa.b$j -side top -fill x
 	}
 
-#	button .oa.connect -text "Connect" -command launch
-#	pack .oa.connect -side top -fill x 
+	button .oa.sa -text "Use ssh-agent" -command ssh_agent_restart
+	pack .oa.sa -side top -fill x
+	if {$is_windows} {
+		.oa.sa configure -state disabled
+	}
 
 	frame .oa.b
 	button .oa.b.done -text "Done" -command {destroy .oa}
 	bind .oa <Escape> {destroy .oa}
+	wm protocol .oa WM_DELETE_WINDOW {destroy .oa}
 	button .oa.b.help -text "Help" -command help_advanced_opts
 
 	global use_listen
@@ -8639,7 +10834,7 @@ proc ssh_agent_restart {} {
 	#puts $fh "$cmd </dev/null 1>/dev/null 2>/dev/null &"
 	puts $fh "nohup $cmd &"
 	puts $fh "sleep 1"
-	puts $fh "#rm -f $tmp"
+	puts $fh "rm -f $tmp"
 	close $fh
 
 	wm withdraw .
@@ -8674,6 +10869,7 @@ proc putty_pw_entry {mode} {
 proc ssl_ssh_adjust {which} {
 	global use_ssl use_ssh use_sshssl sshssl_sw	
 	global remote_ssh_cmd_list
+	global x11vnc_find_widget x11vnc_xlogin_widget
 
 	if {$which == "ssl"} {
 		set use_ssl 1
@@ -8682,6 +10878,12 @@ proc ssl_ssh_adjust {which} {
 		set sshssl_sw "ssl"
 		catch {.f4.getcert configure -state normal}
 		catch {.f4.always  configure -state normal}
+		if [info exists x11vnc_find_widget] {
+			catch {$x11vnc_find_widget configure -state disabled}
+		}
+		if [info exists x11vnc_xlogin_widget] {
+			catch {$x11vnc_xlogin_widget configure -state disabled}
+		}
 	} elseif {$which == "ssh"} {
 		set use_ssl 0
 		set use_ssh 1
@@ -8689,6 +10891,12 @@ proc ssl_ssh_adjust {which} {
 		set sshssl_sw "ssh"
 		catch {.f4.getcert configure -state disabled}
 		catch {.f4.always  configure -state disabled}
+		if [info exists x11vnc_find_widget] {
+			catch {$x11vnc_find_widget configure -state normal}
+		}
+		if [info exists x11vnc_xlogin_widget] {
+			catch {$x11vnc_xlogin_widget configure -state normal}
+		}
 	} elseif {$which == "sshssl"} {
 		set use_ssl 0
 		set use_ssh 0
@@ -8696,6 +10904,12 @@ proc ssl_ssh_adjust {which} {
 		set sshssl_sw "sshssl"
 		catch {.f4.getcert configure -state disabled}
 		catch {.f4.always  configure -state disabled}
+		if [info exists x11vnc_find_widget] {
+			catch {$x11vnc_find_widget configure -state normal}
+		}
+		if [info exists x11vnc_xlogin_widget] {
+			catch {$x11vnc_xlogin_widget configure -state normal}
+		}
 	}
 
 	if [info exists remote_ssh_cmd_list] {
@@ -8714,6 +10928,13 @@ proc ssl_ssh_adjust {which} {
 	if {! $use_ssl && ! $use_ssh && ! $use_sshssl} {
 		set use_ssl 1
 		set sshssl_sw "ssl"
+	}
+	global ssh_only ts_only
+	if {$ssh_only || $ts_only} {
+		set use_ssl 0
+		set use_sshssl 0
+		set use_ssh 1
+		set sshssl_sw "ssh"
 	}
 	
 	putty_pw_entry check
@@ -8743,12 +10964,56 @@ proc unixpw_adjust {} {
 	}
 }
 
+proc x11vnc_find_adjust {which} {
+	global remote_ssh_cmd
+	global use_x11vnc_find x11vnc_find_widget
+	global use_x11vnc_xlogin x11vnc_xlogin_widget
+
+	if {$which == "find"} {
+		if {$use_x11vnc_find} {
+			set use_x11vnc_xlogin 0
+		}
+	} elseif {$which == "xlogin"} {
+		if {$use_x11vnc_xlogin} {
+			set use_x11vnc_find 0
+		}
+	}
+	if {! $use_x11vnc_find && ! $use_x11vnc_xlogin} {
+		set remote_ssh_cmd "";
+		return
+	}
+	if {![regexp {x11vnc} $remote_ssh_cmd]} {
+		set remote_ssh_cmd "";
+	}
+	regsub {^[ 	]*PO?R?T?=[ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
+	regsub {^[ 	]*sudo x11vnc[ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
+	regsub {^[ 	]*x11vnc[ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
+	regsub -all {[ 	]*-find[ 	]*} $remote_ssh_cmd " " remote_ssh_cmd
+	regsub -all {[ 	]*-localhost[ 	]*} $remote_ssh_cmd " " remote_ssh_cmd
+	regsub -all {[ 	]*-env FD_XDM=1[ 	]*} $remote_ssh_cmd " " remote_ssh_cmd
+	if {$use_x11vnc_find} {
+		set remote_ssh_cmd "PORT= x11vnc -find -localhost $remote_ssh_cmd"
+	} else {
+		set remote_ssh_cmd "PORT= sudo x11vnc -find -localhost -env FD_XDM=1 $remote_ssh_cmd"
+	}
+	regsub {[ 	]*$} $remote_ssh_cmd "" remote_ssh_cmd
+	regsub {^[ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
+	regsub -all {[ 	][ 	]*} $remote_ssh_cmd " " remote_ssh_cmd
+}
+
 proc set_options {} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
 	global compresslevel_text quality_text
 	global env is_windows darwin_cotvnc
 	global use_listen
+	global use_x11vnc_find x11vnc_find_widget
+	global use_x11vnc_xlogin x11vnc_xlogin_widget
+	global ts_only
+	if {$ts_only} {
+		set_ts_options
+		return
+	}
 
 	toplev .o
 	wm title .o "SSL/SSH VNC Options"
@@ -8768,8 +11033,20 @@ proc set_options {} {
 	set iss $i
 	incr i
 
+	checkbutton .o.b$i -anchor w -variable use_x11vnc_find -text \
+		"Automatically Find X Session" -command {x11vnc_find_adjust "find"}
+	if {!$use_ssh && !$use_sshssl} {.o.b$i configure -state disabled}
+	set x11vnc_find_widget ".o.b$i"
+	incr i
+
+	checkbutton .o.b$i -anchor w -variable use_x11vnc_xlogin -text \
+		"Automatically Find X Login/Greeter" -command {x11vnc_find_adjust "xlogin"}
+	if {!$use_ssh && !$use_sshssl} {.o.b$i configure -state disabled}
+	set x11vnc_xlogin_widget ".o.b$i"
+	incr i
+
 	checkbutton .o.b$i -anchor w -variable use_unixpw -text \
-		"Unix Username & Password" -command {unixpw_adjust; catch {destroy .o}}
+		"Unix Username & Password" -command {unixpw_adjust}
 	if {$is_windows} {.o.b$i configure -state disabled}
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i
@@ -8798,24 +11075,12 @@ proc set_options {} {
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i
 
-	checkbutton .o.b$i -anchor w -variable use_alpha -text \
-		"Cursor alphablending (32bpp required)"
-	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
-	set ia $i
-	incr i
-
-	checkbutton .o.b$i -anchor w -variable use_grab -text \
-		"Use XGrabServer"
-	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
-	set ix $i
-	incr i
-
 	checkbutton .o.b$i -anchor w -variable use_nojpeg -text \
 		"Do not use JPEG (-nojpeg)"
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i
 
-	menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable compresslevel_text
+	menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable compresslevel_text -relief groove
 	set compresslevel_text "Compress Level: $use_compresslevel"
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 
@@ -8833,11 +11098,11 @@ proc set_options {} {
 	}
 	incr i
 
-	menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable quality_text
+	menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable quality_text -relief groove
 	set quality_text "Quality: $use_quality"
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 
-	menu .o.b$i.m -tearoff 0
+	menu .o.b$i.m -tearoff 0 
 	for {set j -1} {$j < 10} {incr j} {
 		set v $j
 		set l $j
@@ -8851,13 +11116,40 @@ proc set_options {} {
 	}
 	incr i
 
-	for {set j 1} {$j < $i} {incr j} {
-		pack .o.b$j -side top -fill x
+	set oldmode 0
+
+	global use_mode ts_only ssh_only
+	if {$ts_only} {
+		set use_mode "Terminal Services (tsvnc)"
+	} elseif {$ssh_only} {
+		set use_mode "SSH-Only (sshvnc)"
+	} else {
+		set use_mode "SSVNC"
+	}
+	global mode_text
+	set mode_text "Mode: $use_mode"
+	if {! $oldmode} {
+		menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable mode_text -relief groove
+
+		menu .o.b$i.m -tearoff 0
+		.o.b$i.m add radiobutton -variable use_mode -value "SSVNC"  \
+			-label "SSVNC" -command { if {$ts_only || $ssh_only} {to_ssvnc; set mode_text "Mode: SSVNC"; destroy .o}}
+		.o.b$i.m add radiobutton -variable use_mode -value "SSH-Only (sshvnc)" \
+			-label "SSH-Only (sshvnc)" -command { if {$ts_only || ! $ssh_only} {to_sshonly; set mode_text "Mode: SSH-Only (sshvnc)"; destroy .o}}
+		.o.b$i.m add radiobutton -variable use_mode -value "Terminal Services (tsvnc)" \
+			-label "Terminal Services (tsvnc)" -command {to_tsonly; set mode_text "Mode: Terminal Services (tsvnc)"; destroy .o}
+		incr i
 	}
 
-	if {$is_windows} {
-		.o.b$ia configure -state disabled
-		.o.b$ix configure -state disabled
+	for {set j 1} {$j < $i} {incr j} {
+		global ssh_only ts_only 
+		if {$ssh_only && $j <= 3} {
+			continue;
+		}
+		if {$ts_only && $j <= 3} {
+			continue;
+		}
+		pack .o.b$j -side top -fill x
 	}
 
 	if {$is_windows} {
@@ -8868,25 +11160,36 @@ proc set_options {} {
 		pack .o.pw.e -side left -expand 1 -fill x
 		pack .o.pw -side top -fill x 
 		putty_pw_entry check
-	} else {
-		button .o.sa -text "Use ssh-agent" -command ssh_agent_restart
-		pack .o.sa -side top -fill x 
 	}
 
-	button .o.s_prof -text "Save Profile ..." -command {save_profile .o; raise .o}
-	button .o.l_prof -text " Load Profile ..." -command {load_profile .o; raise .o}
-	button .o.advanced -text "Advanced ..." -command set_advanced_options
-#	button .o.connect -text "Connect" -command launch
-	button .o.clear -text "Clear Options" -command set_defaults
-#	pack .o.connect -side top -fill x 
+#	button .o.s_prof -text "Save Profile ..." -command {save_profile .o; raise .o}
+#	button .o.l_prof -text " Load Profile ..." -command {load_profile .o; raise .o}
+	if {$oldmode} {
+		button .o.ssv      -anchor w -text "             SSVNC Mode" -command {to_ssvnc; destroy .o}
+		button .o.ssh      -anchor w -text "             SSH-Only Mode" -command {to_sshonly; destroy .o}
+		button .o.tso      -anchor w -text "             Terminal Svc Mode" -command {to_tsonly; destroy .o}
+	}
+	button .o.advanced -anchor w -text "             Advanced ..." -command set_advanced_options
+	button .o.clear    -anchor w -text "             Clear Options" -command set_defaults
+	button .o.delete   -anchor w -text "             Delete Profile ..." -command {destroy .o; delete_profile}
+
 	pack .o.clear -side top -fill x 
-	pack .o.s_prof -side top -fill x 
-	pack .o.l_prof -side top -fill x 
+	pack .o.delete -side top -fill x 
 	pack .o.advanced -side top -fill x 
+
+#	pack .o.s_prof -side top -fill x 
+#	pack .o.l_prof -side top -fill x 
+
+	if {$oldmode} {
+		pack .o.ssv -side top -fill x 
+		pack .o.ssh -side top -fill x 
+		pack .o.tso -side top -fill x 
+	}
 
 	frame .o.b
 	button .o.b.done -text "Done" -command {destroy .o}
 	bind .o <Escape> {destroy .o}
+	wm protocol .o WM_DELETE_WINDOW {destroy .o}
 	button .o.b.help -text "Help" -command help_opts
 	global use_listen
 	if {$use_listen} {
@@ -9017,18 +11320,99 @@ if [file exists $buck_zero] {
 	#puts "HOME: $env(SSVNC_HOME)"
 }
 
+set saw_ts_only 0
+set saw_ssh_only 0
+
+set ssvncrc $env(SSVNC_HOME)/.ssvncrc
+if {$is_windows} {
+	set ssvncrc $env(SSVNC_HOME)/ssvnc_rc
+}
+
+global ts_desktop_size_def ts_desktop_depth_def ts_desktop_type_def ts_xserver_type_def
+set ts_desktop_size_def ""
+set ts_desktop_depth_def ""
+set ts_desktop_type_def ""
+set ts_xserver_type_def ""
+
+if [file exists $ssvncrc] {
+	set fh ""
+	catch {set fh [open $ssvncrc "r"]}
+	if {$fh != ""} {
+		while {[gets $fh line] > -1} {
+			set str [string trim $line]
+			if [regexp {^#} $str] {
+				continue
+			}
+			if [regexp {^mode=tsvnc} $str] {
+				set saw_ts_only 1
+				set saw_ssh_only 0
+			} elseif [regexp {^mode=sshvnc} $str] {
+				set saw_ts_only 0
+				set saw_ssh_only 1
+			} elseif [regexp {^mode=ssvnc} $str] {
+				set saw_ts_only 0
+				set saw_ssh_only 0
+			}
+			if [regexp {^desktop_type=(.*)$} $str m val] {
+				set val [string trim $val]
+				set ts_desktop_type_def $val
+			}
+			if [regexp {^desktop_size=(.*)$} $str m val] {
+				set val [string trim $val]
+				set ts_desktop_size_def $val
+			}
+			if [regexp {^desktop_depth=(.*)$} $str m val] {
+				set val [string trim $val]
+				set ts_desktop_depth_def $val
+			}
+			if [regexp {^xserver_type=(.*)$} $str m val] {
+				set val [string trim $val]
+				set ts_xserver_type_def $val
+			}
+		}
+		close $fh
+	}
+}
+
 for {set i 0} {$i < $argc} {incr i} {
 	set item [lindex $argv $i]
 	regsub {^--} $item "-" item
-	if {$item == "-profiles"} {
+	if {$item == "-profiles" || $item == "-list"} {
 		set dir [get_profiles_dir]
-		puts stderr "VNC Profiles:"
-		puts stderr " "
+		#puts stderr "VNC Profiles:"
+		#puts stderr " "
+		if {[info exists env(SSVNC_TS_ONLY)]} {
+			set saw_ts_only 1
+		} elseif {[info exists env(SSVNC_SSH_ONLY)]} {
+			set saw_ssh_only 1
+		}
 		set profs [list]
 		foreach prof [glob -nocomplain -directory $dir "*.vnc"] {
 			set s [file tail $prof]
 			regsub {\.vnc$} $s "" s
-			lappend profs [file tail $s]
+			if {$saw_ts_only || $saw_ssh_only} {
+				set ok 0;
+				set tsok 0;
+				set fh ""
+				catch {set fh [open $prof "r"]}
+				if {$fh != ""} {
+					while {[gets $fh line] > -1} {
+						if {[regexp {use_ssh=1} $line]} {
+							set ok 1
+						}
+						if {[regexp {ts_mode=1} $line]} {
+							set tsok 1
+						}
+					}
+					close $fh
+				}
+				if {$saw_ts_only && !$tsok} {
+					continue;
+				} elseif {! $ok} {
+					continue
+				}
+			}
+			lappend profs $s
 		}
 		foreach prof [lsort $profs] {
 			puts "$prof"
@@ -9037,7 +11421,41 @@ for {set i 0} {$i < $argc} {incr i} {
 	} elseif {$item == "-nvb"} {
 		global env
 		set env(SSVNC_NO_VERIFY_ALL_BUTTON) 1
+	} elseif {$item == "-bigger"} {
+		global env
+		if {![info exists env(SSVNC_BIGGER_DIALOG)]} {
+			set env(SSVNC_BIGGER_DIALOG) 1
+		}
+	} elseif {$item == "-ssh"} {
+		set saw_ssh_only 1
+		set saw_ts_only 0
+	} elseif {$item == "-ts"} {
+		set saw_ts_only 1
+		set saw_ssh_only 0
+	} elseif {$item == "-ssl" || $item == "-ss"} {
+		set saw_ts_only 0
+		set saw_ssh_only 0
+	} elseif {$item == "-tso"} {
+		global env
+		set env(SSVNC_TS_ALWAYS) 1
+		set saw_ts_only 1
 	}
+}
+
+if {$saw_ts_only && $saw_ssh_only} {
+	set saw_ssh_only 0
+}
+
+global ssh_only
+set ssh_only 0
+if {[info exists env(SSVNC_SSH_ONLY)] || $saw_ssh_only} {
+	set ssh_only 1
+}
+
+global ts_only
+set ts_only 0
+if {[info exists env(SSVNC_TS_ONLY)] || $saw_ts_only} {
+	set ts_only 1
 }
 
 if {$is_windows} {
@@ -9071,13 +11489,21 @@ set scroll_text_focus 1
 set multientry 1
 
 wm withdraw .
-wm title . "SSL/SSH VNC Viewer"
+if {$ssh_only} {
+	wm title . "SSH VNC Viewer"
+} elseif {$ts_only} {
+	wm title . "Terminal Services VNC Viewer"
+} else {
+	wm title . "SSL/SSH VNC Viewer"
+}
+
 wm resizable . 1 0
 
 set_defaults
 set skip_pre 0
 
 set vncdisplay ""
+set last_load ""
 set vncproxy ""
 set remote_ssh_cmd ""
 set vncauth_passwd ""
@@ -9091,15 +11517,23 @@ set accepted_cert_dialog_in_progress 0
 global fetch_cert_filename
 set fetch_cert_filename ""
 
-label .l -text "SSL/SSH VNC Viewer" -relief ridge
+set vhd "VNC Host:Display"
+if {$ssh_only} {
+	label .l -text "SSH VNC Viewer" -relief ridge
+} elseif {$ts_only} {
+	label .l -text "Terminal Services VNC Viewer" -relief ridge
+	set vhd "VNC Terminal Server:"
+} else {
+	label .l -text "SSL/SSH VNC Viewer" -relief ridge
+}
 
 set wl 21
 set we 40
 frame .f0
 if {$multientry} {
-	label .f0.l -width $wl -anchor w -text "VNC Host:Display" -relief ridge
+	label .f0.l -width $wl -anchor w -text "$vhd" -relief ridge
 } else {
-	label .f0.l -anchor w -text "VNC Host:Display" -relief ridge
+	label .f0.l -anchor w -text "$vhd" -relief ridge
 }
 entry .f0.e -width $we -textvariable vncdisplay
 pack  .f0.l -side left 
@@ -9166,7 +11600,11 @@ if {[info exists env(SSVNC_NO_VERIFY_ALL_BUTTON)]} {
 	pack .f4.always -side right -fill x
 }
 
-ssl_ssh_adjust ssl
+if {$ssh_only || $ts_only} {
+	ssl_ssh_adjust ssh
+} else {
+	ssl_ssh_adjust ssl
+}
 
 frame .b
 button .b.help  -text "Help" -command help
@@ -9178,13 +11616,29 @@ button .b.conn  -text "Connect" -command launch
 button .b.exit  -text "Exit" -command {destroy .; exit}
 
 
-pack .b.certs .b.opts .b.save .b.load .b.conn .b.help .b.exit -side left -expand 1 -fill x
+if {$ssh_only || $ts_only} {
+	pack          .b.opts .b.save .b.load .b.conn .b.help .b.exit -side left -expand 1 -fill x
+} else {
+	pack .b.certs .b.opts .b.save .b.load .b.conn .b.help .b.exit -side left -expand 1 -fill x
+}
 
 if {$multientry} {
 	if {! $is_windows} {
-		pack .l .f0 .f1 .f2 .f3 .f4 .b -side top -fill x
+		if {$ssh_only} {
+			pack .l .f0 .f1 .f2 .f3     .b -side top -fill x
+		} elseif {$ts_only} {
+			pack .l .f0     .f2         .b -side top -fill x
+		} else {
+			pack .l .f0 .f1 .f2 .f3 .f4 .b -side top -fill x
+		}
 	} else {
-		pack .l .f0     .f2 .f3 .f4 .b -side top -fill x
+		if {$ssh_only} {
+			pack .l .f0     .f2 .f3     .b -side top -fill x
+		} elseif {$ts_only} {
+			pack .l .f0     .f2         .b -side top -fill x
+		} else {
+			pack .l .f0     .f2 .f3 .f4 .b -side top -fill x
+		}
 	}
 } else {
 	pack .l .f0 .b -side top -fill x
@@ -9214,6 +11668,14 @@ bind . <Control-P> {port_knock_only "" "FINISH"}
 bind . <Control-l> {load_profile}
 bind . <B3-ButtonRelease> {load_profile}
 
+bind . <Control-t> {toggle_tsonly}
+bind . <Control-d> {delete_profile}
+bind . <Shift-B3-ButtonRelease> {toggle_tsonly}
+bind . <Shift-B2-ButtonRelease> {toggle_tsonly}
+bind .l <Shift-ButtonRelease> {toggle_tsonly}
+bind . <Control-h> {toggle_sshonly}
+bind . <Control-T> {to_ssvnc}
+
 global entered_gui_top button_gui_top
 set entered_gui_top 0
 set button_gui_top 0
@@ -9222,6 +11684,8 @@ bind .l <ButtonPress> {set button_gui_top 1}
 bind .f0.l <ButtonPress> {set button_gui_top 1}
 
 update
+
+set didload 0
 
 for {set i 0} {$i < $argc} {incr i} {
 	set item [lindex $argv $i]
@@ -9232,15 +11696,28 @@ for {set i 0} {$i < $argc} {incr i} {
 		set always_verify_ssl 0
 	} elseif {$item == "-help"} {
 		help
+	} elseif {$item == "-ssh"} {
+		;
+	} elseif {$item == "-bigger"} {
+		;
+	} elseif {$item == "-ts"} {
+		;
+	} elseif {$item == "-ss"} {
+		;
+	} elseif {$item == "-ssl"} {
+		;
+	} elseif {$item == "-tso"} {
+		;
 	} elseif {$item != ""} {
-		if [file exists $item] {
+		if {[file exists $item] && [file isfile $item]}  {
+			set didload 1
 			load_profile . $item
 		} else {
 			set ok 0
 			set dir [get_profiles_dir]
 			set try "$dir/$item"
 			foreach try [list $dir/$item $dir/$item.vnc] {
-				if [file exists $try] {
+				if {[file exists $try] && [file isfile $try]} {
 					load_profile . $try
 					set ok 1
 					break;
@@ -9251,8 +11728,17 @@ for {set i 0} {$i < $argc} {incr i} {
 				set vncdisplay $item
 				set ok 1
 			}
+			
+			if {! $ok} {
+			    if {$ts_only || $ssh_only} {
+				global vncdisplay
+				set vncdisplay $item
+				set ok 1
+			    }
+			}
 			if {$ok} {
 				update 
+				set didload 1
 				after 750
 				launch
 			}

@@ -10,6 +10,9 @@ Just click on the program "ssvnc.exe", and then enter the remote
 VNC Server and click "Connect".  Click on "Help" for more information
 information.  You can also set some simple options under "Options ..."
 
+If you want that application to run in "SSH-ONLY" mode, click on
+the "sshvnc.bat" wrapper instead.  Or enter SSH_ONLY.
+
 Note that on Windows when the TightVNC viewer disconnects you may need to
 terminate the STUNNEL program manually.  To do this: Click on the STUNNEL
 icon (dark green) on the System Tray and then click "Exit".  Before that,
