@@ -699,8 +699,10 @@ static void
 rfbProcessClientInitMessage(rfbClientPtr cl)
 {
     rfbClientInitMsg ci;
-    char buf[256];
-    rfbServerInitMsg *si = (rfbServerInitMsg *)buf;
+    union {
+        char buf[256];
+        rfbServerInitMsg si;
+    } u;
     int len, n;
     rfbClientIteratorPtr iterator;
     rfbClientPtr otherCl;
@@ -715,20 +717,20 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
         return;
     }
 
-    memset(buf,0,sizeof(buf));
+    memset(u.buf,0,sizeof(u.buf));
 
-    si->framebufferWidth = Swap16IfLE(cl->screen->width);
-    si->framebufferHeight = Swap16IfLE(cl->screen->height);
-    si->format = cl->screen->serverFormat;
-    si->format.redMax = Swap16IfLE(si->format.redMax);
-    si->format.greenMax = Swap16IfLE(si->format.greenMax);
-    si->format.blueMax = Swap16IfLE(si->format.blueMax);
+    u.si.framebufferWidth = Swap16IfLE(cl->screen->width);
+    u.si.framebufferHeight = Swap16IfLE(cl->screen->height);
+    u.si.format = cl->screen->serverFormat;
+    u.si.format.redMax = Swap16IfLE(u.si.format.redMax);
+    u.si.format.greenMax = Swap16IfLE(u.si.format.greenMax);
+    u.si.format.blueMax = Swap16IfLE(u.si.format.blueMax);
 
-    strncpy(buf + sz_rfbServerInitMsg, cl->screen->desktopName, 127);
-    len = strlen(buf + sz_rfbServerInitMsg);
-    si->nameLength = Swap32IfLE(len);
+    strncpy(u.buf + sz_rfbServerInitMsg, cl->screen->desktopName, 127);
+    len = strlen(u.buf + sz_rfbServerInitMsg);
+    u.si.nameLength = Swap32IfLE(len);
 
-    if (rfbWriteExact(cl, buf, sz_rfbServerInitMsg + len) < 0) {
+    if (rfbWriteExact(cl, u.buf, sz_rfbServerInitMsg + len) < 0) {
         rfbLogPerror("rfbProcessClientInitMessage: write");
         rfbCloseClient(cl);
         return;
