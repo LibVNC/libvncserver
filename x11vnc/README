@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Mon Sep 10 23:47:54 EDT 2007
+x11vnc README file                         Date: Wed Sep 26 15:16:21 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -4108,6 +4108,25 @@ service x11vncservice
 
    (or one can replace the -q with say "-o /var/log/x11vnc.log" to
    capture a log)
+
+   The above works nicely for GDM becasue the -auth file is a fixed name.
+   For KDM or XDM the filename varies. Here is one idea for a x11vnc_sh
+   wrapper to try to guess the name:
+#!/bin/sh
+COLUMNS=256
+export COLUMNS
+authfile=`ps wwwwwaux | grep '/X.*-auth' | grep -v grep | sed -e 's/^.*-auth */
+/' -e 's/ .*$//' | head -n 1`
+
+if [ -r "$authfile" ]; then
+        exec /usr/local/bin/x11vnc -inetd -o /var/log/x11vnc.log -display :0 -a
+uth "$authfile"
+fi
+exit 1
+
+   Starting with x11vnc 0.9.3 this can be automated by:
+#!/bin/sh
+exec /usr/local/bin/x11vnc -inetd -o /var/log/x11vnc.log -find -env FD_XDM=1
 
 
    Q-57: Can I have x11vnc advertise its VNC service and port via mDNS /
@@ -10194,18 +10213,21 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
    front-end GUI and wrapper scripts features dwarf the Unix TightVNC
    Viewer patches (see the lists below).
 
-   It adds a GUI for Windows, Mac OS X, and Unix that automatically
-   starts up STUNNEL SSL tunnel for SSL or SSH connections to [3]x11vnc,
-   and then launches the TightVNC Viewer to use the tunnel. It also
-   enables SSL encrypted VNC connections to any other VNC Server running
-   an SSL tunnel, such as STUNNEL, at their end. It can be used to
-   perform SSH tunnelled connections to any VNC Server as well.
+   The project provides a GUI for Windows, Mac OS X, and Unix that
+   automatically starts up an STUNNEL SSL tunnel for SSL or ssh for SSH
+   connections to [3]x11vnc, and then launches the TightVNC Viewer to use
+   the tunnel.
+
+   It also enables SSL encrypted VNC connections to any other VNC Server
+   running an SSL tunnel, such as STUNNEL, at their end. It can be used
+   to perform SSH tunnelled connections to any VNC Server as well.
 
    The short name for this project is "ssvnc" for SSL/SSH VNC Viewer.
    This is the name of the command to start it.
 
    There is a simplified [4]SSH-Only mode (sshvnc). And an even more
-   simplified [5]Terminal-Services mode (tsvnc) for use with x11vnc.
+   simplified [5]Terminal-Services mode (tsvnc) for use with x11vnc on
+   the remote side.
 
    The tool has many additional features; see the descriptions below.
 
@@ -10272,7 +10294,7 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
        CursorShape updates, X11 Cursor, Cursor Alphablending, Toggle
        Tight/ZRLE, Toggle JPEG, FullColor/16bpp/8bpp (256/64/8 colors),
        Greyscale for low color modes.
-     * Maintains its own BackingStore if the X server does not
+     * Maintains its own BackingStore if the X server does not.
      * The default for localhost:0 connections is not raw encoding since
        same-machine connections are pretty rare. Default assumes you are
        using a SSL or SSH tunnel. Use -rawlocal to revert.
@@ -10408,7 +10430,7 @@ Windows:
    "ssvnc.bat" that looks like this:
 C:
 cd \ssvnc\Windows
-ssvnc.exe
+start ssvnc.exe
 
    Update: A simple workaround is now in place where it will copy
    everything to a cache directory ss_vnc/cache in your Windows home
@@ -10424,12 +10446,16 @@ ssvnc.exe
    (the Mac OS X and Unix launchers are simply links to the bin
    directory). See the README for more information.
 
+   The [14]SSH-Only mode launcher program has name sshvnc. The
+   [15]Terminal Services mode launcher program (assumes x11vnc 0.8.4 or
+   later and Xvfb installed on the server machine) has name tsvnc.
+
    The Viewer SSL support is done via a wrapper script (bin/ssvnc_cmd
    that calls bin/util/ss_vncviewer) that starts up the STUNNEL tunnel
    first and then starts the TightVNC viewer pointed at that tunnel. The
-   bin/ssvnc program is a GUI front-end to that script. See [14]this FAQ
+   bin/ssvnc program is a GUI front-end to that script. See [16]this FAQ
    for more details on SSL tunnelling. In SSH connection mode, the
-   wrappers stat up SSH appropriately.
+   wrappers start up SSH appropriately.
 
 
    Memory Stick Usage: If you create a directory named "Home" in that
@@ -10467,7 +10493,7 @@ ssvnc.exe
    switch from the regular SSVNC mode, click "Terminal Services" under
    Options.
 
-   This mode requires [15]x11vnc (0.9.3 or later) installed on the remote
+   This mode requires [17]x11vnc (0.9.3 or later) installed on the remote
    machine to find, create, and manage the user sessions. SSH is used to
    create the encrypted and authenticated tunnel. The Xvfb (virtual
    framebuffer X server) program must also be installed on the remote
@@ -10485,16 +10511,22 @@ ssvnc.exe
    press "Connect").
 
    Normally the Terminal Services sessions created are virtual (RAM-only)
-   ones (e.g. Xvfb, [16]Xdummy, or Xvnc), however a nice feature is if
+   ones (e.g. Xvfb, [18]Xdummy, or Xvnc), however a nice feature is if
    you have a regular X session (i.e displaying on the physical hardware)
    on the remote machine that you are ALREADY logged into, then the
    x11vnc run from tsvnc will find it for you as well.
 
+   Also, there is setting "X Login" under Advanced Options that allows
+   you to attach to a real X server with no one logged in yet (i.e.
+   XDM/GDM/KDM Login Greeter screen) as long as you have sudo(1)
+   permission on the remote machine.
+
    Nice features to soon to be added to the tsvnc mode are easy CUPS
-   printing and Sound redirection of the Terminal Services session. It is
-   easier in tsvnc mode because the entire desktop session can be started
-   with the correct environment. ssvnc tries to handle the general case
-   of an already started desktop and that is more difficult.
+   printing (working fairly well) and Sound redirection (needs much work)
+   of the Terminal Services Desktop session. It is easier in tsvnc mode
+   because the entire desktop session can be started with the correct
+   environment. ssvnc tries to handle the general case of an already
+   started desktop and that is more difficult.
 
 
    Dynamic VNC Server Port determination: If you are running SSVNC on
@@ -10521,7 +10553,7 @@ or:     PORT= vncserver :4; sleep 15
    sessions if called repeatedly.
 
    If you use PORT= on Windows, a large random port is selected instead
-   and the [17]-rfbport option is passed to x11vnc (it does not work with
+   and the [19]-rfbport option is passed to x11vnc (it does not work with
    vncserver).
 
 
@@ -10532,7 +10564,7 @@ or:     PORT= vncserver :4; sleep 15
    resize when the server does (e.g. "x11vnc -R scale=3/4" remote control
    command).
 
-   The cursor alphablending is [18]described here.
+   The cursor alphablending is [20]described here.
 
    The RealVNC ZRLE encoding is supported, in addition to some low colors
    modes (16bpp and 8bpp at 256, 64, and even 8 colors, for use on very
@@ -10542,7 +10574,7 @@ or:     PORT= vncserver :4; sleep 15
    The Popup menu (F8) is enhanced with the ability to change many things
    on the fly. F9 is added as a shortcut to toggle FullScreen mode.
 
-   Client Side Caching: The x11vnc [19]client-side caching is handled
+   Client Side Caching: The x11vnc [21]client-side caching is handled
    nicely by this viewer. The very large pixel cache below the actual
    display in this caching method is distracting. Our Unix VNC viewer
    will automatically try to autodetect the actual display height if the
@@ -10555,7 +10587,7 @@ or:     PORT= vncserver :4; sleep 15
    scrollbars are set to be very thin (2 pixels) to be less distracting.
    Use the -sbwidth n to make them wider.
 
-   Probably nobody is interested in the [20]grabserver patch for old
+   Probably nobody is interested in the [22]grabserver patch for old
    window managers when the viewer is in fullscreen mode... This and some
    other unfixed bugs have been fixed in our patches (fullscreen toggle
    works with KDE, -x11cursor has been fixed, and the dot cursor has been
@@ -10712,7 +10744,7 @@ Enhanced TightVNC viewer (SSVNC) options:
      _________________________________________________________________
 
    Hopefully this tool will make it convenient for people to help test
-   and use the [21]built-in SSL support in x11vnc. Extra testing of this
+   and use the [23]built-in SSL support in x11vnc. Extra testing of this
    feature is much appreciated!! Thanks.
 
    Please Help Test the newly added features:
@@ -10725,47 +10757,47 @@ Enhanced TightVNC viewer (SSVNC) options:
    Server machine, and to mount your local Windows or Samba shares on the
    remote VNC Server machine. Basically these new features try to
    automate the tricks described here:
-    [22]http://www.karlrunge.com/x11vnc/#faq-smb-shares
-    [23]http://www.karlrunge.com/x11vnc/#faq-cups
-    [24]http://www.karlrunge.com/x11vnc/#faq-sound
+    [24]http://www.karlrunge.com/x11vnc/#faq-smb-shares
+    [25]http://www.karlrunge.com/x11vnc/#faq-cups
+    [26]http://www.karlrunge.com/x11vnc/#faq-sound
      _________________________________________________________________
 
    Downloading: This project can be downloaded here, choose the archive
    file bundle that best suits you (e.g. no source code, windows only,
    unix only, zip, tar etc):
-  [25]ssvnc_windows_only-1.0.18.zip      Windows Binaries Only.  No source incl
+  [27]ssvnc_windows_only-1.0.18.zip      Windows Binaries Only.  No source incl
 uded (~6MB)
-  [26]ssvnc_no_windows-1.0.18.tar.gz     Unix and Mac OS X Only. No Windows bin
+  [28]ssvnc_no_windows-1.0.18.tar.gz     Unix and Mac OS X Only. No Windows bin
 aries.  Source included. (~6MB)
-  [27]ssvnc_unix_only-1.0.18.tar.gz      Unix Binaries Only.     No source incl
+  [29]ssvnc_unix_only-1.0.18.tar.gz      Unix Binaries Only.     No source incl
 uded. (~3.5MB)
-  [28]ssvnc_unix_minimal-1.0.18.tar.gz   Unix Minimal.  You must supply your ow
+  [30]ssvnc_unix_minimal-1.0.18.tar.gz   Unix Minimal.  You must supply your ow
 n vncviewer and stunnel. (~0.1MB)
 
-  [29]ssvnc-1.0.18.tar.gz                All Unix, Mac OS X, and Windows binari
+  [31]ssvnc-1.0.18.tar.gz                All Unix, Mac OS X, and Windows binari
 es and source TGZ. (~11MB)
-  [30]ssvnc-1.0.18.zip                   All Unix, Mac OS X, and Windows binari
+  [32]ssvnc-1.0.18.zip                   All Unix, Mac OS X, and Windows binari
 es and source ZIP. (~11MB)
-  [31]ssvnc_all-1.0.18.zip               All Unix, Mac OS X, and Windows binari
+  [33]ssvnc_all-1.0.18.zip               All Unix, Mac OS X, and Windows binari
 es and source AND full archives in the zip dir. (~15MB)
 
    You can try for an older one by replacing, e.g. ".18" by ".11", etc.
 
    Here are the corresponding development bundles:
-  [32]ssvnc_windows_only-1.0.19.zip
-  [33]ssvnc_no_windows-1.0.19.tar.gz
-  [34]ssvnc_unix_only-1.0.19.tar.gz
-  [35]ssvnc_unix_minimal-1.0.19.tar.gz
+  [34]ssvnc_windows_only-1.0.19.zip
+  [35]ssvnc_no_windows-1.0.19.tar.gz
+  [36]ssvnc_unix_only-1.0.19.tar.gz
+  [37]ssvnc_unix_minimal-1.0.19.tar.gz
 
-  [36]ssvnc-1.0.19.tar.gz
-  [37]ssvnc-1.0.19.zip
-  [38]ssvnc_all-1.0.19.zip
+  [38]ssvnc-1.0.19.tar.gz
+  [39]ssvnc-1.0.19.zip
+  [40]ssvnc_all-1.0.19.zip
 
    Please help test the UltraVNC File Transfer support in the native Unix
    VNC viewer!
 
    A self-extracting and running file for the "ssvnc_unix_minimal"
-   package is here: [39]ssvnc. Save it as filename "ssvnc", type "chmod
+   package is here: [41]ssvnc. Save it as filename "ssvnc", type "chmod
    755 ./ssvnc", and then launch the GUI via typing "./ssvnc". Note that
    this "ssvnc_unix_minimal" mode requires you install the "stunnel" and
    "vncviewer" programs externally (for example, install your distros'
@@ -10805,13 +10837,13 @@ es and source AND full archives in the zip dir. (~15MB)
    redistribute the above because of cryptographic software they contain
    or for other reasons. Please check out your situation and information
    at the following and related sites:
-        [40]http://www.stunnel.org
-        [41]http://stunnel.mirt.net
-        [42]http://www.openssl.org
-        [43]http://www.chiark.greenend.org.uk/~sgtatham/putty/
-        [44]http://www.tightvnc.com
-        [45]http://www.realvnc.com
-        [46]http://sourceforge.net/projects/cotvnc/
+        [42]http://www.stunnel.org
+        [43]http://stunnel.mirt.net
+        [44]http://www.openssl.org
+        [45]http://www.chiark.greenend.org.uk/~sgtatham/putty/
+        [46]http://www.tightvnc.com
+        [47]http://www.realvnc.com
+        [48]http://sourceforge.net/projects/cotvnc/
      _________________________________________________________________
 
    Here is the toplevel README from the bundle:
@@ -11361,39 +11393,41 @@ References
   11. http://www.karlrunge.com/x11vnc/index.html#faq-xfixes-alpha-hacks
   12. http://www.karlrunge.com/x11vnc/index.html#faq-client-caching
   13. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#popup
-  14. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-ext
-  15. http://www.karlrunge.com/x11vnc/index.html
-  16. http://www.karlrunge.com/x11vnc/index.html#faq-xvfb
-  17. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rfbport
-  18. http://www.karlrunge.com/x11vnc/index.html#faq-xfixes-alpha-hacks
-  19. http://www.karlrunge.com/x11vnc/index.html#faq-client-caching
-  20. http://www.karlrunge.com/x11vnc/index.html#faq-scrollbars
-  21. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
-  22. http://www.karlrunge.com/x11vnc/index.html#faq-smb-shares
-  23. http://www.karlrunge.com/x11vnc/index.html#faq-cups
-  24. http://www.karlrunge.com/x11vnc/index.html#faq-sound
-  25. http://www.karlrunge.com/x11vnc/etv/ssvnc_windows_only-1.0.18.zip
-  26. http://www.karlrunge.com/x11vnc/etv/ssvnc_no_windows-1.0.18.tar.gz
-  27. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_only-1.0.18.tar.gz
-  28. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_minimal-1.0.18.tar.gz
-  29. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.18.tar.gz
-  30. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.18.zip
-  31. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.18.zip
-  32. http://www.karlrunge.com/x11vnc/etv/ssvnc_windows_only-1.0.19.zip
-  33. http://www.karlrunge.com/x11vnc/etv/ssvnc_no_windows-1.0.19.tar.gz
-  34. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_only-1.0.19.tar.gz
-  35. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_minimal-1.0.19.tar.gz
-  36. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.19.tar.gz
-  37. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.19.zip
-  38. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.19.zip
-  39. http://www.karlrunge.com/x11vnc/etv/ssvnc
-  40. http://www.stunnel.org/
-  41. http://stunnel.mirt.net/
-  42. http://www.openssl.org/
-  43. http://www.chiark.greenend.org.uk/~sgtatham/putty/
-  44. http://www.tightvnc.com/
-  45. http://www.realvnc.com/
-  46. http://sourceforge.net/projects/cotvnc/
+  14. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#sshvnc
+  15. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#tsvnc
+  16. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-ext
+  17. http://www.karlrunge.com/x11vnc/index.html
+  18. http://www.karlrunge.com/x11vnc/index.html#faq-xvfb
+  19. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rfbport
+  20. http://www.karlrunge.com/x11vnc/index.html#faq-xfixes-alpha-hacks
+  21. http://www.karlrunge.com/x11vnc/index.html#faq-client-caching
+  22. http://www.karlrunge.com/x11vnc/index.html#faq-scrollbars
+  23. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
+  24. http://www.karlrunge.com/x11vnc/index.html#faq-smb-shares
+  25. http://www.karlrunge.com/x11vnc/index.html#faq-cups
+  26. http://www.karlrunge.com/x11vnc/index.html#faq-sound
+  27. http://www.karlrunge.com/x11vnc/etv/ssvnc_windows_only-1.0.18.zip
+  28. http://www.karlrunge.com/x11vnc/etv/ssvnc_no_windows-1.0.18.tar.gz
+  29. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_only-1.0.18.tar.gz
+  30. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_minimal-1.0.18.tar.gz
+  31. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.18.tar.gz
+  32. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.18.zip
+  33. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.18.zip
+  34. http://www.karlrunge.com/x11vnc/etv/ssvnc_windows_only-1.0.19.zip
+  35. http://www.karlrunge.com/x11vnc/etv/ssvnc_no_windows-1.0.19.tar.gz
+  36. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_only-1.0.19.tar.gz
+  37. http://www.karlrunge.com/x11vnc/etv/ssvnc_unix_minimal-1.0.19.tar.gz
+  38. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.19.tar.gz
+  39. http://www.karlrunge.com/x11vnc/etv/ssvnc-1.0.19.zip
+  40. http://www.karlrunge.com/x11vnc/etv/ssvnc_all-1.0.19.zip
+  41. http://www.karlrunge.com/x11vnc/etv/ssvnc
+  42. http://www.stunnel.org/
+  43. http://stunnel.mirt.net/
+  44. http://www.openssl.org/
+  45. http://www.chiark.greenend.org.uk/~sgtatham/putty/
+  46. http://www.tightvnc.com/
+  47. http://www.realvnc.com/
+  48. http://sourceforge.net/projects/cotvnc/
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/x11vnc_opts.html:
@@ -11406,7 +11440,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-09-10
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-09-26
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -11428,68 +11462,69 @@ x11vnc options:
   -find                    -finddpy                 -listdpy               
   -create                  -xdummy                  -xvnc                  
   -xvnc_redirect           -svc                     -svc_xdummy            
-  -svc_xvnc                -xdmsvc                  -redirect port         
-  -display WAIT:...        -nossl                   -ssl [pem]             
-  -ssltimeout n            -sslnofail               -ssldir [dir]          
-  -sslverify [path]        -sslGenCA [dir]          -sslGenCert type name  
-  -sslEncKey [pem]         -sslCertInfo [pem]       -sslDelCert [pem]      
-  -stunnel [pem]           -stunnel3  [pem]         -https [port]          
-  -httpsredir [port]       -usepw                   -storepasswd pass file 
-  -nopw                    -accept string           -afteraccept string    
-  -gone string             -users list              -noshm                 
-  -flipbyteorder           -onetile                 -solid [color]         
-  -blackout string         -xinerama                -noxinerama            
-  -xtrap                   -xrandr [mode]           -rotate string         
-  -padgeom WxH             -o logfile               -flag file             
-  -rc filename             -norc                    -env VAR=VALUE         
-  -prog /path/to/x11vnc    -h, -help                -?, -opts              
-  -V, -version             -license                 -dbg                   
-  -q, -quiet               -v, -verbose             -bg                    
-  -modtweak                -nomodtweak              -xkb                   
-  -noxkb                   -capslock                -skip_lockkeys         
-  -skip_keycodes string    -sloppy_keys             -skip_dups             
-  -noskip_dups             -add_keysyms             -noadd_keysyms         
-  -clear_mods              -clear_keys              -remap string          
-  -norepeat                -repeat                  -nofb                  
-  -nobell                  -nosel                   -noprimary             
-  -nosetprimary            -noclipboard             -nosetclipboard        
-  -seldir string           -cursor [mode]           -nocursor              
-  -cursor_drag             -arrow n                 -noxfixes              
-  -alphacut n              -alphafrac fraction      -alpharemove           
-  -noalphablend            -nocursorshape           -cursorpos             
-  -nocursorpos             -xwarppointer            -noxwarppointer        
-  -buttonmap string        -nodragging              -ncache n              
-  -ncache_cr               -ncache_no_moveraise     -ncache_no_dtchange    
-  -ncache_no_rootpixmap    -ncache_keep_anims       -ncache_old_wm         
-  -ncache_pad n            -debug_ncache            -wireframe [str]       
-  -nowireframe             -nowireframelocal        -wirecopyrect mode     
-  -nowirecopyrect          -debug_wireframe         -scrollcopyrect mode   
-  -noscrollcopyrect        -scr_area n              -scr_skip list         
-  -scr_inc list            -scr_keys list           -scr_term list         
-  -scr_keyrepeat lo-hi     -scr_parms string        -fixscreen string      
-  -debug_scroll            -noxrecord               -grab_buster           
-  -nograb_buster           -debug_grabs             -debug_sel             
-  -pointer_mode n          -input_skip n            -allinput              
-  -speeds rd,bw,lat        -wmdt string             -debug_pointer         
-  -debug_keyboard          -defer time              -wait time             
-  -wait_ui factor          -nowait_bog              -slow_fb time          
-  -xrefresh time           -readtimeout n           -nap                   
-  -nonap                   -sb time                 -nofbpm                
-  -fbpm                    -nodpms                  -dpms                  
-  -forcedpms               -clientdpms              -noserverdpms          
-  -noultraext              -noxdamage               -xd_area A             
-  -xd_mem f                -sigpipe string          -threads               
-  -nothreads               -fs f                    -gaps n                
-  -grow n                  -fuzz n                  -debug_tiles           
-  -snapfb                  -rawfb string            -freqtab file          
-  -pipeinput cmd           -macnodim                -macnosleep            
-  -macnosaver              -macnowait               -macwheel n            
-  -macnoswap               -macnoresize             -maciconanim n         
-  -macmenu                 -gui [gui-opts]          -remote command        
-  -query variable          -QD variable             -sync                  
-  -noremote                -yesremote               -unsafe                
-  -safer                   -privremote              -nocmds                
-  -allowedcmds list        -deny_all              
+  -svc_xvnc                -xdmsvc                  -sshxdmsvc             
+  -redirect port           -display WAIT:...        -nossl                 
+  -ssl [pem]               -ssltimeout n            -sslnofail             
+  -ssldir [dir]            -sslverify [path]        -sslGenCA [dir]        
+  -sslGenCert type name    -sslEncKey [pem]         -sslCertInfo [pem]     
+  -sslDelCert [pem]        -stunnel [pem]           -stunnel3  [pem]       
+  -https [port]            -httpsredir [port]       -usepw                 
+  -storepasswd pass file   -nopw                    -accept string         
+  -afteraccept string      -gone string             -users list            
+  -noshm                   -flipbyteorder           -onetile               
+  -solid [color]           -blackout string         -xinerama              
+  -noxinerama              -xtrap                   -xrandr [mode]         
+  -rotate string           -padgeom WxH             -o logfile             
+  -flag file               -rc filename             -norc                  
+  -env VAR=VALUE           -prog /path/to/x11vnc    -h, -help              
+  -?, -opts                -V, -version             -license               
+  -dbg                     -q, -quiet               -v, -verbose           
+  -bg                      -modtweak                -nomodtweak            
+  -xkb                     -noxkb                   -capslock              
+  -skip_lockkeys           -skip_keycodes string    -sloppy_keys           
+  -skip_dups               -noskip_dups             -add_keysyms           
+  -noadd_keysyms           -clear_mods              -clear_keys            
+  -remap string            -norepeat                -repeat                
+  -nofb                    -nobell                  -nosel                 
+  -noprimary               -nosetprimary            -noclipboard           
+  -nosetclipboard          -seldir string           -cursor [mode]         
+  -nocursor                -cursor_drag             -arrow n               
+  -noxfixes                -alphacut n              -alphafrac fraction    
+  -alpharemove             -noalphablend            -nocursorshape         
+  -cursorpos               -nocursorpos             -xwarppointer          
+  -noxwarppointer          -buttonmap string        -nodragging            
+  -ncache n                -ncache_cr               -ncache_no_moveraise   
+  -ncache_no_dtchange      -ncache_no_rootpixmap    -ncache_keep_anims     
+  -ncache_old_wm           -ncache_pad n            -debug_ncache          
+  -wireframe [str]         -nowireframe             -nowireframelocal      
+  -wirecopyrect mode       -nowirecopyrect          -debug_wireframe       
+  -scrollcopyrect mode     -noscrollcopyrect        -scr_area n            
+  -scr_skip list           -scr_inc list            -scr_keys list         
+  -scr_term list           -scr_keyrepeat lo-hi     -scr_parms string      
+  -fixscreen string        -debug_scroll            -noxrecord             
+  -grab_buster             -nograb_buster           -debug_grabs           
+  -debug_sel               -pointer_mode n          -input_skip n          
+  -allinput                -speeds rd,bw,lat        -wmdt string           
+  -debug_pointer           -debug_keyboard          -defer time            
+  -wait time               -wait_ui factor          -nowait_bog            
+  -slow_fb time            -xrefresh time           -readtimeout n         
+  -nap                     -nonap                   -sb time               
+  -nofbpm                  -fbpm                    -nodpms                
+  -dpms                    -forcedpms               -clientdpms            
+  -noserverdpms            -noultraext              -noxdamage             
+  -xd_area A               -xd_mem f                -sigpipe string        
+  -threads                 -nothreads               -fs f                  
+  -gaps n                  -grow n                  -fuzz n                
+  -debug_tiles             -snapfb                  -rawfb string          
+  -freqtab file            -pipeinput cmd           -macnodim              
+  -macnosleep              -macnosaver              -macnowait             
+  -macwheel n              -macnoswap               -macnoresize           
+  -maciconanim n           -macmenu                 -gui [gui-opts]        
+  -remote command          -query variable          -QD variable           
+  -sync                    -noremote                -yesremote             
+  -unsafe                  -safer                   -privremote            
+  -nocmds                  -allowedcmds list        -deny_all              
+
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -11523,7 +11558,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-09-10
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-09-26
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -12283,22 +12318,42 @@ Options:
                        FINDCREATEDISPLAY method.  This is an alias for
                        "-display WAIT:cmd=FINDCREATEDISPLAY-Xvfb".
 
--xdummy                As in -create, except Xdummy instead of Xvfb.  Implies
-                       FD_XDUMMY_NOROOT=1.
+                       SSH NOTE: for both -find and -create you can (should!)
+                       add the "-localhost" option to force SSH tunnel access.
+
+-xdummy                As in -create, except Xdummy instead of Xvfb.
 -xvnc                  As in -create, except Xvnc instead of Xvfb.
 -xvnc_redirect         As in -create, except Xvnc.redirect instead of Xvfb.
 
--svc                   Terminal services mode. Also "-service". Alias for
-                       -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb -unixpw
-                       -users unixpw= -ssl SAVE
+-svc                   Terminal services mode based on SSL access.  Alias for
+                       -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb -unixpw -users
+                       unixpw= -ssl SAVE   Also "-service".
 
--svc_xdummy            As -svc except Xdummy instead of Xvfb.  Implies
-                       FD_XDUMMY_NOROOT=1.
+-svc_xdummy            As -svc except Xdummy instead of Xvfb.
 -svc_xvnc              As -svc except Xvnc instead of Xvfb.
 
--xdmsvc                Terminal services mode. Also "-xdm_service". Alias for
-                       -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp -unixpw
-                       -users unixpw= -ssl SAVE
+-xdmsvc                Display manager Terminal services mode based on SSL.
+                       Alias for -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp
+                       -unixpw -users unixpw= -ssl SAVE  Also "-xdm_service".
+
+                       To create a session a user will have to first log in
+                       to the -unixpw dialog and then log in again to the
+                       XDM/GDM/KDM prompt.  Subsequent re-connections will
+                       only require the -unixpw password.  See the discussion
+                       under -display WAIT:... for more details about XDM,
+                       etc configuration.
+
+-sshxdmsvc             Display manager Terminal services mode based on SSH.
+                       Alias for -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp
+                       -localhost.
+
+                       The -localhost option constrains connections to come
+                       in via a SSH tunnel (which will require a login).
+                       To create a session a user will also have to log into
+                       the XDM GDM KDM prompt. Subsequent re-connections will
+                       only only require the SSH login.  See the discussion
+                       under -display WAIT:... for more details about XDM,
+                       etc configuration.
 
 -redirect port         As in FINDCREATEDISPLAY-Xvnc.redirect mode except
                        redirect immediately (i.e. without X session finding
@@ -12448,14 +12503,19 @@ Options:
                        actually start up an X server.
 
                        By default FINDCREATEDISPLAY will try Xdummy and then
-                       Xvfb.  The Xdummy wrapper is part of the x11vnc source
-                       code (x11vnc/misc/Xdummy)  It should be available in
-                       PATH and have run "Xdummy -install" once to create
-                       the shared library.  Xdummy requires root permission and
-                       only works on Linux.  (Note: specify FD_XDUMMY_NOROOT=1
-                       to skip a check for the root id; evidently your sudo(1)
-                       will take care of everything).  Xvfb is available on
-                       most platforms and does not require root.
+                       Xvfb:
+
+                       The Xdummy wrapper is part of the x11vnc source code
+                       (x11vnc/misc/Xdummy)  It should be available in PATH and
+                       have run "Xdummy -install" once to create the shared
+                       library.  Xdummy requires root permission and only works
+                       on Linux.  (Note: specify FD_XDUMMY_NOROOT=1 to skip
+                       a check for the root id; evidently your sudo(1) will
+                       take care of everything.  The -xdummy and -svc_xdummy
+                       options imply FD_XDUMMY_NOROOT=1).
+
+                       Xvfb is available on most platforms and does not
+                       require root.
 
                        When x11vnc exits (i.e. user disconnects) the X
                        server session stays running in the background.
@@ -12527,8 +12587,9 @@ Options:
                         for kdm in kdmrc:      Enable=true in section [Xdmcp]
                         for xdm in xdm-config: DisplayManager.requestPort: 177
 
-                       See the shorthand options above "-svc" and "-xdmsvc"
-                       that specify the above options for some useful cases.
+                       See the shorthand options above "-svc", "-xdmsvc"
+                       and "-sshxdmsvc" that specify the above options for
+                       some useful cases.
 
                        If you set the env. var WAITBG=1 x11vnc will go into
                        the background once listening in wait mode.

@@ -1,3 +1,11 @@
+2007-09-26  Karl Runge <runge@karlrunge.com>
+	* x11vnc: COLUMNS=256 to find/create scripts. More ratecheck.
+
+2007-09-14  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Add -sshxdmsvc. Fix find_display for inetd.  Improve
+	  -allinput method; env CHECK_RATE to watch for FBUR build up
+	  (i.e. JFVNC).
+
 2007-09-11  Karl Runge <runge@karlrunge.com>
 	* x11vnc: fix wireframe crash under -clip.  Add -redirect for
 	  VNC redir.  -rawfb nullbig, randbig, solid, swirl, etc.

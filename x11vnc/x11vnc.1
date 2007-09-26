@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.3, lastmod: 2007-09-10
+         version: 0.9.3, lastmod: 2007-09-26
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -930,11 +930,13 @@ First try to find the user's display using FINDDISPLAY,
 if that doesn't succeed create an X session via the
 FINDCREATEDISPLAY method.  This is an alias for
 "\fB-display\fR \fIWAIT:cmd=FINDCREATEDISPLAY-Xvfb\fR".
+.IP
+SSH NOTE: for both \fB-find\fR and \fB-create\fR you can (should!)
+add the "\fB-localhost\fR" option to force SSH tunnel access.
 .PP
 \fB-xdummy\fR
 .IP
-As in \fB-create,\fR except Xdummy instead of Xvfb.  Implies
-FD_XDUMMY_NOROOT=1.
+As in \fB-create,\fR except Xdummy instead of Xvfb.
 .PP
 \fB-xvnc\fR
 .IP
@@ -946,14 +948,13 @@ As in \fB-create,\fR except Xvnc.redirect instead of Xvfb.
 .PP
 \fB-svc\fR
 .IP
-Terminal services mode. Also "\fB-service\fR". Alias for
-\fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb \fB-unixpw\fR
-\fB-users\fR unixpw= \fB-ssl\fR SAVE
+Terminal services mode based on SSL access.  Alias for
+\fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb \fB-unixpw\fR \fB-users\fR
+unixpw= \fB-ssl\fR SAVE   Also "\fB-service\fR".
 .PP
 \fB-svc_xdummy\fR
 .IP
-As \fB-svc\fR except Xdummy instead of Xvfb.  Implies
-FD_XDUMMY_NOROOT=1.
+As \fB-svc\fR except Xdummy instead of Xvfb.
 .PP
 \fB-svc_xvnc\fR
 .IP
@@ -961,9 +962,30 @@ As \fB-svc\fR except Xvnc instead of Xvfb.
 .PP
 \fB-xdmsvc\fR
 .IP
-Terminal services mode. Also "\fB-xdm_service\fR". Alias for
-\fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp \fB-unixpw\fR
-\fB-users\fR unixpw= \fB-ssl\fR SAVE
+Display manager Terminal services mode based on SSL.
+Alias for \fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp
+\fB-unixpw\fR \fB-users\fR unixpw= \fB-ssl\fR SAVE  Also "\fB-xdm_service\fR".
+.IP
+To create a session a user will have to first log in
+to the \fB-unixpw\fR dialog and then log in again to the
+XDM/GDM/KDM prompt.  Subsequent re-connections will
+only require the \fB-unixpw\fR password.  See the discussion
+under \fB-display\fR WAIT:... for more details about XDM,
+etc configuration.
+.PP
+\fB-sshxdmsvc\fR
+.IP
+Display manager Terminal services mode based on SSH.
+Alias for \fB-display\fR WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp
+\fB-localhost.\fR
+.IP
+The \fB-localhost\fR option constrains connections to come
+in via a SSH tunnel (which will require a login).
+To create a session a user will also have to log into
+the XDM GDM KDM prompt. Subsequent re-connections will
+only only require the SSH login.  See the discussion
+under \fB-display\fR WAIT:... for more details about XDM,
+etc configuration.
 .PP
 \fB-redirect\fR \fIport\fR
 .IP
@@ -1122,15 +1144,21 @@ for the user.  This is the only time x11vnc tries to
 actually start up an X server.
 .IP
 By default FINDCREATEDISPLAY will try Xdummy and then
-Xvfb.  The Xdummy wrapper is part of the x11vnc source
-code (x11vnc/misc/Xdummy)  It should be available in
-PATH and have run "Xdummy \fB-install"\fR once to create
-the shared library.  Xdummy requires root permission and
-only works on Linux.  (Note: specify FD_XDUMMY_NOROOT=1
-to skip a check for the root id; evidently your 
+Xvfb:
+.IP
+The Xdummy wrapper is part of the x11vnc source code
+(x11vnc/misc/Xdummy)  It should be available in PATH and
+have run "Xdummy \fB-install"\fR once to create the shared
+library.  Xdummy requires root permission and only works
+on Linux.  (Note: specify FD_XDUMMY_NOROOT=1 to skip
+a check for the root id; evidently your 
 .IR sudo (1)
-will take care of everything).  Xvfb is available on
-most platforms and does not require root.
+will
+take care of everything.  The \fB-xdummy\fR and \fB-svc_xdummy\fR
+options imply FD_XDUMMY_NOROOT=1).
+.IP
+Xvfb is available on most platforms and does not
+require root.
 .IP
 When x11vnc exits (i.e. user disconnects) the X
 server session stays running in the background.
@@ -1209,8 +1237,9 @@ for gdm in gdm.conf:   Enable=true in section [xdmcp]
 for kdm in kdmrc:      Enable=true in section [Xdmcp]
 for xdm in xdm-config: DisplayManager.requestPort: 177
 .IP
-See the shorthand options above "\fB-svc\fR" and "\fB-xdmsvc\fR"
-that specify the above options for some useful cases.
+See the shorthand options above "\fB-svc\fR", "\fB-xdmsvc\fR"
+and "\fB-sshxdmsvc\fR" that specify the above options for
+some useful cases.
 .IP
 If you set the env. var WAITBG=1 x11vnc will go into
 the background once listening in wait mode.

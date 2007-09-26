@@ -1412,6 +1412,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 			if (fd >= 0) {
 				write(fd, find_display, strlen(find_display));
 				close(fd);
+				set_env("FINDDISPLAY_run", "1");
 				sprintf(com, "/bin/sh %s -n; rm -f %s", tmp, tmp);
 				system(com);
 			}

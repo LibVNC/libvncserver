@@ -1934,10 +1934,10 @@ void read_x11vnc_remote_prop(int nomsg) {
 	} else if (strstr(x11vnc_remote_str, "cmd=") &&
 	    strstr(x11vnc_remote_str, "passwd")) {
 		rfbLog("read X11VNC_REMOTE: *\n");
-	} else if (strlen(x11vnc_remote_str) > 38) {
+	} else if (strlen(x11vnc_remote_str) > 36) {
 		char trim[100]; 
 		trim[0] = '\0';
-		strncat(trim, x11vnc_remote_str, 38);
+		strncat(trim, x11vnc_remote_str, 36);
 		rfbLog("read X11VNC_REMOTE: %s ...\n", trim);
 		
 	} else {

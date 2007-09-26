@@ -1026,6 +1026,8 @@ static void watch_loop(void) {
 		got_keyboard_calls = 0;
 		urgent_update = 0;
 
+		x11vnc_current = dnow();
+
 		if (! use_threads) {
 			dtime0(&tm);
 			if (! skip_pe) {
@@ -2518,6 +2520,10 @@ int main(int argc, char* argv[]) {
 			users_list = strdup("unixpw=");
 			use_openssl = 1;
 			openssl_pem = strdup("SAVE");
+		} else if (!strcmp(arg, "-sshxdmsvc")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp");
+			allow_list = strdup("127.0.0.1");
+			got_localhost = 1;
 #ifndef NO_SSL_OR_UNIXPW
 		} else if (!strcmp(arg, "-unixpw_cmd")
 		    || !strcmp(arg, "-unixpw_cmd_unsafe")) {
@@ -3880,7 +3886,7 @@ int main(int argc, char* argv[]) {
 	/* open the X display: */
 	if (auth_file) {
 		set_env("XAUTHORITY", auth_file);
-fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
+if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	}
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 	/*

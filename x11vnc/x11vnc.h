@@ -468,6 +468,7 @@ extern double last_copyrect_fix;
 extern double last_wireframe;
 extern double servertime_diff;
 extern double x11vnc_start;
+extern double x11vnc_current;
 extern double g_now;
 
 extern double last_get_wm_frame_time;
