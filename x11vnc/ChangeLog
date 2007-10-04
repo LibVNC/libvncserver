@@ -1,3 +1,6 @@
+2007-10-03  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add xfce to createdisplay
+
 2007-09-26  Karl Runge <runge@karlrunge.com>
 	* x11vnc: COLUMNS=256 to find/create scripts. More ratecheck.
 

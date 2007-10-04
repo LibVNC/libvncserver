@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Wed Sep 26 15:16:21 EDT 2007
+x11vnc README file                         Date: Wed Oct  3 18:57:35 EDT 2007
 
 The following information is taken from these URLs:
 
@@ -7777,7 +7777,7 @@ References
   99. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
  100. http://www.karlrunge.com/x11vnc/x11vnc-0.9.3.tar.gz
  101. http://www.karlrunge.com/x11vnc/bins
- 102. mailto:xvml-beta@karlrunge.com
+ 102. mailto:xvml@karlrunge.com
  103. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-int
  104. http://www.karlrunge.com/x11vnc/index.html#ss_vncviewer
  105. http://www.karlrunge.com/x11vnc/index.html#faq-ssl-tunnel-ext
@@ -8405,7 +8405,7 @@ References
  727. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-capslock
  728. http://www.karlrunge.com/x11vnc/index.html#faq-scaling
  729. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-scale
- 730. http://www.cus.cam.ac.uk/~ssb22/source/vnc-magnification.html
+ 730. http://people.pwf.cam.ac.uk/ssb22/setup/vnc-magnification.html
  731. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rfbport
  732. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-gui
  733. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-connect
@@ -11440,7 +11440,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-09-26
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-09-30
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -11558,7 +11558,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-09-26
+x11vnc: allow VNC connections to real X11 displays. 0.9.3 lastmod: 2007-09-30
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -12432,16 +12432,16 @@ Options:
                        your long "login:" line press the Up arrow once
                        (before typing anything else).
 
-                       Another option is "geom=WxH" or "geom=WxHxD"
-                       (or ge=). This only has an effect in FINDCREATEDISPLAY
-                       mode when a virtual X server such as Xvfb is going to
-                       be created.  It sets the width and height of the new
-                       display, and optionally the color depth as well. You
-                       can also supply "gnome", "kde", "twm", "fvwm",
-                       "mwm", "dtwm", "wmaker", "enlightenment",
-                       "Xsession", or "failsafe" (same as "xterm")
-                       to have the created display use that mode for the
-                       user session.
+                       Another option is "geom=WxH" or "geom=WxHxD" (or
+                       ge=). This only has an effect in FINDCREATEDISPLAY
+                       mode when a virtual X server such as Xvfb is going
+                       to be created.  It sets the width and height of
+                       the new display, and optionally the color depth as
+                       well. You can also supply "gnome", "kde", "twm",
+                       "fvwm", "mwm", "dtwm", "wmaker", "xfce",
+                       "enlightenment", "Xsession", or "failsafe"
+                       (same as "xterm") to have the created display use
+                       that mode for the user session.
 
                        To disable the option setting set the environment
                        variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.

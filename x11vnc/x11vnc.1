@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "September 2007" "x11vnc " "User Commands"
+.TH X11VNC "1" "October 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.3, lastmod: 2007-09-26
+         version: 0.9.3, lastmod: 2007-09-30
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1071,16 +1071,16 @@ type and enter your password incorrectly, to retrieve
 your long "login:" line press the Up arrow once
 (before typing anything else).
 .IP
-Another option is "geom=WxH" or "geom=WxHxD"
-(or ge=). This only has an effect in FINDCREATEDISPLAY
-mode when a virtual X server such as Xvfb is going to
-be created.  It sets the width and height of the new
-display, and optionally the color depth as well. You
-can also supply "gnome", "kde", "twm", "fvwm",
-"mwm", "dtwm", "wmaker", "enlightenment",
-"Xsession", or "failsafe" (same as "xterm")
-to have the created display use that mode for the
-user session.
+Another option is "geom=WxH" or "geom=WxHxD" (or
+ge=). This only has an effect in FINDCREATEDISPLAY
+mode when a virtual X server such as Xvfb is going
+to be created.  It sets the width and height of
+the new display, and optionally the color depth as
+well. You can also supply "gnome", "kde", "twm",
+"fvwm", "mwm", "dtwm", "wmaker", "xfce",
+"enlightenment", "Xsession", or "failsafe"
+(same as "xterm") to have the created display use
+that mode for the user session.
 .IP
 To disable the option setting set the environment
 variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.

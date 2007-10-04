@@ -1989,6 +1989,8 @@ if (0) db = 1;
 						sprintf(fdsess, "xterm");
 					} else if (strstr(t, "wmaker")) {
 						sprintf(fdsess, "wmaker");
+					} else if (strstr(t, "xfce")) {
+						sprintf(fdsess, "xfce");
 					} else if (strstr(t, "enlightenment")) {
 						sprintf(fdsess, "enlightenment");
 					} else if (strstr(t, "Xsession")) {

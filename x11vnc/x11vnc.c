@@ -1240,7 +1240,7 @@ static void watch_loop(void) {
 			if (use_snapfb) {
 				int t, tries = 3;
 				copy_snap();
-				for (t =0; t < tries; t++) {
+				for (t=0; t < tries; t++) {
 					tile_diffs = scan_for_updates(0);
 				}
 			} else {
