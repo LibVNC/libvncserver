@@ -1314,6 +1314,7 @@ void user_supplied_opts(char *opts) {
 
 static void vnc_redirect_timeout (int sig) {
 	write(2, "timeout: no clients connected.\n", 31);
+	if (sig) {};
 	exit(0);
 }
 
@@ -1513,6 +1514,10 @@ int wait_for_client(int *argc, char** argv, int http) {
 
 	initialize_signals();
 
+	if (ssh_str != NULL) {
+		ssh_remote_tunnel(ssh_str, screen->port);
+	}
+
 	if (! raw_fb) {
 		chg_raw_fb = 1;
 		/* kludge to get RAWFB_RET with dpy == NULL guards */
@@ -1600,7 +1605,6 @@ int wait_for_client(int *argc, char** argv, int http) {
 				accept_openssl(OPENSSL_INETD, -1);
 			}
 		} else {
-			int gotone = 0;
 			if (first_conn_timeout) {
 				if (first_conn_timeout < 0) {
 					first_conn_timeout = -first_conn_timeout;

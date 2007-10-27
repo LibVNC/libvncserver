@@ -133,6 +133,10 @@ void clean_up_exit (int ret) {
 	if (avahi) {
 		avahi_cleanup();
 	}
+	if (ssh_pid > 0) {
+		kill(ssh_pid, SIGTERM);
+		ssh_pid = 0;
+	}
 
 #ifdef MACOSX
 	if (client_connect_file) {

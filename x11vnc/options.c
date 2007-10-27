@@ -35,6 +35,8 @@ int https_port_redir = 0;
 char *ssl_verify = NULL;
 int ssl_initialized = 0;
 int ssl_timeout_secs = -1;
+char *ssh_str = NULL;
+pid_t ssh_pid = 0;
 int usepw = USEPW;
 char *blackout_str = NULL;	/* -blackout */
 int blackout_ptr = 0;
@@ -176,6 +178,7 @@ char *client_connect = NULL;	/* strings for -connect option */
 char *client_connect_file = NULL;
 int connect_or_exit = 0;
 int vnc_connect = 1;		/* -vncconnect option */
+char *connect_proxy = NULL;
 
 int show_cursor = 1;		/* show cursor shapes */
 int show_multiple_cursors = 0;	/* show X when on root background, etc */

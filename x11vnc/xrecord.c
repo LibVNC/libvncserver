@@ -633,6 +633,7 @@ if (db > 1) fprintf(stderr, "record_CA-%d\n", k++);
 				scr_attr_cache[i].y = attr.y;
 				scr_attr_cache[i].width = attr.width;
 				scr_attr_cache[i].height = attr.height;
+				scr_attr_cache[i].border_width = attr.border_width;
 				scr_attr_cache[i].depth = attr.depth;
 				scr_attr_cache[i].class = attr.class;
 				scr_attr_cache[i].backing_store =

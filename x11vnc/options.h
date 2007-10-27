@@ -35,6 +35,8 @@ extern int https_port_redir;
 extern char *ssl_verify;
 extern int ssl_initialized;
 extern int ssl_timeout_secs;
+extern char *ssh_str;
+extern pid_t ssh_pid;
 extern int usepw;
 extern char *blackout_str;
 extern int blackout_ptr;
@@ -148,6 +150,7 @@ extern char *client_connect;
 extern char *client_connect_file;
 extern int connect_or_exit;
 extern int vnc_connect;
+extern char *connect_proxy;
 
 extern int show_cursor;
 extern int show_multiple_cursors;

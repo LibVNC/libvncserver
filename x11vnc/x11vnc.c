@@ -398,6 +398,7 @@ static int tsdo_timeout_flag;
 
 static void tsdo_timeout (int sig) {
 	tsdo_timeout_flag = 1;
+	if (sig) {};
 }
 
 #define TASKMAX 32
@@ -474,6 +475,7 @@ int tsdo(int port, int lsock, int *conn) {
 		raw_xfer(rsock, csock, csock);
 		exit(0);
 	}
+	return 0;
 }
 
 void set_redir_properties(void);
@@ -570,7 +572,7 @@ void terminal_services(char *list) {
 
 	for (i=0; i<n; i++) {
 		atom[i] = XInternAtom(dpy, tag[i], False);
-		if (db) fprintf(stderr, "tag: %s atom: %d\n", tag[i], atom[i]);
+		if (db) fprintf(stderr, "tag: %s atom: %d\n", tag[i], (int) atom[i]);
 		if (atom[i] == None) {
 			continue;
 		}
@@ -897,7 +899,7 @@ void check_redir_services(void) {
 	Atom a;
 	char prop[513];
 	time_t tsd_last;
-	int i, restart = 0;
+	int restart = 0;
 	pid_t pid = 0;
 
 	if (! dpy) {
@@ -960,6 +962,130 @@ void check_redir_services(void) {
 
 	set_redir_properties();
 #endif
+}
+
+void ssh_remote_tunnel(char *instr, int lport) {
+	char *p, *q, *cmd, *ssh;
+	char *s = strdup(instr);
+	int sleep = 300, disp = 0, sport = 0;
+	int rc, len, rport;
+
+	/* user@host:port:disp+secs */
+
+	/* +sleep */
+	q = strrchr(s, '+');
+	if (q) {
+		sleep = atoi(q+1);
+		if (sleep <= 0) {
+			sleep = 1;
+		}
+		*q = '\0';
+	}
+	/* :disp */
+	q = strrchr(s, ':');
+	if (q) {
+		disp = atoi(q+1);
+		*q = '\0';
+	}
+	
+	/* :sshport */
+	q = strrchr(s, ':');
+	if (q) {
+		sport = atoi(q+1);
+		*q = '\0';
+	}
+
+	if (getenv("SSH")) {
+		ssh = getenv("SSH");
+	} else {
+		ssh = "ssh";
+	}
+
+	len = 0;
+	len += strlen(ssh) + strlen(s) + 500;
+	cmd = (char *) malloc(len);
+
+	if (disp >= 0 && disp <= 200) {
+		rport = disp + 5900;
+	} else if (disp < 0) {
+		rport = -disp;
+	} else {
+		rport = disp;
+	}
+
+	if (sport > 0) {
+		sprintf(cmd, "%s -f -p %d -R '%d:localhost:%d' '%s' 'sleep %d'", ssh, sport, rport, lport, s, sleep);
+	} else {
+		sprintf(cmd, "%s -f       -R '%d:localhost:%d' '%s' 'sleep %d'", ssh,        rport, lport, s, sleep);
+	}
+
+	if (no_external_cmds || !cmd_ok("ssh")) {
+		rfbLogEnable(1);
+		rfbLog("cannot run external commands in -nocmds mode:\n");
+		rfbLog("   \"%s\"\n", cmd);
+		rfbLog("   exiting.\n");
+		clean_up_exit(1);
+	}
+
+	close_exec_fds();
+	fprintf(stderr, "\n");
+	rfbLog("running: %s\n", cmd);
+	rc = system(cmd);
+
+	if (rc != 0) {
+		free(cmd);
+		free(s);
+		rfbLog("ssh remote listen failed.\n");
+		clean_up_exit(1);
+	}
+
+	if (1) {
+		FILE *pipe;
+		int mypid = (int) getpid();
+		int bestpid = -1;
+		int best = -1;
+		char line[1024];
+		char *ps = "ps -ef";
+		/* not portable... but it is really good to terminate the ssh when done. */
+		/* ps -ef | egrep 'ssh2.*-R.*5907:localhost:5900.*runge@celias.lbl.gov.*sleep 300' | grep -v grep | awk '{print $2}' */
+		if (strstr(UT.sysname, "Linux")) {
+			ps = "ps wwwwwaux";
+		} else if (strstr(UT.sysname, "BSD")) {
+			ps = "ps wwwwwaux";
+		}
+		sprintf(cmd, "env COLUMNS=256 %s | egrep '%s.*-R *%d:localhost:%d.*%s.*sleep *%d' | grep -v grep | awk '{print $2}'", ps, ssh, rport, lport, s, sleep);
+		pipe = popen(cmd, "r");
+		if (pipe) {
+			while (fgets(line, 1024, pipe) != NULL) {
+				int p = atoi(line);
+				if (p > 0) {
+					int score;
+					if (p > mypid) 	{
+						score = p - mypid;
+					} else {
+						score = p - mypid + 32768;
+						if (score < 0) {
+							score = 32768;
+						}
+					}
+					if (best < 0 || score < best) {
+						best = score;
+						bestpid = p;
+					}
+				}
+			}
+			pclose(pipe);
+		}
+
+		if (bestpid != -1) {
+			ssh_pid = (pid_t) bestpid;
+			rfbLog("guessed ssh pid=%d, will terminate it on exit.\n", bestpid);
+		}
+	}
+
+	free(cmd);
+	free(s);
+
 }
 
 void check_filexfer(void) {
@@ -2463,6 +2589,9 @@ int main(int argc, char* argv[]) {
 			if (!strcmp(arg, "-connect_or_exit")) {
 				connect_or_exit = 1;
 			}
+		} else if (!strcmp(arg, "-proxy")) {
+			CHECK_ARGC
+			connect_proxy = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-vncconnect")) {
 			vnc_connect = 1;
 		} else if (!strcmp(arg, "-novncconnect")) {
@@ -2672,6 +2801,9 @@ int main(int argc, char* argv[]) {
 #endif
 		} else if (!strcmp(arg, "-nopw")) {
 			nopw = 1;
+		} else if (!strcmp(arg, "-ssh")) {
+			CHECK_ARGC
+			ssh_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-usepw")) {
 			usepw = 1;
 		} else if (!strcmp(arg, "-storepasswd")) {
@@ -3670,7 +3802,7 @@ int main(int argc, char* argv[]) {
 				if (! s) s = getenv("SSH_CLIENT");
 				if (! s) s = "SSH_CONNECTION";
 				fprintf(stderr, "\n");
-				rfbLog("Skipping -ssl/-stunnel contraint in"
+				rfbLog("Skipping -ssl/-stunnel constraint in"
 				    " -unixpw\n");
 				rfbLog("mode, assuming your SSH encryption"
 				    " is: %s\n", s);
@@ -4567,6 +4699,9 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	if (! waited_for_client) {
 		if (try_http && ! got_httpdir && check_httpdir()) {
 			http_connections(1);
+		}
+		if (ssh_str != NULL) {
+			ssh_remote_tunnel(ssh_str, screen->port);
 		}
 	}
 

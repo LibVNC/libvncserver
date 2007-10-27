@@ -382,8 +382,10 @@ Tuning
 	ncache_cr
 	ncache_no_moveraise
 	ncache_no_dtchange
+	ncache_old_wm
 	ncache_no_rootpixmap
 	ncache_keep_anims
+	ncache_pad:
 	=RA ncache_reset_rootpixmap
 	=GAL LOFF
 	--

@@ -1,5 +1,7 @@
 /* -- macosxCGP.c -- */
 
+void macosxCGP_unused(void) {}
+
 #if (defined(__MACH__) && defined(__APPLE__))
 
 #include <ApplicationServices/ApplicationServices.h>

@@ -151,6 +151,14 @@ int get_wm_frame_pos(int *px, int *py, int *x, int *y, int *w, int *h,
 	*w = attr.width;
 	*h = attr.height;
 
+#if 0
+	/* more accurate, but the animation is bogus anyway */
+	if (attr.border_width > 0) {
+		*w += 2 * attr.border_width;
+		*h += 2 * attr.border_width;
+	}
+#endif
+
 	if (win != NULL) {
 		*win = descend_pointer(5, c, NULL, 0);
 	}
@@ -871,6 +879,7 @@ static void draw_box(int x, int y, int w, int h, int restore) {
 			memcpy(dst, src, (x1-x0)*pixelsize);
 		}
 		if (y_min >= 0) {
+if (0) fprintf(stderr, "Mark-1 %d %d %d %d\n", x0, y_min, x1, y_max+1);
 			mark_rect_as_modified(x0, y_min, x1, y_max+1, 0);
 		}
 		save[i]->saved = 0;
@@ -1012,6 +1021,7 @@ if (0) fprintf(stderr, "  DrawBox: %04dx%04d+%04d+%04d B=%d rest=%d lw=%d %.4f\n
 		}
 		/* mark it for sending: */
 		if (save[i]->saved) {
+if (0) fprintf(stderr, "Mark-2 %d %d %d %d\n", x0, y_min, x1, y_max+1);
 			mark_rect_as_modified(x0, y_min, x1, y_max+1, 0);
 		}
 	}
@@ -1859,9 +1869,19 @@ if (0 || debug_scroll > 1) fprintf(stderr, "<<<-rfbDoCopyRect req: %d mod: %d cp
 				src = main_fb + (y1-dy)*stride + (x1-dx)*Bpp;
 
 			} else if (c == 1) {
-				if (! cmap8to24_fb || cmap8to24_fb == rfb_fb) {
+				if (!cmap8to24 || !cmap8to24_fb) {
 					continue;
 				}
+				if (cmap8to24_fb == rfb_fb) {
+					if (mode == DCR_FBOnly) {
+						;
+					} else if (mode == DCR_Direct) {
+						;
+					} else if (mode == DCR_Normal) {
+						continue;
+					}
+				}
+if (0) fprintf(stderr, "copyrect: cmap8to24_fb: mode=%d\n", mode);
 				if (cmap8to24 && depth == 8) {
 					Bpp = 4 * Bpp0;
 					stride = 4 * stride0;
@@ -3257,6 +3277,7 @@ if (db2) fprintf(stderr, "sw: %d/%lx\n", k, swin);
 					stack_list[k].y = attr.y;
 					stack_list[k].width = attr.width;
 					stack_list[k].height = attr.height;
+					stack_list[k].border_width = attr.border_width;
 					stack_list[k].depth = attr.depth;
 					stack_list[k].class = attr.class;
 					stack_list[k].backing_store =
@@ -3276,6 +3297,7 @@ if (db2) fprintf(stderr, "sw: %d/%lx\n", k, swin);
 			attr.depth  = stack_list[k].depth;
 			attr.width  = stack_list[k].width;
 			attr.height = stack_list[k].height;
+			attr.border_width = stack_list[k].border_width;
 			attr.map_state = stack_list[k].map_state;
 
 			if (attr.map_state != IsViewable) {
@@ -4981,9 +5003,9 @@ if ((ncache || db) && ncdb) fprintf(stderr, "sent_copyrect: %d - obs: %d  frame:
 	rfbPE(1000);
 	wireframe_in_progress = 0;
 
-	if (0) {
-	/* No longer needed.  see draw_box() */
-	    if (frame_changed && cmap8to24 && multivis_count) {
+	if (1) {
+	/* In principle no longer needed...  see draw_box() */
+	    if (frame_changed && cmap8to24 /* && multivis_count */) {
 		/* handle -8to24 kludge, mark area and check 8bpp... */
 		int x1, x2, y1, y2, f = 16;
 		x1 = nmin(box_x, orig_x) - f;
@@ -4994,8 +5016,16 @@ if ((ncache || db) && ncdb) fprintf(stderr, "sent_copyrect: %d - obs: %d  frame:
 		x2 = nfix(x2, dpy_x+1);
 		y1 = nfix(y1, dpy_y);
 		y2 = nfix(y2, dpy_y+1);
-		check_for_multivis();
-		mark_rect_as_modified(x1, y1, x2, y2, 0);
+		if (0) {
+			check_for_multivis();
+			mark_rect_as_modified(x1, y1, x2, y2, 0);
+		} else {
+			if (1) {
+				bpp8to24(x1, y1, x2, y2);
+			} else {
+				bpp8to24(0, 0, dpy_x, dpy_y);
+			}
+		}
 	    }
 	}
 
@@ -6011,8 +6041,15 @@ int lookup_old_stack_index(int ic) {
 	cache_list[k].y = attr.y;  \
 	cache_list[k].width = attr.width;  \
 	cache_list[k].height = attr.height;  \
+	cache_list[k].border_width = attr.border_width;  \
 	cache_list[k].map_state = attr.map_state; \
 	cache_list[k].time = dnow();
+
+#if 0
+	cache_list[k].width = attr.width   + 2*attr.border_width;  \
+	cache_list[k].height = attr.height + 2*attr.border_width;  \
+
+#endif
 
 #define CLEAR(k) \
 	if (0) fprintf(stderr, "CLEAR(%d)\n", k); \
@@ -8119,7 +8156,9 @@ void set_ncache_xrootpmap(void) {
 			dst += main_bytes_per_line;
 		}
 		XDestroyImage(image);
+		X_UNLOCK;
 		scale_mark_xrootpmap();
+		X_LOCK;
 	} else {
 		int yn = (ncache+1) * dpy_y;
 		zero_fb(0, yn, dpy_x, yn + dpy_y);

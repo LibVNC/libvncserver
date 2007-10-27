@@ -2,7 +2,7 @@
 .TH X11VNC "1" "October 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.3, lastmod: 2007-09-30
+         version: 0.9.4, lastmod: 2007-10-27
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -472,7 +472,7 @@ As \fB-http,\fR but force lookup for ssl classes subdir.
 .PP
 \fB-avahi\fR
 .IP
-Use the Avahi/mDNS ZeroConf protocol to advertize
+Use the Avahi/mDNS ZeroConf protocol to advertise
 this VNC server to the local network. (Related terms:
 Rendezvous, Bonjour).  Depending on your setup, you
 may need to start avahi-daemon and open udp port 5353
@@ -513,8 +513,69 @@ is running as root (e.g. via
 As with \fB-connect,\fR except if none of the reverse
 connections succeed, then x11vnc shutdowns immediately.
 .IP
-If you do not want x11vnc to listen on ANY interface
-use \fB-rfbport\fR 0
+By the way, if you do not want x11vnc to listen on
+ANY interface use \fB-rfbport\fR 0  which is handy for the
+\fB-connect_or_exit\fR mode.
+.PP
+\fB-proxy\fR \fIstring\fR
+.IP
+Use proxy in string (e.g. host:port) as a proxy for
+making reverse connections (-connect or \fB-connect_or_exit\fR
+options).
+.IP
+Web proxies are supported, but note by default most of
+them only support destination connections to ports 443
+or 563, so this might not be very useful (the viewer
+would need to listen on that port or the router would
+have to do a port redirection).
+.IP
+A web proxy may be specified by either "host:port"
+or "http://host:port" (the port is required even if
+it is the common choices 80 or 8080)
+.IP
+SOCKS4, SOCKS4a, and SOCKS5 are also supported.
+SOCKS proxies normally do not have restrictions on the
+destination port number.
+.IP
+Use a format like this: socks://host:port or
+socks5://host:port.  Note that ssh \fB-D\fR does not support
+SOCKS4a, so use socks5://.  For socks:// SOCKS4 is used
+on a numerical IP and "localhost", otherwise SOCKS4a
+is used (and so the proxy tries to do the DNS lookup).
+.IP
+An experimental mode is "\fB-proxy\fR \fIhttp://host:port/...\fR"
+Note the "/" after the port that distinguishes it from
+a normal web proxy.  The port must be supplied even if
+it is the default 80.  For this mode a GET is done to
+the supplied URL with the string host=H&port=P appended.
+H and P will be the \fB-connect\fR reverse connect host
+and port.  Use the string "__END__" to disable the
+appending.  The basic idea here is that maybe some cgi
+script provides the actual viewer hookup and tunnelling.
+How to actually achieve this within cgi, php, etc. is
+not clear...  A custom web server or apache module
+would be straight-forward.
+.IP
+Another experimental mode is "\fB-proxy\fR \fIssh://user@host\fR"
+in which case a SSH tunnel is used for the proxying.
+"user@" is not needed unless your unix username is
+different on "host".  For a non-standard SSH port
+use ssh://user@host:port.  If proxies are chained (see
+next paragraph) then the ssh one must be the first one.
+If ssh-agent is not active, then the ssh password needs
+to be entered in the terminal where x11vnc is running.
+Examples:
+.IP
+\fB-connect\fR localhost:0 \fB-proxy\fR ssh://me@friends-pc:2222
+.IP
+\fB-connect\fR snoopy:0 \fB-proxy\fR ssh://ssh.company.com
+.IP
+Multiple proxies may be chained together in case one
+needs to ricochet off of a number of hosts to finally
+reach the VNC viewer.  Up to 3 may be chained, separate
+them by commas in the order they are to be connected to.
+E.g.:  http://host1:port1,socks5://host2:port2 or three
+like:  first,second,third
 .PP
 \fB-vncconnect,\fR \fB-novncconnect\fR
 .IP
@@ -692,7 +753,7 @@ File format for \fB-passwdfile:\fR
 If multiple non-blank lines exist in the file they are
 all taken as valid passwords.  Blank lines are ignored.
 Password lines may be "commented out" (ignored) if
-they begin with the charactor "#" or the line contains
+they begin with the character "#" or the line contains
 the string "__SKIP__".  Lines may be annotated by use
 of the "__COMM__" string: from it to the end of the
 line is ignored.  An empty password may be specified
@@ -856,7 +917,7 @@ use the traditional
 .IR crypt (3)
 method to
 verify passwords. All of the above \fB-unixpw\fR options and
-contraints apply.
+constraints apply.
 .IP
 This mode requires that the encrypted passwords be
 readable.  Encrypted passwords stored in /etc/shadow
@@ -1278,6 +1339,11 @@ into x11vnc at build time.  If x11vnc is not built
 with libssl support it will exit immediately when \fB-ssl\fR
 is prescribed.
 .IP
+The VNC Viewer-side needs support SSL as well.
+See this URL and also the discussion below for ideas
+on how to enable SSL support for the viewer:
+http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-viewers
+.IP
 [pem] is optional, use "\fB-ssl\fR \fI/path/to/mycert.pem\fR"
 to specify a PEM certificate file to use to identify
 and provide a key for this server.  See 
@@ -1288,12 +1354,12 @@ more info about PEMs and the \fB-sslGenCert\fR option below.
 The connecting VNC viewer SSL tunnel can optionally
 authenticate this server if they have the public
 key part of the certificate (or a common certificate
-authority, CA, is a more sophisicated way to verify
+authority, CA, is a more sophisticated way to verify
 this server's cert, see \fB-sslGenCA\fR below).  This is
 used to prevent man-in-the-middle attacks.  Otherwise,
 if the VNC viewer accepts this server's key without
 verification, at least the traffic is protected
-from passive sniffing on the network (but NOT from
+from passive sniffing on the network (but *NOT* from
 man-in-the-middle attacks).
 .IP
 If [pem] is not supplied and the 
@@ -1331,6 +1397,8 @@ is "SAVE_PROMPT" the server.pem certificate will be
 made based on your answers to its prompts for info such
 as OrganizationalName, CommonName, etc.
 .IP
+We expect most users to use "\fB-ssl\fR \fISAVE\fR".
+.IP
 Use "SAVE-<string>" and "SAVE_PROMPT-<string>"
 to refer to the file ~/.vnc/certs/server-<string>.pem
 instead.  E.g. "SAVE-charlie" will store to the file
@@ -1341,13 +1409,14 @@ default ~/.vnc/certs
 .IP
 Example: x11vnc \fB-ssl\fR SAVE \fB-display\fR :0 ...
 .IP
-Your VNC viewer will also need to be able to connect
+Your VNC viewer will need to be able to connect
 via SSL.  See the discussion below under \fB-stunnel\fR and
-the FAQ (ss_vncviewer script) for how this might be
-achieved.  E.g. on Unix it is easy to write a shell
-script that starts up stunnel and then vncviewer.
-Also in the x11vnc source a SSL enabled Java VNC Viewer
-applet is provided in the classes/ssl directory.
+http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-viewers
+for how this might be achieved.  E.g. on Unix it is
+easy to write a shell script that starts up stunnel
+and then vncviewer.  Also in the x11vnc source a SSL
+enabled Java VNC Viewer applet is provided in the
+classes/ssl directory.
 .PP
 \fB-ssltimeout\fR \fIn\fR
 .IP
@@ -1525,7 +1594,7 @@ You will also need to supply a passphrase of at least
 Once you have generated the CA you can distribute
 its certificate part, [dir]/CA/cacert.pem, to other
 workstations where VNC viewers will be run.  One will
-need to "import" this certicate in the applications,
+need to "import" this certificate in the applications,
 e.g. Web browser, Java applet plugin, stunnel, etc.
 Next, you can create and sign keys using the CA with
 the \fB-sslGenCert\fR option below.
@@ -1603,7 +1672,7 @@ delete the line.
 Similar to \fB-sslGenCA,\fR you will be prompted to fill
 in some information that will be recorded in the
 certificate when it is created.  Tip: if you know
-the fully-quailified hostname other people will be
+the fully-qualified hostname other people will be
 connecting to you can use that as the CommonName "CN"
 to avoid some applications (e.g. web browsers and java
 plugin) complaining it does not match the hostname.
@@ -1611,7 +1680,7 @@ plugin) complaining it does not match the hostname.
 You will also need to supply the CA private key
 passphrase to unlock the private key created from
 \fB-sslGenCA.\fR  This private key is used to sign the server
-or client certicate.
+or client certificate.
 .IP
 The "server" certs can be used by x11vnc directly by
 pointing to them via the \fB-ssl\fR [pem] option.  The default
@@ -1844,11 +1913,53 @@ redir from mygateway.com:443 to workstation:5900.
 .IP
 This spares the user from having to type in
 https://mygateway.com/?PORT=443 into their web
-browser. Note taht port 443 is the default https port;
-other ports must be explicity indicated, for example:
+browser. Note that port 443 is the default https port;
+other ports must be explicitly indicated, for example:
 https://mygateway.com:8000/?PORT=8000.  To avoid having
 to include the PORT= in the browser URL, simply supply
 "\fB-httpsredir\fR" to x11vnc.
+.PP
+\fB-ssh\fR \fIuser@host:disp\fR
+.IP
+Create a remote listening port on machine "host"
+via a SSH tunnel using the \fB-R\fR rport:localhost:lport
+method. lport will be the local x11vnc listening port,
+so a connection to rport (5900+disp) on "host"
+will reach x11vnc.  E.g. fred@snoopy.com:0
+.IP
+This could be useful if a firewall/router prevents
+incoming connections to the x11vnc machine, but
+the ssh machine "host" can be reached by the VNC
+viewer. "user@" is not needed unless the remote unix
+username differs from the current one.
+.IP
+By default the remote sshd is usually configured to
+only listen on localhost for rport, so the viewer may
+need to ssh \fB-L\fR redir to "host" as well (See SSVNC to
+automate this).  The sshd setting GatewayPorts enables
+listening on all interfaces for rport; viewers can
+reach it more easily.
+.IP
+"disp" is the VNC display for the remote SSH side,
+e.g. 0 corresponds to port 5900, etc.  If disp is
+greater than 200 the value is used as the port.  Use a
+negative value to force a low port, e.g. host:-80 will
+use port 80.
+.IP
+If ssh-agent is not active, then the ssh password needs
+to be entered in the terminal where x11vnc is running.
+.IP
+By default the remote ssh will issue a 'sleep 300' to
+wait for the incoming connection for 5 mins.  To modify
+this use user@host:disp+secs.
+.IP
+If the remote SSH server is on a non-standard port
+(i.e. not 22) use user@host:port:disp+secs.
+.IP
+Note that the ssh process may NOT be killed when
+x11vnc exits.  It tries by looking at 
+.IR ps (1)
+output.
 .PP
 \fB-usepw\fR
 .IP
@@ -1912,7 +2023,7 @@ RFB_CLIENT_ID, and the number of other connected clients
 in RFB_CLIENT_COUNT.  RFB_MODE will be "accept".
 RFB_STATE will be PROTOCOL_VERSION, SECURITY_TYPE,
 AUTHENTICATION, INITIALISATION, NORMAL, or UNKNOWN
-indicating up to which state the client has acheived.
+indicating up to which state the client has achieved.
 RFB_LOGIN_VIEWONLY will be 0, 1, or -1 (unknown).
 RFB_USERNAME, RFB_LOGIN_TIME, and RFB_CURRENT_TIME may
 also be set.
@@ -3406,7 +3517,7 @@ are moving the mouse or typing.  Default: 2.00
 Do not detect if the screen polling is "bogging down"
 and sleep more.  Some activities with no user input can
 slow things down a lot: consider a large terminal window
-with a long build running in it continously streaming
+with a long build running in it continuously streaming
 text output.  By default x11vnc will try to detect this
 (3 screen polls in a row each longer than 0.25 sec with
 no user input), and sleep up to 1.5 secs to let things
@@ -3672,7 +3783,7 @@ determining WxHxB, etc. These are often done as root
 so take care.
 .IP
 If the string begins with "video", see the VIDEO4LINUX
-discusion below where the device may be queried for
+discussion below where the device may be queried for
 (and possibly set) the framebuffer parameters.
 .IP
 If the string begins with "console", "/dev/fb", or
@@ -4319,13 +4430,13 @@ deny            deny any new connections, same as "lock"
 .IP
 nodeny          allow new connections, same as "unlock"
 .IP
-avahi           enable  avahi service advertizing.
+avahi           enable  avahi service advertising.
 .IP
-noavahi         disable avahi service advertizing.
+noavahi         disable avahi service advertising.
 .IP
-mdns            enable  avahi service advertizing.
+mdns            enable  avahi service advertising.
 .IP
-nomdns          disable avahi service advertizing.
+nomdns          disable avahi service advertising.
 .IP
 connect:host    do reverse connection to host, "host"
 may be a comma separated list of hosts
@@ -4339,6 +4450,9 @@ same as "close:host".  Use host
 If you know the client internal hex ID,
 e.g. 0x3 (returned by "\fB-query\fR \fIclients\fR"
 and RFB_CLIENT_ID) you can use that too.
+.IP
+proxy:host:port set reverse connection proxy (empty to
+disable).
 .IP
 allowonce:host  For the next connection only, allow
 connection from "host".
@@ -4578,6 +4692,10 @@ ncache_no_dtchange      enable  ncache_no_dtchange mode.
 .IP
 noncache_no_dtchange    disable ncache_no_dtchange mode.
 .IP
+ncache_old_wm           enable  ncache_old_wm mode.
+.IP
+noncache_old_wm         disable ncache_old_wm mode.
+.IP
 ncache_no_rootpixmap    enable  ncache_no_rootpixmap.
 .IP
 noncache_no_rootpixmap  disable ncache_no_rootpixmap.
@@ -4587,6 +4705,8 @@ ncache_reset_rootpixmap recheck the root pixmap, ncrp
 ncache_keep_anims       enable  ncache_keep_anims.
 .IP
 noncache_keep_anims     disable ncache_keep_anims.
+.IP
+ncache_pad:n    set \fB-ncache_pad\fR to n.
 .IP
 wireframe       enable  \fB-wireframe\fR mode. same as "wf"
 .IP
@@ -4873,8 +4993,8 @@ nooverlay_yescursor overlay_nocursor 8to24 no8to24
 8to24_opts 24to32 no24to32 visual scale scale_cursor
 viewonly noviewonly shared noshared forever noforever
 once timeout tightfilexfer notightfilexfer ultrafilexfer
-noultrafilexfer rfbversion deny lock nodeny unlock
-avahi mdns noavahi nomdns connect allowonce allow
+noultrafilexfer rfbversion deny lock nodeny unlock avahi
+mdns noavahi nomdns connect proxy  allowonce allow
 localhost nolocalhost listen lookup nolookup accept
 afteraccept gone shm noshm flipbyteorder noflipbyteorder
 onetile noonetile solid_color solid nosolid blackout
@@ -4896,12 +5016,12 @@ xwarp noxwarppointer noxwarp buttonmap dragging
 nodragging ncache_cr noncache_cr ncache_no_moveraise
 noncache_no_moveraise ncache_no_dtchange
 noncache_no_dtchange ncache_no_rootpixmap
-noncache_no_rootpixmap ncache_reset_rootpixmap
+noncache_no_rootpixmap ncache_reset_rootpixmap ncrp
 ncache_keep_anims noncache_keep_anims ncache_old_wm
-noncache_old_wm ncache noncache ncache_size debug_ncache
-nodebug_ncache wireframe_mode wireframe wf nowireframe
-nowf wireframelocal wfl nowireframelocal nowfl
-wirecopyrect wcr nowirecopyrect nowcr scr_area
+noncache_old_wm ncache_pad ncache noncache ncache_size
+debug_ncache nodebug_ncache wireframe_mode wireframe wf
+nowireframe nowf wireframelocal wfl nowireframelocal
+nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
 scr_parms scrollcopyrect scr noscrollcopyrect noscr
 fixscreen noxrecord xrecord reset_record pointer_mode
@@ -4969,7 +5089,7 @@ This allows for a reliable way to see if the \fB-remote\fR
 command was processed by querying for any new settings.
 Note however that there is timeout of a few seconds so
 if the x11vnc takes longer than that to process the
-requests the requestor will think that a failure has
+requests the requester will think that a failure has
 taken place.
 .PP
 \fB-noremote,\fR \fB-yesremote\fR
@@ -5037,7 +5157,7 @@ external commands that can be run.  The full list of
 associated options is:
 .IP
 stunnel, ssl, unixpw, WAIT, id, accept, afteraccept,
-gone, pipeinput, v4l-info, rawfb-setup, dt, gui,
+gone, pipeinput, v4l-info, rawfb-setup, dt, gui, ssh,
 storepasswd, passwdfile, custom_passwd, crash.
 .IP
 See each option's help to learn the associated external

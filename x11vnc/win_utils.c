@@ -315,6 +315,7 @@ void update_stack_list(void) {
 			stack_list[k].y = attr.y;
 			stack_list[k].width = attr.width;
 			stack_list[k].height = attr.height;
+			stack_list[k].border_width = attr.border_width;
 			stack_list[k].depth = attr.depth;
 			stack_list[k].class = attr.class;
 			stack_list[k].backing_store = attr.backing_store;

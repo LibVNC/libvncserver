@@ -9,6 +9,7 @@ typedef struct winattr {
 	int valid;
 	int x, y;
 	int width, height;
+	int border_width;
 	int depth;
 	int class;
 	int backing_store;

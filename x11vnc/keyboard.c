@@ -1755,7 +1755,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			if (khints && keysym < 0x100) {
 				/* low keysyms, ascii, only */
 				int ks = (int) keysym;
-				int ok = 1, lbest, l;
+				int ok = 1, lbest = 0, l;
 				short sbest = -1;
 				for (l=0; l < found; l++) {
 					if (kc_f[l] < 0x100) {
@@ -1820,7 +1820,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			/* next just check for "best" one that is down */
 			if (Kc_f == -1 && anydown) {
 				int l;
-				int best = -1, lbest;
+				int best = -1, lbest = 0;
 				/*
 				 * If it is already down, that is
 				 * a great hint.  Use it.

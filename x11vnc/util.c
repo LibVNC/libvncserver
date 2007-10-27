@@ -405,7 +405,7 @@ double rfac(void) {
 }
 
 void check_allinput_rate(void) {
-	static double last_all_input_check = 0.0, last_all_input_start = 0.0;
+	static double last_all_input_check = 0.0;
 	static int set = 0;
 	if (! set) {
 		set = 1;

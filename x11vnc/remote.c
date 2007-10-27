@@ -1380,6 +1380,25 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		/* this is a reverse connection */
 		reverse_connect(p);
 
+	} else if (strstr(p, "proxy") == p) {
+		COLON_CHECK("proxy:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%s", p, co,
+			    NONUL(connect_proxy));
+			goto qry;
+		}
+		p += strlen("proxy:");
+		if (connect_proxy) {
+			free(connect_proxy);
+			connect_proxy = NULL;
+		}
+		if (!strcmp(p, "") || !strcasecmp(p, "none")) {
+			rfbLog("remote_cmd: disabled -proxy\n");
+		} else {
+			connect_proxy = strdup(p);
+			rfbLog("remote_cmd: set -proxy %s\n", connect_proxy);
+		}
+
 	} else if (strstr(p, "allowonce") == p) {
 		COLON_CHECK("allowonce:")
 		if (query) {
@@ -2909,6 +2928,18 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		ncache_old_wm = 0;
 		rfbLog("remote_cmd: disabled -ncache_old_wm\n");
+
+	} else if (strstr(p, "ncache_pad") == p) {
+		int orig = ncache_pad, n;
+		COLON_CHECK("ncache_pad:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, ncache_pad);
+			goto qry;
+		}
+		p += strlen("ncache_pad:");
+		n = atoi(p);
+
+		rfbLog("remote_cmd: setting ncache_pad %d to: %d\n", orig, n);
 
 	} else if (!strcmp(p, "ncache")) {
 		if (query) {

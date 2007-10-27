@@ -5,6 +5,7 @@
  * and the other stuff, otherwise it does not work properly, mouse drags
  * will not work!!
  */
+void macosxCGS_unused(void) {}
 
 #if (defined(__MACH__) && defined(__APPLE__))
 

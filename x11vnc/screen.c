@@ -25,6 +25,7 @@
 #include "macosxCG.h"
 #include "avahi.h"
 #include "solid.h"
+#include "inet.h"
 
 #include <rfb/rfbclient.h>
 
@@ -1242,7 +1243,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		unsigned int vals[1024], val;
 		int x, y, fd, w = 1024, h = 768;
 		if (strstr(n, "0x")) {
-			if (sscanf(n, "0x%lx", &val) != 1) {
+			if (sscanf(n, "0x%x", &val) != 1) {
 				val = 0;
 			}
 		}

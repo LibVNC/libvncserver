@@ -1610,6 +1610,544 @@ static void check_connect_file(char *file) {
 	}
 }
 
+static int socks5_proxy(char *host, int port, int sock) {
+	unsigned char buf[512], tmp[2];
+	char reply[512];
+	int len, n, i, j = 0;
+
+	memset(buf, 0, 512);
+	memset(reply, 0, 512);
+
+	buf[0] = 0x5;
+	buf[1] = 0x1;
+	buf[2] = 0x0;
+
+	write(sock, buf, 3);
+
+	n = read(sock, buf, 2);
+
+	if (n != 2) {
+		rfbLog("socks5_proxy: read error: %d\n", n);
+		close(sock);
+		return 0;
+	}
+	if (buf[0] != 0x5 || buf[1] != 0x0) {
+		rfbLog("socks5_proxy: handshake error: %d %d\n", (int) buf[0], (int) buf[1]);
+		close(sock);
+		return 0;
+	}
+
+	buf[0] = 0x5;
+	buf[1] = 0x1;
+	buf[2] = 0x0;
+	buf[3] = 0x3;
+
+	buf[4] = (unsigned char) strlen(host);
+	strcat((char *) buf+5, host); 
+
+	len = 5 + strlen(host);
+
+	buf[len]   = (unsigned char) (port >> 8);
+	buf[len+1] = (unsigned char) (port & 0xff);
+
+	write(sock, buf, len+2);
+
+	for (i=0; i<4; i++) {
+		int n;
+		n = read(sock, tmp, 1);
+		j++;
+		if (n < 0) {
+			if (errno != EINTR) {
+				break;
+			} else {
+				i--;
+				if (j > 100) {
+					break;
+				}
+				continue;
+			}
+		}
+		if (n == 0) {
+			break;
+		}
+		reply[i] = tmp[0];
+	}
+	if (reply[3] == 0x1) {
+		read(sock, reply+4, 4 + 2);
+	} else if (reply[3] == 0x3) {
+		n = read(sock, tmp, 1);
+		reply[4] = tmp[0];
+		read(sock, reply+5, (int) reply[4] + 2);
+	} else if (reply[3] == 0x4) {
+		read(sock, reply+4, 16 + 2);
+	}
+
+	if (0) {
+		int i;
+		for (i=0; i<len+2; i++) {
+			fprintf(stderr, "b[%d]: %d\n", i, (int) buf[i]);
+		}
+		for (i=0; i<len+2; i++) {
+			fprintf(stderr, "r[%d]: %d\n", i, (int) reply[i]);
+		}
+	}
+	if (reply[0] == 0x5 && reply[1] == 0x0 && reply[2] == 0x0) {
+		rfbLog("SOCKS5 connect OK to %s:%d sock=%d\n", host, port, sock);
+		return 1;
+	} else {
+		rfbLog("SOCKS5 error to %s:%d sock=%d\n", host, port, sock);
+		close(sock);
+		return 0;
+	}
+}
+
+static int socks_proxy(char *host, int port, int sock) {
+	unsigned char buf[512], tmp[2];
+	char reply[16];
+	int socks4a = 0, len, i, j = 0, d1, d2, d3, d4;
+
+	memset(buf, 0, 512);
+
+	buf[0] = 0x4;
+	buf[1] = 0x1;
+	buf[2] = (unsigned char) (port >> 8);
+	buf[3] = (unsigned char) (port & 0xff);
+
+
+	if (strlen(host) > 256)  {
+		rfbLog("socks_proxy: hostname too long: %s\n", host);
+		close(sock);
+		return 0;
+	}
+
+	if (!strcmp(host, "localhost") || !strcmp(host, "127.0.0.1")) {
+		buf[4] = 127;
+		buf[5] = 0;
+		buf[6] = 0;
+		buf[7] = 1;
+	} else if (sscanf(host, "%d.%d.%d.%d", &d1, &d2, &d3, &d4) == 4) {
+		buf[4] = (unsigned char) d1;
+		buf[5] = (unsigned char) d2;
+		buf[6] = (unsigned char) d3;
+		buf[7] = (unsigned char) d4;
+	} else {
+		buf[4] = 0x0;
+		buf[5] = 0x0;
+		buf[6] = 0x0;
+		buf[7] = 0x3;
+		socks4a = 1;
+	}
+	len = 8;
+
+	strcat((char *)buf+8, "nobody"); 
+	len += strlen("nobody") + 1;
+
+	if (socks4a) {
+		strcat((char *) buf+8+strlen("nobody") + 1, host);
+		len += strlen(host) + 1;
+	}
+
+	write(sock, buf, len);
+
+	for (i=0; i<8; i++) {
+		int n;
+		n = read(sock, tmp, 1);
+		j++;
+		if (n < 0) {
+			if (errno != EINTR) {
+				break;
+			} else {
+				i--;
+				if (j > 100) {
+					break;
+				}
+				continue;
+			}
+		}
+		if (n == 0) {
+			break;
+		}
+		reply[i] = tmp[0];
+	}
+	if (0) {
+		int i;
+		for (i=0; i<len; i++) {
+			fprintf(stderr, "b[%d]: %d\n", i, (int) buf[i]);
+		}
+		for (i=0; i<8; i++) {
+			fprintf(stderr, "r[%d]: %d\n", i, (int) reply[i]);
+		}
+	}
+	if (reply[0] == 0x0 && reply[1] == 0x5a) {
+		if (socks4a) {
+			rfbLog("SOCKS4a connect OK to %s:%d sock=%d\n", host, port, sock);
+		} else {
+			rfbLog("SOCKS4  connect OK to %s:%d sock=%d\n", host, port, sock);
+		}
+		return 1;
+	} else {
+		if (socks4a) {
+			rfbLog("SOCKS4a error to %s:%d sock=%d\n", host, port, sock);
+		} else {
+			rfbLog("SOCKS4  error to %s:%d sock=%d\n", host, port, sock);
+		}
+		close(sock);
+		return 0;
+	}
+}
+
+#define PXY_HTTP	1
+#define PXY_GET		2
+#define PXY_SOCKS	3
+#define PXY_SOCKS5	4
+#define PXY_SSH		5
+#define PXY 3
+
+static int pxy_get_sock;
+
+static int pconnect(int psock, char *host, int port, int type, char *http_path, char *gethost, int getport) {
+	char reply[4096];
+	int i, ok, len;
+	char *req;
+
+	pxy_get_sock = -1;
+
+	if (type == PXY_SOCKS) {
+		return socks_proxy(host, port, psock);
+	}
+	if (type == PXY_SOCKS5) {
+		return socks5_proxy(host, port, psock);
+	}
+	if (type == PXY_SSH) {
+		return 1;
+	}
+
+	len = strlen("CONNECT ") + strlen(host);
+	if (type == PXY_GET) {
+		len += strlen(http_path) + strlen(gethost);
+		len += strlen("host=") + 1 + strlen("port=") + 1 + 1;
+	}
+	len += 1 + 20 + strlen("HTTP/1.1\r\n") + 1;
+
+	req = (char *)malloc(len);
+
+	if (type == PXY_GET) {
+		int noquery = 0;
+		char *t = strstr(http_path, "__END__");
+		if (t) {
+			noquery = 1;
+			*t = '\0';
+		}
+
+		if (noquery) {
+			sprintf(req, "GET %s HTTP/1.1\r\n", http_path);
+		} else {
+			sprintf(req, "GET %shost=%s&port=%d HTTP/1.1\r\n", http_path, host, port);
+		}
+	} else {
+		sprintf(req, "CONNECT %s:%d HTTP/1.1\r\n", host, port);
+	}
+	rfbLog("http proxy: %s", req);
+	write(psock, req, strlen(req));
+
+	if (type == PXY_GET) {
+		char *t = "Connection: close\r\n";
+		write(psock, t, strlen(t));
+	}
+
+	if (type == PXY_GET) {
+		sprintf(req, "Host: %s:%d\r\n", gethost, getport);
+		rfbLog("http proxy: %s", req);
+		sprintf(req, "Host: %s:%d\r\n\r\n", gethost, getport);
+	} else {
+		sprintf(req, "Host: %s:%d\r\n", host, port);
+		rfbLog("http proxy: %s", req);
+		sprintf(req, "Host: %s:%d\r\n\r\n", host, port);
+	}
+
+	write(psock, req, strlen(req));
+
+	ok = 0;
+	reply[0] = '\0';
+
+	for (i=0; i<4096; i++) {
+		int n;
+		req[0] = req[1] = '\0';
+		n = read(psock, req, 1);
+		if (n < 0) {
+			if (errno != EINTR) {
+				break;
+			} else {
+				continue;
+			}
+		}
+		if (n == 0) {
+			break;
+		}
+		strcat(reply, req);
+		if (strstr(reply, "\r\n\r\n")) {
+			if (strstr(reply, "HTTP/") == reply) {
+				char *q = strchr(reply, ' ');
+				if (q) {
+					q++;
+					if (q[0] == '2' && q[1] == '0' && q[2] == '0' && q[3] == ' ') {
+						ok = 1;
+					}
+				}
+			}
+			break;
+		}
+	}
+
+	if (type == PXY_GET) {
+		char *t1 = strstr(reply, "VNC-IP-Port: ");
+		char *t2 = strstr(reply, "VNC-Host-Port: ");
+		char *s, *newhost = NULL;
+		int newport = 0;
+		fprintf(stderr, "%s\n", reply);
+		if (t1) {
+			t1 += strlen("VNC-IP-Port: ");
+			s = strstr(t1, ":");
+			if (s) {
+				*s = '\0';
+				newhost = strdup(t1);
+				newport = atoi(s+1);
+			}
+		} else if (t2) {
+			t2 += strlen("VNC-Host-Port: ");
+			s = strstr(t2, ":");
+			if (s) {
+				*s = '\0';
+				newhost = strdup(t2);
+				newport = atoi(s+1);
+			}
+		}
+		if (newhost && newport > 0) {
+			rfbLog("proxy GET reconnect to: %s:%d\n", newhost, newport);
+			pxy_get_sock = rfbConnectToTcpAddr(newhost, newport);
+		}
+	}
+	free(req);
+
+	return ok;
+}
+
+static int proxy_connect(char *host, int port) {
+	char *p, *q, *str;
+	int i, n, pxy[PXY],pxy_p[PXY];
+	int psock = -1;
+	char *pxy_h[PXY], *pxy_g[PXY];
+
+	if (! connect_proxy) {
+		return -1;
+	}
+	str = strdup(connect_proxy);
+
+	for (i=0; i<PXY; i++) {
+		pxy[i] = 0;
+		pxy_p[i] = 0;
+		pxy_h[i] = NULL;
+		pxy_g[i] = NULL;
+	}
+
+	n = 0;
+	p = str;
+	while (p) {
+		char *hp, *c, *s = NULL;
+
+		q = strchr(p, ',');
+		if (q) {
+			*q = '\0';
+		}
+
+		if (n==0) fprintf(stderr, "\n");
+		rfbLog("proxy_connect[%d]: %s\n", n+1, p);
+
+		pxy[n] = 0;
+		pxy_p[n] = 0;
+		pxy_h[n] = NULL;
+		pxy_g[n] = NULL;
+
+		if (strstr(p, "socks://") == p)	{
+			hp = strstr(p, "://") + 3;
+			pxy[n] = PXY_SOCKS;
+		} else if (strstr(p, "socks4://") == p) {
+			hp = strstr(p, "://") + 3;
+			pxy[n] = PXY_SOCKS;
+		} else if (strstr(p, "socks5://") == p) {
+			hp = strstr(p, "://") + 3;
+			pxy[n] = PXY_SOCKS5;
+		} else if (strstr(p, "ssh://") == p) {
+			if (n != 0) {
+				rfbLog("ssh:// proxy must be the first one\n");
+				clean_up_exit(1);
+			}
+			hp = strstr(p, "://") + 3;
+			pxy[n] = PXY_SSH;
+		} else if (strstr(p, "http://") == p) {
+			hp = strstr(p, "://") + 3;
+			pxy[n] = PXY_HTTP;
+		} else if (strstr(p, "https://") == p) {
+			hp = strstr(p, "://") + 3;
+			pxy[n] = PXY_HTTP;
+		} else {
+			hp = p;
+			pxy[n] = PXY_HTTP;
+		}
+		c = strstr(hp, ":");
+		if (!c && pxy[n] == PXY_SSH) {
+			char *hp2 = (char *) malloc(strlen(hp) + 5);
+			sprintf(hp2, "%s:1", hp);
+			hp = hp2;
+			c = strstr(hp, ":");
+		}
+		if (!c) {
+			pxy[n] = 0;
+			if (q) {
+				*q = ',';
+				p = q + 1;
+			} else {
+				p = NULL;
+			}
+			continue;
+		}
+	
+		if (pxy[n] == PXY_HTTP) {
+			s = strstr(c, "/");
+			if (s) {
+				pxy[n] = PXY_GET;
+				pxy_g[n] = strdup(s);
+				*s = '\0';
+			}
+		}
+		pxy_p[n] = atoi(c+1);
+
+		if (pxy_p[n] <= 0) {
+			pxy[n] = 0;
+			pxy_p[n] = 0;
+			if (q) {
+				*q = ',';
+				p = q + 1;
+			} else {
+				p = NULL;
+			}
+			continue;
+		}
+		*c = '\0';
+		pxy_h[n] = strdup(hp);
+
+		if (++n >= PXY) {
+			break;
+		}
+
+		if (q) {
+			*q = ',';
+			p = q + 1;
+		} else {
+			p = NULL;
+		}
+	}
+	free(str);
+
+	if (!n) {
+		psock = -1;
+		goto pxy_clean;
+	}
+
+	if (pxy[0] == PXY_SSH) {
+		int rc, len = 0;
+		char *cmd, *ssh;
+		int sport = find_free_port(7300, 8000);
+		if (getenv("SSH")) {
+			ssh = getenv("SSH");
+		} else {
+			ssh = "ssh";
+		}
+		len = 200 + strlen(ssh) + strlen(pxy_h[0]) + strlen(host);
+		cmd = (char *) malloc(len);
+		if (n == 1) {
+			if (pxy_p[0] <= 1) {
+				sprintf(cmd, "%s -f       -L '%d:%s:%d' '%s' 'sleep 20'", ssh,           sport, host, port, pxy_h[0]);
+			} else {
+				sprintf(cmd, "%s -f -p %d -L '%d:%s:%d' '%s' 'sleep 20'", ssh, pxy_p[0], sport, host, port, pxy_h[0]);
+			}
+		} else {
+			if (pxy_p[0] <= 1) {
+				sprintf(cmd, "%s -f       -L '%d:%s:%d' '%s' 'sleep 20'", ssh,           sport, pxy_h[1], pxy_p[1], pxy_h[0]);
+			} else {
+				sprintf(cmd, "%s -f -p %d -L '%d:%s:%d' '%s' 'sleep 20'", ssh, pxy_p[0], sport, pxy_h[1], pxy_p[1], pxy_h[0]);
+			}
+		}
+		if (no_external_cmds || !cmd_ok("ssh")) {
+			rfbLogEnable(1);
+			rfbLog("cannot run external commands in -nocmds mode:\n");
+			rfbLog("   \"%s\"\n", cmd);
+			rfbLog("   exiting.\n");
+			clean_up_exit(1);
+		}
+		close_exec_fds();
+		fprintf(stderr, "\n");
+		rfbLog("running: %s\n", cmd);
+		rc = system(cmd);
+		free(cmd);
+		if (rc != 0) {
+			psock = -1;
+			goto pxy_clean;
+		}
+		psock = rfbConnectToTcpAddr("localhost", sport);
+
+	} else {
+		psock = rfbConnectToTcpAddr(pxy_h[0], pxy_p[0]);
+	}
+
+	if (psock < 0) {
+		psock = -1;
+		goto pxy_clean;
+	}
+	rfbLog("opened socket to proxy: %s:%d\n", pxy_h[0], pxy_p[0]);
+
+	if (n >= 2) {
+		if (! pconnect(psock, pxy_h[1], pxy_p[1], pxy[0], pxy_g[0], pxy_h[0], pxy_p[0])) {
+			close(psock); psock = -1; goto pxy_clean;
+		}
+		if (pxy_get_sock >= 0) {close(psock); psock = pxy_get_sock;}
+		
+		if (n >= 3) {
+			if (! pconnect(psock, pxy_h[2], pxy_p[2], pxy[1], pxy_g[1], pxy_h[1], pxy_p[1])) {
+				close(psock); psock = -1; goto pxy_clean;
+			}
+			if (pxy_get_sock >= 0) {close(psock); psock = pxy_get_sock;}
+			if (! pconnect(psock, host, port, pxy[2], pxy_g[2], pxy_h[2], pxy_p[2])) {
+				close(psock); psock = -1; goto pxy_clean;
+			}
+			if (pxy_get_sock >= 0) {close(psock); psock = pxy_get_sock;}
+			
+		} else {
+			if (! pconnect(psock, host, port, pxy[1], pxy_g[1], pxy_h[1], pxy_p[1])) {
+				close(psock); psock = -1; goto pxy_clean;
+			}
+			if (pxy_get_sock >= 0) {close(psock); psock = pxy_get_sock;}
+		}
+	} else {
+		if (! pconnect(psock, host, port, pxy[0], pxy_g[0], pxy_h[0], pxy_p[0])) {
+			close(psock); psock = -1; goto pxy_clean;
+		}
+		if (pxy_get_sock >= 0) {close(psock); psock = pxy_get_sock;}
+	}
+
+	pxy_clean:
+	for (i=0; i < PXY; i++) {
+		if (pxy_h[i] != NULL) {
+			free(pxy_h[i]);
+		}
+		if (pxy_g[i] != NULL) {
+			free(pxy_g[i]);
+		}
+	}
+
+	return psock;
+}
+
 /*
  * Do a reverse connect for a single "host" or "host:port"
  */
@@ -1654,15 +2192,13 @@ static int do_reverse_connect(char *str) {
 		*p = '\0';
 	}
 
-#if 0
-	if (use_openssl && !getenv("X11VNC_SSL_ALLOW_REVERSE")) {
-		rfbLog("reverse connections disabled in -ssl mode.\n");
-		return 0;
-	}
-#endif
-
 	if (use_openssl) {
-		int vncsock = rfbConnectToTcpAddr(host, rport);
+		int vncsock;
+		if (connect_proxy) {
+			vncsock = proxy_connect(host, rport);
+		} else {
+			vncsock = rfbConnectToTcpAddr(host, rport);
+		}
 		if (vncsock < 0) {
 			rfbLog("reverse_connect: failed to connect to: %s\n", str);
 			return 0;
@@ -1702,7 +2238,17 @@ static int do_reverse_connect(char *str) {
 		}
 	}
 
-	cl = rfbReverseConnection(screen, host, rport);
+	if (connect_proxy != NULL) {
+		int sock = proxy_connect(host, rport);
+		if (sock >= 0) {
+			cl = rfbNewClient(screen, sock);
+		} else {
+			return 0;
+		}
+	} else {
+		cl = rfbReverseConnection(screen, host, rport);
+	}
+
 	free(host);
 
 	if (cl == NULL) {

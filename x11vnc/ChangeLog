@@ -1,3 +1,9 @@
+2007-10-27  Karl Runge <runge@karlrunge.com>
+	* x11vnc: fix ncache bug and others under -8to24, -ssh
+	  option, socks and other proxies in -proxy option.
+	  compiler warnings.  fix TARGETS selection request bug
+	  (java, konsole).
+
 2007-10-03  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add xfce to createdisplay
 

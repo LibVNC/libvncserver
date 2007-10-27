@@ -62,6 +62,7 @@ void selection_request(XEvent *ev, char *type) {
 	char *str;
 	unsigned int length;
 	unsigned char *data;
+	static Atom xa_targets = None;
 # ifndef XA_LENGTH
 	unsigned long XA_LENGTH;
 # endif
@@ -103,34 +104,69 @@ void selection_request(XEvent *ev, char *type) {
 			req_event->target, req_event->property);
 	}
 
+	if (xa_targets == None) {
+		xa_targets = XInternAtom(dpy, "TARGETS", False);
+	}
+
 	/* the window may have gone away, so trap errors */
 	trapped_xerror = 0;
 	old_handler = XSetErrorHandler(trap_xerror);
 
 	if (ev->xselectionrequest.target == XA_LENGTH) {
 		/* length request */
+		int ret;
+		long llength = (long) length;
 
-		XChangeProperty(ev->xselectionrequest.display,
+		ret = XChangeProperty(ev->xselectionrequest.display,
 		    ev->xselectionrequest.requestor,
 		    ev->xselectionrequest.property,
 		    ev->xselectionrequest.target, 32, PropModeReplace,
-		    (unsigned char *) &length, sizeof(unsigned int));
+		    (unsigned char *) &llength, 1);	/* had sizeof(unsigned int) = 4 before... */
+		if (debug_sel) {
+			rfbLog("LENGTH: XChangeProperty() -> %d\n", ret);
+		}
 
-	} else {
-		/* data request */
+	} else if (xa_targets != None && ev->xselectionrequest.target == xa_targets) {
+		/* targets request */
+		int ret;
+		Atom targets[2];
+		targets[0] = (Atom) xa_targets;
+		targets[1] = (Atom) XA_STRING;
 
 		data = (unsigned char *)str;
 
-		XChangeProperty(ev->xselectionrequest.display,
+		ret = XChangeProperty(ev->xselectionrequest.display,
+		    ev->xselectionrequest.requestor,
+		    ev->xselectionrequest.property,
+		    ev->xselectionrequest.target, 32, PropModeReplace,
+		    (unsigned char *) targets, 2);
+		if (debug_sel) {
+			rfbLog("TARGETS: XChangeProperty() -> %d -- sz1: %d  sz2: %d\n",
+			    ret, sizeof(targets[0]), sizeof(targets)/sizeof(targets[0]));
+		}
+
+	} else {
+		/* data request */
+		int ret;
+
+		data = (unsigned char *)str;
+
+		ret = XChangeProperty(ev->xselectionrequest.display,
 		    ev->xselectionrequest.requestor,
 		    ev->xselectionrequest.property,
 		    ev->xselectionrequest.target, 8, PropModeReplace,
 		    data, length);
+		if (debug_sel) {
+			rfbLog("DATA: XChangeProperty() -> %d\n", ret);
+		}
 	}
 
 	if (! trapped_xerror) {
-		XSendEvent(req_event->display, req_event->requestor, False, 0,
+		int ret = XSendEvent(req_event->display, req_event->requestor, False, 0,
 		    (XEvent *)&notify_event);
+		if (debug_sel) {
+			rfbLog("XSendEvent() -> %d\n", ret);
+		}
 	} 
 	if (trapped_xerror) {
 		rfbLog("selection_request: ignored XError while sending "

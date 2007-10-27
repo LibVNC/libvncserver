@@ -1721,10 +1721,12 @@ if (db24 > 1) fprintf(stderr, "bpp8to24 %d %d %d %d %.4f\n", x1, y1, x2, y2, dno
 	call_count++;
 
 	/* clip to display just in case: */
-	x1 = nfix(x1, dpy_x);
-	y1 = nfix(y1, dpy_y);
-	x2 = nfix(x2, dpy_x+1);
-	y2 = nfix(y2, dpy_y+1);
+	if (!ncache) {
+		x1 = nfix(x1, dpy_x);
+		y1 = nfix(y1, dpy_y);
+		x2 = nfix(x2, dpy_x+1);
+		y2 = nfix(y2, dpy_y+1);
+	}
 
 	if (wireframe_in_progress) {
 		/*
@@ -1765,6 +1767,7 @@ if (db24 > 1) fprintf(stderr, "bpp8to24 %d %d %d %d %.4f\n", x1, y1, x2, y2, dno
 
 					idx = (int) (*uc);
 
+if (0 && line % 100 == 0 && j % 32 == 0) fprintf(stderr, "%d %d %u  x1=%d y1=%d\n", line, j, root_rgb[idx], x1, y1);
 #if 0
 					if (do_hibits) {
 						hi = idx << 24;
