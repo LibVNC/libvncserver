@@ -8,7 +8,7 @@ exec wish "$0" "$@"
 # ssvnc.tcl: gui wrapper to the programs in this
 # package. Also sets up service port forwarding.
 #
-set version 1.0.19
+set version 1.0.20
 
 set buck_zero $argv0
 
@@ -111,16 +111,16 @@ proc ts_help {} {
 
     You MUST be able to log in via SSH to the remote terminal server.
     Ask your administrator to set this up for you if it isn't already.
+    Also see "Requirements" below.
 
     This mode is started by the commands 'tsvnc' or 'ssvnc -ts' or
     toggling by pressing Ctrl-t.  "SSVNC Mode" under Options -> Advanced
     will also return to the full SSVNC.
 
     Or in your ~/.ssvncrc (or ~/ssvnc_rc on Windows) put "mode=tsvnc"
-    to have the tool always start up in that mode.
-
-    To constrain the UI, run with -tso or SSVNC_TS_ALWAYS set to prevent
-    leaving the Terminal Services mode.
+    to have the tool always start up in that mode.  To constrain the UI,
+    run with -tso or SSVNC_TS_ALWAYS set to prevent leaving the Terminal
+    Services mode.
 
 
  Hosts and Displays:
@@ -150,36 +150,61 @@ proc ts_help {} {
     you *MUST* supply the remote username.  This entry is passed to SSH;
     it could also be an SSH alias you have created (in ~/.ssh/config).
 
+    If the remote SSH server is run on a non-standard port, e.g. 2222, use
+    something like this:
+
+           far-away.east:2222
+           fred@someplace.no:2222
+
+    (unlike SSVNC mode, the number is the SSH port, not the VNC display)
+
 
  Proxies/Gateways:
 
-    Proxy/Gateway is usually a gateway machine to log into via SSH
-    that is not the machine running the VNC terminal services.
+    Proxy/Gateway is usually a gateway machine to log into via SSH that is
+    not the machine running the VNC terminal services.  However, Web and
+    SOCKS proxies can also be used (see below).
 
     For example if a company had a central login server: "ssh.company.com"
     (accessible from the internet) and the internal server name was
-    "ts-server", one could put in for the
+    "ts-server", one could put in
 
            VNC Terminal Server:   ts-server
            Proxy/Gateway:         ssh.company.com
 
     It is OK if the hostname "ts-server" only resolves inside the firewall.
 
-    The 2nd host, ts-server in this example, MUST also be running an
-    SSH server and you must be able to log into it.
+    The 2nd host, ts-server in this example, MUST also be running an SSH
+    server and you must be able to log into it.  You may need to supply
+    a 2nd password to it to login.
 
     Use username@host (e.g. joe@ts-server or jsmith@ssh.company.com)
     if the user name differs between machines.
 
-    To use a non-standard ssh port (i.e. a port other than 22) you need to
-    use the Proxies/Gateways as well.  Something like this for port 2222:
+    To use a non-standard ssh port (i.e. a port other than 22) in
+    Proxy/Gateways use something like this for port 2222:
 
-           VNC Host:Display:   localhost
-           Proxy/Gateway:      jsmith@ssh.company.com:2222
+           VNC Terminal Server:  ts-server
+           Proxy/Gateway:        jsmith@ssh.company.com:2222
 
-    The username@ is not needed if it is the same as on this machine. The
-    above will also work going to a different internal machine,
-    e.g. "ts-server", as in the first example.
+    The username@ is not needed if it is the same as on this machine.
+
+    A Web or SOCKS proxy can also be used.  Use this if you are inside a
+    firewall that prohibits direct connections to remote SSH servers.
+
+           VNC Terminal Server:  fred@someplace.no
+           Proxy/Gateway:        http://myproxy.west:8080
+
+    or for SOCKS:
+
+           VNC Terminal Server:  fred@someplace.no
+           Proxy/Gateway:        socks://mysocks.west:1080
+
+    use socks5://... to force the SOCKS5 version.  For a non-standard
+    port the above would be, e.g., fred@someplace.no:2222
+
+    One can also chain proxies and other things.  See the section
+    "SSH Proxies/Gateways" in the Main SSVNC Help for full details.
 
 
  Options:
@@ -247,7 +272,7 @@ proc ts_help {} {
 
  Real X servers:
 
-    As a BONUS, if on the remote host, say a workstation, you have a
+    As a *BONUS*, if on the remote host, say a workstation, you have a
     regular X session running on the physical hardware that you are
     ALREADY logged into you can access to that display as well (x11vnc
     will find it).
@@ -261,6 +286,10 @@ proc ts_help {} {
     If you (mistakenly) have not logged into an X session on the real
     X server on the workstation, a VIRTUAL (Xvfb, etc.) server will be
     created for you (that may or may not be what you want).
+
+    The X Login Advanced setting can be used to connect to a X Display
+    Manger Greeter login panel (no one is logged in yet).  This requires
+    sudo(1) privileges on the remote machine.
 
  More Info:
 
@@ -299,8 +328,11 @@ proc help {} {
     it is often "0".  Examples:
 
            snoopy:0
+
            far-away.east:0
+
            sunray-srv1.west:17
+
            24.67.132.27:0
     
     Then click on "Connect".  When you do so the STUNNEL program will be
@@ -311,12 +343,12 @@ proc help {} {
     port of the SSL tunnel which, in turn, encrypts and redirects the
     connection to the remote VNC server.
 
-    The remote VNC server must support an initial SSL handshake before
+    The remote VNC server MUST support an initial SSL handshake before
     using the VNC protocol (i.e. VNC is tunnelled through the SSL channel
     after it is established).  "x11vnc -ssl ..."  does this, and any VNC
     server can be made to do this by using, e.g., STUNNEL on the remote side.
 
-    SSH tunnels are described below.
+    Automatic SSH tunnels are described below.
 
     If you are using a port less than the default VNC port 5900 (usually
     the VNC display = port - 5900), use the full port number itself, e.g.:
@@ -329,55 +361,77 @@ proc help {} {
     e.g.:  24.67.132.27:-80
 
 
-    *IMPORTANT*: If you do not take the steps to verify the VNC Server's
-    SSL Certificate, you are vulnerable to a Man-In-The-Middle attack.
-    Only passive network sniffing attacks will be prevented.
+ SSL Certificate Verification:
+
+    *IMPORTANT*: If you do not take the steps to VERIFY the VNC Server's SSL
+    Certificate, you are theoretically vulnerable to a Man-In-The-Middle
+    attack.  Without SSL Certificate verification, only passive network
+    sniffing attacks will be guaranteed to be prevented.
 
     You can use the "Fetch Cert" button to retrieve the Cert and then
     after you check it is OK (say, via comparing the MD5 or other info)
-    you can Save it and use it to verify future connections to servers.
+    you can "Save" it and use it to verify future connections to servers.
 
-    If "Verify All Certs" is checked, this check is always enforced, and
-    so the first time you connect to a new server you may need to follow
-    a few dialogs to inspect and save the server certificate.  See the
-    "Certs... -> Help" for information on how to manage certificates.
+    When "Verify All Certs" is checked, this check is always enforced,
+    and so the first time you connect to a new server you may need to
+    follow a few dialogs to inspect and save the server certificate.
+    See the "Certs... -> Help" for information on how to manage certificates.
 
-    "Fetch Cert" and "Verify All Certs" are currently disabled in the
-    "SSH + SSL" mode (e.g. SSH is used to enter a firewall gateway,
+    "Fetch Cert" and "Verify All Certs" are currently disabled in the rare
+    "SSH + SSL" usage mode (e.g. SSH is used to enter a firewall gateway,
     and then SSL is tunneled through that to reach the workstation).
 
 
+ Windows STUNNEL:
+
     Note that on Windows when the Viewer connection is finished you may
     need to terminate STUNNEL manually from the System Tray (right click
-    on dark green icon) and selecting "Exit".
+    on dark green icon) and selecting "Exit".  Double clicking that icon
+    will show you its log file (useful for debugging connections).
+
+    SSVNC will try to kill the STUNNEL process for you, but you may still
+    need to move the mouse over the icon to make it go away.
+
 
  VNC Password:
 
     On Unix or MacOSX if there is a VNC password for the server you
     can enter it in the "VNC Password:" entry box.  
 
-    This is *REQUIRED* on MacOSX when Chicken of the VNC (the default)
-    is used.  On Unix if you choose not to enter the password you will
-    be prompted for it in the terminal window running TightVNC viewer.
-    On Windows TightVNC viewer should prompt you.
+    This is *REQUIRED* on MacOSX when Chicken of the VNC is used.
+
+    On Unix if you choose not to enter the password you will be prompted
+    for it in the terminal window running TightVNC viewer if one is required.
+
+    On Windows TightVNC viewer should prompt you when a password is required.
 
     NOTE: when you Save a VNC profile, the password is not saved (you
     need to enter it each time).
 
+
  SSH:
 
-    Click on "Use SSH" or go to "Options ..." if you want to use an
-    *SSH* tunnel instead of SSL (then the VNC Server does not need to
-    speak SSL or use STUNNEL).  You will need to be able to login to the
-    remote host via SSH (e.g. via password or ssh-agent).
+    Click on "Use SSH" if you want to use an *SSH* tunnel instead of SSL
+    (then the VNC Server does not need to speak SSL or use STUNNEL).
+    You will need to be able to login to your account on the remote host
+    via SSH (e.g. via password or ssh-agent).
 
-    Specify the hostname and VNC display in the VNC Host:Display entry.
-    Use something like "username@hostname.com:0" if the remote username
-    is different.  "SSH + SSL" is similar but its use is more rare. See
-    the Help under Options for more info.
+    Specify the SSH hostname and VNC display in the VNC Host:Display entry.
+    Use something like:
 
-    See Tip 13) below for how to make this application be SSH only with
-    the -ssh command line option.
+           username@far-away.east:0
+
+    if your remote username is different from the one on the local viewer
+    machine.  On Windows you MUST supply the "username@" part.
+
+    "SSH + SSL" is similar but its use is more rare because it requires 2
+    encrypted tunnels to reach the VNC server. See the Help under Options
+    for more info.
+
+    To connect to a non-standard SSH port, see SSH Proxies/Gateways below.
+
+    See Tip 13) below for how to make this application be SSH-only with
+    the -ssh command line option or "sshvnc".
 
 
  Proxies/Gateways:
@@ -387,40 +441,49 @@ proc help {} {
     entry box:
 
            VNC Host-Display:   host:number
-           Proxy/Gateway:      gw-host:port
+           Proxy/Gateway:      proxy-host:port
     e.g.:
            VNC Host-Display:   far-away.east:0
-           Proxy/Gateway:      mygateway.com:8080
-
-    Or Alternatively one can supply both hosts separated by
-    spaces (with the proxy second) in the VNC Host:Display box:
-
-           VNC Host-Display:   far-away.east:0    mygateway.com:8080
-
-    This looks a little strange, but it actually how SSVNC stores the
-    host info internally.
+           Proxy/Gateway:      myproxy.west:8080
 
 
     If the "double proxy" case is required (e.g. coming out of a web
-    proxied firewall environment and then into a 2nd proxy to ultimately
+    proxied firewall environment and then INTO a 2nd proxy to ultimately
     reach the VNC server), separate them via a comma, e.g.:
 
            VNC Host-Display:   far-away:0
-           Proxy/Gateway:      local-proxy:8080,mygateway.com:443
+           Proxy/Gateway:      myproxy.west:8080,myhome.net:443
 
-    (either as above, or alternatively putting both strings in Host:Display)
-    So it goes: viewer -> local-proxy -> mygateway.com -> far-away (VNC)
+    So it goes: viewer -> myproxy.west -> myhome.net -> far-away (VNC)
+
+    The proxies are assumed to be Web proxies.  To use SOCKS proxies:
+
+           VNC Host-Display:   far-away.east:0
+           Proxy/Gateway:      socks://mysocks.west:1080
+
+    Use socks5:// to force the SOCKS5 proxy protocol (e.g. for ssh -D).
+    You can prefix web proxies with http:// but it doesn't matter since
+    that is the default.
+
+    Note that Web proxies are often configured to only allow outgoing
+    connections to ports 443 (HTTPS) and 563 (SNEWS), so you might
+    have run the VNC server (or router port redirector) on those ports.
+    SOCKS proxies usually have no restrictions on port number.
+
+    On Unix you can chain up to 3 proxies (any combination of http:// and
+    socks://) by separating them with commas (i.e. first,second,third).
 
     See the ss_vncviewer description and x11vnc FAQ for info on proxies:
 
            http://www.karlrunge.com/x11vnc/#ss_vncviewer
            http://www.karlrunge.com/x11vnc/#faq-ssl-java-viewer-proxy
 
+
  SSH Proxies/Gateways:
 
-    Proxy/Gateway also applies to SSH mode, it is a usually a gateway
-    machine to log into via SSH that is not the workstation running the
-    VNC server.
+    Proxy/Gateway also applies to SSH mode, it is a usually a gateway SSH
+    machine to log into via ssh that is not the workstation running the
+    VNC server.  However, Web and SOCKS proxies can also be used (see below).
 
     For example if a company had a central login server: "ssh.company.com"
     (accessible from the internet) and the internal workstation name was
@@ -434,25 +497,58 @@ proc help {} {
     The 2nd leg, from ssh.company.com -> joes-pc is done by a ssh -L
     redir and is not encrypted (but viewer -> ssh.company.com is encrypted). 
 
-    To SSH encrypt both legs, try the "double gateway" using the above
-    "comma" notation:
+    To SSH encrypt BOTH legs, try the "double SSH gateway" method using
+    the "comma" notation:
 
            VNC Host:Display:   localhost:0
            Proxy/Gateway:      ssh.company.com,joes-pc
 
-    this requires an SSH server running on joes-pc.  Use username@host
-    (e.g. joe@joes-pc  jsmith@ssh.company.com) if the user name differs.
+    this requires an SSH server running on joes-pc.  So an initial SSH
+    login is done to ssh.company.com, then a 2nd SSH is performed (through
+    port a redirection of the first) to login straight to joes-pc where
+    the VNC server is running.
+
+    Use username@host (e.g. joe@joes-pc  jsmith@ssh.company.com) if the
+    user names differ between the various machines.  On Windows you MUST
+    supply the usernames.
 
     To use a non-standard ssh port (i.e. a port other than 22) you need to
-    use the Proxies/Gateways as well.  Something like this for port 2222:
+    use the Proxy/Gateways as well.  E.g. something like this for port 2222:
 
            VNC Host:Display:   localhost:0
-           Proxy/Gateway:      joe@ssh.company.com:2222
+           Proxy/Gateway:      joe@far-away.east:2222
 
-    The username@ is not needed if it is the same as on the client.
-    (Also, localhost:0 is actually the same as :0).  This will also work
-    going to a different internal machine, e.g. "joes-pc:0", as in the
-    first example.
+    The username@ is not needed if it is the same as on the client.  This
+    will also work going to a different internal machine, e.g. "joes-pc:0"
+    instead of "localhost:0", as in the first example.
+
+    A Web or SOCKS proxy can also be used with SSH.  Use this if you are
+    inside a firewall that prohibits direct connections to remote SSH servers.
+
+           VNC Host:Display:   joe@far-away.east:0
+           Proxy/Gateway:      http://myproxy.west:8080
+
+    or for SOCKS:
+
+           VNC Host:Display:   joe@far-away.east:0
+           Proxy/Gateway:      socks://mysocks.west:1080
+
+    use socks5://... to force the SOCKS5 version.
+
+    On Unix you can chain up to 3 proxies (any combination of http:// and
+    socks://) by separating them with commas (i.e. first,second,third).
+
+    For a non-standard SSH port and a Web or SOCKS proxy try:
+
+           VNC Host:Display:   localhost:0
+           Proxy/Gateway:      http://myproxy.west:8080,joe@far-away.east:2222
+
+    Even the "double SSH gateway" method (2 SSH encrypted legs) described
+    above works with an initial Web or SOCKS proxy, e.g.:
+
+           VNC Host:Display:   localhost:0
+           Proxy/Gateway:      http://mysocks.west:1080,ssh.company.com,joes-pc
+
 
  Remote SSH Command:
 
@@ -460,15 +556,16 @@ proc help {} {
     to run on the remote ssh host in the "Remote SSH Command" entry.
     The default is just to sleep a bit (e.g. sleep 30) to make sure
     the port tunnels are established.  Alternatively you could have the
-    remote command start the VNC server, e.g.  x11vnc -nopw -display :0
-    -rfbport 5900 -localhost
+    remote command start the VNC server, e.g.
+
+         x11vnc -display :0 -rfbport 5900 -localhost -nopw
 
     When starting the VNC server this way, note that sometimes you
     will need to correlate the VNC Display number with the "-rfbport"
     (or similar) option of the server.  E.g.:
 
          VNC Host:Display       username@somehost.com:2
-         Remote SSH Command:    x11vnc -find -rfbport 5902
+         Remote SSH Command:    x11vnc -find -rfbport 5902 -nopw
 
     See the the Tip below (11) for using x11vnc PORT=NNNN feature (or
     vncserver(1) output) to not need to specify the VNC display number
@@ -518,9 +615,9 @@ proc help {} {
 
  More Options:
 
-    To set other Options, e.g. to use SSH instead of STUNNEL SSL, or
-    View-Only usage, click on the "Options ..." button and read the Help
-    there.
+    To set other Options, e.g. for View-Only usage or to limit the
+    number of colors used.  click on the "Options ..." button and read
+    the Help there.
 
  Profiles:
 
@@ -560,24 +657,24 @@ proc help {} {
         Ctrl-N or try Ctrl-LeftButton -> New SSVNC_GUI.  On Windows you
         will have to manually Start a new one: Start -> Run ..., etc.
 
-     2) If you use "user@hostname cmd=SHELL" then you get an SSH shell only:
-        no VNC viewer will be launched.  On Windows "user@hostname cmd=PUTTY"
-        will try to use putty.exe (better terminal emulation than
-        plink.exe).  A ShortCut for this is Ctrl-S as long as user@hostname
-        is present in the entry box.  You can also put the string in the
-        "Remote SSH Command" entry.
+     2) If you use "SHELL" for the "Remote SSH Command" (or in the display
+        line: "user@hostname cmd=SHELL") then you get an SSH shell only:
+        no VNC viewer will be launched.  On Windows "PUTTY" will try
+        to use putty.exe (better terminal emulation than plink.exe).
+        A ShortCut for this is Ctrl-S as long as user@hostname is present
+        in the entry box.
 
-     3) If you use "user@hostname cmd=KNOCK" then only the port-knocking 
-        is performed.  A ShortCut for this is Ctrl-P as long as hostname
-        is present in the entry box.  If it matches cmd=KNOCKF, i.e. an
-        extra "F", then the port-knocking "FINISH" sequence is sent, if any.
+     3) If you use "KNOCK" for the "Remote SSH Command" (or int he display
+        line "user@hostname cmd=KNOCK") then only the port-knocking is
+        performed.  A ShortCut for this is Ctrl-P as long as hostname
+        is present in the entry box.  If it is KNOCKF, i.e. an extra
+        "F", then the port-knocking "FINISH" sequence is sent, if any.
         A ShortCut for this Shift-Ctrl-P as long as hostname is present.
-        You can also put the string in the "Remote SSH Command" entry.
 
      4) Pressing the "Load" button or pressing Ctrl-L or Clicking the Right
         mouse button on the main GUI will invoke the Load dialog.
 
-     5) If you want to do a Direct VNC connection, WITH *NO* SSL OR SSH
+     5) If you want to do a Direct VNC connection, WITH **NO(* SSL OR SSH
         ENCRYPTION, use the "vnc://" prefix, e.g. vnc://far-away.east:0
         This also works for reverse connections (see below).
 
@@ -600,8 +697,8 @@ proc help {} {
         port is the desired local listening port.  Then click Connect.
         If you didn't set the local port look for it in the terminal output.
 
-        On Windows set it to "NOTEPAD" or similar; you can't control
-        the port though.  It is usually 5930.
+        On Windows set it to "NOTEPAD" or similar; you can't control the
+        port though.  It is usually 5930, 5931, ... Watch the messages.
 
      8) On Unix if you are going to an older SSH server (e.g. Solaris 10),
         you will probably need to set the env. var. SS_VNCVIEWER_NO_T=1
@@ -609,10 +706,16 @@ proc help {} {
         command from being run).
 
      9) In the VNC Host:Display entry you can also use these "URL-like"
-        prefixes:  vncs://host:0, vncssl://host:0, and vnc+ssl://host:0
-        for SSL, and vncssh://host:0 and vnc+ssh://host:0 for SSH. There
-        is no need to toggle the SSL/SSH setting.  These also work from
-        the command line, e.g.:  ssvnc vnc+ssh://mymachine:10
+        prefixes:
+
+           vncs://host:0, vncssl://host:0, vnc+ssl://host:0  for SSL
+
+        and
+
+           vncssh://host:0, vnc+ssh://host:0                 for SSH
+
+        There is no need to toggle the SSL/SSH setting.  These also work
+        from the command line, e.g.:  ssvnc vnc+ssh://mymachine:10
 
     10) Mobile USB memory stick / flash drive usage:  You can unpack
         ssvnc to a flash drive for impromptu usage (e.g. from a friends
@@ -624,7 +727,7 @@ proc help {} {
 
         WARNING: if you use ssvnc from an "Internet Cafe", i.e. an
         untrusted computer, an unscrupulous person may be capturing
-        keystrokes, etc.
+        keystrokes, etc.!
 
 	You can also set the SSVNC_HOME env. var. to point to any
 	directory you want. It can be set after starting ssvnc by putting
@@ -640,7 +743,7 @@ proc help {} {
         the SSH tunnel.  For example:
 
                 VNC Host:Display     user@somehost.com
-                Remote SSH Command:  PORT= x11vnc -find
+                Remote SSH Command:  PORT= x11vnc -find -nopw
 
         or "PORT= x11vnc -display :0 -localhost", etc.  Or use "P= ..."
 
@@ -671,9 +774,8 @@ proc help {} {
     13) If you want this application to be SSH only, then supply the
         command line option "-ssh" or set the env. var SSVNC_SSH_ONLY=1.
         Then no GUI elements specific to SSL will appear (the
-        documentation will refer to the SSL mode, however).  You cannot
-        Load an SSL profile when in this mode.  To convert a running
-        app to ssh-only select "Mode: SSH-Only" in Options.
+        documentation will refer to the SSL mode, however).  To convert
+        a running app to ssh-only select "Mode: SSH-Only" in Options.
 
         The wrapper scripts "sshvnc" and "sshvnc.bat" will start it up
         automatically this way.
@@ -699,13 +801,13 @@ proc help {} {
 	Put "mode=tsvnc" or "mode=sshvnc" in the ~/.ssvncrc file to have
 	the application start up in the given mode.
 
-        desktop_type=wmaker  (e.g.) to switch the default Desktop Type.
+        desktop_type=wmaker    (e.g.) to switch the default Desktop Type.
 
-        desktop_size=1280x1024  (e.g.) to switch the default Desktop Size.
+        desktop_size=1280x1024 (e.g.) to switch the default Desktop Size.
 
-        desktop_depth=24  (e.g.) to switch the default Desktop Color Depth.
+        desktop_depth=24       (e.g.) to switch the default Desktop Color Depth
 
-        xserver_type=Xdummy  (e.g.) to switch the default X Server Type.
+        xserver_type=Xdummy    (e.g.) to switch the default X Server Type.
 
         (The above 4 settings apply only to the Terminal Services Mode.)
 
@@ -721,6 +823,14 @@ proc help {} {
 	.h.f.t insert end $msg
 	jiggle_text .h.f.t
 }
+
+#    Or Alternatively one can supply both hosts separated by
+#    spaces (with the proxy second) in the VNC Host:Display box:
+#
+#           VNC Host-Display:   far-away.east:0    theproxy.net:8080
+#
+#    This looks a little strange, but it actually how SSVNC stores the
+#    host info internally.
 
 #    You can also specify the remote SSH command by putting a string like
 #    
@@ -1163,7 +1273,7 @@ set msg {
             Windows you *MUST* always supply the "user@" part (due to a
             plink deficiency). E.g.:
 
-                fred@far-away.east:0
+                VNC Host:Display:    fred@far-away.east:0
 
 
             Gateway:  If an intermediate gateway machine must be used
@@ -1190,19 +1300,27 @@ set msg {
                 VNC Host:Display: localhost:0
                 Proxy/Gateway:    user@gateway-host:port,user@workstation:port
 
+            Web and SOCKS proxies can also be used with SSH:
+
+                VNC Host:Display: user@workstation:0
+                Proxy/Gateway:    socks://socks.server:1080
+
+            See the "SSH Proxies/Gateways" in the Main Help document for full
+            details.
+
 
             Remote Command:  In the "Remote SSH Command" entry you can to
             indicate that a remote command to be run.  The default is
             "sleep 15".  For example, to run x11vnc for your X :0 display:
 
-                x11vnc -nopw -display :0
+                x11vnc -display :0 -nopw
 
 
-            Trick:  If you use "cmd=SHELL" then you get an SSH shell only:
-            no VNC viewer will be launched.  On Windows "cmd=PUTTY" will
-            try to use putty.exe (better terminal emulation than plink.exe)
-            A shortcut for this is Ctrl-S as long as user@hostname is present
-            in the "VNC Host:Display" box.
+            Trick:  If you use "SHELL" asl the "Remote SSH Command" then
+            you get an SSH shell only: no VNC viewer will be launched.
+            On Windows "PUTTY" will try to use putty.exe (better terminal
+            emulation than plink.exe)  A shortcut for this is Ctrl-S as
+            long as user@hostname is present in the "VNC Host:Display" box.
 
 
   Use SSH + SSL:
@@ -1231,13 +1349,15 @@ set msg {
             does it attaches to it; otherwise the x11vnc VNC server exits
             immediately followed by your VNC Viewer.
 
-            The PORT= option just means to let x11vnc pick its own VNC
-            port and then connect to whatever it picked.
+            The PORT= option just means to let x11vnc pick its own
+            VNC port and then connect to whatever it picked.  Use P=
+            for more debugging output.
 
             The idea for this mode is you simply type 'username@workstation'
             in the VNC Host:Display box, Select 'Options -> Automatically
-            Find X Session', and then click Connect.  The tsvnc mode
-            is similar.
+            Find X Session', and then click Connect.  The tsvnc mode is
+            similar (it runs x11vnc on the remote side with the intent
+            of automatically finding, or creating, your desktop).
 
   Automatically Find X Login/Greeter:
 
@@ -1255,7 +1375,8 @@ set msg {
 
             An initial ssh running 'sudo id' is performed to try to
             'prime' sudo so the 2nd one that runs x11vnc does not need
-            a password.  This may not always succeed...
+            a password.  This may not always succeed... please mail us
+            the details if it doesn't.
 
             See the 'X Login' description in 'Terminal Services' Mode
             Help for more info.
@@ -1312,7 +1433,7 @@ set msg {
             prior to any connections.
 
             For reverse connections in SSH or SSH + SSL modes it is a
-            little trickier.  The SSH tunnel (with -R redirect) must be
+            little trickier.  The SSH tunnel (with -R tunnel) must be
             established and remain up waiting for reverse connections.
             The default time is "sleep 1800", i.e. 30 mins.  You can put
             a longer or shorter sleep in "Remote SSH Command" (perhaps
@@ -2106,7 +2227,8 @@ proc guess_nat_ip {} {
 	set ip "unknown"
 	if {$s != ""} {
 		fconfigure $s -buffering none
-		puts $s "GET / HTTP/1.1"
+		#puts $s "GET / HTTP/1.1"
+		puts $s "GET /automation/n09230945.asp HTTP/1.1"
 		puts $s "Host: www.whatismyip.com"
 		puts $s "Connection: close"
 		puts $s ""
@@ -2116,6 +2238,7 @@ proc guess_nat_ip {} {
 			if {! $on && [regexp {<HEAD>}  $line]} {set on 1}
 			if {! $on && [regexp {<HTML>}  $line]} {set on 1}
 			if {! $on && [regexp {<TITLE>} $line]} {set on 1}
+			if {! $on && [regexp {^[0-9][0-9]*\.[0-9]} $line]} {set on 1}
 			if {! $on} {
 				continue;
 			}
@@ -2297,7 +2420,20 @@ proc launch_windows_ssh {hp file n} {
 	regsub {^.*:} $vnc_disp "" vnc_disp
 
 	if {$ts_only} {
-		;
+		regsub {:0$} $hpnew "" hpnew 
+		if {$proxy == ""} {
+			if {[regexp {^([^:]*):([0-9][0-9]*)$} $hpnew mv sshhst sshpt]} {
+				set proxy "$sshhst:$sshpt"
+				set hpnew "localhost"
+			}
+		} else {
+			if {![regexp {,} $proxy]} {
+				if {$hpnew != "localhost"} {
+					set proxy "$proxy,$hpnew"
+					set hpnew "localhost"
+				}
+			}
+		}
 	} elseif {![regexp {^-?[0-9][0-9]*$} $vnc_disp]} {
 		if {[regexp {cmd=SHELL} $hp]} {
 			;
@@ -2342,6 +2478,88 @@ proc launch_windows_ssh {hp file n} {
 	set double_ssh ""
 	set p_port ""
 	if {$proxy != ""} {
+		if [regexp -nocase {(http|https|socks|socks4|socks5)://} $proxy] {
+			set pproxy ""
+			set sproxy1 ""
+			set sproxy_rest ""
+			set sproxy1_host ""
+			set sproxy1_user ""
+			set sproxy1_port ""
+			foreach part [split $proxy ","] {
+				if {[regexp {^[ 	]*$} $part]} {
+					continue
+				}
+				if [regexp -nocase {^(http|https|socks|socks4|socks5)://} $part] {
+					if {$pproxy == ""} {
+						set pproxy $part
+					} else {
+						set pproxy "$pproxy,$part"
+					}
+				} else {
+					if {$sproxy1 == ""} {
+						set sproxy1 $part
+					} else {
+						if {$sproxy_rest == ""} {
+							set sproxy_rest $part
+						} else {
+							set sproxy_rest "$sproxy_rest,$part"
+						}
+					}
+				}
+			}
+#mesg "pproxy: $pproxy"; after 2000
+#mesg "sproxy1: $sproxy1"; after 2000
+#mesg "sproxy_rest: $sproxy_rest"; after 2000
+#mesg "ssh_host: $ssh_host"; after 2000
+#mesg "ssh_port: $ssh_port"; after 2000
+			if {$sproxy1 != ""} {
+				regsub {:[0-9][0-9]*$} $sproxy1 "" sproxy1_host
+				regsub {^.*@} $sproxy1_host "" sproxy1_host
+				regsub {@.*$} $sproxy1 "" sproxy1_user
+				regsub {^.*:} $sproxy1 "" sproxy1_port
+			} else {
+				regsub {:[0-9][0-9]*$} $ssh_host "" sproxy1_host
+				regsub {^.*@} $sproxy1_host "" sproxy1_host
+				regsub {@.*$} $ssh_host "" sproxy1_user
+				regsub {^.*:} $ssh_host "" sproxy1_port
+			}
+			if {![regexp {^[0-9][0-9]*$} $sproxy1_port]} {
+				set sproxy1_port 22
+			}
+			if {$sproxy1_user != ""} {
+				set sproxy1_user "$sproxy1_user@"
+			}
+#mesg "sproxy1_host: $sproxy1_host"; after 2000
+#mesg "sproxy1_user: $sproxy1_user"; after 2000
+#mesg "sproxy1_port: $sproxy1_port"; after 2000
+
+			set port2 [rand_port]
+			set env(SSVNC_PROXY) $pproxy
+			set env(SSVNC_LISTEN) $port2
+			set env(SSVNC_DEST) "$sproxy1_host:$sproxy1_port"
+
+			mesg "Starting TCP helper on port $port2 ..."
+			after 400
+			set proxy_pid [exec "connect_br.exe" &]
+
+			unset -nocomplain env(SSVNC_PROXY)
+			unset -nocomplain env(SSVNC_LISTEN)
+			unset -nocomplain env(SSVNC_DEST)
+
+			if {$sproxy1 == ""} {
+				set proxy "localhost:$port2"
+				if [regexp {^(.*)@} $ssh_host mv u] {
+					set proxy "$u@$proxy"
+				}
+			} else {
+				set proxy "${sproxy1_user}localhost:$port2"
+			}
+			if {$sproxy_rest != ""} {
+				set proxy "$proxy,$sproxy_rest"
+			}
+			mesg "Set proxy to: $proxy"
+			after 400
+		}
 		if [regexp {,} $proxy] {
 			if {$is_win9x} {
 				mesg "Double proxy does not work on Win9x"
@@ -2598,6 +2816,7 @@ proc launch_windows_ssh {hp file n} {
 	if {$vnc_host == ""} {
 		set vnc_host "localhost"
 	}
+	regsub {^.*@} $vnc_host "" vnc_host
 
 	set redir "-L $use:$vnc_host:$vnc_port"
 	if {$use_listen} {
@@ -3475,7 +3694,21 @@ proc fetch_cert_windows {hp} {
 	if {$proxy != ""} {
 		global env
 
-		set port2 5991
+		set port2 [rand_port] 
+
+		set sp ""
+		if [info exists env(SSVNC_PROXY)] {
+			set sp $env(SSVNC_PROXY)
+		}
+		set sl ""
+		if [info exists env(SSVNC_LISTEN)] {
+			set sl $env(SSVNC_LISTEN)
+		}
+		set sd ""
+		if [info exists env(SSVNC_DEST)] {
+			set sd $env(SSVNC_DEST)
+		}
+
 		set env(SSVNC_PROXY) $proxy
 		set env(SSVNC_LISTEN) $port2
 		set env(SSVNC_DEST) "$host:$port"
@@ -3485,9 +3718,22 @@ proc fetch_cert_windows {hp} {
 		mesg "Starting TCP helper on port $port2 ..."
 		after 600
 		set proxy_pid [exec "connect_br.exe" &]
-		unset -nocomplain env(SSVNC_PROXY)
-		unset -nocomplain env(SSVNC_LISTEN)
-		unset -nocomplain env(SSVNC_DEST)
+
+		if {$sp == ""} {
+			unset -nocomplain env(SSVNC_PROXY)
+		} else {
+			set env(SSVNC_PROXY) $sp
+		}
+		if {$sl == ""} {
+			unset -nocomplain env(SSVNC_LISTEN)
+		} else {
+			set env(SSVNC_LISTEN) $sl
+		}
+		if {$sd == ""} {
+			unset -nocomplain env(SSVNC_DEST)
+		} else {
+			set env(SSVNC_DEST) $sd
+		}
 	}
 
 	set ossl [get_openssl]
@@ -3809,7 +4055,7 @@ proc check_accepted_certs {} {
 
 	.acert.f.t insert end $msg
 
-	pack .acert.cancel .acert.accept .acert.inspect -side bottom -fill x
+	pack .acert.accept .acert.inspect .acert.cancel -side bottom -fill x
 	pack .acert.f -side top -fill both -expand 1
 
 	center_win .acert
@@ -4053,15 +4299,28 @@ proc launch_unix {hp} {
 		set proxy  [get_ssh_proxy $hp]
 		set sshcmd [get_ssh_cmd $hp]
 
-		if {$ts_only && $proxy != "" && ![regexp {,} $proxy]} {
-			regsub {:[0-9]*$} $hpnew "" h2
-			set proxy "$proxy,$h2"
-			regsub {^[^:]*} $hpnew "localhost" hpnew
+		if {$ts_only} {
+			regsub {:0$} $hpnew "" hpnew 
+			if {$proxy == ""} {
+				if {[regexp {^([^:]*):([0-9][0-9]*)$} $hpnew mv sshhst sshpt]} {
+					set proxy "$sshhst:$sshpt"
+					set hpnew "localhost"
+				}
+			} else {
+				if {![regexp {,} $proxy]} {
+					if {$hpnew != "localhost"} {
+						set proxy "$proxy,$hpnew"
+						set hpnew "localhost"
+					}
+				}
+			}
 		}
+
 #puts hp=$hp
 #puts hpn=$hpnew
 #puts pxy=$proxy
 #puts cmd=$sshcmd
+
 		set hp $hpnew
 
 		if {$proxy != ""} {
@@ -6021,7 +6280,7 @@ proc create_cert {} {
 
 	button .ccrt.create -text "Generate Cert" -command {destroy .ccrt; catch {raise .c}; do_oss_create}
 
-	pack .ccrt.cancel .ccrt.create -side bottom -fill x
+	pack .ccrt.create .ccrt.cancel -side bottom -fill x
 
 	set ew 40
 
@@ -6127,6 +6386,10 @@ proc import_save_browse {{par ".icrt"}} {
 proc do_save {par} {
 	global import_mode import_file import_save_file
 	global also_save_to_accepted_certs
+
+	if {![info exists also_save_to_accepted_certs]} {
+		set also_save_to_accepted_certs 0
+	}
 	
 	if {$import_save_file == "" && ! $also_save_to_accepted_certs} {
 		tk_messageBox -parent $par -type ok -icon error \
@@ -6378,7 +6641,7 @@ TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 	pack $w.l -side left
 	pack $w.e -side left -expand 1 -fill x
 
-	pack .icrt.cancel .icrt.save .icrt.sf .icrt.mf -side bottom -fill x
+	pack .icrt.save .icrt.cancel .icrt.sf .icrt.mf -side bottom -fill x
 	pack .icrt.paste .icrt.plab -side bottom -fill x
 
 	pack .icrt.f -side top -fill both -expand 1
@@ -7253,7 +7516,12 @@ proc get_sound_redir {} {
 
 	set loc $sound_daemon_local_port
 	if {! [regexp {:} $loc]} {
-		set loc "localhost:$loc"
+		global uname
+		if {$uname == "Darwin"} {
+			set loc "127.0.0.1:$loc"
+		} else {
+			set loc "localhost:$loc"
+		}
 	}
 	set redir "$sound_daemon_remote_port:$loc"
 	regsub -all {['" 	]} $redir {} redir; #"
@@ -8260,7 +8528,7 @@ proc ts_cups_dialog {} {
 	global cups_local_server cups_remote_port cups_manage_rcfile cups_x11vnc
 	global cups_local_smb_server cups_remote_smb_port
 
-	scroll_text .cups.f 80 29
+	scroll_text .cups.f 80 30
 		
 
 	set msg {
@@ -8271,7 +8539,8 @@ proc ts_cups_dialog {} {
     Enter the VNC Viewer side (i.e. where you are sitting) CUPS server
     under "Local CUPS Server".  Use "localhost:631" if there is one
     on your viewer machine (cupsd), or, say, "my-print-srv:631" for a
-    nearby CUPS print server.  631 is the default CUPS port.
+    nearby CUPS print server.  631 is the default CUPS port.  On
+    MacOSX it seems better to use "127.0.0.1" than "localhost".
 
     The remote Desktop session will have the variables CUPS_SERVER and
     IPP_PORT set so all printing applications will be redirected to your
@@ -8303,8 +8572,13 @@ proc ts_cups_dialog {} {
 }
 	.cups.f.t insert end $msg
 
+	global uname
 	if {$cups_local_server == ""} {
-		set cups_local_server "localhost:631"
+		if {$uname == "Darwin"} {
+			set cups_local_server "127.0.0.1:631"
+		} else {
+			set cups_local_server "localhost:631"
+		}
 	}
 	if {$cups_remote_port == ""} {
 		set cups_remote_port [expr "6731 + int(1000 * rand())"]
@@ -8313,6 +8587,8 @@ proc ts_cups_dialog {} {
 		global is_windows
 		if {$is_windows} {
 			set cups_local_smb_server "IP:139"
+		} elseif {$uname == "Darwin"} {
+			set cups_local_smb_server "127.0.0.1:139"
 		} else {
 			set cups_local_smb_server "localhost:139"
 		}
@@ -8459,8 +8735,13 @@ proc cups_dialog {} {
 }
 	.cups.f.t insert end $msg
 
+	global uname
 	if {$cups_local_server == ""} {
-		set cups_local_server "localhost:631"
+		if {$uname == "Darwin"} {
+			set cups_local_server "127.0.0.1:631"
+		} else {
+			set cups_local_server "localhost:631"
+		}
 	}
 	if {$cups_remote_port == ""} {
 		set cups_remote_port "6631"
@@ -8469,6 +8750,8 @@ proc cups_dialog {} {
 		global is_windows
 		if {$is_windows} {
 			set cups_local_smb_server "IP:139"
+		} elseif {$uname == "Darwin"} {
+			set cups_local_smb_server "127.0.0.1:139"
 		} else {
 			set cups_local_smb_server "localhost:139"
 		}
@@ -10368,16 +10651,17 @@ proc choose_desktop_dialog {} {
 	radiobutton .sd.b3 -anchor w -variable ts_desktop_type -value Xsession -text cde
 	radiobutton .sd.b4 -anchor w -variable ts_desktop_type -value mwm      -text mwm
 	radiobutton .sd.b5 -anchor w -variable ts_desktop_type -value wmaker   -text wmaker
-	radiobutton .sd.b6 -anchor w -variable ts_desktop_type -value enlightenment   -text enlightenment
-	radiobutton .sd.b7 -anchor w -variable ts_desktop_type -value twm      -text twm
-	radiobutton .sd.b8 -anchor w -variable ts_desktop_type -value failsafe -text failsafe
+	radiobutton .sd.b6 -anchor w -variable ts_desktop_type -value xfce     -text xfce
+	radiobutton .sd.b7 -anchor w -variable ts_desktop_type -value enlightenment   -text enlightenment
+	radiobutton .sd.b8 -anchor w -variable ts_desktop_type -value twm      -text twm
+	radiobutton .sd.b9 -anchor w -variable ts_desktop_type -value failsafe -text failsafe
 
 	button .sd.cancel -text "Cancel" -command {destroy .sd; set choose_desktop 0; set ts_desktop_type ""}
 	bind .sd <Escape> {destroy .sd; set choose_desktop 0; set ts_desktop_type ""}
 	wm protocol .sd WM_DELETE_WINDOW {destroy .sd; set choose_desktop 0; set ts_desktop_type ""}
 	button .sd.done -text "Done" -command {destroy .sd}
 
-	pack .sd.l1 .sd.l2 .sd.b1 .sd.b2 .sd.b3 .sd.b4 .sd.b5 .sd.b6 .sd.b7 .sd.b8 .sd.cancel .sd.done -side top -fill x
+	pack .sd.l1 .sd.l2 .sd.b1 .sd.b2 .sd.b3 .sd.b4 .sd.b5 .sd.b6 .sd.b7 .sd.b8 .sd.b9 .sd.cancel .sd.done -side top -fill x
 
 	center_win .sd
 }
@@ -10692,7 +10976,7 @@ proc set_advanced_options {} {
 
 	checkbutton .oa.b$i -anchor w -variable use_grab -text \
 		"Use XGrabServer"
-	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	if {$darwin_cotvnc} {.oa.b$i configure -state disabled}
 	set ix $i
 	incr i
 
@@ -10992,9 +11276,9 @@ proc x11vnc_find_adjust {which} {
 	regsub -all {[ 	]*-localhost[ 	]*} $remote_ssh_cmd " " remote_ssh_cmd
 	regsub -all {[ 	]*-env FD_XDM=1[ 	]*} $remote_ssh_cmd " " remote_ssh_cmd
 	if {$use_x11vnc_find} {
-		set remote_ssh_cmd "PORT= x11vnc -find -localhost $remote_ssh_cmd"
+		set remote_ssh_cmd "PORT= x11vnc -find -localhost -nopw $remote_ssh_cmd"
 	} else {
-		set remote_ssh_cmd "PORT= sudo x11vnc -find -localhost -env FD_XDM=1 $remote_ssh_cmd"
+		set remote_ssh_cmd "PORT= sudo x11vnc -find -localhost -env FD_XDM=1 -nopw $remote_ssh_cmd"
 	}
 	regsub {[ 	]*$} $remote_ssh_cmd "" remote_ssh_cmd
 	regsub {^[ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
@@ -11169,9 +11453,18 @@ proc set_options {} {
 		button .o.ssh      -anchor w -text "             SSH-Only Mode" -command {to_sshonly; destroy .o}
 		button .o.tso      -anchor w -text "             Terminal Svc Mode" -command {to_tsonly; destroy .o}
 	}
-	button .o.advanced -anchor w -text "             Advanced ..." -command set_advanced_options
-	button .o.clear    -anchor w -text "             Clear Options" -command set_defaults
-	button .o.delete   -anchor w -text "             Delete Profile ..." -command {destroy .o; delete_profile}
+	global uname
+	set t1 "             Advanced ..."
+	set t2 "             Clear Options"
+	set t3 "             Delete Profile ..."
+	if {$uname == "Darwin"} {
+		regsub {^ *} $t1 "" t1
+		regsub {^ *} $t2 "" t2
+		regsub {^ *} $t3 "" t3
+	}
+	button .o.advanced -anchor w -text $t1 -command set_advanced_options
+	button .o.clear    -anchor w -text $t2 -command set_defaults
+	button .o.delete   -anchor w -text $t3 -command {destroy .o; delete_profile}
 
 	pack .o.clear -side top -fill x 
 	pack .o.delete -side top -fill x 
@@ -11479,6 +11772,9 @@ if {$uname == "Darwin"} {
 		}
 	}
 	set help_font "-font {Monaco 10}"
+
+	#option add *Button.font Helvetica widgetDefault
+	catch {option add *Button.font {System 10} widgetDefault}
 }
 
 set putty_pw ""

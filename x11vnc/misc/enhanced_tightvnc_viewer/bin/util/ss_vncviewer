@@ -38,6 +38,9 @@
 #         (the first CONNECT is done through host1:port1 to host2:port2
 #         and then a 2nd CONNECT to the destination VNC server.)
 #
+#         Use socks://host:port, socks4://host:port, or socks5://host,port
+#         to force usage of a SOCKS proxy.
+#
 # -showcert  Only fetch the certificate using the 'openssl s_client'
 #            command (openssl(1) must in installed).
 #
@@ -45,6 +48,8 @@
 #    certificates with VNC.
 #
 # A few other args (not related to SSL and certs):
+#
+# -2nd    Run the vncviewer a 2nd time if the first connections fails.
 #
 # -ssh    Use ssh instead of stunnel SSL.  ssh(1) must be installed and you
 #         must be able to log into the remote machine via ssh.
@@ -112,12 +117,14 @@ VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
 # Same for STUNNEL, e.g. set it to /path/to/stunnel or stunnel4, etc.
 #
 
+# turn on verbose debugging output
 if [ "X$SS_DEBUG" != "X" ]; then
 	set -xv 
 fi
 
 PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
 
+# work out which stunnel t use (debian installs as stunnel4)
 if [ "X$STUNNEL" = "X" ]; then
 	type stunnel4 > /dev/null 2>&1
 	if [ $? = 0 ]; then
@@ -131,23 +138,32 @@ help() {
 	tail -n +2 "$0" | sed -e '/^$/ q'
 }
 
+secondtry=""
 gotalpha=""
 use_ssh=""
 use_sshssl=""
 direct_connect=""
 ssh_sleep=15
+
+# sleep longer in -listen mode:
 if echo "$*" | grep '.*-listen' > /dev/null; then
 	ssh_sleep=1800
 fi
+
+
 ssh_cmd=""
+# env override of ssh_cmd:
 if [ "X$SS_VNCVIEWER_SSH_CMD" != "X" ]; then
 	ssh_cmd="$SS_VNCVIEWER_SSH_CMD"
 fi
+
 ssh_args=""
 showcert=""
 reverse=""
 
 if [ "X$1" = "X-viewerflavor" ]; then
+	# special case, try to guess which viewer:
+	#
 	if echo "$VNCVIEWERCMD" | egrep -i '^(xmessage|sleep )' > /dev/null; then
 		echo "unknown"
 		exit 0
@@ -160,6 +176,7 @@ if [ "X$1" = "X-viewerflavor" ]; then
 		echo "ultravnc"
 		exit 0
 	fi
+	# OK, run it for help output...
 	str=`$VNCVIEWERCMD -h 2>&1 | head -n 5`
 	if echo "$str" | grep -i 'TightVNC.viewer' > /dev/null; then
 		echo "tightvnc"
@@ -173,6 +190,7 @@ if [ "X$1" = "X-viewerflavor" ]; then
 	exit 0
 fi
 
+# maxconn is something we added to stunnel, this disables it:
 if [ "X$SS_VNCVIEWER_NO_MAXCONN" != "X" ]; then
 	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
 elif echo "$VNCVIEWERCMD" | egrep -i '^(xmessage|sleep )' > /dev/null; then
@@ -206,6 +224,8 @@ do
                 ;;
 	"-reverse")	reverse=1
                 ;;
+	"-2nd")		secondtry=1
+                ;;
 	"-grab")	VNCVIEWER_GRAB_SERVER=1; export VNCVIEWER_GRAB_SERVER
                 ;;
 	"-h"*)	help; exit 0
@@ -218,11 +238,13 @@ do
     shift
 done
 
+# this is the -t ssh option (gives better keyboard responsd thru SSH tunnel)
 targ="-t"
 if [ "X$SS_VNCVIEWER_NO_T" != "X" ]; then
 	targ=""
 fi
 
+# set the alpha blending env. hack: 
 if [ "X$gotalpha" = "X1" ]; then
 	VNCVIEWER_ALPHABLEND=1
 	export VNCVIEWER_ALPHABLEND
@@ -230,9 +252,11 @@ else
 	NO_ALPHABLEND=1
 	export NO_ALPHABLEND
 fi
+
 if [ "X$reverse" != "X" ]; then
 	ssh_sleep=1800
 	if [ "X$proxy" != "X" ]; then
+		# check proxy usage under reverse connection:
 		if [ "X$use_ssh" = "X" -a "X$use_sshssl" = "X" ]; then
 			echo ""
 			echo "*Warning*: SSL -listen and a Web proxy does not make sense."
@@ -247,12 +271,16 @@ if [ "X$reverse" != "X" ]; then
 	fi
 fi
 if [ "X$ssh_cmd" = "X" ]; then
+	# if no remote ssh cmd, sleep a bit:
 	ssh_cmd="sleep $ssh_sleep"
 fi
 
+# this should be a host:display:
+#
 orig="$1"
 shift
 
+# check -ssh and -mycert/-verify conflict:
 if [ "X$use_ssh" = "X1" -a "X$use_sshssl" = "X" ]; then
 	if [ "X$mycert" != "X" -o "X$verify" != "X" ]; then
 		echo "-mycert and -verify cannot be used in -ssh mode" 
@@ -260,12 +288,15 @@ if [ "X$use_ssh" = "X1" -a "X$use_sshssl" = "X" ]; then
 	fi
 fi
 
+# direct mode Vnc:// means show no warnings.
+# direct mode vnc:// will show warnings.
 if echo "$orig" | grep '^V[Nn][Cc]://' > /dev/null; then
 	SSVNC_NO_ENC_WARN=1
 	export SSVNC_NO_ENC_WARN
 	orig=`echo "$orig" | sed -e 's/^...:/vnc:/'`
 fi
 
+# interprest the pseudo URL proto:// strings:
 if echo "$orig" | grep '^vnc://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vnc://,,'`
 	verify=""
@@ -286,11 +317,14 @@ elif echo "$orig" | grep '^vnc+ssh://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vnc.ssh://,,'`
 	use_ssh=1
 fi
+
+# (possibly) tell the vncviewer to only listen on lo: 
 if [ "X$reverse" != "X" -a "X$direct_connect" = "X" ]; then
 	VNCVIEWER_LISTEN_LOCALHOST=1
 	export VNCVIEWER_LISTEN_LOCALHOST
 fi
 
+# rsh mode is an internal/secret thing only I use.
 rsh=""
 if echo "$orig" | grep '^rsh://' > /dev/null; then
 	use_ssh=1
@@ -302,11 +336,11 @@ elif echo "$orig" | grep '^rsh:' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,rsh:,,'`
 fi
 
-
 # play around with host:display port:
 if echo "$orig" | grep ':' > /dev/null; then
 	:
 else
+	# add or assume :0 if no ':'
 	if [ "X$reverse" = "X" ]; then
 		orig="$orig:0"
 	elif [ "X$orig" = "X" ]; then
@@ -314,20 +348,24 @@ else
 	fi
 fi
 
+# extract host and disp number:
 host=`echo "$orig" | awk -F: '{print $1}'`
 disp=`echo "$orig" | awk -F: '{print $2}'`
 if [ "X$host" = "X" ]; then
 	host=localhost
 fi
 if [ $disp -lt 0 ]; then
+	# negative means use |n| without question:
 	port=`expr 0 - $disp`
 elif [ $disp -lt 200 ]; then
+	# less than 200 means 5900+n
 	if [ "X$reverse" = "X" ]; then
 		port=`expr $disp + 5900`
 	else
 		port=`expr $disp + 5500`
 	fi
 else
+	# otherwise use the number directly, e.g. 443, 2345
 	port=$disp
 fi
 
@@ -342,8 +380,11 @@ elif uname | grep -i bsd > /dev/null; then
 # add others...
 fi
 
+# this is a crude attempt for unique ports tags, etc.
 date_sec=`date +%S`
 
+# these are special cases of no vnc, e.g. sleep or xmessage.
+# these are for using ssvnc as a general port redirector.
 if echo "$VNCVIEWERCMD" | grep '^sleep[ 	][ 	]*[0-9][0-9]*' > /dev/null; then
 	if [ "X$SS_VNCVIEWER_LISTEN_PORT" = "X" ]; then
 		p=`echo "$VNCVIEWERCMD" | awk '{print $3}'`
@@ -360,6 +401,7 @@ elif echo "$VNCVIEWERCMD" | grep '^xmessage[ 	][ 	]*[0-9][0-9]*' > /dev/null; th
 	fi
 fi
 
+# utility to find a free port to listen on.
 findfree() {
 	try0=$1
 	try=$try0
@@ -369,8 +411,13 @@ findfree() {
 		echo "$SS_VNCVIEWER_LISTEN_PORT"
 		return	
 	fi
+	if [ $try -ge 6000 ]; then
+		fmax=`expr $try + 1000`
+	else
+		fmax=6000
+	fi
 
-	while [ $try -lt 6000 ]
+	while [ $try -lt $fmax ]
 	do
 		if [ "X$inuse" = "X" ]; then
 			break
@@ -390,6 +437,8 @@ findfree() {
 	echo $use0
 }
 
+# utility for exiting; kills some helper processes,
+# removes files, etc.
 final() {
 	echo ""
 	if [ "X$SS_VNCVIEWER_RM" != "X" ]; then
@@ -420,6 +469,7 @@ final() {
 }
 
 if [ "X$reverse" = "X" ]; then
+	# normal connections try 5930-5999:
 	use=`findfree 5930`
 	if [ $use -ge 5900 ]; then
 		N=`expr $use - 5900`
@@ -427,6 +477,7 @@ if [ "X$reverse" = "X" ]; then
 		N=$use
 	fi
 else
+	# reverse connections:
 	p2=`expr $port + 30`
 	use=`findfree $p2`
 	if [ $use -ge 5500 ]; then
@@ -436,17 +487,20 @@ else
 	fi
 fi
 
+# this is for my special use of ss_vncip -> vncip viewer.
 if echo "$0" | grep vncip > /dev/null; then
 	VNCVIEWERCMD="$VNCIPCMD"
 fi
 
 rchk() {
+	# a kludge to set $RANDOM if we are not bash:
 	if [ "X$BASH_VERSION" = "X" ]; then
 		RANDOM=`date +%S``sh -c 'echo $$'``ps -elf 2>&1 | sum 2>&1 | awk '{print $1}'`
 	fi
 }
 rchk
 
+# a portable, but not absolutely safe, tmp file creator
 mytmp() {
 	tf=$1
 	rm -rf "$tf" || exit 1
@@ -465,6 +519,7 @@ mytmp() {
 	rchk
 }
 
+# trick for the undocumented rsh://host:port method.
 rsh_setup() {
 	if echo "$ssh_host" | grep '@' > /dev/null; then
 		ul=`echo "$ssh_host" | awk -F@ '{print $1}'`
@@ -476,6 +531,7 @@ rsh_setup() {
 	ssh_cmd=`echo "$ssh_cmd" | sed -e 's/ -localhost/ /g'`
 }
 
+# trick for the undocumented rsh://host:port method.
 rsh_viewer() {
 	trap "final" 0 2 15
 	if [ "X$PORT" = "X" ]; then
@@ -489,22 +545,505 @@ rsh_viewer() {
 	echo "$VNCVIEWERCMD" "$@" $ssh_host:$vdpy
 	echo ""
 	$VNCVIEWERCMD "$@" $ssh_host:$vdpy
+	if [ $? != 0 ]; then
+		sleep 2
+		$VNCVIEWERCMD "$@" $ssh_host:$vdpy
+	fi
+}
+
+# this is the PPROXY tool.  used only here for now... 
+pcode() {
+	tf=$1
+	PPROXY_PROXY=$proxy; export PPROXY_PROXY
+	PPROXY_DEST="$host:$port"; export PPROXY_DEST
+	cod='#!/usr/bin/perl
+
+# A hack to glue stunnel to a Web proxy or SOCKS for client connections.
+
+use IO::Socket::INET;
+
+my ($first, $second, $third) = split(/,/, $ENV{PPROXY_PROXY}, 3);
+
+if ($first =~ m,^socks4?://(\S*)$,i) {
+	$ENV{PPROXY_SOCKS} = 1;
+	$first = $1;
+} elsif ($first =~ m,^socks5://(\S*)$,i) {
+	$ENV{PPROXY_SOCKS} = 5;
+	$first = $1;
+} elsif ($first =~ m,^https?://(\S*)$,i) {
+	$ENV{PPROXY_SOCKS} = "";
+	$first = $1;
+}
+
+my ($proxy_host, $proxy_port) = split(/:/, $first);
+my $connect = $ENV{PPROXY_DEST};
+
+my $mode_2nd = "";
+if ($second ne "") {
+	if ($second =~ m,^socks4?://(\S*)$,i) {
+		$mode_2nd = "socks4";
+		$second = $1;
+	} elsif ($second =~ m,^socks5://(\S*)$,i) {
+		$mode_2nd = "socks5";
+		$second = $1;
+	} elsif ($second =~ m,^https?://(\S*)$,i) {
+		$mode_2nd = "http";
+		$second = $1;
+	}
+}
+
+my $mode_3rd = "";
+if ($third ne "") {
+	if ($third =~ m,^socks4?://(\S*)$,i) {
+		$mode_3rd = "socks4";
+		$third = $1;
+	} elsif ($third =~ m,^socks5://(\S*)$,i) {
+		$mode_3rd = "socks5";
+		$third = $1;
+	} elsif ($third =~ m,^https?://(\S*)$,i) {
+		$mode_3rd = "http";
+		$third = $1;
+	}
+}
+
+print STDERR "\n";
+print STDERR "PPROXY v0.2: a tool for Web proxies and SOCKS connections.\n";
+print STDERR "proxy_host:       $proxy_host\n";
+print STDERR "proxy_port:       $proxy_port\n";
+print STDERR "proxy_connect:    $connect\n";
+print STDERR "pproxy_params:    $ENV{PPROXY_PROXY}\n";
+print STDERR "pproxy_listen:    $ENV{PPROXY_LISTEN}\n";
+print STDERR "\n";
+
+my $listen_handle = "";
+if ($ENV{PPROXY_LISTEN} != "") {
+	my $listen_sock = IO::Socket::INET->new(
+		Listen    => 2,
+		LocalAddr => "localhost",
+		LocalPort => $ENV{PPROXY_LISTEN},
+		Proto     => "tcp"
+	);
+	if (! $listen_sock) {
+		die "pproxy: $!\n";
+	}
+	my $ip;
+	($listen_handle, $ip) = $listen_sock->accept();
+	if (! $listen_handle) {
+		die "pproxy: $!\n";
+	}
+}
+
+my $sock = IO::Socket::INET->new(
+	PeerAddr => $proxy_host,
+	PeerPort => $proxy_port,
+	Proto => "tcp"
+);
+
+if (! $sock) {
+	my $err = $!;
+	unlink($0) if $ENV{PPROXY_REMOVE};
+	die "pproxy: $err\n";
+}
+
+sub connection {
+	my ($CONNECT, $w) = @_;
+
+	my $con = "";
+	my $msg = "";
+
+	if ($ENV{PPROXY_SOCKS} eq "5") {
+		# SOCKS5
+		my ($h, $p) = split(/:/, $CONNECT);
+		$con .= pack("C", 0x05);
+		$con .= pack("C", 0x01);
+		$con .= pack("C", 0x00);
+
+		$msg = "SOCKS5 via $cur_proxy to $h:$p\n\n";
+		print STDERR "proxy_request$w: $msg";
+
+		syswrite($sock, $con, length($con));
+
+		my ($n1, $n2, $n3, $n4, $n5, $n6);
+		my ($r1, $r2, $r3, $r4, $r5, $r6);
+		my ($s1, $s2, $s3, $s4, $s5, $s6);
+
+		$n1 = sysread($sock, $r1, 1);
+		$n2 = sysread($sock, $r2, 1);
+
+		$s1 = unpack("C", $r1);
+		$s2 = unpack("C", $r2);
+		if ($s1 != 0x05 || $s2 != 0x00) {
+			print STDERR "SOCKS5 fail s1=$s1 s2=$s2 n1=$n1 n2=$n2\n";
+			close $sock;
+			exit(1);
+		}
+
+		$con = "";
+		$con .= pack("C", 0x05);
+		$con .= pack("C", 0x01);
+		$con .= pack("C", 0x00);
+		$con .= pack("C", 0x03);
+		$con .= pack("C", length($h));
+		$con .= $h;
+		$con .= pack("C", $p >> 8);
+		$con .= pack("C", $p & 0xff);
+
+		syswrite($sock, $con, length($con));
+
+		$n1 = sysread($sock, $r1, 1);
+		$n2 = sysread($sock, $r2, 1);
+		$n3 = sysread($sock, $r3, 1);
+		$n4 = sysread($sock, $r4, 1);
+		$s1 = unpack("C", $r1);
+		$s2 = unpack("C", $r2);
+		$s3 = unpack("C", $r3);
+		$s4 = unpack("C", $r4);
+
+		if ($s4 == 0x1) {
+			sysread($sock, $r5, 4 + 2);
+		} elsif ($s4 == 0x3) {
+			sysread($sock, $r5, 1);
+			$s5 = unpack("C", $r5);
+			sysread($sock, $r6, $s5 + 2);
+		} elsif ($s4 == 0x4) {
+			sysread($sock, $r5, 16 + 2);
+		}
+
+		if ($s1 != 0x5 || $s2 != 0x0 || $s3 != 0x0) {
+			print STDERR "SOCKS5 failed: s1=$s1 s2=$s2 s3=$s3 s4=$s4 n1=$n1 n2=$n2 n3=$n3 n4=$n4\n";
+			close $sock;
+			exit(1);
+		}
+
+	} elsif ($ENV{PPROXY_SOCKS} ne "") {
+		# SOCKS4 SOCKS4a
+		my ($h, $p) = split(/:/, $CONNECT);
+		$con .= pack("C", 0x04);
+		$con .= pack("C", 0x01);
+		$con .= pack("n", $p);
+
+		my $SOCKS_4a = 0;
+		if ($h eq "localhost" || $h eq "127.0.0.1") {
+			$con .= pack("C", 127);
+			$con .= pack("C", 0);
+			$con .= pack("C", 0);
+			$con .= pack("C", 1);
+		} elsif ($h =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
+			$con .= pack("C", $1);
+			$con .= pack("C", $2);
+			$con .= pack("C", $3);
+			$con .= pack("C", $4);
+		} else {
+			$con .= pack("C", 0);
+			$con .= pack("C", 0);
+			$con .= pack("C", 0);
+			$con .= pack("C", 3);
+			$SOCKS_4a = 1;
+		}
+
+		$con .= "nobody";
+		$con .= pack("C", 0);
+
+		$msg = "SOCKS4 via $cur_proxy to $h:$p\n\n";
+		if ($SOCKS_4a) {
+			$con .= $h;
+			$con .= pack("C", 0);
+			$msg =~ s/SOCKS4/SOCKS4a/;
+		}
+		print STDERR "proxy_request$w: $msg";
+		syswrite($sock, $con, length($con));
+
+		my $ok = 1;
+		for (my $i = 0; $i < 8; $i++) {
+			my $c;
+			sysread($sock, $c, 1);
+			my $s = unpack("C", $c);
+			if ($i == 0) {
+				$ok = 0 if $s != 0x0;
+			} elsif ($i == 1) {
+				$ok = 0 if $s != 0x5a;
+			}
+		}
+		if (! $ok) {
+			print STDERR "SOCKS4 failed.\n";
+			close $sock;
+			exit(1);
+		}
+
+	} else {
+		# Web Proxy:
+		$con = "CONNECT $CONNECT HTTP/1.1\r\n";
+		$con   .= "Host: $CONNECT\r\n";
+		$con   .= "Connection: close\r\n\r\n";
+		$msg = $con;
+
+		print STDERR "proxy_request$w: via $cur_proxy:\n$msg";
+		syswrite($sock, $con, length($con));
+
+		my $rep = "";
+		my $n = 0;
+		while ($rep !~ /\r\n\r\n/ && $n < 30000) {
+			my $c;
+			sysread($sock, $c, 1);
+			print STDERR $c;
+			$rep .= $c;
+			$n++;
+		}
+		if ($rep !~ m,HTTP/.* 200,) {
+			print STDERR "HTTP CONNECT failed.\n";
+			close $sock;
+			exit(1);
+		}
+	}
+}
+
+unlink($0) if $ENV{PPROXY_REMOVE};
+
+$cur_proxy = $first;
+
+if ($second ne "") {
+	connection($second, 1);
+
+	setmode($mode_2nd);
+	$cur_proxy = $second;
+
+	if ($third ne "") {
+		connection($third, 2);
+		setmode($mode_3rd);
+		$cur_proxy = $third;
+		connection($connect, 3);
+	} else {
+		connection($connect, 2);
+	}
+} else {
+	connection($connect, 1);
+}
+
+$parent = $$;
+$child = fork;
+if (! defined $child) {
+	exit 1;
+}
+
+if ($child) {
+	print STDERR "pproxy parent\[$$]  STDIN -> socket\n";
+	if ($listen_handle) {
+		xfer($listen_handle, $sock);
+	} else {
+		xfer(STDIN, $sock);
+	}
+	select(undef, undef, undef, 0.25);
+	if (kill 0, $child) {
+		select(undef, undef, undef, 1.5);
+		#print STDERR "pproxy\[$$]: kill TERM $child\n";
+		kill "TERM", $child;
+	}
+} else {
+	print STDERR "pproxy child \[$$]  socket -> STDOUT\n";
+	if ($listen_handle) {
+		xfer($sock, $listen_handle);
+	} else {
+		xfer($sock, STDOUT);
+	}
+	select(undef, undef, undef, 0.25);
+	if (kill 0, $parent) {
+		select(undef, undef, undef, 1.5);
+		#print STDERR "pproxy\[$$]: kill TERM $parent\n";
+		kill "TERM", $parent;
+	}
+}
+exit;
+
+sub setmode {
+	my $mode = shift;
+	if ($mode =~ /^socks/) {
+		if ($mode =~ /^socks5/) {
+			$ENV{PPROXY_SOCKS} = 5;
+		} else {
+			$ENV{PPROXY_SOCKS} = 1;
+		}
+	} else {
+		$ENV{PPROXY_SOCKS} = "";
+	}
+}
+
+sub xfer {
+	my($in, $out) = @_;
+	$RIN = $WIN = $EIN = "";
+	$ROUT = "";
+	vec($RIN, fileno($in), 1) = 1;
+	vec($WIN, fileno($in), 1) = 1;
+	$EIN = $RIN | $WIN;
+
+	while (1) {
+		my $nf = 0;
+		while (! $nf) {
+			$nf = select($ROUT=$RIN, undef, undef, undef);
+		}
+		my $len = sysread($in, $buf, 8192);
+		if (! defined($len)) {
+			next if $! =~ /^Interrupted/;
+			print STDERR "pproxy\[$$]: $!\n";
+			last;
+		} elsif ($len == 0) {
+			print STDERR "pproxy\[$$]: Input is EOF.\n";
+			last;
+		}
+		my $offset = 0;
+		my $quit = 0;
+		while ($len) {
+			my $written = syswrite($out, $buf, $len, $offset);
+			if (! defined $written) {
+				print STDERR "pproxy\[$$]: Output is EOF. $!\n";
+				$quit = 1;
+				last;
+			}
+			$len -= $written;
+			$offset += $written;
+		}
+		last if $quit;
+	}
+	close($in);
+	close($out);
+}
+'
+	echo "$cod" > $tf
+	chmod 700 $tf
+	# prime perl
+	perl -e 'use IO::Socket::INET; select(undef, undef, undef, 0.01)' >/dev/null 2>&1
+}
+
+Kecho() {
+	if [ "X$USER" = "Xrunge" ]; then
+		echo "dbg: $*"
+	fi
 }
 
 if [ "X$use_ssh" = "X1" ]; then
+	#
+	# USING SSH
+	#
 	ssh_port="22"
 	ssh_host="$host"
 	vnc_host="localhost"
+	# let user override ssh via $SSH
 	ssh=${SSH:-"ssh -x"}
 
+	if echo "$proxy" | egrep '(http|https|socks|socks4|socks5)://' > /dev/null; then
+		# Handle Web or SOCKS proxy(ies) for the initial connect.
+Kecho host=$host
+Kecho port=$port
+		pproxy=""
+		sproxy1=""
+		sproxy_rest=""
+		for part in `echo "$proxy" | tr ',' ' '`
+		do
+			Kecho proxy_part=$part
+			if [ "X$part" = "X" ]; then
+				continue
+			elif echo "$part" | egrep -i '^(http|https|socks|socks4|socks5)://' > /dev/null; then
+				pproxy="$pproxy,$part"
+			else
+				if [ "X$sproxy1" = "X" ]; then
+					sproxy1="$part"
+				else
+					sproxy_rest="$sproxy_rest,$part"
+				fi
+			fi
+		done
+		pproxy=`echo "$pproxy" | sed -e 's/^,,*//' -e 's/,,*/,/g'`
+		sproxy_rest=`echo "$sproxy_rest" | sed -e 's/^,,*//' -e 's/,,*/,/g'`
+Kecho pproxy=$pproxy
+Kecho sproxy1=$sproxy1
+Kecho sproxy_rest=$sproxy_rest
+
+		sproxy1_host=""
+		sproxy1_port=""
+		sproxy1_user=""
+
+		if [ "X$sproxy1" != "X" ]; then
+			sproxy1_host=`echo "$sproxy1" | awk -F: '{print $1}'`
+			sproxy1_user=`echo "$sproxy1_host" | awk -F@ '{print $1}'`
+			sproxy1_host=`echo "$sproxy1_host" | awk -F@ '{print $2}'`
+			if [ "X$sproxy1_host" = "X" ]; then
+				sproxy1_host=$sproxy1_user
+				sproxy1_user=""
+			else
+				sproxy1_user="${sproxy1_user}@"
+			fi
+			sproxy1_port=`echo "$sproxy1" | awk -F: '{print $2}'`
+			if [ "X$sproxy1_port" = "X" ]; then
+				sproxy1_port="22"
+			fi
+		else
+			sproxy1_host=`echo "$host" | awk -F: '{print $1}'`
+			sproxy1_user=`echo "$sproxy1_host" | awk -F@ '{print $1}'`
+			sproxy1_host=`echo "$sproxy1_host" | awk -F@ '{print $2}'`
+			if [ "X$sproxy1_host" = "X" ]; then
+				sproxy1_host=$sproxy1_user
+				sproxy1_user=""
+			else
+				sproxy1_user="${sproxy1_user}@"
+			fi
+			sproxy1_port=`echo "$host" | awk -F: '{print $2}'`
+			if [ "X$sproxy1_port" = "X" ]; then
+				sproxy1_port="22"
+			fi
+		fi
+
+Kecho sproxy1_host=$sproxy1_host
+Kecho sproxy1_port=$sproxy1_port
+Kecho sproxy1_user=$sproxy1_user
+
+		ptmp="/tmp/ss_vncviewer${RANDOM}.$$.pl"
+		mytmp "$ptmp"
+		PPROXY_REMOVE=1; export PPROXY_REMOVE
+		proxy=$pproxy
+		port_save=$port
+		host_save=$host
+		if [ "X$sproxy1_host" != "X" ]; then
+			host=$sproxy1_host
+		fi
+		if [ "X$sproxy1_port" != "X" ]; then
+			port=$sproxy1_port
+		fi
+		host=`echo "$host" | sed -e 's/^.*@//'`
+		port=`echo "$port" | sed -e 's/^.*://'`
+		pcode "$ptmp"
+		port=$port_save
+		host=$host_save
+
+		nd=`findfree 6700`
+		PPROXY_LISTEN=$nd; export PPROXY_LISTEN
+		$ptmp &
+		sleep 2
+		ssh_args="$ssh_args -o NoHostAuthenticationForLocalhost=yes"
+		if [ "X$sproxy1" = "X" ]; then
+			u=""
+			if echo "$host" | grep '@' > /dev/null; then
+				u=`echo "$host" | sed -e 's/@.*$/@/'`
+			fi
+			
+			proxy="${u}localhost:$nd"
+		else
+			proxy="${sproxy1_user}localhost:$nd"
+		fi
+		if [ "X$sproxy_rest" != "X" ]; then
+			proxy="$proxy,$sproxy_rest"
+		fi
+Kecho proxy=$proxy
+	fi
+
 	if echo "$proxy" | grep "," > /dev/null; then
+
 		proxy1=`echo "$proxy" | awk -F, '{print $1}'`
 		proxy2=`echo "$proxy" | awk -F, '{print $2}'`
+
 		# user1@gw1.com:port1,user2@ws2:port2
 		ssh_host1=`echo "$proxy1" | awk -F: '{print $1}'`
 		ssh_port1=`echo "$proxy1" | awk -F: '{print $2}'`
 		if [ "X$ssh_port1" != "X" ]; then
-			ssh_port1="-p 22"
+			ssh_port1="-p $ssh_port1"
 		fi
 		ssh_host2=`echo "$proxy2" | awk -F: '{print $1}'`
 		ssh_user2=`echo "$ssh_host2" | awk -F@ '{print $1}'`
@@ -522,8 +1061,9 @@ if [ "X$use_ssh" = "X1" ]; then
 		proxport=`findfree 3500`
 		echo
 		echo "Running 1st ssh proxy:"
-		echo "$ssh -f -x $ssh_port1 $targ -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
-		      $ssh -f -x $ssh_port1 $targ -e none -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
+		echo "$ssh -f -x $ssh_port1 $targ -e none -o NoHostAuthenticationForLocalhost=yes -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
+		echo ""
+		      $ssh -f -x $ssh_port1 $targ -e none -o NoHostAuthenticationForLocalhost=yes -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
 		ssh_args="$ssh_args -o NoHostAuthenticationForLocalhost=yes"
 		sleep 1
 		stty sane
@@ -538,6 +1078,7 @@ if [ "X$use_ssh" = "X1" ]; then
 		ssh_host=`echo "$proxy" | awk -F: '{print $1}'`
 		vnc_host="$host"
 	fi
+
 	echo ""
 	echo "Running ssh:"
 	sz=`echo "$ssh_cmd" | wc -c`
@@ -632,8 +1173,16 @@ if [ "X$use_ssh" = "X1" ]; then
 
 		stty sane
 		i=0
-		while [ $i -lt 10 ]; do
-			sleep 1
+		if type perl > /dev/null 2>&1; then
+			imax=50
+			sleepit="perl -e 'select(undef, undef, undef, 0.20)'"
+		else
+			imax=10
+			sleepit="sleep 1"
+		fi
+		while [ $i -lt $imax ]; do
+			#echo $sleepit
+			eval $sleepit
 			PORT=`grep "^PORT=" $tport | head -n 1 | sed -e 's/PORT=//' -e 's/\r//g'`
 			if echo "$PORT" | grep '^[0-9][0-9]*$' > /dev/null; then
 				break
@@ -660,6 +1209,9 @@ if [ "X$use_ssh" = "X1" ]; then
 			exit $?
 		fi
 		PPROXY_SOCKS=1
+		if [ "X$SSVNC_SOCKS5" != "X" ]; then
+			PPROXY_SOCKS=5
+		fi
 		export PPROXY_SOCKS
 		host="localhost"
 		port="$PORT"
@@ -704,13 +1256,19 @@ if [ "X$use_ssh" = "X1" ]; then
 	if [ "X$getport" != "X" ]; then
 		:
 	elif [ "X$ssh_cmd" = "Xsleep $ssh_sleep" ] ; then
+		#echo T sleep 1
 		sleep 1
+	elif echo "$ssh_cmd" | grep '^sleep ' >/dev/null; then
+		#echo T sleep 2
+		sleep 2
 	else
 		# let any command get started a bit.
+		#echo T sleep 5
 		sleep 5
 	fi
 	echo ""
 	if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
+		#echo T sleep $SSVNC_EXTRA_SLEEP
 		sleep $SSVNC_EXTRA_SLEEP
 	fi
 	#reset
@@ -724,6 +1282,13 @@ if [ "X$use_ssh" = "X1" ]; then
 			echo "$VNCVIEWERCMD" "$@" localhost:$N
 			echo ""
 			$VNCVIEWERCMD "$@" localhost:$N
+			if [ $? != 0 ]; then
+				echo "vncviewer command failed: $?"
+				if [ "X$secondtry" = "X1" ]; then
+					sleep 2
+					$VNCVIEWERCMD "$@" localhost:$N
+				fi
+			fi
 		else
 			echo ""
 			echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
@@ -765,229 +1330,26 @@ if [ "X$mycert" != "X" ]; then
 	cert="cert = $mycert"
 fi
 
-pcode() {
-	tf=$1
-	PPROXY_PROXY=$proxy; export PPROXY_PROXY
-	PPROXY_DEST="$host:$port"; export PPROXY_DEST
-	cod='#!/usr/bin/perl
-
-# A hack to glue stunnel to a Web proxy or SOCKS for client connections.
-
-use IO::Socket::INET;
-
-my ($first, $second) = split(/,/, $ENV{PPROXY_PROXY});
-my ($proxy_host, $proxy_port) = split(/:/, $first);
-my $connect = $ENV{PPROXY_DEST};
-
-print STDERR "PPROXY v0.1: a tool for Web proxies and SOCKS connections.\n";
-print STDERR "proxy_host:       $proxy_host\n";
-print STDERR "proxy_port:       $proxy_port\n";
-print STDERR "proxy_connect:    $connect\n";
-print STDERR "pproxy_listen:    $ENV{PPROXY_LISTEN}\n";
-print STDERR "\n";
-
-my $listen_handle = "";
-if ($ENV{PPROXY_LISTEN} != "") {
-	my $listen_sock = IO::Socket::INET->new(
-		Listen    => 2,
-		LocalAddr => "localhost",
-		LocalPort => $ENV{PPROXY_LISTEN},
-		Proto     => "tcp"
-	);
-	if (! $listen_sock) {
-		die "pproxy: $!\n";
-	}
-	my $ip;
-	($listen_handle, $ip) = $listen_sock->accept();
-	if (! $listen_handle) {
-		die "pproxy: $!\n";
-	}
-}
-
-my $sock = IO::Socket::INET->new(
-	PeerAddr => $proxy_host,
-	PeerPort => $proxy_port,
-	Proto => "tcp"
-);
-
-if (! $sock) {
-	unlink($0);
-	die "pproxy: $!\n";
-}
-
-my $con = "";
-my $con0 = "";
-if ($ENV{PPROXY_SOCKS} ne "") {
-	$second = "";
-	my ($h, $p) = split(/:/, $connect);
-	$con .= pack("C", 0x04);
-	$con .= pack("C", 0x01);
-	$con .= pack("n", $p);
-
-	my $SOCKS_4a = 0;
-	if ($h eq "localhost" || $h eq "127.0.0.1") {
-		$con .= pack("C", 127);
-		$con .= pack("C", 0);
-		$con .= pack("C", 0);
-		$con .= pack("C", 1);
-	} elsif ($h =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
-		$con .= pack("C", $1);
-		$con .= pack("C", $2);
-		$con .= pack("C", $3);
-		$con .= pack("C", $4);
-	} else {
-		$con .= pack("C", 0);
-		$con .= pack("C", 0);
-		$con .= pack("C", 0);
-		$con .= pack("C", 3);
-		$SOCKS_4a = 1;
-	}
-
-	$con .= "nobody";
-	$con .= pack("C", 0);
-
-	if ($SOCKS_4a) {
-		$con .= $h;
-		$con .= pack("C", 0);
-	}
-	$con0 = "SOCKS4 via $proxy_host:$proxy_port to $h:$p\n\n";
-
-} elsif ($second ne "") {
-	$con = "CONNECT $second HTTP/1.1\r\n";
-	$con   .= "Host: $second\r\n\r\n";
-	$con0 = $con;
-} else {
-	$con = "CONNECT $connect HTTP/1.1\r\n";
-	$con   .= "Host: $connect\r\n\r\n";
-	$con0 = $con;
-}
-
-print STDERR "proxy_request1: $con0";
-print $sock $con;
-
-unlink($0);
-
-my $rep = "";
-if ($ENV{PPROXY_SOCKS} ne "") {
-	$rep = "HTTP/1.0 200";
-	for (my $i = 0; $i < 8; $i++) {
-		my $c;
-		sysread($sock, $c, 1);
-		my $s = unpack("C", $c);
-		if ($i == 0) {
-			$rep = "" if $s != 0x0;
-		} elsif ($i == 1) {
-			$rep = "" if $s != 0x5a;
-		}
-	}
-} else {
-	while ($rep !~ /\r\n\r\n/) {
-		my $c;
-		sysread($sock, $c, 1);
-		print STDERR $c;
-		$rep .= $c;
-	}
-}
-if ($rep !~ m,HTTP/.* 200,) {
-	die "proxy error: $rep\n";
-}
-
-if ($second ne "") {
-	$con = "CONNECT $connect HTTP/1.1\r\n";
-	$con   .= "Host: $connect\r\n\r\n";
-	print STDERR "proxy_request2: $con";
-
-	print $sock $con;
-
-	$rep = "";
-	while ($rep !~ /\r\n\r\n/) {
-		my $c;
-		sysread($sock, $c, 1);
-		print STDERR $c;
-		$rep .= $c;
-	}
-	if ($rep !~ m,HTTP/.* 200,) {
-		die "proxy error: $rep\n";
-	}
-}
-
-if (fork) {
-	print STDERR "pproxy parent\[$$]  STDIN -> socket\n";
-	if ($listen_handle) {
-		xfer($listen_handle, $sock);
-	} else {
-		xfer(STDIN, $sock);
-	}
-} else {
-	print STDERR "pproxy child \[$$]  socket -> STDOUT\n";
-	if ($listen_handle) {
-		xfer($sock, $listen_handle);
-	} else {
-		xfer($sock, STDOUT);
-	}
-}
-exit;
-
-sub xfer {
-	my($in, $out) = @_;
-	$RIN = $WIN = $EIN = "";
-	$ROUT = "";
-	vec($RIN, fileno($in), 1) = 1;
-	vec($WIN, fileno($in), 1) = 1;
-	$EIN = $RIN | $WIN;
-
-	while (1) {
-		my $nf = 0;
-		while (! $nf) {
-			$nf = select($ROUT=$RIN, undef, undef, undef);
-		}
-		my $len = sysread($in, $buf, 8192);
-		if (! defined($len)) {
-			next if $! =~ /^Interrupted/;
-			print STDERR "pproxy\[$$]: $!\n";
-			last;
-		} elsif ($len == 0) {
-			print STDERR "pproxy\[$$]: Input is EOF.\n";
-			last;
-		}
-		my $offset = 0;
-		my $quit = 0;
-		while ($len) {
-			my $written = syswrite($out, $buf, $len, $offset);
-			if (! defined $written) {
-				print STDERR "pproxy\[$$]: Output is EOF. $!\n";
-				$quit = 1;
-				last;
-			}
-			$len -= $written;
-			$offset += $written;
-		}
-		last if $quit;
-	}
-	close($in);
-	close($out);
-}
-'
-	echo "$cod" > $tf
-	chmod 700 $tf
-}
-
 ptmp=""
 if [ "X$proxy" != "X" ]; then
 	ptmp="/tmp/ss_vncviewer${RANDOM}.$$.pl"
 	mytmp "$ptmp"
+	PPROXY_REMOVE=1; export PPROXY_REMOVE
 	pcode "$ptmp"
 	if [ "X$showcert" != "X1" -a "X$direct_connect" = "X" ]; then
 		if uname | grep Darwin >/dev/null; then
-			nd=`expr $use + 333`
+			# on mac we need to listen on socket instead of stdio:
+			nd=`findfree 6700`
 			PPROXY_LISTEN=$nd
 			export PPROXY_LISTEN
 			$ptmp 2>/dev/null &
-			sleep 3
+			#sleep 3
+			sleep 2
 			host="localhost"
 			port="$nd"
 			connect="connect = localhost:$nd"
 		else
+			# otherwise on unix we can exec it:
 			connect="exec = $ptmp"
 		fi
 	else
@@ -1002,7 +1364,7 @@ if [ "X$showcert" = "X1" ]; then
 		PPROXY_LISTEN=$use
 		export PPROXY_LISTEN
 		$ptmp 2>/dev/null &
-		sleep 3
+		sleep 1
 		host="localhost"
 		port="$use"
 	fi
@@ -1018,8 +1380,11 @@ if [ "X$direct_connect" != "X" ]; then
 		echo "** NOTE: THERE WILL BE NO SSL OR SSH ENCRYPTION **"
 		echo ""
 	fi
+	x=""
 	if [ "X$SSVNC_NO_ENC_WARN" != "X" ]; then
-		sleep 1
+		if [ "X$getport" = "X" ]; then
+			sleep 1
+		fi
 	elif type printf > /dev/null 2>&1; then
 		printf  "Are you sure you want to continue? [y]/n "
 		read x
@@ -1036,12 +1401,15 @@ if [ "X$direct_connect" != "X" ]; then
 		export PPROXY_LISTEN
 		$ptmp &
 		if [ "X$reverse" = "X" ]; then
-			sleep 2
+			#sleep 2
+			#echo T sleep 1
+			sleep 1
 		fi
 		host="localhost"
 		disp="$N"
 	fi
 	if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
+		#echo T sleep $SSVNC_EXTRA_SLEEP
 		sleep $SSVNC_EXTRA_SLEEP
 	fi
 	if [ "X$reverse" = "X" ]; then
@@ -1049,6 +1417,13 @@ if [ "X$direct_connect" != "X" ]; then
 		trap "final" 0 2 15
 		echo ""
 		$VNCVIEWERCMD "$@" $host:$disp
+		if [ $? != 0 ]; then
+			echo "vncviewer command failed: $?"
+			if [ "X$secondtry" = "X1" ]; then
+				sleep 2
+				$VNCVIEWERCMD "$@" $host:$disp
+			fi
+		fi
 	else
 		echo ""
 		echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
@@ -1175,6 +1550,8 @@ sleep 1
 echo ""
 echo "Running stunnel:"
 echo "$STUNNEL $tmp"
+st=`echo "$STUNNEL" | awk '{print $1}'`
+$st -help > /dev/null 2>&1
 $STUNNEL "$tmp" < /dev/tty > /dev/tty &
 stunnel_pid=$!
 echo ""
@@ -1182,13 +1559,14 @@ echo ""
 # pause here to let the user supply a possible passphrase for the
 # mycert key:
 if [ "X$mycert" != "X" ]; then
-	sleep 2
+	sleep 1
 	echo ""
 	echo "(pausing for possible certificate passphrase dialog)"
 	echo ""
-	sleep 2
+	sleep 4
 fi
-sleep 2
+#echo T sleep 1
+sleep 1
 rm -f "$tmp"
 
 echo ""
@@ -1201,6 +1579,13 @@ if [ "X$reverse" = "X" ]; then
 	trap "final" 0 2 15
 	echo ""
 	$VNCVIEWERCMD "$@" localhost:$N
+	if [ $? != 0 ]; then
+		echo "vncviewer command failed: $?"
+		if [ "X$secondtry" = "X1" ]; then
+			sleep 2
+			$VNCVIEWERCMD "$@" localhost:$N
+		fi
+	fi
 else
 	echo ""
 	echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
