@@ -1185,6 +1185,7 @@ void user_supplied_opts(char *opts) {
 		"skip-display", "skip-auth", "skip-shared",
 		"scale", "scale_cursor", "sc", "solid", "so", "id",
 		"clear_mods", "cm", "clear_keys", "ck", "repeat",
+		"clear_all", "ca",
 		"speeds", "sp", "readtimeout", "rd",
 		"rotate", "ro",
 		"geometry", "geom", "ge",
@@ -1272,6 +1273,9 @@ void user_supplied_opts(char *opts) {
 			} else if (!strcmp(p, "clear_keys") ||
 			    !strcmp(p, "ck")) {
 				clear_mods = 2;
+			} else if (!strcmp(p, "clear_all") ||
+			    !strcmp(p, "ca")) {
+				clear_mods = 3;
 			} else if (!strcmp(p, "noncache") ||
 			    !strcmp(p, "nc")) {
 				ncache  = 0;

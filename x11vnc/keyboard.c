@@ -21,6 +21,7 @@ void get_keystate(int *keystate);
 void clear_modifiers(int init);
 int track_mod_state(rfbKeySym keysym, rfbBool down, rfbBool set);
 void clear_keys(void);
+void clear_locks(void);
 int get_autorepeat_state(void);
 int get_initial_autorepeat_state(void);
 void autorepeat(int restore, int bequiet);
@@ -250,6 +251,68 @@ void clear_keys(void) {
 	XFlush_wr(dpy);
 }
 		
+
+void clear_locks(void) {
+#if NO_X11
+	RAWFB_RET_VOID
+	return;
+#else
+	XModifierKeymap *map;
+	int i, j, k = 0;
+	unsigned int state;
+
+	RAWFB_RET_VOID
+
+	/* n.b. caller decides to X_LOCK or not. */
+#if LIBVNCSERVER_HAVE_XKEYBOARD
+	if (xkb_present) {
+		XkbStateRec kbstate;
+		XkbGetState(dpy, XkbUseCoreKbd, &kbstate);
+		rfbLog("locked:  0x%x\n", kbstate.locked_mods);
+		rfbLog("latched: 0x%x\n", kbstate.latched_mods);
+		rfbLog("compat:  0x%x\n", kbstate.compat_state);
+		state = kbstate.locked_mods;
+		if (! state) {
+			state = kbstate.compat_state;
+		}
+	} else 
+#endif
+	{
+		state = mask_state();
+		rfbLog("state:   0x%x\n", state);
+	}
+	if (! state) {
+		return;
+	}
+	map = XGetModifierMapping(dpy);
+	if (! map) {
+		return;
+	}
+	for (i = 0; i < 8; i++) {
+		int did = 0;
+		for (j = 0; j < map->max_keypermod; j++) {
+			if (! did && state & (0x1 << i)) {
+				if (map->modifiermap[k]) {
+					KeyCode key = map->modifiermap[k];
+					KeySym ks = XKeycodeToKeysym(dpy, key, 0);
+					char *nm = XKeysymToString(ks);
+					rfbLog("toggling: %03d / %03d -- %s\n", key, ks, nm ? nm : "BadKey");
+					did = 1;
+					XTestFakeKeyEvent_wr(dpy, key, True, CurrentTime);
+					usleep(10*1000);
+					XTestFakeKeyEvent_wr(dpy, key, False, CurrentTime);
+					XFlush_wr(dpy);
+				}
+			}
+			k++;
+		}
+	}
+	XFreeModifiermap(map);
+	XFlush_wr(dpy);
+	rfbLog("state:   0x%x\n", mask_state());
+#endif
+}
+
 /*
  * Kludge for -norepeat option: we turn off keystroke autorepeat in
  * the X server when clients are connected.  This may annoy people at
@@ -2660,6 +2723,9 @@ void initialize_keyboard_and_pointer(void) {
 	clear_modifiers(1);
 	if (clear_mods == 1) {
 		clear_modifiers(0);
+	}
+	if (clear_mods == 3) {
+		clear_locks();
 	}
 }
 

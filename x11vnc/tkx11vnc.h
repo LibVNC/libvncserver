@@ -219,6 +219,8 @@ char gui_code[] = "";
 "	=FP remap:\n"
 "	clear_mods\n"
 "	clear_keys\n"
+"	clear_all\n"
+"	=RA clear_locks\n"
 "\n"
 "Pointer\n"
 "	=D-C:none,arrow,X,some,most cursor:\n"

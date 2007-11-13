@@ -159,6 +159,9 @@ void clean_up_exit (int ret) {
 		clear_modifiers(0);
 	} else if (clear_mods == 2) {
 		clear_keys();
+	} else if (clear_mods == 3) {
+		clear_keys();
+		clear_locks();
 	}
 
 	if (no_autorepeat) {
@@ -420,6 +423,9 @@ static void interrupted (int sig) {
 		clear_modifiers(0);
 	} else if (clear_mods == 2) {
 		clear_keys();
+	} else if (clear_mods == 3) {
+		clear_keys();
+		clear_locks();
 	}
 	if (no_autorepeat) {
 		autorepeat(1, 0);

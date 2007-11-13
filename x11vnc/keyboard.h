@@ -8,6 +8,7 @@ extern void get_keystate(int *keystate);
 extern void clear_modifiers(int init);
 extern int track_mod_state(rfbKeySym keysym, rfbBool down, rfbBool set);
 extern void clear_keys(void);
+extern void clear_locks(void);
 extern int get_autorepeat_state(void);
 extern int get_initial_autorepeat_state(void);
 extern void autorepeat(int restore, int bequiet);

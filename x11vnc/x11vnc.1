@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "October 2007" "x11vnc " "User Commands"
+.TH X11VNC "1" "November 2007" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2007-10-27
+         version: 0.9.4, lastmod: 2007-11-07
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1956,7 +1956,7 @@ this use user@host:disp+secs.
 If the remote SSH server is on a non-standard port
 (i.e. not 22) use user@host:port:disp+secs.
 .IP
-Note that the ssh process may NOT be killed when
+Note that the ssh process MAY NOT be killed when
 x11vnc exits.  It tries by looking at 
 .IR ps (1)
 output.
@@ -2581,9 +2581,14 @@ left with any pressed down.
 .PP
 \fB-clear_keys\fR
 .IP
-As \fB-clear_mods,\fR except try to release any pressed key.
+As \fB-clear_mods,\fR except try to release ANY pressed key.
 Note that this option and \fB-clear_mods\fR can interfere
 with a person typing at the physical keyboard.
+.PP
+\fB-clear_all\fR
+.IP
+As \fB-clear_keys,\fR except try to release any CapsLock,
+NumLock, etc. locks as well.
 .PP
 \fB-remap\fR \fIstring\fR
 .IP
@@ -4587,6 +4592,12 @@ clear_keys      enable  \fB-clear_keys\fR mode and clear them.
 .IP
 noclear_keys    disable \fB-clear_keys\fR mode.
 .IP
+clear_locks     do the clear_locks action.
+.IP
+clear_all       do the clear_all action.
+.IP
+keystate        have x11vnc print current keystate.
+.IP
 remap:str       set \fB-remap\fR "str" (empty to disable).
 See \fB-remap\fR for the form of "str"
 (basically: key1-key2,key3-key4,...)
@@ -4993,17 +5004,18 @@ nooverlay_yescursor overlay_nocursor 8to24 no8to24
 8to24_opts 24to32 no24to32 visual scale scale_cursor
 viewonly noviewonly shared noshared forever noforever
 once timeout tightfilexfer notightfilexfer ultrafilexfer
-noultrafilexfer rfbversion deny lock nodeny unlock avahi
-mdns noavahi nomdns connect proxy  allowonce allow
-localhost nolocalhost listen lookup nolookup accept
-afteraccept gone shm noshm flipbyteorder noflipbyteorder
-onetile noonetile solid_color solid nosolid blackout
-xinerama noxinerama xtrap noxtrap xrandr noxrandr
-xrandr_mode rotate padgeom quiet q noquiet modtweak
-nomodtweak xkb noxkb capslock nocapslock skip_lockkeys
-noskip_lockkeys skip_keycodes sloppy_keys nosloppy_keys
-skip_dups noskip_dups add_keysyms noadd_keysyms
-clear_mods noclear_mods clear_keys noclear_keys
+noultrafilexfer rfbversion deny lock nodeny unlock
+avahi mdns noavahi nomdns connect proxy  allowonce
+allow localhost nolocalhost listen lookup nolookup
+accept afteraccept gone shm noshm flipbyteorder
+noflipbyteorder onetile noonetile solid_color solid
+nosolid blackout xinerama noxinerama xtrap noxtrap
+xrandr noxrandr xrandr_mode rotate padgeom quiet
+q noquiet modtweak nomodtweak xkb noxkb capslock
+nocapslock skip_lockkeys noskip_lockkeys skip_keycodes
+sloppy_keys nosloppy_keys skip_dups noskip_dups
+add_keysyms noadd_keysyms clear_mods noclear_mods
+clear_keys noclear_keys clear_all clear_locks keystate
 remap repeat norepeat fb nofb bell nobell sel nosel
 primary noprimary setprimary nosetprimary clipboard
 noclipboard setclipboard nosetclipboard seldir

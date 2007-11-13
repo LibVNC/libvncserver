@@ -208,6 +208,8 @@ Keyboard
 	=FP remap:
 	clear_mods
 	clear_keys
+	clear_all
+	=RA clear_locks
 
 Pointer
 	=D-C:none,arrow,X,some,most cursor:

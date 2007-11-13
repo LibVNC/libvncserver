@@ -1045,13 +1045,17 @@ void ssh_remote_tunnel(char *instr, int lport) {
 		int bestpid = -1;
 		int best = -1;
 		char line[1024];
-		char *ps = "ps -ef";
+		char *psef = "ps -ef";
+		char *psww = "ps wwwwwwaux";
+		char *ps = psef;
 		/* not portable... but it is really good to terminate the ssh when done. */
 		/* ps -ef | egrep 'ssh2.*-R.*5907:localhost:5900.*runge@celias.lbl.gov.*sleep 300' | grep -v grep | awk '{print $2}' */
 		if (strstr(UT.sysname, "Linux")) {
-			ps = "ps wwwwwaux";
+			ps = psww;
 		} else if (strstr(UT.sysname, "BSD")) {
-			ps = "ps wwwwwaux";
+			ps = psww;
+		} else if (strstr(UT.sysname, "Darwin")) {
+			ps = psww;
 		}
 		sprintf(cmd, "env COLUMNS=256 %s | egrep '%s.*-R *%d:localhost:%d.*%s.*sleep *%d' | grep -v grep | awk '{print $2}'", ps, ssh, rport, lport, s, sleep);
 		pipe = popen(cmd, "r");
@@ -2961,6 +2965,8 @@ int main(int argc, char* argv[]) {
 			clear_mods = 1;
 		} else if (!strcmp(arg, "-clear_keys")) {
 			clear_mods = 2;
+		} else if (!strcmp(arg, "-clear_all")) {
+			clear_mods = 3;
 		} else if (!strcmp(arg, "-remap")) {
 			CHECK_ARGC
 			remap_file = strdup(argv[++i]);

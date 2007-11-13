@@ -2246,6 +2246,33 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: disabling -clear_keys mode.\n");
 		clear_mods = 0;
 
+	} else if (!strcmp(p, "clear_all")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p,
+			    clear_mods == 3);
+			goto qry;
+		}
+		rfbLog("remote_cmd: doing clear_all action.\n");
+		clear_mods = 3;
+		clear_keys();
+		clear_locks();
+
+	} else if (!strcmp(p, "clear_locks")) {
+		NOTAPP
+		rfbLog("remote_cmd: doing clear_locks action.\n");
+		clear_locks();
+
+	} else if (!strcmp(p, "keystate")) {
+		int i, state[256];
+		NOTAPP
+		for (i=0; i<256; i++) {
+			state[i] = 0;
+		}
+		get_keystate(state);
+		for (i=0; i<256; i++) {
+			fprintf(stderr, "keystate[%03d] %d\n", i, state[i]);
+		}
+
 	} else if (strstr(p, "remap") == p) {
 		char *before, *old;
 		COLON_CHECK("remap:")
