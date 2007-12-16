@@ -2860,6 +2860,8 @@ int main(int argc, char* argv[]) {
 			blackout_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-xinerama")) {
 			xinerama = 1;
+		} else if (!strcmp(arg, "-noxinerama")) {
+			xinerama = 0;
 		} else if (!strcmp(arg, "-xtrap")) {
 			xtrap_input = 1;
 		} else if (!strcmp(arg, "-xrandr")) {
@@ -4106,8 +4108,20 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		}
 	}
 
+#ifdef MACOSX
+	if (use_dpy && !strcmp(use_dpy, "console")) {
+		;
+	} else
+#endif
 	if (use_dpy) {
 		dpy = XOpenDisplay_wr(use_dpy);
+#ifdef MACOSX
+	} else if (!subwin && getenv("DISPLAY")
+	    && strstr(getenv("DISPLAY"), "/tmp/") ) {
+		/* e.g. /tmp/launch-XlspvM/:0 on leopard */
+		rfbLog("MacOSX: Ignoring $DISPLAY '%s'\n", getenv("DISPLAY"));
+		rfbLog("MacOSX: Use -display $DISPLAY to force it.\n");
+#endif
 	} else if ( (use_dpy = getenv("DISPLAY")) ) {
 		dpy = XOpenDisplay_wr(use_dpy);
 	} else {

@@ -1,3 +1,8 @@
+2007-12-15  Karl Runge <runge@karlrunge.com>
+	* x11vnc: fix find_display and usleep() prototype on macosx.
+	  -display console and check DISPLAY /tmp/...:0 on macosx.
+	  implement -noxinerama.
+
 2007-11-12  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add clear_locks (Caps_Lock, etc) action.  Fix
 	  ssh tunnel on Darwin.

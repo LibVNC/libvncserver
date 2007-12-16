@@ -139,7 +139,11 @@ extern void do_new_fb(int);
 extern int macosx_wait_for_switch, macosx_resize;
 
 extern void macosxGCS_poll_pb(void);
+#if 0
 extern void usleep(unsigned long usec);
+#else
+extern int usleep(useconds_t usec);
+#endif
 extern unsigned int sleep(unsigned int seconds);
 extern void clean_up_exit (int ret);
 

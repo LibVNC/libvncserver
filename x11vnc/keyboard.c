@@ -259,7 +259,7 @@ void clear_locks(void) {
 #else
 	XModifierKeymap *map;
 	int i, j, k = 0;
-	unsigned int state;
+	unsigned int state = 0;
 
 	RAWFB_RET_VOID
 
@@ -279,6 +279,7 @@ void clear_locks(void) {
 #endif
 	{
 		state = mask_state();
+		/* this may contain non-locks too... */
 		rfbLog("state:   0x%x\n", state);
 	}
 	if (! state) {

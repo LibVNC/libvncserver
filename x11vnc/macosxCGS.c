@@ -135,7 +135,11 @@ int macosxCGS_find_index(int w) {
 	return -1;
 }
 
+#if 0
 extern void usleep(unsigned long usec);
+#else
+extern int usleep(useconds_t usec);
+#endif
 
 int macosxCGS_follow_animation_win(int win, int idx, int grow) {
 	double t = dnow();
@@ -496,7 +500,9 @@ void macosxGCS_initpb(void) {
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	pblock = [[NSLock alloc] init];
 	if (![NSPasteboard generalPasteboard]) {
-		macosx_log("macosxGCS_initpb: pasteboard inaccessible.\n");
+		macosx_log("macosxGCS_initpb: **PASTEBOARD INACCESSIBLE**.\n");
+		macosx_log("macosxGCS_initpb: Clipboard exchange will NOT work.\n");
+		macosx_log("macosxGCS_initpb: Start x11vnc *inside* Aqua for Clipboard.\n");
 		pbcnt = 0;
 		pbstr = [[NSString alloc] initWithString:@"\e<PASTEBOARD INACCESSIBLE>\e"]; 
 	}
