@@ -907,8 +907,20 @@ sub xfer {
 	close($out);
 }
 '
-	echo "$cod" > $tf
+	# xpg_echo will expand \n \r, etc.
+	# try to unset and then test for it.
+	shopt -u xpg_echo >/dev/null 2>&1
+	v='print STDOUT "abc\n";'
+	echo "$v" > $tf
 	chmod 700 $tf
+
+	lc=`wc -l $tf | awk '{print $1}'`
+	if [ "X$lc" = "X1" ]; then
+		echo "$cod" > $tf
+	else
+		printf "%s" "$cod" > $tf
+		echo "" >> $tf
+	fi
 	# prime perl
 	perl -e 'use IO::Socket::INET; select(undef, undef, undef, 0.01)' >/dev/null 2>&1
 }

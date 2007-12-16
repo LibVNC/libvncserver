@@ -111,7 +111,7 @@ use_ours=0
 if [ "X$VNCVIEWERCMD" = "X" ]; then
 	VNCVIEWERCMD="vncviewer"
 	export VNCVIEWERCMD
-	if [ "X$DARWIN_COTVNC" = "X" ]; then
+	if [ "X$DARWIN_COTVNC" != "X1" ]; then
 		use_ours=1
 	fi
 fi
@@ -183,7 +183,7 @@ else
 	export SSVNC_VIEWER_INTERNAL
 fi
 
-if [ "X$DARWIN_COTVNC" = "X" -a "X$VNCVIEWERCMD" = "Xvncviewer" ]; then
+if [ "X$DARWIN_COTVNC" != "X1" -a "X$VNCVIEWERCMD" = "Xvncviewer" ]; then
 	hstr=`$VNCVIEWERCMD -h 2>&1 | head -5`
 	if echo "$hstr" | grep '^TightVNC.*version 1\.[23]' > /dev/null; then
 		# we need to avoid raw encoding

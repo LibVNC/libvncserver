@@ -219,6 +219,7 @@ proc ts_help {} {
            - File Transfer       (Ultra or TightVNC filexfer)
            - View Only           (View only client)
            - Change VNC Viewer   (Realvnc, ultra, etc...)
+           - X11 viewer MacOSX   (use bundled X11 vncviewer)
            - Delete Profile...   (Delete a saved profile)
 
            - Advanced Options:
@@ -1090,6 +1091,13 @@ set msg {
     If you do not like the VNC Viewer bundled in the package, you can
     indicate another one here.
 
+ X11 viewer MacOSX:
+
+    On MacOSX try to use the bundled X11 vncviewer instead of the
+    Chicken of the VNC viewer; the Xquartz X server must be installed
+    (it is by default on 10.5.x) and the DISPLAY variable must be set
+    (see tip 12 of SSVNC Help to do this manually.)
+
 
  Advanced Options:
 
@@ -1477,6 +1485,13 @@ set msg {
   Use 8bit color:          Request a very low-color pixel format.
   
   Do not use JPEG:         Do not use the jpeg aspect of the tight encoding.
+
+  Use X11 vncviewer on MacOSX:
+                           On MacOSX try to use the bundled X11 vncviewer
+                           instead of the Chicken of the VNC viewer;
+                           The Xquartz X server must be installed (it is by
+                           default on 10.5.x) and the DISPLAY variable must
+                           be set (see tip 12 of Help to do this manually.)
 
   Compress Level/Quality:  Set TightVNC encoding parameters.
 
@@ -1891,7 +1906,7 @@ proc set_defaults {} {
 
 	global mycert svcert crtdir
 	global use_alpha use_grab use_ssl use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
-	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
+	global use_nojpeg use_raise_on_beep use_compresslevel use_quality use_x11_macosx
 	global compresslevel_text quality_text
 	global use_cups use_sound use_smbmnt
 	global cups_local_server cups_remote_port cups_manage_rcfile cups_x11vnc
@@ -1923,6 +1938,7 @@ proc set_defaults {} {
 	set defs(use_alpha) 0
 	set defs(use_grab) 0
 	set defs(use_nojpeg) 0
+	set defs(use_x11_macosx) 0
 	set defs(use_compresslevel) "default"
 	set defs(use_quality) "default"
 	set defs(compresslevel_text) "Compress Level: default"
@@ -3266,11 +3282,6 @@ proc unix_terminal_cmd {{geometry "+100+100"} {title "xterm-command"} {cmd "echo
 	if {$uname == "Darwin"} {
 		global env
 		set doX  0;
-		if [info exists env(DISPLAY)] {
-			if {[in_path "xterm"] != ""} {
-				set doX 1
-			}
-		}
 		if {! $doX} {
 			darwin_terminal_cmd $title $cmd $bg
 			return
@@ -4515,6 +4526,16 @@ proc launch_unix {hp} {
 	global darwin_cotvnc
 	if {$darwin_cotvnc} {
 		set env(DARWIN_COTVNC) 1
+	} else {
+		if [info exists env(DISPLAY)] {
+			if {$env(DISPLAY) != ""} {
+				set env(DARWIN_COTVNC) 0
+			} else {
+				set env(DARWIN_COTVNC) 1
+			}
+		} else {
+			set env(DARWIN_COTVNC) 1
+		}
 	}
 
 	set cmd "$cmd $hp"
@@ -5664,7 +5685,14 @@ proc get_idir_certs {str} {
 		}
 		if {$idir == ""} {
 			if [info exists env(SSVNC_HOME)] {
+				set t "$env(SSVNC_HOME)/.vnc"	
+				if {! [file isdirectory $t]} {
+					catch {file mkdir $t}
+				}
 				set t "$env(SSVNC_HOME)/.vnc/certs"	
+				if {! [file isdirectory $t]} {
+					catch {file mkdir $t}
+				}
 				if [file isdirectory $t] {
 					set idir $t
 				}
@@ -7216,6 +7244,15 @@ proc load_profile {{parent "."} {infile ""}} {
 	set last_load [file tail $file]
 ##	regsub {\.vnc$} $last_load "" last_load
 
+	global uname darwin_cotvnc
+	if {$uname == "Darwin"} {
+		if {$use_x11_macosx} {
+			set darwin_cotvnc 0;
+		} else {
+			set darwin_cotvnc 1;
+		}
+	}
+
 	mesg "Loaded [file tail $file]"
 }
 
@@ -7355,6 +7392,8 @@ proc save_profile {{parent "."}} {
 	regsub { .*$} $p "" p
 	if {$p == ""} {
 		set p 0
+	} elseif {![regexp {^[-0-9][0-9]*$} $p]} {
+		set p 0
 	}
 	if {$p < 0} {
 		set port $p
@@ -7395,6 +7434,7 @@ proc save_profile {{parent "."}} {
 	puts $fh "proxyport=$proxyport"
 	puts $fh "disp=$vncdisp"
 	puts $fh "\n\[options\]"
+	puts $fh "# parameters commented out with '#' indicate the default setting."
 
 	if {$include_list != ""} {
 		load_include $include_list [get_profiles_dir]
@@ -10771,6 +10811,7 @@ proc set_ts_options {} {
 	global use_cups use_sound use_smbmnt
 	global change_vncviewer choose_xserver
 	global ts_only
+	global darwin_cotvnc use_x11_macosx uname
 	if {! $ts_only} {
 		return
 	}
@@ -10822,6 +10863,12 @@ proc set_ts_options {} {
 	checkbutton .ot.b$i -anchor w -variable change_vncviewer -text \
 		"Change VNC Viewer" \
 		-command {if {$change_vncviewer} {change_vncviewer_dialog}}
+	incr i
+
+	checkbutton .ot.b$i -anchor w -variable use_x11_macosx -text \
+		"X11 viewer MacOSX" \
+		-command {if {$use_x11_macosx} {set darwin_cotvnc 0} else {set darwin_cotvnc 1}; catch {destroy .ot}; set_ts_options}
+	if {$uname != "Darwin"} {.ot.b$i configure -state disabled}
 	incr i
 
 	button .ot.b$i -anchor w -text "   Delete Profile..." \
@@ -11287,9 +11334,9 @@ proc x11vnc_find_adjust {which} {
 
 proc set_options {} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
-	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
+	global use_nojpeg use_raise_on_beep use_compresslevel use_quality use_x11_macosx
 	global compresslevel_text quality_text
-	global env is_windows darwin_cotvnc
+	global env is_windows darwin_cotvnc uname
 	global use_listen
 	global use_x11vnc_find x11vnc_find_widget
 	global use_x11vnc_xlogin x11vnc_xlogin_widget
@@ -11362,6 +11409,12 @@ proc set_options {} {
 	checkbutton .o.b$i -anchor w -variable use_nojpeg -text \
 		"Do not use JPEG (-nojpeg)"
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	incr i
+
+	checkbutton .o.b$i -anchor w -variable use_x11_macosx -text \
+		"Use X11 vncviewer on MacOSX" \
+		-command {if {$use_x11_macosx} {set darwin_cotvnc 0} else {set darwin_cotvnc 1}; catch {destroy .o}; set_options}
+	if {$uname != "Darwin"} {.o.b$i configure -state disabled}
 	incr i
 
 	menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable compresslevel_text -relief groove
@@ -11763,6 +11816,8 @@ if {! $is_windows} {
 set darwin_cotvnc 0
 if {$uname == "Darwin"} {
 	if {! [info exists env(DISPLAY)]} {
+		set darwin_cotvnc 1
+	} elseif {[regexp {/tmp/} $env(DISPLAY)]} {
 		set darwin_cotvnc 1
 	}
 	if [info exists env(SSVNC_HOME)] {
