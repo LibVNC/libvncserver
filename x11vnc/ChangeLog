@@ -1,3 +1,7 @@
+2007-12-16  Karl Runge <runge@karlrunge.com>
+	* x11vnc: setup remote-ctrl file by default on macosx. improve
+	  tkx11vnc wrt attaching to existing server in icon/tray mode. 
+
 2007-12-15  Karl Runge <runge@karlrunge.com>
 	* x11vnc: fix find_display and usleep() prototype on macosx.
 	  -display console and check DISPLAY /tmp/...:0 on macosx.

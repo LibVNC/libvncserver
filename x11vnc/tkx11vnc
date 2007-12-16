@@ -4860,7 +4860,7 @@ proc lmenu {menu} {
 }
 
 proc old_balloon {} {
-	global client_str saved_client_str
+	global client_str saved_clients_str
 	set str ""
 	if {[info exists client_str]} {
 		if {$client_str != ""} {
@@ -4868,8 +4868,8 @@ proc old_balloon {} {
 		}
 	}
 	if {$str == ""} {
-		if {[info exists saved_client_str]} {
-			set str $saved_client_str
+		if {[info exists saved_clients_str]} {
+			set str $saved_clients_str
 		}
 	}
 	if {$str != ""} {
@@ -5029,6 +5029,7 @@ proc make_icon {} {
 	}
 	$menu add cascade -font $mfont -label "Window View:" -menu $wv
 
+	$menu add command -font $mfont -label "Dismiss" -command "$menu unpost"
 	$menu add command -font $mfont -label "Stop x11vnc" -command clean_icon_exit
 
 	set items [get_custom_menu_items]
@@ -5047,10 +5048,11 @@ proc make_icon {} {
 	bind $icon_win <Enter> {set client_balloon_id [after 500 show_client_balloon]}
 	bind $icon_win <Button> {kill_client_balloon}
 	bind $icon_win <Leave>  {kill_client_balloon}
-	bind $icon_win <ButtonPress-2> {kill_client_balloon; show_client_balloon}
+	bind $icon_win <Shift-ButtonRelease-1> {kill_client_balloon; show_client_balloon}
+	bind $icon_win <ButtonRelease-2> {kill_client_balloon; show_client_balloon}
 #	bind $menu <Leave> "lmenu $menu"
 #	bind $menu <Enter> "set left_iconwin_menu 0"
-##	bind $menu <KeyPress-Escape> "$menu unpost"
+#	bind $menu <KeyPress-Escape> "$menu unpost"
 
 	bind . <Control-KeyPress-c> {destroy .; exit 0}
 
@@ -5071,8 +5073,19 @@ proc make_icon {} {
 	wm iconname . "tkx11vnc"
 	wm title . "tkx11vnc"
 	update
-	wm deiconify .
+	if {$tray_embed && $tray_running} {
+		wm deiconify .
+		#after 10000 {wm deiconify .; puts "reqheight [winfo reqheight .]"; puts "reqwidth  [winfo reqwidth  .]"; puts "height [winfo height .]"; puts "width  [winfo width  .]"}
+	} else {
+		wm deiconify .
+	}
 	update
+
+#puts "reqheight [winfo reqheight .]"
+#puts "reqwidth  [winfo reqwidth  .]"
+#puts "height [winfo height .]"
+#puts "width  [winfo width  .]"
+#puts "AAA"
 
 	old_balloon
 }

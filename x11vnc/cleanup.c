@@ -140,7 +140,7 @@ void clean_up_exit (int ret) {
 
 #ifdef MACOSX
 	if (client_connect_file) {
-		if (strstr(client_connect_file, "/tmp/x11vnc-macosx-channel.")
+		if (strstr(client_connect_file, "/tmp/x11vnc-macosx-remote")
 		    == client_connect_file) {
 			unlink(client_connect_file);
 		}

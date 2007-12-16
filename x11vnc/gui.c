@@ -152,6 +152,16 @@ int tray_embed(Window iconwin, int remove) {
 	XChangeProperty(dpy, iconwin, xembed_info, xembed_info, 32,
 	    PropModeReplace, (unsigned char *)&info, 2);
 
+#if 0
+{
+XSizeHints *xszh = XAllocSizeHints();
+xszh->flags = PMinSize;
+xszh->min_width = 24;
+xszh->min_height = 24;
+XSetWMNormalHints(dpy, iconwin, xszh);
+}
+#endif
+
 	/* kludge for KDE evidently needed... */
 	tatom = XInternAtom(dpy, "KWM_DOCKWINDOW", False);
 	XChangeProperty(dpy, iconwin, tatom, tatom, 32, PropModeReplace,

@@ -3489,26 +3489,38 @@ int main(int argc, char* argv[]) {
 	if (more_safe) {
 		launch_gui = 0;
 	}
+
+#ifdef MACOSX
+	if (! use_dpy) {
+		/* we need this for gui since no X properties */
+		if (!client_connect_file && !client_connect) {
+			char *user = get_user_name();
+			char *str = (char *) malloc(strlen(user) + strlen("/tmp/x11vnc-macosx-remote.") + 1);
+			struct stat sb;
+			sprintf(str, "/tmp/x11vnc-macosx-remote.%s", user);
+			if (!remote_cmd && !query_cmd) {
+				unlink(str);
+				if (stat(str, &sb) != 0) {
+					int fd = open(str, O_WRONLY|O_EXCL|O_CREAT, 0600);
+					if (fd >= 0) {
+						close(fd);
+						client_connect_file = str;
+					}
+				}
+			} else {
+				client_connect_file = str;
+			}
+			if (client_connect_file) {
+				rfbLog("MacOS X: set -connect file to %s\n", client_connect_file);
+			}
+		}
+	}
+#endif
 	if (launch_gui) {
 		int sleep = 0;
 		if (SHOW_NO_PASSWORD_WARNING && !nopw) {
 			sleep = 1;
 		}
-#ifdef MACOSX
-		if (! use_dpy && getenv("DISPLAY") == NULL) {
-			/* we need this for gui since no X properties */
-			if (! client_connect_file && ! client_connect) {
-				int fd;
-				char tmp[] = "/tmp/x11vnc-macosx-channel.XXXXXX";
-				fd = mkstemp(tmp);
-				if (fd >= 0) {
-					close(fd);
-					client_connect_file = strdup(tmp);
-					rfbLog("MacOS X: set -connect file to %s\n", client_connect_file);
-				}
-			}
-		}
-#endif
 		do_gui(gui_str, sleep);
 	}
 	if (logfile) {

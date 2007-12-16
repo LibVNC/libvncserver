@@ -52,6 +52,7 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 	FILE *in = NULL;
 
 	if (client_connect_file) {
+		umask(077);
 		in = fopen(client_connect_file, "w");
 		if (in == NULL) {
 			fprintf(stderr, "send_remote_cmd: could not open "

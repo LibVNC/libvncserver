@@ -32,7 +32,7 @@ int macosxCG_get_cursor(void);
 void macosxCG_init_key_table(void);
 void macosxCG_key_inject(int down, unsigned int keysym);
 
-CGDirectDisplayID displayID = NULL;
+CGDirectDisplayID displayID = 0;
 
 extern void macosx_log(char *);
 extern int collect_non_X_xdamage(int x_in, int y_in, int w_in, int h_in, int call);
@@ -100,7 +100,7 @@ extern void macosxCGP_screensaver_timer_off(void);
 extern void macosxCGP_screensaver_timer_on(void);
 
 void macosxCG_init(void) {
-	if (displayID == NULL) {
+	if (displayID == 0) {
 		macosx_log("macosxCG_init: initializing display.\n");
 #if 0
 		dragum();
