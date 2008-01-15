@@ -774,7 +774,7 @@ void print_help(int mode) {
 "                       associated with it does apply as normal.\n"
 "\n"
 "                       There are also some utilities for testing password\n"
-"                       if [list] starts with the \"%\" character.  See the\n"
+"                       if [list] starts with the \"%%\" character.  See the\n"
 "                       quick_pw() function in the source for details.\n"
 "\n"
 "-unixpw_nis [list]     As -unixpw above, however do not use su(1) but rather\n"
@@ -2214,14 +2214,6 @@ void print_help(int mode) {
 "                       Keysym to the X server's keyboard mapping on an unused\n"
 "                       key.  Added Keysyms will be removed periodically and\n"
 "                       also when x11vnc exits.  Default: %s\n"
-#if 0
-"-xkbcompat             Ignore the XKEYBOARD extension.  Use as a workaround for\n"
-"                       some keyboard mapping problems.  E.g. if you are using\n"
-"                       an international keyboard (AltGr or ISO_Level3_Shift),\n"
-"                       and the OS or keyboard where the VNC viewer is run\n"
-"                       is not identical to that of the X server, and you are\n"
-"                       having problems typing some keys.  Implies -nobell.\n"
-#endif
 "-clear_mods            At startup and exit clear the modifier keys by sending\n"
 "                       KeyRelease for each one. The Lock modifiers are skipped.\n"
 "                       Used to clear the state if the display was accidentally\n"
@@ -3029,16 +3021,19 @@ void print_help(int mode) {
 "                       to repaint themselves.  Use this only if applications\n"
 "                       misbehave by not repainting themselves properly.\n"
 "                       See also -noxdamage.\n"
-"-readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On\n"
-"                       slow links that take a long time to paint the first\n"
-"                       screen libvncserver may hit the timeout and drop the\n"
-"                       connection.  Default: %d seconds.\n"
 "-nap                   Monitor activity and if it is low take longer naps\n"
 "-nonap                 between screen polls to really cut down load when idle.\n"
 "                       Default: %s\n"
 "-sb time               Time in seconds after NO activity (e.g. screen blank)\n"
 "                       to really throttle down the screen polls (i.e. sleep\n"
 "                       for about 1.5 secs). Use 0 to disable.  Default: %d\n"
+"\n"
+"-readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On\n"
+"                       slow links that take a long time to paint the first\n"
+"                       screen libvncserver may hit the timeout and drop the\n"
+"                       connection.  Default: %d seconds.\n"
+"-ping n                Send a 1x1 framebuffer update to all clients every n\n"
+"                       seconds (e.g. to try to keep a network connection alive)\n"
 "\n"
 "-nofbpm                If the system supports the FBPM (Frame Buffer Power\n"
 "-fbpm                  Management) extension (i.e. some Sun systems), then\n"
@@ -4277,6 +4272,7 @@ void print_help(int mode) {
 		fprintf(stderr, "\n");
 		exit(1);
 	}
+#if 1
 	fprintf(stderr, help, lastmod,
 		POLL_8TO24_DELAY,
 		scaling_copyrect ? ":cr":":nocr",
@@ -4306,8 +4302,8 @@ void print_help(int mode) {
 		defer_update,
 		waitms,
 		wait_ui,
-		rfbMaxClientWait/1000,
 		take_naps ? "take naps":"no naps",
+		rfbMaxClientWait/1000,
 		screen_blank,
 		watch_fbpm ? "-nofbpm":"-fbpm",
 		watch_dpms ? "-nodpms":"-dpms",
@@ -4320,6 +4316,9 @@ void print_help(int mode) {
 		accept_remote_cmds ? "-yesremote":"-noremote",
 		""
 	);
+#else
+	fprintf(stderr, "%s", help);
+#endif
 
 	rfbUsage();
 #endif

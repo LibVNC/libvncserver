@@ -1,3 +1,7 @@
+2008-01-14  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -ping option, fix memory corruption in copy_tiles
+	  after xrandr resize.
+
 2007-12-16  Karl Runge <runge@karlrunge.com>
 	* x11vnc: setup remote-ctrl file by default on macosx. improve
 	  tkx11vnc wrt attaching to existing server in icon/tray mode. 

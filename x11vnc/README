@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sun Dec 16 13:21:20 EST 2007
+x11vnc README file                         Date: Mon Jan 14 22:59:36 EST 2008
 
 The following information is taken from these URLs:
 
@@ -1978,8 +1978,8 @@ typedef unsigned int in_addr_t;
    [361]http://www.archlinux.org/ Nokia 770 (.deb)
    [362]http://mike.saunby.googlepages.com/x11vncfornokia7702 Sharp
    Zaurus [363]http://www.focv.com/ Debian: (.deb)
-   [364]http://packages.debian.org/x11vnc (N.B: old and unmaintained;
-   better to compile from source) Solaris: (pkg)
+   [364]http://packages.debian.org/x11vnc (N.B: often unmaintained; might
+   be better to compile from source) Solaris: (pkg)
    [365]http://www.sunfreeware.com/ (N.B: very old; better to compile
    from source) OpenBSD: (.tgz) [366]http://www.openbsd.org/ (N.B: very
    old and unmaintained; better to compile from source)
@@ -11842,7 +11842,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2007-12-16
+x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-01-14
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -11910,24 +11910,24 @@ x11vnc options:
   -allinput                -speeds rd,bw,lat        -wmdt string           
   -debug_pointer           -debug_keyboard          -defer time            
   -wait time               -wait_ui factor          -nowait_bog            
-  -slow_fb time            -xrefresh time           -readtimeout n         
-  -nap                     -nonap                   -sb time               
-  -nofbpm                  -fbpm                    -nodpms                
-  -dpms                    -forcedpms               -clientdpms            
-  -noserverdpms            -noultraext              -noxdamage             
-  -xd_area A               -xd_mem f                -sigpipe string        
-  -threads                 -nothreads               -fs f                  
-  -gaps n                  -grow n                  -fuzz n                
-  -debug_tiles             -snapfb                  -rawfb string          
-  -freqtab file            -pipeinput cmd           -macnodim              
-  -macnosleep              -macnosaver              -macnowait             
-  -macwheel n              -macnoswap               -macnoresize           
-  -maciconanim n           -macmenu                 -gui [gui-opts]        
-  -remote command          -query variable          -QD variable           
-  -sync                    -noremote                -yesremote             
-  -unsafe                  -safer                   -privremote            
-  -nocmds                  -allowedcmds list        -deny_all              
-
+  -slow_fb time            -xrefresh time           -nap                   
+  -nonap                   -sb time                 -readtimeout n         
+  -ping n                  -nofbpm                  -fbpm                  
+  -nodpms                  -dpms                    -forcedpms             
+  -clientdpms              -noserverdpms            -noultraext            
+  -noxdamage               -xd_area A               -xd_mem f              
+  -sigpipe string          -threads                 -nothreads             
+  -fs f                    -gaps n                  -grow n                
+  -fuzz n                  -debug_tiles             -snapfb                
+  -rawfb string            -freqtab file            -pipeinput cmd         
+  -macnodim                -macnosleep              -macnosaver            
+  -macnowait               -macwheel n              -macnoswap             
+  -macnoresize             -maciconanim n           -macmenu               
+  -gui [gui-opts]          -remote command          -query variable        
+  -QD variable             -sync                    -noremote              
+  -yesremote               -unsafe                  -safer                 
+  -privremote              -nocmds                  -allowedcmds list      
+  -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -11961,7 +11961,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2007-12-16
+x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-01-14
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -14956,16 +14956,19 @@ t
                        to repaint themselves.  Use this only if applications
                        misbehave by not repainting themselves properly.
                        See also -noxdamage.
--readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On
-                       slow links that take a long time to paint the first
-                       screen libvncserver may hit the timeout and drop the
-                       connection.  Default: 20 seconds.
 -nap                   Monitor activity and if it is low take longer naps
 -nonap                 between screen polls to really cut down load when idle.
                        Default: take naps
 -sb time               Time in seconds after NO activity (e.g. screen blank)
                        to really throttle down the screen polls (i.e. sleep
-                       for about 1.5 secs). Use 0 to disable.  Default: 60
+                       for about 1.5 secs). Use 0 to disable.  Default: 20
+
+-readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On
+                       slow links that take a long time to paint the first
+                       screen libvncserver may hit the timeout and drop the
+                       connection.  Default: 60 seconds.
+-ping n                Send a 1x1 framebuffer update to all clients every n
+                       seconds (e.g. to try to keep a network connection alive)
 
 -nofbpm                If the system supports the FBPM (Frame Buffer Power
 -fbpm                  Management) extension (i.e. some Sun systems), then

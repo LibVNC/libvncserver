@@ -85,6 +85,7 @@ extern int begin_viewonly;
 extern int inetd;
 extern int tightfilexfer; 
 extern int first_conn_timeout;
+extern int ping_interval;
 extern int flash_cmap;
 extern int shift_cmap;
 extern int force_indexed_color;

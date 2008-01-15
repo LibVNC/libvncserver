@@ -1873,6 +1873,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " shared:     %d\n", shared);
 	fprintf(stderr, " conn_once:  %d\n", connect_once);
 	fprintf(stderr, " timeout:    %d\n", first_conn_timeout);
+	fprintf(stderr, " ping:       %d\n", ping_interval);
 	fprintf(stderr, " inetd:      %d\n", inetd);
 	fprintf(stderr, " tightfilexfer:   %d\n", tightfilexfer);
 	fprintf(stderr, " http:       %d\n", try_http);
@@ -2263,6 +2264,9 @@ char msg2[] =
 ;
 
 	if (raw_fb_str && !macosx_console) {
+		return;
+	}
+	if (quiet) {
 		return;
 	}
 	if (nofb) {
@@ -3221,6 +3225,9 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-readtimeout")) {
 			CHECK_ARGC
 			rfbMaxClientWait = atoi(argv[++i]) * 1000;
+		} else if (!strcmp(arg, "-ping")) {
+			CHECK_ARGC
+			ping_interval = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-nap")) {
 			take_naps = 1;
 		} else if (!strcmp(arg, "-nonap")) {

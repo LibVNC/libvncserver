@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "December 2007" "x11vnc " "User Commands"
+.TH X11VNC "1" "January 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2007-12-16
+         version: 0.9.4, lastmod: 2008-01-14
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -3546,13 +3546,6 @@ to repaint themselves.  Use this only if applications
 misbehave by not repainting themselves properly.
 See also \fB-noxdamage.\fR
 .PP
-\fB-readtimeout\fR \fIn\fR
-.IP
-Set libvncserver rfbMaxClientWait to n seconds. On
-slow links that take a long time to paint the first
-screen libvncserver may hit the timeout and drop the
-connection.  Default: 20 seconds.
-.PP
 \fB-nap,\fR \fB-nonap\fR
 .IP
 Monitor activity and if it is low take longer naps
@@ -3563,7 +3556,19 @@ Default: take naps
 .IP
 Time in seconds after NO activity (e.g. screen blank)
 to really throttle down the screen polls (i.e. sleep
-for about 1.5 secs). Use 0 to disable.  Default: 60
+for about 1.5 secs). Use 0 to disable.  Default: 20
+.PP
+\fB-readtimeout\fR \fIn\fR
+.IP
+Set libvncserver rfbMaxClientWait to n seconds. On
+slow links that take a long time to paint the first
+screen libvncserver may hit the timeout and drop the
+connection.  Default: 60 seconds.
+.PP
+\fB-ping\fR \fIn\fR
+.IP
+Send a 1x1 framebuffer update to all clients every n
+seconds (e.g. to try to keep a network connection alive)
 .PP
 \fB-nofbpm,\fR \fB-fbpm\fR
 .IP

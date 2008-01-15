@@ -1659,8 +1659,8 @@ static void mark_hint(hint_t hint) {
  * devices are optimized for write, not read, so we are limited by the
  * read bandwidth, sometimes only 5 MB/sec on otherwise fast hardware.
  */
-static int *first_line = NULL, *last_line;
-static unsigned short *left_diff, *right_diff;
+static int *first_line = NULL, *last_line = NULL;
+static unsigned short *left_diff = NULL, *right_diff = NULL;
 
 static int copy_tiles(int tx, int ty, int nt) {
 	int x, y, line;
@@ -1670,14 +1670,23 @@ static int copy_tiles(int tx, int ty, int nt) {
 	int pixelsize = bpp/8;
 	int first_min, last_max;
 	int first_x = -1, last_x = -1;
+	static int prev_ntiles_x = -1;
 
 	char *src, *dst, *s_src, *s_dst, *m_src, *m_dst;
 	char *h_src, *h_dst;
 	if (unixpw_in_progress) return 0;
 
-	if (! first_line) {
+	if (ntiles_x != prev_ntiles_x && first_line != NULL) {
+		free(first_line);	first_line = NULL;
+		free(last_line);	last_line = NULL;
+		free(left_diff);	left_diff = NULL;
+		free(right_diff);	right_diff = NULL;
+	}
+
+	if (first_line == NULL) {
 		/* allocate arrays first time in. */
 		int n = ntiles_x + 1;
+		rfbLog("copy_tiles: allocating first_line at size %d\n", n);
 		first_line = (int *) malloc((size_t) (n * sizeof(int)));
 		last_line  = (int *) malloc((size_t) (n * sizeof(int)));
 		left_diff  = (unsigned short *)
@@ -1685,6 +1694,7 @@ static int copy_tiles(int tx, int ty, int nt) {
 		right_diff = (unsigned short *)
 			malloc((size_t) (n * sizeof(unsigned short)));
 	}
+	prev_ntiles_x = ntiles_x;
 
 	x = tx * tile_x;
 	y = ty * tile_y;
@@ -3353,6 +3363,11 @@ if (tile_count) fprintf(stderr, "XX copytile: %.4f  tile_count: %d\n", dnow() - 
 		ping_clients(-1);
 	} else if (use_openssl && !tile_diffs) {
 		ping_clients(0);
+	}
+	/* -ping option: */
+	if (ping_interval) {
+		int td = ping_interval > 0 ? ping_interval : -ping_interval;
+		ping_clients(-td);
 	}
 
 

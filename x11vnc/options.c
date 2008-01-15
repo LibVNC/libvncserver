@@ -110,6 +110,7 @@ int inetd = 0;			/* spawned from inetd(8) */
 #endif
 int tightfilexfer = TIGHTFILEXFER; 
 int first_conn_timeout = 0;	/* -timeout */
+int ping_interval = 0;		/* -ping */
 int flash_cmap = 0;		/* follow installed colormaps */
 int shift_cmap = 0;		/* ncells < 256 and needs shift of pixel values */
 int force_indexed_color = 0;	/* whether to force indexed color for 8bpp */
