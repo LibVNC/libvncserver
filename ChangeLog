@@ -1,3 +1,9 @@
+2008-01-28  Noriaki Yamazaki <micro-vnc@ias.hitachi-system.co.jp>
+	*  rfb/rfbproto.h, libvncserver/rfbserver.c, libvncserver/scale.c,
+	   libvncserver/zrle.c, libvncserver/zrleencodetemplate.c,
+	   libvncserver/zywrletemplate.c: add (server-side) ZYWRLE support,
+		and fix a few endian/scale errors
+
 2008-01-27  Christian Ehrlicher <Ch.Ehrlicher@gmx.de>
 	* CMakeLists, rfb/rfbconfig.h.cmake, rfb/rfbint.h.cmake:
 	  support CMake

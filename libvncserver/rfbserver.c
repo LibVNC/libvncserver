@@ -962,6 +962,7 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingZRLE);
+    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingZYWRLE);
 #endif
     rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingUltra);
     rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingUltraZip);
@@ -1908,6 +1909,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	    case rfbEncodingZlib:
             case rfbEncodingZRLE:
+            case rfbEncodingZYWRLE:
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	    case rfbEncodingTight:
 #endif
@@ -2806,6 +2808,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
        case rfbEncodingZRLE:
+       case rfbEncodingZYWRLE:
            if (!rfbSendRectEncodingZRLE(cl, x, y, w, h))
 	       goto updateFailed;
            break;
