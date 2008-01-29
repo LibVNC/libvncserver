@@ -74,6 +74,8 @@
 #include <dirent.h>
 /* errno */
 #include <errno.h>
+/* strftime() */
+#include <time.h>
 
 #ifdef __MINGW32__
 static int compat_mkdir(const char *path, int mode)
