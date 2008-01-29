@@ -1,19 +1,23 @@
 immediate:
 ----------
 
+Integrate CMake patch
+Clean up ZYWRLE (client-specific zywrle_level and zywrleBuf)
+Clean up ZRLE (probably not thread-safe: zrleBeforeBuf, zrlePaletteHelper)
+Implement ZYWRLE decoding in libvncclient
+style fixes: use Linux' coding guidelines
 LibVNCClient cleanup: prefix with "rfbClient", and make sure it does
 	not deliberately die() or exit() anywhere!
 ANSIfy tightvnc-filetransfer
 VisualNaCro testing
-test IRIX -overlay (x11vnc)
 java vncviewer doesn't do colour cursors?
 MinGW32 doesn't do fcntl on sockets; use setsockopt instead...
 make corre work again (libvncclient or libvncserver?)
 teach SDLvncviewer about capitals...
 teach SDLvncviewer about CopyRect...
+make SDLvncviewer more versatile (test for missing keys, introduce scrollbars,
+	make scrollable with 2xCtrl and mouse drag)
 implement "-record" in libvncclient
-libtoolize
-come up with an alpha cursor patch for Windows vncviewer
 
 later:
 ------
@@ -23,5 +27,3 @@ authentification schemes (secure vnc)
 	IO function ptr exists; now explain how to tunnel and implement a
 	client address restriction scheme.
 using Hermes library for fast colour translations.
-CORBA
-
