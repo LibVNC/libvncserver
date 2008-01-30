@@ -116,9 +116,9 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
 	  if (cl->tightQualityLevel < 0) {
 		  zywrle_level = 1;
 	  } else if (cl->tightQualityLevel < 3) {
-		  zywrle_level = 2;
-	  } else if (cl->tightQualityLevel < 6) {
 		  zywrle_level = 3;
+	  } else if (cl->tightQualityLevel < 6) {
+		  zywrle_level = 2;
 	  } else {
 		  zywrle_level = 1;
 	  }

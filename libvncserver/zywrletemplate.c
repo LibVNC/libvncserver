@@ -766,8 +766,9 @@ PIXEL_T* ZYWRLE_ANALYZE (PIXEL_T* dst, PIXEL_T* src, int w, int h, int scanline,
 		ZYWRLE_PACK_COEFF(pBuf, dst, 3, w, h, l);
 		ZYWRLE_PACK_COEFF(pBuf, dst, 2, w, h, l);
 		ZYWRLE_PACK_COEFF(pBuf, dst, 1, w, h, l);
-		if (l == level-1)
+		if (l == level-1) {
 			ZYWRLE_PACK_COEFF(pBuf, dst, 0, w, h, l);
+		}
 	}
 	ZYWRLE_SAVE_UNALIGN(dst,*dst=*(PIXEL_T*)pTop;)
 	return dst;
@@ -797,8 +798,9 @@ PIXEL_T* ZYWRLE_SYNTHESIZE(PIXEL_T* dst, PIXEL_T* src, int w, int h, int scanlin
 		ZYWRLE_UNPACK_COEFF(pBuf, src, 3, w, h, l);
 		ZYWRLE_UNPACK_COEFF(pBuf, src, 2, w, h, l);
 		ZYWRLE_UNPACK_COEFF(pBuf, src, 1, w, h, l);
-		if (l == level-1)
+		if (l == level-1) {
 			ZYWRLE_UNPACK_COEFF(pBuf, src, 0, w, h, l);
+		}
 	}
 	ZYWRLE_SAVE_UNALIGN(src,*(PIXEL_T*)pTop=*src;)
 	InvWavelet(pBuf, w, h, level);
