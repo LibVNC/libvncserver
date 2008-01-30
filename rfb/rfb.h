@@ -579,6 +579,8 @@ typedef struct _rfbClientRec {
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     void* zrleData;
+    int zywrleLevel;
+    int zywrleBuf[rfbZRLETileWidth * rfbZRLETileHeight];
 #endif
 
     /* if progressive updating is on, this variable holds the current

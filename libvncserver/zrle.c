@@ -96,6 +96,7 @@
  * data.
  */
 
+/* TODO: put into rfbClient struct */
 static char zrleBeforeBuf[rfbZRLETileWidth * rfbZRLETileHeight * 4 + 4];
 
 
@@ -114,17 +115,16 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
 
   if (cl->preferredEncoding == rfbEncodingZYWRLE) {
 	  if (cl->tightQualityLevel < 0) {
-		  zywrle_level = 1;
+		  cl->zywrleLevel = 1;
 	  } else if (cl->tightQualityLevel < 3) {
-		  zywrle_level = 3;
+		  cl->zywrleLevel = 3;
 	  } else if (cl->tightQualityLevel < 6) {
-		  zywrle_level = 2;
+		  cl->zywrleLevel = 2;
 	  } else {
-		  zywrle_level = 1;
+		  cl->zywrleLevel = 1;
 	  }
-  } else {
-	  zywrle_level = 0;
-  }
+  } else
+	  cl->zywrleLevel = 0;
 
   if (!cl->zrleData)
     cl->zrleData = zrleOutStreamNew();
