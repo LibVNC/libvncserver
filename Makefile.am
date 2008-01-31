@@ -1,6 +1,10 @@
 CFLAGS=-g -Wall
 
-SUBDIRS=libvncserver examples contrib libvncclient vncterm classes client_examples test
+if WITH_X11VNC
+X11VNC=x11vnc
+endif
+
+SUBDIRS=libvncserver examples contrib libvncclient vncterm classes client_examples test $(X11VNC)
 DIST_SUBDIRS=libvncserver examples contrib libvncclient vncterm classes client_examples test
 
 bin_SCRIPTS = libvncserver-config

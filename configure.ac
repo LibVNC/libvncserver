@@ -704,6 +704,7 @@ for directory in packages OpenLinux redhat RedHat rpm RPM "" ; do
 done
 echo "$RPMSOURCEDIR"
 AM_CONDITIONAL(HAVE_RPM, test "$RPMSOURCEDIR" != "NOT-FOUND")
+AM_CONDITIONAL(WITH_X11VNC,  test "$build_x11vnc" = "yes")
 AC_SUBST(RPMSOURCEDIR)
 
 AC_CONFIG_FILES([Makefile
