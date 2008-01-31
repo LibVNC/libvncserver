@@ -3093,9 +3093,9 @@ rfbSendSetColourMapEntries(rfbClientPtr cl,
 	  rgb[i*3+1] = Swap16IfLE(cm->data.shorts[i*3+1]);
 	  rgb[i*3+2] = Swap16IfLE(cm->data.shorts[i*3+2]);
 	} else {
-	  rgb[i*3] = Swap16IfLE(cm->data.bytes[i*3]);
-	  rgb[i*3+1] = Swap16IfLE(cm->data.bytes[i*3+1]);
-	  rgb[i*3+2] = Swap16IfLE(cm->data.bytes[i*3+2]);
+	  rgb[i*3] = Swap16IfLE((unsigned short)cm->data.bytes[i*3]);
+	  rgb[i*3+1] = Swap16IfLE((unsigned short)cm->data.bytes[i*3+1]);
+	  rgb[i*3+2] = Swap16IfLE((unsigned short)cm->data.bytes[i*3+2]);
 	}
       }
     }
