@@ -525,6 +525,8 @@ typedef struct _rfbClientRec {
     struct z_stream_s compStream;
     rfbBool compStreamInited;
     uint32_t zlibCompressLevel;
+    /* the quality level is also used by ZYWRLE */
+    int tightQualityLevel;
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     /* tight encoding -- preserve zlib streams' state for each client */
@@ -532,7 +534,6 @@ typedef struct _rfbClientRec {
     rfbBool zsActive[4];
     int zsLevel[4];
     int tightCompressLevel;
-    int tightQualityLevel;
 #endif
 #endif
 

@@ -369,9 +369,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       UNLOCK(rfbClientListMutex);
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
+      cl->tightQualityLevel = -1;
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
       cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
-      cl->tightQualityLevel = -1;
       {
 	int i;
 	for (i = 0; i < 4; i++)
@@ -2004,12 +2004,12 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		    cl->tightCompressLevel = enc & 0x0F;
 		    rfbLog("Using compression level %d for client %s\n",
 			   cl->tightCompressLevel, cl->host);
+#endif
 		} else if ( enc >= (uint32_t)rfbEncodingQualityLevel0 &&
 			    enc <= (uint32_t)rfbEncodingQualityLevel9 ) {
 		    cl->tightQualityLevel = enc & 0x0F;
 		    rfbLog("Using image quality level %d for client %s\n",
 			   cl->tightQualityLevel, cl->host);
-#endif
 		} else
 #endif
 		{
