@@ -907,15 +907,6 @@ rfbSendSupportedMessages(rfbClientPtr cl)
 
 
 
-static void rfbSendSupporteddEncodings_SendEncoding(rfbClientPtr cl, uint32_t enc)
-{
-    uint32_t nSwapped=0;
-    nSwapped = Swap32IfLE(enc);
-    memcpy(&cl->updateBuf[cl->ublen], (char *)&nSwapped, sizeof(nSwapped));
-    cl->ublen+=sizeof(nSwapped);
-}
-
-
 /*
  * Send rfbEncodingSupportedEncodings.
  */
@@ -924,21 +915,38 @@ rfbBool
 rfbSendSupportedEncodings(rfbClientPtr cl)
 {
     rfbFramebufferUpdateRectHeader rect;
-    uint16_t nEncodings=0;
-    
+    static uint32_t supported[] = {
+        rfbEncodingRaw,
+	rfbEncodingCopyRect,
+	rfbEncodingRRE,
+	rfbEncodingCoRRE,
+	rfbEncodingHextile,
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+	rfbEncodingZlib,
+	rfbEncodingZRLE,
+	rfbEncodingZYWRLE,
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+	rfbEncodingTight,
+#endif
+	rfbEncodingUltra,
+	rfbEncodingUltraZip,
+	rfbEncodingXCursor,
+	rfbEncodingRichCursor,
+	rfbEncodingPointerPos,
+	rfbEncodingLastRect,
+	rfbEncodingNewFBSize,
+	rfbEncodingKeyboardLedState,
+	rfbEncodingSupportedMessages,
+	rfbEncodingSupportedEncodings,
+	rfbEncodingServerIdentity,
+    };
+    uint32_t nEncodings = sizeof(supported) / sizeof(supported[0]), i;
+
     /* think rfbSetEncodingsMsg */
 
-    /* TODO: dynamic way of doing this */
-    nEncodings=16;
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-    nEncodings += 2;
-#endif
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-    nEncodings++;
-#endif
-
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader
-                  + (nEncodings*sizeof(uint32_t)) > UPDATE_BUF_SIZE) {
+                  + (nEncodings * sizeof(uint32_t)) > UPDATE_BUF_SIZE) {
         if (!rfbSendUpdateBuf(cl))
             return FALSE;
     }
@@ -953,30 +961,11 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
         sz_rfbFramebufferUpdateRectHeader);
     cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingRaw);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingCopyRect);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingRRE);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingCoRRE);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingHextile);
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingZlib);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingTight);
-#endif
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingZRLE);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingZYWRLE);
-#endif
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingUltra);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingUltraZip);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingXCursor);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingRichCursor);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingPointerPos);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingLastRect);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingNewFBSize);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingKeyboardLedState);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingSupportedMessages);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingSupportedEncodings);
-    rfbSendSupporteddEncodings_SendEncoding(cl, rfbEncodingServerIdentity);
+    for (i = 0; i < nEncodings; i++) {
+        uint32_t encoding = Swap32IfLE(supported[i]);
+	memcpy(&cl->updateBuf[cl->ublen], (char *)&encoding, sizeof(encoding));
+	cl->ublen += sizeof(encoding);
+    }
 
     rfbStatRecordEncodingSent(cl, rfbEncodingSupportedEncodings,
         sz_rfbFramebufferUpdateRectHeader+(nEncodings * sizeof(uint32_t)),
