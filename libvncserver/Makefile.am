@@ -27,7 +27,7 @@ EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 	zrleencodetemplate.c
 
 if HAVE_LIBZ
-ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c
+ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c zywrletemplate.c
 if HAVE_LIBJPEG
 JPEGSRCS = tight.c
 endif
