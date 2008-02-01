@@ -354,7 +354,9 @@ disp=`echo "$orig" | awk -F: '{print $2}'`
 if [ "X$host" = "X" ]; then
 	host=localhost
 fi
-if [ $disp -lt 0 ]; then
+if [ "X$disp" = "X" ]; then
+	port=""	# probably -listen mode.
+elif [ $disp -lt 0 ]; then
 	# negative means use |n| without question:
 	port=`expr 0 - $disp`
 elif [ $disp -lt 200 ]; then

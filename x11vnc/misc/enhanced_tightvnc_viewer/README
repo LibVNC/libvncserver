@@ -1,6 +1,6 @@
        Enhanced TightVNC Viewer (SSVNC: SSL/SSH VNC viewer)
 
-Copyright (c) 2006-2007 Karl J. Runge <runge@karlrunge.com>
+Copyright (c) 2006-2008 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
 These bundles provide 1) An enhanced TightVNC Viewer on Unix, 2) Binaries
@@ -337,6 +337,14 @@ certificates.  Also, for convenience, if you first run the command with
 on a USB flash drive that you carry around for mobile use and you want
 the profiles you create to stay with the drive (otherwise you'd have to
 browse to the drive directory each time you load or save).
+
+One user on Windows created a BAT file to launch SSVNC and needed to
+do this to get the Home directory correct:
+
+cd \ssvnc\Windows
+start \ssvnc\Windows\ssvnc.exe
+
+(an optional profile name can be supplied to the ssvnc.exe line)
 
 WARNING: if you use ssvnc from an "Internet Cafe", i.e.  an untrusted
 computer, an intruder may be capturing keystrokes etc.

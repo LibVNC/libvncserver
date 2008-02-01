@@ -1,6 +1,6 @@
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncviewer/Vncviewer
 --- vnc_unixsrc.orig/vncviewer/Vncviewer	2003-02-07 05:30:57.000000000 -0500
-+++ vnc_unixsrc/vncviewer/Vncviewer	2007-04-05 23:13:59.000000000 -0400
++++ vnc_unixsrc/vncviewer/Vncviewer	2008-01-03 17:10:12.000000000 -0500
 @@ -5,9 +5,9 @@
  
  !
@@ -21,7 +21,27 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
    <ButtonPress>: SendRFBEvent()\n\
    <ButtonRelease>: SendRFBEvent()\n\
    <Motion>: SendRFBEvent()\n\
-@@ -77,9 +78,9 @@
+@@ -72,17 +73,39 @@
+ *passwordDialog.dialog.value.translations: #override\n\
+   <Key>Return: PasswordDialogDone()
+ 
++*ycropDialog.dialog.label: Y Crop (max-height in pixels):
++*ycropDialog.dialog.value:
++*ycropDialog.dialog.value.translations: #override\\n\
++     <Key>Return: YCropDialogDone()
++
++*scbarDialog.dialog.label: Scroll Bars width:
++*scbarDialog.dialog.value:
++*scbarDialog.dialog.value.translations: #override\\n\
++     <Key>Return: ScbarDialogDone()
++
++*scaleDialog.dialog.label: Integer n for 1/n server scaling:
++*scaleDialog.dialog.value:
++*scaleDialog.dialog.value.translations: #override\\n\
++     <Key>Return: ScaleDialogDone()
++
+ 
+ !
  ! Popup window appearance
  !
  
@@ -33,12 +53,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
  *popup.buttonForm.Command.borderWidth: 0
  *popup.buttonForm.Toggle.borderWidth: 0
  
-@@ -96,43 +97,160 @@
++*scaleN.title: 1/n scale
++*scaleN*background: grey
++*scaleN*font_old: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*
++*scaleN*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
++*scaleN.buttonForm.Command.borderWidth: 0
++*scaleN.buttonForm.Toggle.borderWidth: 0
++
+ !
+ ! Translations on popup window - send key presses through
+ !
+@@ -96,43 +119,172 @@
  ! Popup buttons
  !
  
 -*popupButtonCount: 8
-+*popupButtonCount: 28
++*popupButtonCount: 31
  
  *popup*button1.label: Dismiss popup
 -*popup*button1.translations: #override\n\
@@ -148,79 +178,91 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
 +     <Visible>: SetNOJPEGState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleJPEG() HidePopup()
 +
-+*popup*button17.label: Prefer raw for localhost
++*popup*button17.label: Full Color
 +*popup*button17.type: toggle
 +*popup*button17.translations: #override\\n\
-+     <Visible>: SetRawLocalState()\\n\
-+     <Btn1Down>,<Btn1Up>: toggle() ToggleRawLocal() HidePopup()
-+
-+*popup*button18.label: Full Color
-+*popup*button18.type: toggle
-+*popup*button18.translations: #override\\n\
 +     <Visible>: SetFullColorState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFullColor() HidePopup()
 +
-+*popup*button19.label: Grey Scale (16 & 8-bpp)
-+*popup*button19.type: toggle
-+*popup*button19.translations: #override\\n\
++*popup*button18.label: Grey Scale (16 & 8-bpp)
++*popup*button18.type: toggle
++*popup*button18.translations: #override\\n\
 +     <Visible>: SetGreyScaleState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleGreyScale() HidePopup()
 +
-+*popup*button20.label: 16 bit color (BGR565)
-+*popup*button20.type: toggle
-+*popup*button20.translations: #override\\n\
++*popup*button19.label: 16 bit color (BGR565)
++*popup*button19.type: toggle
++*popup*button19.translations: #override\\n\
 +     <Visible>: Set16bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle16bpp() HidePopup()
 +
-+*popup*button21.label: 8   bit color (BGR233)
-+*popup*button21.type: toggle
-+*popup*button21.translations: #override\\n\
++*popup*button20.label: 8   bit color (BGR233)
++*popup*button20.type: toggle
++*popup*button20.translations: #override\\n\
 +     <Visible>: Set8bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8bpp() HidePopup()
 +
-+*popup*button22.label: -     256 colors
-+*popup*button22.type: toggle
-+*popup*button22.translations: #override\\n\
++*popup*button21.label: -     256 colors
++*popup*button21.type: toggle
++*popup*button21.translations: #override\\n\
 +     <Visible>: Set256ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle256Colors() HidePopup()
 +
-+*popup*button23.label: -       64 colors
-+*popup*button23.type: toggle
-+*popup*button23.translations: #override\\n\
++*popup*button22.label: -       64 colors
++*popup*button22.type: toggle
++*popup*button22.translations: #override\\n\
 +     <Visible>: Set64ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle64Colors() HidePopup()
 +
-+*popup*button24.label: -         8 colors
-+*popup*button24.type: toggle
-+*popup*button24.translations: #override\\n\
++*popup*button23.label: -         8 colors
++*popup*button23.type: toggle
++*popup*button23.translations: #override\\n\
 +     <Visible>: Set8ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8Colors() HidePopup()
 +
-+*popup*button25.label: Disable Remote Input
-+*popup*button25.type: toggle
++*popup*button24.label: Set Y Crop (y-max)
++*popup*button24.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HidePopup() SetYCrop()
++
++*popup*button25.label: Set Scrollbar Width
 +*popup*button25.translations: #override\\n\
-+     <Visible>: SetServerInputState()\\n\
-+     <Btn1Down>,<Btn1Up>: toggle() ToggleServerInput() HidePopup()
++     <Btn1Down>,<Btn1Up>: HidePopup() SetScbar()
 +
-+*popup*button26.label: Single Window
-+*popup*button26.type: toggle
++*popup*button26.label: UltraVNC Extensions:
 +*popup*button26.translations: #override\\n\
-+     <Visible>: SetSingleWindowState()\\n\
-+     <Btn1Down>,<Btn1Up>: toggle() ToggleSingleWindow() HidePopup()
++     <Btn1Down>,<Btn1Up>: HidePopup()
 +
-+*popup*button27.label: Set 1/n Server Scale
++*popup*button27.label: - Set 1/n Server Scale
 +*popup*button27.translations: #override\\n\
-+     <Btn1Down>,<Btn1Up>: DoServerScale() HidePopup()
++     <Btn1Down>,<Btn1Up>: HidePopup() ShowScaleN()
 +
-+*popup*button28.label: Text Chat
++*popup*button28.label: - Text Chat
 +*popup*button28.type: toggle
 +*popup*button28.translations: #override\\n\
 +     <Visible>: SetTextChatState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTextChat() HidePopup()
 +
++*popup*button29.label: - File Transfer
++*popup*button29.type: toggle
++*popup*button29.translations: #override\\n\
++     <Visible>: SetFileXferState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleFileXfer() HidePopup()
++
++*popup*button30.label: - Single Window
++*popup*button30.type: toggle
++*popup*button30.translations: #override\\n\
++     <Visible>: SetSingleWindowState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleSingleWindow() HidePopup()
++
++*popup*button31.label: - Disable Remote Input
++*popup*button31.type: toggle
++*popup*button31.translations: #override\\n\
++     <Visible>: SetServerInputState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleServerInput() HidePopup()
++
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/vncviewer/argsresources.c
 --- vnc_unixsrc.orig/vncviewer/argsresources.c	2007-02-04 17:10:31.000000000 -0500
-+++ vnc_unixsrc/vncviewer/argsresources.c	2007-05-30 23:52:19.000000000 -0400
++++ vnc_unixsrc/vncviewer/argsresources.c	2008-01-03 18:41:17.000000000 -0500
 @@ -31,7 +31,7 @@
  
  char *fallback_resources[] = {
@@ -246,7 +288,28 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
       <ButtonPress>: SendRFBEvent()\\n\
       <ButtonRelease>: SendRFBEvent()\\n\
       <Motion>: SendRFBEvent()\\n\
-@@ -64,17 +70,25 @@
+@@ -58,23 +64,46 @@
+   "*serverDialog.dialog.value.translations: #override\\n\
+      <Key>Return: ServerDialogDone()",
+ 
++  "*ycropDialog.dialog.label: Y Crop (max-height in pixels):",
++  "*ycropDialog.dialog.value:",
++  "*ycropDialog.dialog.value.translations: #override\\n\
++     <Key>Return: YCropDialogDone()",
++
++  "*scbarDialog.dialog.label: Scroll Bars width:",
++  "*scbarDialog.dialog.value:",
++  "*scbarDialog.dialog.value.translations: #override\\n\
++     <Key>Return: ScbarDialogDone()",
++
++  "*scaleDialog.dialog.label: Integer n for 1/n server scaling:",
++  "*scaleDialog.dialog.value:",
++  "*scaleDialog.dialog.value.translations: #override\\n\
++     <Key>Return: ScaleDialogDone()",
++
+   "*passwordDialog.dialog.label: Password:",
+   "*passwordDialog.dialog.value:",
+   "*passwordDialog.dialog.value.AsciiSink.echo: False",
    "*passwordDialog.dialog.value.translations: #override\\n\
       <Key>Return: PasswordDialogDone()",
  
@@ -271,11 +334,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
       <KeyPress>: SendRFBEvent() HidePopup()",
  
 -  "*popupButtonCount: 8",
-+  "*popupButtonCount: 29",
++  "*popupButtonCount: 31",
  
    "*popup*button1.label: Dismiss popup",
    "*popup*button1.translations: #override\\n\
-@@ -84,7 +98,7 @@
+@@ -84,7 +113,7 @@
    "*popup*button2.translations: #override\\n\
       <Btn1Down>,<Btn1Up>: Quit()",
  
@@ -284,7 +347,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    "*popup*button3.type: toggle",
    "*popup*button3.translations: #override\\n\
       <Visible>: SetFullScreenState()\\n\
-@@ -115,9 +129,172 @@
+@@ -115,9 +144,180 @@
    "*popup*button8.translations: #override\\n\
       <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F8) HidePopup()",
  
@@ -376,35 +439,43 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +     <Visible>: Set8ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8Colors() HidePopup()",
 +
-+  "*popup*button24.label: UltraVNC Extensions:",
++  "*popup*button24.label: Set Y Crop (y-max)",
 +  "*popup*button24.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HidePopup() SetYCrop()",
++
++  "*popup*button25.label: Set Scrollbar Width",
++  "*popup*button25.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HidePopup() SetScbar()",
++
++  "*popup*button26.label: UltraVNC Extensions:",
++  "*popup*button26.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup()",
 +
-+  "*popup*button25.label: - Set 1/n Server Scale",
-+  "*popup*button25.translations: #override\\n\
-+     <Btn1Down>,<Btn1Up>: ShowScaleN() HidePopup()",
++  "*popup*button27.label: - Set 1/n Server Scale",
++  "*popup*button27.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HidePopup() ShowScaleN()",
 +
-+  "*popup*button26.label: - Text Chat",
-+  "*popup*button26.type: toggle",
-+  "*popup*button26.translations: #override\\n\
++  "*popup*button28.label: - Text Chat",
++  "*popup*button28.type: toggle",
++  "*popup*button28.translations: #override\\n\
 +     <Visible>: SetTextChatState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTextChat() HidePopup()",
 +
-+  "*popup*button27.label: - File Transfer",
-+  "*popup*button27.type: toggle",
-+  "*popup*button27.translations: #override\\n\
++  "*popup*button29.label: - File Transfer",
++  "*popup*button29.type: toggle",
++  "*popup*button29.translations: #override\\n\
 +     <Visible>: SetFileXferState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFileXfer() HidePopup()",
 +
-+  "*popup*button28.label: - Single Window",
-+  "*popup*button28.type: toggle",
-+  "*popup*button28.translations: #override\\n\
++  "*popup*button30.label: - Single Window",
++  "*popup*button30.type: toggle",
++  "*popup*button30.translations: #override\\n\
 +     <Visible>: SetSingleWindowState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleSingleWindow() HidePopup()",
 +
-+  "*popup*button29.label: - Disable Remote Input",
-+  "*popup*button29.type: toggle",
-+  "*popup*button29.translations: #override\\n\
++  "*popup*button31.label: - Disable Remote Input",
++  "*popup*button31.type: toggle",
++  "*popup*button31.translations: #override\\n\
 +     <Visible>: SetServerInputState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleServerInput() HidePopup()",
 +
@@ -434,7 +505,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +
 +  "*scaleN*button6.label: Other",
 +  "*scaleN*button6.translations: #override\\n\
-+     <Btn1Down>,<Btn1Up>: DoServerScale() HideScaleN()",
++     <Btn1Down>,<Btn1Up>: HideScaleN() DoServerScale()",
 +
    NULL
  };
@@ -457,7 +528,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  /*
   * vncServerHost and vncServerPort are set either from the command line or
-@@ -135,6 +312,7 @@
+@@ -135,6 +335,7 @@
   */
  
  AppData appData;
@@ -465,7 +536,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  static XtResource appDataResourceList[] = {
    {"shareDesktop", "ShareDesktop", XtRBool, sizeof(Bool),
-@@ -155,14 +333,29 @@
+@@ -155,14 +356,29 @@
    {"userLogin", "UserLogin", XtRString, sizeof(String),
     XtOffsetOf(AppData, userLogin), XtRImmediate, (XtPointer) 0},
  
@@ -497,7 +568,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"nColours", "NColours", XtRInt, sizeof(int),
     XtOffsetOf(AppData, nColours), XtRImmediate, (XtPointer) 256},
-@@ -179,9 +372,12 @@
+@@ -179,9 +395,12 @@
    {"requestedDepth", "RequestedDepth", XtRInt, sizeof(int),
     XtOffsetOf(AppData, requestedDepth), XtRImmediate, (XtPointer) 0},
  
@@ -511,7 +582,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"wmDecorationWidth", "WmDecorationWidth", XtRInt, sizeof(int),
     XtOffsetOf(AppData, wmDecorationWidth), XtRImmediate, (XtPointer) 4},
  
-@@ -206,8 +402,13 @@
+@@ -206,8 +425,13 @@
    {"bumpScrollPixels", "BumpScrollPixels", XtRInt, sizeof(int),
     XtOffsetOf(AppData, bumpScrollPixels), XtRImmediate, (XtPointer) 20},
  
@@ -525,7 +596,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"qualityLevel", "QualityLevel", XtRInt, sizeof(int),
     XtOffsetOf(AppData, qualityLevel), XtRImmediate, (XtPointer) 6},
-@@ -218,14 +419,55 @@
+@@ -218,14 +442,55 @@
    {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
  
@@ -583,7 +654,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -242,8 +484,22 @@
+@@ -242,8 +507,22 @@
    {"-noraiseonbeep", "*raiseOnBeep",        XrmoptionNoArg,  "False"},
    {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
    {"-user",          "*userLogin",          XrmoptionSepArg, 0},
@@ -607,7 +678,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"-owncmap",       "*forceOwnCmap",       XrmoptionNoArg,  "True"},
    {"-truecolor",     "*forceTrueColour",    XrmoptionNoArg,  "True"},
    {"-truecolour",    "*forceTrueColour",    XrmoptionNoArg,  "True"},
-@@ -253,7 +509,19 @@
+@@ -253,7 +532,19 @@
    {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
    {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
    {"-x11cursor",     "*useX11Cursor",       XrmoptionNoArg,  "True"},
@@ -628,7 +699,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  };
  
-@@ -268,6 +536,7 @@
+@@ -268,15 +559,62 @@
      {"SendRFBEvent", SendRFBEvent},
      {"ShowPopup", ShowPopup},
      {"HidePopup", HidePopup},
@@ -636,7 +707,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
      {"ToggleFullScreen", ToggleFullScreen},
      {"SetFullScreenState", SetFullScreenState},
      {"SelectionFromVNC", SelectionFromVNC},
-@@ -277,6 +546,47 @@
+     {"SelectionToVNC", SelectionToVNC},
+     {"ServerDialogDone", ServerDialogDone},
++    {"YCropDialogDone", YCropDialogDone},
++    {"ScbarDialogDone", ScbarDialogDone},
++    {"ScaleDialogDone", ScaleDialogDone},
+     {"PasswordDialogDone", PasswordDialogDone},
      {"Pause", Pause},
      {"RunCommand", RunCommand},
      {"Quit", Quit},
@@ -660,6 +736,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +    {"ToggleTextChat", ToggleTextChat},
 +    {"ToggleFileXfer", ToggleFileXfer},
 +    {"DoServerScale", DoServerScale},
++    {"SetYCrop", SetYCrop},
++    {"SetScbar", SetScbar},
 +    {"ShowScaleN", ShowScaleN},
 +    {"SetScaleN", SetScaleN},
 +    {"Set8bppState", Set8bppState},
@@ -684,7 +762,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -302,8 +612,8 @@
+@@ -302,8 +640,8 @@
  void
  usage(void)
  {
@@ -695,7 +773,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  	  "\n"
  	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
  	  "       %s [<OPTIONS>] [<HOST>][::<PORT#>]\n"
-@@ -332,10 +642,142 @@
+@@ -332,10 +670,145 @@
  	  "        -autopass\n"
  	  "\n"
  	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
@@ -817,15 +895,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "        256 colors               ~ -bgr233 default # of colors.\n"
 +	  "         64 colors               ~ -bgr222 / -use64\n"
 +	  "          8 colors               ~ -bgr111 / -use8\n"
++	  "        Set Y Crop (y-max)       ~ -ycrop\n"
++	  "        Set Scrollbar Width      ~ -sbwidth\n"
 +	  "\n"
 +	  "        UltraVNC Extensions:\n"
-+	  "        Disable Remote Input       Ultravnc ext. Try to prevent input and\n"
++	  "\n"
++	  "          Set 1/n Server Scale     Ultravnc ext. Scale desktop by 1/n.\n"
++	  "          Text Chat                Ultravnc ext. Do Text Chat.\n"
++	  "          File Transfer            Ultravnc ext. File xfer via Java helper.\n"
++	  "          Single Window            Ultravnc ext. Grab and view a single window.\n"
++	  "                                   (select then click on the window you want).\n"
++	  "          Disable Remote Input     Ultravnc ext. Try to prevent input and\n"
 +	  "                                   viewing of monitor at physical display.\n"
-+	  "        Single Window              Ultravnc ext. Grab and view a single window.\n"
-+	  "                                   (click on the window you want).\n"
-+	  "        Set 1/n Server Scale       Ultravnc ext. Scale desktop by 1/n.\n"
-+	  "                                   prompt is from the terminal.\n"
-+	  "        Text Chat                  Ultravnc ext. Do Text Chat.\n"
 +	  "\n"
 +	  "        Note: the Ultravnc extensions only apply to servers that support\n"
 +	  "              them.  x11vnc/libvncserver supports some of them.\n"
@@ -839,7 +920,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  
  /*
-@@ -350,6 +792,7 @@
+@@ -350,6 +823,7 @@
    int i;
    char *vncServerName, *colonPos;
    int len, portOffset;
@@ -847,7 +928,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    /* Turn app resource specs into our appData structure for the rest of the
       program to use */
-@@ -357,6 +800,23 @@
+@@ -357,6 +831,23 @@
    XtGetApplicationResources(toplevel, &appData, appDataResourceList,
  			    XtNumber(appDataResourceList), 0, 0);
  
@@ -871,7 +952,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    /* Add our actions to the actions table so they can be used in widget
       resource specs */
  
-@@ -376,6 +836,10 @@
+@@ -376,6 +867,10 @@
      return;
    }
  
@@ -882,7 +963,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    if (argc == 1) {
      vncServerName = DoServerDialog();
      appData.passwordDialog = True;
-@@ -414,6 +878,13 @@
+@@ -414,6 +909,13 @@
      if (!len || strspn(colonPos + 1, "0123456789") != len) {
        usage();
      }
@@ -1661,7 +1742,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 -
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncviewer/desktop.c
 --- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
-+++ vnc_unixsrc/vncviewer/desktop.c	2007-05-27 11:58:01.000000000 -0400
++++ vnc_unixsrc/vncviewer/desktop.c	2008-01-03 10:21:20.000000000 -0500
 @@ -28,21 +28,29 @@
  #include <X11/extensions/XShm.h>
  #endif
@@ -2250,7 +2331,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			return;
 +		}
 +	}
-+
+ 
+-  if (appData.viewOnly) return;
 +	if (selectingSingleWindow && ev->type == ButtonPress) {
 +		selectingSingleWindow = False;
 +		SendSingleWindow(ev->xbutton.x, ev->xbutton.y);
@@ -2261,8 +2343,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		}
 +		return;
 +	}
- 
--  if (appData.viewOnly) return;
++
 +	if (appData.viewOnly) {
 +		int W = si.framebufferWidth;
 +		int H = si.framebufferHeight;
@@ -2440,10 +2521,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			*(uip+h) = (unsigned int)   fill;
 +		}
 +	}
++
++	scr = image->data + y * Bpl + x * Bpp;
  
 -  return cursor;
-+	scr = image->data + y * Bpl + x * Bpp;
-+
 +	for (h = 0; h < height; h++) {
 +		memcpy(scr, buf, widthInBytes);
 +		scr += Bpl;
@@ -2545,7 +2626,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -401,62 +902,226 @@
+@@ -401,62 +902,228 @@
  static void
  CopyBGR233ToScreen(CARD8 *buf, int x, int y, int width, int height)
  {
@@ -2744,6 +2825,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +void ReDoDesktop(void) {
 +	int w, h, x, y, dw, dh;
 +
++fprintf(stderr, "ReDoDesktop: ycrop: %d\n", appData.yCrop);
++
 +	check_tall();
 +	if (appData.yCrop) {
 +		if (appData.yCrop < 0 || old_width <= 0) {
@@ -2822,6 +2905,160 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +
 +	reset_image();
  }
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/dialogs.c vnc_unixsrc/vncviewer/dialogs.c
+--- vnc_unixsrc.orig/vncviewer/dialogs.c	2000-10-26 15:19:19.000000000 -0400
++++ vnc_unixsrc/vncviewer/dialogs.c	2008-01-03 12:19:13.000000000 -0500
+@@ -26,6 +26,128 @@
+ 
+ static Bool serverDialogDone = False;
+ static Bool passwordDialogDone = False;
++static Bool ycropDialogDone = False;
++static Bool scbarDialogDone = False;
++static Bool scaleDialogDone = False;
++
++extern void popupFixer(Widget wid);
++
++void
++YCropDialogDone(Widget w, XEvent *event, String *params, Cardinal *num_params)
++{
++  ycropDialogDone = True;
++}
++
++char *
++DoYCropDialog()
++{
++  Widget pshell, dialog;
++  char *ycropValue;
++  char *valueString;
++
++  pshell = XtVaCreatePopupShell("ycropDialog", transientShellWidgetClass,
++				toplevel, NULL);
++  dialog = XtVaCreateManagedWidget("dialog", dialogWidgetClass, pshell, NULL);
++
++  XtMoveWidget(pshell, WidthOfScreen(XtScreen(pshell))*2/5,
++	       HeightOfScreen(XtScreen(pshell))*2/5);
++  XtPopup(pshell, XtGrabNonexclusive);
++  XtRealizeWidget(pshell);
++
++  if (appData.popupFix) {
++	popupFixer(pshell);
++  }
++
++  ycropDialogDone = False;
++
++  while (!ycropDialogDone) {
++    XtAppProcessEvent(appContext, XtIMAll);
++  }
++
++  valueString = XawDialogGetValueString(dialog);
++  ycropValue = XtNewString(valueString);
++
++  XtPopdown(pshell);
++  return ycropValue;
++}
++
++void
++ScbarDialogDone(Widget w, XEvent *event, String *params, Cardinal *num_params)
++{
++  scbarDialogDone = True;
++}
++
++char *
++DoScbarDialog()
++{
++  Widget pshell, dialog;
++  char *scbarValue;
++  char *valueString;
++
++  pshell = XtVaCreatePopupShell("scbarDialog", transientShellWidgetClass,
++				toplevel, NULL);
++  dialog = XtVaCreateManagedWidget("dialog", dialogWidgetClass, pshell, NULL);
++
++  XtMoveWidget(pshell, WidthOfScreen(XtScreen(pshell))*2/5,
++	       HeightOfScreen(XtScreen(pshell))*2/5);
++  XtPopup(pshell, XtGrabNonexclusive);
++  XtRealizeWidget(pshell);
++
++  if (appData.popupFix) {
++	popupFixer(pshell);
++  }
++
++  scbarDialogDone = False;
++
++  while (!scbarDialogDone) {
++    XtAppProcessEvent(appContext, XtIMAll);
++  }
++
++  valueString = XawDialogGetValueString(dialog);
++  scbarValue = XtNewString(valueString);
++
++  XtPopdown(pshell);
++  return scbarValue;
++}
++
++void
++ScaleDialogDone(Widget w, XEvent *event, String *params, Cardinal *num_params)
++{
++  scaleDialogDone = True;
++}
++
++char *
++DoScaleDialog()
++{
++  Widget pshell, dialog;
++  char *scaleValue;
++  char *valueString;
++
++  pshell = XtVaCreatePopupShell("scaleDialog", transientShellWidgetClass,
++				toplevel, NULL);
++  dialog = XtVaCreateManagedWidget("dialog", dialogWidgetClass, pshell, NULL);
++
++  XtMoveWidget(pshell, WidthOfScreen(XtScreen(pshell))*2/5,
++	       HeightOfScreen(XtScreen(pshell))*2/5);
++  XtPopup(pshell, XtGrabNonexclusive);
++  XtRealizeWidget(pshell);
++
++  if (appData.popupFix) {
++	popupFixer(pshell);
++  }
++
++  scaleDialogDone = False;
++
++  while (!scaleDialogDone) {
++    XtAppProcessEvent(appContext, XtIMAll);
++  }
++
++  valueString = XawDialogGetValueString(dialog);
++  scaleValue = XtNewString(valueString);
++
++  XtPopdown(pshell);
++  return scaleValue;
++}
+ 
+ void
+ ServerDialogDone(Widget w, XEvent *event, String *params, Cardinal *num_params)
+@@ -49,6 +171,10 @@
+   XtPopup(pshell, XtGrabNonexclusive);
+   XtRealizeWidget(pshell);
+ 
++  if (appData.popupFix) {
++	popupFixer(pshell);
++  }
++
+   serverDialogDone = False;
+ 
+   while (!serverDialogDone) {
+@@ -85,6 +211,10 @@
+   XtPopup(pshell, XtGrabNonexclusive);
+   XtRealizeWidget(pshell);
+ 
++  if (appData.popupFix) {
++	popupFixer(pshell);
++  }
++
+   passwordDialogDone = False;
+ 
+   while (!passwordDialogDone) {
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/fullscreen.c vnc_unixsrc/vncviewer/fullscreen.c
 --- vnc_unixsrc.orig/vncviewer/fullscreen.c	2003-10-09 05:23:49.000000000 -0400
 +++ vnc_unixsrc/vncviewer/fullscreen.c	2007-02-17 16:32:23.000000000 -0500
@@ -3195,7 +3432,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
  static int
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer/popup.c
 --- vnc_unixsrc.orig/vncviewer/popup.c	2000-06-11 08:00:53.000000000 -0400
-+++ vnc_unixsrc/vncviewer/popup.c	2007-05-31 16:42:36.000000000 -0400
++++ vnc_unixsrc/vncviewer/popup.c	2008-01-03 12:17:32.000000000 -0500
 @@ -25,15 +25,44 @@
  
  #include <X11/Xaw/Form.h>
@@ -3205,7 +3442,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
  
  Widget popup, fullScreenToggle;
  
-+static void popupFixer(Widget wid) {
++void popupFixer(Widget wid) {
 +	Window rr, cr; 
 +	unsigned int m;
 +  	int x0 = 500, y0 = 500;
@@ -3538,8 +3775,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewer/popup_ad
 --- vnc_unixsrc.orig/vncviewer/popup_ad	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/popup_ad	2007-02-18 19:52:31.000000000 -0500
-@@ -0,0 +1,19 @@
++++ vnc_unixsrc/vncviewer/popup_ad	2008-01-03 11:27:04.000000000 -0500
+@@ -0,0 +1,20 @@
 +#!/usr/bin/perl
 +
 +$ok = 0;
@@ -3554,6 +3791,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +	}
 +	next unless $on;
 +	chomp;
++	last if /scaleN/;
 +	$_ =~ s/^\s*"//;
 +	$_ =~ s/",//;
 +	$_ .= "\n" unless $_ =~ /\n/;
@@ -3561,7 +3799,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
 --- vnc_unixsrc.orig/vncviewer/rfbproto.c	2004-03-11 13:14:39.000000000 -0500
-+++ vnc_unixsrc/vncviewer/rfbproto.c	2007-06-02 20:37:25.000000000 -0400
++++ vnc_unixsrc/vncviewer/rfbproto.c	2008-01-03 10:26:37.000000000 -0500
 @@ -57,6 +57,25 @@
  static Bool HandleTight16(int rx, int ry, int rw, int rh);
  static Bool HandleTight32(int rx, int ry, int rw, int rh);
@@ -4823,7 +5061,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -    int bytesPerLine;
 -    int i;
 -    int usecs;
-+extern void raiseme(void);
++extern void raiseme(int force);
  
 -    if (!ReadFromRFBServer(((char *)&msg.fu) + 1,
 -			   sz_rfbFramebufferUpdateMsg - 1))
@@ -4831,7 +5069,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +Bool
 +SendTextChatOpen(void)
 +{
-+	raiseme();
++	raiseme(0);
 +	rfbTextChatMsg chat;
 +	chat.type = rfbTextChat;
 +	chat.pad1 = 0;
@@ -6484,542 +6722,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/tunnel.c vnc_unixsrc/vncviewe
    }
  
    sprintf(lastArgv, "localhost::%d", localPort);
-diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vncviewer/vncviewer._man
---- vnc_unixsrc.orig/vncviewer/vncviewer._man	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer._man	2007-05-25 23:22:17.000000000 -0400
-@@ -0,0 +1,529 @@
-+'\" t
-+.\" ** The above line should force tbl to be a preprocessor **
-+.\" Man page for X vncviewer
-+.\"
-+.\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
-+.\" Copyright (C) 2000,2001 Red Hat, Inc.
-+.\" Copyright (C) 2001-2003 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
-+.\"
-+.\" You may distribute under the terms of the GNU General Public
-+.\" License as specified in the file LICENCE.TXT that comes with the
-+.\" TightVNC distribution.
-+.\"
-+.TH vncviewer 1 "January 2003" "" "TightVNC"
-+.SH NAME
-+vncviewer \- an X viewer client for VNC
-+.SH SYNOPSIS
-+.B vncviewer
-+.RI [\| options \|]
-+.RI [\| host \|][\| :display \|]
-+.br
-+.B vncviewer
-+.RI [\| options \|]
-+.RI [\| host \|][\| ::port \|]
-+.br
-+.B vncviewer
-+.RI [\| options \|]
-+.IR \-listen
-+.RI [\| display \|]
-+.br
-+.B vncviewer
-+.IR \-help
-+.br
-+.SH DESCRIPTION
-+.B vncviewer
-+is an Xt\-based client application for the VNC (Virtual Network
-+Computing) system. It can connect to any VNC\-compatible server such
-+as \fBXvnc\fR or WinVNC, allowing you to control desktop environment
-+of a different machine.
-+
-+You can use F8 to display a pop\-up utility menu. Press F8 twice to
-+pass single F8 to the remote side.
-+.SH OPTIONS
-+.TP
-+\fB\-help\fR
-+Prints a short usage notice to stderr.
-+.TP
-+\fB\-listen\fR
-+Make the viewer listen on port 5500+\fIdisplay\fR for reverse
-+connections from a server. WinVNC supports reverse connections using
-+the "Add New Client" menu option, or the \-connect command line
-+option. \fBXvnc\fR requires the use of the helper program
-+\fBvncconnect\fR.
-+.TP
-+\fB\-via\fR \fIgateway\fR
-+Automatically create encrypted TCP tunnel to the \fIgateway\fR machine
-+before connection, connect to the \fIhost\fR through that tunnel
-+(TightVNC\-specific). By default, this option invokes SSH local port
-+forwarding, assuming that SSH client binary can be accessed as
-+/usr/bin/ssh. Note that when using the \fB\-via\fR option, the host
-+machine name should be specified as known to the gateway machine, e.g. 
-+"localhost" denotes the \fIgateway\fR, not the machine where vncviewer
-+was launched. See the ENVIRONMENT section below for the information on
-+configuring the \fB\-via\fR option.
-+.TP
-+\fB\-shared\fR
-+When connecting, specify that a shared connection is requested. In
-+TightVNC, this is the default mode, allowing you to share the desktop
-+with other clients already using it.
-+.TP
-+\fB\-noshared\fR
-+When connecting, specify that the session may not be shared. This
-+would either disconnect other connected clients or refuse your
-+connection, depending on the server configuration.
-+.TP
-+\fB\-viewonly\fR
-+Disable transfer of mouse and keyboard events from the client to the
-+server.
-+.TP
-+\fB\-fullscreen\fR
-+Start in full\-screen mode. Please be aware that operating in
-+full\-screen mode may confuse X window managers. Typically, such
-+conflicts cause incorrect handling of input focus or make the viewer
-+window disappear mysteriously. See the grabKeyboard setting in the
-+RESOURCES section below for a method to solve input focus problem.
-+.TP
-+\fB\-noraiseonbeep\fR
-+By default, the viewer shows and raises its window on remote beep
-+(bell) event. This option disables such behaviour
-+(TightVNC\-specific).
-+.TP
-+\fB\-user\fR \fIusername\fR
-+User name for Unix login authentication. Default is to use current
-+Unix user name. If this option was given, the viewer will prefer Unix
-+login authentication over the standard VNC authentication.
-+.TP
-+\fB\-passwd\fR \fIpasswd\-file\fR
-+File from which to get the password (as generated by the
-+\fBvncpasswd\fR(1) program). This option affects only the standard VNC
-+authentication.
-+.TP
-+\fB\-encodings\fR \fIencoding\-list\fR
-+TightVNC supports several different compression methods to encode
-+screen updates; this option specifies a set of them to use in order of
-+preference. Encodings are specified separated with spaces, and must
-+thus be enclosed in quotes if more than one is specified. Available
-+encodings, in default order for a remote connection, are "copyrect
-+tight hextile zlib corre rre raw". For a local connection (to the same
-+machine), the default order to try is "raw copyrect tight hextile zlib
-+corre rre". Raw encoding is always assumed as a last option if no
-+other encoding can be used for some reason. For more information on
-+encodings, see the section ENCODINGS below.
-+.TP
-+\fB\-bgr233\fR
-+Always use the BGR233 format to encode pixel data. This reduces
-+network traffic, but colors may be represented inaccurately. The
-+bgr233 format is an 8\-bit "true color" format, with 2 bits blue, 3
-+bits green, and 3 bits red.
-+.TP
-+\fB\-owncmap\fR
-+Try to use a PseudoColor visual and a private colormap. This allows
-+the VNC server to control the colormap.
-+.TP
-+\fB\-truecolour\fR, \fB\-truecolor\fR
-+Try to use a TrueColor visual.
-+.TP
-+\fB\-depth\fR \fIdepth\fR
-+On an X server which supports multiple TrueColor visuals of different
-+depths, attempt to use the specified one (in bits per pixel); if
-+successful, this depth will be requested from the VNC server.
-+.TP
-+\fB\-compresslevel \fIlevel\fR
-+Use specified compression \fIlevel\fR (0..9) for "tight" and "zlib"
-+encodings (TightVNC\-specific). Level 1 uses minimum of CPU time and
-+achieves weak compression ratios, while level 9 offers best
-+compression but is slow in terms of CPU time consumption on the server
-+side. Use high levels with very slow network connections, and low
-+levels when working over high\-speed LANs. It's not recommended to use
-+compression level 0, reasonable choices start from the level 1.
-+.TP
-+\fB\-quality \fIlevel\fR
-+Use the specified JPEG quality \fIlevel\fR (0..9) for the "tight"
-+encoding (TightVNC\-specific). Quality level 0 denotes bad image
-+quality but very impressive compression ratios, while level 9 offers
-+very good image quality at lower compression ratios. Note that the
-+"tight" encoder uses JPEG to encode only those screen areas that look
-+suitable for lossy compression, so quality level 0 does not always
-+mean unacceptable image quality.
-+.TP
-+\fB\-nojpeg\fR
-+Disable lossy JPEG compression in Tight encoding (TightVNC\-specific). 
-+Disabling JPEG compression is not a good idea in typical cases, as
-+that makes the Tight encoder less efficient. You might want to use
-+this option if it's absolutely necessary to achieve perfect image
-+quality (see also the \fB\-quality\fR option).
-+.TP
-+\fB\-nocursorshape\fR
-+Disable cursor shape updates, protocol extensions used to handle
-+remote cursor movements locally on the client side
-+(TightVNC\-specific). Using cursor shape updates decreases delays with
-+remote cursor movements, and can improve bandwidth usage dramatically. 
-+.TP
-+\fB\-x11cursor\fR
-+Use a real X11 cursor with X-style cursor shape updates, instead of
-+drawing the remote cursor on the framebuffer. This option also
-+disables the dot cursor, and disables cursor position updates in
-+non-fullscreen mode.
-+.TP
-+\fB\-autopass\fR
-+Read a plain-text password from stdin. This option affects only the
-+standard VNC authentication.
-+
-+.SH Enhanced TightVNC Viewer (SSVNC) OPTIONS
-+.TP
-+Enhanced TightVNC Viewer (SSVNC) web page is located at:
-+.TP
-+http://www.karlrunge.com/x11vnc/ssvnc.html
-+.TP
-+Note: ZRLE encoding is now supported.
-+.TP
-+Note: F9 is shortcut to Toggle FullScreen mode.
-+.TP
-+\fB\-use64\fR
-+In \fB\-bgr233\fR mode, use 64 colors instead of 256.
-+.TP
-+\fB\-bgr222\fR
-+Same as \fB\-use64\fR.
-+.TP
-+\fB\-use8\fR
-+In \fB\-bgr233\fR mode, use 8 colors instead of 256.
-+.TP
-+\fB\-bgr111\fR
-+Same as \fB\-use8\fR.
-+.TP
-+\fB\-16bpp\fR
-+If the vnc viewer X display is depth 24 at 32bpp
-+request a 16bpp format from the VNC server to cut
-+network traffic by up to 2X, then tranlate the
-+pixels to 32bpp locally.
-+.TP
-+\fB\-bgr565\fR
-+Same as \fB\-16bpp\fR.
-+.TP
-+\fB\-grey\fR
-+Use a grey scale for the 16- and 8\fB\-bpp\fR modes.
-+.TP
-+\fB\-alpha\fR
-+Use alphablending transparency for local cursors
-+requires: x11vnc server, both client and server
-+must be 32bpp and same endianness.
-+.TP
-+\fB\-ycrop\fR n
-+Only show the top n rows of the framebuffer.  For
-+use with x11vnc \fB\-ncache\fR client caching option
-+to help "hide" the pixel cache region.
-+Use a negative value (e.g. \fB\-1\fR) for autodetection.
-+Autodetection will always take place if the remote
-+fb height is more than 2 times the width.
-+.TP
-+\fB\-sbwidth\fR n
-+Scrollbar width for x11vnc \fB\-ncache\fR mode (\fB\-ycrop\fR),
-+default is very narrow: 2 pixels, it is narrow to
-+avoid distraction in \fB\-ycrop\fR mode.
-+.TP
-+\fB\-nobell\fR
-+Disable bell.
-+.TP
-+\fB\-rawlocal\fR
-+Prefer raw encoding for localhost, default is
-+no, i.e. assumes you have a SSH tunnel instead.
-+.TP
-+\fB\-graball\fR
-+Grab the entire X server when in fullscreen mode,
-+needed by some old window managers like fvwm2.
-+.TP
-+\fB\-popupfix\fR
-+Warp the popup back to the pointer position,
-+needed by some old window managers like fvwm2.
-+.TP
-+\fB\-grabkbd\fR
-+Grab the X keyboard when in fullscreen mode,
-+needed by some window managers. Same as \fB\-grabkeyboard\fR.
-+\fB\-grabkbd\fR is the default, use \fB\-nograbkbd\fR to disable.
-+.TP
-+\fB\-bs\fR, \fB\-nobs\fR
-+Whether or not to use X server Backingstore for the
-+main viewer window.  The default is to not, mainly
-+because most Linux, etc, systems X servers disable
-+*all* Backingstore by default.  To re\fB\-enable\fR it put
-+Option "Backingstore"
-+in the Device section of /etc/X11/xorg.conf.
-+In \fB\-bs\fR mode with no X server backingstore, whenever an
-+area of the screen is re\fB\-exposed\fR it must go out to the
-+VNC server to retrieve the pixels. This is too slow.
-+In \fB\-nobs\fR mode, memory is allocated by the viewer to
-+provide its own backing of the main viewer window. This
-+actually makes some activities faster (changes in large
-+regions) but can appear to "flash" too much.
-+.TP
-+\fB\-noshm\fR
-+Disable use of MIT shared memory extension (not recommended)
-+.TP
-+\fB\-termchat\fR
-+Do the UltraVNC chat in the terminal vncviewer is in
-+instead of in an independent window.
-+.TP
-+\fB\-unixpw str\fR
-+Useful for logging into x11vnc in -unixpw mode. "str" is a
-+string that allows many ways to enter the Unix Username
-+and Unix Password.  These characters: username, newline,
-+password, newline are sent to the VNC server after any VNC
-+authentication has taken place.  Under x11vnc they are
-+used for the -unixpw login.  Other VNC servers could do
-+something similar.
-+You can also indicate "str" via the environment
-+variable SSVNC_UNIXPW.
-+Note that the Escape key is actually sent first to tell
-+x11vnc to not echo the Unix Username back to the VNC
-+viewer. Set SSVNC_UNIXPW_NOESC=1 to override this.
-+If str is ".", then you are prompted at the command line
-+for the username and password in the normal way.  If str is
-+"-" the stdin is read via getpass(3) for username@password.
-+Otherwise if str is a file, it is opened and the first line
-+read is taken as the Unix username and the 2nd as the
-+password. If str prefixed by "rm:" the file is removed
-+after reading. Otherwise, if str has a "@" character,
-+it is taken as username@password. Otherwise, the program
-+exits with an error. Got all that?
-+.TP
-+\fB New Popup actions:\fR
-+
-+        ViewOnly:                ~ -viewonly
-+        Disable Bell:            ~ -nobell
-+        Cursor Shape:            ~ -nocursorshape
-+        X11 Cursor:              ~ -x11cursor
-+        Cursor Alphablend:       ~ -alpha
-+        Toggle Tight/ZRLE:       ~ -encodings ...
-+        Disable JPEG:            ~ -nojpeg
-+        Full Color                 as many colors as local screen allows.
-+        Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
-+        16 bit color (BGR565)    ~ -16bpp / -bgr565
-+        8  bit color (BGR233)    ~ -bgr233
-+        256 colors               ~ -bgr233 default # of colors.
-+         64 colors               ~ -bgr222 / -use64
-+          8 colors               ~ -bgr111 / -use8
-+
-+        UltraVNC Extensions:
-+        Disable Remote Input       Ultravnc ext. Try to prevent input and
-+                                   viewing of monitor at physical display.
-+        Single Window              Ultravnc ext. Grab and view a single window.
-+                                   (click on the window you want).
-+        Set 1/n Server Scale       Ultravnc ext. Scale desktop by 1/n.
-+                                   prompt is from the terminal.
-+        Text Chat                  Ultravnc ext. Do Text Chat.
-+
-+        Note: the Ultravnc extensions only apply to servers that support
-+              them.  x11vnc/libvncserver supports some of them.
-+
-+.SH ENCODINGS
-+The server supplies information in whatever format is desired by the
-+client, in order to make the client as easy as possible to implement. 
-+If the client represents itself as able to use multiple formats, the
-+server will choose one.
-+
-+.I Pixel format
-+refers to the representation of an individual pixel. The most common
-+formats are 24 and 16 bit "true\-color" values, and 8\-bit "color map"
-+representations, where an arbitrary map converts the color number to
-+RGB values.
-+
-+.I Encoding
-+refers to how a rectangle of pixels are sent (all pixel information in
-+VNC is sent as rectangles). All rectangles come with a header giving
-+the location and size of the rectangle and an encoding type used by
-+the data which follows. These types are listed below.
-+.TP
-+.B Raw
-+The raw encoding simply sends width*height pixel values. All clients
-+are required to support this encoding type. Raw is also the fastest
-+when the server and viewer are on the same machine, as the connection
-+speed is essentially infinite and raw encoding minimizes processing
-+time.
-+.TP
-+.B CopyRect
-+The Copy Rectangle encoding is efficient when something is being
-+moved; the only data sent is the location of a rectangle from which
-+data should be copied to the current location. Copyrect could also be
-+used to efficiently transmit a repeated pattern.
-+.TP
-+.B RRE
-+The Rise\-and\-Run\-length\-Encoding is basically a 2D version of
-+run\-length encoding (RLE). In this encoding, a sequence of identical
-+pixels are compressed to a single value and repeat count. In VNC, this
-+is implemented with a background color, and then specifications of an
-+arbitrary number of subrectangles and color for each. This is an
-+efficient encoding for large blocks of constant color.
-+.TP
-+.B CoRRE
-+This is a minor variation on RRE, using a maximum of 255x255 pixel
-+rectangles. This allows for single\-byte values to be used, reducing
-+packet size. This is in general more efficient, because the savings
-+from sending 1\-byte values generally outweighs the losses from the
-+(relatively rare) cases where very large regions are painted the same
-+color.
-+.TP
-+.B Hextile
-+Here, rectangles are split up in to 16x16 tiles, which are sent in a
-+predetermined order. The data within the tiles is sent either raw or
-+as a variant on RRE. Hextile encoding is usually the best choice for
-+using in high\-speed network environments (e.g. Ethernet local\-area
-+networks).
-+.TP
-+.B Zlib
-+Zlib is a very simple encoding that uses zlib library to compress raw
-+pixel data. This encoding achieves good compression, but consumes a
-+lot of CPU time. Support for this encoding is provided for
-+compatibility with VNC servers that might not understand Tight
-+encoding which is more efficient than Zlib in nearly all real\-life
-+situations.
-+.TP
-+.B Tight
-+Like Zlib encoding, Tight encoding uses zlib library to compress the
-+pixel data, but it pre\-processes data to maximize compression ratios,
-+and to minimize CPU usage on compression. Also, JPEG compression may
-+be used to encode color\-rich screen areas (see the description of
-+\-quality and \-nojpeg options above). Tight encoding is usually the
-+best choice for low\-bandwidth network environments (e.g. slow modem
-+connections).
-+.SH RESOURCES
-+X resources that \fBvncviewer\fR knows about, aside from the
-+normal Xt resources, are as follows:
-+.TP
-+.B shareDesktop
-+Equivalent of \fB\-shared\fR/\fB\-noshared\fR options. Default true.
-+.TP
-+.B viewOnly
-+Equivalent of \fB\-viewonly\fR option. Default false.
-+.TP
-+.B fullScreen
-+Equivalent of \fB\-fullscreen\fR option. Default false.
-+.TP
-+.B grabKeyboard
-+Grab keyboard in full-screen mode. This can help to solve problems
-+with losing keyboard focus. Default false.
-+.TP
-+.B raiseOnBeep
-+Equivalent of \fB\-noraiseonbeep\fR option, when set to false. Default
-+true.
-+.TP
-+.B passwordFile
-+Equivalent of \fB\-passwd\fR option.
-+.TP
-+.B userLogin
-+Equivalent of \fB\-user\fR option.
-+.TP
-+.B passwordDialog
-+Whether to use a dialog box to get the password (true) or get it from
-+the tty (false). Irrelevant if \fBpasswordFile\fR is set. Default
-+false.
-+.TP
-+.B encodings
-+Equivalent of \fB\-encodings\fR option.
-+.TP
-+.B compressLevel
-+Equivalent of \fB\-compresslevel\fR option (TightVNC\-specific).
-+.TP
-+.B qualityLevel
-+Equivalent of \fB\-quality\fR option (TightVNC\-specific).
-+.TP
-+.B enableJPEG
-+Equivalent of \fB\-nojpeg\fR option, when set to false. Default true.
-+.TP
-+.B useRemoteCursor
-+Equivalent of \fB\-nocursorshape\fR option, when set to false
-+(TightVNC\-specific). Default true.
-+.TP
-+.B useBGR233
-+Equivalent of \fB\-bgr233\fR option. Default false.
-+.TP
-+.B nColours
-+When using BGR233, try to allocate this many "exact" colors from the
-+BGR233 color cube. When using a shared colormap, setting this resource
-+lower leaves more colors for other X clients. Irrelevant when using
-+truecolor. Default is 256 (i.e. all of them).
-+.TP
-+.B useSharedColours
-+If the number of "exact" BGR233 colors successfully allocated is less
-+than 256 then the rest are filled in using the "nearest" colors
-+available. This resource says whether to only use the "exact" BGR233
-+colors for this purpose, or whether to use other clients' "shared"
-+colors as well. Default true (i.e. use other clients' colors).
-+.TP
-+.B forceOwnCmap
-+Equivalent of \fB\-owncmap\fR option. Default false.
-+.TP
-+.B forceTrueColour
-+Equivalent of \fB\-truecolour\fR option. Default false.
-+.TP
-+.B requestedDepth
-+Equivalent of \fB\-depth\fR option.
-+.TP
-+.B useSharedMemory
-+Use MIT shared memory extension if on the same machine as the X
-+server. Default true.
-+.TP
-+.B wmDecorationWidth, wmDecorationHeight
-+The total width and height taken up by window manager decorations.
-+This is used to calculate the maximum size of the VNC viewer window. 
-+Default is width 4, height 24.
-+.TP
-+.B bumpScrollTime, bumpScrollPixels
-+When in full screen mode and the VNC desktop is bigger than the X
-+display, scrolling happens whenever the mouse hits the edge of the
-+screen. The maximum speed of scrolling is bumpScrollPixels pixels
-+every bumpScrollTime milliseconds. The actual speed of scrolling will
-+be slower than this, of course, depending on how fast your machine is. 
-+Default 20 pixels every 25 milliseconds.
-+.TP
-+.B popupButtonCount
-+The number of buttons in the popup window. See the README file for
-+more information on how to customize the buttons.
-+.TP
-+.B debug
-+For debugging. Default false.
-+.TP
-+.B rawDelay, copyRectDelay
-+For debugging, see the README file for details. Default 0 (off).
-+.SH ENVIRONMENT
-+When started with the \fB\-via\fR option, vncviewer reads the
-+\fBVNC_VIA_CMD\fR environment variable, expands patterns beginning
-+with the "%" character, and executes result as a command assuming that
-+it would create TCP tunnel that should be used for VNC connection. If
-+not set, this environment variable defaults to "/usr/bin/ssh -f -L
-+%L:%H:%R %G sleep 20".
-+
-+The following patterns are recognized in the \fBVNC_VIA_CMD\fR (note
-+that all the patterns %G, %H, %L and %R must be present in the command
-+template):
-+.TP
-+.B %%
-+A literal "%";
-+.TP
-+.B %G
-+gateway host name;
-+.TP
-+.B %H
-+remote VNC host name, as known to the gateway;
-+.TP
-+.B %L
-+local TCP port number;
-+.TP
-+.B %R
-+remote TCP port number.
-+.SH SEE ALSO
-+\fBvncserver\fR(1), \fBXvnc\fR(1), \fBvncpasswd\fR(1),
-+\fBvncconnect\fR(1), \fBssh\fR(1)
-+.SH AUTHORS
-+Original VNC was developed in AT&T Laboratories Cambridge. TightVNC
-+additions was implemented by Constantin Kaplinsky. Many other people
-+participated in development, testing and support.
-+
-+\fBMan page authors:\fR
-+.br
-+Marcus Brinkmann <Marcus.Brinkmann@ruhr-uni-bochum.de>,
-+.br
-+Terran Melconian <terran@consistent.org>,
-+.br
-+Tim Waugh <twaugh@redhat.com>,
-+.br
-+Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncviewer/vncviewer.c
 --- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.c	2007-05-31 15:18:09.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.c	2008-01-03 17:30:53.000000000 -0500
 @@ -22,6 +22,7 @@
   */
  
@@ -7114,7 +6819,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		
 +	} else if (!strcmp(str, "-")) {
 +		char *p, *q;
-+		p = getpass("unixuser@unixpasswd ");
++		p = getpass("unixuser@unixpasswd: ");
 +		if (! p) {
 +			exit(1);
 +		}
@@ -7123,7 +6828,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +			exit(1);
 +		}
 +		*q = '\0';
-+		strncpy(username, q, N);
++		strncpy(username, p, N);
 +		strncpy(passwd, q+1, N);
 +		
 +	} else if (infile) {
@@ -7199,7 +6904,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  
    /* The -listen option is used to make us a daemon process which listens for
       incoming connections from servers, rather than actively connecting to a
-@@ -45,89 +203,834 @@
+@@ -45,89 +203,906 @@
       listenForIncomingConnections() returns, setting the listenSpecified
       flag. */
  
@@ -7735,13 +7440,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	}
 +}
 +
-+void raiseme(void);
++void raiseme(int force);
 +void AppendChatInput(char *);
 +
 +void printChat(char *str, Bool raise) {
 +	if (appData.termChat) {
 +		if (raise) {
-+			raiseme();
++			raiseme(0);
 +		}
 +		fprintf(stderr, str);
 +	} else {
@@ -7788,8 +7493,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	return 0;
 +}
 +
-+void raiseme(void) {
-+	if (appData.termChat && getenv("WINDOWID")) {
++void raiseme(int force) {
++	if ((force || appData.termChat) && getenv("WINDOWID")) {
 +		unsigned long w;
 +		if (sscanf(getenv("WINDOWID"), "%lu", &w) == 1)  {
 +			;
@@ -7821,17 +7526,89 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +void
 +DoServerScale(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
-+	char str[100], *q;
++	char str[100], *s, *q;
 +	int n;
-+	raiseme();
-+	fprintf(stderr, "\n\n\a\nEnter integer n for 1/n server scaling: ");
-+	str[0] = '\0';
-+	fgets(str, 100, stdin); 
-+	q = strstr(str, "\n");
-+	if (q) *q = '\0';
-+	if (str[0] != '\0') {
-+		n = atoi(str);
++	if (1) {
++		s = DoScaleDialog();
++	} else {
++		raiseme(1);
++		fprintf(stderr, "\n\n\a\nEnter integer n for 1/n server scaling: ");
++		str[0] = '\0';
++		fgets(str, 100, stdin); 
++		s = str;
++		q = strstr(str, "\n");
++		if (q) *q = '\0';
++	}
++	if (s[0] != '\0') {
++		n = atoi(s);
 +		set_server_scale(n);
++	}
++}
++
++void set_ycrop(int n) {
++	if (n >= 1) {
++		int w = si.framebufferWidth;
++		int h = si.framebufferHeight;
++		appData.yCrop = n;
++		ReDoDesktop();
++		SendFramebufferUpdateRequest(0, 0, w, h, False);
++		schedule_fb_update();
++	}
++}
++
++void
++SetYCrop(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	char str[100], *q, *s;
++	int n;
++	if (1) {
++		s = DoYCropDialog();
++	} else {
++		raiseme(1);
++		fprintf(stderr, "\n\n\a\nEnter pixel size n -ycrop maximum y-height: ");
++		str[0] = '\0';
++		fgets(str, 100, stdin); 
++		s = str;
++		q = strstr(str, "\n");
++		if (q) *q = '\0';
++	}
++	if (s[0] != '\0') {
++		n = atoi(s);
++		set_ycrop(n);
++	}
++}
++
++void set_scbar(int n) {
++	if (n >= 1) {
++		int w = si.framebufferWidth;
++		int h = si.framebufferHeight;
++fprintf(stderr, "set_scbat: %d\n", n);
++		appData.sbWidth = n;
++		ReDoDesktop();
++		SendFramebufferUpdateRequest(0, 0, w, h, False);
++		schedule_fb_update();
++	}
++}
++
++void
++SetScbar(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	char str[100], *q, *s;
++	int n;
++	if (1) {
++		s = DoScbarDialog();
++	} else {
++		raiseme(1);
++		fprintf(stderr, "\n\n\a\nEnter pixel size n scrollbar width: ");
++		str[0] = '\0';
++		fgets(str, 100, stdin); 
++		s = str;
++		q = strstr(str, "\n");
++		if (q) *q = '\0';
++	}
++	if (s[0] != '\0') {
++		n = atoi(s);
++		set_scbar(n);
 +	}
 +}
 +
@@ -7933,8 +7710,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		if (b16 != NULL) XtVaSetValues(b16, XtNstate, False, NULL);
 +	}
 +}
- 
--  return 0;
++
 +void
 +Set256ColorsState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -8034,7 +7810,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +  else
 +    XtVaSetValues(w, XtNstate, False, NULL);
 +}
-+
+ 
+-  return 0;
 +void
 +SetServerInputState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -8072,7 +7849,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncviewer/vncviewer.h
 --- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.h	2007-05-30 23:52:07.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.h	2008-01-03 12:03:29.000000000 -0500
 @@ -68,51 +68,73 @@
  /* argsresources.c */
  
@@ -8201,7 +7978,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern void SetVisualAndCmap();
  
-@@ -157,11 +180,18 @@
+@@ -157,13 +180,32 @@
  
  extern void DesktopInitBeforeRealization();
  extern void DesktopInitAfterRealization();
@@ -8219,8 +7996,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +
  /* dialogs.c */
  
++extern void YCropDialogDone(Widget w, XEvent *event, String *params,
++			     Cardinal *num_params);
++extern char *DoYCropDialog();
++
++extern void ScbarDialogDone(Widget w, XEvent *event, String *params,
++			     Cardinal *num_params);
++extern char *DoScbarDialog();
++
++extern void ScaleDialogDone(Widget w, XEvent *event, String *params,
++			     Cardinal *num_params);
++extern char *DoScaleDialog();
++
  extern void ServerDialogDone(Widget w, XEvent *event, String *params,
-@@ -207,6 +237,10 @@
+ 			     Cardinal *num_params);
+ extern char *DoServerDialog();
+@@ -207,6 +249,10 @@
  		      Cardinal *num_params);
  extern void CreatePopup();
  
@@ -8231,7 +8022,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  /* rfbproto.c */
  
  extern int rfbsock;
-@@ -229,6 +263,15 @@
+@@ -229,6 +275,15 @@
  extern Bool SendClientCutText(char *str, int len);
  extern Bool HandleRFBServerMessage();
  
@@ -8247,7 +8038,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern void PrintPixelFormat(rfbPixelFormat *format);
  
  /* selection.c */
-@@ -241,8 +284,9 @@
+@@ -241,8 +296,9 @@
  
  /* shm.c */
  
@@ -8258,7 +8049,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  /* sockets.c */
  
-@@ -271,3 +315,50 @@
+@@ -271,3 +327,52 @@
  extern XtAppContext appContext;
  extern Display* dpy;
  extern Widget toplevel;
@@ -8283,6 +8074,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void ToggleServerInput(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleSingleWindow(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void DoServerScale(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetYCrop(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetScbar(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ShowScaleN(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetScaleN(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleTextChat(Widget w, XEvent *ev, String *params, Cardinal *num_params);

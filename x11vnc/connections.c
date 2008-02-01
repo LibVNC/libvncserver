@@ -672,6 +672,7 @@ void client_gone(rfbClientPtr client) {
 	speeds_net_latency_measured = 0;
 
 	rfbLog("client_count: %d\n", client_count);
+	last_client_gone = dnow();
 
 	if (unixpw_in_progress && unixpw_client) {
 		if (client == unixpw_client) {

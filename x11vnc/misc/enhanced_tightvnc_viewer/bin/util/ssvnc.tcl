@@ -734,6 +734,12 @@ proc help {} {
 	directory you want. It can be set after starting ssvnc by putting
 	HOME=/path/to/dir in the Host:Display box and clicking "Connect".
 
+        For a Windows BAT file to get the "Home" directory correct
+        something like this might be needed:
+
+         cd \ssvnc\Windows
+         start \ssvnc\Windows\ssvnc.exe 
+
     11) Dynamic VNC Server Port determination and redirection:  If you
         are running SSVNC on Unix and are using SSH to start the remote
         VNC server and the VNC server prints out the line "PORT=NNNN"

@@ -1,3 +1,7 @@
+2008-01-31  Karl Runge <runge@karlrunge.com>
+	* x11vnc: during speeds estimate, guard against client
+	  disconnecting.  ssvnc sync.
+
 2008-01-14  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -ping option, fix memory corruption in copy_tiles
 	  after xrandr resize.

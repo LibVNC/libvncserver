@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.9.4 lastmod: 2008-01-14";
+char lastmod[] = "0.9.4 lastmod: 2008-01-24";
 
 /* X display info */
 
@@ -146,6 +146,7 @@ int hack_val = 0;
 /* last client to move pointer */
 rfbClientPtr last_pointer_client = NULL;
 rfbClientPtr latest_client = NULL;
+double last_client_gone = 0.0;
 
 int waited_for_client = 0;
 int findcreatedisplay = 0;

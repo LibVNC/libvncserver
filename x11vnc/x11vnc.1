@@ -2,7 +2,7 @@
 .TH X11VNC "1" "January 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2008-01-14
+         version: 0.9.4, lastmod: 2008-01-24
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -396,7 +396,7 @@ is already connected before the process goes into the
 background, for example, usage of \fB-display\fR WAIT:..,
 \fB-svc,\fR and \fB-connect\fR can make use of this "poor man's"
 inetd mode.  The default wait time is 500ms in this
-mode.  This usage could use useful:  \fB-svc\fR \fB-loopbg\fR
+mode.  This usage could use useful:  \fB-svc\fR \fB-bg\fR \fB-loopbg\fR
 .PP
 \fB-timeout\fR \fIn\fR
 .IP
@@ -3773,7 +3773,8 @@ for slower
 .IR lseek (2)
 based reading.  Use "snap:..."
 to imply \fB-snapfb\fR mode and the "file:" access (this
-is for devices that only provide the fb all at once).
+is for unseekable devices that only provide the fb all
+at once, e.g. a video camera provides the whole frame).
 .IP
 For shared memory segments string is of the form:
 "shm:N@WxHxB" which specifies a shmid N and with
