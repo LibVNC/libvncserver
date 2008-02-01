@@ -354,7 +354,9 @@ disp=`echo "$orig" | awk -F: '{print $2}'`
 if [ "X$host" = "X" ]; then
 	host=localhost
 fi
-if [ $disp -lt 0 ]; then
+if [ "X$disp" = "X" ]; then
+	port=""	# probably -listen mode.
+elif [ $disp -lt 0 ]; then
 	# negative means use |n| without question:
 	port=`expr 0 - $disp`
 elif [ $disp -lt 200 ]; then
@@ -907,8 +909,20 @@ sub xfer {
 	close($out);
 }
 '
-	echo "$cod" > $tf
+	# xpg_echo will expand \n \r, etc.
+	# try to unset and then test for it.
+	shopt -u xpg_echo >/dev/null 2>&1
+	v='print STDOUT "abc\n";'
+	echo "$v" > $tf
 	chmod 700 $tf
+
+	lc=`wc -l $tf | awk '{print $1}'`
+	if [ "X$lc" = "X1" ]; then
+		echo "$cod" > $tf
+	else
+		printf "%s" "$cod" > $tf
+		echo "" >> $tf
+	fi
 	# prime perl
 	perl -e 'use IO::Socket::INET; select(undef, undef, undef, 0.01)' >/dev/null 2>&1
 }
