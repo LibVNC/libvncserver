@@ -4,7 +4,6 @@ immediate:
 Implement ZYWRLE decoding in libvncclient
 make SDLvncviewer more versatile (test for missing keys, introduce scrollbars,
 	make scrollable with 2xCtrl and mouse drag)
-	- Tab does not work
 	- Left Ctrl + A does not work
 	- 2nd and 3rd mouse button are switched
 Clean up ZRLE (probably not thread-safe: zrleBeforeBuf, zrlePaletteHelper)

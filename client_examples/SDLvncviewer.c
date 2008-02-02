@@ -58,7 +58,7 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	rfbKeySym k = 0;
 	switch(e->keysym.sym) {
 	case SDLK_BACKSPACE: k = XK_BackSpace; break;
-	case SDLK_TAB: k = XK_ISO_Left_Tab; break;
+	case SDLK_TAB: k = XK_Tab; break;
 	case SDLK_CLEAR: k = XK_Clear; break;
 	case SDLK_RETURN: k = XK_Return; break;
 	case SDLK_PAUSE: k = XK_Pause; break;
