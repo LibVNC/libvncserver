@@ -130,6 +130,11 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_BREAK: k = XK_Break; break;
 	default: break;
 	}
+	if (k == 0 && e->keysym.sym >= SDLK_a && e->keysym.sym <= SDLK_z) {
+		k = XK_a + e->keysym.sym - SDLK_a;
+		if (e->keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT))
+			k &= ~0x20;
+	}
 	if (k == 0) {
 		if (e->keysym.unicode < 0x100)
 			k = e->keysym.unicode;
