@@ -3,8 +3,8 @@
 
 struct { int sdl; int rfb; } buttonMapping[]={
 	{1, rfbButton1Mask},
-	{3, rfbButton2Mask},
-	{2, rfbButton3Mask},
+	{2, rfbButton2Mask},
+	{3, rfbButton3Mask},
 	{0,0}
 };
 

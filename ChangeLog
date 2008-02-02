@@ -1,3 +1,7 @@
+2008-02-02  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* client_examples/SDLvncviewer.c: fix buttons (2 & 3 were switched),
+		fix Tab key, and fix Ctrl+<letter>
+
 2008-01-29  Christian Ehrlicher <Ch.Ehrlicher@gmx.de>
 	* libvncserver/rfbserver.c: add missing #include <time.h>
 
