@@ -1,4 +1,8 @@
 2008-02-04  Noriaki Yamazaki <micro-vnc@ias.hitachi-system.co.jp>
+	* libvncclient/rfbproto.c, libvncclient/zrle.c: Add ZYWRLE
+		support to LibVNCClient
+
+2008-02-04  Noriaki Yamazaki <micro-vnc@ias.hitachi-system.co.jp>
 	* libvncserver/zywrletemplate.c: Fix mis encode/decode when
 		width != scanline
 
