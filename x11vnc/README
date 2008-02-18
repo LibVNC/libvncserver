@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Sat Feb  2 21:40:58 EST 2008
+x11vnc README file                         Date: Mon Feb 18 00:58:42 EST 2008
 
 The following information is taken from these URLs:
 
@@ -10781,6 +10781,8 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
      * The default for localhost:0 connections is not raw encoding since
        same-machine connections are pretty rare. Default assumes you are
        using a SSL or SSH tunnel. Use -rawlocal to revert.
+     * Support for the ZYWRLE encoding, a wavelet based extension to ZRLE
+       to improve compression of motion video and photo regions.
      * XGrabServer support for fullscreen mode, for old window managers
        (-grab/-graball option).
      * Fix for Popup menu positioning for old window managers (-popupfix
@@ -11088,7 +11090,7 @@ Enhanced TightVNC viewer (SSVNC) options:
 
    URL http://www.karlrunge.com/x11vnc/ssvnc.html
 
-   Note: ZRLE encoding is now supported.
+   Note: ZRLE and ZYWRLE encodings are now supported.
 
    Note: F9 is shortcut to Toggle FullScreen mode.
 
@@ -11120,6 +11122,8 @@ Enhanced TightVNC viewer (SSVNC) options:
         -sbwidth n  Scrollbar width for x11vnc -ncache mode (-ycrop),
                     default is very narrow: 2 pixels, it is narrow to
                     avoid distraction in -ycrop mode.
+
+        -nobell     Disable bell.
 
         -rawlocal   Prefer raw encoding for localhost, default is
                     no, i.e. assumes you have a SSH tunnel instead.
@@ -11181,7 +11185,6 @@ Enhanced TightVNC viewer (SSVNC) options:
                     it is taken as username@password. Otherwise, the program
                     exits with an error. Got all that?
 
-
    New Popup actions:
 
         ViewOnly:                ~ -viewonly
@@ -11189,7 +11192,11 @@ Enhanced TightVNC viewer (SSVNC) options:
         Cursor Shape:            ~ -nocursorshape
         X11 Cursor:              ~ -x11cursor
         Cursor Alphablend:       ~ -alpha
-        Disable JPEG:            ~ -nojpeg
+        Toggle Tight/ZRLE:       ~ -encodings ...
+        Toggle ZRLE/ZYWRLE:      ~ -encodings zywrle...
+        Quality Level            ~ -quality (both Tight and ZYWRLE)
+        Compress Level           ~ -compresslevel
+        Disable JPEG:            ~ -nojpeg  (Tight)
         Full Color                 as many colors as local screen allows.
         Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
         16 bit color (BGR565)    ~ -16bpp / -bgr565
@@ -11197,16 +11204,18 @@ Enhanced TightVNC viewer (SSVNC) options:
         256 colors               ~ -bgr233 default # of colors.
          64 colors               ~ -bgr222 / -use64
           8 colors               ~ -bgr111 / -use8
+        Set Y Crop (y-max)       ~ -ycrop
+        Set Scrollbar Width      ~ -sbwidth
 
         UltraVNC Extensions:
-        Disable Remote Input       Ultravnc ext. Try to prevent input and
-                                   viewing of monitor at physical display.
-        Single Window              Ultravnc ext. Grab and view a single window.
-                                   (click on the window you want).
-        Set 1/n Server Scale       Ultravnc ext. Scale desktop by 1/n.
-                                   prompt is from the terminal.
-        Text Chat                  Ultravnc ext. Do Text Chat.
 
+          Set 1/n Server Scale     Ultravnc ext. Scale desktop by 1/n.
+          Text Chat                Ultravnc ext. Do Text Chat.
+          File Transfer            Ultravnc ext. File xfer via Java helper.
+          Single Window            Ultravnc ext. Grab and view a single window.
+                                   (select then click on the window you want).
+          Disable Remote Input     Ultravnc ext. Try to prevent input and
+                                   viewing of monitor at physical display.
 
         Note: the Ultravnc extensions only apply to servers that support
               them.  x11vnc/libvncserver supports some of them.
@@ -11480,6 +11489,9 @@ The enhanced TightVNC viewer features are:
         - The default for localhost:0 connections is not raw encoding
           (local machine). Default assumes you are using SSH tunnel. Use
           -rawlocal to revert.
+
+        - Support for the ZYWRLE encoding, a wavelet based extension to
+          ZRLE to improve compression of motion video and photo regions.
 
         - XGrabServer support for fullscreen mode, for old window managers
           (-grab/-graball option).
@@ -11938,7 +11950,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-02-02
+x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-02-17
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -12057,7 +12069,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-02-02
+x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-02-17
 
 (type "x11vnc -opts" to just list the options.)
 
