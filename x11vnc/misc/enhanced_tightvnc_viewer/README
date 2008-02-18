@@ -142,6 +142,9 @@ The enhanced TightVNC viewer features are:
 	  (local machine). Default assumes you are using SSH tunnel. Use
 	  -rawlocal to revert.
 
+	- Support for the ZYWRLE encoding, a wavelet based extension to
+	  ZRLE to improve compression of motion video and photo regions.
+
 	- XGrabServer support for fullscreen mode, for old window managers
 	  (-grab/-graball option).
 

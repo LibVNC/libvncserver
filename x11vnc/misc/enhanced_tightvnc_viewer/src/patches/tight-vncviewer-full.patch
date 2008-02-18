@@ -1,6 +1,6 @@
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncviewer/Vncviewer
 --- vnc_unixsrc.orig/vncviewer/Vncviewer	2003-02-07 05:30:57.000000000 -0500
-+++ vnc_unixsrc/vncviewer/Vncviewer	2008-01-03 17:10:12.000000000 -0500
++++ vnc_unixsrc/vncviewer/Vncviewer	2008-02-17 13:34:03.000000000 -0500
 @@ -5,9 +5,9 @@
  
  !
@@ -21,7 +21,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
    <ButtonPress>: SendRFBEvent()\n\
    <ButtonRelease>: SendRFBEvent()\n\
    <Motion>: SendRFBEvent()\n\
-@@ -72,17 +73,39 @@
+@@ -72,17 +73,51 @@
  *passwordDialog.dialog.value.translations: #override\n\
    <Key>Return: PasswordDialogDone()
  
@@ -49,26 +49,39 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
 +*popup.title: SSVNC popup
  *popup*background: grey
 -*popup*font: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*
++*popup*font_old: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*
 +*popup*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
  *popup.buttonForm.Command.borderWidth: 0
  *popup.buttonForm.Toggle.borderWidth: 0
  
 +*scaleN.title: 1/n scale
 +*scaleN*background: grey
-+*scaleN*font_old: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*
 +*scaleN*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
 +*scaleN.buttonForm.Command.borderWidth: 0
 +*scaleN.buttonForm.Toggle.borderWidth: 0
 +
++*quality.title: quality
++*quality*background: grey
++*quality*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
++*quality.buttonForm.Command.borderWidth: 0
++*quality.buttonForm.Toggle.borderWidth: 0
++
++*compress.title: compress
++*compress*background: grey
++*compress*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
++*compress.buttonForm.Command.borderWidth: 0
++*compress.buttonForm.Toggle.borderWidth: 0
++
  !
  ! Translations on popup window - send key presses through
  !
-@@ -96,43 +119,172 @@
+@@ -96,43 +131,344 @@
  ! Popup buttons
  !
  
 -*popupButtonCount: 8
-+*popupButtonCount: 31
++*popupButtonCount: 38
++*popupButtonBreak: 19
  
  *popup*button1.label: Dismiss popup
 -*popup*button1.translations: #override\n\
@@ -172,97 +185,268 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
 +     <Visible>: SetZRLEState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTightZRLE() HidePopup()
 +
-+*popup*button16.label: Disable JPEG
++*popup*button16.label: Toggle ZRLE/ZYWRLE
 +*popup*button16.type: toggle
 +*popup*button16.translations: #override\\n\
++     <Visible>: SetZYWRLEState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleZRLEZYWRLE() HidePopup()
++
++*popup*button17.label: Quality Level
++*popup*button17.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HidePopup() ShowQuality()
++
++*popup*button18.label: Compress Level
++*popup*button18.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HidePopup() ShowCompress()
++
++*popup*button19.label: Disable JPEG
++*popup*button19.type: toggle
++*popup*button19.translations: #override\\n\
 +     <Visible>: SetNOJPEGState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleJPEG() HidePopup()
 +
-+*popup*button17.label: Full Color
-+*popup*button17.type: toggle
-+*popup*button17.translations: #override\\n\
++*popup*button20.label: Full Color
++*popup*button20.type: toggle
++*popup*button20.translations: #override\\n\
 +     <Visible>: SetFullColorState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFullColor() HidePopup()
 +
-+*popup*button18.label: Grey Scale (16 & 8-bpp)
-+*popup*button18.type: toggle
-+*popup*button18.translations: #override\\n\
++*popup*button21.label: Grey Scale (16 & 8-bpp)
++*popup*button21.type: toggle
++*popup*button21.translations: #override\\n\
 +     <Visible>: SetGreyScaleState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleGreyScale() HidePopup()
 +
-+*popup*button19.label: 16 bit color (BGR565)
-+*popup*button19.type: toggle
-+*popup*button19.translations: #override\\n\
++*popup*button22.label: 16 bit color (BGR565)
++*popup*button22.type: toggle
++*popup*button22.translations: #override\\n\
 +     <Visible>: Set16bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle16bpp() HidePopup()
 +
-+*popup*button20.label: 8   bit color (BGR233)
-+*popup*button20.type: toggle
-+*popup*button20.translations: #override\\n\
++*popup*button23.label: 8   bit color (BGR233)
++*popup*button23.type: toggle
++*popup*button23.translations: #override\\n\
 +     <Visible>: Set8bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8bpp() HidePopup()
 +
-+*popup*button21.label: -     256 colors
-+*popup*button21.type: toggle
-+*popup*button21.translations: #override\\n\
++*popup*button24.label: -     256 colors
++*popup*button24.type: toggle
++*popup*button24.translations: #override\\n\
 +     <Visible>: Set256ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle256Colors() HidePopup()
 +
-+*popup*button22.label: -       64 colors
-+*popup*button22.type: toggle
-+*popup*button22.translations: #override\\n\
++*popup*button25.label: -       64 colors
++*popup*button25.type: toggle
++*popup*button25.translations: #override\\n\
 +     <Visible>: Set64ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle64Colors() HidePopup()
 +
-+*popup*button23.label: -         8 colors
-+*popup*button23.type: toggle
-+*popup*button23.translations: #override\\n\
++*popup*button26.label: -         8 colors
++*popup*button26.type: toggle
++*popup*button26.translations: #override\\n\
 +     <Visible>: Set8ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8Colors() HidePopup()
 +
-+*popup*button24.label: Set Y Crop (y-max)
-+*popup*button24.translations: #override\\n\
++*popup*button27.label: Set Y Crop (y-max)
++*popup*button27.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() SetYCrop()
 +
-+*popup*button25.label: Set Scrollbar Width
-+*popup*button25.translations: #override\\n\
++*popup*button28.label: Set Scrollbar Width
++*popup*button28.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() SetScbar()
 +
-+*popup*button26.label: UltraVNC Extensions:
-+*popup*button26.translations: #override\\n\
++*popup*button29.label: UltraVNC Extensions:
++*popup*button29.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup()
 +
-+*popup*button27.label: - Set 1/n Server Scale
-+*popup*button27.translations: #override\\n\
++*popup*button30.label: - Set 1/n Server Scale
++*popup*button30.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() ShowScaleN()
 +
-+*popup*button28.label: - Text Chat
-+*popup*button28.type: toggle
-+*popup*button28.translations: #override\\n\
++*popup*button31.label: - Text Chat
++*popup*button31.type: toggle
++*popup*button31.translations: #override\\n\
 +     <Visible>: SetTextChatState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTextChat() HidePopup()
 +
-+*popup*button29.label: - File Transfer
-+*popup*button29.type: toggle
-+*popup*button29.translations: #override\\n\
++*popup*button32.label: - File Transfer
++*popup*button32.type: toggle
++*popup*button32.translations: #override\\n\
 +     <Visible>: SetFileXferState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFileXfer() HidePopup()
 +
-+*popup*button30.label: - Single Window
-+*popup*button30.type: toggle
-+*popup*button30.translations: #override\\n\
++*popup*button33.label: - Single Window
++*popup*button33.type: toggle
++*popup*button33.translations: #override\\n\
 +     <Visible>: SetSingleWindowState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleSingleWindow() HidePopup()
 +
-+*popup*button31.label: - Disable Remote Input
-+*popup*button31.type: toggle
-+*popup*button31.translations: #override\\n\
++*popup*button34.label: - Disable Remote Input
++*popup*button34.type: toggle
++*popup*button34.translations: #override\\n\
 +     <Visible>: SetServerInputState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleServerInput() HidePopup()
 +
++*popup*button35.label:
++*popup*button36.label:
++*popup*button37.label:
++*popup*button38.label:
++
++*scaleN*button0.label: Dismiss
++*scaleN*button0.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HideScaleN()
++
++*scaleN*button1.label: 1/1
++*scaleN*button1.translations: #override\\n\
++     <Visible>: SetScaleNState(1)\\n\
++     <Btn1Down>,<Btn1Up>: SetScaleN(1) HideScaleN()
++
++*scaleN*button2.label: 1/2
++*scaleN*button2.translations: #override\\n\
++     <Visible>: SetScaleNState(2)\\n\
++     <Btn1Down>,<Btn1Up>: SetScaleN(2) HideScaleN()
++
++*scaleN*button3.label: 1/3
++*scaleN*button3.translations: #override\\n\
++     <Visible>: SetScaleNState(3)\\n\
++     <Btn1Down>,<Btn1Up>: SetScaleN(3) HideScaleN()
++
++*scaleN*button4.label: 1/4
++*scaleN*button4.translations: #override\\n\
++     <Visible>: SetScaleNState(4)\\n\
++     <Btn1Down>,<Btn1Up>: SetScaleN(4) HideScaleN()
++
++*scaleN*button5.label: 1/5
++*scaleN*button5.translations: #override\\n\
++     <Visible>: SetScaleNState(5)\\n\
++     <Btn1Down>,<Btn1Up>: SetScaleN(5) HideScaleN()
++
++*scaleN*button6.label: Other
++*scaleN*button6.translations: #override\\n\
++     <Visible>: SetScaleNState(6)\\n\
++     <Btn1Down>,<Btn1Up>: HideScaleN() DoServerScale()
++
++*quality*buttonD.label: Dismiss
++*quality*buttonD.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HideQuality()
++
++*quality*button0.label: 0
++*quality*button0.type: toggle
++*quality*button0.translations: #override\\n\
++     <Visible>: SetQualityState(0)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(0) HideQuality()
++
++*quality*button1.label: 1
++*quality*button1.type: toggle
++*quality*button1.translations: #override\\n\
++     <Visible>: SetQualityState(1)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(1) HideQuality()
++
++*quality*button2.label: 2
++*quality*button2.type: toggle
++*quality*button2.translations: #override\\n\
++     <Visible>: SetQualityState(2)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(2) HideQuality()
++
++*quality*button3.label: 3
++*quality*button3.type: toggle
++*quality*button3.translations: #override\\n\
++     <Visible>: SetQualityState(3)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(3) HideQuality()
++
++*quality*button4.label: 4
++*quality*button4.type: toggle
++*quality*button4.translations: #override\\n\
++     <Visible>: SetQualityState(4)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(4) HideQuality()
++
++*quality*button5.label: 5
++*quality*button5.type: toggle
++*quality*button5.translations: #override\\n\
++     <Visible>: SetQualityState(5)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(5) HideQuality()
++
++*quality*button6.label: 6
++*quality*button6.type: toggle
++*quality*button6.translations: #override\\n\
++     <Visible>: SetQualityState(6)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(6) HideQuality()
++
++*quality*button7.label: 7
++*quality*button7.type: toggle
++*quality*button7.translations: #override\\n\
++     <Visible>: SetQualityState(7)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(7) HideQuality()
++
++*quality*button8.label: 8
++*quality*button8.type: toggle
++*quality*button8.translations: #override\\n\
++     <Visible>: SetQualityState(8)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(8) HideQuality()
++
++*quality*button9.label: 9
++*quality*button9.type: toggle
++*quality*button9.translations: #override\\n\
++     <Visible>: SetQualityState(9)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(9) HideQuality()
++
++*compress*buttonD.label: Dismiss
++*compress*buttonD.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HideCompress()
++
++*compress*button0.label: 0
++*compress*button0.translations: #override\\n\
++     <Visible>: SetCompressState(0)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(0) HideCompress()
++
++*compress*button1.label: 1
++*compress*button1.translations: #override\\n\
++     <Visible>: SetCompressState(1)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(1) HideCompress()
++
++*compress*button2.label: 2
++*compress*button2.translations: #override\\n\
++     <Visible>: SetCompressState(2)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(2) HideCompress()
++
++*compress*button3.label: 3
++*compress*button3.translations: #override\\n\
++     <Visible>: SetCompressState(3)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(3) HideCompress()
++
++*compress*button4.label: 4
++*compress*button4.translations: #override\\n\
++     <Visible>: SetCompressState(4)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(4) HideCompress()
++
++*compress*button5.label: 5
++*compress*button5.translations: #override\\n\
++     <Visible>: SetCompressState(5)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(5) HideCompress()
++
++*compress*button6.label: 6
++*compress*button6.translations: #override\\n\
++     <Visible>: SetCompressState(6)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(6) HideCompress()
++
++*compress*button7.label: 7
++*compress*button7.translations: #override\\n\
++     <Visible>: SetCompressState(7)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(7) HideCompress()
++
++*compress*button8.label: 8
++*compress*button8.translations: #override\\n\
++     <Visible>: SetCompressState(8)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(8) HideCompress()
++
++*compress*button9.label: 9
++*compress*button9.translations: #override\\n\
++     <Visible>: SetCompressState(9)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(9) HideCompress()
++
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/vncviewer/argsresources.c
 --- vnc_unixsrc.orig/vncviewer/argsresources.c	2007-02-04 17:10:31.000000000 -0500
-+++ vnc_unixsrc/vncviewer/argsresources.c	2008-01-03 18:41:17.000000000 -0500
++++ vnc_unixsrc/vncviewer/argsresources.c	2008-02-17 13:34:30.000000000 -0500
 @@ -31,7 +31,7 @@
  
  char *fallback_resources[] = {
@@ -288,7 +472,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
       <ButtonPress>: SendRFBEvent()\\n\
       <ButtonRelease>: SendRFBEvent()\\n\
       <Motion>: SendRFBEvent()\\n\
-@@ -58,23 +64,46 @@
+@@ -58,23 +64,58 @@
    "*serverDialog.dialog.value.translations: #override\\n\
       <Key>Return: ServerDialogDone()",
  
@@ -317,28 +501,42 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +  "*popup.title: SSVNC popup",
    "*popup*background: grey",
 -  "*popup*font: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*",
+-  "*popup.buttonForm.Command.borderWidth: 0",
+-  "*popup.buttonForm.Toggle.borderWidth: 0",
 +  "*popup*font_old: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*",
 +  "*popup*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*",
-   "*popup.buttonForm.Command.borderWidth: 0",
-   "*popup.buttonForm.Toggle.borderWidth: 0",
- 
++  "*popup.buttonForm*.Command.borderWidth: 0",
++  "*popup.buttonForm*.Toggle.borderWidth: 0",
++
 +  "*scaleN.title: 1/n scale",
 +  "*scaleN*background: grey",
-+  "*scaleN*font_old: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*",
 +  "*scaleN*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*",
 +  "*scaleN.buttonForm.Command.borderWidth: 0",
 +  "*scaleN.buttonForm.Toggle.borderWidth: 0",
 +
++  "*quality.title: quality",
++  "*quality*background: grey",
++  "*quality*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*",
++  "*quality.buttonForm.Command.borderWidth: 0",
++  "*quality.buttonForm.Toggle.borderWidth: 0",
++
++  "*compress.title: compress",
++  "*compress*background: grey",
++  "*compress*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*",
++  "*compress.buttonForm.Command.borderWidth: 0",
++  "*compress.buttonForm.Toggle.borderWidth: 0",
+ 
    "*popup.translations: #override <Message>WM_PROTOCOLS: HidePopup()",
    "*popup.buttonForm.translations: #override\\n\
       <KeyPress>: SendRFBEvent() HidePopup()",
  
 -  "*popupButtonCount: 8",
-+  "*popupButtonCount: 31",
++  "*popupButtonCount: 38",
++  "*popupButtonBreak: 19",
  
    "*popup*button1.label: Dismiss popup",
    "*popup*button1.translations: #override\\n\
-@@ -84,7 +113,7 @@
+@@ -84,7 +125,7 @@
    "*popup*button2.translations: #override\\n\
       <Btn1Down>,<Btn1Up>: Quit()",
  
@@ -347,7 +545,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    "*popup*button3.type: toggle",
    "*popup*button3.translations: #override\\n\
       <Visible>: SetFullScreenState()\\n\
-@@ -115,9 +144,180 @@
+@@ -115,6 +156,305 @@
    "*popup*button8.translations: #override\\n\
       <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F8) HidePopup()",
  
@@ -391,93 +589,112 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +     <Visible>: SetZRLEState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTightZRLE() HidePopup()",
 +
-+  "*popup*button16.label: Disable JPEG",
++  "*popup*button16.label: Toggle ZRLE/ZYWRLE",
 +  "*popup*button16.type: toggle",
 +  "*popup*button16.translations: #override\\n\
++     <Visible>: SetZYWRLEState()\\n\
++     <Btn1Down>,<Btn1Up>: toggle() ToggleZRLEZYWRLE() HidePopup()",
++
++  "*popup*button17.label: Quality Level",
++  "*popup*button17.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HidePopup() ShowQuality()",
++
++  "*popup*button18.label: Compress Level",
++  "*popup*button18.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HidePopup() ShowCompress()",
++
++  "*popup*button19.label: Disable JPEG",
++  "*popup*button19.type: toggle",
++  "*popup*button19.translations: #override\\n\
 +     <Visible>: SetNOJPEGState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleJPEG() HidePopup()",
 +
-+  "*popup*button17.label: Full Color",
-+  "*popup*button17.type: toggle",
-+  "*popup*button17.translations: #override\\n\
++  "*popup*button20.label: Full Color",
++  "*popup*button20.type: toggle",
++  "*popup*button20.translations: #override\\n\
 +     <Visible>: SetFullColorState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFullColor() HidePopup()",
 +
-+  "*popup*button18.label: Grey Scale (16 & 8-bpp)",
-+  "*popup*button18.type: toggle",
-+  "*popup*button18.translations: #override\\n\
++  "*popup*button21.label: Grey Scale (16 & 8-bpp)",
++  "*popup*button21.type: toggle",
++  "*popup*button21.translations: #override\\n\
 +     <Visible>: SetGreyScaleState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleGreyScale() HidePopup()",
 +
-+  "*popup*button19.label: 16 bit color (BGR565)",
-+  "*popup*button19.type: toggle",
-+  "*popup*button19.translations: #override\\n\
++  "*popup*button22.label: 16 bit color (BGR565)",
++  "*popup*button22.type: toggle",
++  "*popup*button22.translations: #override\\n\
 +     <Visible>: Set16bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle16bpp() HidePopup()",
 +
-+  "*popup*button20.label: 8   bit color (BGR233)",
-+  "*popup*button20.type: toggle",
-+  "*popup*button20.translations: #override\\n\
++  "*popup*button23.label: 8   bit color (BGR233)",
++  "*popup*button23.type: toggle",
++  "*popup*button23.translations: #override\\n\
 +     <Visible>: Set8bppState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8bpp() HidePopup()",
 +
-+  "*popup*button21.label: -     256 colors",
-+  "*popup*button21.type: toggle",
-+  "*popup*button21.translations: #override\\n\
++  "*popup*button24.label: -     256 colors",
++  "*popup*button24.type: toggle",
++  "*popup*button24.translations: #override\\n\
 +     <Visible>: Set256ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle256Colors() HidePopup()",
 +
-+  "*popup*button22.label: -       64 colors",
-+  "*popup*button22.type: toggle",
-+  "*popup*button22.translations: #override\\n\
++  "*popup*button25.label: -       64 colors",
++  "*popup*button25.type: toggle",
++  "*popup*button25.translations: #override\\n\
 +     <Visible>: Set64ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle64Colors() HidePopup()",
 +
-+  "*popup*button23.label: -         8 colors",
-+  "*popup*button23.type: toggle",
-+  "*popup*button23.translations: #override\\n\
++  "*popup*button26.label: -         8 colors",
++  "*popup*button26.type: toggle",
++  "*popup*button26.translations: #override\\n\
 +     <Visible>: Set8ColorsState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8Colors() HidePopup()",
 +
-+  "*popup*button24.label: Set Y Crop (y-max)",
-+  "*popup*button24.translations: #override\\n\
++  "*popup*button27.label: Set Y Crop (y-max)",
++  "*popup*button27.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() SetYCrop()",
 +
-+  "*popup*button25.label: Set Scrollbar Width",
-+  "*popup*button25.translations: #override\\n\
++  "*popup*button28.label: Set Scrollbar Width",
++  "*popup*button28.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() SetScbar()",
 +
-+  "*popup*button26.label: UltraVNC Extensions:",
-+  "*popup*button26.translations: #override\\n\
++  "*popup*button29.label: UltraVNC Extensions:",
++  "*popup*button29.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup()",
 +
-+  "*popup*button27.label: - Set 1/n Server Scale",
-+  "*popup*button27.translations: #override\\n\
++  "*popup*button30.label: - Set 1/n Server Scale",
++  "*popup*button30.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() ShowScaleN()",
 +
-+  "*popup*button28.label: - Text Chat",
-+  "*popup*button28.type: toggle",
-+  "*popup*button28.translations: #override\\n\
++  "*popup*button31.label: - Text Chat",
++  "*popup*button31.type: toggle",
++  "*popup*button31.translations: #override\\n\
 +     <Visible>: SetTextChatState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTextChat() HidePopup()",
 +
-+  "*popup*button29.label: - File Transfer",
-+  "*popup*button29.type: toggle",
-+  "*popup*button29.translations: #override\\n\
++  "*popup*button32.label: - File Transfer",
++  "*popup*button32.type: toggle",
++  "*popup*button32.translations: #override\\n\
 +     <Visible>: SetFileXferState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFileXfer() HidePopup()",
 +
-+  "*popup*button30.label: - Single Window",
-+  "*popup*button30.type: toggle",
-+  "*popup*button30.translations: #override\\n\
++  "*popup*button33.label: - Single Window",
++  "*popup*button33.type: toggle",
++  "*popup*button33.translations: #override\\n\
 +     <Visible>: SetSingleWindowState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleSingleWindow() HidePopup()",
 +
-+  "*popup*button31.label: - Disable Remote Input",
-+  "*popup*button31.type: toggle",
-+  "*popup*button31.translations: #override\\n\
++  "*popup*button34.label: - Disable Remote Input",
++  "*popup*button34.type: toggle",
++  "*popup*button34.translations: #override\\n\
 +     <Visible>: SetServerInputState()\\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleServerInput() HidePopup()",
++
++  "*popup*button35.label:",
++  "*popup*button36.label:",
++  "*popup*button37.label:",
++  "*popup*button38.label:",
 +
 +  "*scaleN*button0.label: Dismiss",
 +  "*scaleN*button0.translations: #override\\n\
@@ -485,50 +702,156 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +
 +  "*scaleN*button1.label: 1/1",
 +  "*scaleN*button1.translations: #override\\n\
++     <Visible>: SetScaleNState(1)\\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(1) HideScaleN()",
 +
 +  "*scaleN*button2.label: 1/2",
 +  "*scaleN*button2.translations: #override\\n\
++     <Visible>: SetScaleNState(2)\\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(2) HideScaleN()",
 +
 +  "*scaleN*button3.label: 1/3",
 +  "*scaleN*button3.translations: #override\\n\
++     <Visible>: SetScaleNState(3)\\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(3) HideScaleN()",
 +
 +  "*scaleN*button4.label: 1/4",
 +  "*scaleN*button4.translations: #override\\n\
++     <Visible>: SetScaleNState(4)\\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(4) HideScaleN()",
 +
 +  "*scaleN*button5.label: 1/5",
 +  "*scaleN*button5.translations: #override\\n\
++     <Visible>: SetScaleNState(5)\\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(5) HideScaleN()",
 +
 +  "*scaleN*button6.label: Other",
 +  "*scaleN*button6.translations: #override\\n\
++     <Visible>: SetScaleNState(6)\\n\
 +     <Btn1Down>,<Btn1Up>: HideScaleN() DoServerScale()",
++
++  "*quality*buttonD.label: Dismiss",
++  "*quality*buttonD.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HideQuality()",
++
++  "*quality*button0.label: 0",
++  "*quality*button0.type: toggle",
++  "*quality*button0.translations: #override\\n\
++     <Visible>: SetQualityState(0)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(0) HideQuality()",
++
++  "*quality*button1.label: 1",
++  "*quality*button1.type: toggle",
++  "*quality*button1.translations: #override\\n\
++     <Visible>: SetQualityState(1)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(1) HideQuality()",
++
++  "*quality*button2.label: 2",
++  "*quality*button2.type: toggle",
++  "*quality*button2.translations: #override\\n\
++     <Visible>: SetQualityState(2)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(2) HideQuality()",
++
++  "*quality*button3.label: 3",
++  "*quality*button3.type: toggle",
++  "*quality*button3.translations: #override\\n\
++     <Visible>: SetQualityState(3)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(3) HideQuality()",
++
++  "*quality*button4.label: 4",
++  "*quality*button4.type: toggle",
++  "*quality*button4.translations: #override\\n\
++     <Visible>: SetQualityState(4)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(4) HideQuality()",
++
++  "*quality*button5.label: 5",
++  "*quality*button5.type: toggle",
++  "*quality*button5.translations: #override\\n\
++     <Visible>: SetQualityState(5)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(5) HideQuality()",
++
++  "*quality*button6.label: 6",
++  "*quality*button6.type: toggle",
++  "*quality*button6.translations: #override\\n\
++     <Visible>: SetQualityState(6)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(6) HideQuality()",
++
++  "*quality*button7.label: 7",
++  "*quality*button7.type: toggle",
++  "*quality*button7.translations: #override\\n\
++     <Visible>: SetQualityState(7)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(7) HideQuality()",
++
++  "*quality*button8.label: 8",
++  "*quality*button8.type: toggle",
++  "*quality*button8.translations: #override\\n\
++     <Visible>: SetQualityState(8)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(8) HideQuality()",
++
++  "*quality*button9.label: 9",
++  "*quality*button9.type: toggle",
++  "*quality*button9.translations: #override\\n\
++     <Visible>: SetQualityState(9)\\n\
++     <Btn1Down>,<Btn1Up>: SetQuality(9) HideQuality()",
++
++  "*compress*buttonD.label: Dismiss",
++  "*compress*buttonD.translations: #override\\n\
++     <Btn1Down>,<Btn1Up>: HideCompress()",
++
++  "*compress*button0.label: 0",
++  "*compress*button0.translations: #override\\n\
++     <Visible>: SetCompressState(0)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(0) HideCompress()",
++
++  "*compress*button1.label: 1",
++  "*compress*button1.translations: #override\\n\
++     <Visible>: SetCompressState(1)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(1) HideCompress()",
++
++  "*compress*button2.label: 2",
++  "*compress*button2.translations: #override\\n\
++     <Visible>: SetCompressState(2)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(2) HideCompress()",
++
++  "*compress*button3.label: 3",
++  "*compress*button3.translations: #override\\n\
++     <Visible>: SetCompressState(3)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(3) HideCompress()",
++
++  "*compress*button4.label: 4",
++  "*compress*button4.translations: #override\\n\
++     <Visible>: SetCompressState(4)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(4) HideCompress()",
++
++  "*compress*button5.label: 5",
++  "*compress*button5.translations: #override\\n\
++     <Visible>: SetCompressState(5)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(5) HideCompress()",
++
++  "*compress*button6.label: 6",
++  "*compress*button6.translations: #override\\n\
++     <Visible>: SetCompressState(6)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(6) HideCompress()",
++
++  "*compress*button7.label: 7",
++  "*compress*button7.translations: #override\\n\
++     <Visible>: SetCompressState(7)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(7) HideCompress()",
++
++  "*compress*button8.label: 8",
++  "*compress*button8.translations: #override\\n\
++     <Visible>: SetCompressState(8)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(8) HideCompress()",
++
++  "*compress*button9.label: 9",
++  "*compress*button9.translations: #override\\n\
++     <Visible>: SetCompressState(9)\\n\
++     <Btn1Down>,<Btn1Up>: SetCompress(9) HideCompress()",
 +
    NULL
  };
  
-+#if 0
-+  "*popup*button14.label: -     ZRLE/ZWYRLE",
-+  "*popup*button14.type: toggle",
-+  "*popup*button14.translations: #override\\n\
-+     <Visible>: SetZRLEState()\\n\
-+     <Btn1Down>,<Btn1Up>: toggle() ToggleTightZRLE() HidePopup()",
-+
-+  "*popup*button17.label: Prefer raw for localhost",
-+  "*popup*button17.type: toggle",
-+  "*popup*button17.translations: #override\\n\
-+     <Visible>: SetRawLocalState()\\n\
-+     <Btn1Down>,<Btn1Up>: toggle() ToggleRawLocal() HidePopup()",
-+
-+#endif
-+
- 
- /*
-  * vncServerHost and vncServerPort are set either from the command line or
-@@ -135,6 +335,7 @@
+@@ -135,6 +475,7 @@
   */
  
  AppData appData;
@@ -536,7 +859,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  static XtResource appDataResourceList[] = {
    {"shareDesktop", "ShareDesktop", XtRBool, sizeof(Bool),
-@@ -155,14 +356,29 @@
+@@ -155,14 +496,29 @@
    {"userLogin", "UserLogin", XtRString, sizeof(String),
     XtOffsetOf(AppData, userLogin), XtRImmediate, (XtPointer) 0},
  
@@ -568,7 +891,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"nColours", "NColours", XtRInt, sizeof(int),
     XtOffsetOf(AppData, nColours), XtRImmediate, (XtPointer) 256},
-@@ -179,9 +395,12 @@
+@@ -179,9 +535,12 @@
    {"requestedDepth", "RequestedDepth", XtRInt, sizeof(int),
     XtOffsetOf(AppData, requestedDepth), XtRImmediate, (XtPointer) 0},
  
@@ -582,7 +905,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"wmDecorationWidth", "WmDecorationWidth", XtRInt, sizeof(int),
     XtOffsetOf(AppData, wmDecorationWidth), XtRImmediate, (XtPointer) 4},
  
-@@ -206,8 +425,13 @@
+@@ -191,6 +550,9 @@
+   {"popupButtonCount", "PopupButtonCount", XtRInt, sizeof(int),
+    XtOffsetOf(AppData, popupButtonCount), XtRImmediate, (XtPointer) 0},
+ 
++  {"popupButtonBreak", "PopupButtonBreak", XtRInt, sizeof(int),
++   XtOffsetOf(AppData, popupButtonBreak), XtRImmediate, (XtPointer) 0},
++
+   {"debug", "Debug", XtRBool, sizeof(Bool),
+    XtOffsetOf(AppData, debug), XtRImmediate, (XtPointer) False},
+ 
+@@ -206,8 +568,13 @@
    {"bumpScrollPixels", "BumpScrollPixels", XtRInt, sizeof(int),
     XtOffsetOf(AppData, bumpScrollPixels), XtRImmediate, (XtPointer) 20},
  
@@ -596,7 +929,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"qualityLevel", "QualityLevel", XtRInt, sizeof(int),
     XtOffsetOf(AppData, qualityLevel), XtRImmediate, (XtPointer) 6},
-@@ -218,14 +442,55 @@
+@@ -218,14 +585,55 @@
    {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
  
@@ -654,7 +987,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -242,8 +507,22 @@
+@@ -242,8 +650,22 @@
    {"-noraiseonbeep", "*raiseOnBeep",        XrmoptionNoArg,  "False"},
    {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
    {"-user",          "*userLogin",          XrmoptionSepArg, 0},
@@ -678,7 +1011,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"-owncmap",       "*forceOwnCmap",       XrmoptionNoArg,  "True"},
    {"-truecolor",     "*forceTrueColour",    XrmoptionNoArg,  "True"},
    {"-truecolour",    "*forceTrueColour",    XrmoptionNoArg,  "True"},
-@@ -253,7 +532,19 @@
+@@ -253,7 +675,19 @@
    {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
    {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
    {"-x11cursor",     "*useX11Cursor",       XrmoptionNoArg,  "True"},
@@ -699,11 +1032,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  };
  
-@@ -268,15 +559,62 @@
+@@ -268,15 +702,73 @@
      {"SendRFBEvent", SendRFBEvent},
      {"ShowPopup", ShowPopup},
      {"HidePopup", HidePopup},
 +    {"HideScaleN", HideScaleN},
++    {"HideQuality", HideQuality},
++    {"HideCompress", HideCompress},
      {"ToggleFullScreen", ToggleFullScreen},
      {"SetFullScreenState", SetFullScreenState},
      {"SelectionFromVNC", SelectionFromVNC},
@@ -724,6 +1059,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +    {"Toggle8Colors", Toggle8Colors},
 +    {"ToggleGreyScale", ToggleGreyScale},
 +    {"ToggleTightZRLE", ToggleTightZRLE},
++    {"ToggleZRLEZYWRLE", ToggleZRLEZYWRLE},
 +    {"ToggleViewOnly", ToggleViewOnly},
 +    {"ToggleJPEG", ToggleJPEG},
 +    {"ToggleCursorShape", ToggleCursorShape},
@@ -739,7 +1075,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +    {"SetYCrop", SetYCrop},
 +    {"SetScbar", SetScbar},
 +    {"ShowScaleN", ShowScaleN},
++    {"ShowQuality", ShowQuality},
++    {"ShowCompress", ShowCompress},
 +    {"SetScaleN", SetScaleN},
++    {"SetQuality", SetQuality},
++    {"SetCompress", SetCompress},
 +    {"Set8bppState", Set8bppState},
 +    {"Set16bppState", Set16bppState},
 +    {"SetFullColorState", SetFullColorState},
@@ -748,7 +1088,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +    {"Set8ColorsState", Set8ColorsState},
 +    {"SetGreyScaleState", SetGreyScaleState},
 +    {"SetZRLEState", SetZRLEState},
++    {"SetZYWRLEState", SetZYWRLEState},
 +    {"SetNOJPEGState", SetNOJPEGState},
++    {"SetScaleNState", SetScaleNState},
++    {"SetQualityState", SetQualityState},
++    {"SetCompressState", SetCompressState},
 +    {"SetViewOnlyState", SetViewOnlyState},
 +    {"SetCursorShapeState", SetCursorShapeState},
 +    {"SetCursorAlphaState", SetCursorAlphaState},
@@ -762,7 +1106,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -302,8 +640,8 @@
+@@ -302,8 +794,8 @@
  void
  usage(void)
  {
@@ -773,7 +1117,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  	  "\n"
  	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
  	  "       %s [<OPTIONS>] [<HOST>][::<PORT#>]\n"
-@@ -332,10 +670,145 @@
+@@ -332,10 +824,148 @@
  	  "        -autopass\n"
  	  "\n"
  	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
@@ -785,7 +1129,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "\n"
 +	  "   URL http://www.karlrunge.com/x11vnc/ssvnc.html\n"
 +	  "\n"
-+	  "   Note: ZRLE encoding is now supported.\n"
++	  "   Note: ZRLE and ZYWRLE encodings are now supported.\n"
 +	  "\n"
 +	  "   Note: F9 is shortcut to Toggle FullScreen mode.\n"
 +	  "\n"
@@ -887,7 +1231,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "        X11 Cursor:              ~ -x11cursor\n"
 +	  "        Cursor Alphablend:       ~ -alpha\n"
 +	  "        Toggle Tight/ZRLE:       ~ -encodings ...\n"
-+	  "        Disable JPEG:            ~ -nojpeg\n"
++	  "        Toggle ZRLE/ZYWRLE:      ~ -encodings zywrle...\n"
++	  "        Quality Level            ~ -quality (both Tight and ZYWRLE)\n"
++	  "        Compress Level           ~ -compresslevel\n"
++	  "        Disable JPEG:            ~ -nojpeg  (Tight)\n"
 +	  "        Full Color                 as many colors as local screen allows.\n"
 +	  "        Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.\n"
 +	  "        16 bit color (BGR565)    ~ -16bpp / -bgr565\n"
@@ -920,7 +1267,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  
  /*
-@@ -350,6 +823,7 @@
+@@ -350,6 +980,7 @@
    int i;
    char *vncServerName, *colonPos;
    int len, portOffset;
@@ -928,7 +1275,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    /* Turn app resource specs into our appData structure for the rest of the
       program to use */
-@@ -357,6 +831,23 @@
+@@ -357,6 +988,23 @@
    XtGetApplicationResources(toplevel, &appData, appDataResourceList,
  			    XtNumber(appDataResourceList), 0, 0);
  
@@ -952,7 +1299,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    /* Add our actions to the actions table so they can be used in widget
       resource specs */
  
-@@ -376,6 +867,10 @@
+@@ -376,6 +1024,10 @@
      return;
    }
  
@@ -963,7 +1310,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    if (argc == 1) {
      vncServerName = DoServerDialog();
      appData.passwordDialog = True;
-@@ -414,6 +909,13 @@
+@@ -414,6 +1066,13 @@
      if (!len || strspn(colonPos + 1, "0123456789") != len) {
        usage();
      }
@@ -1742,7 +2089,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 -
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncviewer/desktop.c
 --- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
-+++ vnc_unixsrc/vncviewer/desktop.c	2008-01-03 10:21:20.000000000 -0500
++++ vnc_unixsrc/vncviewer/desktop.c	2008-02-02 18:48:22.000000000 -0500
 @@ -28,21 +28,29 @@
  #include <X11/extensions/XShm.h>
  #endif
@@ -2386,7 +2733,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  
    if (*num_params != 0) {
      if (strncasecmp(params[0],"key",3) == 0) {
-@@ -329,26 +702,157 @@
+@@ -329,26 +702,161 @@
   * CreateDotCursor.
   */
  
@@ -2458,8 +2805,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +}
 +#endif
 +
++int skip_maybe_sync = 0;
 +void maybe_sync(int width, int height) {
 +	static int singles = 0;
++	if (skip_maybe_sync) {
++		return;
++	}
 +	if (width > 1 || height > 1) {
 +		XSync(dpy, False);
 +		singles = 0;
@@ -2521,10 +2872,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			*(uip+h) = (unsigned int)   fill;
 +		}
 +	}
-+
-+	scr = image->data + y * Bpl + x * Bpp;
  
 -  return cursor;
++	scr = image->data + y * Bpl + x * Bpp;
++
 +	for (h = 0; h < height; h++) {
 +		memcpy(scr, buf, widthInBytes);
 +		scr += Bpl;
@@ -2560,7 +2911,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -359,38 +863,35 @@
+@@ -359,38 +867,35 @@
  void
  CopyDataToScreen(char *buf, int x, int y, int width, int height)
  {
@@ -2626,7 +2977,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -401,62 +902,228 @@
+@@ -401,62 +906,228 @@
  static void
  CopyBGR233ToScreen(CARD8 *buf, int x, int y, int width, int height)
  {
@@ -2907,14 +3258,16 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/dialogs.c vnc_unixsrc/vncviewer/dialogs.c
 --- vnc_unixsrc.orig/vncviewer/dialogs.c	2000-10-26 15:19:19.000000000 -0400
-+++ vnc_unixsrc/vncviewer/dialogs.c	2008-01-03 12:19:13.000000000 -0500
-@@ -26,6 +26,128 @@
++++ vnc_unixsrc/vncviewer/dialogs.c	2008-02-16 19:04:46.000000000 -0500
+@@ -26,6 +26,208 @@
  
  static Bool serverDialogDone = False;
  static Bool passwordDialogDone = False;
 +static Bool ycropDialogDone = False;
 +static Bool scbarDialogDone = False;
 +static Bool scaleDialogDone = False;
++static Bool qualityDialogDone = False;
++static Bool compressDialogDone = False;
 +
 +extern void popupFixer(Widget wid);
 +
@@ -3034,10 +3387,88 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/dialogs.c vnc_unixsrc/vncview
 +  XtPopdown(pshell);
 +  return scaleValue;
 +}
++
++void
++QualityDialogDone(Widget w, XEvent *event, String *params, Cardinal *num_params)
++{
++  qualityDialogDone = True;
++}
++
++char *
++DoQualityDialog()
++{
++  Widget pshell, dialog;
++  char *qualityValue;
++  char *valueString;
++
++  pshell = XtVaCreatePopupShell("qualityDialog", transientShellWidgetClass,
++				toplevel, NULL);
++  dialog = XtVaCreateManagedWidget("dialog", dialogWidgetClass, pshell, NULL);
++
++  XtMoveWidget(pshell, WidthOfScreen(XtScreen(pshell))*2/5,
++	       HeightOfScreen(XtScreen(pshell))*2/5);
++  XtPopup(pshell, XtGrabNonexclusive);
++  XtRealizeWidget(pshell);
++
++  if (appData.popupFix) {
++	popupFixer(pshell);
++  }
++
++  qualityDialogDone = False;
++
++  while (!qualityDialogDone) {
++    XtAppProcessEvent(appContext, XtIMAll);
++  }
++
++  valueString = XawDialogGetValueString(dialog);
++  qualityValue = XtNewString(valueString);
++
++  XtPopdown(pshell);
++  return qualityValue;
++}
++
++void
++CompressDialogDone(Widget w, XEvent *event, String *params, Cardinal *num_params)
++{
++  compressDialogDone = True;
++}
++
++char *
++DoCompressDialog()
++{
++  Widget pshell, dialog;
++  char *compressValue;
++  char *valueString;
++
++  pshell = XtVaCreatePopupShell("compressDialog", transientShellWidgetClass,
++				toplevel, NULL);
++  dialog = XtVaCreateManagedWidget("dialog", dialogWidgetClass, pshell, NULL);
++
++  XtMoveWidget(pshell, WidthOfScreen(XtScreen(pshell))*2/5,
++	       HeightOfScreen(XtScreen(pshell))*2/5);
++  XtPopup(pshell, XtGrabNonexclusive);
++  XtRealizeWidget(pshell);
++
++  if (appData.popupFix) {
++	popupFixer(pshell);
++  }
++
++  compressDialogDone = False;
++
++  while (!compressDialogDone) {
++    XtAppProcessEvent(appContext, XtIMAll);
++  }
++
++  valueString = XawDialogGetValueString(dialog);
++  compressValue = XtNewString(valueString);
++
++  XtPopdown(pshell);
++  return compressValue;
++}
  
  void
  ServerDialogDone(Widget w, XEvent *event, String *params, Cardinal *num_params)
-@@ -49,6 +171,10 @@
+@@ -49,6 +251,10 @@
    XtPopup(pshell, XtGrabNonexclusive);
    XtRealizeWidget(pshell);
  
@@ -3048,7 +3479,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/dialogs.c vnc_unixsrc/vncview
    serverDialogDone = False;
  
    while (!serverDialogDone) {
-@@ -85,6 +211,10 @@
+@@ -85,6 +291,10 @@
    XtPopup(pshell, XtGrabNonexclusive);
    XtRealizeWidget(pshell);
  
@@ -3432,7 +3863,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
  static int
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer/popup.c
 --- vnc_unixsrc.orig/vncviewer/popup.c	2000-06-11 08:00:53.000000000 -0400
-+++ vnc_unixsrc/vncviewer/popup.c	2008-01-03 12:17:32.000000000 -0500
++++ vnc_unixsrc/vncviewer/popup.c	2008-02-17 12:50:06.000000000 -0500
 @@ -25,15 +25,44 @@
  
  #include <X11/Xaw/Form.h>
@@ -3480,10 +3911,54 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
    XSetWMProtocols(dpy, XtWindow(popup), &wmDeleteWindow, 1);
  }
  
-@@ -91,3 +120,292 @@
-     prevButton = button;
-   }
- }
+@@ -52,42 +81,448 @@
+ };
+ 
+ void
+-CreatePopup()
++CreatePopup() {
++	Widget buttonForm1, buttonForm2, twoForm, button, prevButton = NULL;
++	int i;
++	char buttonName[12];
++	String buttonType;
++
++	popup = XtVaCreatePopupShell("popup", transientShellWidgetClass, toplevel, NULL);
++
++	twoForm = XtVaCreateManagedWidget("buttonForm", formWidgetClass, popup, NULL);
++	buttonForm1 = XtVaCreateManagedWidget("buttonForm", formWidgetClass, twoForm, NULL);
++	buttonForm2 = XtVaCreateManagedWidget("buttonForm", formWidgetClass, twoForm, XtNfromHoriz, (XtArgVal) buttonForm1, NULL);
++
++	if (appData.popupButtonCount > 100) {
++		fprintf(stderr,"Too many popup buttons\n");
++		exit(1);
++	}
++
++	for (i = 1; i <= appData.popupButtonCount; i++) {
++		Widget bform;
++		sprintf(buttonName, "button%d", i);
++
++		if (i <= appData.popupButtonBreak) {
++			bform = buttonForm1;
++		} else {
++			if (i == appData.popupButtonBreak+1) {
++				prevButton = NULL;
++			}
++			bform = buttonForm2;
++		}
++		XtVaGetSubresources(bform, (XtPointer)&buttonType, buttonName, "Button", resources, 1, NULL);
++
++		if (strcmp(buttonType, "command") == 0) {
++			button = XtVaCreateManagedWidget(buttonName, commandWidgetClass, bform, NULL);
++			XtVaSetValues(button, XtNfromVert, prevButton, XtNleft, XawChainLeft, XtNright, XawChainRight, NULL);
++		} else if (strcmp(buttonType, "toggle") == 0) {
++			button = XtVaCreateManagedWidget(buttonName, toggleWidgetClass, bform, NULL);
++			XtVaSetValues(button, XtNfromVert, prevButton, XtNleft, XawChainLeft, XtNright, XawChainRight, NULL);
++		} else {
++			fprintf(stderr,"unknown button type '%s'\n", buttonType);
++		}
++		prevButton = button;
++	}
++}
 +
 +
 +Widget scaleN;
@@ -3513,30 +3988,159 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +
 +void
 +CreateScaleN()
+ {
+   Widget buttonForm, button, prevButton = NULL;
+   int i;
+-  char buttonName[12];
++  char buttonName[32];
+   String buttonType;
+ 
+-  popup = XtVaCreatePopupShell("popup", transientShellWidgetClass, toplevel,
++  scaleN = XtVaCreatePopupShell("scaleN", transientShellWidgetClass, toplevel,
+ 			       NULL);
+ 
+-  buttonForm = XtVaCreateManagedWidget("buttonForm", formWidgetClass, popup,
++  buttonForm = XtVaCreateManagedWidget("buttonForm", formWidgetClass, scaleN,
+ 				       NULL);
+ 
+-  if (appData.popupButtonCount > 100) {
+-    fprintf(stderr,"Too many popup buttons\n");
+-    exit(1);
+-  }
+-
+-  for (i = 1; i <= appData.popupButtonCount; i++) {
++  for (i = 0; i <= 6; i++) {
+     sprintf(buttonName, "button%d", i);
+     XtVaGetSubresources(buttonForm, (XtPointer)&buttonType, buttonName,
+ 			"Button", resources, 1, NULL);
+ 
+-    if (strcmp(buttonType, "command") == 0) {
+-      button = XtVaCreateManagedWidget(buttonName, commandWidgetClass,
++    button = XtVaCreateManagedWidget(buttonName, toggleWidgetClass,
+ 				       buttonForm, NULL);
+-      XtVaSetValues(button, XtNfromVert, prevButton,
++    XtVaSetValues(button, XtNfromVert, prevButton,
+ 		    XtNleft, XawChainLeft, XtNright, XawChainRight, NULL);
+-    } else if (strcmp(buttonType, "toggle") == 0) {
+-      button = XtVaCreateManagedWidget(buttonName, toggleWidgetClass,
++    prevButton = button;
++  }
++}
++
++Widget qualityW;
++
++void
++ShowQuality(Widget w, XEvent *event, String *params, Cardinal *num_params)
++{
++  if (appData.popupFix) {
++	popupFixer(qualityW);
++
++  } else {
++	XtMoveWidget(qualityW, event->xbutton.x_root, event->xbutton.y_root);
++  	XtPopup(qualityW, XtGrabNone);
++  }
++  if (appData.grabAll) {
++  	XRaiseWindow(dpy, XtWindow(qualityW));
++  }
++  XSetWMProtocols(dpy, XtWindow(qualityW), &wmDeleteWindow, 1);
++}
++
++void
++HideQuality(Widget w, XEvent *event, String *params, Cardinal *num_params)
++{
++  XtPopdown(qualityW);
++}
++
++
++void
++CreateQuality()
 +{
 +  Widget buttonForm, button, prevButton = NULL;
 +  int i;
 +  char buttonName[32];
 +  String buttonType;
 +
-+  scaleN = XtVaCreatePopupShell("scaleN", transientShellWidgetClass, toplevel,
++  qualityW = XtVaCreatePopupShell("quality", transientShellWidgetClass, toplevel,
 +			       NULL);
 +
-+  buttonForm = XtVaCreateManagedWidget("buttonForm", formWidgetClass, scaleN,
++  buttonForm = XtVaCreateManagedWidget("buttonForm", formWidgetClass, qualityW,
 +				       NULL);
 +
-+  for (i = 0; i <= 6; i++) {
-+    sprintf(buttonName, "button%d", i);
++  for (i = -1; i <= 9; i++) {
++    if (i < 0) {
++	sprintf(buttonName, "buttonD");
++    } else {
++	sprintf(buttonName, "button%d", i);
++    }
 +    XtVaGetSubresources(buttonForm, (XtPointer)&buttonType, buttonName,
 +			"Button", resources, 1, NULL);
 +
-+    button = XtVaCreateManagedWidget(buttonName, commandWidgetClass,
-+				       buttonForm, NULL);
++    button = XtVaCreateManagedWidget(buttonName, toggleWidgetClass,
+ 				       buttonForm, NULL);
+-      XtVaSetValues(button, XtNfromVert, prevButton,
 +    XtVaSetValues(button, XtNfromVert, prevButton,
-+		    XtNleft, XawChainLeft, XtNright, XawChainRight, NULL);
+ 		    XtNleft, XawChainLeft, XtNright, XawChainRight, NULL);
 +    prevButton = button;
 +  }
 +}
++
++Widget compressW;
++
++void
++ShowCompress(Widget w, XEvent *event, String *params, Cardinal *num_params)
++{
++  if (appData.popupFix) {
++	popupFixer(compressW);
++
++  } else {
++	XtMoveWidget(compressW, event->xbutton.x_root, event->xbutton.y_root);
++  	XtPopup(compressW, XtGrabNone);
++  }
++  if (appData.grabAll) {
++  	XRaiseWindow(dpy, XtWindow(compressW));
++  }
++  XSetWMProtocols(dpy, XtWindow(compressW), &wmDeleteWindow, 1);
++}
++
++void
++HideCompress(Widget w, XEvent *event, String *params, Cardinal *num_params)
++{
++  XtPopdown(compressW);
++}
++
++
++void
++CreateCompress()
++{
++  Widget buttonForm, button, prevButton = NULL;
++  int i;
++  char buttonName[32];
++  String buttonType;
++
++  compressW = XtVaCreatePopupShell("compress", transientShellWidgetClass, toplevel,
++			       NULL);
++
++  buttonForm = XtVaCreateManagedWidget("buttonForm", formWidgetClass, compressW,
++				       NULL);
++
++  for (i = -1; i <= 9; i++) {
++    if (i < 0) {
++	sprintf(buttonName, "buttonD");
+     } else {
+-      fprintf(stderr,"unknown button type '%s'\n",buttonType);
++	sprintf(buttonName, "button%d", i);
+     }
++    XtVaGetSubresources(buttonForm, (XtPointer)&buttonType, buttonName,
++			"Button", resources, 1, NULL);
++
++    button = XtVaCreateManagedWidget(buttonName, toggleWidgetClass,
++				       buttonForm, NULL);
++    XtVaSetValues(button, XtNfromVert, prevButton,
++		    XtNleft, XawChainLeft, XtNright, XawChainRight, NULL);
+     prevButton = button;
+   }
+ }
++
 +
 +int filexfer_sock = -1;
 +int filexfer_listen = -1;
@@ -3775,7 +4379,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewer/popup_ad
 --- vnc_unixsrc.orig/vncviewer/popup_ad	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/popup_ad	2008-01-03 11:27:04.000000000 -0500
++++ vnc_unixsrc/vncviewer/popup_ad	2008-02-17 13:32:34.000000000 -0500
 @@ -0,0 +1,20 @@
 +#!/usr/bin/perl
 +
@@ -3791,7 +4395,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +	}
 +	next unless $on;
 +	chomp;
-+	last if /scaleN/;
++	last if /NULL/;
 +	$_ =~ s/^\s*"//;
 +	$_ =~ s/",//;
 +	$_ .= "\n" unless $_ =~ /\n/;
@@ -3799,13 +4403,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
 --- vnc_unixsrc.orig/vncviewer/rfbproto.c	2004-03-11 13:14:39.000000000 -0500
-+++ vnc_unixsrc/vncviewer/rfbproto.c	2008-01-03 10:26:37.000000000 -0500
-@@ -57,6 +57,25 @@
++++ vnc_unixsrc/vncviewer/rfbproto.c	2008-02-17 10:38:27.000000000 -0500
+@@ -57,6 +57,44 @@
  static Bool HandleTight16(int rx, int ry, int rw, int rh);
  static Bool HandleTight32(int rx, int ry, int rw, int rh);
  
 +/* runge add zrle */
 +static Bool HandleZRLE8(int rx, int ry, int rw, int rh);
++static Bool HandleZRLE15(int rx, int ry, int rw, int rh);
 +static Bool HandleZRLE16(int rx, int ry, int rw, int rh);
 +static Bool HandleZRLE24(int rx, int ry, int rw, int rh);
 +static Bool HandleZRLE24Up(int rx, int ry, int rw, int rh);
@@ -3816,17 +4421,35 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +    unsigned long length;
 +} rfbZRLEHeader;
 +
-+long zywrle;
-+
 +#define sz_rfbZRLEHeader 4
 +
 +#define rfbZRLETileWidth 64
 +#define rfbZRLETileHeight 64
 +
++#define DO_ZYWRLE 1
++
++#if DO_ZYWRLE
++
++#ifndef ZRLE_ONCE
++#define ZRLE_ONCE
++
++static const int bitsPerPackedPixel[] = {
++  0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
++};
++
++int zywrle_level;
++int zywrleBuf[rfbZRLETileWidth*rfbZRLETileHeight];
++
++#include "zrlepalettehelper.h"
++static zrlePaletteHelper paletteHelper;
++
++#endif /* ZRLE_ONCE */
++#endif /* DO_ZYWRLE */
++
  static void ReadConnFailedReason(void);
  static long ReadCompactLen (void);
  
-@@ -68,6 +87,10 @@
+@@ -68,6 +106,10 @@
                                int compressedLen);
  
  
@@ -3837,7 +4460,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  int rfbsock;
  char *desktopName;
  rfbPixelFormat myFormat;
-@@ -177,6 +200,9 @@
+@@ -177,6 +219,9 @@
  	  sig_rfbEncodingPointerPos, "Pointer position update");
    CapsAdd(encodingCaps, rfbEncodingLastRect, rfbTightVncVendor,
  	  sig_rfbEncodingLastRect, "LastRect protocol extension");
@@ -3847,7 +4470,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -187,21 +213,21 @@
+@@ -187,21 +232,21 @@
  Bool
  ConnectToRFBServer(const char *hostname, int port)
  {
@@ -3880,7 +4503,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -212,211 +238,228 @@
+@@ -212,211 +257,228 @@
  Bool
  InitialiseRFBConnection(void)
  {
@@ -4219,7 +4842,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	if (!ReadFromRFBServer((char *)secTypes, nSecTypes)) {
 +		return rfbSecTypeInvalid;
 +	}
-+
+ 
+-  free(secTypes);
 +	/* Find out if the server supports TightVNC protocol extensions */
 +	for (j = 0; j < (int)nSecTypes; j++) {
 +		if (secTypes[j] == rfbSecTypeTight) {
@@ -4232,7 +4856,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			return rfbSecTypeTight;
 +		}
 +	}
-+
+ 
+-  if (secType == rfbSecTypeInvalid)
+-    fprintf(stderr, "Server did not offer supported security type\n");
 +	/* Find first supported security type */
 +	for (j = 0; j < (int)nSecTypes; j++) {
 +		for (i = 0; i < nKnownSecTypes; i++) {
@@ -4249,12 +4875,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			break;
 +		}
 +	}
- 
--  free(secTypes);
++
 +	free(secTypes);
- 
--  if (secType == rfbSecTypeInvalid)
--    fprintf(stderr, "Server did not offer supported security type\n");
++
 +	if (secType == rfbSecTypeInvalid) {
 +		fprintf(stderr, "Server did not offer supported security type\n");
 +	}
@@ -4264,7 +4887,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -451,6 +494,9 @@
+@@ -451,6 +513,9 @@
    return True;
  }
  
@@ -4274,7 +4897,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * Negotiate authentication scheme (protocol version 3.7t)
-@@ -459,56 +505,61 @@
+@@ -459,56 +524,61 @@
  static Bool
  PerformAuthenticationTight(void)
  {
@@ -4378,7 +5001,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -519,80 +570,97 @@
+@@ -519,80 +589,97 @@
  static Bool
  AuthenticateVNC(void)
  {
@@ -4539,7 +5162,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  /*
-@@ -602,68 +670,71 @@
+@@ -602,68 +689,71 @@
  static Bool
  AuthenticateUnixLogin(void)
  {
@@ -4663,7 +5286,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -675,19 +746,20 @@
+@@ -675,19 +765,20 @@
  static Bool
  ReadInteractionCaps(void)
  {
@@ -4696,7 +5319,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -700,17 +772,18 @@
+@@ -700,17 +791,18 @@
  static Bool
  ReadCapabilityList(CapsContainer *caps, int count)
  {
@@ -4724,7 +5347,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -729,6 +802,10 @@
+@@ -729,6 +821,10 @@
    Bool requestCompressLevel = False;
    Bool requestQualityLevel = False;
    Bool requestLastRectEncoding = False;
@@ -4735,7 +5358,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
    spf.type = rfbSetPixelFormat;
    spf.format = myFormat;
-@@ -736,6 +813,7 @@
+@@ -736,6 +832,7 @@
    spf.format.greenMax = Swap16IfLE(spf.format.greenMax);
    spf.format.blueMax = Swap16IfLE(spf.format.blueMax);
  
@@ -4743,7 +5366,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
    if (!WriteExact(rfbsock, (char *)&spf, sz_rfbSetPixelFormatMsg))
      return False;
  
-@@ -754,6 +832,12 @@
+@@ -754,6 +851,12 @@
  	encStrLen = strlen(encStr);
        }
  
@@ -4756,18 +5379,28 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
        if (strncasecmp(encStr,"raw",encStrLen) == 0) {
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
        } else if (strncasecmp(encStr,"copyrect",encStrLen) == 0) {
-@@ -775,6 +859,10 @@
+@@ -775,6 +878,20 @@
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
        } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
 +      } else if (strncasecmp(encStr,"zrle",encStrLen) == 0) {
 +	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZRLE);
++#if DO_ZYWRLE
 +      } else if (strncasecmp(encStr,"zywrle",encStrLen) == 0) {
 +	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZYWRLE);
++	requestQualityLevel = True;
++		if (appData.qualityLevel < 3) {
++			zywrle_level = 3;
++		} else if (appData.qualityLevel < 6) {
++			zywrle_level = 2;
++		} else {
++			zywrle_level = 1;
++		}
++#endif
        } else {
  	fprintf(stderr,"Unknown encoding '%.*s'\n",encStrLen,encStr);
        }
-@@ -797,7 +885,7 @@
+@@ -797,7 +914,7 @@
      if (appData.useRemoteCursor) {
        if (se->nEncodings < MAX_ENCODINGS)
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
@@ -4776,7 +5409,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
        if (se->nEncodings < MAX_ENCODINGS)
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
-@@ -806,10 +894,14 @@
+@@ -806,10 +923,14 @@
      if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
      }
@@ -4792,15 +5425,16 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	fprintf(stderr,"Same machine: preferring raw encoding\n");
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
        } else {
-@@ -819,6 +911,7 @@
+@@ -819,6 +940,8 @@
  
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
 +    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZRLE);
++    encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZYWRLE);
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
-@@ -844,11 +937,14 @@
+@@ -844,11 +967,14 @@
  
      if (appData.useRemoteCursor) {
        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
@@ -4816,7 +5450,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
    }
  
    len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
-@@ -868,10 +964,11 @@
+@@ -868,10 +994,11 @@
  Bool
  SendIncrementalFramebufferUpdateRequest()
  {
@@ -4830,7 +5464,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * SendFramebufferUpdateRequest.
-@@ -880,19 +977,35 @@
+@@ -880,19 +1007,35 @@
  Bool
  SendFramebufferUpdateRequest(int x, int y, int w, int h, Bool incremental)
  {
@@ -4876,7 +5510,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -903,19 +1016,27 @@
+@@ -903,19 +1046,27 @@
  Bool
  SendPointerEvent(int x, int y, int buttonMask)
  {
@@ -4889,11 +5523,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			return True;
 +		}
 +	}
-+
-+	pe.type = rfbPointerEvent;
-+	pe.buttonMask = buttonMask;
-+	if (x < 0) x = 0;
-+	if (y < 0) y = 0;
  
 -  pe.type = rfbPointerEvent;
 -  pe.buttonMask = buttonMask;
@@ -4906,6 +5535,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -  pe.x = Swap16IfLE(x);
 -  pe.y = Swap16IfLE(y);
 -  return WriteExact(rfbsock, (char *)&pe, sz_rfbPointerEventMsg);
++	pe.type = rfbPointerEvent;
++	pe.buttonMask = buttonMask;
++	if (x < 0) x = 0;
++	if (y < 0) y = 0;
++
 +	if (!appData.useX11Cursor) {
 +		SoftCursorMove(x, y);
 +	}
@@ -4916,7 +5550,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -926,12 +1047,12 @@
+@@ -926,12 +1077,12 @@
  Bool
  SendKeyEvent(CARD32 key, Bool down)
  {
@@ -4934,7 +5568,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -942,281 +1063,661 @@
+@@ -942,281 +1093,675 @@
  Bool
  SendClientCutText(char *str, int len)
  {
@@ -5261,57 +5895,57 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	CheckFileXfer();
 +	return True;
 +}
-+
-+/*
-+ * HandleRFBServerMessage.
-+ */
  
 -      /* If RichCursor encoding is used, we should prevent collisions
 -	 between framebuffer updates and cursor drawing operations. */
 -      SoftCursorLockArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h);
++/*
++ * HandleRFBServerMessage.
++ */
  
 -      switch (rect.encoding) {
+ 
+-      case rfbEncodingRaw:
 +Bool
 +HandleRFBServerMessage()
 +{
 +	int db = 0;
 +	rfbServerToClientMsg msg;
  
--      case rfbEncodingRaw:
-+	if (!ReadFromRFBServer((char *)&msg, 1)) {
-+		return False;
-+	}
- 
 -	bytesPerLine = rect.r.w * myFormat.bitsPerPixel / 8;
 -	linesToRead = BUFFER_SIZE / bytesPerLine;
-+	if (msg.type == rfbFileTransfer) {
-+		return HandleFileXfer();
++	if (!ReadFromRFBServer((char *)&msg, 1)) {
++		return False;
 +	}
  
 -	while (rect.r.h > 0) {
 -	  if (linesToRead > rect.r.h)
 -	    linesToRead = rect.r.h;
-+    switch (msg.type) {
++	if (msg.type == rfbFileTransfer) {
++		return HandleFileXfer();
++	}
  
 -	  if (!ReadFromRFBServer(buffer,bytesPerLine * linesToRead))
 -	    return False;
++    switch (msg.type) {
+ 
+-	  CopyDataToScreen(buffer, rect.r.x, rect.r.y, rect.r.w,
+-			   linesToRead);
 +    case rfbSetColourMapEntries:
 +    {
 +	int i;
 +	CARD16 rgb[3];
 +	XColor xc;
  
--	  CopyDataToScreen(buffer, rect.r.x, rect.r.y, rect.r.w,
--			   linesToRead);
+-	  rect.r.h -= linesToRead;
+-	  rect.r.y += linesToRead;
 +	if (!ReadFromRFBServer(((char *)&msg) + 1, sz_rfbSetColourMapEntriesMsg - 1)) {
 +		return False;
 +	}
  
--	  rect.r.h -= linesToRead;
--	  rect.r.y += linesToRead;
 +	msg.scme.firstColour = Swap16IfLE(msg.scme.firstColour);
 +	msg.scme.nColours = Swap16IfLE(msg.scme.nColours);
- 
++
 +	for (i = 0; i < msg.scme.nColours; i++) {
 +		if (!ReadFromRFBServer((char *)rgb, 6)) {
 +			return False;
@@ -5332,6 +5966,20 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +
  	break;
 +    }
++
++    case rfbFramebufferUpdate:
++    {
++	rfbFramebufferUpdateRectHeader rect;
++	int linesToRead;
++	int bytesPerLine;
++	int i;
++	int usecs;
++
++	int area_copyrect = 0;
++	int area_tight = 0;
++	int area_zrle = 0;
++	int area_raw = 0;
++	if (db) fprintf(stderr, "FBU-0:    %.6f\n", dnow());
  
 -      case rfbEncodingCopyRect:
 -      {
@@ -5359,20 +6007,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -			 rect.r.w, rect.r.h);
 -	  XFillRectangle(dpy, desktopWin, srcGC, cr.srcX, cr.srcY,
 -			 rect.r.w, rect.r.h);
-+    case rfbFramebufferUpdate:
-+    {
-+	rfbFramebufferUpdateRectHeader rect;
-+	int linesToRead;
-+	int bytesPerLine;
-+	int i;
-+	int usecs;
-+
-+	int area_copyrect = 0;
-+	int area_tight = 0;
-+	int area_zrle = 0;
-+	int area_raw = 0;
-+	if (db) fprintf(stderr, "FBU-0:    %.6f\n", dnow());
-+
 +	int skip_incFBU = 0;
 +	sent_FBU = -1;
 +
@@ -5637,6 +6271,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +
 +		/* runge adds zrle and zywrle: */
 +		case rfbEncodingZRLE:
++#if DO_ZYWRLE
++		zywrle_level = 0;
++		case rfbEncodingZYWRLE:
++#endif
 +		{
 +			if (db) fprintf(stderr, "ZRLE:    %dx%d+%d+%d\n", rect.r.w, rect.r.h, rect.r.x, rect.r.y);
 +			area_zrle += rect.r.w * rect.r.h;
@@ -5647,8 +6285,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +				}
 +				break;
 +			case 16:
-+				if (!HandleZRLE16(rect.r.x,rect.r.y,rect.r.w,rect.r.h)) {
-+					return False;
++				if (myFormat.greenMax > 0x1f) {
++					if (!HandleZRLE16(rect.r.x,rect.r.y,rect.r.w,rect.r.h)) {
++						return False;
++					}
++				} else {
++					if (!HandleZRLE15(rect.r.x,rect.r.y,rect.r.w,rect.r.h)) {
++						return False;
++					}
 +				}
 +				break;
 +			case 32:
@@ -5656,15 +6300,19 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +				unsigned int maxColor=(myFormat.redMax<<myFormat.redShift)|
 +				    (myFormat.greenMax<<myFormat.greenShift)|
 +				    (myFormat.blueMax<<myFormat.blueShift);
++if (db) fprintf(stderr, "maxColor: 0x%x  mfbigEnding: %d\n", maxColor, myFormat.bigEndian);
 +				if ((myFormat.bigEndian && (maxColor&0xff)==0) || (!myFormat.bigEndian && (maxColor&0xff000000)==0)) {
++if (db) fprintf(stderr, "HandleZRLE24\n");
 +					if (!HandleZRLE24(rect.r.x,rect.r.y,rect.r.w,rect.r.h)) {
 +						return False;
 +					}
 +				} else if (!myFormat.bigEndian && (maxColor&0xff)==0) {
++if (db) fprintf(stderr, "HandleZRLE24Up\n");
 +					if (!HandleZRLE24Up(rect.r.x,rect.r.y,rect.r.w,rect.r.h)) {
 +						return False;
 +					}
 +				} else if (myFormat.bigEndian && (maxColor&0xff000000)==0) {
++if (db) fprintf(stderr, "HandleZRLE24Down\n");
 +					if (!HandleZRLE24Down(rect.r.x,rect.r.y,rect.r.w,rect.r.h)) {
 +						return False;
 +					}
@@ -5825,7 +6473,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  #ifdef MITSHM
      /* if using shared memory PutImage, make sure that the X server has
-@@ -1224,59 +1725,149 @@
+@@ -1224,59 +1769,149 @@
         mainly to avoid copyrect using invalid screen contents - not sure
         if we'd need it otherwise. */
  
@@ -5856,12 +6504,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
    {
 -    Window toplevelWin;
 +	Window toplevelWin;
-+
+ 
+-    XBell(dpy, 0);
 +	if (appData.useBell) {
 +		XBell(dpy, 0);
 +	}
- 
--    XBell(dpy, 0);
++
 +	if (appData.raiseOnBeep) {
 +		toplevelWin = XtWindow(toplevel);
 +		XMapRaised(dpy, toplevelWin);
@@ -6008,7 +6656,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -1296,12 +1887,19 @@
+@@ -1296,26 +1931,47 @@
  #define CONCAT2(a,b) a##b
  #define CONCAT2E(a,b) CONCAT2(a,b)
  
@@ -6026,17 +6674,21 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #include "tight.c"
 +#include "zrle.c"
  #undef BPP
++
  #define BPP 16
  #include "rre.c"
-@@ -1309,6 +1907,7 @@
+ #include "corre.c"
  #include "hextile.c"
  #include "zlib.c"
  #include "tight.c"
 +#include "zrle.c"
++#define REALBPP 15
++#include "zrle.c"
  #undef BPP
++
  #define BPP 32
  #include "rre.c"
-@@ -1316,6 +1915,15 @@
+ #include "corre.c"
  #include "hextile.c"
  #include "zlib.c"
  #include "tight.c"
@@ -6052,7 +6704,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  
  /*
-@@ -1358,9 +1966,9 @@
+@@ -1358,9 +2014,9 @@
  	    "  %s significant bit in each byte is leftmost on the screen.\n",
  	    (format->bigEndian ? "Most" : "Least"));
    } else {
@@ -6064,122 +6716,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	      (format->bigEndian ? "Most" : "Least"));
      }
      if (format->trueColour) {
-@@ -1463,3 +2071,115 @@
+@@ -1462,4 +2118,3 @@
+ 
    cinfo->src = &jpegSrcManager;
  }
- 
-+#define DO_ZYWRLE 0
-+#if DO_ZYWRLE
-+
-+#define ZYWRLE_ENDIAN ENDIAN_LITTLE
-+
-+#undef END_FIX
-+#if ZYWRLE_ENDIAN == ENDIAN_LITTLE
-+#  define END_FIX LE
-+#elif ZYWRLE_ENDIAN == ENDIAN_BIG
-+#  define END_FIX BE
-+#else
-+#  define END_FIX NE
-+#endif
-+#define ZYWRLE_DECODE
-+
-+#ifndef __RFB_CONCAT2E
-+#define __RFB_CONCAT2(a,b) a##b
-+#define __RFB_CONCAT2E(a,b) __RFB_CONCAT2(a,b)
-+#endif
-+
-+#ifndef __RFB_CONCAT3E
-+#define __RFB_CONCAT3(a,b,c) a##b##c
-+#define __RFB_CONCAT3E(a,b,c) __RFB_CONCAT3(a,b,c)
-+#endif
-+
-+#undef END_FIX
-+#if ZYWRLE_ENDIAN == ENDIAN_LITTLE
-+#  define END_FIX LE
-+#elif ZYWRLE_ENDIAN == ENDIAN_BIG
-+#  define END_FIX BE
-+#else
-+#  define END_FIX NE
-+#endif
-+
-+#include "zrletypes.h"
-+#include "zrlepalettehelper.h"
-+
-+#if 0
-+typedef unsigned short uint16_t;
-+typedef unsigned int uint32_t;
-+
-+#ifdef CPIXEL
-+#define PIXEL_T __RFB_CONCAT3E(uint,BPP,_t)
-+#define zrleOutStreamWRITE_PIXEL __RFB_CONCAT2E(zrleOutStreamWriteOpaque,CPIXEL)
-+#define ZRLE_ENCODE __RFB_CONCAT3E(zrleEncode,CPIXEL,END_FIX)
-+#define ZRLE_ENCODE_TILE __RFB_CONCAT3E(zrleEncodeTile,CPIXEL,END_FIX)
-+#define BPPOUT 24
-+#elif BPP==15
-+#define PIXEL_T __RFB_CONCAT3E(uint,16,_t)
-+#define zrleOutStreamWRITE_PIXEL __RFB_CONCAT2E(zrleOutStreamWriteOpaque,16)
-+#define ZRLE_ENCODE __RFB_CONCAT3E(zrleEncode,BPP,END_FIX)
-+#define ZRLE_ENCODE_TILE __RFB_CONCAT3E(zrleEncodeTile,BPP,END_FIX)
-+#define BPPOUT 16
-+#else
-+#define PIXEL_T __RFB_CONCAT3E(uint,BPP,_t)
-+#define zrleOutStreamWRITE_PIXEL __RFB_CONCAT2E(zrleOutStreamWriteOpaque,BPP)
-+#define ZRLE_ENCODE __RFB_CONCAT3E(zrleEncode,BPP,END_FIX)
-+#define ZRLE_ENCODE_TILE __RFB_CONCAT3E(zrleEncodeTile,BPP,END_FIX)
-+#define BPPOUT BPP
-+#endif
-+
-+#else
-+
-+#ifdef CPIXEL
-+#define PIXEL_T __RFB_CONCAT2E(zrle_U,BPP)
-+#define zrleOutStreamWRITE_PIXEL __RFB_CONCAT2E(zrleOutStreamWriteOpaque,CPIXEL)
-+#define ZRLE_ENCODE __RFB_CONCAT3E(zrleEncode,CPIXEL,END_FIX)
-+#define ZRLE_ENCODE_TILE __RFB_CONCAT3E(zrleEncodeTile,CPIXEL,END_FIX)
-+#define BPPOUT 24
-+#elif BPP==15
-+#define PIXEL_T __RFB_CONCAT2E(zrle_U,16)
-+#define zrleOutStreamWRITE_PIXEL __RFB_CONCAT2E(zrleOutStreamWriteOpaque,16)
-+#define ZRLE_ENCODE __RFB_CONCAT3E(zrleEncode,BPP,END_FIX)
-+#define ZRLE_ENCODE_TILE __RFB_CONCAT3E(zrleEncodeTile,BPP,END_FIX)
-+#define BPPOUT 16
-+#else
-+#define PIXEL_T __RFB_CONCAT2E(zrle_U,BPP)
-+#define zrleOutStreamWRITE_PIXEL __RFB_CONCAT2E(zrleOutStreamWriteOpaque,BPP)
-+#define ZRLE_ENCODE __RFB_CONCAT3E(zrleEncode,BPP,END_FIX)
-+#define ZRLE_ENCODE_TILE __RFB_CONCAT3E(zrleEncodeTile,BPP,END_FIX)
-+#define BPPOUT BPP
-+#endif
-+
-+#endif
-+
-+#ifndef ZRLE_ONCE
-+#define ZRLE_ONCE
-+
-+static const int bitsPerPackedPixel[] = {
-+  0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
-+};
-+
-+int zywrle_level;
-+int zywrleBuf[rfbZRLETileWidth*rfbZRLETileHeight];
-+
-+static zrlePaletteHelper paletteHelper;
-+
-+#endif /* ZRLE_ONCE */
-+
-+#if 0
-+void ZRLE_ENCODE_TILE (PIXEL_T* data, int w, int h, zrleOutStream* os);
-+#endif
-+
-+#define BPP 16
-+#include "zywrletemplate.c"
-+#undef BPP
-+#define BPP 32
-+#include "zywrletemplate.c"
-+#undef BPP
-+
-+#endif	/* DO_ZYWRLE */
-+
+-
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rre.c vnc_unixsrc/vncviewer/rre.c
 --- vnc_unixsrc.orig/vncviewer/rre.c	2000-06-11 08:00:53.000000000 -0400
 +++ vnc_unixsrc/vncviewer/rre.c	2007-02-17 22:52:24.000000000 -0500
@@ -6724,7 +7265,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/tunnel.c vnc_unixsrc/vncviewe
    sprintf(lastArgv, "localhost::%d", localPort);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncviewer/vncviewer.c
 --- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.c	2008-01-03 17:30:53.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.c	2008-02-17 13:27:17.000000000 -0500
 @@ -22,6 +22,7 @@
   */
  
@@ -6904,7 +7445,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  
    /* The -listen option is used to make us a daemon process which listens for
       incoming connections from servers, rather than actively connecting to a
-@@ -45,89 +203,906 @@
+@@ -45,89 +203,1154 @@
       listenForIncomingConnections() returns, setting the listenSpecified
       flag. */
  
@@ -7019,6 +7560,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 -  CreatePopup();
 +	CreatePopup();
 +	CreateScaleN();
++	CreateQuality();
++	CreateCompress();
 +	CreateChat();
  
    /* Find the best pixel format and X visual/colormap to use */
@@ -7107,6 +7650,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	appDataNew.useRemoteCursor = appData.useRemoteCursor;
 +	appDataNew.useX11Cursor    = appData.useX11Cursor;
 +	appDataNew.useRawLocal     = appData.useRawLocal;
++	appDataNew.qualityLevel    = appData.qualityLevel;
++	appDataNew.compressLevel   = appData.compressLevel;
 +}
 +void cutover_format_change(void) {
 +	appData.useBGR233       = appDataNew.useBGR233;
@@ -7117,6 +7662,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	appData.useRemoteCursor = appDataNew.useRemoteCursor;
 +	appData.useX11Cursor    = appDataNew.useX11Cursor;
 +	appData.useRawLocal     = appDataNew.useRawLocal;
++	appData.qualityLevel    = appDataNew.qualityLevel;
++	appData.compressLevel   = appDataNew.compressLevel;
 +}
 +
 +void
@@ -7275,39 +7822,80 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 + */
 +
 +static Bool usingZRLE = False;
++static Bool usingZYWRLE = False;
++extern int skip_maybe_sync;
 +
 +void
 +ToggleTightZRLE(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
-+	char prefTight[] = "copyrect tight zrle zlib hextile corre rre raw";
-+	char prefZRLE[]  = "copyrect zrle tight zlib hextile corre rre raw";
++	char prefTight[] = "copyrect tight zrle zywrle zlib hextile corre rre raw";
++	char prefZRLE[]  = "copyrect zrle zywrle tight zlib hextile corre rre raw";
 +	init_format_change();
 +	if (! appData.encodingsString) {
 +		appDataNew.encodingsString = strdup(prefZRLE);
 +		usingZRLE = True;
 +		fprintf(stderr, "prefer: ZRLE\n");
 +	} else {
-+		char *p, *q;
-+		p = strstr(appData.encodingsString, "tight");
-+		q = strstr(appData.encodingsString, "zrle");
-+		if (! p) {
++		char *t, *z;
++		static int first = 1;
++		t = strstr(appData.encodingsString, "tight");
++		z = strstr(appData.encodingsString, "zrle");
++		if (first && usingZRLE) {
++			appDataNew.encodingsString = strdup(prefTight);
++			usingZRLE = False;
++			usingZYWRLE = False;
++		} else if (! t) {
 +			appDataNew.encodingsString = strdup(prefZRLE);
 +			usingZRLE = True;
 +			fprintf(stderr, "prefer: ZRLE\n");
-+		} else if (! q) {
++		} else if (! z) {
 +			appDataNew.encodingsString = strdup(prefTight);
 +			usingZRLE = False;
++			usingZYWRLE = False;
++			skip_maybe_sync = 0;
 +			fprintf(stderr, "prefer: Tight\n");
 +		} else {
-+			if (p < q) {
++			if (t < z) {
 +				appDataNew.encodingsString = strdup(prefZRLE);
 +				usingZRLE = True;
 +				fprintf(stderr, "prefer: ZRLE\n");
 +			} else {
 +				appDataNew.encodingsString = strdup(prefTight);
 +				usingZRLE = False;
++				usingZYWRLE = False;
++				skip_maybe_sync = 0;
 +				fprintf(stderr, "prefer: Tight\n");
 +			}
++		}
++		first = 0;
++	}
++	schedule_format_change();
++}
++
++void
++ToggleZRLEZYWRLE(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	char prefZYWRLE[] = "copyrect zywrle zrle tight zlib hextile corre rre raw";
++	char prefZRLE[]   = "copyrect zrle zywrle tight zlib hextile corre rre raw";
++	init_format_change();
++	usingZRLE = True;
++	if (! appData.encodingsString) {
++		appDataNew.encodingsString = strdup(prefZYWRLE);
++		usingZYWRLE = True;
++		fprintf(stderr, "prefer: ZYWRLE\n");
++	} else {
++		char *z, *w;
++		w = strstr(appData.encodingsString, "zywrle");
++		z = strstr(appData.encodingsString, "zrle");
++		if (usingZYWRLE) {
++			appDataNew.encodingsString = strdup(prefZRLE);
++			fprintf(stderr, "prefer: ZRLE\n");
++			usingZYWRLE = False;
++			skip_maybe_sync = 0;
++		} else {
++			appDataNew.encodingsString = strdup(prefZYWRLE);
++			fprintf(stderr, "prefer: ZYWRLE\n");
++			usingZYWRLE = True;
 +		}
 +	}
 +	schedule_format_change();
@@ -7545,6 +8133,75 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	}
 +}
 +
++void set_server_quality(int n) {
++	fprintf(stderr, "set_quality: %d\n", n);
++	if (n >= 0 && n <= 9) {
++		int w = si.framebufferWidth;
++		int h = si.framebufferHeight;
++		init_format_change();
++		appDataNew.qualityLevel = n;
++		SendFramebufferUpdateRequest(0, 0, w, h, False);
++		schedule_format_change();
++	}
++}
++
++void
++DoServerQuality(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	char str[100], *s, *q;
++	int n;
++	if (1) {
++		s = DoQualityDialog();
++	} else {
++		raiseme(1);
++		fprintf(stderr, "\n\n\a\nEnter integer 1 <= n <= 9 for quality setting: ");
++		str[0] = '\0';
++		fgets(str, 100, stdin); 
++		s = str;
++		q = strstr(str, "\n");
++		if (q) *q = '\0';
++	}
++	if (s[0] != '\0') {
++		n = atoi(s);
++		set_server_quality(n);
++	}
++}
++
++void set_server_compress(int n) {
++	fprintf(stderr, "set_compress: %d\n", n);
++	if (n >= 0 && n <= 9) {
++		int w = si.framebufferWidth;
++		int h = si.framebufferHeight;
++		init_format_change();
++		appDataNew.compressLevel = n;
++		SendFramebufferUpdateRequest(0, 0, w, h, False);
++		schedule_format_change();
++	}
++}
++
++void
++DoServerCompress(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	char str[100], *s, *q;
++	int n;
++	if (1) {
++		s = DoCompressDialog();
++	} else {
++		raiseme(1);
++		fprintf(stderr, "\n\n\a\nEnter integer 1 <= n <= 9 for compress level setting: ");
++		str[0] = '\0';
++		fgets(str, 100, stdin); 
++		s = str;
++		q = strstr(str, "\n");
++		if (q) *q = '\0';
++	}
++	if (s[0] != '\0') {
++		n = atoi(s);
++		set_server_compress(n);
++	}
++}
++
++
 +void set_ycrop(int n) {
 +	if (n >= 1) {
 +		int w = si.framebufferWidth;
@@ -7622,6 +8279,24 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +}
 +
 +void
++SetQuality(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (*num_params != 0) {
++		int n = atoi(params[0]);
++		set_server_quality(n);
++	}
++}
++
++void
++SetCompress(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (*num_params != 0) {
++		int n = atoi(params[0]);
++		set_server_compress(n);
++	}
++}
++
++void
 +GotChatText(char *str, int len)
 +{
 +	static char *b = NULL;
@@ -7675,6 +8350,45 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +}
 +
 +void
++SetQualityState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (*num_params != 0) {
++		int n = atoi(params[0]);
++		if (appData.qualityLevel == n) {
++			XtVaSetValues(w, XtNstate, True, NULL);
++		} else {
++			XtVaSetValues(w, XtNstate, False, NULL);
++		}
++	}
++}
++
++void
++SetCompressState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (*num_params != 0) {
++		int n = atoi(params[0]);
++		if (appData.compressLevel == n) {
++			XtVaSetValues(w, XtNstate, True, NULL);
++		} else {
++			XtVaSetValues(w, XtNstate, False, NULL);
++		}
++	}
++}
++
++void
++SetScaleNState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++	if (*num_params != 0) {
++		int n = atoi(params[0]);
++		if (appData.serverScale == n || (appData.serverScale >= 6 && n >= 6)) {
++			XtVaSetValues(w, XtNstate, True, NULL);
++		} else {
++			XtVaSetValues(w, XtNstate, False, NULL);
++		}
++	}
++}
++
++void
 +Set8bppState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
 +	if (appData.useBGR233) {
@@ -7697,8 +8411,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		XtVaSetValues(w, XtNstate, False, NULL);
 +	}
 +}
- 
--  Cleanup();
++
 +void
 +SetFullColorState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -7760,12 +8473,88 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +void
 +SetZRLEState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
-+  if (usingZRLE)
++	static int first = 1;
++	if (first && appData.encodingsString) {
++		char *t, *z, *w;
++		t = strstr(appData.encodingsString, "tight");
++		z = strstr(appData.encodingsString, "zrle");
++		w = strstr(appData.encodingsString, "zywrle");
++		if (t) {
++			if (z) {
++				if (w) {
++					if (t < z && t < w) {
++						usingZRLE = False;
++					} else {
++						usingZRLE = True;
++					}
++					if (z < w) {
++						usingZYWRLE = False;
++					} else {
++						usingZYWRLE = True;
++					}
++				} else {
++					if (t < z) {
++						usingZRLE = False;
++					} else {
++						usingZRLE = True;
++					}
++					usingZYWRLE = False;
++				}
++			} else {
++				if (w) {
++					if (t < w) {
++						usingZRLE = False;
++					} else {
++						usingZRLE = True;
++					}
++					usingZYWRLE = True;
++				} else {
++					usingZRLE = False;
++					usingZYWRLE = False;
++				}
++			}
++		} else {
++			if (z) {
++				if (w) {
++					usingZRLE = True;
++					if (z < w) {
++						usingZYWRLE = False;
++					} else {
++						usingZYWRLE = True;
++					}
++				} else {
++					usingZRLE = True;
++					usingZYWRLE = False;
++				}
++			} else {
++				if (w) {
++					usingZRLE = True;
++					usingZYWRLE = True;
++				} else {
++					usingZRLE = False;
++					usingZYWRLE = False;
++				}
++			}
++		}
++	}
++	first = 0;
++
++	if (usingZRLE)
++		XtVaSetValues(w, XtNstate, True, NULL);
++	else
++		XtVaSetValues(w, XtNstate, False, NULL);
++}
++
++void
++SetZYWRLEState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
++{
++  if (usingZYWRLE)
 +    XtVaSetValues(w, XtNstate, True, NULL);
 +  else
 +    XtVaSetValues(w, XtNstate, False, NULL);
 +}
-+
+ 
+-  Cleanup();
 +void
 +SetCursorShapeState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -7774,7 +8563,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +  else
 +    XtVaSetValues(w, XtNstate, False, NULL);
 +}
-+
+ 
+-  return 0;
 +void
 +SetCursorAlphaState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -7810,8 +8600,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +  else
 +    XtVaSetValues(w, XtNstate, False, NULL);
 +}
- 
--  return 0;
++
 +void
 +SetServerInputState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -7849,8 +8638,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncviewer/vncviewer.h
 --- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.h	2008-01-03 12:03:29.000000000 -0500
-@@ -68,51 +68,73 @@
++++ vnc_unixsrc/vncviewer/vncviewer.h	2008-02-17 12:36:58.000000000 -0500
+@@ -51,7 +51,7 @@
+ 			     (((l) & 0x0000ff00) << 8)  | \
+ 			     (((l) & 0x000000ff) << 24))  : (l))
+ 
+-#define MAX_ENCODINGS 20
++#define MAX_ENCODINGS 24
+ 
+ #define FLASH_PORT_OFFSET 5400
+ #define LISTEN_PORT_OFFSET 5500
+@@ -68,51 +68,74 @@
  /* argsresources.c */
  
  typedef struct {
@@ -7940,6 +8738,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +	Bool debug;
 +
 +	int popupButtonCount;
++	int popupButtonBreak;
 +
 +	int bumpScrollTime;
 +	int bumpScrollPixels;
@@ -7965,7 +8764,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern char *fallback_resources[];
  extern char vncServerHost[];
-@@ -130,10 +152,11 @@
+@@ -130,10 +153,11 @@
  /* colour.c */
  
  extern unsigned long BGR233ToPixel[];
@@ -7978,7 +8777,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern void SetVisualAndCmap();
  
-@@ -157,13 +180,32 @@
+@@ -157,13 +181,40 @@
  
  extern void DesktopInitBeforeRealization();
  extern void DesktopInitAfterRealization();
@@ -8008,10 +8807,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +			     Cardinal *num_params);
 +extern char *DoScaleDialog();
 +
++extern void QualityDialogDone(Widget w, XEvent *event, String *params,
++			     Cardinal *num_params);
++extern char *DoQualityDialog();
++
++extern void CompressDialogDone(Widget w, XEvent *event, String *params,
++			     Cardinal *num_params);
++extern char *DoCompressDialog();
++
  extern void ServerDialogDone(Widget w, XEvent *event, String *params,
  			     Cardinal *num_params);
  extern char *DoServerDialog();
-@@ -207,6 +249,10 @@
+@@ -207,6 +258,18 @@
  		      Cardinal *num_params);
  extern void CreatePopup();
  
@@ -8019,10 +8826,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +		      Cardinal *num_params);
 +extern void CreateScaleN();
 +
++extern void HideQuality(Widget w, XEvent *event, String *params,
++		      Cardinal *num_params);
++extern void CreateQuality();
++
++extern void HideCompress(Widget w, XEvent *event, String *params,
++		      Cardinal *num_params);
++extern void CreateCompress();
++
  /* rfbproto.c */
  
  extern int rfbsock;
-@@ -229,6 +275,15 @@
+@@ -229,6 +292,15 @@
  extern Bool SendClientCutText(char *str, int len);
  extern Bool HandleRFBServerMessage();
  
@@ -8038,7 +8853,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern void PrintPixelFormat(rfbPixelFormat *format);
  
  /* selection.c */
-@@ -241,8 +296,9 @@
+@@ -241,8 +313,9 @@
  
  /* shm.c */
  
@@ -8049,7 +8864,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  /* sockets.c */
  
-@@ -271,3 +327,52 @@
+@@ -271,3 +344,63 @@
  extern XtAppContext appContext;
  extern Display* dpy;
  extern Widget toplevel;
@@ -8064,6 +8879,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void Toggle8Colors(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleGreyScale(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleTightZRLE(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ToggleZRLEZYWRLE(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleViewOnly(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleJPEG(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleCursorShape(Widget w, XEvent *ev, String *params, Cardinal *num_params);
@@ -8074,16 +8890,25 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void ToggleServerInput(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleSingleWindow(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void DoServerScale(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void DoServerQuality(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void DoServerCompress(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetYCrop(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetScbar(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ShowScaleN(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ShowQuality(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void ShowCompress(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetScaleN(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetQuality(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetCompress(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleTextChat(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleFileXfer(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleTermTextChat(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +
 +extern void SetViewOnlyState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetNOJPEGState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetScaleNState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetQualityState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetCompressState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void Set8bppState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void Set16bppState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetFullColorState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
@@ -8092,6 +8917,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void Set8ColorsState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetGreyScaleState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetZRLEState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
++extern void SetZYWRLEState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetCursorShapeState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetCursorAlphaState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetX11CursorState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
@@ -8104,8 +8930,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void SetFileXferState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vncviewer/vncviewer.man
 --- vnc_unixsrc.orig/vncviewer/vncviewer.man	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.man	2007-05-25 23:22:17.000000000 -0400
-@@ -168,6 +168,153 @@
++++ vnc_unixsrc/vncviewer/vncviewer.man	2008-02-17 13:52:41.000000000 -0500
+@@ -168,6 +168,159 @@
  \fB\-autopass\fR
  Read a plain-text password from stdin. This option affects only the
  standard VNC authentication.
@@ -8116,7 +8942,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +.TP
 +http://www.karlrunge.com/x11vnc/ssvnc.html
 +.TP
-+Note: ZRLE encoding is now supported.
++Note: ZRLE and ZYWRLE encodings are now supported.
 +.TP
 +Note: F9 is shortcut to Toggle FullScreen mode.
 +.TP
@@ -8204,13 +9030,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +Do the UltraVNC chat in the terminal vncviewer is in
 +instead of in an independent window.
 +.TP
-+\fB\-unixpw str\fR
-+Useful for logging into x11vnc in -unixpw mode. "str" is a
++\fB\-unixpw\fR
++str Useful for logging into x11vnc in \fB\-unixpw\fR mode. "str" is a
 +string that allows many ways to enter the Unix Username
 +and Unix Password.  These characters: username, newline,
 +password, newline are sent to the VNC server after any VNC
 +authentication has taken place.  Under x11vnc they are
-+used for the -unixpw login.  Other VNC servers could do
++used for the \fB\-unixpw\fR login.  Other VNC servers could do
 +something similar.
 +You can also indicate "str" via the environment
 +variable SSVNC_UNIXPW.
@@ -8235,7 +9061,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +        X11 Cursor:              ~ -x11cursor
 +        Cursor Alphablend:       ~ -alpha
 +        Toggle Tight/ZRLE:       ~ -encodings ...
-+        Disable JPEG:            ~ -nojpeg
++        Toggle ZRLE/ZYWRLE:      ~ -encodings zywrle...
++        Quality Level            ~ -quality (both Tight and ZYWRLE)
++        Compress Level           ~ -compresslevel
++        Disable JPEG:            ~ -nojpeg  (Tight)
 +        Full Color                 as many colors as local screen allows.
 +        Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
 +        16 bit color (BGR565)    ~ -16bpp / -bgr565
@@ -8243,15 +9072,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +        256 colors               ~ -bgr233 default # of colors.
 +         64 colors               ~ -bgr222 / -use64
 +          8 colors               ~ -bgr111 / -use8
++        Set Y Crop (y-max)       ~ -ycrop
++        Set Scrollbar Width      ~ -sbwidth
 +
 +        UltraVNC Extensions:
-+        Disable Remote Input       Ultravnc ext. Try to prevent input and
++
++          Set 1/n Server Scale     Ultravnc ext. Scale desktop by 1/n.
++          Text Chat                Ultravnc ext. Do Text Chat.
++          File Transfer            Ultravnc ext. File xfer via Java helper.
++          Single Window            Ultravnc ext. Grab and view a single window.
++                                   (select then click on the window you want).
++          Disable Remote Input     Ultravnc ext. Try to prevent input and
 +                                   viewing of monitor at physical display.
-+        Single Window              Ultravnc ext. Grab and view a single window.
-+                                   (click on the window you want).
-+        Set 1/n Server Scale       Ultravnc ext. Scale desktop by 1/n.
-+                                   prompt is from the terminal.
-+        Text Chat                  Ultravnc ext. Do Text Chat.
 +
 +        Note: the Ultravnc extensions only apply to servers that support
 +              them.  x11vnc/libvncserver supports some of them.
@@ -8259,10 +9091,26 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .SH ENCODINGS
  The server supplies information in whatever format is desired by the
  client, in order to make the client as easy as possible to implement. 
+@@ -238,6 +391,15 @@
+ \-quality and \-nojpeg options above). Tight encoding is usually the
+ best choice for low\-bandwidth network environments (e.g. slow modem
+ connections).
++.TP
++.B ZRLE
++The SSVNC viewer has ported the RealVNC (www.realvnc.com) ZRLE encoding
++to the unix tightvnc viewer.
++.TP
++.B ZYWRLE
++The SSVNC viewer has ported the Hitachi lossy wavelet based ZRLE
++encoding from http://mobile.hitachi-system.co.jp/publications/ZYWRLE/ 
++to the unix tightvnc viewer.
+ .SH RESOURCES
+ X resources that \fBvncviewer\fR knows about, aside from the
+ normal Xt resources, are as follows:
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/zrle.c
 --- vnc_unixsrc.orig/vncviewer/zrle.c	2007-02-04 18:59:50.000000000 -0500
-+++ vnc_unixsrc/vncviewer/zrle.c	2007-02-17 22:36:37.000000000 -0500
-@@ -0,0 +1,455 @@
++++ vnc_unixsrc/vncviewer/zrle.c	2008-02-17 10:34:45.000000000 -0500
+@@ -0,0 +1,616 @@
 +/*
 + *  Copyright (C) 2005 Johannes E. Schindelin.  All Rights Reserved.
 + *
@@ -8321,6 +9169,51 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/
 +			XFillRectangle(dpy, desktopWin, gc, x, y, w, h); \
 +		} \
 +	}
++
++#if defined(__sparc) || defined(__sparc__) || defined(__ppc__) || defined(__POWERPC__) || defined(__BIG_ENDIAN__) || defined(_BIG_ENDIAN)
++#define IS_BIG_ENDIAN 1
++#else
++#define IS_BIG_ENDIAN 0
++#endif
++
++#if DO_ZYWRLE
++
++#define ENDIAN_LITTLE 0
++#define ENDIAN_BIG 1
++#define ENDIAN_NO 2
++#if IS_BIG_ENDIAN
++#define ZYWRLE_ENDIAN ENDIAN_BIG
++#else
++#define ZYWRLE_ENDIAN ENDIAN_LITTLE
++#endif
++#undef END_FIX
++#if ZYWRLE_ENDIAN == ENDIAN_LITTLE
++#  define END_FIX LE
++#elif ZYWRLE_ENDIAN == ENDIAN_BIG
++#  define END_FIX BE
++#else
++#  define END_FIX NE
++#endif
++#define __RFB_CONCAT3E(a,b,c) CONCAT3E(a,b,c)
++#define __RFB_CONCAT2E(a,b) CONCAT2E(a,b)
++#undef CPIXEL
++#if REALBPP != BPP
++#if UNCOMP == 0
++#define CPIXEL REALBPP
++#elif UNCOMP>0
++#define CPIXEL CONCAT2E(REALBPP,Down)
++#else
++#define CPIXEL CONCAT2E(REALBPP,Up)
++#endif
++#endif
++#define PIXEL_T CARDBPP
++#if BPP!=8
++#define ZYWRLE_DECODE 1
++#include "zywrletemplate.c"
++#endif
++#undef CPIXEL
++
++#endif	/* DO_ZYWRLE */
 +
 +static int HandleZRLETile(
 +	unsigned char* buffer,size_t buffer_length,
@@ -8470,14 +9363,21 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/
 +}
 +
 +#if REALBPP!=BPP && defined(UNCOMP) && UNCOMP!=0
-+#if UNCOMP>0
-+#define UncompressCPixel(pointer) ((*(CARDBPP*)pointer)>>UNCOMP)
++# if BPP == 32 && IS_BIG_ENDIAN
++#  define UncompressCPixel(p) ( (*p << myFormat.redShift) | (*(p+1) << myFormat.greenShift) | (*(p+2) << myFormat.blueShift) )
++# else
++#  if UNCOMP>0
++#   define UncompressCPixel(pointer) ((*(CARDBPP*)pointer)>>UNCOMP)
++#  else
++#   define UncompressCPixel(pointer) ((*(CARDBPP*)pointer)<<(-(UNCOMP)))
++#  endif
++# endif
 +#else
-+#define UncompressCPixel(pointer) ((*(CARDBPP*)pointer)<<(-(UNCOMP)))
++# define UncompressCPixel(pointer) (*(CARDBPP*)pointer)
 +#endif
-+#else
-+#define UncompressCPixel(pointer) (*(CARDBPP*)pointer)
-+#endif
++
++extern XImage *image;
++extern int skip_maybe_sync;
 +
 +static int HandleZRLETile(
 +		unsigned char* buffer,size_t buffer_length,
@@ -8489,21 +9389,30 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/
 +	if(buffer_length<1)
 +		return -2;
 +
-+	if (frameBufferLen < w * h * REALBPP/8) {
++	if (frameBufferLen < w * h * BPP/8) {
 +		if(frameBuffer) {
 +			free(frameBuffer);
 +		}
-+		frameBufferLen = w * h * REALBPP/8 * 2;
++		frameBufferLen = w * h * BPP/8 * 2;
 +		frameBuffer = (unsigned char *) malloc(frameBufferLen);
 +	}
 +
++zywrle_top:
 +	type = *buffer;
 +	buffer++;
 +	switch(type) {
 +		case 0: /* raw */
 +		{
++#if DO_ZYWRLE && BPP != 8
++		    if (zywrle_level > 0 && !(zywrle_level & 0x80) ) {
++			zywrle_level |= 0x80;
++			goto zywrle_top;
++		    } else
++#endif
++		    {
 +#if REALBPP!=BPP
 +			int m0 = 0, i,j;
++
 +
 +			if(1+w*h*REALBPP/8>buffer_length) {
 +				fprintf(stderr, "expected %d bytes, got only %d (%dx%d)\n",1+w*h*REALBPP/8,buffer_length,w,h);
@@ -8533,6 +9442,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/
 +#  endif
 +			buffer+=w*h*REALBPP/8;
 +#endif
++		    }
 +			break;
 +		}
 +		case 1: /* solid */
@@ -8705,6 +9615,104 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/
 +		}
 +	}
 +
++#if DO_ZYWRLE && BPP != 8
++	if (zywrle_level & 0x80) {
++		int th, tx;
++		int widthInBytes = w * BPP / 8;
++		int scrWidthInBytes;
++		char *scr, *buf;
++		static CARDBPP *ptmp = NULL;
++		static int ptmp_len = 0;
++
++		if (w * h > ptmp_len) {
++			ptmp_len = w * h;
++			if (ptmp_len < rfbZRLETileWidth*rfbZRLETileHeight) {
++				ptmp_len = rfbZRLETileWidth*rfbZRLETileHeight;
++			}
++			if (ptmp) {
++				free(ptmp);
++			}
++			ptmp = (CARDBPP *) malloc(ptmp_len * sizeof(CARDBPP));
++		}
++
++		zywrle_level &= 0x7F;
++		// Reverse copy: screen to buf/ptmp:
++		// make this CopyDataFromScreen() or something.
++		if (!appData.useBGR565) {
++			scrWidthInBytes = si.framebufferWidth * myFormat.bitsPerPixel / 8;
++			scr = image->data + y * scrWidthInBytes + x * myFormat.bitsPerPixel / 8;
++			buf = (char *) ptmp;
++
++			for (th = 0; th < h; th++) {
++				memcpy(buf, scr, widthInBytes);
++				buf += widthInBytes;
++				scr += scrWidthInBytes;
++			}
++		} else {
++			scrWidthInBytes = si.framebufferWidth * 4;
++			scr = image->data + y * scrWidthInBytes + x * 4;
++			buf = (char *) ptmp;
++
++			for (th = 0; th < h; th++) {
++				for (tx = 0; tx < w; tx++) {
++					unsigned long pix = *((unsigned int *)scr + tx);
++					unsigned int r1 = (pix & 0xff0000) >> 16; 
++					unsigned int g1 = (pix & 0x00ff00) >> 8; 
++					unsigned int b1 = (pix & 0x0000ff) >> 0; 
++					int r2, g2, b2, idx;
++					int rok = 0, gok = 0, bok = 0, is0, sh = 10;
++					r2 = (31 * r1)/255;
++					g2 = (63 * g1)/255;
++					b2 = (31 * b1)/255;
++					for (is0 = 0; is0 < sh; is0++) {
++						int is, i, t;
++						for (i = 0; i < 2; i++) {
++							if (i == 0) {
++								is = -is0;
++							} else {
++								is = +is0;
++							}
++							if (!rok) {
++								t = r2 + is;
++								if (r1 == (255 * t)/31) {
++									r2 = t; rok = 1;
++								}
++							}
++							if (!gok) {
++								t = g2 + is;
++								if (g1 == (255 * t)/63) {
++									g2 = t; gok = 1;
++								}
++							}
++							if (!bok) {
++								t = b2 + is;
++								if (b1 == (255 * t)/31) {
++									b2 = t; bok = 1;
++								}
++							}
++						}
++						if (rok && gok && bok) {
++							break;
++						}
++					}
++					idx = (r2 << 11) | (g2 << 5) | (b2 << 0);
++					*((CARDBPP *)buf + tx) = (CARDBPP) idx;
++				}
++				buf += widthInBytes;
++				scr += scrWidthInBytes;
++			}
++		}
++		ZYWRLE_SYNTHESIZE((PIXEL_T *)ptmp, (PIXEL_T *)ptmp, w, h, w, zywrle_level, zywrleBuf );
++		skip_maybe_sync = 1;
++
++		if (appData.yCrop > 0) {
++			skip_maybe_sync = 0;
++		}
++		CopyDataToScreen((char *)ptmp, x, y, w, h);
++
++	}
++#endif
++
 +	return buffer-buffer_copy;	
 +}
 +
@@ -8718,6 +9726,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/
 +#undef UNCOMP
 +
 +#undef FillRectangle
++#undef IS_BIG_ENDIAN
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrleencodetemplate.c vnc_unixsrc/vncviewer/zrleencodetemplate.c
 --- vnc_unixsrc.orig/vncviewer/zrleencodetemplate.c	1969-12-31 19:00:00.000000000 -0500
 +++ vnc_unixsrc/vncviewer/zrleencodetemplate.c	2007-02-04 23:18:09.000000000 -0500
@@ -9536,8 +10545,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrletypes.h vnc_unixsrc/vncvi
 +#endif /* __ZRLE_TYPES_H__ */
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/vncviewer/zywrletemplate.c
 --- vnc_unixsrc.orig/vncviewer/zywrletemplate.c	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/zywrletemplate.c	2007-02-04 23:24:16.000000000 -0500
-@@ -0,0 +1,804 @@
++++ vnc_unixsrc/vncviewer/zywrletemplate.c	2008-02-15 23:33:13.000000000 -0500
+@@ -0,0 +1,824 @@
 +
 +/********************************************************************
 + *                                                                  *
@@ -9563,8 +10572,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +notice, this list of conditions and the following disclaimer in the
 +documentation and/or other materials provided with the distribution.
 +
-+- Neither the name of the Hitachi Systems & Services, Ltd. nor 
-+the names of its contributors may be used to endorse or promote 
++- Neither the name of the Hitachi Systems & Services, Ltd. nor
++the names of its contributors may be used to endorse or promote
 +products derived from this software without specific prior written
 +permission.
 +
@@ -9581,18 +10590,27 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 + ********************************************************************/
 +
-+//#define ZYWRLE_ENCODE
-+//#define ZYWRLE_DECODE
++/* Change Log:
++     V0.02 : 2008/02/04 : Fix mis encode/decode when width != scanline
++	                     (Thanks Johannes Schindelin, author of LibVNC
++						  Server/Client)
++     V0.01 : 2007/02/06 : Initial release
++*/
++
++/* #define ZYWRLE_ENCODE */
++/* #define ZYWRLE_DECODE */
 +#define ZYWRLE_QUANTIZE
 +
-+//[References]
-+// PLHarr:
-+//   Senecal, J. G., P. Lindstrom, M. A. Duchaineau, and K. I. Joy, "An Improved N-Bit to N-Bit Reversible Haar-Like Transform," Pacific Graphics 2004, October 2004, pp. 371-380.
-+// EZW:
-+//   Shapiro, JM: Embedded Image Coding Using Zerotrees of Wavelet Coefficients, IEEE Trans. Signal. Process., Vol.41, pp.3445-3462 (1993). 
++/*
++[References]
++ PLHarr:
++   Senecal, J. G., P. Lindstrom, M. A. Duchaineau, and K. I. Joy, "An Improved N-Bit to N-Bit Reversible Haar-Like Transform," Pacific Graphics 2004, October 2004, pp. 371-380.
++ EZW:
++   Shapiro, JM: Embedded Image Coding Using Zerotrees of Wavelet Coefficients, IEEE Trans. Signal. Process., Vol.41, pp.3445-3462 (1993).
++*/
 +
 +
-+// Template Macro stuffs.
++/* Template Macro stuffs. */
 +#undef ZYWRLE_ANALYZE
 +#undef ZYWRLE_SYNTHESIZE
 +#define ZYWRLE_ANALYZE __RFB_CONCAT3E(zywrleAnalyze,BPP,END_FIX)
@@ -9605,8 +10623,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +#define ZYWRLE_LOAD_PIXEL __RFB_CONCAT2E(ZYWRLE_LOAD_PIXEL,BPP)
 +#define ZYWRLE_SAVE_PIXEL __RFB_CONCAT2E(ZYWRLE_SAVE_PIXEL,BPP)
 +
-+// Packing/Unpacking pixel stuffs.
-+//   Endian conversion stuffs.
++/* Packing/Unpacking pixel stuffs.
++   Endian conversion stuffs. */
 +#undef S_0
 +#undef S_1
 +#undef L_0
@@ -9626,7 +10644,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +#  define L_2	2
 +#endif
 +
-+//   Load/Save pixel stuffs.
++/*   Load/Save pixel stuffs. */
 +#define ZYWRLE_YMASK15  0xFFFFFFF8
 +#define ZYWRLE_UVMASK15 0xFFFFFFF8
 +#define ZYWRLE_LOAD_PIXEL15(pSrc,R,G,B) { \
@@ -9678,155 +10696,155 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +#endif
 +
 +#ifdef ZYWRLE_ENCODE
-+// Tables for Coefficients filtering.
++/* Tables for Coefficients filtering. */
 +#  ifndef ZYWRLE_QUANTIZE
-+// Type A:lower bit omitting of EZW style.
++/* Type A:lower bit omitting of EZW style. */
 +const static unsigned int zywrleParam[3][3]={
 +	{0x0000F000,0x00000000,0x00000000},
 +	{0x0000C000,0x00F0F0F0,0x00000000},
 +	{0x0000C000,0x00C0C0C0,0x00F0F0F0},
-+//	{0x0000FF00,0x00000000,0x00000000},
-+//	{0x0000FF00,0x00FFFFFF,0x00000000},
-+//	{0x0000FF00,0x00FFFFFF,0x00FFFFFF},
++/*	{0x0000FF00,0x00000000,0x00000000},
++	{0x0000FF00,0x00FFFFFF,0x00000000},
++	{0x0000FF00,0x00FFFFFF,0x00FFFFFF}, */
 +};
 +#  else
-+// Type B:Non liner quantization filter.
++/* Type B:Non liner quantization filter. */
 +static const signed char zywrleConv[4][256]={
-+{	// bi=5, bo=5 r=0.0:PSNR=24.849
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
++{	/* bi=5, bo=5 r=0.0:PSNR=24.849 */
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
 +},
-+{	// bi=5, bo=5 r=2.0:PSNR=74.031
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 32, 
-+	32, 32, 32, 32, 32, 32, 32, 32, 
-+	32, 32, 32, 32, 32, 32, 32, 32, 
-+	48, 48, 48, 48, 48, 48, 48, 48, 
-+	48, 48, 48, 56, 56, 56, 56, 56, 
-+	56, 56, 56, 56, 64, 64, 64, 64, 
-+	64, 64, 64, 64, 72, 72, 72, 72, 
-+	72, 72, 72, 72, 80, 80, 80, 80, 
-+	80, 80, 88, 88, 88, 88, 88, 88, 
-+	88, 88, 88, 88, 88, 88, 96, 96, 
-+	96, 96, 96, 104, 104, 104, 104, 104, 
-+	104, 104, 104, 104, 104, 112, 112, 112, 
-+	112, 112, 112, 112, 112, 112, 120, 120, 
-+	120, 120, 120, 120, 120, 120, 120, 120, 
-+	0, -120, -120, -120, -120, -120, -120, -120, 
-+	-120, -120, -120, -112, -112, -112, -112, -112, 
-+	-112, -112, -112, -112, -104, -104, -104, -104, 
-+	-104, -104, -104, -104, -104, -104, -96, -96, 
-+	-96, -96, -96, -88, -88, -88, -88, -88, 
-+	-88, -88, -88, -88, -88, -88, -88, -80, 
-+	-80, -80, -80, -80, -80, -72, -72, -72, 
-+	-72, -72, -72, -72, -72, -64, -64, -64, 
-+	-64, -64, -64, -64, -64, -56, -56, -56, 
-+	-56, -56, -56, -56, -56, -56, -48, -48, 
-+	-48, -48, -48, -48, -48, -48, -48, -48, 
-+	-48, -32, -32, -32, -32, -32, -32, -32, 
-+	-32, -32, -32, -32, -32, -32, -32, -32, 
-+	-32, -32, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
++{	/* bi=5, bo=5 r=2.0:PSNR=74.031 */
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 32,
++	32, 32, 32, 32, 32, 32, 32, 32,
++	32, 32, 32, 32, 32, 32, 32, 32,
++	48, 48, 48, 48, 48, 48, 48, 48,
++	48, 48, 48, 56, 56, 56, 56, 56,
++	56, 56, 56, 56, 64, 64, 64, 64,
++	64, 64, 64, 64, 72, 72, 72, 72,
++	72, 72, 72, 72, 80, 80, 80, 80,
++	80, 80, 88, 88, 88, 88, 88, 88,
++	88, 88, 88, 88, 88, 88, 96, 96,
++	96, 96, 96, 104, 104, 104, 104, 104,
++	104, 104, 104, 104, 104, 112, 112, 112,
++	112, 112, 112, 112, 112, 112, 120, 120,
++	120, 120, 120, 120, 120, 120, 120, 120,
++	0, -120, -120, -120, -120, -120, -120, -120,
++	-120, -120, -120, -112, -112, -112, -112, -112,
++	-112, -112, -112, -112, -104, -104, -104, -104,
++	-104, -104, -104, -104, -104, -104, -96, -96,
++	-96, -96, -96, -88, -88, -88, -88, -88,
++	-88, -88, -88, -88, -88, -88, -88, -80,
++	-80, -80, -80, -80, -80, -72, -72, -72,
++	-72, -72, -72, -72, -72, -64, -64, -64,
++	-64, -64, -64, -64, -64, -56, -56, -56,
++	-56, -56, -56, -56, -56, -56, -48, -48,
++	-48, -48, -48, -48, -48, -48, -48, -48,
++	-48, -32, -32, -32, -32, -32, -32, -32,
++	-32, -32, -32, -32, -32, -32, -32, -32,
++	-32, -32, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
 +},
-+{	// bi=5, bo=4 r=2.0:PSNR=64.441
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	48, 48, 48, 48, 48, 48, 48, 48, 
-+	48, 48, 48, 48, 48, 48, 48, 48, 
-+	48, 48, 48, 48, 48, 48, 48, 48, 
-+	64, 64, 64, 64, 64, 64, 64, 64, 
-+	64, 64, 64, 64, 64, 64, 64, 64, 
-+	80, 80, 80, 80, 80, 80, 80, 80, 
-+	80, 80, 80, 80, 80, 88, 88, 88, 
-+	88, 88, 88, 88, 88, 88, 88, 88, 
-+	104, 104, 104, 104, 104, 104, 104, 104, 
-+	104, 104, 104, 112, 112, 112, 112, 112, 
-+	112, 112, 112, 112, 120, 120, 120, 120, 
-+	120, 120, 120, 120, 120, 120, 120, 120, 
-+	0, -120, -120, -120, -120, -120, -120, -120, 
-+	-120, -120, -120, -120, -120, -112, -112, -112, 
-+	-112, -112, -112, -112, -112, -112, -104, -104, 
-+	-104, -104, -104, -104, -104, -104, -104, -104, 
-+	-104, -88, -88, -88, -88, -88, -88, -88, 
-+	-88, -88, -88, -88, -80, -80, -80, -80, 
-+	-80, -80, -80, -80, -80, -80, -80, -80, 
-+	-80, -64, -64, -64, -64, -64, -64, -64, 
-+	-64, -64, -64, -64, -64, -64, -64, -64, 
-+	-64, -48, -48, -48, -48, -48, -48, -48, 
-+	-48, -48, -48, -48, -48, -48, -48, -48, 
-+	-48, -48, -48, -48, -48, -48, -48, -48, 
-+	-48, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
++{	/* bi=5, bo=4 r=2.0:PSNR=64.441 */
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	48, 48, 48, 48, 48, 48, 48, 48,
++	48, 48, 48, 48, 48, 48, 48, 48,
++	48, 48, 48, 48, 48, 48, 48, 48,
++	64, 64, 64, 64, 64, 64, 64, 64,
++	64, 64, 64, 64, 64, 64, 64, 64,
++	80, 80, 80, 80, 80, 80, 80, 80,
++	80, 80, 80, 80, 80, 88, 88, 88,
++	88, 88, 88, 88, 88, 88, 88, 88,
++	104, 104, 104, 104, 104, 104, 104, 104,
++	104, 104, 104, 112, 112, 112, 112, 112,
++	112, 112, 112, 112, 120, 120, 120, 120,
++	120, 120, 120, 120, 120, 120, 120, 120,
++	0, -120, -120, -120, -120, -120, -120, -120,
++	-120, -120, -120, -120, -120, -112, -112, -112,
++	-112, -112, -112, -112, -112, -112, -104, -104,
++	-104, -104, -104, -104, -104, -104, -104, -104,
++	-104, -88, -88, -88, -88, -88, -88, -88,
++	-88, -88, -88, -88, -80, -80, -80, -80,
++	-80, -80, -80, -80, -80, -80, -80, -80,
++	-80, -64, -64, -64, -64, -64, -64, -64,
++	-64, -64, -64, -64, -64, -64, -64, -64,
++	-64, -48, -48, -48, -48, -48, -48, -48,
++	-48, -48, -48, -48, -48, -48, -48, -48,
++	-48, -48, -48, -48, -48, -48, -48, -48,
++	-48, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
 +},
-+{	// bi=5, bo=2 r=2.0:PSNR=43.175
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	88, 88, 88, 88, 88, 88, 88, 88, 
-+	88, 88, 88, 88, 88, 88, 88, 88, 
-+	88, 88, 88, 88, 88, 88, 88, 88, 
-+	88, 88, 88, 88, 88, 88, 88, 88, 
-+	88, 88, 88, 88, 88, 88, 88, 88, 
-+	88, 88, 88, 88, 88, 88, 88, 88, 
-+	88, 88, 88, 88, 88, 88, 88, 88, 
-+	88, 88, 88, 88, 88, 88, 88, 88, 
-+	0, -88, -88, -88, -88, -88, -88, -88, 
-+	-88, -88, -88, -88, -88, -88, -88, -88, 
-+	-88, -88, -88, -88, -88, -88, -88, -88, 
-+	-88, -88, -88, -88, -88, -88, -88, -88, 
-+	-88, -88, -88, -88, -88, -88, -88, -88, 
-+	-88, -88, -88, -88, -88, -88, -88, -88, 
-+	-88, -88, -88, -88, -88, -88, -88, -88, 
-+	-88, -88, -88, -88, -88, -88, -88, -88, 
-+	-88, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
-+	0, 0, 0, 0, 0, 0, 0, 0, 
++{	/* bi=5, bo=2 r=2.0:PSNR=43.175 */
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	88, 88, 88, 88, 88, 88, 88, 88,
++	88, 88, 88, 88, 88, 88, 88, 88,
++	88, 88, 88, 88, 88, 88, 88, 88,
++	88, 88, 88, 88, 88, 88, 88, 88,
++	88, 88, 88, 88, 88, 88, 88, 88,
++	88, 88, 88, 88, 88, 88, 88, 88,
++	88, 88, 88, 88, 88, 88, 88, 88,
++	88, 88, 88, 88, 88, 88, 88, 88,
++	0, -88, -88, -88, -88, -88, -88, -88,
++	-88, -88, -88, -88, -88, -88, -88, -88,
++	-88, -88, -88, -88, -88, -88, -88, -88,
++	-88, -88, -88, -88, -88, -88, -88, -88,
++	-88, -88, -88, -88, -88, -88, -88, -88,
++	-88, -88, -88, -88, -88, -88, -88, -88,
++	-88, -88, -88, -88, -88, -88, -88, -88,
++	-88, -88, -88, -88, -88, -88, -88, -88,
++	-88, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0,
 +}
 +};
 +const static signed char* zywrleParam[3][3][3]={
@@ -9837,49 +10855,52 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +#  endif
 +#endif
 +
-+static InlineX void Harr( signed char* pX0, signed char* pX1 ){
-+	// Piecewise-Linear Harr(PLHarr)
-+	int X0=(int)*pX0, X1=(int)*pX1;
-+	int orgX0=X0, orgX1=X1;
-+	if( (X0^X1)&0x80 ){
-+		// differ sign
++static InlineX void Harr(signed char* pX0, signed char* pX1)
++{
++	/* Piecewise-Linear Harr(PLHarr) */
++	int X0 = (int)*pX0, X1 = (int)*pX1;
++	int orgX0 = X0, orgX1 = X1;
++	if ((X0 ^ X1) & 0x80) {
++		/* differ sign */
 +		X1 += X0;
-+		if( ((X1^orgX1)&0x80)==0 ){
-+			// |X1| > |X0|
-+			X0 -= X1;	// H = -B
++		if (((X1^orgX1)&0x80)==0) {
++			/* |X1| > |X0| */
++			X0 -= X1;	/* H = -B */
 +		}
-+	}else{
-+		// same sign
++	} else {
++		/* same sign */
 +		X0 -= X1;
-+		if( ((X0^orgX0)&0x80)==0 ){
-+			// |X0| > |X1|
-+			X1 += X0;	// L = A
++		if (((X0 ^ orgX0) & 0x80) == 0) {
++			/* |X0| > |X1| */
++			X1 += X0;	/* L = A */
 +		}
 +	}
 +	*pX0 = (signed char)X1;
 +	*pX1 = (signed char)X0;
 +}
-+// 1D-Wavelet transform.
-+//
-+// In coefficients array, the famous 'pyramid' decomposition is well used.
-+//
-+// 1D Model:
-+//   |L0L0L0L0|L0L0L0L0|H0H0H0H0|H0H0H0H0| : level 0
-+//   |L1L1L1L1|H1H1H1H1|H0H0H0H0|H0H0H0H0| : level 1
-+//
-+// But this method needs line buffer because H/L is different position from X0/X1.
-+// So, I used 'interleave' decomposition instead of it.
-+//
-+// 1D Model:
-+//   |L0H0L0H0|L0H0L0H0|L0H0L0H0|L0H0L0H0| : level 0
-+//   |L1H0H1H0|L1H0H1H0|L1H0H1H0|L1H0H1H0| : level 1
-+//
-+// In this method, H/L and X0/X1 is always same position.
-+// This lead us to more speed and less memory.
-+// Of cause, the result of both method is quite same
-+// because it's only difference that coefficient position.
++/*
++ 1D-Wavelet transform.
 +
-+static InlineX void WaveletLevel( int* data, int size, int l, int SkipPixel ){
++ In coefficients array, the famous 'pyramid' decomposition is well used.
++
++ 1D Model:
++   |L0L0L0L0|L0L0L0L0|H0H0H0H0|H0H0H0H0| : level 0
++   |L1L1L1L1|H1H1H1H1|H0H0H0H0|H0H0H0H0| : level 1
++
++ But this method needs line buffer because H/L is different position from X0/X1.
++ So, I used 'interleave' decomposition instead of it.
++
++ 1D Model:
++   |L0H0L0H0|L0H0L0H0|L0H0L0H0|L0H0L0H0| : level 0
++   |L1H0H1H0|L1H0H1H0|L1H0H1H0|L1H0H1H0| : level 1
++
++ In this method, H/L and X0/X1 is always same position.
++ This lead us to more speed and less memory.
++ Of cause, the result of both method is quite same
++ because it's only difference that coefficient position.
++*/
++static InlineX void WaveletLevel(int* data, int size, int l, int SkipPixel)
++{
 +	int s, ofs;
 +	signed char* pX0;
 +	signed char* end;
@@ -9889,12 +10910,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +	end = pX0+(size>>(l+1))*s;
 +	s -= 2;
 +	ofs = (4<<l)*SkipPixel;
-+	while( pX0 < end ){
-+		Harr( pX0, pX0+ofs );
++	while (pX0 < end) {
++		Harr(pX0, pX0+ofs);
 +		pX0++;
-+		Harr( pX0, pX0+ofs );
++		Harr(pX0, pX0+ofs);
 +		pX0++;
-+		Harr( pX0, pX0+ofs );
++		Harr(pX0, pX0+ofs);
 +		pX0 += s;
 +	}
 +}
@@ -9902,8 +10923,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +
 +#ifdef ZYWRLE_ENCODE
 +#  ifndef ZYWRLE_QUANTIZE
-+// Type A:lower bit omitting of EZW style.
-+static InlineX void FilterWaveletSquare( int* pBuf, int width, int height, int level, int l ){
++/* Type A:lower bit omitting of EZW style. */
++static InlineX void FilterWaveletSquare(int* pBuf, int width, int height, int level, int l)
++{
 +	int r, s;
 +	int x, y;
 +	int* pH;
@@ -9911,30 +10933,27 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +
 +	pM = &(zywrleParam[level-1][l]);
 +	s = 2<<l;
-+	for( r=1; r<4; r++ ){
++	for (r = 1; r < 4; r++) {
 +		pH   = pBuf;
-+		if( r & 0x01 ){
++		if (r & 0x01)
 +			pH +=  s>>1;
-+		}
-+		if( r & 0x02 ){
++		if (r & 0x02)
 +			pH += (s>>1)*width;
-+		}
-+		for( y=0; y<height/s; y++ ){
-+			for( x=0; x<width/s; x++ ){
-+				// these are same following code.
-+				//     pH[x] = pH[x] / (~pM[x]+1) * (~pM[x]+1);
-+				//     ( round pH[x] with pM[x] bit )
-+				// '&' operator isn't 'round' but is 'floor'.
-+				// So, we must offset when pH[x] is negative.
-+				if( ((signed char*)pH)[0] & 0x80 ){
++		for (y = 0; y < height / s; y++) {
++			for (x = 0; x < width / s; x++) {
++				/*
++				 these are same following code.
++				     pH[x] = pH[x] / (~pM[x]+1) * (~pM[x]+1);
++				     ( round pH[x] with pM[x] bit )
++				 '&' operator isn't 'round' but is 'floor'.
++				 So, we must offset when pH[x] is negative.
++				*/
++				if (((signed char*)pH)[0] & 0x80)
 +					((signed char*)pH)[0] += ~((signed char*)pM)[0];
-+				}
-+				if( ((signed char*)pH)[1] & 0x80 ){
++				if (((signed char*)pH)[1] & 0x80)
 +					((signed char*)pH)[1] += ~((signed char*)pM)[1];
-+				}
-+				if( ((signed char*)pH)[2] & 0x80 ){
++				if (((signed char*)pH)[2] & 0x80)
 +					((signed char*)pH)[2] += ~((signed char*)pM)[2];
-+				}
 +				*pH &= *pM;
 +				pH += s;
 +			}
@@ -9943,35 +10962,38 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +	}
 +}
 +#  else
-+// Type B:Non liner quantization filter.
-+//
-+// Coefficients have Gaussian curve and smaller value which is 
-+// large part of coefficients isn't more important than larger value.
-+// So, I use filter of Non liner quantize/dequantize table.
-+// In general, Non liner quantize formula is explained as following.
-+//
-+//    y=f(x)   = sign(x)*round( ((abs(x)/(2^7))^ r   )* 2^(bo-1) )*2^(8-bo)
-+//    x=f-1(y) = sign(y)*round( ((abs(y)/(2^7))^(1/r))* 2^(bi-1) )*2^(8-bi)
-+// ( r:power coefficient  bi:effective MSB in input  bo:effective MSB in output )
-+//
-+//   r < 1.0 : Smaller value is more important than larger value.
-+//   r > 1.0 : Larger value is more important than smaller value.
-+//   r = 1.0 : Liner quantization which is same with EZW style.
-+//
-+// r = 0.75 is famous non liner quantization used in MP3 audio codec.
-+// In contrast to audio data, larger value is important in wavelet coefficients.
-+// So, I select r = 2.0 table( quantize is x^2, dequantize sqrt(x) ).
-+//
-+// As compared with EZW style liner quantization, this filter tended to be 
-+// more sharp edge and be more compression rate but be more blocking noise and be less quality.
-+// Especially, the surface of graphic objects has distinguishable noise in middle quality mode.
-+//
-+// We need only quantized-dequantized(filtered) value rather than quantized value itself
-+// because all values are packed or palette-lized in later ZRLE section.
-+// This lead us not to need to modify client decoder when we change
-+// the filtering procedure in future.
-+// Client only decodes coefficients given by encoder.
-+static InlineX void FilterWaveletSquare( int* pBuf, int width, int height, int level, int l ){
++/*
++ Type B:Non liner quantization filter.
++
++ Coefficients have Gaussian curve and smaller value which is
++ large part of coefficients isn't more important than larger value.
++ So, I use filter of Non liner quantize/dequantize table.
++ In general, Non liner quantize formula is explained as following.
++
++    y=f(x)   = sign(x)*round( ((abs(x)/(2^7))^ r   )* 2^(bo-1) )*2^(8-bo)
++    x=f-1(y) = sign(y)*round( ((abs(y)/(2^7))^(1/r))* 2^(bi-1) )*2^(8-bi)
++ ( r:power coefficient  bi:effective MSB in input  bo:effective MSB in output )
++
++   r < 1.0 : Smaller value is more important than larger value.
++   r > 1.0 : Larger value is more important than smaller value.
++   r = 1.0 : Liner quantization which is same with EZW style.
++
++ r = 0.75 is famous non liner quantization used in MP3 audio codec.
++ In contrast to audio data, larger value is important in wavelet coefficients.
++ So, I select r = 2.0 table( quantize is x^2, dequantize sqrt(x) ).
++
++ As compared with EZW style liner quantization, this filter tended to be
++ more sharp edge and be more compression rate but be more blocking noise and be less quality.
++ Especially, the surface of graphic objects has distinguishable noise in middle quality mode.
++
++ We need only quantized-dequantized(filtered) value rather than quantized value itself
++ because all values are packed or palette-lized in later ZRLE section.
++ This lead us not to need to modify client decoder when we change
++ the filtering procedure in future.
++ Client only decodes coefficients given by encoder.
++*/
++static InlineX void FilterWaveletSquare(int* pBuf, int width, int height, int level, int l)
++{
 +	int r, s;
 +	int x, y;
 +	int* pH;
@@ -9979,16 +11001,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +
 +	pM = zywrleParam[level-1][l];
 +	s = 2<<l;
-+	for( r=1; r<4; r++ ){
++	for (r = 1; r < 4; r++) {
 +		pH   = pBuf;
-+		if( r & 0x01 ){
++		if (r & 0x01)
 +			pH +=  s>>1;
-+		}
-+		if( r & 0x02 ){
++		if (r & 0x02)
 +			pH += (s>>1)*width;
-+		}
-+		for( y=0; y<height/s; y++ ){
-+			for( x=0; x<width/s; x++ ){
++		for (y = 0; y < height / s; y++) {
++			for (x = 0; x < width / s; x++) {
 +				((signed char*)pH)[0] = pM[0][((unsigned char*)pH)[0]];
 +				((signed char*)pH)[1] = pM[1][((unsigned char*)pH)[1]];
 +				((signed char*)pH)[2] = pM[2][((unsigned char*)pH)[2]];
@@ -10000,57 +11020,59 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +}
 +#  endif
 +
-+static InlineX void Wavelet( int* pBuf, int width, int height, int level ){
++static InlineX void Wavelet(int* pBuf, int width, int height, int level)
++{
 +	int l, s;
 +	int* pTop;
 +	int* pEnd;
 +
-+	for( l=0; l<level; l++ ){
++	for (l = 0; l < level; l++) {
 +		pTop = pBuf;
 +		pEnd = pBuf+height*width;
 +		s = width<<l;
-+		while( pTop < pEnd ){
-+			WaveletLevel( pTop, width, l, 1 );
++		while (pTop < pEnd) {
++			WaveletLevel(pTop, width, l, 1);
 +			pTop += s;
 +		}
 +		pTop = pBuf;
 +		pEnd = pBuf+width;
 +		s = 1<<l;
-+		while( pTop < pEnd ){
-+			WaveletLevel( pTop, height,l, width );
++		while (pTop < pEnd) {
++			WaveletLevel(pTop, height,l, width);
 +			pTop += s;
 +		}
-+		FilterWaveletSquare( pBuf, width, height, level, l );
++		FilterWaveletSquare(pBuf, width, height, level, l);
 +	}
 +}
 +#endif
 +#ifdef ZYWRLE_DECODE
-+static InlineX void InvWavelet( int* pBuf, int width, int height, int level ){
++static InlineX void InvWavelet(int* pBuf, int width, int height, int level)
++{
 +	int l, s;
 +	int* pTop;
 +	int* pEnd;
 +
-+	for( l=level-1; l>=0; l-- ){
++	for (l = level - 1; l >= 0; l--) {
 +		pTop = pBuf;
 +		pEnd = pBuf+width;
 +		s = 1<<l;
-+		while( pTop < pEnd ){
-+			InvWaveletLevel( pTop, height,l, width );
++		while (pTop < pEnd) {
++			InvWaveletLevel(pTop, height,l, width);
 +			pTop += s;
 +		}
 +		pTop = pBuf;
 +		pEnd = pBuf+height*width;
 +		s = width<<l;
-+		while( pTop < pEnd ){
-+			InvWaveletLevel( pTop, width, l, 1 );
++		while (pTop < pEnd) {
++			InvWaveletLevel(pTop, width, l, 1);
 +			pTop += s;
 +		}
 +	}
 +}
 +#endif
 +
-+// Load/Save coefficients stuffs.
-+// Coefficients manages as 24 bits little-endian pixel.
++/* Load/Save coefficients stuffs.
++ Coefficients manages as 24 bits little-endian pixel. */
 +#define ZYWRLE_LOAD_COEFF(pSrc,R,G,B) { \
 +	R = ((signed char*)pSrc)[2];	\
 +	G = ((signed char*)pSrc)[1];	\
@@ -10062,22 +11084,23 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +	((signed char*)pDst)[0] = (signed char)B;	\
 +}
 +
-+// RGB <=> YUV conversion stuffs.
-+// YUV coversion is explained as following formula in strict meaning:
-+//   Y =  0.299R + 0.587G + 0.114B (   0<=Y<=255)
-+//   U = -0.169R - 0.331G + 0.500B (-128<=U<=127)
-+//   V =  0.500R - 0.419G - 0.081B (-128<=V<=127)
-+// 
-+// I use simple conversion RCT(reversible color transform) which is described 
-+// in JPEG-2000 specification.
-+//   Y = (R + 2G + B)/4 (   0<=Y<=255)
-+//   U = B-G (-256<=U<=255)
-+//   V = R-G (-256<=V<=255)
++/*
++ RGB <=> YUV conversion stuffs.
++ YUV coversion is explained as following formula in strict meaning:
++   Y =  0.299R + 0.587G + 0.114B (   0<=Y<=255)
++   U = -0.169R - 0.331G + 0.500B (-128<=U<=127)
++   V =  0.500R - 0.419G - 0.081B (-128<=V<=127)
 +
++ I use simple conversion RCT(reversible color transform) which is described
++ in JPEG-2000 specification.
++   Y = (R + 2G + B)/4 (   0<=Y<=255)
++   U = B-G (-256<=U<=255)
++   V = R-G (-256<=V<=255)
++*/
 +#define ROUND(x) (((x)<0)?0:(((x)>255)?255:(x)))
-+	// RCT is N-bit RGB to N-bit Y and N+1-bit UV.
-+	// For make Same N-bit, UV is lossy.
-+	// More exact PLHarr, we reduce to odd range(-127<=x<=127).
++	/* RCT is N-bit RGB to N-bit Y and N+1-bit UV.
++	 For make Same N-bit, UV is lossy.
++	 More exact PLHarr, we reduce to odd range(-127<=x<=127). */
 +#define ZYWRLE_RGBYUV1(R,G,B,Y,U,V,ymask,uvmask) { \
 +	Y = (R+(G<<1)+B)>>2;	\
 +	U =  B-G;	\
@@ -10088,15 +11111,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +	Y &= ymask;	\
 +	U &= uvmask;	\
 +	V &= uvmask;	\
-+	if( Y == -128 ){	\
++	if (Y == -128)	\
 +		Y += (0xFFFFFFFF-ymask+1);	\
-+	}	\
-+	if( U == -128 ){	\
++	if (U == -128)	\
 +		U += (0xFFFFFFFF-uvmask+1);	\
-+	}	\
-+	if( V == -128 ){	\
++	if (V == -128)	\
 +		V += (0xFFFFFFFF-uvmask+1);	\
-+	}	\
 +}
 +#define ZYWRLE_YUVRGB1(R,G,B,Y,U,V) { \
 +	Y += 128;	\
@@ -10110,79 +11130,85 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +	R = ROUND(R);	\
 +}
 +
-+// coefficient packing/unpacking stuffs.
-+// Wavelet transform makes 4 sub coefficient image from 1 original image.
-+//
-+// model with pyramid decomposition:
-+//   +------+------+
-+//   |      |      |
-+//   |  L   |  Hx  |
-+//   |      |      |
-+//   +------+------+
-+//   |      |      |
-+//   |  H   |  Hxy |
-+//   |      |      |
-+//   +------+------+
-+//
-+// So, we must transfer each sub images individually in strict meaning.
-+// But at least ZRLE meaning, following one decompositon image is same as
-+// avobe individual sub image. I use this format.
-+// (Strictly saying, transfer order is reverse(Hxy->Hy->Hx->L)
-+//  for simplified procedure for any wavelet level.)
-+//
-+//   +------+------+
-+//   |      L      |
-+//   +------+------+
-+//   |      Hx     |
-+//   +------+------+
-+//   |      Hy     |
-+//   +------+------+
-+//   |      Hxy    |
-+//   +------+------+
++/*
++ coefficient packing/unpacking stuffs.
++ Wavelet transform makes 4 sub coefficient image from 1 original image.
 +
-+#define ZYWRLE_TRANSFER_COEFF(pBuf,data,r,width,height,level,TRANS)	\
-+	pH = pBuf;	\
-+	s = 2<<level;	\
-+	if( r & 0x01 ){	\
-+		pH +=  s>>1;	\
-+	}	\
-+	if( r & 0x02 ){	\
-+		pH += (s>>1)*width;	\
-+	}	\
-+	pEnd = pH+height*width;	\
-+	while( pH < pEnd ){	\
-+		pLine = pH+width;	\
-+		while( pH < pLine ){	\
-+			TRANS	\
-+			data++;	\
-+			pH += s;	\
-+		}	\
-+		pH += (s-1)*width;	\
++ model with pyramid decomposition:
++   +------+------+
++   |      |      |
++   |  L   |  Hx  |
++   |      |      |
++   +------+------+
++   |      |      |
++   |  H   |  Hxy |
++   |      |      |
++   +------+------+
++
++ So, we must transfer each sub images individually in strict meaning.
++ But at least ZRLE meaning, following one decompositon image is same as
++ avobe individual sub image. I use this format.
++ (Strictly saying, transfer order is reverse(Hxy->Hy->Hx->L)
++  for simplified procedure for any wavelet level.)
++
++   +------+------+
++   |      L      |
++   +------+------+
++   |      Hx     |
++   +------+------+
++   |      Hy     |
++   +------+------+
++   |      Hxy    |
++   +------+------+
++*/
++#define INC_PTR(data) \
++	data++;	\
++	if( data-pData >= (w+uw) ){	\
++		data += scanline-(w+uw);	\
++		pData = data;	\
 +	}
 +
-+#define ZYWRLE_PACK_COEFF(pBuf,data,r,width,height,level)	\
-+	ZYWRLE_TRANSFER_COEFF(pBuf,data,r,width,height,level,ZYWRLE_LOAD_COEFF(pH,R,G,B);ZYWRLE_SAVE_PIXEL(data,R,G,B);)
++#define ZYWRLE_TRANSFER_COEFF(pBuf,data,r,w,h,scanline,level,TRANS)	\
++	pH = pBuf;	\
++	s = 2<<level;	\
++	if (r & 0x01)	\
++		pH +=  s>>1;	\
++	if (r & 0x02)	\
++		pH += (s>>1)*w;	\
++	pEnd = pH+h*w;	\
++	while (pH < pEnd) {	\
++		pLine = pH+w;	\
++		while (pH < pLine) {	\
++			TRANS	\
++			INC_PTR(data)	\
++			pH += s;	\
++		}	\
++		pH += (s-1)*w;	\
++	}
 +
-+#define ZYWRLE_UNPACK_COEFF(pBuf,data,r,width,height,level)	\
-+	ZYWRLE_TRANSFER_COEFF(pBuf,data,r,width,height,level,ZYWRLE_LOAD_PIXEL(data,R,G,B);ZYWRLE_SAVE_COEFF(pH,R,G,B);)
++#define ZYWRLE_PACK_COEFF(pBuf,data,r,width,height,scanline,level)	\
++	ZYWRLE_TRANSFER_COEFF(pBuf,data,r,width,height,scanline,level,ZYWRLE_LOAD_COEFF(pH,R,G,B);ZYWRLE_SAVE_PIXEL(data,R,G,B);)
++
++#define ZYWRLE_UNPACK_COEFF(pBuf,data,r,width,height,scanline,level)	\
++	ZYWRLE_TRANSFER_COEFF(pBuf,data,r,width,height,scanline,level,ZYWRLE_LOAD_PIXEL(data,R,G,B);ZYWRLE_SAVE_COEFF(pH,R,G,B);)
 +
 +#define ZYWRLE_SAVE_UNALIGN(data,TRANS)	\
 +	pTop = pBuf+w*h;	\
-+	pEnd = pTop + (w+uw)*(h+uh)-w*h;	\
-+	while( pTop < pEnd ){	\
++	pEnd = pBuf + (w+uw)*(h+uh);	\
++	while (pTop < pEnd) {	\
 +		TRANS	\
-+		data++;	\
++		INC_PTR(data)	\
 +		pTop++;	\
 +	}
 +
-+#define ZYWRLE_LOAD_UNALIGN(data,pData,TRANS)	\
++#define ZYWRLE_LOAD_UNALIGN(data,TRANS)	\
 +	pTop = pBuf+w*h;	\
-+	if( uw ){	\
++	if (uw) {	\
 +		pData=         data + w;	\
 +		pEnd = (int*)(pData+ h*scanline);	\
-+		while( pData < (PIXEL_T*)pEnd ){	\
++		while (pData < (PIXEL_T*)pEnd) {	\
 +			pLine = (int*)(pData + uw);	\
-+			while( pData < (PIXEL_T*)pLine ){	\
++			while (pData < (PIXEL_T*)pLine) {	\
 +				TRANS	\
 +				pData++;	\
 +				pTop++;	\
@@ -10190,12 +11216,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +			pData += scanline-uw;	\
 +		}	\
 +	}	\
-+	if( uh ){	\
++	if (uh) {	\
 +		pData=         data +  h*scanline;	\
 +		pEnd = (int*)(pData+ uh*scanline);	\
-+		while( pData < (PIXEL_T*)pEnd ){	\
++		while (pData < (PIXEL_T*)pEnd) {	\
 +			pLine = (int*)(pData + w);	\
-+			while( pData < (PIXEL_T*)pLine ){	\
++			while (pData < (PIXEL_T*)pLine) {	\
 +				TRANS	\
 +				pData++;	\
 +				pTop++;	\
@@ -10203,12 +11229,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +			pData += scanline-w;	\
 +		}	\
 +	}	\
-+	if( uw && uh ){	\
++	if (uw && uh) {	\
 +		pData=         data + w+ h*scanline;	\
 +		pEnd = (int*)(pData+   uh*scanline);	\
-+		while( pData < (PIXEL_T*)pEnd ){	\
++		while (pData < (PIXEL_T*)pEnd) {	\
 +			pLine = (int*)(pData + uw);	\
-+			while( pData < (PIXEL_T*)pLine ){	\
++			while (pData < (PIXEL_T*)pLine) {	\
 +				TRANS	\
 +				pData++;	\
 +				pTop++;	\
@@ -10217,24 +11243,26 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +		}	\
 +	}
 +
-+static InlineX void zywrleCalcSize( int* pW, int* pH, int level ){
++static InlineX void zywrleCalcSize(int* pW, int* pH, int level)
++{
 +	*pW &= ~((1<<level)-1);
 +	*pH &= ~((1<<level)-1);
 +}
 +
-+#endif // ZYWRLE_ONCE
++#endif /* ZYWRLE_ONCE */
 +
 +#ifndef CPIXEL
 +#ifdef ZYWRLE_ENCODE
-+static InlineX void ZYWRLE_RGBYUV( int* pBuf, PIXEL_T* data, int width, int height, int scanline ){
++static InlineX void ZYWRLE_RGBYUV(int* pBuf, PIXEL_T* data, int width, int height, int scanline)
++{
 +	int R, G, B;
 +	int Y, U, V;
 +	int* pLine;
 +	int* pEnd;
 +	pEnd = pBuf+height*width;
-+	while( pBuf < pEnd ){
++	while (pBuf < pEnd) {
 +		pLine = pBuf+width;
-+		while( pBuf < pLine ){
++		while (pBuf < pLine) {
 +			ZYWRLE_LOAD_PIXEL(data,R,G,B);
 +			ZYWRLE_RGBYUV1(R,G,B,Y,U,V,ZYWRLE_YMASK,ZYWRLE_UVMASK);
 +			ZYWRLE_SAVE_COEFF(pBuf,V,Y,U);
@@ -10246,15 +11274,15 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +}
 +#endif
 +#ifdef ZYWRLE_DECODE
-+static InlineX void ZYWRLE_YUVRGB( int* pBuf, PIXEL_T* data, int width, int height, int scanline ){
++static InlineX void ZYWRLE_YUVRGB(int* pBuf, PIXEL_T* data, int width, int height, int scanline) {
 +	int R, G, B;
 +	int Y, U, V;
 +	int* pLine;
 +	int* pEnd;
 +	pEnd = pBuf+height*width;
-+	while( pBuf < pEnd ){
++	while (pBuf < pEnd) {
 +		pLine = pBuf+width;
-+		while( pBuf < pLine ){
++		while (pBuf < pLine) {
 +			ZYWRLE_LOAD_COEFF(pBuf,V,Y,U);
 +			ZYWRLE_YUVRGB1(R,G,B,Y,U,V);
 +			ZYWRLE_SAVE_PIXEL(data,R,G,B);
@@ -10267,34 +11295,34 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +#endif
 +
 +#ifdef ZYWRLE_ENCODE
-+PIXEL_T* ZYWRLE_ANALYZE ( PIXEL_T* dst, PIXEL_T* src, int w, int h, int scanline, int level, int* pBuf ){
++PIXEL_T* ZYWRLE_ANALYZE(PIXEL_T* dst, PIXEL_T* src, int w, int h, int scanline, int level, int* pBuf) {
 +	int l;
 +	int uw = w;
 +	int uh = h;
 +	int* pTop;
 +	int* pEnd;
 +	int* pLine;
-+	PIXEL_T* pSrc;
++	PIXEL_T* pData;
 +	int R, G, B;
 +	int s;
 +	int* pH;
 +
-+	zywrleCalcSize( &w, &h, level );
-+	if( (w==0)||(h==0) ){
++	zywrleCalcSize(&w, &h, level);
++	if (w == 0 || h == 0)
 +		return NULL;
-+	}
 +	uw -= w;
 +	uh -= h;
 +
-+	ZYWRLE_LOAD_UNALIGN(src,pSrc,*(PIXEL_T*)pTop=*pSrc;)
-+	ZYWRLE_RGBYUV( pBuf, src, w, h, scanline );
-+	Wavelet( pBuf, w, h, level );
-+	for( l=0; l<level; l++ ){
-+		ZYWRLE_PACK_COEFF( pBuf, dst, 3, w, h, l );
-+		ZYWRLE_PACK_COEFF( pBuf, dst, 2, w, h, l );
-+		ZYWRLE_PACK_COEFF( pBuf, dst, 1, w, h, l );
-+		if( l == level-1 ){
-+			ZYWRLE_PACK_COEFF( pBuf, dst, 0, w, h, l );
++	pData = dst;
++	ZYWRLE_LOAD_UNALIGN(src,*(PIXEL_T*)pTop=*pData;)
++	ZYWRLE_RGBYUV(pBuf, src, w, h, scanline);
++	Wavelet(pBuf, w, h, level);
++	for (l = 0; l < level; l++) {
++		ZYWRLE_PACK_COEFF(pBuf, dst, 3, w, h, scanline, l);
++		ZYWRLE_PACK_COEFF(pBuf, dst, 2, w, h, scanline, l);
++		ZYWRLE_PACK_COEFF(pBuf, dst, 1, w, h, scanline, l);
++		if (l == level - 1) {
++			ZYWRLE_PACK_COEFF(pBuf, dst, 0, w, h, scanline, l);
 +		}
 +	}
 +	ZYWRLE_SAVE_UNALIGN(dst,*dst=*(PIXEL_T*)pTop;)
@@ -10302,41 +11330,42 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +}
 +#endif
 +#ifdef ZYWRLE_DECODE
-+PIXEL_T* ZYWRLE_SYNTHESIZE ( PIXEL_T* dst, PIXEL_T* src, int w, int h, int scanline, int level, int* pBuf ){
++PIXEL_T* ZYWRLE_SYNTHESIZE(PIXEL_T* dst, PIXEL_T* src, int w, int h, int scanline, int level, int* pBuf)
++{
 +	int l;
 +	int uw = w;
 +	int uh = h;
 +	int* pTop;
 +	int* pEnd;
 +	int* pLine;
-+	PIXEL_T* pDst;
++	PIXEL_T* pData;
 +	int R, G, B;
 +	int s;
 +	int* pH;
 +
-+	zywrleCalcSize( &w, &h, level );
-+	if( (w==0)||(h==0) ){
++	zywrleCalcSize(&w, &h, level);
++	if (w == 0 || h == 0)
 +		return NULL;
-+	}
 +	uw -= w;
 +	uh -= h;
 +
-+	for( l=0; l<level; l++ ){
-+		ZYWRLE_UNPACK_COEFF( pBuf, src, 3, w, h, l );
-+		ZYWRLE_UNPACK_COEFF( pBuf, src, 2, w, h, l );
-+		ZYWRLE_UNPACK_COEFF( pBuf, src, 1, w, h, l );
-+		if( l == level-1 ){
-+			ZYWRLE_UNPACK_COEFF( pBuf, src, 0, w, h, l );
++	pData = src;
++	for (l = 0; l < level; l++) {
++		ZYWRLE_UNPACK_COEFF(pBuf, src, 3, w, h, scanline, l);
++		ZYWRLE_UNPACK_COEFF(pBuf, src, 2, w, h, scanline, l);
++		ZYWRLE_UNPACK_COEFF(pBuf, src, 1, w, h, scanline, l);
++		if (l == level - 1) {
++			ZYWRLE_UNPACK_COEFF(pBuf, src, 0, w, h, scanline, l);
 +		}
 +	}
 +	ZYWRLE_SAVE_UNALIGN(src,*(PIXEL_T*)pTop=*src;)
-+	InvWavelet( pBuf, w, h, level );
-+	ZYWRLE_YUVRGB( pBuf, dst, w, h, scanline );
-+	ZYWRLE_LOAD_UNALIGN(dst,pDst,*pDst=*(PIXEL_T*)pTop;)
++	InvWavelet(pBuf, w, h, level);
++	ZYWRLE_YUVRGB(pBuf, dst, w, h, scanline);
++	ZYWRLE_LOAD_UNALIGN(dst,*pData=*(PIXEL_T*)pTop;)
 +	return src;
 +}
 +#endif
-+#endif  // CPIXEL
++#endif  /* CPIXEL */
 +
 +#undef ZYWRLE_RGBYUV
 +#undef ZYWRLE_YUVRGB

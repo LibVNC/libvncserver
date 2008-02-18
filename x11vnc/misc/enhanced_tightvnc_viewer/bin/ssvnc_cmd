@@ -120,7 +120,7 @@ fi
 #
 name=$UNAME
 if [ "X$name" = "X" ]; then
-	name=`uname -sm | sed -e 's/ /./g' -e 's/Linux\.i.86/Linux.i686/'`
+	name=`uname -sm | sed -e 's/ /./g' -e 's,/.*,,' -e 's/Linux\.i.86/Linux.i686/'`
 fi
 
 f="$0"
