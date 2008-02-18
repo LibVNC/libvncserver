@@ -3,7 +3,7 @@
 # ss_vncviewer:  wrapper for vncviewer to use an stunnel SSL tunnel
 #                or an SSH tunnel.
 #
-# Copyright (c) 2006-2007 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2006-2008 by Karl J. Runge <runge@karlrunge.com>
 #
 # You must have stunnel(8) installed on the system and in your PATH
 # (however, see the -ssh option below, in which case you will need ssh(1)
