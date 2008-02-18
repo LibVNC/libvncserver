@@ -1,5 +1,5 @@
 
-x11vnc README file                         Date: Thu Jan 24 15:45:09 EST 2008
+x11vnc README file                         Date: Sat Feb  2 21:40:58 EST 2008
 
 The following information is taken from these URLs:
 
@@ -858,6 +858,9 @@ make
        use [127]-clear_all.
      * Usage with dvorak keyboards has been improved. See also:
        [128]-xkb.
+     * Support for the ZYWRLE encoding, this is the RealVNC ZRLE encoding
+       extended to do motion video and photo regions more efficiently by
+       way of a Wavelet based transformation.
 
 
    Here are some features that appeared in the 0.9.3 release:
@@ -10948,6 +10951,13 @@ start ssvnc.exe
    (otherwise you'd have to browse to the drive directory each time you
    load or save).
 
+   One user on Windows created a BAT file to launch SSVNC and needed to
+   do this to get the Home directory correct:
+cd \ssvnc\Windows
+start \ssvnc\Windows\ssvnc.exe
+
+   (an optional profile name can be supplied to the ssvnc.exe line)
+
    WARNING: if you use ssvnc from an "Internet Cafe", i.e. some untrusted
    computer, please be aware that someone may have set up that machine to
    be capturing your keystrokes, etc.
@@ -11329,7 +11339,7 @@ es and source AND full archives in the zip dir. (~15MB)
    Here is the toplevel README from the bundle:
        Enhanced TightVNC Viewer (SSVNC: SSL/SSH VNC viewer)
 
-Copyright (c) 2006-2007 Karl J. Runge
+Copyright (c) 2006-2008 Karl J. Runge
 All rights reserved.
 
 These bundles provide 1) An enhanced TightVNC Viewer on Unix, 2) Binaries
@@ -11667,6 +11677,14 @@ on a USB flash drive that you carry around for mobile use and you want
 the profiles you create to stay with the drive (otherwise you'd have to
 browse to the drive directory each time you load or save).
 
+One user on Windows created a BAT file to launch SSVNC and needed to
+do this to get the Home directory correct:
+
+cd \ssvnc\Windows
+start \ssvnc\Windows\ssvnc.exe
+
+(an optional profile name can be supplied to the ssvnc.exe line)
+
 WARNING: if you use ssvnc from an "Internet Cafe", i.e.  an untrusted
 computer, an intruder may be capturing keystrokes etc.
 
@@ -11920,7 +11938,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-01-24
+x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-02-02
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -12039,7 +12057,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-01-24
+x11vnc: allow VNC connections to real X11 displays. 0.9.4 lastmod: 2008-02-02
 
 (type "x11vnc -opts" to just list the options.)
 
