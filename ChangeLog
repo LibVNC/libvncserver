@@ -1,3 +1,6 @@
+2008-02-18  Christian Ehrlicher <Ch.Ehrlicher@gmx.de>
+	* libvncserver/rfbregion.c: please MS Visual C++
+
 2008-02-04  Noriaki Yamazaki <micro-vnc@ias.hitachi-system.co.jp>
 	* libvncclient/rfbproto.c, libvncclient/zrle.c: Add ZYWRLE
 		support to LibVNCClient
