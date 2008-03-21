@@ -1,10 +1,13 @@
 immediate:
 ----------
 
-Implement ZYWRLE decoding in libvncclient
-make SDLvncviewer more versatile (test for missing keys, introduce scrollbars,
-	make scrollable with 2xCtrl and mouse drag)
-Clean up ZRLE (probably not thread-safe: zrleBeforeBuf, zrlePaletteHelper)
+make SDLvncviewer more versatile
+	- AltGr!
+	- test for missing keys (especially "[]{}" with ./examples/mac),
+	- keyboard repeat,
+	- introduce scrollbars,
+	- make scrollable with 2xCtrl and mouse drag,
+	- handle selection
 style fixes: use Linux' coding guidelines & ANSIfy tightvnc-filetransfer:
 	discuss on list
 LibVNCClient cleanup: prefix with "rfbClient", and make sure it does
@@ -12,7 +15,6 @@ LibVNCClient cleanup: prefix with "rfbClient", and make sure it does
 java vncviewer doesn't do colour cursors?
 MinGW32 doesn't do fcntl on sockets; use setsockopt instead...
 make corre work again (libvncclient or libvncserver?)
-teach SDLvncviewer about capitals...
 teach SDLvncviewer about CopyRect...
 implement "-record" in libvncclient
 
