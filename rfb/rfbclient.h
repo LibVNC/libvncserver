@@ -177,7 +177,6 @@ typedef struct _rfbClient {
 
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	/*
 	 * Variables for the ``tight'' encoding implementation.
 	 */
@@ -196,6 +195,7 @@ typedef struct _rfbClient {
 	char tightPalette[256*4];
 	uint8_t tightPrevRow[2048*3*sizeof(uint16_t)];
 
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	/* JPEG decoder state. */
 	rfbBool jpegError;
 
