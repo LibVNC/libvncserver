@@ -73,8 +73,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2007-09-05 00:13:45.000000000 -0400
-@@ -0,0 +1,1453 @@
++++ vnc_javasrc/SSLSocketToMe.java	2008-04-15 12:54:51.000000000 -0400
+@@ -0,0 +1,1456 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -834,7 +834,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +				if (s2.indexOf("proxy") < 0 && v2.indexOf("proxy") < 0) {
 +					continue;
 +				}
-+				if (v2.indexOf("https") < 0) {
++				if (v2.indexOf("http") < 0) {
 +					continue;
 +				}
 +
@@ -860,7 +860,10 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					String p = pieces[i];
 +					int j = p.indexOf("https");
 +					if (j < 0) {
-+						continue;
++						j = p.indexOf("http");
++						if (j < 0) {
++							continue;
++						}
 +					}
 +					j = p.indexOf("=", j);
 +					if (j < 0) {
