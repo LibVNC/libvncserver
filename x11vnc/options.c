@@ -414,7 +414,7 @@ int verbose = 0;
 
 /* threaded vs. non-threaded (default) */
 #if LIBVNCSERVER_HAVE_LIBPTHREAD && defined(X11VNC_THREADED)
-int use_threads = 1;
+int use_threads = 0;	/* not 1. now X11VNC_THREADED means enable it at all. */
 #else
 int use_threads = 0;
 #endif

@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "February 2008" "x11vnc " "User Commands"
+.TH X11VNC "1" "May 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2008-02-17
+         version: 0.9.4, lastmod: 2008-05-07
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -507,6 +507,45 @@ Be careful about the location of this file if x11vnc
 is running as root (e.g. via 
 .IR gdm (1)
 , etc).
+.IP
+Repeater mode: Some services provide an intermediate
+"vnc repeater": http://www.uvnc.com/addons/repeater.html
+(and also http://koti.mbnet.fi/jtko/ for linux port)
+that acts as a proxy / gateway.  Modes like these require
+an initial string to be sent for the reverse connection
+before the VNC protocol is started.  Here are the ways
+to do this:
+.IP
+\fB-connect\fR pre=some_string+host:port
+\fB-connect\fR pre128=some_string+host:port
+\fB-connect\fR repeater=ID:1234+host:port
+\fB-connect\fR repeater=23.45.67.89::5501+host:port
+.IP
+SSVNC notation is also supported:
+.IP
+\fB-connect\fR repeater://host:port+ID:1234
+.IP
+As with normal \fB-connect\fR usage, if the repeater port is
+not supplied 5500 is assumed.
+.IP
+The basic idea is between the special tag, e.g. "pre="
+and "+" is the pre-string to be sent.  Note that in
+this case host:port is the repeater server, NOT the
+vnc viewer.  Somehow the pre-string tells the repeater
+server how to find the vnc viewer and connect you to it.
+.IP
+In the case pre=some_string+host:port, "some_string"
+is simply sent. In the case preNNN=some_string+host:port
+"some_string" is sent in a null padded buffer of
+length NNN.  repeater= is the same as pre250=, this is
+the ultravnc repeater buffer size.
+.IP
+Strings like "\\n" and "\\r", etc. are expanded to
+newline and carriage return.  "\\c" is expanded to
+"," since the connect string is comma separated.
+.IP
+See also the \fB-proxy\fR option below for additional ways
+to plumb reverse connections.
 .PP
 \fB-connect_or_exit\fR \fIstr\fR
 .IP
@@ -1068,6 +1107,10 @@ In fact, the protocol does not even need to be VNC,
 and so "\fB-ssl\fR \fISAVE \fB-redirect\fR host:port\fR" can act as a
 replacement for 
 .IR stunnel (1).
+.IP
+This mode only allows one redirected connection.
+The \fB-forever\fR option does not apply.  Use \fB-inetd\fR or
+\fB-loop\fR for persistant service.
 .PP
 \fB-display\fR \fIWAIT:...\fR
 .IP
@@ -3620,8 +3663,8 @@ for details.  \fB-nodpms\fR is basically the same as running
 If the system supports the DPMS (Display Power
 Management Signaling) extension, then try to keep the
 monitor in a powered off state.  This is to prevent
-nosey people at the physical display from viewing
-what is on the screen.  Be sure lock the screen before
+nosey people at the physical display from viewing what
+is on the screen.  Be sure to lock the screen before
 disconnecting.
 .IP
 This method is far from bullet proof, e.g. suppose
@@ -3713,7 +3756,11 @@ for this option if you don't like the 'pipe'. Example:
 .IP
 Whether or not to use the threaded libvncserver
 algorithm [rfbRunEventLoop] if libpthread is available
-Default: \fB-nothreads\fR
+Default: \fB-nothreads.\fR  NOTE:  The \fB-threads\fR mode is now
+disabled due to its unstable behavior.  Not recommended,
+but you can recompile with \fB-DX11VNC_THREADED\fR in
+CPPFLAGS if you need to use it.  You can also set the
+env. variable X11VNC_THREADED=1
 .PP
 \fB-fs\fR \fIf\fR
 .IP

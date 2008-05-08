@@ -1567,6 +1567,9 @@ void accept_openssl(int mode, int presock) {
 		if (screen->httpListenSock >= 0 && screen->httpPort > 0) {
 			have_httpd = 1;
 		}
+		if (screen->httpListenSock == -2) {
+			have_httpd = 1;
+		}
 		if (mode == OPENSSL_HTTPS && ! have_httpd) {
 			rfbLog("SSL: accept_openssl[%d]: no httpd socket for "
 			    "-https mode\n", getpid());
@@ -1695,10 +1698,11 @@ void accept_openssl(int mode, int presock) {
 			/* send the failure tag: */
 			strcpy(tbuf, uniq);
 
-			if (https_port_redir < 0) {
+			if (https_port_redir < 0 || (strstr(buf, "PORT=") || strstr(buf, "port="))) {
 				char *q = strstr(buf, "Host:");
-				int fport = 443;
+				int fport = 443, match = 0;
 				char num[16];
+
 				if (q && strstr(q, "\n")) {
 				    q += strlen("Host:") + 1;
 				    while (*q != '\n') {
@@ -1706,11 +1710,24 @@ void accept_openssl(int mode, int presock) {
 					if (*q == ':' && sscanf(q, ":%d", &p) == 1) {
 						if (p > 0 && p < 65536) {
 							fport = p;
+							match = 1;
 							break;
 						}
 					}
 					q++;
 				    }
+				}
+				if (!match || !https_port_redir) {
+					int p;
+					if (sscanf(buf, "PORT=%d,", &p) == 1) {
+						if (p > 0 && p < 65536) {
+							fport = p;
+						}
+					} else if (sscanf(buf, "port=%d,", &p) == 1) {
+						if (p > 0 && p < 65536) {
+							fport = p;
+						}
+					}
 				}
 				sprintf(num, "HP=%d,", fport);
 				strcat(tbuf, num);

@@ -2589,7 +2589,7 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-connect") ||
 		    !strcmp(arg, "-connect_or_exit")) {
 			CHECK_ARGC
-			if (strchr(argv[++i], '/')) {
+			if (strchr(argv[++i], '/' && !strstr(argv[i], "repeater://"))) {
 				client_connect_file = strdup(argv[i]);
 			} else {
 				client_connect = strdup(argv[i]);
@@ -3280,7 +3280,22 @@ int main(int argc, char* argv[]) {
 			}
 #if LIBVNCSERVER_HAVE_LIBPTHREAD
 		} else if (!strcmp(arg, "-threads")) {
+#if defined(X11VNC_THREADED)
 			use_threads = 1;
+#else
+			if (getenv("X11VNC_THREADED")) {
+				use_threads = 1;
+			} else {
+				rfbLog("\n");
+				rfbLog("The -threads mode is unstable and not tested or maintained.\n");
+				rfbLog("It is disabled in the source code.  If you really need\n");
+				rfbLog("the feature you can reenable it at build time by setting\n");
+				rfbLog("-DX11VNC_THREADED in CPPFLAGS. Or set X11VNC_THREADED=1\n");
+				rfbLog("in your runtime environment.\n");
+				rfbLog("\n");
+				usleep(500*1000);
+			}
+#endif
 		} else if (!strcmp(arg, "-nothreads")) {
 			use_threads = 0;
 #endif

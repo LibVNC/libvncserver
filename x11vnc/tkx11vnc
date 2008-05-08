@@ -671,7 +671,7 @@ of actions:
 
     Properties      - Brings up the Properties dialog to set some basic
                       parameters.  The full tkx11vnc GUI may be accessed
-                      via the \"Advanced ...\" button.  Press \"Help ...\"
+                      via the \"Advanced ...\" button.  Press \"Help\"
                       in the Properties dialog for more info.
     
     Help            - Displays this help text.
@@ -781,7 +781,7 @@ Password\" empty as well and removes the need for any password to log in.
 If you set \"ViewOnly Password\" to the empty string that just removes
 the ViewOnly log in aspect: \"Password\" is still required to log in.
 
- - The \"Help ...\" button shows this help text.
+ - The \"Help\" button shows this help text.
    
  - The \"Advanced ...\" button replaces the Properties dialog with the full
    tkx11vnc GUI.  All dynamic settings can be modified in the full GUI.
@@ -4272,7 +4272,7 @@ proc do_props {{msg ""}} {
 
 	bind $w <KeyPress-Escape> "destroy $w"
 
-	pack $b1.apply $b1.cancel $b1.ok -side right -expand 1
+	pack $b1.ok $b1.cancel $b1.apply -side left -expand 0
 	lappend props_buttons $b1.apply $b1.cancel $b1.ok
 
 	set b2 "$w.buttons2"
@@ -4282,12 +4282,12 @@ proc do_props {{msg ""}} {
 		-command "destroy $w; props_advanced" -font $bfont
 	if {! $icon_noadvanced} {
 		lappend props_buttons $b2.advanced
-		pack $b2.advanced -side right -expand 1
+		pack $b2.advanced -side left -expand 0
 	}
 
-	button $b2.help -text "Help ..." -command "menu_help Properties" -font $bfont
+	button $b2.help -text "Help" -command "menu_help Properties" -font $bfont
 	lappend props_buttons $b2.help
-	pack $b2.help -side right -expand 1
+	pack $b2.help -side left -expand 0
 
 	set vp "$w.viewpw"
 	if {$have_labelframes} {
@@ -6626,14 +6626,8 @@ get_default_vars
 
 dtime D
 
-if {$icon_mode} {
-	if {$tray_embed} {
-		make_gui "tray"
-	} else {
-		make_gui "icon"
-	}
-	dtime G
-	old_balloon
+proc check_setpasswd {} {
+	global icon_setpasswd
 	if {$icon_setpasswd} {
 		set m "You must specify a Session Password\n" 
 		set m "${m}before VNC clients can connect.\n" 
@@ -6643,9 +6637,33 @@ if {$icon_mode} {
 		do_props $m
 		#push_new_value "unlock" "unlock" 1 0
 	}
+}
+
+if {0} {
+	if {[info exists env(X11VNC_ICON_SETPASS)]} {
+		if {$env(X11VNC_ICON_SETPASS) == "2"} {
+			global icon_mode_at_startup icon_mode
+			set icon_mode_at_startup 1
+			set icon_mode 2
+		}
+	}
+}
+
+if {$icon_mode} {
+	if {$icon_mode == 2} {
+		make_gui "full"
+	} elseif {$tray_embed} {
+		make_gui "tray"
+	} else {
+		make_gui "icon"
+	}
+	dtime G
+	old_balloon
+	check_setpasswd
 } else {
 	make_gui "full"
 	dtime G
+	check_setpasswd
 }
 
 
