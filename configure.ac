@@ -305,6 +305,7 @@ if test "x$with_crypto" != "xno" -a "x$with_ssl" != "xno"; then
 		[AC_DEFINE(HAVE_LIBCRYPTO) HAVE_LIBCRYPTO="true"], ,)
 fi
 
+AH_TEMPLATE(HAVE_X509_PRINT_EX_FP, [open ssl X509_print_ex_fp available])
 if test "x$with_ssl" != "xno"; then
 	if test "x$HAVE_LIBCRYPTO" = "xtrue"; then
 		AC_CHECK_LIB(ssl, SSL_library_init,
@@ -328,6 +329,10 @@ SSL install the necessary development packages (perhaps it is named
 something like libssl-dev) and run configure again.
 ==========================================================================
 ])
+	else
+		AC_CHECK_LIB(ssl, X509_print_ex_fp, 
+			[AC_DEFINE(HAVE_X509_PRINT_EX_FP) HAVE_X509_PRINT_EX_FP="true"], , $SSL_LIBS
+			)
 	fi
 
 if test "x$with_v4l" != "xno"; then
