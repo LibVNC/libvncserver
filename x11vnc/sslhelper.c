@@ -2130,8 +2130,16 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 			return 0;
 
 		} else if (rc < 0) {
+			unsigned long err;
+			int cnt = 0;
 
-			rfbLog("SSL: ssl_helper[%d]: SSL_accept() *FATAL: %d\n", getpid(), rc);
+			rfbLog("SSL: ssl_helper[%d]: SSL_accept() *FATAL: %d SSL FAILED\n", getpid(), rc);
+			while ((err = ERR_get_error()) != 0) {
+				rfbLog("SSL: %s\n", ERR_error_string(err, NULL));
+				if (cnt++ > 100) {
+					break;
+				}
+			}
 			return 0;
 
 		} else if (dnow() > start + 3.0) {
@@ -2174,9 +2182,18 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 			}
 		} else {
 			rfbLog("SSL: ssl_helper[%d]: accepted client %s x509 cert is:\n", getpid(), name);
+#if LIBVNCSERVER_HAVE_X509_PRINT_EX_FP
 			X509_print_ex_fp(stderr, x, 0, XN_FLAG_MULTILINE);
+#endif
 			if (cr != NULL) {
+#if LIBVNCSERVER_HAVE_X509_PRINT_EX_FP
 				X509_print_ex_fp(cr, x, 0, XN_FLAG_MULTILINE);
+#else
+				rfbLog("** not compiled with libssl X509_print_ex_fp() function **\n");
+				if (users_list && strstr(users_list, "sslpeer=")) {
+					rfbLog("** -users sslpeer= will not work! **\n");
+				}
+#endif
 				fclose(cr);
 			}
 		}
