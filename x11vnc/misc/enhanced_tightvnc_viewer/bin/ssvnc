@@ -52,10 +52,15 @@ if [ "X$name" = "X" ]; then
 	name=`uname -sm | sed -e 's/ /./g' -e 's,/.*,,' -e 's/Linux\.i.86/Linux.i686/'`
 fi
 
+dL="-L"
+if uname -sr | egrep 'SunOS 5\.[5-8]' > /dev/null; then
+	dL="-h"
+fi
+
 f="$0"
 for t in 1 2 3 4 5
 do
-	if [ -L "$f" ]; then
+	if [ $dL "$f" ]; then
 		f0="$f"
 		f=`ls -l "$f" | sed -e 's/^.* -> //'`
 		if echo "$f" | grep '^/' > /dev/null; then

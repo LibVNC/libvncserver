@@ -196,6 +196,7 @@ Unix and Mac OS X:
     have the XDarwin X server installed, you can set DISPLAY before starting
     ssvnc (or type DISPLAY=... in Host:Disp and hit Return).  Then our
     enhanced TightVNC viewer will be used instead of COTVNC.
+    Update: there is now a 'Use X11 vncviewer on MacOSX' under Options ...
 
 
     If you want a SSH-only tool (without the distractions of SSL) run

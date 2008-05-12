@@ -33,6 +33,16 @@ proc center_win {w} {
 	update
 }
 
+proc mac_raise {} {
+	global uname
+	if {$uname == "Darwin"} {
+		catch {exec /bin/sh -c {osascript -e 'tell application "Wish Shell" to activate' >/dev/null 2>&1 &}}
+		after 150
+		update
+		update idletasks
+	}
+}
+
 proc toplev {w} {
 	catch {destroy $w}
 	toplevel $w
@@ -105,16 +115,18 @@ proc ts_help {} {
     The Terminal Services VNC Viewer uses SSH to establish an encrypted
     and authenticated connection to the remote server.
 
-    On the remote server x11vnc is run in terminal services mode to find
-    or create your desktop session.  x11vnc is used for both the session
-    management and the VNC transport.
+    Through the SSH channel, it automatically starts x11vnc in terminal
+    services mode on the remote server to find or create your desktop
+    session.  x11vnc is used for both the session management and the
+    VNC transport.
 
     You MUST be able to log in via SSH to the remote terminal server.
     Ask your administrator to set this up for you if it isn't already.
-    Also see "Requirements" below.
+    x11vnc must also be installed on the remote server machine.
+    See "Requirements" below.
 
     This mode is started by the commands 'tsvnc' or 'ssvnc -ts' or
-    toggling by pressing Ctrl-t.  "SSVNC Mode" under Options -> Advanced
+    toggled by pressing Ctrl-t.  "SSVNC Mode" under Options -> Advanced
     will also return to the full SSVNC.
 
     Or in your ~/.ssvncrc (or ~/ssvnc_rc on Windows) put "mode=tsvnc"
@@ -322,11 +334,11 @@ proc help {} {
 	set msg {
  Hosts and Displays:
 
-    Enter the VNC host and display in the 'VNC Host:Display' entry box.
+    Enter the VNC host and display in the  'VNC Host:Display'  entry box.
     
     It is of the form "host:number", where "host" is the hostname of the
     machine running the VNC Server and "number" is the VNC display number;
-    it is often "0".  Examples:
+    it is often "0".  Some Examples:
 
            snoopy:0
 
@@ -336,13 +348,13 @@ proc help {} {
 
            24.67.132.27:0
     
-    Then click on "Connect".  When you do so the STUNNEL program will be
+    Then click on "Connect".  When you do the STUNNEL program will be
     started locally to provide you with an outgoing SSL tunnel.
 
     Once the STUNNEL is running, the TightVNC Viewer (Or Chicken of the
-    VNC on Mac OS X) will be automatically started directed to the local
-    port of the SSL tunnel which, in turn, encrypts and redirects the
-    connection to the remote VNC server.
+    VNC on Mac OS X, or one you set under Options) will be automatically
+    started directed to the local port of the SSL tunnel which, in turn,
+    encrypts and redirects the connection to the remote VNC server.
 
     The remote VNC server MUST support an initial SSL handshake before
     using the VNC protocol (i.e. VNC is tunnelled through the SSL channel
@@ -351,15 +363,21 @@ proc help {} {
 
     Automatic SSH tunnels are described below.
 
-    If you are using a port less than the default VNC port 5900 (usually
-    the VNC display = port - 5900), use the full port number itself, e.g.:
+    See tip 5) below for how to disable encryption.
 
-           24.67.132.27:443
 
-    Note, however, if the number n after the colon is < 200, then a
-    port number 5900 + n is assumed; i.e. n is the VNC display number.
-    If you must use a TCP port less than 200, specify a negative value,
-    e.g.:  24.67.132.27:-80
+    Port numbers:
+
+        If you are using a port less than the default VNC port 5900
+        (usually the VNC display = port - 5900), use the full port number
+        itself, e.g.:
+       
+             24.67.132.27:443
+       
+        Note, however, if the number n after the colon is < 200, then a
+        port number 5900 + n is assumed; i.e. n is the VNC display number.
+        If you must use a TCP port less than 200, specify a negative value,
+        e.g.:  24.67.132.27:-80
 
 
  SSL Certificate Verification:
@@ -377,21 +395,29 @@ proc help {} {
     and so the first time you connect to a new server you may need to
     follow a few dialogs to inspect and save the server certificate.
     See the "Certs... -> Help" for information on how to manage certificates.
+    "Verify All Certs" is on by default.
 
-    "Fetch Cert" and "Verify All Certs" are currently disabled in the rare
-    "SSH + SSL" usage mode (e.g. SSH is used to enter a firewall gateway,
-    and then SSL is tunneled through that to reach the workstation).
+    However, "Fetch Cert" and "Verify All Certs" are currently disabled
+    in the rare "SSH + SSL" usage mode (e.g. SSH is used to enter a
+    firewall gateway, and then SSL is tunneled through that to reach
+    the workstation).
 
 
  Windows STUNNEL:
 
-    Note that on Windows when the Viewer connection is finished you may
-    need to terminate STUNNEL manually from the System Tray (right click
-    on dark green icon) and selecting "Exit".  Double clicking that icon
-    will show you its log file (useful for debugging connections).
+    Note that on Windows when the Viewer connection is finished you
+    will be prompted if you want SSVNC to try to kill the STUNNEL process
+    for you.  Usually you will say Yes, however if there are problems
+    connecting you may want to look at the STUNNEL Log first.
 
-    SSVNC will try to kill the STUNNEL process for you, but you may still
-    need to move the mouse over the icon to make it go away.
+    Double clicking the STUNNEL tray icon (dark green) will show you
+    its Log file (useful for debugging connections).
+
+    SSVNC will kill the STUNNEL process for you, but you may still need
+    to move the mouse over the icon to make it go away.
+
+    In some cases you may need to terminate STUNNEL manually from the
+    System Tray (right click on dark green icon) and selecting "Exit".
 
 
  VNC Password:
@@ -406,7 +432,7 @@ proc help {} {
 
     On Windows TightVNC viewer should prompt you when a password is required.
 
-    NOTE: when you Save a VNC profile, the password is not saved (you
+    NOTE: when you Save a VNC profile, the password is NOT saved (you
     need to enter it each time).
 
 
@@ -414,6 +440,7 @@ proc help {} {
 
     Click on "Use SSH" if you want to use an *SSH* tunnel instead of SSL
     (then the VNC Server does not need to speak SSL or use STUNNEL).
+
     You will need to be able to login to your account on the remote host
     via SSH (e.g. via password or ssh-agent).
 
@@ -433,6 +460,50 @@ proc help {} {
 
     See Tip 13) below for how to make this application be SSH-only with
     the -ssh command line option or "sshvnc".
+
+
+ Remote SSH Command:
+
+    In SSH or SSH + SSL mode you can also specify a remote command
+    to run on the remote ssh host in the "Remote SSH Command" entry.
+    The default is just to sleep a bit (e.g. sleep 30) to make sure
+    the port tunnels are established.  Alternatively you could have the
+    remote command start the VNC server, e.g.
+
+         x11vnc -display :0 -rfbport 5900 -localhost -nopw
+
+    When starting the VNC server this way, note that sometimes you
+    will need to correlate the VNC Display number with the "-rfbport"
+    (or similar) option of the server.  E.g.:
+
+         VNC Host:Display       username@somehost.com:2
+         Remote SSH Command:    x11vnc -find -rfbport 5902 -nopw
+
+    See the the Tip below (11) for using x11vnc PORT=NNNN feature (or
+    vncserver(1) output) to not need to specify the VNC display number
+    or the x11vnc -rfbport option.
+
+
+ Profiles:
+
+    Use "Save" to save a profile (i.e. a host:display and its specific
+    settings) with a name.
+
+    To load in a saved Options profile, click on the "Load" button.
+
+    To list your profiles from the command line use: 
+
+        ssvnc -profiles    (or -list)
+
+    You can launch ssvnc and have it immediately connect to the server
+    by invoking it something like this:
+
+        ssvnc profile1              (launches profile named "profile1")
+        ssvnc hostname:0            (connect to hostname VNC disp 0 via SSL)
+        ssvnc vnc+ssl://hostname:0  (same)
+        ssvnc vnc+ssh://hostname:0  (connect to hostname VNC disp 0 via SSH)
+
+    see the Tips 5 and 9 below for more about the URL-like syntax.
 
 
  Proxies/Gateways:
@@ -466,12 +537,12 @@ proc help {} {
     You can prefix web proxies with http:// but it doesn't matter since
     that is the default.
 
-    Note that Web proxies are often configured to only allow outgoing
+    Note that Web proxies are often configured to ONLY allow outgoing
     connections to ports 443 (HTTPS) and 563 (SNEWS), so you might
     have run the VNC server (or router port redirector) on those ports.
     SOCKS proxies usually have no restrictions on port number.
 
-    On Unix you can chain up to 3 proxies (any combination of http:// and
+    You can chain up to 3 proxies (any combination of http:// and
     socks://) by separating them with commas (i.e. first,second,third).
 
     See the ss_vncviewer description and x11vnc FAQ for info on proxies:
@@ -523,6 +594,7 @@ proc help {} {
     will also work going to a different internal machine, e.g. "joes-pc:0"
     instead of "localhost:0", as in the first example.
 
+
     A Web or SOCKS proxy can also be used with SSH.  Use this if you are
     inside a firewall that prohibits direct connections to remote SSH servers.
 
@@ -536,7 +608,7 @@ proc help {} {
 
     use socks5://... to force the SOCKS5 version.
 
-    On Unix you can chain up to 3 proxies (any combination of http:// and
+    You can chain up to 3 proxies (any combination of http:// and
     socks://) by separating them with commas (i.e. first,second,third).
 
     For a non-standard SSH port and a Web or SOCKS proxy try:
@@ -551,26 +623,75 @@ proc help {} {
            Proxy/Gateway:      http://mysocks.west:1080,ssh.company.com,joes-pc
 
 
- Remote SSH Command:
+ UltraVNC Proxies/Gateways:
 
-    In SSH or SSH + SSL mode you can also specify a remote command
-    to run on the remote ssh host in the "Remote SSH Command" entry.
-    The default is just to sleep a bit (e.g. sleep 30) to make sure
-    the port tunnels are established.  Alternatively you could have the
-    remote command start the VNC server, e.g.
+    UltraVNC has a "repeater" tool (http://www.uvnc.com/addons/repeater.html
+    and http://koti.mbnet.fi/jtko/) that acts as an VNC proxy.  SSVNC can
+    work with both mode I and mode II schemes of this repeater.
 
-         x11vnc -display :0 -rfbport 5900 -localhost -nopw
+    Note: only SSL (or unencrypted) SSVNC connections make sense with
+    the UltraVNC repeater.  SSH connections (previous section) do not
+    seem to (let us know if you find a way to use it).
 
-    When starting the VNC server this way, note that sometimes you
-    will need to correlate the VNC Display number with the "-rfbport"
-    (or similar) option of the server.  E.g.:
+    For mode I repeater the viewer initiates the connection and passes
+    a string that is the internal VNC server's IP address (or hostname)
+    and port or display:
 
-         VNC Host:Display       username@somehost.com:2
-         Remote SSH Command:    x11vnc -find -rfbport 5902 -nopw
+           VNC Host:Display:   :0
+           Proxy/Gateway:      repeater://myproxy.west:5900+joes-pc:1
 
-    See the the Tip below (11) for using x11vnc PORT=NNNN feature (or
-    vncserver(1) output) to not need to specify the VNC display number
-    or the x11vnc -rfbport option.
+    Note here that the VNC Host:Display can be anything; we use :0.
+
+    The Proxy/Gateway format is repeater://proxy:port+vncserver:display.
+    The string after the "+" sign is passed to the repeater server for
+    it to interpret.  For this example, instead of joes-pc:1 it could
+    be joes-pc:5901 or 192.168.1.4:1, 192.168.1.4:5901, etc.
+
+    If you do not supply a proxy port, then the default 5900 is assumed,
+    e.g.  repeater://myproxy.west+joes-pc:1
+
+
+    For mode II repeater both the VNC viewer and VNC server initiate
+    connections to the repeater proxy.  In this case they pass a string
+    that identifies their mutual connection via "ID:NNNN":
+
+           VNC Host:Display:   :0
+           Proxy/Gateway:      repeater://myproxy.west:5900+ID:1234
+
+    again, the default proxy port is 5900 if not supplied.
+
+    In this case, mode II, you MUST set Options -> Reverse VNC Connection.
+    That is to say a "Listening Connection".  The reason for this is that
+    the VNC server acts as a SSL *client* and so requires the Viewer end
+    to have an SSL cert, etc.
+
+    Set REPEATER_FORCE=1 in the Host:Display (hit Enter, and then clear
+    it) to force SSVNC to try to a forward connection in this situation.
+
+    We have also found that usually the Listening viewer must be started
+    BEFORE the VNC Server connects to the proxy.  This is a likely bug
+    in the repeater tool.
+
+
+    For mode II, you probably should also disable "Verify All Certs"
+    unless you have taken the steps beforehand to save the VNC server's
+    certificate, or have previously accepted it using another method.
+
+    Also, after the connection you MUST terminate the listening VNC Viewer
+    (Ctrl-C) and connect again (the proxy only runs once.)  In Windows,
+    go to the System Tray and terminate the Listening VNC Viewer.
+
+    BTW, the x11vnc VNC server command for the mode II case would be
+    something like:
+
+       x11vnc -ssl SAVE -connect repeater=ID:1234+myproxy.west:5500 ...
+
+    It also supports -connect repeater://myproxy.west:5500+ID:1234
+    notation.
+
+    For mode I operation x11vnc simply runs as a normal SSL/VNC server
+
+       x11vnc -ssl SAVE
 
 
  SSL Certificates:
@@ -599,10 +720,10 @@ proc help {} {
     the other one in the "Certs ..." dialog.
 
     Alternatively you can use the "Import Certificate" action to paste
-    in a certificate or read one in from a file or use the "Fetch Cert"
-    button on the main panel.  If "Verify All Certs" is checked, you
-    will be forced to check Certs of any new servers the first time
-    you connect.
+    in a certificate or read one in from a file.  Or you can use the
+    "Fetch Cert" button on the main panel.  If "Verify All Certs" is
+    checked, you will be forced to check Certs of any new servers the
+    first time you connect.
 
     Note that "Verify All Certs" is on by default so that users who do
     not understand the SSL Man-In-The-Middle problem will not be left
@@ -619,27 +740,6 @@ proc help {} {
     To set other Options, e.g. for View-Only usage or to limit the
     number of colors used.  click on the "Options ..." button and read
     the Help there.
-
- Profiles:
-
-    Use "Save" to save a profile (i.e. a host:display and its specific
-    settings) with a name.
-
-    To load in a saved Options profile, click on the "Load" button.
-
-    To list your profiles from the command line use: 
-
-        ssvnc -profiles    (or -list)
-
-    You can launch ssvnc and have it immediately connect to the server
-    by invoking it something like this:
-
-        ssvnc profile1              (launches profile named "profile1")
-        ssvnc hostname:0            (connect to hostname VNC disp 0 via SSL)
-        ssvnc vnc+ssl://hostname:0  (same)
-        ssvnc vnc+ssh://hostname:0  (connect to hostname VNC disp 0 via SSH)
-
-    see the Tips 5 and 9 below for more about the URL-like syntax.
 
 
  More Info:
@@ -662,20 +762,25 @@ proc help {} {
         line: "user@hostname cmd=SHELL") then you get an SSH shell only:
         no VNC viewer will be launched.  On Windows "PUTTY" will try
         to use putty.exe (better terminal emulation than plink.exe).
+
         A ShortCut for this is Ctrl-S as long as user@hostname is present
         in the entry box.
 
      3) If you use "KNOCK" for the "Remote SSH Command" (or int he display
         line "user@hostname cmd=KNOCK") then only the port-knocking is
-        performed.  A ShortCut for this is Ctrl-P as long as hostname
-        is present in the entry box.  If it is KNOCKF, i.e. an extra
-        "F", then the port-knocking "FINISH" sequence is sent, if any.
-        A ShortCut for this Shift-Ctrl-P as long as hostname is present.
+        performed.
+
+        A ShortCut for this is Ctrl-P as long as hostname is present in
+        the entry box.
+
+        If it is KNOCKF, i.e. an extra "F", then the port-knocking
+        "FINISH" sequence is sent, if any.  A ShortCut for this
+        Shift-Ctrl-P as long as hostname is present.
 
      4) Pressing the "Load" button or pressing Ctrl-L or Clicking the Right
         mouse button on the main GUI will invoke the Load dialog.
 
-     5) If you want to do a Direct VNC connection, WITH **NO(* SSL OR SSH
+     5) If you want to do a Direct VNC connection, WITH **NO** SSL OR SSH
         ENCRYPTION, use the "vnc://" prefix, e.g. vnc://far-away.east:0
         This also works for reverse connections (see below).
 
@@ -720,11 +825,13 @@ proc help {} {
 
     10) Mobile USB memory stick / flash drive usage:  You can unpack
         ssvnc to a flash drive for impromptu usage (e.g. from a friends
-        computer) If you create a directory "Home" in the toplevel ssvnc
-        directory, then that will be the default location for your VNC
-        profiles and certs.  So they follow the drive this way.  If you
-        run like this: "ssvnc ." or "ssvnc.exe ." the "Home" directory
-        will be created for you.
+        computer). 
+
+        If you create a directory "Home" in the toplevel ssvnc directory,
+        then that will be the default location for your VNC profiles
+        and certs.  So they follow the drive this way.  If you run like
+        this: "ssvnc ." or "ssvnc.exe ." the "Home" directory will be
+        created for you.
 
         WARNING: if you use ssvnc from an "Internet Cafe", i.e. an
         untrusted computer, an unscrupulous person may be capturing
@@ -773,10 +880,12 @@ proc help {} {
         This only works with x11vnc (not vncserver).
 
     12) You can change the X DISPLAY variable by typing DISPLAY=... into
-        VNC Host:Display and hitting Return or clicking Connect. Same for
-        HOME=.  Setting SLEEP=n increases the amount of time waited before
-        starting the viewer.  On Mac, you can set DYLD_LIBRARY_PATH=... too.
-        It should propagate down the the viewer.
+        VNC Host:Display and hitting Return or clicking Connect. Same
+        for HOME=.  Setting SLEEP=n increases the amount of time waited
+        before starting the viewer.  The env. var. SSVNC_EXTRA_SLEEP
+        also does this (and also Sleep: Option setting)  On Mac, you
+        can set DYLD_LIBRARY_PATH=... too.  It should propagate down
+        the the viewer.
 
     13) If you want this application to be SSH only, then supply the
         command line option "-ssh" or set the env. var SSVNC_SSH_ONLY=1.
@@ -1777,6 +1886,7 @@ proc ts_x11vnc_cmd {} {
 	global choose_filexfer ts_filexfer
 	global ts_x11vnc_opts  ts_x11vnc_path ts_x11vnc_autoport choose_x11vnc_opts
 	global ts_othervnc choose_othervnc ts_xlogin
+	global choose_sleep extra_sleep
 
 	set cmd ""
 	if {$choose_x11vnc_opts && $ts_x11vnc_path != ""} {
@@ -1796,6 +1906,12 @@ proc ts_x11vnc_cmd {} {
 	}
 	if {$choose_othervnc && $ts_othervnc == "find"} {
 		set type "Xvnc.redirect"
+	}
+
+	if [info exists choose_sleep] {
+		if {! $choose_sleep} {
+			set extra_sleep ""
+		}
 	}
 
 	if {$choose_othervnc && $ts_othervnc != "find"} {
@@ -1921,7 +2037,7 @@ proc set_defaults {} {
 	global choose_xserver ts_xserver_type choose_desktop ts_desktop_type ts_unixpw ts_vncshared
 	global choose_filexfer ts_filexfer
 	global ts_x11vnc_opts choose_x11vnc_opts ts_x11vnc_path ts_x11vnc_autoport ts_xlogin
-	global ts_othervnc choose_othervnc
+	global ts_othervnc choose_othervnc choose_sleep
 	global choose_ncache ts_ncache choose_multisession ts_multisession
 	global ts_mode ts_desktop_size ts_desktop_depth choose_desktop_geom
 	global additional_port_redirs additional_port_redirs_list
@@ -1929,7 +2045,7 @@ proc set_defaults {} {
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_x11vnc sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
-	global ycrop_string use_listen use_unixpw use_x11vnc_find unixpw_username
+	global ycrop_string extra_sleep use_listen use_unixpw use_x11vnc_find unixpw_username
 	global include_list
 
 
@@ -2010,8 +2126,9 @@ proc set_defaults {} {
 	set defs(sound_daemon_local_kill) 0
 	set defs(sound_daemon_x11vnc) 0
 
-	set defs(use_port_knocking) 0
 	set defs(ycrop_string) ""
+	set defs(extra_sleep) ""
+	set defs(use_port_knocking) 0
 	set defs(port_knocking_list) ""
 
 	set defs(include_list) ""
@@ -2131,20 +2248,24 @@ proc do_viewer_windows {n} {
 			}
 
 			set msg "
-   About to start the Listening VNC Viewer.
+   About to start the Listening VNC Viewer (Reverse Connection).
 
-   VNC Viewer command to be run:
+   The VNC Viewer command to be run is:
 
        $cmd
 
-   The VNC server should then Reverse connect to:
+   After the Viewer starts listening, the VNC server should
+   then Reverse connect to:
 
        $ln
 
-   To stop the Viewer: right click on the VNC Icon in the tray
-   and select 'Close listening daemon' (or similar).
+   When the VNC Connection has ended **YOU MUST MANUALLY STOP**
+   the Listening VNC Viewer.
 
-   You will then return to this GUI.
+   To stop the Listening Viewer: right click on the VNC Icon in
+   the tray and select 'Close listening daemon' (or similar).
+
+   ONLY AFTER THAT will you return to the SSVNC GUI.
 
    Click OK now to start the Listening VNC Viewer.
 "
@@ -2159,7 +2280,7 @@ proc do_viewer_windows {n} {
 
 			set wll_done 0
 
-			eval text .wll.t -width 60 -height 19 $help_font
+			eval text .wll.t -width 64 -height 22 $help_font
 			button .wll.d -text "OK" -command {destroy .wll; set wll_done 1}
 			pack .wll.t .wll.d -side top -fill x
 
@@ -2184,6 +2305,13 @@ proc do_viewer_windows {n} {
 
 	if [info exists env(SSVNC_EXTRA_SLEEP)] {
 		set t $env(SSVNC_EXTRA_SLEEP)
+		mesg "sleeping an extra $t seconds..."
+		set t [expr "$t * 1000"]
+		after $t
+	}
+	global extra_sleep
+	if {$extra_sleep != ""} {
+		set t $extra_sleep
 		mesg "sleeping an extra $t seconds..."
 		set t [expr "$t * 1000"]
 		after $t
@@ -2426,12 +2554,33 @@ proc ssh_split {str} {
 	return [list $ssh_user $ssh_host $ssh_port]
 }
 
+proc check_debug_netstat {port str wn} {
+	global debug_netstat
+	if {! [info exists debug_netstat]} {
+		return
+	}
+	if {$debug_netstat == "0" || $debug_netstat == ""} {
+		return
+	}
+	mesg "DBG: $wn"
+
+	toplev .dbns
+
+	scroll_text_dismiss .dbns.f 82 35
+	center_win .dbns
+	.dbns.f.t insert end "LOOKING FOR PORT: $port\n\n$str"
+	jiggle_text .dbns.f.t
+	update
+	after 1000
+}
+
 proc launch_windows_ssh {hp file n} {
 	global is_win9x env
 	global use_sshssl use_ssh putty_pw
 	global port_knocking_list
 	global use_listen listening_name
 	global ts_only
+	global debug_netstat
 
 	set hpnew  [get_ssh_hp $hp]
 	set proxy  [get_ssh_proxy $hp]
@@ -2500,7 +2649,7 @@ proc launch_windows_ssh {hp file n} {
 	set double_ssh ""
 	set p_port ""
 	if {$proxy != ""} {
-		if [regexp -nocase {(http|https|socks|socks4|socks5)://} $proxy] {
+		if [regexp -nocase {(http|https|socks|socks4|socks5|repeater)://} $proxy] {
 			set pproxy ""
 			set sproxy1 ""
 			set sproxy_rest ""
@@ -2511,7 +2660,7 @@ proc launch_windows_ssh {hp file n} {
 				if {[regexp {^[ 	]*$} $part]} {
 					continue
 				}
-				if [regexp -nocase {^(http|https|socks|socks4|socks5)://} $part] {
+				if [regexp -nocase {^(http|https|socks|socks4|socks5|repeater)://} $part] {
 					if {$pproxy == ""} {
 						set pproxy $part
 					} else {
@@ -2933,6 +3082,7 @@ proc launch_windows_ssh {hp file n} {
 			}
 			set ns [get_netstat]
 			set re ":$p_port"
+			check_debug_netstat $p_port $ns $waited
 			append re {[ 	][ 	]*[0:.][0:.]*[ 	][ 	]*LISTEN}
 			if [regexp $re $ns] {
 				set gotit 1
@@ -2945,8 +3095,17 @@ proc launch_windows_ssh {hp file n} {
 		}
 	}
 
+	set wdraw 1
+	if [info exists debug_netstat] {
+		if {$debug_netstat != "" && $debug_netstat != "0"} {
+			set wdraw 0
+		}
+	}
+
 	if {$is_win9x} {
-		wm withdraw .
+		if {$wdraw} {
+			wm withdraw .
+		}
 		update
 		win9x_plink_msg $file
 		global win9x_plink_msg_done
@@ -3012,7 +3171,9 @@ proc launch_windows_ssh {hp file n} {
 		if {! $do_shell} {
 			make_plink
 		}
-		wm withdraw .
+		if {$wdraw} {
+			wm withdraw .
+		}
 		update
 		if {$do_shell && [regexp {FINISH} $port_knocking_list]} {
 			catch {exec $com /c $file}
@@ -3046,6 +3207,7 @@ proc launch_windows_ssh {hp file n} {
 		}
 		set ns [get_netstat]
 		set re ":$use"
+		check_debug_netstat $use $ns $waited
 		append re {[ 	][ 	]*[0:.][0:.]*[ 	][ 	]*LISTEN}
 		if [regexp $re $ns] {
 			set plink_status yes
@@ -3228,6 +3390,7 @@ proc darwin_terminal_cmd {{title ""} {cmd ""} {bg 0}} {
 	if {! [info exists darwin_terminal]} {
 		raise .
 		tk_messageBox -type ok -icon error -message "Cannot find Darwin Terminal program." -title "Cannot find Terminal program"
+		mac_raise
 		return
 	}
 
@@ -3244,6 +3407,7 @@ proc darwin_terminal_cmd {{title ""} {cmd ""} {bg 0}} {
 	if {$fh == ""} {
 		raise .
 		tk_messageBox -type ok -icon error -message "Cannot open temporary file: $tmp" -title "Cannot open file"
+		mac_raise
 		return
 	}
 	global env
@@ -3268,6 +3432,7 @@ proc darwin_terminal_cmd {{title ""} {cmd ""} {bg 0}} {
 	puts $fh {	echo termpid-find-fail: termpid=$termpid mypid=$$}
 	puts $fh {fi}
 	puts $fh {trap "rm -f $tmp; kill -TERM $termpid; kill -TERM $mypid; kill -KILL $mypid; exit 0" 0 2 15}
+	puts $fh {osascript -e 'tell application "Terminal" to activate' >/dev/null 2>&1 &}
 	puts $fh "$cmd"
 	puts $fh "sleep 1"
 	puts $fh {rm -f $tmp}
@@ -3559,12 +3724,14 @@ proc fetch_cert {save} {
 		mesg "No host:disp supplied."
 		bell
 		catch {raise .}
+		mac_raise
 		return
 	}
 	if {[regexp -- {--nohost--} $tt]} {
 		mesg "No host:disp supplied."
 		bell
 		catch {raise .}
+		mac_raise
 		return
 	}
 	if {! [regexp ":" $hp]} {
@@ -4160,6 +4327,39 @@ proc tpid {} {
 	return $p
 }
 
+proc repeater_proxy_check {proxy} {
+	if [regexp {^repeater://.*\+ID:[0-9]} $proxy] {
+		global env
+		set force 0
+		if [info exists env(REPEATER_FORCE)] {
+			if {$env(REPEATER_FORCE) != "" && $env(REPEATER_FORCE) != "0"} {
+				set force 1
+			}
+		}
+		global use_listen
+		if {! $use_listen} {
+			if {$force} {
+				mesg "WARNING: repeater:// ID:nnn proxy must use Listen Mode"
+				after 1000
+			} else {
+				bell
+				mesg "ERROR: repeater:// ID:nnn proxy must use Listen Mode"
+				after 1000
+				return 0
+			}
+		}
+		global always_verify_ssl
+		if [info exists always_verify_ssl] {
+			if {$always_verify_ssl} {
+				bell
+				mesg "WARNING: repeater:// ID:nnn Verify All Certs may fail"
+				after 2500
+			}
+		}
+	}
+	return 1
+}
+
 proc fini_unixpw {} {
 	global named_pipe_fh unixpw_tmp
 	
@@ -4477,6 +4677,11 @@ proc launch_unix {hp} {
 		set cmd "ssvnc_cmd"
 		set hpnew  [get_ssh_hp $hp]
 		set proxy  [get_ssh_proxy $hp]
+
+		if {! [repeater_proxy_check $proxy]} {
+			return
+		}
+
 		if {! $do_direct && ![regexp -nocase {ssh://} $hpnew]} {
 			if {$mycert != ""} {
 				set cmd "$cmd -mycert '$mycert'"
@@ -4518,6 +4723,7 @@ proc launch_unix {hp} {
 			after 2000
 		}
 	}
+
 
 	if {$use_alpha} {
 		set cmd "$cmd -alpha"
@@ -4775,11 +4981,29 @@ proc launch_unix {hp} {
 	if {$ts_only} {
 		set te ""
 	}
+
+	global extra_sleep
+	set ssvnc_extra_sleep_save ""
+	if {$extra_sleep != ""} {
+		if [info exists env(SSVNC_EXTRA_SLEEP)] {
+			set ssvnc_extra_sleep_save $env(SSVNC_EXTRA_SLEEP)
+		}
+		set env(SSVNC_EXTRA_SLEEP) $extra_sleep
+	}
+
 	unix_terminal_cmd $geometry "SSL/SSH VNC Viewer $hp" \
 	"$te$cmd; set +xv; ulimit -c 0; trap 'printf \"Paused. Press Enter to exit:\"; read x' QUIT; echo; echo $m; echo; echo sleep 5; echo; sleep 6" 0 $xrm1 $xrm2 $xrm3
 
 	set env(SS_VNCVIEWER_SSH_CMD) ""
 	set env(SS_VNCVIEWER_USE_C) ""
+
+	if {$extra_sleep != ""} {
+		if {$ssvnc_extra_sleep_save != ""} {
+			set env(SSVNC_EXTRA_SLEEP) $ssvnc_extra_sleep_save
+		} else {
+			catch {unset env(SSVNC_EXTRA_SLEEP)}
+		}
+	}
 
 	if {$use_sound && $sound_daemon_local_kill && $sound_daemon_local_cmd != ""} {
 		# XXX need to kill just one...
@@ -4804,6 +5028,7 @@ proc launch_unix {hp} {
 		catch {file delete $passwdfile}
 	}
 	wm deiconify .
+	mac_raise
 	mesg "Disconnected from $hp"
 	if {[regexp {FINISH} $port_knocking_list]} {
 		do_port_knock $pk_hp finish
@@ -5035,6 +5260,7 @@ proc launch {{hp ""}} {
 	global pids_before pids_after pids_new
 	global env
 	global use_ssl use_ssh use_sshssl use_listen
+	global vncdisplay
 
 	set debug 0
 	if {$hp == ""} {
@@ -5051,6 +5277,7 @@ proc launch {{hp ""}} {
 		set t [string trim $t]
 		set env(SSVNC_HOME) $t
 		mesg "set SSVNC_HOME to $t"
+		set vncdisplay ""
 		return 0
 	}
 	if {[regexp {^DISPLAY=} $hpt] || [regexp {^SSVNC_DISPLAY=} $hpt]} {
@@ -5059,6 +5286,7 @@ proc launch {{hp ""}} {
 		set t [string trim $t]
 		set env(DISPLAY) $t
 		mesg "set DISPLAY to $t"
+		set vncdisplay ""
 		global uname darwin_cotvnc
 		if {$uname == "Darwin"} {
 			if {$t != ""} {
@@ -5076,6 +5304,7 @@ proc launch {{hp ""}} {
 		set env(DYLD_LIBRARY_PATH) $t
 		set env(SSVNC_DYLD_LIBRARY_PATH) $t
 		mesg "set DYLD_LIBRARY_PATH to $t"
+		set vncdisplay ""
 		return 0
 	}
 	if {[regexp {^SLEEP=} $hpt] || [regexp {^SSVNC_EXTRA_SLEEP=} $hpt]} {
@@ -5084,6 +5313,24 @@ proc launch {{hp ""}} {
 		set t [string trim $t]
 		set env(SSVNC_EXTRA_SLEEP) $t
 		mesg "set SSVNC_EXTRA_SLEEP to $t"
+		set vncdisplay ""
+		return 0
+	}
+	if {[regexp {^DEBUG_NETSTAT=} $hpt]} {
+		set t $hpt
+		regsub {^.*DEBUG_NETSTAT=} $t "" t
+		global debug_netstat
+		set debug_netstat $t
+		mesg "set DEBUG_NETSTAT to $t"
+		set vncdisplay ""
+		return 0
+	}
+	if {[regexp {^REPEATER_FORCE=} $hpt]} {
+		set t $hpt
+		regsub {^.*REPEATER_FORCE=} $t "" t
+		set env(REPEATER_FORCE) $t
+		mesg "set REPEATER_FORCE to $t"
+		set vncdisplay ""
 		return 0
 	}
 	if {[regexp -nocase {^SSH.?ONLY} $hpt]} {
@@ -5112,12 +5359,14 @@ proc launch {{hp ""}} {
 		mesg "No host:disp supplied."
 		bell
 		catch {raise .}
+		mac_raise
 		return
 	}
 	if {[regexp -- {--nohost--} $tt]} {
 		mesg "No host:disp supplied."
 		bell
 		catch {raise .}
+		mac_raise
 		return
 	}
 	if {! [regexp ":" $hp]} {
@@ -5243,6 +5492,9 @@ proc launch {{hp ""}} {
 	if {$use_sshssl} {
 		set proxy ""
 	}
+	if {! [repeater_proxy_check $proxy]} {
+		return
+	}
 
 	for {set i 30} {$i < 90} {incr i}  {
 		set try "$prefix-$i.$suffix"
@@ -5295,6 +5547,7 @@ proc launch {{hp ""}} {
 		set did_port_knock 1
 	} elseif {$use_ssh} {
 		launch_windows_ssh $hp $file $n
+		# WE ARE DONE.
 		return
 	}
 
@@ -5340,8 +5593,12 @@ proc launch {{hp ""}} {
 			mesg "WARNING: SSL proxy contains \"@\" sign"
 			after 2000
 		}
+		if {$use_listen} {
+			set env(SSVNC_REVERSE) "localhost:$port"
+		} else {
+			set env(SSVNC_LISTEN) [expr "$n2 + 5900"]
+		}
 		set env(SSVNC_PROXY) $proxy
-		set env(SSVNC_LISTEN) [expr "$n2 + 5900"]
 		set env(SSVNC_DEST) "$host:$port"
 	}
 
@@ -5442,7 +5699,7 @@ proc launch {{hp ""}} {
 			if {$hn == ""} {
 				set hn "this-computer"
 			}
-			set listening_name "$hn:$port  (or IP:$port, etc.)"
+			set listening_name "$hn:$port  (or nn.nn.nn.nn:$port, etc.)"
 		}
 		puts $fh "accept = $hloc$port"
 		puts $fh "connect = localhost:$port2"
@@ -5471,6 +5728,7 @@ proc launch {{hp ""}} {
 		set proxy_pid [exec "connect_br.exe" &]
 		unset -nocomplain env(SSVNC_PROXY)
 		unset -nocomplain env(SSVNC_LISTEN)
+		unset -nocomplain env(SSVNC_REVERSE)
 		unset -nocomplain env(SSVNC_DEST)
 	}
 
@@ -8380,6 +8638,46 @@ proc ts_othervnc_dialog {} {
 	focus .ovnc.c.e 
 }
 
+proc ts_sleep_dialog {} {
+
+	toplev .eslp
+	wm title .eslp "Extra Sleep"
+
+	scroll_text .eslp.f 80 5
+
+	global extra_sleep
+
+	set msg {
+    Sleep: Enter a number to indicate how many extra seconds to sleep
+    while waiting for the VNC viewer to start up.  On Windows this
+    can give extra time to enter the Putty/Plink password, etc.
+}
+	.eslp.f.t insert end $msg
+
+	frame .eslp.c
+	label .eslp.c.l -anchor w -text "Extra Sleep:"
+	entry .eslp.c.e -width 20 -textvariable extra_sleep
+	pack .eslp.c.l -side left
+	pack .eslp.c.e -side left -expand 1 -fill x
+
+	button .eslp.cancel -text "Cancel" -command {destroy .eslp; set choose_sleep 0}
+	bind .eslp <Escape> {destroy .eslp; set choose_sleep 0}
+	wm protocol .eslp WM_DELETE_WINDOW {destroy .eslp; set choose_sleep 0}
+	button .eslp.done -text "Done" -command {destroy .eslp; set choose_sleep 1}
+	bind .eslp.c.e <Return> {destroy .eslp; set choose_sleep 1}
+
+	global choose_sleep
+	if {! $choose_sleep} {
+		set extra_sleep ""
+	}
+
+	pack .eslp.done .eslp.cancel .eslp.c -side bottom -fill x
+	pack .eslp.f -side top -fill both -expand 1
+
+	center_win .eslp
+	focus .eslp.c.e 
+}
+
 proc ts_ncache_dialog {} {
 
 	toplev .nche
@@ -9911,6 +10209,10 @@ proc help_advanced_opts {} {
          in them will be applied first, and then any values in the loaded
          Profile will override them.
 
+         Sleep: Enter a number to indicate how many extra seconds to sleep
+         while waiting for the VNC viewer to start up.  On Windows this
+         can give extra time to enter the Putty/Plink password, etc.
+
          ssh-agent: On Unix only: restart the GUI in the presence of
          ssh-agent(1) (e.g. in case you forgot to start your agent before
          starting this GUI).  An xterm will be used to enter passphrases,
@@ -10906,7 +11208,7 @@ proc set_ts_options {} {
 proc set_ts_adv_options {} {
 	global ts_only ts_unixpw ts_vncshared
 	global ts_ncache ts_multisession
-	global choose_othervnc darwin_cotvnc
+	global choose_othervnc darwin_cotvnc choose_sleep
 
 	if {! $ts_only} {
 		return
@@ -10955,6 +11257,11 @@ proc set_ts_adv_options {} {
 	checkbutton .ot2.b$i -anchor w -variable choose_x11vnc_opts -text \
 		"X11VNC Options" \
 		-command {if {$choose_x11vnc_opts} {ts_x11vnc_opts_dialog}}
+	incr i
+
+	checkbutton .ot2.b$i -anchor w -variable choose_sleep -text \
+		"Extra Sleep" \
+		-command {if {$choose_sleep} {ts_sleep_dialog}}
 	incr i
 
 	global env
@@ -11054,6 +11361,15 @@ proc set_advanced_options {} {
 	frame .oa.b$i
 	label .oa.b$i.l -text "Include:"
 	entry .oa.b$i.e -width 10 -textvariable include_list
+	pack .oa.b$i.l -side left
+	pack .oa.b$i.e -side right -expand 1 -fill x
+
+	incr i
+
+	global extra_sleep
+	frame .oa.b$i
+	label .oa.b$i.l -text "Sleep:  "
+	entry .oa.b$i.e -width 10 -textvariable extra_sleep
 	pack .oa.b$i.l -side left
 	pack .oa.b$i.e -side right -expand 1 -fill x
 
@@ -11389,7 +11705,7 @@ proc set_options {} {
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_listen -text \
-		"Reverse VNC Connection (-listen)" -command {listen_adjust; if {$vncdisplay == ""} {set vncdisplay ":0"}}
+		"Reverse VNC Connection (-LISTEN)" -command {listen_adjust; if {$vncdisplay == ""} {set vncdisplay ":0"}}
 	#if {$is_windows} {.o.b$i configure -state disabled}
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
 	incr i
@@ -12041,6 +12357,8 @@ bind .l <ButtonPress> {set button_gui_top 1}
 bind .f0.l <ButtonPress> {set button_gui_top 1}
 
 update
+
+mac_raise
 
 set didload 0
 

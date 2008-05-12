@@ -1,4 +1,5 @@
 #!/usr/bin/wish
+
 proc check_callback {} {
 	global debug
 	if {$debug} {
@@ -20,6 +21,11 @@ proc getout {} {
 	after $delay
 	catch {close $server_fh}
 	after $delay
+
+	global bmesg_cnt
+	if [info exists bmesg_cnt] {
+		catch {tkwait window .bmesg$bmesg_cnt}
+	}
 	destroy .
 	exit
 }
@@ -48,7 +54,8 @@ proc check_closed {} {
 proc xfer_in_to_out {} {
 	global client_fh server_fh debug
 	if {$client_fh != "" && ![eof $client_fh]} {
-		set str [read $client_fh 4096]
+		set str ""
+		catch {set str [read $client_fh 4096]}
 		if {$debug} {
 			puts stderr "xfer_in_to_out: $str"
 		}
@@ -63,7 +70,8 @@ proc xfer_in_to_out {} {
 proc xfer_out_to_in {} {
 	global client_fh server_fh debug
 	if {$server_fh != "" && ![eof $server_fh]} {
-		set str [read $server_fh 4096]
+		set str ""
+		catch {set str [read $server_fh 4096]}
 		if {$debug} {
 			puts stderr "xfer_out_to_in: $str"
 		}
@@ -75,6 +83,22 @@ proc xfer_out_to_in {} {
 	check_closed
 }
 
+proc bmesg {msg} {
+	return
+
+	global bmesg_cnt
+	if {! [info exists bmesg_cnt]} {
+		set bmesg_cnt 0
+	}
+	incr bmesg_cnt
+	set w .bmesg$bmesg_cnt
+	catch {destroy $w}
+	toplevel $w
+	label $w.l -width 70 -text "$msg"
+	pack $w.l
+	update
+}
+
 proc do_connect_http {sock hostport which} {
 	global debug cur_proxy
 	set con ""
@@ -83,6 +107,7 @@ proc do_connect_http {sock hostport which} {
 	append con "Connection: close\r\n\r\n"
 
 	puts stderr "pxy=$which CONNECT $hostport HTTP/1.1 via $cur_proxy"
+	bmesg "H: $which CONNECT $hostport HTTP/1.1 $cur_proxy";
 
 	puts -nonewline $sock $con
 	flush $sock
@@ -323,6 +348,38 @@ proc do_connect_socks5 {sock hostport which} {
 	}
 }
 
+proc do_connect_repeater {sock hostport which repeater} {
+	global debug cur_proxy
+
+	# 250 is UltraVNC buffer size.
+	set con [binary format a250 $repeater]
+
+	puts stderr "pxy=$which REPEATER $repeater via $cur_proxy"
+	bmesg "R: $which CONNECT $hostport | $repeater $cur_proxy";
+
+	puts -nonewline $sock $con
+	flush $sock
+
+	set r ""
+	set cnt 0
+	while {1} {
+		incr cnt
+		set c [read $sock 1]
+		if {$c == ""} {
+			check_closed
+			after 20
+		}
+		append r $c
+		if {[string length $r] >= 12} {
+			puts stderr "do_connect_repeater: $r"
+			break
+		}
+		if {$cnt > 30000} {
+			break
+		}
+	}
+}
+
 proc do_connect {sock type hostport which} {
 	if {$type == "http"} 	{
 		do_connect_http $sock $hostport $which
@@ -330,6 +387,9 @@ proc do_connect {sock type hostport which} {
 		do_connect_socks4 $sock $hostport $which
 	} elseif {$type == "socks5"} {
 		do_connect_socks5 $sock $hostport $which
+	} elseif [regexp -nocase {^repeater:} $type] {
+		regsub -nocase {^repeater:} $type "" repeater
+		do_connect_repeater $sock $hostport $which $repeater
 	}
 }
 
@@ -376,11 +436,11 @@ proc handle_connection {fh host port} {
 
 	set cur_proxy $proxy1
 	if {$proxy2 != ""} {
-		do_connect $sock $proxy1_type $proxy2 1
+		do_connect $sock $proxy1_type "$proxy2_host:$proxy2_port" 1
 
 		set cur_proxy $proxy2
 		if {$proxy3 != ""} {
-			do_connect $sock $proxy2_type $proxy3 2
+			do_connect $sock $proxy2_type "$proxy3_host:$proxy3_port" 2
 
 			set cur_proxy $proxy3
 			do_connect $sock $proxy3_type $dest 3
@@ -406,9 +466,20 @@ proc proxy_type {proxy} {
 		return "http"
 	} elseif [regexp -nocase {^https://} $proxy] {
 		return "http"
+	} elseif [regexp -nocase {^repeater://.*\+(.*)$} $proxy mat idstr] {
+		return "repeater:$idstr"
 	} else {
 		return "http"
 	}
+}
+
+proc proxy_hostport {proxy} {
+	regsub -nocase {^[a-z][a-z]*://} $proxy "" hp
+	regsub {\+.*$} $hp "" hp
+	if {! [regexp {:[0-9]} $hp] && [regexp {^repeater:} $proxy]} {
+		set hp "$hp:5900"
+	}
+	return $hp
 }
 
 global env
@@ -437,7 +508,7 @@ if {$debug} {
 	if {! [info exists env(SSVNC_PROXY)]} {
 		destroy .; exit;
 	}
-	if {! [info exists env(SSVNC_LISTEN)]} {
+	if {! [info exists env(SSVNC_LISTEN)] && ! [info exists env(SSVNC_REVERSE)]} {
 		destroy .; exit;
 	}
 }
@@ -453,10 +524,10 @@ if [regexp {,} $env(SSVNC_PROXY)] {
 	set proxy1 $env(SSVNC_PROXY)
 }
 
-set proxy1_type [proxy_type $proxy1]
-regsub {^[A-z0-9][A-z0-9]*://} $proxy1 "" proxy1
+set proxy1_type [proxy_type     $proxy1]
+set proxy1_hp   [proxy_hostport $proxy1]
 
-set s [split $proxy1 ":"]
+set s [split $proxy1_hp ":"]
 set proxy1_host [lindex $s 0]
 set proxy1_port [lindex $s 1]
 
@@ -464,39 +535,58 @@ set proxy2_type ""
 set proxy2_host ""
 set proxy2_port ""
 
-set proxy3_type ""
-set proxy3_host ""
-set proxy3_port ""
-
 if {$proxy2 != ""} {
-	set proxy2_type [proxy_type $proxy2]
-	regsub {^[A-z0-9][A-z0-9]*://} $proxy2 "" proxy2
-	set s [split $proxy2 ":"]
+	set proxy2_type [proxy_type     $proxy2]
+	set proxy2_hp   [proxy_hostport $proxy2]
+	set s [split $proxy2_hp ":"]
 	set proxy2_host [lindex $s 0]
 	set proxy2_port [lindex $s 1]
 }
 
+set proxy3_type ""
+set proxy3_host ""
+set proxy3_port ""
+
 if {$proxy3 != ""} {
-	set proxy3_type [proxy_type $proxy3]
-	regsub {^[A-z0-9][A-z0-9]*://} $proxy3 "" proxy3
-	set s [split $proxy3 ":"]
+	set proxy3_type [proxy_type     $proxy3]
+	set proxy3_hp   [proxy_hostport $proxy3]
+	set s [split $proxy3_hp ":"]
 	set proxy3_host [lindex $s 0]
 	set proxy3_port [lindex $s 1]
 }
 
-set lport $env(SSVNC_LISTEN)
+bmesg "1: '$proxy1_host' '$proxy1_port' '$proxy1_type'";
+bmesg "2: '$proxy2_host' '$proxy2_port' '$proxy2_type'";
+bmesg "3: '$proxy3_host' '$proxy3_port' '$proxy3_type'";
 
 set got_connection 0
-set rc [catch {set lsock [socket -myaddr 127.0.0.1 -server handle_connection $lport]}]
-if {$rc != 0} {
-	puts stderr "error listening"	
-	destroy .
-	exit
+
+proc setb {} {
+	wm withdraw .
+	button .b -text "CONNECT_BR" -command {destroy .}
+	pack .b
+	after 1000 check_callback 
 }
 
-if {1} {
-	wm withdraw .
+if [info exists env(SSVNC_REVERSE)] {
+	set s [split $env(SSVNC_REVERSE) ":"]
+	set rhost [lindex $s 0]
+	set rport [lindex $s 1]
+	set rc [catch {set lsock [socket $rhost $rport]}]
+	if {$rc != 0} {
+		puts stderr "error reversing"	
+		destroy .; exit 1
+	}
+	puts stderr "SSVNC_REVERSE to $rhost $rport OK";
+	setb
+	handle_connection $lsock $rhost $rport
+} else {
+	set lport $env(SSVNC_LISTEN)
+	set rc [catch {set lsock [socket -myaddr 127.0.0.1 -server handle_connection $lport]}]
+	if {$rc != 0} {
+		puts stderr "error listening"	
+		destroy .; exit 1
+	}
+	puts stderr "SSVNC_LISTEN on $lport OK";
+	setb
 }
-button .b -text "CONNECT_BR" -command {destroy .}
-pack .b
-after 1000 check_callback 
