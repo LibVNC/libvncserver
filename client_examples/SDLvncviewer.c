@@ -221,12 +221,22 @@ log_to_file(const char *format, ...)
 
 int main(int argc,char** argv) {
 	rfbClient* cl;
-	int i,buttonMask=0;
+	int i, j, buttonMask = 0, viewOnly = 0;
 	SDL_Event e;
 
 #ifdef LOG_TO_FILE
 	rfbClientLog=rfbClientErr=log_to_file;
 #endif
+
+	for (i = 1, j = 1; i < argc; i++)
+		if (!strcmp(argv[1], "-viewonly"))
+			viewOnly = 1;
+		else {
+			if (i != j)
+				argv[j] = argv[i];
+			j++;
+		}
+	argc = j;
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
 	SDL_EnableUNICODE(1);
@@ -252,6 +262,8 @@ int main(int argc,char** argv) {
 				case SDL_MOUSEBUTTONUP: case SDL_MOUSEBUTTONDOWN:
 				case SDL_MOUSEMOTION: {
 						int x,y;
+						if (viewOnly)
+							break;
 						int state=SDL_GetMouseState(&x,&y);
 						int i;
 						for(buttonMask=0,i=0;buttonMapping[i].sdl;i++)
@@ -261,6 +273,8 @@ int main(int argc,char** argv) {
 					}
 					break;
 				case SDL_KEYUP: case SDL_KEYDOWN:
+					if (viewOnly)
+						break;
 					SendKeyEvent(cl,SDL_key2rfbKeySym(&e.key),(e.type==SDL_KEYDOWN)?TRUE:FALSE);
 					break;
 				case SDL_QUIT:
