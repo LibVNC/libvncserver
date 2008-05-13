@@ -464,6 +464,9 @@ ScreenInit(int argc, char**argv)
   rfbScreen->frameBuffer =
     (char *)CGDisplayBaseAddress(kCGDirectMainDisplay);
 
+  /* we cannot write to the frame buffer */
+  rfbScreen->cursor = NULL;
+
   rfbScreen->ptrAddEvent = PtrAddEvent;
   rfbScreen->kbdAddEvent = KbdAddEvent;
 
