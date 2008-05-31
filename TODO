@@ -2,11 +2,11 @@ immediate:
 ----------
 
 make SDLvncviewer more versatile
-	- AltGr!
+	- Send modifiers key-up on leave focus,
 	- test for missing keys (especially "[]{}" with ./examples/mac),
+	- map Apple/Linux/Windows keys onto each other,
 	- keyboard repeat,
 	- introduce scrollbars,
-	- make scrollable with 2xCtrl and mouse drag,
 	- handle selection
 style fixes: use Linux' coding guidelines & ANSIfy tightvnc-filetransfer:
 	discuss on list
