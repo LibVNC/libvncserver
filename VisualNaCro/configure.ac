@@ -8,7 +8,7 @@ AC_CANONICAL_HOST
 AM_INIT_AUTOMAKE
 
 dnl Checks for programs.
-AC_CHECK_PROG(SWIG,swig)
+AC_CHECK_PROG(SWIG,swig,swig)
 AC_CHECK_PROG(LIBVNCSERVERCONFIG,libvncserver-config,yes,no)
 if test "$LIBVNCSERVERCONFIG" != "yes"; then
 	AC_MSG_ERROR([Need to have libvncserver-config in PATH])
