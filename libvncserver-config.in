@@ -11,7 +11,7 @@ if [ -f "`dirname "$0"`/libvncserver-config.in" ]; then
   dir="`dirname "$0"`"
   prefix="`cd "$dir"; pwd`"
   includedir="$prefix"
-  libdir="$prefix/libvncserver $prefix/libvncclient"
+  libdir="$prefix/libvncserver/.libs $prefix/libvncclient/.libs"
 fi
 
 usage="\
