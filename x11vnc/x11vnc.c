@@ -2514,6 +2514,17 @@ int main(int argc, char* argv[]) {
 			shift_cmap = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-notruecolor")) {
 			force_indexed_color = 1;
+		} else if (!strcmp(arg, "-advertise_truecolor")) {
+			advertise_truecolor = 1;
+			if (i < argc-1) {
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					if (strstr(s, "reset")) {
+						advertise_truecolor_reset = 1;
+					}
+					i++;
+				}
+			}
 		} else if (!strcmp(arg, "-overlay")) {
 			overlay = 1;
 		} else if (!strcmp(arg, "-overlay_nocursor")) {

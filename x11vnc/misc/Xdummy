@@ -396,7 +396,8 @@ make_so() {
 		warn "$tmp still exists."
 		exit 1
 	fi
-	tail +$n1 $0 | head -$dn > $tmp
+	#tail +$n1 $0 | head -$dn > $tmp
+	tail -n +$n1 $0 | head -n $dn > $tmp
 
 	# compile it to Xdummy.so:
 	rm -f $SO

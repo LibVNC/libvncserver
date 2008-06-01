@@ -2734,6 +2734,23 @@ void check_gui_inputs(void) {
 	}
 }
 
+static int turn_off_truecolor = 0;
+
+static void turn_off_truecolor_ad(rfbClientPtr client) {
+	if (turn_off_truecolor) {
+		rfbLog("turning off truecolor advertising.\n");
+		screen->serverFormat.trueColour = FALSE;
+		screen->displayHook = NULL;
+		screen->serverFormat.redShift   = 0;
+		screen->serverFormat.greenShift = 0;
+		screen->serverFormat.blueShift  = 0;
+		screen->serverFormat.redMax     = 0;
+		screen->serverFormat.greenMax   = 0;
+		screen->serverFormat.blueMax    = 0;
+		turn_off_truecolor = 0;
+	}
+}
+
 /*
  * libvncserver callback for when a new client connects
  */
@@ -2875,6 +2892,43 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	if (ncache) {
 		check_ncache(1, 0);
+	}
+
+	if (advertise_truecolor && indexed_color) {
+		int rs = 0, gs = 2, bs = 4;
+		int rm = 3, gm = 3, bm = 3;
+		if (bpp >= 24) {
+			rs = 0, gs = 8, bs = 16;
+			rm = 255, gm = 255, bm = 255;
+		} else if (bpp >= 16) {
+			rs = 0, gs = 5, bs = 10;
+			rm = 31, gm = 31, bm = 31;
+		}
+		rfbLog("advertising truecolor.\n");
+		if (getenv("ADVERT_BMSHIFT")) {
+			bm--;
+		}
+
+		client->format.trueColour = TRUE;
+		client->format.redShift   = rs;
+		client->format.greenShift = gs;
+		client->format.blueShift  = bs;
+		client->format.redMax     = rm;
+		client->format.greenMax   = gm;
+		client->format.blueMax    = bm;
+
+		rfbSetTranslateFunction(client);
+
+		screen->serverFormat.trueColour = TRUE;
+		screen->serverFormat.redShift   = rs;
+		screen->serverFormat.greenShift = gs;
+		screen->serverFormat.blueShift  = bs;
+		screen->serverFormat.redMax     = rm;
+		screen->serverFormat.greenMax   = gm;
+		screen->serverFormat.blueMax    = bm;
+		screen->displayHook = turn_off_truecolor_ad;
+
+		turn_off_truecolor = 1;
 	}
 
 	if (unixpw) {

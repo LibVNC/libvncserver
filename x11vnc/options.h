@@ -89,6 +89,8 @@ extern int ping_interval;
 extern int flash_cmap;
 extern int shift_cmap;
 extern int force_indexed_color;
+extern int advertise_truecolor;
+extern int advertise_truecolor_reset;
 extern int cmap8to24;
 extern char *cmap8to24_str;
 extern int xform24to32;

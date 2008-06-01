@@ -1,3 +1,8 @@
+2008-05-31  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Improvements to nonstandard indexed color support, e.g.
+	  depths 1, 4, 12, etc. instead of only 8.  Only enable xinerama
+	  xwarppointer if there is more than 1 subscreen.
+
 2008-05-07  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add UltraVNC repeater proxy support.  fix to setp gui
 	  mode. -threads is now strongly discouraged.  Read PORT= in url.

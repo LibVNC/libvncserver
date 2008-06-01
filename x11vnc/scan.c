@@ -1285,8 +1285,12 @@ void scale_and_mark_rect(int X1, int Y1, int X2, int Y2, int mark) {
 
 	if (cmap8to24 && cmap8to24_fb) {
 		src_fb = cmap8to24_fb;
-		if (scaling && depth == 8) {
-			fac = 4;
+		if (scaling) {
+			if (depth <= 8) {
+				fac = 4;
+			} else if (depth <= 16) {
+				fac = 2;
+			}
 		}
 	}
 	dst_fb = rfb_fb;

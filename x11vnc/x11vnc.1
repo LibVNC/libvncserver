@@ -2,7 +2,7 @@
 .TH X11VNC "1" "May 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2008-05-10
+         version: 0.9.4, lastmod: 2008-05-31
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -161,6 +161,13 @@ a colormap histogram.  Example: \fB-shiftcmap\fR 240
 For 8bpp displays, force indexed color (i.e. a colormap)
 even if it looks like 8bpp TrueColor (rare problem).
 .PP
+\fB-advertise_truecolor\fR
+.IP
+If the X11 display is indexed color, lie to clients
+when they first connect by telling them it is truecolor.
+To workaround RealVNC: inPF has colourMap but not 8bpp
+Use '-advertise_truecolor reset' to reset client fb too.
+.PP
 \fB-visual\fR \fIn\fR
 .IP
 This option probably does not do what you think.
@@ -172,8 +179,10 @@ Run
 .IR xdpyinfo (1)
 for the values.  One may also use
 "TrueColor", etc. see <X11/X.h> for a list.  If the
-string ends in ":m" then for better or for worse the
-visual depth is forced to be m.
+string ends in ":m" then for better or for worse
+the visual depth is forced to be m.  You may want to
+use \fB-noshm\fR when using this option (so XGetImage may
+automatically translate the pixel data).
 .PP
 \fB-overlay\fR
 .IP

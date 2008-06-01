@@ -263,17 +263,17 @@ static void initialize_xinerama (void) {
 	rfbLog("\n");
 	rfbLog("Xinerama is present and active (e.g. multi-head).\n");
 
-	if (! use_xwarppointer && ! got_noxwarppointer) {
-		rfbLog("Xinerama: enabling -xwarppointer mode to try to correct\n");
-		rfbLog("Xinerama: mouse pointer motion. XTEST+XINERAMA bug.\n");
-		rfbLog("Xinerama: Use -noxwarppointer to force XTEST.\n");
-		use_xwarppointer = 1;
-	}
-
 	/* n.b. change to XineramaGetData() someday */
 	xineramas = XineramaQueryScreens(dpy, &n);
 	if (verbose) {
 		rfbLog("Xinerama: number of sub-screens: %d\n", n);
+	}
+
+	if (! use_xwarppointer && ! got_noxwarppointer && n > 1) {
+		rfbLog("Xinerama: enabling -xwarppointer mode to try to correct\n");
+		rfbLog("Xinerama: mouse pointer motion. XTEST+XINERAMA bug.\n");
+		rfbLog("Xinerama: Use -noxwarppointer to force XTEST.\n");
+		use_xwarppointer = 1;
 	}
 
 	if (n == 1) {
