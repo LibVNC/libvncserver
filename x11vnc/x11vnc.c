@@ -3222,6 +3222,7 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-wait")) {
 			CHECK_ARGC
 			waitms = atoi(argv[++i]);
+			got_waitms = 1;
 		} else if (!strcmp(arg, "-wait_ui")) {
 			CHECK_ARGC
 			wait_ui = atof(argv[++i]);
@@ -4781,6 +4782,28 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	initialize_signals();
 
 	initialize_speeds();
+
+	if (speeds_read_rate_measured > 100) {
+		/* framebuffer read is fast at  > 100 MB/sec */
+		if (! got_waitms) {
+			waitms /= 2;
+			if (waitms < 10) {
+				waitms = 10;
+			}
+			if (!quiet) {
+				rfbLog("fast read: reset wait  ms to: %d\n", waitms);
+			}
+		}
+		if (! got_deferupdate && ! got_defer) {
+			if (defer_update > 15) {
+				defer_update = 15;
+				if (screen) {
+					screen->deferUpdateTime = defer_update;
+				}
+				rfbLog("fast read: reset defer ms to: %d\n", defer_update);
+			}
+		}
+	}
 
 	initialize_keyboard_and_pointer();
 

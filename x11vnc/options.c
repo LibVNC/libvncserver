@@ -353,6 +353,7 @@ int flip_byte_order = 0;	/* sometimes needed when using_shm = 0 */
  * poll times of 10-35ms, so maybe this value cuts the idle load by 2 or so.
  */
 int waitms = 20;
+int got_waitms = 0;
 double wait_ui = 2.0;
 double slow_fb = 0.0;
 double xrefresh = 0.0;

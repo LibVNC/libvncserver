@@ -258,6 +258,7 @@ extern int tile_shm_count;
 extern int using_shm;
 extern int flip_byte_order;
 extern int waitms;
+extern int got_waitms;
 extern double wait_ui;
 extern double slow_fb;
 extern double xrefresh;
