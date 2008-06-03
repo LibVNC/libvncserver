@@ -17,6 +17,8 @@ static rfbBool resize(rfbClient* client) {
 #endif
 	int width=client->width,height=client->height,
 		depth=client->format.bitsPerPixel;
+	client->updateRect.x = client->updateRect.y = 0;
+	client->updateRect.w = width; client->updateRect.h = height;
 	rfbBool okay=SDL_VideoModeOK(width,height,depth,flags);
 	if(!okay)
 		for(depth=24;!okay && depth>4;depth/=2)

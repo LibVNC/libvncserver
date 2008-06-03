@@ -1,3 +1,6 @@
+2008-06-03  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* client_examples/SDLvncviewer.c: fix update after resize
+
 2008-02-18  Christian Ehrlicher <Ch.Ehrlicher@gmx.de>
 	* libvncserver/rfbregion.c: please MS Visual C++
 
