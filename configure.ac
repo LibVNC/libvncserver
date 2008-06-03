@@ -278,6 +278,19 @@ configure again.
 ])
 fi
 
+# set some ld -R nonsense
+#
+uname_s=`(uname -s) 2>/dev/null`
+ld_minus_R="yes"
+if test "x$uname_s" = "xHP-UX"; then
+	ld_minus_R="no"
+elif test "x$uname_s" = "xOSF1"; then
+	ld_minus_R="no"
+elif test "x$uname_s" = "xDarwin"; then
+	ld_minus_R="no"
+fi
+
+
 AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
 AC_ARG_WITH(crypt,
 [  --without-crypt         disable support for libcrypt],,)
@@ -298,11 +311,31 @@ AC_ARG_WITH(crypto,
 
 AH_TEMPLATE(HAVE_LIBSSL, [openssl libssl library present])
 AC_ARG_WITH(ssl,
-[  --without-ssl           disable support for openssl libssl],,)
+[  --without-ssl           disable support for openssl libssl]
+[  --with-ssl=DIR          use openssl include/library files in DIR],,)
 
 if test "x$with_crypto" != "xno" -a "x$with_ssl" != "xno"; then
+	if test ! -z "$with_ssl" -a "x$with_ssl" != "xyes"; then
+		saved_CPPFLAGS="$CPPFLAGS"
+		saved_LDFLAGS="$LDFLAGS"
+		CPPFLAGS="$CPPFLAGS -I$with_ssl/include"
+		LDFLAGS="$LDFLAGS -L$with_ssl/lib"
+		if test "x$ld_minus_R" = "xno"; then
+			:
+		elif test "x$GCC" = "xyes"; then
+			LDFLAGS="$LDFLAGS -Xlinker -R$with_ssl/lib"
+		else
+			LDFLAGS="$LDFLAGS -R$with_ssl/lib"
+		fi
+	fi
 	AC_CHECK_LIB(crypto, RAND_file_name,
 		[AC_DEFINE(HAVE_LIBCRYPTO) HAVE_LIBCRYPTO="true"], ,)
+	if test ! -z "$with_ssl" -a "x$with_ssl" != "xyes"; then
+		if test "x$HAVE_LIBCRYPTO" != "xtrue"; then
+			CPPFLAGS="$saved_CPPFLAGS"
+			LDFLAGS="$saved_LDFLAGS"
+		fi
+	fi
 fi
 
 AH_TEMPLATE(HAVE_X509_PRINT_EX_FP, [open ssl X509_print_ex_fp available])
@@ -320,7 +353,7 @@ if test "x$with_ssl" != "xno"; then
 fi
 AC_SUBST(SSL_LIBS)
 
-	if test "x$HAVE_LIBSSL" != "xtrue"; then
+	if test "x$HAVE_LIBSSL" != "xtrue" -a "x$with_ssl" != "xno"; then
 		AC_MSG_WARN([
 ==========================================================================
 *** The openssl encryption library libssl.so was not found. ***
@@ -329,7 +362,7 @@ SSL install the necessary development packages (perhaps it is named
 something like libssl-dev) and run configure again.
 ==========================================================================
 ])
-	else
+	elif test "x$with_ssl" != "xno"; then
 		AC_CHECK_LIB(ssl, X509_print_ex_fp, 
 			[AC_DEFINE(HAVE_X509_PRINT_EX_FP) HAVE_X509_PRINT_EX_FP="true"], , $SSL_LIBS
 			)
@@ -387,16 +420,6 @@ fi
 # end x11vnc only.
 
 # Checks for libraries.
-
-uname_s=`(uname -s) 2>/dev/null`
-ld_minus_R="yes"
-if test "x$uname_s" = "xHP-UX"; then
-	ld_minus_R="no"
-elif test "x$uname_s" = "xOSF1"; then
-	ld_minus_R="no"
-elif test "x$uname_s" = "xDarwin"; then
-	ld_minus_R="no"
-fi
 
 if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xno"; then
 	printf "checking for system libvncserver... "
