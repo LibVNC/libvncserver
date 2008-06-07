@@ -2,7 +2,7 @@
 .TH X11VNC "1" "June 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2008-06-01
+         version: 0.9.4, lastmod: 2008-06-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -139,6 +139,13 @@ corner of the selected window.  An example use of this
 option would be to split a large (e.g. Xinerama) display
 into two parts to be accessed via separate viewers by
 running a separate x11vnc on each part.
+.IP
+Use '-clip xinerama0' to clip to the first xinerama
+sub-screen (if xinerama is active).  xinerama1 for the
+2nd sub-screen, etc.  This way you don't need to figure
+out the WxH+X+Y of the desired xinerama sub-screen.
+screens are sorted in increasing distance from the
+(0,0) origin (I.e. not the Xserver's order).
 .PP
 \fB-flashcmap\fR
 .IP

@@ -1,3 +1,7 @@
+2008-06-07  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -clip xineramaN option, -DIGNORE_GETSPNAM for HP-UX.
+	  Print info on SSH_CONNECTION override.
+
 2008-05-31  Karl Runge <runge@karlrunge.com>
 	* x11vnc: Improvements to nonstandard indexed color support, e.g.
 	  depths 1, 4, 12, etc. instead of only 8.  Only enable xinerama

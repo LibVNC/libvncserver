@@ -3857,11 +3857,14 @@ int main(int argc, char* argv[]) {
 				if (! s) s = "SSH_CONNECTION";
 				fprintf(stderr, "\n");
 				rfbLog("Skipping -ssl/-stunnel constraint in"
-				    " -unixpw\n");
-				rfbLog("mode, assuming your SSH encryption"
-				    " is: %s\n", s);
+				    " -unixpw mode,\n");
+				rfbLog("assuming your SSH encryption"
+				    " is:\n");
+				rfbLog("   %s\n", s);
 				rfbLog("Setting -localhost in SSH + -unixpw"
 				    " mode.\n");
+				rfbLog("If you *actually* want SSL, restart"
+				    " with -ssl on the cmdline\n");
 				fprintf(stderr, "\n");
 				allow_list = strdup("127.0.0.1");
 				got_localhost = 1;
@@ -4229,6 +4232,9 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		if (! quiet) rfbLog("Using default X display.\n");
 	}
 
+	if (clip_str != NULL && dpy != NULL) {
+		check_xinerama_clip();
+	}
 
 	scr = DefaultScreen(dpy);
 	rootwin = RootWindow(dpy, scr);
