@@ -2631,7 +2631,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	    rows = (h-1)/cl->correMaxHeight+1;
 	    nUpdateRegionRects += rectsPerRow*rows;
         }
-	sraRgnReleaseIterator(i);
+	sraRgnReleaseIterator(i); i=NULL;
     } else if (cl->preferredEncoding == rfbEncodingUltra) {
         nUpdateRegionRects = 0;
         
@@ -2645,7 +2645,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
                 rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
             nUpdateRegionRects += (((h-1) / (ULTRA_MAX_SIZE( w ) / w)) + 1);
           }
-        sraRgnReleaseIterator(i);
+        sraRgnReleaseIterator(i); i=NULL;
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     } else if (cl->preferredEncoding == rfbEncodingZlib) {
 	nUpdateRegionRects = 0;
@@ -2660,7 +2660,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
                 rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
 	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
 	}
-	sraRgnReleaseIterator(i);
+	sraRgnReleaseIterator(i); i=NULL;
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     } else if (cl->preferredEncoding == rfbEncodingTight) {
 	nUpdateRegionRects = 0;
@@ -2681,7 +2681,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	    }
 	    nUpdateRegionRects += n;
 	}
-	sraRgnReleaseIterator(i);
+	sraRgnReleaseIterator(i); i=NULL;
 #endif
 #endif
     } else {
@@ -2805,6 +2805,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
            break;
 #endif
         }
+    }
+    if (i) {
+        sraRgnReleaseIterator(i);
+        i = NULL;
     }
 
     if ( nUpdateRegionRects == 0xFFFF &&
