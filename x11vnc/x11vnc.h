@@ -456,7 +456,7 @@ extern unsigned char *tile_has_xdamage_diff, *tile_row_has_xdamage_diff;
 /* times of recent events */
 extern time_t last_event, last_input, last_client;
 extern time_t last_keyboard_input, last_pointer_input; 
-extern time_t last_local_input;
+extern time_t last_local_input;	/* macosx */
 extern time_t last_fb_bytes_sent;
 extern double last_keyboard_time;
 extern double last_pointer_time;
@@ -507,6 +507,8 @@ extern rfbBool last_rfb_down;
 extern rfbBool last_rfb_key_accepted;
 extern rfbKeySym last_rfb_keysym;
 extern double last_rfb_keytime;
+extern double last_rfb_key_injected;
+extern double last_rfb_ptr_injected;
 extern int fb_copy_in_progress;	
 extern int drag_in_progress;	
 extern int shut_down;	

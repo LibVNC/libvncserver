@@ -532,6 +532,12 @@ static void solid_gnome(char *color) {
 	    "/desktop/gnome/background/picture_options";
 	char set_option[] = "gconftool-2 --set "
 	    "/desktop/gnome/background/picture_options --type string '%s'";
+#if 0
+	char get_filename[] = "gconftool-2 --get "
+	    "/desktop/gnome/background/picture_filename";
+	char set_filename[] = "gconftool-2 --set "
+	    "/desktop/gnome/background/picture_filename --type string '%s'";
+#endif
 	static char *orig_color = NULL;
 	static char *orig_option = NULL;
 	char *cmd;
@@ -607,6 +613,14 @@ static void solid_gnome(char *color) {
 	sprintf(cmd, set_option, "none");
 	dt_cmd(cmd);
 	free(cmd);
+
+#if 0
+	cmd = (char *) malloc(strlen(set_filename) + strlen("none") + 1);
+	sprintf(cmd, set_filename, "none");
+	dt_cmd(cmd);
+	free(cmd);
+#endif
+
 #endif	/* NO_X11 */
 }
 

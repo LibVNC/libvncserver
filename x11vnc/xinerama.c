@@ -267,7 +267,7 @@ void check_xinerama_clip(void) {
 		}
 	}
 	for (i=0; i <= k; i++) {
-		int j, jmon, mon = -1, mox = -1;
+		int j, jmon = 0, mon = -1, mox = -1;
 		for (j=0; j < is; j++) {
 			if (mon < 0 || score[j] < mon) {
 				mon = score[j];

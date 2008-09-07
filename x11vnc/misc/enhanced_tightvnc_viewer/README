@@ -29,7 +29,7 @@ survey http://rechten.uvt.nl/koops/cryptolaw/index.htm for useful
 information.
 
 All work done by Karl J. Runge in this project is
-Copyright (c) 2006-2007 Karl J. Runge and is licensed under the GPL as
+Copyright (c) 2006-2008 Karl J. Runge and is licensed under the GPL as
 described in the file COPYING in this directory.
 
 All the files and information in this project are provided "AS IS"
@@ -66,23 +66,30 @@ The enhanced TightVNC viewer features are:
 
 	- Create or Import SSL Certificates and Private Keys.
 
+	- Reverse (viewer listening) VNC connections via SSL and SSH.
+
+	- Support for Web Proxies, SOCKS Proxies, and the UltraVNC
+	  repeater proxy (e.g. repeater://host:port+ID:1234). Multiple
+	  proxies may be chained together (3 max).
+
+	- Support for SSH Gateway connections and non-standard SSH ports.
+
+	- You can also use your own VNC Viewer, e.g. UltraVNC or RealVNC,
+	  with the front-end GUI or scripts if you like.
+
 	- Automatic Service tunnelling via SSH for CUPS and SMB Printing,
 	  ESD/ARTSD Audio, and SMB (Windows/Samba) filesystem mounting.
+
+	- Sets up any additional SSH port redirections that you want.
 
         - Port Knocking for "closed port" SSH/SSL connections.  In addition
           to a simple fixed port sequence and one-time-pad implementation,
           a hook is also provided to run any port knocking client before a
           connecting.
 
-	- You can also use your own VNC Viewer, e.g. UltraVNC or RealVNC,
-	  with the front-end GUI or scripts if you like.
-
-	- Sets up any additional SSH port redirections that you want.
-
 	- Support for native MacOS X usage with bundled Chicken of the
-	  VNC viewer.
-
-	- Reverse (viewer listening) VNC connections via SSL and SSH.
+	  VNC viewer (the Unix X11 viewer is also provided for MacOS X,
+	  and is better IMHO).
 
 	- Dynamic VNC Server Port determination and redirection (using
 	  ssh's builtin SOCKS proxy, -D) for servers like x11vnc that
@@ -115,6 +122,16 @@ The enhanced TightVNC viewer features are:
 	- UltraVNC File Transfer via an auxiliary Java helper program
 	  (java must be in $PATH). Note that x11vnc supports UltraVNC
 	  file transfer.
+
+	- Connection support for the UltraVNC repeater proxy (-repeater
+	  option).
+
+	- Support for UltraVNC Single Click operation. (both unencrypted:
+	  SC I, and SSL encrypted: SC III)
+
+	- Instead of hostname:display one can also supply "exec=command args..."
+	  to connect the viewer to the stdio of an external command
+	  (e.g. stunnel or socat) rather than using a TCP/IP socket.
 
 	- Extremely low color modes: 64 and 8 colors in 8bpp
 	  (-use64/-bgr222, -use8/-bgr111)
@@ -391,7 +408,7 @@ If you need to Build:
 If your OS/arch is not included or the provided binary has the wrong
 library dependencies, etc. the script "build.unix" may be able to
 successfully build on for you and deposit the binaries down in ./bin/...
-using the included source code.
+using the included source code.  It is a hack but usually works.
 
 You MUST run the build.unix script from this directory (that this toplevel
 README is in, i.e "ssvnc") and like this:
@@ -401,7 +418,28 @@ README is in, i.e "ssvnc") and like this:
 To use custom locations for libraries see the LDFLAGS_OS and CPPFLAGS_OS
 description at the top of the build.unix script.
 
+You can set these env. vars to customize the build:
+
+	SSVNC_BUILD_NO_STATIC=1        do not try to statically link libs
+	SSVNC_BUILD_FORCE_OVERWRITE=1  do not prompt about existing binaries
+	SSVNC_BUILD_SKIP_VIEWER=1      do not build vncviewer
+	SSVNC_BUILD_SKIP_STUNNEL=1     do not build stunnel
+	SSVNC_BUILD_ULTRAFTP=1         only build the file xfer helper jar
+
+here is an example to build only the vncviewer and with normal library
+linking (and in a more or less automated way):
+
+ env SSVNC_BUILD_NO_STATIC=1 SSVNC_BUILD_FORCE_OVERWRITE=1 SSVNC_BUILD_SKIP_STUNNEL=1 ./build.unix
+
 Feel free to ask us if you need help running ./build.unix
+
+
+Convential Build:
+
+A more conventional source tarball is provided in ssvnc-x.y.z.src.tar.gz.
+It uses a more or less familiar 'make config; make all; make install'
+method.  It does not include stunnel, so that must be installed on the
+system separately.
 
 
 The programs:
@@ -517,6 +555,86 @@ however, the tiny scripts only one (only 60KB) will run properly on Unix
 as long as you install external vncviewer and stunnel packages:
 
 	ssvnc_unix_minimal-1.x.y.tar.gz
+
+
+Untrusted Local Users:
+---------------------
+
+    *IMPORTANT WARNING*:  If you run SSVNC on a workstation or computer
+    that other users can log into and you DO NOT TRUST these users
+    (it is a shame but sometimes one has to work in an environment like
+    this), then please note the following warning.
+
+    By 'do not trust' we mean they might try to gain access to remote
+    machines you connect to via SSVNC.  Note that an untrusted local
+    user can often obtain root access in a short amount of time; if a
+    user has acheived that, then all bets are off for ANYTHING that you
+    do on the workstation.  It is best to get rid of Untrusted Local
+    Users as soon as possible.
+
+    Both the SSL and SSH tunnels set up by SSVNC listen on certain ports
+    on the 'localhost' address and redirect TCP connections to the remote
+    machine; usually the VNC server running there (but it could also be
+    another service, e.g. CUPS printing).  These are the stunnel(8) SSL
+    redirection and the ssh(1) '-L' port redirection.  Because 'localhost'
+    is used only users or programs on the same workstation that is
+    running SSVNC can connect to these ports, however this includes any
+    local users (not just the user running SSVNC.)
+
+    If the untrusted local user tries to connect to these ports, he may
+    succeed in varying degrees to gain access to the remote machine.
+    We now list some safeguards one can put in place to try to make this
+    more difficult to acheive.
+
+    It probably pays to have the VNC server require a password, even
+    though there has already been SSL or SSH authentication (via
+    certificates or passwords).  In general if the VNC Server requires
+    SSL authentication of the viewer that helps, unless the untrusted
+    local user has gained access to your SSVNC certificate keys.
+
+    If the VNC server is configured to only allow one viewer connection
+    at a time, then the window of opportunity that the untrusted local
+    user can use is greatly reduced: he might only have a second or two
+    between the tunnel being set up and the SSVNC vncviewer connecting
+    to it (i.e. if the VNC server only allows a single connection, the
+    untrusted local user cannot connect once your session is established).
+    Similarly, when you disconnect the tunnel is torn down quickly and
+    there is little or no window of opportunity to connect (e.g. x11vnc
+    in its default mode exits after the first client disconnects).
+
+    Also for SSL tunnelling with stunnel(8) on Unix using one of the SSVNC
+    prebuilt 'bundles', a patched stunnel is provided that denies all
+    connections after the first one, and exits when the first one closes.
+    This is not true if the system installed stunnel(8) is used and is
+    not true when using SSVNC on Windows.
+
+    The following are two experimental features that are added to SSVNC
+    to improve the situation for the SSL/stunnel case.  Set them via
+    Options -> Advanced -> "STUNNEL Local Port Protections".
+
+    1) For SSL tunnelling with stunnel(8) on Unix there is a setting
+       'Use stunnel EXEC mode' (experimental) that will try to exec(2)
+       stunnel instead of using a listening socket.  This will require
+       using the specially modified vncviewer unix viewer provided
+       by SSVNC.  If this mode proves stable it will become the default.
+
+    2) For SSL tunnelling with stunnel(8) on Unix there is a setting
+       'Use stunnel IDENT check' (experimental) to limit socket
+       connections to be from you (this assumes the untrusted local
+       user has not become root on your workstation and has modified
+       your local IDENT check service; if he has you have much bigger
+       problems to worry about...)
+
+    There is also one simple LD_PRELOAD trick for SSH to limit the number
+    of accepted port redirection connections.  This makes the window of
+    time the untrusted local user can connect to the tunnel much smaller.
+    Enable it via Options -> Advanced -> "SSH Local Port Protections".
+    You will need to have the lim_accept.so file in your SSVNC package.
+
+    The main message is to 'Watch your Back' when you connect via the
+    SSVNC tunnels and there are users you don't trust on your workstation.
+    The same applies to ANY use of SSH '-L' port redirections or outgoing
+    stunnel SSL redirection services.
 
 
 Help and Info:

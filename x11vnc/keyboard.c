@@ -3149,6 +3149,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 				last_rfb_down = down;
 				last_rfb_keysym = keysym;
 				last_rfb_keytime = tnow;
+				last_rfb_key_injected = dnow();
 
 				got_user_input++;
 				got_keyboard_input++;
@@ -3176,6 +3177,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	last_rfb_down = down;
 	last_rfb_keysym = keysym;
 	last_rfb_keytime = tnow;
+	last_rfb_key_injected = dnow();
 
 	got_user_input++;
 	got_keyboard_input++;

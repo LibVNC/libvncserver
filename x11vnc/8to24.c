@@ -1359,6 +1359,8 @@ static int get_cmap(int j, Colormap cmap) {
 		X_LOCK;
 		ncells = CellsOfScreen(ScreenOfDisplay(dpy, scr));
 		X_UNLOCK;
+	} else {
+		ncells = NCOLOR;
 	}
 if (db24 > 1) fprintf(stderr, "get_cmap: %d 0x%x\n", j, (unsigned int) cmap);
 

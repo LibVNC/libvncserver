@@ -1,6 +1,10 @@
 #!/bin/sh
 
-# Notes: to customize locations, e.g. for libjpeg, set LDFLAGS_OS and/or CPPFLAGS_OS
+# See the README in this directory for more info on using this script
+# (build.unix).  Search for SSVNC_BUILD.
+#
+# Notes: to customize locations, e.g. for libjpeg, set LDFLAGS_OS and/or
+# CPPFLAGS_OS
 #
 # e.g. on Darwin we did:
 #
@@ -45,6 +49,10 @@ if [ ! -d ./bin -o ! -d src/patches -o ! -f ./build.unix ]; then
 	exit $?
 fi
 
+pline() {
+	echo "------------------------------------------------------------------"
+}
+
 # Try to find osname.arch
 #
 name=$UNAME
@@ -62,20 +70,6 @@ if [ `uname` = "Darwin" ]; then
 	LDD="otool -L"
 fi
 
-# Work out main destination:
-#
-dest=./bin/$name
-if [ -d $dest ]; then
-	printf "$dest exists.  overwrite it? [y]/n "
-	read x
-	if [ "X$x" = "Xn" ]; then
-		exit
-	fi
-	rm -f $dest/*stunnel*
-	rm -f $dest/*vncviewer*
-fi
-mkdir -p $dest || exit 1
-
 # Create a tmp dir for this build:
 #
 tmp=./src/tmp/$name.$$
@@ -84,13 +78,65 @@ if [ "X$TMPDIR" != "X" ]; then
 fi
 mkdir -p $tmp || exit 1
 
+# Do ultraftp Java viewer (only):
+#
+if [ "X$SSVNC_BUILD_ULTRAFTP" != "X" ]; then
+	ultraftp_tar=`ls -td ./src/zips/ultraftp.tar* | head -1`
+	if [ ! -f $ultraftp_tar ]; then
+		echo "could not locate ultraftp java vnc viewer source"
+		exit 1
+	fi
+	echo ""
+	pline
+	echo "BUILDING THE ULTRAFTP HELPER JAR"
+	echo ""
+	sleep 1
+
+	cat $ultraftp_tar | (cd $tmp; tar xvf -) || exit 1
+	cd $tmp/ultraftp || exit 1
+	pwd
+	echo
+	make install
+
+	exit 0	# DONE
+fi
+
+# Work out main destination:
+#
+dest=./bin/$name
+if [ -d $dest ]; then
+	if [ "X$SSVNC_BUILD_FORCE_OVERWRITE" = "X" ]; then
+		printf "$dest exists.  overwrite in it? [y]/n "
+		read x
+		if [ "X$x" = "Xn" ]; then
+			exit
+		fi
+	else
+		echo "$dest exists.  overwriting in it."
+	fi
+	if [ "X$SSVNC_BUILD_SKIP_VIEWER" = "X" ]; then
+		if [ `uname` = "Darwin" ]; then
+			rm -f $dest/vncviewer.x11*
+		else
+			rm -f $dest/vncviewer*
+		fi
+	fi
+	if [ "X$SSVNC_BUILD_SKIP_STUNNEL" = "X" ]; then
+		rm -f $dest/stunnel*
+	fi
+fi
+mkdir -p $dest || exit 1
+
+
 # Try to find some static archives of various libraries:
 #
 libs="$tmp/libs"
 mkdir -p $libs || exit 1
 for liba in libz.a libjpeg.a libssl.a libcrypto.a
-#for liba in libz.a libjpeg.a
 do
+	if [ "X$SSVNC_BUILD_NO_STATIC" != "X" ]; then
+		break
+	fi
 	for dir in /usr/lib /lib /usr/local/lib /usr/pkg/lib /usr/sfw/lib /usr/openwin/lib
 	do
 		if [ "$name" = "Linux.x86_64" -o "$name" = "Linux.ppc64" ] ; then
@@ -105,10 +151,12 @@ do
 		fi
 	done
 done
-echo "Found these static archive libraries, will try to use them..."
-ls -ld $libs
-ls -l $libs
-echo
+if [ "X$SSVNC_BUILD_NO_STATIC" = "X" ]; then
+	echo "Found these static archive libraries, will try to use them..."
+	ls -ld $libs
+	ls -l $libs
+	echo
+fi
 
 have_gcc=""
 if type gcc > /dev/null; then
@@ -132,7 +180,7 @@ END
 	fi
 fi
 
-if [ -d /var/tmp/LIBS ]; then
+if [ -d /var/tmp/LIBS -a "X$SSVNC_BUILD_NO_STATIC" = "X" ]; then
 	LDFLAGS_OS="$LDFLAGS_OS -L/var/tmp/LIBS"
 fi
 
@@ -150,176 +198,262 @@ if [ $cnt -lt 1 ]; then
 	exit 1
 fi
 
+pline() {
+	echo "------------------------------------------------------------------"
+}
+
 # Do tightvnc viewer:
 #
-tight_src=`ls -td ./src/vnc_unixsrc* | head -1`
-if [ ! -d $tight_src ]; then
-	echo "could not locate tight vnc viewer source"
-	exit 1
-fi
-
-cp -pR "$tight_src" "$tmp/vnc_unixsrc" || exit 1
-
-echo "applying tight vnc patches:"
-start=`pwd`
-cd $tmp;
-failed=0
-count=0
-patches="../../patches/tight-vncviewer-full.patch"
-if [ ! -f "$patches" ]; then
-	patches=`ls ../../patches/tight* | grep -v 'tight-vncviewer-full.patch'`
-fi
-for patch in $patches
-do
-	if [ ! -f "$patch" ]; then
-		continue
+if [ "X$SSVNC_BUILD_SKIP_VIEWER" = "X" ]; then
+	tight_src=`ls -td ./src/vnc_unixsrc* | head -1`
+	if [ ! -d $tight_src ]; then
+		echo "could not locate tight vnc viewer source"
+		exit 1
 	fi
-	if [ "X$PATCH_FAIL" != "X" ]; then
-		failed=1	
-		break
-	fi
-	echo PATCHING WITH: "$patch" 
-	ls -l "$patch"
+	echo ""
+	pline
+	echo "BUILDING THE VNCVIEWER"
+	echo ""
 	sleep 1
-	patch -p0 < "$patch"
-	if [ $? != 0 ]; then
-		failed=`expr $failed + 1`
-	else
-		count=`expr $count + 1`
+
+	cp -pR "$tight_src" "$tmp/vnc_unixsrc" || exit 1
+
+	echo "applying tight vnc patches:"
+	start=`pwd`
+	cd $tmp;
+	failed=0
+	count=0
+	patches="../../patches/tight-vncviewer-full.patch"
+	if [ ! -f "$patches" ]; then
+		patches=`ls ../../patches/tight* | grep -v 'tight-vncviewer-full.patch'`
 	fi
-done
-sleep 1
-cd "$start"
-if [ $failed != 0 -o $count = 0 ]; then
-	ball=src/zips/vnc_unixsrc_vncviewer.patched.tar
-	echo "patches failed, trying to use backup tarball:"
-	ls -l $ball
-	sleep 2
-	cat $ball | (cd $tmp; tar -xvf -)
-fi
-echo
-
-
-cd $tmp/vnc_unixsrc
-xmkmf
-make Makefiles
-mv vncviewer/Makefile vncviewer/Makefile.orig
-sed -e "s,EXTRA_LDOPTIONS =,EXTRA_LDOPTIONS = -L$start/$libs $LDFLAGS_OS," \
-    -e "s,CCOPTIONS =,CCOPTIONS = $CPPFLAGS_OS," \
-	vncviewer/Makefile.orig > vncviewer/Makefile
-
-if [ `uname` = "SunOS" ]; then
-	for d in vncviewer libvncauth vncconnect vncpasswd
+	for patch in $patches
 	do
-		mv $d/Makefile $d/Makefile.orig
-		sed -e "s,CCOPTIONS =.*\$,CCOPTIONS = $CPPFLAGS_OS," \
-			$d/Makefile.orig > $d/Makefile
+		if [ ! -f "$patch" ]; then
+			continue
+		fi
+		if [ "X$PATCH_FAIL" != "X" ]; then
+			failed=1	
+			break
+		fi
+		echo PATCHING WITH: "$patch" 
+		ls -l "$patch"
+		sleep 1
+		patch -p0 < "$patch"
+		if [ $? != 0 ]; then
+			failed=`expr $failed + 1`
+		else
+			count=`expr $count + 1`
+		fi
 	done
-fi
+	sleep 1
+	cd "$start"
+	if [ $failed != 0 -o $count = 0 ]; then
+		ball=src/zips/vnc_unixsrc_vncviewer.patched.tar
+		echo "patches failed, trying to use backup tarball:"
+		ls -l $ball
+		sleep 2
+		cat $ball | (cd $tmp; tar -xvf -)
+	fi
+	echo
 
-make depend
-echo $PATH
-make all
-ls -l vncviewer/vncviewer
-cd "$start"
-src=$tmp/vnc_unixsrc/vncviewer/vncviewer
-sync
-sleep 2
-sync
-strip $src
-sync
-sleep 2
-sync
-wc  $src
-sum $src
-sleep 2
 
-suff=""
-if [ `uname` = "Darwin" ]; then
-	suff=".x11"
+	cd $tmp/vnc_unixsrc
+	xmkmf
+	make Makefiles
+	mv vncviewer/Makefile vncviewer/Makefile.orig
+	sed -e "s,EXTRA_LDOPTIONS =,EXTRA_LDOPTIONS = -L$start/$libs $LDFLAGS_OS," \
+	    -e "s,CCOPTIONS =,CCOPTIONS = $CPPFLAGS_OS," \
+		vncviewer/Makefile.orig > vncviewer/Makefile
+
+	if [ `uname` = "SunOS" ]; then
+		for d in vncviewer libvncauth vncconnect vncpasswd
+		do
+			mv $d/Makefile $d/Makefile.orig
+			sed -e "s,CCOPTIONS =.*\$,CCOPTIONS = $CPPFLAGS_OS," \
+				$d/Makefile.orig > $d/Makefile
+		done
+	fi
+
+	make depend
+	echo $PATH
+	make all
+	ls -l vncviewer/vncviewer
+	cd "$start"
+	src=$tmp/vnc_unixsrc/vncviewer/vncviewer
+	sync
+	sleep 2
+	sync
+	strip $src
+	sync
+	sleep 2
+	sync
+	wc  $src
+	sum $src
+	sleep 2
+
+	suff=""
+	if [ `uname` = "Darwin" ]; then
+		suff=".x11"
+	fi
+	echo cp -p $src $dest/vncviewer$suff
+	sleep 1
+	cp -p $src $dest/vncviewer$suff || exit 1
+
+	echo
+	pline
+	echo "LISTING, HELP, and LDD THE VNCVIEWER:" 
+	echo
+	sleep 1
+
+	ls -l $src $dest/vncviewer$suff
+	echo
+	echo $dest/vncviewer$suff -h
+	echo
+	$dest/vncviewer$suff -h
+	echo
+	echo $LDD $dest/vncviewer$suff
+	echo
+	$LDD $dest/vncviewer$suff
+	echo ""
 fi
-echo cp -p $src $dest/vncviewer$suff
-sleep 1
-cp -p $src $dest/vncviewer$suff || exit 1
-ls -l $src $dest/vncviewer$suff
-$dest/vncviewer$suff -h
-$LDD $dest/vncviewer$suff
-echo ""
 
 # Do stunnel:
 #
-stunnel_src=`ls -td ./src/stunnel* | head -1`
-if [ ! -d $stunnel_src ]; then
-	echo "could not locate stunnel source"
-	exit 1
-fi
-
-cp -pR "$stunnel_src" "$tmp/stunnel" || exit 1
-
-echo "applying stunnel patches:"
-start=`pwd`
-cd $tmp;
-failed=0
-count=0
-for patch in ../../patches/stunnel*
-do
-	if [ ! -f "$patch" ]; then
-		continue
+if [ "X$SSVNC_BUILD_SKIP_STUNNEL" = "X" ]; then
+	stunnel_src=`ls -td ./src/stunnel* | head -1`
+	if [ ! -d $stunnel_src ]; then
+		echo "could not locate stunnel source"
+		exit 1
 	fi
-	if [ "X$PATCH_FAIL" != "X" ]; then
-		failed=1	
-		break
-	fi
-	echo PATCHING WITH: "$patch" 
-	ls -l "$patch"
+	echo ""
+	pline
+	echo "BUILDING THE STUNNEL"
+	echo ""
 	sleep 1
-	patch -p0 < $patch
-	if [ $? != 0 ]; then
-		failed=`expr $failed + 1`
-	else
-		count=`expr $count + 1`
+
+	cp -pR "$stunnel_src" "$tmp/stunnel" || exit 1
+
+	echo "applying stunnel patches:"
+	start=`pwd`
+	cd $tmp;
+	failed=0
+	count=0
+	for patch in ../../patches/stunnel*
+	do
+		if [ ! -f "$patch" ]; then
+			continue
+		fi
+		if [ "X$PATCH_FAIL" != "X" ]; then
+			failed=1	
+			break
+		fi
+		echo PATCHING WITH: "$patch" 
+		ls -l "$patch"
+		sleep 1
+		patch -p0 < $patch
+		if [ $? != 0 ]; then
+			failed=`expr $failed + 1`
+		else
+			count=`expr $count + 1`
+		fi
+	done
+	sleep 1
+	cd "$start"
+	if [ $failed != 0 -o $count = 0 ]; then
+		ball=src/zips/stunnel.patched.tar
+		echo "patches failed, trying to use backup tarball:"
+		ls -l $ball
+		sleep 2
+		cat $ball | (cd $tmp; tar -xvf -)
 	fi
-done
-sleep 1
-cd "$start"
-if [ $failed != 0 -o $count = 0 ]; then
-	ball=src/zips/stunnel.patched.tar
-	echo "patches failed, trying to use backup tarball:"
-	ls -l $ball
+	echo
+
+
+	cd $tmp/stunnel
+	if [ `uname` = "SunOS" ]; then
+		cp configure configure.orig
+		sed -e "s,/var/ssl,/var/ssl /usr/sfw," configure.orig > configure
+	fi
+	env LDFLAGS="-L$start/$libs $LDFLAGS_OS" CPPFLAGS="$CPPFLAGS_OS" ./configure --disable-libwrap
+	make
+	ls -l src/stunnel
+	cd "$start"
+	src=$tmp/stunnel/src/stunnel
+	sync
 	sleep 2
-	cat $ball | (cd $tmp; tar -xvf -)
+	sync
+	strip $src
+	sync
+	sleep 2
+	sync
+	wc  $src
+	sum $src
+	sleep 2
+	echo cp -p $src $dest/stunnel
+	cp -p $src $dest/stunnel || exit 1
+	sleep 1
+	cp -p $src $dest/stunnel || exit 1
+
+	echo
+	pline
+	echo "LISTING, HELP, and LDD THE STUNNEL:" 
+	echo
+	sleep 1
+
+	ls -l $src $dest/stunnel
+	echo
+	echo $dest/stunnel -help
+	echo
+	$dest/stunnel -help
+	echo
+	echo $LDD $dest/stunnel
+	echo
+	$LDD $dest/stunnel
+	echo ""
 fi
-echo
 
+# Do vncstorepw and ld preload friends:
+#
+if [ "X$SSVNC_BUILD_SKIP_VNCSTOREPW" = "X" ]; then
+	vncpw_tar=`ls -td ./src/zips/vncstorepw* | head -1`
+	if [ ! -f $vncpw_tar ]; then
+		echo "could not locate vncstorepw source"
+		exit 1
+	fi
+	echo ""
+	pline
+	echo "BUILDING THE VNCSTOREPW AND FRIENDS"
+	echo ""
+	sleep 1
 
-cd $tmp/stunnel
-if [ `uname` = "SunOS" ]; then
-	cp configure configure.orig
-	sed -e "s,/var/ssl,/var/ssl /usr/sfw," configure.orig > configure
+	cat "$vncpw_tar" | (cd $tmp; tar xvf -)
+
+	cd $tmp/vncstorepw
+	make
+
+	cd "$start"
+	cp -p $tmp/vncstorepw/vncstorepw $tmp/vncstorepw/lim_accept.so $dest
+	echo ""
 fi
-env LDFLAGS="-L$start/$libs $LDFLAGS_OS" CPPFLAGS="$CPPFLAGS_OS" ./configure --disable-libwrap
-make
-ls -l src/stunnel
-cd "$start"
-src=$tmp/stunnel/src/stunnel
-sync
-sleep 2
-sync
-strip $src
-sync
-sleep 2
-sync
-wc  $src
-sum $src
-sleep 2
-echo cp -p $src $dest/stunnel
-cp -p $src $dest/stunnel || exit 1
-sleep 1
-cp -p $src $dest/stunnel || exit 1
-ls -l $src $dest/stunnel
-$dest/stunnel -help
-$LDD $dest/stunnel
-echo ""
 
-$dest/vncviewer$suff -h
-$LDD $dest/vncviewer$suff
+
+if [ "X$SSVNC_BUILD_SKIP_VIEWER" = "X" -a "X$SSVNC_BUILD_SKIP_STUNNEL" = "X" ]; then
+	# list the viewer again.
+
+	echo
+	pline
+	echo "LISTING, HELP, and LDD THE VNCVIEWER (again):" 
+	echo
+	sleep 1
+
+	ls -l $dest/vncviewer$suff
+	echo
+	echo $dest/vncviewer$suff -h
+	echo
+	$dest/vncviewer$suff -h
+	echo
+	echo $LDD $dest/vncviewer$suff
+	echo
+	$LDD $dest/vncviewer$suff
+fi

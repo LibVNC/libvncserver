@@ -2524,6 +2524,8 @@ fprintf(stderr, "\n");}
 	return 1;
 }
 
+void ssh_remote_tunnel(char *, int);
+
 static XImage ximage_struct;
 
 int wait_for_client(int *argc, char** argv, int http) {

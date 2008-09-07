@@ -630,6 +630,10 @@ int remote_control_access_ok(void) {
 #endif	/* NO_X11 */
 }
 
+#ifdef MACOSX
+void macosxCG_keycode_inject(int down, int keycode);
+#endif
+
 /*
  * Huge, ugly switch to handle all remote commands and queries
  * -remote/-R and -query/-Q.
@@ -3502,6 +3506,19 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		adjust_grabs(0, 0);
 		rfbLog("disabled grab_always\n");
 
+	} else if (strstr(p, "grablocal") == p) {
+		COLON_CHECK("grablocal:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co,
+			    grab_local);
+			goto qry;
+		}
+		p += strlen("grablocal:");
+
+		grab_local = atoi(p);
+		rfbLog("remote_cmd: changed -grablocal to: %d\n",
+		    grab_local);
+
 	} else if (strstr(p, "client_input") == p) {
 		NOTAPP
 		COLON_CHECK("client_input:")
@@ -3578,6 +3595,28 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: turning off debug_keyboard.\n");
 		debug_keyboard = 0;
 
+	} else if (strstr(p, "keycode") == p) {
+		int kc;
+		NOTAPP
+		COLON_CHECK("keycode:")
+		p += strlen("keycode:");
+		kc = atoi(p);
+		if (kc < 0) kc = 0;
+		kc = kc % 256;
+		rfbLog("remote_cmd: insert keycode %d\n", kc);
+
+		if (macosx_console) {
+#ifdef MACOSX
+			macosxCG_keycode_inject(1, kc);
+			usleep(100*1000);
+			macosxCG_keycode_inject(0, kc);
+#endif
+		} else {
+			XTestFakeKeyEvent_wr(dpy, kc, 1, CurrentTime);
+			usleep(100*1000);
+			XTestFakeKeyEvent_wr(dpy, kc, 0, CurrentTime);
+		}
+		
 	} else if (strstr(p, "deferupdate") == p) {
 		int d;
 		COLON_CHECK("deferupdate:")
@@ -4420,6 +4459,19 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: disable macosx_ncache_macmenu.\n");
 		macosx_ncache_macmenu = 0;
+
+	} else if (!strcmp(p, "macuskbd")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, macosx_us_kbd); goto qry;
+		}
+		rfbLog("remote_cmd: enable macosx_us_kbd.\n");
+		macosx_us_kbd = 1;
+	} else if (!strcmp(p, "nomacuskbd")) {
+		if (query) {
+			snprintf(buf, bufn, "ans=%s:%d", p, !macosx_us_kbd); goto qry;
+		}
+		rfbLog("remote_cmd: disable macosx_us_kbd.\n");
+		macosx_us_kbd = 0;
 
 	} else if (strstr(p, "hack") == p) { /* skip-cmd-list */
 		COLON_CHECK("hack:")

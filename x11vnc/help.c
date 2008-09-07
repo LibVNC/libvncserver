@@ -484,7 +484,7 @@ void print_help(int mode) {
 "                       to plumb reverse connections.\n"
 "\n"
 "-connect_or_exit str   As with -connect, except if none of the reverse\n"
-"                       connections succeed, then x11vnc shutdowns immediately.\n"
+"                       connections succeed, then x11vnc shuts down immediately\n"
 "\n"
 "                       By the way, if you do not want x11vnc to listen on\n"
 "                       ANY interface use -rfbport 0  which is handy for the\n"
@@ -628,6 +628,16 @@ void print_help(int mode) {
 "                       use the -R remote control to turn the other back on,\n"
 "                       e.g. -R nograbptr.\n"
 "\n"
+#ifdef ENABLE_GRABLOCAL
+"-grablocal n           If it appears that a user sitting at the physical\n"
+"                       display has injected a keystroke or mouse event ignore\n"
+"                       any VNC client inputs for the next n seconds.  The idea\n"
+"                       is that during a demonstration, etc, the local user\n"
+"                       will not be interrupted by viewers accidentally moving\n"
+"                       the mouse, etc.  The detection of local user input is\n"
+"                       approximate and so at times gives unexpected results.\n"
+"\n"
+#endif
 "-viewpasswd string     Supply a 2nd password for view-only logins.  The -passwd\n"
 "                       (full-access) password must also be supplied.\n"
 "\n"
@@ -3631,25 +3641,27 @@ void print_help(int mode) {
 "                       You can also set the env. var X11VNC_UINPUT_DEBUG=1 or\n"
 "                       higher to get debugging output for UINPUT mode.\n"
 "\n"
-"-macnodim              For the native Mac OS X server, disable dimming. \n"
-"-macnosleep            For the native Mac OS X server, disable display sleep.\n"
-"-macnosaver            For the native Mac OS X server, disable screensaver.\n"
-"-macnowait             For the native Mac OS X server, do not wait for the\n"
+"-macnodim              For the native MacOSX server, disable dimming. \n"
+"-macnosleep            For the native MacOSX server, disable display sleep.\n"
+"-macnosaver            For the native MacOSX server, disable screensaver.\n"
+"-macnowait             For the native MacOSX server, do not wait for the\n"
 "                       user to switch back to his display.\n"
-"-macwheel n            For the native Mac OS X server, set the mouse wheel\n"
+"-macwheel n            For the native MacOSX server, set the mouse wheel\n"
 "                       speed to n (default 5).\n"
-"-macnoswap             For the native Mac OS X server, do not swap mouse\n"
+"-macnoswap             For the native MacOSX server, do not swap mouse\n"
 "                       buttons 2 and 3.\n"
-"-macnoresize           For the native Mac OS X server, do not resize or reset\n"
+"-macnoresize           For the native MacOSX server, do not resize or reset\n"
 "                       the framebuffer even if it is detected that the screen\n"
 "                       resolution or depth has changed.\n"
-"-maciconanim n         For the native Mac OS X server, set n to the number\n"
+"-maciconanim n         For the native MacOSX server, set n to the number\n"
 "                       of milliseconds that the window iconify/deiconify\n"
 "                       animation takes.  In -ncache mode this value will be\n"
 "                       used to skip the animation if possible. (default 400)\n"
-"-macmenu               For the native Mac OS X server, in -ncache client-side\n"
+"-macmenu               For the native MacOSX server, in -ncache client-side\n"
 "                       caching mode, try to cache pull down menus (not perfect\n"
 "                       because they have animated fades, etc.)\n"
+"-macuskbd              For the native MacOSX server, use the original\n"
+"                       keystroke insertion code based on a US keyboard.\n"
 "\n"
 "-gui [gui-opts]        Start up a simple tcl/tk gui based on the the remote\n"
 "                       control options -remote/-query described below.\n"
@@ -3706,6 +3718,14 @@ void print_help(int mode) {
 "                       the full gui is available under \"Advanced\".  To be\n"
 "                       fully functional, the gui mode should be \"start\"\n"
 "                       (the default).\n"
+"\n"
+"                       Note that tray or icon mode will imply the -forever\n"
+"                       x11vnc option (if the x11vnc server is started along\n"
+"                       with the gui) unless -connect or -connect_or_exit has\n"
+"                       been specified.  So x11vnc (and the tray/icon gui)\n"
+"                       will wait for more connections after the first client\n"
+"                       disconnects.  If you want only one viewer connection\n"
+"                       include the -once option.\n"
 "\n"
 "                       For \"icon\" the gui just a small standalone window.\n"
 "                       For \"tray\" it will attempt to embed itself in the\n"
@@ -4397,12 +4417,13 @@ void xopen_display_fail_message(char *disp) {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Some tips and guidelines:\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, " * An X server (the one you wish to view) must"
+	fprintf(stderr, "** An X server (the one you wish to view) must"
 	    " be running before x11vnc is\n");
-	fprintf(stderr, "   started: x11vnc does not start the X server.  (however, see the\n");
-	fprintf(stderr, "   recent -create option if that is what you really want).\n");
+	fprintf(stderr, "   started: x11vnc does not start the X server.  "
+	    "(however, see the -create\n");
+	fprintf(stderr, "   option if that is what you really want).\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, " * You must use -display <disp>, -OR- set and"
+	fprintf(stderr, "** You must use -display <disp>, -OR- set and"
 	    " export your $DISPLAY\n");
 	fprintf(stderr, "   environment variable to refer to the display of"
 	    " the desired X server.\n");
@@ -4414,7 +4435,7 @@ void xopen_display_fail_message(char *disp) {
 	    " or a guru if you are having\n");
 	fprintf(stderr, "   difficulty determining what your X DISPLAY is.\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, " * Next, you need to have sufficient permissions"
+	fprintf(stderr, "** Next, you need to have sufficient permissions"
 	    " (Xauthority) \n");
 	fprintf(stderr, "   to connect to the X DISPLAY.   Here are some"
 	    " Tips:\n");
@@ -4438,7 +4459,7 @@ void xopen_display_fail_message(char *disp) {
 	    " -display :0\n");
 	fprintf(stderr, "   you must have read permission for the auth file.\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, " - If NO ONE is logged into an X session yet, but"
+	fprintf(stderr, "** If NO ONE is logged into an X session yet, but"
 	    " there is a greeter login\n");
 	fprintf(stderr, "   program like \"gdm\", \"kdm\", \"xdm\", or"
 	    " \"dtlogin\" running, you will need\n");
@@ -4447,18 +4468,21 @@ void xopen_display_fail_message(char *disp) {
 	fprintf(stderr, "   Some examples for various display managers:\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "     gdm:     -auth /var/gdm/:0.Xauth\n");
+	fprintf(stderr, "              -auth /var/lib/gdm/:0.Xauth\n");
 	fprintf(stderr, "     kdm:     -auth /var/lib/kdm/A:0-crWk72\n");
+	fprintf(stderr, "              -auth /var/run/xauth/A:0-crWk72\n");
 	fprintf(stderr, "     xdm:     -auth /var/lib/xdm/authdir/authfiles/A:0-XQvaJk\n");
 	fprintf(stderr, "     dtlogin: -auth /var/dt/A:0-UgaaXa\n");
 	fprintf(stderr, "\n");
+	fprintf(stderr, "   Sometimes the command \"ps wwwwaux | grep auth\""
+	    " can reveal the file location.\n");
+	fprintf(stderr, "\n");
 	fprintf(stderr, "   Only root will have read permission for the"
 	    " file, and so x11vnc must be run\n");
-	fprintf(stderr, "   as root.  The random characters in the filenames"
-	    " will of course change,\n");
-	fprintf(stderr, "   and the directory the cookie file resides in may"
-	    " also be system dependent.\n");
-	fprintf(stderr, "   Sometimes the command \"ps wwwaux | grep auth\""
-	    " can reveal the file location.\n");
+	fprintf(stderr, "   as root (or copy it).  The random characters in the filenames"
+	    " will of course\n");
+	fprintf(stderr, "   change and the directory the cookie file resides in"
+	    " is system dependent.\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "See also: http://www.karlrunge.com/x11vnc/#faq\n");
 }
@@ -4474,7 +4498,7 @@ void nopassword_warning_msg(int gotloc) {
 "#@        YOU ARE RUNNING X11VNC WITHOUT A PASSWORD!!        @#\n"
 "#@                                                           @#\n"
 "#@  This means anyone with network access to this computer   @#\n"
-"#@  will be able to view and control your desktop.           @#\n"
+"#@  may be able to view and control your desktop.            @#\n"
 "#@                                                           @#\n"
 "#@ >>> If you did not mean to do this Press CTRL-C now!! <<< @#\n"
 "#@                                                           @#\n"

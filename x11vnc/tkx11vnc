@@ -340,6 +340,7 @@ Permissions
 	grabkbd
 	grabptr
 	grabalways
+	grablocal:
 	forcedpms
 	clientdpms
 	noserverdpms
@@ -4828,7 +4829,10 @@ proc get_icon_label {{set 0}} {
 	if {$icon_minimal} {
 		set lab [get_vnc_display_number]
 		if {$lab != "none"} {
-			set lab "  :$lab"
+			#set lab "  :$lab"
+			set lab ":$lab"
+		} else {
+			set lab "-"
 		}
 	} else {
 		set lab $lab0
@@ -5074,7 +5078,7 @@ proc make_icon {} {
 	wm title . "tkx11vnc"
 	update
 	if {$tray_embed && $tray_running} {
-		wm deiconify .
+		#wm deiconify .;   #  why did we have this???
 		#after 10000 {wm deiconify .; puts "reqheight [winfo reqheight .]"; puts "reqwidth  [winfo reqwidth  .]"; puts "height [winfo height .]"; puts "width  [winfo width  .]"}
 	} else {
 		wm deiconify .
@@ -5146,7 +5150,7 @@ proc clean_icon_exit {} {
 }
 
 proc make_gui {mode} {
-	global icon_mode tray_embed full_win icon_win
+	global icon_mode tray_embed tray_running full_win icon_win
 	global top_widget_names x11vnc_gui_geom
 	global gui_current_state make_gui_count
 	global x11vnc_connect connected_to_x11vnc
@@ -5226,7 +5230,9 @@ proc make_gui {mode} {
 
 
 	update
-	wm deiconify .
+	if {!$tray_embed || !$tray_running} {
+		wm deiconify .
+	}
 	update idletasks
 	wm minsize $w [winfo width $w] [winfo height $w]
 	if {$mode == "full" && $make_gui_count > 1} {
@@ -6187,6 +6193,9 @@ proc change_view_state {} {
 			exit
 		}
 		make_gui $new
+		if {$new == "tray"} {
+			wm withdraw .
+		}
 	} else {
 		set_view_variable $old
 	}
@@ -6346,10 +6355,16 @@ set ls ""
 catch {set ls [font metrics $bfont -linespace]}
 if {$ls != ""} {
     if {$ls > 14} {
-	# some recent setups have BIG rendering for the above fonts:
+	# some recent setups have BIG rendering for the above fonts.
+	# on recent (8/08) debian these are really ragged:
 	set bfont "-adobe-helvetica-bold-r-*-*-*-90-*-*-*-*-*-*"
 	set sfont "-adobe-helvetica-bold-r-*-*-*-75-*-*-*-*-*-*"
 	set snfont "-adobe-helvetica-medium-r-*-*-*-75-*-*-*-*-*-*"
+
+	# these are bigger but look better... but for how long?
+	set bfont "-adobe-helvetica-bold-r-*-*-*-100-*-*-*-*-*-*"
+	set sfont "-adobe-helvetica-bold-r-*-*-*-80-*-*-*-*-*-*"
+	set snfont "-adobe-helvetica-medium-r-*-*-*-80-*-*-*-*-*-*"
     }
 }
 set help_indent 24;

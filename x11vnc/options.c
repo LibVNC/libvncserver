@@ -241,6 +241,7 @@ int ncache_dt_change = 1;
 int ncache_keep_anims = 0;
 int ncache_old_wm = 0;
 int macosx_ncache_macmenu = 0;
+int macosx_us_kbd = 0;
 int ncache_beta_tester = 0;
 int ncdb = 0;
 

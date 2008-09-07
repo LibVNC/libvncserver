@@ -690,6 +690,9 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				button_mask_prev = button_mask;
 				button_mask = mask;
 			}
+			if (!view_only && (input.motion || input.button)) {
+				last_rfb_ptr_injected = dnow();
+			}
 			return;
 		}
 	}
@@ -714,6 +717,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		last_pointer_client = client;
 
 		last_pointer_time = now;
+		last_rfb_ptr_injected = dnow();
 
 		if (blackout_ptr && blackouts) {
 			int b, ok = 1;

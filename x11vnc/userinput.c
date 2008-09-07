@@ -3575,7 +3575,7 @@ void check_fixscreen(void) {
 	}
 	if (advertise_truecolor && advertise_truecolor_reset && indexed_color) {
 		/* this will reset framebuffer to correct colors, if needed */
-		static dlast = 0.0;
+		static double dlast = 0.0;
 		now = dnow();
 		if (now > last_client + 1.0 && now < last_client + 3.0 && now > dlast + 5.0) {
 			rfbLog("advertise truecolor reset framebuffer\n");
@@ -9080,6 +9080,8 @@ if (hack_val == 2) {
 	for (k = 1; k <= 3; k++) {
 		int j, retry = 0;
 
+		if (retry) {}
+
 		nsave = n;
 
 		if (k > 1 && ncdb) fprintf(stderr, "read_events-%d\n", k);
@@ -9250,12 +9252,10 @@ if (ncdb) fprintf(stderr, "SKIPWINS: Ev_unmap/map: 0x%lx %d\n", twin, n2);
 		}
 	}
 	if (ncache_old_wm) {
-		int old_maps = 0; 
-		int old_unmaps = 0; 
 		int shifts = 0;
 		for (i=0; i < n; i++) {
 			XEvent ev;
-			int ns, skip = 0, type, idx = -1, state, valid;
+			int type, idx = -1;
 			int ik = Ev_order[i];
 			int x_new, y_new, w_new, h_new;
 			int x_old, y_old, w_old, h_old;
@@ -9517,7 +9517,7 @@ if (ncdb) fprintf(stderr, "UM Ev_order[%d] = %d oku=%d okm=%d\n", i, j, oku, okm
 		} else if (n_MN <= 2 && n_ON_st <= 1) {
 			for (i=0; i < n; i++) {
 				XEvent ev;
-				int ns, skip = 0, type, idx = -1, state, valid;
+				int type, idx = -1, state, valid;
 				int ik = Ev_order[i];
 
 				if (Ev_done[ik]) continue;

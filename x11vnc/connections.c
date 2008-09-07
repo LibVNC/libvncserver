@@ -755,6 +755,10 @@ void client_gone(rfbClientPtr client) {
 
 	if (inetd && client == inetd_client) {
 		rfbLog("inetd viewer exited.\n");
+		if (gui_pid > 0) {
+			rfbLog("killing gui_pid %d\n", gui_pid);
+			kill(gui_pid, SIGTERM);
+		}
 		clean_up_exit(0);
 	}
 	if (connect_once) {
@@ -779,6 +783,10 @@ void client_gone(rfbClientPtr client) {
 		}
 
 		rfbLog("viewer exited.\n");
+		if ((client_connect || connect_or_exit) && gui_pid > 0) {
+			rfbLog("killing gui_pid %d\n", gui_pid);
+			kill(gui_pid, SIGTERM);
+		}
 		clean_up_exit(0);
 	}
 #ifdef MACOSX
@@ -2423,6 +2431,10 @@ void reverse_connect(char *str) {
 		if (connect_or_exit) {
 			rfbLogEnable(1);
 			rfbLog("exiting under -connect_or_exit\n");
+			if (gui_pid > 0) {
+				rfbLog("killing gui_pid %d\n", gui_pid);
+				kill(gui_pid, SIGTERM);
+			}
 			clean_up_exit(0);
 		}
 		return;
@@ -2458,6 +2470,10 @@ void reverse_connect(char *str) {
 		if (client_count <= nclients0)  {
 			rfbLogEnable(1);
 			rfbLog("exiting under -connect_or_exit\n");
+			if (gui_pid > 0) {
+				rfbLog("killing gui_pid %d\n", gui_pid);
+				kill(gui_pid, SIGTERM);
+			}
 			clean_up_exit(0);
 		}
 	}
@@ -2737,6 +2753,7 @@ void check_gui_inputs(void) {
 static int turn_off_truecolor = 0;
 
 static void turn_off_truecolor_ad(rfbClientPtr client) {
+	if (client) {}
 	if (turn_off_truecolor) {
 		rfbLog("turning off truecolor advertising.\n");
 		screen->serverFormat.trueColour = FALSE;

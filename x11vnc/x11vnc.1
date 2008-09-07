@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "June 2008" "x11vnc " "User Commands"
+.TH X11VNC "1" "September 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2008-06-06
+         version: 0.9.4, lastmod: 2008-09-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -566,7 +566,7 @@ to plumb reverse connections.
 \fB-connect_or_exit\fR \fIstr\fR
 .IP
 As with \fB-connect,\fR except if none of the reverse
-connections succeed, then x11vnc shutdowns immediately.
+connections succeed, then x11vnc shuts down immediately
 .IP
 By the way, if you do not want x11vnc to listen on
 ANY interface use \fB-rfbport\fR 0  which is handy for the
@@ -4239,49 +4239,54 @@ higher to get debugging output for UINPUT mode.
 .PP
 \fB-macnodim\fR
 .IP
-For the native Mac OS X server, disable dimming.
+For the native MacOSX server, disable dimming.
 .PP
 \fB-macnosleep\fR
 .IP
-For the native Mac OS X server, disable display sleep.
+For the native MacOSX server, disable display sleep.
 .PP
 \fB-macnosaver\fR
 .IP
-For the native Mac OS X server, disable screensaver.
+For the native MacOSX server, disable screensaver.
 .PP
 \fB-macnowait\fR
 .IP
-For the native Mac OS X server, do not wait for the
+For the native MacOSX server, do not wait for the
 user to switch back to his display.
 .PP
 \fB-macwheel\fR \fIn\fR
 .IP
-For the native Mac OS X server, set the mouse wheel
+For the native MacOSX server, set the mouse wheel
 speed to n (default 5).
 .PP
 \fB-macnoswap\fR
 .IP
-For the native Mac OS X server, do not swap mouse
+For the native MacOSX server, do not swap mouse
 buttons 2 and 3.
 .PP
 \fB-macnoresize\fR
 .IP
-For the native Mac OS X server, do not resize or reset
+For the native MacOSX server, do not resize or reset
 the framebuffer even if it is detected that the screen
 resolution or depth has changed.
 .PP
 \fB-maciconanim\fR \fIn\fR
 .IP
-For the native Mac OS X server, set n to the number
+For the native MacOSX server, set n to the number
 of milliseconds that the window iconify/deiconify
 animation takes.  In \fB-ncache\fR mode this value will be
 used to skip the animation if possible. (default 400)
 .PP
 \fB-macmenu\fR
 .IP
-For the native Mac OS X server, in \fB-ncache\fR client-side
+For the native MacOSX server, in \fB-ncache\fR client-side
 caching mode, try to cache pull down menus (not perfect
 because they have animated fades, etc.)
+.PP
+\fB-macuskbd\fR
+.IP
+For the native MacOSX server, use the original
+keystroke insertion code based on a US keyboard.
 .PP
 \fB-gui\fR \fI[gui-opts]\fR
 .IP
@@ -4340,6 +4345,14 @@ gives a menu from which properties, etc, can be set and
 the full gui is available under "Advanced".  To be
 fully functional, the gui mode should be "start"
 (the default).
+.IP
+Note that tray or icon mode will imply the \fB-forever\fR
+x11vnc option (if the x11vnc server is started along
+with the gui) unless \fB-connect\fR or \fB-connect_or_exit\fR has
+been specified.  So x11vnc (and the tray/icon gui)
+will wait for more connections after the first client
+disconnects.  If you want only one viewer connection
+include the \fB-once\fR option.
 .IP
 For "icon" the gui just a small standalone window.
 For "tray" it will attempt to embed itself in the

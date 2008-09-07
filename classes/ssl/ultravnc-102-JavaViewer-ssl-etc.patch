@@ -121,7 +121,7 @@ diff -Naur JavaViewer.orig/ButtonPanel.java JavaViewer/ButtonPanel.java
  }
 diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 --- JavaViewer.orig/FTPFrame.java	2005-03-15 23:53:14.000000000 -0500
-+++ JavaViewer/FTPFrame.java	2007-06-02 23:24:32.000000000 -0400
++++ JavaViewer/FTPFrame.java	2008-08-31 14:46:16.000000000 -0400
 @@ -24,8 +24,13 @@
  import java.io.*;
  import java.util.ArrayList;
@@ -136,7 +136,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  
  /*
   * Created on Feb 25, 2004
-@@ -74,12 +79,27 @@
+@@ -74,12 +79,31 @@
  	public javax.swing.JTextField connectionStatus = null;
  	public boolean updateDriveList;
  	private Vector remoteList = null;
@@ -151,6 +151,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +
 +// begin runge/x11vnc
 +	private javax.swing.JButton viewButton = null;
++	private javax.swing.JButton refreshButton = null;
 +	public File saveLocalDirectory = null;
 +	public long saveLocalDirectoryTime = 0;
 +	public int saveLocalDirectoryCount = 0;
@@ -160,15 +161,19 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +	private boolean localCurrentIsDir = true;
 +	private int lastRemoteIndex = -1;
 +	private int lastLocalIndex = -1;
++	private boolean doingShortcutDir = false;
++	private boolean gotShortcutDir = false;
++	private boolean ignore_events = false;
 +// end   runge/x11vnc
  	
  //	 sf@2004 - Separate directories and files for better lisibility
  	private ArrayList DirsList;
-@@ -125,11 +145,60 @@
+@@ -125,11 +149,61 @@
  	 
  	 void refreshRemoteLocation()
  	 {
 +
++//System.out.println("refreshRemoteLocation1");
  		remoteList.clear();
 +		remoteListInfo.clear();
  		remoteFileTable.setListData(remoteList);	
@@ -225,23 +230,94 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  	/*
  	 * Prints the list of drives on the remote directory and returns a String[].  
  	 * str takes as string like A:fC:lD:lE:lF:lG:cH:c
-@@ -185,6 +254,7 @@
+@@ -143,6 +217,9 @@
+ 		int size = str.length();
+ 		String driveType = null;
+ 		String[] drive = new String[str.length() / 3];
++		int idx = 0, C_drive = -1, O_drive = -1;
++
++System.out.println("ComboBox: Str   '" + str + "'");
+ 
+ 		// Loop through the string to create a String[]
+ 		for (int i = 0; i < size; i = i + 3) {
+@@ -150,26 +227,52 @@
+ 			driveType = str.substring(i + 2, i + 3);
+ 			if (driveType.compareTo("f") == 0)
+ 				drive[i / 3] += "\\ Floppy";
+-			if (driveType.compareTo("l") == 0)
++			if (driveType.compareTo("l") == 0) {
+ 				drive[i / 3] += "\\ Local Disk";
++				if (drive[i/3].substring(0,1).toUpperCase().equals("C")) {
++					C_drive = idx;
++				} else if (O_drive < 0) {
++					O_drive = idx;
++				}
++			}
+ 			if (driveType.compareTo("c") == 0)
+ 				drive[i / 3] += "\\ CD-ROM";
+ 			if (driveType.compareTo("n") == 0)
+ 				drive[i / 3] += "\\ Network";
+ 
+ 			remoteDrivesComboBox.addItem(drive[i / 3]);
++System.out.println("ComboBox: Add " + idx + " '" + drive[i/3] + "'");
++			idx++;
+ 		}
++
++		// runge
++		remoteDrivesComboBox.addItem(" [My Documents]");
++		remoteDrivesComboBox.addItem(" [Desktop]");
++
+ 		//sf@ - Select Drive C:as default if possible
+ 		boolean bFound = false;
+-		for(int i = 0; i < remoteDrivesComboBox.getItemCount() ; i++)
+-		{
+-			if(remoteDrivesComboBox.getItemAt(i).toString().substring(0,1).toUpperCase().equals("C"))
+-			{
+-				remoteDrivesComboBox.setSelectedIndex(i);
++
++		if (false) {
++			for(int i = 0; i < remoteDrivesComboBox.getItemCount() ; i++) {
++				if(remoteDrivesComboBox.getItemAt(i).toString().substring(0,1).toUpperCase().equals("C")) {
++					remoteDrivesComboBox.setSelectedIndex(i);
++					bFound = true;
++				}
++			}
++		} else {
++			if (C_drive > 0) {
++				remoteDrivesComboBox.setSelectedIndex(C_drive);
+ 				bFound = true;
++System.out.println("ComboBox: C_drive index: " + C_drive);
++			} else if (O_drive > 0) {
++				remoteDrivesComboBox.setSelectedIndex(O_drive);
++				bFound = true;
++System.out.println("ComboBox: Other_drive index: " + O_drive);
+ 			}
+ 		}
++
+ 		if (!bFound) remoteDrivesComboBox.setSelectedIndex(0);
++
+ 		updateDriveList = false;
+ 		return drive;
+ 	}
+@@ -185,6 +288,8 @@
  		stopButton.setVisible(true);
  		stopButton.setEnabled(true);
  		receiveButton.setEnabled(false);
 +		viewButton.setEnabled(false);	// runge/x11vnc
++		refreshButton.setEnabled(false);
  		remoteTopButton.setEnabled(false);
  		sendButton.setEnabled(false);
  		remoteFileTable.setEnabled(false);
-@@ -207,6 +277,7 @@
+@@ -207,6 +312,8 @@
  		stopButton.setVisible(false);
  		stopButton.setEnabled(false);
  		receiveButton.setEnabled(true);
 +		viewButton.setEnabled(true);	// runge/x11vnc
++		refreshButton.setEnabled(true);
  		remoteTopButton.setEnabled(true);
  		sendButton.setEnabled(true);
  		remoteFileTable.setEnabled(true);
-@@ -221,10 +292,11 @@
+@@ -221,10 +328,11 @@
  	/*
  	 * Print Directory prints out all the contents of a directory
  	 */
@@ -254,15 +330,55 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		remoteFileTable.setListData(remoteList);
  	}
-@@ -253,6 +325,7 @@
+@@ -235,10 +343,12 @@
+ 	 * @return void
+ 	 */
+ 	private void initialize() {
++		ignore_events = true;
+ 		this.setSize(794, 500);
+ 		this.setContentPane(getJContentPane());
++		ignore_events = false;
+ 		updateDriveList = true;
+-		}
++	}
+ 	/**
+ 	 * This method initializes jContentPane.  This is the main content pane
+ 	 * 
+@@ -253,6 +363,33 @@
  			jContentPane.add(getRemotePanel(), java.awt.BorderLayout.EAST);
  			jContentPane.add(getLocalPanel(), java.awt.BorderLayout.WEST);
  			jContentPane.add(getButtonPanel(), java.awt.BorderLayout.CENTER);
-+//System.out.println("getJContentPane");
++
++			KeyStroke stroke = KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0);
++			AbstractAction escapeAction = new AbstractAction() {
++				public void actionPerformed(ActionEvent actionEvent) {
++					System.out.println("Escape Pressed");
++					if (viewer.ftpOnly) {
++						System.out.println("exiting...");
++						System.exit(0);
++					} else {
++						doClose();
++					}
++				}
++			};
++			jContentPane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(stroke, "escapeAction");
++			jContentPane.getInputMap().put(stroke, "escapeAction");
++			jContentPane.getActionMap().put("escapeAction", escapeAction);
++
++			stroke = KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_MASK);
++			AbstractAction resetAction = new AbstractAction() {
++				public void actionPerformed(ActionEvent actionEvent) {
++					System.out.println("Ctrl-R Pressed");
++					doReset();
++				}
++			};
++			jContentPane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(stroke, "resetAction");
++			jContentPane.getInputMap().put(stroke, "resetAction");
++			jContentPane.getActionMap().put("resetAction", resetAction);
  		}
  		return jContentPane;
  	}
-@@ -270,6 +343,7 @@
+@@ -270,6 +407,7 @@
  			topPanelLocal.add(getLocalMachineLabel(), java.awt.BorderLayout.CENTER);
  			topPanelLocal.add(getLocalTopButton(), java.awt.BorderLayout.EAST);
  			topPanelLocal.setBackground(java.awt.Color.lightGray);
@@ -270,7 +386,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return topPanelLocal;
  	}
-@@ -288,6 +362,7 @@
+@@ -288,6 +426,7 @@
  			topPanelRemote.add(getRemoteMachineLabel(), java.awt.BorderLayout.CENTER);
  			topPanelRemote.add(getRemoteTopButton(), java.awt.BorderLayout.EAST);
  			topPanelRemote.setBackground(java.awt.Color.lightGray);
@@ -278,7 +394,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return topPanelRemote;
  	}
-@@ -301,6 +376,7 @@
+@@ -301,6 +440,7 @@
  		if (topPanelCenter == null) {
  			topPanelCenter = new javax.swing.JPanel();
  			topPanelCenter.add(getDummyButton(), null);
@@ -286,7 +402,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return topPanelCenter;
  	}
-@@ -328,6 +404,7 @@
+@@ -328,6 +468,7 @@
  			topPanel.add(getRemoteTopButton(), null);
  			topPanel.setBackground(java.awt.Color.lightGray);
  			*/
@@ -294,7 +410,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return topPanel;
  	}
-@@ -348,6 +425,7 @@
+@@ -348,6 +489,7 @@
  			statusPanel.add(getJProgressBar(), null);
  			statusPanel.add(getConnectionStatus(), null);
  			statusPanel.setBackground(java.awt.Color.lightGray);
@@ -302,7 +418,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  			
  		}
  		return statusPanel;
-@@ -368,6 +446,7 @@
+@@ -368,6 +510,7 @@
  			remotePanel.add(getRemoteScrollPane(), null);
  			remotePanel.add(getRemoteStatus(), null);
  			remotePanel.setBackground(java.awt.Color.lightGray);
@@ -310,7 +426,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return remotePanel;
  	}
-@@ -390,6 +469,7 @@
+@@ -390,6 +533,7 @@
  			localPanel.setComponentOrientation(
  				java.awt.ComponentOrientation.UNKNOWN);
  			localPanel.setName("localPanel");
@@ -318,10 +434,11 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return localPanel;
  	}
-@@ -405,12 +485,14 @@
+@@ -405,12 +549,15 @@
  			buttonPanel = new javax.swing.JPanel();
  			buttonPanel.setLayout(null);
  			buttonPanel.add(getReceiveButton(), null);
++			buttonPanel.add(getRefreshButton(), null);	// runge/x11vnc
 +			buttonPanel.add(getViewButton(), null);	// runge/x11vnc
  			buttonPanel.add(getNewFolderButton(), null);
  			buttonPanel.add(getCloseButton(), null);
@@ -333,7 +450,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return buttonPanel;
  	}
-@@ -422,10 +504,11 @@
+@@ -422,10 +569,11 @@
  	private javax.swing.JButton getSendButton() {
  		if (sendButton == null) {
  			sendButton = new javax.swing.JButton();
@@ -346,7 +463,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  
  		}
  		return sendButton;
-@@ -438,7 +521,7 @@
+@@ -438,7 +586,7 @@
  	private javax.swing.JButton getReceiveButton() {
  		if (receiveButton == null) {
  			receiveButton = new javax.swing.JButton();
@@ -355,7 +472,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  			receiveButton.setText("<< Receive");
  			receiveButton.setName("receiveButton");
  			receiveButton.addActionListener(this);
-@@ -453,7 +536,7 @@
+@@ -453,7 +601,7 @@
  	private javax.swing.JButton getDeleteButton() {
  		if (deleteButton == null) {
  			deleteButton = new javax.swing.JButton();
@@ -364,7 +481,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  			deleteButton.setText("Delete File");
  			deleteButton.setName("deleteButton");
  			deleteButton.addActionListener(this);
-@@ -468,7 +551,7 @@
+@@ -468,7 +616,7 @@
  	private javax.swing.JButton getNewFolderButton() {
  		if (newFolderButton == null) {
  			newFolderButton = new javax.swing.JButton();
@@ -373,11 +490,26 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  			newFolderButton.setText("New Folder");
  			newFolderButton.setName("newFolderButton");
  			newFolderButton.addActionListener(this);
-@@ -476,6 +559,24 @@
+@@ -476,6 +624,39 @@
  		return newFolderButton;
  	}
  	
 +// begin runge/x11vnc
++	/**
++	 * This method initializes refreshButton
++	 * 
++	 * @return javax.swing.JButton
++	 */
++	private javax.swing.JButton getRefreshButton() {
++		if (refreshButton == null) {
++			refreshButton = new javax.swing.JButton();
++			refreshButton.setBounds(15, 170, 107, 25);
++			refreshButton.setText("Refresh");
++			refreshButton.setName("refreshButton");
++			refreshButton.addActionListener(this);
++		}
++		return refreshButton;
++	}
 +	/**
 +	 * This method initializes viewButton
 +	 * 
@@ -386,7 +518,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +	private javax.swing.JButton getViewButton() {
 +		if (viewButton == null) {
 +			viewButton = new javax.swing.JButton();
-+			viewButton.setBounds(15, 170, 107, 25);
++			viewButton.setBounds(15, 200, 107, 25);
 +			viewButton.setText("View File");
 +			viewButton.setName("viewButton");
 +			viewButton.addActionListener(this);
@@ -398,16 +530,16 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  	/**
  	 * This method initializes stopButton
  	 * 
-@@ -486,7 +587,7 @@
+@@ -486,7 +667,7 @@
  		if (stopButton == null)
  		{
  			stopButton = new javax.swing.JButton();
 -			stopButton.setBounds(20, 200, 97, 25);
-+			stopButton.setBounds(15, 200, 107, 25);	// runge/x11vnc
++			stopButton.setBounds(15, 230, 107, 25);	// runge/x11vnc
  			stopButton.setText("Stop");
  			stopButton.setName("stopButton");
  			stopButton.addActionListener(this);
-@@ -503,8 +604,12 @@
+@@ -503,8 +684,12 @@
  	private javax.swing.JButton getCloseButton() {
  		if (closeButton == null) {
  			closeButton = new javax.swing.JButton();
@@ -422,7 +554,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  			closeButton.setName("closeButton");
  			closeButton.addActionListener(this);
  		}
-@@ -551,6 +656,7 @@
+@@ -551,6 +736,7 @@
  			//Select the second entry (e.g. C:\)
  			// localDrivesComboBox.setSelectedIndex(1);
  			localDrivesComboBox.addActionListener(this);
@@ -430,7 +562,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		updateDriveList = false;
  		return localDrivesComboBox;
-@@ -567,6 +673,7 @@
+@@ -567,6 +753,7 @@
  			remoteDrivesComboBox.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.PLAIN, 10));
  			remoteDrivesComboBox.addActionListener(this);
@@ -438,7 +570,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  
  		}
  		return remoteDrivesComboBox;
-@@ -587,6 +694,7 @@
+@@ -587,6 +774,7 @@
  			localMachineLabel.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.BOLD, 11));
  			localMachineLabel.setEditable(false);
@@ -446,7 +578,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return localMachineLabel;
  	}
-@@ -622,6 +730,7 @@
+@@ -622,6 +810,7 @@
  			localTopButton.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.BOLD, 10));
  			localTopButton.addActionListener(this);
@@ -454,7 +586,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return localTopButton;
  	}
-@@ -638,6 +747,7 @@
+@@ -638,6 +827,7 @@
  			remoteTopButton.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.BOLD, 10));
  			remoteTopButton.addActionListener(this);
@@ -462,7 +594,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return remoteTopButton;
  	}
-@@ -650,9 +760,24 @@
+@@ -650,9 +840,24 @@
  	private javax.swing.JList getLocalFileTable() {
  		if (localFileTable == null) {
  			localList = new Vector(0);
@@ -487,7 +619,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return localFileTable;
  	}
-@@ -669,6 +794,7 @@
+@@ -669,6 +874,7 @@
  			localScrollPane.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.PLAIN, 10));
  			localScrollPane.setName("localFileList");
@@ -495,7 +627,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return localScrollPane;
  	}
-@@ -680,10 +806,25 @@
+@@ -680,10 +886,25 @@
  	private javax.swing.JList getRemoteFileTable() {
  		if (remoteFileTable == null) {
  			remoteList = new Vector(0);
@@ -521,7 +653,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  			
  		}
  		return remoteFileTable;
-@@ -698,6 +839,7 @@
+@@ -698,6 +919,7 @@
  			remoteScrollPane = new javax.swing.JScrollPane();
  			remoteScrollPane.setViewportView(getRemoteFileTable());
  			remoteScrollPane.setPreferredSize(new java.awt.Dimension(325, 418));
@@ -529,7 +661,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return remoteScrollPane;
  	}
-@@ -716,6 +858,7 @@
+@@ -716,6 +938,7 @@
  			remoteLocation.setBackground(new Color(255,255,238));
  			remoteLocation.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.PLAIN, 10));
@@ -537,7 +669,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return remoteLocation;
  	}
-@@ -732,6 +875,7 @@
+@@ -732,6 +955,7 @@
  			localLocation.setBackground( new Color(255,255,238));
  			localLocation.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.PLAIN, 10));
@@ -545,7 +677,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return localLocation;
  	}
-@@ -748,6 +892,7 @@
+@@ -748,6 +972,7 @@
  			localStatus.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.PLAIN, 10));
  			localStatus.setEditable(false);
@@ -553,7 +685,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return localStatus;
  	}
-@@ -764,6 +909,7 @@
+@@ -764,6 +989,7 @@
  			remoteStatus.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.PLAIN, 10));
  			remoteStatus.setEditable(false);
@@ -561,15 +693,19 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return remoteStatus;
  	}
-@@ -780,6 +926,7 @@
- 			historyComboBox.insertItemAt(new String("Pulldown to view history ..."),0);
+@@ -777,9 +1003,10 @@
+ 			historyComboBox = new javax.swing.JComboBox();
+ 			historyComboBox.setFont(
+ 				new java.awt.Font("Dialog", java.awt.Font.BOLD, 10));
+-			historyComboBox.insertItemAt(new String("Pulldown to view history ..."),0);
++			historyComboBox.insertItemAt(new String("Pulldown to view history;   Press Escape to Close/Quit;   Press Ctrl-R to Reset Panel."),0);
  			historyComboBox.setSelectedIndex(0);
  			historyComboBox.addActionListener(this);
 +//System.out.println("getHistoryComboBox");
  		}
  		return historyComboBox;
  	}
-@@ -791,6 +938,7 @@
+@@ -791,6 +1018,7 @@
  	private javax.swing.JProgressBar getJProgressBar() {
  		if (jProgressBar == null) {
  			jProgressBar = new javax.swing.JProgressBar();
@@ -577,7 +713,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		return jProgressBar;
  	}
-@@ -806,6 +954,7 @@
+@@ -806,6 +1034,7 @@
  			connectionStatus.setBackground(java.awt.Color.lightGray);
  			connectionStatus.setFont(
  				new java.awt.Font("Dialog", java.awt.Font.PLAIN, 10));
@@ -585,16 +721,21 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  			connectionStatus.setEditable(false);
  		return connectionStatus;
-@@ -815,7 +964,7 @@
+@@ -815,7 +1044,12 @@
  	 * Implements Action listener.
  	 */
  	public void actionPerformed(ActionEvent evt) {
 -		System.out.println(evt.getSource());
 +//		System.out.println(evt.getSource());
++
++		if (ignore_events) {
++			System.out.println("ignore_events: " + evt.getSource());
++			return;
++		}
  
  		if (evt.getSource() == closeButton)
  		{ // Close Button
-@@ -829,14 +978,22 @@
+@@ -829,15 +1063,27 @@
  		{
  			doReceive();
  		}
@@ -610,22 +751,48 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		else if (evt.getSource() == remoteDrivesComboBox)
  		{ 
-+System.out.println("remoteDrivesComboBox");	// runge/x11vnc
++//System.out.println("remoteDrivesComboBox");	// runge/x11vnc
  			changeRemoteDrive();
- 			remoteList.clear();
-+			remoteListInfo.clear();
- 			remoteFileTable.setListData(remoteList);
+-			remoteList.clear();
+-			remoteFileTable.setListData(remoteList);
++
++			// are these really needed? changeRemoteDrive() does them at the end.
++			if (false) {
++				remoteList.clear();
++				remoteListInfo.clear();
++				remoteFileTable.setListData(remoteList);
++			}
  		}
  		else if (evt.getSource() == localTopButton)
-@@ -845,6 +1002,7 @@
+ 		{
+@@ -845,12 +1091,17 @@
  		}
  		else if (evt.getSource() == remoteTopButton)
  		{
-+System.out.println("remoteTopButton");	// runge/x11vnc
++//System.out.println("remoteTopButton");	// runge/x11vnc
  		  	changeRemoteDrive();
  		}
  		else if(evt.getSource() == deleteButton)
-@@ -880,25 +1038,42 @@
+ 		{
+ 			doDelete();
+ 		}
++		else if(evt.getSource() == refreshButton)
++		{
++			doRefresh();
++		}
+ 		else if(evt.getSource()==newFolderButton)
+ 		{
+ 			doNewFolder();
+@@ -864,7 +1115,7 @@
+ 
+ 	private void doNewFolder()
+ 	{
+-		String name = JOptionPane.showInputDialog(null,"Enter new directory name", "Create New Directory", JOptionPane.QUESTION_MESSAGE);
++		String name = JOptionPane.showInputDialog(jContentPane,"Enter new directory name", "Create New Directory", JOptionPane.QUESTION_MESSAGE);
+ 		if(selectedTable.equals("remote"))
+ 		{
+ 			name = remoteLocation.getText()+name;
+@@ -880,34 +1131,106 @@
  			historyComboBox.setSelectedIndex(0);
  		}
  	}
@@ -656,6 +823,57 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  			e.printStackTrace();
  		}
  	}
++	private void unSwing() {
++		jContentPane = null;
++		topPanel = null;
++		topPanelLocal = null;
++		topPanelRemote = null;
++		topPanelCenter = null;
++		statusPanel = null;
++		remotePanel = null;
++		localPanel = null;
++		buttonPanel = null;
++		sendButton = null;
++		receiveButton = null;
++		deleteButton = null;
++		newFolderButton = null;
++		stopButton = null;
++		closeButton = null;
++		dummyButton = null;
++		localDrivesComboBox = null;
++		remoteDrivesComboBox = null;
++		localMachineLabel = null;
++		remoteMachineLabel = null;
++		localTopButton = null;
++		remoteTopButton = null;
++		localScrollPane = null;
++		localFileTable = null;
++		remoteScrollPane = null;
++		remoteFileTable = null;
++		remoteLocation = null;
++		localLocation = null;
++		localStatus = null;
++		remoteStatus = null;
++		historyComboBox = null;
++		jProgressBar = null;
++		connectionStatus = null;
++		viewButton = null;
++		refreshButton = null;
++	}
++
++	public void doReset()
++	{
++		try {
++			this.setVisible(false);
++			this.dispose();
++			jContentPane = null;
++		        try {Thread.sleep(500);} catch (InterruptedException e) {}
++			viewer.ftp_init();
++		} catch (Exception e) {
++			// TODO Auto-generated catch block
++			e.printStackTrace();
++		}
++	}
  
 +	public void doOpen()
 +	{
@@ -676,20 +894,98 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		//Call this method to delete a file at server
  		if(selectedTable.equals("remote"))
  		{	
-@@ -952,7 +1127,7 @@
+-			String sFileName = ((String) this.remoteFileTable.getSelectedValue());
++			Object selected = this.remoteFileTable.getSelectedValue();
++			if (selected == null) {
++				return;
++			}
++			String sFileName = ((String) selected);
+ 			
+ //			 sf@2004 - Directory can't be deleted
+ 			if (sFileName.substring(0, 2).equals(" [") && sFileName.substring((sFileName.length() - 1), sFileName.length()).equals("]"))
+ 			{
+-				JOptionPane.showMessageDialog(null, (String)"Directory Deletion is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);
++				JOptionPane.showMessageDialog(jContentPane, (String)"Directory Deletion is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);
+ 				return;
+ 			}			
+ 			
+@@ -916,7 +1239,7 @@
+ 			// sf@2004 - Delete prompt
+ 			if (remoteList.contains(sFileName))
+ 			{
+-				int r = JOptionPane.showConfirmDialog(null, "Are you sure you want to delete the file \n< " + sFileName + " >\n on Remote Machine ?", "File Transfer Warning", JOptionPane.YES_NO_OPTION);
++				int r = JOptionPane.showConfirmDialog(jContentPane, "Are you sure you want to delete the file \n< " + sFileName + " >\n on Remote Machine ?", "File Transfer Warning", JOptionPane.YES_NO_OPTION);
+ 				if (r == JOptionPane.NO_OPTION)
+ 					return;
+ 			}
+@@ -926,18 +1249,22 @@
+ 		}
+ 		else
+ 		{
+-			String sFileName = ((String) this.localFileTable.getSelectedValue());
++			Object selected = this.localFileTable.getSelectedValue();
++			if (selected == null) {
++				return;
++			}
++			String sFileName = ((String) selected);
+ 			
+ //			 sf@2004 - Directory can't be deleted
+ 			if (sFileName.substring(0, 2).equals(" [") && sFileName.substring((sFileName.length() - 1), sFileName.length()).equals("]"))
+ 			{
+-				JOptionPane.showMessageDialog(null, (String)"Directory Deletion is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);
++				JOptionPane.showMessageDialog(jContentPane, (String)"Directory Deletion is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);
+ 				return;
+ 			}			
+ 			// sf@2004 - Delete prompt
+ 			if (localList.contains(sFileName))
+ 			{
+-				int r = JOptionPane.showConfirmDialog(null, "Are you sure you want to delete the file \n< " + sFileName + " >\n on Local Machine ?", "File Transfer Warning", JOptionPane.YES_NO_OPTION);
++				int r = JOptionPane.showConfirmDialog(jContentPane, "Are you sure you want to delete the file \n< " + sFileName + " >\n on Local Machine ?", "File Transfer Warning", JOptionPane.YES_NO_OPTION);
+ 				if (r == JOptionPane.NO_OPTION)
+ 					return;
+ 			}			
+@@ -952,21 +1279,25 @@
  
  	private void doReceive()
  	{
 -		System.out.println("Received Button Pressed");
 +//		System.out.println("Received Button Pressed");
  
- 		String sFileName = ((String) this.remoteFileTable.getSelectedValue());
+-		String sFileName = ((String) this.remoteFileTable.getSelectedValue());
++		Object selected = this.remoteFileTable.getSelectedValue();
++		if (selected == null) {
++			return;
++		}
++		String sFileName = ((String) selected);
  		
-@@ -979,9 +1154,59 @@
+ 		// sf@2004 - Directory can't be transfered
+ 		if (sFileName.substring(0, 2).equals(" [") && sFileName.substring((sFileName.length() - 1), sFileName.length()).equals("]"))
+ 		{
+-			JOptionPane.showMessageDialog(null, (String)"Directory Transfer is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);
++			JOptionPane.showMessageDialog(jContentPane, (String)"Directory Transfer is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);
+ 			return;
+ 		}
+ 		
+ 		// sf@2004 - Overwrite prompt
+ 		if (localList.contains(sFileName))
+ 		{
+-			int r = JOptionPane.showConfirmDialog(null, "The file < " + sFileName + " >\n already exists on Local Machine\n Are you sure you want to overwrite it ?", "File Transfer Warning", JOptionPane.YES_NO_OPTION);
++			int r = JOptionPane.showConfirmDialog(jContentPane, "The file < " + sFileName + " >\n already exists on Local Machine\n Are you sure you want to overwrite it ?", "File Transfer Warning", JOptionPane.YES_NO_OPTION);
+ 			if (r == JOptionPane.NO_OPTION)
+ 				return;
+ 		}
+@@ -979,23 +1310,89 @@
  		viewer.rfb.requestRemoteFile(remoteFileName,localDestinationPath);
  	}
  
 +// begin runge/x11vnc
++	private void doRefresh()
++	{
++		System.out.println("Refreshing Local and Remote.");
++		refreshLocalLocation();
++		refreshRemoteLocation();
++	}
++
 +	private void doView()
 +	{
 +//		System.out.println("View Button Pressed");
@@ -710,7 +1006,12 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +		if (remoteFileTable == null) {
 +			return null;
 +		}
-+		String sFileName = ((String) this.remoteFileTable.getSelectedValue());
++		Object selected = this.remoteFileTable.getSelectedValue();
++		if (selected == null) {
++			return null;
++		}
++		String sFileName = ((String) selected);
++		
 +		if (sFileName == null) {
 +			return null;
 +		}
@@ -744,24 +1045,98 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 -		System.out.println("Send Button Pressed");
 +//		System.out.println("Send Button Pressed");
  
- 		String sFileName = ((String) this.localFileTable.getSelectedValue());
+-		String sFileName = ((String) this.localFileTable.getSelectedValue());
++		Object selected = this.localFileTable.getSelectedValue();
++		if (selected == null) {
++			return;
++		}
++		String sFileName = ((String) selected);
  		
-@@ -1035,10 +1260,14 @@
+ 		// sf@2004 - Directory can't be transfered
+ 		if (sFileName.substring(0, 2).equals(" [") && sFileName.substring((sFileName.length() - 1), sFileName.length()).equals("]"))
+ 		{
+-			JOptionPane.showMessageDialog(null, (String)"Directory Transfer is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);
++			JOptionPane.showMessageDialog(jContentPane, (String)"Directory Transfer is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);
+ 			return;
+ 		}
+ 		
+ 		// sf@2004 - Overwrite prompt
+ 		if (remoteList.contains(sFileName))
+ 		{
+-			int r = JOptionPane.showConfirmDialog(null, "The file < " + sFileName + " >\n already exists on Remote Machine\n Are you sure you want to overwrite it ?", "File Transfer Warning", JOptionPane.YES_NO_OPTION);
++			int r = JOptionPane.showConfirmDialog(jContentPane, "The file < " + sFileName + " >\n already exists on Remote Machine\n Are you sure you want to overwrite it ?", "File Transfer Warning", JOptionPane.YES_NO_OPTION);
+ 			if (r == JOptionPane.NO_OPTION)
+ 				return;
+ 		}
+@@ -1013,6 +1410,7 @@
+ 	// 
+ 	private void doStop()
+ 	{
++		System.out.println("** Current Transfer Aborted **");
+ 		viewer.rfb.fAbort = true;
+ 	}
+ 	/**
+@@ -1024,6 +1422,14 @@
+ 		System.out.println("History: " + message);
+ 		historyComboBox.insertItemAt(new String(message), 0);
+ 	}
++
++	public void receivedRemoteDirectoryName(String str) {
++		if (doingShortcutDir) {
++			if (str.length() > 1) {
++				remoteLocation.setText(str);
++			}
++		}
++	}
+ 	
+ 	/**
+ 	 * This method updates the file table to the current selection of the remoteComboBox
+@@ -1034,11 +1440,41 @@
+ 		remoteSelection = null;
  	
  		if (!updateDriveList) {
- 			String drive =	remoteDrivesComboBox.getSelectedItem().toString().substring(0,1)+ ":\\";
-+//System.out.println("changeRemoteDrive-A " + drive);	// runge/x11vnc
-+			drive = saveRemoteHack(drive);
- 			viewer.rfb.readServerDirectory(drive);
- 			remoteLocation.setText(drive);
-+//System.out.println("changeRemoteDrive-B " + drive);	// runge/x11vnc
+-			String drive =	remoteDrivesComboBox.getSelectedItem().toString().substring(0,1)+ ":\\";
+-			viewer.rfb.readServerDirectory(drive);
+-			remoteLocation.setText(drive);
++//System.out.println("changeRemoteDrive-A " + drive);	// begin runge/x11vnc
++			Object selected = remoteDrivesComboBox.getSelectedItem();
++			if (selected != null)  {
++				String instr =	selected.toString();
++				if (instr != null) {
++System.out.println("changeRemoteDrive: instr='" + instr + "'");
++					String drive =	instr.substring(0,1)+ ":\\";
++					if (instr.startsWith(" [")) {
++						int idx = instr.lastIndexOf(']'); 
++						if (idx > 2) {
++							drive = instr.substring(2, idx);
++						} else {
++							drive = instr.substring(2);
++						}
++						drive += "\\";
++						doingShortcutDir = true;
++					} else {
++						doingShortcutDir = false;
++						drive = saveRemoteHack(drive);
++					}
++					gotShortcutDir = false;
++					viewer.rfb.readServerDirectory(drive);
++					if (!gotShortcutDir) {
++						remoteLocation.setText(drive);
++					}
++				} else {
++System.out.println("changeRemoteDrive: instr null");
++				}
++			} else {
++System.out.println("changeRemoteDrive: selection null");
++			}
++//System.out.println("changeRemoteDrive-B " + drive);	// end runge/x11vnc
  		}
  		remoteList.clear();
 +		remoteListInfo.clear();
  		remoteFileTable.setListData(remoteList);
  	}
  	/**
-@@ -1048,6 +1277,7 @@
+@@ -1048,6 +1484,7 @@
  	private void changeLocalDrive()
  	{
  		File currentDrive = new File(localDrivesComboBox.getSelectedItem().toString());
@@ -769,7 +1144,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		if(currentDrive.canRead())
  		{
  			localSelection = null;
-@@ -1057,9 +1287,11 @@
+@@ -1057,9 +1494,11 @@
  		else
  		{
  			localList.clear();
@@ -781,8 +1156,20 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  	}
  	/**
  	 * Determines which FileTable was double-clicked and updates the table
-@@ -1101,7 +1333,7 @@
- 		String name = (remoteFileTable.getSelectedValue().toString()).substring(1);
+@@ -1098,10 +1537,18 @@
+ 		selectedTable = "remote";
+ 		localFileTable.setBackground(new Color(238, 238, 238));
+ 		remoteFileTable.setBackground(new Color(255, 255, 255));
+-		String name = (remoteFileTable.getSelectedValue().toString()).substring(1);
++		Object selected = remoteFileTable.getSelectedValue();
++		if (selected == null) {
++			return;
++		}
++		String selstr = selected.toString();
++		if (selstr == null) {
++			return;
++		}
++		String name = selstr.substring(1);
  		if( !name.substring(0, 2).equals(" ["))	
  			remoteSelection = remoteLocation.getText() + name.substring(0, name.length());
 -		
@@ -790,7 +1177,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  	}
  
  	/*
-@@ -1115,10 +1347,38 @@
+@@ -1115,10 +1562,38 @@
  		localFileTable.setBackground(new Color(255, 255, 255));
  		File currentSelection = new File(currentLocalDirectory, getTrimmedSelection());
  		
@@ -830,7 +1217,31 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  	/**
  	 * Updates the Remote File Table based on selection.  Called from mouseClicked handler
  	 */
-@@ -1140,6 +1400,7 @@
+@@ -1126,20 +1601,29 @@
+ 		String name = null;
+ 		String action = null;
+ 		String drive = null;
+-		name = (remoteFileTable.getSelectedValue().toString()).substring(1);
++		Object selected = remoteFileTable.getSelectedValue();
++		if (selected == null) {
++			return;
++		}
++		String sname = selected.toString();
++		if (sname == null) {
++			return;
++		}
++		name = sname.substring(1);
+ 
+ 		if (name.equals("[..]"))
+ 		{
+ 			action = "up";
+ 			remoteSelection = null;
+ 			drive = remoteLocation.getText().substring(0, remoteLocation.getText().length() - 1);
+-			// JOptionPane.showMessageDialog(null, (String)drive, "FileTransfer DEBUG", JOptionPane.INFORMATION_MESSAGE);
++			// JOptionPane.showMessageDialog(jContentPane, (String)drive, "FileTransfer DEBUG", JOptionPane.INFORMATION_MESSAGE);
+ 			int index = drive.lastIndexOf("\\");
+ 			drive = drive.substring(0, index + 1);
+ 
  			remoteLocation.setText(drive);
  			viewer.rfb.readServerDirectory(drive);
  			remoteList.clear();
@@ -838,7 +1249,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  			remoteFileTable.setListData(remoteList);	
  		}
  		else if (!name.substring(0, 2).equals(" [") && !name.substring((name.length() - 1), name.length()).equals("]"))
-@@ -1149,6 +1410,7 @@
+@@ -1149,6 +1633,7 @@
  			remoteSelection = remoteLocation.getText() + name.substring(0, name.length());
  			drive = remoteLocation.getText();
  			// ??
@@ -846,7 +1257,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		else
  		{ 
-@@ -1159,10 +1421,12 @@
+@@ -1159,10 +1644,12 @@
  			remoteLocation.setText(drive);
  			viewer.rfb.readServerDirectory(drive);
  			remoteList.clear();
@@ -859,7 +1270,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  	/**
  	 * Updates the Local File Table based on selection. Called from MouseClicked handler
  	 */
-@@ -1188,6 +1452,7 @@
+@@ -1188,6 +1675,7 @@
  		else if (currentSelection.isFile())
  		{
  			localSelection = currentSelection.getAbsoluteFile();
@@ -867,7 +1278,37 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  		}
  		else if (currentSelection.isDirectory())
  		{
-@@ -1241,36 +1506,113 @@
+@@ -1201,13 +1689,22 @@
+ 	 * 
+ 	 */
+ 	private String getTrimmedSelection(){
+-		String currentSelection = (localFileTable.getSelectedValue().toString()).substring(1);
+-				if(currentSelection.substring(0,1).equals("[") &&
+-				currentSelection.substring(currentSelection.length()-1,currentSelection.length()).equals("]")){
+-				return currentSelection.substring(1,currentSelection.length()-1);
+-				} else {
+-					return currentSelection;
+-				}
++		String currentSelection = "";
++		Object selected = localFileTable.getSelectedValue();
++		if (selected == null) {
++			return currentSelection;
++		}
++		String selstr = selected.toString();
++		if (selstr == null) {
++			return currentSelection;
++		}
++		currentSelection = selstr.substring(1);
++		if(currentSelection.substring(0,1).equals("[") &&
++			currentSelection.substring(currentSelection.length()-1,currentSelection.length()).equals("]")){
++			return currentSelection.substring(1,currentSelection.length()-1);
++		} else {
++			return currentSelection;
++		}
+ 	}
+ 
+ 	/*
+@@ -1241,36 +1738,113 @@
  	 	return null;
  	}
  	
@@ -987,7 +1428,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
  			
  			FilesList.clear();
  			DirsList.clear();
-@@ -1296,3 +1638,135 @@
+@@ -1296,3 +1870,147 @@
  	}
  
  } //  @jve:visual-info  decl-index=0 visual-constraint="10,10"
@@ -1003,11 +1444,13 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +	int rcnt = 0;
 +	int tms = 250;
 +	boolean delete_it = false;
++	TextViewer me;
 +
 +	public TextViewer(String s, File f, boolean d) {
 +
 +		delete_it = d;
 +		file = f;
++		me = this;
 +
 +		JScrollPane scrollPane = new JScrollPane(textArea,
 +		    JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
@@ -1016,6 +1459,16 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +		textArea.setEditable(false);
 +		textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
 +
++		KeyStroke stroke = KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, InputEvent.SHIFT_MASK);
++		AbstractAction escapeAction = new AbstractAction() {
++			public void actionPerformed(ActionEvent actionEvent) {
++				cleanse();
++				me.dispose();
++			}
++		};
++		textArea.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(stroke, "escapeAction");
++		textArea.getInputMap().put(stroke, "escapeAction");
++		textArea.getActionMap().put("escapeAction", escapeAction);
 +
 +		refreshButton = new JButton();
 +		refreshButton.setText("Reload");
@@ -1140,8 +1593,16 @@ diff -Naur JavaViewer.orig/OptionsFrame.java JavaViewer/OptionsFrame.java
      choices[shareDesktopIndex].select("Yes");
 diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 --- JavaViewer.orig/RfbProto.java	2006-05-24 15:14:40.000000000 -0400
-+++ JavaViewer/RfbProto.java	2007-06-02 23:46:21.000000000 -0400
-@@ -86,8 +86,11 @@
++++ JavaViewer/RfbProto.java	2008-09-06 21:36:14.000000000 -0400
+@@ -31,6 +31,7 @@
+ import java.net.Socket;
+ import java.util.*;
+ import java.util.zip.*;
++import java.text.DateFormat;
+ 
+ 
+ class RfbProto {
+@@ -86,8 +87,11 @@
  
  	// sf@2004 - FileTransfer part
  	ArrayList remoteDirsList;
@@ -1153,7 +1614,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	boolean fFTInit = true; // sf@2004
  	boolean fFTAllowed = true;
  	boolean fAbort = false;
-@@ -199,6 +202,10 @@
+@@ -199,6 +203,10 @@
  	// playback.
  	int numUpdatesInSession;
  
@@ -1164,7 +1625,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	//
  	// Constructor. Make TCP connection to RFB server.
  	//
-@@ -207,7 +214,27 @@
+@@ -207,7 +215,27 @@
  		viewer = v;
  		host = h;
  		port = p;
@@ -1193,7 +1654,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		is =
  			new DataInputStream(
  				new BufferedInputStream(sock.getInputStream(), 16384));
-@@ -215,9 +242,12 @@
+@@ -215,9 +243,12 @@
  		osw = new OutputStreamWriter(sock.getOutputStream());
  		inDirectory2 = false;
  		a = new ArrayList();
@@ -1206,7 +1667,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	
  		sendFileSource = "";
  	}
-@@ -420,7 +450,13 @@
+@@ -420,7 +451,13 @@
  	//
  
  	int readServerMessageType() throws IOException {
@@ -1221,7 +1682,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  
  		// If the session is being recorded:
  		if (rec != null) {
-@@ -600,6 +636,7 @@
+@@ -600,6 +637,7 @@
  		contentParamT = is.readUnsignedByte();
  		contentParamT = contentParamT << 8;
  		contentParam = contentParam | contentParamT;
@@ -1229,7 +1690,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		if (contentType == rfbRDrivesList || contentType == rfbDirPacket)
  		{
  			readDriveOrDirectory(contentParam);
-@@ -610,7 +647,7 @@
+@@ -610,7 +648,7 @@
  		}
  		else if (contentType == rfbFilePacket)
  		{
@@ -1238,7 +1699,30 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		else if (contentType == rfbEndOfFile)
  		{
-@@ -645,6 +682,7 @@
+@@ -618,6 +656,10 @@
+ 		}
+ 		else if (contentType == rfbAbortFileTransfer)
+ 		{
++			System.out.println("rfbAbortFileTransfer: fFileReceptionRunning="
++			    + fFileReceptionRunning + " fAbort="
++			    + fAbort + " fFileReceptionError="
++			    + fFileReceptionError);
+ 			if (fFileReceptionRunning)
+ 			{
+ 				endOfReceiveFile(false); // Error
+@@ -626,6 +668,11 @@
+ 			{
+ 				// sf@2004 - Todo: Add TestPermission 
+ 				// System.out.println("File Transfer Aborted!");
++
++				// runge: seems like we must at least read the remaining
++				// 8 bytes of the header, right?
++				int size = is.readInt();
++				int length = is.readInt();
+ 			}
+ 			
+ 		}
+@@ -645,6 +692,7 @@
  		{
  			System.out.println("ContentType: " + contentType);
  		}
@@ -1246,7 +1730,15 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	}
  
  	//Refactored from readRfbFileTransferMsg()
-@@ -688,11 +726,11 @@
+@@ -662,6 +710,7 @@
+ 
+ 	//Refactored from readRfbFileTransferMsg()
+ 	public void readDriveOrDirectory(int contentParam) throws IOException {
++//System.out.println("RDOD: " + contentParam + " " + inDirectory2);
+ 		if (contentParam == rfbADrivesList)
+ 		{
+ 			readFTPMsgDriveList();
+@@ -688,11 +737,11 @@
  
  	// Internally used. Write an Rfb message to the server
  	void writeRfbFileTransferMsg(
@@ -1263,7 +1755,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	{
  		byte b[] = new byte[12];
  
-@@ -702,7 +740,10 @@
+@@ -702,7 +751,10 @@
  
  		byte by = 0;
  		long c = 0;
@@ -1275,7 +1767,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		c = size & 0xFF000000;
  		by = (byte) (c >>> 24);
  		b[4] = by;
-@@ -729,6 +770,8 @@
+@@ -729,6 +781,8 @@
  		by = (byte) c;
  		b[11] = by;
  		os.write(b);
@@ -1284,7 +1776,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		
  
  		if (text != null)
-@@ -746,12 +789,12 @@
+@@ -746,12 +800,12 @@
  
  	//Internally used. Write an rfb message to the server for sending files ONLY 
  	int writeRfbFileTransferMsgForSendFile(
@@ -1303,7 +1795,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	{
  		File f = new File(source);
  		fis = new FileInputStream(f);
-@@ -768,50 +811,51 @@
+@@ -768,50 +822,47 @@
  	
  		while (bytesRead!=-1)
  		{
@@ -1369,11 +1861,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 +				null
 +			);
 +			// Todo: Test write error !
-+			os.write(
-+					fCompress ? CompressionBuffer : byteBuffer,
-+					0,
-+					fCompress ? compressedSize : bytesRead
-+					);
++			os.write(fCompress ? CompressionBuffer : byteBuffer, 0, fCompress ? compressedSize : bytesRead);
 +			
 +			// Todo: test read error !
 +			bytesRead = fis.read(byteBuffer);
@@ -1399,7 +1887,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		
  		writeRfbFileTransferMsg(fError ? rfbAbortFileTransfer : rfbEndOfFile, 0, 0, 0, null);
-@@ -831,6 +875,15 @@
+@@ -831,24 +882,30 @@
  			{
  				System.out.print((char) is.readUnsignedByte());
  			}
@@ -1413,9 +1901,32 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 +				return;
 +			}
  			
- 			int ret = writeRfbFileTransferMsgForSendFile(
- 															rfbFilePacket,
-@@ -907,7 +960,7 @@
+-			int ret = writeRfbFileTransferMsgForSendFile(
+-															rfbFilePacket,
+-															0,
+-															0,
+-															0,
+-															sendFileSource);
++			int ret = writeRfbFileTransferMsgForSendFile(rfbFilePacket, 0, 0, 0, sendFileSource);
+ 	
+ 			viewer.ftp.refreshRemoteLocation();
+ 			if (ret != 1)
+ 			{
+ 				viewer.ftp.connectionStatus.setText(" > Error - File NOT sent");
+-				viewer.ftp.historyComboBox.insertItemAt(new String(" > Error - File: <" + sendFileSource) + "> was not correctly sent (aborted by user or error)",0);
++				viewer.ftp.historyComboBox.insertItemAt(new String(" > Error - File: <" + sendFileSource)
++				    + "> was not correctly sent (aborted or error). Data may still be buffered/in transit. Wait for remote listing...",0);
+ 			}
+ 			else
+ 			{
+ 				viewer.ftp.connectionStatus.setText(" > File sent");
+-				viewer.ftp.historyComboBox.insertItemAt(new String(" > File: <" + sendFileSource) + "> was sent to Remote Machine",0);
++				viewer.ftp.historyComboBox.insertItemAt(new String(" > File: <" + sendFileSource)
++				    + "> was sent to Remote Machine. Note: data may still be buffered/in transit. Wait for remote listing...",0);
+ 			}
+ 			viewer.ftp.historyComboBox.setSelectedIndex(0);
+ 			viewer.ftp.enableButtons();
+@@ -907,7 +964,7 @@
  	//Handles acknowledgement that the file has been deleted on the server
  	void deleteRemoteFileFeedback() throws IOException
  	{
@@ -1424,7 +1935,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		int length = is.readInt();
  		String f = "";
  		for (int i = 0; i < length; i++)
-@@ -916,7 +969,11 @@
+@@ -916,7 +973,11 @@
  		}
  		
  		viewer.ftp.refreshRemoteLocation();	
@@ -1437,24 +1948,21 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		viewer.ftp.historyComboBox.setSelectedIndex(0);
  	}
  
-@@ -927,11 +984,11 @@
+@@ -926,12 +987,7 @@
+ 		try
  		{
  			String temp = text;
- 			writeRfbFileTransferMsg(
+-			writeRfbFileTransferMsg(
 -									rfbCommand,
 -									rfbCFileDelete,
 -									0,
 -									temp.length(),
 -									temp);
-+				rfbCommand,
-+				rfbCFileDelete,
-+				0,
-+				temp.length(),
-+				temp);
++			writeRfbFileTransferMsg(rfbCommand, rfbCFileDelete, 0, temp.length(), temp);
  		}
  		catch (IOException e)
  		{
-@@ -943,7 +1000,7 @@
+@@ -943,7 +999,7 @@
  	// Handles acknowledgement that the directory has been created on the server
  	void createRemoteDirectoryFeedback() throws IOException
  	{
@@ -1463,7 +1971,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		int length = is.readInt();
  		String f="";
  		for (int i = 0; i < length; i++)
-@@ -951,7 +1008,11 @@
+@@ -951,7 +1007,11 @@
  			f += (char)is.readUnsignedByte();
  		}
  		viewer.ftp.refreshRemoteLocation();	
@@ -1476,7 +1984,21 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		viewer.ftp.historyComboBox.setSelectedIndex(0);
  	}
  
-@@ -979,15 +1040,17 @@
+@@ -961,12 +1021,7 @@
+ 		try
+ 		{
+ 			String temp = text;
+-			writeRfbFileTransferMsg(
+-				rfbCommand,
+-				rfbCDirCreate,
+-				0,
+-				temp.length(),
+-				temp);
++			writeRfbFileTransferMsg(rfbCommand, rfbCDirCreate, 0, temp.length(), temp);
+ 		}
+ 		catch (IOException e)
+ 		{
+@@ -979,15 +1034,13 @@
  	{
  		try
  		{
@@ -1485,21 +2007,18 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  			String temp = text;
  			receivePath = localPath;
  					
- 			writeRfbFileTransferMsg(
+-			writeRfbFileTransferMsg(
 -									rfbFileTransferRequest,
 -									0,
 -									1, // 0 : compression not supported - 1 : compression supported
 -									temp.length(),
 -									temp);
-+				rfbFileTransferRequest,
-+				0,
-+				1, // 0 : compression not supported - 1 : compression supported
-+				temp.length(),
-+				temp);
++			// 0 : compression not supported - 1 : compression supported
++			writeRfbFileTransferMsg(rfbFileTransferRequest, 0, 1, temp.length(), temp);
  		}
  		catch (IOException e)
  		{
-@@ -1004,6 +1067,9 @@
+@@ -1004,6 +1057,9 @@
  		viewer.ftp.disableButtons();
  		int size = is.readInt();
  		int length = is.readInt();
@@ -1509,7 +2028,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		
  		String tempName = "";
  		for (int i = 0; i < length; i++)
-@@ -1011,6 +1077,15 @@
+@@ -1011,6 +1067,15 @@
  			tempName += (char) is.readUnsignedByte();
  		}
  
@@ -1525,7 +2044,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		// sf@2004 - Read the high part of file size (not yet in rfbFileTransferMsg for 
  		// backward compatibility reasons...)
  		int sizeH = is.readInt();
-@@ -1021,7 +1096,16 @@
+@@ -1021,7 +1086,16 @@
  		fileSize=0;
  		fileChunkCounter = 0;
  		String fileName = receivePath;
@@ -1543,24 +2062,52 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		writeRfbFileTransferMsg(rfbFileHeader, 0, 0, 0, null);
  	}
  
-@@ -1133,11 +1217,11 @@
+@@ -1085,7 +1159,13 @@
+ 			fAbort = false;
+ 			fFileReceptionError = true;
+ 			writeRfbFileTransferMsg(rfbAbortFileTransfer, 0, 0, 0, null);
+-			
++
++			//runge for use with x11vnc/libvncserver, no rfbAbortFileTransfer reply sent.
++		        try {Thread.sleep(500);} catch (InterruptedException e) {}
++			viewer.ftp.enableButtons();
++			viewer.ftp.refreshLocalLocation();
++			viewer.ftp.connectionStatus.setText(" > Error - File NOT received");
++			viewer.ftp.historyComboBox.insertItemAt(new String(" > Error - File: <" + receivePath + "> not correctly received from Remote Machine (aborted by user or error)") ,0);
+ 		}
+ 		// sf@2004 - For old FT protocole only
+ 		/*
+@@ -1104,7 +1184,7 @@
+ 		int length = is.readInt();
+ 		fileSize=0;
+ 		fos.close();
+-		
++
+ 		viewer.ftp.refreshLocalLocation();
+ 		if (fReceptionOk && !fFileReceptionError)
+ 		{
+@@ -1132,12 +1212,7 @@
+ 		try
  		{
  			String temp = text;
- 			writeRfbFileTransferMsg(
+-			writeRfbFileTransferMsg(
 -									rfbDirContentRequest,
 -									rfbRDirContent,
 -									0,
 -									temp.length(),
 -									temp);
-+				rfbDirContentRequest,
-+				rfbRDirContent,
-+				0,
-+				temp.length(),
-+				temp);
++			writeRfbFileTransferMsg(rfbDirContentRequest, rfbRDirContent, 0, temp.length(), temp);
  		}
  		catch (IOException e)
  		{
-@@ -1202,6 +1286,52 @@
+@@ -1197,11 +1272,80 @@
+ 					str += temp;
+ 				}
+ 			}
++			// runge
++			viewer.ftp.receivedRemoteDirectoryName(str);
+ 			// viewer.ftp.changeRemoteDirectory(str);
+ 			
  		}
  	}
  
@@ -1573,13 +2120,34 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 +		l = (l >> 24) | ((l & 0x00ff0000) >> 8) | ((l & 0x0000ff00) << 8) | (l << 24);
 +		return (int) l;
 +	}
++
++	int windozeToUnix(int L, int H) {
++		long L2 = zogswap(L);
++		long H2 = zogswap(H);
++		long unix = (H2 << 32) + L2;
++		unix -= 11644473600L * 10000000L;
++		unix /= 10000000L;
++		//System.out.println("unix time: " + unix + " H2: " + H2 + " L2: " + L2);
++		return (int) unix;
++	}
 +	
-+	String timeStr(int t) {
-+		t = zogswap(t);
++	String timeStr(int t, int h) {
++		if (h == 0) {
++			// x11vnc/libvncserver unix
++			t = zogswap(t);
++		} else {
++			// ultra (except if h==0 by chance)
++			t = windozeToUnix(t, h);
++		}
 +		long tl = (long) t;
 +		Date date = new Date(tl * 1000);
-+		return date.toString();
++		if (true) {
++			return date.toString();
++		} else {
++			return DateFormat.getDateTimeInstance().format(date);
++		}
 +	}
++
 +	String dotPast(double f, int n) {
 +		String fs = "" + f;
 +		int i = fs.lastIndexOf(".") + n;
@@ -1613,7 +2181,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	//Internally used to receive directory content from server
  	//Here, the server sends one file/directory with it's attributes
  	void readFTPMsgDirectoryListContent() throws IOException
-@@ -1217,17 +1347,25 @@
+@@ -1217,17 +1361,25 @@
  			dwReserved0,
  			dwReserved1;
  		long ftCreationTime, ftLastAccessTime, ftLastWriteTime;
@@ -1642,11 +2210,26 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		length -= 8;
  		nFileSizeHigh = is.readInt();
  		length -= 4;
-@@ -1263,11 +1401,68 @@
+@@ -1253,7 +1405,9 @@
+ 			cAlternateFileName = (char) is.readUnsignedByte();
+ 			length--;
+ 		}
+-		if (dwFileAttributes == 268435456
++		if (fileName.length() <= 0) {
++			;
++		} else if (dwFileAttributes == 268435456
+ 			|| dwFileAttributes == 369098752
+ 			|| dwFileAttributes == 285212672 
+ 			|| dwFileAttributes == 271056896
+@@ -1263,11 +1417,74 @@
  			|| dwFileAttributes == 369623040)
  		{
  			fileName = " [" + fileName + "]";
 -			remoteDirsList.add(fileName); // sf@2004
+-		}
+-		else
+-		{
+-			remoteFilesList.add(" " + fileName); // sf@2004
 +// begin runge/x11vnc
 +//			remoteDirsList.add(fileName); // sf@2004
 +			int i = -1;
@@ -1659,14 +2242,14 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 +					break;
 +				}
 +			}
-+			//String s = "Lastmod: " + timeStr(ftLastWriteTimeL) + "    " + fileName; 
++			//String s = "Lastmod: " + timeStr(ftLastWriteTimeL, ftLastWriteTimeH) + "    " + fileName; 
 +			String f2 = fileName;
 +			if (f2.length() < 24) {
 +				for (int ik = f2.length(); ik < 24; ik++) {
 +					f2 = f2 + " ";
 +				}
 +			}
-+			String s = f2 + "    \tLastmod: " + timeStr(ftLastWriteTimeL) + "    \t\tSize: " + sizeStr(nFileSizeLow); 
++			String s = f2 + "    \tLastmod: " + timeStr(ftLastWriteTimeL, ftLastWriteTimeH) + "    \t\tSize: " + sizeStr(nFileSizeLow); 
 +			//s = fileName + " Lastmod: " + zogswap(ftLastWriteTimeL); 
 +			if (i >= 0) {
 +				remoteDirsList.add(i, fileName);
@@ -1676,10 +2259,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 +				remoteDirsListInfo.add(s);
 +			}
 +// end runge/x11vnc
- 		}
- 		else
- 		{
--			remoteFilesList.add(" " + fileName); // sf@2004
++		} else {
 +// begin runge/x11vnc
 +//			remoteFilesList.add(" " + fileName); // sf@2004
 +	
@@ -1700,7 +2280,15 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 +					f2 = f2 + " ";
 +				}
 +			}
-+			String s = f2 + "    \tLastmod: " + timeStr(ftLastWriteTimeL) + "    \t\tSize: " + sizeStr(nFileSizeLow); 
++
++if (false) {
++System.out.println("fileName:         " + f2);
++System.out.println("ftLastWriteTimeL: " + ftLastWriteTimeL);
++System.out.println("ftLastWriteTimeH: " + ftLastWriteTimeH);
++System.out.println("nFileSizeLow:     " + nFileSizeLow);
++}
++
++			String s = f2 + "    \tLastmod: " + timeStr(ftLastWriteTimeL, ftLastWriteTimeH) + "    \t\tSize: " + sizeStr(nFileSizeLow); 
 +			//s = fileName + " Lastmod: " + ftLastWriteTimeL + "/" + zogswap(ftLastWriteTimeL) + "  Size: " + nFileSizeLow + "/" + zogswap(nFileSizeLow); 
 +			if (i >= 0) {
 +				remoteFilesList.add(i, fileName);
@@ -1713,7 +2301,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  	
  		// a.add(fileName);
-@@ -1282,14 +1477,31 @@
+@@ -1282,14 +1499,31 @@
  
  		// sf@2004
  		a.clear();
@@ -1748,7 +2336,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	}
  
  	//Internally used to signify the drive requested is not ready
-@@ -1299,6 +1511,8 @@
+@@ -1299,6 +1533,8 @@
  		System.out.println("Remote Drive unavailable");
  		viewer.ftp.connectionStatus.setText(" > WARNING - Remote Drive unavailable (possibly restricted access or media not present)");
  		viewer.ftp.remoteStatus.setText("WARNING: Remote Drive unavailable");
@@ -1757,20 +2345,17 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	}
  
  	//Call this method to request the list of drives on the server.
-@@ -1307,11 +1521,15 @@
+@@ -1306,12 +1542,11 @@
+ 	{
  		try
  		{
- 			viewer.rfb.writeRfbFileTransferMsg(
+-			viewer.rfb.writeRfbFileTransferMsg(
 -												RfbProto.rfbDirContentRequest,
 -												RfbProto.rfbRDrivesList,
 -												0,
 -												0,
 -												null);
-+				RfbProto.rfbDirContentRequest,
-+				RfbProto.rfbRDrivesList,
-+				0,
-+				0,
-+				null);
++			viewer.rfb.writeRfbFileTransferMsg(RfbProto.rfbDirContentRequest, RfbProto.rfbRDrivesList, 0, 0, null);
 +// begin runge/x11vnc
 +			readServerDriveListCnt = 0;
 +			readServerDriveListTime = System.currentTimeMillis();
@@ -1778,7 +2363,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		catch (IOException e)
  		{
-@@ -1355,21 +1573,21 @@
+@@ -1355,21 +1590,21 @@
  		int h,
  		boolean incremental)
  		throws IOException {
@@ -3398,8 +3983,8 @@ diff -Naur JavaViewer.orig/VncCanvas.java JavaViewer/VncCanvas.java
  						result = 0; // Transparent pixel
 diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 --- JavaViewer.orig/VncViewer.java	2006-05-24 15:14:40.000000000 -0400
-+++ JavaViewer/VncViewer.java	2007-09-03 23:31:31.000000000 -0400
-@@ -80,7 +80,7 @@
++++ JavaViewer/VncViewer.java	2008-08-27 10:46:27.000000000 -0400
+@@ -80,11 +80,11 @@
    GridBagLayout gridbag;
    ButtonPanel buttonPanel;
    AuthPanel authenticator;
@@ -3408,6 +3993,11 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
    OptionsFrame options;
    ClipboardFrame clipboard;
    RecordingFrame rec;
+-  FTPFrame ftp; // KMC: FTP Frame declaration
++  FTPFrame ftp = null; // KMC: FTP Frame declaration
+ 
+   // Control session recording.
+   Object recordingSync;
 @@ -96,7 +96,7 @@
  
    // Variables read from parameter values.
@@ -3417,7 +4007,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
    String passwordParam;
    String encPasswordParam;
    boolean showControls;
-@@ -115,6 +115,28 @@
+@@ -115,28 +115,66 @@
    int i;
    // mslogon support 2 end
  
@@ -3446,7 +4036,24 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
    //
    // init()
    //
-@@ -124,19 +146,20 @@
+ 
++public void ftp_init() {
++	boolean show = false;
++	if (ftp != null) {
++		show = true;
++	}
++	ftp = null;
++
++	ftp = new FTPFrame(this); // KMC: FTPFrame creation
++
++	if (show) {
++		ftp.doOpen();
++		rfb.readServerDriveList();
++	}
++}
++
+   public void init() {
+ 
      readParameters();
  
      if (inSeparateFrame) {
@@ -3473,7 +4080,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // authenticator = new AuthPanel(false);   // mslogon support : go to connectAndAuthenticate()
      if (RecordingFrame.checkSecurity())
        rec = new RecordingFrame(this);
-@@ -147,7 +170,7 @@
+@@ -147,10 +185,11 @@
      cursorUpdatesDef = null;
      eightBitColorsDef = null;
  
@@ -3481,8 +4088,13 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +    if (inSeparateFrame && vncFrame != null)
        vncFrame.addWindowListener(this);
  
-     ftp = new FTPFrame(this); // KMC: FTPFrame creation
-@@ -186,6 +209,30 @@
+-    ftp = new FTPFrame(this); // KMC: FTPFrame creation
++    ftp_init();
++
+     rfbThread = new Thread(this);
+     rfbThread.start();
+   }
+@@ -186,6 +225,30 @@
        gbc.weightx = 1.0;
        gbc.weighty = 1.0;
  
@@ -3513,7 +4125,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  	// Add ScrollPanel to applet mode
  
  	// Create a panel which itself is resizeable and can hold
-@@ -286,6 +333,24 @@
+@@ -286,6 +349,24 @@
  
    void connectAndAuthenticate() throws Exception {
  
@@ -3538,7 +4150,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // If "ENCPASSWORD" parameter is set, decrypt the password into
      // the passwordParam string.
  
-@@ -336,7 +401,22 @@
+@@ -336,7 +417,22 @@
      //
  
      
@@ -3562,7 +4174,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      authenticator = new AuthPanel(mslogon);
      
-@@ -390,6 +470,10 @@
+@@ -390,6 +486,10 @@
  	break;
        //mslogon support end
  
@@ -3573,7 +4185,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
        // Retry on authentication failure.
        authenticator.retry();
      }
-@@ -405,9 +489,11 @@
+@@ -405,9 +505,11 @@
  
    void prologueDetectAuthProtocol() throws Exception {
  
@@ -3587,7 +4199,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      System.out.println("RFB server supports protocol version " +
  		       rfb.serverMajor + "." + rfb.serverMinor);
-@@ -431,16 +517,36 @@
+@@ -431,16 +533,36 @@
  
    boolean tryAuthenticate(String us, String pw) throws Exception {
      
@@ -3607,10 +4219,10 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +			       rfb.serverMajor + "." + rfb.serverMinor);
 +
 +		rfb.writeVersionMsg();
-+
-+		authScheme = rfb.readAuthScheme();
  
 -    int authScheme = rfb.readAuthScheme();
++		authScheme = rfb.readAuthScheme();
++
 +		gotAuth = true;
 +		authGot = authScheme;
 +	} else {
@@ -3630,7 +4242,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      switch (authScheme) {
  
-@@ -629,6 +735,10 @@
+@@ -629,6 +751,10 @@
  
    void doProtocolInitialisation() throws IOException {
  
@@ -3641,7 +4253,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfb.writeClientInit();
  
      rfb.readServerInit();
-@@ -775,8 +885,25 @@
+@@ -775,8 +901,25 @@
        }
      }
  
@@ -3669,7 +4281,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      if (inAnApplet) {
        str = readParameter("Open New Window", false);
-@@ -804,6 +931,90 @@
+@@ -804,6 +947,90 @@
      deferScreenUpdates = readIntParameter("Defer screen updates", 20);
      deferCursorUpdates = readIntParameter("Defer cursor updates", 10);
      deferUpdateRequests = readIntParameter("Defer update requests", 50);

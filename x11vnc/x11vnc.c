@@ -965,7 +965,7 @@ void check_redir_services(void) {
 }
 
 void ssh_remote_tunnel(char *instr, int lport) {
-	char *p, *q, *cmd, *ssh;
+	char *q, *cmd, *ssh;
 	char *s = strdup(instr);
 	int sleep = 300, disp = 0, sport = 0;
 	int rc, len, rport;
@@ -1089,7 +1089,6 @@ void ssh_remote_tunnel(char *instr, int lport) {
 
 	free(cmd);
 	free(s);
-
 }
 
 void check_filexfer(void) {
@@ -1272,6 +1271,11 @@ static void watch_loop(void) {
 			check_xrecord_reset(0);
 			check_add_keysyms();
 			check_new_passwds(0);
+#ifdef ENABLE_GRABLOCAL
+			if (grab_local) {
+				check_local_grab();
+			}
+#endif
 			if (started_as_root) {
 				check_switched_user();
 			}
@@ -2600,13 +2604,18 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-connect") ||
 		    !strcmp(arg, "-connect_or_exit")) {
 			CHECK_ARGC
-			if (strchr(argv[++i], '/' && !strstr(argv[i], "repeater://"))) {
-				client_connect_file = strdup(argv[i]);
-			} else {
-				client_connect = strdup(argv[i]);
-			}
 			if (!strcmp(arg, "-connect_or_exit")) {
 				connect_or_exit = 1;
+			}
+			if (strchr(argv[++i], '/') && !strstr(argv[i], "repeater://")) {
+				struct stat sb;
+				client_connect_file = strdup(argv[i]);
+				if (stat(client_connect_file, &sb) != 0) {
+					FILE* f = fopen(client_connect_file, "w");
+					if (f != NULL) fclose(f);
+				}
+			} else {
+				client_connect = strdup(argv[i]);
 			}
 		} else if (!strcmp(arg, "-proxy")) {
 			CHECK_ARGC
@@ -2634,6 +2643,11 @@ int main(int argc, char* argv[]) {
 			grab_kbd = 1;
 			grab_ptr = 1;
 			grab_always = 1;
+#ifdef ENABLE_GRABLOCAL
+		} else if (!strcmp(arg, "-grablocal")) {
+			CHECK_ARGC
+			grab_local = atoi(argv[++i]);
+#endif
 		} else if (!strcmp(arg, "-viewpasswd")) {
 			vpw_loc = i;
 			CHECK_ARGC
@@ -3368,6 +3382,8 @@ int main(int argc, char* argv[]) {
 			macosx_icon_anim_time = atoi(argv[++i]);
 		} else if (!strcmp(arg, "-macmenu")) {
 			macosx_ncache_macmenu = 1;
+		} else if (!strcmp(arg, "-macuskbd")) {
+			macosx_us_kbd = 1;
 		} else if (!strcmp(arg, "-gui")) {
 			launch_gui = 1;
 			if (i < argc-1) {

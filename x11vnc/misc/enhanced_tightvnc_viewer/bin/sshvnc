@@ -1,0 +1,7 @@
+#!/bin/sh
+# 
+# wrapper for SSH_ONLY mode 
+# 
+PATH=`dirname "$0"`:$PATH; export PATH
+SSVNC_SSH_ONLY=1; export SSVNC_SSH_ONLY
+exec ssvnc -ssh "$@"

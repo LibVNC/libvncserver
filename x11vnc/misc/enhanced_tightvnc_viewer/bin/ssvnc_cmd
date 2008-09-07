@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2006-2008 by Karl J. Runge <runge@karlrunge.com>
 #
 # ssvnc_cmd:
 #
@@ -23,9 +23,15 @@
 #
 # Usage:
 #
-#     ssvnc_cmd [ss_vncviewer-args] hostname:N [tightvncviewer-args]
+#     ssvnc_cmd [ss_vncviewer-args] hostname:N [vncviewer-args]
 #
-# "hostname:N" is the host and VNC display to connect to, e.g. snoopy:0
+#  if, instead, this script is named "tightvncviewer" it calls the
+#  vncviewer directly and must be invoked as:
+#
+#     tightvncviewer [vncviewer-args] hostname:N
+#
+# In both cases, "hostname:N" is the host and VNC display to connect to,
+# e.g. snoopy:0
 #
 # See the script util/ss_vncviewer for details about its arguments:
 #
@@ -35,6 +41,8 @@
 #	-alpha
 #	-grab
 #
+# N.B. if this script is named "tightvncviewer" the vncviewer is called
+# directly, and there won't be any SSL or SSH encryption tunnels.
 #
 # If the *very first* argument is "-cotvnc" then it is assumed you are on
 # Darwin and want to run the Chicken of the VNC viewer via our wrapper.
@@ -75,9 +83,12 @@
 #       Option names may be abbreviated, e.g. -bgr instead of -bgr233.
 #       See the manual page for more information.
 #  
+# Note: the enhanced tightvnc viewer (SSVNC) has many more options, run
+# this script as "ssvnc_cmd Vnc://a:0 -help" or "tightvncviewer -help"
+# to seem them.
 
-if [ "X$1" = "X-h" -o "X$1" = "X-help" -o "X$1" = "X--help" ]; then
-	head -76 "$0" | grep -v bin/sh
+if [ "X$1" = "X-h" -o "X$1" = "X-helpxxx" -o "X$1" = "X--help" ]; then
+	tail -n +2 "$0" | sed -e '/^$/ q' -e 's/^#//' 
 	exit
 fi
 
@@ -145,12 +156,20 @@ do
 done
 dir=`dirname "$f"`
 PATH="$dir:$PATH"
+SSVNC_BASEDIR="$dir"
+export SSVNC_BASEDIR
+SSVNC_UNAME="$name"
+export SSVNC_UNAME
 
 nearby=0
 if [ -x "$dir/vncviewer" -a -x "$dir/stunnel" ]; then
 	nearby=1
 fi
-if [ ! -d "$dir/$name" -a $nearby = 0 ]; then
+if [ "X$name" = "X." ]; then
+	:
+	#type vncviewer
+	#type stunnel
+elif [ ! -d "$dir/$name" -a $nearby = 0 ]; then
 	echo
 	echo "Cannot find platform dir for your OS `uname -sm`:"
 	echo
@@ -223,6 +242,9 @@ fi
 #
 #
 if [ $use_ours = 1 ]; then
+	# avoid system vncviewer app-defaults
+	#XFILESEARCHPATH="/tmp/path/nowhere"; export XFILESEARCHPATH
+
 	if [ "X$base" = "Xtightvncviewer" ]; then
 		$VNCVIEWERCMD -encodings 'copyrect tight zrle zlib hextile' "$@"
 	else

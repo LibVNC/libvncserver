@@ -25,6 +25,7 @@ Window tray_request = None;
 Window tray_window = None;
 int tray_unembed = 0;
 pid_t run_gui_pid = 0;
+pid_t gui_pid = 0;
 
 
 char *get_gui_code(void);
@@ -49,6 +50,10 @@ static Window tweak_tk_window_id(Window win) {
 #else
 	char *name = NULL;
 	Window parent, new;
+
+	if (getenv("NO_TWEAK_TK_WINDOW_ID")) {
+		return win;
+	}
 
 	/* hack for tk, does not report outermost window */
 	new = win;
@@ -684,8 +689,10 @@ void do_gui(char *opts, int sleep) {
 					fprintf(icon_mode_fh, "none\n");
 					fflush(icon_mode_fh);
 					if (! got_connect_once) {
-						/* want -forever for tray */
-						connect_once = 0;
+						if (!client_connect && !connect_or_exit) {
+							/* want -forever for tray? */
+							connect_once = 0;
+						}
 					}
 				}
 			}
@@ -707,6 +714,7 @@ void do_gui(char *opts, int sleep) {
 		}
 		if (connect_to_x11vnc) {
 			run_gui_pid = p;
+			gui_pid = p;
 		}
 #else
 		fprintf(stderr, "system does not support fork: start "

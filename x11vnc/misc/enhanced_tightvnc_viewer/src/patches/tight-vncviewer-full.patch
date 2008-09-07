@@ -1,7 +1,14 @@
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncviewer/Vncviewer
 --- vnc_unixsrc.orig/vncviewer/Vncviewer	2003-02-07 05:30:57.000000000 -0500
-+++ vnc_unixsrc/vncviewer/Vncviewer	2008-02-17 13:34:03.000000000 -0500
-@@ -5,9 +5,9 @@
++++ vnc_unixsrc/vncviewer/Vncviewer	2008-08-24 16:26:01.000000000 -0400
+@@ -1,20 +1,22 @@
+ !
+-! Application defaults file for vncviewer.
++! Application defaults file for SSVNC vncviewer.
++!
++! N.B.: You will need to rename this file to be "Ssvnc" instead of "Vncviewer"
+ !
+ 
  
  !
  ! The title of the main window.  "%s" will be replaced by the desktop name.
@@ -9,11 +16,38 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
 +!
  
 -Vncviewer.title: TightVNC: %s
-+Vncviewer.title: SSVNC: %s Press F8 for Menu
++Ssvnc.title: SSVNC: %s Press F8 for Menu
  
  
  !
-@@ -50,6 +50,7 @@
+ ! Translations on the main window.
+ !
+ 
+-Vncviewer.translations:\
++Ssvnc.translations:\
+   <Enter>: SelectionToVNC()\n\
+   <Leave>: SelectionFromVNC()
+ 
+@@ -23,7 +25,7 @@
+ ! Uncomment to grab the keyboard in full-screen mode.
+ !
+ 
+-! Vncviewer.grabKeyboard: True
++! Ssvnc.grabKeyboard: True
+ 
+ 
+ !
+@@ -43,6 +45,9 @@
+ *viewport.useRight: True
+ *viewport*Scrollbar*thumb: None
+ 
++*viewport.horizontal.height:   6
++*viewport.vertical.width:   6
++
+ 
+ !
+ ! Default translations on desktop window.
+@@ -50,89 +55,591 @@
  
  *desktop.baseTranslations:\
    <Key>F8: ShowPopup()\n\
@@ -21,25 +55,97 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
    <ButtonPress>: SendRFBEvent()\n\
    <ButtonRelease>: SendRFBEvent()\n\
    <Motion>: SendRFBEvent()\n\
-@@ -72,17 +73,51 @@
- *passwordDialog.dialog.value.translations: #override\n\
-   <Key>Return: PasswordDialogDone()
+   <KeyPress>: SendRFBEvent()\n\
+   <KeyRelease>: SendRFBEvent()
  
++*viewport.horizontal.translations: #override\n\
++     <KeyPress>Right:  StartScroll(Forward)\n\
++     <KeyRelease>Right:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Left:  StartScroll(Backward)\n\
++     <KeyRelease>Left:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Next:  StartScroll(Forward)\n\
++     <KeyRelease>Next:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Prior:  StartScroll(Backward)\n\
++     <KeyRelease>Prior:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>z:  StartScroll(Forward)\n\
++     <KeyRelease>z:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>a:  StartScroll(Backward)\n\
++     <KeyRelease>a:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>f:  StartScroll(Forward)\n\
++     <KeyRelease>f:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>b:  StartScroll(Backward)\n\
++     <KeyRelease>b:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Down:  StartScroll(Forward)\n\
++     <KeyRelease>Down:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Up:  StartScroll(Backward)\n\
++     <KeyRelease>Up:  NotifyScroll(FullLength) EndScroll()
++
++*viewport.vertical.translations: #override\n\
++     <KeyPress>Down:  StartScroll(Forward)\n\
++     <KeyRelease>Down:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Up:  StartScroll(Backward)\n\
++     <KeyRelease>Up:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Next:  StartScroll(Forward)\n\
++     <KeyRelease>Next:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Prior:  StartScroll(Backward)\n\
++     <KeyRelease>Prior:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>z:  StartScroll(Forward)\n\
++     <KeyRelease>z:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>a:  StartScroll(Backward)\n\
++     <KeyRelease>a:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>f:  StartScroll(Forward)\n\
++     <KeyRelease>f:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>b:  StartScroll(Backward)\n\
++     <KeyRelease>b:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Right:  StartScroll(Forward)\n\
++     <KeyRelease>Right:  NotifyScroll(FullLength) EndScroll()\n\
++     <KeyPress>Left:  StartScroll(Backward)\n\
++     <KeyRelease>Left:  NotifyScroll(FullLength) EndScroll()
++
+ 
+ !
+ ! Dialog boxes
+ !
+ 
+ *serverDialog.dialog.label: VNC server:
++
+ *serverDialog.dialog.value:
++
+ *serverDialog.dialog.value.translations: #override\n\
+-  <Key>Return: ServerDialogDone()
++     <Key>Return: ServerDialogDone()
++
 +*ycropDialog.dialog.label: Y Crop (max-height in pixels):
++
 +*ycropDialog.dialog.value:
-+*ycropDialog.dialog.value.translations: #override\\n\
++
++*ycropDialog.dialog.value.translations: #override\n\
 +     <Key>Return: YCropDialogDone()
 +
 +*scbarDialog.dialog.label: Scroll Bars width:
++
 +*scbarDialog.dialog.value:
-+*scbarDialog.dialog.value.translations: #override\\n\
++
++*scbarDialog.dialog.value.translations: #override\n\
 +     <Key>Return: ScbarDialogDone()
 +
 +*scaleDialog.dialog.label: Integer n for 1/n server scaling:
-+*scaleDialog.dialog.value:
-+*scaleDialog.dialog.value.translations: #override\\n\
-+     <Key>Return: ScaleDialogDone()
 +
++*scaleDialog.dialog.value:
++
++*scaleDialog.dialog.value.translations: #override\n\
++     <Key>Return: ScaleDialogDone()
+ 
+ *passwordDialog.dialog.label: Password:
++
+ *passwordDialog.dialog.value:
++
+ *passwordDialog.dialog.value.AsciiSink.echo: False
++
+ *passwordDialog.dialog.value.translations: #override\n\
+-  <Key>Return: PasswordDialogDone()
++     <Key>Return: PasswordDialogDone()
+ 
  
  !
  ! Popup window appearance
@@ -47,423 +153,538 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
  
 -*popup.title: TightVNC popup
 +*popup.title: SSVNC popup
++
  *popup*background: grey
 -*popup*font: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*
+-*popup.buttonForm.Command.borderWidth: 0
+-*popup.buttonForm.Toggle.borderWidth: 0
++
 +*popup*font_old: -*-helvetica-bold-r-*-*-16-*-*-*-*-*-*-*
++
 +*popup*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
- *popup.buttonForm.Command.borderWidth: 0
- *popup.buttonForm.Toggle.borderWidth: 0
- 
++
++*popup.buttonForm*.Command.borderWidth: 0
++
++*popup.buttonForm*.Toggle.borderWidth: 0
++
 +*scaleN.title: 1/n scale
++
 +*scaleN*background: grey
++
 +*scaleN*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
++
 +*scaleN.buttonForm.Command.borderWidth: 0
++
 +*scaleN.buttonForm.Toggle.borderWidth: 0
 +
 +*quality.title: quality
++
 +*quality*background: grey
++
 +*quality*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
++
 +*quality.buttonForm.Command.borderWidth: 0
++
 +*quality.buttonForm.Toggle.borderWidth: 0
 +
 +*compress.title: compress
++
 +*compress*background: grey
++
 +*compress*font: -*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*
++
 +*compress.buttonForm.Command.borderWidth: 0
++
 +*compress.buttonForm.Toggle.borderWidth: 0
 +
+ 
  !
  ! Translations on popup window - send key presses through
  !
-@@ -96,43 +131,344 @@
+ 
+ *popup.translations: #override <Message>WM_PROTOCOLS: HidePopup()
++
+ *popup.buttonForm.translations: #override\n\
+-  <KeyPress>: SendRFBEvent() HidePopup()
++     <KeyPress>: SendRFBEvent() HidePopup()
+ 
+ 
+ !
  ! Popup buttons
  !
  
 -*popupButtonCount: 8
 +*popupButtonCount: 38
++
 +*popupButtonBreak: 19
  
  *popup*button1.label: Dismiss popup
--*popup*button1.translations: #override\n\
++
+ *popup*button1.translations: #override\n\
 -  <Btn1Down>,<Btn1Up>: HidePopup()
-+*popup*button1.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup()
  
  *popup*button2.label: Quit viewer
--*popup*button2.translations: #override\n\
++
+ *popup*button2.translations: #override\n\
 -  <Btn1Down>,<Btn1Up>: Quit()
-+*popup*button2.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: Quit()
++
++*popup*button3.label: Full screen  (also F9)
  
 -*popup*button3.label: Full screen
-+*popup*button3.label: Full screen  (also F9)
  *popup*button3.type: toggle
--*popup*button3.translations: #override\n\
++
+ *popup*button3.translations: #override\n\
 -  <Visible>: SetFullScreenState()\n\
 -  <Btn1Down>,<Btn1Up>: toggle() HidePopup() ToggleFullScreen()
-+*popup*button3.translations: #override\\n\
-+     <Visible>: SetFullScreenState()\\n\
++     <Visible>: SetFullScreenState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFullScreen() HidePopup()
  
  *popup*button4.label: Clipboard: local -> remote
--*popup*button4.translations: #override\n\
++
+ *popup*button4.translations: #override\n\
 -  <Btn1Down>,<Btn1Up>: SelectionToVNC(always) HidePopup()
-+*popup*button4.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: SelectionToVNC(always) HidePopup()
  
  *popup*button5.label: Clipboard: local <- remote
--*popup*button5.translations: #override\n\
++
+ *popup*button5.translations: #override\n\
 -  <Btn1Down>,<Btn1Up>: SelectionFromVNC(always) HidePopup()
-+*popup*button5.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: SelectionFromVNC(always) HidePopup()
  
  *popup*button6.label: Request refresh
--*popup*button6.translations: #override\n\
++
+ *popup*button6.translations: #override\n\
 -  <Btn1Down>,<Btn1Up>: SendRFBEvent(fbupdate) HidePopup()
-+*popup*button6.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: SendRFBEvent(fbupdate) HidePopup()
  
  *popup*button7.label: Send ctrl-alt-del
--*popup*button7.translations: #override\n\
++
+ *popup*button7.translations: #override\n\
 -  <Btn1Down>,<Btn1Up>: SendRFBEvent(keydown,Control_L)\
 -                       SendRFBEvent(keydown,Alt_L)\
 -                       SendRFBEvent(key,Delete)\
 -                       SendRFBEvent(keyup,Alt_L)\
 -                       SendRFBEvent(keyup,Control_L)\
 -                       HidePopup()
-+*popup*button7.translations: #override\\n\
-+     <Btn1Down>,<Btn1Up>: SendRFBEvent(keydown,Control_L)\
-+                          SendRFBEvent(keydown,Alt_L)\
-+                          SendRFBEvent(key,Delete)\
-+                          SendRFBEvent(keyup,Alt_L)\
-+                          SendRFBEvent(keyup,Control_L)\
-+                          HidePopup()
++     <Btn1Down>,<Btn1Up>: SendRFBEvent(keydown,Control_L)     SendRFBEvent(keydown,Alt_L)     SendRFBEvent(key,Delete)     SendRFBEvent(keyup,Alt_L)     SendRFBEvent(keyup,Control_L)     HidePopup()
  
  *popup*button8.label: Send F8
--*popup*button8.translations: #override\n\
++
+ *popup*button8.translations: #override\n\
 -  <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F8) HidePopup()
-+*popup*button8.translations: #override\\n\
 +     <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F8) HidePopup()
 +
 +*popup*button9.label: Send F9
-+*popup*button9.translations: #override\\n\
++
++*popup*button9.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F9) HidePopup()
 +
 +*popup*button10.label: ViewOnly
++
 +*popup*button10.type: toggle
-+*popup*button10.translations: #override\\n\
-+     <Visible>: SetViewOnlyState()\\n\
++
++*popup*button10.translations: #override\n\
++     <Visible>: SetViewOnlyState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleViewOnly() HidePopup()
 +
 +*popup*button11.label: Disable Bell
++
 +*popup*button11.type: toggle
-+*popup*button11.translations: #override\\n\
-+     <Visible>: SetBellState()\\n\
++
++*popup*button11.translations: #override\n\
++     <Visible>: SetBellState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleBell() HidePopup()
 +
 +*popup*button12.label: Cursor Shape
++
 +*popup*button12.type: toggle
-+*popup*button12.translations: #override\\n\
-+     <Visible>: SetCursorShapeState()\\n\
++
++*popup*button12.translations: #override\n\
++     <Visible>: SetCursorShapeState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleCursorShape() HidePopup()
 +
 +*popup*button13.label: X11 Cursor
++
 +*popup*button13.type: toggle
-+*popup*button13.translations: #override\\n\
-+     <Visible>: SetX11CursorState()\\n\
++
++*popup*button13.translations: #override\n\
++     <Visible>: SetX11CursorState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleX11Cursor() HidePopup()
 +
 +*popup*button14.label: Cursor Alphablend
++
 +*popup*button14.type: toggle
-+*popup*button14.translations: #override\\n\
-+     <Visible>: SetCursorAlphaState()\\n\
++
++*popup*button14.translations: #override\n\
++     <Visible>: SetCursorAlphaState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleCursorAlpha() HidePopup()
 +
 +*popup*button15.label: Toggle Tight/ZRLE
++
 +*popup*button15.type: toggle
-+*popup*button15.translations: #override\\n\
-+     <Visible>: SetZRLEState()\\n\
++
++*popup*button15.translations: #override\n\
++     <Visible>: SetZRLEState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTightZRLE() HidePopup()
 +
 +*popup*button16.label: Toggle ZRLE/ZYWRLE
++
 +*popup*button16.type: toggle
-+*popup*button16.translations: #override\\n\
-+     <Visible>: SetZYWRLEState()\\n\
++
++*popup*button16.translations: #override\n\
++     <Visible>: SetZYWRLEState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleZRLEZYWRLE() HidePopup()
 +
 +*popup*button17.label: Quality Level
-+*popup*button17.translations: #override\\n\
++
++*popup*button17.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() ShowQuality()
 +
 +*popup*button18.label: Compress Level
-+*popup*button18.translations: #override\\n\
++
++*popup*button18.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() ShowCompress()
 +
 +*popup*button19.label: Disable JPEG
++
 +*popup*button19.type: toggle
-+*popup*button19.translations: #override\\n\
-+     <Visible>: SetNOJPEGState()\\n\
++
++*popup*button19.translations: #override\n\
++     <Visible>: SetNOJPEGState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleJPEG() HidePopup()
 +
 +*popup*button20.label: Full Color
++
 +*popup*button20.type: toggle
-+*popup*button20.translations: #override\\n\
-+     <Visible>: SetFullColorState()\\n\
++
++*popup*button20.translations: #override\n\
++     <Visible>: SetFullColorState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFullColor() HidePopup()
 +
 +*popup*button21.label: Grey Scale (16 & 8-bpp)
++
 +*popup*button21.type: toggle
-+*popup*button21.translations: #override\\n\
-+     <Visible>: SetGreyScaleState()\\n\
++
++*popup*button21.translations: #override\n\
++     <Visible>: SetGreyScaleState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleGreyScale() HidePopup()
 +
 +*popup*button22.label: 16 bit color (BGR565)
++
 +*popup*button22.type: toggle
-+*popup*button22.translations: #override\\n\
-+     <Visible>: Set16bppState()\\n\
++
++*popup*button22.translations: #override\n\
++     <Visible>: Set16bppState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle16bpp() HidePopup()
 +
 +*popup*button23.label: 8   bit color (BGR233)
++
 +*popup*button23.type: toggle
-+*popup*button23.translations: #override\\n\
-+     <Visible>: Set8bppState()\\n\
++
++*popup*button23.translations: #override\n\
++     <Visible>: Set8bppState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8bpp() HidePopup()
 +
 +*popup*button24.label: -     256 colors
++
 +*popup*button24.type: toggle
-+*popup*button24.translations: #override\\n\
-+     <Visible>: Set256ColorsState()\\n\
++
++*popup*button24.translations: #override\n\
++     <Visible>: Set256ColorsState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle256Colors() HidePopup()
 +
 +*popup*button25.label: -       64 colors
++
 +*popup*button25.type: toggle
-+*popup*button25.translations: #override\\n\
-+     <Visible>: Set64ColorsState()\\n\
++
++*popup*button25.translations: #override\n\
++     <Visible>: Set64ColorsState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle64Colors() HidePopup()
 +
 +*popup*button26.label: -         8 colors
++
 +*popup*button26.type: toggle
-+*popup*button26.translations: #override\\n\
-+     <Visible>: Set8ColorsState()\\n\
++
++*popup*button26.translations: #override\n\
++     <Visible>: Set8ColorsState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() Toggle8Colors() HidePopup()
 +
 +*popup*button27.label: Set Y Crop (y-max)
-+*popup*button27.translations: #override\\n\
++
++*popup*button27.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() SetYCrop()
 +
 +*popup*button28.label: Set Scrollbar Width
-+*popup*button28.translations: #override\\n\
++
++*popup*button28.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() SetScbar()
 +
 +*popup*button29.label: UltraVNC Extensions:
-+*popup*button29.translations: #override\\n\
++
++*popup*button29.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup()
 +
 +*popup*button30.label: - Set 1/n Server Scale
-+*popup*button30.translations: #override\\n\
++
++*popup*button30.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: HidePopup() ShowScaleN()
 +
 +*popup*button31.label: - Text Chat
++
 +*popup*button31.type: toggle
-+*popup*button31.translations: #override\\n\
-+     <Visible>: SetTextChatState()\\n\
++
++*popup*button31.translations: #override\n\
++     <Visible>: SetTextChatState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleTextChat() HidePopup()
 +
 +*popup*button32.label: - File Transfer
++
 +*popup*button32.type: toggle
-+*popup*button32.translations: #override\\n\
-+     <Visible>: SetFileXferState()\\n\
++
++*popup*button32.translations: #override\n\
++     <Visible>: SetFileXferState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleFileXfer() HidePopup()
 +
 +*popup*button33.label: - Single Window
++
 +*popup*button33.type: toggle
-+*popup*button33.translations: #override\\n\
-+     <Visible>: SetSingleWindowState()\\n\
++
++*popup*button33.translations: #override\n\
++     <Visible>: SetSingleWindowState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleSingleWindow() HidePopup()
 +
 +*popup*button34.label: - Disable Remote Input
++
 +*popup*button34.type: toggle
-+*popup*button34.translations: #override\\n\
-+     <Visible>: SetServerInputState()\\n\
++
++*popup*button34.translations: #override\n\
++     <Visible>: SetServerInputState()\n\
 +     <Btn1Down>,<Btn1Up>: toggle() ToggleServerInput() HidePopup()
 +
 +*popup*button35.label:
++
 +*popup*button36.label:
++
 +*popup*button37.label:
++
 +*popup*button38.label:
 +
 +*scaleN*button0.label: Dismiss
-+*scaleN*button0.translations: #override\\n\
++
++*scaleN*button0.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: HideScaleN()
 +
 +*scaleN*button1.label: 1/1
-+*scaleN*button1.translations: #override\\n\
-+     <Visible>: SetScaleNState(1)\\n\
++
++*scaleN*button1.translations: #override\n\
++     <Visible>: SetScaleNState(1)\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(1) HideScaleN()
 +
 +*scaleN*button2.label: 1/2
-+*scaleN*button2.translations: #override\\n\
-+     <Visible>: SetScaleNState(2)\\n\
++
++*scaleN*button2.translations: #override\n\
++     <Visible>: SetScaleNState(2)\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(2) HideScaleN()
 +
 +*scaleN*button3.label: 1/3
-+*scaleN*button3.translations: #override\\n\
-+     <Visible>: SetScaleNState(3)\\n\
++
++*scaleN*button3.translations: #override\n\
++     <Visible>: SetScaleNState(3)\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(3) HideScaleN()
 +
 +*scaleN*button4.label: 1/4
-+*scaleN*button4.translations: #override\\n\
-+     <Visible>: SetScaleNState(4)\\n\
++
++*scaleN*button4.translations: #override\n\
++     <Visible>: SetScaleNState(4)\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(4) HideScaleN()
 +
 +*scaleN*button5.label: 1/5
-+*scaleN*button5.translations: #override\\n\
-+     <Visible>: SetScaleNState(5)\\n\
++
++*scaleN*button5.translations: #override\n\
++     <Visible>: SetScaleNState(5)\n\
 +     <Btn1Down>,<Btn1Up>: SetScaleN(5) HideScaleN()
 +
 +*scaleN*button6.label: Other
-+*scaleN*button6.translations: #override\\n\
-+     <Visible>: SetScaleNState(6)\\n\
++
++*scaleN*button6.translations: #override\n\
++     <Visible>: SetScaleNState(6)\n\
 +     <Btn1Down>,<Btn1Up>: HideScaleN() DoServerScale()
 +
 +*quality*buttonD.label: Dismiss
-+*quality*buttonD.translations: #override\\n\
++
++*quality*buttonD.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: HideQuality()
 +
 +*quality*button0.label: 0
++
 +*quality*button0.type: toggle
-+*quality*button0.translations: #override\\n\
-+     <Visible>: SetQualityState(0)\\n\
++
++*quality*button0.translations: #override\n\
++     <Visible>: SetQualityState(0)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(0) HideQuality()
 +
 +*quality*button1.label: 1
++
 +*quality*button1.type: toggle
-+*quality*button1.translations: #override\\n\
-+     <Visible>: SetQualityState(1)\\n\
++
++*quality*button1.translations: #override\n\
++     <Visible>: SetQualityState(1)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(1) HideQuality()
 +
 +*quality*button2.label: 2
++
 +*quality*button2.type: toggle
-+*quality*button2.translations: #override\\n\
-+     <Visible>: SetQualityState(2)\\n\
++
++*quality*button2.translations: #override\n\
++     <Visible>: SetQualityState(2)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(2) HideQuality()
 +
 +*quality*button3.label: 3
++
 +*quality*button3.type: toggle
-+*quality*button3.translations: #override\\n\
-+     <Visible>: SetQualityState(3)\\n\
++
++*quality*button3.translations: #override\n\
++     <Visible>: SetQualityState(3)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(3) HideQuality()
 +
 +*quality*button4.label: 4
++
 +*quality*button4.type: toggle
-+*quality*button4.translations: #override\\n\
-+     <Visible>: SetQualityState(4)\\n\
++
++*quality*button4.translations: #override\n\
++     <Visible>: SetQualityState(4)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(4) HideQuality()
 +
 +*quality*button5.label: 5
++
 +*quality*button5.type: toggle
-+*quality*button5.translations: #override\\n\
-+     <Visible>: SetQualityState(5)\\n\
++
++*quality*button5.translations: #override\n\
++     <Visible>: SetQualityState(5)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(5) HideQuality()
 +
 +*quality*button6.label: 6
++
 +*quality*button6.type: toggle
-+*quality*button6.translations: #override\\n\
-+     <Visible>: SetQualityState(6)\\n\
++
++*quality*button6.translations: #override\n\
++     <Visible>: SetQualityState(6)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(6) HideQuality()
 +
 +*quality*button7.label: 7
++
 +*quality*button7.type: toggle
-+*quality*button7.translations: #override\\n\
-+     <Visible>: SetQualityState(7)\\n\
++
++*quality*button7.translations: #override\n\
++     <Visible>: SetQualityState(7)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(7) HideQuality()
 +
 +*quality*button8.label: 8
++
 +*quality*button8.type: toggle
-+*quality*button8.translations: #override\\n\
-+     <Visible>: SetQualityState(8)\\n\
++
++*quality*button8.translations: #override\n\
++     <Visible>: SetQualityState(8)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(8) HideQuality()
 +
 +*quality*button9.label: 9
++
 +*quality*button9.type: toggle
-+*quality*button9.translations: #override\\n\
-+     <Visible>: SetQualityState(9)\\n\
++
++*quality*button9.translations: #override\n\
++     <Visible>: SetQualityState(9)\n\
 +     <Btn1Down>,<Btn1Up>: SetQuality(9) HideQuality()
 +
 +*compress*buttonD.label: Dismiss
-+*compress*buttonD.translations: #override\\n\
++
++*compress*buttonD.translations: #override\n\
 +     <Btn1Down>,<Btn1Up>: HideCompress()
 +
 +*compress*button0.label: 0
-+*compress*button0.translations: #override\\n\
-+     <Visible>: SetCompressState(0)\\n\
++
++*compress*button0.translations: #override\n\
++     <Visible>: SetCompressState(0)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(0) HideCompress()
 +
 +*compress*button1.label: 1
-+*compress*button1.translations: #override\\n\
-+     <Visible>: SetCompressState(1)\\n\
++
++*compress*button1.translations: #override\n\
++     <Visible>: SetCompressState(1)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(1) HideCompress()
 +
 +*compress*button2.label: 2
-+*compress*button2.translations: #override\\n\
-+     <Visible>: SetCompressState(2)\\n\
++
++*compress*button2.translations: #override\n\
++     <Visible>: SetCompressState(2)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(2) HideCompress()
 +
 +*compress*button3.label: 3
-+*compress*button3.translations: #override\\n\
-+     <Visible>: SetCompressState(3)\\n\
++
++*compress*button3.translations: #override\n\
++     <Visible>: SetCompressState(3)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(3) HideCompress()
 +
 +*compress*button4.label: 4
-+*compress*button4.translations: #override\\n\
-+     <Visible>: SetCompressState(4)\\n\
++
++*compress*button4.translations: #override\n\
++     <Visible>: SetCompressState(4)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(4) HideCompress()
 +
 +*compress*button5.label: 5
-+*compress*button5.translations: #override\\n\
-+     <Visible>: SetCompressState(5)\\n\
++
++*compress*button5.translations: #override\n\
++     <Visible>: SetCompressState(5)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(5) HideCompress()
 +
 +*compress*button6.label: 6
-+*compress*button6.translations: #override\\n\
-+     <Visible>: SetCompressState(6)\\n\
++
++*compress*button6.translations: #override\n\
++     <Visible>: SetCompressState(6)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(6) HideCompress()
 +
 +*compress*button7.label: 7
-+*compress*button7.translations: #override\\n\
-+     <Visible>: SetCompressState(7)\\n\
++
++*compress*button7.translations: #override\n\
++     <Visible>: SetCompressState(7)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(7) HideCompress()
 +
 +*compress*button8.label: 8
-+*compress*button8.translations: #override\\n\
-+     <Visible>: SetCompressState(8)\\n\
++
++*compress*button8.translations: #override\n\
++     <Visible>: SetCompressState(8)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(8) HideCompress()
 +
 +*compress*button9.label: 9
-+*compress*button9.translations: #override\\n\
-+     <Visible>: SetCompressState(9)\\n\
++
++*compress*button9.translations: #override\n\
++     <Visible>: SetCompressState(9)\n\
 +     <Btn1Down>,<Btn1Up>: SetCompress(9) HideCompress()
 +
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/vncviewer/argsresources.c
 --- vnc_unixsrc.orig/vncviewer/argsresources.c	2007-02-04 17:10:31.000000000 -0500
-+++ vnc_unixsrc/vncviewer/argsresources.c	2008-04-28 21:30:05.000000000 -0400
-@@ -31,7 +31,7 @@
++++ vnc_unixsrc/vncviewer/argsresources.c	2008-09-06 21:48:37.000000000 -0400
+@@ -31,9 +31,9 @@
  
  char *fallback_resources[] = {
  
 -  "Vncviewer.title: TightVNC: %s",
-+  "Vncviewer.title: SSVNC: %s - Press F8 for Menu",
++  "Ssvnc.title: SSVNC: %s - Press F8 for Menu",
  
-   "Vncviewer.translations:\
+-  "Vncviewer.translations:\
++  "Ssvnc.translations:\
      <Enter>: SelectionToVNC()\\n\
+     <Leave>: SelectionFromVNC()",
+ 
 @@ -45,8 +45,58 @@
    "*viewport.useRight: True",
    "*viewport*Scrollbar*thumb: None",
  
 +           "*viewport.horizontal.height:   6 ",
 +              "*viewport.vertical.width:   6 ",
-+  "vncviewer*viewport.horizontal.height:   6 ",
-+     "vncviewer*viewport.vertical.width:   6 ",
++  "ssvnc*viewport.horizontal.height:   6 ",
++     "ssvnc*viewport.vertical.width:   6 ",
 +
 +  "*viewport.horizontal.translations: #override\\n\
 +     <KeyPress>Right:  StartScroll(Forward)\\n\
@@ -589,7 +810,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    "*popup*button3.type: toggle",
    "*popup*button3.translations: #override\\n\
       <Visible>: SetFullScreenState()\\n\
-@@ -115,6 +200,305 @@
+@@ -105,16 +190,315 @@
+   "*popup*button7.label: Send ctrl-alt-del",
+   "*popup*button7.translations: #override\\n\
+      <Btn1Down>,<Btn1Up>: SendRFBEvent(keydown,Control_L)\
+-                          SendRFBEvent(keydown,Alt_L)\
+-                          SendRFBEvent(key,Delete)\
+-                          SendRFBEvent(keyup,Alt_L)\
+-                          SendRFBEvent(keyup,Control_L)\
+-                          HidePopup()",
++     SendRFBEvent(keydown,Alt_L)\
++     SendRFBEvent(key,Delete)\
++     SendRFBEvent(keyup,Alt_L)\
++     SendRFBEvent(keyup,Control_L)\
++     HidePopup()",
+ 
+   "*popup*button8.label: Send F8",
    "*popup*button8.translations: #override\\n\
       <Btn1Down>,<Btn1Up>: SendRFBEvent(key,F8) HidePopup()",
  
@@ -895,6 +1131,15 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    NULL
  };
  
+@@ -124,7 +508,7 @@
+  * from a dialog box.
+  */
+ 
+-char vncServerHost[256];
++char vncServerHost[1024];
+ int vncServerPort = 0;
+ 
+ 
 @@ -135,6 +519,7 @@
   */
  
@@ -1158,22 +1403,28 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -302,8 +846,8 @@
+@@ -302,11 +846,13 @@
  void
  usage(void)
  {
 -  fprintf(stderr,
 -	  "TightVNC viewer version 1.3dev7\n"
 +  fprintf(stdout,
-+	  "TightVNC viewer version 1.3.9 (SSVNC)\n"
++	  "SSVNC Viewer (based on TightVNC viewer version 1.3.9)\n"
  	  "\n"
  	  "Usage: %s [<OPTIONS>] [<HOST>][:<DISPLAY#>]\n"
  	  "       %s [<OPTIONS>] [<HOST>][::<PORT#>]\n"
-@@ -332,10 +876,154 @@
++	  "       %s [<OPTIONS>] exec=[CMD ARGS...]\n"
++	  "       %s [<OPTIONS>] /path/to/unix/socket\n"
+ 	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
+ 	  "       %s -help\n"
+ 	  "\n"
+@@ -332,10 +878,185 @@
  	  "        -autopass\n"
  	  "\n"
  	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
 -	  "See the manual page for more information."
+-	  "\n", programName, programName, programName, programName);
 +	  "See the manual page for more information.\n"
 +	  "\n"
 +	  "\n"
@@ -1184,6 +1435,28 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "   Note: ZRLE and ZYWRLE encodings are now supported.\n"
 +	  "\n"
 +	  "   Note: F9 is shortcut to Toggle FullScreen mode.\n"
++	  "\n"
++	  "   Note: In -listen mode set the env var. SSVNC_MULTIPLE_LISTEN=1\n"
++	  "         to allow more than one incoming VNC server at a time.\n"
++	  "         This is the same as -multilisten described below.\n"
++	  "\n"
++	  "   Note: If the host:port is specified as \"exec=command args...\"\n"
++	  "         then instead of making a TCP/IP socket connection to the\n"
++	  "         remote VNC server, \"command args...\" is executed and the\n"
++	  "         viewer is attached to its stdio.  This enables tunnelling\n"
++	  "         established via an external command, e.g. an stunnel(8)\n"
++	  "         that does not involve a listening socket.  This mode does\n"
++	  "         not work for -listen reverse connections.\n"
++	  "\n"
++	  "   Note: If the host:port contains a '/' it is interpreted as a\n"
++	  "         unix-domain socket (AF_LOCAL insead of AF_INET)\n"
++	  "\n"
++	  "        -multilisten  As in -listen (reverse connection listening)\n"
++	  "                    except allow more than one incoming VNC server to\n"
++	  "                    be connected at a time.  The default of only one\n"
++	  "                    at a time tries to play it safe by not allowing\n"
++	  "                    anyone on the network to put (many) desktops on\n"
++	  "                    your screen during a long window of time.\n"
 +	  "\n"
 +	  "        -use64      In -bgr233 mode, use 64 colors instead of 256.\n"
 +	  "        -bgr222     Same as -use64.\n"
@@ -1278,8 +1551,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "     -repeater str  This is for use with UltraVNC repeater proxy described\n"  
 +	  "                    here: http://www.uvnc.com/addons/repeater.html.  The \"str\"\n"  
 +	  "                    is the ID string to be sent to the repeater.  E.g. ID:1234\n"  
-+	  "                    In this case host:dpy on the command line is the repeater\n"  
-+	  "                    server, not the VNC server.  The repeater will connect you.\n"  
++	  "                    It can also be the hostname and port or display of the VNC\n"  
++	  "                    server, e.g. 12.34.56.78:0 or snoopy.com:1.  Note that when\n"  
++	  "                    using -repeater, the host:dpy on the cmdline is the repeater\n"  
++	  "                    server, NOT the VNC server.  The repeater will connect you.\n"  
++	  "                    Example: vncviewer ... -repeater ID:3333 repeat.host:5900\n"  
++	  "                    Example: vncviewer ... -repeater vhost:0 repeat.host:5900\n"  
++	  "\n"
++	  "     -printres      Print out the Ssvnc X resources (appdefaults) and then exit\n"  
++	  "                    You can save them to a file and customize them (e.g. the\n"  
++	  "                    keybindings and Popup menu)  Then point to the file via\n"  
++	  "                    XENVIRONMENT or XAPPLRESDIR.\n"  
 +	  "\n"
 +	  "   New Popup actions:\n"
 +	  "\n"
@@ -1316,7 +1598,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "        Note: the Ultravnc extensions only apply to servers that support\n"
 +	  "              them.  x11vnc/libvncserver supports some of them.\n"
 +	  "\n"
- 	  "\n", programName, programName, programName, programName);
++	  "\n", programName, programName, programName, programName, programName, programName);
    exit(1);
  }
 +#if 0
@@ -1325,7 +1607,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  
  /*
-@@ -350,6 +1038,7 @@
+@@ -350,6 +1071,7 @@
    int i;
    char *vncServerName, *colonPos;
    int len, portOffset;
@@ -1333,7 +1615,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    /* Turn app resource specs into our appData structure for the rest of the
       program to use */
-@@ -357,6 +1046,23 @@
+@@ -357,6 +1079,23 @@
    XtGetApplicationResources(toplevel, &appData, appDataResourceList,
  			    XtNumber(appDataResourceList), 0, 0);
  
@@ -1357,7 +1639,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    /* Add our actions to the actions table so they can be used in widget
       resource specs */
  
-@@ -376,6 +1082,10 @@
+@@ -376,6 +1115,10 @@
      return;
    }
  
@@ -1368,7 +1650,20 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    if (argc == 1) {
      vncServerName = DoServerDialog();
      appData.passwordDialog = True;
-@@ -414,6 +1124,13 @@
+@@ -396,7 +1139,11 @@
+   }
+ 
+   colonPos = strchr(vncServerName, ':');
+-  if (colonPos == NULL) {
++  if (strstr(vncServerName, "exec=") == vncServerName) {
++    /* special exec-external-command case */
++    strcpy(vncServerHost, vncServerName);
++    vncServerPort = SERVER_PORT_OFFSET;
++  } else if (colonPos == NULL) {
+     /* No colon -- use default port number */
+     strcpy(vncServerHost, vncServerName);
+     vncServerPort = SERVER_PORT_OFFSET;
+@@ -414,6 +1161,13 @@
      if (!len || strspn(colonPos + 1, "0123456789") != len) {
        usage();
      }
@@ -2147,11 +2442,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 -
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncviewer/desktop.c
 --- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
-+++ vnc_unixsrc/vncviewer/desktop.c	2008-02-02 18:48:22.000000000 -0500
-@@ -28,21 +28,29 @@
++++ vnc_unixsrc/vncviewer/desktop.c	2008-09-05 19:12:25.000000000 -0400
+@@ -28,21 +28,40 @@
  #include <X11/extensions/XShm.h>
  #endif
  
++/* we don't have Xvlib working yet... not all cards supply RGB @ 32bpp */
++#define XVLIB__dont
++#ifdef XVLIB
++#include <X11/extensions/Xvlib.h>
++XvImage *xv_image;
++XvPortID xv_port = None;
++int xv_width = 640;
++int xv_height = 480;
++#endif
++
++
 +#include <X11/cursorfont.h>
 +
  GC gc;
@@ -2180,15 +2486,67 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  static XtResource desktopBackingStoreResources[] = {
    {
      XtNbackingStore, XtCBackingStore, XtRBackingStore, sizeof(int), 0,
-@@ -50,6 +58,86 @@
+@@ -50,6 +69,138 @@
    },
  };
  
++#ifdef XVLIB
++void setup_xv(void) {
++	int a, p, f;
++	int num_adaptors;
++	XvAdaptorInfo *adaptor_info;
++	XvImageFormatValues *formats, *format = NULL;
++	int nformats;
++
++	if (xv_port != None) {
++		return;
++	}
++	XvQueryAdaptors (dpy, RootWindow(dpy, DefaultScreen(dpy)), &num_adaptors, &adaptor_info);
++	for (a = 0; a < num_adaptors; a++) {
++		fprintf(stderr, "Adapator \"%s\" has %d ports\n",
++			adaptor_info[a].name,
++			adaptor_info[a].num_ports);
++	}
++	for (a = 0; a < num_adaptors; a++) {
++		for (p = 0; a < adaptor_info[a].num_ports; p++) {
++			if (XvGrabPort(dpy, adaptor_info[a].base_id + p, CurrentTime) == Success)  {
++				xv_port = adaptor_info[a].base_id + p;
++				break;
++			}
++		}
++	}
++	formats = XvListImageFormats (dpy, xv_port, &nformats);
++	for (f=0; f < nformats; f++) {
++fprintf(stderr, "f=%d\n", f);
++fprintf(stderr, "formats[f].type: %d\n", formats[f].type);
++fprintf(stderr, "formats[f].format: %d\n", formats[f].format);
++fprintf(stderr, "formats[f].bits_per_pixel: %d\n", formats[f].bits_per_pixel);
++fprintf(stderr, "formats[f].num_planes: %d\n", formats[f].num_planes);
++fprintf(stderr, "formats[f].scanline_order: %d\n", formats[f].scanline_order);
++fprintf(stderr, "formats[f].component_order: %s\n", formats[f].component_order);
++		if (formats[f].type != XvRGB) continue;
++		if (formats[f].format != XvPacked) continue;
++		if (formats[f].bits_per_pixel != 32) continue;
++		if (formats[f].num_planes != 1) continue;
++		if (formats[f].scanline_order != XvTopToBottom) continue;
++		if (strcmp (formats[f].component_order, "BGRX") != 0) continue;
++		format = &formats[f];
++		break;
++	}
++//	fprintf(stderr, "y_sample_bits %d u_sample_bits %d v_sample_bits %d\n",
++//		format->y_sample_bits, format->u_sample_bits, format->v_sample_bits);
++//	fprintf(stderr, "component_order: %s\n", format->component_order);
++
++	xv_image = XvCreateImage (dpy, xv_port, format->id, NULL, si.framebufferWidth, si.framebufferHeight);
++}
++#endif
++
 +void create_image() {
 +	image = NULL;
 +	image_ycrop = NULL;
 +
 +//fprintf(stderr, "useShm: %d\n", appData.useShm);
++
 +
 +#ifdef MITSHM
 +	if (appData.useShm) {
@@ -2267,31 +2625,28 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  
  /*
   * DesktopInitBeforeRealization creates the "desktop" widget and the viewport
-@@ -59,89 +147,303 @@
+@@ -59,89 +210,320 @@
  void
  DesktopInitBeforeRealization()
  {
 -  int i;
--
++	int i;
+ 
 -  form = XtVaCreateManagedWidget("form", formWidgetClass, toplevel,
 -				 XtNborderWidth, 0,
 -				 XtNdefaultDistance, 0, NULL);
-+	int i;
++	form = XtVaCreateManagedWidget("form", formWidgetClass, toplevel,
++	    XtNborderWidth, 0, XtNdefaultDistance, 0, NULL);
  
 -  viewport = XtVaCreateManagedWidget("viewport", viewportWidgetClass, form,
 -				     XtNborderWidth, 0,
 -				     NULL);
-+	form = XtVaCreateManagedWidget("form", formWidgetClass, toplevel,
-+	    XtNborderWidth, 0, XtNdefaultDistance, 0, NULL);
++	viewport = XtVaCreateManagedWidget("viewport", viewportWidgetClass, form,
++	    XtNborderWidth, 0, NULL);
  
 -  desktop = XtVaCreateManagedWidget("desktop", coreWidgetClass, viewport,
 -				    XtNborderWidth, 0,
 -				    NULL);
-+	viewport = XtVaCreateManagedWidget("viewport", viewportWidgetClass, form,
-+	    XtNborderWidth, 0, NULL);
- 
--  XtVaSetValues(desktop, XtNwidth, si.framebufferWidth,
--		XtNheight, si.framebufferHeight, NULL);
 +	desktop = XtVaCreateManagedWidget("desktop", coreWidgetClass, viewport,
 +	    XtNborderWidth, 0, NULL);
 +
@@ -2321,19 +2676,24 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	old_width  = si.framebufferWidth;
 +	old_height = si.framebufferHeight;
  
--  XtAddEventHandler(desktop, LeaveWindowMask|ExposureMask,
--		    True, HandleBasicDesktopEvent, NULL);
+-  XtVaSetValues(desktop, XtNwidth, si.framebufferWidth,
+-		XtNheight, si.framebufferHeight, NULL);
 +	for (i = 0; i < 256; i++) {
 +		modifierPressed[i] = False;
 +	}
  
--  for (i = 0; i < 256; i++)
--    modifierPressed[i] = False;
+-  XtAddEventHandler(desktop, LeaveWindowMask|ExposureMask,
+-		    True, HandleBasicDesktopEvent, NULL);
 +	create_image();
 +}
  
--  image = NULL;
+-  for (i = 0; i < 256; i++)
+-    modifierPressed[i] = False;
 +static Widget scrollbar_y = NULL;
+ 
+-  image = NULL;
++static int xsst = 2;
++#include <X11/Xaw/Scrollbar.h>
  
 -#ifdef MITSHM
 -  if (appData.useShm) {
@@ -2342,9 +2702,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 -      appData.useShm = False;
 -  }
 -#endif
-+static int xsst = 2;
-+#include <X11/Xaw/Scrollbar.h>
- 
+-
 -  if (!image) {
 -    image = XCreateImage(dpy, vis, visdepth, ZPixmap, 0, NULL,
 -			 si.framebufferWidth, si.framebufferHeight,
@@ -2370,7 +2728,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		float t = 0.0;
 +		XtVaSetValues(w, XtNtopOfThumb, &t, NULL);
 +	}
-+}
+ }
 +static XtCallbackProc Jumped(Widget w, XtPointer closure, XtPointer call_data) {
 +	float top = *((float *) call_data);
 +	Position x, y;
@@ -2388,9 +2746,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			XtVaSetValues(w, XtNtopOfThumb, *(XtArgVal*)&t, XtNshown, *(XtArgVal*)&s, NULL);
 +		}
 +	}
- }
- 
- 
++}
++
++
 +extern double dnow(void);
 +
 +void check_things() {
@@ -2452,13 +2810,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	if (now <= last + 1.0) {
 +		return;
 +	}
-+
+ 
 +	dpyWidth  = WidthOfScreen(DefaultScreenOfDisplay(dpy));
 +	dpyHeight = HeightOfScreen(DefaultScreenOfDisplay(dpy));
 +
 +	last = dnow();
 +}
-+
+ 
  /*
   * DesktopInitAfterRealization does things which require the X windows to
   * exist.  It creates some GCs and sets the dot cursor.
@@ -2541,8 +2899,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			appData.useBackingstore = False;
 +		}
 +	}
- 
--  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
++
 +	if (appData.useBackingstore) {
 +		XtVaGetApplicationResources(desktop, (XtPointer)&attr.backing_store,
 +		    desktopBackingStoreResources, 1, NULL);
@@ -2594,10 +2951,28 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	FreeX11Cursor();
 +	FreeSoftCursor();
 +}
-+
+ 
+-  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
 +void put_image(int src_x, int src_y, int dst_x, int dst_y, int width,
 +    int height) {
 +	
++#ifdef XVLIB
++	if (xv_width > 0) {
++		if (xv_port == None) {
++			setup_xv();
++		}
++		if (xv_port != None) {
++			double ratw = (double) xv_width / si.framebufferWidth;
++			double rath = (double) xv_height / si.framebufferHeight;
++			XvPutImage(dpy, xv_port, desktopWin, gc, xv_image,
++			    src_x, src_y, width, height,
++			    (int) ratw * dst_x, (int) rath * dst_y,
++			    (int) ratw * width, (int) rath * height);
++			return;
++		}
++	}
++#endif
++
 +#ifdef MITSHM
 +	if (appData.useShm) {
 +		if (image_ycrop == NULL) {
@@ -2634,7 +3009,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -152,39 +454,53 @@
+@@ -152,39 +534,53 @@
  static void
  HandleBasicDesktopEvent(Widget w, XtPointer ptr, XEvent *ev, Boolean *cont)
  {
@@ -2709,7 +3084,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -201,6 +517,13 @@
+@@ -201,6 +597,13 @@
   * button2 down, 3 for both, etc).
   */
  
@@ -2723,7 +3098,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  void
  SendRFBEvent(Widget w, XEvent *ev, String *params, Cardinal *num_params)
  {
-@@ -208,12 +531,62 @@
+@@ -208,12 +611,62 @@
    char keyname[256];
    int buttonMask, x, y;
  
@@ -2736,8 +3111,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			return;
 +		}
 +	}
- 
--  if (appData.viewOnly) return;
++
 +	if (selectingSingleWindow && ev->type == ButtonPress) {
 +		selectingSingleWindow = False;
 +		SendSingleWindow(ev->xbutton.x, ev->xbutton.y);
@@ -2748,7 +3122,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		}
 +		return;
 +	}
-+
+ 
+-  if (appData.viewOnly) return;
 +	if (appData.viewOnly) {
 +		int W = si.framebufferWidth;
 +		int H = si.framebufferHeight;
@@ -2791,7 +3166,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  
    if (*num_params != 0) {
      if (strncasecmp(params[0],"key",3) == 0) {
-@@ -329,26 +702,161 @@
+@@ -329,26 +782,161 @@
   * CreateDotCursor.
   */
  
@@ -2969,7 +3344,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -359,38 +867,35 @@
+@@ -359,38 +947,35 @@
  void
  CopyDataToScreen(char *buf, int x, int y, int width, int height)
  {
@@ -3035,7 +3410,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -401,62 +906,228 @@
+@@ -401,62 +986,228 @@
  static void
  CopyBGR233ToScreen(CARD8 *buf, int x, int y, int width, int height)
  {
@@ -3853,6 +4228,20 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/fullscreen.c vnc_unixsrc/vncv
 +}
 +
 +
+diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/h2html.pl vnc_unixsrc/vncviewer/h2html.pl
+--- vnc_unixsrc.orig/vncviewer/h2html.pl	1969-12-31 19:00:00.000000000 -0500
++++ vnc_unixsrc/vncviewer/h2html.pl	2008-08-30 20:34:45.000000000 -0400
+@@ -0,0 +1,10 @@
++#!/usr/bin/perl
++
++open(HELP, "./vncviewer -help|");
++
++while (<HELP>) {
++	$_ =~ s/&/&amp;/g;
++	$_ =~ s/</&lt;/g;
++	$_ =~ s/>/&gt;/g;
++	print;
++}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/hextile.c vnc_unixsrc/vncviewer/hextile.c
 --- vnc_unixsrc.orig/vncviewer/hextile.c	2007-02-17 22:33:46.000000000 -0500
 +++ vnc_unixsrc/vncviewer/hextile.c	2007-02-17 22:48:39.000000000 -0500
@@ -3980,8 +4369,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/hextile.c vnc_unixsrc/vncview
 +#undef FillRectangle
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewer/listen.c
 --- vnc_unixsrc.orig/vncviewer/listen.c	2001-01-16 03:07:57.000000000 -0500
-+++ vnc_unixsrc/vncviewer/listen.c	2007-03-23 22:30:46.000000000 -0400
-@@ -111,13 +111,14 @@
++++ vnc_unixsrc/vncviewer/listen.c	2008-09-06 18:17:58.000000000 -0400
+@@ -58,6 +58,8 @@
+   int n;
+   int i;
+   char *displayname = NULL;
++  int children = 0;
++  int totalconn = 0, maxconn = 0;
+ 
+   listenSpecified = True;
+ 
+@@ -111,20 +113,36 @@
    getFlashFont(d);
  
    listenSocket = ListenAtTcpPort(listenPort);
@@ -3999,8 +4397,31 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
 +  fprintf(stderr,"%s -listen: Cmdline errors are not reported until "
  	  "a connection comes in.\n", programName);
  
++	/* this will only work if X events drives this loop -- they don't */
++	if (getenv("SSVNC_MAX_LISTEN")) {
++		maxconn = atoi(getenv("SSVNC_MAX_LISTEN"));
++	}
++
    while (True) {
-@@ -132,12 +133,13 @@
+ 
+     /* reap any zombies */
+     int status, pid;
+-    while ((pid= wait3(&status, WNOHANG, (struct rusage *)0))>0);
++    while ((pid = wait3(&status, WNOHANG, (struct rusage *)0))>0) {
++    	if (pid > 0 && children > 0) {
++    		children--;	
++		/* this will only work if X events drives this loop -- they don't */
++		if (maxconn > 0 && totalconn >= maxconn) {
++			fprintf(stderr,"%s -listen: Finished final connection %d\n",
++			    programName, maxconn);
++			exit(0);
++		}
++    	}
++    }
+ 
+     /* discard any X events */
+     while (XCheckIfEvent(d, &ev, AllXEventsPredicate, NULL))
+@@ -132,12 +150,24 @@
  
      FD_ZERO(&fds); 
  
@@ -4011,19 +4432,69 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
  
      select(FD_SETSIZE, &fds, NULL, NULL, NULL);
  
++    while ((pid = wait3(&status, WNOHANG, (struct rusage *)0))>0) {
++    	if (pid > 0 && children > 0) {
++    		children--;	
++		if (maxconn > 0 && totalconn >= maxconn) {
++			fprintf(stderr,"%s -listen: Finished final connection %d\n",
++			    programName, maxconn);
++			exit(0);
++		}
++    	}
++    }
++
 +#if 0
      if (FD_ISSET(flashSocket, &fds)) {
  
        sock = AcceptTcpConnection(flashSocket);
-@@ -151,6 +153,7 @@
+@@ -151,11 +181,35 @@
        }
        close(sock);
      }
 +#endif
  
      if (FD_ISSET(listenSocket, &fds)) {
-       rfbsock = AcceptTcpConnection(listenSocket);
-@@ -182,6 +185,10 @@
+-      rfbsock = AcceptTcpConnection(listenSocket);
+-      if (rfbsock < 0) exit(1);
+-      if (!SetNonBlocking(rfbsock)) exit(1);
++	int multi_ok = 0;
++	char *sml = getenv("SSVNC_MULTIPLE_LISTEN");
++
++	rfbsock = AcceptTcpConnection(listenSocket);
++
++	if (sml != NULL) {
++		if (strcmp(sml, "") && strcmp(sml, "0")) {
++			multi_ok = 1;
++		}
++	}
++
++	if (rfbsock < 0) exit(1);
++	if (!SetNonBlocking(rfbsock)) exit(1);
++
++	if (children > 0 && !multi_ok) {
++		fprintf(stderr,"\n");
++		fprintf(stderr,"%s: denying extra incoming connection (%d already)\n",
++		    programName, children);
++		fprintf(stderr,"%s: to override: use '-multilisten' or set SSVNC_MULTIPLE_LISTEN=1\n",
++		    programName);
++		fprintf(stderr,"\n");
++		close(rfbsock);
++		rfbsock = -1;
++		continue;
++	}
++	totalconn++;
+ 
+       XCloseDisplay(d);
+ 
+@@ -175,6 +229,7 @@
+ 
+       default:
+ 	/* parent - go round and listen again */
++        children++;
+ 	close(rfbsock); 
+ 	if (!(d = XOpenDisplay(displayname))) {
+ 	  fprintf(stderr,"%s: unable to open display %s\n",
+@@ -182,6 +237,10 @@
  	  exit(1);
  	}
  	getFlashFont(d);
@@ -4047,7 +4518,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
  static int
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer/popup.c
 --- vnc_unixsrc.orig/vncviewer/popup.c	2000-06-11 08:00:53.000000000 -0400
-+++ vnc_unixsrc/vncviewer/popup.c	2008-02-17 12:50:06.000000000 -0500
++++ vnc_unixsrc/vncviewer/popup.c	2008-09-05 21:59:15.000000000 -0400
 @@ -25,15 +25,44 @@
  
  #include <X11/Xaw/Form.h>
@@ -4095,7 +4566,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
    XSetWMProtocols(dpy, XtWindow(popup), &wmDeleteWindow, 1);
  }
  
-@@ -52,42 +81,448 @@
+@@ -52,42 +81,453 @@
  };
  
  void
@@ -4342,6 +4813,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +
 +extern int use_loopback;
 +time_t start_listen = 0;
++pid_t java_helper = 0;
 +
 +void ShowFile(Widget w, XEvent *event, String *params, Cardinal *num_params) {
 +	int i, port0 = 7200, port, sock = -1;
@@ -4355,6 +4827,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +		fprintf(stderr, "Cannot find UltraVNC FTP jar file.\n");
 +		return;
 +	}
++
 +	use_loopback = 1;
 +	for (i = 0; i < 100; i++) {
 +		port = port0 + i;
@@ -4365,6 +4838,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +		}
 +	}
 +	use_loopback = 0;
++
 +	if (sock >= 0) {
 +		int st;
 +		pid_t pid = fork();
@@ -4381,7 +4855,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +			system(cmd);
 +			exit(0);
 +		}
++		fprintf(stderr, "java helper pid is: %d\n", (int) pid);
 +		waitpid(pid, &st, 0);
++		java_helper = pid;
 +		start_listen = time(NULL);
 +	}
 +	free(cmd);
@@ -4550,7 +5026,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +	entry = XtVaCreateManagedWidget("entry", asciiTextWidgetClass, myform,
 +	    XtNresize, XawtextResizeWidth, XtNresizable, True, XtNwrap, XawtextWrapWord,
 +	    XtNscrollHorizontal, XawtextScrollNever, XtNscrollVertical, XawtextScrollNever,
-+	    XtNheight, 20, XtNwidth, 400, XtNfromVert, text,
++	    XtNheight, 20, XtNwidth, 400, XtNfromVert, text, XtNeditType, XawtextEdit,
 +	    XtNdisplayCaret, True, XtNeditType, XawtextEdit, NULL);
 +
 +	dismiss = XtVaCreateManagedWidget("dismiss", commandWidgetClass, myform, XtNlabel, "Close Chat", XtNfromVert, entry, NULL);
@@ -4586,9 +5062,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +	print;
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
---- vnc_unixsrc.orig/vncviewer/rfbproto.c	2004-03-11 13:14:39.000000000 -0500
-+++ vnc_unixsrc/vncviewer/rfbproto.c	2008-05-11 11:20:45.000000000 -0400
-@@ -57,6 +57,44 @@
+--- vnc_unixsrc.orig/vncviewer/rfbproto.c	2008-09-05 19:51:24.000000000 -0400
++++ vnc_unixsrc/vncviewer/rfbproto.c	2008-09-05 21:51:53.000000000 -0400
+@@ -23,6 +23,7 @@
+  * rfbproto.c - functions to deal with client side of RFB protocol.
+  */
+ 
++#include <sys/stat.h>
+ #include <unistd.h>
+ #include <errno.h>
+ #include <pwd.h>
+@@ -57,6 +58,44 @@
  static Bool HandleTight16(int rx, int ry, int rw, int rh);
  static Bool HandleTight32(int rx, int ry, int rw, int rh);
  
@@ -4633,7 +5117,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  static void ReadConnFailedReason(void);
  static long ReadCompactLen (void);
  
-@@ -68,6 +106,10 @@
+@@ -68,6 +107,10 @@
                                int compressedLen);
  
  
@@ -4644,7 +5128,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  int rfbsock;
  char *desktopName;
  rfbPixelFormat myFormat;
-@@ -177,6 +219,9 @@
+@@ -177,6 +220,9 @@
  	  sig_rfbEncodingPointerPos, "Pointer position update");
    CapsAdd(encodingCaps, rfbEncodingLastRect, rfbTightVncVendor,
  	  sig_rfbEncodingLastRect, "LastRect protocol extension");
@@ -4654,40 +5138,125 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -187,21 +232,21 @@
+@@ -187,21 +233,104 @@
  Bool
  ConnectToRFBServer(const char *hostname, int port)
  {
 -  unsigned int host;
-+	unsigned int host;
- 
+-
 -  if (!StringToIPAddr(hostname, &host)) {
 -    fprintf(stderr,"Couldn't convert '%s' to host address\n", hostname);
 -    return False;
 -  }
-+	if (!StringToIPAddr(hostname, &host)) {
-+		fprintf(stderr,"Couldn't convert '%s' to host address\n", hostname);
-+		return False;
-+	}
- 
+-
 -  rfbsock = ConnectToTcpAddr(host, port);
-+	rfbsock = ConnectToTcpAddr(host, port);
++	unsigned int host;
++	char *q, *cmd = NULL;
++	Bool setnb;
++	struct stat sb;
++
++	if (strstr(hostname, "exec=") == hostname) {
++		cmd = strdup(hostname);
++		q = strchr(cmd, '=');
++		*q = ' ';
++		if (getenv("SSVNC_BASEDIR")) {
++			char *base = getenv("SSVNC_BASEDIR");
++			char *newcmd = (char *)malloc(strlen(base) + strlen(cmd) + 1000);	
++			sprintf(newcmd, "%s/unwrap.so", base);
++			if (stat(newcmd, &sb) == 0) {
++#if (defined(__MACH__) && defined(__APPLE__))
++				sprintf(newcmd, "DYLD_FORCE_FLAT_NAMESPACE=1; export DYLD_FORCE_FLAT_NAMESPACE; DYLD_INSERT_LIBRARIES='%s/unwrap.so'; export DYLD_INSERT_LIBRARIES; %s", base, cmd);
++#else
++				sprintf(newcmd, "LD_PRELOAD='%s/unwrap.so'; export LD_PRELOAD; %s", base, cmd);
++#endif
++				cmd = newcmd;
++			}
++		}
++	}
  
 -  if (rfbsock < 0) {
 -    fprintf(stderr,"Unable to connect to VNC server\n");
 -    return False;
 -  }
-+	if (rfbsock < 0) {
-+		fprintf(stderr,"Unable to connect to VNC server\n");
-+		return False;
++	if (cmd != NULL) {
++		int sfd[2];
++		pid_t pid;
++
++		fprintf(stderr, "exec-cmd: %s\n", cmd);
++
++		if (! SocketPair(sfd)) {
++			return False;
++		}
++		if (0) {
++			fprintf(stderr, "sfd: %d %d\n", sfd[0], sfd[1]);
++			fflush(stderr);
++		}
++
++		pid = fork();
++		if (pid == -1) {
++			perror("fork");
++			return False;
++		}
++		if (pid == 0) {
++			char *args[4];
++			int d;
++			args[0] = "/bin/sh";
++			args[1] = "-c";
++			args[2] = cmd;
++			args[3] = NULL;
++
++			close(sfd[1]);
++			dup2(sfd[0], 0);
++			dup2(sfd[0], 1);
++			for (d=3; d < 256; d++) {
++				if (d != sfd[0]) {
++					close(d);
++				}
++			}
++			execvp(args[0], args);
++			perror("exec");
++			exit(1);
++		} else {
++			close(sfd[0]);
++			rfbsock = sfd[1];
++		}
++		if (rfbsock < 0) {
++			fprintf(stderr,"Unable to connect to exec'd command: %s\n", cmd);
++			return False;
++		}
++	} else if (strchr(hostname, '/') && stat(hostname, &sb) == 0) {
++		/* assume unix domain socket */
++		char *thost = strdup(hostname); 
++
++		rfbsock = ConnectToUnixSocket(thost);
++		free(thost);
++
++		if (rfbsock < 0) {
++			fprintf(stderr,"Unable to connect to VNC server (unix-domain socket: %s)\n", hostname);
++			return False;
++		}
++		
++	} else {
++		if (!StringToIPAddr(hostname, &host)) {
++			fprintf(stderr,"Couldn't convert '%s' to host address\n", hostname);
++			return False;
++		}
++
++		rfbsock = ConnectToTcpAddr(host, port);
++
++		if (rfbsock < 0) {
++			fprintf(stderr,"Unable to connect to VNC server (%s:%d)\n", hostname, port);
++			return False;
++		}
 +	}
  
 -  return SetNonBlocking(rfbsock);
-+	return SetNonBlocking(rfbsock);
++	setnb = SetNonBlocking(rfbsock);
++	return setnb;
  }
  
  
-@@ -212,211 +257,228 @@
+@@ -212,211 +341,299 @@
  Bool
  InitialiseRFBConnection(void)
  {
@@ -4730,8 +5299,54 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -    fprintf(stderr,"Not a valid VNC server\n");
 -    return False;
 -  }
-+	if (sscanf(pv, rfbProtocolVersionFormat, &server_major, &server_minor) != 2) {
-+		fprintf(stderr,"Not a valid VNC server\n");
++	if (strstr(pv, "ID:") == pv) {
++		;
++	} else if (sscanf(pv, rfbProtocolVersionFormat, &server_major, &server_minor) != 2) {
++		if (strstr(pv, "test") == pv) {
++			/* now some hacks for ultraVNC SC III (SSL) ... testA, etc */
++			int i;
++			char *se = NULL;
++
++			fprintf(stderr,"Trying UltraVNC Single Click III workaround: %s\n", pv);
++			for (i=0; i < 7 ; i++) {
++				pv[i] = pv[i+5];
++			}
++			if (!ReadFromRFBServer(pv+7, 5)) {
++				return False;
++			}
++
++			se = getenv("STUNNEL_EXTRA_OPTS");
++			if (se == NULL) {
++				se = getenv("STUNNEL_EXTRA_OPTS_USER");
++			}
++			if (se != NULL) {
++				if (strstr(se, "options")) {
++					if (strstr(se, "ALL") || strstr(se, "DONT_INSERT_EMPTY_FRAGMENTS")) {
++						;	/* good */
++					} else {
++						se = NULL;
++					}
++				} else {
++					se = NULL;
++				}
++			}
++			if (se == NULL) {
++				fprintf(stderr, "\n");
++				fprintf(stderr, "***************************************************************\n");
++				fprintf(stderr, "To work around UltraVNC SC III SSL dropping after a few minutes\n");
++				fprintf(stderr, "you may need to set STUNNEL_EXTRA_OPTS_USER='options = ALL'.\n");
++				fprintf(stderr, "Or select 'UltraVNC Single Click III Bug' in the SSVNC GUI.\n");
++				fprintf(stderr, "***************************************************************\n");
++				fprintf(stderr, "\n");
++			}
++			if (strstr(pv, "ID:") == pv) {
++				goto check_ID_string;
++			}
++			if (sscanf(pv, rfbProtocolVersionFormat, &server_major, &server_minor) == 2) {
++				goto ultra_vnc_nonsense;
++			}
++		}
++		fprintf(stderr,"Not a valid VNC server: '%s'\n", pv);
 +		return False;
 +	}
  
@@ -4743,26 +5358,43 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -    /* any other server version, request the standard 3.3 */
 -    viewer_minor = rfbProtocolFallbackMinorVersion;
 -  }
++	check_ID_string:
++	if (strstr(pv, "ID:") == pv) {
++		char tmp[256];
++		fprintf(stderr, "UltraVNC Repeater string detected: %s\n", pv);
++		fprintf(stderr, "Pretending to be UltraVNC repeater: reading 250 bytes...\n\n");
++		if (!ReadFromRFBServer(tmp, 250 - 12)) {
++			return False;
++		}
++		if (!ReadFromRFBServer(pv, 12)) {
++			return False;
++		}
++		if (sscanf(pv, rfbProtocolVersionFormat, &server_major, &server_minor) != 2) {
++			fprintf(stderr,"Not a valid VNC server: '%s'\n", pv);
++			return False;
++		}
++	}
+ 
+-  fprintf(stderr, "Connected to RFB server, using protocol version %d.%d\n",
+-	  viewer_major, viewer_minor);
++	ultra_vnc_nonsense:
++	fprintf(stderr,"Proto: %s\n", pv);
+ 
+-  sprintf(pv, rfbProtocolVersionFormat, viewer_major, viewer_minor);
 +	viewer_major = rfbProtocolMajorVersion;
-+	if (server_major == 3 && server_minor >= rfbProtocolMinorVersion) {
+ 
+-  if (!WriteExact(rfbsock, pv, sz_rfbProtocolVersionMsg))
+-    return False;
++	if (server_major == 3 && (server_minor == 14 || server_minor == 16)) {
++		/* hack for UltraVNC Single Click. They misuse rfb proto version */
++		fprintf(stderr,"Setting RFB version to 3.3 for UltraVNC Single Click.\n");
++		viewer_minor = rfbProtocolFallbackMinorVersion;
++	} else if (server_major == 3 && server_minor >= rfbProtocolMinorVersion) {
 +		/* the server supports at least the standard protocol 3.7 */
 +		viewer_minor = rfbProtocolMinorVersion;
 +	} else {
 +		/* any other server version, request the standard 3.3 */
 +		viewer_minor = rfbProtocolFallbackMinorVersion;
-+	}
- 
--  fprintf(stderr, "Connected to RFB server, using protocol version %d.%d\n",
--	  viewer_major, viewer_minor);
-+	fprintf(stderr, "\nConnected to RFB server, using protocol version %d.%d\n", viewer_major, viewer_minor);
- 
--  sprintf(pv, rfbProtocolVersionFormat, viewer_major, viewer_minor);
-+	sprintf(pv, rfbProtocolVersionFormat, viewer_major, viewer_minor);
- 
--  if (!WriteExact(rfbsock, pv, sz_rfbProtocolVersionMsg))
--    return False;
-+	if (!WriteExact(rfbsock, pv, sz_rfbProtocolVersionMsg)) {
-+		return False;
 +	}
  
 -  /* Read or select the security type. */
@@ -4773,15 +5405,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -  }
 -  if (secType == rfbSecTypeInvalid)
 -    return False;
-+	/* Read or select the security type. */
-+	if (viewer_minor == rfbProtocolMinorVersion) {
-+		secType = SelectSecurityType();
-+	} else {
-+		secType = ReadSecurityType();
-+	}
-+	if (secType == rfbSecTypeInvalid) {
-+		return False;
-+	}
++	fprintf(stderr, "\nConnected to RFB server, using protocol version %d.%d\n", viewer_major, viewer_minor);
  
 -  switch (secType) {
 -  case rfbSecTypeNone:
@@ -4803,6 +5427,27 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -    fprintf(stderr, "Internal error: Invalid security type\n");
 -    return False;
 -  }
++	sprintf(pv, rfbProtocolVersionFormat, viewer_major, viewer_minor);
+ 
+-  ci.shared = (appData.shareDesktop ? 1 : 0);
++	if (!WriteExact(rfbsock, pv, sz_rfbProtocolVersionMsg)) {
++		return False;
++	}
+ 
+-  if (!WriteExact(rfbsock, (char *)&ci, sz_rfbClientInitMsg))
+-    return False;
++	/* Read or select the security type. */
++	if (viewer_minor == rfbProtocolMinorVersion) {
++		secType = SelectSecurityType();
++	} else {
++		secType = ReadSecurityType();
++	}
++	if (secType == rfbSecTypeInvalid) {
++		return False;
++	}
+ 
+-  if (!ReadFromRFBServer((char *)&si, sz_rfbServerInitMsg))
+-    return False;
 +	switch (secType) {
 +		case rfbSecTypeNone:
 +			fprintf(stderr, "No authentication needed\n\n");
@@ -4827,21 +5472,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			return False;
 +	}
  
--  ci.shared = (appData.shareDesktop ? 1 : 0);
-+	ci.shared = (appData.shareDesktop ? 1 : 0);
- 
--  if (!WriteExact(rfbsock, (char *)&ci, sz_rfbClientInitMsg))
--    return False;
-+	if (!WriteExact(rfbsock, (char *)&ci, sz_rfbClientInitMsg)) {
-+		return False;
-+	}
- 
--  if (!ReadFromRFBServer((char *)&si, sz_rfbServerInitMsg))
--    return False;
-+	if (!ReadFromRFBServer((char *)&si, sz_rfbServerInitMsg)) {
-+		return False;
-+	}
- 
 -  si.framebufferWidth = Swap16IfLE(si.framebufferWidth);
 -  si.framebufferHeight = Swap16IfLE(si.framebufferHeight);
 -  si.format.redMax = Swap16IfLE(si.format.redMax);
@@ -4856,6 +5486,19 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -            (unsigned long)si.nameLength);
 -    return False;
 -  }
++	ci.shared = (appData.shareDesktop ? 1 : 0);
+ 
+-  if (!ReadFromRFBServer(desktopName, si.nameLength)) return False;
++	if (!WriteExact(rfbsock, (char *)&ci, sz_rfbClientInitMsg)) {
++		return False;
++	}
+ 
+-  desktopName[si.nameLength] = 0;
++	if (!ReadFromRFBServer((char *)&si, sz_rfbServerInitMsg)) {
++		return False;
++	}
+ 
+-  fprintf(stderr,"Desktop name \"%s\"\n",desktopName);
 +	si.framebufferWidth = Swap16IfLE(si.framebufferWidth);
 +	si.framebufferHeight = Swap16IfLE(si.framebufferHeight);
 +	si.format.redMax = Swap16IfLE(si.format.redMax);
@@ -4871,35 +5514,32 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +		return False;
 +	}
  
--  if (!ReadFromRFBServer(desktopName, si.nameLength)) return False;
+-  fprintf(stderr,"VNC server default format:\n");
+-  PrintPixelFormat(&si.format);
 +	if (!ReadFromRFBServer(desktopName, si.nameLength)) {
 +		return False;
 +	}
- 
--  desktopName[si.nameLength] = 0;
-+	desktopName[si.nameLength] = 0;
- 
--  fprintf(stderr,"Desktop name \"%s\"\n",desktopName);
-+	fprintf(stderr,"Desktop name \"%s\"\n\n", desktopName);
- 
--  fprintf(stderr,"VNC server default format:\n");
--  PrintPixelFormat(&si.format);
-+	fprintf(stderr,"VNC server default format:\n");
-+	PrintPixelFormat(&si.format);
  
 -  if (tightVncProtocol) {
 -    /* Read interaction capabilities (protocol 3.7t) */
 -    if (!ReadInteractionCaps())
 -      return False;
 -  }
++	desktopName[si.nameLength] = 0;
+ 
+-  return True;
++	fprintf(stderr,"Desktop name \"%s\"\n\n", desktopName);
++
++	fprintf(stderr,"VNC server default format:\n");
++	PrintPixelFormat(&si.format);
++
 +	if (tightVncProtocol) {
 +		/* Read interaction capabilities (protocol 3.7t) */
 +		if (!ReadInteractionCaps()) {
 +			return False;
 +		}
 +	}
- 
--  return True;
++
 +	return True;
  }
  
@@ -5026,8 +5666,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	if (!ReadFromRFBServer((char *)secTypes, nSecTypes)) {
 +		return rfbSecTypeInvalid;
 +	}
- 
--  free(secTypes);
++
 +	/* Find out if the server supports TightVNC protocol extensions */
 +	for (j = 0; j < (int)nSecTypes; j++) {
 +		if (secTypes[j] == rfbSecTypeTight) {
@@ -5041,8 +5680,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +		}
 +	}
  
--  if (secType == rfbSecTypeInvalid)
--    fprintf(stderr, "Server did not offer supported security type\n");
+-  free(secTypes);
 +	/* Find first supported security type */
 +	for (j = 0; j < (int)nSecTypes; j++) {
 +		for (i = 0; i < nKnownSecTypes; i++) {
@@ -5060,9 +5698,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +		}
 +	}
  
--  return (int)secType;
+-  if (secType == rfbSecTypeInvalid)
+-    fprintf(stderr, "Server did not offer supported security type\n");
 +	free(secTypes);
-+
+ 
+-  return (int)secType;
 +	if (secType == rfbSecTypeInvalid) {
 +		fprintf(stderr, "Server did not offer supported security type\n");
 +	}
@@ -5071,7 +5711,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -451,6 +513,9 @@
+@@ -451,6 +668,9 @@
    return True;
  }
  
@@ -5081,7 +5721,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * Negotiate authentication scheme (protocol version 3.7t)
-@@ -459,56 +524,61 @@
+@@ -459,56 +679,61 @@
  static Bool
  PerformAuthenticationTight(void)
  {
@@ -5185,7 +5825,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -519,80 +589,97 @@
+@@ -519,80 +744,97 @@
  static Bool
  AuthenticateVNC(void)
  {
@@ -5346,7 +5986,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  /*
-@@ -602,68 +689,71 @@
+@@ -602,68 +844,71 @@
  static Bool
  AuthenticateUnixLogin(void)
  {
@@ -5470,7 +6110,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -675,19 +765,20 @@
+@@ -675,19 +920,20 @@
  static Bool
  ReadInteractionCaps(void)
  {
@@ -5503,7 +6143,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -700,17 +791,18 @@
+@@ -700,17 +946,18 @@
  static Bool
  ReadCapabilityList(CapsContainer *caps, int count)
  {
@@ -5531,7 +6171,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -729,6 +821,10 @@
+@@ -729,6 +976,10 @@
    Bool requestCompressLevel = False;
    Bool requestQualityLevel = False;
    Bool requestLastRectEncoding = False;
@@ -5542,7 +6182,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
    spf.type = rfbSetPixelFormat;
    spf.format = myFormat;
-@@ -736,6 +832,7 @@
+@@ -736,6 +987,7 @@
    spf.format.greenMax = Swap16IfLE(spf.format.greenMax);
    spf.format.blueMax = Swap16IfLE(spf.format.blueMax);
  
@@ -5550,7 +6190,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
    if (!WriteExact(rfbsock, (char *)&spf, sz_rfbSetPixelFormatMsg))
      return False;
  
-@@ -754,6 +851,12 @@
+@@ -754,6 +1006,12 @@
  	encStrLen = strlen(encStr);
        }
  
@@ -5563,7 +6203,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
        if (strncasecmp(encStr,"raw",encStrLen) == 0) {
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
        } else if (strncasecmp(encStr,"copyrect",encStrLen) == 0) {
-@@ -775,6 +878,20 @@
+@@ -775,6 +1033,20 @@
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
        } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRRE);
@@ -5584,7 +6224,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
        } else {
  	fprintf(stderr,"Unknown encoding '%.*s'\n",encStrLen,encStr);
        }
-@@ -797,7 +914,7 @@
+@@ -797,7 +1069,7 @@
      if (appData.useRemoteCursor) {
        if (se->nEncodings < MAX_ENCODINGS)
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
@@ -5593,7 +6233,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
        if (se->nEncodings < MAX_ENCODINGS)
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
-@@ -806,10 +923,14 @@
+@@ -806,10 +1078,14 @@
      if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
      }
@@ -5609,7 +6249,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	fprintf(stderr,"Same machine: preferring raw encoding\n");
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
        } else {
-@@ -819,6 +940,8 @@
+@@ -819,6 +1095,8 @@
  
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
@@ -5618,7 +6258,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingZlib);
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCoRRE);
-@@ -844,11 +967,14 @@
+@@ -844,11 +1122,14 @@
  
      if (appData.useRemoteCursor) {
        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
@@ -5634,7 +6274,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
    }
  
    len = sz_rfbSetEncodingsMsg + se->nEncodings * 4;
-@@ -868,10 +994,11 @@
+@@ -868,31 +1149,109 @@
  Bool
  SendIncrementalFramebufferUpdateRequest()
  {
@@ -5645,24 +6285,49 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
 +time_t last_filexfer = 0;
++int delay_filexfer = 3;
++extern void CheckFileXfer(void);
++extern int rfbsock_is_ready(void);
++
++
++//			fprintf(stderr, "skip SendFramebufferUpdateRequest: %d - %d\n", last_filexfer, time(NULL));
++#if 0
++int ready;
++if (0) {
++	ready = rfbsock_is_ready();
++	if (db) fprintf(stderr, "rsir: %d\n", ready);
++	if (ready) {
++		int r = (int) HandleRFBServerMessage();
++		if (db) fprintf(stderr, "hrsm: %d\n", r);
++		
++	}
++	if (db) fprintf(stderr, "CFX: C ****\n");
++	CheckFileXfer();
++	return True;
++}
++if (db) {
++	ready = rfbsock_is_ready();
++	fprintf(stderr, "rsir: %d\n", ready);
++}
++#endif
++//			x = y = 0;
++//			w = h = 1;
++
++
++static int dyn = -1;
++extern int filexfer_sock;
++extern int filexfer_listen;
  
  /*
   * SendFramebufferUpdateRequest.
-@@ -880,19 +1007,35 @@
+  */
+-
  Bool
  SendFramebufferUpdateRequest(int x, int y, int w, int h, Bool incremental)
  {
 -  rfbFramebufferUpdateRequestMsg fur;
 +	rfbFramebufferUpdateRequestMsg fur;
-+
-+	if (appData.fileActive) {
-+		if (time(NULL) < last_filexfer + 2) {
-+//			fprintf(stderr, "skip SendFramebufferUpdateRequest: %d - %d\n", last_filexfer, time(NULL));
-+//			return True;
-+			x = y = 0;
-+			w = h = 1;
-+		}
-+	}
++	static int db = -1;
  
 -  fur.type = rfbFramebufferUpdateRequest;
 -  fur.incremental = incremental ? 1 : 0;
@@ -5670,6 +6335,47 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -  fur.y = Swap16IfLE(y);
 -  fur.w = Swap16IfLE(w);
 -  fur.h = Swap16IfLE(h);
++	if (db < 0) {
++		if (getenv("SSVNC_DEBUG_RECTS")) {
++			db = atoi(getenv("SSVNC_DEBUG_RECTS"));
++		} else {
++			db = 0;
++		}
++	}
+ 
+-  if (!WriteExact(rfbsock, (char *)&fur, sz_rfbFramebufferUpdateRequestMsg))
+-    return False;
++	if (db) fprintf(stderr, "SendFramebufferUpdateRequest(%d, %d, %d, %d, incremental=%d)\n", x, y, w, h, (int) incremental);
+ 
+-  return True;
++	if (dyn < 0) {
++		struct stat sb;
++		if (getenv("USER") && !strcmp(getenv("USER"), "runge")) {
++			if (stat("/tmp/nodyn", &sb) == 0) {
++				putenv("NOFTFBUPDATES=1");
++				unlink("/tmp/nodyn");
++			}
++		}
++		if (getenv("NOFTFBUPDATES")) {
++			dyn = 0;
++		} else {
++			dyn = 1;
++		}
++	}
++
++	if (appData.fileActive && filexfer_sock >= 0) {
++		static int first = 1;
++		if (first) {
++			fprintf(stderr, "SFU: dynamic fb updates during filexfer: %d\n", dyn);
++			first = 0;
++		}
++if (db > 2 || 0) fprintf(stderr, "A sfur: %d %d %d %d d_last: %d\n", x, y, w, h, (int) (time(NULL) - last_filexfer));
++		if (!dyn || time(NULL) < last_filexfer + delay_filexfer) {
++			return True;
++		}
++	}
++if (db > 1) fprintf(stderr, "B sfur: %d %d %d %d\n", x, y, w, h);
++
 +	fur.type = rfbFramebufferUpdateRequest;
 +	fur.incremental = incremental ? 1 : 0;
 +	fur.x = Swap16IfLE(x);
@@ -5682,24 +6388,33 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	} else {
 +		sent_FBU = 2;
 +	}
- 
--  if (!WriteExact(rfbsock, (char *)&fur, sz_rfbFramebufferUpdateRequestMsg))
--    return False;
++
 +	if (!WriteExact(rfbsock, (char *)&fur, sz_rfbFramebufferUpdateRequestMsg)) {
 +		return False;
 +	}
- 
--  return True;
++
 +	return True;
  }
  
  
-@@ -903,19 +1046,27 @@
+@@ -903,19 +1262,27 @@
  Bool
  SendPointerEvent(int x, int y, int buttonMask)
  {
 -  rfbPointerEventMsg pe;
 +	rfbPointerEventMsg pe;
++
++	if (appData.fileActive) {
++		if (!dyn || time(NULL) < last_filexfer + delay_filexfer) {
++			//fprintf(stderr, "skip SendPointerEvent: %d - %d\n", last_filexfer, time(NULL));
++			return True;
++		}
++	}
++
++	pe.type = rfbPointerEvent;
++	pe.buttonMask = buttonMask;
++	if (x < 0) x = 0;
++	if (y < 0) y = 0;
  
 -  pe.type = rfbPointerEvent;
 -  pe.buttonMask = buttonMask;
@@ -5712,18 +6427,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -  pe.x = Swap16IfLE(x);
 -  pe.y = Swap16IfLE(y);
 -  return WriteExact(rfbsock, (char *)&pe, sz_rfbPointerEventMsg);
-+	if (appData.fileActive) {
-+		if (time(NULL) < last_filexfer + 2) {
-+			//fprintf(stderr, "skip SendPointerEvent: %d - %d\n", last_filexfer, time(NULL));
-+			return True;
-+		}
-+	}
-+
-+	pe.type = rfbPointerEvent;
-+	pe.buttonMask = buttonMask;
-+	if (x < 0) x = 0;
-+	if (y < 0) y = 0;
-+
 +	if (!appData.useX11Cursor) {
 +		SoftCursorMove(x, y);
 +	}
@@ -5734,7 +6437,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -926,12 +1077,12 @@
+@@ -926,12 +1293,19 @@
  Bool
  SendKeyEvent(CARD32 key, Bool down)
  {
@@ -5745,6 +6448,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -  ke.down = down ? 1 : 0;
 -  ke.key = Swap32IfLE(key);
 -  return WriteExact(rfbsock, (char *)&ke, sz_rfbKeyEventMsg);
++	if (appData.fileActive) {
++		if (!dyn || time(NULL) < last_filexfer + delay_filexfer) {
++			//fprintf(stderr, "skip SendPointerEvent: %d - %d\n", last_filexfer, time(NULL));
++			return True;
++		}
++	}
++
 +	ke.type = rfbKeyEvent;
 +	ke.down = down ? 1 : 0;
 +	ke.key = Swap32IfLE(key);
@@ -5752,7 +6462,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -942,281 +1093,716 @@
+@@ -942,281 +1316,818 @@
  Bool
  SendClientCutText(char *str, int len)
  {
@@ -5767,95 +6477,102 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -  cct.length = Swap32IfLE(len);
 -  return  (WriteExact(rfbsock, (char *)&cct, sz_rfbClientCutTextMsg) &&
 -	   WriteExact(rfbsock, str, len));
--}
 +	if (serverCutText) {
 +		free(serverCutText);
 +	}
 +	serverCutText = NULL;
- 
++
++	if (appData.fileActive) {
++		if (!dyn || time(NULL) < last_filexfer + delay_filexfer) {
++			// ultravnc java viewer lets this one through.
++			return True;
++		}
++	}
++
 +	if (appData.viewOnly) {
 +		return True;
 +	}
- 
--/*
-- * HandleRFBServerMessage.
-- */
++
 +	cct.type = rfbClientCutText;
 +	cct.length = Swap32IfLE(len);
 +	return  (WriteExact(rfbsock, (char *)&cct, sz_rfbClientCutTextMsg) &&
 +	    WriteExact(rfbsock, str, len));
-+}
+ }
  
- Bool
--HandleRFBServerMessage()
++static int ultra_scale = 0;
+ 
+-/*
+- * HandleRFBServerMessage.
+- */
++Bool
 +SendServerScale(int nfac)
- {
--  rfbServerToClientMsg msg;
++{
 +	rfbSetScaleMsg ssc;
 +	if (nfac < 0 || nfac > 100) {
 +		return True;
 +	}
- 
--  if (!ReadFromRFBServer((char *)&msg, 1))
--    return False;
++
++	ultra_scale = nfac;
 +	ssc.type = rfbSetScale;
 +	ssc.scale = nfac;
 +	return WriteExact(rfbsock, (char *)&ssc, sz_rfbSetScaleMsg);
 +}
  
+ Bool
+-HandleRFBServerMessage()
++SendServerInput(Bool enabled)
+ {
+-  rfbServerToClientMsg msg;
++	rfbSetServerInputMsg sim;
+ 
+-  if (!ReadFromRFBServer((char *)&msg, 1))
+-    return False;
++	sim.type = rfbSetServerInput;
++	sim.status = enabled;
++	return WriteExact(rfbsock, (char *)&sim, sz_rfbSetServerInputMsg);
++}
+ 
 -  switch (msg.type) {
 +Bool
-+SendServerInput(Bool enabled)
++SendSingleWindow(int x, int y)
 +{
-+	rfbSetServerInputMsg sim;
++	static int w_old = -1, h_old = -1;
++	rfbSetSWMsg sw;
  
 -  case rfbSetColourMapEntries:
 -  {
 -    int i;
 -    CARD16 rgb[3];
 -    XColor xc;
-+	sim.type = rfbSetServerInput;
-+	sim.status = enabled;
-+	return WriteExact(rfbsock, (char *)&sim, sz_rfbSetServerInputMsg);
-+}
++	fprintf(stderr, "SendSingleWindow: %d %d\n", x, y);
  
 -    if (!ReadFromRFBServer(((char *)&msg) + 1,
 -			   sz_rfbSetColourMapEntriesMsg - 1))
 -      return False;
-+Bool
-+SendSingleWindow(int x, int y)
-+{
-+	rfbSetSWMsg sw;
- 
--    msg.scme.firstColour = Swap16IfLE(msg.scme.firstColour);
--    msg.scme.nColours = Swap16IfLE(msg.scme.nColours);
-+	fprintf(stderr, "SendSingleWindow: %d %d\n", x, y);
- 
--    for (i = 0; i < msg.scme.nColours; i++) {
--      if (!ReadFromRFBServer((char *)rgb, 6))
--	return False;
--      xc.pixel = msg.scme.firstColour + i;
--      xc.red = Swap16IfLE(rgb[0]);
--      xc.green = Swap16IfLE(rgb[1]);
--      xc.blue = Swap16IfLE(rgb[2]);
--      xc.flags = DoRed|DoGreen|DoBlue;
--      XStoreColor(dpy, cmap, &xc);
--    }
 +	if (x == -1 && y == -1)  {
 +		sw.type = rfbSetSW;
 +		sw.x = Swap16IfLE(1);
 +		sw.y = Swap16IfLE(1);
++		if (w_old > 0) {
++			si.framebufferWidth  = w_old;
++			si.framebufferHeight = h_old;
++			ReDoDesktop();
++		}
++		w_old = h_old = -1;
 +	} else {
 +		sw.type = rfbSetSW;
 +		sw.x = Swap16IfLE(x);
 +		sw.y = Swap16IfLE(y);
++		w_old = si.framebufferWidth;
++		h_old = si.framebufferHeight;
++		
 +	}
 +	sw.status = True;
 +	return WriteExact(rfbsock, (char *)&sw, sz_rfbSetSWMsg);
 +}
  
--    break;
--  }
+-    msg.scme.firstColour = Swap16IfLE(msg.scme.firstColour);
+-    msg.scme.nColours = Swap16IfLE(msg.scme.nColours);
 +Bool
 +SendTextChat(char *str)
 +{
@@ -5872,18 +6589,20 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	return WriteExact(rfbsock, str, strlen(str));
 +}
  
--  case rfbFramebufferUpdate:
--  {
--    rfbFramebufferUpdateRectHeader rect;
--    int linesToRead;
--    int bytesPerLine;
--    int i;
--    int usecs;
+-    for (i = 0; i < msg.scme.nColours; i++) {
+-      if (!ReadFromRFBServer((char *)rgb, 6))
+-	return False;
+-      xc.pixel = msg.scme.firstColour + i;
+-      xc.red = Swap16IfLE(rgb[0]);
+-      xc.green = Swap16IfLE(rgb[1]);
+-      xc.blue = Swap16IfLE(rgb[2]);
+-      xc.flags = DoRed|DoGreen|DoBlue;
+-      XStoreColor(dpy, cmap, &xc);
+-    }
 +extern void raiseme(int force);
  
--    if (!ReadFromRFBServer(((char *)&msg.fu) + 1,
--			   sz_rfbFramebufferUpdateMsg - 1))
--      return False;
+-    break;
+-  }
 +Bool
 +SendTextChatOpen(void)
 +{
@@ -5896,7 +6615,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	return WriteExact(rfbsock, (char *)&chat, sz_rfbTextChatMsg);
 +}
  
--    msg.fu.nRects = Swap16IfLE(msg.fu.nRects);
+-  case rfbFramebufferUpdate:
+-  {
+-    rfbFramebufferUpdateRectHeader rect;
+-    int linesToRead;
+-    int bytesPerLine;
+-    int i;
+-    int usecs;
 +Bool
 +SendTextChatClose(void)
 +{
@@ -5908,9 +6633,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	return WriteExact(rfbsock, (char *)&chat, sz_rfbTextChatMsg);
 +}
  
--    for (i = 0; i < msg.fu.nRects; i++) {
--      if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader))
--	return False;
+-    if (!ReadFromRFBServer(((char *)&msg.fu) + 1,
+-			   sz_rfbFramebufferUpdateMsg - 1))
+-      return False;
 +Bool
 +SendTextChatFinished(void)
 +{
@@ -5957,11 +6682,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +        return dtime0(&t);
 +}
 +
-+extern int filexfer_sock;
-+extern int filexfer_listen;
-+
 +static char fxfer[65536];
-+extern void CheckFileXfer(void);
 +
 +Bool HandleFileXfer(void) {
 +	unsigned char hdr[12];
@@ -5998,11 +6719,30 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +
 +        int rfbRErrorUnknownCmd = 1; // Unknown FileTransfer command.
 +        int rfbRErrorCmd = 0xFFFFFFFF;
++
++	int db = 0;
++
++#if 0
++	if (filexfer_sock < 0) {
++		return True;
++	}
++	// instead, we read and discard the ft msg data.
++#endif
+ 
+-    msg.fu.nRects = Swap16IfLE(msg.fu.nRects);
++//fprintf(stderr, "In  HandleFileXfer\n");
+ 
+-    for (i = 0; i < msg.fu.nRects; i++) {
+-      if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader))
+-	return False;
++	last_filexfer = time(NULL);
++	//fprintf(stderr, "last_filexfer-1: %d\n", last_filexfer);
  
 -      rect.encoding = Swap32IfLE(rect.encoding);
 -      if (rect.encoding == rfbEncodingLastRect)
 -	break;
-+	int db = 0;
++	// load first byte to send to Java be the FT msg number:
++	hdr[0] = rfbFileTransfer;
  
 -      rect.r.x = Swap16IfLE(rect.r.x);
 -      rect.r.y = Swap16IfLE(rect.r.y);
@@ -6014,17 +6754,39 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -	if (!HandleCursorShape(rect.r.x, rect.r.y, rect.r.w, rect.r.h,
 -			      rect.encoding)) {
 -	  return False;
--	}
++	// this is to avoid XtAppProcessEvent() calls induce by our ReadFromRFBServer calls below:
++	skip_XtUpdateAll = 1;
++	if (!ReadFromRFBServer(&hdr[1], 11)) {
++		skip_XtUpdateAll = 0;
++		return False;
++	}
++	if (filexfer_sock >= 0) {
++		write(filexfer_sock, hdr, 12);
++	} else {
++		fprintf(stderr, "filexfer_sock closed, discarding 12 bytes\n");
++	}
++	if (db) fprintf(stderr, "\n");
++	if (db) fprintf(stderr, "Got rfbFileTransfer hdr\n");
++	if (db > 1) write(2, hdr, 12);
++
++	if (db) {
++		int i;
++		fprintf(stderr, "HFX HDR:");
++		for (i=0; i < 12; i++) {
++			fprintf(stderr, " %d", (int) hdr[i]);
++		}
++		fprintf(stderr, "\n");
+ 	}
 -	continue;
 -      }
-+	last_filexfer = time(NULL);
-+	//fprintf(stderr, "last_filexfer-1: %d\n", last_filexfer);
  
 -      if (rect.encoding == rfbEncodingPointerPos) {
 -	if (!HandleCursorPos(rect.r.x, rect.r.y)) {
 -	  return False;
-+	if (filexfer_sock < 0) {
-+		return True;
++	if (hdr[1] == rfbEndOfFile) {
++		goto read_no_more;
++	} else if (hdr[1] == rfbAbortFileTransfer) {
++		goto read_no_more;
  	}
 -	continue;
 -      }
@@ -6035,29 +6797,30 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -	  fprintf(stderr,"Rect too large: %dx%d at (%d, %d)\n",
 -		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
 -	  return False;
-+	hdr[0] = rfbFileTransfer;
-+	skip_XtUpdateAll = 1;
-+	if (!ReadFromRFBServer(&hdr[1], 11)) {
-+		skip_XtUpdateAll = 0;
-+		return False;
-+	}
-+	write(filexfer_sock, hdr, 12);
-+	if (db) fprintf(stderr, "Got rfbFileTransfer hdr\n");
-+	if (db) write(2, hdr, 12);
-+	if (db) fprintf(stderr, "\n");
-+
 +	len = (hdr[8] << 24) | (hdr[9] << 16) | (hdr[10] << 8) | hdr[11];
-+	if (db) fprintf(stderr, "Got rfbFileTransfer: len %d\n", len);
++	if (db) fprintf(stderr, "Got rfbFileTransfer: len1 %u\n", len);
 +	if (len > 0) {
 +		if (!ReadFromRFBServer(fxfer, len)) {
 +			skip_XtUpdateAll = 0;
 +			return False;
 +		}
-+		if (db) write(2, fxfer, len);
-+		if (db) fprintf(stderr, "\n");
-+		write(filexfer_sock, fxfer, len);
-+	}
++		if (db > 1) write(2, fxfer, len);
++		if (db && 0) fprintf(stderr, "\n");
++		if (filexfer_sock >= 0) {
++			write(filexfer_sock, fxfer, len);
++		} else {
++			fprintf(stderr, "filexfer_sock closed, discarding %d bytes\n", len);
++		}
+ 	}
+ 
+-      if (rect.r.h * rect.r.w == 0) {
+-	fprintf(stderr,"Zero size rect - ignoring\n");
+-	continue;
+-      }
++	/* not used! */
 +	len = (hdr[4] << 24) | (hdr[5] << 16) | (hdr[6] << 8) | hdr[7];
++	if (db) fprintf(stderr, "Got rfbFileTransfer: len2 %u\n", len);
++
 +	if (hdr[1] == rfbFileHeader && len != rfbRErrorCmd) {
 +		if (db) fprintf(stderr, "Got rfbFileTransfer: rfbFileHeader\n");
 +		len = 4;
@@ -6065,39 +6828,76 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			skip_XtUpdateAll = 0;
 +			return False;
 +		}
-+		if (db) write(2, fxfer, len);
-+		if (db) fprintf(stderr, "\n");
-+		write(filexfer_sock, fxfer, len);
- 	}
-+	if (db) fprintf(stderr, "Got rfbFileTransfer done.\n");
-+	skip_XtUpdateAll = 0;
- 
--      if (rect.r.h * rect.r.w == 0) {
--	fprintf(stderr,"Zero size rect - ignoring\n");
--	continue;
--      }
-+	CheckFileXfer();
-+	return True;
-+}
++		if (db > 1) write(2, fxfer, len);
++		if (db && 0) fprintf(stderr, "\n");
++		if (filexfer_sock >= 0) {
++			write(filexfer_sock, fxfer, len);
++		} else {
++			fprintf(stderr, "filexfer_sock closed, discarding %d bytes\n", len);
++		}
++	}
  
 -      /* If RichCursor encoding is used, we should prevent collisions
 -	 between framebuffer updates and cursor drawing operations. */
 -      SoftCursorLockArea(rect.r.x, rect.r.y, rect.r.w, rect.r.h);
++	read_no_more:
+ 
+-      switch (rect.encoding) {
++	if (filexfer_sock < 0) {
++		int stop = 0;
++		static time_t last_stop = 0;
++#if 0
++		// this isn't working
++		if (hdr[1] == rfbFilePacket || hdr[1] == rfbFileHeader) {
++			fprintf(stderr, "filexfer_sock closed, trying to abort receive\n");
++			stop = 1;
++		}
++#endif
++		if (stop && time(NULL) > last_stop+1) {
++			unsigned char rpl[12];
++			int k;
++			rpl[0] = rfbFileTransfer;
++			rpl[1] = rfbAbortFileTransfer;
++			for (k=2; k < 12; k++) {
++				rpl[k] = 0;
++			}
++			WriteExact(rfbsock, rpl, 12);
++			last_stop = time(NULL);
++		}
++	}
+ 
+-      case rfbEncodingRaw:
++	if (db) fprintf(stderr, "Got rfbFileTransfer done.\n");
++	skip_XtUpdateAll = 0;
+ 
+-	bytesPerLine = rect.r.w * myFormat.bitsPerPixel / 8;
+-	linesToRead = BUFFER_SIZE / bytesPerLine;
++	if (db) fprintf(stderr, "CFX: B\n");
++	CheckFileXfer();
++//fprintf(stderr, "Out HandleFileXfer\n");
++	return True;
++}
+ 
+-	while (rect.r.h > 0) {
+-	  if (linesToRead > rect.r.h)
+-	    linesToRead = rect.r.h;
 +/*
 + * HandleRFBServerMessage.
 + */
  
--      switch (rect.encoding) {
+-	  if (!ReadFromRFBServer(buffer,bytesPerLine * linesToRead))
+-	    return False;
  
--      case rfbEncodingRaw:
+-	  CopyDataToScreen(buffer, rect.r.x, rect.r.y, rect.r.w,
+-			   linesToRead);
 +Bool
 +HandleRFBServerMessage()
 +{
 +	static int db = -1;
 +	rfbServerToClientMsg msg;
  
--	bytesPerLine = rect.r.w * myFormat.bitsPerPixel / 8;
--	linesToRead = BUFFER_SIZE / bytesPerLine;
+-	  rect.r.h -= linesToRead;
+-	  rect.r.y += linesToRead;
 +	if (db < 0) {
 +		if (getenv("DEBUG_RFB_SMSG")) {
 +			db = 1;
@@ -6106,32 +6906,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +		}
 +	}
  
--	while (rect.r.h > 0) {
--	  if (linesToRead > rect.r.h)
--	    linesToRead = rect.r.h;
 +	if (!ReadFromRFBServer((char *)&msg, 1)) {
-+		return False;
-+	}
- 
--	  if (!ReadFromRFBServer(buffer,bytesPerLine * linesToRead))
--	    return False;
-+	if (msg.type == rfbFileTransfer) {
-+		return HandleFileXfer();
-+	}
- 
--	  CopyDataToScreen(buffer, rect.r.x, rect.r.y, rect.r.w,
--			   linesToRead);
-+    switch (msg.type) {
- 
--	  rect.r.h -= linesToRead;
--	  rect.r.y += linesToRead;
-+    case rfbSetColourMapEntries:
-+    {
-+	int i;
-+	CARD16 rgb[3];
-+	XColor xc;
- 
-+	if (!ReadFromRFBServer(((char *)&msg) + 1, sz_rfbSetColourMapEntriesMsg - 1)) {
 +		return False;
  	}
 -	break;
@@ -6162,33 +6937,21 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -			 rect.r.w, rect.r.h);
 -	  XFillRectangle(dpy, desktopWin, srcGC, cr.srcX, cr.srcY,
 -			 rect.r.w, rect.r.h);
--	}
-+	msg.scme.firstColour = Swap16IfLE(msg.scme.firstColour);
-+	msg.scme.nColours = Swap16IfLE(msg.scme.nColours);
++	if (msg.type == rfbFileTransfer) {
++		return HandleFileXfer();
+ 	}
  
 -	XCopyArea(dpy, desktopWin, desktopWin, gc, cr.srcX, cr.srcY,
 -		  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
-+	for (i = 0; i < msg.scme.nColours; i++) {
-+		if (!ReadFromRFBServer((char *)rgb, 6)) {
-+			return False;
-+		}
-+		xc.pixel = msg.scme.firstColour + i;
-+		xc.red = Swap16IfLE(rgb[0]);
-+		xc.green = Swap16IfLE(rgb[1]);
-+		xc.blue = Swap16IfLE(rgb[2]);
-+		if (appData.useGreyScale) {
-+			int ave = (xc.red + xc.green + xc.blue)/3;
-+			xc.red   = ave;
-+			xc.green = ave;
-+			xc.blue  = ave;
-+		}
-+		xc.flags = DoRed|DoGreen|DoBlue;
-+		XStoreColor(dpy, cmap, &xc);
-+	}
++    switch (msg.type) {
  
- 	break;
+-	break;
 -      }
-+    }
++    case rfbSetColourMapEntries:
++    {
++	int i;
++	CARD16 rgb[3];
++	XColor xc;
  
 -      case rfbEncodingRRE:
 -      {
@@ -6205,22 +6968,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -	  if (!HandleRRE32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
 -	    return False;
 -	  break;
--	}
++	if (!ReadFromRFBServer(((char *)&msg) + 1, sz_rfbSetColourMapEntriesMsg - 1)) {
++		return False;
+ 	}
 -	break;
 -      }
-+    case rfbFramebufferUpdate:
-+    {
-+	rfbFramebufferUpdateRectHeader rect;
-+	int linesToRead;
-+	int bytesPerLine;
-+	int i;
-+	int usecs;
-+
-+	int area_copyrect = 0;
-+	int area_tight = 0;
-+	int area_zrle = 0;
-+	int area_raw = 0;
-+	if (db) fprintf(stderr, "FBU-0:    %.6f\n", dnow());
  
 -      case rfbEncodingCoRRE:
 -      {
@@ -6240,8 +6992,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -	}
 -	break;
 -      }
-+	int skip_incFBU = 0;
-+	sent_FBU = -1;
++	msg.scme.firstColour = Swap16IfLE(msg.scme.firstColour);
++	msg.scme.nColours = Swap16IfLE(msg.scme.nColours);
  
 -      case rfbEncodingHextile:
 -      {
@@ -6258,11 +7010,27 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -	  if (!HandleHextile32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
 -	    return False;
 -	  break;
-+	if (!ReadFromRFBServer(((char *)&msg.fu) + 1, sz_rfbFramebufferUpdateMsg - 1)) {
-+		return False;
++	for (i = 0; i < msg.scme.nColours; i++) {
++		if (!ReadFromRFBServer((char *)rgb, 6)) {
++			return False;
++		}
++		xc.pixel = msg.scme.firstColour + i;
++		xc.red = Swap16IfLE(rgb[0]);
++		xc.green = Swap16IfLE(rgb[1]);
++		xc.blue = Swap16IfLE(rgb[2]);
++		if (appData.useGreyScale) {
++			int ave = (xc.red + xc.green + xc.blue)/3;
++			xc.red   = ave;
++			xc.green = ave;
++			xc.blue  = ave;
++		}
++		xc.flags = DoRed|DoGreen|DoBlue;
++		XStoreColor(dpy, cmap, &xc);
  	}
--	break;
++
+ 	break;
 -      }
++    }
  
 -      case rfbEncodingZlib:
 -      {
@@ -6279,10 +7047,30 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -	  if (!HandleZlib32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
 -	    return False;
 -	  break;
--	}
++    case rfbFramebufferUpdate:
++    {
++	rfbFramebufferUpdateRectHeader rect;
++	int linesToRead;
++	int bytesPerLine;
++	int i;
++	int usecs;
++
++	int area_copyrect = 0;
++	int area_tight = 0;
++	int area_zrle = 0;
++	int area_raw = 0;
++	static int rdb = -1;
++
++	if (db) fprintf(stderr, "FBU-0:    %.6f\n", dnow());
++	if (rdb < 0) {
++		if (getenv("SSVNC_DEBUG_RECTS")) {
++			rdb = atoi(getenv("SSVNC_DEBUG_RECTS"));
++		} else {
++			rdb = 0;
++		}
+ 	}
 -	break;
 -     }
-+	msg.fu.nRects = Swap16IfLE(msg.fu.nRects);
  
 -      case rfbEncodingTight:
 -      {
@@ -6299,9 +7087,25 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -	  if (!HandleTight32(rect.r.x,rect.r.y,rect.r.w,rect.r.h))
 -	    return False;
 -	  break;
--	}
++	int skip_incFBU = 0;
++	sent_FBU = -1;
++
++	if (!ReadFromRFBServer(((char *)&msg.fu) + 1, sz_rfbFramebufferUpdateMsg - 1)) {
++		return False;
+ 	}
 -	break;
 -      }
+ 
+-      default:
+-	fprintf(stderr,"Unknown rect encoding %d\n",
+-		(int)rect.encoding);
+-	return False;
+-      }
++	msg.fu.nRects = Swap16IfLE(msg.fu.nRects);
+ 
+-      /* Now we may discard "soft cursor locks". */
+-      SoftCursorUnlockScreen();
+-    }
 +	for (i = 0; i < msg.fu.nRects; i++) {
 +		if (!ReadFromRFBServer((char *)&rect, sz_rfbFramebufferUpdateRectHeader)) {
 +			return False;
@@ -6328,8 +7132,16 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +
 +		if (rect.encoding == rfbEncodingPointerPos) {
 +			if (db) fprintf(stderr, "FBU-Pos1  %.6f\n", dnow());
-+			if (!HandleCursorPos(rect.r.x, rect.r.y)) {
-+				return False;
++			if (0) fprintf(stderr, "CursorPos: %d %d / %d %d\n", rect.r.x, rect.r.y, rect.r.w, rect.r.h);
++			if (ultra_scale > 0) {
++				int f = ultra_scale;
++				if (!HandleCursorPos(rect.r.x/f, rect.r.y/f)) {
++					return False;
++				}
++			} else {
++				if (!HandleCursorPos(rect.r.x, rect.r.y)) {
++					return False;
++				}
 +			}
 +			if (db) fprintf(stderr, "FBU-Pos2  %.6f\n", dnow());
 +			continue;
@@ -6342,17 +7154,19 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			ReDoDesktop();
 +			continue;
 +		}
++		if (rdb) fprintf(stderr,"Rect: %dx%d at (%d, %d)\n", rect.r.w, rect.r.h, rect.r.x, rect.r.y);
 +
 +		if ((rect.r.x + rect.r.w > si.framebufferWidth) ||
 +		    (rect.r.y + rect.r.h > si.framebufferHeight)) {
-+			fprintf(stderr,"Rect too large: %dx%d at (%d, %d)\n",
-+			rect.r.w, rect.r.h, rect.r.x, rect.r.y);
++			fprintf(stderr,"Rect too large: %dx%d at (%d, %d) encoding=%d\n",
++			rect.r.w, rect.r.h, rect.r.x, rect.r.y, rect.encoding);
 +			return False;
 +		}
 +
 +		if (rect.r.h * rect.r.w == 0) {
-+			fprintf(stderr,"Zero size rect - ignoring\n");
-+			continue;
++			fprintf(stderr,"*** Warning *** Zero size rect: %dx%d+%d+%d  encoding=%d\n",
++			    rect.r.w, rect.r.h, rect.r.x, rect.r.y, rect.encoding);
++			if (0) continue;
 +		}
 +
 +		/* If RichCursor encoding is used, we should prevent collisions
@@ -6644,18 +7458,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +		fprintf(stderr,"Unknown rect encoding %d\n", (int)rect.encoding);
 +		return False;
 +		}
- 
--      default:
--	fprintf(stderr,"Unknown rect encoding %d\n",
--		(int)rect.encoding);
--	return False;
--      }
++
 +		/* Now we may discard "soft cursor locks". */
 +		if (db) fprintf(stderr, "FBU-SUL1  %.6f\n", dnow());
- 
--      /* Now we may discard "soft cursor locks". */
--      SoftCursorUnlockScreen();
--    }
++
 +		SoftCursorUnlockScreen();
 +
 +		if (db) fprintf(stderr, "FBU-SUL2  %.6f\n", dnow());
@@ -6698,7 +7504,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  #ifdef MITSHM
      /* if using shared memory PutImage, make sure that the X server has
-@@ -1224,59 +1810,149 @@
+@@ -1224,59 +2135,165 @@
         mainly to avoid copyrect using invalid screen contents - not sure
         if we'd need it otherwise. */
  
@@ -6830,6 +7636,20 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -    fprintf(stderr,"Unknown message type %d from VNC server\n",msg.type);
 -    return False;
 -  }
++    case rfbResizeFrameBuffer:
++    {
++	rfbResizeFrameBufferMsg rsmsg;
++	if (!ReadFromRFBServer(((char *)&rsmsg) + 1, sz_rfbResizeFrameBufferMsg - 1)) {
++		return False;
++	}
++	si.framebufferWidth  = Swap16IfLE(rsmsg.framebufferWidth);
++	si.framebufferHeight = Swap16IfLE(rsmsg.framebufferHeight);
++	fprintf(stderr,"UltraVNC ReSize: %dx%d\n", si.framebufferWidth, si.framebufferHeight);
++	ReDoDesktop();
++	break;
++    }
+ 
+-  return True;
 +    case rfbRestartConnection:
 +    {
 +	rfbRestartConnectionMsg rc;
@@ -6860,8 +7680,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	SetFormatAndEncodings();
 +	DesktopCursorOff();
 +	SendFramebufferUpdateRequest(0, 0, si.framebufferWidth, si.framebufferHeight, False);
- 
--  return True;
++
 +	break;
 +    }
 +
@@ -6869,10 +7688,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	fprintf(stderr,"Unknown message type %d from VNC server\n",msg.type);
 +	return False;
 +    }
++
 +	if (appData.fileActive) {
 +		if (filexfer_sock < 0 && filexfer_listen < 0) {
 +			appData.fileActive = False;
++			SendFramebufferUpdateRequest(0, 0, 1, 1, False);
 +		} else {
++//fprintf(stderr, "CFX: A\n");
 +			CheckFileXfer();
 +		}
 +	}
@@ -6881,7 +7703,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -1296,26 +1972,47 @@
+@@ -1296,26 +2313,47 @@
  #define CONCAT2(a,b) a##b
  #define CONCAT2E(a,b) CONCAT2(a,b)
  
@@ -6929,7 +7751,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  
  /*
-@@ -1358,9 +2055,9 @@
+@@ -1358,9 +2396,9 @@
  	    "  %s significant bit in each byte is leftmost on the screen.\n",
  	    (format->bigEndian ? "Most" : "Least"));
    } else {
@@ -6941,7 +7763,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	      (format->bigEndian ? "Most" : "Least"));
      }
      if (format->trueColour) {
-@@ -1462,4 +2159,3 @@
+@@ -1462,4 +2500,3 @@
  
    cinfo->src = &jpegSrcManager;
  }
@@ -7165,11 +7987,49 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/smake vnc_unixsrc/vncviewer/s
 +fi
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncviewer/sockets.c
 --- vnc_unixsrc.orig/vncviewer/sockets.c	2001-01-14 22:54:18.000000000 -0500
-+++ vnc_unixsrc/vncviewer/sockets.c	2007-12-15 21:08:14.000000000 -0500
-@@ -63,15 +63,216 @@
-   XtRemoveInput(*id);
- }
++++ vnc_unixsrc/vncviewer/sockets.c	2008-09-03 14:33:59.000000000 -0400
+@@ -27,6 +27,7 @@
+ #include <netinet/in.h>
+ #include <netinet/tcp.h>
+ #include <arpa/inet.h>
++#include <sys/un.h>
+ #include <netdb.h>
+ #include <fcntl.h>
+ #include <assert.h>
+@@ -56,22 +57,327 @@
+  */
  
+ static Bool rfbsockReady = False;
++static Bool xfrsockReady = False;
++static XtInputId rfbsockId = 0;
++static XtInputId xfrsockId = 0;
++static int do_rfbsockId = 0;
++static int do_xfrsockId = 0;
++
+ static void
+ rfbsockReadyCallback(XtPointer clientData, int *fd, XtInputId *id)
+ {
+-  rfbsockReady = True;
+-  XtRemoveInput(*id);
++	rfbsockReady = True;
++//	XtRemoveInput(*id);
++	XtRemoveInput(rfbsockId);
++	if (do_xfrsockId) {
++		XtRemoveInput(xfrsockId);
++	}
++}
++
++static void
++xfrsockReadyCallback(XtPointer clientData, int *fd, XtInputId *id)
++{
++	xfrsockReady = True;
++	XtRemoveInput(xfrsockId);
++	if (do_rfbsockId) {
++		XtRemoveInput(rfbsockId);
++	}
++}
++
++
 +extern int skip_XtUpdate;
 +extern int skip_XtUpdateAll;
 +extern int filexfer_sock, filexfer_listen;
@@ -7179,6 +8039,27 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
 +
 +static char fxfer[65536];
 +int fxfer_size = 65536;
++
++int rfbsock_is_ready(void) {
++	fd_set fds;
++	struct timeval tv;
++
++	if (rfbsock < 0)  {
++		return 0;
++	}
++	FD_ZERO(&fds);
++	FD_SET(rfbsock,&fds);
++	tv.tv_sec = 0;
++	tv.tv_usec = 0;
++	if (select(rfbsock+1, &fds, NULL, NULL, &tv) > 0) {
++		if (FD_ISSET(rfbsock, &fds)) {
++			return 1;
++		}
++	}
++	return 0;
++}
++
++time_t filexfer_start = 0;
 +
 +void CheckFileXfer() {
 +	fd_set fds;
@@ -7190,13 +8071,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
 +		return;
 +	}
 +
-+	if (filexfer_listen >= 0 && time(NULL) > start_listen + 10) {
++	if (filexfer_listen >= 0 && time(NULL) > start_listen + 30) {
 +		fprintf(stderr, "filexfer closing aging listen socket.\n");
 +		close(filexfer_listen);
 +		filexfer_listen = -1;
 +		return;
 +	}
-+//fprintf(stderr, "In CheckFileXfer\n");
++//fprintf(stderr, "In  CheckFileXfer\n");
 +
 +	if (filexfer_listen >=0) {
 +		n = filexfer_listen;
@@ -7212,84 +8093,95 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
 +		tv.tv_sec = 0;
 +		tv.tv_usec = 0;
 +		if (select(n+1, &fds, NULL, NULL, &tv) > 0) {
-+			if (FD_ISSET(n, &fds)) {
-+				if (list) {
-+					if (filexfer_sock >= 0) {
-+						fprintf(stderr, "filexfer close stale(?) filexfer_sock.\n");
-+						close(filexfer_sock);
-+						filexfer_sock = -1;
-+					}
-+					filexfer_sock = AcceptTcpConnection(filexfer_listen);
-+					if (filexfer_listen >= 0) {
-+						fprintf(stderr, "filexfer accept OK.\n");
-+						close(filexfer_listen);
-+						filexfer_listen = -1;
-+					} else {
-+						fprintf(stderr, "filexfer accept failed.\n");
-+					}
-+					break;
++		    if (FD_ISSET(n, &fds)) {
++			if (list) {
++				if (filexfer_sock >= 0) {
++					fprintf(stderr, "filexfer close stale(?) filexfer_sock.\n");
++					close(filexfer_sock);
++					filexfer_sock = -1;
++				}
++				filexfer_sock = AcceptTcpConnection(filexfer_listen);
++				if (filexfer_sock >= 0) {
++					fprintf(stderr, "filexfer accept OK.\n");
++					close(filexfer_listen);
++					filexfer_listen = -1;
++					filexfer_start = last_filexfer = time(NULL);
 +				} else {
-+					ssize_t rn;
-+					unsigned char hdr[12];
-+					unsigned int len;
-+					if (db) fprintf(stderr, "try read filexfer...\n");
++					fprintf(stderr, "filexfer accept failed.\n");
++				}
++				break;
++			} else {
++				ssize_t rn;
++				unsigned char hdr[12];
++				unsigned int len;
++				if (db) fprintf(stderr, "try read filexfer...\n");
 +#if 1
-+					rn = read(n, fxfer, 1*8192);
-+					if (0 || db) fprintf(stderr, "filexfer read[%d] %d.\n", icnt, rn);
-+					if (rn < 0) {
-+						fprintf(stderr, "filexfer bad read: %d\n", errno);
-+						break;
-+					} else if (rn == 0) {
-+						fprintf(stderr, "filexfer gone.\n");
-+						close(n);
-+						filexfer_sock = -1;
-+						last_filexfer = time(NULL);
-+						//fprintf(stderr, "last_filexfer-2a: %d\n", last_filexfer);
++				rn = read(n, fxfer, 1*8192);
++if (db) {
++	int i;
++	fprintf(stderr, "CFX HDR:");
++	for (i=0; i < 12; i++) {
++		fprintf(stderr, " %d", (int) fxfer[i]);
++	}
++	fprintf(stderr, " ?\n");
++}
++				if (0 || db) fprintf(stderr, "filexfer read[%d] %d.\n", icnt, rn);
++				if (rn < 0) {
++					fprintf(stderr, "filexfer bad read: %d\n", errno);
++					break;
++				} else if (rn == 0) {
++					fprintf(stderr, "filexfer gone.\n");
++					close(n);
++					filexfer_sock = -1;
++					last_filexfer = time(NULL);
++					//fprintf(stderr, "last_filexfer-2a: %d\n", last_filexfer);
++					appData.fileActive = False;
++					SendFramebufferUpdateRequest(0, 0, 1, 1, False);
++					return;
++				} else if (rn > 0) {
++					if (db > 1) write(2, fxfer, rn);
++					if (db) fprintf(stderr, "\n");
++					bytes += rn;
++					last_filexfer = time(NULL);
++					//fprintf(stderr, "last_filexfer-2b: %d\n", last_filexfer);
++					if (!WriteExact(rfbsock, fxfer, rn)) {
 +						return;
-+					} else if (rn > 0) {
-+						if (db) write(2, fxfer, rn);
-+						if (db) fprintf(stderr, "\n");
-+						bytes += rn;
-+						last_filexfer = time(NULL);
-+						//fprintf(stderr, "last_filexfer-2b: %d\n", last_filexfer);
-+						if (!WriteExact(rfbsock, fxfer, rn)) {
-+							return;
-+						}
-+						igot = 1;
-+					}
-+#else
-+					// not working, not always 7 msg type.	
-+					rn = read(n, hdr, 12);
-+					if (db) fprintf(stderr, "filexfer read %d.\n", rn);
-+					if (rn == 0) {
-+						fprintf(stderr, "filexfer gone.\n");
-+						close(n);
-+						filexfer_sock = -1;
-+						last_filexfer = time(NULL);
-+						return;
-+					}
-+					if (rn == 12) {
-+						len = (hdr[8] << 24) | (hdr[9] << 16) | (hdr[10] << 8) | hdr[11];
-+						if (db) fprintf(stderr, "n=%d len=%d\n", rn, len);
-+						if (db) write(2, hdr, rn);
-+						if (db) fprintf(stderr, "\n");
-+						WriteExact(rfbsock, hdr, rn);
-+						if (len > 0) {
-+							rn = read(len, fxfer, len);
-+							if (!WriteExact(rfbsock, fxfer, len)) {
-+								last_filexfer = time(NULL);
-+								return;
-+							}
-+							if (db) write(2, fxfer, len);
-+						}
-+						if (db) fprintf(stderr, "\n");
-+					} else {
-+						if (db) fprintf(stderr, "bad rn: %d\n", rn);
 +					}
 +					igot = 1;
-+#endif
 +				}
++#else
++				// not working, not always 7 msg type.	
++				rn = read(n, hdr, 12);
++				if (db) fprintf(stderr, "filexfer read %d.\n", rn);
++				if (rn == 0) {
++					fprintf(stderr, "filexfer gone.\n");
++					close(n);
++					filexfer_sock = -1;
++					last_filexfer = time(NULL);
++					return;
++				}
++				if (rn == 12) {
++					len = (hdr[8] << 24) | (hdr[9] << 16) | (hdr[10] << 8) | hdr[11];
++					if (db) fprintf(stderr, "n=%d len=%d\n", rn, len);
++					if (db > 1) write(2, hdr, rn);
++					if (db) fprintf(stderr, "\n");
++					WriteExact(rfbsock, hdr, rn);
++					if (len > 0) {
++						rn = read(len, fxfer, len);
++						if (!WriteExact(rfbsock, fxfer, len)) {
++							last_filexfer = time(NULL);
++							return;
++						}
++						if (db > 1) write(2, fxfer, len);
++					}
++					if (db) fprintf(stderr, "\n");
++				} else {
++					if (db) fprintf(stderr, "bad rn: %d\n", rn);
++				}
++				igot = 1;
++#endif
 +			}
++		    }
 +		} else {
 +			if (bytes >= 8192) {
 +				int ok = 0;
@@ -7304,6 +8196,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
 +					grace++;
 +					bytes0 = bytes;
 +					//fprintf(stderr, "grace: %d\n", grace);
++					// forgot that this is about...
 +					usleep(10 * 1000);
 +					continue;
 +				}
@@ -7315,8 +8208,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
 +		last_filexfer = time(NULL);
 +		//fprintf(stderr, "last_filexfer-2c: %d\n", last_filexfer);
 +	}
++//fprintf(stderr, "Out CheckFileXfer\n");
 +	return;
-+}
+ }
+ 
++static time_t time_mark;
++extern int delay_filexfer;
++#include <sys/stat.h>
 +
  static void
  ProcessXtEvents()
@@ -7327,7 +8225,24 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
 -  while (!rfbsockReady) {
 -    XtAppProcessEvent(appContext, XtIMAll);
 -  }
-+	int y;
++	int y, db = 0;
++	static int dyn = -1;
++
++	if (dyn < 0) {
++		struct stat sb;
++		if (getenv("USER") && !strcmp(getenv("USER"), "runge")) {
++			if (stat("/tmp/nodyn", &sb) == 0) {
++				putenv("NOFTFBUPDATES=1");
++				unlink("/tmp/nodyn");
++			}
++		}
++		if (getenv("NOFTFBUPDATES")) {
++			dyn = 0;
++		} else {
++			dyn = 1;
++		}
++	}
++
 +	if (skip_XtUpdateAll) {
 +		return;
 +	}
@@ -7376,20 +8291,89 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
 +		return;
 +	}
 +
-+//fprintf(stderr, "XtAppAddInput: ");
 +	rfbsockReady = False;
-+	XtAppAddInput(appContext, rfbsock, (XtPointer)XtInputReadMask,
++	xfrsockReady = False;
++	do_rfbsockId = 1;
++	rfbsockId = XtAppAddInput(appContext, rfbsock, (XtPointer)XtInputReadMask,
 +	    rfbsockReadyCallback, NULL);
 +
-+	while (!rfbsockReady) {
-+//fprintf(stderr, ".");
++	do_xfrsockId = 0;
++	if (filexfer_sock >= 0) {
++		do_xfrsockId = 1;
++		xfrsockId = XtAppAddInput(appContext, filexfer_sock, (XtPointer)XtInputReadMask,
++		    xfrsockReadyCallback, NULL);
++	}
++
++	time_mark = time(NULL);
++
++	if (appData.fileActive) {
++		static int first = 1;
++		if (first) {
++			fprintf(stderr, "PXT: dynamic fb updates during filexfer: %d\n", dyn);
++			first = 0;
++		}
++	}
++
++	if (db) fprintf(stderr, "XtAppAddInput: ");
++	while (!rfbsockReady && !xfrsockReady) {
++		int w = si.framebufferWidth;
++		int h = si.framebufferHeight;
++		if (db) fprintf(stderr, ".");
++		if (dyn && filexfer_sock >= 0 && time(NULL) > time_mark + delay_filexfer) {
++			SendFramebufferUpdateRequest(0, 0, w, h, False);
++		}
 +		XtAppProcessEvent(appContext, XtIMAll);
 +	}
-+//fprintf(stderr, " done.\n");
++	if (db) fprintf(stderr, " done. r: %d  x: %d\n", rfbsockReady, xfrsockReady);
++
++	if (xfrsockReady) {
++		CheckFileXfer();
++	}
  }
  
  Bool
-@@ -203,6 +404,8 @@
+@@ -191,6 +497,40 @@
+   return True;
+ }
+ 
++int
++ConnectToUnixSocket(char *file) {
++	int sock;
++	struct sockaddr_un addr;
++	int i;
++
++	memset(&addr, 0, sizeof(struct sockaddr_un));
++
++	addr.sun_family = AF_UNIX;
++
++	for (i=0; i < 108; i++) {
++		addr.sun_path[i] = file[i];
++		if (file[i] == '\0') {
++			break;
++		}
++	}
++
++	sock = socket(AF_UNIX, SOCK_STREAM, 0);
++	if (sock < 0) {
++		fprintf(stderr,programName);
++		perror(": ConnectToUnixSocket: socket");
++		return -1;
++	}
++
++	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
++		fprintf(stderr, programName);
++		perror(": ConnectToUnixSocket: connect");
++		close(sock);
++		return -1;
++	}
++
++	return sock;
++}
++
+ 
+ /*
+  * ConnectToTcpAddr connects to the given TCP port.
+@@ -203,6 +543,8 @@
    struct sockaddr_in addr;
    int one = 1;
  
@@ -7398,7 +8382,30 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
    addr.sin_family = AF_INET;
    addr.sin_port = htons(port);
    addr.sin_addr.s_addr = host;
-@@ -245,6 +448,8 @@
+@@ -232,7 +574,22 @@
+   return sock;
+ }
+ 
++Bool SocketPair(int fd[2]) {
++	if (socketpair(PF_UNIX, SOCK_STREAM, AF_UNIX, fd) == -1) {
++		perror("socketpair");
++		return False;
++	}
++	return True;
++}
+ 
++Bool SetNoDelay(int sock) {
++	const int one = 1;
++	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *)&one, sizeof(one)) < 0) {
++		perror("setsockopt");
++		return False;
++	}
++	return True;
++}
+ 
+ /*
+  * FindFreeTcpPort tries to find unused TCP port in the range
+@@ -245,6 +602,8 @@
    int sock, port;
    struct sockaddr_in addr;
  
@@ -7407,7 +8414,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
    addr.sin_family = AF_INET;
    addr.sin_addr.s_addr = INADDR_ANY;
  
-@@ -272,6 +477,8 @@
+@@ -272,6 +631,8 @@
   * ListenAtTcpPort starts listening at the given TCP port.
   */
  
@@ -7416,7 +8423,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
  int
  ListenAtTcpPort(int port)
  {
-@@ -279,10 +486,16 @@
+@@ -279,10 +640,16 @@
    struct sockaddr_in addr;
    int one = 1;
  
@@ -7490,8 +8497,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/tunnel.c vnc_unixsrc/vncviewe
    sprintf(lastArgv, "localhost::%d", localPort);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vncviewer/vncviewer._man
 --- vnc_unixsrc.orig/vncviewer/vncviewer._man	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer._man	2008-02-17 13:52:41.000000000 -0500
-@@ -0,0 +1,544 @@
++++ vnc_unixsrc/vncviewer/vncviewer._man	2008-09-02 13:31:57.000000000 -0400
+@@ -0,0 +1,586 @@
 +'\" t
 +.\" ** The above line should force tbl to be a preprocessor **
 +.\" Man page for X vncviewer
@@ -7499,37 +8506,50 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +.\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
 +.\" Copyright (C) 2000,2001 Red Hat, Inc.
 +.\" Copyright (C) 2001-2003 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
++.\" Copyright (C) 2006-2008 Karl J. Runge <runge@karlrunge.com>
 +.\"
 +.\" You may distribute under the terms of the GNU General Public
 +.\" License as specified in the file LICENCE.TXT that comes with the
 +.\" TightVNC distribution.
 +.\"
-+.TH vncviewer 1 "January 2003" "" "TightVNC"
++.TH ssvncviewer 1 "August 2008" "" "SSVNC"
 +.SH NAME
-+vncviewer \- an X viewer client for VNC
++ssvncviewer \- an X viewer client for VNC
 +.SH SYNOPSIS
-+.B vncviewer
++.B ssvncviewer
 +.RI [\| options \|]
 +.RI [\| host \|][\| :display \|]
 +.br
-+.B vncviewer
++.B ssvncviewer
 +.RI [\| options \|]
 +.RI [\| host \|][\| ::port \|]
 +.br
-+.B vncviewer
++.B ssvncviewer
++.RI [\| options \|]
++.RI exec=[\| cmd+args... \|]
++.br
++.B ssvncviewer
++.RI [\| options \|]
++.RI /path/to/unix/socket
++.br
++.B ssvncviewer
 +.RI [\| options \|]
 +.IR \-listen
 +.RI [\| display \|]
 +.br
-+.B vncviewer
++.B ssvncviewer
 +.IR \-help
 +.br
 +.SH DESCRIPTION
-+.B vncviewer
++.B ssvncviewer
 +is an Xt\-based client application for the VNC (Virtual Network
 +Computing) system. It can connect to any VNC\-compatible server such
-+as \fBXvnc\fR or WinVNC, allowing you to control desktop environment
++as \fBXvnc\fR, WinVNC, or \fBx11vnc\fR, allowing you to control desktop environment
 +of a different machine.
++
++ssvncviewer is an enhanced version of the tightvnc unix viewer that can
++take advantage of features in the \fBx11vnc\fR and UltraVNC VNC servers.
++See below for the description of these features.
 +
 +You can use F8 to display a pop\-up utility menu. Press F8 twice to
 +pass single F8 to the remote side.
@@ -7673,6 +8693,20 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +.TP
 +Note: F9 is shortcut to Toggle FullScreen mode.
 +.TP
++Note: In -listen mode set the env var. SSVNC_MULTIPLE_LISTEN=1
++to allow more than one incoming VNC server at a time.
++.TP
++Note: If the host:port is specified as "exec=command args..."
++then instead of making a TCP/IP socket connection to the
++remote VNC server, "command args..." is executed and the
++viewer is attached to its stdio.  This enables tunnelling
++established via an external command, e.g. an stunnel(8)
++that does not involve a listening socket.
++This mode does not work for -listen reverse connections.
++.TP
++Note: If the host:port contains a '/' it is interpreted as a
++unix-domain socket (AF_LOCAL insead of AF_INET)
++.TP
 +\fB\-use64\fR
 +In \fB\-bgr233\fR mode, use 64 colors instead of 256.
 +.TP
@@ -7780,40 +8814,55 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +it is taken as username@password. Otherwise, the program
 +exits with an error. Got all that?
 +.TP
++\fB-repeater\fR str  This is for use with UltraVNC repeater proxy described
++here: http://www.uvnc.com/addons/repeater.html.  The "str"
++is the ID string to be sent to the repeater.  E.g. ID:1234
++It can also be the hostname and port or display of the VNC
++server, e.g. 12.34.56.78:0 or snoopy.com:1.  Note that when
++using -repeater, the host:dpy on the cmdline is the repeater
++server, NOT the VNC server.  The repeater will connect you.
++Example: vncviewer ... -repeater ID:3333 repeat.host:5900
++Example: vncviewer ... -repeater vhost:0 repeat.host:5900
++.TP
++\fB\-printres\fR  Print out the Ssvnc X resources (appdefaults) and
++then exit. You can save them to a file and customize them (e.g. the
++keybindings and Popup menu)  Then point to the file via
++XENVIRONMENT or XAPPLRESDIR.
++.TP
 +\fB New Popup actions:\fR
 +
-+        ViewOnly:                ~ -viewonly
-+        Disable Bell:            ~ -nobell
-+        Cursor Shape:            ~ -nocursorshape
-+        X11 Cursor:              ~ -x11cursor
-+        Cursor Alphablend:       ~ -alpha
-+        Toggle Tight/ZRLE:       ~ -encodings ...
-+        Toggle ZRLE/ZYWRLE:      ~ -encodings zywrle...
-+        Quality Level            ~ -quality (both Tight and ZYWRLE)
-+        Compress Level           ~ -compresslevel
-+        Disable JPEG:            ~ -nojpeg  (Tight)
-+        Full Color                 as many colors as local screen allows.
-+        Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
-+        16 bit color (BGR565)    ~ -16bpp / -bgr565
-+        8  bit color (BGR233)    ~ -bgr233
-+        256 colors               ~ -bgr233 default # of colors.
-+         64 colors               ~ -bgr222 / -use64
-+          8 colors               ~ -bgr111 / -use8
-+        Set Y Crop (y-max)       ~ -ycrop
-+        Set Scrollbar Width      ~ -sbwidth
++ ViewOnly:                ~ -viewonly
++ Disable Bell:            ~ -nobell
++ Cursor Shape:            ~ -nocursorshape
++ X11 Cursor:              ~ -x11cursor
++ Cursor Alphablend:       ~ -alpha
++ Toggle Tight/ZRLE:       ~ -encodings ...
++ Toggle ZRLE/ZYWRLE:      ~ -encodings zywrle...
++ Quality Level            ~ -quality (both Tight and ZYWRLE)
++ Compress Level           ~ -compresslevel
++ Disable JPEG:            ~ -nojpeg  (Tight)
++ Full Color               ~ as many colors as local screen allows.
++ Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes.
++ 16 bit color (BGR565)    ~ -16bpp / -bgr565
++ 8  bit color (BGR233)    ~ -bgr233
++ 256 colors               ~ -bgr233 default # of colors.
++  64 colors               ~ -bgr222 / -use64
++   8 colors               ~ -bgr111 / -use8
++ Set Y Crop (y-max)       ~ -ycrop
++ Set Scrollbar Width      ~ -sbwidth
 +
-+        UltraVNC Extensions:
++ UltraVNC Extensions:
 +
-+          Set 1/n Server Scale     Ultravnc ext. Scale desktop by 1/n.
-+          Text Chat                Ultravnc ext. Do Text Chat.
-+          File Transfer            Ultravnc ext. File xfer via Java helper.
-+          Single Window            Ultravnc ext. Grab and view a single window.
-+                                   (select then click on the window you want).
-+          Disable Remote Input     Ultravnc ext. Try to prevent input and
-+                                   viewing of monitor at physical display.
++ Set 1/n Server Scale  Ultravnc ext. Scale desktop by 1/n.
++ Text Chat             Ultravnc ext. Do Text Chat.
++ File Transfer         Ultravnc ext. File xfer via Java helper.
++ Single Window         Ultravnc ext. Grab a single window.
++                       (click on the window you want).
++ Disable Remote Input  Ultravnc ext. Try to prevent input and
++                       viewing of monitor at physical display.
 +
-+        Note: the Ultravnc extensions only apply to servers that support
-+              them.  x11vnc/libvncserver supports some of them.
++ Note: the Ultravnc extensions only apply to servers that
++ support them.  x11vnc/libvncserver supports some of them.
 +
 +.SH ENCODINGS
 +The server supplies information in whatever format is desired by the
@@ -8038,7 +9087,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncviewer/vncviewer.c
 --- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.c	2008-04-28 21:20:06.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.c	2008-09-06 16:54:58.000000000 -0400
 @@ -22,6 +22,7 @@
   */
  
@@ -8080,7 +9129,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +					*(q+i) = t[i];
 +				}
 +				fallback_resources[k] = p;
-+				if (db) fprintf(stderr, "res: %s\n", p);
++				if (db) fprintf(stderr, "res: %s\n\n", p);
 +			}
 +		}
 +		k++;
@@ -8218,7 +9267,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  
    /* The -listen option is used to make us a daemon process which listens for
       incoming connections from servers, rather than actively connecting to a
-@@ -45,89 +203,1172 @@
+@@ -45,89 +203,1219 @@
       listenForIncomingConnections() returns, setting the listenSpecified
       flag. */
  
@@ -8238,11 +9287,34 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +			listenForIncomingConnections(&argc, argv, i);
 +			break;
 +		}
++		if (strcmp(argv[i], "-multilisten") == 0) {
++			putenv("SSVNC_MULTIPLE_LISTEN=1");
++			listenForIncomingConnections(&argc, argv, i);
++			break;
++		}
 +		if (strcmp(argv[i], "-tunnel") == 0 || strcmp(argv[i], "-via") == 0) {
 +			if (!createTunnel(&argc, argv, i)) {
 +				exit(1);
 +			}
 +			break;
++		}
++		if (strcmp(argv[i], "-printres") == 0 || strcmp(argv[i], "-res") == 0) {
++			int j = 0;
++			fprintf(stdout, "\n! Ssvnc fallback X resources:\n\n");
++			while (1) {
++				char *p = fallback_resources[j++];
++				int k = 0;
++				if (p == NULL) break;
++				while (*p != '\0') {
++					fprintf(stdout, "%c", *p);
++					if (k > 0 && *p == 'n' && *(p-1) == '\\') {
++						fprintf(stdout, "\\\n");
++					}
++					p++; k++;
++				}
++				fprintf(stdout, "\n\n");
++			}
++			exit(0);	
 +		}
 +	}
 +
@@ -8284,7 +9356,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		set_sbwidth(6);
 +	}
 +
-+	toplevel = XtVaAppInitialize(&appContext, "Vncviewer", cmdLineOptions,
++	toplevel = XtVaAppInitialize(&appContext, "Ssvnc", cmdLineOptions,
 +	    numCmdLineOptions, &argc, argv, fallback_resources,
 +	    XtNborderWidth, 0, NULL);
  
@@ -8524,7 +9596,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	}
 +	schedule_format_change();
 +}
-+
+ 
+-  Cleanup();
 +/*
 + * ToggleNColors
 + */
@@ -8856,12 +9929,36 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	}
 +}
 +
++extern int filexfer_sock;
++extern pid_t java_helper;
++#define KILLJAVA
++#ifdef KILLJAVA
++#include <signal.h>
++#endif
++
 +void
 +ToggleFileXfer(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
 +	if (appData.fileActive) {
-+		HideFile(w, ev, params, num_params);
-+		appData.fileActive= False;
++		//HideFile(w, ev, params, num_params);
++		//appData.fileActive = False;
++#ifndef KILLJAVA
++		if (filexfer_sock >= 0) {
++			close(filexfer_sock);
++		}
++#else
++		if (java_helper != 0) {
++			int i;
++			for (i=1; i<=5; i++) {
++				pid_t p = java_helper + i;
++				fprintf(stderr, "trying to kill java helper: %d\n", p);
++				if (kill(p, SIGTERM) == 0) {
++					java_helper = 0;
++					break;
++				}
++			}
++		}
++#endif
 +	} else {
 +		ShowFile(w, ev, params, num_params);
 +		appData.fileActive = True;
@@ -8897,7 +9994,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		int h = si.framebufferHeight;
 +		appData.serverScale = n;
 +		SendServerScale(n);
-+		SendFramebufferUpdateRequest(0, 0, w, h, False);
++		if (0) SendFramebufferUpdateRequest(0, 0, w, h, False);
 +		schedule_fb_update();
 +	}
 +}
@@ -8923,7 +10020,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		set_server_scale(n);
 +	}
 +}
-+
+ 
+-  return 0;
 +void set_server_quality(int n) {
 +	fprintf(stderr, "set_quality: %d\n", n);
 +	if (n >= 0 && n <= 9) {
@@ -9344,8 +10442,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +  else
 +    XtVaSetValues(w, XtNstate, False, NULL);
 +}
- 
--  Cleanup();
++
 +void
 +SetCursorShapeState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -9354,8 +10451,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +  else
 +    XtVaSetValues(w, XtNstate, False, NULL);
 +}
- 
--  return 0;
++
 +void
 +SetCursorAlphaState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -9429,7 +10525,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncviewer/vncviewer.h
 --- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.h	2008-04-28 21:08:16.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.h	2008-09-02 12:21:52.000000000 -0400
 @@ -51,7 +51,7 @@
  			     (((l) & 0x0000ff00) << 8)  | \
  			     (((l) & 0x000000ff) << 24))  : (l))
@@ -9668,7 +10764,19 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  /* sockets.c */
  
-@@ -271,3 +350,63 @@
+@@ -253,8 +332,11 @@
+ extern int FindFreeTcpPort(void);
+ extern int ListenAtTcpPort(int port);
+ extern int ConnectToTcpAddr(unsigned int host, int port);
++extern int ConnectToUnixSocket(char *file);
+ extern int AcceptTcpConnection(int listenSock);
+ extern Bool SetNonBlocking(int sock);
++extern Bool SetNoDelay(int sock);
++extern Bool SocketPair(int fd[2]);
+ 
+ extern int StringToIPAddr(const char *str, unsigned int *addr);
+ extern Bool SameMachine(int sock);
+@@ -271,3 +353,63 @@
  extern XtAppContext appContext;
  extern Display* dpy;
  extern Widget toplevel;
@@ -9734,8 +10842,68 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void SetFileXferState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vncviewer/vncviewer.man
 --- vnc_unixsrc.orig/vncviewer/vncviewer.man	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.man	2008-02-17 13:52:41.000000000 -0500
-@@ -168,6 +168,159 @@
++++ vnc_unixsrc/vncviewer/vncviewer.man	2008-09-02 13:31:57.000000000 -0400
+@@ -5,38 +5,51 @@
+ .\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
+ .\" Copyright (C) 2000,2001 Red Hat, Inc.
+ .\" Copyright (C) 2001-2003 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
++.\" Copyright (C) 2006-2008 Karl J. Runge <runge@karlrunge.com>
+ .\"
+ .\" You may distribute under the terms of the GNU General Public
+ .\" License as specified in the file LICENCE.TXT that comes with the
+ .\" TightVNC distribution.
+ .\"
+-.TH vncviewer 1 "January 2003" "" "TightVNC"
++.TH ssvncviewer 1 "August 2008" "" "SSVNC"
+ .SH NAME
+-vncviewer \- an X viewer client for VNC
++ssvncviewer \- an X viewer client for VNC
+ .SH SYNOPSIS
+-.B vncviewer
++.B ssvncviewer
+ .RI [\| options \|]
+ .RI [\| host \|][\| :display \|]
+ .br
+-.B vncviewer
++.B ssvncviewer
+ .RI [\| options \|]
+ .RI [\| host \|][\| ::port \|]
+ .br
+-.B vncviewer
++.B ssvncviewer
++.RI [\| options \|]
++.RI exec=[\| cmd+args... \|]
++.br
++.B ssvncviewer
++.RI [\| options \|]
++.RI /path/to/unix/socket
++.br
++.B ssvncviewer
+ .RI [\| options \|]
+ .IR \-listen
+ .RI [\| display \|]
+ .br
+-.B vncviewer
++.B ssvncviewer
+ .IR \-help
+ .br
+ .SH DESCRIPTION
+-.B vncviewer
++.B ssvncviewer
+ is an Xt\-based client application for the VNC (Virtual Network
+ Computing) system. It can connect to any VNC\-compatible server such
+-as \fBXvnc\fR or WinVNC, allowing you to control desktop environment
++as \fBXvnc\fR, WinVNC, or \fBx11vnc\fR, allowing you to control desktop environment
+ of a different machine.
+ 
++ssvncviewer is an enhanced version of the tightvnc unix viewer that can
++take advantage of features in the \fBx11vnc\fR and UltraVNC VNC servers.
++See below for the description of these features.
++
+ You can use F8 to display a pop\-up utility menu. Press F8 twice to
+ pass single F8 to the remote side.
+ .SH OPTIONS
+@@ -168,6 +181,188 @@
  \fB\-autopass\fR
  Read a plain-text password from stdin. This option affects only the
  standard VNC authentication.
@@ -9749,6 +10917,20 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +Note: ZRLE and ZYWRLE encodings are now supported.
 +.TP
 +Note: F9 is shortcut to Toggle FullScreen mode.
++.TP
++Note: In -listen mode set the env var. SSVNC_MULTIPLE_LISTEN=1
++to allow more than one incoming VNC server at a time.
++.TP
++Note: If the host:port is specified as "exec=command args..."
++then instead of making a TCP/IP socket connection to the
++remote VNC server, "command args..." is executed and the
++viewer is attached to its stdio.  This enables tunnelling
++established via an external command, e.g. an stunnel(8)
++that does not involve a listening socket.
++This mode does not work for -listen reverse connections.
++.TP
++Note: If the host:port contains a '/' it is interpreted as a
++unix-domain socket (AF_LOCAL insead of AF_INET)
 +.TP
 +\fB\-use64\fR
 +In \fB\-bgr233\fR mode, use 64 colors instead of 256.
@@ -9857,45 +11039,60 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +it is taken as username@password. Otherwise, the program
 +exits with an error. Got all that?
 +.TP
++\fB-repeater\fR str  This is for use with UltraVNC repeater proxy described
++here: http://www.uvnc.com/addons/repeater.html.  The "str"
++is the ID string to be sent to the repeater.  E.g. ID:1234
++It can also be the hostname and port or display of the VNC
++server, e.g. 12.34.56.78:0 or snoopy.com:1.  Note that when
++using -repeater, the host:dpy on the cmdline is the repeater
++server, NOT the VNC server.  The repeater will connect you.
++Example: vncviewer ... -repeater ID:3333 repeat.host:5900
++Example: vncviewer ... -repeater vhost:0 repeat.host:5900
++.TP
++\fB\-printres\fR  Print out the Ssvnc X resources (appdefaults) and
++then exit. You can save them to a file and customize them (e.g. the
++keybindings and Popup menu)  Then point to the file via
++XENVIRONMENT or XAPPLRESDIR.
++.TP
 +\fB New Popup actions:\fR
 +
-+        ViewOnly:                ~ -viewonly
-+        Disable Bell:            ~ -nobell
-+        Cursor Shape:            ~ -nocursorshape
-+        X11 Cursor:              ~ -x11cursor
-+        Cursor Alphablend:       ~ -alpha
-+        Toggle Tight/ZRLE:       ~ -encodings ...
-+        Toggle ZRLE/ZYWRLE:      ~ -encodings zywrle...
-+        Quality Level            ~ -quality (both Tight and ZYWRLE)
-+        Compress Level           ~ -compresslevel
-+        Disable JPEG:            ~ -nojpeg  (Tight)
-+        Full Color                 as many colors as local screen allows.
-+        Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
-+        16 bit color (BGR565)    ~ -16bpp / -bgr565
-+        8  bit color (BGR233)    ~ -bgr233
-+        256 colors               ~ -bgr233 default # of colors.
-+         64 colors               ~ -bgr222 / -use64
-+          8 colors               ~ -bgr111 / -use8
-+        Set Y Crop (y-max)       ~ -ycrop
-+        Set Scrollbar Width      ~ -sbwidth
++ ViewOnly:                ~ -viewonly
++ Disable Bell:            ~ -nobell
++ Cursor Shape:            ~ -nocursorshape
++ X11 Cursor:              ~ -x11cursor
++ Cursor Alphablend:       ~ -alpha
++ Toggle Tight/ZRLE:       ~ -encodings ...
++ Toggle ZRLE/ZYWRLE:      ~ -encodings zywrle...
++ Quality Level            ~ -quality (both Tight and ZYWRLE)
++ Compress Level           ~ -compresslevel
++ Disable JPEG:            ~ -nojpeg  (Tight)
++ Full Color               ~ as many colors as local screen allows.
++ Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes.
++ 16 bit color (BGR565)    ~ -16bpp / -bgr565
++ 8  bit color (BGR233)    ~ -bgr233
++ 256 colors               ~ -bgr233 default # of colors.
++  64 colors               ~ -bgr222 / -use64
++   8 colors               ~ -bgr111 / -use8
++ Set Y Crop (y-max)       ~ -ycrop
++ Set Scrollbar Width      ~ -sbwidth
 +
-+        UltraVNC Extensions:
++ UltraVNC Extensions:
 +
-+          Set 1/n Server Scale     Ultravnc ext. Scale desktop by 1/n.
-+          Text Chat                Ultravnc ext. Do Text Chat.
-+          File Transfer            Ultravnc ext. File xfer via Java helper.
-+          Single Window            Ultravnc ext. Grab and view a single window.
-+                                   (select then click on the window you want).
-+          Disable Remote Input     Ultravnc ext. Try to prevent input and
-+                                   viewing of monitor at physical display.
++ Set 1/n Server Scale  Ultravnc ext. Scale desktop by 1/n.
++ Text Chat             Ultravnc ext. Do Text Chat.
++ File Transfer         Ultravnc ext. File xfer via Java helper.
++ Single Window         Ultravnc ext. Grab a single window.
++                       (click on the window you want).
++ Disable Remote Input  Ultravnc ext. Try to prevent input and
++                       viewing of monitor at physical display.
 +
-+        Note: the Ultravnc extensions only apply to servers that support
-+              them.  x11vnc/libvncserver supports some of them.
++ Note: the Ultravnc extensions only apply to servers that
++ support them.  x11vnc/libvncserver supports some of them.
 +
  .SH ENCODINGS
  The server supplies information in whatever format is desired by the
  client, in order to make the client as easy as possible to implement. 
-@@ -238,6 +391,15 @@
+@@ -238,6 +433,15 @@
  \-quality and \-nojpeg options above). Tight encoding is usually the
  best choice for low\-bandwidth network environments (e.g. slow modem
  connections).
@@ -12177,11 +13374,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +#undef ZYWRLE_SAVE_PIXEL
 diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
 --- vnc_unixsrc.orig/include/rfbproto.h	2004-05-27 03:02:02.000000000 -0400
-+++ vnc_unixsrc/include/rfbproto.h	2007-02-18 13:04:35.000000000 -0500
-@@ -381,6 +381,10 @@
++++ vnc_unixsrc/include/rfbproto.h	2008-09-05 17:01:18.000000000 -0400
+@@ -381,6 +381,11 @@
  #define rfbBell 2
  #define rfbServerCutText 3
  
++#define rfbResizeFrameBuffer 4 // Modif sf@2002
 +
 +/* http://sourceforge.net/projects/vncsessmgr */
 +#define rfbRestartConnection 82
@@ -12189,7 +13387,7 @@ diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
  #define rfbFileListData 130
  #define rfbFileDownloadData 131
  #define rfbFileUploadCancel 132
-@@ -403,6 +407,18 @@
+@@ -403,6 +408,18 @@
  #define rfbPointerEvent 5
  #define rfbClientCutText 6
  
@@ -12208,7 +13406,7 @@ diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
  #define rfbFileListRequest 130
  #define rfbFileDownloadRequest 131
  #define rfbFileUploadRequest 132
-@@ -435,6 +451,11 @@
+@@ -435,6 +452,11 @@
  #define rfbEncodingTight     7
  #define rfbEncodingZlibHex   8
  
@@ -12220,7 +13418,7 @@ diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
  /* signatures for basic encoding types */
  #define sig_rfbEncodingRaw       "RAW_____"
  #define sig_rfbEncodingCopyRect  "COPYRECT"
-@@ -955,6 +976,36 @@
+@@ -955,6 +977,51 @@
  #define sz_rfbFileDownloadFailedMsg 4
  
  /*-----------------------------------------------------------------------------
@@ -12254,10 +13452,25 @@ diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
 +#define rfbTextChatFinished 0xFFFFFFFD  
 +
 +/*-----------------------------------------------------------------------------
++ * Modif sf@2002
++ * ResizeFrameBuffer - The Client must change the size of its framebuffer  
++ */
++
++typedef struct _rfbResizeFrameBufferMsg {
++    CARD8 type;                 /* always rfbResizeFrameBuffer */
++        CARD8 pad1;
++        CARD16 framebufferWidth;        // FrameBuffer width
++        CARD16 framebufferHeight;       // FrameBuffer height
++} rfbResizeFrameBufferMsg;
++
++#define sz_rfbResizeFrameBufferMsg 6
++
++
++/*-----------------------------------------------------------------------------
   * Union of all server->client messages.
   */
  
-@@ -968,6 +1019,8 @@
+@@ -968,6 +1035,8 @@
      rfbFileDownloadDataMsg fdd;
      rfbFileUploadCancelMsg fuc;
      rfbFileDownloadFailedMsg fdf;
@@ -12266,7 +13479,7 @@ diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
  } rfbServerToClientMsg;
  
  
-@@ -1221,6 +1274,41 @@
+@@ -1221,6 +1290,41 @@
  
  #define sz_rfbFileCreateDirRequestMsg 4
  
@@ -12308,7 +13521,7 @@ diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
  /*-----------------------------------------------------------------------------
   * Union of all client->server messages.
   */
-@@ -1241,4 +1329,9 @@
+@@ -1241,4 +1345,9 @@
      rfbFileDownloadCancelMsg fdc;
      rfbFileUploadFailedMsg fuf;
      rfbFileCreateDirRequestMsg fcdr;

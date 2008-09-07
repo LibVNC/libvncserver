@@ -3,3 +3,7 @@
 cp -p /dist/src/apps/VNC/tight_vnc_1.3dev5/tight-vncviewer*patch .
 cp -p /dist/src/apps/VNC/tight_vnc_1.3dev5/vnc_unixsrc_vncviewer.patched.tar ../zips/
 
+cp -p /dist/src/apps/VNC/etc/libvncserver_cvs/expts/java_ssl/ultra/ultraftp.tar ../zips/
+cp -p /dist/src/apps/VNC/etc/libvncserver_cvs/expts/vncstorepw.tar ../zips/
+
+cp -p /dist/src/apps/VNC/tight_vnc_1.3dev5/vnc_unixsrc/vncviewer/vncviewer.man ../../man/man1/ssvncviewer.1

@@ -24,6 +24,7 @@ int grab_buster = 0;
 int grab_kbd = 0;
 int grab_ptr = 0;
 int grab_always = 0;
+int grab_local = 0;
 int sync_tod_delay = 20;
 
 void initialize_vnc_connect_prop(void);
@@ -693,6 +694,96 @@ void check_keycode_state(void) {
 		last_check = now;
 	}
 }
+
+/*
+ * To use the experimental -grablocal option configure like this:
+ * env CPPFLAGS=-DENABLE_GRABLOCAL LDFLAGS=-lXss ./configure
+ */
+#ifdef ENABLE_GRABLOCAL
+#include <X11/extensions/scrnsaver.h>
+
+void check_local_grab(void) {
+	static double last_check = 0.0;
+	double now;
+
+	if (grab_local <= 0) {
+		return;
+	}
+	if (! client_count) {
+		return;
+	}
+	if (unixpw_in_progress) return;
+
+	if (last_rfb_key_injected <= 0.0 && last_rfb_ptr_injected <= 0.0) {
+		return;
+	}
+
+	RAWFB_RET_VOID
+
+	now = dnow();
+
+	if (now > last_check + 0.1)   {
+#if !NO_X11
+		int ret;
+		double idle;
+		XScreenSaverInfo info;
+		static int save_viewonly = -1, local_is_idle = -1, db = -1;
+
+		if (debug_keyboard) db = debug_keyboard;
+		if (debug_pointer ) db = debug_pointer;
+
+		if (db < 0) {
+			if (getenv("LOCAL_GRAB_DEBUG")) {
+				db = atoi(getenv("LOCAL_GRAB_DEBUG"));
+			} else {
+				db = 0;
+			}
+		}
+
+		ret = XScreenSaverQueryInfo(dpy, RootWindowOfScreen(
+		    ScreenOfDisplay(dpy, 0)), &info);
+
+		if (ret) {
+			double tlatest_rfb = 0.0;
+
+			idle = ((double) info.idle)/1000.0;
+			now = dnow();
+
+			if (last_rfb_key_injected > 0.0) {
+				tlatest_rfb = last_rfb_key_injected;
+			}
+			if (last_rfb_ptr_injected > tlatest_rfb) {
+				tlatest_rfb = last_rfb_ptr_injected;
+			}
+			if (db > 1) fprintf(stderr, "idle: %.4f latest: %.4f dt: %.4f\n", idle, now - tlatest_rfb, idle - (now - tlatest_rfb));
+
+			if (now - tlatest_rfb <= idle + 0.005) {
+				/* 0.005 is 5ms tolerance */
+			} else if (idle < grab_local) {
+				if (local_is_idle < 0 || local_is_idle) {
+					save_viewonly = view_only;
+					view_only = 1;
+					if (db) {
+						rfbLog("check_local_grab: set viewonly\n");
+					}
+				}
+				
+				local_is_idle = 0;
+			} else {
+				if (!local_is_idle && save_viewonly >= 0) {
+					view_only = save_viewonly;
+					if (db) {
+						rfbLog("check_local_grab: restored viewonly; %d\n", view_only);
+					}
+				}
+				local_is_idle = 1;
+			}
+		}
+#endif
+		last_check = dnow();
+	}
+}
+#endif
 
 void check_autorepeat(void) {
 	static time_t last_check = 0;

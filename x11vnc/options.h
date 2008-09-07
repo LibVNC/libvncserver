@@ -182,6 +182,7 @@ extern int ncache_xrootpmap;
 extern int ncache_keep_anims;
 extern int ncache_old_wm;
 extern int macosx_ncache_macmenu;
+extern int macosx_us_kbd;
 extern int ncache_beta_tester;
 extern int ncdb;
 

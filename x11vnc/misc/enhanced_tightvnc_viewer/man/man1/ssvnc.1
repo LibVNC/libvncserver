@@ -1,0 +1,148 @@
+'\" t
+.\" ** The above line should force tbl to be a preprocessor **
+.\" Man page for the SSVNC vncviewer
+.\"
+.\" Copyright (C) 2006-2008 Karl J. Runge <runge@karlrunge.com>
+.\"
+.\" You may distribute under the terms of the GNU General Public
+.\" License as specified in the file LICENCE.TXT that comes with the
+.\" TightVNC distribution.
+.\"
+.TH ssvnc 1 "September 2008" "" "SSVNC"
+.SH NAME
+ssvnc \- a GUI wrapper for SSL and SSH VNC connections.
+.SH SYNOPSIS
+.B ssvnc
+.br
+.B ssvnc
+.RI [\| host \|][\| :display \|]
+.br
+.B ssvnc
+.RI [\| saved-profile-name \|]
+.br
+.B ssvnc
+.RI [\| options \|][\| host-or-profile \]
+.br
+.B ssvnc
+.IR \--help
+.br
+.SH DESCRIPTION
+.B ssvnc
+is a tcl/tk gui wrapper that runs on Unix, MacOSX, and Windows.
+It sets up an SSL or SSH tunnel to the remote VNC Server and then launches
+the VNC viewer (either the one provided or another one that you have
+specified) to use that encrypted tunnel to connect to the VNC Server.
+The use of Proxies and Gateways to make the connections is implemented. 
+
+Once you have started the SSVNC gui, you can click on the buttons
+"Help", "Options -> Help", "Certs -> Help", etc. for much information
+on how to use and configure the tool.
+
+In short, you supply a VNC server "hostname:display" in the
+"VNC Host:Display" entry box and then press the "Connect" button to
+connect to the server via SSL (stunnel).  E.g. "far-away.east:0".
+Port numbers are also allowed, e.g. far-away.east:5905.
+
+Or supply user@hostname:display and click on the "Use SSH" option, then
+press the "Connect" button to connect to the server via an SSH tunnel.
+E.g. "fred@far-away.east:0".
+
+As an easter egg, we note it is also possible to disable the use of SSL/SSH 
+encryption tunnels by using a vnc:// or Vnc:// prefix before
+host:display.
+
+Normally you do not specify any command line options.  You simply
+run \fBssvnc\fR and use the GUI that starts up.
+
+However, as shortcuts you can supply a VNC host:display (or host:port)
+on the command line.  to connect to immediately (the GUI is started
+and the connection is initiated).  For example, "\fBssvnc far-away.east:0\fR"
+Instead of a  host:display, you can specify the name of a saved profile to
+automatically load that profile and then connect to its server.  
+For example "\fBssvnc far\fR", if you name the profile "far".
+You can use the \fB-profiles\fR option to list the profiles you have saved.
+
+The related commands \fBsshvnc\fR and \fBtsvnc\fR start up the GUI in
+simplified modes: SSH Only Mode, and Terminal Services Mode, respectively.
+See below and the application Help for more information on the modes.
+
+There are also some command line options described as follows.
+.SH OPTIONS
+.TP
+\fB\--help\fR
+Starts up the GUI as though the 'Help' button was pressed to show the
+main Help panel.
+.TP
+\fB\-profiles\fR
+List the saved SSVNC profiles you have created.  A profile
+is a destination host with specific parameter settings.
+.TP
+\fB\-list\fR
+Same as \fB\-profiles\fR
+.TP
+\fB\-ssh\fR
+Start in "SSH Only Mode".  No SSL aspects are shown.
+Same as running the command \fBsshvnc\fR
+.TP
+\fB\-ts\fR
+Start in "Terminal Services Mode".  This is like "SSH Only Mode", but
+simpler and assumes \fBx11vnc\fR is available on the remote side
+to start and manage X and VNC sessions.
+Same as running the command \fBtsvnc\fR
+.TP
+\fB\-tso\fR
+Same as \fB-ts\fR "Terminal Services Mode", however never let the
+user leave this mode (no button to switch modes is provided.)
+Same as SSVNC_TS_ALWAYS=1.
+.TP
+\fB\-ssl\fR
+Force the full GUI Mode: both SSL and SSH.  This is the default.
+.TP
+\fB\-nv\fR
+Toggle the "Verify All Certs" button to be off at startup.
+.TP
+\fB\-nvb\fR
+Never show the "Verify All Certs" button.
+Same as SSVNC_NO_VERIFY_ALL_BUTTON=1.
+.TP
+\fB\-bigger\fR
+Make the Profile Selection Dialog window bigger.
+Same as SSVNC_BIGGER_DIALOG=1.
+.SH URL NOTATION
+Here are all of our URL-like prefixes that you can put in front of
+host:display (or host:port): 
+
+For SSL:  vncs:// vncssl:// and vnc+ssl://
+
+For SSH:  vncssh:// and vnc+ssh://
+
+For No Encryption Tunnel:  vnc:// and Vnc://
+
+Examples:
+
+To quickly make an SSL connection: \fBssvnc vncs://snoopy.com:0\fR
+
+To quickly make an SSH connection: \fBssvnc vnc+ssh://fred@snoopy.com:0\fR
+
+To quickly make a direct connection: \fBssvnc Vnc://snoopy.com:0\fR
+
+The above will also work in the "VNC Host:Display" entry box in the GUI.
+Press the "Connect" button after entering them.
+.SH FILES
+Your SSVNC vnc profiles are stored in the \fB$HOME/.vnc/profiles\fR
+directory.  They end in suffix \fB.vnc\fR
+
+Your SSVNC vnc certificates and keys are stored in the \fB$HOME/.vnc/certs\fR
+directory.  They typically end in \fB.pem\fR (both certificate and
+private key) or \fB.crt\fR (certificate only).
+
+You can put a few global parameters (e.g. mode=sshvnc) in your
+\fB$HOME/.ssvncrc\fR file (\fBssvnc_rc\fR on Windows); see the
+application Help for more information.
+
+.SH SEE ALSO
+\fBssvncviewer\fB(1), \fBvncviewer\fR(1), \fBstunnel\fR(8), \fBssh\fR(1), \fBx11vnc\fR(1), \fBvncserver\fR(1) 
+http://www.karlrunge.com/x11vnc http://www.karlrunge.com/x11vnc/ssvnc.html
+.SH AUTHORS
+Karl J. Runge <runge@karlrunge.com> wrote the SSVNC gui (tcl/tk) and
+associated wrapper scripts.

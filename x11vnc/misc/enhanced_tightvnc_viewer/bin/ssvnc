@@ -79,7 +79,11 @@ nearby=0
 if [ -x "$dir/vncviewer" -a -x "$dir/stunnel" ]; then
 	nearby=1
 fi
-if [ ! -d "$dir/$name" -a $nearby = 0 ]; then
+if [ "X$name" = "X." ]; then
+	:
+	#type vncviewer
+	#type stunnel
+elif [ ! -d "$dir/$name" -a $nearby = 0 ]; then
 	echo
 	echo "Cannot find platform dir for your OS `uname -sm`:"
 	echo

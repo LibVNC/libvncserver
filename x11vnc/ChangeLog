@@ -1,3 +1,10 @@
+2008-09-06  Karl Runge <runge@karlrunge.com>
+	* x11vnc: kill gui_pid on exit in -connect/-connect_or_exit mode.
+	  -grablocal n experiment (not compiled by default).  -macuskbd
+	  option for macosx for orig uskdb code. keycode=N remote contol
+	  cmd.  Find dpy look at non-NFS cookies in /tmp.  Fix gui tray
+	  insertion on recent gnome dt. Fix connect_file bug. Sync SSVNC
+
 2008-06-07  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -clip xineramaN option, -DIGNORE_GETSPNAM for HP-UX.
 	  Print info on SSH_CONNECTION override.

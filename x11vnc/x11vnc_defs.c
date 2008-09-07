@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.9.4 lastmod: 2008-06-06";
+char lastmod[] = "0.9.4 lastmod: 2008-09-06";
 
 /* X display info */
 
@@ -170,6 +170,8 @@ rfbBool last_rfb_down = FALSE;
 rfbBool last_rfb_key_accepted = FALSE;
 rfbKeySym last_rfb_keysym = 0;
 double last_rfb_keytime = 0.0;
+double last_rfb_key_injected = 0.0;
+double last_rfb_ptr_injected = 0.0;
 int fb_copy_in_progress = 0;	
 int drag_in_progress = 0;	
 int shut_down = 0;	

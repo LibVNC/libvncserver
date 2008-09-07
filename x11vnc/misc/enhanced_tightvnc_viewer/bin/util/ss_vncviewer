@@ -447,6 +447,9 @@ findfree() {
 # removes files, etc.
 final() {
 	echo ""
+	if [ "X$tmp_cfg" != "X" ]; then
+		rm -f $tmp_cfg
+	fi
 	if [ "X$SS_VNCVIEWER_RM" != "X" ]; then
 		rm -f $SS_VNCVIEWER_RM 2>/dev/null
 	fi
@@ -1012,6 +1015,24 @@ if [ "X$use_ssh" = "X1" ]; then
 	# let user override ssh via $SSH
 	ssh=${SSH:-"ssh -x"}
 
+	if [ "X$SSVNC_LIM_ACCEPT_PRELOAD" != "X" ]; then
+		SSVNC_LIM_ACCEPT_PRELOAD="$SSVNC_BASEDIR/$SSVNC_UNAME/$SSVNC_LIM_ACCEPT_PRELOAD"
+	fi
+	if [ "X$SSVNC_LIM_ACCEPT_PRELOAD" != "X" ]; then
+		echo ""
+		echo "SSVNC_LIM_ACCEPT_PRELOAD=$SSVNC_LIM_ACCEPT_PRELOAD"
+	fi
+
+	if [ "X$SSVNC_LIM_ACCEPT_PRELOAD" != "X" -a -f "$SSVNC_LIM_ACCEPT_PRELOAD" ]; then
+		plvar=LD_PRELOAD
+		if uname | grep Darwin >/dev/null; then
+			plvar="DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES"
+		fi
+		ssh="env $plvar=$SSVNC_LIM_ACCEPT_PRELOAD $ssh"
+	else
+		SSVNC_LIM_ACCEPT_PRELOAD=""
+	fi
+
 	if echo "$proxy" | egrep '(http|https|socks|socks4|socks5)://' > /dev/null; then
 		# Handle Web or SOCKS proxy(ies) for the initial connect.
 Kecho host=$host
@@ -1328,10 +1349,11 @@ Kecho proxy=$proxy
 
 	c=0
 	pssh=""
+	mssh=`echo "$ssh" | sed -e 's/^env.*ssh/ssh/'`
 	while [ $c -lt 30 ]
 	do
 		p=`expr $pmark + $c`
-		if ps -p "$p" 2>&1 | grep "$ssh" > /dev/null; then
+		if ps -p "$p" 2>&1 | grep "$mssh" > /dev/null; then
 			pssh=$p
 			break
 		fi
@@ -1339,6 +1361,8 @@ Kecho proxy=$proxy
 	done
 	if [ "X$getport" != "X" ]; then
 		:
+	elif [ "X$SSVNC_LIM_ACCEPT_PRELOAD" != "X" ] ; then
+		sleep 2
 	elif [ "X$ssh_cmd" = "Xsleep $ssh_sleep" ] ; then
 		#echo T sleep 1
 		sleep 1
@@ -1523,9 +1547,11 @@ if [ "X$direct_connect" != "X" ]; then
 	exit $?
 fi
 
-tmp=/tmp/ss_vncviewer${RANDOM}.$$
-mytmp "$tmp"
+tmp_cfg=/tmp/ss_vncviewer${RANDOM}.$$
+mytmp "$tmp_cfg"
 
+# make_tcert is no longer invoked via the ssvnc gui (Listen mode).
+# make_tcert is for testing only now via -mycert BUILTIN
 make_tcert() {
 	tcert="/tmp/tcert${RANDOM}.$$"
 	cat > $tcert <<END
@@ -1584,37 +1610,50 @@ END
 	echo "$tcert"
 }
 
+stunnel_exec=""
+if echo $STUNNEL_EXTRA_SVC_OPTS | grep '#stunnel-exec' > /dev/null; then
+	stunnel_exec="#"
+fi
+
 if [ "X$reverse" = "X" ]; then
 
 	if echo "$proxy" | grep repeater:// > /dev/null; then
-		if [ "X$cert" = "X" ]; then
+		if [ "X$cert" = "XBUILTIN" ]; then
 			ttcert=`make_tcert`
 			cert="cert = $ttcert"
 		fi
+		# Note for listen mode, an empty cert will cause stunnel to fail.
+		# The ssvnc gui will have already taken care of this.
 	fi
 
-	cat > "$tmp" <<END
+	cat > "$tmp_cfg" <<END
 foreground = yes
 pid =
 client = yes
 debug = 6
 $STUNNEL_EXTRA_OPTS
+$STUNNEL_EXTRA_OPTS_USER
 $verify
 $cert
 
-[vnc_stunnel]
-accept = localhost:$use
+${stunnel_exec}[vnc_stunnel]
+${stunnel_exec}accept = localhost:$use
 $connect
+$STUNNEL_EXTRA_SVC_OPTS
+$STUNNEL_EXTRA_SVC_OPTS_USER
 
 END
 else
+	stunnel_exec=""	# doesn't work for listening.
 
 	p2=`expr 5500 + $N`
 	connect="connect = localhost:$p2"
-	if [ "X$cert" = "X" ]; then
+	if [ "X$cert" = "XBUILTIN" ]; then
 		ttcert=`make_tcert`
 		cert="cert = $ttcert"
 	fi
+	# Note for listen mode, an empty cert will cause stunnel to fail.
+	# The ssvnc gui will have already taken care of this.
 
 	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
 
@@ -1622,18 +1661,21 @@ else
 	if [ "X$use_ssh" = "X1" ]; then
 		hloc="localhost:"
 	fi
-	cat > "$tmp" <<END
+	cat > "$tmp_cfg" <<END
 foreground = yes
 pid =
 client = no
 debug = 6
 $STUNNEL_EXTRA_OPTS
+$STUNNEL_EXTRA_OPTS_USER
 $verify
 $cert
 
 [vnc_stunnel]
 accept = $hloc$port
 $connect
+$STUNNEL_EXTRA_SVC_OPTS
+$STUNNEL_EXTRA_SVC_OPTS_USER
 
 END
 fi
@@ -1641,31 +1683,33 @@ fi
 echo ""
 echo "Using this stunnel configuration:"
 echo ""
-cat "$tmp" | uniq
+cat "$tmp_cfg" | uniq
 echo ""
 sleep 1
 
-echo ""
-echo "Running stunnel:"
-echo "$STUNNEL $tmp"
-st=`echo "$STUNNEL" | awk '{print $1}'`
-$st -help > /dev/null 2>&1
-$STUNNEL "$tmp" < /dev/tty > /dev/tty &
-stunnel_pid=$!
-echo ""
+if [ "X$stunnel_exec" = "X" ]; then
+	echo ""
+	echo "Running stunnel:"
+	echo "$STUNNEL $tmp_cfg"
+	st=`echo "$STUNNEL" | awk '{print $1}'`
+	$st -help > /dev/null 2>&1
+	$STUNNEL "$tmp_cfg" < /dev/tty > /dev/tty &
+	stunnel_pid=$!
+	echo ""
 
-# pause here to let the user supply a possible passphrase for the
-# mycert key:
-if [ "X$mycert" != "X" ]; then
+	# pause here to let the user supply a possible passphrase for the
+	# mycert key:
+	if [ "X$mycert" != "X" ]; then
+		sleep 1
+		echo ""
+		echo "(pausing for possible certificate passphrase dialog)"
+		echo ""
+		sleep 4
+	fi
+	#echo T sleep 1
 	sleep 1
-	echo ""
-	echo "(pausing for possible certificate passphrase dialog)"
-	echo ""
-	sleep 4
+	rm -f "$tmp_cfg"
 fi
-#echo T sleep 1
-sleep 1
-rm -f "$tmp"
 
 
 echo ""
@@ -1675,15 +1719,19 @@ if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
 fi
 echo "Running viewer:"
 if [ "X$reverse" = "X" ]; then
-	echo "$VNCVIEWERCMD" "$@" localhost:$N
+	vnc_hp=localhost:$N
+	if [ "X$stunnel_exec" != "X" ]; then
+		vnc_hp="exec=$STUNNEL $tmp_cfg"
+	fi
+	echo "$VNCVIEWERCMD" "$@" "$vnc_hp"
 	trap "final" 0 2 15
 	echo ""
-	$VNCVIEWERCMD "$@" localhost:$N
+	$VNCVIEWERCMD "$@" "$vnc_hp"
 	if [ $? != 0 ]; then
 		echo "vncviewer command failed: $?"
 		if [ "X$secondtry" = "X1" ]; then
 			sleep 2
-			$VNCVIEWERCMD "$@" localhost:$N
+			$VNCVIEWERCMD "$@" "$vnc_hp"
 		fi
 	fi
 else
