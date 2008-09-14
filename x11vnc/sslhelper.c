@@ -2041,6 +2041,9 @@ static int ssl_init(int s_in, int s_out) {
 	if (getenv("SSL_DEBUG")) {
 		db = atoi(getenv("SSL_DEBUG"));
 	}
+	if (getenv("SSL_INIT_TIMEOUT")) {
+		timeout = atoi(getenv("SSL_INIT_TIMEOUT"));
+	}
 	if (db) fprintf(stderr, "ssl_init: %d/%d\n", s_in, s_out);
 
 	ssl = SSL_new(ctx);

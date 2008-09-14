@@ -667,24 +667,22 @@ void do_gui(char *opts, int sleep) {
 		pid_t parent = getpid();
 
 		if (icon_mode) {
-			char tf[100]; 
-			double dn = dnow();
+			char tf[] = "/tmp/x11vnc.tray.XXXXXX"; 
+			int fd;
 			struct stat sbuf;
-			/* FIXME */
-			dn = dn - ((int) dn);
-			sprintf(tf, "/tmp/x11vnc.tray%d%d", (int) (1000000*dn),
-			    (int) getpid());
-			unlink(tf);
-			/* race begins.. */
-			if (stat(tf, &sbuf) == 0) {
+
+			fd = mkstemp(tf);
+			if (fd < 0) {
 				icon_mode = 0;
 			} else {
+				close(fd);
 				icon_mode_fh = fopen(tf, "w");
 				if (! icon_mode_fh) {
 					icon_mode = 0;
 				} else {
 					chmod(tf, 0400);
 					icon_mode_file = strdup(tf);
+					rfbLog("icon_mode_file=%s\n", icon_mode_file);
 					fprintf(icon_mode_fh, "none\n");
 					fprintf(icon_mode_fh, "none\n");
 					fflush(icon_mode_fh);

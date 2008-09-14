@@ -129,6 +129,9 @@ The enhanced TightVNC viewer features are:
 	- Support for UltraVNC Single Click operation. (both unencrypted:
 	  SC I, and SSL encrypted: SC III)
 
+        - Support for UltraVNC DSM Encryption Plugin mode. (ARC4 and
+          AESV2, but not MSRC4 yet)
+
 	- Instead of hostname:display one can also supply "exec=command args..."
 	  to connect the viewer to the stdio of an external command
 	  (e.g. stunnel or socat) rather than using a TCP/IP socket.

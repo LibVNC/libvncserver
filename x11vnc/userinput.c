@@ -7656,6 +7656,10 @@ void xselectinput(Window w, unsigned long evmask, int sync) {
 	XErrorHandler   old_handler1;
 	XIOErrorHandler old_handler2;
 
+	if (macosx_console || !dpy) {
+		return;
+	}
+
 	old_handler1 = XSetErrorHandler(trap_xerror);
 	old_handler2 = XSetIOErrorHandler(trap_xioerror);
 	trapped_xerror = 0;
@@ -8812,7 +8816,7 @@ if (ncdb) fprintf(stderr, "*VIS  BS_save: 0x%lx %d %d %d\n", win, cache_list[i].
 		last_sched_bs = dnow();
 	}
 #if !NO_X11
-	if (atom_XROOTPMAP_ID == None && now > last_pixmap + 5.0) {
+	if (dpy && atom_XROOTPMAP_ID == None && now > last_pixmap + 5.0) {
 		atom_XROOTPMAP_ID = XInternAtom(dpy, "_XROOTPMAP_ID", True);
 		last_pixmap = now;
 	}

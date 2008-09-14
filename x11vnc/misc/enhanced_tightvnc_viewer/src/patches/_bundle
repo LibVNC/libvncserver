@@ -62,7 +62,10 @@ zip -9 -r ssvnc-$vers.zip ssvnc -x '*.zip' '*.tar.gz'
 tar cvf - --exclude='*.zip' --exclude='*.tar.gz' ssvnc | gzip -9 >  ssvnc-$vers.tar.gz
 tar cvf - --exclude='*.zip' --exclude='*.tar.gz' --exclude='*.dll' --exclude='*.exe' --exclude ssvnc/Windows/util ssvnc | gzip -9 >  ssvnc_no_windows-$vers.tar.gz
 
+echo
 ls -l ssvnc*-$vers.*
+echo
+
 
 ###########################################
 dest=./t.windows_only
@@ -84,3 +87,18 @@ rm -f $zip
 ls -l $zip
 rm -rf $dest
 
+
+sync
+echo
+for g in ssvnc*-$vers*.gz
+do
+	md5sum $g
+	gzip -t $g || (tput bel; sleep 2)
+done
+for g in ssvnc*-$vers*.zip
+do
+	md5sum $g
+done
+
+sleep 3
+echo

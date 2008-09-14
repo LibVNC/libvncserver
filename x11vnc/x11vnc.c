@@ -2293,6 +2293,38 @@ char msg2[] =
 	    && !query_cmd && !remote_cmd && !unixpw && !got_gui_pw \
 	    && ! ssl_verify && !inetd && !terminal_services_daemon)
 
+static void do_sleepin(char *sleep) {
+	int n1, n2, nt;
+	double f1, f2, ft;
+
+	if (strchr(sleep, '-')) {
+		double s = atof(strchr(sleep, '-')+1); 
+		if (sscanf(sleep, "%d-%d", &n1, &n2) == 2) {
+			if (n1 > n2) {
+				nt = n1;
+				n1 = n2;
+				n2 = nt;
+			}
+			s = n1 + rfac() * (n2 - n1);
+		} else if (sscanf(sleep, "%lf-%lf", &f1, &f2) == 2) {
+			if (f1 > f2) {
+				ft = f1;
+				f1 = f2;
+				f2 = ft;
+			}
+			s = f1 + rfac() * (f2 - f1);
+		}
+		if (getenv("DEBUG_SLEEPIN")) fprintf(stderr, "sleepin: %f secs\n", s);
+		usleep( (int) (1000*1000*s) );
+	} else {
+		n1 = atoi(sleep);
+		if (getenv("DEBUG_SLEEPIN")) fprintf(stderr, "sleepin: %d secs\n", n1);
+		if (n1 > 0) {
+			usleep(1000*1000*n1);
+		}
+	}
+}
+
 extern int dragum(void);
 
 int main(int argc, char* argv[]) {
@@ -2581,10 +2613,7 @@ int main(int argc, char* argv[]) {
 		} else if (!strcmp(arg, "-sleepin")) {
 			int n;
 			CHECK_ARGC
-			n = atoi(argv[++i]);
-			if (n > 0) {
-				usleep(1000*1000*n);
-			}
+			do_sleepin(argv[++i]);
 		} else if (!strcmp(arg, "-users")) {
 			CHECK_ARGC
 			users_list = strdup(argv[++i]);

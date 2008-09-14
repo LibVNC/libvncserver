@@ -39,7 +39,8 @@
 #         and then a 2nd CONNECT to the destination VNC server.)
 #
 #         Use socks://host:port, socks4://host:port, or socks5://host,port
-#         to force usage of a SOCKS proxy.  Also repeater://host:port.
+#         to force usage of a SOCKS proxy.  Also repeater://host:port and
+#         sslrepeater://host:port.
 #
 # -showcert  Only fetch the certificate using the 'openssl s_client'
 #            command (openssl(1) must in installed).
@@ -284,6 +285,19 @@ fi
 orig="$1"
 shift
 
+# set up special case of ultravnc single click III mode:
+if echo "$proxy" | egrep "^sslrepeater://" > /dev/null; then
+	pstr=`echo "$proxy" | sed -e 's,sslrepeater://,,'`
+	pstr1=`echo "$pstr" | sed -e 's/+.*$//'`
+	pstr2=`echo "$pstr" | sed -e 's/^[^+]*+//'`
+	SSVNC_REPEATER="SCIII=$pstr2"; export SSVNC_REPEATER
+	orig=$pstr1
+	echo
+	echo "reset: SSVNC_REPEATER=$SSVNC_REPEATER orig=$orig proxy=''"
+	proxy=""
+fi
+
+
 # check -ssh and -mycert/-verify conflict:
 if [ "X$use_ssh" = "X1" -a "X$use_sshssl" = "X" ]; then
 	if [ "X$mycert" != "X" -o "X$verify" != "X" ]; then
@@ -320,6 +334,14 @@ elif echo "$orig" | grep '^vncssh://' > /dev/null; then
 elif echo "$orig" | grep '^vnc+ssh://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vnc.ssh://,,'`
 	use_ssh=1
+fi
+
+if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
+        verify=""
+        mycert=""
+        use_ssh=""
+        use_sshssl=""
+        direct_connect=1
 fi
 
 # (possibly) tell the vncviewer to only listen on lo: 
@@ -472,6 +494,14 @@ final() {
 		kill -KILL "$stunnel_pid" 2>/dev/null
 		stunnel_pid=""
 	fi
+	if [ "X$dsm_pid" != "X" ]; then
+		echo "Terminating background ultravnc_dsm_helper process"
+		echo kill -TERM "$dsm_pid"
+		kill -TERM "$dsm_pid" 2>/dev/null
+		sleep 1
+		kill -KILL "$dsm_pid" 2>/dev/null
+		stunnel_pid=""
+	fi
 	if [ "X$tail_pid" != "X" ]; then
 		kill -TERM $tail_pid
 	fi
@@ -517,6 +547,19 @@ fi
 # a portable, but not absolutely safe, tmp file creator
 mytmp() {
 	tf=$1
+	if type mktemp > /dev/null 2>&1; then
+		# if we have mktemp(1), use it:
+		tf2="$tf.XXXXXX"
+		tf2=`mktemp "$tf2"`
+		if [ "X$tf2" != "X" -a -f "$tf2" ]; then
+			if [ "X$DEBUG_MKTEMP" != "X" ]; then
+				echo "mytmp-mktemp: $tf2" 1>&2
+			fi
+			echo "$tf2"
+			return
+		fi
+	fi
+	# fallback to multiple cmds:
 	rm -rf "$tf" || exit 1
 	if [ -d "$tf" ]; then
 		echo "tmp file $tf still exists as a directory."
@@ -531,6 +574,10 @@ mytmp() {
 	touch "$tf" || exit 1
 	chmod 600 "$tf" || exit 1
 	rchk
+	if [ "X$DEBUG_MKTEMP" != "X" ]; then
+		echo "mytmp-touch: $tf" 1>&2
+	fi
+	echo "$tf"
 }
 
 # trick for the undocumented rsh://host:port method.
@@ -1099,8 +1146,8 @@ Kecho sproxy1_host=$sproxy1_host
 Kecho sproxy1_port=$sproxy1_port
 Kecho sproxy1_user=$sproxy1_user
 
-		ptmp="/tmp/ss_vncviewer${RANDOM}.$$.pl"
-		mytmp "$ptmp"
+		ptmp="/tmp/ss_vncviewer_ssh${RANDOM}.$$.pl"
+		ptmp=`mytmp "$ptmp"`
 		PPROXY_REMOVE=1; export PPROXY_REMOVE
 		proxy=$pproxy
 		port_save=$port
@@ -1241,8 +1288,8 @@ Kecho proxy=$proxy
 		rc=$?
 
 	elif [ "X$getport" != "X" ]; then
-		tport=/tmp/tport${RANDOM}.$$
-		mytmp $tport
+		tport=/tmp/ss_vncviewer_tport${RANDOM}.$$
+		tport=`mytmp "$tport"`
 
 		if [ "X$rsh" != "X1" ]; then
 			if echo "$ssh_cmd" | grep -w sudo > /dev/null; then
@@ -1441,7 +1488,7 @@ fi
 ptmp=""
 if [ "X$proxy" != "X" ]; then
 	ptmp="/tmp/ss_vncviewer${RANDOM}.$$.pl"
-	mytmp "$ptmp"
+	ptmp=`mytmp "$ptmp"`
 	PPROXY_REMOVE=1; export PPROXY_REMOVE
 	pcode "$ptmp"
 	if [ "X$showcert" != "X1" -a "X$direct_connect" = "X" ]; then
@@ -1484,7 +1531,14 @@ if [ "X$showcert" = "X1" ]; then
 fi
 
 if [ "X$direct_connect" != "X" ]; then
-	if [ "X$getport" = "X" ]; then
+	if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
+		SSVNC_NO_ENC_WARN=1
+		echo ""
+		echo "Using UltraVNC DSM Plugin key for encryption:"
+		echo ""
+		echo "  $SSVNC_ULTRA_DSM PORT HOST:PORT"
+		echo ""
+	elif [ "X$getport" = "X" ]; then
 		echo ""
 		echo "Running viewer for direct connection:"
 		echo ""
@@ -1508,9 +1562,22 @@ if [ "X$direct_connect" != "X" ]; then
 	fi
 	echo ""
 	if [ "X$ptmp" != "X" ]; then
-		PPROXY_LISTEN=$use
-		export PPROXY_LISTEN
+		if [ "X$reverse" = "X" ]; then
+			PPROXY_LISTEN=$use
+			export PPROXY_LISTEN
+		else
+			PPROXY_REVERSE="localhost:$use"
+			export PPROXY_REVERSE
+			pps=3
+			if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
+				pps=`expr $pps + $SSVNC_EXTRA_SLEEP`
+			fi
+			PPROXY_SLEEP=$pps; export PPROXY_SLEEP;
+			PPROXY_KILLPID=+1; export PPROXY_KILLPID;
+		fi
+
 		$ptmp &
+
 		if [ "X$reverse" = "X" ]; then
 			#sleep 2
 			#echo T sleep 1
@@ -1518,29 +1585,52 @@ if [ "X$direct_connect" != "X" ]; then
 		fi
 		host="localhost"
 		disp="$N"
+		port=`expr $disp + 5900`
 	fi
 	if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
 		echo "T sleep $SSVNC_EXTRA_SLEEP"
 		sleep $SSVNC_EXTRA_SLEEP
 	fi
 	if [ "X$reverse" = "X" ]; then
-		echo "$VNCVIEWERCMD" "$@" $host:$disp
+		hostdisp="$host:$disp"
+		if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
+			hostdisp="exec=$SSVNC_ULTRA_DSM 0 $host:$port"
+		fi
+		echo "$VNCVIEWERCMD" "$@" "$hostdisp"
 		trap "final" 0 2 15
 		echo ""
-		$VNCVIEWERCMD "$@" $host:$disp
+		$VNCVIEWERCMD "$@" "$hostdisp"
 		if [ $? != 0 ]; then
 			echo "vncviewer command failed: $?"
 			if [ "X$secondtry" = "X1" ]; then
 				sleep 2
-				$VNCVIEWERCMD "$@" $host:$disp
+				$VNCVIEWERCMD "$@" "$hostdisp"
 			fi
 		fi
 	else
 		echo ""
 		echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
 		echo ""
-		echo "$VNCVIEWERCMD" "$@" -listen $disp
 		trap "final" 0 2 15
+		if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
+			echo "NOTE: The ultravnc_dsm_helper only runs once.  So after the first LISTEN"
+			echo "      ends, you will have to Press Ctrl-C and restart for a new connection."
+			echo ""
+			dport=`expr 5500 + $disp`
+			cmd="$SSVNC_ULTRA_DSM $dport localhost:$use"
+			echo "Running:"
+			echo
+			echo "$cmd &"
+			echo
+			$cmd &
+			dsm_pid=$!
+			sleep 2
+			disp=$use
+			if [ $disp -ge 5500 ]; then
+				disp=`expr $disp - 5500`
+			fi
+		fi
+		echo "$VNCVIEWERCMD" "$@" -listen $disp
 		echo ""
 		$VNCVIEWERCMD "$@" -listen $disp
 	fi
@@ -1548,12 +1638,13 @@ if [ "X$direct_connect" != "X" ]; then
 fi
 
 tmp_cfg=/tmp/ss_vncviewer${RANDOM}.$$
-mytmp "$tmp_cfg"
+tmp_cfg=`mytmp "$tmp_cfg"`
 
 # make_tcert is no longer invoked via the ssvnc gui (Listen mode).
 # make_tcert is for testing only now via -mycert BUILTIN
 make_tcert() {
-	tcert="/tmp/tcert${RANDOM}.$$"
+	tcert="/tmp/ss_vnc_viewer_tcert${RANDOM}.$$"
+	tcert=`mytmp "$tcert"`
 	cat > $tcert <<END
 -----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAvkfXxb0wcxgrjV2ziFikjII+ze8iKcTBt47L0GM/c21efelN
@@ -1617,7 +1708,7 @@ fi
 
 if [ "X$reverse" = "X" ]; then
 
-	if echo "$proxy" | grep repeater:// > /dev/null; then
+	if echo "$proxy" | grep "^repeater://" > /dev/null; then
 		if [ "X$cert" = "XBUILTIN" ]; then
 			ttcert=`make_tcert`
 			cert="cert = $ttcert"

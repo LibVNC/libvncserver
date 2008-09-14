@@ -121,7 +121,7 @@ diff -Naur JavaViewer.orig/ButtonPanel.java JavaViewer/ButtonPanel.java
  }
 diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 --- JavaViewer.orig/FTPFrame.java	2005-03-15 23:53:14.000000000 -0500
-+++ JavaViewer/FTPFrame.java	2008-08-31 14:46:16.000000000 -0400
++++ JavaViewer/FTPFrame.java	2008-09-07 21:12:11.000000000 -0400
 @@ -24,8 +24,13 @@
  import java.io.*;
  import java.util.ArrayList;
@@ -283,11 +283,11 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +				}
 +			}
 +		} else {
-+			if (C_drive > 0) {
++			if (C_drive >= 0) {
 +				remoteDrivesComboBox.setSelectedIndex(C_drive);
  				bFound = true;
 +System.out.println("ComboBox: C_drive index: " + C_drive);
-+			} else if (O_drive > 0) {
++			} else if (O_drive >= 0) {
 +				remoteDrivesComboBox.setSelectedIndex(O_drive);
 +				bFound = true;
 +System.out.println("ComboBox: Other_drive index: " + O_drive);
@@ -1593,7 +1593,7 @@ diff -Naur JavaViewer.orig/OptionsFrame.java JavaViewer/OptionsFrame.java
      choices[shareDesktopIndex].select("Yes");
 diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 --- JavaViewer.orig/RfbProto.java	2006-05-24 15:14:40.000000000 -0400
-+++ JavaViewer/RfbProto.java	2008-09-06 21:36:14.000000000 -0400
++++ JavaViewer/RfbProto.java	2008-09-14 10:50:33.000000000 -0400
 @@ -31,6 +31,7 @@
  import java.net.Socket;
  import java.util.*;
@@ -1738,7 +1738,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		if (contentParam == rfbADrivesList)
  		{
  			readFTPMsgDriveList();
-@@ -688,11 +737,11 @@
+@@ -688,21 +737,31 @@
  
  	// Internally used. Write an Rfb message to the server
  	void writeRfbFileTransferMsg(
@@ -1755,7 +1755,16 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	{
  		byte b[] = new byte[12];
  
-@@ -702,7 +751,10 @@
++		if (viewer.dsmActive) {
++			// need to send the rfbFileTransfer msg type twice for the plugin...
++			byte b2[] = new byte[1];
++			b2[0] = (byte) rfbFileTransfer;
++			os.write(b2);
++		}
++
+ 		b[0] = (byte) rfbFileTransfer;
+ 		b[1] = (byte) contentType;
+ 		b[2] = (byte) contentParam;
  
  		byte by = 0;
  		long c = 0;
@@ -1767,7 +1776,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		c = size & 0xFF000000;
  		by = (byte) (c >>> 24);
  		b[4] = by;
-@@ -729,6 +781,8 @@
+@@ -729,6 +788,8 @@
  		by = (byte) c;
  		b[11] = by;
  		os.write(b);
@@ -1776,7 +1785,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		
  
  		if (text != null)
-@@ -746,12 +800,12 @@
+@@ -746,12 +807,12 @@
  
  	//Internally used. Write an rfb message to the server for sending files ONLY 
  	int writeRfbFileTransferMsgForSendFile(
@@ -1795,7 +1804,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	{
  		File f = new File(source);
  		fis = new FileInputStream(f);
-@@ -768,50 +822,47 @@
+@@ -768,50 +829,47 @@
  	
  		while (bytesRead!=-1)
  		{
@@ -1887,7 +1896,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		
  		writeRfbFileTransferMsg(fError ? rfbAbortFileTransfer : rfbEndOfFile, 0, 0, 0, null);
-@@ -831,24 +882,30 @@
+@@ -831,24 +889,30 @@
  			{
  				System.out.print((char) is.readUnsignedByte());
  			}
@@ -1926,7 +1935,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  			}
  			viewer.ftp.historyComboBox.setSelectedIndex(0);
  			viewer.ftp.enableButtons();
-@@ -907,7 +964,7 @@
+@@ -907,7 +971,7 @@
  	//Handles acknowledgement that the file has been deleted on the server
  	void deleteRemoteFileFeedback() throws IOException
  	{
@@ -1935,7 +1944,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		int length = is.readInt();
  		String f = "";
  		for (int i = 0; i < length; i++)
-@@ -916,7 +973,11 @@
+@@ -916,7 +980,11 @@
  		}
  		
  		viewer.ftp.refreshRemoteLocation();	
@@ -1948,7 +1957,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		viewer.ftp.historyComboBox.setSelectedIndex(0);
  	}
  
-@@ -926,12 +987,7 @@
+@@ -926,12 +994,7 @@
  		try
  		{
  			String temp = text;
@@ -1962,7 +1971,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		catch (IOException e)
  		{
-@@ -943,7 +999,7 @@
+@@ -943,7 +1006,7 @@
  	// Handles acknowledgement that the directory has been created on the server
  	void createRemoteDirectoryFeedback() throws IOException
  	{
@@ -1971,7 +1980,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		int length = is.readInt();
  		String f="";
  		for (int i = 0; i < length; i++)
-@@ -951,7 +1007,11 @@
+@@ -951,7 +1014,11 @@
  			f += (char)is.readUnsignedByte();
  		}
  		viewer.ftp.refreshRemoteLocation();	
@@ -1984,7 +1993,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		viewer.ftp.historyComboBox.setSelectedIndex(0);
  	}
  
-@@ -961,12 +1021,7 @@
+@@ -961,12 +1028,7 @@
  		try
  		{
  			String temp = text;
@@ -1998,7 +2007,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		catch (IOException e)
  		{
-@@ -979,15 +1034,13 @@
+@@ -979,15 +1041,13 @@
  	{
  		try
  		{
@@ -2018,7 +2027,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		catch (IOException e)
  		{
-@@ -1004,6 +1057,9 @@
+@@ -1004,6 +1064,9 @@
  		viewer.ftp.disableButtons();
  		int size = is.readInt();
  		int length = is.readInt();
@@ -2028,7 +2037,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		
  		String tempName = "";
  		for (int i = 0; i < length; i++)
-@@ -1011,6 +1067,15 @@
+@@ -1011,6 +1074,15 @@
  			tempName += (char) is.readUnsignedByte();
  		}
  
@@ -2044,7 +2053,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		// sf@2004 - Read the high part of file size (not yet in rfbFileTransferMsg for 
  		// backward compatibility reasons...)
  		int sizeH = is.readInt();
-@@ -1021,7 +1086,16 @@
+@@ -1021,7 +1093,16 @@
  		fileSize=0;
  		fileChunkCounter = 0;
  		String fileName = receivePath;
@@ -2062,7 +2071,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		writeRfbFileTransferMsg(rfbFileHeader, 0, 0, 0, null);
  	}
  
-@@ -1085,7 +1159,13 @@
+@@ -1085,7 +1166,13 @@
  			fAbort = false;
  			fFileReceptionError = true;
  			writeRfbFileTransferMsg(rfbAbortFileTransfer, 0, 0, 0, null);
@@ -2077,7 +2086,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		// sf@2004 - For old FT protocole only
  		/*
-@@ -1104,7 +1184,7 @@
+@@ -1104,7 +1191,7 @@
  		int length = is.readInt();
  		fileSize=0;
  		fos.close();
@@ -2086,7 +2095,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		viewer.ftp.refreshLocalLocation();
  		if (fReceptionOk && !fFileReceptionError)
  		{
-@@ -1132,12 +1212,7 @@
+@@ -1132,12 +1219,7 @@
  		try
  		{
  			String temp = text;
@@ -2100,7 +2109,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		catch (IOException e)
  		{
-@@ -1197,11 +1272,80 @@
+@@ -1197,11 +1279,80 @@
  					str += temp;
  				}
  			}
@@ -2181,7 +2190,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	//Internally used to receive directory content from server
  	//Here, the server sends one file/directory with it's attributes
  	void readFTPMsgDirectoryListContent() throws IOException
-@@ -1217,17 +1361,25 @@
+@@ -1217,17 +1368,25 @@
  			dwReserved0,
  			dwReserved1;
  		long ftCreationTime, ftLastAccessTime, ftLastWriteTime;
@@ -2210,7 +2219,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		length -= 8;
  		nFileSizeHigh = is.readInt();
  		length -= 4;
-@@ -1253,7 +1405,9 @@
+@@ -1253,7 +1412,9 @@
  			cAlternateFileName = (char) is.readUnsignedByte();
  			length--;
  		}
@@ -2221,7 +2230,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  			|| dwFileAttributes == 369098752
  			|| dwFileAttributes == 285212672 
  			|| dwFileAttributes == 271056896
-@@ -1263,11 +1417,74 @@
+@@ -1263,11 +1424,74 @@
  			|| dwFileAttributes == 369623040)
  		{
  			fileName = " [" + fileName + "]";
@@ -2301,7 +2310,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  	
  		// a.add(fileName);
-@@ -1282,14 +1499,31 @@
+@@ -1282,14 +1506,31 @@
  
  		// sf@2004
  		a.clear();
@@ -2336,7 +2345,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	}
  
  	//Internally used to signify the drive requested is not ready
-@@ -1299,6 +1533,8 @@
+@@ -1299,6 +1540,8 @@
  		System.out.println("Remote Drive unavailable");
  		viewer.ftp.connectionStatus.setText(" > WARNING - Remote Drive unavailable (possibly restricted access or media not present)");
  		viewer.ftp.remoteStatus.setText("WARNING: Remote Drive unavailable");
@@ -2345,7 +2354,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	}
  
  	//Call this method to request the list of drives on the server.
-@@ -1306,12 +1542,11 @@
+@@ -1306,12 +1549,11 @@
  	{
  		try
  		{
@@ -2363,7 +2372,7 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
  		catch (IOException e)
  		{
-@@ -1355,21 +1590,21 @@
+@@ -1355,21 +1597,21 @@
  		int h,
  		boolean incremental)
  		throws IOException {
@@ -3983,7 +3992,7 @@ diff -Naur JavaViewer.orig/VncCanvas.java JavaViewer/VncCanvas.java
  						result = 0; // Transparent pixel
 diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 --- JavaViewer.orig/VncViewer.java	2006-05-24 15:14:40.000000000 -0400
-+++ JavaViewer/VncViewer.java	2008-08-27 10:46:27.000000000 -0400
++++ JavaViewer/VncViewer.java	2008-09-14 10:36:37.000000000 -0400
 @@ -80,11 +80,11 @@
    GridBagLayout gridbag;
    ButtonPanel buttonPanel;
@@ -4007,7 +4016,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
    String passwordParam;
    String encPasswordParam;
    boolean showControls;
-@@ -115,28 +115,66 @@
+@@ -115,28 +115,67 @@
    int i;
    // mslogon support 2 end
  
@@ -4027,6 +4036,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +boolean delayAuthPanel;
 +boolean ftpOnly;
 +boolean graftFtp;
++boolean dsmActive;
 +
 +boolean gotAuth;
 +int authGot;
@@ -4080,7 +4090,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // authenticator = new AuthPanel(false);   // mslogon support : go to connectAndAuthenticate()
      if (RecordingFrame.checkSecurity())
        rec = new RecordingFrame(this);
-@@ -147,10 +185,11 @@
+@@ -147,10 +186,11 @@
      cursorUpdatesDef = null;
      eightBitColorsDef = null;
  
@@ -4094,7 +4104,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfbThread = new Thread(this);
      rfbThread.start();
    }
-@@ -186,6 +225,30 @@
+@@ -186,6 +226,30 @@
        gbc.weightx = 1.0;
        gbc.weighty = 1.0;
  
@@ -4125,7 +4135,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  	// Add ScrollPanel to applet mode
  
  	// Create a panel which itself is resizeable and can hold
-@@ -286,6 +349,24 @@
+@@ -286,6 +350,24 @@
  
    void connectAndAuthenticate() throws Exception {
  
@@ -4150,7 +4160,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // If "ENCPASSWORD" parameter is set, decrypt the password into
      // the passwordParam string.
  
-@@ -336,7 +417,22 @@
+@@ -336,7 +418,22 @@
      //
  
      
@@ -4174,7 +4184,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      authenticator = new AuthPanel(mslogon);
      
-@@ -390,6 +486,10 @@
+@@ -390,6 +487,10 @@
  	break;
        //mslogon support end
  
@@ -4185,7 +4195,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
        // Retry on authentication failure.
        authenticator.retry();
      }
-@@ -405,9 +505,11 @@
+@@ -405,9 +506,11 @@
  
    void prologueDetectAuthProtocol() throws Exception {
  
@@ -4199,7 +4209,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      System.out.println("RFB server supports protocol version " +
  		       rfb.serverMajor + "." + rfb.serverMinor);
-@@ -431,16 +533,36 @@
+@@ -431,16 +534,36 @@
  
    boolean tryAuthenticate(String us, String pw) throws Exception {
      
@@ -4242,7 +4252,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      switch (authScheme) {
  
-@@ -629,6 +751,10 @@
+@@ -629,6 +752,10 @@
  
    void doProtocolInitialisation() throws IOException {
  
@@ -4253,7 +4263,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfb.writeClientInit();
  
      rfb.readServerInit();
-@@ -775,8 +901,25 @@
+@@ -775,8 +902,25 @@
        }
      }
  
@@ -4281,7 +4291,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      if (inAnApplet) {
        str = readParameter("Open New Window", false);
-@@ -804,6 +947,90 @@
+@@ -804,6 +948,95 @@
      deferScreenUpdates = readIntParameter("Defer screen updates", 20);
      deferCursorUpdates = readIntParameter("Defer cursor updates", 10);
      deferUpdateRequests = readIntParameter("Defer update requests", 50);
@@ -4362,6 +4372,11 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +    str = readParameter("graftFtp", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +	graftFtp = true;
++    }
++    dsmActive = false;
++    str = readParameter("dsmActive", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	dsmActive = true;
 +    }
 +    delayAuthPanel = false;
 +    str = readParameter("delayAuthPanel", false);

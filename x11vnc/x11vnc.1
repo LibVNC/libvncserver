@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2008-09-06
+         version: 0.9.4, lastmod: 2008-09-14
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -423,6 +423,10 @@ after startup.
 .IP
 At startup sleep n seconds before proceeding (e.g. to
 allow redirs and listening clients to start up)
+.IP
+If a range is given: '-sleepin min-max', a random value
+between min and max is slept. E.g. '-sleepin 0-20' and
+\'-sleepin 10-30'.  Floats are allowed too.
 .PP
 \fB-inetd\fR
 .IP
@@ -1485,6 +1489,10 @@ talking and the connection is dropped after the default
 timeout (25s for about the first minute, 43200s later).
 Set to zero to poll forever.  Set to a negative value
 to use the builtin setting.
+.IP
+Note that this value does not apply to the *initial* ssl
+init connection.  The default timeout for that is 20sec.
+Use \fB-env\fR SSL_INIT_TIMEOUT=n to modify it.
 .PP
 \fB-sslnofail\fR
 .IP
@@ -2527,6 +2535,9 @@ the state of the modifiers: this usually works for
 identical keyboards).  Also useful in resolving cases
 where a Keysym is bound to multiple keys (e.g. "<" + ">"
 and "," + "<" keys).  Default: \fB-modtweak\fR
+.IP
+If you are having trouble with with keys and \fB-xkb\fR or
+\fB-noxkb,\fR and similar things don't help, try \fB-nomodtweak.\fR
 .IP
 On some HP-UX systems it is been noted that they have
 an odd keymapping where a single keycode will have a

@@ -1,3 +1,8 @@
+2008-09-14  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -sleepin m-n for random sleep. More mktemp and mkstemp
+	  protections. SSL_INIT_TIMEOUT=n env. var.  Fix macosx console
+	  X call bug.  Synchronize other projects sources.
+
 2008-09-06  Karl Runge <runge@karlrunge.com>
 	* x11vnc: kill gui_pid on exit in -connect/-connect_or_exit mode.
 	  -grablocal n experiment (not compiled by default).  -macuskbd

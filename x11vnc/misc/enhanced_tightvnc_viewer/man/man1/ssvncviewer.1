@@ -194,6 +194,9 @@ Note: F9 is shortcut to Toggle FullScreen mode.
 .TP
 Note: In -listen mode set the env var. SSVNC_MULTIPLE_LISTEN=1
 to allow more than one incoming VNC server at a time.
+This is the same as -multilisten described below.  Set
+SSVNC_MULTIPLE_LISTEN=MAX:n to allow no more than "n"
+simultaneous reverse connections.
 .TP
 Note: If the host:port is specified as "exec=command args..."
 then instead of making a TCP/IP socket connection to the
@@ -205,6 +208,14 @@ This mode does not work for -listen reverse connections.
 .TP
 Note: If the host:port contains a '/' it is interpreted as a
 unix-domain socket (AF_LOCAL insead of AF_INET)
+.TP
+\fB\-multilisten\fR
+As in -listen (reverse connection listening) except
+allow more than one incoming VNC server to be connected
+at a time.  The default for -listen of only one at a
+time tries to play it safe by not allowing anyone on
+the network to put (many) desktops on your screen over
+a long window of time. Use -multilisten for no limit.
 .TP
 \fB\-use64\fR
 In \fB\-bgr233\fR mode, use 64 colors instead of 256.
@@ -290,8 +301,8 @@ Disable use of MIT shared memory extension (not recommended)
 Do the UltraVNC chat in the terminal vncviewer is in
 instead of in an independent window.
 .TP
-\fB\-unixpw\fR
-str Useful for logging into x11vnc in \fB\-unixpw\fR mode. "str" is a
+\fB\-unixpw\fR \fIstr\fR
+Useful for logging into x11vnc in \fB\-unixpw\fR mode. "str" is a
 string that allows many ways to enter the Unix Username
 and Unix Password.  These characters: username, newline,
 password, newline are sent to the VNC server after any VNC
@@ -313,17 +324,45 @@ after reading. Otherwise, if str has a "@" character,
 it is taken as username@password. Otherwise, the program
 exits with an error. Got all that?
 .TP
-\fB-repeater\fR str  This is for use with UltraVNC repeater proxy described
+\fB-repeater\fR \fIstr\fR
+This is for use with UltraVNC repeater proxy described
 here: http://www.uvnc.com/addons/repeater.html.  The "str"
 is the ID string to be sent to the repeater.  E.g. ID:1234
 It can also be the hostname and port or display of the VNC
 server, e.g. 12.34.56.78:0 or snoopy.com:1.  Note that when
 using -repeater, the host:dpy on the cmdline is the repeater
 server, NOT the VNC server.  The repeater will connect you.
+
 Example: vncviewer ... -repeater ID:3333 repeat.host:5900
+
 Example: vncviewer ... -repeater vhost:0 repeat.host:5900
+
+Use, e.g., '-repeater SCIII=ID:3210' if the repeater is a
+Single Click III (SSL) repeater (repeater_SSL.exe) and you
+are passing the SSL part of the connection through stunnel, socat, etc.
+This way the magic UltraVNC string 'testB' needed to work with the
+repeater is sent to it.
 .TP
-\fB\-printres\fR  Print out the Ssvnc X resources (appdefaults) and
+\fB-rfbversion\fR \fIstr\fR
+Set the advertised RFB version.  E.g.: -rfbversion 3.6  For some
+servers, e.g. UltraVNC this needs to be done.
+.TP
+\fB-ultradsm\fR
+UltraVNC has symmetric private encryption DSM plugins.  See
+http://www.uvnc.com/features/encryption.html.  It is assumed
+you are using a unix program (e.g. our ultravnc_dsm_helper) to
+encrypt and decrypt the UltraVNC DSM stream. IN ADDITION TO
+THAT supply -ultradsm to tell THIS viewer to modify the RFB
+data sent so as to work with the UltraVNC Server.  For some
+reason, each RFB msg type must be sent twice under DSM.
+.TP
+\fB-env\fR \fIVAR=VALUE\fR
+To save writing a shell script to set environment
+variables, specify as many as you need on the command line.  For example,
+-env SSVNC_MULTIPLE_LISTEN=MAX:5 -env EDITOR=vi
+.TP
+\fB\-printres\fR
+Print out the Ssvnc X resources (appdefaults) and
 then exit. You can save them to a file and customize them (e.g. the
 keybindings and Popup menu)  Then point to the file via
 XENVIRONMENT or XAPPLRESDIR.
@@ -568,8 +607,8 @@ local TCP port number;
 .B %R
 remote TCP port number.
 .SH SEE ALSO
-\fBvncserver\fR(1), \fBXvnc\fR(1), \fBvncpasswd\fR(1),
-\fBvncconnect\fR(1), \fBssh\fR(1)
+\fBvncserver\fR(1), \fBx11vnc\fR(1), \fBssvnc\fR(1), \fBXvnc\fR(1), \fBvncpasswd\fR(1),
+\fBvncconnect\fR(1), \fBssh\fR(1), http://www.karlrunge.com/x11vnc, http://www.karlrunge.com/x11vnc/ssvnc.html
 .SH AUTHORS
 Original VNC was developed in AT&T Laboratories Cambridge. TightVNC
 additions was implemented by Constantin Kaplinsky. Many other people
@@ -584,3 +623,5 @@ Terran Melconian <terran@consistent.org>,
 Tim Waugh <twaugh@redhat.com>,
 .br
 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
+.br
+Karl Runge <runge@karlrunge.com>

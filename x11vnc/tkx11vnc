@@ -6275,10 +6275,17 @@ proc restart_everything {gui_mode} {
 		exit 1;
 	}
 	set tmp "/tmp/x11vnc[pid]"
-	file delete -force $tmp
-	if {[file exists $tmp]} {
-		puts stderr "failure in restart_everything."
-		exit 1;
+	append tmp [clock clicks]
+	set tmp2 ""
+	catch {set tmp2 [exec mktemp $tmp.XXXXXX 2>/dev/null]}
+	if {$tmp2 != "" && [file exists $tmp2]} {
+		set tmp $tmp2
+	} else {
+		file delete -force $tmp
+		if {[file exists $tmp]} {
+			puts stderr "failure in restart_everything."
+			exit 1;
+		}
 	}
 	set fh [open $tmp "a"]
 	if {![file owned $tmp]}  {

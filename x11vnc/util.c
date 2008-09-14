@@ -399,8 +399,23 @@ double rnow(void) {
 }
 
 double rfac(void) {
-	double f = (double) rand();
+	double f;
+	static int first = 1;
+
+	if (first) {
+		unsigned int s;
+		if (getenv("RAND_SEED")) {
+			s = (unsigned int) atoi(getenv("RAND_SEED"));
+		} else {
+			s = (unsigned int) ((int) getpid() + 100000 * rnow());
+		}
+		srand(s);
+		first = 0;
+	}
+
+	f = (double) rand();
 	f = f / ((double) RAND_MAX);
+
 	return f;
 }
 
