@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2008-09-14
+         version: 0.9.4, lastmod: 2008-09-16
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -657,10 +657,12 @@ the comma separated list of hostnames or IP addresses.
 Can also be a numerical IP prefix, e.g. "192.168.100."
 to match a simple subnet, for more control build
 libvncserver with libwrap support (See the FAQ).  If the
-list contains a "/" it instead is a interpreted as a
-file containing addresses or prefixes that is re-read
-each time a new client connects.  Lines can be commented
-out with the "#" character in the usual way.
+list contains a "/" it instead is a interpreted
+as a file containing addresses or prefixes that is
+re-read each time a new client connects.  Lines can be
+commented out with the "#" character in the usual way.
+.IP
+\fB-allow\fR applies in \fB-ssl\fR mode, but not in \fB-stunnel\fR mode.
 .PP
 \fB-localhost\fR
 .IP
@@ -1923,7 +1925,7 @@ on Unix using stunnel 3.x is:
 .IP
 For Windows, stunnel has been ported to it and there
 are probably other such tools available.  See the FAQ
-for more examples.
+and SSVNC for more examples.
 .PP
 \fB-stunnel3\fR \fI[pem]\fR
 .IP
@@ -4553,7 +4555,9 @@ proxy:host:port set reverse connection proxy (empty to
 disable).
 .IP
 allowonce:host  For the next connection only, allow
-connection from "host".
+connection from "host". In \fB-ssl\fR mode
+two connections are allowed (i.e. Fetch
+Cert) unless X11VNC_NO_SSL_ALLOW_TWICE=1
 .IP
 allow:hostlist  set \fB-allow\fR list to (comma separated)
 "hostlist". See \fB-allow\fR and \fB-localhost.\fR
@@ -5129,14 +5133,14 @@ nowireframe nowf wireframelocal wfl nowireframelocal
 nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
 scr_parms scrollcopyrect scr noscrollcopyrect noscr
-fixscreen noxrecord xrecord reset_record pointer_mode
-pm input_skip allinput noallinput input grabkbd
-nograbkbd grabptr nograbptr grabalways nograbalways
+fixscreen noxrecord xrecord reset_record pointer_mode pm
+input_skip allinput noallinput input grabkbd nograbkbd
+grabptr nograbptr grabalways nograbalways grablocal
 client_input ssltimeout speeds wmdt debug_pointer dp
 nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-nodk deferupdate defer wait_ui wait_bog nowait_bog
-slow_fb xrefresh wait readtimeout nap nonap sb
-screen_blank fbpm nofbpm dpms nodpms clientdpms
+nodk keycode deferupdate defer wait_ui wait_bog
+nowait_bog slow_fb xrefresh wait readtimeout nap nonap
+sb screen_blank fbpm nofbpm dpms nodpms clientdpms
 noclientdpms forcedpms noforcedpms noserverdpms
 serverdpms noultraext ultraext fs gaps grow fuzz snapfb
 nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
@@ -5152,7 +5156,7 @@ debug_grabs nodebug_grabs debug_sel nodebug_sel dbg
 nodbg macnosaver macsaver nomacnosaver macnowait macwait
 nomacnowait macwheel macnoswap macswap nomacnoswap
 macnoresize macresize nomacnoresize maciconanim macmenu
-macnomenu nomacmenu noremote
+macnomenu nomacmenu macuskbd nomacuskbd noremote
 .IP
 aro=  noop display vncdisplay desktopname guess_desktop
 http_url auth xauth users rootshift clipshift

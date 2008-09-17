@@ -55,10 +55,10 @@ void check_new_clients(void);
 int accept_client(rfbClientPtr client);
 int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
     int len, FILE *output);
+int check_access(char *addr);
 
 static rfbClientPtr *client_match(char *str);
 static void free_client_data(rfbClientPtr client);
-static int check_access(char *addr);
 static void ugly_geom(char *p, int *x, int *y);
 static int ugly_window(char *addr, char *userhost, int X, int Y,
     int timeout, char *mode, int accept);
@@ -800,10 +800,14 @@ void client_gone(rfbClientPtr client) {
  * Simple routine to limit access via string compare.  A power user will
  * want to compile libvncserver with libwrap support and use /etc/hosts.allow.
  */
-static int check_access(char *addr) {
+int check_access(char *addr) {
 	int allowed = 0;
+	int ssl = 0;
 	char *p, *list;
 
+	if (use_openssl || use_stunnel) {
+		ssl = 1;
+	}
 	if (deny_all) {
 		rfbLog("check_access: new connections are currently "
 		    "blocked.\n");
@@ -842,6 +846,10 @@ static int check_access(char *addr) {
 			len2 = strlen(allow_once) + 2;
 			len += len2;
 		}
+		if (ssl) {
+			len2 = strlen("127.0.0.1") + 2;
+			len += len2;
+		}
 		list = (char *) malloc(len);
 		list[0] = '\0';
 		
@@ -869,10 +877,18 @@ static int check_access(char *addr) {
 			strcat(list, allow_once);
 			strcat(list, "\n");
 		}
+		if (ssl) {
+			strcat(list, "\n");
+			strcat(list, "127.0.0.1");
+			strcat(list, "\n");
+		}
 	} else {
 		int len = strlen(allow_list) + 1;
 		if (allow_once) {
 			len += strlen(allow_once) + 1;
+		}
+		if (ssl) {
+			len += strlen("127.0.0.1") + 1;
 		}
 		list = (char *) malloc(len);
 		list[0] = '\0';
@@ -880,6 +896,10 @@ static int check_access(char *addr) {
 		if (allow_once) {
 			strcat(list, ",");
 			strcat(list, allow_once);
+		}
+		if (ssl) {
+			strcat(list, ",");
+			strcat(list, "127.0.0.1");
 		}
 	}
 

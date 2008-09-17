@@ -1227,6 +1227,9 @@ static void csock_timeout (int sig) {
 	}
 }
 
+#define PROXY_HACK 0
+#if PROXY_HACK
+
 static int wait_conn(int sock) {
 	int conn;
 	struct sockaddr_in addr;
@@ -1246,6 +1249,8 @@ static int wait_conn(int sock) {
 	signal(SIGALRM, SIG_DFL);
 	return conn;
 }
+
+/* no longer used */
 
 int proxy_hack(int vncsock, int listen, int s_in, int s_out, char *cookie,
     int mode) {
@@ -1320,6 +1325,31 @@ if (db) fprintf(stderr, "buf: '%s'\n", buf);
 	ssl_xfer(vncsock, sock1, sock1, 0);
 
 	return 1;
+}
+#endif	/* PROXY_HACK */
+
+static int check_ssl_access(char *addr) {
+	static char *save_allow_once = NULL;
+	static time_t time_allow_once = 0;
+
+	/* due to "Fetch Cert" activities for SSL really need to "allow twice" */
+	if (allow_once != NULL) {
+		save_allow_once = strdup(allow_once);
+		time_allow_once = time(NULL);
+	} else if (save_allow_once != NULL) {
+		if (getenv("X11VNC_NO_SSL_ALLOW_TWICE")) {
+			;
+		} else if (time(NULL) < time_allow_once + 30) {
+			/* give them 30 secs to check and save the fetched cert. */
+			allow_once = save_allow_once; 
+			rfbLog("SSL: Permitting 30 sec grace period for allowonce.\n");
+			rfbLog("SSL: Set X11VNC_NO_SSL_ALLOW_TWICE=1 to disable.\n");
+		}
+		save_allow_once = NULL;
+		time_allow_once = 0;
+	}
+
+	return check_access(addr);
 }
 
 void accept_openssl(int mode, int presock) {
@@ -1405,6 +1435,17 @@ void accept_openssl(int mode, int presock) {
 		openssl_last_ip = get_remote_host(fileno(stdin));
 	} else {
 		openssl_last_ip = get_remote_host(sock);
+	}
+
+	if (!check_ssl_access(openssl_last_ip)) {
+		rfbLog("SSL: accept_openssl: denying client %s\n", openssl_last_ip);
+		rfbLog("SSL: accept_openssl: does not match -allow (or other reason).\n");
+		close(sock);
+		sock = -1;
+		if (ssl_no_fail) {
+			clean_up_exit(1);
+		}
+		return;
 	}
 
 	/* now make a listening socket for child to connect back to us by: */

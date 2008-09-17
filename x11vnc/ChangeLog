@@ -1,3 +1,6 @@
+2008-09-17  Karl Runge <runge@karlrunge.com>
+	* x11vnc: make -allow work in -ssl mode.
+
 2008-09-14  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -sleepin m-n for random sleep. More mktemp and mkstemp
 	  protections. SSL_INIT_TIMEOUT=n env. var.  Fix macosx console
