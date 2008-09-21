@@ -3080,7 +3080,11 @@ void announce(int lport, int ssl, char *iface) {
 	if (! ssl) {
 		tvdt = "The VNC desktop is:     ";
 	} else {
-		tvdt = "The SSL VNC desktop is: ";
+		if (enc_str) {
+			tvdt = "The ENC VNC desktop is: ";
+		} else {
+			tvdt = "The SSL VNC desktop is: ";
+		}
 	}
 
 	if (iface != NULL && *iface != '\0' && strcmp(iface, "any")) {
@@ -3209,7 +3213,11 @@ void set_vnc_desktop_name(void) {
 			if (stunnel_port) {
 				fprintf(stdout, "SSLPORT=%d\n", stunnel_port);
 			} else if (use_openssl) {
-				fprintf(stdout, "SSLPORT=%d\n", screen->port);
+				if (enc_str) {
+					fprintf(stdout, "ENCPORT=%d\n", screen->port);
+				} else {
+					fprintf(stdout, "SSLPORT=%d\n", screen->port);
+				}
 			}
 			fflush(stdout);	
 			if (flagfile) {

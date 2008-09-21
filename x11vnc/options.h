@@ -30,6 +30,7 @@ extern int http_ssl;
 extern int ssl_no_fail;
 extern char *openssl_pem;
 extern char *ssl_certs_dir;
+extern char *enc_str;
 extern int https_port_num;
 extern int https_port_redir;
 extern char *ssl_verify;

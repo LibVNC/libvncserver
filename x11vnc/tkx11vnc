@@ -127,6 +127,7 @@ Clients
 	-- D
 	tightfilexfer
 	ultrafilexfer
+	proxy:
 	=GAL Java-applet::
 	=D http
 	httpdir:
@@ -142,6 +143,7 @@ Displays
 	=S reflect:
 	=D desktop:
 	=D rfbport:
+	=S autoport
 	=0 gui:
 
 Screen
@@ -267,6 +269,7 @@ Misc
 	bg
 	=S loop
 	=S loopbg
+	=S sleepin:
 	=-C:ignore,exit sigpipe:
 	=0 inetd
 
@@ -327,6 +330,8 @@ Permissions
 	=F ssldir:
 	=F sslverify:
 	ssltimeout:
+	--
+	enc:
 	=GAL LOFF
 	=GAL Misc-Perms::
 	safer

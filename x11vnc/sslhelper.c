@@ -702,6 +702,14 @@ void openssl_init(int isclient) {
 
 	do_dh = DO_DH;
 
+	if (enc_str != NULL) {
+		if (first) {
+			init_prng();
+		}
+		first = 0;
+		return;
+	}
+
 	if (! quiet) {
 		rfbLog("\n");
 		rfbLog("Initializing SSL (%s connect mode).\n", isclient ? "client":"server");
@@ -2079,6 +2087,9 @@ static int ssl_init(int s_in, int s_out) {
 	double start = dnow();
 	int timeout = 20;
 
+	if (enc_str != NULL) {
+		return 1;
+	}
 	if (getenv("SSL_DEBUG")) {
 		db = atoi(getenv("SSL_DEBUG"));
 	}
@@ -2247,6 +2258,8 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 	return 1;
 }
 
+static symmetric_encryption_xfer(int csock, int s_in, int s_out);
+
 static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	int dbxfer = 0, db = 0, check_pending, fdmax, nfd, n, i, err;
 	char cbuf[ABSIZE], sbuf[ABSIZE];
@@ -2272,6 +2285,10 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 
 	if (dbxfer) {
 		raw_xfer(csock, s_in, s_out);
+		return;
+	}
+	if (enc_str != NULL) {
+		symmetric_encryption_xfer(csock, s_in, s_out);
 		return;
 	}
 	if (getenv("SSL_DEBUG")) {
@@ -2685,8 +2702,8 @@ void check_https(void) {
 
 #define MSZ 4096
 static void init_prng(void) {
-	int db = 0, bytes;
-	char file[MSZ];
+	int db = 0, bytes, ubytes, fd;
+	char file[MSZ], dtmp[100];
 
 	RAND_file_name(file, MSZ);
 
@@ -2695,19 +2712,42 @@ static void init_prng(void) {
 	bytes = RAND_load_file(file, -1);
 	if (db) fprintf(stderr, "bytes read: %d\n", bytes);
 	
-	bytes += RAND_load_file("/dev/urandom", 64);
-	if (db) fprintf(stderr, "bytes read: %d\n", bytes);
+	ubytes = RAND_load_file("/dev/urandom", 64);
+	bytes += ubytes;
+	if (db) fprintf(stderr, "bytes read: %d / %d\n", bytes, ubytes);
+
+	/* mix in more predictable stuff as well for fallback */
+	sprintf(dtmp, "/tmp/p%.8f.XXXXXX", dnow());
+	fd = mkstemp(dtmp);
+	RAND_add(dtmp, strlen(dtmp), 0);
+	if (fd >= 0) {
+		close(fd);
+		unlink(dtmp);
+	}
+	sprintf(dtmp, "%d-%.8f", (int) getpid(), dnow());
+	RAND_add(dtmp, strlen(dtmp), 0);
+
+	if (!RAND_status()) {
+		ubytes = -1;
+		rfbLog("calling RAND_poll()\n");
+		RAND_poll();
+	}
 	
 	if (bytes > 0) {
 		if (! quiet) {
 			rfbLog("initialized PRNG with %d random bytes.\n",
 			    bytes);
 		}
+		if (ubytes > 32 && rnow() < 0.25) {
+			RAND_write_file(file);
+		}
 		return;
 	}
 
 	bytes += RAND_load_file("/dev/random", 8);
 	if (db) fprintf(stderr, "bytes read: %d\n", bytes);
+	RAND_poll();
+
 	if (! quiet) {
 		rfbLog("initialized PRNG with %d random bytes.\n", bytes);
 	}
@@ -2798,5 +2838,38 @@ if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", cso
 	close(s_in);
 	close(s_out);
 #endif	/* FORK_OK */
+}
+
+#define ENC_MODULE
+#if LIBVNCSERVER_HAVE_LIBSSL
+#define ENC_HAVE_OPENSSL 1
+#else
+#define ENC_HAVE_OPENSSL 0
+#endif
+#include "enc.h"
+
+static symmetric_encryption_xfer(int csock, int s_in, int s_out) {
+	char tmp[100];
+	char *cipher, *keyfile, *q;
+	if (! enc_str) {
+		return;
+	}
+	cipher = (char *) malloc(strlen(enc_str) + 100);
+	q = strchr(enc_str, ':');
+	if (!q) return;
+	*q = '\0';
+	if (getenv("X11VNC_USE_ULTRADSM_IV")) {
+		sprintf(cipher, "rev:%s", enc_str);
+	} else {
+		sprintf(cipher, "noultra:rev:%s", enc_str);
+	}
+	keyfile = strdup(q+1);
+	*q = ':';
+
+
+	/* TBD: s_in != s_out */
+	sprintf(tmp, "fd=%d,%d", s_in, csock);
+
+	enc_do(cipher, keyfile, "-1", tmp);
 }
 

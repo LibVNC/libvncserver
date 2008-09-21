@@ -2,7 +2,7 @@
 .TH X11VNC "1" "September 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.4, lastmod: 2008-09-16
+         version: 0.9.5, lastmod: 2008-09-21
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1932,6 +1932,82 @@ and SSVNC for more examples.
 Use version 3.x stunnel command line syntax instead of
 version 4.x
 .PP
+\fB-enc\fR \fIcipher:keyfile\fR
+.IP
+Use symmetric encryption with cipher "cipher"
+and secret key data in "keyfile".  If keyfile is
+pw=<string> then "string" is used as the key data.
+.IP
+NOTE: It is recommended that you use SSL via the \fB-ssl\fR
+option instead of this option because SSL is well
+understood and takes great care to establish unique
+session keys and is more compatible with other software.
+Use this option if you do not want to deal with SSL
+certificates for authentication and do not want to
+use SSH but want some encryption for your VNC session.
+Or if you must interface with some symmetric key tunnel.
+.IP
+Note that this mode will NOT work with the UltraVNC DSM
+plugins because they alter the RFB protocol in addition
+to tunnelling with the symmetric cipher (an unfortunate
+choice of implementation).
+.IP
+cipher can be one of:  arc4, aesv2, aes-cfb, blowfish,
+or 3des.  See the OpenSSL documentation for more info.
+The keysize is 128 bits.  Here is one way to make a
+keyfile with that many bits:
+.IP
+dd if=/dev/random of=./my.key bs=16 count=1
+.IP
+you will need to securely share this key with the other
+side of the VNC connection (See SSVNC for examples).
+.IP
+Example:  \fB-enc\fR blowfish:./my.key
+Example:  \fB-enc\fR blowfish:pw=swordfish
+.IP
+By default 16 bytes of random salt followed by 16 bytes
+of random initialization vector are sent at the very
+beginning of the stream.  The other side must read these
+and initialize their cipher with them.  These values
+make the session key unique (without them the security
+is minimal).  Similarly, the other side must send us
+its random salt and IV with those same lengths.
+.IP
+The salt and key data are combined to create a session
+key using an md5 hash as described in 
+.IR EVP_BytesToKey (3).
+.IP
+The exact call is: EVP_BytesToKey(Cipher, EVP_md5(),
+salt, keydata, len, 1, keystr, NULL);  where salt is
+the random data as described above, and keydata is the
+shared secret key data.  keystr is the resulting session
+key.  The cipher is then seeded with keystr and uses
+the random initialization vector as its first block.
+.IP
+To modify the amount of random salt and initialization
+vector use cipher@n,m where n is the salt length and
+m the initialization vector length.  E.g.
+.IP
+\fB-enc\fR aes-cfb@8,16:./my.key
+.IP
+It is not a good idea to set either one to zero,
+although you may be forced to if the other side of the
+tunnel is not under your control.
+.IP
+The SSVNC vnc viewer project supplies a symmetric
+encryption tool named "ultravnc_dsm_helper" that can
+be used on the viewer side.  For example:
+.IP
+ssvncviewer exec='ultravnc_dsm_helper arc4 my.key 0 h:p'
+.IP
+where h:p is the hostname and port of the x11vnc server.
+ultravnc_dsm_helper may also be used standalone to
+provide a symmetric encryption tunnel for any viewer
+or server (VNC or otherwise.)
+.IP
+Also see the 'Non-Ultra DSM' SSVNC option for the
+\'UltraVNC DSM Encryption Plugin' advanced option.
+.PP
 \fB-https\fR \fI[port]\fR
 .IP
 Choose a separate HTTPS port (-ssl mode only).
@@ -2961,6 +3037,10 @@ modifier's up/down state is toggled, e.g. to send
 shift down and the 2nd one is shift up). (note: the
 initial state of the modifier is ignored and not reset)
 To include button events use "Button1", ... etc.
+.IP
+.IP
+\fB-buttonmap\fR currently does not work on MacOSX console
+or in \fB-rawfb\fR mode.
 .PP
 \fB-nodragging\fR
 .IP

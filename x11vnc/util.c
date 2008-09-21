@@ -388,7 +388,7 @@ double dnowx(void) {
 }
 
 double rnow(void) {
-	double t = dnowx();
+	double t = dnow();
 	t = t - ((int) t); 
 	if (t > 1.0) {
 		t = 1.0;

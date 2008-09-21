@@ -30,6 +30,7 @@ int http_ssl = 0;
 int ssl_no_fail = 0;
 char *openssl_pem = NULL;
 char *ssl_certs_dir = NULL;
+char *enc_str = NULL;
 int https_port_num = -1;
 int https_port_redir = 0;
 char *ssl_verify = NULL;

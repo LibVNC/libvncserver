@@ -1,3 +1,8 @@
+2008-09-21  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Add symmetric key encryption -enc cipher:keyfile,
+	  works with SSVNC.  Make -remap work on MacOSX console.
+	  update to 0.9.5 strings.  Add a couple menu items to tkx11vnc.
+
 2008-09-17  Karl Runge <runge@karlrunge.com>
 	* x11vnc: make -allow work in -ssl mode.
 

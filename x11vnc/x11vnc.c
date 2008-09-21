@@ -1443,7 +1443,7 @@ static int argc2 = 0;
 static char **argv2;
 
 static void check_rcfile(int argc, char **argv) {
-	int i, j, pwlast, norc = 0, argmax = 1024;
+	int i, j, pwlast, enclast, norc = 0, argmax = 1024;
 	char *infile = NULL;
 	char rcfile[1024];
 	FILE *rc = NULL; 
@@ -1661,6 +1661,7 @@ static void check_rcfile(int argc, char **argv) {
 		free(buf);
 	}
 	pwlast = 0;
+	enclast = 0;
 	for (i=1; i < argc; i++) {
 		argv2[argc2++] = strdup(argv[i]);
 
@@ -1673,6 +1674,18 @@ static void check_rcfile(int argc, char **argv) {
 				pwlast = 1;
 			}
 			strzero(p);
+		}
+		if (enclast || !strcmp("-enc", argv[i])) {
+			char *q, *p = argv[i];		
+			if (enclast) {
+				enclast = 0;
+			} else {
+				enclast = 1;
+			}
+			q = strstr(p, "pw=");
+			if (q) {
+				strzero(q);
+			}
 		}
 		if (argc2 >= argmax) {
 			fprintf(stderr, "too many rcfile options\n");
@@ -2760,6 +2773,11 @@ int main(int argc, char* argv[]) {
 					i++;
 				}
 			}
+		} else if (!strcmp(arg, "-enc")) {
+			char *q;
+			use_openssl = 1;
+			CHECK_ARGC
+			enc_str = strdup(argv[++i]);
 		} else if (!strcmp(arg, "-ssltimeout")) {
 			CHECK_ARGC
 			ssl_timeout_secs = atoi(argv[++i]);
@@ -4949,3 +4967,5 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 #undef argv
 
 }
+
+
