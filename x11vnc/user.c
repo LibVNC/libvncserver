@@ -1189,6 +1189,7 @@ void user_supplied_opts(char *opts) {
 		"geometry", "geom", "ge",
 		"noncache", "nc",
 		"nodisplay", "nd",
+		"viewonly", "vo",
 		NULL
 	};
 
@@ -1247,6 +1248,8 @@ void user_supplied_opts(char *opts) {
 				if (!solid_str) {
 					solid_str = strdup(solid_default);
 				}
+			} else if (!strcmp(p, "viewonly") || !strcmp(p, "vo")) {
+				view_only = 1;
 			} else if (strstr(p, "solid=") == p ||
 			    strstr(p, "so=") == p) {
 				use_solid_bg = 1;
@@ -1826,6 +1829,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	char fdgeom[128], fdsess[128], fdopts[128], fdprog[128];
 	char fdxsrv[128], fdxdum[128], fdcups[128], fdesd[128];
 	char fdnas[128], fdsmb[128], fdtag[128];
+	char cdout[128];
 
 	if (opts) {
 		opts++;
@@ -1847,6 +1851,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	fdnas[0]  = '\0';
 	fdsmb[0]  = '\0';
 	fdtag[0]  = '\0';
+	cdout[0]  = '\0';
 
 	if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
 		char *q, *p, *t = strdup(keep_unixpw_opts);
@@ -1955,6 +1960,9 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	if (fdxdum[0] == '\0' && getenv("FD_XDUMMY_NOROOT")) {
 		snprintf(fdxdum, 120, "%s", getenv("FD_XDUMMY_NOROOT"));
 	}
+	if (getenv("CREATE_DISPLAY_OUTPUT")) {
+		snprintf(cdout, 120, "CREATE_DISPLAY_OUTPUT='%s'", getenv("CREATE_DISPLAY_OUTPUT"));
+	}
 
 	set_env("FD_GEOM", fdgeom);
 	set_env("FD_OPTS", fdopts);
@@ -1998,13 +2006,14 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		    + strlen(fdtag) + 1
 		    + strlen(fdxdum) + 1
 		    + strlen(fdsess) + 1
+		    + strlen(cdout) + 1
 		    + strlen(opts) + 1);
 		sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' "
 		    "FD_OPTS='%s' FD_PROG='%s' FD_XSRV='%s' FD_CUPS='%s' "
 		    "FD_ESD='%s' FD_NAS='%s' FD_SMB='%s' FD_TAG='%s' "
-		    "FD_XDUMMY_NOROOT='%s' /bin/sh %s %s",
+		    "FD_XDUMMY_NOROOT='%s' %s /bin/sh %s %s",
 		    uu, fdgeom, fdsess, fdopts, fdprog, fdxsrv,
-		    fdcups, fdesd, fdnas, fdsmb, fdtag, fdxdum, tmp, opts);
+		    fdcups, fdesd, fdnas, fdsmb, fdtag, fdxdum, cdout, tmp, opts);
 	} else {
 		create_cmd = (char *) malloc(strlen(tmp)
 		    + strlen("/bin/sh ") + 1 + strlen(opts) + 1);
@@ -2158,6 +2167,7 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 	if (!strcmp(cmd, "FINDDISPLAY") ||
 	    strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 		char *nd = "";
+		char fdout[128];
 		tmp_fd = mkstemp(tmp);
 		if (tmp_fd < 0) {
 			rfbLog("wait_for_client: open failed: %s\n", tmp);
@@ -2183,9 +2193,14 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 		}
 		check_nodisplay(&nd);
 
+		fdout[0] = '\0';
+		if (getenv("FIND_DISPLAY_OUTPUT")) {
+			snprintf(fdout, 120, " FIND_DISPLAY_OUTPUT='%s' ", getenv("FIND_DISPLAY_OUTPUT"));
+		}
+
 		cmd = (char *) malloc(strlen("env X11VNC_SKIP_DISPLAY='' ")
-		    + strlen(nd) + strlen(tmp) + strlen("/bin/sh ") + 1);
-		sprintf(cmd, "env X11VNC_SKIP_DISPLAY='%s' /bin/sh %s", nd, tmp);
+		    + strlen(nd) + strlen(tmp) + strlen("/bin/sh ") + strlen(fdout) + 1);
+		sprintf(cmd, "env X11VNC_SKIP_DISPLAY='%s' %s /bin/sh %s", nd, fdout, tmp);
 	}
 
 	rfbLog("wait_for_client: running: %s\n", cmd);

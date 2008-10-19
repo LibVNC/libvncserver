@@ -226,6 +226,26 @@ int trap_getimage_xerror(Display *d, XErrorEvent *error) {
 
 static int Xerror(Display *d, XErrorEvent *error) {
 	X_UNLOCK;
+
+	if (getenv("X11VNC_PRINT_XERROR")) {
+		fprintf(stderr, "Xerror: major_opcode: %d minor_opcode: %d error_code: %d\n",
+		    error->request_code, error->minor_code, error->error_code);
+	}
+
+	if (xshm_opcode > 0 && error->request_code == xshm_opcode) {
+		if (error->minor_code == X_ShmAttach) {
+			char *dstr = DisplayString(dpy);
+			fprintf(stderr, "\nX11 MIT Shared Memory Attach failed:\n");
+			fprintf(stderr, "  Is your DISPLAY=%s on a remote machine?\n", dstr);
+			if (strstr(dstr, "localhost:")) {
+				fprintf(stderr, "  Note:   DISPLAY=localhost:N suggests a SSH X11 redir to a remote machine.\n");
+			} else if (dstr[0] != ':') {
+				fprintf(stderr, "  Note:   DISPLAY=hostname:N suggests a remote display.\n");
+			}
+			fprintf(stderr, "  Suggestion, use: x11vnc -display :0 ... for local display :0\n\n");
+		}
+	}
+
 	interrupted(0);
 
 	if (d) {} /* unused vars warning: */

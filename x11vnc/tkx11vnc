@@ -128,6 +128,11 @@ Clients
 	tightfilexfer
 	ultrafilexfer
 	proxy:
+	=GAL Chat::
+	chatwindow
+	=DRA chaton
+	=DRA chatoff
+	=GAL LOFF
 	=GAL Java-applet::
 	=D http
 	httpdir:
@@ -1061,6 +1066,12 @@ The default port listened on is 5800, so the URL is typically:
 	http://hostname:5800/
 
 but this can be altered by -httpport, etc.
+"
+
+	set helptext(Chat:) "
+In this sub-menu are some options for enabling a local chat window
+and starting or stopping the current chat.  This is the UltraVNC 
+Text Chat support in x11vnc.
 "
 
 	set helptext(ScrollCopyRect:) "

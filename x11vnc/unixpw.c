@@ -155,8 +155,8 @@ void unixpw_screen(int init) {
 		y = dpy_y / 4;
 
 		if (scaling) {
-			x = (int) (x * scale_fac);
-			y = (int) (y * scale_fac);
+			x = (int) (x * scale_fac_x);
+			y = (int) (y * scale_fac_y);
 			x = nfix(x, scaled_x);
 			y = nfix(y, scaled_y);
 		}
@@ -1231,10 +1231,10 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 				x = text_x();
 				y = text_y();
 				if (scaling) {
-					int x2 = x / scale_fac;
-					int y2 = y / scale_fac;
-					int w2 = char_w / scale_fac;
-					int h2 = char_h / scale_fac;
+					int x2 = x / scale_fac_x;
+					int y2 = y / scale_fac_y;
+					int w2 = char_w / scale_fac_x;
+					int h2 = char_h / scale_fac_y;
 
 					x2 = nfix(x2, dpy_x);
 					y2 = nfix(y2, dpy_y);

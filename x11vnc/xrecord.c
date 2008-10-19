@@ -372,7 +372,7 @@ int xrecord_skip_keysym(rfbKeySym keysym) {
 
 int xrecord_skip_button(int new, int old) {
 	/* unused vars warning: */
-	if (new || old) {} 
+	if (new || old) {}
 
 	return 0;
 }
@@ -1309,7 +1309,7 @@ static void record_grab(XPointer ptr, XRecordInterceptData *rec_data) {
 	XRecordFreeData(rec_data);
 
 	/* unused vars warning: */
-	if (ptr) {} 
+	if (ptr) {}
 }
 #endif
 

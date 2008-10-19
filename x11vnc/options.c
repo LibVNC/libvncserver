@@ -388,6 +388,8 @@ int no_ultra_dpms = 0;
 int no_ultra_ext = 0;
 int saw_ultra_chat = 0;
 int saw_ultra_file = 0;
+int chat_window = 0;
+rfbClientPtr chat_window_client = NULL;
 
 int watch_selection = 1;	/* normal selection/cutbuffer maintenance */
 int watch_primary = 1;		/* more dicey, poll for changes in PRIMARY */

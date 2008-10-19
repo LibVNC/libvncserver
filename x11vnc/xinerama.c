@@ -328,7 +328,7 @@ static void initialize_xinerama (void) {
 		xinerama = 0;
 		xinerama_present = 0;
 		return;
-	} 
+	}
 	xinerama_present = 1;
 	rfbLog("\n");
 	rfbLog("Xinerama is present and active (e.g. multi-head).\n");

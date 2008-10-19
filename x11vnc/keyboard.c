@@ -2700,7 +2700,7 @@ static void modifier_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 		X_LOCK;
 		XTestFakeKeyEvent_wr(dpy, k, (Bool) down, CurrentTime);
 		X_UNLOCK;
-	} 
+	}
 
 	if ( tweak ) {
 		tweak_mod(modifiers[keysym], False);

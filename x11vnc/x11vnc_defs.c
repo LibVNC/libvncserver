@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.9.5 lastmod: 2008-09-21";
+char lastmod[] = "0.9.5 lastmod: 2008-10-18";
 
 /* X display info */
 
@@ -86,7 +86,8 @@ int raw_fb_bytes_per_line = 0;
 
 /* scaling parameters */
 char *scale_str = NULL;
-double scale_fac = 1.0;
+double scale_fac_x = 1.0;
+double scale_fac_y = 1.0;
 int scaling = 0;
 int scaling_blend = 1;		/* for no blending option (very course) */
 int scaling_nomult4 = 0;	/* do not require width = n * 4 */
@@ -101,7 +102,8 @@ int rotating_cursors = 0;
 
 /* scale cursor */
 char *scale_cursor_str = NULL;
-double scale_cursor_fac = 1.0;
+double scale_cursor_fac_x = 1.0;
+double scale_cursor_fac_y = 1.0;
 int scaling_cursor = 0;
 int scaling_cursor_blend = 1;
 int scaling_cursor_interpolate = 0;

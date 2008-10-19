@@ -287,6 +287,8 @@ extern int no_ultra_dpms;
 extern int no_ultra_ext;
 extern int saw_ultra_chat;
 extern int saw_ultra_file;
+extern int chat_window;
+extern rfbClientPtr chat_window_client;
 
 extern int watch_selection;
 extern int watch_primary;

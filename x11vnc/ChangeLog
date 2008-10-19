@@ -1,3 +1,11 @@
+2008-10-19  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -chatwindow for chat window on X console using SSVNC
+	  as a helper.	Print suggestion for X_ShmAttach failure.
+	  Allow -scale WxH for different X- and Y-scaling factors.
+	  Workaround for missing -enc cipher EVP_aes_256_cfb.  Modify
+	  message digest and salt/IV parameters.  Try to improve compile
+	  time by breaking up large if blocks.
+
 2008-09-21  Karl Runge <runge@karlrunge.com>
 	* x11vnc: Add symmetric key encryption -enc cipher:keyfile,
 	  works with SSVNC.  Make -remap work on MacOSX console.

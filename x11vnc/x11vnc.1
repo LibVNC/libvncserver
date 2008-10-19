@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "September 2008" "x11vnc " "User Commands"
+.TH X11VNC "1" "October 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.5, lastmod: 2008-09-21
+         version: 0.9.5, lastmod: 2008-10-18
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -336,6 +336,10 @@ is taken as a floating point number, alternatively
 the notation "m/n" may be used to denote fractions
 exactly, e.g. \fB-scale\fR 2/3
 .IP
+To scale asymmetrically in the horizontal and vertical
+directions, specify a WxH geometry to stretch to:
+e.g. '-scale 1024x768', or also '-scale 0.9x0.75'
+.IP
 Scaling Options: can be added after \fIfraction\fR via
 ":", to supply multiple ":" options use commas.
 If you just want a quick, rough scaling without
@@ -355,6 +359,10 @@ to disable this use ":n4".  ":in" use interpolation
 scheme even when shrinking, ":pad" pad scaled width
 and height to be multiples of scaling denominator
 (e.g. 3 for 2/3).
+.PP
+\fB-geometry\fR \fIWxH\fR
+.IP
+Same as \fB-scale\fR WxH
 .PP
 \fB-scale_cursor\fR \fIfrac\fR
 .IP
@@ -1953,9 +1961,9 @@ to tunnelling with the symmetric cipher (an unfortunate
 choice of implementation).
 .IP
 cipher can be one of:  arc4, aesv2, aes-cfb, blowfish,
-or 3des.  See the OpenSSL documentation for more info.
-The keysize is 128 bits.  Here is one way to make a
-keyfile with that many bits:
+aes256, or 3des.  See the OpenSSL documentation for
+more info.  The keysize is 128 bits (except for aes256).
+Here is one way to make a keyfile with that many bits:
 .IP
 dd if=/dev/random of=./my.key bs=16 count=1
 .IP
@@ -1994,6 +2002,18 @@ It is not a good idea to set either one to zero,
 although you may be forced to if the other side of the
 tunnel is not under your control.
 .IP
+To skip the salt and EVP_BytesToKey MD5 entirely (no
+hashing is done: the keydata is directly inserted into
+the cipher) specify "-1" for the salt, e.g.
+.IP
+\fB-enc\fR blowfish@-1,16:./my.key
+.IP
+The message digest can also be changed to something
+besides the default MD5.  Use cipher@md+n,m where "md"
+can be one of sha, sha1, md5, or ripe.  For example:
+.IP
+\fB-enc\fR arc4@sha+8,16:./my.key
+.IP
 The SSVNC vnc viewer project supplies a symmetric
 encryption tool named "ultravnc_dsm_helper" that can
 be used on the viewer side.  For example:
@@ -2003,16 +2023,22 @@ ssvncviewer exec='ultravnc_dsm_helper arc4 my.key 0 h:p'
 where h:p is the hostname and port of the x11vnc server.
 ultravnc_dsm_helper may also be used standalone to
 provide a symmetric encryption tunnel for any viewer
-or server (VNC or otherwise.)
+or server (VNC or otherwise.) The cipher (1st arg)
+is basically the same syntax as we use above.
 .IP
 Also see the 'Non-Ultra DSM' SSVNC option for the
 \'UltraVNC DSM Encryption Plugin' advanced option.
+.IP
+For both ways of using the viewer, you can specify the
+salt,ivec sizes (in GUI or, e.g. arc4@8,16).
 .PP
 \fB-https\fR \fI[port]\fR
 .IP
-Choose a separate HTTPS port (-ssl mode only).
+Use a special, separate HTTPS port (-ssl mode only)
+for HTTPS Java viewer applet downloading. I.e. not 5900
+and not 5800 (the defaults.)
 .IP
-In \fB-ssl\fR mode, it turns out you can use the
+BACKGROUND: In \fB-ssl\fR mode, it turns out you can use the
 single VNC port (e.g. 5900) for both VNC and HTTPS
 connections. (HTTPS is used to retrieve a SSL-aware
 VncViewer.jar applet that is provided with x11vnc).
@@ -2030,14 +2056,15 @@ ponder the Certificate dialogs in his browser, Java VM,
 or VNC Viewer applet.  That's right 3 separate "Are
 you sure you want to connect?" dialogs!)
 .IP
-So use the \fB-https\fR option to provide a separate, more
-reliable HTTPS port that x11vnc will listen on.  If
+USAGE: So use the \fB-https\fR option to provide a separate,
+more reliable HTTPS port that x11vnc will listen on.  If
 [port] is not provided (or is 0), one is autoselected.
 The URL to use is printed out at startup.
 .IP
 The SSL Java applet directory is specified via the
-\fB-httpdir\fR option.  If not supplied it will try to guess
-the directory as though the \fB-http\fR option was supplied.
+\fB-httpdir\fR option.  If not supplied, \fB-https\fR will try
+to guess the directory as though the \fB-http\fR option
+was supplied.
 .PP
 \fB-httpsredir\fR \fI[port]\fR
 .IP
@@ -3805,6 +3832,27 @@ Disable the following UltraVNC extensions: SingleWindow
 and ServerInput.  The others managed by libvncserver
 (textchat, 1/n scaling, rfbEncodingUltra) are not.
 .PP
+\fB-chatwindow\fR
+.IP
+Place a local UltraVNC chat window on the X11 display
+that x11vnc is polling.  That way the person on the VNC
+viewer-side can chat with the person at the physical
+X11 console. (e.g. helpdesk w/o telephone)
+.IP
+For this to work the SSVNC package (version 1.0.21 or
+later) MUST BE installed on the system where x11vnc runs
+and the 'ssvnc' command must be available in $PATH.
+The ssvncviewer is used as a chat window helper.
+See http://www.karlrunge.com/x11vnc/ssvnc.html
+.IP
+This option implies '-rfbversion 3.6' so as to trick
+UltraVNC viewers, otherwise they assume chat is not
+available.  To specify a different rfbversion, place
+it after the \fB-chatwindow\fR option on the cmdline.
+.IP
+See also the remote control 'chaton' and 'chatoff'
+actions.  These can also be set from the tkx11vnc GUI.
+.PP
 \fB-noxdamage\fR
 .IP
 Do not use the X DAMAGE extension to detect framebuffer
@@ -5004,6 +5052,14 @@ noultraext      enable  \fB-noultraext\fR mode.
 .IP
 ultraext        disable \fB-noultraext\fR mode.
 .IP
+chatwindow      enable  local chatwindow mode.
+.IP
+nochatwindow    disable local chatwindow mode.
+.IP
+chaton          begin chat using local window.
+.IP
+chatoff         end   chat using local window.
+.IP
 xdamage         enable  xdamage polling hints.
 .IP
 noxdamage       disable xdamage polling hints.
@@ -5213,16 +5269,17 @@ nowireframe nowf wireframelocal wfl nowireframelocal
 nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
 scr_parms scrollcopyrect scr noscrollcopyrect noscr
-fixscreen noxrecord xrecord reset_record pointer_mode pm
-input_skip allinput noallinput input grabkbd nograbkbd
-grabptr nograbptr grabalways nograbalways grablocal
-client_input ssltimeout speeds wmdt debug_pointer dp
-nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-nodk keycode deferupdate defer wait_ui wait_bog
-nowait_bog slow_fb xrefresh wait readtimeout nap nonap
-sb screen_blank fbpm nofbpm dpms nodpms clientdpms
-noclientdpms forcedpms noforcedpms noserverdpms
-serverdpms noultraext ultraext fs gaps grow fuzz snapfb
+fixscreen noxrecord xrecord reset_record pointer_mode
+pm input_skip allinput noallinput input grabkbd
+nograbkbd grabptr nograbptr grabalways nograbalways
+grablocal client_input ssltimeout speeds wmdt
+debug_pointer dp nodebug_pointer nodp debug_keyboard
+dk nodebug_keyboard nodk keycode deferupdate defer
+wait_ui wait_bog nowait_bog slow_fb xrefresh wait
+readtimeout nap nonap sb screen_blank fbpm nofbpm dpms
+nodpms clientdpms noclientdpms forcedpms noforcedpms
+noserverdpms serverdpms noultraext ultraext chatwindow
+nochatwindow chaton chatoff fs gaps grow fuzz snapfb
 nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
 uinput_always progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared
@@ -5239,9 +5296,9 @@ macnoresize macresize nomacnoresize maciconanim macmenu
 macnomenu nomacmenu macuskbd nomacuskbd noremote
 .IP
 aro=  noop display vncdisplay desktopname guess_desktop
-http_url auth xauth users rootshift clipshift
-scale_str scaled_x scaled_y scale_numer scale_denom
-scale_fac scaling_blend scaling_nomult4 scaling_pad
+http_url auth xauth users rootshift clipshift scale_str
+scaled_x scaled_y scale_numer scale_denom scale_fac_x
+scale_fac_y scaling_blend scaling_nomult4 scaling_pad
 scaling_interpolate inetd privremote unsafe safer
 nocmds passwdfile unixpw unixpw_nis unixpw_list ssl
 ssl_pem sslverify stunnel stunnel_pem https httpsredir

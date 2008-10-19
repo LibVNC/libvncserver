@@ -9,6 +9,7 @@
 
 /*
  * ultravnc_dsm_helper.c unix/openssl UltraVNC encryption encoder/decoder. 
+ *                       (also a generic symmetric encryption tunnel)
  *
  * compile via:
 
@@ -30,6 +31,7 @@
  *   any-client <=> ultravnc_dsm_helper <--network--> ultravnc_dsm_helper(reverse mode) <=> any-server
  *
  * e.g. to connect a non-ultra-dsm-vnc viewer to a non-ultra-dsm-vnc server
+ * without using SSH or SSL.
  *
  * -----------------------------------------------------------------------
  * Copyright (c) 2008 Karl J. Runge <runge@karlrunge.com>
@@ -58,7 +60,7 @@ static char *usage =
     "e.g.:  ultravnc_dsm_helper arc4 ./arc4.key 5901 snoopy.com:5900\n"
     "\n"
     "       cipher: specify 'msrc4', 'msrc4_sc', 'arc4', 'aesv2',\n"
-    "               'aes-cfb', 'blowfish', or '3des'.\n"
+    "               'aes-cfb', 'aes256', 'blowfish', or '3des'.\n"
     "\n"
     "         'msrc4_sc' enables a workaround for UVNC SC -plugin use.\n"
     "\n"
@@ -84,7 +86,11 @@ static char *usage =
     "\n"
     "\n"
     "       Also: cipher may be cipher@n,m where n is the salt size and m is the\n"
-    "       initialization vector size. E.g. aesv2@8,16\n"
+    "       initialization vector size. E.g. aesv2@8,16  Use n=-1 to disable salt\n"
+    "       and the MD5 hash (i.e. insert the keydata directly into the cipher.)\n"
+    "\n"
+    "       Use cipher@md+n,m to change the message digest. E.g. arc4@sha+8,16\n"
+    "       Supported: 'md5', 'sha', 'sha1', 'ripemd160'.\n"
 ;
 
 /*
@@ -93,8 +99,8 @@ static char *usage =
  *
  * Note that when running as a module we still assume we have been
  * forked off of the parent process and are communicating back to it
- * via a socket.  So we still exit(3) at the end or on error.  And
- * the globals would not work.
+ * via a socket.  So we *still* exit(3) at the end or on error.  And
+ * the global settings won't work.
  */
 #ifdef ENC_MODULE
 #  define main __enc_main
@@ -124,21 +130,25 @@ static char *prog = "ultravnc_dsm_helper";
 #include <netdb.h>
 
 
+/* Solaris (sysv?) needs INADDR_NONE */
 #ifndef INADDR_NONE
 #define INADDR_NONE ((in_addr_t) 0xffffffff)
 #endif
 
-#if ENC_HAVE_OPENSSL
 /* openssl includes */
+#if ENC_HAVE_OPENSSL
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 static const EVP_CIPHER *Cipher;
+static const EVP_MD *Digest;
 #endif
 
 static char *cipher = NULL;	/* name of cipher, e.g. "aesv2" */
 static int reverse = 0;		/* listening connection */
 static int msrc4_sc = 0;	/* enables workaround for SC I/II */
-static int noultra = 0;		/* manage salt and iv differently than ultradsm */
+static int noultra = 0;		/* manage salt/iv differently from ultradsm */
+static int nomd = 0;		/* use the keydata directly, no md5 or salt */
+static int pw_in = 0;		/* pw=.... read in */
 
 
 /* The data that was read in from key file (or pw=password) */
@@ -157,6 +167,7 @@ static int ivec_size = IVEC;
 /* To track parent and child pids */
 static pid_t parent, child;
 
+/* transfer buffer size */
 #define BSIZE 8192
 
 /* Some very verbose debugging stuff I enable for testing */
@@ -170,6 +181,9 @@ static pid_t parent, child;
 #  define PRINT_IVEC
 #  define PRINT_KEYDATA
 #  define PRINT_KEYSTR_AND_FRIENDS
+#  define PRINT_LOOP_DBG1
+#  define PRINT_LOOP_DBG2
+#  define PRINT_LOOP_DBG3
 #endif
 
 static void enc_connections(int, char*, int);
@@ -185,6 +199,15 @@ extern void enc_do(char *ciph, char *keyfile, char *lport, char *rhp) {
 
 #else
 
+#if defined(NO_EVP_aes_256_cfb) || (defined (__SVR4) && defined (__sun) && !defined(EVP_aes_256_cfb) && !defined(ASSUME_EVP_aes_256_cfb))
+/*
+ * For Solaris 10 missing 192 & 256 bit crypto.
+ * Note that EVP_aes_256_cfb is a macro.
+ */
+#undef EVP_aes_256_cfb
+#define EVP_aes_256_cfb() EVP_aes_128_cfb(); {fprintf(stderr, "Not compiled with EVP_aes_256_cfb() 'aes256' support.\n"); exit(1);}
+#endif
+
 /* If we are a module, enc_do() is the only interface we export.  */
 
 
@@ -197,8 +220,9 @@ extern void enc_do(char *ciph, char *keyfile, char *lport, char *rhp) {
 	char tmp[16];
 	int fd, len, listen_port, connect_port, mbits;
 
-	/* check for noultra mode: */
 	q = ciph;
+
+	/* check for noultra mode: */
 	if (strstr(q, "noultra:") == q) {
 		noultra = 1;
 		q += strlen("noultra:");
@@ -227,13 +251,16 @@ extern void enc_do(char *ciph, char *keyfile, char *lport, char *rhp) {
 	} else if (strstr(q, "aes-cfb") == q) {
 		Cipher = EVP_aes_128_cfb();	cipher = "aes-cfb";
 
+	} else if (strstr(q, "aes256") == q) {
+		Cipher = EVP_aes_256_cfb();	cipher = "aes256";
+
 	} else if (strstr(q, "blowfish") == q) {
 		Cipher = EVP_bf_cfb();		cipher = "blowfish";
 
 	} else if (strstr(q, "3des") == q) {
-		Cipher = EVP_des_ede3_ofb();	cipher = "3des";
+		Cipher = EVP_des_ede3_cfb();	cipher = "3des";
 
-	} else {
+	} else if (strstr(q, ".") == q) {
 		/* otherwise, try to guess cipher from key filename: */
 		if (strstr(keyfile, "arc4.key")) {
 			Cipher = EVP_rc4();		cipher = "arc4";
@@ -247,33 +274,76 @@ extern void enc_do(char *ciph, char *keyfile, char *lport, char *rhp) {
 		} else if (strstr(keyfile, "aes-cfb.key")) {
 			Cipher = EVP_aes_128_cfb();	cipher = "aes-cfb";
 
+		} else if (strstr(keyfile, "aes256.key")) {
+			Cipher = EVP_aes_256_cfb();	cipher = "aes256";
+
 		} else if (strstr(keyfile, "blowfish.key")) {
 			Cipher = EVP_bf_cfb();		cipher = "blowfish";
 
 		} else if (strstr(keyfile, "3des.key")) {
-			Cipher = EVP_des_ede3_ofb();	cipher = "3des";
+			Cipher = EVP_des_ede3_cfb();	cipher = "3des";
 
 		} else {
 			fprintf(stderr, "cannot figure out cipher, supply 'msrc4', 'arc4', or 'aesv2' ...\n");
 			exit(1);
 		}
+	} else {
+		fprintf(stderr, "cannot figure out cipher, supply 'msrc4', 'arc4', or 'aesv2' ...\n");
+		exit(1);
 	}
 
-	/* look for user specified salt and IV sizes at the end: */
+	/* set the default message digest (md5) */
+	Digest = EVP_md5();
+
+	/*
+	 * Look for user specified salt and IV sizes at the end
+	 * ( ciph@salt,iv and ciph@[md+]salt,iv ):
+	 */
 	p = strchr(q, '@');
 	if (p) {
 		int s, v;
-		if (sscanf(p+1, "%d,%d", &s, &v) == 2) {
-			if (0 <= s && s <= SALT) {
+		p++;
+		if (strstr(p, "md5+") == p) {
+			Digest = EVP_md5();        p += strlen("md5+");
+		} else if (strstr(p, "sha+") == p) {
+			Digest = EVP_sha();        p += strlen("sha+");
+		} else if (strstr(p, "sha1+") == p) {
+			Digest = EVP_sha1();       p += strlen("sha1+");
+		} else if (strstr(p, "ripe+") == p) {
+			Digest = EVP_ripemd160();  p += strlen("ripe+");
+		} else if (strstr(p, "ripemd160+") == p) {
+			Digest = EVP_ripemd160();  p += strlen("ripemd160+");
+		}
+		if (sscanf(p, "%d,%d", &s, &v) == 2) {
+			/* cipher@n,m */
+			if (-1 <= s && s <= SALT) {
 				salt_size = s;
+			} else {
+				fprintf(stderr, "%s: invalid salt size: %d\n",
+				    prog, s);
+				exit(1);
 			}
 			if (0 <= v && v <= EVP_MAX_IV_LENGTH) {
 				ivec_size = v;
+			} else {
+				fprintf(stderr, "%s: invalid IV size: %d\n",
+				    prog, v);
+				exit(1);
 			}
-		} else if (sscanf(p+1, "%d", &s) == 1) {
-			if (0 <= s && s <= SALT) {
+		} else if (sscanf(p, "%d", &s) == 1) {
+			/* cipher@n */
+			if (-1 <= s && s <= SALT) {
 				salt_size = s;
+			} else {
+				fprintf(stderr, "%s: invalid salt size: %d\n",
+				    prog, s);
+				exit(1);
 			}
+		}
+		if (salt_size == -1) {
+			/* let salt = -1 mean skip both MD5 and salt */
+			nomd = 1;
+			salt_size = 0;
 		}
 	}
 
@@ -292,20 +362,24 @@ extern void enc_do(char *ciph, char *keyfile, char *lport, char *rhp) {
 	connect_host = strdup(rhp);
 
 	/* check for and read in the key file */
+	memset(keydata, 0, sizeof(keydata));
 	if (stat(keyfile, &sb) != 0) {
 		if (strstr(keyfile, "pw=") == keyfile) {
 			/* user specified key/password on cmdline */
 			int i;
 			len = 0;
+			pw_in = 1;
 			for (i=0; i < strlen(keyfile); i++) {
 				/* load the string to keydata: */
 				int n = i + strlen("pw=");
 				keydata[i] = keyfile[n];
 				if (keyfile[n] == '\0') break;
 				len++;
+				if (i > 100) break;
 			}
 			goto readed_in;
 		}
+		/* otherwise invalid file */
 		perror("stat");
 		exit(1);
 	}
@@ -329,6 +403,7 @@ extern void enc_do(char *ciph, char *keyfile, char *lport, char *rhp) {
 	close(fd);
 
 	readed_in:
+
 
 	/* check for ultravnc msrc4 format 'rc4.key' */
 	mbits = 0;
@@ -373,7 +448,6 @@ extern void enc_do(char *ciph, char *keyfile, char *lport, char *rhp) {
  * encrypt or decrypt.
  */
 static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
-
 	/*
 	 * We keep both E and D aspects in case we revert back to a
 	 * single process calling select(2) on all fds...
@@ -388,9 +462,9 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 	unsigned char salt[SALT+1];
 	unsigned char ivec[EVP_MAX_IV_LENGTH];
 
-	int i, cnt, len, n = 0, m, vb = 0, pa = 1, first = 1;
+	int i, cnt, len, m, n = 0, vb = 0, pa = 1, first = 1;
 	int whoops = 1; /* for the msrc4 problem */
-	char *encstr;
+	char *encstr, *encsym;
 	
 	/* zero the buffers */
 	memset(buf,  0, BSIZE);
@@ -404,6 +478,10 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 		salt_size = MSRC4_SALT; /* 11 vs. 16 */
 	}
 
+	if (msrc4_sc) {
+		whoops = 1;	/* force workaround in SC mode */
+	}
+
 	if (getenv("ENCRYPT_VERBOSE")) {
 		vb = 1;	/* let user turn on some debugging via env. var. */
 	}
@@ -415,10 +493,7 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 		encrypt = (!encrypt);
 	}
 	encstr = encrypt ? "encrypt" : "decrypt";  /* string for messages */
-
-	if (msrc4_sc) {
-		whoops = 1;
-	}
+	encsym = encrypt ? "+" : "-";
 
 	if (encrypt) {
 		/* encrypter initializes the salt and initialization vector */
@@ -426,7 +501,8 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 		/*
 		 * Our salt is 16 bytes but I believe only the first 8
 		 * bytes are used by EVP_BytesToKey(3).  Since we send it
-		 * to the other "plugin" we need to keep it 16.
+		 * to the other "plugin" we need to keep it 16.  Also,
+		 * the IV size can depend on the cipher type.  Again, 16.
 		 */
 		RAND_bytes(salt, salt_size);
 		RAND_bytes(ivec, ivec_size);
@@ -452,20 +528,25 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 		tv.tv_usec = 100 * 1000;
 		select(1, NULL, NULL, NULL, &tv);
 
-		n = read(sock_fr, buf, salt_size+ivec_size+96);
+		if (salt_size+ivec_size == 0) {
+			n = 0;	/* no salt or iv, skip reading. */
+		} else {
+			n = read(sock_fr, buf, salt_size+ivec_size+96);
+		}
 		if (n == 0 && salt_size+ivec_size > 0) {
 			fprintf(stderr, "%s: decrypt finished.\n", prog);
-
 			goto finished;
 		}
 		if (n < salt_size+ivec_size) {
-			if (msrc4_sc && n == 12) {
-				fprintf(stderr, "%s: only %d bytes read. Assuming UVNC Single Click server.\n", prog, n);
-			} else {
-				if (n < 0) perror("read");
-				fprintf(stderr, "%s: could not read enough for salt and ivec: n=%d\n", prog, n);
-				goto finished;
-			}
+		    if (msrc4_sc && n == 12) {
+			fprintf(stderr, "%s: only %d bytes read. Assuming "
+			    "UVNC Single Click server.\n", prog, n);
+		    } else {
+			if (n < 0) perror("read");
+			fprintf(stderr, "%s: could not read enough for salt "
+			    "and ivec: n=%d\n", prog, n);
+			goto finished;
+		    }
 		}
 
 		DEC_CT_DBG(buf, n);
@@ -482,7 +563,10 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 			psrc = buf + salt_size + ivec_size;
 		
 			if (n > 0) {
-				/* copy it down to the start of buf for sending below */
+				/*
+				 * copy it down to the start of buf for
+				 * sending below:
+				 */
 				for (i=0; i < n; i++) {
 					buf[i] = psrc[i];
 				}
@@ -505,37 +589,74 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 			fprintf(stderr, "%s: %s - WARNING: MSRC4 mode and IGNORING random salt\n", prog, encstr);
 			fprintf(stderr, "%s: %s - WARNING: and initialization vector!!\n", prog, encstr);
 			EVP_CIPHER_CTX_init(ctx);
-			EVP_CipherInit_ex(ctx, Cipher, NULL, (unsigned char *) keydata, NULL, encrypt);
+			if (pw_in) {
+			    /* for pw=xxxx a md5 hash is used */
+			    EVP_BytesToKey(Cipher, Digest, NULL, keydata,
+			        keydata_len, 1, keystr, NULL);
+			    EVP_CipherInit_ex(ctx, Cipher, NULL, keystr, NULL,
+			        encrypt);
+			} else {
+			    /* otherwise keydata as is */
+			    EVP_CipherInit_ex(ctx, Cipher, NULL,
+			        (unsigned char *) keydata, NULL, encrypt);
+			}
 		} else {
 			/* XXX might not be correct */
 			exit(1);
-			EVP_BytesToKey(Cipher, EVP_md5(), NULL, keydata, keydata_len, 1, keystr, ivec); 
+			EVP_BytesToKey(Cipher, Digest, NULL, keydata,
+			    keydata_len, 1, keystr, ivec); 
 			EVP_CIPHER_CTX_init(ctx);
-			EVP_CipherInit_ex(ctx, Cipher, NULL, keystr, ivec, encrypt);
+			EVP_CipherInit_ex(ctx, Cipher, NULL, keystr, ivec,
+			    encrypt);
 		}
+
 	} else {
 		unsigned char *in_salt;
 
+		/* check salt and IV source and size. */
 		if (salt_size <= 0) {
 			/* let salt_size = 0 mean keep it out of the MD5 */
-			fprintf(stderr, "%s: %s - WARNING: no salt\n", prog, encstr);
+			fprintf(stderr, "%s: %s - WARNING: no salt\n",
+			    prog, encstr);
 			in_salt = NULL;
 		} else {
 			in_salt = salt;
 		}
 		if (ivec_size < Cipher->iv_len) {
-			fprintf(stderr, "%s: %s - WARNING: short IV %d < %d\n", prog, encstr, ivec_size, Cipher->iv_len);
+			fprintf(stderr, "%s: %s - WARNING: short IV %d < %d\n",
+			    prog, encstr, ivec_size, Cipher->iv_len);
 		}
 
 		/* make the hashed value and place in keystr */
 
-		/* XXX N.B.: DSM plugin had count=0, and overwrote ivec by not passing NULL iv */
+		/*
+		 * XXX N.B.: DSM plugin had count=0, and overwrote ivec
+		 * by not passing NULL iv.
+		 */
 
-		if (noultra && ivec_size > 0) {
-			EVP_BytesToKey(Cipher, EVP_md5(), in_salt, keydata, keydata_len, 1, keystr, NULL);
+		if (nomd) {
+			/* special mode: no salt or md5, use keydata directly */
+
+			int sz = keydata_len < EVP_MAX_KEY_LENGTH ?
+			    keydata_len : EVP_MAX_KEY_LENGTH; 
+
+			fprintf(stderr, "%s: %s - WARNING: no-md5 specified: ignoring salt & hash\n", prog, encstr);
+			memcpy(keystr, keydata, sz);
+
+		} else if (noultra && ivec_size > 0) {
+			/* "normal" mode, don't overwrite ivec. */
+
+			EVP_BytesToKey(Cipher, Digest, in_salt, keydata,
+			    keydata_len, 1, keystr, NULL);
+
 		} else {
-			/* even under noultra we overwrite ivec if ivec_size = 0 */
-			EVP_BytesToKey(Cipher, EVP_md5(), in_salt, keydata, keydata_len, 1, keystr, ivec);
+			/* 
+			 * Ultra DSM compatibility mode.  Note that this
+			 * clobbers the ivec we set up above!  Under
+			 * noultra we overwrite ivec only if ivec_size=0.
+			 */
+			EVP_BytesToKey(Cipher, Digest, in_salt, keydata,
+			    keydata_len, 1, keystr, ivec);
 		}
 
 
@@ -545,7 +666,10 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 
 		/* set the cipher & initialize */
 
-		/* XXX N.B.: DSM plugin had encrypt=1 for both (i.e. perfectly symmetric) */
+		/*
+		 * XXX N.B.: DSM plugin had encrypt=1 for both
+		 * (i.e. perfectly symmetric)
+		 */
 
 		EVP_CipherInit_ex(ctx, Cipher, NULL, keystr, ivec, encrypt);
 	}
@@ -562,27 +686,28 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 				/* skip sending salt+iv */
 				first = 0;
 				continue;
+			} else {
+				/* use that first block of data placed in buf */
 			}
-			/* use that first block of data placed in buf above */
+		} else if (first && n == 0 && salt_size + ivec_size == 0) {
+			first = 0;
+			continue;
 		} else {
 			/* general case of loop, read some in: */
 			n = read(sock_fr, buf, BSIZE);
 		}
 
 		/* debug output: */
-		if (vb) fprintf(stderr, "%s%d/%d ", encrypt ? "+" : "-", n, errno);
-		if (n <= 0) {} else if (encrypt) {ENC_PT_DBG(buf, n);} else {DEC_CT_DBG(buf, n);}
+		if (vb) fprintf(stderr, "%s%d/%d ", encsym, n, errno);
+		PRINT_LOOP_DBG1;
 
 		if (n == 0 || (n < 0 && errno != EINTR)) {
-			/* failure to read any data... it is EOF or fatal error. */
+			/* failure to read any data, it is EOF or fatal error */
+			int err = errno;
 
 			/* debug output: */
-			char tmp[32]; int err = errno;
-
-			if (encrypt) {ENC_PT_DBG("--EOF--", 7);} else {DEC_CT_DBG("--EOF--", 7);}
-			sprintf(tmp, "err=%d,n=%d", err, n);
+			PRINT_LOOP_DBG2;
 			fprintf(stderr, "%s: %s - input stream finished: n=%d, err=%d", prog, encstr, n, err);
-			if (encrypt) {ENC_PT_DBG(tmp, strlen(tmp));} else {DEC_CT_DBG(tmp, strlen(tmp));}
 
 			/* EOF or fatal error */
 			break;
@@ -602,8 +727,8 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 			}
 
 			/* debug output: */
-			if (vb) fprintf(stderr, "c%d/%d ", cnt, n);
-			if (encrypt) {ENC_CT_DBG(out, cnt);} else {DEC_PT_DBG(out, cnt);}
+			if (vb) fprintf(stderr, "%sc%d/%d ", encsym, cnt, n);
+			PRINT_LOOP_DBG3;
 
 			/* write transformed data to the other end: */
 			len = cnt;
@@ -613,7 +738,7 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 				m = write(sock_to, psrc, len);
 
 				/* debug output: */
-				if (vb) fprintf(stderr, "m%s%d/%d ", encrypt ? "+" : "-", m, errno);
+				if (vb) fprintf(stderr, "m%s%d/%d ", encsym, m, errno);
 
 				if (m > 0) {
 					/* scoot them by how much was written: */
@@ -697,7 +822,8 @@ static void enc_connections(int listen_port, char *connect_host, int connect_por
 		exit(1);
 	}
 
-	ret = setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one));
+	ret = setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR,
+	    (char *)&one, sizeof(one));
 	if (ret < 0) {
 		perror("setsockopt");
 		exit(1);
@@ -715,7 +841,8 @@ static void enc_connections(int listen_port, char *connect_host, int connect_por
 		exit(1);
 	}
 
-	fprintf(stderr, "%s: waiting for connection on port: %d\n", prog, listen_port);
+	fprintf(stderr, "%s: waiting for connection on port: %d\n",
+	    prog, listen_port);
 
 	/* wait for a connection: */
 	clen = sizeof(client);
@@ -769,6 +896,8 @@ static void enc_connections(int listen_port, char *connect_host, int connect_por
 	if (child == (pid_t) -1) {
 		/* couldn't fork... */
 		perror("fork");
+		close(conn1);
+		close(conn2);
 		exit(1);
 	}
 
@@ -797,7 +926,7 @@ extern int main (int argc, char *argv[]) {
 	q = strstr(argv[2], "pw=");
 	if (q) {
 		while (*q != '\0') {
-			*q = '\0';
+			*q = '\0';	/* now ps(1) won't show it */
 			q++;
 		}
 	}

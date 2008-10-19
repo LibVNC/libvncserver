@@ -40,6 +40,7 @@ void set_client_input(char *str);
 void set_child_info(void);
 int cmd_ok(char *cmd);
 void client_gone(rfbClientPtr client);
+void client_gone_chat_helper(rfbClientPtr client);
 void reverse_connect(char *str);
 void set_vnc_connect_prop(char *str);
 void read_vnc_connect_prop(int);
@@ -48,6 +49,8 @@ void read_x11vnc_remote_prop(int);
 void check_connect_inputs(void);
 void check_gui_inputs(void);
 enum rfbNewClientAction new_client(rfbClientPtr client);
+enum rfbNewClientAction new_client_chat_helper(rfbClientPtr client);
+rfbBool password_check_chat_helper(rfbClientPtr cl, const char* response, int len);
 void start_client_info_sock(char *host_port_cookie);
 void send_client_info(char *str);
 void adjust_grabs(int grab, int quiet);
@@ -2469,7 +2472,7 @@ void reverse_connect(char *str) {
 	n = cnt;
 	if (n >= n_max) {
 		n = n_max; 
-	} 
+	}
 	t = sleep_max - sleep_min;
 	tot = sleep_min + ((n-1) * t) / (n_max-1);
 
@@ -2786,6 +2789,40 @@ static void turn_off_truecolor_ad(rfbClientPtr client) {
 		screen->serverFormat.blueMax    = 0;
 		turn_off_truecolor = 0;
 	}
+}
+
+/*
+ * some overrides for the local console text chat.
+ * could be useful in general for local helpers.
+ */
+
+rfbBool password_check_chat_helper(rfbClientPtr cl, const char* response, int len) {
+	if (cl != chat_window_client) {
+		rfbLog("invalid client during chat_helper login\n");
+		return FALSE;
+	} else {
+		if (!cl->host) {
+			rfbLog("empty cl->host during chat_helper login\n");
+			return FALSE;
+		}
+		if (strcmp(cl->host, "127.0.0.1")) {
+			rfbLog("invalid cl->host during chat_helper login: %s\n", cl->host);
+			return FALSE;
+		}
+		rfbLog("chat_helper login accepted\n");
+		return TRUE;
+	}
+}
+
+enum rfbNewClientAction new_client_chat_helper(rfbClientPtr client) {
+	client->clientGoneHook = client_gone_chat_helper;
+	rfbLog("new chat helper\n");
+	return(RFB_CLIENT_ACCEPT);
+}
+
+void client_gone_chat_helper(rfbClientPtr client) {
+	rfbLog("finished chat helper\n");
+	chat_window_client = NULL;
 }
 
 /*
@@ -3119,11 +3156,11 @@ void send_client_info(char *str) {
 				buf += n;
 				len -= n;
 				continue;
-			} 
+			}
 
 			if (n < 0 && errno == EINTR) {
 				continue;
-			} 
+			}
 			close(sock);
 			icon_mode_socks[i] = -1;
 			break;

@@ -2492,7 +2492,7 @@ static int check_xrecord_keys(void) {
 	get_out = 1;
 	if (got_keyboard_input) {
 		get_out = 0;
-	} 
+	}
 
 	dtime0(&tnow);
 	if (tnow < last_key_scroll + scroll_persist) {
@@ -2735,10 +2735,10 @@ static int check_xrecord_mouse(void) {
 	get_out = 1;
 	if (button_mask) {
 		get_out = 0;
-	} 
+	}
 	if (want_back_in) {
 		get_out = 0;
-	} 
+	}
 	dtime0(&tnow);
 if (0) fprintf(stderr, "check_xrecord_mouse: IN xrecording: %d\n", xrecording);
 
@@ -8116,7 +8116,7 @@ void scale_mark_xrootpmap(void) {
 	dst_fb = rfb_fb;
 	dst_bpl = rfb_bytes_per_line;
 
-	scale_rect(scale_fac, scaling_blend, scaling_interpolate, fac * Bpp,
+	scale_rect(scale_fac_x, scale_fac_y, scaling_blend, scaling_interpolate, fac * Bpp,
 	    src_fb, fac * main_bytes_per_line, dst_fb, dst_bpl, dpy_x, yfac * dpy_y,
 	    scaled_x, yfac * scaled_y, 0, yn, dpy_x, yn + dpy_y, mark);
 }
@@ -8303,7 +8303,7 @@ void read_events(int *n_in) {
 					if (w_new != wd || h_new != ht) {
 						msg = "change size";
 						cfg_size = 1;
-					} 
+					}
 					if (x_new != x || y_new != y) {
 						if (!strcmp(msg, "")) {
 							msg = "change position";
@@ -9939,14 +9939,14 @@ if (ncdb) fprintf(stderr, "----%02d: MapNotify        0x%lx  %3d\n", ik, win, id
 								save = 0;
 							}
 							sraRgnDestroy(r);
-						} 
+						}
 						if (missed_bs_restore) {
 							r = idx_create_rgn(r0, idx);
 							if (sraRgnAnd(r, missed_bs_restore_rgn)) {
 								save = 0;
 							}
 							sraRgnDestroy(r);
-						} 
+						}
 						if (save) {
 							valid = 0;
 							su_save(idx, nbatch, &attr, 1, &valid, 1);
@@ -10040,14 +10040,14 @@ if (ncdb) fprintf(stderr, "----%02d: UnmapNotify      0x%lx  %3d\n", ik, win, id
 								save = 0;
 							}
 							sraRgnDestroy(r);
-						} 
+						}
 						if (missed_bs_restore) {
 							r = idx_create_rgn(r0, idx);
 							if (sraRgnAnd(r, missed_bs_restore_rgn)) {
 								save = 0;
 							}
 							sraRgnDestroy(r);
-						} 
+						}
 						if (save) {
 							valid = 0;
 							bs_save(idx, nbatch, &attr, 1, 0, &valid, 1);

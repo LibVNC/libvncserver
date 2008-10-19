@@ -423,7 +423,8 @@ extern int raw_fb_bytes_per_line;	/* of actual raw region we poll, not our raw_f
 
 /* scaling parameters */
 extern char *scale_str;
-extern double scale_fac;
+extern double scale_fac_x;
+extern double scale_fac_y;
 extern int scaling;
 extern int scaling_blend;		/* for no blending option (very course) */
 extern int scaling_nomult4;		/* do not require width = n * 4 */
@@ -438,7 +439,8 @@ extern int rotating_cursors;
 
 /* scale cursor */
 extern char *scale_cursor_str;
-extern double scale_cursor_fac;
+extern double scale_cursor_fac_x;
+extern double scale_cursor_fac_y;
 extern int scaling_cursor;
 extern int scaling_cursor_blend;
 extern int scaling_cursor_interpolate;

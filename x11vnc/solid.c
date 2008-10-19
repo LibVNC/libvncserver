@@ -706,7 +706,7 @@ static char *dcop_session(void) {
 				} else {
 					if (sess2) {
 						free(sess2);
-					} 
+					}
 					sess2 = strdup(q);
 				}
 			}

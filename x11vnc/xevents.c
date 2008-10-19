@@ -1494,25 +1494,135 @@ void set_server_input(rfbClientPtr cl, int grab) {
 #endif
 }
 
+static int wsock_timeout_sock = -1;
+
+static void wsock_timeout (int sig) {
+	rfbLog("sig: %d, wsock_timeout.\n", sig);
+	if (wsock_timeout_sock >= 0) {
+		close(wsock_timeout_sock);
+		wsock_timeout_sock = -1;
+	}
+}
+
+static void try_local_chat_window(void) {
+	int i, port, lsock;
+	char cmd[100];
+	struct sockaddr_in addr;
+#ifdef __hpux
+	int addrlen = sizeof(addr);
+#else
+	socklen_t addrlen = sizeof(addr);
+#endif
+
+	for (i = 0; i < 90; i++)  {
+		/* find an open port */
+		port = 7300 + i;
+		lsock = rfbListenOnTCPPort(port, htonl(INADDR_LOOPBACK));
+		if (lsock >= 0) {
+			break;
+		}
+		port = 0;
+	}
+
+	if (port == 0) {
+		return;
+	}
+
+	/* have ssvncvncviewer connect back to us (n.b. sockpair fails) */
+
+	sprintf(cmd, "ssvnc -cmd VNC://localhost:%d -chatonly", port);
+
+	pid_t pid = fork();
+
+	if (pid == -1) {
+		perror("fork");
+		return;
+	} else if (pid == 0) {
+		char *args[4];
+		int d;
+		args[0] = "/bin/sh";
+		args[1] = "-c";
+		/* "ssvnc -cmd VNC://fd=0 -chatonly"; */
+		args[2] = cmd;
+		args[3] = NULL;
+
+		for (d = 3; d < 256; d++) {
+			close(d);
+		}
+		set_env("VNCVIEWER_PASSWORD", "moo");
+
+		execvp(args[0], args);
+		perror("exec");
+		exit(1);
+	} else {
+		int i, sock = -1;
+		rfbNewClientHookPtr new_save;
+
+		signal(SIGALRM, wsock_timeout);
+		wsock_timeout_sock = lsock;
+		
+		alarm(10);
+		sock = accept(lsock, (struct sockaddr *)&addr, &addrlen);
+		alarm(0);
+
+		signal(SIGALRM, SIG_DFL);
+		close(lsock);
+
+		if (sock < 0) {
+			return;
+		}
+
+		new_save = screen->newClientHook;
+		screen->newClientHook = new_client_chat_helper;
+
+		chat_window_client = rfbNewClient(screen, sock);
+
+		screen->newClientHook = new_save;
+
+		if (chat_window_client != NULL) {
+			rfbPasswordCheckProcPtr pwchk_save = screen->passwordCheck;
+			rfbBool save_shared1 = screen->alwaysShared;
+			rfbBool save_shared2 = screen->neverShared;
+
+			screen->alwaysShared = TRUE;
+			screen->neverShared  = FALSE;
+
+			screen->passwordCheck = password_check_chat_helper;
+			for (i=0; i<30; i++) {
+				rfbPE(-1);
+				if (!chat_window_client) {
+					break;
+				}
+				if (chat_window_client->state == RFB_NORMAL) {
+					break;
+				}
+			}
+
+			screen->passwordCheck = pwchk_save;
+			screen->alwaysShared  = save_shared1;
+			screen->neverShared   = save_shared2;
+		}
+	}
+}
+
 void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 	int dochat = 1;
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl2;
+	unsigned int ulen = (unsigned int) len;
 
 	if (no_ultra_ext || ! dochat) {
 		return;
 	}
 
-#if 0
-	rfbLog("set_text_chat: len=%d\n", len);
-	rfbLog("set_text_chat: len=0x%x txt='", len);
-	if (0 < len && len < 10000) write(2, txt, len);
-	fprintf(stderr, "'\n");
-#endif
 	if (unixpw_in_progress) {
 		rfbLog("set_text_chat: unixpw_in_progress, dropping client.\n");
 		rfbCloseClient(cl);
 		return;
+	}
+
+	if (chat_window && chat_window_client == NULL && ulen == rfbTextChatOpen) {
+		try_local_chat_window();
 	}
 
 	saw_ultra_chat = 1;
@@ -1523,10 +1633,15 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 		if (cl2 == cl) {
 			continue;
 		}
+		if (cl2->state != RFB_NORMAL) {
+			continue;
+		}
 		if (ulen == rfbTextChatOpen) {
 			rfbSendTextChatMessage(cl2, rfbTextChatOpen, "");
 		} else if (ulen == rfbTextChatClose) {
 			rfbSendTextChatMessage(cl2, rfbTextChatClose, "");
+			/* not clear what is going on WRT close and finished... */
+			rfbSendTextChatMessage(cl2, rfbTextChatFinished, "");
 		} else if (ulen == rfbTextChatFinished) {
 			rfbSendTextChatMessage(cl2, rfbTextChatFinished, "");
 		} else if (len <= rfbTextMaxSize) {
@@ -1534,6 +1649,11 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 		}
 	}
 	rfbReleaseClientIterator(iter);
+
+	if (ulen == rfbTextChatClose && cl != NULL) {
+		/* not clear what is going on WRT close and finished... */
+		rfbSendTextChatMessage(cl, rfbTextChatFinished, "");
+	}
 }
 
 int get_keyboard_led_state_hook(rfbScreenInfoPtr s) {
