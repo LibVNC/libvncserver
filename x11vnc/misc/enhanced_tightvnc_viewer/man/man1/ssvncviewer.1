@@ -11,7 +11,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvncviewer 1 "August 2008" "" "SSVNC"
+.TH ssvncviewer 1 "October 2008" "" "SSVNC"
 .SH NAME
 ssvncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
@@ -246,6 +246,16 @@ Use alphablending transparency for local cursors
 requires: x11vnc server, both client and server
 must be 32bpp and same endianness.
 .TP
+\fB\-scale\fR \fIstr\fR
+Scale the desktop locally.  The string "str" can
+a floating point ratio, e.g. "0.9", or a fraction,
+e.g. "3/4", or WxH, e.g. 1280x1024.  Use "fit"
+to fit in the current screen size.
+Use "auto" to fit in the window size.
+Note that scaling is done in software and can be slow
+and requires more memory. "str" can also be set by
+the env. var. SSVNC_SCALE.
+.TP
 \fB\-ycrop\fR n
 Only show the top n rows of the framebuffer.  For
 use with x11vnc \fB\-ncache\fR client caching option
@@ -356,6 +366,11 @@ THAT supply -ultradsm to tell THIS viewer to modify the RFB
 data sent so as to work with the UltraVNC Server.  For some
 reason, each RFB msg type must be sent twice under DSM.
 .TP
+\fB\-chatonly\fR
+Try to be a client that only does UltraVNC text chat. This
+mode is used by x11vnc to present a chat window on the physical
+X11 console (i.e. to chat with the person at the display).
+.TP
 \fB-env\fR \fIVAR=VALUE\fR
 To save writing a shell script to set environment
 variables, specify as many as you need on the command line.  For example,
@@ -386,8 +401,10 @@ XENVIRONMENT or XAPPLRESDIR.
  256 colors               ~ -bgr233 default # of colors.
   64 colors               ~ -bgr222 / -use64
    8 colors               ~ -bgr111 / -use8
+ Scale Viewer             ~ -scale
  Set Y Crop (y-max)       ~ -ycrop
  Set Scrollbar Width      ~ -sbwidth
+ XGrabServer              ~ -graball
 
  UltraVNC Extensions:
 

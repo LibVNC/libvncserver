@@ -140,7 +140,10 @@ if [ -f "$dir/util/ultraftp.jar" ]; then
 	export SSVNC_ULTRA_FTP_JAR
 fi
 
-if [ "X$WISH" = "Xwish" ]; then
+if [ "X$1" = "X-cmd" ]; then
+	shift
+	exec ssvnc_cmd "$@"
+elif [ "X$WISH" = "Xwish" ]; then
 	exec ssvnc.tcl "$@"
 else
 	exec $WISH $dir/util/ssvnc.tcl "$@"

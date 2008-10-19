@@ -134,14 +134,16 @@ libs="$tmp/libs"
 mkdir -p $libs || exit 1
 for liba in libz.a libjpeg.a libssl.a libcrypto.a
 do
-	if [ "X$SSVNC_BUILD_NO_STATIC" != "X" ]; then
+	if [ "X$SSVNC_BUILD_STATIC" = "X" ]; then
 		break
 	fi
 	for dir in /usr/lib /lib /usr/local/lib /usr/pkg/lib /usr/sfw/lib /usr/openwin/lib
 	do
 		if [ "$name" = "Linux.x86_64" -o "$name" = "Linux.ppc64" ] ; then
 			dir64=`echo "$dir" | sed -e 's,lib,lib64,'`
-			if [ -d $dir64 ]; then
+			if [ "X$SSVNC_BUILD_NO_LINUX64" != "X" ]; then
+				:
+			elif [ -d $dir64 ]; then
 				dir=$dir64
 			fi
 		fi
@@ -151,7 +153,7 @@ do
 		fi
 	done
 done
-if [ "X$SSVNC_BUILD_NO_STATIC" = "X" ]; then
+if [ "X$SSVNC_BUILD_STATIC" != "X" ]; then
 	echo "Found these static archive libraries, will try to use them..."
 	ls -ld $libs
 	ls -l $libs
@@ -180,7 +182,7 @@ END
 	fi
 fi
 
-if [ -d /var/tmp/LIBS -a "X$SSVNC_BUILD_NO_STATIC" = "X" ]; then
+if [ -d /var/tmp/LIBS -a "X$SSVNC_BUILD_STATIC" != "X" ]; then
 	LDFLAGS_OS="$LDFLAGS_OS -L/var/tmp/LIBS"
 fi
 
@@ -434,6 +436,15 @@ if [ "X$SSVNC_BUILD_SKIP_VNCSTOREPW" = "X" ]; then
 
 	cd "$start"
 	cp -p $tmp/vncstorepw/vncstorepw $tmp/vncstorepw/lim_accept.so $dest
+	echo ""
+
+	cd $tmp/vncstorepw
+	make clean
+
+	env LD_SSL="-L$start/$libs $LDFLAGS_OS" CPP_SSL="$CPPFLAGS_OS" make ultravnc_dsm_helper
+
+	cd "$start"
+	cp -p $tmp/vncstorepw/ultravnc_dsm_helper $dest
 	echo ""
 fi
 

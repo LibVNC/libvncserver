@@ -8,7 +8,7 @@ exec wish "$0" "$@"
 # ssvnc.tcl: gui wrapper to the programs in this
 # package. Also sets up service port forwarding.
 #
-set version 1.0.20
+set version 1.0.21
 
 set buck_zero $argv0
 
@@ -362,9 +362,8 @@ proc help {} {
     and any VNC server can be made to do this by using, e.g., STUNNEL
     or socat on the remote side.
 
-    Automatic SSH tunnels are described below.
-
-    See Tip 5) below for how to disable encryption.
+    * Automatic SSH Tunnels are described below.
+    * See Tip 5) below for how to Disable Encryption.
 
 
     Port numbers:
@@ -379,6 +378,10 @@ proc help {} {
         port number 5900 + n is assumed; i.e. n is the VNC display number.
         If you must use a TCP port less than 200, specify a negative value,
         e.g.:  24.67.132.27:-80
+
+        For Reverse VNC connections (listening viewer, See Tip 6 below and
+        Options -> Help), the port mapping is similar, except "listening
+        display :0" corresponds to port 5500, :1 to 5501, etc.
 
 
  SSL Certificate Verification:
@@ -828,14 +831,20 @@ proc help {} {
 
     For mode II when tunnelling via SSL, you probably should also disable
     "Verify All Certs" unless you have taken the steps beforehand to
-    import the VNC server's certificate, or have previously accepted it
-    using another method.  With the mode II proxying scheme, there is
-    no way to "Fetch Cert" and check if it has been previously accepted.
+    import the VNC server's certificate, or have previously accepted
+    it using another method.  With the mode II proxying scheme, there
+    is no way to do the initial "Fetch Cert" and check if it has been
+    previously accepted.
+
+    Even when you disable "Verify All Certs", you are free to set a
+    ServerCert or CertsDir under "Certs ..." to authenticate the VNC
+    Server against.
 
     Also, after the connection you MUST terminate the listening VNC Viewer
     (Ctrl-C) and connect again (the proxy only runs once.)  In Windows,
     go to the System Tray and terminate the Listening VNC Viewer.
-    Subsequent connection attempts after the first one will fail.
+    Subsequent connection attempts after the first one will fail unless
+    you return to the GUI and restart listening.
 
     BTW, the x11vnc VNC server command for the mode II case would be
     something like:
@@ -909,10 +918,6 @@ proc help {} {
     (use a different number if you are not using the default listening
     port 5500).  Then click on the "Listen" button and finally have the
     user run your Single Click III EXE.
-
-    For SC III, you will also need to enable the setting in the Options
-    menu "UltraVNC Single Click III Bug", otherwise the STUNNEL connection
-    may drop after 2-15 minutes.
 
     Note that in Listening SSL mode you MUST supply a MyCert or use the 
     "listen.pem" one you are prompted to create.
@@ -996,21 +1001,52 @@ proc help {} {
      4) Pressing the "Load" button or pressing Ctrl-L or Clicking the Right
         mouse button on the main GUI will invoke the Load dialog.
 
-     5) If you want to do a Direct VNC connection, WITH **NO** SSL OR SSH
-        ENCRYPTION, use the "vnc://" prefix, e.g. vnc://far-away.east:0
-        This also works for reverse connections (see below).
+        Pressing Ctrl-A on the main GUI will bring up the Advanced 
+        Options Panel.
 
-        Sorry we do not make this easy to figure out how to do (e.g. a
-        button on the main panel), but the goal of SSVNC is secure
-        connections!  Set the env var SSVNC_NO_ENC_WARN=1 to skip the
-        warning prompts.  Using capitalized: Vnc:// will also skip the
-        prompts.
+     5) If you want to make a Direct VNC connection, WITH **NO** SSL OR
+        SSH ENCRYPTION, use the "vnc://" prefix in the VNC Host:Display
+        entry box, e.g. "vnc://far-away.east:0"  This also works for
+        reverse connections (e.g. vnc://0  more info below).  Use Vnc://
+        to avoid being prompted if you are sure you want no encryption.
 
-     6) Reverse VNC connections are possible as well.  Go to Options and
-        select "Reverse VNC connection".  In the 'VNC Host:Display' entry
-        box put in the number (e.g. "0" or ":0") that corresponds to the
-        Listening display (0 -> port 5500).  See the Options Help for more
-        info.
+        Apologies that we do not make this easy to figure out how to do
+        (e.g. a button on the main panel), but the goal of SSVNC is
+        secure and encrypted connections!
+
+        Often SSVNC is used to connect to x11vnc where the Unix username
+        and password is sent over the channel.  It would be a very bad
+        idea to let that data be sent over an unencrypted connection.
+        In general, it is not wise to have a plaintext VNC connection.
+
+        So we force you to learn about and supply the "vnc://" or "Vnc://"
+        prefix to the host:port to disable encryption rather than simply
+        click on an option and not think too much about the consequences.
+
+        Note that even the VNC Password challenge-response method (the
+        password is not sent in plaintext) leaves your VNC password
+        susceptible a dictionary attack unless encryption is used.
+
+        The prefix will be stored in any profile that you save so you
+        do not have to enter it every time.
+
+        Set the env var SSVNC_NO_ENC_WARN=1 to skip the warning prompts.
+
+        Using capitalized: Vnc:// will also skip the prompts, for example,
+        "Vnc://far-away.east:0" in the VNC Host:Display entry box.
+
+     6) Reverse VNC connections (Listening) are possible as well.
+        In this case the VNC Server initiates the connection to your
+        waiting (i.e. listening) SSVNC viewer.
+
+        Go to Options and select "Reverse VNC connection".  In the 'VNC
+        Host:Display' entry box put in the number (e.g. "0" or ":0", or
+        ":1", etc) that corresponds to the Listening display (0 -> port
+        5500, 1 -> port 5501, etc.) you want to use.  Then clicking on
+        'Listen' puts your SSVNC viewer in a "listening" state on that
+        port number, waiting for a connection from the VNC Server.
+
+        See the Options Help for more info.
 
      7) On Unix to have SSVNC act as a general STUNNEL redirector (i.e. no
         VNC), put the desired host:port in VNC Host:Display (use a
@@ -1526,6 +1562,11 @@ set msg {
 
     Clicking on this button will return you to the full SSVNC Mode.
 
+ Unix ssvncviewer:
+
+    Clicking on this button will popup a menu for setting options
+    of the Unix (and Mac OS X) provided SSVNC vncviewer.
+
 
  ~/.ssvncrc file:
 
@@ -1781,18 +1822,28 @@ set msg {
 
   Reverse VNC Connection:
 
-            Reverse (listening) VNC connections are possible.
+            Reverse (listening) VNC connections are possible as well.
+
+            In this case the VNC Server initiates the connection to your
+            waiting (i.e. listening) SSVNC viewer.
 
             For SSL connections in the 'VNC Host:Display' entry box put in
-            the number (e.g. "0" or ":0") that corresponds to the Listening
-            display (0 -> port 5500).  For example x11vnc can then be used:
-            "x11vnc ... -ssl SAVE -connect hostname:port".
+            the number (e.g. "0" or ":0" or ":1", etc.) that corresponds to
+            the Listening display (0 -> port 5500, 1 -> port 5501, etc.) you
+            want to use.  For example x11vnc can then be used via:
+            "x11vnc ... -ssl SAVE -connect hostname:port" using the "port"
+            with the one you chose.
+
+            Clicking on the 'Listen' button puts your SSVNC viewer
+            in a "listening" state on that port number, waiting for a
+            connection from the VNC Server.
 
             Then a VNC server should establish a reverse connection to
-            that port on this machine (e.g. -connect this-machine:5500)
+            that port on this machine (e.g. -connect this-machine:5500
+            or -connect this-machine:5503, etc.)
 
             Server SSL certificates will be verified, however you WILL
-            NOTE be prompted about unrecognized ones; rather, you MUST
+            NOT be prompted about unrecognized ones; rather, you MUST
             set up the correct Server certificate (e.g. by importing).
             prior to any connections.
 
@@ -1843,32 +1894,6 @@ set msg {
             does not make sense (the ssh cannot do a -R on a remote host:port),
             unless it is a double proxy where the 2nd host is the machine with
             the VNC server.
-
-  UltraVNC Single Click III Bug:
-
-            The UltraVNC Single Click III (SSL) server works with SSVNC;
-            it makes a reverse connection to it via an SSL tunnel:
- 
-                http://www.uvnc.com/pchelpware/SCIII/index.html
-
-            Unfortunately the SSL implementation used by UltraVNC SC III
-            is incompatible with OpenSSL in that the connection will be
-            dropped after 2-15 minutes due to an unexpected packet.
-
-            However this can be worked around in STUNNEL by setting
-            configution item 'options = ALL'.  Enabling 'UltraVNC Single
-            Click III Bug' passes this setting to STUNNEL.
-
-            On Windows 'options = ALL' is used by default for stunnel.
-            On Unix and MacOSX you will need to select this option.
-
-            Setting this option may provide a workaround for other SSL
-            VNC servers.
-
-            BTW, you can set the environment variable STUNNEL_EXTRA_OPTS_USER
-            to add any lines to the STUNNEL global config that you want to. 
-            See the stunnel(8) man page for more details.
-
 
 
   View Only:               Have VNC Viewer ignore mouse and keyboard input.
@@ -2322,19 +2347,20 @@ proc set_defaults {} {
 	global ts_mode ts_desktop_size ts_desktop_depth choose_desktop_geom
 	global additional_port_redirs additional_port_redirs_list
 	global stunnel_local_protection stunnel_local_protection_type ssh_local_protection multiple_listen
-	global ultra_dsm ultra_dsm_type ultra_dsm_file
+	global ultra_dsm ultra_dsm_type ultra_dsm_file ultra_dsm_noultra ultra_dsm_salt
 	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_x11vnc sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
-	global ycrop_string extra_sleep use_listen use_unixpw use_x11vnc_find unixpw_username
-	global use_uvnc_ssl_bug
+	global ycrop_string ssvnc_scale sbwid_string rfbversion ssvnc_encodings use_x11cursor use_nobell use_rawlocal use_popupfix extra_sleep use_listen use_unixpw use_x11vnc_find unixpw_username
+	global disable_ssl_workarounds disable_ssl_workarounds_type
 	global include_list
 
 
 	set defs(use_viewonly) 0
 	set defs(use_listen) 0
-	set defs(use_uvnc_ssl_bug) 0
+	set defs(disable_ssl_workarounds) 0
+	set defs(disable_ssl_workarounds_type) "none"
 	set defs(use_unixpw) 0
 	set defs(unixpw_username) ""
 	set defs(use_x11vnc_find) 0
@@ -2392,13 +2418,15 @@ proc set_defaults {} {
 	set defs(additional_port_redirs_list) ""
 
 	set defs(stunnel_local_protection) 0
-	set defs(stunnel_local_protection_type) "none"
+	set defs(stunnel_local_protection_type) "exec"
 	set defs(ssh_local_protection) 0
 	set defs(multiple_listen) 0
 
 	set defs(ultra_dsm) 0
 	set defs(ultra_dsm_file) ""
 	set defs(ultra_dsm_type) "guess"
+	set defs(ultra_dsm_noultra) 0
+	set defs(ultra_dsm_salt) ""
 
 	set defs(cups_local_server) ""
 	set defs(cups_remote_port) ""
@@ -2420,6 +2448,14 @@ proc set_defaults {} {
 	set defs(sound_daemon_x11vnc) 0
 
 	set defs(ycrop_string) ""
+	set defs(ssvnc_scale) ""
+	set defs(sbwid_string) ""
+	set defs(rfbversion) ""
+	set defs(ssvnc_encodings) ""
+	set defs(use_x11cursor) 0
+	set defs(use_nobell) 0
+	set defs(use_rawlocal) 0
+	set defs(use_popupfix) 0
 	set defs(extra_sleep) ""
 	set defs(use_port_knocking) 0
 	set defs(port_knocking_list) ""
@@ -2458,10 +2494,10 @@ proc set_defaults {} {
 }
 
 proc do_viewer_windows {n} {
-	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
+	global use_alpha use_grab use_x11cursor use_nobell use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
 	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
-	global use_listen use_uvnc_ssl_bug env
+	global use_listen disable_ssl_workarounds disable_ssl_workarounds_type env
 
 	set cmd "vncviewer"
 	if {$change_vncviewer && $change_vncviewer_path != ""} {
@@ -2897,7 +2933,8 @@ proc launch_windows_ssh {hp file n} {
 	global is_win9x env
 	global use_sshssl use_ssh putty_pw
 	global port_knocking_list
-	global use_listen use_uvnc_ssl_bug listening_name
+	global use_listen listening_name
+	global disable_ssl_workarounds disable_ssl_workarounds_type
 	global ts_only
 	global debug_netstat
 
@@ -3363,6 +3400,7 @@ proc launch_windows_ssh {hp file n} {
 
 	catch {destroy .o}
 	catch {destroy .oa}
+	catch {destroy .os}
 
 	if { ![do_port_knock $ssh_host start]} {
 		catch {file delete $file}
@@ -3766,6 +3804,7 @@ proc darwin_terminal_cmd {{title ""} {cmd ""} {bg 0}} {
 	
 	set fh ""
 	catch {set fh [open $tmp w 0755]}
+	catch {[exec chmod 755 $tmp]}
 	if {$fh == ""} {
 		raise .
 		tk_messageBox -type ok -icon error -message "Cannot open temporary file: $tmp" -title "Cannot open file"
@@ -4707,9 +4746,11 @@ proc repeater_proxy_check {proxy} {
 				set force 1
 			}
 		}
-		global use_listen
+		global use_listen ultra_dsm
 		if {! $use_listen} {
-			if {$force} {
+			if {$ultra_dsm != ""} {
+				return 1;
+			} elseif {$force} {
 				mesg "WARNING: repeater:// ID:nnn proxy must use Listen Mode"
 				after 1000
 			} else {
@@ -4880,7 +4921,8 @@ proc reset_stunnel_extra_opts {} {
 proc launch_unix {hp} {
 	global smb_redir_0 smb_mounts env
 	global vncauth_passwd use_unixpw unixpw_username unixpw_passwd
-	global ssh_only ts_only
+	global ssh_only ts_only use_x11cursor use_nobell use_rawlocal use_popupfix ssvnc_scale
+	global ssvnc_encodings
 
 	globalize
 
@@ -4933,17 +4975,31 @@ proc launch_unix {hp} {
 	set ssvnc_multiple_listen0 ""
 
 	if {[regexp -nocase {sslrepeater://} $hp]} {
-		if {! $use_uvnc_ssl_bug} {
-			set use_uvnc_ssl_bug 1
-			mesg "Enabling 'UltraVNC Single Click III Bug'"
+		if {$disable_ssl_workarounds} {
+			set disable_ssl_workarounds 0
+			mesg "Disabling SSL workarounds for 'UVNC Single Click III Bug'"
 			after 400
 		}
 	}
 
-	if {$use_uvnc_ssl_bug && ! $use_ssh} {
-		if [info exists env(STUNNEL_EXTRA_OPTS)] {
-			set stunnel_extra_opts0 $env(STUNNEL_EXTRA_OPTS)
+	if [info exists env(STUNNEL_EXTRA_OPTS)] {
+		set stunnel_extra_opts0 $env(STUNNEL_EXTRA_OPTS)
+		if {$disable_ssl_workarounds} {
+			if {$disable_ssl_workarounds_type == "none"} {
+				;
+			} elseif {$disable_ssl_workarounds_type == "noempty"} {
+				set env(STUNNEL_EXTRA_OPTS) "$env(STUNNEL_EXTRA_OPTS)\noptions = DONT_INSERT_EMPTY_FRAGMENTS"
+			}
+		} else {
 			set env(STUNNEL_EXTRA_OPTS) "$env(STUNNEL_EXTRA_OPTS)\noptions = ALL"
+		}
+	} else {
+		if {$disable_ssl_workarounds} {
+			if {$disable_ssl_workarounds_type == "none"} {
+				;
+			} elseif {$disable_ssl_workarounds_type == "noempty"} {
+				set env(STUNNEL_EXTRA_OPTS) "options = DONT_INSERT_EMPTY_FRAGMENTS"
+			}
 		} else {
 			set env(STUNNEL_EXTRA_OPTS) "options = ALL"
 		}
@@ -4974,13 +5030,25 @@ proc launch_unix {hp} {
 		}
 	}
 	if {$ultra_dsm} {
-		if {![file exists $ultra_dsm_file]} {
+		if {![file exists $ultra_dsm_file] && ![regexp {pw=} $ultra_dsm_file]} {
 			mesg "DSM key file does exist: $ultra_dsm_file" 
 			bell
 			after 1000
 			return
 		}
+		global vncauth_passwd
+		if {$ultra_dsm_file == "pw=VNCPASSWORD" || $ultra_dsm_file == "pw=VNCPASSWD"} {
+			if {![info exists vncauth_passwd] || $vncauth_passwd == ""} {
+				mesg "For DSM pw=VNCPASSWD you must supply the VNC Password" 
+				bell
+				after 1000
+				return
+			}
+		}
 		set dsm "ultravnc_dsm_helper "
+		if {$ultra_dsm_noultra} {
+			append dsm "noultra:"
+		}
 		if {$use_listen} {
 			append dsm "rev:"
 		}
@@ -4989,7 +5057,16 @@ proc launch_unix {hp} {
 		} else {
 			append dsm $ultra_dsm_type
 		}
-		append dsm " $ultra_dsm_file"
+		if {$ultra_dsm_noultra} {
+			if {$ultra_dsm_salt != ""} {
+				append dsm "@$ultra_dsm_salt"
+			}
+		}
+		if {$ultra_dsm_file == "pw=VNCPASSWORD" || $ultra_dsm_file == "pw=VNCPASSWD"} {
+			append dsm " pw=$vncauth_passwd"
+		} else {
+			append dsm " $ultra_dsm_file"
+		}
 		set env(SSVNC_ULTRA_DSM) $dsm
 	}
 	if {$ssh_local_protection} {
@@ -5255,6 +5332,30 @@ proc launch_unix {hp} {
 	if {$use_grab} {
 		set cmd "$cmd -grab"
 	}
+	if {$use_x11cursor} {
+		set cmd "$cmd -x11cursor"
+	}
+	if {$use_nobell} {
+		set cmd "$cmd -nobell"
+	}
+	if {$use_rawlocal} {
+		set cmd "$cmd -rawlocal"
+	}
+	if {$use_popupfix} {
+		set cmd "$cmd -popupfix"
+	}
+	if {$ssvnc_scale != ""} {
+		set cmd "$cmd -scale '$ssvnc_scale'"
+	}
+	if {$ssvnc_encodings != ""} {
+		set cmd "$cmd -ssvnc_encodings '$ssvnc_encodings'"
+	}
+	if {$rfbversion != ""} {
+		set cmd "$cmd -rfbversion '$rfbversion'"
+	}
+	if {$vncviewer_realvnc4} {
+		set cmd "$cmd -realvnc4"
+	}
 	if {$use_listen} {
 		set cmd "$cmd -listen"
 	}
@@ -5273,8 +5374,6 @@ proc launch_unix {hp} {
 			set env(DARWIN_COTVNC) 1
 		}
 	}
-
-	set cmd "$cmd $hp"
 
 	set do_vncspacewrapper 0
 	if {$change_vncviewer && $change_vncviewer_path != ""} {
@@ -5346,11 +5445,23 @@ proc launch_unix {hp} {
 		set realvnc4 0
 		set realvnc3 1
 	}
+	if {$realvnc4} {
+		set cmd "$cmd -realvnc4"
+	}
+
+	set cmd "$cmd $hp"
 
 	set passwdfile ""
 	if {$vncauth_passwd != ""} {
 		global use_listen
-		set passwdfile "$env(SSVNC_HOME)/.vncauth_tmp.[tpid]"
+		set footest [mytmp /tmp/.check.[tpid]]
+		catch {file delete $footest}
+		global mktemp
+		set passwdfile "/tmp/.vncauth_tmp.[tpid]"
+		if {$mktemp == ""} {
+			set passwdfile "$env(SSVNC_HOME)/.vncauth_tmp.[tpid]"
+		}
+		
 		set passwdfile [mytmp $passwdfile]
 		catch {exec vncstorepw $vncauth_passwd $passwdfile}
 		catch {exec chmod 600 $passwdfile}
@@ -5446,6 +5557,7 @@ proc launch_unix {hp} {
 	}
 
 	global ycrop_string
+	global sbwid_string
 	catch {unset env(VNCVIEWER_SBWIDTH)}
 	catch {unset env(VNCVIEWER_YCROP)}
 	if {[info exists ycrop_string] && $ycrop_string != ""}  {
@@ -5457,12 +5569,18 @@ proc launch_unix {hp} {
 		if {$t != ""} {
 			set env(VNCVIEWER_YCROP) $t
 		}
-		#catch {puts "VNCVIEWER_SBWIDTH $env(VNCVIEWER_SBWIDTH)"}
-		#catch {puts "VNCVIEWER_YCROP   $env(VNCVIEWER_YCROP)"}
+	}
+	if {[info exists sbwid_string] && $sbwid_string != ""}  {
+		set t $sbwid_string
+		set env(VNCVIEWER_SBWIDTH) $sbwid_string
+		if {$t != ""} {
+			set env(VNCVIEWER_SBWIDTH) $t
+		}
 	}
 
 	catch {destroy .o}
 	catch {destroy .oa}
+	catch {destroy .os}
 	update
 
 	if {$use_sound && $sound_daemon_local_start && $sound_daemon_local_cmd != ""} {
@@ -5471,7 +5589,6 @@ proc launch_unix {hp} {
 		set sound_daemon_local_pid ""
 		#exec sh -c "$sound_daemon_local_cmd " >& /dev/null </dev/null &
 		set sound_daemon_local_pid [exec sh -c "echo \$\$; exec $sound_daemon_local_cmd </dev/null 1>/dev/null 2>/dev/null &"]
-#puts "A $sound_daemon_local_pid"
 		update
 		after 500
 	}
@@ -5522,8 +5639,15 @@ proc launch_unix {hp} {
 		set env(SSVNC_EXTRA_SLEEP) $extra_sleep
 	}
 
-	unix_terminal_cmd $geometry "SSL/SSH VNC Viewer $hp" \
-	"$te$cmd; set +xv; ulimit -c 0; trap 'printf \"Paused. Press Enter to exit:\"; read x' QUIT; echo; echo $m; echo; echo sleep 5; echo; sleep 6" 0 $xrm1 $xrm2 $xrm3
+	set sstx "SSL/SSH VNC Viewer"
+	set hptx $hp
+	global use_listen
+	if {$use_listen} {
+		set sstx "SSVNC"
+		set hptx "$hp (Press Ctrl-C to Stop Listening)"
+	}
+	unix_terminal_cmd $geometry "$sstx $hptx" \
+	"$te$cmd; set +xv; ulimit -c 0; trap 'printf \"Paused. Press Enter to exit:\"; read x' QUIT; echo; echo $m; echo; echo sleep 5; echo; sleep 5" 0 $xrm1 $xrm2 $xrm3
 
 	set env(SS_VNCVIEWER_SSH_CMD) ""
 	set env(SS_VNCVIEWER_USE_C) ""
@@ -5786,7 +5910,7 @@ proc launch {{hp ""}} {
 	global mycert svcert crtdir
 	global pids_before pids_after pids_new
 	global env
-	global use_ssl use_ssh use_sshssl use_listen use_uvnc_ssl_bug
+	global use_ssl use_ssh use_sshssl use_listen disable_ssl_workarounds
 	global vncdisplay
 
 	set debug 0
@@ -6151,10 +6275,14 @@ proc launch {{hp ""}} {
 	} else {
 		puts $fh "client = yes"
 	}
-	# WRT, UltraVNC Single Click III Bug:
-	# Wow, on Windows we've been using 'options = ALL'
-	# all along!  Duh.  OK keep it...
-	puts $fh "options = ALL"
+	global disable_ssl_workarounds disable_ssl_workarounds_type
+	if {$disable_ssl_workarounds} {
+		if {$disable_ssl_workarounds_type == "noempty"} {
+			puts $fh "options = DONT_INSERT_EMPTY_FRAGMENTS"
+		}
+	} else {
+		puts $fh "options = ALL"
+	}
 
 	puts $fh "taskbar = yes"
 	puts $fh "RNDbytes = 2048"
@@ -6287,6 +6415,7 @@ proc launch {{hp ""}} {
 	} else {
 		catch {destroy .o}
 		catch {destroy .oa}
+		catch {destroy .os}
 		wm withdraw .
 	}
 
@@ -6418,6 +6547,7 @@ proc direct_connect_windows {{hp ""}} {
 
 	catch {destroy .o}
 	catch {destroy .oa}
+	catch {destroy .os}
 	wm withdraw .
 
 	if {$use_listen} {
@@ -10728,79 +10858,89 @@ proc help_advanced_opts {} {
 
     Brief descriptions:
 
-         CUPS Print tunnelling: redirect localhost:6631 (say) on the VNC
-         server to your local CUPS server.
+      CUPS Print tunnelling:
 
-         ESD/ARTSD Audio tunnelling: redirect localhost:16001 (say) on
-         the VNC server to your local ESD, etc. sound server.
+         Redirect localhost:6631 (say) on the VNC server to your local
+         CUPS server.
 
-         SMB mount tunnelling: redirect localhost:1139 (say) on the VNC
-         server and through that mount SMB file shares from your local
-         server.  The remote machine must be Linux with smbmount installed.
+      ESD/ARTSD Audio tunnelling:
 
-         Additional Port Redirs: specify additional -L port:host:port and 
-         -R port:host:port cmdline options for SSH to enable additional
-         services.
+         Redirect localhost:16001 (say) on the VNC server to your local
+         ESD, etc. sound server.
 
-         SSH Local Port Protections: and LD_PRELOAD hack to limit the
-         number of SSH port redirections to 1 and within the first
-         15 seconds.  So there is a smaller window when the user can try
-         to use your tunnel compared to the duration of your session.
+      SMB mount tunnelling:
 
-         STUNNEL Local Port Protections: Try to prevent Untrusted Local
-         Users (see the main Help panel) from using your STUNNEL tunnel
-         to connect to the remote VNC Server.
+         Redirect localhost:1139 (say) on the VNC server and through
+         that mount SMB file shares from your local server.  The remote
+         machine must be Linux with smbmount installed.
 
-         UltraVNC DSM Encryption Plugin: on Unix, by using the supplied
-         tool, ultravnc_dsm_helper, encrypted connections to UltraVNC
-         servers using their plugins is enabled.
+      Additional Port Redirs:
 
-         Multiple LISTEN Connections: allow multiple VNC servers to
-         reverse connect at the same time and so display each of their
-         desktops on your screen at the same time.
+         Specify additional -L port:host:port and -R port:host:port
+         cmdline options for SSH to enable additional services.
 
-         Change VNC Viewer: specify a non-bundled VNC Viewer (e.g.
-         UltraVNC or RealVNC) to run instead of the bundled TightVNC Viewer.
+      SSH Local Port Protections:
 
-         Port Knocking: for "closed port" services, first "knock" on the
-         firewall ports in a certain way to open the door for SSH or SSL.
-         The port can also be closed when the encrypted VNC connection
-         finishes.
+         An LD_PRELOAD hack to limit the number of SSH port redirections
+         to 1 and within the first 15 seconds.  So there is a smaller
+         window when the user can try to use your tunnel compared to
+         the duration of your session.
 
-         Use XGrabServer:  On Unix only, use the XGrabServer workaround
-         for old window managers.
+      STUNNEL Local Port Protections:
 
-         Cursor Alphablending:  Use the x11vnc alpha hack for translucent
-         cursors (requires Unix, 32bpp and same endianness)
+         Try to prevent Untrusted Local Users (see the main Help panel)
+         from using your STUNNEL tunnel to connect to the remote VNC
+         Server.
 
-         Y Crop: this is for x11vnc's -ncache client side caching scheme
-         with our Unix TightVNC viewer.  Sets the Y value to "crop" the
-         viewer size at (below the cut is the pixel cache region you do
-         not want to see).  If the screen is tall (H > 2*W) ycropping
-         will be autodetected, or you can set to -1 to force autodection.
-         Otherwise, set it to the desired Y value.  You can also set
-         the scrollbar width (very thin by default) by appending ",sb=N"
-         (or use ",sb=N" by itself to just set the scrollbar width).
+      UltraVNC DSM Encryption Plugin:
 
-         Include:  Profile template(s) to load before loading a profile
-         (Load button).  For example if you Save a profile called "globals"
+         On Unix only, by using the supplied tool, ultravnc_dsm_helper,
+         encrypted connections to UltraVNC servers using their plugins
+         is enabled.  Support for secret key encryption to Non-UltraVNC
+         DSM servers is also supported, e.g. x11vnc -enc blowfish:my.key
+
+      Change VNC Viewer:
+
+         Specify a non-bundled VNC Viewer (e.g.  UltraVNC or RealVNC)
+         to run instead of the bundled TightVNC Viewer.
+
+      Port Knocking:
+
+         For "closed port" services, first "knock" on the firewall ports
+         in a certain way to open the door for SSH or SSL.  The port
+         can also be closed when the encrypted VNC connection finishes.
+
+      Include:
+
+         Profile template(s) to load before loading a profile (Load
+         button).  For example if you Save a profile called "globals"
          that has some settings you use often, then just supply "Include:
          globals" to have them applied.  You may supply a comma or space
-         separated list of templates to include.  They can be full path
-         names or basenames relative to the profiles directory.  You do
-         not need to supply the .vnc suffix.  The non-default settings
-         in them will be applied first, and then any values in the loaded
-         Profile will override them.
+         separated list of templates to include.  They can be full
+         path names or basenames relative to the profiles directory.
+         You do not need to supply the .vnc suffix.  The non-default
+         settings in them will be applied first, and then any values in
+         the loaded Profile will override them.
 
-         Sleep: Enter a number to indicate how many extra seconds to sleep
+      Sleep:
+
+         Enter a number to indicate how many extra seconds to sleep
          while waiting for the VNC viewer to start up.  On Windows this
          can give extra time to enter the Putty/Plink password, etc.
 
-         ssh-agent: On Unix only: restart the GUI in the presence of
-         ssh-agent(1) (e.g. in case you forgot to start your agent before
-         starting this GUI).  An xterm will be used to enter passphrases,
-         etc.  This can avoid repeatedly entering passphrases for the SSH
-         logins (note this requires setting up and distributing SSH keys).
+      Unix ssvncviewer:
+
+         Display a popup menu with options that apply to the special 
+         Unix SSVNC VNC Viewer (perhaps called 'ssvncviewer') provided by
+         this SSVNC package.  This only applies to Unix or Mac OS X.
+     
+      Use ssh-agent:
+
+         On Unix only: restart the GUI in the presence of ssh-agent(1)
+         (e.g. in case you forgot to start your agent before starting
+         this GUI).  An xterm will be used to enter passphrases, etc.
+         This can avoid repeatedly entering passphrases for the SSH logins
+         (note this requires setting up and distributing SSH keys).
 
 
     About the CheckButtons:
@@ -10812,6 +10952,111 @@ proc help_advanced_opts {} {
 
 	.ah.f.t insert end $msg
 	jiggle_text .ah.f.t
+}
+
+proc help_ssvncviewer_opts {} {
+	toplev .av
+
+	scroll_text_dismiss .av.f
+
+	center_win .av
+
+	wm title .av "Unix SSVNC viewer Options Help"
+
+	set msg {
+    These Unix SSVNC VNC Viewer Options apply only on Unix or Mac OS X
+    when using the viewer (ssvncviewer) supplied by this SSVNC package.
+
+    Brief descriptions:
+
+      Multiple LISTEN Connections:
+
+         Allow multiple VNC servers to reverse connect at the same time
+         and so display each of their desktops on your screen at the
+         same time.
+
+      Use X11 Cursor:
+
+         When drawing the mouse cursor shape locally, use an X11 cursor
+         instead of drawing it directly into the framebuffer.  This
+         can sometimes give better response, and avoid problems under
+         'Scaling'. 
+
+      Disable Bell:
+
+         Disable beeps coming from remote side.
+
+      Use Raw Local:
+
+         Use the VNC Raw encoding for 'localhost' connections (instead
+         of assuming there is a local tunnel, SSL or SSH, going to the
+         remote machine.
+
+      Use Popup Fix:
+
+         Enable a fix that warps the popup (F8) to the mouse pointer.
+
+      Use XGrabServer (for fullscreen):
+
+         On Unix only, use the XGrabServer workaround for older window
+         managers.  Sometimes also needed on recent (2008) GNOME.  This
+         workaround can make going into/out-of Fullscreen work better.
+
+      Cursor Alphablending:
+
+         Use the x11vnc alpha hack for translucent cursors (requires Unix,
+         32bpp and same endianness)
+
+      Scaling:
+
+         Use viewer-side (i.e. local) scaling of the VNC screen.  Supply
+         a fraction, e.g. 0.75 or 3/4, or a WxH geometry, e.g. 1280x1024,
+         or the string 'fit' to fill the current screen.  Use 'auto'
+         to scale the desktop to match the viewer window size.
+
+      Y Crop:
+
+         This is for x11vnc's -ncache client side caching scheme with our
+         Unix TightVNC viewer.  Sets the Y value to "crop" the viewer
+         size at (below the cut is the pixel cache region you do not
+         want to see).  If the screen is tall (H > 2*W) ycropping will
+         be autodetected, or you can set to -1 to force autodection.
+         Otherwise, set it to the desired Y value.  You can also set
+         the scrollbar width (very thin by default) by appending ",sb=N"
+         (or use ",sb=N" by itself to just set the scrollbar width).
+
+      ScrollBar Width:
+
+         This is for x11vnc's -ncache client side caching scheme with our
+         Unix TightVNC viewer.  For Y-Crop mode, set the size of the
+         scrollbars (often one want it to be very narrow, e.g. 2 pixels
+         to be less distracting.
+
+
+    These are environment variables one may set to affect the options
+    of the SSVNC vncviewer:
+
+         VNCVIEWER_ALPHABLEND    (-alpha, see Cursor Alphablending above)
+         VNCVIEWER_POPUP_FIX     (-popupfix, warp popup to mouse location)
+         VNCVIEWER_GRAB_SERVER   (-graball, see Use XGrabServer above)
+         VNCVIEWER_YCROP         (-ycrop, see Y Crop above)
+         VNCVIEWER_SBWIDTH       (-sbwidth, see ScrollBar Width above)
+         VNCVIEWER_RFBVERSION    (-rfbversion, e.g. 3.6)
+         VNCVIEWER_ENCODINGS     (-encodings, e.g. "copyrect zrle hextile")
+         VNCVIEWER_BELL          (-bell)
+         VNCVIEWER_X11CURSOR     (-x11cursor, see Use X11 Cursor above)
+         VNCVIEWER_RAWLOCAL      (-rawlocal, see Use Raw Local above)
+         SSVNC_SCALE             (-scale, see Scaling above)
+         SSVNC_MULTIPLE_LISTEN   (-multilisten, see Mulitple LISTEN above)
+         SSVNC_UNIXPW            (-unixpw)
+         SSVNC_UNIXPW_NOESC      (do not send escape in -unixpw mode)
+         SSVNC_NOSOLID           (do not do solid region speedup in
+                                  scaling mode.)
+	
+}
+
+	.av.f.t insert end $msg
+	jiggle_text .av.f.t
 }
 
 proc set_viewer_path {} {
@@ -10993,7 +11238,7 @@ proc stunnel_sec_dialog {} {
 
     On Unix, for STUNNEL SSL tunnels we provide two options as extra
     safeguards against untrusted local users.  Both only apply to Unix/MacOSX.
-    Note that Both options are *ignored* in reverse connection (Listen) mode.
+    Note that Both options are *IGNORED* in reverse connection (Listen) mode.
 
     1) The first one 'Use stunnel EXEC mode' (it is mutually exclusive with
        option 2).  For this case the modified SSVNC Unix viewer must be
@@ -11038,6 +11283,95 @@ proc stunnel_sec_dialog {} {
 	wm resizable .stlsec 1 0
 }
 
+proc disable_ssl_workarounds_dialog {} {
+	global disable_ssl_workarounds disable_ssl_workarounds_type
+	
+	toplev .sslwrk
+	wm title .sslwrk "Disable SSL Workarounds"
+
+	global help_font uname
+	scroll_text .sslwrk.f 86 36
+
+	apply_bg .sslwrk.f
+
+	set msg {
+    Some SSL implementations are incomplete or buggy or do not work properly
+    with other implementations.  SSVNC uses STUNNEL for its SSL encryption,
+    and STUNNEL uses the OpenSSL SSL implementation.
+
+    This causes some problems with non-OpenSSL implementations on the VNC server
+    side.  The most noticable one is the UltraVNC Single Click III (SSL) server:
+
+       http://www.uvnc.com/pchelpware/SCIII/index.html
+
+    It can make a reverse connection to SSVNC via an encrypted SSL tunnel.
+
+    Unfortunately, in the default operation with STUNNEL the connection will be
+    dropped after 2-15 minutes due to an unexpected packet.
+
+    Because of this, by default SSVNC will enable some SSL workarounds to make
+    connections like these work.  This is the STUNNEL 'options = ALL' setting:
+    it enables a basic set of SSL workarounds.
+
+    You can read all about these workarounds in the stunnel(8) manpage and the
+    OpenSSL SSL_CTX_set_options(3) manpage.
+
+    Why are we mentioning this?  STUNNELS's 'options = ALL' lowers the SSL
+    security a little bit.  If you know you do not have an incompatible SSL
+    implementation on the server side (e.g. any one using OpenSSL is compatible,
+    x11vnc in particular), then you can regain that little bit of security by
+    selecting the "Disable SSL Workarounds" option.
+
+    "Disable All SSL Workarounds" selected below will do that.  On the other hand,
+    choose "Keep the DONT_INSERT_EMPTY_FRAGMENTS Workaround" to retain that one,
+    commonly needed workaround.
+
+    BTW, you can set the environment variable STUNNEL_EXTRA_OPTS_USER to add
+    any lines to the STUNNEL global config that you want to.  See the stunnel(8)
+    man page for more details.
+}
+	.sslwrk.f.t insert end $msg
+
+	radiobutton .sslwrk.none    -relief ridge -anchor w -variable disable_ssl_workarounds_type -value "none" -text "Disable All Workarounds"
+	radiobutton .sslwrk.noempty  -relief ridge -anchor w -variable disable_ssl_workarounds_type -value "noempty"  -text "Keep the DONT_INSERT_EMPTY_FRAGMENTS Workaround"
+
+	button .sslwrk.cancel -text "Cancel" -command {set disable_ssl_workarounds 0; destroy .sslwrk}
+	bind .sslwrk <Escape> {set disable_ssl_workarounds 0; destroy .sslwrk}
+	wm protocol .sslwrk WM_DELETE_WINDOW {set disable_ssl_workarounds 0; destroy .sslwrk}
+	button .sslwrk.done -text "Done" -command {destroy .sslwrk}
+
+	pack .sslwrk.f .sslwrk.none .sslwrk.noempty .sslwrk.cancel .sslwrk.done -side top -fill x
+
+	center_win .sslwrk
+	wm resizable .sslwrk 1 0
+}
+
+proc update_no_ultra_dsm {} {
+	global ultra_dsm_noultra
+	global ultra_dsm_type
+
+	foreach b {bf des3 aes aes256 l e} {
+		if {! $ultra_dsm_noultra} {
+			.ultradsm.nou.$b configure -state disabled
+		} else {
+			.ultradsm.nou.$b configure -state normal
+		}
+	}
+	if {! $ultra_dsm_noultra} {
+		if {$ultra_dsm_type == "arc4"} {
+			;
+		} elseif {$ultra_dsm_type == "aesv2"} {
+			;
+		} elseif {$ultra_dsm_type == "msrc4"} {
+			;
+		} elseif {$ultra_dsm_type == "msrc4_sc"} {
+			;
+		} else {
+			set ultra_dsm_type guess
+		}
+	}
+}
+
 proc ultra_dsm_dialog {} {
 	global ultra_dsm ultra_dsm_file ultra_dsm_type
 	
@@ -11045,20 +11379,28 @@ proc ultra_dsm_dialog {} {
 	wm title .ultradsm "UltraVNC DSM Encryption Plugin"
 
 	global help_font
-	eval text .ultradsm.t -width 80 -height 24 $help_font
-	apply_bg .ultradsm.t
+	scroll_text .ultradsm.f 85 35
 
 	set msg {
     On Unix with the provided SSVNC vncviewer, you can connect to an UltraVNC
-    server that is using one of its encryption plugins: MSRC4 (not yet
-    supported), ARC4, or AESV2.
+    server that is using one of its encryption plugins: MSRC4, ARC4, or AESV2.
 
-    You will need to specify the corresponding UltraVNC encryption key
-    (created by you using an UltraVNC server or viewer).  It is usually
-    called 'rc4.key' (for MSRC4), 'arc4.key' (for ARC4), and 'aesv2.key'
-    (for AESV2).  Specify the path to it or browse for it.  Also, specify
-    which type of plugin it is (or use 'guess' to have it guess via the
-    before mentioned filenames).
+    See the end of this text for how to use symmetric encryption with NON-UltraVNC
+    servers (for example, x11vnc 0.9.5 or later).
+
+    You will need to specify the corresponding UltraVNC encryption key (created
+    by you using an UltraVNC server or viewer).  It is usually called 'rc4.key'
+    (for MSRC4), 'arc4.key' (for ARC4), and 'aesv2.key' (for AESV2).  Specify
+    the path to it or Browse for it.  Also, specify which type of plugin it is
+    (or use 'guess' to have it guess via the before mentioned filenames).
+
+    The choice "UVNC SC" enables a special workaround for use with UltraVNC
+    Single Click and the MSRC4 plugin.  It may not be needed on recent SC.
+
+    You can also specify pw=my-password instead of a keyfile.
+
+    Use the literal string 'pw=VNCPASSWD' to have the VNC password that you
+    entered into the 'VNC Password:' be used for the pw=...
 
     SSL and SSH tunnels do not apply in this mode (any settings are ignored.)
 
@@ -11069,11 +11411,18 @@ proc ultra_dsm_dialog {} {
     vncviewer had to be modified to support it.  The tight and zlib encodings
     currently do not work in this mode and are disabled.
 
-    Note that this program also requires the utility tool named
-    'ultravnc_dsm_helper' that should be included in your SSVNC kit.
+    Note that this mode also requires the utility tool named 'ultravnc_dsm_helper'
+    that should be included in your SSVNC kit.
+
+    Select Non-Ultra DSM to use symmetric encryption to a Non-UltraVNC server
+    via a supported symmetric key cipher.  x11vnc supports symmetric
+    encryption via, e.g., "x11vnc -enc aesv2:./my.key".  Extra ciphers are
+    enabled for this mode (e.g. blowfish and 3des).  You can also set the random
+    salt size and initialization vector size in Salt,IV for example "8,16".
+    See the x11vnc and 'ultravnc_dsm_helper -help' documentation for more info.
 }
 
-	.ultradsm.t insert end $msg
+	.ultradsm.f.t insert end $msg
 
 	frame .ultradsm.path
 	label .ultradsm.path.l -text "Ultra DSM Keyfile:"
@@ -11085,7 +11434,7 @@ proc ultra_dsm_dialog {} {
 	pack .ultradsm.path.b -side left
 
 	frame .ultradsm.key
-	label .ultradsm.key.l -text "Type of Key:         "
+	label .ultradsm.key.l -text "Type of Key:        "
 	radiobutton .ultradsm.key.guess -pady 1 -anchor w -variable ultra_dsm_type -value guess \
 		-text "Guess"
 	radiobutton .ultradsm.key.arc4 -pady 1 -anchor w -variable ultra_dsm_type -value arc4 \
@@ -11096,13 +11445,43 @@ proc ultra_dsm_dialog {} {
 
 	radiobutton .ultradsm.key.msrc4 -pady 1 -anchor w -variable ultra_dsm_type -value msrc4 \
 		-text "MSRC4"
-	.ultradsm.key.msrc4 configure -state disabled
+
+	radiobutton .ultradsm.key.msrc4_sc -pady 1 -anchor w -variable ultra_dsm_type -value msrc4_sc \
+		-text "UVNC SC"
 
 	pack .ultradsm.key.l -side left
 	pack .ultradsm.key.guess -side left
 	pack .ultradsm.key.arc4 -side left
 	pack .ultradsm.key.aesv2 -side left
 	pack .ultradsm.key.msrc4 -side left
+	pack .ultradsm.key.msrc4_sc -side left
+
+	frame .ultradsm.nou
+	checkbutton .ultradsm.nou.cb -text "Non-Ultra DSM" -variable ultra_dsm_noultra -command update_no_ultra_dsm
+	radiobutton .ultradsm.nou.bf -pady 1 -anchor w -variable ultra_dsm_type -value blowfish \
+		-text "Blowfish"
+
+	radiobutton .ultradsm.nou.des3 -pady 1 -anchor w -variable ultra_dsm_type -value 3des \
+		-text "3DES"
+
+	radiobutton .ultradsm.nou.aes -pady 1 -anchor w -variable ultra_dsm_type -value "aes-cfb" \
+		-text "AES-CFB"
+
+	radiobutton .ultradsm.nou.aes256 -pady 1 -anchor w -variable ultra_dsm_type -value "aes256" \
+		-text "AES-256"
+
+	label .ultradsm.nou.l -text " Salt,IV"
+	entry .ultradsm.nou.e -width 6 -textvariable ultra_dsm_salt
+
+	pack .ultradsm.nou.cb -side left
+	pack .ultradsm.nou.bf -side left
+	pack .ultradsm.nou.des3 -side left
+	pack .ultradsm.nou.aes -side left
+	pack .ultradsm.nou.aes256 -side left
+	pack .ultradsm.nou.l -side left
+	pack .ultradsm.nou.e -side left -expand 0
+
+	update_no_ultra_dsm
 
 	button .ultradsm.cancel -text "Cancel" -command {destroy .ultradsm; set ultra_dsm 0}
 	bind .ultradsm <Escape> {destroy .ultradsm; set ultra_dsm 0}
@@ -11110,7 +11489,7 @@ proc ultra_dsm_dialog {} {
 	button .ultradsm.done -text "Done" -command {destroy .ultradsm; catch {raise .oa}}
 	bind .ultradsm.path.e <Return> {destroy .ultradsm; catch {raise .oa}}
 
-	pack .ultradsm.t .ultradsm.path .ultradsm.key .ultradsm.cancel .ultradsm.done -side top -fill x
+	pack .ultradsm.f .ultradsm.path .ultradsm.key .ultradsm.nou .ultradsm.cancel .ultradsm.done -side top -fill x
 
 	center_win .ultradsm
 	wm resizable .ultradsm 1 0
@@ -11227,6 +11606,59 @@ proc multilisten_dialog {} {
 
 	center_win .multil
 	wm resizable .multil 1 0
+}
+
+proc use_grab_dialog {} {
+	global usg_grab
+	
+	toplev .usegrb
+	wm title .usegrb "Use XGrabServer (for fullscreen)"
+
+	global help_font
+	eval text .usegrb.t -width 85 -height 29 $help_font
+
+	apply_bg .usegrb.t
+
+	set msg {
+    On Unix, some Window managers and some Desktops make it difficult for the
+    SSVNC Unix VNC viewer to go into full screen mode (F9) and/or return.
+
+    Sometimes one can go into full screen mode, but then your keystrokes or
+    Mouse actions do not get through.  This can leave you trapped because you
+    cannot inject input (F9 again) to get out of full screen mode.  (Tip:
+    press Ctrl-Alt-F2 for a console login shell; then kill your vncviewer
+    process, e.g. pkill vncviewer; then Alt-F7 to get back to your desktop)
+
+    We have seen this in some very old Window managers (e.g. fvwm2 circa
+    1998) and some very new Desktops (e.g. GNOME circa 2008).  We try
+    to work around the problem on recent desktops by using the NEW_WM
+    interface, but if you use Fullscreen, you may need to use this option.
+
+    The default for the SSVNC Unix VNC viewer is '-grabkbd' mode where it will
+    try to exclusively grab the keyboard.  This often works correctly.
+
+    However if Fullscreen is not working properly, try setting this
+    'Use XGrabServer' option to enable '-graball' mode where it tries to grab
+    the entire X server.  This usually works, but can be a bit flakey.
+
+    Sometimes toggling F9 a few times gets lets the vncviewer fill the whole
+    screen.  Sometimes tapping F9 very quickly gets it to snap in.  If GNOME
+    (or whatever desktop) is still showing its taskbars, it is recommended
+    you toggle F9 until it isn't. Otherwise, it is not clear who gets the input.
+
+    Best of luck.
+}
+	.usegrb.t insert end $msg
+
+	button .usegrb.cancel -text "Cancel" -command {set use_grab 0; destroy .usegrb}
+	bind .usegrb <Escape> {set use_grab 0; destroy .usegrb}
+	wm protocol .usegrb WM_DELETE_WINDOW {set use_grab 0; destroy .usegrb}
+	button .usegrb.done -text "Done" -command {destroy .usegrb}
+
+	pack .usegrb.t .usegrb.cancel .usegrb.done -side top -fill x
+
+	center_win .usegrb
+	wm resizable .usegrb 1 0
 }
 
 
@@ -12013,12 +12445,12 @@ proc set_ts_options {} {
 
 	checkbutton .ot.b$i -anchor w -variable change_vncviewer -text \
 		"Change VNC Viewer" \
-		-command {if {$change_vncviewer} {change_vncviewer_dialog}}
+		-command change_vncviewer_dialog_wrap
 	incr i
 
 	checkbutton .ot.b$i -anchor w -variable use_x11_macosx -text \
 		"X11 viewer MacOSX" \
-		-command {if {$use_x11_macosx} {set darwin_cotvnc 0} else {set darwin_cotvnc 1}; catch {destroy .ot}; set_ts_options}
+		-command {if {$use_x11_macosx} {set darwin_cotvnc 0} else {set darwin_cotvnc 1}; set_darwin_cotvnc_buttons}
 	if {$uname != "Darwin"} {.ot.b$i configure -state disabled}
 	incr i
 
@@ -12091,6 +12523,8 @@ proc set_ts_adv_options {} {
 	checkbutton .ot2.b$i -anchor w -variable use_bgr233 -text \
 		"Client 8bit Color"
 	if {$darwin_cotvnc} {.ot2.b$i configure -state disabled}
+	global darwin_cotvnc_blist
+	set darwin_cotvnc_blist(.ot2.b$i) 1
 	incr i
 
 	checkbutton .ot2.b$i -anchor w -variable choose_ncache -text \
@@ -12120,6 +12554,18 @@ proc set_ts_adv_options {} {
 			-command {destroy .ot2; to_ssvnc}
 		incr i
 	}
+	button .ot2.b$i -anchor w -text "   Unix ssvncviewer ..." \
+		-command {set_ssvncviewer_options}
+	if {$is_windows} {
+		.ot2.b$i configure -state disabled
+	}
+	global change_vncviewer
+	if {$change_vncviewer} {
+		.ot2.b$i configure -state disabled
+	}
+	global ts_uss_button
+	set ts_uss_button .ot2.b$i
+	incr i
 
 	for {set j 1} {$j < $i} {incr j} {
 		pack .ot2.b$j -side top -fill x
@@ -12140,6 +12586,25 @@ proc set_ts_adv_options {} {
 	focus .ot2
 }
 
+proc change_vncviewer_dialog_wrap {} {
+	global change_vncviewer ts_uss_button
+	if {$change_vncviewer} {
+		change_vncviewer_dialog
+		catch {tkwait window .chviewer}
+	}
+	if {$change_vncviewer} {
+		catch {.oa.ss configure -state disabled}
+	} else {
+		catch {.oa.ss configure -state normal}
+	}
+	if [info exists ts_uss_button] {
+		if {$change_vncviewer} {
+			catch {$ts_uss_button configure -state disabled}
+		} else {
+			catch {$ts_uss_button configure -state normal}
+		}
+	}
+}
 
 proc set_advanced_options {} {
 	global use_cups use_sound use_smbmnt
@@ -12204,6 +12669,14 @@ proc set_advanced_options {} {
 	if {$is_windows} {.oa.b$i configure -state disabled}
 	incr i
 
+	checkbutton .oa.b$i -anchor w -variable disable_ssl_workarounds -text \
+		"Disable SSL Workarounds" \
+		-command {if {$disable_ssl_workarounds} {disable_ssl_workarounds_dialog}}
+	global disable_ssl_workarounds_button
+	set disable_ssl_workarounds_button .oa.b$i
+	if {$use_ssh}    {.oa.b$i configure -state disabled}
+	incr i
+
 	checkbutton .oa.b$i -anchor w -variable ultra_dsm -text \
 		"UltraVNC DSM Encryption Plugin" \
 		-command {if {$ultra_dsm} {ultra_dsm_dialog}}
@@ -12212,46 +12685,14 @@ proc set_advanced_options {} {
 	if {$is_windows} {.oa.b$i configure -state disabled}
 	incr i
 
-	checkbutton .oa.b$i -anchor w -variable multiple_listen -text \
-		"Multiple LISTEN Connections" \
-		-command {if {$multiple_listen} {multilisten_dialog}}
-	global multiple_listen_button use_listen
-	set multiple_listen_button .oa.b$i
-	if {$is_windows}  {.oa.b$i configure -state disabled}
-	if {!$use_listen} {.oa.b$i configure -state disabled}
-	incr i
-
 	checkbutton .oa.b$i -anchor w -variable change_vncviewer -text \
 		"Change VNC Viewer" \
-		-command {if {$change_vncviewer} {change_vncviewer_dialog}}
+		-command change_vncviewer_dialog_wrap
 	incr i
 
 	checkbutton .oa.b$i -anchor w -variable use_port_knocking -text \
 		"Port Knocking" \
 		-command {if {$use_port_knocking} {port_knocking_dialog}}
-	incr i
-
-	checkbutton .oa.b$i -anchor w -variable use_grab -text \
-		"Use XGrabServer"
-	if {$darwin_cotvnc} {.oa.b$i configure -state disabled}
-	set ix $i
-	incr i
-
-	checkbutton .oa.b$i -anchor w -variable use_alpha -text \
-		"Cursor alphablending (32bpp required)"
-	if {$darwin_cotvnc} {.oa.b$i configure -state disabled}
-	set ia $i
-	incr i
-
-
-
-	global ycrop_string
-	frame .oa.b$i
-	label .oa.b$i.l -text "Y Crop: "
-	entry .oa.b$i.e -width 10 -textvariable ycrop_string
-	pack .oa.b$i.l -side left
-	pack .oa.b$i.e -side right -expand 1 -fill x
-
 	incr i
 
 	global include_list
@@ -12272,16 +12713,27 @@ proc set_advanced_options {} {
 
 	incr i
 
-	if {$is_windows} {
-		.oa.b$ix configure -state disabled
-		.oa.b$ia configure -state disabled
-	}
-
 	for {set j 1} {$j < $i} {incr j} {
 		pack .oa.b$j -side top -fill x
 	}
 
-	button .oa.sa -text "Use ssh-agent" -command ssh_agent_restart
+	global uname
+	set t1 "         Unix ssvncviewer ..."
+	if {$uname == "Darwin" } { regsub {^ *} $t1 "" t1 }
+	button .oa.ss -anchor w -text $t1 -command set_ssvncviewer_options
+	pack .oa.ss -side top -fill x
+	if {$is_windows} {
+		.oa.ss configure -state disabled
+	}
+	global change_vncviewer
+	if {$change_vncviewer} {
+		.oa.ss configure -state disabled
+	}
+
+	set t2 "         Use ssh-agent"
+	if {$uname == "Darwin" } { regsub {^ *} $t2 "" t2 }
+
+	button .oa.sa -anchor w -text $t2 -command ssh_agent_restart
 	pack .oa.sa -side top -fill x
 	if {$is_windows} {
 		.oa.sa configure -state disabled
@@ -12308,6 +12760,198 @@ proc set_advanced_options {} {
 	wm resizable .oa 1 0
 	focus .oa
 }
+
+proc set_ssvncviewer_options {} {
+	global is_windows darwin_cotvnc
+	global use_ssh use_sshssl use_x11cursor use_rawlocal use_popupfix use_alpha use_grab use_nobell
+	global ssvnc_scale
+
+	if {$is_windows} {
+		return
+	}
+
+	catch {destroy .oa}
+	toplev .os
+	wm title .os "Unix ssvncviewer Options"
+
+	set darwinlist [list]
+
+	set i 1
+
+	checkbutton .os.b$i -anchor w -variable multiple_listen -text \
+		"Multiple LISTEN Connections" \
+		-command {if {$multiple_listen} {multilisten_dialog}}
+	global multiple_listen_button use_listen
+	set multiple_listen_button .os.b$i
+	if {$is_windows}  {.os.b$i configure -state disabled}
+	if {!$use_listen} {.os.b$i configure -state disabled}
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+
+	checkbutton .os.b$i -anchor w -variable use_x11cursor -text \
+		"Use X11 Cursor"
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+	checkbutton .os.b$i -anchor w -variable use_nobell -text \
+		"Disable Bell"
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+	checkbutton .os.b$i -anchor w -variable use_rawlocal -text \
+		"Use Raw Local"
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+	checkbutton .os.b$i -anchor w -variable use_popupfix -text \
+		"Use Popup Fix"
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+	checkbutton .os.b$i -anchor w -variable use_grab -text \
+		"Use XGrabServer (for fullscreen)" \
+		-command {if {$use_grab} {use_grab_dialog}}
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+	checkbutton .os.b$i -anchor w -variable use_alpha -text \
+		"Cursor alphablending (32bpp required)"
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+	frame .os.b$i -height 2; incr i
+
+	set relief ridge
+	frame .os.b$i -relief $relief -borderwidth 2
+
+	label .os.b$i.l -font fixed -anchor w -text "Examples: '0.75', '1024x768', 'fit' (fill screen), or 'auto'";
+
+	global ssvnc_scale
+	frame .os.b$i.f
+	label .os.b$i.f.l -text "Scaling: "
+	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
+	entry .os.b$i.f.e -width 10 -textvariable ssvnc_scale
+	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
+	pack .os.b$i.f.l -side left
+	pack .os.b$i.f.e -side right -expand 1 -fill x
+
+	pack .os.b$i.f .os.b$i.l -side top -fill x
+
+	incr i
+
+	frame .os.b$i -height 2; incr i
+
+	frame .os.b$i -relief $relief -borderwidth 2
+
+	label .os.b$i.l -font fixed -anchor w -text "Enter the max height in pixels, e.g. '900'";
+
+	global ycrop_string
+	frame .os.b$i.f
+	label .os.b$i.f.l -text "Y Crop: "
+	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
+	entry .os.b$i.f.e -width 10 -textvariable ycrop_string
+	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
+	pack .os.b$i.f.l -side left
+	pack .os.b$i.f.e -side right -expand 1 -fill x
+
+	pack .os.b$i.f .os.b$i.l -side top -fill x
+
+	incr i
+
+	frame .os.b$i -height 2; incr i
+
+	frame .os.b$i -relief $relief -borderwidth 2
+
+	label .os.b$i.l -font fixed -anchor w -text "Enter the scrollbar width in pixels, e.g. '4'";
+
+	global sbwid_string
+	frame .os.b$i.f
+	label .os.b$i.f.l -text "ScrollBar Width: "
+	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
+	entry .os.b$i.f.e -width 10 -textvariable sbwid_string
+	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
+	pack .os.b$i.f.l -side left
+	pack .os.b$i.f.e -side right -expand 1 -fill x
+
+	pack .os.b$i.f .os.b$i.l -side top -fill x
+
+	incr i
+
+	frame .os.b$i -height 2; incr i
+
+	frame .os.b$i -relief $relief -borderwidth 2
+
+	label .os.b$i.l  -font fixed -anchor w -text "Enter the RFB version to pretend to be using, e.g. '3.4'";
+	label .os.b$i.l2 -font fixed -anchor w -text "Sometimes needed for UltraVNC: 3.4, 3.6, 3.14, 3.16";
+
+	global rfbversion
+	frame .os.b$i.f
+	label .os.b$i.f.l -text "RFB Version: "
+	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
+	entry .os.b$i.f.e -width 10 -textvariable rfbversion
+	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
+	pack .os.b$i.f.l -side left
+	pack .os.b$i.f.e -side right -expand 1 -fill x
+
+	pack .os.b$i.f .os.b$i.l .os.b$i.l2  -side top -fill x
+
+	incr i
+
+	frame .os.b$i -height 2; incr i
+
+	frame .os.b$i -relief $relief -borderwidth 2
+
+	label .os.b$i.l1 -font fixed -anchor w -text "List encodings in preferred order, for example";
+	label .os.b$i.l2 -font fixed -anchor w -text "'copyrect zrle tight'   The list of encodings is:";
+	label .os.b$i.l3 -font fixed -anchor w -text "copyrect tight zrle zywrle hextile zlib corre rre raw";
+
+	global ssvnc_encodings
+	frame .os.b$i.f
+	label .os.b$i.f.l -text "Encodings: "
+	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
+	entry .os.b$i.f.e -width 10 -textvariable ssvnc_encodings
+	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
+	pack .os.b$i.f.l -side left
+	pack .os.b$i.f.e -side right -expand 1 -fill x
+
+	pack .os.b$i.f .os.b$i.l1 .os.b$i.l2 .os.b$i.l3 -side top -fill x
+
+	incr i
+
+	frame .os.b$i -height 2; incr i
+
+	for {set j 1} {$j < $i} {incr j} {
+		pack .os.b$j -side top -fill x
+	}
+
+	frame .os.b
+	button .os.b.done -text "Done" -command {destroy .os}
+	bind .os <Escape> {destroy .os}
+	wm protocol .os WM_DELETE_WINDOW {destroy .os}
+	button .os.b.help -text "Help" -command help_ssvncviewer_opts
+
+	global use_listen
+	if {$use_listen} {
+		button .os.b.connect -text "Listen" -command launch
+	} else {
+		button .os.b.connect -text "Connect" -command launch
+	}
+
+	pack .os.b.help .os.b.connect .os.b.done -fill x -expand 1 -side left
+
+	pack .os.b -side top -fill x 
+
+	global darwin_cotvnc_blist
+	foreach b $darwinlist {
+		set darwin_cotvnc_blist($b) 1
+	}
+
+	center_win .os
+	wm resizable .os 1 0
+	focus .os
+}
+
 
 proc in_path {cmd} {
 	global env
@@ -12431,11 +13075,19 @@ proc adv_ssh_tog {on} {
 
 proc adv_listen_ssl_tog {on} {
 	global stunnel_local_protection_button is_windows
+	global disable_ssl_workarounds_button
 	if [info exists stunnel_local_protection_button] {
 		if {$on} {
 			catch {$stunnel_local_protection_button configure -state normal}
 		} else {
 			catch {$stunnel_local_protection_button configure -state disabled}
+		}
+	}
+	if [info exists disable_ssl_workarounds_button] {
+		if {$on} {
+			catch {$disable_ssl_workarounds_button configure -state normal}
+		} else {
+			catch {$disable_ssl_workarounds_button configure -state disabled}
 		}
 	}
 	if {$is_windows} {
@@ -12558,10 +13210,12 @@ proc listen_adjust {} {
 		catch {.b.conn configure -text "Listen"}
 		catch {.o.b.connect configure -text "Listen"}
 		catch {$multiple_listen_button configure -state normal}
+		catch {mesg "Listen :N -> Port 5500+N, i.e. :0 -> 5500, :1 -> 5501, :2 -> 5502 ..."}
 	} else {
 		catch {.b.conn configure -text "Connect"}
 		catch {.o.b.connect configure -text "Connect"}
 		catch {$multiple_listen_button configure -state disabled}
+		catch {mesg "Switched to Forward Connection mode."}
 	}
 	if {$is_windows} {
 		catch {$multiple_listen_button configure -state disabled}
@@ -12618,6 +13272,20 @@ proc x11vnc_find_adjust {which} {
 	regsub -all {[ 	][ 	]*} $remote_ssh_cmd " " remote_ssh_cmd
 }
 
+proc set_darwin_cotvnc_buttons {} {
+	global darwin_cotvnc uname darwin_cotvnc_blist 
+	
+	if {$uname == "Darwin" && [info exists darwin_cotvnc_blist]} {
+		foreach b [array names darwin_cotvnc_blist] {
+			if {$darwin_cotvnc} {
+				catch {$b configure -state disabled}
+			} else {
+				catch {$b configure -state normal}
+			}
+		}
+	}
+}
+
 proc set_options {} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality use_x11_macosx
@@ -12627,6 +13295,7 @@ proc set_options {} {
 	global use_x11vnc_find x11vnc_find_widget
 	global use_x11vnc_xlogin x11vnc_xlogin_widget uvnc_bug_widget
 	global ts_only
+	global darwin_cotvnc_blist
 	if {$ts_only} {
 		set_ts_options
 		return
@@ -12666,19 +13335,14 @@ proc set_options {} {
 		"Unix Username & Password" -command {unixpw_adjust}
 	if {$is_windows} {.o.b$i configure -state disabled}
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	set darwin_cotvnc_blist(.o.b$i) 1
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_listen -text \
-		"Reverse VNC Connection (-LISTEN)" -command {listen_adjust; if {$vncdisplay == ""} {set vncdisplay ":0"}; if {$use_listen} {destroy .o}}
+		"Reverse VNC Connection (-LISTEN)" -command {listen_adjust; if {$vncdisplay == ""} {set vncdisplay ":0"} else {set vncdisplay ""}; if {$use_listen} {destroy .o}}
 	#if {$is_windows} {.o.b$i configure -state disabled}
-	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
-	incr i
-
-	checkbutton .o.b$i -anchor w -variable use_uvnc_ssl_bug -text \
-		"UltraVNC Single Click III Bug"
-	if {$is_windows} {.o.b$i configure -state disabled}
-	if {$use_ssh && !$use_sshssl} {.o.b$i configure -state disabled}
-	set uvnc_bug_widget ".o.b$i"
+	#if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	#set darwin_cotvnc_blist(.o.b$i) 1
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_viewonly -text \
@@ -12692,27 +13356,31 @@ proc set_options {} {
 	checkbutton .o.b$i -anchor w -variable use_raise_on_beep -text \
 		"Raise On Beep"
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	set darwin_cotvnc_blist(.o.b$i) 1
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_bgr233 -text \
 		"Use 8bit color (-bgr233)"
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	set darwin_cotvnc_blist(.o.b$i) 1
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_nojpeg -text \
 		"Do not use JPEG (-nojpeg)"
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	set darwin_cotvnc_blist(.o.b$i) 1
 	incr i
 
 	checkbutton .o.b$i -anchor w -variable use_x11_macosx -text \
 		"Use X11 vncviewer on MacOSX" \
-		-command {if {$use_x11_macosx} {set darwin_cotvnc 0} else {set darwin_cotvnc 1}; catch {destroy .o}; set_options}
+		-command {if {$use_x11_macosx} {set darwin_cotvnc 0} else {set darwin_cotvnc 1}; set_darwin_cotvnc_buttons}
 	if {$uname != "Darwin"} {.o.b$i configure -state disabled}
 	incr i
 
 	menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable compresslevel_text -relief groove
 	set compresslevel_text "Compress Level: $use_compresslevel"
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	set darwin_cotvnc_blist(.o.b$i) 1
 
 	menu .o.b$i.m -tearoff 0
 	for {set j -1} {$j < 10} {incr j} {
@@ -12731,6 +13399,7 @@ proc set_options {} {
 	menubutton .o.b$i -anchor w -menu .o.b$i.m -textvariable quality_text -relief groove
 	set quality_text "Quality: $use_quality"
 	if {$darwin_cotvnc} {.o.b$i configure -state disabled}
+	set darwin_cotvnc_blist(.o.b$i) 1
 
 	menu .o.b$i.m -tearoff 0 
 	for {set j -1} {$j < 10} {incr j} {
@@ -12808,6 +13477,7 @@ proc set_options {} {
 		regsub {^ *} $t2 "" t2
 		regsub {^ *} $t3 "" t3
 	}
+
 	button .o.advanced -anchor w -text $t1 -command set_advanced_options
 	button .o.clear    -anchor w -text $t2 -command set_defaults
 	button .o.delete   -anchor w -text $t3 -command {destroy .o; delete_profile}
@@ -12890,7 +13560,12 @@ proc print_help {} {
 	help_advanced_opts
 	set str [.ah.f.t get 1.0 end]
 	puts "${b}Advanced Options Help:\n$str"
-	destroy .oh
+	destroy .ah
+
+	help_ssvncviewer_opts
+	set str [.av.f.t get 1.0 end]
+	puts "${b}ssvncviewer Options Help:\n$str"
+	destroy .av
 
 	help_certs
 	set str [.ch.f.t get 1.0 end]
@@ -13144,6 +13819,7 @@ if {! $is_windows} {
 	catch {set uname [exec uname]}
 }
 
+
 set darwin_cotvnc 0
 if {$uname == "Darwin"} {
 	if {! [info exists env(DISPLAY)]} {
@@ -13162,6 +13838,9 @@ if {$uname == "Darwin"} {
 	#option add *Button.font Helvetica widgetDefault
 	catch {option add *Button.font {System 10} widgetDefault}
 }
+
+##for testing macosx
+##set uname Darwin; set darwin_cotvnc 1
 
 set putty_pw ""
 
@@ -13357,6 +14036,8 @@ bind . <Shift-B2-ButtonRelease> {toggle_tsonly}
 bind .l <Shift-ButtonRelease> {toggle_tsonly}
 bind . <Control-h> {toggle_sshonly}
 bind . <Control-T> {to_ssvnc}
+bind . <Control-a> {set_advanced_options}
+bind . <Control-u> {set_ssvncviewer_options}
 
 global entered_gui_top button_gui_top
 set entered_gui_top 0

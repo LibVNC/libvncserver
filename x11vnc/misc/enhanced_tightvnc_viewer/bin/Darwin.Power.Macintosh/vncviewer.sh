@@ -14,7 +14,7 @@ if [ "X$SSVNC_DYLD_LIBRARY_PATH" != "X" ]; then
 	export DYLD_LIBRARY_PATH
 fi
 
-if [ "X$DISPLAY" != "X" ]; then
+if [ "X$DISPLAY" != "X" -a "X$DARWIN_COTVNC" != "X1" ]; then
 	"$dir/vncviewer.x11" "$@"
 else
 	args=""

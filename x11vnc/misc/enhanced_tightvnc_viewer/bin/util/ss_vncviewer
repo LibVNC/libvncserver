@@ -229,6 +229,22 @@ do
                 ;;
 	"-grab")	VNCVIEWER_GRAB_SERVER=1; export VNCVIEWER_GRAB_SERVER
                 ;;
+	"-x11cursor")	VNCVIEWER_X11CURSOR=1; export VNCVIEWER_X11CURSOR
+                ;;
+	"-rawlocal")	VNCVIEWER_RAWLOCAL=1; export VNCVIEWER_RAWLOCAL
+                ;;
+	"-scale")	shift; SSVNC_SCALE="$1"; export SSVNC_SCALE
+                ;;
+	"-ssvnc_encodings")	shift; VNCVIEWER_ENCODINGS="$1"; export VNCVIEWER_ENCODINGS
+                ;;
+	"-rfbversion")	shift; VNCVIEWER_RFBVERSION="$1"; export VNCVIEWER_RFBVERSION
+                ;;
+	"-nobell")	VNCVIEWER_NOBELL=1; export VNCVIEWER_NOBELL
+                ;;
+	"-popupfix")	VNCVIEWER_POPUP_FIX=1; export VNCVIEWER_POPUP_FIX
+                ;;
+	"-realvnc4")	VNCVIEWER_IS_REALVNC4=1; export VNCVIEWER_IS_REALVNC4
+                ;;
 	"-h"*)	help; exit 0
                 ;;
 	"--h"*)	help; exit 0
@@ -273,6 +289,7 @@ if [ "X$reverse" != "X" ]; then
 			echo "*Warning*: -listen and a single proxy/gateway does not make sense."
 			sleep 3
 		fi
+		SSVNC_LISTEN_ONCE=1; export SSVNC_LISTEN_ONCE
 	fi
 fi
 if [ "X$ssh_cmd" = "X" ]; then
@@ -342,6 +359,9 @@ if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
         use_ssh=""
         use_sshssl=""
         direct_connect=1
+	if echo "$SSVNC_ULTRA_DSM" | grep 'noultra:' > /dev/null; then
+		SSVNC_NO_ULTRA_DSM=1; export SSVNC_NO_ULTRA_DSM
+	fi
 fi
 
 # (possibly) tell the vncviewer to only listen on lo: 
@@ -1448,9 +1468,16 @@ Kecho proxy=$proxy
 			echo ""
 			echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
 			echo ""
-			echo "$VNCVIEWERCMD" "$@" -listen $N
+			N2=$N
+			if [ "X$VNCVIEWER_IS_REALVNC4" = "X1" ]; then
+				N2=`echo "$N2" | sed -e 's/://g'`
+				if [ $N2 -le 200 ]; then
+					N2=`expr $N2 + 5500`
+				fi
+			fi
+			echo "$VNCVIEWERCMD" "$@" -listen $N2
 			echo ""
-			$VNCVIEWERCMD "$@" -listen $N
+			$VNCVIEWERCMD "$@" -listen $N2
 		fi
 
 		exit $?
@@ -1536,14 +1563,19 @@ if [ "X$direct_connect" != "X" ]; then
 		echo ""
 		echo "Using UltraVNC DSM Plugin key for encryption:"
 		echo ""
-		echo "  $SSVNC_ULTRA_DSM PORT HOST:PORT"
+		ustr=`echo "$SSVNC_ULTRA_DSM" | sed -e 's/pw=[^ ]*/pw=******/g'`
+		echo "  $ustr PORT HOST:PORT"
 		echo ""
 	elif [ "X$getport" = "X" ]; then
 		echo ""
 		echo "Running viewer for direct connection:"
-		echo ""
-		echo "** NOTE: THERE WILL BE NO SSL OR SSH ENCRYPTION **"
-		echo ""
+		if echo X"$@" | grep chatonly > /dev/null; then
+			:
+		else
+			echo ""
+			echo "** NOTE: THERE WILL BE NO SSL OR SSH ENCRYPTION **"
+			echo ""
+		fi
 	fi
 	x=""
 	if [ "X$SSVNC_NO_ENC_WARN" != "X" ]; then
@@ -1594,9 +1626,25 @@ if [ "X$direct_connect" != "X" ]; then
 	if [ "X$reverse" = "X" ]; then
 		hostdisp="$host:$disp"
 		if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
-			hostdisp="exec=$SSVNC_ULTRA_DSM 0 $host:$port"
+			if [ "X$SSVNC_USE_OURS" = "X1" ]; then
+				hostdisp="exec=$SSVNC_ULTRA_DSM 0 $host:$port"
+			else
+				pf=`findfree 5970`
+				cmd="$SSVNC_ULTRA_DSM -$pf $host:$port"
+				pf=`expr $pf - 5900`
+				hostdisp="localhost:$pf"
+				ustr=`echo "$cmd" | sed -e 's/pw=[^ ]*/pw=******/g'`
+				echo "Running:"
+				echo
+				echo "$ustr &"
+				echo
+				$cmd &
+				dsm_pid=$!
+				sleep 2
+			fi
 		fi
-		echo "$VNCVIEWERCMD" "$@" "$hostdisp"
+		hostdisp2=`echo "$hostdisp" | sed -e 's/pw=[^ ]*/pw=******/g'`
+		echo "$VNCVIEWERCMD" "$@" "$hostdisp2"
 		trap "final" 0 2 15
 		echo ""
 		$VNCVIEWERCMD "$@" "$hostdisp"
@@ -1614,13 +1662,17 @@ if [ "X$direct_connect" != "X" ]; then
 		trap "final" 0 2 15
 		if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
 			echo "NOTE: The ultravnc_dsm_helper only runs once.  So after the first LISTEN"
-			echo "      ends, you will have to Press Ctrl-C and restart for a new connection."
+			echo "      ends, you may have to Press Ctrl-C and restart for another connection."
 			echo ""
+			SSVNC_LISTEN_ONCE=1; export SSVNC_LISTEN_ONCE
+			VNCVIEWER_LISTEN_LOCALHOST=1
+			export VNCVIEWER_LISTEN_LOCALHOST
 			dport=`expr 5500 + $disp`
 			cmd="$SSVNC_ULTRA_DSM $dport localhost:$use"
+			ustr=`echo "$cmd" | sed -e 's/pw=[^ ]*/pw=******/g'`
 			echo "Running:"
 			echo
-			echo "$cmd &"
+			echo "$ustr &"
 			echo
 			$cmd &
 			dsm_pid=$!
@@ -1630,9 +1682,16 @@ if [ "X$direct_connect" != "X" ]; then
 				disp=`expr $disp - 5500`
 			fi
 		fi
-		echo "$VNCVIEWERCMD" "$@" -listen $disp
+		disp2=$disp
+		if [ "X$VNCVIEWER_IS_REALVNC4" = "X1" ]; then
+			disp2=`echo "$disp2" | sed -e 's/://g'`
+			if [ $disp2 -le 200 ]; then
+				disp2=`expr $disp2 + 5500`
+			fi
+		fi
+		echo "$VNCVIEWERCMD" "$@" -listen $disp2
 		echo ""
-		$VNCVIEWERCMD "$@" -listen $disp
+		$VNCVIEWERCMD "$@" -listen $disp2
 	fi
 	exit $?
 fi
@@ -1793,7 +1852,7 @@ if [ "X$stunnel_exec" = "X" ]; then
 	if [ "X$mycert" != "X" ]; then
 		sleep 1
 		echo ""
-		echo "(pausing for possible certificate passphrase dialog)"
+		echo "(** pausing for possible certificate passphrase dialog **)"
 		echo ""
 		sleep 4
 	fi
@@ -1829,7 +1888,14 @@ else
 	echo ""
 	echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
 	echo ""
-	echo "$VNCVIEWERCMD" "$@" -listen $N
+	N2=$N
+	if [ "X$VNCVIEWER_IS_REALVNC4" = "X1" ]; then
+		N2=`echo "$N2" | sed -e 's/://g'`
+		if [ $N2 -le 200 ]; then
+			N2=`expr $N2 + 5500`
+		fi
+	fi
+	echo "$VNCVIEWERCMD" "$@" -listen $N2
 	trap "final" 0 2 15
 	echo ""
 	if [ "X$proxy" != "X" ]; then
@@ -1838,7 +1904,7 @@ else
 		PPROXY_KILLPID=+1; export PPROXY_KILLPID;
 		$ptmp &
 	fi
-	$VNCVIEWERCMD "$@" -listen $N
+	$VNCVIEWERCMD "$@" -listen $N2
 fi
 
 sleep 1
