@@ -802,7 +802,7 @@ char find_display[] =
 "				# otherwise try lsof:\n"
 "				pvt=`ps wwwwwaux | grep X | egrep -v 'startx|xinit' | egrep \" $d4 \" | head -n 1 | awk '{print $2}'`\n"
 "				if [ \"X$pvt\" != \"X\" ]; then\n"
-"					vt=`lsof -p \"$pvt\" 2>/dev/null | egrep '/dev/tty([789]|[1-9][0-9][0-9]*)$' | grep -v grep | head -n 1 | awk '{print $NF}' | sed -e 's,/dev/tty,,'`\n"
+"					vt=`lsof -b -p \"$pvt\" 2>/dev/null | egrep '/dev/tty([789]|[1-9][0-9][0-9]*)$' | grep -v grep | head -n 1 | awk '{print $NF}' | sed -e 's,/dev/tty,,'`\n"
 "					if echo \"$vt\" | grep '^[0-9][0-9]*$' > /dev/null; then\n"
 "						chvt0=\",VT=$vt\"\n"
 "					else\n"

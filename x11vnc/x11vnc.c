@@ -1800,6 +1800,7 @@ int main(int argc, char* argv[]) {
 	int got_rfbwait = 0;
 	int got_httpdir = 0, try_http = 0;
 	int orig_use_xdamage = use_xdamage;
+	int http_oneport_msg = 0;
 	XImage *fb0 = NULL;
 	int ncache_msg = 0;
 
@@ -2360,6 +2361,12 @@ int main(int argc, char* argv[]) {
 			use_openssl = 1;
 			CHECK_ARGC
 			enc_str = strdup(argv[++i]);
+			continue;
+		}
+		if (!strcmp(arg, "-http_oneport")) {
+			http_oneport_msg = 1;
+			use_openssl = 1;
+			enc_str = strdup("none");
 			continue;
 		}
 		if (!strcmp(arg, "-ssltimeout")) {
@@ -3643,6 +3650,9 @@ int main(int argc, char* argv[]) {
 	}
 	if (! quiet && ! inetd) {
 		int i;
+		if (http_oneport_msg) {
+			rfbLog("setting '-enc none' for -http_oneport mode.\n");
+		}
 		for (i=1; i < argc_vnc; i++) {
 			rfbLog("passing arg to libvncserver: %s\n", argv_vnc[i]);
 			if (!strcmp(argv_vnc[i], "-passwd")) {
@@ -4620,11 +4630,13 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 #endif
 		}
 	} else {
+#if !NO_X11
 		int op, ev, er;
 		if (XQueryExtension(dpy, "MIT-SHM", &op, &ev, &er)) {
 			xshm_opcode = op;
 			if (0) fprintf(stderr, "xshm_opcode: %d %d %d\n", op, ev, er);
 		}
+#endif
 	}
 
 #if LIBVNCSERVER_HAVE_XKEYBOARD

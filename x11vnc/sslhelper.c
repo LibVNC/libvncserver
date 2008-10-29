@@ -1153,7 +1153,7 @@ if (db) fprintf(stderr, "tv_sec: %d - %s\n", (int) tv.tv_sec, last_get);
 }
 
 #define ABSIZE 16384
-static int watch_for_http_traffic(char *buf_a, int *n_a) {
+static int watch_for_http_traffic(char *buf_a, int *n_a, int raw_sock) {
 	int is_http, err, n, n2;
 	char *buf;
 	int db = 0;
@@ -1174,8 +1174,13 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	buf = (char *) calloc((ABSIZE+1), 1);
 	*n_a = 0;
 
-	n = SSL_read(ssl, buf, 2);
-	err = SSL_get_error(ssl, n);
+	if (enc_str && !strcmp(enc_str, "none")) {
+		n = read(raw_sock, buf, 2);
+		err = SSL_ERROR_NONE;
+	} else {
+		n = SSL_read(ssl, buf, 2);
+		err = SSL_get_error(ssl, n);
+	}
 
 	if (err != SSL_ERROR_NONE || n < 2) {
 		if (n > 0) {
@@ -1204,7 +1209,11 @@ static int watch_for_http_traffic(char *buf_a, int *n_a) {
 	 * in ssl_xfer().
 	 */
 
-	n2 = SSL_read(ssl, buf + n, ABSIZE - n);
+	if (enc_str && !strcmp(enc_str, "none")) {
+		n2 = read(raw_sock, buf + n, ABSIZE - n);
+	} else {
+		n2 = SSL_read(ssl, buf + n, ABSIZE - n);
+	}
 	if (n2 >= 0) {
 		n += n2;
 	}
@@ -1663,7 +1672,7 @@ void accept_openssl(int mode, int presock) {
 
 			if (db) fprintf(stderr, "watch_for_http_traffic\n");
 
-			is_http = watch_for_http_traffic(buf, &n);
+			is_http = watch_for_http_traffic(buf, &n, s_in);
 
 			if (is_http < 0 || is_http == 0) {
 				/*
@@ -1707,7 +1716,7 @@ void accept_openssl(int mode, int presock) {
 						if (n > 0) {
 							ptr += n;
 						}
-			if (db) fprintf(stderr, "buf2: '%s'\n", buf2);
+						if (db) fprintf(stderr, "buf2: '%s'\n", buf2);
 
 						if (strstr(buf2, "\r\n\r\n")) {
 							break;
@@ -1807,7 +1816,7 @@ void accept_openssl(int mode, int presock) {
 			write(vncsock, tbuf, strlen(tbuf));
 
 			usleep(150*1000);
-if (db) fprintf(stderr, "close vncsock: %d\n", vncsock);
+			if (db) fprintf(stderr, "close vncsock: %d\n", vncsock);
 			close(vncsock);
 
 			/* now, finally, connect to the libvncserver httpd: */
@@ -1822,7 +1831,7 @@ if (db) fprintf(stderr, "close vncsock: %d\n", vncsock);
 			if (iface == NULL || !strcmp(iface, "")) {
 				iface = "127.0.0.1";
 			}
-if (db) fprintf(stderr, "iface: %s\n", iface);
+			if (db) fprintf(stderr, "iface: %s:%d\n", iface, hport);
 			usleep(150*1000);
 
 			httpsock = rfbConnectToTcpAddr(iface, hport);
@@ -1840,6 +1849,7 @@ if (db) fprintf(stderr, "iface: %s\n", iface);
 			 * the rest of the SSL session to it:
 			 */
 			if (n > 0) {
+				if (db) fprintf(stderr, "sending http buffer httpsock: %d\n'%s'\n", httpsock, buf);
 				write(httpsock, buf, n);
 			}
 			ssl_xfer(httpsock, s_in, s_out, is_http);
@@ -2288,7 +2298,13 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 		return;
 	}
 	if (enc_str != NULL) {
-		symmetric_encryption_xfer(csock, s_in, s_out);
+		if (!strcmp(enc_str, "none")) {
+			usleep(250*1000);
+			rfbLog("doing '-enc none' raw transfer (no encryption)\n"); 
+			raw_xfer(csock, s_in, s_out);
+		} else {
+			symmetric_encryption_xfer(csock, s_in, s_out);
+		}
 		return;
 	}
 	if (getenv("SSL_DEBUG")) {
@@ -2772,8 +2788,11 @@ void raw_xfer(int csock, int s_in, int s_out) {
 	if (pid < 0) {
 		exit(1);
 	}
+	if (getenv("X11VNC_DEBUG_RAW_XFER")) {
+		db = atoi(getenv("X11VNC_DEBUG_RAW_XFER"));
+	}
 	if (pid) {
-		if (db) fprintf(stderr, "raw_xfer start: %d -> %d/%d\n", csock, s_in, s_out);
+		if (db) rfbLog("raw_xfer start: %d -> %d/%d\n", csock, s_in, s_out);
 
 		while (1) {
 			n = read(csock, buf, sz);
@@ -2793,7 +2812,7 @@ void raw_xfer(int csock, int s_in, int s_out) {
 					if (m < 0 && (errno == EINTR || errno == EAGAIN)) {
 						continue;
 					}
-if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", csock, s_out, m, n, errno);
+if (db) rfbLog("raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", csock, s_out, m, n, errno);
 					break;
 				}
 			}
@@ -2801,10 +2820,11 @@ if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", cso
 		usleep(250*1000);
 		kill(pid, SIGTERM);
 		waitpid(pid, &status, WNOHANG); 
-		if (db) fprintf(stderr, "raw_xfer done:  %d -> %d\n", csock, s_out);
+		if (db) rfbLog("raw_xfer done:  %d -> %d\n", csock, s_out);
 
 	} else {
-		if (db) fprintf(stderr, "raw_xfer start: %d <- %d\n", csock, s_in);
+		if (db) usleep(50*1000);
+		if (db) rfbLog("raw_xfer start: %d <- %d\n", csock, s_in);
 
 		while (1) {
 			n = read(s_in, buf, sz);
@@ -2824,7 +2844,7 @@ if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", cso
 					if (m < 0 && (errno == EINTR || errno == EAGAIN)) {
 						continue;
 					}
-		if (db) fprintf(stderr, "raw_xfer bad write:  %d <- %d | %d/%d errno=%d\n", csock, s_in, m, n, errno);
+		if (db) rfbLog("raw_xfer bad write:  %d <- %d | %d/%d errno=%d\n", csock, s_in, m, n, errno);
 					break;
 				}
 			}
@@ -2832,7 +2852,7 @@ if (db) fprintf(stderr, "raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", cso
 		usleep(250*1000);
 		kill(par, SIGTERM);
 		waitpid(par, &status, WNOHANG); 
-		if (db) fprintf(stderr, "raw_xfer done:  %d <- %d\n", csock, s_in);
+		if (db) rfbLog("raw_xfer done:  %d <- %d\n", csock, s_in);
 	}
 	close(csock);
 	close(s_in);

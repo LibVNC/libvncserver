@@ -333,13 +333,13 @@ int check_httpdir(void) {
 		len = strlen(prog) + 21 + 1;
 		*q = '\0';
 		httpdir = (char *) malloc(len);
-		if (use_openssl || use_stunnel || http_ssl) {
+		if (!enc_str && (use_openssl || use_stunnel || http_ssl)) {
 			snprintf(httpdir, len, "%s/../share/x11vnc/classes/ssl", prog);
 		} else {
 			snprintf(httpdir, len, "%s/../share/x11vnc/classes", prog);
 		}
 		if (stat(httpdir, &sbuf) != 0) {
-			if (use_openssl || use_stunnel || http_ssl) {
+			if (!enc_str && (use_openssl || use_stunnel || http_ssl)) {
 				snprintf(httpdir, len, "%s/../classes/ssl", prog);
 			} else {
 				snprintf(httpdir, len, "%s/../classes", prog);
@@ -367,7 +367,7 @@ int check_httpdir(void) {
 				"/usr/share/x11vnc/classes/ssl",
 				NULL
 			};
-			if (use_openssl || use_stunnel || http_ssl) {
+			if (!enc_str && (use_openssl || use_stunnel || http_ssl)) {
 				use = ssllist;
 			} else {
 				use = list;

@@ -1,3 +1,7 @@
+2008-10-29  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -http_oneport for single port HTTP and VNC.
+	  Improve find_display wrt lsof blocking with -b.
+
 2008-10-19  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -chatwindow for chat window on X console using SSVNC
 	  as a helper.	Print suggestion for X_ShmAttach failure.

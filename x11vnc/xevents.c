@@ -1508,6 +1508,7 @@ static void try_local_chat_window(void) {
 	int i, port, lsock;
 	char cmd[100];
 	struct sockaddr_in addr;
+	pid_t pid = -1;
 #ifdef __hpux
 	int addrlen = sizeof(addr);
 #else
@@ -1532,7 +1533,9 @@ static void try_local_chat_window(void) {
 
 	sprintf(cmd, "ssvnc -cmd VNC://localhost:%d -chatonly", port);
 
-	pid_t pid = fork();
+#if LIBVNCSERVER_HAVE_FORK
+	pid = fork();
+#endif
 
 	if (pid == -1) {
 		perror("fork");
@@ -1542,14 +1545,19 @@ static void try_local_chat_window(void) {
 		int d;
 		args[0] = "/bin/sh";
 		args[1] = "-c";
-		/* "ssvnc -cmd VNC://fd=0 -chatonly"; */
+		/* "ssvnc -cmd VNC://fd=0 -chatonly"; not working */
 		args[2] = cmd;
 		args[3] = NULL;
 
+		set_env("VNCVIEWER_PASSWORD", "moo");
+#if !NO_X11
+		if (dpy != NULL) {
+			set_env("DISPLAY", DisplayString(dpy));
+		}
+#endif
 		for (d = 3; d < 256; d++) {
 			close(d);
 		}
-		set_env("VNCVIEWER_PASSWORD", "moo");
 
 		execvp(args[0], args);
 		perror("exec");

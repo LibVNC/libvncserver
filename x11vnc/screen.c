@@ -3101,7 +3101,9 @@ void announce(int lport, int ssl, char *iface) {
 	if (! ssl) {
 		tvdt = "The VNC desktop is:     ";
 	} else {
-		if (enc_str) {
+		if (enc_str && !strcmp(enc_str, "none")) {
+			tvdt = "The VNC desktop is:     ";
+		} else if (enc_str) {
 			tvdt = "The ENC VNC desktop is: ";
 		} else {
 			tvdt = "The SSL VNC desktop is: ";
@@ -3156,7 +3158,9 @@ static void announce_http(int lport, int ssl, char *iface) {
 	char *host = this_host();
 	char *jvu;
 
-	if (ssl == 1) {
+	if (enc_str && !strcmp(enc_str, "none")) {
+		jvu = "Java viewer URL:         http";
+	} else if (ssl == 1) {
 		jvu = "Java SSL viewer URL:     https";
 	} else if (ssl == 2) {
 		jvu = "Java SSL viewer URL:     http";
@@ -3170,6 +3174,9 @@ static void announce_http(int lport, int ssl, char *iface) {
 	if (host != NULL) {
 		if (! inetd) {
 			fprintf(stderr, "%s://%s:%d/\n", jvu, host, lport);
+			if (screen && enc_str && !strcmp(enc_str, "none")) {
+				fprintf(stderr, "%s://%s:%d/\n", jvu, host, screen->port);
+			}
 		}
 	}
 }
@@ -3187,7 +3194,9 @@ void set_vnc_desktop_name(void) {
 				rfbLog("\n");
 				rfbLog("The URLs printed out below ('Java ... viewer URL') can\n");
 				rfbLog("be used for Java enabled Web browser connections.\n");
-				if (use_openssl || stunnel_port) {
+				if (enc_str && !strcmp(enc_str, "none")) {
+					;
+				} else if (use_openssl || stunnel_port) {
 					rfbLog("Here are some additional possibilities:\n");
 					rfbLog("\n");
 					rfbLog("https://host:port/proxy.vnc (MUST be used if Web Proxy used)\n");
@@ -3213,7 +3222,11 @@ void set_vnc_desktop_name(void) {
 		}
 		if (screen->httpListenSock > -1 && screen->httpPort) {
 			if (use_openssl) {
-				announce_http(screen->port, 1, listen_str);
+				if (enc_str && !strcmp(enc_str, "none")) {
+					;
+				} else {
+					announce_http(screen->port, 1, listen_str);
+				}
 				if (https_port_num >= 0) {
 					announce_http(https_port_num, 1,
 					    listen_str);
@@ -3234,7 +3247,9 @@ void set_vnc_desktop_name(void) {
 			if (stunnel_port) {
 				fprintf(stdout, "SSLPORT=%d\n", stunnel_port);
 			} else if (use_openssl) {
-				if (enc_str) {
+				if (enc_str && !strcmp(enc_str, "none")) {
+					;
+				} else if (enc_str) {
 					fprintf(stdout, "ENCPORT=%d\n", screen->port);
 				} else {
 					fprintf(stdout, "SSLPORT=%d\n", screen->port);

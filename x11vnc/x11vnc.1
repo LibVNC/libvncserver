@@ -2,7 +2,7 @@
 .TH X11VNC "1" "October 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.5, lastmod: 2008-10-18
+         version: 0.9.6, lastmod: 2008-10-29
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1953,7 +1953,8 @@ session keys and is more compatible with other software.
 Use this option if you do not want to deal with SSL
 certificates for authentication and do not want to
 use SSH but want some encryption for your VNC session.
-Or if you must interface with some symmetric key tunnel.
+Or if you must interface with a symmetric key tunnel
+that you do not have control over.
 .IP
 Note that this mode will NOT work with the UltraVNC DSM
 plugins because they alter the RFB protocol in addition
@@ -2090,6 +2091,38 @@ other ports must be explicitly indicated, for example:
 https://mygateway.com:8000/?PORT=8000.  To avoid having
 to include the PORT= in the browser URL, simply supply
 "\fB-httpsredir\fR" to x11vnc.
+.PP
+\fB-http_oneport\fR
+.IP
+For un-encrypted connections mode (i.e. no \fB-ssl,\fR
+\fB-stunnel,\fR or \fB-enc\fR options), allow the Java VNC Viewer
+applet to be downloaded thru the VNC port via HTTP.
+.IP
+That is to say, you can use a single port for Java
+applet viewer connections by using a URL in your web
+browser like this, for example:
+.IP
+http://hostname:5900
+.IP
+The regular, two-port mode, URL http://hostname:5800
+will continue to work as well.
+.IP
+As mentioned above, this mode will NOT work with
+the \fB-ssl,\fR \fB-stunnel,\fR or \fB-enc\fR encryption options.
+Note that is it equivalent to '-enc none' (i.e. it
+uses the same detection mechanism as for HTTPS, but
+with no encryption.)
+.IP
+HTTPS single-port is on by default in \fB-ssl\fR encrypted
+mode (and \fB-enc\fR too), so you only need \fB-http_oneport\fR
+when doing non-SSL encrypted connections.
+.IP
+This mode could also be useful for SSH tunnels since
+it means only one port needs to be redirected.
+.IP
+The \fB-httpsredir\fR option may also be useful for this
+mode when using an SSH tunnel as well as for router
+port redirections.
 .PP
 \fB-ssh\fR \fIuser@host:disp\fR
 .IP
