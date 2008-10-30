@@ -110,6 +110,9 @@ The enhanced TightVNC viewer features are:
 
 	- ZRLE VNC encoding support (RealVNC's encoding)
 
+	- Support for the ZYWRLE encoding, a wavelet based extension to
+	  ZRLE to improve compression of motion video and photo regions.
+
 	- Cursor alphablending with x11vnc at 32bpp (-alpha option)
 
 	- Option "-unixpw ..." for use with "x11vnc -unixpw" login dialogs.
@@ -120,8 +123,8 @@ The enhanced TightVNC viewer features are:
 	  extensions
 
 	- UltraVNC File Transfer via an auxiliary Java helper program
-	  (java must be in $PATH). Note that x11vnc supports UltraVNC
-	  file transfer.
+	  (java must be in $PATH). Note that the x11vnc server supports
+	  UltraVNC file transfer.
 
 	- Connection support for the UltraVNC repeater proxy (-repeater
 	  option).
@@ -130,11 +133,21 @@ The enhanced TightVNC viewer features are:
 	  SC I, and SSL encrypted: SC III)
 
         - Support for UltraVNC DSM Encryption Plugin mode. (ARC4 and
-          AESV2, but not MSRC4 yet)
+          AESV2, and MSRC4)
 
-	- Instead of hostname:display one can also supply "exec=command args..."
-	  to connect the viewer to the stdio of an external command
-	  (e.g. stunnel or socat) rather than using a TCP/IP socket.
+        - Support for symmetric encryption (including blowfish and 3des
+          ciphers) to Non-UltraVNC Servers. Any server using the same
+          encryption method will work, e.g.:  x11vnc -enc blowfish:./my.key
+
+	- Instead of hostname:display one can also supply "exec=command
+	  args..." to connect the viewer to the stdio of an external command
+	  (e.g. stunnel or socat) rather than using a TCP/IP socket. Unix
+	  domain sockets, e.g. /path/to/unix/socket, and a previously
+	  opened file descriptor fd=0, work too.
+
+        - Local Port Protections for STUNNEL and SSH: avoid having for
+          long periods of time a listening port on the the local (VNC
+          viewer) side that redirects to the remote side.
 
 	- Extremely low color modes: 64 and 8 colors in 8bpp
 	  (-use64/-bgr222, -use8/-bgr111)
@@ -147,6 +160,11 @@ The enhanced TightVNC viewer features are:
 	  below the actual display. Set to actual height or use -1 for
 	  autodetection (tall screens are autodetected by default).
 
+        - Escape Keys: enable a set of modifier keys so when they
+          are all pressed down you can invoke Popup menu actions via
+          keystrokes. I.e., a set of 'Hot Keys'. One can also pan (move)
+          the desktop inside the viewport via Arrow keys or a mouse drag.
+
 	- Scrollbar width setting: -sbwidth n, the default is very thin,
 	  2 pixels, for less distracting -ycrop usage.
 
@@ -154,16 +172,14 @@ The enhanced TightVNC viewer features are:
 	  dynamically via the menu: ViewOnly, Toggle Bell, CursorShape
 	  updates, X11 Cursor, Cursor Alphablending, Toggle Tight/ZRLE,
 	  Toggle JPEG, FullColor/16bpp/8bpp (256/64/8 colors), Greyscale
-	  for low color modes.
+	  for low color modes, Scaling the Viewer resolution, Escape Keys,
+	  and others, including UltraVNC extensions.
 
 	- Maintains its own BackingStore if the X server does not
 
 	- The default for localhost:0 connections is not raw encoding
 	  (local machine). Default assumes you are using SSH tunnel. Use
 	  -rawlocal to revert.
-
-	- Support for the ZYWRLE encoding, a wavelet based extension to
-	  ZRLE to improve compression of motion video and photo regions.
 
 	- XGrabServer support for fullscreen mode, for old window managers
 	  (-grab/-graball option).
@@ -198,7 +214,7 @@ Unix and Mac OS X:
 
     Unpack the archive:
 
-        % gzip -dc ssvnc-1.0.19.tar.gz | tar xvf -
+        % gzip -dc ssvnc-1.0.21.tar.gz | tar xvf -
 
     Run the GUI:
 
@@ -206,7 +222,7 @@ Unix and Mac OS X:
 
         % ./ssvnc/MacOSX/ssvnc             (for Mac OS X)
 
-    The smaller file "ssvnc_no_windows-1.0.19.tar.gz"
+    The smaller file "ssvnc_no_windows-1.0.21.tar.gz"
     could have been used as well.
 
     On MacOSX you could also click on the SSVNC app icon in the Finder.
@@ -241,7 +257,8 @@ Unix and Mac OS X:
 
 Unix/MacOSX Install:
 
-    There is no standard install, but you can make symlinks like so:
+    There is no standard install for the bundles, but you can make
+    symlinks like so:
 
 	cd /a/directory/in/PATH
 	ln -s /path/to/ssvnc/bin/{s,t}* .
@@ -249,12 +266,22 @@ Unix/MacOSX Install:
     Or put /path/to/ssvnc/bin, /path/to/ssvnc/Unix, or /path/to/ssvnc/MacOSX
     in your PATH.
 
+    For the conventional source tarball it will compile and install, e.g.:
+
+       gzip -dc ssvnc-1.0.20.src.tar.gz | tar xvf -
+       cd ssvnc-1.0.20
+       make config
+       make all
+       make PREFIX=/my/install/dir install
+
+    then have /my/install/dir/bin in your PATH.
+
 
 Windows:
 
     Unzip, using WinZip or a similar utility, the zip file:
 
-        ssvnc-1.0.19.zip
+        ssvnc-1.0.21.zip
 
     Run the GUI, e.g.:
 
@@ -266,7 +293,7 @@ Windows:
 
     select Open, and then OK to launch it.
 
-    The smaller file "ssvnc_windows_only-1.0.19.zip"
+    The smaller file "ssvnc_windows_only-1.0.21.zip"
     could have been used as well.
 
     You can make a Windows shortcut to this program if you want to.

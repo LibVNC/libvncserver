@@ -235,6 +235,8 @@ do
                 ;;
 	"-scale")	shift; SSVNC_SCALE="$1"; export SSVNC_SCALE
                 ;;
+	"-escape")	shift; VNCVIEWER_ESCAPE="$1"; export VNCVIEWER_ESCAPE
+                ;;
 	"-ssvnc_encodings")	shift; VNCVIEWER_ENCODINGS="$1"; export VNCVIEWER_ENCODINGS
                 ;;
 	"-rfbversion")	shift; VNCVIEWER_RFBVERSION="$1"; export VNCVIEWER_RFBVERSION

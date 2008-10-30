@@ -1200,6 +1200,99 @@ proc help {} {
 	jiggle_text .h.f.t
 }
 
+proc ssvnc_escape_help {} {
+	toplev .ekh
+
+	scroll_text_dismiss .ekh.f
+
+	center_win .ekh
+	wm title .ekh "SSVNC Escape Keys Help"
+
+	set msg {
+ SSVNC Escape Keys:
+
+   The Unix SSVNC VNC Viewer, ssvncviewer(1), has an 'Escape Keys'
+   mechanism that enables using keystrokes that are bound as 'Hot Keys'
+   to specific actions.
+
+   So, when you have all of the modifier keys ('escape keys') pressed down,
+   then subsequent keystrokes are interpreted as local special actions
+   instead of being sent to the remote VNC server.
+   
+   This enables quick parameter changing and also panning of the viewport.
+   E.g. the keystroke 'r' is mapped to refresh the screen.
+   
+   Enter 'default' in the entry box to enable this feature and to use the
+   default modifier list (Alt_L,Super_L on unix and Control_L,Meta_L on
+   macosx) or set it to a list of modifier keys, e.g. Alt_L,Control_L.
+   Note that _L means left side of keyboard and _R means right side.
+
+   Alt_L is the 'Alt' key on the left side of the keyboard, and Super_L
+   is usually the 'WindowsFlaggie(TM)' on the left side of the keyboard,
+   so when both of those are pressed, the escape keys mapping take effect.
+
+
+   Here is info from the ssvncviewer(1) manual page:
+
+     -escape str    This sets the 'Escape Keys' modifier sequence and enables
+                    escape keys mode.  When the modifier keys escape sequence
+                    is held down, the next keystroke is interpreted locally
+                    to perform a special action instead of being sent to the
+                    remote VNC server.
+
+                    Use '-escape default' for the default modifier sequence.
+                    (Unix: Alt_L,Super_L and MacOSX: Control_L,Meta_L)
+
+    Here are the 'Escape Keys: Help+Set' instructions from the Popup Menu:
+
+    Escape Keys:  Enter a comma separated list of modifier keys to be the
+    'escape sequence'.  When these keys are held down, the next keystroke is
+    interpreted locally to invoke a special action instead of being sent to
+    the remote VNC server.  In other words, a set of 'Hot Keys'.
+    
+    To enable or disable this, click on 'Escape Keys: Toggle' in the Popup.
+    
+    Here is the list of hot-key mappings to special actions:
+    
+       r: refresh desktop  b: toggle bell   c: toggle full-color
+       f: file transfer    x: x11cursor     z: toggle Tight/ZRLE
+       l: full screen      g: graball       e: escape keys dialog
+       s: scale dialog     +: scale up (=)  -: scale down (_)
+       t: text chat                         a: alphablend cursor
+       V: toggle viewonly  Q: quit viewer   1 2 3 4 5 6: UltraVNC scale 1/n
+    
+       Arrow keys:         pan the viewport about 10% for each keypress.
+       PageUp / PageDown:  pan the viewport by a screenful vertically.
+       Home   / End:       pan the viewport by a screenful horizontally.
+       KeyPad Arrow keys:  pan the viewport by 1 pixel for each keypress.
+       Dragging the Mouse with Button1 pressed also pans the viewport.
+       Clicking Mouse Button3 brings up the Popup Menu.
+    
+    The above mappings are *always* active in ViewOnly mode, unless you set the
+    Escape Keys value to 'never'.
+    
+    If the Escape Keys value below is set to 'default' then a default list of
+    of modifier keys is used.  For Unix it is: Alt_L,Super_L and for MacOSX it
+    is Control_L,Meta_L.  Note: the Super_L key usually has a Windows(TM) Flag
+    on it.  Also note the _L and _R mean the key is on the LEFT or RIGHT side
+    of the keyboard.
+    
+    On Unix   the default is Alt and Windows keys on Left side of keyboard.
+    On MacOSX the default is Control and Command keys on Left side of keyboard.
+    
+    Example: Press and hold the Alt and Windows keys on the LEFT side of the
+    keyboard and then press 'c' to toggle the full-color state.  Or press 't'
+    to toggle the ultravnc Text Chat window, etc.
+    
+    To use something besides the default, supply a comma separated list (or a
+    single one) from: Shift_L Shift_R Control_L Control_R Alt_L Alt_R Meta_L
+    Meta_R Super_L Super_R Hyper_L Hyper_R or Mode_switch.
+}
+
+	.ekh.f.t insert end $msg
+	jiggle_text .ekh.f.t
+}
+
 #    Or Alternatively one can supply both hosts separated by
 #    spaces (with the proxy second) in the VNC Host:Display box:
 #
@@ -2352,7 +2445,7 @@ proc set_defaults {} {
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_x11vnc sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
-	global ycrop_string ssvnc_scale sbwid_string rfbversion ssvnc_encodings use_x11cursor use_nobell use_rawlocal use_popupfix extra_sleep use_listen use_unixpw use_x11vnc_find unixpw_username
+	global ycrop_string ssvnc_scale ssvnc_escape sbwid_string rfbversion ssvnc_encodings use_x11cursor use_nobell use_rawlocal use_popupfix extra_sleep use_listen use_unixpw use_x11vnc_find unixpw_username
 	global disable_ssl_workarounds disable_ssl_workarounds_type
 	global include_list
 
@@ -2449,6 +2542,7 @@ proc set_defaults {} {
 
 	set defs(ycrop_string) ""
 	set defs(ssvnc_scale) ""
+	set defs(ssvnc_escape) ""
 	set defs(sbwid_string) ""
 	set defs(rfbversion) ""
 	set defs(ssvnc_encodings) ""
@@ -4921,7 +5015,7 @@ proc reset_stunnel_extra_opts {} {
 proc launch_unix {hp} {
 	global smb_redir_0 smb_mounts env
 	global vncauth_passwd use_unixpw unixpw_username unixpw_passwd
-	global ssh_only ts_only use_x11cursor use_nobell use_rawlocal use_popupfix ssvnc_scale
+	global ssh_only ts_only use_x11cursor use_nobell use_rawlocal use_popupfix ssvnc_scale ssvnc_escape
 	global ssvnc_encodings
 
 	globalize
@@ -5346,6 +5440,9 @@ proc launch_unix {hp} {
 	}
 	if {$ssvnc_scale != ""} {
 		set cmd "$cmd -scale '$ssvnc_scale'"
+	}
+	if {$ssvnc_escape != ""} {
+		set cmd "$cmd -escape '$ssvnc_escape'"
 	}
 	if {$ssvnc_encodings != ""} {
 		set cmd "$cmd -ssvnc_encodings '$ssvnc_encodings'"
@@ -11014,6 +11111,13 @@ proc help_ssvncviewer_opts {} {
          or the string 'fit' to fill the current screen.  Use 'auto'
          to scale the desktop to match the viewer window size.
 
+      Escape Keys:
+
+         Enable 'Escape Keys', a set of modifier keys that, if all are
+         pressed down, enable local Hot Key actions.  Set to 'default'
+         to use the default (Alt_L,Super_L on unix, Control_L,Meta_L
+         on macosx) or set to a list of modifier keys.
+
       Y Crop:
 
          This is for x11vnc's -ncache client side caching scheme with our
@@ -11043,9 +11147,10 @@ proc help_ssvncviewer_opts {} {
          VNCVIEWER_SBWIDTH       (-sbwidth, see ScrollBar Width above)
          VNCVIEWER_RFBVERSION    (-rfbversion, e.g. 3.6)
          VNCVIEWER_ENCODINGS     (-encodings, e.g. "copyrect zrle hextile")
-         VNCVIEWER_BELL          (-bell)
+         VNCVIEWER_NOBELL        (-nobell)
          VNCVIEWER_X11CURSOR     (-x11cursor, see Use X11 Cursor above)
          VNCVIEWER_RAWLOCAL      (-rawlocal, see Use Raw Local above)
+         VNCVIEWER_ESCAPE        (-escape, see Escape Keys above)
          SSVNC_SCALE             (-scale, see Scaling above)
          SSVNC_MULTIPLE_LISTEN   (-multilisten, see Mulitple LISTEN above)
          SSVNC_UNIXPW            (-unixpw)
@@ -12764,7 +12869,7 @@ proc set_advanced_options {} {
 proc set_ssvncviewer_options {} {
 	global is_windows darwin_cotvnc
 	global use_ssh use_sshssl use_x11cursor use_rawlocal use_popupfix use_alpha use_grab use_nobell
-	global ssvnc_scale
+	global ssvnc_scale ssvnc_escape
 
 	if {$is_windows} {
 		return
@@ -12820,9 +12925,10 @@ proc set_ssvncviewer_options {} {
 	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
 	incr i
 
+	set relief ridge
+
 	frame .os.b$i -height 2; incr i
 
-	set relief ridge
 	frame .os.b$i -relief $relief -borderwidth 2
 
 	label .os.b$i.l -font fixed -anchor w -text "Examples: '0.75', '1024x768', 'fit' (fill screen), or 'auto'";
@@ -12834,6 +12940,28 @@ proc set_ssvncviewer_options {} {
 	entry .os.b$i.f.e -width 10 -textvariable ssvnc_scale
 	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
 	pack .os.b$i.f.l -side left
+	pack .os.b$i.f.e -side right -expand 1 -fill x
+
+	pack .os.b$i.f .os.b$i.l -side top -fill x
+
+	incr i
+
+	frame .os.b$i -height 2; incr i
+
+	frame .os.b$i -relief $relief -borderwidth 2
+
+	label .os.b$i.l -font fixed -anchor w -text "Examples: 'default', 'Control_L,Alt_L', 'never'";
+
+	global ssvnc_escape
+	frame .os.b$i.f
+	label .os.b$i.f.l -text "Escape Keys: "
+	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
+	entry .os.b$i.f.e -width 10 -textvariable ssvnc_escape
+	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
+	button .os.b$i.f.b -relief ridge -text Help -command ssvnc_escape_help
+	lappend darwinlist .os.b$i.f.b; if {$darwin_cotvnc} {.os.b$i.f.b configure -state disabled}
+	pack .os.b$i.f.l -side left
+	pack .os.b$i.f.b -side right
 	pack .os.b$i.f.e -side right -expand 1 -fill x
 
 	pack .os.b$i.f .os.b$i.l -side top -fill x

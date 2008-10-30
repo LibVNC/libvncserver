@@ -29,6 +29,10 @@ ssvncviewer \- an X viewer client for VNC
 .br
 .B ssvncviewer
 .RI [\| options \|]
+.RI fd=n
+.br
+.B ssvncviewer
+.RI [\| options \|]
 .RI /path/to/unix/socket
 .br
 .B ssvncviewer
@@ -197,16 +201,20 @@ to allow more than one incoming VNC server at a time.
 This is the same as -multilisten described below.  Set
 SSVNC_MULTIPLE_LISTEN=MAX:n to allow no more than "n"
 simultaneous reverse connections.
-.TP
-Note: If the host:port is specified as "exec=command args..."
+
+If the host:port is specified as "exec=command args..."
 then instead of making a TCP/IP socket connection to the
 remote VNC server, "command args..." is executed and the
 viewer is attached to its stdio.  This enables tunnelling
 established via an external command, e.g. an stunnel(8)
 that does not involve a listening socket.
 This mode does not work for -listen reverse connections.
-.TP
-Note: If the host:port contains a '/' it is interpreted as a
+
+If the host:port is specified as "fd=n" then it is assumed
+n is an already opened file descriptor to the socket. (i.e
+the parent did fork+exec)
+
+If the host:port contains a '/' it is interpreted as a
 unix-domain socket (AF_LOCAL insead of AF_INET)
 .TP
 \fB\-multilisten\fR
@@ -382,6 +390,69 @@ then exit. You can save them to a file and customize them (e.g. the
 keybindings and Popup menu)  Then point to the file via
 XENVIRONMENT or XAPPLRESDIR.
 .TP
+\fB\-escape \fR\fIstr\fR
+This sets the 'Escape Keys' modifier sequence and enables
+escape keys mode.  When the modifier keys escape sequence
+is held down, the next keystroke is interpreted locally
+to perform a special action instead of being sent to the
+remote VNC server.
+
+Use '\fB\-escape\fR default' for the default modifier sequence.
+(Unix: Alt_L,Super_L and MacOSX: Control_L,Meta_L)
+
+Here are the 'Escape Keys: Help+Set' instructions from the Popup:
+
+Escape Keys:  Enter a comma separated list of modifier keys to be the 'escape
+sequence'.  When these keys are held down, the next keystroke is
+interpreted locally to invoke a special action instead of being sent to
+the remote VNC server.  In other words, a set of 'Hot Keys'.
+
+Here is the list of local key mappings to special actions:
+
+r: refresh desktop  b: toggle bell  c: toggle full-color
+
+f: file transfer    x: x11cursor    z: toggle Tight/ZRLE
+
+l: full screen      g: graball      e: escape keys dialog
+
+s: scale dialog     +: scale up (=) -: scale down (_)
+
+t: text chat                        a: alphablend cursor
+
+V: toggle viewonly  Q: quit viewer  123456: UltraVNC scale 1/n
+
+Arrow keys: pan the viewport about 10% for each keypress.
+
+PageUp/PageDown: pan the viewport by a screenful vertically.
+
+Home/End: pan the viewport by a screenful horizontally.
+
+KeyPad Arrows: pan the viewport by 1 pixel for each keypress.
+
+Dragging the Mouse with Button1 pressed also pans the viewport.
+
+Clicking Mouse Button3 brings up the Popup Menu.
+
+The above mappings are \fBalways\fR active in ViewOnly mode, unless you set
+the Escape Keys value to 'never'.
+
+If the Escape Keys value below is set to 'default' then a default list of
+of modifier keys is used.  For Unix it is: Alt_L,Super_L and for MacOSX it
+is Control_L,Meta_L.  Note: the Super_L key usually has a Windows(TM) Flag
+on it.  Also note the _L and _R mean the key is on the LEFT or RIGHT side
+of the keyboard.
+
+On Unix   the default is Alt and Windows keys on Left side of keyboard.
+On MacOSX the default is Control and Command keys on Left side of keyboard.
+
+Example: Press and hold the Alt and Windows keys on the LEFT side of the
+keyboard and then press 'c' to toggle the full-color state.  Or press 't'
+to toggle the ultravnc Text Chat window, etc.
+
+To use something besides the default, supply a comma separated list (or a
+single one) from: Shift_L Shift_R Control_L Control_R Alt_L Alt_R Meta_L
+Meta_R Super_L Super_R Hyper_L Hyper_R or Mode_switch.
+.TP
 \fB New Popup actions:\fR
 
  ViewOnly:                ~ -viewonly
@@ -402,6 +473,8 @@ XENVIRONMENT or XAPPLRESDIR.
   64 colors               ~ -bgr222 / -use64
    8 colors               ~ -bgr111 / -use8
  Scale Viewer             ~ -scale
+ Escape Keys: Toggle      ~ -escape
+ Escape Keys: Help+Set    ~ -escape
  Set Y Crop (y-max)       ~ -ycrop
  Set Scrollbar Width      ~ -sbwidth
  XGrabServer              ~ -graball
