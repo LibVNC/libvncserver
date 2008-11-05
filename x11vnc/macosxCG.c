@@ -146,7 +146,7 @@ extern void usleep(unsigned long usec);
 extern int usleep(useconds_t usec);
 #endif
 extern unsigned int sleep(unsigned int seconds);
-extern void clean_up_exit (int ret);
+extern void clean_up_exit(int ret);
 
 void macosxCG_event_loop(void) {
 	OSStatus rc;

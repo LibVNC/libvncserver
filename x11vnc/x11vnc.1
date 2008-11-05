@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "October 2008" "x11vnc " "User Commands"
+.TH X11VNC "1" "November 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.6, lastmod: 2008-10-29
+         version: 0.9.6, lastmod: 2008-11-04
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -505,8 +505,19 @@ this VNC server to the local network. (Related terms:
 Rendezvous, Bonjour).  Depending on your setup, you
 may need to start avahi-daemon and open udp port 5353
 in your firewall.
+.IP
+If the avahi API cannot be found at build time, a helper
+program like avahi-
+.IR publish (1)
+or dns-
+.IR sd (1)
+will be tried
 .PP
 \fB-mdns\fR
+.IP
+Same as \fB-avahi.\fR
+.PP
+\fB-zeroconf\fR
 .IP
 Same as \fB-avahi.\fR
 .PP
@@ -2475,6 +2486,11 @@ or
 may be needed for GNOME and KDE.  If x11vnc guesses
 your desktop incorrectly, you can force it by prefixing
 color with "gnome:", "kde:", "cde:" or "root:".
+.IP
+This mode works in a limited way on the Mac OS X Console
+with one color ('kelp') using the screensaver writing
+to the background.  Look in "~/Library/Screen Savers"
+for VncSolidColor.png to change the color.
 .PP
 \fB-blackout\fR \fIstring\fR
 .IP
@@ -5427,7 +5443,7 @@ No external commands (e.g.
 , 
 .IR exec (3)
 )
-will be run.
+will be run at all.
 .PP
 \fB-allowedcmds\fR \fIlist\fR
 .IP
@@ -5435,9 +5451,10 @@ will be run.
 external commands that can be run.  The full list of
 associated options is:
 .IP
-stunnel, ssl, unixpw, WAIT, id, accept, afteraccept,
-gone, pipeinput, v4l-info, rawfb-setup, dt, gui, ssh,
-storepasswd, passwdfile, custom_passwd, crash.
+stunnel, ssl, unixpw, WAIT, zeroconf, id, accept,
+afteraccept, gone, pipeinput, v4l-info, rawfb-setup,
+dt, gui, ssh, storepasswd, passwdfile, custom_passwd,
+crash.
 .IP
 See each option's help to learn the associated external
 command.  Note that the \fB-nocmds\fR option takes precedence

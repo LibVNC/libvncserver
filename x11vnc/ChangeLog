@@ -1,3 +1,9 @@
+2008-11-09  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add zeroconf external helpers (avahi-publish and
+	  dns-sd).  Alias -zeroconf.  Close pipeinput_fh on exit.
+	  Kludge to make -solid work on MacOSX console.  Attempt at
+	  cpp macros to disable newer libvncserver interfaces.
+
 2008-10-29  Karl Runge <runge@karlrunge.com>
 	* x11vnc: -http_oneport for single port HTTP and VNC.
 	  Improve find_display wrt lsof blocking with -b.

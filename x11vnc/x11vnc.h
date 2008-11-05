@@ -134,6 +134,29 @@
 #define PASSWD_UNLESS_NOPW 0
 #endif
 
+/* some -D macros for building with old LibVNCServer */
+#ifndef LIBVNCSERVER_HAS_STATS
+#define LIBVNCSERVER_HAS_STATS 1
+#endif
+
+#ifndef LIBVNCSERVER_HAS_SHUTDOWNSOCKETS
+#define LIBVNCSERVER_HAS_SHUTDOWNSOCKETS 1
+#endif
+
+#ifndef LIBVNCSERVER_HAS_TEXTCHAT
+#define LIBVNCSERVER_HAS_TEXTCHAT 1
+#endif
+
+#ifdef PRE_0_8_LIBVNCSERVER
+#undef  LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
+#undef  LIBVNCSERVER_HAS_STATS
+#undef  LIBVNCSERVER_HAS_SHUTDOWNSOCKETS
+#undef  LIBVNCSERVER_HAS_TEXTCHAT 
+#define LIBVNCSERVER_HAS_STATS 0
+#define LIBVNCSERVER_HAS_SHUTDOWNSOCKETS 0
+#define LIBVNCSERVER_HAS_TEXTCHAT 0
+#endif
+
 /* these are for delaying features: */
 #define xxNO_SSL_OR_UNIXPW
 #define xxNO_NCACHE
@@ -212,6 +235,10 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <X11/extensions/XShm.h>
+#endif
+#if LIBVNCSERVER_HAVE_SHMAT
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #endif
 
 #include <dirent.h>

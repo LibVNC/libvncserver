@@ -2176,7 +2176,7 @@ int main(int argc, char* argv[]) {
 			http_ssl = 1;
 			continue;
 		}
-		if (!strcmp(arg, "-avahi") || !strcmp(arg, "-mdns")) {
+		if (!strcmp(arg, "-avahi") || !strcmp(arg, "-mdns") || !strcmp(arg, "-zeroconf")) {
 			avahi = 1;
 			continue;
 		}

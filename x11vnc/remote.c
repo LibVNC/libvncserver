@@ -1417,7 +1417,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		deny_all = 0;
 		goto done;
 	}
-	if (!strcmp(p, "avahi") || !strcmp(p, "mdns")) {
+	if (!strcmp(p, "avahi") || !strcmp(p, "mdns") || !strcmp(p, "zeroconf")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, avahi);
 			goto qry;
@@ -1431,7 +1431,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		goto done;
 	}
-	if (!strcmp(p, "noavahi") || !strcmp(p, "nomdns")) {
+	if (!strcmp(p, "noavahi") || !strcmp(p, "nomdns") || !strcmp(p, "nozeroconf")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, !avahi);
 			goto qry;
@@ -1914,7 +1914,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		solid_str = new;
 		use_solid_bg = 1;
-		if (raw_fb) set_raw_fb_params(0);
+		if (raw_fb && !macosx_console) set_raw_fb_params(0);
 
 		if (doit && client_count) {
 			solid_bg(0);
@@ -1932,7 +1932,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			solid_str = strdup(solid_default);
 		}
 		use_solid_bg = 1;
-		if (raw_fb) set_raw_fb_params(0);
+		if (raw_fb && !macosx_console) set_raw_fb_params(0);
 		if (client_count && !orig) {
 			solid_bg(0);
 		}

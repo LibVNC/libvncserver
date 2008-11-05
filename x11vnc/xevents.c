@@ -1628,6 +1628,7 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 		rfbCloseClient(cl);
 		return;
 	}
+#if LIBVNCSERVER_HAS_TEXTCHAT
 
 	if (chat_window && chat_window_client == NULL && ulen == rfbTextChatOpen) {
 		try_local_chat_window();
@@ -1662,6 +1663,7 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 		/* not clear what is going on WRT close and finished... */
 		rfbSendTextChatMessage(cl, rfbTextChatFinished, "");
 	}
+#endif
 }
 
 int get_keyboard_led_state_hook(rfbScreenInfoPtr s) {

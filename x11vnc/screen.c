@@ -1557,7 +1557,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 
 	if (sscanf(str, "shm:%d", &shmid) == 1) {
 		/* shm:N */
-#if LIBVNCSERVER_HAVE_XSHM
+#if LIBVNCSERVER_HAVE_XSHM || LIBVNCSERVER_HAVE_SHMAT
 		raw_fb_addr = (char *) shmat(shmid, 0, SHM_RDONLY);
 		if (! raw_fb_addr) {
 			rfbLogEnable(1);
@@ -3402,7 +3402,9 @@ static void record_last_fb_update(void) {
 #if 0
 		rbs += cl->rawBytesEquivalent;
 #else
+#if LIBVNCSERVER_HAS_STATS
 		rbs += rfbStatGetSentBytesIfRaw(cl);
+#endif
 #endif
 	}
 	rfbReleaseClientIterator(iter);

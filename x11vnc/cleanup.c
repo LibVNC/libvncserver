@@ -30,7 +30,7 @@ XErrorEvent *trapped_xerror_event;
 int crash_debug = 0;
 
 void clean_shm(int quick);
-void clean_up_exit (int ret);
+void clean_up_exit(int ret);
 int trap_xerror(Display *d, XErrorEvent *error);
 int trap_xioerror(Display *d);
 int trap_getimage_xerror(Display *d, XErrorEvent *error);
@@ -110,7 +110,7 @@ static void clean_icon_mode(void) {
 /*
  * Normal exiting
  */
-void clean_up_exit (int ret) {
+void clean_up_exit(int ret) {
 	static int depth = 0;
 	exit_flag = 1;
 
@@ -149,6 +149,11 @@ void clean_up_exit (int ret) {
 		macosxCG_fini();
 	}
 #endif
+
+	if (pipeinput_fh != NULL) {
+		pclose(pipeinput_fh);
+		pipeinput_fh = NULL;
+	}
 
 	if (! dpy) exit(ret);	/* raw_rb hack */
 

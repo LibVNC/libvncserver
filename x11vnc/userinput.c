@@ -5362,7 +5362,9 @@ int fb_update_sent(int *count) {
 #if 0
 		sent += cl->framebufferUpdateMessagesSent;
 #else
+#if LIBVNCSERVER_HAS_STATS
 		sent += rfbStatGetMessageCountSent(cl, rfbFramebufferUpdate);
+#endif
 #endif
 	}
 	rfbReleaseClientIterator(i);

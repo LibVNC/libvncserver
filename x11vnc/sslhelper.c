@@ -932,7 +932,9 @@ void openssl_port(void) {
 	if (shutdown) {
 		if (db) fprintf(stderr, "shutting down %d/%d\n",
 		    port, screen->listenSock);
+#if LIBVNCSERVER_HAS_SHUTDOWNSOCKETS
 		rfbShutdownSockets(screen);
+#endif
 	}
 
 	sock = rfbListenOnTCPPort(port, iface);
