@@ -267,7 +267,7 @@ if test "x$HAVE_X" = "xtrue" -a "x$HAVE_XTEST" != "xtrue"; then
 	AC_MSG_WARN([
 ==========================================================================
 *** A working build environment for the XTEST extension was not found ***
-(libXtst).  An x11vnc built this way will be only barely usable.
+(libXtst).  An x11vnc built this way will be *ONLY BARELY USABLE*.
 You will be able to move the mouse but not click or type.  There can
 also be deadlocks if an application grabs the X server.
 
@@ -276,6 +276,7 @@ for XTEST (perhaps it is named something like libxtst-dev) and run
 configure again.
 ==========================================================================
 ])
+	sleep 5
 fi
 
 # set some ld -R nonsense
@@ -362,6 +363,7 @@ SSL install the necessary development packages (perhaps it is named
 something like libssl-dev) and run configure again.
 ==========================================================================
 ])
+		sleep 5
 	elif test "x$with_ssl" != "xno"; then
 		AC_CHECK_LIB(ssl, X509_print_ex_fp, 
 			[AC_DEFINE(HAVE_X509_PRINT_EX_FP) HAVE_X509_PRINT_EX_FP="true"], , $SSL_LIBS
@@ -424,6 +426,9 @@ fi
 if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xno"; then
 	printf "checking for system libvncserver... "
 	vneed="0.9.1"
+	if test "X$VNEED" != "X"; then
+		vneed=$VNEED
+	fi
 	if test "x$with_system_libvncserver" != "xyes"; then
 		rflag=""
 		if test "x$ld_minus_R" = "xno"; then
@@ -442,12 +447,11 @@ if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xno
 			if test $cscore -lt $nscore; then
 				echo "no"
 				with_system_libvncserver=no
-				AC_MSG_WARN([
+				AC_MSG_ERROR([
 ==========================================================================
 *** Need libvncserver version $vneed, have version $cvers ***
 You are building with a system installed libvncserver and it is not
-new enough.  NOTE: The libvncserver included in the x11vnc source tree
-will be used instead.
+new enough.
 ==========================================================================
 ])
 			else
@@ -477,12 +481,11 @@ will be used instead.
 
 		if test $cscore -lt $nscore; then
 			echo "no"
-				AC_MSG_WARN([
+				AC_MSG_ERROR([
 ==========================================================================
 *** Need libvncserver version $vneed, have version $cvers ***
 You are building with a system installed libvncserver and it is not
-new enough.  NOTE: The libvncserver included in the x11vnc source tree
-will be used instead.
+new enough.
 ==========================================================================
 ])
 		else
@@ -542,7 +545,7 @@ if test "x$with_jpeg" != "xno"; then
 			LDFLAGS="$saved_LDFLAGS"
 		fi
 	fi
-	if test "$build" = "yes"; then
+	if test "$build_x11vnc" = "yes"; then
 		if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
 			AC_MSG_WARN([
 ==========================================================================
@@ -554,6 +557,7 @@ in DIR/lib/libjpeg.a.  A copy of libjpeg may be obtained from:
 ftp://ftp.uu.net/graphics/jpeg/
 ==========================================================================
 ])
+			sleep 5
 		fi
 	fi
 fi
@@ -599,6 +603,7 @@ header file is in DIR/include/zlib.h and the library in DIR/lib/libz.a.
 A copy of libz may be obtained from: http://www.gzip.org/zlib/
 ==========================================================================
 ])
+			sleep 5
 		fi
 	fi
 fi
@@ -700,7 +705,7 @@ fi
 AC_CHECK_FUNCS([ftime gethostbyname gethostname gettimeofday inet_ntoa memmove memset mmap mkfifo select socket strchr strcspn strdup strerror strstr])
 # x11vnc only:
 if test "$build_x11vnc" = "yes"; then
-	AC_CHECK_FUNCS([setsid setpgrp getpwuid getpwnam getspnam getuid geteuid setuid setgid seteuid setegid initgroups waitpid setutxent grantpt])
+	AC_CHECK_FUNCS([setsid setpgrp getpwuid getpwnam getspnam getuid geteuid setuid setgid seteuid setegid initgroups waitpid setutxent grantpt shmat])
 fi
 
 # check, if shmget is in cygipc.a
