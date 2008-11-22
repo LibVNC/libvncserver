@@ -26,7 +26,7 @@
 /*
  * user input handling heuristics
  */
-int defer_update_nofb = 6;	/* defer a shorter time under -nofb */
+int defer_update_nofb = 4;	/* defer a shorter time under -nofb */
 int last_scroll_type = SCR_NONE;
 
 
@@ -10026,7 +10026,7 @@ if (ncdb) fprintf(stderr, "----%02d: UnmapNotify      0x%lx  %3d\n", ik, win, id
 
 #if 0
 /*
-//				if (cache_list[idx].map_state == IsViewable || desktop_change || macosx_console)
+				if (cache_list[idx].map_state == IsViewable || desktop_change || macosx_console)
  */
 #endif
 				if (1) {

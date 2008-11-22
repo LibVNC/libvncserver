@@ -2843,7 +2843,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		use_xdamage = 1;
 		if (use_xdamage != orig) {
 			initialize_xdamage();
-			create_xdamage_if_needed();
+			create_xdamage_if_needed(0);
 		}
 		goto done;
 	}
@@ -3927,6 +3927,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		d = atoi(p);
 		if (d < 0) d = 0;
 		rfbLog("remote_cmd: setting defer to %d ms.\n", d);
+		defer_update = d;
 		screen->deferUpdateTime = d;
 		got_defer = 1;
 		goto done;
@@ -3947,8 +3948,20 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		d = atoi(p);
 		if (d < 0) d = 0;
 		rfbLog("remote_cmd: setting defer to %d ms.\n", d);
+		defer_update = d;
 		screen->deferUpdateTime = d;
 		got_defer = 1;
+		goto done;
+	}
+	if (strstr(p, "setdefer") == p) {
+		COLON_CHECK("setdefer:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, set_defer);
+			goto qry;
+		}
+		p += strlen("setdefer:");
+		set_defer = atoi(p);
+		rfbLog("remote_cmd: setting set_defer to %d\n", set_defer);
 		goto done;
 	}
 	if (strstr(p, "wait_ui") == p) {
@@ -5177,7 +5190,6 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(passwdfile));
 			goto qry;
 		}
-#ifndef NO_SSL_OR_UNIXPW
 		if (!strcmp(p, "unixpw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, unixpw);
 			goto qry;
@@ -5218,7 +5230,6 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%d", p, https_port_redir);
 			goto qry;
 		}
-#endif
 		if (!strcmp(p, "usepw")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, usepw);
 			goto qry;

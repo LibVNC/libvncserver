@@ -3072,6 +3072,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	}
 	if (! got_deferupdate) {
 		screen->deferUpdateTime = defer_update;
+	} else {
+		defer_update = screen->deferUpdateTime;
 	}
 
 	rfbInitServer(screen);
@@ -3429,9 +3431,15 @@ static int choose_delay(double dt) {
 	int bogdown = 1, bcnt = 0;
 	int ndt = 8, nave = 3;
 	double fac = 1.0;
-	int db = 0;
+	static int db = 0, did_set_defer = 0;
 	static double dts[8];
+	static int link = LR_UNSET, latency = -1, netrate = -1;
+	static double last_link = 0.0;
 
+	if (screen && did_set_defer) {
+		/* reset defer in case we changed it */
+		screen->deferUpdateTime = defer_update;
+	}
 	if (waitms == 0) {
 		return waitms;
 	}
@@ -3443,10 +3451,21 @@ static int choose_delay(double dt) {
 		for(i=0; i<ndt; i++) {
 			dts[i] = 0.0;
 		}
+		if (getenv("DEBUG_DELAY")) {
+			db = atoi(getenv("DEBUG_DELAY"));
+		}
+		if (getenv("SET_DEFER")) {
+			set_defer = atoi(getenv("SET_DEFER"));
+		}
 		first = 0;
 	}
 
 	now = dnow();
+
+	if (now > last_link + 30.0 || link == LR_UNSET) {
+		link = link_rate(&latency, &netrate);
+		last_link = now;
+	}
 
 	/*
 	 * first check for bogdown, e.g. lots of activity, scrolling text
@@ -3514,6 +3533,7 @@ if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnowx());
 		db = (db || debug_tiles);
 		if (db) fprintf(stderr, "bogg[%d] %.3f %.3f %.3f %.3f\n",
 		    msec, dts[ndt-4], dts[ndt-3], dts[ndt-2], dts[ndt-1]);
+
 		return msec;
 	}
 
@@ -3526,6 +3546,8 @@ if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnowx());
 	dy0 = nabs(y1 - y0);
 	dx1 = nabs(x2 - x1);
 	dy1 = nabs(y2 - y1);
+
+	/* bigger displacement for most recent dt: */
 	if (dx1 > dy1) {
 		dm = dx1;
 	} else {
@@ -3533,19 +3555,51 @@ if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnowx());
 	}
 
 	if ((dx0 || dy0) && (dx1 || dy1)) {
+		/* if mouse moved the previous two times: */
 		if (t2 < t0 + cut1 || t2 < t1 + cut2 || dm > 20) {
-			fac = wait_ui * 1.25;
+			/*
+			 * if within 0.15s(0) or 0.075s(1) or mouse
+			 * moved > 20pixels, set and bump up the cut
+			 * down factor.
+			 */
+			fac = wait_ui * 1.5;
+		} else if ((dx1 || dy1) && dm > 40) {
+			fac = wait_ui;
+		} else {
+			/* still 1.0? */
+			if (db > 1) fprintf(stderr, "wait_ui: still 1.0\n");
 		}
 	} else if ((dx1 || dy1) && dm > 40) {
+		/* if mouse moved > 40 last time: */
 		fac = wait_ui;
 	}
 
-	if (fac == 1 && t2 < last_keyboard_time + cut3) {
+	if (fac == 1.0 && t2 < last_keyboard_time + cut3) {
+		/* if typed in last 0.25s set wait_ui */
 		fac = wait_ui;
 	}
-	msec = (int) ((double) waitms / fac);
+	if (fac != 1.0) {
+		if (link == LR_LAN || latency <= 3) {
+			fac *= 1.5;
+		}
+	}
+
+	msec = (int) (((double) waitms) / fac);
 	if (msec == 0) {
 		msec = 1;
+	}
+
+	if (set_defer && fac != 1.0 && screen) {
+		/* this is wait_ui mode, set defer to match wait: */
+		if (set_defer >= 1) {
+			screen->deferUpdateTime = msec;
+		} else if (set_defer <= -1) {
+			screen->deferUpdateTime = 0;
+		}
+		if (nabs(set_defer) == 2) {
+			urgent_update = 1;
+		}
+		did_set_defer = 1;
 	}
 
 	x0 = x1;
@@ -3556,6 +3610,8 @@ if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnowx());
 	y1 = y2;
 	t1 = t2;
 
+	if (db > 1) fprintf(stderr, "wait: %2d defer[%02d]: %2d\n", msec, defer_update, screen->deferUpdateTime);
+
 	return msec;
 }
 
@@ -3563,7 +3619,7 @@ if (0 && dt > 0.0) fprintf(stderr, "dt: %.5f %.4f\n", dt, dnowx());
  * main x11vnc loop: polls, checks for events, iterate libvncserver, etc.
  */
 void watch_loop(void) {
-	int cnt = 0, tile_diffs = 0, skip_pe = 0;
+	int cnt = 0, tile_diffs = 0, skip_pe = 0, wait;
 	double tm, dtr, dt = 0.0;
 	time_t start = time(NULL);
 
@@ -3812,26 +3868,27 @@ void watch_loop(void) {
 				last_dt = dt;
 			}
 
- if ((debug_tiles || debug_scroll > 1 || debug_wireframe > 1)
-    && (tile_diffs > 4 || debug_tiles > 1)) {
-	double rate = (tile_x * tile_y * bpp/8 * tile_diffs) / dt;
-	fprintf(stderr, "============================= TILES: %d  dt: %.4f"
-	    "  t: %.4f  %.2f MB/s nap_ok: %d\n", tile_diffs, dt,
-	    tm - x11vnc_start, rate/1000000.0, nap_ok);
- }
+			if ((debug_tiles || debug_scroll > 1 || debug_wireframe > 1)
+			    && (tile_diffs > 4 || debug_tiles > 1)) {
+				double rate = (tile_x * tile_y * bpp/8 * tile_diffs) / dt;
+				fprintf(stderr, "============================= TILES: %d  dt: %.4f"
+				    "  t: %.4f  %.2f MB/s nap_ok: %d\n", tile_diffs, dt,
+				    tm - x11vnc_start, rate/1000000.0, nap_ok);
+			}
 
 		}
 
 		/* sleep a bit to lessen load */
-		if (! urgent_update) {
-			int wait = choose_delay(dt);
-			if (wait > 2*waitms) {
-				/* bog case, break it up */
-				nap_sleep(wait, 10);
-			} else {
-				usleep(wait * 1000);
-			}
+		wait = choose_delay(dt);
+		if (urgent_update) {
+			;
+		} else if (wait > 2*waitms) {
+			/* bog case, break it up */
+			nap_sleep(wait, 10);
+		} else {
+			usleep(wait * 1000);
 		}
+
 		cnt++;
 	}
 }

@@ -13,8 +13,11 @@ endif
 SUBDIRS = misc
 DIST_SUBDIRS = misc
 
+desktopdir = $(datadir)/applications
+desktop_DATA = x11vnc.desktop
+
 man_MANS=x11vnc.1
-EXTRA_DIST=ChangeLog README tkx11vnc $(man_MANS)
+EXTRA_DIST=ChangeLog README tkx11vnc $(man_MANS) $(desktop_DATA)
 
 if CYGIPC
 LD_CYGIPC=-lcygipc

@@ -2,7 +2,7 @@
 .TH X11VNC "1" "November 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.6, lastmod: 2008-11-04
+         version: 0.9.6, lastmod: 2008-11-22
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -89,6 +89,22 @@ port is not available.
 Automatically probe for a free VNC port starting at n.
 The default is to start probing at 5900.  Use this to
 stay away from other VNC servers near 5900.
+.PP
+\fB-rfbport\fR \fIstr\fR
+.IP
+The VNC port to listen on (a libvncserver option), e.g.
+5900, 5901, etc.  If specified as "\fB-rfbport\fR \fIPROMPT\fR"
+then the x11vnc \fB-gui\fR is used to prompt the user to
+enter the port number.
+.PP
+\fB-reopen\fR
+.IP
+If the X server connection is disconnected, try to
+reopen the X display (up to one time.)  This is of use
+for display managers like GDM (KillInitClients option)
+that kill x11vnc just after the user logs into the
+X session.  Note: the reopened state may be unstable.
+Set X11VNC_REOPEN_DISPLAY=n to reopen n times.
 .PP
 \fB-reflect\fR \fIhost:N\fR
 .IP
@@ -1408,6 +1424,89 @@ module for the h/w display however it will work only
 for finding the display and the user must already be
 logged into the X console.
 .PP
+\fB-vencrypt\fR \fImode\fR
+.IP
+The VeNCrypt extension to the VNC protocol allows
+encrypted SSL/TLS connections.  If the \fB-ssl\fR mode is
+enabled, then VeNCrypt is enabled as well BY DEFAULT
+(they both use the SSL/TLS tunnel, only the protocol
+handshake is a little different.)
+.IP
+To control when and how VeNCrypt is used, specify the
+mode string.  If mode is "never", then VeNCrypt is
+not used.  If mode is "support" (the default) then
+VeNCrypt is supported.  If mode is "only", then the
+similar and older TLSVNC protocol is not simultaneously
+supported.  x11vnc's normal SSL mode (vncs://) will be
+supported under \fB-ssl\fR unless you set mode to "force".
+.IP
+If mode is prefixed with "nodh:", then Diffie Hellman
+anonymous key exchange is disabled.  If mode is prefixed
+with "nox509:", then X509 key exchange is disabled.
+.IP
+To disable all Anonymous Diffie-Hellman access
+(susceptible to Man-In-The-Middle attack) you will need
+to supply "\fB-vencrypt\fR \fInodh:support \fB-tlsvnc\fR never\fR"
+.IP
+If mode is prefixed with "newdh:", then new Diffie
+Hellman parameters are generated for each connection
+(this can be time consuming: 1-60 secs) rather than
+using the fixed values in the program.  Using fixed,
+publicly known values is not known to be a security
+problem.  This setting applies to TLSVNC as well.
+.IP
+Long example: \fB-vencrypt\fR newdh:nox509:support
+.IP
+Also, if mode is prefixed with "plain:", then
+if \fB-unixpw\fR mode is active the VeNCrypt "*Plain"
+username+passwd method is enabled for Unix logins.
+Otherwise in \fB-unixpw\fR mode the normal login panel is
+provided.
+.IP
+You *MUST* supply the \fB-ssl\fR option for VeNCrypt to be
+active.  This option only fine-tunes its operation.
+.PP
+\fB-tlsvnc\fR \fImode\fR
+.IP
+The TLSVNC extension to the VNC protocol allows
+encrypted SSL/TLS connections.  If the \fB-ssl\fR mode is
+enabled, then TLSVNC is enabled as well BY DEFAULT
+(they both use the SSL/TLS tunnel, only the protocol
+handshake is a little different.)
+.IP
+To control when and how TLSVNC is used, specify the
+mode string.  If mode is "never", then TLSVNC is not
+used.  If mode is "support" (the default) then TLSVNC
+is supported.  If mode is "only", then the similar
+VeNCrypt protocol is not simultaneously supported.
+x11vnc's normal SSL mode (vncs://) will be supported
+under \fB-ssl\fR unless you set mode to "force".
+.IP
+If mode is prefixed with "newdh:", then new Diffie
+Hellman parameters are generated for each connection
+(this can be time consuming: 1-60 secs) rather than
+using the fixed values in the program.  Using fixed,
+publicly known values is not known to be a security
+problem.  This setting applies to VeNCrypt as well.
+See the description of "plain:" under \fB-vencrypt.\fR
+.IP
+Long example: \fB-tlsvnc\fR newdh:plain:support
+.IP
+You *MUST* supply the \fB-ssl\fR option for TLSVNC to be
+active.  This option only fine-tunes its operation.
+.PP
+\fB-dhparams\fR \fIfile\fR
+.IP
+For some operations a set of Diffie Hellman parameters
+(prime and generator) is needed.  If so, use the
+parameters in \fIfile\fR. In particular, the VeNCrypt and
+TLSVNC anonymous DH mode need them.  By default a
+fixed set is used. If you do not want to do that you
+can specify "newdh:" to the \fB-vencrypt\fR and \fB-tlsvnc\fR
+options to generate a new set each session.  If that
+is too slow for you, use \fB-dhparams\fR file to a set you
+created manually via "openssl dhparam \fB-out\fR file 1024"
+.PP
 \fB-nossl\fR
 .IP
 Disable the \fB-ssl\fR option (see below). Since \fB-ssl\fR is off
@@ -1417,44 +1516,49 @@ to unset any *earlier* \fB-ssl\fR option (or \fB-svc...)\fR
 \fB-ssl\fR \fI[pem]\fR
 .IP
 Use the openssl library (www.openssl.org) to provide a
-built-in encrypted SSL tunnel between VNC viewers and
-x11vnc.  This requires libssl support to be compiled
+built-in encrypted SSL/TLS tunnel between VNC viewers
+and x11vnc.  This requires libssl support to be compiled
 into x11vnc at build time.  If x11vnc is not built
 with libssl support it will exit immediately when \fB-ssl\fR
 is prescribed.
 .IP
-The VNC Viewer-side needs support SSL as well.
-See this URL and also the discussion below for ideas
-on how to enable SSL support for the viewer:
+The VNC Viewer-side needs to support SSL/TLS as well.
+See this URL and also the discussion below for
+ideas on how to enable SSL support for the viewer:
 http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-viewers
+x11vnc provides an SSL enabled Java viewer applet in
+the classes/ssl directory (-http or \fB-httpdir\fR options.)
+The SSVNC viewer package supports SSL too.
 .IP
-[pem] is optional, use "\fB-ssl\fR \fI/path/to/mycert.pem\fR"
-to specify a PEM certificate file to use to identify
-and provide a key for this server.  See 
+[pem] is optional, use "\fB-ssl\fR \fI/path/to/mycert.pem\fR" to
+specify a PEM certificate file to use to identify and
+provide a key for this server.  See 
 .IR openssl (1)
-for
-more info about PEMs and the \fB-sslGenCert\fR option below.
+for more
+info about PEMs and the \fB-sslGenCert\fR and "\fB-ssl\fR \fISAVE\fR"
+options below for how to create them.
 .IP
-The connecting VNC viewer SSL tunnel can optionally
-authenticate this server if they have the public
-key part of the certificate (or a common certificate
-authority, CA, is a more sophisticated way to verify
-this server's cert, see \fB-sslGenCA\fR below).  This is
-used to prevent man-in-the-middle attacks.  Otherwise,
-if the VNC viewer accepts this server's key without
-verification, at least the traffic is protected
-from passive sniffing on the network (but *NOT* from
-man-in-the-middle attacks).
+The connecting VNC viewer SSL tunnel can (optionally)
+authenticate this server if they have the public key
+part of the certificate (or a common certificate
+authority, CA, is a more sophisticated way to
+verify this server's cert, see \fB-sslGenCA\fR below).
+This is used to prevent Man-In-The-Middle attacks.
+Otherwise, if the VNC viewer accepts this server's
+key WITHOUT verification, the traffic is protected
+from passive sniffing on the network, but *NOT* from
+Man-In-The-Middle attacks.
 .IP
 If [pem] is not supplied and the 
 .IR openssl (1)
 utility
 command exists in PATH, then a temporary, self-signed
-certificate will be generated for this session (this
-may take 5-30 seconds on slow machines).  If 
+certificate will be generated for this session
+(this may take 5-30 seconds on very slow machines).
+If 
 .IR openssl (1)
-cannot be used to generate a temporary certificate
-x11vnc exits immediately.
+cannot be used to generate a temporary
+certificate x11vnc exits immediately.
 .IP
 If successful in using 
 .IR openssl (1)
@@ -1462,17 +1566,27 @@ to generate a
 temporary certificate, the public part of it will be
 displayed to stderr (e.g. one could copy it to the
 client-side to provide authentication of the server to
-VNC viewers.)  See following paragraphs for how to save
-keys to reuse when x11vnc is restarted.
+VNC viewers.)
 .IP
-Set the env. var. X11VNC_SHOW_TMP_PEM=1 to have x11vnc
-print out the entire certificate, including the PRIVATE
-KEY part, to stderr.  One could reuse this cert if saved
-in a [pem] file.  Similarly, set X11VNC_KEEP_TMP_PEM=1
-to not delete the temporary PEM file: the file name
-will be printed to stderr (so one could move it to
-a safe place for reuse).  You will be prompted for a
-passphrase for the private key.
+NOTE: Unless you safely copy the public part of the
+temporary Cert to the viewer for authenticate *every
+time* (unlikely...), then only passive sniffing
+attacks are prevented and you are still open to
+Man-In-The-Middle attacks.  See the following
+paragraphs for how to save keys to reuse them when
+x11vnc is restarted.  With saved keys AND the VNC viewer
+authenticating them by using the public certificate,
+then Man-In-The-Middle attacks are prevented.
+.IP
+If [pem] is "ANON" then the Diffie-Hellman anonymous
+key exchange method is used.  In this mode there
+are *no* SSL certificates and so it is not possible
+to authenticate either the VNC server or VNC client.
+Thus only passive network sniffing attacks are avoided:
+the "ANON" method is susceptible to Man-In-The-Middle
+attacks.  "ANON" is not recommended; instead use
+a SSL PEM you created or the "SAVE" method in the
+next paragraph.
 .IP
 If [pem] is "SAVE" then the certificate will be saved
 to the file ~/.vnc/certs/server.pem, or if that file
@@ -1488,19 +1602,17 @@ to refer to the file ~/.vnc/certs/server-<string>.pem
 instead.  E.g. "SAVE-charlie" will store to the file
 ~/.vnc/certs/server-charlie.pem
 .IP
+Examples: x11vnc \fB-ssl\fR SAVE \fB-display\fR :0 ...
+x11vnc \fB-ssl\fR SAVE-other \fB-display\fR :0 ...
+.IP
 See \fB-ssldir\fR below to use a directory besides the
 default ~/.vnc/certs
 .IP
-Example: x11vnc \fB-ssl\fR SAVE \fB-display\fR :0 ...
-.IP
-Your VNC viewer will need to be able to connect
-via SSL.  See the discussion below under \fB-stunnel\fR and
-http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-viewers
-for how this might be achieved.  E.g. on Unix it is
-easy to write a shell script that starts up stunnel
-and then vncviewer.  Also in the x11vnc source a SSL
-enabled Java VNC Viewer applet is provided in the
-classes/ssl directory.
+Misc Info: In temporary cert creation mode, set the
+env. var. X11VNC_SHOW_TMP_PEM=1 to have x11vnc print out
+the entire certificate, including the PRIVATE KEY part,
+to stderr.  There are better ways to get/save this info.
+See "SAVE" above and "\fB-sslGenCert\fR" below.
 .PP
 \fB-ssltimeout\fR \fIn\fR
 .IP
@@ -1655,6 +1767,39 @@ be "imported" somehow.  Web browsers have "Manage
 Certificates" actions as does the Java applet plugin
 Control Panel.  stunnel can also use these files (see
 the ss_vncviewer example script in the FAQ.)
+.PP
+\fB-sslCRL\fR \fIpath\fR
+.IP
+Set the Certificate Revocation Lists (CRL) to \fIpath\fR.
+.IP
+If path is a file, the file contains one more more CRLs
+in PEM format.  If path is a directory, it contains
+hash named files of CRLs in the usual OpenSSL manner.
+See the OpenSSL and 
+.IR stunnel (8)
+documentation for
+more info.
+.IP
+This option only applies if \fB-sslverify\fR has been
+supplied: it checks for revocation along the
+certificate chain used to verify the VNC client.
+The \fB-sslCRL\fR setting will be ignored when \fB-sslverify\fR is
+not specified.
+.IP
+Only rarely will one's x11vnc \fB-ssl\fR infrastructure be so
+large that this option would be useful (since normally
+maintaining the contents of the \fB-sslverify\fR file or
+directory should be enough.)  However, when using
+x11vnc with a Certificate Authority (see \fB-sslGenCA)\fR
+to authenticate Clients via SSL/TLS, the \fB-sslCRL\fR option
+can be useful to revoke users' certs whose private SSL
+keys were lost or stolen (e.g. laptop.)  This way a new
+CA cert+key does not need to be created and new signed
+client keys generated and distributed to all users.
+.IP
+To create a CRL file with revoked certificates the
+commands 'openssl ca \fB-revoke\fR ...' and 'openssl ca
+\fB-gencrl\fR ...' are useful.  (Run them in ~/.vnc/certs)
 .PP
 \fB-sslGenCA\fR \fI[dir]\fR
 .IP
@@ -2606,9 +2751,12 @@ to handle all subsequent resizes (e.g. under \fB-xrandr,\fR
 .PP
 \fB-o\fR \fIlogfile\fR
 .IP
-Write stderr messages to file \fIlogfile\fR instead of
-to the terminal.  Same as "\fB-logfile\fR \fIfile\fR".  To append
+Write stderr messages to file \fIlogfile\fR instead of to
+the terminal.  Same as "\fB-logfile\fR \fIfile\fR".  To append
 to the file use "\fB-oa\fR \fIfile\fR" or "\fB-logappend\fR \fIfile\fR".
+If \fIlogfile\fR contains the string "%VNCDISPLAY"
+it is expanded to the vnc display (the name may need
+to be guessed at.)  "%HOME" works too.
 .PP
 \fB-flag\fR \fIfile\fR
 .IP
@@ -3745,6 +3893,12 @@ has been recent user input (pointer or keyboard).
 Improves response, but increases the load whenever you
 are moving the mouse or typing.  Default: 2.00
 .PP
+\fB-setdefer\fR \fIn\fR
+.IP
+When the \fB-wait_ui\fR mechanism cuts down the wait time ms,
+set the defer time to the same ms value. n=1 to enable,
+0 to disable, and -1 to set defer to 0 (no delay).
+.PP
 \fB-nowait_bog\fR
 .IP
 Do not detect if the screen polling is "bogging down"
@@ -4715,6 +4869,10 @@ mdns            enable  avahi service advertising.
 .IP
 nomdns          disable avahi service advertising.
 .IP
+zeroconf        enable  avahi service advertising.
+.IP
+nozeroconf      disable avahi service advertising.
+.IP
 connect:host    do reverse connection to host, "host"
 may be a comma separated list of hosts
 or host:ports.  See \fB-connect.\fR  Passwords
@@ -5287,13 +5445,13 @@ nooverlay_yescursor overlay_nocursor 8to24 no8to24
 viewonly noviewonly shared noshared forever noforever
 once timeout tightfilexfer notightfilexfer ultrafilexfer
 noultrafilexfer rfbversion deny lock nodeny unlock
-avahi mdns noavahi nomdns connect proxy  allowonce
-allow localhost nolocalhost listen lookup nolookup
-accept afteraccept gone shm noshm flipbyteorder
-noflipbyteorder onetile noonetile solid_color solid
-nosolid blackout xinerama noxinerama xtrap noxtrap
-xrandr noxrandr xrandr_mode rotate padgeom quiet
-q noquiet modtweak nomodtweak xkb noxkb capslock
+avahi mdns zeroconf noavahi nomdns nozeroconf connect
+proxy  allowonce allow localhost nolocalhost listen
+lookup nolookup accept afteraccept gone shm noshm
+flipbyteorder noflipbyteorder onetile noonetile
+solid_color solid nosolid blackout xinerama noxinerama
+xtrap noxtrap xrandr noxrandr xrandr_mode rotate padgeom
+quiet q noquiet modtweak nomodtweak xkb noxkb capslock
 nocapslock skip_lockkeys noskip_lockkeys skip_keycodes
 sloppy_keys nosloppy_keys skip_dups noskip_dups
 add_keysyms noadd_keysyms clear_mods noclear_mods

@@ -7,6 +7,7 @@
 #include "scan.h"
 #include "connections.h"
 #include "sslcmds.h"
+#include "unixpw.h"
 
 #define OPENSSL_INETD 1
 #define OPENSSL_VNC   2
@@ -21,13 +22,6 @@
 #endif
 #endif
 
-#ifdef NO_SSL_OR_UNIXPW
-#undef FORK_OK
-#undef LIBVNCSERVER_HAVE_LIBSSL
-#define LIBVNCSERVER_HAVE_LIBSSL 0
-#endif
-
-
 int openssl_sock = -1;
 int openssl_port_num = 0;
 int https_sock = -1;
@@ -38,6 +32,11 @@ static char *certret = NULL;
 static int certret_fd = -1;
 static mode_t omode;
 char *certret_str = NULL;
+
+static char *dhret = NULL;
+static int dhret_fd = -1;
+char *dhret_str = NULL;
+char *new_dh_params = NULL;
 
 void raw_xfer(int csock, int s_in, int s_out);
 
@@ -85,6 +84,7 @@ static SSL_CTX *ctx = NULL;
 static RSA *rsa_512 = NULL;
 static RSA *rsa_1024 = NULL;
 static SSL *ssl = NULL;
+static X509_STORE *revocation_store = NULL;
 
 
 static void init_prng(void);
@@ -128,6 +128,9 @@ char *get_saved_pem(char *save, int create) {
 	if (strstr(save, "SAVE_PROMPT") == save) {
 		prompt = 1;
 		s = save + strlen("SAVE_PROMPT");
+	} else if (strstr(save, "SAVE_NOPROMPT") == save) {
+		set_env("GENCERT_NOPROMPT", "1");
+		s = save + strlen("SAVE_NOPROMPT");
 	} else if (strstr(save, "SAVE") == save) {
 		s = save + strlen("SAVE");
 	} else {
@@ -318,7 +321,7 @@ static char *create_tmp_pem(char *pathin, int prompt) {
 	}
 
 	rfbLog("\n");	
-	rfbLog("This will NOT prevent man-in-the-middle attacks UNLESS you\n");	
+	rfbLog("This will NOT prevent Man-In-The-Middle attacks UNLESS you\n");	
 	rfbLog("get the certificate information to the VNC viewers SSL\n");	
 	rfbLog("tunnel configuration or you take the extra steps to sign it\n");
 	rfbLog("with a CA key. However, it will prevent passive network\n");
@@ -486,6 +489,9 @@ static char *create_tmp_pem(char *pathin, int prompt) {
 			fprintf(out, "%s", line);
 			if (on) {
 				fprintf(crt, "%s", line);
+				if (!quiet) {
+					fprintf(stderr, "%s", line);
+				}
 			}
 			if (strstr(line, "END CERTIFICATE")) {
 				on = 0;
@@ -585,7 +591,7 @@ static char *get_ssl_verify_file(char *str_in) {
 	char *tfile, *tfile2;
 	FILE *file;
 	struct stat sbuf;
-	int count = 0;
+	int count = 0, fd;
 
 	if (! str_in) {
 		rfbLog("get_ssl_verify_file: no filename\n");
@@ -606,7 +612,15 @@ static char *get_ssl_verify_file(char *str_in) {
 	tfile  = (char *) malloc(strlen(tmp) + 1024);
 	tfile2 = (char *) malloc(strlen(tmp) + 1024);
 
-	sprintf(tfile, "%s/sslverify-load-%d.crts", tmp, getpid());
+	sprintf(tfile, "%s/sslverify-load-%d.crts.XXXXXX", tmp, getpid());
+
+	fd = mkstemp(tfile);
+	if (fd < 0) {
+		rfbLog("get_ssl_verify_file: %s\n", tfile);
+		rfbLogPerror("mkstemp");
+		exit(1);
+	}
+	close(fd);
 
 	file = fopen(tfile, "w");
 	chmod(tfile, 0600);
@@ -626,7 +640,7 @@ static char *get_ssl_verify_file(char *str_in) {
 				unlink(tfile);
 				exit(1);
 			}
-			fprintf(stderr, "sslverify: loaded %s\n", tfile2);
+			rfbLog("sslverify: loaded %s\n", tfile2);
 			count++;
 
 		} else if (!strcmp(p, "clients")) {
@@ -657,7 +671,7 @@ static char *get_ssl_verify_file(char *str_in) {
 					unlink(tfile);
 					exit(1);
 				}
-				fprintf(stderr, "sslverify: loaded %s\n",
+				rfbLog("sslverify: loaded %s\n",
 				    tfile2);
 				count++;
 			}
@@ -676,7 +690,7 @@ static char *get_ssl_verify_file(char *str_in) {
 				unlink(tfile);
 				exit(1);
 			}
-			fprintf(stderr, "sslverify: loaded %s\n", tfile2);
+			rfbLog("sslverify: loaded %s\n", tfile2);
 			count++;
 		}
 		p = strtok(NULL, ",");
@@ -685,13 +699,166 @@ static char *get_ssl_verify_file(char *str_in) {
 	free(tfile2);
 	free(str);
 
-	fprintf(stderr, "sslverify: using %d client certs in %s\n", count,
-	    tfile);
+	rfbLog("sslverify: using %d client certs in\n", count);
+	rfbLog("sslverify: %s\n", tfile);
 
 	return tfile;
 }
 
+/* based on mod_ssl */
+static int crl_callback(X509_STORE_CTX *callback_ctx) {
+	X509_STORE_CTX store_ctx;
+	X509_OBJECT obj;
+	X509_NAME *subject;
+	X509_NAME *issuer;
+	X509 *xs;
+	X509_CRL *crl;
+	X509_REVOKED *revoked;
+	EVP_PKEY *pubkey;
+	long serial;
+	BIO *bio;
+	int i, n, rc;
+	char *cp, *cp2;
+	ASN1_TIME *t;
+	
+	/* Determine certificate ingredients in advance */
+	xs      = X509_STORE_CTX_get_current_cert(callback_ctx);
+	subject = X509_get_subject_name(xs);
+	issuer  = X509_get_issuer_name(xs);
+	
+	/* Try to retrieve a CRL corresponding to the _subject_ of
+	* the current certificate in order to verify it's integrity. */
+	memset((char *)&obj, 0, sizeof(obj));
+	X509_STORE_CTX_init(&store_ctx, revocation_store, NULL, NULL);
+	rc=X509_STORE_get_by_subject(&store_ctx, X509_LU_CRL, subject, &obj);
+	X509_STORE_CTX_cleanup(&store_ctx);
+	crl=obj.data.crl;
+
+	if(rc>0 && crl) {
+		/* Log information about CRL
+		 * (A little bit complicated because of ASN.1 and BIOs...) */
+		bio=BIO_new(BIO_s_mem());
+		BIO_printf(bio, "lastUpdate: ");
+		ASN1_UTCTIME_print(bio, X509_CRL_get_lastUpdate(crl));
+		BIO_printf(bio, ", nextUpdate: ");
+		ASN1_UTCTIME_print(bio, X509_CRL_get_nextUpdate(crl));
+		n=BIO_pending(bio);
+		cp=malloc(n+1);
+		n=BIO_read(bio, cp, n);
+		cp[n]='\0';
+		BIO_free(bio);
+		cp2=X509_NAME_oneline(subject, NULL, 0);
+		rfbLog("CA CRL: Issuer: %s, %s\n", cp2, cp);
+		OPENSSL_free(cp2);
+		free(cp);
+
+		/* Verify the signature on this CRL */
+		pubkey=X509_get_pubkey(xs);
+		if(X509_CRL_verify(crl, pubkey)<=0) {
+			rfbLog("Invalid signature on CRL\n");
+			X509_STORE_CTX_set_error(callback_ctx,
+				X509_V_ERR_CRL_SIGNATURE_FAILURE);
+			X509_OBJECT_free_contents(&obj);
+			if(pubkey)
+				EVP_PKEY_free(pubkey);
+			return 0; /* Reject connection */
+		}
+		if(pubkey)
+			EVP_PKEY_free(pubkey);
+
+		/* Check date of CRL to make sure it's not expired */
+		t=X509_CRL_get_nextUpdate(crl);
+		if(!t) {
+			rfbLog("Found CRL has invalid nextUpdate field\n");
+			X509_STORE_CTX_set_error(callback_ctx,
+				X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD);
+			X509_OBJECT_free_contents(&obj);
+			return 0; /* Reject connection */
+		}
+		if(X509_cmp_current_time(t)<0) {
+			rfbLog("Found CRL is expired - "
+				"revoking all certificates until you get updated CRL\n");
+			X509_STORE_CTX_set_error(callback_ctx, X509_V_ERR_CRL_HAS_EXPIRED);
+			X509_OBJECT_free_contents(&obj);
+			return 0; /* Reject connection */
+		}
+		X509_OBJECT_free_contents(&obj);
+	}
+
+	/* Try to retrieve a CRL corresponding to the _issuer_ of
+	 * the current certificate in order to check for revocation. */
+	memset((char *)&obj, 0, sizeof(obj));
+	X509_STORE_CTX_init(&store_ctx, revocation_store, NULL, NULL);
+	rc=X509_STORE_get_by_subject(&store_ctx, X509_LU_CRL, issuer, &obj);
+	X509_STORE_CTX_cleanup(&store_ctx);
+	crl=obj.data.crl;
+
+	if(rc>0 && crl) {
+		/* Check if the current certificate is revoked by this CRL */
+		n=sk_X509_REVOKED_num(X509_CRL_get_REVOKED(crl));
+		for(i=0; i<n; i++) {
+			revoked=sk_X509_REVOKED_value(X509_CRL_get_REVOKED(crl), i);
+			if(ASN1_INTEGER_cmp(revoked->serialNumber,
+					X509_get_serialNumber(xs)) == 0) {
+				serial=ASN1_INTEGER_get(revoked->serialNumber);
+				cp=X509_NAME_oneline(issuer, NULL, 0);
+				rfbLog("Certificate with serial %ld (0x%lX) "
+					"revoked per CRL from issuer %s\n", serial, serial, cp);
+				OPENSSL_free(cp);
+				X509_STORE_CTX_set_error(callback_ctx, X509_V_ERR_CERT_REVOKED);
+				X509_OBJECT_free_contents(&obj);
+				return 0; /* Reject connection */
+			}
+		}
+		X509_OBJECT_free_contents(&obj);
+	}
+
+	return 1; /* Accept connection */
+}
+
+static int verify_callback(int ok, X509_STORE_CTX *callback_ctx) {
+	if (!ssl_verify) {
+		rfbLog("CRL_check: skipped.\n");
+		return ok;
+	}
+	if (!ssl_crl) {
+		rfbLog("CRL_check: skipped.\n");
+		return ok;
+	}
+	if (!ok) {
+		rfbLog("CRL_check: client cert is already rejected.\n");
+		return ok;
+	}
+	if (revocation_store) {
+		if (crl_callback(callback_ctx)) {
+			rfbLog("CRL_check: succeeded.\n");
+			return 1;
+		} else {
+			rfbLog("CRL_check: did not pass.\n");
+			return 0;
+		}
+	}
+	/* NOTREACHED */
+	return 1;
+}
+
+#define rfbSecTypeTlsVnc   18
+#define rfbSecTypeVencrypt 19
+
+#define rfbVencryptPlain	256
+#define rfbVencryptTlsNone	257
+#define rfbVencryptTlsVnc	258
+#define rfbVencryptTlsPlain	259
+#define rfbVencryptX509None	260
+#define rfbVencryptX509Vnc	261
+#define rfbVencryptX509Plain	262
+
+static int vencrypt_selected = 0;
+static int tlsvnc_selected = 0;
+
 static int ssl_client_mode = 0;
+
+static int switch_to_anon_dh(void);
 
 void openssl_init(int isclient) {
 	int db = 0, tmp_pem = 0, do_dh;
@@ -792,11 +959,27 @@ void openssl_init(int isclient) {
 		}
 		tmp_pem = 1;
 
+	} else if (!strcmp(openssl_pem, "ANON")) {
+		if (ssl_verify) {
+			rfbLog("openssl_init: Anonymous Diffie-Hellman cannot"
+			    " be used in -sslverify mode.\n");	
+			clean_up_exit(1);
+		}
+		if (ssl_crl) {
+			rfbLog("openssl_init: Anonymous Diffie-Hellman cannot"
+			    " be used in -sslCRL mode.\n");	
+			clean_up_exit(1);
+		}
+		if (!switch_to_anon_dh()) {
+			rfbLog("openssl_init: Anonymous Diffie-Hellman setup"
+			    " failed.\n");	
+			clean_up_exit(1);
+		}
 	} else if (strstr(openssl_pem, "SAVE") == openssl_pem) {
 		openssl_pem = get_saved_pem(openssl_pem, 1);
 		if (! openssl_pem) {
 			rfbLog("openssl_init: could not create or open"
-			    " saved PEM:\n", openssl_pem);	
+			    " saved PEM: %s\n", openssl_pem);	
 			clean_up_exit(1);
 		}
 		tmp_pem = 0;
@@ -834,18 +1017,20 @@ void openssl_init(int isclient) {
 		DH_free(dh);
 	}
 
-	if (! SSL_CTX_use_certificate_chain_file(ctx, openssl_pem)) {
-		rfbLog("openssl_init: SSL_CTX_use_certificate_chain_file() failed.\n");	
-		sslerrexit();
-	}
-	if (! SSL_CTX_use_RSAPrivateKey_file(ctx, openssl_pem,
-	    SSL_FILETYPE_PEM)) {
-		rfbLog("openssl_init: SSL_CTX_set_tmp_rsa(1024) failed.\n");	
-		sslerrexit();
-	}
-	if (! SSL_CTX_check_private_key(ctx)) {
-		rfbLog("openssl_init: SSL_CTX_set_tmp_rsa(1024) failed.\n");	
-		sslerrexit();
+	if (strcmp(openssl_pem, "ANON")) {
+		if (! SSL_CTX_use_certificate_chain_file(ctx, openssl_pem)) {
+			rfbLog("openssl_init: SSL_CTX_use_certificate_chain_file() failed.\n");	
+			sslerrexit();
+		}
+		if (! SSL_CTX_use_RSAPrivateKey_file(ctx, openssl_pem,
+		    SSL_FILETYPE_PEM)) {
+			rfbLog("openssl_init: SSL_CTX_set_tmp_rsa(1024) failed.\n");	
+			sslerrexit();
+		}
+		if (! SSL_CTX_check_private_key(ctx)) {
+			rfbLog("openssl_init: SSL_CTX_set_tmp_rsa(1024) failed.\n");	
+			sslerrexit();
+		}
 	}
 
 	if (tmp_pem && ! getenv("X11VNC_KEEP_TMP_PEM")) {
@@ -866,6 +1051,46 @@ void openssl_init(int isclient) {
 		openssl_pem = NULL;
 	}
 
+	if (ssl_crl) {
+		struct stat sbuf;
+		X509_LOOKUP *lookup;
+
+		if (stat(ssl_crl, &sbuf) != 0) {
+			rfbLog("openssl_init: -sslCRL does not exist %s.\n",
+			    ssl_crl ? ssl_crl : "null");	
+			rfbLogPerror("stat");
+			clean_up_exit(1);
+		}
+
+		revocation_store = X509_STORE_new();
+		if (!revocation_store) {
+			rfbLog("openssl_init: X509_STORE_new failed.\n");
+			sslerrexit();
+		}
+		if (! S_ISDIR(sbuf.st_mode)) {
+			lookup = X509_STORE_add_lookup(revocation_store, X509_LOOKUP_file());
+			if (!lookup) {
+				rfbLog("openssl_init: X509_STORE_add_lookup failed.\n");
+				sslerrexit();
+			}
+			if (!X509_LOOKUP_load_file(lookup, ssl_crl, X509_FILETYPE_PEM))  {
+				rfbLog("openssl_init: X509_LOOKUP_load_file failed.\n");
+				sslerrexit();
+			}
+		} else {
+			lookup = X509_STORE_add_lookup(revocation_store, X509_LOOKUP_hash_dir());
+			if (!lookup) {
+				rfbLog("openssl_init: X509_STORE_add_lookup failed.\n");
+				sslerrexit();
+			}
+			if (!X509_LOOKUP_add_dir(lookup, ssl_crl, X509_FILETYPE_PEM))  {
+				rfbLog("openssl_init: X509_LOOKUP_add_dir failed.\n");
+				sslerrexit();
+			}
+		}
+		rfbLog("loaded CRL file: %s\n", ssl_crl);
+	}
+
 	if (ssl_verify) {
 		struct stat sbuf;
 		char *file;
@@ -874,7 +1099,7 @@ void openssl_init(int isclient) {
 		file = get_ssl_verify_file(ssl_verify);
 
 		if (!file || stat(file, &sbuf) != 0) {
-			rfbLog("openssl_init: -sslverify does not exists %s.\n",
+			rfbLog("openssl_init: -sslverify does not exist %s.\n",
 			    file ? file : "null");	
 			rfbLogPerror("stat");
 			clean_up_exit(1);
@@ -894,7 +1119,11 @@ void openssl_init(int isclient) {
 		}
 
 		lvl = SSL_VERIFY_FAIL_IF_NO_PEER_CERT|SSL_VERIFY_PEER;
-		SSL_CTX_set_verify(ctx, lvl, NULL);
+		if (ssl_crl == NULL) {
+			SSL_CTX_set_verify(ctx, lvl, NULL);
+		} else {
+			SSL_CTX_set_verify(ctx, lvl, verify_callback);
+		}
 		if (strstr(file, "tmp/sslverify-load-")) {
 			/* temporary file */
 			unlink(file);
@@ -1371,6 +1600,106 @@ static int check_ssl_access(char *addr) {
 	return check_access(addr);
 }
 
+static int write_exact(int sock, char *buf, int len);
+static int read_exact(int sock, char *buf, int len);
+
+static int finish_auth(rfbClientPtr client, char *type) {
+	int security_result, ret;
+
+	ret = 0;
+
+if (getenv("X11VNC_DEBUG_TLSPLAIN")) fprintf(stderr, "finish_auth type=%s\n", type);
+
+	if (!strcmp(type, "None")) {
+		security_result = 0;	/* success */
+		if (write_exact(client->sock, (char *) &security_result, 4)) {
+			ret = 1;
+		}
+		rfbLog("finish_auth: using auth 'None'\n");
+		client->state = RFB_INITIALISATION;
+
+	} else if (!strcmp(type, "Vnc")) {
+		RAND_bytes(client->authChallenge, CHALLENGESIZE);
+		if (write_exact(client->sock, (char *) &client->authChallenge, CHALLENGESIZE)) {
+			ret = 1;
+		}
+		rfbLog("finish_auth: using auth 'Vnc', sent challenge.\n");
+		client->state = RFB_AUTHENTICATION;
+
+	} else if (!strcmp(type, "Plain")) {
+		if (!unixpw) {
+			rfbLog("finish_auth: *Plain not allowed outside unixpw mode.\n");
+			ret = 0;
+		} else {
+			char *un, *pw;
+			int unlen, pwlen;
+
+if (getenv("X11VNC_DEBUG_TLSPLAIN")) fprintf(stderr, "*Plain begin: onHold=%d client=%p unixpw_client=%p\n", client->onHold, (void *) client, (void *) unixpw_client);
+
+			if (!read_exact(client->sock, (char *)&unlen, 4)) goto fail;
+			unlen = Swap32IfLE(unlen);
+
+if (getenv("X11VNC_DEBUG_TLSPLAIN")) fprintf(stderr, "unlen: %d\n", unlen);
+
+			if (!read_exact(client->sock, (char *)&pwlen, 4)) goto fail;
+			pwlen = Swap32IfLE(pwlen);
+
+if (getenv("X11VNC_DEBUG_TLSPLAIN")) fprintf(stderr, "pwlen: %d\n", pwlen);
+
+			un = (char *) malloc(unlen+1);
+			memset(un, 0, unlen+1);
+
+			pw = (char *) malloc(pwlen+2);
+			memset(pw, 0, pwlen+2);
+
+			if (!read_exact(client->sock, un, unlen)) goto fail;
+			if (!read_exact(client->sock, pw, pwlen)) goto fail;
+
+if (getenv("X11VNC_DEBUG_TLSPLAIN")) fprintf(stderr, "*Plain: %d %d '%s' ... \n", unlen, pwlen, un);
+			strcat(pw, "\n");
+
+			if (unixpw_verify(un, pw)) {
+				security_result = 0;	/* success */
+				if (write_exact(client->sock, (char *) &security_result, 4)) {
+					ret = 1;
+					unixpw_verify_screen(un, pw);
+				}
+				client->onHold = FALSE;
+				client->state = RFB_INITIALISATION;
+			}
+			if (ret == 0) {
+				rfbClientSendString(client, "unixpw failed");
+			}
+
+			memset(un, 0, unlen+1);
+			memset(pw, 0, pwlen+2);
+			free(un);
+			free(pw);
+		}
+	} else {
+		rfbLog("finish_auth: unknown sub-type: %s\n", type);
+		ret = 0;
+	}
+
+	fail:
+	return ret;
+}
+
+static int finish_vencrypt_auth(rfbClientPtr client, int subtype) {
+
+	if (subtype == rfbVencryptTlsNone || subtype == rfbVencryptX509None) {
+		return finish_auth(client, "None");
+	} else if (subtype == rfbVencryptTlsVnc || subtype == rfbVencryptX509Vnc) {
+		return finish_auth(client, "Vnc");
+	} else if (subtype == rfbVencryptTlsPlain || subtype == rfbVencryptX509Plain) {
+		return finish_auth(client, "Plain");
+	} else {
+		rfbLog("finish_vencrypt_auth: unknown sub-type: %d\n", subtype);
+		return 0;
+	}
+}
+
+
 void accept_openssl(int mode, int presock) {
 	int sock = -1, listen = -1, cport, csock, vsock;	
 	int peerport = 0;
@@ -1384,15 +1713,18 @@ void accept_openssl(int mode, int presock) {
 	rfbClientPtr client;
 	pid_t pid;
 	char uniq[] = "_evilrats_";
-	char cookie[128], rcookie[128], *name = NULL;
+	char cookie[256], rcookie[256], *name = NULL;
+	int vencrypt_sel = 0;
+	int tlsvnc_sel = 0;
 	static time_t last_https = 0;
-	static char last_get[128];
+	static char last_get[256];
 	static int first = 1;
+	unsigned char *rb;
 
 	openssl_last_helper_pid = 0;
 
 	/* zero buffers for use below. */
-	for (i=0; i<128; i++) {
+	for (i=0; i<256; i++) {
 		if (first) {
 			last_get[i] = '\0';
 		}
@@ -1500,7 +1832,11 @@ void accept_openssl(int mode, int presock) {
 	 * but hard to guess exactly (just worrying about local lusers
 	 * here, since we use INADDR_LOOPBACK).
 	 */
-	sprintf(cookie, "%f/%f", dnow(), x11vnc_start);
+	rb = (unsigned char *) malloc(6);
+	RAND_bytes((char *)rb, 6);
+	sprintf(cookie, "RB=%d%d%d%d%d%d/%f%f/0x%x",
+	    rb[0], rb[1], rb[2], rb[3], rb[4], rb[5],
+            dnow() - x11vnc_start, x11vnc_start, rb);
 
 	if (mode != OPENSSL_INETD) {
 		name = get_remote_host(sock);
@@ -1541,6 +1877,23 @@ void accept_openssl(int mode, int presock) {
 		free(certret);
 		certret = NULL;
 		certret_fd = -1;
+	}
+
+	if (dhret) {
+		free(dhret);
+	}
+	if (dhret_str) {
+		free(dhret_str);
+		dhret_str = NULL;
+	}
+	dhret = strdup("/tmp/x11vnc-dhret.XXXXXX");
+	omode = umask(077);
+	dhret_fd = mkstemp(dhret);
+	umask(omode);
+	if (dhret_fd < 0) {
+		free(dhret);
+		dhret = NULL;
+		dhret_fd = -1;
 	}
 
 	/* now fork the child to handle the SSL: */
@@ -1612,6 +1965,20 @@ void accept_openssl(int mode, int presock) {
 		if (! ssl_init(s_in, s_out)) {
 			close(vncsock);
 			exit(1);
+		}
+
+		if (vencrypt_selected != 0) {
+			char *tbuf;
+			tbuf = (char *) malloc(strlen(cookie) + 100);
+			sprintf(tbuf, "%s,VENCRYPT=%d,%s", uniq, vencrypt_selected, cookie);
+			write(vncsock, tbuf, strlen(cookie));
+			goto wrote_cookie;
+		} else if (tlsvnc_selected != 0) {
+			char *tbuf;
+			tbuf = (char *) malloc(strlen(cookie) + 100);
+			sprintf(tbuf, "%s,TLSVNC=%d,%s", uniq, tlsvnc_selected, cookie);
+			write(vncsock, tbuf, strlen(cookie));
+			goto wrote_cookie;
 		}
 
 		/*
@@ -1907,6 +2274,13 @@ void accept_openssl(int mode, int presock) {
 		if (certret) {
 			unlink(certret);
 		}
+		if (dhret_fd >= 0) {
+			close(dhret_fd);
+			dhret_fd = -1;
+		}
+		if (dhret) {
+			unlink(dhret);
+		}
 		return;
 	}
 	if (db) fprintf(stderr, "accept_openssl: vsock: %d\n", vsock);
@@ -1920,7 +2294,7 @@ void accept_openssl(int mode, int presock) {
 		struct stat sbuf;
 		sbuf.st_size = 0;
 		if (certret_fd >= 0 && stat(certret, &sbuf) == 0 && sbuf.st_size > 0) {
-			certret_str = (char *) malloc(sbuf.st_size+1);
+			certret_str = (char *) calloc(sbuf.st_size+1, 1);
 			read(certret_fd, certret_str, sbuf.st_size);
 			close(certret_fd);
 			certret_fd = -1;
@@ -1939,6 +2313,59 @@ void accept_openssl(int mode, int presock) {
 		}
 	}
 
+	if (dhret) {
+		struct stat sbuf;
+		sbuf.st_size = 0;
+		if (dhret_fd >= 0 && stat(dhret, &sbuf) == 0 && sbuf.st_size > 0) {
+			dhret_str = (char *) calloc(sbuf.st_size+1, 1);
+			read(dhret_fd, dhret_str, sbuf.st_size);
+			close(dhret_fd);
+			dhret_fd = -1;
+		}
+		if (dhret_fd >= 0) {
+			close(dhret_fd);
+			dhret_fd = -1;
+		}
+		unlink(dhret);
+		if (dhret_str && strstr(dhret_str, "NOCERT") == dhret_str) {
+			free(dhret_str);
+			dhret_str = NULL;
+		}
+		if (dhret_str) {
+			if (new_dh_params == NULL) {
+				fprintf(stderr, "dhret_str[%d]:\n%s\n", (int) sbuf.st_size, dhret_str);
+				new_dh_params = strdup(dhret_str);
+			}
+		}
+	}
+
+	if (0) {
+		fprintf(stderr, "rcookie: %s\n", rcookie);
+		fprintf(stderr, "cookie:  %s\n", cookie);
+	}
+
+	if (strstr(rcookie, uniq) == rcookie) {
+		char *q = strstr(rcookie, "RB=");
+		if (q && strstr(cookie, q) == cookie) {
+			vencrypt_sel = 0;
+			tlsvnc_sel = 0;
+			q = strstr(rcookie, "VENCRYPT=");
+			if (q && sscanf(q, "VENCRYPT=%d,", &vencrypt_sel) == 1) {
+				if (vencrypt_sel != 0) {
+					rfbLog("SSL: VENCRYPT mode=%d accepted.\n", vencrypt_sel);
+					goto accept_client;
+				}
+			}
+			q = strstr(rcookie, "TLSVNC=");
+			if (q && sscanf(q, "TLSVNC=%d,", &tlsvnc_sel) == 1) {
+				if (tlsvnc_sel != 0) {
+					rfbLog("SSL: TLSVNC mode=%d accepted.\n", tlsvnc_sel);
+					goto accept_client;
+				}
+			}
+		}
+	}
+
 	if (n != (int) strlen(cookie) || strncmp(cookie, rcookie, n)) {
 		rfbLog("SSL: accept_openssl: cookie from ssl_helper FAILED. %d\n", n);
 		if (db) fprintf(stderr, "'%s'\n'%s'\n", cookie, rcookie);
@@ -1949,7 +2376,7 @@ void accept_openssl(int mode, int presock) {
 			rfbLog("SSL: BUT WAIT! HTTPS for helper process succeeded. Good.\n");
 			if (mode != OPENSSL_HTTPS) {
 				last_https = time(NULL);
-				for (i=0; i<128; i++) {
+				for (i=0; i<256; i++) {
 					last_get[i] = '\0';
 				}
 				strncpy(last_get, rcookie, 100);
@@ -2044,6 +2471,9 @@ void accept_openssl(int mode, int presock) {
 		}
 		return;
 	}
+
+	accept_client:
+
 	if (db) fprintf(stderr, "accept_openssl: cookie good: %s\n", cookie);
 
 	rfbLog("SSL: handshake with helper process succeeded.\n");
@@ -2072,6 +2502,17 @@ void accept_openssl(int mode, int presock) {
 		    strpbrk(openssl_last_ip, "0123456789") == openssl_last_ip) {
 			client->host = strdup(openssl_last_ip);
 		}
+		if (vencrypt_sel != 0) {
+			client->protocolMajorVersion = 3;
+			client->protocolMinorVersion = 8;
+			if (!finish_vencrypt_auth(client, vencrypt_sel)) {
+				rfbCloseClient(client);
+			}
+		} else if (tlsvnc_sel != 0) {
+			client->protocolMajorVersion = 3;
+			client->protocolMinorVersion = 8;
+			rfbAuthNewClient(client);
+		}
 	} else {
 		rfbLog("SSL: accept_openssl: rfbNewClient failed.\n");
 		close(vsock);
@@ -2082,6 +2523,567 @@ void accept_openssl(int mode, int presock) {
 			clean_up_exit(1);
 		}
 		return;
+	}
+}
+
+static int read_exact(int sock, char *buf, int len) {
+	int n, fail = 0;
+	if (sock < 0) {
+		return 0;
+	}
+	while (len > 0) {
+		n = read(sock, buf, len);
+		if (n > 0) {
+			buf += n;
+			len -= n;
+		} else if (n == 0) {
+			fail = 1;
+			break;
+		} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+			usleep(10*1000);
+		} else if (n < 0 && errno != EINTR) {
+			fail = 1;
+			break;
+		}
+	}
+	if (fail) {
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+static int write_exact(int sock, char *buf, int len) {
+	int n, fail = 0;
+	if (sock < 0) {
+		return 0;
+	}
+	while (len > 0) {
+		n = write(sock, buf, len);
+		if (n > 0) {
+			buf += n;
+			len -= n;
+		} else if (n == 0) {
+			fail = 1;
+			break;
+		} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+			usleep(10*1000);
+		} else if (n < 0 && errno != EINTR) {
+			fail = 1;
+			break;
+		}
+	}
+	if (fail) {
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+static int add_anon_dh(void) {
+	pid_t pid, pidw;
+	char cnf[] = "/tmp/x11vnc-dh.XXXXXX";
+	char *infile = NULL;
+	int status, cnf_fd;
+	DH *dh;
+	BIO *bio;
+	FILE *in;
+	double ds;
+	/*
+	 * These are dh parameters (prime, generator), not dh keys.
+	 * Evidently it is ok for them to be publicly known.
+	 * openssl dhparam -out dh.out 1024
+	 */
+	char *fixed_dh_params = 
+"-----BEGIN DH PARAMETERS-----\n"
+"MIGHAoGBAL28w69ZnLYBvp8R2OeqtAIms+oatY19iBL4WhGI/7H1OMmkJjIe+OHs\n"
+"PXoJfe5ucrnvno7Xm+HJZYa1jnPGQuWoa/VJKXdVjYdJVNzazJKM2daKKcQA4GDc\n"
+"msFS5DxLbzUR5jy1n12K3EcbvpyFqDYVTJJXm7NuNuiWRfz3wTozAgEC\n"
+"-----END DH PARAMETERS-----\n";
+
+	if (dhparams_file != NULL) {
+		infile = dhparams_file;
+		rfbLog("add_anon_dh: using %s\n", dhparams_file);
+		goto readin;
+	}
+
+	cnf_fd = mkstemp(cnf);
+	if (cnf_fd < 0) {
+		return 0;
+	}
+	infile = cnf;
+
+	if (create_fresh_dhparams) {
+
+		if (new_dh_params != NULL) {
+			write(cnf_fd, new_dh_params, strlen(new_dh_params));
+			close(cnf_fd);
+		} else {
+			char *exe = find_openssl_bin();
+			struct stat sbuf;
+
+			if (no_external_cmds || !cmd_ok("ssl")) {
+				rfbLog("add_anon_dh: cannot run external commands.\n");	
+				return 0;
+			}
+
+			close(cnf_fd);
+			if (exe == NULL) {
+				return 0;
+			}
+			ds = dnow();
+			pid = fork();
+			if (pid < 0) {
+				return 0;
+			} else if (pid == 0) {
+				int i;
+				for (i=0; i<256; i++) {
+					if (i == 2) continue;
+					close(i);
+				}
+				/* rather slow at 1024 */
+				execlp(exe, exe, "dhparam", "-out", cnf, "1024", (char *)0);
+				exit(1);
+			}
+			pidw = waitpid(pid, &status, 0); 
+			if (pidw != pid) {
+				return 0;
+			}
+			if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+				;
+			} else {
+				return 0;
+			}
+			rfbLog("add_anon_dh: created new DH params in %.3f secs\n", dnow() - ds);
+
+			if (stat(cnf, &sbuf) == 0 && sbuf.st_size > 0) {
+				/* save it to reuse during our process's lifetime: */
+				int d = open(cnf, O_RDONLY);
+				if (d >= 0) {
+					int n, len = sbuf.st_size;
+					new_dh_params = (char *) calloc(len+1, 1);
+					n = read(d, new_dh_params, len);
+					close(d);
+					if (n != len) {
+						free(new_dh_params);
+						new_dh_params = NULL;
+					} else if (dhret != NULL) {
+						d = open(dhret, O_WRONLY);
+						if (d >= 0) {
+							write(d, new_dh_params, strlen(new_dh_params));
+							close(d);
+						}
+					}
+				}
+			}
+		}
+	} else {
+		write(cnf_fd, fixed_dh_params, strlen(fixed_dh_params));
+		close(cnf_fd);
+	}
+
+	readin:
+
+	ds = dnow();
+	in = fopen(infile, "r");
+
+	if (in == NULL) {
+		rfbLogPerror("fopen");
+		unlink(cnf);
+		return 0;
+	}
+	bio = BIO_new_fp(in, BIO_CLOSE|BIO_FP_TEXT);
+	if (! bio) {
+		rfbLog("openssl_init: BIO_new_fp() failed.\n");	
+		unlink(cnf);
+		return 0;
+	}
+	dh = PEM_read_bio_DHparams(bio, NULL, NULL, NULL);
+	if (dh == NULL) {
+		rfbLog("openssl_init: PEM_read_bio_DHparams() failed.\n");	
+		unlink(cnf);
+		BIO_free(bio);
+		return 0;
+	}
+	BIO_free(bio);
+	SSL_CTX_set_tmp_dh(ctx, dh);
+	rfbLog("loaded Diffie Hellman %d bits, %.3fs\n", 8*DH_size(dh), dnow()-ds);
+	DH_free(dh);
+
+	unlink(cnf);
+	return 1;
+}
+
+static int switch_to_anon_dh(void) {
+	long mode;
+	
+	rfbLog("Using Anonymous Diffie-Hellman mode.\n");
+	rfbLog("WARNING: Anonymous Diffie-Hellman uses encryption but is\n");
+	rfbLog("WARNING: susceptible to a Man-In-The-Middle attack.\n");
+	ctx = SSL_CTX_new( SSLv23_server_method() );
+	if (ctx == NULL) {
+		return 0;
+	}
+	if (!SSL_CTX_set_cipher_list(ctx, "ADH:@STRENGTH")) {
+		return 0;
+	}
+	if (!add_anon_dh()) {
+		return 0;
+	}
+
+	mode = 0;
+	mode |= SSL_MODE_ENABLE_PARTIAL_WRITE;
+	mode |= SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER;
+	SSL_CTX_set_mode(ctx, mode);
+
+	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_BOTH);
+	SSL_CTX_set_timeout(ctx, 300);
+	SSL_CTX_set_default_passwd_cb(ctx, pem_passwd_callback);
+	SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
+
+	return 1;
+}
+
+static int tlsvnc_dialog(int s_in, int s_out) {
+
+	tlsvnc_selected = 1;
+
+	if (!switch_to_anon_dh()) {
+		rfbLog("tlsvnc: Anonymous Diffie-Hellman failed.\n");	
+		return 0;
+	}
+
+	/* continue with SSL/TLS */
+	return 1;
+}
+
+/*
+ * Using spec:
+ * http://www.mail-archive.com/qemu-devel@nongnu.org/msg08681.html
+ */
+static int vencrypt_dialog(int s_in, int s_out) {
+	char buf[256], buf2[256];
+	int subtypes[16];
+	int n, i, ival, ok, db = 1, nsubtypes = 0;
+
+	vencrypt_selected = 0;
+
+	/* send version 0.2 */
+	buf[0] = 0;
+	buf[1] = 2;
+
+	if (!write_exact(s_out, buf, 2)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	/* read client version 0.2 */
+	memset(buf, 0, sizeof(buf));
+	if (!read_exact(s_in, buf, 2)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+	rfbLog("vencrypt: received %d.%d client version.\n", (int) buf[0], (int) buf[1]);
+
+	/* close 0.0 */
+	if (buf[0] == 0 && buf[1] == 0) {
+		rfbLog("vencrypt: received 0.0 version, closing connection.\n");
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	/* accept only 0.2 */
+	if (buf[0] != 0 || buf[1] != 2) {
+		rfbLog("vencrypt: unsupported VeNCrypt version, closing connection.\n");
+		buf[0] = 255;
+		write_exact(s_out, buf, 1);
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	/* tell them OK */
+	buf[0] = 0;
+	if (!write_exact(s_out, buf, 1)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	if (getenv("X11VNC_ENABLE_VENCRYPT_PLAIN_LOGIN")) {
+		vencrypt_enable_plain_login = atoi(getenv("X11VNC_ENABLE_VENCRYPT_PLAIN_LOGIN"));
+	}
+
+	/* load our list of sub-types: */
+	n = 0;
+	if (!ssl_verify && vencrypt_kx != VENCRYPT_NODH) {
+		if (screen->authPasswdData != NULL) {
+			subtypes[n++] = rfbVencryptTlsVnc;
+		} else {
+			if (vencrypt_enable_plain_login && unixpw) {
+				subtypes[n++] = rfbVencryptTlsPlain;
+			} else {
+				subtypes[n++] = rfbVencryptTlsNone;
+			}
+		}
+	}
+	if (vencrypt_kx != VENCRYPT_NOX509) {
+		if (screen->authPasswdData != NULL) {
+			subtypes[n++] = rfbVencryptX509Vnc;
+		} else {
+			if (vencrypt_enable_plain_login && unixpw) {
+				subtypes[n++] = rfbVencryptX509Plain;
+			} else {
+				subtypes[n++] = rfbVencryptX509None;
+			}
+		}
+	}
+
+	nsubtypes = n;
+	for (i = 0; i < nsubtypes; i++) {
+		((uint32_t *)buf)[i] = Swap32IfLE(subtypes[i]);
+	}
+
+	/* send number first: */
+	buf2[0] = (char) nsubtypes;
+	if (!write_exact(s_out, buf2, 1)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+	/* and now the list: */
+	if (!write_exact(s_out, buf, 4*n)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	/* read client's selection: */
+	if (!read_exact(s_in, (char *)&ival, 4)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+	ival = Swap32IfLE(ival);
+
+	/* zero means no dice: */
+	if (ival == 0) {
+		rfbLog("vencrypt: client selected no sub-type, closing connection.\n");
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	/* check if he selected a valid one: */
+	ok = 0;
+	for (i = 0; i < nsubtypes; i++) {
+		if (ival == subtypes[i]) {
+			ok = 1;
+		}
+	}
+
+	if (!ok) {
+		rfbLog("vencrypt: client selected invalid sub-type: %d\n", ival);
+		close(s_in); close(s_out);
+		return 0;
+	} else {
+		char *st = "unknown!!";
+		if (ival == rfbVencryptTlsNone)	  st = "rfbVencryptTlsNone";
+		if (ival == rfbVencryptTlsVnc)    st = "rfbVencryptTlsVnc";
+		if (ival == rfbVencryptTlsPlain)  st = "rfbVencryptTlsPlain";
+		if (ival == rfbVencryptX509None)  st = "rfbVencryptX509None";
+		if (ival == rfbVencryptX509Vnc)   st = "rfbVencryptX509Vnc";
+		if (ival == rfbVencryptX509Plain) st = "rfbVencryptX509Plain";
+		rfbLog("vencrypt: client selected sub-type: %d (%s)\n", ival, st);
+	}
+
+	vencrypt_selected = ival;
+
+	/* not documented in spec, send OK: */
+	buf[0] = 1;
+	if (!write_exact(s_out, buf, 1)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	if (vencrypt_selected == rfbVencryptTlsNone ||
+	    vencrypt_selected == rfbVencryptTlsVnc  ||
+	    vencrypt_selected == rfbVencryptTlsPlain) {
+		/* these modes are Anonymous Diffie-Hellman */
+		if (!switch_to_anon_dh()) {
+			rfbLog("vencrypt: Anonymous Diffie-Hellman failed.\n");	
+			return 0;
+		}
+	}
+
+	/* continue with SSL/TLS */
+	return 1;
+}
+
+static int check_vnc_tls_mode(int s_in, int s_out) {
+	double waited = 0.0, dt = 0.01, start = dnow();
+	struct timeval tv;
+	int input = 0, i, n, ok;
+	int major, minor, sectype = -1;
+	char *proto = "RFB 003.008\n";
+	char *stype = "unknown";
+	char buf[256];
+	
+	vencrypt_selected = 0;
+	tlsvnc_selected = 0;
+
+	if (vencrypt_mode == VENCRYPT_NONE && tlsvnc_mode == TLSVNC_NONE) {
+		/* only normal SSL */
+		return 1;
+	}
+	if (ssl_client_mode) {
+		/* XXX check if this can be done in SSL client mode. */
+		if (vencrypt_mode == VENCRYPT_FORCE || tlsvnc_mode == TLSVNC_FORCE) {
+			rfbLog("check_vnc_tls_mode: VENCRYPT_FORCE/TLSVNC_FORCE prevents normal SSL\n");
+			return 0;
+		}
+		return 1;
+	}
+	if (ssl_verify && vencrypt_mode != VENCRYPT_FORCE && tlsvnc_mode == TLSVNC_FORCE) {
+		rfbLog("check_vnc_tls_mode: Cannot use TLSVNC_FORCE with -sslverify (Anon DH only)\n");
+		/* fallback to normal SSL */
+		return 1;
+	}
+
+	while (waited < 0.7) {
+		fd_set rfds;
+		FD_ZERO(&rfds);
+		FD_SET(s_in, &rfds);
+		tv.tv_sec = 0; 
+		tv.tv_usec = 0; 
+		select(s_in+1, &rfds, NULL, NULL, &tv);
+		if (FD_ISSET(s_in, &rfds)) {
+			input = 1;
+			break;
+		}
+		usleep((int) (1000 * 1000 * dt));
+		waited += dt;
+	}
+	rfbLog("check_vnc_tls_mode: waited: %f input: %s\n", dnow() - start, input ? "SSL Handshake" : "(future) RFB Handshake");
+
+	if (input) {
+		/* got SSL client hello, can only assume normal SSL */
+		if (vencrypt_mode == VENCRYPT_FORCE || tlsvnc_mode == TLSVNC_FORCE) {
+			rfbLog("check_vnc_tls_mode: VENCRYPT_FORCE/TLSVNC_FORCE prevents normal SSL\n");
+			return 0;
+		}
+		return 1;
+	}
+
+	/* send RFB 003.008 -- there is no turning back from this point... */
+	if (!write_exact(s_out, proto, strlen(proto))) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	memset(buf, 0, sizeof(buf));
+	if (!read_exact(s_in, buf, 12)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	if (sscanf(buf, "RFB %03d.%03d\n", &major, &minor) != 2) {
+		rfbLog("check_vnc_tls_mode: abnormal handshake: '%s'\n", buf);
+		close(s_in); close(s_out);
+		return 0;
+	}
+	rfbLog("check_vnc_tls_mode: version: %d.%d\n", major, minor);
+	if (major != 3 || minor < 8) {
+		rfbLog("check_vnc_tls_mode: invalid version: '%s'\n", buf);
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	n = 1;
+	if (vencrypt_mode == VENCRYPT_FORCE) {
+		buf[n++] = rfbSecTypeVencrypt;
+	} else if (tlsvnc_mode == TLSVNC_FORCE && !ssl_verify) {
+		buf[n++] = rfbSecTypeTlsVnc;
+	} else if (vencrypt_mode == VENCRYPT_SOLE) {
+		buf[n++] = rfbSecTypeVencrypt;
+	} else if (tlsvnc_mode == TLSVNC_SOLE && !ssl_verify) {
+		buf[n++] = rfbSecTypeTlsVnc;
+	} else {
+		if (vencrypt_mode == VENCRYPT_SUPPORT) {
+			buf[n++] = rfbSecTypeVencrypt;
+		}
+		if (tlsvnc_mode == TLSVNC_SUPPORT && !ssl_verify) {
+			buf[n++] = rfbSecTypeTlsVnc;
+		}
+	}
+
+	n--;
+	buf[0] = (char) n;
+	if (!write_exact(s_out, buf, n+1)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+	if (0) fprintf(stderr, "wrote[%d] %d %d %d\n", n, buf[0], buf[1], buf[2]);
+
+	buf[0] = 0;
+	if (!read_exact(s_in, buf, 1)) {
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	if (buf[0] == rfbSecTypeVencrypt) stype = "VeNCrypt";
+	if (buf[0] == rfbSecTypeTlsVnc)   stype = "TLSVNC";
+
+	rfbLog("check_vnc_tls_mode: reply: %d (%s)\n", (int) buf[0], stype);
+
+	ok = 0;
+	for (i=1; i < n+1; i++) {
+		if (buf[0] == buf[i]) {
+			ok = 1;
+		}
+	}
+	if (!ok) {
+		char *msg = "check_vnc_tls_mode: invalid security-type";
+		int len = strlen(msg);
+		rfbLog("%s: %d\n", msg, (int) buf[0]);
+		((uint32_t *)buf)[0] = Swap32IfLE(len);
+		write_exact(s_out, buf, 4);
+		write_exact(s_out, msg, strlen(msg));
+		close(s_in); close(s_out);
+		return 0;
+	}
+
+	sectype = (int) buf[0];
+
+	if (sectype == rfbSecTypeVencrypt) {
+		return vencrypt_dialog(s_in, s_out);
+	} else if (sectype == rfbSecTypeTlsVnc) {
+		return tlsvnc_dialog(s_in, s_out);
+	} else {
+		return 0;
+	}
+}
+
+static void pr_ssl_info(int verb) {
+	SSL_CIPHER *c;
+	SSL_SESSION *s;
+	char *proto = "unknown";
+
+	if (ssl == NULL) {
+		return;
+	}
+	c = SSL_get_current_cipher(ssl);
+	s = SSL_get_session(ssl);
+
+	if (s == NULL) {
+		proto = "nosession";
+	} else if (s->ssl_version == SSL2_VERSION) {
+		proto = "SSLv2";
+	} else if (s->ssl_version == SSL3_VERSION) {
+		proto = "SSLv3";
+	} else if (s->ssl_version == TLS1_VERSION) {
+		proto = "TLSv1";
+	}
+	if (c != NULL) {
+		rfbLog("SSL: ssl_helper[%d]: Cipher: %s %s Proto: %s\n", getpid(),
+		    SSL_CIPHER_get_version(c), SSL_CIPHER_get_name(c), proto);
+	} else {
+		rfbLog("SSL: ssl_helper[%d]: Proto: %s\n", getpid(),
+		    proto);
 	}
 }
 
@@ -2110,12 +3112,16 @@ static int ssl_init(int s_in, int s_out) {
 	}
 	if (db) fprintf(stderr, "ssl_init: %d/%d\n", s_in, s_out);
 
+	if (!check_vnc_tls_mode(s_in, s_out)) {
+		return 0;
+	}
+
 	ssl = SSL_new(ctx);
 	if (ssl == NULL) {
 		fprintf(stderr, "SSL_new failed\n");
 		return 0;
 	}
-if (db > 1) fprintf(stderr, "ssl_init: 1\n");
+	if (db > 1) fprintf(stderr, "ssl_init: 1\n");
 
 	SSL_set_session_id_context(ssl, sid, strlen((char *)sid));
 
@@ -2134,7 +3140,7 @@ if (db > 1) fprintf(stderr, "ssl_init: 1\n");
 			return 0;
 		}
 	}
-if (db > 1) fprintf(stderr, "ssl_init: 2\n");
+	if (db > 1) fprintf(stderr, "ssl_init: 2\n");
 
 	if (ssl_client_mode) {
 		SSL_set_connect_state(ssl);
@@ -2142,12 +3148,12 @@ if (db > 1) fprintf(stderr, "ssl_init: 2\n");
 		SSL_set_accept_state(ssl);
 	}
 
-if (db > 1) fprintf(stderr, "ssl_init: 3\n");
+	if (db > 1) fprintf(stderr, "ssl_init: 3\n");
 
 	name = get_remote_host(ssock);
 	peerport = get_remote_port(ssock);
 
-if (db > 1) fprintf(stderr, "ssl_init: 4\n");
+	if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 
 	while (1) {
 		if (db) fprintf(stderr, "calling SSL_accept...\n");
@@ -2173,6 +3179,7 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 			if (db) fprintf(stderr, "got SSL_ERROR_WANT_READ\n");
 			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s:%d\n",
 			    getpid(), name, peerport);
+			pr_ssl_info(1);
 			return 0;
 			
 		} else if (err == SSL_ERROR_WANT_WRITE) {
@@ -2180,6 +3187,7 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 			if (db) fprintf(stderr, "got SSL_ERROR_WANT_WRITE\n");
 			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s:%d\n",
 			    getpid(), name, peerport);
+			pr_ssl_info(1);
 			return 0;
 
 		} else if (err == SSL_ERROR_SYSCALL) {
@@ -2187,6 +3195,7 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 			if (db) fprintf(stderr, "got SSL_ERROR_SYSCALL\n");
 			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s:%d\n",
 			    getpid(), name, peerport);
+			pr_ssl_info(1);
 			return 0;
 
 		} else if (err == SSL_ERROR_ZERO_RETURN) {
@@ -2194,6 +3203,7 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 			if (db) fprintf(stderr, "got SSL_ERROR_ZERO_RETURN\n");
 			rfbLog("SSL: ssl_helper[%d]: SSL_accept() failed for: %s:%d\n",
 			    getpid(), name, peerport);
+			pr_ssl_info(1);
 			return 0;
 
 		} else if (rc < 0) {
@@ -2207,12 +3217,14 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 					break;
 				}
 			}
+			pr_ssl_info(1);
 			return 0;
 
 		} else if (dnow() > start + 3.0) {
 
 			rfbLog("SSL: ssl_helper[%d]: timeout looping SSL_accept() "
 			    "fatal.\n", getpid());
+			pr_ssl_info(1);
 			return 0;
 
 		} else {
@@ -2220,11 +3232,13 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 			if (bio == NULL) {
 				rfbLog("SSL: ssl_helper[%d]: ssl BIO is null. "
 				    "fatal.\n", getpid());
+				pr_ssl_info(1);
 				return 0;
 			}
 			if (BIO_eof(bio)) {
 				rfbLog("SSL: ssl_helper[%d]: ssl BIO is EOF. "
 				    "fatal.\n", getpid());
+				pr_ssl_info(1);
 				return 0;
 			}
 		}
@@ -2232,6 +3246,8 @@ if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 	}
 
 	rfbLog("SSL: ssl_helper[%d]: SSL_accept() succeeded for: %s:%d\n", getpid(), name, peerport);
+
+	pr_ssl_info(0);
 
 	if (SSL_get_verify_result(ssl) == X509_V_OK) {
 		X509 *x;
@@ -2357,6 +3373,14 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 
 	cptr = 0;	/* offsets into ABSIZE buffers */
 	sptr = 0;
+
+	if (vencrypt_selected > 0 || tlsvnc_selected > 0) {
+		char tmp[16];
+		/* read and discard the extra RFB version */
+		memset(tmp, 0, sizeof(tmp));
+		read(csock, tmp, 12);
+		if (0) fprintf(stderr, "extra: %s\n", tmp);
+	}
 
 	while (1) {
 		int c_to_s, s_to_c, closing;

@@ -189,6 +189,7 @@ Status XShmAttach_wr(Display *disp, XShmSegmentInfo *shminfo) {
 
 Status XShmDetach_wr(Display *disp, XShmSegmentInfo *shminfo) {
 #if LIBVNCSERVER_HAVE_XSHM
+	if (getenv("X11VNC_SHM_DEBUG")) fprintf(stderr, "XShmDetach_wr: 0x%x disp: 0x%x\n", shminfo, disp);
 	return XShmDetach(disp, shminfo);
 #else
 	if (!disp || !shminfo) {}

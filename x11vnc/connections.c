@@ -772,7 +772,8 @@ void client_gone(rfbClientPtr client) {
 		 */
 		if ((client->state == RFB_PROTOCOL_VERSION ||
 		     client->state == RFB_SECURITY_TYPE ||
-		     client->state == RFB_AUTHENTICATION) && accepted_client) {
+		     client->state == RFB_AUTHENTICATION ||
+		     client->state == RFB_INITIALISATION) && accepted_client) {
 			rfbLog("connect_once: invalid password or early "
 			   "disconnect.\n");
 			rfbLog("connect_once: waiting for next connection.\n"); 
@@ -3208,7 +3209,7 @@ void adjust_grabs(int grab, int quiet) {
 }
 
 void check_new_clients(void) {
-	static int last_count = 0;
+	static int last_count = -1;
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
 	int i, send_info = 0;
@@ -3243,7 +3244,9 @@ void check_new_clients(void) {
 		}
 	}
 	
-	if (client_count == last_count) {
+	if (last_count == -1) {
+		last_count = 0;
+	} else if (client_count == last_count) {
 		return;
 	}
 

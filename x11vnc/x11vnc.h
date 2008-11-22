@@ -158,7 +158,6 @@
 #endif
 
 /* these are for delaying features: */
-#define xxNO_SSL_OR_UNIXPW
 #define xxNO_NCACHE
 
 /*

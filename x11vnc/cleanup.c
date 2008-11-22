@@ -259,7 +259,51 @@ static int Xerror(Display *d, XErrorEvent *error) {
 }
 
 static int XIOerr(Display *d) {
+	static int reopen = 0, rmax = 1;
 	X_UNLOCK;
+
+	if (getenv("X11VNC_REOPEN_DISPLAY")) {
+		rmax = atoi(getenv("X11VNC_REOPEN_DISPLAY"));
+	}
+
+#if !NO_X11
+	if (reopen < rmax && getenv("X11VNC_REOPEN_DISPLAY")) {
+		int db = getenv("X11VNC_REOPEN_DEBUG") ? 1 : 0;
+		Display *save_dpy = dpy;
+		char *dstr = DisplayString(save_dpy);
+		reopen++;	
+		rfbLog("*** XIO error: Trying to reopen[%d/%d] display '%s'\n", reopen, rmax, dstr);
+		rfbLog("*** XIO error: Note the reopened state may be unstable.\n");
+		usleep (3000 * 1000);
+		dpy = XOpenDisplay_wr(dstr);
+		if (dpy) {
+			rfbLog("*** XIO error: Reopened display '%s' successfully.\n", dstr);
+			if (db) rfbLog("*** XIO error: '%s' 0x%x\n", dstr, dpy);
+			scr = DefaultScreen(dpy);
+			rootwin = RootWindow(dpy, scr);
+			if (db) rfbLog("*** XIO error: disable_grabserver\n");
+			disable_grabserver(dpy, 0);
+			if (db) rfbLog("*** XIO error: xrecord\n");
+			zerodisp_xrecord();
+			initialize_xrecord();
+			if (db) rfbLog("*** XIO error: xdamage\n");
+			create_xdamage_if_needed(1);
+			if (db) rfbLog("*** XIO error: do_new_fb\n");
+			if (using_shm) {
+				if (db) rfbLog("*** XIO error: clean_shm\n");
+				clean_shm(1);
+			}
+			do_new_fb(1);
+			if (db) rfbLog("*** XIO error: check_xevents\n");
+			check_xevents(1);
+			/* sadly, we can never return... */
+			if (db) rfbLog("*** XIO error: watch_loop\n");
+			watch_loop();
+			clean_up_exit(1);	
+		}
+	}
+#endif
+
 	interrupted(-1);
 
 	if (d) {} /* unused vars warning: */

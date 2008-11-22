@@ -113,6 +113,7 @@ void avahi_initialise(void) {
 void avahi_advertise(const char *name, const char *host, const uint16_t port) {
 	if (!try_avahi_helper(name, host, port)) {
 		rfbLog("avahi_advertise:  no Avahi support at buildtime.\n");
+		avahi = 0;
 	}
 }
 

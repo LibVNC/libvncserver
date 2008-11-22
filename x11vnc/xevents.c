@@ -134,6 +134,7 @@ static void initialize_xevents(int reset) {
 		selwin = XCreateSimpleWindow(dpy, rootwin, 0, 0, 1, 1, 0, 0, 0);
 		X_UNLOCK;
 		did_xcreate_simple_window = 1;
+		if (0) rfbLog("selwin: 0x%lx\n", selwin);
 	}
 
 	if ((xrandr || xrandr_maybe) && !did_xrandr) {

@@ -31,9 +31,16 @@ int ssl_no_fail = 0;
 char *openssl_pem = NULL;
 char *ssl_certs_dir = NULL;
 char *enc_str = NULL;
+int vencrypt_mode = VENCRYPT_SUPPORT;
+int vencrypt_kx = VENCRYPT_BOTH;
+int vencrypt_enable_plain_login = 0;
+int tlsvnc_mode = TLSVNC_SUPPORT;
+int create_fresh_dhparams = 0;
+char *dhparams_file = NULL;
 int https_port_num = -1;
 int https_port_redir = 0;
 char *ssl_verify = NULL;
+char *ssl_crl = NULL;
 int ssl_initialized = 0;
 int ssl_timeout_secs = -1;
 char *ssh_str = NULL;
@@ -110,6 +117,7 @@ int inetd = 0;			/* spawned from inetd(8) */
 #define TIGHTFILEXFER 0
 #endif
 int tightfilexfer = TIGHTFILEXFER; 
+int got_ultrafilexfer = 0; 
 int first_conn_timeout = 0;	/* -timeout */
 int ping_interval = 0;		/* -ping */
 int flash_cmap = 0;		/* follow installed colormaps */
@@ -361,6 +369,7 @@ double slow_fb = 0.0;
 double xrefresh = 0.0;
 int wait_bog = 1;
 int defer_update = 20;	/* deferUpdateTime ms to wait before sends. */
+int set_defer = 1;
 int got_defer = 0;
 int got_deferupdate = 0;
 

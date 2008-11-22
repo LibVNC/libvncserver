@@ -1803,6 +1803,8 @@ int main(int argc, char* argv[]) {
 	int http_oneport_msg = 0;
 	XImage *fb0 = NULL;
 	int ncache_msg = 0;
+	char *got_rfbport_str = NULL;
+	int got_rfbport_pos = -1;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc_max = 1024;
@@ -1925,6 +1927,18 @@ int main(int argc, char* argv[]) {
 					fprintf(stdout, "%s", create_display);
 					exit(0);
 				}
+			}
+			continue;
+		}
+		if (!strcmp(arg, "-reopen")) {
+			char *str = getenv("X11VNC_REOPEN_DISPLAY");
+			if (str) {
+				int rmax = atoi(str);
+				if (rmax > 0) {
+					set_env("X11VNC_REOPEN_DISPLAY", str);
+				}
+			} else {
+				set_env("X11VNC_REOPEN_DISPLAY", "1");
 			}
 			continue;
 		}
@@ -2303,7 +2317,6 @@ int main(int argc, char* argv[]) {
 			got_localhost = 1;
 			continue;
 		}
-#ifndef NO_SSL_OR_UNIXPW
 		if (!strcmp(arg, "-unixpw_cmd")
 		    || !strcmp(arg, "-unixpw_cmd_unsafe")) {
 			CHECK_ARGC
@@ -2338,6 +2351,65 @@ int main(int argc, char* argv[]) {
 				set_env("UNIXPW_DISABLE_SSL", "1");
 				set_env("UNIXPW_DISABLE_LOCALHOST", "1");
 			}
+			continue;
+		}
+		if (!strcmp(arg, "-vencrypt")) {
+			char *s;
+			CHECK_ARGC
+			s = strdup(argv[++i]);
+			if (strstr(s, "never")) {
+				vencrypt_mode = VENCRYPT_NONE;
+			} else if (strstr(s, "support")) {
+				vencrypt_mode = VENCRYPT_SUPPORT;
+			} else if (strstr(s, "only")) {
+				vencrypt_mode = VENCRYPT_SOLE;
+			} else if (strstr(s, "force")) {
+				vencrypt_mode = VENCRYPT_FORCE;
+			} else {
+				fprintf(stderr, "invalid %s arg: %s\n", arg, s);
+				exit(1);
+			}
+			if (strstr(s, "nodh")) {
+				vencrypt_kx = VENCRYPT_NODH;
+			} else if (strstr(s, "nox509")) {
+				vencrypt_kx = VENCRYPT_NOX509;
+			}
+			if (strstr(s, "newdh")) {
+				create_fresh_dhparams = 1;
+			}
+			if (strstr(s, "noplain")) {
+				vencrypt_enable_plain_login = 0;
+			} else if (strstr(s, "plain")) {
+				vencrypt_enable_plain_login = 1;
+			}
+			free(s);
+			continue;
+		}
+		if (!strcmp(arg, "-tlsvnc")) {
+			char *s;
+			CHECK_ARGC
+			s = strdup(argv[++i]);
+			if (strstr(s, "never")) {
+				tlsvnc_mode = TLSVNC_NONE;
+			} else if (strstr(s, "support")) {
+				tlsvnc_mode = TLSVNC_SUPPORT;
+			} else if (strstr(s, "only")) {
+				tlsvnc_mode = TLSVNC_SOLE;
+			} else if (strstr(s, "force")) {
+				tlsvnc_mode = TLSVNC_FORCE;
+			} else {
+				fprintf(stderr, "invalid %s arg: %s\n", arg, s);
+				exit(1);
+			}
+			if (strstr(s, "newdh")) {
+				create_fresh_dhparams = 1;
+			}
+			free(s);
+			continue;
+		}
+		if (!strcmp(arg, "-dhparams")) {
+			CHECK_ARGC
+			dhparams_file = strdup(argv[++i]);
 			continue;
 		}
 		if (!strcmp(arg, "-nossl")) {
@@ -2386,6 +2458,11 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-sslverify")) {
 			CHECK_ARGC
 			ssl_verify = strdup(argv[++i]);
+			continue;
+		}
+		if (!strcmp(arg, "-sslCRL")) {
+			CHECK_ARGC
+			ssl_crl = strdup(argv[++i]);
 			continue;
 		}
 		if (!strcmp(arg, "-sslGenCA")) {
@@ -2493,7 +2570,6 @@ int main(int argc, char* argv[]) {
 			}
 			continue;
 		}
-#endif
 		if (!strcmp(arg, "-nopw")) {
 			nopw = 1;
 			continue;
@@ -3133,6 +3209,11 @@ int main(int argc, char* argv[]) {
 			got_defer = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-setdefer")) {
+			CHECK_ARGC
+			set_defer = atoi(argv[++i]);
+			continue;
+		}
 		if (!strcmp(arg, "-wait")) {
 			CHECK_ARGC
 			waitms = atoi(argv[++i]);
@@ -3517,6 +3598,8 @@ int main(int argc, char* argv[]) {
 			}
 			if (!strcmp(arg, "-rfbport") && i < argc-1) {
 				got_rfbport = 1;
+				got_rfbport_str = strdup(argv[i+1]);
+				got_rfbport_pos = argc_vnc+1;
 				got_rfbport_val = atoi(argv[i+1]);
 			}
 			if (!strcmp(arg, "-alwaysshared ")) {
@@ -3530,11 +3613,7 @@ int main(int argc, char* argv[]) {
 			}
 			/* otherwise copy it for libvncserver use below. */
 			if (!strcmp(arg, "-ultrafilexfer")) {
-				if (argc_vnc + 2 < argc_vnc_max) {
-					argv_vnc[argc_vnc++] = strdup("-rfbversion");
-					argv_vnc[argc_vnc++] = strdup("3.6");
-					argv_vnc[argc_vnc++] = strdup("-permitfiletransfer");
-				}
+				got_ultrafilexfer = 1;
 			} else if (argc_vnc < argc_vnc_max) {
 				argv_vnc[argc_vnc++] = strdup(arg);
 			} else {
@@ -3544,6 +3623,9 @@ int main(int argc, char* argv[]) {
 			continue;
 		}
 	}
+
+	/* set OS struct UT */
+	uname(&UT);
 
 	orig_use_xdamage = use_xdamage;
 
@@ -3602,6 +3684,40 @@ int main(int argc, char* argv[]) {
 		}
 	}
 #endif
+	if (got_rfbport_str != NULL && !strcasecmp(got_rfbport_str, "prompt")) {
+		char *opts, tport[32];
+
+		if (gui_str) {
+			opts = (char *) malloc(strlen(gui_str) + 32);
+			sprintf(opts, "%s,portprompt", gui_str);
+		} else {
+			opts = strdup("portprompt");
+		}
+		got_rfbport_val = -1;
+
+		do_gui(opts, 0);
+		if (got_rfbport_val == -1) {
+			rfbLog("Port prompt indicated cancel.\n");
+			clean_up_exit(1);
+		}
+		rfbLog("Port prompt selected: %d\n", got_rfbport_val);
+		sprintf(tport, "%d", got_rfbport_val);
+		argv_vnc[got_rfbport_pos] = strdup(tport);
+		free(opts);
+	}
+
+	{
+		char num[32];
+		sprintf(num, "%d", got_rfbport_val);
+		set_env("X11VNC_GOT_RFBPORT_VAL", num);
+	}
+
+	if (got_ultrafilexfer && argc_vnc + 2 < argc_vnc_max) {
+		argv_vnc[argc_vnc++] = strdup("-rfbversion");
+		argv_vnc[argc_vnc++] = strdup("3.6");
+		argv_vnc[argc_vnc++] = strdup("-permitfiletransfer");
+	}
+	
 	if (launch_gui) {
 		int sleep = 0;
 		if (SHOW_NO_PASSWORD_WARNING && !nopw) {
@@ -3611,6 +3727,84 @@ int main(int argc, char* argv[]) {
 	}
 	if (logfile) {
 		int n;
+		char *pstr = "%VNCDISPLAY";
+		if (strstr(logfile, pstr)) {
+			char *h = this_host();
+			char *s, *q, *new;
+			int n, p = got_rfbport_val;
+			/* we don't really know the port yet... so guess */
+			if (p < 0) {
+				p = auto_port;
+			}
+			if (p <= 0) {
+				p = 5900;
+			}
+			s = (char *) malloc(strlen(h) + 32);
+			sprintf(s, "%s:%d", h, p);
+			n = 1;
+			q = logfile;
+			while (1) {
+				char *t = strstr(q, pstr);
+				if (!t) break;
+				n++;
+				q = t+1; 
+			}
+			new = (char *) malloc(strlen(logfile) + n * strlen(pstr));
+			new[0] = '\0';
+
+			q = logfile;
+			while (1) {
+				char *t = strstr(q, pstr);
+				if (!t) {
+					strcat(new, q);
+					break;
+				}
+				strncat(new, q, t - q);
+				strcat(new, s);
+				q = t + strlen(pstr); 
+			}
+			logfile = new;
+			if (!quiet) {
+				rfbLog("Expanded logfile to '%s'\n", new);
+			}
+			free(s);
+		}
+		pstr = "%HOME";
+		if (strstr(logfile, pstr)) {
+			char *h = get_home_dir();
+			char *s, *q, *new;
+
+			s = (char *) malloc(strlen(h) + 32);
+			sprintf(s, "%s", h);
+			n = 1;
+			q = logfile;
+			while (1) {
+				char *t = strstr(q, pstr);
+				if (!t) break;
+				n++;
+				q = t+1; 
+			}
+			new = (char *) malloc(strlen(logfile) + n * strlen(pstr));
+			new[0] = '\0';
+
+			q = logfile;
+			while (1) {
+				char *t = strstr(q, pstr);
+				if (!t) {
+					strcat(new, q);
+					break;
+				}
+				strncat(new, q, t - q);
+				strcat(new, s);
+				q = t + strlen(pstr); 
+			}
+			logfile = new;
+			if (!quiet) {
+				rfbLog("Expanded logfile to '%s'\n", new);
+			}
+			free(s);
+		}
+
 		if (logfile_append) {
 			n = open(logfile, O_WRONLY|O_CREAT|O_APPEND, 0666);
 		} else {
@@ -4110,9 +4304,6 @@ int main(int argc, char* argv[]) {
 		allow_list = strdup("127.0.0.1");
 	}
 
-	/* set OS struct UT */
-	uname(&UT);
-
 	initialize_crash_handler();
 
 	if (! quiet) {
@@ -4293,6 +4484,13 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 
 	scr = DefaultScreen(dpy);
 	rootwin = RootWindow(dpy, scr);
+
+#if !NO_X11
+	if (dpy) {
+		Window w = XCreateSimpleWindow(dpy, rootwin, 0, 0, 1, 1, 0, 0, 0);
+		if (! quiet) rfbLog("rootwin: 0x%lx reswin: 0x%lx dpy: 0x%x\n", rootwin, w, dpy);
+	}
+#endif
 
 	if (ncache_beta_tester) {
 		int h = DisplayHeight(dpy, scr);
@@ -4863,8 +5061,8 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 			}
 		}
 		if (! got_deferupdate && ! got_defer) {
-			if (defer_update > 15) {
-				defer_update = 15;
+			if (defer_update > 10) {
+				defer_update = 10;
 				if (screen) {
 					screen->deferUpdateTime = defer_update;
 				}

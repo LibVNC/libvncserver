@@ -123,7 +123,7 @@ Clients
 	afteraccept:
 	gone:
 	vncconnect
-	avahi
+	zeroconf
 	-- D
 	tightfilexfer
 	ultrafilexfer
@@ -708,6 +708,8 @@ of actions:
     Stop x11vnc     - Directs the x11vnc server to disconnect all vncviewers
                       and then exit.  The tray/icon GUI then exits as well.
 
+    Logfile         - Show the logfile if x11vnc is being run with one.
+
     Custom          - If you have a \$HOME/.x11vnc.gui file each uncommented
                       line in it becomes an additional menu item for this
                       menu.  The remote control command is run directly
@@ -755,42 +757,78 @@ The Properties dialog allows you to set some basic parameters of a
 running x11vnc server.  After modifying them press \"OK\" or \"Apply\"
 to apply the changes, or press \"Cancel\" to skip applying them.
 
- - \"Accept Connections\" toggles whether VNC viewers are allowed
-   to connect or not.  It corresponds to the \"-R unlock\" and \"-R lock\"
+ Accept Connections:
+
+   Toggles whether VNC viewers are allowed to connect or not.  It corresponds
+   to the \"-R unlock\" and \"-R lock\" remote-control commands.
+
+ Ask for Confirmation:
+
+   Toggles whether a popup menu will be presented at the X display when
+   a new VNC viewer attempts to connect.  The person sitting at the X
+   display can choose to accept or reject the connection or accept the
+   connection in ViewOnly mode.  It corresponds to the \"-R accept:popup\"
+   and \"-R accept:\" remote-control commands.
+   
+ All Clients ViewOnly:
+
+   Toggles whether the entire VNC desktop is view only.  All clients
+   will only be able to watch when this is set (regardless of how they
+   logged in).  It corresponds to the \"-R viewonly\" and \"-R noviewonly\"
    remote-control commands.
    
- - \"Ask for Confirmation\" toggles whether a popup menu will be presented
-   at the X display when a new VNC viewer attempts to connect.  The person
-   sitting at the X display can choose to accept or reject the connection
-   or accept the connection in View-Only mode.  It corresponds to the 
-   \"-R accept:popup\" and \"-R accept:\" remote-control commands.
-   
- - \"All Clients ViewOnly\" toggles whether the entire VNC desktop is
-   view only.  All clients will only be able to watch when this is set
-   (regardless of how they logged in).  It corresponds to the
-   \"-R viewonly\" and \"-R noviewonly\" remote-control commands.
-   
- - \"Shared\" toggles whether multiple simultaneous connections are
-   allowed or not.  It corresponds to the \"-R shared\" and \"-R noshared\"
+ Shared:
+
+   Toggles whether multiple simultaneous viewer connections are allowed
+   or not.  It corresponds to the \"-R shared\" and \"-R noshared\"
    remote-control commands.
 
- - \"Password\" lets you set the session password viewers may use to gain full
-   access to the display.  This will only work if x11vnc was started with 
+ Advertise Service (Zeroconf):
+
+   Toggles whether this VNC server should advertize itself via Zeroconf
+   (also called Bonjour, mDNS, and avahi).  Then VNC viewers can then find
+   this service on the local network.  It corresponds to the \"-R zeroconf\"
+   and \"-R nozeroconf\" remote-control commands.
+
+ Serve Java Viewer Applet:
+
+   Toggles whether this VNC server should serve up a Java VNC Viewer
+   applet via HTTP on http://hostname:5800/ (or port 5800+n for VNC
+   port 5900+n).  A java enabled Web Browser can then connect to the
+   desktopby VNC.  If SSL is active then the HTTPS URL https://hostname:5900/
+   (etc.) will work as well.  This requires the x11vnc java viewer jar file
+   (shared/x11vnc/classes) to be installed.  It corresponds to the
+   \"-R http\" and \"-R nohttp\" remote commands.
+
+ Solid Background Color:
+
+   To improve VNC performance, if this option is set, then x11vnc will try
+   to make the desktop background a solid color (which compresses extremely
+   well compared to photo images, etc.)  It corresponds to the \"-R solid\"
+   and \"-R nosolid\" remote commands.
+
+ Password:
+
+   Lets you set the session password viewers may use to gain full access
+   to the display.  This will only work if x11vnc was started with the
+   -gui icon or -gui tray mode.
+   
+ ViewOnly Password:
+
+   Lets you set the session password viewers may use to gain view only
+   access to the display.  This will only work if x11vnc was started with
    the -gui icon or -gui tray mode.
-   
- - \"ViewOnly Password\" lets you set the session password viewers may
-   use to gain view only access to the display.  This will only work if
-   x11vnc was started with the -gui icon or -gui tray mode.
 
-NOTE: These \"session\" passwords only last for the current x11vnc
-session (they are not remembered, see the -storepasswd, -passwdfile,
-and -rfbauth x11vnc options for using stored passwords).
 
-If you set \"Password\" to the empty string that makes the \"View-Only
-Password\" empty as well and removes the need for any password to log in.
+ NOTE: These \"session\" passwords only last for the current x11vnc
+ session (they are not remembered, see the -storepasswd, -passwdfile,
+ and -rfbauth x11vnc options for using stored passwords).
 
-If you set \"ViewOnly Password\" to the empty string that just removes
-the ViewOnly log in aspect: \"Password\" is still required to log in.
+ If you set \"Password\" to the empty string that makes the \"ViewOnly
+ Password\" empty as well and removes the need for any password to log in.
+
+ If you set \"ViewOnly Password\" to the empty string that just removes
+ the ViewOnly log in aspect: \"Password\" is still required to log in.
 
  - The \"Help\" button shows this help text.
    
@@ -798,7 +836,8 @@ the ViewOnly log in aspect: \"Password\" is still required to log in.
    tkx11vnc GUI.  All dynamic settings can be modified in the full GUI.
 
 
---------------------------------------------------------------------
+==========================================================================
+
 Don't Lock Yourself Out:
 
    If you are sitting at the physical X display you cannot get into too
@@ -1648,6 +1687,9 @@ proc parse_help {} {
 		if {[regexp {^These options} $line]} {
 			continue;
 		}
+		# tweak aliases:
+		regsub {^-zeroconf} $line "-zero_conf" line
+		regsub {^-avahi   } $line "-zeroconf" line
 
 		if {! $sawopts} {
 			continue;
@@ -2912,6 +2954,8 @@ proc all_query_vars {} {
 	}
 	set cache_all_query_vars $qry
 
+#puts $qry
+
 	return $qry
 }
 
@@ -2919,6 +2963,7 @@ proc query_all {{quiet 0}} {
 	global query_ans_list query_aro_list all_settings
 	global last_query_all_time
 
+	dtime 1
 	set qry [all_query_vars]
 
 	set qargs [list "-Q" $qry]
@@ -2936,6 +2981,7 @@ proc query_all {{quiet 0}} {
 		}
 	}
 	set last_query_all_time [clock seconds]
+	dtime 2
 	return $all
 }
 
@@ -4023,9 +4069,11 @@ proc props_widgets {state} {
 }
 
 proc props_apply {} {
-	global props_accept props_confirm props_viewonly props_shared
+	global props_accept props_confirm props_viewonly props_shared 
+	global props_zeroconf props_javaview props_solid
 	global props_passwd props_viewpasswd
 	global prop0_accept prop0_confirm prop0_viewonly prop0_shared
+	global prop0_zeroconf prop0_javaview prop0_solid
 	global prop0_passwd prop0_viewpasswd
 	global menu_var
 	global client_sock
@@ -4040,15 +4088,7 @@ proc props_apply {} {
 	}
 	set did 0
 
-	if {$props_accept != $prop0_accept} {
-		if {$did > 0} {after $aft}; incr did
-		if {$props_accept} {
-			push_new_value "unlock" "unlock" 1 0
-		} else {
-			push_new_value "lock" "lock" 1 0
-		}
-		set prop0_accept $props_accept
-	}
+	set fail 0
 
 	if {$props_confirm != $prop0_confirm} {
 		if {$did > 0} {after $aft}; incr did
@@ -4062,6 +4102,7 @@ proc props_apply {} {
 		} elseif {$menu_var(accept) == ""} {
 			set props_confirm 0
 		}
+		if {$props_confirm == $prop0_confirm} {incr fail}
 		set prop0_confirm $props_confirm
 	}
 
@@ -4077,6 +4118,7 @@ proc props_apply {} {
 		} else {
 			set props_viewonly 0
 		}
+		if {$props_viewonly == $prop0_viewonly} {incr fail}
 		set prop0_viewonly $props_viewonly
 	}
 
@@ -4092,7 +4134,56 @@ proc props_apply {} {
 		} else {
 			set props_shared 0
 		}
+		if {$props_shared == $prop0_shared} {incr fail}
 		set prop0_shared $props_shared
+	}
+
+	if {$props_zeroconf != $prop0_zeroconf} {
+		if {$did > 0} {after $aft}; incr did
+		if {$props_zeroconf} {
+			push_new_value "zeroconf" "zeroconf" 1 1
+		} else {
+			push_new_value "zeroconf" "nozeroconf" 1 1
+		}
+		if {$menu_var(zeroconf)} {
+			set props_zeroconf 1
+		} else {
+			set props_zeroconf 0
+		}
+		if {$props_zeroconf == $prop0_zeroconf} {incr fail}
+		set prop0_zeroconf $props_zeroconf
+	}
+
+	if {$props_javaview != $prop0_javaview} {
+		if {$did > 0} {after $aft}; incr did
+		if {$props_javaview} {
+			push_new_value "http" "http" 1 1
+		} else {
+			push_new_value "http" "nohttp" 1 1
+		}
+		if {$menu_var(http)} {
+			set props_javaview 1
+		} else {
+			set props_javaview 0
+		}
+		if {$props_javaview == $prop0_javaview} {incr fail}
+		set prop0_javaview $props_javaview
+	}
+
+	if {$props_solid != $prop0_solid} {
+		if {$did > 0} {after $aft}; incr did
+		if {$props_solid} {
+			push_new_value "solid" "solid" 1 1
+		} else {
+			push_new_value "solid" "nosolid" 1 1
+		}
+		if {$menu_var(solid)} {
+			set props_solid 1
+		} else {
+			set props_solid 0
+		}
+		if {$props_solid == $prop0_solid} {incr fail}
+		set prop0_solid $props_solid
 	}
 
 	set fpw 0
@@ -4159,16 +4250,34 @@ proc props_apply {} {
 		if {$case == "fpw"} {
 			if {$did > 0} {after $aft}; incr did
 			push_new_value "passwd" "passwd" "$props_passwd" 1
+			if {$props_passwd == $prop0_passwd} {incr fail}
 			set prop0_passwd $props_passwd
 		}
 		if {$case == "vpw"} {
 			if {$did > 0} {after $aft}; incr did
 			push_new_value "viewpasswd" "viewpasswd" "$props_viewpasswd" 1
+			if {$props_viewpasswd == $prop0_viewpasswd} {incr fail}
 			set prop0_viewpasswd $props_viewpasswd
 		}
 	}
 
+	if {$props_accept != $prop0_accept} {
+		if {$did > 0} {after $aft}; incr did
+		if {$props_accept} {
+			push_new_value "unlock" "unlock" 1 0
+		} else {
+			push_new_value "lock" "lock" 1 0
+		}
+		if {$props_accept == $prop0_accept} {incr fail}
+		set prop0_accept $props_accept
+	}
+
 	props_widgets normal
+	if {$fail > 0} {
+		return 0
+	} else {
+		return 1
+	}
 }
 
 proc props_advanced {} {
@@ -4192,20 +4301,29 @@ proc props_advanced {} {
 	}
 }
 
-proc do_props {{msg ""}} {
+proc do_props {} {
 	global props_accept props_confirm props_viewonly props_shared
+	global props_zeroconf props_javaview props_solid
 	global props_passwd props_viewpasswd
 	global prop0_accept prop0_confirm prop0_viewonly prop0_shared
+	global prop0_zeroconf prop0_javaview prop0_solid
 	global prop0_passwd prop0_viewpasswd
 	global menu_var unset_str
 	global have_labelframes ffont bfont
 	global props_buttons icon_noadvanced
 	global icon_mode icon_mode_at_startup
 	global screen_height screen_width
+	global do_props_msg
+
+	set msg ""
+	if {[info exists do_props_msg]} {
+		set msg $do_props_msg
+	}
 
 	check_update_vars
 
-	set pady 1m
+	set pady 0.5m
+	set pady 0.3m
 	if {$screen_height <= 360} {
 		set pady 0m
 	}
@@ -4262,6 +4380,48 @@ proc do_props {{msg ""}} {
 	}
 	set prop0_shared $props_shared
 
+	if [info exists menu_var(zeroconf)] {
+		if {$menu_var(zeroconf) == $unset_str || $menu_var(zeroconf) == ""} {
+			set props_zeroconf 0
+		} elseif ($menu_var(zeroconf)) {
+			set props_zeroconf 1
+		} else {
+			set props_zeroconf 0
+		}
+	} else {
+		set menu_var(zeroconf) 0
+		set props_zeroconf 0
+	}
+	set prop0_zeroconf $props_zeroconf
+
+	if [info exists menu_var(http)] {
+		if {$menu_var(http) == $unset_str || $menu_var(http) == ""} {
+			set props_javaview 0
+		} elseif ($menu_var(http)) {
+			set props_javaview 1
+		} else {
+			set props_javaview 0
+		}
+	} else {
+		set menu_var(http) 0
+		set props_javaview 0
+	}
+	set prop0_javaview $props_javaview
+
+	if [info exists menu_var(solid)] {
+		if {$menu_var(solid) == $unset_str || $menu_var(solid) == ""} {
+			set props_solid 0
+		} elseif ($menu_var(solid)) {
+			set props_solid 1
+		} else {
+			set props_solid 0
+		}
+	} else {
+		set menu_var(solid) 0
+		set props_solid 0
+	}
+	set prop0_solid $props_solid
+
 	if ![info exists props_passwd] {
 		set props_passwd ""
 	}
@@ -4283,7 +4443,7 @@ proc do_props {{msg ""}} {
 	wm title $w "x11vnc Properties"
 	set b1 "$w.buttons1"
 	frame $b1
-	button $b1.ok -text OK -command "props_apply; destroy $w" -font $bfont
+	button $b1.ok -text OK -command "if {\[props_apply\]} {destroy $w}" -font $bfont
 	button $b1.cancel -text Cancel -command "destroy $w" -font $bfont
 	button $b1.apply  -text Apply -command "props_apply" -font $bfont
 
@@ -4295,16 +4455,28 @@ proc do_props {{msg ""}} {
 	set b2 "$w.buttons2"
 	frame $b2
 
-	button $b2.advanced -text "Advanced ..." \
+	button $b2.advanced -text " Advanced ... " \
 		-command "destroy $w; props_advanced" -font $bfont
 	if {! $icon_noadvanced} {
 		lappend props_buttons $b2.advanced
 		pack $b2.advanced -side left -expand 0
 	}
 
-	button $b2.help -text "Help" -command "menu_help Properties" -font $bfont
+	button $b2.help -text "  Help  " -command "menu_help Properties" -font $bfont
 	lappend props_buttons $b2.help
 	pack $b2.help -side left -expand 0
+
+	set pw "$w.passwd"
+	if {$have_labelframes} {
+		labelframe $pw -text "Password" -font $bfont
+	} else {
+		frame $pw
+		set l $pw.l
+		label $l -text "Password:" -justify left -anchor w -font $bfont
+		pack $pw.l -fill x -expand 1 -padx 1m -pady 0m -side top
+	}
+	entry $pw.e -show "*" -textvariable props_passwd -font $bfont
+	pack $pw.e -fill x -expand 1 -padx 1m -pady $pady -side top
 
 	set vp "$w.viewpw"
 	if {$have_labelframes} {
@@ -4321,18 +4493,6 @@ proc do_props {{msg ""}} {
 
 	lappend props_buttons $vp.e
 
-	set pw "$w.passwd"
-	if {$have_labelframes} {
-		labelframe $pw -text "Password" -font $bfont
-	} else {
-		frame $pw
-		set l $pw.l
-		label $l -text "Password:" -justify left -anchor w -font $bfont
-		pack $pw.l -fill x -expand 1 -padx 1m -pady 0m -side top
-	}
-	entry $pw.e -show "*" -textvariable props_passwd -font $bfont
-	pack $pw.e -fill x -expand 1 -padx 1m -pady $pady -side top
-
 	if {! $icon_mode_at_startup} {
 		$vp.e configure -state disabled
 		catch {$vp.l configure -state disabled}
@@ -4345,6 +4505,24 @@ proc do_props {{msg ""}} {
 	}
 
 	lappend props_buttons $pw.e
+
+	set sb "$w.solid"
+	frame $sb
+	checkbutton $sb.button -text "Solid Background Color" \
+		-variable props_solid -anchor w -font $bfont
+	pack $sb.button -fill x -expand 1 -padx 1m -pady $pady
+
+	set jv "$w.javaview"
+	frame $jv
+	checkbutton $jv.button -text "Serve Java Viewer Applet" \
+		-variable props_javaview -anchor w -font $bfont
+	pack $jv.button -fill x -expand 1 -padx 1m -pady $pady
+
+	set zc "$w.zeroconf"
+	frame $zc
+	checkbutton $zc.button -text "Advertise Service (Zeroconf)" \
+		-variable props_zeroconf -anchor w -font $bfont
+	pack $zc.button -fill x -expand 1 -padx 1m -pady $pady
 
 	set sh "$w.shared"
 	frame $sh
@@ -4375,10 +4553,20 @@ proc do_props {{msg ""}} {
 	pack $b2 -side bottom -fill x -pady $pady -padx $px
 	pack $vp -side bottom -fill x -pady $pady -padx $px
 	pack $pw -side bottom -fill x -pady $pady -padx $px
+	pack $sb -side bottom -fill x -pady 0m -padx $px
+	pack $jv -side bottom -fill x -pady 0m -padx $px
+	pack $zc -side bottom -fill x -pady 0m -padx $px
 	pack $sh -side bottom -fill x -pady 0m -padx $px
 	pack $vo -side bottom -fill x -pady 0m -padx $px
 	pack $cf -side bottom -fill x -pady 0m -padx $px
 	pack $ac -side bottom -fill x -pady 0m -padx $px
+
+	global show_props_instructions
+	if {![info exists show_props_instructions]} {
+		set show_props_instructions 1
+	}
+
+	wm withdraw $w
 
 	if {$msg != ""} {
 		set tw [textwidth $msg]
@@ -4387,18 +4575,46 @@ proc do_props {{msg ""}} {
 		set ms "$w.msg"
 		text $ms -font $ffont -relief ridge -width $tw -height $th
 		$ms insert 1.0 $msg
-		pack $ms -side bottom -fill x -pady $pady -padx $px
+
+		set si "$w.instructions"
+		frame $si
+		checkbutton $si.button -text "Show Instructions" \
+			-variable show_props_instructions -anchor w -font $bfont \
+			-command "toggle_instructions $ms $pady $px"
+
+		pack $si.button -fill x -expand 1 -padx 1m -pady $pady
+		pack $si -side bottom -fill x -pady 0m -padx $px
+
+		if {$show_props_instructions} {
+			pack $ms -side bottom -fill x -pady $pady -padx $px
+		}
+
 		update
 	}
 
-	lappend props_buttons $ac.button $cf.button $vo.button $sh.button
+	lappend props_buttons $ac.button $cf.button $vo.button $sh.button $zc.button $jv.button $sb.button
 
+	
+	update
 	wm resizable $w 1 0
 	center_win $w
 	update
-	wm minsize $w [winfo width $w] [winfo height $w]
+
+	#wm minsize $w [winfo width $w] [winfo height $w]
 
 	tkwait window $w
+	set show_props_instructions 0
+}
+
+proc toggle_instructions {ms pady px} {
+	global show_props_instructions
+	if {$show_props_instructions} {
+		pack $ms -side bottom -fill x -pady $pady -padx $px
+	} else {
+		pack forget $ms
+	}
+	catch {pack .props}
+	update
 }
 
 proc do_new_client {} {
@@ -4547,7 +4763,10 @@ proc set_client_balloon {str} {
 proc read_client_info {channel} {
 	global x11vnc_client_file client_str client_info_read
 	global read_client_info_lock
+	global read_clients
 	set db 0
+
+	set read_clients 0
 
 	if {![info exists read_client_info_lock]} {
 		set read_client_info_lock 0
@@ -4580,6 +4799,7 @@ proc read_client_info {channel} {
 				;
 			} elseif [regexp {^clients:} $str] {
 				regsub {^clients:} $str "" str
+				set read_clients 1
 				if {$str == "none"} {
 					set str ""
 				}
@@ -4592,11 +4812,30 @@ proc read_client_info {channel} {
 	}
 }
 
+proc check_set_vnc_display {} {
+	
+	global read_clients check_set_vnc_display_done
+
+	if {[info exists check_set_vnc_display_done]} {
+		return
+	}
+	if {[info exists read_clients]} {
+		if {$read_clients} {
+			after 250
+			query_all
+			global client_str
+			set_client_balloon $client_str
+			set check_set_vnc_display_done 1
+		}
+	}
+}
+
 proc read_client_tail {} {
 	global client_tail
 
 	if {$client_tail != ""} {
 		read_client_info $client_tail
+		check_set_vnc_display
 	}
 }
 
@@ -4605,6 +4844,7 @@ proc read_client_sock {} {
 
 	if {$client_sock != ""} {
 		read_client_info $client_sock
+		check_set_vnc_display
 	}
 }
 
@@ -5023,6 +5263,7 @@ proc make_icon {} {
 	menu $menu -tearoff 0 -postcommand "popup_post $menu"
 	$menu add command -font $mfont -label "Properties" -command do_props
 	$menu add command -font $mfont -label "Help" -command "menu_help Tray"
+	$menu add command -font $mfont -label "Logfile" -command show_logfile
 	$menu add separator
 	$menu add command -font $mfont -label "New Client" -command do_new_client
 
@@ -5138,6 +5379,7 @@ proc setup_client_channel {} {
 		textwin "Warning" "Warning" $m
 		update
 	}
+	dtime C
 }
 
 proc clean_client_tail {} {
@@ -6179,6 +6421,125 @@ proc get_view_variable {} {
 	return $menu_var(WindowView)
 }
 
+proc dono {a b c} {
+	exit 1;
+}
+
+proc do_port_prompt {} {
+	global bfont ffont
+	global port_reply port_set
+
+	set guess 5900
+	for {set i 0} {$i < 50} {incr i} {
+		set fh ""
+		set try [expr $guess + $i]
+		catch {set fh [socket -server dono $try]}
+		if {$fh != ""} {
+			catch {close $fh}
+			set guess $try
+			break;
+		}
+	}
+	set hn ""
+	catch {set hn [exec uname -n]}
+	if {$hn == ""} {
+		set hn "hostname"
+	}
+
+	set text " Set the x11vnc Listening Port:
+
+    VNC Display :0 corresponds to TCP port 5900
+    VNC Display :1 corresponds to TCP port 5901
+    etc.
+
+ In the Entry below, indicate a Port for x11vnc to listen on. 
+
+ Note that to connect to x11vnc, a VNC Viewer will need to
+ know your selection, for example:
+
+    vncviewer $hn:0
+    vncviewer $hn:1
+    etc.
+    
+ You may also set some additional parameters:
+
+    - Enable SSL encryption.
+      (requires an SSL enabled vncviewer, such as SSVNC)  
+    - Listen only on localhost. (e.g. for an SSH tunnel)
+    - Enable UltraVNC or TightVNC File transfer.
+"
+	set port_set $guess
+	set port_reply ""
+
+	toplevel .pp
+	wm title .pp "Select x11vnc port"
+
+	wm protocol .   WM_DELETE_WINDOW "destroy .; exit"
+	wm protocol .pp WM_DELETE_WINDOW "destroy .pp; exit"
+
+	label .pp.m -text "$text" -justify left -font $ffont
+
+	frame .pp.f -bd 1 -relief ridge -pady 2
+	label .pp.f.l -text "Port: "
+	entry .pp.f.e -width 8 -textvariable port_set
+	global enable_ssl; set enable_ssl 0
+	if [info exists env(X11VNC_SSL_ENABLED)] {
+		set enable_ssl 1
+	}
+	checkbutton .pp.f.ssl -relief raised -pady 3 -padx 3 -text "Enable SSL" -variable enable_ssl
+	global localhost; set localhost 0
+	if [info exists env(X11VNC_LOCALHOST_ENABLED)] {
+		set localhost 1
+	}
+	checkbutton .pp.f.loc -relief raised -pady 3 -padx 3 -text "Listen on localhost" -variable localhost
+	pack .pp.f.l .pp.f.e -side left
+	pack .pp.f.loc .pp.f.ssl -side right
+
+	frame .pp.t -bd 1 -relief ridge -pady 2
+	global file_transfer; set file_transfer "none"
+	if [info exists env(X11VNC_FILETRANSFER_ENABLED)] {
+		set file_transfer $env(X11VNC_FILETRANSFER_ENABLED)
+	}
+	label .pp.t.l -text "File Transfer: "
+	radiobutton .pp.t.none  -text "None" -variable file_transfer -value "none"
+	radiobutton .pp.t.ultra -text "UltraVNC" -variable file_transfer -value "ultra"
+	radiobutton .pp.t.tight -text "TightVNC" -variable file_transfer -value "tight"
+	pack .pp.t.l .pp.t.none .pp.t.ultra .pp.t.tight -side left
+
+	frame .pp.o -bd 1 -relief ridge
+	button .pp.o.ok -text "OK" -command "set port_reply 1; destroy .pp"
+	button .pp.o.cancel -text "Cancel" -command "set port_reply 0; destroy .pp"
+	pack .pp.o.ok .pp.o.cancel -side left -fill x -expand 1
+	pack .pp.m -side top -fill x -expand 1 
+	pack .pp.f .pp.t .pp.o -side top -fill x
+
+	focus .pp.f.e
+	.pp.f.e icursor end
+
+	wm withdraw .pp
+	update
+	center_win .pp
+
+	wm minsize .pp [winfo width .pp] [winfo height .pp]
+
+	bind .pp.f.e <KeyPress-Return> "set port_reply 1; destroy .pp"
+
+	vwait port_reply
+
+	if {$port_reply} {
+		regsub -all {^:} $port_set "" port_set
+		regsub -all {[ \t]} $port_set "" port_set
+		if {[regexp {^[0-9][0-9]*$} $port_set]} {
+			if {$port_set < 0} {
+				set port_set [expr 0 - $port_set]
+			} elseif {$port_set < 200} {
+				set port_set [expr $port_set + 5900]
+			} 
+			puts "$port_set:ssl${enable_ssl}:localhost$localhost:ft_$file_transfer"
+		}
+	}
+}
+
 proc change_view_state {} {
 	global menu_var gui_current_state
 
@@ -6376,20 +6737,47 @@ set ffont "fixed"
 
 set ls ""
 catch {set ls [font metrics $bfont -linespace]}
-if {$ls != ""} {
-    if {$ls > 14} {
+if {$ls != "" && $ls > 14} {
 	# some recent setups have BIG rendering for the above fonts.
 	# on recent (8/08) debian these are really ragged:
 	set bfont "-adobe-helvetica-bold-r-*-*-*-90-*-*-*-*-*-*"
 	set sfont "-adobe-helvetica-bold-r-*-*-*-75-*-*-*-*-*-*"
 	set snfont "-adobe-helvetica-medium-r-*-*-*-75-*-*-*-*-*-*"
 
-	# these are bigger but look better... but for how long?
-	set bfont "-adobe-helvetica-bold-r-*-*-*-100-*-*-*-*-*-*"
-	set sfont "-adobe-helvetica-bold-r-*-*-*-80-*-*-*-*-*-*"
-	set snfont "-adobe-helvetica-medium-r-*-*-*-80-*-*-*-*-*-*"
-    }
+	set ls ""
+	catch {set ls [font metrics $bfont -linespace]}
+	if {$ls != "" && $ls < 14} {
+		# these are bigger but look better... but for how long?
+		set bfont "-adobe-helvetica-bold-r-*-*-*-100-*-*-*-*-*-*"
+		set sfont "-adobe-helvetica-bold-r-*-*-*-80-*-*-*-*-*-*"
+		set snfont "-adobe-helvetica-medium-r-*-*-*-80-*-*-*-*-*-*"
+
+		# maybe consider... {-font font Font {Helvetica -12 bold} {Helvetica -12 bold}}
+		# or stick with system font like ssvnc.
+	}
 }
+
+# need to check if "fixed" font under XFT on tk8.5 is actually fixed width!!
+set ls ""
+catch {set ls [font metrics $ffont -linespace]}
+set fs ""
+catch {set fs [font metrics $ffont -fixed]}
+set redo 0
+if {$fs != "" && $fs != "1"} {
+	set redo 1
+}
+if {$ls != "" && $ls > 14} {
+	set redo 1
+}
+if {$redo} {
+	foreach fn [font names] {
+		if {$fn == "TkFixedFont"} {
+			set ffont $fn
+			break
+		}
+	}
+}
+
 set help_indent 24;
 set reply_xdisplay ""
 set all_settings "None so far."
@@ -6465,6 +6853,10 @@ if {"$argv" == "-spit"} {
 	puts "/* ifndef _TKX11VNC_H */"
 	close $fh
 	puts ";"
+	exit 0
+}
+if {"$argv" == "-portprompt"} {
+	do_port_prompt
 	exit 0
 }
 
@@ -6665,15 +7057,65 @@ get_default_vars
 dtime D
 
 proc check_setpasswd {} {
-	global icon_setpasswd
+	global env icon_setpasswd
+	global do_props_msg
+	set do_props_msg ""
 	if {$icon_setpasswd} {
-		set m "You must specify a Session Password\n" 
-		set m "${m}before VNC clients can connect.\n" 
-		set m "${m}Enter one in the Password field\n" 
-		set m "${m}and Press \"OK\". The password(s) is\n" 
-		set m "${m}only for this x11vnc session.\n" 
-		do_props $m
-		#push_new_value "unlock" "unlock" 1 0
+		set m "\n"
+		set m     " Note the x11vnc icon in the system tray \n" 
+		set m "${m} This panel is its 'Properties' dialog.\n" 
+		set m "${m}\n" 
+		set m "${m} To specify a Session Password and to\n" 
+		set m "${m} allow VNC clients to connect, follow\n" 
+		set m "${m} these steps:\n" 
+		set m "${m}\n" 
+		set m "${m} Enter a passwd in the Password field\n" 
+		set m "${m} (it can be left blank.)  You can also\n" 
+		set m "${m} supply a ViewOnly passwd if desired.\n" 
+		set m "${m}\n" 
+		set m "${m} Set 'Accept Connections' and then Press \n" 
+		set m "${m} 'Apply' to allow incoming connections.\n" 
+		set m "${m}\n" 
+		set m "${m} The passwords are only for this x11vnc\n" 
+		set m "${m} session and are not saved. Run x11vnc\n" 
+		set m "${m} manually for more control.\n" 
+		set m "${m}\n" 
+		set m "${m} See 'Help' for details on each option.\n" 
+
+		global x11vnc_cmdline
+
+		set dossl 0
+		if {[info exists x11vnc_cmdline]} {
+			if [regexp -- {-ssl} $x11vnc_cmdline] {
+				set dossl 1
+			}
+		}
+		if {$dossl || [info exists env(X11VNC_GOT_SSL)]} {
+			set m "${m}\n" 
+			set m "${m} SSL encryption mode active.  You can\n" 
+			set m "${m} find your Public Cert in the Logfile\n" 
+			set m "${m} and also the ~/.vnc/certs directory.\n" 
+		}
+
+		if {[info exists env(X11VNC_SETPASS_FAIL)]} {
+			set pp 5900
+			if {[info exists env(X11VNC_GOT_RFBPORT_VAL)]} {
+				if {$env(X11VNC_GOT_RFBPORT_VAL) > 0} {
+					set pp $env(X11VNC_GOT_RFBPORT_VAL)
+				}
+			}
+			
+			set m     " The x11vnc program failed to start! \n"
+			set m "${m}\n" 
+			set m "${m} Maybe there is another VNC server\n"
+			set m "${m} already listening on port $pp?\n"
+			set m "${m}\n" 
+			set m "${m} You will need to start over after\n"
+			set m "${m} you make sure x11vnc can start.\n"
+		}
+		
+		set do_props_msg $m
+		do_props
 	}
 }
 
