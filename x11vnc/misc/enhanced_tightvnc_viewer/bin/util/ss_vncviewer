@@ -162,6 +162,9 @@ ssh_args=""
 showcert=""
 reverse=""
 
+ciphers=""
+anondh="ALL:RC4+RSA:+SSLv2:@STRENGTH"
+
 if [ "X$1" = "X-viewerflavor" ]; then
 	# special case, try to guess which viewer:
 	#
@@ -196,6 +199,10 @@ if [ "X$SS_VNCVIEWER_NO_MAXCONN" != "X" ]; then
 	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
 elif echo "$VNCVIEWERCMD" | egrep -i '^(xmessage|sleep )' > /dev/null; then
 	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
+else
+	STUNNEL_ONCE=1; export STUNNEL_ONCE
+	STUNNEL_MAX_CLIENTS=1; export STUNNEL_MAX_CLIENTS
+	STUNNEL_NO_SYSLOG=1; export STUNNEL_NO_SYSLOG
 fi
 
 # grab our cmdline options:
@@ -216,6 +223,10 @@ do
 	"-sshcmd")	shift; ssh_cmd="$1"
                 ;;
 	"-sshargs")	shift; ssh_args="$1"
+                ;;
+	"-anondh")	ciphers="ciphers=$anondh"
+                ;;
+	"-ciphers")	shift; ciphers="ciphers=$1"
                 ;;
 	"-alpha")	gotalpha=1
                 ;;
@@ -304,6 +315,47 @@ fi
 orig="$1"
 shift
 
+dL="-L"
+if uname -sr | egrep 'SunOS 5\.[5-8]' > /dev/null; then
+	dL="-h"
+fi
+
+# a portable, but not absolutely safe, tmp file creator
+mytmp() {
+	tf=$1
+	if type mktemp > /dev/null 2>&1; then
+		# if we have mktemp(1), use it:
+		tf2="$tf.XXXXXX"
+		tf2=`mktemp "$tf2"`
+		if [ "X$tf2" != "X" -a -f "$tf2" ]; then
+			if [ "X$DEBUG_MKTEMP" != "X" ]; then
+				echo "mytmp-mktemp: $tf2" 1>&2
+			fi
+			echo "$tf2"
+			return
+		fi
+	fi
+	# fallback to multiple cmds:
+	rm -rf "$tf" || exit 1
+	if [ -d "$tf" ]; then
+		echo "tmp file $tf still exists as a directory."
+		exit 1
+	elif [ $dL "$tf" ]; then
+		echo "tmp file $tf still exists as a symlink."
+		exit 1
+	elif [ -f "$tf" ]; then
+		echo "tmp file $tf still exists."
+		exit 1
+	fi
+	touch "$tf" || exit 1
+	chmod 600 "$tf" || exit 1
+	rchk
+	if [ "X$DEBUG_MKTEMP" != "X" ]; then
+		echo "mytmp-touch: $tf" 1>&2
+	fi
+	echo "$tf"
+}
+
 # set up special case of ultravnc single click III mode:
 if echo "$proxy" | egrep "^sslrepeater://" > /dev/null; then
 	pstr=`echo "$proxy" | sed -e 's,sslrepeater://,,'`
@@ -314,6 +366,13 @@ if echo "$proxy" | egrep "^sslrepeater://" > /dev/null; then
 	echo
 	echo "reset: SSVNC_REPEATER=$SSVNC_REPEATER orig=$orig proxy=''"
 	proxy=""
+fi
+if echo "$proxy" | egrep "vencrypt://" > /dev/null; then
+	vtmp="/tmp/ss_handshake${RANDOM}.$$.txt"
+	vtmp=`mytmp "$vtmp"`
+	SSVNC_PREDIGESTED_HANDSHAKE="$vtmp"
+	export SSVNC_PREDIGESTED_HANDSHAKE
+	#echo "SSVNC_PREDIGESTED_HANDSHAKE=$SSVNC_PREDIGESTED_HANDSHAKE"
 fi
 
 
@@ -561,47 +620,6 @@ rchk() {
 }
 rchk
 
-dL="-L"
-if uname -sr | egrep 'SunOS 5\.[5-8]' > /dev/null; then
-	dL="-h"
-fi
-
-# a portable, but not absolutely safe, tmp file creator
-mytmp() {
-	tf=$1
-	if type mktemp > /dev/null 2>&1; then
-		# if we have mktemp(1), use it:
-		tf2="$tf.XXXXXX"
-		tf2=`mktemp "$tf2"`
-		if [ "X$tf2" != "X" -a -f "$tf2" ]; then
-			if [ "X$DEBUG_MKTEMP" != "X" ]; then
-				echo "mytmp-mktemp: $tf2" 1>&2
-			fi
-			echo "$tf2"
-			return
-		fi
-	fi
-	# fallback to multiple cmds:
-	rm -rf "$tf" || exit 1
-	if [ -d "$tf" ]; then
-		echo "tmp file $tf still exists as a directory."
-		exit 1
-	elif [ $dL "$tf" ]; then
-		echo "tmp file $tf still exists as a symlink."
-		exit 1
-	elif [ -f "$tf" ]; then
-		echo "tmp file $tf still exists."
-		exit 1
-	fi
-	touch "$tf" || exit 1
-	chmod 600 "$tf" || exit 1
-	rchk
-	if [ "X$DEBUG_MKTEMP" != "X" ]; then
-		echo "mytmp-touch: $tf" 1>&2
-	fi
-	echo "$tf"
-}
-
 # trick for the undocumented rsh://host:port method.
 rsh_setup() {
 	if echo "$ssh_host" | grep '@' > /dev/null; then
@@ -662,6 +680,32 @@ if ($ENV{PPROXY_SOCKS} ne "" && $ENV{PPROXY_PROXY} !~ m,^socks5?://,i) {
 		$ENV{PPROXY_PROXY} = "socks5://$ENV{PPROXY_PROXY}";
 	} else {
 		$ENV{PPROXY_PROXY} = "socks://$ENV{PPROXY_PROXY}";
+	}
+}
+
+my $rfbSecTypeTlsVnc   = 18;
+my $rfbSecTypeVencrypt = 19;
+
+my $rfbVencryptPlain        = 256;
+my $rfbVencryptTlsNone      = 257;
+my $rfbVencryptTlsVnc       = 258;
+my $rfbVencryptTlsPlain     = 259;
+my $rfbVencryptX509None     = 260;
+my $rfbVencryptX509Vnc      = 261;
+my $rfbVencryptX509Plain    = 262;
+
+my $handshake_file = "";
+if (exists $ENV{SSVNC_PREDIGESTED_HANDSHAKE})  {
+	$handshake_file = $ENV{SSVNC_PREDIGESTED_HANDSHAKE};
+}
+
+sub append_handshake {
+	my $str = shift;
+	if ($handshake_file) {
+		if (open(HSF, ">>$handshake_file")) {
+			print HSF $str;
+			close HSF;
+		}
 	}
 }
 
@@ -825,6 +869,18 @@ sub url_parse {
 		if ($hostport !~ /:\d+/) {
 			$hostport .= ":5900";
 		}
+	} elsif ($hostport =~ m,^vencrypt://(\S*)$,i) {
+		# vencrypt handshake.
+		$hostport = $1;
+		my $m = "connect";
+		if ($hostpost =~ /^(\S+)\+(\S+)$/) {
+			$hostport = $1;
+			$mode = $2;
+		}
+		$mode = "vencrypt:$m";
+		if ($hostport !~ /:\d+/) {
+			$hostport .= ":5900";
+		}
 	}
 	return ($hostport, $mode);
 }
@@ -832,6 +888,7 @@ sub url_parse {
 sub setmode {
 	my $mode = shift;
 	$ENV{PPROXY_REPEATER} = "";
+	$ENV{PPROXY_VENCRYPT} = "";
 	if ($mode =~ /^socks/) {
 		if ($mode =~ /^socks5/) {
 			$ENV{PPROXY_SOCKS} = 5;
@@ -840,6 +897,9 @@ sub setmode {
 		}
 	} elsif ($mode =~ /^repeater:(.*)/) {
 		$ENV{PPROXY_REPEATER} = $1;
+		$ENV{PPROXY_SOCKS} = "";
+	} elsif ($mode =~ /^vencrypt:(.*)/) {
+		$ENV{PPROXY_VENCRYPT} = $1;
 		$ENV{PPROXY_SOCKS} = "";
 	} else {
 		$ENV{PPROXY_SOCKS} = "";
@@ -982,6 +1042,9 @@ sub connection {
 			sysread($sock, $c, 1);
 			print STDERR $c;
 		}
+	} elsif ($ENV{PPROXY_VENCRYPT} ne "") {
+		my $vencrypt = $ENV{PPROXY_VENCRYPT};
+		vencrypt_dialog($vencrypt);
 
 	} else {
 		# Web Proxy:
@@ -1007,6 +1070,189 @@ sub connection {
 			close $sock;
 			exit(1);
 		}
+	}
+}
+
+sub vdie {
+	append_handshake("done\n");
+	close $sock;
+	exit(1);
+}
+
+sub tlsvnc_handshake {
+	my ($vmode, $db) = @_;
+
+	print STDERR "PPROXY: Doing TLSVNC Handshake\n";
+
+	my $psec = pack("C", $rfbSecTypeTlsVnc);
+	syswrite($sock, $psec, 1);
+
+	append_handshake("done\n");
+}
+
+sub vencrypt_handshake {
+	
+	my ($vmode, $db) = @_;
+
+	print STDERR "PPROXY: Doing VeNCrypt Handshake\n";
+
+	my $psec = pack("C", $rfbSecTypeVencrypt);
+	syswrite($sock, $psec, 1);
+
+	my $vmajor;
+	my $vminor;
+	sysread($sock, $vmajor, 1);
+	sysread($sock, $vminor, 1);
+
+	vdie if $vmajor eq "" || $vminor eq "";
+
+	$vmajor = unpack("C", $vmajor);
+	$vminor = unpack("C", $vminor);
+	print STDERR "$vmajor.$vminor\n" if $db;
+
+	vdie if $vmajor ne 0;
+	vdie if $vminor < 2;
+
+	$vmajor = pack("C", 0);
+	$vminor = pack("C", 2);
+	append_handshake("subversion=0.2\n");
+
+	syswrite($sock, $vmajor, 1);
+	syswrite($sock, $vminor, 1);
+
+	my $result;
+	sysread($sock, $result, 1);
+
+	vdie if $result eq "";
+	$result = unpack("C", $result);
+	print STDERR "result=$result\n" if $db;
+
+	vdie if $result ne 0;
+
+	my $nsubtypes;
+	sysread($sock, $nsubtypes, 1);
+
+	vdie if $nsubtypes eq "";
+	$nsubtypes = unpack("C", $nsubtypes);
+	print STDERR "nsubtypes=$nsubtypes\n" if $db;
+
+	my %subtypes;
+
+	for (my $i = 0; $i < $nsubtypes; $i++) {
+		my $subtype = ""; 
+		sysread($sock, $subtype, 4);
+		vdie if length($subtype) != 4;
+
+		# XXX fix 64bit.
+		$subtype = unpack("N", $subtype);
+		print STDERR "subtype: $subtype\n" if $db;
+		$subtypes{$subtype} = 1;
+		append_handshake("sst$i=$subtype\n");
+	}
+
+	my $subtype = 0;
+	if (exists $subtypes{$rfbVencryptX509None})  {
+		$subtype = $rfbVencryptX509None;
+		print STDERR "selected rfbVencryptX509None\n" if $db;
+	} elsif (exists $subtypes{$rfbVencryptX509Vnc})  {
+		$subtype = $rfbVencryptX509Vnc;
+		print STDERR "selected rfbVencryptX509Vnc\n" if $db;
+	} elsif (exists $subtypes{$rfbVencryptX509Plain})  {
+		$subtype = $rfbVencryptX509Plain;
+		print STDERR "selected rfbVencryptX509Plain\n" if $db;
+	} elsif (exists $subtypes{$rfbVencryptTlsNone})  {
+		$subtype = $rfbVencryptTlsNone;
+		print STDERR "selected rfbVencryptTlsNone\n" if $db;
+	} elsif (exists $subtypes{$rfbVencryptTlsVnc})  {
+		$subtype = $rfbVencryptTlsVnc;
+		print STDERR "selected rfbVencryptTlsVnc\n" if $db;
+	} elsif (exists $subtypes{$rfbVencryptTlsPlain})  {
+		$subtype = $rfbVencryptTlsPlain;
+		print STDERR "selected rfbVencryptTlsPlain\n" if $db;
+	}
+	append_handshake("subtype=$subtype\n");
+
+	my $pst = pack("N", $subtype);
+	syswrite($sock, $pst, 4); 
+
+	vdie if $subtype == 0;
+
+	my $ok;
+	sysread($sock, $ok, 1);
+	$ok = unpack("C", $ok);
+	print STDERR "ok=$ok\n" if $db;
+
+	append_handshake("done\n");
+
+	vdie if $ok == 0;
+}
+
+sub vencrypt_dialog {
+	my $vmode = shift;
+	my $db = 0;
+
+	$db = 1 if exists $ENV{SS_DEBUG};
+
+	append_handshake("mode=$vmode\n");
+
+	my $server_rfb = "";
+	syswrite($sock, $rep, 250);
+	for (my $i = 0; $i < 12; $i++) {
+		my $c;
+		sysread($sock, $c, 1);
+		$server_rfb .= $c;
+		print STDERR $c;
+	}
+	print STDERR "server_rfb: $server_rfb\n" if $db;
+	append_handshake("server=$server_rfb");
+
+	my $minor = "";
+	if ($server_rfb =~ /^RFB 003\.(\d+)/) {
+		$minor = $1;
+	} else {
+		vdie;
+	}
+	my $viewer_rfb = "RFB 003.008\n";
+	if ($minor < 7) {
+		vdie;
+	} elsif ($minor == 7) {
+		$viewer_rfb = "RFB 003.007\n";
+	}
+	syswrite($sock, $viewer_rfb, 12);
+	append_handshake("viewer=$viewer_rfb");
+
+	my $nsec;
+
+	sysread($sock, $nsec, 1);
+	vdie if $nsec eq "";
+
+	$nsec = unpack("C", $nsec);
+
+	print STDERR "nsec: $nsec\n" if $db;
+	vdie if $nsec eq 0 || $nsec > 100;
+
+	my %sectypes = ();
+
+	for (my $i = 0; $i < $nsec; $i++) {
+		my $sec;
+		sysread($sock, $sec, 1);
+		vdie if $sec eq "";
+		$sec = unpack("C", $sec);
+		print STDERR "sec: $sec\n" if $db;
+		$sectypes{$sec} = 1;
+	}
+	
+	if (exists $sectypes{$rfbSecTypeVencrypt}) {
+		print STDERR "found rfbSecTypeVencrypt\n" if $db;
+		append_handshake("sectype=$rfbSecTypeVencrypt\n");
+		vencrypt_handshake($vmode, $db);
+	} elsif (exists $sectypes{$rfbSecTypeTlsVnc}) {
+		print STDERR "found rfbSecTypeTlsVnc\n" if $db;
+		append_handshake("sectype=$rfbSecTypeTlsVnc\n");
+		tlsvnc_handshake($vmode, $db);
+	} else {
+		print STDERR "No supported sec-type found\n" if $db;
+		vdie;
 	}
 }
 
@@ -1104,8 +1350,8 @@ if [ "X$use_ssh" = "X1" ]; then
 
 	if echo "$proxy" | egrep '(http|https|socks|socks4|socks5)://' > /dev/null; then
 		# Handle Web or SOCKS proxy(ies) for the initial connect.
-Kecho host=$host
-Kecho port=$port
+		Kecho host=$host
+		Kecho port=$port
 		pproxy=""
 		sproxy1=""
 		sproxy_rest=""
@@ -1126,9 +1372,10 @@ Kecho port=$port
 		done
 		pproxy=`echo "$pproxy" | sed -e 's/^,,*//' -e 's/,,*/,/g'`
 		sproxy_rest=`echo "$sproxy_rest" | sed -e 's/^,,*//' -e 's/,,*/,/g'`
-Kecho pproxy=$pproxy
-Kecho sproxy1=$sproxy1
-Kecho sproxy_rest=$sproxy_rest
+
+		Kecho pproxy=$pproxy
+		Kecho sproxy1=$sproxy1
+		Kecho sproxy_rest=$sproxy_rest
 
 		sproxy1_host=""
 		sproxy1_port=""
@@ -1164,9 +1411,9 @@ Kecho sproxy_rest=$sproxy_rest
 			fi
 		fi
 
-Kecho sproxy1_host=$sproxy1_host
-Kecho sproxy1_port=$sproxy1_port
-Kecho sproxy1_user=$sproxy1_user
+		Kecho sproxy1_host=$sproxy1_host
+		Kecho sproxy1_port=$sproxy1_port
+		Kecho sproxy1_user=$sproxy1_user
 
 		ptmp="/tmp/ss_vncviewer_ssh${RANDOM}.$$.pl"
 		ptmp=`mytmp "$ptmp"`
@@ -1204,7 +1451,7 @@ Kecho sproxy1_user=$sproxy1_user
 		if [ "X$sproxy_rest" != "X" ]; then
 			proxy="$proxy,$sproxy_rest"
 		fi
-Kecho proxy=$proxy
+		Kecho proxy=$proxy
 	fi
 
 	if echo "$proxy" | grep "," > /dev/null; then
@@ -1550,13 +1797,26 @@ if [ "X$showcert" = "X1" ]; then
 	if [ "X$proxy" != "X" ]; then
 		PPROXY_LISTEN=$use
 		export PPROXY_LISTEN
-		$ptmp 2>/dev/null &
+		if [ "X$SS_DEBUG" != "X" ]; then
+			$ptmp &
+		else
+			$ptmp 2>/dev/null &
+		fi
 		sleep 1
 		host="localhost"
 		port="$use"
 	fi
-	openssl s_client -connect $host:$port 2>&1 < /dev/null
-	exit $?
+	cipher_args=""
+	if [ "X$ciphers" != "X" ]; then
+		cipher_args=`echo "$ciphers" | sed -e 's/ciphers=/-cipher /'`
+	fi
+	#echo "openssl s_client $cipher_args -connect $host:$port" 
+	openssl s_client $cipher_args -prexit -connect $host:$port 2>&1 < /dev/null
+	rc=$?
+	if [ "X$SSVNC_PREDIGESTED_HANDSHAKE" != "X" ]; then
+		rm -f $SSVNC_PREDIGESTED_HANDSHAKE
+	fi
+	exit $rc
 fi
 
 if [ "X$direct_connect" != "X" ]; then
@@ -1783,6 +2043,7 @@ foreground = yes
 pid =
 client = yes
 debug = 6
+$ciphers
 $STUNNEL_EXTRA_OPTS
 $STUNNEL_EXTRA_OPTS_USER
 $verify
@@ -1818,6 +2079,7 @@ foreground = yes
 pid =
 client = no
 debug = 6
+$ciphers
 $STUNNEL_EXTRA_OPTS
 $STUNNEL_EXTRA_OPTS_USER
 $verify

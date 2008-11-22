@@ -201,8 +201,8 @@ elif [ ! -d "$dir/$name" -a $nearby = 0 ]; then
 
 else
 	STUNNEL=stunnel
-	STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
-	export STUNNEL STUNNEL_EXTRA_OPTS
+	#STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
+	#export STUNNEL STUNNEL_EXTRA_OPTS
 	SSVNC_VIEWER_INTERNAL=1
 	export SSVNC_VIEWER_INTERNAL
 fi

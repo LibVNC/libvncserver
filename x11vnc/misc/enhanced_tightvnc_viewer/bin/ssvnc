@@ -30,7 +30,7 @@ fi
 
 if [ "X$WISH" = "X" ]; then
 	WISH=wish
-	for try in wish wish8.3 wish8.4 wish8.5 wish8.6
+	for try in wish8.4 wish wish8.3 wish8.5 wish8.6
 	do
 		if type $try > /dev/null; then
 			WISH=$try
@@ -114,8 +114,8 @@ elif [ ! -d "$dir/$name" -a $nearby = 0 ]; then
 	echo "Using externel \"vncviewer\" and \"stunnel\" found in PATH."
 else
 	STUNNEL=stunnel
-	STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
-	export STUNNEL STUNNEL_EXTRA_OPTS
+	#STUNNEL_EXTRA_OPTS=${STUNNEL_EXTRA_OPTS:-"maxconn = 1"}
+	#export STUNNEL STUNNEL_EXTRA_OPTS
 	SSVNC_VIEWER_INTERNAL=1
 	export SSVNC_VIEWER_INTERNAL
 fi

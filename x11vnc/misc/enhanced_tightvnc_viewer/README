@@ -82,6 +82,10 @@ The enhanced TightVNC viewer features are:
 
 	- Sets up any additional SSH port redirections that you want.
 
+	- Zeroconf (aka Bonjour) is used on Unix and Mac OS X to find
+	  VNC servers on your local network if the avahi-browse or dns-sd
+	  program is available and in your PATH.
+
         - Port Knocking for "closed port" SSH/SSL connections.  In addition
           to a simple fixed port sequence and one-time-pad implementation,
           a hook is also provided to run any port knocking client before a
@@ -107,6 +111,8 @@ The enhanced TightVNC viewer features are:
 	(the following features only apply to the bundled Unix tightvnc viewer)
 
 	- rfbNewFBSize VNC support (screen resizing)
+
+	- Client-side Scaling of the Viewer.
 
 	- ZRLE VNC encoding support (RealVNC's encoding)
 
@@ -268,8 +274,8 @@ Unix/MacOSX Install:
 
     For the conventional source tarball it will compile and install, e.g.:
 
-       gzip -dc ssvnc-1.0.20.src.tar.gz | tar xvf -
-       cd ssvnc-1.0.20
+       gzip -dc ssvnc-1.0.21.src.tar.gz | tar xvf -
+       cd ssvnc-1.0.21
        make config
        make all
        make PREFIX=/my/install/dir install
@@ -428,9 +434,10 @@ On Mac OS X depending on what you do you need these programs installed:
 
     Lesser used ones: netcat, smbclient, cups
 
-
 Most Mac OS X and Unix OS come with the main components installed. 
 	
+See the README.src for a more detailed description of dependencies.
+
 
 If you need to Build:
 --------------------
@@ -467,7 +474,7 @@ Feel free to ask us if you need help running ./build.unix
 Convential Build:
 
 A more conventional source tarball is provided in ssvnc-x.y.z.src.tar.gz.
-It uses a more or less familiar 'make config; make all; make install'
+It uses a more or less familiar 'make config; make all; make PREFIX=path install'
 method.  It does not include stunnel, so that must be installed on the
 system separately.
 

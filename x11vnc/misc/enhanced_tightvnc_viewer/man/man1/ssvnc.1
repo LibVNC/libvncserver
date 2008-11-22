@@ -8,7 +8,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvnc 1 "September 2008" "" "SSVNC"
+.TH ssvnc 1 "November 2008" "" "SSVNC"
 .SH NAME
 ssvnc \- a GUI wrapper for SSL and SSH VNC connections.
 .SH SYNOPSIS
@@ -21,7 +21,7 @@ ssvnc \- a GUI wrapper for SSL and SSH VNC connections.
 .RI [\| saved-profile-name \|]
 .br
 .B ssvnc
-.RI [\| options \|][\| host-or-profile \]
+.RI [\| options \|]\ [\| host-or-profile \]
 .br
 .B ssvnc
 .IR \--help
@@ -49,7 +49,8 @@ E.g. "fred@far-away.east:0".
 
 As an easter egg, we note it is also possible to disable the use of SSL/SSH 
 encryption tunnels by using a vnc:// or Vnc:// prefix before
-host:display.
+host:display.  Shift+Ctrl-E is a short-cut to add/remove it.
+See also the \fB-noenc\fR option below.
 
 Normally you do not specify any command line options.  You simply
 run \fBssvnc\fR and use the GUI that starts up.
@@ -59,7 +60,7 @@ on the command line to connect to immediately (the GUI is started
 and the connection is initiated).  For example, "\fBssvnc far-away.east:0\fR"
 Instead of a  host:display, you can specify the name of a saved profile to
 automatically load that profile and then connect to its server.  
-For example "\fBssvnc far\fR", if you name the profile "far".
+For example "\fBssvnc far\fR", if you named the profile "far".
 You can use the \fB-profiles\fR option to list the profiles you have saved.
 
 The related commands \fBsshvnc\fR and \fBtsvnc\fR start up the GUI in
@@ -108,6 +109,18 @@ Same as SSVNC_NO_VERIFY_ALL_BUTTON=1.
 \fB\-bigger\fR
 Make the Profile Selection Dialog window bigger.
 Same as SSVNC_BIGGER_DIALOG=1.
+.TP
+\fB\-noenc\fR
+Start off in a mode where a 'No Encryption' check button is present.
+You can toggle the mode with Ctrl-E.
+Same as SSVNC_DISABLE_ENCRYPTION_BUTTON=1. Or noenc=1 in ~/.ssvncrc.
+Selecting no encryption is the same as the vnc:// and Vnc:// prefixes
+described below.
+.TP
+\fB\-killstunnel\fR
+On Windows, automatically terminate the STUNNEL process when the viewer
+exits instead of prompting you (same as killstunnel=1 in ssvnc_rc or
+toggle in Options menu)
 .SH URL NOTATION
 Here are all of our URL-like prefixes that you can put in front of
 host:display (or host:port): 
@@ -116,7 +129,7 @@ For SSL:  vncs:// vncssl:// and vnc+ssl://
 
 For SSH:  vncssh:// and vnc+ssh://
 
-For No Encryption Tunnel:  vnc:// and Vnc://
+For No Encryption:  vnc:// and Vnc://
 
 Examples:
 
@@ -128,6 +141,10 @@ To quickly make a direct connection: \fBssvnc Vnc://snoopy.com:0\fR
 
 The above will also work in the "VNC Host:Display" entry box in the GUI.
 Press the "Connect" button after entering them.
+
+The difference between vnc:// and Vnc:// is that the latter one will not
+prompt you whether you really want to make an unencrypted connection
+or not.
 .SH FILES
 Your SSVNC vnc profiles are stored in the \fB$HOME/.vnc/profiles\fR
 directory.  They end in suffix \fB.vnc\fR

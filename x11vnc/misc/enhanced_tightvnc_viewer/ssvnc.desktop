@@ -1,0 +1,11 @@
+[Desktop Entry]
+# Copy this file to "/usr/shared/applications/ssvnc.desktop" then SSVNC will
+# appear in desktop menus (once they are updated; e.g. update-menus command).
+Name=SSL/SSH VNC Viewer
+Comment=SSVNC - access remote VNC desktops
+Exec=ssvnc -noenc
+Icon=computer
+Terminal=false
+Type=Application
+StartupWMClass=Ssvnc.tcl
+Categories=Network;RemoteAccess;
