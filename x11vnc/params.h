@@ -63,9 +63,9 @@
 #define VENCRYPT_NODH		1
 #define VENCRYPT_NOX509		2
 
-#define TLSVNC_NONE		0
-#define TLSVNC_SUPPORT		1
-#define TLSVNC_SOLE		2
-#define TLSVNC_FORCE		3
+#define ANONTLS_NONE		0
+#define ANONTLS_SUPPORT		1
+#define ANONTLS_SOLE		2
+#define ANONTLS_FORCE		3
 
 #endif /* _X11VNC_PARAMS_H */

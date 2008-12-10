@@ -34,7 +34,7 @@ extern char *enc_str;
 extern int vencrypt_mode;
 extern int vencrypt_kx;
 extern int vencrypt_enable_plain_login;
-extern int tlsvnc_mode;
+extern int anontls_mode;
 extern int create_fresh_dhparams;
 extern char *dhparams_file;
 extern int https_port_num;

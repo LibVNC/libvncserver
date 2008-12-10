@@ -177,9 +177,9 @@ static double scr_key_bdpush_time, scr_mouse_bdpush_time;
 static void parse_scroll_copyrect_str(char *scr) {
 	char *p, *str;
 	int i;
-	char *part[10];
+	char *part[16];
 
-	for (i=0; i<10; i++) {
+	for (i=0; i<16; i++) {
 		part[i] = NULL;
 	}
 
@@ -194,6 +194,7 @@ static void parse_scroll_copyrect_str(char *scr) {
 	while (p) {
 		part[i++] = strdup(p);
 		p = strtok(NULL, ",");
+		if (i >= 16) break;
 	}
 	free(str);
 
@@ -301,9 +302,9 @@ static char *wireframe_mods = NULL;
 static void parse_wireframe_str(char *wf) {
 	char *p, *str;
 	int i;
-	char *part[10];
+	char *part[16];
 
-	for (i=0; i<10; i++) {
+	for (i=0; i<16; i++) {
 		part[i] = NULL;
 	}
 
@@ -327,6 +328,7 @@ static void parse_wireframe_str(char *wf) {
 	while (p) {
 		part[i++] = strdup(p);
 		p = strtok(NULL, ",");
+		if (i >= 16) break;
 	}
 	free(str);
 

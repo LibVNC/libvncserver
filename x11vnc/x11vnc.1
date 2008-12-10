@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "November 2008" "x11vnc " "User Commands"
+.TH X11VNC "1" "December 2008" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.6, lastmod: 2008-11-22
+         version: 0.9.6, lastmod: 2008-12-08
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -79,10 +79,12 @@ man pages for more info.
 .PP
 \fB-N\fR
 .IP
-If the X display is :N, try to set the VNC display
-to also be :N  This just sets the \fB-rfbport\fR option
-to 5900+N.  The program will exit immediately if that
-port is not available.
+If the X display is :N, try to set the VNC display to
+also be :N This just sets the \fB-rfbport\fR option to 5900+N
+The program will exit immediately if that port is not
+available. The \fB-N\fR option only works with normal \fB-display\fR
+usage, e.g. :0 or :8, \fB-N\fR is ignored in the \fB-display\fR
+WAIT:..., \fB-create,\fR \fB-find,\fR \fB-svc,\fR \fB-redirect,\fR etc modes.
 .PP
 \fB-autoport\fR \fIn\fR
 .IP
@@ -1156,13 +1158,13 @@ If 0 <= port < 200 it is taken as a VNC display (5900 is
 added to get the actual port), if port < 0 then \fB-port\fR
 is used.
 .IP
-Probably the only reason to use the \fB-redirect\fR option is
-in conjunction with SSL support, e.g. \fB-ssl,\fR \fB-ssl\fR SAVE.
+Probably the only reason to use the \fB-redirect\fR option
+is in conjunction with SSL support, e.g. \fB-ssl\fR SAVE.
 This provides an easy way to add SSL encryption to a VNC
 server that does not support SSL (e.g. Xvnc or vnc.so)
 In fact, the protocol does not even need to be VNC,
-and so "\fB-ssl\fR \fISAVE \fB-redirect\fR host:port\fR" can act as a
-replacement for 
+and so "\fB-rfbport\fR \fIport1 \fB-ssl\fR SAVE \fB-redirect\fR host:port2\fR"
+can act as a replacement for 
 .IR stunnel (1).
 .IP
 This mode only allows one redirected connection.
@@ -1304,6 +1306,9 @@ find one it will try to *start* up an X server session
 for the user.  This is the only time x11vnc tries to
 actually start up an X server.
 .IP
+It will start looking for an open display number at :20
+Override via X11VNC_CREATE_STARTING_DISPLAY_NUMBER=n
+.IP
 By default FINDCREATEDISPLAY will try Xdummy and then
 Xvfb:
 .IP
@@ -1429,14 +1434,14 @@ logged into the X console.
 The VeNCrypt extension to the VNC protocol allows
 encrypted SSL/TLS connections.  If the \fB-ssl\fR mode is
 enabled, then VeNCrypt is enabled as well BY DEFAULT
-(they both use the SSL/TLS tunnel, only the protocol
+(they both use a SSL/TLS tunnel, only the protocol
 handshake is a little different.)
 .IP
 To control when and how VeNCrypt is used, specify the
 mode string.  If mode is "never", then VeNCrypt is
 not used.  If mode is "support" (the default) then
 VeNCrypt is supported.  If mode is "only", then the
-similar and older TLSVNC protocol is not simultaneously
+similar and older ANONTLS protocol is not simultaneously
 supported.  x11vnc's normal SSL mode (vncs://) will be
 supported under \fB-ssl\fR unless you set mode to "force".
 .IP
@@ -1446,14 +1451,16 @@ with "nox509:", then X509 key exchange is disabled.
 .IP
 To disable all Anonymous Diffie-Hellman access
 (susceptible to Man-In-The-Middle attack) you will need
-to supply "\fB-vencrypt\fR \fInodh:support \fB-tlsvnc\fR never\fR"
+to supply "\fB-vencrypt\fR \fInodh:support \fB-anontls\fR never\fR"
+or "\fB-vencrypt\fR \fInodh:only\fR"
 .IP
 If mode is prefixed with "newdh:", then new Diffie
 Hellman parameters are generated for each connection
-(this can be time consuming: 1-60 secs) rather than
-using the fixed values in the program.  Using fixed,
-publicly known values is not known to be a security
-problem.  This setting applies to TLSVNC as well.
+(this can be time consuming: 1-60 secs; see \fB-dhparams\fR
+below for a faster way) rather than using the
+fixed values in the program.  Using fixed, publicly
+known values is not known to be a security problem.
+This setting applies to ANONTLS as well.
 .IP
 Long example: \fB-vencrypt\fR newdh:nox509:support
 .IP
@@ -1466,17 +1473,25 @@ provided.
 You *MUST* supply the \fB-ssl\fR option for VeNCrypt to be
 active.  This option only fine-tunes its operation.
 .PP
-\fB-tlsvnc\fR \fImode\fR
+\fB-anontls\fR \fImode\fR
 .IP
-The TLSVNC extension to the VNC protocol allows
+The ANONTLS extension to the VNC protocol allows
 encrypted SSL/TLS connections.  If the \fB-ssl\fR mode is
-enabled, then TLSVNC is enabled as well BY DEFAULT
-(they both use the SSL/TLS tunnel, only the protocol
+enabled, then ANONTLS is enabled as well BY DEFAULT
+(they both use a SSL/TLS tunnel, only the protocol
 handshake is a little different.)
 .IP
-To control when and how TLSVNC is used, specify the
-mode string.  If mode is "never", then TLSVNC is not
-used.  If mode is "support" (the default) then TLSVNC
+ANONTLS is an older SSL/TLS mode introduced by vino.
+.IP
+It is referred to as 'TLS' for its registered VNC
+security-type name, but we use the more descriptive
+\'ANONTLS' here because it provides only Anonymous
+Diffie-Hellman encrypted connections, and hence no
+possibility for certificate authentication.
+.IP
+To control when and how ANONTLS is used, specify the
+mode string.  If mode is "never", then ANONTLS is not
+used.  If mode is "support" (the default) then ANONTLS
 is supported.  If mode is "only", then the similar
 VeNCrypt protocol is not simultaneously supported.
 x11vnc's normal SSL mode (vncs://) will be supported
@@ -1484,25 +1499,33 @@ under \fB-ssl\fR unless you set mode to "force".
 .IP
 If mode is prefixed with "newdh:", then new Diffie
 Hellman parameters are generated for each connection
-(this can be time consuming: 1-60 secs) rather than
-using the fixed values in the program.  Using fixed,
-publicly known values is not known to be a security
-problem.  This setting applies to VeNCrypt as well.
-See the description of "plain:" under \fB-vencrypt.\fR
+(this can be time consuming: 1-60 secs; see \fB-dhparams\fR
+below for a faster way) rather than using the
+fixed values in the program.  Using fixed, publicly
+known values is not known to be a security problem.
+This setting applies to VeNCrypt as well.  See the
+description of "plain:" under \fB-vencrypt.\fR
 .IP
-Long example: \fB-tlsvnc\fR newdh:plain:support
+Long example: \fB-anontls\fR newdh:plain:support
 .IP
-You *MUST* supply the \fB-ssl\fR option for TLSVNC to be
+You *MUST* supply the \fB-ssl\fR option for ANONTLS to be
 active.  This option only fine-tunes its operation.
+.PP
+\fB-sslonly\fR
+.IP
+Same as: "\fB-vencrypt\fR \fInever \fB-anontls\fR never\fR"  i.e. it
+disables the VeNCrypt and ANONTLS encryption methods
+and only allows standard SSL tunneling.  You must also
+supply the \fB-ssl\fR ... option (see below.)
 .PP
 \fB-dhparams\fR \fIfile\fR
 .IP
 For some operations a set of Diffie Hellman parameters
 (prime and generator) is needed.  If so, use the
 parameters in \fIfile\fR. In particular, the VeNCrypt and
-TLSVNC anonymous DH mode need them.  By default a
+ANONTLS anonymous DH mode need them.  By default a
 fixed set is used. If you do not want to do that you
-can specify "newdh:" to the \fB-vencrypt\fR and \fB-tlsvnc\fR
+can specify "newdh:" to the \fB-vencrypt\fR and \fB-anontls\fR
 options to generate a new set each session.  If that
 is too slow for you, use \fB-dhparams\fR file to a set you
 created manually via "openssl dhparam \fB-out\fR file 1024"
@@ -1528,55 +1551,88 @@ ideas on how to enable SSL support for the viewer:
 http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-viewers
 x11vnc provides an SSL enabled Java viewer applet in
 the classes/ssl directory (-http or \fB-httpdir\fR options.)
-The SSVNC viewer package supports SSL too.
+The SSVNC viewer package supports SSL tunnels too.
 .IP
-[pem] is optional, use "\fB-ssl\fR \fI/path/to/mycert.pem\fR" to
-specify a PEM certificate file to use to identify and
+If the VNC Viewer supports VeNCrypt or ANONTLS (vino's
+encryption mode) they are also supported by the \fB-ssl\fR
+mode (see the \fB-vencrypt\fR and \fB-anontls\fR options for more
+info; use \fB-sslonly\fR to disable both of them.)
+.IP
+Use "\fB-ssl\fR \fI/path/to/mycert.pem\fR" to specify an SSL
+certificate file in PEM format to use to identify and
 provide a key for this server.  See 
 .IR openssl (1)
 for more
 info about PEMs and the \fB-sslGenCert\fR and "\fB-ssl\fR \fISAVE\fR"
 options below for how to create them.
 .IP
-The connecting VNC viewer SSL tunnel can (optionally)
-authenticate this server if they have the public key
-part of the certificate (or a common certificate
-authority, CA, is a more sophisticated way to
-verify this server's cert, see \fB-sslGenCA\fR below).
-This is used to prevent Man-In-The-Middle attacks.
-Otherwise, if the VNC viewer accepts this server's
-key WITHOUT verification, the traffic is protected
-from passive sniffing on the network, but *NOT* from
+The connecting VNC viewer SSL tunnel can (at its option)
+authenticate this server if it has the public key part
+of the certificate (or a common certificate authority,
+CA, is a more sophisticated way to verify this server's
+cert, see \fB-sslGenCA\fR below).  This authentication is
+done to prevent Man-In-The-Middle attacks.  Otherwise,
+if the VNC viewer simply accepts this server's key
+WITHOUT verification, the traffic is protected from
+passive sniffing on the network, but *NOT* from
+Man-In-The-Middle attacks. There are hacker tools
+like dsniff/webmitm and cain that implement SSL
 Man-In-The-Middle attacks.
 .IP
-If [pem] is not supplied and the 
+If [pem] is empty or the string "SAVE" then the
+.IR openssl (1)
+command must be available to generate the
+certificate the first time.  A self-signed certificate
+is generated (see \fB-sslGenCA\fR and \fB-sslGenCert\fR for use
+of a Certificate Authority.)  It will be saved to the
+file ~/.vnc/certs/server.pem.  On subsequent calls if
+that file already exists it will be used directly.
+.IP
+Use "SAVE_NOPROMPT" to avoid being prompted to
+protect the generated key with a passphrase.  However in
+\fB-inetd\fR and \fB-bg\fR modes there will be no prompting for a
+passphrase in either case.
+.IP
+If [pem] is "SAVE_PROMPT" the server.pem certificate
+will be created based on your answers to its prompts for
+all info such as OrganizationalName, CommonName, etc.
+.IP
+Use "SAVE-<string>" and "SAVE_PROMPT-<string>"
+to refer to the file ~/.vnc/certs/server-<string>.pem
+instead (it will be generated if it does not already
+exist).  E.g. "SAVE-charlie" will store to the file
+~/.vnc/certs/server-charlie.pem
+.IP
+Examples: x11vnc \fB-ssl\fR SAVE \fB-display\fR :0 ...
+x11vnc \fB-ssl\fR SAVE-someother \fB-display\fR :0 ...
+.IP
+If [pem] is "TMP" and the 
 .IR openssl (1)
 utility
 command exists in PATH, then a temporary, self-signed
-certificate will be generated for this session
-(this may take 5-30 seconds on very slow machines).
-If 
+certificate will be generated for this session.  If
 .IR openssl (1)
 cannot be used to generate a temporary
-certificate x11vnc exits immediately.
+certificate x11vnc exits immediately.  The temporary
+cert will be discarded when x11vnc exits.
 .IP
 If successful in using 
 .IR openssl (1)
 to generate a
-temporary certificate, the public part of it will be
-displayed to stderr (e.g. one could copy it to the
-client-side to provide authentication of the server to
-VNC viewers.)
+temporary certificate in "SAVE" or "TMP" creation
+modes, the public part of it will be displayed to stderr
+(e.g. one could copy it to the client-side to provide
+authentication of the server to VNC viewers.)
 .IP
-NOTE: Unless you safely copy the public part of the
-temporary Cert to the viewer for authenticate *every
-time* (unlikely...), then only passive sniffing
-attacks are prevented and you are still open to
-Man-In-The-Middle attacks.  See the following
-paragraphs for how to save keys to reuse them when
-x11vnc is restarted.  With saved keys AND the VNC viewer
-authenticating them by using the public certificate,
-then Man-In-The-Middle attacks are prevented.
+NOTE: In "TMP" mode, unless you safely copy the
+public part of the temporary Cert to the viewer for
+authenticate *every time* (unlikely...), then only
+passive sniffing attacks are prevented and you are
+still open to Man-In-The-Middle attacks.  This is
+why the default "SAVE" mode is preferred (and more
+sophisticated CA mode too).  Only with saved keys AND
+the VNC viewer authenticating them (via the public
+certificate), are Man-In-The-Middle attacks prevented.
 .IP
 If [pem] is "ANON" then the Diffie-Hellman anonymous
 key exchange method is used.  In this mode there
@@ -1585,34 +1641,16 @@ to authenticate either the VNC server or VNC client.
 Thus only passive network sniffing attacks are avoided:
 the "ANON" method is susceptible to Man-In-The-Middle
 attacks.  "ANON" is not recommended; instead use
-a SSL PEM you created or the "SAVE" method in the
-next paragraph.
-.IP
-If [pem] is "SAVE" then the certificate will be saved
-to the file ~/.vnc/certs/server.pem, or if that file
-exists it will be used directly.  Similarly, if [pem]
-is "SAVE_PROMPT" the server.pem certificate will be
-made based on your answers to its prompts for info such
-as OrganizationalName, CommonName, etc.
-.IP
-We expect most users to use "\fB-ssl\fR \fISAVE\fR".
-.IP
-Use "SAVE-<string>" and "SAVE_PROMPT-<string>"
-to refer to the file ~/.vnc/certs/server-<string>.pem
-instead.  E.g. "SAVE-charlie" will store to the file
-~/.vnc/certs/server-charlie.pem
-.IP
-Examples: x11vnc \fB-ssl\fR SAVE \fB-display\fR :0 ...
-x11vnc \fB-ssl\fR SAVE-other \fB-display\fR :0 ...
+a SSL PEM you created or the defaut "SAVE" method.
 .IP
 See \fB-ssldir\fR below to use a directory besides the
 default ~/.vnc/certs
 .IP
-Misc Info: In temporary cert creation mode, set the
-env. var. X11VNC_SHOW_TMP_PEM=1 to have x11vnc print out
-the entire certificate, including the PRIVATE KEY part,
-to stderr.  There are better ways to get/save this info.
-See "SAVE" above and "\fB-sslGenCert\fR" below.
+Misc Info: In temporary cert creation mode "TMP", set
+the env. var. X11VNC_SHOW_TMP_PEM=1 to have x11vnc print
+out the entire certificate, including the PRIVATE KEY
+part, to stderr.  There are better ways to get/save this
+info.  See "SAVE" above and "\fB-sslGenCert\fR" below.
 .PP
 \fB-ssltimeout\fR \fIn\fR
 .IP
@@ -1665,7 +1703,7 @@ to replace standard password authentication of clients.
 .IP
 If [path] is a directory it contains the client (or CA)
 certificates in separate files.  If [path] is a file,
-it contains multiple certificates.  See special tokens
+it contains one or more certificates. See special tokens
 below.  These correspond to the "CApath = dir" and
 "CAfile = file" stunnel options.  See the 
 .IR stunnel (8)
@@ -1727,19 +1765,19 @@ VNC-ing with x11vnc. (note that they require
 .IR openssl (1)
 be installed on the system)
 .IP
-However, the simplest usage mode (where x11vnc
-automatically generates its own, self-signed, temporary
-key and the VNC viewers always accept it, e.g. accepting
-via a dialog box) is probably safe enough for most
-scenarios.  CA management is not needed.
+However, the simplest usage mode, "\fB-ssl\fR \fITMP\fR" (where
+x11vnc automatically generates its own, self-signed,
+temporary key and the VNC viewers always accept it,
+e.g. accepting via a dialog box) is probably safe enough
+for most scenarios.  CA management is not needed.
 .IP
-To protect against Man-In-The-Middle attacks the
-simplest mode can be improved by using "\fB-ssl\fR \fISAVE\fR"
-to have x11vnc create a longer term self-signed
-certificate, and then (safely) copy the corresponding
-public key cert to the desired client machines (care
-must be taken the private key part is not stolen;
-you will be prompted for a passphrase).
+To protect against Man-In-The-Middle attacks the "TMP"
+mode can be improved by using "\fB-ssl\fR \fISAVE\fR" (same as
+"\fB-ssl\fR", i.e. the default) to have x11vnc create a
+longer term self-signed certificate, and then (safely)
+copy the corresponding public key cert to the desired
+client machines (care must be taken the private key part
+is not stolen; you will be prompted for a passphrase).
 .IP
 So keep in mind no CA key creation or management
 (-sslGenCA and \fB-sslGenCert)\fR is needed for either of
@@ -1766,7 +1804,7 @@ key files.  On the VNC client side, they will need to
 be "imported" somehow.  Web browsers have "Manage
 Certificates" actions as does the Java applet plugin
 Control Panel.  stunnel can also use these files (see
-the ss_vncviewer example script in the FAQ.)
+the ss_vncviewer example script in the FAQ and SSVNC.)
 .PP
 \fB-sslCRL\fR \fIpath\fR
 .IP
@@ -3898,6 +3936,8 @@ are moving the mouse or typing.  Default: 2.00
 When the \fB-wait_ui\fR mechanism cuts down the wait time ms,
 set the defer time to the same ms value. n=1 to enable,
 0 to disable, and -1 to set defer to 0 (no delay).
+Similarly, 2 and -2 indicate 'urgent_update' mode should
+be used to push the updates even sooner.  Default: 1
 .PP
 \fB-nowait_bog\fR
 .IP
@@ -3912,10 +3952,11 @@ no user input), and sleep up to 1.5 secs to let things
 .PP
 \fB-slow_fb\fR \fItime\fR
 .IP
-Floating point time in seconds delay all screen polling.
-For special purpose usage where a low frame rate is
-acceptable and desirable, but you want the user input
-processed at the normal rate so you cannot use \fB-wait.\fR
+Floating point time in seconds to delay all screen
+polling.  For special purpose usage where a low frame
+rate is acceptable and desirable, but you want the
+user input processed at the normal rate so you cannot
+use \fB-wait.\fR
 .PP
 \fB-xrefresh\fR \fItime\fR
 .IP
@@ -5219,6 +5260,8 @@ wait:n          set \fB-wait\fR to n ms.
 .IP
 wait_ui:f       set \fB-wait_ui\fR factor to f.
 .IP
+setdefer:n      set \fB-setdefer\fR to \fB-2,-1,0,1,\fR or 2.
+.IP
 wait_bog        disable \fB-nowait_bog\fR mode.
 .IP
 nowait_bog      enable  \fB-nowait_bog\fR mode.
@@ -5476,15 +5519,15 @@ nowireframe nowf wireframelocal wfl nowireframelocal
 nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
 scr_parms scrollcopyrect scr noscrollcopyrect noscr
-fixscreen noxrecord xrecord reset_record pointer_mode
-pm input_skip allinput noallinput input grabkbd
-nograbkbd grabptr nograbptr grabalways nograbalways
-grablocal client_input ssltimeout speeds wmdt
-debug_pointer dp nodebug_pointer nodp debug_keyboard
-dk nodebug_keyboard nodk keycode deferupdate defer
-wait_ui wait_bog nowait_bog slow_fb xrefresh wait
-readtimeout nap nonap sb screen_blank fbpm nofbpm dpms
-nodpms clientdpms noclientdpms forcedpms noforcedpms
+fixscreen noxrecord xrecord reset_record pointer_mode pm
+input_skip allinput noallinput input grabkbd nograbkbd
+grabptr nograbptr grabalways nograbalways grablocal
+client_input ssltimeout speeds wmdt debug_pointer dp
+nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+nodk keycode deferupdate defer setdefer wait_ui
+wait_bog nowait_bog slow_fb xrefresh wait readtimeout
+nap nonap sb screen_blank fbpm nofbpm dpms nodpms
+clientdpms noclientdpms forcedpms noforcedpms
 noserverdpms serverdpms noultraext ultraext chatwindow
 nochatwindow chaton chatoff fs gaps grow fuzz snapfb
 nosnapfb rawfb uinput_accel uinput_thresh uinput_reset

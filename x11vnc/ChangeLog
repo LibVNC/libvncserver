@@ -1,3 +1,12 @@
+2008-12-10  Karl Runge <runge@karlrunge.com>
+	* x11vnc: 0.9.6 release.  Some strtok bugfixes. rename -tlsvnc
+	  to -anontls.	Disable ssl caching.  No cert creation prompting
+	  in inetd or bg modes.  waitpid a bit more carefully on ssl
+	  helpers.  Tune ssl initial timeouts.	Let -create user specify
+	  starting X display.  fix -rfbport prompt gui for older tk.
+	  -sslonly option. Error if no -ssl with related options. -rand
+	  option.  -ssl implies -ssl SAVE
+
 2008-11-22  Karl Runge <runge@karlrunge.com>
 	* x11vnc: x11vnc.desktop file. -reopen, -dhparams, -sslCRL,
 	  -setdefer options. -rfbport PROMPT VeNCrypt and TLSVNC SSL/TLS

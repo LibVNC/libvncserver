@@ -2338,6 +2338,7 @@ static int do_reverse_connect(char *str_in) {
 			write(vncsock, prestring, prestring_len);
 			free(prestring);
 		}
+/* XXX use header */
 #define OPENSSL_REVERSE 4
 		openssl_init(1);
 		accept_openssl(OPENSSL_REVERSE, vncsock);
@@ -2345,6 +2346,7 @@ static int do_reverse_connect(char *str_in) {
 		free(host);
 		return 1;
 	}
+
 	if (use_stunnel) {
 		if(strcmp(host, "localhost") && strcmp(host, "127.0.0.1")) {
 			if (!getenv("STUNNEL_DISABLE_LOCALHOST")) {
@@ -2427,20 +2429,31 @@ void reverse_connect(char *str) {
 	int sleep_min = 1500, sleep_max = 4500, n_max = 5;
 	int n, tot, t, dt = 100, cnt = 0;
 	int nclients0 = client_count;
+	int lcnt, j;
+	char **list;
 
 	if (unixpw_in_progress) return;
 
 	tmp = strdup(str);
 
+	list = (char **) calloc( (strlen(tmp)+2) * sizeof (char *), 1);
+	lcnt = 0;
+
 	p = strtok(tmp, ", \t\r\n");
 	while (p) {
+		list[lcnt++] = strdup(p);
+		p = strtok(NULL, ", \t\r\n");
+	}
+	free(tmp);
+
+	for (j = 0; j < lcnt; j++) {
+		p = list[j];
+		
 		if ((n = do_reverse_connect(p)) != 0) {
 			rfbPE(-1);
 		}
 		cnt += n;
-
-		p = strtok(NULL, ", \t\r\n");
-		if (p) {
+		if (list[j+1] != NULL) {
 			t = 0;
 			while (t < sleep_between_host) {
 				usleep(dt * 1000);
@@ -2449,7 +2462,12 @@ void reverse_connect(char *str) {
 			}
 		}
 	}
-	free(tmp);
+
+	for (j = 0; j < lcnt; j++) {
+		p = list[j];
+		if (p) free(p);
+	}
+	free(list);
 
 	if (cnt == 0) {
 		if (connect_or_exit) {
@@ -2739,6 +2757,9 @@ void check_gui_inputs(void) {
 	for (i=0; i<n; i++) {
 		int k, fd = icon_mode_socks[socks[i]];
 		char *p;
+		char **list;
+		int lind;
+
 		if (! FD_ISSET(fd, &fds)) {
 			continue;
 		}
@@ -2752,8 +2773,18 @@ void check_gui_inputs(void) {
 			continue;
 		}
 
+		list = (char **) calloc((strlen(buf)+2) * sizeof(char *), 1);
+
+		lind = 0;
 		p = strtok(buf, "\r\n");
 		while (p) {
+			list[lind++] = strdup(p);
+			p = strtok(NULL, "\r\n");
+		}
+
+		lind = 0;
+		while (list[lind] != NULL) {
+			p = list[lind++];
 			if (strstr(p, "cmd=") == p ||
 			    strstr(p, "qry=") == p) {
 				char *str = process_remote_cmd(p, 1);
@@ -2769,8 +2800,14 @@ void check_gui_inputs(void) {
 					break;
 				}
 			}
-			p = strtok(NULL, "\r\n");
 		}
+
+		lind = 0;
+		while (list[lind] != NULL) {
+			p = list[lind++];
+			if (p) free(p);
+		}
+		free(list);
 	}
 }
 

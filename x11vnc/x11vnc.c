@@ -243,6 +243,7 @@ void set_redir_properties(void);
 
 #define TSMAX 32
 #define TSSTK 16
+
 void terminal_services(char *list) {
 	int i, j, n = 0, db = 1;
 	char *p, *q, *r, *str = strdup(list);
@@ -257,6 +258,10 @@ void terminal_services(char *list) {
 	char num[32];
 	time_t last_clean = time(NULL);
 
+	if (getenv("TS_REDIR_DEBUG")) {
+		db = 2;
+	}
+
 	if (! dpy) {
 		return;
 	}
@@ -268,6 +273,8 @@ void terminal_services(char *list) {
 		    PropModeReplace, (unsigned char *)list, strlen(list));
 		XSync(dpy, False);
 	}
+	if (db) fprintf(stderr, "TS_REDIR_LIST Atom: %d.\n");
+
 	for (i=0; i<TASKMAX; i++) {
 		ts_tasks[i] = 0;
 	}
@@ -544,12 +551,19 @@ void do_tsd(void) {
 	char *cmd;
 	int n, sz = 0;
 	char *disp = DisplayString(dpy);
+	int db = 0;
+
+	if (getenv("TS_REDIR_DEBUG")) {
+		db = 1;
+	}
+	if (db) fprintf(stderr, "do_tsd() in.\n");
 
 	prop[0] = '\0';
 	a = XInternAtom(dpy, "TS_REDIR_LIST", False);
 	if (a != None) {
 		get_prop(prop, 512, a);
 	}
+	if (db) fprintf(stderr, "TS_REDIR_LIST Atom: %d = '%s'\n", a, prop);
 
 	if (prop[0] == '\0') {
 		return;
@@ -662,6 +676,13 @@ static void check_redir_services(void) {
 	time_t tsd_last;
 	int restart = 0;
 	pid_t pid = 0;
+	int db = 0;
+	db = 0;
+
+	if (getenv("TS_REDIR_DEBUG")) {
+		db = 1;
+	}
+	if (db) fprintf(stderr, "check_redir_services in.\n");
 
 	if (! dpy) {
 		return;
@@ -675,6 +696,7 @@ static void check_redir_services(void) {
 			pid = (pid_t) atoi(prop);
 		}
 	}
+	if (db) fprintf(stderr, "TS_REDIR_PID Atom: %d = '%s'\n", a, prop);
 
 	if (getenv("FD_TAG")) {
 		a = XInternAtom(dpy, "FD_TAG", False);
@@ -685,6 +707,7 @@ static void check_redir_services(void) {
 			    PropModeReplace, (unsigned char *)tag, strlen(tag));
 			XSync(dpy, False);
 		}
+		if (db) fprintf(stderr, "FD_TAG Atom: %d = '%s'\n", a, prop);
 	}
 
 	prop[0] = '\0';
@@ -692,6 +715,7 @@ static void check_redir_services(void) {
 	if (a != None) {
 		get_prop(prop, 512, a);
 	}
+	if (db) fprintf(stderr, "TS_REDIR Atom: %d = '%s'\n", a, prop);
 	if (prop[0] == '\0') {
 		rfbLog("TS_REDIR is empty, restarting...\n");
 		restart = 1;
@@ -718,9 +742,11 @@ static void check_redir_services(void) {
 			kill(pid, SIGKILL);
 		}
 		do_tsd();
+		if (db) fprintf(stderr, "check_redir_services restarted.\n");
 		return;
 	}
 
+	if (db) fprintf(stderr, "check_redir_services, no restart, calling set_redir_properties.\n");
 	set_redir_properties();
 #endif
 }
@@ -1805,6 +1831,7 @@ int main(int argc, char* argv[]) {
 	int ncache_msg = 0;
 	char *got_rfbport_str = NULL;
 	int got_rfbport_pos = -1;
+	int got_tls = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc_max = 1024;
@@ -2188,6 +2215,7 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-http_ssl")) {
 			try_http = 1;
 			http_ssl = 1;
+			got_tls++;
 			continue;
 		}
 		if (!strcmp(arg, "-avahi") || !strcmp(arg, "-mdns") || !strcmp(arg, "-zeroconf")) {
@@ -2357,6 +2385,7 @@ int main(int argc, char* argv[]) {
 			char *s;
 			CHECK_ARGC
 			s = strdup(argv[++i]);
+			got_tls++;
 			if (strstr(s, "never")) {
 				vencrypt_mode = VENCRYPT_NONE;
 			} else if (strstr(s, "support")) {
@@ -2385,18 +2414,19 @@ int main(int argc, char* argv[]) {
 			free(s);
 			continue;
 		}
-		if (!strcmp(arg, "-tlsvnc")) {
+		if (!strcmp(arg, "-anontls")) {
 			char *s;
 			CHECK_ARGC
 			s = strdup(argv[++i]);
+			got_tls++;
 			if (strstr(s, "never")) {
-				tlsvnc_mode = TLSVNC_NONE;
+				anontls_mode = ANONTLS_NONE;
 			} else if (strstr(s, "support")) {
-				tlsvnc_mode = TLSVNC_SUPPORT;
+				anontls_mode = ANONTLS_SUPPORT;
 			} else if (strstr(s, "only")) {
-				tlsvnc_mode = TLSVNC_SOLE;
+				anontls_mode = ANONTLS_SOLE;
 			} else if (strstr(s, "force")) {
-				tlsvnc_mode = TLSVNC_FORCE;
+				anontls_mode = ANONTLS_FORCE;
 			} else {
 				fprintf(stderr, "invalid %s arg: %s\n", arg, s);
 				exit(1);
@@ -2407,14 +2437,22 @@ int main(int argc, char* argv[]) {
 			free(s);
 			continue;
 		}
+		if (!strcmp(arg, "-sslonly")) {
+			vencrypt_mode = VENCRYPT_NONE;
+			anontls_mode = ANONTLS_NONE;
+			got_tls++;
+			continue;
+		}
 		if (!strcmp(arg, "-dhparams")) {
 			CHECK_ARGC
 			dhparams_file = strdup(argv[++i]);
+			got_tls++;
 			continue;
 		}
 		if (!strcmp(arg, "-nossl")) {
 			use_openssl = 0;
 			openssl_pem = NULL;
+			got_tls = -1000;
 			continue;
 		}
 		if (!strcmp(arg, "-ssl")) {
@@ -2422,9 +2460,21 @@ int main(int argc, char* argv[]) {
 			if (i < argc-1) {
 				char *s = argv[i+1];
 				if (s[0] != '-') {
-					openssl_pem = strdup(s);
+					if (!strcmp(s, "ADH")) {
+						openssl_pem = strdup("ANON");
+					} else if (!strcmp(s, "ANONDH")) {
+						openssl_pem = strdup("ANON");
+					} else if (!strcmp(s, "TMP")) {
+						openssl_pem = NULL;
+					} else {
+						openssl_pem = strdup(s);
+					}
 					i++;
+				} else {
+					openssl_pem = strdup("SAVE");
 				}
+			} else {
+				openssl_pem = strdup("SAVE");
 			}
 			continue;
 		}
@@ -2458,11 +2508,13 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-sslverify")) {
 			CHECK_ARGC
 			ssl_verify = strdup(argv[++i]);
+			got_tls++;
 			continue;
 		}
 		if (!strcmp(arg, "-sslCRL")) {
 			CHECK_ARGC
 			ssl_crl = strdup(argv[++i]);
+			got_tls++;
 			continue;
 		}
 		if (!strcmp(arg, "-sslGenCA")) {
@@ -2522,15 +2574,19 @@ int main(int argc, char* argv[]) {
 				sslEncKey(s, 2);
 			}
 			exit(0);
-
 			continue;
 		}
 		if (!strcmp(arg, "-stunnel")) {
 			use_stunnel = 1;
+			got_tls = -1000;
 			if (i < argc-1) {
 				char *s = argv[i+1];
 				if (s[0] != '-') {
-					stunnel_pem = strdup(s);
+					if (!strcmp(s, "TMP")) {
+						stunnel_pem = NULL;
+					} else {
+						stunnel_pem = strdup(s);
+					}
 					i++;
 				}
 			}
@@ -2538,10 +2594,15 @@ int main(int argc, char* argv[]) {
 		}
 		if (!strcmp(arg, "-stunnel3")) {
 			use_stunnel = 3;
+			got_tls = -1000;
 			if (i < argc-1) {
 				char *s = argv[i+1];
 				if (s[0] != '-') {
-					stunnel_pem = strdup(s);
+					if (!strcmp(s, "TMP")) {
+						stunnel_pem = NULL;
+					} else {
+						stunnel_pem = strdup(s);
+					}
 					i++;
 				}
 			}
@@ -2550,6 +2611,7 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-https")) {
 			https_port_num = 0;
 			try_http = 1;
+			got_tls++;
 			if (i < argc-1) {
 				char *s = argv[i+1];
 				if (s[0] != '-') {
@@ -2561,6 +2623,7 @@ int main(int argc, char* argv[]) {
 		}
 		if (!strcmp(arg, "-httpsredir")) {
 			https_port_redir = -1;
+			got_tls++;
 			if (i < argc-1) {
 				char *s = argv[i+1];
 				if (s[0] != '-') {
@@ -3410,6 +3473,12 @@ int main(int argc, char* argv[]) {
 			use_snapfb = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-rand")) {
+			/* equiv. to -nopw -rawfb rand for quick tests */
+			raw_fb_str = strdup("rand");
+			nopw = 1;
+			continue;
+		}
 		if (!strcmp(arg, "-rawfb")) {
 			CHECK_ARGC
 			raw_fb_str = strdup(argv[++i]);
@@ -4089,6 +4158,18 @@ int main(int argc, char* argv[]) {
 		free(str);
 		users_list = tmp;
 		if (db) fprintf(stderr, "users_list: %s\n", users_list);
+	}
+
+	if (got_tls > 0 && !use_openssl) {
+		rfbLog("SSL: Error: you did not supply the '-ssl ...' option even\n");
+		rfbLog("SSL: though you supplied one of these related options:\n");
+		rfbLog("SSL:   -sslonly, -sslverify, -sslCRL, -vencrypt, -anontls,\n");
+		rfbLog("SSL:   -dhparams, -https, -http_ssl, or -httpsredir.\n");
+		rfbLog("SSL: Restart with, for example, '-ssl SAVE' on the cmd line.\n");
+		rfbLog("SSL: See the '-ssl' x11vnc -help description for more info.\n");
+		if (!getenv("X11VNC_FORCE_NO_OPENSSL")) {
+			exit(1);
+		}
 	}
 
 	if (unixpw) {
@@ -5049,12 +5130,12 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 
 	initialize_speeds();
 
-	if (speeds_read_rate_measured > 100) {
-		/* framebuffer read is fast at  > 100 MB/sec */
+	if (speeds_read_rate_measured > 80) {
+		/* framebuffer read is fast at > 80 MB/sec */
 		if (! got_waitms) {
 			waitms /= 2;
-			if (waitms < 10) {
-				waitms = 10;
+			if (waitms < 5) {
+				waitms = 5;
 			}
 			if (!quiet) {
 				rfbLog("fast read: reset wait  ms to: %d\n", waitms);

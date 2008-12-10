@@ -414,6 +414,7 @@ Tuning
 	grow:
 	fuzz:
 	wait_ui:
+	setdefer:
 	nowait_bog
 	slow_fb:
 	xrefresh:
@@ -6460,8 +6461,11 @@ proc do_port_prompt {} {
     vncviewer $hn:0
     vncviewer $hn:1
     etc.
+
+ Your firewall may block incoming connections to TCP ports;
+ if it does you may need to reconfigure it. 
     
- You may also set some additional parameters:
+ You can also set some additional parameters:
 
     - Enable SSL encryption.
       (requires an SSL enabled vncviewer, such as SSVNC)  
@@ -6477,9 +6481,24 @@ proc do_port_prompt {} {
 	wm protocol .   WM_DELETE_WINDOW "destroy .; exit"
 	wm protocol .pp WM_DELETE_WINDOW "destroy .pp; exit"
 
-	label .pp.m -text "$text" -justify left -font $ffont
+	label .pp.m -text "$text" -relief ridge -justify left -font $ffont
 
-	frame .pp.f -bd 1 -relief ridge -pady 2
+	global tk_version
+	set tkold 0
+	if [info exists tk_version] {
+		if [regexp {^8\.[0-3]$} $tk_version] {
+			set tkold 1
+		}
+		if [regexp {^[3-7]\.} $tk_version] {
+			set tkold 1
+		}
+	}
+
+	if {$tkold} {
+		frame .pp.f -bd 1 -relief ridge
+	} else {
+		frame .pp.f -bd 1 -relief ridge -pady 2
+	}
 	label .pp.f.l -text "Port: "
 	entry .pp.f.e -width 8 -textvariable port_set
 	global enable_ssl; set enable_ssl 0
@@ -6495,7 +6514,11 @@ proc do_port_prompt {} {
 	pack .pp.f.l .pp.f.e -side left
 	pack .pp.f.loc .pp.f.ssl -side right
 
-	frame .pp.t -bd 1 -relief ridge -pady 2
+	if {$tkold} {
+		frame .pp.t -bd 1 -relief ridge
+	} else {
+		frame .pp.t -bd 1 -relief ridge -pady 2
+	}
 	global file_transfer; set file_transfer "none"
 	if [info exists env(X11VNC_FILETRANSFER_ENABLED)] {
 		set file_transfer $env(X11VNC_FILETRANSFER_ENABLED)
@@ -7077,7 +7100,7 @@ proc check_setpasswd {} {
 		set m "${m} 'Apply' to allow incoming connections.\n" 
 		set m "${m}\n" 
 		set m "${m} The passwords are only for this x11vnc\n" 
-		set m "${m} session and are not saved. Run x11vnc\n" 
+		set m "${m} session and are not saved.  Run x11vnc\n" 
 		set m "${m} manually for more control.\n" 
 		set m "${m}\n" 
 		set m "${m} See 'Help' for details on each option.\n" 

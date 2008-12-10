@@ -333,10 +333,7 @@ char **create_str_list(char *cslist) {
 	}
 
 	/* the extra last one holds NULL */
-	list = (char **) malloc( (n+1)*sizeof(char *) );
-	for(i=0; i < n+1; i++) {
-		list[i] = NULL;
-	}
+	list = (char **) calloc((n+1)*sizeof(char *), 1);
 
 	p = strtok(str, ",");
 	i = 0;

@@ -91,7 +91,7 @@ static void init_prng(void);
 static void sslerrexit(void);
 static char *get_input(char *tag, char **in);
 static char *create_tmp_pem(char *path, int prompt);
-static int  ssl_init(int s_in, int s_out);
+static int  ssl_init(int s_in, int s_out, int skip_vnc_tls);
 static void ssl_xfer(int csock, int s_in, int s_out, int is_https);
 
 #ifndef FORK_OK
@@ -142,6 +142,7 @@ char *get_saved_pem(char *save, int create) {
 		clean_up_exit(1);
 	}
 
+
 	cdir = get_Cert_dir(NULL, &tmp);
 	if (! cdir || ! tmp) {
 		rfbLog("get_saved_pem: could not find Cert dir.\n");
@@ -156,8 +157,11 @@ char *get_saved_pem(char *save, int create) {
 	if (stat(path, &sbuf) != 0) {
 		char *new = NULL;
 		if (create) {
+			if (inetd || opts_bg) {
+				set_env("GENCERT_NOPROMPT", "1");
+			}
 			new = create_tmp_pem(path, prompt);
-			if (! getenv("X11VNC_SSL_NO_PASSPHRASE") && ! inetd) {
+			if (!getenv("X11VNC_SSL_NO_PASSPHRASE") && !inetd && !opts_bg) {
 				sslEncKey(new, 0);
 			}
 		}
@@ -842,7 +846,7 @@ static int verify_callback(int ok, X509_STORE_CTX *callback_ctx) {
 	return 1;
 }
 
-#define rfbSecTypeTlsVnc   18
+#define rfbSecTypeAnonTls  18
 #define rfbSecTypeVencrypt 19
 
 #define rfbVencryptPlain	256
@@ -854,7 +858,7 @@ static int verify_callback(int ok, X509_STORE_CTX *callback_ctx) {
 #define rfbVencryptX509Plain	262
 
 static int vencrypt_selected = 0;
-static int tlsvnc_selected = 0;
+static int anontls_selected = 0;
 
 static int ssl_client_mode = 0;
 
@@ -946,8 +950,14 @@ void openssl_init(int isclient) {
 	mode |= SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER;
 	SSL_CTX_set_mode(ctx, mode);
 
+#define ssl_cache 0
+#if ssl_cache
 	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_BOTH);
 	SSL_CTX_set_timeout(ctx, 300);
+#else
+	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
+	SSL_CTX_set_timeout(ctx, 1);
+#endif
 
 	ds = dnow();
 	if (! openssl_pem) {
@@ -1255,16 +1265,31 @@ void ssl_helper_pid(pid_t pid, int sock) {
 				continue;
 			}
 			if (kill(helpers[i], 0) == 0) {
+				int kret = -2;
+				pid_t wret;
 				if (sock != -2) {
 					if (sockets[i] >= 0) {
 						close(sockets[i]);
 					}
-					kill(helpers[i], SIGTERM);
+					kret = kill(helpers[i], SIGTERM);
+					if (kret == 0) {
+						usleep(20 * 1000);
+					}
 				}
 
 #if LIBVNCSERVER_HAVE_SYS_WAIT_H && LIBVNCSERVER_HAVE_WAITPID 
 if (db) fprintf(stderr, "waitpid(%d)\n", helpers[i]);
-				waitpid(helpers[i], &status, WNOHANG); 
+				wret = waitpid(helpers[i], &status, WNOHANG); 
+				if (kret == 0 && wret != helpers[i]) {
+					int k;
+					for (k=0; k < 10; k++) {
+						usleep(100 * 1000);
+						wret = waitpid(helpers[i], &status, WNOHANG); 
+						if (wret == helpers[i]) {
+							break;
+						}
+					}
+				}
 #endif
 				if (sock == -2) {
 					continue;
@@ -1350,7 +1375,7 @@ static int is_ssl_readable(int s_in, time_t last_https, char *last_get,
 		 * for each socket (and some clients send requests
 		 * rapid fire).
 		 */
-		tv.tv_sec  = 6;
+		tv.tv_sec = 6;
 	}
 
 	/*
@@ -1358,9 +1383,9 @@ static int is_ssl_readable(int s_in, time_t last_https, char *last_get,
 	 * recently:
 	 */
 	if (time(NULL) < last_https + 30) {
-		tv.tv_sec  = 8;
+		tv.tv_sec = 10;
 		if (last_get && strstr(last_get, "VncViewer")) {
-			tv.tv_sec  = 4;
+			tv.tv_sec = 5;
 		}
 	}
 	if (getenv("X11VNC_HTTPS_VS_VNC_TIMEOUT")) {
@@ -1543,7 +1568,7 @@ int proxy_hack(int vncsock, int listen, int s_in, int s_out, char *cookie,
 
 if (db) fprintf(stderr, "got applet input sock1: %d\n", sock1);
 
-	if (! ssl_init(sock1, sock1)) {
+	if (! ssl_init(sock1, sock1, 0)) {
 if (db) fprintf(stderr, "ssl_init FAILED\n");
 		exit(1);
 	}
@@ -1715,7 +1740,7 @@ void accept_openssl(int mode, int presock) {
 	char uniq[] = "_evilrats_";
 	char cookie[256], rcookie[256], *name = NULL;
 	int vencrypt_sel = 0;
-	int tlsvnc_sel = 0;
+	int anontls_sel = 0;
 	static time_t last_https = 0;
 	static char last_get[256];
 	static int first = 1;
@@ -1832,7 +1857,7 @@ void accept_openssl(int mode, int presock) {
 	 * but hard to guess exactly (just worrying about local lusers
 	 * here, since we use INADDR_LOOPBACK).
 	 */
-	rb = (unsigned char *) malloc(6);
+	rb = (unsigned char *) calloc(6, 1);
 	RAND_bytes((char *)rb, 6);
 	sprintf(cookie, "RB=%d%d%d%d%d%d/%f%f/0x%x",
 	    rb[0], rb[1], rb[2], rb[3], rb[4], rb[5],
@@ -1915,6 +1940,7 @@ void accept_openssl(int mode, int presock) {
 		int i, have_httpd = 0;
 		int f_in  = fileno(stdin);
 		int f_out = fileno(stdout);
+		int skip_vnc_tls = mode == OPENSSL_HTTPS ? 1 : 0;
 
 		if (db) fprintf(stderr, "helper pid in: %d %d %d %d\n", f_in, f_out, sock, listen);
 
@@ -1962,7 +1988,7 @@ void accept_openssl(int mode, int presock) {
 			s_in = s_out = sock;
 		}
 
-		if (! ssl_init(s_in, s_out)) {
+		if (! ssl_init(s_in, s_out, skip_vnc_tls)) {
 			close(vncsock);
 			exit(1);
 		}
@@ -1973,10 +1999,10 @@ void accept_openssl(int mode, int presock) {
 			sprintf(tbuf, "%s,VENCRYPT=%d,%s", uniq, vencrypt_selected, cookie);
 			write(vncsock, tbuf, strlen(cookie));
 			goto wrote_cookie;
-		} else if (tlsvnc_selected != 0) {
+		} else if (anontls_selected != 0) {
 			char *tbuf;
 			tbuf = (char *) malloc(strlen(cookie) + 100);
-			sprintf(tbuf, "%s,TLSVNC=%d,%s", uniq, tlsvnc_selected, cookie);
+			sprintf(tbuf, "%s,ANONTLS=%d,%s", uniq, anontls_selected, cookie);
 			write(vncsock, tbuf, strlen(cookie));
 			goto wrote_cookie;
 		}
@@ -2005,7 +2031,7 @@ void accept_openssl(int mode, int presock) {
 		}
 
 		if (have_httpd) {
-			int n = 0, is_http;
+			int n = 0, is_http = 0;
 			int hport = screen->httpPort; 
 			char *iface = NULL;
 			char *buf, *tbuf;
@@ -2348,7 +2374,7 @@ void accept_openssl(int mode, int presock) {
 		char *q = strstr(rcookie, "RB=");
 		if (q && strstr(cookie, q) == cookie) {
 			vencrypt_sel = 0;
-			tlsvnc_sel = 0;
+			anontls_sel = 0;
 			q = strstr(rcookie, "VENCRYPT=");
 			if (q && sscanf(q, "VENCRYPT=%d,", &vencrypt_sel) == 1) {
 				if (vencrypt_sel != 0) {
@@ -2356,10 +2382,10 @@ void accept_openssl(int mode, int presock) {
 					goto accept_client;
 				}
 			}
-			q = strstr(rcookie, "TLSVNC=");
-			if (q && sscanf(q, "TLSVNC=%d,", &tlsvnc_sel) == 1) {
-				if (tlsvnc_sel != 0) {
-					rfbLog("SSL: TLSVNC mode=%d accepted.\n", tlsvnc_sel);
+			q = strstr(rcookie, "ANONTLS=");
+			if (q && sscanf(q, "ANONTLS=%d,", &anontls_sel) == 1) {
+				if (anontls_sel != 0) {
+					rfbLog("SSL: ANONTLS mode=%d accepted.\n", anontls_sel);
 					goto accept_client;
 				}
 			}
@@ -2508,7 +2534,7 @@ void accept_openssl(int mode, int presock) {
 			if (!finish_vencrypt_auth(client, vencrypt_sel)) {
 				rfbCloseClient(client);
 			}
-		} else if (tlsvnc_sel != 0) {
+		} else if (anontls_sel != 0) {
 			client->protocolMajorVersion = 3;
 			client->protocolMinorVersion = 8;
 			rfbAuthNewClient(client);
@@ -2744,12 +2770,12 @@ static int switch_to_anon_dh(void) {
 	return 1;
 }
 
-static int tlsvnc_dialog(int s_in, int s_out) {
+static int anontls_dialog(int s_in, int s_out) {
 
-	tlsvnc_selected = 1;
+	anontls_selected = 1;
 
 	if (!switch_to_anon_dh()) {
-		rfbLog("tlsvnc: Anonymous Diffie-Hellman failed.\n");	
+		rfbLog("anontls: Anonymous Diffie-Hellman failed.\n");	
 		return 0;
 	}
 
@@ -2924,27 +2950,27 @@ static int check_vnc_tls_mode(int s_in, int s_out) {
 	char buf[256];
 	
 	vencrypt_selected = 0;
-	tlsvnc_selected = 0;
+	anontls_selected = 0;
 
-	if (vencrypt_mode == VENCRYPT_NONE && tlsvnc_mode == TLSVNC_NONE) {
+	if (vencrypt_mode == VENCRYPT_NONE && anontls_mode == ANONTLS_NONE) {
 		/* only normal SSL */
 		return 1;
 	}
 	if (ssl_client_mode) {
 		/* XXX check if this can be done in SSL client mode. */
-		if (vencrypt_mode == VENCRYPT_FORCE || tlsvnc_mode == TLSVNC_FORCE) {
-			rfbLog("check_vnc_tls_mode: VENCRYPT_FORCE/TLSVNC_FORCE prevents normal SSL\n");
+		if (vencrypt_mode == VENCRYPT_FORCE || anontls_mode == ANONTLS_FORCE) {
+			rfbLog("check_vnc_tls_mode: VENCRYPT_FORCE/ANONTLS_FORCE prevents normal SSL\n");
 			return 0;
 		}
 		return 1;
 	}
-	if (ssl_verify && vencrypt_mode != VENCRYPT_FORCE && tlsvnc_mode == TLSVNC_FORCE) {
-		rfbLog("check_vnc_tls_mode: Cannot use TLSVNC_FORCE with -sslverify (Anon DH only)\n");
+	if (ssl_verify && vencrypt_mode != VENCRYPT_FORCE && anontls_mode == ANONTLS_FORCE) {
+		rfbLog("check_vnc_tls_mode: Cannot use ANONTLS_FORCE with -sslverify (Anon DH only)\n");
 		/* fallback to normal SSL */
 		return 1;
 	}
 
-	while (waited < 0.7) {
+	while (waited < 1.1) {
 		fd_set rfds;
 		FD_ZERO(&rfds);
 		FD_SET(s_in, &rfds);
@@ -2962,8 +2988,8 @@ static int check_vnc_tls_mode(int s_in, int s_out) {
 
 	if (input) {
 		/* got SSL client hello, can only assume normal SSL */
-		if (vencrypt_mode == VENCRYPT_FORCE || tlsvnc_mode == TLSVNC_FORCE) {
-			rfbLog("check_vnc_tls_mode: VENCRYPT_FORCE/TLSVNC_FORCE prevents normal SSL\n");
+		if (vencrypt_mode == VENCRYPT_FORCE || anontls_mode == ANONTLS_FORCE) {
+			rfbLog("check_vnc_tls_mode: VENCRYPT_FORCE/ANONTLS_FORCE prevents normal SSL\n");
 			return 0;
 		}
 		return 1;
@@ -2982,7 +3008,12 @@ static int check_vnc_tls_mode(int s_in, int s_out) {
 	}
 
 	if (sscanf(buf, "RFB %03d.%03d\n", &major, &minor) != 2) {
-		rfbLog("check_vnc_tls_mode: abnormal handshake: '%s'\n", buf);
+		int i;
+		rfbLog("check_vnc_tls_mode: abnormal handshake: '%s'\nbytes: ", buf);
+		for (i=0; i < 12; i++) {
+			fprintf(stderr, "%x.", (int) buf[i]);
+		}
+		fprintf(stderr, "\n");
 		close(s_in); close(s_out);
 		return 0;
 	}
@@ -2996,18 +3027,18 @@ static int check_vnc_tls_mode(int s_in, int s_out) {
 	n = 1;
 	if (vencrypt_mode == VENCRYPT_FORCE) {
 		buf[n++] = rfbSecTypeVencrypt;
-	} else if (tlsvnc_mode == TLSVNC_FORCE && !ssl_verify) {
-		buf[n++] = rfbSecTypeTlsVnc;
+	} else if (anontls_mode == ANONTLS_FORCE && !ssl_verify) {
+		buf[n++] = rfbSecTypeAnonTls;
 	} else if (vencrypt_mode == VENCRYPT_SOLE) {
 		buf[n++] = rfbSecTypeVencrypt;
-	} else if (tlsvnc_mode == TLSVNC_SOLE && !ssl_verify) {
-		buf[n++] = rfbSecTypeTlsVnc;
+	} else if (anontls_mode == ANONTLS_SOLE && !ssl_verify) {
+		buf[n++] = rfbSecTypeAnonTls;
 	} else {
 		if (vencrypt_mode == VENCRYPT_SUPPORT) {
 			buf[n++] = rfbSecTypeVencrypt;
 		}
-		if (tlsvnc_mode == TLSVNC_SUPPORT && !ssl_verify) {
-			buf[n++] = rfbSecTypeTlsVnc;
+		if (anontls_mode == ANONTLS_SUPPORT && !ssl_verify) {
+			buf[n++] = rfbSecTypeAnonTls;
 		}
 	}
 
@@ -3026,7 +3057,7 @@ static int check_vnc_tls_mode(int s_in, int s_out) {
 	}
 
 	if (buf[0] == rfbSecTypeVencrypt) stype = "VeNCrypt";
-	if (buf[0] == rfbSecTypeTlsVnc)   stype = "TLSVNC";
+	if (buf[0] == rfbSecTypeAnonTls)  stype = "ANONTLS";
 
 	rfbLog("check_vnc_tls_mode: reply: %d (%s)\n", (int) buf[0], stype);
 
@@ -3051,8 +3082,8 @@ static int check_vnc_tls_mode(int s_in, int s_out) {
 
 	if (sectype == rfbSecTypeVencrypt) {
 		return vencrypt_dialog(s_in, s_out);
-	} else if (sectype == rfbSecTypeTlsVnc) {
-		return tlsvnc_dialog(s_in, s_out);
+	} else if (sectype == rfbSecTypeAnonTls) {
+		return anontls_dialog(s_in, s_out);
 	} else {
 		return 0;
 	}
@@ -3088,11 +3119,15 @@ static void pr_ssl_info(int verb) {
 }
 
 static void ssl_timeout (int sig) {
-	rfbLog("sig: %d, ssl_init timed out.\n", sig);
+	int i;
+	rfbLog("sig: %d, ssl_init[%d] timed out.\n", sig, getpid());
+	for (i=0; i < 256; i) {
+		close(i);
+	}
 	exit(1);
 }
 
-static int ssl_init(int s_in, int s_out) {
+static int ssl_init(int s_in, int s_out, int skip_vnc_tls) {
 	unsigned char *sid = (unsigned char *) "x11vnc SID";
 	char *name;
 	int peerport = 0;
@@ -3112,7 +3147,10 @@ static int ssl_init(int s_in, int s_out) {
 	}
 	if (db) fprintf(stderr, "ssl_init: %d/%d\n", s_in, s_out);
 
-	if (!check_vnc_tls_mode(s_in, s_out)) {
+	if (skip_vnc_tls) {
+		rfbLog("SSL: ssl_helper[%d]: HTTPS mode, skipping check_vnc_tls_mode()\n",
+		    getpid(), name, peerport);
+	} else if (!check_vnc_tls_mode(s_in, s_out)) {
 		return 0;
 	}
 
@@ -3305,7 +3343,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	time_t start;
 	int tv_https_early = 60;
 	int tv_https_later = 20;
-	int tv_vnc_early = 25;
+	int tv_vnc_early = 40;
 	int tv_vnc_later = 43200;	/* was 300, stunnel: 43200 */
 	int tv_cutover = 70;
 	int tv_closing = 60;
@@ -3374,7 +3412,7 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	cptr = 0;	/* offsets into ABSIZE buffers */
 	sptr = 0;
 
-	if (vencrypt_selected > 0 || tlsvnc_selected > 0) {
+	if (vencrypt_selected > 0 || anontls_selected > 0) {
 		char tmp[16];
 		/* read and discard the extra RFB version */
 		memset(tmp, 0, sizeof(tmp));
@@ -3501,8 +3539,8 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 				}
 				continue;
 			}
-			rfbLog("SSL: ssl_xfer[%d]: connection timedout. %d\n",
-			    getpid(), ndata);
+			rfbLog("SSL: ssl_xfer[%d]: connection timedout. %d  tv_use: %d\n",
+			    getpid(), ndata, tv_use);
 			/* connection finished */
 			return;
 		}

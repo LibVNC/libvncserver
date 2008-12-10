@@ -224,12 +224,12 @@ static char **user_list(char *user_str) {
 			n++;
 		}
 	}
-	list = (char **) malloc((n+1)*sizeof(char *));
+	list = (char **) calloc((n+1)*sizeof(char *), 1);
 
 	p = strtok(user_str, ",");
 	i = 0;
 	while (p) {
-		list[i++] = p;
+		list[i++] = strdup(p);
 		p = strtok(NULL, ",");
 	}
 	list[i] = NULL;
@@ -327,6 +327,8 @@ static int lurk(char **users) {
 	gid_t gid;
 	int success = 0, dmin = -1, dmax = -1;
 	char *p, *logins, **u;
+	char **list;
+	int lind;
 
 	if ((u = users) != NULL && *u != NULL && *(*u) == ':') {
 		int len;
@@ -402,12 +404,23 @@ static int lurk(char **users) {
 	} else {
 		logins = get_login_list(1);
 	}
-	
+
+	list = (char **) calloc((strlen(logins)+2)*sizeof(char *), 1);
+	lind = 0;
 	p = strtok(logins, ",");
 	while (p) {
+		list[lind++] = strdup(p);
+		p = strtok(NULL, ",");
+	}
+	free(logins);
+
+	lind = 0;
+	while (list[lind] != NULL) {
 		char *user, *name, *home, dpystr[10];
 		char *q, *t;
 		int ok = 1, dn;
+
+		p = list[lind++];
 		
 		t = strdup(p);	/* bob:0 */
 		q = strchr(t, ':'); 
@@ -442,7 +455,6 @@ static int lurk(char **users) {
 		}
 
 		if (! ok) {
-			p = strtok(NULL, ",");
 			continue;
 		}
 		
@@ -464,10 +476,14 @@ static int lurk(char **users) {
 		if (success) {
 			 break;
 		}
-
-		p = strtok(NULL, ",");
 	}
-	free(logins);
+
+	lind = 0;
+	while (list[lind] != NULL) {
+		free(list[lind]);
+		lind++;
+	}
+
 	return success;
 }
 
@@ -502,6 +518,8 @@ static int guess_user_and_switch(char *str, int fb_mode) {
 	char *dstr, *d;
 	char *p, *tstr = NULL, *allowed = NULL, *logins, **users = NULL;
 	int dpy1, ret = 0;
+	char **list;
+	int lind;
 
 	RAWFB_RET(0)
 
@@ -528,10 +546,21 @@ static int guess_user_and_switch(char *str, int fb_mode) {
 
 	/* loop over the utmpx entries looking for this display */
 	logins = get_login_list(1);
+
+	list = (char **) calloc((strlen(logins)+2)*sizeof(char *), 1);
+	lind = 0;
 	p = strtok(logins, ",");
 	while (p) {
+		list[lind++] = strdup(p);
+		p = strtok(NULL, ",");
+	}
+
+	lind = 0;
+	while (list[lind] != NULL) {
 		char *user, *q, *t;
 		int dpy2, ok = 1;
+
+		p = list[lind++];
 
 		t = strdup(p);
 		q = strchr(t, ':'); 
@@ -559,7 +588,6 @@ static int guess_user_and_switch(char *str, int fb_mode) {
 
 		if (! ok) {
 			free(t);
-			p = strtok(NULL, ",");
 			continue;
 		}
 		if (switch_user(user, fb_mode)) {
@@ -568,8 +596,6 @@ static int guess_user_and_switch(char *str, int fb_mode) {
 			ret = 1;
 			break;
 		}
-
-		p = strtok(NULL, ",");
 	}
 	if (tstr) {
 		free(tstr);
@@ -1479,6 +1505,7 @@ static void loop_for_connect(int did_client_connect) {
 		}
 		if (use_openssl && !inetd) {
 			check_openssl();
+			check_https();
 			/*
 			 * This is to handle an initial verify cert from viewer,
 			 * they disconnect right after fetching the cert.

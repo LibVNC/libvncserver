@@ -327,6 +327,7 @@ int check_httpdir(void) {
 		if ((q = strrchr(prog, '/')) == NULL) {
 			rfbLog("check_httpdir: bad program path: %s\n", prog);
 			free(prog);
+			rfbLog("check_httpdir: *HTTP disabled*  Use -httpdir path\n");
 			return 0;
 		}
 
@@ -383,6 +384,7 @@ int check_httpdir(void) {
 
 			rfbLog("check_httpdir: bad guess:\n");
 			rfbLog("   %s\n", httpdir);
+			rfbLog("check_httpdir: *HTTP disabled*  Use -httpdir path\n");
 			return 0;
 		}
 	}
