@@ -13,8 +13,8 @@
  *
  * compile via:
 
-   cc       -O -o ultravnc_dsm_helper ultravnc_dsm_helper.c -lssl -lcrypto
-   cc -DDBG -O -o ultravnc_dsm_helper ultravnc_dsm_helper.c -lssl -lcrypto
+   cc       -O -o ultravnc_dsm_helper ultravnc_dsm_helper.c -lcrypto
+   cc -DDBG -O -o ultravnc_dsm_helper ultravnc_dsm_helper.c -lcrypto
 
  *
  * See usage below for how to run it.
@@ -369,7 +369,7 @@ extern void enc_do(char *ciph, char *keyfile, char *lport, char *rhp) {
 			int i;
 			len = 0;
 			pw_in = 1;
-			for (i=0; i < strlen(keyfile); i++) {
+			for (i=0; i < (int) strlen(keyfile); i++) {
 				/* load the string to keydata: */
 				int n = i + strlen("pw=");
 				keydata[i] = keyfile[n];
@@ -462,7 +462,7 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 	unsigned char salt[SALT+1];
 	unsigned char ivec[EVP_MAX_IV_LENGTH];
 
-	int i, cnt, len, m, n = 0, vb = 0, pa = 1, first = 1;
+	int i, cnt, len, m, n = 0, vb = 0, first = 1;
 	int whoops = 1; /* for the msrc4 problem */
 	char *encstr, *encsym;
 	
@@ -788,7 +788,7 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
  * decrypter.
  */
 static void enc_connections(int listen_port, char *connect_host, int connect_port) {
-	int listen_fd, conn1, conn2, ret, n, one = 1;
+	int listen_fd, conn1, conn2, ret, one = 1;
 	socklen_t clen;
 	struct hostent *hp;
 	struct sockaddr_in client, server;

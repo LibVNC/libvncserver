@@ -1629,6 +1629,9 @@ static int check_ssl_access(char *addr) {
 static int write_exact(int sock, char *buf, int len);
 static int read_exact(int sock, char *buf, int len);
 
+/* XXX not in rfb.h: */
+void rfbClientSendString(rfbClientPtr cl, char *reason);
+
 static int finish_auth(rfbClientPtr client, char *type) {
 	int security_result, ret;
 
@@ -1859,10 +1862,10 @@ void accept_openssl(int mode, int presock) {
 	 * here, since we use INADDR_LOOPBACK).
 	 */
 	rb = (unsigned char *) calloc(6, 1);
-	RAND_bytes((char *)rb, 6);
-	sprintf(cookie, "RB=%d%d%d%d%d%d/%f%f/0x%x",
+	RAND_bytes(rb, 6);
+	sprintf(cookie, "RB=%d%d%d%d%d%d/%f%f/%p",
 	    rb[0], rb[1], rb[2], rb[3], rb[4], rb[5],
-            dnow() - x11vnc_start, x11vnc_start, rb);
+            dnow() - x11vnc_start, x11vnc_start, (void *)rb);
 
 	if (mode != OPENSSL_INETD) {
 		name = get_remote_host(sock);
@@ -2780,6 +2783,7 @@ static int switch_to_anon_dh(void) {
 
 static int anontls_dialog(int s_in, int s_out) {
 
+	if (s_in || s_out) {}
 	anontls_selected = 1;
 
 	if (!switch_to_anon_dh()) {
@@ -2798,7 +2802,7 @@ static int anontls_dialog(int s_in, int s_out) {
 static int vencrypt_dialog(int s_in, int s_out) {
 	char buf[256], buf2[256];
 	int subtypes[16];
-	int n, i, ival, ok, db = 1, nsubtypes = 0;
+	int n, i, ival, ok, nsubtypes = 0;
 
 	vencrypt_selected = 0;
 
@@ -2829,7 +2833,7 @@ static int vencrypt_dialog(int s_in, int s_out) {
 	/* accept only 0.2 */
 	if (buf[0] != 0 || buf[1] != 2) {
 		rfbLog("vencrypt: unsupported VeNCrypt version, closing connection.\n");
-		buf[0] = 255;
+		buf[0] = (char) 255;
 		write_exact(s_out, buf, 1);
 		close(s_in); close(s_out);
 		return 0;
@@ -2965,12 +2969,12 @@ static int check_vnc_tls_mode(int s_in, int s_out) {
 		return 1;
 	}
 	if (ssl_client_mode) {
-		/* XXX check if this can be done in SSL client mode. */
 		if (vencrypt_mode == VENCRYPT_FORCE || anontls_mode == ANONTLS_FORCE) {
 			rfbLog("check_vnc_tls_mode: VENCRYPT_FORCE/ANONTLS_FORCE in client\n");
-			rfbLog("check_vnc_tls_mode: connect mode prevents normal SSL.\n");
-			//return 0;
+			rfbLog("check_vnc_tls_mode: connect mode.\n");
+			/* this is OK, continue on below for dialog. */
 		} else {
+			/* otherwise we must assume normal SSL (we send client hello) */
 			return 1;
 		}
 	}
@@ -3104,6 +3108,8 @@ static void pr_ssl_info(int verb) {
 	SSL_SESSION *s;
 	char *proto = "unknown";
 
+	if (verb) {}
+
 	if (ssl == NULL) {
 		return;
 	}
@@ -3131,7 +3137,7 @@ static void pr_ssl_info(int verb) {
 static void ssl_timeout (int sig) {
 	int i;
 	rfbLog("sig: %d, ssl_init[%d] timed out.\n", sig, getpid());
-	for (i=0; i < 256; i) {
+	for (i=0; i < 256; i++) {
 		close(i);
 	}
 	exit(1);
@@ -3139,7 +3145,7 @@ static void ssl_timeout (int sig) {
 
 static int ssl_init(int s_in, int s_out, int skip_vnc_tls) {
 	unsigned char *sid = (unsigned char *) "x11vnc SID";
-	char *name;
+	char *name = NULL;
 	int peerport = 0;
 	int db = 0, rc, err;
 	int ssock = s_in;
@@ -3159,7 +3165,7 @@ static int ssl_init(int s_in, int s_out, int skip_vnc_tls) {
 
 	if (skip_vnc_tls) {
 		rfbLog("SSL: ssl_helper[%d]: HTTPS mode, skipping check_vnc_tls_mode()\n",
-		    getpid(), name, peerport);
+		    getpid());
 	} else if (!check_vnc_tls_mode(s_in, s_out)) {
 		return 0;
 	}
@@ -3343,7 +3349,7 @@ static int ssl_init(int s_in, int s_out, int skip_vnc_tls) {
 	return 1;
 }
 
-static symmetric_encryption_xfer(int csock, int s_in, int s_out);
+static void symmetric_encryption_xfer(int csock, int s_in, int s_out);
 
 static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 	int dbxfer = 0, db = 0, check_pending, fdmax, nfd, n, i, err;
@@ -3951,9 +3957,10 @@ if (db) rfbLog("raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", csock, s_out
 #endif
 #include "enc.h"
 
-static symmetric_encryption_xfer(int csock, int s_in, int s_out) {
+static void symmetric_encryption_xfer(int csock, int s_in, int s_out) {
 	char tmp[100];
 	char *cipher, *keyfile, *q;
+
 	if (! enc_str) {
 		return;
 	}
@@ -3971,6 +3978,8 @@ static symmetric_encryption_xfer(int csock, int s_in, int s_out) {
 
 
 	/* TBD: s_in != s_out */
+	if (s_out) {}
+
 	sprintf(tmp, "fd=%d,%d", s_in, csock);
 
 	enc_do(cipher, keyfile, "-1", tmp);

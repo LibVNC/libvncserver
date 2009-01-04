@@ -341,7 +341,7 @@ static int shm_create(XShmSegmentInfo *shm, XImage **ximg_ptr, int w, int h,
 
 void shm_delete(XShmSegmentInfo *shm) {
 #if LIBVNCSERVER_HAVE_XSHM
-	if (getenv("X11VNC_SHM_DEBUG")) fprintf(stderr, "shm_delete:    0x%x\n", shm);
+	if (getenv("X11VNC_SHM_DEBUG")) fprintf(stderr, "shm_delete:    %p\n", (void *) shm);
 	if (shm != NULL && shm->shmaddr != (char *) -1) {
 		shmdt(shm->shmaddr);
 	}

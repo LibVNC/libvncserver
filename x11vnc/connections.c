@@ -2833,6 +2833,7 @@ static void turn_off_truecolor_ad(rfbClientPtr client) {
  */
 
 rfbBool password_check_chat_helper(rfbClientPtr cl, const char* response, int len) {
+	if (response || len) {}
 	if (cl != chat_window_client) {
 		rfbLog("invalid client during chat_helper login\n");
 		return FALSE;
@@ -2851,12 +2852,14 @@ rfbBool password_check_chat_helper(rfbClientPtr cl, const char* response, int le
 }
 
 enum rfbNewClientAction new_client_chat_helper(rfbClientPtr client) {
+	if (client) {}
 	client->clientGoneHook = client_gone_chat_helper;
 	rfbLog("new chat helper\n");
 	return(RFB_CLIENT_ACCEPT);
 }
 
 void client_gone_chat_helper(rfbClientPtr client) {
+	if (client) {}
 	rfbLog("finished chat helper\n");
 	chat_window_client = NULL;
 }

@@ -15,6 +15,9 @@
 #include "macosx.h"
 #include "macosxCG.h"
 #include "avahi.h"
+#include "screen.h"
+#include "xrecord.h"
+#include "xevents.h"
 
 /*
  * Exiting and error handling routines
@@ -269,6 +272,8 @@ static int Xerror(Display *d, XErrorEvent *error) {
 
 	return (*Xerror_def)(d, error);
 }
+
+void watch_loop(void);
 
 static int XIOerr(Display *d) {
 	static int reopen = 0, rmax = 1;

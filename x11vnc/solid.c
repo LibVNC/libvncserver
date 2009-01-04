@@ -924,7 +924,9 @@ static void solid_macosx(int restore) {
 	if (restore) {
 		rfbLog("restore pid: %d\n", (int) solid_macosx_pid);
 		if (solid_macosx_pid > 0) {
+#if 0
 			int i, status;
+#endif
 			rfbLog("kill -TERM macosx_solid_background helper pid: %d\n", (int) solid_macosx_pid);
 			kill(solid_macosx_pid, SIGTERM);
 #if 0

@@ -189,7 +189,7 @@ Status XShmAttach_wr(Display *disp, XShmSegmentInfo *shminfo) {
 
 Status XShmDetach_wr(Display *disp, XShmSegmentInfo *shminfo) {
 #if LIBVNCSERVER_HAVE_XSHM
-	if (getenv("X11VNC_SHM_DEBUG")) fprintf(stderr, "XShmDetach_wr: 0x%x disp: 0x%x\n", shminfo, disp);
+	if (getenv("X11VNC_SHM_DEBUG")) fprintf(stderr, "XShmDetach_wr: %p disp: %p\n", (void *)shminfo, (void *)disp);
 	return XShmDetach(disp, shminfo);
 #else
 	if (!disp || !shminfo) {}
@@ -386,6 +386,8 @@ static void copy_raw_fb_low_bpp(XImage *dest, int x, int y, unsigned int w,
 	static int last_bpp = -1;
 	static int cga = -1;
 
+	if (rm_f | gm_f | bm_f) {}
+
 	if (cga < 0) {
 		if (getenv("RAWFB_CGA")) {
 			cga = 1;
@@ -412,7 +414,7 @@ static void copy_raw_fb_low_bpp(XImage *dest, int x, int y, unsigned int w,
 		for (br = 0; br < 8; br++) {
 			unsigned int pbit, k, m = 0;
 			
-			for (k=0; k < raw_fb_native_bpp; k++) {
+			for (k=0; k < (unsigned int) raw_fb_native_bpp; k++) {
 				pbit = 1 << (br+k);
 				m |= pbit;
 			}
@@ -426,8 +428,6 @@ if (0) fprintf(stderr, "x=%d y=%d w=%d h=%d bpl=%d d_bpl=%d-%dx%dx%d/%d %p\n",
     x, y, w, h, bpl, dest->bytes_per_line, dest->width, dest->height, dest->bits_per_pixel, dest->depth, dst);
 
 	for (line = 0; line < h; line++) {
-
-//fprintf(stderr, "w=%d h=%d x=%d y+line=%d\n", w, h, x, y+line);
 
 		if (! raw_fb_seek) {
 			/* mmap */
@@ -456,13 +456,11 @@ if (0) fprintf(stderr, "x=%d y=%d w=%d h=%d bpl=%d d_bpl=%d-%dx%dx%d/%d %p\n",
 				}
 			}
 		}
-		for (ix = 0; ix < w; ix++) {
+		for (ix = 0; ix < (int) w; ix++) {
 			int bx = (x + ix) * raw_fb_native_bpp;
 			int ib = bx / 8;
 			int br = bx - ib * 8;
 			unsigned char val;
-
-//fprintf(stderr, "%d\n", ix);
 
 			val = *((unsigned char*) (buf + ib));
 
@@ -503,8 +501,6 @@ if (0) fprintf(stderr, "x=%d y=%d w=%d h=%d bpl=%d d_bpl=%d-%dx%dx%d/%d %p\n",
 
 			*(dst+ix) = (char) val;
 		}
-
-//fprintf(stderr, "\n", ix);
 
 		dst += dest->bytes_per_line;
 	}

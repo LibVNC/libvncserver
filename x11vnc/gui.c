@@ -674,7 +674,7 @@ void do_gui(char *opts, int sleep) {
 		char *cmd, *p, *p2, *p1, *p0 = getenv("PATH");
 		char tf1[] = "/tmp/x11vnc_port_prompt.2XXXXXX";
 		char tf2[] = "/tmp/x11vnc_port_prompt.1XXXXXX";
-		int fd, i, port;
+		int fd;
 		char *dstr = "", *wish = NULL;
 		char line[128];
 		FILE *fp;
@@ -831,7 +831,6 @@ void do_gui(char *opts, int sleep) {
 		if (icon_mode) {
 			char tf[] = "/tmp/x11vnc.tray.XXXXXX"; 
 			int fd;
-			struct stat sbuf;
 
 			fd = mkstemp(tf);
 			if (fd < 0) {

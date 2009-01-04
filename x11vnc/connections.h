@@ -37,5 +37,6 @@ extern void check_new_clients(void);
 extern int accept_client(rfbClientPtr client);
 extern int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
     int len, FILE *output);
+extern int check_access(char *addr);
 
 #endif /* _X11VNC_CONNECTIONS_H */

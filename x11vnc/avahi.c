@@ -1,6 +1,7 @@
 /* -- avahi.c -- */
 
 #include "x11vnc.h"
+#include "connections.h"
 
 void avahi_initialise(void);
 void avahi_advertise(const char *name, const char *host, const uint16_t port);
@@ -20,6 +21,8 @@ static int try_avahi_helper(const char *name, const char *host, const uint16_t p
 #if LIBVNCSERVER_HAVE_FORK
 	char *cmd, *p, *path = getenv("PATH"), portstr[32];
 	int i;
+
+	if (!name || !host || !port) {}
 
 	/* avahi-publish */
 	if (no_external_cmds || !cmd_ok("zeroconf")) {

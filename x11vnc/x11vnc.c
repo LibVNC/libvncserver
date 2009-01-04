@@ -148,6 +148,7 @@
 /*
  * main routine for the x11vnc program
  */
+void watch_loop(void);
 
 static int limit_shm(void);
 static void check_rcfile(int argc, char **argv);
@@ -284,7 +285,7 @@ void terminal_services(char *list) {
 		    PropModeReplace, (unsigned char *)list, strlen(list));
 		XSync(dpy, False);
 	}
-	if (db) fprintf(stderr, "TS_REDIR_LIST Atom: %d.\n");
+	if (db) fprintf(stderr, "TS_REDIR_LIST Atom: %d.\n", (int) at);
 
 	oh_restart_it_all:
 
@@ -512,7 +513,7 @@ if (tstk[j] != 0) fprintf(stderr, "B redir[%d][%d] = %d  %s\n", i, j, tstk[j], t
 				}
 			}
 			if (did_ts && rate_count > 100) {
-				int k, db_netstat = 1;
+				int db_netstat = 1;
 				char dcmd[100];
 
 				if (no_external_cmds) {
@@ -639,7 +640,7 @@ void do_tsd(void) {
 	if (a != None) {
 		get_prop(prop, 512, a);
 	}
-	if (db) fprintf(stderr, "TS_REDIR_LIST Atom: %d = '%s'\n", a, prop);
+	if (db) fprintf(stderr, "TS_REDIR_LIST Atom: %d = '%s'\n", (int) a, prop);
 
 	if (prop[0] == '\0') {
 		return;
@@ -772,7 +773,7 @@ static void check_redir_services(void) {
 			pid = (pid_t) atoi(prop);
 		}
 	}
-	if (db) fprintf(stderr, "TS_REDIR_PID Atom: %d = '%s'\n", a, prop);
+	if (db) fprintf(stderr, "TS_REDIR_PID Atom: %d = '%s'\n", (int) a, prop);
 
 	if (getenv("FD_TAG")) {
 		a = XInternAtom(dpy, "FD_TAG", False);
@@ -783,7 +784,7 @@ static void check_redir_services(void) {
 			    PropModeReplace, (unsigned char *)tag, strlen(tag));
 			XSync(dpy, False);
 		}
-		if (db) fprintf(stderr, "FD_TAG Atom: %d = '%s'\n", a, prop);
+		if (db) fprintf(stderr, "FD_TAG Atom: %d = '%s'\n", (int) a, prop);
 	}
 
 	prop[0] = '\0';
@@ -791,7 +792,7 @@ static void check_redir_services(void) {
 	if (a != None) {
 		get_prop(prop, 512, a);
 	}
-	if (db) fprintf(stderr, "TS_REDIR Atom: %d = '%s'\n", a, prop);
+	if (db) fprintf(stderr, "TS_REDIR Atom: %d = '%s'\n", (int) a, prop);
 	if (prop[0] == '\0') {
 		rfbLog("TS_REDIR is empty, restarting...\n");
 		restart = 1;
@@ -2264,7 +2265,6 @@ int main(int argc, char* argv[]) {
 			continue;
 		}
 		if (!strcmp(arg, "-sleepin")) {
-			int n;
 			CHECK_ARGC
 			do_sleepin(argv[++i]);
 			continue;
@@ -2557,7 +2557,6 @@ int main(int argc, char* argv[]) {
 			continue;
 		}
 		if (!strcmp(arg, "-enc")) {
-			char *q;
 			use_openssl = 1;
 			CHECK_ARGC
 			enc_str = strdup(argv[++i]);

@@ -27,6 +27,8 @@
 #include "solid.h"
 #include "inet.h"
 #include "xrandr.h"
+#include "xrecord.h"
+#include "pm.h"
 
 #include <rfb/rfbclient.h>
 
@@ -54,8 +56,6 @@ void vnc_reflect_process_client(void);
 rfbBool vnc_reflect_send_pointer(int x, int y, int mask);
 rfbBool vnc_reflect_send_key(uint32_t key, rfbBool down);
 rfbBool vnc_reflect_send_cuttext(char *str, int len);
-
-void watch_loop(void);
 
 static void debug_colormap(XImage *fb);
 static void set_visual(char *str);
