@@ -209,7 +209,7 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 		if test "x$with_xrandr" != "xno"; then
 			AC_CHECK_LIB(Xrandr, XRRSelectInput,
 				X_PRELIBS="$X_PRELIBS -lXrandr"
-				[AC_DEFINE(HAVE_LIBXRANDR)], ,
+				[AC_DEFINE(HAVE_LIBXRANDR) HAVE_LIBXRANDR="true"], ,
 				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 		fi
 
@@ -231,6 +231,12 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			# need /usr/sfw/lib in RPATH for Solaris 10 and later
 			case `(uname -sr) 2>/dev/null` in
 			"SunOS 5"*) X_EXTRA_LIBS="$X_EXTRA_LIBS -R/usr/sfw/lib" ;;
+			esac
+		fi
+		if test ! -z "$HAVE_LIBXRANDR"; then
+			# also need /usr/X11/include for Solaris 10 10/08 and later
+			case `(uname -sr) 2>/dev/null` in
+			"SunOS 5"*) CPPFLAGS="$CPPFLAGS -I/usr/X11/include" ;;
 			esac
 		fi
 
