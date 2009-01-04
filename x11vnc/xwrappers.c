@@ -352,6 +352,164 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 #endif	/* NO_X11 */
 }
 
+static void copy_raw_fb_low_bpp(XImage *dest, int x, int y, unsigned int w,
+    unsigned int h) {
+	char *src, *dst;
+	unsigned int line;
+	static char *buf = NULL;
+	static int buflen = -1;
+	int bpl = wdpy_x * raw_fb_native_bpp / 8;
+	int n, ix, len, del, sz = wdpy_x * raw_fb_expand_bytes;
+
+	unsigned int rm_n = raw_fb_native_red_mask;
+	unsigned int gm_n = raw_fb_native_green_mask;
+	unsigned int bm_n = raw_fb_native_blue_mask;
+	unsigned int rm_f = main_red_mask;
+	unsigned int gm_f = main_green_mask;
+	unsigned int bm_f = main_blue_mask;
+
+	unsigned int rs_n = raw_fb_native_red_shift;
+	unsigned int gs_n = raw_fb_native_green_shift;
+	unsigned int bs_n = raw_fb_native_blue_shift;
+	unsigned int rs_f = main_red_shift;
+	unsigned int gs_f = main_green_shift;
+	unsigned int bs_f = main_blue_shift;
+
+	unsigned int rx_n = raw_fb_native_red_max;
+	unsigned int gx_n = raw_fb_native_green_max;
+	unsigned int bx_n = raw_fb_native_blue_max;
+	unsigned int rx_f = main_red_max;
+	unsigned int gx_f = main_green_max;
+	unsigned int bx_f = main_blue_max;
+
+	static unsigned int msk[8];
+	static int last_bpp = -1;
+	static int cga = -1;
+
+	if (cga < 0) {
+		if (getenv("RAWFB_CGA")) {
+			cga = 1;
+		} else {
+			cga = 0;
+		}
+	}
+
+	if (sz > buflen || buf == NULL) {
+		if (buf) {
+			free(buf);
+		}
+		buflen = sz + 1000;
+		buf = (char *) malloc(buflen);
+	}
+
+	if (clipshift && ! use_snapfb) {
+		x += coff_x;
+		y += coff_y;
+	}
+
+	if (last_bpp != raw_fb_native_bpp) {
+		int br;
+		for (br = 0; br < 8; br++) {
+			unsigned int pbit, k, m = 0;
+			
+			for (k=0; k < raw_fb_native_bpp; k++) {
+				pbit = 1 << (br+k);
+				m |= pbit;
+			}
+			msk[br] = m;
+		}
+		last_bpp = raw_fb_native_bpp;
+	}
+
+	dst = dest->data;
+if (0) fprintf(stderr, "x=%d y=%d w=%d h=%d bpl=%d d_bpl=%d-%dx%dx%d/%d %p\n",
+    x, y, w, h, bpl, dest->bytes_per_line, dest->width, dest->height, dest->bits_per_pixel, dest->depth, dst);
+
+	for (line = 0; line < h; line++) {
+
+//fprintf(stderr, "w=%d h=%d x=%d y+line=%d\n", w, h, x, y+line);
+
+		if (! raw_fb_seek) {
+			/* mmap */
+			src = raw_fb_addr + raw_fb_offset + bpl*(y+line);
+
+			memcpy(buf, src, bpl);
+		} else {
+			/* lseek */
+			off_t off;
+			off = (off_t) (raw_fb_offset + bpl*(y+line));
+
+			lseek(raw_fb_fd, off, SEEK_SET);
+
+			len = bpl;
+			del = 0;
+			while (len > 0) {
+				n = read(raw_fb_fd, buf + del, len);
+
+				if (n > 0) {
+					del += n;
+					len -= n;
+				} else if (n == 0) {
+					break;
+				} else if (errno != EINTR && errno != EAGAIN) {
+					break;
+				}
+			}
+		}
+		for (ix = 0; ix < w; ix++) {
+			int bx = (x + ix) * raw_fb_native_bpp;
+			int ib = bx / 8;
+			int br = bx - ib * 8;
+			unsigned char val;
+
+//fprintf(stderr, "%d\n", ix);
+
+			val = *((unsigned char*) (buf + ib));
+
+			val = msk[br] & val;
+			val = val >> br;
+
+			if (cga) {
+				/* this is expt for CGA */
+				double r, g, b;
+				int ir, ig, ib;
+				r = (2./3)*(val & 4) + (1./3)*(val & 8);
+				g = (2./3)*(val & 2) + (1./3)*(val & 8);
+				b = (2./3)*(val & 1) + (1./3)*(val & 8);
+				if (val == 6) {
+					g = g/2.;
+				}
+				ir = rx_f * r;
+				ig = gx_f * g;
+				ib = bx_f * b;
+				val = (ib << bs_f) | (ig << gs_f) | (ir << rs_f);
+			} else {
+				unsigned char rval, gval, bval;
+				
+				rval = (val & rm_n) >> rs_n;
+				gval = (val & gm_n) >> gs_n;
+				bval = (val & bm_n) >> bs_n;
+
+				rval = (rx_f * rval) / rx_n;
+				gval = (gx_f * gval) / gx_n;
+				bval = (bx_f * bval) / bx_n;
+
+				rval = rval << rs_f;
+				gval = gval << gs_f;
+				bval = bval << bs_f;
+
+				val = rval | gval | bval;
+			}
+
+			*(dst+ix) = (char) val;
+		}
+
+//fprintf(stderr, "\n", ix);
+
+		dst += dest->bytes_per_line;
+	}
+}
+
 static void copy_raw_fb_24_to_32(XImage *dest, int x, int y, unsigned int w,
     unsigned int h) {
 	/*
@@ -489,6 +647,10 @@ void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 
 	if (xform24to32) {
 		copy_raw_fb_24_to_32(dest, x, y, w, h);
+		return;
+	}
+	if (raw_fb_native_bpp < 8) {
+		copy_raw_fb_low_bpp(dest, x, y, w, h);
 		return;
 	}
 

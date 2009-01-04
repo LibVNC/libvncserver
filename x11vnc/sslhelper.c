@@ -980,6 +980,7 @@ void openssl_init(int isclient) {
 			    " be used in -sslCRL mode.\n");	
 			clean_up_exit(1);
 		}
+		/* n.b. new ctx */
 		if (!switch_to_anon_dh()) {
 			rfbLog("openssl_init: Anonymous Diffie-Hellman setup"
 			    " failed.\n");	
@@ -2746,9 +2747,16 @@ static int switch_to_anon_dh(void) {
 	rfbLog("Using Anonymous Diffie-Hellman mode.\n");
 	rfbLog("WARNING: Anonymous Diffie-Hellman uses encryption but is\n");
 	rfbLog("WARNING: susceptible to a Man-In-The-Middle attack.\n");
-	ctx = SSL_CTX_new( SSLv23_server_method() );
+	if (ssl_client_mode) {
+		ctx = SSL_CTX_new( SSLv23_client_method() );
+	} else {
+		ctx = SSL_CTX_new( SSLv23_server_method() );
+	}
 	if (ctx == NULL) {
 		return 0;
+	}
+	if (ssl_client_mode) {
+		return 1;
 	}
 	if (!SSL_CTX_set_cipher_list(ctx, "ADH:@STRENGTH")) {
 		return 0;
@@ -2959,10 +2967,12 @@ static int check_vnc_tls_mode(int s_in, int s_out) {
 	if (ssl_client_mode) {
 		/* XXX check if this can be done in SSL client mode. */
 		if (vencrypt_mode == VENCRYPT_FORCE || anontls_mode == ANONTLS_FORCE) {
-			rfbLog("check_vnc_tls_mode: VENCRYPT_FORCE/ANONTLS_FORCE prevents normal SSL\n");
-			return 0;
+			rfbLog("check_vnc_tls_mode: VENCRYPT_FORCE/ANONTLS_FORCE in client\n");
+			rfbLog("check_vnc_tls_mode: connect mode prevents normal SSL.\n");
+			//return 0;
+		} else {
+			return 1;
 		}
-		return 1;
 	}
 	if (ssl_verify && vencrypt_mode != VENCRYPT_FORCE && anontls_mode == ANONTLS_FORCE) {
 		rfbLog("check_vnc_tls_mode: Cannot use ANONTLS_FORCE with -sslverify (Anon DH only)\n");
@@ -3194,14 +3204,15 @@ static int ssl_init(int s_in, int s_out, int skip_vnc_tls) {
 	if (db > 1) fprintf(stderr, "ssl_init: 4\n");
 
 	while (1) {
-		if (db) fprintf(stderr, "calling SSL_accept...\n");
 
 		signal(SIGALRM, ssl_timeout);
 		alarm(timeout);
 
 		if (ssl_client_mode) {
+			if (db) fprintf(stderr, "calling SSL_connect...\n");
 			rc = SSL_connect(ssl);
 		} else {
+			if (db) fprintf(stderr, "calling SSL_accept...\n");
 			rc = SSL_accept(ssl);
 		}
 		err = SSL_get_error(ssl, rc);
@@ -3209,7 +3220,11 @@ static int ssl_init(int s_in, int s_out, int skip_vnc_tls) {
 		alarm(0);
 		signal(SIGALRM, SIG_DFL);
 
-		if (db) fprintf(stderr, "SSL_accept %d/%d\n", rc, err);
+		if (ssl_client_mode) {
+			if (db) fprintf(stderr, "SSL_connect %d/%d\n", rc, err);
+		} else {
+			if (db) fprintf(stderr, "SSL_accept %d/%d\n", rc, err);
+		}
 		if (err == SSL_ERROR_NONE) {
 			break;
 		} else if (err == SSL_ERROR_WANT_READ) {
@@ -3283,7 +3298,11 @@ static int ssl_init(int s_in, int s_out, int skip_vnc_tls) {
 		usleep(10 * 1000);
 	}
 
-	rfbLog("SSL: ssl_helper[%d]: SSL_accept() succeeded for: %s:%d\n", getpid(), name, peerport);
+	if (ssl_client_mode) {
+		rfbLog("SSL: ssl_helper[%d]: SSL_connect() succeeded for: %s:%d\n", getpid(), name, peerport);
+	} else {
+		rfbLog("SSL: ssl_helper[%d]: SSL_accept() succeeded for: %s:%d\n", getpid(), name, peerport);
+	}
 
 	pr_ssl_info(0);
 
@@ -3848,13 +3867,13 @@ void raw_xfer(int csock, int s_in, int s_out) {
 		/* change buf size some direction. */
 	}
 
-	/* this is for testing, no SSL just socket redir */
-	if (pid < 0) {
-		exit(1);
-	}
 	if (getenv("X11VNC_DEBUG_RAW_XFER")) {
 		db = atoi(getenv("X11VNC_DEBUG_RAW_XFER"));
 	}
+	if (pid < 0) {
+		exit(1);
+	}
+	/* this is for testing or special helper usage, no SSL just socket redir */
 	if (pid) {
 		if (db) rfbLog("raw_xfer start: %d -> %d/%d\n", csock, s_in, s_out);
 

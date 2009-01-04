@@ -1,3 +1,8 @@
+2009-01-03  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add -rmflag option, -rawfb vt support, bpp < 8 support
+	  for rawfb, find /dev/video better. Fix reverse SSL connection
+	  for DH.  Some improvements for CUPS TS helper, restart if needed.
+
 2008-12-10  Karl Runge <runge@karlrunge.com>
 	* x11vnc: 0.9.6 release.  Some strtok bugfixes. rename -tlsvnc
 	  to -anontls.	Disable ssl caching.  No cert creation prompting

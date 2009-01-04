@@ -155,7 +155,13 @@ void clean_up_exit(int ret) {
 		pipeinput_fh = NULL;
 	}
 
-	if (! dpy) exit(ret);	/* raw_rb hack */
+	if (! dpy) {	/* raw_rb hack */
+		if (rm_flagfile) {
+			unlink(rm_flagfile);
+			rm_flagfile = NULL;
+		}
+		exit(ret);
+	}
 
 	/* X keyboard cleanups */
 	delete_added_keycodes(0);
@@ -195,6 +201,12 @@ void clean_up_exit(int ret) {
 	X_UNLOCK;
 
 	fflush(stderr);
+
+	if (rm_flagfile) {
+		unlink(rm_flagfile);
+		rm_flagfile = NULL;
+	}
+
 	exit(ret);
 }
 
@@ -452,6 +464,10 @@ static void interrupted (int sig) {
 		} else if (exit_flag <= 2) {
 			return;
 		}
+		if (rm_flagfile) {
+			unlink(rm_flagfile);
+			rm_flagfile = NULL;
+		}
 		exit(4);
 	}
 	exit_flag++;
@@ -482,6 +498,10 @@ static void interrupted (int sig) {
 
 	if (sig == -1) {
 		/* not worth trying any more cleanup, X server probably gone */
+		if (rm_flagfile) {
+			unlink(rm_flagfile);
+			rm_flagfile = NULL;
+		}
 		exit(3);
 	}
 
@@ -512,6 +532,10 @@ static void interrupted (int sig) {
 	}
 
 	if (sig) {
+		if (rm_flagfile) {
+			unlink(rm_flagfile);
+			rm_flagfile = NULL;
+		}
 		exit(2);
 	}
 }

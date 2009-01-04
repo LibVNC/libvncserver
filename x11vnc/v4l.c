@@ -1287,12 +1287,24 @@ static void parse_str(char *str, char **dev, char **settings, char **atparms) {
 	}
 
 	if (*dev == NULL) {
-		s = (char *) malloc(strlen("/dev/") + strlen(str) + 1);
+		struct stat sbuf;
+		s = (char *) malloc(strlen("/dev/") + strlen(str) + 2);
 		if (strstr(str, "/dev/") == str) {
 			sprintf(s, "%s", str);
 		} else {
 			sprintf(s, "/dev/%s", str);
+		} 
+		rfbLog("Checking existence of '%s'\n", s);
+                if (stat(s, &sbuf) != 0) {
+			rfbLogPerror("stat");
+			strcat(s, "0");
+			rfbLog("switching to '%s'\n", s);
 		}
+                if (stat(s, &sbuf) != 0) {
+			rfbLogPerror("stat");
+			rfbLog("You will need to specify the video device more explicity.\n");
+		}
+
 		*dev = s;
 		rfbLog("set video device to: '%s'\n", *dev);
 	}

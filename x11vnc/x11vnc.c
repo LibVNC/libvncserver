@@ -194,17 +194,19 @@ int tsdo(int port, int lsock, int *conn) {
 		*conn = csock;
 	} else {
 		csock = *conn;
-		if (db) rfbLog("tsdo: using exiting csock: %d, port: %d\n", csock, port);
+		if (db) rfbLog("tsdo: using existing csock: %d, port: %d\n", csock, port);
 	}
 
 	rsock = rfbConnectToTcpAddr("127.0.0.1", port);
 	if (rsock < 0) {
 		if (db) rfbLog("tsdo: rfbConnectToTcpAddr(port=%d) failed.\n", port);
+		close(csock);
 		return 2;
 	}
 
 	pid = fork();
 	if (pid < 0) {
+		close(csock);
 		close(rsock);
 		return 3;
 	}
@@ -212,8 +214,8 @@ int tsdo(int port, int lsock, int *conn) {
 		ts_taskn = (ts_taskn+1) % TASKMAX;
 		ts_tasks[ts_taskn] = pid;
 		close(csock);
-		*conn = -1;
 		close(rsock);
+		*conn = -1;
 		return 0;
 	}
 	if (pid == 0) {
@@ -225,15 +227,21 @@ int tsdo(int port, int lsock, int *conn) {
 #if LIBVNCSERVER_HAVE_SETSID
 		if (setsid() == -1) {
 			perror("setsid");
+			close(csock);
+			close(rsock);
 			exit(1);
 		}
 #else
 		if (setpgrp() == -1) {
 			perror("setpgrp");
+			close(csock);
+			close(rsock);
 			exit(1);
 		}
 #endif	/* SETSID */
 		raw_xfer(rsock, csock, csock);
+		close(csock);
+		close(rsock);
 		exit(0);
 	}
 	return 0;
@@ -245,11 +253,13 @@ void set_redir_properties(void);
 #define TSSTK 16
 
 void terminal_services(char *list) {
-	int i, j, n = 0, db = 1;
-	char *p, *q, *r, *str = strdup(list);
+	int i, j, n, db = 1;
+	char *p, *q, *r, *str;
 #if !NO_X11
 	char *tag[TSMAX];
 	int listen[TSMAX], redir[TSMAX][TSSTK], socks[TSMAX], tstk[TSSTK];
+	double rate_start;
+	int rate_count;
 	Atom at, atom[TSMAX];
 	fd_set rd;
 	Window rwin;
@@ -265,6 +275,7 @@ void terminal_services(char *list) {
 	if (! dpy) {
 		return;
 	}
+
 	rwin = RootWindow(dpy, DefaultScreen(dpy));
 
 	at = XInternAtom(dpy, "TS_REDIR_LIST", False);
@@ -275,15 +286,24 @@ void terminal_services(char *list) {
 	}
 	if (db) fprintf(stderr, "TS_REDIR_LIST Atom: %d.\n");
 
+	oh_restart_it_all:
+
 	for (i=0; i<TASKMAX; i++) {
 		ts_tasks[i] = 0;
 	}
 	for (i=0; i<TSMAX; i++) {
+		socks[i] = -1;
+		listen[i] = -1;
 		for (j=0; j<TSSTK; j++) {
 			redir[i][j] = 0;
 		}
 	}
 
+	rate_start = 0.0;
+	rate_count = 0;
+
+	n = 0;
+	str = strdup(list);
 	p = strtok(str, ",");
 	while (p) {
 		int m1, m2;
@@ -339,6 +359,7 @@ void terminal_services(char *list) {
 	}
 
 	for (i=0; i<n; i++) {
+		int k;
 		atom[i] = XInternAtom(dpy, tag[i], False);
 		if (db) fprintf(stderr, "tag: %s atom: %d\n", tag[i], (int) atom[i]);
 		if (atom[i] == None) {
@@ -350,7 +371,15 @@ void terminal_services(char *list) {
 		    PropModeReplace, (unsigned char *)num, strlen(num));
 		XSync(dpy, False);
 
-		socks[i] = rfbListenOnTCPPort(listen[i], htonl(INADDR_LOOPBACK));
+		for (k=1; k <= 5; k++) {
+			socks[i] = rfbListenOnTCPPort(listen[i], htonl(INADDR_LOOPBACK));
+			if (socks[i] >= 0) {
+				if (db) fprintf(stderr, "     listen succeeded: %d\n", listen[i]);
+				break;
+			}
+			if (db) fprintf(stderr, "     listen failed***: %d\n", listen[i]);
+			usleep(k * 2000*1000);
+		}
 	}
 
 	if (getenv("TSD_RESTART")) {
@@ -385,6 +414,7 @@ void terminal_services(char *list) {
 			continue;
 		}
 		if (nfd > 0) {
+			int did_ts = 0;
 			for(i=0; i<n; i++) {
 				int k = 0;
 				for (j = 0; j < TSSTK; j++) {
@@ -439,7 +469,16 @@ if (tstk[j] != 0) fprintf(stderr, "B redir[%d][%d] = %d  %s\n", i, j, tstk[j], t
 							redir[i][j] = 0;
 							continue;
 						}
+
+						if (dnow() > rate_start + 10.0) {
+							rate_start = dnow();
+							rate_count = 0;
+						}
+						rate_count++;
+
 						rc = tsdo(p, s, &conn);
+						did_ts++;
+
 						if (rc == 0) {
 							/* AOK */
 							if (db) fprintf(stderr, "tsdo[%d] OK: %d\n", i, p);
@@ -452,16 +491,18 @@ if (tstk[j] != 0) fprintf(stderr, "B redir[%d][%d] = %d  %s\n", i, j, tstk[j], t
 							break;
 						} else if (rc == 1) {
 							/* accept failed */
-							if (db) fprintf(stderr, "tsdo[%d] accept failed: %d\n", i, p);
+							if (db) fprintf(stderr, "tsdo[%d] accept failed: %d, sleep 50ms\n", i, p);
+							usleep(50*1000);
 							break;
 						} else if (rc == 2) {
 							/* connect failed */
-							if (db) fprintf(stderr, "tsdo[%d] connect failed: %d\n", i, p);
+							if (db) fprintf(stderr, "tsdo[%d] connect failed: %d, sleep 50ms  rate: %d/10s\n", i, p, rate_count);
 							redir[i][j] = 0;
+							usleep(50*1000);
 							continue;
 						} else if (rc == 3) {
 							/* fork failed */
-							usleep(250*1000);
+							usleep(500*1000);
 							break;
 						}
 					}
@@ -469,6 +510,41 @@ if (tstk[j] != 0) fprintf(stderr, "B redir[%d][%d] = %d  %s\n", i, j, tstk[j], t
 						if (redir[i][j] != 0) fprintf(stderr, "A redir[%d][%d] = %d  %s\n", i, j, redir[i][j], tag[i]);
 					}
 				}
+			}
+			if (did_ts && rate_count > 100) {
+				int k, db_netstat = 1;
+				char dcmd[100];
+
+				if (no_external_cmds) {
+					db_netstat = 0;
+				}
+
+				rfbLog("terminal_services: throttling high connect rate %d/10s\n", rate_count);
+				usleep(2*1000*1000);
+				rfbLog("terminal_services: stopping ts services.\n");
+				for(i=0; i<n; i++) {
+					int s = socks[i];
+					if (s < 0) {
+						continue;
+					}
+					rfbLog("terminal_services: closing listen=%d sock=%d.\n", listen[i], socks[i]);
+					if (listen[i] >= 0 && db_netstat) {
+						sprintf(dcmd, "netstat -an | grep -w '%d'", listen[i]);
+						fprintf(stderr, "#1 %s\n", dcmd);
+						system(dcmd);
+					}
+					close(s);
+					socks[i] = -1;
+					usleep(2*1000*1000);
+					if (listen[i] >= 0 && db_netstat) {
+						fprintf(stderr, "#2 %s\n", dcmd);
+						system(dcmd);
+					}
+				}
+				usleep(10*1000*1000);
+
+				rfbLog("terminal_services: restarting ts services\n");
+				goto oh_restart_it_all;
 			}
 		}
 		for (i=0; i<TASKMAX; i++) {
@@ -1407,6 +1483,8 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	    : "null");
 	fprintf(stderr, " logappend:  %d\n", logfile_append);
 	fprintf(stderr, " flag:       %s\n", flagfile ? flagfile
+	    : "null");
+	fprintf(stderr, " rm_flag:    %s\n", rm_flagfile ? rm_flagfile
 	    : "null");
 	fprintf(stderr, " rc_file:    \"%s\"\n", rc_rcfile ? rc_rcfile
 	    : "null");
@@ -2766,6 +2844,11 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-flag")) {
 			CHECK_ARGC
 			flagfile = strdup(argv[++i]);
+			continue;
+		}
+		if (!strcmp(arg, "-rmflag")) {
+			CHECK_ARGC
+			rm_flagfile = strdup(argv[++i]);
 			continue;
 		}
 		if (!strcmp(arg, "-rc")) {

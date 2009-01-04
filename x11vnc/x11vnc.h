@@ -438,6 +438,12 @@ extern int raw_fb_seek;
 extern int raw_fb_fd;
 extern int raw_fb_back_to_X;
 
+extern int raw_fb_native_bpp;
+extern int raw_fb_expand_bytes;
+extern unsigned long  raw_fb_native_red_mask,  raw_fb_native_green_mask,  raw_fb_native_blue_mask;
+extern unsigned short raw_fb_native_red_max,   raw_fb_native_green_max,   raw_fb_native_blue_max;
+extern unsigned short raw_fb_native_red_shift, raw_fb_native_green_shift, raw_fb_native_blue_shift;
+
 extern int rfb_bytes_per_line;
 extern int main_bytes_per_line;
 extern int rot_bytes_per_line;

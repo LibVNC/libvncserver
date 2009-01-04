@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "December 2008" "x11vnc " "User Commands"
+.TH X11VNC "1" "January 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.6, lastmod: 2008-12-08
+         version: 0.9.7, lastmod: 2009-01-03
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2802,6 +2802,15 @@ Write the "PORT=NNNN" (e.g. PORT=5900) string to
 \fIfile\fR in addition to stdout.  This option could be
 useful by wrapper script to detect when x11vnc is ready.
 .PP
+\fB-rmflag\fR \fIfile\fR
+.IP
+Remove \fIfile\fR at exit to signal when x11vnc is done.
+The file is created at startup if it does not already
+exist or if \fIfile\fR is prefixed with "create:".
+If the file is created, the x11vnc PID is placed in
+the file.  Otherwise the files contents is not changed.
+Use prefix "nocreate:" to prevent creation.
+.PP
 \fB-rc\fR \fIfilename\fR
 .IP
 Use \fIfilename\fR instead of $HOME/.x11vncrc for rc file.
@@ -4209,20 +4218,22 @@ webcams, or where window tearing is a problem.
 Instead of polling X, poll the memory object specified
 in \fIstring\fR.
 .IP
-For file polling to memory map 
+For file polling, to memory map 
 .IR mmap (2)
 a file use:
 "map:/path/to/a/file@WxHxB", with framebuffer Width,
 Height, and Bits per pixel.  "mmap:..." is the
 same.
 .IP
-If there is trouble with mmap, use  "file:/..."
+If there is trouble with mmap, use "file:/..."
 for slower 
 .IR lseek (2)
-based reading.  Use "snap:..."
-to imply \fB-snapfb\fR mode and the "file:" access (this
-is for unseekable devices that only provide the fb all
-at once, e.g. a video camera provides the whole frame).
+based reading.
+.IP
+Use "snap:..." to imply \fB-snapfb\fR mode and the "file:"
+access (this is for unseekable devices that only provide
+the fb all at once, e.g. a video camera provides the
+whole frame).
 .IP
 For shared memory segments string is of the form:
 "shm:N@WxHxB" which specifies a shmid N and with
@@ -4245,24 +4256,28 @@ If the string begins with "video", see the VIDEO4LINUX
 discussion below where the device may be queried for
 (and possibly set) the framebuffer parameters.
 .IP
-If the string begins with "console", "/dev/fb", or
-"fb", see the LINUX CONSOLE discussion below where
-the framebuffer device is opened and keystrokes (and
-possibly mouse events) are inserted into the console.
+If the string begins with "console", "/dev/fb",
+"fb", or "vt", see the LINUX CONSOLE discussion
+below where the framebuffer device is opened and
+keystrokes (and possibly mouse events) are inserted
+into the console.
 .IP
 If the string begins with "vnc", see the VNC HOST
 discussion below where the framebuffer is taken as that
 of another remote VNC server.
 .IP
 Optional suffixes are ":R/G/B" and "+O" to specify
-red, green, and blue masks and an offset into the
-memory object.  If the masks are not provided x11vnc
-guesses them based on the bpp.
+red, green, and blue masks (in hex) and an offset into
+the memory object.  If the masks are not provided x11vnc
+guesses them based on the bpp (if the colors look wrong,
+you need to provide the masks.)
 .IP
 Another optional suffix is the Bytes Per Line which in
-some cases is not WxB/4.  Specify it as WxHxB-BPL
+some cases is not WxB/8.  Specify it as WxHxB-BPL
 e.g. 800x600x16-2048.  This could be a normal width
 1024 at 16bpp fb, but only width 800 shows up.
+.IP
+So the full format is: mode:file@WxHxB:R/G/B+O-BPL
 .IP
 Examples:
 .IP
@@ -4279,6 +4294,7 @@ Examples:
 \fB-rawfb\fR video0
 \fB-rawfb\fR video \fB-pipeinput\fR VID
 \fB-rawfb\fR console
+\fB-rawfb\fR vt2
 \fB-rawfb\fR vnc:somehost:0
 .IP
 (see 
@@ -4306,7 +4322,7 @@ something strange with /dev/fb0.
 If the device is not "seekable" (e.g. webcam) try
 reading it all at once in full snaps via the "snap:"
 mode (note: this is a resource hog).  If you are using
-file: or map: and the device needs to be reopened for
+file: or map: AND the device needs to be reopened for
 *every* snapfb snapshot, set the environment variable:
 SNAPFB_RAWFB_RESET=1 as well.
 .IP
@@ -4316,6 +4332,25 @@ supply the \fB-24to32\fR option.  This would be useful for,
 say, a video camera that delivers the pixel data as
 24bpp packed RGB.  This is the default under "video"
 mode if the bpp is 24.
+.IP
+Normally the bits per pixel, B, is 8, 16, or 32 (or
+rarely 24), however there is also some support for
+B < 8 (e.g. old graphics displays 4 bpp or 1 bpp).
+In this case you certainly must supply the masks as
+well: WxHxB:R/G/B.  The pixels will be padded out to
+8 bpp using depth 8 truecolor.  The scheme currently
+does not work with snap fb (ask if interested.) B=1
+monochrome example: file:/dev/urandom@128x128x1:1/1/1
+Some other like this are 128x128x2:3/3/3 128x128x4:7/7/7
+.IP
+For B < 8 framebuffers you can also set the env. var
+RAWFB_CGA=1 to try a CGA mapping for B=4 (e.g. linux
+vga16fb driver.)  Note with low bpp and/or resolution
+VGA and VGA16 modes on the Linux console one's attempt
+to export them via x11vnc can often be thwarted due to
+special color palettes, pixel packings, and even video
+painting buffering.  OTOH, often experimenting with the
+RGB masks can yield something recognizable.
 .IP
 VIDEO4LINUX: on Linux some attempt is made to handle
 video devices (webcams or TV tuners) automatically.
@@ -4405,38 +4440,77 @@ As above, if you specify a "@WxHxB..." after the
 is not queried for the current values.  Otherwise the
 device will be queried.
 .IP
-LINUX CONSOLE:  If the libvncserver LinuxVNC program
-is on your system you may want to use that instead of
-the following method because it will be faster and more
-accurate for Linux text console.
+LINUX CONSOLE:  The following describes some ways to
+view and possibly interact with the Linux text/graphics
+console (i.e. not X11 XFree86/Xorg)
+.IP
+Note: If the libvncserver LinuxVNC program is on your
+system you may want to use that instead of the following
+method because it will be faster and more accurate
+for the Linux text console and includes mouse support.
+There is, however, the basic LinuxVNC functionality in
+x11vnc if you replace "console" with "vt" in the
+examples below.
 .IP
 If the rawfb string begins with "console" the
-framebuffer device /dev/fb0 is opened (this requires
-the appropriate kernel modules to be installed) and so
-is /dev/tty0.  The latter is used to inject keystrokes
+framebuffer device /dev/fb0 is opened and /dev/tty0 is
+opened too.  The latter is used to inject keystrokes
 (not all are supported, but the basic ones are).
-You will need to be root to inject keystrokes.
-/dev/tty0 refers to the active VT, to indicate one
-explicitly, use "console2", etc. using the VT number.
+You will need to be root to inject keystrokes, but
+not necessarily to open /dev/fb0.  /dev/tty0 refers to
+the active VT, to indicate one explicitly, use, e.g.,
+"console2" for /dev/tty2, etc. by indicating the
+specific VT number.
 .IP
-If the Linux version seems to be 2.6 or later and the
-"uinput" module appears to be present, then the uinput
-method will be used instead of /dev/ttyN.  uinput allows
-insertion of BOTH keystrokes and mouse input and so it
-preferred when accessing graphical (e.g. QT-embedded)
-linux console apps.  See \fB-pipeinput\fR UINPUT below for
-more information on this mode; you will have to use
-\fB-pipeinput\fR if you want to tweak any UINPUT parameters.
-You may also want to also use the \fB-nodragging\fR and
-\fB-cursor\fR none options.  Use "console0", etc  or
-\fB-pipeinput\fR CONSOLE to force the /dev/ttyN method.
+For the Linux framebuffer device, /dev/fb0, (fb1,
+etc) to be enabled the appropriate kernel drivers must
+be loaded.  E.g. vesafb or vga16fb and also by setting
+the boot parameter vga=0x301 (or 0x314, 0x317, etc.)
+(The vga=... method is the preferred way; set your
+machines up that way.)  Otherwise there will be a
+\'No such device' error.  You can also load a Linux
+framebuffer driver specific to your make of video card
+for more functionality.  Once the machine is booted one
+can often 'modprobe' the fb driver as root to obtain
+a framebuffer device.
 .IP
-Note you can change VT remotely using the 
+If you cannot get /dev/fb0 working on Linux, try
+using the LinuxVNC emulation mode by "\fB-rawfb\fR \fIvtN\fR"
+where N = 1, ... 6 is the Linux Virtual Terminal (aka
+virtual console) you wish to view, e.g. "\fB-rawfb\fR \fIvt2\fR".
+Unlike /dev/fb mode, it need not be the active Virtual
+Terminal.  Note that this mode can only show text and
+not graphics.  x11vnc polls the text in /dev/vcsaN
+.IP
+Set the env. var. RAWFB_VCSA_BW=1 to disable colors in
+the "vtN" mode (i.e. black and white only.)  If you
+do not prefer the default 16bpp set RAWFB_VCSA_BPP to
+8 or 32.  If you need to tweak the rawfb parameters by
+using the 'console_guess' string printed at startup,
+be sure to indicate the snap: method.
+.IP
+uinput: If the Linux version appears to be 2.6 or
+later and the "uinput" module appears to be present
+(modprobe uinput), then the uinput method will be used
+instead of /dev/ttyN.  uinput allows insertion of BOTH
+keystrokes and mouse input and so it preferred when
+accessing graphical (e.g. QT-embedded) linux console
+apps.  See \fB-pipeinput\fR UINPUT below for more information
+on this mode; you will have to use \fB-pipeinput\fR if you
+want to tweak any UINPUT parameters.  You may also want
+to also use the \fB-nodragging\fR and \fB-cursor\fR none options.
+Use "console0", etc  or \fB-pipeinput\fR CONSOLE to force
+the /dev/ttyN method.
+.IP
+Note you can change the Linux VT remotely using the
 .IR chvt (1)
-command.  Sometimes switching out and back corrects
-the framebuffer state.
+command to make the one you want be the active
+one (e.g. 'chvt 3').  Sometimes switching out and back
+corrects the framebuffer's graphics state.  For the
+"\fB-rawfb\fR \fIvtN\fR" mode there is no need to switch the VT's.
 .IP
-To skip input injecting entirely use "consolex".
+To skip input injecting entirely use "consolex"
+or "vtx".
 .IP
 The string "/dev/fb0" (1, etc.) can be used instead
 of "console".  This can be used to specify a different
@@ -4446,8 +4520,8 @@ nonstandard, use "console:/dev/foofb"
 .IP
 If you do not want x11vnc to guess the framebuffer's
 WxHxB and masks automatically (sometimes the kernel
-gives inaccurate information), specify them with a
-@WxHxB at the end of the string.
+gives incorrect information), specify them with a @WxHxB
+(and optional :R/G/B masks) at the end of the string.
 .IP
 Examples:
 \fB-rawfb\fR console
@@ -4456,6 +4530,7 @@ Examples:
 \fB-rawfb\fR consolex           (no keystrokes or mouse)
 \fB-rawfb\fR console:/dev/nonstd
 \fB-rawfb\fR console \fB-pipeinput\fR UINPUT:accel=4.0
+\fB-rawfb\fR vt3                (/dev/tty3 w/o /dev/fb0)
 .IP
 VNC HOST: if the \fB-rawfb\fR string is of the form
 "vnc:host:N" then the VNC display "N" on the remote

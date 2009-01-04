@@ -993,6 +993,8 @@ if (0) fprintf(stderr, "initialize_pipeinput: %s -- %s\n", pipeinput_str, p);
 		} else {
 			rfbLog("pipeinput: could not open: %s\n", dev);
 			rfbLogPerror("open");
+			rfbLog("You may need to be root to open %s.\n", dev);
+			rfbLog("\n");
 		}
 		return;
 	} else if (strstr(p, "UINPUT") == p) {

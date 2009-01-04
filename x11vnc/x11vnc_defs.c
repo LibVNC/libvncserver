@@ -15,7 +15,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.9.6 lastmod: 2008-12-08";
+char lastmod[] = "0.9.7 lastmod: 2009-01-03";
 
 /* X display info */
 
@@ -74,6 +74,12 @@ int raw_fb_mmap = 0;
 int raw_fb_seek = 0;
 int raw_fb_fd = -1;
 int raw_fb_back_to_X = 0;	/* kludge for testing rawfb -> X */
+
+int raw_fb_native_bpp = 0;
+int raw_fb_expand_bytes = 1;
+unsigned long  raw_fb_native_red_mask = 0,  raw_fb_native_green_mask = 0,  raw_fb_native_blue_mask = 0;
+unsigned short raw_fb_native_red_max = 0,   raw_fb_native_green_max = 0,   raw_fb_native_blue_max = 0;
+unsigned short raw_fb_native_red_shift = 0, raw_fb_native_green_shift = 0, raw_fb_native_blue_shift = 0;
 
 int rfb_bytes_per_line = 0;
 int main_bytes_per_line = 0;

@@ -2263,8 +2263,6 @@ char *get_repeater_string(char *str, int *len) {
  * Do a reverse connect for a single "host" or "host:port"
  */
 
-extern int ssl_client_mode;
-
 static int do_reverse_connect(char *str_in) {
 	rfbClientPtr cl;
 	char *host, *p, *str = str_in, *s = NULL;

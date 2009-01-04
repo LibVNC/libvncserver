@@ -5248,6 +5248,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(flagfile));
 			goto qry;
 		}
+		if (!strcmp(p, "rmflag")) {
+			snprintf(buf, bufn, "aro=%s:%s", p, NONUL(rm_flagfile));
+			goto qry;
+		}
 		if (!strcmp(p, "rc")) {
 			char *s = rc_rcfile;
 			if (rc_rcfile_default) {

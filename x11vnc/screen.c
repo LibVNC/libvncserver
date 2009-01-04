@@ -1165,6 +1165,24 @@ void vnc_reflect_process_client(void) {
 	}
 }
 
+void linux_dev_fb_msg(char* q) {
+	if (strstr(q, "/dev/fb") && strstr(UT.sysname, "Linux")) {
+		rfbLog("\n");
+		rfbLog("On Linux you may need to load a kernel module to enable\n");
+		rfbLog("the framebuffer device /dev/fb*; e.g.:\n");
+		rfbLog("   vga=0x303 (and others) kernel boot parameter\n");
+		rfbLog("   modprobe uvesafb\n");
+		rfbLog("   modprobe radeonfb (card specific)\n");
+		rfbLog("   modprobe nvidiafb (card specific, others)\n");
+		rfbLog("   modprobe vesafb (?)\n");
+		rfbLog("   modprobe vga16fb\n");
+		rfbLog("\n");
+		rfbLog("You may also need root permission to open /dev/fb*\n");
+		rfbLog("and/or /dev/tty*.\n");
+		rfbLog("\n");
+	}
+}
+
 #define RAWFB_MMAP 1
 #define RAWFB_FILE 2
 #define RAWFB_SHM  3
@@ -1414,7 +1432,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	} else if (strstr(str, "dev/video")) {
 		rawfb_dev_video = 1;
 	} else if (strstr(str, "console") == str || strstr(str, "fb") == str ||
-	    strstr(str, "/dev/fb") == str) {
+	    strstr(str, "/dev/fb") == str || strstr(str, "vt") == str) {
 		char *str2 = console_guess(str, &raw_fb_fd);
 		if (str2 == NULL) {
 			rfbLog("console_guess failed for: %s\n", str);
@@ -1467,6 +1485,11 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	 * -rawfb file:/path/to/file@640x480x32:ff/ff00/ff0000
 	 */
 
+	if (raw_fb_full_str) {
+		free(raw_fb_full_str);
+	}
+	raw_fb_full_str = strdup(str);
+
 
 	/* +O offset */
 	if ((q = strrchr(str, '+')) != NULL) {
@@ -1508,6 +1531,93 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		clean_up_exit(1);
 	}
 	*q = '\0';
+
+	if (rm == 0 && gm == 0 && bm == 0) {
+		/* guess masks... */
+		if (b == 24 || b == 32) {
+			rm = 0xff0000;
+			gm = 0x00ff00;
+			bm = 0x0000ff;
+		} else if (b == 16) {
+			rm = 0xf800;
+			gm = 0x07e0;
+			bm = 0x001f;
+		} else if (b == 8) {
+			rm = 0x07;
+			gm = 0x38;
+			bm = 0xc0;
+		}
+	}
+	/* we can fake -flipbyteorder to some degree... */
+	if (flip_byte_order) {
+		if (b == 24 || b == 32) {
+			tm = rm;
+			rm = bm;
+			bm = tm;
+		} else if (b == 16) {
+			unsigned short s1, s2;
+			s1 = (unsigned short) rm;
+			s2 = ((0xff & s1) << 8) | ((0xff00 & s1) >> 8);
+			rm = (unsigned long) s2;
+			s1 = (unsigned short) gm;
+			s2 = ((0xff & s1) << 8) | ((0xff00 & s1) >> 8);
+			gm = (unsigned long) s2;
+			s1 = (unsigned short) bm;
+			s2 = ((0xff & s1) << 8) | ((0xff00 & s1) >> 8);
+			bm = (unsigned long) s2;
+		}
+	}
+
+	/* native fb stuff for bpp < 8 only */
+	raw_fb_native_bpp = b;
+	raw_fb_native_red_mask = rm;
+	raw_fb_native_green_mask = gm;
+	raw_fb_native_blue_mask = bm;
+	raw_fb_native_red_shift = 100;
+	raw_fb_native_green_shift = 100;
+	raw_fb_native_blue_shift = 100;
+	raw_fb_native_red_max = 1;
+	raw_fb_native_green_max = 1;
+	raw_fb_native_blue_max = 1;
+	m = 1;
+	for (i=0; i<32; i++)  {
+		if (raw_fb_native_red_mask & m) {
+			if (raw_fb_native_red_shift == 100) {
+				raw_fb_native_red_shift = i;
+			}
+			raw_fb_native_red_max *= 2;
+		}
+		if (raw_fb_native_green_mask & m) {
+			if (raw_fb_native_green_shift == 100) {
+				raw_fb_native_green_shift = i;
+			}
+			raw_fb_native_green_max *= 2;
+		}
+		if (raw_fb_native_blue_mask & m) {
+			if (raw_fb_native_blue_shift == 100) {
+				raw_fb_native_blue_shift = i;
+			}
+			raw_fb_native_blue_max *= 2;
+		}
+		m = m << 1;
+	}
+	raw_fb_native_red_max -= 1;
+	raw_fb_native_green_max -= 1;
+	raw_fb_native_blue_max -= 1;
+
+	if (b < 8) {
+		/* e.g. VGA16 */
+		rfbLog("raw_fb_native_bpp: %d 0x%02lx 0x%02lx 0x%02lx %d/%d/%d %d/%d/%d\n", raw_fb_native_bpp,
+		    raw_fb_native_red_mask, raw_fb_native_green_mask, raw_fb_native_blue_mask,
+		    raw_fb_native_red_max, raw_fb_native_green_max, raw_fb_native_blue_max,
+		    raw_fb_native_red_shift, raw_fb_native_green_shift, raw_fb_native_blue_shift);
+		raw_fb_expand_bytes = 1;
+		b = 8;
+		rm = 0x07;
+		gm = 0x38;
+		bm = 0xc0;
+	}
+	/* end of stuff for bpp < 8 */
 
 	dpy_x = wdpy_x = w;
 	dpy_y = wdpy_y = h;
@@ -1609,11 +1719,14 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 			rfbLogEnable(1);
 			rfbLog("failed to open file: %s, %s\n", q, str);
 			rfbLogPerror("open");
+			linux_dev_fb_msg(q);
 			clean_up_exit(1);
 		}
 		raw_fb_fd = fd;
 
-		if (xform24to32) {
+		if (raw_fb_native_bpp < 8) {
+			size = w*h*raw_fb_native_bpp/8 + raw_fb_offset;
+		} else if (xform24to32) {
 			size = w*h*24/8 + raw_fb_offset;
 		} else {
 			size = w*h*b/8 + raw_fb_offset;
@@ -1650,14 +1763,20 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 				rfbLog("failed to mmap file: %s, %s\n", q, str);
 				rfbLog("   raw_fb_addr: %p\n", raw_fb_addr);
 				rfbLogPerror("mmap");
-				clean_up_exit(1);
-			}
-			raw_fb_mmap = size;
 
-			rfbLog("rawfb: mmap file: %s\n", q);
-			rfbLog("   w: %d h: %d b: %d addr: %p sz: %d\n", w, h,
-			    b, raw_fb_addr, size);
-			last_mode = RAWFB_MMAP;
+				raw_fb_addr = NULL;
+				rfbLog("mmap(2) failed, trying slower lseek(2)\n");
+				raw_fb_seek = size;
+				last_mode = RAWFB_FILE;
+
+			} else {
+				raw_fb_mmap = size;
+
+				rfbLog("rawfb: mmap file: %s\n", q);
+				rfbLog("   w: %d h: %d b: %d addr: %p sz: %d\n", w, h,
+				    b, raw_fb_addr, size);
+				last_mode = RAWFB_MMAP;
+			}
 #else
 			rfbLog("mmap(2) not supported on system, using"
 			    " slower lseek(2)\n");
@@ -1739,42 +1858,6 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		snap->bitmap_unit = -1;
 	}
 
-	if (rm == 0 && gm == 0 && bm == 0) {
-		/* guess masks... */
-		if (b == 24 || b == 32) {
-			rm = 0xff0000;
-			gm = 0x00ff00;
-			bm = 0x0000ff;
-		} else if (b == 16) {
-			rm = 0xf800;
-			gm = 0x07e0;
-			bm = 0x001f;
-		} else if (b == 8) {
-			rm = 0x07;
-			gm = 0x38;
-			bm = 0xc0;
-		}
-	}
-	/* we can fake -flipbyteorder to some degree... */
-	if (flip_byte_order) {
-		if (b == 24 || b == 32) {
-			tm = rm;
-			rm = bm;
-			bm = tm;
-		} else if (b == 16) {
-			unsigned short s1, s2;
-			s1 = (unsigned short) rm;
-			s2 = ((0xff & s1) << 8) | ((0xff00 & s1) >> 8);
-			rm = (unsigned long) s2;
-			s1 = (unsigned short) gm;
-			s2 = ((0xff & s1) << 8) | ((0xff00 & s1) >> 8);
-			gm = (unsigned long) s2;
-			s1 = (unsigned short) bm;
-			s2 = ((0xff & s1) << 8) | ((0xff00 & s1) >> 8);
-			bm = (unsigned long) s2;
-		}
-	}
-
 
 	raw_fb_image->red_mask = rm;
 	raw_fb_image->green_mask = gm;
@@ -1794,6 +1877,9 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		}
 		m = m << 1;
 	}
+	if (raw_fb_native_bpp < 8) {
+		raw_fb_image->depth = raw_fb_expand_bytes * 8;
+	}
 	if (! raw_fb_image->depth) { 
 		raw_fb_image->depth = (b == 32) ? 24 : b;
 	}
@@ -1805,7 +1891,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		depth++;
 	}
 
-	if (clipshift) {
+	if (clipshift || raw_fb_native_bpp < 8) {
 		memset(raw_fb, 0xff, dpy_y * raw_fb_image->bytes_per_line);
 	} else if (raw_fb_addr && ! xform24to32) {
 		memcpy(raw_fb, raw_fb_addr + raw_fb_offset, dpy_y * raw_fb_image->bytes_per_line);
@@ -1814,7 +1900,6 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	}
 
 	if (verbose) {
-		
 		rfbLog("\n");
 		rfbLog("rawfb:  raw_fb  %p\n", raw_fb);
 		rfbLog("        format  %d\n", raw_fb_image->format);
@@ -3271,6 +3356,31 @@ void set_vnc_desktop_name(void) {
 				} else {
 					rfbLog("could not open flag file: %s\n",
 					    flagfile);
+				}
+			}
+			if (rm_flagfile) {
+				int create = 0;
+				struct stat sb;
+				if (strstr(rm_flagfile, "create:") == rm_flagfile) {
+					char *s = rm_flagfile;
+					create = 1;
+					rm_flagfile = strdup(rm_flagfile + strlen("create:"));
+					free(s);
+				}
+				if (strstr(rm_flagfile, "nocreate:") == rm_flagfile) {
+					char *s = rm_flagfile;
+					create = 0;
+					rm_flagfile = strdup(rm_flagfile + strlen("nocreate:"));
+					free(s);
+				} else if (stat(rm_flagfile, &sb) != 0) {
+					create = 1;
+				}
+				if (create) {
+					FILE *flag = fopen(rm_flagfile, "w");
+					if (flag) {
+						fprintf(flag, "%d\n", getpid());
+						fclose(flag);
+					}
 				}
 			}
 		}
