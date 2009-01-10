@@ -79,7 +79,9 @@ static void set_root_cmap(void) {
 
 	RAWFB_RET_VOID
 
-	if (depth > 8) {
+	if (depth > 16) {
+		ncolor = NCOLOR;
+	} else if (depth > 8) {
 		ncolor = 1 << depth;
 	} else {
 		ncolor = NCOLOR;
@@ -255,7 +257,7 @@ static void set_poll_fb(void) {
 		return;		/* this saves a bit of RAM */
 	}
 	pfb(4, &poll24_fb, &poll24_fb_w, &poll24_fb_h);
-	if (depth > 8) {
+	if (depth > 8 && depth <= 16) {
 		pfb(2, &poll8_fb,  &poll8_fb_w,  &poll8_fb_h);	/* 2X for rare 16bpp colormap case */
 	} else {
 		pfb(1, &poll8_fb,  &poll8_fb_w,  &poll8_fb_h);
@@ -333,7 +335,7 @@ if (db24 > 2) fprintf(stderr, " check_for_multivis: %.4f\n", now - last_call);
 		if (stack_old) {
 			free(stack_old);
 		}
-		stack_old = (Window *) malloc(n*sizeof(Window));
+		stack_old = (Window *) calloc(n*sizeof(Window), 1);
 		stack_old_len = n;
 	}
 
@@ -1340,7 +1342,10 @@ static int get_cmap(int j, Colormap cmap) {
 
 	RAWFB_RET(0)
 
-	if (depth > 8) {
+	if (depth > 16) {
+		/* 24 */
+		ncolor = NCOLOR;
+	} else if (depth > 8) {
 		ncolor = 1 << depth;
 	} else {
 		ncolor = NCOLOR;
@@ -1362,9 +1367,10 @@ static int get_cmap(int j, Colormap cmap) {
 	} else {
 		ncells = NCOLOR;
 	}
-if (db24 > 1) fprintf(stderr, "get_cmap: %d 0x%x\n", j, (unsigned int) cmap);
 
-	if (ncells > ncolor) {
+	if (depth > 16) {
+		;
+	} else if (ncells > ncolor) {
 		ncells = ncolor;
 	} else if (ncells == 8 && depth != 3) {
 		/* XXX. see set_colormap() */
@@ -1376,6 +1382,7 @@ if (db24 > 1) fprintf(stderr, "get_cmap: %d 0x%x\n", j, (unsigned int) cmap);
 		color[j][i].pixel = i;
 		color[j][i].pad = 0;
 	}
+if (db24 > 1) fprintf(stderr, "get_cmap: %d 0x%x ncolor=%d ncells=%d\n", j, (unsigned int) cmap, ncolor, ncells);
 
 	/* try to query the colormap, trap errors */
 	X_LOCK;

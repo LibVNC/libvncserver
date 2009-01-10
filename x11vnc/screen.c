@@ -194,7 +194,9 @@ void set_colormap(int reset) {
 	}
 
 	if (init) {
-		if (depth > 8) {
+		if (depth > 16) {
+			ncolor = NCOLOR;
+		} else if (depth > 8) {
 			ncolor = 1 << depth;
 		} else {
 			ncolor = NCOLOR;

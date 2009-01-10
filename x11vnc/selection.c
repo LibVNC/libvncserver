@@ -63,6 +63,7 @@ void selection_request(XEvent *ev, char *type) {
 	unsigned int length;
 	unsigned char *data;
 	static Atom xa_targets = None;
+	static int sync_it = -1;
 # ifndef XA_LENGTH
 	unsigned long XA_LENGTH;
 # endif
@@ -71,6 +72,14 @@ void selection_request(XEvent *ev, char *type) {
 # ifndef XA_LENGTH
 	XA_LENGTH = XInternAtom(dpy, "LENGTH", True);
 # endif
+
+	if (sync_it < 0) {
+		if (getenv("X11VNC_SENDEVENT_SYNC")) {
+			sync_it = 1;
+		} else {
+			sync_it = 0;
+		}
+	}
 
 	req_event = &(ev->xselectionrequest);
 	notify_event.type 	= SelectionNotify;
@@ -170,10 +179,16 @@ void selection_request(XEvent *ev, char *type) {
 		rfbLog("selection_request: ignored XError while sending "
 		    "%s selection to 0x%x.\n", type, req_event->requestor);
 	}
+
+	XFlush_wr(dpy);
+	if (sync_it) {
+		usleep(5 * 1000);
+		XSync(dpy, False);
+	}
+
 	XSetErrorHandler(old_handler);
 	trapped_xerror = 0;
 
-	XFlush_wr(dpy);
 #endif	/* NO_X11 */
 }
 

@@ -135,8 +135,8 @@ static void xrecord_grabserver(int start) {
 		XSetErrorHandler(old_handler);
 		return;
 	}
-	XSetErrorHandler(old_handler);
 	XFlush_wr(gdpy_data);
+	XSetErrorHandler(old_handler);
 #else
 	if (!rc || !old_handler) {}
 #endif

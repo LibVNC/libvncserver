@@ -1,3 +1,9 @@
+2009-01-10  Karl Runge <runge@karlrunge.com>
+	* x11vnc: fix failure of -8to24 on default depth 24 due to 
+	  nonstandard indexed color support changes.  Fix small window
+	  for failure after XSendEvent selection call; add env var.
+	  X11VNC_SENDEVENT_SYNC=1 to take even more care.
+
 2009-01-03  Karl Runge <runge@karlrunge.com>
 	* x11vnc: add -rmflag option, -rawfb vt support, bpp < 8 support
 	  for rawfb, find /dev/video better. Fix reverse SSL connection
