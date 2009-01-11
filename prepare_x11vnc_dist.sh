@@ -18,9 +18,19 @@ sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
 mv Makefile.am Makefile.am.LibVNCServer
 
 echo "EXTRA_DIST=tightvnc-1.3dev5-vncviewer-alpha-cursor.patch README.LibVNCServer" > Makefile.am
+echo "" >> Makefile.am
+echo "if HAVE_SYSTEM_LIBVNCSERVER" >> Makefile.am
+echo "SUBDIRS=x11vnc classes" >> Makefile.am
+echo "DIST_SUBDIRS=x11vnc classes" >> Makefile.am
+echo "else" >> Makefile.am
+echo "SUBDIRS=libvncserver libvncclient x11vnc classes" >> Makefile.am
+echo "DIST_SUBDIRS=libvncserver libvncclient x11vnc classes" >> Makefile.am
+echo "endif" >> Makefile.am
+echo "" >> Makefile.am
+
 cat Makefile.am.LibVNCServer | \
-sed -e "s/^SUBDIRS.*$/SUBDIRS=libvncserver libvncclient x11vnc classes/" \
-    -e "s/^DIST_SUBDIRS.*$/DIST_SUBDIRS=libvncserver libvncclient x11vnc classes/" \
+sed -e "s/^SUBDIRS.*$/#SUBDIRS=libvncserver libvncclient x11vnc classes/" \
+    -e "s/^DIST_SUBDIRS.*$/#DIST_SUBDIRS=libvncserver libvncclient x11vnc classes/" \
     -e "/all: make_config_executable/,\$d" \
     -e "/^.*bin_SCRIPTS.*$/d" \
     -e "s/include_/noinst_/" \
