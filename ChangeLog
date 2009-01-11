@@ -1,3 +1,7 @@
+2007-09-04  Karl Runge <runge@karlrunge.com>
+	* prepare_x11vnc_dist.sh: fix SUBDIRS and DIST_SUBDIRS when using
+	  --with-system-libvncserver
+
 2008-06-03  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* client_examples/SDLvncviewer.c: fix update after resize
 
