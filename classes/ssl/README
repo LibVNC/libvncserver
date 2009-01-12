@@ -84,3 +84,192 @@ SignedUltraViewerSSL.jar
 ultra.vnc
 ultraproxy.vnc
 ultravnc-102-JavaViewer-ssl-etc.patch
+
+---------------------------------------------------------------
+Applet Parameters:
+
+Some additional applet parameters can be set via the URL, e.g.
+
+	http://host:5800/?param=value
+	http://host:5800/ultra.vnc?param=value
+	https://host:5900/ultra.vnc?param=value
+
+etc.  If running java from command line as show above, it comes
+in as java ... VncViewer param value ... 
+
+There is a limitation with libvncserver that param and value can
+only be alphanumeric, underscore, "+" (for space), or "."
+
+We have added some applet parameters to the stock VNC java
+viewers.  Here are the applet parameters:
+
+Both TightVNC and UltraVNC Java viewers:
+
+  HOST
+	string, default: none.
+	The Hostname to connect to.
+	
+  PORT
+	number, default: 0
+	The VNC server port to connect to.
+
+  Open New Window
+	yes/no, default: no
+	Run applet in separate frame.
+
+  Show Controls
+	yes/no, default: yes
+	Show Controls button panel.
+
+  Show Offline Desktop
+	yes/no, default: no
+	Do we continue showing desktop on remote disconnect?
+
+  Defer screen updates
+	number, default: 20
+	Milliseconds delay
+
+  Defer cursor updates
+	number, default: 10
+	Milliseconds delay
+
+  Defer update requests
+	number, default: 50
+	Milliseconds delay
+
+  
+  The following are added by x11vnc and/or ssvnc project
+  
+  VNCSERVERPORT
+	number, default: 0
+	Like PORT, but if there is a firewall this is the Actual VNC
+	server port.  PORT might be a redir port on the firewall.
+
+  DisableSSL
+	yes/no, default: no
+	Do unencrypted connection, no SSL. 
+
+  httpsPort
+	number, default: none
+	When checking for proxy, use this at the url port number.
+
+  CONNECT
+	string, default: none
+	Sets to host:port for the CONNECT line to a Web proxy. 
+	The Web proxy should connect us to it.
+
+  GET
+	yes/no, default: no
+	Set to do a special HTTP GET (/request.https.vnc.connection)
+	to the vnc server that will cause it to switch to VNC instead.
+	This is to speedup/make more robust, the single port HTTPS and VNC
+	mode of x11vnc (e.g. both services thru port 5900, etc) 
+	
+  urlPrefix
+	string, default: none
+	set to a string that will be prefixed to all URL's when contacting
+	the VNC server.  Idea is a special proxy will use this to indicate
+	internal hostname, etc.
+
+  oneTimeKey
+	string, default: none
+	set a special hex "key" to correspond to an SSL X.509 cert.  
+	See the 'onetimekey' helper script.  Can also be PROMPT to
+	prompt the user to paste the hex key string in.
+
+	This is to try to work around the problem that the Java
+	applet cannot keep an SSL keystore on disk, etc.
+	E.g. if they log into an HTTPS website via password they
+	are authenticated and encrypted, then the website can
+	safely put oneTimeKey=... on the URL.  The Vncviewer
+	authenticates the VNC server with this key.
+
+  forceProxy
+	yes/no, default: no
+	Assume there is a proxy.
+
+  ignoreProxy
+	yes/no, default: no
+	Don't check for a proxy, assume there is none.
+
+  trustAllVncCerts
+	yes/no, default: no
+	Automatically trust any cert received from the VNC server
+	(obviously this could be dangerous and lead to man in the
+	middle attack).  Do not ask the user to verify any of these
+	certs from the VNC server.
+
+  trustUrlVncCert
+	yes/no, default: no
+	Automatically trust any cert that the web browsers has accepted.
+	E.g. the user said "Yes" or "Continue" to a web browser dialog
+	regarding a certificate.  If we get the same cert from the VNC
+	server we trust it without prompting the user.
+
+TightVNC Java viewer only:
+
+  Offer Relogin
+	yes/no, default: yes
+	"Offer Relogin" set to "No" disables "Login again" 
+
+  SocketFactory
+	string, default: none
+	set Java Socket class factory.
+
+UltraVNC Java viewer only:
+
+  PASSWORD
+	string, default: none
+	VNC session password in plain text.
+
+  ENCPASSWORD
+	string, default: none
+	VNC session password in encrypted in DES with KNOWN FIXED
+	key.  It is a hex string.  This is like the ~/.vnc/passwd format.
+  
+  The following are added by x11vnc and/or ssvnc project
+  
+  ftpDropDown
+	string, default: none
+	Sets the file transfer "drives" dropdown to the "." separated
+	list.  Use "+" for space. The default is
+
+		My+Documents.Desktop.Home
+
+	for 3 entries in the dropdown in addition to the "drives"
+	(e.g. C:\)  These items should be expanded properly by the VNC
+	Server.  x11vnc will prepend $HOME to them, which is normally
+	what one wants.  To include a "/" use "_2F_".  Another example:
+
+		Home.Desktop.bin_2F_linux
+
+  ftpOnly
+	yes/no, default: no
+	The VNC viewer only shows the filetransfer panel, no desktop
+	is displayed.
+
+  graftFtp
+	yes/no, default: no
+	As ftpOnly, the VNC viewer only shows the filetransfer panel,
+	no desktop is displayed, however it is "grafted" onto an existing
+	SSVNC unix vncviewer.  The special SSVNC vncviewer merges the two
+	channels.
+
+  dsmActive
+	yes/no, default: no
+	Special usage mode with the SSVNC unix vncviewer.  The UltraVNC
+	DSM encryption is active.  Foolishly, UltraVNC DSM encryption
+	*MODIFIES* the VNC protocol when active (it is not a pure tunnel).
+	This option indicates to modify the VNC protocol to make this work. 
+	Usually only used with graftFtp and SSVNC unix vncviewer.
+
+  delayAuthPanel
+	yes/no, default: no
+	This is another special usage mode with the SSVNC unix vncviewer.
+	A login panel is delayed (not shown at startup.)  Could be useful
+	for non SSVNC usage too.
+
+  ignoreMSLogonCheck
+	yes/no, default: no
+	Similar to delayAuthPanel, do not put up a popup asking for
+	Windows username, etc.
