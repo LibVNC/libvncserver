@@ -134,6 +134,8 @@ fi
 
 SSVNC_BASEDIR="$dir"
 export SSVNC_BASEDIR
+SSVNC_BASEDIRNAME="$dir/$name"
+export SSVNC_BASEDIRNAME
 
 if [ -f "$dir/util/ultraftp.jar" ]; then
 	SSVNC_ULTRA_FTP_JAR="$dir/util/ultraftp.jar"

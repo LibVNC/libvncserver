@@ -664,7 +664,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
 +
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/vncviewer/argsresources.c
 --- vnc_unixsrc.orig/vncviewer/argsresources.c	2007-02-04 17:10:31.000000000 -0500
-+++ vnc_unixsrc/vncviewer/argsresources.c	2008-11-16 14:26:47.000000000 -0500
++++ vnc_unixsrc/vncviewer/argsresources.c	2008-12-30 19:22:59.000000000 -0500
 @@ -31,9 +31,9 @@
  
  char *fallback_resources[] = {
@@ -1519,7 +1519,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
  	  "       %s -help\n"
  	  "\n"
-@@ -332,10 +975,287 @@
+@@ -332,10 +975,302 @@
  	  "        -autopass\n"
  	  "\n"
  	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
@@ -1586,11 +1586,26 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "                    a floating point ratio, e.g. \"0.9\", or a fraction,\n"
 +	  "                    e.g. \"3/4\", or WxH, e.g. 1280x1024.  Use \"fit\"\n"
 +	  "                    to fit in the current screen size.  Use \"auto\" to\n"
-+	  "                    fit in the window size.\n"
-+	  "\n"
-+	  "                    Note that scaling is done in software and can be slow\n"
-+	  "                    and requires more memory. \"str\" can also be set by\n"
++	  "                    fit in the window size.  \"str\" can also be set by\n"
 +	  "                    the env. var. SSVNC_SCALE.\n"
++	  "\n"
++	  "                    If you observe mouse trail painting errors, enable\n"
++	  "                    X11 Cursor mode (either via Popup or -x11cursor.)\n"
++	  "\n"
++	  "                    Note that scaling is done in software and so can be\n"
++	  "                    slow and requires more memory.  Some speedup Tips:\n"
++	  "\n"
++	  "                        ZRLE is faster than Tight in this mode.  When\n"
++	  "                        scaling is first detected, the encoding will\n"
++	  "                        be automatically switched to ZRLE.  Use the\n"
++	  "                        Popup menu if you want to go back to Tight.\n"
++	  "                        Set SSVNC_PRESERVE_ENCODING=1 to disable this.\n"
++	  "\n"
++	  "                        Use a solid background on the remote side.\n"
++	  "                        (e.g. manually or via x11vnc -solid ...)\n"
++	  "\n"
++	  "                        If the remote server is x11vnc, try client\n"
++	  "                        side caching: x11vnc -ncache 10 ...\n"
 +	  "\n"
 +	  "        -ycrop n    Only show the top n rows of the framebuffer.  For\n"
 +	  "                    use with x11vnc -ncache client caching option\n"
@@ -1809,7 +1824,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  
  /*
-@@ -347,73 +1267,191 @@
+@@ -347,73 +1282,191 @@
  void
  GetArgsAndResources(int argc, char **argv)
  {
@@ -3385,7 +3400,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 -
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncviewer/desktop.c
 --- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
-+++ vnc_unixsrc/vncviewer/desktop.c	2008-10-29 07:32:30.000000000 -0400
++++ vnc_unixsrc/vncviewer/desktop.c	2008-12-30 19:33:58.000000000 -0500
 @@ -28,28 +28,473 @@
  #include <X11/extensions/XShm.h>
  #endif
@@ -3864,7 +3879,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  
  /*
   * DesktopInitBeforeRealization creates the "desktop" widget and the viewport
-@@ -59,91 +504,964 @@
+@@ -59,91 +504,1012 @@
  void
  DesktopInitBeforeRealization()
  {
@@ -3980,8 +3995,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		float t = 0.0;
 +		XtVaSetValues(w, XtNtopOfThumb, &t, NULL);
 +	}
-+}
-+
+ }
+ 
 +static XtCallbackProc Jumped(Widget w, XtPointer closure, XtPointer call_data) {
 +	float top = *((float *) call_data);
 +	Position x, y;
@@ -3999,8 +4014,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			XtVaSetValues(w, XtNtopOfThumb, *(XtArgVal*)&t, XtNshown, *(XtArgVal*)&s, NULL);
 +		}
 +	}
- }
- 
++}
++
 +extern double dnow(void);
 +
 +void check_things() {
@@ -4064,6 +4079,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	
 +	if (now <= last + 0.25) {
 +		return;
++	}
++
++	if (image_scale) {
++		scale_check_zrle();
 +	}
 +
 +	/* e.g. xrandr resize */
@@ -4259,8 +4278,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +#else
 +#define nfix(i, n) ( i < 0 ? 0 : ( (i >= n) ? (n - 1) : i  ) )
 +#endif
- 
--  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
++
 +int scale_round(int len, double fac) {
 +        double eps = 0.000001;
 +
@@ -4269,8 +4287,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +                len = 1;
 +        }
 +        return len;
- }
- 
++}
++
 +static void scale_rect(double factor_x, double factor_y, int blend, int interpolate,
 +    int *px, int *py, int *pw, int *ph, int solid) {
 +
@@ -4333,7 +4351,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		/* try to avoid problems with bleeding... */
 +		sbdy = (int) (2.0 * fmax * sbdy);
 +	}
-+
+ 
+-  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
 +	//fprintf(stderr, "scale_rect: %dx%d+%d+%d\n", *pw, *ph, *px, *py);
 +
 +	*px = (int) (*px * factor_x);
@@ -4798,6 +4817,36 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	markit:
 +/* End taken from x11vnc scale: */
 +	if (0) {}
+ }
+ 
++void do_scale_stats(int width, int height) {
++	static double calls = 0.0, sum = 0.0, var = 0.0, last = 0.0;
++	double A = width * height;
++
++	if (last == 0.0) {
++		last = dnow();
++	}
++
++	calls += 1.0;
++	sum += A;
++	var += A*A;
++
++	if (dnow() > last + 4.0) {
++		double cnt = calls;
++		if (cnt <= 0.0) cnt = 1.0;
++		var /= cnt;
++		sum /= cnt;
++		var = var - sum * sum;
++		if (sum > 0.0) {
++			var = var / (sum*sum);
++		}
++		fprintf(stderr, "scale_rect stats: %10d %10.1f ave: %10.3f var-rat: %10.3f\n", (int) calls, sum * cnt, sum, var); 
++
++		calls = 0.0;
++		sum = 0.0;
++		var = 0.0;
++		last = dnow();
++	}
 +}
 +
 +void put_image(int src_x, int src_y, int dst_x, int dst_y, int width,
@@ -4810,6 +4859,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +
 +	if (image_scale) {
 +		int i;
++		static int scale_stats = -1;
++
 +		for (i=0; i < 2; i++) {
 +			if (src_x > 0) src_x--;
 +			if (src_y > 0) src_y--;
@@ -4818,8 +4869,20 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			if (src_x + width  < xmax) width++;
 +			if (src_y + height < ymax) height++;
 +		}
-+if (db) fprintf(stderr, "put_image(%d %d %d %d %d %d)\n", src_x, src_y, dst_x, dst_y, width, height);
-+if (db) fprintf(stderr, "scale_rect(%d %d %d %d)\n", src_x, src_y, width, height);
++
++		if (db) fprintf(stderr, "put_image(%d %d %d %d %d %d)\n", src_x, src_y, dst_x, dst_y, width, height);
++		if (db) fprintf(stderr, "scale_rect(%d %d %d %d)\n", src_x, src_y, width, height);
++
++		if (scale_stats < 0) {
++			if (getenv("SSVNC_SCALE_STATS")) {
++				scale_stats = 1;
++			} else {
++				scale_stats = 0;
++			}
++		}
++		if (scale_stats) {
++			do_scale_stats(width, height);
++		}
 +
 +		scale_rect(scale_factor_x, scale_factor_y, 1, 0, &src_x, &src_y, &width, &height, solid);
 +		dst_x = src_x;
@@ -4891,7 +4954,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  
  /*
   * HandleBasicDesktopEvent - deal with expose and leave events.
-@@ -152,41 +1470,392 @@
+@@ -152,41 +1518,392 @@
  static void
  HandleBasicDesktopEvent(Widget w, XtPointer ptr, XEvent *ev, Boolean *cont)
  {
@@ -4899,13 +4962,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	int i, x, y, width, height;
 +	static double last_expose = 0.0;
 +	double now = dnow();
- 
--  switch (ev->type) {
++
 +	if (0) {
 +		PR_EXPOSE;
 +	}
  
-+
+-  switch (ev->type) {
+ 
 +  switch (ev->type) {
    case Expose:
    case GraphicsExpose:
@@ -4933,6 +4996,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			if (y + height < si.framebufferHeight)  height++;
 +		}
 +	}
++
++	if (x + width > si.framebufferWidth) {
++		width = si.framebufferWidth - x;
++		if (width <= 0) {
++			break;
++		}
++	}
  
 -    if (ev->xexpose.x + ev->xexpose.width > si.framebufferWidth) {
 -      ev->xexpose.width = si.framebufferWidth - ev->xexpose.x;
@@ -4947,13 +5017,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 -    SendFramebufferUpdateRequest(ev->xexpose.x, ev->xexpose.y,
 -				 ev->xexpose.width, ev->xexpose.height, False);
 -    break;
-+	if (x + width > si.framebufferWidth) {
-+		width = si.framebufferWidth - x;
-+		if (width <= 0) {
-+			break;
-+		}
-+	}
-+
 +	if (y + height > si.framebufferHeight) {
 +		height = si.framebufferHeight - y;
 +		if (height <= 0) {
@@ -5027,8 +5090,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	break;
    }
 +	check_things();
- }
- 
++}
++
 +extern Position desktopX, desktopY;
 +
 +void scroll_desktop(int horiz, int vert, double amount) {
@@ -5095,8 +5158,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	} else if (amount == -1.0) {
 +		XSync(dpy, False);
 +	}
-+}
-+
+ }
+ 
 +void scale_desktop(int bigger, double frac) {
 +	double current, new;
 +	char tmp[100];
@@ -5306,7 +5369,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  
  /*
   * SendRFBEvent is an action which sends an RFB event.  It can be used in two
-@@ -201,127 +1870,322 @@
+@@ -201,127 +1918,322 @@
   * button2 down, 3 for both, etc).
   */
  
@@ -5350,8 +5413,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			last = now;
 +		}
 +	}
- 
--  if (appData.viewOnly) return;
++
 +	if (selectingSingleWindow && ev->type == ButtonPress) {
 +		selectingSingleWindow = False;
 +		SendSingleWindow(ev->xbutton.x, ev->xbutton.y);
@@ -5525,7 +5587,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	if (appData.viewOnly) {
 +		return;
 +	}
-+
+ 
+-  if (appData.viewOnly) return;
 +	if (*num_params != 0) {
 +		if (strncasecmp(params[0],"key",3) == 0) {
 +			if (*num_params != 2) {
@@ -5737,7 +5800,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -329,26 +2193,185 @@
+@@ -329,26 +2241,185 @@
   * CreateDotCursor.
   */
  
@@ -5939,7 +6002,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -359,38 +2382,37 @@
+@@ -359,38 +2430,37 @@
  void
  CopyDataToScreen(char *buf, int x, int y, int width, int height)
  {
@@ -6007,7 +6070,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -401,62 +2423,297 @@
+@@ -401,62 +2471,297 @@
  static void
  CopyBGR233ToScreen(CARD8 *buf, int x, int y, int width, int height)
  {
@@ -9233,7 +9296,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
 --- vnc_unixsrc.orig/vncviewer/rfbproto.c	2008-09-05 19:51:24.000000000 -0400
-+++ vnc_unixsrc/vncviewer/rfbproto.c	2008-11-19 20:38:51.000000000 -0500
++++ vnc_unixsrc/vncviewer/rfbproto.c	2008-12-08 10:53:56.000000000 -0500
 @@ -23,6 +23,7 @@
   * rfbproto.c - functions to deal with client side of RFB protocol.
   */
@@ -9370,7 +9433,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			}
 +		}
 +
-+		fprintf(stderr, "exec-cmd: %s\n", cmd2);
++		fprintf(stderr, "exec-cmd: %s\n\n", cmd2);
 +		free(cmd2);
 +
 +		if (! SocketPair(sfd)) {
@@ -9473,7 +9536,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	if (type == rfbSecTypeTight) str = "rfbSecTypeTight";
 +	if (type == rfbSecTypeUltra) str = "rfbSecTypeUltra";
 +
-+	if (type == rfbSecTypeTlsVnc) str = "rfbSecTypeTlsVnc";
++	if (type == rfbSecTypeAnonTls) str = "rfbSecTypeAnonTls";
 +	if (type == rfbSecTypeVencrypt) str = "rfbSecTypeVencrypt";
 +	return str;
 +}
@@ -9492,7 +9555,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * InitialiseRFBConnection.
-@@ -212,211 +399,494 @@
+@@ -212,211 +399,493 @@
  Bool
  InitialiseRFBConnection(void)
  {
@@ -9791,7 +9854,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +				fprintf(stderr, "Pre-Handshake set Security-Type to: %d (%s)\n", st, pr_sec_type(st));
 +				if (secType == rfbSecTypeVencrypt) {
 +					goto sec_type;
-+				} else if (secType == rfbSecTypeTlsVnc) {
++				} else if (secType == rfbSecTypeAnonTls) {
 +					break;
 +				}
 +			}
@@ -9874,7 +9937,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	switch (secType) {
 +		case rfbSecTypeNone:
 +			fprintf(stderr, "No authentication needed\n");
-+			/* TBD 3.8 */
 +			if (viewer_minor == 8) {
 +				CARD32 authResult;
 +
@@ -10142,7 +10204,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -451,6 +921,9 @@
+@@ -451,6 +920,9 @@
    return True;
  }
  
@@ -10152,7 +10214,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * Negotiate authentication scheme (protocol version 3.7t)
-@@ -459,56 +932,61 @@
+@@ -459,56 +931,61 @@
  static Bool
  PerformAuthenticationTight(void)
  {
@@ -10256,7 +10318,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -519,80 +997,104 @@
+@@ -519,80 +996,104 @@
  static Bool
  AuthenticateVNC(void)
  {
@@ -10424,7 +10486,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  /*
-@@ -602,68 +1104,71 @@
+@@ -602,68 +1103,71 @@
  static Bool
  AuthenticateUnixLogin(void)
  {
@@ -10548,7 +10610,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -675,19 +1180,20 @@
+@@ -675,19 +1179,20 @@
  static Bool
  ReadInteractionCaps(void)
  {
@@ -10581,7 +10643,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -700,17 +1206,18 @@
+@@ -700,17 +1205,18 @@
  static Bool
  ReadCapabilityList(CapsContainer *caps, int count)
  {
@@ -10609,7 +10671,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -729,6 +1236,11 @@
+@@ -729,6 +1235,11 @@
    Bool requestCompressLevel = False;
    Bool requestQualityLevel = False;
    Bool requestLastRectEncoding = False;
@@ -10621,7 +10683,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
    spf.type = rfbSetPixelFormat;
    spf.format = myFormat;
-@@ -736,12 +1248,18 @@
+@@ -736,12 +1247,18 @@
    spf.format.greenMax = Swap16IfLE(spf.format.greenMax);
    spf.format.blueMax = Swap16IfLE(spf.format.blueMax);
  
@@ -10640,7 +10702,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
    if (appData.encodingsString) {
      char *encStr = appData.encodingsString;
      int encStrLen;
-@@ -754,11 +1272,17 @@
+@@ -754,11 +1271,17 @@
  	encStrLen = strlen(encStr);
        }
  
@@ -10659,7 +10721,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingTight);
  	requestLastRectEncoding = True;
  	if (appData.compressLevel >= 0 && appData.compressLevel <= 9)
-@@ -767,16 +1291,33 @@
+@@ -767,16 +1290,33 @@
  	  requestQualityLevel = True;
        } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingHextile);
@@ -10695,7 +10757,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
        }
  
        encStr = nextEncStr;
-@@ -797,7 +1338,7 @@
+@@ -797,7 +1337,7 @@
      if (appData.useRemoteCursor) {
        if (se->nEncodings < MAX_ENCODINGS)
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
@@ -10704,7 +10766,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
        if (se->nEncodings < MAX_ENCODINGS)
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
-@@ -806,10 +1347,14 @@
+@@ -806,10 +1346,14 @@
      if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
      }
@@ -10720,7 +10782,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	fprintf(stderr,"Same machine: preferring raw encoding\n");
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
        } else {
-@@ -818,13 +1363,15 @@
+@@ -818,13 +1362,15 @@
      }
  
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
@@ -10740,7 +10802,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
        encs[se->nEncodings++] = Swap32IfLE(appData.compressLevel +
  					  rfbEncodingCompressLevel0);
      } else if (!tunnelSpecified) {
-@@ -835,7 +1382,7 @@
+@@ -835,7 +1381,7 @@
        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCompressLevel1);
      }
  
@@ -10749,7 +10811,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
        if (appData.qualityLevel < 0 || appData.qualityLevel > 9)
  	appData.qualityLevel = 5;
        encs[se->nEncodings++] = Swap32IfLE(appData.qualityLevel +
-@@ -844,18 +1391,35 @@
+@@ -844,18 +1390,35 @@
  
      if (appData.useRemoteCursor) {
        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingXCursor);
@@ -10788,7 +10850,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
    return True;
  }
-@@ -868,31 +1432,86 @@
+@@ -868,31 +1431,86 @@
  Bool
  SendIncrementalFramebufferUpdateRequest()
  {
@@ -10888,7 +10950,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -903,19 +1522,36 @@
+@@ -903,19 +1521,36 @@
  Bool
  SendPointerEvent(int x, int y, int buttonMask)
  {
@@ -10937,7 +10999,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -926,12 +1562,20 @@
+@@ -926,12 +1561,20 @@
  Bool
  SendKeyEvent(CARD32 key, Bool down)
  {
@@ -10963,7 +11025,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -942,281 +1586,943 @@
+@@ -942,281 +1585,943 @@
  Bool
  SendClientCutText(char *str, int len)
  {
@@ -12130,7 +12192,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  #ifdef MITSHM
      /* if using shared memory PutImage, make sure that the X server has
-@@ -1224,59 +2530,165 @@
+@@ -1224,59 +2529,165 @@
         mainly to avoid copyrect using invalid screen contents - not sure
         if we'd need it otherwise. */
  
@@ -12329,7 +12391,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -1296,26 +2708,47 @@
+@@ -1296,26 +2707,47 @@
  #define CONCAT2(a,b) a##b
  #define CONCAT2E(a,b) CONCAT2(a,b)
  
@@ -12377,7 +12439,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  
  /*
-@@ -1358,9 +2791,9 @@
+@@ -1358,9 +2790,9 @@
  	    "  %s significant bit in each byte is leftmost on the screen.\n",
  	    (format->bigEndian ? "Most" : "Least"));
    } else {
@@ -12389,7 +12451,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	      (format->bigEndian ? "Most" : "Least"));
      }
      if (format->trueColour) {
-@@ -1462,4 +2895,3 @@
+@@ -1462,4 +2894,3 @@
  
    cinfo->src = &jpegSrcManager;
  }
@@ -13258,8 +13320,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/tunnel.c vnc_unixsrc/vncviewe
    sprintf(lastArgv, "localhost::%d", localPort);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vncviewer/vncviewer._man
 --- vnc_unixsrc.orig/vncviewer/vncviewer._man	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer._man	2008-10-29 08:24:43.000000000 -0400
-@@ -0,0 +1,717 @@
++++ vnc_unixsrc/vncviewer/vncviewer._man	2008-12-30 19:24:50.000000000 -0500
+@@ -0,0 +1,739 @@
 +'\" t
 +.\" ** The above line should force tbl to be a preprocessor **
 +.\" Man page for X vncviewer
@@ -13273,7 +13335,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +.\" License as specified in the file LICENCE.TXT that comes with the
 +.\" TightVNC distribution.
 +.\"
-+.TH ssvncviewer 1 "October 2008" "" "SSVNC"
++.TH ssvncviewer 1 "December 2008" "" "SSVNC"
 +.SH NAME
 +ssvncviewer \- an X viewer client for VNC
 +.SH SYNOPSIS
@@ -13520,11 +13582,27 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +Scale the desktop locally.  The string "str" can
 +a floating point ratio, e.g. "0.9", or a fraction,
 +e.g. "3/4", or WxH, e.g. 1280x1024.  Use "fit"
-+to fit in the current screen size.
-+Use "auto" to fit in the window size.
-+Note that scaling is done in software and can be slow
-+and requires more memory. "str" can also be set by
++to fit in the current screen size.  Use "auto" to
++fit in the window size.  "str" can also be set by
 +the env. var. SSVNC_SCALE.
++
++If you observe mouse trail painting errors, enable
++X11 Cursor mode (either via Popup or \fB\-x11cursor\fR.)
++
++Note that scaling is done in software and so can be
++slow and requires more memory.  Some speedup Tips:
++
++ZRLE is faster than Tight in this mode.  When
++scaling is first detected, the encoding will
++be automatically switched to ZRLE.  Use the
++Popup menu if you want to go back to Tight.
++Set SSVNC_PRESERVE_ENCODING=1 to disable this.
++
++Use a solid background on the remote side.
++(e.g. manually or via x11vnc \fB\-solid\fR ...)
++
++If the remote server is x11vnc, try client
++side caching: x11vnc \fB\-ncache\fR 10 ...
 +.TP
 +\fB\-ycrop\fR n
 +Only show the top n rows of the framebuffer.  For
@@ -13564,11 +13642,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +main viewer window.  The default is to not, mainly
 +because most Linux, etc, systems X servers disable
 +*all* Backingstore by default.  To re\fB\-enable\fR it put
++
 +Option "Backingstore"
++
 +in the Device section of /etc/X11/xorg.conf.
 +In \fB\-bs\fR mode with no X server backingstore, whenever an
 +area of the screen is re\fB\-exposed\fR it must go out to the
 +VNC server to retrieve the pixels. This is too slow.
++
 +In \fB\-nobs\fR mode, memory is allocated by the viewer to
 +provide its own backing of the main viewer window. This
 +actually makes some activities faster (changes in large
@@ -13589,11 +13670,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +authentication has taken place.  Under x11vnc they are
 +used for the \fB\-unixpw\fR login.  Other VNC servers could do
 +something similar.
++
 +You can also indicate "str" via the environment
 +variable SSVNC_UNIXPW.
++
 +Note that the Escape key is actually sent first to tell
 +x11vnc to not echo the Unix Username back to the VNC
 +viewer. Set SSVNC_UNIXPW_NOESC=1 to override this.
++
 +If str is ".", then you are prompted at the command line
 +for the username and password in the normal way.  If str is
 +"-" the stdin is read via getpass(3) for username@password.
@@ -13979,7 +14063,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +Karl Runge <runge@karlrunge.com>
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncviewer/vncviewer.c
 --- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.c	2008-11-17 21:29:21.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.c	2008-12-30 19:22:19.000000000 -0500
 @@ -22,6 +22,7 @@
   */
  
@@ -14212,7 +14296,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  
    /* The -listen option is used to make us a daemon process which listens for
       incoming connections from servers, rather than actively connecting to a
-@@ -45,89 +256,1398 @@
+@@ -45,89 +256,1415 @@
       listenForIncomingConnections() returns, setting the listenSpecified
       flag. */
  
@@ -14776,6 +14860,23 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	schedule_format_change();
 +}
 +
++void scale_check_zrle(void) {
++	static int didit = 0;
++	if (didit) {
++		return;
++	}
++	didit = 1;
++	if (getenv("SSVNC_PRESERVE_ENCODING")) {
++		return;
++	}
++	if (!usingZRLE) {
++		Widget w;
++		fprintf(stderr, "\nSwitching to faster ZRLE encoding in client-side scaling mode.\n");
++		fprintf(stderr, "Switch back to Tight via the Popup menu if you prefer it.\n\n");
++		ToggleTightZRLE(w, NULL, NULL, NULL);
++	}
++}
++
 +/*
 + * ToggleViewOnly
 + */
@@ -15294,8 +15395,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		XtVaSetValues(w, XtNstate, False, NULL);
 +	}
 +}
- 
--  Cleanup();
++
 +void
 +SetNOJPEGState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -15360,8 +15460,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		XtVaSetValues(w, XtNstate, False, NULL);
 +	}
 +}
- 
--  return 0;
++
 +void
 +Set16bppState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -15617,7 +15716,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		XtVaSetValues(w, XtNstate, False, NULL);
 +	}
 +}
-+
+ 
+-  Cleanup();
 +void
 +SetSingleWindowState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -15627,7 +15727,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		XtVaSetValues(w, XtNstate, False, NULL);
 +	}
 +}
-+
+ 
+-  return 0;
 +void
 +SetTextChatState(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -15649,7 +15750,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncviewer/vncviewer.h
 --- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.h	2008-11-17 21:22:35.000000000 -0500
++++ vnc_unixsrc/vncviewer/vncviewer.h	2008-12-30 14:03:39.000000000 -0500
 @@ -28,6 +28,7 @@
  #include <string.h>
  #include <sys/time.h>
@@ -15957,7 +16058,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern int StringToIPAddr(const char *str, unsigned int *addr);
  extern Bool SameMachine(int sock);
-@@ -271,3 +386,70 @@
+@@ -271,3 +386,72 @@
  extern XtAppContext appContext;
  extern Display* dpy;
  extern Widget toplevel;
@@ -16002,6 +16103,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void ToggleFileXfer(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void ToggleTermTextChat(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +
++extern void scale_check_zrle(void);
++
 +extern void SetViewOnlyState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetNOJPEGState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 +extern void SetScaleNState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
@@ -16030,7 +16133,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void SetEscapeKeysState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vncviewer/vncviewer.man
 --- vnc_unixsrc.orig/vncviewer/vncviewer.man	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.man	2008-10-29 08:24:43.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.man	2008-12-30 19:24:50.000000000 -0500
 @@ -5,38 +5,55 @@
  .\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
  .\" Copyright (C) 2000,2001 Red Hat, Inc.
@@ -16042,7 +16145,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .\" TightVNC distribution.
  .\"
 -.TH vncviewer 1 "January 2003" "" "TightVNC"
-+.TH ssvncviewer 1 "October 2008" "" "SSVNC"
++.TH ssvncviewer 1 "December 2008" "" "SSVNC"
  .SH NAME
 -vncviewer \- an X viewer client for VNC
 +ssvncviewer \- an X viewer client for VNC
@@ -16095,7 +16198,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  You can use F8 to display a pop\-up utility menu. Press F8 twice to
  pass single F8 to the remote side.
  .SH OPTIONS
-@@ -168,6 +185,313 @@
+@@ -168,6 +185,335 @@
  \fB\-autopass\fR
  Read a plain-text password from stdin. This option affects only the
  standard VNC authentication.
@@ -16172,11 +16275,27 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +Scale the desktop locally.  The string "str" can
 +a floating point ratio, e.g. "0.9", or a fraction,
 +e.g. "3/4", or WxH, e.g. 1280x1024.  Use "fit"
-+to fit in the current screen size.
-+Use "auto" to fit in the window size.
-+Note that scaling is done in software and can be slow
-+and requires more memory. "str" can also be set by
++to fit in the current screen size.  Use "auto" to
++fit in the window size.  "str" can also be set by
 +the env. var. SSVNC_SCALE.
++
++If you observe mouse trail painting errors, enable
++X11 Cursor mode (either via Popup or \fB\-x11cursor\fR.)
++
++Note that scaling is done in software and so can be
++slow and requires more memory.  Some speedup Tips:
++
++ZRLE is faster than Tight in this mode.  When
++scaling is first detected, the encoding will
++be automatically switched to ZRLE.  Use the
++Popup menu if you want to go back to Tight.
++Set SSVNC_PRESERVE_ENCODING=1 to disable this.
++
++Use a solid background on the remote side.
++(e.g. manually or via x11vnc \fB\-solid\fR ...)
++
++If the remote server is x11vnc, try client
++side caching: x11vnc \fB\-ncache\fR 10 ...
 +.TP
 +\fB\-ycrop\fR n
 +Only show the top n rows of the framebuffer.  For
@@ -16216,11 +16335,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +main viewer window.  The default is to not, mainly
 +because most Linux, etc, systems X servers disable
 +*all* Backingstore by default.  To re\fB\-enable\fR it put
++
 +Option "Backingstore"
++
 +in the Device section of /etc/X11/xorg.conf.
 +In \fB\-bs\fR mode with no X server backingstore, whenever an
 +area of the screen is re\fB\-exposed\fR it must go out to the
 +VNC server to retrieve the pixels. This is too slow.
++
 +In \fB\-nobs\fR mode, memory is allocated by the viewer to
 +provide its own backing of the main viewer window. This
 +actually makes some activities faster (changes in large
@@ -16241,11 +16363,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +authentication has taken place.  Under x11vnc they are
 +used for the \fB\-unixpw\fR login.  Other VNC servers could do
 +something similar.
++
 +You can also indicate "str" via the environment
 +variable SSVNC_UNIXPW.
++
 +Note that the Escape key is actually sent first to tell
 +x11vnc to not echo the Unix Username back to the VNC
 +viewer. Set SSVNC_UNIXPW_NOESC=1 to override this.
++
 +If str is ".", then you are prompted at the command line
 +for the username and password in the normal way.  If str is
 +"-" the stdin is read via getpass(3) for username@password.
@@ -16409,7 +16534,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .SH ENCODINGS
  The server supplies information in whatever format is desired by the
  client, in order to make the client as easy as possible to implement. 
-@@ -238,6 +562,15 @@
+@@ -238,6 +584,15 @@
  \-quality and \-nojpeg options above). Tight encoding is usually the
  best choice for low\-bandwidth network environments (e.g. slow modem
  connections).
@@ -16425,7 +16550,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .SH RESOURCES
  X resources that \fBvncviewer\fR knows about, aside from the
  normal Xt resources, are as follows:
-@@ -364,8 +697,8 @@
+@@ -364,8 +719,8 @@
  .B %R
  remote TCP port number.
  .SH SEE ALSO
@@ -16436,7 +16561,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .SH AUTHORS
  Original VNC was developed in AT&T Laboratories Cambridge. TightVNC
  additions was implemented by Constantin Kaplinsky. Many other people
-@@ -380,3 +713,5 @@
+@@ -380,3 +735,5 @@
  Tim Waugh <twaugh@redhat.com>,
  .br
  Constantin Kaplinsky <const@ce.cctpu.edu.ru>
@@ -18710,7 +18835,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zywrletemplate.c vnc_unixsrc/
 +#undef ZYWRLE_SAVE_PIXEL
 diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
 --- vnc_unixsrc.orig/include/rfbproto.h	2004-05-27 03:02:02.000000000 -0400
-+++ vnc_unixsrc/include/rfbproto.h	2008-11-18 11:08:50.000000000 -0500
++++ vnc_unixsrc/include/rfbproto.h	2008-12-07 09:35:32.000000000 -0500
 @@ -205,7 +205,22 @@
  #define rfbSecTypeInvalid 0
  #define rfbSecTypeNone 1
@@ -18721,7 +18846,7 @@ diff -Naur vnc_unixsrc.orig/include/rfbproto.h vnc_unixsrc/include/rfbproto.h
 +#define rfbSecTypeUltra 17
 +
 +/* try to support VeNCrypt and TLS */
-+#define rfbSecTypeTlsVnc   18
++#define rfbSecTypeAnonTls  18
 +#define rfbSecTypeVencrypt 19
 +
 +#define rfbVencryptPlain        256

@@ -8,7 +8,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvnc 1 "November 2008" "" "SSVNC"
+.TH ssvnc 1 "December 2008" "" "SSVNC"
 .SH NAME
 ssvnc \- a GUI wrapper for SSL and SSH VNC connections.
 .SH SYNOPSIS
@@ -98,6 +98,7 @@ Same as SSVNC_TS_ALWAYS=1.
 .TP
 \fB\-ssl\fR
 Force the full GUI Mode: both SSL and SSH.  This is the default.
+Same as \fB-ss\fR.
 .TP
 \fB\-nv\fR
 Toggle the "Verify All Certs" button to be off at startup.
@@ -113,14 +114,36 @@ Same as SSVNC_BIGGER_DIALOG=1.
 \fB\-noenc\fR
 Start off in a mode where a 'No Encryption' check button is present.
 You can toggle the mode with Ctrl-E.
-Same as SSVNC_DISABLE_ENCRYPTION_BUTTON=1. Or noenc=1 in ~/.ssvncrc.
+Same as SSVNC_DISABLE_ENCRYPTION_BUTTON=1. Or \fInoenc=1\fR in ~/.ssvncrc.
 Selecting no encryption is the same as the vnc:// and Vnc:// prefixes
-described below.
+described below.  \fB-enc\fR implies the opposite.
 .TP
 \fB\-killstunnel\fR
 On Windows, automatically terminate the STUNNEL process when the viewer
-exits instead of prompting you (same as killstunnel=1 in ssvnc_rc or
+exits instead of prompting you (same as \fIkillstunnel=1\fR in ssvnc_rc or
 toggle in Options menu)
+.TP
+\fB\-nokillstunnel\fR
+On Windows, disable \fB-killstunnel\fR mode.
+Same as \fIkillstunnel=0\fR in ssvnc_rc or
+toggle in Options menu.  Note that \fB-killstunnel\fR mode is now the default.
+.TP
+\fB\-mycert\fR \fI/path/to/mycert.pem\fR
+Set the default "MyCert" to be \fI/path/to/mycert.pem\fR.
+Same as \fB-cert\fR.
+If the file does not exist, ~/.vnc/certs is prefixed and tried.
+You can also set \fImycert=/path/to/mycert.pem\fR in ~/.ssvncrc.
+.TP
+\fB\-cacert\fR \fI/path/to/cacert.crt\fR
+Set the default "ServerCert" to be \fI/path/to/cacert.crt\fR.
+Same as \fB-ca\fR.
+If the file does not exist, ~/.vnc/certs is prefixed and tried.
+You can also set \fIcacert=/path/to/cacert.crt\fR in ~/.ssvncrc.
+.TP
+\fB\-crl\fR \fI/path/to/mycrl.pem\fR
+Set the default Certificate Revocation List to be \fI/path/to/mycrl.pem\fR.
+If the file does not exist, ~/.vnc/certs is prefixed and tried.
+You can also set \fIcrl=/path/to/mycrl.pem\fR in ~/.ssvncrc.
 .SH URL NOTATION
 Here are all of our URL-like prefixes that you can put in front of
 host:display (or host:port): 

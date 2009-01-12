@@ -11,7 +11,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvncviewer 1 "October 2008" "" "SSVNC"
+.TH ssvncviewer 1 "December 2008" "" "SSVNC"
 .SH NAME
 ssvncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
@@ -258,11 +258,27 @@ must be 32bpp and same endianness.
 Scale the desktop locally.  The string "str" can
 a floating point ratio, e.g. "0.9", or a fraction,
 e.g. "3/4", or WxH, e.g. 1280x1024.  Use "fit"
-to fit in the current screen size.
-Use "auto" to fit in the window size.
-Note that scaling is done in software and can be slow
-and requires more memory. "str" can also be set by
+to fit in the current screen size.  Use "auto" to
+fit in the window size.  "str" can also be set by
 the env. var. SSVNC_SCALE.
+
+If you observe mouse trail painting errors, enable
+X11 Cursor mode (either via Popup or \fB\-x11cursor\fR.)
+
+Note that scaling is done in software and so can be
+slow and requires more memory.  Some speedup Tips:
+
+ZRLE is faster than Tight in this mode.  When
+scaling is first detected, the encoding will
+be automatically switched to ZRLE.  Use the
+Popup menu if you want to go back to Tight.
+Set SSVNC_PRESERVE_ENCODING=1 to disable this.
+
+Use a solid background on the remote side.
+(e.g. manually or via x11vnc \fB\-solid\fR ...)
+
+If the remote server is x11vnc, try client
+side caching: x11vnc \fB\-ncache\fR 10 ...
 .TP
 \fB\-ycrop\fR n
 Only show the top n rows of the framebuffer.  For
@@ -302,11 +318,14 @@ Whether or not to use X server Backingstore for the
 main viewer window.  The default is to not, mainly
 because most Linux, etc, systems X servers disable
 *all* Backingstore by default.  To re\fB\-enable\fR it put
+
 Option "Backingstore"
+
 in the Device section of /etc/X11/xorg.conf.
 In \fB\-bs\fR mode with no X server backingstore, whenever an
 area of the screen is re\fB\-exposed\fR it must go out to the
 VNC server to retrieve the pixels. This is too slow.
+
 In \fB\-nobs\fR mode, memory is allocated by the viewer to
 provide its own backing of the main viewer window. This
 actually makes some activities faster (changes in large
@@ -327,11 +346,14 @@ password, newline are sent to the VNC server after any VNC
 authentication has taken place.  Under x11vnc they are
 used for the \fB\-unixpw\fR login.  Other VNC servers could do
 something similar.
+
 You can also indicate "str" via the environment
 variable SSVNC_UNIXPW.
+
 Note that the Escape key is actually sent first to tell
 x11vnc to not echo the Unix Username back to the VNC
 viewer. Set SSVNC_UNIXPW_NOESC=1 to override this.
+
 If str is ".", then you are prompted at the command line
 for the username and password in the normal way.  If str is
 "-" the stdin is read via getpass(3) for username@password.

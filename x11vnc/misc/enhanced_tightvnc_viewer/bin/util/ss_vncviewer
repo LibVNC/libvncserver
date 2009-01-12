@@ -23,6 +23,7 @@
 #
 #	-verify /path/to/cacert.pem		
 #	-mycert /path/to/mycert.pem		
+#	-crl    /path/to/my_crl.pem  (or directory)
 #	-proxy  host:port
 #
 # -verify specifies a CA cert PEM file (or a self-signed one) for
@@ -125,13 +126,31 @@ fi
 
 PATH=$PATH:/usr/sbin:/usr/local/sbin:/dist/sbin; export PATH
 
-# work out which stunnel t use (debian installs as stunnel4)
+localhost="localhost"
+if uname | grep Darwin >/dev/null; then
+	localhost="127.0.0.1"
+fi
+
+# work out which stunnel to use (debian installs as stunnel4)
 if [ "X$STUNNEL" = "X" ]; then
-	type stunnel4 > /dev/null 2>&1
-	if [ $? = 0 ]; then
-		STUNNEL=stunnel4
-	else
-		STUNNEL=stunnel
+	check_stunnel=1
+	if [ "X$SSVNC_BASEDIRNAME" != "X" ]; then
+		if [ -x "$SSVNC_BASEDIRNAME/stunnel" ]; then
+			type stunnel > /dev/null 2>&1
+			if [ $? = 0 ]; then
+				# found ours
+				STUNNEL=stunnel
+				check_stunnel=0
+			fi
+		fi
+	fi
+	if [ "X$check_stunnel" = "X1" ]; then
+		type stunnel4 > /dev/null 2>&1
+		if [ $? = 0 ]; then
+			STUNNEL=stunnel4
+		else
+			STUNNEL=stunnel
+		fi
 	fi
 fi
 
@@ -164,6 +183,11 @@ reverse=""
 
 ciphers=""
 anondh="ALL:RC4+RSA:+SSLv2:@STRENGTH"
+anondh_set=""
+stunnel_debug="6"
+if [ "X$SS_DEBUG" != "X" -o "X$SSVNC_VENCRYPT_DEBUG" != "X" -o "X$SSVNC_STUNNEL_DEBUG" != "X" ]; then
+	stunnel_debug="7"
+fi
 
 if [ "X$1" = "X-viewerflavor" ]; then
 	# special case, try to guess which viewer:
@@ -193,16 +217,9 @@ if [ "X$1" = "X-viewerflavor" ]; then
 	fi
 	exit 0
 fi
-
-# maxconn is something we added to stunnel, this disables it:
-if [ "X$SS_VNCVIEWER_NO_MAXCONN" != "X" ]; then
-	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
-elif echo "$VNCVIEWERCMD" | egrep -i '^(xmessage|sleep )' > /dev/null; then
-	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
-else
-	STUNNEL_ONCE=1; export STUNNEL_ONCE
-	STUNNEL_MAX_CLIENTS=1; export STUNNEL_MAX_CLIENTS
-	STUNNEL_NO_SYSLOG=1; export STUNNEL_NO_SYSLOG
+if [ "X$1" = "X-viewerhelp" ]; then
+	$VNCVIEWERCMD -h 2>&1
+	exit 0
 fi
 
 # grab our cmdline options:
@@ -212,6 +229,8 @@ do
 	"-verify")	shift; verify="$1"
                 ;;
 	"-mycert")	shift; mycert="$1"
+                ;;
+	"-crl")		shift; crl="$1"
                 ;;
 	"-proxy")	shift; proxy="$1"
                 ;;
@@ -225,6 +244,7 @@ do
 	"-sshargs")	shift; ssh_args="$1"
                 ;;
 	"-anondh")	ciphers="ciphers=$anondh"
+			anondh_set=1
                 ;;
 	"-ciphers")	shift; ciphers="ciphers=$1"
                 ;;
@@ -245,6 +265,8 @@ do
 	"-rawlocal")	VNCVIEWER_RAWLOCAL=1; export VNCVIEWER_RAWLOCAL
                 ;;
 	"-scale")	shift; SSVNC_SCALE="$1"; export SSVNC_SCALE
+                ;;
+	"-onelisten")	SSVNC_LISTEN_ONCE=1; export SSVNC_LISTEN_ONCE
                 ;;
 	"-escape")	shift; VNCVIEWER_ESCAPE="$1"; export VNCVIEWER_ESCAPE
                 ;;
@@ -268,7 +290,28 @@ do
     shift
 done
 
-# this is the -t ssh option (gives better keyboard responsd thru SSH tunnel)
+# maxconn is something we added to stunnel, this disables it:
+if [ "X$SS_VNCVIEWER_NO_MAXCONN" != "X" ]; then
+	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
+elif echo "$VNCVIEWERCMD" | egrep -i '^(xmessage|sleep )' > /dev/null; then
+	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
+elif [ "X$reverse" != "X" ]; then
+	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
+else
+	# new way (our patches).  other than the above, we set these:
+	if [ "X$SKIP_STUNNEL_ONCE" = "X" ]; then
+		STUNNEL_ONCE=1; export STUNNEL_ONCE
+	fi
+	if [ "X$SKIP_STUNNEL_MAX_CLIENTS" = "X" ]; then
+		STUNNEL_MAX_CLIENTS=1; export STUNNEL_MAX_CLIENTS
+	fi
+fi
+# always set this one:
+if [ "X$SKIP_STUNNEL_NO_SYSLOG" = "X" ]; then
+	STUNNEL_NO_SYSLOG=1; export STUNNEL_NO_SYSLOG
+fi
+
+# this is the -t ssh option (gives better keyboard response thru SSH tunnel)
 targ="-t"
 if [ "X$SS_VNCVIEWER_NO_T" != "X" ]; then
 	targ=""
@@ -289,18 +332,18 @@ if [ "X$reverse" != "X" ]; then
 		# check proxy usage under reverse connection:
 		if [ "X$use_ssh" = "X" -a "X$use_sshssl" = "X" ]; then
 			echo ""
-			if echo "$proxy" | egrep "repeater://" > /dev/null; then
+			if echo "$proxy" | egrep -i "(repeater|vencrypt)://" > /dev/null; then
 				:
 			else
 				echo "*Warning*: SSL -listen and a Web proxy does not make sense."
-				sleep 3
+				sleep 2
 			fi
 		elif echo "$proxy" | grep "," > /dev/null; then
 			:
 		else
 			echo ""
 			echo "*Warning*: -listen and a single proxy/gateway does not make sense."
-			sleep 3
+			sleep 2
 		fi
 		SSVNC_LISTEN_ONCE=1; export SSVNC_LISTEN_ONCE
 	fi
@@ -319,6 +362,14 @@ dL="-L"
 if uname -sr | egrep 'SunOS 5\.[5-8]' > /dev/null; then
 	dL="-h"
 fi
+
+rchk() {
+	# a kludge to set $RANDOM if we are not bash:
+	if [ "X$BASH_VERSION" = "X" ]; then
+		RANDOM=`date +%S``sh -c 'echo $$'``ps -elf 2>&1 | sum 2>&1 | awk '{print $1}'`
+	fi
+}
+rchk
 
 # a portable, but not absolutely safe, tmp file creator
 mytmp() {
@@ -397,6 +448,7 @@ if echo "$orig" | grep '^vnc://' > /dev/null; then
 	orig=`echo "$orig" | sed -e 's,vnc://,,'`
 	verify=""
 	mycert=""
+	crl=""
 	use_ssh=""
 	use_sshssl=""
 	direct_connect=1
@@ -417,6 +469,7 @@ fi
 if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
         verify=""
         mycert=""
+        crl=""
         use_ssh=""
         use_sshssl=""
         direct_connect=1
@@ -459,7 +512,7 @@ fi
 host=`echo "$orig" | awk -F: '{print $1}'`
 disp=`echo "$orig" | awk -F: '{print $2}'`
 if [ "X$host" = "X" ]; then
-	host=localhost
+	host=$localhost
 fi
 if [ "X$disp" = "X" ]; then
 	port=""	# probably -listen mode.
@@ -483,9 +536,9 @@ inuse=""
 if uname | grep Linux > /dev/null; then
 	inuse=`netstat -ant | egrep 'LISTEN|WAIT|ESTABLISH|CLOSE' | awk '{print $4}' | sed 's/^.*://'`
 elif uname | grep SunOS > /dev/null; then
-	inuse=`netstat -an -f inet -P tcp | grep LISTEN | awk '{print $1}' | sed 's/^.*\.//'`
-elif uname | grep -i bsd > /dev/null; then
-	inuse=`netstat -ant -f inet | grep LISTEN | awk '{print $4}' | sed 's/^.*\.//'`
+	inuse=`netstat -an -f inet -P tcp | egrep 'LISTEN|WAIT|ESTABLISH|CLOSE' | awk '{print $1}' | sed 's/^.*\.//'`
+elif uname | egrep -i 'bsd|darwin' > /dev/null; then
+	inuse=`netstat -ant -f inet | egrep 'LISTEN|WAIT|ESTABLISH|CLOSE' | awk '{print $4}' | sed 's/^.*\.//'`
 # add others...
 fi
 
@@ -590,7 +643,14 @@ final() {
 
 if [ "X$reverse" = "X" ]; then
 	# normal connections try 5930-5999:
-	use=`findfree 5930`
+	if [ "X$showcert" = "X" ]; then
+		use=`findfree 5930`
+	else
+		# move away from normal place for (possibly many) -showcert
+		pstart=`date +%S`
+		pstart=`expr 6130 + $pstart + $pstart`
+		use=`findfree $pstart`
+	fi
 	if [ $use -ge 5900 ]; then
 		N=`expr $use - 5900`
 	else
@@ -611,14 +671,6 @@ fi
 if echo "$0" | grep vncip > /dev/null; then
 	VNCVIEWERCMD="$VNCIPCMD"
 fi
-
-rchk() {
-	# a kludge to set $RANDOM if we are not bash:
-	if [ "X$BASH_VERSION" = "X" ]; then
-		RANDOM=`date +%S``sh -c 'echo $$'``ps -elf 2>&1 | sum 2>&1 | awk '{print $1}'`
-	fi
-}
-rchk
 
 # trick for the undocumented rsh://host:port method.
 rsh_setup() {
@@ -670,7 +722,7 @@ if (exists $ENV{PPROXY_SLEEP}) {
 
 foreach my $var (qw(PPROXY_PROXY PPROXY_SOCKS PPROXY_DEST PPROXY_LISTEN
     PPROXY_REVERSE PPROXY_REPEATER PPROXY_REMOVE PPROXY_KILLPID PPROXY_SLEEP)) {
-	if (0 || $ENV{SS_DEBUG}) {
+	if (0 || $ENV{SS_DEBUG} || $ENV{SSVNC_VENCRYPT_DEBUG}) {
 		print STDERR "$var: $ENV{$var}\n";
 	}
 } 
@@ -683,7 +735,7 @@ if ($ENV{PPROXY_SOCKS} ne "" && $ENV{PPROXY_PROXY} !~ m,^socks5?://,i) {
 	}
 }
 
-my $rfbSecTypeTlsVnc   = 18;
+my $rfbSecTypeAnonTls  = 18;
 my $rfbSecTypeVencrypt = 19;
 
 my $rfbVencryptPlain        = 256;
@@ -755,13 +807,24 @@ if ($ENV{PPROXY_REVERSE} ne "") {
 		die "pproxy: $! -- PPROXY_REVERSE\n";
 	}
 	print STDERR "PPROXY_REVERSE: connected to $rhost $rport\n";
+
 } elsif ($ENV{PPROXY_LISTEN} ne "") {
-	my $listen_sock = IO::Socket::INET->new(
-		Listen    => 2,
-		LocalAddr => "localhost",
-		LocalPort => $ENV{PPROXY_LISTEN},
-		Proto     => "tcp"
-	);
+	my $listen_sock = "";
+	if ($ENV{PPROXY_LISTEN} =~ /^INADDR_ANY:(.*)/) {
+		my $p = $1;
+		$listen_sock = IO::Socket::INET->new(
+			Listen    => 2,
+			LocalPort => $p,
+			Proto     => "tcp"
+		);
+	} else {
+		$listen_sock = IO::Socket::INET->new(
+			Listen    => 2,
+			LocalAddr => "127.0.0.1",
+			LocalPort => $ENV{PPROXY_LISTEN},
+			Proto     => "tcp"
+		);
+	}
 	if (! $listen_sock) {
 		die "pproxy: $! -- PPROXY_LISTEN\n";
 	}
@@ -770,6 +833,7 @@ if ($ENV{PPROXY_REVERSE} ne "") {
 	if (! $listen_handle) {
 		die "pproxy: $!\n";
 	}
+	close $listen_sock;
 }
 
 my $sock = IO::Socket::INET->new(
@@ -785,6 +849,13 @@ if (! $sock) {
 }
 
 unlink($0) if $ENV{PPROXY_REMOVE};
+
+if ($ENV{PPROXY_PROXY} =~ /^vencrypt:/ && $ENV{PPROXY_LISTEN} =~ /^INADDR_ANY:/) {
+	print STDERR "PPROXY: vencrypt+reverse: swapping listen socket with connect socket.\n";
+	my $tmp_swap = $sock;
+	$sock = $listen_handle;
+	$listen_handle = $tmp_swap;
+}
 
 $cur_proxy = $first;
 setmode($mode_1st);
@@ -810,7 +881,14 @@ if ($second ne "") {
 $parent = $$;
 $child = fork;
 if (! defined $child) {
-	kill "TERM", $ENV{PPROXY_KILLPID} if $ENV{PPROXY_KILLPID};
+	if ($ENV{PPROXY_KILLPID}) {
+		foreach my $p (split(/,/, $ENV{PPROXY_KILLPID})) {
+			if ($p =~ /^(\+|-)/) {
+				$p = $parent + $p;
+			}
+			kill "TERM", $p;
+		}
+	}
 	exit 1;
 }
 
@@ -824,7 +902,7 @@ if ($child) {
 	select(undef, undef, undef, 0.25);
 	if (kill 0, $child) {
 		select(undef, undef, undef, 1.5);
-		#print STDERR "pproxy\[$$]: kill TERM $child\n";
+		print STDERR "pproxy\[$$]: kill TERM $child\n";
 		kill "TERM", $child;
 	}
 } else {
@@ -837,16 +915,20 @@ if ($child) {
 	select(undef, undef, undef, 0.25);
 	if (kill 0, $parent) {
 		select(undef, undef, undef, 1.5);
-		#print STDERR "pproxy\[$$]: kill TERM $parent\n";
+		print STDERR "pproxy\[$$]: kill TERM $parent\n";
 		kill "TERM", $parent;
 	}
 }
 if ($ENV{PPROXY_KILLPID} ne "") {
-	if ($ENV{PPROXY_KILLPID} =~ /^(\+|-)/) {
-		$ENV{PPROXY_KILLPID} = $$ + $ENV{PPROXY_KILLPID};
+	if ($ENV{PPROXY_KILLPID}) {
+		foreach my $p (split(/,/, $ENV{PPROXY_KILLPID})) {
+			if ($p =~ /^(\+|-)/) {
+				$p = $parent + $p;
+			}
+			print STDERR "kill TERM, $p (PPROXY_KILLPID)\n";
+			kill "TERM", $p;
+		}
 	}
-	print STDERR "kill TERM, $ENV{PPROXY_KILLPID}\n";
-	kill "TERM", $ENV{PPROXY_KILLPID};
 }
 exit;
 
@@ -1079,12 +1161,12 @@ sub vdie {
 	exit(1);
 }
 
-sub tlsvnc_handshake {
+sub anontls_handshake {
 	my ($vmode, $db) = @_;
 
-	print STDERR "PPROXY: Doing TLSVNC Handshake\n";
+	print STDERR "PPROXY: Doing ANONTLS Handshake\n";
 
-	my $psec = pack("C", $rfbSecTypeTlsVnc);
+	my $psec = pack("C", $rfbSecTypeAnonTls);
 	syswrite($sock, $psec, 1);
 
 	append_handshake("done\n");
@@ -1097,6 +1179,13 @@ sub vencrypt_handshake {
 	print STDERR "PPROXY: Doing VeNCrypt Handshake\n";
 
 	my $psec = pack("C", $rfbSecTypeVencrypt);
+
+	if (exists $ENV{SSVNC_TEST_SEC_TYPE}) {
+		my $fake = $ENV{SSVNC_TEST_SEC_TYPE};
+		print STDERR "PPROXY: sending sec-type: $fake\n";
+		$psec = pack("C", $fake);
+	}
+
 	syswrite($sock, $psec, 1);
 
 	my $vmajor;
@@ -1108,10 +1197,14 @@ sub vencrypt_handshake {
 
 	$vmajor = unpack("C", $vmajor);
 	$vminor = unpack("C", $vminor);
-	print STDERR "$vmajor.$vminor\n" if $db;
+	print STDERR "server vencrypt version $vmajor.$vminor\n" if $db;
 
-	vdie if $vmajor ne 0;
-	vdie if $vminor < 2;
+	if (exists $ENV{SSVNC_TEST_SEC_TYPE}) {
+		print STDERR "PPROXY: continuing on in test mode.\n";
+	} else {
+		vdie if $vmajor ne 0;
+		vdie if $vminor < 2;
+	}
 
 	$vmajor = pack("C", 0);
 	$vminor = pack("C", 2);
@@ -1122,6 +1215,7 @@ sub vencrypt_handshake {
 
 	my $result;
 	sysread($sock, $result, 1);
+	print STDERR "result empty\n" if $db && $result eq "";
 
 	vdie if $result eq "";
 	$result = unpack("C", $result);
@@ -1170,12 +1264,23 @@ sub vencrypt_handshake {
 		$subtype = $rfbVencryptTlsPlain;
 		print STDERR "selected rfbVencryptTlsPlain\n" if $db;
 	}
+
+	if (exists $ENV{SSVNC_TEST_SEC_SUBTYPE}) {
+		my $fake = $ENV{SSVNC_TEST_SEC_SUBTYPE};
+		print STDERR "PPROXY: sending sec-subtype: $fake\n";
+		$subtype = $fake;
+	}
+
 	append_handshake("subtype=$subtype\n");
 
 	my $pst = pack("N", $subtype);
 	syswrite($sock, $pst, 4); 
 
-	vdie if $subtype == 0;
+	if (exists $ENV{SSVNC_TEST_SEC_SUBTYPE}) {
+		print STDERR "PPROXY: continuing on in test mode.\n";
+	} else {
+		vdie if $subtype == 0;
+	}
 
 	my $ok;
 	sysread($sock, $ok, 1);
@@ -1192,11 +1297,12 @@ sub vencrypt_dialog {
 	my $db = 0;
 
 	$db = 1 if exists $ENV{SS_DEBUG};
+	$db = 1 if exists $ENV{SSVNC_VENCRYPT_DEBUG};
 
 	append_handshake("mode=$vmode\n");
 
 	my $server_rfb = "";
-	syswrite($sock, $rep, 250);
+	#syswrite($sock, $rep, 250);
 	for (my $i = 0; $i < 12; $i++) {
 		my $c;
 		sysread($sock, $c, 1);
@@ -1246,10 +1352,10 @@ sub vencrypt_dialog {
 		print STDERR "found rfbSecTypeVencrypt\n" if $db;
 		append_handshake("sectype=$rfbSecTypeVencrypt\n");
 		vencrypt_handshake($vmode, $db);
-	} elsif (exists $sectypes{$rfbSecTypeTlsVnc}) {
-		print STDERR "found rfbSecTypeTlsVnc\n" if $db;
-		append_handshake("sectype=$rfbSecTypeTlsVnc\n");
-		tlsvnc_handshake($vmode, $db);
+	} elsif (exists $sectypes{$rfbSecTypeAnonTls}) {
+		print STDERR "found rfbSecTypeAnonTls\n" if $db;
+		append_handshake("sectype=$rfbSecTypeAnonTls\n");
+		anontls_handshake($vmode, $db);
 	} else {
 		print STDERR "No supported sec-type found\n" if $db;
 		vdie;
@@ -1296,9 +1402,12 @@ sub xfer {
 	close($out);
 }
 '
+	# '
 	# xpg_echo will expand \n \r, etc.
 	# try to unset and then test for it.
-	shopt -u xpg_echo >/dev/null 2>&1
+	if type shopt > /dev/null 2>&1; then
+		shopt -u xpg_echo >/dev/null 2>&1
+	fi
 	v='print STDOUT "abc\n";'
 	echo "$v" > $tf
 	chmod 700 $tf
@@ -1314,6 +1423,67 @@ sub xfer {
 	perl -e 'use IO::Socket::INET; select(undef, undef, undef, 0.01)' >/dev/null 2>&1
 }
 
+# make_tcert is no longer invoked via the ssvnc gui (Listen mode).
+# make_tcert is for testing only now via -mycert BUILTIN
+make_tcert() {
+	tcert="/tmp/ss_vnc_viewer_tcert${RANDOM}.$$"
+	tcert=`mytmp "$tcert"`
+	cat > $tcert <<END
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAvkfXxb0wcxgrjV2ziFikjII+ze8iKcTBt47L0GM/c21efelN
++zZpJUUXLu4zz8Ryq8Q+sQgfNy7uTOpN9bUUaOk1TnD7gaDQnQWiNHmqbW2kL+DS
+OKngJVPo9dETAS8hf7+D1e1DBZxjTc1a4RQqWJixwpYj99ixWzu8VC2m/xXsjvOs
+jp4+DLBB490nbkwvstmhmiWm1CmI5O5xOkgioVNQqHvQMdVKOSz9PpbjvZiRX1Uo
+qoMrk+2NOqwP90TB35yPASXb9zXKpO7DLhkube+yYGf+yk46aD707L07Eb7cosFP
+S84vNZ9gX7rQ0UOwm5rYA/oZTBskgaqhtIzkLwIDAQABAoIBAD4ot/sXt5kRn0Ca
+CIkU9AQWlC+v28grR2EQW9JiaZrqcoDNUzUqbCTJsi4ZkIFh2lf0TsqELbZYNW6Y
+6AjJM7al4E0UqYSKJTv2WCuuRxdiRs2BMwthqyBmjeanev7bB6V0ybt7u3Y8xU/o
+MrTuYnr4vrEjXPKdLirwk7AoDbKsRXHSIiHEIBOq1+dUQ32t36ukdnnza4wKDLZc
+PKHiCdCk/wOGhuDlxD6RspqUAlRnJ8/aEhrgWxadFXw1hRhRsf/v1shtB0T3DmTe
+Jchjwyiw9mryb9JZAcKxW+fUc4EVvj6VdQGqYInQJY5Yxm5JAlVQUJicuuJEvn6A
+rj5osQECgYEA552CaHpUiFlB4HGkjaH00kL+f0+gRF4PANCPk6X3UPDVYzKnzmuu
+yDvIdEETGFWBwoztUrOOKqVvPEQ+kBa2+DWWYaERZLtg2cI5byfDJxQ3ldzilS3J
+1S3WgCojqcsG/hlxoQJ1dZFanUy/QhUZ0B+wlC+Zp1Q8AyuGQvhHp68CgYEA0lBI
+eqq2GGCdJuNHMPFbi8Q0BnX55LW5C1hWjhuYiEkb3hOaIJuJrqvayBlhcQa2cGqp
+uP34e9UCfoeLgmoCQ0b4KpL2NGov/mL4i8bMgog4hcoYuIi3qxN18vVR14VKEh4U
+RLk0igAYPU+IK2QByaQlBo9OSaKkcfm7U1/pK4ECgYAxr6VpGk0GDvfF2Tsusv6d
+GIgV8ZP09qSLTTJvvxvF/lQYeqZq7sjI5aJD5i3de4JhpO/IXQJzfZfWOuGc8XKA
+3qYK/Y2IqXXGYRcHFGWV/Y1LFd55mCADHlk0l1WdOBOg8P5iRu/Br9PbiLpCx9oI
+vrOXpnp03eod1/luZmqguwKBgQCWFRSj9Q7ddpSvG6HCG3ro0qsNsUMTI1tZ7UBX
+SPogx4tLf1GN03D9ZUZLZVFUByZKMtPLX/Hi7K9K/A9ikaPrvsl6GEX6QYzeTGJx
+3Pw0amFrmDzr8ySewNR6/PXahxPEuhJcuI31rPufRRI3ZLah3rFNbRbBFX+klkJH
+zTnoAQKBgDbUK/aQFGduSy7WUT7LlM3UlGxJ2sA90TQh4JRQwzur0ACN5GdYZkqM
+YBts4sBJVwwJoxD9OpbvKu3uKCt41BSj0/KyoBzjT44S2io2tj1syujtlVUsyyBy
+/ca0A7WBB8lD1D7QMIhYUm2O9kYtSCLlUTHt5leqGaRG38DqlX36
+-----END RSA PRIVATE KEY-----
+-----BEGIN CERTIFICATE-----
+MIIDzDCCArQCCQDSzxzxqhyqLzANBgkqhkiG9w0BAQQFADCBpzELMAkGA1UEBhMC
+VVMxFjAUBgNVBAgTDU1hc3NhY2h1c2V0dHMxDzANBgNVBAcTBkJvc3RvbjETMBEG
+A1UEChMKTXkgQ29tcGFueTEcMBoGA1UECxMTUHJvZHVjdCBEZXZlbG9wbWVudDEZ
+MBcGA1UEAxMQd3d3Lm5vd2hlcmUubm9uZTEhMB8GCSqGSIb3DQEJARYSYWRtaW5A
+bm93aGVyZS5ub25lMB4XDTA3MDMyMzE4MDc0NVoXDTI2MDUyMjE4MDc0NVowgacx
+CzAJBgNVBAYTAlVTMRYwFAYDVQQIEw1NYXNzYWNodXNldHRzMQ8wDQYDVQQHEwZC
+b3N0b24xEzARBgNVBAoTCk15IENvbXBhbnkxHDAaBgNVBAsTE1Byb2R1Y3QgRGV2
+ZWxvcG1lbnQxGTAXBgNVBAMTEHd3dy5ub3doZXJlLm5vbmUxITAfBgkqhkiG9w0B
+CQEWEmFkbWluQG5vd2hlcmUubm9uZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC
+AQoCggEBAL5H18W9MHMYK41ds4hYpIyCPs3vIinEwbeOy9BjP3NtXn3pTfs2aSVF
+Fy7uM8/EcqvEPrEIHzcu7kzqTfW1FGjpNU5w+4Gg0J0FojR5qm1tpC/g0jip4CVT
+6PXREwEvIX+/g9XtQwWcY03NWuEUKliYscKWI/fYsVs7vFQtpv8V7I7zrI6ePgyw
+QePdJ25ML7LZoZolptQpiOTucTpIIqFTUKh70DHVSjks/T6W472YkV9VKKqDK5Pt
+jTqsD/dEwd+cjwEl2/c1yqTuwy4ZLm3vsmBn/spOOmg+9Oy9OxG+3KLBT0vOLzWf
+YF+60NFDsJua2AP6GUwbJIGqobSM5C8CAwEAATANBgkqhkiG9w0BAQQFAAOCAQEA
+vGomHEp6TVU83X2EBUgnbOhzKJ9u3fOI/Uf5L7p//Vxqow7OR1cguzh/YEzmXOIL
+ilMVnzX9nj/bvcLAuqEP7MR1A8f4+E807p/L/Sf49BiCcwQq5I966sGKYXjkve+T
+2GTBNwMSq+5kLSf6QY8VZI+qnrAudEQMeJByQhTZZ0dH8Njeq8EGl9KUio+VWaiW
+CQK6xJuAvAHqa06OjLmwu1fYD4GLGSrOIiRVkSXV8qLIUmzxdJaIRznkFWsrCEKR
+wAH966SAOvd2s6yOHMvyDRIL7WHxfESB6rDHsdIW/yny1fBePjv473KrxyXtbz7I
+dMw1yW09l+eEo4A7GzwOdw==
+-----END CERTIFICATE-----
+END
+	chmod 600 $tcert
+	echo "$tcert"
+}
+
 Kecho() {
 	if [ "X$USER" = "Xrunge" ]; then
 		echo "dbg: $*"
@@ -1326,7 +1496,7 @@ if [ "X$use_ssh" = "X1" ]; then
 	#
 	ssh_port="22"
 	ssh_host="$host"
-	vnc_host="localhost"
+	vnc_host="$localhost"
 	# let user override ssh via $SSH
 	ssh=${SSH:-"ssh -x"}
 
@@ -1444,9 +1614,9 @@ if [ "X$use_ssh" = "X1" ]; then
 				u=`echo "$host" | sed -e 's/@.*$/@/'`
 			fi
 			
-			proxy="${u}localhost:$nd"
+			proxy="${u}$localhost:$nd"
 		else
-			proxy="${sproxy1_user}localhost:$nd"
+			proxy="${sproxy1_user}$localhost:$nd"
 		fi
 		if [ "X$sproxy_rest" != "X" ]; then
 			proxy="$proxy,$sproxy_rest"
@@ -1487,7 +1657,7 @@ if [ "X$use_ssh" = "X1" ]; then
 		ssh_args="$ssh_args -o NoHostAuthenticationForLocalhost=yes"
 		sleep 1
 		stty sane
-		proxy="${ssh_user2}localhost:$proxport"
+		proxy="${ssh_user2}$localhost:$proxport"
 	fi
 
 	if [ "X$proxy" != "X" ]; then
@@ -1515,14 +1685,14 @@ if [ "X$use_ssh" = "X1" ]; then
 
 	getport=""
 	teeport=""
-	if echo "$ssh_cmd" | egrep "^(PORT=|P=)" > /dev/null; then
+	if echo "$ssh_cmd" | egrep "(PORT=|P=) " > /dev/null; then
 		getport=1
-		if echo "$ssh_cmd" | egrep "^P=" > /dev/null; then
+		if echo "$ssh_cmd" | egrep "P= " > /dev/null; then
 			teeport=1
 		fi
 
 		PORT=""
-		ssh_cmd=`echo "$ssh_cmd" | sed -e 's/^PORT=[ 	]*//' -e 's/^P=//'`
+		ssh_cmd=`echo "$ssh_cmd" | sed -e 's/PORT=[ 	]*//' -e 's/P=//'`
 		SSVNC_NO_ENC_WARN=1
 		if [ "X$use_sshssl" = "X" ]; then
 			direct_connect=1
@@ -1561,7 +1731,7 @@ if [ "X$use_ssh" = "X1" ]; then
 		tport=`mytmp "$tport"`
 
 		if [ "X$rsh" != "X1" ]; then
-			if echo "$ssh_cmd" | grep -w sudo > /dev/null; then
+			if echo "$ssh_cmd" | grep "sudo " > /dev/null; then
 				echo ""
 				echo "Initial ssh with 'sudo id' to prime sudo so hopefully the next one"
 				echo "will require no password..."
@@ -1634,9 +1804,9 @@ if [ "X$use_ssh" = "X1" ]; then
 			PPROXY_SOCKS=5
 		fi
 		export PPROXY_SOCKS
-		host="localhost"
+		host="$localhost"
 		port="$PORT"
-		proxy="localhost:$use"
+		proxy="$localhost:$use"
 
 	else
 		if [ "X$rsh" != "X1" ]; then
@@ -1665,13 +1835,19 @@ if [ "X$use_ssh" = "X1" ]; then
 
 	c=0
 	pssh=""
-	mssh=`echo "$ssh" | sed -e 's/^env.*ssh/ssh/'`
-	while [ $c -lt 30 ]
+	while [ $c -lt 40 ]
 	do
 		p=`expr $pmark + $c`
-		if ps -p "$p" 2>&1 | grep "$mssh" > /dev/null; then
-			pssh=$p
-			break
+		pout=`ps -p "$p" 2>/dev/null | grep -v '^[ 	]*PID' | sed -e 's/-L.*$//' -e 's/-x .*$//'`
+		if echo "$pout" | grep "ssh" > /dev/null; then
+			if echo "$pout" | egrep -i 'ssh.*(-add|-agent|-ask|-keygen|-argv0|vnc)' >/dev/null; then
+				:
+			elif echo "$pout" | egrep -i 'scp|sshd' >/dev/null; then
+				:
+			else
+				pssh=$p
+				break
+			fi
 		fi
 		c=`expr $c + 1`
 	done
@@ -1697,20 +1873,20 @@ if [ "X$use_ssh" = "X1" ]; then
 		echo "sleep $SSVNC_EXTRA_SLEEP"
 		sleep $SSVNC_EXTRA_SLEEP
 	fi
-	#echo "pssh=\"$pssh\""
+	echo "ssh_pid='$pssh'"; echo
 	if [ "X$use_sshssl" = "X" -a "X$getport" = "X" ]; then
 		echo "Running viewer:"
 
 		trap "final" 0 2 15
 		if [ "X$reverse" = "X" ]; then
-			echo "$VNCVIEWERCMD" "$@" localhost:$N
+			echo "$VNCVIEWERCMD" "$@" $localhost:$N
 			echo ""
-			$VNCVIEWERCMD "$@" localhost:$N
+			$VNCVIEWERCMD "$@" $localhost:$N
 			if [ $? != 0 ]; then
 				echo "vncviewer command failed: $?"
 				if [ "X$secondtry" = "X1" ]; then
 					sleep 2
-					$VNCVIEWERCMD "$@" localhost:$N
+					$VNCVIEWERCMD "$@" $localhost:$N
 				fi
 			fi
 		else
@@ -1734,7 +1910,7 @@ if [ "X$use_ssh" = "X1" ]; then
 		use2=`findfree 5960`
 		host0=$host
 		port0=$port
-		host=localhost
+		host=$localhost
 		port=$use
 		use=$use2
 		N=`expr $use - 5900`
@@ -1760,6 +1936,13 @@ fi
 if [ "X$mycert" != "X" ]; then
 	cert="cert = $mycert"
 fi
+if [ "X$crl" != "X" ]; then
+	if [ -d $crl ]; then
+		crl="CRLpath = $crl"
+	else
+		crl="CRLfile = $crl"
+	fi
+fi
 
 ptmp=""
 if [ "X$proxy" != "X" ]; then
@@ -1769,19 +1952,24 @@ if [ "X$proxy" != "X" ]; then
 	pcode "$ptmp"
 	if [ "X$showcert" != "X1" -a "X$direct_connect" = "X" ]; then
 		if uname | egrep 'Darwin|SunOS' >/dev/null; then
-			# on mac we need to listen on socket instead of stdio:
-			nd=`findfree 6700`
-			PPROXY_LISTEN=$nd
-			export PPROXY_LISTEN
-			if [ "X$reverse" = "X" ]; then
-				#$ptmp 2>/dev/null &
-				$ptmp &
+			vout=`echo "$proxy" | grep -i vencrypt`
+			if [ "X$vout" != "X" -a "X$reverse" = "X1" ]; then
+				# need to exec for reverse vencrypt
+				connect="exec = $ptmp"
+			else
+				# on mac and solaris we need to listen on socket instead of stdio:
+				nd=`findfree 6700`
+				PPROXY_LISTEN=$nd
+				export PPROXY_LISTEN
+				if [ "X$reverse" = "X" ]; then
+					#$ptmp 2>/dev/null &
+					$ptmp &
+				fi
+				sleep 2
+				host="$localhost"
+				port="$nd"
+				connect="connect = $localhost:$nd"
 			fi
-			#sleep 3
-			sleep 2
-			host="localhost"
-			port="$nd"
-			connect="connect = localhost:$nd"
 		else
 			# otherwise on unix we can exec it:
 			connect="exec = $ptmp"
@@ -1803,7 +1991,7 @@ if [ "X$showcert" = "X1" ]; then
 			$ptmp 2>/dev/null &
 		fi
 		sleep 1
-		host="localhost"
+		host="$localhost"
 		port="$use"
 	fi
 	cipher_args=""
@@ -1811,8 +1999,63 @@ if [ "X$showcert" = "X1" ]; then
 		cipher_args=`echo "$ciphers" | sed -e 's/ciphers=/-cipher /'`
 	fi
 	#echo "openssl s_client $cipher_args -connect $host:$port" 
-	openssl s_client $cipher_args -prexit -connect $host:$port 2>&1 < /dev/null
-	rc=$?
+	if [ "X$reverse" = "X" ]; then
+		openssl s_client $cipher_args -prexit -connect $host:$port 2>&1 < /dev/null
+		rc=$?
+	else
+		tcert=""
+		if [ "X$mycert" = "X" ]; then
+			tcert=`make_tcert`
+			cert_args="-cert $tcert -CAfile $tcert"
+		else
+			cert_args="-cert $mycert -CAfile $mycert"
+		fi
+		tmp_out=/tmp/showcert_out${RANDOM}.$$
+		tmp_out=`mytmp "$tmp_out"`
+		tmp_err=/tmp/showcert_err${RANDOM}.$$
+		tmp_err=`mytmp "$tmp_err"`
+
+		#echo "openssl s_server $cipher_args $cert_args -accept $port -verify 2 > $tmp_out 2> $tmp_err" 1>&2
+
+		perl -e "
+			\$p = open(O, \"|openssl s_server $cipher_args $cert_args -accept $port -verify 2 1>$tmp_out 2> $tmp_err\");
+			exit 1 unless \$p;
+			while (1) {
+				sleep 1;
+				if (!open(F, \"<$tmp_out\")) {
+					kill \$p;
+					exit 1;
+				}
+				while (<F>) {
+					if (/RFB 00/) {
+						fsleep(0.25);
+						print O \"RFB 000.000\\n\";
+						fsleep(1.00);
+						kill \$p;
+						fsleep(0.25);
+						exit 0;
+					}
+				}
+				close F;
+			}
+			sub fsleep {
+				select(undef, undef, undef, shift);
+			}
+		";
+
+		echo ""
+		cat $tmp_out
+		echo ""
+		echo "----2----"
+		cat $tmp_err
+		if grep BEGIN.CERTIFICATE $tmp_out >/dev/null; then
+			rc=0
+		else
+			rc=1
+		fi
+
+		rm -f $tmp_out $tmp_err
+	fi
 	if [ "X$SSVNC_PREDIGESTED_HANDSHAKE" != "X" ]; then
 		rm -f $SSVNC_PREDIGESTED_HANDSHAKE
 	fi
@@ -1860,7 +2103,7 @@ if [ "X$direct_connect" != "X" ]; then
 			PPROXY_LISTEN=$use
 			export PPROXY_LISTEN
 		else
-			PPROXY_REVERSE="localhost:$use"
+			PPROXY_REVERSE="$localhost:$use"
 			export PPROXY_REVERSE
 			pps=3
 			if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
@@ -1877,7 +2120,7 @@ if [ "X$direct_connect" != "X" ]; then
 			#echo T sleep 1
 			sleep 1
 		fi
-		host="localhost"
+		host="$localhost"
 		disp="$N"
 		port=`expr $disp + 5900`
 	fi
@@ -1894,7 +2137,7 @@ if [ "X$direct_connect" != "X" ]; then
 				pf=`findfree 5970`
 				cmd="$SSVNC_ULTRA_DSM -$pf $host:$port"
 				pf=`expr $pf - 5900`
-				hostdisp="localhost:$pf"
+				hostdisp="$localhost:$pf"
 				ustr=`echo "$cmd" | sed -e 's/pw=[^ ]*/pw=******/g'`
 				echo "Running:"
 				echo
@@ -1930,7 +2173,7 @@ if [ "X$direct_connect" != "X" ]; then
 			VNCVIEWER_LISTEN_LOCALHOST=1
 			export VNCVIEWER_LISTEN_LOCALHOST
 			dport=`expr 5500 + $disp`
-			cmd="$SSVNC_ULTRA_DSM $dport localhost:$use"
+			cmd="$SSVNC_ULTRA_DSM $dport $localhost:$use"
 			ustr=`echo "$cmd" | sed -e 's/pw=[^ ]*/pw=******/g'`
 			echo "Running:"
 			echo
@@ -1961,69 +2204,10 @@ fi
 tmp_cfg=/tmp/ss_vncviewer${RANDOM}.$$
 tmp_cfg=`mytmp "$tmp_cfg"`
 
-# make_tcert is no longer invoked via the ssvnc gui (Listen mode).
-# make_tcert is for testing only now via -mycert BUILTIN
-make_tcert() {
-	tcert="/tmp/ss_vnc_viewer_tcert${RANDOM}.$$"
-	tcert=`mytmp "$tcert"`
-	cat > $tcert <<END
------BEGIN RSA PRIVATE KEY-----
-MIIEowIBAAKCAQEAvkfXxb0wcxgrjV2ziFikjII+ze8iKcTBt47L0GM/c21efelN
-+zZpJUUXLu4zz8Ryq8Q+sQgfNy7uTOpN9bUUaOk1TnD7gaDQnQWiNHmqbW2kL+DS
-OKngJVPo9dETAS8hf7+D1e1DBZxjTc1a4RQqWJixwpYj99ixWzu8VC2m/xXsjvOs
-jp4+DLBB490nbkwvstmhmiWm1CmI5O5xOkgioVNQqHvQMdVKOSz9PpbjvZiRX1Uo
-qoMrk+2NOqwP90TB35yPASXb9zXKpO7DLhkube+yYGf+yk46aD707L07Eb7cosFP
-S84vNZ9gX7rQ0UOwm5rYA/oZTBskgaqhtIzkLwIDAQABAoIBAD4ot/sXt5kRn0Ca
-CIkU9AQWlC+v28grR2EQW9JiaZrqcoDNUzUqbCTJsi4ZkIFh2lf0TsqELbZYNW6Y
-6AjJM7al4E0UqYSKJTv2WCuuRxdiRs2BMwthqyBmjeanev7bB6V0ybt7u3Y8xU/o
-MrTuYnr4vrEjXPKdLirwk7AoDbKsRXHSIiHEIBOq1+dUQ32t36ukdnnza4wKDLZc
-PKHiCdCk/wOGhuDlxD6RspqUAlRnJ8/aEhrgWxadFXw1hRhRsf/v1shtB0T3DmTe
-Jchjwyiw9mryb9JZAcKxW+fUc4EVvj6VdQGqYInQJY5Yxm5JAlVQUJicuuJEvn6A
-rj5osQECgYEA552CaHpUiFlB4HGkjaH00kL+f0+gRF4PANCPk6X3UPDVYzKnzmuu
-yDvIdEETGFWBwoztUrOOKqVvPEQ+kBa2+DWWYaERZLtg2cI5byfDJxQ3ldzilS3J
-1S3WgCojqcsG/hlxoQJ1dZFanUy/QhUZ0B+wlC+Zp1Q8AyuGQvhHp68CgYEA0lBI
-eqq2GGCdJuNHMPFbi8Q0BnX55LW5C1hWjhuYiEkb3hOaIJuJrqvayBlhcQa2cGqp
-uP34e9UCfoeLgmoCQ0b4KpL2NGov/mL4i8bMgog4hcoYuIi3qxN18vVR14VKEh4U
-RLk0igAYPU+IK2QByaQlBo9OSaKkcfm7U1/pK4ECgYAxr6VpGk0GDvfF2Tsusv6d
-GIgV8ZP09qSLTTJvvxvF/lQYeqZq7sjI5aJD5i3de4JhpO/IXQJzfZfWOuGc8XKA
-3qYK/Y2IqXXGYRcHFGWV/Y1LFd55mCADHlk0l1WdOBOg8P5iRu/Br9PbiLpCx9oI
-vrOXpnp03eod1/luZmqguwKBgQCWFRSj9Q7ddpSvG6HCG3ro0qsNsUMTI1tZ7UBX
-SPogx4tLf1GN03D9ZUZLZVFUByZKMtPLX/Hi7K9K/A9ikaPrvsl6GEX6QYzeTGJx
-3Pw0amFrmDzr8ySewNR6/PXahxPEuhJcuI31rPufRRI3ZLah3rFNbRbBFX+klkJH
-zTnoAQKBgDbUK/aQFGduSy7WUT7LlM3UlGxJ2sA90TQh4JRQwzur0ACN5GdYZkqM
-YBts4sBJVwwJoxD9OpbvKu3uKCt41BSj0/KyoBzjT44S2io2tj1syujtlVUsyyBy
-/ca0A7WBB8lD1D7QMIhYUm2O9kYtSCLlUTHt5leqGaRG38DqlX36
------END RSA PRIVATE KEY-----
------BEGIN CERTIFICATE-----
-MIIDzDCCArQCCQDSzxzxqhyqLzANBgkqhkiG9w0BAQQFADCBpzELMAkGA1UEBhMC
-VVMxFjAUBgNVBAgTDU1hc3NhY2h1c2V0dHMxDzANBgNVBAcTBkJvc3RvbjETMBEG
-A1UEChMKTXkgQ29tcGFueTEcMBoGA1UECxMTUHJvZHVjdCBEZXZlbG9wbWVudDEZ
-MBcGA1UEAxMQd3d3Lm5vd2hlcmUubm9uZTEhMB8GCSqGSIb3DQEJARYSYWRtaW5A
-bm93aGVyZS5ub25lMB4XDTA3MDMyMzE4MDc0NVoXDTI2MDUyMjE4MDc0NVowgacx
-CzAJBgNVBAYTAlVTMRYwFAYDVQQIEw1NYXNzYWNodXNldHRzMQ8wDQYDVQQHEwZC
-b3N0b24xEzARBgNVBAoTCk15IENvbXBhbnkxHDAaBgNVBAsTE1Byb2R1Y3QgRGV2
-ZWxvcG1lbnQxGTAXBgNVBAMTEHd3dy5ub3doZXJlLm5vbmUxITAfBgkqhkiG9w0B
-CQEWEmFkbWluQG5vd2hlcmUubm9uZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC
-AQoCggEBAL5H18W9MHMYK41ds4hYpIyCPs3vIinEwbeOy9BjP3NtXn3pTfs2aSVF
-Fy7uM8/EcqvEPrEIHzcu7kzqTfW1FGjpNU5w+4Gg0J0FojR5qm1tpC/g0jip4CVT
-6PXREwEvIX+/g9XtQwWcY03NWuEUKliYscKWI/fYsVs7vFQtpv8V7I7zrI6ePgyw
-QePdJ25ML7LZoZolptQpiOTucTpIIqFTUKh70DHVSjks/T6W472YkV9VKKqDK5Pt
-jTqsD/dEwd+cjwEl2/c1yqTuwy4ZLm3vsmBn/spOOmg+9Oy9OxG+3KLBT0vOLzWf
-YF+60NFDsJua2AP6GUwbJIGqobSM5C8CAwEAATANBgkqhkiG9w0BAQQFAAOCAQEA
-vGomHEp6TVU83X2EBUgnbOhzKJ9u3fOI/Uf5L7p//Vxqow7OR1cguzh/YEzmXOIL
-ilMVnzX9nj/bvcLAuqEP7MR1A8f4+E807p/L/Sf49BiCcwQq5I966sGKYXjkve+T
-2GTBNwMSq+5kLSf6QY8VZI+qnrAudEQMeJByQhTZZ0dH8Njeq8EGl9KUio+VWaiW
-CQK6xJuAvAHqa06OjLmwu1fYD4GLGSrOIiRVkSXV8qLIUmzxdJaIRznkFWsrCEKR
-wAH966SAOvd2s6yOHMvyDRIL7WHxfESB6rDHsdIW/yny1fBePjv473KrxyXtbz7I
-dMw1yW09l+eEo4A7GzwOdw==
------END CERTIFICATE-----
-END
-	chmod 600 $tcert
-	echo "$tcert"
-}
-
 stunnel_exec=""
-if echo $STUNNEL_EXTRA_SVC_OPTS | grep '#stunnel-exec' > /dev/null; then
+if [ "X$SSVNC_USE_OURS" != "X1" ]; then
+	:
+elif echo $STUNNEL_EXTRA_SVC_OPTS | grep '#stunnel-exec' > /dev/null; then
 	stunnel_exec="#"
 fi
 
@@ -2042,25 +2226,29 @@ if [ "X$reverse" = "X" ]; then
 foreground = yes
 pid =
 client = yes
-debug = 6
+debug = $stunnel_debug
 $ciphers
 $STUNNEL_EXTRA_OPTS
 $STUNNEL_EXTRA_OPTS_USER
-$verify
 $cert
+$crl
+$verify
 
 ${stunnel_exec}[vnc_stunnel]
-${stunnel_exec}accept = localhost:$use
+${stunnel_exec}accept = $localhost:$use
 $connect
 $STUNNEL_EXTRA_SVC_OPTS
 $STUNNEL_EXTRA_SVC_OPTS_USER
 
 END
+
 else
+	# REVERSE case:
+
 	stunnel_exec=""	# doesn't work for listening.
 
 	p2=`expr 5500 + $N`
-	connect="connect = localhost:$p2"
+	connect="connect = $localhost:$p2"
 	if [ "X$cert" = "XBUILTIN" ]; then
 		ttcert=`make_tcert`
 		cert="cert = $ttcert"
@@ -2068,22 +2256,33 @@ else
 	# Note for listen mode, an empty cert will cause stunnel to fail.
 	# The ssvnc gui will have already taken care of this.
 
-	STUNNEL_EXTRA_OPTS=`echo "$STUNNEL_EXTRA_OPTS" | sed -e 's/maxconn/#maxconn/'`
 
 	hloc=""
 	if [ "X$use_ssh" = "X1" ]; then
-		hloc="localhost:"
+		hloc="$localhost:"
+	fi
+	if echo "$proxy" | grep -i '^vencrypt:' > /dev/null; then
+		hloc="$localhost:"
+		pv=`findfree 5570`
+		proxy="vencrypt:$pv:$port"
+		port=$pv
+		if [ "X$anondh_set" = "X1" ]; then
+			# not needed for ANONDH in this mode
+			#ciphers="ciphers = ADH:@STRENGTH"
+			:
+		fi
 	fi
 	cat > "$tmp_cfg" <<END
 foreground = yes
 pid =
 client = no
-debug = 6
+debug = $stunnel_debug
 $ciphers
 $STUNNEL_EXTRA_OPTS
 $STUNNEL_EXTRA_OPTS_USER
-$verify
 $cert
+$crl
+$verify
 
 [vnc_stunnel]
 accept = $hloc$port
@@ -2092,6 +2291,7 @@ $STUNNEL_EXTRA_SVC_OPTS
 $STUNNEL_EXTRA_SVC_OPTS_USER
 
 END
+
 fi
 
 echo ""
@@ -2114,11 +2314,21 @@ if [ "X$stunnel_exec" = "X" ]; then
 	# pause here to let the user supply a possible passphrase for the
 	# mycert key:
 	if [ "X$mycert" != "X" ]; then
-		sleep 1
-		echo ""
-		echo "(** pausing for possible certificate passphrase dialog **)"
-		echo ""
-		sleep 4
+		nsl=10
+		dsl=0
+		if [ ! -f $mycert ]; then
+			dsl=0
+		elif grep -i 'Proc-Type.*ENCRYPTED' "$mycert" > /dev/null 2>/dev/null; then
+			dsl=1
+		fi
+		if [ "X$dsl" = "X1" ]; then
+			echo ""
+			echo "(** pausing $nsl secs for possible certificate passphrase dialog **)"
+			echo ""
+			sleep $nsl
+			echo "(** done pausing for passphrase **)"
+			echo ""
+		fi
 	fi
 	#echo T sleep 1
 	sleep 1
@@ -2133,7 +2343,7 @@ if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
 fi
 echo "Running viewer:"
 if [ "X$reverse" = "X" ]; then
-	vnc_hp=localhost:$N
+	vnc_hp=$localhost:$N
 	if [ "X$stunnel_exec" != "X" ]; then
 		vnc_hp="exec=$STUNNEL $tmp_cfg"
 	fi
@@ -2163,8 +2373,18 @@ else
 	trap "final" 0 2 15
 	echo ""
 	if [ "X$proxy" != "X" ]; then
-		PPROXY_REVERSE="localhost:$port"; export PPROXY_REVERSE
-		PPROXY_SLEEP=1; export PPROXY_SLEEP;
+		if echo "$proxy" | grep -i '^vencrypt:' > /dev/null; then
+			pstunnel=`echo "$proxy" | awk -F: '{print $2}'`
+			plisten=`echo "$proxy" | awk -F: '{print $3}'`
+			PPROXY_LISTEN="INADDR_ANY:$plisten"; export PPROXY_LISTEN
+			PPROXY_PROXY="vencrypt://$localhost:$pstunnel"; export PPROXY_PROXY
+			PPROXY_DEST="$localhost:$pstunnel"; export PPROXY_DEST
+			STUNNEL_ONCE=1; export STUNNEL_ONCE
+			STUNNEL_MAX_CLIENTS=1; export STUNNEL_MAX_CLIENTS
+		else
+			PPROXY_REVERSE="$localhost:$port"; export PPROXY_REVERSE
+			PPROXY_SLEEP=1; export PPROXY_SLEEP;
+		fi
 		PPROXY_KILLPID=+1; export PPROXY_KILLPID;
 		$ptmp &
 	fi

@@ -158,6 +158,8 @@ dir=`dirname "$f"`
 PATH="$dir:$PATH"
 SSVNC_BASEDIR="$dir"
 export SSVNC_BASEDIR
+SSVNC_BASEDIRNAME="$dir/$name"
+export SSVNC_BASEDIRNAME
 SSVNC_UNAME="$name"
 export SSVNC_UNAME
 

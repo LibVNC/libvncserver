@@ -3,12 +3,12 @@
 exec wish "$0" "$@"
 
 #
-# Copyright (c) 2006-2008 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2006-2009 by Karl J. Runge <runge@karlrunge.com>
 #
 # ssvnc.tcl: gui wrapper to the programs in this
 # package. Also sets up service port forwarding.
 #
-set version 1.0.22
+set version 1.0.23
 
 set buck_zero $argv0
 
@@ -148,8 +148,8 @@ proc ts_help {} {
     
     Then click on "Connect".
 
-    Once the SSH is running (you may need to type a password
-    in the terminal window that pops up), the TightVNC Viewer (Or
+    Once the SSH is running (you may need to type a password in the
+    terminal window that pops up), the TightVNC Viewer (Or perhaps
     Chicken-of-the-VNC on Mac OS X) will be automatically started directed
     to the local port of the SSH tunnel which, in turn, encrypts and
     redirects the connection to the remote VNC server.
@@ -268,7 +268,7 @@ proc ts_help {} {
 
            - VNC Shared          (optional traditional VNC sharing)
            - Multiple Sessions   (more than 1 session per server)
-           - X Login             (Connect to Login/Greeter Display)
+           - X Login Greeter     (Connect to Login/Greeter Display)
            - Other VNC Server    (redirect to 3rd party VNC Server)
            - Use unixpw          (optional x11vnc login mode)
            - Client 8bit Color   (VNC Viewer requests low color mode)
@@ -362,8 +362,8 @@ proc help {} {
     Then click on "Connect".  When you do the STUNNEL program will be started
     locally to provide you with an outgoing SSL tunnel.
 
-    Once the STUNNEL is running, the TightVNC Viewer (Or Chicken of the
-    VNC on Mac OS X, or one you set under Options) will be automatically
+    Once the STUNNEL is running, the TightVNC Viewer (Or perhaps Chicken of
+    the VNC on Mac OS X, or one you set under Options) will be automatically
     started and directed to the local port of the SSL tunnel which, in turn,
     encrypts and redirects the connection to the remote VNC server.
 
@@ -405,17 +405,18 @@ proc help {} {
 
  VNC Password:
 
-    On Unix or MacOSX *IF* there is a VNC password for the server you can
+    On Unix or MacOSX IF there is a VNC password for the server you can
     enter it in the "VNC Password:" entry box.
 
-    This is *REQUIRED* on MacOSX when Chicken of the VNC is used, because does
-    not put up a user password prompt when it learns that a password is needed.
+    This is *REQUIRED* on MacOSX when Chicken of the VNC is used, because
+    that viewer does not put up a user password prompt when it learns
+    that a password is needed.
 
     On Unix (including MacOSX using the X11 viewer) if you choose not to
     enter the password you will simply be prompted for it in the terminal
     window running TightVNC viewer if one is required.
 
-    On Windows TightVNC viewer should prompt you when a password is required.
+    On Windows TightVNC viewer will prompt you if a password is required.
 
     NOTE: when you Save a VNC profile, the password is NOT saved (you need
     to enter it each time).
@@ -443,25 +444,14 @@ proc help {} {
     see the Tips 3 and 9 for more about the URL-like syntax.
 
 
- SSL/TLS Variants; VeNCrypt and TLSVNC:
-
-    SSVNC can also connect to VNC specific SSL/TLS variants; namely the
-    VeNCrypt and 'TLS'  VNC Security types.  Vino uses the latter, and
-    a growing number use the former.  On Unix and Mac OS X, when "Verify
-    All Certs" is enabled, it applies heuristics to detect the protocol,
-    and switches to SSL/TLS at the right time.  To improve the accuracy
-    and speed with which this takes place, you can specify the one or both
-    of the 'Server uses VeNCrypt SSL/TLS encryption' and 'Server uses
-    Anonymous Diffie-Hellman' in the 'Unix ssvncviewer' options panel.
-    See its Help for more info.
-
-
  SSL Certificate Verification:
 
-    ***IMPORTANT***: If you do not take the steps to VERIFY the VNC Server's
+    *** IMPORTANT ***: If you do not take the steps to VERIFY the VNC Server's
     SSL Certificate, you are in principle vulnerable to a Man-In-The-Middle
     attack.  Without SSL Certificate verification, only passive network
-    sniffing attacks will be guaranteed to be prevented.
+    sniffing attacks will be guaranteed to be prevented.  There are hacker
+    tools like dsniff/webmitm and cain that implement SSL Man-In-The-Middle
+    attacks.  They rely on the client user not bothering to check the cert.
 
     You can use the "Fetch Cert" button to retrieve the Cert and then
     after you check it is OK (say, via comparing the MD5 or other info)
@@ -483,6 +473,24 @@ proc help {} {
     and/or VNC client Certs, that can be used instead and avoids the need to
     manually verify every cert while still authenticating every connection.
     More info: http://www.karlrunge.com/x11vnc/#faq-ssl-ca
+
+    See the cmdline option -cacert file below in 'SSL Certificates'
+    for setting a default ServerCert/CA Cert.
+
+
+ SSL/TLS Variants; VeNCrypt and ANONTLS:
+
+    SSVNC can also connect to VNC specific SSL/TLS variants; namely the
+    VeNCrypt and "TLS" VNC Security types.  Vino uses the latter (we call it
+    "ANONTLS" in ssvnc and x11vnc because that describes it more accurately),
+    and a growing number use VeNCrypt.
+
+    On Unix and Mac OS X, when "Verify All Certs" is enabled, it applies
+    heuristics to detect the protocol, and switches to SSL/TLS at the right time.
+    To improve the accuracy and speed with which this takes place, you can
+    specify the one or both of the 'Server uses VeNCrypt SSL/TLS encryption'
+    and 'Server uses Anonymous Diffie-Hellman' in the 'Advanced' options panel.
+    See its Help for more info.
 
 
  Deciphering SSL Negotiation Success or Failure:
@@ -593,6 +601,11 @@ proc help {} {
 
     Certificate verification is needed to prevent Man-In-The-Middle attacks;
     if it is not done then only passive network sniffing attacks are prevented.
+    There are hacker tools like dsniff/webmitm and cain that implement SSL
+    Man-In-The-Middle attacks.  They rely on the client user not bothering to
+    check the cert.
+
+
     See the x11vnc documentation:
 
            http://www.karlrunge.com/x11vnc/ssl.html
@@ -622,6 +635,20 @@ proc help {} {
     To have "Verify All Certs" toggled off at startup, use "ssvnc -nv" or
     set SSVNC_NO_VERIFY_ALL=1 before starting.  If you do not even want to
     see the button, use "ssvnc -nvb" or SSVNC_NO_VERIFY_ALL_BUTTON=1.
+
+    Use the "-mycert file" option (same as "-cert file") to set a default
+    MyCert.  This is the same as "mycert=file" (also "cert=file") in the
+    ~/.ssvncrc file.  See Certs -> Help for more info.
+
+    Use the "-cacert file" option (same as "-ca file") to set a default
+    ServerCert (or CA).  This is the same as "cacert=file" (also "ca=file")
+    in the ~/.ssvncrc file.  See Certs -> Help for more info.
+
+    Use the "-crl file" option to set a default CRL File.  This is the same
+    as "crl=file" in the ~/.ssvncrc file.  See Certs -> Help for more info.
+
+    Prefix any of these files with "FORCE:" to make them immutable.
+
 
 
  More Options:
@@ -658,8 +685,10 @@ proc help {} {
     Tray (right click on dark green icon) and selecting "Exit".
 
     If you want SSVNC to always kill STUNNEL automatically, run with the
-    '-killstunnel' (also '-skill') command line option or set it under Options.
-    You can also set killstunnel=1 in ssvnc_rc.
+    '-killstunnel' command line option or set it under Options.  You can also
+    set killstunnel=1 in ssvnc_rc.  Recently (1/2009) this option has been
+    enabled by default, so use -nokillstunnel and killstunnel=0 to disable
+    it in general, or uncheck the option for the next connection.
 
 
  Untrusted Local Users:
@@ -712,15 +741,19 @@ proc help {} {
     This is not true if the system installed stunnel(8) is used and is
     not true when using SSVNC on Windows.
 
-    The following are two experimental features that are added to SSVNC
-    to improve the situation for the SSL/stunnel case.  Set them via
-    Options -> Advanced -> "STUNNEL Local Port Protections".
+    The following are experimental features that are added to SSVNC to
+    improve the situation for the SSL/stunnel and SSH cases.  Set them
+    via Options -> Advanced -> "STUNNEL Local Port Protections" or
+    "SSH Local Port Protections".
+
+    STUNNEL:
 
     1) For SSL tunnelling with stunnel(8) on Unix there is a setting
        'Use stunnel EXEC mode' that will try to exec(2) stunnel
        instead of using a listening socket.  This will require using
        the specially modified vncviewer unix viewer provided by SSVNC.
        The mode works well and is currently set as the default.
+       Disable it if it causes problems or conflicts.
 
     2) For SSL tunnelling with stunnel(8) on Unix there is a setting
        'Use stunnel IDENT check' (experimental) to limit socket
@@ -729,11 +762,19 @@ proc help {} {
        your local IDENT check service; if he has you have much bigger
        problems to worry about...)
 
-    There is also one simple LD_PRELOAD trick for SSH to limit the number
-    of accepted port redirection connections.  This makes the window of
-    time the untrusted local user can connect to the tunnel much smaller.
-    Enable it via Options -> Advanced -> "SSH Local Port Protections".
-    You will need to have the lim_accept.so file in your SSVNC package.
+       Neither of the above methods are available on Windows.
+
+    SSH:
+
+    1) There is also a simple LD_PRELOAD trick for SSH to limit the
+       number of accepted port redirection connections.  This makes the
+       window of time the untrusted local user can connect to the tunnel
+       much smaller.  Enable it via Options -> Advanced -> "SSH Local
+       Port Protections".  You will need to have the lim_accept.so file
+       in your SSVNC package.  The mode works well and is currently set
+       as the default.  Disable it if it causes problems or conflicts.
+
+       The above method is not available on Windows.
 
     The main message is to 'Watch your Back' when you connect via the
     SSVNC tunnels and there are users you don't trust on your workstation.
@@ -1293,13 +1334,35 @@ proc help {} {
 
         noenc=1  (same as the -noenc option for a 'No Encryption' button)
 
-        killstunnel=1 (same as -killstunnel, on Windows automatically kills
-        the STUNNEL process when the viewer exits.
+        killstunnel=1 (same as -killstunnel), on Windows automatically kills
+        the STUNNEL process when the viewer exits.  Disable via killstunnel=0
+        and -nokillstunnel.
+
+        cotvnc=1 have the default vncviewer on Mac OS X be the Chicken of
+        the VNC.  By default the included ssvnc X11 vncviewer is used
+        (requires Mac OS X X11 server to be running.)
+
+        mycert=file (same as -mycert file option).  Set your default MyCert
+        to "file".  If file does not exist ~/.vnc/certs/file is used.
+
+        cacert=file (same as -cacert file option).  Set your default ServerCert
+        to "file".  If file does not exist ~/.vnc/certs/file is used.  If
+        file is "CA" then ~/.vnc/certs/CA/cacert.pem is used.
+
+        crl=file (same as -crl file option).  Set your default CRL File
+        to "file".  If file does not exist ~/.vnc/certs/file is used.
+
+        Prefix any of these with "FORCE:" to make them immutable, e.g.
+        "cacert=FORCE:CA".
 
     16) On Unix you can make the "Open File" and "Save File" dialogs
         bigger by setting the env. var. SSVNC_BIGGER_DIALOG=1 or
         supplying the -bigger option.  If you set it to a Width x Height,
         e.g. SSVNC_BIGGER_DIALOG=500x200, that size will be used.
+
+    17) On Unix / MacOSX to enable debug output you can set these env.
+        vars to 1: SSVNC_STUNNEL_DEBUG, SSVNC_VENCRYPT_DEBUG, and
+        SS_DEBUG (very verbose)
 }
 
 	global version
@@ -1453,7 +1516,7 @@ proc ssvnc_escape_help {} {
 proc help_certs {} {
 	toplev .ch
 
-	scroll_text_dismiss .ch.f 90 33
+	scroll_text_dismiss .ch.f 87 33
 
 	center_win .ch
 	wm resizable .ch 1 0
@@ -1463,9 +1526,12 @@ proc help_certs {} {
 	set msg {
  Description:
 
-    ***IMPORTANT***: Only with SSL Certificate verification (either manually or
-    via a Certificate Authority certificate) can Man-In-The-Middle attacks be
+    *** IMPORTANT ***: Only with SSL Certificate verification (either manually
+    or via a Certificate Authority certificate) can Man-In-The-Middle attacks be
     prevented.  Otherwise, only passive network sniffing attacks are prevented.
+    There are hacker tools like dsniff/webmitm and cain that implement SSL
+    Man-In-The-Middle attacks.  They rely on the client user not bothering to
+    check the cert.
 
     The SSL Certificate files described below may have been created externally
     (e.g. by x11vnc or openssl): you can import them via "Import Certificate".
@@ -1474,15 +1540,15 @@ proc help_certs {} {
     distribute one of the generated files to the VNC Server).
 
     Then you associate the Saved cert with the VNC server, see the panel entry
-    box description below, and then Connect.  You will usually want to Save this
-    association in a VNC Server profile for the next time you connect.
+    box description below.  Then click Connect.  You will usually want to Save
+    this association in a VNC Server profile for the next time you connect.
 
  Expiration:
 
     SSL Certificates will Expire after a certain period (usually 1-2 years;
     if you create a cert with this tool you can set it to any length you want).
     So if for a particular Cert you find you can no longer connect, check the
-    STUNNEL log output to see if the cert has expired.  Then create a new one. 
+    STUNNEL log output to see if the cert has expired.  Then create a new one.
 
  Fetch Cert:
 
@@ -1515,8 +1581,12 @@ proc help_certs {} {
     button, use "ssvnc -nvb" or SSVNC_NO_VERIFY_ALL_BUTTON=1.
 
     Note: "Fetch Cert" and "Verify All Certs" do not currently work in "SSH +
-    SSL" mode.  In this case to have server authentication "ServerCert" must be
-    set explicitly to a file (or "CertDir" to a directory).
+    SSL" mode.  In this case to have server authentication "ServerCert" must
+    be set explicitly to a file (or "CertsDir" to a directory).  
+
+    Also note that "Fetch Cert" only works in a limited fashion in "Listen"
+    mode (it is the VNC Server that initiates the connection), and so you
+    may need to be set via "ServerCert" as well.
 
  CA:
 
@@ -1534,17 +1604,17 @@ proc help_certs {} {
  Now what goes into the panel's entry boxes is described.
 
 
- Your Certificate + Key:
+ Your Certificate + Key (MyCert):
 
-    You can specify YOUR own SSL certificate (PEM) file in "MyCert" in which case it
-    is used to authenticate YOU (the viewer) to the remote VNC Server.  If this fails
-    the remote VNC Server will drop the connection.
+    You can specify YOUR own SSL certificate (PEM) file in "MyCert" in which
+    case it is used to authenticate YOU (the viewer) to the remote VNC Server.
+    If this fails the remote VNC Server will drop the connection.
 
     So the Server could use this method to authenticate Viewers instead of the
     more common practice of using a VNC password or x11vnc's -unixpw mode.
 
 
- Server Certificates:
+ Server Certificates (ServerCert/CertsDir):
     
     Server certs can be specified in one of two ways:
     
@@ -1562,15 +1632,16 @@ proc help_certs {} {
 
     See stunnel(8) or www.stunnel.org for more information.
     
-    If the remote VNC Server fails to authenticate itself with respect to the specified
-    certificate(s), then the VNC Viewer (your side) will drop the connection.
+    If the remote VNC Server fails to authenticate itself with respect to the
+    specified certificate(s), then the VNC Viewer (your side) will drop the
+    connection.
 
-    Select which file or directory by clicking on the appropriate "Browse..."  button.
-    Once selected, if you click Info or the Right Mouse button on "Browse..."
-    then information about the certificate will be displayed.
+    Select which file or directory by clicking on the appropriate "Browse..."
+    button.  Once selected, if you click Info or the Right Mouse button on
+    "Browse..."  then information about the certificate will be displayed.
 
-    If, as is the default, "CertsDir" is set to the token "ACCEPTED_CERTS" (and
-    "ServerCert" is unset) then the certificates accumulated in the special
+    If, as is the default, "CertsDir" is set to the token "ACCEPTED_CERTS"
+    (and "ServerCert" is unset) then the certificates accumulated in the special
     'Accepted Certs' directory will be used.  "ACCEPTED_CERTS" is the default for
     every server ("Verify All Certs").  Note that if you ever need to clean this
     directory, each cert is saved in two files, for example:
@@ -1585,6 +1656,27 @@ proc help_certs {} {
     dialog should automatically find the matching one for you and prompt you to
     remove it as well.
 
+ Certificate Revocation List (CRL File):
+
+    For large scale deployments, usually involving a CA Cert, it is worthwhile
+    to be able to revoke individual certs (so that a new CA cert does not need to
+    be created and new keys distributed).  Set CRL File to the path to the
+    file containing the revoked certificates (or a directory containing 
+    OpenSSL style hash-based filenames.)  See the x11vnc -sslCRL documentation
+    for how to create CRL's.  In short, the commands 'openssl ca -revoke ...'
+    and 'openssl ca -gencrl ...' are the ones to look for; See the ca(1) manpage.
+
+ Create Certificate:
+
+    A simple dialog to create a Self-Signed Certificate.  See the x11vnc
+    -sslGenCA, -sslGenCert options for creating a CA Cert and signing with it.
+
+ Import Certificate:
+
+    You can paste in Certificate or read one in from a file to add to your
+    list of Server Certificates.  If (also) saved in the 'Accepted Certs'
+    directory, it will be automatically used to verify any Server when in
+    'Verify All Certs' Mode. 
 
  Deleting Certificates:
 
@@ -1592,6 +1684,32 @@ proc help_certs {} {
     and select one in the menu.  You will be prompted to remove it,
     and also any corresponding .pem or .crt file.  For "ACCEPTED_CERTS"
     it will find the matching "HASH" file and prompt you to remove that too.
+
+
+ Default Certs and Keys:
+
+    Use the "-mycert file" option (same as "-cert file") to set a default
+    MyCert.  The user will then have to manually clear the field to not
+    use a certificate.  This is the same as "mycert=file" (also "cert=file")
+    in the ~/.ssvncrc file.  If "file" does not exist, then ~/.vnc/certs is
+    prepended to it.
+
+    Use the "-cacert file" option (same as "-ca file") to set a default
+    ServerCert.  The user will then have to manually clear the field to not
+    set a server cert.  This is the same as "cacert=file" (also "ca=file")
+    in the ~/.ssvncrc file.  If "file" does not exist, then ~/.vnc/certs is
+    prepended to it.  Use "-cacert CA" to set it to ~/.vnc/certs/CA/cacert.pem
+
+    Use the "-crl file" option to set a default CRL File.  The user will
+    then have to manually clear the field to not use a CRL.  This is the
+    same as "crl=file" in the ~/.ssvncrc file.  If "file" does not exist,
+    then ~/.vnc/certs is prepended to it.
+
+    A sys-admin might set up an SSVNC deployment for user's workstations or
+    laptops using one or more of -cacert (authenticate VNC server to the
+    user) or -mycert (authenticate user to VNC server) or -crl (supply a
+    list of revoked certificates).  Prefix either one with "FORCE:" to make
+    the setting unchangable.
 
 
  Notes:
@@ -1610,13 +1728,14 @@ proc help_certs {} {
         x11vnc -ssl SAVE ...
 
     and then copy the Server certificate to the local (viewer-side) machine.
-    x11vnc prints out to the screen the Server certificate it generates.  You can
-    set "ServerCert" to it directly or use the "Import Certificate" action to
-    save it to a file.  Or use the "Fetch Cert" method to retrieve it (be sure
-    to verify the MD5 fingerprint, etc).
+    x11vnc prints out to the screen the Server certificate it generates
+    (stored in ~/.vnc/certs/server.crt).  You can set "ServerCert" to it
+    directly or use the "Import Certificate" action to save it to a file.
+    Or use the "Fetch Cert" method to retrieve it (be sure to verify the
+    MD5 fingerprint, etc).
 
     x11vnc also has command line utilities to create server, client, and CA
-    (Certificate Authority) certificates.  See the above URLs.
+    (Certificate Authority) certificates and sign with it. See the above URLs.
 }
 
 	.ch.f.t insert end $msg
@@ -1651,7 +1770,7 @@ set msg {
 
  Desktop Size:
 
-    The default size of remote Desktop type is the "1024x768" with a
+    The default size of remote Desktop type is the "1280x1024" with a
     Color depth of 16 bits per pixel (BPP).  Choose one of the standard
     WxH values or enter a custom one (TBD).
 
@@ -1686,7 +1805,7 @@ set msg {
 
     This sets up a SSH port redirection for you from your remote session
     to your local print server.  The CUPS mechanism is used.  The local
-    print server can also be SMB/Windows (not fully functional yet).
+    print server can also be SMB/Windows.
 
  Enable Sound:
 
@@ -1741,7 +1860,7 @@ set msg {
     X session on a single machine, this option lets you create Tags for
     multiple ones (e.g. KDE_BIG, TWM_800x600)
 
- X Login:
+ X Login Greeter:
 
     If you have root (sudo(1)) permission on the remote machine,
     you can have x11vnc try to connect to X displays that have nobody
@@ -2071,13 +2190,23 @@ set msg {
                            The Xquartz X server must be installed (it is by
                            default on 10.5.x) and the DISPLAY variable must
                            be set (see Tip 12 of Help to do this manually.)
+                           Put cotvnc=1 in ~/.ssvncrc to switch the default.
 
   Kill Stunnel Automatically:
                            On Windows, automatically try to kill the STUNNEL
                            process when the VNC Viewer exits.  This is a
-                           global setting; it can be also set via either the
-                           -killstunnel cmdline option, or killstunnel=1
-                           in ssvnc_rc
+                           global setting (not per-profile); it can be also
+                           set via either the -killstunnel cmdline option,
+                           or killstunnel=1 in ssvnc_rc.  To disable it supply
+                           -nokillstunnel or put killstunnel=0 in ssvnc_rc.
+                           As of 1/2009 this option is on by default.
+
+                           The main drawback to having STUNNEL automatically
+                           killed is that you will not be able to view its
+                           logfile.  If you are having trouble connecting via
+                           SSL, disable this option and double click on the
+                           dark green STUNNEL icon in the tray to view the log.
+
 
   Compress Level/Quality:  Set TightVNC encoding parameters.
 
@@ -2113,7 +2242,7 @@ set msg {
 
   Buttons:
                 
-  Clear Options:   Set all options to their defaults (i.e. unset).
+  Use Defaults:    Set all options to their defaults (i.e. unset).
 
   Delete Profile:  Delete a saved profile.
 
@@ -2323,7 +2452,7 @@ proc win9x_plink_msg {file} {
 }
 
 proc mesg {str} {
-	set maxx 53
+	set maxx 54
 	if {[string length $str] > $maxx} {
 		set str [string range $str 0 $maxx]
 		append str " ..."
@@ -2467,7 +2596,7 @@ proc ts_x11vnc_cmd {} {
 	set cmd "$cmd -env FD_SESS=$sess";
 
 	if {$choose_desktop_geom} {
-		set geom 1024x768
+		set geom "1280x1024"
 		set dep 16
 		global ts_desktop_size_def ts_desktop_depth_def
 		if {$ts_desktop_size_def != ""} {
@@ -2501,7 +2630,8 @@ proc ts_x11vnc_cmd {} {
 		set cmd "$cmd $ts_x11vnc_opts";
 	}
 	if {$ts_xlogin} {
-		regsub {PORT=} $cmd "PORT= sudo" cmd
+		regsub {PORT= } $cmd "PORT= sudo " cmd
+		regsub {P= } $cmd "P= sudo " cmd
 		regsub { -o [^ ][^ ]*} $cmd "" cmd
 		
 		set cmd "$cmd -env FD_XDM=1";
@@ -2511,15 +2641,15 @@ proc ts_x11vnc_cmd {} {
 }
 
 proc set_defaults {} {
-	global defs
+	global defs env
 
-	global mycert svcert crtdir
+	global mycert svcert crtdir crlfil
 	global use_alpha use_grab use_ssl use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global disable_all_encryption
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality use_x11_macosx
 	global compresslevel_text quality_text
 	global use_cups use_sound use_smbmnt
-	global cups_local_server cups_remote_port cups_manage_rcfile cups_x11vnc
+	global cups_local_server cups_remote_port cups_manage_rcfile ts_cups_manage_rcfile cups_x11vnc
 	global cups_local_smb_server cups_remote_smb_port
 	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
 	global choose_xserver ts_xserver_type choose_desktop ts_desktop_type ts_unixpw ts_vncshared
@@ -2529,7 +2659,7 @@ proc set_defaults {} {
 	global choose_ncache ts_ncache choose_multisession ts_multisession
 	global ts_mode ts_desktop_size ts_desktop_depth choose_desktop_geom
 	global additional_port_redirs additional_port_redirs_list
-	global stunnel_local_protection stunnel_local_protection_type ssh_local_protection multiple_listen
+	global stunnel_local_protection stunnel_local_protection_type ssh_local_protection multiple_listen listen_once
 	global ultra_dsm ultra_dsm_type ultra_dsm_file ultra_dsm_noultra ultra_dsm_salt
 	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_x11vnc sound_daemon_local_start 
@@ -2539,6 +2669,7 @@ proc set_defaults {} {
 	global disable_ssl_workarounds disable_ssl_workarounds_type
 	global server_vencrypt server_anondh
 	global include_list
+	global svcert_default mycert_default crlfil_default
 
 
 	set defs(use_viewonly) 0
@@ -2556,15 +2687,23 @@ proc set_defaults {} {
 	set defs(server_anondh) 0
 	set defs(use_grab) 0
 	set defs(use_nojpeg) 0
-	set defs(use_x11_macosx) 0
+	set defs(use_x11_macosx) 1
+	if [info exists env(SSVNC_COTVNC)] {
+		if {$env(SSVNC_COTVNC) != 0} {
+			set defs(use_x11_macosx) 0
+		}
+	} elseif {![info exists env(DISPLAY)]} {
+		set defs(use_x11_macosx) 0
+	}
 	set defs(use_compresslevel) "default"
 	set defs(use_quality) "default"
 	set defs(compresslevel_text) "Compress Level: default"
 	set defs(quality_text) "Quality: default"
 
-	set defs(mycert) ""
-	set defs(svcert) ""
+	set defs(mycert) $mycert_default
+	set defs(svcert) $svcert_default
 	set defs(crtdir) "ACCEPTED_CERTS"
+	set defs(crlfil) $crlfil_default
 
 	set defs(use_cups) 0
 	set defs(use_sound) 0
@@ -2596,7 +2735,8 @@ proc set_defaults {} {
 
 	set defs(change_vncviewer) 0 
 	set defs(change_vncviewer_path) "" 
-	set defs(cups_manage_rcfile) 0 
+	set defs(cups_manage_rcfile) 1
+	set defs(ts_cups_manage_rcfile) 0
 	set defs(cups_x11vnc) 0 
 	set defs(vncviewer_realvnc4) 0
 
@@ -2605,8 +2745,9 @@ proc set_defaults {} {
 
 	set defs(stunnel_local_protection) 1
 	set defs(stunnel_local_protection_type) "exec"
-	set defs(ssh_local_protection) 0
+	set defs(ssh_local_protection) 1
 	set defs(multiple_listen) 0
+	set defs(listen_once) 0
 
 	set defs(ultra_dsm) 0
 	set defs(ultra_dsm_file) ""
@@ -2619,7 +2760,7 @@ proc set_defaults {} {
 	set defs(cups_local_smb_server) ""
 	set defs(cups_remote_smb_port) ""
 
-	set defs(smb_su_mode) "su"
+	set defs(smb_su_mode) "sudo"
 	set defs(smb_mount_list) ""
 
 	set defs(sound_daemon_remote_cmd) ""
@@ -3169,9 +3310,9 @@ proc launch_windows_ssh {hp file n} {
 		set vnc_port 5900
 	}
 
-	if {$ts_only || [regexp {^PORT= .*x11vnc} $sshcmd] || [regexp {^P= .*x11vnc} $sshcmd]} {
-		regsub {^PORT=[ 	]*} $sshcmd "" sshcmd
-		regsub {^P=[ 	]*} $sshcmd "" sshcmd
+	if {$ts_only || [regexp {PORT= .*x11vnc} $sshcmd] || [regexp {P= .*x11vnc} $sshcmd]} {
+		regsub {PORT= [ 	]*} $sshcmd "" sshcmd
+		regsub {P= [ 	]*} $sshcmd "" sshcmd
 		set vnc_port [expr "8100 + int(4000 * rand())"]
 		set sshcmd "$sshcmd -rfbport $vnc_port"
 	} elseif {[regexp {^-[0-9][0-9]*$} $vnc_disp]} {
@@ -4096,8 +4237,8 @@ proc smbmnt_wait {tee} {
 				}
 			}
 			set g ""
-			catch {set g [exec grep vnc-helper-exiting $tee]}
-			if [regexp {vnc-helper-exiting} $g] {
+			catch {set g [exec grep main-vnc-helper-finished $tee]}
+			if [regexp {main-vnc-helper-finished} $g] {
 				break
 			}
 			after 1000
@@ -4308,6 +4449,50 @@ proc fetch_cert {save} {
 	global env vncdisplay is_windows
 	set hp [get_vncdisplay]
 
+	global use_listen
+	if {$use_listen} {
+		if {$is_windows} {
+			mesg "Fetch Cert not enabled for Reverse Connections"
+			bell
+			catch {raise .}
+			mac_raise
+			return
+		}
+		toplev .fcr
+		global help_font
+		wm title .fcr "Fetch Cert for Reverse Connections"
+		global fcr_result
+		set fcr_result 0
+		eval text .fcr.t -width 55 -height 14 $help_font
+		.fcr.t insert end {
+   In Reverse VNC Connections (-LISTEN) mode, the
+   Fetch Cert operation requires that the Remote
+   VNC Server makes an initial connection NOW so
+   we can collect its SSL Certificate.
+
+   Do you want to Continue with this operation?
+   If so, press "Continue" and then instruct the
+   remote VNC Server to make a Reverse Connection
+   to us.
+
+   Otherwise, press "Cancel" to cancel the Fetch
+   Cert operation.
+}
+
+		button .fcr.cancel   -text Cancel   -command {set fcr_result 0; destroy .fcr}
+		button .fcr.continue -text Continue -command {set fcr_result 1; destroy .fcr}
+		pack .fcr.t .fcr.continue .fcr.cancel -side top -fill x
+		center_win .fcr
+
+		tkwait window .fcr
+
+		if {$fcr_result != 1}  {
+			return
+		}
+		after 100
+		update idletasks
+	}
+
 	regsub {[ 	]*cmd=.*$} $hp "" tt
 	if {[regexp {^[ 	]*$} $tt]} {
 		mesg "No host:disp supplied."
@@ -4331,16 +4516,19 @@ proc fetch_cert {save} {
 	set hpnew  [get_ssh_hp $hp]
 	set proxy  [get_ssh_proxy $hp]
 
+
+	set pstr 1
 	mesg "Fetching $hpnew Cert..."
 	global cert_text
 	set cert_text ""
 	.f4.getcert configure -state disabled
 	update
-	if {$is_windows} {
-		set cert_text [fetch_cert_windows $hp]
-	} else {
+	if {! $is_windows} {
 		catch {set cert_text [fetch_cert_unix $hp]}
+	} else {
+		set cert_text [fetch_cert_windows $hp]
 	}
+
 if [info exists env(CERTDBG)] {puts "\nFetch-0-\n$cert_text"}
 
 	if {! $is_windows} {
@@ -4350,9 +4538,11 @@ if [info exists env(CERTDBG)] {puts "\nFetch-0-\n$cert_text"}
 			if [regexp {CONNECTED} $cert_text] {
 				if {![regexp -nocase {GET_SERVER_HELLO} $cert_text]
 				  || [regexp -nocase {GET_SERVER_HELLO.*unknown protocol} $cert_text]} {
-					# suspect VeNCrypt or TLSVNC plaintext RFB
+					# suspect VeNCrypt or ANONTLS plaintext RFB
 					set cert_text ""
 					set vencrypt 1
+					incr pstr
+					mesg "#${pstr} Fetching $hpnew Cert..."
 					catch {set cert_text [fetch_cert_unix $hp $vencrypt $anondh]}
 if [info exists env(CERTDBG)] {puts "\nFetch-1-\n$cert_text"}
 				}
@@ -4365,6 +4555,8 @@ if [info exists env(CERTDBG)] {puts "\nFetch-1-\n$cert_text"}
 					# suspect Anonymous Diffie Hellman
 					set cert_text ""
 					set anondh 1
+					incr pstr
+					mesg "#${pstr} Fetching $hpnew Cert..."
 					catch {set cert_text [fetch_cert_unix $hp $vencrypt $anondh]}
 if [info exists env(CERTDBG)] {puts "\nFetch-2-\n$cert_text"}
 				}
@@ -4383,7 +4575,30 @@ if [info exists env(CERTDBG)] {puts "\nFetch-2-\n$cert_text"}
 				}
 			}
 		}
+	} else { 
+		if {![regexp {BEGIN CERTIFICATE} $cert_text]} {
+			if [regexp {CONNECTED} $cert_text] {
+				if {[regexp -nocase {no peer certificate} $cert_text]} {
+					# suspect Anonymous Diffie Hellman
+					set cert_text ""
+					incr pstr
+					mesg "#${pstr} Fetching $hpnew Cert..."
+					catch {set cert_text [fetch_cert_windows $hp 1]}
+				}
+			}
+		}
+		if {![regexp {BEGIN CERTIFICATE} $cert_text]} {
+			if [regexp {CONNECTED} $cert_text] {
+				if {[regexp -nocase {cipher.*ADH} $cert_text]} {
+					# it is Anonymous Diffie Hellman
+					mesg "WARNING: Anonymous Diffie Hellman Server detected"
+					.f4.getcert configure -state normal
+					return $cert_text
+				}
+			}
+		}
 	}
+
 
 	.f4.getcert configure -state normal
 	mesg "Fetched $hpnew Cert"
@@ -4398,6 +4613,32 @@ if [info exists env(CERTDBG)] {puts "\nFetch-2-\n$cert_text"}
 		set cert_text "An Error occurred in fetching $hp\n\n$cert_text"
 		set ok 0
 	} else {
+		if [regexp -- {-----BEGIN SSL SESSION PARAMETERS-----} $cert_text] {
+			set new ""
+			set off 0
+			foreach line [split $cert_text "\n"] {
+				if [regexp -- {RFB 00} $line] {
+					continue
+				}
+				if [regexp -- {Using default temp} $line] {
+					continue
+				}
+				if [regexp -- {-----BEGIN SSL SESSION PARAMETERS-----} $line] {
+					set off 1
+				}
+				if [regexp -- {-----END SSL SESSION PARAMETERS-----} $line] {
+					set off 0
+					continue
+				}
+				if {$off} {
+					continue;
+				}
+				append new "$line\n"
+			}
+			if [regexp -- {-----BEGIN CERTIFICATE-----} $new] {
+				set cert_text $new
+			}
+		}
 		set text "" 
 		set on 0
 		foreach line [split $cert_text "\n"] {
@@ -4465,6 +4706,7 @@ proc fetch_dialog {cert_text hp hpnew ok n} {
 }
 
 proc get_vencrypt_proxy {hpnew} {
+	set hpnew  [get_ssh_hp $hpnew]
 	set list [split $hpnew ":"] 
 	set h [lindex $list 0]
 	set p [lindex $list 1]
@@ -4473,11 +4715,14 @@ proc get_vencrypt_proxy {hpnew} {
 		set hp2 "$hp2:[expr - $p]"
 	} elseif {$p < 200} {
 		set hp2 "$hp2:[expr $p + 5900]"
+	} else {
+		set hp2 "$hp2:$p"
 	}
 	return "vencrypt://$hp2"
 }
 
 proc fetch_cert_unix {hp {vencrypt 0} {anondh 0}} {
+	global use_listen
 	set hpnew  [get_ssh_hp $hp]
 	set proxy  [get_ssh_proxy $hp]
 	if {$vencrypt} {
@@ -4498,12 +4743,8 @@ proc fetch_cert_unix {hp {vencrypt 0} {anondh 0}} {
 		lappend cmd "-proxy"
 		lappend cmd $proxy
 	}
-	if {0} {
-		global mycert
-		if {$mycert != ""} {
-			lappend cmd "-mycert"
-			lappend cmd $mycert
-		}
+	if {$use_listen} {
+		lappend cmd "-listen"
 	}
 	lappend cmd "-showcert"
 	lappend cmd $hpnew
@@ -4511,11 +4752,13 @@ proc fetch_cert_unix {hp {vencrypt 0} {anondh 0}} {
 	if {$proxy != ""} {
 		lappend cmd "2>/dev/null"
 	}
+	global env
+if [info exists env(CERTDBG)] {puts "\nFetch-cmd: $cmd"}
 
 	return [eval exec $cmd]
 }
 
-proc fetch_cert_windows {hp} {
+proc fetch_cert_windows {hp {anondh 0}} {
 
 	regsub {^vnc.*://} $hp "" hp
 
@@ -4613,8 +4856,11 @@ proc fetch_cert_windows {hp} {
 
 	if {1} {
 		set ph ""
-		set ph [open "| $ossl s_client -prexit -connect $host:$port < $tin 2>NUL" "r"]
-#		set ph [open "| $ossl s_client -prexit -connect $host:$port" "r"]
+		if {$anondh} {
+			set ph [open "| $ossl s_client -prexit -connect $host:$port -cipher ALL:RC4+RSA:+SSLv2:@STRENGTH < $tin 2>NUL" "r"]
+		} else {
+			set ph [open "| $ossl s_client -prexit -connect $host:$port < $tin 2>NUL" "r"]
+		}
 
 		set text ""
 		if {$ph != ""} {
@@ -4645,17 +4891,25 @@ proc fetch_cert_windows {hp} {
 	} else {
 		set pids ""
 
-if {1} {
-		set ph2 [open "| $ossl s_client -prexit -connect $host:$port > $tou 2>NUL" "w"]
-		set pids [pid $ph2]
-		after 500
-		for {set i 0} {$i < 128} {incr i} {
-			puts $ph2 "Q"
+		if {1} {
+			if {$anondh} {
+				set ph2 [open "| $ossl s_client -prexit -connect $host:$port -cipher ALL:RC4+RSA:+SSLv2:@STRENGTH > $tou 2>NUL" "w"]
+			} else {
+				set ph2 [open "| $ossl s_client -prexit -connect $host:$port > $tou 2>NUL" "w"]
+			}
+			set pids [pid $ph2]
+			after 500
+			for {set i 0} {$i < 128} {incr i} {
+				puts $ph2 "Q"
+			}
+			catch {close $ph2}
+		} else {
+			if {$anondh} {
+				set pids [exec $ossl s_client -prexit -connect $host:$port -cipher ALL:RC4+RSA:+SSLv2:@STRENGTH < $tin >& $tou &]
+			} else {
+				set pids [exec $ossl s_client -prexit -connect $host:$port < $tin >& $tou &]
+			}
 		}
-		catch {close $ph2}
-} else {
-		set pids [exec $ossl s_client -prexit -connect $host:$port < $tin >& $tou &]
-}
 
 		for {set i 0} {$i < 10} {incr i} {
 			after 500
@@ -4696,9 +4950,15 @@ if {1} {
 proc check_accepted_certs {} {
 	global cert_text always_verify_ssl
 	global skip_verify_accepted_certs use_listen
-	global ultra_dsm
+	global ultra_dsm server_anondh
 
 	if {! $always_verify_ssl} {
+		set skip_verify_accepted_certs 1
+		return 1
+	}
+	if {$server_anondh} {
+		mesg "WARNING: Anonymous Diffie Hellman (SKIPPING CERT CHECK)"
+		after 2000
 		set skip_verify_accepted_certs 1
 		return 1
 	}
@@ -4709,14 +4969,6 @@ proc check_accepted_certs {} {
 		return 1;
 	}
 
-	global server_anondh
-	if {$server_anondh} {
-		mesg "WARNING: Anonymous Diffie Hellman (skipping cert check)"
-		after 1000
-		set skip_verify_accepted_certs 1
-		return 1
-	}
-
 	global anon_dh_detected
 	set anon_dh_detected 0
 	global vencrypt_detected
@@ -4725,7 +4977,7 @@ proc check_accepted_certs {} {
 	set cert_text [fetch_cert 0]
 
 	if {[regexp -nocase {cipher.*ADH} $cert_text]} {
-		set msg "Anonymous Diffie-Hellman server detected.\nThere can be no SSL/TLS authentication. Continue?"
+		set msg "Anonymous Diffie-Hellman server detected.\nThere will be encryption, but no\nSSL/TLS authentication. Continue?"
 		set reply [tk_messageBox -type okcancel -icon warning -message $msg -title "Anonymous Diffie-Hellman Detected"]
 		set anon_dh_detected 1
 		if {$reply == "cancel"} {
@@ -5211,6 +5463,72 @@ proc check_for_listen_ssl_cert {} {
 	return 0
 }
 
+proc listen_verify_all_dialog {hp} {
+	global use_listen always_verify_ssl
+	global did_listen_verify_all_dialog
+	global svcert
+	global sshssl_sw
+
+	if {!$use_listen} {
+		return 1
+	}
+	if {!$always_verify_ssl} {
+		return 1
+	}
+	if {$svcert != ""} {
+		return 1
+	}
+	if [regexp -nocase {^vnc://} $hp] {
+		return 1
+	}
+	if [info exists sshssl_sw] {
+		if {$sshssl_sw == "none"} {
+			return 1
+		}
+		if {$sshssl_sw == "ssh"} {
+			return 1
+		}
+	}
+	if [info exists did_listen_verify_all_dialog] {
+		return 1
+	}
+
+	toplev .lvd
+	global help_font
+	wm title .lvd "Verify All Certs for Reverse Connections"
+	eval text .lvd.t -width 55 -height 21 $help_font
+	.lvd.t insert end {
+  Information: 
+
+    You have the 'Verify All Certs' option enabled
+    in Reverse VNC Connections (-LISTEN) mode.
+   
+    For this to work, you must have already saved
+    the remote VNC Server's Certificate to the
+    'Accepted Certs' directory.  Otherwise the
+    incoming Reverse connection will be rejected.
+    
+    You can save the Server's Certificate by using
+    the 'Import Certificate' dialog or on Unix
+    and MacOSX by pressing 'Fetch Cert' and then
+    have the Server make an initial connection.
+
+    If you do not want to save the certificate of
+    the VNC Server making the Reverse connection,
+    you must disable 'Verify All Certs' (and so
+    the server authenticity will not be checked.)
+}
+
+	button .lvd.ok   -text OK   -command {destroy .lvd}
+	pack .lvd.t .lvd.ok -side top -fill x
+	center_win .lvd
+
+	tkwait window .lvd
+
+	set did_listen_verify_all_dialog 1
+	return 1
+}
+
 proc reset_stunnel_extra_opts {} {
 	global stunnel_extra_opts0 stunnel_extra_svc_opts0 env
 	global ssvnc_multiple_listen0
@@ -5270,6 +5588,8 @@ proc launch_unix {hp} {
 			direct_connect_msg
 		}
 	}
+
+	listen_verify_all_dialog $hp
 
 	if {! $do_direct} {
 		if {! [check_for_listen_ssl_cert]} {
@@ -5378,17 +5698,6 @@ proc launch_unix {hp} {
 		}
 		set env(SSVNC_ULTRA_DSM) $dsm
 	}
-	if {$ssh_local_protection} {
-		if {![info exists env(LIM_ACCEPT)]} {
-			set env(LIM_ACCEPT) 1
-		}
-		if {![info exists env(LIM_ACCEPT_TIME)]} {
-			set env(LIM_ACCEPT_TIME) 15
-		}
-		set env(SSVNC_LIM_ACCEPT_PRELOAD) "lim_accept.so"
-		mesg "SSH LIM_ACCEPT($env(LIM_ACCEPT),$env(LIM_ACCEPT_TIME)): lim_accept.so"
-		after 1000
-	}
 	if {$multiple_listen && $use_listen} {
 		if [info exists env(SSVNC_MULTIPLE_LISTEN)] {
 			set ssvnc_multiple_listen0 $env(SSVNC_MULTIPLE_LISTEN)
@@ -5397,6 +5706,17 @@ proc launch_unix {hp} {
 	}
 
 	if {$use_ssh || $use_sshssl} {
+		if {$ssh_local_protection} {
+			if {![info exists env(LIM_ACCEPT)]} {
+				set env(LIM_ACCEPT) 1
+			}
+			if {![info exists env(LIM_ACCEPT_TIME)]} {
+				set env(LIM_ACCEPT_TIME) 15
+			}
+			set env(SSVNC_LIM_ACCEPT_PRELOAD) "lim_accept.so"
+			mesg "SSH LIM_ACCEPT($env(LIM_ACCEPT),$env(LIM_ACCEPT_TIME)): lim_accept.so"
+			after 1000
+		}
 		if {$skip_ssh || $ultra_dsm} {
 			set cmd "ss_vncviewer"
 		} elseif {$use_ssh} {
@@ -5405,6 +5725,9 @@ proc launch_unix {hp} {
 			set cmd "ss_vncviewer -sshssl"
 			if {$mycert != ""} {
 				set cmd "$cmd -mycert '$mycert'"
+			}
+			if {$crlfil != ""} {
+				set cmd "$cmd -crl '$crlfil'"
 			}
 			if {$svcert != ""} {
 				set cmd "$cmd -verify '$svcert'"
@@ -5474,6 +5797,7 @@ proc launch_unix {hp} {
 
 
 		set setup_cmds [ugly_setup_scripts post $tag] 
+
 		if {$skip_ssh} {
 			set setup_cmds ""
 		}
@@ -5516,6 +5840,9 @@ proc launch_unix {hp} {
 			set env(SS_VNCVIEWER_SSH_CMD) {$SHELL}
 			set env(SS_VNCVIEWER_SSH_ONLY) 1
 		} elseif {$setup_cmds != ""} {
+			if {$sshcmd == ""} {
+				set sshcmd "sleep 15"
+			}
 			set env(SS_VNCVIEWER_SSH_CMD) "$setup_cmds$sshcmd"
 		} else {
 			if {$sshcmd != ""} {
@@ -5594,6 +5921,9 @@ proc launch_unix {hp} {
 		if {! $do_direct && ! $ultra_dsm && ![regexp -nocase {ssh://} $hpnew]} {
 			if {$mycert != ""} {
 				set cmd "$cmd -mycert '$mycert'"
+			}
+			if {$crlfil != ""} {
+				set cmd "$cmd -crl '$crlfil'"
 			}
 			if {$svcert != ""} {
 				set cmd "$cmd -verify '$svcert'"
@@ -5690,6 +6020,9 @@ proc launch_unix {hp} {
 	}
 	if {$use_listen} {
 		set cmd "$cmd -listen"
+		if {$listen_once} {
+			set cmd "$cmd -onelisten"
+		}
 	}
 
 	global darwin_cotvnc
@@ -6251,7 +6584,7 @@ proc to_ssvnc {} {
 
 proc launch {{hp ""}} {
 	global tcl_platform is_windows
-	global mycert svcert crtdir
+	global mycert svcert crtdir crlfil
 	global pids_before pids_after pids_new
 	global env
 	global use_ssl use_ssh use_sshssl sshssl_sw use_listen disable_ssl_workarounds
@@ -6472,6 +6805,13 @@ proc launch {{hp ""}} {
 				return
 			}
 		}
+		if {$crlfil != ""} {
+			if {! [file exists $crlfil]} {
+				mesg "CRL File does not exist: $crlfil"
+				bell
+				return
+			}
+		}
 	}
 
 	# VF
@@ -6609,6 +6949,8 @@ proc launch {{hp ""}} {
 		after 1000
 	}
 
+	listen_verify_all_dialog $hp
+
 	if {$use_listen && $mycert == ""} {
 		if {! [check_for_listen_ssl_cert]} {
 			return;
@@ -6650,6 +6992,13 @@ proc launch {{hp ""}} {
 		# see above, this should not happen.
 		puts $fh "cert = _nocert_"
 	}
+	if {$crlfil != ""} {
+		if [file isdirectory $crlfil] {
+			puts $fh "CRLpath = $crlfil"
+		} else {
+			puts $fh "CRLfile = $crlfil"
+		}
+	}
 
 	if {$svcert != ""} {
 		if {! [file exists $svcert]} {
@@ -6683,6 +7032,13 @@ proc launch {{hp ""}} {
 			puts $fh "verify = 2"
 		}
 	}
+
+	global anon_dh_detected server_anondh
+	if {$anon_dh_detected || $server_anondh} {
+		puts $fh "ciphers = ALL:RC4+RSA:+SSLv2:@STRENGTH"
+		set anon_dh_detected 0
+	}
+
 
 	if {$n == ""} {
 		set n 10
@@ -7009,12 +7365,13 @@ proc delete_cert {{parent "."}} {
 	if {$f != "" && [file exists $f]} {
 		set reply [tk_messageBox -parent $parent -type yesno -icon question -title "Delete Cert" -message "Delete $f"]
 		if {$reply == "yes"} {
-			global mycert svcert
+			global mycert svcert crlfil
 			set f_text [read_file $f]
 			set f2 "" 
 			catch {file delete $f}	
 			if {$f == $mycert} { set mycert "" }
 			if {$f == $svcert} { set svcert "" }
+			if {$f == $crlfil} { set crlfil "" }
 			if [regexp {\.crt$} $f] {
 				regsub {\.crt$} $f ".pem" f2
 			} elseif [regexp {\.pem$} $f] {
@@ -7026,6 +7383,7 @@ proc delete_cert {{parent "."}} {
 					catch {file delete $f2}	
 					if {$f2 == $mycert} { set mycert "" }
 					if {$f2 == $svcert} { set svcert "" }
+					if {$f2 == $crlfil} { set crlfil "" }
 				}
 			}
 			set dir [file dirname $f]
@@ -7066,6 +7424,24 @@ proc set_mycert {{parent "."}} {
 	}
 	catch {wm deiconify .c}
 	v_mycert
+	update 
+}
+
+proc set_crlfil {{parent "."}} {
+	global crlfil
+	set idir [get_idir_certs $crlfil]
+	set t ""
+	unix_dialog_resize $parent
+	if {$idir != ""} {
+		set t [tk_getOpenFile -parent $parent -initialdir $idir]
+	} else {
+		set t [tk_getOpenFile -parent $parent]
+	}
+	if {$t != ""} {
+		set crlfil $t
+	}
+	catch {wm deiconify .c}
+	v_crlfil
 	update 
 }
 
@@ -7114,6 +7490,55 @@ proc show_cert {crt} {
 	catch {raise $w}
 }
 
+proc show_crl {crl} {
+	if {$crl == ""} {
+		bell
+		return
+	}
+	if {! [file exists $crl]} {
+		bell
+		return
+	}
+
+	set flist [list]
+
+	if [file isdirectory $crl] {
+		foreach cfile [glob -nocomplain -directory $crl "*"] {
+			if [file isfile $cfile] {
+				lappend flist $cfile
+			}
+		}
+	} else {
+		lappend flist $crl
+	}
+
+	set ossl [get_openssl]
+	set info ""
+
+	foreach cfile $flist {
+		catch {
+			set ph [open "| $ossl crl -fingerprint -text -noout -in \"$cfile\"" "r"]
+			while {[gets $ph line] > -1} {
+				append info "$line\n"
+			}
+			close $ph
+			append info "\n"
+		}
+	}
+
+	set w .show_crl
+	toplev $w
+	scroll_text $w.f
+	button $w.b -text Dismiss -command "destroy $w"
+	bind $w <Escape> "destroy $w"
+	$w.f.t insert end $info
+
+	pack $w.b -side bottom -fill x
+	pack $w.f -side top -fill both -expand 1
+	center_win $w
+	catch {raise $w}
+}
+
 proc v_svcert {} {
 	global svcert
 	if {$svcert == "" || ! [file exists $svcert]} {
@@ -7134,6 +7559,16 @@ proc v_mycert {} {
 	return 1
 }
 
+proc v_crlfil {} {
+	global crlfil
+	if {$crlfil == "" || ! [file exists $crlfil]} {
+		catch {.c.crlfil.i configure -state disabled}
+	} else {
+		catch {.c.crlfil.i configure -state normal}
+	}
+	return 1
+}
+
 proc show_mycert {} {
 	global mycert
 	show_cert $mycert
@@ -7142,6 +7577,11 @@ proc show_mycert {} {
 proc show_svcert {} {
 	global svcert
 	show_cert $svcert
+}
+
+proc show_crlfil {} {
+	global crlfil
+	show_crl $crlfil
 }
 
 proc set_svcert {{parent "."}} {
@@ -7882,6 +8322,9 @@ proc do_save {par} {
 
 		global vncdisplay
 		set from [get_ssh_hp $vncdisplay]
+		if [regexp -- {^:[0-9][0-9]*$} $from] {
+			set from "listen$from"
+		}
 		set hp $from
 
 		set from [string tolower $from]
@@ -8130,6 +8573,20 @@ proc save_cert {hp} {
 		button .scrt.save -text "Save" -command {do_save .scrt}
 	}
 
+	global cert_text
+	if [regexp -nocase -- {ACCEPT} $cert_text] {
+		if [regexp -nocase -- {Client certificate} $cert_text] {
+			if [regexp -- {^:[0-9][0-9]*$} $hp] {
+				if [regexp -nocase {subject=.*CN=([^/][^/]*)/} $cert_text mv0 mv1] {
+					regsub -all {[ 	]} $mv1 "" mv1
+					set hp "$mv1$hp"
+				} else {
+					set hp "listen$hp"
+				}
+			}
+		}
+	}
+
 	set w .scrt.sf
 	frame $w
 
@@ -8154,6 +8611,11 @@ proc save_cert {hp} {
 
 	global also_save_to_accepted_certs
 	set also_save_to_accepted_certs 0
+	if [regexp -nocase -- {ACCEPT} $cert_text] {
+		if [regexp -nocase -- {Client certificate} $cert_text] {
+			set also_save_to_accepted_certs 1
+		}
+	}
 	checkbutton .scrt.ac -anchor w -variable also_save_to_accepted_certs -text \
 	    "Also Save to the 'Accepted Certs' directory" -relief raised
 
@@ -8166,7 +8628,6 @@ proc save_cert {hp} {
 
 	pack .scrt.f -side top -fill both -expand 1
 
-	global cert_text
 	set text "" 
 	set on 0
 	foreach line [split $cert_text "\n"] {
@@ -8194,41 +8655,68 @@ proc save_cert {hp} {
 
 
 proc getcerts {} {
-	global mycert svcert crtdir
+	global mycert svcert crtdir crlfil
 	global use_ssh use_sshssl
 	toplev .c
 	wm title .c "SSL Certificates"
 	frame .c.mycert
 	frame .c.svcert
 	frame .c.crtdir
+	frame .c.crlfil
 	label .c.mycert.l -anchor w -width 12 -text "MyCert:"
 	label .c.svcert.l -anchor w -width 12 -text "ServerCert:"
 	label .c.crtdir.l -anchor w -width 12 -text "CertsDir:"
+	label .c.crlfil.l -anchor w -width 12 -text "CRL File:"
 	
 	entry .c.mycert.e -width 32 -textvariable mycert -vcmd v_mycert
 	entry .c.svcert.e -width 32 -textvariable svcert -vcmd v_svcert
+	entry .c.crtdir.e -width 32 -textvariable crtdir
+	entry .c.crlfil.e -width 32 -textvariable crlfil -vcmd v_crlfil
+
 	bind .c.mycert.e <Enter> {.c.mycert.e validate}
 	bind .c.mycert.e <Leave> {.c.mycert.e validate}
 	bind .c.svcert.e <Enter> {.c.svcert.e validate}
 	bind .c.svcert.e <Leave> {.c.svcert.e validate}
-	entry .c.crtdir.e -width 32 -textvariable crtdir
+
 	button .c.mycert.b -text "Browse..." -command {set_mycert .c; catch {raise .c}}
 	button .c.svcert.b -text "Browse..." -command {set_svcert .c; catch {raise .c}}
 	button .c.crtdir.b -text "Browse..." -command {set_crtdir .c; catch {raise .c}}
+	button .c.crlfil.b -text "Browse..." -command {set_crlfil .c; catch {raise .c}}
+
 	button .c.mycert.i -text "Info" -command {show_mycert}
 	button .c.svcert.i -text "Info" -command {show_svcert}
 	button .c.crtdir.i -text "Info" -command {}
+	button .c.crlfil.i -text "Info" -command {show_crlfil}
+
 	bind .c.mycert.b <Enter> "v_mycert"
 	bind .c.svcert.b <Enter> "v_svcert"
+	bind .c.crlfil.b <Enter> "v_crlfil"
+
 	.c.mycert.i configure -state disabled
 	.c.svcert.i configure -state disabled
 	.c.crtdir.i configure -state disabled
+	.c.crlfil.i configure -state disabled
+
 	bind .c.mycert.b <B3-ButtonRelease>   "show_mycert"
 	bind .c.svcert.b <B3-ButtonRelease>   "show_svcert"
+	bind .c.crlfil.b <B3-ButtonRelease>   "show_crlfil"
 
-	button .c.create -text "Create Certificate ..." -command {create_cert}
-	button .c.import -text "Import Certificate ..." -command {import_cert}
-	button .c.delete -text "Delete Certificate ..." -command {delete_cert .c}
+	set do_crl 1
+	set do_row 1
+
+	set c .c
+	if {$do_row} {
+		frame .c.b0
+		set c .c.b0
+	}
+
+	button $c.create -text "Create Certificate ..." -command {create_cert}
+	button $c.import -text "Import Certificate ..." -command {import_cert}
+	button $c.delete -text "Delete Certificate ..." -command {delete_cert .c}
+
+	if {$c != ".c"} {
+		pack $c.create $c.import $c.delete  -fill x -expand 1 -side left
+	}
 
 	frame .c.b
 	button .c.b.done -text "Done" -command {catch {destroy .c}}
@@ -8236,7 +8724,10 @@ proc getcerts {} {
 	button .c.b.help -text "Help" -command help_certs
 	pack .c.b.help .c.b.done -fill x -expand 1 -side left
 
-	foreach w [list mycert svcert crtdir] {
+	set wlist [list mycert svcert crtdir]
+	lappend wlist crlfil
+
+	foreach w $wlist {
 		pack .c.$w.l -side left
 		pack .c.$w.e -side left -expand 1 -fill x
 		pack .c.$w.b -side left
@@ -8249,14 +8740,45 @@ proc getcerts {} {
 		}	
 	}
 
+	global svcert_default_force mycert_default_force crlfil_default_force
+	if {$mycert_default_force} {
+		.c.mycert.e configure -state readonly
+		.c.mycert.b configure -state disabled
+	}
+	if {$svcert_default_force} {
+		.c.svcert.e configure -state readonly
+		.c.svcert.b configure -state disabled
+		.c.crtdir.e configure -state readonly
+		.c.crtdir.b configure -state disabled
+	}
+	if {$crlfil_default_force} {
+		.c.crlfil.e configure -state readonly
+		.c.crlfil.b configure -state disabled
+	}
+
 	if {$mycert != ""} {
 		v_mycert
 	}
 	if {$svcert != ""} {
 		v_svcert
 	}
+	if {$crlfil != ""} {
+		v_crlfil
+	}
 
-	pack .c.mycert .c.svcert .c.crtdir .c.create .c.import .c.delete .c.b -side top -fill x
+	set wlist [list .c.mycert .c.svcert .c.crtdir]
+	if {$do_crl} {
+		lappend wlist .c.crlfil
+	}
+	if {$c != ".c"} {
+		lappend wlist $c
+	} else {
+		lappend wlist .c.create .c.import .c.delete
+	}
+	lappend wlist .c.b
+
+	eval pack $wlist -side top -fill x
+
 	center_win .c
 	wm resizable .c 1 0
 
@@ -8843,9 +9365,18 @@ proc get_cups_redir {} {
 	global cups_local_server cups_remote_port
 	global cups_local_smb_server cups_remote_smb_port
 
-	set redir "$cups_remote_port:$cups_local_server"
-	regsub -all {['" 	]} $redir {} redir; #"
-	set redir " -R $redir"
+	regsub -all {[ 	]} $cups_local_server "" cups_local_server
+	regsub -all {[ 	]} $cups_remote_port "" cups_remote_port
+	regsub -all {[ 	]} $cups_local_smb_server "" cups_local_smb_server
+	regsub -all {[ 	]} $cups_remote_smb_port "" cups_remote_smb_port
+
+	set redir ""
+
+	if {$cups_local_server != "" && $cups_remote_port != ""} {
+		set redir "$cups_remote_port:$cups_local_server"
+		regsub -all {['" 	]} $redir {} redir; #"
+		set redir " -R $redir"
+	}
 	if {$cups_local_smb_server != "" && $cups_remote_smb_port != ""} {
 		set redir2 "$cups_remote_smb_port:$cups_local_smb_server"
 		regsub -all {['" 	]} $redir2 {} redir2; #"
@@ -8874,6 +9405,14 @@ proc get_additional_redir {} {
 proc get_sound_redir {} {
 	global sound_daemon_remote_port sound_daemon_local_port
 	global sound_daemon_x11vnc
+
+	regsub -all {[ 	]} $sound_daemon_remote_port "" sound_daemon_remote_port
+	regsub -all {[ 	]} $sound_daemon_local_port "" sound_daemon_local_port
+
+	set redir ""
+	if {$sound_daemon_local_port == "" || $sound_daemon_remote_port == ""} {
+		return $redir
+	}
 
 	set loc $sound_daemon_local_port
 	if {! [regexp {:} $loc]} {
@@ -9030,7 +9569,7 @@ set cmd(1) {
 	DO_SMB_SU=0
 	DO_SMB_WAIT=0
 	smb_mounts=
-	DONE_PORT=NNNN
+	DONE_PORT_CHECK=NNNN
 	smb_script=$HOME/.smb-mounts__PID__.sh
 
 	DO_SOUND=0
@@ -9040,43 +9579,126 @@ set cmd(1) {
 	sound_daemon_remote_args=
 
 	findpid() {
-		i=1
-		back=10
+		db=0
+		back=30
 		touch $FLAG
+		tty=`tty | sed -e "s,/dev/,,"`
 
 		if [ "X$TOPPID" = "X" ]; then
 			TOPPID=$$
-			back=50
+			if [ $db = 1 ]; then echo "set TOPPID to $TOPPID"; fi
+			back=70
 		fi
+		#back=5
+		if [ $db = 1 ]; then echo "TOPPID=$TOPPID THISPID=$$ back=$back"; fi
 
+		i=1
 		while [ $i -lt $back ]
 		do
 			try=`expr $TOPPID - $i`
-			if ps $try 2>/dev/null | grep sshd >/dev/null; then
+			if [ $try -lt 1 ]; then
+				try=`expr 32768 + $try`
+			fi
+			if [ $db = 1 ]; then echo try-1=$try; ps $try; fi
+			if ps $try 2>/dev/null | grep "sshd.*$USER" | grep "$tty" >/dev/null; then
+				if [ $db = 1 ]; then echo Found=$try; fi
 				SSHD_PID="$try"	
-				echo SSHD_PID=$try
+				echo
+				ps $try
 				echo
 				break
 			fi
 			i=`expr $i + 1`
 		done
-		echo MY_PID=$$
-		tty
-		echo
+
+		if [ "X$SSHD_PID" = "X" ]; then
+			back=`expr $back + 20`
+			#back=5
+
+			for fallback in 2 3
+			do
+				i=1
+				while [ $i -lt $back ]
+				do
+					try=`expr $TOPPID - $i`
+					if [ $try -lt 1 ]; then
+						try=`expr 32768 + $try`
+					fi
+					match="sshd.*$USER"
+					if [ $fallback = 3 ]; then
+						match="sshd"
+					fi
+					if [ $db = 1 ]; then echo "try-$fallback=$try match=$match"; ps $try; fi
+					if ps $try 2>/dev/null | grep "$match" >/dev/null; then
+						if [ $db = 1 ]; then echo Found=$try; fi
+						SSHD_PID="$try"	
+						echo
+						ps $try
+						echo
+						break
+					fi
+					i=`expr $i + 1`
+				done
+				if [ "X$SSHD_PID" != "X" ]; then
+					break
+				fi
+			done
+		fi
+		#curlie}
+};
+
+set cmd(2) {
+		#curlie{
+		if [ "X$SSHD_PID" = "X" ]; then
+			if [ $db = 1 ]; then
+				echo 
+				pstr=`ps -elf | grep "$USER" | grep "$tty" | grep -v grep | grep -v PID | grep -v "ps -elf"`
+				echo "$pstr"
+			fi
+			plist=`ps -elf | grep "$USER" | grep "$tty" | grep -v grep | grep -v PID | grep -v "ps -elf" | awk "{print \\\$4}" | sort -n`
+			if [ $db = 1 ]; then
+				echo 
+				echo "$plist"
+			fi
+			for try in $plist
+			do
+				if [ $db = 1 ]; then echo try-final=$try; ps $try; fi
+				if echo "$try" | grep "^[0-9][0-9]*\\\$" > /dev/null; then
+					:
+				else
+					continue
+				fi
+				if ps $try | egrep vnc-helper > /dev/null; then
+					:
+				else
+					if [ $db = 1 ]; then echo Found=$try; fi
+					SSHD_PID=$try
+					echo
+					ps $try
+					echo
+					break
+				fi
+			done
+		fi
+		if [ "X$SSHD_PID" = "X" ]; then
+			#ugh
+			SSHD_PID=$$
+		fi
+
+		echo "vnc-helper: [for cups/smb/esd]      SSHD_PID=$SSHD_PID MY_PID=$$ TTY=$tty"
+		echo "vnc-helper: To force me to finish:  rm $FLAG" 
 	}
 
 	wait_til_ssh_gone() {
 		try_perl=""
 		if type perl >/dev/null 2>&1; then
-			try_perl=1
-		fi
-		uname=`uname`
-		if [ "X$uname" != "XLinux" -a "X$uname" != "XSunOS" ]; then
-			try_perl=""
+			if [ -d /proc -a -e /proc/$$ ]; then
+				try_perl="1"
+			fi
 		fi
 		if [ "X$try_perl" = "X1" ]; then
 			# try to avoid wasting pids:
-			perl -e "while (1) {if(! -e \"/proc/$SSHD_PID\"){exit} if(! -f \"$FLAG\"){exit} sleep 1;}"
+			perl -e "while (1) {if(-d \"/proc\" && ! -e \"/proc/$SSHD_PID\"){exit} if(! -f \"$FLAG\"){exit} sleep 1;}"
 		else
 			while [ 1 ]
 			do
@@ -9097,57 +9719,76 @@ set cmd(1) {
 	}
 };
 
-set cmd(2) {
+set cmd(3) {
 	update_client_conf() {
 		mkdir -p $cups_dir
-		if [ -f $cups_cfg ]; then
-			cp -p $cups_cfg $cups_cfg.back
-		else
+
+		if [ ! -f $cups_cfg.back ]; then
 			touch $cups_cfg.back
 		fi
-		sed -e "s/^ServerName/#-etv-#ServerName/" $cups_cfg.back > $cups_cfg
+		if [ ! -f $cups_cfg ]; then
+			touch $cups_cfg
+		fi
+
+		if grep ssvnc-auto $cups_cfg > /dev/null; then
+			:
+		else
+			cp -p $cups_cfg $cups_cfg.back
+		fi
+
+		echo "#-ssvnc-auto:" > $cups_cfg
+		sed -e "s/^ServerName/#-ssvnc-auto-#ServerName/" $cups_cfg.back >> $cups_cfg
 		echo "ServerName $cups_host:$cups_port" >> $cups_cfg
+
 		echo
-		echo "--------------------------------------------------------------"
+		echo "-----------------------------------------------------------------"
+		echo "On `hostname`:"
+		echo
 		echo "The CUPS $cups_cfg config file has been set to:"
 		echo
-		cat $cups_cfg
+		cat $cups_cfg | grep -v "^#-ssvnc-auto:" | sed -e "s/^/  /"
 		echo
-		echo "If there are problems automatically restoring it, edit or"
-		echo "remove the file to go back to local CUPS settings."
+		echo "If there are problems automatically restoring it, edit or remove"
+		echo "the file to go back to the local CUPS settings."
 		echo
 		echo "A backup has been placed in: $cups_cfg.back"
 		echo
-		echo "See the help description for more details on printing."
-		echo
-		echo "done."
-		echo "--------------------------------------------------------------"
+		echo "See the SSVNC CUPS dialog for more details on printing."
+		if type lpstat >/dev/null 2>&1; then
+			echo
+			echo "lpstat -a output:"
+			echo
+			(lpstat -a 2>&1 | sed -e "s/^/  /") &
+			sleep 0.5 >/dev/null 2>&1
+		fi
+		echo "-----------------------------------------------------------------"
 		echo
 	}
 
 	reset_client_conf() {
-		cp -p $cups_cfg $cups_cfg.tmp
-		grep -v "^ServerName" $cups_cfg.tmp | sed -e "s/^#-etv-#ServerName/ServerName/" > $cups_cfg
+		cp $cups_cfg $cups_cfg.tmp
+		grep -v "^ServerName" $cups_cfg.tmp | grep -v "^#-ssvnc-auto:" | sed -e "s/^#-ssvnc-auto-#ServerName/ServerName/" > $cups_cfg
 		rm -f $cups_cfg.tmp
 	}
 
 	cupswait() {
 		trap "" INT QUIT HUP
+		trap "reset_client_conf; rm -f $FLAG; exit" TERM
 		wait_til_ssh_gone
 		reset_client_conf
 	}
 };
 
-#		if [ "X$DONE_PORT" != "X" ]; then
+#		if [ "X$DONE_PORT_CHECK" != "X" ]; then
 #			if type perl >/dev/null 2>&1; then
-#				perl -e "use IO::Socket::INET; \$SIG{INT} = \"IGNORE\"; \$SIG{QUIT} = \"IGNORE\"; \$SIG{HUP} = \"INGORE\"; my \$client = IO::Socket::INET->new(Listen => 5, LocalAddr => \"localhost\", LocalPort => $DONE_PORT, Proto => \"tcp\")->accept(); \$line = <\$client>; close \$client; unlink \"$smb_script\";" </dev/null >/dev/null 2>/dev/null &
+#				perl -e "use IO::Socket::INET; \$SIG{INT} = \"IGNORE\"; \$SIG{QUIT} = \"IGNORE\"; \$SIG{HUP} = \"INGORE\"; my \$client = IO::Socket::INET->new(Listen => 5, LocalAddr => \"localhost\", LocalPort => $DONE_PORT_CHECK, Proto => \"tcp\")->accept(); \$line = <\$client>; close \$client; unlink \"$smb_script\";" </dev/null >/dev/null 2>/dev/null &
 #				if [ $? = 0 ]; then
 #					have_perl_done="1"
 #				fi
 #			fi
 #		fi
 
-set cmd(3) {
+set cmd(4) {
 	smbwait() {
 		trap "" INT QUIT HUP
 		wait_til_ssh_gone
@@ -9170,24 +9811,32 @@ set cmd(3) {
 				mkdir -p $dest
 			fi
 			echo "echo SMBMOUNT:" >> $smb_script
-			echo "echo smbmount $smfs $dest -o uid=$USER,ip=127.0.0.1,ttl=20000,port=$port" >> $smb_script
-			echo "smbmount \"$smfs\" \"$dest\" -o uid=$USER,ip=127.0.0.1,ttl=20000,port=$port" >> $smb_script
+			echo "echo smbmount $smfs $dest -o uid=$USER,ip=127.0.0.1,port=$port" >> $smb_script
+			echo "smbmount \"$smfs\" \"$dest\" -o uid=$USER,ip=127.0.0.1,port=$port" >> $smb_script
 			echo "echo; df \"$dest\"; echo" >> $smb_script
 			dests="$dests $dest"
 		done
-		#}
+		#curlie}
 };
 
-set cmd(4) {
+set cmd(5) {
 		echo "(" >> $smb_script
+		echo "un_mnt() {" >> $smb_script
+		for dest in $dests
+		do
+			echo "  echo smbumount $dest" >> $smb_script
+			echo "  smbumount \"$dest\"" >> $smb_script
+		done
+		echo "}" >> $smb_script
 		echo "trap \"\" INT QUIT HUP" >> $smb_script
+		echo "trap \"un_mnt; exit\" TERM" >> $smb_script
 
 		try_perl=""
 		if type perl >/dev/null 2>&1; then
 			try_perl=1
 		fi
 		uname=`uname`
-		if [ "X$uname" != "XLinux" -a "X$uname" != "XSunOS" ]; then
+		if [ "X$uname" != "XLinux" -a "X$uname" != "XSunOS" -a "X$uname" != "XDarwin" ]; then
 			try_perl=""
 		fi
 
@@ -9197,15 +9846,13 @@ set cmd(4) {
 			echo "     sleep 1" >> $smb_script
 			echo "done" >> $smb_script
 		else
-			echo "perl -e \"while (-f \\\\\"$smb_script\\\\\") {sleep 1;} exit 0;\"" >> $smb_script
+			echo "perl -e \"while (-f \\\"$smb_script\\\") {sleep 1;} exit 0;\"" >> $smb_script
 		fi
-		for dest in $dests
-		do
-			echo "echo smbumount $dest" >> $smb_script
-			echo "smbumount \"$dest\"" >> $smb_script
-		done
+		echo "un_mnt" >> $smb_script
 		echo ") &" >> $smb_script
-		echo "--------------------------------------------------------------"
+		echo "-----------------------------------------------------------------"
+		echo "On `hostname`:"
+		echo
 		if [ "$DO_SMB_SU" = "0" ]; then
 			echo "We now run the smbmount script as user $USER"
 			echo
@@ -9231,20 +9878,21 @@ set cmd(4) {
 			echo "Subsequent \"Password:\" will be for the SMB shares (hit enter if no passwd)"
 			echo
 			echo SUDO:
-			echo sudo sh $smb_script
-			sudo sh $smb_script
+			sd="sudo"
+			echo "$sd sh $smb_script"
+			$sd sh $smb_script
 			rc=$?
 		fi
 };
 
-set cmd(5) {
-		#{
+set cmd(6) {
+		#curlie{
 		echo
 		if [ "$rc" = 0 ]; then
 			if [ "X$have_perl_done" = "X1" -o 1 = 1 ] ; then
 				echo
 				echo "Your SMB shares will be unmounted when the VNC connection closes,"
-				echo "*As Long As* No Applications have any of the share files opened or are"
+				echo "*AS LONG AS* No Applications have any of the share files opened or are"
 				echo "cd-ed into any of the share directories."
 				echo
 				echo "Try to make sure nothing is accessing the SMB shares before disconnecting"
@@ -9257,6 +9905,7 @@ set cmd(5) {
 			echo "   rm -f $smb_script"
 			echo 
 			echo "In the worst case run: smbumount /path/to/mount/point for each mount as root"
+			echo 
 			echo "Even with the remote redirection gone the kernel should umount after a timeout."
 		else
 			echo 
@@ -9267,14 +9916,12 @@ set cmd(5) {
 			fi
 			rm -f $smb_script
 		fi
-		echo
-		echo "done."
-		echo "--------------------------------------------------------------"
+		echo "-----------------------------------------------------------------"
 		echo
 	}
 };
 
-set cmd(6) {
+set cmd(7) {
 
 	setup_sound() {
 		dpid=""
@@ -9284,7 +9931,9 @@ set cmd(6) {
 		else
 			dpid=`env PATH=/usr/ucb:$PATH ps wwwwaux | grep -w $USER | grep -w $d | grep -v grep | head -1`
 		fi
-		echo "--------------------------------------------------------------"
+		echo "-----------------------------------------------------------------"
+		echo "On `hostname`:"
+		echo
 		echo "Setting up Sound: pid=$dpid"
 		if [ "X$dpid" != "X" ]; then
 			dcmd=`env PATH=/usr/ucb:$PATH ps wwwwaux | grep -w $USER | grep -w $d | grep -w $dpid | grep -v grep | head -1 | sed -e "s/^.*$d/$d/"`
@@ -9294,9 +9943,7 @@ set cmd(6) {
 				kill -TERM $dpid
 			fi
 		fi
-		echo
-		echo "done."
-		echo "--------------------------------------------------------------"
+		echo "-----------------------------------------------------------------"
 		echo
 	}
 
@@ -9311,9 +9958,11 @@ set cmd(6) {
 
 	soundwait() {
 		trap "" INT QUIT HUP
+		trap "reset_sound; rm -f $FLAG; exit" TERM
 		wait_til_ssh_gone
 		reset_sound
 	}
+
 
 	findpid
 
@@ -9343,9 +9992,7 @@ set cmd(6) {
 
 
 	#FINMSG
-	echo
-	echo "--vnc-helper-exiting--"
-	echo
+	echo "--main-vnc-helper-finished--"
 	#cat $0
 	rm -f $0
 	exit 0
@@ -9353,13 +10000,14 @@ set cmd(6) {
 
 	set cmdall ""
 
-	for {set i 1} {$i <= 6} {incr i} {
+	for {set i 1} {$i <= 7} {incr i} {
 		set v $cmd($i);
 		regsub -all "\n" $v "%" v
+		regsub -all {.curlie.} $v "" v
 		set cmd($i) $v
 		append cmdall "echo "
 		if {$i == 1} {
-			append cmdall {TOPPID=$$%} 
+			append cmdall {TOPPID=$$ %} 
 		}
 		append cmdall {'}
 		append cmdall $cmd($i)
@@ -9381,11 +10029,25 @@ set cmd(6) {
 
 	set orig $cmdall
 
-	global use_cups cups_local_server cups_remote_port cups_manage_rcfile cups_x11vnc
-	if {$use_cups && $cups_manage_rcfile} {
-		if {$mode == "post"} {
-			regsub {DO_CUPS=0} $cmdall {DO_CUPS=1} cmdall
-			regsub {cups_port=NNNN} $cmdall "cups_port=$cups_remote_port" cmdall
+	global use_cups cups_local_server cups_remote_port cups_manage_rcfile ts_only ts_cups_manage_rcfile cups_x11vnc
+	regsub -all {[ 	]} $cups_local_server "" cups_local_server
+	regsub -all {[ 	]} $cups_remote_port "" cups_remote_port
+	if {$use_cups} {
+		set dorc 0
+		if {$ts_only} {
+			if {$ts_cups_manage_rcfile} {
+				set dorc 1
+			}
+		} else {
+			if {$cups_manage_rcfile} {
+				set dorc 1
+			}
+		}
+		if {$dorc && $mode == "post"} {
+			if {$cups_local_server != "" && $cups_remote_port != ""} {
+				regsub {DO_CUPS=0} $cmdall {DO_CUPS=1} cmdall
+				regsub {cups_port=NNNN} $cmdall "cups_port=$cups_remote_port" cmdall
+			}
 		}
 	}
 	
@@ -9452,11 +10114,19 @@ set cmd(6) {
 		}
 	}
 
+	set cmdstr $cmdall
+
 	if {"$orig" == "$cmdall"} {
-		return ""
-	} else {
-		return $cmdall
+		set cmdstr ""
 	}
+	global env
+	if [info exists env(SSVNC_DEBUG_CUPS)] {
+		regsub -all {db=0} $cmdstr "db=1" cmdstr
+		set pout ""
+		regsub -all {%} $cmdstr "\n" pout
+		puts stderr "\nSERVICE REDIR COMMAND:\n\n$pout\n"
+	}
+	return $cmdstr
 }
 
 proc ts_unixpw_dialog {} {
@@ -9596,7 +10266,7 @@ proc ts_multi_dialog {} {
 proc ts_xlogin_dialog {} {
 
 	toplev .xlog
-	wm title .xlog "X Login"
+	wm title .xlog "X Login Greeter"
 
 	scroll_text .xlog.f 80 33
 
@@ -9936,51 +10606,85 @@ proc ts_cups_dialog {} {
 
 	toplev .cups
 	wm title .cups "CUPS and SMB Printing"
-	global cups_local_server cups_remote_port cups_manage_rcfile cups_x11vnc
+	global cups_local_server cups_remote_port cups_manage_rcfile ts_cups_manage_rcfile cups_x11vnc
 	global cups_local_smb_server cups_remote_smb_port
 
 	scroll_text .cups.f 80 30
 		
 
 	set msg {
-    This method requires working a CUPS Desktop setup on the remote side
+    This method requires a working CUPS Desktop setup on the remote side
     of the connection and working CUPS (or possibly Windows SMB or IPP)
-    printing on the local side of the connection.
+    printing on the local viewer-side of the connection.
+
+    For CUPS printing redirection to work properly, you MUST enable it for
+    the connection that *creates* your terminal services X session (i.e. the
+    first connection.)  You cannot retroactively enable CUPS redirection
+    on an already existing terminal services X session.  (See CUPS printing
+    for normal SSVNC mode for how you might do that.)
 
     Enter the VNC Viewer side (i.e. where you are sitting) CUPS server
     under "Local CUPS Server".  Use "localhost:631" if there is one
-    on your viewer machine (cupsd), or, say, "my-print-srv:631" for a
-    nearby CUPS print server.  631 is the default CUPS port.  On
-    MacOSX it seems better to use "127.0.0.1" than "localhost".
+    on your viewer machine (normally the case if you set up a printer
+    on your unix or macosx system), or, e.g., "my-print-srv:631" for a
+    nearby CUPS print server.  Note that 631 is the default CUPS port.
 
-    The remote Desktop session will have the variables CUPS_SERVER and
-    IPP_PORT set so all printing applications will be redirected to your
-    local CUPS server.  Your locally available printers should appear
-    in the remote print dialogs.
+    (On MacOSX it seems better to use "127.0.0.1" instead of "localhost".)
 
-    Windows/SMB Printers:  Under "Local SMB Print Server" you can
-    set a port redirection for a Windows (non-CUPS) SMB printer.
-    If localhost:139 does not work, try "IP:139", or use the known
-    value of the IP address manually.  139 is the default SMB port;
-    445 is also a possibility.
+    The SSVNC Terminal Services created remote Desktop session will have
+    the variables CUPS_SERVER and IPP_PORT set so all printing applications
+    will be redirected to your local CUPS server.  So your locally available
+    printers should appear in the remote print dialogs.
+
+
+    Windows/SMB Printers:  Under "Local SMB Print Server" you can set a
+    port redirection for a Windows (non-CUPS) SMB printer.  If localhost:139
+    does not work, try the literal string "IP:139", or use the known value
+    of the IP address manually.  139 is the default SMB port; nowadays 445
+    might be a better possibility.
+
+    For Windows/SMB Printers if there is no local CUPS print server, it is
+    usually a very good idea to make the CUPS Server setting EMPTY (to avoid
+    desktop apps trying incessantly to reach the nonexistent CUPS server.)
 
     On the remote side, in the Desktop session the variables $SMB_SERVER,
     $SMB_HOST, and $SMB_PORT will be set for you to use.
 
-    Unfortunately, printing to Windows is only partially functional
-    due to the general lack PostScript support on Windows.  We hope to
-    improve this in the future.
+    Unfortunately, printing to Windows may only ve partially functional due
+    to the general lack PostScript support on Windows.
 
     If you have print admin permission on the remote machine you can
     configure CUPS to know about your Windows printer via lpadmin(8) or
-    a GUI tool.  You give it the URI: smb://localhost:port/printername.
-    port will be found in the $SMB_PORT.  You also identify the printer
-    type.  NOTE: You will leave "Local CUPS Server" blank in this case.
-    The smbspool(1) command should also work as well, at least for
-    PostScript printers.
+    a GUI tool.  You give it the URI:
+
+        smb://localhost:port/printername
+
+    or possibly:
+
+        smb://localhost:port/computer/printername
+
+    "port" will be found in the $SMB_PORT.  You also need to identify
+    the printer type.  NOTE: You will leave "Local CUPS Server" blank in
+    this case.  The smbspool(1) command should also work as well, at least
+    for PostScript printers.
+
+    A similar thing can be done with CUPS printers if you are having problems
+    with the above default mechanism.  Use
+
+        http://localhost:port/printers/printername
 
     For more info see: http://www.karlrunge.com/x11vnc/#faq-cups
 }
+
+#    The "Manage 'ServerName' in .cups/client.conf for me" setting is usually
+#    NOT needed unless you are using Terminal Services to connect to an
+#    existing Session that did NOT have CUPS print redirection set at session
+#    start time (i.e. IPP_PORT and CUPS_SERVER were not set up).  In that
+#    case, select this option as a workaround: NOTE that the client.conf
+#    setting will REDIRECT ALL PRINTING for apps with the same $HOME/.cups
+#    directory (which you probably do not want), however it will be reset
+#    when the SSVNC viewer disconnects.
+
 	.cups.f.t insert end $msg
 
 	global uname
@@ -10020,6 +10724,10 @@ proc ts_cups_dialog {} {
 	pack .cups.smbs.e -side right
 	pack .cups.smbs.l -side left -expand 1 -fill x
 
+	# not working with x11vnc:
+	checkbutton .cups.cupsrc -anchor w -variable ts_cups_manage_rcfile -text \
+		"Manage 'ServerName' in the remote \$HOME/.cups/client.conf file for me"
+
 	button .cups.cancel -text "Cancel" -command {destroy .cups; set use_cups 0}
 	bind .cups <Escape> {destroy .cups; set use_cups 0}
 	wm protocol .cups WM_DELETE_WINDOW {destroy .cups; set use_cups 0}
@@ -10054,110 +10762,215 @@ proc cups_dialog {} {
 		
 
 	set msg {
-    CUPS Printing requires SSH be used to set up the Print service port
-    redirection.  This will be either of the "Use SSH" or "SSH + SSL"
-    modes under "Options".  Pure SSL tunnelling will not work.
+    CUPS Printing requires SSH be used to set up the CUPS Print service TCP
+    port redirection.  This will be either of the "Use SSH" or "SSH+SSL" modes.
+    NOTE:  For pure SSL tunnelling it currently will not work.
 
-    This method requires working CUPS software setups on both the remote
+    This method requires working CUPS software setups on BOTH the remote
     and local sides of the connection.
 
-    (See Method #1 below for perhaps the easiest way to get applications to
-    print through the tunnel; it requires printing admin privileges however).
+    If the remote VNC server is Windows you probably cannot SSH into it
+    anyway...  If you can, you will still need to set up a special printer
+    TCP port redirection on your own.  Perhaps adding and configuring a
+    "Unix Printer" under Windows (like Method #2 below) will work.
 
-    You choose an actual remote CUPS port below under "Use Remote CUPS
-    Port:", 6631 is just our default and used in the examples below.
-    Note that the normal default CUPS server port is 631.
+    If the local machine (SSVNC side) is Windows, see the bottom of this
+    help for redirecting to SMB printers.
 
-    The port you choose must be unused on the VNC server machine (n.b. no
-    checking is done).  Print requests connecting to it are redirected to
-    your local machine through the SSH tunnel.  Note: root permission is
-    needed for ports less than 1024 (this is not recommended).
+    If the remote VNC server is Mac OS X this method may or may not work.
+    Sometimes applications need to be restarted to get them to notice the
+    new printers.  Adding and configuring a special "Unix Printer",
+    (Method #2) below, might yield more reliable results at the cost of
+    additional setup and permissions.
+
+    For Unix/Linux remote VNC servers, applications may also need to be
+    restarted to notice the new printers.  The only case known to work
+    well is the one where the remote side has no CUPS printers configured.
+    As mentioned above, see Method #2 for another method.
+
+    *************************************************************************
+    *** Directions:
+
+    You choose your own remote CUPS redir port below under "Use Remote
+    CUPS Port".  6631 is our default and is used in the examples below.
+    Use it or some random value greater than 1024.  Note that the standard
+    CUPS server port is 631.
+
+    The port you choose must be unused on the VNC server machine (it is NOT
+    checked for you).  Print requests connecting to it are redirected to
+    your local VNC viewer-side CUPS server through the SSH tunnel.
+
+    (Note: root SSH login permission is needed for ports less than 1024,
+    e.g. 631; this is not recommended, use something around 6631 instead).
 
     Then enter the VNC Viewer side (i.e. where you are sitting) CUPS server
-    under "Local CUPS Server".  E.g. use "localhost:631" if there is one
-    on the viewer machine, or, say, "my-print-srv:631" for a nearby CUPS
-    print server.
+    into "Local CUPS Server".  A good choice is the default "localhost:631"
+    if there is a cups server on your viewer machine (this is usually the case
+    if you have set up a printer).  Otherwise enter, e.g., "my-print-srv:631"
+    for your nearby (viewer-side) CUPS print server.
 
-    Several methods are now described for how to get applications to
-    print through the port redirected tunnel.
 
-    Method #0: Create or edit the file $HOME/.cups/client.conf on the VNC
-    server side by putting in something like this in it:
+    The "Manage 'ServerName' in the $HOME/.cups/client.conf file for me"
+    setting below is enabled by default.  It should handle most situations.
+
+    What it does is modify the .cups/client.conf file on the VNC server-side
+    to redirect the print requests while the SSVNC viewer is connected.  When
+    SSVNC disconnects .cups/client.conf is restored to its previous setting.
+
+    If, for some reason, the SSVNC CUPS script fails to restore this file
+    after SSVNC disconnects, run this command on the remote machine:
+
+        cp $HOME/.cups/client.conf.back $HOME/.cups/client.conf
+
+    to regain your initial printing configuration.
+
+
+    You can also use CUPS on the VNC server-side to redirect to Windows
+    (SMB) printers.  See the additional info for Windows Printing at the
+    bottom of this help.
+
+
+    In case the default method (automatic .cups/client.conf modification)
+    fails, we describe below all of the possible methods that can be tried.
+
+    As noted above, you may need to restart applications for them to notice
+    the new printers or for them to revert to the original printers.  If this
+    is not acceptable, consider Method #2 below if you have the permission
+    and ability to alter the print queues for this.
+
+
+    *************************************************************************
+    *** Method #1:  Manually create or edit the file $HOME/.cups/client.conf
+    on the VNC server side by putting in something like this in it:
 
     	ServerName localhost:6631
 
-    based on the port you selected above.
+    based on the port you set in this dialog's entry box.
     
-    NOTE: For this client.conf ServerName setting to work with lp(1)
-    and lpr(1) CUPS 1.2 or greater is required.  The cmdline option 
-    "-h localhost:6631" can be used for older versions.  For client.conf to
-    work in general (e.g. Openoffice, Firefox), a bugfix found in CUPS 1.2.3
-    is required.  Two Workarounds (Methods #1 and #2) are described below.
-
     After the remote VNC Connection is finished, to go back to the non-SSH
     tunnelled CUPS server and either remove the client.conf file or comment
     out the ServerName line.  This restores the normal CUPS server for
-    you on the remote machine.
+    you on the remote VNC server machine.
 
-    Select "Manage ServerName in the $HOME/.cups/client.conf file for me" to
-    attempt to do this editing of the CUPS config file for you automatically.
+    Select "Manage 'ServerName' in the $HOME/.cups/client.conf file for me"
+    to do this editing of the VNC server-side CUPS config file for you
+    automatically.  NOTE: It is now on by default (deselect it if you want
+    to manage the file manually; e.g. you print through the tunnel only very
+    rarely, or often print locally when the tunnel is up, etc.)
 
     Select "Pass -env FD_CUPS=<Port> to x11vnc command line" if you are
     starting x11vnc as the Remote SSH Command, and x11vnc is running in
     -create mode (i.e. FINDCREATEDISPLAY).  That way, when your X session
     is created IPP_PORT will be set correctly for the entire session.
+    This is the mode used for 'Terminal Services' printing.
 
-    You probably would never select both of the above two options at
-    the same time, since they conflict with eachother to some degree.
+    NOTE: You probably would never select both of the above two options
+    at the same time, since they conflict with each other to some degree.
 
-    Method #1: If you have admin permission on the VNC Server machine you
-    can likely "Add a Printer" via a GUI dialog, wizard, lpadmin(8), etc.
-    This makes the client.conf ServerName parameter unnecessary.  You will
-    need to tell the GUI dialog that the printer is at, e.g., localhost:6631,
-    and anything else needed to identify the printer (type, model, etc).
 
-    Method #2: Restarting individual applications with the IPP_PORT
+    *************************************************************************
+    *** Method #2:  If you have admin permission on the VNC Server machine
+    you can likely "Add a Printer" via a GUI dialog, a Wizard, CUPS Web
+    interface (i.e. http://localhost:631/), lpadmin(8), etc.
+
+    You will need to tell the dialog that the network printer located
+    is at, e.g., localhost:6631, and anything else needed to identify
+    the printer (type, model, etc).  NOTE: sometimes it is best to set
+    the model/type as "Generic / Postscript Printer" to avoid problems
+    with garbage being printed out.
+
+    For the URI to use, we have successfully used ones like this with CUPS:
+
+       http://localhost:6631/printers/Deskjet-3840
+        ipp://localhost:6631/printers/Deskjet-3840
+
+    for an HP Deskjet-3840 printer.  See the CUPS documentation for more
+    about the URI syntax and pathname.
+
+    This mode makes the client.conf ServerName parameter unnecessary
+    (BE SURE TO DISABLE the "Manage 'ServerName' ... for me"  option.)
+
+
+    *************************************************************************
+    *** Method #3:  Restarting individual applications with the IPP_PORT
     set will enable redirected printing for them, e.g.:
 
        env IPP_PORT=6631 firefox
 
-    If you can only get Method #2 to work, an extreme application would
-    be to run the whole desktop, e.g. env IPP_PORT=6631 gnome-session, but
+    If you can only get this method to work, an extreme application would
+    be to run the whole desktop, e.g. "env IPP_PORT=6631 gnome-session", but
     then you would need some sort of TCP redirector (ssh -L comes to mind),
     to direct it to 631 when not connected remotely.
 
-    Windows/SMB Printers:  Under "Local SMB Print Server" you can set
+
+    *************************************************************************
+    *** Windows/SMB Printers:  Under "Local SMB Print Server" you can set
     a port redirection for a Windows (non-CUPS) SMB printer.  E.g. port
-    6632 -> localhost:139.  If localhost:139 does not work, try IP:139,
-    etc. or put in the IP address manually.  Then at the least you can
-    print using the smbspool(8) program like this:
+    6632 -> localhost:139.
 
-       smbspool smb://localhost:6632/lp job user title 1 "" myfile.ps
+    If localhost:139 does not work, try the literal string "IP:139", or
+    insert the actual IP address manually.  NOTE: Nowadays on Windows port
+    445 might be a better choice.
 
-    You could put this in a script, "myprinter".  It appears for the URI,
-    only the number of copies ("1" above) and the file itself are important.
-    (XXX this might only work for Samba printers...)
+    For Windows printers, if there is no local CUPS print server, set the
+    'Local CUPS Server' and 'Use Remote CUPS Port' to be EMPTY (to avoid
+    desktop apps trying incessantly to reach the nonexistent CUPS server.)
 
-    If you have root or print admin permission you can configure CUPS to
-    know about this printer via lpadmin(8), etc.  You basically give it
-    the smb://... URI.
+    You must enable Sharing for your local Windows Printer.  Use Windows
+    Printer configuration dialogs to do this.
+
+    Next, you need to have sudo or print admin permission so that you can
+    configure the *remote* CUPS to know about this Windows printer via
+    lpadmin(8) or GUI Printer Configuration dialog, etc (Method #2 above).
+    You basically give it the URI:
+
+        smb://localhost:6632/printername
+
+    For example, we have had success with GNOME CUPS printing configuration
+    using:
+
+	smb://localhost:6632/HPOffice
+	smb://localhost:6632/COMPUTERNAME/HPOffice
+
+    where "HPOffice" was the name Windows shares the printer as.
+
+    Also with this SMB port redir mode, as a last resort you can often print
+    using the smbspool(8) program like this:
+
+       smbspool smb://localhost:6632/printer job user title 1 "" myfile.ps
+
+    You could put this in a script.  For this URI, it appears only the number
+    of copies ("1" above) and the file itself are important.
+
+    If on the local (SSVNC viewer) side there is some nearby CUPS print server
+    that knows about your Windows printer, you might have better luck with
+    that instead of using SMB.  Set 'Local CUPS Server' to it.
 
     For more info see: http://www.karlrunge.com/x11vnc/#faq-cups
 }
 	.cups.f.t insert end $msg
 
 	global uname
-	if {$cups_local_server == ""} {
+	set something_set 0
+
+	if {$cups_local_server != ""} {
+		set something_set 1
+	}
+	if {$cups_local_smb_server != ""} {
+		set something_set 1
+	}
+
+	if {$cups_local_server == "" && ! $something_set} {
 		if {$uname == "Darwin"} {
 			set cups_local_server "127.0.0.1:631"
 		} else {
 			set cups_local_server "localhost:631"
 		}
 	}
-	if {$cups_remote_port == ""} {
+	if {$cups_remote_port == "" && ! $something_set} {
 		set cups_remote_port "6631"
 	}
-	if {$cups_local_smb_server == ""} {
+	if {$cups_local_smb_server == "" && ! $something_set} {
 		global is_windows
 		if {$is_windows} {
 			set cups_local_smb_server "IP:139"
@@ -10167,7 +10980,7 @@ proc cups_dialog {} {
 			set cups_local_smb_server "localhost:139"
 		}
 	}
-	if {$cups_remote_smb_port == ""} {
+	if {$cups_remote_smb_port == "" && ! $something_set} {
 		set cups_remote_smb_port "6632"
 	}
 
@@ -10196,7 +11009,7 @@ proc cups_dialog {} {
 	pack .cups.smbp.l -side left -expand 1 -fill x
 
 	checkbutton .cups.cupsrc -anchor w -variable cups_manage_rcfile -text \
-		"Manage ServerName in the remote \$HOME/.cups/client.conf file for me"
+		"Manage 'ServerName' in the remote \$HOME/.cups/client.conf file for me"
 
 	checkbutton .cups.x11vnc -anchor w -variable cups_x11vnc -text \
 		"Pass -env FD_CUPS=<Port> to x11vnc command line."
@@ -10314,13 +11127,12 @@ proc sound_dialog {} {
 	}
 
 	set msg {
-    Sound tunnelling to a sound daemon requires SSH be used to set up
-    the service port redirection.  This will be either of the "Use SSH"
-    or "SSH + SSL" modes under "Options".  Pure SSL tunnelling
-    will not work.
+    Sound tunnelling to a sound daemon requires SSH be used to set up the
+    service port redirection.  This will be either of the "Use SSH" or
+    "SSH+SSL" modes. NOTE: For pure SSL tunnelling it currently will not work.
 
     This method requires working Sound daemon (e.g. ESD or ARTSD) software
-    setups on both the remote and local sides of the connection.
+    setups on BOTH the remote and local sides of the connection.
 
     Often this means you want to run your ENTIRE remote desktop with ALL
     applications instructed to use the sound daemon's network port.  E.g.
@@ -11084,10 +11896,9 @@ proc smb_dialog {} {
 	}
 
 	set msg {
-    Windows/Samba Filesystem mounting requires SSH be used to set up the
-    SMB service port redirection.  This will be either of the "Use SSH"
-    or "SSH + SSL" modes under "Options".  Pure SSL tunnelling
-    will not work.
+    Windows/Samba Filesystem mounting requires SSH be used to set up the SMB
+    service port redirection.  This will be either of the "Use SSH" or
+    "SSH+SSL" modes. NOTE: For pure SSL tunnelling it currently will not work.
 
     This method requires a working Samba software setup on the remote
     side of the connection (VNC server) and existing Samba or Windows file
@@ -11097,7 +11908,8 @@ proc smb_dialog {} {
     evidently limits the mounting to Linux systems.  Let us know of similar
     utilities on other Unixes.  Mounting onto remote Windows machines is
     currently not supported (our SSH mode with services setup only works
-    to Unix).
+    to Unix).  On Debian and Ubuntu the smbmount program is currently in
+    the package named 'smbfs'.
 
     Depending on how smbmount is configured you may be able to run it
     as a regular user, or it may require running under su(1) or sudo(8)
@@ -11232,30 +12044,31 @@ proc help_advanced_opts {} {
       CUPS Print tunnelling:
 
          Redirect localhost:6631 (say) on the VNC server to your local
-         CUPS server.
+         CUPS server.  SSH mode is required.
 
       ESD/ARTSD Audio tunnelling:
 
          Redirect localhost:16001 (say) on the VNC server to your local
-         ESD, etc. sound server.
+         ESD, etc. sound server.  SSH mode is required.
 
       SMB mount tunnelling:
 
-         Redirect localhost:1139 (say) on the VNC server and through
-         that mount SMB file shares from your local server.  The remote
-         machine must be Linux with smbmount installed.
+         Redirect localhost:1139 (say) on the VNC server and through that
+         mount SMB file shares from your local server.  The remote machine
+         must be Linux with smbmount installed. SSH mode is required.
 
       Additional Port Redirs:
 
          Specify additional -L port:host:port and -R port:host:port
          cmdline options for SSH to enable additional services.
+         SSH mode is required.
 
       Automatically Find X Login/Greeter:
 
          This mode is similar to "Automatically Find X Session" except
          that it will attach to a X Login/Greeter screen that no one
          has logged into yet.  It requires root privileges via sudo(1)
-         on the remote machine.
+         on the remote machine.  SSH mode is required.
 
          As with "Automatically Find X Session" it works only with SSH
          mode and requires x11vnc be installed on the remote computer.
@@ -11277,20 +12090,13 @@ proc help_advanced_opts {} {
          An LD_PRELOAD hack to limit the number of SSH port redirections
          to 1 and within the first 15 seconds.  So there is a smaller
          window when the user can try to use your tunnel compared to
-         the duration of your session.
+         the duration of your session.  SSH mode is required.
 
       STUNNEL Local Port Protections:
 
          Try to prevent Untrusted Local Users (see the main Help panel)
          from using your STUNNEL tunnel to connect to the remote VNC
          Server.
-
-      UltraVNC DSM Encryption Plugin:
-
-         On Unix only, by using the supplied tool, ultravnc_dsm_helper,
-         encrypted connections to UltraVNC servers using their plugins
-         is enabled.  Support for secret key encryption to Non-UltraVNC
-         DSM servers is also supported, e.g. x11vnc -enc blowfish:my.key
 
       Change VNC Viewer:
 
@@ -11302,6 +12108,39 @@ proc help_advanced_opts {} {
          For "closed port" services, first "knock" on the firewall ports
          in a certain way to open the door for SSH or SSL.  The port
          can also be closed when the encrypted VNC connection finishes.
+
+      UltraVNC DSM Encryption Plugin:
+
+         On Unix only, by using the supplied tool, ultravnc_dsm_helper,
+         encrypted connections to UltraVNC servers using their plugins
+         is enabled.  Support for secret key encryption to Non-UltraVNC
+         DSM servers is also supported, e.g. x11vnc -enc blowfish:my.key
+
+      Server uses VeNCrypt SSL encryption:
+
+         Use the VeNCrypt extension to VNC that switches to an SSL/TLS
+         tunnel at a certain point in the VNC Handshake.  This is in
+         constrast to the default ssvnc/x11vnc SSL tunnel mode where
+         the entire VNC session goes through SSL (e.g. vncs://) 
+
+         Enable this option if you know the server supports VeNCrypt.
+         (SSVNC may also be able to autodetect it and switch).  Also use
+         this option for the older ANONTLS extension (vino).
+
+         Note: many VeNCrypt servers only support Anonymous Diffie Hellman
+         TLS which has no built in authentication (see next section)
+
+      Server uses Anonymous Diffie-Hellman
+
+         Anonymous Diffie-Hellman can be used for SSL/TLS connections but
+         there are no Certificates for authentication.  Therefore
+         only passive eavesdropping attacks are prevented, not
+         Man-In-The-Middle attacks.  Not recommended; use verified X509
+         certs instead.
+
+         Enable this option if you know the server supports Anon DH.
+         (SSVNC may also be able to detect it and prompt you whether it
+         should continue).
 
       Include:
 
@@ -11368,6 +12207,11 @@ proc help_ssvncviewer_opts {} {
          and so display each of their desktops on your screen at the
          same time.
 
+      Listen Once:
+
+         Try to have the VNC Viewer exit after the first listening
+         connection. (It may not always be detected; use Ctrl-C to exit)
+
       Use X11 Cursor:
 
          When drawing the mouse cursor shape locally, use an X11 cursor
@@ -11400,38 +12244,25 @@ proc help_ssvncviewer_opts {} {
          Use the x11vnc alpha hack for translucent cursors (requires Unix,
          32bpp and same endianness)
 
-      Server uses VeNCrypt SSL/TLS encryption:
-
-         Use the VeNCrypt extension to VNC that switches to an SSL/TLS
-         tunnel at a certain point in the VNC Handshake.  This is in
-         constrast to the default ssvnc/x11vnc SSL tunnel mode where
-         the entire VNC session goes through SSL (e.g. vncs://) 
-
-         Enable this option if you know the server supports VeNCrypt.
-         (SSVNC may also be able to autodetect it and switch).  Also use
-         this option for the older TLSVNC extension (vino).
-
-         Note: many VeNCrypt servers only support Anonymous Diffie Hellman
-         TLS which has no built in authentication (see next section)
-
-      Server uses Anonymous Diffie-Hellman
-
-         Anonymous Diffie-Hellman can be used for SSL/TLS connections but
-         there are no Certificates for authentication.  Therefore
-         only passive eavesdropping attacks are prevented, not
-         Man-In-The-Middle attacks.  Not recommended; use verified X509
-         certs instead.
-
-         Enable this option if you know the server supports Anon DH.
-         (SSVNC may also be able to detect it and prompt you whether it
-         should continue).
-
       Scaling:
 
          Use viewer-side (i.e. local) scaling of the VNC screen.  Supply
          a fraction, e.g. 0.75 or 3/4, or a WxH geometry, e.g. 1280x1024,
          or the string 'fit' to fill the current screen.  Use 'auto'
          to scale the desktop to match the viewer window size.
+
+         If you observe mouse trail painting errors try using X11 Cursor.
+
+         Note that since the local scaling is done in software it can
+         be slow.  Since ZRLE is better than Tight in this regard, when
+         scaling is detected, the encoding will be switched to ZRLE.
+         Use the Popup to go back to Tight if you want to, or set the
+         env. var. SSVNC_PRESERVE_ENCODING=1 to disable the switch.
+
+         For additional speedups under local scaling: try having a solid
+         desktop background on the remote side (either manually or using
+         'x11vnc -solid ...'); and also consider using client side caching
+         'x11vnc -ncache 10 ...' if the remote server is x11vnc.
 
       Escape Keys:
 
@@ -11473,17 +12304,36 @@ proc help_ssvncviewer_opts {} {
          VNCVIEWER_X11CURSOR     (-x11cursor, see Use X11 Cursor above)
          VNCVIEWER_RAWLOCAL      (-rawlocal, see Use Raw Local above)
          VNCVIEWER_ESCAPE        (-escape, see Escape Keys above)
-         SSVNC_SCALE             (-scale, see Scaling above)
          SSVNC_MULTIPLE_LISTEN   (-multilisten, see Mulitple LISTEN above)
          SSVNC_UNIXPW            (-unixpw)
          SSVNC_UNIXPW_NOESC      (do not send escape in -unixpw mode)
+         SSVNC_SCALE             (-scale, see Scaling above)
          SSVNC_NOSOLID           (do not do solid region speedup in
                                   scaling mode.)
-	
+         SSVNC_PRESERVE_ENCODING (do not switch to ZRLE when scaling)
 }
 
 	.av.f.t insert end $msg
+	button .av.htext -text "SSVNC vncviewer -help Output" -command show_viewer_help
+	pack .av.htext -side bottom -fill x
 	jiggle_text .av.f.t
+}
+
+proc show_viewer_help {} {
+	toplev .vhlp
+
+	scroll_text_dismiss .vhlp.f 83 35
+
+	center_win .vhlp
+	wm resizable .vhlp 1 0
+
+	wm title .vhlp "SSVNC vncviewer -help Output"
+
+	set msg "-- No Help Output --"
+	catch {set msg [exec ss_vncviewer -viewerhelp 2>/dev/null]}
+
+	.vhlp.f.t insert end $msg
+	jiggle_text .vhlp.f.t
 }
 
 proc set_viewer_path {} {
@@ -12727,7 +13577,7 @@ proc choose_size_dialog {} {
 	wm title .sz "Desktop Size"
 	global ts_desktop_size ts_desktop_depth choose_desktop_geom
 
-	set def1 "1024x768"
+	set def1 "1280x1024"
 	set def2 "16"
 
 	global ts_desktop_size_def ts_desktop_depth_def
@@ -12939,7 +13789,7 @@ proc set_ts_adv_options {} {
 	incr i
 
 	checkbutton .ot2.b$i -anchor w -variable ts_xlogin -text \
-		"X Login" \
+		"X Login Greeter" \
 		-command {if {$ts_xlogin} {ts_xlogin_dialog}}
 	incr i
 
@@ -13124,6 +13974,22 @@ proc set_advanced_options {} {
 	global ultra_dsm_button
 	set ultra_dsm_button .oa.b$i
 	if {$is_windows} {.oa.b$i configure -state disabled}
+	if {$use_ssh}    {.oa.b$i configure -state disabled}
+	incr i
+
+	checkbutton .oa.b$i -anchor w -variable server_vencrypt -text \
+		"Server uses VeNCrypt SSL encryption"
+	global vencrypt_button
+	set vencrypt_button .oa.b$i
+	if {$is_windows} {.oa.b$i configure -state disabled}
+	if {$use_ssh}    {.oa.b$i configure -state disabled}
+	incr i
+
+	checkbutton .oa.b$i -anchor w -variable server_anondh -text \
+		"Server uses Anonymous Diffie-Hellman"
+	global anondh_button
+	set anondh_button .oa.b$i
+	if {$use_ssh}    {.oa.b$i configure -state disabled}
 	incr i
 
 	checkbutton .oa.b$i -anchor w -variable change_vncviewer -text \
@@ -13230,6 +14096,13 @@ proc set_ssvncviewer_options {} {
 	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
 	incr i
 
+	checkbutton .os.b$i -anchor w -variable listen_once -text \
+		"Listen Once"
+	global listen_once_button
+	set listen_once_button .os.b$i
+	if {!$use_listen} {.os.b$i configure -state disabled}
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
 
 	checkbutton .os.b$i -anchor w -variable use_x11cursor -text \
 		"Use X11 Cursor"
@@ -13260,14 +14133,6 @@ proc set_ssvncviewer_options {} {
 	checkbutton .os.b$i -anchor w -variable use_alpha -text \
 		"Cursor alphablending (32bpp required)"
 	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
-	incr i
-
-	checkbutton .os.b$i -anchor w -variable server_vencrypt -text \
-		"Server uses VeNCrypt SSL/TLS encryption"
-	incr i
-
-	checkbutton .os.b$i -anchor w -variable server_anondh -text \
-		"Server uses Anonymous Diffie-Hellman"
 	incr i
 
 	set relief ridge
@@ -13550,22 +14415,36 @@ proc adv_ssh_tog {on} {
 proc adv_listen_ssl_tog {on} {
 	global stunnel_local_protection_button is_windows
 	global disable_ssl_workarounds_button
+	global vencrypt_button anondh_button ultra_dsm_button
+
+	set blist [list] 
 	if [info exists stunnel_local_protection_button] {
-		if {$on} {
-			catch {$stunnel_local_protection_button configure -state normal}
-		} else {
-			catch {$stunnel_local_protection_button configure -state disabled}
-		}
+		lappend blist $stunnel_local_protection_button
 	}
 	if [info exists disable_ssl_workarounds_button] {
+		lappend blist $disable_ssl_workarounds_button
+	}
+	if [info exists ultra_dsm_button] {
+		lappend blist $ultra_dsm_button
+	}
+	if [info exists vencrypt_button] {
+		lappend blist $vencrypt_button
+	}
+	if [info exists anondh_button] {
+		lappend blist $anondh_button
+	}
+	foreach b $blist {
 		if {$on} {
-			catch {$disable_ssl_workarounds_button configure -state normal}
+			catch {$b configure -state normal}
 		} else {
-			catch {$disable_ssl_workarounds_button configure -state disabled}
+			catch {$b configure -state disabled}
 		}
 	}
+
 	if {$is_windows} {
 		catch {$stunnel_local_protection_button configure -state disabled}
+		catch {$ultra_dsm_button                configure -state disabled}
+		catch {$vencrypt_button                 configure -state disabled}
 	}
 }
 
@@ -13698,6 +14577,7 @@ proc ssl_ssh_adjust {which} {
 
 proc listen_adjust {} {
 	global use_listen revs_button multiple_listen_button is_windows
+	global listen_once_button
 	if {![info exists multiple_listen_button]} {
 		set multiple_listen_button "none"
 	}
@@ -13705,15 +14585,18 @@ proc listen_adjust {} {
 		catch {.b.conn configure -text "Listen"}
 		catch {.o.b.connect configure -text "Listen"}
 		catch {$multiple_listen_button configure -state normal}
+		catch {$listen_once_button configure -state normal}
 		catch {mesg "Listen :N -> Port 5500+N, i.e. :0 -> 5500, :1 -> 5501, :2 -> 5502 ..."}
 	} else {
 		catch {.b.conn configure -text "Connect"}
 		catch {.o.b.connect configure -text "Connect"}
 		catch {$multiple_listen_button configure -state disabled}
+		catch {$listen_once_button configure -state disabled}
 		catch {mesg "Switched to Forward Connection mode."}
 	}
 	if {$is_windows} {
 		catch {$multiple_listen_button configure -state disabled}
+		catch {$listen_once_button configure -state disabled}
 	}
 }
 
@@ -13751,7 +14634,8 @@ proc x11vnc_find_adjust {which} {
 	if {![regexp {x11vnc} $remote_ssh_cmd]} {
 		set remote_ssh_cmd "";
 	}
-	regsub {^[ 	]*PO?R?T?=[ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
+	regsub {^[ 	]*PORT= [ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
+	regsub {^[ 	]*P= [ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
 	regsub {^[ 	]*sudo x11vnc[ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
 	regsub {^[ 	]*x11vnc[ 	]*} $remote_ssh_cmd "" remote_ssh_cmd
 	regsub -all {[ 	]*-find[ 	]*} $remote_ssh_cmd " " remote_ssh_cmd
@@ -13822,7 +14706,7 @@ proc set_options {} {
 	incr i
 
 	radiobutton .o.b$i -anchor w -variable sshssl_sw -value sshssl -text \
-		"Use SSH + SSL" -command {ssl_ssh_adjust sshssl}
+		"Use SSH+SSL" -command {ssl_ssh_adjust sshssl}
 	set iss $i
 	set no_enc_prev .o.b$i
 	incr i
@@ -13997,7 +14881,7 @@ proc set_options {} {
 
 	global uname
 	set t1 "             Advanced ..."
-	set t2 "             Clear Options"
+	set t2 "             Use Defaults"
 	set t3 "             Delete Profile ..."
 	if {$uname == "Darwin"} {
 		regsub {^ *} $t1 "" t1
@@ -14006,7 +14890,7 @@ proc set_options {} {
 	}
 
 	button .o.advanced -anchor w -text $t1 -command set_advanced_options
-	button .o.clear    -anchor w -text $t2 -command set_defaults
+	button .o.clear    -anchor w -text $t2 -command {set_defaults; init_vncdisplay}
 	button .o.delete   -anchor w -text $t3 -command {destroy .o; delete_profile}
 
 	pack .o.clear -side top -fill x 
@@ -14421,7 +15305,7 @@ proc zeroconf_fill {b m} {
 				set hp $dns_sd_cache($name)
 			} else {
 				global env
-				regsub -all {["']} $name "" name2
+				regsub -all {"} $name "" name2
 				set env(DNS_SD_LU) $name2
 				set emsg ""
 				if {$zeroconf_command == "dns-sd"} {
@@ -14669,6 +15553,15 @@ if [file exists $buck_zero] {
 	#puts "HOME: $env(SSVNC_HOME)"
 }
 
+global svcert_default mycert_default crlfil_default
+global svcert_default_force mycert_default_force crlfil_default_force
+set svcert_default ""
+set mycert_default ""
+set crlfil_default ""
+set svcert_default_force 0
+set mycert_default_force 0
+set crlfil_default_force 0
+
 set saw_ts_only 0
 set saw_ssh_only 0
 
@@ -14687,7 +15580,7 @@ global win_localhost
 set win_localhost "127.0.0.1"
 
 global kill_stunnel
-set kill_stunnel 0
+set kill_stunnel 1
 
 global started_with_noenc
 set started_with_noenc 0
@@ -14732,8 +15625,39 @@ if [file exists $ssvncrc] {
 				set env(SSVNC_DISABLE_ENCRYPTION_BUTTON) 1
 				set started_with_noenc 1
 			}
+			if [regexp {^cotvnc=1} $str] {
+				global env
+				set env(SSVNC_COTVNC) 1
+			}
+			if [regexp {^cotvnc=0} $str] {
+				global env
+				set env(SSVNC_COTVNC) 0
+			}
 			if [regexp {^killstunnel=1} $str] {
 				set kill_stunnel 1
+			}
+			if [regexp {^killstunnel=0} $str] {
+				set kill_stunnel 0
+			}
+			if [regexp {^mycert=(.*)$} $str m val] {
+				set val [string trim $val]
+				set mycert_default $val
+			}
+			if [regexp {^cert=(.*)$} $str m val] {
+				set val [string trim $val]
+				set mycert_default $val
+			}
+			if [regexp {^cacert=(.*)$} $str m val] {
+				set val [string trim $val]
+				set svcert_default $val
+			}
+			if [regexp {^ca=(.*)$} $str m val] {
+				set val [string trim $val]
+				set svcert_default $val
+			}
+			if [regexp {^crl=(.*)$} $str m val] {
+				set val [string trim $val]
+				set crlfil_default $val
 			}
 		}
 		close $fh
@@ -14814,8 +15738,17 @@ for {set i 0} {$i < $argc} {incr i} {
 		set saw_ts_only 1
 	} elseif {$item == "-killstunnel"} {
 		set kill_stunnel 1
-	} elseif {$item == "-skill"} {
-		set kill_stunnel 1
+	} elseif {$item == "-nokillstunnel"} {
+		set kill_stunnel 0
+	} elseif {$item == "-mycert" || $item == "-cert"} {
+		incr i
+		set mycert_default [lindex $argv $i]
+	} elseif {$item == "-cacert" || $item == "-ca"} {
+		incr i
+		set svcert_default [lindex $argv $i]
+	} elseif {$item == "-crl"} {
+		incr i
+		set crlfil_default [lindex $argv $i]
 	}
 }
 
@@ -14833,6 +15766,43 @@ global ts_only
 set ts_only 0
 if {[info exists env(SSVNC_TS_ONLY)] || $saw_ts_only} {
 	set ts_only 1
+}
+
+if {$mycert_default != ""} {
+	if [regexp -nocase {^FORCE:} $mycert_default] {
+		set mycert_default_force 1
+		regsub -nocase {^FORCE:} $mycert_default "" mycert_default
+	}
+	if {![file exists $mycert_default]} {
+		set idir [get_idir_certs ""]
+		set mycert_default "$idir/$mycert_default"
+	}
+}
+
+if {$svcert_default != ""} {
+	if [regexp -nocase {^FORCE:} $svcert_default] {
+		set svcert_default_force 1
+		regsub -nocase {^FORCE:} $svcert_default "" svcert_default
+	}
+	if {![file exists $svcert_default]} {
+		set idir [get_idir_certs ""]
+		if {$svcert_default == "CA"} {
+			set svcert_default "$idir/CA/cacert.pem"
+		} else {
+			set svcert_default "$idir/$svcert_default"
+		}
+	}
+}
+
+if {$crlfil_default != ""} {
+	if [regexp -nocase {^FORCE:} $crlfil_default] {
+		set crlfil_default_force 1
+		regsub -nocase {^FORCE:} $crlfil_default "" crlfil_default
+	}
+	if {![file exists $crlfil_default]} {
+		set idir [get_idir_certs ""]
+		set crlfil_default "$idir/$crlfil_default"
+	}
 }
 
 if {$is_windows} {
@@ -14886,6 +15856,13 @@ if {$ssh_only} {
 wm resizable . 1 0
 
 set_defaults
+if {$uname == "Darwin"} {
+	if [info exists use_x11_macosx] {
+		if {$use_x11_macosx} {
+			set darwin_cotvnc 0
+		}
+	}
+}
 set skip_pre 0
 
 set vncdisplay ""
@@ -14971,7 +15948,7 @@ set remote_ssh_cmd_list {.f3.e .f3.l}
 frame .f4
 radiobutton .f4.ssl -anchor w    -variable sshssl_sw -value ssl    -command {ssl_ssh_adjust ssl}    -text "Use SSL"
 radiobutton .f4.ssh -anchor w    -variable sshssl_sw -value ssh    -command {ssl_ssh_adjust ssh}    -text "Use SSH"
-radiobutton .f4.sshssl -anchor w -variable sshssl_sw -value sshssl -command {ssl_ssh_adjust sshssl} -text "SSH + SSL"
+radiobutton .f4.sshssl -anchor w -variable sshssl_sw -value sshssl -command {ssl_ssh_adjust sshssl} -text "SSH+SSL"
 pack .f4.ssl .f4.ssh .f4.sshssl -side left -fill x
 
 set showing_no_encryption 0
@@ -15117,6 +16094,12 @@ for {set i 0} {$i < $argc} {incr i} {
 		;
 	} elseif {$item == "-tso"} {
 		;
+	} elseif {$item == "-mycert" || $item == "-cert"} {
+		incr i
+	} elseif {$item == "-cacert" || $item == "-ca"} {
+		incr i
+	} elseif {$item == "-crl"} {
+		incr i
 	} elseif {$item == "-printhelp"} {
 		print_help
 		exit;
