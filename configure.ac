@@ -682,7 +682,7 @@ if test ! -d ./rfb; then
 fi
 AC_CREATE_STDINT_H(rfb/rfbint.h)
 AC_CACHE_CHECK([for in_addr_t],
-        inaddrt, [
+        vnc_cv_inaddrt, [
                 AC_TRY_COMPILE([#include <sys/types.h>
 #include <netinet/in.h>],
                         [in_addr_t foo; return 0;],
