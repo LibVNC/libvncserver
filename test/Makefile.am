@@ -8,7 +8,7 @@ endif
 
 copyrecttest_LDADD=$(LDADD) -lm
 
-noinst_PROGRAMS=$(ENCODINGS_TEST) cargstest copyrecttest $(BACKGROUND_TEST) \
+check_PROGRAMS=$(ENCODINGS_TEST) cargstest copyrecttest $(BACKGROUND_TEST) \
 	cursortest
 
 test: encodingstest$(EXEEXT) cargstest$(EXEEXT) copyrecttest$(EXEEXT)
