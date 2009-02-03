@@ -6,6 +6,7 @@ AX_PREFIX_CONFIG_H([rfb/rfbconfig.h])
 
 # Checks for programs.
 AC_PROG_CC
+AM_PROG_CC_C_O
 if test -z "$CC"; then
 	CCLD="\$(CC)"
 else
