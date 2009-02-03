@@ -1,3 +1,6 @@
+2009-02-03  Mike Frysinger <vapier@gentoo.org>
+	* autogen.sh, configure.ac, **/Makefile.am: major automake cleanups
+
 2009-01-04  Karl Runge <runge@karlrunge.com>
 	* configure.ac, CMakeLists.txt: set LibVNCServer version to 0.9.7
 
