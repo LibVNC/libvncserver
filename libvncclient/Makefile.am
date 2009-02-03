@@ -1,4 +1,4 @@
-AM_CFLAGS=-g -I $(top_srcdir) -I. -Wall
+INCLUDES = -I$(top_srcdir)
 
 libvncclient_la_SOURCES=cursor.c listen.c rfbproto.c sockets.c vncviewer.c minilzo.c
 

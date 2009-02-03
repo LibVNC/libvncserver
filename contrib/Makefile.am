@@ -1,4 +1,4 @@
-AM_CFLAGS = -I $(top_srcdir)
+INCLUDES = -I$(top_srcdir)
 LDADD = ../libvncserver/libvncserver.la @WSOCKLIB@
 
 noinst_PROGRAMS=zippy

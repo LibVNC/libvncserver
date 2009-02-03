@@ -12,6 +12,7 @@ if test -z "$CC"; then
 else
 	CCLD="$CC"
 fi
+test "x$GCC" = "xyes" && CFLAGS="$CFLAGS -Wall"
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
 AC_PATH_PROG([AR], [ar], [/usr/bin/ar],

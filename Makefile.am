@@ -1,5 +1,3 @@
-CFLAGS=-g -Wall
-
 if WITH_X11VNC
 X11VNC=x11vnc
 endif

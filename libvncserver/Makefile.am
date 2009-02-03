@@ -1,4 +1,4 @@
-AM_CFLAGS=-g -Wall -I $(top_srcdir)
+INCLUDES = -I$(top_srcdir)
 
 if WITH_TIGHTVNC_FILETRANSFER
 TIGHTVNCFILETRANSFERHDRS=tightvnc-filetransfer/filelistinfo.h \
