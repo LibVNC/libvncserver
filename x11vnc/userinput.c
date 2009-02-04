@@ -9015,7 +9015,7 @@ if (ncdb && c) fprintf(stderr, "check_ncache purged %d events\n", c);
 			    "If there are painting errors press 3 Alt_L's (Left \"Alt\" key) in a row to repaint the screen.",
 			    white_pixel());
 			rfbDrawString(screen, &default8x16Font, dx, ds + Dy+6*dy,
-			    "More info:  http://www.karlrunge.com/x11vnc/#faq-client-caching",
+			    "More info:  http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching",
 			    white_pixel());
 
 			ds += 11 * dy;

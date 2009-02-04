@@ -1004,6 +1004,48 @@ void vnc_reflect_got_cursorshape(rfbClient *cl, int xhot, int yhot, int width, i
 	set_cursor(cursor_x, cursor_y, get_which_cursor());
 }
 
+static void from_libvncclient_CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y) {
+  int i,j;
+
+#define COPY_RECT_FROM_RECT(BPP) \
+  { \
+    uint##BPP##_t* _buffer=((uint##BPP##_t*)client->frameBuffer)+(src_y-dest_y)*client->width+src_x-dest_x; \
+    if (dest_y < src_y) { \
+      for(j = dest_y*client->width; j < (dest_y+h)*client->width; j += client->width) { \
+        if (dest_x < src_x) { \
+          for(i = dest_x; i < dest_x+w; i++) { \
+            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
+          } \
+        } else { \
+          for(i = dest_x+w-1; i >= dest_x; i--) { \
+            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
+          } \
+        } \
+      } \
+    } else { \
+      for(j = (dest_y+h-1)*client->width; j >= dest_y*client->width; j-=client->width) { \
+        if (dest_x < src_x) { \
+          for(i = dest_x; i < dest_x+w; i++) { \
+            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
+          } \
+        } else { \
+          for(i = dest_x+w-1; i >= dest_x; i--) { \
+            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
+          } \
+        } \
+      } \
+    } \
+  }
+
+  switch(client->format.bitsPerPixel) {
+  case  8: COPY_RECT_FROM_RECT(8);  break;
+  case 16: COPY_RECT_FROM_RECT(16); break;
+  case 32: COPY_RECT_FROM_RECT(32); break;
+  default:
+    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
+  }
+}
+
 void vnc_reflect_got_copyrect(rfbClient *cl, int src_x, int src_y, int w, int h, int dest_x, int dest_y) {
 	sraRegionPtr reg;
 	int dx, dy, rc = -1;
@@ -1021,13 +1063,15 @@ void vnc_reflect_got_copyrect(rfbClient *cl, int src_x, int src_y, int w, int h,
 	if (dx != last_dx || dy != last_dy) {
 		rc = fb_push_wait(0.05, FB_COPY|FB_MOD);
 	}
-	if (0) fprintf(stderr, "vnc_reflect_got_copyrect: %dx%d+%d+%d   %d %d  rc=%d\n", dest_x, dest_y, w, h, dx, dy, rc);
+	if (1) fprintf(stderr, "vnc_reflect_got_copyrect: %03dx%03d+%03d+%03d   %3d %3d  rc=%d\n", dest_x, dest_y, w, h, dx, dy, rc);
 	reg = sraRgnCreateRect(dest_x, dest_y, dest_x + w, dest_y + h);
 	do_copyregion(reg, dx, dy, 0);
 	sraRgnDestroy(reg);
 
 	last_dx = dx;
 	last_dy = dy;
+
+	from_libvncclient_CopyRectangleFromRectangle(cl, src_x, src_y, w, h, dest_x, dest_y);
 }
 
 rfbBool vnc_reflect_resize(rfbClient *cl)  {

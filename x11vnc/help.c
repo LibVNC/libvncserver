@@ -52,7 +52,7 @@ void print_help(int mode) {
 "Also, use of a VNC password (-rfbauth or -passwdfile) is strongly recommended.\n"
 "\n"
 "For additional info see: http://www.karlrunge.com/x11vnc/\n"
-"                    and  http://www.karlrunge.com/x11vnc/#faq\n"
+"                    and  http://www.karlrunge.com/x11vnc/faq.html\n"
 "\n"
 "\n"
 "Config file support: if the file $HOME/.x11vncrc exists then each line in\n"
@@ -1343,10 +1343,11 @@ void print_help(int mode) {
 "                       The VNC Viewer-side needs to support SSL/TLS as well.\n"
 "                       See this URL and also the discussion below for\n"
 "                       ideas on how to enable SSL support for the viewer:\n"
-"                       http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-viewers\n"
-"                       x11vnc provides an SSL enabled Java viewer applet in\n"
-"                       the classes/ssl directory (-http or -httpdir options.)\n"
-"                       The SSVNC viewer package supports SSL tunnels too.\n"
+"                       http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tun\n"
+"                       nel-viewers x11vnc provides an SSL enabled Java\n"
+"                       viewer applet in the classes/ssl directory (-http or\n"
+"                       -httpdir options.)  The SSVNC viewer package supports\n"
+"                       SSL tunnels too.\n"
 "\n"
 "                       If the VNC Viewer supports VeNCrypt or ANONTLS (vino's\n"
 "                       encryption mode) they are also supported by the -ssl\n"
@@ -2459,6 +2460,10 @@ void print_help(int mode) {
 "                       sure the initial viewer geometry will be big enough\n"
 "                       to handle all subsequent resizes (e.g. under -xrandr,\n"
 "                       -remote id:windowid, rescaling, etc.)\n"
+"\n"
+"                       In -unixpw mode this sets the size of the login screen.\n"
+"                       Use \"once:WxH\" it ignore padgeom after the login\n"
+"                       screen is set up.\n"
 "\n"
 "-o logfile             Write stderr messages to file \"logfile\" instead of to\n"
 "                       the terminal.  Same as \"-logfile file\".  To append\n"
@@ -4382,6 +4387,7 @@ void print_help(int mode) {
 "                       fb              disable -nofb mode.\n"
 "                       bell            enable  bell (if supported).\n"
 "                       nobell          disable bell.\n"
+"                       sendbell        ring the bell now.\n"
 "                       nosel           enable  -nosel mode.\n"
 "                       sel             disable -nosel mode.\n"
 "                       noprimary       enable  -noprimary mode.\n"
@@ -4914,7 +4920,7 @@ void xopen_display_fail_message(char *disp) {
 	fprintf(stderr, "   change and the directory the cookie file resides in"
 	    " is system dependent.\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, "See also: http://www.karlrunge.com/x11vnc/#faq\n");
+	fprintf(stderr, "See also: http://www.karlrunge.com/x11vnc/faq.html\n");
 }
 
 void nopassword_warning_msg(int gotloc) {
@@ -4974,7 +4980,7 @@ void nopassword_warning_msg(int gotloc) {
 "#@  Please Read the documention for more info about          @#\n"
 "#@  passwords, security, and encryption.                     @#\n"
 "#@                                                           @#\n"
-"#@    http://www.karlrunge.com/x11vnc/#faq-passwd            @#\n"
+"#@    http://www.karlrunge.com/x11vnc/faq.html#faq-passwd    @#\n"
 ;
 	char str3[] =
 "#@                                                           @#\n"

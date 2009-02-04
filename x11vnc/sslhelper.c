@@ -1248,18 +1248,23 @@ void ssl_helper_pid(pid_t pid, int sock) {
 #	define HPSIZE 256
 	static pid_t helpers[HPSIZE];
 	static int   sockets[HPSIZE], first = 1;
-	int i, empty, set, status, db = 0;
+	int i, empty, set, status;
+	static int db = 0;
 
 	if (first) {
 		for (i=0; i < HPSIZE; i++)  {
 			helpers[i] = 0;
 			sockets[i] = 0;
 		}
+		if (getenv("SSL_HELPER_PID_DB")) {
+			db = 1;
+		}
 		first = 0;
 	}
 
+
 	if (pid == 0) {
-		/* killall */
+		/* killall or waitall */
 		for (i=0; i < HPSIZE; i++) {
 			if (helpers[i] == 0) {
 				sockets[i] = -1;
@@ -1279,13 +1284,17 @@ void ssl_helper_pid(pid_t pid, int sock) {
 				}
 
 #if LIBVNCSERVER_HAVE_SYS_WAIT_H && LIBVNCSERVER_HAVE_WAITPID 
-if (db) fprintf(stderr, "waitpid(%d)\n", helpers[i]);
 				wret = waitpid(helpers[i], &status, WNOHANG); 
+
+if (db) fprintf(stderr, "waitpid(%d)\n", helpers[i]);
+if (db) fprintf(stderr, "  waitret1=%d\n", wret);
+
 				if (kret == 0 && wret != helpers[i]) {
 					int k;
 					for (k=0; k < 10; k++) {
 						usleep(100 * 1000);
 						wret = waitpid(helpers[i], &status, WNOHANG); 
+if (db) fprintf(stderr, "  waitret2=%d\n", wret);
 						if (wret == helpers[i]) {
 							break;
 						}
@@ -1310,10 +1319,12 @@ if (db) fprintf(stderr, "ssl_helper_pid(%d, %d)\n", pid, sock);
 	for (i=0; i < HPSIZE; i++) {
 		if (helpers[i] == pid) {
 			if (sock == -1) {
-
 #if LIBVNCSERVER_HAVE_SYS_WAIT_H && LIBVNCSERVER_HAVE_WAITPID 
+				pid_t wret;
+				wret = waitpid(helpers[i], &status, WNOHANG); 
+
 if (db) fprintf(stderr, "waitpid(%d) 2\n", helpers[i]);
-				waitpid(helpers[i], &status, WNOHANG); 
+if (db) fprintf(stderr, "  waitret1=%d\n", wret);
 #endif
 				helpers[i] = 0;
 			}
@@ -2456,6 +2467,7 @@ void accept_openssl(int mode, int presock) {
 				}
 				screen->port = origport;
 				rfbLog("SSL: guessing child https finished.\n");
+				ssl_helper_pid(0, -2);
 				if (mode == OPENSSL_INETD) {
 					clean_up_exit(1);
 				}
@@ -2490,8 +2502,11 @@ void accept_openssl(int mode, int presock) {
 				}
 				rfbLog("SSL: OPENSSL_INETD guessing "
 				    "child https finished.\n");
+				ssl_helper_pid(0, -2);
 				clean_up_exit(1);
 			}
+			/* this will actually only get earlier https */
+			ssl_helper_pid(0, -2);
 			return;
 		}
 		kill(pid, SIGTERM);
@@ -3522,6 +3537,8 @@ static void ssl_xfer(int csock, int s_in, int s_out, int is_https) {
 			} else {
 				tv_use = tv_vnc_later;
 			}
+			/* try to clean out some zombies if we can. */
+			ssl_helper_pid(0, -2);
 		}
 		if (ssl_timeout_secs > 0) {
 			tv_use = ssl_timeout_secs;
@@ -3742,7 +3759,16 @@ void check_openssl(void) {
 	static double last_check = 0.0;
 	double now;
 
-	if (! use_openssl || openssl_sock < 0) {
+	if (! use_openssl) {
+		return;
+	}
+
+	if (time(NULL) > last_waitall + 120) {
+		last_waitall = time(NULL);
+		ssl_helper_pid(0, -2);	/* waitall */
+	}
+
+	if (openssl_sock < 0) {
 		return;
 	}
 
@@ -3751,11 +3777,6 @@ void check_openssl(void) {
 		return;
 	}
 	last_check = now;
-
-	if (time(NULL) > last_waitall + 150) {
-		last_waitall = time(NULL);
-		ssl_helper_pid(0, -2);	/* waitall */
-	}
 
 	FD_ZERO(&fds);
 	FD_SET(openssl_sock, &fds);
@@ -3809,6 +3830,7 @@ void check_https(void) {
 static void init_prng(void) {
 	int db = 0, bytes, ubytes, fd;
 	char file[MSZ], dtmp[100];
+	unsigned int sr;
 
 	RAND_file_name(file, MSZ);
 
@@ -3838,6 +3860,9 @@ static void init_prng(void) {
 		RAND_poll();
 	}
 	
+	RAND_bytes((unsigned char *)&sr, 4);
+	srand(sr);
+
 	if (bytes > 0) {
 		if (! quiet) {
 			rfbLog("initialized PRNG with %d random bytes.\n",

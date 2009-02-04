@@ -169,10 +169,37 @@ void selection_request(XEvent *ev, char *type) {
 	}
 
 	if (! trapped_xerror) {
-		int ret = XSendEvent(req_event->display, req_event->requestor, False, 0,
-		    (XEvent *)&notify_event);
+		int ret = -2, skip_it = 0, ms = 0;
+		double now = dnow();
+		static double last_check = 0.0;
+
+		if (now > last_check + 0.2) {
+			XFlush_wr(dpy);
+			if (!valid_window(req_event->requestor , NULL, 1)) {
+				sync_it = 1;
+				skip_it = 1;
+				if (debug_sel) {
+					rfbLog("selection_request: not a valid window: 0x%x\n",
+					    req_event->requestor);
+				}
+				ms = 10;
+			}
+			if (trapped_xerror) {
+				sync_it = 1;
+				skip_it = 1;
+			}
+			last_check = dnow();
+		}
+
+		if (!skip_it) {
+			ret = XSendEvent(req_event->display, req_event->requestor, False, 0,
+			    (XEvent *)&notify_event);
+		}
 		if (debug_sel) {
 			rfbLog("XSendEvent() -> %d\n", ret);
+		}
+		if (ms > 0) {
+			usleep(ms * 1000);
 		}
 	}
 	if (trapped_xerror) {
@@ -182,7 +209,7 @@ void selection_request(XEvent *ev, char *type) {
 
 	XFlush_wr(dpy);
 	if (sync_it) {
-		usleep(5 * 1000);
+		usleep(10 * 1000);
 		XSync(dpy, False);
 	}
 

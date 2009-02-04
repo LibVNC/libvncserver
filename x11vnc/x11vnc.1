@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "January 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "February 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.7, lastmod: 2009-01-11
+         version: 0.9.7, lastmod: 2009-01-24
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -40,7 +40,7 @@ ssh \fB-t\fR \fB-L\fR 5900:localhost:5900 far-host 'x11vnc \fB-localhost\fR \fB-
 Also, use of a VNC password (-rfbauth or \fB-passwdfile)\fR is strongly recommended.
 .PP
 For additional info see: http://www.karlrunge.com/x11vnc/
-and  http://www.karlrunge.com/x11vnc/#faq
+and  http://www.karlrunge.com/x11vnc/faq.html
 .PP
 Config file support: if the file $HOME/.x11vncrc exists then each line in
 it is treated as a single command line option.  Disable with \fB-norc.\fR  For
@@ -1548,10 +1548,11 @@ is prescribed.
 The VNC Viewer-side needs to support SSL/TLS as well.
 See this URL and also the discussion below for
 ideas on how to enable SSL support for the viewer:
-http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-viewers
-x11vnc provides an SSL enabled Java viewer applet in
-the classes/ssl directory (-http or \fB-httpdir\fR options.)
-The SSVNC viewer package supports SSL tunnels too.
+http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tun
+nel-viewers x11vnc provides an SSL enabled Java
+viewer applet in the classes/ssl directory (-http or
+\fB-httpdir\fR options.)  The SSVNC viewer package supports
+SSL tunnels too.
 .IP
 If the VNC Viewer supports VeNCrypt or ANONTLS (vino's
 encryption mode) they are also supported by the \fB-ssl\fR
@@ -2786,6 +2787,10 @@ that do not support NewFBSize and one wants to make
 sure the initial viewer geometry will be big enough
 to handle all subsequent resizes (e.g. under \fB-xrandr,\fR
 \fB-remote\fR id:windowid, rescaling, etc.)
+.IP
+In \fB-unixpw\fR mode this sets the size of the login screen.
+Use "once:WxH" it ignore padgeom after the login
+screen is set up.
 .PP
 \fB-o\fR \fIlogfile\fR
 .IP
@@ -5163,6 +5168,8 @@ fb              disable \fB-nofb\fR mode.
 bell            enable  bell (if supported).
 .IP
 nobell          disable bell.
+.IP
+sendbell        ring the bell now.
 .IP
 nosel           enable  \fB-nosel\fR mode.
 .IP

@@ -243,6 +243,16 @@ UltraVNC Java viewer only:
 
 		Home.Desktop.bin_2F_linux
 
+	If an item is prefixed with "TOP_" then the item is inserted at
+	the top of the drop down rather than being appended to the end.
+	E.g. to try to initially load the user homedir instead of /:
+
+		TOP_Home.My+Documents.Desktop
+
+	If ftpDropDown is set to the empty string, "", then no special
+	locations, [Desktop] etc., are placed in the drop down.  Only the
+	ultravnc "drives" will appear.
+
   ftpOnly
 	yes/no, default: no
 	The VNC viewer only shows the filetransfer panel, no desktop

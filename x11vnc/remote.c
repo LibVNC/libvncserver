@@ -2537,6 +2537,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		sound_bell = 0;
 		goto done;
 	}
+	if (!strcmp(p, "sendbell")) {
+		NOTAPP
+		rfbLog("remote_cmd: sendbell.\n");
+		if (screen && client_count) {
+			rfbSendBell(screen);
+		}
+		goto done;
+	}
 	if (!strcmp(p, "sel")) {
 		if (query) {
 			snprintf(buf, bufn, "ans=%s:%d", p, watch_selection);

@@ -1809,7 +1809,7 @@ char msg[] =
 "    2) You can actually see the cached pixel data if you scroll down\n"
 "       to it in your viewer; adjust your viewer's size to hide it.\n"
 "\n"
-"More info: http://www.karlrunge.com/x11vnc/#faq-client-caching\n"
+"More info: http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching\n"
 "\n"
 "waiting for connections:\n"
 ;
@@ -1824,7 +1824,7 @@ char msg2[] =
 "\n"
 "    x11vnc -ncache 10 ...\n"
 "\n"
-"more info: http://www.karlrunge.com/x11vnc/#faq-client-caching\n"
+"more info: http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching\n"
 "\n"
 ;
 
@@ -3775,6 +3775,11 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	if (! getenv("NO_LIBXCB_ALLOW_SLOPPY_LOCK")) {
+		/* libxcb is a bit too strict for us sometimes... */
+		set_env("LIBXCB_ALLOW_SLOPPY_LOCK", "1");
+	}
+
 	/* set OS struct UT */
 	uname(&UT);
 
@@ -4166,6 +4171,14 @@ int main(int argc, char* argv[]) {
 	if (viewonly_passwd && pw_loc < 0) {
 		rfbLog("-passwd must be supplied when using -viewpasswd\n");
 		exit(1);
+	}
+	if (1) {
+		/* mix things up a little bit */
+		unsigned char buf[CHALLENGESIZE];
+		int k, kmax = (int) (500 * rfac()) + 100;
+		for (k=0; k < kmax; k++) {
+			rfbRandomBytes(buf);
+		}
 	}
 
 	if (SHOW_NO_PASSWORD_WARNING) {
@@ -4943,7 +4956,7 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		rfbLog("  client sides.  This mode works with any VNC viewer.\n");
 		rfbLog("  However, in most you can actually see the cached pixel\n");
 		rfbLog("  data by scrolling down, so you need to re-adjust its size.\n");
-		rfbLog("  See http://www.karlrunge.com/x11vnc/#faq-client-caching.\n");
+		rfbLog("  See http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching.\n");
 		rfbLog("  If this mode yields undesired behavior (poor response,\n");
 		rfbLog("  painting errors, etc) it may be disabled via: '-ncache 0'\n");
 		rfbLog("  You can press 3 Alt_L's (Left \"Alt\" key) in a row to \n");

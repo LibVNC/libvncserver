@@ -16,6 +16,7 @@ extern char *crypt(const char*, const char *);
 #include "connections.h"
 #include "user.h"
 #include "connections.h"
+#include "sslhelper.h"
 #include "cursor.h"
 #include <rfb/default8x16.h>
 
@@ -1517,6 +1518,8 @@ static void apply_opts (char *user) {
 
 void unixpw_accept(char *user) {
 	apply_opts(user);
+
+	ssl_helper_pid(0, -2);	/* waitall */
 
 	if (accept_cmd && strstr(accept_cmd, "popup") == accept_cmd) {
 		if (use_dpy && strstr(use_dpy, "WAIT:") == use_dpy &&

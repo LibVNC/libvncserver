@@ -13,6 +13,7 @@
 #include "keyboard.h"
 #include "cursor.h"
 #include "remote.h"
+#include "sslhelper.h"
 #include "avahi.h"
 
 void check_switched_user(void);
@@ -590,6 +591,7 @@ static int guess_user_and_switch(char *str, int fb_mode) {
 			free(t);
 			continue;
 		}
+
 		if (switch_user(user, fb_mode)) {
 			rfbLog("switched to guessed user: %s\n", user);
 			free(t);
@@ -683,6 +685,8 @@ int switch_user(char *user, int fb_mode) {
 		doit = 1;
 		user++;
 	}
+
+	ssl_helper_pid(0, -2);	/* waitall */
 
 	if (strstr(user, "guess=") == user) {
 		return guess_user_and_switch(user, fb_mode);
@@ -1370,10 +1374,27 @@ static void setup_fake_fb(XImage* fb_image, int w, int h, int b) {
 	fb_image->bits_per_pixel = b;
 	fb_image->bytes_per_line = w*b/8;
 	fb_image->bitmap_unit = -1;
-	fb_image->depth = 24;
-	fb_image->red_mask   = 0xff0000;
-	fb_image->green_mask = 0x00ff00;
-	fb_image->blue_mask  = 0x0000ff;
+	if (b >= 24) {
+		fb_image->depth = 24;
+		fb_image->red_mask   = 0xff0000;
+		fb_image->green_mask = 0x00ff00;
+		fb_image->blue_mask  = 0x0000ff;
+	} else if (b >= 16) {
+		fb_image->depth = 16;
+		fb_image->red_mask   = 0x003f;
+		fb_image->green_mask = 0x07c0;
+		fb_image->blue_mask  = 0xf800;
+	} else if (b >= 2) {
+		fb_image->depth = 8;
+		fb_image->red_mask   = 0x07;
+		fb_image->green_mask = 0x38;
+		fb_image->blue_mask  = 0xc0;
+	} else {
+		fb_image->depth = 1;
+		fb_image->red_mask   = 0x1;
+		fb_image->green_mask = 0x1;
+		fb_image->blue_mask  = 0x1;
+	}
 
 	depth = fb_image->depth;
 
@@ -2574,7 +2595,7 @@ int wait_for_client(int *argc, char** argv, int http) {
 	/* ugh, here we go... */
 	XImage* fb_image;
 	int w = 640, h = 480, b = 32;
-	int w0, h0, i, chg_raw_fb = 0;
+	int w0 = -1, h0 = -1, i, chg_raw_fb = 0;
 	char *str, *q, *cmd = NULL;
 	int db = 0, dt = 0;
 	char *create_cmd = NULL;
@@ -2618,9 +2639,31 @@ int wait_for_client(int *argc, char** argv, int http) {
 			w = w0;
 			h = h0;
 			rfbLog("wait_for_client set: w=%d h=%d\n", w, h);
+		} else {
+			w0 = -1;
+			h0 = -1;
 		}
 		*q = ':';
 		str = q;
+	}
+	if ((w0 == -1 || h0 == -1) && pad_geometry != NULL) {
+		int b0, del = 0;
+		char *s = pad_geometry;
+		if (strstr(s, "once:") == s) {
+			del = 1;
+			s += strlen("once:");
+		}
+		if (sscanf(s, "%dx%dx%d", &w0, &h0, &b0) == 3)  {
+			w = nabs(w0);
+			h = nabs(h0);
+			b = nabs(b0);
+		} else if (sscanf(s, "%dx%d", &w0, &h0) == 2)  {
+			w = nabs(w0);
+			h = nabs(h0);
+		}
+		if (del) {
+			pad_geometry = NULL;
+		}
 	}
 
 	/* str currently begins with a ':' */
