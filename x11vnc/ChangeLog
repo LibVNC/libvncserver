@@ -1,3 +1,6 @@
+2009-02-21  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add -noskip_lockkeys option for future use.
+
 2009-02-03  Karl Runge <runge@karlrunge.com>
 	* x11vnc: Add "sendbell" remote cmd.  Fix copyrect updates under
 	  -reflect.  Workaround that checks valid window of selection

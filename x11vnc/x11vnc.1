@@ -2,7 +2,7 @@
 .TH X11VNC "1" "February 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.7, lastmod: 2009-01-24
+         version: 0.9.7, lastmod: 2009-02-21
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -2942,7 +2942,7 @@ pressing CapsLock outside of the viewer window, also
 \fB-skip_lockkeys\fR below).  Also try \fB-nomodtweak\fR for a
 possible workaround.
 .PP
-\fB-skip_lockkeys\fR
+\fB-skip_lockkeys,\fR \fB-noskip_lockkeys\fR
 .IP
 Have x11vnc ignore all Caps_Lock, Shift_Lock, Num_Lock,
 Scroll_Lock keysyms received from viewers.  The idea is
@@ -2954,6 +2954,7 @@ X server.  Note this mode probably won't do what you
 want in \fB-nomodtweak\fR mode.  Also, a kludge for KP_n
 digits is always done it this mode: they are mapped to
 regular digit keysyms.  See also \fB-capslock\fR above.
+The default is \fB-noskip_lockkeys.\fR
 .PP
 \fB-skip_keycodes\fR \fIstring\fR
 .IP

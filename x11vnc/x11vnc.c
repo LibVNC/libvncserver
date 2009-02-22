@@ -2944,6 +2944,10 @@ int main(int argc, char* argv[]) {
 			skip_lockkeys = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-noskip_lockkeys")) {
+			skip_lockkeys = 0;
+			continue;
+		}
 		if (!strcmp(arg, "-xkbcompat")) {
 			xkbcompat = 1;
 			continue;
