@@ -591,7 +591,7 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 			EVP_CIPHER_CTX_init(ctx);
 			if (pw_in) {
 			    /* for pw=xxxx a md5 hash is used */
-			    EVP_BytesToKey(Cipher, Digest, NULL, keydata,
+			    EVP_BytesToKey(Cipher, Digest, NULL, (unsigned char *) keydata,
 			        keydata_len, 1, keystr, NULL);
 			    EVP_CipherInit_ex(ctx, Cipher, NULL, keystr, NULL,
 			        encrypt);
@@ -603,7 +603,7 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 		} else {
 			/* XXX might not be correct */
 			exit(1);
-			EVP_BytesToKey(Cipher, Digest, NULL, keydata,
+			EVP_BytesToKey(Cipher, Digest, NULL, (unsigned char *) keydata,
 			    keydata_len, 1, keystr, ivec); 
 			EVP_CIPHER_CTX_init(ctx);
 			EVP_CipherInit_ex(ctx, Cipher, NULL, keystr, ivec,
@@ -646,7 +646,7 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 		} else if (noultra && ivec_size > 0) {
 			/* "normal" mode, don't overwrite ivec. */
 
-			EVP_BytesToKey(Cipher, Digest, in_salt, keydata,
+			EVP_BytesToKey(Cipher, Digest, in_salt, (unsigned char *) keydata,
 			    keydata_len, 1, keystr, NULL);
 
 		} else {
@@ -655,7 +655,7 @@ static void enc_xfer(int sock_fr, int sock_to, int encrypt) {
 			 * clobbers the ivec we set up above!  Under
 			 * noultra we overwrite ivec only if ivec_size=0.
 			 */
-			EVP_BytesToKey(Cipher, Digest, in_salt, keydata,
+			EVP_BytesToKey(Cipher, Digest, in_salt, (unsigned char *) keydata,
 			    keydata_len, 1, keystr, ivec);
 		}
 

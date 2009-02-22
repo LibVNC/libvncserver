@@ -2,6 +2,7 @@
 
 #include "x11vnc.h"
 #include "connections.h"
+#include "cleanup.h"
 
 void avahi_initialise(void);
 void avahi_advertise(const char *name, const char *host, const uint16_t port);
@@ -136,6 +137,10 @@ void avahi_cleanup(void) {
 #include <avahi-client/client.h>
 #include <avahi-client/publish.h>
 
+#include <avahi-common/malloc.h>
+#include <avahi-common/error.h>
+
+
 static AvahiThreadedPoll *_poll = NULL;
 static AvahiClient *_client = NULL;
 static AvahiEntryGroup *_group = NULL;
@@ -241,6 +246,8 @@ if (db) fprintf(stderr, "in  _avahi_entry_group_callback %d 0x%p\n", state, svc)
 		rfbLog("Avahi Entry group failure: %s\n",
 		    avahi_strerror(avahi_client_errno(
 		    avahi_entry_group_get_client(g))));
+		break;
+	default:
 		break;
 	}
 if (db) fprintf(stderr, "out _avahi_entry_group_callback\n");

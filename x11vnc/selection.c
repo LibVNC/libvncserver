@@ -4,6 +4,7 @@
 #include "cleanup.h"
 #include "connections.h"
 #include "unixpw.h"
+#include "win_utils.h"
 #include "xwrappers.h"
 
 /*
