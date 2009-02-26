@@ -148,7 +148,7 @@ Displays
 	=S reflect:
 	=D desktop:
 	=D rfbport:
-	=S autoport
+	=S autoport:
 	=0 gui:
 
 Screen
@@ -254,7 +254,7 @@ Misc
 	=GAL LOFF
 	=GAL X-ext::
 	xtrap
-	xrecord
+	noxrecord
 	=RQA reset_record
 	=GAL LOFF
 	=GAL MacOSX::
@@ -2535,8 +2535,38 @@ proc get_default_vars {} {
 
 	append qry ",vncconnect"
 
-	set qargs [list "-QD" $qry]
-	set all [run_remote_cmd $qargs]
+	set q ""
+	set i 0
+	set all ""
+	foreach s [split $qry ","] {
+		if {$q != ""} {
+			append q ","
+		}
+		append q $s
+		incr i
+		if {$i > 50} {
+			set qargs [list "-QD" $q]
+			set a [run_remote_cmd $qargs]
+			if {$all != ""} {
+				append all ","
+			}
+			append all $a
+			set q ""
+			set i 0
+		}
+	}
+	if {$q != ""} {
+		set qargs [list "-QD" $q]
+		set a [run_remote_cmd $qargs]
+		if {$all != ""} {
+			append all ","
+		}
+		append all $a
+	}
+
+# old way, qry too long...
+#	set qargs [list "-QD" $qry]
+#	set all [run_remote_cmd $qargs]
 
 	if {[regexp {ans=} $all]} {
 		#append_text "Retrieved all default settings.\n"
@@ -5870,12 +5900,17 @@ proc get_settings_rcfile {} {
 			continue
 		} elseif {$item == "rc" || $item == "norc"} {
 			continue
+		} elseif {$item == "loop"} {
+			continue
+		} elseif {$item == "loopbg"} {
+			continue
 		}
 
 		set def ""
 		if {[info exists default_var($item)]} {
 			set def $default_var($item)
 		}
+
 
 		set qst ""
 		set hmm "#? "
@@ -5896,6 +5931,7 @@ proc get_settings_rcfile {} {
 		} else {
 			set mv $menu_var($item)
 		}
+#puts "item=$item def=$def mv=$mv"
 		if {$mv == $unset_str} {
 			set mv ""
 		}

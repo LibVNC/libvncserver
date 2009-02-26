@@ -1363,7 +1363,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	}
 	if (!strcmp(p, "ultrafilexfer")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p, screen->permitFileTransfer == TRUE);
+			if (screen) {
+				snprintf(buf, bufn, "ans=%s:%d", p, screen->permitFileTransfer == TRUE);
+			} else {
+				snprintf(buf, bufn, "ans=%s:%d", p, 0);
+			}
 			goto qry;
 		}
 		if (! screen->permitFileTransfer) {
@@ -1374,7 +1378,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 	}
 	if (!strcmp(p, "noultrafilexfer")) {
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d", p, screen->permitFileTransfer == FALSE);
+			if (screen) {
+				snprintf(buf, bufn, "ans=%s:%d", p, screen->permitFileTransfer == FALSE);
+			} else {
+				snprintf(buf, bufn, "ans=%s:%d", p, 1);
+			}
 			goto qry;
 		}
 		if (screen->permitFileTransfer) {
@@ -1387,7 +1395,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		int maj, min;
 		COLON_CHECK("rfbversion:")
 		if (query) {
-			snprintf(buf, bufn, "ans=%s:%d.%d", p, screen->protocolMajorVersion, screen->protocolMinorVersion);
+			if (screen) {
+				snprintf(buf, bufn, "ans=%s:%d.%d", p, screen->protocolMajorVersion, screen->protocolMinorVersion);
+			} else {
+				snprintf(buf, bufn, "ans=%s:%d.%d", p, 3, 8);
+			}
 			goto qry;
 		}
 		p += strlen("rfbversion:");
@@ -5091,6 +5103,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (!strcmp(p, "vncdisplay")) {
 			snprintf(buf, bufn, "aro=%s:%s", p,
 			    NONUL(vnc_desktop_name));
+			goto qry;
+		}
+		if (!strcmp(p, "autoport")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, auto_port);
+			goto qry;
+		}
+		if (!strcmp(p, "loop") || !strcmp(p, "loopbg")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, 0);
 			goto qry;
 		}
 		if (!strcmp(p, "desktopname")) {
