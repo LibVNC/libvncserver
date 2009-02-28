@@ -1,0 +1,13 @@
+#!/bin/sh
+
+ldir="../../../libvncserver"
+
+if [ ! -f "$ldir/tight.c.ORIG" ]; then
+	ls -l "$ldir/tight.c.ORIG"
+	exit 1
+fi
+
+set -xv
+rm -f "$ldir/tight.c" "$ldir/turbojpeg.h"
+mv "$ldir/tight.c.ORIG" "$ldir/tight.c"
+ls -l $ldir/tight.c*

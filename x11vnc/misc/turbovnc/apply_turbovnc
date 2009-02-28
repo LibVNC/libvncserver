@@ -1,0 +1,33 @@
+#!/bin/sh
+
+ldir="../../../libvncserver"
+
+fail=""
+if [ ! -f "./tight.c" ]; then
+	fail=1
+fi
+if [ ! -f "./turbojpeg.h" ]; then
+	fail=1
+fi
+if [ ! -f "./convert" ]; then
+	fail=1
+fi
+if [ ! -f "$ldir/tight.c" ]; then
+	ls -l "$ldir/tight.c"
+	fail=1
+fi
+if [ "X$fail" = "X1" ]; then
+	echo "Must be run from inside the directory containing 'apply_turbovnc'"
+	exit 1
+fi
+
+if [ -f "$ldir/tight.c.ORIG" ]; then
+	set -xv
+else
+	set -xv
+	cp -p "$ldir/tight.c" "$ldir/tight.c.ORIG"
+fi
+
+perl ./convert ./tight.c > "$ldir/tight.c"
+cp -p ./turbojpeg.h "$ldir"
+ls -l $ldir/tight.c* $ldir/turbojpeg.h

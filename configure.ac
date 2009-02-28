@@ -774,7 +774,7 @@ if test "$build_x11vnc" = "yes"; then
 	#
 	# configure.ac:690: required file `x11vnc/Makefile.in' not found
 	#
-	AC_CONFIG_FILES([x11vnc/Makefile x11vnc/misc/Makefile])
+	AC_CONFIG_FILES([x11vnc/Makefile x11vnc/misc/Makefile x11vnc/misc/turbovnc/Makefile])
 fi
 
 AC_CONFIG_COMMANDS([chmod-libvncserver-config],[chmod a+x libvncserver-config])

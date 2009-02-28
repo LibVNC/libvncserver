@@ -1,0 +1,147 @@
+INTRO:
+------
+
+This is a "patch" to make x11vnc/libvncserver work with TurboVNC:
+
+	http://www.virtualgl.org/About/TurboVNC
+
+It is very experimental/kludgy.  Not all TurboVNC features may be enabled.
+We are currently evaluating whether TurboVNC support should be officially
+put into x11vnc/libvncserver.
+
+TurboVNC is an optimized VNC for fast refresh rates on fast networks.
+
+It does pretty well on good broadband as well.  But it is not as fast
+as regular TightVNC on slow links.
+
+
+TURBOJPEG:
+---------
+
+TurboVNC uses the TurboJPEG library based on a fast proprietary JPEG
+implementation.  You will need to download it from the VirtualGL
+sourceforge site:
+
+	http://sourceforge.net/project/showfiles.php?group_id=117509&package_id=166100
+
+Either install it or simply unpack the .deb or .rpm file into a directory.
+
+N.B. you can unpack a .deb via 'ar x package.deb' and the extracting
+from the data.tar.gz file.  rpm2cpio can be used to unpack .rpm's.
+
+
+QUICK-START:
+------------
+
+For those in a hurry:
+
+  cd x11vnc-x.y.z/x11vnc/misc/turbovnc
+  ./apply_turbovnc
+  cd ../../..
+  env LDFLAGS='-L/DIR -Xlinker --rpath=/DIR' ./configure
+  make AM_LDFLAGS='-lturbojpeg'
+
+where you replace /DIR with your directory containing libturbojpeg.so.
+
+
+PATCHING AND BUILDING:
+----------------------
+
+After unpacking your x11vnc-x.y.z.tar.gz tarball cd to the
+x11vnc-x.y.z/x11vnc/misc/turbovnc (where this README file is) and from
+that directory run:
+
+	./apply_turbovnc
+
+that will modify files in the libvncserver and x11vnc directories above
+this directory.  (To undo these changes run: ./undo_turbovnc)  The input
+sources, tight.c and turbojpeg.h are from the TurboVNC source package.
+
+After applying, go back to the top level source directory and run:
+
+	env LDFLAGS='-L/path/to/turbojpeg -Xlinker --rpath=/path/to/turbojpeg' ./configure 
+
+where the turbojpeg library is:
+
+	/path/to/turbojpeg/libturbojpeg.so
+
+(change /path/to/turbojpeg to the directory where you installed or
+unpacked it.)
+
+If you are not using gnu gcc and gnu linker the options may be a little
+different (e.g. -R instead of -Xlinker --rpath).
+
+If you need additional ./configure options or env. var. settings,
+add them too.
+
+
+Next, run this make command:
+
+	make AM_LDFLAGS='-lturbojpeg'
+
+This is a hack and may not always work, if it doesn't edit x11vnc/Makefile
+and add '-lturbojpeg' to the LIBS variable.
+
+This should create a binary:
+
+	./x11vnc/x11vnc
+
+that supports VirtualGL's TurboVNC.
+
+You will need a TurboVNC viewer, you can get one here:
+
+	http://sourceforge.net/project/showfiles.php?group_id=117509&package_id=128130
+
+Let us know how it goes.
+
+
+PERFORMANCE:
+------------
+
+Note that x11vnc has to read the display's screen pixels from the
+graphics card memory.  This can be slow, e.g. 10 MB/sec.
+
+There is not a big need for graphics card manufacturers to optimize the
+read rate; the write rate is the one they optimize greatly.
+
+	http://www.karlrunge.com/x11vnc/#limitations
+
+If you run x11vnc and see lines like this:
+
+    28/02/2009 00:52:07 Autoprobing selected port 5900
+    28/02/2009 00:52:07 fb read rate: 10 MB/sec
+    28/02/2009 00:52:07 screen setup finished.
+
+you have a typical slow one.
+
+Whereas if you see this:
+
+    28/02/2009 00:54:46 Autoprobing selected port 5900
+    28/02/2009 00:54:46 fb read rate: 321 MB/sec
+    28/02/2009 00:54:46 fast read: reset wait  ms to: 10
+    28/02/2009 00:54:46 fast read: reset defer ms to: 10
+    28/02/2009 00:54:46 screen setup finished.
+
+that is very fast.
+
+We have only seen it this fast on Linux by using the nvidia proprietary
+graphics drivers.  The Xorg drivers are typically slow 10 MB/sec.
+
+It will also be fast if the X server is virtual: Xvfb or Xdummy
+since the screen pixels are stored in RAM:
+
+	http://www.karlrunge.com/x11vnc/faq.html#faq-xvfb
+
+And it will be fast if the ShadowFB xorg.conf option is enabled (if the
+card supports it.)
+
+
+The point we are trying to make is that even though TurboVNC uses a
+wicked fast JPEG implementation, and cuts out overhead in its attempt to
+pump out as many frames per second as it can, if it is slow for x11vnc
+to read the screen pixels in the first place then you might not even
+notice the TurboVNC speedup.
+
+So TurboVNC+x11vnc will be faster than TightVNC+x11vnc, but if there is
+a large overhead/bottleneck from reading the graphics card framebuffer,
+then the speedup will be marginal.

@@ -1,3 +1,6 @@
+2009-02-28  Karl Runge <runge@karlrunge.com>
+	* x11vnc: add kludge to experiment with turbovnc.
+
 2009-02-25  Karl Runge <runge@karlrunge.com>
 	* x11vnc: fix some -QD cases for use in tkx11vnc.
 

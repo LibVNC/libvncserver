@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+
+while (<>) {
+	if (/^#include.*"rfb.h"/) {
+		print <<END;
+#include <rfb/rfb.h>
+#define Bool rfbBool
+#define CARD32 uint32_t
+#define CARD16 uint16_t
+#define CARD8 uint8_t
+#define xalloc malloc
+#define xrealloc realloc
+#define rfbTightNoZlib 0x0A
+END
+		next;
+	}
+	foreach $func (qw(FindBestSolidArea ExtendSolidArea CheckSolidTile CheckSolidTile##bpp CheckSolidTile8 CheckSolidTile16 CheckSolidTile32 Pack24)) {
+		if (/static.*\b\Q$func\E\b/ && !exists $did_static{$func}) {
+			$_ =~ s/\b\Q$func\E\b(\s*)\(/$func$1(rfbClientPtr cl, /;
+			$did_static{$func} = 1;
+		} elsif (/\b\Q$func\E\b\s*\(/) {
+			$_ =~ s/\b\Q$func\E\b(\s*)\(/$func$1(cl, /;
+		}
+	}
+	if (/^\s*subsampLevel\s*=\s*cl/) {
+		$_ = "//$_";
+		print "subsampLevel = 0;\n";
+	}
+	$_ =~ s/cl->tightQualityLevel;/cl->tightQualityLevel * 10;/;
+
+	$_ =~ s/rfbScreen.pfbMemory/cl->scaledScreen->frameBuffer/g;
+	$_ =~ s/rfbScreen.paddedWidthInBytes/cl->scaledScreen->paddedWidthInBytes/g;
+	$_ =~ s/rfbScreen.bitsPerPixel/cl->scaledScreen->bitsPerPixel/g;
+	$_ =~ s/rfbServerFormat/cl->screen->serverFormat/g;
+
+	if (/^(FindBestSolidArea|ExtendSolidArea|static void Pack24|CheckSolidTile)\(cl/) {
+		$_ .= "rfbClientPtr cl;\n";
+	}
+	if (/^(CheckSolidTile##bpp)\(cl/) {
+		$_ .= "rfbClientPtr cl; \\\n";
+	}
+	$_ =~ s/\bublen\b/cl->ublen/;
+	$_ =~ s/\bupdateBuf\b/cl->updateBuf/;
+
+	if (/cl->(rfbRectanglesSent|rfbBytesSent)/) {
+		$_ = "//$_";
+	}
+	print;
+}
+
+print <<END;
+
+void rfbTightCleanup(rfbScreenInfoPtr screen) {
+}
+
+END
+
+
