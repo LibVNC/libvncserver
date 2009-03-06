@@ -5,7 +5,6 @@ make SDLvncviewer more versatile
 	- Send modifiers key-up on leave focus,
 	- test for missing keys (especially "[]{}" with ./examples/mac),
 	- map Apple/Linux/Windows keys onto each other,
-	- keyboard repeat,
 	- introduce scrollbars,
 	- handle selection
 style fixes: use Linux' coding guidelines & ANSIfy tightvnc-filetransfer:

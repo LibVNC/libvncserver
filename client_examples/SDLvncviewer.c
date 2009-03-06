@@ -242,6 +242,8 @@ int main(int argc,char** argv) {
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
 	SDL_EnableUNICODE(1);
+	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY,
+			SDL_DEFAULT_REPEAT_INTERVAL);
 
 	/* 16-bit: cl=rfbGetClient(5,3,2); */
 	cl=rfbGetClient(8,3,4);
