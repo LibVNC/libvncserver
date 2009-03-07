@@ -17,6 +17,8 @@ static int enableResizable, viewOnly, buttonMask;
 static int realWidth, realHeight, bytesPerPixel, rowStride;
 static char *sdlPixels;
 
+static int rightAltKeyDown, leftAltKeyDown;
+
 static rfbBool resize(rfbClient* client) {
 	static char first=TRUE;
 	int width=client->width,height=client->height,
@@ -376,11 +378,25 @@ static void handleSDLEvent(rfbClient *cl, SDL_Event *e)
 			break;
 		SendKeyEvent(cl, SDL_key2rfbKeySym(&e->key),
 			e->type == SDL_KEYDOWN ? TRUE : FALSE);
+		if (e->key.keysym.sym == SDLK_RALT)
+			rightAltKeyDown = e->type == SDL_KEYDOWN;
+		if (e->key.keysym.sym == SDLK_LALT)
+			leftAltKeyDown = e->type == SDL_KEYDOWN;
 		break;
 	case SDL_QUIT:
 		rfbClientCleanup(cl);
 		exit(0);
 	case SDL_ACTIVEEVENT:
+		if (!e->active.gain && rightAltKeyDown) {
+			SendKeyEvent(cl, XK_Alt_R, FALSE);
+			rightAltKeyDown = FALSE;
+			rfbClientLog("released right Alt key\n");
+		}
+		if (!e->active.gain && leftAltKeyDown) {
+			SendKeyEvent(cl, XK_Alt_L, FALSE);
+			leftAltKeyDown = FALSE;
+			rfbClientLog("released left Alt key\n");
+		}
 		break;
 	case SDL_VIDEORESIZE:
 		setRealDimension(cl, e->resize.w, e->resize.h);

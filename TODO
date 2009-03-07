@@ -2,7 +2,6 @@ immediate:
 ----------
 
 make SDLvncviewer more versatile
-	- Send modifiers key-up on leave focus,
 	- test for missing keys (especially "[]{}" with ./examples/mac),
 	- map Apple/Linux/Windows keys onto each other,
 	- handle selection

@@ -1,4 +1,10 @@
 2009-03-07  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* client_examples/SDLvncviewer.c: force releasing Alt keys whenr
+	  losing focus.  This helps when you switch windows by pressing
+	  Alt+Tab (SDLvncviewer would get the "Alt down" event, but not
+	  the "Alt up" one).
+
+2009-03-07  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* client_examples/SDLvncviewer.c: make the viewer resizable
 
 2009-03-06  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
