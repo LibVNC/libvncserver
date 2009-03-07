@@ -1,3 +1,6 @@
+2009-03-07  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* client_examples/SDLvncviewer.c: make the viewer resizable
+
 2009-03-06  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* client_examples/SDLvncviewer.c: enable key repeat
 
