@@ -2448,6 +2448,7 @@ void reverse_connect(char *str) {
 		p = list[j];
 		
 		if ((n = do_reverse_connect(p)) != 0) {
+			progress_client();
 			rfbPE(-1);
 		}
 		cnt += n;

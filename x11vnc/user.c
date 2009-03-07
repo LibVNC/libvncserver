@@ -22,6 +22,7 @@ int switch_user(char *user, int fb_mode);
 int read_passwds(char *passfile);
 void install_passwds(void);
 void check_new_passwds(int force);
+void progress_client(void);
 int wait_for_client(int *argc, char** argv, int http);
 rfbBool custom_passwd_check(rfbClientPtr cl, const char *response, int len);
 char *xdmcp_insert = NULL;
@@ -2137,7 +2138,7 @@ static void check_nodisplay(char **nd) {
 			t2 = strchr(t, ',');
 			if (t2) *t2 = '\0';
 			while (*t != '\0') {
-				if (*t == '-') {
+				if (*t == '+') {
 					*t = ',';
 				}
 				t++;
@@ -2591,6 +2592,36 @@ void ssh_remote_tunnel(char *, int);
 
 static XImage ximage_struct;
 
+void progress_client(void) {
+	int i, j = 0, progressed = 0, db = 0;
+	double start = dnow();
+	if (getenv("PROGRESS_CLIENT_DBG")) {
+		rfbLog("progress_client: begin\n");
+		db = 1;
+	}
+	for (i = 0; i < 15; i++) {
+		if (latest_client) {
+			for (j = 0; j < 10; j++) {
+				if (latest_client->state != RFB_PROTOCOL_VERSION) {
+					progressed = 1;
+					break;
+				}
+				if (db) rfbLog("progress_client: calling-1 rfbCFD(1) %.6f\n", dnow()-start);
+				rfbCFD(1);
+			}
+		}
+		if (progressed) {
+			break;
+		}
+		if (db) rfbLog("progress_client: calling-2 rfbCFD(1) %.6f\n", dnow()-start);
+		rfbCFD(1);
+	}
+	if (!quiet) {
+		rfbLog("client progressed=%d in %d/%d %.6f s\n",
+		    progressed, i, j, dnow() - start);
+	}
+}
+
 int wait_for_client(int *argc, char** argv, int http) {
 	/* ugh, here we go... */
 	XImage* fb_image;
@@ -2767,6 +2798,10 @@ int wait_for_client(int *argc, char** argv, int http) {
 				}
 			}
 			do_unixpw_loop();
+		} else if (cmd && !use_threads) {
+			/* try to get RFB proto done now. */
+			progress_client();
+
 		}
 	}
 

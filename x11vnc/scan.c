@@ -3345,7 +3345,7 @@ int scan_for_updates(int count_only) {
 		scan_count %= NSCAN;
 
 		/* some periodic maintenance */
-		if (subwin) {
+		if (subwin && scan_count % 4 == 0) {
 			set_offset();	/* follow the subwindow */
 		}
 		if (indexed_color && scan_count % 4 == 0) {

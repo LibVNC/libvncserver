@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "February 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "March 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.7, lastmod: 2009-02-25
+         version: 0.9.7, lastmod: 2009-03-07
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1275,11 +1275,22 @@ script that works on most Unixes to determine a user's
 DISPLAY variable and xauthority data (see 
 .IR who (1)
 ).
+The option "\fB-find\fR" is an alias for this mode.
 .IP
 To have this default script printed to stdout (e.g. for
 customization) run with WAIT:cmd=FINDDISPLAY-print To
 have the script run to print what display it would find
 use "\fB-finddpy\fR" or WAIT:cmd=FINDDISPLAY-run
+.IP
+The standard script runs 
+.IR xdpyinfo (1)
+run on potential
+displays.  If your X server(s) have a login greeter
+that exclusively grabs the Xserver, then xdpyinfo
+blocks forever and this mode will not work.  See
+www.karlrunge.com/x11vnc/faq.html#faq-display-manager
+for how to disable this for dtgreet on Solaris and
+possibly for other greeters.
 .IP
 As another special case, WAIT:cmd=HTTPONCE will allow
 x11vnc to service one http request and then exit.
@@ -1294,10 +1305,12 @@ by client web browsers.  For example:
 Where /.../x11vnc is the full path to x11vnc.
 It is used in the Apache SSL-portal example (see FAQ).
 .IP
-In this mode you can set X11VNC_SKIP_DISPLAY to a comma
-separated list of displays (e.g. ":0,:1") to ignore
-in the finding process.  This can also be set by the
-user via "nd=" using "-" instead of ","
+In this mode you can set X11VNC_SKIP_DISPLAY to a
+comma separated list of displays (e.g. ":0,:1") to
+ignore in the finding process.  The ":" is optional.
+Ranges n-m e.g. 0-20 can also be supplied. This string
+can also be set by the connecting user via "nd="
+using "+" instead of ","
 .IP
 An interesting option is WAIT:cmd=FINDCREATEDISPLAY
 that is like FINDDISPLAY in that is uses the same method
@@ -1305,6 +1318,8 @@ to find an existing display.  However, if it does not
 find one it will try to *start* up an X server session
 for the user.  This is the only time x11vnc tries to
 actually start up an X server.
+.IP
+The option "\fB-create\fR" is an alias for this mode.
 .IP
 It will start looking for an open display number at :20
 Override via X11VNC_CREATE_STARTING_DISPLAY_NUMBER=n

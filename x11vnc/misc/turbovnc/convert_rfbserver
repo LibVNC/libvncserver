@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+
+$saw_mark = 0;
+$done = 0;
+
+while (<>) {
+	if (! $saw_mark && /case rfbEncodingServerIdentity:/) 		{
+		$saw_mark = 1;
+	}
+	if ($saw_mark && !$done && /default:/) {
+		print;
+
+		print <<END;
+                /* for turbovnc */
+#define rfbJpegQualityLevel1       0xFFFFFE01
+#define rfbJpegQualityLevel100     0xFFFFFE64
+#define rfbJpegSubsamp1X           0xFFFFFD00
+#define rfbJpegSubsamp4X           0xFFFFFD01
+#define rfbJpegSubsamp2X           0xFFFFFD02
+#define rfbJpegSubsampGray         0xFFFFFD03
+
+                if ( enc >= (uint32_t)rfbJpegSubsamp1X &&
+                         enc <= (uint32_t)rfbJpegSubsampGray ) {
+                    /* XXX member really should be tightSubsample not correMaxWidth */
+                    cl->correMaxWidth = enc & 0xFF;
+                    rfbLog("Using JPEG subsampling %d for client %s\\n",
+                           cl->correMaxWidth, cl->host);
+                } else if ( enc >= (uint32_t)rfbEncodingQualityLevel0 &&
+                            enc <= (uint32_t)rfbEncodingQualityLevel9 ) {
+                    static int JPEG_QUAL[10] = {
+                       5, 10, 15, 25, 37, 50, 60, 70, 75, 80
+                    };
+                    cl->tightQualityLevel = JPEG_QUAL[enc & 0x0F];
+                    /* XXX member really should be tightSubsample not correMaxWidth */
+                    cl->correMaxWidth = 2;
+                    rfbLog("Using image level Subsample %d  Quality %d for client %s\\n",
+                           cl->correMaxWidth, cl->tightQualityLevel, cl->host);
+                } else if ( enc >= (uint32_t)rfbJpegQualityLevel1 &&
+                            enc <= (uint32_t)rfbJpegQualityLevel100 ) {
+                    cl->tightQualityLevel = enc & 0xFF;
+                    rfbLog("Using image quality level %d for client %s\\n",
+                           cl->tightQualityLevel, cl->host);
+                } else
+END
+		$done = 1;
+		next;
+	}
+	print;
+}

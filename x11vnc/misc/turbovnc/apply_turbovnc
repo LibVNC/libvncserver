@@ -16,18 +16,24 @@ if [ ! -f "$ldir/tight.c" ]; then
 	ls -l "$ldir/tight.c"
 	fail=1
 fi
+if [ ! -f "$ldir/rfbserver.c" ]; then
+	ls -l "$ldir/rfbserver.c"
+	fail=1
+fi
 if [ "X$fail" = "X1" ]; then
 	echo "Must be run from inside the directory containing 'apply_turbovnc'"
 	exit 1
 fi
 
-if [ -f "$ldir/tight.c.ORIG" ]; then
-	set -xv
-else
-	set -xv
+set -x
+if [ ! -f "$ldir/tight.c.ORIG" ]; then
 	cp -p "$ldir/tight.c" "$ldir/tight.c.ORIG"
+fi
+if [ ! -f "$ldir/rfbserver.c.ORIG" ]; then
+	cp -p "$ldir/rfbserver.c" "$ldir/rfbserver.c.ORIG"
 fi
 
 perl ./convert ./tight.c > "$ldir/tight.c"
+perl ./convert_rfbserver $ldir/rfbserver.c.ORIG > "$ldir/rfbserver.c"
 cp -p ./turbojpeg.h "$ldir"
-ls -l $ldir/tight.c* $ldir/turbojpeg.h
+ls -l $ldir/tight.c* $ldir/rfbserver.c* $ldir/turbojpeg.h

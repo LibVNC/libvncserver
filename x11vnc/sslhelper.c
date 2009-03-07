@@ -8,6 +8,7 @@
 #include "connections.h"
 #include "sslcmds.h"
 #include "unixpw.h"
+#include "user.h"
 
 #define OPENSSL_INETD 1
 #define OPENSSL_VNC   2
@@ -2558,6 +2559,8 @@ void accept_openssl(int mode, int presock) {
 			client->protocolMinorVersion = 8;
 			rfbAuthNewClient(client);
 		}
+		/* try to get RFB proto done now. */
+		progress_client();
 	} else {
 		rfbLog("SSL: accept_openssl: rfbNewClient failed.\n");
 		close(vsock);

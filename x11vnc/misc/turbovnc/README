@@ -4,6 +4,7 @@ INTRO:
 This is a "patch" to make x11vnc/libvncserver work with TurboVNC:
 
 	http://www.virtualgl.org/About/TurboVNC
+	http://www.karlrunge.com/x11vnc/faq.html#faq-turbovnc
 
 It is very experimental/kludgy.  Not all TurboVNC features may be enabled.
 We are currently evaluating whether TurboVNC support should be officially
@@ -122,7 +123,9 @@ Whereas if you see this:
     28/02/2009 00:54:46 fast read: reset defer ms to: 10
     28/02/2009 00:54:46 screen setup finished.
 
-that is very fast.
+that is very fast.  In such a situation you may want to dial down
+x11vnc's delay, e.g.:  -wait 5 -defer 5, or even smaller to push things
+out more quickly.
 
 We have only seen it this fast on Linux by using the nvidia proprietary
 graphics drivers.  The Xorg drivers are typically slow 10 MB/sec.

@@ -11,6 +11,7 @@ while (<>) {
 #define xalloc malloc
 #define xrealloc realloc
 #define rfbTightNoZlib 0x0A
+#define tightSubsampLevel correMaxWidth
 END
 		next;
 	}
@@ -22,11 +23,13 @@ END
 			$_ =~ s/\b\Q$func\E\b(\s*)\(/$func$1(cl, /;
 		}
 	}
-	if (/^\s*subsampLevel\s*=\s*cl/) {
-		$_ = "//$_";
-		print "subsampLevel = 0;\n";
-	}
-	$_ =~ s/cl->tightQualityLevel;/cl->tightQualityLevel * 10;/;
+
+#	if (/^\s*subsampLevel\s*=\s*cl/) {
+#		$_ = "//$_";
+#		print "subsampLevel = 0;\n";
+#	}
+
+#	$_ =~ s/cl->tightQualityLevel;/cl->tightQualityLevel * 10;/;
 
 	$_ =~ s/rfbScreen.pfbMemory/cl->scaledScreen->frameBuffer/g;
 	$_ =~ s/rfbScreen.paddedWidthInBytes/cl->scaledScreen->paddedWidthInBytes/g;
