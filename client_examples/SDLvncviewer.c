@@ -8,7 +8,7 @@ struct { int sdl; int rfb; } buttonMapping[]={
 	{0,0}
 };
 
-static int enableResizable;
+static int enableResizable, viewOnly, buttonMask;
 #ifdef SDL_ASYNCBLIT
 	int sdlFlags = SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_HWACCEL;
 #else
@@ -343,13 +343,60 @@ log_to_file(const char *format, ...)
 }
 #endif
 
+static void handleSDLEvent(rfbClient *cl, SDL_Event *e)
+{
+	switch(e->type) {
+#if SDL_MAJOR_VERSION > 1 || SDL_MINOR_VERSION >= 2
+	case SDL_VIDEOEXPOSE:
+		SendFramebufferUpdateRequest(cl, 0, 0,
+					cl->width, cl->height, FALSE);
+		break;
+#endif
+	case SDL_MOUSEBUTTONUP:
+	case SDL_MOUSEBUTTONDOWN:
+	case SDL_MOUSEMOTION: {
+		int x, y, state, i;
+		if (viewOnly)
+			break;
+
+		state = SDL_GetMouseState(&x, &y);
+		if (sdlPixels) {
+			x = x * cl->width / realWidth;
+			y = y * cl->height / realHeight;
+		}
+		for (buttonMask = 0, i = 0; buttonMapping[i].sdl; i++)
+			if (state & SDL_BUTTON(buttonMapping[i].sdl))
+					buttonMask |= buttonMapping[i].rfb;
+			SendPointerEvent(cl, x, y, buttonMask);
+			break;
+		}
+	case SDL_KEYUP:
+	case SDL_KEYDOWN:
+		if (viewOnly)
+			break;
+		SendKeyEvent(cl, SDL_key2rfbKeySym(&e->key),
+			e->type == SDL_KEYDOWN ? TRUE : FALSE);
+		break;
+	case SDL_QUIT:
+		rfbClientCleanup(cl);
+		exit(0);
+	case SDL_ACTIVEEVENT:
+		break;
+	case SDL_VIDEORESIZE:
+		setRealDimension(cl, e->resize.w, e->resize.h);
+		break;
+	default:
+		rfbClientLog("ignore SDL event: 0x%x\n", e->type);
+	}
+}
+
 #ifdef mac
 #define main SDLmain
 #endif
 
 int main(int argc,char** argv) {
 	rfbClient* cl;
-	int i, j, buttonMask = 0, viewOnly = 0;
+	int i, j;
 	SDL_Event e;
 
 #ifdef LOG_TO_FILE
@@ -385,47 +432,7 @@ int main(int argc,char** argv) {
 
 	while(1) {
 		if(SDL_PollEvent(&e))
-			switch(e.type) {
-#if SDL_MAJOR_VERSION>1 || SDL_MINOR_VERSION>=2
-				case SDL_VIDEOEXPOSE:
-					SendFramebufferUpdateRequest(cl,0,0,cl->width,cl->height,FALSE);
-					break;
-#endif
-				case SDL_MOUSEBUTTONUP: case SDL_MOUSEBUTTONDOWN:
-				case SDL_MOUSEMOTION: {
-						int x,y;
-						if (viewOnly)
-							break;
-						int state=SDL_GetMouseState(&x,&y);
-						int i;
-
-						if (sdlPixels) {
-							x = x * cl->width / realWidth;
-							y = y * cl->height / realHeight;
-						}
-						for(buttonMask=0,i=0;buttonMapping[i].sdl;i++)
-							if(state&SDL_BUTTON(buttonMapping[i].sdl))
-								buttonMask|=buttonMapping[i].rfb;
-						SendPointerEvent(cl,x,y,buttonMask);
-					}
-					break;
-				case SDL_KEYUP: case SDL_KEYDOWN:
-					if (viewOnly)
-						break;
-					SendKeyEvent(cl,SDL_key2rfbKeySym(&e.key),(e.type==SDL_KEYDOWN)?TRUE:FALSE);
-					break;
-				case SDL_QUIT:
-					rfbClientCleanup(cl);
-					return 0;
-				case SDL_ACTIVEEVENT:
-					break;
-				case SDL_VIDEORESIZE:
-					setRealDimension(cl,
-						e.resize.w, e.resize.h);
-					break;
-				default:
-					rfbClientLog("ignore SDL event: 0x%x\n",e.type);
-			}
+			handleSDLEvent(cl, &e);
 		else {
 			i=WaitForMessage(cl,500);
 			if(i<0)
