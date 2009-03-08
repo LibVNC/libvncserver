@@ -1,5 +1,6 @@
 #include <SDL.h>
 #include <rfb/rfbclient.h>
+#include "scrap.h"
 
 struct { int sdl; int rfb; } buttonMapping[]={
 	{1, rfbButton1Mask},
@@ -397,6 +398,17 @@ static void handleSDLEvent(rfbClient *cl, SDL_Event *e)
 			leftAltKeyDown = FALSE;
 			rfbClientLog("released left Alt key\n");
 		}
+
+		if (e->active.gain && lost_scrap()) {
+			static char *data = NULL;
+			static int len = 0;
+			get_scrap(T('T', 'E', 'X', 'T'), &len, &data);
+			if (len)
+				SendClientCutText(cl, data, len);
+		}
+		break;
+	case SDL_SYSWMEVENT:
+		clipboard_filter(&e);
 		break;
 	case SDL_VIDEORESIZE:
 		setRealDimension(cl, e->resize.w, e->resize.h);
@@ -404,6 +416,11 @@ static void handleSDLEvent(rfbClient *cl, SDL_Event *e)
 	default:
 		rfbClientLog("ignore SDL event: 0x%x\n", e->type);
 	}
+}
+
+static void got_selection(rfbClient *cl, const char *text, int len)
+{
+	put_scrap(T('T', 'E', 'X', 'T'), len, text);
 }
 
 #ifdef mac
@@ -443,8 +460,11 @@ int main(int argc,char** argv) {
 	cl->GotFrameBufferUpdate=update;
 	cl->HandleKeyboardLedState=kbd_leds;
 	cl->HandleTextChat=text_chat;
+	cl->GotXCutText = got_selection;
 	if(!rfbInitClient(cl,&argc,argv))
 		return 1;
+
+	init_scrap();
 
 	while(1) {
 		if(SDL_PollEvent(&e))

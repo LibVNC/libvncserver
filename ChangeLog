@@ -1,3 +1,6 @@
+2009-03-08  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* client_examples/SDLvncviewer.c: support clipboard operations
+
 2009-03-07  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* client_examples/SDLvncviewer.c: force releasing Alt keys whenr
 	  losing focus.  This helps when you switch windows by pressing
