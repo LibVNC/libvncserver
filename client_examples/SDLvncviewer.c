@@ -408,7 +408,7 @@ static void handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		}
 		break;
 	case SDL_SYSWMEVENT:
-		clipboard_filter(&e);
+		clipboard_filter(e);
 		break;
 	case SDL_VIDEORESIZE:
 		setRealDimension(cl, e->resize.w, e->resize.h);
