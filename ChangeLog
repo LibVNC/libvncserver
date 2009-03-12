@@ -1,3 +1,6 @@
+2009-03-12  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
+	* client_examples/SDLvncviewer.c: support mouse wheel operations
+
 2009-03-08  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* client_examples/SDLvncviewer.c: support clipboard operations
 

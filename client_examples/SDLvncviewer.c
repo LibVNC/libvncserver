@@ -6,6 +6,8 @@ struct { int sdl; int rfb; } buttonMapping[]={
 	{1, rfbButton1Mask},
 	{2, rfbButton2Mask},
 	{3, rfbButton3Mask},
+	{4, rfbButton4Mask},
+	{5, rfbButton5Mask},
 	{0,0}
 };
 
@@ -357,22 +359,39 @@ static void handleSDLEvent(rfbClient *cl, SDL_Event *e)
 #endif
 	case SDL_MOUSEBUTTONUP:
 	case SDL_MOUSEBUTTONDOWN:
-	case SDL_MOUSEMOTION: {
+	case SDL_MOUSEMOTION:
+	{
 		int x, y, state, i;
 		if (viewOnly)
 			break;
 
-		state = SDL_GetMouseState(&x, &y);
+		if (e->type == SDL_MOUSEMOTION) {
+			x = e->motion.x;
+			y = e->motion.y;
+			state = e->motion.state;
+		}
+		else {
+			x = e->button.x;
+			y = e->button.y;
+			state = e->button.button;
+			for (i = 0; buttonMapping[i].sdl; i++)
+				if (state == buttonMapping[i].sdl) {
+					state = buttonMapping[i].rfb;
+					if (e->type == SDL_MOUSEBUTTONDOWN)
+						buttonMask |= state;
+					else
+						buttonMask &= ~state;
+					break;
+				}
+		}
 		if (sdlPixels) {
 			x = x * cl->width / realWidth;
 			y = y * cl->height / realHeight;
 		}
-		for (buttonMask = 0, i = 0; buttonMapping[i].sdl; i++)
-			if (state & SDL_BUTTON(buttonMapping[i].sdl))
-					buttonMask |= buttonMapping[i].rfb;
-			SendPointerEvent(cl, x, y, buttonMask);
-			break;
-		}
+		SendPointerEvent(cl, x, y, buttonMask);
+		buttonMask &= ~(rfbButton4Mask | rfbButton5Mask);
+		break;
+	}
 	case SDL_KEYUP:
 	case SDL_KEYDOWN:
 		if (viewOnly)
