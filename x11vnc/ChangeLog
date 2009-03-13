@@ -1,3 +1,6 @@
+2009-03-12  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Fix off-screen bug for -ncache_cr copyrect.
+
 2009-03-07  Karl Runge <runge@karlrunge.com>
 	* x11vnc: allow range for X11VNC_SKIP_DISPLAY, document grab
 	  Xserver issue.  Add progress_client() to proceed more quickly

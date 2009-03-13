@@ -1063,7 +1063,7 @@ void vnc_reflect_got_copyrect(rfbClient *cl, int src_x, int src_y, int w, int h,
 	if (dx != last_dx || dy != last_dy) {
 		rc = fb_push_wait(0.05, FB_COPY|FB_MOD);
 	}
-	if (1) fprintf(stderr, "vnc_reflect_got_copyrect: %03dx%03d+%03d+%03d   %3d %3d  rc=%d\n", dest_x, dest_y, w, h, dx, dy, rc);
+	if (0) fprintf(stderr, "vnc_reflect_got_copyrect: %03dx%03d+%03d+%03d   %3d %3d  rc=%d\n", dest_x, dest_y, w, h, dx, dy, rc);
 	reg = sraRgnCreateRect(dest_x, dest_y, dest_x + w, dest_y + h);
 	do_copyregion(reg, dx, dy, 0);
 	sraRgnDestroy(reg);

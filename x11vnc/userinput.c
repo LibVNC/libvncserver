@@ -3825,7 +3825,8 @@ void ncache_pre_portions(Window orig_frame, Window frame, int *nidx_in, int try_
 			dx = 0;
 			dy = dpy_y;
 			sraRgnOffset(r2, dx, dy);
-if (ncdb) fprintf(stderr, "FB_COPY: %.4f 1) offscreen check:\n", dnow() - ntim);
+if (ncdb) fprintf(stderr, "FB_COPY: %.4f 1) offscreen:  dx, dy: %d, %d -> %d, %d orig %dx%d+%d+%d bs_xy: %d %d\n",
+    dnow() - ntim, bs_x - orig_x, bs_y - orig_y, dx, dy, orig_w, orig_h, orig_x, orig_y, bs_x, bs_y);
 
 			/* 0) save it in the invalid (offscreen) SU portion */
 			if (! *use_batch) {
@@ -4107,7 +4108,19 @@ void do_copyrect_drag_move(Window orig_frame, Window frame, int *nidx, int try_b
 	int dx, dy;
 	int use_batch = 0;
 	double ntim = dnow();
+	static int nob = -1;
 	sraRegionPtr r0, r1;
+
+	if (nob < 0) {
+		if (getenv("NOCRBATCH")) {
+			nob = 1;
+		} else {
+			nob = 0;
+		}
+	}
+	if (nob) {
+		try_batch = 0;
+	}
 
 	dx = x - now_x;
 	dy = y - now_y;
@@ -4125,6 +4138,13 @@ if (ncdb) fprintf(stderr, "do_COPY: now_xy: %d %d, orig_wh: %d %d, xy: %d %d, wh
 
 	dx = x - now_x;
 	dy = y - now_y;
+
+	/* make sure the source is on-screen too */
+	sraRgnOffset(r1, -dx, -dy);
+	sraRgnAnd(r1, r0);
+	sraRgnOffset(r1, +dx, +dy);
+	sraRgnAnd(r1, r0);	/* just to be sure, problably not needed */
+
 	if (! use_batch) {
 		do_copyregion(r1, dx, dy, 0);
 		if (!fb_push_wait(0.2, FB_COPY)) {

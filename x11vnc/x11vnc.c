@@ -1824,7 +1824,8 @@ char msg2[] =
 "\n"
 "    x11vnc -ncache 10 ...\n"
 "\n"
-"more info: http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching\n"
+"One can also add -ncache_cr for smooth 'copyrect' window motion.\n"
+"More info: http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching\n"
 "\n"
 ;
 
