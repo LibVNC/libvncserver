@@ -1875,7 +1875,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	char *create_cmd = NULL;
 	char *opts = strchr(cmd, '-');
 	char st[] = "";
-	char fdgeom[128], fdsess[128], fdopts[128], fdprog[128];
+	char fdgeom[128], fdsess[128], fdopts[128], fdextra[256], fdprog[128];
 	char fdxsrv[128], fdxdum[128], fdcups[128], fdesd[128];
 	char fdnas[128], fdsmb[128], fdtag[128];
 	char cdout[128];
@@ -1892,6 +1892,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	fdsess[0] = '\0';
 	fdgeom[0] = '\0';
 	fdopts[0] = '\0';
+	fdextra[0] = '\0';
 	fdprog[0] = '\0';
 	fdxsrv[0] = '\0';
 	fdxdum[0] = '\0';
@@ -1985,6 +1986,11 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	if (fdopts[0] == '\0' && getenv("FD_OPTS")) {
 		snprintf(fdopts, 120, "%s", getenv("FD_OPTS"));
 	}
+	if (fdextra[0] == '\0' && getenv("FD_EXTRA")) {
+		if (!strchr(getenv("FD_EXTRA"), '\'')) {
+			snprintf(fdextra, 250, "%s", getenv("FD_EXTRA"));
+		}
+	}
 	if (fdprog[0] == '\0' && getenv("FD_PROG")) {
 		snprintf(fdprog, 120, "%s", getenv("FD_PROG"));
 	}
@@ -2015,6 +2021,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 
 	set_env("FD_GEOM", fdgeom);
 	set_env("FD_OPTS", fdopts);
+	set_env("FD_EXTRA", fdextra);
 	set_env("FD_PROG", fdprog);
 	set_env("FD_XSRV", fdxsrv);
 	set_env("FD_CUPS", fdcups);
@@ -2034,6 +2041,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		    + strlen("env USER='' ")
 		    + strlen("FD_GEOM='' ")
 		    + strlen("FD_OPTS='' ")
+		    + strlen("FD_EXTRA='' ")
 		    + strlen("FD_PROG='' ")
 		    + strlen("FD_XSRV='' ")
 		    + strlen("FD_CUPS='' ")
@@ -2046,6 +2054,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		    + strlen(uu) + 1
 		    + strlen(fdgeom) + 1
 		    + strlen(fdopts) + 1
+		    + strlen(fdextra) + 1
 		    + strlen(fdprog) + 1
 		    + strlen(fdxsrv) + 1
 		    + strlen(fdcups) + 1
@@ -2058,10 +2067,10 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		    + strlen(cdout) + 1
 		    + strlen(opts) + 1);
 		sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' "
-		    "FD_OPTS='%s' FD_PROG='%s' FD_XSRV='%s' FD_CUPS='%s' "
+		    "FD_OPTS='%s' FD_EXTRA='%s' FD_PROG='%s' FD_XSRV='%s' FD_CUPS='%s' "
 		    "FD_ESD='%s' FD_NAS='%s' FD_SMB='%s' FD_TAG='%s' "
 		    "FD_XDUMMY_NOROOT='%s' %s /bin/sh %s %s",
-		    uu, fdgeom, fdsess, fdopts, fdprog, fdxsrv,
+		    uu, fdgeom, fdsess, fdopts, fdextra, fdprog, fdxsrv,
 		    fdcups, fdesd, fdnas, fdsmb, fdtag, fdxdum, cdout, tmp, opts);
 	} else {
 		create_cmd = (char *) malloc(strlen(tmp)

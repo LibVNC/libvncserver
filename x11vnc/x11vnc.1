@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.7, lastmod: 2009-03-08
+         version: 0.9.7, lastmod: 2009-03-13
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1207,11 +1207,12 @@ this string and the
 program will also be run.
 Any remaining output is taken as XAUTHORITY data.
 It can be either of the form XAUTHORITY=<file> or raw
-xauthority data for the display (e.g. "xauth extract -
-$DISPLAY" output).
+xauthority data for the display. For example;
+.IP
+xauth extract - $DISPLAY"
 .IP
 In the case of \fB-unixpw\fR (but not \fB-unixpw_nis),\fR then the
-above command is run as the user who just authenticated
+cmd= command is run as the user who just authenticated
 via the login and password prompt.
 .IP
 Also in the case of \fB-unixpw,\fR the user logging in can
@@ -1219,7 +1220,7 @@ place a colon at the end of her username and supply
 a few options: scale=, scale_cursor= (or sc=), solid
 (or so), id=, clear_mods (or cm), clear_keys (or ck),
 repeat, speeds= (or sp=), readtimeout= (or rd=),
-rotate= (or ro=), or noncache (or nc) separated by
+rotate= (or ro=), or noncache (or nc), all separated by
 commas if there is more than one.  After the user logs
 in successfully, these options will be applied to the
 VNC screen.  For example,
@@ -1270,11 +1271,14 @@ the user as well.  Note: there will be a 2nd SSL helper
 process that will not switch, but it is only encoding
 and decoding the encrypted stream at that point.
 .IP
+Automatic Finding of User X Sessions:
+.IP
 As a special case, WAIT:cmd=FINDDISPLAY will run a
 script that works on most Unixes to determine a user's
 DISPLAY variable and xauthority data (see 
 .IR who (1)
 ).
+.IP
 The option "\fB-find\fR" is an alias for this mode.
 .IP
 To have this default script printed to stdout (e.g. for
@@ -1311,6 +1315,8 @@ ignore in the finding process.  The ":" is optional.
 Ranges n-m e.g. 0-20 can also be supplied. This string
 can also be set by the connecting user via "nd="
 using "+" instead of ","
+.IP
+Automatic Creation of User X Sessions:
 .IP
 An interesting option is WAIT:cmd=FINDCREATEDISPLAY
 that is like FINDDISPLAY in that is uses the same method
@@ -1363,12 +1369,14 @@ on the machine.  E.g. a desktop service:
 .IP
 Where /.../x11vnc is the full path to x11vnc.
 .IP
+See the \fB-svc/-service\fR option alias above.
+.IP
 If for some reason you do not want x11vnc to ever
 try to find an existing display set the env. var
 X11VNC_FINDDISPLAY_ALWAYS_FAILS=1 (also \fB-env\fR ...)
 .IP
 Use WAIT:cmd=FINDCREATEDISPLAY-print to print out the
-script used.
+script that is used for this.
 .IP
 You can specify the preferred X server order via e.g.,
 WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb,X  and/or leave
@@ -1390,20 +1398,21 @@ this be a wrapper script if you like (it must handle :N,
 \fB-geometry,\fR and \fB-depth\fR and other X server options).
 .IP
 You can set the environment variable FD_GEOM (or
-X11VNC_CREATE_GEOM) to WxH or WxHxD to set the width and
-height and optionally the color depth of the created
-display.  You can also set FD_SESS to be the session
-(short name of the windowmanager: kde, gnome, twm,
-failsafe, etc.). FD_OPTS as extra options to pass to
-the X server. You can also set FD_PROG to be the full
-path to the session/windowmanager program.
+X11VNC_CREATE_GEOM) to WxH or WxHxD to set the width
+and height and optionally the color depth of the
+created display.  You can also set FD_SESS to be the
+session (short name of the windowmanager: kde, gnome,
+twm, failsafe, etc.). FD_OPTS contains extra options
+to pass to the X server. You can also set FD_PROG to
+be the full path to the session/windowmanager program.
 .IP
 More FD tricks:  FD_CUPS=port or FD_CUPS=host:port
 will set the cups printing environment.  Similarly
 for FD_ESD=port or FD_ESD=host:port for esddsp sound
 redirection.  FD_XDUMMY_NOROOT means the Xdummy server
 does not need to be started as root (e.g. it will sudo
-automatically)
+automatically).  Set FD_EXTRA to a command to be run
+a few seconds after the X server starts up.
 .IP
 If you want the FINDCREATEDISPLAY session to contact an
 XDMCP login manager (xdm/gdm/kdm) on the same machine,
