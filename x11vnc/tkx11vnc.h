@@ -14,7 +14,7 @@ char gui_code[] = "";
 "exec wish \"$0\" \"$@\"\n"
 "catch {rename send {}}\n"
 "#\n"
-"# Copyright (c) 2004-2006 Karl J. Runge <runge@karlrunge.com>\n"
+"# Copyright (C) 2004-2009 Karl J. Runge <runge@karlrunge.com>\n"
 "# All rights reserved.\n"
 "#\n"
 "#  This is free software; you can redistribute it and/or modify\n"

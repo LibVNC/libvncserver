@@ -3,7 +3,7 @@
 exec wish "$0" "$@"
 catch {rename send {}}
 #
-# Copyright (c) 2004-2006 Karl J. Runge <runge@karlrunge.com>
+# Copyright (C) 2004-2009 Karl J. Runge <runge@karlrunge.com>
 # All rights reserved.
 #
 #  This is free software; you can redistribute it and/or modify

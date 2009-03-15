@@ -1,0 +1,31 @@
+The following files in this directory:
+
+	Makefile.am
+	README
+	Xdummy
+	blockdpy.c
+	ranfb.pl
+	rx11vnc
+	rx11vnc.pl
+	shm_clear
+	slide.pl
+	vcinject.pl
+	x11vnc_loop
+	x11vnc_pw
+
+are all Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
+and are all released under this license:
+
+  This is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; version 2 of the License.
+
+  This software is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this software; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
+  USA  or see <http://www.gnu.org/licenses/>.

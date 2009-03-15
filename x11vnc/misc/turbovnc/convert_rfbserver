@@ -1,4 +1,11 @@
 #!/usr/bin/perl
+#
+# This script has been (or is hereby) released into the public domain by
+# its author, Karl J. Runge <runge@karlrunge.com>. This applies worldwide.
+# 
+# In case this is not legally possible: Karl J. Runge grants anyone the
+# right to use this work for any purpose, without any conditions, unless
+# such conditions are required by law.
 
 $saw_mark = 0;
 $done = 0;

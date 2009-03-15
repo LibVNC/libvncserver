@@ -1,8 +1,10 @@
 /*
  * x11vnc: a VNC server for X displays.
  *
- * Copyright (c) 2002-2009 Karl J. Runge <runge@karlrunge.com>
+ * Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
  * All rights reserved.
+ *
+ *  This file is part of x11vnc.
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,14 +18,29 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this software; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
- *  USA.
+ *  USA  or see <http://www.gnu.org/licenses/>.
  *
- *
- * This program is based on the following programs:
+ *  In addition, as a special exception, Karl J. Runge
+ *  gives permission to link the code of its release of x11vnc with the
+ *  OpenSSL project's "OpenSSL" library (or with modified versions of it
+ *  that use the same license as the "OpenSSL" library), and distribute
+ *  the linked executables.  You must obey the GNU General Public License
+ *  in all respects for all of the code used other than "OpenSSL".  If you
+ *  modify this file, you may extend this exception to your version of the
+ *  file, but you are not obligated to do so.  If you do not wish to do
+ *  so, delete this exception statement from your version.
+ */
+
+/*
+ * This program is based on some ideas from the following programs:
  *
  *       the originial x11vnc.c in libvncserver (Johannes E. Schindelin)
  *	 x0rfbserver, the original native X vnc server (Jens Wagner)
  *       krfb, the KDE desktopsharing project (Tim Jansen)
+ *
+ * Please see http://www.karlrunge.com/x11vnc for the most up-to-date
+ * information about x11vnc.  Some of the following text may be out
+ * of date.
  *
  * The primary goal of this program is to create a portable and simple
  * command-line server utility that allows a VNC viewer to connect
@@ -109,7 +126,6 @@
  * There seems to be a serious bug with simultaneous clients when
  * threaded, currently the only workaround in this case is -nothreads
  * (which is now the default).
- *
  */
 
 
