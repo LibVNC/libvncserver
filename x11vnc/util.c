@@ -568,7 +568,18 @@ void rfbCFD(long usec) {
 		return;
 	}
  	if (unixpw && unixpw_in_progress && !unixpw_in_rfbPE) {
-		rfbLog("unixpw_in_rfbPE: skipping rfbCFD\n");
+		static int msgs = 0;
+		static double last_reset = 0.0;
+		if (dnow() > last_reset + 5.0) {
+			msgs = 0;
+			last_reset = dnow();
+		}
+		if (msgs++ < 10) {
+			rfbLog("unixpw_in_rfbPE: skipping rfbCFD\n");
+			if (msgs == 10) {
+				rfbLog("unixpw_in_rfbPE: skipping rfbCFD ...\n");
+			}
+		}
  		return;
  	}
 	if (usec > USEC_MAX) {

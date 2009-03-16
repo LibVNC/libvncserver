@@ -34,7 +34,7 @@
 /*
  * This program is based on some ideas from the following programs:
  *
- *       the originial x11vnc.c in libvncserver (Johannes E. Schindelin)
+ *       the initial x11vnc.c in libvncserver (Johannes E. Schindelin)
  *	 x0rfbserver, the original native X vnc server (Jens Wagner)
  *       krfb, the KDE desktopsharing project (Tim Jansen)
  *

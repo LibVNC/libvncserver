@@ -2,7 +2,7 @@
 .TH X11VNC "1" "March 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.7, lastmod: 2009-03-14
+         version: 0.9.7, lastmod: 2009-03-15
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -3048,9 +3048,25 @@ or hex value) separated by a space.  If no file named
 form: key1-key2,key3-key4,...  See <X11/keysymdef.h>
 header file for a list of Keysym names, or use 
 .IR xev (1).
+.IP
 To map a key to a button click, use the fake Keysyms
 "Button1", ..., etc. E.g: "\fB-remap\fR \fISuper_R-Button2\fR"
 (useful for pasting on a laptop)
+.IP
+I use these if the machine I am viewing from does not
+have a scrollwheel or I don't like using the one it has:
+.IP
+\fB-remap\fR Super_R-Button4,Menu-Button5
+\fB-remap\fR KP_Add-Button4,KP_Enter-Button5
+.IP
+the former would be used on a PC, the latter on a
+MacBook.  This way those little used keys can be used
+to generate bigger hops than the Up and Down arrows
+provide.  One can scroll through text or web pages more
+quickly this way (especially if x11vnc scroll detection
+is active.)
+.IP
+Use Button44, Button12, etc. for multiple clicks.
 .IP
 To disable a keysym (i.e. make it so it will not be
 injected), remap it to "NoSymbol" or "None".

@@ -2860,6 +2860,8 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	if (isbutton) {
 		int mask, button = (int) keysym;
 		int x = cursor_x, y = cursor_y;
+		char *b, bstr[32];
+
 		if (!down) {
 			return;
 		}
@@ -2874,10 +2876,23 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		 * remap the button click to keystroke sequences!
 		 * Usually just will simulate the button click.
 		 */
-		mask = 1<<(button-1);
-		pointer(mask, x, y, client);
-		mask = 0;
-		pointer(mask, x, y, client);
+
+		/* loop over possible multiclicks: Button123 */
+		sprintf(bstr, "%d", button);
+		b = bstr;
+		while (*b != '\0') {
+			char t[2];
+			int butt;
+			t[0] = *b;
+			t[1] = '\0';
+			if (sscanf(t, "%d", &butt) == 1) {
+				mask = 1<<(butt-1);
+				pointer(mask, x, y, client);
+				mask = 0;
+				pointer(mask, x, y, client);
+			}
+			b++;
+		}
 		return;
 	}
 
@@ -3302,6 +3317,8 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 
 	if (isbutton) {
 		int mask, button = (int) keysym;
+		char *b, bstr[32];
+
 		if (! down) {
 			return;	/* nothing to send */
 		}
@@ -3317,10 +3334,23 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		 * remap the button click to keystroke sequences!
 		 * Usually just will simulate the button click.
 		 */
-		mask = 1<<(button-1);
-		do_button_mask_change(mask, button);	/* down */
-		mask = 0;
-		do_button_mask_change(mask, button);	/* up */
+
+		/* loop over possible multiclicks: Button123 */
+		sprintf(bstr, "%d", button);
+		b = bstr;
+		while (*b != '\0') {
+			char t[2];
+			int butt;
+			t[0] = *b;
+			t[1] = '\0';
+			if (sscanf(t, "%d", &butt) == 1) {
+				mask = 1<<(butt-1);
+				do_button_mask_change(mask, butt);	/* down */
+				mask = 0;
+				do_button_mask_change(mask, butt);	/* up */
+			}
+			b++;
+		}
 		XFlush_wr(dpy);
 		X_UNLOCK;
 		return;
