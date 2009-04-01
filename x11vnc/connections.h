@@ -70,5 +70,6 @@ extern int accept_client(rfbClientPtr client);
 extern int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
     int len, FILE *output);
 extern int check_access(char *addr);
+extern void client_set_net(rfbClientPtr client);
 
 #endif /* _X11VNC_CONNECTIONS_H */

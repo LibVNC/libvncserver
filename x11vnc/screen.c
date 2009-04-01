@@ -3858,6 +3858,9 @@ void watch_loop(void) {
 				} else {
 					rfbPE(-1);
 				}
+				if (x11vnc_current < last_new_client + 0.5) {
+					urgent_update = 1;
+				}
 
 				unixpw_in_rfbPE = 0;
 
@@ -3990,6 +3993,9 @@ void watch_loop(void) {
 #ifdef MACOSX
 			else check_x11_pointer();
 #endif
+			continue;
+		}
+		if (x11vnc_current < last_new_client + 0.5 && !all_clients_initialized()) {
 			continue;
 		}
 

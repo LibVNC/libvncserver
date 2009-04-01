@@ -91,6 +91,7 @@ int accept_client(rfbClientPtr client);
 int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
     int len, FILE *output);
 int check_access(char *addr);
+void client_set_net(rfbClientPtr client);
 
 static rfbClientPtr *client_match(char *str);
 static void free_client_data(rfbClientPtr client);
@@ -138,6 +139,7 @@ char *list_clients(void) {
 
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
+		client_set_net(cl);
 		count++;
 	}
 	rfbReleaseClientIterator(iter);
@@ -156,6 +158,7 @@ char *list_clients(void) {
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
+
 		if (! cd) {
 			continue;
 		}
@@ -411,6 +414,7 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 	char str[100];
 	int rc, ok;
 	ClientData *cd = NULL;
+	client_set_net(client);
 	if (client != NULL) {
 		cd = (ClientData *) client->clientData;
 		addr = client->host;
@@ -2897,6 +2901,24 @@ void client_gone_chat_helper(rfbClientPtr client) {
 	chat_window_client = NULL;
 }
 
+void client_set_net(rfbClientPtr client) {
+	ClientData *cd; 
+	if (client == NULL) {
+		return;
+	}
+	cd = (ClientData *) client->clientData;
+	if (cd == NULL) {
+		return;
+	}
+	if (cd->client_port < 0) {
+		double dt = dnow();
+		cd->client_port = get_remote_port(client->sock);
+		cd->server_port = get_local_port(client->sock);
+		cd->server_ip   = get_local_host(client->sock);
+		cd->hostname = ip2host(client->host);
+		rfbLog("client_set_net: %s  %.4f\n", client->host, dnow() - dt);
+	}
+}
 /*
  * libvncserver callback for when a new client connects
  */
@@ -2950,10 +2972,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	client->clientData = (void *) calloc(sizeof(ClientData), 1);
 	cd = (ClientData *) client->clientData;
 
-	cd->client_port = get_remote_port(client->sock);
-	cd->server_port = get_local_port(client->sock);
-	cd->server_ip   = get_local_host(client->sock);
-	cd->hostname = ip2host(client->host);
+	/* see client_set_net() we delay the DNS lookups during handshake */
+	cd->client_port = -1;
 	cd->username = strdup("");
 	cd->unixname = strdup("");
 
@@ -3026,7 +3046,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		install_padded_fb(pad_geometry);
 	}
 
-	cd->timer = dnow();
+	cd->timer = last_new_client = dnow();
 	cd->send_cmp_rate = 0.0;
 	cd->send_raw_rate = 0.0;
 	cd->latency = 0.0;
@@ -3347,6 +3367,7 @@ void check_new_clients(void) {
 		ClientData *cd = (ClientData *) cl->clientData;
 		char *s;
 
+		client_set_net(cl);
 		if (! cd) {
 			continue;
 		}
