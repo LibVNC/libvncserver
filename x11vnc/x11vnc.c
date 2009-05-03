@@ -5233,24 +5233,24 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 						usleep(100*1000);
 					}
 					if (0) fprintf(stderr, "C/k %c/%x\n", c, k);
-					XTestFakeKeyEvent_wr(dpy, k, True, CurrentTime);
+					XTestFakeKeyEvent_wr(dpy, NULL, k, True, CurrentTime);
 					XFlush_wr(dpy);
 					usleep(100*1000);
-					XTestFakeKeyEvent_wr(dpy, k, False, CurrentTime);
+					XTestFakeKeyEvent_wr(dpy, NULL, k, False, CurrentTime);
 					XFlush_wr(dpy);
 					usleep(100*1000);
 					if (isupper(c)) {
 						k2 = XKeysymToKeycode(dpy, XK_Shift_L);
-						XTestFakeKeyEvent_wr(dpy, k2, False, CurrentTime);
+						XTestFakeKeyEvent_wr(dpy, NULL, k2, False, CurrentTime);
 						XFlush_wr(dpy);
 						usleep(100*1000);
 					}
 				}
 				k2 = XKeysymToKeycode(dpy, XK_Tab);
-				XTestFakeKeyEvent_wr(dpy, k2, True, CurrentTime);
+				XTestFakeKeyEvent_wr(dpy, NULL, k2, True, CurrentTime);
 				XFlush_wr(dpy);
 				usleep(100*1000);
-				XTestFakeKeyEvent_wr(dpy, k2, False, CurrentTime);
+				XTestFakeKeyEvent_wr(dpy, NULL, k2, False, CurrentTime);
 				XFlush_wr(dpy);
 				usleep(100*1000);
 			}

@@ -3959,9 +3959,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			macosxCG_keycode_inject(0, kc);
 #endif
 		} else {
-			XTestFakeKeyEvent_wr(dpy, kc, 1, CurrentTime);
+   		        XTestFakeKeyEvent_wr(dpy, NULL, kc, 1, CurrentTime);
 			usleep(100*1000);
-			XTestFakeKeyEvent_wr(dpy, kc, 0, CurrentTime);
+			XTestFakeKeyEvent_wr(dpy, NULL, kc, 0, CurrentTime);
 		}
 		goto done;
 	}
