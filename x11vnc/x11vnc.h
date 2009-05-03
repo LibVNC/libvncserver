@@ -620,6 +620,8 @@ typedef struct _ClientData {
 	int cmp_bytes_sent;
 	int raw_bytes_sent;
 
+	XDevice* ptr;
+	XDevice* kbd;
 } ClientData;
 
 extern void nox11_exit(int rc);
