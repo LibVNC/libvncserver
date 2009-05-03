@@ -79,6 +79,7 @@ AH_TEMPLATE(HAVE_LIBXINERAMA, [XINERAMA extension build environment present])
 AH_TEMPLATE(HAVE_LIBXRANDR, [XRANDR extension build environment present])
 AH_TEMPLATE(HAVE_LIBXFIXES, [XFIXES extension build environment present])
 AH_TEMPLATE(HAVE_LIBXDAMAGE, [XDAMAGE extension build environment present])
+AH_TEMPLATE(HAVE_LIBXCURSOR, [Xcursor library build environment present])
 AH_TEMPLATE(HAVE_LIBXTRAP, [DEC-XTRAP extension build environment present])
 AH_TEMPLATE(HAVE_RECORD, [RECORD extension build environment present])
 AH_TEMPLATE(HAVE_SOLARIS_XREADSCREEN, [Solaris XReadScreen available])
@@ -117,6 +118,9 @@ AC_ARG_WITH(uinput,
 [  --without-uinput        disable linux uinput device support],,)
 AC_ARG_WITH(macosx-native,
 [  --without-macosx-native disable MacOS X native display support],,)
+AC_ARG_WITH(colormultipointer,
+[  --without-colormultipointer  disable color support for multiple pointers]
+[  --with-cairo=DIR        use cairo include/library files in DIR (needed for color cursor support)],,)
 
 fi
 # end x11vnc only.
@@ -226,6 +230,13 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 			AC_CHECK_LIB(Xdamage, XDamageQueryExtension,
 				X_PRELIBS="$X_PRELIBS -lXdamage"
 				[AC_DEFINE(HAVE_LIBXDAMAGE) HAVE_LIBXDAMAGE="true"], ,
+				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
+		fi
+
+		if test "x$with_colormultipointer" != "xno"; then
+			AC_CHECK_LIB(Xcursor, XcursorImageLoadCursor,
+				X_PRELIBS="$X_PRELIBS -lXcursor"
+				[AC_DEFINE(HAVE_LIBXCURSOR) HAVE_LIBXCURSOR="true"], ,
 				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 		fi
 
@@ -425,6 +436,33 @@ if test "x$with_avahi" = "xyes"; then
 	AC_SUBST(AVAHI_CFLAGS)
 	AC_SUBST(AVAHI_LIBS)
 fi
+
+
+AH_TEMPLATE(HAVE_CAIRO, [cairo graphics library present])
+if test "x$with_cairo" != "xno"; then
+	printf "checking for cairo... "
+	if test ! -z "$with_cairo" -a "x$with_cairo" != "xyes"; then
+		CAIRO_CFLAGS="-I$with_cairo/include"
+		CAIRO_LIBS="-L$with_cairo/lib -lcairo"
+		echo "using $with_cairo"
+		with_cairo=yes
+	elif pkg-config cairo >/dev/null 2>&1; then
+		CAIRO_CFLAGS=`pkg-config --cflags cairo`
+		CAIRO_LIBS=`pkg-config --libs cairo`
+		with_cairo=yes
+		echo yes
+	else
+		with_cairo=no
+		echo no
+	fi
+fi
+if test "x$with_cairo" = "xyes"; then
+	AC_DEFINE(HAVE_CAIRO)
+	AC_SUBST(CAIRO_CFLAGS)
+	AC_SUBST(CAIRO_LIBS)
+fi
+
+
 
 fi
 # end x11vnc only.
