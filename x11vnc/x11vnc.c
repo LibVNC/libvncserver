@@ -5228,7 +5228,7 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 					k = XKeysymToKeycode(dpy, sym);
 					if (isupper(c)) {
 						k2 = XKeysymToKeycode(dpy, XK_Shift_L);
-						XTestFakeKeyEvent_wr(dpy, k2, True, CurrentTime);
+						XTestFakeKeyEvent_wr(dpy, NULL, k2, True, CurrentTime);
 						XFlush_wr(dpy);
 						usleep(100*1000);
 					}
