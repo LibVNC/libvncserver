@@ -79,15 +79,15 @@ extern void init_track_keycode_state(void);
 
 extern void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
     unsigned long delay);
-extern void XTestFakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
+extern void XTestFakeKeyEvent_wr(Display* dpy, XDevice *dev, KeyCode key, Bool down,
     unsigned long delay);
 extern void XTRAP_FakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
     unsigned long delay);
-extern void XTestFakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
+extern void XTestFakeButtonEvent_wr(Display* dpy, XDevice *dev, unsigned int button, Bool is_press,
     unsigned long delay);
 extern void XTRAP_FakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
     unsigned long delay);
-extern void XTestFakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
+extern void XTestFakeMotionEvent_wr(Display* dpy, XDevice *dev, int screen, int x, int y,
     unsigned long delay);
 
 extern Bool XTestCompareCurrentCursorWithWindow_wr(Display* dpy, Window w);
@@ -101,6 +101,7 @@ extern int XTRAP_GrabControl_wr(Display *dpy, Bool impervious);
 extern void disable_grabserver(Display *in_dpy, int change);
 
 extern Bool XRecordQueryVersion_wr(Display *dpy, int *maj, int *min);
+extern Bool XInputQueryVersion_wr(Display *dpy, int *maj, int *min);
 
 extern int xauth_raw(int on);
 extern Display *XOpenDisplay_wr(char *display_name);
