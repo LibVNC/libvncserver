@@ -3067,21 +3067,19 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
             X_LOCK;
 
             xi2_device_creation_in_progress = 1;
-	    /* X seems prone to crashing if we dont leave this well alone, oh my ... */
-            usleep(1000*2000); 
-            char tmp[256];
+	    char tmp[256];
             snprintf(tmp, 256, "x11vnc %s", client->host);
             cd->ptr = createMD(dpy, tmp);
             cd->kbd = getPairedMD(dpy, cd->ptr);
             snprintf(tmp, 256, "%i", cd->uid);
 	    /* maybe we can use the returned shape later on when reworking the libvncserver interna */
-            XcursorImage *ci; 
-            ci = setPointerShape(dpy, cd->ptr, 0.1*cd->uid, 0.2*cd->uid, 0.5*(cd->uid%2), tmp);
-            if(!ci)
+            XcursorImage *ci = NULL; 
+	    ci = setPointerShape(dpy, cd->ptr, 0.4*(cd->uid%3), 0.2*(cd->uid%5), 1*(cd->uid%2), tmp);
+	    if(!ci)
               rfbLog("setting pointer shape for client %s failed.\n", client->host); // sometimes this happens...
             else
               XcursorImageDestroy(ci); /* we dont use it for now, so clean up immediatly */
-            usleep(1000*2000); /* X seems prone to crashing if we dont leave this well alone, oh my ... */
+         
             rfbLog("created XInput2 MD %i %i for client %s.\n", cd->ptr->device_id, cd->kbd->device_id, client->host);
             xi2_device_creation_in_progress = 0;
 
