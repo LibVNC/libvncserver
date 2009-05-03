@@ -1,10 +1,12 @@
 
 #include <string.h>
 #include <X11/extensions/XInput.h> 
-#include <cairo.h> 
+#include <cairo.h>
+#include <X11/Xproto.h> 
+#include <X11/keysym.h> 
 
 #include "xi2_devices.h" 
-#include <X11/keysym.h> 
+
 
 
 // does the X version we're running on support XI2?
@@ -43,8 +45,8 @@ XDevice* createMD(Display* dpy, char* name)
  
   XFreeDeviceList(devices);
 
-  // HACK START
-  
+
+#ifdef HACK
   // not-so-nice hack to get the new MD keyboard set up
   // attach the physical keyboard to our new MD keyboard, send shift up, down
   // and put it back
@@ -53,13 +55,13 @@ XDevice* createMD(Display* dpy, char* name)
   XDevice *slavekbd = NULL;
   XDevice *vck =  XOpenDevice(dpy, 1);     // the virtual core keyboard
 
-  // get attached slave keyb
+  // get attached slave keyb - hopefully the right one
   devices = XListInputDevices(dpy, &num_devices);
   int found = 0;
-  while(num_devices && !found)
+  for(i = 0; i < num_devices && !found; ++i)
     {
       XDeviceInfo* currDevice;
-      currDevice = &devices[--num_devices];
+      currDevice = &devices[i];
       if (currDevice->use == IsXExtensionKeyboard)
         {
 	  /* run through classes, find attach class to get the
@@ -74,7 +76,6 @@ XDevice* createMD(Display* dpy, char* name)
                   if(att->attached == vck->device_id)
                     {
                       slavekbd = XOpenDevice(dpy, currDevice->id);
-                      fprintf(stderr, "--> %i\n", currDevice->id);
                       found = 1;
                       break;
                     }
@@ -84,7 +85,11 @@ XDevice* createMD(Display* dpy, char* name)
         }
     }
   XFreeDeviceList(devices);
- 
+  
+  fprintf(stderr, "slave k: %i\n", slavekbd->device_id);
+  fprintf(stderr, "master k: %i\n", kbd->device_id);
+  fprintf(stderr, "master p: %i\n", dev->device_id);
+   
   XChangeAttachmentInfo ca;
   ca.type = CH_ChangeAttachment; 
   ca.changeMode = AttachToMaster; 
@@ -98,10 +103,8 @@ XDevice* createMD(Display* dpy, char* name)
   ca.device = slavekbd;
   ca.newMaster = vck;
   XChangeDeviceHierarchy(dpy, (XAnyHierarchyChangeInfo*)&ca, 1);
-
   // HACK END
-
-  
+#endif  
 
   return dev;
 }
@@ -135,12 +138,15 @@ int removeMD(Display* dpy, XDevice* dev)
   // we can go on safely
   r.type = CH_RemoveMasterDevice;
   r.device = dev;
-  //r.returnMode = Floating;
+#ifndef HACK
+  r.returnMode = Floating;
+#else
   // HACK START
   r.returnMode = AttachToMaster;
   r.returnPointer = XOpenDevice(dpy, 0);
   r.returnKeyboard = XOpenDevice(dpy, 1);
   // HACK END
+#endif
 
   return (XChangeDeviceHierarchy(dpy, (XAnyHierarchyChangeInfo*)&r, 1) == Success) ? 1 : 0;
 }
@@ -198,10 +204,10 @@ XDevice* getPairedMD(Display* dpy, XDevice* dev)
 XcursorImage *setPointerShape(Display *dpy, XDevice* dev, float r, float g, float b, char *label)
 {
   // label setup
-  int idFontSize = 18;
-  int idXOffset = 11;
-  int idYOffset = 25;
-  size_t textsz = 64;
+  const int idFontSize = 18;
+  const int idXOffset = 11;
+  const int idYOffset = 25;
+  const size_t textsz = 64;
   char text[textsz];
   int total_width, total_height;
   XcursorImage *cursor_image = NULL;
@@ -220,9 +226,7 @@ XcursorImage *setPointerShape(Display *dpy, XDevice* dev, float r, float g, floa
   cairo_surface_t* barecursor_surface;
   cairo_t* cr;
 
-  // this could be used instead of the selfmade cursor
-  //XcursorImage *XcursorShapeLoadImage (unsigned int shape, const char *theme, int size)
-
+  
   // simple cursor w/o label
   barecursor_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 24, 24);
   cr = cairo_create(barecursor_surface);
@@ -260,23 +264,31 @@ XcursorImage *setPointerShape(Display *dpy, XDevice* dev, float r, float g, floa
   cairo_move_to(cr, idXOffset, idYOffset);
   cairo_show_text(cr,text);
     
-
+ 
   // copy cairo surface to cursor image
-  if(cursor_image = XcursorImageCreate(total_width, total_height))
-    memcpy(cursor_image->pixels, cairo_image_surface_get_data (main_surface), sizeof(CARD32) * total_width * total_height);
-     
-     
+  cursor_image = XcursorImageCreate(total_width, total_height);
+  cursor_image->xhot = cursor_image->yhot = 0; // this is important! otherwise we get badmatch, badcursor xerrrors galore...
+  memcpy(cursor_image->pixels, cairo_image_surface_get_data (main_surface), sizeof(CARD32) * total_width * total_height);
+ 
+  // this is another way of doing it...
+  /*
+    cairo_surface_write_to_png(main_surface,"/tmp/.mpwm_pointer.png");
+    system("echo \"24 0 0 /tmp/.mpwm_pointer.png \" > /tmp/.mpwm_pointer.cfg");
+    system("xcursorgen /tmp/.mpwm_pointer.cfg /tmp/.mpwm_pointer.cur");
+    Cursor cursor = XcursorFilenameLoadCursor(dpy, "/tmp/.mpwm_pointer.cur");
+  */
+
   // and display 
-  Cursor cursor;
-  if(cursor = XcursorImageLoadCursor(dpy, cursor_image));
-     if(XDefineDeviceCursor(dpy, dev, RootWindow(dpy, DefaultScreen(dpy)), cursor) != Success)
-       {
-         XcursorImageDestroy(cursor_image);
-         cursor_image = NULL;
-       }
+  Cursor cursor = XcursorImageLoadCursor(dpy, cursor_image);
+
+  if(XDefineDeviceCursor(dpy, dev, RootWindow(dpy, DefaultScreen(dpy)), cursor) != Success)
+    {
+      XcursorImageDestroy(cursor_image);
+      cursor_image = NULL;
+    }
+
 
   // clean up
-
   cairo_destroy(cr);
   cairo_surface_destroy(dummy_surface);
   cairo_surface_destroy(main_surface);
