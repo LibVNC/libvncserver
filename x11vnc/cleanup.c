@@ -50,6 +50,7 @@ so, delete this exception statement from your version.
 #include "screen.h"
 #include "xrecord.h"
 #include "xevents.h"
+#include "xi2_devices.h"
 
 /*
  * Exiting and error handling routines
@@ -200,6 +201,22 @@ void clean_up_exit(int ret) {
 
 	/* X keyboard cleanups */
 	delete_added_keycodes(0);
+
+	/* remove created pointers */
+        if(use_multipointer)
+          {
+            X_LOCK;
+            rfbClientPtr c = screen->clientHead;
+            while(c)
+              {
+                ClientData *cd = (ClientData *) c->clientData;
+                removeMD(dpy, cd->ptr);
+                rfbLog("removed XInput2 MD for client %s.\n", c->host);
+                c = c->next;
+              }
+            X_UNLOCK;
+          }
+
 
 	if (clear_mods == 1) {
 		clear_modifiers(0);
