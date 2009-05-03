@@ -160,6 +160,7 @@
 #include "selection.h"
 #include "pm.h"
 #include "solid.h"
+#include "xi2_devices.h"
 
 /*
  * main routine for the x11vnc program
@@ -1590,6 +1591,7 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " xdamage:    %d\n", use_xdamage);
 	fprintf(stderr, "  xd_area:   %d\n", xdamage_max_area);
 	fprintf(stderr, "  xd_mem:    %.3f\n", xdamage_memory);
+	fprintf(stderr, " multiptr:   %d\n", use_multipointer);
 	fprintf(stderr, " sigpipe:    %s\n", sigpipe
 	    ? sigpipe : "null");
 	fprintf(stderr, " threads:    %d\n", use_threads);
@@ -3495,6 +3497,10 @@ int main(int argc, char* argv[]) {
 			}
 			continue;
 		}
+                if (!strcmp(arg, "-multiptr")) {
+                        use_multipointer++;
+			continue;
+		}
 		if (!strcmp(arg, "-sigpipe") || !strcmp(arg, "-sig")) {
 			CHECK_ARGC
 			if (known_sigpipe_mode(argv[++i])) {
@@ -4756,6 +4762,15 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		use_xfixes = 0;
 	}
 
+        if(use_multipointer)
+          {
+	    /* XFixesGetCursorImage() gets confused with multiple pointers and crashes */
+            use_xfixes = 0;  
+            rfbLog("Disabled XFIXES while using multiple pointer support.\n");
+          }      
+
+
+
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (! XDamageQueryExtension(dpy, &xdamage_base_event_type, &er)) {
 		if (! quiet && ! raw_fb_str) {
@@ -4933,6 +4948,26 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	}
 
 	initialize_xrecord();
+
+
+	/* check for Xinput 2 */
+        maj = 2;
+        min = 0;
+	if (! XInputQueryVersion_wr(dpy, &maj, &min)) {
+		xinput2_present = 0;
+		if (! quiet) {
+			rfbLog("\n");
+			rfbLog("Xinput2 support was not found on this display.\n");
+			rfbLog("Multiple pointer support will not be available.\n");
+                        rfbLog("\n");
+		}
+	} else {
+		xinput2_present = 1;
+	}
+        
+        if(!xinput2_present)
+          use_multipointer = 0;
+
 
 	tmpi = 1;
 	if (scroll_copyrect) {
