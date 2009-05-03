@@ -38,10 +38,10 @@ so, delete this exception statement from your version.
 extern int pointer_queued_sent;
 
 extern void initialize_pointer_map(char *pointer_remap);
-extern void do_button_mask_change(int mask, int button);
+extern void do_button_mask_change(int mask, int button, XDevice *ptr, XDevice *kbd);
 extern void pointer(int mask, int x, int y, rfbClientPtr client);
 extern int check_pipeinput(void);
 extern void initialize_pipeinput(void);
-extern void update_x11_pointer_position(int x, int y);
+extern void update_x11_pointer_position(int x, int y, XDevice *dev);
 
 #endif /* _X11VNC_POINTER_H */
