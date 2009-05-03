@@ -51,6 +51,7 @@ so, delete this exception statement from your version.
 #include "macosx.h"
 #include "macosxCG.h"
 #include "userinput.h"
+#include "xi2_devices.h"
 
 /*
  * routines for handling incoming, outgoing, etc connections
@@ -785,6 +786,15 @@ void client_gone(rfbClientPtr client) {
 			run_user_command(gone_cmd, client, "gone", NULL,0,NULL);
 		}
 	}
+
+	/* remove clients XInput2 master device */
+        if(use_multipointer)
+          {
+            X_LOCK;
+            removeMD(dpy, cd->ptr);
+            rfbLog("removed XInput2 MD for client %s.\n", client->host);
+            X_UNLOCK;
+          }
 
 	free_client_data(client);
 
@@ -2946,6 +2956,22 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		    allow_list ? allow_list : "(null)" );
 		return(RFB_CLIENT_REFUSE);
 	}
+       
+
+        if(xi2_device_creation_in_progress && use_multipointer) 
+          {
+            rfbLog("denying additional client: %s during MD creation.\n", client->host);
+            return(RFB_CLIENT_REFUSE);
+          }
+        
+	/* at least now (14.12.08) X crashes when adding a 7th MD */
+	/*
+        if (client_count >= 6 && use_multipointer)
+          {
+            rfbLog("denying client: %s no more than 6 users in multi pointer mode.\n", client->host); 
+            return(RFB_CLIENT_REFUSE);
+	    }
+	*/
 
 	client->clientData = (void *) calloc(sizeof(ClientData), 1);
 	cd = (ClientData *) client->clientData;
@@ -3032,6 +3058,39 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	cd->latency = 0.0;
 	cd->cmp_bytes_sent = 0;
 	cd->raw_bytes_sent = 0;
+
+        /*
+	  create new XInput2 master device and add it it to client
+	*/
+        if(use_multipointer)
+          {
+            X_LOCK;
+
+            xi2_device_creation_in_progress = 1;
+	    /* X seems prone to crashing if we dont leave this well alone, oh my ... */
+            usleep(1000*2000); 
+            char tmp[256];
+            snprintf(tmp, 256, "x11vnc %s", client->host);
+            cd->ptr = createMD(dpy, tmp);
+            cd->kbd = getPairedMD(dpy, cd->ptr);
+            snprintf(tmp, 256, "%i", cd->uid);
+	    /* maybe we can use the returned shape later on when reworking the libvncserver interna */
+            XcursorImage *ci; 
+            ci = setPointerShape(dpy, cd->ptr, 0.1*cd->uid, 0.2*cd->uid, 0.5*(cd->uid%2), tmp);
+            if(!ci)
+              rfbLog("setting pointer shape for client %s failed.\n", client->host); // sometimes this happens...
+            else
+              XcursorImageDestroy(ci); /* we dont use it for now, so clean up immediatly */
+            usleep(1000*2000); /* X seems prone to crashing if we dont leave this well alone, oh my ... */
+            rfbLog("created XInput2 MD %i %i for client %s.\n", cd->ptr->device_id, cd->kbd->device_id, client->host);
+            xi2_device_creation_in_progress = 0;
+
+            // annotation tool
+            system("gromit -r"); //toggle reload
+          
+            X_UNLOCK;
+          }
+
 
 	accepted_client = 1;
 	last_client = time(NULL);
