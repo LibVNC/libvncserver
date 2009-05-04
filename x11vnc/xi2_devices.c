@@ -34,6 +34,7 @@ XDevice* createMD(Display* dpy, char* name)
 	
   XChangeDeviceHierarchy(dpy, (XAnyHierarchyChangeInfo*)&c, 1);
 
+  XSync(dpy, False);
   if(trapped_xerror)
     {
       XSetErrorHandler(old_handler);
