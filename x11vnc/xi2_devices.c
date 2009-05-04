@@ -45,67 +45,6 @@ XDevice* createMD(Display* dpy, char* name)
  
   XFreeDeviceList(devices);
 
-
-#ifdef HACK
-  // not-so-nice hack to get the new MD keyboard set up
-  // attach the physical keyboard to our new MD keyboard, send shift up, down
-  // and put it back
-  
-  XDevice *kbd = getPairedMD(dpy, dev); 
-  XDevice *slavekbd = NULL;
-  XDevice *vck =  XOpenDevice(dpy, 1);     // the virtual core keyboard
-
-  // get attached slave keyb - hopefully the right one
-  devices = XListInputDevices(dpy, &num_devices);
-  int found = 0;
-  for(i = 0; i < num_devices && !found; ++i)
-    {
-      XDeviceInfo* currDevice;
-      currDevice = &devices[i];
-      if (currDevice->use == IsXExtensionKeyboard)
-        {
-	  /* run through classes, find attach class to get the
-	     paried pointer.*/
-	  XAnyClassPtr any = currDevice->inputclassinfo;
-	  int i;
-	  for (i = 0; i < currDevice->num_classes; i++) 
-	    {
-	      if(any->class == AttachClass)
-		{
-		  XAttachInfoPtr att = (XAttachInfoPtr)any;
-                  if(att->attached == vck->device_id)
-                    {
-                      slavekbd = XOpenDevice(dpy, currDevice->id);
-                      found = 1;
-                      break;
-                    }
-		}
-	      any = (XAnyClassPtr) ((char *) any + any->length);
-	    }
-        }
-    }
-  XFreeDeviceList(devices);
-  
-  fprintf(stderr, "slave k: %i\n", slavekbd->device_id);
-  fprintf(stderr, "master k: %i\n", kbd->device_id);
-  fprintf(stderr, "master p: %i\n", dev->device_id);
-   
-  XChangeAttachmentInfo ca;
-  ca.type = CH_ChangeAttachment; 
-  ca.changeMode = AttachToMaster; 
-  ca.device = slavekbd;
-  ca.newMaster = kbd;
-  XChangeDeviceHierarchy(dpy, (XAnyHierarchyChangeInfo*)&ca, 1);
-
-  XTestFakeDeviceKeyEvent(dpy, slavekbd, XKeysymToKeycode(dpy, XK_Shift_L), 1, NULL, 0, 1);
-  XTestFakeDeviceKeyEvent(dpy, slavekbd, XKeysymToKeycode(dpy, XK_Shift_L), 0, NULL, 0, 1);
-
-  ca.device = slavekbd;
-  ca.newMaster = vck;
-  XChangeDeviceHierarchy(dpy, (XAnyHierarchyChangeInfo*)&ca, 1);
-  // HACK END
-#endif  
-
   return dev;
 }
 
@@ -138,15 +77,7 @@ int removeMD(Display* dpy, XDevice* dev)
   // we can go on safely
   r.type = CH_RemoveMasterDevice;
   r.device = dev;
-#ifndef HACK
   r.returnMode = Floating;
-#else
-  // HACK START
-  r.returnMode = AttachToMaster;
-  r.returnPointer = XOpenDevice(dpy, 0);
-  r.returnKeyboard = XOpenDevice(dpy, 1);
-  // HACK END
-#endif
 
   return (XChangeDeviceHierarchy(dpy, (XAnyHierarchyChangeInfo*)&r, 1) == Success) ? 1 : 0;
 }
