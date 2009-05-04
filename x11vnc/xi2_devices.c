@@ -5,6 +5,7 @@
 #include <X11/Xproto.h> 
 #include <X11/keysym.h> 
 
+#include "cleanup.h"
 #include "xi2_devices.h" 
 
 
