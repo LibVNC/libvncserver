@@ -3073,10 +3073,9 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
             cd->kbd = getPairedMD(dpy, cd->ptr);
             snprintf(tmp, 256, "%i", cd->uid);
 	    /* maybe we can use the returned shape later on when reworking the libvncserver interna */
-            XcursorImage *ci = NULL; 
-	    ci = setPointerShape(dpy, cd->ptr, 0.4*(cd->uid%3), 0.2*(cd->uid%5), 1*(cd->uid%2), tmp);
+            XcursorImage *ci = setPointerShape(dpy, cd->ptr, 0.4*(cd->uid%3), 0.2*(cd->uid%5), 1*(cd->uid%2), tmp);
 	    if(!ci)
-              rfbLog("setting pointer shape for client %s failed.\n", client->host); // sometimes this happens...
+              rfbLog("setting pointer shape for client %s failed.\n", client->host); 
             else
               XcursorImageDestroy(ci); /* we dont use it for now, so clean up immediatly */
          
