@@ -20,18 +20,31 @@ int xi2_device_creation_in_progress;
 XDevice* createMD(Display* dpy, char* name)
 {
   XDevice *dev = NULL;
-
+  XErrorHandler old_handler;
   XCreateMasterInfo c;
   
   c.type = CH_CreateMasterDevice;
   c.name = name;
   c.sendCore = 1;
   c.enable = 1;
-  
+
+  trapped_xerror = 0;
+  old_handler = XSetErrorHandler(trap_xerror);
+	
   XChangeDeviceHierarchy(dpy, (XAnyHierarchyChangeInfo*)&c, 1);
 
+  if(trapped_xerror)
+    {
+      XSetErrorHandler(old_handler);
+      trapped_xerror = 0;
+      return NULL;
+    }
+
+  XSetErrorHandler(old_handler);
+  trapped_xerror = 0;
 
   // find newly created dev by name
+  // FIXME: is there a better way?
   char handle[256];
   snprintf(handle, 256, "%s pointer", name);
 
