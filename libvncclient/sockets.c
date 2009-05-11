@@ -38,6 +38,7 @@
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/un.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -295,6 +296,34 @@ ConnectClientToTcpAddr(unsigned int host, int port)
   }
 
   return sock;
+}
+
+int
+ConnectClientToUnixSock(const char *sockFile)
+{
+#ifdef WIN32
+  rfbClientErr("Windows doesn't support UNIX sockets\n");
+  return -1;
+#else
+  int sock;
+  struct sockaddr_un addr;
+  addr.sun_family = AF_UNIX;
+  strcpy(addr.sun_path, sockFile);
+
+  sock = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (sock < 0) {
+    rfbClientErr("ConnectToUnixSock: socket (%s)\n",strerror(errno));
+    return -1;
+  }
+
+  if (connect(sock, (struct sockaddr *)&addr, sizeof(addr.sun_family) + strlen(addr.sun_path)) < 0) {
+    rfbClientErr("ConnectToUnixSock: connect\n");
+    close(sock);
+    return -1;
+  }
+
+  return sock;
+#endif
 }
 
 

@@ -29,6 +29,8 @@
 #endif
 #ifndef WIN32
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #else
 #define strncasecmp _strnicmp
 #endif
@@ -342,6 +344,15 @@ DefaultSupportedMessagesTightVNC(rfbClient* client)
     SetServer2Client(client, rfbTextChat);
 }
 
+static rfbBool
+IsUnixSocket(const char *name)
+{
+  struct stat sb;
+  if(stat(name, &sb) && (sb.st_mode & S_IFMT) == S_IFSOCK)
+    return TRUE;
+  return FALSE;
+}
+
 /*
  * ConnectToRFBServer.
  */
@@ -378,12 +389,20 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     return TRUE;
   }
 
-  if (!StringToIPAddr(hostname, &host)) {
-    rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
-    return FALSE;
+#ifndef WIN32
+  if(IsUnixSocket(hostname))
+    /* serverHost is a UNIX socket. */
+    client->sock = ConnectClientToUnixSock(hostname);
+  else
+#endif
+  {
+    /* serverHost is a hostname */
+    if (!StringToIPAddr(hostname, &host)) {
+      rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
+      return FALSE;
+    }
+    client->sock = ConnectClientToTcpAddr(host, port);
   }
-
-  client->sock = ConnectClientToTcpAddr(host, port);
 
   if (client->sock < 0) {
     rfbClientLog("Unable to connect to VNC server\n");
