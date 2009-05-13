@@ -3053,9 +3053,6 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
             rfbLog("created XInput2 MD %i %i for client %s.\n", cd->ptr->device_id, cd->kbd->device_id, client->host);
             xi2_device_creation_in_progress = 0;
 
-            // annotation tool
-            system("gromit -r"); //toggle reload
-          
             X_UNLOCK;
           }
 
