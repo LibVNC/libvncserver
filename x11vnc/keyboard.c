@@ -3134,12 +3134,13 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		}
 	}
 
-        // GROMIT
-        if(use_multipointer && keysym == XK_Pause && down)
+        // GROMIT HACK
+        if(use_multipointer && keysym == XK_Pause)
           {
             char cmd[256];
             snprintf(cmd, 256, "gromit -t %i", (int)cd->ptr->device_id);
-            system(cmd);
+            if(down)
+               system(cmd);
             return;
           }
           
