@@ -3138,7 +3138,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
         if(use_multipointer && keysym == XK_Pause)
           {
             char cmd[256];
-            snprintf(cmd, 256, "gromit -t %i", (int)cd->ptr->device_id);
+            snprintf(cmd, 256, "gromit-mpx -t %i", (int)cd->ptr->device_id);
             if(down)
                system(cmd);
             return;
