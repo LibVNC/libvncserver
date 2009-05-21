@@ -1533,6 +1533,7 @@ static void setup_client_connect(int *did_client_connect) {
 static void loop_for_connect(int did_client_connect) {
 	int loop = 0;
 	time_t start = time(NULL);
+
 	if (first_conn_timeout < 0) {
 		first_conn_timeout = -first_conn_timeout;
 	}
@@ -1564,7 +1565,11 @@ static void loop_for_connect(int did_client_connect) {
 			 * This is to handle an initial verify cert from viewer,
 			 * they disconnect right after fetching the cert.
 			 */
-			if (! use_threads) rfbPE(-1);
+			if (use_threads) {
+				usleep(10 * 1000);
+			} else {
+				rfbPE(-1);
+			}
 			if (screen && screen->clientHead) {
 				int i;
 				if (unixpw) {
@@ -1607,7 +1612,9 @@ static void loop_for_connect(int did_client_connect) {
 			check_openssl();
 		}
 
-		if (! use_threads) {
+		if (use_threads) {
+			usleep(10 * 1000);
+		} else {
 			rfbPE(-1);
 		}
 
@@ -2823,6 +2830,12 @@ int wait_for_client(int *argc, char** argv, int http) {
 	if (vnc_redirect) {
 		vnc_redirect_loop(vnc_redirect_test, &vnc_redirect_cnt);
 	} else {
+
+		if (use_threads && !started_rfbRunEventLoop) {
+			started_rfbRunEventLoop = 1;
+			rfbRunEventLoop(screen, -1, TRUE);
+		}
+
 		if (inetd && use_openssl) {
 			accept_openssl(OPENSSL_INETD, -1);
 		}
@@ -2842,7 +2855,6 @@ int wait_for_client(int *argc, char** argv, int http) {
 		} else if (cmd && !use_threads) {
 			/* try to get RFB proto done now. */
 			progress_client();
-
 		}
 	}
 

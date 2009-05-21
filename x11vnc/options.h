@@ -359,6 +359,7 @@ extern int quiet;
 extern int verbose;
 
 extern int use_threads;
+extern int started_rfbRunEventLoop;
 
 extern int got_noxwarppointer;
 extern int got_rfbport;

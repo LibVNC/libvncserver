@@ -59,6 +59,7 @@ extern void set_x11vnc_remote_prop(char *str);
 extern void read_x11vnc_remote_prop(int);
 extern void check_connect_inputs(void);
 extern void check_gui_inputs(void);
+extern rfbClientPtr create_new_client(int sock, int start_thread);
 extern enum rfbNewClientAction new_client(rfbClientPtr client);
 extern enum rfbNewClientAction new_client_chat_helper(rfbClientPtr client);
 extern rfbBool password_check_chat_helper(rfbClientPtr cl, const char* response, int len);

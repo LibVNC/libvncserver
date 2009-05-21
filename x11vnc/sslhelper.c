@@ -2565,7 +2565,7 @@ void accept_openssl(int mode, int presock) {
 		return;
 	}
 
-	client = rfbNewClient(screen, vsock);
+	client = create_new_client(vsock, 0);
 	openssl_last_helper_pid = 0;
 
 	if (client) {
@@ -2585,11 +2585,15 @@ void accept_openssl(int mode, int presock) {
 			client->protocolMinorVersion = 8;
 			if (!finish_vencrypt_auth(client, vencrypt_sel)) {
 				rfbCloseClient(client);
+				client = NULL;
 			}
 		} else if (anontls_sel != 0) {
 			client->protocolMajorVersion = 3;
 			client->protocolMinorVersion = 8;
 			rfbAuthNewClient(client);
+		}
+		if (use_threads && client != NULL) {
+			rfbStartOnHoldClient(client);
 		}
 		/* try to get RFB proto done now. */
 		progress_client();

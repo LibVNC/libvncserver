@@ -344,7 +344,7 @@ char **scroll_skip_all = NULL;
 char **scroll_skip_key = NULL;
 char **scroll_skip_mouse = NULL;
 char *scroll_skip_str = NULL;
-char *scroll_skip_str0 = "##Soffice.bin,##StarOffice";
+char *scroll_skip_str0 = "##Soffice.bin,##StarOffice,##OpenOffice";
 /*	"##Konsole,"	 * no problems, known heuristics do not work */
 
 char **scroll_term = NULL;
@@ -463,11 +463,8 @@ int quiet = 0;
 int verbose = 0;
 
 /* threaded vs. non-threaded (default) */
-#if LIBVNCSERVER_HAVE_LIBPTHREAD && defined(X11VNC_THREADED)
-int use_threads = 0;	/* not 1. now X11VNC_THREADED means enable it at all. */
-#else
 int use_threads = 0;
-#endif
+int started_rfbRunEventLoop = 0;
 
 /* info about command line opts */
 int got_noxwarppointer = 0;

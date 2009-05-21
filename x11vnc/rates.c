@@ -455,11 +455,16 @@ if (db) fprintf(stderr, "%d client num rects req: %d  mod: %d  cbs: %d  "
 		if (OUCH && ouch_db) fprintf(stderr, "***OUCH-A\n");
 		if (OUCH) continue;
 
+		if (use_threads) LOCK(cl->updateMutex);
+
 		if (sraRgnCountRects(cl->modifiedRegion)) {
 			rfbPE(1000);
 			if (OUCH && ouch_db) fprintf(stderr, "***OUCH-B\n");
+			if (use_threads) UNLOCK(cl->updateMutex);
 			if (OUCH) continue;
 		}
+
+		if (use_threads) UNLOCK(cl->updateMutex);
 
 		defer = screen->deferUpdateTime;
 		httpdir = screen->httpDir;
@@ -486,8 +491,13 @@ if (db) fprintf(stderr, "%d client num rects req: %d  mod: %d  cbs: %d  "
 			if (OUCH && ouch_db) fprintf(stderr, "***OUCH-C1\n");
 			if (OUCH) break;
 
+			if (use_threads) LOCK(cl->updateMutex);
+
 			req0 = sraRgnCountRects(cl->requestedRegion);
 			mod0 = sraRgnCountRects(cl->modifiedRegion);
+
+			if (use_threads) UNLOCK(cl->updateMutex);
+
 			if (use_threads) {
 				usleep(1000);
 			} else {
@@ -506,8 +516,12 @@ if (db) fprintf(stderr, "%d client num rects req: %d  mod: %d  cbs: %d  "
 			if (OUCH && ouch_db) fprintf(stderr, "***OUCH-C2\n");
 			if (OUCH) break;
 
+			if (use_threads) LOCK(cl->updateMutex);
+
 			req1 = sraRgnCountRects(cl->requestedRegion);
 			mod1 = sraRgnCountRects(cl->modifiedRegion);
+
+			if (use_threads) UNLOCK(cl->updateMutex);
 
 if (db) fprintf(stderr, "dt2 calc: num rects req: %d/%d mod: %d/%d  "
     "fbu-sent: %d  dt: %.4f dt2: %.4f  tm: %.4f\n",
@@ -558,10 +572,12 @@ if (db) fprintf(stderr, "dt2 calc: num rects req: %d/%d mod: %d/%d  "
 				while (1) {
 					int req0, req1, mod0, mod1;
 
-					req0 = sraRgnCountRects(
-					    cl->requestedRegion);
-					mod0 = sraRgnCountRects(
-					    cl->modifiedRegion);
+					if (use_threads) LOCK(cl->updateMutex);
+
+					req0 = sraRgnCountRects(cl->requestedRegion);
+					mod0 = sraRgnCountRects(cl->modifiedRegion);
+
+					if (use_threads) UNLOCK(cl->updateMutex);
 
 					if (i == 0) {
 						rfbPE(0);
@@ -582,11 +598,13 @@ if (db) fprintf(stderr, "dt2 calc: num rects req: %d/%d mod: %d/%d  "
 					if (dt3 > spin_lat_max) {
 						break;
 					}
-					req1 = sraRgnCountRects(
-					    cl->requestedRegion);
 
-					mod1 = sraRgnCountRects(
-					    cl->modifiedRegion);
+					if (use_threads) LOCK(cl->updateMutex);
+
+					req1 = sraRgnCountRects(cl->requestedRegion);
+					mod1 = sraRgnCountRects(cl->modifiedRegion);
+
+					if (use_threads) UNLOCK(cl->updateMutex);
 
 if (db) fprintf(stderr, "dt3 calc: num rects req: %d/%d mod: %d/%d  "
     "fbu-sent: %d  dt: %.4f dt3: %.4f  tm: %.4f\n",

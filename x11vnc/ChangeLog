@@ -1,3 +1,10 @@
+2009-05-21  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Thread safety improvements. Add 'OpenOffice' to special
+	  case list for scroll detection.  Fix -clip mode under -rawfb.
+	  Workaround Xorg bug that yields infinitely repeating keys
+	  when 'xset r off' action is done with keys pressed. Env. var
+	  X11VNC_IDLE_TIMEOUT.
+
 2009-03-12  Karl Runge <runge@karlrunge.com>
 	* x11vnc: Fix off-screen bug for -ncache_cr copyrect.
 

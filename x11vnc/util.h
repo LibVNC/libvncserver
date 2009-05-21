@@ -118,4 +118,23 @@ extern MUTEX(scrollMutex);
 #define SCR_UNLOCK if (use_threads) {UNLOCK(scrollMutex);}
 #define SCR_INIT INIT_MUTEX(scrollMutex)
 
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+MUTEX(clientMutex);
+#endif
+#define CLIENT_LOCK   if (use_threads) {LOCK(clientMutex);}
+#define CLIENT_UNLOCK if (use_threads) {UNLOCK(clientMutex);}
+#define CLIENT_INIT INIT_MUTEX(clientMutex)
+
+/*
+ * The sendMutex member was added to libvncserver 0.9.8
+ * rfb/rfb.h sets LIBVNCSERVER_SEND_MUTEX if present.
+ */
+#if LIBVNCSERVER_HAVE_LIBPTHREAD && defined(LIBVNCSERVER_SEND_MUTEX)
+#define SEND_LOCK(cl)   if (use_threads)   LOCK((cl)->sendMutex);
+#define SEND_UNLOCK(cl) if (use_threads) UNLOCK((cl)->sendMutex);
+#else
+#define SEND_LOCK(cl)
+#define SEND_UNLOCK(cl)
+#endif
+
 #endif /* _X11VNC_UTIL_H */

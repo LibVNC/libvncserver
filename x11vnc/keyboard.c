@@ -397,13 +397,12 @@ void autorepeat(int restore, int bequiet) {
 			return;		/* nothing to restore */
 		}
 		global_auto_repeat = get_autorepeat_state();
-		X_LOCK;
 		/* read state and skip restore if equal (e.g. no clients) */
 		if (global_auto_repeat == save_auto_repeat) {
-			X_UNLOCK;
 			return;
 		}
 
+		X_LOCK;
 		kctrl.auto_repeat_mode = save_auto_repeat;
 		XChangeKeyboardControl(dpy, KBAutoRepeatMode, &kctrl);
 		XFlush_wr(dpy);
@@ -2641,6 +2640,7 @@ static void tweak_mod(signed char mod, rfbBool down) {
 	    XTestFakeKeyEvent_wr(dpy, altgr, dn, CurrentTime);
 	}
 	X_UNLOCK;
+
 	if (debug_keyboard) {
 		rfbLog("tweak_mod: Finish: down=%d index=%d mod_state=0x%x"
 		    " is_shift=%d\n", down, (int) mod, (int) mod_state,
@@ -2758,6 +2758,7 @@ void initialize_keyboard_and_pointer(void) {
 	initialize_remap(remap_file);
 	initialize_pointer_map(pointer_remap);
 
+	X_LOCK;
 	clear_modifiers(1);
 	if (clear_mods == 1) {
 		clear_modifiers(0);
@@ -2765,6 +2766,7 @@ void initialize_keyboard_and_pointer(void) {
 	if (clear_mods == 3) {
 		clear_locks();
 	}
+	X_UNLOCK;
 }
 
 void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {

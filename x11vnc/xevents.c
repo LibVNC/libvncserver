@@ -723,7 +723,9 @@ void check_keycode_state(void) {
 	 * in sync with the Xserver at every instant of time.
 	 */
 	if (now > last_check + delay && now > last_keyboard_input + noinput) {
+		X_LOCK;
 		init_track_keycode_state();
+		X_UNLOCK;
 		last_check = now;
 	}
 }
@@ -820,9 +822,9 @@ void check_local_grab(void) {
 
 void check_autorepeat(void) {
 	static time_t last_check = 0;
+	static int idle_timeout = -300, idle_reset = 0;
 	time_t now = time(NULL);
-	int autorepeat_is_on, autorepeat_initially_on, idle_timeout = 300;
-	static int idle_reset = 0;
+	int autorepeat_is_on, autorepeat_initially_on;
 
 	if (! no_autorepeat || ! client_count) {
 		return;
@@ -832,6 +834,15 @@ void check_autorepeat(void) {
 	}
 
 	if (unixpw_in_progress) return;
+
+	if (idle_timeout < 0) {
+		if (getenv("X11VNC_IDLE_TIMEOUT")) {
+			idle_timeout = atoi(getenv("X11VNC_IDLE_TIMEOUT"));
+		}
+		if (idle_timeout < 0) {
+			idle_timeout = -idle_timeout;
+		}
+	}
 
 	last_check = now;
 
@@ -850,7 +861,7 @@ void check_autorepeat(void) {
 		if (! autorepeat_is_on && autorepeat_initially_on) {
 			static time_t last_msg = 0;
 			static int cnt = 0;
-			if (now > last_msg + idle_timeout && cnt++ < 5) {
+			if (now > last_msg + idle_timeout && cnt++ < 10) {
 				rfbLog("idle keyboard:   turning X autorepeat"
 				    " back on.\n");
 				last_msg = now;
@@ -860,9 +871,26 @@ void check_autorepeat(void) {
 		}
 	} else {
 		if (idle_reset) {
+			int i, state[256];
+			for (i=0; i<256; i++) {
+				state[i] = 0;
+			}
+			if (use_threads) {X_LOCK;}
+			get_keystate(state);
+			if (use_threads) {X_UNLOCK;}
+			for (i=0; i<256; i++) {
+				if (state[i] != 0) {
+					/* better wait until all keys are up  */
+					rfbLog("active keyboard: waiting until"
+					    " all keys are up. key_down=%d\n", i);
+					return;
+				}
+			}
+		}
+		if (idle_reset) {
 			static time_t last_msg = 0;
 			static int cnt = 0;
-			if (now > last_msg + idle_timeout && cnt++ < 5) {
+			if (now > last_msg + idle_timeout && cnt++ < 10) {
 				rfbLog("active keyboard: turning X autorepeat"
 				    " off.\n");
 				last_msg = now;
@@ -1435,8 +1463,16 @@ void kbd_release_all_keys(rfbClientPtr cl) {
 #if NO_X11
 	return;
 #else
+	if (use_threads) {
+		X_LOCK;
+	}
+
 	clear_keys();
 	clear_modifiers(0);
+
+	if (use_threads) {
+		X_UNLOCK;
+	}
 #endif
 }
 
@@ -1616,7 +1652,7 @@ static void try_local_chat_window(void) {
 		new_save = screen->newClientHook;
 		screen->newClientHook = new_client_chat_helper;
 
-		chat_window_client = rfbNewClient(screen, sock);
+		chat_window_client = create_new_client(sock, 1);
 
 		screen->newClientHook = new_save;
 
@@ -1678,6 +1714,9 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 		if (cl2->state != RFB_NORMAL) {
 			continue;
 		}
+
+		SEND_LOCK(cl2);
+
 		if (ulen == rfbTextChatOpen) {
 			rfbSendTextChatMessage(cl2, rfbTextChatOpen, "");
 		} else if (ulen == rfbTextChatClose) {
@@ -1689,12 +1728,16 @@ void set_text_chat(rfbClientPtr cl, int len, char *txt) {
 		} else if (len <= rfbTextMaxSize) {
 			rfbSendTextChatMessage(cl2, len, txt);
 		}
+
+		SEND_UNLOCK(cl2);
 	}
 	rfbReleaseClientIterator(iter);
 
 	if (ulen == rfbTextChatClose && cl != NULL) {
 		/* not clear what is going on WRT close and finished... */
+		SEND_LOCK(cl);
 		rfbSendTextChatMessage(cl, rfbTextChatFinished, "");
+		SEND_UNLOCK(cl);
 	}
 #endif
 }

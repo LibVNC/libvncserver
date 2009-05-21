@@ -858,6 +858,60 @@ static void remove_fake_fb(void) {
 	fake_fb = NULL;
 }
 
+static void lock_client_sends(int lock) {
+	static rfbClientPtr *cls = NULL;
+	static int cls_len = 0;
+	static int blocked = 0;
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+
+	if (!use_threads) {
+		return;
+	}
+	if (!screen) {
+		return;
+	}
+
+	if (lock) {
+		if (cls_len < client_count + 128) {
+			if (cls != NULL) {
+				free(cls);
+			}
+			cls_len = client_count + 128;
+			cls = (rfbClientPtr *) calloc(cls_len * sizeof(rfbClientPtr), 1);
+		}
+		
+		iter = rfbGetClientIterator(screen);
+		blocked = 0;
+		while ((cl = rfbClientIteratorNext(iter)) != NULL) {
+			SEND_LOCK(cl);
+rfbLog("locked client:   %p\n", cl);
+			cls[blocked++] = cl;
+		}
+		rfbReleaseClientIterator(iter);
+	} else {
+		int i;
+		for (i=0; i < blocked; i++) {
+			cl = cls[i];
+			if (cl != NULL) {
+				SEND_UNLOCK(cl)
+rfbLog("unlocked client: %p\n", cl);
+			}
+			cls[i] = NULL;
+		}
+		blocked = 0;
+	}
+}
+
+static void rfb_new_framebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
+    int width,int height, int bitsPerSample,int samplesPerPixel,
+    int bytesPerPixel) {
+
+	rfbNewFramebuffer(rfbScreen, framebuffer, width, height, bitsPerSample,
+	    samplesPerPixel, bytesPerPixel);
+
+}
+
 static void install_fake_fb(int w, int h, int bpp) {
 	int bpc;
 	if (! screen) {
@@ -876,7 +930,9 @@ static void install_fake_fb(int w, int h, int bpp) {
 	rfbLog("rfbNewFramebuffer(0x%x, 0x%x, %d, %d, %d, %d, %d)\n",
 	    screen, fake_fb, w, h, bpc, 1, bpp/8);
 
-	rfbNewFramebuffer(screen, fake_fb, w, h, bpc, 1, bpp/8);
+	lock_client_sends(1);
+	rfb_new_framebuffer(screen, fake_fb, w, h, bpc, 1, bpp/8);
+	lock_client_sends(0);
 }
 
 void check_padded_fb(void) {
@@ -1202,6 +1258,11 @@ rfbBool vnc_reflect_send_pointer(int x, int y, int mask) {
 		got_user_input++;
 		got_pointer_input++;
 		last_pointer_time = time(NULL);
+	}
+
+	if (clipshift) {
+		x += coff_x;
+		y += coff_y;
 	}
 
 	if (cursor_x != x || cursor_y != y) {
@@ -2021,7 +2082,7 @@ static void initialize_clipshift(void) {
 			bad = 1;
 		}
 		if (bad) {
-			rfbLog("skipping invalid -clip WxH+X+Y: %s\n",
+			rfbLog("*** ignoring invalid -clip WxH+X+Y: %s\n",
 			    clip_str); 
 		} else {
 			/* OK, change geom behind everyone's back... */
@@ -2356,6 +2417,7 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 	if (use_snapfb) {
 		initialize_snap_fb();
 	}
+
 	X_UNLOCK;
 
 	if (fb->bits_per_pixel == 24 && ! quiet) {
@@ -2743,6 +2805,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	 */
 	bits_per_color = guess_bits_per_color(fb_bpp);
 
+	lock_client_sends(1);
+
 	/* n.b. samplesPerPixel (set = 1 here) seems to be unused. */
 	if (create_screen) {
 		if (use_openssl) {
@@ -2764,7 +2828,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		screen->bitsPerPixel = fb_bpp;
 		screen->depth = fb_depth;
 
-		rfbNewFramebuffer(screen, NULL, width, height,
+		rfb_new_framebuffer(screen, NULL, width, height,
 		    bits_per_color, 1, (int) fb_bpp/8);
 	}
 	if (! screen) {
@@ -3175,6 +3239,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		do_copy_screen = 1;
 		
 		/* done for framebuffer change case */
+		lock_client_sends(0);
 		return;
 	}
 
@@ -3249,6 +3314,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	}
 
 	install_passwds();
+
+	lock_client_sends(0);
 }
 
 #define DO_AVAHI \
@@ -3811,7 +3878,8 @@ void watch_loop(void) {
 	double tm, dtr, dt = 0.0;
 	time_t start = time(NULL);
 
-	if (use_threads) {
+	if (use_threads && !started_rfbRunEventLoop) {
+		started_rfbRunEventLoop = 1;
 		rfbRunEventLoop(screen, -1, TRUE);
 	}
 
@@ -3887,8 +3955,7 @@ void watch_loop(void) {
 				disable_cursor_shape_updates(screen);
 			}
 			if (screen && screen->clientHead) {
-				int ret = check_user_input(dt, dtr,
-				    tile_diffs, &cnt);
+				int ret = check_user_input(dt, dtr, tile_diffs, &cnt);
 				/* true: loop back for more input */
 				if (ret == 2) {
 					skip_pe = 1;
@@ -3905,6 +3972,16 @@ void watch_loop(void) {
 			}
 		} else {
 			/* -threads here. */
+			if (unixpw_in_progress) {
+				rfbClientPtr cl = unixpw_client;
+				if (cl && cl->onHold) {
+					rfbLog(msg, cl->host);
+					unixpw_client->onHold = FALSE;
+				}
+			}
+			if (use_xrecord) {
+				check_xrecord();
+			}
 			if (wireframe && button_mask) {
 				check_wireframe();
 			}

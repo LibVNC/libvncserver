@@ -1776,6 +1776,7 @@ static int copy_tiles(int tx, int ty, int nt) {
 	copy_image(tile_row[nt], x, y, size_x, size_y);
 	XRANDR_CHK_TRAP_RET(-1, "copy_tile-chk");
 
+
 	X_UNLOCK;
 
 	if (blackouts && tile_blackout[n].cover == 1) {
@@ -2806,6 +2807,7 @@ if (db && snapcnt++ < 5) rfbLog("rawfb copy_snap took: %.5f secs\n", dnow() - st
 	}
 
 	X_UNLOCK;
+
 	dt = dtime(&dt);
 	if (first) {
 		rfbLog("copy_snap: time for -snapfb snapshot: %.3f sec\n", dt);
@@ -3474,7 +3476,7 @@ int scan_for_updates(int count_only) {
 			last_xd_check = time(NULL);
 			if (xd_samples > 200) {
 				static int bad = 0;
-				if (xd_misses > (5 * xd_samples) / 100) {
+				if (xd_misses > (20 * xd_samples) / 100) {
 					rfbLog("XDAMAGE is not working well... misses: %d/%d\n", xd_misses, xd_samples);
 					rfbLog("Maybe an OpenGL app like Beryl or Compiz is the problem?\n");
 					rfbLog("Use x11vnc -noxdamage or disable the Beryl/Compiz app.\n");

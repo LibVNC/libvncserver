@@ -1157,6 +1157,7 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 static void set_db(void) {
 	if (getenv("DEBUG_UNIXPW")) {
 		db = atoi(getenv("DEBUG_UNIXPW"));
+		rfbLog("DEBUG_UNIXPW: %d\n", db);
 	}
 }
 

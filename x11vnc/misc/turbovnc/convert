@@ -19,6 +19,13 @@ while (<>) {
 #define xrealloc realloc
 #define rfbTightNoZlib 0x0A
 #define tightSubsampLevel correMaxWidth
+
+#if LIBVNCSERVER_HAVE_LIBPTHREAD && LIBVNCSERVER_HAVE_TLS
+#define TLS __thread
+#else
+#define TLS
+#endif
+
 END
 		next;
 	}
@@ -37,6 +44,10 @@ END
 #	}
 
 #	$_ =~ s/cl->tightQualityLevel;/cl->tightQualityLevel * 10;/;
+
+	if (/^static\s+(Bool|int|CARD32|PALETTE|char|unsigned|tjhandle)\s+[^()]*;\s*$/) {
+		$_ =~ s/^static/static TLS /;
+	}
 
 	$_ =~ s/rfbScreen.pfbMemory/cl->scaledScreen->frameBuffer/g;
 	$_ =~ s/rfbScreen.paddedWidthInBytes/cl->scaledScreen->paddedWidthInBytes/g;
