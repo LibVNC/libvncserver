@@ -75,6 +75,24 @@ rfbVncAuthSendChallenge(rfbClientPtr cl)
 }
 
 /*
+ * LibVNCServer has a bug WRT Tight SecurityType and RFB 3.8
+ * It should send auth result even for rfbAuthNone.
+ * See http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=517422
+ * For testing set USE_SECTYPE_TIGHT_FOR_RFB_3_8 when compiling
+ * or set it here.
+ */
+#define SECTYPE_TIGHT_FOR_RFB_3_8 \
+	if (cl->protocolMajorVersion==3 && cl->protocolMinorVersion > 7) { \
+		uint32_t authResult; \
+		rfbLog("rfbProcessClientSecurityType: returning securityResult for client rfb version >= 3.8\n"); \
+		authResult = Swap32IfLE(rfbVncAuthOK); \
+		if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) { \
+			rfbLogPerror("rfbAuthProcessClientMessage: write"); \
+			rfbCloseClient(cl); \
+			return; \
+		} \
+	}
+/*
  * Read client's preferred authentication type (protocol 3.7t).
  */
 
@@ -117,6 +135,9 @@ rfbProcessClientAuthType(rfbClientPtr cl)
     switch (auth_type) {
     case rfbAuthNone:
 	/* Dispatch client input to rfbProcessClientInitMessage. */
+#ifdef USE_SECTYPE_TIGHT_FOR_RFB_3_8
+	SECTYPE_TIGHT_FOR_RFB_3_8
+#endif
 	cl->state = RFB_INITIALISATION;
 	break;
     case rfbAuthVNC:
@@ -188,6 +209,9 @@ rfbSendAuthCaps(rfbClientPtr cl)
 	/* Call the function for authentication from here */
 	rfbProcessClientAuthType(cl);
     } else {
+#ifdef USE_SECTYPE_TIGHT_FOR_RFB_3_8
+	SECTYPE_TIGHT_FOR_RFB_3_8
+#endif
 	/* Dispatch client input to rfbProcessClientInitMessage. */
 	cl->state = RFB_INITIALISATION;
     }
