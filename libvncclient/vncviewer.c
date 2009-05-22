@@ -316,6 +316,8 @@ void rfbClientCleanup(rfbClient* client) {
 #endif
 #endif
 
+  if (client->sock > 0)
+    close(client->sock);
   free(client->desktopName);
   free(client->serverHost);
   free(client);
