@@ -6,7 +6,6 @@
 #include <X11/keysym.h> 
 
 #include "cleanup.h"
-#include "solid.h"
 #include "xi2_devices.h" 
 
 
@@ -165,13 +164,6 @@ XcursorImage *setPointerShape(Display *dpy, XDevice* dev, float r, float g, floa
   int total_width, total_height;
   XcursorImage *cursor_image = NULL;
 
-  Window window = RootWindow(dpy, DefaultScreen(dpy));
-  Window ignore;
-  Window *child_list = NULL;
-  unsigned int num_children;
-  int i;
-  char *name = NULL;
-
   if(!dev)
     return NULL;
 
@@ -239,32 +231,10 @@ XcursorImage *setPointerShape(Display *dpy, XDevice* dev, float r, float g, floa
     Cursor cursor = XcursorFilenameLoadCursor(dpy, "/tmp/.mpwm_pointer.cur");
   */
 
+  /* and display  */
   Cursor cursor = XcursorImageLoadCursor(dpy, cursor_image);
 
-  /* 
-     in case it's KDE, we run through the window tree and find the kdesktop window 
-     and use that instead of the root window.
-  */
-  if(strcmp("kde", guess_desktop()) == 0)
-    if(XQueryTree(dpy, RootWindow(dpy, DefaultScreen(dpy)), &ignore, &ignore, &child_list, &num_children))
-      for(i = 0; i < num_children; ++i)
-	{
-	  if(!XFetchName(dpy, child_list[i], &name))
-	    continue; /* noname */
-	  else
-	    if(strcmp(name, "kdesktop") == 0)
-	      {
-		window = child_list[i];
-		XFree(name);
-		break;
-	      }
-	}
-  if(child_list)
-    XFree(child_list);
-    
-
-  /* finally ... */
-  if(XDefineDeviceCursor(dpy, dev, window, cursor) != Success)
+  if(XDefineDeviceCursor(dpy, dev, RootWindow(dpy, DefaultScreen(dpy)), cursor) != Success)
     {
       XcursorImageDestroy(cursor_image);
       cursor_image = NULL;
