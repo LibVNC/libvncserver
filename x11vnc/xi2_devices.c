@@ -52,13 +52,12 @@ int createMD(Display* dpy, char* name)
   char handle[256];
   snprintf(handle, 256, "%s pointer", name);
 
-
   XIDeviceInfo	*devinfo;
   int		num_devices;
   devinfo = XIQueryDevice(dpy, XIAllMasterDevices, &num_devices);
 
   int i;
-  for(i = 0; i < num_devices; ++i) /* seems the InputDevices List is already chronologically reversed */
+  for(i = num_devices-1; i >= 0; --i) 
     if(strcmp(devinfo[i].name, handle) == 0)
       {
 	dev_id = devinfo[i].deviceid;
