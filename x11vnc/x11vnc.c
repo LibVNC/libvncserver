@@ -4958,7 +4958,7 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		if (! quiet) {
 			rfbLog("\n");
 			rfbLog("Xinput2 support was not found on this display.\n");
-			rfbLog("Multiple pointer support will not be available.\n");
+			rfbLog("Multi pointer support will not be available.\n");
                         rfbLog("\n");
 		}
 	} else {
@@ -5228,29 +5228,29 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 					k = XKeysymToKeycode(dpy, sym);
 					if (isupper(c)) {
 						k2 = XKeysymToKeycode(dpy, XK_Shift_L);
-						XTestFakeKeyEvent_wr(dpy, NULL, k2, True, CurrentTime);
+						XTestFakeKeyEvent_wr(dpy, -1, k2, True, CurrentTime);
 						XFlush_wr(dpy);
 						usleep(100*1000);
 					}
 					if (0) fprintf(stderr, "C/k %c/%x\n", c, k);
-					XTestFakeKeyEvent_wr(dpy, NULL, k, True, CurrentTime);
+					XTestFakeKeyEvent_wr(dpy, -1, k, True, CurrentTime);
 					XFlush_wr(dpy);
 					usleep(100*1000);
-					XTestFakeKeyEvent_wr(dpy, NULL, k, False, CurrentTime);
+					XTestFakeKeyEvent_wr(dpy, -1, k, False, CurrentTime);
 					XFlush_wr(dpy);
 					usleep(100*1000);
 					if (isupper(c)) {
 						k2 = XKeysymToKeycode(dpy, XK_Shift_L);
-						XTestFakeKeyEvent_wr(dpy, NULL, k2, False, CurrentTime);
+						XTestFakeKeyEvent_wr(dpy, -1, k2, False, CurrentTime);
 						XFlush_wr(dpy);
 						usleep(100*1000);
 					}
 				}
 				k2 = XKeysymToKeycode(dpy, XK_Tab);
-				XTestFakeKeyEvent_wr(dpy, NULL, k2, True, CurrentTime);
+				XTestFakeKeyEvent_wr(dpy, -1, k2, True, CurrentTime);
 				XFlush_wr(dpy);
 				usleep(100*1000);
-				XTestFakeKeyEvent_wr(dpy, NULL, k2, False, CurrentTime);
+				XTestFakeKeyEvent_wr(dpy, -1, k2, False, CurrentTime);
 				XFlush_wr(dpy);
 				usleep(100*1000);
 			}

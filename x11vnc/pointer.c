@@ -55,15 +55,15 @@ so, delete this exception statement from your version.
 int pointer_queued_sent = 0;
 
 void initialize_pointer_map(char *pointer_remap);
-void do_button_mask_change(int mask, int button, XDevice *ptr, XDevice *kbd);
+void do_button_mask_change(int mask, int button, int ptr_id, int kbd_id);
 void pointer(int mask, int x, int y, rfbClientPtr client);
 void initialize_pipeinput(void);
 int check_pipeinput(void);
-void update_x11_pointer_position(int x, int y, XDevice *dev);
+void update_x11_pointer_position(int x, int y, int dev_id);
 
 
 static void buttonparse(int from, char **s);
-static void update_x11_pointer_mask(int mask, XDevice *dev, XDevice *kbd);
+static void update_x11_pointer_mask(int mask, int dev_id, int kbd_id);
 static void pipe_pointer(int mask, int x, int y, rfbClientPtr client);
 
 /*
@@ -338,7 +338,7 @@ void initialize_pointer_map(char *pointer_remap) {
 /*
  * Send a pointer position event to the X server.
  */
-void update_x11_pointer_position(int x, int y, XDevice *dev) {
+void update_x11_pointer_position(int x, int y, int dev_id) {
 #if NO_X11
 	RAWFB_RET_VOID
 	if (!x || !y) {}
@@ -355,11 +355,11 @@ void update_x11_pointer_position(int x, int y, XDevice *dev) {
 		 * window is used:
 		 */
                 if(use_multipointer)
-                  XWarpDevicePointer(dpy, dev, None, window, 0, 0, 0, 0, x + coff_x, y + coff_y);
+                  XIWarpPointer(dpy, dev_id, None, window, 0, 0, 0, 0, x + coff_x, y + coff_y);
                 else
                   XWarpPointer(dpy, None, window, 0, 0, 0, 0, x + coff_x, y + coff_y);
 	} else {
-                XTestFakeMotionEvent_wr(dpy, dev, scr, x + off_x + coff_x, y + off_y + coff_y, CurrentTime);
+                XTestFakeMotionEvent_wr(dpy, dev_id, scr, x + off_x + coff_x, y + off_y + coff_y, CurrentTime);
 	}
 	X_UNLOCK;
 
@@ -381,7 +381,7 @@ void update_x11_pointer_position(int x, int y, XDevice *dev) {
 #endif	/* NO_X11 */
 }
 
-void do_button_mask_change(int mask, int button, XDevice *ptr, XDevice *kbd) {
+void do_button_mask_change(int mask, int button, int ptr_id, int kbd_id) {
 #if NO_X11
 	if (!mask || !button) {}
 	return;
@@ -415,7 +415,7 @@ void do_button_mask_change(int mask, int button, XDevice *ptr, XDevice *kbd) {
 				    " %s (event %d)\n", mb, bmask
 				    ? "down" : "up", k+1);
 			}
-			XTestFakeButtonEvent_wr(dpy, ptr, mb, (mask & (1<<i))
+			XTestFakeButtonEvent_wr(dpy, ptr_id, mb, (mask & (1<<i))
 			    ? True : False, CurrentTime);
 		} else {
 			/* send keysym up or down */
@@ -437,11 +437,11 @@ void do_button_mask_change(int mask, int button, XDevice *ptr, XDevice *kbd) {
 				    "%s\n", down, up, str ? str : "null");
 			}
 			if (down) {
-                                    XTestFakeKeyEvent_wr(dpy, kbd, key, True,
+                                    XTestFakeKeyEvent_wr(dpy, kbd_id, key, True,
 				    CurrentTime);
 			}
 			if (up) {
-                                    XTestFakeKeyEvent_wr(dpy, kbd, key, False,
+                                    XTestFakeKeyEvent_wr(dpy, kbd_id, key, False,
 				    CurrentTime);
 			}
 		}
@@ -452,7 +452,7 @@ void do_button_mask_change(int mask, int button, XDevice *ptr, XDevice *kbd) {
 /*
  * Send a pointer button event to the X server.
  */
-static void update_x11_pointer_mask(int mask, XDevice* ptr, XDevice *kbd) {
+static void update_x11_pointer_mask(int mask, int ptr_id, int kbd_id) {
 #if NO_X11
 	last_event = last_input = last_pointer_input = time(NULL);
 
@@ -566,7 +566,7 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 			rfbLog("pointer(): mask change: mask: 0x%x -> "
 			    "0x%x button: %d\n", button_mask, mask,i+1);
 		}
-		do_button_mask_change(mask, i+1, ptr, kbd);	/* button # is i+1 */
+		do_button_mask_change(mask, i+1, ptr_id, kbd_id);	/* button # is i+1 */
 	    }
 	}
 
@@ -879,11 +879,11 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				    i+1, dnowx());
 			}
 			if (ev[i][1] >= 0) {
-                                update_x11_pointer_position(ev[i][1], ev[i][2], cd->ptr);
+                                update_x11_pointer_position(ev[i][1], ev[i][2], cd->ptr_id);
 				sent = 1;
 			}
 			if (ev[i][0] >= 0) {
-                                update_x11_pointer_mask(ev[i][0], cd->ptr, cd->kbd);
+                                update_x11_pointer_mask(ev[i][0], cd->ptr_id, cd->kbd_id);
 				sent = 1;
 			}
 
@@ -920,7 +920,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 
 	/* update the X display with the event: */
 	if (input.motion) {
-                update_x11_pointer_position(x, y, cd->ptr);
+                update_x11_pointer_position(x, y, cd->ptr_id);
                 sent = 1;
 	}
 	if (input.button) {
@@ -928,7 +928,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			button_change_x = cursor_x;
 			button_change_y = cursor_y;
 		}
-		update_x11_pointer_mask(mask, cd->ptr, cd->kbd);
+		update_x11_pointer_mask(mask, cd->ptr_id, cd->kbd_id);
 		sent = 1;
 	}
 

@@ -85,15 +85,15 @@ void init_track_keycode_state(void);
 
 void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
     unsigned long delay);
-void XTestFakeKeyEvent_wr(Display* dpy, XDevice *dev, KeyCode key, Bool down,
+void XTestFakeKeyEvent_wr(Display* dpy, int dev_id, KeyCode key, Bool down,
     unsigned long delay);
 void XTRAP_FakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
     unsigned long delay);
-void XTestFakeButtonEvent_wr(Display* dpy, XDevice *dev, unsigned int button, Bool is_press,
+void XTestFakeButtonEvent_wr(Display* dpy, int dev_id, unsigned int button, Bool is_press,
     unsigned long delay);
 void XTRAP_FakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
     unsigned long delay);
-void XTestFakeMotionEvent_wr(Display* dpy, XDevice *dev, int screen, int x, int y,
+void XTestFakeMotionEvent_wr(Display* dpy, int dev_id, int screen, int x, int y,
     unsigned long delay);
 
 Bool XTestCompareCurrentCursorWithWindow_wr(Display* dpy, Window w);
@@ -851,7 +851,7 @@ void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 #endif	/* NO_X11 */
 }
 
-void XTestFakeKeyEvent_wr(Display* dpy, XDevice *dev, KeyCode key, Bool down,
+void XTestFakeKeyEvent_wr(Display* dpy, int dev_id, KeyCode key, Bool down,
     unsigned long delay) {
 	static int first = 1;
 
@@ -898,8 +898,13 @@ void XTestFakeKeyEvent_wr(Display* dpy, XDevice *dev, KeyCode key, Bool down,
 		    key, down, dnowx());	
 	}
 #if LIBVNCSERVER_HAVE_XTEST
-        if(use_multipointer && dev)
-          XTestFakeDeviceKeyEvent(dpy, dev, key, down, NULL, 0, delay);
+        if(use_multipointer && dev_id >= 0)
+          {
+	    //FIXME
+	    XDevice xdev;
+	    xdev.device_id = dev_id;
+	    XTestFakeDeviceKeyEvent(dpy, &xdev, key, down, NULL, 0, delay);
+	  }
         else
           XTestFakeKeyEvent(dpy, key, down, delay);
         
@@ -942,7 +947,7 @@ void XTRAP_FakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
 #endif	/* NO_X11 */
 }
 
-void XTestFakeButtonEvent_wr(Display* dpy, XDevice *dev, unsigned int button, Bool is_press,
+void XTestFakeButtonEvent_wr(Display* dpy, int dev_id, unsigned int button, Bool is_press,
     unsigned long delay) {
 
 	RAWFB_RET_VOID
@@ -973,8 +978,13 @@ void XTestFakeButtonEvent_wr(Display* dpy, XDevice *dev, unsigned int button, Bo
 		    button, is_press, dnowx());	
 	}
 #if LIBVNCSERVER_HAVE_XTEST
-        if(use_multipointer && dev)
-          XTestFakeDeviceButtonEvent(dpy, dev, button, is_press, NULL, 0, delay);
+        if(use_multipointer && dev_id >= 0)
+          {
+	    //FIXME
+	    XDevice xdev;
+	    xdev.device_id = dev_id;
+	    XTestFakeDeviceButtonEvent(dpy, &xdev, button, is_press, NULL, 0, delay);
+	  }
         else
           XTestFakeButtonEvent(dpy, button, is_press, delay);
 #endif
@@ -1010,7 +1020,7 @@ void XTRAP_FakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
 #endif	/* NO_X11 */
 }
 
-void XTestFakeMotionEvent_wr(Display* dpy, XDevice* dev, int screen, int x, int y,
+void XTestFakeMotionEvent_wr(Display* dpy, int dev_id, int screen, int x, int y,
     unsigned long delay) {
 
 	RAWFB_RET_VOID
@@ -1037,10 +1047,13 @@ void XTestFakeMotionEvent_wr(Display* dpy, XDevice* dev, int screen, int x, int 
 		    x, y, dnowx());	
 	}
 #if LIBVNCSERVER_HAVE_XTEST
-        if(use_multipointer && dev)
+        if(use_multipointer && dev_id >= 0)
           {
             int axes[] = {x, y};
-            XTestFakeDeviceMotionEvent(dpy, dev, 0, 0, axes, 2, delay);
+	    //FIXME
+	    XDevice xdev;
+	    xdev.device_id = dev_id;
+            XTestFakeDeviceMotionEvent(dpy, &xdev, 0, 0, axes, 2, delay);
           }
         else
           XTestFakeMotionEvent(dpy, screen, x, y, delay);
@@ -1244,13 +1257,14 @@ Bool XInputQueryVersion_wr(Display *dpy, int *maj, int *min) {
 	if (!display_name || !d || !db) {}
 	return NULL;
 #else
-        XExtensionVersion* ret;
-        ret = XQueryInputVersion(dpy, *maj, *min);
-        if(ret->present)
-          return True;
-        else 
-          return False;
-            
+	int ignore;
+	if(! XQueryExtension (dpy, "XInputExtension", &ignore, &ignore, &ignore))
+	  return False;
+
+	if (XIQueryVersion(dpy, maj, min) != Success)
+	  return False;
+
+	return True;
 #endif	/* NO_X11 */
 }
 

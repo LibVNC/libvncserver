@@ -318,35 +318,35 @@ static void bust_grab(int reset) {
 		/* try button press+release */
 		fprintf(stderr, "**bust_grab: button%d  %.4f\n",
 		    button, dnowx());
-		XTestFakeButtonEvent_wr(dpy, NULL, button, True, CurrentTime);
+		XTestFakeButtonEvent_wr(dpy, -1, button, True, CurrentTime);
 		XFlush_wr(dpy);
 		usleep(50 * 1000);
-		XTestFakeButtonEvent_wr(dpy, NULL, button, False, CurrentTime);
+		XTestFakeButtonEvent_wr(dpy, -1, button, False, CurrentTime);
 	} else if (x > 0) {
 		/* try button motion*/
 		int scr = DefaultScreen(dpy);
 
 		fprintf(stderr, "**bust_grab: x=%d y=%d  %.4f\n", x, y,
 		    dnowx());
-		XTestFakeMotionEvent_wr(dpy, NULL, scr, x, y, CurrentTime);
+		XTestFakeMotionEvent_wr(dpy, -1, scr, x, y, CurrentTime);
 		XFlush_wr(dpy);
 		usleep(50 * 1000);
 
 		/* followed by button press */
 		button = 1;
 		fprintf(stderr, "**bust_grab: button%d\n", button);
-		XTestFakeButtonEvent_wr(dpy, NULL, button, True, CurrentTime);
+		XTestFakeButtonEvent_wr(dpy, -1, button, True, CurrentTime);
 		XFlush_wr(dpy);
 		usleep(50 * 1000);
-		XTestFakeButtonEvent_wr(dpy, NULL, button, False, CurrentTime);
+		XTestFakeButtonEvent_wr(dpy, -1, button, False, CurrentTime);
 	} else {
 		/* try Escape or Space press+release */
 		fprintf(stderr, "**bust_grab: keycode: %d  %.4f\n",
 		    (int) key, dnowx());
-		XTestFakeKeyEvent_wr(dpy, NULL, key, True, CurrentTime);
+		XTestFakeKeyEvent_wr(dpy, -1, key, True, CurrentTime);
 		XFlush_wr(dpy);
 		usleep(50 * 1000);
-		XTestFakeKeyEvent_wr(dpy, NULL, key, False, CurrentTime);
+		XTestFakeKeyEvent_wr(dpy, -1, key, False, CurrentTime);
 	}
 	XFlush_wr(dpy);
 	last_bust = time(NULL);
@@ -1470,7 +1470,7 @@ void set_single_window(rfbClientPtr cl, int x, int y) {
 		int rootx, rooty, wx, wy;
 		unsigned int mask;
 
-		update_x11_pointer_position(x, y, cd->ptr);
+		update_x11_pointer_position(x, y, cd->ptr_id);
 		XSync(dpy, False);
 
 		if (XQueryPointer_wr(dpy, rootwin, &r, &c, &rootx, &rooty,

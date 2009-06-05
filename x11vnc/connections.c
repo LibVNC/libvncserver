@@ -791,7 +791,7 @@ void client_gone(rfbClientPtr client) {
         if(use_multipointer)
           {
             X_LOCK;
-            removeMD(dpy, cd->ptr);
+            removeMD(dpy, cd->ptr_id);
             rfbLog("removed XInput2 MD for client %s.\n", client->host);
             X_UNLOCK;
           }
@@ -3026,9 +3026,9 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	  
             snprintf(tmp, 256, "x11vnc %s", client->host);
 
-            cd->ptr = createMD(dpy, tmp);
+            cd->ptr_id = createMD(dpy, tmp);
 
-	    if(!cd->ptr)
+	    if(cd->ptr_id < 0)
 	      {
 		rfbLog("ERROR creating XInput2 MD for client %s, denying client.\n", client->host);
 	
@@ -3039,18 +3039,18 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		return(RFB_CLIENT_REFUSE);
 	      }
 
-            cd->kbd = getPairedMD(dpy, cd->ptr);
+            cd->kbd_id = getPairedMD(dpy, cd->ptr_id);
 
             snprintf(tmp, 256, "%i", cd->uid);
 	    /* maybe we can use the returned shape later on when reworking the libvncserver interna */
-            XcursorImage *ci = setPointerShape(dpy, cd->ptr, 0.4*(cd->uid%3), 0.2*(cd->uid%5), 1*(cd->uid%2), tmp);
+            XcursorImage *ci = setPointerShape(dpy, cd->ptr_id, 0.4*(cd->uid%3), 0.2*(cd->uid%5), 1*(cd->uid%2), tmp);
 	    if(!ci)
               rfbLog("setting pointer shape for client %s failed.\n", client->host); 
             else
               XcursorImageDestroy(ci); /* we dont use it for now, so clean up immediatly */
          
 
-            rfbLog("created XInput2 MD %i %i for client %s.\n", cd->ptr->device_id, cd->kbd->device_id, client->host);
+            rfbLog("created XInput2 MD %i %i for client %s.\n", cd->ptr_id, cd->kbd_id, client->host);
             xi2_device_creation_in_progress = 0;
 
             X_UNLOCK;

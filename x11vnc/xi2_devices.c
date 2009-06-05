@@ -1,12 +1,12 @@
 
 #include <string.h>
-#include <X11/extensions/XInput.h> 
 #include <cairo.h>
 #include <X11/Xproto.h> 
 #include <X11/keysym.h> 
 
-#include "cleanup.h"
 #include "xi2_devices.h" 
+#include "cleanup.h"
+
 
 
 
@@ -18,15 +18,15 @@ int xi2_device_creation_in_progress;
 
 /*
   create MD with given name
-  returns device pointer
+  returns device id, -1 on error
 */
-XDevice* createMD(Display* dpy, char* name)
+int createMD(Display* dpy, char* name)
 {
-  XDevice *dev = NULL;
+  int dev_id = -1;
   XErrorHandler old_handler;
-  XCreateMasterInfo c;
-  
-  c.type = CH_CreateMasterDevice;
+  XICreateMasterInfo c;
+
+  c.type = XICreateMaster;
   c.name = name;
   c.sendCore = 1;
   c.enable = 1;
@@ -34,35 +34,40 @@ XDevice* createMD(Display* dpy, char* name)
   trapped_xerror = 0;
   old_handler = XSetErrorHandler(trap_xerror);
 	
-  XChangeDeviceHierarchy(dpy, (XAnyHierarchyChangeInfo*)&c, 1);
-
+  XIChangeHierarchy(dpy, (XIAnyHierarchyChangeInfo*)&c, 1);
+  
   XSync(dpy, False);
   if(trapped_xerror)
     {
       XSetErrorHandler(old_handler);
       trapped_xerror = 0;
-      return NULL;
+      return -1;
     }
 
   XSetErrorHandler(old_handler);
   trapped_xerror = 0;
 
   /* find newly created dev by name
-     FIXME: is there a better way? */
+     FIXME: better wait for XIHierarchy event here? */
   char handle[256];
   snprintf(handle, 256, "%s pointer", name);
 
-  XDeviceInfo	*devices;
+
+  XIDeviceInfo	*devinfo;
   int		num_devices;
-  devices = XListInputDevices(dpy, &num_devices); 
+  devinfo = XIQueryDevice(dpy, XIAllMasterDevices, &num_devices);
+
   int i;
   for(i = 0; i < num_devices; ++i) /* seems the InputDevices List is already chronologically reversed */
-    if(strcmp(devices[i].name, handle) == 0)
-      dev = XOpenDevice(dpy, devices[i].id);
+    if(strcmp(devinfo[i].name, handle) == 0)
+      {
+	dev_id = devinfo[i].deviceid;
+	break;
+      }
  
-  XFreeDeviceList(devices);
-
-  return dev;
+  XIFreeDeviceInfo(devinfo);
+      
+  return dev_id;
 }
 
 
@@ -71,75 +76,56 @@ XDevice* createMD(Display* dpy, char* name)
   remove device 
   return 1 on success, 0 on failure
 */
-int removeMD(Display* dpy, XDevice* dev)
+int removeMD(Display* dpy, int dev_id)
 {
-  XRemoveMasterInfo r;
+  XIRemoveMasterInfo r;
   int found = 0;
 
-  if(!dev)
+  if(dev_id < 0)
     return 0;
 
-  /* find id of newly created dev by id */
-  XDeviceInfo	*devices;
+  /* see if this device exists */
+  XIDeviceInfo	*devinfo;
   int		num_devices;
-  devices = XListInputDevices(dpy, &num_devices); 
+  devinfo = XIQueryDevice(dpy, XIAllMasterDevices, &num_devices);
   int i;
   for(i = 0; i < num_devices; ++i)
-    if(devices[i].id == dev->device_id)
+    if(devinfo[i].deviceid == dev_id)
       found = 1;
  
-  XFreeDeviceList(devices);
+  XIFreeDeviceInfo(devinfo);
 
   if(!found)
     return 0;
 
   /* we can go on safely */
-  r.type = CH_RemoveMasterDevice;
-  r.device = dev;
-  r.returnMode = Floating;
+  r.type = XIRemoveMaster;
+  r.device = dev_id;
+  r.returnMode = XIFloating;
 
-  return (XChangeDeviceHierarchy(dpy, (XAnyHierarchyChangeInfo*)&r, 1) == Success) ? 1 : 0;
+  return (XIChangeHierarchy(dpy, (XIAnyHierarchyChangeInfo*)&r, 1) == Success) ? 1 : 0;
 }
 
 
 
 
 
-XDevice* getPairedMD(Display* dpy, XDevice* dev)
+int getPairedMD(Display* dpy, int dev_id)
 {
-  XDevice* paired = NULL;
-  XDeviceInfo* devices;
-  int devicecount;
+  int paired = -1;
+  XIDeviceInfo* devinfo;
+  int devicecount = 0;
 
-  if(!dev)
+  if(dev_id < 0)
     return paired;
 
-  devices = XListInputDevices(dpy, &devicecount);
+  devinfo = XIQueryDevice(dpy, dev_id, &devicecount);
 
-  while(devicecount)
-    {
-      XDeviceInfo* currDevice;
+  if(devicecount)
+    paired = devinfo->attachment;
 
-      currDevice = &devices[--devicecount];
-      /* ignore slave devices, only masters are interesting */
-      if ((currDevice->use == IsXKeyboard || currDevice->use == IsXPointer) && currDevice->id == dev->device_id)
-        {
-	  /* run through classes, find attach class to get the
-	     paried pointer.*/
-	  XAnyClassPtr any = currDevice->inputclassinfo;
-	  int i;
-	  for (i = 0; i < currDevice->num_classes; i++) 
-	    {
-	      if(any->class == AttachClass)
-		{
-		  XAttachInfoPtr att = (XAttachInfoPtr)any;
-		  paired = XOpenDevice(dpy, att->attached);
-		}
-	      any = (XAnyClassPtr) ((char *) any + any->length);
-	    }
-        }
-    }
-  XFreeDeviceList(devices);
+  
+  XIFreeDeviceInfo(devinfo);
 
   return paired;
 }
@@ -153,7 +139,7 @@ XDevice* getPairedMD(Display* dpy, XDevice* dev)
   set cursor of pointer dev
   returns the shape as an XCursorImage 
 */
-XcursorImage *setPointerShape(Display *dpy, XDevice* dev, float r, float g, float b, char *label)
+XcursorImage *setPointerShape(Display *dpy, int dev_id, float r, float g, float b, char *label)
 {
   /* label setup */
   const int idFontSize = 18;
@@ -164,13 +150,13 @@ XcursorImage *setPointerShape(Display *dpy, XDevice* dev, float r, float g, floa
   int total_width, total_height;
   XcursorImage *cursor_image = NULL;
 
-  if(!dev)
+  if(dev_id < 0)
     return NULL;
 
   if(label)
     snprintf(text, textsz, "%s", label);
   else
-    snprintf(text, textsz, "%i", (int) dev->device_id);
+    snprintf(text, textsz, "%i", (int) dev_id);
  
   
   cairo_surface_t* main_surface;
@@ -223,18 +209,11 @@ XcursorImage *setPointerShape(Display *dpy, XDevice* dev, float r, float g, floa
   cursor_image->xhot = cursor_image->yhot = 0; 
   memcpy(cursor_image->pixels, cairo_image_surface_get_data (main_surface), sizeof(CARD32) * total_width * total_height);
  
-  /* this is another way of doing it... */
-  /*
-    cairo_surface_write_to_png(main_surface,"/tmp/.mpwm_pointer.png");
-    system("echo \"24 0 0 /tmp/.mpwm_pointer.png \" > /tmp/.mpwm_pointer.cfg");
-    system("xcursorgen /tmp/.mpwm_pointer.cfg /tmp/.mpwm_pointer.cur");
-    Cursor cursor = XcursorFilenameLoadCursor(dpy, "/tmp/.mpwm_pointer.cur");
-  */
 
   /* and display  */
   Cursor cursor = XcursorImageLoadCursor(dpy, cursor_image);
 
-  if(XDefineDeviceCursor(dpy, dev, RootWindow(dpy, DefaultScreen(dpy)), cursor) != Success)
+  if(XIDefineCursor(dpy, dev_id, RootWindow(dpy, DefaultScreen(dpy)), cursor) != Success)
     {
       XcursorImageDestroy(cursor_image);
       cursor_image = NULL;

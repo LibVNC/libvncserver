@@ -210,7 +210,7 @@ void clean_up_exit(int ret) {
             while(c)
               {
                 ClientData *cd = (ClientData *) c->clientData;
-                removeMD(dpy, cd->ptr);
+                removeMD(dpy, cd->ptr_id);
                 rfbLog("removed XInput2 MD for client %s.\n", c->host);
                 c = c->next;
               }

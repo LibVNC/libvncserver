@@ -79,15 +79,15 @@ extern void init_track_keycode_state(void);
 
 extern void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
     unsigned long delay);
-extern void XTestFakeKeyEvent_wr(Display* dpy, XDevice *dev, KeyCode key, Bool down,
+extern void XTestFakeKeyEvent_wr(Display* dpy, int dev_id, KeyCode key, Bool down,
     unsigned long delay);
 extern void XTRAP_FakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
     unsigned long delay);
-extern void XTestFakeButtonEvent_wr(Display* dpy, XDevice *dev, unsigned int button, Bool is_press,
+extern void XTestFakeButtonEvent_wr(Display* dpy, int dev_id, unsigned int button, Bool is_press,
     unsigned long delay);
 extern void XTRAP_FakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
     unsigned long delay);
-extern void XTestFakeMotionEvent_wr(Display* dpy, XDevice *dev, int screen, int x, int y,
+extern void XTestFakeMotionEvent_wr(Display* dpy, int dev_id, int screen, int x, int y,
     unsigned long delay);
 
 extern Bool XTestCompareCurrentCursorWithWindow_wr(Display* dpy, Window w);
