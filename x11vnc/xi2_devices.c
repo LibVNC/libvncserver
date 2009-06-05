@@ -4,11 +4,9 @@
 #include <X11/Xproto.h> 
 #include <X11/keysym.h> 
 
-#include "xi2_devices.h" 
+#include "x11vnc.h" 
 #include "cleanup.h"
-
-
-
+#include "xi2_devices.h" 
 
 /* does the X version we're running on support XI2? */
 int xinput2_present;

@@ -3630,9 +3630,11 @@ void print_help(int mode) {
 "                       there are problems or decrease it to live on the edge\n"
 "                       (perhaps useful on a slow machine).\n"
 "\n"
+#ifdef LIBVNCSERVER_HAVE_XI2
 "-multiptr              Enable support for multiple pointers, one per client.\n"
 "                       Uses XInput2 aka MPX. Default is off.\n"
 "\n"
+#endif
 "-sigpipe string        Broken pipe (SIGPIPE) handling.  \"string\" can be\n"
 "                       \"ignore\" or \"exit\".  For \"ignore\" libvncserver\n"
 "                       will handle the abrupt loss of a client and continue,\n"

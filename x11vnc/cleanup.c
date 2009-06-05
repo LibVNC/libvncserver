@@ -52,6 +52,7 @@ so, delete this exception statement from your version.
 #include "xevents.h"
 #include "xi2_devices.h"
 
+
 /*
  * Exiting and error handling routines
  */
@@ -202,6 +203,7 @@ void clean_up_exit(int ret) {
 	/* X keyboard cleanups */
 	delete_added_keycodes(0);
 
+#ifdef LIBVNCSERVER_HAVE_XI2
 	/* remove created pointers */
         if(use_multipointer)
           {
@@ -216,7 +218,7 @@ void clean_up_exit(int ret) {
               }
             X_UNLOCK;
           }
-
+#endif
 
 	if (clear_mods == 1) {
 		clear_modifiers(0);

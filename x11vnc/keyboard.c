@@ -1742,9 +1742,11 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 
 	if (debug_keyboard > 1) {
 		/* get state early for debug output */
+#ifdef LIBVNCSERVER_HAVE_XI2
                 if(use_multipointer)
                   XkbGetState(dpy, cd->kbd_id, &kbstate);
                 else
+#endif
                   XkbGetState(dpy, XkbUseCoreKbd, &kbstate);
 		got_kbstate = 1;
 		PKBSTATE
@@ -1783,9 +1785,11 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 			int best = 0, best_score = -1;
 			/* need to break the tie... */
 			if (! got_kbstate) {
+#ifdef LIBVNCSERVER_HAVE_XI2
                                if(use_multipointer)
                                  XkbGetState(dpy, cd->kbd_id, &kbstate);
                                else
+#endif
                                  XkbGetState(dpy, XkbUseCoreKbd, &kbstate);
                                got_kbstate = 1;
 			}
@@ -2042,9 +2046,11 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 
 		if (! got_kbstate) {
 			/* get the current modifier state if we haven't yet */
+#ifdef LIBVNCSERVER_HAVE_XI2
 			 if(use_multipointer)
                            XkbGetState(dpy, cd->kbd_id, &kbstate);
                          else
+#endif
                            XkbGetState(dpy, XkbUseCoreKbd, &kbstate);
                          got_kbstate = 1;
 		}
@@ -3133,7 +3139,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			keysym = XK_period; 
 		}
 	}
-
+#ifdef LIBVNCSERVER_HAVE_XI2
         // GROMIT HACK
         if(use_multipointer && keysym == XK_Pause)
           {
@@ -3143,7 +3149,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
                system(cmd);
             return;
           }
-          
+#endif          
 
 	last_down = down;
 	last_keysym = keysym;

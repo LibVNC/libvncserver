@@ -898,6 +898,7 @@ void XTestFakeKeyEvent_wr(Display* dpy, int dev_id, KeyCode key, Bool down,
 		    key, down, dnowx());	
 	}
 #if LIBVNCSERVER_HAVE_XTEST
+#ifdef LIBVNCSERVER_HAVE_XI2
         if(use_multipointer && dev_id >= 0)
           {
 	    //FIXME
@@ -906,6 +907,7 @@ void XTestFakeKeyEvent_wr(Display* dpy, int dev_id, KeyCode key, Bool down,
 	    XTestFakeDeviceKeyEvent(dpy, &xdev, key, down, NULL, 0, delay);
 	  }
         else
+#endif
           XTestFakeKeyEvent(dpy, key, down, delay);
         
 	if (grab_kbd) {
@@ -978,6 +980,7 @@ void XTestFakeButtonEvent_wr(Display* dpy, int dev_id, unsigned int button, Bool
 		    button, is_press, dnowx());	
 	}
 #if LIBVNCSERVER_HAVE_XTEST
+#ifdef LIBVNCSERVER_HAVE_XI2
         if(use_multipointer && dev_id >= 0)
           {
 	    //FIXME
@@ -986,6 +989,7 @@ void XTestFakeButtonEvent_wr(Display* dpy, int dev_id, unsigned int button, Bool
 	    XTestFakeDeviceButtonEvent(dpy, &xdev, button, is_press, NULL, 0, delay);
 	  }
         else
+#endif
           XTestFakeButtonEvent(dpy, button, is_press, delay);
 #endif
 	if (grab_ptr) {
@@ -1047,6 +1051,7 @@ void XTestFakeMotionEvent_wr(Display* dpy, int dev_id, int screen, int x, int y,
 		    x, y, dnowx());	
 	}
 #if LIBVNCSERVER_HAVE_XTEST
+#ifdef LIBVNCSERVER_HAVE_XI2
         if(use_multipointer && dev_id >= 0)
           {
             int axes[] = {x, y};
@@ -1056,6 +1061,7 @@ void XTestFakeMotionEvent_wr(Display* dpy, int dev_id, int screen, int x, int y,
             XTestFakeDeviceMotionEvent(dpy, &xdev, 0, 0, axes, 2, delay);
           }
         else
+#endif
           XTestFakeMotionEvent(dpy, screen, x, y, delay);
 #endif
 	if (grab_ptr) {
@@ -1260,9 +1266,10 @@ Bool XInputQueryVersion_wr(Display *dpy, int *maj, int *min) {
 	int ignore;
 	if(! XQueryExtension (dpy, "XInputExtension", &ignore, &ignore, &ignore))
 	  return False;
-
+#ifdef LIBVNCSERVER_HAVE_XI2
 	if (XIQueryVersion(dpy, maj, min) != Success)
 	  return False;
+#endif
 
 	return True;
 #endif	/* NO_X11 */

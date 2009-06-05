@@ -122,6 +122,12 @@ AC_ARG_WITH(colormultipointer,
 [  --without-colormultipointer  disable color support for multiple pointers]
 [  --with-cairo=DIR        use cairo include/library files in DIR (needed for color cursor support)],,)
 
+# check for XI2 support
+PKG_CHECK_MODULES(XI2, [xi >= 1.2.99] [inputproto >= 1.9.99.9],
+                  HAVE_XI2="yes"; AC_DEFINE(HAVE_XI2, 1, [XI2 available]),
+                  HAVE_XI2="no");
+
+
 fi
 # end x11vnc only.
 
@@ -233,7 +239,7 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 		fi
 
-		if test "x$with_colormultipointer" != "xno"; then
+		if test "$HAVE_XI2" = "yes" -a "x$with_colormultipointer" != "xno"; then
 			AC_CHECK_LIB(Xcursor, XcursorImageLoadCursor,
 				X_PRELIBS="$X_PRELIBS -lXcursor"
 				[AC_DEFINE(HAVE_LIBXCURSOR) HAVE_LIBXCURSOR="true"], ,
@@ -438,6 +444,7 @@ if test "x$with_avahi" = "xyes"; then
 fi
 
 
+if test "$HAVE_XI2" = "yes"; then
 AH_TEMPLATE(HAVE_CAIRO, [cairo graphics library present])
 if test "x$with_cairo" != "xno"; then
 	printf "checking for cairo... "
@@ -461,7 +468,7 @@ if test "x$with_cairo" = "xyes"; then
 	AC_SUBST(CAIRO_CFLAGS)
 	AC_SUBST(CAIRO_LIBS)
 fi
-
+fi
 
 
 fi
@@ -697,6 +704,10 @@ if test ! -z "$MINGW"; then
 	WSOCKLIB="-lws2_32"
 fi
 AC_SUBST(WSOCKLIB)
+
+# XI2 present?
+AM_CONDITIONAL(HAVE_XI2, [ test "$HAVE_XI2" = "yes" ])
+
 
 # Checks for header files.
 AC_HEADER_STDC

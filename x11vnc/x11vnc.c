@@ -1591,7 +1591,9 @@ static void print_settings(int try_http, int bg, char *gui_str) {
 	fprintf(stderr, " xdamage:    %d\n", use_xdamage);
 	fprintf(stderr, "  xd_area:   %d\n", xdamage_max_area);
 	fprintf(stderr, "  xd_mem:    %.3f\n", xdamage_memory);
+#ifdef LIBVNCSERVER_HAVE_XI2
 	fprintf(stderr, " multiptr:   %d\n", use_multipointer);
+#endif
 	fprintf(stderr, " sigpipe:    %s\n", sigpipe
 	    ? sigpipe : "null");
 	fprintf(stderr, " threads:    %d\n", use_threads);
@@ -3497,10 +3499,12 @@ int main(int argc, char* argv[]) {
 			}
 			continue;
 		}
+#ifdef LIBVNCSERVER_HAVE_XI2
                 if (!strcmp(arg, "-multiptr")) {
                         use_multipointer++;
 			continue;
 		}
+#endif
 		if (!strcmp(arg, "-sigpipe") || !strcmp(arg, "-sig")) {
 			CHECK_ARGC
 			if (known_sigpipe_mode(argv[++i])) {
@@ -4761,14 +4765,14 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	if (! xfixes_present) {
 		use_xfixes = 0;
 	}
-
+#ifdef LIBVNCSERVER_HAVE_XI2
         if(use_multipointer)
           {
 	    /* XFixesGetCursorImage() gets confused with multiple pointers and crashes */
             use_xfixes = 0;  
             rfbLog("Disabled XFIXES while using multiple pointer support.\n");
           }      
-
+#endif
 
 
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
@@ -4949,7 +4953,7 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 
 	initialize_xrecord();
 
-
+#ifdef LIBVNCSERVER_HAVE_XI2
 	/* check for Xinput 2 */
         maj = 2;
         min = 0;
@@ -4967,7 +4971,7 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
         
         if(!xinput2_present)
           use_multipointer = 0;
-
+#endif
 
 	tmpi = 1;
 	if (scroll_copyrect) {
