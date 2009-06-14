@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "May 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "June 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.8, lastmod: 2009-05-18
+         version: 0.9.8, lastmod: 2009-06-14
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -4631,6 +4631,11 @@ is x11vnc doing wireframing, or an X display that does
 wireframing that gives much better response than opaque
 window dragging.  Consider the \fB-nodragging\fR option if
 the problem is severe.
+.IP
+The env. var. X11VNC_REFLECT_PASSWORD can be set to
+the password needed to log into the vnc host server, or
+to "file:path_to_file" to indicate a file containing
+the password as its first line.
 .IP
 The VNC HOST mode implies \fB-shared.\fR  Use \fB-noshared\fR as
 a subsequent cmdline option to disable sharing.

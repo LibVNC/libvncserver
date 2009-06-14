@@ -1175,6 +1175,39 @@ rfbBool vnc_reflect_resize(rfbClient *cl)  {
 	return cl->frameBuffer ? TRUE : FALSE;
 }
 
+static char* vnc_reflect_get_password(rfbClient* client) {
+	char *q, *p, *str = getenv("X11VNC_REFLECT_PASSWORD");
+	int len = 110;
+
+	if (str) {
+		len += 2*strlen(str);	
+	}
+	p = (char *) calloc(len, 1);
+	if (!str || strlen(str) == 0) {
+		fprintf(stderr, "VNC Reflect Password: ");
+		fgets(p, 100, stdin);
+	} else {
+		if (strstr(str, "file:") == str) {
+			FILE *f = fopen(str + strlen("file:"), "r");
+			if (f) {
+				fgets(p, 100, f);
+				fclose(f);
+			}
+		}
+		if (p[0] == '\0') {
+			strncpy(p, str, 100);
+		}
+	}
+	q = p;
+	while (*q != '\0') {
+		if (*q == '\n') {
+			*q = '\0';
+		}
+		q++;
+	}
+	return p;
+}
+
 char *vnc_reflect_guess(char *str, char **raw_fb_addr) {
 
 	static int first = 1;
@@ -1205,6 +1238,10 @@ char *vnc_reflect_guess(char *str, char **raw_fb_addr) {
 	client->MallocFrameBuffer = vnc_reflect_resize;
 	client->canHandleNewFBSize = TRUE;
 	client->GotFrameBufferUpdate = vnc_reflect_got_update;
+
+	if (getenv("X11VNC_REFLECT_PASSWORD")) {
+		client->GetPassword = vnc_reflect_get_password;
+	}
 
 	if (first) {
 		argv[argc++] = "x11vnc_rawfb_vnc";

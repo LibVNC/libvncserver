@@ -817,7 +817,10 @@ void client_gone(rfbClientPtr client) {
 			rfbLog("connect_once: invalid password or early "
 			   "disconnect.\n");
 			rfbLog("connect_once: waiting for next connection.\n"); 
-			accepted_client = 0;
+			accepted_client--;
+			if (accepted_client < 0) {
+				accepted_client = 0;
+			}
 			CLIENT_UNLOCK;
 			return;
 		}
@@ -2995,8 +2998,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	if (connect_once) {
 		if (screen->dontDisconnect && screen->neverShared) {
 			if (! shared && accepted_client) {
-				rfbLog("denying additional client: %s\n",
-				     client->host);
+				rfbLog("denying additional client: %s:%d\n",
+				     client->host, get_remote_port(client->sock));
 				CLIENT_UNLOCK;
 				return(RFB_CLIENT_REFUSE);
 			}
@@ -3095,7 +3098,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	cd->cmp_bytes_sent = 0;
 	cd->raw_bytes_sent = 0;
 
-	accepted_client = 1;
+	rfbLog("incr accepted_client for %s:%d.\n", client->host, get_remote_port(client->sock));
+	accepted_client++;
 	last_client = time(NULL);
 
 	if (ncache) {

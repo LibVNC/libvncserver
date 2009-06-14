@@ -1,3 +1,8 @@
+2009-06-14  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Add X11VNC_REFLECT_PASSWORD env. var. for -reflect mode.
+	  Message to user about compiz problems suggesting -noxdamage.
+	  Improvements to single-port detection and logging.
+
 2009-05-21  Karl Runge <runge@karlrunge.com>
 	* x11vnc: Thread safety improvements. Add 'OpenOffice' to special
 	  case list for scroll detection.  Fix -clip mode under -rawfb.

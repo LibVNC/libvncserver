@@ -4785,6 +4785,11 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	if (! quiet && xdamage_present && use_xdamage && ! raw_fb_str) {
 		rfbLog("X DAMAGE available on display, using it for polling hints.\n");
 		rfbLog("  To disable this behavior use: '-noxdamage'\n");
+		rfbLog("\n");
+		rfbLog("  Most compositing window managers like 'compiz' or 'beryl'\n");
+		rfbLog("  cause X DAMAGE to fail, and so you may not see any screen\n");
+		rfbLog("  updates via VNC.  Either disable 'compiz' (recommended) or\n");
+		rfbLog("  supply the x11vnc '-noxdamage' command line option.\n");
 	}
 
 	if (! quiet && wireframe && ! raw_fb_str) {

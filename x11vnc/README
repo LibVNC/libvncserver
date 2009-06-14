@@ -2,7 +2,7 @@
 Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
-x11vnc README file                         Date: Thu May 21 10:41:49 EDT 2009
+x11vnc README file                         Date: Sun Jun 14 13:03:59 EDT 2009
 
 The following information is taken from these URLs:
 
@@ -3221,6 +3221,13 @@ TrueColor defdepth 24
    the Xterminal (you'll of course need basic X11 permission to do that)
    and finally supply the [222]-noshm option (this enables the polling
    over the network).
+
+   If the Xterminal's X display is open to the network for connections,
+   you might use something like "-display xterm123:0". If you are trying
+   to do this via an SSH tunnel (assuming you can actually ssh into the
+   Xterminal) it will be a little tricky (either use the ssh "-R" option
+   or consider ssh-ing in the other direction.) In all cases the X11
+   permissions need to allow the connection.
 
    The response will likely be sluggish (maybe only one "frame" per
    second). This mode is not recommended except for "quick checks" of
@@ -9375,7 +9382,7 @@ References
  462. http://www.karlrunge.com/x11vnc/faq.html#faq-linuxvc
  463. http://www.karlrunge.com/x11vnc/Xdummy
  464. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-find
- 465. http://www.isc.cnrs.fr/informatique/public_notice/x11vnc
+ 465. http://www.karlrunge.com/x11vnc/xdm_one_shot.html
  466. http://www.karlrunge.com/x11vnc/faq.html#infaq_display-manager-continuously
  467. http://www.karlrunge.com/x11vnc/faq.html#infaq_findcreatedisplay
  468. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-display_WAIT
@@ -11655,6 +11662,10 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
        inside the viewport via Arrow keys or a mouse drag.
      * Scrollbar width setting: -sbwidth n, the default is very thin, 2
        pixels, for less distracting -ycrop usage.
+     * Selection text sending and receiving can be fine-tuned with the
+       -sendclipboard, -sendalways, and -recvtext options.
+     * TightVNC compression and quality levels are automatically set
+       based on observed network latency (n.b. not bandwidth.)
      * Improvements to the [29]Popup menu, all of these can now be
        changed dynamically via the menu: ViewOnly, Toggle Bell,
        CursorShape updates, X11 Cursor, Cursor Alphablending, Toggle
@@ -12307,6 +12318,8 @@ r
         Quality Level            ~ -quality (both Tight and ZYWRLE)
         Compress Level           ~ -compresslevel
         Disable JPEG:            ~ -nojpeg  (Tight)
+        Pipeline Updates         ~ -pipeline
+
         Full Color                 as many colors as local screen allows.
         Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
         16 bit color (BGR565)    ~ -16bpp / -bgr565
@@ -12320,7 +12333,6 @@ r
         Set Y Crop (y-max)       ~ -ycrop
         Set Scrollbar Width      ~ -sbwidth
         XGrabServer              ~ -graball
-        Pipeline Updates         ~ -pipeline
 
         UltraVNC Extensions:
 
@@ -12334,6 +12346,9 @@ r
 
         Note: the Ultravnc extensions only apply to servers that support
               them.  x11vnc/libvncserver supports some of them.
+
+        Send Clipboard not Primary  ~ -sendclipboard
+        Send Selection Every time   ~ -sendalways
 
    Nearly all of these can be changed dynamically in the Popup menu
    (press F8 for it):
@@ -12598,7 +12613,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.8 lastmod: 2009-05-18
+x11vnc: allow VNC connections to real X11 displays. 0.9.8 lastmod: 2009-06-14
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -12723,7 +12738,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.8 lastmod: 2009-05-18
+x11vnc: allow VNC connections to real X11 displays. 0.9.8 lastmod: 2009-06-14
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -16695,6 +16710,11 @@ t
                        wireframing that gives much better response than opaque
                        window dragging.  Consider the -nodragging option if
                        the problem is severe.
+
+                       The env. var. X11VNC_REFLECT_PASSWORD can be set to
+                       the password needed to log into the vnc host server, or
+                       to "file:path_to_file" to indicate a file containing
+                       the password as its first line.
 
                        The VNC HOST mode implies -shared.  Use -noshared as
                        a subsequent cmdline option to disable sharing.
