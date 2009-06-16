@@ -111,10 +111,9 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
     return NULL;
   }
   initAppData(&client->appData);
-  client->programName = NULL;
   client->endianTest = 1;
   client->programName="";
-  client->serverHost="";
+  client->serverHost=strdup("");
   client->serverPort=5900;
   
   client->CurrentKeyboardLedState = 0;
@@ -264,6 +263,9 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
         j+=2;
       } else {
 	char* colon=strchr(argv[i],':');
+
+	if(client->serverHost)
+	  free(client->serverHost);
 
 	if(colon) {
 	  client->serverHost=strdup(argv[i]);
