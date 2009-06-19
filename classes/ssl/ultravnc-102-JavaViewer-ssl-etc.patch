@@ -2644,8 +2644,8 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	//	}
 diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 --- JavaViewer.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ JavaViewer/SSLSocketToMe.java	2009-06-18 09:47:22.000000000 -0400
-@@ -0,0 +1,1717 @@
++++ JavaViewer/SSLSocketToMe.java	2009-06-19 10:23:50.000000000 -0400
+@@ -0,0 +1,1726 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -3495,7 +3495,16 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +		} catch (Exception e) {
 +			dbg("props failed: " + e.getMessage());
 +		}
-+		if (props != null) {
++		if (viewer.proxyHost != null) {
++			dbg("Using supplied proxy " + viewer.proxyHost + " " + viewer.proxyPort + " applet parameters.");
++			proxyHost = viewer.proxyHost;
++			if (viewer.proxyPort != null) {
++				proxyPort = gint(viewer.proxyPort);
++			} else {
++				proxyPort = 8080;
++			}
++			
++		} else if (props != null) {
 +			dbg("\n---------------\nAll props:");
 +			props.list(System.out);
 +			dbg("\n---------------\n\n");
@@ -4488,7 +4497,7 @@ diff -Naur JavaViewer.orig/VncCanvas.java JavaViewer/VncCanvas.java
  						result = 0; // Transparent pixel
 diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 --- JavaViewer.orig/VncViewer.java	2006-05-24 15:14:40.000000000 -0400
-+++ JavaViewer/VncViewer.java	2009-01-11 12:28:55.000000000 -0500
++++ JavaViewer/VncViewer.java	2009-06-19 10:31:23.000000000 -0400
 @@ -80,11 +80,11 @@
    GridBagLayout gridbag;
    ButtonPanel buttonPanel;
@@ -4512,7 +4521,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
    String passwordParam;
    String encPasswordParam;
    boolean showControls;
-@@ -115,28 +115,68 @@
+@@ -115,28 +115,70 @@
    int i;
    // mslogon support 2 end
  
@@ -4524,6 +4533,8 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +String httpsPort;
 +String oneTimeKey;
 +String ftpDropDown;
++String proxyHost;
++String proxyPort;
 +boolean forceProxy;
 +boolean ignoreProxy;
 +boolean trustAllVncCerts;
@@ -4587,7 +4598,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // authenticator = new AuthPanel(false);   // mslogon support : go to connectAndAuthenticate()
      if (RecordingFrame.checkSecurity())
        rec = new RecordingFrame(this);
-@@ -147,10 +187,11 @@
+@@ -147,10 +189,11 @@
      cursorUpdatesDef = null;
      eightBitColorsDef = null;
  
@@ -4601,7 +4612,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfbThread = new Thread(this);
      rfbThread.start();
    }
-@@ -186,6 +227,30 @@
+@@ -186,6 +229,30 @@
        gbc.weightx = 1.0;
        gbc.weighty = 1.0;
  
@@ -4632,7 +4643,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  	// Add ScrollPanel to applet mode
  
  	// Create a panel which itself is resizeable and can hold
-@@ -286,6 +351,24 @@
+@@ -286,6 +353,24 @@
  
    void connectAndAuthenticate() throws Exception {
  
@@ -4657,7 +4668,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // If "ENCPASSWORD" parameter is set, decrypt the password into
      // the passwordParam string.
  
-@@ -336,7 +419,22 @@
+@@ -336,7 +421,22 @@
      //
  
      
@@ -4681,7 +4692,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      authenticator = new AuthPanel(mslogon);
      
-@@ -390,6 +488,10 @@
+@@ -390,6 +490,10 @@
  	break;
        //mslogon support end
  
@@ -4692,7 +4703,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
        // Retry on authentication failure.
        authenticator.retry();
      }
-@@ -405,9 +507,11 @@
+@@ -405,9 +509,11 @@
  
    void prologueDetectAuthProtocol() throws Exception {
  
@@ -4706,7 +4717,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      System.out.println("RFB server supports protocol version " +
  		       rfb.serverMajor + "." + rfb.serverMinor);
-@@ -431,16 +535,36 @@
+@@ -431,16 +537,36 @@
  
    boolean tryAuthenticate(String us, String pw) throws Exception {
      
@@ -4749,7 +4760,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      switch (authScheme) {
  
-@@ -629,6 +753,10 @@
+@@ -629,6 +755,10 @@
  
    void doProtocolInitialisation() throws IOException {
  
@@ -4760,7 +4771,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfb.writeClientInit();
  
      rfb.readServerInit();
-@@ -775,8 +903,25 @@
+@@ -775,8 +905,25 @@
        }
      }
  
@@ -4788,7 +4799,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      if (inAnApplet) {
        str = readParameter("Open New Window", false);
-@@ -804,6 +949,105 @@
+@@ -804,6 +951,133 @@
      deferScreenUpdates = readIntParameter("Defer screen updates", 20);
      deferCursorUpdates = readIntParameter("Defer cursor updates", 10);
      deferUpdateRequests = readIntParameter("Defer update requests", 50);
@@ -4846,15 +4857,43 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +    }
 +
 +    forceProxy = false;
++    proxyHost = null;
++    proxyPort = null;
 +    str = readParameter("forceProxy", false);
-+    if (str != null && str.equalsIgnoreCase("Yes")) {
-+	forceProxy = true;
++    if (str != null) {
++	    if (str.equalsIgnoreCase("Yes")) {
++		forceProxy = true;
++	    } else if (str.equalsIgnoreCase("No")) {
++		forceProxy = false;
++	    } else {
++		forceProxy = true;
++		String[] pieces = str.split(" ");
++		proxyHost = new String(pieces[0]);
++		if (pieces.length >= 2) {
++			proxyPort = new String(pieces[1]);
++		} else {
++			proxyPort = new String("8080");
++		}
++	    }
 +    }
++    str = readParameter("proxyHost", false);
++    if (str != null) {
++	proxyHost = new String(str);
++    }
++    str = readParameter("proxyPort", false);
++    if (str != null) {
++	proxyPort = new String(str);
++    }
++    if (proxyHost != null && proxyPort == null) {
++    	proxyPort = new String("8080");
++    }
++
 +    ignoreProxy = false;
 +    str = readParameter("ignoreProxy", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +	ignoreProxy = true;
 +    }
++
 +    trustAllVncCerts = false;
 +    str = readParameter("trustAllVncCerts", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {

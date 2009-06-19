@@ -73,8 +73,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2009-06-18 09:47:22.000000000 -0400
-@@ -0,0 +1,1717 @@
++++ vnc_javasrc/SSLSocketToMe.java	2009-06-19 10:23:50.000000000 -0400
+@@ -0,0 +1,1726 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -924,7 +924,16 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		} catch (Exception e) {
 +			dbg("props failed: " + e.getMessage());
 +		}
-+		if (props != null) {
++		if (viewer.proxyHost != null) {
++			dbg("Using supplied proxy " + viewer.proxyHost + " " + viewer.proxyPort + " applet parameters.");
++			proxyHost = viewer.proxyHost;
++			if (viewer.proxyPort != null) {
++				proxyPort = gint(viewer.proxyPort);
++			} else {
++				proxyPort = 8080;
++			}
++			
++		} else if (props != null) {
 +			dbg("\n---------------\nAll props:");
 +			props.list(System.out);
 +			dbg("\n---------------\n\n");
@@ -1794,7 +1803,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2007-09-03 23:22:13.000000000 -0400
++++ vnc_javasrc/VncViewer.java	2009-06-19 10:32:03.000000000 -0400
 @@ -80,7 +80,7 @@
    // Variables read from parameter values.
    String socketFactory;
@@ -1804,7 +1813,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
    boolean showControls;
    boolean offerRelogin;
    boolean showOfflineDesktop;
-@@ -88,6 +88,17 @@
+@@ -88,6 +88,19 @@
    int deferCursorUpdates;
    int deferUpdateRequests;
  
@@ -1814,6 +1823,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +  String urlPrefix;
 +  String httpsPort;
 +  String oneTimeKey;
++  String proxyHost;
++  String proxyPort;
 +  boolean forceProxy;
 +  boolean ignoreProxy;
 +  boolean trustAllVncCerts;
@@ -1822,7 +1833,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
    // Reference to this applet for inter-applet communication.
    public static java.applet.Applet refApplet;
  
-@@ -591,8 +602,25 @@
+@@ -591,8 +604,25 @@
        }
      }
  
@@ -1850,7 +1861,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
  
      if (inAnApplet) {
        str = readParameter("Open New Window", false);
-@@ -626,6 +654,68 @@
+@@ -626,6 +656,96 @@
  
      // SocketFactory.
      socketFactory = readParameter("SocketFactory", false);
@@ -1897,15 +1908,43 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    }
 +
 +    forceProxy = false;
++    proxyHost = null;
++    proxyPort = null;
 +    str = readParameter("forceProxy", false);
-+    if (str != null && str.equalsIgnoreCase("Yes")) {
-+	forceProxy = true;
++    if (str != null) {
++	    if (str.equalsIgnoreCase("Yes")) {
++		forceProxy = true;
++	    } else if (str.equalsIgnoreCase("No")) {
++		forceProxy = false;
++	    } else {
++		forceProxy = true;
++		String[] pieces = str.split(" ");
++		proxyHost = new String(pieces[0]);
++		if (pieces.length >= 2) {
++			proxyPort = new String(pieces[1]);
++		} else {
++			proxyPort = new String("8080");
++		}
++	    }
 +    }
++    str = readParameter("proxyHost", false);
++    if (str != null) {
++	proxyHost = new String(str);
++    }
++    str = readParameter("proxyPort", false);
++    if (str != null) {
++	proxyPort = new String(str);
++    }
++    if (proxyHost != null && proxyPort == null) {
++    	proxyPort = new String("8080");
++    }
++
 +    ignoreProxy = false;
 +    str = readParameter("ignoreProxy", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +	ignoreProxy = true;
 +    }
++
 +    trustAllVncCerts = false;
 +    str = readParameter("trustAllVncCerts", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {

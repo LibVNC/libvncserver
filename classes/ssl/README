@@ -184,9 +184,24 @@ Both TightVNC and UltraVNC Java viewers:
 	safely put oneTimeKey=... on the URL.  The Vncviewer
 	authenticates the VNC server with this key.
 
+  proxyHost
+	string, default: none
+	Do not try to guess the proxy's hostname, use the value in
+	proxyHost.  Does not imply forceProxy (below.)
+
+  proxyPort
+	string, default: none
+	Do not try to guess the proxy's port number, use the value in
+	proxyPort.  Does not imply forceProxy (below.)
+
   forceProxy
 	yes/no, default: no
-	Assume there is a proxy.
+	Assume there is a proxy and force its use.
+
+	If a string other than "yes" or "no" is given, it implies "yes"
+	and uses the string for proxyHost and proxyPort (see above).
+	In this case the string must be of the form "hostname+port".
+	Note that it is "+" and not ":" before the port number.
 
   ignoreProxy
 	yes/no, default: no
