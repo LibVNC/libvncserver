@@ -1,6 +1,6 @@
        Enhanced TightVNC Viewer (SSVNC: SSL/SSH VNC viewer)
 
-Copyright (c) 2006-2008 Karl J. Runge <runge@karlrunge.com>
+Copyright (c) 2006-2009 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
 These bundles provide 1) An enhanced TightVNC Viewer on Unix, 2) Binaries
@@ -108,7 +108,8 @@ The enhanced TightVNC viewer features are:
 	  "Terminal Services" mode (uses x11vnc on the remote side).
 
 
-	(the following features only apply to the bundled Unix tightvnc viewer)
+	(the following features only apply to the bundled Unix tightvnc viewer
+        including MacOS X)
 
 	- rfbNewFBSize VNC support (screen resizing)
 
@@ -119,9 +120,21 @@ The enhanced TightVNC viewer features are:
 	- Support for the ZYWRLE encoding, a wavelet based extension to
 	  ZRLE to improve compression of motion video and photo regions.
 
+	- TurboVNC support (VirtualGL's modified TightVNC encoding;
+	  requires TurboJPEG library)
+
+        - Pipelined Updates of the framebuffer as in TurboVNC (asks for
+          the next update before the current one has finished downloading;
+          this gives some speedup on high latency connections.)
+
 	- Cursor alphablending with x11vnc at 32bpp (-alpha option)
 
 	- Option "-unixpw ..." for use with "x11vnc -unixpw" login dialogs.
+
+	- VeNCrypt SSL/TLS VNC encryption support (used by VeNCrypt,
+	  QEMU, ggi, libvirt/virt-manager/xen, vinagre/gvncviewer/gtk-vnc)
+
+	- ANONTLS SSL/TLS VNC encryption support (used by vino)
 
 	- Support for UltraVNC extensions: Single Window, Disable
 	  Server-side Input, 1/n Server side scaling, Text Chat (shell
@@ -140,6 +153,11 @@ The enhanced TightVNC viewer features are:
 
         - Support for UltraVNC DSM Encryption Plugin mode. (ARC4 and
           AESV2, and MSRC4)
+
+        - Support for UltraVNC MS-Logon authentication (NOTE: the UltraVNC
+          MS-Logon key exchange implementation is very weak; an eavesdropper
+          on the network can recover your Windows password easily; you
+          need to use an additional encrypted tunnel with MS-Logon.)
 
         - Support for symmetric encryption (including blowfish and 3des
           ciphers) to Non-UltraVNC Servers. Any server using the same
@@ -174,12 +192,18 @@ The enhanced TightVNC viewer features are:
 	- Scrollbar width setting: -sbwidth n, the default is very thin,
 	  2 pixels, for less distracting -ycrop usage.
 
+	- Selection text sending and receiving can be fine-tuned with the
+	  -sendclipboard, -sendalways, and -recvtext options.
+
+	- TightVNC compression and quality levels are automatically set
+	  based on observed network latency (n.b. not bandwidth.)
+
 	- Improvements to the Popup menu, all of these can now be changed
 	  dynamically via the menu: ViewOnly, Toggle Bell, CursorShape
 	  updates, X11 Cursor, Cursor Alphablending, Toggle Tight/ZRLE,
 	  Toggle JPEG, FullColor/16bpp/8bpp (256/64/8 colors), Greyscale
 	  for low color modes, Scaling the Viewer resolution, Escape Keys,
-	  and others, including UltraVNC extensions.
+	  Pipeline Updates, and others, including UltraVNC extensions.
 
 	- Maintains its own BackingStore if the X server does not
 
@@ -220,7 +244,7 @@ Unix and Mac OS X:
 
     Unpack the archive:
 
-        % gzip -dc ssvnc-1.0.21.tar.gz | tar xvf -
+        % gzip -dc ssvnc-1.0.22.tar.gz | tar xvf -
 
     Run the GUI:
 
@@ -228,7 +252,7 @@ Unix and Mac OS X:
 
         % ./ssvnc/MacOSX/ssvnc             (for Mac OS X)
 
-    The smaller file "ssvnc_no_windows-1.0.21.tar.gz"
+    The smaller file "ssvnc_no_windows-1.0.22.tar.gz"
     could have been used as well.
 
     On MacOSX you could also click on the SSVNC app icon in the Finder.
@@ -274,8 +298,8 @@ Unix/MacOSX Install:
 
     For the conventional source tarball it will compile and install, e.g.:
 
-       gzip -dc ssvnc-1.0.21.src.tar.gz | tar xvf -
-       cd ssvnc-1.0.21
+       gzip -dc ssvnc-1.0.22.src.tar.gz | tar xvf -
+       cd ssvnc-1.0.22
        make config
        make all
        make PREFIX=/my/install/dir install
@@ -287,7 +311,7 @@ Windows:
 
     Unzip, using WinZip or a similar utility, the zip file:
 
-        ssvnc-1.0.21.zip
+        ssvnc-1.0.22.zip
 
     Run the GUI, e.g.:
 
@@ -299,7 +323,7 @@ Windows:
 
     select Open, and then OK to launch it.
 
-    The smaller file "ssvnc_windows_only-1.0.21.zip"
+    The smaller file "ssvnc_windows_only-1.0.22.zip"
     could have been used as well.
 
     You can make a Windows shortcut to this program if you want to.
@@ -437,6 +461,30 @@ On Mac OS X depending on what you do you need these programs installed:
 Most Mac OS X and Unix OS come with the main components installed. 
 	
 See the README.src for a more detailed description of dependencies.
+
+
+TurboVNC Support:
+----------------
+
+TurboVNC is supported in an experimental way.  To it build via the
+build.unix script described in the next section, do something like:
+
+	env TURBOVNC='-L/DIR -Xlinker --rpath=/DIR -lturbojpeg' ./build.unix
+
+where you replace /DIR with the directory where the libturbojpeg.so
+(http://sourceforge.net/project/showfiles.php?group_id=117509&package_id=166100)
+is installed.
+
+You may not need to set rpath if libturbojpeg.so is installed in a
+standard location or you use LD_LIBRARY_PATH to point to it.
+
+See the turbovnc/README in the vnc_unixsrc/vncviewer directory for
+more info.  You can find it in the ssvnc source tarball and also
+in:
+
+	src/zips/vnc_unixsrc_vncviewer.patched.tar
+
+More TurboVNC features will be enabled in the future.
 
 
 If you need to Build:
@@ -685,7 +733,7 @@ For more help on other options and usage patterns run these:
 See also:
 
 	http://www.karlrunge.com/x11vnc
-	http://www.karlrunge.com/x11vnc/#faq
+	http://www.karlrunge.com/x11vnc/faq.html
 	x11vnc -h | more
 
 	http://www.stunnel.org

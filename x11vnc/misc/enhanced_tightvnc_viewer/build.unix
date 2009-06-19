@@ -137,8 +137,11 @@ do
 	if [ "X$SSVNC_BUILD_STATIC" = "X" ]; then
 		break
 	fi
-	for dir in /usr/lib /lib /usr/local/lib /usr/pkg/lib /usr/sfw/lib /usr/openwin/lib
+	for dir in $SSVNC_STATIC_DIRS /usr/lib /lib /usr/local/lib /usr/pkg/lib /usr/sfw/lib /usr/openwin/lib
 	do
+		if [ "X$dir" = "X" ]; then
+			continue
+		fi
 		if [ "$name" = "Linux.x86_64" -o "$name" = "Linux.ppc64" ] ; then
 			dir64=`echo "$dir" | sed -e 's,lib,lib64,'`
 			if [ "X$SSVNC_BUILD_NO_LINUX64" != "X" ]; then
@@ -149,7 +152,9 @@ do
 		fi
 		try="$dir/$liba"
 		if [ -f $try ]; then
-			cp -p "$try" $libs
+			echo cp -p "$try" $libs
+			     cp -p "$try" $libs
+			break
 		fi
 	done
 done
@@ -279,7 +284,11 @@ if [ "X$SSVNC_BUILD_SKIP_VIEWER" = "X" ]; then
 
 	make depend
 	echo $PATH
-	make all
+	if [ "X$TURBOVNC" = "X" ]; then
+		make all
+	else
+		make CCOPTIONS="-DTURBOVNC $CPPFLAGS_OS" EXTRA_LIBRARIES="$TURBOVNC" all
+	fi
 	ls -l vncviewer/vncviewer
 	cd "$start"
 	src=$tmp/vnc_unixsrc/vncviewer/vncviewer
@@ -297,6 +306,9 @@ if [ "X$SSVNC_BUILD_SKIP_VIEWER" = "X" ]; then
 	suff=""
 	if [ `uname` = "Darwin" ]; then
 		suff=".x11"
+	fi
+	if [ "X$TURBOVNC" != "X" ]; then
+		suff="$suff.turbovnc"
 	fi
 	echo cp -p $src $dest/vncviewer$suff
 	sleep 1

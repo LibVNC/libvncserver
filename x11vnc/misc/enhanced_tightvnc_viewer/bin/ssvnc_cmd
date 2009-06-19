@@ -249,6 +249,16 @@ if [ $use_ours = 1 ]; then
 
 	SSVNC_USE_OURS=1; export SSVNC_USE_OURS
 
+	if [ "X$SSVNC_TURBOVNC" != "X" ]; then
+		if echo "$VNCVIEWERCMD" | grep '\.turbovnc' > /dev/null; then
+			:
+		else
+			if type "$VNCVIEWERCMD.turbovnc" > /dev/null 2>/dev/null; then
+				VNCVIEWERCMD="$VNCVIEWERCMD.turbovnc"
+			fi
+		fi
+	fi
+
 	if [ "X$base" = "Xtightvncviewer" ]; then
 		$VNCVIEWERCMD -encodings 'copyrect tight zrle zlib hextile' "$@"
 	else

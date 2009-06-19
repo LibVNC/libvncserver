@@ -5,13 +5,13 @@
 .\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
 .\" Copyright (C) 2000,2001 Red Hat, Inc.
 .\" Copyright (C) 2001-2003 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
-.\" Copyright (C) 2006-2008 Karl J. Runge <runge@karlrunge.com>
+.\" Copyright (C) 2006-2009 Karl J. Runge <runge@karlrunge.com>
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvncviewer 1 "December 2008" "" "SSVNC"
+.TH ssvncviewer 1 "June 2009" "" "SSVNC"
 .SH NAME
 ssvncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
@@ -300,6 +300,24 @@ Disable bell.
 Prefer raw encoding for localhost, default is
 no, i.e. assumes you have a SSH tunnel instead.
 .TP
+\fB\-sendclipboard\fR
+Send the X CLIPBOARD selection (i.e. Ctrl+C,
+Ctrl+V) instead of the X PRIMARY selection (mouse
+select and middle button paste.)
+.TP
+\fB\-sendalways\fR
+Whenever the mouse enters the VNC viewer main
+window, send the selection to the VNC server even if
+it has not changed.  This is like the Xt resource
+translation SelectionToVNC(always)
+.TP
+\fB\-recvtext\fR
+str   When cut text is received from the VNC server,
+ssvncviewer will set both the X PRIMARY and the
+X CLIPBOARD local selections.  To control which
+is set, specify 'str' as 'primary', 'clipboard',
+or 'both' (the default.)
+.TP
 \fB\-graball\fR
 Grab the entire X server when in fullscreen mode,
 needed by some old window managers like fvwm2.
@@ -396,6 +414,18 @@ THAT supply -ultradsm to tell THIS viewer to modify the RFB
 data sent so as to work with the UltraVNC Server.  For some
 reason, each RFB msg type must be sent twice under DSM.
 .TP
+\fB\-mslogon\fR \fIuser\fR
+Use Windows MS Logon to an UltraVNC server.  Supply the
+username or "1" to be prompted.  The default is to
+autodetect the UltraVNC MS Logon server and prompt for
+the username and password.
+
+IMPORTANT NOTE: The UltraVNC MS-Logon Diffie-Hellman
+exchange is very weak and can be brute forced to recover
+your username and password in a few hours or seconds of CPU
+time.  To be safe, be sure to use an additional encrypted
+tunnel (e.g. SSL or SSH) for the entire VNC session.
+.TP
 \fB\-chatonly\fR
 Try to be a client that only does UltraVNC text chat. This
 mode is used by x11vnc to present a chat window on the physical
@@ -411,6 +441,12 @@ Print out the Ssvnc X resources (appdefaults) and
 then exit. You can save them to a file and customize them (e.g. the
 keybindings and Popup menu)  Then point to the file via
 XENVIRONMENT or XAPPLRESDIR.
+.TP
+\fB\-pipeline\fR
+Like TurboVNC, request the next framebuffer update as soon
+as possible instead of waiting until the end of the current
+framebuffer update coming in.  Helps 'pipeline' the updates.
+This is currently the default, use \fB-nopipeline\fR to disable.
 .TP
 \fB\-escape \fR\fIstr\fR
 This sets the 'Escape Keys' modifier sequence and enables
@@ -487,8 +523,10 @@ Meta_R Super_L Super_R Hyper_L Hyper_R or Mode_switch.
  Quality Level            ~ -quality (both Tight and ZYWRLE)
  Compress Level           ~ -compresslevel
  Disable JPEG:            ~ -nojpeg  (Tight)
- Full Color               ~ as many colors as local screen allows.
- Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes.
+ Pipeline Updates         ~ -pipeline
+
+ Full Color                 as many colors as local screen allows.
+ Grey scale (16 & 8-bpp)  ~ -grey, for low colors 16/8bpp modes only.
  16 bit color (BGR565)    ~ -16bpp / -bgr565
  8  bit color (BGR233)    ~ -bgr233
  256 colors               ~ -bgr233 default # of colors.
@@ -503,16 +541,19 @@ Meta_R Super_L Super_R Hyper_L Hyper_R or Mode_switch.
 
  UltraVNC Extensions:
 
- Set 1/n Server Scale  Ultravnc ext. Scale desktop by 1/n.
- Text Chat             Ultravnc ext. Do Text Chat.
- File Transfer         Ultravnc ext. File xfer via Java helper.
- Single Window         Ultravnc ext. Grab a single window.
-                       (click on the window you want).
- Disable Remote Input  Ultravnc ext. Try to prevent input and
-                       viewing of monitor at physical display.
+   Set 1/n Server Scale     Ultravnc ext. Scale desktop by 1/n.
+   Text Chat                Ultravnc ext. Do Text Chat.
+   File Transfer            Ultravnc ext. File xfer via Java helper.
+   Single Window            Ultravnc ext. Grab and view a single window.
+                            (select then click on the window you want).
+   Disable Remote Input     Ultravnc ext. Try to prevent input and
+                            viewing of monitor at physical display.
 
- Note: the Ultravnc extensions only apply to servers that
- support them.  x11vnc/libvncserver supports some of them.
+ Note: the Ultravnc extensions only apply to servers that support
+       them.  x11vnc/libvncserver supports some of them.
+
+ Send Clipboard not Primary  ~ -sendclipboard
+ Send Selection Every time   ~ -sendalways
 
 .SH ENCODINGS
 The server supplies information in whatever format is desired by the
