@@ -22,11 +22,11 @@ int createMD(Display* dpy, char* name)
 {
   int dev_id = -1;
   XErrorHandler old_handler;
-  XICreateMasterInfo c;
+  XIAddMasterInfo c;
 
-  c.type = XICreateMaster;
+  c.type = XIAddMaster;
   c.name = name;
-  c.sendCore = 1;
+  c.send_core = 1;
   c.enable = 1;
 
   trapped_xerror = 0;
@@ -97,8 +97,8 @@ int removeMD(Display* dpy, int dev_id)
 
   /* we can go on safely */
   r.type = XIRemoveMaster;
-  r.device = dev_id;
-  r.returnMode = XIFloating;
+  r.deviceid = dev_id;
+  r.return_mode = XIFloating;
 
   return (XIChangeHierarchy(dpy, (XIAnyHierarchyChangeInfo*)&r, 1) == Success) ? 1 : 0;
 }
