@@ -122,12 +122,6 @@ AC_ARG_WITH(colormultipointer,
 [  --without-colormultipointer  disable color support for multiple pointers]
 [  --with-cairo=DIR        use cairo include/library files in DIR (needed for color cursor support)],,)
 
-# check for XI2 support
-PKG_CHECK_MODULES(XI2, [xi >= 1.2.99] [inputproto >= 1.9.99.9],
-                  HAVE_XI2="yes"; AC_DEFINE(HAVE_XI2, 1, [XI2 available]),
-                  HAVE_XI2="no");
-
-
 fi
 # end x11vnc only.
 
@@ -238,6 +232,11 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 				[AC_DEFINE(HAVE_LIBXDAMAGE) HAVE_LIBXDAMAGE="true"], ,
 				$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 		fi
+
+		# check for XI2 support
+		PKG_CHECK_MODULES(XI2, [xi >= 1.2.99] [inputproto >= 1.9.99.9],
+			 HAVE_XI2="yes"; AC_DEFINE(HAVE_XI2, 1, [XI2 available]),
+			 HAVE_XI2="no");
 
 		if test "$HAVE_XI2" = "yes" -a "x$with_colormultipointer" != "xno"; then
 			AC_CHECK_LIB(Xcursor, XcursorImageLoadCursor,
