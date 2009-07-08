@@ -668,7 +668,10 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	allowed_input_t input;
 	int sent = 0, buffer_it = 0;
 	double now;
-        ClientData *cd = (ClientData *) client->clientData;
+        ClientData *cd = NULL;
+	
+	if(client)
+	  cd = (ClientData *) client->clientData;
 
         
 	if (mask >= 0) {
@@ -881,11 +884,13 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				    i+1, dnowx());
 			}
 			if (ev[i][1] >= 0) {
-                                update_x11_pointer_position(ev[i][1], ev[i][2], cd->ptr_id);
+         		        if(cd)
+				  update_x11_pointer_position(ev[i][1], ev[i][2], cd->ptr_id);
 				sent = 1;
 			}
 			if (ev[i][0] >= 0) {
-                                update_x11_pointer_mask(ev[i][0], cd->ptr_id, cd->kbd_id);
+         		        if(cd)
+				  update_x11_pointer_mask(ev[i][0], cd->ptr_id, cd->kbd_id);
 				sent = 1;
 			}
 
@@ -922,7 +927,8 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 
 	/* update the X display with the event: */
 	if (input.motion) {
-                update_x11_pointer_position(x, y, cd->ptr_id);
+	        if(cd)
+		  update_x11_pointer_position(x, y, cd->ptr_id);
                 sent = 1;
 	}
 	if (input.button) {
@@ -930,7 +936,8 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			button_change_x = cursor_x;
 			button_change_y = cursor_y;
 		}
-		update_x11_pointer_mask(mask, cd->ptr_id, cd->kbd_id);
+		if(cd)
+		  update_x11_pointer_mask(mask, cd->ptr_id, cd->kbd_id);
 		sent = 1;
 	}
 
