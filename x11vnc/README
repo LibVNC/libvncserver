@@ -2,7 +2,7 @@
 Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
-x11vnc README file                         Date: Fri Jun 19 10:41:53 EDT 2009
+x11vnc README file                         Date: Sat Jul 11 12:53:06 EDT 2009
 
 The following information is taken from these URLs:
 
@@ -245,7 +245,7 @@ to:     http://www.karlrunge.com/x11vnc/faq.html#faq-singleclick
      * Have x11vnc (0.9.3 or later) available to run on the remote host
        (i.e. in $PATH.)
      * Download and unpack a [55]SSVNC bundle (1.0.19 or later, e.g.
-       [56]ssvnc_no_windows-1.0.19.tar.gz) on the Viewer-side machine.
+       [56]ssvnc_no_windows-1.0.23.tar.gz) on the Viewer-side machine.
      * Start the SSVNC Terminal Services mode GUI: ./ssvnc/bin/tsvnc
      * Enter your remote username@hostname (e.g. fred@far-away.east) in
        the "VNC Terminal Server" entry.
@@ -586,12 +586,12 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
    SourceForge.net. I use libvncserver for all of the VNC aspects; I
    couldn't have done without it. The full source code may be found and
    downloaded (either file-release tarball or CVS tree) from the above
-   link. As of Mar 2009, the [91]x11vnc-0.9.7.tar.gz source package is
-   released (recommended download). The [92]x11vnc 0.9.7 release notes.
+   link. As of Jul 2009, the [91]x11vnc-0.9.8.tar.gz source package is
+   released (recommended download). The [92]x11vnc 0.9.8 release notes.
 
    The x11vnc package is the subset of the libvncserver package needed to
    build the x11vnc program. Also, you can get a copy of my latest,
-   bleeding edge [93]x11vnc-0.9.8.tar.gz tarball to build the most up to
+   bleeding edge [93]x11vnc-0.9.9.tar.gz tarball to build the most up to
    date one.
 
    Precompiled Binaries/Packages:  See the [94]FAQ below for information
@@ -629,13 +629,13 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
    them by default.)
 
    If your OS has libjpeg.so and libz.so in standard locations you can
-   build as follows (example given for the 0.9.7 release of x11vnc:
+   build as follows (example given for the 0.9.8 release of x11vnc:
    replace with the version you downloaded):
 (un-tar the x11vnc+libvncserver tarball)
-# gzip -dc x11vnc-0.9.7.tar.gz | tar -xvf -
+# gzip -dc x11vnc-0.9.8.tar.gz | tar -xvf -
 
 (cd to the source directory)
-# cd x11vnc-0.9.7
+# cd x11vnc-0.9.8
 
 (run configure and then run make)
 # ./configure
@@ -877,13 +877,13 @@ make
    I'd appreciate any additional testing very much.
 
    Thanks to those who suggested features and helped beta test x11vnc
-   0.9.7 released in Mar 2009!
+   0.9.8 released in Mar 2009!
 
-   Please help test and debug the 0.9.8 version for release sometime in
-   Summer 2009.
+   Please help test and debug the 0.9.9 version for release sometime in
+   2009.
 
-   The version 0.9.8 beta tarball is kept here:
-   [114]x11vnc-0.9.8.tar.gz
+   The version 0.9.9 beta tarball is kept here:
+   [114]x11vnc-0.9.9.tar.gz
 
    There are also some Linux, Solaris, Mac OS X, and other OS test
    binaries [115]here. Please kick the tires and report bugs, performance
@@ -900,7 +900,10 @@ make
    Encryption Plugin' settings panel.)
 
 
-   Here are some features that will appear in the 0.9.8 release:
+   Here are some features that will appear in the 0.9.9 release:
+
+
+   Here are some features that appeared in the 0.9.8 release:
      * Stability improvements to [122]-threads mode. Running x11vnc this
        way is more reliable now. Threaded operation sometimes gives
        better interactive response and faster updates: try it out. The
@@ -1512,7 +1515,7 @@ References
   53. http://www.karlrunge.com/x11vnc/faq.html#faq-passwd
   54. http://www.karlrunge.com/x11vnc/index.html#vnc_password_file
   55. http://www.karlrunge.com/x11vnc/ssvnc.html#download
-  56. http://downloads.sourceforge.net/ssvnc/ssvnc_no_windows-1.0.19.tar.gz?use_mirror
+  56. http://downloads.sourceforge.net/ssvnc/ssvnc_no_windows-1.0.23.tar.gz?use_mirror
   57. http://www.karlrunge.com/x11vnc/index.html#tunnelling
   58. http://www.karlrunge.com/x11vnc/ssvnc.html#tsvnc
   59. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-connect
@@ -1547,8 +1550,8 @@ References
   88. http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-int
   89. http://www.karlrunge.com/x11vnc/ssvnc.html
   90. http://sourceforge.net/projects/libvncserver/
-  91. http://sourceforge.net/project/showfiles.php?group_id=32584&package_id=119006&release_id=672184
-  92. http://sourceforge.net/project/shownotes.php?release_id=672184&group_id=32584
+  91. http://sourceforge.net/project/showfiles.php?group_id=32584&package_id=119006&release_id=695585
+  92. http://sourceforge.net/project/shownotes.php?group_id=32584&release_id=695585
   93. http://x11vnc.sourceforge.net/dev/x11vnc-0.9.8.tar.gz
   94. http://www.karlrunge.com/x11vnc/faq.html#faq-binaries
   95. http://www.tightvnc.com/download.html
@@ -2121,13 +2124,13 @@ http://www.karlrunge.com/x11vnc/faq.html:
    [106]Q-104: Why is the view in my VNC viewer completely black? Or why
    is everything flashing around randomly? 
 
-   [107]Q-105: I use Linux Virtual Consoles (VC's) to implement 'Fast
+   [107]Q-105: I use Linux Virtual Terminals (VT's) to implement 'Fast
    User Switching' between users' sessions (e.g. Betty is on Ctrl-Alt-F7,
    Bobby is on Ctrl-Alt-F8, and Sid is on Ctrl-Alt-F1: they use those
    keystrokes to switch between their sessions.)   How come the view in a
    VNC viewer connecting to x11vnc is either completely black or
    otherwise all messed up unless the X session x11vnc is attached to is
-   in the active VC? 
+   in the active VT? 
 
    [108]Q-106: I am using x11vnc where my local machine has "popup/hidden
    taskbars" and the remote display where x11vnc runs also has
@@ -7330,22 +7333,22 @@ EndSection
    See the next FAQ for a possible explanation.
 
 
-   Q-105: I use Linux Virtual Consoles (VC's) to implement 'Fast User
+   Q-105: I use Linux Virtual Terminals (VT's) to implement 'Fast User
    Switching' between users' sessions (e.g. Betty is on Ctrl-Alt-F7,
    Bobby is on Ctrl-Alt-F8, and Sid is on Ctrl-Alt-F1: they use those
    keystrokes to switch between their sessions.)   How come the view in a
    VNC viewer connecting to x11vnc is either completely black or
    otherwise all messed up unless the X session x11vnc is attached to is
-   in the active VC?
+   in the active VT?
 
    This seems to have to do with how applications (the X server processes
-   in this case) must "play nicely" if they are not on the active VC
-   (sometimes called VT for virtual terminal.) That is, they should not
+   in this case) must "play nicely" if they are not on the active VT
+   (sometimes called VC for virtual console.) That is, they should not
    read from the keyboard or mouse or manage the video display unless
-   they have the active VC. Given that it appears the XGetImage() call
+   they have the active VT. Given that it appears the XGetImage() call
    must ultimately retrieve the framebuffer data from the video hardware
    itself, it would make sense x11vnc's polling wouldn't work unless the
-   X session had active control of the VC.
+   X session had active control of the VT.
 
    There does not seem to be an easy way to work around this. Even xwd(1)
    doesn't work in this case (try it.) Something would need to be done at
@@ -7354,9 +7357,9 @@ EndSection
    memory) does not appear to fix the problem.
 
    If no one is sitting at the workstation and you just want to remotely
-   switch the VC over to the one associated with your X session (so
+   switch the VT over to the one associated with your X session (so
    x11vnc can poll it correctly), one can use the chvt(1) command, e.g.
-   "chvt 7" for VC #7.
+   "chvt 7" for VT #7.
 
 
    Q-106: I am using x11vnc where my local machine has "popup/hidden
@@ -7436,8 +7439,8 @@ EndSection
      * Fullscreen mode
 
    The way VMWare does Fullscreen mode on Linux is to display the Guest
-   desktop in a separate Virtual Console (e.g. VC 8) (see [647]this FAQ
-   on VC's for background.) Unfortunately, this Fullscreen VC is not an X
+   desktop in a separate Virtual Terminal (e.g. VT 8) (see [647]this FAQ
+   on VT's for background.) Unfortunately, this Fullscreen VT is not an X
    server. So x11vnc cannot access it (however, [648]see this discussion
    of -rawfb for a possible workaround.) x11vnc works fine with "Normal X
    application window" and "Quick-Switch mode" because these use X.
@@ -7446,7 +7449,7 @@ EndSection
    x11vnc access does work.
 
    One user reports he left his machine with VMWare in the Fullscreen
-   mode, and even though his X session wasn't in the active VC, he could
+   mode, and even though his X session wasn't in the active VT, he could
    still connect x11vnc to the X session and pass the keystrokes Ctrl-Alt
    (typing "blind") to the VMWare X app. This induced VMWare to switch
    out of Fullscreen into Normal X mode and he could continue working in
@@ -7459,14 +7462,14 @@ EndSection
    improve response. One can also cut the display depth (e.g. to 16bpp)
    in this 2nd X session to improve video performance. This 2nd X session
    emulates Fullscreen mode to some degree and can be viewed via x11vnc
-   as long as the VMWare X session [649]is in the active VC.
+   as long as the VMWare X session [649]is in the active VT.
 
    Also note that with a little bit of playing with "xwininfo -all
    -children" output one can extract the (non-toplevel) window-id of the
    of the Guest desktop only when VMWare is running as a normal X
    application. Then one can export just the guest desktop (i.e. without
    the VMWare menu buttons) by use of the [650]-id windowid option. The
-   caveats are the X session VMWare is in must be in the active VC and
+   caveats are the X session VMWare is in must be in the active VT and
    the window must be fully visible, so this mode is not terribly
    convenient, but could be useful in some circumstances (e.g. running
    VMWare on a very powerful server machine in a server room that happens
@@ -7553,10 +7556,10 @@ EndSection
    viewable.) In general some guessing may be required, especially for
    the bpp. Update: in "-rawfb console" mode x11vnc will use the linuxfb
    API to try to guess (it is still not always accurate.) Also try
-   "-rawfb vtN" for the N-th Linux text console (aka virtual terminal.)
-   If the number of Bytes Per Line is not WxHxB/8 (i.e. the framebuffer
-   lines are padded) you can specify this information after WxHxB via
-   "-BPL", e.g. @800x600x16-2048
+   "-rawfb vtN" (on x11vnc 0.9.7 and later) for the N-th Linux text
+   console (aka virtual terminal.) If the number of Bytes Per Line is not
+   WxHxB/8 (i.e. the framebuffer lines are padded) you can specify this
+   information after WxHxB via "-BPL", e.g. @800x600x16-2048
 
    Based on the bpp x11vnc will try to guess the red, green, and blue
    masks (these indicate which bits correspond to each color.) It if gets
@@ -7657,14 +7660,14 @@ minal #2)
    keystrokes into the Linux console (e.g. the virtual consoles:
    /dev/tty1, /dev/tty2, etc) in x11vnc/misc/vcinject.pl. It is based on
    the vncterm/LinuxVNC.c program also in the libvncserver CVS. So to
-   view and interact with VC #2 (assuming it is the [661]active VC) one
+   view and interact with VT #2 (assuming it is the [661]active VT) one
    can run something like:
   x11vnc -rawfb map:/dev/fb0@1024x768x16 -pipeinput './vcinject.pl 2'
 
    This assumes your Linux framebuffer device (/dev/fb0) is properly
    configured. See fbset(8) and other documentation. Try
    "file:/dev/fb0@WxHxB" as a last resort. Starting with x11vnc 0.8.1,
-   the above VC injection is built in, as well as WxHxB determination.
+   the above VT injection is built in, as well as WxHxB determination.
    Just use something like:
   x11vnc -rawfb console
 
@@ -7759,7 +7762,8 @@ minal #2)
 
    Another mode is specific to the Linux text Virtual Terminals, it shows
    their text and colors (but no graphics) regardless of whether it is
-   the active VT or not. Enable this mode like this:
+   the active VT or not. It is available on x11vnc 0.9.7 and later.
+   Enable this mode like this:
   x11vnc -rawfb vt
   x11vnc -rawfb vt2
 
@@ -11725,7 +11729,7 @@ Unix and Mac OS X:
 
     Unpack the archive:
 
-        % gzip -dc ssvnc-1.0.22.tar.gz | tar xvf -
+        % gzip -dc ssvnc-1.0.23.tar.gz | tar xvf -
 
     Run the GUI:
 
@@ -11733,7 +11737,7 @@ Unix and Mac OS X:
 
         % ./ssvnc/MacOSX/ssvnc             (for Mac OS X)
 
-    The smaller file "ssvnc_no_windows-1.0.22.tar.gz"
+    The smaller file "ssvnc_no_windows-1.0.23.tar.gz"
     could have been used as well.
 
     On MacOSX you could also click on the SSVNC app icon in the Finder.
@@ -11779,8 +11783,8 @@ Unix/MacOSX Install:
 
     For the conventional source tarball it will compile and install, e.g.:
 
-       gzip -dc ssvnc-1.0.22.src.tar.gz | tar xvf -
-       cd ssvnc-1.0.22
+       gzip -dc ssvnc-1.0.23.src.tar.gz | tar xvf -
+       cd ssvnc-1.0.23
        make config
        make all
        make PREFIX=/my/install/dir install
@@ -11793,7 +11797,7 @@ Windows:
 
     Unzip, using WinZip or a similar utility, the zip file:
 
-        ssvnc-1.0.22.zip
+        ssvnc-1.0.23.zip
 
     Run the GUI, e.g.:
 
@@ -11805,7 +11809,7 @@ Windows:
 
     select Open, and then OK to launch it.
 
-    The smaller file "ssvnc_windows_only-1.0.22.zip"
+    The smaller file "ssvnc_windows_only-1.0.23.zip"
     could have been used as well.
 
     You can make a Windows shortcut to this program if you want to.
@@ -12422,25 +12426,25 @@ r
    "ssvnc_unix_only" (or "ssvnc_no_windows" to recompile).
       On Mac OS X? Use "ssvnc_no_windows".
       On Windows? Use "ssvnc_windows_only".
-  [47]ssvnc_windows_only-1.0.22.zip      Windows Binaries Only.  No source incl
+  [47]ssvnc_windows_only-1.0.23.zip      Windows Binaries Only.  No source incl
 uded (~6MB)
-  [48]ssvnc_no_windows-1.0.22.tar.gz     Unix and Mac OS X Only. No Windows bin
+  [48]ssvnc_no_windows-1.0.23.tar.gz     Unix and Mac OS X Only. No Windows bin
 aries.  Source included. (~9MB)
-  [49]ssvnc_unix_only-1.0.22.tar.gz      Unix Binaries Only.     No source incl
+  [49]ssvnc_unix_only-1.0.23.tar.gz      Unix Binaries Only.     No source incl
 uded. (~6.5MB)
-  [50]ssvnc_unix_minimal-1.0.22.tar.gz   Unix Minimal.  You must supply your ow
+  [50]ssvnc_unix_minimal-1.0.23.tar.gz   Unix Minimal.  You must supply your ow
 n vncviewer and stunnel. (~0.1MB)
 
-  [51]ssvnc-1.0.22.tar.gz                All Unix, Mac OS X, and Windows binari
+  [51]ssvnc-1.0.23.tar.gz                All Unix, Mac OS X, and Windows binari
 es and source TGZ. (~15MB)
-  [52]ssvnc-1.0.22.zip                   All Unix, Mac OS X, and Windows binari
+  [52]ssvnc-1.0.23.zip                   All Unix, Mac OS X, and Windows binari
 es and source ZIP. (~15MB)
-  [53]ssvnc_all-1.0.22.zip               All Unix, Mac OS X, and Windows binari
+  [53]ssvnc_all-1.0.23.zip               All Unix, Mac OS X, and Windows binari
 es and source AND full archives in the zip dir. (~18MB)
 
 
    Here is a conventional source tarball:
-  [54]ssvnc-1.0.22.src.tar.gz            Conventional Source for SSVNC GUI and
+  [54]ssvnc-1.0.23.src.tar.gz            Conventional Source for SSVNC GUI and
 Unix VNCviewer  (~0.4MB)
 
    it will be of use to those who do not want the SSVNC
@@ -12458,18 +12462,18 @@ Unix VNCviewer  (~0.4MB)
    "ssvnc_all", you may need to run the "./build.unix" script in the top
    directory to recompile for your operating system.
 
-   Here are the corresponding 1.0.23 development bundles:
+   Here are the corresponding 1.0.24 development bundles:
 
-  [56]ssvnc_windows_only-1.0.23.zip
-  [57]ssvnc_no_windows-1.0.23.tar.gz
-  [58]ssvnc_unix_only-1.0.23.tar.gz
-  [59]ssvnc_unix_minimal-1.0.23.tar.gz
+  [56]ssvnc_windows_only-1.0.24.zip
+  [57]ssvnc_no_windows-1.0.24.tar.gz
+  [58]ssvnc_unix_only-1.0.24.tar.gz
+  [59]ssvnc_unix_minimal-1.0.24.tar.gz
 
-  [60]ssvnc-1.0.23.tar.gz
-  [61]ssvnc-1.0.23.zip
-  [62]ssvnc_all-1.0.23.zip
+  [60]ssvnc-1.0.24.tar.gz
+  [61]ssvnc-1.0.24.zip
+  [62]ssvnc_all-1.0.24.zip
 
-  [63]ssvnc-1.0.23.src.tar.gz            Conventional Source for SSVNC GUI and
+  [63]ssvnc-1.0.24.src.tar.gz            Conventional Source for SSVNC GUI and
 Unix VNCviewer  (~0.4MB)
 
 
@@ -12488,6 +12492,7 @@ Unix VNCviewer  (~0.4MB)
       [67]Release 1.0.20 at Sourceforge.net
       [68]Release 1.0.21 at Sourceforge.net
       [69]Release 1.0.22 at Sourceforge.net
+      [70]Release 1.0.23 at Sourceforge.net
 
 
    Please help test the UltraVNC File Transfer support in the native Unix
@@ -12530,16 +12535,16 @@ Unix VNCviewer  (~0.4MB)
    redistribute the above because of cryptographic software they contain
    or for other reasons. Please check out your situation and information
    at the following and related sites:
-        [70]http://www.stunnel.org
-        [71]http://stunnel.mirt.net
-        [72]http://www.openssl.org
-        [73]http://www.chiark.greenend.org.uk/~sgtatham/putty/
-        [74]http://www.tightvnc.com
-        [75]http://www.realvnc.com
-        [76]http://sourceforge.net/projects/cotvnc/
+        [71]http://www.stunnel.org
+        [72]http://stunnel.mirt.net
+        [73]http://www.openssl.org
+        [74]http://www.chiark.greenend.org.uk/~sgtatham/putty/
+        [75]http://www.tightvnc.com
+        [76]http://www.realvnc.com
+        [77]http://sourceforge.net/projects/cotvnc/
      _________________________________________________________________
 
-   README: Here is the toplevel [77]README from the bundle.
+   README: Here is the toplevel [78]README from the bundle.
 
 References
 
@@ -12589,37 +12594,38 @@ References
   44. http://www.karlrunge.com/x11vnc/faq.html#faq-cups
   45. http://www.karlrunge.com/x11vnc/faq.html#faq-sound
   46. http://sourceforge.net/projects/ssvnc
-  47. http://downloads.sourceforge.net/ssvnc/ssvnc_windows_only-1.0.22.zip?use_mirror=
-  48. http://downloads.sourceforge.net/ssvnc/ssvnc_no_windows-1.0.22.tar.gz?use_mirror=
-  49. http://downloads.sourceforge.net/ssvnc/ssvnc_unix_only-1.0.22.tar.gz?use_mirror=
-  50. http://downloads.sourceforge.net/ssvnc/ssvnc_unix_minimal-1.0.22.tar.gz?use_mirror=
-  51. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.22.tar.gz
-  52. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.22.zip
-  53. http://downloads.sourceforge.net/ssvnc/ssvnc_all-1.0.22.zip?use_mirror=
-  54. http://downloads.sourceforge.net/ssvnc/ssvnc-1.0.22.src.tar.gz?use_mirror=
+  47. http://downloads.sourceforge.net/ssvnc/ssvnc_windows_only-1.0.23.zip?use_mirror=
+  48. http://downloads.sourceforge.net/ssvnc/ssvnc_no_windows-1.0.23.tar.gz?use_mirror=
+  49. http://downloads.sourceforge.net/ssvnc/ssvnc_unix_only-1.0.23.tar.gz?use_mirror=
+  50. http://downloads.sourceforge.net/ssvnc/ssvnc_unix_minimal-1.0.23.tar.gz?use_mirror=
+  51. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.23.tar.gz
+  52. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.23.zip
+  53. http://downloads.sourceforge.net/ssvnc/ssvnc_all-1.0.23.zip?use_mirror=
+  54. http://downloads.sourceforge.net/ssvnc/ssvnc-1.0.23.src.tar.gz?use_mirror=
   55. http://www.karlrunge.com/x11vnc/etv/README.src.txt
-  56. http://ssvnc.sourceforge.net/dev/ssvnc_windows_only-1.0.23.zip
-  57. http://ssvnc.sourceforge.net/dev/ssvnc_no_windows-1.0.23.tar.gz
-  58. http://ssvnc.sourceforge.net/dev/ssvnc_unix_only-1.0.23.tar.gz
-  59. http://ssvnc.sourceforge.net/dev/ssvnc_unix_minimal-1.0.23.tar.gz
-  60. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.23.tar.gz
-  61. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.23.zip
-  62. http://ssvnc.sourceforge.net/dev/ssvnc_all-1.0.23.zip
-  63. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.23.src.tar.gz
+  56. http://ssvnc.sourceforge.net/dev/ssvnc_windows_only-1.0.24.zip
+  57. http://ssvnc.sourceforge.net/dev/ssvnc_no_windows-1.0.24.tar.gz
+  58. http://ssvnc.sourceforge.net/dev/ssvnc_unix_only-1.0.24.tar.gz
+  59. http://ssvnc.sourceforge.net/dev/ssvnc_unix_minimal-1.0.24.tar.gz
+  60. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.24.tar.gz
+  61. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.24.zip
+  62. http://ssvnc.sourceforge.net/dev/ssvnc_all-1.0.24.zip
+  63. http://ssvnc.sourceforge.net/dev/ssvnc-1.0.24.src.tar.gz
   64. http://www.karlrunge.com/x11vnc/etv/ssvnc
   65. http://sourceforge.net/project/showfiles.php?group_id=243486&package_id=296727&release_id=636282
   66. http://sourceforge.net/project/showfiles.php?group_id=243486&package_id=296727&release_id=636337
   67. http://sourceforge.net/project/showfiles.php?group_id=243486&package_id=296727&release_id=636338
   68. http://sourceforge.net/project/showfiles.php?group_id=243486&package_id=296727&release_id=640923
   69. http://sourceforge.net/project/showfiles.php?group_id=243486&package_id=296727&release_id=652804
-  70. http://www.stunnel.org/
-  71. http://stunnel.mirt.net/
-  72. http://www.openssl.org/
-  73. http://www.chiark.greenend.org.uk/~sgtatham/putty/
-  74. http://www.tightvnc.com/
-  75. http://www.realvnc.com/
-  76. http://sourceforge.net/projects/cotvnc/
-  77. http://www.karlrunge.com/x11vnc/README.ssvnc.html
+  70. http://sourceforge.net/project/showfiles.php?group_id=243486&package_id=296727&release_id=691389
+  71. http://www.stunnel.org/
+  72. http://stunnel.mirt.net/
+  73. http://www.openssl.org/
+  74. http://www.chiark.greenend.org.uk/~sgtatham/putty/
+  75. http://www.tightvnc.com/
+  76. http://www.realvnc.com/
+  77. http://sourceforge.net/projects/cotvnc/
+  78. http://www.karlrunge.com/x11vnc/README.ssvnc.html
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/x11vnc_opts.html:
@@ -12632,7 +12638,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.8 lastmod: 2009-06-14
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-07-11
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -12757,7 +12763,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.8 lastmod: 2009-06-14
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-07-11
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -12975,10 +12981,10 @@ Options:
                        an improvement over -flashcmap because it avoids the
                        flashing and shows each window in the correct color.
 
-                       This method appear to work, but may still have bugs
-                       and it does hog resources.  If there are multiple 8bpp
-                       windows using different colormaps, one may have to
-                       iconify all but one for the colors to be correct.
+                       This method works OK, but may still have bugs and it
+                       does hog resources.  If there are multiple 8bpp windows
+                       using different colormaps, one may have to iconify all
+                       but one for the colors to be correct.
 
                        There may be painting errors for clipping and switching
                        between windows of depths 8 and 24.  Heuristics are
@@ -14185,7 +14191,7 @@ e
                        Thus only passive network sniffing attacks are avoided:
                        the "ANON" method is susceptible to Man-In-The-Middle
                        attacks.  "ANON" is not recommended; instead use
-                       a SSL PEM you created or the defaut "SAVE" method.
+                       a SSL PEM you created or the default "SAVE" method.
 
                        See -ssldir below to use a directory besides the
                        default ~/.vnc/certs
@@ -14203,7 +14209,7 @@ e
                        Set to zero to poll forever.  Set to a negative value
                        to use the builtin setting.
 
-                       Note that this value does not apply to the *initial* ssl
+                       Note that this value does NOT apply to the *initial* ssl
                        init connection.  The default timeout for that is 20sec.
                        Use -env SSL_INIT_TIMEOUT=n to modify it.
 

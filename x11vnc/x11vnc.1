@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "June 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "July 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.8, lastmod: 2009-06-14
+         version: 0.9.9, lastmod: 2009-07-11
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -276,10 +276,10 @@ windows (i.e. pure 8bpp), this mode is potentially
 an improvement over \fB-flashcmap\fR because it avoids the
 flashing and shows each window in the correct color.
 .IP
-This method appear to work, but may still have bugs
-and it does hog resources.  If there are multiple 8bpp
-windows using different colormaps, one may have to
-iconify all but one for the colors to be correct.
+This method works OK, but may still have bugs and it
+does hog resources.  If there are multiple 8bpp windows
+using different colormaps, one may have to iconify all
+but one for the colors to be correct.
 .IP
 There may be painting errors for clipping and switching
 between windows of depths 8 and 24.  Heuristics are
@@ -1669,7 +1669,7 @@ to authenticate either the VNC server or VNC client.
 Thus only passive network sniffing attacks are avoided:
 the "ANON" method is susceptible to Man-In-The-Middle
 attacks.  "ANON" is not recommended; instead use
-a SSL PEM you created or the defaut "SAVE" method.
+a SSL PEM you created or the default "SAVE" method.
 .IP
 See \fB-ssldir\fR below to use a directory besides the
 default ~/.vnc/certs
@@ -1689,7 +1689,7 @@ timeout (25s for about the first minute, 43200s later).
 Set to zero to poll forever.  Set to a negative value
 to use the builtin setting.
 .IP
-Note that this value does not apply to the *initial* ssl
+Note that this value does NOT apply to the *initial* ssl
 init connection.  The default timeout for that is 20sec.
 Use \fB-env\fR SSL_INIT_TIMEOUT=n to modify it.
 .PP
