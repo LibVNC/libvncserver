@@ -672,6 +672,13 @@ if test "x$with_pthread" != "xno"; then
 fi
 AM_CONDITIONAL(HAVE_LIBPTHREAD, test ! -z "$HAVE_LIBPTHREAD")
 
+AC_MSG_CHECKING([for __thread])
+AC_LINK_IFELSE([AC_LANG_PROGRAM(, [static __thread int p = 0])],
+	       [AC_DEFINE(HAVE_TLS, 1,
+		      Define to 1 if compiler supports __thread)
+		AC_MSG_RESULT([yes])],
+	       [AC_MSG_RESULT([no])])
+
 # tightvnc-filetransfer implemented using threads:
 if test -z "$HAVE_LIBPTHREAD"; then
 	with_tightvnc_filetransfer=""

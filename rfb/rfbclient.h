@@ -285,6 +285,9 @@ extern rfbBool PermitServerInput(rfbClient* client, int enabled);
 
 extern void PrintPixelFormat(rfbPixelFormat *format);
 
+extern rfbBool SupportsClient2Server(rfbClient* client, int messageType);
+extern rfbBool SupportsServer2Client(rfbClient* client, int messageType);
+
 /* client data */
 
 void rfbClientSetClientData(rfbClient* client, void* tag, void* data);
@@ -314,6 +317,7 @@ extern rfbBool WriteToRFBServer(rfbClient* client, char *buf, int n);
 extern int FindFreeTcpPort(void);
 extern int ListenAtTcpPort(int port);
 extern int ConnectClientToTcpAddr(unsigned int host, int port);
+extern int ConnectClientToUnixSock(const char *sockFile);
 extern int AcceptTcpConnection(int listenSock);
 extern rfbBool SetNonBlocking(int sock);
 

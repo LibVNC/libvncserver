@@ -603,6 +603,9 @@ static void copy_raw_fb_24_to_32(XImage *dest, int x, int y, unsigned int w,
 	} else if (! raw_fb_seek) {
 		/* mmap */
 		bpl = raw_fb_bytes_per_line;
+		if (clipshift && wdpy_x != cdpy_x) {
+			bpl = wdpy_x * 3;
+		}
 		src = raw_fb_addr + raw_fb_offset + bpl*y + 3*x;
 		dst = dest->data;
 
@@ -628,6 +631,9 @@ static void copy_raw_fb_24_to_32(XImage *dest, int x, int y, unsigned int w,
 		/* lseek */
 		off_t off;
 		bpl = raw_fb_bytes_per_line;
+		if (clipshift && wdpy_x != cdpy_x) {
+			bpl = wdpy_x * 3;
+		}
 		off = (off_t) (raw_fb_offset + bpl*y + 3*x);
 
 		lseek(raw_fb_fd, off, SEEK_SET);
@@ -673,7 +679,7 @@ void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 	char *src, *dst;
 	unsigned int line;
 	int pixelsize = bpp/8;
-	int bpl = wdpy_x * pixelsize;
+	static int db = -1;
 
 	if (xform24to32) {
 		copy_raw_fb_24_to_32(dest, x, y, w, h);
@@ -683,16 +689,26 @@ void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 		copy_raw_fb_low_bpp(dest, x, y, w, h);
 		return;
 	}
+	if (db < 0) {
+		if (getenv("DEBUG_COPY_RAW_FB")) {
+			db = atoi(getenv("DEBUG_COPY_RAW_FB"));
+		} else {
+			db = 0;
+		}
+	}
 
 	if (clipshift && ! use_snapfb) {
 		x += coff_x;
 		y += coff_y;
 	}
 
+
 	if (use_snapfb && dest != snap) {
 		/* snapfb src */
 		src = snap->data + snap->bytes_per_line*y + pixelsize*x;
 		dst = dest->data;
+
+if (db) fprintf(stderr, "snap->bytes_per_line: %d, dest->bytes_per_line: %d, w: %d h: %d dpy_x: %d wdpy_x: %d cdpy_x: %d\n", snap->bytes_per_line, dest->bytes_per_line, w, h, dpy_x, wdpy_x, cdpy_x);
 
 		for (line = 0; line < h; line++) {
 			memcpy(dst, src, w * pixelsize);
@@ -702,9 +718,16 @@ void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 
 	} else if (! raw_fb_seek) {
 		/* mmap */
-		bpl = raw_fb_bytes_per_line;
+		int bpl = raw_fb_bytes_per_line;
+
+		if (clipshift && wdpy_x != cdpy_x) {
+			bpl = wdpy_x * pixelsize;
+		}
+
 		src = raw_fb_addr + raw_fb_offset + bpl*y + pixelsize*x;
 		dst = dest->data;
+
+if (db) fprintf(stderr, "bpl: %d, dest->bytes_per_line: %d, w: %d h: %d dpy_x: %d wdpy_x: %d cdpy_x: %d\n", bpl, dest->bytes_per_line, w, h, dpy_x, wdpy_x, cdpy_x);
 
 		for (line = 0; line < h; line++) {
 			memcpy(dst, src, w * pixelsize);
@@ -716,20 +739,25 @@ void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 		/* lseek */
 		int n, len, del, sz = w * pixelsize;
 		off_t off;
-		bpl = raw_fb_bytes_per_line;
+		int bpl = raw_fb_bytes_per_line;
+
+		if (clipshift && wdpy_x != cdpy_x) {
+			bpl = wdpy_x * pixelsize;
+		}
+
 		off = (off_t) (raw_fb_offset + bpl*y + pixelsize*x);
 
 		lseek(raw_fb_fd, off, SEEK_SET);
 		dst = dest->data;
 
-if (0) fprintf(stderr, "lseek 0 ps: %d  sz: %d off: %d bpl: %d\n", pixelsize, sz, (int) off, bpl);
+if (db) fprintf(stderr, "lseek 0 ps: %d  sz: %d off: %d bpl: %d\n", pixelsize, sz, (int) off, bpl);
 
 		for (line = 0; line < h; line++) {
 			len = sz;
 			del = 0;
 			while (len > 0) {
 				n = read(raw_fb_fd, dst + del, len);
-if (0) fprintf(stderr, "len: %d n: %d\n", len, n);
+//if (db > 2) fprintf(stderr, "len: %d n: %d\n", len, n);
 
 				if (n > 0) {
 					del += n;
@@ -741,7 +769,7 @@ if (0) fprintf(stderr, "len: %d n: %d\n", len, n);
 				}
 			}
 			if (bpl > sz) {
-if (0) fprintf(stderr, "bpl>sz %d %d\n", bpl, sz);
+//if (db > 1) fprintf(stderr, "bpl>sz %d %d\n", bpl, sz);
 				off = (off_t) (bpl - sz);
 				lseek(raw_fb_fd, off, SEEK_CUR);
 			}

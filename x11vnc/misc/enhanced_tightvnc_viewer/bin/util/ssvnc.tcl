@@ -472,7 +472,7 @@ proc help {} {
     steps of setting up a Certificate Authority (CA) to sign the VNC server
     and/or VNC client Certs, that can be used instead and avoids the need to
     manually verify every cert while still authenticating every connection.
-    More info: http://www.karlrunge.com/x11vnc/#faq-ssl-ca
+    More info: http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-ca
 
     See the cmdline option -cacert file below in 'SSL Certificates'
     for setting a default ServerCert/CA Cert.
@@ -662,7 +662,7 @@ proc help {} {
 
     See also these links for more information:
 
-        http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-ext
+        http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-ext
         http://www.stunnel.org
         http://www.tightvnc.com
 }
@@ -828,8 +828,8 @@ proc help {} {
 
     See the ss_vncviewer description and x11vnc FAQ for info on proxies:
 
-           http://www.karlrunge.com/x11vnc/#ss_vncviewer
-           http://www.karlrunge.com/x11vnc/#faq-ssl-java-viewer-proxy
+        http://www.karlrunge.com/x11vnc/faq.html#ss_vncviewer
+        http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-java-viewer-proxy
 
 
  SSH Proxies/Gateways:
@@ -1719,7 +1719,7 @@ proc help_certs {} {
     See the x11vnc and STUNNEL documentation for how to create and use PEM
     certificate files:
 
-        http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-ext
+        http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-ext
         http://www.karlrunge.com/x11vnc/ssl.html
         http://www.stunnel.org
 
@@ -1903,7 +1903,7 @@ set msg {
     x11vnc has an experiment Client-Side caching scheme "-ncache n"
     that can give nice speedups.  But there are some drawbacks
     because the cache-region is visible and uses much RAM.
-    http://www.karlrunge.com/x11vnc/#faq-client-caching
+    http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching
 
  X11VNC Options:
 
@@ -2644,7 +2644,8 @@ proc set_defaults {} {
 	global defs env
 
 	global mycert svcert crtdir crlfil
-	global use_alpha use_grab use_ssl use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
+	global use_alpha use_turbovnc use_grab use_ssl use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
+	global use_send_clipboard use_send_always
 	global disable_all_encryption
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality use_x11_macosx
 	global compresslevel_text quality_text
@@ -2683,6 +2684,9 @@ proc set_defaults {} {
 	set defs(use_raise_on_beep) 0
 	set defs(use_bgr233) 0
 	set defs(use_alpha) 0
+	set defs(use_send_clipboard) 0
+	set defs(use_send_always) 0
+	set defs(use_turbovnc) 0
 	set defs(server_vencrypt) 0
 	set defs(server_anondh) 0
 	set defs(use_grab) 0
@@ -2825,6 +2829,7 @@ proc set_defaults {} {
 proc do_viewer_windows {n} {
 	global use_alpha use_grab use_x11cursor use_nobell use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
+	global use_send_clipboard use_send_always
 	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
 	global use_listen disable_ssl_workarounds disable_ssl_workarounds_type env
 
@@ -5543,6 +5548,7 @@ proc reset_stunnel_extra_opts {} {
 		set env(SSVNC_MULTIPLE_LISTEN) $ssvnc_multiple_listen0
 	}
 	set env(SSVNC_ULTRA_DSM) ""
+	set env(SSVNC_TURBOVNC) ""
 }
 
 proc launch_unix {hp} {
@@ -5987,6 +5993,15 @@ proc launch_unix {hp} {
 	}
 	if {$use_alpha} {
 		set cmd "$cmd -alpha"
+	}
+	if {$use_send_clipboard} {
+		set cmd "$cmd -sendclipboard"
+	}
+	if {$use_send_always} {
+		set cmd "$cmd -sendalways"
+	}
+	if {$use_turbovnc} {
+		set env(SSVNC_TURBOVNC) 1
 	}
 	if {$use_grab} {
 		set cmd "$cmd -grab"
@@ -8045,7 +8060,7 @@ proc create_cert {{name ""}} {
     For more information see:
 
            http://www.karlrunge.com/x11vnc/ssl.html
-           http://www.karlrunge.com/x11vnc/#faq-ssl-tunnel-int
+           http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-int
 
     The first one describes how to use x11vnc to create Certificate
     Authority (CA) certificates in addition to self-signed ones.
@@ -10300,9 +10315,9 @@ proc ts_xlogin_dialog {} {
     not x11vnc.
 
     Note that the GDM display manager has a setting KillInitClients in
-    gdm.conf that will kill x11vnc right after you log in, and so you
-    would have to repeat the whole process ('Connect' button) to attach to
-    your session. See http://www.karlrunge.com/x11vnc/#faq-display-manager
+    gdm.conf that will kill x11vnc right after you log in, and so you would
+    have to repeat the whole process ('Connect' button) to attach to your
+    session. See http://www.karlrunge.com/x11vnc/faq.html#faq-display-manager
     for more info.
 }
 	.xlog.f.t insert end $msg
@@ -10444,7 +10459,7 @@ proc ts_ncache_dialog {} {
     for the caching region.  So 10 means use 10 times the RAM to store
     pixmaps.  The default is 8.
 
-    More info: http://www.karlrunge.com/x11vnc/#faq-client-caching
+    More info: http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching
 }
 	.nche.f.t insert end $msg
 
@@ -10505,7 +10520,7 @@ proc ts_x11vnc_opts_dialog {} {
 	-repeat		-cursor		-wmdt
 	-nowireframe	-ncache_cr	-speeds
 
-    More info: http://www.karlrunge.com/x11vnc/#faq-cmdline-opts
+    More info: http://www.karlrunge.com/x11vnc/faq.html#faq-cmdline-opts
 }
 #    In Auto Port put a starting port for x11vnc to try autoprobing
 #    instead of the default 5900.  It starts at the value you supply and
@@ -10571,7 +10586,7 @@ proc ts_filexfer_dialog {} {
     The defaults for the SSVNC viewer package are TightVNC on
     Windows and UltraVNC on Unix.
 
-    For more info see: http://www.karlrunge.com/x11vnc/#faq-filexfer
+    For more info see: http://www.karlrunge.com/x11vnc/faq.html#faq-filexfer
 }
 	.xfer.f.t insert end $msg
 
@@ -10673,7 +10688,7 @@ proc ts_cups_dialog {} {
 
         http://localhost:port/printers/printername
 
-    For more info see: http://www.karlrunge.com/x11vnc/#faq-cups
+    For more info see: http://www.karlrunge.com/x11vnc/faq.html#faq-cups
 }
 
 #    The "Manage 'ServerName' in .cups/client.conf for me" setting is usually
@@ -10946,7 +10961,7 @@ proc cups_dialog {} {
     that knows about your Windows printer, you might have better luck with
     that instead of using SMB.  Set 'Local CUPS Server' to it.
 
-    For more info see: http://www.karlrunge.com/x11vnc/#faq-cups
+    For more info see: http://www.karlrunge.com/x11vnc/faq.html#faq-cups
 }
 	.cups.f.t insert end $msg
 
@@ -11058,7 +11073,7 @@ proc ts_sound_dialog {} {
           And esd's LD_PRELOAD is broken on 64+32bit Linux (x86_64).
           And so this mode is not working well currently... 
  
-    For more info see: http://www.karlrunge.com/x11vnc/#faq-sound
+    For more info see: http://www.karlrunge.com/x11vnc/faq.html#faq-sound
 }
 
 
@@ -11187,7 +11202,7 @@ proc sound_dialog {} {
     a numerical port to specify non-localhost connections, e.g. to another
     nearby machine.
 
-    For more info see: http://www.karlrunge.com/x11vnc/#faq-sound
+    For more info see: http://www.karlrunge.com/x11vnc/faq.html#faq-sound
 }
 	.snd.f.t insert end $msg
 
@@ -11972,7 +11987,7 @@ proc smb_dialog {} {
     the share, become root and umount the shares manually ("smbumount
     /path/to/share", etc.)
 
-    For more info see: http://www.karlrunge.com/x11vnc/#faq-smb-shares
+    For more info see: http://www.karlrunge.com/x11vnc/faq.html#faq-smb-shares
 }
 
 	set msg2 {
@@ -12244,6 +12259,29 @@ proc help_ssvncviewer_opts {} {
          Use the x11vnc alpha hack for translucent cursors (requires Unix,
          32bpp and same endianness)
 
+      TurboVNC:
+
+         If available on your platform, use a ssvncviewer compiled with
+         TurboVNC support.  This is based on the the VirtualGL project:
+         http://www.sourceforge.net/projects/virtualgl	You will need
+         to install the VirtualGL's TurboJPEG library too.
+
+         Currently (May/2009) only Linux.i686, Linux.x86_64, and
+         Darwin.i386 have vncviewer.turbovnc binaries shipped in the
+         ssvnc bundles.  See the build instructions for how you might
+         compile your own.
+
+      Send CLIPBOARD not PRIMARY:
+
+         When sending locally selected text to the VNC server side,
+         send the CLIPBOARD selection instead of the PRIMARY selection.
+
+      Send Selection Every time:
+
+         Send selected text to the VNC server side every time the mouse
+         focus enters the main VNC Viewer window instead only when it
+         appears to have changed since the last send.
+
       Scaling:
 
          Use viewer-side (i.e. local) scaling of the VNC screen.  Supply
@@ -12293,24 +12331,61 @@ proc help_ssvncviewer_opts {} {
     These are environment variables one may set to affect the options
     of the SSVNC vncviewer:
 
-         VNCVIEWER_ALPHABLEND    (-alpha, see Cursor Alphablending above)
-         VNCVIEWER_POPUP_FIX     (-popupfix, warp popup to mouse location)
-         VNCVIEWER_GRAB_SERVER   (-graball, see Use XGrabServer above)
-         VNCVIEWER_YCROP         (-ycrop, see Y Crop above)
-         VNCVIEWER_SBWIDTH       (-sbwidth, see ScrollBar Width above)
-         VNCVIEWER_RFBVERSION    (-rfbversion, e.g. 3.6)
-         VNCVIEWER_ENCODINGS     (-encodings, e.g. "copyrect zrle hextile")
-         VNCVIEWER_NOBELL        (-nobell)
-         VNCVIEWER_X11CURSOR     (-x11cursor, see Use X11 Cursor above)
-         VNCVIEWER_RAWLOCAL      (-rawlocal, see Use Raw Local above)
-         VNCVIEWER_ESCAPE        (-escape, see Escape Keys above)
-         SSVNC_MULTIPLE_LISTEN   (-multilisten, see Mulitple LISTEN above)
-         SSVNC_UNIXPW            (-unixpw)
-         SSVNC_UNIXPW_NOESC      (do not send escape in -unixpw mode)
-         SSVNC_SCALE             (-scale, see Scaling above)
-         SSVNC_NOSOLID           (do not do solid region speedup in
-                                  scaling mode.)
-         SSVNC_PRESERVE_ENCODING (do not switch to ZRLE when scaling)
+         VNCVIEWER_ALPHABLEND     (-alpha, see Cursor Alphablending above)
+         VNCVIEWER_POPUP_FIX      (-popupfix, warp popup to mouse location)
+         VNCVIEWER_GRAB_SERVER    (-graball, see Use XGrabServer above)
+         VNCVIEWER_YCROP          (-ycrop, see Y Crop above)
+         VNCVIEWER_SBWIDTH        (-sbwidth, see ScrollBar Width above)
+         VNCVIEWER_RFBVERSION     (-rfbversion, e.g. 3.6)
+         VNCVIEWER_ENCODINGS      (-encodings, e.g. "copyrect zrle hextile")
+         VNCVIEWER_NOBELL         (-nobell)
+         VNCVIEWER_X11CURSOR      (-x11cursor, see Use X11 Cursor above)
+         VNCVIEWER_RAWLOCAL       (-rawlocal, see Use Raw Local above)
+         VNCVIEWER_ESCAPE         (-escape, see Escape Keys above)
+         VNCVIEWER_ULTRADSM       (-ultradsm)
+         VNCVIEWER_SEND_CLIPBOARD (-sendclipboard)
+         VNCVIEWER_SEND_ALWAYS    (-sendalways)
+         VNCVIEWER_RECV_TEXT      (-recvtext clipboard/primary/both)
+         VNCVIEWER_NO_CUTBUFFER   (do not send CUTBUFFER0 as fallback)
+
+         SSVNC_MULTIPLE_LISTEN    (-multilisten, see Multiple LISTEN above)
+         SSVNC_TURBOVNC           (see TurboVNC above)
+         SSVNC_UNIXPW             (-unixpw)
+         SSVNC_UNIXPW_NOESC       (do not send escape in -unixpw mode)
+         SSVNC_SCALE              (-scale, see Scaling above)
+         SSVNC_NOSOLID            (do not do solid region speedup in
+                                   scaling mode.)
+         SSVNC_PRESERVE_ENCODING  (do not switch to ZRLE when scaling)
+
+         Misc (special usage or debugging):
+
+         SSVNC_NO_ULTRA_DSM
+         SSVNC_ULTRA_FTP_JAR
+         SSVNC_SCALE_STATS
+         SSVNC_DEBUG_RELEASE
+         SSVNC_DEBUG_ESCAPE_KEYS
+         SSVNC_NO_MAYBE_SYNC
+         SSVNC_MAX_LISTEN
+         SSVNC_LISTEN_ONCE
+         SSVNC_EXIT_DEBUG
+         SSVNC_DEBUG_CHAT
+         SSVNC_NO_MESSAGE_POPUP
+         SSVNC_SET_SECURITY_TYPE
+         SSVNC_PREDIGESTED_HANDSHAKE
+         SSVNC_SKIP_RFB_PROTOCOL_VERSION
+         SSVNC_DEBUG_SEC_TYPES
+         SSVNC_DEBUG_MSLOGON
+         SSVNC_DEBUG_RECTS
+         SSVNC_DEBUG_CHAT
+         SSVNC_DELAY_SYNC
+         SSVNC_DEBUG_SELECTION
+         SSVNC_REPEATER
+         SSVNC_VENCRYPT_DEBUG
+         SSVNC_STUNNEL_DEBUG
+         SSVNC_TEST_SEC_TYPE
+         SSVNC_LIM_ACCEPT_PRELOAD
+         SSVNC_EXTRA_SLEEP
+         SSVNC_SOCKS5
 }
 
 	.av.f.t insert end $msg
@@ -12660,10 +12735,17 @@ proc ultra_dsm_dialog {} {
 
 	set msg {
     On Unix with the provided SSVNC vncviewer, you can connect to an UltraVNC
-    server that is using one of its encryption plugins: MSRC4, ARC4, or AESV2.
+    server that is using one of its DSM encryption plugins: MSRC4, ARC4, AESV2.
+    More info at: http://www.uvnc.com/features/encryption.html
+
+    IMPORTANT: The UltraVNC DSM implementation contains unfixed errors
+    that could allow an eavesdropper to recover the session key or traffic
+    relatively easily.  They often do not provide strong encryption, but
+    only provide basic obscurity instead.  Do not use them with critical data.
 
     See the bottom of this help text for how to use symmetric encryption with
-    NON-UltraVNC servers (for example, x11vnc 0.9.5 or later).
+    Non-UltraVNC servers (for example, x11vnc 0.9.5 or later).  This mode does
+    not suffer the shortcomings of the UltraVNC DSM implementation.
 
     You will need to specify the corresponding UltraVNC encryption key (created
     by you using an UltraVNC server or viewer).  It is usually called 'rc4.key'
@@ -14070,7 +14152,8 @@ proc set_advanced_options {} {
 
 proc set_ssvncviewer_options {} {
 	global is_windows darwin_cotvnc
-	global use_ssh use_sshssl use_x11cursor use_rawlocal use_popupfix use_alpha use_grab use_nobell
+	global use_ssh use_sshssl use_x11cursor use_rawlocal use_popupfix use_alpha use_turbovnc use_grab use_nobell
+	global use_send_clipboard use_send_always
 	global ssvnc_scale ssvnc_escape
 	global server_vencrypt server_anondh
 
@@ -14131,7 +14214,22 @@ proc set_ssvncviewer_options {} {
 	incr i
 
 	checkbutton .os.b$i -anchor w -variable use_alpha -text \
-		"Cursor alphablending (32bpp required)"
+		"Cursor Alphablending (32bpp required)"
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+	checkbutton .os.b$i -anchor w -variable use_turbovnc -text \
+		"TurboVNC (if available on platform)"
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+	checkbutton .os.b$i -anchor w -variable use_send_clipboard -text \
+		"Send CLIPBOARD not PRIMARY"
+	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	incr i
+
+	checkbutton .os.b$i -anchor w -variable use_send_always -text \
+		"Send Selection Every time"
 	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
 	incr i
 
@@ -14678,6 +14776,7 @@ proc disable_encryption {} {
 proc set_options {} {
 	global use_alpha use_grab use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality use_x11_macosx
+	global use_send_clipboard use_send_always
 	global compresslevel_text quality_text
 	global env is_windows darwin_cotvnc uname
 	global use_listen

@@ -1577,10 +1577,20 @@ if (0) db = 1;
 		return;
 	}
 	if (use_threads) {
-		/* XXX not working */
-		use_xrecord = 0;
-		xrecording = 0;
-		return;
+		/* XXX not working.  Still?  Painting errors. */
+		static int first = 1;
+		if (first) {
+			if (use_xrecord && !getenv("XRECORD_THREADS")) {
+				rfbLog("xrecord_watch: disabling scroll detection in -threads mode.\n");
+				rfbLog("xrecord_watch: Set -env XRECORD_THREADS=1 to enable it.\n");
+				use_xrecord = 0;
+				xrecording = 0;
+			}
+			first = 0;
+		}
+		if (!use_xrecord && !xrecording) {
+			return;
+		}
 	}
 
 	dtime0(&now);

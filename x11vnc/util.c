@@ -451,6 +451,9 @@ double rfac(void) {
 void check_allinput_rate(void) {
 	static double last_all_input_check = 0.0;
 	static int set = 0;
+	if (use_threads) {
+		return;
+	}
 	if (! set) {
 		set = 1;
 		last_all_input_check = dnow();
@@ -480,6 +483,9 @@ static void do_allinput(long usec) {
 	long usec0;
 	double now;
 	if (!screen || !screen->clientHead) {
+		return;
+	}
+	if (use_threads) {
 		return;
 	}
 	if (usec < 0) {
@@ -592,9 +598,6 @@ void rfbCFD(long usec) {
 		    (int) usec, tm - x11vnc_start);
 	}
 
-#if 0
-fprintf(stderr, "handleEventsEagerly: %d\n", screen->handleEventsEagerly);
-#endif
 
 	if (! use_threads) {
 		if (all_input) {
@@ -678,6 +681,7 @@ char *choose_title(char *display) {
 		}
 	}
 	strncat(title, display, MAXN - strlen(title));
+	X_LOCK;
 	if (subwin && dpy && valid_window(subwin, NULL, 0)) {
 #if !NO_X11
 		char *name = NULL;
@@ -690,5 +694,6 @@ char *choose_title(char *display) {
 		}
 #endif	/* NO_X11 */
 	}
+	X_UNLOCK;
 	return title;
 }

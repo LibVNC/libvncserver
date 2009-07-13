@@ -81,6 +81,7 @@ void set_x11vnc_remote_prop(char *str);
 void read_x11vnc_remote_prop(int);
 void check_connect_inputs(void);
 void check_gui_inputs(void);
+rfbClientPtr create_new_client(int sock, int start_thread);
 enum rfbNewClientAction new_client(rfbClientPtr client);
 enum rfbNewClientAction new_client_chat_helper(rfbClientPtr client);
 rfbBool password_check_chat_helper(rfbClientPtr cl, const char* response, int len);
@@ -92,6 +93,7 @@ int accept_client(rfbClientPtr client);
 int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
     int len, FILE *output);
 int check_access(char *addr);
+void client_set_net(rfbClientPtr client);
 
 static rfbClientPtr *client_match(char *str);
 static void free_client_data(rfbClientPtr client);
@@ -139,6 +141,7 @@ char *list_clients(void) {
 
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
+		client_set_net(cl);
 		count++;
 	}
 	rfbReleaseClientIterator(iter);
@@ -157,6 +160,7 @@ char *list_clients(void) {
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		ClientData *cd = (ClientData *) cl->clientData;
+
 		if (! cd) {
 			continue;
 		}
@@ -412,6 +416,7 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 	char str[100];
 	int rc, ok;
 	ClientData *cd = NULL;
+	client_set_net(client);
 	if (client != NULL) {
 		cd = (ClientData *) client->clientData;
 		addr = client->host;
@@ -701,6 +706,8 @@ static int accepted_client = 0;
 void client_gone(rfbClientPtr client) {
 	ClientData *cd = NULL;
 
+	CLIENT_LOCK;
+
 	client_count--;
 	if (client_count < 0) client_count = 0;
 
@@ -807,6 +814,7 @@ void client_gone(rfbClientPtr client) {
 		}
 		clean_up_exit(0);
 	}
+
 	if (connect_once) {
 		/*
 		 * This non-exit is done for a bad passwd to be consistent
@@ -820,12 +828,17 @@ void client_gone(rfbClientPtr client) {
 			rfbLog("connect_once: invalid password or early "
 			   "disconnect.\n");
 			rfbLog("connect_once: waiting for next connection.\n"); 
-			accepted_client = 0;
+			accepted_client--;
+			if (accepted_client < 0) {
+				accepted_client = 0;
+			}
+			CLIENT_UNLOCK;
 			return;
 		}
 		if (shared && client_count > 0)  {
 			rfbLog("connect_once: other shared clients still "
 			    "connected, not exiting.\n");
+			CLIENT_UNLOCK;
 			return;
 		}
 
@@ -834,6 +847,7 @@ void client_gone(rfbClientPtr client) {
 			rfbLog("killing gui_pid %d\n", gui_pid);
 			kill(gui_pid, SIGTERM);
 		}
+		CLIENT_UNLOCK;
 		clean_up_exit(0);
 	}
 #ifdef MACOSX
@@ -841,6 +855,7 @@ void client_gone(rfbClientPtr client) {
 		macosxCG_refresh_callback_off();
 	}
 #endif
+	CLIENT_UNLOCK;
 }
 
 /*
@@ -2424,7 +2439,7 @@ static int do_reverse_connect(char *str_in) {
 				write(sock, prestring, prestring_len);
 				free(prestring);
 			}
-			cl = rfbNewClient(screen, sock);
+			cl = create_new_client(sock, 1);
 		} else {
 			return 0;
 		}
@@ -2433,12 +2448,16 @@ static int do_reverse_connect(char *str_in) {
 		if (sock >= 0) {
 			write(sock, prestring, prestring_len);
 			free(prestring);
-			cl = rfbNewClient(screen, sock);
+			cl = create_new_client(sock, 1);
 		} else {
 			return 0;
 		}
 	} else {
 		cl = rfbReverseConnection(screen, host, rport);
+		if (cl != NULL && use_threads) {
+			cl->onHold = FALSE;
+			rfbStartOnHoldClient(cl);
+		}
 	}
 
 	free(host);
@@ -2853,6 +2872,27 @@ void check_gui_inputs(void) {
 	}
 }
 
+rfbClientPtr create_new_client(int sock, int start_thread) {
+	rfbClientPtr cl;
+
+	if (!screen) {
+		return NULL;
+	}
+
+	cl = rfbNewClient(screen, sock);
+
+	if (cl == NULL) {
+		return NULL;	
+	}
+	if (use_threads) {
+		cl->onHold = FALSE;
+		if (start_thread) {
+			rfbStartOnHoldClient(cl);
+		}
+	}
+	return cl;
+}
+
 static int turn_off_truecolor = 0;
 
 static void turn_off_truecolor_ad(rfbClientPtr client) {
@@ -2908,11 +2948,31 @@ void client_gone_chat_helper(rfbClientPtr client) {
 	chat_window_client = NULL;
 }
 
+void client_set_net(rfbClientPtr client) {
+	ClientData *cd; 
+	if (client == NULL) {
+		return;
+	}
+	cd = (ClientData *) client->clientData;
+	if (cd == NULL) {
+		return;
+	}
+	if (cd->client_port < 0) {
+		double dt = dnow();
+		cd->client_port = get_remote_port(client->sock);
+		cd->server_port = get_local_port(client->sock);
+		cd->server_ip   = get_local_host(client->sock);
+		cd->hostname = ip2host(client->host);
+		rfbLog("client_set_net: %s  %.4f\n", client->host, dnow() - dt);
+	}
+}
 /*
  * libvncserver callback for when a new client connects
  */
 enum rfbNewClientAction new_client(rfbClientPtr client) {
 	ClientData *cd; 
+
+	CLIENT_LOCK;
 
 	last_event = last_input = time(NULL);
 
@@ -2931,30 +2991,36 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	clients_served++;
 
+
 	if (use_openssl || use_stunnel) {
 		if (! ssl_initialized) {
 			rfbLog("denying additional client: %s ssl not setup"
 			    " yet.\n", client->host);
+			CLIENT_UNLOCK;
 			return(RFB_CLIENT_REFUSE);
 		}
 	}
 	if (unixpw_in_progress) {
 		rfbLog("denying additional client: %s during -unixpw login.\n",
 		     client->host);
+		CLIENT_UNLOCK;
 		return(RFB_CLIENT_REFUSE);
 	}
 	if (connect_once) {
 		if (screen->dontDisconnect && screen->neverShared) {
 			if (! shared && accepted_client) {
-				rfbLog("denying additional client: %s\n",
-				     client->host);
+				rfbLog("denying additional client: %s:%d\n",
+				     client->host, get_remote_port(client->sock));
+				CLIENT_UNLOCK;
 				return(RFB_CLIENT_REFUSE);
 			}
 		}
 	}
+
 	if (! check_access(client->host)) {
 		rfbLog("denying client: %s does not match %s\n", client->host,
 		    allow_list ? allow_list : "(null)" );
+		CLIENT_UNLOCK;
 		return(RFB_CLIENT_REFUSE);
 	}
        
@@ -2969,10 +3035,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	client->clientData = (void *) calloc(sizeof(ClientData), 1);
 	cd = (ClientData *) client->clientData;
 
-	cd->client_port = get_remote_port(client->sock);
-	cd->server_port = get_local_port(client->sock);
-	cd->server_ip   = get_local_host(client->sock);
-	cd->hostname = ip2host(client->host);
+	/* see client_set_net() we delay the DNS lookups during handshake */
+	cd->client_port = -1;
 	cd->username = strdup("");
 	cd->unixname = strdup("");
 
@@ -2994,6 +3058,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 		free_client_data(client);
 
+		CLIENT_UNLOCK;
 		return(RFB_CLIENT_REFUSE);
 	}
 
@@ -3090,14 +3155,15 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		install_padded_fb(pad_geometry);
 	}
 
-	cd->timer = dnow();
+	cd->timer = last_new_client = dnow();
 	cd->send_cmp_rate = 0.0;
 	cd->send_raw_rate = 0.0;
 	cd->latency = 0.0;
 	cd->cmp_bytes_sent = 0;
 	cd->raw_bytes_sent = 0;
 
-	accepted_client = 1;
+	rfbLog("incr accepted_client for %s:%d.\n", client->host, get_remote_port(client->sock));
+	accepted_client++;
 	last_client = time(NULL);
 
 	if (ncache) {
@@ -3119,6 +3185,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 			bm--;
 		}
 
+		if (use_threads) LOCK(client->updateMutex);
+
 		client->format.trueColour = TRUE;
 		client->format.redShift   = rs;
 		client->format.greenShift = gs;
@@ -3126,6 +3194,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		client->format.redMax     = rm;
 		client->format.greenMax   = gm;
 		client->format.blueMax    = bm;
+
+		if (use_threads) UNLOCK(client->updateMutex);
 
 		rfbSetTranslateFunction(client);
 
@@ -3168,10 +3238,17 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 			rfbLog("new client: %s in non-unixpw_in_rfbPE.\n",
 			     client->host);
 		}
-		/* always put client on hold even if unixpw_in_rfbPE is true */
-		return(RFB_CLIENT_ON_HOLD);
+		CLIENT_UNLOCK;
+		if (!use_threads) {
+			/* always put client on hold even if unixpw_in_rfbPE is true */
+			return(RFB_CLIENT_ON_HOLD);
+		} else {
+			/* unixpw threads is still in testing mode, disabled by default. See UNIXPW_THREADS */
+			return(RFB_CLIENT_ACCEPT);
+		}
 	}
 
+	CLIENT_UNLOCK;
 	return(RFB_CLIENT_ACCEPT);
 }
 
@@ -3411,6 +3488,7 @@ void check_new_clients(void) {
 		ClientData *cd = (ClientData *) cl->clientData;
 		char *s;
 
+		client_set_net(cl);
 		if (! cd) {
 			continue;
 		}

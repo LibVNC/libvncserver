@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "March 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "July 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.7, lastmod: 2009-03-15
+         version: 0.9.9, lastmod: 2009-07-11
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -276,10 +276,10 @@ windows (i.e. pure 8bpp), this mode is potentially
 an improvement over \fB-flashcmap\fR because it avoids the
 flashing and shows each window in the correct color.
 .IP
-This method appear to work, but may still have bugs
-and it does hog resources.  If there are multiple 8bpp
-windows using different colormaps, one may have to
-iconify all but one for the colors to be correct.
+This method works OK, but may still have bugs and it
+does hog resources.  If there are multiple 8bpp windows
+using different colormaps, one may have to iconify all
+but one for the colors to be correct.
 .IP
 There may be painting errors for clipping and switching
 between windows of depths 8 and 24.  Heuristics are
@@ -1003,6 +1003,9 @@ associated with it does apply as normal.
 There are also some utilities for testing password
 if [list] starts with the "%" character.  See the
 quick_pw() function in the source for details.
+.IP
+Use \fB-nounixpw\fR to disable unixpw mode if it was enabled
+earlier in the cmd line (e.g. \fB-svc\fR mode)
 .PP
 \fB-unixpw_nis\fR \fI[list]\fR
 .IP
@@ -1666,7 +1669,7 @@ to authenticate either the VNC server or VNC client.
 Thus only passive network sniffing attacks are avoided:
 the "ANON" method is susceptible to Man-In-The-Middle
 attacks.  "ANON" is not recommended; instead use
-a SSL PEM you created or the defaut "SAVE" method.
+a SSL PEM you created or the default "SAVE" method.
 .IP
 See \fB-ssldir\fR below to use a directory besides the
 default ~/.vnc/certs
@@ -1686,7 +1689,7 @@ timeout (25s for about the first minute, 43200s later).
 Set to zero to poll forever.  Set to a negative value
 to use the builtin setting.
 .IP
-Note that this value does not apply to the *initial* ssl
+Note that this value does NOT apply to the *initial* ssl
 init connection.  The default timeout for that is 20sec.
 Use \fB-env\fR SSL_INIT_TIMEOUT=n to modify it.
 .PP
@@ -3114,9 +3117,12 @@ Option \fB-norepeat\fR disables X server key auto repeat when
 VNC clients are connected and VNC keyboard input is
 not idle for more than 5 minutes.  This works around a
 repeating keystrokes bug (triggered by long processing
-delays between key down and key up client events: either
-from large screen changes or high latency).
+delays between key down and key up client events:
+either from large screen changes or high latency).
 Default: \fB-norepeat\fR
+.IP
+You can set the env. var. X11VNC_IDLE_TIMEOUT to the
+number of idle seconds you want (5min = 300secs).
 .IP
 Note: your VNC viewer side will likely do autorepeating,
 so this is no loss unless someone is simultaneously at
@@ -3667,7 +3673,7 @@ If a pattern is prefixed with "KEY:" it only applies
 to Keystroke generated scrolls (e.g. Up arrow).  If it
 is prefixed with "MOUSE:" it only applies to Mouse
 induced scrolls (e.g. dragging on a scrollbar).
-Default: ##Soffice.bin,##StarOffice
+Default: ##Soffice.bin,##StarOffice,##OpenOffice
 .PP
 \fB-scr_inc\fR \fIlist\fR
 .IP
@@ -4211,12 +4217,25 @@ for this option if you don't like the 'pipe'. Example:
 \fB-threads,\fR \fB-nothreads\fR
 .IP
 Whether or not to use the threaded libvncserver
-algorithm [rfbRunEventLoop] if libpthread is available
-Default: \fB-nothreads.\fR  NOTE:  The \fB-threads\fR mode is now
-disabled due to its unstable behavior.  Not recommended,
-but you can recompile with \fB-DX11VNC_THREADED\fR in
-CPPFLAGS if you need to use it.  You can also set the
-env. variable X11VNC_THREADED=1
+algorithm [rfbRunEventLoop] if libpthread is available.
+In this mode new threads (one for input and one
+for output) are created to handle each new client.
+Default: \fB-nothreads.\fR
+.IP
+NOTE:  The \fB-threads\fR mode may be disabled due to its
+unstable behavior.  If it is disabled, a warning is
+printed out.  Stability has been improved in version
+0.9.8 and so the feature has been re-enabled.
+.IP
+Multiple clients in threaded mode should be stable
+for the ZRLE encoding on all platforms.  The Tight and
+Zlib encodings are currently only stable on Linux for
+multiple clients.  Compile with \fB-DTLS=__thread\fR if your
+OS and compiler and linker support it.
+.IP
+Multiple clients in threaded mode could yield better
+performance for 'class-room' broadcasting usage.
+See also the \fB-reflect\fR option.
 .PP
 \fB-fs\fR \fIf\fR
 .IP
@@ -4612,6 +4631,11 @@ is x11vnc doing wireframing, or an X display that does
 wireframing that gives much better response than opaque
 window dragging.  Consider the \fB-nodragging\fR option if
 the problem is severe.
+.IP
+The env. var. X11VNC_REFLECT_PASSWORD can be set to
+the password needed to log into the vnc host server, or
+to "file:path_to_file" to indicate a file containing
+the password as its first line.
 .IP
 The VNC HOST mode implies \fB-shared.\fR  Use \fB-noshared\fR as
 a subsequent cmdline option to disable sharing.

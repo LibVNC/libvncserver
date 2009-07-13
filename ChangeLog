@@ -1,3 +1,16 @@
+2009-05-21  Karl Runge <runge@karlrunge.com>
+	* configure.ac: check for __thread.
+	* libvncserver/main.c, libvncserver/rfbserver.c: various
+	  thread safe corrections including sendMutex guard.
+	* libvncserver/zrle.c, libvncserver/zrleencodetemplate.c:
+	  thread safety via per-client buffers.
+	* libvncserver/tight.c, libvncserver/zlib.c: thread safety
+	  corrections via thread local storage using __thread.
+	* rfb/rfb.h: new members for threaded usage.
+	* tightvnc-filetransfer/rfbtightserver.c: fix (currently disabled)
+	  for tight security type for RFB 3.8 (debian bug 517422.)
+	  NEEDS AUDIT.
+
 2009-03-12  Johannes E. Schindelin  <Johannes.Schindelin@gmx.de>
 	* client_examples/SDLvncviewer.c: support mouse wheel operations
 

@@ -941,6 +941,7 @@ if (db24 > 2) fprintf(stderr, "avoid bad match...\n");
 	xi_r = XGetSubImage(dpy, win, xo, yo, w, 1, AllPlanes, ZPixmap, xi,
 	    0, 0);
 	XSetErrorHandler(old_handler);
+
 	X_UNLOCK;
 
 	if (! xi_r || trapped_xerror) {
@@ -1664,6 +1665,7 @@ if (db24 > 1) fprintf(stderr, "skipping due to potential bad match...\n");
 		    ZPixmap, xi, 0, 0);
 #endif
 		XSetErrorHandler(old_handler);
+
 		X_UNLOCK;
 
 		if (! xi_r || trapped_xerror) {
@@ -2100,7 +2102,7 @@ void mark_8bpp(int mode) {
 		}
 		if (windows_8bpp[i].map_state != IsViewable) {
 			XWindowAttributes attr;
-			int vw;
+			int vw = 0;
 
 			X_LOCK;
 			vw = valid_window(windows_8bpp[i].win, &attr, 1);

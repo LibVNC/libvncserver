@@ -2480,6 +2480,14 @@ int main(int argc, char* argv[]) {
 			}
 			continue;
 		}
+		if (strstr(arg, "-nounixpw") == arg) {
+			unixpw = 0;
+			unixpw_nis = 0;
+			if (unixpw_list) {
+				unixpw_list = NULL;
+			}
+			continue;
+		}
 		if (!strcmp(arg, "-vencrypt")) {
 			char *s;
 			CHECK_ARGC
@@ -3523,6 +3531,9 @@ int main(int argc, char* argv[]) {
 #else
 			if (getenv("X11VNC_THREADED")) {
 				use_threads = 1;
+			} else if (1) {
+				/* we re-enable it due to threaded mode bugfixes. */
+				use_threads = 1;
 			} else {
 				rfbLog("\n");
 				rfbLog("The -threads mode is unstable and not tested or maintained.\n");
@@ -4341,7 +4352,7 @@ int main(int argc, char* argv[]) {
 				}
 			}
 		}
-		if (use_threads) {
+		if (use_threads && !getenv("UNIXPW_THREADS")) {
 			if (! quiet) {
 				rfbLog("disabling -threads under -unixpw\n");
 			}
@@ -4524,6 +4535,7 @@ int main(int argc, char* argv[]) {
 
 	X_INIT;
 	SCR_INIT;
+	CLIENT_INIT;
 	
 	/* open the X display: */
 	if (auth_file) {
@@ -4792,6 +4804,11 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	if (! quiet && xdamage_present && use_xdamage && ! raw_fb_str) {
 		rfbLog("X DAMAGE available on display, using it for polling hints.\n");
 		rfbLog("  To disable this behavior use: '-noxdamage'\n");
+		rfbLog("\n");
+		rfbLog("  Most compositing window managers like 'compiz' or 'beryl'\n");
+		rfbLog("  cause X DAMAGE to fail, and so you may not see any screen\n");
+		rfbLog("  updates via VNC.  Either disable 'compiz' (recommended) or\n");
+		rfbLog("  supply the x11vnc '-noxdamage' command line option.\n");
 	}
 
 	if (! quiet && wireframe && ! raw_fb_str) {

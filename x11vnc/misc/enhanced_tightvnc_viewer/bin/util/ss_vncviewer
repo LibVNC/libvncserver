@@ -46,8 +46,8 @@
 # -showcert  Only fetch the certificate using the 'openssl s_client'
 #            command (openssl(1) must in installed).
 #
-#    See http://www.karlrunge.com/x11vnc/#faq-ssl-ca for details on SSL
-#    certificates with VNC.
+#    See http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-ca for details on
+#    SSL certificates with VNC.
 #
 # A few other args (not related to SSL and certs):
 #
@@ -115,6 +115,15 @@
 #
 VNCIPCMD=${VNCVIEWERCMD:-vncip}
 VNCVIEWERCMD=${VNCVIEWERCMD:-vncviewer}
+if [ "X$SSVNC_TURBOVNC" != "X" ]; then
+	if echo "$VNCVIEWERCMD" | grep '\.turbovnc' > /dev/null; then
+		:
+	else
+		if type "$VNCVIEWERCMD.turbovnc" > /dev/null 2>/dev/null; then
+			VNCVIEWERCMD="$VNCVIEWERCMD.turbovnc"
+		fi
+	fi
+fi
 #
 # Same for STUNNEL, e.g. set it to /path/to/stunnel or stunnel4, etc.
 #
@@ -267,6 +276,12 @@ do
 	"-scale")	shift; SSVNC_SCALE="$1"; export SSVNC_SCALE
                 ;;
 	"-onelisten")	SSVNC_LISTEN_ONCE=1; export SSVNC_LISTEN_ONCE
+                ;;
+	"-sendclipboard")	VNCVIEWER_SEND_CLIPBOARD=1; export VNCVIEWER_SEND_CLIPBOARD
+                ;;
+	"-sendalways")	VNCVIEWER_SEND_ALWAYS=1; export VNCVIEWER_SEND_ALWAYS
+                ;;
+	"-recvtext")	shift; VNCVIEWER_RECV_TEXT="$1"; export VNCVIEWER_RECV_TEXT
                 ;;
 	"-escape")	shift; VNCVIEWER_ESCAPE="$1"; export VNCVIEWER_ESCAPE
                 ;;
@@ -749,6 +764,19 @@ my $rfbVencryptX509Plain    = 262;
 my $handshake_file = "";
 if (exists $ENV{SSVNC_PREDIGESTED_HANDSHAKE})  {
 	$handshake_file = $ENV{SSVNC_PREDIGESTED_HANDSHAKE};
+}
+
+my $have_gettimeofday = 0;
+eval "use Time::HiRes";
+if ($@ eq "") {
+	$have_gettimeofday = 1;
+}
+sub gettime {
+	my $t = "0.0";
+	if ($have_gettimeofday) {
+		$t = Time::HiRes::gettimeofday();
+	}
+	return $t;
 }
 
 sub append_handshake {
@@ -1324,12 +1352,19 @@ sub vencrypt_dialog {
 	} elsif ($minor == 7) {
 		$viewer_rfb = "RFB 003.007\n";
 	}
-	syswrite($sock, $viewer_rfb, 12);
-	append_handshake("viewer=$viewer_rfb");
-
 	my $nsec;
+	my $t1 = gettime();
+	my $t0 = gettime();
 
+	syswrite($sock, $viewer_rfb, 12);
 	sysread($sock, $nsec, 1);
+
+	$t1 = gettime();
+	$t1 = sprintf("%.6f", $t1 - $t0);
+
+	append_handshake("viewer=$viewer_rfb");
+	append_handshake("latency=$t1\n");
+
 	vdie if $nsec eq "";
 
 	$nsec = unpack("C", $nsec);

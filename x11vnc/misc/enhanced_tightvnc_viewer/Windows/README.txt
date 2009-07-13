@@ -37,7 +37,7 @@ and also:
 
 You can use x11vnc to create certificates if you like:
 
-	http://www.karlrunge.com/x11vnc/#faq-ssl-ca
+	http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-ca
 
 
 Misc:

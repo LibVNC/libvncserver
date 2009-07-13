@@ -929,12 +929,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			ok = 1;
 		}
 		if (ok) {
+			X_LOCK;
 			if (twin && ! valid_window(twin, NULL, 0)) {
-				rfbLog("skipping invalid sub-window: 0x%lx\n",
-				    twin);
+				rfbLog("skipping invalid sub-window: 0x%lx\n", twin);
+				X_UNLOCK;
 			} else {
 				subwin = twin;
 				rootshift = 0;
+				X_UNLOCK;
 				check_black_fb();
 				do_new_fb(1);
 			}
@@ -968,12 +970,14 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			ok = 1;
 		}
 		if (ok) {
+			X_LOCK;
 			if (twin && ! valid_window(twin, NULL, 0)) {
-				rfbLog("skipping invalid sub-window: 0x%lx\n",
-				    twin);
+				rfbLog("skipping invalid sub-window: 0x%lx\n", twin);
+				X_UNLOCK;
 			} else {
 				subwin = twin;
 				rootshift = 1;
+				X_UNLOCK;
 				check_black_fb();
 				do_new_fb(1);
 			}
@@ -2394,7 +2398,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: enabling -clear_mods mode.\n");
 		clear_mods = 1;
+		if (use_threads) {X_LOCK;}
 		clear_modifiers(0);
+		if (use_threads) {X_UNLOCK;}
 		goto done;
 	}
 	if (!strcmp(p, "noclear_mods")) {
@@ -2415,7 +2421,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: enabling -clear_keys mode.\n");
 		clear_mods = 2;
+		if (use_threads) {X_LOCK;}
 		clear_keys();
+		if (use_threads) {X_UNLOCK;}
 		goto done;
 	}
 	if (!strcmp(p, "noclear_keys")) {
@@ -2436,14 +2444,18 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		rfbLog("remote_cmd: doing clear_all action.\n");
 		clear_mods = 3;
+		if (use_threads) {X_LOCK;}
 		clear_keys();
 		clear_locks();
+		if (use_threads) {X_UNLOCK;}
 		goto done;
 	}
 	if (!strcmp(p, "clear_locks")) {
 		NOTAPP
 		rfbLog("remote_cmd: doing clear_locks action.\n");
+		if (use_threads) {X_LOCK;}
 		clear_locks();
+		if (use_threads) {X_UNLOCK;}
 		goto done;
 	}
 	if (!strcmp(p, "keystate")) {
@@ -2452,7 +2464,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		for (i=0; i<256; i++) {
 			state[i] = 0;
 		}
+		if (use_threads) {X_LOCK;}
 		get_keystate(state);
+		if (use_threads) {X_UNLOCK;}
 		for (i=0; i<256; i++) {
 			fprintf(stderr, "keystate[%03d] %d\n", i, state[i]);
 		}

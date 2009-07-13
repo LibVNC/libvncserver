@@ -73,8 +73,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2008-04-15 12:54:51.000000000 -0400
-@@ -0,0 +1,1456 @@
++++ vnc_javasrc/SSLSocketToMe.java	2009-06-19 10:23:50.000000000 -0400
+@@ -0,0 +1,1726 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -130,6 +130,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +	public DataInputStream is = null;
 +	public OutputStream os = null;
 +
++	String proxy_auth_string = null;
 +	String proxy_dialog_host = null;
 +	int proxy_dialog_port = 0;
 +
@@ -648,9 +649,9 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +				user_wants_to_see_cert = false;
 +			} else {
 +				bcd = new BrowserCertsDialog(serv, host + ":" + port);
-+				dbg("bcd START");
++				dbg("browser certs dialog START");
 +				bcd.queryUser();
-+				dbg("bcd DONE");
++				dbg("browser certs dialog DONE");
 +				if (bcd.showCertDialog) {
 +					String msg = "user wants to see cert";
 +					dbg(msg);
@@ -658,14 +659,17 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					throw new SSLHandshakeException(msg);
 +				} else {
 +					user_wants_to_see_cert = false;
-+					dbg("bcd: user said yes, accept it");
++					dbg("browser certs dialog: user said yes, accept it");
 +				}
 +			}
 +
 +		} catch (SSLHandshakeException eh)  {
 +			dbg("Could not automatically verify Server.");
 +			dbg("msg: " + eh.getMessage());
++			String getoutstr = "GET /index.vnc HTTP/1.0\r\nConnection: close\r\n\r\n";
 +
++    			OutputStream os = socket.getOutputStream();
++			os.write(getoutstr.getBytes());
 +			socket.close();
 +			socket = null;
 +
@@ -701,6 +705,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					 * close socket now, we will reopen after
 +					 * dialog if user agrees to use the cert.
 +					 */
++    					os = socket.getOutputStream();
++					os.write(getoutstr.getBytes());
 +					socket.close();
 +					socket = null;
 +
@@ -720,6 +726,15 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +				dbg("** Could not TrustAll Verify Server.");
 +
 +				throw new IOException(ehand2.getMessage());
++			}
++
++			if (socket != null) {
++				try {
++					socket.close();
++				} catch (Exception e) {
++					;
++				}
++				socket = null;
 +			}
 +
 +			/*
@@ -806,6 +821,95 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		return n;
 +	}
 +
++	private void proxy_helper(String proxyHost, int proxyPort) {
++
++		boolean proxy_auth = false;
++		String proxy_auth_basic_realm = "";
++		String hp = host + ":" + port;
++		dbg("proxy_helper: " + proxyHost + ":" + proxyPort + " hp: " + hp);
++
++		for (int k=0; k < 2; k++) {
++			dbg("proxy_in_use psocket:");
++
++			if (proxySock != null) {
++				try {
++					proxySock.close();
++				} catch (Exception e) {
++					;
++				}
++			}
++
++			proxySock = psocket(proxyHost, proxyPort);
++			if (proxySock == null) {
++				dbg("1-a sadly, returning a null socket");
++				return;
++			}
++
++			String req1 = "CONNECT " + hp + " HTTP/1.1\r\n"
++			    + "Host: " + hp + "\r\n";
++
++			dbg("requesting: " + req1);
++
++			if (proxy_auth) {
++				if (proxy_auth_string == null) {
++					ProxyPasswdDialog pp = new ProxyPasswdDialog(proxyHost, proxyPort, proxy_auth_basic_realm);
++					pp.queryUser();
++					proxy_auth_string = pp.getAuth();
++				}
++				//dbg("auth1: " + proxy_auth_string);
++				String auth2 = Base64Coder.encodeString(proxy_auth_string);
++				//dbg("auth2: " + auth2);
++				req1 += "Proxy-Authorization: Basic " + auth2 + "\r\n";
++				//dbg("req1: " + req1);
++				dbg("added Proxy-Authorization: Basic ... to request");
++			}
++			req1 += "\r\n";
++
++			try {
++				proxy_os.write(req1.getBytes());
++				String reply = readline(proxy_is);
++
++				dbg("proxy replied: " + reply.trim());
++
++				if (reply.indexOf("HTTP/1.") == 0 && reply.indexOf(" 407 ") > 0) {
++					proxy_auth = true;
++					proxySock.close();
++				} else if (reply.indexOf("HTTP/1.") < 0 && reply.indexOf(" 200") < 0) {
++					proxySock.close();
++					proxySock = psocket(proxyHost, proxyPort);
++					if (proxySock == null) {
++						dbg("2-a sadly, returning a null socket");
++						return;
++					}
++				}
++			} catch(Exception e) {
++				dbg("sock prob: " + e.getMessage());
++			}
++
++			while (true) {
++				String line = readline(proxy_is);
++				dbg("proxy line: " + line.trim());
++				if (proxy_auth) {
++					String uc = line.toLowerCase();
++					if (uc.indexOf("proxy-authenticate:") == 0) {
++						if (uc.indexOf(" basic ") >= 0) {
++							int idx = uc.indexOf(" realm");
++							if (idx >= 0) {
++								proxy_auth_basic_realm = uc.substring(idx+1);
++							}
++						}
++					}
++				}
++				if (line.equals("\r\n") || line.equals("\n")) {
++					break;
++				}
++			}
++			if (!proxy_auth || proxy_auth_basic_realm.equals("")) {
++				break;
++			}
++		}
++	}
++
 +	public SSLSocket proxy_socket(SSLSocketFactory factory) {
 +		Properties props = null;
 +		String proxyHost = null;
@@ -820,7 +924,16 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		} catch (Exception e) {
 +			dbg("props failed: " + e.getMessage());
 +		}
-+		if (props != null) {
++		if (viewer.proxyHost != null) {
++			dbg("Using supplied proxy " + viewer.proxyHost + " " + viewer.proxyPort + " applet parameters.");
++			proxyHost = viewer.proxyHost;
++			if (viewer.proxyPort != null) {
++				proxyPort = gint(viewer.proxyPort);
++			} else {
++				proxyPort = 8080;
++			}
++			
++		} else if (props != null) {
 +			dbg("\n---------------\nAll props:");
 +			props.list(System.out);
 +			dbg("\n---------------\n\n");
@@ -912,43 +1025,9 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +				dbg("User said host: " + pd.getHost() + " port: " + pd.getPort());
 +			}
 +
-+			dbg("proxy_in_use psocket:");
-+			proxySock = psocket(proxyHost, proxyPort);
++			proxy_helper(proxyHost, proxyPort);
 +			if (proxySock == null) {
-+				dbg("1-a sadly, returning a null socket");
 +				return null;
-+			}
-+			String hp = host + ":" + port;
-+
-+			String req1 = "CONNECT " + hp + " HTTP/1.1\r\n"
-+			    + "Host: " + hp + "\r\n\r\n";
-+
-+			dbg("requesting1: " + req1);
-+
-+			try {
-+				proxy_os.write(req1.getBytes());
-+				String reply = readline(proxy_is);
-+
-+				dbg("proxy replied1: " + reply.trim());
-+
-+				if (reply.indexOf("HTTP/1.") < 0 && reply.indexOf(" 200") < 0) {
-+					proxySock.close();
-+					proxySock = psocket(proxyHost, proxyPort);
-+					if (proxySock == null) {
-+						dbg("2-a sadly, returning a null socket");
-+						return null;
-+					}
-+				}
-+			} catch(Exception e) {
-+				dbg("sock prob1: " + e.getMessage());
-+			}
-+
-+			while (true) {
-+				String line = readline(proxy_is);
-+				dbg("proxy line1: " + line.trim());
-+				if (line.equals("\r\n") || line.equals("\n")) {
-+					break;
-+				}
 +			}
 +		} else if (viewer.CONNECT != null) {
 +			dbg("viewer.CONNECT psocket:");
@@ -991,7 +1070,6 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					break;
 +				}
 +			}
-+			
 +		}
 +
 +		Socket sslsock = null;
@@ -1351,6 +1429,77 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +	}
 +}
 +
++class ProxyPasswdDialog implements ActionListener {
++	String guessedHost = null;
++	String guessedPort = null;
++	String guessedUser = null;
++	String guessedPasswd = null;
++	String realm = null;
++	/*
++	 * this is the gui to show the user the cert and info and ask
++	 * them if they want to continue using this cert.
++	 */
++
++	Button ok;
++	Dialog dialog;
++	TextField entry1;
++	TextField entry2;
++	String reply1 = "";
++	String reply2 = "";
++
++	ProxyPasswdDialog (String h, int p, String realm) {
++		guessedHost = h;
++		try {
++			guessedPort = Integer.toString(p);
++		} catch (Exception e) {
++			guessedPort = "8080";
++		}
++		this.realm = realm;
++	}
++
++	public void queryUser() {
++
++		/* create and display the dialog for unverified cert. */
++
++		Frame frame = new Frame("Proxy Requires Username and Password");
++
++		dialog = new Dialog(frame, true);
++
++		//Label label = new Label("Please Enter your Web Proxy Username in the top Entry and Password in the bottom Entry", Label.CENTER);
++		TextArea label = new TextArea("Please Enter your Web Proxy\nUsername in the Top Entry and\nPassword in the Bottom Entry,\nand then press OK.", 4, 20, TextArea.SCROLLBARS_NONE);
++		entry1 = new TextField(30);
++		entry2 = new TextField(30);
++		entry2.setEchoChar('*');
++		ok = new Button("OK");
++		ok.addActionListener(this);
++
++		dialog.setLayout(new BorderLayout());
++		dialog.add("North", label);
++		dialog.add("Center", entry1);
++		dialog.add("South",  entry2);
++		dialog.add("East", ok);
++		dialog.pack();
++		dialog.resize(dialog.preferredSize());
++
++		dialog.show();	/* block here til OK or Cancel pressed. */
++		return;
++	}
++
++	public String getAuth() {
++		return reply1 + ":" + reply2;
++	}
++
++	public synchronized void actionPerformed(ActionEvent evt) {
++		System.out.println(evt.getActionCommand());
++		if (evt.getSource() == ok) {
++			reply1 = entry1.getText();
++			reply2 = entry2.getText();
++			//dialog.dispose();
++			dialog.hide();
++		}
++	}
++}
++
 +class ClientCertDialog implements ActionListener {
 +
 +	Button ok;
@@ -1531,9 +1680,130 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		}
 +	}
 +}
++
++class Base64Coder {
++
++	// Mapping table from 6-bit nibbles to Base64 characters.
++	private static char[]    map1 = new char[64];
++	   static {
++	      int i=0;
++	      for (char c='A'; c<='Z'; c++) map1[i++] = c;
++	      for (char c='a'; c<='z'; c++) map1[i++] = c;
++	      for (char c='0'; c<='9'; c++) map1[i++] = c;
++	      map1[i++] = '+'; map1[i++] = '/'; }
++
++	// Mapping table from Base64 characters to 6-bit nibbles.
++	private static byte[]    map2 = new byte[128];
++	   static {
++	      for (int i=0; i<map2.length; i++) map2[i] = -1;
++	      for (int i=0; i<64; i++) map2[map1[i]] = (byte)i; }
++
++	/**
++	* Encodes a string into Base64 format.
++	* No blanks or line breaks are inserted.
++	* @param s  a String to be encoded.
++	* @return   A String with the Base64 encoded data.
++	*/
++	public static String encodeString (String s) {
++	   return new String(encode(s.getBytes())); }
++
++	/**
++	* Encodes a byte array into Base64 format.
++	* No blanks or line breaks are inserted.
++	* @param in  an array containing the data bytes to be encoded.
++	* @return    A character array with the Base64 encoded data.
++	*/
++	public static char[] encode (byte[] in) {
++	   return encode(in,in.length); }
++
++	/**
++	* Encodes a byte array into Base64 format.
++	* No blanks or line breaks are inserted.
++	* @param in   an array containing the data bytes to be encoded.
++	* @param iLen number of bytes to process in <code>in</code>.
++	* @return     A character array with the Base64 encoded data.
++	*/
++	public static char[] encode (byte[] in, int iLen) {
++	   int oDataLen = (iLen*4+2)/3;       // output length without padding
++	   int oLen = ((iLen+2)/3)*4;         // output length including padding
++	   char[] out = new char[oLen];
++	   int ip = 0;
++	   int op = 0;
++	   while (ip < iLen) {
++	      int i0 = in[ip++] & 0xff;
++	      int i1 = ip < iLen ? in[ip++] & 0xff : 0;
++	      int i2 = ip < iLen ? in[ip++] & 0xff : 0;
++	      int o0 = i0 >>> 2;
++	      int o1 = ((i0 &   3) << 4) | (i1 >>> 4);
++	      int o2 = ((i1 & 0xf) << 2) | (i2 >>> 6);
++	      int o3 = i2 & 0x3F;
++	      out[op++] = map1[o0];
++	      out[op++] = map1[o1];
++	      out[op] = op < oDataLen ? map1[o2] : '='; op++;
++	      out[op] = op < oDataLen ? map1[o3] : '='; op++; }
++	   return out; }
++
++	/**
++	* Decodes a string from Base64 format.
++	* @param s  a Base64 String to be decoded.
++	* @return   A String containing the decoded data.
++	* @throws   IllegalArgumentException if the input is not valid Base64 encoded data.
++	*/
++	public static String decodeString (String s) {
++	   return new String(decode(s)); }
++
++	/**
++	* Decodes a byte array from Base64 format.
++	* @param s  a Base64 String to be decoded.
++	* @return   An array containing the decoded data bytes.
++	* @throws   IllegalArgumentException if the input is not valid Base64 encoded data.
++	*/
++	public static byte[] decode (String s) {
++	   return decode(s.toCharArray()); }
++
++	/**
++	* Decodes a byte array from Base64 format.
++	* No blanks or line breaks are allowed within the Base64 encoded data.
++	* @param in  a character array containing the Base64 encoded data.
++	* @return    An array containing the decoded data bytes.
++	* @throws    IllegalArgumentException if the input is not valid Base64 encoded data.
++	*/
++	public static byte[] decode (char[] in) {
++	   int iLen = in.length;
++	   if (iLen%4 != 0) throw new IllegalArgumentException ("Length of Base64 encoded input string is not a multiple of 4.");
++	   while (iLen > 0 && in[iLen-1] == '=') iLen--;
++	   int oLen = (iLen*3) / 4;
++	   byte[] out = new byte[oLen];
++	   int ip = 0;
++	   int op = 0;
++	   while (ip < iLen) {
++	      int i0 = in[ip++];
++	      int i1 = in[ip++];
++	      int i2 = ip < iLen ? in[ip++] : 'A';
++	      int i3 = ip < iLen ? in[ip++] : 'A';
++	      if (i0 > 127 || i1 > 127 || i2 > 127 || i3 > 127)
++		 throw new IllegalArgumentException ("Illegal character in Base64 encoded data.");
++	      int b0 = map2[i0];
++	      int b1 = map2[i1];
++	      int b2 = map2[i2];
++	      int b3 = map2[i3];
++	      if (b0 < 0 || b1 < 0 || b2 < 0 || b3 < 0)
++		 throw new IllegalArgumentException ("Illegal character in Base64 encoded data.");
++	      int o0 = ( b0       <<2) | (b1>>>4);
++	      int o1 = ((b1 & 0xf)<<4) | (b2>>>2);
++	      int o2 = ((b2 &   3)<<6) |  b3;
++	      out[op++] = (byte)o0;
++	      if (op<oLen) out[op++] = (byte)o1;
++	      if (op<oLen) out[op++] = (byte)o2; }
++	   return out; }
++
++	// Dummy constructor.
++	private Base64Coder() {}
++
++}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2007-09-03 23:22:13.000000000 -0400
++++ vnc_javasrc/VncViewer.java	2009-06-19 10:32:03.000000000 -0400
 @@ -80,7 +80,7 @@
    // Variables read from parameter values.
    String socketFactory;
@@ -1543,7 +1813,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
    boolean showControls;
    boolean offerRelogin;
    boolean showOfflineDesktop;
-@@ -88,6 +88,17 @@
+@@ -88,6 +88,19 @@
    int deferCursorUpdates;
    int deferUpdateRequests;
  
@@ -1553,6 +1823,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +  String urlPrefix;
 +  String httpsPort;
 +  String oneTimeKey;
++  String proxyHost;
++  String proxyPort;
 +  boolean forceProxy;
 +  boolean ignoreProxy;
 +  boolean trustAllVncCerts;
@@ -1561,7 +1833,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
    // Reference to this applet for inter-applet communication.
    public static java.applet.Applet refApplet;
  
-@@ -591,8 +602,25 @@
+@@ -591,8 +604,25 @@
        }
      }
  
@@ -1589,7 +1861,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
  
      if (inAnApplet) {
        str = readParameter("Open New Window", false);
-@@ -626,6 +654,68 @@
+@@ -626,6 +656,96 @@
  
      // SocketFactory.
      socketFactory = readParameter("SocketFactory", false);
@@ -1636,15 +1908,43 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    }
 +
 +    forceProxy = false;
++    proxyHost = null;
++    proxyPort = null;
 +    str = readParameter("forceProxy", false);
-+    if (str != null && str.equalsIgnoreCase("Yes")) {
-+	forceProxy = true;
++    if (str != null) {
++	    if (str.equalsIgnoreCase("Yes")) {
++		forceProxy = true;
++	    } else if (str.equalsIgnoreCase("No")) {
++		forceProxy = false;
++	    } else {
++		forceProxy = true;
++		String[] pieces = str.split(" ");
++		proxyHost = new String(pieces[0]);
++		if (pieces.length >= 2) {
++			proxyPort = new String(pieces[1]);
++		} else {
++			proxyPort = new String("8080");
++		}
++	    }
 +    }
++    str = readParameter("proxyHost", false);
++    if (str != null) {
++	proxyHost = new String(str);
++    }
++    str = readParameter("proxyPort", false);
++    if (str != null) {
++	proxyPort = new String(str);
++    }
++    if (proxyHost != null && proxyPort == null) {
++    	proxyPort = new String("8080");
++    }
++
 +    ignoreProxy = false;
 +    str = readParameter("ignoreProxy", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +	ignoreProxy = true;
 +    }
++
 +    trustAllVncCerts = false;
 +    str = readParameter("trustAllVncCerts", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {

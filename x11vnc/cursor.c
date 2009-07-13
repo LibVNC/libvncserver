@@ -897,8 +897,6 @@ static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 
 	RAWFB_RET_VOID
 
-	X_LOCK;
-
 	if (!strcmp(s, "default") || !strcmp(s, "X") || !strcmp(s, "arrow")) {
 		nm_info = 0;
 	}
@@ -977,8 +975,6 @@ static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 
 	XSetErrorHandler(old_handler);
 	trapped_xerror = 0;
-
-	X_UNLOCK;
 
 	*depth = descend;
 	*w = wins[descend];
@@ -1522,7 +1518,7 @@ int get_which_cursor(void) {
 	int db = 0;
 
 	if (show_multiple_cursors) {
-		int depth = 0;
+		int depth = 0, rint;
 		static win_str_info_t winfo;
 		static int first = 1, depth_cutoff = -1;
 		Window win = None;
@@ -1550,12 +1546,14 @@ int get_which_cursor(void) {
 		}
 
 		if (rawfb_vnc_reflect && mode > -1) {
-			return get_exact_cursor(0);
+			rint = get_exact_cursor(0);
+			return rint;
 		}
 		if (mode == 3) {
 			if ((xfixes_present && use_xfixes) || macosx_console) {
 				if (db) fprintf(stderr, "get_which_cursor call get_exact_cursor\n");
-				return get_exact_cursor(0);
+				rint = get_exact_cursor(0);
+				return rint;
 			}
 		}
 
@@ -1575,7 +1573,9 @@ int get_which_cursor(void) {
 		}
 		first = 0;
 		
+		X_LOCK;
 		tree_descend_cursor(&depth, &win, &winfo);
+		X_UNLOCK;
 
 		if (depth <= depth_cutoff && !subwin) {
 			which = CURS_ROOT;
@@ -1939,7 +1939,7 @@ int check_x11_pointer(void) {
 	Window root_w, child_w;
 	rfbBool ret = 0;
 	int root_x, root_y, win_x, win_y;
-	int x, y;
+	int x, y, rint;
 	unsigned int mask;
 
 	if (unixpw_in_progress) return 0;
@@ -2006,6 +2006,7 @@ if (0) fprintf(stderr, "check_x11_pointer %d %d\n", root_x, root_y);
 	cursor_position(x, y);
 
 	/* change the cursor shape if necessary */
-	return set_cursor(x, y, get_which_cursor());
+	rint = set_cursor(x, y, get_which_cursor());
+	return rint;
 }
 
