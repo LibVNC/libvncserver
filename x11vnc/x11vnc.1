@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "July 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "August 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-07-11
+         version: 0.9.9, lastmod: 2009-08-10
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -347,8 +347,8 @@ is needed for the latter, feel free to ask).
 \fB-scale\fR \fIfraction\fR
 .IP
 Scale the framebuffer by factor \fIfraction\fR.  Values
-less than 1 shrink the fb, larger ones expand it.  Note:
-image may not be sharp and response may be slower.
+less than 1 shrink the fb, larger ones expand it. Note:
+the image may not be sharp and response may be slower.
 If \fIfraction\fR contains a decimal point "." it
 is taken as a floating point number, alternatively
 the notation "m/n" may be used to denote fractions
@@ -568,7 +568,7 @@ is running as root (e.g. via
 Repeater mode: Some services provide an intermediate
 "vnc repeater": http://www.uvnc.com/addons/repeater.html
 (and also http://koti.mbnet.fi/jtko/ for linux port)
-that acts as a proxy / gateway.  Modes like these require
+that acts as a proxy/gateway.  Modes like these require
 an initial string to be sent for the reverse connection
 before the VNC protocol is started.  Here are the ways
 to do this:
@@ -871,14 +871,14 @@ full-access passwords)
 \fB-unixpw\fR \fI[list]\fR
 .IP
 Use Unix username and password authentication.  x11vnc
-uses the 
+will use the 
 .IR su (1)
-program to verify the user's password.
-[list] is an optional comma separated list of allowed
-Unix usernames.  If the [list] string begins with the
-character "!" then the entire list is taken as an
-exclude list.  See below for per-user options that can
-be applied.
+program to verify the user's
+password.  [list] is an optional comma separated list
+of allowed Unix usernames.  If the [list] string begins
+with the character "!" then the entire list is taken
+as an exclude list.  See below for per-user options
+that can be applied.
 .IP
 A familiar "login:" and "Password:" dialog is
 presented to the user on a black screen inside the
@@ -896,8 +896,9 @@ Since the detailed behavior of
 .IR su (1)
 can vary from
 OS to OS and for local configurations, test the mode
-carefully.  x11vnc will attempt to be conservative and
-reject a login if anything abnormal occurs.
+before deployment to make sure it is working properly.
+x11vnc will attempt to be conservative and reject a
+login if anything abnormal occurs.
 .IP
 One case to note: FreeBSD and the other BSD's by
 default it is impossible for the user running x11vnc to
@@ -932,7 +933,7 @@ Method 2) requires the viewer connection to appear
 to come from the same machine x11vnc is running on
 (e.g. from a ssh \fB-L\fR port redirection).  And that the
 \fB-stunnel\fR SSL mode be used for encryption over the
-network.(see the description of \fB-stunnel\fR below).
+network. (see the description of \fB-stunnel\fR below).
 .IP
 Note: as a convenience, if you 
 .IR ssh (1)
@@ -966,7 +967,7 @@ local connections from that machine are accepted).
 Set UNIXPW_DISABLE_LOCALHOST=1 to disable the \fB-localhost\fR
 requirement in Method 2).  One should never do this
 (i.e. allow the Unix passwords to be sniffed on the
-network).
+network.)
 .IP
 Regarding reverse connections (e.g. \fB-R\fR connect:host
 and \fB-connect\fR host), when the \fB-localhost\fR constraint is
@@ -984,7 +985,7 @@ Tip: you can also have your own stunnel spawn x11vnc
 in \fB-inetd\fR mode (thereby bypassing inetd).  See the FAQ
 for details.
 .IP
-The user names in the comma separated [list] can have
+The user names in the comma separated [list] may have
 per-user options after a ":", e.g. "fred:opts"
 where "opts" is a "+" separated list of
 "viewonly", "fullaccess", "input=XXXX", or
@@ -992,13 +993,13 @@ where "opts" is a "+" separated list of
 For "input=" it is the K,M,B,C described under \fB-input.\fR
 .IP
 If an item in the list is "*" that means those
-options apply to all users.  It also means all users
+options apply to all users.  It ALSO implies all users
 are allowed to log in after supplying a valid password.
 Use "deny" to explicitly deny some users if you use
-"*" to set a global option.  If [list] begins with
-the "!" character then "*" is ignored for checking
-if the user is allowed, but the any value of options
-associated with it does apply as normal.
+"*" to set a global option.  If [list] begins with the
+"!" character then "*" is ignored for checking if
+the user is allowed, but the option values associated
+with it do apply as normal.
 .IP
 There are also some utilities for testing password
 if [list] starts with the "%" character.  See the
@@ -1032,18 +1033,27 @@ user can authenticate ANY user.
 NIS is not required for this mode to work (only that
 .IR getpwnam (3)
 return the encrypted password is required),
-but it is unlikely it will work for any most modern
-environments unless x11vnc is run as root to be able
-to access /etc/shadow (note running as root is often
-done when running x11vnc from inetd and xdm/gdm/kdm).
+but it is unlikely it will work (as an ordinary user)
+for most modern environments unless NIS is available.
+On the other hand, when x11vnc is run as root it will
+be able to to access /etc/shadow even if NIS is not
+available (note running as root is often done when
+running x11vnc from inetd and xdm/gdm/kdm).
 .IP
 Looked at another way, if you do not want to use the
 .IR su (1)
-method provided by \fB-unixpw,\fR you can run x11vnc
-as root and use \fB-unixpw_nis.\fR  Any users with passwords
-in /etc/shadow can then be authenticated.  You may want
-to use \fB-users\fR unixpw= to switch the process user after
-the user logs in.
+method provided by \fB-unixpw\fR (i.e. su_verify()), you
+can run x11vnc as root and use \fB-unixpw_nis.\fR  Any users
+with passwords in /etc/shadow can then be authenticated.
+.IP
+In \fB-unixpw_nis\fR mode, under no circumstances is x11vnc's
+user password verifying function based on su called
+(i.e. the function su_verify() that runs /bin/su
+in a pseudoterminal to verify passwords.)  However,
+if \fB-unixpw_nis\fR is used in conjunction with the \fB-find\fR
+and \fB-create\fR \fB-display\fR WAIT:... modes then, if x11vnc is
+running as root, /bin/su may be called externally to
+run the find or create commands.
 .PP
 \fB-unixpw_cmd\fR \fIcmd\fR
 .IP
@@ -1051,18 +1061,66 @@ As \fB-unixpw\fR above, however do not use
 .IR su (1)
 but rather
 run the externally supplied command \fIcmd\fR.  The first
-line of its stdin will the username and the second line
-the received password.  If the command exits with status
-0 (success) the VNC client will be accepted.  It will be
-rejected for any other return status.
+line of its stdin will be the username and the second
+line the received password.  If the command exits
+with status 0 (success) the VNC user will be accepted.
+It will be rejected for any other return status.
 .IP
-Dynamic passwords and non-unix passwords can be
-implemented this way by providing your own custom helper
-program.  Note that under unixpw mode the remote viewer
-is given 3 tries to enter the correct password.
+Dynamic passwords and non-unix passwords, e.g. LDAP,
+can be implemented this way by providing your own custom
+helper program.  Note that the remote viewer is given 3
+tries to enter the correct password, and so the program
+may be called in a row that many (or more) times.
 .IP
-If a list of allowed users is needed use \fB-unixpw\fR [list]
-in addition to this option.
+If a list of allowed users is needed to limit who can
+log in, use \fB-unixpw\fR [list] in addition to this option.
+.IP
+In FINDDISPLAY and FINDCREATEDISPLAY modes the \fIcmd\fR
+will also be run with the RFB_UNIXPW_CMD_RUN env. var.
+non-empty and set to the corresponding display
+find/create command.  The first two lines of input are
+the username and passwd as in the normal case described
+above.  To support FINDDISPLAY and FINDCREATEDISPLAY,
+\fIcmd\fR should run the requested command as the user
+(and most likely refusing to run it if the password is
+not correct.)  Here is an example script (note it has
+a hardwired bogus password "abc"!)
+.IP
+#!/bin/sh
+# Example x11vnc \fB-unixpw_cmd\fR script.
+# Read the first two lines of stdin (user and passwd)
+read user
+read pass
+.IP
+debug=0
+if [ $debug = 1 ]; then
+echo "user: $user" 1>&2
+echo "pass: $pass" 1>&2
+env | egrep \fB-i\fR 'rfb|vnc' 1>&2
+fi
+.IP
+# Check if the password is valid.
+# (A real example would use ldap lookup, etc!)
+if [ "X$pass" != "Xabc" ]; then
+exit 1	# incorrect password
+fi
+.IP
+if [ "X$RFB_UNIXPW_CMD_RUN" = "X" ]; then
+exit 0	# correct password
+else
+# Run the requested command (finddisplay)
+if [ $debug = 1 ]; then
+echo "run: $RFB_UNIXPW_CMD_RUN" 1>&2
+fi
+exec /bin/su - "$user" \fB-c\fR "$RFB_UNIXPW_CMD_RUN"
+fi
+.IP
+In \fB-unixpw_cmd\fR mode, under no circumstances is x11vnc's
+user password verifying function based on su called
+(i.e. the function su_verify() that runs /bin/su in a
+pseudoterminal to verify passwords.)  It is up to the
+supplied unixpw_cmd to do user switching if desired
+and if it has the permissions to do so.
 .PP
 \fB-find\fR
 .IP
@@ -1214,9 +1272,15 @@ xauthority data for the display. For example;
 .IP
 xauth extract - $DISPLAY"
 .IP
-In the case of \fB-unixpw\fR (but not \fB-unixpw_nis),\fR then the
-cmd= command is run as the user who just authenticated
-via the login and password prompt.
+In the case of \fB-unixpw\fR (and \fB-unixpw_nis\fR only if x11vnc
+is running as root), then the cmd= command is run
+as the user who just authenticated via the login and
+password prompt.
+.IP
+In the case of \fB-unixpw_cmd,\fR the commands will also be
+run as the logged-in user, as long as the user-supplied
+helper program supports RFB_UNIXPW_CMD_RUN (see the
+\fB-unixpw_cmd\fR option.)
 .IP
 Also in the case of \fB-unixpw,\fR the user logging in can
 place a colon at the end of her username and supply
@@ -5827,7 +5891,7 @@ max time in ms to wait for RFB client
 \fB-rfbauth\fR \fIpasswd-file\fR
 .IP
 use authentication on RFB protocol
-(use 'storepasswd' to create a password file)
+(use 'x11vnc \fB-storepasswd\fR pass file' to create a password file)
 .PP
 \fB-rfbversion\fR \fI3.x\fR
 .IP

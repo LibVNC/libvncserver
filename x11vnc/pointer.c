@@ -343,11 +343,22 @@ void update_x11_pointer_position(int x, int y) {
 	return;
 #else
 	int rc;
+	static int watch_dx_dy = -1;
 
 	RAWFB_RET_VOID
 
+	if (watch_dx_dy == -1) {
+		if (getenv("X11VNC_WATCH_DX_DY")) {
+			watch_dx_dy = 1;
+		} else {
+			watch_dx_dy = 0;
+		}
+	}
+
 	X_LOCK;
-	if (use_xwarppointer) {
+	if (watch_dx_dy && cursor_x == x && cursor_y == y) {
+		;
+	} else if (use_xwarppointer) {
 		/*
 		 * off_x and off_y not needed with XWarpPointer since
 		 * window is used:
