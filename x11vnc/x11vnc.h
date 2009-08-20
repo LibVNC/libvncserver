@@ -266,6 +266,8 @@ so, delete this exception statement from your version.
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <X11/extensions/XShm.h>
+#include <X11/Xmd.h>
+#include <X11/extensions/shmproto.h>
 #endif
 #if LIBVNCSERVER_HAVE_SHMAT
 #include <sys/ipc.h>
