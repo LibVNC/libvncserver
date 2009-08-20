@@ -266,8 +266,11 @@ so, delete this exception statement from your version.
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <X11/extensions/XShm.h>
+#ifdef LIBVNCSERVER_HAVE_X11_EXTENSIONS_SHMPROTO_H
+/* XShm.h was split into several headers as of xextproto 7.1.0 */
 #include <X11/Xmd.h>
 #include <X11/extensions/shmproto.h>
+#endif
 #endif
 #if LIBVNCSERVER_HAVE_SHMAT
 #include <sys/ipc.h>
