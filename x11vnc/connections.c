@@ -575,18 +575,57 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 	close_exec_fds();
 
 	if (output != NULL) {
-		FILE *ph = popen(cmd, "r");
+		FILE *ph;
 		char line[1024];
+		char *cmd2 = NULL;
+		char tmp[] = "/tmp/x11vnc-tmp.XXXXXX";
+		int deltmp = 0;
+
+		if (input != NULL) {
+			int tmp_fd = mkstemp(tmp);
+			if (tmp_fd < 0) {
+				rfbLog("mkstemp failed on: %s\n", tmp);
+				clean_up_exit(1);
+			}
+			write(tmp_fd, input, len);
+			close(tmp_fd);
+			deltmp = 1;
+			cmd2 = (char *) malloc(100 + strlen(tmp) + strlen(cmd));
+			sprintf(cmd2, "/bin/cat %s | %s", tmp, cmd);
+			
+			ph = popen(cmd2, "r");
+		} else {
+			ph = popen(cmd, "r");
+		}
 		if (ph == NULL) {
 			rfbLog("popen(%s) failed", cmd);
 			rfbLogPerror("popen");
 			clean_up_exit(1);
 		}
-		while (fgets(line, 1024, ph) != NULL) {
+		memset(line, 0, sizeof(line));
+		while (fgets(line, sizeof(line), ph) != NULL) {
+			int j, k = -1;
 			if (0) fprintf(stderr, "line: %s", line);
-			fprintf(output, "%s", line);
+			/* take care to handle embedded nulls */
+			for (j=0; j < sizeof(line); j++) {
+				if (line[j] != '\0') {
+					k = j;
+				}
+			}
+			if (k >= 0) {
+				write(fileno(output), line, k+1);
+			}
+			memset(line, 0, sizeof(line));
 		}
+
 		rc = pclose(ph);
+
+		if (cmd2 != NULL) {
+			free(cmd2);
+		}
+		if (deltmp) {
+			unlink(tmp);
+		}
 		goto got_rc;
 	} else if (input != NULL) {
 		FILE *ph = popen(cmd, "w");
@@ -790,7 +829,7 @@ void client_gone(rfbClientPtr client) {
 			free(userhost);
 		} else {
 			rfbLog("client_gone: using cmd: %s\n", client->host);
-			run_user_command(gone_cmd, client, "gone", NULL,0,NULL);
+			run_user_command(gone_cmd, client, "gone", NULL, 0, NULL);
 		}
 	}
 
