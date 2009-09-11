@@ -308,6 +308,9 @@ static void user2uid(char *user, uid_t *uid, gid_t *gid, char **name, char **hom
 			if (strstr(user2group[i], user) == user2group[i]) {
 				char *w = user2group[i] + strlen(user);
 				if (*w == '.') {
+#if (SMALL_FOOTPRINT > 2)
+					gotgroup = 0;
+#else
 					struct group* gr = getgrnam(++w);
 					if (! gr) {
 						rfbLog("Invalid group: %s\n", w);
@@ -320,6 +323,7 @@ static void user2uid(char *user, uid_t *uid, gid_t *gid, char **name, char **hom
 						did[i] = 1;
 					}
 					gotgroup = 1;
+#endif
 				}
 			}
 			i++;
@@ -761,7 +765,7 @@ static int switch_user_env(uid_t uid, gid_t gid, char *name, char *home, int fb_
 	return 0;
 #else
 	/*
-	 * OK tricky here, we need to free the shm... otherwise
+	 * OK, tricky here, we need to free the shm... otherwise
 	 * we won't be able to delete it as the other user...
 	 */
 	if (fb_mode == 1 && (using_shm && ! xform24to32)) {
@@ -773,11 +777,13 @@ static int switch_user_env(uid_t uid, gid_t gid, char *name, char *home, int fb_
 #if LIBVNCSERVER_HAVE_PWD_H
 	if (getpwuid(uid) != NULL && getenv("X11VNC_SINGLE_GROUP") == NULL) {
 		struct passwd *p = getpwuid(uid);
-		if (initgroups(p->pw_name, gid) == 0)  {
+		/* another possibility is p->pw_gid instead of gid */
+		if (setgid(gid) == 0 && initgroups(p->pw_name, gid) == 0)  {
 			grp_ok = 1;
 		} else {
 			rfbLogPerror("initgroups");
 		}
+		endgrent();
 	}
 #endif
 #endif
@@ -2235,12 +2241,58 @@ static char *get_usslpeer() {
 	return upeer;
 }
 
+static void do_try_switch(char *usslpeer, char *users_list_save) {
+	if (usslpeer) {
+		char *u = (char *) malloc(strlen(usslpeer+2));
+		sprintf(u, "+%s", usslpeer);
+		if (switch_user(u, 0)) {
+			rfbLog("sslpeer switched to user: %s\n", usslpeer);
+		} else {
+			rfbLog("sslpeer failed to switch to user: %s\n", usslpeer);
+		}
+		free(u);
+		
+	} else if (users_list_save && keep_unixpw_user) {
+		char *user = keep_unixpw_user;
+		char *u = (char *)malloc(strlen(user)+1); 
+
+		users_list = users_list_save;
+
+		u[0] = '\0';
+		if (!strcmp(users_list, "unixpw=")) {
+			sprintf(u, "+%s", user);
+		} else {
+			char *p, *str = strdup(users_list);
+			p = strtok(str + strlen("unixpw="), ",");
+			while (p) {
+				if (!strcmp(p, user)) {
+					sprintf(u, "+%s", user);
+					break;
+				}
+				p = strtok(NULL, ",");
+			}
+			free(str);
+		}
+		
+		if (u[0] == '\0') {
+			rfbLog("unixpw_accept skipping switch to user: %s (drc)\n", user);
+		} else if (switch_user(u, 0)) {
+			rfbLog("unixpw_accept switched to user: %s (drc)\n", user);
+		} else {
+			rfbLog("unixpw_accept failed to switch to user: %s (drc)\n", user);
+		}
+		free(u);
+	}
+}
+
 static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int created_disp, int db) {
 	char tmp[] = "/tmp/x11vnc-find_display.XXXXXX";
 	char line1[1024], line2[16384];
 	char *q, *usslpeer = NULL;
 	int n, nodisp = 0, saw_xdmcp = 0;
 	int tmp_fd = -1;
+	int internal_cmd = 0;
+	int tried_switch = 0;
 
 	memset(line1, 0, 1024);
 	memset(line2, 0, 16384);
@@ -2251,6 +2303,7 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 			return 0;
 		}
 	}
+	if (getenv("DEBUG_RUN_CMD")) db = 1;
 
 	/* only sets environment variables: */
 	run_user_command("", latest_client, "env", NULL, 0, NULL);
@@ -2265,7 +2318,11 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 	    strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 		char *nd = "";
 		char fdout[128];
+
+		internal_cmd = 1;
+
 		tmp_fd = mkstemp(tmp);
+
 		if (tmp_fd < 0) {
 			rfbLog("wait_for_client: open failed: %s\n", tmp);
 			rfbLogPerror("mkstemp");
@@ -2302,7 +2359,7 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 
 	rfbLog("wait_for_client: running: %s\n", cmd);
 
-	if (unixpw) {
+	if (unixpw && !unixpw_nis) {
 		int res = 0, k, j, i;
 		char line[18000];
 
@@ -2310,8 +2367,13 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 
 		if (keep_unixpw_user && keep_unixpw_pass) {
 			n = 18000;
-			res = su_verify(keep_unixpw_user,
-			    keep_unixpw_pass, cmd, line, &n, nodisp);
+			if (unixpw_cmd != NULL) {
+				res = unixpw_cmd_run(keep_unixpw_user,
+				    keep_unixpw_pass, cmd, line, &n, nodisp);
+			} else {
+				res = su_verify(keep_unixpw_user,
+				    keep_unixpw_pass, cmd, line, &n, nodisp);
+			}
 		}
 
 if (db) {fprintf(stderr, "line: "); write(2, line, n); write(2, "\n", 1); fprintf(stderr, "res=%d n=%d\n", res, n);}
@@ -2331,7 +2393,13 @@ if (db) {fprintf(stderr, "line: "); write(2, line, n); write(2, "\n", 1); fprint
 
 			findcreatedisplay = 1;
 
-			if (getuid() != 0) {
+			if (unixpw_cmd != NULL) {
+				/* let the external unixpw command do it: */
+				n = 18000;
+				close_exec_fds();
+				res = unixpw_cmd_run(keep_unixpw_user,
+				    keep_unixpw_pass, create_cmd, line, &n, nodisp);
+			} else if (getuid() != 0) {
 				/* if not root, run as the other user... */
 				n = 18000;
 				close_exec_fds();
@@ -2411,6 +2479,7 @@ if (db) fprintf(stderr, "line1: '%s'\n", line1);
 		}
 if (db) write(2, line, 100);
 if (db) fprintf(stderr, "\n");
+
 	} else {
 		FILE *p;
 		int rc;
@@ -2428,9 +2497,22 @@ if (db) fprintf(stderr, "\n");
 			p = popen(c, "r");
 			free(c);
 			
+		} else if (unixpw_nis && keep_unixpw_user) {
+			char *c;
+			if (getuid() == 0) {
+				c = (char *) malloc(strlen("su - '' -c \"")
+				    + strlen(keep_unixpw_user) + strlen(cmd) + 1 + 1);
+				sprintf(c, "su - '%s' -c \"%s\"", keep_unixpw_user, cmd);
+			} else {
+				c = strdup(cmd);
+			}
+			p = popen(c, "r");
+			free(c);
+			
 		} else {
 			p = popen(cmd, "r");
 		}
+
 		if (! p) {
 			rfbLog("wait_for_client: cmd failed: %s\n", cmd);
 			rfbLogPerror("popen");
@@ -2575,49 +2657,13 @@ fprintf(stderr, "\n");}
 		}
 	}
 
-	if (usslpeer) {
-		char *u = (char *) malloc(strlen(usslpeer+2));
-		sprintf(u, "+%s", usslpeer);
-		if (switch_user(u, 0)) {
-			rfbLog("sslpeer switched to user: %s\n", usslpeer);
-		} else {
-			rfbLog("sslpeer failed to switch to user: %s\n", usslpeer);
-		}
-		free(u);
-		
-	} else if (users_list_save && keep_unixpw_user) {
-		char *user = keep_unixpw_user;
-		char *u = (char *)malloc(strlen(user)+1); 
-
-		users_list = users_list_save;
-
-		u[0] = '\0';
-		if (!strcmp(users_list, "unixpw=")) {
-			sprintf(u, "+%s", user);
-		} else {
-			char *p, *str = strdup(users_list);
-			p = strtok(str + strlen("unixpw="), ",");
-			while (p) {
-				if (!strcmp(p, user)) {
-					sprintf(u, "+%s", user);
-					break;
-				}
-				p = strtok(NULL, ",");
-			}
-			free(str);
-		}
-		
-		if (u[0] == '\0') {
-			rfbLog("unixpw_accept skipping switch to user: %s\n", user);
-		} else if (switch_user(u, 0)) {
-			rfbLog("unixpw_accept switched to user: %s\n", user);
-		} else {
-			rfbLog("unixpw_accept failed to switch to user: %s\n", user);
-		}
-		free(u);
+	if (!tried_switch) {
+		do_try_switch(usslpeer, users_list_save);
+		tried_switch = 1;
 	}
 
 	if (unixpw) {
+		/* Some cleanup and messaging for -unixpw case: */
 		char str[32];
 
 		if (keep_unixpw_user && keep_unixpw_pass) {

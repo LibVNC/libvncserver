@@ -42,6 +42,7 @@ extern void unixpw_accept(char *user);
 extern void unixpw_deny(void);
 extern void unixpw_msg(char *msg, int delay);
 extern int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int nodisp);
+extern int unixpw_cmd_run(char *user, char *pass, char *cmd, char *line, int *n, int nodisp);
 extern int crypt_verify(char *user, char *pass);
 extern int cmd_verify(char *user, char *pass);
 extern int unixpw_verify(char *user, char *pass);

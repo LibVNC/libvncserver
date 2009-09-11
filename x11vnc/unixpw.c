@@ -96,6 +96,7 @@ void unixpw_accept(char *user);
 void unixpw_deny(void);
 void unixpw_msg(char *msg, int delay);
 int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int nodisp);
+int unixpw_cmd_run(char *user, char *pass, char *cmd, char *line, int *n, int nodisp);
 int crypt_verify(char *user, char *pass);
 int cmd_verify(char *user, char *pass);
 void unixpw_verify_screen(char *user, char *pass);
@@ -530,6 +531,82 @@ int crypt_verify(char *user, char *pass) {
 #endif	/* UNIXPW_CRYPT */
 }
 
+int unixpw_cmd_run(char *user, char *pass, char *cmd, char *line, int *n, int nodisp) {
+	int i, len, rc;
+	char *str;
+	FILE *out;
+
+	if (! user || ! pass) {
+		return 0;
+	}
+	if (! unixpw_cmd || *unixpw_cmd == '\0') {
+		return 0;
+	}
+
+	if (! scheck(user, 100, "username")) {
+		return 0;
+	}
+	if (! scheck(pass, 100, "password")) {
+		return 0;
+	}
+	if (! unixpw_list_match(user)) {
+		return 0;
+	}
+	if (cmd == NULL) {
+		cmd = "";
+	}
+
+	len = strlen(user) + 1 + strlen(pass) + 1 + 1;
+	str = (char *) malloc(len);
+	if (! str) {
+		return 0;
+	}
+	str[0] = '\0';
+	strcat(str, user);
+	strcat(str, "\n");
+	strcat(str, pass);
+	if (!strchr(pass, '\n')) {
+		strcat(str, "\n");
+	}
+
+	out = tmpfile();
+	if (out == NULL) {
+		rfbLog("unixpw_cmd_run tmpfile() failed.\n");
+		clean_up_exit(1);
+	}
+
+	set_env("RFB_UNIXPW_CMD_RUN", cmd);
+
+	rc = run_user_command(unixpw_cmd, unixpw_client, "cmd_verify",
+	    str, strlen(str), out);
+
+	set_env("RFB_UNIXPW_CMD_RUN", "");
+
+	for (i=0; i < len; i++) {
+		str[i] = '\0';
+	}
+	free(str);
+
+	fflush(out);
+	rewind(out);
+	for (i=0; i < (*n) - 1; i++) {
+		int c = fgetc(out);
+		if (c == EOF) {
+			break;
+		}
+		line[i] = (char) c;
+	}
+	fclose(out);
+	*n = i;
+
+	if (rc == 0) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+
 int cmd_verify(char *user, char *pass) {
 	int i, len, rc;
 	char *str;
@@ -602,6 +679,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 		set_db();
 		first = 0;
 	}
+	rfbLog("su_verify: '%s' for %s.\n", user, cmd ? "command" : "login");
 
 	if (! scheck(user, 100, "username")) {
 		return 0;
@@ -1043,7 +1121,7 @@ int unixpw_verify(char *user, char *pass) {
 			    " succeeded.\n", user);
 			ok = 1;
 		} else {
-			rfbLog("unixpw_verify: crypt_verify login for '%s'"
+			rfbLog("unixpw_verify: cmd_verify login for '%s'"
 			    " failed.\n", user);
 			usleep(3000*1000);
 			ok = 0;

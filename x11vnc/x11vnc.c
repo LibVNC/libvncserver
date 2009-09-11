@@ -2486,6 +2486,9 @@ int main(int argc, char* argv[]) {
 			if (unixpw_list) {
 				unixpw_list = NULL;
 			}
+			if (unixpw_cmd) {
+				unixpw_cmd = NULL;
+			}
 			continue;
 		}
 		if (!strcmp(arg, "-vencrypt")) {

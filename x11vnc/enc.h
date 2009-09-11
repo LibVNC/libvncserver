@@ -83,8 +83,8 @@ so, delete this exception statement from your version.
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA  or see <http://www.gnu.org/licenses/>.
  *
- *  In addition, as a special exception, Karl J. Runge
- *  gives permission to link the code of its release of x11vnc with the
+ *  In addition, as a special exception, Karl J. Runge gives permission
+ *  to link the code of its release of ultravnc_dsm_helper with the
  *  OpenSSL project's "OpenSSL" library (or with modified versions of it
  *  that use the same license as the "OpenSSL" library), and distribute
  *  the linked executables.  You must obey the GNU General Public License
