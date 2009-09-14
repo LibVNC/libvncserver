@@ -531,7 +531,8 @@ InitialiseRFBConnection(rfbClient* client)
     uint8_t count=0;
     uint8_t loop=0;
     uint8_t flag=0;
-    uint8_t tAuth=0;
+    uint8_t tAuth[256];
+    char buf1[500],buf2[10];
     
     if (!ReadFromRFBServer(client, (char *)&count, 1)) return FALSE;
 
@@ -549,22 +550,41 @@ InitialiseRFBConnection(rfbClient* client)
         free(reason);
         return FALSE;
     }
+    if (count>sizeof(tAuth))
+    {
+        rfbClientLog("%d security types are too many; maximum is %d\n", count, sizeof(tAuth));
+        return FALSE;
+    }
 
     rfbClientLog("We have %d security types to read\n", count);
+    authScheme=0;
     /* now, we have a list of available security types to read ( uint8_t[] ) */
     for (loop=0;loop<count;loop++)
     {
-        if (!ReadFromRFBServer(client, (char *)&tAuth, 1)) return FALSE;
-        rfbClientLog("%d) Received security type %d\n", loop, tAuth);
-        if ((flag==0) && ((tAuth==rfbVncAuth) || (tAuth==rfbNoAuth)))
+        if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
+        rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
+        if ((flag==0) && ((tAuth[loop]==rfbVncAuth) || (tAuth[loop]==rfbNoAuth)))
         {
             flag++;
-            authScheme=tAuth;
+            authScheme=tAuth[loop];
             rfbClientLog("Selecting security type %d (%d/%d in the list)\n", authScheme, loop, count);
             /* send back a single byte indicating which security type to use */
-            if (!WriteToRFBServer(client, (char *)&tAuth, 1)) return FALSE;
+            if (!WriteToRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
             
         }
+    }
+    if (authScheme==0)
+    {
+        memset(buf1, 0, sizeof(buf1));
+        for (loop=0;loop<count;loop++)
+        {
+            if (strlen(buf1)>=sizeof(buf1)-1) break;
+            snprintf(buf2, sizeof(buf2), (loop>0 ? ", %d" : "%d"), (int)tAuth[loop]);
+            strncat(buf1, buf2, sizeof(buf1)-strlen(buf1)-1);
+        }
+        rfbClientLog("Unknown authentication scheme from VNC server: %s\n",
+               buf1);
+        return FALSE;
     }
   }
   else
