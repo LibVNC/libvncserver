@@ -511,8 +511,11 @@ InitialiseRFBConnection(rfbClient* client)
   }
 
   /* we do not support > RFB3.8 */
-  if (major==3 && minor>8)
+  if ((major==3 && minor>8) || major>3)
+  {
+    client->major=3;
     client->minor=8;
+  }
 
   rfbClientLog("VNC server supports protocol version %d.%d (viewer %d.%d)\n",
 	  major, minor, rfbProtocolMajorVersion, rfbProtocolMinorVersion);
