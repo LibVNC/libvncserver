@@ -30,6 +30,7 @@
 #include <string.h>
 #include <time.h>
 #include <rfb/rfbclient.h>
+#include "tls.h"
 
 static void Dummy(rfbClient* client) {
 }
@@ -179,6 +180,13 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->CurrentKeyboardLedState = 0;
   client->HandleKeyboardLedState = (HandleKeyboardLedStateProc)DummyPoint;
 
+  client->authScheme = 0;
+  client->subAuthScheme = 0;
+  client->GetCredential = NULL;
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+  client->tlsSession = NULL;
+#endif
+
   return client;
 }
 
@@ -318,6 +326,7 @@ void rfbClientCleanup(rfbClient* client) {
 #endif
 #endif
 
+  FreeTLS(client);
   if (client->sock > 0)
     close(client->sock);
   free(client->desktopName);

@@ -33,6 +33,9 @@
 #include <unistd.h>
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+#include <gnutls/gnutls.h>
+#endif
 
 #define rfbClientSwap16IfLE(s) \
     (*(char *)&client->endianTest ? ((((s) & 0xff) << 8) | (((s) >> 8) & 0xff)) : (s))
@@ -98,6 +101,24 @@ typedef struct {
   int scaleSetting; /* 0 means no scale set, else 1/scaleSetting */
 } AppData;
 
+/* For GetCredentialProc callback function to return */
+typedef union _rfbCredential
+{
+  /* VeNCrypt */
+  struct
+  {
+    char *x509CACertFile;
+    char *x509CACrlFile;
+    char *x509ClientCertFile;
+    char *x509ClientKeyFile;
+  } x509Credential;
+  /* MSLogon */
+  struct
+  {
+    char *username;
+    char *password;
+  } userCredential;
+} rfbCredential;
 
 struct _rfbClient;
 
@@ -108,6 +129,7 @@ typedef void (*SoftCursorLockAreaProc)(struct _rfbClient* client, int x, int y, 
 typedef void (*SoftCursorUnlockScreenProc)(struct _rfbClient* client);
 typedef void (*GotFrameBufferUpdateProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef char* (*GetPasswordProc)(struct _rfbClient* client);
+typedef rfbCredential* (*GetCredentialProc)(struct _rfbClient* client, uint8_t securityType);
 typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int textlen);
 typedef void (*BellProc)(struct _rfbClient* client);
@@ -249,6 +271,22 @@ typedef struct _rfbClient {
 
 	/* negotiated protocol version */
 	int major, minor;
+
+	/* The selected security types */
+	uint32_t authScheme, subAuthScheme;
+
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+	/* The TLS session for Anonymous TLS and VeNCrypt */
+	gnutls_session_t tlsSession;
+#endif
+
+	/* To support security types that requires user input (except VNC password
+	 * authentication), for example VeNCrypt and MSLogon, this callback function
+	 * must be set before the authentication. Otherwise, it implicates that the
+	 * caller application does not support it and related security types should
+	 * be bypassed.
+	 */
+	GetCredentialProc GetCredential;
 } rfbClient;
 
 /* cursor.c */

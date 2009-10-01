@@ -53,6 +53,7 @@
 #include <time.h>
 
 #include "minilzo.h"
+#include "tls.h"
 
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
@@ -454,6 +455,119 @@ rfbHandleAuthResult(rfbClient* client)
     return FALSE;
 }
 
+static void
+ReadReason(rfbClient* client)
+{
+    uint32_t reasonLen;
+    char *reason;
+
+    /* we have an error following */
+    if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return;
+    reasonLen = rfbClientSwap32IfLE(reasonLen);
+    reason = malloc(reasonLen+1);
+    if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
+    reason[reasonLen]=0;
+    rfbClientLog("VNC connection failed: %s\n",reason);
+    free(reason);
+}
+
+static rfbBool
+ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
+{
+    uint8_t count=0;
+    uint8_t loop=0;
+    uint8_t flag=0;
+    uint8_t tAuth[256];
+    char buf1[500],buf2[10];
+    uint32_t authScheme;
+
+    if (!ReadFromRFBServer(client, (char *)&count, 1)) return FALSE;
+
+    if (count==0)
+    {
+        rfbClientLog("List of security types is ZERO, expecting an error to follow\n");
+        ReadReason(client);
+        return FALSE;
+    }
+    if (count>sizeof(tAuth))
+    {
+        rfbClientLog("%d security types are too many; maximum is %d\n", count, sizeof(tAuth));
+        return FALSE;
+    }
+
+    rfbClientLog("We have %d security types to read\n", count);
+    authScheme=0;
+    /* now, we have a list of available security types to read ( uint8_t[] ) */
+    for (loop=0;loop<count;loop++)
+    {
+        if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
+        rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
+        if (flag) continue;
+        if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
+            (!subAuth && tAuth[loop]==rfbTLS))
+        {
+            flag++;
+            authScheme=tAuth[loop];
+            rfbClientLog("Selecting security type %d (%d/%d in the list)\n", authScheme, loop, count);
+            /* send back a single byte indicating which security type to use */
+            if (!WriteToRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
+
+        }
+    }
+    if (authScheme==0)
+    {
+        memset(buf1, 0, sizeof(buf1));
+        for (loop=0;loop<count;loop++)
+        {
+            if (strlen(buf1)>=sizeof(buf1)-1) break;
+            snprintf(buf2, sizeof(buf2), (loop>0 ? ", %d" : "%d"), (int)tAuth[loop]);
+            strncat(buf1, buf2, sizeof(buf1)-strlen(buf1)-1);
+        }
+        rfbClientLog("Unknown authentication scheme from VNC server: %s\n",
+               buf1);
+        return FALSE;
+    }
+    *result = authScheme;
+    return TRUE;
+}
+
+static rfbBool
+HandleVncAuth(rfbClient *client)
+{
+    uint8_t challenge[CHALLENGESIZE];
+    char *passwd=NULL;
+    int i;
+
+    if (!ReadFromRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
+
+    if (client->serverPort!=-1) { /* if not playing a vncrec file */
+      if (client->GetPassword)
+        passwd = client->GetPassword(client);
+
+      if ((!passwd) || (strlen(passwd) == 0)) {
+        rfbClientLog("Reading password failed\n");
+        return FALSE;
+      }
+      if (strlen(passwd) > 8) {
+        passwd[8] = '\0';
+      }
+
+      rfbClientEncryptBytes(challenge, passwd);
+
+      /* Lose the password from memory */
+      for (i = strlen(passwd); i >= 0; i--) {
+        passwd[i] = '\0';
+      }
+      free(passwd);
+
+      if (!WriteToRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
+    }
+
+    /* Handle the SecurityResult message */
+    if (!rfbHandleAuthResult(client)) return FALSE;
+
+    return TRUE;
+}
 
 /*
  * InitialiseRFBConnection.
@@ -464,11 +578,8 @@ InitialiseRFBConnection(rfbClient* client)
 {
   rfbProtocolVersionMsg pv;
   int major,minor;
-  uint32_t authScheme, reasonLen;
-  char *reason;
-  uint8_t challenge[CHALLENGESIZE];
-  char *passwd=NULL;
-  int i;
+  uint32_t authScheme;
+  uint32_t subAuthScheme;
   rfbClientInitMsg ci;
 
   /* if the connection is immediately closed, don't report anything, so
@@ -528,64 +639,7 @@ InitialiseRFBConnection(rfbClient* client)
   /* 3.7 and onwards sends a # of security types first */
   if (client->major==3 && client->minor > 6)
   {
-    uint8_t count=0;
-    uint8_t loop=0;
-    uint8_t flag=0;
-    uint8_t tAuth[256];
-    char buf1[500],buf2[10];
-    
-    if (!ReadFromRFBServer(client, (char *)&count, 1)) return FALSE;
-
-    if (count==0)
-    {
-        rfbClientLog("List of security types is ZERO, expecting an error to follow\n"); 
-
-        /* we have an error following */
-        if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
-        reasonLen = rfbClientSwap32IfLE(reasonLen);
-        reason = malloc(reasonLen+1);
-        if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
-        reason[reasonLen]=0;
-        rfbClientLog("VNC connection failed: %s\n",reason);
-        free(reason);
-        return FALSE;
-    }
-    if (count>sizeof(tAuth))
-    {
-        rfbClientLog("%d security types are too many; maximum is %d\n", count, sizeof(tAuth));
-        return FALSE;
-    }
-
-    rfbClientLog("We have %d security types to read\n", count);
-    authScheme=0;
-    /* now, we have a list of available security types to read ( uint8_t[] ) */
-    for (loop=0;loop<count;loop++)
-    {
-        if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
-        rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
-        if ((flag==0) && ((tAuth[loop]==rfbVncAuth) || (tAuth[loop]==rfbNoAuth)))
-        {
-            flag++;
-            authScheme=tAuth[loop];
-            rfbClientLog("Selecting security type %d (%d/%d in the list)\n", authScheme, loop, count);
-            /* send back a single byte indicating which security type to use */
-            if (!WriteToRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
-            
-        }
-    }
-    if (authScheme==0)
-    {
-        memset(buf1, 0, sizeof(buf1));
-        for (loop=0;loop<count;loop++)
-        {
-            if (strlen(buf1)>=sizeof(buf1)-1) break;
-            snprintf(buf2, sizeof(buf2), (loop>0 ? ", %d" : "%d"), (int)tAuth[loop]);
-            strncat(buf1, buf2, sizeof(buf1)-strlen(buf1)-1);
-        }
-        rfbClientLog("Unknown authentication scheme from VNC server: %s\n",
-               buf1);
-        return FALSE;
-    }
+    if (!ReadSupportedSecurityType(client, &authScheme, FALSE)) return FALSE;
   }
   else
   {
@@ -594,19 +648,12 @@ InitialiseRFBConnection(rfbClient* client)
   }
   
   rfbClientLog("Selected Security Scheme %d\n", authScheme);
+  client->authScheme = authScheme;
   
   switch (authScheme) {
 
   case rfbConnFailed:
-    if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
-    reasonLen = rfbClientSwap32IfLE(reasonLen);
-
-    reason = malloc(reasonLen+1);
-
-    if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
-    reason[reasonLen]=0;
-    rfbClientLog("VNC connection failed: %s\n", reason);
-    free(reason);
+    ReadReason(client);
     return FALSE;
 
   case rfbNoAuth:
@@ -619,33 +666,38 @@ InitialiseRFBConnection(rfbClient* client)
     break;
 
   case rfbVncAuth:
-    if (!ReadFromRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
+    if (!HandleVncAuth(client)) return FALSE;
+    break;
 
-    if (client->serverPort!=-1) { /* if not playing a vncrec file */
-      if (client->GetPassword)
-        passwd = client->GetPassword(client);
+  case rfbTLS:
+    if (!HandleAnonTLSAuth(client)) return FALSE;
+    /* After the TLS session is established, sub auth types are expected.
+     * Note that all following reading/writing are through the TLS session from here.
+     */
+    if (!ReadSupportedSecurityType(client, &subAuthScheme, TRUE)) return FALSE;
+    client->subAuthScheme = subAuthScheme;
 
-      if ((!passwd) || (strlen(passwd) == 0)) {
-        rfbClientLog("Reading password failed\n");
+    switch (subAuthScheme) {
+
+      case rfbConnFailed:
+        ReadReason(client);
         return FALSE;
-      }
-      if (strlen(passwd) > 8) {
-        passwd[8] = '\0';
-      }
 
-      rfbClientEncryptBytes(challenge, passwd);
+      case rfbNoAuth:
+        rfbClientLog("No sub authentication needed\n");
+        if (!rfbHandleAuthResult(client)) return FALSE;
+        break;
 
-      /* Lose the password from memory */
-      for (i = strlen(passwd); i >= 0; i--) {
-        passwd[i] = '\0';
-      }
-      free(passwd);
+      case rfbVncAuth:
+        if (!HandleVncAuth(client)) return FALSE;
+        break;
 
-      if (!WriteToRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
+      default:
+        rfbClientLog("Unknown sub authentication scheme from VNC server: %d\n",
+            (int)subAuthScheme);
+        return FALSE;
     }
 
-    /* Handle the SecurityResult message */
-    if (!rfbHandleAuthResult(client)) return FALSE;
     break;
 
   default:

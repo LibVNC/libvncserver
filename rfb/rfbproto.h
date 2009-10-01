@@ -264,6 +264,7 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 #define rfbTight 16
 #define rfbUltra 17
 #define rfbTLS 18
+#define rfbVeNCrypt 19
 
 /*
  * rfbConnFailed:	For some reason the connection failed (e.g. the server
