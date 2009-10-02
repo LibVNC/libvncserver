@@ -191,11 +191,13 @@ static void* clientLoop(void* data) {
 	return NULL;
 }
 
+static pthread_t all_threads[NUMBER_OF_ENCODINGS_TO_TEST];
+static int thread_counter;
+
 static void startClient(int encodingIndex,rfbScreenInfo* server) {
 	rfbClient* client=rfbGetClient(8,3,4);
 	clientData* cd;
-	pthread_t clientThread;
-	
+
 	client->clientData=malloc(sizeof(clientData));
 	client->MallocFrameBuffer=resize;
 	client->GotFrameBufferUpdate=update;
@@ -210,7 +212,7 @@ static void startClient(int encodingIndex,rfbScreenInfo* server) {
 	lastUpdateRect.x2=server->width;
 	lastUpdateRect.y2=server->height;
 
-	pthread_create(&clientThread,NULL,clientLoop,(void*)client);
+	pthread_create(&all_threads[thread_counter++],NULL,clientLoop,(void*)client);
 }
 
 /* Here begin the server functions */
@@ -334,8 +336,10 @@ int main(int argc,char** argv)
 	}
 #endif
 
-	free(server->frameBuffer);
 	rfbScreenCleanup(server);
+	for(i=0;i<thread_counter;i++)
+		pthread_join(all_threads[i], NULL);
+	free(server->frameBuffer);
 
 	rfbLog("Statistics:\n");
 	for(i=0;i<NUMBER_OF_ENCODINGS_TO_TEST;i++)
