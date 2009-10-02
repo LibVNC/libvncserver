@@ -344,6 +344,7 @@ DefaultSupportedMessagesTightVNC(rfbClient* client)
     SetServer2Client(client, rfbTextChat);
 }
 
+#ifndef WIN32
 static rfbBool
 IsUnixSocket(const char *name)
 {
@@ -352,6 +353,7 @@ IsUnixSocket(const char *name)
     return TRUE;
   return FALSE;
 }
+#endif
 
 /*
  * ConnectToRFBServer.

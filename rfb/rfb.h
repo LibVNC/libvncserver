@@ -44,6 +44,7 @@ extern "C"
 #endif
 
 #ifdef __MINGW32__
+#undef SOCKET
 #include <winsock2.h>
 #endif
 

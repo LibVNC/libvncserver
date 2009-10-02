@@ -7,8 +7,10 @@ noinst_HEADERS=VNConsole.h vga.h
 LDADD=../libvncserver/libvncserver.la @WSOCKLIB@
 
 if LINUX
+if ! MINGW
 bin_PROGRAMS=LinuxVNC
 LinuxVNC_SOURCES=LinuxVNC.c $(CONSOLE_SRCS)
+endif
 endif
 
 if ! MINGW
