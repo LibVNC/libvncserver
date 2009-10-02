@@ -504,7 +504,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
         rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
         if (flag) continue;
         if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
-            (!subAuth && tAuth[loop]==rfbTLS))
+            (!subAuth && (tAuth[loop]==rfbTLS || tAuth[loop]==rfbVeNCrypt)))
         {
             flag++;
             authScheme=tAuth[loop];
@@ -567,6 +567,50 @@ HandleVncAuth(rfbClient *client)
     if (!rfbHandleAuthResult(client)) return FALSE;
 
     return TRUE;
+}
+
+static rfbBool
+HandlePlainAuth(rfbClient *client)
+{
+  uint32_t ulen, ulensw;
+  uint32_t plen, plensw;
+  rfbCredential *cred;
+
+  if (!client->GetCredential)
+  {
+    rfbClientLog("GetCredential callback is not set.\n");
+    return FALSE;
+  }
+  cred = client->GetCredential(client, rfbCredentialTypeUser);
+  if (!cred)
+  {
+    rfbClientLog("Reading credential failed\n");
+    return FALSE;
+  }
+
+  ulen = (cred->userCredential.username ? strlen(cred->userCredential.username) : 0);
+  ulensw = rfbClientSwap32IfLE(ulen);
+  plen = (cred->userCredential.password ? strlen(cred->userCredential.password) : 0);
+  plensw = rfbClientSwap32IfLE(plen);
+  if (!WriteToRFBServer(client, (char *)&ulensw, 4)) return FALSE;
+  if (!WriteToRFBServer(client, (char *)&plensw, 4)) return FALSE;
+  if (ulen > 0)
+  {
+    if (!WriteToRFBServer(client, cred->userCredential.username, ulen)) return FALSE;
+  }
+  if (plen > 0)
+  {
+    if (!WriteToRFBServer(client, cred->userCredential.password, plen)) return FALSE;
+  }
+
+  if (cred->userCredential.username) free(cred->userCredential.username);
+  if (cred->userCredential.password) free(cred->userCredential.password);
+  free(cred);
+
+  /* Handle the SecurityResult message */
+  if (!rfbHandleAuthResult(client)) return FALSE;
+
+  return TRUE;
 }
 
 /*
@@ -695,6 +739,35 @@ InitialiseRFBConnection(rfbClient* client)
       default:
         rfbClientLog("Unknown sub authentication scheme from VNC server: %d\n",
             (int)subAuthScheme);
+        return FALSE;
+    }
+
+    break;
+
+  case rfbVeNCrypt:
+    if (!HandleVeNCryptAuth(client)) return FALSE;
+
+    switch (client->subAuthScheme) {
+
+      case rfbVeNCryptTLSNone:
+      case rfbVeNCryptX509None:
+        rfbClientLog("No sub authentication needed\n");
+        if (!rfbHandleAuthResult(client)) return FALSE;
+        break;
+
+      case rfbVeNCryptTLSVNC:
+      case rfbVeNCryptX509VNC:
+        if (!HandleVncAuth(client)) return FALSE;
+        break;
+
+      case rfbVeNCryptTLSPlain:
+      case rfbVeNCryptX509Plain:
+        if (!HandlePlainAuth(client)) return FALSE;
+        break;
+
+      default:
+        rfbClientLog("Unknown sub authentication scheme from VNC server: %d\n",
+            client->subAuthScheme);
         return FALSE;
     }
 

@@ -104,7 +104,7 @@ typedef struct {
 /* For GetCredentialProc callback function to return */
 typedef union _rfbCredential
 {
-  /* VeNCrypt */
+  /* X509 (VeNCrypt) */
   struct
   {
     char *x509CACertFile;
@@ -112,13 +112,16 @@ typedef union _rfbCredential
     char *x509ClientCertFile;
     char *x509ClientKeyFile;
   } x509Credential;
-  /* MSLogon */
+  /* Plain (VeNCrypt), MSLogon (UltraVNC) */
   struct
   {
     char *username;
     char *password;
   } userCredential;
 } rfbCredential;
+
+#define rfbCredentialTypeX509 1
+#define rfbCredentialTypeUser 2
 
 struct _rfbClient;
 
@@ -129,7 +132,7 @@ typedef void (*SoftCursorLockAreaProc)(struct _rfbClient* client, int x, int y, 
 typedef void (*SoftCursorUnlockScreenProc)(struct _rfbClient* client);
 typedef void (*GotFrameBufferUpdateProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef char* (*GetPasswordProc)(struct _rfbClient* client);
-typedef rfbCredential* (*GetCredentialProc)(struct _rfbClient* client, uint8_t securityType);
+typedef rfbCredential* (*GetCredentialProc)(struct _rfbClient* client, int credentialType);
 typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int textlen);
 typedef void (*BellProc)(struct _rfbClient* client);
