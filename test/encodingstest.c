@@ -78,8 +78,6 @@ static void updateStatistics(int encodingIndex,rfbBool failed) {
 	UNLOCK(statisticsMutex);
 }
 
-	
-
 /* Here begin the functions for the client. They will be called in a
  * pthread. */
 
@@ -99,7 +97,7 @@ static rfbBool doFramebuffersMatch(rfbScreenInfo* server,rfbClient* client,
 			for(k=0;k<3/*server->serverFormat.bitsPerPixel/8*/;k++) {
 				unsigned char s=server->frameBuffer[k+i*4+j*server->paddedWidthInBytes];
 				unsigned char cl=client->frameBuffer[k+i*4+j*client->width*4];
-				
+
 				if(maxDelta==0 && s!=cl) {
 					UNLOCK(frameBufferMutex);
 					return FALSE;
@@ -133,7 +131,7 @@ typedef struct clientData {
 static void update(rfbClient* client,int x,int y,int w,int h) {
 	clientData* cd=(clientData*)client->clientData;
 	int maxDelta=0;
-	
+
 #ifndef VERY_VERBOSE
 	static const char* progress="|/-\\";
 	static int counter=0;
@@ -159,7 +157,7 @@ static void update(rfbClient* client,int x,int y,int w,int h) {
 	if(testEncodings[cd->encodingIndex].id==rfbEncodingTight)
 		maxDelta=5;
 #endif
-	
+
 	updateStatistics(cd->encodingIndex,
 			!doFramebuffersMatch(cd->server,client,maxDelta));
 }
@@ -169,7 +167,7 @@ static void* clientLoop(void* data) {
 	clientData* cd=(clientData*)client->clientData;
 
 	client->appData.encodingsString=strdup(testEncodings[cd->encodingIndex].str);
-	
+
 	sleep(1);
 	rfbClientLog("Starting client (encoding %s, display %s)\n",
 			testEncodings[cd->encodingIndex].str,
@@ -288,7 +286,7 @@ rfbTestLog(const char *format, ...)
 /* the main function */
 
 int main(int argc,char** argv)
-{                                                                
+{
 	int i,j;
 	time_t t;
 	rfbScreenInfoPtr server;
