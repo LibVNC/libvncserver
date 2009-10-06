@@ -2366,7 +2366,7 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 
 	again:
 	if (subwin) {
-		int shift = 0;
+	        int shift = 0, fit = 0;
 		int subwin_x, subwin_y;
 		int disp_x = DisplayWidth(dpy, scr);
 		int disp_y = DisplayHeight(dpy, scr);
@@ -2376,6 +2376,15 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 		old_handler = XSetErrorHandler(trap_xerror);
 		XTranslateCoordinates(dpy, window, rootwin, 0, 0, &subwin_x,
 		    &subwin_y, &twin);
+
+		if (wdpy_x > disp_x ) {
+		        fit = 1;
+			dpy_x = wdpy_x = disp_x - 3;
+		}
+		if (wdpy_y > disp_y) {
+		        fit = 1;
+			dpy_y = wdpy_y = disp_y - 3;
+		}
 
 		if (subwin_x + wdpy_x > disp_x) {
 			shift = 1;
@@ -2394,6 +2403,9 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 			subwin_y = off_y = 1;
 		}
 
+		if (fit) {
+			XResizeWindow(dpy, window, wdpy_x, wdpy_y);
+		}
 		if (shift) {
 			XMoveWindow(dpy, window, subwin_x, subwin_y);
 		}
