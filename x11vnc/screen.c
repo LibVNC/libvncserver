@@ -2379,19 +2379,19 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 
 		if (subwin_x + wdpy_x > disp_x) {
 			shift = 1;
-			subwin_x = disp_x - wdpy_x - 3;
+			subwin_x = off_x = disp_x - wdpy_x - 3;
 		}
 		if (subwin_y + wdpy_y > disp_y) {
 			shift = 1;
-			subwin_y = disp_y - wdpy_y - 3;
+			subwin_y = off_y = disp_y - wdpy_y - 3;
 		}
 		if (subwin_x < 0) {
 			shift = 1;
-			subwin_x = 1;
+			subwin_x = off_x = 1;
 		}
 		if (subwin_y < 0) {
 			shift = 1;
-			subwin_y = 1;
+			subwin_y = off_y = 1;
 		}
 
 		if (shift) {
