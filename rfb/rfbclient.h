@@ -46,6 +46,16 @@
 			     (((l) & 0x0000ff00) << 8)  | \
 			     (((l) & 0x000000ff) << 24))  : (l))
 
+#define rfbClientSwap64IfLE(l) \
+    (*(char *)&client->endianTest ? ((((l) & 0xff00000000000000ULL) >> 56) | \
+			     (((l) & 0x00ff000000000000ULL) >> 40)  | \
+			     (((l) & 0x0000ff0000000000ULL) >> 24)  | \
+			     (((l) & 0x000000ff00000000ULL) >> 8)  | \
+			     (((l) & 0x00000000ff000000ULL) << 8)  | \
+			     (((l) & 0x0000000000ff0000ULL) << 24)  | \
+			     (((l) & 0x000000000000ff00ULL) << 40)  | \
+			     (((l) & 0x00000000000000ffULL) << 56))  : (l))
+
 #define FLASH_PORT_OFFSET 5400
 #define LISTEN_PORT_OFFSET 5500
 #define TUNNEL_PORT_OFFSET 5500

@@ -414,6 +414,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
 }
 
 extern void rfbClientEncryptBytes(unsigned char* bytes, char* passwd);
+extern void rfbClientEncryptBytes2(unsigned char *where, const int length, unsigned char *key);
 
 rfbBool
 rfbHandleAuthResult(rfbClient* client)
@@ -503,7 +504,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
         rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
         if (flag) continue;
-        if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
+        if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth || tAuth[loop]==rfbMSLogon ||
             (!subAuth && (tAuth[loop]==rfbTLS || tAuth[loop]==rfbVeNCrypt)))
         {
             flag++;
@@ -569,6 +570,14 @@ HandleVncAuth(rfbClient *client)
     return TRUE;
 }
 
+static void
+FreeUserCredential(rfbCredential *cred)
+{
+  if (cred->userCredential.username) free(cred->userCredential.username);
+  if (cred->userCredential.password) free(cred->userCredential.password);
+  free(cred);
+}
+
 static rfbBool
 HandlePlainAuth(rfbClient *client)
 {
@@ -592,20 +601,114 @@ HandlePlainAuth(rfbClient *client)
   ulensw = rfbClientSwap32IfLE(ulen);
   plen = (cred->userCredential.password ? strlen(cred->userCredential.password) : 0);
   plensw = rfbClientSwap32IfLE(plen);
-  if (!WriteToRFBServer(client, (char *)&ulensw, 4)) return FALSE;
-  if (!WriteToRFBServer(client, (char *)&plensw, 4)) return FALSE;
+  if (!WriteToRFBServer(client, (char *)&ulensw, 4) ||
+      !WriteToRFBServer(client, (char *)&plensw, 4))
+  {
+    FreeUserCredential(cred);
+    return FALSE;
+  }
   if (ulen > 0)
   {
-    if (!WriteToRFBServer(client, cred->userCredential.username, ulen)) return FALSE;
+    if (!WriteToRFBServer(client, cred->userCredential.username, ulen))
+    {
+      FreeUserCredential(cred);
+      return FALSE;
+    }
   }
   if (plen > 0)
   {
-    if (!WriteToRFBServer(client, cred->userCredential.password, plen)) return FALSE;
+    if (!WriteToRFBServer(client, cred->userCredential.password, plen))
+    {
+      FreeUserCredential(cred);
+      return FALSE;
+    }
   }
 
-  if (cred->userCredential.username) free(cred->userCredential.username);
-  if (cred->userCredential.password) free(cred->userCredential.password);
-  free(cred);
+  FreeUserCredential(cred);
+
+  /* Handle the SecurityResult message */
+  if (!rfbHandleAuthResult(client)) return FALSE;
+
+  return TRUE;
+}
+
+/* Simple 64bit big integer arithmetic implementation */
+/* (x + y) % m, works even if (x + y) > 64bit */
+#define rfbAddM64(x,y,m) ((x+y)%m+(x+y<x?(((uint64_t)-1)%m+1)%m:0))
+/* (x * y) % m */
+static uint64_t
+rfbMulM64(uint64_t x, uint64_t y, uint64_t m)
+{
+  uint64_t r;
+  for(r=0;x>0;x>>=1)
+  {
+    if (x&1) r=rfbAddM64(r,y,m);
+    y=rfbAddM64(y,y,m);
+  }
+  return r;
+}
+/* (x ^ y) % m */
+static uint64_t
+rfbPowM64(uint64_t b, uint64_t e, uint64_t m)
+{
+  uint64_t r;
+  for(r=1;e>0;e>>=1)
+  {
+    if(e&1) r=rfbMulM64(r,b,m);
+    b=rfbMulM64(b,b,m);
+  }
+  return r;
+}
+
+static rfbBool
+HandleMSLogonAuth(rfbClient *client)
+{
+  uint64_t gen, mod, resp, priv, pub, key;
+  uint8_t username[256], password[64];
+  rfbCredential *cred;
+
+  if (!ReadFromRFBServer(client, (char *)&gen, 8)) return FALSE;
+  if (!ReadFromRFBServer(client, (char *)&mod, 8)) return FALSE;
+  if (!ReadFromRFBServer(client, (char *)&resp, 8)) return FALSE;
+  gen = rfbClientSwap64IfLE(gen);
+  mod = rfbClientSwap64IfLE(mod);
+  resp = rfbClientSwap64IfLE(resp);
+
+  if (!client->GetCredential)
+  {
+    rfbClientLog("GetCredential callback is not set.\n");
+    return FALSE;
+  }
+  rfbClientLog("WARNING! MSLogon security type has very low password encryption! "\
+    "Use it only with SSH tunnel or trusted network.\n");
+  cred = client->GetCredential(client, rfbCredentialTypeUser);
+  if (!cred)
+  {
+    rfbClientLog("Reading credential failed\n");
+    return FALSE;
+  }
+
+  memset(username, 0, sizeof(username));
+  strncpy((char *)username, cred->userCredential.username, sizeof(username));
+  memset(password, 0, sizeof(password));
+  strncpy((char *)password, cred->userCredential.password, sizeof(password));
+  FreeUserCredential(cred);
+
+  srand(time(NULL));
+  priv = ((uint64_t)rand())<<32;
+  priv |= (uint64_t)rand();
+
+  pub = rfbPowM64(gen, priv, mod);
+  key = rfbPowM64(resp, priv, mod);
+  pub = rfbClientSwap64IfLE(pub);
+  key = rfbClientSwap64IfLE(key);
+
+  rfbClientEncryptBytes2(username, sizeof(username), (unsigned char *)&key);
+  rfbClientEncryptBytes2(password, sizeof(password), (unsigned char *)&key);
+
+  if (!WriteToRFBServer(client, (char *)&pub, 8)) return FALSE;
+  if (!WriteToRFBServer(client, (char *)username, sizeof(username))) return FALSE;
+  if (!WriteToRFBServer(client, (char *)password, sizeof(password))) return FALSE;
 
   /* Handle the SecurityResult message */
   if (!rfbHandleAuthResult(client)) return FALSE;
@@ -711,6 +814,10 @@ InitialiseRFBConnection(rfbClient* client)
 
   case rfbVncAuth:
     if (!HandleVncAuth(client)) return FALSE;
+    break;
+
+  case rfbMSLogon:
+    if (!HandleMSLogonAuth(client)) return FALSE;
     break;
 
   case rfbTLS:
@@ -1889,6 +1996,7 @@ PrintPixelFormat(rfbPixelFormat *format)
 /* avoid name clashes with LibVNCServer */
 
 #define rfbEncryptBytes rfbClientEncryptBytes
+#define rfbEncryptBytes2 rfbClientEncryptBytes2
 #define rfbDes rfbClientDes
 #define rfbDesKey rfbClientDesKey
 #define rfbUseKey rfbClientUseKey
