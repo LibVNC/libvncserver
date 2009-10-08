@@ -8,7 +8,7 @@ exec wish "$0" "$@"
 # ssvnc.tcl: gui wrapper to the programs in this
 # package. Also sets up service port forwarding.
 #
-set version 1.0.23
+set version 1.0.24
 
 set buck_zero $argv0
 
@@ -54,6 +54,14 @@ proc apply_bg {w} {
 	if {$is_windows && $system_button_face != ""} {
 		catch {$w configure -bg "$system_button_face"}
 	}
+}
+
+proc line_count {{str ""} {pad 0}} {
+	set n $pad
+	foreach l [split $str "\n"] {
+		incr n
+	}
+	return $n
 }
 
 proc scroll_text {fr {w 80} {h 35}} {
@@ -1355,6 +1363,11 @@ proc help {} {
         Prefix any of these with "FORCE:" to make them immutable, e.g.
         "cacert=FORCE:CA".
 
+        To change the fonts (see Tip 18 below for examples):
+
+        font_default=tk-font-name     (sets the font for menus and buttons)
+        font_fixed=tk-font-name       (sets the font for help text)
+
     16) On Unix you can make the "Open File" and "Save File" dialogs
         bigger by setting the env. var. SSVNC_BIGGER_DIALOG=1 or
         supplying the -bigger option.  If you set it to a Width x Height,
@@ -1363,6 +1376,19 @@ proc help {} {
     17) On Unix / MacOSX to enable debug output you can set these env.
         vars to 1: SSVNC_STUNNEL_DEBUG, SSVNC_VENCRYPT_DEBUG, and
         SS_DEBUG (very verbose)
+
+    18) Fonts: To change the tk fonts, set these environment variables
+        before starting up ssvnc: SSVNC_FONT_DEFAULT and SSVNC_FONT_FIXED.
+        For example:
+
+            % env SSVNC_FONT_DEFAULT='helvetica -20 bold' ssvnc
+            % env SSVNC_FONT_FIXED='courier -14' ssvnc
+
+        or set both of them at once.  You can also set 'font_default' and
+        'font_fixed' in your ~/.ssvncrc.  E.g.:
+
+        font_default=helvetica -16 bold
+        font_fixed=courier -12
 }
 
 	global version
@@ -1939,6 +1965,9 @@ set msg {
     (The above 4 settings apply only to the Terminal Services Mode.)
 
     noenc=1  (same as the -noenc option for a 'No Encryption' button)
+
+    font_default=tk-font-name     (sets the font for menus and buttons)
+    font_fixed=tk-font-name       (sets the font for help text)
 }
 	.oh.f.t insert end $msg
 	jiggle_text .oh.f.t
@@ -2644,7 +2673,7 @@ proc set_defaults {} {
 	global defs env
 
 	global mycert svcert crtdir crlfil
-	global use_alpha use_turbovnc use_grab use_ssl use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
+	global use_alpha use_turbovnc disable_pipeline use_grab use_ssl use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_send_clipboard use_send_always
 	global disable_all_encryption
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality use_x11_macosx
@@ -2660,13 +2689,13 @@ proc set_defaults {} {
 	global choose_ncache ts_ncache choose_multisession ts_multisession
 	global ts_mode ts_desktop_size ts_desktop_depth choose_desktop_geom
 	global additional_port_redirs additional_port_redirs_list
-	global stunnel_local_protection stunnel_local_protection_type ssh_local_protection multiple_listen listen_once
+	global stunnel_local_protection stunnel_local_protection_type ssh_local_protection multiple_listen listen_once listen_accept_popup listen_accept_popup_sc
 	global ultra_dsm ultra_dsm_type ultra_dsm_file ultra_dsm_noultra ultra_dsm_salt
 	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_x11vnc sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
 	global use_port_knocking port_knocking_list
-	global ycrop_string ssvnc_scale ssvnc_escape sbwid_string rfbversion ssvnc_encodings use_x11cursor use_nobell use_rawlocal use_popupfix extra_sleep use_listen use_unixpw use_x11vnc_find unixpw_username
+	global ycrop_string ssvnc_scale ssvnc_escape sbwid_string rfbversion ssvnc_encodings ssvnc_extra_opts use_x11cursor use_nobell use_rawlocal use_popupfix extra_sleep use_listen use_unixpw use_x11vnc_find unixpw_username
 	global disable_ssl_workarounds disable_ssl_workarounds_type
 	global server_vencrypt server_anondh
 	global include_list
@@ -2687,6 +2716,7 @@ proc set_defaults {} {
 	set defs(use_send_clipboard) 0
 	set defs(use_send_always) 0
 	set defs(use_turbovnc) 0
+	set defs(disable_pipeline) 0
 	set defs(server_vencrypt) 0
 	set defs(server_anondh) 0
 	set defs(use_grab) 0
@@ -2752,6 +2782,8 @@ proc set_defaults {} {
 	set defs(ssh_local_protection) 1
 	set defs(multiple_listen) 0
 	set defs(listen_once) 0
+	set defs(listen_accept_popup) 0
+	set defs(listen_accept_popup_sc) 0
 
 	set defs(ultra_dsm) 0
 	set defs(ultra_dsm_file) ""
@@ -2784,6 +2816,7 @@ proc set_defaults {} {
 	set defs(sbwid_string) ""
 	set defs(rfbversion) ""
 	set defs(ssvnc_encodings) ""
+	set defs(ssvnc_extra_opts) ""
 	set defs(use_x11cursor) 0
 	set defs(use_nobell) 0
 	set defs(use_rawlocal) 0
@@ -3405,9 +3438,9 @@ proc launch_windows_ssh {hp file n} {
 			after 400
 			set proxy_pid [exec "connect_br.exe" &]
 
-			unset -nocomplain env(SSVNC_PROXY)
-			unset -nocomplain env(SSVNC_LISTEN)
-			unset -nocomplain env(SSVNC_DEST)
+			catch { unset env(SSVNC_PROXY)  }
+			catch { unset env(SSVNC_LISTEN) }
+			catch { unset env(SSVNC_DEST)   }
 
 			if {$sproxy1 == ""} {
 				set proxy "$win_localhost:$port2"
@@ -4193,6 +4226,24 @@ proc unix_terminal_cmd {{geometry "+100+100"} {title "xterm-command"} {cmd "echo
 			return
 		}
 	}
+
+	global checked_for_xterm
+	if {![info exists checked_for_xterm]} {
+		set p ""
+		set r [catch {set p [exec /bin/sh -c {type xterm}]}]
+		set checked_for_xterm 1
+		if {$r != 0} {
+			set p [exec /bin/sh -c {type xterm 2>&1; exit 0}]
+			set txt "Problem finding the 'xterm' command:\n\n$p\n\n"
+			append txt "Perhaps you need to install a package containing 'xterm'  (Sigh...)\n\n"
+			fetch_dialog $txt "xterm" "xterm" 0 [line_count $txt]
+			update
+			after 1000
+			catch {tkwait window .fetch}
+			update
+		}
+	}
+
 	if {$bg} {
 		if {$xrm1 == ""} {
 			exec xterm -sb -sl 2000 -geometry "$geometry" -title "$title" -e sh -c "$cmd" 2>@stdout &
@@ -4616,6 +4667,7 @@ if [info exists env(CERTDBG)] {puts "\nFetch-2-\n$cert_text"}
 		set n 4
 	} elseif {! [regexp {BEGIN CERTIFICATE} $cert_text]} {
 		set cert_text "An Error occurred in fetching $hp\n\n$cert_text"
+		set n [line_count $cert_text 1]
 		set ok 0
 	} else {
 		if [regexp -- {-----BEGIN SSL SESSION PARAMETERS-----} $cert_text] {
@@ -4759,6 +4811,7 @@ proc fetch_cert_unix {hp {vencrypt 0} {anondh 0}} {
 	}
 	global env
 if [info exists env(CERTDBG)] {puts "\nFetch-cmd: $cmd"}
+	set env(SSVNC_SHOWCERT_EXIT_0) 1
 
 	return [eval exec $cmd]
 }
@@ -4830,17 +4883,17 @@ proc fetch_cert_windows {hp {anondh 0}} {
 		set proxy_pid [exec "connect_br.exe" &]
 
 		if {$sp == ""} {
-			unset -nocomplain env(SSVNC_PROXY)
+			catch { unset env(SSVNC_PROXY) }
 		} else {
 			set env(SSVNC_PROXY) $sp
 		}
 		if {$sl == ""} {
-			unset -nocomplain env(SSVNC_LISTEN)
+			catch { unset env(SSVNC_LISTEN) }
 		} else {
 			set env(SSVNC_LISTEN) $sl
 		}
 		if {$sd == ""} {
-			unset -nocomplain env(SSVNC_DEST)
+			catch { unset env(SSVNC_DEST) }
 		} else {
 			set env(SSVNC_DEST) $sd
 		}
@@ -5026,6 +5079,11 @@ proc check_accepted_certs {} {
 		bell
 		catch {raise .; update}
 		mesg "WARNING: Error fetching Server Cert"
+		after 500
+		set hp [get_vncdisplay]
+		set n [line_count $cert_text 1]
+		fetch_dialog $cert_text $hp $hp 0 $n
+		update
 		after 2000
 		return 0
 	}
@@ -5549,13 +5607,16 @@ proc reset_stunnel_extra_opts {} {
 	}
 	set env(SSVNC_ULTRA_DSM) ""
 	set env(SSVNC_TURBOVNC) ""
+	catch { unset env(VNCVIEWER_NO_PIPELINE_UPDATES) }
+	catch { unset env(SSVNC_ACCEPT_POPUP)    }
+	catch { unset env(SSVNC_ACCEPT_POPUP_SC) }
 }
 
 proc launch_unix {hp} {
 	global smb_redir_0 smb_mounts env
 	global vncauth_passwd use_unixpw unixpw_username unixpw_passwd
 	global ssh_only ts_only use_x11cursor use_nobell use_rawlocal use_popupfix ssvnc_scale ssvnc_escape
-	global ssvnc_encodings
+	global ssvnc_encodings ssvnc_extra_opts
 
 	globalize
 
@@ -5717,7 +5778,7 @@ proc launch_unix {hp} {
 				set env(LIM_ACCEPT) 1
 			}
 			if {![info exists env(LIM_ACCEPT_TIME)]} {
-				set env(LIM_ACCEPT_TIME) 15
+				set env(LIM_ACCEPT_TIME) 35
 			}
 			set env(SSVNC_LIM_ACCEPT_PRELOAD) "lim_accept.so"
 			mesg "SSH LIM_ACCEPT($env(LIM_ACCEPT),$env(LIM_ACCEPT_TIME)): lim_accept.so"
@@ -6003,6 +6064,9 @@ proc launch_unix {hp} {
 	if {$use_turbovnc} {
 		set env(SSVNC_TURBOVNC) 1
 	}
+	if {$disable_pipeline} {
+		set env(VNCVIEWER_NO_PIPELINE_UPDATES) 1
+	}
 	if {$use_grab} {
 		set cmd "$cmd -grab"
 	}
@@ -6027,6 +6091,9 @@ proc launch_unix {hp} {
 	if {$ssvnc_encodings != ""} {
 		set cmd "$cmd -ssvnc_encodings '$ssvnc_encodings'"
 	}
+	if {$ssvnc_extra_opts != ""} {
+		set cmd "$cmd -ssvnc_extra_opts '$ssvnc_extra_opts'"
+	}
 	if {$rfbversion != ""} {
 		set cmd "$cmd -rfbversion '$rfbversion'"
 	}
@@ -6037,6 +6104,13 @@ proc launch_unix {hp} {
 		set cmd "$cmd -listen"
 		if {$listen_once} {
 			set cmd "$cmd -onelisten"
+		}
+		if {$listen_accept_popup} {
+			if {$listen_accept_popup_sc} {
+				set env(SSVNC_ACCEPT_POPUP_SC) 1
+			} else {
+				set env(SSVNC_ACCEPT_POPUP) 1
+			}
 		}
 	}
 
@@ -7111,10 +7185,10 @@ proc launch {{hp ""}} {
 		mesg "Starting TCP helper on port $port ..."
 		after 600
 		set proxy_pid [exec "connect_br.exe" &]
-		unset -nocomplain env(SSVNC_PROXY)
-		unset -nocomplain env(SSVNC_LISTEN)
-		unset -nocomplain env(SSVNC_REVERSE)
-		unset -nocomplain env(SSVNC_DEST)
+		catch { unset env(SSVNC_PROXY) }
+		catch { unset env(SSVNC_LISTEN) }
+		catch { unset env(SSVNC_REVERSE) }
+		catch { unset env(SSVNC_DEST) }
 	}
 
 	mesg "Starting STUNNEL on port $port2 ..."
@@ -7265,9 +7339,9 @@ proc direct_connect_windows {{hp ""}} {
 		mesg "Starting TCP helper on port $port ..."
 		after 600
 		set proxy_pid [exec "connect_br.exe" &]
-		unset -nocomplain env(SSVNC_PROXY)
-		unset -nocomplain env(SSVNC_LISTEN)
-		unset -nocomplain env(SSVNC_DEST)
+		catch { unset env(SSVNC_PROXY) }
+		catch { unset env(SSVNC_LISTEN) }
+		catch { unset env(SSVNC_DEST) }
 	}
 
 	catch {destroy .o}
@@ -12072,7 +12146,7 @@ proc help_advanced_opts {} {
          mount SMB file shares from your local server.  The remote machine
          must be Linux with smbmount installed. SSH mode is required.
 
-      Additional Port Redirs:
+      Additional Port Redirs (via SSH):
 
          Specify additional -L port:host:port and -R port:host:port
          cmdline options for SSH to enable additional services.
@@ -12103,7 +12177,7 @@ proc help_advanced_opts {} {
       SSH Local Port Protections:
 
          An LD_PRELOAD hack to limit the number of SSH port redirections
-         to 1 and within the first 15 seconds.  So there is a smaller
+         to 1 and within the first 35 seconds.  So there is a smaller
          window when the user can try to use your tunnel compared to
          the duration of your session.  SSH mode is required.
 
@@ -12227,6 +12301,20 @@ proc help_ssvncviewer_opts {} {
          Try to have the VNC Viewer exit after the first listening
          connection. (It may not always be detected; use Ctrl-C to exit)
 
+      Listen Accept Popup Dialog:
+
+         In -listen (reverse connection listening) mode when a reverse
+         VNC connection comes in show a popup asking whether to Accept
+         or Reject the connection. (-acceptpopup vncviewer option.)
+
+      Accept Popup UltraVNC Single Click:
+
+         As in 'Listen Accept Popup Dialog', except assume the remote
+         VNC server is UltraVNC Single Click and force the execution of
+         the protocol to retrieve the extra remote-side info (Windows
+         User, ComputerName, etc) which is then also displayed in the
+         Popup window. (-acceptpopupsc vncviewer option.)
+
       Use X11 Cursor:
 
          When drawing the mouse cursor shape locally, use an X11 cursor
@@ -12270,6 +12358,16 @@ proc help_ssvncviewer_opts {} {
          Darwin.i386 have vncviewer.turbovnc binaries shipped in the
          ssvnc bundles.  See the build instructions for how you might
          compile your own.
+
+      Disable Pipeline Updates:
+
+         Disable the TurboVNC-like pipelined updates mode.  Pipelined
+         updates is the default even when not TurboVNC enabled.  They
+         ask for the next screen update before the current one has 
+         finished downloading, and so this might reduce the slowdown
+         due to high latency or low bandwidth by 2X or so.  Disable
+         them if they cause problems with the remote VNC Server or
+         use too much bandwidth.
 
       Send CLIPBOARD not PRIMARY:
 
@@ -12327,6 +12425,23 @@ proc help_ssvncviewer_opts {} {
          scrollbars (often one want it to be very narrow, e.g. 2 pixels
          to be less distracting.
 
+      RFB Version:
+
+         Set the numerical version of RFB (VNC) protocol to pretend to
+         be, 3.x.  Usually only needed with UltraVNC servers.
+
+      Encodings:
+
+         List encodings in preferred order, for example
+         'copyrect zrle tight'   The list of encodings is:
+         copyrect tight zrle zywrle hextile zlib corre rre raw
+
+      Extra Options:
+
+         String of extra Unix ssvncviewer command line options.  I.e. for
+         ones like -16bpp that cannot be set inside this SSVNC GUI.  For a
+         list click Help then 'SSVNC vncviewer -help Output'. 
+
 
     These are environment variables one may set to affect the options
     of the SSVNC vncviewer:
@@ -12347,8 +12462,15 @@ proc help_ssvncviewer_opts {} {
          VNCVIEWER_SEND_ALWAYS    (-sendalways)
          VNCVIEWER_RECV_TEXT      (-recvtext clipboard/primary/both)
          VNCVIEWER_NO_CUTBUFFER   (do not send CUTBUFFER0 as fallback)
+         VNCVIEWER_NO_PIPELINE_UPDATES (-nopipeline)
+
+         VNCVIEWERCMD             (unix viewer command, default vncviewer)
+         VNCVIEWERCMD_OVERRIDE    (force override of VNCVIEWERCMD)
+         VNCVIEWERCMD_EXTRA_OPTS  (extra options to pass to VNCVIEWERCMD)
 
          SSVNC_MULTIPLE_LISTEN    (-multilisten, see Multiple LISTEN above)
+         SSVNC_ACCEPT_POPUP       (-acceptpopup, see Accept Popup Dialog)
+         SSVNC_ACCEPT_POPUP_SC    (-acceptpopupsc, see Accept Popup Dialog)
          SSVNC_TURBOVNC           (see TurboVNC above)
          SSVNC_UNIXPW             (-unixpw)
          SSVNC_UNIXPW_NOESC       (do not send escape in -unixpw mode)
@@ -12500,7 +12622,7 @@ proc port_redir_dialog {} {
 	global additional_port_redirs additional_port_redirs_list
 	
 	toplev .redirs
-	wm title .redirs "Additional Port Redirections"
+	wm title .redirs "Additional Port Redirections (via SSH)"
 
 	global help_font uname
 	if {$uname == "Darwin"} {
@@ -12881,11 +13003,11 @@ proc ssh_sec_dialog {} {
 
     On Unix, for SSH tunnels we have an LD_PRELOAD hack (lim_accept.so)
     that will limit ssh from accepting any local redirection connections
-    after the first one or after 15 seconds, whichever comes first.
+    after the first one or after 35 seconds, whichever comes first.
     The first SSH port redirection connection is intended to be the one
     that tunnels your VNC Viewer to reach the remote server.
 
-    You can adjust these defaults LIM_ACCEPT=1 LIM_ACCEPT_TIME=15 by
+    You can adjust these defaults LIM_ACCEPT=1 LIM_ACCEPT_TIME=35 by
     setting those env. vars. to different values. 
 
     Note that there is still a window of a few seconds the Untrusted
@@ -12894,8 +13016,8 @@ proc ssh_sec_dialog {} {
     he should be blocked out.  Test to make sure blocking is taking place.
 
     Do not use this option if you are doing SSH Service redirections
-    'Additional Port Redirections' that redirect a local port to the
-    remote server via ssh -L.
+    'Additional Port Redirections (via SSH)' that redirect a local port
+    to the remote server via ssh -L.
 
     Note that if the shared object "lim_accept.so" cannot be found,
     this option has no effect.  Watch the output in the terminal for
@@ -14009,17 +14131,17 @@ proc set_advanced_options {} {
 	set adv_ssh(smb) .oa.b$i
 	incr i
 
-	checkbutton .oa.b$i -anchor w -variable additional_port_redirs -text \
-		"Additional Port Redirs" \
-		-command {if {$additional_port_redirs} {port_redir_dialog}}
-	if {!$use_ssh && !$use_sshssl} {.oa.b$i configure -state disabled}
-	set adv_ssh(redirs) .oa.b$i
-	incr i
-
 	checkbutton .oa.b$i -anchor w -variable use_x11vnc_xlogin -text \
 		"Automatically Find X Login/Greeter" -command {x11vnc_find_adjust "xlogin"}
 	if {!$use_ssh && !$use_sshssl} {.oa.b$i configure -state disabled}
 	set x11vnc_xlogin_widget ".oa.b$i"
+	incr i
+
+	checkbutton .oa.b$i -anchor w -variable additional_port_redirs -text \
+		"Additional Port Redirs (via SSH)" \
+		-command {if {$additional_port_redirs} {port_redir_dialog}}
+	if {!$use_ssh && !$use_sshssl} {.oa.b$i configure -state disabled}
+	set adv_ssh(redirs) .oa.b$i
 	incr i
 
 	global use_ssl use_ssh use_sshssl
@@ -14152,7 +14274,7 @@ proc set_advanced_options {} {
 
 proc set_ssvncviewer_options {} {
 	global is_windows darwin_cotvnc
-	global use_ssh use_sshssl use_x11cursor use_rawlocal use_popupfix use_alpha use_turbovnc use_grab use_nobell
+	global use_ssh use_sshssl use_x11cursor use_rawlocal use_popupfix use_alpha use_turbovnc disable_pipeline use_grab use_nobell
 	global use_send_clipboard use_send_always
 	global ssvnc_scale ssvnc_escape
 	global server_vencrypt server_anondh
@@ -14167,200 +14289,260 @@ proc set_ssvncviewer_options {} {
 
 	set darwinlist [list]
 
-	set i 1
+	set f0 .os.f
+	frame $f0
+	set fl $f0.fl
+	frame $fl
+	set fr $f0.fr
+	frame $fr
 
-	checkbutton .os.b$i -anchor w -variable multiple_listen -text \
+	set i 1
+	set j 1
+
+	checkbutton $fl.b$i -anchor w -variable multiple_listen -text \
 		"Multiple LISTEN Connections" \
 		-command {if {$multiple_listen} {multilisten_dialog}}
 	global multiple_listen_button use_listen
-	set multiple_listen_button .os.b$i
-	if {$is_windows}  {.os.b$i configure -state disabled}
-	if {!$use_listen} {.os.b$i configure -state disabled}
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	set multiple_listen_button $fl.b$i
+	if {$is_windows}  {$fl.b$i configure -state disabled}
+	if {!$use_listen} {$fl.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable listen_once -text \
+	checkbutton $fl.b$i -anchor w -variable listen_once -text \
 		"Listen Once"
 	global listen_once_button
-	set listen_once_button .os.b$i
-	if {!$use_listen} {.os.b$i configure -state disabled}
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	set listen_once_button $fl.b$i
+	if {!$use_listen} {$fl.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable use_x11cursor -text \
+	checkbutton $fl.b$i -anchor w -variable listen_accept_popup -text \
+		"Listen Accept Popup Dialog" \
+		-command { if {$listen_accept_popup} { catch {$listen_accept_popup_button_sc configure -state normal} } else { catch {$listen_accept_popup_button_sc  configure -state disabled} } }
+	global listen_accept_popup_button
+	set listen_accept_popup_button $fl.b$i
+	if {!$use_listen} {$fl.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
+	incr i
+
+	global listen_accept_popup
+	checkbutton $fl.b$i -anchor w -variable listen_accept_popup_sc -text \
+		"   Accept Popup UltraVNC Single Click"
+	global listen_accept_popup_button_sc
+	set listen_accept_popup_button_sc $fl.b$i
+	if {!$use_listen} {$fl.b$i configure -state disabled}
+	if {!$listen_accept_popup} {$fl.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
+	incr i
+
+	checkbutton $fl.b$i -anchor w -variable use_x11cursor -text \
 		"Use X11 Cursor"
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable use_nobell -text \
+	checkbutton $fl.b$i -anchor w -variable use_nobell -text \
 		"Disable Bell"
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable use_rawlocal -text \
+	checkbutton $fl.b$i -anchor w -variable use_rawlocal -text \
 		"Use Raw Local"
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable use_popupfix -text \
+	checkbutton $fl.b$i -anchor w -variable use_popupfix -text \
 		"Use Popup Fix"
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable use_grab -text \
+	checkbutton $fl.b$i -anchor w -variable use_grab -text \
 		"Use XGrabServer (for fullscreen)" \
 		-command {if {$use_grab} {use_grab_dialog}}
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable use_alpha -text \
-		"Cursor Alphablending (32bpp required)"
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	checkbutton $fl.b$i -anchor w -variable use_alpha -text \
+		"Cursor Alphablending (32bpp required)     "
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable use_turbovnc -text \
+	checkbutton $fl.b$i -anchor w -variable use_turbovnc -text \
 		"TurboVNC (if available on platform)"
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable use_send_clipboard -text \
+	checkbutton $fl.b$i -anchor w -variable disable_pipeline -text \
+		"Disable Pipelined Updates"
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
+	incr i
+
+	checkbutton $fl.b$i -anchor w -variable use_send_clipboard -text \
 		"Send CLIPBOARD not PRIMARY"
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
-	checkbutton .os.b$i -anchor w -variable use_send_always -text \
+	checkbutton $fl.b$i -anchor w -variable use_send_always -text \
 		"Send Selection Every time"
-	lappend darwinlist .os.b$i; if {$darwin_cotvnc} {.os.b$i configure -state disabled}
+	lappend darwinlist $fl.b$i; if {$darwin_cotvnc} {$fl.b$i configure -state disabled}
 	incr i
 
 	set relief ridge
 
-	frame .os.b$i -height 2; incr i
+	frame $fr.b$j -height 2; incr j
 
-	frame .os.b$i -relief $relief -borderwidth 2
+	frame $fr.b$j -relief $relief -borderwidth 2
 
 	global ffont
-	label .os.b$i.l -font $ffont -anchor w -text "Examples: '0.75', '1024x768', 'fit' (fill screen), or 'auto'";
+	label $fr.b$j.l -font $ffont -anchor w -text "Examples: '0.75', '1024x768', 'fit' (fill screen), or 'auto' ";
 
 	global ssvnc_scale
-	frame .os.b$i.f
-	label .os.b$i.f.l -text "Scaling: "
-	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
-	entry .os.b$i.f.e -width 10 -textvariable ssvnc_scale
-	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
-	pack .os.b$i.f.l -side left
-	pack .os.b$i.f.e -side right -expand 1 -fill x
+	frame $fr.b$j.f
+	label $fr.b$j.f.l -text "Scaling: "
+	lappend darwinlist $fr.b$j.f.l; if {$darwin_cotvnc} {$fr.b$j.f.l configure -state disabled}
+	entry $fr.b$j.f.e -width 10 -textvariable ssvnc_scale
+	lappend darwinlist $fr.b$j.f.e; if {$darwin_cotvnc} {$fr.b$j.f.e configure -state disabled}
+	pack $fr.b$j.f.l -side left
+	pack $fr.b$j.f.e -side right -expand 1 -fill x
 
-	pack .os.b$i.f .os.b$i.l -side top -fill x
+	pack $fr.b$j.f $fr.b$j.l -side top -fill x
 
-	incr i
+	incr j
 
-	frame .os.b$i -height 2; incr i
+	frame $fr.b$j -height 2; incr j
 
-	frame .os.b$i -relief $relief -borderwidth 2
+	frame $fr.b$j -relief $relief -borderwidth 2
 
-	label .os.b$i.l -font $ffont -anchor w -text "Examples: 'default', 'Control_L,Alt_L', 'never'";
+	label $fr.b$j.l -font $ffont -anchor w -text "Examples: 'default', 'Control_L,Alt_L', 'never'";
 
 	global ssvnc_escape
-	frame .os.b$i.f
-	label .os.b$i.f.l -text "Escape Keys: "
-	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
-	entry .os.b$i.f.e -width 10 -textvariable ssvnc_escape
-	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
-	button .os.b$i.f.b -relief ridge -text Help -command ssvnc_escape_help
-	lappend darwinlist .os.b$i.f.b; if {$darwin_cotvnc} {.os.b$i.f.b configure -state disabled}
-	pack .os.b$i.f.l -side left
-	pack .os.b$i.f.b -side right
-	pack .os.b$i.f.e -side right -expand 1 -fill x
+	frame $fr.b$j.f
+	label $fr.b$j.f.l -text "Escape Keys: "
+	lappend darwinlist $fr.b$j.f.l; if {$darwin_cotvnc} {$fr.b$j.f.l configure -state disabled}
+	entry $fr.b$j.f.e -width 10 -textvariable ssvnc_escape
+	lappend darwinlist $fr.b$j.f.e; if {$darwin_cotvnc} {$fr.b$j.f.e configure -state disabled}
+	button $fr.b$j.f.b -relief ridge -text Help -command ssvnc_escape_help
+	lappend darwinlist $fr.b$j.f.b; if {$darwin_cotvnc} {$fr.b$j.f.b configure -state disabled}
+	pack $fr.b$j.f.l -side left
+	pack $fr.b$j.f.b -side right
+	pack $fr.b$j.f.e -side right -expand 1 -fill x
 
-	pack .os.b$i.f .os.b$i.l -side top -fill x
+	pack $fr.b$j.f $fr.b$j.l -side top -fill x
 
-	incr i
+	incr j
 
-	frame .os.b$i -height 2; incr i
+	frame $fr.b$j -height 2; incr j
 
-	frame .os.b$i -relief $relief -borderwidth 2
+	frame $fr.b$j -relief $relief -borderwidth 2
 
-	label .os.b$i.l -font $ffont -anchor w -text "Enter the max height in pixels, e.g. '900'";
+	label $fr.b$j.l -font $ffont -anchor w -text "Enter the max height in pixels, e.g. '900'";
 
 	global ycrop_string
-	frame .os.b$i.f
-	label .os.b$i.f.l -text "Y Crop: "
-	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
-	entry .os.b$i.f.e -width 10 -textvariable ycrop_string
-	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
-	pack .os.b$i.f.l -side left
-	pack .os.b$i.f.e -side right -expand 1 -fill x
+	frame $fr.b$j.f
+	label $fr.b$j.f.l -text "Y Crop: "
+	lappend darwinlist $fr.b$j.f.l; if {$darwin_cotvnc} {$fr.b$j.f.l configure -state disabled}
+	entry $fr.b$j.f.e -width 10 -textvariable ycrop_string
+	lappend darwinlist $fr.b$j.f.e; if {$darwin_cotvnc} {$fr.b$j.f.e configure -state disabled}
+	pack $fr.b$j.f.l -side left
+	pack $fr.b$j.f.e -side right -expand 1 -fill x
 
-	pack .os.b$i.f .os.b$i.l -side top -fill x
+	pack $fr.b$j.f $fr.b$j.l -side top -fill x
 
-	incr i
+	incr j
 
-	frame .os.b$i -height 2; incr i
+	frame $fr.b$j -height 2; incr j
 
-	frame .os.b$i -relief $relief -borderwidth 2
+	frame $fr.b$j -relief $relief -borderwidth 2
 
-	label .os.b$i.l -font $ffont -anchor w -text "Enter the scrollbar width in pixels, e.g. '4'";
+	label $fr.b$j.l -font $ffont -anchor w -text "Enter the scrollbar width in pixels, e.g. '4'";
 
 	global sbwid_string
-	frame .os.b$i.f
-	label .os.b$i.f.l -text "ScrollBar Width: "
-	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
-	entry .os.b$i.f.e -width 10 -textvariable sbwid_string
-	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
-	pack .os.b$i.f.l -side left
-	pack .os.b$i.f.e -side right -expand 1 -fill x
+	frame $fr.b$j.f
+	label $fr.b$j.f.l -text "ScrollBar Width: "
+	lappend darwinlist $fr.b$j.f.l; if {$darwin_cotvnc} {$fr.b$j.f.l configure -state disabled}
+	entry $fr.b$j.f.e -width 10 -textvariable sbwid_string
+	lappend darwinlist $fr.b$j.f.e; if {$darwin_cotvnc} {$fr.b$j.f.e configure -state disabled}
+	pack $fr.b$j.f.l -side left
+	pack $fr.b$j.f.e -side right -expand 1 -fill x
 
-	pack .os.b$i.f .os.b$i.l -side top -fill x
+	pack $fr.b$j.f $fr.b$j.l -side top -fill x
 
-	incr i
+	incr j
 
-	frame .os.b$i -height 2; incr i
+	frame $fr.b$j -height 2; incr j
 
-	frame .os.b$i -relief $relief -borderwidth 2
+	frame $fr.b$j -relief $relief -borderwidth 2
 
-	label .os.b$i.l  -font $ffont -anchor w -text "Enter the RFB version to pretend to be using, e.g. '3.4'";
-	label .os.b$i.l2 -font $ffont -anchor w -text "Sometimes needed for UltraVNC: 3.4, 3.6, 3.14, 3.16";
+	label $fr.b$j.l  -font $ffont -anchor w -text "Enter the RFB version to pretend to be using, e.g. '3.4'";
+	label $fr.b$j.l2 -font $ffont -anchor w -text "Sometimes needed for UltraVNC: 3.4, 3.6, 3.14, 3.16";
 
 	global rfbversion
-	frame .os.b$i.f
-	label .os.b$i.f.l -text "RFB Version: "
-	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
-	entry .os.b$i.f.e -width 10 -textvariable rfbversion
-	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
-	pack .os.b$i.f.l -side left
-	pack .os.b$i.f.e -side right -expand 1 -fill x
+	frame $fr.b$j.f
+	label $fr.b$j.f.l -text "RFB Version: "
+	lappend darwinlist $fr.b$j.f.l; if {$darwin_cotvnc} {$fr.b$j.f.l configure -state disabled}
+	entry $fr.b$j.f.e -width 10 -textvariable rfbversion
+	lappend darwinlist $fr.b$j.f.e; if {$darwin_cotvnc} {$fr.b$j.f.e configure -state disabled}
+	pack $fr.b$j.f.l -side left
+	pack $fr.b$j.f.e -side right -expand 1 -fill x
 
-	pack .os.b$i.f .os.b$i.l .os.b$i.l2  -side top -fill x
+	pack $fr.b$j.f $fr.b$j.l $fr.b$j.l2  -side top -fill x
 
-	incr i
+	incr j
 
-	frame .os.b$i -height 2; incr i
+	frame $fr.b$j -height 2; incr j
 
-	frame .os.b$i -relief $relief -borderwidth 2
+	frame $fr.b$j -relief $relief -borderwidth 2
 
-	label .os.b$i.l1 -font $ffont -anchor w -text "List encodings in preferred order, for example";
-	label .os.b$i.l2 -font $ffont -anchor w -text "'copyrect zrle tight'   The list of encodings is:";
-	label .os.b$i.l3 -font $ffont -anchor w -text "copyrect tight zrle zywrle hextile zlib corre rre raw";
+	label $fr.b$j.l1 -font $ffont -anchor w -text "List encodings in preferred order, for example";
+	label $fr.b$j.l2 -font $ffont -anchor w -text "'copyrect zrle tight'   The full list of encodings is:";
+	label $fr.b$j.l3 -font $ffont -anchor w -text "copyrect tight zrle zywrle hextile zlib corre rre raw";
 
 	global ssvnc_encodings
-	frame .os.b$i.f
-	label .os.b$i.f.l -text "Encodings: "
-	lappend darwinlist .os.b$i.f.l; if {$darwin_cotvnc} {.os.b$i.f.l configure -state disabled}
-	entry .os.b$i.f.e -width 10 -textvariable ssvnc_encodings
-	lappend darwinlist .os.b$i.f.e; if {$darwin_cotvnc} {.os.b$i.f.e configure -state disabled}
-	pack .os.b$i.f.l -side left
-	pack .os.b$i.f.e -side right -expand 1 -fill x
+	frame $fr.b$j.f
+	label $fr.b$j.f.l -text "Encodings: "
+	lappend darwinlist $fr.b$j.f.l; if {$darwin_cotvnc} {$fr.b$j.f.l configure -state disabled}
+	entry $fr.b$j.f.e -width 10 -textvariable ssvnc_encodings
+	lappend darwinlist $fr.b$j.f.e; if {$darwin_cotvnc} {$fr.b$j.f.e configure -state disabled}
+	pack $fr.b$j.f.l -side left
+	pack $fr.b$j.f.e -side right -expand 1 -fill x
 
-	pack .os.b$i.f .os.b$i.l1 .os.b$i.l2 .os.b$i.l3 -side top -fill x
+	pack $fr.b$j.f $fr.b$j.l1 $fr.b$j.l2 $fr.b$j.l3 -side top -fill x
 
-	incr i
+	incr j
 
-	frame .os.b$i -height 2; incr i
+	frame $fr.b$j -height 2; incr j
 
-	for {set j 1} {$j < $i} {incr j} {
-		pack .os.b$j -side top -fill x
+	frame $fr.b$j -relief $relief -borderwidth 2
+
+	label $fr.b$j.l1 -font $ffont -anchor w -text "Add any extra options for ssvncviewer that you want.";
+	label $fr.b$j.l2 -font $ffont -anchor w -text "For example: -16bpp -noshm etc.  See Help for a list.";
+
+	global ssvnc_extra_opts
+	frame $fr.b$j.f
+	label $fr.b$j.f.l -text "Extra Options: "
+	lappend darwinlist $fr.b$j.f.l; if {$darwin_cotvnc} {$fr.b$j.f.l configure -state disabled}
+	entry $fr.b$j.f.e -width 10 -textvariable ssvnc_extra_opts
+	lappend darwinlist $fr.b$j.f.e; if {$darwin_cotvnc} {$fr.b$j.f.e configure -state disabled}
+	pack $fr.b$j.f.l -side left
+	pack $fr.b$j.f.e -side right -expand 1 -fill x
+
+	pack $fr.b$j.f $fr.b$j.l1 $fr.b$j.l2 -side top -fill x
+
+	incr j
+
+	frame $fr.b$j -height 2; incr j
+
+	for {set k 1} {$k < $i} {incr k} {
+		pack $fl.b$k -side top -fill x
 	}
+	for {set k 1} {$k < $j} {incr k} {
+		pack $fr.b$k -side top -fill x
+	}
+
+	pack $fl -side left -fill both
+	pack $fr -side left -fill both -expand 1
+
+	pack $f0 -side top -fill both
 
 	frame .os.b
 	button .os.b.done -text "Done" -command {destroy .os}
@@ -14386,6 +14568,7 @@ proc set_ssvncviewer_options {} {
 
 	center_win .os
 	wm resizable .os 1 0
+	wm minsize .os [winfo reqwidth .os] [winfo reqheight .os] 
 	focus .os
 }
 
@@ -14675,7 +14858,7 @@ proc ssl_ssh_adjust {which} {
 
 proc listen_adjust {} {
 	global use_listen revs_button multiple_listen_button is_windows
-	global listen_once_button
+	global listen_once_button listen_accept_popup_button listen_accept_popup_button_sc
 	if {![info exists multiple_listen_button]} {
 		set multiple_listen_button "none"
 	}
@@ -14684,17 +14867,23 @@ proc listen_adjust {} {
 		catch {.o.b.connect configure -text "Listen"}
 		catch {$multiple_listen_button configure -state normal}
 		catch {$listen_once_button configure -state normal}
+		catch {$listen_accept_popup_button configure -state normal}
+		catch {$listen_accept_popup_button_sc configure -state normal}
 		catch {mesg "Listen :N -> Port 5500+N, i.e. :0 -> 5500, :1 -> 5501, :2 -> 5502 ..."}
 	} else {
 		catch {.b.conn configure -text "Connect"}
 		catch {.o.b.connect configure -text "Connect"}
 		catch {$multiple_listen_button configure -state disabled}
 		catch {$listen_once_button configure -state disabled}
+		catch {$listen_accept_popup_button configure -state disabled}
+		catch {$listen_accept_popup_button_sc configure -state disabled}
 		catch {mesg "Switched to Forward Connection mode."}
 	}
 	if {$is_windows} {
 		catch {$multiple_listen_button configure -state disabled}
 		catch {$listen_once_button configure -state disabled}
+		catch {$listen_accept_popup_button configure -state disabled}
+		catch {$listen_accept_popup_button_sc configure -state disabled}
 	}
 }
 
@@ -15375,7 +15564,7 @@ proc zeroconf_fill {b m} {
 			set last_dns_sd 0
 		}
 		if {[clock seconds] > [expr $last_dns_sd + 1800]} {
-			unset -nocomplain dns_sd_cache
+			catch { unset dns_sd_cache }
 			set last_dns_sd [clock seconds]
 		}
 		foreach line $lines {
@@ -15540,8 +15729,9 @@ proc toggle_vnc_prefix {} {
 	catch {.f0.e icursor end}
 }
 
+############################################
+
 global env
-set is_windows 0
 
 if {[regexp -nocase {Windows.9} $tcl_platform(os)]} {
 	set is_win9x 1
@@ -15549,13 +15739,17 @@ if {[regexp -nocase {Windows.9} $tcl_platform(os)]} {
 	set is_win9x 0
 }
 
-set ffont "fixed"
-set help_font "-font $ffont"
+set is_windows 0
 if { [regexp -nocase {Windows} $tcl_platform(os)]} {
-	cd util
-	set help_font ""
 	set is_windows 1
 }
+
+set uname ""
+if {! $is_windows} {
+	catch {set uname [exec uname]}
+}
+
+set ffont "fixed"
 
 # need to check if "fixed" font under XFT on tk8.5 is actually fixed width!!
 if {$tcl_platform(platform) == "unix"} {
@@ -15578,9 +15772,14 @@ if {$tcl_platform(platform) == "unix"} {
 			}
 		}
 	}
-	set help_font "-font $ffont"
 }
 
+if {$uname == "Darwin"} {
+	set ffont "Monaco 10"
+
+	#option add *Button.font Helvetica widgetDefault
+	catch {option add *Button.font {System 10} widgetDefault}
+}
 
 # set SSVNC_HOME to HOME in case we modify it for mobile use:
 if [info exists env(HOME)] {
@@ -15719,6 +15918,14 @@ if [file exists $ssvncrc] {
 				set val [string trim $val]
 				set ts_xserver_type_def $val
 			}
+			if [regexp {^font_default=(.*)$} $str m val] {
+				set val [string trim $val]
+				catch {option add *font $val}
+			}
+			if [regexp {^font_fixed=(.*)$} $str m val] {
+				set val [string trim $val]
+				set ffont $val
+			}
 			if [regexp {^noenc=1} $str] {
 				global env
 				set env(SSVNC_DISABLE_ENCRYPTION_BUTTON) 1
@@ -15851,6 +16058,27 @@ for {set i 0} {$i < $argc} {incr i} {
 	}
 }
 
+if [info exists env(SSVNC_FONT_FIXED)] {
+	set ffont $env(SSVNC_FONT_FIXED)
+}
+
+if [info exists env(SSVNC_FONT_DEFAULT)] {
+	catch {option add *font $env(SSVNC_FONT_DEFAULT)}
+}
+
+if [regexp {[ 	]} $ffont] {
+	set help_font "-font \"$ffont\""
+} else {
+	set help_font "-font $ffont"
+}
+
+if { [regexp -nocase {Windows} $tcl_platform(os)]} {
+	cd util
+	if {$help_font == "-font fixed"} {
+		set help_font ""
+	}
+}
+
 if {$saw_ts_only && $saw_ssh_only} {
 	set saw_ssh_only 0
 }
@@ -15908,11 +16136,6 @@ if {$is_windows} {
 	check_writable
 }
 
-set uname ""
-if {! $is_windows} {
-	catch {set uname [exec uname]}
-}
-
 
 set darwin_cotvnc 0
 if {$uname == "Darwin"} {
@@ -15927,14 +16150,13 @@ if {$uname == "Darwin"} {
 			catch {file mkdir $t}
 		}
 	}
-	set help_font "-font {Monaco 10}"
-
-	#option add *Button.font Helvetica widgetDefault
-	catch {option add *Button.font {System 10} widgetDefault}
 }
 
 ##for testing macosx
-##set uname Darwin; set darwin_cotvnc 1
+if [info exists env(FORCE_DARWIN)] {
+	set uname Darwin
+	set darwin_cotvnc 1
+}
 
 set putty_pw ""
 

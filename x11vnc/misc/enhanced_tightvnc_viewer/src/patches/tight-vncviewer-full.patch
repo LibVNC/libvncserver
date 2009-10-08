@@ -664,7 +664,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
 +
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/vncviewer/argsresources.c
 --- vnc_unixsrc.orig/vncviewer/argsresources.c	2007-02-04 17:10:31.000000000 -0500
-+++ vnc_unixsrc/vncviewer/argsresources.c	2009-05-31 17:50:18.000000000 -0400
++++ vnc_unixsrc/vncviewer/argsresources.c	2009-10-03 12:27:50.000000000 -0400
 @@ -31,9 +31,9 @@
  
  char *fallback_resources[] = {
@@ -1318,7 +1318,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  static XtResource appDataResourceList[] = {
    {"shareDesktop", "ShareDesktop", XtRBool, sizeof(Bool),
-@@ -155,14 +710,41 @@
+@@ -155,14 +710,44 @@
    {"userLogin", "UserLogin", XtRString, sizeof(String),
     XtOffsetOf(AppData, userLogin), XtRImmediate, (XtPointer) 0},
  
@@ -1333,6 +1333,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +
 +  {"ultraDSM", "UltraDSM", XtRBool, sizeof(Bool),
 +   XtOffsetOf(AppData, ultraDSM), XtRImmediate, (XtPointer) False},
++
++  {"acceptPopup", "AcceptPopup", XtRBool, sizeof(Bool),
++   XtOffsetOf(AppData, acceptPopup), XtRImmediate, (XtPointer) False},
 +
 +  {"rfbVersion", "RfbVersion", XtRString, sizeof(String),
 +   XtOffsetOf(AppData, rfbVersion), XtRImmediate, (XtPointer) 0},
@@ -1362,7 +1365,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"nColours", "NColours", XtRInt, sizeof(int),
     XtOffsetOf(AppData, nColours), XtRImmediate, (XtPointer) 256},
-@@ -179,9 +761,12 @@
+@@ -179,9 +764,12 @@
    {"requestedDepth", "RequestedDepth", XtRInt, sizeof(int),
     XtOffsetOf(AppData, requestedDepth), XtRImmediate, (XtPointer) 0},
  
@@ -1376,7 +1379,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"wmDecorationWidth", "WmDecorationWidth", XtRInt, sizeof(int),
     XtOffsetOf(AppData, wmDecorationWidth), XtRImmediate, (XtPointer) 4},
  
-@@ -191,6 +776,9 @@
+@@ -191,6 +779,9 @@
    {"popupButtonCount", "PopupButtonCount", XtRInt, sizeof(int),
     XtOffsetOf(AppData, popupButtonCount), XtRImmediate, (XtPointer) 0},
  
@@ -1386,7 +1389,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"debug", "Debug", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, debug), XtRImmediate, (XtPointer) False},
  
-@@ -206,11 +794,13 @@
+@@ -206,11 +797,13 @@
    {"bumpScrollPixels", "BumpScrollPixels", XtRInt, sizeof(int),
     XtOffsetOf(AppData, bumpScrollPixels), XtRImmediate, (XtPointer) 20},
  
@@ -1401,7 +1404,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"enableJPEG", "EnableJPEG", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, enableJPEG), XtRImmediate, (XtPointer) True},
-@@ -218,14 +808,85 @@
+@@ -218,14 +811,85 @@
    {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
  
@@ -1489,7 +1492,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -242,8 +903,26 @@
+@@ -242,8 +906,28 @@
    {"-noraiseonbeep", "*raiseOnBeep",        XrmoptionNoArg,  "False"},
    {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
    {"-user",          "*userLogin",          XrmoptionSepArg, 0},
@@ -1497,6 +1500,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +  {"-mslogon",       "*msLogon",            XrmoptionSepArg, 0},
 +  {"-repeater",      "*repeaterUltra",      XrmoptionSepArg, 0},
 +  {"-ultradsm",      "*ultraDSM",           XrmoptionNoArg,  "True"},
++  {"-acceptpopup",   "*acceptPopup",        XrmoptionNoArg,  "True"},
++  {"-acceptpopupsc", "*acceptPopup",        XrmoptionNoArg,  "True"},
 +  {"-rfbversion",    "*rfbVersion",         XrmoptionSepArg, 0},
    {"-encodings",     "*encodings",          XrmoptionSepArg, 0},
 -  {"-bgr233",        "*useBGR233",          XrmoptionNoArg,  "True"},
@@ -1517,7 +1522,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"-owncmap",       "*forceOwnCmap",       XrmoptionNoArg,  "True"},
    {"-truecolor",     "*forceTrueColour",    XrmoptionNoArg,  "True"},
    {"-truecolour",    "*forceTrueColour",    XrmoptionNoArg,  "True"},
-@@ -253,8 +932,27 @@
+@@ -253,8 +937,27 @@
    {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
    {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
    {"-x11cursor",     "*useX11Cursor",       XrmoptionNoArg,  "True"},
@@ -1547,7 +1552,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  int numCmdLineOptions = XtNumber(cmdLineOptions);
-@@ -267,16 +965,98 @@
+@@ -267,16 +970,98 @@
  static XtActionsRec actions[] = {
      {"SendRFBEvent", SendRFBEvent},
      {"ShowPopup", ShowPopup},
@@ -1646,7 +1651,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -302,11 +1082,14 @@
+@@ -302,11 +1087,14 @@
  void
  usage(void)
  {
@@ -1663,7 +1668,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
  	  "       %s -help\n"
  	  "\n"
-@@ -332,10 +1115,339 @@
+@@ -332,10 +1120,349 @@
  	  "        -autopass\n"
  	  "\n"
  	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
@@ -1707,6 +1712,16 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "                    time tries to play it safe by not allowing anyone on\n"
 +	  "                    the network to put (many) desktops on your screen over\n"
 +	  "                    a long window of time. Use -multilisten for no limit.\n"
++	  "\n"
++	  "        -acceptpopup  In -listen (reverse connection listening) mode when\n"
++	  "                    a reverse VNC connection comes in show a popup asking\n"
++	  "                    whether to Accept or Reject the connection.  The IP\n"
++	  "                    address of the connecting host is shown.  Same as\n"
++	  "                    setting the env. var. SSVNC_ACCEPT_POPUP=1.\n"
++	  "\n"
++	  "        -acceptpopupsc  As in -acceptpopup except assume UltraVNC Single\n"
++	  "                    Click (SC) server.  Retrieve User and ComputerName\n"
++	  "                    info from UltraVNC Server and display in the Popup.\n"
 +	  "\n"
 +	  "        -use64      In -bgr233 mode, use 64 colors instead of 256.\n"
 +	  "        -bgr222     Same as -use64.\n"
@@ -1874,9 +1889,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "\n"
 +	  "                    IMPORTANT NOTE: The UltraVNC MS-Logon Diffie-Hellman\n"
 +	  "                    exchange is very weak and can be brute forced to recover\n"
-+	  "                    your username and password in a few hours or seconds of CPU\n"
-+	  "                    time.  To be safe, be sure to use an additional encrypted\n"
-+	  "                    tunnel (e.g. SSL or SSH) for the entire VNC session.\n"
++	  "                    your username and password in a few seconds of CPU time.\n"
++	  "                    To be safe, be sure to use an additional encrypted tunnel\n"
++	  "                    (e.g. SSL or SSH) for the entire VNC session.\n"
 +	  "\n"
 +	  "     -chatonly      Try to be a client that only does UltraVNC text chat. This\n"  
 +	  "                    mode is used by x11vnc to present a chat window on the\n"
@@ -2005,7 +2020,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  
  /*
-@@ -347,73 +1459,214 @@
+@@ -347,73 +1474,214 @@
  void
  GetArgsAndResources(int argc, char **argv)
  {
@@ -8327,7 +8342,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/hextile.c vnc_unixsrc/vncview
 +#undef FillRectangle
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewer/listen.c
 --- vnc_unixsrc.orig/vncviewer/listen.c	2001-01-16 03:07:57.000000000 -0500
-+++ vnc_unixsrc/vncviewer/listen.c	2008-09-26 15:43:23.000000000 -0400
++++ vnc_unixsrc/vncviewer/listen.c	2009-07-28 21:44:32.000000000 -0400
 @@ -32,6 +32,7 @@
  #define FLASHDELAY 1	/* seconds */
  
@@ -8336,7 +8351,83 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
  int listenPort = 0, flashPort = 0;
  
  static Font flashFont;
-@@ -58,8 +59,11 @@
+@@ -40,6 +41,75 @@
+ static void flashDisplay(Display *d, char *user);
+ static Bool AllXEventsPredicate(Display *d, XEvent *ev, char *arg);
+ 
++
++static int accept_popup_check(int *argc, char **argv, char *sip, char *sih) {
++	char line[16];
++	char msg[1000];
++	int dopopup = 1;
++
++	if (!getenv("SSVNC_ACCEPT_POPUP")) {
++		return 1;
++	}
++	
++	if (!dopopup) {
++		fprintf(stderr, "Accept VNC connection? y/[n] ");
++		fgets(line, sizeof(line), stdin);
++		if (!strchr(line, 'y') && !strchr(line, 'Y')) {
++			fprintf(stderr, "Refusing connection.\n");
++			return 0;
++		} else {
++			fprintf(stderr, "Accepting connection.\n");
++			return 1;
++		}
++	} else {
++		int pid, pid2, accept_it = 0;
++
++		pid = fork();
++		if (pid == -1) {
++			perror("fork"); 
++			exit(1);
++		}
++		if (pid == 0) {
++			char *geometry = "2x2+0+0";
++			String fb[] = { "*message.Scroll: whenNeeded", NULL};
++			close(rfbsock);
++
++			toplevel = XtAppInitialize(&appContext, "Ssvnc", cmdLineOptions, numCmdLineOptions,
++			    argc, argv, fb, NULL, 0);
++			XtVaSetValues(toplevel, XtNmaxWidth, 2, XtNmaxHeight, 2, NULL);
++			XtVaSetValues(toplevel, XtNgeometry, geometry, NULL);
++			XtRealizeWidget(toplevel);
++			dpy = XtDisplay(toplevel);
++			sprintf(msg, "\n(LISTEN) Reverse VNC connection from IP: %s\n                               Hostname: %s\n\n", sip, sih);
++			strcat(msg, "Accept or Reject VNC connection?");
++			if (CreateMsg(msg, 2)) {
++				XCloseDisplay(dpy);
++				exit(0);
++			} else {
++				XCloseDisplay(dpy);
++				exit(1);
++			}
++		} else {
++			int status;
++			pid2 = waitpid(pid, &status, 0);
++			fprintf(stderr, "waitpid: %d/%d status: %d\n", pid, pid2, status);
++			if (pid2 == pid) {
++				if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
++					accept_it = 1;
++				}
++			}
++		}
++		if (accept_it) {
++			fprintf(stderr, "Accepting connection.\n");
++			return 1;
++		} else {
++			fprintf(stderr, "Refusing connection.\n");
++			return 0;
++		}
++	}
++	return 0;
++}
++
+ /*
+  * listenForIncomingConnections() - listen for incoming connections from
+  * servers, and fork a new process to deal with each connection.  We must do
+@@ -58,8 +128,11 @@
    int n;
    int i;
    char *displayname = NULL;
@@ -8348,7 +8439,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
  
    for (i = 1; i < *argc; i++) {
      if (strcmp(argv[i], "-display") == 0 && i+1 < *argc) {
-@@ -108,23 +112,40 @@
+@@ -108,23 +181,40 @@
      exit(1);
    }
  
@@ -8395,7 +8486,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
  
      /* discard any X events */
      while (XCheckIfEvent(d, &ev, AllXEventsPredicate, NULL))
-@@ -132,12 +153,24 @@
+@@ -132,12 +222,24 @@
  
      FD_ZERO(&fds); 
  
@@ -8421,7 +8512,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
      if (FD_ISSET(flashSocket, &fds)) {
  
        sock = AcceptTcpConnection(flashSocket);
-@@ -151,11 +184,48 @@
+@@ -151,11 +253,66 @@
        }
        close(sock);
      }
@@ -8433,6 +8524,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
 -      if (!SetNonBlocking(rfbsock)) exit(1);
 +	int multi_ok = 0;
 +	char *sml = getenv("SSVNC_MULTIPLE_LISTEN");
++	char *sip = NULL;
++	char *sih = NULL;
 +
 +	rfbsock = AcceptTcpConnection(listenSocket);
 +
@@ -8469,16 +8562,37 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
 +		rfbsock = -1;
 +		continue;
 +	}
++
++	sip = get_peer_ip(rfbsock);
++	if (strlen(sip) > 100) sip = "0.0.0.0";
++	sih = ip2host(sip);
++	if (strlen(sih) > 300) sih = "unknown";
++
++	fprintf(stderr, "\n");
++	fprintf(stderr, "(LISTEN) Reverse VNC connection from IP: %s\n", sip);
++	fprintf(stderr, "                               Hostname: %s\n\n", sih);
++
++	if (sml == NULL && !accept_popup_check(argc, argv, sip, sih)) {
++		close(rfbsock);
++		rfbsock = -1;
++		continue;
++	}
++
 +	totalconn++;
  
        XCloseDisplay(d);
  
-@@ -170,18 +240,23 @@
+@@ -170,18 +327,28 @@
        case 0:
  	/* child - return to caller */
  	close(listenSocket);
 -	close(flashSocket);
 +//	close(flashSocket);
++	if (sml != NULL && !accept_popup_check(argc, argv, sip, sih)) {
++		close(rfbsock);
++		rfbsock = -1;
++		exit(0);
++	}
  	return;
  
        default:
@@ -8499,7 +8613,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
  	break;
        }
      }
-@@ -200,6 +275,13 @@
+@@ -200,6 +367,13 @@
    char **fontNames;
    int nFontNames;
  
@@ -8513,7 +8627,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
    sprintf(fontName,"-*-courier-bold-r-*-*-%d-*-*-*-*-*-iso8859-1",
  	  FLASHWIDTH);
    fontNames = XListFonts(d, fontName, 1, &nFontNames);
-@@ -209,6 +291,9 @@
+@@ -209,6 +383,9 @@
      sprintf(fontName,"fixed");
    }
    flashFont = XLoadFont(d, fontName);
@@ -8523,7 +8637,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
  }
  
  
-@@ -222,6 +307,11 @@
+@@ -222,6 +399,11 @@
    Window w1, w2, w3, w4;
    XSetWindowAttributes attr;
  
@@ -8535,7 +8649,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
    XBell(d, 0);
  
    XForceScreenSaver(d, ScreenSaverReset);
-@@ -284,6 +374,9 @@
+@@ -284,6 +466,9 @@
    XDestroyWindow(d, w3);
    XDestroyWindow(d, w4);
    XFlush(d);
@@ -8547,7 +8661,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
  /*
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/misc.c
 --- vnc_unixsrc.orig/vncviewer/misc.c	2003-01-15 02:58:32.000000000 -0500
-+++ vnc_unixsrc/vncviewer/misc.c	2009-03-26 23:10:56.000000000 -0400
++++ vnc_unixsrc/vncviewer/misc.c	2009-07-25 19:39:44.000000000 -0400
 @@ -33,12 +33,14 @@
  
  Dimension dpyWidth, dpyHeight;
@@ -8942,7 +9056,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
  
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer/popup.c
 --- vnc_unixsrc.orig/vncviewer/popup.c	2000-06-11 08:00:53.000000000 -0400
-+++ vnc_unixsrc/vncviewer/popup.c	2009-04-15 15:44:22.000000000 -0400
++++ vnc_unixsrc/vncviewer/popup.c	2009-07-29 20:05:17.000000000 -0400
 @@ -25,22 +25,59 @@
  
  #include <X11/Xaw/Form.h>
@@ -9009,7 +9123,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
  }
  
  
-@@ -52,42 +89,755 @@
+@@ -52,42 +89,789 @@
  };
  
  void
@@ -9722,7 +9836,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +	pos = XawTextGetInsertionPoint(msgtext);
 +}
 +
-+static msg_visible = 0;
++static int msg_visible = 0;
++static int msg_NO_clicked = 0;
 +
 +void msg_dismiss_proc(Widget w, XtPointer client_data, XtPointer call_data) {
 +	XtPopdown(msgwin);
@@ -9731,12 +9846,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +	usleep(200 * 1000);
 +}
 +
-+void CreateMsg(char *msg, int wait) {
++void msg_NO_proc(Widget w, XtPointer client_data, XtPointer call_data) {
++	XtPopdown(msgwin);
++	msg_visible = 0;
++	msg_NO_clicked = 1;
++	XSync(dpy, False);
++	usleep(200 * 1000);
++}
 +
-+	Widget myform, dismiss;
++int CreateMsg(char *msg, int wait) {
++
++	Widget myform, dismiss, reject;
 +	char *p;
 +	int i, n, run, wmax = 0;
++	int ret = 1;
 +	Dimension w, h;
++
 +
 +	n = 0;
 +	run = 0;
@@ -9749,6 +9874,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +		run++;
 +		if (run > wmax) wmax = run;
 +		p++;
++	}
++	if (wmax > 80) {
++		if (wmax > 120) n++;
++		if (wmax > 80) n++;
++		wmax = 80;
 +	}
 +	h = (Dimension) (n+2) * 14;
 +	w = (Dimension) (wmax+10) * 8;
@@ -9764,12 +9894,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +	    XtNeditType, XawtextAppend, XtNtype, XawAsciiString,
 +	    XtNuseStringInPlace, False, NULL);
 +
-+	dismiss = XtVaCreateManagedWidget("dismiss", commandWidgetClass, myform, XtNlabel, "OK", XtNfromVert, msgtext, NULL);
++	if (wait == 2) {
++		msg_NO_clicked = 0;
++
++		dismiss = XtVaCreateManagedWidget("dismiss", commandWidgetClass, myform, XtNlabel, "Accept", XtNfromVert, msgtext, NULL);
++		XtAddCallback(dismiss, XtNcallback, msg_dismiss_proc, NULL);
++
++		reject = XtVaCreateManagedWidget("reject", commandWidgetClass, myform, XtNlabel, "Reject", XtNfromVert, dismiss, NULL);
++		XtAddCallback(reject, XtNcallback, msg_NO_proc, NULL);
++	} else {
++		dismiss = XtVaCreateManagedWidget("dismiss", commandWidgetClass, myform, XtNlabel, "OK", XtNfromVert, msgtext, NULL);
++		XtAddCallback(dismiss, XtNcallback, msg_dismiss_proc, NULL);
++		
++	}
 +
 +	AppendMsg("");
 +	AppendMsg(msg);
-+
-+	XtAddCallback(dismiss, XtNcallback, msg_dismiss_proc, NULL);
 +
 +	XtRealizeWidget(msgwin);
 +
@@ -9781,6 +9921,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup.c vnc_unixsrc/vncviewer
 +		if (0) fprintf(stderr, "mv: %d\n", msg_visible);
 +		XtAppProcessEvent(appContext, XtIMAll);
 +	}
++	if (wait == 2) {
++		if (msg_NO_clicked) {
++			ret = 0;
++		} else {
++			ret = 1;
++		}
++	}
++	return ret;
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewer/popup_ad
 --- vnc_unixsrc.orig/vncviewer/popup_ad	1969-12-31 19:00:00.000000000 -0500
@@ -9808,7 +9956,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
 --- vnc_unixsrc.orig/vncviewer/rfbproto.c	2008-09-05 19:51:24.000000000 -0400
-+++ vnc_unixsrc/vncviewer/rfbproto.c	2009-05-31 13:29:44.000000000 -0400
++++ vnc_unixsrc/vncviewer/rfbproto.c	2009-10-03 12:28:22.000000000 -0400
 @@ -23,6 +23,7 @@
   * rfbproto.c - functions to deal with client side of RFB protocol.
   */
@@ -9872,7 +10020,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  static void ReadConnFailedReason(void);
  static long ReadCompactLen (void);
  
-@@ -67,6 +109,19 @@
+@@ -67,6 +109,20 @@
  static void JpegSetSrcManager(j_decompress_ptr cinfo, CARD8 *compressedData,
                                int compressedLen);
  
@@ -9887,12 +10035,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +int skip_XtUpdateAll = 0;
 +
 +static double dt_out = 0.0;
++static double dt_out_sc = 0.0;
 +double latency = 0.0;
 +double connect_time = 0.0;
  
  int rfbsock;
  char *desktopName;
-@@ -75,6 +130,14 @@
+@@ -75,6 +131,14 @@
  char *serverCutText = NULL;
  Bool newServerCutText = False;
  
@@ -9907,7 +10056,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  int endianTest = 1;
  
  static Bool tightVncProtocol = False;
-@@ -177,8 +240,27 @@
+@@ -177,8 +241,26 @@
  	  sig_rfbEncodingPointerPos, "Pointer position update");
    CapsAdd(encodingCaps, rfbEncodingLastRect, rfbTightVncVendor,
  	  sig_rfbEncodingLastRect, "LastRect protocol extension");
@@ -9924,7 +10073,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
 +static char msgbuf[10000];
-+extern void CreateMsg(char *msg, int wait);
 +
 +static void wmsg(char *msg, int wait) {
 +	fprintf(stderr, "%s", msg);
@@ -10115,7 +10263,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  /*
   * InitialiseRFBConnection.
   */
-@@ -212,211 +437,559 @@
+@@ -212,211 +437,620 @@
  Bool
  InitialiseRFBConnection(void)
  {
@@ -10126,7 +10274,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 -  int secType;
 +	rfbProtocolVersionMsg pv;
 +	rfbClientInitMsg ci;
-+	int i, secType, anon_dh = 0;
++	int i, secType, anon_dh = 0, accept_uvnc = 0;
 +	FILE *pd;
 +	char *hsfile = NULL;
 +	char *hsparam[128];
@@ -10391,6 +10539,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			viewer_minor = 4;
 +		}
 +	}
++	if (getenv("SSVNC_ACCEPT_POPUP_SC")) {
++		if (server_minor == -4 || server_minor == -6 || server_minor == 14 || server_minor == 16) {
++			/* 4 and 6 work too? */
++			viewer_minor = server_minor;
++			accept_uvnc = 1;
++			fprintf(stderr,"Reset RFB version to 3.%d for UltraVNC SSVNC_ACCEPT_POPUP_SC.\n\n", viewer_minor);
++		}
++	}
  
 -  if (!ReadFromRFBServer(desktopName, si.nameLength)) return False;
 +	fprintf(stderr, "Connected to RFB server, using protocol version %d.%d\n", viewer_major, viewer_minor);
@@ -10456,16 +10612,69 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	}
  
 -  return True;
++	if (accept_uvnc) {
++		unsigned int msg_sz = 0;
++		unsigned int nimmer = 0;
++		char msg[3000];
++		char *msg_buf, *sip = NULL, *sih = NULL;
++
++		if (!ReadFromRFBServer((char *) &msg_sz, 4)) {
++			return False;
++		}
++		dt_out_sc = dnow();
++		msg_sz = Swap32IfBE(msg_sz);
++		if (msg_sz < 0 || msg_sz > 1024) {
++			fprintf(stderr, "UVNC msg size too big: %d\n", msg_sz);
++			exit(1);
++		}
++		msg_buf = (char *)calloc(msg_sz + 100, 1);
++		if (!ReadFromRFBServer(msg_buf, msg_sz)) {
++			return False;
++		}
++
++		if (0) {
++			fprintf(stderr, "msg_buf: ");
++			write(2, msg_buf, msg_sz);
++			fprintf(stderr, "\n");
++		}
++
++		sip = get_peer_ip(rfbsock);
++		if (strlen(sip) > 100) sip = "0.0.0.0";
++		sih = ip2host(sip);
++		if (strlen(sih) > 300) sih = "unknown";
++
++		sprintf(msg, "\n(LISTEN) Reverse VNC connection from IP: %s\n                               Hostname: %s\n\n", sip, sih);
++		strcat(msg, "UltraVNC Server Message:\n");
++		strcat(msg, msg_buf);
++		free(msg_buf);
++		strcat(msg, "\n\n");
++		strcat(msg, "Accept or Reject VNC connection?");
++		if (CreateMsg(msg, 2)) {
++			nimmer = 1;
++			fprintf(stderr, "Accepting connection.\n\n");
++		} else {
++			nimmer = 0;
++			fprintf(stderr, "Refusing connection.\n\n");
++		}
++		if (!WriteExact(rfbsock, (char *) &nimmer, 4)) {
++			return False;
++		}
++	}
++
 +	/* Read or select the security type. */
 +	dt_out = 0.0;
 +
 +	skip_XtUpdateAll = 1;
-+	if (viewer_minor >= 7) {
++	if (viewer_minor >= 7 && !accept_uvnc) {
 +		secType = SelectSecurityType();
 +	} else {
 +		secType = ReadSecurityType();
 +	}
 +	skip_XtUpdateAll = 0;
++
++	if (accept_uvnc) {
++		dt_out = dt_out_sc;
++	}
 +
 +	if (dt > 0.0 && dt_out > dt) {
 +		latency = (dt_out - dt) * 1000;
@@ -10770,13 +10979,16 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	if (!ReadFromRFBServer((char *)secTypes, nSecTypes)) {
 +		return rfbSecTypeInvalid;
 +	}
-+
+ 
+-  free(secTypes);
 +	if (getenv("SSVNC_DEBUG_SEC_TYPES")) {
 +		for (j = 0; j < (int)nSecTypes; j++) {
 +			fprintf(stderr, "sec-type[%d] %d\n", j, (int) secTypes[j]);
 +		}
 +	}
-+
+ 
+-  if (secType == rfbSecTypeInvalid)
+-    fprintf(stderr, "Server did not offer supported security type\n");
 +	/* Find out if the server supports TightVNC protocol extensions */
 +	for (j = 0; j < (int)nSecTypes; j++) {
 +		if (getenv("SSVNC_NO_SEC_TYPE_TIGHT")) {
@@ -10795,7 +11007,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			return rfbSecTypeTight;
 +		}
 +	}
-+
+ 
+-  return (int)secType;
 +	/* Find first supported security type */
 +	for (j = 0; j < (int)nSecTypes; j++) {
 +		for (i = 0; i < nKnownSecTypes; i++) {
@@ -10812,25 +11025,21 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			break;
 +		}
 +	}
- 
--  free(secTypes);
++
 +	if (secType == rfbSecTypeInvalid) {
 +		fprintf(stderr, "Server did not offer supported security type:\n");
 +		for (j = 0; j < (int)nSecTypes; j++) {
 +			fprintf(stderr, "  sectype[%d] %d\n", j, (int) secTypes[j]);
 +		}
 +	}
- 
--  if (secType == rfbSecTypeInvalid)
--    fprintf(stderr, "Server did not offer supported security type\n");
++
 +	free(secTypes);
- 
--  return (int)secType;
++
 +	return (int)secType;
  }
  
  
-@@ -451,6 +1024,9 @@
+@@ -451,6 +1085,9 @@
    return True;
  }
  
@@ -10840,7 +11049,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * Negotiate authentication scheme (protocol version 3.7t)
-@@ -459,58 +1035,384 @@
+@@ -459,58 +1096,384 @@
  static Bool
  PerformAuthenticationTight(void)
  {
@@ -11157,14 +11366,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +		char tmp[10000];
 +		tmp[0] = '\0';
 +		strcat(tmp, "\n");
-+		strcat(tmp, "WARNING: The UltraVNC Diffie-Hellman Key is short (key < 2e+9, i.e. 31 bits)\n");
++		strcat(tmp, "WARNING: The UltraVNC Diffie-Hellman Key is weak (key < 2e+9, i.e. 31 bits)\n");
 +		strcat(tmp, "WARNING: and so an eavesdropper could recover your MS-Logon username and\n");
-+		strcat(tmp, "WARNING: password via brute force in a few hours to a few seconds of CPU time\n");
-+		strcat(tmp, "WARNING: depending on the method used.  If this connection is not being\n");
-+		strcat(tmp, "WARNING: tunnelled through a separate SSL or SSH encrypted tunnel, consider\n");
-+		strcat(tmp, "WARNING: things carefully before proceeding...  Do not enter an important\n");
-+		strcat(tmp, "WARNING: username+password when prompted below if there is a risk of an\n");
-+		strcat(tmp, "WARNING: eavesdropper sniffing this connection.  You've been warned!\n");
++		strcat(tmp, "WARNING: password via brute force in a few seconds of CPU time. \n");
++		strcat(tmp, "WARNING: If this connection is NOT being tunnelled through a separate SSL or\n");
++		strcat(tmp, "WARNING: SSH encrypted tunnel, consider things carefully before proceeding...\n");
++		strcat(tmp, "WARNING: Do not enter an important username+password when prompted below if\n");
++		strcat(tmp, "WARNING: there is a risk of an eavesdropper sniffing this connection.\n");
++		strcat(tmp, "WARNING: UltraVNC MSLogon encryption is VERY weak.  You've been warned!\n");
 +		wmsg(tmp, 1);
 +	}
 +
@@ -11267,7 +11476,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * Standard VNC authentication.
-@@ -519,80 +1421,113 @@
+@@ -519,80 +1482,113 @@
  static Bool
  AuthenticateVNC(void)
  {
@@ -11444,7 +11653,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  /*
-@@ -602,68 +1537,74 @@
+@@ -602,68 +1598,74 @@
  static Bool
  AuthenticateUnixLogin(void)
  {
@@ -11571,7 +11780,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -675,19 +1616,20 @@
+@@ -675,19 +1677,20 @@
  static Bool
  ReadInteractionCaps(void)
  {
@@ -11604,7 +11813,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -700,19 +1642,67 @@
+@@ -700,19 +1703,67 @@
  static Bool
  ReadCapabilityList(CapsContainer *caps, int count)
  {
@@ -11681,7 +11890,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * SetFormatAndEncodings.
-@@ -729,6 +1719,17 @@
+@@ -729,6 +1780,17 @@
    Bool requestCompressLevel = False;
    Bool requestQualityLevel = False;
    Bool requestLastRectEncoding = False;
@@ -11699,7 +11908,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
    spf.type = rfbSetPixelFormat;
    spf.format = myFormat;
-@@ -736,12 +1737,18 @@
+@@ -736,12 +1798,18 @@
    spf.format.greenMax = Swap16IfLE(spf.format.greenMax);
    spf.format.blueMax = Swap16IfLE(spf.format.blueMax);
  
@@ -11718,7 +11927,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
    if (appData.encodingsString) {
      char *encStr = appData.encodingsString;
      int encStrLen;
-@@ -754,50 +1761,102 @@
+@@ -754,50 +1822,102 @@
  	encStrLen = strlen(encStr);
        }
  
@@ -11837,7 +12046,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
        if (se->nEncodings < MAX_ENCODINGS)
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
-@@ -806,10 +1865,16 @@
+@@ -806,10 +1926,16 @@
      if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
      }
@@ -11857,7 +12066,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	fprintf(stderr,"Same machine: preferring raw encoding\n");
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
        } else {
-@@ -818,44 +1883,84 @@
+@@ -818,44 +1944,84 @@
      }
  
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
@@ -11964,7 +12173,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
    return True;
  }
-@@ -868,31 +1973,86 @@
+@@ -868,31 +2034,86 @@
  Bool
  SendIncrementalFramebufferUpdateRequest()
  {
@@ -12064,7 +12273,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -903,19 +2063,36 @@
+@@ -903,19 +2124,36 @@
  Bool
  SendPointerEvent(int x, int y, int buttonMask)
  {
@@ -12113,7 +12322,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -926,12 +2103,20 @@
+@@ -926,12 +2164,20 @@
  Bool
  SendKeyEvent(CARD32 key, Bool down)
  {
@@ -12139,7 +12348,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -942,281 +2127,1024 @@
+@@ -942,281 +2188,1024 @@
  Bool
  SendClientCutText(char *str, int len)
  {
@@ -13386,7 +13595,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  #ifdef MITSHM
      /* if using shared memory PutImage, make sure that the X server has
-@@ -1224,59 +3152,168 @@
+@@ -1224,59 +3213,168 @@
         mainly to avoid copyrect using invalid screen contents - not sure
         if we'd need it otherwise. */
  
@@ -13588,7 +13797,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -1296,26 +3333,93 @@
+@@ -1296,26 +3394,93 @@
  #define CONCAT2(a,b) a##b
  #define CONCAT2E(a,b) CONCAT2(a,b)
  
@@ -13682,7 +13891,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  
  /*
-@@ -1325,23 +3429,27 @@
+@@ -1325,23 +3490,27 @@
  static void
  ReadConnFailedReason(void)
  {
@@ -13724,7 +13933,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  /*
-@@ -1358,9 +3466,9 @@
+@@ -1358,9 +3527,9 @@
  	    "  %s significant bit in each byte is leftmost on the screen.\n",
  	    (format->bigEndian ? "Most" : "Least"));
    } else {
@@ -13736,7 +13945,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	      (format->bigEndian ? "Most" : "Least"));
      }
      if (format->trueColour) {
-@@ -1462,4 +3570,3 @@
+@@ -1462,4 +3631,3 @@
  
    cinfo->src = &jpegSrcManager;
  }
@@ -14383,8 +14592,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/smake vnc_unixsrc/vncviewer/s
 +fi
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncviewer/sockets.c
 --- vnc_unixsrc.orig/vncviewer/sockets.c	2001-01-14 22:54:18.000000000 -0500
-+++ vnc_unixsrc/vncviewer/sockets.c	2009-03-30 23:14:48.000000000 -0400
-@@ -27,6 +27,7 @@
++++ vnc_unixsrc/vncviewer/sockets.c	2009-08-01 19:05:47.000000000 -0400
+@@ -27,11 +27,17 @@
  #include <netinet/in.h>
  #include <netinet/tcp.h>
  #include <arpa/inet.h>
@@ -14392,7 +14601,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
  #include <netdb.h>
  #include <fcntl.h>
  #include <assert.h>
-@@ -56,31 +57,376 @@
+ #include <vncviewer.h>
+ 
++/* Solaris (sysv?) needs INADDR_NONE */
++#ifndef INADDR_NONE
++#define INADDR_NONE ((in_addr_t) 0xffffffff)
++#endif
++
+ void PrintInHex(char *buf, int len);
+ 
+ Bool errorMessageOnReadFailure = True;
+@@ -56,31 +62,376 @@
   */
  
  static Bool rfbsockReady = False;
@@ -14778,7 +14997,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
      return True;
    }
  
-@@ -119,6 +465,7 @@
+@@ -119,6 +470,7 @@
      memcpy(out, bufoutptr, n);
      bufoutptr += n;
      buffered -= n;
@@ -14786,7 +15005,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
      return True;
  
    } else {
-@@ -146,11 +493,14 @@
+@@ -146,11 +498,14 @@
        n -= i;
      }
  
@@ -14801,7 +15020,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
  /*
   * Write an exact number of bytes, and don't return until you've sent them.
   */
-@@ -158,37 +508,81 @@
+@@ -158,37 +513,81 @@
  Bool
  WriteExact(int sock, char *buf, int n)
  {
@@ -14912,7 +15131,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
  }
  
  
-@@ -203,6 +597,8 @@
+@@ -203,6 +602,8 @@
    struct sockaddr_in addr;
    int one = 1;
  
@@ -14921,7 +15140,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
    addr.sin_family = AF_INET;
    addr.sin_port = htons(port);
    addr.sin_addr.s_addr = host;
-@@ -232,7 +628,22 @@
+@@ -232,7 +633,22 @@
    return sock;
  }
  
@@ -14944,7 +15163,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
  
  /*
   * FindFreeTcpPort tries to find unused TCP port in the range
-@@ -245,6 +656,8 @@
+@@ -245,6 +661,8 @@
    int sock, port;
    struct sockaddr_in addr;
  
@@ -14953,7 +15172,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
    addr.sin_family = AF_INET;
    addr.sin_addr.s_addr = INADDR_ANY;
  
-@@ -272,6 +685,8 @@
+@@ -272,6 +690,8 @@
   * ListenAtTcpPort starts listening at the given TCP port.
   */
  
@@ -14962,7 +15181,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
  int
  ListenAtTcpPort(int port)
  {
-@@ -279,10 +694,16 @@
+@@ -279,10 +699,16 @@
    struct sockaddr_in addr;
    int one = 1;
  
@@ -14979,6 +15198,49 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
    sock = socket(AF_INET, SOCK_STREAM, 0);
    if (sock < 0) {
      fprintf(stderr,programName);
+@@ -392,6 +818,42 @@
+   return False;
+ }
+ 
++char *get_peer_ip(int sock) {
++	struct sockaddr_in saddr;
++	unsigned int saddr_len;
++	int saddr_port;
++	char *saddr_ip_str = NULL;
++
++	saddr_len = sizeof(saddr);
++	memset(&saddr, 0, sizeof(saddr));
++	saddr_port = -1;
++	if (!getpeername(sock, (struct sockaddr *)&saddr, &saddr_len)) {
++		saddr_ip_str = inet_ntoa(saddr.sin_addr);
++	}
++	if (! saddr_ip_str) {
++		saddr_ip_str = "unknown";
++	}
++	return strdup(saddr_ip_str);
++}
++
++char *ip2host(char *ip) {
++	char *str;
++	struct hostent *hp;
++	in_addr_t iaddr;
++
++	iaddr = inet_addr(ip);
++	if (iaddr == htonl(INADDR_NONE)) {
++		return strdup("unknown");
++	}
++
++	hp = gethostbyaddr((char *)&iaddr, sizeof(in_addr_t), AF_INET);
++	if (!hp) {
++		return strdup("unknown");
++	}
++	str = strdup(hp->h_name);
++	return str;
++}
++
+ 
+ /*
+  * Test if the other end of a socket is on the same machine.
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/tight.c vnc_unixsrc/vncviewer/tight.c
 --- vnc_unixsrc.orig/vncviewer/tight.c	2002-04-30 09:07:31.000000000 -0400
 +++ vnc_unixsrc/vncviewer/tight.c	2008-10-05 15:16:35.000000000 -0400
@@ -15903,8 +16165,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/turbovnc/turbojpeg.h vnc_unix
 +#endif
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vncviewer/vncviewer._man
 --- vnc_unixsrc.orig/vncviewer/vncviewer._man	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer._man	2009-05-31 18:53:07.000000000 -0400
-@@ -0,0 +1,780 @@
++++ vnc_unixsrc/vncviewer/vncviewer._man	2009-10-03 12:28:09.000000000 -0400
+@@ -0,0 +1,793 @@
 +'\" t
 +.\" ** The above line should force tbl to be a preprocessor **
 +.\" Man page for X vncviewer
@@ -15918,7 +16180,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +.\" License as specified in the file LICENCE.TXT that comes with the
 +.\" TightVNC distribution.
 +.\"
-+.TH ssvncviewer 1 "June 2009" "" "SSVNC"
++.TH ssvncviewer 1 "September 2009" "" "SSVNC"
 +.SH NAME
 +ssvncviewer \- an X viewer client for VNC
 +.SH SYNOPSIS
@@ -16132,6 +16394,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +the network to put (many) desktops on your screen over
 +a long window of time. Use -multilisten for no limit.
 +.TP
++\fB\-acceptpopup\fR
++In \fB\-listen\fR (reverse connection listening) mode when
++a reverse VNC connection comes in show a popup asking
++whether to Accept or Reject the connection.  The IP
++address of the connecting host is shown.  Same as
++setting the env. var. SSVNC_ACCEPT_POPUP=1.
++.TP
++\fB\-acceptpopupsc\fR
++As in \fB\-acceptpopup\fR except assume UltraVNC Single
++Click (SC) server.  Retrieve User and ComputerName
++info from UltraVNC Server and display in the Popup.
++.TP
 +\fB\-use64\fR
 +In \fB\-bgr233\fR mode, use 64 colors instead of 256.
 +.TP
@@ -16329,7 +16603,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +
 +IMPORTANT NOTE: The UltraVNC MS-Logon Diffie-Hellman
 +exchange is very weak and can be brute forced to recover
-+your username and password in a few hours or seconds of CPU
++your username and password in a few seconds of CPU
 +time.  To be safe, be sure to use an additional encrypted
 +tunnel (e.g. SSL or SSH) for the entire VNC session.
 +.TP
@@ -16672,7 +16946,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +.SH AUTHORS
 +Original VNC was developed in AT&T Laboratories Cambridge. TightVNC
 +additions was implemented by Constantin Kaplinsky. Many other people
-+participated in development, testing and support.
++participated in development, testing and support.  Karl J. Runge 
++added all of the SSVNC related features and improvements.
 +
 +\fBMan page authors:\fR
 +.br
@@ -16684,10 +16959,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +.br
 +Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 +.br
-+Karl Runge <runge@karlrunge.com>
++Karl J. Runge <runge@karlrunge.com>
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncviewer/vncviewer.c
 --- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.c	2009-05-31 16:25:56.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.c	2009-07-28 22:51:20.000000000 -0400
 @@ -22,6 +22,7 @@
   */
  
@@ -16933,7 +17208,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  
    /* The -listen option is used to make us a daemon process which listens for
       incoming connections from servers, rather than actively connecting to a
-@@ -45,89 +269,1607 @@
+@@ -45,89 +269,1615 @@
       listenForIncomingConnections() returns, setting the listenSpecified
       flag. */
  
@@ -16955,6 +17230,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	}
 +
 +	for (i = 1; i < argc; i++) {
++		if (strcmp(argv[i], "-acceptpopup") == 0) {
++			putenv("SSVNC_ACCEPT_POPUP=1");
++			continue;
++		}
++		if (strcmp(argv[i], "-acceptpopupsc") == 0) {
++			putenv("SSVNC_ACCEPT_POPUP_SC=1");
++			continue;
++		}
 +		if (strcmp(argv[i], "-listen") == 0) {
 +			listenForIncomingConnections(&argc, argv, i);
 +			break;
@@ -18579,7 +18862,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncviewer/vncviewer.h
 --- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.h	2009-05-31 16:26:35.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.h	2009-08-01 21:44:48.000000000 -0400
 @@ -28,6 +28,7 @@
  #include <string.h>
  #include <sys/time.h>
@@ -18588,16 +18871,22 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  #include <unistd.h>
  #include <pwd.h>
  #include <X11/IntrinsicP.h>
-@@ -51,7 +52,7 @@
+@@ -51,7 +52,13 @@
  			     (((l) & 0x0000ff00) << 8)  | \
  			     (((l) & 0x000000ff) << 24))  : (l))
  
 -#define MAX_ENCODINGS 20
++#define Swap32IfBE(l) \
++    (*(char *)&endianTest ? (l) : ((((l) & 0xff000000) >> 24) | \
++			     (((l) & 0x00ff0000) >> 8)  | \
++			     (((l) & 0x0000ff00) << 8)  | \
++			     (((l) & 0x000000ff) << 24)) )
++
 +#define MAX_ENCODINGS 24
  
  #define FLASH_PORT_OFFSET 5400
  #define LISTEN_PORT_OFFSET 5500
-@@ -64,60 +65,123 @@
+@@ -64,60 +71,124 @@
  #define DEFAULT_VIA_CMD     \
    (DEFAULT_SSH_CMD " -f -L %L:%H:%R %G sleep 20")
  
@@ -18623,6 +18912,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 -  int requestedDepth;
 -
 -  Bool useShm;
+-
+-  int wmDecorationWidth;
+-  int wmDecorationHeight;
+-
+-  char *userLogin;
+-
+-  char *passwordFile;
+-  Bool passwordDialog;
+-
+-  int rawDelay;
+-  int copyRectDelay;
 +static const char *subsampLevel2str[TVNC_SAMPOPT] = {
 +  "1X", "4X", "2X", "Gray"
 +};
@@ -18637,23 +18937,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +#define rfbJpegSubsampGray         0xFFFFFD03
 +#endif
  
--  int wmDecorationWidth;
--  int wmDecorationHeight;
+-  Bool debug;
 +/* for debugging width, height, etc */
 +//#define XtVaSetValues printf("%s:%d\n", __FILE__, __LINE__); XtVaSetValues
  
--  char *userLogin;
- 
--  char *passwordFile;
--  Bool passwordDialog;
--
--  int rawDelay;
--  int copyRectDelay;
--
--  Bool debug;
--
 -  int popupButtonCount;
--
+ 
 -  int bumpScrollTime;
 -  int bumpScrollPixels;
 +/* argsresources.c */
@@ -18698,6 +18987,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +	char *msLogon;
 +	char *repeaterUltra;
 +	Bool ultraDSM;
++	Bool acceptPopup;
 +	char *rfbVersion;
 +
 +	char *passwordFile;
@@ -18761,7 +19051,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern int listenPort, flashPort;
  
  extern XrmOptionDescRec cmdLineOptions[];
-@@ -130,10 +194,11 @@
+@@ -130,10 +201,11 @@
  /* colour.c */
  
  extern unsigned long BGR233ToPixel[];
@@ -18774,7 +19064,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern void SetVisualAndCmap();
  
-@@ -157,13 +222,52 @@
+@@ -157,13 +229,52 @@
  
  extern void DesktopInitBeforeRealization();
  extern void DesktopInitAfterRealization();
@@ -18827,7 +19117,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern void ServerDialogDone(Widget w, XEvent *event, String *params,
  			     Cardinal *num_params);
  extern char *DoServerDialog();
-@@ -171,6 +275,10 @@
+@@ -171,6 +282,10 @@
  			     Cardinal *num_params);
  extern char *DoPasswordDialog();
  
@@ -18838,7 +19128,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  /* fullscreen.c */
  
  extern void ToggleFullScreen(Widget w, XEvent *event, String *params,
-@@ -181,6 +289,13 @@
+@@ -181,6 +296,13 @@
  extern void FullScreenOn();
  extern void FullScreenOff();
  
@@ -18852,7 +19142,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  /* listen.c */
  
  extern void listenForIncomingConnections();
-@@ -196,6 +311,8 @@
+@@ -196,6 +318,8 @@
  		       Cardinal *num_params);
  extern void Quit(Widget w, XEvent *event, String *params,
  		 Cardinal *num_params);
@@ -18861,7 +19151,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern void Cleanup();
  
  /* popup.c */
-@@ -207,6 +324,27 @@
+@@ -207,6 +331,29 @@
  		      Cardinal *num_params);
  extern void CreatePopup();
  
@@ -18886,10 +19176,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +
 +extern void Noop(Widget w, XEvent *event, String *params,
 +		      Cardinal *num_params);
++
++extern int CreateMsg(char *msg, int wait);
  /* rfbproto.c */
  
  extern int rfbsock;
-@@ -229,8 +367,19 @@
+@@ -229,8 +376,19 @@
  extern Bool SendClientCutText(char *str, int len);
  extern Bool HandleRFBServerMessage();
  
@@ -18909,7 +19201,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  /* selection.c */
  
  extern void InitialiseSelection();
-@@ -241,8 +390,9 @@
+@@ -241,8 +399,9 @@
  
  /* shm.c */
  
@@ -18920,7 +19212,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  /* sockets.c */
  
-@@ -253,8 +403,11 @@
+@@ -253,10 +412,15 @@
  extern int FindFreeTcpPort(void);
  extern int ListenAtTcpPort(int port);
  extern int ConnectToTcpAddr(unsigned int host, int port);
@@ -18931,8 +19223,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern Bool SocketPair(int fd[2]);
  
  extern int StringToIPAddr(const char *str, unsigned int *addr);
++extern char *get_peer_ip(int sock);
++extern char *ip2host(char *ip);
  extern Bool SameMachine(int sock);
-@@ -271,3 +424,80 @@
+ 
+ /* tunnel.c */
+@@ -271,3 +435,80 @@
  extern XtAppContext appContext;
  extern Display* dpy;
  extern Widget toplevel;
@@ -19015,7 +19311,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void SetEscapeKeysState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vncviewer/vncviewer.man
 --- vnc_unixsrc.orig/vncviewer/vncviewer.man	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.man	2009-05-31 18:53:07.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.man	2009-10-03 12:28:09.000000000 -0400
 @@ -5,38 +5,55 @@
  .\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
  .\" Copyright (C) 2000,2001 Red Hat, Inc.
@@ -19027,7 +19323,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .\" TightVNC distribution.
  .\"
 -.TH vncviewer 1 "January 2003" "" "TightVNC"
-+.TH ssvncviewer 1 "June 2009" "" "SSVNC"
++.TH ssvncviewer 1 "September 2009" "" "SSVNC"
  .SH NAME
 -vncviewer \- an X viewer client for VNC
 +ssvncviewer \- an X viewer client for VNC
@@ -19080,7 +19376,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  You can use F8 to display a pop\-up utility menu. Press F8 twice to
  pass single F8 to the remote side.
  .SH OPTIONS
-@@ -168,6 +185,376 @@
+@@ -168,6 +185,388 @@
  \fB\-autopass\fR
  Read a plain-text password from stdin. This option affects only the
  standard VNC authentication.
@@ -19123,6 +19419,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +time tries to play it safe by not allowing anyone on
 +the network to put (many) desktops on your screen over
 +a long window of time. Use -multilisten for no limit.
++.TP
++\fB\-acceptpopup\fR
++In \fB\-listen\fR (reverse connection listening) mode when
++a reverse VNC connection comes in show a popup asking
++whether to Accept or Reject the connection.  The IP
++address of the connecting host is shown.  Same as
++setting the env. var. SSVNC_ACCEPT_POPUP=1.
++.TP
++\fB\-acceptpopupsc\fR
++As in \fB\-acceptpopup\fR except assume UltraVNC Single
++Click (SC) server.  Retrieve User and ComputerName
++info from UltraVNC Server and display in the Popup.
 +.TP
 +\fB\-use64\fR
 +In \fB\-bgr233\fR mode, use 64 colors instead of 256.
@@ -19321,7 +19629,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +
 +IMPORTANT NOTE: The UltraVNC MS-Logon Diffie-Hellman
 +exchange is very weak and can be brute forced to recover
-+your username and password in a few hours or seconds of CPU
++your username and password in a few seconds of CPU
 +time.  To be safe, be sure to use an additional encrypted
 +tunnel (e.g. SSL or SSH) for the entire VNC session.
 +.TP
@@ -19457,7 +19765,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .SH ENCODINGS
  The server supplies information in whatever format is desired by the
  client, in order to make the client as easy as possible to implement. 
-@@ -238,6 +625,15 @@
+@@ -238,6 +637,15 @@
  \-quality and \-nojpeg options above). Tight encoding is usually the
  best choice for low\-bandwidth network environments (e.g. slow modem
  connections).
@@ -19473,7 +19781,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .SH RESOURCES
  X resources that \fBvncviewer\fR knows about, aside from the
  normal Xt resources, are as follows:
-@@ -364,8 +760,8 @@
+@@ -364,12 +772,13 @@
  .B %R
  remote TCP port number.
  .SH SEE ALSO
@@ -19484,12 +19792,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .SH AUTHORS
  Original VNC was developed in AT&T Laboratories Cambridge. TightVNC
  additions was implemented by Constantin Kaplinsky. Many other people
-@@ -380,3 +776,5 @@
+-participated in development, testing and support.
++participated in development, testing and support.  Karl J. Runge 
++added all of the SSVNC related features and improvements.
+ 
+ \fBMan page authors:\fR
+ .br
+@@ -380,3 +789,5 @@
  Tim Waugh <twaugh@redhat.com>,
  .br
  Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 +.br
-+Karl Runge <runge@karlrunge.com>
++Karl J. Runge <runge@karlrunge.com>
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/zrle.c
 --- vnc_unixsrc.orig/vncviewer/zrle.c	2007-02-04 18:59:50.000000000 -0500
 +++ vnc_unixsrc/vncviewer/zrle.c	2008-10-08 00:04:43.000000000 -0400

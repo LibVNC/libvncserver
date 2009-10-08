@@ -11,7 +11,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvncviewer 1 "June 2009" "" "SSVNC"
+.TH ssvncviewer 1 "September 2009" "" "SSVNC"
 .SH NAME
 ssvncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
@@ -225,6 +225,18 @@ time tries to play it safe by not allowing anyone on
 the network to put (many) desktops on your screen over
 a long window of time. Use -multilisten for no limit.
 .TP
+\fB\-acceptpopup\fR
+In \fB\-listen\fR (reverse connection listening) mode when
+a reverse VNC connection comes in show a popup asking
+whether to Accept or Reject the connection.  The IP
+address of the connecting host is shown.  Same as
+setting the env. var. SSVNC_ACCEPT_POPUP=1.
+.TP
+\fB\-acceptpopupsc\fR
+As in \fB\-acceptpopup\fR except assume UltraVNC Single
+Click (SC) server.  Retrieve User and ComputerName
+info from UltraVNC Server and display in the Popup.
+.TP
 \fB\-use64\fR
 In \fB\-bgr233\fR mode, use 64 colors instead of 256.
 .TP
@@ -422,7 +434,7 @@ the username and password.
 
 IMPORTANT NOTE: The UltraVNC MS-Logon Diffie-Hellman
 exchange is very weak and can be brute forced to recover
-your username and password in a few hours or seconds of CPU
+your username and password in a few seconds of CPU
 time.  To be safe, be sure to use an additional encrypted
 tunnel (e.g. SSL or SSH) for the entire VNC session.
 .TP
@@ -765,7 +777,8 @@ remote TCP port number.
 .SH AUTHORS
 Original VNC was developed in AT&T Laboratories Cambridge. TightVNC
 additions was implemented by Constantin Kaplinsky. Many other people
-participated in development, testing and support.
+participated in development, testing and support.  Karl J. Runge 
+added all of the SSVNC related features and improvements.
 
 \fBMan page authors:\fR
 .br
@@ -777,4 +790,4 @@ Tim Waugh <twaugh@redhat.com>,
 .br
 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
 .br
-Karl Runge <runge@karlrunge.com>
+Karl J. Runge <runge@karlrunge.com>
