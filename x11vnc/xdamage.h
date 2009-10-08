@@ -44,6 +44,8 @@ extern int xdamage_max_area;
 extern double xdamage_memory;
 extern int xdamage_tile_count, xdamage_direct_count;
 extern double xdamage_scheduled_mark;
+extern double xdamage_crazy_time;
+extern double xdamage_crazy_delay;
 extern sraRegionPtr xdamage_scheduled_mark_region;
 extern sraRegionPtr *xdamage_regions;
 extern int xdamage_ticker;

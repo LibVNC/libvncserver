@@ -64,6 +64,7 @@ void selection_request(XEvent *ev, char *type);
 int check_sel_direction(char *dir, char *label, char *sel, int len);
 void cutbuffer_send(void);
 void selection_send(XEvent *ev);
+void resend_selection(char *type);
 
 
 /*
@@ -76,6 +77,9 @@ void selection_send(XEvent *ev);
 static char cutbuffer_str[PROP_MAX+1];
 static char primary_str[PROP_MAX+1];
 static char clipboard_str[PROP_MAX+1];
+static int cutbuffer_len = 0;
+static int primary_len   = 0;
+static int clipboard_len = 0;
 
 /*
  * An X11 (not VNC) client on the local display has requested the selection
@@ -346,7 +350,7 @@ void cutbuffer_send(void) {
 	if (!screen) {
 		return;
 	}
-	len = strlen(cutbuffer_str);
+	cutbuffer_len = len = strlen(cutbuffer_str);
 	if (check_sel_direction("send", "cutbuffer_send", cutbuffer_str, len)) {
 		rfbSendServerCutText(screen, cutbuffer_str, len);
 	}
@@ -492,6 +496,49 @@ if (debug_sel) fprintf(stderr, "selection_send: data: '%s' dlen: %d nitems: %lu 
 	}
 
 	len = newlen;
+	if (ev->xselection.selection == XA_PRIMARY) {
+		primary_len = len;
+	} else if (clipboard_atom && ev->xselection.selection == clipboard_atom)  {
+		clipboard_len = len;
+	}
+	if (check_sel_direction("send", "selection_send", selection_str, len)) {
+		rfbSendServerCutText(screen, selection_str, len);
+	}
+#endif	/* NO_X11 */
+}
+
+void resend_selection(char *type) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!type) {}
+	return;
+#else
+	char *selection_str = "";
+	int len = 0;
+
+	RAWFB_RET_VOID
+
+	if (! all_clients_initialized()) {
+		rfbLog("selection_send: no send: uninitialized clients\n");
+		return; /* some clients initializing, cannot send */ 
+	}
+	if (unixpw_in_progress) {
+		return;
+	}
+	if (!screen) {
+		return;
+	}
+
+	if (!strcmp(type, "cutbuffer")) {
+		selection_str = cutbuffer_str;
+		len = cutbuffer_len;
+	} else if (!strcmp(type, "clipboard")) {
+		selection_str = clipboard_str;
+		len = clipboard_len;
+	} else if (!strcmp(type, "primary")) {
+		selection_str = primary_str;
+		len = primary_len;
+	}
 	if (check_sel_direction("send", "selection_send", selection_str, len)) {
 		rfbSendServerCutText(screen, selection_str, len);
 	}

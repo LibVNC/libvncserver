@@ -72,5 +72,10 @@ extern int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *in
     int len, FILE *output);
 extern int check_access(char *addr);
 extern void client_set_net(rfbClientPtr client);
+extern char *get_xprop(char *prop, Window win);
+extern int set_xprop(char *prop, Window win, char *value);
+extern char *bcx_xattach(char *str, int *pg_init, int *kg_init);
+extern void grab_state(int *ptr_grabbed, int *kbd_grabbed);
+extern char *wininfo(Window win, int show_children);
 
 #endif /* _X11VNC_CONNECTIONS_H */

@@ -2045,7 +2045,7 @@ static void xkb_tweak_keyboard(rfbBool down, rfbKeySym keysym,
 		 * why nothing needs to be done with the modifier, see below.
 		 *
 		 * sentmods[] is the corresponding keycode to use
-		 * to acheive the needmods[] requirement for the bit.
+		 * to achieve the needmods[] requirement for the bit.
 		 */
 
 		for (i=0; i<8; i++) {
@@ -2780,6 +2780,11 @@ void get_allowed_input(rfbClientPtr client, allowed_input_t *input) {
 	input->files     = 0;
 
 	if (! client) {
+		input->keystroke = 1;
+		input->motion    = 1;
+		input->button    = 1;
+		input->clipboard = 1;
+		input->files     = 1;
 		return;
 	}
 

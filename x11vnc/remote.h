@@ -44,4 +44,7 @@ extern void http_connections(int on);
 extern int remote_control_access_ok(void);
 extern char *process_remote_cmd(char *cmd, int stringonly);
 
+extern char *query_result;
+
+
 #endif /* _X11VNC_REMOTE_H */

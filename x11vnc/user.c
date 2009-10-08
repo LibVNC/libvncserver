@@ -1291,13 +1291,13 @@ void user_supplied_opts(char *opts) {
 			if (scale_str) free(scale_str);
 			scale_str = strdup(p);
 		} else if (ok) {
-			if (strstr(p, "display=") == p) {
+			if (0 && strstr(p, "display=") == p) {
 				if (use_dpy) free(use_dpy);
 				use_dpy = strdup(p + strlen("display="));
-			} else if (strstr(p, "auth=") == p) {
+			} else if (0 && strstr(p, "auth=") == p) {
 				if (auth_file) free(auth_file);
 				auth_file = strdup(p + strlen("auth="));
-			} else if (!strcmp(p, "shared")) {
+			} else if (0 && !strcmp(p, "shared")) {
 				shared = 1;
 			} else if (strstr(p, "scale=") == p) {
 				if (scale_str) free(scale_str);
@@ -1443,8 +1443,16 @@ static void setup_fake_fb(XImage* fb_image, int w, int h, int b) {
 	off_y = 0;
 }
 
+void do_announce_http(void);
+void do_mention_java_urls(void);
+
 static void setup_service(void) {
+	if (remote_direct) {
+		return;
+	}
 	if (!inetd) {
+		do_mention_java_urls();
+		do_announce_http();
 		if (!use_openssl) {
 			announce(screen->port, use_openssl, NULL);
 			fprintf(stdout, "PORT=%d\n", screen->port);
@@ -1564,9 +1572,12 @@ static void loop_for_connect(int did_client_connect) {
 				goto screen_check;
 			}
 		}
-		if (use_openssl && !inetd) {
-			check_openssl();
-			check_https();
+		if ((use_openssl || use_stunnel) && !inetd) {
+			int enc_none = (enc_str && !strcmp(enc_str, "none"));
+			if (!use_stunnel || enc_none) {
+				check_openssl();
+				check_https();
+			}
 			/*
 			 * This is to handle an initial verify cert from viewer,
 			 * they disconnect right after fetching the cert.
@@ -1655,6 +1666,15 @@ static void do_unixpw_loop(void) {
 				unixpw_in_rfbPE = 0;
 			}
 			if (unixpw_in_progress) {
+				static double lping = 0.0;
+				if (lping < dnow() + 5) {
+					mark_rect_as_modified(0, 0, 1, 1, 1);
+					lping = dnow();
+				}
+				if (time(NULL) > unixpw_last_try_time + 45) {
+					rfbLog("unixpw_deny: timed out waiting for reply.\n");
+					unixpw_deny();
+				}
 				usleep(20 * 1000);
 				continue;
 			}
@@ -2000,7 +2020,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 				p++;
 			}
 			if (ok && strlen(q) < 32) {
-				sprintf(fdgeom, q);
+				sprintf(fdgeom, "%s", q);
 				if (!quiet) {
 					rfbLog("set create display geom: %s\n", fdgeom);
 				}
@@ -2203,6 +2223,12 @@ static void check_nodisplay(char **nd) {
 			}
 		}
 	}
+	if (unixpw_system_greeter_active == 2) {
+		if (!keep_unixpw_user) {
+			clean_up_exit(1);
+		}
+		*nd = strdup("all");
+	}
 }
 
 static char *get_usslpeer() {
@@ -2242,6 +2268,10 @@ static char *get_usslpeer() {
 }
 
 static void do_try_switch(char *usslpeer, char *users_list_save) {
+	if (unixpw_system_greeter_active == 2) {
+		rfbLog("unixpw_system_greeter: not trying switch to user '%s'\n", usslpeer ? usslpeer : "");
+		return;
+	}
 	if (usslpeer) {
 		char *u = (char *) malloc(strlen(usslpeer+2));
 		sprintf(u, "+%s", usslpeer);
@@ -2365,11 +2395,14 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 
 		memset(line, 0, 18000);
 
-		if (keep_unixpw_user && keep_unixpw_pass) {
+		if (unixpw_system_greeter_active == 2) {
+			rfbLog("unixpw_system_greeter: forcing find display failure.\n");
+			res = 0;
+		} else if (keep_unixpw_user && keep_unixpw_pass) {
 			n = 18000;
 			if (unixpw_cmd != NULL) {
 				res = unixpw_cmd_run(keep_unixpw_user,
-				    keep_unixpw_pass, cmd, line, &n, nodisp);
+				    keep_unixpw_pass, cmd, line, &n);
 			} else {
 				res = su_verify(keep_unixpw_user,
 				    keep_unixpw_pass, cmd, line, &n, nodisp);
@@ -2378,7 +2411,7 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 
 if (db) {fprintf(stderr, "line: "); write(2, line, n); write(2, "\n", 1); fprintf(stderr, "res=%d n=%d\n", res, n);}
 		if (! res) {
-			rfbLog("wait_for_client: find display cmd failed\n");
+			rfbLog("wait_for_client: find display cmd failed.\n");
 		}
 
 		if (! res && create_cmd) {
@@ -2398,8 +2431,8 @@ if (db) {fprintf(stderr, "line: "); write(2, line, n); write(2, "\n", 1); fprint
 				n = 18000;
 				close_exec_fds();
 				res = unixpw_cmd_run(keep_unixpw_user,
-				    keep_unixpw_pass, create_cmd, line, &n, nodisp);
-			} else if (getuid() != 0) {
+				    keep_unixpw_pass, create_cmd, line, &n);
+			} else if (getuid() != 0 && unixpw_system_greeter_active != 2) {
 				/* if not root, run as the other user... */
 				n = 18000;
 				close_exec_fds();
@@ -2410,6 +2443,10 @@ if (db) fprintf(stderr, "c-res=%d n=%d line: '%s'\n", res, n, line);
 			} else {
 				FILE *p;
 				close_exec_fds();
+				if (unixpw_system_greeter_active == 2) {
+					rfbLog("unixpw_system_greeter: not trying su_verify() to run\n");
+					rfbLog("unixpw_system_greeter: create display command.\n");
+				}
 				rfbLog("wait_for_client: running: %s\n", create_cmd);
 				p = popen(create_cmd, "r");
 				if (! p) {
@@ -2432,7 +2469,7 @@ if (db) fprintf(stderr, "line1: '%s'\n", line1);
 					}
 				}
 			}
-			if (res && saw_xdmcp) {
+			if (res && saw_xdmcp && unixpw_system_greeter_active != 2) {
 				xdmcp_insert = strdup(keep_unixpw_user);
 			}
 		}
@@ -2533,7 +2570,7 @@ if (db) fprintf(stderr, "\n");
 		rc = pclose(p);
 
 		if (rc != 0) {
-			rfbLog("wait_for_client: find display cmd failed\n");
+			rfbLog("wait_for_client: find display cmd failed.\n");
 		}
 
 		if (create_cmd && rc != 0) {
@@ -2843,6 +2880,18 @@ int wait_for_client(int *argc, char** argv, int http) {
 	initialize_cursors_mode();
 	
 	initialize_screen(argc, argv, fb_image);
+
+	if (! inetd && ! use_openssl) {
+		if (! screen->port || screen->listenSock < 0) {
+			if (got_rfbport && got_rfbport_val == 0) {
+				;
+			} else {
+				rfbLogEnable(1);
+				rfbLog("Error: could not obtain listening port.\n");
+				clean_up_exit(1);
+			}
+		}
+	}
 
 	initialize_signals();
 
